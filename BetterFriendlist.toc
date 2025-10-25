@@ -1,0 +1,13 @@
+## Interface: 110205
+## Title: BetterFriendlist
+## Notes: A complete replacement for the default WoW friends list
+## Author: YourName
+## Version: @project-version@
+## X-Curse-Project-ID: 
+## X-WoWI-ID: 
+## X-Wago-ID: 
+## SavedVariables: BetterFriendlistDB
+
+BetterFriendlist.lua
+BetterFriendlist.xml
+BetterFriendlist_Tooltip.lua
