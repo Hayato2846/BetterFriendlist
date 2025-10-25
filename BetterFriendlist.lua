@@ -1,6 +1,15 @@
 -- BetterFriendlist.lua
 -- A friends list replacement for World of Warcraft with Battle.net support
 
+-- Define color constants if they don't exist (used by Recent Allies)
+-- Note: Blizzard uses FRIENDS_OFFLINE_BACKGROUND_COLOR (with S), not FRIEND_OFFLINE_BACKGROUND_COLOR
+if not FRIENDS_WOW_BACKGROUND_COLOR then
+	FRIENDS_WOW_BACKGROUND_COLOR = CreateColor(0.101961, 0.149020, 0.196078, 1)
+end
+if not FRIENDS_OFFLINE_BACKGROUND_COLOR then
+	FRIENDS_OFFLINE_BACKGROUND_COLOR = CreateColor(0.35, 0.35, 0.35, 1)
+end
+
 local NUM_BUTTONS = 12
 local friendsList = {}
 local displayList = {} -- Flat list with groups and friends for display
@@ -122,6 +131,7 @@ local function UpdateFriendsList()
 		if accountInfo then
 			local friend = {
 				type = "bnet",
+				index = i,  -- Store the BNet friend list index
 				bnetAccountID = accountInfo.bnetAccountID,
 				-- WoW API returns "???" for hidden account names, treat it as nil
 				accountName = (accountInfo.accountName ~= "???") and accountInfo.accountName or nil,
@@ -541,20 +551,28 @@ UpdateFriendsDisplay = function()
 			end
 			
 		elseif item.type == BUTTON_TYPE_FRIEND then
-				-- Configure friend button
-				local friend = item.friend
-				
-				-- Store friend data on button for tooltip
-
-				button.friendIndex = index
-				button.friendData = friend
-				button.groupId = nil
-				
-				-- Hide arrows if they exist
-				if button.RightArrow then button.RightArrow:Hide() end
-				if button.DownArrow then button.DownArrow:Hide() end
-				
-				-- Reset name position
+			-- Configure friend button
+			local friend = item.friend
+			
+			-- Store friend data on button for tooltip
+			button.friendIndex = friend.index  -- Use the actual friend list index, not display index
+			button.friendData = friend
+			button.groupId = nil
+			
+			-- Store friendInfo for context menu (matches our OnClick handler)
+			button.friendInfo = {
+				type = friend.type,
+				index = friend.index,  -- Use the actual friend list index
+				name = friend.name or friend.accountName or friend.battleTag,
+				connected = friend.connected,
+				guid = friend.guid,
+				bnetAccountID = friend.bnetAccountID,
+				battleTag = friend.battleTag
+			}
+			
+			-- Hide arrows if they exist
+			if button.RightArrow then button.RightArrow:Hide() end
+			if button.DownArrow then button.DownArrow:Hide() end				-- Reset name position
 				button.Name:SetPoint("LEFT", 44, 7)
 				button.Name:SetTextColor(1, 1, 1) -- White
 				
@@ -1193,12 +1211,54 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 			if frame.RecruitmentButton then
 				frame.RecruitmentButton:Show()
 			end
-			-- Update RAF info if available
-			if C_RecruitAFriend and C_RecruitAFriend.GetRAFInfo then
+			
+			-- Initialize RAF data (match Blizzard's OnLoad behavior)
+			if C_RecruitAFriend and C_RecruitAFriend.IsSystemEnabled then
+				-- Ensure Blizzard's RecruitAFriendFrame is loaded and initialized
+				if not RecruitAFriendFrame then
+					-- Load the addon if not loaded yet
+					LoadAddOn("Blizzard_RecruitAFriend")
+				end
+				
+				-- If Blizzard's frame exists, trigger its initialization
+				if RecruitAFriendFrame then
+					-- Call OnLoad if it hasn't been called yet (simulate first-time load)
+					if RecruitAFriendFrame.OnLoad and not RecruitAFriendFrame.rafEnabled then
+						RecruitAFriendFrame:OnLoad()
+					end
+					
+					-- Call OnShow to refresh data (this is what Blizzard does when showing the tab)
+					if RecruitAFriendFrame.OnShow then
+						-- OnShow doesn't exist as a direct method, but we can trigger the event
+						-- by registering events if not already done
+						if not RecruitAFriendFrame.eventsRegistered then
+							RecruitAFriendFrame:RegisterEvent("RAF_SYSTEM_ENABLED_STATUS")
+							RecruitAFriendFrame:RegisterEvent("RAF_RECRUITING_ENABLED_STATUS")
+							RecruitAFriendFrame:RegisterEvent("RAF_INFO_UPDATED")
+							RecruitAFriendFrame.eventsRegistered = true
+						end
+					end
+				end
+				
+				-- Get RAF system info
+				local rafSystemInfo = C_RecruitAFriend.GetRAFSystemInfo()
+				if rafSystemInfo then
+					-- Store system info for use by RAF functions
+					frame.RecruitAFriendFrame.rafSystemInfo = rafSystemInfo
+				end
+				
+				-- Get RAF info and update
 				local rafInfo = C_RecruitAFriend.GetRAFInfo()
 				if rafInfo then
 					BetterRAF_UpdateRAFInfo(frame.RecruitAFriendFrame, rafInfo)
+					-- Also store in Blizzard's frame if it exists
+					if RecruitAFriendFrame then
+						RecruitAFriendFrame.rafInfo = rafInfo
+					end
 				end
+				
+				-- Request updated recruitment info (enables "Generate Link" functionality)
+				C_RecruitAFriend.RequestUpdatedRecruitmentInfo()
 			end
 		end
 	elseif tabIndex == 4 then
@@ -1606,6 +1666,110 @@ end
 -- Friend List Button OnLeave
 function BetterFriendsList_Button_OnLeave(button)
 	GameTooltip:Hide()
+end
+
+-- Button OnClick Handler (1:1 from Blizzard)
+function BetterFriendsList_Button_OnClick(button, mouseButton)
+	if not button.friendInfo then
+		return
+	end
+	
+	if mouseButton == "LeftButton" then
+		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+		-- Left click: Select friend (future functionality)
+		-- For now, we just play the sound
+	elseif mouseButton == "RightButton" then
+		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+		
+		local friendInfo = button.friendInfo
+		
+		if friendInfo.type == "bnet" then
+			-- BattleNet friend context menu
+			local accountInfo = C_BattleNet.GetFriendAccountInfo(friendInfo.index)
+			if accountInfo then
+				BetterFriendsList_ShowBNDropdown(
+					accountInfo.accountName,
+					accountInfo.gameAccountInfo.isOnline,
+					nil, -- lineID
+					nil, -- chatType
+					nil, -- chatFrame
+					true, -- friendsList
+					accountInfo.bnetAccountID,
+					nil, -- communityClubID
+					nil, -- communityStreamID
+					nil, -- communityEpoch
+					nil, -- communityPosition
+					accountInfo.battleTag
+				)
+			end
+		else
+			-- WoW friend context menu
+			local info = C_FriendList.GetFriendInfoByIndex(friendInfo.index)
+			if info then
+				BetterFriendsList_ShowDropdown(
+					info.name,
+					info.connected,
+					nil, -- lineID
+					nil, -- chatType
+					nil, -- chatFrame
+					true, -- friendsList
+					nil, -- communityClubID
+					nil, -- communityStreamID
+					nil, -- communityEpoch
+					nil, -- communityPosition
+					info.guid
+				)
+			end
+		end
+	end
+end
+
+-- Show WoW Friend Context Menu (1:1 from Blizzard)
+function BetterFriendsList_ShowDropdown(name, connected, lineID, chatType, chatFrame, friendsList, communityClubID, communityStreamID, communityEpoch, communityPosition, guid)
+	if connected or friendsList then
+		local contextData = {
+			name = name,
+			friendsList = friendsList,
+			lineID = lineID,
+			communityClubID = communityClubID,
+			communityStreamID = communityStreamID,
+			communityEpoch = communityEpoch,
+			communityPosition = communityPosition,
+			chatType = chatType,
+			chatTarget = name,
+			chatFrame = chatFrame,
+			bnetIDAccount = nil,
+			guid = guid,
+		}
+		
+		-- Determine menu type based on online status
+		local menuType = connected and "FRIEND" or "FRIEND_OFFLINE"
+		UnitPopup_OpenMenu(menuType, contextData)
+	end
+end
+
+-- Show BattleNet Friend Context Menu (1:1 from Blizzard)
+function BetterFriendsList_ShowBNDropdown(name, connected, lineID, chatType, chatFrame, friendsList, bnetIDAccount, communityClubID, communityStreamID, communityEpoch, communityPosition, battleTag)
+	if connected or friendsList then
+		local contextData = {
+			name = name,
+			friendsList = friendsList,
+			lineID = lineID,
+			communityClubID = communityClubID,
+			communityStreamID = communityStreamID,
+			communityEpoch = communityEpoch,
+			communityPosition = communityPosition,
+			chatType = chatType,
+			chatTarget = name,
+			chatFrame = chatFrame,
+			bnetIDAccount = bnetIDAccount,
+			battleTag = battleTag,
+		}
+		
+		-- Determine menu type based on online status
+		local menuType = connected and "BN_FRIEND" or "BN_FRIEND_OFFLINE"
+		UnitPopup_OpenMenu(menuType, contextData)
+	end
 end
 
 --------------------------------------------------------------------------
@@ -2109,18 +2273,9 @@ function BetterRecentAlliesFrame_OnLoad(self)
 	
 	view:SetElementFactory(function(factory, elementData)
 		if elementData.isDivider then
-			-- Divider between pinned and unpinned allies
-			factory("Frame", function(frame)
-				frame:SetSize(298, 16)
-				if not frame.texture then
-					frame.texture = frame:CreateTexture(nil, "ARTWORK")
-					frame.texture:SetTexture("Interface\\FriendsFrame\\UI-FriendsFrame-OnlineDivider")
-					frame.texture:SetAllPoints()
-				end
-			end)
+			factory("BetterRecentAlliesDividerTemplate")
 		else
-			-- Recent ally entry button
-			factory("Button", function(button, elementData)
+			factory("BetterRecentAlliesEntryTemplate", function(button, elementData)
 				BetterRecentAlliesEntry_Initialize(button, elementData)
 				button:SetScript("OnClick", function(btn, mouseButtonName)
 					if mouseButtonName == "LeftButton" then
@@ -2153,10 +2308,15 @@ end
 function BetterRecentAlliesFrame_OnShow(self)
 	FrameUtil.RegisterFrameForEvents(self, RecentAlliesListEvents)
 	
-	-- NOTE: TryRequestRecentAlliesData() is a protected function and can only be called
-	-- from secure hardware events. We rely on the game's automatic data loading instead.
-	-- The data will load automatically when the system is ready, and we'll receive
-	-- RECENT_ALLIES_CACHE_UPDATE event when it's available.
+	-- NOTE: TryRequestRecentAlliesData() is PROTECTED and cannot be called by addons.
+	-- Blizzard's code can call it because it's part of the UI core, not an addon.
+	-- The data loads automatically when we check IsRecentAllyDataReady(), and we'll 
+	-- receive RECENT_ALLIES_CACHE_UPDATE event when it becomes available.
+	
+	-- Show spinner initially, will hide when data is ready
+	BetterRecentAlliesFrame_SetLoadingSpinnerShown(self, true)
+	
+	-- Refresh will check if data is ready and hide spinner if it is
 	BetterRecentAlliesFrame_Refresh(self, ScrollBoxConstants.DiscardScrollPosition)
 end
 
@@ -2234,83 +2394,9 @@ end
 function BetterRecentAlliesEntry_Initialize(button, elementData)
 	button.elementData = elementData
 	
-	-- Set button size
-	button:SetSize(298, 53)
-	button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-	
-	-- Create textures and fonts if they don't exist
-	if not button.OnlineStatusIcon then
-		button.OnlineStatusIcon = button:CreateTexture(nil, "BORDER")
-		button.OnlineStatusIcon:SetSize(16, 16)
-		button.OnlineStatusIcon:SetPoint("TOPLEFT", 2, -4)
-	end
-	
-	if not button.Name then
-		button.Name = button:CreateFontString(nil, "BORDER", "GameFontNormal")
-		button.Name:SetPoint("TOPLEFT", button.OnlineStatusIcon, "TOPRIGHT", 2, -2)
-		button.Name:SetPoint("RIGHT", -30, 0)
-		button.Name:SetJustifyH("LEFT")
-		button.Name:SetMaxLines(1)
-	end
-	
-	if not button.Info then
-		button.Info = button:CreateFontString(nil, "BORDER", "Game11Font")
-		button.Info:SetPoint("TOPLEFT", button.Name, "BOTTOMLEFT", 0, -2)
-		button.Info:SetPoint("RIGHT", -30, 0)
-		button.Info:SetJustifyH("LEFT")
-		button.Info:SetMaxLines(1)
-		button.Info:SetTextColor(FRIENDS_GRAY_COLOR.r, FRIENDS_GRAY_COLOR.g, FRIENDS_GRAY_COLOR.b)
-	end
-	
-	if not button.Location then
-		button.Location = button:CreateFontString(nil, "BORDER", "Game11Font")
-		button.Location:SetPoint("TOPLEFT", button.Info, "BOTTOMLEFT", 0, -1)
-		button.Location:SetPoint("RIGHT", -30, 0)
-		button.Location:SetJustifyH("LEFT")
-		button.Location:SetMaxLines(1)
-		button.Location:SetTextColor(FRIENDS_GRAY_COLOR.r, FRIENDS_GRAY_COLOR.g, FRIENDS_GRAY_COLOR.b)
-	end
-	
-	if not button.PartyButton then
-		button.PartyButton = CreateFrame("Button", nil, button)
-		button.PartyButton:SetSize(24, 32)
-		button.PartyButton:SetPoint("RIGHT")
-		button.PartyButton:SetNormalTexture("Interface\\FriendsFrame\\TravelPass-Invite")
-		button.PartyButton:GetNormalTexture():SetTexCoord(0.01562500, 0.39062500, 0.27343750, 0.52343750)
-		button.PartyButton:SetHighlightTexture("Interface\\FriendsFrame\\TravelPass-Invite")
-		button.PartyButton:GetHighlightTexture():SetTexCoord(0.42187500, 0.79687500, 0.00781250, 0.25781250)
-		button.PartyButton:GetHighlightTexture():SetBlendMode("ADD")
-		button.PartyButton:SetScript("OnClick", function()
-			local characterData = elementData and elementData.characterData or nil
-			if characterData and characterData.fullName then
-				C_PartyInfo.InviteUnit(characterData.fullName)
-			end
-		end)
-		button.PartyButton:SetScript("OnEnter", function(self)
-			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip_AddHighlightLine(GameTooltip, RECENT_ALLIES_PARTY_BUTTON_TOOLTIP or "Invite")
-			if not self:IsEnabled() then
-				GameTooltip_AddErrorLine(GameTooltip, RECENT_ALLIES_PARTY_BUTTON_OFFLINE_TOOLTIP or "Player is offline")
-			end
-			GameTooltip:Show()
-		end)
-		button.PartyButton:SetScript("OnLeave", function()
-			GameTooltip:Hide()
-		end)
-	end
-	
-	-- Create highlight texture
-	if not button.HighlightTexture then
-		button.HighlightTexture = button:CreateTexture(nil, "HIGHLIGHT")
-		button.HighlightTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
-		button.HighlightTexture:SetAllPoints()
-		button.HighlightTexture:SetBlendMode("ADD")
-		button.HighlightTexture:SetVertexColor(HIGHLIGHT_LIGHT_BLUE.r, HIGHLIGHT_LIGHT_BLUE.g, HIGHLIGHT_LIGHT_BLUE.b)
-	end
-	
-	-- Update button content
 	local characterData = elementData.characterData
 	local stateData = elementData.stateData
+	local interactionData = elementData.interactionData
 	
 	-- Set online status icon
 	local statusIcon = "Interface\\FriendsFrame\\StatusIcon-Offline"
@@ -2325,35 +2411,115 @@ function BetterRecentAlliesEntry_Initialize(button, elementData)
 	end
 	button.OnlineStatusIcon:SetTexture(statusIcon)
 	
-	-- Set name
-	local nameColor = stateData.isOnline and NORMAL_FONT_COLOR or FRIENDS_GRAY_COLOR
-	button.Name:SetText(nameColor:WrapTextInColorCode(characterData.name))
+	-- Update background color based on online status (match Blizzard exactly)
+	-- Use FRIENDS_OFFLINE_BACKGROUND_COLOR (with S), not FRIEND_OFFLINE_BACKGROUND_COLOR
+	button.NormalTexture:Show()
+	local backgroundColor = stateData.isOnline and FRIENDS_WOW_BACKGROUND_COLOR or FRIENDS_OFFLINE_BACKGROUND_COLOR
+	button.NormalTexture:SetColorTexture(backgroundColor:GetRGBA())
 	
-	-- Set class and level info
+	-- Set name in class color (Zeile 1, Teil 1)
 	local classInfo = C_CreatureInfo.GetClassInfo(characterData.classID)
-	local classColor = stateData.isOnline and (classInfo and GetClassColorObj(classInfo.classFile)) or FRIENDS_GRAY_COLOR
-	local className = classInfo and classInfo.className or UNKNOWN
-	local infoText = string.format("%s | %d | %s", 
-		nameColor:WrapTextInColorCode(characterData.level),
-		characterData.level,
-		classColor and classColor:WrapTextInColorCode(className) or className)
-	button.Info:SetText(infoText)
+	local nameColor
+	if stateData.isOnline and classInfo then
+		nameColor = GetClassColorObj(classInfo.classFile)
+	else
+		nameColor = FRIENDS_GRAY_COLOR
+	end
+	button.CharacterData.Name:SetText(nameColor:WrapTextInColorCode(characterData.name))
+	button.CharacterData.Name:SetWidth(math.min(button.CharacterData.Name:GetUnboundedStringWidth(), 150))
 	
-	-- Set location
-	button.Location:SetText(stateData.currentLocation or "")
+	-- Set level with "Lvl " prefix (Zeile 1, Teil 2)
+	local levelColor = stateData.isOnline and NORMAL_FONT_COLOR or FRIENDS_GRAY_COLOR
+	button.CharacterData.Level:SetText(levelColor:WrapTextInColorCode("Lvl " .. tostring(characterData.level)))
+	button.CharacterData.Level:SetWidth(button.CharacterData.Level:GetUnboundedStringWidth())
+	
+	-- Hide class name (no longer needed)
+	button.CharacterData.Class:SetText("")
+	
+	-- Update divider colors (only first divider between name and level is visible)
+	if button.CharacterData.Dividers then
+		for _, divider in ipairs(button.CharacterData.Dividers) do
+			divider:SetVertexColor(levelColor:GetRGB())
+		end
+	end
+	
+	-- Set most recent interaction (Zeile 2)
+	local mostRecentInteraction = interactionData.interactions and interactionData.interactions[1]
+	if mostRecentInteraction then
+		button.CharacterData.MostRecentInteraction:SetText(mostRecentInteraction.description or "")
+	else
+		button.CharacterData.MostRecentInteraction:SetText("")
+	end
+	
+	-- Set location (Zeile 3)
+	button.CharacterData.Location:SetText(stateData.currentLocation or "")
+	
+	-- Update state icons
+	button.StateIconContainer.PinDisplay:SetShown(stateData.pinExpirationDate ~= nil)
+	if stateData.pinExpirationDate then
+		-- Check if pin is nearing expiration
+		local remainingDays = (stateData.pinExpirationDate - GetServerTime()) / SECONDS_PER_DAY
+		local isNearingExpiration = remainingDays <= 7 -- Constants.RecentAlliesConsts.PIN_EXPIRATION_WARNING_DAYS
+		local atlas = isNearingExpiration and "friendslist-recentallies-pin" or "friendslist-recentallies-pin-yellow"
+		button.StateIconContainer.PinDisplay.Icon:SetAtlas(atlas, true)
+	end
+	
+	button.StateIconContainer.FriendRequestPendingDisplay:SetShown(stateData.hasFriendRequestPending or false)
 	
 	-- Enable/disable party button based on online status
 	button.PartyButton:SetEnabled(stateData.isOnline)
 	
-	-- Tooltip
-	button:SetScript("OnEnter", function(self)
+	-- Setup party button click handler
+	button.PartyButton:SetScript("OnClick", function()
+		if characterData and characterData.fullName then
+			C_PartyInfo.InviteUnit(characterData.fullName)
+		end
+	end)
+	
+	-- Setup party button tooltip
+	button.PartyButton:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		BetterRecentAlliesEntry_BuildTooltip(self, GameTooltip)
+		GameTooltip_AddHighlightLine(GameTooltip, RECENT_ALLIES_PARTY_BUTTON_TOOLTIP or "Invite")
+		if not self:IsEnabled() then
+			GameTooltip_AddErrorLine(GameTooltip, RECENT_ALLIES_PARTY_BUTTON_OFFLINE_TOOLTIP or "Player is offline")
+		end
 		GameTooltip:Show()
 	end)
-	button:SetScript("OnLeave", function()
+	
+	button.PartyButton:SetScript("OnLeave", function()
 		GameTooltip:Hide()
 	end)
+	
+	-- Setup pin display tooltip
+	if button.StateIconContainer.PinDisplay then
+		button.StateIconContainer.PinDisplay:SetScript("OnEnter", function(self)
+			if stateData.pinExpirationDate then
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+				local timeUntilExpiration = math.max(stateData.pinExpirationDate - GetServerTime(), 1)
+				local timeText = RecentAlliesUtil.GetFormattedTime(timeUntilExpiration)
+				GameTooltip_AddHighlightLine(GameTooltip, string.format("Pin expires in %s", timeText))
+				GameTooltip:Show()
+			end
+		end)
+		
+		button.StateIconContainer.PinDisplay:SetScript("OnLeave", function()
+			GameTooltip:Hide()
+		end)
+	end
+end
+
+-- OnEnter handler for Recent Allies Entry
+function BetterRecentAlliesEntry_OnEnter(button)
+	if not button.elementData then return end
+	
+	GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+	BetterRecentAlliesEntry_BuildTooltip(button, GameTooltip)
+	GameTooltip:Show()
+end
+
+-- OnLeave handler for Recent Allies Entry
+function BetterRecentAlliesEntry_OnLeave(button)
+	GameTooltip:Hide()
 end
 
 -- Build tooltip for recent ally (RecentAlliesEntryMixin:BuildRecentAllyTooltip)
@@ -3149,19 +3315,109 @@ function BetterRAF_ClaimOrViewRewardButton_OnClick(button)
 	else
 		-- Show all rewards list
 		if RecruitAFriendRewardsFrame then
-			-- Use Blizzard's rewards frame if available
+			-- Load Blizzard's RAF addon if not already loaded
+			if not RecruitAFriendFrame then
+				LoadAddOn("Blizzard_RecruitAFriend")
+			end
+			
+			-- Ensure Blizzard's RecruitAFriendFrame has the data it needs
+			if RecruitAFriendFrame and frame.rafInfo then
+				-- Store RAF info in Blizzard's frame (critical for RewardsFrame to work!)
+				RecruitAFriendFrame.rafInfo = frame.rafInfo
+				RecruitAFriendFrame.rafEnabled = true
+				
+				-- ALWAYS set selected RAF version to the latest when opening rewards
+				-- This ensures we start with the correct version every time
+				if frame.rafInfo.versions and #frame.rafInfo.versions > 0 then
+					local latestVersion = frame.rafInfo.versions[1].rafVersion
+					RecruitAFriendFrame.selectedRAFVersion = latestVersion
+				end
+				
+				-- Store rafSystemInfo if we have it
+				if frame.RecruitAFriendFrame and frame.RecruitAFriendFrame.rafSystemInfo then
+					RecruitAFriendFrame.rafSystemInfo = frame.RecruitAFriendFrame.rafSystemInfo
+				end
+				
+				-- CRITICAL: Override/Initialize the TriggerEvent system
+				-- Even if it exists, we need to ensure it works with our setup
+				local originalTriggerEvent = RecruitAFriendFrame.TriggerEvent
+				
+				RecruitAFriendFrame.callbacks = RecruitAFriendFrame.callbacks or {}
+				
+				RecruitAFriendFrame.TriggerEvent = function(self, event, ...)
+					-- Handle NewRewardTabSelected event
+					if event == "NewRewardTabSelected" then
+						local newRAFVersion = ...
+						self.selectedRAFVersion = newRAFVersion
+						
+						-- Refresh the rewards display
+						if RecruitAFriendRewardsFrame and RecruitAFriendRewardsFrame.Refresh then
+							RecruitAFriendRewardsFrame:Refresh()
+						end
+					elseif event == "RewardsListOpened" then
+						-- Set to latest version when opening
+						if self.rafInfo and self.rafInfo.versions and #self.rafInfo.versions > 0 then
+							self.selectedRAFVersion = self.rafInfo.versions[1].rafVersion
+						end
+					end
+					
+					-- Call original if it was a real function (not our mock)
+					if originalTriggerEvent and originalTriggerEvent ~= self.TriggerEvent then
+						originalTriggerEvent(self, event, ...)
+					end
+				end
+				
+				-- Add helper methods that RecruitAFriendFrame needs (always set these)
+				RecruitAFriendFrame.GetSelectedRAFVersion = function(self)
+					return self.selectedRAFVersion
+				end
+				
+				RecruitAFriendFrame.GetSelectedRAFVersionInfo = function(self)
+					if not self.rafInfo or not self.rafInfo.versions then 
+						return nil 
+					end
+					for _, versionInfo in ipairs(self.rafInfo.versions) do
+						if versionInfo.rafVersion == self.selectedRAFVersion then
+							return versionInfo
+						end
+					end
+					return self.rafInfo.versions[1] -- Fallback to first version
+				end
+				
+				RecruitAFriendFrame.GetLatestRAFVersion = function(self)
+					if self.rafInfo and self.rafInfo.versions and #self.rafInfo.versions > 0 then
+						return self.rafInfo.versions[1].rafVersion
+					end
+					return nil
+				end
+				
+				RecruitAFriendFrame.IsLegacyRAFVersion = function(self, rafVersion)
+					-- All versions except the latest are considered legacy
+					local latestVersion = self:GetLatestRAFVersion()
+					return rafVersion ~= latestVersion
+				end
+				
+				RecruitAFriendFrame.GetRAFVersionInfo = function(self, rafVersion)
+					if not self.rafInfo or not self.rafInfo.versions then return nil end
+					for _, versionInfo in ipairs(self.rafInfo.versions) do
+						if versionInfo.rafVersion == rafVersion then
+							return versionInfo
+						end
+					end
+					return nil
+				end
+			end
+			
+			-- Use Blizzard's rewards frame
 			if RecruitAFriendRewardsFrame:IsShown() then
 				RecruitAFriendRewardsFrame:Hide()
 			else
-				-- Initialize the rewards frame with our RAF data
-				-- This mimics what Blizzard does in RecruitAFriendFrame:UpdateRAFInfo
+				-- Set up tabs and refresh (Blizzard does this in UpdateRAFInfo)
 				if frame.rafInfo then
-					-- Set up tabs if multiple RAF versions exist
 					if RecruitAFriendRewardsFrame.SetUpTabs then
 						RecruitAFriendRewardsFrame:SetUpTabs(frame.rafInfo)
 					end
 					
-					-- Refresh the rewards display
 					if RecruitAFriendRewardsFrame.Refresh then
 						RecruitAFriendRewardsFrame:Refresh()
 					end
@@ -3219,17 +3475,29 @@ function BetterRAF_DisplayRewardsInChat(rafInfo)
 	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00Use the in-game Recruit-A-Friend interface for full details.|r", 1, 1, 0)
 end
 
--- Recruitment Button OnClick
+-- Recruitment Button OnClick (1:1 from Blizzard)
 function BetterRAF_RecruitmentButton_OnClick(button)
-	local frame = button:GetParent()
-	if not frame then return end
-	
-	-- Request updated recruitment info
-	if C_RecruitAFriend.RequestUpdatedRecruitmentInfo then
-		C_RecruitAFriend.RequestUpdatedRecruitmentInfo()
+	-- Ensure RecruitAFriendRecruitmentFrame is loaded
+	if not RecruitAFriendRecruitmentFrame then
+		LoadAddOn("Blizzard_RecruitAFriend")
 	end
 	
-	-- Show recruitment frame (simplified version)
-	print("RAF Recruitment Frame not yet fully implemented")
-	print("Visit the Recruit A Friend page to generate a recruitment link")
+	if not RecruitAFriendRecruitmentFrame then
+		print("Error: Could not load RecruitAFriendRecruitmentFrame")
+		return
+	end
+	
+	-- Toggle recruitment frame (exact Blizzard logic)
+	if RecruitAFriendRecruitmentFrame:IsShown() then
+		StaticPopupSpecial_Hide(RecruitAFriendRecruitmentFrame)
+	else
+		C_RecruitAFriend.RequestUpdatedRecruitmentInfo()
+		
+		-- Hide rewards frame if shown
+		if RecruitAFriendRewardsFrame then
+			RecruitAFriendRewardsFrame:Hide()
+		end
+		
+		StaticPopupSpecial_Show(RecruitAFriendRecruitmentFrame)
+	end
 end
