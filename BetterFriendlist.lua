@@ -1,5 +1,8 @@
 -- BetterFriendlist.lua
 -- A friends list replacement for World of Warcraft with Battle.net support
+-- Version 0.1
+
+local ADDON_VERSION = "0.1"
 
 -- Define color constants if they don't exist (used by Recent Allies)
 -- Note: Blizzard uses FRIENDS_OFFLINE_BACKGROUND_COLOR (with S), not FRIEND_OFFLINE_BACKGROUND_COLOR
@@ -21,6 +24,9 @@ local buttonPool = {
 	activeButtons = {}   -- Currently visible buttons in order
 }
 
+-- Drag and drop state
+local currentDraggedFriend = nil -- Stores the name of the friend being dragged
+
 -- Performance optimization: Throttle updates to prevent lag
 local lastUpdateTime = 0
 local UPDATE_THROTTLE = 0.1 -- Only update every 0.1 seconds maximum
@@ -33,6 +39,43 @@ local currentSortMode = "status" -- Default: status, name, level, zone
 local BUTTON_TYPE_GROUP_HEADER = "group_header"
 local BUTTON_TYPE_FRIEND = "friend"
 
+-- Animation helper functions
+local function CreatePulseAnimation(frame)
+	if not frame.pulseAnim then
+		local animGroup = frame:CreateAnimationGroup()
+		
+		local scale1 = animGroup:CreateAnimation("Scale")
+		scale1:SetScale(1.1, 1.1)
+		scale1:SetDuration(0.15)
+		scale1:SetOrder(1)
+		
+		local scale2 = animGroup:CreateAnimation("Scale")
+		scale2:SetScale(0.909, 0.909) -- Back to 1.0 (1/1.1)
+		scale2:SetDuration(0.15)
+		scale2:SetOrder(2)
+		
+		frame.pulseAnim = animGroup
+	end
+	return frame.pulseAnim
+end
+
+local function CreateFadeOutAnimation(frame, onFinished)
+	if not frame.fadeOutAnim then
+		local animGroup = frame:CreateAnimationGroup()
+		
+		local alpha = animGroup:CreateAnimation("Alpha")
+		alpha:SetFromAlpha(1.0)
+		alpha:SetToAlpha(0.0)
+		alpha:SetDuration(0.3)
+		alpha:SetSmoothing("OUT")
+		
+		animGroup:SetScript("OnFinished", onFinished)
+		
+		frame.fadeOutAnim = animGroup
+	end
+	return frame.fadeOutAnim
+end
+
 -- Friend Groups
 local friendGroups = {
 	favorites = {
@@ -40,14 +83,18 @@ local friendGroups = {
 		name = "Favorites",
 		collapsed = false,
 		builtin = true,
-		order = 1
+		order = 1,
+		color = {r = 1.0, g = 0.82, b = 0.0}, -- Gold
+		icon = "Interface\\FriendsFrame\\Battlenet-Battleneticon"
 	},
 	nogroup = {
 		id = "nogroup",
 		name = "No Group",
 		collapsed = false,
 		builtin = true,
-		order = 999
+		order = 999,
+		color = {r = 0.5, g = 0.5, b = 0.5}, -- Gray
+		icon = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon"
 	}
 }
 
@@ -191,14 +238,16 @@ local function UpdateFriendsList()
 			local searchIn = ""
 			
 			if friend.type == "bnet" then
-				-- Search in Battle.net: accountName, BattleTag, note, and character name
-				searchIn = (friend.accountName or ""):lower() .. " " .. 
-				           (friend.battleTag or ""):lower() .. " " ..
+				-- Search in Battle.net: BattleTag, note, and character name
+				-- Note: Real ID (accountName) is protected by Blizzard and cannot be accessed
+				-- when users hide it. To search by Real ID, add it manually to the friend's note.
+				searchIn = (friend.battleTag or ""):lower() .. " " ..
 				           (friend.note or ""):lower() .. " " ..
 				           (friend.characterName or ""):lower()
 			else
-				-- Search in WoW friend name
-				searchIn = (friend.name or ""):lower()
+				-- Search in WoW friend name and note
+				searchIn = (friend.name or ""):lower() .. " " ..
+				           (friend.note or ""):lower()
 			end
 			
 			if searchIn:find(searchText, 1, true) then
@@ -293,13 +342,46 @@ local function BuildDisplayList()
 		nogroup = {}
 	}
 	
+	-- Initialize custom group tables
+	for groupId, groupData in pairs(friendGroups) do
+		if not groupData.builtin or groupId == "favorites" or groupId == "nogroup" then
+			groupedFriends[groupId] = groupedFriends[groupId] or {}
+		end
+	end
+	
+	-- Helper function to get friend unique ID
+	local function GetFriendUID(friend)
+		if friend.type == "bnet" then
+			return "bnet_" .. (friend.bnetAccountID or friend.battleTag or "")
+		else
+			return "wow_" .. (friend.name or "")
+		end
+	end
+	
 	for _, friend in ipairs(friendsList) do
+		local isInAnyGroup = false
+		local friendUID = GetFriendUID(friend)
+		
 		-- Check if friend is a favorite (Battle.net only)
 		if friend.type == "bnet" and friend.isFavorite then
 			table.insert(groupedFriends.favorites, friend)
+			isInAnyGroup = true
 		end
-		-- All friends also go to "No Group"
-		table.insert(groupedFriends.nogroup, friend)
+		
+		-- Check for custom groups
+		if BetterFriendlistDB.friendGroups[friendUID] then
+			for _, groupId in ipairs(BetterFriendlistDB.friendGroups[friendUID]) do
+				if groupedFriends[groupId] then
+					table.insert(groupedFriends[groupId], friend)
+					isInAnyGroup = true
+				end
+			end
+		end
+		
+		-- Only add to "No Group" if friend is not in any other group
+		if not isInAnyGroup then
+			table.insert(groupedFriends.nogroup, friend)
+		end
 	end
 	
 	-- Build display list in order
@@ -343,6 +425,158 @@ local function GetOrCreateFriendButton(index)
 		local scrollFrame = BetterFriendsFrame.ScrollFrame
 		local buttonName = "BetterFriendsFrameScrollFrameButton" .. index
 		local button = CreateFrame("Button", buttonName, scrollFrame, "BetterFriendsListButtonTemplate")
+		
+		-- Enable drag for friend buttons
+		button:SetMovable(true)
+		button:RegisterForDrag("LeftButton")
+		
+		-- Create drag overlay (shown during drag)
+		local dragOverlay = button:CreateTexture(nil, "OVERLAY")
+		dragOverlay:SetAllPoints()
+		dragOverlay:SetColorTexture(1, 1, 1, 0.3)
+		dragOverlay:Hide()
+		button.dragOverlay = dragOverlay
+		
+		button:SetScript("OnDragStart", function(self)
+			if self.friendData then
+				-- Store friend name for header text updates (check multiple name fields)
+				currentDraggedFriend = self.friendData.name or self.friendData.accountName or self.friendData.battleTag or "Unknown"
+				
+				-- Show drag overlay
+				self.dragOverlay:Show()
+				self:SetAlpha(0.5)
+				
+				-- Start dragging (visual feedback only)
+				GameTooltip:Hide()
+				
+				-- Enable OnUpdate to continuously check headers under mouse
+				self:SetScript("OnUpdate", function(updateSelf)
+					-- Get cursor position
+					local cursorX, cursorY = GetCursorPosition()
+					local scale = UIParent:GetEffectiveScale()
+					cursorX = cursorX / scale
+					cursorY = cursorY / scale
+					
+					-- Update all group headers
+					for _, headerButton in pairs(buttonPool.headerButtons) do
+						if headerButton:IsVisible() and headerButton.groupId and friendGroups[headerButton.groupId] and not friendGroups[headerButton.groupId].builtin then
+							-- Check if cursor is over this header
+							local left, bottom, width, height = headerButton:GetRect()
+							local isOver = false
+							if left then
+								isOver = (cursorX >= left and cursorX <= left + width and 
+								         cursorY >= bottom and cursorY <= bottom + height)
+							end
+							
+							if isOver and currentDraggedFriend then
+								-- Show highlight and update text
+								headerButton.dropHighlight:Show()
+								local groupData = friendGroups[headerButton.groupId]
+								if groupData then
+									local headerText = string.format("|cffffd700Add %s to %s|r", currentDraggedFriend, groupData.name)
+									headerButton:SetText(headerText)
+								end
+							else
+								-- Hide highlight and restore original text
+								headerButton.dropHighlight:Hide()
+								local groupData = friendGroups[headerButton.groupId]
+								if groupData then
+									local memberCount = 0
+									if BetterFriendlistDB.friendGroups then
+										for _, groups in pairs(BetterFriendlistDB.friendGroups) do
+											for _, gid in ipairs(groups) do
+												if gid == headerButton.groupId then
+													memberCount = memberCount + 1
+													break
+												end
+											end
+										end
+									end
+									local headerText = string.format("|cffffd700%s (%d)|r", groupData.name, memberCount)
+									headerButton:SetText(headerText)
+								end
+							end
+						end
+					end
+				end)
+			end
+		end)
+		
+		button:SetScript("OnDragStop", function(self)
+			-- Disable OnUpdate
+			self:SetScript("OnUpdate", nil)
+			
+			-- Clear dragged friend name
+			currentDraggedFriend = nil
+			
+			-- Hide drag overlay
+			self.dragOverlay:Hide()
+			self:SetAlpha(1.0)
+			
+			-- Reset all header highlights and texts
+			for _, headerButton in pairs(buttonPool.headerButtons) do
+				if headerButton:IsVisible() and headerButton.groupId and friendGroups[headerButton.groupId] then
+					headerButton.dropHighlight:Hide()
+					local groupData = friendGroups[headerButton.groupId]
+					local memberCount = 0
+					if BetterFriendlistDB.friendGroups then
+						for _, groups in pairs(BetterFriendlistDB.friendGroups) do
+							for _, gid in ipairs(groups) do
+								if gid == headerButton.groupId then
+									memberCount = memberCount + 1
+									break
+								end
+							end
+						end
+					end
+					local headerText = string.format("|cffffd700%s (%d)|r", groupData.name, memberCount)
+					headerButton:SetText(headerText)
+				end
+			end
+			
+			-- Get mouse position and find group header under cursor
+			local cursorX, cursorY = GetCursorPosition()
+			local scale = UIParent:GetEffectiveScale()
+			cursorX = cursorX / scale
+			cursorY = cursorY / scale
+			
+			-- Check all group headers for mouse-over
+			local droppedOnGroup = nil
+			for _, headerButton in pairs(buttonPool.headerButtons) do
+				if headerButton:IsVisible() and headerButton.groupId then
+					local left, bottom, width, height = headerButton:GetRect()
+					if left and cursorX >= left and cursorX <= left + width and 
+					   cursorY >= bottom and cursorY <= bottom + height then
+						droppedOnGroup = headerButton.groupId
+						break
+					end
+				end
+			end
+			
+			-- If dropped on a group, add friend to that group
+			if droppedOnGroup and self.friendData then
+				local friendUID = GetFriendUID(self.friendData)
+				if friendUID then
+					-- Remove from current groups if shift is not held
+					if not IsShiftKeyDown() then
+						if BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friendUID] then
+							for i = #BetterFriendlistDB.friendGroups[friendUID], 1, -1 do
+								local groupId = BetterFriendlistDB.friendGroups[friendUID][i]
+								if friendGroups[groupId] and not friendGroups[groupId].builtin then
+									table.remove(BetterFriendlistDB.friendGroups[friendUID], i)
+								end
+							end
+						end
+					end
+					
+					-- Add to new group
+					BetterFriendsList_ToggleFriendInGroup(friendUID, droppedOnGroup)
+					BuildDisplayList()
+					UpdateFriendsDisplay()
+				end
+			end
+		end)
+		
 		buttonPool.friendButtons[index] = button
 	end
 	return buttonPool.friendButtons[index]
@@ -355,6 +589,45 @@ local function GetOrCreateHeaderButton(index)
 		local button = CreateFrame("Button", buttonName, scrollFrame, "BetterFriendsGroupHeaderTemplate")
 		-- Raise header buttons to ensure they're clickable
 		button:SetFrameLevel(scrollFrame:GetFrameLevel() + 2)
+		
+		-- Create drop target highlight
+		local dropHighlight = button:CreateTexture(nil, "BACKGROUND")
+		dropHighlight:SetAllPoints()
+		dropHighlight:SetColorTexture(0, 1, 0, 0.2)
+		dropHighlight:Hide()
+		button.dropHighlight = dropHighlight
+		
+		-- Enable tooltips only (highlight and text update handled by OnUpdate during drag)
+		button:SetScript("OnEnter", function(self)
+			-- Check if we're currently dragging a friend
+			local isDragging = currentDraggedFriend ~= nil
+			
+			if isDragging and self.groupId and friendGroups[self.groupId] and not friendGroups[self.groupId].builtin then
+				-- Show drop target tooltip
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+				GameTooltip:SetText("Drop to add to group", 1, 1, 1)
+				GameTooltip:AddLine("Hold Shift to keep in other groups", 0.7, 0.7, 0.7, true)
+				GameTooltip:Show()
+			else
+				-- Show group info tooltip
+				if self.groupId and friendGroups[self.groupId] then
+					local groupData = friendGroups[self.groupId]
+					
+					GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+					GameTooltip:SetText(groupData.name, 1, 1, 1)
+					GameTooltip:AddLine("Right-click for options", 0.7, 0.7, 0.7, true)
+					if not groupData.builtin then
+						GameTooltip:AddLine("Drag friends here to add them", 0.5, 0.8, 1.0, true)
+					end
+					GameTooltip:Show()
+				end
+			end
+		end)
+		
+		button:SetScript("OnLeave", function(self)
+			GameTooltip:Hide()
+		end)
+		
 		buttonPool.headerButtons[index] = button
 	end
 	return buttonPool.headerButtons[index]
@@ -418,6 +691,238 @@ function BetterFriendsList_ToggleGroup(groupId)
 		BuildDisplayList()
 		UpdateFriendsDisplay()
 	end
+end
+
+-- Create a new custom group
+function BetterFriendsList_CreateGroup(groupName)
+	if not groupName or groupName == "" then
+		return false, "Group name cannot be empty"
+	end
+	
+	-- Generate unique ID from name
+	local groupId = "custom_" .. groupName:gsub("%s+", "_"):lower()
+	
+	-- Check if group already exists
+	if friendGroups[groupId] then
+		return false, "Group already exists"
+	end
+	
+	-- Find next order value (place custom groups between Favorites and No Group)
+	local maxOrder = 1
+	for _, groupData in pairs(friendGroups) do
+		if not groupData.builtin or groupData.id == "favorites" then
+			maxOrder = math.max(maxOrder, groupData.order or 1)
+		end
+	end
+	
+	-- Create group
+	friendGroups[groupId] = {
+		id = groupId,
+		name = groupName,
+		collapsed = false,
+		builtin = false,
+		order = maxOrder + 1,
+		color = {r = 0, g = 0.7, b = 1.0}, -- Default blue for custom groups
+		icon = "Interface\\FriendsFrame\\UI-Toast-ChatInviteIcon"
+	}
+	
+	-- Save to database
+	BetterFriendlistDB.customGroups = BetterFriendlistDB.customGroups or {}
+	BetterFriendlistDB.customGroups[groupId] = {
+		name = groupName,
+		collapsed = false,
+		order = maxOrder + 1
+	}
+	
+	-- Rebuild display
+	BuildDisplayList()
+	UpdateFriendsDisplay()
+	
+	-- Play pulse animation on the newly created group header
+	C_Timer.After(0.1, function()
+		for _, button in pairs(buttonPool.headerButtons) do
+			if button:IsVisible() and button.groupId == groupId then
+				CreatePulseAnimation(button):Play()
+				break
+			end
+		end
+	end)
+	
+	return true, groupId
+end
+
+-- Helper function to get friend unique ID (global for use in multiple places)
+function GetFriendUID(friend)
+	if not friend then return nil end
+	if friend.type == "bnet" then
+		return "bnet_" .. (friend.bnetAccountID or friend.battleTag or "")
+	else
+		return "wow_" .. (friend.name or "")
+	end
+end
+
+-- Add or remove friend from group
+function BetterFriendsList_ToggleFriendInGroup(friendUID, groupId)
+	if not friendUID or not groupId then
+		return false
+	end
+	
+	-- Don't allow adding to builtin groups (except they're managed automatically)
+	if friendGroups[groupId] and friendGroups[groupId].builtin then
+		return false
+	end
+	
+	-- Initialize friendGroups in DB
+	BetterFriendlistDB.friendGroups = BetterFriendlistDB.friendGroups or {}
+	BetterFriendlistDB.friendGroups[friendUID] = BetterFriendlistDB.friendGroups[friendUID] or {}
+	
+	local groups = BetterFriendlistDB.friendGroups[friendUID]
+	
+	-- Check if friend is already in group
+	local isInGroup = false
+	local indexToRemove = nil
+	for i, gid in ipairs(groups) do
+		if gid == groupId then
+			isInGroup = true
+			indexToRemove = i
+			break
+		end
+	end
+	
+	-- Toggle membership
+	if isInGroup then
+		-- Remove from group
+		table.remove(groups, indexToRemove)
+	else
+		-- Add to group
+		table.insert(groups, groupId)
+	end
+	
+	-- Rebuild display
+	BuildDisplayList()
+	UpdateFriendsDisplay()
+	
+	return true
+end
+
+-- Check if friend is in a specific group
+function BetterFriendsList_IsFriendInGroup(friendUID, groupId)
+	if not BetterFriendlistDB.friendGroups or not BetterFriendlistDB.friendGroups[friendUID] then
+		return false
+	end
+	
+	for _, gid in ipairs(BetterFriendlistDB.friendGroups[friendUID]) do
+		if gid == groupId then
+			return true
+		end
+	end
+	
+	return false
+end
+
+-- Rename a custom group
+function BetterFriendsList_RenameGroup(groupId, newName)
+	if not groupId or not newName or newName == "" then
+		return false, "Invalid group name"
+	end
+	
+	local group = friendGroups[groupId]
+	if not group then
+		return false, "Group does not exist"
+	end
+	
+	if group.builtin then
+		return false, "Cannot rename built-in groups"
+	end
+	
+	-- Update in memory
+	group.name = newName
+	
+	-- Update in database
+	if BetterFriendlistDB.customGroups and BetterFriendlistDB.customGroups[groupId] then
+		BetterFriendlistDB.customGroups[groupId].name = newName
+	end
+	
+	-- Rebuild display
+	BuildDisplayList()
+	UpdateFriendsDisplay()
+	
+	return true
+end
+
+-- Delete a custom group
+function BetterFriendsList_DeleteGroup(groupId)
+	if not groupId then
+		return false, "Invalid group ID"
+	end
+	
+	local group = friendGroups[groupId]
+	if not group then
+		return false, "Group does not exist"
+	end
+	
+	if group.builtin then
+		return false, "Cannot delete built-in groups"
+	end
+	
+	-- Remove from memory
+	friendGroups[groupId] = nil
+	
+	-- Remove from database
+	if BetterFriendlistDB.customGroups then
+		BetterFriendlistDB.customGroups[groupId] = nil
+	end
+	
+	-- Remove all friend assignments to this group
+	if BetterFriendlistDB.friendGroups then
+		for friendUID, groups in pairs(BetterFriendlistDB.friendGroups) do
+			for i = #groups, 1, -1 do
+				if groups[i] == groupId then
+					table.remove(groups, i)
+				end
+			end
+			-- Clean up empty entries
+			if #groups == 0 then
+				BetterFriendlistDB.friendGroups[friendUID] = nil
+			end
+		end
+	end
+	
+	-- Rebuild display
+	BuildDisplayList()
+	UpdateFriendsDisplay()
+	
+	return true
+end
+
+-- Remove friend from a specific group
+function BetterFriendsList_RemoveFriendFromGroup(friendUID, groupId)
+	if not friendUID or not groupId then
+		return false
+	end
+	
+	if not BetterFriendlistDB.friendGroups or not BetterFriendlistDB.friendGroups[friendUID] then
+		return false
+	end
+	
+	local groups = BetterFriendlistDB.friendGroups[friendUID]
+	for i = #groups, 1, -1 do
+		if groups[i] == groupId then
+			table.remove(groups, i)
+			
+			-- Clean up if no groups left
+			if #groups == 0 then
+				BetterFriendlistDB.friendGroups[friendUID] = nil
+			end
+			
+			-- Rebuild display
+			BuildDisplayList()
+			UpdateFriendsDisplay()
+			return true
+		end
+	end
+	
+	return false
 end
 
 -- Helper function to get displayList count (used by XML mouse wheel handler)
@@ -539,7 +1044,9 @@ UpdateFriendsDisplay = function()
 		if item.type == BUTTON_TYPE_GROUP_HEADER then
 			-- Configure group header button
 			button.groupId = item.groupId
-			button:SetText(string.format("%s (%d)", item.name, item.count))
+			
+			-- Set text in gold (standard WoW header color)
+			button:SetText(string.format("|cffffd700%s (%d)|r", item.name, item.count))
 			
 			-- Show/hide arrows based on collapsed state
 			if item.collapsed then
@@ -548,6 +1055,82 @@ UpdateFriendsDisplay = function()
 			else
 				button.RightArrow:Hide()
 				button.DownArrow:Show()
+			end
+			
+			-- Add right-click menu for custom groups
+			if friendGroups[item.groupId] and not friendGroups[item.groupId].builtin then
+				button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+				button:SetScript("OnClick", function(self, buttonName)
+					if buttonName == "RightButton" then
+						-- Open context menu for group header
+						MenuUtil.CreateContextMenu(self, function(owner, rootDescription)
+							rootDescription:CreateTitle(friendGroups[self.groupId].name)
+							
+							rootDescription:CreateButton("Rename Group", function()
+								StaticPopup_Show("BETTER_FRIENDLIST_RENAME_GROUP", nil, nil, self.groupId)
+							end)
+							
+							rootDescription:CreateButton("Delete Group", function()
+								StaticPopup_Show("BETTER_FRIENDLIST_DELETE_GROUP", nil, nil, self.groupId)
+							end)
+							
+							rootDescription:CreateDivider()
+							
+							rootDescription:CreateButton("Collapse All Groups", function()
+								for gid, gdata in pairs(friendGroups) do
+									gdata.collapsed = true
+									BetterFriendlistDB.groupStates[gid] = true
+								end
+								BuildDisplayList()
+								UpdateFriendsDisplay()
+							end)
+							
+							rootDescription:CreateButton("Expand All Groups", function()
+								for gid, gdata in pairs(friendGroups) do
+									gdata.collapsed = false
+									BetterFriendlistDB.groupStates[gid] = false
+								end
+								BuildDisplayList()
+								UpdateFriendsDisplay()
+							end)
+						end)
+					else
+						-- Left click: toggle collapse
+						BetterFriendsList_ToggleGroup(self.groupId)
+					end
+				end)
+			else
+				-- Built-in groups: Rechtsklick für Collapse/Expand All
+				button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+				button:SetScript("OnClick", function(self, buttonName)
+					if buttonName == "RightButton" then
+						-- Open context menu for built-in group header
+						MenuUtil.CreateContextMenu(self, function(owner, rootDescription)
+							rootDescription:CreateTitle(friendGroups[self.groupId].name)
+							
+							rootDescription:CreateButton("Collapse All Groups", function()
+								for gid, gdata in pairs(friendGroups) do
+									gdata.collapsed = true
+									BetterFriendlistDB.groupStates[gid] = true
+								end
+								BuildDisplayList()
+								UpdateFriendsDisplay()
+							end)
+							
+							rootDescription:CreateButton("Expand All Groups", function()
+								for gid, gdata in pairs(friendGroups) do
+									gdata.collapsed = false
+									BetterFriendlistDB.groupStates[gid] = false
+								end
+								BuildDisplayList()
+								UpdateFriendsDisplay()
+							end)
+						end)
+					else
+						-- Left click: toggle collapse
+						BetterFriendsList_ToggleGroup(self.groupId)
+					end
+				end)
 			end
 			
 		elseif item.type == BUTTON_TYPE_FRIEND then
@@ -940,16 +1523,159 @@ function ToggleBetterFriendsFrame()
 	end
 end
 
+--------------------------------------------------------------------------
+-- STATIC POPUP DIALOGS
+--------------------------------------------------------------------------
+
+-- Dialog for creating a new group
+StaticPopupDialogs["BETTER_FRIENDLIST_CREATE_GROUP"] = {
+	text = "Enter a name for the new group:",
+	button1 = "Create",
+	button2 = "Cancel",
+	hasEditBox = true,
+	OnAccept = function(self)
+		local groupName = self.EditBox:GetText()
+		if groupName and groupName ~= "" then
+			BetterFriendsList_CreateGroup(groupName)
+		end
+	end,
+	EditBoxOnEnterPressed = function(self)
+		local parent = self:GetParent()
+		local groupName = self:GetText()
+		if groupName and groupName ~= "" then
+			BetterFriendsList_CreateGroup(groupName)
+		end
+		parent:Hide()
+	end,
+	EditBoxOnEscapePressed = function(self)
+		self:GetParent():Hide()
+	end,
+	OnShow = function(self)
+		self.EditBox:SetFocus()
+	end,
+	timeout = 0,
+	whileDead = true,
+	hideOnEscape = true,
+	preferredIndex = 3,
+}
+
+-- Dialog for creating a new group and adding a friend to it
+StaticPopupDialogs["BETTER_FRIENDLIST_CREATE_GROUP_AND_ADD_FRIEND"] = {
+	text = "Enter a name for the new group:",
+	button1 = "Create",
+	button2 = "Cancel",
+	hasEditBox = true,
+	OnAccept = function(self, friendUID)
+		local groupName = self.EditBox:GetText()
+		if groupName and groupName ~= "" then
+			local success, groupId = BetterFriendsList_CreateGroup(groupName)
+			if success then
+				-- Add friend to the newly created group
+				BetterFriendsList_ToggleFriendInGroup(friendUID, groupId)
+			end
+		end
+	end,
+	EditBoxOnEnterPressed = function(self, friendUID)
+		local parent = self:GetParent()
+		local groupName = self:GetText()
+		if groupName and groupName ~= "" then
+			local success, groupId = BetterFriendsList_CreateGroup(groupName)
+			if success then
+				-- Add friend to the newly created group
+				BetterFriendsList_ToggleFriendInGroup(friendUID, groupId)
+			end
+		end
+		parent:Hide()
+	end,
+	EditBoxOnEscapePressed = function(self)
+		self:GetParent():Hide()
+	end,
+	OnShow = function(self)
+		self.EditBox:SetFocus()
+	end,
+	timeout = 0,
+	whileDead = true,
+	hideOnEscape = true,
+	preferredIndex = 3,
+}
+
+-- Dialog for renaming a group
+StaticPopupDialogs["BETTER_FRIENDLIST_RENAME_GROUP"] = {
+	text = "Enter a new name for the group:",
+	button1 = "Rename",
+	button2 = "Cancel",
+	hasEditBox = true,
+	OnAccept = function(self, data)
+		local newName = self.EditBox:GetText()
+		if newName and newName ~= "" then
+			BetterFriendsList_RenameGroup(data, newName)
+		end
+	end,
+	EditBoxOnEnterPressed = function(self, data)
+		local parent = self:GetParent()
+		local newName = self:GetText()
+		if newName and newName ~= "" then
+			BetterFriendsList_RenameGroup(data, newName)
+		end
+		parent:Hide()
+	end,
+	EditBoxOnEscapePressed = function(self)
+		self:GetParent():Hide()
+	end,
+	OnShow = function(self, data)
+		self.EditBox:SetText(friendGroups[data] and friendGroups[data].name or "")
+		self.EditBox:SetFocus()
+		self.EditBox:HighlightText()
+	end,
+	timeout = 0,
+	whileDead = true,
+	hideOnEscape = true,
+	preferredIndex = 3,
+}
+
+-- Dialog for deleting a group
+StaticPopupDialogs["BETTER_FRIENDLIST_DELETE_GROUP"] = {
+	text = "Are you sure you want to delete this group?\n\n|cffff0000This will remove all friends from this group.|r",
+	button1 = "Delete",
+	button2 = "Cancel",
+	OnAccept = function(self, data)
+		BetterFriendsList_DeleteGroup(data)
+	end,
+	timeout = 0,
+	whileDead = true,
+	hideOnEscape = true,
+	preferredIndex = 3,
+}
+
+--------------------------------------------------------------------------
+-- EVENT HANDLERS
+--------------------------------------------------------------------------
+
 -- Event handler
 frame:SetScript("OnEvent", function(self, event, ...)
 	if event == "ADDON_LOADED" then
 		local addonName = ...
 		if addonName == "BetterFriendlist" then
-			print("|cff00ff00Better Friendlist|r loaded! Press 'O' to open. Now with Battle.net support!")
+			print("|cff00ff00BetterFriendlist v" .. ADDON_VERSION .. "|r loaded successfully!")
 			
 			-- Initialize saved variables
 			BetterFriendlistDB = BetterFriendlistDB or {}
 			BetterFriendlistDB.groupStates = BetterFriendlistDB.groupStates or {}
+			BetterFriendlistDB.customGroups = BetterFriendlistDB.customGroups or {}
+			BetterFriendlistDB.friendGroups = BetterFriendlistDB.friendGroups or {}
+			
+			-- Load custom groups from DB
+			for groupId, groupInfo in pairs(BetterFriendlistDB.customGroups) do
+				if not friendGroups[groupId] then
+					friendGroups[groupId] = {
+						id = groupId,
+						name = groupInfo.name,
+						collapsed = groupInfo.collapsed or false,
+						builtin = false,
+						order = groupInfo.order or 50
+					}
+				end
+			end
 			
 			-- Load collapsed states
 			for groupId, groupData in pairs(friendGroups) do
@@ -958,10 +1684,102 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end
 			end
 			
-			-- Register frame to close on Escape key (like Blizzard's FriendsFrame)
-			table.insert(UISpecialFrames, "BetterFriendsFrame")
+		-- Register frame to close on Escape key (like Blizzard's FriendsFrame)
+		table.insert(UISpecialFrames, "BetterFriendsFrame")
+		
+		-- For WoW 11.2: Use Menu.ModifyMenu with correct MENU_UNIT_* tags
+		-- According to https://warcraft.wiki.gg/wiki/Blizzard_Menu_implementation_guide
+		-- UnitPopup menus use "MENU_UNIT_<UNIT_TYPE>" format
+		
+		local function AddGroupsToFriendMenu(owner, rootDescription, contextData)
+			-- contextData contains bnetIDAccount or name
+			if not contextData then
+				return
+			end
 			
-			-- Setup scroll frame
+			-- Determine friendUID from contextData
+			local friendUID
+			if contextData.bnetIDAccount then
+				friendUID = "bnet_" .. contextData.bnetIDAccount
+			elseif contextData.name then
+				friendUID = "wow_" .. contextData.name
+			end
+			
+			if not friendUID then
+				return
+			end
+			
+			-- Check if this friend is in any custom group
+			local friendCurrentGroups = {}
+			if BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friendUID] then
+				for _, gid in ipairs(BetterFriendlistDB.friendGroups[friendUID]) do
+					friendCurrentGroups[gid] = true
+				end
+			end
+			
+			-- Add divider and Groups submenu
+			rootDescription:CreateDivider()
+			local groupsButton = rootDescription:CreateButton("Groups")
+			
+			-- Add "Create Group" option at the top
+			groupsButton:CreateButton("Create Group", function()
+				StaticPopup_Show("BETTER_FRIENDLIST_CREATE_GROUP_AND_ADD_FRIEND", nil, nil, friendUID)
+			end)
+			
+			-- Count custom groups
+			local customGroupCount = 0
+			for groupId, groupData in pairs(friendGroups) do
+				if not groupData.builtin then
+					customGroupCount = customGroupCount + 1
+				end
+			end
+			
+			-- Add divider if there are custom groups
+			if customGroupCount > 0 then
+				groupsButton:CreateDivider()
+				
+				-- Add checkbox for each custom group
+				for groupId, groupData in pairs(friendGroups) do
+					if not groupData.builtin then
+						groupsButton:CreateCheckbox(
+							groupData.name,
+							function() return BetterFriendsList_IsFriendInGroup(friendUID, groupId) end,
+							function()
+								BetterFriendsList_ToggleFriendInGroup(friendUID, groupId)
+								BetterFriendsFrame_UpdateDisplay()
+							end
+						)
+					end
+				end
+				
+				-- Add "Remove from All Groups" if friend is in custom groups
+				if next(friendCurrentGroups) then
+					groupsButton:CreateDivider()
+					
+					-- Add "Remove from All Groups" button
+					groupsButton:CreateButton("Remove from All Groups", function()
+						for currentGroupId in pairs(friendCurrentGroups) do
+							BetterFriendsList_RemoveFriendFromGroup(friendUID, currentGroupId)
+						end
+						BetterFriendsFrame_UpdateDisplay()
+					end)
+				end
+			end
+		end
+		
+		-- Register for BattleNet friend menus (online and offline)
+		if Menu and Menu.ModifyMenu then
+			Menu.ModifyMenu("MENU_UNIT_BN_FRIEND", AddGroupsToFriendMenu)
+			Menu.ModifyMenu("MENU_UNIT_BN_FRIEND_OFFLINE", AddGroupsToFriendMenu)
+			
+			-- Register for WoW friend menus (online and offline)
+			Menu.ModifyMenu("MENU_UNIT_FRIEND", AddGroupsToFriendMenu)
+			Menu.ModifyMenu("MENU_UNIT_FRIEND_OFFLINE", AddGroupsToFriendMenu)
+		end
+		
+		-- DEPRECATED: Old Menu.ModifyMenu code removed (was using wrong tags without MENU_UNIT_ prefix)
+		
+		-- Setup scroll frame
 			if BetterFriendsFrame and BetterFriendsFrame.ScrollFrame then
 				BetterFriendsFrame.ScrollFrame:SetScript("OnVerticalScroll", function(self, offset)
 					FauxScrollFrame_OnVerticalScroll(self, offset, 34, UpdateFriendsDisplay)
@@ -1788,6 +2606,13 @@ local selectedWhoButton = nil
 function BetterFriendsFrame_ShowContactsMenu(button)
 	MenuUtil.CreateContextMenu(button, function(ownerRegion, rootDescription)
 		rootDescription:SetTag("CONTACTS_MENU");
+		
+		-- Create Group option
+		rootDescription:CreateButton("Create Group", function()
+			StaticPopup_Show("BETTER_FRIENDLIST_CREATE_GROUP")
+		end);
+		
+		rootDescription:CreateDivider();
 		
 		-- Broadcast option (only if BNet is connected)
 		local canUseBroadCastFrame = BNFeaturesEnabled() and BNConnected();
