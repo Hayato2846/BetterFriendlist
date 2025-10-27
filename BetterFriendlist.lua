@@ -1,8 +1,14 @@
 -- BetterFriendlist.lua
 -- A friends list replacement for World of Warcraft with Battle.net support
 -- Version 0.1
+-- LEGACY FILE - Being refactored into modules
 
-local ADDON_VERSION = "0.1"
+local ADDON_NAME, BFL = ...
+local ADDON_VERSION = BFL.Version
+
+-- Get modules
+local function GetDB() return BFL:GetModule("DB") end
+local function GetGroups() return BFL:GetModule("Groups") end
 
 -- Define color constants if they don't exist (used by Recent Allies)
 -- Note: Blizzard uses FRIENDS_OFFLINE_BACKGROUND_COLOR (with S), not FRIEND_OFFLINE_BACKGROUND_COLOR
@@ -76,30 +82,19 @@ local function CreateFadeOutAnimation(frame, onFinished)
 	return frame.fadeOutAnim
 end
 
--- Friend Groups
-local friendGroups = {
-	favorites = {
-		id = "favorites",
-		name = "Favorites",
-		collapsed = false,
-		builtin = true,
-		order = 1,
-		color = {r = 1.0, g = 0.82, b = 0.0}, -- Gold
-		icon = "Interface\\FriendsFrame\\Battlenet-Battleneticon"
-	},
-	nogroup = {
-		id = "nogroup",
-		name = "No Group",
-		collapsed = false,
-		builtin = true,
-		order = 999,
-		color = {r = 0.5, g = 0.5, b = 0.5}, -- Gray
-		icon = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon"
-	}
-}
+-- Friend Groups (now managed by Groups module)
+local friendGroups = {} -- Will be synced from Groups module
 
--- Saved variables (initialized on ADDON_LOADED)
-BetterFriendlistDB = BetterFriendlistDB or {}
+-- Helper to sync groups from module
+local function SyncGroups()
+	local Groups = GetGroups()
+	if Groups then
+		friendGroups = Groups:GetAll()
+	end
+end
+
+-- Saved variables (managed by Database module)
+-- BetterFriendlistDB is now handled by Modules/Database.lua
 
 -- Invite restriction constants (matching Blizzard's)
 local INVITE_RESTRICTION_NONE = 0
