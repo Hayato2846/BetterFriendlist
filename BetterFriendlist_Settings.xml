@@ -1,0 +1,370 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<!-- BetterFriendlist Settings Side Panel -->
+	<Frame name="BetterFriendlistSettingsFrame" parent="BetterFriendsFrame" inherits="ButtonFrameTemplate" hidden="true" frameStrata="HIGH" enableMouse="true" movable="false" toplevel="false">
+		<Size x="420" y="520" />
+		<Anchors>
+			<Anchor point="TOPLEFT" relativePoint="TOPRIGHT" x="5" y="0" />
+		</Anchors>
+		<Frames>
+			<!-- Single Main Inset Frame - contains everything -->
+			<Frame parentKey="MainInset" inherits="InsetFrameTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="4" y="-50" />
+					<Anchor point="BOTTOMRIGHT" x="-6" y="25" />
+				</Anchors>
+			</Frame>
+			
+			<!-- Tab 1: General - at top of MainInset -->
+			<Button name="$parentTab1" parentKey="Tab1" inherits="PanelTopTabButtonTemplate" text="General" id="1">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeKey="$parent.MainInset" relativePoint="TOPLEFT" x="8" y="31" />
+				</Anchors>
+				<Scripts>
+					<OnClick>
+						BetterFriendlistSettings_ShowTab(1)
+					</OnClick>
+				</Scripts>
+			</Button>
+			<!-- Tab 2: Groups -->
+			<Button name="$parentTab2" parentKey="Tab2" inherits="PanelTopTabButtonTemplate" text="Groups" id="2">
+				<Anchors>
+					<Anchor point="LEFT" relativeKey="$parent.Tab1" relativePoint="RIGHT" x="-15" y="0" />
+				</Anchors>
+				<Scripts>
+					<OnClick>
+						BetterFriendlistSettings_ShowTab(2)
+					</OnClick>
+				</Scripts>
+			</Button>
+			<!-- Tab 3: Appearance -->
+			<Button name="$parentTab3" parentKey="Tab3" inherits="PanelTopTabButtonTemplate" text="Appearance" id="3">
+				<Anchors>
+					<Anchor point="LEFT" relativeKey="$parent.Tab2" relativePoint="RIGHT" x="-15" y="0" />
+				</Anchors>
+				<Scripts>
+					<OnClick>
+						BetterFriendlistSettings_ShowTab(3)
+					</OnClick>
+				</Scripts>
+			</Button>
+			<!-- Tab 4: Advanced -->
+			<Button name="$parentTab4" parentKey="Tab4" inherits="PanelTopTabButtonTemplate" text="Advanced" id="4">
+				<Anchors>
+					<Anchor point="LEFT" relativeKey="$parent.Tab3" relativePoint="RIGHT" x="-15" y="0" />
+				</Anchors>
+				<Scripts>
+					<OnClick>
+						BetterFriendlistSettings_ShowTab(4)
+					</OnClick>
+				</Scripts>
+			</Button>
+			
+		<!-- Content Scroll Frame - below tabs, above buttons inside MainInset -->
+		<ScrollFrame parentKey="ContentScrollFrame" inherits="UIPanelScrollFrameTemplate">
+			<Anchors>
+				<Anchor point="TOPLEFT" relativeKey="$parent.MainInset" relativePoint="TOPLEFT" x="8" y="-8" />
+				<Anchor point="BOTTOMRIGHT" relativeKey="$parent.MainInset" relativePoint="BOTTOMRIGHT" x="-26" y="8" />
+			</Anchors>
+			<ScrollChild>
+				<Frame parentKey="Content">
+						<Size x="360" y="600" />
+					<Frames>
+						<!-- General Tab Content -->
+						<Frame parentKey="GeneralTab" hidden="false">
+							<Anchors>
+								<Anchor point="TOPLEFT" />
+								<Anchor point="BOTTOMRIGHT" />
+							</Anchors>
+								<Layers>
+									<Layer level="ARTWORK">
+										<FontString parentKey="Title" inherits="GameFontNormalLarge" text="General Settings">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="10" y="-10" />
+											</Anchors>
+										</FontString>
+										<FontString parentKey="Description" inherits="GameFontHighlight" text="Configure general behavior and options">
+											<Anchors>
+												<Anchor point="TOPLEFT" relativeKey="$parent.Title" relativePoint="BOTTOMLEFT" x="0" y="-5" />
+											</Anchors>
+										</FontString>
+									</Layer>
+								</Layers>
+								<Frames>
+									<!-- Show Blizzard Friendlist Option - Modern Checkbox -->
+									<CheckButton parentKey="ShowBlizzardOption" inherits="UICheckButtonTemplate">
+										<Anchors>
+											<Anchor point="TOPLEFT" relativeKey="$parent.Description" relativePoint="BOTTOMLEFT" x="0" y="-20" />
+										</Anchors>
+										<Scripts>
+											<OnLoad>
+												self.text:SetText("Show 'Blizzard Friendlist' in menu")
+												self.text:SetFontObject("GameFontHighlight")
+											</OnLoad>
+										</Scripts>
+									</CheckButton>
+								</Frames>
+							</Frame>
+							
+						<!-- Groups Tab Content -->
+						<Frame parentKey="GroupsTab" hidden="true">
+							<Anchors>
+								<Anchor point="TOPLEFT" />
+								<Anchor point="BOTTOMRIGHT" />
+							</Anchors>
+							<Layers>
+								<Layer level="ARTWORK">
+									<FontString parentKey="Title" inherits="GameFontNormalLarge" text="Group Management">
+										<Anchors>
+											<Anchor point="TOPLEFT" x="10" y="-10" />
+										</Anchors>
+									</FontString>
+									<FontString parentKey="Description" inherits="GameFontHighlight" text="Drag groups to reorder them in your friends list">
+										<Anchors>
+											<Anchor point="TOPLEFT" relativeKey="$parent.Title" relativePoint="BOTTOMLEFT" x="0" y="-5" />
+										</Anchors>
+									</FontString>
+								</Layer>
+							</Layers>
+						<Frames>
+						<!-- Group Order Section -->
+						<Frame parentKey="GroupOrderSection">
+									<Anchors>
+										<Anchor point="TOPLEFT" relativeKey="$parent.Description" relativePoint="BOTTOMLEFT" x="0" y="-10" />
+										<Anchor point="BOTTOMRIGHT" x="-10" y="10" />
+									</Anchors>
+									<Layers>
+										<Layer level="ARTWORK">
+											<FontString parentKey="SectionTitle" inherits="GameFontNormalLarge" text="Group Order">
+												<Anchors>
+													<Anchor point="TOPLEFT" x="0" y="0" />
+												</Anchors>
+											</FontString>
+										</Layer>
+									</Layers>
+									<Frames>
+										<!-- Container for Group List (no inner scroll) -->
+										<Frame parentKey="Container">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="5" y="-25" />
+												<Anchor point="BOTTOMRIGHT" x="-5" y="5" />
+											</Anchors>
+										</Frame>
+									</Frames>
+								</Frame>
+						</Frames>
+					</Frame>
+					
+					<!-- Appearance Tab Content -->
+					<Frame parentKey="AppearanceTab" hidden="true">
+							<Anchors>
+								<Anchor point="TOPLEFT" />
+								<Anchor point="BOTTOMRIGHT" />
+							</Anchors>
+							<Layers>
+								<Layer level="ARTWORK">
+									<FontString parentKey="Title" inherits="GameFontNormalLarge" text="Appearance Settings">
+										<Anchors>
+											<Anchor point="TOPLEFT" x="10" y="-10" />
+										</Anchors>
+									</FontString>
+									<FontString parentKey="Description" inherits="GameFontHighlight" text="Customize the look and feel">
+										<Anchors>
+											<Anchor point="TOPLEFT" relativeKey="$parent.Title" relativePoint="BOTTOMLEFT" x="0" y="-5" />
+										</Anchors>
+									</FontString>
+								</Layer>
+							</Layers>
+							<Frames>
+								<!-- Compact Mode Checkbox - Modern -->
+								<CheckButton parentKey="CompactMode" inherits="UICheckButtonTemplate">
+									<Anchors>
+										<Anchor point="TOPLEFT" relativeKey="$parent.Description" relativePoint="BOTTOMLEFT" x="0" y="-20" />
+									</Anchors>
+									<Scripts>
+										<OnLoad>
+											self.text:SetText("Compact Mode")
+											self.text:SetFontObject("GameFontHighlight")
+										</OnLoad>
+										<OnEnter>
+											GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+											GameTooltip:SetText("Compact Mode", 1, 1, 1)
+											GameTooltip:AddLine("Reduces button height to fit more friends on screen", 0.8, 0.8, 0.8, true)
+											GameTooltip:Show()
+										</OnEnter>
+										<OnLeave>
+											GameTooltip:Hide()
+										</OnLeave>
+									</Scripts>
+								</CheckButton>
+								
+								<!-- Font Size Section -->
+								<Frame parentKey="FontSizeSection">
+									<Size x="340" y="40" />
+									<Anchors>
+										<Anchor point="TOPLEFT" relativeKey="$parent.CompactMode" relativePoint="BOTTOMLEFT" x="0" y="-20" />
+									</Anchors>
+									<Layers>
+										<Layer level="ARTWORK">
+											<FontString parentKey="Label" inherits="GameFontNormal" text="Font Size:">
+												<Anchors>
+													<Anchor point="TOPLEFT" x="0" y="0" />
+												</Anchors>
+											</FontString>
+										</Layer>
+									</Layers>
+								<Frames>
+									<!-- Font Size Dropdown (Modern) -->
+									<DropdownButton parentKey="Dropdown" inherits="WowStyle2DropdownTemplate">
+										<Size x="180" y="22"/>
+										<Anchors>
+											<Anchor point="TOPLEFT" relativeKey="$parent.Label" relativePoint="BOTTOMLEFT" x="0" y="-8" />
+										</Anchors>
+									</DropdownButton>
+								</Frames>
+							</Frame>
+							</Frames>
+						</Frame>
+					
+					<!-- Advanced Tab Content -->
+					<Frame parentKey="AdvancedTab" hidden="true">
+						<Anchors>
+							<Anchor point="TOPLEFT" />
+							<Anchor point="BOTTOMRIGHT" />
+						</Anchors>
+						<Layers>
+							<Layer level="ARTWORK">
+								<FontString parentKey="Title" inherits="GameFontNormalLarge" text="Advanced Settings">
+									<Anchors>
+										<Anchor point="TOPLEFT" x="10" y="-10" />
+									</Anchors>
+								</FontString>
+								<FontString parentKey="Description" inherits="GameFontHighlight" text="Advanced options and tools">
+									<Anchors>
+										<Anchor point="TOPLEFT" relativeKey="$parent.Title" relativePoint="BOTTOMLEFT" x="0" y="-5" />
+									</Anchors>
+								</FontString>
+								
+								<!-- Migration Section -->
+								<FontString parentKey="MigrationHeader" inherits="GameFontNormal" text="FriendGroups Migration">
+									<Anchors>
+										<Anchor point="TOPLEFT" relativeKey="$parent.Description" relativePoint="BOTTOMLEFT" x="0" y="-20" />
+									</Anchors>
+									<Color r="1" g="0.82" b="0" />
+								</FontString>
+								<FontString parentKey="MigrationDesc1" inherits="GameFontHighlightSmall" text="Migrate groups and friend assignments from FriendGroups addon.">
+									<Anchors>
+										<Anchor point="TOPLEFT" relativeKey="$parent.MigrationHeader" relativePoint="BOTTOMLEFT" x="0" y="-8" />
+										<Anchor point="RIGHT" x="-10" />
+									</Anchors>
+								</FontString>
+								<FontString parentKey="MigrationDesc2" inherits="GameFontHighlightSmall" text="This will parse group information from BattleNet notes and">
+									<Anchors>
+										<Anchor point="TOPLEFT" relativeKey="$parent.MigrationDesc1" relativePoint="BOTTOMLEFT" x="0" y="-3" />
+										<Anchor point="RIGHT" x="-10" />
+									</Anchors>
+								</FontString>
+								<FontString parentKey="MigrationDesc3" inherits="GameFontHighlightSmall" text="create corresponding groups in BetterFriendlist.">
+									<Anchors>
+										<Anchor point="TOPLEFT" relativeKey="$parent.MigrationDesc2" relativePoint="BOTTOMLEFT" x="0" y="-3" />
+										<Anchor point="RIGHT" x="-10" />
+									</Anchors>
+								</FontString>
+							</Layer>
+						</Layers>
+						<Frames>
+							<!-- Migration Button -->
+							<Button parentKey="MigrateButton" inherits="UIPanelButtonTemplate" text="Migrate from FriendGroups">
+								<Size x="200" y="24" />
+								<Anchors>
+									<Anchor point="TOPLEFT" relativeKey="$parent.MigrationDesc3" relativePoint="BOTTOMLEFT" x="0" y="-15" />
+								</Anchors>
+								<Scripts>
+									<OnClick>
+										BetterFriendlistSettings_ShowMigrationDialog()
+									</OnClick>
+								</Scripts>
+							</Button>
+						</Frames>
+					</Frame>
+			</Frames>
+		</Frame>
+	</ScrollChild>
+</ScrollFrame>
+
+<!-- Bottom Buttons - at bottom of MainInset -->
+<Button parentKey="DefaultsButton" inherits="UIPanelButtonTemplate" text="Defaults">
+	<Size x="96" y="22" />
+	<Anchors>
+		<Anchor point="BOTTOMLEFT" relativeKey="$parent.MainInset" relativePoint="BOTTOMLEFT" x="8" y="-22" />
+	</Anchors>
+	<Scripts>
+		<OnClick>
+			BetterFriendlistSettings_ResetToDefaults()
+		</OnClick>
+	</Scripts>
+</Button>
+
+<Button parentKey="CancelButton" inherits="UIPanelButtonTemplate" text="Cancel">
+	<Size x="96" y="22" />
+	<Anchors>
+		<Anchor point="BOTTOMRIGHT" relativeKey="$parent.MainInset" relativePoint="BOTTOMRIGHT" x="-110" y="-22" />
+	</Anchors>
+	<Scripts>
+		<OnClick>
+			BetterFriendlistSettings_Cancel()
+		</OnClick>
+	</Scripts>
+</Button>
+
+<Button parentKey="ApplyButton" inherits="UIPanelButtonTemplate" text="Apply">
+	<Size x="96" y="22" />
+	<Anchors>
+		<Anchor point="BOTTOMRIGHT" relativeKey="$parent.MainInset" relativePoint="BOTTOMRIGHT" x="-8" y="-22" />
+	</Anchors>
+	<Scripts>
+		<OnClick>
+			BetterFriendlistSettings_Apply()
+		</OnClick>
+	</Scripts>
+</Button>
+	</Frames>
+	<Scripts>
+		<OnLoad>
+			-- Hide portrait (ButtonFrameTemplate creates one automatically)
+			if self.portrait then
+				self.portrait:Hide()
+			end
+			if self.PortraitContainer then
+				self.PortraitContainer:Hide()
+			end
+			
+			-- Set title
+			self.TitleContainer.TitleText:SetText("BetterFriendlist Settings")
+			
+			-- Setup ButtonFrameTemplate
+			ButtonFrameTemplate_HidePortrait(self)
+			ButtonFrameTemplate_HideAttic(self)
+			
+			-- Hide the default Inset (we use MainInset instead)
+			if self.Inset then
+				self.Inset:Hide()
+			end
+			
+			-- Setup tab system
+			PanelTemplates_SetNumTabs(self, 4)
+			PanelTemplates_SetTab(self, 1)
+			
+			-- Initialize
+			if BetterFriendlistSettings_OnLoad then
+				BetterFriendlistSettings_OnLoad()
+			end
+		</OnLoad>
+		<OnDragStart>
+			self:StartMoving()
+		</OnDragStart>
+		<OnDragStop>
+			self:StopMovingOrSizing()
+		</OnDragStop>
+	</Scripts>
+</Frame>
+</Ui>

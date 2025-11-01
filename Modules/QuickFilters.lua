@@ -1,0 +1,144 @@
+-- Modules/QuickFilters.lua
+-- Quick Filters System Module
+-- Manages the quick filter dropdown and filter state
+
+local ADDON_NAME, BFL = ...
+
+-- Register Module
+local QuickFilters = BFL:RegisterModule("QuickFilters", {})
+
+-- ========================================
+-- Module Dependencies
+-- ========================================
+
+local function GetFriendsList()
+	return BFL:GetModule("FriendsList")
+end
+
+-- ========================================
+-- Local Variables
+-- ========================================
+
+-- Filter icons
+local FILTER_ICONS = {
+	all = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon",  -- All Friends (friend icon)
+	online = "Interface\\FriendsFrame\\StatusIcon-Online",       -- Online Only (green online icon)
+	offline = "Interface\\FriendsFrame\\StatusIcon-Offline",     -- Offline Only (gray offline icon)
+	wow = "Interface\\ChatFrame\\UI-ChatIcon-WoW",               -- WoW Only (WoW logo from chat)
+	bnet = "Interface\\ChatFrame\\UI-ChatIcon-Battlenet"         -- Battle.net Only (BNet logo from chat)
+}
+
+-- Current filter mode
+local filterMode = "all"
+
+-- ========================================
+-- Public API
+-- ========================================
+
+-- Initialize (called from ADDON_LOADED)
+function QuickFilters:Initialize()
+	-- Nothing to initialize yet
+end
+
+-- Initialize Quick Filter Dropdown
+function QuickFilters:InitDropdown(dropdown)
+	if not dropdown then return end
+	
+	-- Helper function to check if a filter mode is selected
+	local function IsSelected(mode)
+		return filterMode == mode
+	end
+	
+	-- Helper function to set the filter mode
+	local function SetSelected(mode)
+		if mode ~= filterMode then
+			self:SetFilter(mode)
+		end
+	end
+	
+	-- Helper function to create radio button with icon
+	local function CreateRadio(rootDescription, text, mode)
+		local radio = rootDescription:CreateButton(text, function() end, mode)
+		radio:SetIsSelected(IsSelected)
+		radio:SetResponder(SetSelected)
+	end
+	
+	-- Set dropdown width (same as StatusDropdown)
+	dropdown:SetWidth(51)
+	
+	-- Setup the dropdown menu
+	dropdown:SetupMenu(function(dropdown, rootDescription)
+		rootDescription:SetTag("MENU_FRIENDS_QUICKFILTER")
+		
+		-- Format for icon + text in menu
+		local optionText = "\124T%s:16:16:0:0\124t %s"
+		
+		-- Create filter options with icons
+		local allText = string.format(optionText, FILTER_ICONS.all, "All Friends")
+		CreateRadio(rootDescription, allText, "all")
+		
+		local onlineText = string.format(optionText, FILTER_ICONS.online, "Online Only")
+		CreateRadio(rootDescription, onlineText, "online")
+		
+		local offlineText = string.format(optionText, FILTER_ICONS.offline, "Offline Only")
+		CreateRadio(rootDescription, offlineText, "offline")
+		
+		local wowText = string.format(optionText, FILTER_ICONS.wow, "WoW Only")
+		CreateRadio(rootDescription, wowText, "wow")
+		
+		local bnetText = string.format(optionText, FILTER_ICONS.bnet, "Battle.net Only")
+		CreateRadio(rootDescription, bnetText, "bnet")
+	end)
+	
+	-- SetSelectionTranslator: Shows only the icon
+	dropdown:SetSelectionTranslator(function(selection)
+		return string.format("\124T%s:16:16:0:0\124t", FILTER_ICONS[selection.data])
+	end)
+	
+	-- Setup tooltip
+	dropdown:SetScript("OnEnter", function()
+		local filterText = self:GetFilterText()
+		
+		GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
+		GameTooltip:SetText("Quick Filter: " .. filterText)
+		GameTooltip:Show()
+	end)
+	
+	dropdown:SetScript("OnLeave", GameTooltip_Hide)
+end
+
+-- Set the quick filter mode
+function QuickFilters:SetFilter(mode)
+	filterMode = mode
+	
+	-- Update FriendsList module with new filter
+	local FriendsList = GetFriendsList()
+	if FriendsList then
+		FriendsList:SetFilterMode(filterMode)
+	end
+	
+	-- Return true to indicate filter changed (caller should refresh display)
+	return true
+end
+
+-- Get current filter mode
+function QuickFilters:GetFilter()
+	return filterMode
+end
+
+-- Get filter text for UI display
+function QuickFilters:GetFilterText()
+	local filterTexts = {
+		all = "All Friends",
+		online = "Online Only",
+		offline = "Offline Only",
+		wow = "WoW Only",
+		bnet = "Battle.net Only",
+	}
+	return filterTexts[filterMode] or "All Friends"
+end
+
+-- Get filter icons table
+function QuickFilters:GetIcons()
+	return FILTER_ICONS
+end

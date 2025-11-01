@@ -9,6 +9,12 @@ local defaults = {
 	groupStates = {},
 	customGroups = {},
 	friendGroups = {},
+	showBlizzardOption = false, -- Show "Show Blizzard's Friendlist" in menu
+	groupOrder = nil, -- nil = use default order (favorites, custom alphabetically, nogroup)
+	groupColors = {}, -- {groupId: {r, g, b}} - custom colors for group headers
+	-- Visual Settings
+	compactMode = false, -- Use compact button layout
+	fontSize = "normal", -- "small", "normal", "large"
 	version = BFL.Version
 }
 

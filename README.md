@@ -40,9 +40,20 @@ A modern, refactored World of Warcraft addon for organizing friends into custom 
 
 1. Download or clone this repository
 2. Extract to your World of Warcraft AddOns directory:
-   - `World of Warcraft\_retail_\Interface\AddOns\FriendGroups\`
+   - `World of Warcraft\_retail_\Interface\AddOns\BetterFriendlist\`
 3. Restart World of Warcraft or reload your UI (`/reload`)
 4. The addon will automatically integrate with your existing Friends frame
+
+### Migrating from FriendGroups
+If you're upgrading from the FriendGroups addon:
+1. Install BetterFriendlist (keep FriendGroups enabled for now)
+2. Open Settings (ESC → Interface → AddOns → BetterFriendlist)
+3. Go to the **Advanced** tab
+4. Click **"Migrate from FriendGroups"**
+5. Choose whether to clean up your BattleNet notes
+6. After successful migration, you can disable FriendGroups
+
+📖 **Detailed Migration Guide**: See [FRIENDGROUPS_MIGRATION.md](FRIENDGROUPS_MIGRATION.md) for complete instructions.
 
 ## Usage
 

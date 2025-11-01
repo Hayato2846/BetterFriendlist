@@ -44,7 +44,7 @@ function Groups:Initialize()
 			collapsed = groupInfo.collapsed or false,
 			builtin = false,
 			order = groupInfo.order or 50,
-			color = {r = 0, g = 0.7, b = 1.0}, -- Default blue
+			color = {r = 1.0, g = 0.82, b = 0.0}, -- Default gold
 			icon = "Interface\\FriendsFrame\\UI-Toast-ChatInviteIcon"
 		}
 	end
@@ -54,6 +54,40 @@ function Groups:Initialize()
 		local collapsed = DB:GetGroupState(groupId)
 		if collapsed ~= nil then
 			groupData.collapsed = collapsed
+		end
+	end
+	
+	-- Apply custom group colors from settings
+	local groupColors = DB:Get("groupColors")
+	if groupColors and type(groupColors) == "table" then
+		for groupId, color in pairs(groupColors) do
+			if self.groups[groupId] and color.r and color.g and color.b then
+				self.groups[groupId].color = {r = color.r, g = color.g, b = color.b}
+			end
+		end
+	end
+	
+	-- Apply saved group order from settings
+	local savedOrder = DB:Get("groupOrder")
+	if savedOrder and type(savedOrder) == "table" and #savedOrder > 0 then
+		-- Apply order from saved settings
+		for i, groupId in ipairs(savedOrder) do
+			if self.groups[groupId] then
+				self.groups[groupId].order = i
+			end
+		end
+		-- Groups not in saved order get high order values
+		for groupId, groupData in pairs(self.groups) do
+			local found = false
+			for _, savedId in ipairs(savedOrder) do
+				if savedId == groupId then
+					found = true
+					break
+				end
+			end
+			if not found then
+				groupData.order = 1000 + (#savedOrder)
+			end
 		end
 	end
 end
@@ -97,7 +131,7 @@ function Groups:Create(groupName)
 		collapsed = false,
 		builtin = false,
 		order = maxOrder + 1,
-		color = {r = 0, g = 0.7, b = 1.0}, -- Default blue for custom groups
+		color = {r = 1.0, g = 0.82, b = 0.0}, -- Default gold for all groups
 		icon = "Interface\\FriendsFrame\\UI-Toast-ChatInviteIcon"
 	}
 	
@@ -107,6 +141,42 @@ function Groups:Create(groupName)
 		name = groupName,
 		collapsed = false,
 		order = maxOrder + 1
+	})
+	
+	return true, groupId
+end
+
+-- Create a new custom group with specific order (for migration)
+function Groups:CreateWithOrder(groupName, orderValue)
+	if not groupName or groupName == "" then
+		return false, "Group name cannot be empty"
+	end
+	
+	-- Generate unique ID from name
+	local groupId = "custom_" .. groupName:gsub("%s+", "_"):lower()
+	
+	-- Check if group already exists
+	if self.groups[groupId] then
+		return false, "Group already exists"
+	end
+	
+	-- Create group with specified order
+	self.groups[groupId] = {
+		id = groupId,
+		name = groupName,
+		collapsed = false,
+		builtin = false,
+		order = orderValue,
+		color = {r = 1.0, g = 0.82, b = 0.0}, -- Default gold for all groups
+		icon = "Interface\\FriendsFrame\\UI-Toast-ChatInviteIcon"
+	}
+	
+	-- Save to database
+	local DB = BFL:GetModule("DB")
+	DB:SaveCustomGroup(groupId, {
+		name = groupName,
+		collapsed = false,
+		order = orderValue
 	})
 	
 	return true, groupId
