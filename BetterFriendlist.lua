@@ -383,15 +383,25 @@ end
 function GetFriendUID(friend)
 	if not friend then return nil end
 	if friend.type == "bnet" then
-		-- CRITICAL: Must use tostring() to ensure numeric ID is converted to string
-		-- Migration uses: "bnet_" .. tostring(bnetAccountID)
-		-- Must match exactly!
-		if friend.bnetAccountID then
+		-- Use battleTag as persistent identifier (bnetAccountID is temporary per session)
+		if friend.battleTag then
+			return "bnet_" .. friend.battleTag
+		elseif friend.bnetAccountID then
+			-- Fallback: Try to look up battleTag from bnetAccountID
+			local numBNet = BNGetNumFriends()
+			for i = 1, numBNet do
+				local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
+				if accountInfo and accountInfo.bnetAccountID == friend.bnetAccountID and accountInfo.battleTag then
+					return "bnet_" .. accountInfo.battleTag
+				end
+			end
+			-- Last resort: use bnetAccountID (will cause issues with persistence)
+			print("|cffff0000BetterFriendlist Warning:|r Using bnetAccountID for friend UID (battleTag unavailable)")
 			return "bnet_" .. tostring(friend.bnetAccountID)
 		else
-			-- Fallback (shouldn't happen, but be safe)
-			print("|cffff0000BetterFriendlist Error:|r BNet friend without bnetAccountID!")
-			return "bnet_" .. (friend.battleTag or "unknown")
+			-- Should never happen
+			print("|cffff0000BetterFriendlist Error:|r BNet friend without bnetAccountID or battleTag!")
+			return "bnet_unknown"
 		end
 	else
 		return "wow_" .. (friend.name or "")
@@ -567,16 +577,23 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			
 		-- COMBAT FIX: ESC key via CloseSpecialWindows hook
 		-- CloseSpecialWindows is NOT protected and called by ESC before ToggleGameMenu
-		-- Returns true = window was closed (stops ESC chain), false = continue
+		-- Hook (not replace!) to ensure our frame also responds to ESC
 		local originalCloseSpecialWindows = CloseSpecialWindows
 		CloseSpecialWindows = function()
-			-- If our frame is visible (Alpha > 0), close it
-			if BetterFriendsFrame and BetterFriendsFrame:GetAlpha() > 0 then
+			local closedSomething = false
+			
+			-- If our frame is visible, close it
+			if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
 				HideBetterFriendsFrame()
-				return true  -- Signal that a window was closed (stops ESC chain)
+				closedSomething = true
 			end
-			-- Otherwise, call original function
-			return originalCloseSpecialWindows()
+			
+			-- Always call original to handle other frames
+			-- It returns true if it closed something
+			local originalClosed = originalCloseSpecialWindows()
+			
+			-- Return true if either we closed something OR original closed something
+			return closedSomething or originalClosed
 		end
 		
 	
@@ -593,88 +610,120 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		-- contextData contains bnetIDAccount or name
 		if not contextData then
 			return
-		end			-- Determine friendUID from contextData
-			local friendUID
-			if contextData.bnetIDAccount then
-				friendUID = "bnet_" .. contextData.bnetIDAccount
-			elseif contextData.name then
-				friendUID = "wow_" .. contextData.name
-			end
-			
-			if not friendUID then
-				return
-			end
-			
-			-- Check if this friend is in any custom group
-			local friendCurrentGroups = {}
-			if BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friendUID] then
-				for _, gid in ipairs(BetterFriendlistDB.friendGroups[friendUID]) do
-					friendCurrentGroups[gid] = true
-				end
-			end
-			
-			-- Add divider and Groups submenu
-			rootDescription:CreateDivider()
-			local groupsButton = rootDescription:CreateButton("Groups")
-			
-			-- Add "Create Group" option at the top
-			groupsButton:CreateButton("Create Group", function()
-				StaticPopup_Show("BETTER_FRIENDLIST_CREATE_GROUP_AND_ADD_FRIEND", nil, nil, friendUID)
-			end)
-			
-			-- Count custom groups
-			local customGroupCount = 0
-			for groupId, groupData in pairs(friendGroups) do
-				if not groupData.builtin then
-					customGroupCount = customGroupCount + 1
-				end
-			end
-			
-			-- Add divider if there are custom groups
-			if customGroupCount > 0 then
-				groupsButton:CreateDivider()
-				
-				-- Collect and sort custom groups by order
-				local sortedGroups = {}
-				for groupId, groupData in pairs(friendGroups) do
-					if not groupData.builtin then
-						table.insert(sortedGroups, {id = groupId, data = groupData})
+		end
+		
+		-- Determine friendUID from contextData
+		local friendUID
+		if contextData.bnetIDAccount then
+			-- For BNet friends, we need to look up the battleTag
+			local numBNet = BNGetNumFriends()
+			for i = 1, numBNet do
+				local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
+				if accountInfo and accountInfo.bnetAccountID == contextData.bnetIDAccount then
+					if accountInfo.battleTag then
+						friendUID = "bnet_" .. accountInfo.battleTag
+					else
+						print("|cffff0000BetterFriendlist Warning:|r BNet friend without battleTag, using bnetAccountID")
+						friendUID = "bnet_" .. tostring(contextData.bnetIDAccount)
 					end
+					break
 				end
-				table.sort(sortedGroups, function(a, b) return a.data.order < b.data.order end)
-				
-				-- Add checkbox for each custom group in sorted order
-				for _, group in ipairs(sortedGroups) do
-					local Groups = GetGroups()
-					groupsButton:CreateCheckbox(
-						group.data.name,
-						function() return Groups and Groups:IsFriendInGroup(friendUID, group.id) or false end,
-						function()
-							if Groups then
-								Groups:ToggleFriendInGroup(friendUID, group.id)
-								BetterFriendsFrame_UpdateDisplay()
-							end
-						end
-					)
-				end
-				
-				-- Add "Remove from All Groups" if friend is in custom groups
-				if next(friendCurrentGroups) then
-					groupsButton:CreateDivider()
-					
-					-- Add "Remove from All Groups" button
-					local Groups = GetGroups()
-					groupsButton:CreateButton("Remove from All Groups", function()
-						if Groups then
-							for currentGroupId in pairs(friendCurrentGroups) do
-								Groups:RemoveFriendFromGroup(friendUID, currentGroupId)
-							end
-							BetterFriendsFrame_UpdateDisplay()
-						end
-					end)
-				end
+			end
+			
+			-- If not found in friends list (shouldn't happen), fallback to bnetAccountID
+			if not friendUID then
+				print("|cffff0000BetterFriendlist Warning:|r Could not find BNet friend, using bnetAccountID")
+				friendUID = "bnet_" .. tostring(contextData.bnetIDAccount)
+			end
+		elseif contextData.name then
+			friendUID = "wow_" .. contextData.name
+		end
+		
+		if not friendUID then
+			return
+		end
+		
+		-- Check if this friend is in any custom group
+		local friendCurrentGroups = {}
+		if BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friendUID] then
+			for _, gid in ipairs(BetterFriendlistDB.friendGroups[friendUID]) do
+				friendCurrentGroups[gid] = true
 			end
 		end
+		
+		-- Add divider and Groups submenu
+		rootDescription:CreateDivider()
+		local groupsButton = rootDescription:CreateButton("Groups")
+		
+		-- Add "Create Group" option at the top
+		groupsButton:CreateButton("Create Group", function()
+			StaticPopup_Show("BETTER_FRIENDLIST_CREATE_GROUP_AND_ADD_FRIEND", nil, nil, friendUID)
+		end)
+		
+		-- Count custom groups
+		local customGroupCount = 0
+		for groupId, groupData in pairs(friendGroups) do
+			if not groupData.builtin then
+				customGroupCount = customGroupCount + 1
+			end
+		end
+		
+		-- Add divider if there are custom groups
+		if customGroupCount > 0 then
+			groupsButton:CreateDivider()
+			
+			-- Collect and sort custom groups by order
+			local sortedGroups = {}
+			for groupId, groupData in pairs(friendGroups) do
+				if not groupData.builtin then
+					table.insert(sortedGroups, {id = groupId, data = groupData})
+				end
+			end
+			table.sort(sortedGroups, function(a, b) return a.data.order < b.data.order end)
+			
+		-- Add checkbox for each custom group in sorted order
+		for _, group in ipairs(sortedGroups) do
+			-- Capture group.id in local variable for closure
+			local groupId = group.id
+			
+			groupsButton:CreateCheckbox(
+				group.data.name,
+				function()
+					-- Read state dynamically from DB each time checkbox is rendered
+					if BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friendUID] then
+						for _, gid in ipairs(BetterFriendlistDB.friendGroups[friendUID]) do
+							if gid == groupId then
+								return true
+							end
+						end
+					end
+					return false
+				end,
+				function()
+					local Groups = GetGroups()
+					if Groups then
+						Groups:ToggleFriendInGroup(friendUID, groupId)
+						BetterFriendsFrame_UpdateDisplay()
+					end
+				end
+			)
+		end			-- Add "Remove from All Groups" if friend is in custom groups
+			if next(friendCurrentGroups) then
+				groupsButton:CreateDivider()
+				
+				-- Add "Remove from All Groups" button
+				local Groups = GetGroups()
+				groupsButton:CreateButton("Remove from All Groups", function()
+					if Groups then
+						for currentGroupId in pairs(friendCurrentGroups) do
+							Groups:RemoveFriendFromGroup(friendUID, currentGroupId)
+						end
+						BetterFriendsFrame_UpdateDisplay()
+					end
+				end)
+			end
+		end
+	end
 		
 		-- Register for BattleNet friend menus (online and offline)
 		if Menu and Menu.ModifyMenu then
@@ -932,8 +981,17 @@ function BetterFriendsFrame_UpdateQuickJoinTab()
 	local frame = BetterFriendsFrame
 	if not frame or not frame.BottomTab4 then return end
 	
-	-- Get number of groups available for quick join
-	local numGroups = C_SocialQueue and C_SocialQueue.GetAllGroups and #C_SocialQueue.GetAllGroups() or 0
+	-- Get number of groups from QuickJoin module (supports mock mode)
+	local QuickJoin = BFL and BFL:GetModule("QuickJoin")
+	local numGroups = 0
+	
+	if QuickJoin then
+		local groups = QuickJoin:GetAllGroups()
+		numGroups = groups and #groups or 0
+	else
+		-- Fallback to C_SocialQueue if module not loaded
+		numGroups = C_SocialQueue and C_SocialQueue.GetAllGroups and #C_SocialQueue.GetAllGroups() or 0
+	end
 	
 	-- Update tab text with count
 	frame.BottomTab4:SetText(QUICK_JOIN.." "..string.format(NUMBER_IN_PARENTHESES, numGroups))
@@ -1610,6 +1668,7 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex)
 	HideChildFrame(frame.SortFrame)
 	HideChildFrame(frame.RecentAlliesFrame)
 	HideChildFrame(frame.RecruitAFriendFrame)
+	HideChildFrame(frame.QuickJoinFrame)
 	
 	-- Hide all friend list buttons explicitly
 	if tabIndex ~= 1 then
@@ -1661,8 +1720,11 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex)
 		-- Raid frame
 		ShowChildFrame(frame.RaidFrame)
 	elseif tabIndex == 4 then
-		-- Quick Join (placeholder for now)
-		print("Quick Join tab not yet implemented")
+		-- Quick Join
+		ShowChildFrame(frame.QuickJoinFrame)
+		if BetterQuickJoinFrame_OnShow then
+			BetterQuickJoinFrame_OnShow(frame.QuickJoinFrame)
+		end
 	end
 end
 
@@ -1692,428 +1754,9 @@ end
 -- XML callbacks reference module methods directly via mixins
 
 -- ========================================
--- RAID FRAME Functions
+-- RAID FRAME & QUICK JOIN XML CALLBACKS
 -- ========================================
-
--- Helper: Get RaidFrame module
-local function GetRaidFrame()
-	return BFL:GetModule("RaidFrame")
-end
-
--- OnShow: Initialize Raid Frame and update roster
-function BetterRaidFrame_OnShow(self)
-	local RaidFrame = GetRaidFrame()
-	if not RaidFrame then return end
-	
-	print("BetterRaidFrame_OnShow called") -- DEBUG
-	
-	-- NOTE: InitializeMemberButtons() is disabled - we use XML-defined buttons now
-	-- If you need dynamic buttons, re-enable this:
-	-- if not RaidFrame.memberButtons or not next(RaidFrame.memberButtons) then
-	-- 	RaidFrame:InitializeMemberButtons()
-	-- end
-	
-	-- Update raid roster
-	RaidFrame:UpdateRaidMembers()
-	RaidFrame:BuildDisplayList()
-	
-	-- Update member buttons (using XML-defined slots)
-	RaidFrame:UpdateAllMemberButtons()
-	
-	-- Render display
-	BetterRaidFrame_Update()
-end
-
--- OnHide: Cleanup
-function BetterRaidFrame_OnHide(self)
-	-- Cleanup if needed (currently nothing to do)
-end
-
--- Update: Render raid member list and control panel
-function BetterRaidFrame_Update()
-	local RaidFrame = GetRaidFrame()
-	if not RaidFrame then return end
-	
-	local frame = BetterFriendsFrame.RaidFrame
-	if not frame or not frame:IsShown() then return end
-	
-	local controlPanel = frame.ControlPanel
-	local raidMembers = RaidFrame.raidMembers or {}
-	local numMembers = #raidMembers
-	
-	-- Update member count label
-	if controlPanel and controlPanel.MemberCount then
-		controlPanel.MemberCount:SetText(string.format("%d/40", numMembers))
-	end
-	
-	-- Update member buttons in all groups
-	RaidFrame:UpdateMemberButtons()
-	
-	-- Update role summary
-	RaidFrame:UpdateRoleSummary()
-	
-	-- Update control panel button states based on permissions
-	local canControl = RaidFrame:CanControlRaid()
-	local isRaidLeader = RaidFrame:IsRaidLeader()
-	
-	if controlPanel then
-		-- Everyone is Assistant checkbox (leader only)
-		if controlPanel.EveryoneAssistCheckbox then
-			if isRaidLeader then
-				controlPanel.EveryoneAssistCheckbox:Enable()
-				controlPanel.EveryoneAssistCheckbox:SetChecked(RaidFrame:GetEveryoneIsAssistant())
-			else
-				controlPanel.EveryoneAssistCheckbox:Disable()
-			end
-		end
-		
-		-- Update Everyone is Assistant label with leader icon (doubled size: 16x16)
-		if controlPanel.EveryoneAssistLabel then
-			-- Using the standard group leader icon texture from Blizzard UI
-			controlPanel.EveryoneAssistLabel:SetText("All |TInterface\\GroupFrame\\UI-Group-LeaderIcon:16:16|t")
-		end
-	end
-end
-
--- Update combat overlay on all raid member buttons
-function BetterRaidFrame_UpdateCombatOverlay(inCombat)
-	if not BetterFriendsFrame or not BetterFriendsFrame.RaidFrame then
-		return
-	end
-	
-	-- GroupsContainer is inside GroupsInset
-	local groupsContainer = BetterFriendsFrame.RaidFrame.GroupsInset and BetterFriendsFrame.RaidFrame.GroupsInset.GroupsContainer
-	if not groupsContainer then
-		return
-	end
-	
-	-- Update all 8 groups
-	for groupIndex = 1, 8 do
-		local groupFrame = groupsContainer["Group" .. groupIndex]
-		if groupFrame then
-			-- Update all 5 slots in this group
-			for slotIndex = 1, 5 do
-				local button = groupFrame["Slot" .. slotIndex]
-				if button and button.CombatOverlay then
-					if inCombat and button:IsShown() and button.memberData then
-						button.CombatOverlay:Show()
-					else
-						button.CombatOverlay:Hide()
-					end
-				end
-			end
-		end
-	end
-end
-
--- Ready Check
-function BetterRaidFrame_DoReadyCheck()
-	local RaidFrame = GetRaidFrame()
-	if not RaidFrame then return end
-	
-	RaidFrame:DoReadyCheck()
-end
-
--- Toggle Everyone is Assistant
-function BetterRaidFrame_ToggleEveryoneAssist(checked)
-	local RaidFrame = GetRaidFrame()
-	if not RaidFrame then return end
-	
-	RaidFrame:SetEveryoneIsAssistant(checked)
-	BetterRaidFrame_Update()
-end
-
--- ========================================
--- RAID MEMBER BUTTON Handlers
--- ========================================
-
--- OnLoad: Initialize raid member button
-function BetterRaidMemberButton_OnLoad(self)
-	-- Enable dragging (but not moving - we only use this for visual feedback)
-	self:RegisterForDrag("LeftButton")
-	self:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-	
-	-- Set up secure button attributes for left-click targeting
-	self:SetAttribute("type1", "target") -- Left click targets the unit
-	
-	-- Initialize data
-	self.memberData = nil
-	self.groupIndex = nil
-	self.slotIndex = nil
-end
-
--- OnEnter: Show tooltip with member info
-function BetterRaidMemberButton_OnEnter(self)
-	if not self.memberData then return end
-	
-	local member = self.memberData
-	
-	-- Show tooltip
-	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-	
-	-- Add name with class color
-	local classColor = RAID_CLASS_COLORS[member.classFileName]
-	if classColor then
-		GameTooltip:AddLine(member.name, classColor.r, classColor.g, classColor.b)
-	else
-		GameTooltip:AddLine(member.name)
-	end
-	
-	-- Add details
-	GameTooltip:AddLine(string.format("Level %d %s", member.level or 0, member.class or ""))
-	GameTooltip:AddLine(string.format("Group %d", member.subgroup or 0))
-	
-	-- Add role if assigned
-	if member.combatRole and member.combatRole ~= "NONE" then
-		local roleText = member.combatRole == "TANK" and "Tank" or 
-		                 member.combatRole == "HEALER" and "Healer" or
-		                 member.combatRole == "DAMAGER" and "DPS" or ""
-		if roleText ~= "" then
-			GameTooltip:AddLine("Role: " .. roleText, 0.5, 0.5, 1.0)
-		end
-	end
-	
-	-- Add rank if leader/assistant
-	if member.rank == 2 then
-		GameTooltip:AddLine("Raid Leader", 1.0, 0.82, 0)
-	elseif member.rank == 1 then
-		GameTooltip:AddLine("Assistant", 0.5, 0.5, 1.0)
-	end
-	
-	-- Add online/offline status
-	if not member.online then
-		GameTooltip:AddLine("Offline", 0.5, 0.5, 0.5)
-	elseif member.isDead then
-		GameTooltip:AddLine("Dead", 1.0, 0, 0)
-	end
-	
-	-- Show combat restriction during combat
-	if InCombatLockdown() then
-		GameTooltip:AddLine(" ")
-		GameTooltip:AddLine("Drag & Drop is unavailable during combat", 1.0, 0, 0)
-	end
-	
-	GameTooltip:Show()
-end
-
--- OnLeave: Hide tooltip
-function BetterRaidMemberButton_OnLeave(self)
-	GameTooltip:Hide()
-end
-
--- OnClick: Handle left/right click
-function BetterRaidMemberButton_OnClick(self, button)
-	if not self.memberData then return end
-	
-	local member = self.memberData
-	
-	if button == "RightButton" then
-		-- Right click: Open context menu using UnitPopup system
-		if member.unit and member.name then
-			local contextData = {
-				unit = member.unit,
-				name = member.name,
-				server = member.server, -- Add server info if available
-			}
-			-- Use "RAID_PLAYER" for full raid member options
-			UnitPopup_OpenMenu("RAID_PLAYER", contextData)
-		end
-	end
-	-- Left click is handled by SecureUnitButtonTemplate via secure attributes
-end
-
--- ========================================
--- DRAG & DROP SYSTEM
--- ========================================
-
--- Global state for drag & drop
-local MOVING_RAID_MEMBER = nil
-
--- OnDragStart: Begin dragging a raid member
-function BetterRaidMemberButton_OnDragStart(self)
-	print("OnDragStart called") -- DEBUG
-	
-	-- Check if in combat (drag & drop not allowed)
-	if InCombatLockdown() then
-		print("In combat - drag blocked") -- DEBUG
-		return
-	end
-	
-	-- Permission check: Only leader/assistant can move members
-	if not (UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")) then
-		print("No permission - not leader/assistant") -- DEBUG
-		return
-	end
-	
-	-- Check if we have member data
-	if not self.memberData then
-		print("No member data") -- DEBUG
-		return
-	end
-	
-	print("Starting drag for:", self.memberData.name) -- DEBUG
-	
-	-- Store dragging state
-	MOVING_RAID_MEMBER = self
-	
-	-- Visual feedback: Reduce alpha during drag (but don't actually move the button)
-	self:SetAlpha(0.5)
-	self:LockHighlight()
-end
-
--- OnDragStop: Stop dragging and execute move/swap
-function BetterRaidMemberButton_OnDragStop(self)
-	-- Restore visual state
-	self:SetAlpha(1.0)
-	self:UnlockHighlight()
-	
-	print("OnDragStop called") -- DEBUG
-	
-	-- Check if in combat
-	if InCombatLockdown() then
-		print("In combat - cannot swap") -- DEBUG
-		MOVING_RAID_MEMBER = nil
-		return
-	end
-	
-	-- Permission check
-	if not (UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")) then
-		print("No permission") -- DEBUG
-		MOVING_RAID_MEMBER = nil
-		return
-	end
-	
-	-- Check if we have member data
-	if not self.memberData then
-		print("No member data on source") -- DEBUG
-		MOVING_RAID_MEMBER = nil
-		return
-	end
-	
-	-- Get mouse position and find frame at that position
-	local x, y = GetCursorPosition()
-	local scale = UIParent:GetEffectiveScale()
-	x = x / scale
-	y = y / scale
-	
-	print("Cursor position:", x, y) -- DEBUG
-	
-	-- Find all raid member buttons and check which one is under cursor
-	local targetButton = nil
-	local targetGroupFrame = nil
-	
-	local groupsContainer = BetterFriendsFrame.RaidFrame.GroupsInset and BetterFriendsFrame.RaidFrame.GroupsInset.GroupsContainer
-	if groupsContainer then
-		for groupIndex = 1, 8 do
-			local groupFrame = groupsContainer["Group" .. groupIndex]
-			if groupFrame then
-				-- Check all 5 slots in this group
-				for slotIndex = 1, 5 do
-					local button = groupFrame["Slot" .. slotIndex]
-					if button and button ~= self and button:IsVisible() then
-						-- Check if cursor is over this button
-						local left = button:GetLeft()
-						local right = button:GetRight()
-						local top = button:GetTop()
-						local bottom = button:GetBottom()
-						
-						if left and right and top and bottom then
-							if x >= left and x <= right and y >= bottom and y <= top then
-								targetButton = button
-								print("Found target button at Group", groupIndex, "Slot", slotIndex) -- DEBUG
-								if button.memberData then
-									print("  Target has member:", button.memberData.name) -- DEBUG
-								else
-									print("  Target is empty slot") -- DEBUG
-								end
-								break
-							end
-						end
-					end
-				end
-				
-				if targetButton then break end
-				
-				-- If no button found, check if cursor is over the group frame itself
-				if not targetButton then
-					local left = groupFrame:GetLeft()
-					local right = groupFrame:GetRight()
-					local top = groupFrame:GetTop()
-					local bottom = groupFrame:GetBottom()
-					
-					if left and right and top and bottom then
-						if x >= left and x <= right and y >= bottom and y <= top then
-							targetGroupFrame = groupFrame
-							print("Found target group frame", groupIndex) -- DEBUG
-							break
-						end
-					end
-				end
-			end
-		end
-	end
-	
-	-- Case 1: Dropped on another member button with member - SWAP
-	if targetButton and targetButton.memberData then
-		print("Swapping with", targetButton.memberData.name) -- DEBUG
-		
-		local sourceMemberIndex = self.memberData.index
-		local targetMemberIndex = targetButton.memberData.index
-		
-		if sourceMemberIndex and targetMemberIndex and sourceMemberIndex ~= targetMemberIndex then
-			SwapRaidSubgroup(sourceMemberIndex, targetMemberIndex)
-			
-			-- Immediately update UI (don't wait for event)
-			C_Timer.After(0.1, function()
-				local RaidFrame = GetRaidFrame()
-				if RaidFrame then
-					RaidFrame:UpdateRaidMembers()
-					RaidFrame:UpdateAllMemberButtons()
-				end
-			end)
-		end
-	-- Case 2: Dropped on empty slot or group area - MOVE
-	elseif targetButton or targetGroupFrame then
-		local targetGroup = nil
-		
-		if targetButton then
-			-- Get group from button's parent
-			for groupIndex = 1, 8 do
-				if groupsContainer["Group" .. groupIndex] == targetButton:GetParent() then
-					targetGroup = groupIndex
-					break
-				end
-			end
-		elseif targetGroupFrame then
-			-- Get group from frame
-			for groupIndex = 1, 8 do
-				if groupsContainer["Group" .. groupIndex] == targetGroupFrame then
-					targetGroup = groupIndex
-					break
-				end
-			end
-		end
-		
-		if targetGroup and targetGroup ~= self.memberData.subgroup then
-			print("Moving to group", targetGroup) -- DEBUG
-			SetRaidSubgroup(self.memberData.index, targetGroup)
-			
-			-- Immediately update UI (don't wait for event)
-			C_Timer.After(0.1, function()
-				local RaidFrame = GetRaidFrame()
-				if RaidFrame then
-					RaidFrame:UpdateRaidMembers()
-					RaidFrame:UpdateAllMemberButtons()
-				end
-			end)
-		else
-			print("Same group or invalid target") -- DEBUG
-		end
-	else
-		print("No valid target found") -- DEBUG
-	end
-	
-	-- Clear drag state
-	MOVING_RAID_MEMBER = nil
-end
-
+-- All Raid Frame and Quick Join XML callbacks have been moved to:
+--   - UI/RaidFrameCallbacks.lua (268 lines)
+--   - UI/QuickJoinCallbacks.lua (264 lines)
+-- This keeps BetterFriendlist.lua focused on Friends List logic only.

@@ -9,7 +9,6 @@ local Settings = BFL:RegisterModule("Settings", {})
 -- Local references
 local settingsFrame = nil
 local currentTab = 1
-local pendingSettings = {}
 local draggedGroupButton = nil
 local groupButtons = {}
 
@@ -367,8 +366,6 @@ function Settings:LoadSettings()
 	local DB = GetDB()
 	if not DB then return end
 	
-	pendingSettings = {}
-	
 	local content = settingsFrame.ContentScrollFrame.Content
 	if content and content.GeneralTab then
 		local generalTab = content.GeneralTab
@@ -376,7 +373,6 @@ function Settings:LoadSettings()
 		if generalTab.ShowBlizzardOption then
 			local value = DB:Get("showBlizzardOption", false)
 			generalTab.ShowBlizzardOption:SetChecked(value)
-			pendingSettings.showBlizzardOption = value
 		end
 	end
 	
@@ -386,72 +382,12 @@ function Settings:LoadSettings()
 		if appearanceTab.CompactMode then
 			local value = DB:Get("compactMode", false)
 			appearanceTab.CompactMode:SetChecked(value)
-			pendingSettings.compactMode = value
 		end
 		
 		if appearanceTab.FontSizeSection then
-			local fontSize = DB:Get("fontSize", "normal")
-			pendingSettings.fontSize = fontSize
 			self:InitFontSizeDropdown()
 		end
 	end
-end
-
--- Save pending settings to database
-function Settings:SaveSettings()
-	local DB = GetDB()
-	if not DB then
-		print("|cffff0000BetterFriendlist Settings:|r Database not available!")
-		return false
-	end
-	
-	for key, value in pairs(pendingSettings) do
-		DB:Set(key, value)
-	end
-	
-	return true
-end
-
--- Update pending settings when UI changes
-function Settings:UpdatePending(key, value)
-	pendingSettings[key] = value
-end
-
--- Apply button handler
-function Settings:Apply()
-	local content = settingsFrame.ContentScrollFrame.Content
-	if content and content.GeneralTab then
-		local generalTab = content.GeneralTab
-		
-		if generalTab.ShowBlizzardOption then
-			pendingSettings.showBlizzardOption = generalTab.ShowBlizzardOption:GetChecked()
-		end
-	end
-	
-	if content and content.AppearanceTab then
-		local appearanceTab = content.AppearanceTab
-		
-		if appearanceTab.CompactMode then
-			pendingSettings.compactMode = appearanceTab.CompactMode:GetChecked()
-		end
-	end
-	
-	if self:SaveSettings() then
-		print("|cff20ff20BetterFriendlist:|r Settings saved successfully!")
-		
-		if BetterFriendsFrame_UpdateDisplay then
-			BetterFriendsFrame_UpdateDisplay()
-		end
-		
-		self:Hide()
-	else
-		print("|cffff0000BetterFriendlist:|r Failed to save settings!")
-	end
-end
-
--- Cancel button handler
-function Settings:Cancel()
-	self:Hide()
 end
 
 -- Initialize font size dropdown
@@ -461,32 +397,46 @@ function Settings:InitFontSizeDropdown()
 	local dropdown = settingsFrame.ContentScrollFrame.Content.AppearanceTab.FontSizeSection.Dropdown
 	if not dropdown then return end
 	
+	local DB = GetDB()
+	if not DB then return end
+	
+	local currentFontSize = DB:Get("fontSize", "normal")
 	dropdown:SetDefaultText("Normal (12px)")
 	
 	dropdown:SetupMenu(function(owner, rootDescription)
 		-- Small option (10px)
 		rootDescription:CreateRadio("Small (Compact, 10px)",
-			function() return pendingSettings.fontSize == "small" end,
+			function() return currentFontSize == "small" end,
 			function() Settings:SetFontSize("small") end
 		)
 		
 		-- Normal option (12px)
 		rootDescription:CreateRadio("Normal (12px)",
-			function() return pendingSettings.fontSize == "normal" end,
+			function() return currentFontSize == "normal" end,
 			function() Settings:SetFontSize("normal") end
 		)
 		
 		-- Large option (14px)
 		rootDescription:CreateRadio("Large (14px)",
-			function() return pendingSettings.fontSize == "large" end,
+			function() return currentFontSize == "large" end,
 			function() Settings:SetFontSize("large") end
 		)
 	end)
 end
 
--- Set font size
+-- Set font size and save immediately
 function Settings:SetFontSize(size)
-	pendingSettings.fontSize = size
+	local DB = GetDB()
+	if not DB then return end
+	
+	DB:Set("fontSize", size)
+	
+	if BetterFriendsFrame_UpdateDisplay then
+		BetterFriendsFrame_UpdateDisplay()
+	end
+	
+	-- Refresh dropdown to show new selection
+	self:InitFontSizeDropdown()
 end
 
 -- Reset to defaults
@@ -756,19 +706,20 @@ function Settings:MigrateFriendGroups(cleanupNotes)
 	for i = 1, numBNetFriends do
 		local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
 		if accountInfo then
-			local bnetAccountID = accountInfo.bnetAccountID
+			local battleTag = accountInfo.battleTag
 			local noteText = accountInfo.note
 			
 			if noteText and noteText ~= "" then
 				local actualNote, friendGroups = ParseFriendGroupsNote(noteText)
 				
 				if #friendGroups > 0 then
-					local friendUID = "bnet_" .. tostring(bnetAccountID)
+					-- Use battleTag as persistent identifier (bnetAccountID is temporary per session)
+					local friendUID = "bnet_" .. (battleTag or tostring(accountInfo.bnetAccountID))
 					friendGroupAssignments[friendUID] = {
 						groups = friendGroups,
 						actualNote = actualNote,
 						isBNet = true,
-						bnetID = bnetAccountID
+						battleTag = battleTag
 					}
 					
 					for _, groupName in ipairs(friendGroups) do
@@ -835,7 +786,21 @@ function Settings:MigrateFriendGroups(cleanupNotes)
 			print("|cff00ff00BetterFriendlist:|r   ✓ Created:", groupName, "(order:", currentOrder, ")")
 			currentOrder = currentOrder + 1
 		else
-			print("|cffff0000BetterFriendlist:|r   ✗ FAILED:", groupName, "-", tostring(groupId))
+			-- Group already exists - get its ID by name
+			if groupId == "Group already exists" then
+				local existingGroupId = Groups:GetGroupIdByName(groupName)
+				if existingGroupId then
+					groupNameMap[groupName] = existingGroupId
+					migratedGroups[groupName] = true
+					table.insert(groupOrderArray, existingGroupId)
+					print("|cffffff00BetterFriendlist:|r   ⚠ Existing:", groupName, "(using existing group)")
+					currentOrder = currentOrder + 1
+				else
+					print("|cffff0000BetterFriendlist:|r   ✗ FAILED:", groupName, "- Group exists but ID not found")
+				end
+			else
+				print("|cffff0000BetterFriendlist:|r   ✗ FAILED:", groupName, "-", tostring(groupId))
+			end
 		end
 	end
 	
@@ -986,6 +951,34 @@ function Settings:DebugDatabase()
 	end
 	
 	print("|cff00ffffBetterFriendlist Debug:|r =================================")
+end
+
+--------------------------------------------------------------------------
+-- GLOBAL CALLBACK FUNCTIONS (Called from XML)
+--------------------------------------------------------------------------
+
+-- Callback for ShowBlizzardOption checkbox
+function BetterFriendlistSettings_OnShowBlizzardOptionChanged(checked)
+	local DB = BFL and BFL:GetModule("DB")
+	if not DB then return end
+	
+	DB:Set("showBlizzardOption", checked)
+	
+	if BetterFriendsFrame_UpdateDisplay then
+		BetterFriendsFrame_UpdateDisplay()
+	end
+end
+
+-- Callback for CompactMode checkbox
+function BetterFriendlistSettings_OnCompactModeChanged(checked)
+	local DB = BFL and BFL:GetModule("DB")
+	if not DB then return end
+	
+	DB:Set("compactMode", checked)
+	
+	if BetterFriendsFrame_UpdateDisplay then
+		BetterFriendsFrame_UpdateDisplay()
+	end
 end
 
 return Settings

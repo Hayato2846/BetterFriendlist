@@ -1,10 +1,10 @@
 -- Core.lua
 -- Main initialization file for BetterFriendlist addon
--- Version 0.13
+-- Version 0.15
 
 -- Create addon namespace
 local ADDON_NAME, BFL = ...
-BFL.Version = "0.13"
+BFL.Version = "0.15"
 
 -- Module registry
 BFL.Modules = {}
@@ -33,6 +33,9 @@ end
 -- This decouples event handling from the main UI file
 --------------------------------------------------------------------------
 
+-- Core event frame (must be defined before RegisterEventCallback)
+local eventFrame = CreateFrame("Frame")
+
 -- Register a callback for an event
 -- @param event: The event name (e.g., "FRIENDLIST_UPDATE")
 -- @param callback: Function to call when event fires
@@ -42,6 +45,8 @@ function BFL:RegisterEventCallback(event, callback, priority)
 	
 	if not self.EventCallbacks[event] then
 		self.EventCallbacks[event] = {}
+		-- Auto-register WoW event with the event frame
+		eventFrame:RegisterEvent(event)
 	end
 	
 	table.insert(self.EventCallbacks[event], {
@@ -68,8 +73,7 @@ function BFL:FireEventCallbacks(event, ...)
 	end
 end
 
--- Core event frame
-local eventFrame = CreateFrame("Frame")
+-- Register initial events
 eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
 
@@ -100,6 +104,9 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 			end
 		end
 	end
+	
+	-- Fire event callbacks for all events
+	BFL:FireEventCallbacks(event, ...)
 end)
 
 -- Expose namespace globally for backward compatibility

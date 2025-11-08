@@ -29,6 +29,51 @@ local builtinGroups = {
 -- All groups (built-in + custom)
 Groups.groups = {}
 
+-- Migrate old bnetAccountID-based UIDs to battleTag-based UIDs
+function Groups:MigrateFriendAssignments()
+	local DB = BFL:GetModule("DB")
+	local friendGroups = DB:GetFriendGroups() -- Get ALL friendGroups
+	
+	-- Check if migration has already been done
+	local migrationDone = DB:Get("bnetUIDMigrationDone_v2") -- Changed flag name to force re-run
+	if migrationDone then
+		return -- Already migrated
+	end
+	
+	-- Count old-style bnet UIDs (format: "bnet_12345" where 12345 is numeric)
+	local oldBnetUIDs = {}
+	local totalMappings = 0
+	
+	for uid, groups in pairs(friendGroups) do
+		-- Skip numeric array indices (corrupted data)
+		if type(uid) == "string" then
+			totalMappings = totalMappings + 1
+			if uid:match("^bnet_%d+$") then
+				table.insert(oldBnetUIDs, uid)
+			end
+		end
+	end
+	
+	-- Debug output
+	print("|cff00ff00BetterFriendlist:|r Migration check - Total friend mappings:", totalMappings)
+	print("|cff00ff00BetterFriendlist:|r Migration check - Old format (bnet_numeric):", #oldBnetUIDs)
+	
+	if #oldBnetUIDs > 0 then
+		-- Remove old-style UIDs (they are now invalid and can't be migrated)
+		for _, uid in ipairs(oldBnetUIDs) do
+			DB:SetFriendGroups(uid, nil) -- Remove assignment
+		end
+		
+		-- Inform user about the migration
+		print("|cff00ff00BetterFriendlist:|r Battle.net friend assignments have been updated to use persistent identifiers.")
+		print("|cffff8800Note:|r Please re-assign your Battle.net friends to groups. This is a one-time migration.")
+		print("|cffaaaaaa(Reason: bnetAccountID is temporary and changes each session)|r")
+	end
+	
+	-- Mark migration as done
+	DB:Set("bnetUIDMigrationDone_v2", true)
+end
+
 function Groups:Initialize()
 	-- Copy built-in groups
 	for id, data in pairs(builtinGroups) do
@@ -37,6 +82,10 @@ function Groups:Initialize()
 	
 	-- Load custom groups from database
 	local DB = BFL:GetModule("DB")
+	
+	-- Migrate old bnetAccountID-based friend assignments to battleTag-based
+	self:MigrateFriendAssignments()
+	
 	for groupId, groupInfo in pairs(DB:GetCustomGroups()) do
 		self.groups[groupId] = {
 			id = groupId,
@@ -100,6 +149,16 @@ end
 -- Get a specific group
 function Groups:Get(groupId)
 	return self.groups[groupId]
+end
+
+-- Get group ID by name (for migration)
+function Groups:GetGroupIdByName(groupName)
+	for groupId, groupData in pairs(self.groups) do
+		if groupData.name == groupName then
+			return groupId
+		end
+	end
+	return nil
 end
 
 -- Create a new custom group
@@ -341,7 +400,13 @@ end
 function Groups:GetFriendUID(friend)
 	if not friend then return nil end
 	if friend.type == "bnet" then
-		return "bnet_" .. (friend.bnetAccountID or friend.battleTag or "")
+		-- Use battleTag as persistent identifier (bnetAccountID is temporary per session)
+		if friend.battleTag then
+			return "bnet_" .. friend.battleTag
+		else
+			-- Fallback to bnetAccountID only if battleTag is unavailable (should never happen)
+			return "bnet_" .. tostring(friend.bnetAccountID or "unknown")
+		end
 	else
 		return "wow_" .. (friend.name or "")
 	end

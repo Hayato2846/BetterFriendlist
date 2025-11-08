@@ -93,11 +93,12 @@ end
 local function GetFriendUID(friend)
 	if not friend then return nil end
 	if friend.type == "bnet" then
-		-- Must use tostring() to match the global GetFriendUID function
-		if friend.bnetAccountID then
-			return "bnet_" .. tostring(friend.bnetAccountID)
+		-- Use battleTag as persistent identifier (bnetAccountID is temporary per session)
+		if friend.battleTag then
+			return "bnet_" .. friend.battleTag
 		else
-			return "bnet_" .. (friend.battleTag or "unknown")
+			-- Fallback to bnetAccountID only if battleTag is unavailable (should never happen)
+			return "bnet_" .. tostring(friend.bnetAccountID or "unknown")
 		end
 	else
 		return "wow_" .. (friend.name or "")

@@ -529,6 +529,74 @@
 		</Scripts>
 		<HighlightTexture file="Interface\FriendsFrame\UI-FriendsFrame-HighlightBar" alphaMode="ADD" setAllPoints="true"/>
 	</Button>
+	
+	<!-- Saved Instance Button Template -->
+	<Button name="BetterSavedInstanceButtonTemplate" virtual="true">
+		<Size y="60"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture setAllPoints="true">
+					<Color r="0.1" g="0.1" b="0.1" a="0.8"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<!-- Instance Name -->
+				<FontString parentKey="Name" inherits="GameFontNormal" justifyH="LEFT">
+					<Size x="0" y="16"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="10" y="-8"/>
+						<Anchor point="TOPRIGHT" x="-10" y="-8"/>
+					</Anchors>
+				</FontString>
+				<!-- Difficulty -->
+				<FontString parentKey="Difficulty" inherits="GameFontHighlightSmall" justifyH="LEFT">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeKey="$parent.Name" relativePoint="BOTTOMLEFT" x="0" y="-2"/>
+					</Anchors>
+				</FontString>
+				<!-- Progress -->
+				<FontString parentKey="Progress" inherits="GameFontHighlightSmall" justifyH="LEFT">
+					<Anchors>
+						<Anchor point="LEFT" relativeKey="$parent.Difficulty" relativePoint="RIGHT" x="10" y="0"/>
+					</Anchors>
+				</FontString>
+				<!-- Reset Time -->
+				<FontString parentKey="Reset" inherits="GameFontHighlightSmall" justifyH="RIGHT">
+					<Anchors>
+						<Anchor point="TOPRIGHT" relativeKey="$parent.Name" relativePoint="BOTTOMRIGHT" x="0" y="-2"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnEnter>
+				if self.instanceData then
+					GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+					GameTooltip:SetText(self.instanceData.name, 1, 1, 1);
+					GameTooltip:AddLine(self.instanceData.difficultyName, 0.7, 0.7, 0.7);
+					if self.instanceData.encounterProgress and self.instanceData.numEncounters then
+						GameTooltip:AddLine(string.format("Progress: %d/%d", self.instanceData.encounterProgress, self.instanceData.numEncounters), 0.5, 1, 0.5);
+					end
+					local timeLeft = SecondsToTime(self.instanceData.reset, true, nil, 3);
+					if self.instanceData.extended then
+						GameTooltip:AddLine("Extended - " .. timeLeft, 1, 0.5, 0);
+					elseif self.instanceData.locked then
+						GameTooltip:AddLine("Resets in: " .. timeLeft, 1, 1, 0);
+					else
+						GameTooltip:AddLine("Expired", 0.5, 0.5, 0.5);
+					end
+					GameTooltip:Show();
+				end
+			</OnEnter>
+			<OnLeave>
+				GameTooltip:Hide();
+			</OnLeave>
+		</Scripts>
+		<HighlightTexture setAllPoints="true" alphaMode="ADD">
+			<Color r="1" g="1" b="1" a="0.1"/>
+		</HighlightTexture>
+	</Button>
+	
 	<!-- RAF Activity Button Template (chest icons for activities) -->
 	<Button name="BetterRecruitActivityButtonTemplate" virtual="true" registerForClicks="LeftButtonUp">
 		<Size x="35" y="34"/>
@@ -565,11 +633,32 @@
 		<Size x="180" y="20"/>
 		<Layers>
 			<Layer level="BACKGROUND">
-				<Texture parentKey="Background" setAllPoints="true">
-					<Color r="0.1" g="0.1" b="0.1" a="0.5"/>
+				<!-- Background using Blizzard's Raid-Bar-Hp-Bg texture -->
+				<Texture parentKey="Background" file="Interface\RaidFrame\Raid-Bar-Hp-Bg">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="-3" y="0"/>
+						<Anchor point="BOTTOMRIGHT" x="3" y="0"/>
+					</Anchors>
+					<TexCoords left="0" right="1" top="0" bottom="0.53125"/>
 				</Texture>
+			</Layer>
+			<Layer level="BACKGROUND" textureSubLevel="1">
+				<!-- Class color tint overlay -->
+				<Texture parentKey="ClassColorTint">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="1" y="-1"/>
+						<Anchor point="BOTTOMRIGHT" x="-1" y="1"/>
+					</Anchors>
+					<Color r="0" g="0" b="0" a="0.5"/>
+				</Texture>
+			</Layer>
+			<Layer level="BORDER">
 				<!-- Combat Overlay - shown during combat to indicate drag&drop is disabled -->
-				<Texture parentKey="CombatOverlay" hidden="true" setAllPoints="true">
+				<Texture parentKey="CombatOverlay" hidden="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="1" y="-1"/>
+						<Anchor point="BOTTOMRIGHT" x="-1" y="1"/>
+					</Anchors>
 					<Color r="0.5" g="0.5" b="0.5" a="0.5"/>
 				</Texture>
 			</Layer>
@@ -596,20 +685,27 @@
 						<Anchor point="RIGHT" x="-20" y="0"/>
 					</Anchors>
 				</FontString>
+				
+				<!-- Empty slot text (centered, gray) -->
+				<FontString parentKey="EmptyText" inherits="GameFontDisable" text="Empty" hidden="true">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</FontString>
 			</Layer>
 			<Layer level="OVERLAY">
-				<!-- Leader/Assistant Icon (top-right) -->
-				<Texture parentKey="RankIcon" hidden="true">
-					<Size x="14" y="14"/>
+				<!-- Role Icon - Tank/Healer/DPS (right side) -->
+				<Texture parentKey="RoleIcon" hidden="true">
+					<Size x="16" y="16"/>
 					<Anchors>
 						<Anchor point="RIGHT" x="-2" y="0"/>
 					</Anchors>
 				</Texture>
-				<!-- Role Icon - Tank/Healer/DPS (overlapping rank icon area when both shown) -->
-				<Texture parentKey="RoleIcon" hidden="true">
-					<Size x="12" y="12"/>
+				<!-- Leader/Assistant Icon (left of role icon) -->
+				<Texture parentKey="RankIcon" hidden="true">
+					<Size x="16" y="16"/>
 					<Anchors>
-						<Anchor point="BOTTOMRIGHT" x="-2" y="2"/>
+						<Anchor point="RIGHT" relativeKey="$parent.RoleIcon" relativePoint="LEFT" x="-5" y="1"/>
 					</Anchors>
 				</Texture>
 				<!-- Ready Check Icon (center overlay) -->
@@ -642,6 +738,88 @@
 			</OnDragStop>
 		</Scripts>
 		<HighlightTexture alphaMode="ADD" file="Interface\QuestFrame\UI-QuestTitleHighlight"/>
+	</Button>
+	
+	<!-- Quick Join Font Templates (used for dynamically created text) -->
+	<FontString name="BetterQuickJoinButtonMemberTemplate" inherits="UserScaledFontGameNormalSmall" justifyH="LEFT" virtual="true"/>
+	<FontString name="BetterQuickJoinButtonQueueTemplate" inherits="UserScaledFontGameNormalSmall" justifyH="LEFT" virtual="true">
+		<Color r="0.7" g="0.7" b="0.7"/>
+	</FontString>
+	
+	<!-- Quick Join Group Button Template - Matches Blizzard's minimal design with dynamic text creation -->
+	<Button name="BetterQuickJoinGroupButtonTemplate" virtual="true" registerForClicks="LeftButtonUp, RightButtonUp">
+		<Size y="50"/>
+		<Anchors>
+			<Anchor point="LEFT"/>
+			<Anchor point="RIGHT"/>
+		</Anchors>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<!-- Selection Background (gold highlight) -->
+				<Texture parentKey="Selected" file="Interface\QuestFrame\UI-QuestLogTitleHighlight" alphaMode="BLEND" hidden="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="0" y="0"/>
+						<Anchor point="BOTTOMRIGHT" x="0" y="0"/>
+					</Anchors>
+					<Color r="1" g="0.82" b="0" a="0.5"/>
+				</Texture>
+			</Layer>
+			<Layer level="BORDER">
+				<!-- Hover Highlight (blue) - separate layer above selection -->
+				<Texture parentKey="HoverHighlight" file="Interface\QuestFrame\UI-QuestLogTitleHighlight" alphaMode="BLEND" hidden="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="0" y="0"/>
+						<Anchor point="BOTTOMRIGHT" x="0" y="0"/>
+					</Anchors>
+					<Color r="0.3" g="0.5" b="0.7" a="0.5"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<!-- FIRST Member Name - this becomes Members[0] via parentArray -->
+				<FontString parentKey="MemberName" parentArray="Members" inherits="UserScaledFontGameNormalSmall" maxLines="1" justifyH="LEFT">
+					<Size x="120"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeKey="$parent" relativePoint="TOPLEFT" x="3" y="-8"/>
+					</Anchors>
+				</FontString>
+				
+				<!-- Queue Icon (socialqueuing-icon-group or socialqueuing-icon-eye) -->
+				<Texture parentKey="Icon" atlas="socialqueuing-icon-eye" useAtlasSize="false">
+					<Size x="16" y="17"/>
+					<Anchors>
+						<Anchor point="LEFT" relativeKey="$parent.MemberName" relativePoint="RIGHT" x="2"/>
+					</Anchors>
+				</Texture>
+				
+				<!-- FIRST Queue Name - this becomes Queues[0] via parentArray -->
+				<FontString parentKey="QueueName" parentArray="Queues" inherits="UserScaledFontGameNormalSmall" maxLines="1" justifyH="LEFT">
+					<Size x="200"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeKey="$parent.MemberName" relativePoint="TOPRIGHT" x="20"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnLoad>
+				-- No dynamic arrays needed - using static MemberName and QueueName
+			</OnLoad>
+			<OnEnter>
+				BetterQuickJoinGroupButton_OnEnter(self);
+			</OnEnter>
+			<OnLeave>
+				BetterQuickJoinGroupButton_OnLeave(self);
+			</OnLeave>
+			<OnClick>
+				BetterQuickJoinGroupButton_OnClick(self, button);
+			</OnClick>
+		</Scripts>
+		<HighlightTexture parentKey="Highlight" alphaMode="ADD" file="Interface\QuestFrame\UI-QuestTitleHighlight" alpha="0.5">
+			<Anchors>
+				<Anchor point="TOPLEFT" x="0" y="0"/>
+				<Anchor point="BOTTOMRIGHT" x="0" y="0"/>
+			</Anchors>
+		</HighlightTexture>
 	</Button>
 	
 	<!-- Raid Group Template -->
@@ -989,8 +1167,7 @@
 								BetterFriendsFrame_ShowTab(4)
 							</OnClick>
 						</Scripts>
-					</Button>
-				</Frames>
+					</Button>				</Frames>
 			</Frame>
 			<!-- Sort Criteria Selection Frame (shown when Sort tab is active) -->
 			<Frame parentKey="SortFrame" hidden="true">
@@ -2005,27 +2182,31 @@
 							<Anchor point="TOPRIGHT" x="-14" y="-8"/>
 						</Anchors>
 						<Frames>
-							<!-- Raid Info Button (top right) -->
-							<Button parentKey="RaidInfoButton" inherits="UIPanelButtonTemplate" text="Raid Info">
-								<Size x="90" y="22"/>
-								<Anchors>
-									<Anchor point="TOPRIGHT" x="-5" y="-15"/>
-								</Anchors>
-								<Scripts>
-									<OnClick>
-										ToggleFriendsFrame(4); -- Opens Social/Raid tab
-									</OnClick>
-								</Scripts>
-							</Button>
-							
-							<!-- Everyone is Assistant Checkbox -->
+						<!-- Raid Info Button (top right) -->
+						<Button parentKey="RaidInfoButton" inherits="UIPanelButtonTemplate" text="Raid Info">
+							<Size x="90" y="22"/>
+							<Anchors>
+								<Anchor point="TOPRIGHT" x="-5" y="-15"/>
+							</Anchors>
+							<Scripts>
+								<OnClick>
+									BetterRaidFrame_RaidInfoButton_OnClick(self);
+								</OnClick>
+							</Scripts>
+						</Button>							<!-- Everyone is Assistant Checkbox -->
 							<CheckButton parentKey="EveryoneAssistCheckbox" inherits="UICheckButtonTemplate">
 								<Anchors>
 									<Anchor point="TOPLEFT" x="45" y="-10"/>
 								</Anchors>
 								<Scripts>
+									<OnLoad>
+										BetterRaidFrame_EveryoneAssistCheckbox_OnLoad(self);
+									</OnLoad>
+									<OnEvent>
+										BetterRaidFrame_EveryoneAssistCheckbox_OnEvent(self);
+									</OnEvent>
 									<OnClick>
-										BetterRaidFrame_ToggleEveryoneAssist(self:GetChecked());
+										BetterRaidFrame_EveryoneAssistCheckbox_OnClick(self);
 									</OnClick>
 								</Scripts>
 							</CheckButton>
@@ -2120,19 +2301,189 @@
 								</Frames>
 							</Frame>
 						</Frames>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnLoad>
+				-- Register for UPDATE_INSTANCE_INFO event to update Raid Info button
+				self:RegisterEvent("UPDATE_INSTANCE_INFO");
+			</OnLoad>
+			<OnEvent>
+				if event == "UPDATE_INSTANCE_INFO" then
+					BetterRaidFrame_UpdateRaidInfoButton();
+				end
+			</OnEvent>
+			<OnShow>
+				BetterRaidFrame_OnShow(self);
+			</OnShow>
+			<OnHide>
+				BetterRaidFrame_OnHide(self);
+			</OnHide>
+		</Scripts>
+	</Frame>
+	
+	<!-- Quick Join Frame (Tab 5) -->
+	<Frame parentKey="QuickJoinFrame" hidden="true">
+		<Anchors>
+			<Anchor point="TOPLEFT" relativeKey="$parent.Inset" x="10" y="-10"/>
+			<Anchor point="BOTTOMRIGHT" relativeKey="$parent.Inset" x="-10" y="40"/>
+		</Anchors>
+		<Frames>
+			<!-- Content Inset with dark background (like Raid GroupsInset) -->
+			<Frame parentKey="ContentInset" inherits="InsetFrameTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="-10" y="80"/>
+					<Anchor point="BOTTOMRIGHT" x="10" y="-42"/>
+				</Anchors>
+				<Layers>
+					<Layer level="ARTWORK">
+						<!-- "No Groups Available" Fallback Text -->
+						<FontString parentKey="NoGroupsText" inherits="GameFontNormalLarge" hidden="true">
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="0"/>
+							</Anchors>
+							<Color r="0.5" g="0.5" b="0.5"/>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Frames>
+					<!-- ScrollBox for Group List -->
+					<Frame parentKey="ScrollBoxContainer">
+						<Anchors>
+							<Anchor point="TOPLEFT" x="4" y="-4"/>
+							<Anchor point="BOTTOMRIGHT" x="-24" y="4"/>
+				</Anchors>
+				<Frames>
+					<Frame parentKey="ScrollBox" inherits="WowScrollBoxList">
+						<Anchors>
+							<Anchor point="TOPLEFT"/>
+							<Anchor point="BOTTOMRIGHT"/>
+						</Anchors>
 					</Frame>
 				</Frames>
-				<Scripts>
-					<OnShow>
-						BetterRaidFrame_OnShow(self);
-					</OnShow>
-					<OnHide>
-						BetterRaidFrame_OnHide(self);
-					</OnHide>
-				</Scripts>
 			</Frame>
 			
-			<!-- Bottom Tabs (Contacts, Who, Raid, Quick Join) - Matching Blizzard's FriendsFrame bottom tabs -->
+					<!-- ScrollBar -->
+					<EventFrame parentKey="ScrollBar" inherits="MinimalScrollBar">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeKey="$parent.ScrollBoxContainer" relativePoint="TOPRIGHT" x="5" y="-2"/>
+							<Anchor point="BOTTOMLEFT" relativeKey="$parent.ScrollBoxContainer" relativePoint="BOTTOMRIGHT" x="5" y="2"/>
+						</Anchors>
+					</EventFrame>
+					
+					<!-- Request to Join Button (bottom-right, outside dark background) -->
+					<Button parentKey="JoinQueueButton" inherits="UIPanelButtonTemplate">
+						<Size x="150" y="22"/>
+						<Anchors>
+							<Anchor point="BOTTOMRIGHT" relativeKey="$parent.ScrollBoxContainer" relativePoint="BOTTOMRIGHT" x="25" y="-26"/>
+						</Anchors>
+				<Scripts>
+					<OnClick>
+						BetterQuickJoinFrame_JoinQueueButton_OnClick(self);
+					</OnClick>
+					<OnEnter>
+						if self.tooltip then
+							GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+							GameTooltip:SetText(self.tooltip, 1, 0.1, 0.1, 1, true);
+							GameTooltip:Show();
+						end
+					</OnEnter>
+					<OnLeave>
+						GameTooltip:Hide();
+					</OnLeave>
+					</Scripts>
+				</Button>
+				</Frames>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnLoad>
+				BetterQuickJoinFrame_OnLoad(self);
+			</OnLoad>
+			<OnShow>
+				BetterQuickJoinFrame_OnShow(self);
+			</OnShow>
+			<OnHide>
+				BetterQuickJoinFrame_OnHide(self);
+			</OnHide>
+		</Scripts>
+	</Frame>
+	
+	<!-- Saved Instances Panel - Separate window next to main frame -->
+	<Frame name="BetterSavedInstancesFrame" parent="UIParent" toplevel="true" movable="true" enableMouse="true" clampedToScreen="true" hidden="true" inherits="ButtonFrameTemplate">
+		<Size x="320" y="480"/>
+		<!-- Position will be set dynamically in Lua -->
+		<Layers>
+			<Layer level="ARTWORK">
+				<FontString parentKey="TitleText" inherits="GameFontNormal" text="Saved Raid Lockouts">
+					<Anchors>
+						<Anchor point="TOP" x="0" y="-5"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<!-- Inset frame for content area -->
+			<Frame parentKey="Inset" inherits="InsetFrameTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="4" y="-24"/>
+					<Anchor point="BOTTOMRIGHT" x="-4" y="4"/>
+				</Anchors>
+			</Frame>
+			
+			<!-- ScrollBox for saved instances list -->
+			<Frame parentKey="ScrollBox" inherits="WowScrollBoxList">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeKey="$parent.Inset" x="4" y="-4"/>
+					<Anchor point="BOTTOMRIGHT" relativeKey="$parent.Inset" x="-24" y="4"/>
+				</Anchors>
+			</Frame>
+			
+			<!-- ScrollBar -->
+			<EventFrame parentKey="ScrollBar" inherits="MinimalScrollBar">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeKey="$parent.ScrollBox" relativePoint="TOPRIGHT" x="5" y="-3"/>
+					<Anchor point="BOTTOMLEFT" relativeKey="$parent.ScrollBox" relativePoint="BOTTOMRIGHT" x="5" y="3"/>
+				</Anchors>
+			</EventFrame>
+			
+			<!-- No Instances Message -->
+			<Frame parentKey="NoInstancesFrame" hidden="true">
+				<Anchors>
+					<Anchor point="CENTER" relativeKey="$parent.Inset"/>
+				</Anchors>
+				<Layers>
+					<Layer level="ARTWORK">
+						<FontString parentKey="Text" inherits="GameFontNormal" text="You have no saved raid lockouts">
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnLoad>
+				ButtonFrameTemplate_HideButtonBar(self);
+				self:RegisterForDrag("LeftButton");
+			</OnLoad>
+			<OnShow>
+				BetterSavedInstancesFrame_OnShow(self);
+			</OnShow>
+			<OnHide>
+				BetterSavedInstancesFrame_OnHide(self);
+			</OnHide>
+			<OnDragStart>
+				self:StartMoving();
+			</OnDragStart>
+			<OnDragStop>
+				self:StopMovingOrSizing();
+			</OnDragStop>
+		</Scripts>
+	</Frame>
+	
+	<!-- Bottom Tabs (Contacts, Who, Raid, Quick Join) - Matching Blizzard's FriendsFrame bottom tabs -->
 			<Button name="BetterFriendsFrameBottomTab1" parentKey="BottomTab1" inherits="PanelTabButtonTemplate" id="1" text="CONTACTS_TAB_TITLE">
 				<Anchors>
 					<Anchor point="BOTTOMLEFT" x="5" y="-30"/>
@@ -2174,15 +2525,7 @@
 				<Scripts>
 					<OnClick>
 						PanelTemplates_Tab_OnClick(self, BetterFriendsFrame)
-						-- COMBAT FIX: ShowUIPanel is protected in combat
-						if InCombatLockdown() then
-							print("|cffff0000BetterFriendlist:|r Cannot open Quick Join in combat")
-						else
-							if not FriendsFrame:IsShown() then
-								ShowUIPanel(FriendsFrame)
-							end
-							FriendsFrame_ShowSubFrame("QuickJoinFrame")
-						end
+						BetterFriendsFrame_ShowBottomTab(4)
 					</OnClick>
 				</Scripts>
 			</Button>

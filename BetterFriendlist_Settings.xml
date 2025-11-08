@@ -100,6 +100,9 @@
 												self.text:SetText("Show 'Blizzard Friendlist' in menu")
 												self.text:SetFontObject("GameFontHighlight")
 											</OnLoad>
+											<OnClick>
+												BetterFriendlistSettings_OnShowBlizzardOptionChanged(self:GetChecked())
+											</OnClick>
 										</Scripts>
 									</CheckButton>
 								</Frames>
@@ -185,6 +188,9 @@
 											self.text:SetText("Compact Mode")
 											self.text:SetFontObject("GameFontHighlight")
 										</OnLoad>
+										<OnClick>
+											BetterFriendlistSettings_OnCompactModeChanged(self:GetChecked())
+										</OnClick>
 										<OnEnter>
 											GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 											GameTooltip:SetText("Compact Mode", 1, 1, 1)
@@ -295,35 +301,11 @@
 <Button parentKey="DefaultsButton" inherits="UIPanelButtonTemplate" text="Defaults">
 	<Size x="96" y="22" />
 	<Anchors>
-		<Anchor point="BOTTOMLEFT" relativeKey="$parent.MainInset" relativePoint="BOTTOMLEFT" x="8" y="-22" />
+		<Anchor point="BOTTOM" relativeKey="$parent.MainInset" relativePoint="BOTTOM" x="0" y="-22" />
 	</Anchors>
 	<Scripts>
 		<OnClick>
 			BetterFriendlistSettings_ResetToDefaults()
-		</OnClick>
-	</Scripts>
-</Button>
-
-<Button parentKey="CancelButton" inherits="UIPanelButtonTemplate" text="Cancel">
-	<Size x="96" y="22" />
-	<Anchors>
-		<Anchor point="BOTTOMRIGHT" relativeKey="$parent.MainInset" relativePoint="BOTTOMRIGHT" x="-110" y="-22" />
-	</Anchors>
-	<Scripts>
-		<OnClick>
-			BetterFriendlistSettings_Cancel()
-		</OnClick>
-	</Scripts>
-</Button>
-
-<Button parentKey="ApplyButton" inherits="UIPanelButtonTemplate" text="Apply">
-	<Size x="96" y="22" />
-	<Anchors>
-		<Anchor point="BOTTOMRIGHT" relativeKey="$parent.MainInset" relativePoint="BOTTOMRIGHT" x="-8" y="-22" />
-	</Anchors>
-	<Scripts>
-		<OnClick>
-			BetterFriendlistSettings_Apply()
 		</OnClick>
 	</Scripts>
 </Button>

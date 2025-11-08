@@ -52,39 +52,6 @@ Settings:LoadSettings()
 end
 end
 
--- Save pending settings to database
-function BetterFriendlistSettings_SaveSettings()
-local Settings = GetSettings()
-if Settings then
-return Settings:SaveSettings()
-end
-return false
-end
-
--- Update pending settings when UI changes
-function BetterFriendlistSettings_UpdatePending(key, value)
-local Settings = GetSettings()
-if Settings then
-Settings:UpdatePending(key, value)
-end
-end
-
--- Apply button handler
-function BetterFriendlistSettings_Apply()
-local Settings = GetSettings()
-if Settings then
-Settings:Apply()
-end
-end
-
--- Cancel button handler
-function BetterFriendlistSettings_Cancel()
-local Settings = GetSettings()
-if Settings then
-Settings:Cancel()
-end
-end
-
 -- Initialize font size dropdown
 function BetterFriendlistSettings_InitFontSizeDropdown()
 local Settings = GetSettings()

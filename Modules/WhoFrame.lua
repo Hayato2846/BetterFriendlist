@@ -351,6 +351,34 @@ function WhoFrame:InvalidateFontCache()
 	cachedExtent = nil
 end
 
+-- Handle button click
+function WhoFrame:OnButtonClick(button, mouseButton)
+	if mouseButton == "LeftButton" then
+		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+		self:SetSelectedButton(button)
+	elseif mouseButton == "RightButton" then
+		-- Open context menu for WHO player
+		if button.index then
+			local info = C_FriendList.GetWhoInfo(button.index)
+			if info then
+				-- Use MenuSystem module if available
+				local MenuSystem = BFL and BFL:GetModule("MenuSystem")
+				if MenuSystem and MenuSystem.OpenWhoPlayerMenu then
+					MenuSystem:OpenWhoPlayerMenu(button, info)
+				else
+					-- Fallback: Use basic UnitPopup
+					local contextData = {
+						name = info.fullName,
+						server = info.fullGuildName,
+						guid = info.guid,
+					}
+					UnitPopup_OpenMenu("FRIEND", contextData)
+				end
+			end
+		end
+	end
+end
+
 -- ========================================
 -- Module Export
 -- ========================================
@@ -502,6 +530,17 @@ end
 -- Export mixins globally for XML access
 _G.WhoFrameEditBoxMixin = WhoFrameEditBoxMixin
 _G.WhoFrameColumnDropdownMixin = WhoFrameColumnDropdownMixin
+
+-- ========================================
+-- Global Wrapper Functions for XML Access
+-- ========================================
+
+-- Global wrapper for WHO list button OnClick
+function _G.BetterWhoListButton_OnClick(button, mouseButton)
+	if WhoFrame and WhoFrame.OnButtonClick then
+		WhoFrame:OnButtonClick(button, mouseButton)
+	end
+end
 
 -- ========================================
 -- Module Return

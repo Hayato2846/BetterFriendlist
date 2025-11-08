@@ -98,14 +98,44 @@ function Dialogs:RegisterDialogs()
 		OnAccept = function(self, data)
 			local newName = self.EditBox:GetText()
 			if newName and newName ~= "" then
-				BetterFriendsList_RenameGroup(data, newName)
+				local FriendsList = BFL and BFL:GetModule("FriendsList")
+				if FriendsList then
+					local success, err = FriendsList:RenameGroup(data, newName)
+					if success then
+						-- Refresh settings group list if it's open
+						local Settings = BFL and BFL:GetModule("Settings")
+						if Settings then
+							Settings:RefreshGroupList()
+						end
+						
+						-- Refresh the friends list display
+						if BetterFriendsFrame_UpdateDisplay then
+							BetterFriendsFrame_UpdateDisplay()
+						end
+					end
+				end
 			end
 		end,
 		EditBoxOnEnterPressed = function(self, data)
 			local parent = self:GetParent()
 			local newName = self:GetText()
 			if newName and newName ~= "" then
-				BetterFriendsList_RenameGroup(data, newName)
+				local FriendsList = BFL and BFL:GetModule("FriendsList")
+				if FriendsList then
+					local success, err = FriendsList:RenameGroup(data, newName)
+					if success then
+						-- Refresh settings group list if it's open
+						local Settings = BFL and BFL:GetModule("Settings")
+						if Settings then
+							Settings:RefreshGroupList()
+						end
+						
+						-- Refresh the friends list display
+						if BetterFriendsFrame_UpdateDisplay then
+							BetterFriendsFrame_UpdateDisplay()
+						end
+					end
+				end
 			end
 			parent:Hide()
 		end,
@@ -113,9 +143,18 @@ function Dialogs:RegisterDialogs()
 			self:GetParent():Hide()
 		end,
 		OnShow = function(self, data)
-			-- Access global friendGroups table
-			local friendGroups = _G.friendGroups or {}
-			self.EditBox:SetText(friendGroups[data] and friendGroups[data].name or "")
+			-- Get group info from Groups module
+			local Groups = BFL and BFL:GetModule("Groups")
+			local groupName = ""
+			
+			if Groups and data then
+				local groupInfo = Groups:Get(data)
+				if groupInfo then
+					groupName = groupInfo.name or ""
+				end
+			end
+			
+			self.EditBox:SetText(groupName)
 			self.EditBox:SetFocus()
 			self.EditBox:HighlightText()
 		end,

@@ -88,7 +88,12 @@ end
 
 -- Get friend's groups
 function DB:GetFriendGroups(friendUID)
-	return BetterFriendlistDB.friendGroups[friendUID] or {}
+	-- If friendUID is provided, return groups for that specific friend
+	if friendUID then
+		return BetterFriendlistDB.friendGroups[friendUID] or {}
+	end
+	-- If no friendUID provided, return ALL friendGroups mappings
+	return BetterFriendlistDB.friendGroups or {}
 end
 
 -- Set friend's groups

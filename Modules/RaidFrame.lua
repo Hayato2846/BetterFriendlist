@@ -97,6 +97,19 @@ function RaidFrame:RegisterEvents()
     BFL:RegisterEventCallback("PLAYER_DIFFICULTY_CHANGED", function(...)
         RaidFrame:OnDifficultyChanged(...)
     end, 50)
+    
+    -- Ready Check events
+    BFL:RegisterEventCallback("READY_CHECK", function(...)
+        RaidFrame:OnReadyCheck(...)
+    end, 50)
+    
+    BFL:RegisterEventCallback("READY_CHECK_CONFIRM", function(...)
+        RaidFrame:OnReadyCheckConfirm(...)
+    end, 50)
+    
+    BFL:RegisterEventCallback("READY_CHECK_FINISHED", function(...)
+        RaidFrame:OnReadyCheckFinished(...)
+    end, 50)
 end
 
 -- ========================================
@@ -468,13 +481,13 @@ function RaidFrame:UpdateMemberButtonVisuals(button, member)
     -- Update role icon (Tank/Healer/DPS)
     if button.RoleIcon then
         if member.combatRole == "TANK" then
-            button.RoleIcon:SetAtlas("roleicon-tiny-tank")
+            button.RoleIcon:SetAtlas("UI-LFG-RoleIcon-Tank-Micro-GroupFinder")
             button.RoleIcon:Show()
         elseif member.combatRole == "HEALER" then
-            button.RoleIcon:SetAtlas("roleicon-tiny-healer")
+            button.RoleIcon:SetAtlas("UI-LFG-RoleIcon-Healer-Micro-GroupFinder")
             button.RoleIcon:Show()
         elseif member.combatRole == "DAMAGER" then
-            button.RoleIcon:SetAtlas("roleicon-tiny-dps")
+            button.RoleIcon:SetAtlas("UI-LFG-RoleIcon-DPS-Micro-GroupFinder")
             button.RoleIcon:Show()
         else
             button.RoleIcon:Hide()
@@ -549,13 +562,13 @@ function RaidFrame:UpdateRoleSummary()
     end
     
     -- Format: Tank Icon + count, Healer Icon + count, DPS Icon + count
-    -- Using Blizzard's official atlas names for role icons
+    -- Using Blizzard's modern micro role icons (same as in GroupFinder and FriendsFrame)
     local iconSize = 16
     
-    -- Using the groupfinder atlas icons (these are the standard Blizzard role icons)
-    local tankIcon = CreateAtlasMarkup("groupfinder-icon-role-large-tank", iconSize, iconSize)
-    local healIcon = CreateAtlasMarkup("groupfinder-icon-role-large-heal", iconSize, iconSize)
-    local dpsIcon = CreateAtlasMarkup("groupfinder-icon-role-large-dps", iconSize, iconSize)
+    -- Using the modern UI-LFG micro role icons
+    local tankIcon = CreateAtlasMarkup("UI-LFG-RoleIcon-Tank-Micro-GroupFinder", iconSize, iconSize)
+    local healIcon = CreateAtlasMarkup("UI-LFG-RoleIcon-Healer-Micro-GroupFinder", iconSize, iconSize)
+    local dpsIcon = CreateAtlasMarkup("UI-LFG-RoleIcon-DPS-Micro-GroupFinder", iconSize, iconSize)
     
     local text = string.format("%s %d  %s %d  %s %d", tankIcon, tanks, healIcon, healers, dpsIcon, dps)
     frame.ControlPanel.RoleSummary:SetText(text)
@@ -582,13 +595,19 @@ function RaidFrame:UpdateMemberButton(button, memberData)
         if button.RoleIcon then button.RoleIcon:Hide() end
         if button.ReadyCheckIcon then button.ReadyCheckIcon:Hide() end
         
-        -- Show as empty slot with gray background
-        if button.Background then
-            button.Background:SetColorTexture(0.1, 0.1, 0.1, 0.3)
+        -- Show "Empty" text
+        if button.EmptyText then button.EmptyText:Show() end
+        
+        -- Reset to empty slot appearance
+        if button.ClassColorTint then
+            button.ClassColorTint:SetColorTexture(0.1, 0.1, 0.1, 0.3)
         end
         
         return
     end
+    
+    -- Hide "Empty" text when slot is occupied
+    if button.EmptyText then button.EmptyText:Hide() end
     
     -- Store member data in button
     button.memberData = memberData
@@ -635,38 +654,13 @@ function RaidFrame:UpdateMemberButton(button, memberData)
         button.Name:SetText(memberData.name or "")
     end
     
-    -- Update background color (subtle class color tint)
-    if button.Background then
+    -- Update class color tint overlay (subtle tint over textured background)
+    if button.ClassColorTint then
         if classColor and memberData.online then
-            button.Background:SetColorTexture(classColor.r * 0.3, classColor.g * 0.3, classColor.b * 0.3, 0.8)
+            button.ClassColorTint:SetColorTexture(classColor.r, classColor.g, classColor.b, 0.3)
         else
-            button.Background:SetColorTexture(0.2, 0.2, 0.2, 0.8)
+            button.ClassColorTint:SetColorTexture(0.1, 0.1, 0.1, 0.5)
         end
-    end
-    
-    -- Update name with class color
-    local classColor = RAID_CLASS_COLORS[memberData.classFileName]
-    if classColor then
-        if memberData.online then
-            if memberData.isDead then
-                -- Dead: Red
-                button.Name:SetTextColor(RED_FONT_COLOR.r, RED_FONT_COLOR.g, RED_FONT_COLOR.b)
-            else
-                -- Alive: Class Color
-                button.Name:SetTextColor(classColor.r, classColor.g, classColor.b)
-            end
-        else
-            -- Offline: Gray
-            button.Name:SetTextColor(GRAY_FONT_COLOR.r, GRAY_FONT_COLOR.g, GRAY_FONT_COLOR.b)
-        end
-    end
-    button.Name:SetText(memberData.name or "")
-    
-    -- Update background color (subtle class color tint)
-    if classColor and memberData.online then
-        button.Background:SetColorTexture(classColor.r * 0.3, classColor.g * 0.3, classColor.b * 0.3, 0.8)
-    else
-        button.Background:SetColorTexture(0.2, 0.2, 0.2, 0.8)
     end
     
     -- Update Rank Icon (Leader/Assistant)
@@ -685,13 +679,13 @@ function RaidFrame:UpdateMemberButton(button, memberData)
     -- Update Role Icon (Tank/Healer/DPS)
     if memberData.combatRole and memberData.combatRole ~= "NONE" then
         if memberData.combatRole == "TANK" then
-            button.RoleIcon:SetAtlas("groupfinder-icon-role-large-tank")
+            button.RoleIcon:SetAtlas("UI-LFG-RoleIcon-Tank-Micro-GroupFinder")
             button.RoleIcon:Show()
         elseif memberData.combatRole == "HEALER" then
-            button.RoleIcon:SetAtlas("groupfinder-icon-role-large-heal")
+            button.RoleIcon:SetAtlas("UI-LFG-RoleIcon-Healer-Micro-GroupFinder")
             button.RoleIcon:Show()
         elseif memberData.combatRole == "DAMAGER" then
-            button.RoleIcon:SetAtlas("groupfinder-icon-role-large-dps")
+            button.RoleIcon:SetAtlas("UI-LFG-RoleIcon-DPS-Micro-GroupFinder")
             button.RoleIcon:Show()
         end
     else
@@ -940,6 +934,9 @@ function RaidFrame:OnRaidRosterUpdate(...)
     -- Update UI
     self:UpdateAllMemberButtons()
     self:UpdateRoleSummary()
+    
+    -- Note: We DON'T need to call BetterRaidFrame_Update() here anymore
+    -- The EveryoneAssistCheckbox handles its own state via events (GROUP_ROSTER_UPDATE)
 end
 
 function RaidFrame:OnGroupJoined(...)
@@ -967,6 +964,88 @@ end
 function RaidFrame:OnDifficultyChanged(...)
     -- Difficulty changed - update control panel state
     -- UI will refresh on next render
+end
+
+--- Handle Ready Check start
+function RaidFrame:OnReadyCheck(initiator, timeLeft)
+    -- Mark all members with their current ready check status
+    for _, member in ipairs(self.raidMembers) do
+        if member.unit then
+            local status = GetReadyCheckStatus(member.unit)
+            -- Only set status if we don't already have one (CONFIRM event might have fired first)
+            if not member.readyStatus then
+                -- For offline players, status might be nil initially
+                if not member.online and not status then
+                    member.readyStatus = "waiting"
+                else
+                    member.readyStatus = status or "waiting"
+                end
+            end
+        end
+    end
+    
+    -- Update all visible buttons
+    self:RefreshMemberButtons()
+end
+
+--- Handle Ready Check confirmation
+function RaidFrame:OnReadyCheckConfirm(unitTarget, isReady)
+    -- Find member by unit and update status
+    for _, member in ipairs(self.raidMembers) do
+        if member.unit == unitTarget then
+            -- Get actual status from API (more reliable than event param)
+            local status = GetReadyCheckStatus(member.unit)
+            member.readyStatus = status or (isReady and "ready" or "notready")
+            break
+        end
+    end
+    
+    -- Update all visible buttons
+    self:RefreshMemberButtons()
+end
+
+--- Handle Ready Check finished
+function RaidFrame:OnReadyCheckFinished(preempted)
+    -- Clear ready check status after a delay (like Blizzard does)
+    C_Timer.After(5, function()
+        for _, member in ipairs(self.raidMembers) do
+            member.readyStatus = nil
+        end
+        
+        -- Update all visible buttons
+        self:RefreshMemberButtons()
+    end)
+end
+
+--- Refresh all visible member buttons (for Ready Check updates)
+function RaidFrame:RefreshMemberButtons()
+    local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
+    if not frame then return end
+    
+    local groupsContainer = frame.GroupsInset and frame.GroupsInset.GroupsContainer
+    if not groupsContainer then return end
+    
+    -- Update each group's buttons
+    for groupIndex = 1, 8 do
+        local groupFrame = groupsContainer["Group" .. groupIndex]
+        if groupFrame then
+            for slotIndex = 1, 5 do
+                local button = groupFrame["Slot" .. slotIndex]
+                if button and button.memberData then
+                    -- Find updated member data from raidMembers
+                    local memberName = button.memberData.name
+                    for _, member in ipairs(self.raidMembers) do
+                        if member.name == memberName then
+                            -- Update button with fresh member data (including readyStatus)
+                            button.memberData = member
+                            self:UpdateMemberButton(button, member)
+                            break
+                        end
+                    end
+                end
+            end
+        end
+    end
 end
 
 -- ========================================
