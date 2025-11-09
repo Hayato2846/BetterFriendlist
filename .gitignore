@@ -1,0 +1,44 @@
+# Editor and IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Documentation (keep essential docs, exclude development notes)
+BUG_*.md
+COMBAT_*.md
+FRIENDGROUPS_*.md
+IMPLEMENTATION_*.md
+MASTER_*.md
+MIGRATION_*.md
+MODULARIZATION_*.md
+RAID_FRAME_*.md
+SETTINGS_*.md
+TESTING_*.md
+PHASE_*.md
+QUICKJOIN_*.md
+v1.0-finalization-plan.md
+plans/
+
+# Reference files
+reference/
+predecessor/
+.ai-context/
+docs/
+
+# Build and package files
+*.zip
+release/
+.release/
+
+# WoW Cache
+*.bak
+*.wtf
+*.toc.bak
+*.log

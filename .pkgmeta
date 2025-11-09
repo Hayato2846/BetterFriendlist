@@ -1,0 +1,35 @@
+package-as: BetterFriendlist
+
+enable-nolib-creation: no
+
+ignore:
+  - .git
+  - .github
+  - .gitignore
+  - .pkgmeta
+  - README.md
+  - CHANGELOG.md
+  - RELEASE_NOTES_v1.0.md
+  - RELEASE_WORKFLOW_SETUP.md
+  - docs
+  - predecessor
+  - reference
+  - "*.md"
+  - BUG_*.md
+  - COMBAT_*.md
+  - FRIENDGROUPS_*.md
+  - IMPLEMENTATION_*.md
+  - MASTER_*.md
+  - MIGRATION_*.md
+  - MODULARIZATION_*.md
+  - RAID_FRAME_*.md
+  - SETTINGS_*.md
+  - TESTING_*.md
+  - v1.0-finalization-plan.md
+  - plans
+  - .ai-context
+  - .vscode
+
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
