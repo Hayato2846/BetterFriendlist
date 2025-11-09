@@ -4,7 +4,7 @@
 ## Author: Hayato2846
 ## Version: @project-version@
 ## X-Curse-Project-ID: 1381771
-## X-WoWI-ID: 
+## X-WoWI-ID: 26984
 ## X-Wago-ID: rNkPLl6a 
 ## SavedVariables: BetterFriendlistDB
 ## Bindings: Bindings.xml
