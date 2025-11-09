@@ -1,16 +1,55 @@
 -- Core.lua
 -- Main initialization file for BetterFriendlist addon
--- Version 0.15
+-- Version 1.0 - November 2025
+-- Complete replacement for WoW Friends frame with modular architecture
 
 -- Create addon namespace
 local ADDON_NAME, BFL = ...
-BFL.Version = "0.15"
+BFL.Version = "1.0"
 
 -- Module registry
 BFL.Modules = {}
 
 -- Event callback registry
 BFL.EventCallbacks = {}
+
+--------------------------------------------------------------------------
+-- Debug Print System
+--------------------------------------------------------------------------
+-- All debug prints are gated behind /bfl print toggle
+-- Default: OFF (no debug spam), persists in SavedVariables
+--------------------------------------------------------------------------
+
+-- Store debug flag in BFL namespace for instant access
+BFL.debugPrintEnabled = false
+
+-- Debug print function (replaces all print() calls except version print)
+function BFL:DebugPrint(...)
+	-- Use cached flag for instant access (no DB lookup)
+	if self.debugPrintEnabled then
+		print(...)
+	end
+end
+
+-- Toggle debug print mode (slash command)
+function BFL:ToggleDebugPrint()
+	if not BetterFriendlistDB then
+		print("|cffff0000BetterFriendlist:|r Database not initialized yet. Try again after login.")
+		return
+	end
+	
+	-- Toggle in DB
+	BetterFriendlistDB.debugPrintEnabled = not BetterFriendlistDB.debugPrintEnabled
+	
+	-- Update cached flag immediately
+	self.debugPrintEnabled = BetterFriendlistDB.debugPrintEnabled
+	
+	if self.debugPrintEnabled then
+		print("|cff00ff00BetterFriendlist:|r Debug printing |cff00ff00ENABLED|r")
+	else
+		print("|cff00ff00BetterFriendlist:|r Debug printing |cffff0000DISABLED|r")
+	end
+end
 
 -- Register a module
 function BFL:RegisterModule(name, module)
@@ -87,6 +126,11 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 				BFL.DB:Initialize()
 			end
 			
+			-- Load debug flag from DB
+			if BetterFriendlistDB then
+				BFL.debugPrintEnabled = BetterFriendlistDB.debugPrintEnabled or false
+			end
+			
 			-- Initialize all modules
 			for name, module in pairs(BFL.Modules) do
 				if module.Initialize then
@@ -111,3 +155,85 @@ end)
 
 -- Expose namespace globally for backward compatibility
 _G.BetterFriendlist = BFL
+
+--------------------------------------------------------------------------
+-- Slash Commands
+--------------------------------------------------------------------------
+
+-- Main slash command handler
+SLASH_BETTERFRIENDLIST1 = "/bfl"
+SlashCmdList["BETTERFRIENDLIST"] = function(msg)
+	msg = msg:lower():trim()
+	
+	-- Debug print toggle
+	if msg == "print" then
+		BFL:ToggleDebugPrint()
+	
+	-- Legacy commands (from old BetterFriendlist.lua slash handler)
+	elseif msg == "show" then
+		if BFL.DB then
+			BFL.DB:Set("showBlizzardOption", true)
+			print("|cff20ff20BetterFriendlist:|r 'Show Blizzard's Friendlist' option is now |cff20ff20enabled|r in the menu")
+		end
+	elseif msg == "hide" then
+		if BFL.DB then
+			BFL.DB:Set("showBlizzardOption", false)
+			print("|cff20ff20BetterFriendlist:|r 'Show Blizzard's Friendlist' option is now |cffff0000disabled|r in the menu")
+		end
+	elseif msg == "toggle" then
+		if BFL.DB then
+			local current = BFL.DB:Get("showBlizzardOption", false)
+			BFL.DB:Set("showBlizzardOption", not current)
+			if not current then
+				print("|cff20ff20BetterFriendlist:|r 'Show Blizzard's Friendlist' option is now |cff20ff20enabled|r in the menu")
+			else
+				print("|cff20ff20BetterFriendlist:|r 'Show Blizzard's Friendlist' option is now |cffff0000disabled|r in the menu")
+			end
+		end
+	elseif msg == "debug" or msg == "debugdb" then
+		if _G.BetterFriendlistSettings_DebugDatabase then
+			_G.BetterFriendlistSettings_DebugDatabase()
+		else
+			print("|cffff0000BetterFriendlist:|r Debug function not available (settings not loaded)")
+		end
+	
+	-- Settings
+	elseif msg == "settings" or msg == "config" or msg == "options" then
+		-- Open settings tab (BottomTab 4)
+		if _G.BetterFriendsFrame_ShowBottomTab then
+			_G.BetterFriendsFrame_ShowBottomTab(5) -- Settings is tab 5
+			if not _G.BetterFriendsFrame:IsShown() then
+				_G.ToggleBetterFriendsFrame()
+			end
+		else
+			print("|cffff0000BetterFriendlist:|r Settings not loaded yet")
+		end
+	
+	-- Help (or any other unrecognized command)
+	else
+		print("|cff00ff00=== BetterFriendlist v" .. BFL.Version .. " ===|r")
+		print("")
+		print("|cffffcc00Main Commands:|r")
+		print("  |cffffffff/bfl|r - Toggle BetterFriendlist frame")
+		print("  |cffffffff/bfl settings|r - Open settings panel")
+		print("  |cffffffff/bfl help|r - Show this help")
+		print("")
+		print("|cffffcc00Debug Commands:|r")
+		print("  |cffffffff/bfl debug print|r - Toggle debug output")
+		print("  |cffffffff/bfl debug|r - Show database state")
+		print("")
+		print("|cffffcc00Quick Join Commands:|r")
+		print("  |cffffffff/bflqj mock|r - Create 3 test groups")
+		print("  |cffffffff/bflqj clear|r - Remove test groups")
+		print("  |cffffffff/bflqj list|r - List all mock groups")
+		print("  |cffffffff/bflqj disable|r - Use real Social Queue data")
+		print("")
+		print("|cffffcc00Performance Monitoring:|r")
+		print("  |cffffffff/bflperf enable|r - Enable performance tracking")
+		print("  |cffffffff/bflperf report|r - Show performance stats")
+		print("  |cffffffff/bflperf reset|r - Reset statistics")
+		print("  |cffffffff/bflperf memory|r - Show memory usage")
+		print("")
+		print("|cff20ff20For more help, see:|r |cff00ccffhttps://github.com/Hayato2846/BetterFriendlist|r")
+	end
+end

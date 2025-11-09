@@ -59,8 +59,13 @@ end
 local function GetGroupColorCode(groupId)
 	local Groups = BFL:GetModule("Groups")
 	if Groups then
-		local r, g, b = Groups:GetGroupColor(groupId)
-		return string.format("|cff%02x%02x%02x", r * 255, g * 255, b * 255)
+		local group = Groups:Get(groupId)
+		if group and group.color then
+			local r = group.color.r or group.color[1] or 1
+			local g = group.color.g or group.color[2] or 1
+			local b = group.color.b or group.color[3] or 1
+			return string.format("|cff%02x%02x%02x", r * 255, g * 255, b * 255)
+		end
 	end
 	return "|cffffffff"
 end

@@ -15,6 +15,8 @@ local defaults = {
 	-- Visual Settings
 	compactMode = false, -- Use compact button layout
 	fontSize = "normal", -- "small", "normal", "large"
+	-- Debug Settings
+	debugPrintEnabled = false, -- Toggle debug prints with /bfl debug print
 	version = BFL.Version
 }
 

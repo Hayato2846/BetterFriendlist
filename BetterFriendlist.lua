@@ -503,9 +503,13 @@ end
 
 -- Toggle the friends frame
 function ToggleBetterFriendsFrame()
+	BFL:DebugPrint("[BFL] ToggleBetterFriendsFrame() called - Frame shown: " .. tostring(BetterFriendsFrame:IsShown()))
+	
 	if BetterFriendsFrame:IsShown() then
+		BFL:DebugPrint("[BFL] Hiding BetterFriendsFrame")
 		HideBetterFriendsFrame()
 	else
+		BFL:DebugPrint("[BFL] Showing BetterFriendsFrame")
 		ShowBetterFriendsFrame()
 	end
 end
@@ -530,7 +534,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 	if event == "ADDON_LOADED" then
 		local addonName = ...
 		if addonName == "BetterFriendlist" then
-			print("|cff00ff00BetterFriendlist v" .. ADDON_VERSION .. "|r loaded successfully!")
+			-- Note: Version print is in Core.lua ADDON_LOADED handler (prevents duplicate)
 			
 			-- Initialize menu system
 			InitializeMenuSystem()
@@ -809,54 +813,64 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			end
 		end)
 		
-		-- Print keybinding instructions
-		if not GetBindingKey("BETTERFRIENDLIST_TOGGLE") then
-			C_Timer.After(3, function()
-				print("|cff00ff00BetterFriendlist:|r Please set a keybinding in |cffffffffESC > Keybindings > AddOns > BetterFriendlist|r to open the friends frame.")
-			end)
-		end
+		-- Setup automatic keybind override (like BetterBags)
+		BFL:DebugPrint("[BFL] Setting up keybind override system...")
+		BFL.bindingFrame = BFL.bindingFrame or CreateFrame("Frame")
+		BFL.bindingFrame:RegisterEvent("PLAYER_LOGIN")
+		BFL.bindingFrame:RegisterEvent("UPDATE_BINDINGS")
+		BFL.bindingFrame:SetScript("OnEvent", function(self, event, ...)
+			BFL:DebugPrint("[BFL] Event received: " .. event)
+			BFL_CheckKeyBindings()
+		end)
+		
+		-- Trigger initial check after a short delay
+		C_Timer.After(1, function()
+			BFL:DebugPrint("[BFL] Running initial keybind check...")
+			BFL_CheckKeyBindings()
+		end)
 	end
 end)
 
--- Slash Commands for BetterFriendlist
-SLASH_BETTERFRIENDLIST1 = "/bfl"
-SlashCmdList["BETTERFRIENDLIST"] = function(msg)
-	local DB = GetDB()
-	if not DB then
-		print("|cffff0000BetterFriendlist:|r Database module not available")
+-- Automatic Keybind Override System (like BetterBags)
+-- Intercepts the default O-key and redirects it to our frame
+function BFL_CheckKeyBindings()
+	BFL:DebugPrint("[BFL] CheckKeyBindings called")
+	
+	if InCombatLockdown() then
+		BFL:DebugPrint("[BFL] In combat, delaying keybind check")
+		BFL.bindingFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 		return
 	end
+	BFL.bindingFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
+	ClearOverrideBindings(BFL.bindingFrame)
 	
-	msg = msg:lower():trim()
+	local bindings = {
+		"TOGGLESOCIAL",			-- O-key (default social/friends keybind)
+		"TOGGLEFRIENDSTAB",		-- Alternative binding (if exists)
+		"TOGGLEFRIENDSFRAME"	-- Possible alternative name
+	}
 	
-	if msg == "show" then
-		DB:Set("showBlizzardOption", true)
-		print("|cff20ff20BetterFriendlist:|r 'Show Blizzard's Friendlist' option is now |cff20ff20enabled|r in the menu")
-	elseif msg == "hide" then
-		DB:Set("showBlizzardOption", false)
-		print("|cff20ff20BetterFriendlist:|r 'Show Blizzard's Friendlist' option is now |cffff0000disabled|r in the menu")
-	elseif msg == "toggle" then
-		local current = DB:Get("showBlizzardOption", false)
-		DB:Set("showBlizzardOption", not current)
-		if not current then
-			print("|cff20ff20BetterFriendlist:|r 'Show Blizzard's Friendlist' option is now |cff20ff20enabled|r in the menu")
-		else
-			print("|cff20ff20BetterFriendlist:|r 'Show Blizzard's Friendlist' option is now |cffff0000disabled|r in the menu")
+	BFL:DebugPrint("[BFL] Checking " .. #bindings .. " binding names...")
+	
+	for _, binding in pairs(bindings) do
+		local key, otherkey = GetBindingKey(binding)
+		BFL:DebugPrint("[BFL] Binding '" .. binding .. "': key1=" .. tostring(key) .. ", key2=" .. tostring(otherkey))
+		
+		if key ~= nil then
+			SetOverrideBinding(BFL.bindingFrame, true, key, "BETTERFRIENDLIST_TOGGLE")
+			BFL:DebugPrint("[BFL] Override set: " .. key .. " -> BETTERFRIENDLIST_TOGGLE")
 		end
-	elseif msg == "debug" or msg == "debugdb" then
-		if BetterFriendlistSettings_DebugDatabase then
-			BetterFriendlistSettings_DebugDatabase()
-		else
-			print("|cffff0000BetterFriendlist:|r Debug function not available (settings not loaded)")
+		if otherkey ~= nil then
+			SetOverrideBinding(BFL.bindingFrame, true, otherkey, "BETTERFRIENDLIST_TOGGLE")
+			BFL:DebugPrint("[BFL] Override set: " .. otherkey .. " -> BETTERFRIENDLIST_TOGGLE")
 		end
-	else
-		print("|cff20ff20BetterFriendlist|r - Available commands:")
-		print("  |cffffcc00/bfl show|r - Enable 'Show Blizzard's Friendlist' in menu")
-		print("  |cffffcc00/bfl hide|r - Disable 'Show Blizzard's Friendlist' in menu")
-		print("  |cffffcc00/bfl toggle|r - Toggle 'Show Blizzard's Friendlist' option")
-		print("  |cffffcc00/bfl debug|r - Show database state (for debugging migration)")
 	end
+	
+	BFL:DebugPrint("[BFL] Keybind override complete")
 end
+
+-- Slash Commands are now in Core.lua
+-- This avoids loading order conflicts
 
 -- Show specific tab content (11.2.5: 4 tabs - Friends, Recent Allies, RAF, Sort)
 function BetterFriendsFrame_ShowTab(tabIndex)
@@ -1426,23 +1440,30 @@ end
 
 -- Show Ignore List (11.2.5 - part of contacts menu)
 function BetterFriendsFrame_ShowIgnoreList()
-	-- For now, show a simple message
-	-- In the future, we can implement a full ignore list UI
-	local numIgnores = C_FriendList.GetNumIgnores()
-	
-	if numIgnores == 0 then
-		print("Your ignore list is empty.")
-		return
-	end
-	
-	print("Ignore List (" .. numIgnores .. " players):")
-	for i = 1, numIgnores do
-		local name = C_FriendList.GetIgnoreName(i)
-		if name then
-			print("  " .. i .. ". " .. name)
+	-- Show IgnoreList module UI (always, even if empty)
+	local IgnoreList = BFL and BFL:GetModule("IgnoreList")
+	if IgnoreList then
+		-- Set ignore list as active dropdown and show
+		if BetterFriendsFrame and BetterFriendsFrame.IgnoreListWindow then
+			BetterFriendsFrame.IgnoreListWindow:Show()
+			IgnoreList:Update()
+		end
+	else
+		-- Fallback: show console message
+		local numIgnores = C_FriendList.GetNumIgnores()
+		if numIgnores == 0 then
+			print("Your ignore list is empty.")
+		else
+			print("Ignore List (" .. numIgnores .. " players):")
+			for i = 1, numIgnores do
+				local name = C_FriendList.GetIgnoreName(i)
+				if name then
+					print("  " .. i .. ". " .. name)
+				end
+			end
+			print("Use '/unignore <name>' to remove someone from your ignore list.")
 		end
 	end
-	print("Use '/unignore <name>' to remove someone from your ignore list.")
 end
 
 -- ========================================
@@ -1752,6 +1773,23 @@ end
 -- ========================================
 -- All RAF functionality is delegated to Modules/RAF.lua
 -- XML callbacks reference module methods directly via mixins
+
+-- ========================================
+-- RECENT ALLIES CALLBACKS
+-- ========================================
+
+function BetterRecentAlliesEntry_OnEnter(self)
+	local RecentAllies = BFL and BFL:GetModule("RecentAllies")
+	if RecentAllies and RecentAllies.BuildTooltip then
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		RecentAllies:BuildTooltip(self, GameTooltip)
+		GameTooltip:Show()
+	end
+end
+
+function BetterRecentAlliesEntry_OnLeave(self)
+	GameTooltip:Hide()
+end
 
 -- ========================================
 -- RAID FRAME & QUICK JOIN XML CALLBACKS

@@ -720,6 +720,8 @@
 		<Scripts>
 			<OnLoad>
 				BetterRaidMemberButton_OnLoad(self);
+				self:RegisterForDrag("LeftButton");
+				self:SetMovable(true);
 			</OnLoad>
 			<OnEnter>
 				BetterRaidMemberButton_OnEnter(self);
@@ -731,10 +733,14 @@
 				BetterRaidMemberButton_OnClick(self, button);
 			</OnClick>
 			<OnDragStart>
-				BetterRaidMemberButton_OnDragStart(self);
+				if not InCombatLockdown() then
+					BetterRaidMemberButton_OnDragStart(self);
+				end
 			</OnDragStart>
 			<OnDragStop>
-				BetterRaidMemberButton_OnDragStop(self);
+				if not InCombatLockdown() then
+					BetterRaidMemberButton_OnDragStop(self);
+				end
 			</OnDragStop>
 		</Scripts>
 		<HighlightTexture alphaMode="ADD" file="Interface\QuestFrame\UI-QuestTitleHighlight"/>
@@ -1063,6 +1069,7 @@
 									</EditBox>
 									<!-- Update Button -->
 									<Button parentKey="UpdateButton" inherits="UIPanelButtonTemplate" text="UPDATE">
+										<Size x="96" y="22"/>
 										<Anchors>
 											<Anchor point="BOTTOMLEFT" x="20" y="20"/>
 										</Anchors>
@@ -1074,6 +1081,7 @@
 									</Button>
 									<!-- Cancel Button -->
 									<Button parentKey="CancelButton" inherits="UIPanelButtonTemplate" text="CANCEL">
+										<Size x="96" y="22"/>
 										<Anchors>
 											<Anchor point="BOTTOMRIGHT" x="-20" y="20"/>
 										</Anchors>
@@ -1857,23 +1865,17 @@
 						BetterFriendsFrame.WhoFrame.GroupInviteButton:Disable()
 					</OnLoad>
 					<OnShow>
-						-- DEBUG: Log Who Frame opening
-						print("[BetterFriendlist DEBUG] Who Frame OnShow")
-						
 						-- CRITICAL: Set Who data routing FIRST before any other operations
 						C_FriendList.SetWhoToUi(true)
-						print("[BetterFriendlist DEBUG] SetWhoToUi(true) called")
 						
 						-- CRITICAL: Unregister Blizzard's FriendsFrame from WHO_LIST_UPDATE
 						-- This prevents the FriendsFrame from auto-opening when WHO results arrive
 						if FriendsFrame then
 							FriendsFrame:UnregisterEvent("WHO_LIST_UPDATE")
-							print("[BetterFriendlist DEBUG] Unregistered FriendsFrame from WHO_LIST_UPDATE")
 							
 							-- Hide Blizzard's Who Frame if it exists
 							if FriendsFrame.WhoFrame then
 								FriendsFrame.WhoFrame:Hide()
-								print("[BetterFriendlist DEBUG] Hid Blizzard's WhoFrame")
 							end
 						end
 						
@@ -1890,9 +1892,6 @@
 						BetterWhoFrame_Update()
 					</OnShow>
 					<OnHide>
-						-- DEBUG: Log Who Frame closing
-						print("[BetterFriendlist DEBUG] Who Frame OnHide")
-						
 						-- Unregister callbacks
 						EventRegistry:UnregisterCallback("TextSizeManager.OnTextScaleUpdated", self)
 						
@@ -1900,12 +1899,10 @@
 						-- This restores normal Blizzard behavior when our frame is closed
 						if FriendsFrame then
 							FriendsFrame:RegisterEvent("WHO_LIST_UPDATE")
-							print("[BetterFriendlist DEBUG] Re-registered FriendsFrame to WHO_LIST_UPDATE")
 						end
 						
 						-- Reset Who data routing (allows Blizzard's frame to work normally)
 						C_FriendList.SetWhoToUi(false)
-						print("[BetterFriendlist DEBUG] SetWhoToUi(false) called")
 					</OnHide>
 				</Scripts>
 			</Frame>
@@ -2186,7 +2183,7 @@
 						<Button parentKey="RaidInfoButton" inherits="UIPanelButtonTemplate" text="Raid Info">
 							<Size x="90" y="22"/>
 							<Anchors>
-								<Anchor point="TOPRIGHT" x="-5" y="-15"/>
+								<Anchor point="TOPRIGHT" x="0" y="-15"/>
 							</Anchors>
 							<Scripts>
 								<OnClick>
@@ -2216,14 +2213,14 @@
 								<!-- Role Summary Display (Tank, Healer, DPS counts with icons) - Top left -->
 								<FontString parentKey="RoleSummary" inherits="GameFontHighlight" justifyH="LEFT">
 									<Anchors>
-										<Anchor point="RIGHT" relativeKey="$parent.RaidInfoButton" relativePoint="LEFT" x="-60" y="0"/>
+										<Anchor point="RIGHT" relativeKey="$parent.RaidInfoButton" relativePoint="LEFT" x="-75" y="0"/>
 									</Anchors>
 								</FontString>
 								
 								<!-- Member Count Display - Right next to Role Summary -->
 								<FontString parentKey="MemberCount" inherits="GameFontHighlight" justifyH="LEFT">
 									<Anchors>
-										<Anchor point="LEFT" relativeKey="$parent.RoleSummary" relativePoint="RIGHT" x="10" y="0"/>
+										<Anchor point="LEFT" relativeKey="$parent.RoleSummary" relativePoint="RIGHT" x="5" y="0"/>
 									</Anchors>
 								</FontString>
 								
@@ -2235,9 +2232,43 @@
 								</FontString>
 							</Layer>
 						</Layers>
-					</Frame>
-					
-					<!-- Raid Groups Inset holds the dark background and keeps the control panel outside the shaded area -->
+						<Frames>
+							<!-- Combat Icon - Shows between MemberCount and RaidInfo button during combat -->
+							<Button parentKey="CombatIcon" hidden="true">
+								<Size x="16" y="16"/>
+								<Anchors>
+									<Anchor point="RIGHT" relativeKey="$parent.RaidInfoButton" relativePoint="LEFT" x="-3" y="-1"/>
+								</Anchors>
+								<Layers>
+									<Layer level="ARTWORK">
+										<Texture parentKey="Icon">
+											<Anchors>
+												<Anchor point="CENTER"/>
+											</Anchors>
+											<Size x="16" y="16"/>
+										</Texture>
+									</Layer>
+								</Layers>
+								<Scripts>
+									<OnLoad>
+										self.Icon:SetTexture("Interface\\DialogFrame\\UI-Dialog-Icon-AlertNew");
+										self.Icon:SetTexCoord(0, 1, 0, 1);
+									</OnLoad>
+									<OnEnter>
+										GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+										GameTooltip:SetText("In Combat", 1.0, 0.82, 0, 1.0);
+										GameTooltip:AddLine("Players cannot be moved between groups during combat.", 1.0, 1.0, 1.0, true);
+										GameTooltip:AddLine(" ", 1.0, 1.0, 1.0);
+										GameTooltip:AddLine("This restriction is enforced by Blizzard to prevent errors.", 0.8, 0.8, 0.8, true);
+										GameTooltip:Show();
+									</OnEnter>
+									<OnLeave>
+										GameTooltip:Hide();
+									</OnLeave>
+								</Scripts>
+							</Button>
+						</Frames>
+			</Frame>					<!-- Raid Groups Inset holds the dark background and keeps the control panel outside the shaded area -->
 					<Frame parentKey="GroupsInset" inherits="InsetFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT" relativeKey="$parent.ControlPanel" relativePoint="BOTTOMLEFT" x="-4" y="5"/>
@@ -2303,14 +2334,29 @@
 						</Frames>
 			</Frame>
 		</Frames>
+		<Layers>
+			<Layer level="ARTWORK">
+				<!-- "Not in Raid" placeholder text (shown when in party, not raid) -->
+				<FontString parentKey="NotInRaid" inherits="GameFontNormalLarge" text="Raid roster is only available when in a raid group." hidden="true">
+					<Anchors>
+						<Anchor point="CENTER" x="0" y="0"/>
+					</Anchors>
+					<Color r="0.6" g="0.6" b="0.6"/>
+				</FontString>
+			</Layer>
+		</Layers>
 		<Scripts>
 			<OnLoad>
-				-- Register for UPDATE_INSTANCE_INFO event to update Raid Info button
 				self:RegisterEvent("UPDATE_INSTANCE_INFO");
+				self:RegisterEvent("GROUP_ROSTER_UPDATE");
 			</OnLoad>
 			<OnEvent>
 				if event == "UPDATE_INSTANCE_INFO" then
 					BetterRaidFrame_UpdateRaidInfoButton();
+				elseif event == "GROUP_ROSTER_UPDATE" then
+					if self:IsShown() then
+						BetterRaidFrame_Update();
+					end
 				end
 			</OnEvent>
 			<OnShow>

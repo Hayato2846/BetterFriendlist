@@ -237,6 +237,22 @@ function FrameInitializer:SetupBroadcastFrame(frame)
 			self.EditBox:SetText(broadcastText or "")
 		end
 	end
+	
+	-- SetBroadcast method (called by Update button and Enter key)
+	function broadcastFrame:SetBroadcast()
+		if not self.EditBox then return end
+		
+		local text = self.EditBox:GetText() or ""
+		
+		-- Set the broadcast message using BattleNet API
+		BNSetCustomMessage(text)
+		
+		-- Hide the frame
+		self:HideFrame()
+		
+		-- Play sound
+		PlaySound(SOUNDKIT.IG_CHAT_EMOTE_BUTTON)
+	end
 end
 
 --------------------------------------------------------------------------

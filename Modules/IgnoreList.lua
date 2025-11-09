@@ -118,8 +118,9 @@ function IgnoreList:Update()
 	local dataProvider = CreateDataProvider()
 
 	local numIgnores = C_FriendList.GetNumIgnores()
+	-- Always show header, even when empty
+	dataProvider:Insert({header="BetterFriendsFrameIgnoredHeaderTemplate"})
 	if numIgnores and numIgnores > 0 then
-		dataProvider:Insert({header="BetterFriendsFrameIgnoredHeaderTemplate"})
 		for index = 1, numIgnores do
 			dataProvider:Insert({squelchType=SQUELCH_TYPE_IGNORE, index=index})
 		end

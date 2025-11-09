@@ -209,6 +209,21 @@ function WhoFrame:Update(forceRebuild)
 	for i = 1, numWhos do
 		local info = C_FriendList.GetWhoInfo(i)
 		if info then
+			-- Strip trailing dash from names (WoW API bug)
+			if info.fullName then
+				local original = info.fullName
+				info.fullName = info.fullName:gsub("%-$", "")
+				if original ~= info.fullName then
+					print("[BFL WHO] Cleaned fullName: '" .. original .. "' -> '" .. info.fullName .. "'")
+				end
+			end
+			if info.name then
+				local original = info.name
+				info.name = info.name:gsub("%-$", "")
+				if original ~= info.name then
+					print("[BFL WHO] Cleaned name: '" .. original .. "' -> '" .. info.name .. "'")
+				end
+			end
 			-- Add fontObject reference (not string) for extent calculator
 			whoDataProvider:Insert({
 				index = i,
@@ -361,6 +376,14 @@ function WhoFrame:OnButtonClick(button, mouseButton)
 		if button.index then
 			local info = C_FriendList.GetWhoInfo(button.index)
 			if info then
+				-- Strip trailing dash from fullName (WoW API bug)
+				if info.fullName then
+					info.fullName = info.fullName:gsub("%-$", "")
+				end
+				-- Also clean name field if present
+				if info.name then
+					info.name = info.name:gsub("%-$", "")
+				end
 				-- Use MenuSystem module if available
 				local MenuSystem = BFL and BFL:GetModule("MenuSystem")
 				if MenuSystem and MenuSystem.OpenWhoPlayerMenu then
@@ -482,6 +505,8 @@ function WhoFrameColumnDropdownMixin:OnLoad()
 	
 	if self.Text then
 		self.Text:SetFontObject(self.fontObject)
+		-- Fix font color: Use white instead of yellow
+		self.Text:SetTextColor(1, 1, 1)  -- RGB: white
 		self.Text:ClearAllPoints()
 		self.Text:SetPoint("LEFT", self, 8, 0)
 		self.Text:SetPoint("RIGHT", self.Arrow, "LEFT", -8, 0)
@@ -509,6 +534,10 @@ function WhoFrameColumnDropdownMixin:OnLoad()
 		
 		local function SetSelected(data)
 			WhoFrame:SetSortValue(data.value)
+			
+			-- Force dropdown to update its text immediately
+			self:GenerateMenu()
+			
 			-- Update the Who list after changing sort
 			if _G.BetterWhoFrame_Update then
 				_G.BetterWhoFrame_Update()

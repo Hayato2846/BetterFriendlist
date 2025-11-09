@@ -26,16 +26,7 @@ local isWhoPlayerMenu = false
 
 -- Initialize (called from ADDON_LOADED)
 function MenuSystem:Initialize()
-	-- Hook into UnitPopup system to handle menu customization
-	hooksecurefunc("UnitPopup_OpenMenu", function(which, contextData)
-		-- If we just opened a WHO player menu, handle it
-		if isWhoPlayerMenu then
-			-- Reset flag after a short delay (menu is built asynchronously)
-			C_Timer.After(0, function()
-				isWhoPlayerMenu = false
-			end)
-		end
-	end)
+	-- No menu modifications needed currently
 end
 
 -- Open context menu for a friend
@@ -80,14 +71,40 @@ end
 
 -- Open context menu for WHO player
 function MenuSystem:OpenWhoPlayerMenu(button, whoInfo)
-	if not button or not whoInfo then return end
+	if not button or not whoInfo then
+		return
+	end
 	
 	-- Set flag to indicate this is a WHO player menu
 	self:SetWhoPlayerMenuFlag(true)
 	
+	-- Strip trailing dash from name (WoW API bug)
+	local cleanName = whoInfo.fullName
+	if cleanName then
+		cleanName = cleanName:gsub("%-$", "")
+	end
+	
+	-- IMPORTANT: Also clean the regular name field
+	local cleanShortName = whoInfo.name
+	if cleanShortName then
+		cleanShortName = cleanShortName:gsub("%-$", "")
+	end
+	
+	-- Extract server from fullName (e.g., "Name-Server" -> "Server")
+	-- DO NOT use fullGuildName as server - that's the guild name!
+	local serverName = nil
+	if cleanName and cleanName:find("-") then
+		-- Split "Charactername-Servername" 
+		local _, _, name, server = cleanName:find("^(.-)%-(.+)$")
+		if server then
+			cleanName = name  -- Use just the character name
+			serverName = server
+		end
+	end
+	
 	local contextData = {
-		name = whoInfo.fullName,
-		server = whoInfo.fullGuildName, -- TODO: Get actual server if available
+		name = cleanName or cleanShortName,
+		server = serverName,  -- Only set if cross-realm, otherwise nil
 		guid = whoInfo.guid,
 	}
 	

@@ -299,7 +299,6 @@ end
 function Settings:OnLoad(frame)
 	settingsFrame = frame
 	if not settingsFrame then
-		print("|cffff0000BetterFriendlist Settings:|r Frame not found!")
 		return
 	end
 	
@@ -834,10 +833,22 @@ function Settings:MigrateFriendGroups(cleanupNotes)
 		
 		for friendUID, data in pairs(friendGroupAssignments) do
 			if data.isBNet then
-				if data.actualNote ~= "" then
-					BNSetFriendNote(data.bnetID, data.actualNote)
-				else
-					BNSetFriendNote(data.bnetID, "")
+				-- Find bnetAccountID by battleTag (needed for BNSetFriendNote)
+				local bnetAccountID = nil
+				for i = 1, BNGetNumFriends() do
+					local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
+					if accountInfo and accountInfo.battleTag == data.battleTag then
+						bnetAccountID = accountInfo.bnetAccountID
+						break
+					end
+				end
+				
+				if bnetAccountID then
+					if data.actualNote ~= "" then
+						BNSetFriendNote(bnetAccountID, data.actualNote)
+					else
+						BNSetFriendNote(bnetAccountID, "")
+					end
 				end
 			else
 				if data.actualNote ~= "" then
@@ -934,7 +945,14 @@ function Settings:DebugDatabase()
 		for friendUID, groups in pairs(BetterFriendlistDB.friendGroups) do
 			friendCount = friendCount + 1
 			totalAssignments = totalAssignments + #groups
-			print(string.format("|cff00ffffBetterFriendlist Debug:|r   %s -> [%s]", friendUID, table.concat(groups, ", ")))
+			-- Filter out non-string keys before concat
+			local stringKeys = {}
+			for _, v in ipairs(groups) do
+				if type(v) == "string" then
+					table.insert(stringKeys, v)
+				end
+			end
+			print(string.format("|cff00ffffBetterFriendlist Debug:|r   %s -> [%s]", friendUID, table.concat(stringKeys, ", ")))
 		end
 		print("|cff00ffffBetterFriendlist Debug:|r Total friends:", friendCount)
 		print("|cff00ffffBetterFriendlist Debug:|r Total assignments:", totalAssignments)

@@ -1,8 +1,8 @@
 ## Interface: 110205
 ## Title: BetterFriendlist
-## Notes: A complete replacement for the default WoW friends list with groups, enhanced features, and Battle.net integration
+## Notes: Complete replacement for WoW Friends frame - Custom groups, Raid management, Quick Join, and more!
 ## Author: Hayato
-## Version: 0.15
+## Version: 1.0
 ## X-Curse-Project-ID: 
 ## X-WoWI-ID: 
 ## X-Wago-ID: 

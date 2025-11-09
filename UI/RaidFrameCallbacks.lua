@@ -54,25 +54,48 @@ function BetterRaidFrame_Update()
 	local frame = BetterFriendsFrame.RaidFrame
 	if not frame or not frame:IsShown() then return end
 	
+	local isInRaid = IsInRaid()
 	local controlPanel = frame.ControlPanel
-	local raidMembers = RaidFrame.raidMembers or {}
-	local numMembers = #raidMembers
 	
-	-- Update member count text
-	if controlPanel and controlPanel.MemberCountText then
-		controlPanel.MemberCountText:SetText(string.format("%d/40", numMembers))
+	-- Show/hide UI elements based on group type (Raid vs Party)
+	if controlPanel then
+		-- Hide raid-specific controls when not in raid
+		if controlPanel.EveryoneAssistCheckbox then
+			controlPanel.EveryoneAssistCheckbox:SetShown(isInRaid)
+		end
+		if controlPanel.EveryoneAssistLabel then
+			controlPanel.EveryoneAssistLabel:SetShown(isInRaid)
+		end
+		if controlPanel.MemberCount then
+			controlPanel.MemberCount:SetShown(isInRaid)
+		end
+		if controlPanel.CombatIcon then
+			controlPanel.CombatIcon:SetShown(isInRaid and InCombatLockdown())
+		end
+		if controlPanel.RoleSummary then
+			controlPanel.RoleSummary:SetShown(isInRaid)
+		end
+		-- Raid Info Button always visible
 	end
 	
-	-- Show/hide "Not in Raid" text
+	-- Show/hide member buttons and groups container
+	if frame.GroupsInset and frame.GroupsInset.GroupsContainer then
+		frame.GroupsInset.GroupsContainer:SetShown(isInRaid)
+	end
+	
+	-- Show/hide "Not in Raid" placeholder text
 	if frame.NotInRaid then
-		frame.NotInRaid:SetShown(not IsInRaid())
+		frame.NotInRaid:SetShown(not isInRaid)
 	end
 	
-	-- Update control panel buttons
-	BetterRaidFrame_UpdateControlPanelButtons()
-	
-	-- Update member buttons via module
-	RaidFrame:UpdateAllMemberButtons()
+	-- Only update member buttons if in raid
+	if isInRaid then
+		-- Update control panel buttons
+		BetterRaidFrame_UpdateControlPanelButtons()
+		
+		-- Update member buttons via module
+		RaidFrame:UpdateAllMemberButtons()
+	end
 end
 
 -- Update Control Panel Buttons (Enable/Disable based on state)
@@ -107,17 +130,30 @@ end
 -- Update Combat Overlay (shows during combat to prevent taint)
 function BetterRaidFrame_UpdateCombatOverlay(inCombat)
 	local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
-	if not frame or not frame.CombatOverlay then return end
+	if not frame then return end
 	
-	frame.CombatOverlay:SetShown(inCombat)
+	-- Only show combat overlay when in raid
+	local isInRaid = IsInRaid()
 	
-	-- Update text
-	if inCombat then
-		frame.CombatOverlay.Text:SetText("Raid management disabled during combat")
+	BFL:DebugPrint("[BFL] UpdateCombatOverlay called: inCombat=" .. tostring(inCombat) .. ", isInRaid=" .. tostring(isInRaid))
+	
+	-- Update Combat Icon (shows between MemberCount and RaidInfo button)
+	-- Only show if in raid AND in combat
+	if frame.ControlPanel and frame.ControlPanel.CombatIcon then
+		frame.ControlPanel.CombatIcon:SetShown(isInRaid and inCombat)
+		BFL:DebugPrint("[BFL] Combat icon " .. (isInRaid and inCombat and "shown" or "hidden"))
 	end
-end
-
--- ========================================
+	
+    -- Update member button overlays via RaidFrame module
+    -- Only update if in raid
+    if isInRaid then
+        local raidFrameModule = BFL.Modules and BFL.Modules.RaidFrame
+        if raidFrameModule then
+            raidFrameModule:UpdateCombatOverlay(inCombat)  -- Pass the parameter!
+            BFL:DebugPrint("[BFL] Member button overlays updated")
+        end
+    end
+end-- ========================================
 -- CONTROL PANEL BUTTONS
 -- ========================================
 
@@ -134,6 +170,9 @@ end
 function BetterRaidFrame_EveryoneAssistCheckbox_OnLoad(self)
 	self:RegisterEvent("GROUP_ROSTER_UPDATE")
 	self:RegisterEvent("PARTY_LEADER_CHANGED")
+	
+	-- Label will be set by RaidFrame:Initialize() after frame is ready
+	-- Don't try to set it here - BetterFriendsFrame.RaidFrame doesn't exist yet
 	
 	-- Initialize state
 	BetterRaidFrame_EveryoneAssistCheckbox_OnEvent(self)
@@ -168,8 +207,8 @@ function BetterRaidFrame_RaidInfoButton_OnClick(self)
 	end
 	
 	-- Load Blizzard's Raid UI (contains RaidInfoFrame)
-	if not IsAddOnLoaded("Blizzard_RaidUI") then
-		LoadAddOn("Blizzard_RaidUI")
+	if not C_AddOns.IsAddOnLoaded("Blizzard_RaidUI") then
+		C_AddOns.LoadAddOn("Blizzard_RaidUI")
 	end
 	
 	-- Check if RaidInfoFrame exists
@@ -252,12 +291,12 @@ function BetterRaidMemberButton_OnLoad(self)
 end
 
 function BetterRaidMemberButton_OnEnter(self)
-	if not self.unit then return end
+	if not self.unit then
+		return
+	end
 	
-	-- Show tooltip
-	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-	GameTooltip:SetUnit(self.unit)
-	GameTooltip:Show()
+	-- Use Blizzard's standard UnitFrame tooltip (same as default raid frames)
+	UnitFrame_UpdateTooltip(self)
 	
 	-- Highlight
 	if self.Highlight then
@@ -274,46 +313,101 @@ function BetterRaidMemberButton_OnLeave(self)
 end
 
 function BetterRaidMemberButton_OnClick(self, button)
-	if not self.unit or not self.name then return end
+	if not self.unit or not self.name then
+		return
+	end
 	
 	if button == "LeftButton" then
-		-- Target unit
+		-- Left-click: Target unit
 		if UnitExists(self.unit) then
 			TargetUnit(self.unit)
 		end
 	elseif button == "RightButton" then
-		-- Show context menu
+		-- Show standard raid context menu
 		local contextData = {
-			name = self.name,
 			unit = self.unit,
-			guid = UnitGUID(self.unit)
+			name = self.name,
 		}
-		UnitPopup_OpenMenu("RAID_PLAYER", contextData, self)
+		UnitPopup_OpenMenu("RAID", contextData)
 	end
 end
 
 function BetterRaidMemberButton_OnDragStart(self)
-	if not self.unit or not self.name then return end
+	if not self.unit or not self.name then
+		return
+	end
+	
+	-- Check if player is raid leader or assistant
+	local isLeader = UnitIsGroupLeader("player")
+	local isAssistant = UnitIsGroupAssistant("player")
+	
+	if not isLeader and not isAssistant then
+		return
+	end
 	
 	-- Start drag (for moving to different groups)
 	-- Store dragged unit info
 	BetterRaidFrame_DraggedUnit = {
 		unit = self.unit,
 		name = self.name,
-		slot = self.raidSlot
+		groupIndex = self.groupIndex
 	}
-	
-	-- Set cursor
-	SetCursor("Interface\\CURSOR\\UI-Cursor-Move")
 end
 
 function BetterRaidMemberButton_OnDragStop(self)
-	if not BetterRaidFrame_DraggedUnit then return end
+	if not BetterRaidFrame_DraggedUnit then
+		return
+	end
 	
-	-- Get target group from mouse position
-	-- For now, just clear the drag state
-	-- Full implementation would detect drop target and call SetRaidSubgroup()
+	-- Check if dropped on a valid target (raid member button - can be empty or occupied)
+	-- GetMouseFoci() returns array in WoW 11.2+, GetMouseFocus() was deprecated
+	local mouseFoci = GetMouseFoci and GetMouseFoci() or {}
+	local targetFrame = nil
 	
+	-- Search through all frames under mouse to find a raid member button
+	for _, frame in ipairs(mouseFoci) do
+		if frame and frame.groupIndex and frame.slotIndex then
+			targetFrame = frame
+			break
+		end
+	end
+	
+	-- Fallback for older WoW versions
+	if not targetFrame and GetMouseFocus then
+		local frame = GetMouseFocus()
+		if frame and frame.groupIndex and frame.slotIndex then
+			targetFrame = frame
+		end
+	end
+	
+	if not targetFrame or not targetFrame.groupIndex then
+		BetterRaidFrame_DraggedUnit = nil
+		return
+	end
+	
+	-- Don't allow dropping on self
+	if targetFrame.unit == BetterRaidFrame_DraggedUnit.unit then
+		BetterRaidFrame_DraggedUnit = nil
+		return
+	end
+	
+	-- Get source and target subgroups from groupIndex (always set on buttons)
+	local sourceSubgroup = BetterRaidFrame_DraggedUnit.groupIndex
+	local targetSubgroup = targetFrame.groupIndex
+	
+	-- Only move if different subgroup
+	if targetSubgroup ~= sourceSubgroup then
+		-- Calculate raidIndex from unit (raid1 = 1, raid2 = 2, etc.)
+		local raidIndex = tonumber(string.match(BetterRaidFrame_DraggedUnit.unit, "raid(%d+)"))
+		if not raidIndex then
+			BetterRaidFrame_DraggedUnit = nil
+			return
+		end
+		
+		-- SetRaidSubgroup(raidIndex, subgroup) - moves raid member to different subgroup
+		SetRaidSubgroup(raidIndex, targetSubgroup)
+	end
+	
+	-- Clear drag state
 	BetterRaidFrame_DraggedUnit = nil
-	ResetCursor()
 end

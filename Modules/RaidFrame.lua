@@ -60,9 +60,13 @@ function RaidFrame:Initialize()
     -- Register for events
     self:RegisterEvents()
     
-    if BFL.Debug then
-        print("|cff00ff00BetterFriendlist:|r RaidFrame module initialized")
-    end
+    -- Initialize member buttons (XML templates)
+    self:InitializeMemberButtons()
+    
+    -- Initial update of control panel (this will set label too)
+    self:UpdateControlPanel()
+    
+    BFL:DebugPrint("[BFL] RaidFrame initialized")
 end
 
 function RaidFrame:RegisterEvents()
@@ -265,18 +269,14 @@ end
 function RaidFrame:UpdateAllMemberButtons()
     local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
     if not frame then
-        print("UpdateAllMemberButtons: RaidFrame not found") -- DEBUG
         return
     end
     
     -- GroupsContainer is inside GroupsInset
     local groupsContainer = frame.GroupsInset and frame.GroupsInset.GroupsContainer
     if not groupsContainer then
-        print("UpdateAllMemberButtons: GroupsContainer not found") -- DEBUG
         return
     end
-    
-    print("UpdateAllMemberButtons: Found", #self.raidMembers, "raid members") -- DEBUG
     
     -- Organize members by subgroup
     local membersByGroup = {}
@@ -298,23 +298,20 @@ function RaidFrame:UpdateAllMemberButtons()
     
     -- Update each group's buttons
     for groupIndex = 1, 8 do
+        -- Update group title
         local groupFrame = groupsContainer["Group" .. groupIndex]
-        if groupFrame then
-            -- Update group title
-            if groupFrame.GroupTitle then
-                groupFrame.GroupTitle:SetText("Group " .. groupIndex)
-            end
-            
-            -- Update each slot in the group
-            local members = membersByGroup[groupIndex]
-            print("Group", groupIndex, "has", #members, "members") -- DEBUG
+        if groupFrame and groupFrame.GroupTitle then
+            groupFrame.GroupTitle:SetText("Group " .. groupIndex)
+        end
+        
+        -- Update each slot in the group using self.memberButtons[]
+        local members = membersByGroup[groupIndex]
+        
+        if self.memberButtons[groupIndex] then
             for slotIndex = 1, 5 do
-                local button = groupFrame["Slot" .. slotIndex]
+                local button = self.memberButtons[groupIndex][slotIndex]
                 if button then
                     local memberData = members[slotIndex]
-                    if memberData then
-                        print("  Updating Slot", slotIndex, "with", memberData.name) -- DEBUG
-                    end
                     self:UpdateMemberButton(button, memberData)
                 end
             end
@@ -330,7 +327,7 @@ function RaidFrame:InitializeMemberButtons()
     local groupsContainer = frame.GroupsContainer or (frame.GroupsInset and frame.GroupsInset.GroupsContainer)
     if not groupsContainer then return end
     
-    -- Create 5 buttons for each of the 8 groups
+    -- Use existing XML template buttons (Slot1-Slot5)
     for groupIndex = 1, 8 do
         local groupFrame = groupsContainer["Group" .. groupIndex]
         if groupFrame then
@@ -339,26 +336,21 @@ function RaidFrame:InitializeMemberButtons()
                 groupFrame.GroupTitle:SetText("Group " .. groupIndex)
             end
             
-            -- Create 5 member buttons
+            -- Reference XML template buttons (already created)
             if not self.memberButtons[groupIndex] then
                 self.memberButtons[groupIndex] = {}
             end
             
             for slotIndex = 1, 5 do
-                local buttonName = "BetterRaidMemberButton_G" .. groupIndex .. "S" .. slotIndex
-                local button = CreateFrame("Button", buttonName, groupFrame, "BetterRaidMemberButtonTemplate")
-                
-                -- Position button vertically
-                if slotIndex == 1 then
-                    button:SetPoint("TOP", groupFrame, "TOP", 0, -20)
-                else
-                    button:SetPoint("TOP", self.memberButtons[groupIndex][slotIndex - 1], "BOTTOM", 0, -2)
-                end
+                -- Use the XML-defined buttons (Slot1, Slot2, etc.)
+                local button = groupFrame["Slot" .. slotIndex]
                 
                 -- Store button reference
-                button.groupIndex = groupIndex
-                button.slotIndex = slotIndex
-                self.memberButtons[groupIndex][slotIndex] = button
+                if button then
+                    button.groupIndex = groupIndex
+                    button.slotIndex = slotIndex
+                    self.memberButtons[groupIndex][slotIndex] = button
+                end
             end
         end
     end
@@ -429,6 +421,11 @@ function RaidFrame:UpdateMemberButtonVisuals(button, member)
             button.ClassIcon:Hide()
         end
     end
+    
+    -- Store data in button for callbacks
+    button.unit = member.unit
+    button.name = member.name
+    button.raidSlot = member.index
     
     -- Update level
     if button.Level then
@@ -509,7 +506,56 @@ function RaidFrame:UpdateMemberButtonVisuals(button, member)
     end
 end
 
---- Update role summary display (Tank, Healer, DPS counts)
+--- Update Member Count display
+function RaidFrame:UpdateMemberCount()
+    local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
+    if not frame or not frame.ControlPanel or not frame.ControlPanel.MemberCount then
+        BFL:DebugPrint("[BFL] UpdateMemberCount: Frame check failed - frame=" .. tostring(frame) .. ", ControlPanel=" .. tostring(frame and frame.ControlPanel) .. ", MemberCount=" .. tostring(frame and frame.ControlPanel and frame.ControlPanel.MemberCount))
+        return
+    end
+    
+    local numMembers = 0
+    if IsInRaid() then
+        numMembers = GetNumGroupMembers()
+    elseif IsInGroup() then
+        numMembers = GetNumSubgroupMembers() + 1 -- +1 for player
+    end
+    
+    -- Add friend icon before the count (same icon as in Quick Filters "All Friends")
+    local FRIEND_ICON = "|TInterface\\FriendsFrame\\UI-Toast-FriendOnlineIcon:16:16|t"
+    local textToSet = FRIEND_ICON .. " " .. numMembers .. "/40"
+    BFL:DebugPrint("[BFL] UpdateMemberCount: Setting text to '" .. textToSet .. "' (numMembers=" .. numMembers .. ")")
+    frame.ControlPanel.MemberCount:SetText(textToSet)
+    local actualText = frame.ControlPanel.MemberCount:GetText()
+    BFL:DebugPrint("[BFL] UpdateMemberCount: Actual text after SetText: '" .. tostring(actualText) .. "'")
+end
+
+--- Update all Control Panel elements (MemberCount, RoleSummary, Labels)
+function RaidFrame:UpdateControlPanel()
+    local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
+    if not frame or not frame.ControlPanel then
+        return
+    end
+    
+    BFL:DebugPrint("[BFL] UpdateControlPanel called")
+    
+    -- Set Assist All label if not already set
+    if frame.ControlPanel.EveryoneAssistLabel then
+        local currentText = frame.ControlPanel.EveryoneAssistLabel:GetText()
+        if not currentText or currentText == "" then
+            local ASSIST_ICON = "|TInterface\\GroupFrame\\UI-Group-AssistantIcon:14:14|t"
+            frame.ControlPanel.EveryoneAssistLabel:SetText("All " .. ASSIST_ICON)
+            BFL:DebugPrint("[BFL] Assist All label set: All " .. ASSIST_ICON)
+        end
+    end
+    
+    -- Update Role Summary
+    self:UpdateRoleSummary()
+    
+    -- Update Member Count
+    self:UpdateMemberCount()
+end
+
 function RaidFrame:UpdateRoleSummary()
     local frame = BetterFriendsFrame.RaidFrame
     if not frame or not frame.ControlPanel or not frame.ControlPanel.RoleSummary then
@@ -587,6 +633,11 @@ function RaidFrame:UpdateMemberButton(button, memberData)
     if not memberData then
         button.memberData = nil
         
+        -- CRITICAL: Clear button properties for callbacks (prevent stale data)
+        button.unit = nil
+        button.name = nil
+        button.raidSlot = nil
+        
         -- Hide all content
         if button.Name then button.Name:SetText("") end
         if button.Level then button.Level:SetText("") end
@@ -603,6 +654,16 @@ function RaidFrame:UpdateMemberButton(button, memberData)
             button.ClassColorTint:SetColorTexture(0.1, 0.1, 0.1, 0.3)
         end
         
+        -- Update Combat Overlay even for empty slots
+        if button.CombatOverlay then
+            local inCombat = InCombatLockdown()
+            if inCombat then
+                button.CombatOverlay:Show()
+            else
+                button.CombatOverlay:Hide()
+            end
+        end
+        
         return
     end
     
@@ -611,6 +672,11 @@ function RaidFrame:UpdateMemberButton(button, memberData)
     
     -- Store member data in button
     button.memberData = memberData
+    
+    -- CRITICAL: Set button properties for callbacks (tooltip, context menu, drag&drop)
+    button.unit = memberData.unit
+    button.name = memberData.name
+    button.raidSlot = memberData.raidIndex
     
     -- Update class icon
     if button.ClassIcon and memberData.classFileName then
@@ -708,34 +774,63 @@ function RaidFrame:UpdateMemberButton(button, memberData)
         button.ReadyCheckIcon:Hide()
     end
     
-    -- Update Combat Overlay
-    if InCombatLockdown() then
-        button.CombatOverlay:Show()
-    else
-        button.CombatOverlay:Hide()
+    -- Update Combat Overlay (always check, even for filled buttons)
+    if button.CombatOverlay then
+        local inCombat = InCombatLockdown()
+        if inCombat then
+            button.CombatOverlay:Show()
+        else
+            button.CombatOverlay:Hide()
+        end
     end
 end
 
 --- Update combat overlay on all buttons
-function RaidFrame:UpdateCombatOverlay()
-    if not self.memberButtons then return end
+--- @param inCombat boolean|nil Optional combat state (defaults to InCombatLockdown())
+function RaidFrame:UpdateCombatOverlay(inCombat)
+    if not self.memberButtons then 
+        BFL:DebugPrint("[BFL] UpdateCombatOverlay: No member buttons")
+        return 
+    end
     
-    local inCombat = InCombatLockdown()
+    -- Use passed parameter or query current state
+    local combatState = inCombat
+    if combatState == nil then
+        combatState = InCombatLockdown()
+    end
+    local buttonsUpdated = 0
+    
+    BFL:DebugPrint("[BFL] RaidFrame:UpdateCombatOverlay START - combatState: " .. tostring(combatState) .. " (param was: " .. tostring(inCombat) .. ")")
+    BFL:DebugPrint("[BFL] memberButtons structure: " .. tostring(self.memberButtons) .. ", type: " .. type(self.memberButtons))
     
     for groupIndex = 1, 8 do
         if self.memberButtons[groupIndex] then
+            BFL:DebugPrint("[BFL] Processing group " .. groupIndex)
             for slotIndex = 1, 5 do
                 local button = self.memberButtons[groupIndex][slotIndex]
-                if button and button.CombatOverlay then
-                    if inCombat and button:IsShown() then
-                        button.CombatOverlay:Show()
+                if button then
+                    local isShown = button:IsShown()
+                    BFL:DebugPrint("[BFL] Button [" .. groupIndex .. "][" .. slotIndex .. "] - IsShown: " .. tostring(isShown) .. ", HasOverlay: " .. tostring(button.CombatOverlay ~= nil))
+                    
+                    -- Ensure CombatOverlay exists
+                    if not button.CombatOverlay then
+                        BFL:DebugPrint("[BFL] Button [" .. groupIndex .. "][" .. slotIndex .. "] missing CombatOverlay!")
                     else
-                        button.CombatOverlay:Hide()
+                        if combatState and isShown then
+                            button.CombatOverlay:Show()
+                            buttonsUpdated = buttonsUpdated + 1
+                            BFL:DebugPrint("[BFL] Showed overlay on button [" .. groupIndex .. "][" .. slotIndex .. "]")
+                        else
+                            button.CombatOverlay:Hide()
+                            BFL:DebugPrint("[BFL] Hid overlay on button [" .. groupIndex .. "][" .. slotIndex .. "] (combatState=" .. tostring(combatState) .. ", isShown=" .. tostring(isShown) .. ")")
+                        end
                     end
                 end
             end
         end
     end
+    
+    BFL:DebugPrint("[BFL] Combat overlay updated on " .. buttonsUpdated .. " buttons (out of 40 possible)")
 end
 
 --- Get number of raid members
@@ -933,7 +1028,7 @@ function RaidFrame:OnRaidRosterUpdate(...)
     
     -- Update UI
     self:UpdateAllMemberButtons()
-    self:UpdateRoleSummary()
+    self:UpdateControlPanel()
     
     -- Note: We DON'T need to call BetterRaidFrame_Update() here anymore
     -- The EveryoneAssistCheckbox handles its own state via events (GROUP_ROSTER_UPDATE)
@@ -946,7 +1041,7 @@ function RaidFrame:OnGroupJoined(...)
     
     -- Update UI
     self:UpdateAllMemberButtons()
-    self:UpdateRoleSummary()
+    self:UpdateControlPanel()
 end
 
 function RaidFrame:OnGroupLeft(...)
