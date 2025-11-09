@@ -25,7 +25,9 @@ local FILTER_ICONS = {
 	online = "Interface\\FriendsFrame\\StatusIcon-Online",       -- Online Only (green online icon)
 	offline = "Interface\\FriendsFrame\\StatusIcon-Offline",     -- Offline Only (gray offline icon)
 	wow = "Interface\\ChatFrame\\UI-ChatIcon-WoW",               -- WoW Only (WoW logo from chat)
-	bnet = "Interface\\ChatFrame\\UI-ChatIcon-Battlenet"         -- Battle.net Only (BNet logo from chat)
+	bnet = "Interface\\ChatFrame\\UI-ChatIcon-Battlenet",        -- Battle.net Only (BNet logo from chat)
+	hideafk = "Interface\\FriendsFrame\\StatusIcon-Away",        -- Hide AFK (away icon)
+	retail = "Interface\\LFGFRAME\\BattleNetWorking0"           -- Retail Only (retail icon)
 }
 
 -- Current filter mode
@@ -88,6 +90,14 @@ function QuickFilters:InitDropdown(dropdown)
 		
 		local bnetText = string.format(optionText, FILTER_ICONS.bnet, "Battle.net Only")
 		CreateRadio(rootDescription, bnetText, "bnet")
+		
+		rootDescription:CreateDivider()
+		
+		local hideafkText = string.format(optionText, FILTER_ICONS.hideafk, "Hide AFK/DND")
+		CreateRadio(rootDescription, hideafkText, "hideafk")
+		
+		local retailText = string.format(optionText, FILTER_ICONS.retail, "Retail Only")
+		CreateRadio(rootDescription, retailText, "retail")
 	end)
 	
 	-- SetSelectionTranslator: Shows only the icon
@@ -134,6 +144,8 @@ function QuickFilters:GetFilterText()
 		offline = "Offline Only",
 		wow = "WoW Only",
 		bnet = "Battle.net Only",
+		hideafk = "Hide AFK/DND",
+		retail = "Retail Only",
 	}
 	return filterTexts[filterMode] or "All Friends"
 end

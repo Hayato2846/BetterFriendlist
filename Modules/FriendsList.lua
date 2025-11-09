@@ -512,6 +512,29 @@ function FriendsList:PassesFilters(friend)
 		
 	elseif self.filterMode == "bnet" then
 		if friend.type ~= "bnet" then return false end
+		
+	elseif self.filterMode == "hideafk" then
+		-- Hide AFK/DND friends
+		if friend.type == "bnet" and friend.connected and friend.gameAccountInfo then
+			local gameInfo = friend.gameAccountInfo
+			if gameInfo.isAFK or gameInfo.isDND then
+				return false
+			end
+		end
+		-- WoW friends don't have AFK/DND status, always show
+		
+	elseif self.filterMode == "retail" then
+		-- Show only Retail/Mainline WoW friends
+		if friend.type == "bnet" then
+			-- BNet friend must be in WoW Retail
+			if not friend.connected or not friend.gameAccountInfo then return false end
+			if friend.gameAccountInfo.clientProgram ~= BNET_CLIENT_WOW then return false end
+			-- Check if it's Retail (Mainline)
+			if friend.gameAccountInfo.wowProjectID and friend.gameAccountInfo.wowProjectID ~= WOW_PROJECT_MAINLINE then
+				return false
+			end
+		end
+		-- WoW friends are assumed to be on same version as player
 	end
 	
 	return true
