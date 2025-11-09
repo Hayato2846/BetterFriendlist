@@ -156,6 +156,38 @@ Settings:ShowImportDialog()
 end
 end
 
+-- Compact mode changed
+function BetterFriendlistSettings_OnCompactModeChanged(checked)
+local Settings = GetSettings()
+if Settings then
+Settings:OnCompactModeChanged(checked)
+end
+end
+
+-- Show Blizzard option changed
+function BetterFriendlistSettings_OnShowBlizzardOptionChanged(checked)
+local Settings = GetSettings()
+if Settings then
+Settings:OnShowBlizzardOptionChanged(checked)
+end
+end
+
+-- Color class names changed
+function BetterFriendlistSettings_OnColorClassNamesChanged(checked)
+local Settings = GetSettings()
+if Settings then
+Settings:OnColorClassNamesChanged(checked)
+end
+end
+
+-- Hide empty groups changed
+function BetterFriendlistSettings_OnHideEmptyGroupsChanged(checked)
+local Settings = GetSettings()
+if Settings then
+Settings:OnHideEmptyGroupsChanged(checked)
+end
+end
+
 --------------------------------------------------------------------------
 -- STATIC POPUP DIALOGS
 --------------------------------------------------------------------------

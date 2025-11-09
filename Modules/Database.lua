@@ -15,6 +15,8 @@ local defaults = {
 	-- Visual Settings
 	compactMode = false, -- Use compact button layout
 	fontSize = "normal", -- "small", "normal", "large"
+	colorClassNames = true, -- Color character names by class (default: ON)
+	hideEmptyGroups = false, -- Hide groups with no online friends (default: OFF)
 	-- Debug Settings
 	debugPrintEnabled = false, -- Toggle debug prints with /bfl debug print
 	version = BFL.Version

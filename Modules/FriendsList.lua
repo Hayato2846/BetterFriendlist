@@ -398,8 +398,26 @@ function FriendsList:BuildDisplayList()
 	for _, groupData in ipairs(orderedGroups) do
 		local groupFriends = groupedFriends[groupData.id]
 		
-		-- Skip empty groups
-		if groupFriends and #groupFriends > 0 then
+		-- Check if we should skip empty groups based on setting
+		local hideEmptyGroups = GetDB():Get("hideEmptyGroups", false)
+		local shouldSkip = false
+		
+		if hideEmptyGroups and groupFriends then
+			-- Count online friends only
+			local onlineCount = 0
+			for _, friend in ipairs(groupFriends) do
+				if friend.connected then
+					onlineCount = onlineCount + 1
+				end
+			end
+			-- Skip if no online friends
+			shouldSkip = (onlineCount == 0)
+		elseif not groupFriends or #groupFriends == 0 then
+			-- Always skip if no friends at all
+			shouldSkip = true
+		end
+		
+		if not shouldSkip then
 			-- Add group header
 			table.insert(self.displayList, {
 				type = BUTTON_TYPE_GROUP_HEADER,
@@ -1180,22 +1198,30 @@ function FriendsList:RenderDisplay()
 							characterName = TimerunningUtil.AddSmallIcon(characterName)
 						end
 						
-						-- Convert localized class name to English uppercase key for RAID_CLASS_COLORS
-						local classFile = nil
-						for i = 1, GetNumClasses() do
-							local localizedClassName, classFilename = GetClassInfo(i)
-							if localizedClassName == friend.className then
-								classFile = classFilename
-								break
+						-- Check if class coloring is enabled
+						local useClassColor = GetDB():Get("colorClassNames", true)
+						
+						if useClassColor then
+							-- Convert localized class name to English uppercase key for RAID_CLASS_COLORS
+							local classFile = nil
+							for i = 1, GetNumClasses() do
+								local localizedClassName, classFilename = GetClassInfo(i)
+								if localizedClassName == friend.className then
+									classFile = classFilename
+									break
+								end
 							end
-						end
-						
-						-- Get class color using the English file name
-						local classColor = classFile and RAID_CLASS_COLORS[classFile]
-						
-						if classColor then
-							line1Text = line1Text .. " (|c" .. (classColor.colorStr or "ffffffff") .. characterName .. "|r)"
+							
+							-- Get class color using the English file name
+							local classColor = classFile and RAID_CLASS_COLORS[classFile]
+							
+							if classColor then
+								line1Text = line1Text .. " (|c" .. (classColor.colorStr or "ffffffff") .. characterName .. "|r)"
+							else
+								line1Text = line1Text .. " (" .. characterName .. ")"
+							end
 						else
+							-- No class coloring - just show character name
 							line1Text = line1Text .. " (" .. characterName .. ")"
 						end
 					end
@@ -1278,21 +1304,20 @@ function FriendsList:RenderDisplay()
 					button.travelPassButton:Hide()
 				end
 				
-				-- Line 1: Character Name (in class color)
-				local line1Text = ""
-				if friend.connected then
-					local classColor = RAID_CLASS_COLORS[friend.className]
-					if classColor then
-						line1Text = "|c" .. (classColor.colorStr or "ffffffff") .. friend.name .. "|r"
-					else
-						line1Text = friend.name
-					end
+			-- Line 1: Character Name (in class color if enabled)
+			local line1Text = ""
+			if friend.connected then
+				local useClassColor = GetDB():Get("colorClassNames", true)
+				local classColor = useClassColor and RAID_CLASS_COLORS[friend.className]
+				if classColor then
+					line1Text = "|c" .. (classColor.colorStr or "ffffffff") .. friend.name .. "|r"
 				else
-					-- Offline - gray
-					line1Text = "|cff7f7f7f" .. friend.name .. "|r"
+					line1Text = friend.name
 				end
-				
-				-- In compact mode, append additional info to line1Text
+			else
+				-- Offline - gray
+				line1Text = "|cff7f7f7f" .. friend.name .. "|r"
+			end				-- In compact mode, append additional info to line1Text
 				if isCompactMode then
 					if friend.connected then
 						local infoText = ""

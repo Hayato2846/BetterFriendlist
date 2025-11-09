@@ -178,10 +178,60 @@
 								</Layer>
 							</Layers>
 							<Frames>
+								<!-- Color Class Names Checkbox -->
+								<CheckButton parentKey="ColorClassNames" inherits="UICheckButtonTemplate">
+									<Anchors>
+										<Anchor point="TOPLEFT" relativeKey="$parent.Description" relativePoint="BOTTOMLEFT" x="0" y="-20" />
+									</Anchors>
+									<Scripts>
+										<OnLoad>
+											self.text:SetText("Color character names by class")
+											self.text:SetFontObject("GameFontHighlight")
+										</OnLoad>
+										<OnClick>
+											BetterFriendlistSettings_OnColorClassNamesChanged(self:GetChecked())
+										</OnClick>
+										<OnEnter>
+											GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+											GameTooltip:SetText("Color Class Names", 1, 1, 1)
+											GameTooltip:AddLine("Colors character names using their class color for easier identification", 0.8, 0.8, 0.8, true)
+											GameTooltip:Show()
+										</OnEnter>
+										<OnLeave>
+											GameTooltip:Hide()
+										</OnLeave>
+									</Scripts>
+								</CheckButton>
+								
+								<!-- Hide Empty Groups Checkbox -->
+								<CheckButton parentKey="HideEmptyGroups" inherits="UICheckButtonTemplate">
+									<Anchors>
+										<Anchor point="TOPLEFT" relativeKey="$parent.ColorClassNames" relativePoint="BOTTOMLEFT" x="0" y="-10" />
+									</Anchors>
+									<Scripts>
+										<OnLoad>
+											self.text:SetText("Hide groups with no online friends")
+											self.text:SetFontObject("GameFontHighlight")
+										</OnLoad>
+										<OnClick>
+											BetterFriendlistSettings_OnHideEmptyGroupsChanged(self:GetChecked())
+										</OnClick>
+										<OnEnter>
+											GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+											GameTooltip:SetText("Hide Empty Groups", 1, 1, 1)
+											GameTooltip:AddLine("Automatically hides groups that have no online members, keeping your friends list clean", 0.8, 0.8, 0.8, true)
+											GameTooltip:Show()
+										</OnEnter>
+										<OnLeave>
+											GameTooltip:Hide()
+										</OnLeave>
+									</Scripts>
+								</CheckButton>
+								
 								<!-- Compact Mode Checkbox - Modern -->
 								<CheckButton parentKey="CompactMode" inherits="UICheckButtonTemplate">
 									<Anchors>
-										<Anchor point="TOPLEFT" relativeKey="$parent.Description" relativePoint="BOTTOMLEFT" x="0" y="-20" />
+										<Anchor point="TOPLEFT" relativeKey="$parent.HideEmptyGroups" relativePoint="BOTTOMLEFT" x="0" y="-10" />
 									</Anchors>
 									<Scripts>
 										<OnLoad>

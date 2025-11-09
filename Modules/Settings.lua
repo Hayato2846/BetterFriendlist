@@ -378,6 +378,16 @@ function Settings:LoadSettings()
 	if content and content.AppearanceTab then
 		local appearanceTab = content.AppearanceTab
 		
+		if appearanceTab.ColorClassNames then
+			local value = DB:Get("colorClassNames", true)
+			appearanceTab.ColorClassNames:SetChecked(value)
+		end
+		
+		if appearanceTab.HideEmptyGroups then
+			local value = DB:Get("hideEmptyGroups", false)
+			appearanceTab.HideEmptyGroups:SetChecked(value)
+		end
+		
 		if appearanceTab.CompactMode then
 			local value = DB:Get("compactMode", false)
 			appearanceTab.CompactMode:SetChecked(value)
@@ -454,6 +464,8 @@ function Settings:DoReset()
 	DB:Set("showBlizzardOption", false)
 	DB:Set("compactMode", false)
 	DB:Set("fontSize", "normal")
+	DB:Set("colorClassNames", true)
+	DB:Set("hideEmptyGroups", false)
 	
 	self:LoadSettings()
 	
@@ -1390,12 +1402,24 @@ function Settings:CreateImportFrame()
 end
 
 --------------------------------------------------------------------------
--- GLOBAL CALLBACK FUNCTIONS (Called from XML)
+-- CALLBACK FUNCTIONS (Called from Settings.lua wrapper)
 --------------------------------------------------------------------------
 
+-- Callback for CompactMode checkbox
+function Settings:OnCompactModeChanged(checked)
+	local DB = GetDB()
+	if not DB then return end
+	
+	DB:Set("compactMode", checked)
+	
+	if BetterFriendsFrame_UpdateDisplay then
+		BetterFriendsFrame_UpdateDisplay()
+	end
+end
+
 -- Callback for ShowBlizzardOption checkbox
-function BetterFriendlistSettings_OnShowBlizzardOptionChanged(checked)
-	local DB = BFL and BFL:GetModule("DB")
+function Settings:OnShowBlizzardOptionChanged(checked)
+	local DB = GetDB()
 	if not DB then return end
 	
 	DB:Set("showBlizzardOption", checked)
@@ -1405,12 +1429,24 @@ function BetterFriendlistSettings_OnShowBlizzardOptionChanged(checked)
 	end
 end
 
--- Callback for CompactMode checkbox
-function BetterFriendlistSettings_OnCompactModeChanged(checked)
-	local DB = BFL and BFL:GetModule("DB")
+-- Callback for ColorClassNames checkbox
+function Settings:OnColorClassNamesChanged(checked)
+	local DB = GetDB()
 	if not DB then return end
 	
-	DB:Set("compactMode", checked)
+	DB:Set("colorClassNames", checked)
+	
+	if BetterFriendsFrame_UpdateDisplay then
+		BetterFriendsFrame_UpdateDisplay()
+	end
+end
+
+-- Callback for HideEmptyGroups checkbox
+function Settings:OnHideEmptyGroupsChanged(checked)
+	local DB = GetDB()
+	if not DB then return end
+	
+	DB:Set("hideEmptyGroups", checked)
 	
 	if BetterFriendsFrame_UpdateDisplay then
 		BetterFriendsFrame_UpdateDisplay()

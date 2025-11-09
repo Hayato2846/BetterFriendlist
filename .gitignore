@@ -10,10 +10,26 @@
 Thumbs.db
 desktop.ini
 
-# Reference files (keep for development, exclude from releases)
+# Development files (keep local, don't push to GitHub)
+docs/
+plans/
 reference/
 predecessor/
 .ai-context/
+
+# Development markdown files (local documentation)
+BUG_*.md
+COMBAT_*.md
+FRIENDGROUPS_*.md
+IMPLEMENTATION_*.md
+MASTER_*.md
+MIGRATION_*.md
+MODULARIZATION_*.md
+RAID_FRAME_*.md
+SETTINGS_*.md
+TESTING_*.md
+PHASE_*.md
+QUICKJOIN_*.md
 
 # Build and package files
 *.zip
