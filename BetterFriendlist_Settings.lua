@@ -212,6 +212,38 @@ Settings:OnGrayOtherFactionChanged(checked)
 end
 end
 
+-- Show Mobile as AFK toggle
+function BetterFriendlistSettings_OnShowMobileAsAFKChanged(checked)
+local Settings = GetSettings()
+if Settings then
+Settings:OnShowMobileAsAFKChanged(checked)
+end
+end
+
+-- Show Mobile Text toggle
+function BetterFriendlistSettings_OnShowMobileTextChanged(checked)
+local Settings = GetSettings()
+if Settings then
+Settings:OnShowMobileTextChanged(checked)
+end
+end
+
+-- Hide Max Level toggle
+function BetterFriendlistSettings_OnHideMaxLevelChanged(checked)
+local Settings = GetSettings()
+if Settings then
+Settings:OnHideMaxLevelChanged(checked)
+end
+end
+
+-- Sort by Status toggle
+function BetterFriendlistSettings_OnSortByStatusChanged(checked)
+local Settings = GetSettings()
+if Settings then
+Settings:OnSortByStatusChanged(checked)
+end
+end
+
 --------------------------------------------------------------------------
 -- STATIC POPUP DIALOGS
 --------------------------------------------------------------------------

@@ -20,6 +20,10 @@ local defaults = {
 	showFactionIcons = false, -- Show faction icons next to character names (default: OFF)
 	showRealmName = false, -- Show realm name for cross-realm friends (default: OFF)
 	grayOtherFaction = false, -- Gray out friends from other faction (default: OFF)
+	showMobileAsAFK = false, -- Show mobile/app friends with AFK status icon (default: OFF)
+	showMobileText = false, -- Add "(Mobile)" text to mobile/app friends (default: OFF)
+	hideMaxLevel = false, -- Hide level display for max level characters (default: OFF)
+	sortByStatus = false, -- Sort online friends first (default: OFF)
 	-- Debug Settings
 	debugPrintEnabled = false, -- Toggle debug prints with /bfl debug print
 	version = BFL.Version

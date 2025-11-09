@@ -403,6 +403,26 @@ function Settings:LoadSettings()
 			appearanceTab.GrayOtherFaction:SetChecked(value)
 		end
 		
+		if appearanceTab.ShowMobileAsAFK then
+			local value = DB:Get("showMobileAsAFK", false)
+			appearanceTab.ShowMobileAsAFK:SetChecked(value)
+		end
+		
+		if appearanceTab.ShowMobileText then
+			local value = DB:Get("showMobileText", false)
+			appearanceTab.ShowMobileText:SetChecked(value)
+		end
+		
+		if appearanceTab.HideMaxLevel then
+			local value = DB:Get("hideMaxLevel", false)
+			appearanceTab.HideMaxLevel:SetChecked(value)
+		end
+		
+		if appearanceTab.SortByStatus then
+			local value = DB:Get("sortByStatus", false)
+			appearanceTab.SortByStatus:SetChecked(value)
+		end
+		
 		if appearanceTab.CompactMode then
 			local value = DB:Get("compactMode", false)
 			appearanceTab.CompactMode:SetChecked(value)
@@ -484,6 +504,10 @@ function Settings:DoReset()
 	DB:Set("showFactionIcons", false)
 	DB:Set("showRealmName", false)
 	DB:Set("grayOtherFaction", false)
+	DB:Set("showMobileAsAFK", false)
+	DB:Set("showMobileText", false)
+	DB:Set("hideMaxLevel", false)
+	DB:Set("sortByStatus", false)
 	
 	self:LoadSettings()
 	
@@ -1501,6 +1525,54 @@ function Settings:OnGrayOtherFactionChanged(checked)
 	if not DB then return end
 	
 	DB:Set("grayOtherFaction", checked)
+	
+	if BetterFriendsFrame_UpdateDisplay then
+		BetterFriendsFrame_UpdateDisplay()
+	end
+end
+
+-- Show Mobile as AFK toggle
+function Settings:OnShowMobileAsAFKChanged(checked)
+	local DB = GetDB()
+	if not DB then return end
+	
+	DB:Set("showMobileAsAFK", checked)
+	
+	if BetterFriendsFrame_UpdateDisplay then
+		BetterFriendsFrame_UpdateDisplay()
+	end
+end
+
+-- Show Mobile Text toggle
+function Settings:OnShowMobileTextChanged(checked)
+	local DB = GetDB()
+	if not DB then return end
+	
+	DB:Set("showMobileText", checked)
+	
+	if BetterFriendsFrame_UpdateDisplay then
+		BetterFriendsFrame_UpdateDisplay()
+	end
+end
+
+-- Hide Max Level toggle
+function Settings:OnHideMaxLevelChanged(checked)
+	local DB = GetDB()
+	if not DB then return end
+	
+	DB:Set("hideMaxLevel", checked)
+	
+	if BetterFriendsFrame_UpdateDisplay then
+		BetterFriendsFrame_UpdateDisplay()
+	end
+end
+
+-- Sort by Status toggle
+function Settings:OnSortByStatusChanged(checked)
+	local DB = GetDB()
+	if not DB then return end
+	
+	DB:Set("sortByStatus", checked)
 	
 	if BetterFriendsFrame_UpdateDisplay then
 		BetterFriendsFrame_UpdateDisplay()
