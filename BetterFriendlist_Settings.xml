@@ -308,42 +308,17 @@
 										<Anchor point="TOPLEFT" relativeKey="$parent.GrayOtherFaction" relativePoint="BOTTOMLEFT" x="0" y="-10" />
 									</Anchors>
 									<Scripts>
-										<OnLoad>
-											self.text:SetText("Show mobile/app friends as AFK")
-											self.text:SetFontObject("GameFontHighlight")
-										</OnLoad>
-										<OnClick>
-											BetterFriendlistSettings_OnShowMobileAsAFKChanged(self:GetChecked())
-										</OnClick>
-										<OnEnter>
-											GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-											GameTooltip:SetText("Show Mobile as AFK", 1, 1, 1)
-											GameTooltip:AddLine("Display AFK status icon for friends on mobile or app", 0.8, 0.8, 0.8, true)
-											GameTooltip:Show()
-										</OnEnter>
-										<OnLeave>
-											GameTooltip:Hide()
-										</OnLeave>
-									</Scripts>
-								</CheckButton>
-								
-								<!-- Show Mobile Text Checkbox -->
-								<CheckButton parentKey="ShowMobileText" inherits="UICheckButtonTemplate">
-									<Anchors>
-										<Anchor point="TOPLEFT" relativeKey="$parent.ShowMobileAsAFK" relativePoint="BOTTOMLEFT" x="0" y="-10" />
-									</Anchors>
-									<Scripts>
-										<OnLoad>
-											self.text:SetText("Add '(Mobile)' text to mobile friends")
-											self.text:SetFontObject("GameFontHighlight")
-										</OnLoad>
-										<OnClick>
-											BetterFriendlistSettings_OnShowMobileTextChanged(self:GetChecked())
-										</OnClick>
-										<OnEnter>
-											GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-											GameTooltip:SetText("Show Mobile Text", 1, 1, 1)
-											GameTooltip:AddLine("Add text indicator for mobile/app friends", 0.8, 0.8, 0.8, true)
+									<OnLoad>
+										self.text:SetText("Show mobile/BSAp friends as AFK")
+										self.text:SetFontObject("GameFontHighlight")
+									</OnLoad>
+									<OnClick>
+										BetterFriendlistSettings_OnShowMobileAsAFKChanged(self:GetChecked())
+									</OnClick>
+									<OnEnter>
+										GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+										GameTooltip:SetText("Show Mobile as AFK", 1, 1, 1)
+										GameTooltip:AddLine("Display AFK status icon for friends on mobile (BSAp only)", 0.8, 0.8, 0.8, true)
 											GameTooltip:Show()
 										</OnEnter>
 										<OnLeave>
@@ -355,7 +330,7 @@
 								<!-- Hide Max Level Checkbox -->
 								<CheckButton parentKey="HideMaxLevel" inherits="UICheckButtonTemplate">
 									<Anchors>
-										<Anchor point="TOPLEFT" relativeKey="$parent.ShowMobileText" relativePoint="BOTTOMLEFT" x="0" y="-10" />
+										<Anchor point="TOPLEFT" relativeKey="$parent.ShowMobileAsAFK" relativePoint="BOTTOMLEFT" x="0" y="-10" />
 									</Anchors>
 									<Scripts>
 										<OnLoad>
@@ -377,35 +352,10 @@
 									</Scripts>
 								</CheckButton>
 								
-								<!-- Sort by Status Checkbox -->
-								<CheckButton parentKey="SortByStatus" inherits="UICheckButtonTemplate">
-									<Anchors>
-										<Anchor point="TOPLEFT" relativeKey="$parent.HideMaxLevel" relativePoint="BOTTOMLEFT" x="0" y="-10" />
-									</Anchors>
-									<Scripts>
-										<OnLoad>
-											self.text:SetText("Sort online friends first")
-											self.text:SetFontObject("GameFontHighlight")
-										</OnLoad>
-										<OnClick>
-											BetterFriendlistSettings_OnSortByStatusChanged(self:GetChecked())
-										</OnClick>
-										<OnEnter>
-											GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-											GameTooltip:SetText("Sort by Status", 1, 1, 1)
-											GameTooltip:AddLine("Show all online friends before offline friends in each group", 0.8, 0.8, 0.8, true)
-											GameTooltip:Show()
-										</OnEnter>
-										<OnLeave>
-											GameTooltip:Hide()
-										</OnLeave>
-									</Scripts>
-								</CheckButton>
-								
 								<!-- Accordion Groups Checkbox -->
 								<CheckButton parentKey="AccordionGroups" inherits="UICheckButtonTemplate">
 									<Anchors>
-										<Anchor point="TOPLEFT" relativeKey="$parent.SortByStatus" relativePoint="BOTTOMLEFT" x="0" y="-10" />
+										<Anchor point="TOPLEFT" relativeKey="$parent.HideMaxLevel" relativePoint="BOTTOMLEFT" x="0" y="-10" />
 									</Anchors>
 									<Scripts>
 										<OnLoad>

@@ -429,25 +429,6 @@ function FriendsList:BuildDisplayList()
 			
 			-- Add friends if not collapsed
 			if not groupData.collapsed then
-				-- Sort friends within group if sortByStatus is enabled
-				local sortByStatus = GetDB():Get("sortByStatus", false)
-				if sortByStatus then
-					table.sort(groupFriends, function(a, b)
-						-- Online friends first
-						local aOnline = a.connected
-						local bOnline = b.connected
-						
-						if aOnline ~= bOnline then
-							return aOnline
-						end
-						
-						-- Same status, sort by name
-						local nameA = a.type == "bnet" and (a.accountName or a.battleTag) or a.name
-						local nameB = b.type == "bnet" and (b.accountName or b.battleTag) or b.name
-						return (nameA or ""):lower() < (nameB or ""):lower()
-					end)
-				end
-				
 				for _, friend in ipairs(groupFriends) do
 					table.insert(self.displayList, {
 						type = BUTTON_TYPE_FRIEND,
@@ -1183,20 +1164,18 @@ function FriendsList:RenderDisplay()
 					button.background:SetColorTexture(FRIENDS_OFFLINE_BACKGROUND_COLOR.r, FRIENDS_OFFLINE_BACKGROUND_COLOR.g, FRIENDS_OFFLINE_BACKGROUND_COLOR.b, FRIENDS_OFFLINE_BACKGROUND_COLOR.a)
 				end
 				
-				-- Set status icon (BSAp shows as AFK if setting enabled)
-				local showMobileAsAFK = GetDB():Get("showMobileAsAFK", false)
-				if friend.connected then
-					local isMobile = friend.gameAccountInfo and (friend.gameAccountInfo.clientProgram == "BSAp" or friend.gameAccountInfo.clientProgram == "App")
-					if showMobileAsAFK and isMobile then
-						button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Away")
-					else
-						button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Online")
-					end
+			-- Set status icon (BSAp shows as AFK if setting enabled)
+			local showMobileAsAFK = GetDB():Get("showMobileAsAFK", false)
+			if friend.connected then
+				local isMobile = friend.gameAccountInfo and friend.gameAccountInfo.clientProgram == "BSAp"
+				if showMobileAsAFK and isMobile then
+					button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Away")
 				else
-					button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Offline")
+					button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Online")
 				end
-				
-				-- Set game icon using Blizzard's modern API
+			else
+				button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Offline")
+			end				-- Set game icon using Blizzard's modern API
 				if friend.gameAccountInfo and friend.gameAccountInfo.clientProgram and friend.connected then
 					local clientProgram = friend.gameAccountInfo.clientProgram
 					
@@ -1417,18 +1396,13 @@ function FriendsList:RenderDisplay()
 					line1Text = "|cff7f7f7f" .. displayName .. "|r"
 				end
 				
-				-- In compact mode, append additional info to line1Text
-				if isCompactMode then
-					local showMobileText = GetDB():Get("showMobileText", false)
-					local hideMaxLevel = GetDB():Get("hideMaxLevel", false)
-					local maxLevel = GetMaxLevelForPlayerExpansion()
-					
-					if friend.connected then
-						local isMobile = friend.gameAccountInfo and (friend.gameAccountInfo.clientProgram == "BSAp" or friend.gameAccountInfo.clientProgram == "App")
-						local mobileText = (showMobileText and isMobile) and " (Mobile)" or ""
-						local infoText = ""
-						
-						if friend.level and friend.areaName then
+			-- In compact mode, append additional info to line1Text
+			if isCompactMode then
+				local hideMaxLevel = GetDB():Get("hideMaxLevel", false)
+				local maxLevel = GetMaxLevelForPlayerExpansion()
+				
+				if friend.connected then
+					local infoText = ""						if friend.level and friend.areaName then
 							if hideMaxLevel and friend.level == maxLevel then
 								infoText = " - " .. friend.areaName
 							else
@@ -1446,8 +1420,8 @@ function FriendsList:RenderDisplay()
 							infoText = " - " .. friend.gameName
 						end
 						-- Add info in gray color
-						if infoText ~= "" or mobileText ~= "" then
-							line1Text = line1Text .. "|cff7f7f7f" .. infoText .. mobileText .. "|r"
+						if infoText ~= "" then
+							line1Text = line1Text .. "|cff7f7f7f" .. infoText .. "|r"
 						end
 					else
 						-- Offline - add last online time
@@ -1461,33 +1435,30 @@ function FriendsList:RenderDisplay()
 				
 				-- Line 2: Level, Zone (in gray) - only used in normal mode
 				if not isCompactMode then
-					local showMobileText = GetDB():Get("showMobileText", false)
 					local hideMaxLevel = GetDB():Get("hideMaxLevel", false)
 					local maxLevel = GetMaxLevelForPlayerExpansion()
 					
 					if friend.connected then
-						local isMobile = friend.gameAccountInfo and (friend.gameAccountInfo.clientProgram == "BSAp" or friend.gameAccountInfo.clientProgram == "App")
-						local mobileText = (showMobileText and isMobile) and " (Mobile)" or ""
 						
 						if friend.level and friend.areaName then
 							if hideMaxLevel and friend.level == maxLevel then
-								button.Info:SetText(friend.areaName .. mobileText)
+								button.Info:SetText(friend.areaName)
 							else
-								button.Info:SetText(string.format("Lvl %d, %s", friend.level, friend.areaName) .. mobileText)
+								button.Info:SetText(string.format("Lvl %d, %s", friend.level, friend.areaName))
 							end
 						elseif friend.level then
 							if hideMaxLevel and friend.level == maxLevel then
-								button.Info:SetText("Max Level" .. mobileText)
+								button.Info:SetText("Max Level")
 							else
-								button.Info:SetText("Lvl " .. friend.level .. mobileText)
+								button.Info:SetText("Lvl " .. friend.level)
 							end
 						elseif friend.areaName then
-							button.Info:SetText(friend.areaName .. mobileText)
+							button.Info:SetText(friend.areaName)
 						elseif friend.gameName then
 							-- Show "Mobile" or "In App" without "Playing" prefix
 							button.Info:SetText(friend.gameName)
 						else
-							button.Info:SetText("Online" .. mobileText)
+							button.Info:SetText("Online")
 						end
 					else
 						-- Offline - show last online time for Battle.net friends

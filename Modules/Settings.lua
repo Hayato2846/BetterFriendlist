@@ -413,17 +413,10 @@ function Settings:LoadSettings()
 			appearanceTab.ShowMobileText:SetChecked(value)
 		end
 		
-		if appearanceTab.HideMaxLevel then
-			local value = DB:Get("hideMaxLevel", false)
-			appearanceTab.HideMaxLevel:SetChecked(value)
-		end
-		
-		if appearanceTab.SortByStatus then
-			local value = DB:Get("sortByStatus", false)
-			appearanceTab.SortByStatus:SetChecked(value)
-		end
-		
-		if appearanceTab.AccordionGroups then
+	if appearanceTab.HideMaxLevel then
+		local value = DB:Get("hideMaxLevel", false)
+		appearanceTab.HideMaxLevel:SetChecked(value)
+	end		if appearanceTab.AccordionGroups then
 			local value = DB:Get("accordionGroups", false)
 			appearanceTab.AccordionGroups:SetChecked(value)
 		end
@@ -510,9 +503,7 @@ function Settings:DoReset()
 	DB:Set("showRealmName", false)
 	DB:Set("grayOtherFaction", false)
 	DB:Set("showMobileAsAFK", false)
-	DB:Set("showMobileText", false)
 	DB:Set("hideMaxLevel", false)
-	DB:Set("sortByStatus", false)
 	DB:Set("accordionGroups", false)
 	
 	self:LoadSettings()
@@ -1549,36 +1540,12 @@ function Settings:OnShowMobileAsAFKChanged(checked)
 	end
 end
 
--- Show Mobile Text toggle
-function Settings:OnShowMobileTextChanged(checked)
-	local DB = GetDB()
-	if not DB then return end
-	
-	DB:Set("showMobileText", checked)
-	
-	if BetterFriendsFrame_UpdateDisplay then
-		BetterFriendsFrame_UpdateDisplay()
-	end
-end
-
 -- Hide Max Level toggle
 function Settings:OnHideMaxLevelChanged(checked)
 	local DB = GetDB()
 	if not DB then return end
 	
 	DB:Set("hideMaxLevel", checked)
-	
-	if BetterFriendsFrame_UpdateDisplay then
-		BetterFriendsFrame_UpdateDisplay()
-	end
-end
-
--- Sort by Status toggle
-function Settings:OnSortByStatusChanged(checked)
-	local DB = GetDB()
-	if not DB then return end
-	
-	DB:Set("sortByStatus", checked)
 	
 	if BetterFriendsFrame_UpdateDisplay then
 		BetterFriendsFrame_UpdateDisplay()
