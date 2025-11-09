@@ -10,27 +10,10 @@
 Thumbs.db
 desktop.ini
 
-# Documentation (keep essential docs, exclude development notes)
-BUG_*.md
-COMBAT_*.md
-FRIENDGROUPS_*.md
-IMPLEMENTATION_*.md
-MASTER_*.md
-MIGRATION_*.md
-MODULARIZATION_*.md
-RAID_FRAME_*.md
-SETTINGS_*.md
-TESTING_*.md
-PHASE_*.md
-QUICKJOIN_*.md
-v1.0-finalization-plan.md
-plans/
-
-# Reference files
+# Reference files (keep for development, exclude from releases)
 reference/
 predecessor/
 .ai-context/
-docs/
 
 # Build and package files
 *.zip
