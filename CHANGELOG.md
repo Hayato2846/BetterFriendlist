@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.0] - 2025-11-10
+
+**🎨 Visual Enhancements & UX Improvements**
+
+This release focuses on visual polish, improved UI consistency, and feature refinements based on user feedback.
+
+### Added
+- **Color Class Names** - Display character names in class colors for better readability
+- **Hide Empty Groups** - Option to hide groups with no friends (reduces clutter)
+- **Faction Icons** - Visual faction indicators (Alliance/Horde) for cross-faction friends
+- **Realm Name Display** - Show realm names for characters on different servers
+- **Gray Other Faction** - Dim opposite faction friends (Alliance sees Horde grayed, vice versa)
+- **Mobile as AFK** - Show mobile/BSAp friends with AFK status icon (BSAp only, not App)
+- **Hide Max Level** - Option to hide level display for max-level characters
+- **Accordion Groups** - Only allow one group open at a time (accordion-style)
+- **Quick Filters: Hide AFK** - Filter to hide AFK/DND friends
+- **Quick Filters: Retail Only** - Filter to show only retail (non-classic) friends
+- **Invite All to Group** - Context menu option to invite all online friends in a group
+
+### Changed
+- **Improved Sort Dropdown UI** - Icon-based display (51px width), matching QuickFilters style
+  - Status icon (green dot), Name icon (speaker), Level icon (skull), Zone icon (map marker)
+  - Icon-only button display, icon+text in menu for clarity
+- **Enhanced Tooltips** - Better tooltip positioning and more descriptive text
+
+### Removed
+- **Show Mobile Text** - Removed obsolete "(Mobile)" text feature (redundant with status icons)
+- **Sort by Status Setting** - Removed redundant per-group sorting (use Sort dropdown instead)
+
+### Fixed
+- **Mobile AFK Logic** - Now only applies to BSAp (mobile devices), not App client
+
+### Notes
+- All 13 planned v1.2.0 features implemented
+- Net deletion: 130 lines of obsolete code removed
+- UI consistency improved across all dropdowns
+
+---
+
 ## [1.0.0] - 2025-11-09
 
 **🎉 Initial Stable Release - Feature Complete!**
