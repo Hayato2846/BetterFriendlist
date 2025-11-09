@@ -26,14 +26,28 @@ function Dialogs:RegisterDialogs()
 		OnAccept = function(self)
 			local groupName = self.EditBox:GetText()
 			if groupName and groupName ~= "" then
-				BetterFriendsList_CreateGroup(groupName)
+				local Groups = BFL:GetModule("Groups")
+				if Groups then
+					local success, groupId = Groups:Create(groupName)
+					if success then
+						if BetterFriendsFrame_UpdateDisplay then
+							BetterFriendsFrame_UpdateDisplay()
+						end
+					end
+				end
 			end
 		end,
 		EditBoxOnEnterPressed = function(self)
 			local parent = self:GetParent()
 			local groupName = self:GetText()
 			if groupName and groupName ~= "" then
-				BetterFriendsList_CreateGroup(groupName)
+				local Groups = BFL:GetModule("Groups")
+				if Groups then
+					Groups:Create(groupName)
+					if BetterFriendsFrame_UpdateDisplay then
+						BetterFriendsFrame_UpdateDisplay()
+					end
+				end
 			end
 			parent:Hide()
 		end,
@@ -58,10 +72,16 @@ function Dialogs:RegisterDialogs()
 		OnAccept = function(self, friendUID)
 			local groupName = self.EditBox:GetText()
 			if groupName and groupName ~= "" then
-				local success, groupId = BetterFriendsList_CreateGroup(groupName)
-				if success then
-					-- Add friend to the newly created group
-					BetterFriendsList_ToggleFriendInGroup(friendUID, groupId)
+				local Groups = BFL:GetModule("Groups")
+				if Groups then
+					local success, groupId = Groups:Create(groupName)
+					if success then
+						-- Add friend to the newly created group
+						Groups:ToggleFriendInGroup(friendUID, groupId)
+						if BetterFriendsFrame_UpdateDisplay then
+							BetterFriendsFrame_UpdateDisplay()
+						end
+					end
 				end
 			end
 		end,
@@ -69,10 +89,16 @@ function Dialogs:RegisterDialogs()
 			local parent = self:GetParent()
 			local groupName = self:GetText()
 			if groupName and groupName ~= "" then
-				local success, groupId = BetterFriendsList_CreateGroup(groupName)
-				if success then
-					-- Add friend to the newly created group
-					BetterFriendsList_ToggleFriendInGroup(friendUID, groupId)
+				local Groups = BFL:GetModule("Groups")
+				if Groups then
+					local success, groupId = Groups:Create(groupName)
+					if success then
+						-- Add friend to the newly created group
+						Groups:ToggleFriendInGroup(friendUID, groupId)
+						if BetterFriendsFrame_UpdateDisplay then
+							BetterFriendsFrame_UpdateDisplay()
+						end
+					end
 				end
 			end
 			parent:Hide()

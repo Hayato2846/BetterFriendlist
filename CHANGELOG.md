@@ -248,15 +248,49 @@ This is the first stable release of BetterFriendlist, representing complete feat
 
 ---
 
+## [1.1.0] - 2025-11-09
+
+**Feature Release: Export/Import System**
+
+### Added
+- **Export/Import Settings** - Share groups and assignments between characters/accounts
+  - Export all custom groups, colors, friend assignments, and group order
+  - Import with validation and error handling
+  - Hex-encoded format (BFL1: prefix) for easy copy/paste
+  - Export Dialog with scrollable text and "Select All" button
+  - Import Dialog with validation and confirmation
+  - Perfect for multi-account players sharing Battle.net friends
+  - UI integrated in Settings → Advanced tab
+
+### Fixed
+- **Create Group Dialog Bug** - Fixed `BetterFriendsList_CreateGroup` nil error
+  - Changed from non-existent global functions to Module API calls
+  - Both `BETTER_FRIENDLIST_CREATE_GROUP` and `BETTER_FRIENDLIST_CREATE_GROUP_AND_ADD_FRIEND` dialogs fixed
+  - Now properly calls `BFL:GetModule("Groups"):Create(groupName)`
+
+### Technical
+- Added 4 new functions in `Modules/Settings.lua`:
+  - `ExportSettings()` - Serializes all settings to hex string
+  - `ImportSettings()` - Deserializes and validates import string
+  - `SerializeTable()` / `DeserializeTable()` - Table <-> String conversion
+  - `EncodeString()` / `DecodeString()` - Hex encoding/decoding
+- Added 2 UI frames:
+  - `BetterFriendlistExportFrame` - 500×400 draggable dialog
+  - `BetterFriendlistImportFrame` - 500×400 draggable dialog with validation
+- Updated `BetterFriendlist_Settings.xml` with Export/Import section
+- Updated `BetterFriendlist_Settings.lua` with callback functions
+
+---
+
 ## [Unreleased]
 
-### Planned for v1.1+
+### Planned for v1.2+
 - Enhanced filtering (level, zone, class filters)
 - Color coding for custom groups
 - Notification system
 - Statistics/activity tracking
 - Profile system
-- Import/Export groups
+- Compact mode
 
 ---
 
@@ -264,6 +298,7 @@ This is the first stable release of BetterFriendlist, representing complete feat
 
 | Version | Date | Description | Lines (Main File) |
 |---------|------|-------------|-------------------|
+| 1.1.0 | 2025-11-09 | Export/Import + Bugfixes | 1655 |
 | 1.0.0 | 2025-11-09 | Initial Stable Release | 1655 |
 | 0.15.0 | 2025-11-08 | Phase 10.5 Bug Fixes | ~2600 |
 | 0.14.0 | 2025-11-06 | Quick Join | ~2600 |

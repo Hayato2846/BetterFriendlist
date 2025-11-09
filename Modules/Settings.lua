@@ -972,6 +972,424 @@ function Settings:DebugDatabase()
 end
 
 --------------------------------------------------------------------------
+-- EXPORT / IMPORT SYSTEM
+--------------------------------------------------------------------------
+
+-- Export all settings to a string
+function Settings:ExportSettings()
+	if not BetterFriendlistDB then
+		return nil, "Database not available"
+	end
+	
+	-- Collect data to export
+	local exportData = {
+		version = 1, -- Export format version
+		customGroups = {},
+		friendGroups = {},
+		groupOrder = {},
+		groupStates = {},
+	}
+	
+	-- Export custom groups with all properties
+	if BetterFriendlistDB.customGroups then
+		for groupId, groupInfo in pairs(BetterFriendlistDB.customGroups) do
+			exportData.customGroups[groupId] = {
+				name = groupInfo.name,
+				collapsed = groupInfo.collapsed,
+				order = groupInfo.order,
+				color = groupInfo.color and {
+					r = groupInfo.color.r,
+					g = groupInfo.color.g,
+					b = groupInfo.color.b
+				} or nil
+			}
+		end
+	end
+	
+	-- Export friend-to-group assignments
+	if BetterFriendlistDB.friendGroups then
+		for friendUID, groups in pairs(BetterFriendlistDB.friendGroups) do
+			exportData.friendGroups[friendUID] = {}
+			for _, groupId in ipairs(groups) do
+				table.insert(exportData.friendGroups[friendUID], groupId)
+			end
+		end
+	end
+	
+	-- Export group order
+	if BetterFriendlistDB.groupOrder then
+		for _, groupId in ipairs(BetterFriendlistDB.groupOrder) do
+			table.insert(exportData.groupOrder, groupId)
+		end
+	end
+	
+	-- Export group states (collapsed)
+	if BetterFriendlistDB.groupStates then
+		for groupId, collapsed in pairs(BetterFriendlistDB.groupStates) do
+			exportData.groupStates[groupId] = collapsed
+		end
+	end
+	
+	-- Serialize to string using LibSerialize or manual encoding
+	local serialized = self:SerializeTable(exportData)
+	
+	if not serialized then
+		return nil, "Failed to serialize data"
+	end
+	
+	-- Encode to base64-like format for easy copy/paste
+	local encoded = self:EncodeString(serialized)
+	
+	return encoded, nil
+end
+
+-- Import settings from string
+function Settings:ImportSettings(importString)
+	if not importString or importString == "" then
+		return false, "Import string is empty"
+	end
+	
+	-- Decode from base64-like format
+	local decoded = self:DecodeString(importString)
+	if not decoded then
+		return false, "Failed to decode import string (invalid format)"
+	end
+	
+	-- Deserialize
+	local importData = self:DeserializeTable(decoded)
+	if not importData then
+		return false, "Failed to deserialize data (corrupted string)"
+	end
+	
+	-- Validate version
+	if not importData.version or importData.version ~= 1 then
+		return false, "Unsupported export version"
+	end
+	
+	-- Validate structure
+	if not importData.customGroups or not importData.friendGroups then
+		return false, "Invalid export data structure"
+	end
+	
+	-- IMPORT DATA
+	local DB = GetDB()
+	local Groups = GetGroups()
+	
+	if not DB or not Groups then
+		return false, "Modules not available"
+	end
+	
+	-- Clear existing data
+	BetterFriendlistDB.customGroups = {}
+	BetterFriendlistDB.friendGroups = {}
+	BetterFriendlistDB.groupOrder = {}
+	BetterFriendlistDB.groupStates = {}
+	
+	-- Import custom groups
+	for groupId, groupInfo in pairs(importData.customGroups) do
+		BetterFriendlistDB.customGroups[groupId] = {
+			name = groupInfo.name,
+			collapsed = groupInfo.collapsed or false,
+			order = groupInfo.order or 2,
+			color = groupInfo.color or {r = 1.0, g = 0.82, b = 0.0}
+		}
+	end
+	
+	-- Import friend assignments
+	for friendUID, groups in pairs(importData.friendGroups) do
+		BetterFriendlistDB.friendGroups[friendUID] = {}
+		for _, groupId in ipairs(groups) do
+			table.insert(BetterFriendlistDB.friendGroups[friendUID], groupId)
+		end
+	end
+	
+	-- Import group order
+	if importData.groupOrder then
+		for _, groupId in ipairs(importData.groupOrder) do
+			table.insert(BetterFriendlistDB.groupOrder, groupId)
+		end
+	end
+	
+	-- Import group states
+	if importData.groupStates then
+		for groupId, collapsed in pairs(importData.groupStates) do
+			BetterFriendlistDB.groupStates[groupId] = collapsed
+		end
+	end
+	
+	-- Reload Groups module
+	Groups:Initialize()
+	
+	-- Refresh UI
+	if BetterFriendsFrame_UpdateDisplay then
+		BetterFriendsFrame_UpdateDisplay()
+	end
+	
+	return true, nil
+end
+
+-- Simple table serialization (Lua table to string)
+function Settings:SerializeTable(tbl)
+	local function serialize(val, depth)
+		depth = depth or 0
+		if depth > 10 then return "nil" end -- Prevent infinite recursion
+		
+		local t = type(val)
+		if t == "number" then
+			return tostring(val)
+		elseif t == "boolean" then
+			return val and "true" or "false"
+		elseif t == "string" then
+			return string.format("%q", val)
+		elseif t == "table" then
+			local parts = {}
+			table.insert(parts, "{")
+			for k, v in pairs(val) do
+				local key = type(k) == "string" and string.format("[%q]", k) or string.format("[%s]", tostring(k))
+				table.insert(parts, key .. "=" .. serialize(v, depth + 1) .. ",")
+			end
+			table.insert(parts, "}")
+			return table.concat(parts)
+		else
+			return "nil"
+		end
+	end
+	
+	return serialize(tbl)
+end
+
+-- Deserialize string to table
+function Settings:DeserializeTable(str)
+	if not str or str == "" then
+		return nil
+	end
+	
+	-- Use loadstring (safe because we control the format)
+	local func, err = loadstring("return " .. str)
+	if not func then
+		return nil
+	end
+	
+	local success, result = pcall(func)
+	if not success then
+		return nil
+	end
+	
+	return result
+end
+
+-- Encode string to base64-like format (simple compression-safe encoding)
+function Settings:EncodeString(str)
+	-- Simple encoding: convert to hex representation
+	local hex = ""
+	for i = 1, #str do
+		hex = hex .. string.format("%02x", string.byte(str, i))
+	end
+	return "BFL1:" .. hex -- BFL1: prefix for version identification
+end
+
+-- Decode base64-like format back to string
+function Settings:DecodeString(encoded)
+	-- Check prefix
+	if not encoded or not string.match(encoded, "^BFL1:") then
+		return nil
+	end
+	
+	-- Remove prefix
+	local hex = string.sub(encoded, 6)
+	
+	-- Convert hex back to string
+	local str = ""
+	for i = 1, #hex, 2 do
+		local byte = tonumber(string.sub(hex, i, i+1), 16)
+		if not byte then
+			return nil
+		end
+		str = str .. string.char(byte)
+	end
+	
+	return str
+end
+
+-- Show export dialog with scrollable text
+function Settings:ShowExportDialog()
+	local exportString, err = self:ExportSettings()
+	
+	if not exportString then
+		print("|cffff0000BetterFriendlist:|r Export failed:", err or "Unknown error")
+		return
+	end
+	
+	-- Create or reuse export frame
+	if not self.exportFrame then
+		self:CreateExportFrame()
+	end
+	
+	-- Set text and show
+	self.exportFrame.scrollFrame.editBox:SetText(exportString)
+	self.exportFrame.scrollFrame.editBox:HighlightText()
+	self.exportFrame.scrollFrame.editBox:SetFocus()
+	self.exportFrame:Show()
+	
+	print("|cff00ff00BetterFriendlist:|r Export complete! Copy the text from the dialog.")
+end
+
+-- Show import dialog
+function Settings:ShowImportDialog()
+	-- Create or reuse import frame
+	if not self.importFrame then
+		self:CreateImportFrame()
+	end
+	
+	-- Clear and show
+	self.importFrame.scrollFrame.editBox:SetText("")
+	self.importFrame.scrollFrame.editBox:SetFocus()
+	self.importFrame:Show()
+end
+
+-- Create export frame
+function Settings:CreateExportFrame()
+	local frame = CreateFrame("Frame", "BetterFriendlistExportFrame", UIParent, "BasicFrameTemplateWithInset")
+	frame:SetSize(500, 400)
+	frame:SetPoint("CENTER")
+	frame:SetFrameStrata("DIALOG")
+	frame:EnableMouse(true)
+	frame:SetMovable(true)
+	frame:RegisterForDrag("LeftButton")
+	frame:SetScript("OnDragStart", frame.StartMoving)
+	frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+	frame:Hide()
+	
+	-- Title
+	frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	frame.title:SetPoint("TOP", 0, -5)
+	frame.title:SetText("Export Settings")
+	
+	-- Info text
+	frame.info = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	frame.info:SetPoint("TOPLEFT", 15, -30)
+	frame.info:SetPoint("TOPRIGHT", -15, -30)
+	frame.info:SetJustifyH("LEFT")
+	frame.info:SetText("Copy the text below and save it. You can import it on another character or account.")
+	
+	-- Scroll frame with edit box
+	local scrollFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
+	scrollFrame:SetPoint("TOPLEFT", 10, -60)
+	scrollFrame:SetPoint("BOTTOMRIGHT", -30, 50)
+	frame.scrollFrame = scrollFrame
+	
+	local editBox = CreateFrame("EditBox", nil, scrollFrame)
+	editBox:SetMultiLine(true)
+	editBox:SetFontObject(GameFontHighlight)
+	editBox:SetWidth(460)
+	editBox:SetAutoFocus(false)
+	editBox:SetScript("OnEscapePressed", function(self)
+		frame:Hide()
+	end)
+	scrollFrame:SetScrollChild(editBox)
+	scrollFrame.editBox = editBox
+	
+	-- Copy All button
+	local copyButton = CreateFrame("Button", nil, frame, "GameMenuButtonTemplate")
+	copyButton:SetPoint("BOTTOM", 0, 15)
+	copyButton:SetSize(120, 25)
+	copyButton:SetText("Select All")
+	copyButton:SetNormalFontObject("GameFontNormal")
+	copyButton:SetHighlightFontObject("GameFontHighlight")
+	copyButton:SetScript("OnClick", function()
+		editBox:HighlightText()
+		editBox:SetFocus()
+	end)
+	
+	self.exportFrame = frame
+end
+
+-- Create import frame
+function Settings:CreateImportFrame()
+	local frame = CreateFrame("Frame", "BetterFriendlistImportFrame", UIParent, "BasicFrameTemplateWithInset")
+	frame:SetSize(500, 400)
+	frame:SetPoint("CENTER")
+	frame:SetFrameStrata("DIALOG")
+	frame:EnableMouse(true)
+	frame:SetMovable(true)
+	frame:RegisterForDrag("LeftButton")
+	frame:SetScript("OnDragStart", frame.StartMoving)
+	frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+	frame:Hide()
+	
+	-- Title
+	frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	frame.title:SetPoint("TOP", 0, -5)
+	frame.title:SetText("Import Settings")
+	
+	-- Info text
+	frame.info = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	frame.info:SetPoint("TOPLEFT", 15, -30)
+	frame.info:SetPoint("TOPRIGHT", -15, -30)
+	frame.info:SetJustifyH("LEFT")
+	frame.info:SetText("Paste your export string below and click Import.\n\n|cffff0000Warning: This will replace ALL your groups and assignments!|r")
+	
+	-- Scroll frame with edit box
+	local scrollFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
+	scrollFrame:SetPoint("TOPLEFT", 10, -80)
+	scrollFrame:SetPoint("BOTTOMRIGHT", -30, 50)
+	frame.scrollFrame = scrollFrame
+	
+	local editBox = CreateFrame("EditBox", nil, scrollFrame)
+	editBox:SetMultiLine(true)
+	editBox:SetFontObject(GameFontHighlight)
+	editBox:SetWidth(460)
+	editBox:SetAutoFocus(true)
+	editBox:SetScript("OnEscapePressed", function(self)
+		frame:Hide()
+	end)
+	scrollFrame:SetScrollChild(editBox)
+	scrollFrame.editBox = editBox
+	
+	-- Import button
+	local importButton = CreateFrame("Button", nil, frame, "GameMenuButtonTemplate")
+	importButton:SetPoint("BOTTOM", -65, 15)
+	importButton:SetSize(120, 25)
+	importButton:SetText("Import")
+	importButton:SetNormalFontObject("GameFontNormal")
+	importButton:SetHighlightFontObject("GameFontHighlight")
+	importButton:SetScript("OnClick", function()
+		local importString = editBox:GetText()
+		local success, err = Settings:ImportSettings(importString)
+		
+		if success then
+			print("|cff00ff00BetterFriendlist:|r Import successful! All groups and assignments have been restored.")
+			frame:Hide()
+		else
+			print("|cffff0000BetterFriendlist:|r Import failed:", err or "Unknown error")
+			-- Show error in UI
+			StaticPopupDialogs["BETTERFRIENDLIST_IMPORT_ERROR"] = {
+				text = "Import Failed!\n\n" .. (err or "Unknown error"),
+				button1 = "OK",
+				timeout = 0,
+				whileDead = true,
+				hideOnEscape = true,
+				preferredIndex = 3,
+			}
+			StaticPopup_Show("BETTERFRIENDLIST_IMPORT_ERROR")
+		end
+	end)
+	
+	-- Cancel button
+	local cancelButton = CreateFrame("Button", nil, frame, "GameMenuButtonTemplate")
+	cancelButton:SetPoint("BOTTOM", 65, 15)
+	cancelButton:SetSize(120, 25)
+	cancelButton:SetText("Cancel")
+	cancelButton:SetNormalFontObject("GameFontNormal")
+	cancelButton:SetHighlightFontObject("GameFontHighlight")
+	cancelButton:SetScript("OnClick", function()
+		frame:Hide()
+	end)
+	
+	self.importFrame = frame
+end
+
+--------------------------------------------------------------------------
 -- GLOBAL CALLBACK FUNCTIONS (Called from XML)
 --------------------------------------------------------------------------
 

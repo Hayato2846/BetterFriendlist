@@ -140,6 +140,22 @@ Settings:DebugDatabase()
 end
 end
 
+-- Show export dialog
+function BetterFriendlistSettings_ShowExportDialog()
+local Settings = GetSettings()
+if Settings then
+Settings:ShowExportDialog()
+end
+end
+
+-- Show import dialog
+function BetterFriendlistSettings_ShowImportDialog()
+local Settings = GetSettings()
+if Settings then
+Settings:ShowImportDialog()
+end
+end
+
 --------------------------------------------------------------------------
 -- STATIC POPUP DIALOGS
 --------------------------------------------------------------------------

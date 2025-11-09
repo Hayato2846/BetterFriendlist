@@ -290,6 +290,75 @@
 									</OnClick>
 								</Scripts>
 							</Button>
+							
+							<!-- Export/Import Section -->
+							<Frame parentKey="ExportImportSection">
+								<Size x="0" y="0" />
+								<Anchors>
+									<Anchor point="TOPLEFT" relativeKey="$parent.MigrateButton" relativePoint="BOTTOMLEFT" x="0" y="-30" />
+									<Anchor point="RIGHT" x="-10" />
+								</Anchors>
+								<Layers>
+									<Layer level="OVERLAY">
+										<FontString parentKey="Header" inherits="GameFontNormal" text="Export / Import Settings">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="0" y="0" />
+											</Anchors>
+											<Color r="1" g="0.82" b="0" />
+										</FontString>
+										<FontString parentKey="Desc1" inherits="GameFontHighlightSmall" text="Export your groups and friend assignments to share between">
+											<Anchors>
+												<Anchor point="TOPLEFT" relativeKey="$parent.Header" relativePoint="BOTTOMLEFT" x="0" y="-8" />
+												<Anchor point="RIGHT" x="-10" />
+											</Anchors>
+										</FontString>
+										<FontString parentKey="Desc2" inherits="GameFontHighlightSmall" text="characters or accounts. Perfect for players with multiple accounts">
+											<Anchors>
+												<Anchor point="TOPLEFT" relativeKey="$parent.Desc1" relativePoint="BOTTOMLEFT" x="0" y="-3" />
+												<Anchor point="RIGHT" x="-10" />
+											</Anchors>
+										</FontString>
+										<FontString parentKey="Desc3" inherits="GameFontHighlightSmall" text="who share Battle.net friends.">
+											<Anchors>
+												<Anchor point="TOPLEFT" relativeKey="$parent.Desc2" relativePoint="BOTTOMLEFT" x="0" y="-3" />
+												<Anchor point="RIGHT" x="-10" />
+											</Anchors>
+										</FontString>
+										<FontString parentKey="Warning" inherits="GameFontHighlightSmall" text="|cffff0000Warning: Importing will replace ALL your groups and assignments!|r">
+											<Anchors>
+												<Anchor point="TOPLEFT" relativeKey="$parent.Desc3" relativePoint="BOTTOMLEFT" x="0" y="-8" />
+												<Anchor point="RIGHT" x="-10" />
+											</Anchors>
+										</FontString>
+									</Layer>
+								</Layers>
+							</Frame>
+							
+							<!-- Export Button -->
+							<Button parentKey="ExportButton" inherits="UIPanelButtonTemplate" text="Export Settings">
+								<Size x="140" y="24" />
+								<Anchors>
+									<Anchor point="TOPLEFT" relativeKey="$parent.ExportImportSection.Warning" relativePoint="BOTTOMLEFT" x="0" y="-15" />
+								</Anchors>
+								<Scripts>
+									<OnClick>
+										BetterFriendlistSettings_ShowExportDialog()
+									</OnClick>
+								</Scripts>
+							</Button>
+							
+							<!-- Import Button -->
+							<Button parentKey="ImportButton" inherits="UIPanelButtonTemplate" text="Import Settings">
+								<Size x="140" y="24" />
+								<Anchors>
+									<Anchor point="LEFT" relativeKey="$parent.ExportButton" relativePoint="RIGHT" x="10" y="0" />
+								</Anchors>
+								<Scripts>
+									<OnClick>
+										BetterFriendlistSettings_ShowImportDialog()
+									</OnClick>
+								</Scripts>
+							</Button>
 						</Frames>
 					</Frame>
 			</Frames>

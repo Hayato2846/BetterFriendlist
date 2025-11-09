@@ -3,9 +3,9 @@
 ## Notes: Complete replacement for WoW Friends frame - Custom groups, Raid management, Quick Join, and more!
 ## Author: Hayato2846
 ## Version: @project-version@
-## X-Curse-Project-ID: 
+## X-Curse-Project-ID: 1381771
 ## X-WoWI-ID: 
-## X-Wago-ID: 
+## X-Wago-ID: rNkPLl6a 
 ## SavedVariables: BetterFriendlistDB
 ## Bindings: Bindings.xml
 
