@@ -402,10 +402,35 @@
 									</Scripts>
 								</CheckButton>
 								
+								<!-- Accordion Groups Checkbox -->
+								<CheckButton parentKey="AccordionGroups" inherits="UICheckButtonTemplate">
+									<Anchors>
+										<Anchor point="TOPLEFT" relativeKey="$parent.SortByStatus" relativePoint="BOTTOMLEFT" x="0" y="-10" />
+									</Anchors>
+									<Scripts>
+										<OnLoad>
+											self.text:SetText("Accordion mode (only one group open)")
+											self.text:SetFontObject("GameFontHighlight")
+										</OnLoad>
+										<OnClick>
+											BetterFriendlistSettings_OnAccordionGroupsChanged(self:GetChecked())
+										</OnClick>
+										<OnEnter>
+											GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+											GameTooltip:SetText("Accordion Groups", 1, 1, 1)
+											GameTooltip:AddLine("Only allow one group to be expanded at a time, automatically collapsing others", 0.8, 0.8, 0.8, true)
+											GameTooltip:Show()
+										</OnEnter>
+										<OnLeave>
+											GameTooltip:Hide()
+										</OnLeave>
+									</Scripts>
+								</CheckButton>
+								
 								<!-- Compact Mode Checkbox - Modern -->
 								<CheckButton parentKey="CompactMode" inherits="UICheckButtonTemplate">
 									<Anchors>
-										<Anchor point="TOPLEFT" relativeKey="$parent.SortByStatus" relativePoint="BOTTOMLEFT" x="0" y="-10" />
+										<Anchor point="TOPLEFT" relativeKey="$parent.AccordionGroups" relativePoint="BOTTOMLEFT" x="0" y="-10" />
 									</Anchors>
 									<Scripts>
 										<OnLoad>

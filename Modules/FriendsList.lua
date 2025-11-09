@@ -639,6 +639,74 @@ function FriendsList:DeleteGroup(groupId)
 	return success, err
 end
 
+-- Invite all online friends in a group to party
+function FriendsList:InviteGroupToParty(groupId)
+	local DB = GetDB()
+	if not DB then return end
+	
+	local inviteCount = 0
+	
+	-- Collect all friends in this group
+	for _, friend in ipairs(self.friendsList) do
+		if friend.connected then
+			local friendUID = GetFriendUID(friend)
+			local isInGroup = false
+			
+			-- Check if favorite
+			if groupId == "favorites" and friend.type == "bnet" and friend.isFavorite then
+				isInGroup = true
+			-- Check if in custom group
+			elseif groupId ~= "favorites" and groupId ~= "nogroup" then
+				if BetterFriendlistDB and BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friendUID] then
+					local groups = BetterFriendlistDB.friendGroups[friendUID]
+					for _, gid in ipairs(groups) do
+						if gid == groupId then
+							isInGroup = true
+							break
+						end
+					end
+				end
+			-- Check if in no group
+			elseif groupId == "nogroup" then
+				local hasGroup = false
+				if friend.type == "bnet" and friend.isFavorite then
+					hasGroup = true
+				elseif BetterFriendlistDB and BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friendUID] then
+					local groups = BetterFriendlistDB.friendGroups[friendUID]
+					if #groups > 0 then
+						hasGroup = true
+					end
+				end
+				isInGroup = not hasGroup
+			end
+			
+			-- Invite if in this group
+			if isInGroup then
+				if friend.type == "bnet" then
+					-- Battle.net friend - invite via BNet
+					if friend.gameAccountInfo and friend.gameAccountInfo.clientProgram == BNET_CLIENT_WOW then
+						local gameAccountID = friend.gameAccountInfo.gameAccountID
+						if gameAccountID then
+							BNInviteFriend(gameAccountID)
+							inviteCount = inviteCount + 1
+						end
+					end
+				elseif friend.type == "wow" then
+					-- WoW friend - invite by name
+					C_PartyInfo.InviteUnit(friend.name)
+					inviteCount = inviteCount + 1
+				end
+			end
+		end
+	end
+	
+	if inviteCount > 0 then
+		print(string.format("|cff00ff00BetterFriendlist:|r Invited %d friend(s) to party.", inviteCount))
+	else
+		print("|cffff8800BetterFriendlist:|r No online friends available to invite.")
+	end
+end
+
 -- Toggle friend in group
 function FriendsList:ToggleFriendInGroup(friendUID, groupId)
 	local DB = GetDB()
@@ -899,6 +967,12 @@ function FriendsList:RenderDisplay()
 							
 							rootDescription:CreateDivider()
 							
+							rootDescription:CreateButton("Invite All to Party", function()
+								FriendsListModule:InviteGroupToParty(self.groupId)
+							end)
+							
+							rootDescription:CreateDivider()
+							
 							rootDescription:CreateButton("Collapse All Groups", function()
 								for gid, gdata in pairs(friendGroups) do
 									gdata.collapsed = true
@@ -921,8 +995,22 @@ function FriendsList:RenderDisplay()
 						-- Left click: toggle collapse
 						local groupData = friendGroups[self.groupId]
 						if groupData then
+							local wasCollapsed = groupData.collapsed
 							groupData.collapsed = not groupData.collapsed
 							BetterFriendlistDB.groupStates[self.groupId] = groupData.collapsed
+							
+							-- Accordion mode: collapse all other groups when opening this one
+							local accordionMode = GetDB():Get("accordionGroups", false)
+							if accordionMode and not groupData.collapsed then
+								-- Opening a group - collapse all others
+								for gid, gdata in pairs(friendGroups) do
+									if gid ~= self.groupId then
+										gdata.collapsed = true
+										BetterFriendlistDB.groupStates[gid] = true
+									end
+								end
+							end
+							
 							FriendsListModule:BuildDisplayList()
 							FriendsListModule:RenderDisplay()
 						end
@@ -940,6 +1028,12 @@ function FriendsList:RenderDisplay()
 							
 							rootDescription:CreateTitle(groupData.name)
 							
+							rootDescription:CreateButton("Invite All to Party", function()
+								FriendsListModule:InviteGroupToParty(self.groupId)
+							end)
+							
+							rootDescription:CreateDivider()
+							
 							rootDescription:CreateButton("Collapse All Groups", function()
 								for gid, gdata in pairs(friendGroups) do
 									gdata.collapsed = true
@@ -962,8 +1056,22 @@ function FriendsList:RenderDisplay()
 						-- Left click: toggle collapse
 						local groupData = friendGroups[self.groupId]
 						if groupData then
+							local wasCollapsed = groupData.collapsed
 							groupData.collapsed = not groupData.collapsed
 							BetterFriendlistDB.groupStates[self.groupId] = groupData.collapsed
+							
+							-- Accordion mode: collapse all other groups when opening this one
+							local accordionMode = GetDB():Get("accordionGroups", false)
+							if accordionMode and not groupData.collapsed then
+								-- Opening a group - collapse all others
+								for gid, gdata in pairs(friendGroups) do
+									if gid ~= self.groupId then
+										gdata.collapsed = true
+										BetterFriendlistDB.groupStates[gid] = true
+									end
+								end
+							end
+							
 							FriendsListModule:BuildDisplayList()
 							FriendsListModule:RenderDisplay()
 						end

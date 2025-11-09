@@ -423,6 +423,11 @@ function Settings:LoadSettings()
 			appearanceTab.SortByStatus:SetChecked(value)
 		end
 		
+		if appearanceTab.AccordionGroups then
+			local value = DB:Get("accordionGroups", false)
+			appearanceTab.AccordionGroups:SetChecked(value)
+		end
+		
 		if appearanceTab.CompactMode then
 			local value = DB:Get("compactMode", false)
 			appearanceTab.CompactMode:SetChecked(value)
@@ -508,6 +513,7 @@ function Settings:DoReset()
 	DB:Set("showMobileText", false)
 	DB:Set("hideMaxLevel", false)
 	DB:Set("sortByStatus", false)
+	DB:Set("accordionGroups", false)
 	
 	self:LoadSettings()
 	
@@ -1573,6 +1579,18 @@ function Settings:OnSortByStatusChanged(checked)
 	if not DB then return end
 	
 	DB:Set("sortByStatus", checked)
+	
+	if BetterFriendsFrame_UpdateDisplay then
+		BetterFriendsFrame_UpdateDisplay()
+	end
+end
+
+-- Accordion Groups toggle
+function Settings:OnAccordionGroupsChanged(checked)
+	local DB = GetDB()
+	if not DB then return end
+	
+	DB:Set("accordionGroups", checked)
 	
 	if BetterFriendsFrame_UpdateDisplay then
 		BetterFriendsFrame_UpdateDisplay()

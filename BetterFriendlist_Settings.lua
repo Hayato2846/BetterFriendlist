@@ -244,6 +244,14 @@ Settings:OnSortByStatusChanged(checked)
 end
 end
 
+-- Accordion Groups toggle
+function BetterFriendlistSettings_OnAccordionGroupsChanged(checked)
+local Settings = GetSettings()
+if Settings then
+Settings:OnAccordionGroupsChanged(checked)
+end
+end
+
 --------------------------------------------------------------------------
 -- STATIC POPUP DIALOGS
 --------------------------------------------------------------------------

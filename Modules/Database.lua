@@ -24,6 +24,7 @@ local defaults = {
 	showMobileText = false, -- Add "(Mobile)" text to mobile/app friends (default: OFF)
 	hideMaxLevel = false, -- Hide level display for max level characters (default: OFF)
 	sortByStatus = false, -- Sort online friends first (default: OFF)
+	accordionGroups = false, -- Only allow one group to be open at a time (default: OFF)
 	-- Debug Settings
 	debugPrintEnabled = false, -- Toggle debug prints with /bfl debug print
 	version = BFL.Version
