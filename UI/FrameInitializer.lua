@@ -104,6 +104,22 @@ end
 -- SORT DROPDOWN INITIALIZATION
 --------------------------------------------------------------------------
 
+-- Sort mode icons
+local SORT_ICONS = {
+	status = "Interface\\FriendsFrame\\StatusIcon-Online",      -- Online status icon
+	name = "Interface\\COMMON\\VOICECHAT-SPEAKER",              -- ABC/speaker icon
+	level = "Interface\\TARGETINGFRAME\\UI-TargetingFrame-Skull", -- Skull for level
+	zone = "Interface\\MINIMAP\\TRACKING\\None"                  -- Map marker for zone
+}
+
+-- Sort mode display names
+local SORT_NAMES = {
+	status = "Status",
+	name = "Name",
+	level = "Level",
+	zone = "Zone"
+}
+
 function FrameInitializer:InitializeSortDropdown(frame)
 	if not frame or not frame.FriendsTabHeader or not frame.FriendsTabHeader.SortDropdown then return end
 	
@@ -128,34 +144,39 @@ function FrameInitializer:InitializeSortDropdown(frame)
 		radio:SetResponder(SetSelected)
 	end
 	
-	dropdown:SetWidth(120)
+	-- Narrower width to match QuickFilters style
+	dropdown:SetWidth(51)
+	
 	dropdown:SetupMenu(function(dropdown, rootDescription)
 		rootDescription:SetTag("MENU_FRIENDS_SORT")
 		
-		CreateRadio(rootDescription, "Sort by Status", "status")
-		CreateRadio(rootDescription, "Sort by Name", "name")
-		CreateRadio(rootDescription, "Sort by Level", "level")
-		CreateRadio(rootDescription, "Sort by Zone", "zone")
+		-- Format for icon + text in menu
+		local optionText = "\124T%s:16:16:0:0\124t %s"
+		
+		-- Create sort options with icons
+		local statusText = string.format(optionText, SORT_ICONS.status, "Sort by Status")
+		CreateRadio(rootDescription, statusText, "status")
+		
+		local nameText = string.format(optionText, SORT_ICONS.name, "Sort by Name")
+		CreateRadio(rootDescription, nameText, "name")
+		
+		local levelText = string.format(optionText, SORT_ICONS.level, "Sort by Level")
+		CreateRadio(rootDescription, levelText, "level")
+		
+		local zoneText = string.format(optionText, SORT_ICONS.zone, "Sort by Zone")
+		CreateRadio(rootDescription, zoneText, "zone")
 	end)
 	
+	-- SetSelectionTranslator: Show icon only (like QuickFilters)
 	dropdown:SetSelectionTranslator(function(selection)
-		if selection.data == "status" then
-			return "Sort: Status"
-		elseif selection.data == "name" then
-			return "Sort: Name"
-		elseif selection.data == "level" then
-			return "Sort: Level"
-		elseif selection.data == "zone" then
-			return "Sort: Zone"
-		end
-		return "Sort"
+		return string.format("\124T%s:16:16:0:0\124t", SORT_ICONS[selection.data])
 	end)
 	
 	-- Set up tooltip
 	dropdown:SetScript("OnEnter", function()
-		GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT")
-		GameTooltip:SetText("Sort Friends List")
-		GameTooltip:AddLine("Choose how to sort your friends list", 1, 1, 1)
+		local sortName = SORT_NAMES[currentSortMode] or "Status"
+		GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
+		GameTooltip:SetText("Sort: " .. sortName)
 		GameTooltip:Show()
 	end)
 	dropdown:SetScript("OnLeave", GameTooltip_Hide)
