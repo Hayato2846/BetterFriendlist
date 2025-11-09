@@ -388,6 +388,21 @@ function Settings:LoadSettings()
 			appearanceTab.HideEmptyGroups:SetChecked(value)
 		end
 		
+		if appearanceTab.ShowFactionIcons then
+			local value = DB:Get("showFactionIcons", false)
+			appearanceTab.ShowFactionIcons:SetChecked(value)
+		end
+		
+		if appearanceTab.ShowRealmName then
+			local value = DB:Get("showRealmName", false)
+			appearanceTab.ShowRealmName:SetChecked(value)
+		end
+		
+		if appearanceTab.GrayOtherFaction then
+			local value = DB:Get("grayOtherFaction", false)
+			appearanceTab.GrayOtherFaction:SetChecked(value)
+		end
+		
 		if appearanceTab.CompactMode then
 			local value = DB:Get("compactMode", false)
 			appearanceTab.CompactMode:SetChecked(value)
@@ -466,6 +481,9 @@ function Settings:DoReset()
 	DB:Set("fontSize", "normal")
 	DB:Set("colorClassNames", true)
 	DB:Set("hideEmptyGroups", false)
+	DB:Set("showFactionIcons", false)
+	DB:Set("showRealmName", false)
+	DB:Set("grayOtherFaction", false)
 	
 	self:LoadSettings()
 	
@@ -1447,6 +1465,42 @@ function Settings:OnHideEmptyGroupsChanged(checked)
 	if not DB then return end
 	
 	DB:Set("hideEmptyGroups", checked)
+	
+	if BetterFriendsFrame_UpdateDisplay then
+		BetterFriendsFrame_UpdateDisplay()
+	end
+end
+
+-- Show Faction Icons toggle
+function Settings:OnShowFactionIconsChanged(checked)
+	local DB = GetDB()
+	if not DB then return end
+	
+	DB:Set("showFactionIcons", checked)
+	
+	if BetterFriendsFrame_UpdateDisplay then
+		BetterFriendsFrame_UpdateDisplay()
+	end
+end
+
+-- Show Realm Name toggle
+function Settings:OnShowRealmNameChanged(checked)
+	local DB = GetDB()
+	if not DB then return end
+	
+	DB:Set("showRealmName", checked)
+	
+	if BetterFriendsFrame_UpdateDisplay then
+		BetterFriendsFrame_UpdateDisplay()
+	end
+end
+
+-- Gray Other Faction toggle
+function Settings:OnGrayOtherFactionChanged(checked)
+	local DB = GetDB()
+	if not DB then return end
+	
+	DB:Set("grayOtherFaction", checked)
 	
 	if BetterFriendsFrame_UpdateDisplay then
 		BetterFriendsFrame_UpdateDisplay()

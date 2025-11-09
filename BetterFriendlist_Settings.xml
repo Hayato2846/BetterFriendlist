@@ -228,10 +228,84 @@
 									</Scripts>
 								</CheckButton>
 								
+								<!-- Show Faction Icons Checkbox -->\n\t\t\t\t\t\t<CheckButton parentKey="ShowFactionIcons" inherits="UICheckButtonTemplate">
+									<Anchors>
+										<Anchor point="TOPLEFT" relativeKey="$parent.HideEmptyGroups" relativePoint="BOTTOMLEFT" x="0" y="-10" />
+									</Anchors>
+									<Scripts>
+										<OnLoad>
+											self.text:SetText("Show faction icons")
+											self.text:SetFontObject("GameFontHighlight")
+										</OnLoad>
+										<OnClick>
+											BetterFriendlistSettings_OnShowFactionIconsChanged(self:GetChecked())
+										</OnClick>
+										<OnEnter>
+											GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+											GameTooltip:SetText("Show Faction Icons", 1, 1, 1)
+											GameTooltip:AddLine("Display Alliance/Horde icons next to character names", 0.8, 0.8, 0.8, true)
+											GameTooltip:Show()
+										</OnEnter>
+										<OnLeave>
+											GameTooltip:Hide()
+										</OnLeave>
+									</Scripts>
+								</CheckButton>
+								
+								<!-- Show Realm Name Checkbox -->
+								<CheckButton parentKey="ShowRealmName" inherits="UICheckButtonTemplate">
+									<Anchors>
+										<Anchor point="TOPLEFT" relativeKey="$parent.ShowFactionIcons" relativePoint="BOTTOMLEFT" x="0" y="-10" />
+									</Anchors>
+									<Scripts>
+										<OnLoad>
+											self.text:SetText("Show realm name for cross-realm friends")
+											self.text:SetFontObject("GameFontHighlight")
+										</OnLoad>
+										<OnClick>
+											BetterFriendlistSettings_OnShowRealmNameChanged(self:GetChecked())
+										</OnClick>
+										<OnEnter>
+											GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+											GameTooltip:SetText("Show Realm Name", 1, 1, 1)
+											GameTooltip:AddLine("Display the realm name for friends on different servers", 0.8, 0.8, 0.8, true)
+											GameTooltip:Show()
+										</OnEnter>
+										<OnLeave>
+											GameTooltip:Hide()
+										</OnLeave>
+									</Scripts>
+								</CheckButton>
+								
+								<!-- Gray Other Faction Checkbox -->
+								<CheckButton parentKey="GrayOtherFaction" inherits="UICheckButtonTemplate">
+									<Anchors>
+										<Anchor point="TOPLEFT" relativeKey="$parent.ShowRealmName" relativePoint="BOTTOMLEFT" x="0" y="-10" />
+									</Anchors>
+									<Scripts>
+										<OnLoad>
+											self.text:SetText("Gray out opposite faction")
+											self.text:SetFontObject("GameFontHighlight")
+										</OnLoad>
+										<OnClick>
+											BetterFriendlistSettings_OnGrayOtherFactionChanged(self:GetChecked())
+										</OnClick>
+										<OnEnter>
+											GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+											GameTooltip:SetText("Gray Out Other Faction", 1, 1, 1)
+											GameTooltip:AddLine("Make friends from the opposite faction appear grayed out", 0.8, 0.8, 0.8, true)
+											GameTooltip:Show()
+										</OnEnter>
+										<OnLeave>
+											GameTooltip:Hide()
+										</OnLeave>
+									</Scripts>
+								</CheckButton>
+								
 								<!-- Compact Mode Checkbox - Modern -->
 								<CheckButton parentKey="CompactMode" inherits="UICheckButtonTemplate">
 									<Anchors>
-										<Anchor point="TOPLEFT" relativeKey="$parent.HideEmptyGroups" relativePoint="BOTTOMLEFT" x="0" y="-10" />
+										<Anchor point="TOPLEFT" relativeKey="$parent.GrayOtherFaction" relativePoint="BOTTOMLEFT" x="0" y="-10" />
 									</Anchors>
 									<Scripts>
 										<OnLoad>

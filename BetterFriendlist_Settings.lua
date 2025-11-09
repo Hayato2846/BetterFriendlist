@@ -188,6 +188,30 @@ Settings:OnHideEmptyGroupsChanged(checked)
 end
 end
 
+-- Show Faction Icons toggle
+function BetterFriendlistSettings_OnShowFactionIconsChanged(checked)
+local Settings = GetSettings()
+if Settings then
+Settings:OnShowFactionIconsChanged(checked)
+end
+end
+
+-- Show Realm Name toggle
+function BetterFriendlistSettings_OnShowRealmNameChanged(checked)
+local Settings = GetSettings()
+if Settings then
+Settings:OnShowRealmNameChanged(checked)
+end
+end
+
+-- Gray Other Faction toggle
+function BetterFriendlistSettings_OnGrayOtherFactionChanged(checked)
+local Settings = GetSettings()
+if Settings then
+Settings:OnGrayOtherFactionChanged(checked)
+end
+end
+
 --------------------------------------------------------------------------
 -- STATIC POPUP DIALOGS
 --------------------------------------------------------------------------

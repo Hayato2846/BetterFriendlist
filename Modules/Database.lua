@@ -17,6 +17,9 @@ local defaults = {
 	fontSize = "normal", -- "small", "normal", "large"
 	colorClassNames = true, -- Color character names by class (default: ON)
 	hideEmptyGroups = false, -- Hide groups with no online friends (default: OFF)
+	showFactionIcons = false, -- Show faction icons next to character names (default: OFF)
+	showRealmName = false, -- Show realm name for cross-realm friends (default: OFF)
+	grayOtherFaction = false, -- Gray out friends from other faction (default: OFF)
 	-- Debug Settings
 	debugPrintEnabled = false, -- Toggle debug prints with /bfl debug print
 	version = BFL.Version

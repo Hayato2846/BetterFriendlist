@@ -1188,9 +1188,22 @@ function FriendsList:RenderDisplay()
 				-- Line 1: BattleNet Name (CharacterName)
 				-- BattleNet Name in blue/cyan Battle.net color, CharacterName in class color
 				local line1Text = ""
+				local playerFactionGroup = UnitFactionGroup("player")
+				local grayOtherFaction = GetDB():Get("grayOtherFaction", false)
+				local showFactionIcons = GetDB():Get("showFactionIcons", false)
+				local showRealmName = GetDB():Get("showRealmName", false)
+				
 				if friend.connected then
-					-- Use Battle.net blue color for the account name
-					line1Text = "|cff00ccff" .. displayName .. "|r"
+					-- Check if friend is from opposite faction
+					local isOppositeFaction = friend.factionName and friend.factionName ~= playerFactionGroup and friend.factionName ~= ""
+					local shouldGray = grayOtherFaction and isOppositeFaction
+					
+					-- Use Battle.net blue color for the account name (or gray if opposite faction)
+					if shouldGray then
+						line1Text = "|cff808080" .. displayName .. "|r"
+					else
+						line1Text = "|cff00ccff" .. displayName .. "|r"
+					end
 					
 					if friend.characterName and friend.className then
 						-- Add Timerunning icon if applicable
@@ -1199,10 +1212,27 @@ function FriendsList:RenderDisplay()
 							characterName = TimerunningUtil.AddSmallIcon(characterName)
 						end
 						
+						-- Add faction icon if enabled
+						if showFactionIcons and friend.factionName then
+							if friend.factionName == "Horde" then
+								characterName = "|TInterface\\FriendsFrame\\PlusManz-Horde:14:14:0:0|t" .. characterName
+							elseif friend.factionName == "Alliance" then
+								characterName = "|TInterface\\FriendsFrame\\PlusManz-Alliance:14:14:0:0|t" .. characterName
+							end
+						end
+						
+						-- Add realm name if enabled and available
+						if showRealmName and friend.realmName and friend.realmName ~= "" then
+							local playerRealm = GetRealmName()
+							if friend.realmName ~= playerRealm then
+								characterName = characterName .. " - " .. friend.realmName
+							end
+						end
+						
 						-- Check if class coloring is enabled
 						local useClassColor = GetDB():Get("colorClassNames", true)
 						
-						if useClassColor then
+						if useClassColor and not shouldGray then
 							-- Convert localized class name to English uppercase key for RAID_CLASS_COLORS
 							local classFile = nil
 							for i = 1, GetNumClasses() do
@@ -1222,8 +1252,12 @@ function FriendsList:RenderDisplay()
 								line1Text = line1Text .. " (" .. characterName .. ")"
 							end
 						else
-							-- No class coloring - just show character name
-							line1Text = line1Text .. " (" .. characterName .. ")"
+							-- No class coloring or opposite faction gray - just show character name
+							if shouldGray then
+								line1Text = line1Text .. " (|cff808080" .. characterName .. "|r)"
+							else
+								line1Text = line1Text .. " (" .. characterName .. ")"
+							end
 						end
 					end
 				else
@@ -1307,13 +1341,50 @@ function FriendsList:RenderDisplay()
 				
 			-- Line 1: Character Name (in class color if enabled)
 			local line1Text = ""
+			local playerFactionGroup = UnitFactionGroup("player")
+			local grayOtherFaction = GetDB():Get("grayOtherFaction", false)
+			local showFactionIcons = GetDB():Get("showFactionIcons", false)
+			local showRealmName = GetDB():Get("showRealmName", false)
+			
 			if friend.connected then
+				-- Check if friend is from opposite faction
+				local isOppositeFaction = friend.factionName and friend.factionName ~= playerFactionGroup and friend.factionName ~= ""
+				local shouldGray = grayOtherFaction and isOppositeFaction
+				
+				local characterName = friend.name
+				
+				-- Add faction icon if enabled
+				if showFactionIcons and friend.factionName then
+					if friend.factionName == "Horde" then
+						characterName = "|TInterface\\FriendsFrame\\PlusManz-Horde:14:14:0:0|t" .. characterName
+					elseif friend.factionName == "Alliance" then
+						characterName = "|TInterface\\FriendsFrame\\PlusManz-Alliance:14:14:0:0|t" .. characterName
+					end
+				end
+				
+				-- Add realm name if enabled and available
+				if showRealmName and friend.realmName and friend.realmName ~= "" then
+					local playerRealm = GetRealmName()
+					if friend.realmName ~= playerRealm then
+						characterName = characterName .. " - " .. friend.realmName
+					end
+				end
+				
 				local useClassColor = GetDB():Get("colorClassNames", true)
-				local classColor = useClassColor and RAID_CLASS_COLORS[friend.className]
-				if classColor then
-					line1Text = "|c" .. (classColor.colorStr or "ffffffff") .. friend.name .. "|r"
+				
+				if useClassColor and not shouldGray then
+					local classColor = RAID_CLASS_COLORS[friend.className]
+					if classColor then
+						line1Text = "|c" .. (classColor.colorStr or "ffffffff") .. characterName .. "|r"
+					else
+						line1Text = characterName
+					end
 				else
-					line1Text = friend.name
+					if shouldGray then
+						line1Text = "|cff808080" .. characterName .. "|r"
+					else
+						line1Text = characterName
+					end
 				end
 			else
 				-- Offline - gray
