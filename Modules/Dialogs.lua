@@ -196,7 +196,11 @@ function Dialogs:RegisterDialogs()
 		button1 = "Delete",
 		button2 = "Cancel",
 		OnAccept = function(self, data)
-			BetterFriendsList_DeleteGroup(data)
+			local groupId = data
+			local FriendsList = BFL:GetModule("FriendsList")
+			if FriendsList then
+				FriendsList:DeleteGroup(groupId)
+			end
 		end,
 		timeout = 0,
 		whileDead = true,

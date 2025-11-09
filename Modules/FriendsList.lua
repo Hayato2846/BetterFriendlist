@@ -591,6 +591,7 @@ function FriendsList:DeleteGroup(groupId)
 	if success then
 		self:SyncGroups()
 		self:BuildDisplayList()
+		self:RenderDisplay()
 	end
 	
 	return success, err
