@@ -30,6 +30,8 @@ SETTINGS_*.md
 TESTING_*.md
 PHASE_*.md
 QUICKJOIN_*.md
+SETUP_ANLEITUNG.md
+README_BBCODE.txt
 
 # Build and package files
 *.zip
