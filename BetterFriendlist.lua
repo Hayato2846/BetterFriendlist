@@ -58,6 +58,17 @@ local currentSortMode = "status" -- Default: status, name, level, zone
 -- Quick filter state (session-only, not persistent)
 local filterMode = "all" -- Options: "all", "online", "wow", "bnet", "offline"
 
+-- Load filter mode from database
+local function LoadFilterMode()
+	local DB = BFL:GetModule("DB")
+	if DB then
+		local db = DB:Get()
+		if db and db.quickFilter then
+			filterMode = db.quickFilter
+		end
+	end
+end
+
 -- Button types (matching FriendsList module constants)
 local BUTTON_TYPE_FRIEND = 1
 local BUTTON_TYPE_GROUP_HEADER = 2
@@ -233,7 +244,8 @@ local function UpdateFriendsList()
 		-- Set search and filter from local state
 		FriendsList:SetSearchText(searchText)
 		FriendsList:SetFilterMode(filterMode)
-		FriendsList:SetSortMode(currentSortMode)
+		-- DON'T override sortMode - it's managed internally by FriendsList module
+		-- FriendsList:SetSortMode(currentSortMode)
 		
 		-- Update and build display list
 		FriendsList:UpdateFriendsList()
@@ -288,7 +300,11 @@ function BetterFriendsFrame_InitQuickFilterDropdown()
 	
 	-- Helper function to check if a filter mode is selected
 	local function IsSelected(mode)
-		return filterMode == mode
+		-- Always read from DB when checking selection
+		local DB = BFL:GetModule("DB")
+		local db = DB and DB:Get() or {}
+		local currentFilter = db.quickFilter or filterMode or "all"
+		return currentFilter == mode
 	end
 	
 	-- Helper function to set the filter mode
@@ -361,6 +377,13 @@ end
 -- Set the quick filter mode
 function BetterFriendsFrame_SetQuickFilter(mode)
 	filterMode = mode
+	
+	-- Save to database
+	local DB = BFL:GetModule("DB")
+	if DB then
+		local db = DB:Get()
+		db.quickFilter = filterMode
+	end
 	
 	-- Update FriendsList module with new filter
 	local FriendsList = GetFriendsList()
@@ -536,13 +559,14 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		if addonName == "BetterFriendlist" then
 			-- Note: Version print is in Core.lua ADDON_LOADED handler (prevents duplicate)
 			
-			-- Initialize menu system
-			InitializeMenuSystem()
-			
-			-- Sync groups from module (if available)
-			SyncGroups()
-			
-			-- Initialize saved variables (fallback if modules not used)
+		-- Initialize menu system
+		InitializeMenuSystem()
+		
+		-- Load saved filter mode from database
+		LoadFilterMode()
+		
+		-- Sync groups from module (if available)
+		SyncGroups()			-- Initialize saved variables (fallback if modules not used)
 			BetterFriendlistDB = BetterFriendlistDB or {}
 			BetterFriendlistDB.groupStates = BetterFriendlistDB.groupStates or {}
 			BetterFriendlistDB.customGroups = BetterFriendlistDB.customGroups or {}
@@ -968,7 +992,13 @@ end
 function BetterFriendlist_SetSortMethod(method)
 	if not method then return end
 	
-	-- Store the sort method
+	-- Update FriendsList module
+	local FriendsList = BFL and BFL:GetModule("FriendsList")
+	if FriendsList then
+		FriendsList:SetSortMode(method)
+	end
+	
+	-- Also store in legacy global for backwards compatibility
 	currentSortMethod = method
 	
 	-- Switch back to Friends tab and update tab selection

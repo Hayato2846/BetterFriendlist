@@ -309,7 +309,7 @@
 									</Anchors>
 									<Scripts>
 									<OnLoad>
-										self.text:SetText("Show mobile/BSAp friends as AFK")
+										self.text:SetText("Show mobile friends as AFK")
 										self.text:SetFontObject("GameFontHighlight")
 									</OnLoad>
 									<OnClick>

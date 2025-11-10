@@ -20,9 +20,14 @@ local defaults = {
 	showFactionIcons = false, -- Show faction icons next to character names (default: OFF)
 	showRealmName = false, -- Show realm name for cross-realm friends (default: OFF)
 	grayOtherFaction = false, -- Gray out friends from other faction (default: OFF)
-	showMobileAsAFK = false, -- Show mobile/BSAp friends with AFK status icon (default: OFF)
+	showMobileAsAFK = false, -- Show mobile friends with AFK status icon (default: OFF)
 	hideMaxLevel = false, -- Hide level display for max level characters (default: OFF)
 	accordionGroups = false, -- Only allow one group to be open at a time (default: OFF)
+	-- Sort Settings
+	primarySort = "status", -- Primary sort method: status, name, level, zone (default: status)
+	secondarySort = "name", -- Secondary sort method: none, name, level, zone (default: name)
+	-- Filter Settings
+	quickFilter = "all", -- Quick filter mode: all, online, offline, wow, bnet (default: all)
 	-- Debug Settings
 	debugPrintEnabled = false, -- Toggle debug prints with /bfl debug print
 	version = BFL.Version
@@ -55,6 +60,11 @@ end
 
 -- Get a value from the database
 function DB:Get(key, default)
+	-- If no key provided, return entire database
+	if key == nil then
+		return BetterFriendlistDB
+	end
+	
 	if BetterFriendlistDB[key] ~= nil then
 		return BetterFriendlistDB[key]
 	end

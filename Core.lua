@@ -5,7 +5,7 @@
 
 -- Create addon namespace
 local ADDON_NAME, BFL = ...
-BFL.Version = "1.0"
+BFL.Version = "1.2.5-alpha"
 
 -- Module registry
 BFL.Modules = {}

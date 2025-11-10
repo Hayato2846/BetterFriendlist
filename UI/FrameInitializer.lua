@@ -106,10 +106,11 @@ end
 
 -- Sort mode icons
 local SORT_ICONS = {
-	status = "Interface\\FriendsFrame\\StatusIcon-Online",      -- Online status icon
-	name = "Interface\\COMMON\\VOICECHAT-SPEAKER",              -- ABC/speaker icon
-	level = "Interface\\TARGETINGFRAME\\UI-TargetingFrame-Skull", -- Skull for level
-	zone = "Interface\\MINIMAP\\TRACKING\\None"                  -- Map marker for zone
+	status = "Interface\\FriendsFrame\\StatusIcon-Online",      -- Green dot for online status
+	name = "Interface\\BUTTONS\\UI-GuildButton-PublicNote-Up",  -- Note/text icon for name
+	level = "Interface\\BUTTONS\\UI-MicroStream-Yellow",        -- Level up arrow for level
+	zone = "Interface\\WORLDMAP\\UI-World-Icon",                -- World map icon for zone
+	none = "Interface\\BUTTONS\\UI-GroupLoot-Pass-Up"           -- X icon for none
 }
 
 -- Sort mode display names
@@ -182,6 +183,134 @@ function FrameInitializer:InitializeSortDropdown(frame)
 	dropdown:SetScript("OnLeave", GameTooltip_Hide)
 end
 
+-- Initialize primary and secondary sort dropdowns
+function FrameInitializer:InitializeSortDropdowns(frame)
+	if not frame or not frame.FriendsTabHeader then return end
+	
+	local header = frame.FriendsTabHeader
+	if not header.PrimarySortDropdown or not header.SecondarySortDropdown then return end
+	
+	-- Initialize Primary Sort Dropdown
+	local primaryDropdown = header.PrimarySortDropdown
+	local FriendsList = BFL:GetModule("FriendsList")
+	if not FriendsList then return end
+	
+	local function IsPrimarySelected(sortMode)
+		-- Always read from DB when checking selection
+		local DB = BFL:GetModule("DB")
+		local db = DB and DB:Get() or {}
+		local currentSort = db.primarySort or FriendsList.sortMode or "status"
+		return currentSort == sortMode
+	end
+	
+	local function SetPrimarySelected(sortMode)
+		FriendsList:SetSortMode(sortMode)
+		FriendsList:RenderDisplay()
+	end
+	
+	local function CreatePrimaryRadio(rootDescription, text, sortMode)
+		local radio = rootDescription:CreateButton(text, function() end, sortMode)
+		radio:SetIsSelected(IsPrimarySelected)
+		radio:SetResponder(SetPrimarySelected)
+	end
+	
+	primaryDropdown:SetupMenu(function(dropdown, rootDescription)
+		rootDescription:SetTag("MENU_FRIENDS_PRIMARY_SORT")
+		
+		-- Format: icon + text in menu
+		local optionText = "\124T%s:16:16:0:0\124t %s"
+		
+		local statusText = string.format(optionText, SORT_ICONS.status, "Sort by Status")
+		CreatePrimaryRadio(rootDescription, statusText, "status")
+		
+		local nameText = string.format(optionText, SORT_ICONS.name, "Sort by Name")
+		CreatePrimaryRadio(rootDescription, nameText, "name")
+		
+		local levelText = string.format(optionText, SORT_ICONS.level, "Sort by Level")
+		CreatePrimaryRadio(rootDescription, levelText, "level")
+		
+		local zoneText = string.format(optionText, SORT_ICONS.zone, "Sort by Zone")
+		CreatePrimaryRadio(rootDescription, zoneText, "zone")
+	end)
+	
+	-- Show icon only (like QuickFilters)
+	primaryDropdown:SetSelectionTranslator(function(selection)
+		return string.format("\124T%s:16:16:0:0\124t", SORT_ICONS[selection.data])
+	end)
+	
+	-- Generate menu once to trigger initial selection display
+	primaryDropdown:GenerateMenu()
+	
+	primaryDropdown:SetScript("OnEnter", function()
+		local sortName = SORT_NAMES[FriendsList.sortMode] or "Status"
+		GameTooltip:SetOwner(primaryDropdown, "ANCHOR_RIGHT")
+		GameTooltip:SetText("Primary Sort: " .. sortName)
+		GameTooltip:AddLine("Main sorting criterion for friends list.", 1, 1, 1, true)
+		GameTooltip:Show()
+	end)
+	primaryDropdown:SetScript("OnLeave", GameTooltip_Hide)
+	
+	-- Initialize Secondary Sort Dropdown
+	local secondaryDropdown = header.SecondarySortDropdown
+	
+	local function IsSecondarySelected(sortMode)
+		-- Always read from DB when checking selection
+		local DB = BFL:GetModule("DB")
+		local db = DB and DB:Get() or {}
+		local currentSort = db.secondarySort or FriendsList.secondarySort or "name"
+		return currentSort == sortMode
+	end
+	
+	local function SetSecondarySelected(sortMode)
+		FriendsList:SetSecondarySortMode(sortMode)
+		FriendsList:RenderDisplay()
+	end
+	
+	local function CreateSecondaryRadio(rootDescription, text, sortMode)
+		local radio = rootDescription:CreateButton(text, function() end, sortMode)
+		radio:SetIsSelected(IsSecondarySelected)
+		radio:SetResponder(SetSecondarySelected)
+	end
+	
+	secondaryDropdown:SetupMenu(function(dropdown, rootDescription)
+		rootDescription:SetTag("MENU_FRIENDS_SECONDARY_SORT")
+		
+		-- Format: icon + text in menu
+		local optionText = "\124T%s:16:16:0:0\124t %s"
+		
+		-- None option with X icon
+		local noneText = string.format(optionText, SORT_ICONS.none, "None")
+		CreateSecondaryRadio(rootDescription, noneText, "none")
+		
+		local nameText = string.format(optionText, SORT_ICONS.name, "then by Name")
+		CreateSecondaryRadio(rootDescription, nameText, "name")
+		
+		local levelText = string.format(optionText, SORT_ICONS.level, "then by Level")
+		CreateSecondaryRadio(rootDescription, levelText, "level")
+		
+		local zoneText = string.format(optionText, SORT_ICONS.zone, "then by Zone")
+		CreateSecondaryRadio(rootDescription, zoneText, "zone")
+	end)
+	
+	-- Show icon only (X for none, sort icons for others)
+	secondaryDropdown:SetSelectionTranslator(function(selection)
+		local iconPath = SORT_ICONS[selection.data] or SORT_ICONS.name
+		return string.format("\124T%s:16:16:0:0\124t", iconPath)
+	end)
+	
+	-- Generate menu once to trigger initial selection display
+	secondaryDropdown:GenerateMenu()
+	
+	secondaryDropdown:SetScript("OnEnter", function()
+		local sortName = FriendsList.secondarySort == "none" and "None" or (SORT_NAMES[FriendsList.secondarySort] or "Name")
+		GameTooltip:SetOwner(secondaryDropdown, "ANCHOR_RIGHT")
+		GameTooltip:SetText("Secondary Sort: " .. sortName)
+		GameTooltip:AddLine("Sort by this when primary values are equal.", 1, 1, 1, true)
+		GameTooltip:Show()
+	end)
+	secondaryDropdown:SetScript("OnLeave", GameTooltip_Hide)
+end
+
 -- Get current sort mode (for external access)
 function FrameInitializer:GetSortMode()
 	return currentSortMode
@@ -199,8 +328,8 @@ end
 function FrameInitializer:InitializeTabs(frame)
 	if not frame or not frame.FriendsTabHeader then return end
 	
-	-- Set up the tabs on the FriendsTabHeader (11.2.5: 4 tabs - Friends, Recent Allies, RAF, Sort)
-	PanelTemplates_SetNumTabs(frame.FriendsTabHeader, 4)
+	-- Set up the tabs on the FriendsTabHeader (11.2.5: 3 tabs - Friends, Recent Allies, RAF. Sort tab removed.)
+	PanelTemplates_SetNumTabs(frame.FriendsTabHeader, 3)
 	PanelTemplates_SetTab(frame.FriendsTabHeader, 1)
 	PanelTemplates_UpdateTabs(frame.FriendsTabHeader)
 end
@@ -339,6 +468,7 @@ function FrameInitializer:Initialize(frame)
 	
 	self:InitializeStatusDropdown(frame)
 	self:InitializeSortDropdown(frame)
+	self:InitializeSortDropdowns(frame)
 	self:InitializeTabs(frame)
 	self:InitializeBattlenetFrame(frame)
 	

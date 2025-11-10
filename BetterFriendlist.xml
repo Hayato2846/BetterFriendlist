@@ -889,11 +889,17 @@
 					<Anchors>
 						<Anchor point="TOPLEFT" x="-5" y="7" />
 					</Anchors>
-					<!-- Zoom: Crop 20% from each side (0.2 to 0.8) -->
-					<TexCoords left="0.2" right="0.8" top="0.2" bottom="0.8"/>
-					<!-- Circular mask for rounded appearance -->
-					<MaskTexture file="Interface\CharacterFrame\TempPortraitAlphaMask" hWrapMode="CLAMPTOBLACKADDITIVE" vWrapMode="CLAMPTOBLACKADDITIVE"/>
+					<TexCoords left="0.08" right="0.92" top="0.08" bottom="0.92"/>
 				</Texture>
+				<MaskTexture parentKey="PortraitMask" file="Interface\CharacterFrame\TempPortraitAlphaMask" hWrapMode="CLAMPTOBLACKADDITIVE" vWrapMode="CLAMPTOBLACKADDITIVE">
+					<Size x="60" y="60" />
+					<Anchors>
+						<Anchor point="TOPLEFT" x="-5" y="7" />
+					</Anchors>
+					<MaskedTextures>
+						<MaskedTexture childKey="PortraitIcon"/>
+					</MaskedTextures>
+				</MaskTexture>
 			</Layer>
 		</Layers>
 		<Frames>
@@ -1117,7 +1123,7 @@
 					<KeyValues>
 						<KeyValue key="instructionText" value="Search friends..." type="string"/>
 					</KeyValues>
-					<Size x="320" y="28"/>
+					<Size x="220" y="28"/>
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeKey="$parent.$parent.Inset" x="10" y="60"/>
 					</Anchors>
@@ -1143,6 +1149,23 @@
 					<Anchor point="LEFT" relativeKey="$parent.SearchBox" relativePoint="RIGHT" x="5" y="0"/>
 				</Anchors>
 			</DropdownButton>
+
+		
+		<!-- Primary Sort Dropdown (Icon-Only, right of QuickFilter) -->
+		<DropdownButton parentKey="PrimarySortDropdown" inherits="WowStyle1DropdownTemplate">
+			<Size x="51" y="24"/>
+			<Anchors>
+				<Anchor point="LEFT" relativeKey="$parent.QuickFilterDropdown" relativePoint="RIGHT" x="5" y="0"/>
+			</Anchors>
+		</DropdownButton>
+		
+		<!-- Secondary Sort Dropdown (Icon-Only, right of PrimarySortDropdown) -->
+		<DropdownButton parentKey="SecondarySortDropdown" inherits="WowStyle1DropdownTemplate">
+			<Size x="51" y="24"/>
+			<Anchors>
+				<Anchor point="LEFT" relativeKey="$parent.PrimarySortDropdown" relativePoint="RIGHT" x="5" y="0"/>
+			</Anchors>
+		</DropdownButton>
 						<!-- Tab Buttons (11.2.5: Friends, Recent Allies, Recruit A Friend, Sort) -->
 			<!-- Note: PanelTopTabButtonTemplate is safe now (SecureUnitButtonTemplate was the culprit) -->
 			<Button name="BetterFriendsFrameTab1" parentKey="Tab1" inherits="PanelTopTabButtonTemplate" text="FRIENDS" id="1">
@@ -1172,139 +1195,9 @@
 							</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="BetterFriendsFrameTab4" parentKey="Tab4" inherits="PanelTopTabButtonTemplate" text="SORT" id="4">
-						<Scripts>
-							<OnClick>
-								PanelTemplates_Tab_OnClick(self, self:GetParent())
-								BetterFriendsFrame_ShowTab(4)
-							</OnClick>
-						</Scripts>
-					</Button>				</Frames>
-			</Frame>
-			<!-- Sort Criteria Selection Frame (shown when Sort tab is active) -->
-			<Frame parentKey="SortFrame" hidden="true">
-				<Anchors>
-					<Anchor point="TOPLEFT" relativeKey="$parent.Inset" x="10" y="-10"/>
-					<Anchor point="BOTTOMRIGHT" relativeKey="$parent.Inset" x="-10" y="10"/>
-				</Anchors>
-				<Layers>
-					<Layer level="BACKGROUND">
-						<Texture setAllPoints="true">
-							<Color r="0" g="0" b="0" a="0.5"/>
-						</Texture>
-					</Layer>
-					<Layer level="ARTWORK">
-						<FontString parentKey="Title" inherits="GameFontNormalLarge" text="Sort Friends By">
-							<Anchors>
-								<Anchor point="TOP" x="0" y="-20"/>
-							</Anchors>
-							<Color r="1" g="0.82" b="0"/>
-						</FontString>
-					</Layer>
-				</Layers>
-				<Frames>
-					<!-- Sort by Status -->
-					<Button parentKey="StatusButton" inherits="UIPanelButtonTemplate" text="Status">
-						<Size x="200" y="30"/>
-						<Anchors>
-							<Anchor point="TOP" x="0" y="-60"/>
-						</Anchors>
-						<Scripts>
-							<OnClick>
-								BetterFriendlist_SetSortMethod("status")
-								BetterFriendsFrame_ShowTab(1)
-							</OnClick>
-							<OnEnter>
-								GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-								GameTooltip:SetText("Sort by Status")
-								GameTooltip:AddLine("Online friends first, then offline", 1, 1, 1, true)
-								GameTooltip:Show()
-							</OnEnter>
-							<OnLeave>
-								GameTooltip:Hide()
-							</OnLeave>
-						</Scripts>
-					</Button>
-					<!-- Sort by Name -->
-					<Button parentKey="NameButton" inherits="UIPanelButtonTemplate" text="Name (A-Z)">
-						<Size x="200" y="30"/>
-						<Anchors>
-							<Anchor point="TOP" relativeKey="$parent.StatusButton" relativePoint="BOTTOM" x="0" y="-10"/>
-						</Anchors>
-						<Scripts>
-							<OnClick>
-								BetterFriendlist_SetSortMethod("name")
-								BetterFriendsFrame_ShowTab(1)
-							</OnClick>
-							<OnEnter>
-								GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-								GameTooltip:SetText("Sort by Name")
-								GameTooltip:AddLine("Alphabetical order (A-Z)", 1, 1, 1, true)
-								GameTooltip:Show()
-							</OnEnter>
-							<OnLeave>
-								GameTooltip:Hide()
-							</OnLeave>
-						</Scripts>
-					</Button>
-					<!-- Sort by Level -->
-					<Button parentKey="LevelButton" inherits="UIPanelButtonTemplate" text="Level">
-						<Size x="200" y="30"/>
-						<Anchors>
-							<Anchor point="TOP" relativeKey="$parent.NameButton" relativePoint="BOTTOM" x="0" y="-10"/>
-						</Anchors>
-						<Scripts>
-							<OnClick>
-								BetterFriendlist_SetSortMethod("level")
-								BetterFriendsFrame_ShowTab(1)
-							</OnClick>
-							<OnEnter>
-								GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-								GameTooltip:SetText("Sort by Level")
-								GameTooltip:AddLine("Highest level first", 1, 1, 1, true)
-								GameTooltip:Show()
-							</OnEnter>
-							<OnLeave>
-								GameTooltip:Hide()
-							</OnLeave>
-						</Scripts>
-					</Button>
-					<!-- Sort by Zone -->
-					<Button parentKey="ZoneButton" inherits="UIPanelButtonTemplate" text="Zone">
-						<Size x="200" y="30"/>
-						<Anchors>
-							<Anchor point="TOP" relativeKey="$parent.LevelButton" relativePoint="BOTTOM" x="0" y="-10"/>
-						</Anchors>
-						<Scripts>
-							<OnClick>
-								BetterFriendlist_SetSortMethod("zone")
-								BetterFriendsFrame_ShowTab(1)
-							</OnClick>
-							<OnEnter>
-								GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-								GameTooltip:SetText("Sort by Zone")
-								GameTooltip:AddLine("Group by current zone/area", 1, 1, 1, true)
-								GameTooltip:Show()
-							</OnEnter>
-							<OnLeave>
-								GameTooltip:Hide()
-							</OnLeave>
-						</Scripts>
-					</Button>
-					<!-- Cancel Button -->
-					<Button parentKey="CancelButton" inherits="UIPanelButtonTemplate" text="Cancel">
-						<Size x="200" y="30"/>
-						<Anchors>
-							<Anchor point="BOTTOM" x="0" y="20"/>
-						</Anchors>
-						<Scripts>
-							<OnClick>
-								BetterFriendsFrame_ShowTab(1)
-							</OnClick>
-						</Scripts>
-					</Button>
 				</Frames>
 			</Frame>
+			
 			<!-- Recruit A Friend Frame (11.2.5: Complete RAF implementation) -->
 			<Frame parentKey="RecruitAFriendFrame" hidden="true">
 				<Anchors>

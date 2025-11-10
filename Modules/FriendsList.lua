@@ -111,6 +111,12 @@ end
 
 -- Initialize the module
 function FriendsList:Initialize()
+	-- Initialize sort modes from database
+	local DB = BFL:GetModule("DB")
+	local db = DB and DB:Get() or {}
+	self.sortMode = db.primarySort or "status"
+	self.secondarySort = db.secondarySort or "name"
+	
 	-- Sync groups from Groups module
 	self:SyncGroups()
 	
@@ -255,79 +261,98 @@ function FriendsList:ApplyFilters()
 	-- Filter will be applied in BuildDisplayList
 end
 
--- Apply sort order to friends list
+-- Apply sort order to friends list (with primary and secondary sort)
 function FriendsList:ApplySort()
-	local sortMode = self.sortMode
+	local primarySort = self.sortMode
+	local secondarySort = self.secondarySort or "name" -- Default secondary: name
 	
 	table.sort(self.friendsList, function(a, b)
-		if sortMode == "status" then
-			-- Sort by online status first (use 'connected' not 'isOnline')
-			local aOnline = (a.type == "bnet" and a.connected) or (a.type == "wow" and a.connected)
-			local bOnline = (b.type == "bnet" and b.connected) or (b.type == "wow" and b.connected)
-			
-			if aOnline ~= bOnline then
-				return aOnline
-			end
-			
-			-- Then by DND/AFK priority
-			local function GetStatusPriority(friend)
-				if not ((friend.type == "bnet" and friend.connected) or (friend.type == "wow" and friend.connected)) then
-					return 3 -- Offline lowest priority
-				end
-				
-				if friend.type == "bnet" and friend.gameAccountInfo then
-					local gameInfo = friend.gameAccountInfo
-					if gameInfo.isDND then return 1 end
-					if gameInfo.isAFK or gameInfo.clientProgram == "BSAp" then return 2 end
-					return 0
-				end
-				
-				return 0
-			end
-			
-			local aPriority = GetStatusPriority(a)
-			local bPriority = GetStatusPriority(b)
-			
-			if aPriority ~= bPriority then
-				return aPriority < bPriority
-			end
-			
-			-- Same status, sort by name
-			local nameA = a.type == "bnet" and (a.accountName or a.battleTag) or a.name
-			local nameB = b.type == "bnet" and (b.accountName or b.battleTag) or b.name
-			return (nameA or ""):lower() < (nameB or ""):lower()
-			
-		elseif sortMode == "name" then
-			local nameA = a.type == "bnet" and (a.accountName or a.battleTag) or a.name
-			local nameB = b.type == "bnet" and (b.accountName or b.battleTag) or b.name
-			return (nameA or ""):lower() < (nameB or ""):lower()
-			
-		elseif sortMode == "level" then
-			local levelA = a.level or 0
-			local levelB = b.level or 0
-			if levelA ~= levelB then
-				return levelA > levelB
-			end
-			local nameA = a.type == "bnet" and (a.accountName or a.battleTag) or a.name
-			local nameB = b.type == "bnet" and (b.accountName or b.battleTag) or b.name
-			return (nameA or ""):lower() < (nameB or ""):lower()
-			
-		elseif sortMode == "zone" then
-			local zoneA = a.areaName or a.area or ""
-			local zoneB = b.areaName or b.area or ""
-			if zoneA ~= zoneB then
-				return zoneA:lower() < zoneB:lower()
-			end
-			local nameA = a.type == "bnet" and (a.accountName or a.battleTag) or a.name
-			local nameB = b.type == "bnet" and (b.accountName or b.battleTag) or b.name
-			return (nameA or ""):lower() < (nameB or ""):lower()
+		-- Apply primary sort first
+		local primaryResult = self:CompareFriends(a, b, primarySort)
+		if primaryResult ~= nil then
+			return primaryResult
 		end
 		
-		-- Default fallback
+		-- If primary sort is equal, use secondary sort
+		if secondarySort and secondarySort ~= "none" and secondarySort ~= primarySort then
+			local secondaryResult = self:CompareFriends(a, b, secondarySort)
+			if secondaryResult ~= nil then
+				return secondaryResult
+			end
+		end
+		
+		-- Fallback: sort by name
 		local nameA = a.type == "bnet" and (a.accountName or a.battleTag) or a.name
 		local nameB = b.type == "bnet" and (b.accountName or b.battleTag) or b.name
 		return (nameA or ""):lower() < (nameB or ""):lower()
 	end)
+end
+
+-- Compare two friends by a specific sort mode (returns true, false, or nil if equal)
+function FriendsList:CompareFriends(a, b, sortMode)
+	if sortMode == "status" then
+		-- Sort by online status first
+		local aOnline = (a.type == "bnet" and a.connected) or (a.type == "wow" and a.connected)
+		local bOnline = (b.type == "bnet" and b.connected) or (b.type == "wow" and b.connected)
+		
+		if aOnline ~= bOnline then
+			return aOnline
+		end
+		
+		-- Then by DND/AFK priority
+		local function GetStatusPriority(friend)
+			if not ((friend.type == "bnet" and friend.connected) or (friend.type == "wow" and friend.connected)) then
+				return 3 -- Offline lowest priority
+			end
+			
+			if friend.type == "bnet" and friend.gameAccountInfo then
+				local gameInfo = friend.gameAccountInfo
+				if gameInfo.isDND then return 1 end
+				if gameInfo.isAFK or gameInfo.clientProgram == "BSAp" then return 2 end
+				return 0
+			end
+			
+			return 0
+		end
+		
+		local aPriority = GetStatusPriority(a)
+		local bPriority = GetStatusPriority(b)
+		
+		if aPriority ~= bPriority then
+			return aPriority < bPriority
+		end
+		
+		-- Equal status - return nil to try secondary sort
+		return nil
+		
+	elseif sortMode == "name" then
+		local nameA = a.type == "bnet" and (a.accountName or a.battleTag) or a.name
+		local nameB = b.type == "bnet" and (b.accountName or b.battleTag) or b.name
+		local aLower, bLower = (nameA or ""):lower(), (nameB or ""):lower()
+		if aLower ~= bLower then
+			return aLower < bLower
+		end
+		return nil
+		
+	elseif sortMode == "level" then
+		local levelA = a.level or 0
+		local levelB = b.level or 0
+		if levelA ~= levelB then
+			return levelA > levelB
+		end
+		return nil
+		
+	elseif sortMode == "zone" then
+		local zoneA = a.areaName or a.area or ""
+		local zoneB = b.areaName or b.area or ""
+		if zoneA ~= zoneB then
+			return zoneA:lower() < zoneB:lower()
+		end
+		return nil
+	end
+	
+	-- Unknown sort mode or equal
+	return nil
 end
 
 -- Build display list with groups and headers
@@ -551,6 +576,29 @@ end
 -- Set sort mode
 function FriendsList:SetSortMode(mode)
 	self.sortMode = mode or "status"
+	
+	-- Save to database
+	local DB = BFL:GetModule("DB")
+	if DB then
+		local db = DB:Get()
+		db.primarySort = self.sortMode
+	end
+	
+	self:ApplySort()
+	self:BuildDisplayList()
+end
+
+-- Set secondary sort mode (for multi-criteria sorting)
+function FriendsList:SetSecondarySortMode(mode)
+	self.secondarySort = mode
+	
+	-- Save to database
+	local DB = BFL:GetModule("DB")
+	if DB then
+		local db = DB:Get()
+		db.secondarySort = self.secondarySort
+	end
+	
 	self:ApplySort()
 	self:BuildDisplayList()
 end
