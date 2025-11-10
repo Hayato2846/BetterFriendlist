@@ -2647,6 +2647,15 @@
 					</Anchors>
 					<Color r="0.486" g="0.518" b="0.541" />
 				</FontString>
+				<!-- Activity tracking (custom element) -->
+				<FontString name="$parentActivity" inherits="FriendsFont_Small" justifyH="LEFT" justifyV="TOP" hidden="true">
+					<Size x="176" y="0"/>
+					<Anchors>
+						<Anchor point="LEFT" x="12" y="0"/>
+						<Anchor point="TOP" relativeTo="$parentLastOnline" relativePoint="BOTTOM" x="0" y="-4"/>
+					</Anchors>
+					<Color r="0.667" g="0.667" b="0.667" />
+				</FontString>
 				<!-- Other game accounts header -->
 				<FontString name="$parentOtherGameAccounts" inherits="FriendsFont_Normal" justifyH="LEFT" text="FRIENDS_LIST_PLAYING" hidden="true">
 					<Anchors>

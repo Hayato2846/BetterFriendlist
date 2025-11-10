@@ -104,14 +104,6 @@ local function GetOrCreateFriendButton(index)
 		
 		local friendGroups = GetFriendGroups()
 		
-		-- Wire OnEnter script to call tooltip function
-		if not button.onEnterSet then
-			button:SetScript("OnEnter", function(self)
-				BetterFriendsList_Button_OnEnter(self)
-			end)
-			button.onEnterSet = true
-		end
-		
 		-- Enable drag for friend buttons
 		button:SetMovable(true)
 		button:RegisterForDrag("LeftButton")

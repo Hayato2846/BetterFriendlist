@@ -7,6 +7,9 @@
 local ADDON_NAME, BFL = ...
 BFL.Version = "1.2.6-alpha"
 
+-- Make BFL globally accessible for tooltip and other legacy files
+_G.BFL = BFL
+
 -- Module registry
 BFL.Modules = {}
 

@@ -245,6 +245,26 @@ function BetterFriendsList_Button_OnEnter(self)
 				text = FriendsFrame_GetLastOnlineText(accountInfo)
 				anchor = BetterFriendsTooltip_SetLine(BetterFriendsTooltipLastOnline, anchor, text, -4)
 			end
+			
+			-- Show last activity for BNet friends
+			if friendData.battleTag then
+				local friendUID = "bnet_" .. friendData.battleTag
+				local ActivityTracker = BFL and BFL:GetModule("ActivityTracker")
+				if ActivityTracker then
+					local lastActivity = ActivityTracker:GetLastActivity(friendUID)
+					if lastActivity then
+						local timeSinceActivity = time() - lastActivity
+						local activityText = "Last contact: " .. SecondsToTime(timeSinceActivity) .. " ago"
+						anchor = BetterFriendsTooltip_SetLine(BetterFriendsTooltipActivity, anchor, activityText, -4)
+					else
+						BetterFriendsTooltipActivity:Hide()
+					end
+				else
+					BetterFriendsTooltipActivity:Hide()
+				end
+			else
+				BetterFriendsTooltipActivity:Hide()
+			end
 		end
 	else
 		-- WoW friend
@@ -275,6 +295,26 @@ function BetterFriendsList_Button_OnEnter(self)
 			BetterFriendsTooltipBroadcastIcon:Hide()
 			BetterFriendsTooltipBroadcastText:Hide()
 			BetterFriendsTooltipLastOnline:Hide()
+			
+			-- Show last activity for WoW friends
+			if info.name then
+				local friendUID = "wow_" .. info.name
+				local ActivityTracker = BFL and BFL:GetModule("ActivityTracker")
+				if ActivityTracker then
+					local lastActivity = ActivityTracker:GetLastActivity(friendUID)
+					if lastActivity then
+						local timeSinceActivity = time() - lastActivity
+						local activityText = "Last contact: " .. SecondsToTime(timeSinceActivity) .. " ago"
+						anchor = BetterFriendsTooltip_SetLine(BetterFriendsTooltipActivity, anchor, activityText, -4)
+					else
+						BetterFriendsTooltipActivity:Hide()
+					end
+				else
+					BetterFriendsTooltipActivity:Hide()
+				end
+			else
+				BetterFriendsTooltipActivity:Hide()
+			end
 		end
 	end
 
