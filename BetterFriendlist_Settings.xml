@@ -58,6 +58,17 @@
 					</OnClick>
 				</Scripts>
 			</Button>
+			<!-- Tab 5: Statistics -->
+			<Button name="$parentTab5" parentKey="Tab5" inherits="PanelTopTabButtonTemplate" text="Statistics" id="5">
+				<Anchors>
+					<Anchor point="LEFT" relativeKey="$parent.Tab4" relativePoint="RIGHT" x="-15" y="0" />
+				</Anchors>
+				<Scripts>
+					<OnClick>
+						BetterFriendlistSettings_ShowTab(5)
+					</OnClick>
+				</Scripts>
+			</Button>
 			
 		<!-- Content Scroll Frame - below tabs, above buttons inside MainInset -->
 		<ScrollFrame parentKey="ContentScrollFrame" inherits="UIPanelScrollFrameTemplate">
@@ -557,15 +568,114 @@
 										BetterFriendlistSettings_ShowImportDialog()
 									</OnClick>
 								</Scripts>
-							</Button>
-						</Frames>
-					</Frame>
+						</Button>
+					</Frames>
+				</Frame>
+				
+				<!-- Statistics Tab Content -->
+				<Frame parentKey="StatisticsTab" hidden="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" />
+						<Anchor point="BOTTOMRIGHT" />
+					</Anchors>
+					<Layers>
+						<Layer level="ARTWORK">
+							<FontString parentKey="Title" inherits="GameFontNormalLarge" text="Friend Network Statistics">
+								<Anchors>
+									<Anchor point="TOPLEFT" x="10" y="-10" />
+								</Anchors>
+							</FontString>
+							<FontString parentKey="Description" inherits="GameFontHighlight" text="Overview of your friend network and activity">
+								<Anchors>
+									<Anchor point="TOPLEFT" relativeKey="$parent.Title" relativePoint="BOTTOMLEFT" x="0" y="-5" />
+								</Anchors>
+							</FontString>
+							
+							<!-- Overview Section -->
+							<FontString parentKey="OverviewHeader" inherits="GameFontNormal" text="Overview">
+								<Anchors>
+									<Anchor point="TOPLEFT" relativeKey="$parent.Description" relativePoint="BOTTOMLEFT" x="0" y="-20" />
+								</Anchors>
+								<Color r="1" g="0.82" b="0" />
+							</FontString>
+							<FontString parentKey="TotalFriends" inherits="GameFontHighlight" text="Total Friends: --">
+								<Anchors>
+									<Anchor point="TOPLEFT" relativeKey="$parent.OverviewHeader" relativePoint="BOTTOMLEFT" x="10" y="-8" />
+								</Anchors>
+							</FontString>
+							<FontString parentKey="OnlineFriends" inherits="GameFontHighlight" text="Online: --  |  Offline: --">
+								<Anchors>
+									<Anchor point="TOPLEFT" relativeKey="$parent.TotalFriends" relativePoint="BOTTOMLEFT" x="0" y="-5" />
+								</Anchors>
+							</FontString>
+							<FontString parentKey="FriendTypes" inherits="GameFontHighlight" text="Battle.net: --  |  WoW: --">
+								<Anchors>
+									<Anchor point="TOPLEFT" relativeKey="$parent.OnlineFriends" relativePoint="BOTTOMLEFT" x="0" y="-5" />
+								</Anchors>
+							</FontString>
+							
+							<!-- Top Classes Section -->
+							<FontString parentKey="ClassHeader" inherits="GameFontNormal" text="Top 5 Classes">
+								<Anchors>
+									<Anchor point="TOPLEFT" relativeKey="$parent.FriendTypes" relativePoint="BOTTOMLEFT" x="-10" y="-20" />
+								</Anchors>
+								<Color r="1" g="0.82" b="0" />
+							</FontString>
+							<FontString parentKey="ClassList" inherits="GameFontHighlightSmall" text="No class data available" justifyH="LEFT">
+								<Anchors>
+									<Anchor point="TOPLEFT" relativeKey="$parent.ClassHeader" relativePoint="BOTTOMLEFT" x="10" y="-8" />
+									<Anchor point="RIGHT" x="-10" />
+								</Anchors>
+							</FontString>
+							
+							<!-- Top Realms Section -->
+							<FontString parentKey="RealmHeader" inherits="GameFontNormal" text="Top 5 Realms">
+								<Anchors>
+									<Anchor point="TOPLEFT" relativeKey="$parent.ClassList" relativePoint="BOTTOMLEFT" x="-10" y="-20" />
+								</Anchors>
+								<Color r="1" g="0.82" b="0" />
+							</FontString>
+							<FontString parentKey="RealmList" inherits="GameFontHighlightSmall" text="No realm data available" justifyH="LEFT">
+								<Anchors>
+									<Anchor point="TOPLEFT" relativeKey="$parent.RealmHeader" relativePoint="BOTTOMLEFT" x="10" y="-8" />
+									<Anchor point="RIGHT" x="-10" />
+								</Anchors>
+							</FontString>
+							
+							<!-- Faction Split Section -->
+							<FontString parentKey="FactionHeader" inherits="GameFontNormal" text="Faction Distribution">
+								<Anchors>
+									<Anchor point="TOPLEFT" relativeKey="$parent.RealmList" relativePoint="BOTTOMLEFT" x="-10" y="-20" />
+								</Anchors>
+								<Color r="1" g="0.82" b="0" />
+							</FontString>
+							<FontString parentKey="FactionList" inherits="GameFontHighlightSmall" text="No faction data available" justifyH="LEFT">
+								<Anchors>
+									<Anchor point="TOPLEFT" relativeKey="$parent.FactionHeader" relativePoint="BOTTOMLEFT" x="10" y="-8" />
+									<Anchor point="RIGHT" x="-10" />
+								</Anchors>
+							</FontString>
+						</Layer>
+					</Layers>
+					<Frames>
+						<!-- Refresh Button -->
+						<Button parentKey="RefreshButton" inherits="UIPanelButtonTemplate" text="Refresh Statistics">
+							<Size x="150" y="24" />
+							<Anchors>
+								<Anchor point="TOPLEFT" relativeKey="$parent.FactionList" relativePoint="BOTTOMLEFT" x="-10" y="-20" />
+							</Anchors>
+							<Scripts>
+								<OnClick>
+									BetterFriendlistSettings_RefreshStatistics()
+								</OnClick>
+							</Scripts>
+						</Button>
+					</Frames>
+				</Frame>
 			</Frames>
 		</Frame>
 	</ScrollChild>
-</ScrollFrame>
-
-<!-- Bottom Buttons - at bottom of MainInset -->
+</ScrollFrame><!-- Bottom Buttons - at bottom of MainInset -->
 <Button parentKey="DefaultsButton" inherits="UIPanelButtonTemplate" text="Defaults">
 	<Size x="96" y="22" />
 	<Anchors>
@@ -601,7 +711,7 @@
 			end
 			
 			-- Setup tab system
-			PanelTemplates_SetNumTabs(self, 4)
+			PanelTemplates_SetNumTabs(self, 5)
 			PanelTemplates_SetTab(self, 1)
 			
 			-- Initialize

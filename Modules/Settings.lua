@@ -337,7 +337,7 @@ function Settings:ShowTab(tabID)
 	if not settingsFrame then return end
 	
 	currentTab = tabID
-	settingsFrame.numTabs = 4
+	settingsFrame.numTabs = 5
 	PanelTemplates_SetTab(settingsFrame, tabID)
 	
 	local content = settingsFrame.ContentScrollFrame.Content
@@ -346,6 +346,7 @@ function Settings:ShowTab(tabID)
 		if content.GroupsTab then content.GroupsTab:Hide() end
 		if content.AppearanceTab then content.AppearanceTab:Hide() end
 		if content.AdvancedTab then content.AdvancedTab:Hide() end
+		if content.StatisticsTab then content.StatisticsTab:Hide() end
 		
 		if tabID == 1 and content.GeneralTab then
 			content.GeneralTab:Show()
@@ -356,6 +357,9 @@ function Settings:ShowTab(tabID)
 			content.AppearanceTab:Show()
 		elseif tabID == 4 and content.AdvancedTab then
 			content.AdvancedTab:Show()
+		elseif tabID == 5 and content.StatisticsTab then
+			content.StatisticsTab:Show()
+			self:RefreshStatistics()
 		end
 	end
 end
@@ -1296,6 +1300,88 @@ function Settings:ShowImportDialog()
 	self.importFrame.scrollFrame.editBox:SetText("")
 	self.importFrame.scrollFrame.editBox:SetFocus()
 	self.importFrame:Show()
+end
+
+-- Refresh statistics display
+function Settings:RefreshStatistics()
+	if not settingsFrame then return end
+	
+	local content = settingsFrame.ContentScrollFrame.Content
+	if not content or not content.StatisticsTab then return end
+	
+	local statsTab = content.StatisticsTab
+	
+	-- Get Statistics module
+	local Statistics = BFL:GetModule("Statistics")
+	if not Statistics then
+		BFL:DebugPrint("Settings: Statistics module not available")
+		return
+	end
+	
+	-- Get statistics data
+	local stats = Statistics:GetStatistics()
+	if not stats then
+		BFL:DebugPrint("Settings: Failed to get statistics")
+		return
+	end
+	
+	-- Update Overview section
+	if statsTab.TotalFriends then
+		statsTab.TotalFriends:SetText(string.format("Total Friends: %d", stats.totalFriends))
+	end
+	
+	if statsTab.OnlineFriends then
+		statsTab.OnlineFriends:SetText(string.format("|cff00ff00Online: %d|r  |  |cff808080Offline: %d|r", 
+			stats.onlineFriends, stats.offlineFriends))
+	end
+	
+	if statsTab.FriendTypes then
+		statsTab.FriendTypes:SetText(string.format("|cff0070ddBattle.net: %d|r  |  |cffffd700WoW: %d|r", 
+			stats.bnetFriends, stats.wowFriends))
+	end
+	
+	-- Update Top 5 Classes
+	if statsTab.ClassList then
+		local topClasses = Statistics:GetTopClasses(5)
+		if topClasses and #topClasses > 0 then
+			local classText = ""
+			for i, class in ipairs(topClasses) do
+				if i > 1 then classText = classText .. "\n" end
+				classText = classText .. string.format("%d. %s: %d", i, class.name, class.count)
+			end
+			statsTab.ClassList:SetText(classText)
+		else
+			statsTab.ClassList:SetText("No class data available")
+		end
+	end
+	
+	-- Update Top 5 Realms
+	if statsTab.RealmList then
+		local topRealms = Statistics:GetTopRealms(5)
+		if topRealms and #topRealms > 0 then
+			local realmText = ""
+			for i, realm in ipairs(topRealms) do
+				if i > 1 then realmText = realmText .. "\n" end
+				realmText = realmText .. string.format("%d. %s: %d", i, realm.name, realm.count)
+			end
+			statsTab.RealmList:SetText(realmText)
+		else
+			statsTab.RealmList:SetText("No realm data available")
+		end
+	end
+	
+	-- Update Faction Distribution
+	if statsTab.FactionList then
+		local factionText = string.format(
+			"|cff0080ffAlliance: %d|r\n|cffff0000Horde: %d|r\n|cff808080Unknown: %d|r",
+			stats.factionCounts.Alliance or 0,
+			stats.factionCounts.Horde or 0,
+			stats.factionCounts.Unknown or 0
+		)
+		statsTab.FactionList:SetText(factionText)
+	end
+	
+	BFL:DebugPrint("Settings: Statistics refreshed successfully")
 end
 
 -- Create export frame
