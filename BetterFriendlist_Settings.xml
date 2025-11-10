@@ -140,10 +140,35 @@
 								</Layer>
 							</Layers>
 						<Frames>
+						<!-- Show Favorites Group Checkbox -->
+						<CheckButton parentKey="ShowFavoritesGroup" inherits="UICheckButtonTemplate">
+							<Anchors>
+								<Anchor point="TOPLEFT" relativeKey="$parent.Description" relativePoint="BOTTOMLEFT" x="0" y="-20" />
+							</Anchors>
+							<Scripts>
+								<OnLoad>
+									self.text:SetText("Show Favorites group")
+									self.text:SetFontObject("GameFontHighlight")
+								</OnLoad>
+								<OnClick>
+									BetterFriendlistSettings_OnShowFavoritesGroupChanged(self:GetChecked())
+								</OnClick>
+								<OnEnter>
+									GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+									GameTooltip:SetText("Show Favorites Group", 1, 1, 1)
+									GameTooltip:AddLine("Toggle visibility of the Favorites group in your friends list", 0.8, 0.8, 0.8, true)
+									GameTooltip:Show()
+								</OnEnter>
+								<OnLeave>
+									GameTooltip:Hide()
+								</OnLeave>
+							</Scripts>
+						</CheckButton>
+						
 						<!-- Group Order Section -->
 						<Frame parentKey="GroupOrderSection">
 									<Anchors>
-										<Anchor point="TOPLEFT" relativeKey="$parent.Description" relativePoint="BOTTOMLEFT" x="0" y="-10" />
+										<Anchor point="TOPLEFT" relativeKey="$parent.ShowFavoritesGroup" relativePoint="BOTTOMLEFT" x="0" y="-20" />
 										<Anchor point="BOTTOMRIGHT" x="-10" y="10" />
 									</Anchors>
 									<Layers>

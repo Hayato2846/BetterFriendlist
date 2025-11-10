@@ -143,6 +143,26 @@ end
 
 -- Get all groups
 function Groups:GetAll()
+	-- Check if DB is initialized before checking settings
+	local DB = BFL:GetModule("DB")
+	if not DB or not BetterFriendlistDB then
+		-- DB not yet initialized, return all groups including favorites
+		return self.groups
+	end
+	
+	local showFavorites = DB:Get("showFavoritesGroup", true)
+	
+	-- If Favorites should be hidden, filter it out
+	if not showFavorites then
+		local filtered = {}
+		for id, group in pairs(self.groups) do
+			if id ~= "favorites" then
+				filtered[id] = group
+			end
+		end
+		return filtered
+	end
+	
 	return self.groups
 end
 

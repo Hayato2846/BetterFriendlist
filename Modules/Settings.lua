@@ -379,6 +379,15 @@ function Settings:LoadSettings()
 		end
 	end
 	
+	if content and content.GroupsTab then
+		local groupsTab = content.GroupsTab
+		
+		if groupsTab.ShowFavoritesGroup then
+			local value = DB:Get("showFavoritesGroup", true)
+			groupsTab.ShowFavoritesGroup:SetChecked(value)
+		end
+	end
+	
 	if content and content.AppearanceTab then
 		local appearanceTab = content.AppearanceTab
 		
@@ -1596,6 +1605,18 @@ function Settings:OnShowRealmNameChanged(checked)
 	if not DB then return end
 	
 	DB:Set("showRealmName", checked)
+	
+	if BetterFriendsFrame_UpdateDisplay then
+		BetterFriendsFrame_UpdateDisplay()
+	end
+end
+
+-- Show Favorites Group toggle
+function Settings:OnShowFavoritesGroupChanged(checked)
+	local DB = GetDB()
+	if not DB then return end
+	
+	DB:Set("showFavoritesGroup", checked)
 	
 	if BetterFriendsFrame_UpdateDisplay then
 		BetterFriendsFrame_UpdateDisplay()

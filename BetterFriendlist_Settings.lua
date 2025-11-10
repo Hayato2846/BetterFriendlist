@@ -212,6 +212,14 @@ Settings:OnShowRealmNameChanged(checked)
 end
 end
 
+-- Show Favorites Group toggle
+function BetterFriendlistSettings_OnShowFavoritesGroupChanged(checked)
+local Settings = GetSettings()
+if Settings then
+Settings:OnShowFavoritesGroupChanged(checked)
+end
+end
+
 -- Gray Other Faction toggle
 function BetterFriendlistSettings_OnGrayOtherFactionChanged(checked)
 local Settings = GetSettings()

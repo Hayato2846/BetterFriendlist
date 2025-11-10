@@ -24,6 +24,7 @@ local defaults = {
 	showMobileAsAFK = false, -- Show mobile friends with AFK status icon (default: OFF)
 	hideMaxLevel = false, -- Hide level display for max level characters (default: OFF)
 	accordionGroups = false, -- Only allow one group to be open at a time (default: OFF)
+	showFavoritesGroup = true, -- Show the Favorites group (default: ON)
 	-- Sort Settings
 	primarySort = "status", -- Primary sort method: status, name, level, zone (default: status)
 	secondarySort = "name", -- Secondary sort method: none, name, level, zone (default: name)
