@@ -317,19 +317,16 @@ function BetterRaidMemberButton_OnClick(self, button)
 		return
 	end
 	
-	if button == "LeftButton" then
-		-- Left-click: Target unit
-		if UnitExists(self.unit) then
-			TargetUnit(self.unit)
-		end
-	elseif button == "RightButton" then
-		-- Show standard raid context menu
+	if button == "RightButton" then
+		-- Right-click: Show standard raid context menu
 		local contextData = {
 			unit = self.unit,
 			name = self.name,
 		}
 		UnitPopup_OpenMenu("RAID", contextData)
 	end
+	-- Note: Left-click is handled by OnDragStart for drag and drop (only when not in combat)
+	-- We do NOT target the unit on left-click to avoid taint issues
 end
 
 function BetterRaidMemberButton_OnDragStart(self)

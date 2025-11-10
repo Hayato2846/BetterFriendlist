@@ -15,6 +15,7 @@ Core.lua
 # Modules
 Modules\Database.lua
 Modules\ActivityTracker.lua
+Modules\Statistics.lua
 Modules\Groups.lua
 Modules\FriendsList.lua
 Modules\WhoFrame.lua

@@ -16,6 +16,7 @@ plans/
 reference/
 predecessor/
 .ai-context/
+*.png
 
 # Development markdown files (local documentation)
 BUG_*.md
@@ -32,6 +33,7 @@ PHASE_*.md
 QUICKJOIN_*.md
 SETUP_ANLEITUNG.md
 README_BBCODE.txt
+Tests/MANUAL_*.md
 
 # Build and package files
 *.zip

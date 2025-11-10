@@ -229,6 +229,50 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 			end
 		end
 	
+	-- Statistics
+	elseif msg == "stats" or msg == "statistics" then
+		local Statistics = BFL:GetModule("Statistics")
+		if not Statistics then
+			print("|cffff0000BetterFriendlist:|r Statistics module not loaded")
+			return
+		end
+		
+		local stats = Statistics:GetStatistics()
+		print("|cff00ff00=== BetterFriendlist Statistics ===|r")
+		print("")
+		print("|cffffcc00Overview:|r")
+		print(string.format("  Total Friends: |cffffffff%d|r", stats.totalFriends))
+		print(string.format("  Online: |cff00ff00%d|r  Offline: |cffaaaaaa%d|r", stats.onlineFriends, stats.offlineFriends))
+		print(string.format("  Battle.net: |cff0099ff%d|r  WoW: |cffffd700%d|r", stats.bnetFriends, stats.wowFriends))
+		print("")
+		
+		-- Top 5 classes
+		local topClasses = Statistics:GetTopClasses(5)
+		if #topClasses > 0 then
+			print("|cffffcc00Top Classes:|r")
+			for i, class in ipairs(topClasses) do
+				print(string.format("  %d. %s: |cffffffff%d|r", i, class.name, class.count))
+			end
+			print("")
+		end
+		
+		-- Top 5 realms
+		local topRealms = Statistics:GetTopRealms(5)
+		if #topRealms > 0 then
+			print("|cffffcc00Top Realms:|r")
+			for i, realm in ipairs(topRealms) do
+				print(string.format("  %d. %s: |cffffffff%d|r", i, realm.name, realm.count))
+			end
+			print("")
+		end
+		
+		-- Faction split
+		if stats.factionCounts.Alliance > 0 or stats.factionCounts.Horde > 0 then
+			print("|cffffcc00Faction Split:|r")
+			print(string.format("  Alliance: |cff0099ff%d|r  Horde: |cffff0000%d|r  Unknown: |cffaaaaaa%d|r",
+				stats.factionCounts.Alliance, stats.factionCounts.Horde, stats.factionCounts.Unknown))
+		end
+	
 	-- Settings
 	elseif msg == "settings" or msg == "config" or msg == "options" then
 		-- Open settings tab (BottomTab 4)
@@ -254,6 +298,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		print("  |cffffffff/bfl debug print|r - Toggle debug output")
 		print("  |cffffffff/bfl debug|r - Show database state")
 		print("  |cffffffff/bfl activity|r - Show activity tracking data")
+		print("  |cffffffff/bfl stats|r - Show friend network statistics")
 		print("")
 		print("|cffffcc00Quick Join Commands:|r")
 		print("  |cffffffff/bflqj mock|r - Create 3 test groups")
