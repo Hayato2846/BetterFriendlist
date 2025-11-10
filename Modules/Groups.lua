@@ -222,6 +222,12 @@ function Groups:Create(groupName)
 		order = maxOrder + 1
 	})
 	
+	-- Refresh Settings UI if open
+	local Settings = BFL:GetModule("Settings")
+	if Settings and BetterFriendlistSettingsFrame and BetterFriendlistSettingsFrame:IsShown() then
+		Settings:RefreshGroupList()
+	end
+	
 	return true, groupId
 end
 
@@ -258,6 +264,12 @@ function Groups:CreateWithOrder(groupName, orderValue)
 		order = orderValue
 	})
 	
+	-- Refresh Settings UI if open
+	local Settings = BFL:GetModule("Settings")
+	if Settings and BetterFriendlistSettingsFrame and BetterFriendlistSettingsFrame:IsShown() then
+		Settings:RefreshGroupList()
+	end
+	
 	return true, groupId
 end
 
@@ -287,6 +299,12 @@ function Groups:Rename(groupId, newName)
 		DB:SaveCustomGroup(groupId, groupInfo)
 	end
 	
+	-- Refresh Settings UI if open
+	local Settings = BFL:GetModule("Settings")
+	if Settings and BetterFriendlistSettingsFrame and BetterFriendlistSettingsFrame:IsShown() then
+		Settings:RefreshGroupList()
+	end
+	
 	return true
 end
 
@@ -311,6 +329,12 @@ function Groups:Delete(groupId)
 	-- Remove from database
 	local DB = BFL:GetModule("DB")
 	DB:DeleteCustomGroup(groupId)
+	
+	-- Refresh Settings UI if open
+	local Settings = BFL:GetModule("Settings")
+	if Settings and BetterFriendlistSettingsFrame and BetterFriendlistSettingsFrame:IsShown() then
+		Settings:RefreshGroupList()
+	end
 	
 	-- Remove all friend assignments to this group
 	for _, friendUID in ipairs(DB:GetAllFriendUIDs()) do
