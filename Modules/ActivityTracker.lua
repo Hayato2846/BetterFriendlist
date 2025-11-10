@@ -219,6 +219,15 @@ function ActivityTracker:CleanupOldActivity()
 	end
 end
 
+-- Get all activities for a friend
+function ActivityTracker:GetAllActivities(friendUID)
+	local DB = GetDB()
+	if not DB then return nil end
+	
+	local friendActivity = DB:Get("friendActivity", {})
+	return friendActivity[friendUID]
+end
+
 -- Handle incoming whisper (CHAT_MSG_WHISPER)
 function ActivityTracker:OnWhisper(text, sender, languageName, channelName, target, flags, zoneChannelID, channelIndex, channelBaseName, languageID, lineID, guid, ...)
 	-- Debug: Log all parameters

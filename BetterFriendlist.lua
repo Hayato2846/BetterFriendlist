@@ -1284,6 +1284,66 @@ function BetterFriendsList_Button_OnEnter(button)
 		GameTooltip:AddLine(friend.note, 1, 0.82, 0, true)
 	end
 	
+	-- Add activity information
+	local ActivityTracker = BFL:GetModule("ActivityTracker")
+	if ActivityTracker then
+		local friendUID = nil
+		
+		-- Determine friend UID based on friend type
+		if friend.bnetAccountID then
+			-- Battle.net friend
+			if friend.battleTag then
+				friendUID = "bnet_" .. friend.battleTag
+			end
+		else
+			-- WoW friend
+			if friend.name then
+				friendUID = "wow_" .. friend.name
+			end
+		end
+		
+		if friendUID then
+			local activity = ActivityTracker:GetAllActivities(friendUID)
+			if activity and (activity.lastWhisper or activity.lastGroup or activity.lastTrade) then
+				GameTooltip:AddLine(" ") -- Spacer
+				
+				-- Show each activity type that exists
+				if activity.lastWhisper then
+					local elapsed = time() - activity.lastWhisper
+					local timeText = SecondsToTime(elapsed) .. " ago"
+					GameTooltip:AddDoubleLine(
+						"Last Whisper:",
+						timeText,
+						0.7, 0.7, 0.7, -- Left color (gray)
+						1.0, 1.0, 1.0  -- Right color (white)
+					)
+				end
+				
+				if activity.lastGroup then
+					local elapsed = time() - activity.lastGroup
+					local timeText = SecondsToTime(elapsed) .. " ago"
+					GameTooltip:AddDoubleLine(
+						"Last Group:",
+						timeText,
+						0.7, 0.7, 0.7,
+						1.0, 1.0, 1.0
+					)
+				end
+				
+				if activity.lastTrade then
+					local elapsed = time() - activity.lastTrade
+					local timeText = SecondsToTime(elapsed) .. " ago"
+					GameTooltip:AddDoubleLine(
+						"Last Trade:",
+						timeText,
+						0.7, 0.7, 0.7,
+						1.0, 1.0, 1.0
+					)
+				end
+			 end
+		end
+	end
+	
 	GameTooltip:Show()
 end
 
