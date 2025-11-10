@@ -32,6 +32,8 @@ local defaults = {
 	quickFilter = "all", -- Quick filter mode: all, online, offline, wow, bnet (default: all)
 	-- Debug Settings
 	debugPrintEnabled = false, -- Toggle debug prints with /bfl debug print
+	-- Migration tracking
+	friendGroupsMigrated = false, -- Track if FriendGroups migration has been completed
 	version = BFL.Version
 }
 

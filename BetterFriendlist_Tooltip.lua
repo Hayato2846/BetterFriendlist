@@ -140,13 +140,15 @@ function BetterFriendsList_Button_OnEnter(self)
 		return
 	end
 
-	local anchor, text
-	local numGameAccounts = 0
-	local tooltip = BetterFriendsTooltip
-	local battleTag = ""
-	tooltip.height = 0
-	tooltip.maxWidth = 0
-	local friendData = self.friendData
+	-- Wrap tooltip generation in pcall for error safety
+	local success, errorMsg = pcall(function()
+		local anchor, text
+		local numGameAccounts = 0
+		local tooltip = BetterFriendsTooltip
+		local battleTag = ""
+		tooltip.height = 0
+		tooltip.maxWidth = 0
+		local friendData = self.friendData
 
 	if friendData.type == "bnet" then
 		-- Battle.net friend - need to find the actual index
@@ -405,16 +407,27 @@ function BetterFriendsList_Button_OnEnter(self)
 		BetterFriendsTooltipGameAccountMany:Hide()
 	end
 
-	tooltip.button = self
-	tooltip:SetPoint("TOPLEFT", self, "TOPRIGHT", 36, 0)
+		tooltip.button = self
+		tooltip:SetPoint("TOPLEFT", self, "TOPRIGHT", 36, 0)
+		
+		-- Calculate and set final dimensions
+		local finalHeight = tooltip.height + FRIENDS_TOOLTIP_MARGIN_WIDTH
+		local finalWidth = min(FRIENDS_TOOLTIP_MAX_WIDTH, tooltip.maxWidth + FRIENDS_TOOLTIP_MARGIN_WIDTH)
+		
+		tooltip:SetHeight(finalHeight)
+		tooltip:SetWidth(finalWidth)
+		tooltip:Show()
+	end)
 	
-	-- Calculate and set final dimensions
-	local finalHeight = tooltip.height + FRIENDS_TOOLTIP_MARGIN_WIDTH
-	local finalWidth = min(FRIENDS_TOOLTIP_MAX_WIDTH, tooltip.maxWidth + FRIENDS_TOOLTIP_MARGIN_WIDTH)
-	
-	tooltip:SetHeight(finalHeight)
-	tooltip:SetWidth(finalWidth)
-	tooltip:Show()
+	-- Handle errors by clearing tooltip
+	if not success then
+		GameTooltip:Hide()
+		BetterFriendsTooltip:Hide()
+		BetterFriendsTooltip:ClearAllPoints()
+		if errorMsg then
+			print("|cffff0000BetterFriendlist Tooltip Error:|r " .. tostring(errorMsg))
+		end
+	end
 end
 
 -- Button OnLeave handler

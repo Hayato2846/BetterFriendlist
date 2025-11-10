@@ -168,8 +168,11 @@ function PerformanceMonitor:Report()
 		for _, sample in ipairs(self.stats.memory_samples) do
 			totalMemory = totalMemory + sample.memory
 		end
-		local avgMemory = totalMemory / #self.stats.memory_samples
-		print(string.format("  Average (last %d samples): %.2f KB", #self.stats.memory_samples, avgMemory))
+		local sampleCount = #self.stats.memory_samples
+		if sampleCount > 0 then
+			local avgMemory = totalMemory / sampleCount
+			print(string.format("  Average (last %d samples): %.2f KB", sampleCount, avgMemory))
+		end
 	end
 	print("")
 	
@@ -182,7 +185,7 @@ function PerformanceMonitor:Report()
 	
 	-- Overall assessment
 	local quickJoinAvg = self:GetAverage("quickjoin_update")
-	if quickJoinAvg > 0 then
+	if quickJoinAvg and quickJoinAvg > 0 then
 		local fps = 1000 / quickJoinAvg
 		local status = quickJoinAvg < 16.6 and "|cff00ff00EXCELLENT|r" 
 			or quickJoinAvg < 33.3 and "|cffffff00GOOD|r"
@@ -203,6 +206,7 @@ function PerformanceMonitor:PrintOperation(operation, displayName)
 		return
 	end
 	
+	if stat.count == 0 then return end
 	local avg = stat.totalTime / stat.count
 	local status = avg < 16.6 and "✓" or avg < 50 and "⚠" or "✗"
 	

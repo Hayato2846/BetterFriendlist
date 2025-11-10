@@ -749,6 +749,12 @@ function Settings:MigrateFriendGroups(cleanupNotes)
 		return
 	end
 	
+	-- Check if migration has already been completed
+	if DB:Get("friendGroupsMigrated") then
+		print("|cff00ffffBetterFriendlist:|r Migration already completed. Use '/bfl migrate force' to re-run.")
+		return
+	end
+	
 	print("|cff00ffffBetterFriendlist:|r Starting FriendGroups migration...")
 	print("|cff00ffffBetterFriendlist:|r DB module:", DB and "OK" or "MISSING")
 	print("|cff00ffffBetterFriendlist:|r Groups module:", Groups and "OK" or "MISSING")
@@ -930,6 +936,9 @@ function Settings:MigrateFriendGroups(cleanupNotes)
 	end
 	
 	local cleanupMsg = cleanupNotes and "\n|cff00ff00Notes cleaned up!|r" or "\n|cffffff00Notes preserved (you can clean them manually).|r"
+	
+	-- Mark migration as completed
+	DB:Set("friendGroupsMigrated", true)
 	
 	print("|cff00ff00═══════════════════════════════════════")
 	print("|cff00ff00BetterFriendlist: Migration Complete!")
