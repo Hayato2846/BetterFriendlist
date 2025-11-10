@@ -367,12 +367,22 @@ function ButtonPool:GetButtonForDisplay(index, buttonType)
 end
 
 function ButtonPool:ResetButtonPool()
-	-- Hide all buttons
+	-- Hide all buttons and clear stored data references
 	for _, button in pairs(buttonPool.friendButtons) do
 		button:Hide()
+		-- Clear all stored data to prevent memory leaks
+		button.friendData = nil
+		button.friendInfo = nil
+		button.gameAccountInfo = nil
+		button.isBNet = nil
+		button.bnetAccountId = nil
+		button.wowAccountId = nil
 	end
 	for _, button in pairs(buttonPool.headerButtons) do
 		button:Hide()
+		-- Clear group data reference
+		button.groupId = nil
+		button.groupData = nil
 	end
 	
 	-- Clear active buttons list

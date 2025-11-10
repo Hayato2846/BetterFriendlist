@@ -18,6 +18,10 @@ local function GetFontManager() return BFL.FontManager end
 local BUTTON_TYPE_FRIEND = 1
 local BUTTON_TYPE_GROUP_HEADER = 2
 
+-- Race condition protection
+local isUpdatingFriendsList = false
+local hasPendingUpdate = false
+
 -- Invite restriction constants (matching Blizzard's)
 local INVITE_RESTRICTION_NONE = 0
 local INVITE_RESTRICTION_LEADER = 1
@@ -144,9 +148,20 @@ end
 
 -- Handle friend list update events
 function FriendsList:OnFriendListUpdate(...)
-	-- Update will be triggered by the UI if visible
-	-- This callback just ensures the module is aware of the event
-	-- The actual update is throttled in the UI layer
+	-- If an update is already in progress, mark that we need another update
+	if isUpdatingFriendsList then
+		hasPendingUpdate = true
+		return
+	end
+	
+	-- Trigger immediate update
+	self:UpdateFriendsList()
+	
+	-- Process any pending update that occurred during our update
+	if hasPendingUpdate then
+		hasPendingUpdate = false
+		self:UpdateFriendsList()
+	end
 end
 
 -- Sync groups from Groups module
@@ -181,6 +196,13 @@ end
 
 -- Update the friends list from WoW API
 function FriendsList:UpdateFriendsList()
+	-- Prevent concurrent updates
+	if isUpdatingFriendsList then
+		hasPendingUpdate = true
+		return
+	end
+	
+	isUpdatingFriendsList = true
 	wipe(self.friendsList)
 	
 	-- Sync groups first
@@ -254,6 +276,9 @@ function FriendsList:UpdateFriendsList()
 	-- Apply filters and sort
 	self:ApplyFilters()
 	self:ApplySort()
+	
+	-- Release lock after update complete
+	isUpdatingFriendsList = false
 end
 
 -- Apply search and filter to friends list
