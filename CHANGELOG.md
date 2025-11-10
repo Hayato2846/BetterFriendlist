@@ -7,6 +7,109 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.6-alpha] - 2025-11-10
+
+**📊 Activity Tracking Foundation**
+
+This intermediate release adds friend activity tracking infrastructure (whispers, groups, trades) with sorting support. Tooltip integration is postponed to v1.3.0 for proper planning.
+
+### Added
+- **Activity Tracking System** - Track friend interaction timestamps
+  - Whisper tracking (incoming and outgoing, WoW and Battle.net)
+  - Group formation tracking (GROUP_ROSTER_UPDATE)
+  - Trade interaction tracking (TRADE_SHOW)
+  - Automatic cleanup of activity data older than 730 days (2 years)
+- **Activity Sorting** - Sort friends by most recent interaction
+  - New "then by Activity" option in Secondary Sort dropdown
+  - Most recent interactions appear first
+  - Works with BNet and WoW friends
+- **Activity Command** - `/bfl activity` displays all tracked friend activities
+  - Shows timestamps with human-readable "X ago" format (e.g., "9 Min 53 Sec ago")
+  - Displays lastWhisper, lastGroup, and lastTrade for each friend
+  - Counts total friends with activity data
+- **BNet Whisper Support** - Full Battle.net whisper event handling
+  - CHAT_MSG_BN_WHISPER (incoming BNet whispers)
+  - CHAT_MSG_BN_WHISPER_INFORM (outgoing BNet whispers)
+  - Correct sender resolution using C_BattleNet.GetAccountInfoByID()
+
+### Technical Details
+- **New Module**: `Modules/ActivityTracker.lua` (~412 lines)
+- **Database Schema**: Added `friendActivity` field to store per-friend timestamps
+  - Format: `friendActivity[friendUID] = {lastWhisper=timestamp, lastGroup=timestamp, lastTrade=timestamp}`
+  - Friend UID format: `bnet_BattleTag#1234` for BNet friends, `wow_CharacterName` for WoW friends
+- **Event Callbacks**: CHAT_MSG_WHISPER, CHAT_MSG_WHISPER_INFORM, CHAT_MSG_BN_WHISPER, CHAT_MSG_BN_WHISPER_INFORM, GROUP_ROSTER_UPDATE, TRADE_SHOW, PLAYER_LOGIN
+- **Cleanup Logic**: `CleanupOldActivity()` runs on PLAYER_LOGIN, removes entries where ALL activity types are older than 730 days
+
+### Changed
+- Secondary Sort dropdown now includes "then by Activity" option with clock icon
+- `CompareFriends()` in FriendsList.lua extended with activity sorting logic
+- Sort icon mapping includes `activity = "Interface\\CURSOR\\UI-Cursor-Move"`
+
+### Tests Passed (6/6)
+- ✅ Test 1.1: Outgoing whisper tracking (WoW + BNet)
+- ✅ Test 1.2: Incoming whisper tracking (WoW + BNet)
+- ✅ Test 1.3: Group join tracking
+- ✅ Test 1.4: Trade window tracking
+- ✅ Test 1.5: Timestamp accuracy verification
+- ✅ Test 1.6: BNet friend resolution (battleTag format)
+
+### Fixed
+- **Raid Frame Left-Click**: Fixed error when left-clicking raid members in Raid tab
+
+### Known Issues
+- **Tooltip Integration**: Activity display in tooltips postponed to v1.3.0
+  - Root cause identified: Dynamic buttons don't wire XML template OnEnter
+  - Requires proper implementation planning before adding
+
+### Files Changed
+- NEW: `Modules/ActivityTracker.lua` (412 lines)
+- MODIFIED: `Modules/Database.lua` (added friendActivity schema)
+- MODIFIED: `BetterFriendlist.toc` (added ActivityTracker.lua, version 1.2.6-alpha)
+- MODIFIED: `Core.lua` (version 1.2.6-alpha, /bfl activity command)
+- MODIFIED: `UI/FrameInitializer.lua` (activity icon and dropdown option)
+- MODIFIED: `Modules/FriendsList.lua` (activity sorting in CompareFriends)
+
+### Notes
+- This is an intermediate release focusing on activity tracking foundation only
+- Tooltip display, statistics dashboard, and favorites toggle will be added in v1.3.0
+- All features tested in-game and working as expected
+
+---
+
+## [1.2.5-alpha] - 2025-11-09
+
+**🎨 Sort UI Redesign & QuickFilter Persistence**
+
+This release replaces the button-based Sort tab with clean dropdown UI and adds QuickFilter persistence.
+
+### Added
+- **Sort Dropdowns** - Icon-based Primary and Secondary sort dropdowns in header
+  - Primary Sort: Status, Name, Level, Zone
+  - Secondary Sort: None, Name, Level, Zone (now also Activity in v1.2.6+)
+  - Icons: Status (green dot), Name (speaker), Level (skull), Zone (map marker)
+- **QuickFilter Persistence** - Selected QuickFilter now persists after `/reload`
+  - Stored in database as `quickFilter` field
+  - Restored on PLAYER_LOGIN
+
+### Changed
+- Removed Tab4 (Sort buttons) from UI entirely
+- Sort controls moved to header dropdowns (cleaner UX)
+- Database schema extended with `quickFilter` field
+
+### Fixed
+- `Database:Get()` now supports parameterless calls (returns full DB)
+- Module name consistency: Changed "Database" to "DB" in all GetModule calls
+
+### Files Changed
+- MODIFIED: `UI/FrameInitializer.lua` (dropdowns, removed Tab4)
+- MODIFIED: `Modules/Database.lua` (quickFilter schema)
+- MODIFIED: `Modules/FriendsList.lua` (quickFilter persistence)
+- MODIFIED: `BetterFriendlist.xml` (removed Tab4)
+- MODIFIED: `Core.lua` (version 1.2.5-alpha)
+- MODIFIED: `BetterFriendlist.toc` (version 1.2.5-alpha)
+
+---
+
 ## [1.2.0] - 2025-11-10
 
 **🎨 Visual Enhancements & UX Improvements**

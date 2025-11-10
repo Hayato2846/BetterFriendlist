@@ -5,7 +5,7 @@
 
 -- Create addon namespace
 local ADDON_NAME, BFL = ...
-BFL.Version = "1.2.5-alpha"
+BFL.Version = "1.2.6-alpha"
 
 -- Module registry
 BFL.Modules = {}
@@ -197,6 +197,35 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 			print("|cffff0000BetterFriendlist:|r Debug function not available (settings not loaded)")
 		end
 	
+	-- Debug Activity Tracking
+	elseif msg == "activity" or msg == "debugactivity" then
+		local DB = BFL:GetModule("DB")
+		if not DB then
+			print("|cffff0000BetterFriendlist:|r DB module not available")
+			return
+		end
+		
+		local friendActivity = DB:Get("friendActivity") or {}
+		local count = 0
+		for _ in pairs(friendActivity) do count = count + 1 end
+		
+		print("|cff00ff00=== BetterFriendlist Activity Tracking ===|r")
+		print(string.format("Total friends with activity: %d", count))
+		print("")
+		
+		for friendUID, activities in pairs(friendActivity) do
+			print("|cffffcc00" .. friendUID .. "|r")
+			if activities.lastWhisper then
+				print(string.format("  lastWhisper: %d (%s ago)", activities.lastWhisper, SecondsToTime(time() - activities.lastWhisper)))
+			end
+			if activities.lastGroup then
+				print(string.format("  lastGroup: %d (%s ago)", activities.lastGroup, SecondsToTime(time() - activities.lastGroup)))
+			end
+			if activities.lastTrade then
+				print(string.format("  lastTrade: %d (%s ago)", activities.lastTrade, SecondsToTime(time() - activities.lastTrade)))
+			end
+		end
+	
 	-- Settings
 	elseif msg == "settings" or msg == "config" or msg == "options" then
 		-- Open settings tab (BottomTab 4)
@@ -221,6 +250,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		print("|cffffcc00Debug Commands:|r")
 		print("  |cffffffff/bfl debug print|r - Toggle debug output")
 		print("  |cffffffff/bfl debug|r - Show database state")
+		print("  |cffffffff/bfl activity|r - Show activity tracking data")
 		print("")
 		print("|cffffcc00Quick Join Commands:|r")
 		print("  |cffffffff/bflqj mock|r - Create 3 test groups")

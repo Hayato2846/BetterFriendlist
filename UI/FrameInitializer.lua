@@ -110,6 +110,7 @@ local SORT_ICONS = {
 	name = "Interface\\BUTTONS\\UI-GuildButton-PublicNote-Up",  -- Note/text icon for name
 	level = "Interface\\BUTTONS\\UI-MicroStream-Yellow",        -- Level up arrow for level
 	zone = "Interface\\WORLDMAP\\UI-World-Icon",                -- World map icon for zone
+	activity = "Interface\\CURSOR\\UI-Cursor-Move",             -- Clock/time icon for activity
 	none = "Interface\\BUTTONS\\UI-GroupLoot-Pass-Up"           -- X icon for none
 }
 
@@ -290,6 +291,9 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 		
 		local zoneText = string.format(optionText, SORT_ICONS.zone, "then by Zone")
 		CreateSecondaryRadio(rootDescription, zoneText, "zone")
+		
+		local activityText = string.format(optionText, SORT_ICONS.activity, "then by Activity")
+		CreateSecondaryRadio(rootDescription, activityText, "activity")
 	end)
 	
 	-- Show icon only (X for none, sort icons for others)

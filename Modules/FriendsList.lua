@@ -349,6 +349,35 @@ function FriendsList:CompareFriends(a, b, sortMode)
 			return zoneA:lower() < zoneB:lower()
 		end
 		return nil
+		
+	elseif sortMode == "activity" then
+		-- Get ActivityTracker module
+		local ActivityTracker = BFL:GetModule("ActivityTracker")
+		if not ActivityTracker then
+			return nil
+		end
+		
+		-- Get friend UIDs
+		local function GetFriendUID(friend)
+			if friend.type == "bnet" then
+				return friend.battleTag and ("bnet_" .. friend.battleTag) or nil
+			else
+				return friend.name and ("wow_" .. friend.name) or nil
+			end
+		end
+		
+		local uidA = GetFriendUID(a)
+		local uidB = GetFriendUID(b)
+		
+		-- Get last activity timestamps
+		local activityA = uidA and ActivityTracker:GetLastActivity(uidA) or 0
+		local activityB = uidB and ActivityTracker:GetLastActivity(uidB) or 0
+		
+		-- Sort by most recent activity first (higher timestamp = more recent)
+		if activityA ~= activityB then
+			return activityA > activityB
+		end
+		return nil
 	end
 	
 	-- Unknown sort mode or equal
