@@ -884,7 +884,7 @@
 		</Anchors>
 		<Layers>
 			<Layer level="OVERLAY" textureSubLevel="-1">
-				<Texture parentKey="PortraitIcon" file="Interface\FriendsFrame\Battlenet-Portrait">
+				<Texture parentKey="PortraitIcon" file="Interface\AddOns\BetterFriendlist\Textures\PortraitIcon">
 					<Size x="60" y="60" />
 					<Anchors>
 						<Anchor point="TOPLEFT" x="-5" y="7" />
