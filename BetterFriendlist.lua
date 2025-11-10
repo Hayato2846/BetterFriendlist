@@ -1286,6 +1286,12 @@ function BetterFriendsList_Button_OnEnter(button)
 	
 	-- Add activity information
 	local ActivityTracker = BFL:GetModule("ActivityTracker")
+	print("=== TOOLTIP DEBUG ===")
+	print("ActivityTracker module:", ActivityTracker)
+	print("friend.bnetAccountID:", friend.bnetAccountID)
+	print("friend.battleTag:", friend.battleTag)
+	print("friend.name:", friend.name)
+	
 	if ActivityTracker then
 		local friendUID = nil
 		
@@ -1302,8 +1308,17 @@ function BetterFriendsList_Button_OnEnter(button)
 			end
 		end
 		
+		print("Resolved friendUID:", friendUID)
+		
 		if friendUID then
 			local activity = ActivityTracker:GetAllActivities(friendUID)
+			print("Activity data:", activity)
+			if activity then
+				print("  lastWhisper:", activity.lastWhisper)
+				print("  lastGroup:", activity.lastGroup)
+				print("  lastTrade:", activity.lastTrade)
+			end
+			
 			if activity and (activity.lastWhisper or activity.lastGroup or activity.lastTrade) then
 				GameTooltip:AddLine(" ") -- Spacer
 				
