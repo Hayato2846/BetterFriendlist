@@ -50,6 +50,3 @@ BetterFriendlist_Tooltip.lua
 # Settings
 BetterFriendlist_Settings.lua
 BetterFriendlist_Settings.xml
-
-# Tests (Optional - for development)
-Tests\ActivityTracker_Tests.lua
