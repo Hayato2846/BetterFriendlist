@@ -10,6 +10,9 @@
 
 local addonName, BFL = ...
 
+-- Import UI constants
+local UI = BFL.UI.CONSTANTS
+
 -- ========================================
 -- QUICK JOIN FRAME CALLBACKS
 -- ========================================
@@ -62,7 +65,7 @@ function BetterQuickJoinFrame_OnLoad(self)
 				button.Selected:SetShown(selected)
 			end
 			if button.Highlight then
-				button.Highlight:SetAlpha(selected and 0 or 0.5)
+				button.Highlight:SetAlpha(selected and 0 or UI.ALPHA_DIMMED)
 			end
 		end)
 		
@@ -242,21 +245,21 @@ function BetterQuickJoinRoleSelectionFrame:ShowForGroup(guid)
 	-- Create checkboxes if not exist
 	if not self.TankCheck then
 		self.TankCheck = CreateFrame("CheckButton", nil, self, "UICheckButtonTemplate")
-		self.TankCheck:SetPoint("TOPLEFT", 20, -40)
+		self.TankCheck:SetPoint("TOPLEFT", UI.SPACING_XLARGE, UI.BUTTON_OFFSET_Y)
 		self.TankCheck.Text:SetText("Tank")
 		
 		self.HealerCheck = CreateFrame("CheckButton", nil, self, "UICheckButtonTemplate")
-		self.HealerCheck:SetPoint("TOPLEFT", 20, -70)
+		self.HealerCheck:SetPoint("TOPLEFT", UI.SPACING_XLARGE, -70)
 		self.HealerCheck.Text:SetText("Healer")
 		
 		self.DamageCheck = CreateFrame("CheckButton", nil, self, "UICheckButtonTemplate")
-		self.DamageCheck:SetPoint("TOPLEFT", 20, -100)
+		self.DamageCheck:SetPoint("TOPLEFT", UI.SPACING_XLARGE, -100)
 		self.DamageCheck.Text:SetText("Damage")
 		
 		-- Join button
 		self.JoinButton = CreateFrame("Button", nil, self, "UIPanelButtonTemplate")
 		self.JoinButton:SetSize(100, 25)
-		self.JoinButton:SetPoint("BOTTOM", 0, 20)
+		self.JoinButton:SetPoint("BOTTOM", 0, UI.SPACING_XLARGE)
 		self.JoinButton:SetText("Join")
 		self.JoinButton:SetScript("OnClick", function()
 			BetterQuickJoinGroupButton_OnJoinClick(self)

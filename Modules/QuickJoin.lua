@@ -164,7 +164,30 @@ function QuickJoin:Initialize()
 	-- Initial update
 	self:Update()
 	
+	-- Start periodic cache cleanup (every 5 minutes)
+	C_Timer.NewTicker(300, function()
+		self:CleanupCache()
+	end)
+	
 	self.initialized = true
+end
+
+-- Cleanup old cache entries (called every 5 minutes)
+function QuickJoin:CleanupCache()
+	local currentTime = GetTime()
+	local maxAge = 300 -- 5 minutes
+	local cleaned = 0
+	
+	for guid, cached in pairs(self.groupCache) do
+		if currentTime - cached.timestamp > maxAge then
+			self.groupCache[guid] = nil
+			cleaned = cleaned + 1
+		end
+	end
+	
+	if cleaned > 0 then
+		BFL:DebugPrint("QuickJoin: Cleaned up", cleaned, "old cache entries")
+	end
 end
 
 -- Update available groups list
@@ -270,7 +293,7 @@ function QuickJoin:GetGroupInfo(groupGUID)
 		info.numMembers = #info.members
 		
 		-- Get leader name
-		if info.members[1] then
+		if info.members and #info.members > 0 and info.members[1] then
 			local member = info.members[1]
 			
 			-- Try multiple name fields
@@ -300,7 +323,7 @@ function QuickJoin:GetGroupInfo(groupGUID)
 	
 	-- Get GROUP TITLE from queues (NOT activity name!)
 	-- Blizzard's approach: Display searchResultInfo.name for LFG List (the group's custom title)
-	if info.queues and #info.queues > 0 then
+	if info.queues and #info.queues > 0 and info.queues[1] then
 		local queueData = info.queues[1].queueData
 		if queueData then
 			-- Get group title/name based on queue type
@@ -340,7 +363,7 @@ function QuickJoin:GetGroupInfo(groupGUID)
 				end
 				
 				-- Activity name für Tooltip
-				if searchResultInfo.activityIDs and searchResultInfo.activityIDs[1] then
+				if searchResultInfo.activityIDs and #searchResultInfo.activityIDs > 0 and searchResultInfo.activityIDs[1] then
 					info.activityName = C_LFGList.GetActivityFullName(searchResultInfo.activityIDs[1], nil, searchResultInfo.isWarMode)
 				end
 				
@@ -448,6 +471,9 @@ function QuickJoin:GetGroupPriority(groupGUID)
 	end)
 	
 	-- Check relationship with leader
+	if not members or #members == 0 or not members[1] then
+		return 0
+	end
 	local leaderGUID = members[1].guid
 	local accountInfo = C_BattleNet.GetAccountInfoByGUID(leaderGUID)
 	
@@ -611,7 +637,7 @@ function QuickJoinEntry:ApplyToFrame(frame)
 	end
 	
 	-- Queue Icon (MIDDLE, between members and queues) (QuickJoin.lua:492-497)
-	local useGroupIcon = #self.displayedQueues > 0 and self.displayedQueues[1].queueData.queueType == "lfglist"
+	local useGroupIcon = self.displayedQueues and #self.displayedQueues > 0 and self.displayedQueues[1] and self.displayedQueues[1].queueData and self.displayedQueues[1].queueData.queueType == "lfglist"
 	if frame.Icon then
 		frame.Icon:SetAtlas(useGroupIcon and "socialqueuing-icon-group" or "socialqueuing-icon-eye")
 		-- Set height based on member names height (Blizzard: QuickJoin.lua:500)
@@ -729,7 +755,7 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 	local needTank, needHealer, needDamage = false, false, false
 	
 	-- Get group title from first queue (this is searchResultInfo.name - "Wo ist Hayato")
-	if self.displayedQueues and #self.displayedQueues > 0 then
+	if self.displayedQueues and #self.displayedQueues > 0 and self.displayedQueues[1] then
 		local firstQueue = self.displayedQueues[1]
 		if firstQueue.queueData and firstQueue.queueData.name then
 			groupTitle = firstQueue.queueData.name
@@ -755,7 +781,7 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 	-- Try groupInfo.leaderName first (more reliable)
 	if self.groupInfo and self.groupInfo.leaderName then
 		leaderName = self.groupInfo.leaderName
-	elseif self.displayedMembers and #self.displayedMembers > 0 then
+	elseif self.displayedMembers and #self.displayedMembers > 0 and self.displayedMembers[1] then
 		local memberGuid = self.displayedMembers[1].guid
 		if memberGuid then
 			-- Check if this is a mock GUID first
@@ -998,6 +1024,10 @@ function QuickJoin:GetGroupDisplayName(groupGUID)
 	end)
 	
 	-- Get leader name
+	if not members or #members == 0 or not members[1] then
+		return UNKNOWNOBJECT or "Unknown Group"
+	end
+	
 	local leaderName = members[1].clubName or members[1].name or "Unknown"
 	local color = "|cffffffff"  -- Default white
 	
@@ -1023,7 +1053,7 @@ end
 -- Get formatted queue name for display
 function QuickJoin:GetQueueDisplayName(groupGUID)
 	local queues = C_SocialQueue.GetGroupQueues(groupGUID)
-	if not queues or #queues == 0 then
+	if not queues or #queues == 0 or not queues[1] then
 		return "No Queue"
 	end
 	
@@ -1123,7 +1153,7 @@ function QuickJoin:CreateMockGroup(leaderName, activityName, numMembers, needTan
 		needDamage = needDamage,  -- FIXED: Use needDamage not needsDPS
 		isSoloQueueParty = false,
 		questSessionActive = false,
-		leaderGUID = members[1].guid,
+		leaderGUID = (members and #members > 0 and members[1]) and members[1].guid or "Unknown",
 		members = members,
 		queues = queues,
 		requestedToJoin = false,
@@ -1475,6 +1505,7 @@ function QuickJoin:OpenContextMenu(guid, anchorFrame)
 	end
 	
 	-- Get first member (leader) for context
+	if not groupInfo.members[1] then return end
 	local leaderInfo = groupInfo.members[1]
 	if not leaderInfo then return end
 	

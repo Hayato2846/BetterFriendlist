@@ -607,6 +607,9 @@ end
 
 -- Get display list item
 function FriendsList:GetDisplayListItem(index)
+	if not self.displayList or not index or index < 1 or index > #self.displayList then
+		return nil
+	end
 	return self.displayList[index]
 end
 
@@ -988,6 +991,9 @@ function FriendsList:RenderDisplay()
 		end
 		
 		local item = displayList[index]
+		if not item then
+			break
+		end
 		local buttonHeight = (item.type == BUTTON_TYPE_GROUP_HEADER) and HEADER_HEIGHT or FRIEND_HEIGHT
 		
 		-- Check if this button would fit in the remaining space

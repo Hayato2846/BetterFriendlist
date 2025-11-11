@@ -242,9 +242,11 @@ local function GetOrCreateFriendButton(index)
 					if not IsShiftKeyDown() then
 						if BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friendUID] then
 							for i = #BetterFriendlistDB.friendGroups[friendUID], 1, -1 do
-								local groupId = BetterFriendlistDB.friendGroups[friendUID][i]
-								if friendGroups[groupId] and not friendGroups[groupId].builtin then
-									table.remove(BetterFriendlistDB.friendGroups[friendUID], i)
+								if BetterFriendlistDB.friendGroups[friendUID][i] then
+									local groupId = BetterFriendlistDB.friendGroups[friendUID][i]
+									if friendGroups[groupId] and not friendGroups[groupId].builtin then
+										table.remove(BetterFriendlistDB.friendGroups[friendUID], i)
+									end
 								end
 							end
 						end

@@ -39,6 +39,9 @@ function RAF:OnLoad(frame)
 	frame.rafEnabled = C_RecruitAFriend.IsEnabled and C_RecruitAFriend.IsEnabled() or false
 	frame.rafRecruitingEnabled = C_RecruitAFriend.IsRecruitingEnabled and C_RecruitAFriend.IsRecruitingEnabled() or false
 	
+	-- Unregister existing events to prevent duplicates
+	frame:UnregisterAllEvents()
+	
 	-- Register events
 	frame:RegisterEvent("RAF_SYSTEM_ENABLED_STATUS")
 	frame:RegisterEvent("RAF_RECRUITING_ENABLED_STATUS")
@@ -337,7 +340,7 @@ function RAF:UpdateRAFInfo(frame, rafInfo)
 	frame.rafInfo = rafInfo
 	
 	-- Store latest RAF version globally for recruit button logic
-	if rafInfo.versions and rafInfo.versions[1] then
+	if rafInfo.versions and #rafInfo.versions > 0 and rafInfo.versions[1] then
 		latestRAFVersion = rafInfo.versions[1].rafVersion or 0
 	end
 	
@@ -348,7 +351,7 @@ function RAF:UpdateRAFInfo(frame, rafInfo)
 	
 	-- Update month count
 	if frame.RewardClaiming and frame.RewardClaiming.MonthCount and frame.RewardClaiming.MonthCount.Text then
-		local latestVersionInfo = rafInfo.versions and rafInfo.versions[1]
+		local latestVersionInfo = rafInfo.versions and #rafInfo.versions > 0 and rafInfo.versions[1]
 		if latestVersionInfo then
 			local monthCount = latestVersionInfo.monthCount and latestVersionInfo.monthCount.lifetimeMonths or 0
 			-- Format: "X Months Subscribed by Friends"
@@ -359,7 +362,7 @@ function RAF:UpdateRAFInfo(frame, rafInfo)
 	end
 	
 	-- Update next reward
-	local latestVersionInfo = rafInfo.versions and rafInfo.versions[1]
+	local latestVersionInfo = rafInfo.versions and #rafInfo.versions > 0 and rafInfo.versions[1]
 	if latestVersionInfo and latestVersionInfo.nextReward then
 		self:UpdateNextReward(frame, latestVersionInfo.nextReward)
 	end
@@ -478,9 +481,13 @@ function RAF:RecruitListButton_SetupRecruit(button, recruitInfo)
 	end
 	
 	-- Update activities (always process all activity buttons to ensure they're hidden when no activities)
-	for i = 1, #button.Activities do
-		local activityInfo = recruitInfo.activities and recruitInfo.activities[i] or nil
-		self:RecruitActivityButton_Setup(button.Activities[i], activityInfo, recruitInfo)
+	if button.Activities then
+		for i = 1, #button.Activities do
+			if button.Activities[i] then
+				local activityInfo = recruitInfo.activities and recruitInfo.activities[i] or nil
+				self:RecruitActivityButton_Setup(button.Activities[i], activityInfo, recruitInfo)
+			end
+		end
 	end
 	
 	button:Show()
@@ -603,8 +610,12 @@ function RAF:RecruitActivityButton_OnEnter(button)
 		
 		if C_RecruitAFriend.GetRecruitActivityRequirementsText then
 			local reqTextLines = C_RecruitAFriend.GetRecruitActivityRequirementsText(button.activityInfo.activityID, button.recruitInfo.acceptanceID)
-			for i = 1, #reqTextLines do
-				GameTooltip_AddColoredLine(GameTooltip, reqTextLines[i], HIGHLIGHT_FONT_COLOR, wrap)
+			if reqTextLines then
+				for i = 1, #reqTextLines do
+					if reqTextLines[i] then
+						GameTooltip_AddColoredLine(GameTooltip, reqTextLines[i], HIGHLIGHT_FONT_COLOR, wrap)
+					end
+				end
 			end
 		end
 		
@@ -651,7 +662,7 @@ function RAF:NextRewardButton_OnClick(button, mouseButton)
 	local frame = button:GetParent():GetParent()
 	if not frame or not frame.rafInfo then return end
 	
-	local latestVersionInfo = frame.rafInfo.versions and frame.rafInfo.versions[1]
+	local latestVersionInfo = frame.rafInfo.versions and #frame.rafInfo.versions > 0 and frame.rafInfo.versions[1]
 	local nextReward = latestVersionInfo and latestVersionInfo.nextReward
 	
 	if IsModifiedClick("DRESSUP") and nextReward then
@@ -674,7 +685,7 @@ function RAF:NextRewardButton_OnEnter(button)
 	local frame = button:GetParent():GetParent()
 	if not frame or not frame.rafInfo then return end
 	
-	local latestVersionInfo = frame.rafInfo.versions and frame.rafInfo.versions[1]
+	local latestVersionInfo = frame.rafInfo.versions and #frame.rafInfo.versions > 0 and frame.rafInfo.versions[1]
 	local nextReward = latestVersionInfo and latestVersionInfo.nextReward
 	
 	if not nextReward or not nextReward.itemID then return end
@@ -697,7 +708,7 @@ function RAF:ClaimOrViewRewardButton_OnClick(button)
 	local frame = button:GetParent():GetParent()
 	if not frame or not frame.rafInfo then return end
 	
-	local latestVersionInfo = frame.rafInfo.versions and frame.rafInfo.versions[1]
+	local latestVersionInfo = frame.rafInfo.versions and #frame.rafInfo.versions > 0 and frame.rafInfo.versions[1]
 	local nextReward = latestVersionInfo and latestVersionInfo.nextReward
 	local haveUnclaimedReward = nextReward and nextReward.canClaim
 	
@@ -737,10 +748,10 @@ function RAF:ClaimOrViewRewardButton_OnClick(button)
 				RecruitAFriendFrame.rafInfo = frame.rafInfo
 				RecruitAFriendFrame.rafEnabled = true
 				
-				-- ALWAYS set selected RAF version to the latest when opening rewards
-				-- This ensures we start with the correct version every time
-				if frame.rafInfo.versions and #frame.rafInfo.versions > 0 then
-					local latestVersion = frame.rafInfo.versions[1].rafVersion
+			-- ALWAYS set selected RAF version to the latest when opening rewards
+			-- This ensures we start with the correct version every time
+			if frame.rafInfo.versions and #frame.rafInfo.versions > 0 and frame.rafInfo.versions[1] then
+				local latestVersion = frame.rafInfo.versions[1].rafVersion
 					RecruitAFriendFrame.selectedRAFVersion = latestVersion
 				end
 				
@@ -765,10 +776,10 @@ function RAF:ClaimOrViewRewardButton_OnClick(button)
 						if RecruitAFriendRewardsFrame and RecruitAFriendRewardsFrame.Refresh then
 							RecruitAFriendRewardsFrame:Refresh()
 						end
-					elseif event == "RewardsListOpened" then
-						-- Set to latest version when opening
-						if self.rafInfo and self.rafInfo.versions and #self.rafInfo.versions > 0 then
-							self.selectedRAFVersion = self.rafInfo.versions[1].rafVersion
+				elseif event == "RewardsListOpened" then
+					-- Set to latest version when opening
+					if self.rafInfo and self.rafInfo.versions and #self.rafInfo.versions > 0 and self.rafInfo.versions[1] then
+						self.selectedRAFVersion = self.rafInfo.versions[1].rafVersion
 						end
 					end
 					

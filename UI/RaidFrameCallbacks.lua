@@ -10,6 +10,9 @@
 
 local addonName, BFL = ...
 
+-- Import UI constants
+local UI = BFL.UI.CONSTANTS
+
 -- Helper: Get RaidFrame module
 local function GetRaidFrame()
 	return BFL:GetModule("RaidFrame")
@@ -242,7 +245,7 @@ function BetterRaidFrame_RaidInfoButton_OnClick(self)
 		RaidInfoFrame:SetPoint("TOPLEFT", BetterFriendsFrame, "TOPRIGHT", 0, 0)
 	else
 		-- Fallback if BetterFriendsFrame is hidden
-		RaidInfoFrame:SetPoint("CENTER", UIParent, "CENTER", 200, 0)
+		RaidInfoFrame:SetPoint("CENTER", UIParent, "CENTER", UI.CENTER_OFFSET, 0)
 	end
 	
 	-- Hook the close button to restore original parent

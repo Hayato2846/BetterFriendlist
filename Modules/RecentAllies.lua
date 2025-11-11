@@ -203,7 +203,7 @@ function RecentAllies:InitializeEntry(button, elementData)
 	end
 	
 	-- Set most recent interaction (Line 2)
-	local mostRecentInteraction = interactionData.interactions and interactionData.interactions[1]
+	local mostRecentInteraction = interactionData.interactions and #interactionData.interactions > 0 and interactionData.interactions[1]
 	if mostRecentInteraction then
 		button.CharacterData.MostRecentInteraction:SetText(mostRecentInteraction.description or "")
 	else
@@ -333,7 +333,7 @@ function RecentAllies:BuildTooltip(button, tooltip)
 	end
 	
 	-- Most recent interaction
-	if interactionData.interactions and #interactionData.interactions > 0 then
+	if interactionData.interactions and #interactionData.interactions > 0 and interactionData.interactions[1] then
 		GameTooltip_AddBlankLineToTooltip(tooltip)
 		local mostRecent = interactionData.interactions[1]
 		GameTooltip_AddNormalLine(tooltip, "Recent Activity:")
