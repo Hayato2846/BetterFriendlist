@@ -4,6 +4,22 @@
 
 local ADDON_NAME, BFL = ...
 
+--------------------------------------------------------------------------
+-- UI CONSTANTS
+--------------------------------------------------------------------------
+local UI_CONSTANTS = {
+	DROPDOWN_WIDTH = 51,
+	TOOLTIP_OFFSET_X = 36,
+	TOOLTIP_ANCHOR_Y = -18,
+	SPACING_SMALL = 5,
+	SPACING_MEDIUM = 10,
+	SPACING_LARGE = 15,
+	BUTTON_OFFSET_Y = -40,
+	CENTER_OFFSET = 200,
+	DIALOG_WIDTH = 300,
+	DIALOG_HEIGHT = 200,
+}
+
 -- Module registration
 local FrameInitializer = {
 	name = "FrameInitializer",
@@ -58,7 +74,7 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 		radio:SetResponder(SetSelected)
 	end
 	
-	dropdown:SetWidth(51)
+	dropdown:SetWidth(UI_CONSTANTS.DROPDOWN_WIDTH)
 	dropdown:SetupMenu(function(dropdown, rootDescription)
 		rootDescription:SetTag("MENU_FRIENDS_STATUS")
 		
@@ -147,7 +163,7 @@ function FrameInitializer:InitializeSortDropdown(frame)
 	end
 	
 	-- Narrower width to match QuickFilters style
-	dropdown:SetWidth(51)
+	dropdown:SetWidth(UI_CONSTANTS.DROPDOWN_WIDTH)
 	
 	dropdown:SetupMenu(function(dropdown, rootDescription)
 		rootDescription:SetTag("MENU_FRIENDS_SORT")

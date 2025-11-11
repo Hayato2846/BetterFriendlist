@@ -907,10 +907,17 @@ function FriendsList:RenderDisplay()
 	-- Calculate the maximum valid offset
 	local maxOffset = math.max(0, numItems - maxVisibleButtons)
 	
+	-- Save current scroll position before update
+	local savedOffset = FauxScrollFrame_GetOffset(scrollFrame)
+	
 	-- Update scroll frame - use dynamic height based on compact mode
 	-- ONLY call FauxScrollFrame_Update if we're not in a mouse wheel update
 	if not BetterFriendsFrame.inMouseWheelUpdate then
 		FauxScrollFrame_Update(scrollFrame, numItems, maxVisibleButtons, avgButtonHeight)
+		
+		-- Restore scroll position after update (clamped to valid range)
+		local restoredOffset = math.max(0, math.min(savedOffset, maxOffset))
+		scrollFrame:SetVerticalScroll(restoredOffset * avgButtonHeight)
 	end
 	
 	-- FauxScrollFrame_Update can hide the scrollFrame when numItems <= NUM_BUTTONS

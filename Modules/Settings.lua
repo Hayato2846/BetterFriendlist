@@ -1254,11 +1254,11 @@ end
 -- Encode string to base64-like format (simple compression-safe encoding)
 function Settings:EncodeString(str)
 	-- Simple encoding: convert to hex representation
-	local hex = ""
+	local hexParts = {}
 	for i = 1, #str do
-		hex = hex .. string.format("%02x", string.byte(str, i))
+		table.insert(hexParts, string.format("%02x", string.byte(str, i)))
 	end
-	return "BFL1:" .. hex -- BFL1: prefix for version identification
+	return "BFL1:" .. table.concat(hexParts) -- BFL1: prefix for version identification
 end
 
 -- Decode base64-like format back to string
@@ -1272,16 +1272,16 @@ function Settings:DecodeString(encoded)
 	local hex = string.sub(encoded, 6)
 	
 	-- Convert hex back to string
-	local str = ""
+	local chars = {}
 	for i = 1, #hex, 2 do
 		local byte = tonumber(string.sub(hex, i, i+1), 16)
 		if not byte then
 			return nil
 		end
-		str = str .. string.char(byte)
+		table.insert(chars, string.char(byte))
 	end
 	
-	return str
+	return table.concat(chars)
 end
 
 -- Show export dialog with scrollable text
@@ -1362,12 +1362,12 @@ function Settings:RefreshStatistics()
 	if statsTab.ClassList then
 		local topClasses = Statistics:GetTopClasses(5)
 		if topClasses and #topClasses > 0 then
-			local classText = ""
+			local classParts = {}
 			for i, class in ipairs(topClasses) do
-				if i > 1 then classText = classText .. "\n" end
-				classText = classText .. string.format("%d. %s: %d", i, class.name, class.count)
+				if i > 1 then table.insert(classParts, "\n") end
+				table.insert(classParts, string.format("%d. %s: %d", i, class.name, class.count))
 			end
-			statsTab.ClassList:SetText(classText)
+			statsTab.ClassList:SetText(table.concat(classParts))
 		else
 			statsTab.ClassList:SetText("No class data available")
 		end
@@ -1377,12 +1377,12 @@ function Settings:RefreshStatistics()
 	if statsTab.RealmList then
 		local topRealms = Statistics:GetTopRealms(5)
 		if topRealms and #topRealms > 0 then
-			local realmText = ""
+			local realmParts = {}
 			for i, realm in ipairs(topRealms) do
-				if i > 1 then realmText = realmText .. "\n" end
-				realmText = realmText .. string.format("%d. %s: %d", i, realm.name, realm.count)
+				if i > 1 then table.insert(realmParts, "\n") end
+				table.insert(realmParts, string.format("%d. %s: %d", i, realm.name, realm.count))
 			end
-			statsTab.RealmList:SetText(realmText)
+			statsTab.RealmList:SetText(table.concat(realmParts))
 		else
 			statsTab.RealmList:SetText("No realm data available")
 		end

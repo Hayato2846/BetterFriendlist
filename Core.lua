@@ -5,7 +5,7 @@
 
 -- Create addon namespace
 local ADDON_NAME, BFL = ...
-BFL.Version = "1.3.2-beta"
+BFL.Version = "1.3.3-beta"
 
 -- Make BFL globally accessible for tooltip and other legacy files
 _G.BFL = BFL
