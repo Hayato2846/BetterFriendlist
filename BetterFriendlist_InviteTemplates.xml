@@ -1,0 +1,118 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+	
+	<!-- Friend Invite Header - Matches Group Header Style -->
+	<Button name="BFL_FriendInviteHeaderTemplate" virtual="true">
+		<Size x="375" y="22"/>
+		<NormalFont style="GameFontNormalLeft"/>
+		<HighlightFont style="GameFontHighlightLeft"/>
+		<Layers>
+			<Layer level="BACKGROUND" textureSubLevel="-1">
+				<Texture parentKey="BG" file="Interface\FrameGeneral\UI-Background-Rock" horizTile="true" vertTile="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="2" y="-1"/>
+						<Anchor point="BOTTOMRIGHT" x="-2" y="1"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture parentKey="RightArrow" atlas="friendslist-categorybutton-arrow-right" useAtlasSize="true" hidden="true">
+					<Anchors>
+						<Anchor point="LEFT" x="8" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="DownArrow" atlas="friendslist-categorybutton-arrow-down" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="LEFT" x="6" y="-2"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<ButtonText parentKey="Text">
+			<Anchors>
+				<Anchor point="LEFT" x="22" y="0"/>
+			</Anchors>
+			<Color r="1.0" g="0.82" b="0.0"/>
+		</ButtonText>
+		<HighlightTexture file="Interface\QuestFrame\UI-QuestLogTitleHighlight" alphaMode="ADD">
+			<Anchors>
+				<Anchor point="TOPLEFT" x="0" y="-1"/>
+				<Anchor point="BOTTOMRIGHT" x="0" y="1"/>
+			</Anchors>
+		</HighlightTexture>
+	</Button>
+	
+	<!-- Friend Invite Button - Blizzard Style (Text only, no icon) -->
+	<Button name="BFL_FriendInviteButtonTemplate" virtual="true" registerForClicks="LeftButtonUp,RightButtonUp">
+		<Size x="375" y="34"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="background">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="0" y="-1"/>
+						<Anchor point="BOTTOMRIGHT" x="0" y="1"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<!-- Account Name (no icon) -->
+				<FontString parentKey="Name" inherits="FriendsFont_Normal" justifyH="LEFT">
+					<Size x="200" y="0"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="10" y="-6"/>
+					</Anchors>
+				</FontString>
+				
+				<!-- Info text (hidden in compact mode) -->
+				<FontString parentKey="Info" inherits="FriendsFont_Small" justifyH="LEFT" hidden="true">
+					<Size x="200" y="0"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeKey="$parent.Name" relativePoint="BOTTOMLEFT" x="0" y="-1"/>
+					</Anchors>
+					<Color color="FRIENDS_GRAY_COLOR"/>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+		<!-- Accept Button - Narrower, positioned further right -->
+		<Button parentKey="AcceptButton" inherits="UIMenuButtonStretchTemplate">
+			<Size x="75" y="22"/>
+			<Anchors>
+				<Anchor point="RIGHT" x="-90" y="0"/>
+			</Anchors>
+				<ButtonText text="Accept"/>
+			</Button>
+			
+		<!-- Decline Button - Narrower -->
+		<Button parentKey="DeclineButton" inherits="UIMenuButtonStretchTemplate">
+			<Size x="75" y="22"/>
+			<Anchors>
+				<Anchor point="RIGHT" x="-10" y="0"/>
+				</Anchors>
+				<ButtonText text="Decline"/>
+			</Button>
+		</Frames>
+		<HighlightTexture file="Interface\QuestFrame\UI-QuestLogTitleHighlight" alphaMode="ADD">
+			<Anchors>
+				<Anchor point="TOPLEFT" x="0" y="-1"/>
+				<Anchor point="BOTTOMRIGHT" x="0" y="1"/>
+			</Anchors>
+		</HighlightTexture>
+	</Button>
+	
+	<!-- Simple Divider Line -->
+	<Frame name="BetterFriendsDividerTemplate" virtual="true">
+		<Size x="375" y="8"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture parentKey="Line">
+					<Size x="357" y="1"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+					<Color r="0.5" g="0.5" b="0.5" a="0.5"/>
+				</Texture>
+			</Layer>
+		</Layers>
+	</Frame>
+	
+</Ui>

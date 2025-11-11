@@ -17,6 +17,9 @@ local function GetFontManager() return BFL.FontManager end
 -- ========================================
 local BUTTON_TYPE_FRIEND = 1
 local BUTTON_TYPE_GROUP_HEADER = 2
+local BUTTON_TYPE_INVITE_HEADER = 3
+local BUTTON_TYPE_INVITE = 4
+local BUTTON_TYPE_DIVIDER = 5
 
 -- Race condition protection
 local isUpdatingFriendsList = false
@@ -143,6 +146,23 @@ function FriendsList:Initialize()
 	
 	BFL:RegisterEventCallback("BN_FRIEND_INFO_CHANGED", function(...)
 		self:OnFriendListUpdate(...)
+	end, 10)
+	
+	-- Register friend invite events
+	BFL:RegisterEventCallback("BN_FRIEND_INVITE_LIST_INITIALIZED", function()
+		self:UpdateFriendsList()
+	end, 10)
+	
+	BFL:RegisterEventCallback("BN_FRIEND_INVITE_ADDED", function()
+		local collapsed = GetCVarBool("friendInvitesCollapsed")
+		if collapsed then
+			self:FlashInviteHeader()
+		end
+		self:UpdateFriendsList()
+	end, 10)
+	
+	BFL:RegisterEventCallback("BN_FRIEND_INVITE_REMOVED", function()
+		self:UpdateFriendsList()
 	end, 10)
 end
 
@@ -415,6 +435,24 @@ function FriendsList:BuildDisplayList()
 	
 	-- Sync groups first
 	self:SyncGroups()
+	
+	-- Add friend invites at top
+	local numInvites = BNGetNumFriendInvites()
+	if numInvites and numInvites > 0 then
+		table.insert(self.displayList, {
+			type = BUTTON_TYPE_INVITE_HEADER,
+			count = numInvites,
+		})
+		
+		if not GetCVarBool("friendInvitesCollapsed") then
+			for i = 1, numInvites do
+				table.insert(self.displayList, {
+					type = BUTTON_TYPE_INVITE,
+					inviteIndex = i,
+				})
+			end
+		end
+	end
 	
 	-- Separate friends into groups
 	local groupedFriends = {
@@ -1175,6 +1213,17 @@ function FriendsList:RenderDisplay()
 				end)
 			end
 		
+		elseif item.type == BUTTON_TYPE_INVITE_HEADER then
+			-- Configure invite header button
+			self:UpdateInviteHeaderButton(button, item)
+		
+		elseif item.type == BUTTON_TYPE_INVITE then
+			-- Configure invite button
+			self:UpdateInviteButton(button, item)
+		
+		elseif item.type == BUTTON_TYPE_DIVIDER then
+			-- Divider needs no configuration
+		
 		elseif item.type == BUTTON_TYPE_FRIEND then
 			-- Configure friend button
 			local friend = item.friend
@@ -1719,6 +1768,88 @@ function FriendsList:RenderDisplay()
 			
 		end -- end of elseif item.type == BUTTON_TYPE_FRIEND
 	end -- end of for loop
+end
+
+-- ========================================
+-- Friend Invite Functions
+-- ========================================
+
+-- Update invite header button
+function FriendsList:UpdateInviteHeaderButton(button, data)
+	button.Text:SetFormattedText("Friend Requests (%d)", data.count)
+	local collapsed = GetCVarBool("friendInvitesCollapsed")
+	button.DownArrow:SetShown(not collapsed)
+	button.RightArrow:SetShown(collapsed)
+	
+	-- Apply font scaling to header text
+	local FontManager = BFL.FontManager
+	if FontManager and button.Text then
+		FontManager:ApplyFontSize(button.Text)
+	end
+end
+
+-- Update invite button
+function FriendsList:UpdateInviteButton(button, data)
+	local inviteID, accountName = BNGetFriendInviteInfo(data.inviteIndex)
+	if not inviteID then return end
+	
+	-- Get current button height to determine if compact mode
+	local height = button:GetHeight()
+	local isCompact = height < 25
+	
+	-- Set name with cyan color (BNet style)
+	button.Name:SetText("|cff00ccff" .. accountName .. "|r")
+	
+	-- Set Info text ALWAYS
+	button.Info:SetText("Tap to accept or decline")
+	
+	-- Adjust positioning based on compact mode
+	button.Name:ClearAllPoints()
+	
+	if isCompact then
+		-- Compact mode: single line, vertically centered
+		button.Name:SetPoint("LEFT", 10, 0)
+		button.Info:Hide()
+	else
+		-- Normal mode: two-line layout (Info uses XML relative positioning)
+		button.Name:SetPoint("TOPLEFT", 10, -6)
+		button.Info:Show()
+	end
+	
+	-- Apply font scaling (must be called after text is set)
+	local FontManager = BFL.FontManager
+	if FontManager then
+		FontManager:ApplyFontSize(button.Name)
+		if not isCompact then
+			FontManager:ApplyFontSize(button.Info)
+		end
+		-- Apply to button text if exists
+		if button.AcceptButton and button.AcceptButton:GetFontString() then
+			FontManager:ApplyFontSize(button.AcceptButton:GetFontString())
+		end
+		if button.DeclineButton and button.DeclineButton:GetFontString() then
+			FontManager:ApplyFontSize(button.DeclineButton:GetFontString())
+		end
+	end
+	
+	-- Store invite data
+	button.inviteID = inviteID
+	button.inviteIndex = data.inviteIndex
+end
+
+-- Flash invite header when new invite arrives while collapsed
+function FriendsList:FlashInviteHeader()
+	-- Find header button in active buttons
+	local ButtonPool = BFL:GetModule("ButtonPool")
+	if not ButtonPool then return end
+	
+	for _, button in pairs(ButtonPool.activeButtons) do
+		if button.GetName and button:GetName() and button:GetName():find("InviteHeader") then
+			-- Flash animation (simple alpha pulse)
+			UIFrameFlash(button, 0.5, 0.5, 2, false, 0, 0)
+			break
+		end
+	end
 end
 
 -- ========================================

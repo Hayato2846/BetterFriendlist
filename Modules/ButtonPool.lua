@@ -20,6 +20,9 @@ local ButtonPool = BFL:RegisterModule("ButtonPool", {})
 -- Button types (must match BetterFriendlist.lua constants!)
 local BUTTON_TYPE_FRIEND = 1
 local BUTTON_TYPE_GROUP_HEADER = 2
+local BUTTON_TYPE_INVITE_HEADER = 3
+local BUTTON_TYPE_INVITE = 4
+local BUTTON_TYPE_DIVIDER = 5
 local NUM_BUTTONS = 12  -- Number of original XML buttons to hide
 
 --------------------------------------------------------------------------
@@ -28,13 +31,31 @@ local NUM_BUTTONS = 12  -- Number of original XML buttons to hide
 
 -- Button pool storage
 local buttonPool = {
-	friendButtons = {},    -- Pooled friend buttons
-	headerButtons = {},    -- Pooled group header buttons
-	activeButtons = {}     -- Currently visible buttons
+	friendButtons = {},      -- Pooled friend buttons
+	headerButtons = {},      -- Pooled group header buttons
+	inviteHeaderButtons = {},  -- Pooled invite header buttons
+	inviteButtons = {},      -- Pooled invite buttons
+	dividerButtons = {},     -- Pooled divider buttons
+	activeButtons = {}       -- Currently visible buttons
 }
+
+-- Button pool counters for recycling
+local currentHeaderIndex = 1
+local currentFriendIndex = 1
+local currentInviteHeaderIndex = 1
+local currentInviteIndex = 1
+local currentDividerIndex = 1
 
 -- Drag & drop state
 local currentDraggedFriend = nil
+
+-- Cached BNet background color for invite buttons
+local BNET_BG_R, BNET_BG_G, BNET_BG_B, BNET_BG_A
+if FRIENDS_BNET_BACKGROUND_COLOR then
+	BNET_BG_R, BNET_BG_G, BNET_BG_B, BNET_BG_A = FRIENDS_BNET_BACKGROUND_COLOR:GetRGBA()
+else
+	BNET_BG_R, BNET_BG_G, BNET_BG_B, BNET_BG_A = 0.101961, 0.149020, 0.196078, 1
+end
 
 --------------------------------------------------------------------------
 -- Helper Functions
@@ -334,6 +355,113 @@ function ButtonPool:Initialize()
 	-- Nothing to initialize yet
 end
 
+--------------------------------------------------------------------------
+-- Invite Header Button Creation
+--------------------------------------------------------------------------
+
+local function GetOrCreateInviteHeaderButton(index)
+	if not buttonPool.inviteHeaderButtons[index] then
+		local scrollFrame = BetterFriendsFrame.ScrollFrame
+		local buttonName = "BetterFriendsInviteHeader" .. index
+		local button = CreateFrame("Button", buttonName, scrollFrame, "BFL_FriendInviteHeaderTemplate")
+		
+		button:SetFrameLevel(scrollFrame:GetFrameLevel() + 2)
+		
+		-- OnClick to toggle collapse
+		button:SetScript("OnClick", function(self)
+			local collapsed = GetCVarBool("friendInvitesCollapsed")
+			SetCVar("friendInvitesCollapsed", collapsed and "0" or "1")
+			local FriendsList = BFL:GetModule("FriendsList")
+			if FriendsList then
+				-- Force full rebuild of display list
+				FriendsList:BuildDisplayList()
+				FriendsList:RenderDisplay()
+			end
+		end)
+		
+		buttonPool.inviteHeaderButtons[index] = button
+	end
+	return buttonPool.inviteHeaderButtons[index]
+end
+
+--------------------------------------------------------------------------
+-- Invite Button Creation
+--------------------------------------------------------------------------
+
+local function GetOrCreateInviteButton(index)
+	if not buttonPool.inviteButtons[index] then
+		local scrollFrame = BetterFriendsFrame.ScrollFrame
+		local buttonName = "BetterFriendsInvite" .. index
+		local button = CreateFrame("Button", buttonName, scrollFrame, "BFL_FriendInviteButtonTemplate")
+		
+		button:SetFrameLevel(scrollFrame:GetFrameLevel() + 2)
+		
+		-- Apply BNet background color (cached)
+		button.background:SetColorTexture(BNET_BG_R, BNET_BG_G, BNET_BG_B, BNET_BG_A)
+		
+		-- Initialize base font sizes for scaling (ApplyFontSize stores base on first call)
+		local FontManager = BFL.FontManager
+		if FontManager then
+			FontManager:ApplyFontSize(button.Name)
+			FontManager:ApplyFontSize(button.Info)
+		end
+		
+		-- Setup Accept button
+		button.AcceptButton:SetScript("OnClick", function(self)
+			local parent = self:GetParent()
+			if parent.inviteID then
+				BNAcceptFriendInvite(parent.inviteID)
+			end
+		end)
+		
+		-- Setup Decline dropdown
+		button.DeclineButton:SetScript("OnClick", function(self)
+			local parent = self:GetParent()
+			if not parent.inviteID or not parent.inviteIndex then return end
+			
+			local inviteID, accountName = BNGetFriendInviteInfo(parent.inviteIndex)
+			if not inviteID then return end
+			
+			MenuUtil.CreateContextMenu(self, function(owner, rootDescription)
+				rootDescription:CreateButton("Decline", function()
+					BNDeclineFriendInvite(inviteID)
+				end)
+				rootDescription:CreateButton("Report Player", function()
+					if C_ReportSystem and C_ReportSystem.OpenReportPlayerDialog then
+						C_ReportSystem.OpenReportPlayerDialog(
+							C_ReportSystem.ReportType.InappropriateBattleNetName,
+							accountName
+						)
+					end
+				end)
+				rootDescription:CreateButton("Block Invites", function()
+					BNSetBlocked(inviteID, true)
+				end)
+			end)
+		end)
+		
+		buttonPool.inviteButtons[index] = button
+	end
+	return buttonPool.inviteButtons[index]
+end
+
+--------------------------------------------------------------------------
+-- Divider Creation
+--------------------------------------------------------------------------
+
+local function GetOrCreateDividerButton(index)
+	if not buttonPool.dividerButtons[index] then
+		local scrollFrame = BetterFriendsFrame.ScrollFrame
+		local buttonName = "BetterFriendsDivider" .. index
+		local button = CreateFrame("Frame", buttonName, scrollFrame, "BetterFriendsDividerTemplate")
+		
+		button:SetFrameLevel(scrollFrame:GetFrameLevel() + 1)
+		
+		buttonPool.dividerButtons[index] = button
+	end
+	return buttonPool.dividerButtons[index]
+end
+
 function ButtonPool:GetOrCreateFriendButton(index)
 	return GetOrCreateFriendButton(index)
 end
@@ -345,10 +473,23 @@ end
 function ButtonPool:GetButtonForDisplay(index, buttonType)
 	-- Get or create the appropriate button type
 	local button
-	if buttonType == BUTTON_TYPE_GROUP_HEADER then
-		button = GetOrCreateHeaderButton(index)
+	if buttonType == BUTTON_TYPE_INVITE_HEADER then
+		button = GetOrCreateInviteHeaderButton(currentInviteHeaderIndex)
+		currentInviteHeaderIndex = currentInviteHeaderIndex + 1
+	elseif buttonType == BUTTON_TYPE_INVITE then
+		button = GetOrCreateInviteButton(currentInviteIndex)
+		currentInviteIndex = currentInviteIndex + 1
+		-- Set dynamic height based on compact mode
+		button:SetHeight(GetButtonHeight())
+	elseif buttonType == BUTTON_TYPE_DIVIDER then
+		button = GetOrCreateDividerButton(currentDividerIndex)
+		currentDividerIndex = currentDividerIndex + 1
+	elseif buttonType == BUTTON_TYPE_GROUP_HEADER then
+		button = GetOrCreateHeaderButton(currentHeaderIndex)
+		currentHeaderIndex = currentHeaderIndex + 1
 	else
-		button = GetOrCreateFriendButton(index)
+		button = GetOrCreateFriendButton(currentFriendIndex)
+		currentFriendIndex = currentFriendIndex + 1
 		-- Set dynamic height based on compact mode
 		button:SetHeight(GetButtonHeight())
 	end
@@ -369,6 +510,13 @@ function ButtonPool:GetButtonForDisplay(index, buttonType)
 end
 
 function ButtonPool:ResetButtonPool()
+	-- Reset button counters for recycling
+	currentHeaderIndex = 1
+	currentFriendIndex = 1
+	currentInviteHeaderIndex = 1
+	currentInviteIndex = 1
+	currentDividerIndex = 1
+	
 	-- Hide all buttons and clear stored data references
 	for _, button in pairs(buttonPool.friendButtons) do
 		button:Hide()
@@ -385,6 +533,17 @@ function ButtonPool:ResetButtonPool()
 		-- Clear group data reference
 		button.groupId = nil
 		button.groupData = nil
+	end
+	for _, button in pairs(buttonPool.inviteHeaderButtons) do
+		button:Hide()
+	end
+	for _, button in pairs(buttonPool.inviteButtons) do
+		button:Hide()
+		button.inviteID = nil
+		button.inviteIndex = nil
+	end
+	for _, button in pairs(buttonPool.dividerButtons) do
+		button:Hide()
 	end
 	
 	-- Clear active buttons list
