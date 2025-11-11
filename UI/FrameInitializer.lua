@@ -8,17 +8,60 @@ local ADDON_NAME, BFL = ...
 -- UI CONSTANTS
 --------------------------------------------------------------------------
 local UI_CONSTANTS = {
+	-- Dropdown
 	DROPDOWN_WIDTH = 51,
+	
+	-- Tooltip positioning
 	TOOLTIP_OFFSET_X = 36,
 	TOOLTIP_ANCHOR_Y = -18,
+	
+	-- Spacing
+	SPACING_TINY = 2,
 	SPACING_SMALL = 5,
 	SPACING_MEDIUM = 10,
 	SPACING_LARGE = 15,
+	SPACING_XLARGE = 20,
+	
+	-- Common UI element sizes
+	BUTTON_SIZE_SMALL = 20,
+	BUTTON_SIZE_MEDIUM = 30,
+	BUTTON_SIZE_LARGE = 34,
+	BUTTON_HEIGHT_STANDARD = 34,
+	
+	-- Offsets
 	BUTTON_OFFSET_Y = -40,
 	CENTER_OFFSET = 200,
+	TOP_OFFSET = -5,
+	SIDE_MARGIN = 15,
+	SCROLL_TOP_OFFSET = -60,
+	SCROLL_TOP_OFFSET_LARGE = -80,
+	BOTTOM_BUTTON_OFFSET = 15,
+	
+	-- Dialog sizes
 	DIALOG_WIDTH = 300,
 	DIALOG_HEIGHT = 200,
+	
+	-- Alpha values
+	ALPHA_DIMMED = 0.5,
+	ALPHA_BACKGROUND = 0.5,
+	
+	-- Background colors
+	BG_COLOR_DARK = {0.1, 0.1, 0.1, 0.5},
+	BG_COLOR_MEDIUM = {0.2, 0.2, 0.2, 0.5},
+	
+	-- Text colors
+	TEXT_COLOR_GRAY = {0.5, 0.5, 0.5},
+	
+	-- Recursion limits
+	MAX_RECURSION_DEPTH = 10,
+	
+	-- Statistics
+	TOP_STATS_COUNT = 5,
 }
+
+-- Export to BFL namespace for use in other modules
+BFL.UI = BFL.UI or {}
+BFL.UI.CONSTANTS = UI_CONSTANTS
 
 -- Module registration
 local FrameInitializer = {
@@ -109,7 +152,7 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 			statusText = FRIENDS_LIST_BUSY
 		end
 		
-		GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
+		GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", UI_CONSTANTS.TOOLTIP_ANCHOR_Y, 0)
 		GameTooltip:SetText(string.format(FRIENDS_LIST_STATUS_TOOLTIP, statusText))
 		GameTooltip:Show()
 	end)
@@ -193,7 +236,7 @@ function FrameInitializer:InitializeSortDropdown(frame)
 	-- Set up tooltip
 	dropdown:SetScript("OnEnter", function()
 		local sortName = SORT_NAMES[currentSortMode] or "Status"
-		GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
+		GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", UI_CONSTANTS.TOOLTIP_ANCHOR_Y, 0)
 		GameTooltip:SetText("Sort: " .. sortName)
 		GameTooltip:Show()
 	end)

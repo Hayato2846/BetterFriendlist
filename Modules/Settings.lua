@@ -3,6 +3,9 @@
 
 local ADDON_NAME, BFL = ...
 
+-- Import UI constants
+local UI = BFL.UI.CONSTANTS
+
 -- Register the Settings module
 local Settings = BFL:RegisterModule("Settings", {})
 
@@ -34,30 +37,30 @@ local function CreateGroupButton(parent, groupId, groupName, orderIndex)
 	
 	button:SetSize(310, 32)
 	button:SetNormalTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
-	button:GetNormalTexture():SetAlpha(0.3)
+	button:GetNormalTexture():SetAlpha(UI.ALPHA_DIMMED)
 	button:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
 	button:GetHighlightTexture():SetAlpha(0.7)
 	
 	-- Background
 	button.bg = button:CreateTexture(nil, "BACKGROUND")
 	button.bg:SetAllPoints()
-	button.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
+	button.bg:SetColorTexture(unpack(UI.BG_COLOR_DARK))
 	
 	-- Drag Handle (:::)
 	button.dragHandle = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	button.dragHandle:SetPoint("LEFT", 5, 0)
+	button.dragHandle:SetPoint("LEFT", UI.SPACING_SMALL, 0)
 	button.dragHandle:SetText(":::")
-	button.dragHandle:SetTextColor(0.5, 0.5, 0.5)
+	button.dragHandle:SetTextColor(unpack(UI.TEXT_COLOR_GRAY))
 	
 	-- Order Number
 	button.orderText = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	button.orderText:SetPoint("LEFT", button.dragHandle, "RIGHT", 10, 0)
+	button.orderText:SetPoint("LEFT", button.dragHandle, "RIGHT", UI.SPACING_MEDIUM, 0)
 	button.orderText:SetText(orderIndex)
 	button.orderText:SetTextColor(0.7, 0.7, 0.7)
 	
 	-- Group Name
 	button.nameText = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	button.nameText:SetPoint("LEFT", button.orderText, "RIGHT", 15, 0)
+	button.nameText:SetPoint("LEFT", button.orderText, "RIGHT", UI.SPACING_LARGE, 0)
 	button.nameText:SetText(groupName)
 	button.nameText:SetTextColor(1, 1, 1)
 	
@@ -71,10 +74,10 @@ local function CreateGroupButton(parent, groupId, groupName, orderIndex)
 		
 		local bg = button.editButton:CreateTexture(nil, "BACKGROUND")
 		bg:SetAllPoints()
-		bg:SetColorTexture(0.2, 0.2, 0.2, 0.5)
+		bg:SetColorTexture(unpack(UI.BG_COLOR_MEDIUM))
 		
 		local texture = button.editButton:CreateTexture(nil, "ARTWORK")
-		texture:SetSize(20, 20)
+		texture:SetSize(UI.BUTTON_SIZE_SMALL, UI.BUTTON_SIZE_SMALL)
 		texture:SetPoint("CENTER")
 		texture:SetTexture("Interface\\Buttons\\UI-GuildButton-PublicNote-Up")
 		button.editButton.texture = texture
@@ -82,7 +85,7 @@ local function CreateGroupButton(parent, groupId, groupName, orderIndex)
 		button.editButton:SetHighlightTexture("Interface\\Buttons\\UI-GuildButton-PublicNote-Up")
 		local highlightTex = button.editButton:GetHighlightTexture()
 		if highlightTex then
-			highlightTex:SetSize(20, 20)
+			highlightTex:SetSize(UI.BUTTON_SIZE_SMALL, UI.BUTTON_SIZE_SMALL)
 			highlightTex:SetPoint("CENTER")
 		end
 		
@@ -112,8 +115,8 @@ local function CreateGroupButton(parent, groupId, groupName, orderIndex)
 	button.colorBorder:SetColorTexture(0, 0, 0, 1)
 	
 	button.colorSwatch = button.colorButton:CreateTexture(nil, "ARTWORK")
-	button.colorSwatch:SetPoint("TOPLEFT", button.colorButton, "TOPLEFT", 2, -2)
-	button.colorSwatch:SetPoint("BOTTOMRIGHT", button.colorButton, "BOTTOMRIGHT", -2, 2)
+	button.colorSwatch:SetPoint("TOPLEFT", button.colorButton, "TOPLEFT", UI.SPACING_TINY, -UI.SPACING_TINY)
+	button.colorSwatch:SetPoint("BOTTOMRIGHT", button.colorButton, "BOTTOMRIGHT", -UI.SPACING_TINY, UI.SPACING_TINY)
 	button.colorSwatch:SetColorTexture(1, 1, 1)
 	
 	-- Load current color from Groups module
@@ -147,8 +150,8 @@ local function CreateGroupButton(parent, groupId, groupName, orderIndex)
 	-- Delete Button (only for custom groups)
 	if not isBuiltIn then
 		button.deleteButton = CreateFrame("Button", nil, button)
-		button.deleteButton:SetSize(20, 20)
-		button.deleteButton:SetPoint("RIGHT", -10, 0)
+		button.deleteButton:SetSize(UI.BUTTON_SIZE_SMALL, UI.BUTTON_SIZE_SMALL)
+		button.deleteButton:SetPoint("RIGHT", -UI.SPACING_MEDIUM, 0)
 		
 		local texture = button.deleteButton:CreateTexture(nil, "ARTWORK")
 		texture:SetAllPoints()
@@ -182,7 +185,7 @@ local function CreateGroupButton(parent, groupId, groupName, orderIndex)
 	button:RegisterForDrag("LeftButton")
 	button:SetScript("OnDragStart", function(self)
 		draggedGroupButton = self
-		self:SetAlpha(0.5)
+		self:SetAlpha(UI.ALPHA_DIMMED)
 		
 		self:SetScript("OnUpdate", function(updateSelf)
 			local cursorX, cursorY = GetCursorPosition()
@@ -192,7 +195,7 @@ local function CreateGroupButton(parent, groupId, groupName, orderIndex)
 			
 			for _, btn in ipairs(groupButtons) do
 				if btn ~= updateSelf then
-					btn.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
+					btn.bg:SetColorTexture(unpack(UI.BG_COLOR_DARK))
 				end
 			end
 			
@@ -241,7 +244,7 @@ local function CreateGroupButton(parent, groupId, groupName, orderIndex)
 		end
 		
 		for _, btn in ipairs(groupButtons) do
-			btn.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
+			btn.bg:SetColorTexture(unpack(UI.BG_COLOR_DARK))
 		end
 		
 		draggedGroupButton = nil
@@ -256,7 +259,7 @@ local function CreateGroupButton(parent, groupId, groupName, orderIndex)
 	
 	button:SetScript("OnLeave", function(self)
 		if not draggedGroupButton or draggedGroupButton == self then
-			self.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
+			self.bg:SetColorTexture(unpack(UI.BG_COLOR_DARK))
 		end
 	end)
 	
@@ -592,16 +595,16 @@ function Settings:RefreshGroupList()
 		end
 	end
 	
-	local yOffset = -5
+	local yOffset = UI.TOP_OFFSET
 	for i, groupData in ipairs(orderedGroups) do
 		local button = CreateGroupButton(container, groupData.id, groupData.name, i)
-		button:SetPoint("TOPLEFT", 5, yOffset)
+		button:SetPoint("TOPLEFT", UI.SPACING_SMALL, yOffset)
 		button:Show()
 		table.insert(groupButtons, button)
-		yOffset = yOffset - 34
+		yOffset = yOffset - UI.BUTTON_HEIGHT_STANDARD
 	end
 	
-	container:SetHeight(math.max(1, #orderedGroups * 34 + 10))
+	container:SetHeight(math.max(1, #orderedGroups * UI.BUTTON_HEIGHT_STANDARD + UI.SPACING_MEDIUM))
 end
 
 -- Save group order after drag/drop
@@ -1103,6 +1106,20 @@ function Settings:ExportSettings()
 		end
 	end
 	
+	-- Export group colors (user-customized colors)
+	if BetterFriendlistDB.groupColors then
+		exportData.groupColors = {}
+		for groupId, color in pairs(BetterFriendlistDB.groupColors) do
+			if color and color.r and color.g and color.b then
+				exportData.groupColors[groupId] = {
+					r = color.r,
+					g = color.g,
+					b = color.b
+				}
+			end
+		end
+	end
+	
 	-- Serialize to string using LibSerialize or manual encoding
 	local serialized = self:SerializeTable(exportData)
 	
@@ -1190,7 +1207,21 @@ function Settings:ImportSettings(importString)
 		end
 	end
 	
-	-- Reload Groups module
+	-- Import group colors (user-customized colors)
+	if importData.groupColors then
+		BetterFriendlistDB.groupColors = {}
+		for groupId, color in pairs(importData.groupColors) do
+			if color and color.r and color.g and color.b then
+				BetterFriendlistDB.groupColors[groupId] = {
+					r = color.r,
+					g = color.g,
+					b = color.b
+				}
+			end
+		end
+	end
+	
+	-- Reload Groups module (this will apply imported colors)
 	Groups:Initialize()
 	
 	-- Refresh UI
@@ -1205,7 +1236,7 @@ end
 function Settings:SerializeTable(tbl)
 	local function serialize(val, depth)
 		depth = depth or 0
-		if depth > 10 then return "nil" end -- Prevent infinite recursion
+		if depth > UI.MAX_RECURSION_DEPTH then return "nil" end -- Prevent infinite recursion
 		
 		local t = type(val)
 		if t == "number" then
@@ -1429,7 +1460,7 @@ function Settings:CreateExportFrame()
 	
 	-- Scroll frame with edit box
 	local scrollFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
-	scrollFrame:SetPoint("TOPLEFT", 10, -60)
+	scrollFrame:SetPoint("TOPLEFT", UI.SPACING_MEDIUM, -60)
 	scrollFrame:SetPoint("BOTTOMRIGHT", -30, 50)
 	frame.scrollFrame = scrollFrame
 	
@@ -1486,7 +1517,7 @@ function Settings:CreateImportFrame()
 	
 	-- Scroll frame with edit box
 	local scrollFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
-	scrollFrame:SetPoint("TOPLEFT", 10, -80)
+	scrollFrame:SetPoint("TOPLEFT", UI.SPACING_MEDIUM, -80)
 	scrollFrame:SetPoint("BOTTOMRIGHT", -30, 50)
 	frame.scrollFrame = scrollFrame
 	
