@@ -34,6 +34,8 @@ QUICKJOIN_*.md
 SETUP_ANLEITUNG.md
 README_BBCODE.txt
 Tests/MANUAL_*.md
+RELEASE_WORKFLOW.md
+release_notes.txt
 
 # Build and package files
 *.zip
