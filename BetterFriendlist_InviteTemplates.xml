@@ -79,7 +79,12 @@
 			<Anchors>
 				<Anchor point="RIGHT" x="-90" y="0"/>
 			</Anchors>
-				<ButtonText text="Accept"/>
+				<ButtonText/>
+				<Scripts>
+					<OnLoad>
+						self:SetText(BFL_L.INVITE_BUTTON_ACCEPT)
+					</OnLoad>
+				</Scripts>
 			</Button>
 			
 		<!-- Decline Button - Narrower -->
@@ -88,7 +93,12 @@
 			<Anchors>
 				<Anchor point="RIGHT" x="-10" y="0"/>
 				</Anchors>
-				<ButtonText text="Decline"/>
+				<ButtonText/>
+				<Scripts>
+					<OnLoad>
+						self:SetText(BFL_L.INVITE_BUTTON_DECLINE)
+					</OnLoad>
+				</Scripts>
 			</Button>
 		</Frames>
 		<HighlightTexture file="Interface\QuestFrame\UI-QuestLogTitleHighlight" alphaMode="ADD">

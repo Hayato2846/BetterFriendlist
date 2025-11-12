@@ -319,8 +319,8 @@ local function GetOrCreateHeaderButton(index)
 			if isDragging and self.groupId and friendGroups[self.groupId] and not friendGroups[self.groupId].builtin then
 				-- Show drop target tooltip
 				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-				GameTooltip:SetText("Drop to add to group", 1, 1, 1)
-				GameTooltip:AddLine("Hold Shift to keep in other groups", 0.7, 0.7, 0.7, true)
+				GameTooltip:SetText(BFL_L.TOOLTIP_DROP_TO_ADD, 1, 1, 1)
+				GameTooltip:AddLine(BFL_L.TOOLTIP_HOLD_SHIFT, 0.7, 0.7, 0.7, true)
 				GameTooltip:Show()
 			else
 				-- Show group info tooltip
@@ -331,7 +331,7 @@ local function GetOrCreateHeaderButton(index)
 					GameTooltip:SetText(groupData.name, 1, 1, 1)
 					GameTooltip:AddLine("Right-click for options", 0.7, 0.7, 0.7, true)
 					if not groupData.builtin then
-						GameTooltip:AddLine("Drag friends here to add them", 0.5, 0.8, 1.0, true)
+						GameTooltip:AddLine(BFL_L.TOOLTIP_DRAG_HERE, 0.5, 0.8, 1.0, true)
 					end
 					GameTooltip:Show()
 				end

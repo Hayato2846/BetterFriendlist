@@ -95,8 +95,8 @@ local function CreateGroupButton(parent, groupId, groupName, orderIndex)
 		
 		button.editButton:SetScript("OnEnter", function(self)
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText("Rename Group", 1, 1, 1)
-			GameTooltip:AddLine("Click to rename this group", 0.8, 0.8, 0.8, true)
+			GameTooltip:SetText(BFL_L.TOOLTIP_RENAME_GROUP, 1, 1, 1)
+			GameTooltip:AddLine(BFL_L.TOOLTIP_RENAME_DESC, 0.8, 0.8, 0.8, true)
 			GameTooltip:Show()
 		end)
 		
@@ -138,8 +138,8 @@ local function CreateGroupButton(parent, groupId, groupName, orderIndex)
 	
 	button.colorButton:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText("Group Color", 1, 1, 1)
-		GameTooltip:AddLine("Click to change the color of this group", 0.8, 0.8, 0.8, true)
+		GameTooltip:SetText(BFL_L.TOOLTIP_GROUP_COLOR, 1, 1, 1)
+		GameTooltip:AddLine(BFL_L.TOOLTIP_GROUP_COLOR_DESC, 0.8, 0.8, 0.8, true)
 		GameTooltip:Show()
 	end)
 	
@@ -171,8 +171,8 @@ local function CreateGroupButton(parent, groupId, groupName, orderIndex)
 		
 		button.deleteButton:SetScript("OnEnter", function(self)
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText("Delete Group", 1, 0.2, 0.2)
-			GameTooltip:AddLine("Remove this group and unassign all friends", 0.8, 0.8, 0.8, true)
+			GameTooltip:SetText(BFL_L.TOOLTIP_DELETE_GROUP, 1, 0.2, 0.2)
+			GameTooltip:AddLine(BFL_L.TOOLTIP_DELETE_DESC, 0.8, 0.8, 0.8, true)
 			GameTooltip:Show()
 		end)
 		
@@ -528,7 +528,7 @@ function Settings:DoReset()
 		BetterFriendsFrame_UpdateDisplay()
 	end
 	
-	print("|cff20ff20BetterFriendlist:|r Settings reset to defaults!")
+	print("|cff20ff20BetterFriendlist:|r " .. BFL_L.SETTINGS_RESET_SUCCESS)
 end
 
 -- Refresh the group list in the Groups tab
@@ -624,7 +624,7 @@ function Settings:SaveGroupOrder()
 	local DB = GetDB()
 	if DB then
 		DB:Set("groupOrder", newOrder)
-		print("|cff20ff20BetterFriendlist:|r Group order saved!")
+		print("|cff20ff20BetterFriendlist:|r " .. BFL_L.SETTINGS_GROUP_ORDER_SAVED)
 		
 		local Groups = GetGroups()
 		if Groups and Groups.Initialize then
@@ -723,7 +723,7 @@ function Settings:DeleteGroup(groupId, groupName)
 			
 			local success, err = Groups:Delete(groupId)
 			if success then
-				print("|cff00ff00BetterFriendlist:|r Group '" .. groupName .. "' deleted")
+				print("|cff00ff00BetterFriendlist:|r " .. string.format(BFL_L.MSG_GROUP_DELETED, groupName))
 				
 				Settings:RefreshGroupList()
 				
@@ -754,11 +754,11 @@ function Settings:MigrateFriendGroups(cleanupNotes)
 	
 	-- Check if migration has already been completed
 	if DB:Get("friendGroupsMigrated") then
-		print("|cff00ffffBetterFriendlist:|r Migration already completed. Use '/bfl migrate force' to re-run.")
+		print("|cff00ffffBetterFriendlist:|r " .. BFL_L.MSG_MIGRATION_ALREADY_DONE)
 		return
 	end
 	
-	print("|cff00ffffBetterFriendlist:|r Starting FriendGroups migration...")
+	print("|cff00ffffBetterFriendlist:|r " .. BFL_L.MSG_MIGRATION_STARTING)
 	print("|cff00ffffBetterFriendlist:|r DB module:", DB and "OK" or "MISSING")
 	print("|cff00ffffBetterFriendlist:|r Groups module:", Groups and "OK" or "MISSING")
 	
@@ -938,20 +938,23 @@ function Settings:MigrateFriendGroups(cleanupNotes)
 		numGroups = numGroups + 1
 	end
 	
-	local cleanupMsg = cleanupNotes and "\n|cff00ff00Notes cleaned up!|r" or "\n|cffffff00Notes preserved (you can clean them manually).|r"
+	local cleanupMsg = cleanupNotes and ("\n|cff00ff00" .. BFL_L.SETTINGS_NOTES_CLEANED .. "|r") or ("\n|cffffff00" .. BFL_L.SETTINGS_NOTES_PRESERVED .. "|r")
 	
 	-- Mark migration as completed
 	DB:Set("friendGroupsMigrated", true)
 	
 	print("|cff00ff00═══════════════════════════════════════")
-	print("|cff00ff00BetterFriendlist: Migration Complete!")
+	print("|cff00ff00BetterFriendlist: " .. BFL_L.SETTINGS_MIGRATION_COMPLETE)
 	print("|cff00ff00═══════════════════════════════════════")
 	print(string.format(
-		"|cff00ffffFriends processed:|r %d\n" ..
-		"|cff00ffffGroups created:|r %d\n" ..
-		"|cff00ffffAssignments made:|r %d%s",
+		"|cff00ffff%s|r %d\n" ..
+		"|cff00ffff%s|r %d\n" ..
+		"|cff00ffff%s|r %d%s",
+		BFL_L.SETTINGS_MIGRATION_FRIENDS,
 		migratedFriends,
+		BFL_L.SETTINGS_MIGRATION_GROUPS,
 		numGroups,
+		BFL_L.SETTINGS_MIGRATION_ASSIGNMENTS,
 		assignmentCount,
 		cleanupMsg
 	))
@@ -970,10 +973,10 @@ end
 -- Show migration dialog
 function Settings:ShowMigrationDialog()
 	StaticPopupDialogs["BETTERFRIENDLIST_MIGRATE_FRIENDGROUPS"] = {
-		text = "Migrate friend groups from FriendGroups to BetterFriendlist?\n\nThis will:\n• Create all groups from BNet notes\n• Assign friends to their groups\n• Optionally clean up notes\n\n|cffff0000Warning: This cannot be undone!|r",
-		button1 = "Migrate & Clean Notes",
-		button2 = "Migrate Only",
-		button3 = "Cancel",
+		text = BFL_L.DIALOG_MIGRATE_TEXT,
+		button1 = BFL_L.DIALOG_MIGRATE_BTN1,
+		button2 = BFL_L.DIALOG_MIGRATE_BTN2,
+		button3 = BFL_L.DIALOG_MIGRATE_BTN3,
 		OnAccept = function()
 			Settings:MigrateFriendGroups(true)
 		end,
@@ -1712,3 +1715,4 @@ function Settings:OnAccordionGroupsChanged(checked)
 end
 
 return Settings
+

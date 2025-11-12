@@ -827,7 +827,7 @@ function FriendsList:InviteGroupToParty(groupId)
 	if inviteCount > 0 then
 		print(string.format("|cff00ff00BetterFriendlist:|r Invited %d friend(s) to party.", inviteCount))
 	else
-		print("|cffff8800BetterFriendlist:|r No online friends available to invite.")
+		print("|cffff8800BetterFriendlist:|r " .. BFL_L.MSG_NO_FRIENDS_AVAILABLE)
 	end
 end
 
@@ -1622,14 +1622,14 @@ function FriendsList:RenderDisplay()
 							-- Show "Mobile" or "In App" without "Playing" prefix
 							button.Info:SetText(friend.gameName)
 						else
-							button.Info:SetText("Online")
+							button.Info:SetText(BFL_L.ONLINE_STATUS)
 						end
 					else
 						-- Offline - show last online time for Battle.net friends
 						if friend.lastOnlineTime then
 							button.Info:SetText(GetLastOnlineText(friend))
 						else
-							button.Info:SetText("Offline")
+							button.Info:SetText(BFL_L.OFFLINE_STATUS)
 						end
 					end
 				end  -- end of if not isCompactMode
@@ -1755,17 +1755,17 @@ function FriendsList:RenderDisplay()
 							else
 								button.Info:SetText("Lvl " .. friend.level)
 							end
-						elseif friend.area then
-							button.Info:SetText(friend.area)
-						else
-							button.Info:SetText("Online")
-						end
+					elseif friend.area then
+						button.Info:SetText(friend.area)
 					else
-						button.Info:SetText("Offline")
+						button.Info:SetText(BFL_L.ONLINE_STATUS)
 					end
-				end  -- end of if not isCompactMode
-			end -- end of if friend.type == "bnet"
-			
+				else
+					button.Info:SetText(BFL_L.OFFLINE_STATUS)
+				end
+			end  -- end of if not isCompactMode
+		end -- end of if friend.type == "bnet"
+		
 		end -- end of elseif item.type == BUTTON_TYPE_FRIEND
 	end -- end of for loop
 end
@@ -1776,7 +1776,7 @@ end
 
 -- Update invite header button
 function FriendsList:UpdateInviteHeaderButton(button, data)
-	button.Text:SetFormattedText("Friend Requests (%d)", data.count)
+	button.Text:SetFormattedText(BFL_L.INVITE_HEADER, data.count)
 	local collapsed = GetCVarBool("friendInvitesCollapsed")
 	button.DownArrow:SetShown(not collapsed)
 	button.RightArrow:SetShown(collapsed)
@@ -1801,7 +1801,7 @@ function FriendsList:UpdateInviteButton(button, data)
 	button.Name:SetText("|cff00ccff" .. accountName .. "|r")
 	
 	-- Set Info text ALWAYS
-	button.Info:SetText("Tap to accept or decline")
+	button.Info:SetText(BFL_L.INVITE_TAP_TEXT)
 	
 	-- Adjust positioning based on compact mode
 	button.Name:ClearAllPoints()
@@ -1861,3 +1861,4 @@ function FriendsList:FireEvent(eventName, ...)
 end
 
 return FriendsList
+

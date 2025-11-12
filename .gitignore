@@ -18,29 +18,16 @@ predecessor/
 .ai-context/
 *.png
 
-# Development markdown files (local documentation)
-BUG_*.md
-COMBAT_*.md
-FRIENDGROUPS_*.md
-IMPLEMENTATION_*.md
-MASTER_*.md
-MIGRATION_*.md
-MODULARIZATION_*.md
-RAID_FRAME_*.md
-SETTINGS_*.md
-TESTING_*.md
-PHASE_*.md
-QUICKJOIN_*.md
-SETUP_ANLEITUNG.md
+# All markdown files except README.md
+*.md
+!README.md
 README_BBCODE.txt
-Tests/MANUAL_*.md
-RELEASE_WORKFLOW.md
-release_notes.txt
 
 # Build and package files
 *.zip
 release/
 .release/
+release_notes.txt
 
 # WoW Cache
 *.bak
