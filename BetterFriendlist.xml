@@ -2090,7 +2090,7 @@
 						</Button>							<!-- Everyone is Assistant Checkbox -->
 							<CheckButton parentKey="EveryoneAssistCheckbox" inherits="UICheckButtonTemplate">
 								<Anchors>
-									<Anchor point="TOPLEFT" x="45" y="-10"/>
+									<Anchor point="TOPLEFT" x="31" y="-10"/>
 								</Anchors>
 								<Scripts>
 									<OnLoad>
@@ -2110,21 +2110,21 @@
 								<!-- Role Summary Display (Tank, Healer, DPS counts with icons) - Top left -->
 								<FontString parentKey="RoleSummary" inherits="GameFontHighlight" justifyH="LEFT">
 									<Anchors>
-										<Anchor point="RIGHT" relativeKey="$parent.RaidInfoButton" relativePoint="LEFT" x="-75" y="0"/>
+										<Anchor point="RIGHT" relativeKey="$parent.RaidInfoButton" relativePoint="LEFT" x="-85" y="0"/>
 									</Anchors>
 								</FontString>
 								
 								<!-- Member Count Display - Right next to Role Summary -->
 								<FontString parentKey="MemberCount" inherits="GameFontHighlight" justifyH="LEFT">
 									<Anchors>
-										<Anchor point="LEFT" relativeKey="$parent.RoleSummary" relativePoint="RIGHT" x="5" y="0"/>
+										<Anchor point="LEFT" relativeKey="$parent.RoleSummary" relativePoint="RIGHT" x="10" y="0"/>
 									</Anchors>
 								</FontString>
 								
 								<!-- Everyone is Assistant Label with crown icon -->
 								<FontString parentKey="EveryoneAssistLabel" inherits="GameFontNormal">
 									<Anchors>
-										<Anchor point="LEFT" relativeKey="$parent.EveryoneAssistCheckbox" relativePoint="RIGHT" x="5" y="0"/>
+										<Anchor point="LEFT" relativeKey="$parent.EveryoneAssistCheckbox" relativePoint="RIGHT" x="0" y="0"/>
 									</Anchors>
 								</FontString>
 							</Layer>

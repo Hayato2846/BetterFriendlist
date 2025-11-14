@@ -13,9 +13,158 @@ local addonName, BFL = ...
 -- Import UI constants
 local UI = BFL.UI.CONSTANTS
 
+-- ========================================
+-- MULTI-SELECT STATE (Phase 8.2)
+-- ========================================
+
+-- Global state for multi-selection
+BetterRaidFrame_SelectedPlayers = {}
+
 -- Helper: Get RaidFrame module
 local function GetRaidFrame()
 	return BFL:GetModule("RaidFrame")
+end
+
+-- ========================================
+-- MULTI-SELECT HELPER FUNCTIONS (Phase 8.2)
+-- ========================================
+
+local function IsPlayerSelected(raidIndex)
+	for i, playerData in ipairs(BetterRaidFrame_SelectedPlayers) do
+		if playerData.raidIndex == raidIndex then
+			return true, i
+		end
+	end
+	return false
+end
+
+local function ClearAllSelections()
+	local RaidFrame = GetRaidFrame()
+	if not RaidFrame then return end
+	
+	-- Clear visual highlights
+	for _, playerData in ipairs(BetterRaidFrame_SelectedPlayers) do
+		RaidFrame:SetButtonSelectionHighlight(playerData.raidIndex, false)
+	end
+	
+	-- Clear state
+	BetterRaidFrame_SelectedPlayers = {}
+end
+
+local function TogglePlayerSelection(button)
+	if not button.unit or not button.name or not button.groupIndex then
+		return
+	end
+	
+	local raidIndex = tonumber(string.match(button.unit, "raid(%d+)"))
+	if not raidIndex then return end
+	
+	local RaidFrame = GetRaidFrame()
+	if not RaidFrame then return end
+	
+	local isSelected, index = IsPlayerSelected(raidIndex)
+	
+	if isSelected then
+		-- Remove from selection
+		table.remove(BetterRaidFrame_SelectedPlayers, index)
+		RaidFrame:SetButtonSelectionHighlight(raidIndex, false)
+	else
+		-- Add to selection
+		table.insert(BetterRaidFrame_SelectedPlayers, {
+			raidIndex = raidIndex,
+			groupIndex = button.groupIndex,
+			unit = button.unit,
+			name = button.name
+		})
+		RaidFrame:SetButtonSelectionHighlight(raidIndex, true)
+	end
+end
+
+local function CountPlayersInGroup(targetSubgroup)
+	local count = 0
+	for i = 1, GetNumGroupMembers() do
+		local _, _, subgroup = GetRaidRosterInfo(i)
+		if subgroup == targetSubgroup then
+			count = count + 1
+		end
+	end
+	return count
+end
+
+local function BulkMoveToGroup(targetSubgroup)
+	local selectedCount = #BetterRaidFrame_SelectedPlayers
+	if selectedCount == 0 then return end
+	
+	-- Count free slots in target group
+	local targetGroupSize = CountPlayersInGroup(targetSubgroup)
+	local freeSlots = 5 - targetGroupSize
+	
+	-- Validation: Enough space?
+	if selectedCount > freeSlots then
+		UIErrorsFrame:AddMessage(
+			string.format("Not enough space: %d players selected, %d free slots in Group %d",
+				selectedCount, freeSlots, targetSubgroup),
+			1.0, 0.1, 0.1, 1.0
+		)
+		return false
+	end
+	
+	-- Check if all players already in target group (no-op)
+	local allInTargetGroup = true
+	for _, playerData in ipairs(BetterRaidFrame_SelectedPlayers) do
+		if playerData.groupIndex ~= targetSubgroup then
+			allInTargetGroup = false
+			break
+		end
+	end
+	
+	if allInTargetGroup then
+		-- Silent no-op, clear selections
+		ClearAllSelections()
+		return true
+	end
+	
+	-- Execute bulk move
+	local movedCount = 0
+	local failedCount = 0
+	
+	for _, playerData in ipairs(BetterRaidFrame_SelectedPlayers) do
+		local success = pcall(SetRaidSubgroup, playerData.raidIndex, targetSubgroup)
+		if success then
+			movedCount = movedCount + 1
+		else
+			failedCount = failedCount + 1
+		end
+	end
+	
+	-- Success feedback
+	if movedCount > 0 then
+		UIErrorsFrame:AddMessage(
+			string.format("Moved %d players to Group %d", movedCount, targetSubgroup),
+			0.0, 1.0, 0.0, 1.0
+		)
+		
+		-- Phase 8.3: Delayed refresh for instant visual update
+		-- Blizzard API is asynchronous - event fires before data updates
+		C_Timer.After(0.1, function()
+			local RaidFrame = GetRaidFrame()
+			if RaidFrame then
+				RaidFrame:UpdateRaidMembers()
+				RaidFrame:BuildDisplayList()
+				RaidFrame:UpdateAllMemberButtons()
+			end
+		end)
+	end
+	
+	-- Error feedback if any failed
+	if failedCount > 0 then
+		UIErrorsFrame:AddMessage(
+			string.format("Failed to move %d players", failedCount),
+			1.0, 0.1, 0.1, 1.0
+		)
+	end
+	
+	return movedCount > 0
 end
 
 -- ========================================
@@ -26,6 +175,9 @@ end
 function BetterRaidFrame_OnShow(self)
 	local RaidFrame = GetRaidFrame()
 	if not RaidFrame then return end
+	
+	-- Clear multi-selections on show (Phase 8.2)
+	ClearAllSelections()
 	
 	-- Request raid info (for saved instances)
 	RequestRaidInfo()
@@ -46,7 +198,8 @@ end
 
 -- OnHide: Cleanup
 function BetterRaidFrame_OnHide(self)
-	-- Cleanup if needed (currently nothing to do)
+	-- Clear multi-selections on hide (Phase 8.2)
+	ClearAllSelections()
 end
 
 -- Update: Render raid member list and control panel
@@ -320,7 +473,15 @@ function BetterRaidMemberButton_OnClick(self, button)
 		return
 	end
 	
-	if button == "RightButton" then
+	if button == "LeftButton" then
+		-- Ctrl+Left-click: Toggle multi-selection (Phase 8.2)
+		if IsControlKeyDown() then
+			TogglePlayerSelection(self)
+		else
+			-- Normal left-click: Clear all selections
+			ClearAllSelections()
+		end
+	elseif button == "RightButton" then
 		-- Right-click: Show standard raid context menu
 		local contextData = {
 			unit = self.unit,
@@ -328,8 +489,6 @@ function BetterRaidMemberButton_OnClick(self, button)
 		}
 		UnitPopup_OpenMenu("RAID", contextData)
 	end
-	-- Note: Left-click is handled by OnDragStart for drag and drop (only when not in combat)
-	-- We do NOT target the unit on left-click to avoid taint issues
 end
 
 function BetterRaidMemberButton_OnDragStart(self)
@@ -343,6 +502,12 @@ function BetterRaidMemberButton_OnDragStart(self)
 	
 	if not isLeader and not isAssistant then
 		return
+	end
+	
+	-- Phase 8.2: Clear selections if dragging non-selected player
+	local raidIndex = tonumber(string.match(self.unit, "raid(%d+)"))
+	if raidIndex and not IsPlayerSelected(raidIndex) then
+		ClearAllSelections()
 	end
 	
 	-- Start drag (for moving to different groups)
@@ -398,14 +563,91 @@ function BetterRaidMemberButton_OnDragStop(self)
 	-- Only move if different subgroup
 	if targetSubgroup ~= sourceSubgroup then
 		-- Calculate raidIndex from unit (raid1 = 1, raid2 = 2, etc.)
-		local raidIndex = tonumber(string.match(BetterRaidFrame_DraggedUnit.unit, "raid(%d+)"))
-		if not raidIndex then
+		local sourceRaidIndex = tonumber(string.match(BetterRaidFrame_DraggedUnit.unit, "raid(%d+)"))
+		if not sourceRaidIndex then
 			BetterRaidFrame_DraggedUnit = nil
 			return
 		end
 		
-		-- SetRaidSubgroup(raidIndex, subgroup) - moves raid member to different subgroup
-		SetRaidSubgroup(raidIndex, targetSubgroup)
+		-- Phase 8.2: Check for multi-selection bulk move
+		if #BetterRaidFrame_SelectedPlayers > 0 then
+			-- BULK MOVE: Move all selected players to target group
+			BulkMoveToGroup(targetSubgroup)
+			ClearAllSelections()
+			BetterRaidFrame_DraggedUnit = nil
+			return
+		end
+		
+		-- Check if target slot is occupied
+		if targetFrame.unit and targetFrame.unit ~= "" then
+			-- SWAP: Both players exchange subgroups
+			-- Use Blizzard's native SwapRaidSubgroup API (handles full groups automatically)
+			local targetRaidIndex = tonumber(string.match(targetFrame.unit, "raid(%d+)"))
+			
+			if targetRaidIndex then
+				local success, errorMsg = pcall(SwapRaidSubgroup, sourceRaidIndex, targetRaidIndex)
+				
+				if success then
+					-- Success feedback (green toast)
+					local sourceName = GetRaidRosterInfo(sourceRaidIndex)
+					local targetName = GetRaidRosterInfo(targetRaidIndex)
+					if sourceName and targetName then
+						UIErrorsFrame:AddMessage(
+							string.format("%s <-> %s swapped", sourceName, targetName),
+							0.0, 1.0, 0.0, 1.0
+						)
+					end
+					
+					-- Phase 8.3: Delayed refresh for instant visual update
+					-- Blizzard API is asynchronous - event fires before data updates
+					C_Timer.After(0.1, function()
+						local RaidFrame = GetRaidFrame()
+						if RaidFrame then
+							RaidFrame:UpdateRaidMembers()
+							RaidFrame:BuildDisplayList()
+							RaidFrame:UpdateAllMemberButtons()
+						end
+					end)
+				else
+					-- Error feedback (red toast)
+					UIErrorsFrame:AddMessage(
+						"Swap failed: " .. tostring(errorMsg or "Unknown error"),
+						1.0, 0.1, 0.1, 1.0
+					)
+				end
+			end
+		else
+			-- MOVE: Target slot is empty (existing logic)
+			local success, errorMsg = pcall(SetRaidSubgroup, sourceRaidIndex, targetSubgroup)
+			
+			if success then
+				-- Success feedback (green toast)
+				local playerName = GetRaidRosterInfo(sourceRaidIndex)
+				if playerName then
+					UIErrorsFrame:AddMessage(
+						string.format("%s moved to Group %d", playerName, targetSubgroup),
+						0.0, 1.0, 0.0, 1.0
+					)
+				end
+				
+				-- Phase 8.3: Delayed refresh for instant visual update
+				-- Blizzard API is asynchronous - event fires before data updates
+				C_Timer.After(0.1, function()
+					local RaidFrame = GetRaidFrame()
+					if RaidFrame then
+						RaidFrame:UpdateRaidMembers()
+						RaidFrame:BuildDisplayList()
+						RaidFrame:UpdateAllMemberButtons()
+					end
+				end)
+			else
+				-- Error feedback (red toast)
+				UIErrorsFrame:AddMessage(
+					"Move failed: " .. tostring(errorMsg or "Unknown error"),
+					1.0, 0.1, 0.1, 1.0
+				)
+			end
+		end
 	end
 	
 	-- Clear drag state

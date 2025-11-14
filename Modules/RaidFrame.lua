@@ -114,6 +114,11 @@ function RaidFrame:RegisterEvents()
     BFL:RegisterEventCallback("READY_CHECK_FINISHED", function(...)
         RaidFrame:OnReadyCheckFinished(...)
     end, 50)
+    
+    -- Phase 8.2: Combat event to clear multi-selections
+    BFL:RegisterEventCallback("PLAYER_REGEN_DISABLED", function(...)
+        RaidFrame:OnCombatStart(...)
+    end, 50)
 end
 
 -- ========================================
@@ -833,6 +838,54 @@ function RaidFrame:UpdateCombatOverlay(inCombat)
     BFL:DebugPrint("[BFL] Combat overlay updated on " .. buttonsUpdated .. " buttons (out of 40 possible)")
 end
 
+-- ========================================
+-- MULTI-SELECT VISUAL HIGHLIGHTS (Phase 8.2)
+-- ========================================
+
+--- Set selection highlight on a specific raid member button
+--- @param raidIndex number The raid index (raid1 = 1, raid2 = 2, etc.)
+--- @param isSelected boolean Whether to show or hide highlight
+function RaidFrame:SetButtonSelectionHighlight(raidIndex, isSelected)
+    if not self.memberButtons then return end
+    
+    -- Find the button with this raidIndex
+    for groupIndex = 1, 8 do
+        if self.memberButtons[groupIndex] then
+            for slotIndex = 1, 5 do
+                local button = self.memberButtons[groupIndex][slotIndex]
+                if button and button.unit then
+                    local buttonRaidIndex = tonumber(string.match(button.unit, "raid(%d+)"))
+                    if buttonRaidIndex == raidIndex then
+                        -- Found the button, update highlight
+                        if button.SelectionHighlight then
+                            if isSelected then
+                                button.SelectionHighlight:Show()
+                            else
+                                button.SelectionHighlight:Hide()
+                            end
+                        else
+                            -- Create highlight texture if it doesn't exist
+                            if not button.SelectionHighlight then
+                                button.SelectionHighlight = button:CreateTexture(nil, "OVERLAY")
+                                button.SelectionHighlight:SetAllPoints()
+                                button.SelectionHighlight:SetColorTexture(1.0, 0.843, 0.0, 0.4) -- Gold with 40% alpha
+                                button.SelectionHighlight:SetBlendMode("ADD")
+                            end
+                            
+                            if isSelected then
+                                button.SelectionHighlight:Show()
+                            else
+                                button.SelectionHighlight:Hide()
+                            end
+                        end
+                        return
+                    end
+                end
+            end
+        end
+    end
+end
+
 --- Get number of raid members
 function RaidFrame:GetNumMembers()
     return #self.raidMembers
@@ -1140,6 +1193,30 @@ function RaidFrame:RefreshMemberButtons()
                 end
             end
         end
+    end
+end
+
+-- ========================================
+-- PHASE 8.2: MULTI-SELECT EVENT HANDLERS
+-- ========================================
+
+--- Handle combat start - clear all multi-selections
+function RaidFrame:OnCombatStart()
+    -- Clear selections via global function in RaidFrameCallbacks.lua
+    if BetterRaidFrame_SelectedPlayers and #BetterRaidFrame_SelectedPlayers > 0 then
+        -- Clear visual highlights
+        for _, playerData in ipairs(BetterRaidFrame_SelectedPlayers) do
+            self:SetButtonSelectionHighlight(playerData.raidIndex, false)
+        end
+        
+        -- Clear state
+        BetterRaidFrame_SelectedPlayers = {}
+        
+        -- Yellow warning toast
+        UIErrorsFrame:AddMessage(
+            "Multi-selection cleared - entered combat",
+            1.0, 0.8, 0.0, 1.0
+        )
     end
 end
 
