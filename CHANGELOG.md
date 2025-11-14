@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.5] - 2025-11-15
+
+**🔧 Friends List Scroll Fix**
+
+Fixed scroll frame height calculation to prevent entries from being cut off.
+
+### Fixed
+- **Scroll Height Calculation** - Now uses dynamic ScrollFrame height instead of hardcoded 418px
+- Last few friend entries are now fully visible when scrolling to the bottom
+- Scroll position correctly accounts for all visible content including Friend Requests
+- Works correctly whether Friend Requests are shown, hidden, collapsed, or expanded
+
+### Technical Details
+- Changed from `local SCROLL_FRAME_HEIGHT = 418` to `local scrollFrameHeight = scrollFrame:GetHeight() or 418`
+- Ensures `maxVisibleButtons` calculation always reflects actual available space
+- Maintains backward compatibility with fallback to 418px if height unavailable
+
+---
+
 ## [1.6.0] - 2025-11-14
 
 **🎮 Raid Frame Enhancements**

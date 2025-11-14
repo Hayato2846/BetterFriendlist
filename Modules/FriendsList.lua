@@ -937,13 +937,14 @@ function FriendsList:RenderDisplay()
 	local scrollFrame = BetterFriendsFrame.ScrollFrame
 	local numItems = #self.displayList
 	
-	-- Calculate maximum visible buttons based on scroll frame height and button heights
-	-- ScrollFrame height: 418px, Button heights: 24px (compact) or 34px (normal), Header: 22px
-	local SCROLL_FRAME_HEIGHT = 418
+	-- Calculate maximum visible buttons based on ACTUAL scroll frame height and button heights
+	-- Get actual ScrollFrame height dynamically (it may change based on frame size)
+	local scrollFrameHeight = scrollFrame:GetHeight() or 418
+	
 	local DB = GetDB()
 	local isCompactMode = DB and DB:Get("compactMode", false)
 	local avgButtonHeight = isCompactMode and 24 or 34
-	local maxVisibleButtons = math.floor(SCROLL_FRAME_HEIGHT / avgButtonHeight)
+	local maxVisibleButtons = math.floor(scrollFrameHeight / avgButtonHeight)
 	
 	-- Calculate the maximum valid offset
 	local maxOffset = math.max(0, numItems - maxVisibleButtons)
