@@ -7,6 +7,130 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.0] - 2025-11-14
+
+**🎮 Raid Frame Enhancements**
+
+Drag & drop your raid members between groups - even with full 40/40 raids!
+
+### Added
+- **Swap Players** - Drag one player onto another to swap their positions (works with full groups!)
+- **Multi-Select** - Hold Ctrl and click players to select multiple, then drag them all at once
+- **Visual Feedback** - Gold highlights show which players you've selected
+- **Smart Notifications** - Green/red messages confirm success or explain errors
+- **Auto-Clear** - Selections clear automatically when entering combat
+- **Instant Updates** - Raid members update immediately after every move
+
+### Improved
+- Better layout and spacing in the raid control panel
+- Cleaner group headers and member button alignment
+- More polished overall raid tab appearance
+
+### How It Works
+Hold Ctrl and click players to select multiple (up to 5 per move). Drag any selected player to a group with enough free slots. If the target group is full, you'll see exactly why it failed. Simple drag & drop swaps work just like before, but now work even when both groups are completely full.
+
+---
+
+## [1.5.0-beta] - 2025-11-12
+
+**🌍 Multi-Language Support**
+
+BetterFriendlist now speaks 11 languages!
+
+### Added
+- Full support for 11 languages
+- Automatic language detection based on WoW settings
+- All UI text localized (menus, buttons, tooltips, dialogs)
+- Friend requests in your language
+- Settings panel in your language
+
+### Supported Languages
+- English (US)
+- German
+- Spanish (EU & Latin America)
+- French
+- Italian
+- Korean
+- Portuguese (Brazil)
+- Russian
+- Chinese (Simplified & Traditional)
+
+Your WoW language is automatically detected and applied!
+
+---
+
+## [1.4.0-beta] - 2025-11-12
+
+**📨 Friend Request Display**
+
+Battle.net friend invites now appear directly in your friends list.
+
+### Added
+- Friend invites shown at top of friends list
+- One-click Accept/Decline buttons
+- Collapsible header with request count
+- Works in compact mode
+- Font scaling support
+- Stone background matching group headers
+
+### Technical
+- Custom BFL styling matching overall design
+- Text-only display (matches Blizzard style)
+- Event-driven updates (instant refresh)
+- Button pooling system integration
+
+---
+
+## [1.3.4-beta] - 2025-11-11
+
+**🔧 Code Quality & Export Fix**
+
+### Fixed
+- Export/import now includes user-customized group colors
+- Backward compatible with old exports
+
+### Improved
+- Replaced 33+ magic numbers with UI_CONSTANTS
+- Added bounds checking for 25 unsafe array accesses
+- Cache cleanup and duplicate event registration fixes
+
+---
+
+## [1.3.3-beta] - 2025-11-11
+
+**⚡ Scroll Fix & Performance**
+
+### Fixed
+- Scroll position now preserved during friend list updates
+
+### Improved
+- Optimized string concatenation performance (4 functions)
+- Began magic number constant migration
+
+---
+
+## [1.3.2-beta] - 2025-11-11
+
+**🛡️ High Severity Fixes**
+
+### Fixed
+- Tooltip error handling (wrapped in pcall, clears on errors)
+- Migration version check (prevents re-running FriendGroups import)
+- 3 division by zero vulnerabilities in PerformanceMonitor
+
+---
+
+## [1.3.1-beta] - 2025-11-11
+
+**🐛 Critical Bug Fixes**
+
+### Fixed
+- Memory leak in ButtonPool (buttons retained friend data references)
+- Race condition in FriendsList (concurrent FRIENDLIST_UPDATE events)
+- Added concurrency protection with update queue mechanism
+
+---
+
 ## [1.3.0-beta] - 2025-11-10
 
 **📊 Activity Tracking & Statistics - Beta Release**
@@ -242,7 +366,7 @@ This release replaces the button-based Sort tab with clean dropdown UI and adds 
 
 ---
 
-## [1.2.0] - 2025-11-10
+## [1.2.0-alpha] - 2025-11-10
 
 **🎨 Visual Enhancements & UX Improvements**
 
@@ -278,6 +402,41 @@ This release focuses on visual polish, improved UI consistency, and feature refi
 - All 13 planned v1.2.0 features implemented
 - Net deletion: 130 lines of obsolete code removed
 - UI consistency improved across all dropdowns
+
+---
+
+## [1.1.0] - 2025-11-09
+
+**📋 Export & Import System**
+
+Settings portability with hex-encoded export/import functionality.
+
+### Added
+- **Export Settings** - Export all settings to a hex string (400+ LOC)
+  - Includes groups, friends, settings, keybinds, activity data, and RAF history
+  - Hex-encoded format (2 characters per byte)
+  - Copy-to-clipboard with EditBox dialog
+  - `/bfl export` command
+- **Import Settings** - Import settings from hex string
+  - Validates hex format and structure
+  - Shows confirmation dialog before applying changes
+  - `/bfl import` command
+  - Validation with user-friendly error messages
+- **Settings UI** - Advanced tab with Export/Import buttons
+  - Large scrollable EditBox for hex string display
+  - Clear instructions in the UI
+
+### Technical Details
+- Export format: `BFL_V1_{hex_encoded_data}`
+- Serialization: `LibStub("AceSerializer-3.0")` for data structure conversion
+- Error handling: Invalid format, corrupted data, version mismatch
+- Full database snapshot (groups, friendGroups, settings, quickFilter, friendActivity, rafTracking)
+
+### Files Changed
+- NEW: Export/Import functionality in Settings.lua (~400 lines)
+- MODIFIED: `BetterFriendlist_Settings.xml` (Advanced tab UI)
+- MODIFIED: `Core.lua` (version 1.1.0, export/import commands)
+- MODIFIED: `BetterFriendlist.toc` (version 1.1.0)
 
 ---
 
