@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.7] - 2025-11-15
+
+**🌍 Class Colors for All Languages**
+
+Class names now show in proper colors for all languages, including German, French, Spanish, and other localized clients.
+
+### Fixed
+- **Class Color Display** - Character names now display in correct class colors for non-English clients
+- Previously only worked for English clients; showed white text for German, French, Spanish, and other languages
+- Handles gendered class names (German "Kriegerin" for female warriors, "Dämonenjägerin" for female demon hunters)
+
+### Technical Details
+- Converts localized class names to English class file identifiers using `GetClassInfo()` API
+- Supports gender variants: German "-in" suffix, French "-e" suffix, Spanish "-a"/"-o" patterns
+- Falls back gracefully when no match is found
+- Works for both Battle.net friends and WoW-only friends
+
+---
+
 ## [1.6.5] - 2025-11-15
 
 **🔧 Friends List Scroll Fix**

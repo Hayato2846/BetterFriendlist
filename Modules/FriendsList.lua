@@ -41,6 +41,80 @@ local INVITE_RESTRICTION_QUEST_SESSION = 11
 local INVITE_RESTRICTION_NO_GAME_ACCOUNTS = 12
 
 -- ========================================
+-- Helper Functions
+-- ========================================
+
+-- Convert localized class name to English class filename for RAID_CLASS_COLORS
+-- This fixes class coloring in non-English clients (deDE, frFR, esES, etc.)
+-- CRITICAL: gameAccountInfo.className and friendInfo.className are LOCALIZED
+-- German client: "Krieger", French client: "Guerrier", English client: "Warrior"
+-- We must convert localized → English classFile (e.g., "Krieger" → "WARRIOR")
+--
+-- IMPORTANT: German (and other languages) use GENDERED class names:
+-- - Masculine: "Krieger", "Dämonenjäger" (from GetClassInfo)
+-- - Feminine: "Kriegerin", "Dämonenjägerin" (from gameAccountInfo.className)
+-- We need to strip gender suffixes before matching
+local function GetClassFileFromClassName(className)
+	if not className or className == "" then 
+		return nil 
+	end
+	
+	-- First try: Direct uppercase match (works for English clients)
+	-- "Warrior" → "WARRIOR" → RAID_CLASS_COLORS["WARRIOR"] ✅
+	local upperClassName = string.upper(className)
+	if RAID_CLASS_COLORS[upperClassName] then
+		return upperClassName
+	end
+	
+	-- Second try: Match localized className against GetClassInfo()
+	-- This handles non-English clients where className is localized
+	-- German: "Krieger" matches GetClassInfo() → returns "WARRIOR"
+	local numClasses = GetNumClasses()
+	for i = 1, numClasses do
+		local localizedName, classFile = GetClassInfo(i)
+		if localizedName == className then
+			return classFile
+		end
+	end
+	
+	-- Third try: Handle gendered class names (German, French, Spanish, etc.)
+	-- German feminine forms add "-in" suffix: "Kriegerin" → "Krieger"
+	-- French feminine forms add "-e" suffix: "Guerrière" → "Guerrier"
+	-- Spanish feminine forms change "-o" to "-a": "Guerrera" → "Guerrero"
+	
+	-- Try removing German/French/Spanish feminine suffixes
+	local genderVariants = {}
+	
+	-- German: Remove "-in" suffix (Kriegerin → Krieger)
+	if className:len() > 2 and className:sub(-2) == "in" then
+		table.insert(genderVariants, className:sub(1, -3))
+	end
+	
+	-- French: Remove "-e" suffix (Guerrière → Guerrier, Chasseresse → Chasseur)
+	if className:len() > 1 and className:sub(-1) == "e" then
+		table.insert(genderVariants, className:sub(1, -2))
+	end
+	
+	-- Spanish: Replace "-a" with "-o" (Guerrera → Guerrero)
+	if className:len() > 1 and className:sub(-1) == "a" then
+		table.insert(genderVariants, className:sub(1, -2) .. "o")
+	end
+	
+	-- Try matching gender variants against GetClassInfo()
+	for _, variant in ipairs(genderVariants) do
+		for i = 1, numClasses do
+			local localizedName, classFile = GetClassInfo(i)
+			if localizedName == variant then
+				return classFile
+			end
+		end
+	end
+	
+	-- No match found
+	return nil
+end
+
+-- ========================================
 -- Module State
 -- ========================================
 FriendsList.friendsList = {}      -- Raw friends data from API
@@ -1529,17 +1603,8 @@ function FriendsList:RenderDisplay()
 						local useClassColor = GetDB():Get("colorClassNames", true)
 						
 						if useClassColor and not shouldGray then
-							-- Convert localized class name to English uppercase key for RAID_CLASS_COLORS
-							local classFile = nil
-							for i = 1, GetNumClasses() do
-								local localizedClassName, classFilename = GetClassInfo(i)
-								if localizedClassName == friend.className then
-									classFile = classFilename
-									break
-								end
-							end
-							
-							-- Get class color using the English file name
+							-- Convert class name to English class file for RAID_CLASS_COLORS
+							local classFile = GetClassFileFromClassName(friend.className)
 							local classColor = classFile and RAID_CLASS_COLORS[classFile]
 							
 							if classColor then
@@ -1691,7 +1756,9 @@ function FriendsList:RenderDisplay()
 				local useClassColor = GetDB():Get("colorClassNames", true)
 				
 				if useClassColor and not shouldGray then
-					local classColor = RAID_CLASS_COLORS[friend.className]
+					-- Convert class name to English class file for RAID_CLASS_COLORS
+					local classFile = GetClassFileFromClassName(friend.className)
+					local classColor = classFile and RAID_CLASS_COLORS[classFile]
 					if classColor then
 						line1Text = "|c" .. (classColor.colorStr or "ffffffff") .. characterName .. "|r"
 					else

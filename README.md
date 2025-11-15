@@ -43,10 +43,6 @@ A complete replacement for WoW's default Friends frame featuring custom groups, 
 2. Enter a group name
 3. Drag & drop friends into your new group
 
-**Commands:**
-- `/bfl` - Toggle frame
-- `/bfl settings` - Open settings
-
 ## Installation
 
 Download from [CurseForge](https://www.curseforge.com/wow/addons/betterfriendlist), [WoWInterface](https://www.wowinterface.com/downloads/info26984), [Wago](https://addons.wago.io/addons/betterfriendlist), or [GitHub Releases](https://github.com/Hayato2846/BetterFriendlist/releases).
