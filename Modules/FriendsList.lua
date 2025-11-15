@@ -462,15 +462,48 @@ function FriendsList:CompareFriends(a, b, sortMode)
 		return nil
 		
 	elseif sortMode == "zone" then
-		local zoneA = a.areaName or a.area or ""
-		local zoneB = b.areaName or b.area or ""
-		if zoneA ~= zoneB then
-			return zoneA:lower() < zoneB:lower()
+		-- PHASE 9A FIX: Online with zone first, then online without zone, then offline
+		-- Get online status
+		local aOnline = (a.type == "wow" and a.connected) or (a.type == "bnet" and a.connected)
+		local bOnline = (b.type == "wow" and b.connected) or (b.type == "bnet" and b.connected)
+		
+		-- Get zone info (only meaningful if online)
+		local aZone = ""
+		local bZone = ""
+		
+		if aOnline then
+			aZone = a.areaName or a.area or ""
 		end
+		if bOnline then
+			bZone = b.areaName or b.area or ""
+		end
+		
+		-- Priority 1: Online WITH zone
+		local aHasZone = aOnline and aZone ~= ""
+		local bHasZone = bOnline and bZone ~= ""
+		
+		if aHasZone ~= bHasZone then
+			return aHasZone  -- Friends with zone first
+		end
+		
+		-- Both have zones: sort alphabetically
+		if aHasZone and bHasZone then
+			if aZone ~= bZone then
+				return aZone:lower() < bZone:lower()
+			end
+			return nil
+		end
+		
+		-- Priority 2: Online without zone vs Offline
+		if aOnline ~= bOnline then
+			return aOnline  -- Online (no zone) before offline
+		end
+		
+		-- Both same status (both online without zone, or both offline)
 		return nil
 		
 	elseif sortMode == "activity" then
-		-- Get ActivityTracker module
+		-- PHASE 9A FIX: Hybrid Activity + Last Online
 		local ActivityTracker = BFL:GetModule("ActivityTracker")
 		if not ActivityTracker then
 			return nil
@@ -488,14 +521,298 @@ function FriendsList:CompareFriends(a, b, sortMode)
 		local uidA = GetFriendUID(a)
 		local uidB = GetFriendUID(b)
 		
-		-- Get last activity timestamps
+		-- Get activity timestamps (whisper/group/trade)
 		local activityA = uidA and ActivityTracker:GetLastActivity(uidA) or 0
 		local activityB = uidB and ActivityTracker:GetLastActivity(uidB) or 0
 		
-		-- Sort by most recent activity first (higher timestamp = more recent)
+		-- FALLBACK: If no activity tracked, use lastOnline from API
+		if activityA == 0 and a.lastOnline then
+			activityA = a.lastOnline  -- Unix timestamp from C_FriendList API
+		end
+		if activityB == 0 and b.lastOnline then
+			activityB = b.lastOnline
+		end
+		
+		-- Sort by most recent first (higher timestamp = more recent)
 		if activityA ~= activityB then
 			return activityA > activityB
 		end
+		return nil
+		
+	elseif sortMode == "game" then
+		-- PHASE 9B: DYNAMIC Game Sort (future-proof for Classic addons)
+		-- Prioritizes friends on YOUR current WoW version first, then other WoW versions, then other games
+		local function GetGamePriority(friend)
+			-- Offline = lowest priority
+			if not ((friend.type == "bnet" and friend.connected) or (friend.type == "wow" and friend.connected)) then
+				return 999
+			end
+			
+			-- WoW-only friends: Check if same project as player
+			if friend.type == "wow" then
+				return 0  -- Always highest (same game by definition)
+			end
+			
+			-- BNet friends: check clientProgram and wowProjectID
+			if friend.type == "bnet" and friend.gameAccountInfo then
+				local clientProgram = friend.gameAccountInfo.clientProgram
+				local friendProjectID = friend.gameAccountInfo.wowProjectID
+				
+				-- WoW games: Use DYNAMIC wowProjectID prioritization
+				if clientProgram == "WoW" and friendProjectID then
+					-- Priority 0: Same WoW version as player (Retail if player on Retail, Classic if player on Classic, etc.)
+					if friendProjectID == WOW_PROJECT_ID then
+						return 0  -- HIGHEST: Same version (future-proof for Classic addons!)
+					end
+					
+					-- Priority 1-99: Other WoW versions (sorted by projectID)
+					-- Lower projectID = higher priority
+					-- See https://warcraft.wiki.gg/wiki/WOW_PROJECT_ID
+					-- 1=Retail, 2=Classic Era, 5=Cataclysm Classic, 11=Classic TBC, etc.
+					return friendProjectID  -- Natural priority based on projectID
+				end
+				
+				-- Non-WoW Blizzard games: Lower priority
+				-- Diablo IV
+				if clientProgram == "ANBS" then
+					return 100
+				end
+				-- Hearthstone
+				if clientProgram == "WTCG" then
+					return 101
+				end
+				-- Diablo Immortal
+				if clientProgram == "DIMAR" then
+					return 102
+				end
+				-- Overwatch 2
+				if clientProgram == "Pro" then
+					return 103
+				end
+				-- StarCraft II
+				if clientProgram == "S2" then
+					return 104
+				end
+				-- Diablo III
+				if clientProgram == "D3" then
+					return 105
+				end
+				-- Heroes of the Storm
+				if clientProgram == "Hero" then
+					return 106
+				end
+				-- Mobile App
+				if clientProgram == "BSAp" or clientProgram == "App" then
+					return 200  -- Lowest priority (mobile/app)
+				end
+				-- Unknown/Other games
+				return 150
+			end
+			
+			return 999  -- Fallback (offline)
+		end
+		
+		local aPriority = GetGamePriority(a)
+		local bPriority = GetGamePriority(b)
+		
+		if aPriority ~= bPriority then
+			return aPriority < bPriority  -- Lower number = higher priority
+		end
+		
+		return nil  -- Equal priority
+		
+	elseif sortMode == "faction" then
+		-- PHASE 9C: Faction Sort (Same Faction → Other Faction → No Faction)
+		local playerFaction = UnitFactionGroup("player")  -- "Alliance" or "Horde"
+		
+		local function GetFactionPriority(friend)
+			-- Offline or non-WoW = lowest priority
+			if not ((friend.type == "bnet" and friend.connected) or (friend.type == "wow" and friend.connected)) then
+				return 3
+			end
+			
+			local friendFaction = nil
+			
+			-- WoW-only friends
+			if friend.type == "wow" and friend.factionName then
+				friendFaction = friend.factionName
+			end
+			
+			-- BNet friends playing WoW
+			if friend.type == "bnet" and friend.gameAccountInfo then
+				if friend.gameAccountInfo.clientProgram == "WoW" and friend.gameAccountInfo.factionName then
+					friendFaction = friend.gameAccountInfo.factionName
+				end
+			end
+			
+			-- Priority logic
+			if not friendFaction then
+				return 3  -- No faction data
+			elseif friendFaction == playerFaction then
+				return 0  -- Same faction (highest priority)
+			else
+				return 1  -- Other faction
+			end
+		end
+		
+		local aPriority = GetFactionPriority(a)
+		local bPriority = GetFactionPriority(b)
+		
+		if aPriority ~= bPriority then
+			return aPriority < bPriority
+		end
+		
+		return nil
+		
+	elseif sortMode == "guild" then
+		-- PHASE 9C: Guild Sort (Same Guild → Other Guilds → No Guild/Not Playing WoW)
+		local playerGuild = GetGuildInfo("player")  -- Returns guild name or nil
+		
+		local function GetGuildPriority(friend)
+			local friendGuild = nil
+			local isPlayingWoW = false
+			
+			-- WoW-only friends
+			if friend.type == "wow" and friend.connected then
+				isPlayingWoW = true
+				friendGuild = GetGuildInfo(friend.name)
+			end
+			
+			-- BNet friends playing WoW
+			if friend.type == "bnet" and friend.gameAccountInfo then
+				if friend.gameAccountInfo.clientProgram == "WoW" then
+					isPlayingWoW = true
+					friendGuild = friend.gameAccountInfo.guildName  -- Available in gameAccountInfo
+				end
+			end
+			
+			-- Not playing WoW = lowest priority
+			if not isPlayingWoW then
+				return {priority = 3, guild = ""}  -- Not playing WoW (lowest)
+			end
+			
+			-- Priority logic for WoW players
+			if not friendGuild then
+				return {priority = 2, guild = ""}  -- No guild
+			elseif playerGuild and friendGuild == playerGuild then
+				return {priority = 0, guild = friendGuild}  -- Same guild (highest)
+			else
+				return {priority = 1, guild = friendGuild}  -- Other guild
+			end
+		end
+		
+		local aData = GetGuildPriority(a)
+		local bData = GetGuildPriority(b)
+		
+		-- First by priority
+		if aData.priority ~= bData.priority then
+			return aData.priority < bData.priority
+		end
+		
+		-- Then by guild name alphabetically (for "other guilds" tier)
+		if aData.priority == 1 and aData.guild ~= bData.guild then
+			return aData.guild:lower() < bData.guild:lower()
+		end
+		
+		return nil
+		
+	elseif sortMode == "class" then
+		-- PHASE 9C: Class Sort (Tank → Healer → DPS → Not Playing WoW)
+		local TANK_CLASSES = {WARRIOR = 1, PALADIN = 1, DEATHKNIGHT = 1, DRUID = 1, MONK = 1, DEMONHUNTER = 1}
+		local HEALER_CLASSES = {PRIEST = 1, PALADIN = 1, SHAMAN = 1, DRUID = 1, MONK = 1, EVOKER = 1}
+		-- DPS: All others
+		
+		local function GetClassPriority(friend)
+			-- Check if friend is actually playing WoW
+			local isPlayingWoW = false
+			if friend.type == "wow" and friend.connected then
+				isPlayingWoW = true
+			elseif friend.type == "bnet" and friend.gameAccountInfo and friend.gameAccountInfo.clientProgram == "WoW" then
+				isPlayingWoW = true
+			end
+			
+			-- Not playing WoW = lowest priority (below all DPS)
+			if not isPlayingWoW then
+				return {priority = 10, class = ""}  -- Not playing WoW (lowest)
+			end
+			
+			-- friend.class already contains the English class file (WARRIOR, MAGE, etc.)
+			local classFile = friend.class
+			
+			if not classFile or classFile == "" or classFile == "Unknown" then
+				return {priority = 9, class = ""}  -- Playing WoW but no class (shouldn't happen)
+			end
+			
+			-- Hybrid classes (can tank AND heal): Check spec if available
+			-- For simplicity, treat hybrids as "Tank" tier (PALADIN, DRUID, MONK)
+			if TANK_CLASSES[classFile] and HEALER_CLASSES[classFile] then
+				return {priority = 0, class = classFile}  -- Hybrid (tank priority)
+			elseif TANK_CLASSES[classFile] then
+				return {priority = 0, class = classFile}  -- Pure tank
+			elseif HEALER_CLASSES[classFile] then
+				return {priority = 1, class = classFile}  -- Pure healer
+			else
+				return {priority = 2, class = classFile}  -- DPS
+			end
+		end
+		
+		local aData = GetClassPriority(a)
+		local bData = GetClassPriority(b)
+		
+		-- First by role priority
+		if aData.priority ~= bData.priority then
+			return aData.priority < bData.priority
+		end
+		
+		-- Then by class name alphabetically (within same role)
+		if aData.class ~= bData.class then
+			return aData.class < bData.class
+		end
+		
+		return nil
+		
+	elseif sortMode == "realm" then
+		-- PHASE 9C: Realm Sort (Same Realm → Other Realms)
+		local playerRealm = GetRealmName()
+		
+		local function GetRealmPriority(friend)
+			local friendRealm = nil
+			
+			-- WoW-only friends
+			if friend.type == "wow" and friend.name then
+				-- Name format: "CharName-RealmName" or just "CharName" (same realm)
+				friendRealm = friend.name:match("-(.+)$") or playerRealm
+			end
+			
+			-- BNet friends playing WoW
+			if friend.type == "bnet" and friend.gameAccountInfo then
+				if friend.gameAccountInfo.clientProgram == "WoW" then
+					friendRealm = friend.gameAccountInfo.realmName or friend.realmName
+				end
+			end
+			
+			if not friendRealm then
+				return {priority = 2, realm = ""}  -- No realm (offline/non-WoW)
+			elseif friendRealm == playerRealm then
+				return {priority = 0, realm = friendRealm}  -- Same realm
+			else
+				return {priority = 1, realm = friendRealm}  -- Other realm
+			end
+		end
+		
+		local aData = GetRealmPriority(a)
+		local bData = GetRealmPriority(b)
+		
+		-- First by priority
+		if aData.priority ~= bData.priority then
+			return aData.priority < bData.priority
+		end
+		
+		-- Then by realm name alphabetically
+		if aData.realm ~= bData.realm then
+			return aData.realm:lower() < bData.realm:lower()
+		end
+		
 		return nil
 	end
 	

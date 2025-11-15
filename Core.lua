@@ -5,7 +5,9 @@
 
 -- Create addon namespace
 local ADDON_NAME, BFL = ...
-BFL.Version = "1.5.0-beta"
+
+-- Get version dynamically from TOC file
+BFL.Version = C_AddOns.GetAddOnMetadata(ADDON_NAME, "Version") or "Unknown"
 
 -- Make BFL globally accessible for tooltip and other legacy files
 _G.BFL = BFL

@@ -91,6 +91,11 @@ if GetLocale() == "itIT" then
 	L.SORT_LEVEL = "Livello"
 	L.SORT_ZONE = "Zona"
 	L.SORT_ACTIVITY = "Attività Recente"
+	L.SORT_GAME = "Gioco"
+	L.SORT_FACTION = "Fazione"
+	L.SORT_GUILD = "Gilda"
+	L.SORT_CLASS = "Classe"
+	L.SORT_REALM = "Reame"
 	L.SORT_CHANGED = "Ordinamento cambiato a: %s"
 	
 	L.MENU_GROUPS = "Gruppi"

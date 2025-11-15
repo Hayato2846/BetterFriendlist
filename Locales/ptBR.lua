@@ -91,6 +91,11 @@ if GetLocale() == "ptBR" then
 	L.SORT_LEVEL = "Nível"
 	L.SORT_ZONE = "Zona"
 	L.SORT_ACTIVITY = "Atividade Recente"
+	L.SORT_GAME = "Jogo"
+	L.SORT_FACTION = "Facção"
+	L.SORT_GUILD = "Guilda"
+	L.SORT_CLASS = "Classe"
+	L.SORT_REALM = "Reino"
 	L.SORT_CHANGED = "Ordenação alterada para: %s"
 	
 	L.MENU_GROUPS = "Grupos"

@@ -163,23 +163,54 @@ end
 -- SORT DROPDOWN INITIALIZATION
 --------------------------------------------------------------------------
 
--- Sort mode icons
+-- Sort mode icons (All using Feather Icons)
 local SORT_ICONS = {
-	status = "Interface\\FriendsFrame\\StatusIcon-Online",      -- Green dot for online status
-	name = "Interface\\BUTTONS\\UI-GuildButton-PublicNote-Up",  -- Note/text icon for name
-	level = "Interface\\BUTTONS\\UI-MicroStream-Yellow",        -- Level up arrow for level
-	zone = "Interface\\WORLDMAP\\UI-World-Icon",                -- World map icon for zone
-	activity = "Interface\\CURSOR\\UI-Cursor-Move",             -- Clock/time icon for activity
-	none = "Interface\\BUTTONS\\UI-GroupLoot-Pass-Up"           -- X icon for none
+	status = "Interface\\AddOns\\BetterFriendlist\\Icons\\status",      -- Feather: disc/status icon
+	name = "Interface\\AddOns\\BetterFriendlist\\Icons\\name",          -- Feather: type/text icon
+	level = "Interface\\AddOns\\BetterFriendlist\\Icons\\level",        -- Feather: bar-chart icon
+	zone = "Interface\\AddOns\\BetterFriendlist\\Icons\\zone",          -- Feather: map-pin icon
+	activity = "Interface\\AddOns\\BetterFriendlist\\Icons\\activity",  -- Feather: activity pulse
+	game = "Interface\\AddOns\\BetterFriendlist\\Icons\\game",          -- Feather: target/game icon
+	faction = "Interface\\AddOns\\BetterFriendlist\\Icons\\faction",    -- Feather: shield icon
+	guild = "Interface\\AddOns\\BetterFriendlist\\Icons\\guild",        -- Feather: users/group icon
+	class = "Interface\\AddOns\\BetterFriendlist\\Icons\\class",        -- Feather: award icon
+	realm = "Interface\\AddOns\\BetterFriendlist\\Icons\\realm",        -- Feather: server icon
+	none = "Interface\\BUTTONS\\UI-GroupLoot-Pass-Up"            -- X icon for none
 }
 
--- Sort mode display names
+-- Sort mode display names (PHASE 9B+9C: Added 5 new sort options)
 local SORT_NAMES = {
 	status = "Status",
 	name = "Name",
 	level = "Level",
-	zone = "Zone"
+	zone = "Zone",
+	game = "Game",      -- PHASE 9B
+	faction = "Faction",  -- PHASE 9C
+	guild = "Guild",    -- PHASE 9C
+	class = "Class",    -- PHASE 9C
+	realm = "Realm"     -- PHASE 9C
 }
+
+-- Helper: Format icon for display (handles both texture paths and Font Awesome strings)
+local function FormatIconText(iconData, text)
+	-- Check if it's a texture path (starts with "Interface")
+	if type(iconData) == "string" and iconData:match("^Interface") then
+		return string.format("\124T%s:16:16:0:2\124t %s", iconData, text)
+	else
+		-- Font Awesome icon - use directly with color
+		return string.format("|cFF00CCFF%s|r %s", iconData, text)
+	end
+end
+
+-- Helper: Format icon only for dropdown button
+local function FormatIconOnly(iconData)
+	if type(iconData) == "string" and iconData:match("^Interface") then
+		return string.format("\124T%s:16:16:0:2\124t", iconData)
+	else
+		-- Font Awesome icon
+		return string.format("|cFF00CCFF%s|r", iconData)
+	end
+end
 
 function FrameInitializer:InitializeSortDropdown(frame)
 	if not frame or not frame.FriendsTabHeader or not frame.FriendsTabHeader.SortDropdown then return end
@@ -277,25 +308,23 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 	primaryDropdown:SetupMenu(function(dropdown, rootDescription)
 		rootDescription:SetTag("MENU_FRIENDS_PRIMARY_SORT")
 		
-		-- Format: icon + text in menu
-		local optionText = "\124T%s:16:16:0:0\124t %s"
+		-- Create sort options with icons (using helper function)
+		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.status, "Sort by Status"), "status")
+		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.name, "Sort by Name"), "name")
+		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.level, "Sort by Level"), "level")
+		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.zone, "Sort by Zone"), "zone")
 		
-		local statusText = string.format(optionText, SORT_ICONS.status, "Sort by Status")
-		CreatePrimaryRadio(rootDescription, statusText, "status")
-		
-		local nameText = string.format(optionText, SORT_ICONS.name, "Sort by Name")
-		CreatePrimaryRadio(rootDescription, nameText, "name")
-		
-		local levelText = string.format(optionText, SORT_ICONS.level, "Sort by Level")
-		CreatePrimaryRadio(rootDescription, levelText, "level")
-		
-		local zoneText = string.format(optionText, SORT_ICONS.zone, "Sort by Zone")
-		CreatePrimaryRadio(rootDescription, zoneText, "zone")
+		-- PHASE 9B+9C: Add 5 new sort options
+		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.game, "Sort by Game"), "game")
+		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.faction, "Sort by Faction"), "faction")
+		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.guild, "Sort by Guild"), "guild")
+		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.class, "Sort by Class"), "class")
+		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.realm, "Sort by Realm"), "realm")
 	end)
 	
 	-- Show icon only (like QuickFilters)
 	primaryDropdown:SetSelectionTranslator(function(selection)
-		return string.format("\124T%s:16:16:0:0\124t", SORT_ICONS[selection.data])
+		return FormatIconOnly(SORT_ICONS[selection.data])
 	end)
 	
 	-- Generate menu once to trigger initial selection display
@@ -335,30 +364,25 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 	secondaryDropdown:SetupMenu(function(dropdown, rootDescription)
 		rootDescription:SetTag("MENU_FRIENDS_SECONDARY_SORT")
 		
-		-- Format: icon + text in menu
-		local optionText = "\124T%s:16:16:0:0\124t %s"
+		-- Create secondary sort options with icons (using helper function)
+		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.none, "None"), "none")
+		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.name, "then by Name"), "name")
+		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.level, "then by Level"), "level")
+		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.zone, "then by Zone"), "zone")
+		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.activity, "then by Activity"), "activity")
 		
-		-- None option with X icon
-		local noneText = string.format(optionText, SORT_ICONS.none, "None")
-		CreateSecondaryRadio(rootDescription, noneText, "none")
-		
-		local nameText = string.format(optionText, SORT_ICONS.name, "then by Name")
-		CreateSecondaryRadio(rootDescription, nameText, "name")
-		
-		local levelText = string.format(optionText, SORT_ICONS.level, "then by Level")
-		CreateSecondaryRadio(rootDescription, levelText, "level")
-		
-		local zoneText = string.format(optionText, SORT_ICONS.zone, "then by Zone")
-		CreateSecondaryRadio(rootDescription, zoneText, "zone")
-		
-		local activityText = string.format(optionText, SORT_ICONS.activity, "then by Activity")
-		CreateSecondaryRadio(rootDescription, activityText, "activity")
+		-- PHASE 9B+9C: Add 5 new sort options
+		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.game, "then by Game"), "game")
+		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.faction, "then by Faction"), "faction")
+		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.guild, "then by Guild"), "guild")
+		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.class, "then by Class"), "class")
+		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.realm, "then by Realm"), "realm")
 	end)
 	
 	-- Show icon only (X for none, sort icons for others)
 	secondaryDropdown:SetSelectionTranslator(function(selection)
-		local iconPath = SORT_ICONS[selection.data] or SORT_ICONS.name
-		return string.format("\124T%s:16:16:0:0\124t", iconPath)
+		local iconData = SORT_ICONS[selection.data] or SORT_ICONS.name
+		return FormatIconOnly(iconData)
 	end)
 	
 	-- Generate menu once to trigger initial selection display

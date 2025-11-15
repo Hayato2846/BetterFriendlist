@@ -91,7 +91,12 @@ if GetLocale() == "koKR" then
 	L.SORT_LEVEL = "레벨"
 	L.SORT_ZONE = "지역"
 	L.SORT_ACTIVITY = "최근 활동"
-	L.SORT_CHANGED = "정렬 방식 변경: %s"
+	L.SORT_GAME = "게임"
+	L.SORT_FACTION = "진영"
+	L.SORT_GUILD = "길드"
+	L.SORT_CLASS = "직업"
+	L.SORT_REALM = "서버"
+	L.SORT_CHANGED = "정렬 변경: %s"
 	
 	L.MENU_GROUPS = "그룹"
 	L.MENU_CREATE_GROUP = "그룹 생성"

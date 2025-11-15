@@ -103,6 +103,11 @@ if GetLocale() == "deDE" then
 	L.SORT_LEVEL = "Stufe"
 	L.SORT_ZONE = "Zone"
 	L.SORT_ACTIVITY = "Letzte Aktivität"
+	L.SORT_GAME = "Spiel"
+	L.SORT_FACTION = "Fraktion"
+	L.SORT_GUILD = "Gilde"
+	L.SORT_CLASS = "Klasse"
+	L.SORT_REALM = "Realm"
 	L.SORT_CHANGED = "Sortierung geändert auf: %s"
 	
 	-- ========================================

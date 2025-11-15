@@ -282,14 +282,15 @@ end
 -- QUICK FILTER DROPDOWN FUNCTIONS (Modern API, Icon-Only Display)
 -- ========================================
 
--- Filter icon definitions (using WoW texture paths like StatusDropdown)
--- Note: Using .tga extension like FRIENDS_TEXTURE_ONLINE constant
+-- Filter icon definitions (Feather Icons for custom filters)
 local FILTER_ICONS = {
-	all = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon",  -- All Friends (friend icon)
-	online = "Interface\\FriendsFrame\\StatusIcon-Online",       -- Online Only (green online icon)
-	offline = "Interface\\FriendsFrame\\StatusIcon-Offline",     -- Offline Only (gray offline icon)
-	wow = "Interface\\ChatFrame\\UI-ChatIcon-WoW",               -- WoW Only (WoW logo from chat)
-	bnet = "Interface\\ChatFrame\\UI-ChatIcon-Battlenet"         -- Battle.net Only (BNet logo from chat)
+	all = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-all",         -- All Friends (users icon)
+	online = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-online",     -- Online Only (user-check icon)
+	offline = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-offline",   -- Offline Only (user-x icon)
+	wow = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-wow",           -- WoW Only (shield icon)
+	bnet = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-bnet",         -- Battle.net Only (share-2 icon)
+	hideafk = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-hide-afk",  -- Hide AFK (eye-off icon)
+	retail = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-retail"     -- Retail Only (trending-up icon)
 }
 
 -- Initialize the Quick Filter dropdown menu (Modern WoW 11.0+ API)

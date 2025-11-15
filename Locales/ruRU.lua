@@ -91,6 +91,11 @@ if GetLocale() == "ruRU" then
 	L.SORT_LEVEL = "Уровень"
 	L.SORT_ZONE = "Зона"
 	L.SORT_ACTIVITY = "Недавняя Активность"
+	L.SORT_GAME = "Игра"
+	L.SORT_FACTION = "Фракция"
+	L.SORT_GUILD = "Гильдия"
+	L.SORT_CLASS = "Класс"
+	L.SORT_REALM = "Сервер"
 	L.SORT_CHANGED = "Сортировка изменена на: %s"
 	
 	L.MENU_GROUPS = "Группы"

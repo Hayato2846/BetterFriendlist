@@ -19,15 +19,15 @@ end
 -- Local Variables
 -- ========================================
 
--- Filter icons
+-- Filter icons (Feather Icons for custom filters)
 local FILTER_ICONS = {
-	all = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon",  -- All Friends (friend icon)
-	online = "Interface\\FriendsFrame\\StatusIcon-Online",       -- Online Only (green online icon)
-	offline = "Interface\\FriendsFrame\\StatusIcon-Offline",     -- Offline Only (gray offline icon)
-	wow = "Interface\\ChatFrame\\UI-ChatIcon-WoW",               -- WoW Only (WoW logo from chat)
-	bnet = "Interface\\ChatFrame\\UI-ChatIcon-Battlenet",        -- Battle.net Only (BNet logo from chat)
-	hideafk = "Interface\\FriendsFrame\\StatusIcon-Away",        -- Hide AFK (away icon)
-	retail = "Interface\\LFGFRAME\\BattleNetWorking0"           -- Retail Only (retail icon)
+	all = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-all",         -- All Friends (users icon)
+	online = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-online",     -- Online Only (user-check icon)
+	offline = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-offline",   -- Offline Only (user-x icon)
+	wow = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-wow",           -- WoW Only (shield icon)
+	bnet = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-bnet",         -- Battle.net Only (share-2 icon)
+	hideafk = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-hide-afk",  -- Hide AFK (eye-off icon)
+	retail = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-retail"     -- Retail Only (trending-up icon)
 }
 
 -- Current filter mode
@@ -72,8 +72,8 @@ function QuickFilters:InitDropdown(dropdown)
 	dropdown:SetupMenu(function(dropdown, rootDescription)
 		rootDescription:SetTag("MENU_FRIENDS_QUICKFILTER")
 		
-		-- Format for icon + text in menu
-		local optionText = "\124T%s:16:16:0:0\124t %s"
+		-- Format for icon + text in menu (with vertical offset +2)
+		local optionText = "\124T%s:16:16:0:2\124t %s"
 		
 		-- Create filter options with icons
 		local allText = string.format(optionText, FILTER_ICONS.all, "All Friends")
@@ -100,9 +100,9 @@ function QuickFilters:InitDropdown(dropdown)
 		CreateRadio(rootDescription, retailText, "retail")
 	end)
 	
-	-- SetSelectionTranslator: Shows only the icon
+	-- SetSelectionTranslator: Shows only the icon (with vertical offset +2)
 	dropdown:SetSelectionTranslator(function(selection)
-		return string.format("\124T%s:16:16:0:0\124t", FILTER_ICONS[selection.data])
+		return string.format("\124T%s:16:16:0:2\124t", FILTER_ICONS[selection.data])
 	end)
 	
 	-- Setup tooltip

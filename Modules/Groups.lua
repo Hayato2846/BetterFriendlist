@@ -32,7 +32,9 @@ Groups.groups = {}
 -- Migrate old bnetAccountID-based UIDs to battleTag-based UIDs
 function Groups:MigrateFriendAssignments()
 	local DB = BFL:GetModule("DB")
+	if not DB then return end
 	local friendGroups = DB:GetFriendGroups() -- Get ALL friendGroups
+	if not friendGroups then return end
 	
 	-- Check if migration has already been done
 	local migrationDone = DB:Get("bnetUIDMigrationDone_v2") -- Changed flag name to force re-run
@@ -82,11 +84,18 @@ function Groups:Initialize()
 	
 	-- Load custom groups from database
 	local DB = BFL:GetModule("DB")
+	if not DB or not BetterFriendlistDB then
+		-- DB not ready yet, skip initialization
+		return
+	end
 	
 	-- Migrate old bnetAccountID-based friend assignments to battleTag-based
 	self:MigrateFriendAssignments()
 	
-	for groupId, groupInfo in pairs(DB:GetCustomGroups()) do
+	local customGroups = DB:GetCustomGroups()
+	if not customGroups then return end
+	
+	for groupId, groupInfo in pairs(customGroups) do
 		self.groups[groupId] = {
 			id = groupId,
 			name = groupInfo.name,

@@ -103,6 +103,11 @@ if GetLocale() == "enUS" then
 	L.SORT_LEVEL = "Level"
 	L.SORT_ZONE = "Zone"
 	L.SORT_ACTIVITY = "Recent Activity"
+	L.SORT_GAME = "Game"
+	L.SORT_FACTION = "Faction"
+	L.SORT_GUILD = "Guild"
+	L.SORT_CLASS = "Class"
+	L.SORT_REALM = "Realm"
 	L.SORT_CHANGED = "Sort changed to: %s"
 	
 	-- ========================================

@@ -91,6 +91,11 @@ if GetLocale() == "esMX" then
 	L.SORT_LEVEL = "Nivel"
 	L.SORT_ZONE = "Zona"
 	L.SORT_ACTIVITY = "Actividad Reciente"
+	L.SORT_GAME = "Juego"
+	L.SORT_FACTION = "Facción"
+	L.SORT_GUILD = "Hermandad"
+	L.SORT_CLASS = "Clase"
+	L.SORT_REALM = "Reino"
 	L.SORT_CHANGED = "Orden cambiado a: %s"
 	
 	L.MENU_GROUPS = "Grupos"

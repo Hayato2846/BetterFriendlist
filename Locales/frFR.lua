@@ -91,6 +91,11 @@ if GetLocale() == "frFR" then
 	L.SORT_LEVEL = "Niveau"
 	L.SORT_ZONE = "Zone"
 	L.SORT_ACTIVITY = "Activité Récente"
+	L.SORT_GAME = "Jeu"
+	L.SORT_FACTION = "Faction"
+	L.SORT_GUILD = "Guilde"
+	L.SORT_CLASS = "Classe"
+	L.SORT_REALM = "Royaume"
 	L.SORT_CHANGED = "Ordre changé à : %s"
 	
 	L.MENU_GROUPS = "Groupes"

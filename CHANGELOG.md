@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.0] - 2025-11-15
+
+**✨ Enhanced Sorting System & Visual Upgrade**
+
+Added 5 new sort modes, fixed critical bugs, and completely redesigned all UI icons with custom Feather Icons for a modern, professional look.
+
+### Added
+- **Sort by Game** - Prioritizes friends playing the same WoW version as you (works automatically in Retail and Classic)
+  - Same WoW version first, then other WoW versions, then other Blizzard games, then offline friends
+  - Future-proof: automatically adapts to new WoW versions without addon updates
+- **Sort by Faction** - Shows same-faction friends first (Alliance/Horde)
+- **Sort by Guild** - Guildmates first, then other guilds alphabetically, then non-guilded friends
+- **Sort by Class** - Organized by role (Tanks → Healers → DPS) with alphabetical sub-sorting
+- **Sort by Realm** - Same-realm friends first, then other realms alphabetically
+- **Custom Feather Icons** - All 17 dropdown icons replaced with professional Feather Icons
+  - 10 unique sort icons (Status, Name, Level, Zone, Activity, Game, Faction, Guild, Class, Realm)
+  - 7 quick filter icons (All, Online, Offline, WoW, Battle.net, Hide AFK, Retail)
+  - Consistent visual language throughout the UI
+  - Gold color scheme matching WoW's interface design
+
+### Fixed
+- **Zone Sort Bug** - Offline friends no longer appear at the top of the list
+  - Previously offline friends with empty zone names sorted before "A" alphabetically
+  - Now correctly shows online friends first, sorted by zone
+- **Activity Sort Enhancement** - Now uses both tracked activity AND WoW API's last-online data
+  - Previously only tracked whispers/groups/trades (most friends showed as "never active")
+  - Now includes last-seen timestamps from Battle.net for complete sorting
+- **Guild Sort Logic** - Now correctly filters only WoW players (excludes non-WoW Battle.net friends)
+- **Class Sort Error** - Fixed Lua error when sorting by class (removed invalid API call)
+- **Database Initialization** - Fixed race condition causing nil errors on first load
+- **Icon Positioning** - Adjusted vertical offset for perfect alignment in dropdowns
+
+### Changed
+- Sort dropdown icons now use custom Feather Icons instead of mixed Blizzard textures
+- Quick Filter dropdown fully converted to Feather Icons for visual consistency
+- Icon distinctions improved (e.g., Status uses radio icon, Game uses monitor icon)
+
+### Technical
+- All sort options available in both Primary and Secondary dropdowns
+- Localized for 11 languages (enUS, deDE, frFR, esES, esMX, itIT, ptBR, ruRU, koKR, zhCN, zhTW)
+- Dynamic `WOW_PROJECT_ID` detection eliminates hardcoded version checks
+- 17 custom BLP textures added to `Icons/` directory
+- Icon paths: `Interface\AddOns\BetterFriendlist\Icons\{name}`
+
+---
+
 ## [1.6.8] - 2025-11-15
 
 **📝 Documentation Cleanup**
