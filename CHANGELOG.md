@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.8] - 2025-11-15
+
+**📝 Documentation Cleanup**
+
+Removed technical details from changelog to keep it user-friendly.
+
+### Changed
+- Cleaned up changelog entries to remove technical implementation details
+- Now focuses on what users can do and what problems were fixed
+- Follows Keep-a-Changelog best practices for user-facing documentation
+
+---
+
 ## [1.6.7] - 2025-11-15
 
 **🌍 Class Colors for All Languages**
@@ -17,11 +30,6 @@ Class names now show in proper colors for all languages, including German, Frenc
 - **Class Color Display** - Character names now display in correct class colors for non-English clients
 - Previously only worked for English clients; showed white text for German, French, Spanish, and other languages
 - Handles gendered class names (German "Kriegerin" for female warriors, "Dämonenjägerin" for female demon hunters)
-
-### Technical Details
-- Converts localized class names to English class file identifiers using `GetClassInfo()` API
-- Supports gender variants: German "-in" suffix, French "-e" suffix, Spanish "-a"/"-o" patterns
-- Falls back gracefully when no match is found
 - Works for both Battle.net friends and WoW-only friends
 
 ---
@@ -33,15 +41,9 @@ Class names now show in proper colors for all languages, including German, Frenc
 Fixed scroll frame height calculation to prevent entries from being cut off.
 
 ### Fixed
-- **Scroll Height Calculation** - Now uses dynamic ScrollFrame height instead of hardcoded 418px
-- Last few friend entries are now fully visible when scrolling to the bottom
+- **Scroll Height Calculation** - Last few friend entries are now fully visible when scrolling to the bottom
 - Scroll position correctly accounts for all visible content including Friend Requests
 - Works correctly whether Friend Requests are shown, hidden, collapsed, or expanded
-
-### Technical Details
-- Changed from `local SCROLL_FRAME_HEIGHT = 418` to `local scrollFrameHeight = scrollFrame:GetHeight() or 418`
-- Ensures `maxVisibleButtons` calculation always reflects actual available space
-- Maintains backward compatibility with fallback to 418px if height unavailable
 
 ---
 
@@ -109,13 +111,7 @@ Battle.net friend invites now appear directly in your friends list.
 - Collapsible header with request count
 - Works in compact mode
 - Font scaling support
-- Stone background matching group headers
-
-### Technical
-- Custom BFL styling matching overall design
-- Text-only display (matches Blizzard style)
-- Event-driven updates (instant refresh)
-- Button pooling system integration
+- Instant updates when new requests arrive
 
 ---
 
