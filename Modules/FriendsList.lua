@@ -324,6 +324,28 @@ end
 -- Legacy Helper Functions
 -- ========================================
 
+-- Get class file for friend (optimized for 11.2.7+)
+-- Priority: classID (11.2.7+) > className (fallback for 11.2.5 and WoW friends)
+-- This function provides a dual system:
+-- 1. Uses classID if available (fast, language-independent, BNet friends on 11.2.7+)
+-- 2. Falls back to className conversion (slower, all languages, WoW friends + older versions)
+local function GetClassFileForFriend(friend)
+	-- 11.2.7+: Use classID if available (BNet friends only)
+	if BFL.UseClassID and friend.classID then
+		local classInfo = GetClassInfoByID(friend.classID)
+		if classInfo and classInfo.classFile then
+			return classInfo.classFile
+		end
+	end
+	
+	-- Fallback: Convert className (WoW friends + older game versions)
+	if friend.className then
+		return GetClassFileFromClassName(friend.className)
+	end
+	
+	return nil
+end
+
 -- Convert localized class name to English class filename for RAID_CLASS_COLORS
 -- This fixes class coloring in non-English clients (deDE, frFR, esES, etc.)
 -- CRITICAL: gameAccountInfo.className and friendInfo.className are LOCALIZED
@@ -334,6 +356,14 @@ end
 -- - Masculine: "Krieger", "Dämonenjäger" (from GetClassInfo)
 -- - Feminine: "Kriegerin", "Dämonenjägerin" (from gameAccountInfo.className)
 -- We need to strip gender suffixes before matching
+--
+-- ⚠️ DEPRECATED: This function is now used only as FALLBACK via GetClassFileForFriend()
+-- Use cases where this fallback is still needed:
+-- - WoW-only friends (friendInfo.className, no classID available from API)
+-- - Game versions < 11.2.7 (classID not available in BNetGameAccountInfo)
+-- - When GetClassInfoByID() fails or returns invalid data
+--
+-- For 11.2.7+: GetClassFileForFriend() prioritizes classID for better performance
 local function GetClassFileFromClassName(className)
 	if not className or className == "" then 
 		return nil 
@@ -612,6 +642,7 @@ function FriendsList:UpdateFriendsList()
 					if gameInfo.clientProgram == "WoW" or gameInfo.clientProgram == "WTCG" then
 						friend.characterName = gameInfo.characterName
 						friend.className = gameInfo.className
+						friend.classID = gameInfo.classID  -- 11.2.7+: Store classID for optimized class color lookup
 						friend.areaName = gameInfo.areaName
 						friend.level = gameInfo.characterLevel
 						friend.realmName = gameInfo.realmName
@@ -2353,27 +2384,27 @@ function FriendsList:UpdateFriendButton(button, elementData)
 					end
 				end
 				
-				-- Check if class coloring is enabled
-				local useClassColor = GetDB():Get("colorClassNames", true)
+			-- Check if class coloring is enabled
+			local useClassColor = GetDB():Get("colorClassNames", true)
+			
+			if useClassColor and not shouldGray then
+				-- Get class file (uses classID if available on 11.2.7+, falls back to className)
+				local classFile = GetClassFileForFriend(friend)
+				local classColor = classFile and RAID_CLASS_COLORS[classFile]
 				
-				if useClassColor and not shouldGray then
-					-- Convert class name to English class file for RAID_CLASS_COLORS
-					local classFile = GetClassFileFromClassName(friend.className)
-					local classColor = classFile and RAID_CLASS_COLORS[classFile]
-					
-					if classColor then
-						line1Text = line1Text .. " (|c" .. (classColor.colorStr or "ffffffff") .. characterName .. "|r)"
-					else
-						line1Text = line1Text .. " (" .. characterName .. ")"
-					end
+				if classColor then
+					line1Text = line1Text .. " (|c" .. (classColor.colorStr or "ffffffff") .. characterName .. "|r)"
 				else
-					-- No class coloring or opposite faction gray - just show character name
-					if shouldGray then
-						line1Text = line1Text .. " (|cff808080" .. characterName .. "|r)"
-					else
-						line1Text = line1Text .. " (" .. characterName .. ")"
-					end
+					line1Text = line1Text .. " (" .. characterName .. ")"
 				end
+			else
+				-- No class coloring or opposite faction gray - just show character name
+				if shouldGray then
+					line1Text = line1Text .. " (|cff808080" .. characterName .. "|r)"
+				else
+					line1Text = line1Text .. " (" .. characterName .. ")"
+				end
+			end
 			end
 		else
 			-- Offline - use gray

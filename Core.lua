@@ -7,10 +7,49 @@
 local ADDON_NAME, BFL = ...
 
 -- Get version dynamically from TOC file
-BFL.VERSION = "1.7.4"
+BFL.VERSION = "1.7.5"
 
 -- Make BFL globally accessible for tooltip and other legacy files
 _G.BFL = BFL
+
+--------------------------------------------------------------------------
+-- Version Detection (Retail: Expansion Version)
+--------------------------------------------------------------------------
+local tocVersion = select(4, GetBuildInfo())  -- Returns TOC version (e.g., 110205)
+BFL.TOCVersion = tocVersion
+BFL.IsTWW = (tocVersion >= 110200 and tocVersion < 120000)    -- The War Within (11.x)
+BFL.IsMidnight = (tocVersion >= 120000)                       -- Midnight (12.x+)
+
+-- Feature Detection (detect available APIs for optional features)
+BFL.UseClassID = false              -- 11.2.7+ classID optimization
+BFL.HasSecretValues = false         -- 12.0.0+ Secret Values API
+BFL.UseNativeCallbacks = false      -- 12.0.0+ Frame:RegisterEventCallback
+
+-- Detect optional features based on API availability
+local function DetectOptionalFeatures()
+	-- 11.2.7+ classID support for performance optimization
+	if GetClassInfoByID then
+		BFL.UseClassID = true
+	end
+	
+	-- 12.0.0+ Secret Values API
+	if issecretvalue then
+		BFL.HasSecretValues = true
+	end
+	
+	-- Print version info (only if debug enabled)
+	if BFL.debugPrintEnabled then
+		local versionName = BFL.IsMidnight and "Midnight (12.x)" or "The War Within (11.x)"
+		print(string.format("|cff00ff00BetterFriendlist:|r TOC %d (%s)", tocVersion, versionName))
+		
+		if BFL.UseClassID then
+			print("|cff00ff00BetterFriendlist:|r Using classID optimization (11.2.7+)")
+		end
+		if BFL.HasSecretValues then
+			print("|cff00ff00BetterFriendlist:|r Secret Values API detected (12.0.0+)")
+		end
+	end
+end
 
 -- Module registry
 BFL.Modules = {}
@@ -136,6 +175,9 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 				BFL.debugPrintEnabled = BetterFriendlistDB.debugPrintEnabled or false
 			end
 			
+			-- Detect optional features (version-specific APIs)
+			DetectOptionalFeatures()
+			
 			-- Initialize all modules
 			for name, module in pairs(BFL.Modules) do
 				if module.Initialize then
@@ -143,9 +185,17 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 				end
 			end
 			
-			print("|cff00ff00BetterFriendlist v" .. BFL.Version .. "|r loaded successfully!")
+			-- Version-aware success message
+			local versionSuffix = BFL.IsMidnight and " (Midnight)" or " (TWW)"
+			print("|cff00ff00BetterFriendlist v" .. BFL.VERSION .. versionSuffix .. "|r loaded successfully!")
 		end
 	elseif event == "PLAYER_LOGIN" then
+		-- Check for native event callbacks (12.0.0+)
+		if BetterFriendsFrame and BetterFriendsFrame.RegisterEventCallback then
+			BFL.UseNativeCallbacks = true
+			BFL:DebugPrint("|cff00ff00[BFL]|r Using native Frame:RegisterEventCallback (12.0.0+)")
+		end
+		
 		-- Late initialization for modules that need PLAYER_LOGIN
 		for name, module in pairs(BFL.Modules) do
 			if module.OnPlayerLogin then

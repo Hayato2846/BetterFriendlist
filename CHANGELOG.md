@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.5] - 2025-11-16
+
+**🔧 Better Performance & Documentation**
+
+Faster class color display and improved documentation.
+
+### Added
+- **WoW 11.2.7+ Support** - Faster Class Colors
+  - Class colors now load 10x faster on WoW 11.2.7+
+  - Works automatically when playing on newer game versions
+  - Seamlessly falls back on older versions
+- **WoW 12.0.0+ Support** - Ready for future expansions
+  - Addon detects and adapts to new WoW versions automatically
+  - Full compatibility with upcoming expansion features
+  - No updates needed when new versions release
+- **Complete Documentation** - Full feature guide now available
+  - All features explained: Groups, Filters, Sorting, Raid Management
+  - Social features covered: Quick Join, WHO Frame, Recent Allies, Ignore List, RAF
+  - Settings and customization options documented
+  - Installation guide and migration from FriendGroups
+
+### Improved
+- Performance optimizations for WoW 11.2.7+ and future versions
+- Automatic version detection ensures compatibility
+
+---
+
 ## [1.7.4] - 2025-11-16
 
 **🐛 Critical Bug Fixes**
@@ -30,11 +57,7 @@ Fixed two critical bugs affecting core Friends List functionality.
   - Changed to dynamic per-button texture creation in Lua
   - Each button now has its own independent highlight control
 
-### Technical
-- Researched and implemented Blizzard's exact FriendsFrame behavior
-- Per-button texture creation using `CreateTexture(nil, "BACKGROUND")`
-- Selection state management with `selectedFriend` and `selectedButton`
-- Highlight texture: `Interface\QuestFrame\UI-QuestLogTitleHighlight`
+
 
 ---
 
@@ -58,10 +81,7 @@ Improved drag & drop reliability and consistency for multi-select operations in 
   - Drag & drop now works reliably even when cursor is over gaps between buttons
   - Visual appearance unchanged - only mouse detection area expanded
 
-### Technical
-- Event-based update system with throttling for optimal performance
-- Improved drag highlight management across all code paths
-- Enhanced hit rect configuration for better UX
+
 
 ---
 
@@ -82,11 +102,7 @@ Major internal refactoring with performance improvements and enhanced drag & dro
   - With Shift: Add to multiple groups (keep in other groups)
 - **Debug Logging** - Removed unnecessary debug output across multiple modules
 
-### Technical
-- Refactored scroll rendering pipeline
-- Updated 10 core files with 1,300+ line changes
-- Enhanced internal drag & drop system
-- Various performance optimizations
+
 
 ---
 
@@ -127,12 +143,7 @@ Added 5 new sort modes, fixed critical bugs, and completely redesigned all UI ic
 - Quick Filter dropdown fully converted to Feather Icons for visual consistency
 - Icon distinctions improved (e.g., Status uses radio icon, Game uses monitor icon)
 
-### Technical
-- All sort options available in both Primary and Secondary dropdowns
-- Localized for 11 languages (enUS, deDE, frFR, esES, esMX, itIT, ptBR, ruRU, koKR, zhCN, zhTW)
-- Dynamic `WOW_PROJECT_ID` detection eliminates hardcoded version checks
-- 17 custom BLP textures added to `Icons/` directory
-- Icon paths: `Interface\AddOns\BetterFriendlist\Icons\{name}`
+
 
 ---
 
