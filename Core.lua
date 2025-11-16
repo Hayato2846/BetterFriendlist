@@ -6,8 +6,8 @@
 -- Create addon namespace
 local ADDON_NAME, BFL = ...
 
--- Get version dynamically from TOC file
-BFL.VERSION = "1.7.5"
+-- Version will be loaded dynamically from TOC file in ADDON_LOADED
+BFL.VERSION = "Unknown"
 
 -- Make BFL globally accessible for tooltip and other legacy files
 _G.BFL = BFL
@@ -165,6 +165,9 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 	if event == "ADDON_LOADED" then
 		local addonName = ...
 		if addonName == ADDON_NAME then
+			-- Get version dynamically from TOC file
+			BFL.VERSION = C_AddOns.GetAddOnMetadata("BetterFriendlist", "Version") or "Unknown"
+			
 			-- Initialize database
 			if BFL.DB then
 				BFL.DB:Initialize()
@@ -339,7 +342,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 	
 	-- Help (or any other unrecognized command)
 	else
-		print("|cff00ff00=== BetterFriendlist v" .. BFL.Version .. " ===|r")
+		print("|cff00ff00=== BetterFriendlist v" .. BFL.VERSION .. " ===|r")
 		print("")
 		print("|cffffcc00Main Commands:|r")
 		print("  |cffffffff/bfl|r - Toggle BetterFriendlist frame")

@@ -51,9 +51,9 @@ function DB:Initialize()
 	end
 	
 	-- Version migration if needed
-	if BetterFriendlistDB.version ~= BFL.Version then
-		self:MigrateData(BetterFriendlistDB.version, BFL.Version)
-		BetterFriendlistDB.version = BFL.Version
+	if BetterFriendlistDB.version ~= BFL.VERSION then
+		self:MigrateData(BetterFriendlistDB.version, BFL.VERSION)
+		BetterFriendlistDB.version = BFL.VERSION
 	end
 end
 

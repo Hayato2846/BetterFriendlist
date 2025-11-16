@@ -324,28 +324,6 @@ end
 -- Legacy Helper Functions
 -- ========================================
 
--- Get class file for friend (optimized for 11.2.7+)
--- Priority: classID (11.2.7+) > className (fallback for 11.2.5 and WoW friends)
--- This function provides a dual system:
--- 1. Uses classID if available (fast, language-independent, BNet friends on 11.2.7+)
--- 2. Falls back to className conversion (slower, all languages, WoW friends + older versions)
-local function GetClassFileForFriend(friend)
-	-- 11.2.7+: Use classID if available (BNet friends only)
-	if BFL.UseClassID and friend.classID then
-		local classInfo = GetClassInfoByID(friend.classID)
-		if classInfo and classInfo.classFile then
-			return classInfo.classFile
-		end
-	end
-	
-	-- Fallback: Convert className (WoW friends + older game versions)
-	if friend.className then
-		return GetClassFileFromClassName(friend.className)
-	end
-	
-	return nil
-end
-
 -- Convert localized class name to English class filename for RAID_CLASS_COLORS
 -- This fixes class coloring in non-English clients (deDE, frFR, esES, etc.)
 -- CRITICAL: gameAccountInfo.className and friendInfo.className are LOCALIZED
@@ -421,6 +399,28 @@ local function GetClassFileFromClassName(className)
 	end
 	
 	-- No match found
+	return nil
+end
+
+-- Get class file for friend (optimized for 11.2.7+)
+-- Priority: classID (11.2.7+) > className (fallback for 11.2.5 and WoW friends)
+-- This function provides a dual system:
+-- 1. Uses classID if available (fast, language-independent, BNet friends on 11.2.7+)
+-- 2. Falls back to className conversion (slower, all languages, WoW friends + older versions)
+local function GetClassFileForFriend(friend)
+	-- 11.2.7+: Use classID if available (BNet friends only)
+	if BFL.UseClassID and friend.classID then
+		local classInfo = GetClassInfoByID(friend.classID)
+		if classInfo and classInfo.classFile then
+			return classInfo.classFile
+		end
+	end
+	
+	-- Fallback: Convert className (WoW friends + older game versions)
+	if friend.className then
+		return GetClassFileFromClassName(friend.className)
+	end
+	
 	return nil
 end
 

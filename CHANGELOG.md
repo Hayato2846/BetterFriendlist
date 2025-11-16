@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.8.0] - 2025-11-16
+
+**🔧 Version Management & Bug Fixes**
+
+Improved version management and fixed critical startup errors.
+
+### Changed
+- **Dynamic Version Loading** - Version now loaded automatically from TOC file
+  - No need to manually update version in multiple files
+  - Single source of truth in BetterFriendlist.toc
+  - Prevents version mismatches between files
+
+### Fixed
+- **Version Variable Error** - Fixed "attempt to concatenate field 'Version' (a nil value)" error
+  - Corrected all occurrences of `BFL.Version` to `BFL.VERSION` (proper capitalization)
+  - Fixed in Core.lua and Database.lua
+- **Function Order Error** - Fixed "attempt to call global 'GetClassFileFromClassName' (a nil value)" error
+  - Moved GetClassFileFromClassName definition before GetClassFileForFriend
+  - Functions now defined in correct dependency order
+
+---
+
 ## [1.7.5] - 2025-11-16
 
 **🔧 Better Performance & Documentation**
