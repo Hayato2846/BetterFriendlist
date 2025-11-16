@@ -510,12 +510,19 @@ function BetterRaidMemberButton_OnDragStart(self)
 		ClearAllSelections()
 	end
 	
+	-- Show drag highlight on the dragged button
+	local RaidFrame = GetRaidFrame()
+	if RaidFrame and raidIndex then
+		RaidFrame:SetButtonDragHighlight(raidIndex, true)
+	end
+	
 	-- Start drag (for moving to different groups)
 	-- Store dragged unit info
 	BetterRaidFrame_DraggedUnit = {
 		unit = self.unit,
 		name = self.name,
-		groupIndex = self.groupIndex
+		groupIndex = self.groupIndex,
+		raidIndex = raidIndex  -- Store for clearing highlight later
 	}
 end
 
@@ -546,12 +553,22 @@ function BetterRaidMemberButton_OnDragStop(self)
 	end
 	
 	if not targetFrame or not targetFrame.groupIndex then
+		-- Clear drag highlight before returning
+		local RaidFrame = GetRaidFrame()
+		if RaidFrame and BetterRaidFrame_DraggedUnit and BetterRaidFrame_DraggedUnit.raidIndex then
+			RaidFrame:SetButtonDragHighlight(BetterRaidFrame_DraggedUnit.raidIndex, false)
+		end
 		BetterRaidFrame_DraggedUnit = nil
 		return
 	end
 	
 	-- Don't allow dropping on self
 	if targetFrame.unit == BetterRaidFrame_DraggedUnit.unit then
+		-- Clear drag highlight before returning
+		local RaidFrame = GetRaidFrame()
+		if RaidFrame and BetterRaidFrame_DraggedUnit and BetterRaidFrame_DraggedUnit.raidIndex then
+			RaidFrame:SetButtonDragHighlight(BetterRaidFrame_DraggedUnit.raidIndex, false)
+		end
 		BetterRaidFrame_DraggedUnit = nil
 		return
 	end
@@ -648,6 +665,12 @@ function BetterRaidMemberButton_OnDragStop(self)
 				)
 			end
 		end
+	end
+	
+	-- Clear drag highlight
+	local RaidFrame = GetRaidFrame()
+	if RaidFrame and BetterRaidFrame_DraggedUnit and BetterRaidFrame_DraggedUnit.raidIndex then
+		RaidFrame:SetButtonDragHighlight(BetterRaidFrame_DraggedUnit.raidIndex, false)
 	end
 	
 	-- Clear drag state

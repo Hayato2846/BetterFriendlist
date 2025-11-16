@@ -1811,112 +1811,21 @@
 					<Anchor point="TOPLEFT" x="-5" y="7" />
 				</Anchors>
 			</Button>
-			<!-- Scroll Frame - positioned below tabs, will be repositioned in OnLoad -->
-			<ScrollFrame parentKey="ScrollFrame" inherits="FauxScrollFrameTemplate">
+			<!-- Scroll Frame Container - NOW uses ScrollBox system (no more FauxScrollFrame!) -->
+			<Frame parentKey="ScrollFrame">
+				<Size x="398" y="418"/>
 				<Anchors>
 					<Anchor point="TOPLEFT" x="8" y="-116" />
 				</Anchors>
 				<Scripts>
 					<OnLoad>
-						-- Hide the default FauxScrollFrame scrollbar completely
-						local scrollBar = self.ScrollBar or _G[self:GetName().."ScrollBar"]
-						if scrollBar then
-							scrollBar:Hide()
-							scrollBar:SetAlpha(0)
-							if scrollBar.ScrollUpButton then scrollBar.ScrollUpButton:Hide() end
-							if scrollBar.ScrollDownButton then scrollBar.ScrollDownButton:Hide() end
-						end
 						-- Enable clipping to match Blizzard's behavior (cuts off at frame boundary)
 						self:SetClipsChildren(true)
 					</OnLoad>
 				</Scripts>
-				<Frames>
-					<!-- Buttons need to be children of ScrollFrame for proper scrolling -->
-					<Button name="$parentButton1" parentKey="Button1"
-						inherits="BetterFriendsListButtonTemplate">
-						<Anchors>
-							<Anchor point="TOPLEFT" x="5" y="-3" />
-						</Anchors>
-					</Button>
-					<Button name="$parentButton2" parentKey="Button2"
-						inherits="BetterFriendsListButtonTemplate">
-						<Anchors>
-							<Anchor point="TOPLEFT" relativeKey="$parent.Button1" relativePoint="BOTTOMLEFT"
-								x="0" y="-1" />
-						</Anchors>
-					</Button>
-					<Button name="$parentButton3" parentKey="Button3"
-						inherits="BetterFriendsListButtonTemplate">
-						<Anchors>
-							<Anchor point="TOPLEFT" relativeKey="$parent.Button2" relativePoint="BOTTOMLEFT"
-								x="0" y="-1" />
-						</Anchors>
-					</Button>
-					<Button name="$parentButton4" parentKey="Button4"
-						inherits="BetterFriendsListButtonTemplate">
-						<Anchors>
-							<Anchor point="TOPLEFT" relativeKey="$parent.Button3" relativePoint="BOTTOMLEFT"
-								x="0" y="-1" />
-						</Anchors>
-					</Button>
-					<Button name="$parentButton5" parentKey="Button5"
-						inherits="BetterFriendsListButtonTemplate">
-						<Anchors>
-							<Anchor point="TOPLEFT" relativeKey="$parent.Button4" relativePoint="BOTTOMLEFT"
-								x="0" y="-1" />
-						</Anchors>
-					</Button>
-					<Button name="$parentButton6" parentKey="Button6"
-						inherits="BetterFriendsListButtonTemplate">
-						<Anchors>
-							<Anchor point="TOPLEFT" relativeKey="$parent.Button5" relativePoint="BOTTOMLEFT"
-								x="0" y="-1" />
-						</Anchors>
-					</Button>
-					<Button name="$parentButton7" parentKey="Button7"
-						inherits="BetterFriendsListButtonTemplate">
-						<Anchors>
-							<Anchor point="TOPLEFT" relativeKey="$parent.Button6" relativePoint="BOTTOMLEFT"
-								x="0" y="-1" />
-						</Anchors>
-					</Button>
-					<Button name="$parentButton8" parentKey="Button8"
-						inherits="BetterFriendsListButtonTemplate">
-						<Anchors>
-							<Anchor point="TOPLEFT" relativeKey="$parent.Button7" relativePoint="BOTTOMLEFT"
-								x="0" y="-1" />
-						</Anchors>
-					</Button>
-					<Button name="$parentButton9" parentKey="Button9"
-						inherits="BetterFriendsListButtonTemplate">
-						<Anchors>
-							<Anchor point="TOPLEFT" relativeKey="$parent.Button8" relativePoint="BOTTOMLEFT"
-								x="0" y="-1" />
-						</Anchors>
-					</Button>
-					<Button name="$parentButton10" parentKey="Button10"
-						inherits="BetterFriendsListButtonTemplate">
-						<Anchors>
-							<Anchor point="TOPLEFT" relativeKey="$parent.Button9" relativePoint="BOTTOMLEFT"
-								x="0" y="-1" />
-						</Anchors>
-					</Button>
-					<Button name="$parentButton11" parentKey="Button11"
-						inherits="BetterFriendsListButtonTemplate">
-						<Anchors>
-							<Anchor point="TOPLEFT" relativeKey="$parent.Button10"
-								relativePoint="BOTTOMLEFT" x="0" y="-1" />
-						</Anchors>
-					</Button>
-					<Button name="$parentButton12" parentKey="Button12"
-						inherits="BetterFriendsListButtonTemplate">
-						<Anchors>
-							<Anchor point="TOPLEFT" relativeKey="$parent.Button11"
-								relativePoint="BOTTOMLEFT" x="0" y="-1" />
-						</Anchors>
-					</Button>
-				</Frames>
-			</ScrollFrame>
+				<!-- ScrollBox will be dynamically created by InitializeScrollBox() -->
+				<!-- No static buttons needed - ScrollBox factory creates them on demand! -->
+			</Frame>
 			<!-- MinimalScrollBar - matching Blizzard's FriendsFrame scrollbar -->
 			<EventFrame parentKey="MinimalScrollBar" inherits="MinimalScrollBar">
 				<Anchors>
@@ -2484,83 +2393,14 @@
 					-- Position Inset so its top edge aligns with bottom of tabs
 					self.Inset:SetPoint("TOPLEFT", self.FriendsTabHeader.Tab1, "BOTTOMLEFT", -4, 1)
 					self.Inset:SetPoint("BOTTOMRIGHT", -6, 26)
-					-- Set explicit height for ScrollFrame to fit 12 buttons perfectly
-					-- Frame: 570px, ScrollFrame needs full 418px for 12 buttons, width: 380px for wider buttons
+					-- Set explicit size for ScrollFrame container
 					if self.ScrollFrame then
 						self.ScrollFrame:ClearAllPoints()
 						self.ScrollFrame:SetPoint("TOPLEFT", self.Inset, "TOPLEFT", 4, -4)
 						self.ScrollFrame:SetPoint("BOTTOMRIGHT", self.Inset, "BOTTOMRIGHT", -22, 2)
 					end
 				end
-				-- Hook up MinimalScrollBar to FauxScrollFrame
-				if self.ScrollFrame and self.MinimalScrollBar then
-					local scrollBar = self.MinimalScrollBar
-					local scrollFrame = self.ScrollFrame
-					-- Flag to prevent infinite recursion
-					local isUpdatingFromScroll = false
-					-- Initialize MinimalScrollBar properly
-					scrollBar:SetScrollPercentage(0)
-					-- Hook MinimalScrollBar scroll events to update FauxScrollFrame
-					-- This is triggered when user drags the scrollbar thumb
-					scrollBar:RegisterCallback(BaseScrollBoxEvents.OnScroll, function(o, scrollPercentage)
-						if isUpdatingFromScroll then return end
-						isUpdatingFromScroll = true
-						-- Calculate the offset from percentage
-						local numFriends = #(BetterFriendlist_GetFriendsList and BetterFriendlist_GetFriendsList() or {})
-						local maxScroll = math.max(0, numFriends - 12)
-						if maxScroll > 0 then
-							local targetOffset = math.floor(scrollPercentage * maxScroll + 0.5)
-							FauxScrollFrame_SetOffset(scrollFrame, targetOffset)
-							-- Trigger update (this will NOT call SetScrollPercentage due to flag)
-							if BetterFriendsFrame_UpdateDisplay then
-								BetterFriendsFrame_UpdateDisplay()
-							end
-						end
-						isUpdatingFromScroll = false
-					end, scrollBar)
-					-- Store the flag on the frame so Lua can access it
-					self.isUpdatingScrollFromCallback = function() return isUpdatingFromScroll end
-					self.setUpdatingScrollFromCallback = function(value) isUpdatingFromScroll = value end
-					-- Enable mouse wheel scrolling on the ScrollFrame
-					scrollFrame:EnableMouseWheel(true)
-					scrollFrame:SetScript("OnMouseWheel", function(frame, delta)
-						-- Get current offset and calculate max based on displayList
-						local currentOffset = FauxScrollFrame_GetOffset(frame)
-						-- Use displayList count for proper scrolling with groups
-						local numItems = BetterFriendsFrame_GetDisplayListCount and BetterFriendsFrame_GetDisplayListCount() or 0
-						local maxOffset = math.max(0, numItems - 12)
-						-- Calculate new offset (scroll by 3 items per wheel notch for smoother scrolling)
-						local scrollAmount = 3
-						local newOffset
-						if delta > 0 then
-							-- Scroll up
-							newOffset = math.max(0, currentOffset - scrollAmount)
-						else
-							-- Scroll down
-							newOffset = math.min(maxOffset, currentOffset + scrollAmount)
-						end
-						-- Set flag to skip FauxScrollFrame_Update
-						BetterFriendsFrame.inMouseWheelUpdate = true
-						-- Set the new offset
-						FauxScrollFrame_SetOffset(frame, newOffset)
-						-- Update the display
-						BetterFriendsFrame_UpdateDisplay()
-						-- Clear flag
-						BetterFriendsFrame.inMouseWheelUpdate = false
-						-- Now update the scroll indicator manually
-						-- Use the isUpdatingFromScroll flag to prevent the callback from resetting the offset
-						if BetterFriendsFrame.MinimalScrollBar and maxOffset > 0 then
-							if BetterFriendsFrame.setUpdatingScrollFromCallback then
-								BetterFriendsFrame.setUpdatingScrollFromCallback(true)
-							end
-							local scrollPercentage = newOffset / maxOffset
-							BetterFriendsFrame.MinimalScrollBar:SetScrollPercentage(scrollPercentage)
-							if BetterFriendsFrame.setUpdatingScrollFromCallback then
-								BetterFriendsFrame.setUpdatingScrollFromCallback(false)
-							end
-						end
-					end)
-				end
+				
 				-- Initialize bottom tabs
 				PanelTemplates_SetNumTabs(self, 4)
 				PanelTemplates_SetTab(self, 1)

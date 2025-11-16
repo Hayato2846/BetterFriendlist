@@ -369,6 +369,22 @@ function Groups:Toggle(groupId)
 	return true
 end
 
+-- Set group collapsed state (for Collapse/Expand All)
+function Groups:SetCollapsed(groupId, collapsed)
+	local group = self.groups[groupId]
+	if not group then
+		return false
+	end
+	
+	group.collapsed = collapsed
+	
+	-- Save to database
+	local DB = BFL:GetModule("DB")
+	DB:SetGroupState(groupId, group.collapsed)
+	
+	return true
+end
+
 -- Check if friend is in group
 function Groups:IsFriendInGroup(friendUID, groupId)
 	local DB = BFL:GetModule("DB")

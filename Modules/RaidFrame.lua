@@ -842,6 +842,42 @@ end
 -- MULTI-SELECT VISUAL HIGHLIGHTS (Phase 8.2)
 -- ========================================
 
+--- Set drag highlight on a specific raid member button
+--- @param raidIndex number The raid index (raid1 = 1, raid2 = 2, etc.)
+--- @param isDragging boolean Whether to show or hide drag highlight
+function RaidFrame:SetButtonDragHighlight(raidIndex, isDragging)
+    if not self.memberButtons then return end
+    
+    -- Find the button with this raidIndex
+    for groupIndex = 1, 8 do
+        if self.memberButtons[groupIndex] then
+            for slotIndex = 1, 5 do
+                local button = self.memberButtons[groupIndex][slotIndex]
+                if button and button.unit then
+                    local buttonRaidIndex = tonumber(string.match(button.unit, "raid(%d+)"))
+                    if buttonRaidIndex == raidIndex then
+                        -- Found the button, update highlight
+                        if not button.DragHighlight then
+                            -- Create drag highlight texture (same as selection but more visible)
+                            button.DragHighlight = button:CreateTexture(nil, "OVERLAY")
+                            button.DragHighlight:SetAllPoints()
+                            button.DragHighlight:SetColorTexture(1.0, 0.843, 0.0, 0.5) -- Gold with 50% alpha (brighter than selection)
+                            button.DragHighlight:SetBlendMode("ADD")
+                        end
+                        
+                        if isDragging then
+                            button.DragHighlight:Show()
+                        else
+                            button.DragHighlight:Hide()
+                        end
+                        return
+                    end
+                end
+            end
+        end
+    end
+end
+
 --- Set selection highlight on a specific raid member button
 --- @param raidIndex number The raid index (raid1 = 1, raid2 = 2, etc.)
 --- @param isSelected boolean Whether to show or hide highlight

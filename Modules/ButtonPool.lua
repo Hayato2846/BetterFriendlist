@@ -476,21 +476,27 @@ function ButtonPool:GetButtonForDisplay(index, buttonType)
 	if buttonType == BUTTON_TYPE_INVITE_HEADER then
 		button = GetOrCreateInviteHeaderButton(currentInviteHeaderIndex)
 		currentInviteHeaderIndex = currentInviteHeaderIndex + 1
+		-- Height is fixed at 22px (XML template)
+		button:SetHeight(22)
 	elseif buttonType == BUTTON_TYPE_INVITE then
 		button = GetOrCreateInviteButton(currentInviteIndex)
 		currentInviteIndex = currentInviteIndex + 1
-		-- Set dynamic height based on compact mode
-		button:SetHeight(GetButtonHeight())
+		-- Height is fixed at 34px (XML template)
+		button:SetHeight(34)
 	elseif buttonType == BUTTON_TYPE_DIVIDER then
 		button = GetOrCreateDividerButton(currentDividerIndex)
 		currentDividerIndex = currentDividerIndex + 1
+		-- Height is fixed at 8px (XML template) - CRITICAL FIX!
+		button:SetHeight(8)
 	elseif buttonType == BUTTON_TYPE_GROUP_HEADER then
 		button = GetOrCreateHeaderButton(currentHeaderIndex)
 		currentHeaderIndex = currentHeaderIndex + 1
+		-- Height is fixed at 22px (XML template)
+		button:SetHeight(22)
 	else
 		button = GetOrCreateFriendButton(currentFriendIndex)
 		currentFriendIndex = currentFriendIndex + 1
-		-- Set dynamic height based on compact mode
+		-- Set dynamic height based on compact mode (24 or 34)
 		button:SetHeight(GetButtonHeight())
 	end
 	

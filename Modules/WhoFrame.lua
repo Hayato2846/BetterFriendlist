@@ -211,18 +211,10 @@ function WhoFrame:Update(forceRebuild)
 		if info then
 			-- Strip trailing dash from names (WoW API bug)
 			if info.fullName then
-				local original = info.fullName
 				info.fullName = info.fullName:gsub("%-$", "")
-				if original ~= info.fullName then
-					print("[BFL WHO] Cleaned fullName: '" .. original .. "' -> '" .. info.fullName .. "'")
-				end
 			end
 			if info.name then
-				local original = info.name
 				info.name = info.name:gsub("%-$", "")
-				if original ~= info.name then
-					print("[BFL WHO] Cleaned name: '" .. original .. "' -> '" .. info.name .. "'")
-				end
 			end
 			-- Add fontObject reference (not string) for extent calculator
 			whoDataProvider:Insert({

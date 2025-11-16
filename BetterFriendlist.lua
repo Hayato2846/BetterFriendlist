@@ -38,6 +38,30 @@ if not FRIENDS_OFFLINE_BACKGROUND_COLOR then
 	FRIENDS_OFFLINE_BACKGROUND_COLOR = CreateColor(0.35, 0.35, 0.35, 1)
 end
 
+-- ========================================
+-- Global Functions (for XML OnClick handlers)
+-- ========================================
+
+-- Toggle group collapsed/expanded state (called from XML)
+function BetterFriendsList_ToggleGroup(groupId)
+	local FriendsList = BFL:GetModule("FriendsList")
+	if FriendsList then
+		FriendsList:ToggleGroup(groupId)
+	end
+end
+
+-- Toggle friend in group (called from Drag & Drop system - IDENTICAL to old system)
+function BetterFriendsList_ToggleFriendInGroup(friendUID, groupId)
+	local Groups = BFL:GetModule("Groups")
+	if Groups then
+		Groups:ToggleFriendInGroup(friendUID, groupId)
+	end
+end
+
+-- ========================================
+-- Constants and Display State
+-- ========================================
+
 -- Constants
 local NUM_BUTTONS = 12  -- Number of visible buttons in scroll frame
 
@@ -567,7 +591,13 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		LoadFilterMode()
 		
 		-- Sync groups from module (if available)
-		SyncGroups()			-- Initialize saved variables (fallback if modules not used)
+		SyncGroups()
+		
+		-- Initialize FriendsList module (sets up ScrollBox)
+		local FriendsList = BFL:GetModule("FriendsList")
+		if FriendsList and FriendsList.Initialize then
+			FriendsList:Initialize()
+		end			-- Initialize saved variables (fallback if modules not used)
 			BetterFriendlistDB = BetterFriendlistDB or {}
 			BetterFriendlistDB.groupStates = BetterFriendlistDB.groupStates or {}
 			BetterFriendlistDB.customGroups = BetterFriendlistDB.customGroups or {}
@@ -766,20 +796,16 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		
 		-- DEPRECATED: Old Menu.ModifyMenu code removed (was using wrong tags without MENU_UNIT_ prefix)
 		
-		-- Setup scroll frame
-			if BetterFriendsFrame and BetterFriendsFrame.ScrollFrame then
-				BetterFriendsFrame.ScrollFrame:SetScript("OnVerticalScroll", function(self, offset)
-					FauxScrollFrame_OnVerticalScroll(self, offset, 34, UpdateFriendsDisplay)
-				end)
-			end
-			
-			-- Setup close button
-			if BetterFriendsFrame and BetterFriendsFrame.CloseButton then
-				BetterFriendsFrame.CloseButton:SetScript("OnClick", function()
-					HideBetterFriendsFrame()
-				end)
-			end
+		-- ScrollBox initialization is now handled by FriendsList:InitializeScrollBox()
+		-- No need for OnVerticalScroll script - ScrollBox handles this automatically
+		
+		-- Setup close button
+		if BetterFriendsFrame and BetterFriendsFrame.CloseButton then
+			BetterFriendsFrame.CloseButton:SetScript("OnClick", function()
+				HideBetterFriendsFrame()
+			end)
 		end
+	end
 	elseif event == "FRIENDLIST_UPDATE" or event == "BN_FRIEND_LIST_SIZE_CHANGED" or 
 	       event == "BN_FRIEND_ACCOUNT_ONLINE" or event == "BN_FRIEND_ACCOUNT_OFFLINE" or
 	       event == "BN_FRIEND_INFO_CHANGED" then

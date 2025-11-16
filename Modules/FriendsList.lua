@@ -44,6 +44,282 @@ local INVITE_RESTRICTION_NO_GAME_ACCOUNTS = 12
 -- Helper Functions
 -- ========================================
 
+-- Get height of a display list item based on its type
+-- CRITICAL: These heights MUST match XML template heights and ButtonPool SetHeight() calls
+-- Otherwise buttons will drift out of position!
+local function GetItemHeight(item, isCompactMode)
+	if not item then return 0 end
+	
+	if item.type == BUTTON_TYPE_GROUP_HEADER then
+		return 22  -- Header height (BetterFriendsGroupHeaderTemplate y="22")
+	elseif item.type == BUTTON_TYPE_INVITE_HEADER then
+		return 22  -- Invite header height (BFL_FriendInviteHeaderTemplate y="22")
+	elseif item.type == BUTTON_TYPE_INVITE then
+		return 34  -- Invite button height (BFL_FriendInviteButtonTemplate y="34")
+	elseif item.type == BUTTON_TYPE_DIVIDER then
+		return 8  -- Divider height (BetterFriendsDividerTemplate y="8") - FIXED from 16!
+	elseif item.type == BUTTON_TYPE_FRIEND then
+		return isCompactMode and 24 or 34  -- Friend button (BetterFriendsListButtonTemplate y="34", compactMode=24)
+	else
+		return 34  -- Default fallback
+	end
+end
+
+-- ========================================
+-- ScrollBox/DataProvider Functions (NEW - Phase 1)
+-- ========================================
+
+-- Build DataProvider for ScrollBox system (replaces BuildDisplayList logic)
+-- Returns a DataProvider object with elementData for each button
+local function BuildDataProvider(self)
+	local dataProvider = CreateDataProvider()
+	
+	-- Sync groups first
+	self:SyncGroups()
+	
+	-- Get friendGroups from Groups module
+	local Groups = GetGroups()
+	local friendGroups = Groups and Groups:GetAll() or {}
+	
+	-- Add friend invites at top
+	local numInvites = BNGetNumFriendInvites()
+	if numInvites and numInvites > 0 then
+		dataProvider:Insert({
+			buttonType = BUTTON_TYPE_INVITE_HEADER,
+			count = numInvites,
+		})
+		
+		if not GetCVarBool("friendInvitesCollapsed") then
+			for i = 1, numInvites do
+				dataProvider:Insert({
+					buttonType = BUTTON_TYPE_INVITE,
+					inviteIndex = i,
+				})
+			end
+			
+			-- Add divider if there are friends below
+			if #self.friendsList > 0 then
+				dataProvider:Insert({
+					buttonType = BUTTON_TYPE_DIVIDER
+				})
+			end
+		end
+	end
+	
+	-- Separate friends into groups
+	local groupedFriends = {
+		favorites = {},
+		nogroup = {}
+	}
+	
+	-- Initialize custom group tables
+	for groupId, groupData in pairs(friendGroups) do
+		if not groupData.builtin or groupId == "favorites" or groupId == "nogroup" then
+			groupedFriends[groupId] = groupedFriends[groupId] or {}
+		end
+	end
+	
+	-- Get DB
+	local DB = GetDB()
+	if not DB then 
+		return dataProvider
+	end
+	
+	-- Group friends
+	for _, friend in ipairs(self.friendsList) do
+		-- Apply filters
+		if self:PassesFilters(friend) then
+			local isInAnyGroup = false
+			local friendUID = GetFriendUID(friend)
+			
+			-- Check if favorite (Battle.net only)
+			if friend.type == "bnet" and friend.isFavorite then
+				table.insert(groupedFriends.favorites, friend)
+				isInAnyGroup = true
+			end
+			
+			-- Check for custom groups
+			if BetterFriendlistDB and BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friendUID] then
+				local groups = BetterFriendlistDB.friendGroups[friendUID]
+				for _, groupId in ipairs(groups) do
+					-- Skip invalid entries
+					if type(groupId) == "string" and groupedFriends[groupId] then
+						table.insert(groupedFriends[groupId], friend)
+						isInAnyGroup = true
+					end
+				end
+			end
+			
+			-- Add to "No Group" if not in any group
+			if not isInAnyGroup then
+				table.insert(groupedFriends.nogroup, friend)
+			end
+		end
+	end
+	
+	-- Build data provider in group order
+	local orderedGroups = {}
+	for _, groupData in pairs(friendGroups) do
+		table.insert(orderedGroups, groupData)
+	end
+	table.sort(orderedGroups, function(a, b) return a.order < b.order end)
+	
+	for _, groupData in ipairs(orderedGroups) do
+		local groupFriends = groupedFriends[groupData.id]
+		
+		-- Only process if group has friends
+		if groupFriends then
+			-- Check if we should skip empty groups
+			local hideEmptyGroups = GetDB():Get("hideEmptyGroups", false)
+			local shouldSkip = false
+			
+			if hideEmptyGroups then
+				-- Count online friends only
+				local onlineCount = 0
+				for _, friend in ipairs(groupFriends) do
+					if friend.connected then
+						onlineCount = onlineCount + 1
+					end
+				end
+				shouldSkip = (onlineCount == 0)
+			elseif #groupFriends == 0 then
+				shouldSkip = true
+			end
+			
+			if not shouldSkip then
+				-- Add group header
+				dataProvider:Insert({
+					buttonType = BUTTON_TYPE_GROUP_HEADER,
+					groupId = groupData.id,
+					name = groupData.name,
+					count = #groupFriends,
+					collapsed = groupData.collapsed
+				})
+				
+				-- Add friends if not collapsed
+				if not groupData.collapsed then
+					for _, friend in ipairs(groupFriends) do
+						dataProvider:Insert({
+							buttonType = BUTTON_TYPE_FRIEND,
+							friend = friend,
+							groupId = groupData.id
+						})
+					end
+				end
+			end
+		end
+	end
+	
+	return dataProvider
+end
+
+-- Create element factory for ScrollBox button creation
+-- Returns a factory function that creates buttons based on elementData.buttonType
+local function CreateElementFactory(friendsList)
+	-- Capture friendsList reference in closure
+	local self = friendsList
+	
+	return function(factory, elementData)
+		local buttonType = elementData.buttonType
+		
+		if buttonType == BUTTON_TYPE_DIVIDER then
+			factory("BetterFriendsDividerTemplate")
+			
+		elseif buttonType == BUTTON_TYPE_INVITE_HEADER then
+			factory("BFL_FriendInviteHeaderTemplate", function(button, data)
+				self:UpdateInviteHeaderButton(button, data)
+			end)
+			
+		elseif buttonType == BUTTON_TYPE_INVITE then
+			factory("BFL_FriendInviteButtonTemplate", function(button, data)
+				self:UpdateInviteButton(button, data)
+			end)
+			
+		elseif buttonType == BUTTON_TYPE_GROUP_HEADER then
+			factory("BetterFriendsGroupHeaderTemplate", function(button, data)
+				self:UpdateGroupHeaderButton(button, data)
+			end)
+			
+		else -- BUTTON_TYPE_FRIEND
+			factory("BetterFriendsListButtonTemplate", function(button, data)
+				self:UpdateFriendButton(button, data)
+			end)
+		end
+	end
+end
+
+-- Create extent calculator for dynamic button heights
+-- Returns a function that calculates height based on elementData.buttonType
+local function CreateExtentCalculator(self)
+	local DB = GetDB()
+	
+	return function(dataIndex, elementData)
+		local isCompactMode = DB and DB:Get("compactMode", false)
+		
+		if elementData.buttonType == BUTTON_TYPE_GROUP_HEADER then
+			return 22
+		elseif elementData.buttonType == BUTTON_TYPE_INVITE_HEADER then
+			return 22
+		elseif elementData.buttonType == BUTTON_TYPE_INVITE then
+			return 34
+		elseif elementData.buttonType == BUTTON_TYPE_DIVIDER then
+			return 8
+		elseif elementData.buttonType == BUTTON_TYPE_FRIEND then
+			return isCompactMode and 24 or 34
+		else
+			return 34
+		end
+	end
+end
+
+-- ========================================
+-- ScrollBox Initialization (NEW - Phase 1)
+-- ========================================
+
+-- Initialize ScrollBox system (called once in Initialize())
+-- Converts FauxScrollFrame to modern ScrollBox/DataProvider system
+function FriendsList:InitializeScrollBox()
+	local scrollFrame = BetterFriendsFrame.ScrollFrame
+	if not scrollFrame then
+		return
+	end
+	
+	-- Create ScrollBox if it doesn't exist
+	if not scrollFrame.ScrollBox then
+		-- Create ScrollBox container (replaces FauxScrollFrame)
+		local scrollBox = CreateFrame("Frame", nil, scrollFrame, "WowScrollBoxList")
+		scrollBox:SetPoint("TOPLEFT", scrollFrame, "TOPLEFT", 0, 0)
+		scrollBox:SetPoint("BOTTOMRIGHT", scrollFrame, "BOTTOMRIGHT", 0, 0)
+		scrollFrame.ScrollBox = scrollBox
+	end
+	
+	-- Use existing MinimalScrollBar (already defined in XML)
+	local scrollBar = BetterFriendsFrame.MinimalScrollBar
+	if not scrollBar then
+		return
+	end
+	
+	-- Create view with factory and extent calculator
+	local view = CreateScrollBoxListLinearView()
+	view:SetElementFactory(CreateElementFactory(self))
+	view:SetElementExtentCalculator(CreateExtentCalculator(self))
+	
+	-- Initialize ScrollBox with view and scrollbar
+	ScrollUtil.InitScrollBoxListWithScrollBar(
+		scrollFrame.ScrollBox,
+		scrollBar,
+		view
+	)
+	
+	-- Store reference for later use
+	self.scrollBox = scrollFrame.ScrollBox
+	self.scrollBar = scrollBar
+end
+
+-- ========================================
+-- Legacy Helper Functions
+-- ========================================
+
 -- Convert localized class name to English class filename for RAID_CLASS_COLORS
 -- This fixes class coloring in non-English clients (deDE, frFR, esES, etc.)
 -- CRITICAL: gameAccountInfo.className and friendInfo.className are LOCALIZED
@@ -201,6 +477,9 @@ function FriendsList:Initialize()
 	-- Sync groups from Groups module
 	self:SyncGroups()
 	
+	-- Initialize ScrollBox system (NEW - Phase 1)
+	self:InitializeScrollBox()
+	
 	-- Register event callbacks for friend list updates
 	BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function(...)
 		self:OnFriendListUpdate(...)
@@ -334,6 +613,11 @@ function FriendsList:UpdateFriendsList()
 						friend.realmName = gameInfo.realmName
 						friend.factionName = gameInfo.factionName
 						friend.timerunningSeasonID = gameInfo.timerunningSeasonID
+						
+						if gameInfo.timerunningSeasonID then
+							friend.timerunningSeasonID = gameInfo.timerunningSeasonID
+						end
+
 					elseif gameInfo.clientProgram == "BSAp" then
 						friend.gameName = "Mobile"
 					elseif gameInfo.clientProgram == "App" then
@@ -1051,12 +1335,14 @@ end
 function FriendsList:SetSearchText(text)
 	self.searchText = text or ""
 	self:BuildDisplayList()
+	self:RenderDisplay()
 end
 
 -- Set filter mode
 function FriendsList:SetFilterMode(mode)
 	self.filterMode = mode or "all"
 	self:BuildDisplayList()
+	self:RenderDisplay()
 end
 
 -- Set sort mode
@@ -1072,6 +1358,7 @@ function FriendsList:SetSortMode(mode)
 	
 	self:ApplySort()
 	self:BuildDisplayList()
+	self:RenderDisplay()
 end
 
 -- Set secondary sort mode (for multi-criteria sorting)
@@ -1087,6 +1374,7 @@ function FriendsList:SetSecondarySortMode(mode)
 	
 	self:ApplySort()
 	self:BuildDisplayList()
+	self:RenderDisplay()
 end
 
 -- ========================================
@@ -1098,10 +1386,9 @@ function FriendsList:ToggleGroup(groupId)
 	local Groups = GetGroups()
 	if not Groups then return end
 	
-	local group = Groups:Get(groupId)
-	if group then
-		Groups:SetCollapsed(groupId, not group.collapsed)
+	if Groups:Toggle(groupId) then
 		self:BuildDisplayList()
+		self:RenderDisplay()
 	end
 end
 
@@ -1116,6 +1403,7 @@ function FriendsList:CreateGroup(groupName)
 	if success then
 		self:SyncGroups()
 		self:BuildDisplayList()
+		self:RenderDisplay()
 	end
 	
 	return success, err
@@ -1132,6 +1420,7 @@ function FriendsList:RenameGroup(groupId, newName)
 	if success then
 		self:SyncGroups()
 		self:BuildDisplayList()
+		self:RenderDisplay()
 	end
 	
 	return success, err
@@ -1213,12 +1502,6 @@ function FriendsList:InviteGroupToParty(groupId)
 				end
 			end
 		end
-	end
-	
-	if inviteCount > 0 then
-		print(string.format("|cff00ff00BetterFriendlist:|r Invited %d friend(s) to party.", inviteCount))
-	else
-		print("|cffff8800BetterFriendlist:|r " .. BFL_L.MSG_NO_FRIENDS_AVAILABLE)
 	end
 end
 
@@ -1302,6 +1585,7 @@ end
 -- RenderDisplay: Updates the visual display of the friends list
 -- This function handles ScrollBox rendering, button pool management, 
 -- friend button configuration (BNet/WoW), compact mode, and TravelPass buttons
+-- NEW: Simplified RenderDisplay using ScrollBox/DataProvider system (Phase 2)
 function FriendsList:RenderDisplay()
 	-- Skip update if frame is not shown (performance optimization)
 	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
@@ -1314,7 +1598,6 @@ function FriendsList:RenderDisplay()
 	end
 	
 	-- Skip update if we're not on the Friends tab (tab 1)
-	-- This prevents the Sort panel from being closed when friend list updates
 	if BetterFriendsFrame.FriendsTabHeader then
 		local selectedTab = PanelTemplates_GetSelectedTab(BetterFriendsFrame.FriendsTabHeader)
 		if selectedTab and selectedTab ~= 1 then
@@ -1322,736 +1605,721 @@ function FriendsList:RenderDisplay()
 		end
 	end
 	
-	-- Build display list from friends list
-	self:BuildDisplayList()
+	-- Build DataProvider from friends list
+	local dataProvider = BuildDataProvider(self)
 	
-	local scrollFrame = BetterFriendsFrame.ScrollFrame
-	local numItems = #self.displayList
+	-- Update ScrollBox with automatic scroll position preservation!
+	local retainScrollPosition = true
+	if self.scrollBox then
+		self.scrollBox:SetDataProvider(dataProvider, retainScrollPosition)
+	end
+end
+
+-- ========================================
+-- Button Update Functions (called by ScrollBox Factory)
+-- ========================================
+
+-- Update group header button (NEW - Phase 1)
+function FriendsList:UpdateGroupHeaderButton(button, elementData)
+	local groupId = elementData.groupId
+	local name = elementData.name
+	local count = elementData.count
+	local collapsed = elementData.collapsed
 	
-	-- Calculate maximum visible buttons based on ACTUAL scroll frame height and button heights
-	-- Get actual ScrollFrame height dynamically (it may change based on frame size)
-	local scrollFrameHeight = scrollFrame:GetHeight() or 418
+	-- Store group data on button
+	button.groupId = groupId
 	
+	-- Create drop target highlight if it doesn't exist (IDENTICAL to old ButtonPool.lua system)
+	if not button.dropHighlight then
+		local dropHighlight = button:CreateTexture(nil, "BACKGROUND")
+		dropHighlight:SetAllPoints()
+		dropHighlight:SetColorTexture(0, 1, 0, 0.2)
+		dropHighlight:Hide()
+		button.dropHighlight = dropHighlight
+	end
+	
+	-- Get Groups module
+	local Groups = GetGroups()
+	
+	-- Get group color
+	local colorCode = "|cffffffff"  -- Default white
+	if Groups then
+		local group = Groups:Get(groupId)
+		if group and group.color then
+			local r = group.color.r or group.color[1] or 1
+			local g = group.color.g or group.color[2] or 1
+			local b = group.color.b or group.color[3] or 1
+			colorCode = string.format("|cff%02x%02x%02x", r * 255, g * 255, b * 255)
+		end
+	end
+	
+	-- Set header text with color
+	button:SetFormattedText("%s%s|r (%d)", colorCode, name, count)
+	
+	-- Show/hide collapse arrows
+	button.DownArrow:SetShown(not collapsed)
+	button.RightArrow:SetShown(collapsed)
+	
+	-- Apply font scaling
+	local FontManager = GetFontManager()
+	if FontManager and button:GetFontString() then
+		FontManager:ApplyFontSize(button:GetFontString())
+	end
+	
+	-- Tooltips for group headers (IDENTICAL to old ButtonPool.lua system)
+	button:SetScript("OnEnter", function(self)
+		-- Check if we're currently dragging a friend
+		local isDragging = BetterFriendsList_DraggedFriend ~= nil
+		
+		local Groups = GetGroups()
+		local friendGroups = Groups and Groups:GetAll() or {}
+		
+		if isDragging and self.groupId and friendGroups[self.groupId] and not friendGroups[self.groupId].builtin then
+			-- Show drop target tooltip
+			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+			GameTooltip:SetText(BFL_L.TOOLTIP_DROP_TO_ADD, 1, 1, 1)
+			GameTooltip:AddLine(BFL_L.TOOLTIP_HOLD_SHIFT, 0.7, 0.7, 0.7, true)
+			GameTooltip:Show()
+		else
+			-- Show group info tooltip
+			if self.groupId and friendGroups[self.groupId] then
+				local groupData = friendGroups[self.groupId]
+				
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+				GameTooltip:SetText(groupData.name, 1, 1, 1)
+				GameTooltip:AddLine("Right-click for options", 0.7, 0.7, 0.7, true)
+				if not groupData.builtin then
+					GameTooltip:AddLine(BFL_L.TOOLTIP_DRAG_HERE, 0.5, 0.8, 1.0, true)
+				end
+				GameTooltip:Show()
+			end
+		end
+	end)
+	
+	button:SetScript("OnLeave", function(self)
+		GameTooltip:Hide()
+	end)
+	
+	-- Add right-click menu functionality
+	if Groups then
+		local group = Groups:Get(groupId)
+		if group and not group.builtin then
+			-- Custom groups: Full context menu with Rename/Delete
+			button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+			button:SetScript("OnClick", function(self, buttonName)
+				if buttonName == "RightButton" then
+					-- Open context menu for custom group header
+					MenuUtil.CreateContextMenu(self, function(owner, rootDescription)
+						local groupData = Groups:Get(self.groupId)
+						if not groupData then return end
+						
+						rootDescription:CreateTitle(groupData.name)
+						
+						rootDescription:CreateButton("Rename Group", function()
+							StaticPopup_Show("BETTER_FRIENDLIST_RENAME_GROUP", nil, nil, self.groupId)
+						end)
+						
+						rootDescription:CreateButton("Delete Group", function()
+							StaticPopup_Show("BETTER_FRIENDLIST_DELETE_GROUP", nil, nil, self.groupId)
+						end)
+						
+						rootDescription:CreateDivider()
+						
+						rootDescription:CreateButton("Invite All to Party", function()
+							FriendsList:InviteGroupToParty(self.groupId)
+						end)
+						
+						rootDescription:CreateDivider()
+						
+						rootDescription:CreateButton("Collapse All Groups", function()
+							if Groups then
+								for gid in pairs(Groups.groups) do
+									Groups:SetCollapsed(gid, true)  -- true = force collapse
+								end
+								FriendsList:BuildDisplayList()
+								FriendsList:RenderDisplay()
+							end
+						end)
+						
+						rootDescription:CreateButton("Expand All Groups", function()
+							if Groups then
+								for gid in pairs(Groups.groups) do
+									Groups:SetCollapsed(gid, false)  -- false = force expand
+								end
+								FriendsList:BuildDisplayList()
+								FriendsList:RenderDisplay()
+							end
+						end)
+					end)
+				else
+					-- Left click: toggle collapse
+					if Groups:Toggle(self.groupId) then
+						-- Check accordion mode
+						local DB = GetDB()
+						local accordionMode = DB and DB:Get("accordionGroups", false)
+						if accordionMode then
+							local clickedGroup = Groups:Get(self.groupId)
+							if clickedGroup and not clickedGroup.collapsed then
+								-- Opening this group - collapse all others
+								for gid in pairs(Groups.groups) do
+									if gid ~= self.groupId then
+										Groups:SetCollapsed(gid, true)  -- Force collapse
+									end
+								end
+							end
+						end
+						
+						FriendsList:BuildDisplayList()
+						FriendsList:RenderDisplay()
+					end
+				end
+			end)
+		else
+			-- Built-in groups: Right-click for Collapse/Expand All + Invite
+			button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+			button:SetScript("OnClick", function(self, buttonName)
+				if buttonName == "RightButton" then
+					-- Open context menu for built-in group header
+					MenuUtil.CreateContextMenu(self, function(owner, rootDescription)
+						local groupData = Groups:Get(self.groupId)
+						if not groupData then return end
+						
+						rootDescription:CreateTitle(groupData.name)
+						
+						rootDescription:CreateButton("Invite All to Party", function()
+							FriendsList:InviteGroupToParty(self.groupId)
+						end)
+						
+						rootDescription:CreateDivider()
+						
+						rootDescription:CreateButton("Collapse All Groups", function()
+							if Groups then
+								for gid in pairs(Groups.groups) do
+									Groups:SetCollapsed(gid, true)  -- true = force collapse
+								end
+								FriendsList:BuildDisplayList()
+								FriendsList:RenderDisplay()
+							end
+						end)
+						
+						rootDescription:CreateButton("Expand All Groups", function()
+							if Groups then
+								for gid in pairs(Groups.groups) do
+									Groups:SetCollapsed(gid, false)  -- false = force expand
+								end
+								FriendsList:BuildDisplayList()
+								FriendsList:RenderDisplay()
+							end
+						end)
+					end)
+				else
+					-- Left click: toggle collapse
+					if Groups:Toggle(self.groupId) then
+						-- Check accordion mode
+						local DB = GetDB()
+						local accordionMode = DB and DB:Get("accordionGroups", false)
+						if accordionMode then
+							local clickedGroup = Groups:Get(self.groupId)
+							if clickedGroup and not clickedGroup.collapsed then
+								-- Opening this group - collapse all others
+								for gid in pairs(Groups.groups) do
+									if gid ~= self.groupId then
+										Groups:SetCollapsed(gid, true)  -- Force collapse
+									end
+								end
+							end
+						end
+						
+						FriendsList:BuildDisplayList()
+						FriendsList:RenderDisplay()
+					end
+				end
+			end)
+		end
+	end
+	
+	-- Ensure button is visible
+	button:Show()
+end
+
+-- ========================================
+-- Friend Button Update (ScrollBox Factory Callback)
+-- ========================================
+
+-- Update friend button (called by ScrollBox factory for each visible friend)
+function FriendsList:UpdateFriendButton(button, elementData)
+	local friend = elementData.friend
+	local groupId = elementData.groupId
+	
+	-- Store friend data on button for tooltip and context menu
+	button.friendIndex = friend.index
+	button.friendData = friend
+	button.groupId = groupId
+	
+	-- Store friendInfo for context menu (matches OnClick handler)
+	button.friendInfo = {
+		type = friend.type,
+		index = friend.index,
+		name = friend.name or friend.accountName or friend.battleTag,
+		connected = friend.connected,
+		guid = friend.guid,
+		bnetAccountID = friend.bnetAccountID,
+		battleTag = friend.battleTag
+	}
+	
+	-- Enable drag and drop for group assignment (IDENTICAL to old ButtonPool.lua system)
+	button:RegisterForDrag("LeftButton")
+	
+	-- Create drag overlay if it doesn't exist (same gold color as RaidFrame)
+	if not button.dragOverlay then
+		local dragOverlay = button:CreateTexture(nil, "OVERLAY")
+		dragOverlay:SetAllPoints()
+		dragOverlay:SetColorTexture(1.0, 0.843, 0.0, 0.5) -- Gold with 50% alpha (matching RaidFrame)
+		dragOverlay:SetBlendMode("ADD")
+		dragOverlay:Hide()
+		button.dragOverlay = dragOverlay
+	end
+	
+	button:SetScript("OnDragStart", function(self)
+		if self.friendData then
+			-- Store friend name for header text updates (same as old system)
+			BetterFriendsList_DraggedFriend = self.friendData.name or self.friendData.accountName or self.friendData.battleTag or "Unknown"
+			
+			-- Show drag overlay
+			self.dragOverlay:Show()
+			self:SetAlpha(0.5)
+			
+			-- Hide tooltip
+			GameTooltip:Hide()
+			
+			-- Enable OnUpdate to continuously check headers under mouse (IDENTICAL to old system)
+			self:SetScript("OnUpdate", function(updateSelf)
+				-- Get cursor position
+				local cursorX, cursorY = GetCursorPosition()
+				local scale = UIParent:GetEffectiveScale()
+				cursorX = cursorX / scale
+				cursorY = cursorY / scale
+				
+				-- Get all visible group header buttons from ScrollBox
+				local Groups = GetGroups()
+				local friendGroups = Groups and Groups:GetAll() or {}
+				local scrollBox = self:GetParent():GetParent()  -- Get ScrollBox
+				
+				if scrollBox then
+					-- GetFrames() returns a table, not a function - iterate with pairs()
+					local frames = scrollBox:GetFrames()
+					for _, frame in pairs(frames) do
+						if frame.groupId and frame.dropHighlight then
+							local groupData = friendGroups[frame.groupId]
+							if groupData and not groupData.builtin then
+								-- Check if cursor is over this header
+								local left, bottom, width, height = frame:GetRect()
+								local isOver = false
+								if left then
+									isOver = (cursorX >= left and cursorX <= left + width and 
+									         cursorY >= bottom and cursorY <= bottom + height)
+								end
+								
+								if isOver and BetterFriendsList_DraggedFriend then
+									-- Show highlight and update text (IDENTICAL to old system - GOLD color)
+									frame.dropHighlight:Show()
+									local headerText = string.format("|cffffd700Add %s to %s|r", BetterFriendsList_DraggedFriend, groupData.name)
+									frame:SetText(headerText)
+								else
+									-- Hide highlight and restore original text (IDENTICAL to old system - GOLD color)
+									frame.dropHighlight:Hide()
+									local memberCount = 0
+									if BetterFriendlistDB.friendGroups then
+										for _, groups in pairs(BetterFriendlistDB.friendGroups) do
+											for _, gid in ipairs(groups) do
+												if gid == frame.groupId then
+													memberCount = memberCount + 1
+													break
+												end
+											end
+										end
+									end
+									local headerText = string.format("|cffffd700%s (%d)|r", groupData.name, memberCount)
+									frame:SetText(headerText)
+								end
+							end
+						end
+					end
+				end
+			end)
+		end
+	end)
+	
+	button:SetScript("OnDragStop", function(self)
+		-- Disable OnUpdate
+		self:SetScript("OnUpdate", nil)
+		
+		-- Hide drag overlay
+		if self.dragOverlay then
+			self.dragOverlay:Hide()
+		end
+		self:SetAlpha(1.0)
+		
+		-- Get Groups and reset all header highlights and texts (IDENTICAL to old system)
+		local Groups = GetGroups()
+		local friendGroups = Groups and Groups:GetAll() or {}
+		local scrollBox = self:GetParent():GetParent()
+		
+		if scrollBox then
+			local frames = scrollBox:GetFrames()
+			for _, frame in pairs(frames) do
+				if frame.groupId and frame.dropHighlight then
+					frame.dropHighlight:Hide()
+					local groupData = friendGroups[frame.groupId]
+					if groupData then
+						local memberCount = 0
+						if BetterFriendlistDB.friendGroups then
+							for _, groups in pairs(BetterFriendlistDB.friendGroups) do
+								for _, gid in ipairs(groups) do
+									if gid == frame.groupId then
+										memberCount = memberCount + 1
+										break
+									end
+								end
+							end
+						end
+						local colorCode = "|cffffffff"
+						if groupData.color then
+							local r = groupData.color.r or groupData.color[1] or 1
+							local g = groupData.color.g or groupData.color[2] or 1
+							local b = groupData.color.b or groupData.color[3] or 1
+							colorCode = string.format("|cff%02x%02x%02x", r * 255, g * 255, b * 255)
+						end
+						local headerText = string.format("%s%s (%d)|r", colorCode, groupData.name, memberCount)
+						frame:SetText(headerText)
+					end
+				end
+			end
+		end
+		
+		-- Get mouse position and find group header under cursor (IDENTICAL to old system)
+		local cursorX, cursorY = GetCursorPosition()
+		local scale = UIParent:GetEffectiveScale()
+		cursorX = cursorX / scale
+		cursorY = cursorY / scale
+		
+		local droppedOnGroup = nil
+		if scrollBox then
+			local frames = scrollBox:GetFrames()
+			for _, frame in pairs(frames) do
+				if frame.groupId then
+					local left, bottom, width, height = frame:GetRect()
+					if left and cursorX >= left and cursorX <= left + width and 
+					   cursorY >= bottom and cursorY <= bottom + height then
+						droppedOnGroup = frame.groupId
+						break
+					end
+				end
+			end
+		end
+		
+		-- If dropped on a group, add friend to that group (IDENTICAL to old system)
+		if droppedOnGroup and self.friendData then
+			local friendUID = FriendsList:GetFriendUID(self.friendData)
+			if friendUID then
+				-- Without Shift: Remove from all other custom groups (move)
+				-- With Shift: Keep in other groups (add to multiple groups)
+				if not IsShiftKeyDown() then
+					if BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friendUID] then
+						for i = #BetterFriendlistDB.friendGroups[friendUID], 1, -1 do
+							if BetterFriendlistDB.friendGroups[friendUID][i] then
+								local groupId = BetterFriendlistDB.friendGroups[friendUID][i]
+								if friendGroups[groupId] and not friendGroups[groupId].builtin then
+									table.remove(BetterFriendlistDB.friendGroups[friendUID], i)
+								end
+							end
+						end
+					end
+				end
+				
+				-- Add to target group (use DB:AddFriendToGroup to prevent toggle behavior)
+				local DB = GetDB()
+				if DB and not DB:IsFriendInGroup(friendUID, droppedOnGroup) then
+					DB:AddFriendToGroup(friendUID, droppedOnGroup)
+				end
+				FriendsList:BuildDisplayList()
+				FriendsList:RenderDisplay()
+			end
+		end
+		
+		-- Clear dragged friend name
+		BetterFriendsList_DraggedFriend = nil
+	end)
+	
+	-- Get settings
 	local DB = GetDB()
 	local isCompactMode = DB and DB:Get("compactMode", false)
-	local avgButtonHeight = isCompactMode and 24 or 34
-	local maxVisibleButtons = math.floor(scrollFrameHeight / avgButtonHeight)
+	local showGameIcon = DB and DB:Get("showGameIcon", true)
 	
-	-- Calculate the maximum valid offset
-	local maxOffset = math.max(0, numItems - maxVisibleButtons)
+	-- Hide arrows if they exist
+	if button.RightArrow then button.RightArrow:Hide() end
+	if button.DownArrow then button.DownArrow:Hide() end
 	
-	-- Save current scroll position before update
-	local savedOffset = FauxScrollFrame_GetOffset(scrollFrame)
+	-- Reset name position based on compact mode
+	if isCompactMode then
+		button.Name:SetPoint("LEFT", 44, 0)  -- Centered vertically for single line
+	else
+		button.Name:SetPoint("LEFT", 44, 7)  -- Upper position for two lines
+	end
+	button.Name:SetTextColor(1, 1, 1) -- White
 	
-	-- Update scroll frame - use dynamic height based on compact mode
-	-- ONLY call FauxScrollFrame_Update if we're not in a mouse wheel update
-	if not BetterFriendsFrame.inMouseWheelUpdate then
-		FauxScrollFrame_Update(scrollFrame, numItems, maxVisibleButtons, avgButtonHeight)
-		
-		-- Restore scroll position after update (clamped to valid range)
-		local restoredOffset = math.max(0, math.min(savedOffset, maxOffset))
-		scrollFrame:SetVerticalScroll(restoredOffset * avgButtonHeight)
+	-- Show/hide friend elements based on compact mode
+	button.status:Show()
+	if isCompactMode then
+		button.Info:Hide()  -- Hide second line in compact mode
+	else
+		button.Info:Show()
 	end
 	
-	-- FauxScrollFrame_Update can hide the scrollFrame when numItems <= NUM_BUTTONS
-	-- We want it always visible, so force it to show
-	scrollFrame:Show()
+	-- Apply font size settings
+	local FontManager = GetFontManager()
+	if FontManager then
+		FontManager:ApplyFontSize(button.Name)
+		FontManager:ApplyFontSize(button.Info)
+	end
 	
-	-- Update MinimalScrollBar to match (uses percentage-based system)
-	if BetterFriendsFrame.MinimalScrollBar then
-		local scrollBar = BetterFriendsFrame.MinimalScrollBar
+	-- Adjust icon positions and sizes for compact mode
+	if isCompactMode then
+		-- Status icon: move up to align with single-line text
+		button.status:ClearAllPoints()
+		button.status:SetPoint("TOPLEFT", 4, -4)  -- Higher position (was -9)
 		
-		-- Set the visible extent percentage (how much of the content is visible)
-		if numItems > 0 then
-			local visibleExtent = maxVisibleButtons / numItems
-			scrollBar:SetVisibleExtentPercentage(visibleExtent)
+		-- Game icon: reduce size for compact mode
+		button.gameIcon:SetSize(20, 20)  -- Smaller (was 28x28)
+		button.gameIcon:ClearAllPoints()
+		button.gameIcon:SetPoint("TOPRIGHT", -30, -2)  -- Moved 8px right total
+		
+		-- TravelPass button: reduce size for compact mode
+		if button.travelPassButton then
+			button.travelPassButton:SetSize(18, 24)  -- Smaller (was 24x32)
+			button.travelPassButton:ClearAllPoints()
+			button.travelPassButton:SetPoint("TOPRIGHT", 0, 0)  -- Moved 8px right total
+			
+			-- Scale textures
+			button.travelPassButton.NormalTexture:SetSize(18, 24)
+			button.travelPassButton.PushedTexture:SetSize(18, 24)
+			button.travelPassButton.DisabledTexture:SetSize(18, 24)
+			button.travelPassButton.HighlightTexture:SetSize(18, 24)
 		end
+	else
+		-- Normal mode: restore original positions and sizes
+		button.status:ClearAllPoints()
+		button.status:SetPoint("TOPLEFT", 4, -9)  -- Original position
 		
-		-- Only update scroll position if we're not already in a callback
-		-- This prevents infinite recursion: SetScrollPercentage -> OnScroll callback -> UpdateDisplay -> SetScrollPercentage...
-		local isInCallback = BetterFriendsFrame.isUpdatingScrollFromCallback and BetterFriendsFrame.isUpdatingScrollFromCallback()
-		if not isInCallback and not BetterFriendsFrame.inMouseWheelUpdate then
-			-- Update scroll position
-			if maxOffset > 0 then
-				local currentOffset = FauxScrollFrame_GetOffset(scrollFrame)
-				currentOffset = math.max(0, math.min(currentOffset, maxOffset))
-				local scrollPercentage = currentOffset / maxOffset
-				scrollBar:SetScrollPercentage(scrollPercentage)
-			else
-				scrollBar:SetScrollPercentage(0)
-			end
+		button.gameIcon:SetSize(28, 28)  -- Original size
+		button.gameIcon:ClearAllPoints()
+		button.gameIcon:SetPoint("TOPRIGHT", -30, -3)  -- Moved 8px right total
+		
+		-- TravelPass button: restore original size
+		if button.travelPassButton then
+			button.travelPassButton:SetSize(24, 32)  -- Original size
+			button.travelPassButton:ClearAllPoints()
+			button.travelPassButton:SetPoint("TOPRIGHT", 0, -1)  -- Moved 8px right total
+			
+			-- Restore texture sizes
+			button.travelPassButton.NormalTexture:SetSize(24, 32)
+			button.travelPassButton.PushedTexture:SetSize(24, 32)
+			button.travelPassButton.DisabledTexture:SetSize(24, 32)
+			button.travelPassButton.HighlightTexture:SetSize(24, 32)
 		end
 	end
 	
-	-- Get offset and clamp it to valid range (ensure it's at least 0)
-	local offset = FauxScrollFrame_GetOffset(scrollFrame)
-	offset = math.max(0, math.min(offset, maxOffset))
-	
-	-- Reset button pool for this frame
-	local ButtonPool = BFL:GetModule("ButtonPool")
-	if ButtonPool then
-		ButtonPool:ResetButtonPool()
-	end
-	
-	-- Render visible buttons using button pool
-	-- We need to fill the available height (418px) with mixed button heights
-	-- Headers: 22px, Friends: dynamic based on compact mode
-	local SCROLL_FRAME_HEIGHT = 418
-	local HEADER_HEIGHT = 22
-	local FRIEND_HEIGHT = avgButtonHeight
-	local BUTTON_SPACING = 1
-	local TOP_PADDING = 3
-	
-	local currentHeight = TOP_PADDING
-	local buttonsRendered = 0
-	
-	local Groups = GetGroups()
-	local displayList = self.displayList
-	local friendGroups = Groups and Groups.groups or {}
-	
-	-- Store reference to self for callbacks
-	local FriendsListModule = self
-	
-	-- Keep rendering buttons until we fill the available height or run out of items
-	for i = 1, math.min(numItems, 20) do  -- Max 20 buttons as safety limit
-		local index = offset + i
+	if friend.type == "bnet" then
+		-- Battle.net friend
+		local displayName = friend.accountName or friend.battleTag or "Unknown"
 		
-		if index > numItems then
-			break
+		-- Set background color
+		if friend.connected then
+			button.background:SetColorTexture(FRIENDS_BNET_BACKGROUND_COLOR.r, FRIENDS_BNET_BACKGROUND_COLOR.g, FRIENDS_BNET_BACKGROUND_COLOR.b, FRIENDS_BNET_BACKGROUND_COLOR.a)
+		else
+			button.background:SetColorTexture(FRIENDS_OFFLINE_BACKGROUND_COLOR.r, FRIENDS_OFFLINE_BACKGROUND_COLOR.g, FRIENDS_OFFLINE_BACKGROUND_COLOR.b, FRIENDS_OFFLINE_BACKGROUND_COLOR.a)
 		end
 		
-		local item = displayList[index]
-		if not item then
-			break
+		-- Set status icon (BSAp shows as AFK if setting enabled)
+		local showMobileAsAFK = GetDB():Get("showMobileAsAFK", false)
+		if friend.connected then
+			local isMobile = friend.gameAccountInfo and friend.gameAccountInfo.clientProgram == "BSAp"
+			if showMobileAsAFK and isMobile then
+				button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Away")
+			else
+				button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Online")
+			end
+		else
+			button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Offline")
 		end
-		local buttonHeight = (item.type == BUTTON_TYPE_GROUP_HEADER) and HEADER_HEIGHT or FRIEND_HEIGHT
 		
-		-- Check if this button would fit in the remaining space
-		-- Allow partial visibility of last button (at least 10px visible)
-		if currentHeight + buttonHeight > SCROLL_FRAME_HEIGHT + 24 then
-			break
+		-- Set game icon using Blizzard's modern API
+		if friend.gameAccountInfo and friend.gameAccountInfo.clientProgram and friend.connected then
+			local clientProgram = friend.gameAccountInfo.clientProgram
+			
+			-- Use Blizzard's modern texture API (11.0+) for ALL client programs including Battle.net App
+			C_Texture.SetTitleIconTexture(button.gameIcon, clientProgram, Enum.TitleIconVersion.Medium)
+			
+			-- Fade icon for WoW friends on different project versions
+			local fadeIcon = (clientProgram == BNET_CLIENT_WOW) and (friend.gameAccountInfo.wowProjectID ~= WOW_PROJECT_ID)
+			if fadeIcon then
+				button.gameIcon:SetAlpha(0.6)
+			else
+				button.gameIcon:SetAlpha(1)
+			end
+			
+			button.gameIcon:Show()
+		else
+			button.gameIcon:Hide()
 		end
 		
-		buttonsRendered = buttonsRendered + 1
-		local ButtonPool = BFL:GetModule("ButtonPool")
-		local button = ButtonPool and ButtonPool:GetButtonForDisplay(buttonsRendered, item.type)
-		if not button then
-			break
-		end
-		button:Show()
-		
-		currentHeight = currentHeight + buttonHeight + BUTTON_SPACING
-		
-		if item.type == BUTTON_TYPE_GROUP_HEADER then
-			-- Configure group header button
-			button.groupId = item.groupId
-		
-			-- Set text with custom color
-			local ColorManager = GetColorManager()
-			local colorCode = ColorManager and ColorManager:GetGroupColorCode(item.groupId) or "|cffffffff"
-			button:SetText(string.format("%s%s (%d)|r", colorCode, item.name, item.count))
-			
-			-- Apply font size settings
-			local headerText = button:GetFontString()
-			if headerText then
-				local FontManager = GetFontManager()
-				if FontManager then
-					FontManager:ApplyFontSize(headerText)
-				end
-			end
-			
-			-- Show/hide arrows based on collapsed state
-			if button.RightArrow and button.DownArrow then
-				if item.collapsed then
-					button.RightArrow:Show()
-					button.DownArrow:Hide()
-				else
-					button.RightArrow:Hide()
-					button.DownArrow:Show()
-				end
-			end
-			
-			-- Add right-click menu for custom groups
-			if friendGroups[item.groupId] and not friendGroups[item.groupId].builtin then
-				button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-				button:SetScript("OnClick", function(self, buttonName)
-					if buttonName == "RightButton" then
-						-- Open context menu for group header
-						MenuUtil.CreateContextMenu(self, function(owner, rootDescription)
-							local groupData = friendGroups[self.groupId]
-							if not groupData then return end
-							
-							rootDescription:CreateTitle(groupData.name)
-							
-							rootDescription:CreateButton("Rename Group", function()
-								StaticPopup_Show("BETTER_FRIENDLIST_RENAME_GROUP", nil, nil, self.groupId)
-							end)
-							
-							rootDescription:CreateButton("Delete Group", function()
-								StaticPopup_Show("BETTER_FRIENDLIST_DELETE_GROUP", nil, nil, self.groupId)
-							end)
-							
-							rootDescription:CreateDivider()
-							
-							rootDescription:CreateButton("Invite All to Party", function()
-								FriendsListModule:InviteGroupToParty(self.groupId)
-							end)
-							
-							rootDescription:CreateDivider()
-							
-							rootDescription:CreateButton("Collapse All Groups", function()
-								for gid, gdata in pairs(friendGroups) do
-									gdata.collapsed = true
-									BetterFriendlistDB.groupStates[gid] = true
-								end
-								FriendsListModule:BuildDisplayList()
-								FriendsListModule:RenderDisplay()
-							end)
-							
-							rootDescription:CreateButton("Expand All Groups", function()
-								for gid, gdata in pairs(friendGroups) do
-									gdata.collapsed = false
-									BetterFriendlistDB.groupStates[gid] = false
-								end
-								FriendsListModule:BuildDisplayList()
-								FriendsListModule:RenderDisplay()
-							end)
-						end)
-					else
-						-- Left click: toggle collapse
-						local groupData = friendGroups[self.groupId]
-						if groupData then
-							local wasCollapsed = groupData.collapsed
-							groupData.collapsed = not groupData.collapsed
-							BetterFriendlistDB.groupStates[self.groupId] = groupData.collapsed
-							
-							-- Accordion mode: collapse all other groups when opening this one
-							local accordionMode = GetDB():Get("accordionGroups", false)
-							if accordionMode and not groupData.collapsed then
-								-- Opening a group - collapse all others
-								for gid, gdata in pairs(friendGroups) do
-									if gid ~= self.groupId then
-										gdata.collapsed = true
-										BetterFriendlistDB.groupStates[gid] = true
-									end
-								end
-							end
-							
-							FriendsListModule:BuildDisplayList()
-							FriendsListModule:RenderDisplay()
-						end
-					end
-				end)
-			else
-				-- Built-in groups: Rechtsklick für Collapse/Expand All
-				button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-				button:SetScript("OnClick", function(self, buttonName)
-					if buttonName == "RightButton" then
-						-- Open context menu for built-in group header
-						MenuUtil.CreateContextMenu(self, function(owner, rootDescription)
-							local groupData = friendGroups[self.groupId]
-							if not groupData then return end
-							
-							rootDescription:CreateTitle(groupData.name)
-							
-							rootDescription:CreateButton("Invite All to Party", function()
-								FriendsListModule:InviteGroupToParty(self.groupId)
-							end)
-							
-							rootDescription:CreateDivider()
-							
-							rootDescription:CreateButton("Collapse All Groups", function()
-								for gid, gdata in pairs(friendGroups) do
-									gdata.collapsed = true
-									BetterFriendlistDB.groupStates[gid] = true
-								end
-								FriendsListModule:BuildDisplayList()
-								FriendsListModule:RenderDisplay()
-							end)
-							
-							rootDescription:CreateButton("Expand All Groups", function()
-								for gid, gdata in pairs(friendGroups) do
-									gdata.collapsed = false
-									BetterFriendlistDB.groupStates[gid] = false
-								end
-								FriendsListModule:BuildDisplayList()
-								FriendsListModule:RenderDisplay()
-							end)
-						end)
-					else
-						-- Left click: toggle collapse
-						local groupData = friendGroups[self.groupId]
-						if groupData then
-							local wasCollapsed = groupData.collapsed
-							groupData.collapsed = not groupData.collapsed
-							BetterFriendlistDB.groupStates[self.groupId] = groupData.collapsed
-							
-							-- Accordion mode: collapse all other groups when opening this one
-							local accordionMode = GetDB():Get("accordionGroups", false)
-							if accordionMode and not groupData.collapsed then
-								-- Opening a group - collapse all others
-								for gid, gdata in pairs(friendGroups) do
-									if gid ~= self.groupId then
-										gdata.collapsed = true
-										BetterFriendlistDB.groupStates[gid] = true
-									end
-								end
-							end
-							
-							FriendsListModule:BuildDisplayList()
-							FriendsListModule:RenderDisplay()
-						end
-					end
-				end)
-			end
-		
-		elseif item.type == BUTTON_TYPE_INVITE_HEADER then
-			-- Configure invite header button
-			self:UpdateInviteHeaderButton(button, item)
-		
-		elseif item.type == BUTTON_TYPE_INVITE then
-			-- Configure invite button
-			self:UpdateInviteButton(button, item)
-		
-		elseif item.type == BUTTON_TYPE_DIVIDER then
-			-- Divider needs no configuration
-		
-		elseif item.type == BUTTON_TYPE_FRIEND then
-			-- Configure friend button
-			local friend = item.friend
-			
-			-- Store friend data on button for tooltip
-			button.friendIndex = friend.index  -- Use the actual friend list index, not display index
-			button.friendData = friend
-			button.groupId = nil
-			
-			-- Store friendInfo for context menu (matches our OnClick handler)
-			button.friendInfo = {
-				type = friend.type,
-				index = friend.index,  -- Use the actual friend list index
-				name = friend.name or friend.accountName or friend.battleTag,
-				connected = friend.connected,
-				guid = friend.guid,
-				bnetAccountID = friend.bnetAccountID,
-				battleTag = friend.battleTag
-			}
-			
-			-- Hide arrows if they exist
-			if button.RightArrow then button.RightArrow:Hide() end
-			if button.DownArrow then button.DownArrow:Hide() end
-			
-			-- Reset name position based on compact mode
-			if isCompactMode then
-				button.Name:SetPoint("LEFT", 44, 0)  -- Centered vertically for single line
-			else
-				button.Name:SetPoint("LEFT", 44, 7)  -- Upper position for two lines
-			end
-			button.Name:SetTextColor(1, 1, 1) -- White
-				
-			-- Show/hide friend elements based on compact mode
-			button.status:Show()
-			if isCompactMode then
-				button.Info:Hide()  -- Hide second line in compact mode
-			else
-				button.Info:Show()
-			end
-			
-			-- Apply font size settings
-			local FontManager = GetFontManager()
-			if FontManager then
-				FontManager:ApplyFontSize(button.Name)
-				FontManager:ApplyFontSize(button.Info)
-			end
-			
-			-- Adjust icon positions and sizes for compact mode
-			if isCompactMode then
-				-- Status icon: move up to align with single-line text
-				button.status:ClearAllPoints()
-				button.status:SetPoint("TOPLEFT", 4, -4)  -- Higher position (was -9)
-				
-				-- Game icon: reduce size for compact mode
-				button.gameIcon:SetSize(20, 20)  -- Smaller (was 28x28)
-				button.gameIcon:ClearAllPoints()
-				button.gameIcon:SetPoint("TOPRIGHT", -38, -2)  -- Adjust position slightly
-				
-				-- TravelPass button: reduce size for compact mode
-				if button.travelPassButton then
-					button.travelPassButton:SetSize(18, 24)  -- Smaller (was 24x32)
-					button.travelPassButton:ClearAllPoints()
-					button.travelPassButton:SetPoint("TOPRIGHT", -8, 0)  -- Adjust position
-					
-					-- Scale textures
-					button.travelPassButton.NormalTexture:SetSize(18, 24)
-					button.travelPassButton.PushedTexture:SetSize(18, 24)
-					button.travelPassButton.DisabledTexture:SetSize(18, 24)
-					button.travelPassButton.HighlightTexture:SetSize(18, 24)
-				end
-			else
-				-- Normal mode: restore original positions and sizes
-				button.status:ClearAllPoints()
-				button.status:SetPoint("TOPLEFT", 4, -9)  -- Original position
-				
-				button.gameIcon:SetSize(28, 28)  -- Original size
-				button.gameIcon:ClearAllPoints()
-				button.gameIcon:SetPoint("TOPRIGHT", -38, -3)  -- Original position
-				
-				-- TravelPass button: restore original size
-				if button.travelPassButton then
-					button.travelPassButton:SetSize(24, 32)  -- Original size
-					button.travelPassButton:ClearAllPoints()
-					button.travelPassButton:SetPoint("TOPRIGHT", -8, -1)  -- Original position
-					
-					-- Restore texture sizes
-					button.travelPassButton.NormalTexture:SetSize(24, 32)
-					button.travelPassButton.PushedTexture:SetSize(24, 32)
-					button.travelPassButton.DisabledTexture:SetSize(24, 32)
-					button.travelPassButton.HighlightTexture:SetSize(24, 32)
-				end
-			end
-			
-			if friend.type == "bnet" then
-				-- Battle.net friend
-				local displayName = friend.accountName or friend.battleTag or "Unknown"
-				
-				-- Set background color
-				if friend.connected then
-					button.background:SetColorTexture(FRIENDS_BNET_BACKGROUND_COLOR.r, FRIENDS_BNET_BACKGROUND_COLOR.g, FRIENDS_BNET_BACKGROUND_COLOR.b, FRIENDS_BNET_BACKGROUND_COLOR.a)
-				else
-					button.background:SetColorTexture(FRIENDS_OFFLINE_BACKGROUND_COLOR.r, FRIENDS_OFFLINE_BACKGROUND_COLOR.g, FRIENDS_OFFLINE_BACKGROUND_COLOR.b, FRIENDS_OFFLINE_BACKGROUND_COLOR.a)
-				end
-				
-			-- Set status icon (BSAp shows as AFK if setting enabled)
-			local showMobileAsAFK = GetDB():Get("showMobileAsAFK", false)
+		-- Handle TravelPass button for Battle.net friends
+		if button.travelPassButton then
+			-- Show for ALL online Battle.net friends (matching Blizzard's behavior)
 			if friend.connected then
-				local isMobile = friend.gameAccountInfo and friend.gameAccountInfo.clientProgram == "BSAp"
-				if showMobileAsAFK and isMobile then
-					button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Away")
-				else
-					button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Online")
-				end
-			else
-				button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Offline")
-			end				-- Set game icon using Blizzard's modern API
-				if friend.gameAccountInfo and friend.gameAccountInfo.clientProgram and friend.connected then
-					local clientProgram = friend.gameAccountInfo.clientProgram
-					
-					-- Use Blizzard's modern texture API (11.0+) for ALL client programs including Battle.net App
-					C_Texture.SetTitleIconTexture(button.gameIcon, clientProgram, Enum.TitleIconVersion.Medium)
-					
-					-- Fade icon for WoW friends on different project versions
-					local fadeIcon = (clientProgram == BNET_CLIENT_WOW) and (friend.gameAccountInfo.wowProjectID ~= WOW_PROJECT_ID)
-					if fadeIcon then
-						button.gameIcon:SetAlpha(0.6)
-					else
-						button.gameIcon:SetAlpha(1)
+				-- Store friend index for click handler
+				button.travelPassButton.friendIndex = friend.index
+				button.travelPassButton.friendData = friend
+				
+				-- Get the actual Battle.net friend index for restriction checking
+				local numBNet = BNGetNumFriends()
+				local actualBNetIndex = nil
+				for i = 1, numBNet do
+					local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
+					if accountInfo and accountInfo.bnetAccountID == friend.bnetAccountID then
+						actualBNetIndex = i
+						break
 					end
-					
-					button.gameIcon:Show()
-				else
-					button.gameIcon:Hide()
 				end
 				
-				-- Handle TravelPass button for Battle.net friends
-				if button.travelPassButton then
-					-- Show for ALL online Battle.net friends (matching Blizzard's behavior)
-					if friend.connected then
-						-- Store friend index for click handler
-						button.travelPassButton.friendIndex = index
-						button.travelPassButton.friendData = friend
-						
-						-- Get the actual Battle.net friend index for restriction checking
-						local numBNet = BNGetNumFriends()
-						local actualBNetIndex = nil
-						for i = 1, numBNet do
-							local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
-							if accountInfo and accountInfo.bnetAccountID == friend.bnetAccountID then
-								actualBNetIndex = i
-								break
-							end
-						end
-						
-						-- Calculate invite restriction (matching Blizzard's logic)
-						local restriction = nil  -- Will be set to NO_GAME_ACCOUNTS if no valid accounts found
-						if actualBNetIndex then
-							local numGameAccounts = C_BattleNet.GetFriendNumGameAccounts(actualBNetIndex)
-							
-							for i = 1, numGameAccounts do
-								local gameAccountInfo = C_BattleNet.GetFriendGameAccountInfo(actualBNetIndex, i)
-								if gameAccountInfo then
-									if gameAccountInfo.clientProgram == BNET_CLIENT_WOW then
-										-- Check WoW version compatibility
-										if gameAccountInfo.wowProjectID and WOW_PROJECT_ID then
-											if gameAccountInfo.wowProjectID == WOW_PROJECT_CLASSIC and WOW_PROJECT_ID ~= WOW_PROJECT_CLASSIC then
-												-- Friend is on Classic, we're not
-												if not restriction then
-													restriction = INVITE_RESTRICTION_WOW_PROJECT_CLASSIC
-												end
-											elseif gameAccountInfo.wowProjectID == WOW_PROJECT_MAINLINE and WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE then
-												-- Friend is on Mainline, we're not
-												if not restriction then
-													restriction = INVITE_RESTRICTION_WOW_PROJECT_MAINLINE
-												end
-											elseif gameAccountInfo.wowProjectID ~= WOW_PROJECT_ID then
-												-- Different WoW version (other)
-												if not restriction then
-													restriction = INVITE_RESTRICTION_WOW_PROJECT_ID
-												end
-											elseif gameAccountInfo.realmID == 0 then
-												-- No realm info
-												if not restriction then
-													restriction = INVITE_RESTRICTION_INFO
-												end
-											elseif not gameAccountInfo.isInCurrentRegion then
-												-- Different region
-												restriction = INVITE_RESTRICTION_REGION
-											else
-												-- At least one valid WoW account that can be invited
-												restriction = INVITE_RESTRICTION_NONE
-												break
-											end
-										elseif gameAccountInfo.realmID == 0 then
-											-- No realm info
-											if not restriction then
-												restriction = INVITE_RESTRICTION_INFO
-											end
-										elseif not gameAccountInfo.isInCurrentRegion then
-											-- Different region
-											restriction = INVITE_RESTRICTION_REGION
-										elseif gameAccountInfo.realmID and gameAccountInfo.realmID ~= 0 then
-											-- Valid WoW account (no project ID check needed)
-											restriction = INVITE_RESTRICTION_NONE
-											break
-										end
-									else
-										-- Non-WoW client (App, BSAp, etc.)
+				-- Calculate invite restriction (matching Blizzard's logic)
+				local restriction = nil  -- Will be set to NO_GAME_ACCOUNTS if no valid accounts found
+				if actualBNetIndex then
+					local numGameAccounts = C_BattleNet.GetFriendNumGameAccounts(actualBNetIndex)
+					
+					for i = 1, numGameAccounts do
+						local gameAccountInfo = C_BattleNet.GetFriendGameAccountInfo(actualBNetIndex, i)
+						if gameAccountInfo then
+							if gameAccountInfo.clientProgram == BNET_CLIENT_WOW then
+								-- Check WoW version compatibility
+								if gameAccountInfo.wowProjectID and WOW_PROJECT_ID then
+									if gameAccountInfo.wowProjectID == WOW_PROJECT_CLASSIC and WOW_PROJECT_ID ~= WOW_PROJECT_CLASSIC then
+										-- Friend is on Classic, we're not
 										if not restriction then
-											restriction = INVITE_RESTRICTION_CLIENT
+											restriction = INVITE_RESTRICTION_WOW_PROJECT_CLASSIC
 										end
+									elseif gameAccountInfo.wowProjectID == WOW_PROJECT_MAINLINE and WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE then
+										-- Friend is on Mainline, we're not
+										if not restriction then
+											restriction = INVITE_RESTRICTION_WOW_PROJECT_MAINLINE
+										end
+									elseif gameAccountInfo.wowProjectID ~= WOW_PROJECT_ID then
+										-- Different WoW version (other)
+										if not restriction then
+											restriction = INVITE_RESTRICTION_WOW_PROJECT_ID
+										end
+									elseif gameAccountInfo.realmID == 0 then
+										-- No realm info
+										if not restriction then
+											restriction = INVITE_RESTRICTION_INFO
+										end
+									elseif not gameAccountInfo.isInCurrentRegion then
+										-- Different region
+										restriction = INVITE_RESTRICTION_REGION
+									else
+										-- At least one valid WoW account that can be invited
+										restriction = INVITE_RESTRICTION_NONE
+										break
 									end
+								elseif gameAccountInfo.realmID == 0 then
+									-- No realm info
+									if not restriction then
+										restriction = INVITE_RESTRICTION_INFO
+									end
+								elseif not gameAccountInfo.isInCurrentRegion then
+									-- Different region
+									restriction = INVITE_RESTRICTION_REGION
+								elseif gameAccountInfo.realmID and gameAccountInfo.realmID ~= 0 then
+									-- Valid WoW account (no project ID check needed)
+									restriction = INVITE_RESTRICTION_NONE
+									break
+								end
+							else
+								-- Non-WoW client (App, BSAp, etc.)
+								if not restriction then
+									restriction = INVITE_RESTRICTION_CLIENT
 								end
 							end
 						end
-						
-						-- If no restriction was set, means no game accounts at all
-						if not restriction then
-							restriction = INVITE_RESTRICTION_NO_GAME_ACCOUNTS
-						end
-						
-						-- Enable/disable button based on restriction
-						if restriction == INVITE_RESTRICTION_NONE then
-							button.travelPassButton:Enable()
-						else
-							button.travelPassButton:Disable()
-						end
-						
-						-- Set atlas based on faction for cross-faction invites
-						local playerFactionGroup = UnitFactionGroup("player")
-						local isCrossFaction = friend.gameAccountInfo and
-											   friend.gameAccountInfo.factionName and 
-											   friend.gameAccountInfo.factionName ~= playerFactionGroup
-						
-						if isCrossFaction then
-							if friend.gameAccountInfo.factionName == "Horde" then
-								button.travelPassButton.NormalTexture:SetAtlas("friendslist-invitebutton-horde-normal")
-								button.travelPassButton.PushedTexture:SetAtlas("friendslist-invitebutton-horde-pressed")
-								button.travelPassButton.DisabledTexture:SetAtlas("friendslist-invitebutton-horde-disabled")
-							elseif friend.gameAccountInfo.factionName == "Alliance" then
-								button.travelPassButton.NormalTexture:SetAtlas("friendslist-invitebutton-alliance-normal")
-								button.travelPassButton.PushedTexture:SetAtlas("friendslist-invitebutton-alliance-pressed")
-								button.travelPassButton.DisabledTexture:SetAtlas("friendslist-invitebutton-alliance-disabled")
-							end
-						else
-							button.travelPassButton.NormalTexture:SetAtlas("friendslist-invitebutton-default-normal")
-							button.travelPassButton.PushedTexture:SetAtlas("friendslist-invitebutton-default-pressed")
-							button.travelPassButton.DisabledTexture:SetAtlas("friendslist-invitebutton-default-disabled")
-						end
-						
-						button.travelPassButton:Show()
-					else
-						button.travelPassButton:Hide()
 					end
 				end
 				
-				-- Line 1: BattleNet Name (CharacterName)
-				-- BattleNet Name in blue/cyan Battle.net color, CharacterName in class color
-				local line1Text = ""
+				-- If no restriction was set, means no game accounts at all
+				if not restriction then
+					restriction = INVITE_RESTRICTION_NO_GAME_ACCOUNTS
+				end
+				
+				-- Enable/disable button based on restriction
+				if restriction == INVITE_RESTRICTION_NONE then
+					button.travelPassButton:Enable()
+				else
+					button.travelPassButton:Disable()
+				end
+				
+				-- Set atlas based on faction for cross-faction invites
 				local playerFactionGroup = UnitFactionGroup("player")
-				local grayOtherFaction = GetDB():Get("grayOtherFaction", false)
-				local showFactionIcons = GetDB():Get("showFactionIcons", false)
-				local showRealmName = GetDB():Get("showRealmName", false)
+				local isCrossFaction = friend.gameAccountInfo and
+									   friend.gameAccountInfo.factionName and 
+									   friend.gameAccountInfo.factionName ~= playerFactionGroup
 				
-				if friend.connected then
-					-- Check if friend is from opposite faction
-					local isOppositeFaction = friend.factionName and friend.factionName ~= playerFactionGroup and friend.factionName ~= ""
-					local shouldGray = grayOtherFaction and isOppositeFaction
-					
-					-- Use Battle.net blue color for the account name (or gray if opposite faction)
-					if shouldGray then
-						line1Text = "|cff808080" .. displayName .. "|r"
-					else
-						line1Text = "|cff00ccff" .. displayName .. "|r"
-					end
-					
-					if friend.characterName and friend.className then
-						-- Add Timerunning icon if applicable
-						local characterName = friend.characterName
-						if friend.timerunningSeasonID and TimerunningUtil and TimerunningUtil.AddSmallIcon then
-							characterName = TimerunningUtil.AddSmallIcon(characterName)
-						end
-						
-						-- Add faction icon if enabled
-						if showFactionIcons and friend.factionName then
-							if friend.factionName == "Horde" then
-								characterName = "|TInterface\\FriendsFrame\\PlusManz-Horde:14:14:0:0|t" .. characterName
-							elseif friend.factionName == "Alliance" then
-								characterName = "|TInterface\\FriendsFrame\\PlusManz-Alliance:14:14:0:0|t" .. characterName
-							end
-						end
-						
-						-- Add realm name if enabled and available
-						if showRealmName and friend.realmName and friend.realmName ~= "" then
-							local playerRealm = GetRealmName()
-							if friend.realmName ~= playerRealm then
-								characterName = characterName .. " - " .. friend.realmName
-							end
-						end
-						
-						-- Check if class coloring is enabled
-						local useClassColor = GetDB():Get("colorClassNames", true)
-						
-						if useClassColor and not shouldGray then
-							-- Convert class name to English class file for RAID_CLASS_COLORS
-							local classFile = GetClassFileFromClassName(friend.className)
-							local classColor = classFile and RAID_CLASS_COLORS[classFile]
-							
-							if classColor then
-								line1Text = line1Text .. " (|c" .. (classColor.colorStr or "ffffffff") .. characterName .. "|r)"
-							else
-								line1Text = line1Text .. " (" .. characterName .. ")"
-							end
-						else
-							-- No class coloring or opposite faction gray - just show character name
-							if shouldGray then
-								line1Text = line1Text .. " (|cff808080" .. characterName .. "|r)"
-							else
-								line1Text = line1Text .. " (" .. characterName .. ")"
-							end
-						end
+				if isCrossFaction then
+					if friend.gameAccountInfo.factionName == "Horde" then
+						button.travelPassButton.NormalTexture:SetAtlas("friendslist-invitebutton-horde-normal")
+						button.travelPassButton.PushedTexture:SetAtlas("friendslist-invitebutton-horde-pressed")
+						button.travelPassButton.DisabledTexture:SetAtlas("friendslist-invitebutton-horde-disabled")
+					elseif friend.gameAccountInfo.factionName == "Alliance" then
+						button.travelPassButton.NormalTexture:SetAtlas("friendslist-invitebutton-alliance-normal")
+						button.travelPassButton.PushedTexture:SetAtlas("friendslist-invitebutton-alliance-pressed")
+						button.travelPassButton.DisabledTexture:SetAtlas("friendslist-invitebutton-alliance-disabled")
 					end
 				else
-					-- Offline - use gray
-					line1Text = "|cff7f7f7f" .. displayName .. "|r"
+					button.travelPassButton.NormalTexture:SetAtlas("friendslist-invitebutton-default-normal")
+					button.travelPassButton.PushedTexture:SetAtlas("friendslist-invitebutton-default-pressed")
+					button.travelPassButton.DisabledTexture:SetAtlas("friendslist-invitebutton-default-disabled")
 				end
 				
-			-- In compact mode, append additional info to line1Text
-			if isCompactMode then
-				local hideMaxLevel = GetDB():Get("hideMaxLevel", false)
-				local maxLevel = GetMaxLevelForPlayerExpansion()
-				
-				if friend.connected then
-					local infoText = ""						if friend.level and friend.areaName then
-							if hideMaxLevel and friend.level == maxLevel then
-								infoText = " - " .. friend.areaName
-							else
-								infoText = string.format(" - Lvl %d, %s", friend.level, friend.areaName)
-							end
-						elseif friend.level then
-							if hideMaxLevel and friend.level == maxLevel then
-								infoText = " - Max Level"
-							else
-								infoText = " - Lvl " .. friend.level
-							end
-						elseif friend.areaName then
-							infoText = " - " .. friend.areaName
-						elseif friend.gameName then
-							infoText = " - " .. friend.gameName
-						end
-						-- Add info in gray color
-						if infoText ~= "" then
-							line1Text = line1Text .. "|cff7f7f7f" .. infoText .. "|r"
-						end
-					else
-						-- Offline - add last online time
-						if friend.lastOnlineTime then
-							line1Text = line1Text .. " |cff7f7f7f- " .. GetLastOnlineText(friend) .. "|r"
-						end
-					end
-				end
-				
-				button.Name:SetText(line1Text)
-				
-				-- Line 2: Level, Zone (in gray) - only used in normal mode
-				if not isCompactMode then
-					local hideMaxLevel = GetDB():Get("hideMaxLevel", false)
-					local maxLevel = GetMaxLevelForPlayerExpansion()
-					
-					if friend.connected then
-						
-						if friend.level and friend.areaName then
-							if hideMaxLevel and friend.level == maxLevel then
-								button.Info:SetText(friend.areaName)
-							else
-								button.Info:SetText(string.format("Lvl %d, %s", friend.level, friend.areaName))
-							end
-						elseif friend.level then
-							if hideMaxLevel and friend.level == maxLevel then
-								button.Info:SetText("Max Level")
-							else
-								button.Info:SetText("Lvl " .. friend.level)
-							end
-						elseif friend.areaName then
-							button.Info:SetText(friend.areaName)
-						elseif friend.gameName then
-							-- Show "Mobile" or "In App" without "Playing" prefix
-							button.Info:SetText(friend.gameName)
-						else
-							button.Info:SetText(BFL_L.ONLINE_STATUS)
-						end
-					else
-						-- Offline - show last online time for Battle.net friends
-						if friend.lastOnlineTime then
-							button.Info:SetText(GetLastOnlineText(friend))
-						else
-							button.Info:SetText(BFL_L.OFFLINE_STATUS)
-						end
-					end
-				end  -- end of if not isCompactMode
+				button.travelPassButton:Show()
 			else
-				-- WoW friend
-				-- Set background color
-				if friend.connected then
-					button.background:SetColorTexture(FRIENDS_WOW_BACKGROUND_COLOR.r, FRIENDS_WOW_BACKGROUND_COLOR.g, FRIENDS_WOW_BACKGROUND_COLOR.b, FRIENDS_WOW_BACKGROUND_COLOR.a)
-				else
-					button.background:SetColorTexture(FRIENDS_OFFLINE_BACKGROUND_COLOR.r, FRIENDS_OFFLINE_BACKGROUND_COLOR.g, FRIENDS_OFFLINE_BACKGROUND_COLOR.b, FRIENDS_OFFLINE_BACKGROUND_COLOR.a)
-				end
-				
-				-- Set status icon
-				if friend.connected then
-					button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Online")
-				else
-					button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Offline")
-				end
-				
-				button.gameIcon:Hide()
-				
-				-- Hide TravelPass button for WoW friends (they don't have it)
-				if button.travelPassButton then
-					button.travelPassButton:Hide()
-				end
-				
-			-- Line 1: Character Name (in class color if enabled)
-			local line1Text = ""
-			local playerFactionGroup = UnitFactionGroup("player")
-			local grayOtherFaction = GetDB():Get("grayOtherFaction", false)
-			local showFactionIcons = GetDB():Get("showFactionIcons", false)
-			local showRealmName = GetDB():Get("showRealmName", false)
+				button.travelPassButton:Hide()
+			end
+		end
+		
+		-- Line 1: BattleNet Name (CharacterName)
+		-- BattleNet Name in blue/cyan Battle.net color, CharacterName in class color
+		local line1Text = ""
+		local playerFactionGroup = UnitFactionGroup("player")
+		local grayOtherFaction = GetDB():Get("grayOtherFaction", false)
+		local showFactionIcons = GetDB():Get("showFactionIcons", false)
+		local showRealmName = GetDB():Get("showRealmName", false)
+		
+		if friend.connected then
+			-- Check if friend is from opposite faction
+			local isOppositeFaction = friend.factionName and friend.factionName ~= playerFactionGroup and friend.factionName ~= ""
+			local shouldGray = grayOtherFaction and isOppositeFaction
 			
-			if friend.connected then
-				-- Check if friend is from opposite faction
-				local isOppositeFaction = friend.factionName and friend.factionName ~= playerFactionGroup and friend.factionName ~= ""
-				local shouldGray = grayOtherFaction and isOppositeFaction
-				
-				local characterName = friend.name
+			-- Use Battle.net blue color for the account name (or gray if opposite faction)
+			if shouldGray then
+				line1Text = "|cff808080" .. displayName .. "|r"
+			else
+				line1Text = "|cff00ccff" .. displayName .. "|r"
+			end
+			
+			if friend.characterName and friend.className then
+				-- Add Timerunning icon if applicable
+				local characterName = friend.characterName
+				if friend.timerunningSeasonID and TimerunningUtil and TimerunningUtil.AddSmallIcon then
+					characterName = TimerunningUtil.AddSmallIcon(characterName)
+				end
 				
 				-- Add faction icon if enabled
 				if showFactionIcons and friend.factionName then
@@ -2070,96 +2338,252 @@ function FriendsList:RenderDisplay()
 					end
 				end
 				
+				-- Check if class coloring is enabled
 				local useClassColor = GetDB():Get("colorClassNames", true)
 				
 				if useClassColor and not shouldGray then
 					-- Convert class name to English class file for RAID_CLASS_COLORS
 					local classFile = GetClassFileFromClassName(friend.className)
 					local classColor = classFile and RAID_CLASS_COLORS[classFile]
+					
 					if classColor then
-						line1Text = "|c" .. (classColor.colorStr or "ffffffff") .. characterName .. "|r"
+						line1Text = line1Text .. " (|c" .. (classColor.colorStr or "ffffffff") .. characterName .. "|r)"
 					else
-						line1Text = characterName
+						line1Text = line1Text .. " (" .. characterName .. ")"
 					end
 				else
+					-- No class coloring or opposite faction gray - just show character name
 					if shouldGray then
-						line1Text = "|cff808080" .. characterName .. "|r"
+						line1Text = line1Text .. " (|cff808080" .. characterName .. "|r)"
 					else
-						line1Text = characterName
+						line1Text = line1Text .. " (" .. characterName .. ")"
 					end
+				end
+			end
+		else
+			-- Offline - use gray
+			line1Text = "|cff7f7f7f" .. displayName .. "|r"
+		end
+		
+		-- In compact mode, append additional info to line1Text
+		if isCompactMode then
+			local hideMaxLevel = GetDB():Get("hideMaxLevel", false)
+			local maxLevel = GetMaxLevelForPlayerExpansion()
+			
+			if friend.connected then
+				local infoText = ""
+				if friend.level and friend.areaName then
+					if hideMaxLevel and friend.level == maxLevel then
+						infoText = " - " .. friend.areaName
+					else
+						infoText = string.format(" - Lvl %d, %s", friend.level, friend.areaName)
+					end
+				elseif friend.level then
+					if hideMaxLevel and friend.level == maxLevel then
+						infoText = " - Max Level"
+					else
+						infoText = " - Lvl " .. friend.level
+					end
+				elseif friend.areaName then
+					infoText = " - " .. friend.areaName
+				elseif friend.gameName then
+					infoText = " - " .. friend.gameName
+				end
+				-- Add info in gray color
+				if infoText ~= "" then
+					line1Text = line1Text .. "|cff7f7f7f" .. infoText .. "|r"
 				end
 			else
-				-- Offline - gray
-				line1Text = "|cff7f7f7f" .. friend.name .. "|r"
-			end				-- In compact mode, append additional info to line1Text
-				if isCompactMode then
-					local hideMaxLevel = GetDB():Get("hideMaxLevel", false)
-					local maxLevel = GetMaxLevelForPlayerExpansion()
-					
-					if friend.connected then
-						local infoText = ""
-						if friend.level and friend.area then
-							if hideMaxLevel and friend.level == maxLevel then
-								infoText = " - " .. friend.area
-							else
-								infoText = string.format(" - Lvl %d, %s", friend.level, friend.area)
-							end
-						elseif friend.level then
-							if hideMaxLevel and friend.level == maxLevel then
-								infoText = " - Max Level"
-							else
-								infoText = " - Lvl " .. friend.level
-							end
-						elseif friend.area then
-							infoText = " - " .. friend.area
-						end
-						-- Add info in gray color
-						if infoText ~= "" then
-							line1Text = line1Text .. "|cff7f7f7f" .. infoText .. "|r"
-						end
-					end
+				-- Offline - add last online time
+				if friend.lastOnlineTime then
+					line1Text = line1Text .. " |cff7f7f7f- " .. GetLastOnlineText(friend) .. "|r"
 				end
-				
-				button.Name:SetText(line1Text)
-				
-				-- Line 2: Level, Zone (in gray) - only used in normal mode
-				if not isCompactMode then
-					local hideMaxLevel = GetDB():Get("hideMaxLevel", false)
-					local maxLevel = GetMaxLevelForPlayerExpansion()
-					
-					if friend.connected then
-						if friend.level and friend.area then
-							if hideMaxLevel and friend.level == maxLevel then
-								button.Info:SetText(friend.area)
-							else
-								button.Info:SetText(string.format("Lvl %d, %s", friend.level, friend.area))
-							end
-						elseif friend.level then
-							if hideMaxLevel and friend.level == maxLevel then
-								button.Info:SetText("Max Level")
-							else
-								button.Info:SetText("Lvl " .. friend.level)
-							end
-					elseif friend.area then
-						button.Info:SetText(friend.area)
+			end
+		end
+		
+		button.Name:SetText(line1Text)
+		
+		-- Line 2: Level, Zone (in gray) - only used in normal mode
+		if not isCompactMode then
+			local hideMaxLevel = GetDB():Get("hideMaxLevel", false)
+			local maxLevel = GetMaxLevelForPlayerExpansion()
+			
+			if friend.connected then
+				if friend.level and friend.areaName then
+					if hideMaxLevel and friend.level == maxLevel then
+						button.Info:SetText(friend.areaName)
 					else
-						button.Info:SetText(BFL_L.ONLINE_STATUS)
+						button.Info:SetText(string.format("Lvl %d, %s", friend.level, friend.areaName))
 					end
+				elseif friend.level then
+					if hideMaxLevel and friend.level == maxLevel then
+						button.Info:SetText("Max Level")
+					else
+						button.Info:SetText("Lvl " .. friend.level)
+					end
+				elseif friend.areaName then
+					button.Info:SetText(friend.areaName)
+				elseif friend.gameName then
+					-- Show "Mobile" or "In App" without "Playing" prefix
+					button.Info:SetText(friend.gameName)
+				else
+					button.Info:SetText(BFL_L.ONLINE_STATUS)
+				end
+			else
+				-- Offline - show last online time for Battle.net friends
+				if friend.lastOnlineTime then
+					button.Info:SetText(GetLastOnlineText(friend))
 				else
 					button.Info:SetText(BFL_L.OFFLINE_STATUS)
 				end
-			end  -- end of if not isCompactMode
-		end -- end of if friend.type == "bnet"
+			end
+		end  -- end of if not isCompactMode
 		
-		end -- end of elseif item.type == BUTTON_TYPE_FRIEND
-	end -- end of for loop
+	else
+		-- WoW friend
+		-- Set background color
+		if friend.connected then
+			button.background:SetColorTexture(FRIENDS_WOW_BACKGROUND_COLOR.r, FRIENDS_WOW_BACKGROUND_COLOR.g, FRIENDS_WOW_BACKGROUND_COLOR.b, FRIENDS_WOW_BACKGROUND_COLOR.a)
+		else
+			button.background:SetColorTexture(FRIENDS_OFFLINE_BACKGROUND_COLOR.r, FRIENDS_OFFLINE_BACKGROUND_COLOR.g, FRIENDS_OFFLINE_BACKGROUND_COLOR.b, FRIENDS_OFFLINE_BACKGROUND_COLOR.a)
+		end
+		
+		-- Set status icon
+		if friend.connected then
+			button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Online")
+		else
+			button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Offline")
+		end
+		
+		button.gameIcon:Hide()
+		
+		-- Hide TravelPass button for WoW friends (they don't have it)
+		if button.travelPassButton then
+			button.travelPassButton:Hide()
+		end
+		
+		-- Line 1: Character Name (in class color if enabled)
+		local line1Text = ""
+		local playerFactionGroup = UnitFactionGroup("player")
+		local grayOtherFaction = GetDB():Get("grayOtherFaction", false)
+		local showFactionIcons = GetDB():Get("showFactionIcons", false)
+		local showRealmName = GetDB():Get("showRealmName", false)
+		
+		if friend.connected then
+			-- Check if friend is from opposite faction
+			local isOppositeFaction = friend.factionName and friend.factionName ~= playerFactionGroup and friend.factionName ~= ""
+			local shouldGray = grayOtherFaction and isOppositeFaction
+			
+			local characterName = friend.name
+			
+			-- Add faction icon if enabled
+			if showFactionIcons and friend.factionName then
+				if friend.factionName == "Horde" then
+					characterName = "|TInterface\\FriendsFrame\\PlusManz-Horde:14:14:0:0|t" .. characterName
+				elseif friend.factionName == "Alliance" then
+					characterName = "|TInterface\\FriendsFrame\\PlusManz-Alliance:14:14:0:0|t" .. characterName
+				end
+			end
+			
+			-- Add realm name if enabled and available
+			if showRealmName and friend.realmName and friend.realmName ~= "" then
+				local playerRealm = GetRealmName()
+				if friend.realmName ~= playerRealm then
+					characterName = characterName .. " - " .. friend.realmName
+				end
+			end
+			
+			local useClassColor = GetDB():Get("colorClassNames", true)
+			
+			if useClassColor and not shouldGray then
+				-- Convert class name to English class file for RAID_CLASS_COLORS
+				local classFile = GetClassFileFromClassName(friend.className)
+				local classColor = classFile and RAID_CLASS_COLORS[classFile]
+				if classColor then
+					line1Text = "|c" .. (classColor.colorStr or "ffffffff") .. characterName .. "|r"
+				else
+					line1Text = characterName
+				end
+			else
+				if shouldGray then
+					line1Text = "|cff808080" .. characterName .. "|r"
+				else
+					line1Text = characterName
+				end
+			end
+		else
+			-- Offline - gray
+			line1Text = "|cff7f7f7f" .. friend.name .. "|r"
+		end
+		
+		-- In compact mode, append additional info to line1Text
+		if isCompactMode then
+			local hideMaxLevel = GetDB():Get("hideMaxLevel", false)
+			local maxLevel = GetMaxLevelForPlayerExpansion()
+			
+			if friend.connected then
+				local infoText = ""
+				if friend.level and friend.area then
+					if hideMaxLevel and friend.level == maxLevel then
+						infoText = " - " .. friend.area
+					else
+						infoText = string.format(" - Lvl %d, %s", friend.level, friend.area)
+					end
+				elseif friend.level then
+					if hideMaxLevel and friend.level == maxLevel then
+						infoText = " - Max Level"
+					else
+						infoText = " - Lvl " .. friend.level
+					end
+				elseif friend.area then
+					infoText = " - " .. friend.area
+				end
+				-- Add info in gray color
+				if infoText ~= "" then
+					line1Text = line1Text .. "|cff7f7f7f" .. infoText .. "|r"
+				end
+			end
+		end
+		
+		button.Name:SetText(line1Text)
+		
+		-- Line 2: Level, Zone (in gray) - only used in normal mode
+		if not isCompactMode then
+			local hideMaxLevel = GetDB():Get("hideMaxLevel", false)
+			local maxLevel = GetMaxLevelForPlayerExpansion()
+			
+			if friend.connected then
+				if friend.level and friend.area then
+					if hideMaxLevel and friend.level == maxLevel then
+						button.Info:SetText(friend.area)
+					else
+						button.Info:SetText(string.format("Lvl %d, %s", friend.level, friend.area))
+					end
+				elseif friend.level then
+					if hideMaxLevel and friend.level == maxLevel then
+						button.Info:SetText("Max Level")
+					else
+						button.Info:SetText("Lvl " .. friend.level)
+					end
+				elseif friend.area then
+					button.Info:SetText(friend.area)
+				else
+					button.Info:SetText(BFL_L.ONLINE_STATUS)
+				end
+			else
+				button.Info:SetText(BFL_L.OFFLINE_STATUS)
+			end
+		end  -- end of if not isCompactMode
+	end -- end of if friend.type == "bnet"
+	
+	-- Ensure button is visible
+	button:Show()
 end
 
 -- ========================================
 -- Friend Invite Functions
 -- ========================================
 
--- Update invite header button
 function FriendsList:UpdateInviteHeaderButton(button, data)
 	button.Text:SetFormattedText(BFL_L.INVITE_HEADER, data.count)
 	local collapsed = GetCVarBool("friendInvitesCollapsed")
@@ -2171,6 +2595,9 @@ function FriendsList:UpdateInviteHeaderButton(button, data)
 	if FontManager and button.Text then
 		FontManager:ApplyFontSize(button.Text)
 	end
+	
+	-- Ensure button is visible
+	button:Show()
 end
 
 -- Update invite button
@@ -2220,6 +2647,9 @@ function FriendsList:UpdateInviteButton(button, data)
 	-- Store invite data
 	button.inviteID = inviteID
 	button.inviteIndex = data.inviteIndex
+	
+	-- Ensure button is visible
+	button:Show()
 end
 
 -- Flash invite header when new invite arrives while collapsed
@@ -2246,4 +2676,8 @@ function FriendsList:FireEvent(eventName, ...)
 end
 
 return FriendsList
+
+
+
+
 
