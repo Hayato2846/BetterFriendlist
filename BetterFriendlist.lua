@@ -545,6 +545,16 @@ end
 
 -- Hide the friends frame  
 function HideBetterFriendsFrame()
+	-- Clear friend selection (like Blizzard's FriendsFrame)
+	local FriendsList = GetFriendsList()
+	if FriendsList then
+		if FriendsList.selectedButton and FriendsList.selectedButton.selectionHighlight then
+			FriendsList.selectedButton.selectionHighlight:Hide()
+		end
+		FriendsList.selectedFriend = nil
+		FriendsList.selectedButton = nil
+	end
+	
 	-- Direct :Hide() - now combat-safe (no longer SECURE frame)
 	BetterFriendsFrame:Hide()
 end
@@ -1375,7 +1385,7 @@ function BetterFriendsList_Button_OnLeave(button)
 	GameTooltip:Hide()
 end
 
--- Button OnClick Handler (1:1 from Blizzard)
+-- Button OnClick Handler (matching Blizzard's FriendsFrame_SelectFriend behavior)
 function BetterFriendsList_Button_OnClick(button, mouseButton)
 	if not button.friendInfo then
 		return
@@ -1383,8 +1393,23 @@ function BetterFriendsList_Button_OnClick(button, mouseButton)
 	
 	if mouseButton == "LeftButton" then
 		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
-		-- Left click: Select friend (future functionality)
-		-- For now, we just play the sound
+		-- Left click: Select friend (for Send Message button) with visual highlight
+		local FriendsList = GetFriendsList()
+		if FriendsList and button.friendData then
+			-- Clear previous selection highlight
+			if FriendsList.selectedButton and FriendsList.selectedButton.selectionHighlight then
+				FriendsList.selectedButton.selectionHighlight:Hide()
+			end
+			
+			-- Set new selection
+			FriendsList.selectedFriend = button.friendData
+			FriendsList.selectedButton = button
+			
+			-- Show selection highlight (blue, like Blizzard)
+			if button.selectionHighlight then
+				button.selectionHighlight:Show()
+			end
+		end
 	elseif mouseButton == "RightButton" then
 		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
 		

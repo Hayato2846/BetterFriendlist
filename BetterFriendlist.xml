@@ -227,6 +227,7 @@
 			</Layer>
 		</Layers>
 		<Frames>
+			<!-- Selection Highlight (blue, like Blizzard's FriendsFrame) -->
 			<!-- TravelPass Invite Button - positioned at top right like Blizzard -->
 			<Button hidden="true" motionScriptsWhileDisabled="true" parentKey="travelPassButton">
 				<Size x="24" y="32"/>
@@ -260,6 +261,12 @@
 				</Scripts>
 			</Button>
 		</Frames>
+		<HighlightTexture file="Interface\QuestFrame\UI-QuestLogTitleHighlight" alphaMode="ADD" parentKey="highlight">
+			<Anchors>
+				<Anchor point="TOPLEFT" x="0" y="-1"/>
+				<Anchor point="BOTTOMRIGHT" x="0" y="1"/>
+			</Anchors>
+		</HighlightTexture>
 		<Scripts>
 			<OnClick>
 				BetterFriendsList_Button_OnClick(self, button);
@@ -1841,7 +1848,20 @@
 				</Anchors>
 				<Scripts>
 					<OnClick>
-						StaticPopup_Show("ADD_FRIEND")
+						-- Use Blizzard's Add Friend Frame (identical to FriendsFrame)
+						if not AddFriendFrame then
+							LoadAddOn("Blizzard_FriendsFrame")
+						end
+						if AddFriendFrame then
+							AddFriendEntryFrame_Init(true)
+							AddFriendFrame.editFocus = AddFriendNameEditBox
+							StaticPopupSpecial_Show(AddFriendFrame)
+							if GetCVarBool("addFriendInfoShown") then
+								AddFriendFrame:ShowEntry()
+							else
+								AddFriendFrame:ShowInfo()
+							end
+						end
 					</OnClick>
 				</Scripts>
 			</Button>
@@ -1852,21 +1872,17 @@
 				</Anchors>
 				<Scripts>
 					<OnClick>
-						-- Get selected friend and open whisper
-						local scrollFrame = BetterFriendsFrame.ScrollFrame
-						local offset = FauxScrollFrame_GetOffset(scrollFrame)
-						-- Find first selected friend button
-						for i = 1, 12 do
-							local button = _G["BetterFriendsFrameScrollFrameButton"..i] or buttonPool.activeButtons[i]
-							if button and button:IsShown() and button.friendData then
-								local friend = button.friendData
-								if friend.type == "bnet" and friend.gameAccountInfo and friend.gameAccountInfo.characterName then
-									ChatFrame_SendBNetTell(friend.accountName or friend.battleTag)
-								elseif friend.type == "wow" and friend.name then
-									ChatFrame_SendTell(friend.name)
-								end
-								break
-							end
+						-- Get selected friend from FriendsList module
+						local FriendsList = BFL and BFL:GetModule("FriendsList")
+						if not FriendsList or not FriendsList.selectedFriend then
+							return
+						end
+						
+						local friend = FriendsList.selectedFriend
+						if friend.type == "bnet" and friend.gameAccountInfo and friend.gameAccountInfo.characterName then
+							ChatFrame_SendBNetTell(friend.accountName or friend.battleTag)
+						elseif friend.type == "wow" and friend.name then
+							ChatFrame_SendTell(friend.name)
 						end
 					</OnClick>
 				</Scripts>

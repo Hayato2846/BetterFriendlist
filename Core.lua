@@ -7,7 +7,7 @@
 local ADDON_NAME, BFL = ...
 
 -- Get version dynamically from TOC file
-BFL.Version = C_AddOns.GetAddOnMetadata(ADDON_NAME, "Version") or "Unknown"
+BFL.VERSION = "1.7.4"
 
 -- Make BFL globally accessible for tooltip and other legacy files
 _G.BFL = BFL

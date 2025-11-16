@@ -25,6 +25,10 @@ local BUTTON_TYPE_DIVIDER = 5
 local isUpdatingFriendsList = false
 local hasPendingUpdate = false
 
+-- Selected friend for "Send Message" button (matching Blizzard's FriendsFrame)
+FriendsList.selectedFriend = nil
+FriendsList.selectedButton = nil  -- Reference to the selected button for highlight management
+
 -- Invite restriction constants (matching Blizzard's)
 local INVITE_RESTRICTION_NONE = 0
 local INVITE_RESTRICTION_LEADER = 1
@@ -1866,6 +1870,17 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		bnetAccountID = friend.bnetAccountID,
 		battleTag = friend.battleTag
 	}
+	
+	-- Create selection highlight texture if it doesn't exist (blue, like Blizzard)
+	if not button.selectionHighlight then
+		local selectionHighlight = button:CreateTexture(nil, "BACKGROUND")
+		selectionHighlight:SetTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
+		selectionHighlight:SetBlendMode("ADD")
+		selectionHighlight:SetAllPoints()
+		selectionHighlight:SetVertexColor(0.510, 0.773, 1.0, 0.5)  -- Blue with alpha
+		selectionHighlight:Hide()
+		button.selectionHighlight = selectionHighlight
+	end
 	
 	-- Enable drag and drop for group assignment (IDENTICAL to old ButtonPool.lua system)
 	button:RegisterForDrag("LeftButton")

@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.4] - 2025-11-16
+
+**🐛 Critical Bug Fixes**
+
+Fixed two critical bugs affecting core Friends List functionality.
+
+### Fixed
+- **Send Message Button Error** - Fixed "attempt to index global 'buttonPool' (a nil value)" error
+  - Changed to use `FriendsList.selectedFriend` from module state instead of non-existent buttonPool reference
+  - Send Message button now works correctly with friend selection
+- **Add Friend Dialog** - Corrected Add Friend button to open Blizzard's native dialog
+  - Now uses `StaticPopupSpecial_Show(AddFriendFrame)` matching Blizzard's implementation
+  - Previously opened incorrect custom dialog
+  - Full integration with Blizzard's AddFriendFrame including initialization and CVar handling
+- **Friend Selection** - Added left-click friend selection with blue highlighting
+  - Left-click now selects friends (required for Send Message button)
+  - Blue selection highlight matching Blizzard's FriendsFrame (RGB 0.510, 0.773, 1.0)
+  - Selection clears automatically when frame closes
+- **Selection Highlight Bug** - Fixed all friends showing highlight simultaneously
+  - Root cause: NormalTexture in XML template was shared across all button instances
+  - Changed to dynamic per-button texture creation in Lua
+  - Each button now has its own independent highlight control
+
+### Technical
+- Researched and implemented Blizzard's exact FriendsFrame behavior
+- Per-button texture creation using `CreateTexture(nil, "BACKGROUND")`
+- Selection state management with `selectedFriend` and `selectedButton`
+- Highlight texture: `Interface\QuestFrame\UI-QuestLogTitleHighlight`
+
+---
+
 ## [1.7.3] - 2025-11-16
 
 **🎯 Raid Frame Drag & Drop Enhancements**
