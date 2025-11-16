@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.1] - 2025-11-16
+
+**🔧 Core Refactoring & Enhancements**
+
+Major internal refactoring with performance improvements and enhanced drag & drop functionality.
+
+### Changed
+- **Core Scroll System** - Comprehensive refactoring of scroll rendering system for better performance and stability
+- **Drag & Drop Visual Feedback** - Gold highlighting during drag operations (matches Raid Frame style)
+- **Multiple Core Functions** - Updated and optimized for improved stability
+
+### Fixed
+- **Shift+Drag Behavior** - Corrected friend assignment logic
+  - Without Shift: Move friend (remove from other groups)
+  - With Shift: Add to multiple groups (keep in other groups)
+- **Debug Logging** - Removed unnecessary debug output across multiple modules
+
+### Technical
+- Refactored scroll rendering pipeline
+- Updated 10 core files with 1,300+ line changes
+- Enhanced internal drag & drop system
+- Various performance optimizations
+
+---
+
 ## [1.7.0] - 2025-11-15
 
 **✨ Enhanced Sorting System & Visual Upgrade**
