@@ -33,6 +33,7 @@ RaidFrame.selectedMember = nil      -- Currently selected member name
 RaidFrame.sortMode = SORT_MODE_GROUP
 RaidFrame.currentTab = TAB_MODE_ROSTER
 RaidFrame.savedInstances = {}       -- Saved instance data
+RaidFrame.pendingUpdate = false     -- Throttle flag for roster updates
 
 -- Difficulty constants (from Blizzard)
 RaidFrame.DIFFICULTY_PRIMARYRAID_NORMAL = 14
@@ -1111,13 +1112,27 @@ end
 -- ========================================
 
 function RaidFrame:OnRaidRosterUpdate(...)
-    -- Update member list
-    self:UpdateRaidMembers()
-    self:BuildDisplayList()
+    -- Throttle: Skip if update already scheduled
+    if self.pendingUpdate then
+        return
+    end
     
-    -- Update UI
-    self:UpdateAllMemberButtons()
-    self:UpdateControlPanel()
+    -- Mark update as pending
+    self.pendingUpdate = true
+    
+    -- Schedule update on next frame (lets API settle)
+    C_Timer.After(0, function()
+        -- Update member list
+        self:UpdateRaidMembers()
+        self:BuildDisplayList()
+        
+        -- Update UI
+        self:UpdateAllMemberButtons()
+        self:UpdateControlPanel()
+        
+        -- Clear throttle flag
+        self.pendingUpdate = false
+    end)
     
     -- Note: We DON'T need to call BetterRaidFrame_Update() here anymore
     -- The EveryoneAssistCheckbox handles its own state via events (GROUP_ROSTER_UPDATE)

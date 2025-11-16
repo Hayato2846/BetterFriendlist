@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.3] - 2025-11-16
+
+**🎯 Raid Frame Drag & Drop Enhancements**
+
+Improved drag & drop reliability and consistency for multi-select operations in the Raid Frame.
+
+### Fixed
+- **Multi-Select Drag Highlights** - Gold drag highlights now properly clear after dropping multiple selected players
+  - Fixed persistent highlighting bug where drag overlays remained visible after bulk moves
+  - All selected players now show drag highlights during multi-select drag operations
+  - Highlights correctly clear in all scenarios (successful drops, failed drops, and canceled drags)
+- **Update Consistency** - Eliminated race condition causing inconsistent update speeds after drag & drop
+  - Replaced manual timer-based updates with event-driven system using Blizzard's GROUP_ROSTER_UPDATE
+  - Added throttling mechanism to prevent duplicate updates
+  - Updates now occur consistently on next frame after roster changes
+- **Drop Zone Reliability** - Expanded hit detection area for raid member buttons
+  - Button hit boxes extended by 1px above and below to cover 2px gaps between buttons
+  - Drag & drop now works reliably even when cursor is over gaps between buttons
+  - Visual appearance unchanged - only mouse detection area expanded
+
+### Technical
+- Event-based update system with throttling for optimal performance
+- Improved drag highlight management across all code paths
+- Enhanced hit rect configuration for better UX
+
+---
+
 ## [1.7.1] - 2025-11-16
 
 **🔧 Core Refactoring & Enhancements**

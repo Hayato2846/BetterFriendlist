@@ -143,17 +143,7 @@ local function BulkMoveToGroup(targetSubgroup)
 			string.format("Moved %d players to Group %d", movedCount, targetSubgroup),
 			0.0, 1.0, 0.0, 1.0
 		)
-		
-		-- Phase 8.3: Delayed refresh for instant visual update
-		-- Blizzard API is asynchronous - event fires before data updates
-		C_Timer.After(0.1, function()
-			local RaidFrame = GetRaidFrame()
-			if RaidFrame then
-				RaidFrame:UpdateRaidMembers()
-				RaidFrame:BuildDisplayList()
-				RaidFrame:UpdateAllMemberButtons()
-			end
-		end)
+		-- Note: Update handled by GROUP_ROSTER_UPDATE event with throttling
 	end
 	
 	-- Error feedback if any failed
@@ -444,6 +434,12 @@ function BetterRaidMemberButton_OnLoad(self)
 	-- Register for updates
 	self:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 	self:RegisterForDrag("LeftButton")
+	
+	-- Expand hit rect to cover the 2px gap between buttons
+	-- Negative values expand the hit area BEYOND the button's visual bounds
+	-- Top: +1px, Right: 0px, Bottom: +1px, Left: 0px
+	-- This makes the drop zone 2px taller (1px above + 1px below) covering the gaps
+	self:SetHitRectInsets(0, 0, -1, -1)
 end
 
 function BetterRaidMemberButton_OnEnter(self)
@@ -516,6 +512,15 @@ function BetterRaidMemberButton_OnDragStart(self)
 		RaidFrame:SetButtonDragHighlight(raidIndex, true)
 	end
 	
+	-- Phase 8.2: Show drag highlights on all selected players (if multi-select active)
+	if #BetterRaidFrame_SelectedPlayers > 0 then
+		for _, playerData in ipairs(BetterRaidFrame_SelectedPlayers) do
+			if RaidFrame and playerData.raidIndex and playerData.raidIndex ~= raidIndex then
+				RaidFrame:SetButtonDragHighlight(playerData.raidIndex, true)
+			end
+		end
+	end
+	
 	-- Start drag (for moving to different groups)
 	-- Store dragged unit info
 	BetterRaidFrame_DraggedUnit = {
@@ -553,10 +558,18 @@ function BetterRaidMemberButton_OnDragStop(self)
 	end
 	
 	if not targetFrame or not targetFrame.groupIndex then
-		-- Clear drag highlight before returning
+		-- Clear drag highlights before returning
 		local RaidFrame = GetRaidFrame()
-		if RaidFrame and BetterRaidFrame_DraggedUnit and BetterRaidFrame_DraggedUnit.raidIndex then
-			RaidFrame:SetButtonDragHighlight(BetterRaidFrame_DraggedUnit.raidIndex, false)
+		if RaidFrame then
+			if BetterRaidFrame_DraggedUnit and BetterRaidFrame_DraggedUnit.raidIndex then
+				RaidFrame:SetButtonDragHighlight(BetterRaidFrame_DraggedUnit.raidIndex, false)
+			end
+			-- Phase 8.2: Clear drag highlights on all selected players
+			for _, playerData in ipairs(BetterRaidFrame_SelectedPlayers) do
+				if playerData.raidIndex then
+					RaidFrame:SetButtonDragHighlight(playerData.raidIndex, false)
+				end
+			end
 		end
 		BetterRaidFrame_DraggedUnit = nil
 		return
@@ -564,10 +577,18 @@ function BetterRaidMemberButton_OnDragStop(self)
 	
 	-- Don't allow dropping on self
 	if targetFrame.unit == BetterRaidFrame_DraggedUnit.unit then
-		-- Clear drag highlight before returning
+		-- Clear drag highlights before returning
 		local RaidFrame = GetRaidFrame()
-		if RaidFrame and BetterRaidFrame_DraggedUnit and BetterRaidFrame_DraggedUnit.raidIndex then
-			RaidFrame:SetButtonDragHighlight(BetterRaidFrame_DraggedUnit.raidIndex, false)
+		if RaidFrame then
+			if BetterRaidFrame_DraggedUnit and BetterRaidFrame_DraggedUnit.raidIndex then
+				RaidFrame:SetButtonDragHighlight(BetterRaidFrame_DraggedUnit.raidIndex, false)
+			end
+			-- Phase 8.2: Clear drag highlights on all selected players
+			for _, playerData in ipairs(BetterRaidFrame_SelectedPlayers) do
+				if playerData.raidIndex then
+					RaidFrame:SetButtonDragHighlight(playerData.raidIndex, false)
+				end
+			end
 		end
 		BetterRaidFrame_DraggedUnit = nil
 		return
@@ -590,6 +611,20 @@ function BetterRaidMemberButton_OnDragStop(self)
 		if #BetterRaidFrame_SelectedPlayers > 0 then
 			-- BULK MOVE: Move all selected players to target group
 			BulkMoveToGroup(targetSubgroup)
+			
+			-- Clear drag highlights BEFORE clearing selections (need the player list)
+			local RaidFrame = GetRaidFrame()
+			if RaidFrame then
+				if BetterRaidFrame_DraggedUnit and BetterRaidFrame_DraggedUnit.raidIndex then
+					RaidFrame:SetButtonDragHighlight(BetterRaidFrame_DraggedUnit.raidIndex, false)
+				end
+				for _, playerData in ipairs(BetterRaidFrame_SelectedPlayers) do
+					if playerData.raidIndex then
+						RaidFrame:SetButtonDragHighlight(playerData.raidIndex, false)
+					end
+				end
+			end
+			
 			ClearAllSelections()
 			BetterRaidFrame_DraggedUnit = nil
 			return
@@ -614,17 +649,7 @@ function BetterRaidMemberButton_OnDragStop(self)
 							0.0, 1.0, 0.0, 1.0
 						)
 					end
-					
-					-- Phase 8.3: Delayed refresh for instant visual update
-					-- Blizzard API is asynchronous - event fires before data updates
-					C_Timer.After(0.1, function()
-						local RaidFrame = GetRaidFrame()
-						if RaidFrame then
-							RaidFrame:UpdateRaidMembers()
-							RaidFrame:BuildDisplayList()
-							RaidFrame:UpdateAllMemberButtons()
-						end
-					end)
+					-- Note: Update handled by GROUP_ROSTER_UPDATE event with throttling
 				else
 					-- Error feedback (red toast)
 					UIErrorsFrame:AddMessage(
@@ -646,17 +671,7 @@ function BetterRaidMemberButton_OnDragStop(self)
 						0.0, 1.0, 0.0, 1.0
 					)
 				end
-				
-				-- Phase 8.3: Delayed refresh for instant visual update
-				-- Blizzard API is asynchronous - event fires before data updates
-				C_Timer.After(0.1, function()
-					local RaidFrame = GetRaidFrame()
-					if RaidFrame then
-						RaidFrame:UpdateRaidMembers()
-						RaidFrame:BuildDisplayList()
-						RaidFrame:UpdateAllMemberButtons()
-					end
-				end)
+				-- Note: Update handled by GROUP_ROSTER_UPDATE event with throttling
 			else
 				-- Error feedback (red toast)
 				UIErrorsFrame:AddMessage(
@@ -667,10 +682,20 @@ function BetterRaidMemberButton_OnDragStop(self)
 		end
 	end
 	
-	-- Clear drag highlight
+	-- Clear drag highlights on all buttons (primary dragged button + any selected players)
 	local RaidFrame = GetRaidFrame()
-	if RaidFrame and BetterRaidFrame_DraggedUnit and BetterRaidFrame_DraggedUnit.raidIndex then
-		RaidFrame:SetButtonDragHighlight(BetterRaidFrame_DraggedUnit.raidIndex, false)
+	if RaidFrame then
+		-- Clear drag highlight on primary dragged button
+		if BetterRaidFrame_DraggedUnit and BetterRaidFrame_DraggedUnit.raidIndex then
+			RaidFrame:SetButtonDragHighlight(BetterRaidFrame_DraggedUnit.raidIndex, false)
+		end
+		
+		-- Phase 8.2: Clear drag highlights on all selected players (if multi-select was active)
+		for _, playerData in ipairs(BetterRaidFrame_SelectedPlayers) do
+			if playerData.raidIndex then
+				RaidFrame:SetButtonDragHighlight(playerData.raidIndex, false)
+			end
+		end
 	end
 	
 	-- Clear drag state
