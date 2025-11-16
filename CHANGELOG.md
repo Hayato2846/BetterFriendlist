@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.8.1] - 2025-11-16
+
+**🐛 Bug Fix**
+
+Fixed compact mode toggle causing errors.
+
+### Fixed
+- **Compact Mode Setting** - Fixed "attempt to call method 'InvalidateDataProvider' (a nil value)" error
+  - Replaced non-existent ScrollBox method with correct FriendsList:RenderDisplay() call
+  - Compact mode toggle now works without errors
+
+---
+
 ## [1.8.0] - 2025-11-16
 
 **🔧 Version Management & Bug Fixes**

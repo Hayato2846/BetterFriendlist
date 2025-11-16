@@ -1589,10 +1589,10 @@ function Settings:OnCompactModeChanged(checked)
 	
 	DB:Set("compactMode", checked)
 	
-	-- CRITICAL: Invalidate ScrollBox DataProvider to recalculate button heights
+	-- CRITICAL: Re-render display to recalculate button heights
 	local FriendsList = BFL:GetModule("FriendsList")
-	if FriendsList and FriendsList.scrollBox then
-		FriendsList.scrollBox:InvalidateDataProvider()
+	if FriendsList then
+		FriendsList:RenderDisplay()
 	end
 	
 	if BetterFriendsFrame_UpdateDisplay then
