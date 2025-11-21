@@ -36,31 +36,52 @@ function Groups:MigrateFriendAssignments()
 	local friendGroups = DB:GetFriendGroups() -- Get ALL friendGroups
 	if not friendGroups then return end
 	
-	-- Check if migration has already been done
-	local migrationDone = DB:Get("bnetUIDMigrationDone_v2") -- Changed flag name to force re-run
-	if migrationDone then
+	-- Check if Battle.net migration has already been done
+	local bnetMigrationDone = DB:Get("bnetUIDMigrationDone_v2") -- Changed flag name to force re-run
+	local wowMigrationDone = DB:Get("wowUIDMigrationDone_v1") -- New migration for WoW friends
+	
+	if bnetMigrationDone and wowMigrationDone then
 		return -- Already migrated
 	end
 	
-	-- Count old-style bnet UIDs (format: "bnet_12345" where 12345 is numeric)
+	-- Count old-style UIDs
 	local oldBnetUIDs = {}
+	local wowUIDsToMigrate = {}
 	local totalMappings = 0
 	
 	for uid, groups in pairs(friendGroups) do
 		-- Skip numeric array indices (corrupted data)
 		if type(uid) == "string" then
 			totalMappings = totalMappings + 1
-			if uid:match("^bnet_%d+$") then
+			
+			-- Battle.net: Old format "bnet_12345" where 12345 is numeric
+			if not bnetMigrationDone and uid:match("^bnet_%d+$") then
 				table.insert(oldBnetUIDs, uid)
+			end
+			
+			-- WoW: Old format "wow_Name" without realm
+			if not wowMigrationDone and uid:match("^wow_[^%-]+$") then
+				-- Extract character name (without "wow_" prefix)
+				local charName = uid:sub(5)
+				-- Only migrate if name doesn't look like it already has realm (no "-")
+				if not charName:find("-") then
+					table.insert(wowUIDsToMigrate, {oldUID = uid, charName = charName, groups = groups})
+				end
 			end
 		end
 	end
 	
 	-- Debug output
 	print("|cff00ff00BetterFriendlist:|r Migration check - Total friend mappings:", totalMappings)
-	print("|cff00ff00BetterFriendlist:|r Migration check - Old format (bnet_numeric):", #oldBnetUIDs)
+	if not bnetMigrationDone then
+		print("|cff00ff00BetterFriendlist:|r Migration check - Old Battle.net format:", #oldBnetUIDs)
+	end
+	if not wowMigrationDone then
+		print("|cff00ff00BetterFriendlist:|r Migration check - WoW friends without realm:", #wowUIDsToMigrate)
+	end
 	
-	if #oldBnetUIDs > 0 then
+	-- Migrate Battle.net UIDs
+	if not bnetMigrationDone and #oldBnetUIDs > 0 then
 		-- Remove old-style UIDs (they are now invalid and can't be migrated)
 		for _, uid in ipairs(oldBnetUIDs) do
 			DB:SetFriendGroups(uid, nil) -- Remove assignment
@@ -70,10 +91,36 @@ function Groups:MigrateFriendAssignments()
 		print("|cff00ff00BetterFriendlist:|r Battle.net friend assignments have been updated to use persistent identifiers.")
 		print("|cffff8800Note:|r Please re-assign your Battle.net friends to groups. This is a one-time migration.")
 		print("|cffaaaaaa(Reason: bnetAccountID is temporary and changes each session)|r")
+		
+		DB:Set("bnetUIDMigrationDone_v2", true)
 	end
 	
-	-- Mark migration as done
-	DB:Set("bnetUIDMigrationDone_v2", true)
+	-- Migrate WoW UIDs (add realm)
+	if not wowMigrationDone and #wowUIDsToMigrate > 0 then
+		local playerRealm = GetNormalizedRealmName()
+		local migrated = 0
+		
+		if playerRealm and playerRealm ~= "" then
+			for _, entry in ipairs(wowUIDsToMigrate) do
+				local newUID = "wow_" .. entry.charName .. "-" .. playerRealm
+				
+				-- Copy groups to new UID
+				DB:SetFriendGroups(newUID, entry.groups)
+				
+				-- Remove old UID
+				DB:SetFriendGroups(entry.oldUID, nil)
+				
+				migrated = migrated + 1
+			end
+			
+			print("|cff00ff00BetterFriendlist:|r Migrated " .. migrated .. " WoW friend assignments to include realm names.")
+			print("|cffaaaaaa(Now using format: CharacterName-RealmName for consistent identification)|r")
+		else
+			print("|cffff8800BetterFriendlist:|r Could not migrate WoW friend assignments (realm name unavailable).")
+		end
+		
+		DB:Set("wowUIDMigrationDone_v1", true)
+	end
 end
 
 function Groups:Initialize()

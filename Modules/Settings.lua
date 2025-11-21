@@ -6,6 +6,9 @@ local ADDON_NAME, BFL = ...
 -- Import UI constants
 local UI = BFL.UI.CONSTANTS
 
+-- Import Settings Components Library
+local Components = BFL.SettingsComponents
+
 -- Register the Settings module
 local Settings = BFL:RegisterModule("Settings", {})
 
@@ -340,31 +343,110 @@ function Settings:ShowTab(tabID)
 	if not settingsFrame then return end
 	
 	currentTab = tabID
-	settingsFrame.numTabs = 5
+	settingsFrame.numTabs = 3
 	PanelTemplates_SetTab(settingsFrame, tabID)
 	
 	local content = settingsFrame.ContentScrollFrame.Content
 	if content then
 		if content.GeneralTab then content.GeneralTab:Hide() end
 		if content.GroupsTab then content.GroupsTab:Hide() end
-		if content.AppearanceTab then content.AppearanceTab:Hide() end
 		if content.AdvancedTab then content.AdvancedTab:Hide() end
 		if content.StatisticsTab then content.StatisticsTab:Hide() end
 		
 		if tabID == 1 and content.GeneralTab then
 			content.GeneralTab:Show()
+			self:RefreshGeneralTab()
 		elseif tabID == 2 and content.GroupsTab then
 			content.GroupsTab:Show()
-			self:RefreshGroupList()
-		elseif tabID == 3 and content.AppearanceTab then
-			content.AppearanceTab:Show()
-		elseif tabID == 4 and content.AdvancedTab then
+			self:RefreshGroupsTab()
+		elseif tabID == 3 and content.AdvancedTab then
 			content.AdvancedTab:Show()
-		elseif tabID == 5 and content.StatisticsTab then
-			content.StatisticsTab:Show()
-			self:RefreshStatistics()
+			self:RefreshAdvancedTab()
+		end
+		
+		-- Adjust content height dynamically after tab is shown
+		self:AdjustContentHeight(tabID)
+	end
+end
+
+-- Adjust the Content frame height based on the active tab's content
+function Settings:AdjustContentHeight(tabID)
+	if not settingsFrame then return end
+	
+	local content = settingsFrame.ContentScrollFrame.Content
+	if not content then return end
+	
+	local activeTab = nil
+	if tabID == 1 then
+		activeTab = content.GeneralTab
+	elseif tabID == 2 then
+		activeTab = content.GroupsTab
+	elseif tabID == 3 then
+		activeTab = content.AdvancedTab
+	elseif tabID == 4 then
+		activeTab = content.StatisticsTab
+	elseif tabID == 5 then
+		activeTab = content.StatisticsTab
+	end
+	
+	if not activeTab then return end
+	
+	-- Calculate required height by measuring all visible children
+	local maxHeight = self:CalculateTabContentHeight(activeTab)
+	
+	-- Get available scroll frame height
+	local scrollFrame = settingsFrame.ContentScrollFrame
+	local availableHeight = scrollFrame:GetHeight()
+	
+	-- Set content height to maximum of calculated height or available height
+	-- This ensures no unnecessary scrolling for small content
+	local newHeight = math.max(maxHeight, availableHeight)
+	content:SetHeight(newHeight)
+end
+
+-- Calculate the actual content height of a tab
+function Settings:CalculateTabContentHeight(tab)
+	if not tab then return 600 end -- fallback
+	
+	local maxY = 0
+	local minY = 0
+	
+	-- Iterate through all regions (textures, fontstrings, frames, etc.)
+	local regions = {tab:GetRegions()}
+	for _, region in ipairs(regions) do
+		if region:IsShown() then
+			local bottom = region:GetBottom()
+			local top = region:GetTop()
+			if bottom and top then
+				local tabTop = tab:GetTop()
+				if tabTop then
+					minY = math.min(minY, bottom - tabTop)
+					maxY = math.max(maxY, top - tabTop)
+				end
+			end
 		end
 	end
+	
+	-- Check all child frames
+	local children = {tab:GetChildren()}
+	for _, child in ipairs(children) do
+		if child:IsShown() then
+			local bottom = child:GetBottom()
+			local top = child:GetTop()
+			if bottom and top then
+				local tabTop = tab:GetTop()
+				if tabTop then
+					minY = math.min(minY, bottom - tabTop)
+					maxY = math.max(maxY, top - tabTop)
+				end
+			end
+		end
+	end
+	
+	-- Calculate total height needed (absolute value of minY gives depth below anchor)
+	local totalHeight = math.abs(minY) + 20 -- Add 20px padding at bottom
+	
+	return math.max(totalHeight, 200) -- Minimum 200px height
 end
 
 -- Load settings from database into UI
@@ -373,14 +455,9 @@ function Settings:LoadSettings()
 	if not DB then return end
 	
 	local content = settingsFrame.ContentScrollFrame.Content
-	if content and content.GeneralTab then
-		local generalTab = content.GeneralTab
-		
-		if generalTab.ShowBlizzardOption then
-			local value = DB:Get("showBlizzardOption", false)
-			generalTab.ShowBlizzardOption:SetChecked(value)
-		end
-	end
+	
+	-- General tab is now populated via RefreshGeneralTab() which reads DB directly
+	-- No need to manually set values here anymore
 	
 	if content and content.GroupsTab then
 		local groupsTab = content.GroupsTab
@@ -442,44 +519,7 @@ function Settings:LoadSettings()
 			appearanceTab.CompactMode:SetChecked(value)
 		end
 		
-		if appearanceTab.FontSizeSection then
-			self:InitFontSizeDropdown()
-		end
 	end
-end
-
--- Initialize font size dropdown
-function Settings:InitFontSizeDropdown()
-	if not settingsFrame or not settingsFrame.ContentScrollFrame or not settingsFrame.ContentScrollFrame.Content then return end
-	
-	local dropdown = settingsFrame.ContentScrollFrame.Content.AppearanceTab.FontSizeSection.Dropdown
-	if not dropdown then return end
-	
-	local DB = GetDB()
-	if not DB then return end
-	
-	local currentFontSize = DB:Get("fontSize", "normal")
-	dropdown:SetDefaultText("Normal (12px)")
-	
-	dropdown:SetupMenu(function(owner, rootDescription)
-		-- Small option (10px)
-		rootDescription:CreateRadio("Small (Compact, 10px)",
-			function() return currentFontSize == "small" end,
-			function() Settings:SetFontSize("small") end
-		)
-		
-		-- Normal option (12px)
-		rootDescription:CreateRadio("Normal (12px)",
-			function() return currentFontSize == "normal" end,
-			function() Settings:SetFontSize("normal") end
-		)
-		
-		-- Large option (14px)
-		rootDescription:CreateRadio("Large (14px)",
-			function() return currentFontSize == "large" end,
-			function() Settings:SetFontSize("large") end
-		)
-	end)
 end
 
 -- Set font size and save immediately
@@ -493,8 +533,10 @@ function Settings:SetFontSize(size)
 		BetterFriendsFrame_UpdateDisplay()
 	end
 	
-	-- Refresh dropdown to show new selection
-	self:InitFontSizeDropdown()
+	-- Refresh General Tab to update dropdown display
+	if currentTab == 1 then
+		self:RefreshGeneralTab()
+	end
 end
 
 -- Reset to defaults
@@ -531,8 +573,15 @@ function Settings:DoReset()
 	print("|cff20ff20BetterFriendlist:|r " .. BFL_L.SETTINGS_RESET_SUCCESS)
 end
 
--- Refresh the group list in the Groups tab
+-- Refresh the group list in the Groups tab (Legacy wrapper)
 function Settings:RefreshGroupList()
+	-- Now uses RefreshGroupsTab which generates everything dynamically
+	self:RefreshGroupsTab()
+	return
+end
+
+-- Old implementation (kept for reference, but not used)
+function Settings:RefreshGroupList_OLD()
 	local frame = BetterFriendlistSettingsFrame
 	if not frame or not frame.ContentScrollFrame or not frame.ContentScrollFrame.Content or not frame.ContentScrollFrame.Content.GroupsTab then return end
 	
@@ -742,6 +791,70 @@ function Settings:DeleteGroup(groupId, groupName)
 	StaticPopup_Show("BETTERFRIENDLIST_DELETE_GROUP")
 end
 
+-- Rename a custom group
+function Settings:RenameGroup(groupId, currentName)
+	StaticPopupDialogs["BETTERFRIENDLIST_RENAME_GROUP"] = {
+		text = string.format("Rename group '%s':", currentName),
+		button1 = "Rename",
+		button2 = "Cancel",
+		hasEditBox = true,
+		maxLetters = 32,
+		editBoxWidth = 200,
+		OnShow = function(self)
+			self.EditBox:SetText(currentName)
+			self.EditBox:SetMaxLetters(32)
+			self.EditBox:SetFocus()
+			self.EditBox:HighlightText()
+		end,
+		OnAccept = function(self)
+			local newName = self.EditBox:GetText()
+			if newName and newName ~= "" and newName ~= currentName then
+				local Groups = BFL:GetModule("Groups")
+				if Groups then
+					local success = Groups:Rename(groupId, newName)
+					if success then
+						print("|cff00ff00BetterFriendlist:|r Group renamed to '" .. newName .. "'")
+						Settings:RefreshGroupsTab()
+						if BetterFriendsFrame_UpdateDisplay then
+							BetterFriendsFrame_UpdateDisplay()
+						end
+					else
+						print("|cffff0000BetterFriendlist:|r Failed to rename group")
+					end
+				end
+			end
+		end,
+		EditBoxOnEnterPressed = function(self)
+			local parent = self:GetParent()
+			local newName = parent.EditBox:GetText()
+			if newName and newName ~= "" and newName ~= currentName then
+				local Groups = BFL:GetModule("Groups")
+				if Groups then
+					local success = Groups:Rename(groupId, newName)
+					if success then
+						print("|cff00ff00BetterFriendlist:|r Group renamed to '" .. newName .. "'")
+						Settings:RefreshGroupsTab()
+						if BetterFriendsFrame_UpdateDisplay then
+							BetterFriendsFrame_UpdateDisplay()
+						end
+					else
+						print("|cffff0000BetterFriendlist:|r Failed to rename group")
+					end
+				end
+			end
+			parent:Hide()
+		end,
+		EditBoxOnEscapePressed = function(self)
+			self:GetParent():Hide()
+		end,
+		timeout = 0,
+		whileDead = true,
+		hideOnEscape = true,
+		preferredIndex = 3,
+	}
+	StaticPopup_Show("BETTERFRIENDLIST_RENAME_GROUP")
+end
+
 -- Migrate from FriendGroups addon
 function Settings:MigrateFriendGroups(cleanupNotes)
 	local DB = GetDB()
@@ -810,7 +923,8 @@ function Settings:MigrateFriendGroups(cleanupNotes)
 	for i = 1, numWoWFriends do
 		local info = C_FriendList.GetFriendInfoByIndex(i)
 		if info then
-			local name = info.name
+			-- Normalize name to always include realm
+			local name = BFL:NormalizeWoWFriendName(info.name)
 			local noteText = info.notes
 			
 			if noteText and noteText ~= "" then
@@ -1021,9 +1135,9 @@ function Settings:DebugDatabase()
 	if BetterFriendlistDB.friendGroups then
 		local friendCount = 0
 		local totalAssignments = 0
+		local assignedFriends = {}
+		
 		for friendUID, groups in pairs(BetterFriendlistDB.friendGroups) do
-			friendCount = friendCount + 1
-			totalAssignments = totalAssignments + #groups
 			-- Filter out non-string keys before concat
 			local stringKeys = {}
 			for _, v in ipairs(groups) do
@@ -1031,9 +1145,25 @@ function Settings:DebugDatabase()
 					table.insert(stringKeys, v)
 				end
 			end
-			print(string.format("|cff00ffffBetterFriendlist Debug:|r   %s -> [%s]", friendUID, table.concat(stringKeys, ", ")))
+			
+			-- Only show friends that have actual group assignments
+			if #stringKeys > 0 then
+				friendCount = friendCount + 1
+				totalAssignments = totalAssignments + #stringKeys
+				table.insert(assignedFriends, string.format("|cff00ffffBetterFriendlist Debug:|r   %s -> [%s]", friendUID, table.concat(stringKeys, ", ")))
+			end
 		end
-		print("|cff00ffffBetterFriendlist Debug:|r Total friends:", friendCount)
+		
+		-- Sort and display
+		table.sort(assignedFriends)
+		for _, line in ipairs(assignedFriends) do
+			print(line)
+		end
+		
+		if friendCount == 0 then
+			print("|cff00ffffBetterFriendlist Debug:|r   (No friends assigned to custom groups)")
+		end
+		print("|cff00ffffBetterFriendlist Debug:|r Total friends with assignments:", friendCount)
 		print("|cff00ffffBetterFriendlist Debug:|r Total assignments:", totalAssignments)
 	else
 		print("|cffff0000BetterFriendlist Debug:|r friendGroups table MISSING!")
@@ -1045,6 +1175,46 @@ function Settings:DebugDatabase()
 		print("|cff00ffffBetterFriendlist Debug:|r", table.concat(BetterFriendlistDB.groupOrder, ", "))
 	else
 		print("|cff00ffffBetterFriendlist Debug:|r Using default order (nil)")
+	end
+	
+	-- Show current friends list
+	print("|cff00ffffBetterFriendlist Debug:|r")
+	print("|cff00ffffBetterFriendlist Debug:|r CURRENT FRIENDS:")
+	
+	-- Battle.net friends
+	local numBNetTotal, numBNetOnline = BNGetNumFriends()
+	print("|cff00ffffBetterFriendlist Debug:|r Battle.net Friends:", numBNetTotal, string.format("(%d online)", numBNetOnline))
+	if numBNetTotal > 0 then
+		for i = 1, math.min(numBNetTotal, 10) do
+			local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
+			if accountInfo then
+				local status = accountInfo.gameAccountInfo and accountInfo.gameAccountInfo.isOnline and "|cff00ff00ONLINE|r" or "|cffaaaaaaOFFLINE|r"
+				local name = accountInfo.accountName ~= "???" and accountInfo.accountName or accountInfo.battleTag
+				print(string.format("|cff00ffffBetterFriendlist Debug:|r   [%d] %s - %s", i, name, status))
+			end
+		end
+		if numBNetTotal > 10 then
+			print(string.format("|cff00ffffBetterFriendlist Debug:|r   ... and %d more", numBNetTotal - 10))
+		end
+	end
+	
+	-- WoW friends
+	print("|cff00ffffBetterFriendlist Debug:|r")
+	local numWoWFriends = C_FriendList.GetNumFriends()
+	local numWoWOnline = C_FriendList.GetNumOnlineFriends()
+	print("|cff00ffffBetterFriendlist Debug:|r WoW Friends:", numWoWFriends, string.format("(%d online)", numWoWOnline))
+	if numWoWFriends > 0 then
+		for i = 1, math.min(numWoWFriends, 10) do
+			local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
+			if friendInfo then
+				local status = friendInfo.connected and "|cff00ff00ONLINE|r" or "|cffaaaaaaOFFLINE|r"
+				local level = friendInfo.level and friendInfo.level > 0 and string.format(" (Lvl %d)", friendInfo.level) or ""
+				print(string.format("|cff00ffffBetterFriendlist Debug:|r   [%d] %s%s - %s", i, friendInfo.name, level, status))
+			end
+		end
+		if numWoWFriends > 10 then
+			print(string.format("|cff00ffffBetterFriendlist Debug:|r   ... and %d more", numWoWFriends - 10))
+		end
 	end
 	
 	print("|cff00ffffBetterFriendlist Debug:|r =================================")
@@ -1377,19 +1547,45 @@ function Settings:RefreshStatistics()
 		return
 	end
 	
+	-- Helper function to format percentage
+	local function FormatPercent(value, total)
+		if total == 0 then return 0 end
+		return math.floor((value / total) * 100 + 0.5)
+	end
+	
 	-- Update Overview section
 	if statsTab.TotalFriends then
 		statsTab.TotalFriends:SetText(string.format("Total Friends: %d", stats.totalFriends))
 	end
 	
 	if statsTab.OnlineFriends then
-		statsTab.OnlineFriends:SetText(string.format("|cff00ff00Online: %d|r  |  |cff808080Offline: %d|r", 
-			stats.onlineFriends, stats.offlineFriends))
+		local onlinePct = FormatPercent(stats.onlineFriends, stats.totalFriends)
+		local offlinePct = FormatPercent(stats.offlineFriends, stats.totalFriends)
+		statsTab.OnlineFriends:SetText(string.format("|cff00ff00Online: %d (%d%%)|r  |  |cff808080Offline: %d (%d%%)|r", 
+			stats.onlineFriends, onlinePct, stats.offlineFriends, offlinePct))
 	end
 	
 	if statsTab.FriendTypes then
-		statsTab.FriendTypes:SetText(string.format("|cff0070ddBattle.net: %d|r  |  |cffffd700WoW: %d|r", 
+		statsTab.FriendTypes:SetText(string.format("|cff0070ddBattle.net Friends: %d|r  |  |cffffd700WoW Friends: %d|r", 
 			stats.bnetFriends, stats.wowFriends))
+	end
+	
+	-- Update Friendship Health (NEW)
+	if statsTab.FriendshipHealth then
+		local totalHealthFriends = stats.totalFriends - (stats.friendshipHealth.unknown or 0)
+		if totalHealthFriends > 0 then
+			local healthText = string.format(
+				"|cff00ff00Active: %d (%d%%)|r\n|cffffd700Regular: %d (%d%%)|r\n|cffffaa00Drifting: %d (%d%%)|r\n|cffff6600Stale: %d (%d%%)|r\n|cffff0000Dormant: %d (%d%%)|r",
+				stats.friendshipHealth.active, FormatPercent(stats.friendshipHealth.active, totalHealthFriends),
+				stats.friendshipHealth.regular, FormatPercent(stats.friendshipHealth.regular, totalHealthFriends),
+				stats.friendshipHealth.drifting, FormatPercent(stats.friendshipHealth.drifting, totalHealthFriends),
+				stats.friendshipHealth.stale, FormatPercent(stats.friendshipHealth.stale, totalHealthFriends),
+				stats.friendshipHealth.dormant, FormatPercent(stats.friendshipHealth.dormant, totalHealthFriends)
+			)
+			statsTab.FriendshipHealth:SetText(healthText)
+		else
+			statsTab.FriendshipHealth:SetText("No health data available")
+		end
 	end
 	
 	-- Update Top 5 Classes
@@ -1399,11 +1595,29 @@ function Settings:RefreshStatistics()
 			local classParts = {}
 			for i, class in ipairs(topClasses) do
 				if i > 1 then table.insert(classParts, "\n") end
-				table.insert(classParts, string.format("%d. %s: %d", i, class.name, class.count))
+				local pct = FormatPercent(class.count, stats.totalFriends)
+				table.insert(classParts, string.format("%d. %s: %d (%d%%)", i, class.name, class.count, pct))
 			end
 			statsTab.ClassList:SetText(table.concat(classParts))
 		else
 			statsTab.ClassList:SetText("No class data available")
+		end
+	end
+	
+	-- Update Level Distribution (NEW)
+	if statsTab.LevelDistribution then
+		if stats.levelDistribution.leveledFriends > 0 then
+			local levelText = string.format(
+				"Max (80): %d\n70-79: %d\n60-69: %d\n<60: %d\nAverage: %.1f",
+				stats.levelDistribution.maxLevel,
+				stats.levelDistribution.ranges[1].count,
+				stats.levelDistribution.ranges[2].count,
+				stats.levelDistribution.ranges[3].count,
+				stats.levelDistribution.average
+			)
+			statsTab.LevelDistribution:SetText(levelText)
+		else
+			statsTab.LevelDistribution:SetText("No level data available")
 		end
 	end
 	
@@ -1412,9 +1626,15 @@ function Settings:RefreshStatistics()
 		local topRealms = Statistics:GetTopRealms(5)
 		if topRealms and #topRealms > 0 then
 			local realmParts = {}
+			-- Add realm categories first
+			local samePct = FormatPercent(stats.realmDistribution.sameRealm, stats.totalFriends)
+			local otherPct = FormatPercent(stats.realmDistribution.otherRealms, stats.totalFriends)
+			table.insert(realmParts, string.format("Same Realm: %d (%d%%)  |  Other Realms: %d (%d%%)",
+				stats.realmDistribution.sameRealm, samePct,
+				stats.realmDistribution.otherRealms, otherPct))
+			table.insert(realmParts, "\nTop Realms:")
 			for i, realm in ipairs(topRealms) do
-				if i > 1 then table.insert(realmParts, "\n") end
-				table.insert(realmParts, string.format("%d. %s: %d", i, realm.name, realm.count))
+				table.insert(realmParts, string.format("\n%d. %s: %d", i, realm.name, realm.count))
 			end
 			statsTab.RealmList:SetText(table.concat(realmParts))
 		else
@@ -1425,12 +1645,70 @@ function Settings:RefreshStatistics()
 	-- Update Faction Distribution
 	if statsTab.FactionList then
 		local factionText = string.format(
-			"|cff0080ffAlliance: %d|r\n|cffff0000Horde: %d|r\n|cff808080Unknown: %d|r",
-			stats.factionCounts.Alliance or 0,
-			stats.factionCounts.Horde or 0,
-			stats.factionCounts.Unknown or 0
+			"|cff0080ffAlliance: %d|r\n|cffff0000Horde: %d|r",
+			stats.factionCounts.alliance or 0,
+			stats.factionCounts.horde or 0
 		)
 		statsTab.FactionList:SetText(factionText)
+	end
+	
+	-- Update Game Distribution (NEW)
+	if statsTab.GameDistribution then
+		local totalGamePlayers = stats.gameCounts.wow + stats.gameCounts.classic + stats.gameCounts.diablo + 
+		                         stats.gameCounts.hearthstone + stats.gameCounts.starcraft + stats.gameCounts.mobile + stats.gameCounts.other
+		if totalGamePlayers > 0 then
+			local gameParts = {}
+			if stats.gameCounts.wow > 0 then
+				table.insert(gameParts, string.format("WoW: %d", stats.gameCounts.wow))
+			end
+			if stats.gameCounts.classic > 0 then
+				table.insert(gameParts, string.format("\nClassic: %d", stats.gameCounts.classic))
+			end
+			if stats.gameCounts.diablo > 0 then
+				table.insert(gameParts, string.format("\nDiablo IV: %d", stats.gameCounts.diablo))
+			end
+			if stats.gameCounts.hearthstone > 0 then
+				table.insert(gameParts, string.format("\nHearthstone: %d", stats.gameCounts.hearthstone))
+			end
+			if stats.gameCounts.mobile > 0 then
+				table.insert(gameParts, string.format("\nMobile: %d", stats.gameCounts.mobile))
+			end
+			if stats.gameCounts.other > 0 then
+				table.insert(gameParts, string.format("\nOther: %d", stats.gameCounts.other))
+			end
+			statsTab.GameDistribution:SetText(table.concat(gameParts))
+		else
+			statsTab.GameDistribution:SetText("No game data available")
+		end
+	end
+	
+	-- Update Mobile vs Desktop (NEW)
+	if statsTab.MobileVsDesktop then
+		if stats.mobileVsDesktop.desktop > 0 or stats.mobileVsDesktop.mobile > 0 then
+			local total = stats.mobileVsDesktop.desktop + stats.mobileVsDesktop.mobile
+			local desktopPct = FormatPercent(stats.mobileVsDesktop.desktop, total)
+			local mobilePct = FormatPercent(stats.mobileVsDesktop.mobile, total)
+			local mobileText = string.format(
+				"Desktop: %d (%d%%)\nMobile: %d (%d%%)",
+				stats.mobileVsDesktop.desktop, desktopPct,
+				stats.mobileVsDesktop.mobile, mobilePct
+			)
+			statsTab.MobileVsDesktop:SetText(mobileText)
+		else
+			statsTab.MobileVsDesktop:SetText("No mobile data available")
+		end
+	end
+	
+	-- Update Notes and Favorites (NEW)
+	if statsTab.NotesAndFavorites then
+		local notesPct = FormatPercent(stats.notesAndFavorites.withNotes, stats.totalFriends)
+		local favPct = FormatPercent(stats.notesAndFavorites.favorites, stats.totalFriends)
+		local notesText = string.format(
+			"With Notes: %d (%d%%)\nFavorites: %d (%d%%)",
+			stats.notesAndFavorites.withNotes, notesPct,
+			stats.notesAndFavorites.favorites, favPct
+		)
+		statsTab.NotesAndFavorites:SetText(notesText)
 	end
 	
 	BFL:DebugPrint("Settings: Statistics refreshed successfully")
@@ -1718,6 +1996,672 @@ function Settings:OnAccordionGroupsChanged(checked)
 	if BetterFriendsFrame_UpdateDisplay then
 		BetterFriendsFrame_UpdateDisplay()
 	end
+end
+
+--------------------------------------------------------------------------
+-- NEW: PLATYNATOR-STYLE TAB REFRESH FUNCTIONS
+--------------------------------------------------------------------------
+
+-- Refresh General Tab with new component library
+function Settings:RefreshGeneralTab()
+	if not settingsFrame or not Components then return end
+	
+	local content = settingsFrame.ContentScrollFrame.Content
+	if not content or not content.GeneralTab then return end
+	
+	local tab = content.GeneralTab
+	local DB = GetDB()
+	if not DB then return end
+	
+	-- Clear existing content (but keep the tab frame itself)
+	if tab.components then
+		for _, component in ipairs(tab.components) do
+			if component.Hide then component:Hide() end
+		end
+	end
+	tab.components = {}
+	
+	local allFrames = {}
+	
+	-- Header: Display Options
+	local displayHeader = Components:CreateHeader(tab, "Display Options")
+	table.insert(allFrames, displayHeader)
+	
+	-- Color Class Names
+	local colorClassNames = Components:CreateCheckbox(tab, "Color Character Names by Class", 
+		DB:Get("colorClassNames", true),
+		function(val) self:OnColorClassNamesChanged(val) end)
+	colorClassNames:SetTooltip("Class Colors", "Colors character names using their class color for easier identification")
+	table.insert(allFrames, colorClassNames)
+	
+	-- Hide Empty Groups
+	local hideEmptyGroups = Components:CreateCheckbox(tab, "Hide Groups with No Online Friends",
+		DB:Get("hideEmptyGroups", false),
+		function(val) self:OnHideEmptyGroupsChanged(val) end)
+	hideEmptyGroups:SetTooltip("Hide Empty Groups", "Automatically hides groups that have no online members")
+	table.insert(allFrames, hideEmptyGroups)
+	
+	-- Show Faction Icons
+	local showFactionIcons = Components:CreateCheckbox(tab, "Show Faction Icons", 
+		DB:Get("showFactionIcons", true),
+		function(val) self:OnShowFactionIconsChanged(val) end)
+	showFactionIcons:SetTooltip("Show Faction Icons", "Display Alliance/Horde icons next to character names")
+	table.insert(allFrames, showFactionIcons)
+	
+	-- Show Realm Name
+	local showRealmName = Components:CreateCheckbox(tab, "Show Realm Name for Cross-Realm Friends",
+		DB:Get("showRealmName", true),
+		function(val) self:OnShowRealmNameChanged(val) end)
+	showRealmName:SetTooltip("Show Realm Name", "Display the realm name for friends on different servers")
+	table.insert(allFrames, showRealmName)
+	
+	-- Gray Other Faction
+	local grayOtherFaction = Components:CreateCheckbox(tab, "Gray Out Opposite Faction", 
+		DB:Get("grayOtherFaction", false),
+		function(val) self:OnGrayOtherFactionChanged(val) end)
+	grayOtherFaction:SetTooltip("Gray Other Faction", "Make friends from the opposite faction appear grayed out")
+	table.insert(allFrames, grayOtherFaction)
+	
+	-- Show Mobile as AFK
+	local showMobileAsAFK = Components:CreateCheckbox(tab, "Show Mobile Friends as AFK", 
+		DB:Get("showMobileAsAFK", false),
+		function(val) self:OnShowMobileAsAFKChanged(val) end)
+	showMobileAsAFK:SetTooltip("Mobile as AFK", "Display AFK status icon for friends on mobile (BSAp only)")
+	table.insert(allFrames, showMobileAsAFK)
+	
+	-- Hide Max Level
+	local hideMaxLevel = Components:CreateCheckbox(tab, "Hide Level for Max Level Characters", 
+		DB:Get("hideMaxLevel", false),
+		function(val) self:OnHideMaxLevelChanged(val) end)
+	hideMaxLevel:SetTooltip("Hide Max Level", "Don't display level number for characters at max level")
+	table.insert(allFrames, hideMaxLevel)
+	
+	-- Show Blizzard Friend List Option
+	local showBlizzard = Components:CreateCheckbox(tab, "Show Blizzard Friends Button", 
+		DB:Get("showBlizzardOption", false),
+		function(val) self:OnShowBlizzardOptionChanged(val) end)
+	showBlizzard:SetTooltip("Show Blizzard Friends Button", "Shows the original Blizzard Friends button in the social menu")
+	table.insert(allFrames, showBlizzard)
+	
+	-- Spacer before next section
+	table.insert(allFrames, Components:CreateSpacer(tab))
+	
+	-- Header: Behavior
+	local behaviorHeader = Components:CreateHeader(tab, "Behavior")
+	table.insert(allFrames, behaviorHeader)
+	
+	-- Accordion Groups
+	local accordionGroups = Components:CreateCheckbox(tab, "Accordion Mode (Only One Group Open)", 
+		DB:Get("accordionGroups", true),
+		function(val) self:OnAccordionGroupsChanged(val) end)
+	accordionGroups:SetTooltip("Accordion Groups", "Only allow one group to be expanded at a time, automatically collapsing others")
+	table.insert(allFrames, accordionGroups)
+	
+	-- Compact Mode
+	local compactMode = Components:CreateCheckbox(tab, "Compact Mode",
+		DB:Get("compactMode", false),
+		function(val) self:OnCompactModeChanged(val) end)
+	compactMode:SetTooltip("Compact Mode", "Reduces button height to fit more friends on screen")
+	table.insert(allFrames, compactMode)
+	
+	-- Spacer before next section
+	table.insert(allFrames, Components:CreateSpacer(tab))
+	
+	-- Header: Group Management
+	local groupHeader = Components:CreateHeader(tab, "Group Management")
+	table.insert(allFrames, groupHeader)
+	
+	-- Show Favorites Group
+	local showFavorites = Components:CreateCheckbox(tab, "Show Favorites Group",
+		DB:Get("showFavoritesGroup", true),
+		function(val) self:OnShowFavoritesGroupChanged(val) end)
+	showFavorites:SetTooltip("Show Favorites Group", "Toggle visibility of the Favorites group in your friends list")
+	table.insert(allFrames, showFavorites)
+	
+	-- Spacer before next section
+	table.insert(allFrames, Components:CreateSpacer(tab))
+	
+	-- Header: Font Settings
+	local fontHeader = Components:CreateHeader(tab, "Font Settings")
+	table.insert(allFrames, fontHeader)
+	
+	-- Font Size Dropdown
+	local fontSizeOptions = {
+		labels = {"Small", "Medium", "Large"},
+		values = {"small", "medium", "large"}
+	}
+	local currentFontSize = DB:Get("fontSize", "medium")
+	
+	local function isFontSizeSelected(value)
+		return value == currentFontSize
+	end
+	
+	local function onFontSizeChanged(value)
+		self:SetFontSize(value)
+	end
+	
+	local fontSizeDropdown = Components:CreateDropdown(tab, "Font Size:", fontSizeOptions, isFontSizeSelected, onFontSizeChanged)
+	table.insert(allFrames, fontSizeDropdown)
+	
+	-- Anchor all frames vertically
+	Components:AnchorChain(allFrames, -5)
+	
+	-- Store components for cleanup
+	tab.components = allFrames
+end
+
+-- Refresh Groups Tab with new component library
+function Settings:RefreshGroupsTab()
+	if not settingsFrame or not Components then return end
+	
+	local content = settingsFrame.ContentScrollFrame.Content
+	if not content or not content.GroupsTab then return end
+	
+	local tab = content.GroupsTab
+	local DB = GetDB()
+	if not DB then return end
+	
+	-- Clear existing content (but keep the tab frame itself)
+	if tab.components then
+		for _, component in ipairs(tab.components) do
+			if component.Hide then component:Hide() end
+		end
+	end
+	tab.components = {}
+	
+	local allFrames = {}
+	
+	-- Header: Group Order
+	local orderHeader = Components:CreateHeader(tab, "Group Order")
+	table.insert(allFrames, orderHeader)
+	
+	-- Get ordered groups
+	local Groups = BFL:GetModule("Groups")
+	if not Groups then return end
+	
+	local allGroups = Groups:GetAll()
+	local groupOrder = DB:Get("groupOrder") or {}
+	local orderedGroups = {}
+	
+	-- Build ordered list
+	if #groupOrder > 0 then
+		for i, groupId in ipairs(groupOrder) do
+			local group = allGroups[groupId]
+			if group then
+				table.insert(orderedGroups, {id = groupId, name = group.name, order = i, builtin = group.builtin})
+			end
+		end
+		-- Add any groups not in order
+		for groupId, group in pairs(allGroups) do
+			local found = false
+			for _, ordered in ipairs(orderedGroups) do
+				if ordered.id == groupId then
+					found = true
+					break
+				end
+			end
+			if not found then
+				table.insert(orderedGroups, {id = groupId, name = group.name, order = #orderedGroups + 1, builtin = group.builtin})
+			end
+		end
+	else
+		-- Default order: favorites, custom groups (sorted), nogroup
+		table.insert(orderedGroups, {id = "favorites", name = "Favorites", order = 1, builtin = true})
+		
+		local customGroups = {}
+		for groupId, group in pairs(allGroups) do
+			if groupId ~= "favorites" and groupId ~= "nogroup" then
+				table.insert(customGroups, {id = groupId, name = group.name, builtin = false})
+			end
+		end
+		table.sort(customGroups, function(a, b) return a.name < b.name end)
+		
+		for _, group in ipairs(customGroups) do
+			table.insert(orderedGroups, {id = group.id, name = group.name, order = #orderedGroups + 1, builtin = false})
+		end
+		
+		if allGroups["nogroup"] then
+			table.insert(orderedGroups, {id = "nogroup", name = "No Group", order = #orderedGroups + 1, builtin = true})
+		end
+	end
+	
+	-- Create list items for each group
+	for i, groupData in ipairs(orderedGroups) do
+		local canMoveUp = i > 1
+		local canMoveDown = i < #orderedGroups
+		local isBuiltin = groupData.builtin
+		
+		local listItem = Components:CreateListItem(
+			tab,
+			groupData.name,
+			i,
+			-- Move Up callback
+			function()
+				if i > 1 then
+					-- Swap with previous
+					local temp = orderedGroups[i-1]
+					orderedGroups[i-1] = orderedGroups[i]
+					orderedGroups[i] = temp
+					
+					-- Save new order
+					local newOrder = {}
+					for _, g in ipairs(orderedGroups) do
+						table.insert(newOrder, g.id)
+					end
+					DB:Set("groupOrder", newOrder)
+					
+					-- Refresh display
+					Groups:Initialize()
+					self:RefreshGroupsTab()
+					
+					if BetterFriendsFrame_UpdateDisplay then
+						BetterFriendsFrame_UpdateDisplay()
+					end
+				end
+			end,
+			-- Move Down callback
+			function()
+				if i < #orderedGroups then
+					-- Swap with next
+					local temp = orderedGroups[i+1]
+					orderedGroups[i+1] = orderedGroups[i]
+					orderedGroups[i] = temp
+					
+					-- Save new order
+					local newOrder = {}
+					for _, g in ipairs(orderedGroups) do
+						table.insert(newOrder, g.id)
+					end
+					DB:Set("groupOrder", newOrder)
+					
+					-- Refresh display
+					Groups:Initialize()
+					self:RefreshGroupsTab()
+					
+					if BetterFriendsFrame_UpdateDisplay then
+						BetterFriendsFrame_UpdateDisplay()
+					end
+				end
+			end,
+			-- Rename callback (only for non-builtin groups)
+			not isBuiltin and function()
+				self:RenameGroup(groupData.id, groupData.name)
+			end or nil,
+			-- Color callback (only for non-builtin groups)
+			not isBuiltin and function(colorSwatch)
+				self:ShowColorPicker(groupData.id, groupData.name, colorSwatch)
+			end or nil,
+			-- Delete callback (only for non-builtin groups)
+			not isBuiltin and function()
+				self:DeleteGroup(groupData.id, groupData.name)
+			end or nil
+		)
+		
+		-- Set initial color for custom groups
+		if not isBuiltin and listItem.colorSwatch then
+			local group = Groups:Get(groupData.id)
+			if group and group.color then
+				listItem.colorSwatch:SetColorTexture(group.color.r, group.color.g, group.color.b)
+			else
+				listItem.colorSwatch:SetColorTexture(1, 0.82, 0)
+			end
+		end
+		
+		-- Set arrow button states
+		listItem:SetArrowState(canMoveUp, canMoveDown)
+		
+		table.insert(allFrames, listItem)
+	end
+	
+	-- Anchor all frames vertically
+	Components:AnchorChain(allFrames, -5)
+	
+	-- Store components for cleanup
+	tab.components = allFrames
+end
+
+-- Refresh Advanced Tab
+function Settings:RefreshAdvancedTab()
+	if not settingsFrame then 
+		print("RefreshAdvancedTab: settingsFrame is nil")
+		return 
+	end
+	if not Components then 
+		print("RefreshAdvancedTab: Components is nil")
+		return 
+	end
+	
+	local content = settingsFrame.ContentScrollFrame.Content
+	if not content then 
+		print("RefreshAdvancedTab: content is nil")
+		return 
+	end
+	if not content.AdvancedTab then 
+		print("RefreshAdvancedTab: AdvancedTab is nil")
+		return 
+	end
+	
+	local tab = content.AdvancedTab
+	
+	-- Clear existing content (but keep the tab frame itself)
+	if tab.components then
+		for _, component in ipairs(tab.components) do
+			if component.Hide then component:Hide() end
+		end
+	end
+	tab.components = {}
+	
+	local allFrames = {}
+	local yOffset = -15
+	
+	-- Title
+	local title = tab:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+	title:SetPoint("TOPLEFT", 10, yOffset)
+	title:SetText("Advanced Settings")
+	table.insert(allFrames, title)
+	yOffset = yOffset - 25
+	
+	-- Description
+	local desc = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	desc:SetPoint("TOPLEFT", 10, yOffset)
+	desc:SetText("Advanced options and tools")
+	table.insert(allFrames, desc)
+	yOffset = yOffset - 30
+	
+	-- ===========================================
+	-- FriendGroups Migration Section
+	-- ===========================================
+	local migrationHeader = Components:CreateHeader(tab, "FriendGroups Migration")
+	migrationHeader:SetPoint("TOPLEFT", 10, yOffset)
+	table.insert(allFrames, migrationHeader)
+	yOffset = yOffset - 25
+	
+	-- Migration description
+	local migrationDesc1 = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	migrationDesc1:SetPoint("TOPLEFT", 10, yOffset)
+	migrationDesc1:SetWidth(350)
+	migrationDesc1:SetJustifyH("LEFT")
+	migrationDesc1:SetWordWrap(true)
+	migrationDesc1:SetText("Migrate groups and friend assignments from FriendGroups addon. This will parse group information from BattleNet notes and create corresponding groups in BetterFriendlist.")
+	table.insert(allFrames, migrationDesc1)
+	yOffset = yOffset - 35
+	
+	-- Migration button
+	local migrateButton = Components:CreateButton(
+		tab,
+		"Migrate from FriendGroups",
+		function()
+			self:ShowMigrationDialog()
+		end,
+		"Import groups from the FriendGroups addon"
+	)
+	migrateButton:SetPoint("TOPLEFT", 10, yOffset)
+	migrateButton:SetSize(200, 24)
+	table.insert(allFrames, migrateButton)
+	yOffset = yOffset - 40
+	
+	-- ===========================================
+	-- Export / Import Section
+	-- ===========================================
+	local exportHeader = Components:CreateHeader(tab, "Export / Import Settings")
+	exportHeader:SetPoint("TOPLEFT", 10, yOffset)
+	table.insert(allFrames, exportHeader)
+	yOffset = yOffset - 25
+	
+	-- Export/Import description
+	local exportDesc1 = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	exportDesc1:SetPoint("TOPLEFT", 10, yOffset)
+	exportDesc1:SetWidth(350)
+	exportDesc1:SetJustifyH("LEFT")
+	exportDesc1:SetWordWrap(true)
+	exportDesc1:SetText("Export your groups and friend assignments to share between characters or accounts. Perfect for players with multiple accounts who share Battle.net friends.")
+	table.insert(allFrames, exportDesc1)
+	yOffset = yOffset - 35
+	
+	local exportWarning = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	exportWarning:SetPoint("TOPLEFT", 10, yOffset)
+	exportWarning:SetPoint("RIGHT", -10, 0)
+	exportWarning:SetJustifyH("LEFT")
+	exportWarning:SetText("|cffff0000Warning: Importing will replace ALL your groups and assignments!|r")
+	table.insert(allFrames, exportWarning)
+	yOffset = yOffset - 25
+	
+	-- Export button
+	local exportButton = Components:CreateButton(
+		tab,
+		"Export Settings",
+		function()
+			self:ShowExportDialog()
+		end,
+		"Export your groups and friend assignments"
+	)
+	exportButton:SetPoint("TOPLEFT", 10, yOffset)
+	exportButton:SetSize(140, 24)
+	table.insert(allFrames, exportButton)
+	
+	-- Import button
+	local importButton = Components:CreateButton(
+		tab,
+		"Import Settings",
+		function()
+			self:ShowImportDialog()
+		end,
+		"Import groups and friend assignments"
+	)
+	importButton:SetPoint("LEFT", exportButton, "RIGHT", 10, 0)
+	importButton:SetSize(140, 24)
+	table.insert(allFrames, importButton)
+	
+	-- Store components for cleanup
+	tab.components = allFrames
+end
+
+-- Refresh Statistics Tab
+function Settings:RefreshStatisticsTab()
+	if not settingsFrame or not Components then return end
+	
+	local content = settingsFrame.ContentScrollFrame.Content
+	if not content or not content.StatisticsTab then return end
+	
+	local tab = content.StatisticsTab
+	
+	-- Clear existing content (but keep the tab frame itself)
+	if tab.components then
+		for _, component in ipairs(tab.components) do
+			if component.Hide then component:Hide() end
+		end
+	end
+	tab.components = {}
+	
+	local allFrames = {}
+	local yOffset = -15
+	
+	-- Title
+	local title = tab:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+	title:SetPoint("TOPLEFT", 10, yOffset)
+	title:SetText("Friend Network Statistics")
+	table.insert(allFrames, title)
+	yOffset = yOffset - 25
+	
+	-- Description
+	local desc = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	desc:SetPoint("TOPLEFT", 10, yOffset)
+	desc:SetText("Overview of your friend network and activity")
+	table.insert(allFrames, desc)
+	yOffset = yOffset - 30
+	
+	-- ===========================================
+	-- Overview Section
+	-- ===========================================
+	local overviewHeader = Components:CreateHeader(tab, "Overview")
+	overviewHeader:SetPoint("TOPLEFT", 10, yOffset)
+	table.insert(allFrames, overviewHeader)
+	yOffset = yOffset - 25
+	
+	-- Total Friends
+	tab.TotalFriends = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	tab.TotalFriends:SetPoint("TOPLEFT", 20, yOffset)
+	tab.TotalFriends:SetText("Total Friends: --")
+	table.insert(allFrames, tab.TotalFriends)
+	yOffset = yOffset - 20
+	
+	-- Online/Offline
+	tab.OnlineFriends = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	tab.OnlineFriends:SetPoint("TOPLEFT", 20, yOffset)
+	tab.OnlineFriends:SetText("Online: --  |  Offline: --")
+	table.insert(allFrames, tab.OnlineFriends)
+	yOffset = yOffset - 20
+	
+	-- Friend Types
+	tab.FriendTypes = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	tab.FriendTypes:SetPoint("TOPLEFT", 20, yOffset)
+	tab.FriendTypes:SetText("Battle.net: --  |  WoW: --")
+	table.insert(allFrames, tab.FriendTypes)
+	yOffset = yOffset - 30
+	
+	-- Store left column start position
+	local leftColumnStart = yOffset
+	
+	-- ===========================================
+	-- LEFT COLUMN
+	-- ===========================================
+	
+	-- Friendship Health Section
+	local healthHeader = Components:CreateHeader(tab, "Friendship Health")
+	healthHeader:SetPoint("TOPLEFT", 10, yOffset)
+	table.insert(allFrames, healthHeader)
+	yOffset = yOffset - 25
+	
+	tab.FriendshipHealth = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	tab.FriendshipHealth:SetPoint("TOPLEFT", 20, yOffset)
+	tab.FriendshipHealth:SetWidth(210)
+	tab.FriendshipHealth:SetJustifyH("LEFT")
+	tab.FriendshipHealth:SetText("No health data available")
+	table.insert(allFrames, tab.FriendshipHealth)
+	yOffset = yOffset - 90
+	
+	-- Top 5 Classes Section
+	local classHeader = Components:CreateHeader(tab, "Top 5 Classes")
+	classHeader:SetPoint("TOPLEFT", 10, yOffset)
+	table.insert(allFrames, classHeader)
+	yOffset = yOffset - 25
+	
+	tab.ClassList = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	tab.ClassList:SetPoint("TOPLEFT", 20, yOffset)
+	tab.ClassList:SetWidth(210)
+	tab.ClassList:SetJustifyH("LEFT")
+	tab.ClassList:SetText("No class data available")
+	table.insert(allFrames, tab.ClassList)
+	yOffset = yOffset - 90
+	
+	-- Realm Clusters Section
+	local realmHeader = Components:CreateHeader(tab, "Realm Clusters")
+	realmHeader:SetPoint("TOPLEFT", 10, yOffset)
+	table.insert(allFrames, realmHeader)
+	yOffset = yOffset - 25
+	
+	tab.RealmList = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	tab.RealmList:SetPoint("TOPLEFT", 20, yOffset)
+	tab.RealmList:SetWidth(210)
+	tab.RealmList:SetJustifyH("LEFT")
+	tab.RealmList:SetText("No realm data available")
+	table.insert(allFrames, tab.RealmList)
+	yOffset = yOffset - 110
+	
+	-- Organization Section
+	local notesHeader = Components:CreateHeader(tab, "Organization")
+	notesHeader:SetPoint("TOPLEFT", 10, yOffset)
+	table.insert(allFrames, notesHeader)
+	yOffset = yOffset - 25
+	
+	tab.NotesAndFavorites = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	tab.NotesAndFavorites:SetPoint("TOPLEFT", 20, yOffset)
+	tab.NotesAndFavorites:SetWidth(210)
+	tab.NotesAndFavorites:SetJustifyH("LEFT")
+	tab.NotesAndFavorites:SetText("No data available")
+	table.insert(allFrames, tab.NotesAndFavorites)
+	yOffset = yOffset - 60
+	
+	-- ===========================================
+	-- RIGHT COLUMN
+	-- ===========================================
+	yOffset = leftColumnStart
+	
+	-- Level Distribution Section
+	local levelHeader = Components:CreateHeader(tab, "Level Distribution")
+	levelHeader:SetPoint("TOPLEFT", 240, yOffset)
+	table.insert(allFrames, levelHeader)
+	yOffset = yOffset - 25
+	
+	tab.LevelDistribution = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	tab.LevelDistribution:SetPoint("TOPLEFT", 250, yOffset)
+	tab.LevelDistribution:SetWidth(190)
+	tab.LevelDistribution:SetJustifyH("LEFT")
+	tab.LevelDistribution:SetText("No level data available")
+	table.insert(allFrames, tab.LevelDistribution)
+	yOffset = yOffset - 90
+	
+	-- Game Distribution Section
+	local gameHeader = Components:CreateHeader(tab, "Game Distribution")
+	gameHeader:SetPoint("TOPLEFT", 240, yOffset)
+	table.insert(allFrames, gameHeader)
+	yOffset = yOffset - 25
+	
+	tab.GameDistribution = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	tab.GameDistribution:SetPoint("TOPLEFT", 250, yOffset)
+	tab.GameDistribution:SetWidth(190)
+	tab.GameDistribution:SetJustifyH("LEFT")
+	tab.GameDistribution:SetText("No game data available")
+	table.insert(allFrames, tab.GameDistribution)
+	yOffset = yOffset - 90
+	
+	-- Mobile vs Desktop Section
+	local mobileHeader = Components:CreateHeader(tab, "Mobile vs. Desktop")
+	mobileHeader:SetPoint("TOPLEFT", 240, yOffset)
+	table.insert(allFrames, mobileHeader)
+	yOffset = yOffset - 25
+	
+	tab.MobileVsDesktop = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	tab.MobileVsDesktop:SetPoint("TOPLEFT", 250, yOffset)
+	tab.MobileVsDesktop:SetWidth(190)
+	tab.MobileVsDesktop:SetJustifyH("LEFT")
+	tab.MobileVsDesktop:SetText("No mobile data available")
+	table.insert(allFrames, tab.MobileVsDesktop)
+	yOffset = yOffset - 60
+	
+	-- Faction Distribution Section
+	local factionHeader = Components:CreateHeader(tab, "Faction Distribution")
+	factionHeader:SetPoint("TOPLEFT", 240, yOffset)
+	table.insert(allFrames, factionHeader)
+	yOffset = yOffset - 25
+	
+	tab.FactionList = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	tab.FactionList:SetPoint("TOPLEFT", 250, yOffset)
+	tab.FactionList:SetWidth(190)
+	tab.FactionList:SetJustifyH("LEFT")
+	tab.FactionList:SetText("No faction data available")
+	table.insert(allFrames, tab.FactionList)
+	
+	-- ===========================================
+	-- Refresh Button (below Organization section)
+	-- ===========================================
+	local refreshButton = Components:CreateButton(
+		tab,
+		"Refresh Statistics",
+		function()
+			self:RefreshStatistics()
+		end,
+		"Update statistics with current data"
+	)
+	refreshButton:SetPoint("TOPLEFT", 10, yOffset)
+	refreshButton:SetSize(150, 24)
+	table.insert(allFrames, refreshButton)
+	
+	-- Store components for cleanup
+	tab.components = allFrames
+	
+	-- Trigger initial data refresh
+	self:RefreshStatistics()
 end
 
 return Settings

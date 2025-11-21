@@ -2,7 +2,7 @@
 ## Title: BetterFriendlist
 ## Notes: Complete replacement for WoW Friends frame - Custom groups, Raid management, Quick Join, and more!
 ## Author: Hayato2846
-## Version: 1.8.1
+## Version: 1.8.2
 ## X-Curse-Project-ID: 1381771
 ## X-WoWI-ID: 26984
 ## X-Wago-ID: rNkPLl6a 
@@ -46,9 +46,10 @@ Modules\IgnoreList.lua
 Modules\RecentAllies.lua
 Modules\MenuSystem.lua
 Modules\QuickFilters.lua
+Modules\SettingsComponents.lua
 Modules\Settings.lua
 Modules\Dialogs.lua
-# Modules\ButtonPool.lua  # REMOVED: Phase 2 - ScrollBox Migration (replaced by Factory pattern)
+# Modules\ButtonPool.lua  # DELETED: Replaced by ScrollBox Factory pattern in Phase 2
 Modules\RAF.lua
 Modules\RaidFrame.lua
 Modules\QuickJoin.lua
@@ -66,3 +67,6 @@ BetterFriendlist_Tooltip.lua
 # Settings
 BetterFriendlist_Settings.lua
 BetterFriendlist_Settings.xml
+
+# Tests (optional, for development)
+# Tests\Settings_GeneralTab_Tests.lua

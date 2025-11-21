@@ -69,7 +69,7 @@ local NUM_BUTTONS = 12  -- Number of visible buttons in scroll frame
 local friendsList = {}
 local displayList = {} -- Flat list with groups and friends for display
 
--- Button pool management (now in Modules/ButtonPool.lua)
+-- Button management handled by ScrollBox Factory pattern
 
 -- Performance optimization: Throttle updates to prevent lag
 local lastUpdateTime = 0
@@ -122,11 +122,6 @@ local friendGroups = {} -- Will be synced from Groups module
 -- Helper to get FriendsList module
 local function GetFriendsList()
 	return BFL:GetModule("FriendsList")
-end
-
--- Helper to get ButtonPool module
-local function GetButtonPool()
-	return BFL:GetModule("ButtonPool")
 end
 
 -- Helper to get Groups module
@@ -536,8 +531,8 @@ function ShowBetterFriendsFrame()
 		searchText = ""
 	end
 	
-	UpdateFriendsList()
-	UpdateFriendsDisplay()
+	-- Force immediate refresh to ensure mock invites are shown
+	BFL:ForceRefreshFriendsList()
 	
 	-- Direct :Show() - now combat-safe (no longer SECURE frame)
 	BetterFriendsFrame:Show()
@@ -840,9 +835,39 @@ frame:SetScript("OnEvent", function(self, event, ...)
 	elseif event == "PLAYER_REGEN_DISABLED" then
 		-- Entering combat - update combat overlay on all raid buttons
 		BetterRaidFrame_UpdateCombatOverlay(true)
+		
+		-- Close all active Contacts Menus (forces refresh with combat icon on reopen)
+		for i = #_G.BFL_ActiveContactsMenus, 1, -1 do
+			local menu = _G.BFL_ActiveContactsMenus[i]
+			if menu and menu:IsShown() then
+				menu:Hide()
+			end
+		end
+		-- Clean up closed menus
+		for i = #_G.BFL_ActiveContactsMenus, 1, -1 do
+			local menu = _G.BFL_ActiveContactsMenus[i]
+			if not menu or not menu:IsShown() then
+				table.remove(_G.BFL_ActiveContactsMenus, i)
+			end
+		end
 	elseif event == "PLAYER_REGEN_ENABLED" then
 		-- Leaving combat - update combat overlay on all raid buttons
 		BetterRaidFrame_UpdateCombatOverlay(false)
+		
+		-- Close all active Contacts Menus (forces refresh without combat icon on reopen)
+		for i = #_G.BFL_ActiveContactsMenus, 1, -1 do
+			local menu = _G.BFL_ActiveContactsMenus[i]
+			if menu and menu:IsShown() then
+				menu:Hide()
+			end
+		end
+		-- Clean up closed menus
+		for i = #_G.BFL_ActiveContactsMenus, 1, -1 do
+			local menu = _G.BFL_ActiveContactsMenus[i]
+			if not menu or not menu:IsShown() then
+				table.remove(_G.BFL_ActiveContactsMenus, i)
+			end
+		end
 	elseif event == "WHO_LIST_UPDATE" then
 		-- Fire callbacks for modules
 		BFL:FireEventCallbacks(event, ...)
@@ -1525,10 +1550,15 @@ local selectedWhoButton = nil
 -- CONTACTS MENU (11.2.5)
 --------------------------------------------------------------------------
 
+-- Store active menu instance for combat closing (use global scope for persistence)
+if not _G.BFL_ActiveContactsMenus then
+	_G.BFL_ActiveContactsMenus = {}
+end
+
 -- Contacts Menu (11.2.5 - replaces broadcast button, includes ignore list)
 -- Uses MenuUtil like Blizzard's ContactsMenuMixin
 function BetterFriendsFrame_ShowContactsMenu(button)
-	MenuUtil.CreateContextMenu(button, function(ownerRegion, rootDescription)
+	local menu = MenuUtil.CreateContextMenu(button, function(ownerRegion, rootDescription)
 		rootDescription:SetTag("CONTACTS_MENU");
 		
 		-- Add BetterFriendList title
@@ -1542,13 +1572,48 @@ function BetterFriendsFrame_ShowContactsMenu(button)
 		-- Show Blizzard's Friendlist option (conditional based on setting)
 		local DB = GetDB()
 		if DB and DB:Get("showBlizzardOption", false) then
-			rootDescription:CreateButton("Show Blizzard's Friendlist", function()
-				if FriendsFrame:IsShown() then
-					HideUIPanel(FriendsFrame)
+			-- Check combat state
+			local inCombat = InCombatLockdown()
+			
+			-- Create button title with combat lock icon if in combat
+			local buttonTitle = "Show Blizzard's Friendlist"
+			if inCombat then
+				-- Add combat lock icon (same as Raid Tab)
+				buttonTitle = "|TInterface\\DialogFrame\\UI-Dialog-Icon-AlertNew:16:16:0:0|t " .. buttonTitle
+			end
+			
+			local menuButton = rootDescription:CreateButton(buttonTitle, function()
+				-- Use stored original function (combat-safe)
+				if BFL and BFL.OriginalToggleFriendsFrame then
+					BFL.OriginalToggleFriendsFrame()
 				else
-					ShowUIPanel(FriendsFrame)
+					-- Fallback to ShowUIPanel (may cause taint in combat)
+					if FriendsFrame:IsShown() then
+						HideUIPanel(FriendsFrame)
+					else
+						ShowUIPanel(FriendsFrame)
+					end
 				end
 			end);
+			
+			-- Disable button in combat (ShowUIPanel/HideUIPanel are protected)
+			if inCombat then
+				menuButton:SetEnabled(false)
+				-- Add tooltip using OnEnter/OnLeave (SetTooltip doesn't exist)
+				menuButton:AddInitializer(function(btn, description, menuInstance)
+					btn:SetScript("OnEnter", function(self)
+						GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+						GameTooltip:SetText("Show Blizzard's Friendlist", 1, 1, 1)
+						GameTooltip:AddLine("Cannot toggle in combat", 1, 0.2, 0.2, true)
+						GameTooltip:Show()
+					end)
+					btn:SetScript("OnLeave", function()
+						GameTooltip:Hide()
+					end)
+				end)
+			else
+				menuButton:SetEnabled(true)
+			end
 		end
 		
 		-- Create Group option
@@ -1574,6 +1639,19 @@ function BetterFriendsFrame_ShowContactsMenu(button)
 			BetterFriendsFrame_ShowIgnoreList();
 		end);
 	end);
+	
+	-- Store menu instance in global table (survives local scope)
+	table.insert(_G.BFL_ActiveContactsMenus, menu)
+	
+	-- Hook menu's Hide to track when it closes (but DON'T remove from list yet)
+	if menu and not menu._bflHooked then
+		menu._bflHooked = true
+		local originalHide = menu.Hide
+		menu.Hide = function(self)
+			originalHide(self)
+			-- DON'T remove from list - let combat handler do cleanup
+		end
+	end
 end
 
 -- Show Ignore List (11.2.5 - part of contacts menu)
@@ -1831,10 +1909,6 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex)
 	
 	-- Hide all friend list buttons explicitly
 	if tabIndex ~= 1 then
-		local ButtonPool = GetButtonPool()
-		if ButtonPool then
-			ButtonPool:ResetButtonPool()
-		end
 		for i = 1, NUM_BUTTONS do
 			local xmlButton = frame.ScrollFrame and frame.ScrollFrame["Button" .. i]
 			if xmlButton then

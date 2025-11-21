@@ -85,8 +85,14 @@ local function BuildDataProvider(self)
 	local Groups = GetGroups()
 	local friendGroups = Groups and Groups:GetAll() or {}
 	
-	-- Add friend invites at top
-	local numInvites = BNGetNumFriendInvites()
+	-- Add friend invites at top (real or mock)
+	local numInvites
+	if BFL.MockFriendInvites.enabled then
+		numInvites = #BFL.MockFriendInvites.invites
+	else
+		numInvites = BNGetNumFriendInvites()
+	end
+	
 	if numInvites and numInvites > 0 then
 		dataProvider:Insert({
 			buttonType = BUTTON_TYPE_INVITE_HEADER,
@@ -492,7 +498,9 @@ local function GetFriendUID(friend)
 			return "bnet_" .. tostring(friend.bnetAccountID or "unknown")
 		end
 	else
-		return "wow_" .. (friend.name or "")
+		-- WoW friends: Always use Name-Realm format for consistency
+		local normalizedName = BFL:NormalizeWoWFriendName(friend.name)
+		return normalizedName and ("wow_" .. normalizedName) or nil
 	end
 end
 
@@ -672,10 +680,13 @@ function FriendsList:UpdateFriendsList()
 	for i = 1, numWoWFriends do
 		local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
 		if friendInfo then
+			-- Normalize name to always include realm for consistent identification
+			local normalizedName = BFL:NormalizeWoWFriendName(friendInfo.name)
+			
 			local friend = {
 				type = "wow",
 				index = i,
-				name = friendInfo.name,
+				name = normalizedName, -- Always includes realm: "Name-Realm"
 				connected = friendInfo.connected,
 				level = friendInfo.level,
 				className = friendInfo.className,
@@ -692,6 +703,11 @@ function FriendsList:UpdateFriendsList()
 	
 	-- Release lock after update complete
 	isUpdatingFriendsList = false
+end
+
+-- Clear pending update flag (used by ForceRefreshFriendsList to prevent race conditions)
+function FriendsList:ClearPendingUpdate()
+	hasPendingUpdate = false
 end
 
 -- Apply search and filter to friends list
@@ -833,7 +849,9 @@ function FriendsList:CompareFriends(a, b, sortMode)
 			if friend.type == "bnet" then
 				return friend.battleTag and ("bnet_" .. friend.battleTag) or nil
 			else
-				return friend.name and ("wow_" .. friend.name) or nil
+				-- WoW friends: Use normalized name with realm
+				local normalizedName = BFL:NormalizeWoWFriendName(friend.name)
+				return normalizedName and ("wow_" .. normalizedName) or nil
 			end
 		end
 		
@@ -1369,15 +1387,13 @@ end
 -- Set search text
 function FriendsList:SetSearchText(text)
 	self.searchText = text or ""
-	self:BuildDisplayList()
-	self:RenderDisplay()
+	BFL:ForceRefreshFriendsList()
 end
 
 -- Set filter mode
 function FriendsList:SetFilterMode(mode)
 	self.filterMode = mode or "all"
-	self:BuildDisplayList()
-	self:RenderDisplay()
+	BFL:ForceRefreshFriendsList()
 end
 
 -- Set sort mode
@@ -1392,8 +1408,7 @@ function FriendsList:SetSortMode(mode)
 	end
 	
 	self:ApplySort()
-	self:BuildDisplayList()
-	self:RenderDisplay()
+	BFL:ForceRefreshFriendsList()
 end
 
 -- Set secondary sort mode (for multi-criteria sorting)
@@ -1408,8 +1423,7 @@ function FriendsList:SetSecondarySortMode(mode)
 	end
 	
 	self:ApplySort()
-	self:BuildDisplayList()
-	self:RenderDisplay()
+	BFL:ForceRefreshFriendsList()
 end
 
 -- ========================================
@@ -1422,8 +1436,7 @@ function FriendsList:ToggleGroup(groupId)
 	if not Groups then return end
 	
 	if Groups:Toggle(groupId) then
-		self:BuildDisplayList()
-		self:RenderDisplay()
+		BFL:ForceRefreshFriendsList()
 	end
 end
 
@@ -1437,8 +1450,7 @@ function FriendsList:CreateGroup(groupName)
 	local success, err = Groups:Create(groupName)
 	if success then
 		self:SyncGroups()
-		self:BuildDisplayList()
-		self:RenderDisplay()
+		BFL:ForceRefreshFriendsList()
 	end
 	
 	return success, err
@@ -1454,8 +1466,7 @@ function FriendsList:RenameGroup(groupId, newName)
 	local success, err = Groups:Rename(groupId, newName)
 	if success then
 		self:SyncGroups()
-		self:BuildDisplayList()
-		self:RenderDisplay()
+		BFL:ForceRefreshFriendsList()
 	end
 	
 	return success, err
@@ -1471,8 +1482,7 @@ function FriendsList:DeleteGroup(groupId)
 	local success, err = Groups:Delete(groupId)
 	if success then
 		self:SyncGroups()
-		self:BuildDisplayList()
-		self:RenderDisplay()
+		BFL:ForceRefreshFriendsList()
 	end
 	
 	return success, err
@@ -1664,7 +1674,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 	-- Store group data on button
 	button.groupId = groupId
 	
-	-- Create drop target highlight if it doesn't exist (IDENTICAL to old ButtonPool.lua system)
+	-- Create drop target highlight if it doesn't exist
 	if not button.dropHighlight then
 		local dropHighlight = button:CreateTexture(nil, "BACKGROUND")
 		dropHighlight:SetAllPoints()
@@ -1701,7 +1711,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 		FontManager:ApplyFontSize(button:GetFontString())
 	end
 	
-	-- Tooltips for group headers (IDENTICAL to old ButtonPool.lua system)
+	-- Tooltips for group headers
 	button:SetScript("OnEnter", function(self)
 		-- Check if we're currently dragging a friend
 		local isDragging = BetterFriendsList_DraggedFriend ~= nil
@@ -1771,8 +1781,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 								for gid in pairs(Groups.groups) do
 									Groups:SetCollapsed(gid, true)  -- true = force collapse
 								end
-								FriendsList:BuildDisplayList()
-								FriendsList:RenderDisplay()
+								BFL:ForceRefreshFriendsList()
 							end
 						end)
 						
@@ -1781,8 +1790,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 								for gid in pairs(Groups.groups) do
 									Groups:SetCollapsed(gid, false)  -- false = force expand
 								end
-								FriendsList:BuildDisplayList()
-								FriendsList:RenderDisplay()
+								BFL:ForceRefreshFriendsList()
 							end
 						end)
 					end)
@@ -1804,8 +1812,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 							end
 						end
 						
-						FriendsList:BuildDisplayList()
-						FriendsList:RenderDisplay()
+						BFL:ForceRefreshFriendsList()
 					end
 				end
 			end)
@@ -1832,8 +1839,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 								for gid in pairs(Groups.groups) do
 									Groups:SetCollapsed(gid, true)  -- true = force collapse
 								end
-								FriendsList:BuildDisplayList()
-								FriendsList:RenderDisplay()
+								BFL:ForceRefreshFriendsList()
 							end
 						end)
 						
@@ -1842,8 +1848,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 								for gid in pairs(Groups.groups) do
 									Groups:SetCollapsed(gid, false)  -- false = force expand
 								end
-								FriendsList:BuildDisplayList()
-								FriendsList:RenderDisplay()
+								BFL:ForceRefreshFriendsList()
 							end
 						end)
 					end)
@@ -1865,8 +1870,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 							end
 						end
 						
-						FriendsList:BuildDisplayList()
-						FriendsList:RenderDisplay()
+						BFL:ForceRefreshFriendsList()
 					end
 				end
 			end)
@@ -1913,7 +1917,7 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		button.selectionHighlight = selectionHighlight
 	end
 	
-	-- Enable drag and drop for group assignment (IDENTICAL to old ButtonPool.lua system)
+	-- Enable drag and drop for group assignment
 	button:RegisterForDrag("LeftButton")
 	
 	-- Create drag overlay if it doesn't exist (same gold color as RaidFrame)
@@ -2088,8 +2092,7 @@ function FriendsList:UpdateFriendButton(button, elementData)
 				if DB and not DB:IsFriendInGroup(friendUID, droppedOnGroup) then
 					DB:AddFriendToGroup(friendUID, droppedOnGroup)
 				end
-				FriendsList:BuildDisplayList()
-				FriendsList:RenderDisplay()
+				BFL:ForceRefreshFriendsList()
 			end
 		end
 		
@@ -2370,9 +2373,9 @@ function FriendsList:UpdateFriendButton(button, elementData)
 				-- Add faction icon if enabled
 				if showFactionIcons and friend.factionName then
 					if friend.factionName == "Horde" then
-						characterName = "|TInterface\\FriendsFrame\\PlusManz-Horde:14:14:0:0|t" .. characterName
+						characterName = "|TInterface\\FriendsFrame\\PlusManz-Horde:12:12:0:0|t" .. characterName
 					elseif friend.factionName == "Alliance" then
-						characterName = "|TInterface\\FriendsFrame\\PlusManz-Alliance:14:14:0:0|t" .. characterName
+						characterName = "|TInterface\\FriendsFrame\\PlusManz-Alliance:12:12:0:0|t" .. characterName
 					end
 				end
 				
@@ -2520,22 +2523,22 @@ function FriendsList:UpdateFriendButton(button, elementData)
 			local isOppositeFaction = friend.factionName and friend.factionName ~= playerFactionGroup and friend.factionName ~= ""
 			local shouldGray = grayOtherFaction and isOppositeFaction
 			
-			local characterName = friend.name
+			-- Get display name: strips realm for same-realm friends unless showRealmName is enabled
+			local characterName
+			if showRealmName then
+				-- Always show full "Name-Realm" format when setting is enabled
+				characterName = friend.name
+			else
+				-- Strip realm for same-realm friends (default behavior)
+				characterName = BFL:GetWoWFriendDisplayName(friend.name)
+			end
 			
 			-- Add faction icon if enabled
 			if showFactionIcons and friend.factionName then
 				if friend.factionName == "Horde" then
-					characterName = "|TInterface\\FriendsFrame\\PlusManz-Horde:14:14:0:0|t" .. characterName
+					characterName = "|TInterface\\FriendsFrame\\PlusManz-Horde:12:12:0:0|t" .. characterName
 				elseif friend.factionName == "Alliance" then
-					characterName = "|TInterface\\FriendsFrame\\PlusManz-Alliance:14:14:0:0|t" .. characterName
-				end
-			end
-			
-			-- Add realm name if enabled and available
-			if showRealmName and friend.realmName and friend.realmName ~= "" then
-				local playerRealm = GetRealmName()
-				if friend.realmName ~= playerRealm then
-					characterName = characterName .. " - " .. friend.realmName
+					characterName = "|TInterface\\FriendsFrame\\PlusManz-Alliance:12:12:0:0|t" .. characterName
 				end
 			end
 			
@@ -2558,8 +2561,9 @@ function FriendsList:UpdateFriendButton(button, elementData)
 				end
 			end
 		else
-			-- Offline - gray
-			line1Text = "|cff7f7f7f" .. friend.name .. "|r"
+			-- Offline - gray (use display helper here too)
+			local displayName = BFL:GetWoWFriendDisplayName(friend.name)
+			line1Text = "|cff7f7f7f" .. displayName .. "|r"
 		end
 		
 		-- In compact mode, append additional info to line1Text
@@ -2642,13 +2646,37 @@ function FriendsList:UpdateInviteHeaderButton(button, data)
 		FontManager:ApplyFontSize(button.Text)
 	end
 	
+	-- Setup OnClick handler for collapse/expand (only once)
+	if not button.handlerRegistered then
+		button:SetScript("OnClick", function(self)
+			local collapsed = GetCVarBool("friendInvitesCollapsed")
+			SetCVar("friendInvitesCollapsed", collapsed and "0" or "1")
+			
+			-- Force full rebuild of display list
+			BFL:ForceRefreshFriendsList()
+		end)
+		button.handlerRegistered = true
+	end
+	
 	-- Ensure button is visible
 	button:Show()
 end
 
 -- Update invite button
 function FriendsList:UpdateInviteButton(button, data)
-	local inviteID, accountName = BNGetFriendInviteInfo(data.inviteIndex)
+	local inviteID, accountName
+	
+	-- Get invite info from mock or real API
+	if BFL.MockFriendInvites.enabled then
+		local mockInvite = BFL.MockFriendInvites.invites[data.inviteIndex]
+		if mockInvite then
+			inviteID = mockInvite.inviteID
+			accountName = mockInvite.accountName
+		end
+	else
+		inviteID, accountName = BNGetFriendInviteInfo(data.inviteIndex)
+	end
+	
 	if not inviteID then return end
 	
 	-- Get current button height to determine if compact mode
@@ -2694,20 +2722,109 @@ function FriendsList:UpdateInviteButton(button, data)
 	button.inviteID = inviteID
 	button.inviteIndex = data.inviteIndex
 	
+	-- Setup Accept button OnClick handler
+	if button.AcceptButton and not button.AcceptButton.handlerRegistered then
+		button.AcceptButton:SetScript("OnClick", function(self)
+			local parent = self:GetParent()
+			if parent.inviteID then
+				if BFL.MockFriendInvites.enabled then
+					-- Mock: Remove from list and refresh
+					for i, invite in ipairs(BFL.MockFriendInvites.invites) do
+						if invite.inviteID == parent.inviteID then
+							table.remove(BFL.MockFriendInvites.invites, i)
+							print("|cff00ff00BetterFriendlist:|r Accepted mock invite from " .. invite.accountName)
+							break
+						end
+					end
+					BFL:ForceRefreshFriendsList()
+				else
+					-- Real API call
+					BNAcceptFriendInvite(parent.inviteID)
+				end
+			end
+		end)
+		button.AcceptButton.handlerRegistered = true
+	end
+	
+	-- Setup Decline button OnClick handler
+	if button.DeclineButton and not button.DeclineButton.handlerRegistered then
+		button.DeclineButton:SetScript("OnClick", function(self)
+			local parent = self:GetParent()
+			if not parent.inviteID or not parent.inviteIndex then return end
+			
+			local inviteID, accountName
+			
+			-- Get invite info from mock or real API
+			if BFL.MockFriendInvites.enabled then
+				local mockInvite = BFL.MockFriendInvites.invites[parent.inviteIndex]
+				if mockInvite then
+					inviteID = mockInvite.inviteID
+					accountName = mockInvite.accountName
+				end
+			else
+				inviteID, accountName = BNGetFriendInviteInfo(parent.inviteIndex)
+			end
+			
+			if not inviteID then return end
+			
+			MenuUtil.CreateContextMenu(self, function(owner, rootDescription)
+				rootDescription:CreateButton("Decline", function()
+					if BFL.MockFriendInvites.enabled then
+						-- Mock: Remove from list and refresh
+						for i, invite in ipairs(BFL.MockFriendInvites.invites) do
+							if invite.inviteID == inviteID then
+								table.remove(BFL.MockFriendInvites.invites, i)
+								print("|cffff0000BetterFriendlist:|r Declined mock invite from " .. invite.accountName)
+								break
+							end
+						end
+						BFL:ForceRefreshFriendsList()
+					else
+						-- Real API call
+						BNDeclineFriendInvite(inviteID)
+					end
+				end)
+				
+				if not BFL.MockFriendInvites.enabled then
+					rootDescription:CreateButton("Report Player", function()
+						if C_ReportSystem and C_ReportSystem.OpenReportPlayerDialog then
+							C_ReportSystem.OpenReportPlayerDialog(
+								C_ReportSystem.ReportType.InappropriateBattleNetName,
+								accountName
+							)
+						end
+					end)
+					rootDescription:CreateButton("Block Invites", function()
+						BNSetBlocked(inviteID, true)
+					end)
+				end
+			end)
+		end)
+		button.DeclineButton.handlerRegistered = true
+	end
+	
 	-- Ensure button is visible
 	button:Show()
 end
 
 -- Flash invite header when new invite arrives while collapsed
 function FriendsList:FlashInviteHeader()
-	-- Find header button in active buttons
-	local ButtonPool = BFL:GetModule("ButtonPool")
-	if not ButtonPool then return end
+	if not self.scrollBox then
+		return
+	end
 	
-	for _, button in pairs(ButtonPool.activeButtons) do
-		if button.GetName and button:GetName() and button:GetName():find("InviteHeader") then
+	-- Get all currently visible frames from ScrollBox
+	local frames = self.scrollBox:GetFrames()
+	if not frames then
+		return
+	end
+	
+	-- Find the invite header button and flash it
+	for _, frame in pairs(frames) do
+		-- Check if this is an invite header button by verifying its unique children
+		if frame:GetObjectType() == "Button" and frame.Text and frame.DownArrow and frame.RightArrow then
 			-- Flash animation (simple alpha pulse)
-			UIFrameFlash(button, 0.5, 0.5, 2, false, 0, 0)
+			UIFrameFlash(frame, 0.5, 0.5, 2, false, 0, 0)
 			break
 		end
 	end

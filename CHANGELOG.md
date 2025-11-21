@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.8.2] - 2025-11-21
+
+**🚀 Major Update - Friend Management & Combat Protection**
+
+Complete redesign of friend name handling, WoW friend realm consistency, and combat protection for the context menu.
+
+### Added
+- **Combat Lock Icon** - Yellow warning icon appears on "Show Blizzard's Friendlist" when in combat
+  - Button disabled during combat to prevent taint errors
+  - Tooltip explains unavailability
+  - Menu closes automatically when entering combat
+- **ToggleFriendsFrame Hook** - Opens BetterFriendlist when other addons call ToggleFriendsFrame
+  - Works with ElvUI, Bartender, and other UI replacements
+  - O-key binding redirects to BetterFriendlist automatically
+  - More reliable integration with other addons
+
+### Fixed
+- **WoW Friend Names** - All WoW friends now stored with realm name for consistency
+  - Allows managing friends with same name on different realms in connected realm groups
+  - Display shows "Name" for same-realm, "Name-Realm" for cross-realm friends
+  - Automatic migration on first load
+- **Friend Request Buttons** - Accept/Decline buttons now work reliably
+  - Fixed duplicate button handler registration
+  - Flash animation now works when new invites arrive
+- **Context Menu Combat** - Menu now closes automatically when entering combat
+  - No more taint errors from protected frame actions
+  - Clean menu state after leaving combat
+- **Settings Window** - Fixed tab display and content height calculation
+  - Dynamic content sizing based on active elements
+  - Proper scrolling for all tabs
+  - No more cut-off content
+
+### Changed
+- **Faction Icons** - Resized from 14x14 to 12x12 for better alignment
+- **Settings UI** - Complete redesign using component library
+  - Tab 1: General (Display options, behavior, font settings)
+  - Tab 2: Groups (Drag & drop reordering with visual controls)
+  - Tab 3: Advanced (Migration, Export/Import)
+  - Removed Appearance and Statistics tabs (merged into General)
+  - New arrow icons, edit icon, and delete icon for group management
+
+---
+
 ## [1.8.1] - 2025-11-16
 
 **🐛 Bug Fix**
