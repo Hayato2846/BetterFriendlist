@@ -232,6 +232,27 @@ BetterFriendlist includes a built-in migration tool:
 
 ---
 
+## 🧪 Beta Features (Experimental)
+
+Enable in **Settings → Advanced → Beta Features**
+
+### 🔔 Smart Notifications (v1.9.0)
+Get notified when friends come online or go offline:
+- **Display Modes**: Toast notifications, chat messages, or disabled
+- **Sound Effects**: Optional notification sounds (customizable)
+- **Offline Notifications**: Separate toggle for offline alerts
+- **Quiet Hours**: Silence notifications during:
+  - Manual Do Not Disturb mode
+  - Combat encounters
+  - Dungeons, raids, and PvP
+  - Scheduled hours (default: 22:00-08:00)
+- **Per-Friend Rules**: Right-click friends → "Notification Settings"
+  - Whitelist: Always notify (bypasses quiet hours)
+  - Blacklist: Never notify
+  - Default: Use global settings
+
+---
+
 ## 💡 Tips & Tricks
 
 ### Friend Management

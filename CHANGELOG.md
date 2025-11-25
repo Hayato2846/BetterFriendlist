@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.9.0] - 2025-11-25
+
+**🔔 Beta Feature - Smart Notifications**
+
+Complete notification system with friend status alerts, quiet hours, per-friend rules, and group notification controls.
+
+### Added
+- **Friend Status Notifications** - Get notified when friends come online, go offline, or switch characters
+  - Three display modes: Toast notifications, chat messages, or disabled
+  - Separate toggles for online, offline, and character switch events
+  - Optional sound effects (default: Battle.net toast sound)
+  - Test button to preview notifications
+  - Smart cooldowns: 30s for online/offline, 10s for character switches
+- **Quiet Hours System** - Control when notifications appear
+  - Manual Do Not Disturb mode (highest priority)
+  - Auto-silence during combat encounters
+  - Auto-silence in dungeons, raids, and PvP
+  - Scheduled quiet hours (default: 22:00-08:00)
+  - Time-based scheduling with midnight crossing support
+- **Per-Friend Notification Rules** - Customize notifications for specific friends
+  - Whitelist: Always notify (bypasses quiet hours and cooldowns)
+  - Blacklist: Never notify (complete silence for that friend)
+  - Default: Use global notification settings
+  - Accessible via right-click menu "Notification Settings"
+- **Group Notification Rules** - Control notifications for entire friend groups
+  - Set Whitelist/Blacklist/Default for any custom group
+  - Right-click on group header to access Notifications menu
+  - All members of whitelisted groups bypass quiet hours
+  - Works with favorites group too
+  - Priority system: Per-friend rules override group rules
+- **Notification Positioning** - Drag and drop toast notifications in Edit Mode
+  - Enter WoW's Edit Mode to reposition notification toasts
+  - Preview toasts appear during Edit Mode
+  - Position saves automatically
+  - Professional library integration (LibEditMode)
+- **All features require Beta Features toggle** - Enable in Settings → Advanced → Beta Features
+
+### Fixed
+- **Friend list updates** - Friend list now always stays synchronized, even when window is closed
+  - Previously friends could show as online for minutes after logging off
+  - Data now updates in background regardless of window visibility
+- **Character switch notifications** - Now work correctly with independent cooldowns
+  - Character switches have separate 10-second cooldown from online/offline events
+  - No longer blocked by online notification cooldowns
+- **False game switch alerts** - Eliminated duplicate notifications during character switches
+  - System now detects and ignores transient loading states
+  - Only shows one notification when switching characters
+- **Beta Features styling** - All Beta feature text now uses consistent orange color
+  - Changed from gold to orange for better visual distinction
+  - "Currently available Beta features:" title properly colored
+
+### Changed
+- Orange color scheme for Beta Features section in settings (changed from gold)
+- Removed "Bulk Friend Operations" from Beta features list (feature moved to future release)
+
+---
+
 ## [1.8.2] - 2025-11-21
 
 **🚀 Major Update - Friend Management & Combat Protection**

@@ -164,4 +164,49 @@ if GetLocale() == "ptBR" then
 	L.BUTTON_SEND_MESSAGE = "Enviar Mensagem"
 	L.EMPTY_TEXT = "Vazio"
 	L.LEVEL_FORMAT = "Nível %d"
+	
+	-- ========================================
+	-- BETA FEATURES (Advanced Tab)
+	-- ========================================
+	L.SETTINGS_BETA_FEATURES_TITLE = "Recursos Beta"
+	L.SETTINGS_BETA_FEATURES_DESC = "Ative recursos experimentais ainda em desenvolvimento. Estes recursos podem mudar ou ser removidos em versões futuras."
+	L.SETTINGS_BETA_FEATURES_ENABLE = "Ativar Recursos Beta"
+	L.SETTINGS_BETA_FEATURES_TOOLTIP = "Ativa recursos experimentais (Notificações, etc.)"
+	L.SETTINGS_BETA_FEATURES_WARNING = "⚠ Aviso: Recursos beta podem conter bugs, problemas de desempenho ou funcionalidade incompleta. Use por sua conta e risco."
+	L.SETTINGS_BETA_FEATURES_LIST = "Recursos Beta atualmente disponíveis:"
+	L.SETTINGS_BETA_FEATURES_ENABLED = "Recursos Beta |cff00ff00ATIVADOS|r"
+	L.SETTINGS_BETA_FEATURES_DISABLED = "Recursos Beta |cffff0000DESATIVADOS|r"
+	L.SETTINGS_BETA_TABS_VISIBLE = "Abas Beta agora visíveis nas Configurações"
+	L.SETTINGS_BETA_TABS_HIDDEN = "Abas Beta agora ocultas"
+	
+	-- ========================================
+	-- NOTIFICATIONS TAB
+	-- ========================================
+	L.SETTINGS_NOTIFICATIONS_TITLE = "Notificações"
+	L.SETTINGS_NOTIFICATIONS_DESC = "Configure notificações inteligentes de amigos. Receba alertas quando amigos ficarem online."
+	L.SETTINGS_NOTIFICATIONS_DISPLAY_HEADER = "Exibição de Notificações"
+	L.SETTINGS_NOTIFICATIONS_DISPLAY_MODE = "Modo de exibição:"
+	L.SETTINGS_NOTIFICATIONS_MODE_TOAST = "Notificação Toast"
+	L.SETTINGS_NOTIFICATIONS_MODE_CHAT = "Apenas mensagem no chat"
+	L.SETTINGS_NOTIFICATIONS_MODE_DISABLED = "Desativado"
+	L.SETTINGS_NOTIFICATIONS_MODE_DESC = "|cffffcc00Notificação Toast:|r Mostra uma notificação compacta quando amigos ficam online\n|cffffcc00Apenas mensagem no chat:|r Sem popup, apenas mensagens no chat\n|cffffcc00Desativado:|r Sem notificações"
+	L.SETTINGS_NOTIFICATIONS_TEST_BUTTON = "Testar notificação"
+	L.SETTINGS_NOTIFICATIONS_SOUND_HEADER = "Configurações de Som"
+	L.SETTINGS_NOTIFICATIONS_SOUND_ENABLE = "Reproduzir som com notificações"
+	L.SETTINGS_NOTIFICATIONS_SOUND_ENABLED = "Sons de notificação |cff00ff00ATIVADOS|r"
+	L.SETTINGS_NOTIFICATIONS_SOUND_DISABLED = "Sons de notificação |cffff0000DESATIVADOS|r"
+	L.SETTINGS_NOTIFICATIONS_COMING_SOON = "Em breve"
+	L.SETTINGS_NOTIFICATIONS_FUTURE_FEATURES = "• Regras de notificação por amigo\n• Gatilhos de grupo (X amigos do grupo Y online)\n• Horas silenciosas (combate, instância, horário)\n• Mensagens de notificação personalizadas\n• Notificações de desconexão"
+	L.SETTINGS_NOTIFICATIONS_QUIET_HOURS = "|cffffcc00Horas silenciosas automáticas:|r\n• Durante combate (sem distrações)\n• Futuro: Detecção de instância, DND manual, horas agendadas"
+	
+	-- ========================================
+	-- NOTIFICATION MESSAGES
+	-- ========================================
+	L.NOTIFICATION_MODE_CHANGED = "Modo de notificação definido para %s"
+	L.NOTIFICATION_TEST_MESSAGE = "Esta é uma notificação de teste"
+	L.NOTIFICATION_FRIEND_ONLINE = "%s está online agora"
+	L.NOTIFICATION_FRIEND_PLAYING = "%s está online agora [jogando %s]"
+	L.NOTIFICATION_SYSTEM_UNAVAILABLE = "Sistema de notificação não disponível"
+	L.NOTIFICATION_BETA_REQUIRED = "Recursos Beta devem estar ativados para usar notificações"
+	L.NOTIFICATION_BETA_ENABLE_HINT = "→ Ative em Configurações > Avançado > Recursos Beta"
 end

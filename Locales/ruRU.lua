@@ -164,4 +164,49 @@ if GetLocale() == "ruRU" then
 	L.BUTTON_SEND_MESSAGE = "Отправить Сообщение"
 	L.EMPTY_TEXT = "Пусто"
 	L.LEVEL_FORMAT = "Ур %d"
+	
+	-- ========================================
+	-- BETA FEATURES (Advanced Tab)
+	-- ========================================
+	L.SETTINGS_BETA_FEATURES_TITLE = "Бета-функции"
+	L.SETTINGS_BETA_FEATURES_DESC = "Включите экспериментальные функции, которые все еще находятся в разработке. Эти функции могут измениться или быть удалены в будущих версиях."
+	L.SETTINGS_BETA_FEATURES_ENABLE = "Включить бета-функции"
+	L.SETTINGS_BETA_FEATURES_TOOLTIP = "Включает экспериментальные функции (Уведомления и т.д.)"
+	L.SETTINGS_BETA_FEATURES_WARNING = "⚠ Предупреждение: Бета-функции могут содержать ошибки, проблемы с производительностью или неполную функциональность. Используйте на свой страх и риск."
+	L.SETTINGS_BETA_FEATURES_LIST = "Доступные бета-функции:"
+	L.SETTINGS_BETA_FEATURES_ENABLED = "Бета-функции |cff00ff00ВКЛЮЧЕНЫ|r"
+	L.SETTINGS_BETA_FEATURES_DISABLED = "Бета-функции |cffff0000ВЫКЛЮЧЕНЫ|r"
+	L.SETTINGS_BETA_TABS_VISIBLE = "Бета-вкладки теперь видны в Настройках"
+	L.SETTINGS_BETA_TABS_HIDDEN = "Бета-вкладки теперь скрыты"
+	
+	-- ========================================
+	-- NOTIFICATIONS TAB
+	-- ========================================
+	L.SETTINGS_NOTIFICATIONS_TITLE = "Уведомления"
+	L.SETTINGS_NOTIFICATIONS_DESC = "Настройте интеллектуальные уведомления о друзьях. Получайте оповещения, когда друзья появляются в сети."
+	L.SETTINGS_NOTIFICATIONS_DISPLAY_HEADER = "Отображение уведомлений"
+	L.SETTINGS_NOTIFICATIONS_DISPLAY_MODE = "Режим отображения:"
+	L.SETTINGS_NOTIFICATIONS_MODE_TOAST = "Всплывающее уведомление"
+	L.SETTINGS_NOTIFICATIONS_MODE_CHAT = "Только сообщение в чате"
+	L.SETTINGS_NOTIFICATIONS_MODE_DISABLED = "Отключено"
+	L.SETTINGS_NOTIFICATIONS_MODE_DESC = "|cffffcc00Всплывающее уведомление:|r Показывает компактное уведомление, когда друзья появляются в сети\n|cffffcc00Только сообщение в чате:|r Без всплывающего окна, только сообщения в чате\n|cffffcc00Отключено:|r Без уведомлений"
+	L.SETTINGS_NOTIFICATIONS_TEST_BUTTON = "Тестовое уведомление"
+	L.SETTINGS_NOTIFICATIONS_SOUND_HEADER = "Настройки звука"
+	L.SETTINGS_NOTIFICATIONS_SOUND_ENABLE = "Воспроизводить звук с уведомлениями"
+	L.SETTINGS_NOTIFICATIONS_SOUND_ENABLED = "Звуки уведомлений |cff00ff00ВКЛЮЧЕНЫ|r"
+	L.SETTINGS_NOTIFICATIONS_SOUND_DISABLED = "Звуки уведомлений |cffff0000ВЫКЛЮЧЕНЫ|r"
+	L.SETTINGS_NOTIFICATIONS_COMING_SOON = "Скоро"
+	L.SETTINGS_NOTIFICATIONS_FUTURE_FEATURES = "• Правила уведомлений для отдельных друзей\n• Триггеры группы (X друзей из группы Y в сети)\n• Тихие часы (бой, подземелье, расписание)\n• Пользовательские сообщения уведомлений\n• Уведомления об отключении"
+	L.SETTINGS_NOTIFICATIONS_QUIET_HOURS = "|cffffcc00Автоматические тихие часы:|r\n• Во время боя (без отвлечений)\n• В будущем: Определение подземелий, ручной DND, запланированные часы"
+	
+	-- ========================================
+	-- NOTIFICATION MESSAGES
+	-- ========================================
+	L.NOTIFICATION_MODE_CHANGED = "Режим уведомлений установлен на %s"
+	L.NOTIFICATION_TEST_MESSAGE = "Это тестовое уведомление"
+	L.NOTIFICATION_FRIEND_ONLINE = "%s сейчас в сети"
+	L.NOTIFICATION_FRIEND_PLAYING = "%s сейчас в сети [играет в %s]"
+	L.NOTIFICATION_SYSTEM_UNAVAILABLE = "Система уведомлений недоступна"
+	L.NOTIFICATION_BETA_REQUIRED = "Бета-функции должны быть включены для использования уведомлений"
+	L.NOTIFICATION_BETA_ENABLE_HINT = "→ Включите в Настройки > Дополнительно > Бета-функции"
 end

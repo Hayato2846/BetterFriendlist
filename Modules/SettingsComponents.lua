@@ -143,7 +143,7 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 	-- Dropdown (right side)
 	local dropdown = CreateFrame("DropdownButton", nil, holder, "WowStyle1DropdownTemplate")
 	dropdown:SetWidth(180)
-	dropdown:SetPoint("LEFT", holder, "LEFT", 75, 0)
+	dropdown:SetPoint("LEFT", holder, "LEFT", 150, 0) -- Doubled from 75 to 150
 	
 	-- Initialize with provided entries using modern API
 	if entries and entries.labels and entries.values then

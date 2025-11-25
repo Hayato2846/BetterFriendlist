@@ -701,6 +701,9 @@ function FriendsList:UpdateFriendsList()
 	self:ApplyFilters()
 	self:ApplySort()
 	
+	-- Build display list to update UI
+	self:BuildDisplayList()
+	
 	-- Release lock after update complete
 	isUpdatingFriendsList = false
 end
@@ -1776,25 +1779,74 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 						
 						rootDescription:CreateDivider()
 						
-						rootDescription:CreateButton("Collapse All Groups", function()
-							if Groups then
-								for gid in pairs(Groups.groups) do
-									Groups:SetCollapsed(gid, true)  -- true = force collapse
-								end
-								BFL:ForceRefreshFriendsList()
-							end
-						end)
+					-- Notification Rules for Group (Beta Features)
+					if BetterFriendlistDB.enableBetaFeatures then
+						local notificationButton = rootDescription:CreateButton("Notifications")
 						
-						rootDescription:CreateButton("Expand All Groups", function()
-							if Groups then
-								for gid in pairs(Groups.groups) do
-									Groups:SetCollapsed(gid, false)  -- false = force expand
+						notificationButton:CreateRadio(
+							"Default (Use global settings)",
+							function()
+								local rule = BetterFriendlistDB.notificationGroupRules and BetterFriendlistDB.notificationGroupRules[self.groupId]
+								return not rule or rule == "default"
+							end,
+							function()
+								if not BetterFriendlistDB.notificationGroupRules then
+									BetterFriendlistDB.notificationGroupRules = {}
 								end
-								BFL:ForceRefreshFriendsList()
+								BetterFriendlistDB.notificationGroupRules[self.groupId] = "default"
+								print("|cff00ff00BetterFriendlist:|r Notifications for group '" .. groupData.name .. "' set to |cffffffffDefault|r")
 							end
-						end)
+						)
+						
+						notificationButton:CreateRadio(
+							"Whitelist (Always notify)",
+							function()
+								local rule = BetterFriendlistDB.notificationGroupRules and BetterFriendlistDB.notificationGroupRules[self.groupId]
+								return rule == "whitelist"
+							end,
+							function()
+								if not BetterFriendlistDB.notificationGroupRules then
+									BetterFriendlistDB.notificationGroupRules = {}
+								end
+								BetterFriendlistDB.notificationGroupRules[self.groupId] = "whitelist"
+								print("|cff00ff00BetterFriendlist:|r Notifications for group '" .. groupData.name .. "' set to |cff00ff00Whitelist|r (always notify)")
+							end
+						)
+						
+						notificationButton:CreateRadio(
+							"Blacklist (Never notify)",
+							function()
+								local rule = BetterFriendlistDB.notificationGroupRules and BetterFriendlistDB.notificationGroupRules[self.groupId]
+								return rule == "blacklist"
+							end,
+							function()
+								if not BetterFriendlistDB.notificationGroupRules then
+									BetterFriendlistDB.notificationGroupRules = {}
+								end
+								BetterFriendlistDB.notificationGroupRules[self.groupId] = "blacklist"
+								print("|cff00ff00BetterFriendlist:|r Notifications for group '" .. groupData.name .. "' set to |cffff0000Blacklist|r (never notify)")
+							end
+						)
+						
+						rootDescription:CreateDivider()
+					end
+					
+					-- Group-wide action buttons
+					rootDescription:CreateButton("Collapse All Groups", function()
+						for gid in pairs(Groups.groups) do
+							Groups:SetCollapsed(gid, true)  -- true = force collapse
+						end
+						BFL:ForceRefreshFriendsList()
 					end)
-				else
+					
+					rootDescription:CreateButton("Expand All Groups", function()
+						for gid in pairs(Groups.groups) do
+							Groups:SetCollapsed(gid, false)  -- false = force expand
+						end
+						BFL:ForceRefreshFriendsList()
+					end)
+				end)
+			else
 					-- Left click: toggle collapse
 					if Groups:Toggle(self.groupId) then
 						-- Check accordion mode

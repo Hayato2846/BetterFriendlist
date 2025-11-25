@@ -164,4 +164,49 @@ if GetLocale() == "koKR" then
 	L.BUTTON_SEND_MESSAGE = "메시지 보내기"
 	L.EMPTY_TEXT = "비어 있음"
 	L.LEVEL_FORMAT = "레벨 %d"
+	
+	-- ========================================
+	-- BETA FEATURES (Advanced Tab)
+	-- ========================================
+	L.SETTINGS_BETA_FEATURES_TITLE = "베타 기능"
+	L.SETTINGS_BETA_FEATURES_DESC = "아직 개발 중인 실험적 기능을 활성화합니다. 이러한 기능은 향후 버전에서 변경되거나 제거될 수 있습니다."
+	L.SETTINGS_BETA_FEATURES_ENABLE = "베타 기능 활성화"
+	L.SETTINGS_BETA_FEATURES_TOOLTIP = "실험적 기능 활성화 (알림 등)"
+	L.SETTINGS_BETA_FEATURES_WARNING = "⚠ 경고: 베타 기능에는 버그, 성능 문제 또는 불완전한 기능이 포함될 수 있습니다. 본인의 책임하에 사용하십시오."
+	L.SETTINGS_BETA_FEATURES_LIST = "현재 사용 가능한 베타 기능:"
+	L.SETTINGS_BETA_FEATURES_ENABLED = "베타 기능 |cff00ff00활성화됨|r"
+	L.SETTINGS_BETA_FEATURES_DISABLED = "베타 기능 |cffff0000비활성화됨|r"
+	L.SETTINGS_BETA_TABS_VISIBLE = "베타 탭이 설정에 표시됩니다"
+	L.SETTINGS_BETA_TABS_HIDDEN = "베타 탭이 숨겨졌습니다"
+	
+	-- ========================================
+	-- NOTIFICATIONS TAB
+	-- ========================================
+	L.SETTINGS_NOTIFICATIONS_TITLE = "알림"
+	L.SETTINGS_NOTIFICATIONS_DESC = "스마트 친구 알림을 구성합니다. 친구가 온라인 상태가 되면 알림을 받습니다."
+	L.SETTINGS_NOTIFICATIONS_DISPLAY_HEADER = "알림 표시"
+	L.SETTINGS_NOTIFICATIONS_DISPLAY_MODE = "표시 모드:"
+	L.SETTINGS_NOTIFICATIONS_MODE_TOAST = "토스트 알림"
+	L.SETTINGS_NOTIFICATIONS_MODE_CHAT = "채팅 메시지만"
+	L.SETTINGS_NOTIFICATIONS_MODE_DISABLED = "비활성화됨"
+	L.SETTINGS_NOTIFICATIONS_MODE_DESC = "|cffffcc00토스트 알림:|r 친구가 온라인 상태가 되면 간단한 알림을 표시합니다\n|cffffcc00채팅 메시지만:|r 팝업 없이 채팅 메시지만 표시합니다\n|cffffcc00비활성화됨:|r 알림 없음"
+	L.SETTINGS_NOTIFICATIONS_TEST_BUTTON = "알림 테스트"
+	L.SETTINGS_NOTIFICATIONS_SOUND_HEADER = "사운드 설정"
+	L.SETTINGS_NOTIFICATIONS_SOUND_ENABLE = "알림과 함께 사운드 재생"
+	L.SETTINGS_NOTIFICATIONS_SOUND_ENABLED = "알림 사운드 |cff00ff00활성화됨|r"
+	L.SETTINGS_NOTIFICATIONS_SOUND_DISABLED = "알림 사운드 |cffff0000비활성화됨|r"
+	L.SETTINGS_NOTIFICATIONS_COMING_SOON = "공개 예정"
+	L.SETTINGS_NOTIFICATIONS_FUTURE_FEATURES = "• 친구별 알림 규칙\n• 그룹 트리거 (그룹 Y의 X명 친구 온라인)\n• 조용한 시간 (전투, 인스턴스, 일정)\n• 사용자 지정 알림 메시지\n• 오프라인 알림"
+	L.SETTINGS_NOTIFICATIONS_QUIET_HOURS = "|cffffcc00자동 조용한 시간:|r\n• 전투 중 (방해 없음)\n• 향후: 인스턴스 감지, 수동 DND, 예약된 시간"
+	
+	-- ========================================
+	-- NOTIFICATION MESSAGES
+	-- ========================================
+	L.NOTIFICATION_MODE_CHANGED = "알림 모드가 %s(으)로 설정되었습니다"
+	L.NOTIFICATION_TEST_MESSAGE = "테스트 알림입니다"
+	L.NOTIFICATION_FRIEND_ONLINE = "%s님이 온라인 상태입니다"
+	L.NOTIFICATION_FRIEND_PLAYING = "%s님이 온라인 상태입니다 [%s 플레이 중]"
+	L.NOTIFICATION_SYSTEM_UNAVAILABLE = "알림 시스템을 사용할 수 없습니다"
+	L.NOTIFICATION_BETA_REQUIRED = "알림을 사용하려면 베타 기능이 활성화되어야 합니다"
+	L.NOTIFICATION_BETA_ENABLE_HINT = "→ 설정 > 고급 > 베타 기능에서 활성화하세요"
 end

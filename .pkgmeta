@@ -5,6 +5,15 @@ enable-nolib-creation: no
 # Release channel: alpha, beta, or release
 release-type: alpha
 
+# External libraries
+externals:
+  Libs/LibStub:
+    url: https://repos.curseforge.com/wow/libstub/trunk
+    tag: 1.0
+  Libs/LibEditMode:
+    url: https://github.com/p3lim-wow/LibEditMode
+    tag: latest
+
 ignore:
   - .git
   - .github

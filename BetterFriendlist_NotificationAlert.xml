@@ -1,0 +1,112 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/">
+
+	<!-- Notification Toast Container - Anchor point for up to 3 toasts, moveable in Edit Mode -->
+	<Frame name="BFL_NotificationToastContainer" parent="UIParent" frameStrata="MEDIUM" frameLevel="50" enableMouse="false">
+		<Size x="260" y="180"/> <!-- Height for 3 toasts (56*3 + 6*2 spacing) -->
+		<Anchors>
+			<Anchor point="TOP" x="0" y="-150"/>
+		</Anchors>
+		<KeyValues>
+			<KeyValue key="editModeName" value="BetterFriendlist Notifications" type="string"/>
+		</KeyValues>
+	</Frame>
+
+	<!-- Friend Notification Toast Template - Used to create 3 instances -->
+	<Frame name="BFL_FriendNotificationToastTemplate" mixin="BackdropTemplateMixin" parent="BFL_NotificationToastContainer" hidden="true" frameStrata="DIALOG" frameLevel="100" enableMouse="true" virtual="true">
+		<Size x="260" y="56"/>
+		<Anchors>
+			<Anchor point="TOP" x="0" y="0"/>
+		</Anchors>
+		
+		<Scripts>
+			<OnLoad>
+				self:SetBackdrop({
+					bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+					edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+					tile = true,
+					tileSize = 16,
+					edgeSize = 16,
+					insets = { left = 4, right = 4, top = 4, bottom = 4 }
+				})
+				self:SetBackdropColor(0.05, 0.05, 0.05, 0.95)
+				self:SetBackdropBorderColor(0.7, 0.7, 0.7, 1)
+			</OnLoad>
+		</Scripts>
+		
+		<Layers>
+			
+			<!-- Icon - Feather user-check -->
+			<Layer level="ARTWORK">
+				<Texture parentKey="Icon" file="Interface\AddOns\BetterFriendlist\Icons\user-check">
+					<Size x="28" y="28"/>
+					<Anchors>
+						<Anchor point="LEFT" x="14" y="0"/>
+					</Anchors>
+					<Color r="0.3" g="1" b="0.3" a="1"/>
+				</Texture>
+			</Layer>
+			
+			<!-- Text - compact layout -->
+			<Layer level="OVERLAY">
+				<FontString parentKey="Name" inherits="GameFontNormal" justifyH="LEFT">
+					<Size x="200" y="0"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="50" y="-14"/>
+					</Anchors>
+					<Color r="1" g="0.82" b="0" a="1"/>
+				</FontString>
+				
+				<FontString parentKey="Message" inherits="GameFontNormalSmall" justifyH="LEFT">
+					<Size x="210" y="0"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeKey="$parent.Name" relativePoint="BOTTOMLEFT" x="0" y="-4"/>
+					</Anchors>
+					<Color r="0.85" g="0.85" b="0.85" a="1"/>
+				</FontString>
+			</Layer>
+		</Layers>
+		
+		<!-- Smooth animations -->
+		<Animations>
+			<AnimationGroup parentKey="FadeIn">
+				<Alpha order="1" duration="0.25" fromAlpha="0" toAlpha="1" smoothing="OUT"/>
+				<Translation order="1" duration="0.25" offsetY="30" smoothing="OUT"/>
+			</AnimationGroup>
+			
+			<AnimationGroup parentKey="FadeOut">
+				<Alpha order="1" duration="0.35" fromAlpha="1" toAlpha="0" smoothing="IN" startDelay="4.0"/>
+			</AnimationGroup>
+		</Animations>
+		
+		<Scripts>
+			<OnMouseUp>
+				-- Don't hide toasts when in Edit Mode (they are previews)
+				if EditModeManagerFrame and EditModeManagerFrame:IsEditModeActive() then
+					return
+				end
+				
+				if self.FadeOut:IsPlaying() then
+					self.FadeOut:Stop()
+				end
+				self:Hide()
+			</OnMouseUp>
+		</Scripts>
+	</Frame>
+
+	<!-- Create 3 Toast instances -->
+	<Frame name="BFL_FriendNotificationToast1" inherits="BFL_FriendNotificationToastTemplate" parent="BFL_NotificationToastContainer" parentKey="Toast1" id="1">
+		<Anchors>
+			<Anchor point="TOP" relativeKey="$parent" relativePoint="TOP" x="0" y="0"/>
+		</Anchors>
+	</Frame>
+	<Frame name="BFL_FriendNotificationToast2" inherits="BFL_FriendNotificationToastTemplate" parent="BFL_NotificationToastContainer" parentKey="Toast2" id="2">
+		<Anchors>
+			<Anchor point="TOP" relativeKey="$parent.Toast1" relativePoint="BOTTOM" x="0" y="-6"/>
+		</Anchors>
+	</Frame>
+	<Frame name="BFL_FriendNotificationToast3" inherits="BFL_FriendNotificationToastTemplate" parent="BFL_NotificationToastContainer" parentKey="Toast3" id="3">
+		<Anchors>
+			<Anchor point="TOP" relativeKey="$parent.Toast2" relativePoint="BOTTOM" x="0" y="-6"/>
+		</Anchors>
+	</Frame>
+</Ui>

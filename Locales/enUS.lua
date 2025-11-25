@@ -191,4 +191,49 @@ if GetLocale() == "enUS" then
 	L.BUTTON_SEND_MESSAGE = "Send Message"
 	L.EMPTY_TEXT = "Empty"
 	L.LEVEL_FORMAT = "Lvl %d"
+	
+	-- ========================================
+	-- BETA FEATURES (Advanced Tab)
+	-- ========================================
+	L.SETTINGS_BETA_FEATURES_TITLE = "Beta Features"
+	L.SETTINGS_BETA_FEATURES_DESC = "Enable experimental features that are still in development. These features may change or be removed in future versions."
+	L.SETTINGS_BETA_FEATURES_ENABLE = "Enable Beta Features"
+	L.SETTINGS_BETA_FEATURES_TOOLTIP = "Enables experimental features (Notifications, etc.)"
+	L.SETTINGS_BETA_FEATURES_WARNING = "⚠ Warning: Beta features may contain bugs, performance issues, or incomplete functionality. Use at your own risk."
+	L.SETTINGS_BETA_FEATURES_LIST = "Currently available Beta Features:"
+	L.SETTINGS_BETA_FEATURES_ENABLED = "Beta Features |cff00ff00ENABLED|r"
+	L.SETTINGS_BETA_FEATURES_DISABLED = "Beta Features |cffff0000DISABLED|r"
+	L.SETTINGS_BETA_TABS_VISIBLE = "Beta tabs are now visible in Settings"
+	L.SETTINGS_BETA_TABS_HIDDEN = "Beta tabs are now hidden"
+	
+	-- ========================================
+	-- NOTIFICATIONS TAB
+	-- ========================================
+	L.SETTINGS_NOTIFICATIONS_TITLE = "Notifications"
+	L.SETTINGS_NOTIFICATIONS_DESC = "Configure smart friend notifications. Get alerts when friends come online."
+	L.SETTINGS_NOTIFICATIONS_DISPLAY_HEADER = "Notification Display"
+	L.SETTINGS_NOTIFICATIONS_DISPLAY_MODE = "Display Mode:"
+	L.SETTINGS_NOTIFICATIONS_MODE_TOAST = "Toast Notification"
+	L.SETTINGS_NOTIFICATIONS_MODE_CHAT = "Chat Message Only"
+	L.SETTINGS_NOTIFICATIONS_MODE_DISABLED = "Disabled"
+	L.SETTINGS_NOTIFICATIONS_MODE_DESC = "|cffffcc00Toast Notification:|r Shows a compact notification when friends come online\n|cffffcc00Chat Message Only:|r No popup, only messages in chat\n|cffffcc00Disabled:|r No notifications at all"
+	L.SETTINGS_NOTIFICATIONS_TEST_BUTTON = "Test Notification"
+	L.SETTINGS_NOTIFICATIONS_SOUND_HEADER = "Sound Settings"
+	L.SETTINGS_NOTIFICATIONS_SOUND_ENABLE = "Play sound with notifications"
+	L.SETTINGS_NOTIFICATIONS_SOUND_ENABLED = "Notification sounds |cff00ff00ENABLED|r"
+	L.SETTINGS_NOTIFICATIONS_SOUND_DISABLED = "Notification sounds |cffff0000DISABLED|r"
+	L.SETTINGS_NOTIFICATIONS_COMING_SOON = "Coming Soon"
+	L.SETTINGS_NOTIFICATIONS_FUTURE_FEATURES = "• Per-friend notification rules\n• Group triggers (X friends from group Y online)\n• Quiet hours (combat, instance, schedule)\n• Custom notification messages\n• Offline notifications"
+	L.SETTINGS_NOTIFICATIONS_QUIET_HOURS = "|cffffcc00Automatic Quiet Hours:|r\n• During combat (no distractions)\n• Future: Instance detection, manual DND, scheduled hours"
+	
+	-- ========================================
+	-- NOTIFICATION MESSAGES
+	-- ========================================
+	L.NOTIFICATION_MODE_CHANGED = "Notification mode set to %s"
+	L.NOTIFICATION_TEST_MESSAGE = "This is a test notification"
+	L.NOTIFICATION_FRIEND_ONLINE = "%s is now online"
+	L.NOTIFICATION_FRIEND_PLAYING = "%s is now online [playing %s]"
+	L.NOTIFICATION_SYSTEM_UNAVAILABLE = "Notification system not available"
+	L.NOTIFICATION_BETA_REQUIRED = "Beta Features must be enabled to use notifications"
+	L.NOTIFICATION_BETA_ENABLE_HINT = "→ Enable in Settings > Advanced > Beta Features"
 end

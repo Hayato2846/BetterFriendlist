@@ -164,4 +164,49 @@ if GetLocale() == "esMX" then
 	L.BUTTON_SEND_MESSAGE = "Enviar Mensaje"
 	L.EMPTY_TEXT = "Vacío"
 	L.LEVEL_FORMAT = "Nvl %d"
+	
+	-- ========================================
+	-- BETA FEATURES (Advanced Tab)
+	-- ========================================
+	L.SETTINGS_BETA_FEATURES_TITLE = "Funciones Beta"
+	L.SETTINGS_BETA_FEATURES_DESC = "Activa funciones experimentales que aún están en desarrollo. Estas funciones pueden cambiar o eliminarse en versiones futuras."
+	L.SETTINGS_BETA_FEATURES_ENABLE = "Activar Funciones Beta"
+	L.SETTINGS_BETA_FEATURES_TOOLTIP = "Activa funciones experimentales (Notificaciones, etc.)"
+	L.SETTINGS_BETA_FEATURES_WARNING = "⚠ Advertencia: Las funciones beta pueden contener errores, problemas de rendimiento o funcionalidad incompleta. Úsalas bajo tu propio riesgo."
+	L.SETTINGS_BETA_FEATURES_LIST = "Funciones Beta disponibles actualmente:"
+	L.SETTINGS_BETA_FEATURES_ENABLED = "Funciones Beta |cff00ff00ACTIVADAS|r"
+	L.SETTINGS_BETA_FEATURES_DISABLED = "Funciones Beta |cffff0000DESACTIVADAS|r"
+	L.SETTINGS_BETA_TABS_VISIBLE = "Las pestañas Beta ahora son visibles en Configuración"
+	L.SETTINGS_BETA_TABS_HIDDEN = "Las pestañas Beta ahora están ocultas"
+	
+	-- ========================================
+	-- NOTIFICATIONS TAB
+	-- ========================================
+	L.SETTINGS_NOTIFICATIONS_TITLE = "Notificaciones"
+	L.SETTINGS_NOTIFICATIONS_DESC = "Configura notificaciones inteligentes de amigos. Recibe alertas cuando los amigos se conecten."
+	L.SETTINGS_NOTIFICATIONS_DISPLAY_HEADER = "Visualización de Notificaciones"
+	L.SETTINGS_NOTIFICATIONS_DISPLAY_MODE = "Modo de visualización:"
+	L.SETTINGS_NOTIFICATIONS_MODE_TOAST = "Notificación Toast"
+	L.SETTINGS_NOTIFICATIONS_MODE_CHAT = "Solo mensaje de chat"
+	L.SETTINGS_NOTIFICATIONS_MODE_DISABLED = "Desactivado"
+	L.SETTINGS_NOTIFICATIONS_MODE_DESC = "|cffffcc00Notificación Toast:|r Muestra una notificación compacta cuando los amigos se conectan\n|cffffcc00Solo mensaje de chat:|r Sin ventana emergente, solo mensajes en el chat\n|cffffcc00Desactivado:|r Sin notificaciones"
+	L.SETTINGS_NOTIFICATIONS_TEST_BUTTON = "Probar notificación"
+	L.SETTINGS_NOTIFICATIONS_SOUND_HEADER = "Configuración de Sonido"
+	L.SETTINGS_NOTIFICATIONS_SOUND_ENABLE = "Reproducir sonido con notificaciones"
+	L.SETTINGS_NOTIFICATIONS_SOUND_ENABLED = "Sonidos de notificación |cff00ff00ACTIVADOS|r"
+	L.SETTINGS_NOTIFICATIONS_SOUND_DISABLED = "Sonidos de notificación |cffff0000DESACTIVADOS|r"
+	L.SETTINGS_NOTIFICATIONS_COMING_SOON = "Próximamente"
+	L.SETTINGS_NOTIFICATIONS_FUTURE_FEATURES = "• Reglas de notificación por amigo\n• Activadores de grupo (X amigos del grupo Y conectados)\n• Horas de silencio (combate, instancia, horario)\n• Mensajes de notificación personalizados\n• Notificaciones de desconexión"
+	L.SETTINGS_NOTIFICATIONS_QUIET_HOURS = "|cffffcc00Horas de silencio automáticas:|r\n• Durante el combate (sin distracciones)\n• Futuro: Detección de instancia, DND manual, horas programadas"
+	
+	-- ========================================
+	-- NOTIFICATION MESSAGES
+	-- ========================================
+	L.NOTIFICATION_MODE_CHANGED = "Modo de notificación establecido a %s"
+	L.NOTIFICATION_TEST_MESSAGE = "Esta es una notificación de prueba"
+	L.NOTIFICATION_FRIEND_ONLINE = "%s está ahora conectado"
+	L.NOTIFICATION_FRIEND_PLAYING = "%s está ahora conectado [jugando %s]"
+	L.NOTIFICATION_SYSTEM_UNAVAILABLE = "Sistema de notificación no disponible"
+	L.NOTIFICATION_BETA_REQUIRED = "Las Funciones Beta deben estar activadas para usar notificaciones"
+	L.NOTIFICATION_BETA_ENABLE_HINT = "→ Actívalas en Configuración > Avanzado > Funciones Beta"
 end

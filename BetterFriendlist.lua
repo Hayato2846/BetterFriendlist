@@ -469,25 +469,34 @@ UpdateFriendsDisplay = function()
 end
 
 -- Throttled update function to batch rapid events
-local function RequestUpdate()
+-- IMPROVED (Phase 14d): Always update data layer, only conditionally update display
+local function RequestUpdate(forceDisplay)
 	local currentTime = GetTime()
 	
 	-- If enough time has passed, update immediately
 	if currentTime - lastUpdateTime >= UPDATE_THROTTLE then
 		lastUpdateTime = currentTime
 		pendingUpdate = false
-		UpdateFriendsList()
-		UpdateFriendsDisplay()
+		UpdateFriendsList() -- ALWAYS update data
+		
+		-- Only update display if frame is shown (unless forced)
+		if forceDisplay or (BetterFriendsFrame and BetterFriendsFrame:IsShown()) then
+			UpdateFriendsDisplay()
+		end
 	else
 		-- Otherwise, schedule a delayed update
 		if not pendingUpdate then
 			pendingUpdate = true
 			C_Timer.After(UPDATE_THROTTLE, function()
-				if pendingUpdate and BetterFriendsFrame and BetterFriendsFrame:IsShown() then
+				if pendingUpdate then
 					lastUpdateTime = GetTime()
 					pendingUpdate = false
-					UpdateFriendsList()
-					UpdateFriendsDisplay()
+					UpdateFriendsList() -- ALWAYS update data
+					
+					-- Only update display if frame is shown
+					if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
+						UpdateFriendsDisplay()
+					end
 				end
 			end)
 		end
@@ -787,6 +796,63 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end)
 			end
 		end
+		
+		-- Add Notification Settings submenu (Phase 9: Per-Friend Rules)
+		if BetterFriendlistDB.enableBetaFeatures then
+			rootDescription:CreateDivider()
+			local notificationButton = rootDescription:CreateButton("Notification Settings")
+			
+			-- Checkbox for "Default (Use global settings)"
+			notificationButton:CreateCheckbox(
+				"Default (Use global settings)",
+				function()
+					local rule = BetterFriendlistDB.notificationFriendRules and BetterFriendlistDB.notificationFriendRules[friendUID]
+					return not rule or rule == "default"
+				end,
+				function()
+					if not BetterFriendlistDB.notificationFriendRules then
+						BetterFriendlistDB.notificationFriendRules = {}
+					end
+					BetterFriendlistDB.notificationFriendRules[friendUID] = "default"
+					local friendName = contextData.name or contextData.battleTag or "friend"
+					print("|cff00ff00BetterFriendlist:|r Notifications for " .. friendName .. " set to |cffffcc00Default|r (global settings)")
+				end
+			)
+			
+			-- Checkbox for "Whitelist (Always notify)"
+			notificationButton:CreateCheckbox(
+				"Whitelist (Always notify)",
+				function()
+					local rule = BetterFriendlistDB.notificationFriendRules and BetterFriendlistDB.notificationFriendRules[friendUID]
+					return rule == "whitelist"
+				end,
+				function()
+					if not BetterFriendlistDB.notificationFriendRules then
+						BetterFriendlistDB.notificationFriendRules = {}
+					end
+					BetterFriendlistDB.notificationFriendRules[friendUID] = "whitelist"
+					local friendName = contextData.name or contextData.battleTag or "friend"
+					print("|cff00ff00BetterFriendlist:|r Notifications for " .. friendName .. " set to |cff00ff00Whitelist|r (always notify)")
+				end
+			)
+			
+			-- Checkbox for "Blacklist (Never notify)"
+			notificationButton:CreateCheckbox(
+				"Blacklist (Never notify)",
+				function()
+					local rule = BetterFriendlistDB.notificationFriendRules and BetterFriendlistDB.notificationFriendRules[friendUID]
+					return rule == "blacklist"
+				end,
+				function()
+					if not BetterFriendlistDB.notificationFriendRules then
+						BetterFriendlistDB.notificationFriendRules = {}
+					end
+					BetterFriendlistDB.notificationFriendRules[friendUID] = "blacklist"
+					local friendName = contextData.name or contextData.battleTag or "friend"
+					print("|cff00ff00BetterFriendlist:|r Notifications for " .. friendName .. " set to |cffff0000Blacklist|r (never notify)")
+				end
+			)
+		end
 	end
 		
 		-- Register for BattleNet friend menus (online and offline)
@@ -817,11 +883,10 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		-- Fire callbacks for modules
 		BFL:FireEventCallbacks(event, ...)
 		
-		-- Always allow events, but throttle them to prevent spam
+		-- CRITICAL (Phase 14d): Always update friend list data, even if UI is hidden
+		-- This ensures data stays synchronized with WoW API
 		-- The UpdateFriendsList() function will apply search filter automatically
-		if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
-			RequestUpdate() -- Use throttled update to prevent lag from rapid events
-		end
+		RequestUpdate() -- No longer checks if frame is shown
 	elseif event == "SOCIAL_QUEUE_UPDATE" or event == "GROUP_LEFT" or event == "GROUP_JOINED" then
 		-- Update Quick Join tab counter when social queue changes
 		if BetterFriendsFrame and BetterFriendsFrame:IsShown() then

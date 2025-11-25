@@ -115,6 +115,16 @@ function BFL:GetModule(name)
 	return self.Modules[name]
 end
 
+-- Count table entries (for non-sequential tables)
+function BFL:TableCount(tbl)
+	if not tbl then return 0 end
+	local count = 0
+	for _ in pairs(tbl) do
+		count = count + 1
+	end
+	return count
+end
+
 --------------------------------------------------------------------------
 -- Event Callback System
 --------------------------------------------------------------------------
@@ -265,6 +275,27 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 				end
 			end
 			
+			-- Initialize NotificationSystem (cooldown timer, etc.)
+			if BFL.NotificationSystem and BFL.NotificationSystem.Initialize then
+				BFL.NotificationSystem:Initialize()
+			end
+			
+			-- Initialize NotificationEditMode (Edit Mode integration, optional dependency)
+			if BFL.NotificationEditMode and BFL.NotificationEditMode.Initialize then
+				BFL.NotificationEditMode:Initialize()
+			end
+			
+			-- Register module events after initialization
+			-- CRITICAL: Only register NotificationSystem events if Beta Features enabled
+			if BFL.NotificationSystem and BFL.NotificationSystem.RegisterEvents then
+				if BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures then
+					BFL.NotificationSystem:RegisterEvents()
+					BFL:DebugPrint("|cff00ffffBFL:|r NotificationSystem events registered (Beta enabled)")
+				else
+					BFL:DebugPrint("|cffffcc00BFL:|r NotificationSystem events NOT registered (Beta disabled)")
+				end
+			end
+			
 			-- Version-aware success message
 			local versionSuffix = BFL.IsMidnight and " (Midnight)" or " (TWW)"
 			print("|cff00ff00BetterFriendlist v" .. BFL.VERSION .. versionSuffix .. "|r loaded successfully!")
@@ -398,6 +429,45 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 				print(string.format("  lastTrade: %d (%s ago)", activities.lastTrade, SecondsToTime(time() - activities.lastTrade)))
 			end
 		end
+	
+	-- Test Notifications
+	elseif msg == "testnotify" or msg == "testnotification" then
+		local NotificationSystem = BFL.NotificationSystem
+		if not NotificationSystem then
+			print("|cffff0000BetterFriendlist:|r NotificationSystem module not loaded")
+			return
+		end
+		
+		-- Check if Beta features enabled
+		if not BetterFriendlistDB.enableBetaFeatures then
+			print("|cffff0000BetterFriendlist:|r Beta Features are disabled!")
+			print("|cffffcc00Enable Beta Features in:|r ESC > AddOns > BetterFriendlist > General")
+			return
+		end
+		
+		print("|cff00ff00BetterFriendlist:|r Triggering 3 test notifications...")
+		
+		-- Trigger 3 test notifications to demonstrate multi-toast system
+		NotificationSystem:ShowNotification("Test Friend 1", "is now online playing World of Warcraft", "Interface\\AddOns\\BetterFriendlist\\Icons\\user-check")
+		C_Timer.After(0.2, function()
+			NotificationSystem:ShowNotification("Test Friend 2", "switched to Warrior", "Interface\\AddOns\\BetterFriendlist\\Icons\\user-check")
+		end)
+		C_Timer.After(0.4, function()
+			NotificationSystem:ShowNotification("Test Friend 3", "logged into World of Warcraft", "Interface\\AddOns\\BetterFriendlist\\Icons\\user-check")
+		end)
+		
+		print("|cff00ff00Success!|r You should see up to 3 toasts displayed simultaneously.")
+		print("|cffffcc00Tip:|r Open Edit Mode (ESC > Edit Mode) to reposition the notification area!")
+	
+	-- Test Group Notification Rules
+	elseif msg == "testgrouprules" or msg == "testgroup" then
+		local NotificationSystem = BFL.NotificationSystem
+		if not NotificationSystem then
+			print("|cffff0000BetterFriendlist:|r NotificationSystem module not loaded")
+			return
+		end
+		
+		NotificationSystem:TestGroupRules()
 	
 	-- Statistics
 	elseif msg == "stats" or msg == "statistics" then
@@ -604,6 +674,8 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		print("  |cffffffff/bfl debug|r - Show database state")
 		print("  |cffffffff/bfl activity|r - Show activity tracking data")
 		print("  |cffffffff/bfl stats|r - Show friend network statistics")
+		print("  |cffffffff/bfl testnotify|r - Test notification system (3 toasts)")
+		print("  |cffffffff/bfl testgrouprules|r - Test group notification rules")
 		print("")
 		print("|cffffcc00Quick Join Commands:|r")
 		print("  |cffffffff/bflqj mock|r - Create 3 test groups")

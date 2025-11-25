@@ -164,4 +164,49 @@ if GetLocale() == "zhCN" then
 	L.BUTTON_SEND_MESSAGE = "发送消息"
 	L.EMPTY_TEXT = "空"
 	L.LEVEL_FORMAT = "%d 级"
+	
+	-- ========================================
+	-- BETA FEATURES (Advanced Tab)
+	-- ========================================
+	L.SETTINGS_BETA_FEATURES_TITLE = "测试功能"
+	L.SETTINGS_BETA_FEATURES_DESC = "启用仍在开发中的实验性功能。这些功能可能会在未来版本中更改或删除。"
+	L.SETTINGS_BETA_FEATURES_ENABLE = "启用测试功能"
+	L.SETTINGS_BETA_FEATURES_TOOLTIP = "启用实验性功能（通知等）"
+	L.SETTINGS_BETA_FEATURES_WARNING = "⚠ 警告：测试功能可能包含错误、性能问题或不完整的功能。使用风险自负。"
+	L.SETTINGS_BETA_FEATURES_LIST = "当前可用的测试功能："
+	L.SETTINGS_BETA_FEATURES_ENABLED = "测试功能 |cff00ff00已启用|r"
+	L.SETTINGS_BETA_FEATURES_DISABLED = "测试功能 |cffff0000已禁用|r"
+	L.SETTINGS_BETA_TABS_VISIBLE = "测试标签页现在在设置中可见"
+	L.SETTINGS_BETA_TABS_HIDDEN = "测试标签页现在已隐藏"
+	
+	-- ========================================
+	-- NOTIFICATIONS TAB
+	-- ========================================
+	L.SETTINGS_NOTIFICATIONS_TITLE = "通知"
+	L.SETTINGS_NOTIFICATIONS_DESC = "配置智能好友通知。当好友上线时接收提醒。"
+	L.SETTINGS_NOTIFICATIONS_DISPLAY_HEADER = "通知显示"
+	L.SETTINGS_NOTIFICATIONS_DISPLAY_MODE = "显示模式："
+	L.SETTINGS_NOTIFICATIONS_MODE_TOAST = "弹出通知"
+	L.SETTINGS_NOTIFICATIONS_MODE_CHAT = "仅聊天消息"
+	L.SETTINGS_NOTIFICATIONS_MODE_DISABLED = "已禁用"
+	L.SETTINGS_NOTIFICATIONS_MODE_DESC = "|cffffcc00弹出通知：|r 当好友上线时显示简洁的通知\n|cffffcc00仅聊天消息：|r 无弹出窗口，仅在聊天中显示消息\n|cffffcc00已禁用：|r 无通知"
+	L.SETTINGS_NOTIFICATIONS_TEST_BUTTON = "测试通知"
+	L.SETTINGS_NOTIFICATIONS_SOUND_HEADER = "声音设置"
+	L.SETTINGS_NOTIFICATIONS_SOUND_ENABLE = "通知时播放声音"
+	L.SETTINGS_NOTIFICATIONS_SOUND_ENABLED = "通知声音 |cff00ff00已启用|r"
+	L.SETTINGS_NOTIFICATIONS_SOUND_DISABLED = "通知声音 |cffff0000已禁用|r"
+	L.SETTINGS_NOTIFICATIONS_COMING_SOON = "即将推出"
+	L.SETTINGS_NOTIFICATIONS_FUTURE_FEATURES = "• 单个好友通知规则\n• 群组触发器（群组 Y 的 X 个好友在线）\n• 安静时段（战斗、副本、时间表）\n• 自定义通知消息\n• 离线通知"
+	L.SETTINGS_NOTIFICATIONS_QUIET_HOURS = "|cffffcc00自动安静时段：|r\n• 战斗中（不打扰）\n• 未来：副本检测、手动勿扰、预定时间"
+	
+	-- ========================================
+	-- NOTIFICATION MESSAGES
+	-- ========================================
+	L.NOTIFICATION_MODE_CHANGED = "通知模式已设置为 %s"
+	L.NOTIFICATION_TEST_MESSAGE = "这是测试通知"
+	L.NOTIFICATION_FRIEND_ONLINE = "%s 现在在线"
+	L.NOTIFICATION_FRIEND_PLAYING = "%s 现在在线 [正在玩 %s]"
+	L.NOTIFICATION_SYSTEM_UNAVAILABLE = "通知系统不可用"
+	L.NOTIFICATION_BETA_REQUIRED = "必须启用测试功能才能使用通知"
+	L.NOTIFICATION_BETA_ENABLE_HINT = "→ 在设置 > 高级 > 测试功能中启用"
 end

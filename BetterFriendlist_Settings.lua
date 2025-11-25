@@ -100,6 +100,14 @@ Settings:SaveGroupOrder()
 end
 end
 
+-- Refresh tab visibility (Beta features toggle)
+function BetterFriendlistSettings_RefreshTabs()
+	local Settings = GetSettings()
+	if Settings then
+		Settings:RefreshTabs()
+	end
+end
+
 -- Show color picker for a group
 function BetterFriendlistSettings_ShowColorPicker(groupId, groupName, colorSwatch)
 local Settings = GetSettings()
@@ -251,6 +259,12 @@ if Settings then
 Settings:OnAccordionGroupsChanged(checked)
 end
 end
+
+--------------------------------------------------------------------------
+-- TAB VISIBILITY SYSTEM (Beta Features)
+--------------------------------------------------------------------------
+
+
 
 --------------------------------------------------------------------------
 -- STATIC POPUP DIALOGS

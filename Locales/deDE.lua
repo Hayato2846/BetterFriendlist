@@ -191,4 +191,49 @@ if GetLocale() == "deDE" then
 	L.BUTTON_SEND_MESSAGE = "Nachricht senden"
 	L.EMPTY_TEXT = "Leer"
 	L.LEVEL_FORMAT = "Stufe %d"
+	
+	-- ========================================
+	-- BETA FEATURES (Advanced Tab)
+	-- ========================================
+	L.SETTINGS_BETA_FEATURES_TITLE = "Beta-Funktionen"
+	L.SETTINGS_BETA_FEATURES_DESC = "Aktiviere experimentelle Funktionen, die sich noch in Entwicklung befinden. Diese Funktionen können sich in zukünftigen Versionen ändern oder entfernt werden."
+	L.SETTINGS_BETA_FEATURES_ENABLE = "Beta-Funktionen aktivieren"
+	L.SETTINGS_BETA_FEATURES_TOOLTIP = "Aktiviert experimentelle Funktionen (Benachrichtigungen, etc.)"
+	L.SETTINGS_BETA_FEATURES_WARNING = "⚠ Warnung: Beta-Funktionen können Bugs, Performance-Probleme oder unvollständige Funktionalität enthalten. Nutzung auf eigenes Risiko."
+	L.SETTINGS_BETA_FEATURES_LIST = "Derzeit verfügbare Beta-Funktionen:"
+	L.SETTINGS_BETA_FEATURES_ENABLED = "Beta-Funktionen |cff00ff00AKTIVIERT|r"
+	L.SETTINGS_BETA_FEATURES_DISABLED = "Beta-Funktionen |cffff0000DEAKTIVIERT|r"
+	L.SETTINGS_BETA_TABS_VISIBLE = "Beta-Tabs sind nun sichtbar in den Einstellungen"
+	L.SETTINGS_BETA_TABS_HIDDEN = "Beta-Tabs sind nun ausgeblendet"
+	
+	-- ========================================
+	-- NOTIFICATIONS TAB
+	-- ========================================
+	L.SETTINGS_NOTIFICATIONS_TITLE = "Benachrichtigungen"
+	L.SETTINGS_NOTIFICATIONS_DESC = "Konfiguriere intelligente Freunde-Benachrichtigungen. Erhalte Benachrichtigungen, wenn Freunde online kommen."
+	L.SETTINGS_NOTIFICATIONS_DISPLAY_HEADER = "Benachrichtigungs-Anzeige"
+	L.SETTINGS_NOTIFICATIONS_DISPLAY_MODE = "Anzeigemodus:"
+	L.SETTINGS_NOTIFICATIONS_MODE_TOAST = "Toast-Benachrichtigung"
+	L.SETTINGS_NOTIFICATIONS_MODE_CHAT = "Nur Chat-Nachricht"
+	L.SETTINGS_NOTIFICATIONS_MODE_DISABLED = "Deaktiviert"
+	L.SETTINGS_NOTIFICATIONS_MODE_DESC = "|cffffcc00Toast-Benachrichtigung:|r Zeigt eine kompakte Benachrichtigung, wenn Freunde online kommen\n|cffffcc00Nur Chat-Nachricht:|r Kein Popup, nur Nachrichten im Chat\n|cffffcc00Deaktiviert:|r Keine Benachrichtigungen"
+	L.SETTINGS_NOTIFICATIONS_TEST_BUTTON = "Benachrichtigung testen"
+	L.SETTINGS_NOTIFICATIONS_SOUND_HEADER = "Sound-Einstellungen"
+	L.SETTINGS_NOTIFICATIONS_SOUND_ENABLE = "Sound bei Benachrichtigungen abspielen"
+	L.SETTINGS_NOTIFICATIONS_SOUND_ENABLED = "Benachrichtigungs-Sounds |cff00ff00AKTIVIERT|r"
+	L.SETTINGS_NOTIFICATIONS_SOUND_DISABLED = "Benachrichtigungs-Sounds |cffff0000DEAKTIVIERT|r"
+	L.SETTINGS_NOTIFICATIONS_COMING_SOON = "Demnächst verfügbar"
+	L.SETTINGS_NOTIFICATIONS_FUTURE_FEATURES = "• Benachrichtigungsregeln pro Freund\n• Gruppen-Trigger (X Freunde aus Gruppe Y online)\n• Ruhezeiten (Kampf, Instanz, Zeitplan)\n• Individuelle Benachrichtigungsnachrichten\n• Offline-Benachrichtigungen"
+	L.SETTINGS_NOTIFICATIONS_QUIET_HOURS = "|cffffcc00Automatische Ruhezeiten:|r\n• Während des Kampfes (keine Ablenkung)\n• Zukünftig: Instanz-Erkennung, manueller DND, geplante Zeiten"
+	
+	-- ========================================
+	-- NOTIFICATION MESSAGES
+	-- ========================================
+	L.NOTIFICATION_MODE_CHANGED = "Benachrichtigungsmodus auf %s gesetzt"
+	L.NOTIFICATION_TEST_MESSAGE = "Dies ist eine Test-Benachrichtigung"
+	L.NOTIFICATION_FRIEND_ONLINE = "%s ist jetzt online"
+	L.NOTIFICATION_FRIEND_PLAYING = "%s ist jetzt online [spielt %s]"
+	L.NOTIFICATION_SYSTEM_UNAVAILABLE = "Benachrichtigungssystem nicht verfügbar"
+	L.NOTIFICATION_BETA_REQUIRED = "Beta-Funktionen müssen aktiviert sein, um Benachrichtigungen zu nutzen"
+	L.NOTIFICATION_BETA_ENABLE_HINT = "→ Aktiviere sie in Einstellungen > Erweitert > Beta-Funktionen"
 end

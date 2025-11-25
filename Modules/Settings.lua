@@ -324,11 +324,114 @@ function Settings:Show()
 	
 	if settingsFrame then
 		self:LoadSettings()
+		self:RefreshTabs() -- Update tab visibility based on Beta features
 		settingsFrame:Show()
 		self:ShowTab(1)
 	else
 		print("|cffff0000BetterFriendlist Settings:|r Frame not initialized!")
 	end
+end
+
+-- ===========================================
+-- TAB SYSTEM: Central Definition
+-- ===========================================
+local TAB_DEFINITIONS = {
+	-- Stable Tabs (always visible)
+	{id = 1, name = "General", icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\settings.blp", beta = false},
+	{id = 2, name = "Groups", icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\users.blp", beta = false},
+	{id = 3, name = "Advanced", icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\sliders.blp", beta = false},
+	
+	-- Beta Tabs (only visible when enableBetaFeatures = true)
+	{id = 4, name = "Notifications", icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\bell.blp", beta = true},
+	-- Future beta tabs go here...
+}
+
+-- Color scheme
+local COLOR_STABLE = "|cffffff00" -- Gold
+local COLOR_BETA = "|cffff8800" -- Orange
+
+-- Get all tabs that should be visible based on current settings
+local function GetVisibleTabs()
+	local betaEnabled = BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures or false
+	local visibleTabs = {}
+	
+	for _, tabDef in ipairs(TAB_DEFINITIONS) do
+		-- Show tab if: it's stable OR (it's beta AND beta features are enabled)
+		if not tabDef.beta or betaEnabled then
+			table.insert(visibleTabs, tabDef)
+		end
+	end
+	
+	return visibleTabs
+end
+
+-- Get all beta tab IDs (for auto-switching when disabling beta)
+local function GetBetaTabIds()
+	local betaTabIds = {}
+	for _, tabDef in ipairs(TAB_DEFINITIONS) do
+		if tabDef.beta then
+			table.insert(betaTabIds, tabDef.id)
+		end
+	end
+	return betaTabIds
+end
+
+-- Refresh tab visibility (Beta features toggle)
+function Settings:RefreshTabs()
+	if not settingsFrame then
+		settingsFrame = BetterFriendlistSettingsFrame
+	end
+	if not settingsFrame then return end
+	
+	local visibleTabs = GetVisibleTabs()
+	
+	-- Update tab buttons
+	for _, tabDef in ipairs(visibleTabs) do
+		local tab = _G["BetterFriendlistSettingsFrameTab" .. tabDef.id]
+		if tab then
+			-- Build tab text with icon and coloring
+			local color = tabDef.beta and COLOR_BETA or COLOR_STABLE
+			-- Icon with color tint: r:g:b values (255, 136, 0 for orange / 255, 255, 0 for gold)
+			local r, g, b
+			if tabDef.beta then
+				r, g, b = 255, 136, 0 -- Orange
+			else
+				r, g, b = 255, 255, 0 -- Gold
+			end
+			local iconTexture = tabDef.icon and ("|T" .. tabDef.icon .. ":16:16:0:0:64:64:0:64:0:64:" .. r .. ":" .. g .. ":" .. b .. "|t ") or ""
+			local text = color .. iconTexture .. tabDef.name .. "|r"
+			
+			tab:SetText(text)
+			tab:Show()
+		end
+	end
+	
+	-- Hide tabs not in visible list
+	for i = 1, 10 do
+		local tab = _G["BetterFriendlistSettingsFrameTab" .. i]
+		if tab then
+			local shouldShow = false
+			for _, tabDef in ipairs(visibleTabs) do
+				if tabDef.id == i then
+					shouldShow = true
+					break
+				end
+			end
+			if not shouldShow then
+				tab:Hide()
+			end
+		end
+	end
+	
+	-- Update panel - always set to highest tab ID in definitions
+	local maxTabId = 0
+	for _, tabDef in ipairs(TAB_DEFINITIONS) do
+		if tabDef.id > maxTabId then
+			maxTabId = tabDef.id
+		end
+	end
+	PanelTemplates_SetNumTabs(settingsFrame, maxTabId)
+	PanelTemplates_UpdateTabs(settingsFrame)
 end
 
 -- Hide the settings window
@@ -343,7 +446,7 @@ function Settings:ShowTab(tabID)
 	if not settingsFrame then return end
 	
 	currentTab = tabID
-	settingsFrame.numTabs = 3
+	settingsFrame.numTabs = 4
 	PanelTemplates_SetTab(settingsFrame, tabID)
 	
 	local content = settingsFrame.ContentScrollFrame.Content
@@ -351,7 +454,7 @@ function Settings:ShowTab(tabID)
 		if content.GeneralTab then content.GeneralTab:Hide() end
 		if content.GroupsTab then content.GroupsTab:Hide() end
 		if content.AdvancedTab then content.AdvancedTab:Hide() end
-		if content.StatisticsTab then content.StatisticsTab:Hide() end
+		if content.NotificationsTab then content.NotificationsTab:Hide() end
 		
 		if tabID == 1 and content.GeneralTab then
 			content.GeneralTab:Show()
@@ -362,6 +465,9 @@ function Settings:ShowTab(tabID)
 		elseif tabID == 3 and content.AdvancedTab then
 			content.AdvancedTab:Show()
 			self:RefreshAdvancedTab()
+		elseif tabID == 4 and content.NotificationsTab then
+			content.NotificationsTab:Show()
+			self:RefreshNotificationsTab()
 		end
 		
 		-- Adjust content height dynamically after tab is shown
@@ -2452,6 +2558,104 @@ function Settings:RefreshAdvancedTab()
 	importButton:SetSize(140, 24)
 	table.insert(allFrames, importButton)
 	
+	yOffset = yOffset - 50
+	
+	-- ===========================================
+	-- Beta Features Section
+	-- ===========================================
+	local betaHeader = Components:CreateHeader(tab, "|cffff8800Beta Features|r") -- Orange for Beta
+	betaHeader:SetPoint("TOPLEFT", 10, yOffset)
+	table.insert(allFrames, betaHeader)
+	yOffset = yOffset - 25
+	
+	-- Beta features description
+	local betaDesc = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	betaDesc:SetPoint("TOPLEFT", 10, yOffset)
+	betaDesc:SetWidth(350)
+	betaDesc:SetJustifyH("LEFT")
+	betaDesc:SetWordWrap(true)
+	betaDesc:SetText("Enable experimental features that are still in development. These features may change or be removed in future versions.")
+	table.insert(allFrames, betaDesc)
+	yOffset = yOffset - 35
+	
+	-- Warning icon + text (before checkbox)
+	local warningIcon = tab:CreateTexture(nil, "ARTWORK")
+	warningIcon:SetSize(16, 16)
+	warningIcon:SetPoint("TOPLEFT", 10, yOffset)
+	warningIcon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\alert-triangle")
+	warningIcon:SetVertexColor(1, 0.65, 0)
+	table.insert(allFrames, warningIcon)
+	
+	local warningText = tab:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+	warningText:SetPoint("LEFT", warningIcon, "RIGHT", 6, 0)
+	warningText:SetWidth(330)
+	warningText:SetJustifyH("LEFT")
+	warningText:SetWordWrap(true)
+	warningText:SetText("Beta features may contain bugs, performance issues, or incomplete functionality. Use at your own risk.")
+	warningText:SetTextColor(1, 0.53, 0) -- Orange (matching Beta theme)
+	table.insert(allFrames, warningText)
+	yOffset = yOffset - 35
+	
+	-- Enable Beta Features Toggle
+	local betaToggle = Components:CreateCheckbox(
+		tab,
+		"Enable Beta Features",
+		BetterFriendlistDB.enableBetaFeatures or false,
+		function(checked)
+			BetterFriendlistDB.enableBetaFeatures = checked
+			
+			-- If disabling Beta and currently on ANY Beta tab, switch to General
+			if not checked then
+				local betaTabIds = GetBetaTabIds()
+				for _, betaTabId in ipairs(betaTabIds) do
+					if currentTab == betaTabId then
+						self:ShowTab(1)
+						break
+					end
+				end
+			end
+			
+			-- Refresh Settings UI (show/hide Beta tabs)
+			if BetterFriendlistSettings_RefreshTabs then
+				BetterFriendlistSettings_RefreshTabs()
+			end
+			
+			-- User feedback
+			if checked then
+				print("|cff00ff00BetterFriendlist:|r Beta Features |cff00ff00ENABLED|r")
+				print("|cffff8800→|r Beta tabs are now visible in Settings")
+			else
+				print("|cff00ff00BetterFriendlist:|r Beta Features |cffff0000DISABLED|r")
+				print("|cffff8800→|r Beta tabs are now hidden")
+			end
+		end
+	)
+	betaToggle:SetPoint("TOPLEFT", 10, yOffset)
+	betaToggle:SetTooltip("Beta Features", "Enable experimental features like Smart Notifications and Bulk Operations")
+	table.insert(allFrames, betaToggle)
+	yOffset = yOffset - 35
+	
+	-- Beta feature list (informational)
+	local featureListTitle = tab:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	featureListTitle:SetPoint("TOPLEFT", 10, yOffset)
+	featureListTitle:SetText("Currently available Beta features:")
+	featureListTitle:SetTextColor(1, 0.53, 0) -- Orange (Beta theme)
+	table.insert(allFrames, featureListTitle)
+	yOffset = yOffset - 20
+	
+	-- Feature 1: Smart Friend Notifications
+	local feature1Icon = tab:CreateTexture(nil, "ARTWORK")
+	feature1Icon:SetSize(14, 14)
+	feature1Icon:SetPoint("TOPLEFT", 15, yOffset)
+	feature1Icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\bell")
+	feature1Icon:SetVertexColor(1, 0.53, 0) -- Orange (Beta theme)
+	table.insert(allFrames, feature1Icon)
+	
+	local feature1Text = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	feature1Text:SetPoint("LEFT", feature1Icon, "RIGHT", 6, 0)
+	feature1Text:SetText("Smart Friend Notifications")
+	table.insert(allFrames, feature1Text)
+	
 	-- Store components for cleanup
 	tab.components = allFrames
 end
@@ -2662,6 +2866,784 @@ function Settings:RefreshStatisticsTab()
 	
 	-- Trigger initial data refresh
 	self:RefreshStatistics()
+end
+
+-- ========================================
+-- Notifications Tab (BETA)
+-- ========================================
+
+function Settings:RefreshNotificationsTab()
+	if not settingsFrame or not Components then return end
+	
+	local content = settingsFrame.ContentScrollFrame.Content
+	if not content or not content.NotificationsTab then return end
+	
+	local tab = content.NotificationsTab
+	
+	-- Clear existing content
+	if tab.components then
+		for _, component in ipairs(tab.components) do
+			if component.Hide then component:Hide() end
+		end
+	end
+	tab.components = {}
+	
+	local allFrames = {}
+	
+	-- ===========================================
+	-- Header (Beta - Orange)
+	-- ===========================================
+	local betaHeader = tab:CreateFontString(nil, "ARTWORK", "GameFontNormalHuge")
+	betaHeader:SetText("|cffff8800Notifications|r") -- Orange for Beta feature
+	table.insert(allFrames, betaHeader)
+	
+	-- Description
+	local desc = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	desc:SetWidth(360)
+	desc:SetJustifyH("LEFT")
+	desc:SetWordWrap(true)
+	desc:SetText("Configure smart friend notifications. Get alerts when friends come online.")
+	table.insert(allFrames, desc)
+	
+	-- ===========================================
+	-- NOTIFICATION DISPLAY SECTION
+	-- ===========================================
+	local displayHeader = Components:CreateHeader(tab, "Notification Display")
+	table.insert(allFrames, displayHeader)
+	
+	-- Display Mode Dropdown
+	local displayModeOptions = {
+		labels = {"Toast Notification", "Chat Message Only", "Disabled"},
+		values = {"alert", "chat", "disabled"}
+	}
+	local currentMode = BetterFriendlistDB.notificationDisplayMode or "alert"
+	
+	local function isDisplayModeSelected(value)
+		return value == BetterFriendlistDB.notificationDisplayMode
+	end
+	
+	local function onDisplayModeChanged(value)
+		BetterFriendlistDB.notificationDisplayMode = value
+		local modeNames = {
+			alert = "|cffffcc00Toast|r",
+			chat = "|cffffcc00Chat|r",
+			disabled = "|cffff0000DISABLED|r"
+		}
+		print("|cff00ff00BetterFriendlist:|r Notification mode set to " .. (modeNames[value] or value))
+	end
+	
+	local displayModeDropdown = Components:CreateDropdown(tab, "Display Mode:", displayModeOptions, isDisplayModeSelected, onDisplayModeChanged)
+	table.insert(allFrames, displayModeDropdown)
+	
+	-- Mode Description
+	local modeDesc = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	modeDesc:SetWidth(360)
+	modeDesc:SetJustifyH("LEFT")
+	modeDesc:SetWordWrap(true)
+	modeDesc:SetText(
+		"|cffffcc00Toast Notification:|r Shows a compact notification when friends come online\n" ..
+		"|cffffcc00Chat Message Only:|r No popup, only shows messages in chat\n" ..
+		"|cffffcc00Disabled:|r No notifications at all"
+	)
+	table.insert(allFrames, modeDesc)
+	
+	-- Test Button
+	local testBtn = Components:CreateButton(
+		tab,
+		"Test Notification",
+		function()
+			if BFL.NotificationSystem and BFL.NotificationSystem.ShowTestNotification then
+				BFL.NotificationSystem:ShowTestNotification()
+			else
+				print("|cffff0000BetterFriendlist:|r Notification system not available")
+			end
+		end,
+		"Trigger a test notification"
+	)
+	testBtn:SetSize(150, 24)
+	table.insert(allFrames, testBtn)
+	
+	-- ===========================================
+	-- SOUND SETTINGS SECTION
+	-- ===========================================
+	local soundHeader = Components:CreateHeader(tab, "Sound Settings")
+	table.insert(allFrames, soundHeader)
+	
+	-- Enable Sound Checkbox
+	local soundToggle = Components:CreateCheckbox(
+		tab,
+		"Play sound with notifications",
+		BetterFriendlistDB.notificationSoundEnabled or false,
+		function(checked)
+			BetterFriendlistDB.notificationSoundEnabled = checked
+			if checked then
+				print("|cff00ff00BetterFriendlist:|r Notification sounds |cff00ff00ENABLED|r")
+			else
+				print("|cff00ff00BetterFriendlist:|r Notification sounds |cffff0000DISABLED|r")
+			end
+		end
+	)
+	soundToggle:SetTooltip("Notification Sounds", "Play a sound effect when notifications appear. You can test the sound using the button above.")
+	table.insert(allFrames, soundToggle)
+	
+	-- ===========================================
+	-- QUIET HOURS SECTION
+	-- ===========================================
+	local quietHeader = Components:CreateHeader(tab, "Quiet Hours")
+	table.insert(allFrames, quietHeader)
+	
+	-- Manual DND Toggle
+	local manualDND = Components:CreateCheckbox(
+		tab,
+		"Manual Do Not Disturb",
+		BetterFriendlistDB.notificationQuietManual or false,
+		function(checked)
+			BetterFriendlistDB.notificationQuietManual = checked
+			if checked then
+				print("|cff00ff00BetterFriendlist:|r Manual DND |cff00ff00ENABLED|r - All notifications silenced")
+			else
+				print("|cff00ff00BetterFriendlist:|r Manual DND |cffff0000DISABLED|r")
+			end
+		end
+	)
+	manualDND:SetTooltip("Manual Do Not Disturb", "Manually silence all notifications until you disable this option. Takes highest priority over all other settings.")
+	table.insert(allFrames, manualDND)
+	
+	-- Combat Toggle
+	local combatQuiet = Components:CreateCheckbox(
+		tab,
+		"Silence during combat",
+		BetterFriendlistDB.notificationQuietCombat ~= false, -- Default: true
+		function(checked)
+			BetterFriendlistDB.notificationQuietCombat = checked
+			print("|cff00ff00BetterFriendlist:|r Combat quiet mode " .. (checked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
+		end
+	)
+	combatQuiet:SetTooltip("Combat Silence", "Automatically silence notifications during combat encounters to avoid distractions.")
+	table.insert(allFrames, combatQuiet)
+	
+	-- Instance Toggle
+	local instanceQuiet = Components:CreateCheckbox(
+		tab,
+		"Silence in instances (dungeons, raids, PvP)",
+		BetterFriendlistDB.notificationQuietInstance or false,
+		function(checked)
+			BetterFriendlistDB.notificationQuietInstance = checked
+			print("|cff00ff00BetterFriendlist:|r Instance quiet mode " .. (checked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
+		end
+	)
+	instanceQuiet:SetTooltip("Instance Silence", "Silence notifications when you are in dungeons, raids, battlegrounds, or arenas.")
+	table.insert(allFrames, instanceQuiet)
+	
+	-- Scheduled Quiet Hours Toggle
+	local scheduledQuiet = Components:CreateCheckbox(
+		tab,
+		"Scheduled quiet hours",
+		BetterFriendlistDB.notificationQuietScheduled or false,
+		function(checked)
+			BetterFriendlistDB.notificationQuietScheduled = checked
+			print("|cff00ff00BetterFriendlist:|r Scheduled quiet hours " .. (checked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
+		end
+	)
+	scheduledQuiet:SetTooltip("Scheduled Quiet Hours", "Silence notifications during specific hours each day. Configure your preferred schedule below.")
+	table.insert(allFrames, scheduledQuiet)
+	
+	-- Helper: Convert minutes to slider index (0-95)
+	local function MinutesToIndex(minutes)
+		return math.floor(minutes / 15)
+	end
+	
+	-- Helper: Convert slider index to minutes
+	local function IndexToMinutes(index)
+		return index * 15
+	end
+	
+	-- Helper: Format minutes as HH:MM
+	local function FormatTime(minutes)
+		local hours = math.floor(minutes / 60)
+		local mins = minutes % 60
+		return string.format("%02d:%02d", hours, mins)
+	end
+	
+	-- Start Time Slider (0-95 = 00:00 to 23:45 in 15-minute steps)
+	local startMinutes = BetterFriendlistDB.notificationQuietScheduleStartMinutes or 1320 -- Default: 22:00 = 1320 minutes
+	local startHourSlider = Components:CreateSlider(
+		tab,
+		"Start Time:",
+		0,
+		95,
+		MinutesToIndex(startMinutes),
+		function(value)
+			return FormatTime(IndexToMinutes(value))
+		end,
+		function(value)
+			BetterFriendlistDB.notificationQuietScheduleStartMinutes = IndexToMinutes(value)
+		end
+	)
+	table.insert(allFrames, startHourSlider)
+	
+	-- End Time Slider (0-95 = 00:00 to 23:45 in 15-minute steps)
+	local endMinutes = BetterFriendlistDB.notificationQuietScheduleEndMinutes or 480 -- Default: 08:00 = 480 minutes
+	local endHourSlider = Components:CreateSlider(
+		tab,
+		"End Time:",
+		0,
+		95,
+		MinutesToIndex(endMinutes),
+		function(value)
+			return FormatTime(IndexToMinutes(value))
+		end,
+		function(value)
+			BetterFriendlistDB.notificationQuietScheduleEndMinutes = IndexToMinutes(value)
+		end
+	)
+	table.insert(allFrames, endHourSlider)
+	
+	-- Scheduled Hours Info
+	local scheduleInfo = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	scheduleInfo:SetWidth(360)
+	scheduleInfo:SetJustifyH("LEFT")
+	scheduleInfo:SetWordWrap(true)
+	scheduleInfo:SetTextColor(0.7, 0.7, 0.7)
+	scheduleInfo:SetText("|cffffcc00Note:|r If start hour is greater than end hour, the schedule crosses midnight (e.g., 22:00-08:00).")
+	table.insert(allFrames, scheduleInfo)
+	
+	-- ===========================================
+	-- OFFLINE NOTIFICATIONS SECTION
+	-- ===========================================
+	local offlineHeader = Components:CreateHeader(tab, "Offline Notifications")
+	table.insert(allFrames, offlineHeader)
+	
+	-- Offline Notifications Toggle
+	local offlineToggle = Components:CreateCheckbox(
+		tab,
+		"Show notifications when friends go offline",
+		BetterFriendlistDB.notificationOfflineEnabled or false,
+		function(checked)
+			BetterFriendlistDB.notificationOfflineEnabled = checked
+			if checked then
+				print("|cff00ff00BetterFriendlist:|r Offline notifications |cff00ff00ENABLED|r")
+			else
+				print("|cff00ff00BetterFriendlist:|r Offline notifications |cffff0000DISABLED|r")
+			end
+		end
+	)
+	offlineToggle:SetTooltip("Offline Notifications", "Show notifications when friends log off. These are independent from online notifications and respect all quiet hours settings.")
+	table.insert(allFrames, offlineToggle)
+	
+	-- ===========================================
+	-- GAME-SPECIFIC NOTIFICATIONS SECTION (Phase 11.5)
+	-- ===========================================
+	local gameSpecificHeader = Components:CreateHeader(tab, "Game-Specific Notifications")
+	table.insert(allFrames, gameSpecificHeader)
+	
+	-- WoW Login Toggle
+	local wowLoginToggle = Components:CreateCheckbox(
+		tab,
+		"WoW Login: Notify when friend logs into World of Warcraft",
+		BetterFriendlistDB.notificationWowLoginEnabled or false,
+		function(checked)
+			BetterFriendlistDB.notificationWowLoginEnabled = checked
+			if checked then
+				print("|cff00ff00BetterFriendlist:|r WoW Login notifications |cff00ff00ENABLED|r")
+			else
+				print("|cff00ff00BetterFriendlist:|r WoW Login notifications |cffff0000DISABLED|r")
+			end
+		end
+	)
+	wowLoginToggle:SetTooltip("WoW Login Notifications", "Get notified when a Battle.net friend starts World of Warcraft (even if they were already online in another game).")
+	table.insert(allFrames, wowLoginToggle)
+	
+	-- Character Switch Toggle
+	local charSwitchToggle = Components:CreateCheckbox(
+		tab,
+		"Character Switch: Notify when friend changes character",
+		BetterFriendlistDB.notificationCharSwitchEnabled or false,
+		function(checked)
+			BetterFriendlistDB.notificationCharSwitchEnabled = checked
+			if checked then
+				print("|cff00ff00BetterFriendlist:|r Character switch notifications |cff00ff00ENABLED|r")
+			else
+				print("|cff00ff00BetterFriendlist:|r Character switch notifications |cffff0000DISABLED|r")
+			end
+		end
+	)
+	charSwitchToggle:SetTooltip("Character Switch Notifications", "Get notified when a friend switches to a different character in World of Warcraft.")
+	table.insert(allFrames, charSwitchToggle)
+	
+	-- Game Switch Toggle
+	local gameSwitchToggle = Components:CreateCheckbox(
+		tab,
+		"Game Switch: Notify when friend changes game",
+		BetterFriendlistDB.notificationGameSwitchEnabled or false,
+		function(checked)
+			BetterFriendlistDB.notificationGameSwitchEnabled = checked
+			if checked then
+				print("|cff00ff00BetterFriendlist:|r Game switch notifications |cff00ff00ENABLED|r")
+			else
+				print("|cff00ff00BetterFriendlist:|r Game switch notifications |cffff0000DISABLED|r")
+			end
+		end
+	)
+	gameSwitchToggle:SetTooltip("Game Switch Notifications", "Get notified when a friend switches from WoW to another Battle.net game (Diablo, Overwatch, etc.).")
+	table.insert(allFrames, gameSwitchToggle)
+	
+	-- ===========================================
+	-- CUSTOM MESSAGES SECTION (Phase 11)
+	-- ===========================================
+	local messagesHeader = Components:CreateHeader(tab, "Custom Messages")
+	table.insert(allFrames, messagesHeader)
+	
+	local messagesDesc = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	messagesDesc:SetWidth(360)
+	messagesDesc:SetJustifyH("LEFT")
+	messagesDesc:SetWordWrap(true)
+	messagesDesc:SetTextColor(0.7, 0.7, 0.7)
+	messagesDesc:SetText("Customize notification messages. Available variables: %name%, %game%, %level%, %zone%, %class%, %realm%, %char%, %prevchar%")
+	table.insert(allFrames, messagesDesc)
+	
+	-- Online Message Label
+	local onlineMsgLabel = tab:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	onlineMsgLabel:SetText("Online Message:")
+	onlineMsgLabel:SetPoint("LEFT", 0, 0)
+	table.insert(allFrames, onlineMsgLabel)
+	
+	-- Online Message EditBox
+	local onlineMsgBox = CreateFrame("EditBox", nil, tab, "InputBoxTemplate")
+	onlineMsgBox:SetSize(340, 25)
+	onlineMsgBox:SetAutoFocus(false)
+	onlineMsgBox:SetText(BetterFriendlistDB.notificationMessageOnline or "%name% is now online")
+	onlineMsgBox:SetScript("OnEnterPressed", function(self)
+		self:ClearFocus()
+	end)
+	onlineMsgBox:SetScript("OnEscapePressed", function(self)
+		self:ClearFocus()
+	end)
+	onlineMsgBox:SetScript("OnEditFocusLost", function(self)
+		local text = self:GetText()
+		if text and text ~= "" then
+			BetterFriendlistDB.notificationMessageOnline = text
+		end
+	end)
+	table.insert(allFrames, onlineMsgBox)
+	
+	-- Offline Message Label
+	local offlineMsgLabel = tab:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	offlineMsgLabel:SetText("Offline Message:")
+	offlineMsgLabel:SetPoint("LEFT", 0, 0)
+	table.insert(allFrames, offlineMsgLabel)
+	
+	-- Offline Message EditBox
+	local offlineMsgBox = CreateFrame("EditBox", nil, tab, "InputBoxTemplate")
+	offlineMsgBox:SetSize(340, 25)
+	offlineMsgBox:SetAutoFocus(false)
+	offlineMsgBox:SetText(BetterFriendlistDB.notificationMessageOffline or "%name% went offline")
+	offlineMsgBox:SetScript("OnEnterPressed", function(self)
+		self:ClearFocus()
+	end)
+	offlineMsgBox:SetScript("OnEscapePressed", function(self)
+		self:ClearFocus()
+	end)
+	offlineMsgBox:SetScript("OnEditFocusLost", function(self)
+		local text = self:GetText()
+		if text and text ~= "" then
+			BetterFriendlistDB.notificationMessageOffline = text
+		end
+	end)
+	table.insert(allFrames, offlineMsgBox)
+	
+	-- WoW Login Message Label (Phase 11.5)
+	local wowLoginMsgLabel = tab:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	wowLoginMsgLabel:SetText("WoW Login Message:")
+	wowLoginMsgLabel:SetPoint("LEFT", 0, 0)
+	table.insert(allFrames, wowLoginMsgLabel)
+	
+	-- WoW Login Message EditBox
+	local wowLoginMsgBox = CreateFrame("EditBox", nil, tab, "InputBoxTemplate")
+	wowLoginMsgBox:SetSize(340, 25)
+	wowLoginMsgBox:SetAutoFocus(false)
+	wowLoginMsgBox:SetText(BetterFriendlistDB.notificationMessageWowLogin or "%name% logged into World of Warcraft")
+	wowLoginMsgBox:SetScript("OnEnterPressed", function(self)
+		self:ClearFocus()
+	end)
+	wowLoginMsgBox:SetScript("OnEscapePressed", function(self)
+		self:ClearFocus()
+	end)
+	wowLoginMsgBox:SetScript("OnEditFocusLost", function(self)
+		local text = self:GetText()
+		if text and text ~= "" then
+			BetterFriendlistDB.notificationMessageWowLogin = text
+		end
+	end)
+	table.insert(allFrames, wowLoginMsgBox)
+	
+	-- Character Switch Message Label
+	local charSwitchMsgLabel = tab:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	charSwitchMsgLabel:SetText("Character Switch Message:")
+	charSwitchMsgLabel:SetPoint("LEFT", 0, 0)
+	table.insert(allFrames, charSwitchMsgLabel)
+	
+	-- Character Switch Message EditBox
+	local charSwitchMsgBox = CreateFrame("EditBox", nil, tab, "InputBoxTemplate")
+	charSwitchMsgBox:SetSize(340, 25)
+	charSwitchMsgBox:SetAutoFocus(false)
+	charSwitchMsgBox:SetText(BetterFriendlistDB.notificationMessageCharSwitch or "%name% switched to %char%")
+	charSwitchMsgBox:SetScript("OnEnterPressed", function(self)
+		self:ClearFocus()
+	end)
+	charSwitchMsgBox:SetScript("OnEscapePressed", function(self)
+		self:ClearFocus()
+	end)
+	charSwitchMsgBox:SetScript("OnEditFocusLost", function(self)
+		local text = self:GetText()
+		if text and text ~= "" then
+			BetterFriendlistDB.notificationMessageCharSwitch = text
+		end
+	end)
+	table.insert(allFrames, charSwitchMsgBox)
+	
+	-- Game Switch Message Label
+	local gameSwitchMsgLabel = tab:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	gameSwitchMsgLabel:SetText("Game Switch Message:")
+	gameSwitchMsgLabel:SetPoint("LEFT", 0, 0)
+	table.insert(allFrames, gameSwitchMsgLabel)
+	
+	-- Game Switch Message EditBox
+	local gameSwitchMsgBox = CreateFrame("EditBox", nil, tab, "InputBoxTemplate")
+	gameSwitchMsgBox:SetSize(340, 25)
+	gameSwitchMsgBox:SetAutoFocus(false)
+	gameSwitchMsgBox:SetText(BetterFriendlistDB.notificationMessageGameSwitch or "%name% is now playing %game%")
+	gameSwitchMsgBox:SetScript("OnEnterPressed", function(self)
+		self:ClearFocus()
+	end)
+	gameSwitchMsgBox:SetScript("OnEscapePressed", function(self)
+		self:ClearFocus()
+	end)
+	gameSwitchMsgBox:SetScript("OnEditFocusLost", function(self)
+		local text = self:GetText()
+		if text and text ~= "" then
+			BetterFriendlistDB.notificationMessageGameSwitch = text
+		end
+	end)
+	table.insert(allFrames, gameSwitchMsgBox)
+	
+	-- Preview Info Text
+	local previewInfo = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	previewInfo:SetWidth(360)
+	previewInfo:SetJustifyH("LEFT")
+	previewInfo:SetWordWrap(true)
+	previewInfo:SetTextColor(0.7, 0.7, 0.7)
+	previewInfo:SetText("|cffffcc00Tip:|r Use the 'Test Notification' button above to preview your custom messages.")
+	table.insert(allFrames, previewInfo)
+	
+	-- ===========================================
+	-- GROUP TRIGGERS SECTION (Phase 10)
+	-- ===========================================
+	local triggersHeader = Components:CreateHeader(tab, "Group Triggers")
+	table.insert(allFrames, triggersHeader)
+	
+	local triggersDesc = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	triggersDesc:SetWidth(360)
+	triggersDesc:SetJustifyH("LEFT")
+	triggersDesc:SetWordWrap(true)
+	triggersDesc:SetTextColor(0.7, 0.7, 0.7)
+	triggersDesc:SetText("Get notified when a certain number of friends from a group come online. Example: Alert when 3+ M+ team members are online.")
+	table.insert(allFrames, triggersDesc)
+	
+	-- Trigger list container
+	local triggerListContainer = CreateFrame("Frame", nil, tab)
+	triggerListContainer:SetSize(360, 100)
+	table.insert(allFrames, triggerListContainer)
+	
+	-- Function to refresh trigger list
+	local function RefreshTriggerList()
+		-- Clear existing children
+		for _, child in ipairs({triggerListContainer:GetChildren()}) do
+			child:Hide()
+			child:SetParent(nil)
+		end
+		
+		-- Clear all font strings (includes the "No triggers" message)
+		for _, region in ipairs({triggerListContainer:GetRegions()}) do
+			if region:GetObjectType() == "FontString" then
+				region:Hide()
+				region:SetText("")
+			end
+		end
+		
+		if not BetterFriendlistDB.notificationGroupTriggers then
+			BetterFriendlistDB.notificationGroupTriggers = {}
+		end
+		
+		local yOffset = 0
+		local Groups = BFL:GetModule("Groups")
+		
+		-- Show each trigger
+		for triggerID, trigger in pairs(BetterFriendlistDB.notificationGroupTriggers) do
+			local triggerFrame = CreateFrame("Frame", nil, triggerListContainer)
+			triggerFrame:SetSize(360, 25)
+			triggerFrame:SetPoint("TOPLEFT", triggerListContainer, "TOPLEFT", 0, yOffset)
+			
+			-- Get group name
+			local group = Groups and Groups:Get(trigger.groupId)
+			local groupName = group and group.name or trigger.groupId
+			
+			-- Trigger label
+			local label = triggerFrame:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+			label:SetPoint("LEFT", triggerFrame, "LEFT", 0, 0)
+			label:SetText(string.format("%d+ from '%s'", trigger.threshold, groupName))
+			
+			-- Enable/Disable toggle
+			local enableBtn = CreateFrame("CheckButton", nil, triggerFrame, "SettingsCheckboxTemplate")
+			enableBtn:SetPoint("RIGHT", triggerFrame, "RIGHT", -40, 0)
+			enableBtn:SetSize(20, 20)
+			enableBtn:SetChecked(trigger.enabled)
+			enableBtn:SetScript("OnClick", function(self)
+				trigger.enabled = self:GetChecked()
+				print("|cff00ff00BetterFriendlist:|r Group trigger " .. (trigger.enabled and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
+			end)
+			
+			-- Delete button
+			local deleteBtn = CreateFrame("Button", nil, triggerFrame, "UIPanelButtonTemplate")
+			deleteBtn:SetSize(20, 20)
+			deleteBtn:SetPoint("RIGHT", triggerFrame, "RIGHT", 0, 0)
+			deleteBtn:SetText("X")
+			deleteBtn:SetScript("OnClick", function()
+				BetterFriendlistDB.notificationGroupTriggers[triggerID] = nil
+				RefreshTriggerList()
+				print("|cff00ff00BetterFriendlist:|r Group trigger removed")
+			end)
+			
+			yOffset = yOffset - 30
+		end
+		
+		-- Show "No triggers" message if empty
+		if next(BetterFriendlistDB.notificationGroupTriggers) == nil then
+			local emptyText = triggerListContainer:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+			emptyText:SetPoint("TOPLEFT", triggerListContainer, "TOPLEFT", 0, 0)
+			emptyText:SetTextColor(0.5, 0.5, 0.5)
+			emptyText:SetText("No group triggers configured. Click 'Add Trigger' below.")
+		end
+	end
+	
+	-- Add Trigger button
+	local addTriggerBtn = CreateFrame("Button", nil, tab, "UIPanelButtonTemplate")
+	addTriggerBtn:SetSize(120, 25)
+	addTriggerBtn:SetText("Add Trigger")
+	addTriggerBtn:SetScript("OnClick", function()
+		if _G.BFL_ShowGroupTriggerDialog then
+			_G.BFL_ShowGroupTriggerDialog()
+		end
+	end)
+	table.insert(allFrames, addTriggerBtn)
+	
+	-- Initial refresh
+	RefreshTriggerList()
+	
+	-- Register global refresh callback for dialog
+	_G.BFL_RefreshNotificationTriggers = RefreshTriggerList
+	
+	-- Anchor all frames vertically with proper spacing
+	local yPos = -15
+	local frameIndex = 1
+	
+	-- BETA Header (1)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 30
+	frameIndex = frameIndex + 1
+	
+	-- Description (2)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 45
+	frameIndex = frameIndex + 1
+	
+	-- Notification Display Header (3)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 50
+	frameIndex = frameIndex + 1
+	
+	-- Display Mode Dropdown (4)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 35
+	frameIndex = frameIndex + 1
+	
+	-- Mode Description (5)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 50
+	frameIndex = frameIndex + 1
+	
+	-- Test Button (6)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 35
+	frameIndex = frameIndex + 1
+	
+	-- Sound Settings Header (7)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 30
+	frameIndex = frameIndex + 1
+	
+	-- Sound Toggle Checkbox (8)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 35
+	frameIndex = frameIndex + 1
+	
+	-- Quiet Hours Header (9)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 30
+	frameIndex = frameIndex + 1
+	
+	-- Manual DND Toggle (10)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 25
+	frameIndex = frameIndex + 1
+	
+	-- Combat Quiet Toggle (11)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 25
+	frameIndex = frameIndex + 1
+	
+	-- Instance Quiet Toggle (12)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 25
+	frameIndex = frameIndex + 1
+	
+	-- Scheduled Quiet Toggle (13)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 25
+	frameIndex = frameIndex + 1
+	
+	-- Start Hour Slider (14)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 25
+	frameIndex = frameIndex + 1
+	
+	-- End Hour Slider (15)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 25
+	frameIndex = frameIndex + 1
+	
+	-- Schedule Info Text (16)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 35
+	frameIndex = frameIndex + 1
+	
+	-- Offline Notifications Header (17)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 30
+	frameIndex = frameIndex + 1
+	
+	-- Offline Toggle (18)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 35
+	frameIndex = frameIndex + 1
+	
+	-- Game-Specific Notifications Header (19) [Phase 11.5]
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 30
+	frameIndex = frameIndex + 1
+	
+	-- WoW Login Toggle (20)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 25
+	frameIndex = frameIndex + 1
+	
+	-- Character Switch Toggle (21)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 25
+	frameIndex = frameIndex + 1
+	
+	-- Game Switch Toggle (22)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 35
+	frameIndex = frameIndex + 1
+	
+	-- Custom Messages Header (23)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 30
+	frameIndex = frameIndex + 1
+	
+	-- Custom Messages Description (24)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 45
+	frameIndex = frameIndex + 1
+	
+	-- Online Message Label (25)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 20
+	frameIndex = frameIndex + 1
+	
+	-- Online Message EditBox (26)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 35
+	frameIndex = frameIndex + 1
+	
+	-- Offline Message Label (27)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 20
+	frameIndex = frameIndex + 1
+	
+	-- Offline Message EditBox (28)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 35
+	frameIndex = frameIndex + 1
+	
+	-- WoW Login Message Label (29) [Phase 11.5]
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 20
+	frameIndex = frameIndex + 1
+	
+	-- WoW Login Message EditBox (30)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 35
+	frameIndex = frameIndex + 1
+	
+	-- Character Switch Message Label (31)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 20
+	frameIndex = frameIndex + 1
+	
+	-- Character Switch Message EditBox (32)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 35
+	frameIndex = frameIndex + 1
+	
+	-- Game Switch Message Label (33)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 20
+	frameIndex = frameIndex + 1
+	
+	-- Game Switch Message EditBox (34)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 35
+	frameIndex = frameIndex + 1
+	
+	-- Preview Info Text (35)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 35
+	frameIndex = frameIndex + 1
+	
+	-- Group Triggers Header (36)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 30
+	frameIndex = frameIndex + 1
+	
+	-- Group Triggers Description (37)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 45
+	frameIndex = frameIndex + 1
+	
+	-- Trigger List Container (38)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 110
+	frameIndex = frameIndex + 1
+	
+	-- Add Trigger Button (39)
+	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
+	yPos = yPos - 40
+	frameIndex = frameIndex + 1
+	
+	-- Store components for cleanup
+	tab.components = allFrames
 end
 
 return Settings
