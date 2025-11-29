@@ -885,7 +885,8 @@
 	<!-- Main Friends Frame -->
 	<Frame name="BetterFriendsFrame" parent="UIParent" inherits="ButtonFrameTemplate" toplevel="true"
 		movable="true" enableMouse="true" hidden="true">
-		<Size x="415" y="570" />
+		<!-- Size removed - will be set dynamically by MainFrameEditMode (Phase 2) -->
+		<!-- Default size: 415x570, User-resizable: 350-800w x 400-1200h -->
 		<Anchors>
 			<Anchor point="TOPLEFT" x="16" y="-116" />
 		</Anchors>
@@ -1118,12 +1119,12 @@
 							</Frame>
 						</Frames>
 					</Frame>
-					<!-- Status Dropdown (positioned to the left of BattlenetFrame) -->
-					<DropdownButton parentKey="StatusDropdown" inherits="WowStyle1DropdownTemplate">
-						<Anchors>
-							<Anchor point="RIGHT" relativeKey="$parent.BattlenetFrame" relativePoint="LEFT" x="-7"/>
-						</Anchors>
-					</DropdownButton>
+				<!-- Status Dropdown (positioned to the left of BattlenetFrame) -->
+				<DropdownButton parentKey="StatusDropdown" inherits="WowStyle1DropdownTemplate">
+					<Anchors>
+						<Anchor point="RIGHT" relativeKey="$parent.BattlenetFrame" relativePoint="LEFT" x="-7"/>
+					</Anchors>
+				</DropdownButton>
 					
 				<!-- Search Box (positioned first, left side) -->
 				<EditBox parentKey="SearchBox" inherits="SearchBoxTemplate" autoFocus="false">
@@ -2159,9 +2160,10 @@
 		<Layers>
 			<Layer level="ARTWORK">
 				<!-- "Not in Raid" placeholder text (shown when in party, not raid) -->
-				<FontString parentKey="NotInRaid" inherits="GameFontNormalLarge" text="Raid roster is only available when in a raid group." hidden="true">
+				<FontString parentKey="NotInRaid" inherits="GameFontNormalLarge" text="Raid roster is only available when in a raid group." hidden="true" wordwrap="true" justifyH="CENTER" justifyV="MIDDLE">
 					<Anchors>
-						<Anchor point="CENTER" x="0" y="0"/>
+						<Anchor point="LEFT" relativeKey="$parent.Inset" x="20" y="0"/>
+						<Anchor point="RIGHT" relativeKey="$parent.Inset" x="-20" y="0"/>
 					</Anchors>
 					<Color r="0.6" g="0.6" b="0.6"/>
 				</FontString>

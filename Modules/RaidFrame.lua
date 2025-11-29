@@ -42,6 +42,47 @@ RaidFrame.DIFFICULTY_PRIMARYRAID_MYTHIC = 16
 RaidFrame.DIFFICULTY_PRIMARYRAID_LFR = 17
 
 -- ========================================
+-- RESPONSIVE LAYOUT (PHASE 4)
+-- ========================================
+
+-- Update group layout with proportional scaling (Phase 4)
+-- Icons remain 28x28 fixed (user decision: no icon scaling)
+function RaidFrame:UpdateGroupLayout()
+    local frame = BetterFriendsFrame
+    if not frame or not frame.RaidFrame then
+        return
+    end
+    
+    local raidFrame = frame.RaidFrame
+    local groupsContainer = raidFrame.GroupsInset and raidFrame.GroupsInset.GroupsContainer
+    if not groupsContainer then
+        return
+    end
+    
+    -- Calculate scale based on frame size
+    -- Default frame: 415x570, so scale = 1.0 at default
+    local frameWidth = frame:GetWidth()
+    local frameHeight = frame:GetHeight()
+    
+    -- Calculate scale factor (proportional to both dimensions, take minimum)
+    local scaleX = frameWidth / 415
+    local scaleY = frameHeight / 570
+    local scale = math.min(scaleX, scaleY)
+    
+    -- Clamp scale to reasonable bounds
+    if scale < 0.7 then
+        scale = 0.7  -- Minimum 70% scale
+    elseif scale > 1.5 then
+        scale = 1.5  -- Maximum 150% scale
+    end
+    
+    -- Apply scale to GroupsContainer (scales all groups proportionally)
+    groupsContainer:SetScale(scale)
+    
+    BFL:DebugPrint("|cff00ffffBFL:RaidFrame:|r Group layout updated (scale: " .. string.format("%.2f", scale) .. ")")
+end
+
+-- ========================================
 -- INITIALIZATION
 -- ========================================
 

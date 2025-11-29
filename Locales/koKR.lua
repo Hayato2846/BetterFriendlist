@@ -172,7 +172,7 @@ if GetLocale() == "koKR" then
 	L.SETTINGS_BETA_FEATURES_DESC = "아직 개발 중인 실험적 기능을 활성화합니다. 이러한 기능은 향후 버전에서 변경되거나 제거될 수 있습니다."
 	L.SETTINGS_BETA_FEATURES_ENABLE = "베타 기능 활성화"
 	L.SETTINGS_BETA_FEATURES_TOOLTIP = "실험적 기능 활성화 (알림 등)"
-	L.SETTINGS_BETA_FEATURES_WARNING = "⚠ 경고: 베타 기능에는 버그, 성능 문제 또는 불완전한 기능이 포함될 수 있습니다. 본인의 책임하에 사용하십시오."
+	L.SETTINGS_BETA_FEATURES_WARNING = "경고: 베타 기능에는 버그, 성능 문제 또는 불완전한 기능이 포함될 수 있습니다. 본인의 책임하에 사용하십시오."
 	L.SETTINGS_BETA_FEATURES_LIST = "현재 사용 가능한 베타 기능:"
 	L.SETTINGS_BETA_FEATURES_ENABLED = "베타 기능 |cff00ff00활성화됨|r"
 	L.SETTINGS_BETA_FEATURES_DISABLED = "베타 기능 |cffff0000비활성화됨|r"
@@ -208,5 +208,14 @@ if GetLocale() == "koKR" then
 	L.NOTIFICATION_FRIEND_PLAYING = "%s님이 온라인 상태입니다 [%s 플레이 중]"
 	L.NOTIFICATION_SYSTEM_UNAVAILABLE = "알림 시스템을 사용할 수 없습니다"
 	L.NOTIFICATION_BETA_REQUIRED = "알림을 사용하려면 베타 기능이 활성화되어야 합니다"
-	L.NOTIFICATION_BETA_ENABLE_HINT = "→ 설정 > 고급 > 베타 기능에서 활성화하세요"
-end
+	L.NOTIFICATION_BETA_ENABLE_HINT = "→ 설정 > 고급 > 베타 기능에서 활성화하세요"	
+	-- ========================================
+	-- EDIT MODE FRAME SIZE (PHASE 5)
+	-- ========================================
+	L.SETTINGS_FRAME_SIZE_HEADER = "기본 프레임 크기 (편집 모드)"
+	L.SETTINGS_FRAME_SIZE_INFO = "새로운 편집 모드 레이아웃을 위한 선호 기본 크기를 설정하세요."
+	L.SETTINGS_FRAME_WIDTH = "너비:"
+	L.SETTINGS_FRAME_HEIGHT = "높이:"
+	L.SETTINGS_FRAME_RESET_SIZE = "415x570으로 재설정"
+	L.SETTINGS_FRAME_APPLY_NOW = "현재 레이아웃에 적용"
+	L.SETTINGS_FRAME_RESET_ALL = "모든 레이아웃 재설정"end

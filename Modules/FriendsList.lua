@@ -283,6 +283,59 @@ local function CreateExtentCalculator(self)
 end
 
 -- ========================================
+-- Responsive ScrollBox Functions (Phase 3)
+-- ========================================
+
+-- Update ScrollBox height when frame is resized (called from MainFrameEditMode)
+function FriendsList:UpdateScrollBoxExtent()
+	local frame = BetterFriendsFrame
+	if not frame or not frame.ScrollFrame or not frame.ScrollFrame.ScrollBox then
+		return
+	end
+	
+	-- Calculate available height for ScrollBox
+	-- Frame structure: TitleContainer (30px) + FriendsTabHeader (30px) + Inset.Top (10px) + Bottom buttons (26px) + padding
+	local frameHeight = frame:GetHeight()
+	local availableHeight = frameHeight - 120  -- Conservative calculation
+	
+	-- Ensure minimum height
+	if availableHeight < 200 then
+		availableHeight = 200
+	end
+	
+	-- Update ScrollFrame size (anchored to Inset, so this adjusts the content area)
+	local scrollFrame = frame.ScrollFrame
+	scrollFrame:ClearAllPoints()
+	scrollFrame:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 4, -4)
+	scrollFrame:SetPoint("BOTTOMRIGHT", frame.Inset, "BOTTOMRIGHT", -22, 2)
+	
+	-- Trigger ScrollBox redraw
+	if self.scrollBox and self.scrollBox:GetDataProvider() then
+		self.scrollBox:FullUpdate(ScrollBoxConstants.UpdateImmediately)
+	end
+end
+
+-- Get button width based on current frame size (Phase 3)
+function FriendsList:GetButtonWidth()
+	local frame = BetterFriendsFrame
+	if not frame then
+		return 398  -- Default width from XML
+	end
+	
+	-- Frame width minus padding, scrollbar, and inset borders
+	-- Frame width - left padding (8px) - right padding (6px) - scrollbar (22px) - inset borders (8px)
+	local frameWidth = frame:GetWidth()
+	local buttonWidth = frameWidth - 44
+	
+	-- Ensure minimum width
+	if buttonWidth < 300 then
+		buttonWidth = 300
+	end
+	
+	return buttonWidth
+end
+
+-- ========================================
 -- ScrollBox Initialization (NEW - Phase 1)
 -- ========================================
 
@@ -521,6 +574,16 @@ function FriendsList:Initialize()
 	
 	-- Initialize ScrollBox system (NEW - Phase 1)
 	self:InitializeScrollBox()
+	
+	-- Initialize responsive SearchBox width
+	C_Timer.After(0.1, function()
+		if BFL.FriendsList and BFL.FriendsList.UpdateSearchBoxWidth then
+			BFL.FriendsList:UpdateSearchBoxWidth()
+			BFL:DebugPrint("|cff00ffffFriendsList:Initialize:|r Called UpdateSearchBoxWidth")
+		else
+			BFL:DebugPrint("|cffff0000FriendsList:Initialize:|r UpdateSearchBoxWidth not found!")
+		end
+	end)
 	
 	-- Register event callbacks for friend list updates
 	BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function(...)
@@ -2889,6 +2952,141 @@ function FriendsList:FireEvent(eventName, ...)
 	-- TODO: Implement event system for module communication
 	-- This will allow Raid/QuickJoin modules to hook into friend list updates
 end
+
+-- ========================================
+-- Responsive UI Functions
+-- ========================================
+
+-- Update SearchBox width dynamically based on available space
+function FriendsList:UpdateSearchBoxWidth()
+	local frame = BetterFriendsFrame
+	if not frame then
+		BFL:DebugPrint("|cffff0000UpdateSearchBoxWidth: No frame|r")
+		return
+	end
+	
+	if not frame.FriendsTabHeader then
+		BFL:DebugPrint("|cffff0000UpdateSearchBoxWidth: No FriendsTabHeader|r")
+		return
+	end
+	
+	local header = frame.FriendsTabHeader
+	if not header.SearchBox then
+		BFL:DebugPrint("|cffff0000UpdateSearchBoxWidth: No SearchBox|r")
+		return
+	end
+	
+	local frameWidth = frame:GetWidth()
+	
+	-- ========================================
+	-- DETAILED DEBUG: Measure all elements
+	-- ========================================
+	local debugInfo = {}
+	
+	-- Measure SearchBox
+	if header.SearchBox then
+		local sbLeft = header.SearchBox:GetLeft() or 0
+		local sbRight = header.SearchBox:GetRight() or 0
+		local sbWidth = header.SearchBox:GetWidth() or 0
+		debugInfo.searchBox = {left = sbLeft, right = sbRight, width = sbWidth}
+	end
+	
+	-- Measure QuickFilter
+	if header.QuickFilter then
+		local qfLeft = header.QuickFilter:GetLeft() or 0
+		local qfRight = header.QuickFilter:GetRight() or 0
+		local qfWidth = header.QuickFilter:GetWidth() or 0
+		debugInfo.quickFilter = {left = qfLeft, right = qfRight, width = qfWidth}
+	end
+	
+	-- Measure PrimarySortDropdown
+	if header.PrimarySortDropdown then
+		local psLeft = header.PrimarySortDropdown:GetLeft() or 0
+		local psRight = header.PrimarySortDropdown:GetRight() or 0
+		local psWidth = header.PrimarySortDropdown:GetWidth() or 0
+		debugInfo.primarySort = {left = psLeft, right = psRight, width = psWidth}
+	end
+	
+	-- Measure SecondarySortDropdown
+	if header.SecondarySortDropdown then
+		local ssLeft = header.SecondarySortDropdown:GetLeft() or 0
+		local ssRight = header.SecondarySortDropdown:GetRight() or 0
+		local ssWidth = header.SecondarySortDropdown:GetWidth() or 0
+		debugInfo.secondarySort = {left = ssLeft, right = ssRight, width = ssWidth}
+	end
+	
+	-- Measure BattlenetFrame (contains BattleTag)
+	if header.BattlenetFrame then
+		local bnLeft = header.BattlenetFrame:GetLeft() or 0
+		local bnRight = header.BattlenetFrame:GetRight() or 0
+		local bnWidth = header.BattlenetFrame:GetWidth() or 0
+		debugInfo.battlenet = {left = bnLeft, right = bnRight, width = bnWidth}
+		
+		-- Measure Tag (BattleTag text inside BattlenetFrame)
+		if header.BattlenetFrame.Tag then
+			local tagWidth = header.BattlenetFrame.Tag:GetStringWidth() or 0
+			debugInfo.battlenetTag = {stringWidth = tagWidth}
+		end
+	end
+	
+	-- Measure StatusDropdown
+	if header.StatusDropdown then
+		local sdLeft = header.StatusDropdown:GetLeft() or 0
+		local sdRight = header.StatusDropdown:GetRight() or 0
+		local sdWidth = header.StatusDropdown:GetWidth() or 0
+		debugInfo.statusDropdown = {left = sdLeft, right = sdRight, width = sdWidth}
+	end
+	
+	-- Measure frame bounds
+	local frameLeft = frame:GetLeft() or 0
+	local frameRight = frame:GetRight() or 0
+	debugInfo.frame = {left = frameLeft, right = frameRight, width = frameWidth}
+	
+	-- ========================================
+	-- CLIPPING DETECTION
+	-- ========================================
+	local clipping = {}
+	local rightmostElement = 0
+	
+	-- Check each element if it extends beyond frame bounds
+	for elementName, data in pairs(debugInfo) do
+		if elementName ~= "frame" and elementName ~= "battlenetTag" and data.right then
+			if data.right > frameRight then
+				table.insert(clipping, {
+					name = elementName,
+					overflow = data.right - frameRight
+				})
+			end
+			if data.right > rightmostElement then
+				rightmostElement = data.right
+			end
+		end
+	end
+	
+	-- Calculate actual space used and available
+	local usedWidth = rightmostElement - frameLeft
+	local wastedSpace = frameRight - rightmostElement
+	
+	-- ========================================
+	-- CALCULATE OPTIMAL SEARCHBOX WIDTH
+	-- ========================================
+	-- Reserve MORE space for right-side elements to prevent clipping at dropdowns
+	-- Goal: Dropdowns have breathing room, no clipping even during resize
+	local fixedElementsWidth = 205  -- Increased from 192px to give dropdowns 13px more space
+	local availableWidth = frameWidth - fixedElementsWidth
+	
+	-- Clamp SearchBox between 175px (functional minimum) and 340px (reduced maximum)
+	if availableWidth < 175 then
+		availableWidth = 175
+	elseif availableWidth > 340 then
+		availableWidth = 340
+	end
+	
+	header.SearchBox:SetWidth(availableWidth)
+end
+
+-- Export module to BFL namespace (required for BFL.FriendsList access)
+BFL.FriendsList = FriendsList
 
 return FriendsList
 

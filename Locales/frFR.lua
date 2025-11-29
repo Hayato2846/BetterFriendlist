@@ -172,7 +172,7 @@ if GetLocale() == "frFR" then
 	L.SETTINGS_BETA_FEATURES_DESC = "Activez des fonctionnalités expérimentales encore en développement. Ces fonctionnalités peuvent changer ou être supprimées dans les versions futures."
 	L.SETTINGS_BETA_FEATURES_ENABLE = "Activer les Fonctionnalités Bêta"
 	L.SETTINGS_BETA_FEATURES_TOOLTIP = "Active les fonctionnalités expérimentales (Notifications, etc.)"
-	L.SETTINGS_BETA_FEATURES_WARNING = "⚠ Avertissement : Les fonctionnalités bêta peuvent contenir des bugs, des problèmes de performance ou des fonctionnalités incomplètes. Utilisez-les à vos risques et périls."
+	L.SETTINGS_BETA_FEATURES_WARNING = "Avertissement : Les fonctionnalités bêta peuvent contenir des bugs, des problèmes de performance ou des fonctionnalités incomplètes. Utilisez-les à vos risques et périls."
 	L.SETTINGS_BETA_FEATURES_LIST = "Fonctionnalités Bêta actuellement disponibles :"
 	L.SETTINGS_BETA_FEATURES_ENABLED = "Fonctionnalités Bêta |cff00ff00ACTIVÉES|r"
 	L.SETTINGS_BETA_FEATURES_DISABLED = "Fonctionnalités Bêta |cffff0000DÉSACTIVÉES|r"
@@ -208,5 +208,14 @@ if GetLocale() == "frFR" then
 	L.NOTIFICATION_FRIEND_PLAYING = "%s est maintenant en ligne [joue à %s]"
 	L.NOTIFICATION_SYSTEM_UNAVAILABLE = "Système de notification non disponible"
 	L.NOTIFICATION_BETA_REQUIRED = "Les Fonctionnalités Bêta doivent être activées pour utiliser les notifications"
-	L.NOTIFICATION_BETA_ENABLE_HINT = "→ Activez-les dans Paramètres > Avancé > Fonctionnalités Bêta"
-end
+	L.NOTIFICATION_BETA_ENABLE_HINT = "→ Activez-les dans Paramètres > Avancé > Fonctionnalités Bêta"	
+	-- ========================================
+	-- EDIT MODE FRAME SIZE (PHASE 5)
+	-- ========================================
+	L.SETTINGS_FRAME_SIZE_HEADER = "Taille de cadre par défaut (Mode d'édition)"
+	L.SETTINGS_FRAME_SIZE_INFO = "Définissez votre taille par défaut préférée pour les nouvelles dispositions du mode d'édition."
+	L.SETTINGS_FRAME_WIDTH = "Largeur:"
+	L.SETTINGS_FRAME_HEIGHT = "Hauteur:"
+	L.SETTINGS_FRAME_RESET_SIZE = "Réinitialiser à 415x570"
+	L.SETTINGS_FRAME_APPLY_NOW = "Appliquer à la disposition actuelle"
+	L.SETTINGS_FRAME_RESET_ALL = "Réinitialiser toutes les dispositions"end

@@ -56,6 +56,12 @@ local defaults = {
 	notificationMessageOffline = "%name% went offline", -- Template for offline notifications (default)
 	-- Toast Container Position (Edit Mode)
 	notificationToastPosition = {}, -- {[layoutName] = {point, x, y}} - Toast container position per layout
+	-- Main Frame Edit Mode (Phase EditMode)
+	mainFrameSize = {}, -- {[layoutName] = {width, height}} - Main frame size per layout
+	mainFramePosition = {}, -- {[layoutName] = {point, x, y}} - Main frame position per layout
+	mainFramePositionMigrated = false, -- Track if old position has been migrated (one-time)
+	defaultFrameWidth = 415, -- User-customizable default width (350-800)
+	defaultFrameHeight = 570, -- User-customizable default height (400-1200)
 	-- Phase 11.5: Game-Specific Notifications
 	notificationWowLoginEnabled = true, -- Show notifications when friend logs into WoW (default: true)
 	notificationCharSwitchEnabled = false, -- Show notifications when friend switches character (default: false)
@@ -79,6 +85,12 @@ function DB:Initialize()
 		if BetterFriendlistDB[key] == nil then
 			BetterFriendlistDB[key] = type(value) == "table" and {} or value
 		end
+	end
+	
+	-- Migration: Ensure defaultFrameWidth meets new minimum (380px)
+	if BetterFriendlistDB.defaultFrameWidth and BetterFriendlistDB.defaultFrameWidth < 380 then
+		BetterFriendlistDB.defaultFrameWidth = 380
+		BFL:DebugPrint("|cff00ff00BFL:Database:|r Migrated defaultFrameWidth to 380 (old minimum was 350)")
 	end
 	
 	-- Version migration if needed

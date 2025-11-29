@@ -51,6 +51,71 @@ function WhoFrame:OnWhoListUpdate(...)
 end
 
 -- ========================================
+-- Responsive Layout Functions
+-- ========================================
+
+function WhoFrame:UpdateResponsiveLayout()
+	local frame = BetterFriendsFrame
+	if not frame or not frame.WhoFrame then return end
+	
+	local whoFrame = frame.WhoFrame
+	local frameWidth = frame:GetWidth()
+	
+	-- Calculate available width for column headers
+	-- Reserve space for: left padding (11px) + scrollbar (20px) + right padding (7px) = 38px
+	local availableWidth = frameWidth - 38
+	
+	-- Distribute widths proportionally:
+	-- Name: 32%, Column Dropdown: 29%, Level: 15%, Class: 24%
+	local nameWidth = math.floor(availableWidth * 0.32)
+	local columnWidth = math.floor(availableWidth * 0.29)
+	local levelWidth = math.floor(availableWidth * 0.15)
+	local classWidth = availableWidth - nameWidth - columnWidth - levelWidth -- Remaining space
+	
+	-- Apply minimum widths
+	nameWidth = math.max(nameWidth, 80)
+	columnWidth = math.max(columnWidth, 70)
+	levelWidth = math.max(levelWidth, 40)
+	classWidth = math.max(classWidth, 60)
+	
+	-- Update column header widths
+	if whoFrame.NameHeader then
+		whoFrame.NameHeader:SetWidth(nameWidth)
+		-- Update middle texture width (total - left(5) - right(4) = total - 9)
+		if whoFrame.NameHeader.Middle then
+			whoFrame.NameHeader.Middle:SetWidth(nameWidth - 9)
+		end
+	end
+	
+	if whoFrame.ColumnDropdown then
+		whoFrame.ColumnDropdown:SetWidth(columnWidth)
+	end
+	
+	if whoFrame.LevelHeader then
+		whoFrame.LevelHeader:SetWidth(levelWidth)
+		if whoFrame.LevelHeader.Middle then
+			whoFrame.LevelHeader.Middle:SetWidth(levelWidth - 9)
+		end
+	end
+	
+	if whoFrame.ClassHeader then
+		whoFrame.ClassHeader:SetWidth(classWidth)
+		if whoFrame.ClassHeader.Middle then
+			whoFrame.ClassHeader.Middle:SetWidth(classWidth - 9)
+		end
+	end
+	
+	-- Update bottom button positions to be centered
+	local buttonsTotalWidth = 326 -- 85 (Refresh) + 1 + 120 (Add) + 1 + 120 (Invite) = 327
+	local buttonsStartX = math.floor((frameWidth - buttonsTotalWidth) / 2)
+	
+	if whoFrame.WhoButton then
+		whoFrame.WhoButton:ClearAllPoints()
+		whoFrame.WhoButton:SetPoint("BOTTOMLEFT", whoFrame.ListInset, buttonsStartX, -26)
+	end
+end
+
+-- ========================================
 -- WHO Frame Core Functions
 -- ========================================
 
@@ -83,6 +148,11 @@ function WhoFrame:OnLoad(frame)
 	-- Initialize selected who
 	frame.selectedWho = nil
 	frame.selectedName = ""
+	
+	-- Apply initial responsive layout
+	C_Timer.After(0.1, function()
+		self:UpdateResponsiveLayout()
+	end)
 end
 
 -- Initialize individual Who button
@@ -566,5 +636,8 @@ end
 -- ========================================
 -- Module Return
 -- ========================================
+
+-- Export module to BFL namespace (required for BFL.WhoFrame access)
+BFL.WhoFrame = WhoFrame
 
 return WhoFrame

@@ -199,7 +199,7 @@ if GetLocale() == "deDE" then
 	L.SETTINGS_BETA_FEATURES_DESC = "Aktiviere experimentelle Funktionen, die sich noch in Entwicklung befinden. Diese Funktionen können sich in zukünftigen Versionen ändern oder entfernt werden."
 	L.SETTINGS_BETA_FEATURES_ENABLE = "Beta-Funktionen aktivieren"
 	L.SETTINGS_BETA_FEATURES_TOOLTIP = "Aktiviert experimentelle Funktionen (Benachrichtigungen, etc.)"
-	L.SETTINGS_BETA_FEATURES_WARNING = "⚠ Warnung: Beta-Funktionen können Bugs, Performance-Probleme oder unvollständige Funktionalität enthalten. Nutzung auf eigenes Risiko."
+	L.SETTINGS_BETA_FEATURES_WARNING = "Warnung: Beta-Funktionen können Bugs, Performance-Probleme oder unvollständige Funktionalität enthalten. Nutzung auf eigenes Risiko."
 	L.SETTINGS_BETA_FEATURES_LIST = "Derzeit verfügbare Beta-Funktionen:"
 	L.SETTINGS_BETA_FEATURES_ENABLED = "Beta-Funktionen |cff00ff00AKTIVIERT|r"
 	L.SETTINGS_BETA_FEATURES_DISABLED = "Beta-Funktionen |cffff0000DEAKTIVIERT|r"
@@ -235,5 +235,14 @@ if GetLocale() == "deDE" then
 	L.NOTIFICATION_FRIEND_PLAYING = "%s ist jetzt online [spielt %s]"
 	L.NOTIFICATION_SYSTEM_UNAVAILABLE = "Benachrichtigungssystem nicht verfügbar"
 	L.NOTIFICATION_BETA_REQUIRED = "Beta-Funktionen müssen aktiviert sein, um Benachrichtigungen zu nutzen"
-	L.NOTIFICATION_BETA_ENABLE_HINT = "→ Aktiviere sie in Einstellungen > Erweitert > Beta-Funktionen"
-end
+	L.NOTIFICATION_BETA_ENABLE_HINT = "→ Aktiviere sie in Einstellungen > Erweitert > Beta-Funktionen"	
+	-- ========================================
+	-- EDIT MODE FRAME SIZE (PHASE 5)
+	-- ========================================
+	L.SETTINGS_FRAME_SIZE_HEADER = "Standard-Fenstergröße (Bearbeitungsmodus)"
+	L.SETTINGS_FRAME_SIZE_INFO = "Legen Sie Ihre bevorzugte Standardgröße für neue Bearbeitungsmodus-Layouts fest."
+	L.SETTINGS_FRAME_WIDTH = "Breite:"
+	L.SETTINGS_FRAME_HEIGHT = "Höhe:"
+	L.SETTINGS_FRAME_RESET_SIZE = "Auf 415x570 zurücksetzen"
+	L.SETTINGS_FRAME_APPLY_NOW = "Auf aktuelles Layout anwenden"
+	L.SETTINGS_FRAME_RESET_ALL = "Alle Layouts zurücksetzen"end

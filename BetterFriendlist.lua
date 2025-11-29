@@ -675,6 +675,19 @@ frame:SetScript("OnEvent", function(self, event, ...)
 	-- UnitPopup menus use "MENU_UNIT_<UNIT_TYPE>" format
 	
 	local function AddGroupsToFriendMenu(owner, rootDescription, contextData)
+		-- Check and reset flag in one atomic operation
+		local isOurMenu = _G.BetterFriendlist_IsOurMenu
+		_G.BetterFriendlist_IsOurMenu = false
+		
+		print("|cff00ffffBFL AddGroupsToFriendMenu called. Flag was:", isOurMenu)
+		
+		-- CRITICAL: Only add entries when menu is opened from our addon
+		if not isOurMenu then
+			print("|cffff0000BFL: Skipping menu entries (flag was false)")
+			return
+		end
+		print("|cff00ff00BFL: Adding menu entries (flag was true)")
+		
 		-- CRITICAL: Don't add group options for WHO players (non-friends)
 		if _G.BetterFriendlist_IsWhoPlayerMenu then
 			return
@@ -1507,7 +1520,8 @@ function BetterFriendsList_Button_OnClick(button, mouseButton)
 		
 		if friendInfo.type == "bnet" then
 			-- BattleNet friend context menu
-			local accountInfo = C_BattleNet.GetFriendAccountInfo(friendInfo.index)
+			-- FIXED: Use bnetAccountID instead of index to avoid stale data issues
+			local accountInfo = friendInfo.bnetAccountID and C_BattleNet.GetAccountInfoByID(friendInfo.bnetAccountID) or nil
 			if accountInfo then
 				BetterFriendsList_ShowBNDropdown(
 					accountInfo.accountName,
@@ -1526,7 +1540,8 @@ function BetterFriendsList_Button_OnClick(button, mouseButton)
 			end
 		else
 			-- WoW friend context menu
-			local info = C_FriendList.GetFriendInfoByIndex(friendInfo.index)
+			-- FIXED: Use guid instead of index to avoid stale data issues
+			local info = friendInfo.guid and C_FriendList.GetFriendInfo(friendInfo.guid) or nil
 			if info then
 				BetterFriendsList_ShowDropdown(
 					info.name,
@@ -1564,6 +1579,9 @@ function BetterFriendsList_ShowDropdown(name, connected, lineID, chatType, chatF
 			guid = guid,
 		}
 		
+		-- Set flag BEFORE opening menu (menu modifiers run during UnitPopup_OpenMenu)
+		_G.BetterFriendlist_IsOurMenu = true
+		
 		-- Determine menu type based on online status
 		local menuType = connected and "FRIEND" or "FRIEND_OFFLINE"
 		UnitPopup_OpenMenu(menuType, contextData)
@@ -1587,6 +1605,9 @@ function BetterFriendsList_ShowBNDropdown(name, connected, lineID, chatType, cha
 			bnetIDAccount = bnetIDAccount,
 			battleTag = battleTag,
 		}
+		
+		-- Set flag BEFORE opening menu (menu modifiers run during UnitPopup_OpenMenu)
+		_G.BetterFriendlist_IsOurMenu = true
 		
 		-- Determine menu type based on online status
 		local menuType = connected and "BN_FRIEND" or "BN_FRIEND_OFFLINE"

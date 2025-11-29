@@ -172,7 +172,7 @@ if GetLocale() == "zhTW" then
 	L.SETTINGS_BETA_FEATURES_DESC = "啟用仍在開發中的實驗性功能。這些功能可能會在未來版本中更改或刪除。"
 	L.SETTINGS_BETA_FEATURES_ENABLE = "啟用測試功能"
 	L.SETTINGS_BETA_FEATURES_TOOLTIP = "啟用實驗性功能（通知等）"
-	L.SETTINGS_BETA_FEATURES_WARNING = "⚠ 警告：測試功能可能包含錯誤、效能問題或不完整的功能。使用風險自負。"
+	L.SETTINGS_BETA_FEATURES_WARNING = "警告：測試功能可能包含錯誤、效能問題或不完整的功能。使用風險自負。"
 	L.SETTINGS_BETA_FEATURES_LIST = "目前可用的測試功能："
 	L.SETTINGS_BETA_FEATURES_ENABLED = "測試功能 |cff00ff00已啟用|r"
 	L.SETTINGS_BETA_FEATURES_DISABLED = "測試功能 |cffff0000已停用|r"
@@ -208,5 +208,14 @@ if GetLocale() == "zhTW" then
 	L.NOTIFICATION_FRIEND_PLAYING = "%s 現在在線 [正在玩 %s]"
 	L.NOTIFICATION_SYSTEM_UNAVAILABLE = "通知系統無法使用"
 	L.NOTIFICATION_BETA_REQUIRED = "必須啟用測試功能才能使用通知"
-	L.NOTIFICATION_BETA_ENABLE_HINT = "→ 在設定 > 進階 > 測試功能中啟用"
-end
+	L.NOTIFICATION_BETA_ENABLE_HINT = "→ 在設定 > 進階 > 測試功能中啟用"	
+	-- ========================================
+	-- EDIT MODE FRAME SIZE (PHASE 5)
+	-- ========================================
+	L.SETTINGS_FRAME_SIZE_HEADER = "預設框架大小 (編輯模式)"
+	L.SETTINGS_FRAME_SIZE_INFO = "設定新編輯模式配置的偏好預設大小。"
+	L.SETTINGS_FRAME_WIDTH = "寬度:"
+	L.SETTINGS_FRAME_HEIGHT = "高度:"
+	L.SETTINGS_FRAME_RESET_SIZE = "重設為 415x570"
+	L.SETTINGS_FRAME_APPLY_NOW = "套用到目前配置"
+	L.SETTINGS_FRAME_RESET_ALL = "重設所有配置"end

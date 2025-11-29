@@ -104,8 +104,10 @@ function BetterFriendlist_GetRelationshipInfo(guid, missingNameFallback, clubId)
 	local friendInfo = GetFriendInfoByGUID(guid)
 	if friendInfo and friendInfo.connected then
 		local name = friendInfo.name
-		local playerLink = GetPlayerLink(name, ("[%s]"):format(name))
-		return name, FRIENDS_WOW_NAME_COLOR_CODE, "wowfriend", playerLink
+		if name then
+			local playerLink = GetPlayerLink(name, ("[%s]"):format(name))
+			return name, FRIENDS_WOW_NAME_COLOR_CODE, "wowfriend", playerLink
+		end
 	end
 	
 	-- Check guild member
@@ -113,7 +115,7 @@ function BetterFriendlist_GetRelationshipInfo(guid, missingNameFallback, clubId)
 		local guildName, guildRankName, guildRankIndex, realm = GetGuildInfo("player")
 		for i = 1, GetNumGuildMembers() do
 			local name, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, memberGuid = GetGuildRosterInfo(i)
-			if memberGuid == guid then
+			if memberGuid == guid and name then
 				local playerLink = GetPlayerLink(name, ("[%s]"):format(name))
 				return name, FRIENDS_WOW_NAME_COLOR_CODE, "guild", playerLink
 			end
@@ -124,7 +126,7 @@ function BetterFriendlist_GetRelationshipInfo(guid, missingNameFallback, clubId)
 	local clubInfo = clubId and C_Club.GetClubInfo(clubId) or nil
 	if clubInfo then
 		local memberInfo = C_Club.GetMemberInfoForSelf(clubId)
-		if memberInfo then
+		if memberInfo and memberInfo.name then
 			local name = memberInfo.name
 			local playerLink = GetPlayerLink(name, ("[%s]"):format(name))
 			return name, FRIENDS_WOW_NAME_COLOR_CODE, "club", playerLink

@@ -172,7 +172,7 @@ if GetLocale() == "ruRU" then
 	L.SETTINGS_BETA_FEATURES_DESC = "Включите экспериментальные функции, которые все еще находятся в разработке. Эти функции могут измениться или быть удалены в будущих версиях."
 	L.SETTINGS_BETA_FEATURES_ENABLE = "Включить бета-функции"
 	L.SETTINGS_BETA_FEATURES_TOOLTIP = "Включает экспериментальные функции (Уведомления и т.д.)"
-	L.SETTINGS_BETA_FEATURES_WARNING = "⚠ Предупреждение: Бета-функции могут содержать ошибки, проблемы с производительностью или неполную функциональность. Используйте на свой страх и риск."
+	L.SETTINGS_BETA_FEATURES_WARNING = "Предупреждение: Бета-функции могут содержать ошибки, проблемы с производительностью или неполную функциональность. Используйте на свой страх и риск."
 	L.SETTINGS_BETA_FEATURES_LIST = "Доступные бета-функции:"
 	L.SETTINGS_BETA_FEATURES_ENABLED = "Бета-функции |cff00ff00ВКЛЮЧЕНЫ|r"
 	L.SETTINGS_BETA_FEATURES_DISABLED = "Бета-функции |cffff0000ВЫКЛЮЧЕНЫ|r"
@@ -208,5 +208,14 @@ if GetLocale() == "ruRU" then
 	L.NOTIFICATION_FRIEND_PLAYING = "%s сейчас в сети [играет в %s]"
 	L.NOTIFICATION_SYSTEM_UNAVAILABLE = "Система уведомлений недоступна"
 	L.NOTIFICATION_BETA_REQUIRED = "Бета-функции должны быть включены для использования уведомлений"
-	L.NOTIFICATION_BETA_ENABLE_HINT = "→ Включите в Настройки > Дополнительно > Бета-функции"
-end
+	L.NOTIFICATION_BETA_ENABLE_HINT = "→ Включите в Настройки > Дополнительно > Бета-функции"	
+	-- ========================================
+	-- EDIT MODE FRAME SIZE (PHASE 5)
+	-- ========================================
+	L.SETTINGS_FRAME_SIZE_HEADER = "Размер фрейма по умолчанию (Режим редактирования)"
+	L.SETTINGS_FRAME_SIZE_INFO = "Установите предпочтительный размер по умолчанию для новых раскладок режима редактирования."
+	L.SETTINGS_FRAME_WIDTH = "Ширина:"
+	L.SETTINGS_FRAME_HEIGHT = "Высота:"
+	L.SETTINGS_FRAME_RESET_SIZE = "Сбросить до 415x570"
+	L.SETTINGS_FRAME_APPLY_NOW = "Применить к текущей раскладке"
+	L.SETTINGS_FRAME_RESET_ALL = "Сбросить все раскладки"end

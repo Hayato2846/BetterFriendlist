@@ -172,7 +172,7 @@ if GetLocale() == "esMX" then
 	L.SETTINGS_BETA_FEATURES_DESC = "Activa funciones experimentales que aún están en desarrollo. Estas funciones pueden cambiar o eliminarse en versiones futuras."
 	L.SETTINGS_BETA_FEATURES_ENABLE = "Activar Funciones Beta"
 	L.SETTINGS_BETA_FEATURES_TOOLTIP = "Activa funciones experimentales (Notificaciones, etc.)"
-	L.SETTINGS_BETA_FEATURES_WARNING = "⚠ Advertencia: Las funciones beta pueden contener errores, problemas de rendimiento o funcionalidad incompleta. Úsalas bajo tu propio riesgo."
+	L.SETTINGS_BETA_FEATURES_WARNING = "Advertencia: Las funciones beta pueden contener errores, problemas de rendimiento o funcionalidad incompleta. Úsalas bajo tu propio riesgo."
 	L.SETTINGS_BETA_FEATURES_LIST = "Funciones Beta disponibles actualmente:"
 	L.SETTINGS_BETA_FEATURES_ENABLED = "Funciones Beta |cff00ff00ACTIVADAS|r"
 	L.SETTINGS_BETA_FEATURES_DISABLED = "Funciones Beta |cffff0000DESACTIVADAS|r"
@@ -209,4 +209,15 @@ if GetLocale() == "esMX" then
 	L.NOTIFICATION_SYSTEM_UNAVAILABLE = "Sistema de notificación no disponible"
 	L.NOTIFICATION_BETA_REQUIRED = "Las Funciones Beta deben estar activadas para usar notificaciones"
 	L.NOTIFICATION_BETA_ENABLE_HINT = "→ Actívalas en Configuración > Avanzado > Funciones Beta"
+	
+	-- ========================================
+	-- EDIT MODE FRAME SIZE (PHASE 5)
+	-- ========================================
+	L.SETTINGS_FRAME_SIZE_HEADER = "Tamaño de marco predeterminado (Modo de edición)"
+	L.SETTINGS_FRAME_SIZE_INFO = "Establece tu tamaño predeterminado preferido para nuevos diseños de modo de edición."
+	L.SETTINGS_FRAME_WIDTH = "Anchura:"
+	L.SETTINGS_FRAME_HEIGHT = "Altura:"
+	L.SETTINGS_FRAME_RESET_SIZE = "Restablecer a 415x570"
+	L.SETTINGS_FRAME_APPLY_NOW = "Aplicar al diseño actual"
+	L.SETTINGS_FRAME_RESET_ALL = "Restablecer todos los diseños"
 end

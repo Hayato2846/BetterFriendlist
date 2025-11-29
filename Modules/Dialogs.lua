@@ -208,6 +208,39 @@ function Dialogs:RegisterDialogs()
 		preferredIndex = 3,
 	}
 	
+	-- Dialog for resetting all Edit Mode layouts (Phase 5)
+	StaticPopupDialogs["BETTER_FRIENDLIST_RESET_ALL_LAYOUTS"] = {
+		text = "Reset all saved frame sizes and positions for all Edit Mode layouts?\n\nThis cannot be undone!",
+		button1 = "Reset All",
+		button2 = "Cancel",
+		OnAccept = function(self)
+			-- Clear all layout data
+			BetterFriendlistDB.mainFrameSize = {}
+			BetterFriendlistDB.mainFramePosition = {}
+			BetterFriendlistDB.mainFramePositionMigrated = false
+			
+			-- Reset frame to default size and position
+			local frame = BetterFriendsFrame
+			if frame then
+				frame:ClearAllPoints()
+				frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+				frame:SetSize(415, 570)
+				
+				-- Trigger responsive updates
+				if BFL.MainFrameEditMode then
+					BFL.MainFrameEditMode:TriggerResponsiveUpdates()
+				end
+			end
+			
+			BFL:DebugPrint("|cff00ff00All Edit Mode layouts reset to default|r")
+			print("|cff00ffffBetterFriendlist:|r All layouts reset. Use /editmode to reposition.")
+		end,
+		timeout = 0,
+		whileDead = true,
+		hideOnEscape = true,
+		preferredIndex = 3,
+	}
+	
 	-- Add Group Trigger Dialog (Phase 10) - Using proper frame approach like Export/Import
 	local triggerFrame = nil
 	

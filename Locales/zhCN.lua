@@ -172,7 +172,7 @@ if GetLocale() == "zhCN" then
 	L.SETTINGS_BETA_FEATURES_DESC = "启用仍在开发中的实验性功能。这些功能可能会在未来版本中更改或删除。"
 	L.SETTINGS_BETA_FEATURES_ENABLE = "启用测试功能"
 	L.SETTINGS_BETA_FEATURES_TOOLTIP = "启用实验性功能（通知等）"
-	L.SETTINGS_BETA_FEATURES_WARNING = "⚠ 警告：测试功能可能包含错误、性能问题或不完整的功能。使用风险自负。"
+	L.SETTINGS_BETA_FEATURES_WARNING = "警告：测试功能可能包含错误、性能问题或不完整的功能。使用风险自负。"
 	L.SETTINGS_BETA_FEATURES_LIST = "当前可用的测试功能："
 	L.SETTINGS_BETA_FEATURES_ENABLED = "测试功能 |cff00ff00已启用|r"
 	L.SETTINGS_BETA_FEATURES_DISABLED = "测试功能 |cffff0000已禁用|r"
@@ -208,5 +208,14 @@ if GetLocale() == "zhCN" then
 	L.NOTIFICATION_FRIEND_PLAYING = "%s 现在在线 [正在玩 %s]"
 	L.NOTIFICATION_SYSTEM_UNAVAILABLE = "通知系统不可用"
 	L.NOTIFICATION_BETA_REQUIRED = "必须启用测试功能才能使用通知"
-	L.NOTIFICATION_BETA_ENABLE_HINT = "→ 在设置 > 高级 > 测试功能中启用"
-end
+	L.NOTIFICATION_BETA_ENABLE_HINT = "→ 在设置 > 高级 > 测试功能中启用"	
+	-- ========================================
+	-- EDIT MODE FRAME SIZE (PHASE 5)
+	-- ========================================
+	L.SETTINGS_FRAME_SIZE_HEADER = "默认框架大小 (编辑模式)"
+	L.SETTINGS_FRAME_SIZE_INFO = "设置新编辑模式布局的首选默认大小。"
+	L.SETTINGS_FRAME_WIDTH = "宽度:"
+	L.SETTINGS_FRAME_HEIGHT = "高度:"
+	L.SETTINGS_FRAME_RESET_SIZE = "重置为 415x570"
+	L.SETTINGS_FRAME_APPLY_NOW = "应用到当前布局"
+	L.SETTINGS_FRAME_RESET_ALL = "重置所有布局"end

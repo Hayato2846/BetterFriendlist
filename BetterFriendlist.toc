@@ -2,12 +2,25 @@
 ## Title: BetterFriendlist
 ## Notes: Complete replacement for WoW Friends frame - Custom groups, Raid management, Quick Join, and more!
 ## Author: Hayato2846
-## Version: 1.9.0
+## Version: 1.9.1
+## IconTexture: Interface\AddOns\BetterFriendlist\Textures\PortraitIcon.blp
 ## X-Curse-Project-ID: 1381771
 ## X-WoWI-ID: 26984
 ## X-Wago-ID: rNkPLl6a 
 ## SavedVariables: BetterFriendlistDB
 ## Bindings: Bindings.xml
+
+## Category: User Interface
+## Category-deDE: Benutzerinterface
+## Category-esES: Interfaz de usuario
+## Category-esMX: Interfaz de usuario
+## Category-frFR: Interface utilisateur
+## Category-itIT: Interfaccia utente
+## Category-koKR: 사용자 인터페이스
+## Category-ptBR: Interface do usuário
+## Category-ruRU: Интерфейс пользователя
+## Category-zhCN: 用户界面
+## Category-zhTW: 使用者介面
 
 # Libraries (loaded first)
 Libs\LibStub\LibStub.lua
@@ -45,6 +58,7 @@ Modules\ActivityTracker.lua
 Modules\Statistics.lua
 Modules\NotificationSystem_Simple.lua
 Modules\NotificationEditMode.lua
+Modules\MainFrameEditMode.lua
 Modules\Groups.lua
 Modules\FriendsList.lua
 Modules\WhoFrame.lua

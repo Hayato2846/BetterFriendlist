@@ -172,7 +172,7 @@ if GetLocale() == "itIT" then
 	L.SETTINGS_BETA_FEATURES_DESC = "Attiva funzionalità sperimentali ancora in sviluppo. Queste funzionalità potrebbero cambiare o essere rimosse nelle versioni future."
 	L.SETTINGS_BETA_FEATURES_ENABLE = "Attiva Funzionalità Beta"
 	L.SETTINGS_BETA_FEATURES_TOOLTIP = "Attiva funzionalità sperimentali (Notifiche, ecc.)"
-	L.SETTINGS_BETA_FEATURES_WARNING = "⚠ Avviso: Le funzionalità beta possono contenere bug, problemi di prestazioni o funzionalità incomplete. Usale a tuo rischio e pericolo."
+	L.SETTINGS_BETA_FEATURES_WARNING = "Avviso: Le funzionalità beta possono contenere bug, problemi di prestazioni o funzionalità incomplete. Usale a tuo rischio e pericolo."
 	L.SETTINGS_BETA_FEATURES_LIST = "Funzionalità Beta attualmente disponibili:"
 	L.SETTINGS_BETA_FEATURES_ENABLED = "Funzionalità Beta |cff00ff00ATTIVATE|r"
 	L.SETTINGS_BETA_FEATURES_DISABLED = "Funzionalità Beta |cffff0000DISATTIVATE|r"
@@ -208,5 +208,14 @@ if GetLocale() == "itIT" then
 	L.NOTIFICATION_FRIEND_PLAYING = "%s è ora online [gioca a %s]"
 	L.NOTIFICATION_SYSTEM_UNAVAILABLE = "Sistema di notifica non disponibile"
 	L.NOTIFICATION_BETA_REQUIRED = "Le Funzionalità Beta devono essere attivate per usare le notifiche"
-	L.NOTIFICATION_BETA_ENABLE_HINT = "→ Attivale in Impostazioni > Avanzate > Funzionalità Beta"
-end
+	L.NOTIFICATION_BETA_ENABLE_HINT = "→ Attivale in Impostazioni > Avanzate > Funzionalità Beta"	
+	-- ========================================
+	-- EDIT MODE FRAME SIZE (PHASE 5)
+	-- ========================================
+	L.SETTINGS_FRAME_SIZE_HEADER = "Dimensione predefinita della finestra (Modalità modifica)"
+	L.SETTINGS_FRAME_SIZE_INFO = "Imposta la tua dimensione predefinita preferita per i nuovi layout della modalità modifica."
+	L.SETTINGS_FRAME_WIDTH = "Larghezza:"
+	L.SETTINGS_FRAME_HEIGHT = "Altezza:"
+	L.SETTINGS_FRAME_RESET_SIZE = "Ripristina a 415x570"
+	L.SETTINGS_FRAME_APPLY_NOW = "Applica al layout corrente"
+	L.SETTINGS_FRAME_RESET_ALL = "Ripristina tutti i layout"end

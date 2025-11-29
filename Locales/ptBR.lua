@@ -172,7 +172,7 @@ if GetLocale() == "ptBR" then
 	L.SETTINGS_BETA_FEATURES_DESC = "Ative recursos experimentais ainda em desenvolvimento. Estes recursos podem mudar ou ser removidos em versões futuras."
 	L.SETTINGS_BETA_FEATURES_ENABLE = "Ativar Recursos Beta"
 	L.SETTINGS_BETA_FEATURES_TOOLTIP = "Ativa recursos experimentais (Notificações, etc.)"
-	L.SETTINGS_BETA_FEATURES_WARNING = "⚠ Aviso: Recursos beta podem conter bugs, problemas de desempenho ou funcionalidade incompleta. Use por sua conta e risco."
+	L.SETTINGS_BETA_FEATURES_WARNING = "Aviso: Recursos beta podem conter bugs, problemas de desempenho ou funcionalidade incompleta. Use por sua conta e risco."
 	L.SETTINGS_BETA_FEATURES_LIST = "Recursos Beta atualmente disponíveis:"
 	L.SETTINGS_BETA_FEATURES_ENABLED = "Recursos Beta |cff00ff00ATIVADOS|r"
 	L.SETTINGS_BETA_FEATURES_DISABLED = "Recursos Beta |cffff0000DESATIVADOS|r"
@@ -208,5 +208,14 @@ if GetLocale() == "ptBR" then
 	L.NOTIFICATION_FRIEND_PLAYING = "%s está online agora [jogando %s]"
 	L.NOTIFICATION_SYSTEM_UNAVAILABLE = "Sistema de notificação não disponível"
 	L.NOTIFICATION_BETA_REQUIRED = "Recursos Beta devem estar ativados para usar notificações"
-	L.NOTIFICATION_BETA_ENABLE_HINT = "→ Ative em Configurações > Avançado > Recursos Beta"
-end
+	L.NOTIFICATION_BETA_ENABLE_HINT = "→ Ative em Configurações > Avançado > Recursos Beta"	
+	-- ========================================
+	-- EDIT MODE FRAME SIZE (PHASE 5)
+	-- ========================================
+	L.SETTINGS_FRAME_SIZE_HEADER = "Tamanho de quadro padrão (Modo de edição)"
+	L.SETTINGS_FRAME_SIZE_INFO = "Defina seu tamanho padrão preferido para novos layouts do modo de edição."
+	L.SETTINGS_FRAME_WIDTH = "Largura:"
+	L.SETTINGS_FRAME_HEIGHT = "Altura:"
+	L.SETTINGS_FRAME_RESET_SIZE = "Redefinir para 415x570"
+	L.SETTINGS_FRAME_APPLY_NOW = "Aplicar ao layout atual"
+	L.SETTINGS_FRAME_RESET_ALL = "Redefinir todos os layouts"end

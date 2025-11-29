@@ -170,7 +170,7 @@ function NotificationSystem:ShowTestNotification()
     -- CRITICAL: Block if Beta Features disabled
     if not IsBetaEnabled() then
         print("|cffff0000BetterFriendlist:|r Beta Features must be enabled to use notifications")
-        print("|cffffcc00→|r Enable in Settings > Advanced > Beta Features")
+        print("|cffffcc00[>]|r Enable in Settings > Advanced > Beta Features")
         return
     end
     
@@ -207,7 +207,7 @@ function NotificationSystem:TestGroupRules()
     -- CRITICAL: Block if Beta Features disabled
     if not IsBetaEnabled() then
         print("|cffff0000BetterFriendlist:|r Beta Features must be enabled to use notifications")
-        print("|cffffcc00→|r Enable in Settings > Advanced > Beta Features")
+        print("|cffffcc00[>]|r Enable in Settings > Advanced > Beta Features")
         return
     end
     
@@ -217,13 +217,13 @@ function NotificationSystem:TestGroupRules()
     -- Test with first BNet friend
     local numBNet = BNGetNumFriends()
     if numBNet == 0 then
-        print("|cffffcc00→|r No BattleNet friends found")
+        print("|cffffcc00[>]|r No BattleNet friends found")
         return
     end
     
     local accountInfo = C_BattleNet.GetFriendAccountInfo(1)
     if not accountInfo then
-        print("|cffffcc00→|r Could not get friend info")
+        print("|cffffcc00[>]|r Could not get friend info")
         return
     end
     

@@ -199,7 +199,7 @@ if GetLocale() == "enUS" then
 	L.SETTINGS_BETA_FEATURES_DESC = "Enable experimental features that are still in development. These features may change or be removed in future versions."
 	L.SETTINGS_BETA_FEATURES_ENABLE = "Enable Beta Features"
 	L.SETTINGS_BETA_FEATURES_TOOLTIP = "Enables experimental features (Notifications, etc.)"
-	L.SETTINGS_BETA_FEATURES_WARNING = "⚠ Warning: Beta features may contain bugs, performance issues, or incomplete functionality. Use at your own risk."
+	L.SETTINGS_BETA_FEATURES_WARNING = "Warning: Beta features may contain bugs, performance issues, or incomplete functionality. Use at your own risk."
 	L.SETTINGS_BETA_FEATURES_LIST = "Currently available Beta Features:"
 	L.SETTINGS_BETA_FEATURES_ENABLED = "Beta Features |cff00ff00ENABLED|r"
 	L.SETTINGS_BETA_FEATURES_DISABLED = "Beta Features |cffff0000DISABLED|r"
@@ -236,4 +236,15 @@ if GetLocale() == "enUS" then
 	L.NOTIFICATION_SYSTEM_UNAVAILABLE = "Notification system not available"
 	L.NOTIFICATION_BETA_REQUIRED = "Beta Features must be enabled to use notifications"
 	L.NOTIFICATION_BETA_ENABLE_HINT = "→ Enable in Settings > Advanced > Beta Features"
+	
+	-- ========================================
+	-- EDIT MODE FRAME SIZE (PHASE 5)
+	-- ========================================
+	L.SETTINGS_FRAME_SIZE_HEADER = "Default Frame Size (Edit Mode)"
+	L.SETTINGS_FRAME_SIZE_INFO = "Set your preferred default size for new Edit Mode layouts."
+	L.SETTINGS_FRAME_WIDTH = "Width:"
+	L.SETTINGS_FRAME_HEIGHT = "Height:"
+	L.SETTINGS_FRAME_RESET_SIZE = "Reset to 415x570"
+	L.SETTINGS_FRAME_APPLY_NOW = "Apply to Current Layout"
+	L.SETTINGS_FRAME_RESET_ALL = "Reset All Layouts to Default"
 end

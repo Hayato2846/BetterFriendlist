@@ -285,6 +285,11 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 				BFL.NotificationEditMode:Initialize()
 			end
 			
+			-- Initialize MainFrameEditMode (Edit Mode integration for main frame)
+			if BFL.MainFrameEditMode and BFL.MainFrameEditMode.Initialize then
+				BFL.MainFrameEditMode:Initialize()
+			end
+			
 			-- Register module events after initialization
 			-- CRITICAL: Only register NotificationSystem events if Beta Features enabled
 			if BFL.NotificationSystem and BFL.NotificationSystem.RegisterEvents then

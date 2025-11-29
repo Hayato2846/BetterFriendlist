@@ -1085,7 +1085,7 @@ function Settings:MigrateFriendGroups(cleanupNotes)
 					groupNameMap[groupName] = existingGroupId
 					migratedGroups[groupName] = true
 					table.insert(groupOrderArray, existingGroupId)
-					print("|cffffff00BetterFriendlist:|r   ⚠ Existing:", groupName, "(using existing group)")
+					print("|cffffff00BetterFriendlist:|r   [!] Existing:", groupName, "(using existing group)")
 					currentOrder = currentOrder + 1
 				else
 					print("|cffff0000BetterFriendlist:|r   ✗ FAILED:", groupName, "- Group exists but ID not found")
@@ -2623,10 +2623,10 @@ function Settings:RefreshAdvancedTab()
 			-- User feedback
 			if checked then
 				print("|cff00ff00BetterFriendlist:|r Beta Features |cff00ff00ENABLED|r")
-				print("|cffff8800→|r Beta tabs are now visible in Settings")
+				print("|cffff8800[>]|r Beta tabs are now visible in Settings")
 			else
 				print("|cff00ff00BetterFriendlist:|r Beta Features |cffff0000DISABLED|r")
-				print("|cffff8800→|r Beta tabs are now hidden")
+				print("|cffff8800[>]|r Beta tabs are now hidden")
 			end
 		end
 	)

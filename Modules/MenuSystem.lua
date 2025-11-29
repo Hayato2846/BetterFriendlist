@@ -46,6 +46,10 @@ function MenuSystem:OpenFriendMenu(button, friendType, friendID)
 		button = button,
 	}
 	
+	-- Set flag to indicate this menu is opened from BetterFriendlist
+	_G.BetterFriendlist_IsOurMenu = true
+	print("|cff00ff00BFL MenuSystem: Flag set to TRUE, opening menu type:", menuType)
+	
 	UnitPopup_OpenMenu(menuType, contextData)
 end
 

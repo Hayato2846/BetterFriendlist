@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.9.1] - 2025-11-29
+
+**🎯 Edit Mode & RaiderIO Integration**
+
+Resize and position your friends list window freely, plus seamless integration with RaiderIO and other tooltip addons.
+
+### Added
+- **Edit Mode Integration** - Full frame positioning and resizing support
+  - Drag and position your friends list window anywhere on screen
+  - Resize window width (380-800px) and height (400-1200px) to your preference
+  - Use WoW's Edit Mode (/editmode) to customize your layout
+  - Size and position saved per Edit Mode layout
+  - All UI elements scale dynamically with frame size
+- **RaiderIO Integration** - Friend tooltips now work with popular addons
+  - RaiderIO scores appear automatically below friend information
+  - Activity tracking ("Last contact") displays cleanly with divider line
+  - Works with any addon that enhances friend tooltips
+  - No configuration needed - works out of the box
+
+### Fixed
+- **Context Menu** - Friend group menu now appears correctly
+  - Group management options show when right-clicking friends
+  - Fixed menu appearing for non-friends (WHO list, guilds)
+  - Proper menu isolation for different friend types
+- **Tooltip Display** - Friend tooltips now appear correctly in all situations
+  - Tooltips show when friends list window is closed
+  - Activity information positioned perfectly without overlap
+  - Consistent appearance with other WoW tooltips
+- **QuickJoin Display** - Player names no longer cause errors
+  - Fixed crash when friend has no character name
+  - Guild and club member lookups now validate names properly
+
+---
+
 ## [1.9.0] - 2025-11-25
 
 **🔔 Beta Feature - Smart Notifications**
