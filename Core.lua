@@ -307,19 +307,33 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 			-- ============================================================================
 			-- Hook ToggleFriendsFrame to open BetterFriendlist instead
 			-- ============================================================================
-			-- Strategy based on cargBags/AdiBags approach:
-			-- 1. Replace global function immediately
-			-- 2. Use hooksecurefunc for close operations (taint-safe)
-			-- 3. NO OnShow hooks (can cause UIPanel state corruption)
+			-- Strategy: Multi-layer hooking for maximum compatibility
+			-- 1. Remove FriendsFrame from UIPanel system (allows Hide() in combat)
+			-- 2. Hook FriendsFrame:OnShow to intercept ALL ways of opening it
+			-- 3. Replace _G.ToggleFriendsFrame for direct calls
+			-- 4. Hook ShowFriends for additional coverage
 			--
-			-- IMPORTANT: Addons like ElvUI cache functions at load time with:
-			--   local ToggleFriendsFrame = ToggleFriendsFrame
-			-- For those cases, we cannot intercept. Users need to configure their
-			-- addon to use our keybind or DataBroker instead.
+			-- This works with ElvUI because even if they cached ToggleFriendsFrame,
+			-- the OnShow hook will catch the FriendsFrame being opened.
 			-- ============================================================================
 			
 			-- Flag to bypass hook when user explicitly wants Blizzard's frame
 			BFL.AllowBlizzardFriendsFrame = false
+			
+			-- ============================================================================
+			-- CRITICAL: Remove FriendsFrame from UIPanel system
+			-- ============================================================================
+			-- By removing FriendsFrame from UIPanelWindows, we can use Hide() in combat
+			-- without taint issues. ShowUIPanel/HideUIPanel are protected in combat,
+			-- but direct Show()/Hide() calls work fine for non-UIPanel frames.
+			-- ============================================================================
+			if UIPanelWindows and UIPanelWindows["FriendsFrame"] then
+				-- Store original settings in case user wants Blizzard's frame
+				BFL.OriginalFriendsFrameUIPanelSettings = UIPanelWindows["FriendsFrame"]
+				-- Remove from UIPanel system
+				UIPanelWindows["FriendsFrame"] = nil
+				BFL:DebugPrint("|cff00ff00[BFL]|r FriendsFrame removed from UIPanel system (combat-safe)")
+			end
 			
 			-- Store original function for "Show Blizzard's Friendlist" option
 			if _G.ToggleFriendsFrame then
@@ -333,11 +347,11 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 						return BFL.OriginalToggleFriendsFrame(tabIndex)
 					end
 					
-					BFL:DebugPrint("[BFL] ToggleFriendsFrame: Opening BetterFriendlist")
+					BFL:DebugPrint("[BFL] ToggleFriendsFrame: Opening BetterFriendlist, tabIndex: " .. tostring(tabIndex))
 					
-					-- Toggle our frame (combat-safe, our frame is not protected)
+					-- Toggle our frame with the requested tab (combat-safe, our frame is not protected)
 					if _G.ToggleBetterFriendsFrame then
-						_G.ToggleBetterFriendsFrame()
+						_G.ToggleBetterFriendsFrame(tabIndex)
 					end
 				end
 				BFL:DebugPrint("|cff00ff00[BFL]|r ToggleFriendsFrame global replaced")
@@ -347,24 +361,23 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 			-- This is used by "Show Blizzard's Friendlist" menu option
 			BFL.ShowBlizzardFriendsFrame = function()
 				BFL.AllowBlizzardFriendsFrame = true
+				-- Temporarily restore UIPanel settings for proper positioning
+				if BFL.OriginalFriendsFrameUIPanelSettings then
+					UIPanelWindows["FriendsFrame"] = BFL.OriginalFriendsFrameUIPanelSettings
+				end
 				if BFL.OriginalToggleFriendsFrame then
 					BFL.OriginalToggleFriendsFrame()
 				elseif FriendsFrame then
-					-- Fallback: Direct ShowUIPanel (may taint in combat)
-					if not InCombatLockdown() then
-						ShowUIPanel(FriendsFrame)
-					else
-						print("|cffff8800BetterFriendlist:|r Cannot open Blizzard's frame in combat")
-					end
+					-- Fallback: Direct Show (combat-safe now that it's not a UIPanel)
+					FriendsFrame:Show()
 				end
-				-- Reset flag after a brief delay (frame should be shown by then)
+				-- Reset flag and UIPanel settings after a brief delay
 				C_Timer.After(0.1, function()
 					BFL.AllowBlizzardFriendsFrame = false
 				end)
 			end
 			
-			-- Hook ShowFriends/HideFriends for additional coverage (taint-safe)
-			-- These are the internal functions Blizzard uses
+			-- Hook ShowFriends for additional coverage (taint-safe)
 			if _G.ShowFriends then
 				BFL.OriginalShowFriends = _G.ShowFriends
 				_G.ShowFriends = function()
@@ -380,14 +393,45 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 				end
 			end
 			
-			-- Note: We do NOT hook FriendsFrame:OnShow() because:
-			-- 1. Calling Hide()/HideUIPanel() in OnShow can corrupt UIPanel state
-			-- 2. It may cause taint in combat
-			-- 3. cargBags and AdiBags don't use this approach either
-			--
-			-- Limitation: If another addon cached ToggleFriendsFrame before us,
-			-- their calls will open Blizzard's frame. This is acceptable - users
-			-- can configure those addons to use BetterFriendlist's keybind instead.
+			-- ============================================================================
+			-- CRITICAL: Hook FriendsFrame:OnShow for ElvUI compatibility
+			-- ============================================================================
+			-- ElvUI and other addons may cache ToggleFriendsFrame at load time.
+			-- By hooking OnShow, we intercept the frame REGARDLESS of how it was opened.
+			-- Since FriendsFrame is no longer a UIPanel, Hide() is combat-safe.
+			-- We detect which tab was requested by checking FriendsFrame's selected tab.
+			-- ============================================================================
+			if FriendsFrame then
+				FriendsFrame:HookScript("OnShow", function(self)
+					-- Skip if user explicitly wants Blizzard's frame
+					if BFL.AllowBlizzardFriendsFrame then
+						BFL:DebugPrint("[BFL] FriendsFrame:OnShow - Allowing (explicit)")
+						return
+					end
+					
+					-- Detect which tab was requested by reading Blizzard's selected tab
+					-- FRIEND_TAB_FRIENDS=1, FRIEND_TAB_WHO=2, FRIEND_TAB_RAID=3, FRIEND_TAB_QUICK_JOIN=4
+					local requestedTab = PanelTemplates_GetSelectedTab(FriendsFrame) or 1
+					BFL:DebugPrint("[BFL] FriendsFrame:OnShow - Intercepting, requested tab: " .. tostring(requestedTab))
+					
+					-- Hide Blizzard's frame immediately (combat-safe since not a UIPanel anymore)
+					FriendsFrame:Hide()
+					
+					-- Open our frame with the requested tab
+					if BetterFriendsFrame then
+						if _G.ToggleBetterFriendsFrame then
+							-- If already shown, just switch tab; otherwise open with tab
+							if BetterFriendsFrame:IsShown() then
+								PanelTemplates_SetTab(BetterFriendsFrame, requestedTab)
+								BetterFriendsFrame_ShowBottomTab(requestedTab)
+							else
+								_G.ShowBetterFriendsFrame(requestedTab)
+							end
+						end
+					end
+				end)
+				BFL:DebugPrint("|cff00ff00[BFL]|r FriendsFrame:OnShow hooked for ElvUI compatibility")
+			end
 		end
 	elseif event == "PLAYER_LOGIN" then
 		-- Check for native event callbacks (12.0.0+)

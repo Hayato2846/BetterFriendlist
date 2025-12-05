@@ -7,27 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.9.3-beta] - 2025-12-05
+## [1.9.4] - 2025-12-05
 
-### 🔧 Quick Join Improvements (Beta)
+### 🔗 ElvUI Compatibility & Quick Join Fixes
 
-Fixes for the Quick Join tab to match Blizzard's behavior more accurately.
+Full compatibility with ElvUI and other UI replacement addons, plus Quick Join improvements.
+
+### Added
+- **Smart Tab Support** - Opening Quick Join, Who, or Raid from other addons now opens the correct tab
+  - ElvUI Quick Join Datatext opens BetterFriendlist directly on Quick Join tab
+  - Works with any addon using `ToggleFriendsFrame(tabIndex)` or `ToggleQuickJoinPanel()`
+  - Intelligent toggle: requesting a different tab switches tabs instead of closing
 
 ### Fixed
-- **Leader Name Display** - Now shows the correct character name in Quick Join tooltips
-  - Previously showed the Battle.net account name (e.g., "Ywi") instead of the character name
+- **ElvUI Friends Button** - Now correctly opens BetterFriendlist instead of Blizzard's frame
+  - Works even when ElvUI caches `ToggleFriendsFrame` at load time
+  - Multi-layer hook strategy intercepts FriendsFrame regardless of how it's opened
+- **Combat Compatibility** - Fixed "Interface action failed because of an AddOn" errors
+  - Removed FriendsFrame from UIPanel system for combat-safe Hide()
+  - No more taint issues when closing the frame during combat
+- **Quick Join Leader Names** - Now shows the correct character name in tooltips
+  - Previously showed the Battle.net account name instead of the character name
   - Now correctly shows the character name with realm (e.g., "Tsveta-ChamberofAspects")
-  - Matches Blizzard's tooltip behavior for LFG List groups
 
 ### Improved
+- **Hook System** - Completely rewritten for maximum addon compatibility
+  - FriendsFrame:OnShow hook catches ALL methods of opening the friends frame
+  - Detects requested tab from Blizzard's selection and passes it through
+  - "Show Blizzard's Friendlist" menu option works reliably with proper UIPanel handling
 - **Quick Join Data Handling** - Better extraction of LFG List group information
   - Stores LFG List ID for fresh data lookup in tooltips
   - Ensures character names are always up-to-date
-- **Friends Frame Hook** - Improved compatibility with other addons
-  - Added `ShowFriends` hook for broader coverage
-  - "Show Blizzard's Friendlist" menu option now works reliably
-  - Better documentation for ElvUI and similar addons that cache functions
-  - Note: If ElvUI or other addons cache `ToggleFriendsFrame` at load time, use the keybind or Data Broker instead
 
 ---
 

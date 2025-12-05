@@ -543,7 +543,8 @@ function BetterFriendsFrame_OnSearchTextChanged(editBox)
 end
 
 -- Show the friends frame
-function ShowBetterFriendsFrame()
+-- tabIndex: Optional tab to show (1=Friends, 2=Who, 3=Raid, 4=Quick Join)
+function ShowBetterFriendsFrame(tabIndex)
 	-- Clear search box
 	if BetterFriendsFrame.FriendsTabHeader and BetterFriendsFrame.FriendsTabHeader.SearchBox then
 		BetterFriendsFrame.FriendsTabHeader.SearchBox:SetText("")
@@ -555,6 +556,13 @@ function ShowBetterFriendsFrame()
 	
 	-- Direct :Show() - now combat-safe (no longer SECURE frame)
 	BetterFriendsFrame:Show()
+	
+	-- Switch to requested tab if specified
+	if tabIndex and tabIndex >= 1 and tabIndex <= 4 then
+		BFL:DebugPrint("[BFL] ShowBetterFriendsFrame: Switching to tab " .. tabIndex)
+		PanelTemplates_SetTab(BetterFriendsFrame, tabIndex)
+		BetterFriendsFrame_ShowBottomTab(tabIndex)
+	end
 end
 
 -- Hide the friends frame  
@@ -574,15 +582,27 @@ function HideBetterFriendsFrame()
 end
 
 -- Toggle the friends frame
-function ToggleBetterFriendsFrame()
-	BFL:DebugPrint("[BFL] ToggleBetterFriendsFrame() called - Frame shown: " .. tostring(BetterFriendsFrame:IsShown()))
+-- tabIndex: Optional tab to show when opening (1=Friends, 2=Who, 3=Raid, 4=Quick Join)
+function ToggleBetterFriendsFrame(tabIndex)
+	BFL:DebugPrint("[BFL] ToggleBetterFriendsFrame() called - Frame shown: " .. tostring(BetterFriendsFrame:IsShown()) .. ", tabIndex: " .. tostring(tabIndex))
 	
 	if BetterFriendsFrame:IsShown() then
+		-- If already shown and same tab (or no tab specified), close it
+		-- If different tab requested, switch to that tab instead of closing
+		if tabIndex and tabIndex >= 1 and tabIndex <= 4 then
+			local currentTab = PanelTemplates_GetSelectedTab(BetterFriendsFrame) or 1
+			if currentTab ~= tabIndex then
+				BFL:DebugPrint("[BFL] Switching from tab " .. currentTab .. " to tab " .. tabIndex)
+				PanelTemplates_SetTab(BetterFriendsFrame, tabIndex)
+				BetterFriendsFrame_ShowBottomTab(tabIndex)
+				return
+			end
+		end
 		BFL:DebugPrint("[BFL] Hiding BetterFriendsFrame")
 		HideBetterFriendsFrame()
 	else
 		BFL:DebugPrint("[BFL] Showing BetterFriendsFrame")
-		ShowBetterFriendsFrame()
+		ShowBetterFriendsFrame(tabIndex)
 	end
 end
 
