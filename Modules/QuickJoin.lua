@@ -131,6 +131,53 @@ function BetterFriendlist_GetRelationshipInfo(guid, missingNameFallback, clubId)
 	return name, FRIENDS_WOW_NAME_COLOR_CODE, nil, playerLink
 end
 
+--[[
+	Blizzard's SocialQueueUtil_SortGroupMembers (1:1 copy from SocialQueue.lua)
+	Sorts group members by relationship priority: BNet > WoW Friend > Guild > Club > Unknown
+	This ensures the most relevant member (usually leader/friend) appears first
+]]
+local relationshipPriorityOrdering = {
+	["bnfriend"] = 1,
+	["wowfriend"] = 2,
+	["guild"] = 3,
+	["club"] = 4,
+}
+
+local function BetterFriendlist_SortGroupMembers(members)
+	if not members then return members end
+	
+	table.sort(members, function(lhs, rhs)
+		local lhsName, _, lhsRelationship = BetterFriendlist_GetRelationshipInfo(lhs.guid, nil, lhs.clubId)
+		local rhsName, _, rhsRelationship = BetterFriendlist_GetRelationshipInfo(rhs.guid, nil, rhs.clubId)
+		
+		-- Sort by relationship priority first (lower = higher priority)
+		if lhsRelationship ~= rhsRelationship then
+			local lhsPriority = lhsRelationship and relationshipPriorityOrdering[lhsRelationship] or 10
+			local rhsPriority = rhsRelationship and relationshipPriorityOrdering[rhsRelationship] or 10
+			return lhsPriority < rhsPriority
+		end
+		
+		-- Same relationship type: sort alphabetically by name
+		return strcmputf8i(lhsName or "", rhsName or "") < 0
+	end)
+	
+	return members
+end
+
+--[[
+	Blizzard's SocialQueueUtil_HasRelationshipWithLeader (1:1 copy from SocialQueue.lua)
+	Checks if the player has a relationship with the group leader
+	Used for auto-accept logic in tooltips
+]]
+local function BetterFriendlist_HasRelationshipWithLeader(partyGuid)
+	local leaderGuid = select(8, C_SocialQueue.GetGroupInfo(partyGuid))
+	if leaderGuid then
+		local _, _, relationship = BetterFriendlist_GetRelationshipInfo(leaderGuid)
+		return relationship ~= nil
+	end
+	return false
+end
+
 --[[ 
 	Public API 
 ]]
@@ -292,31 +339,19 @@ function QuickJoin:GetGroupInfo(groupGUID)
 	if info.members then
 		info.numMembers = #info.members
 		
-		-- Get leader name
+		-- Get leader name using BetterFriendlist_GetRelationshipInfo (like Blizzard's SocialQueueUtil_GetHeaderName)
+		-- CRITICAL: C_SocialQueue.GetGroupMembers() returns SocialQueuePlayerInfo with only 'guid' and 'clubId' fields!
+		-- Fields like 'name', 'memberName', 'clubName' do NOT exist - must use GetRelationshipInfo to resolve name from GUID
 		if info.members and #info.members > 0 and info.members[1] then
 			local member = info.members[1]
 			
-			-- Try multiple name fields
-			local rawName = member.clubName or member.name or member.memberName
-			
-			-- If still no name, try to get name from GUID
-			if not rawName and member.guid then
-				local accountInfo = C_BattleNet.GetAccountInfoByGUID(member.guid)
-				if accountInfo and accountInfo.accountName then
-					rawName = accountInfo.accountName
-				else
-					local friendInfo = GetFriendInfoByGUID(member.guid)
-					if friendInfo and friendInfo.name then
-						rawName = friendInfo.name
-					end
+			-- Use BetterFriendlist_GetRelationshipInfo to get name from GUID (exactly like Blizzard)
+			-- This function internally uses C_BattleNet.GetAccountInfoByGUID and GetPlayerInfoByGUID
+			if member.guid then
+				local name, color, relationship, playerLink = BetterFriendlist_GetRelationshipInfo(member.guid, nil, member.clubId)
+				if name and name ~= UNKNOWNOBJECT then
+					info.leaderName = name
 				end
-			end
-			
-			-- Protected strings are safe to use directly
-			if rawName then
-				info.leaderName = rawName
-			else
-				info.leaderName = "Player"
 			end
 		end
 	end
@@ -370,6 +405,11 @@ function QuickJoin:GetGroupInfo(groupGUID)
 				-- Playstyle für Tooltip
 				if searchResultInfo.playstyle then
 					info.playstyle = searchResultInfo.playstyle
+				end
+				
+				-- Auto-Accept (Blizzard's isAutoAccept for auto-join groups)
+				if searchResultInfo.autoAccept then
+					info.isAutoAccept = true
 				end
 			else
 				-- Fallback if search result not available
@@ -516,15 +556,38 @@ function QuickJoinEntry:New(guid, groupInfo)
 	entry.zombieMemberIndices = {}
 	entry.zombieQueueIndices = {}
 	
+	-- Track relationship with leader (Blizzard's hasRelationshipWithLeader)
+	-- Used for auto-accept logic in tooltips
+	entry.hasRelationshipWithLeader = BetterFriendlist_HasRelationshipWithLeader(guid)
+	
 	-- Extract member data - use actual member info from groupInfo
-	if groupInfo.members and #groupInfo.members > 0 then
+	-- CRITICAL: Sort members by relationship priority first! (like Blizzard's SocialQueueUtil_SortGroupMembers)
+	local sortedMembers = groupInfo.members
+	if sortedMembers and #sortedMembers > 0 then
+		-- Make a copy to avoid modifying original
+		sortedMembers = {}
 		for i, member in ipairs(groupInfo.members) do
-			-- Use leaderName from groupInfo for first member if available
+			sortedMembers[i] = member
+		end
+		-- Sort by relationship priority: BNet > WoW Friend > Guild > Club > Unknown
+		BetterFriendlist_SortGroupMembers(sortedMembers)
+	end
+	
+	if sortedMembers and #sortedMembers > 0 then
+		for i, member in ipairs(sortedMembers) do
+			-- Get name using BetterFriendlist_GetRelationshipInfo (like Blizzard)
+			-- CRITICAL: C_SocialQueue.GetGroupMembers() only returns 'guid' and 'clubId'!
+			-- Fields like 'name', 'memberName' do NOT exist - must resolve name from GUID
 			local name
-			if i == 1 and groupInfo.leaderName then
+			if i == 1 and groupInfo.leaderName and groupInfo.leaderName ~= UNKNOWN then
+				-- Use pre-resolved leaderName for first member if available
 				name = groupInfo.leaderName
+			elseif member.guid then
+				-- Resolve name from GUID using BetterFriendlist_GetRelationshipInfo
+				local resolvedName = BetterFriendlist_GetRelationshipInfo(member.guid, nil, member.clubId)
+				name = resolvedName or UNKNOWN
 			else
-				name = member.name or member.memberName or UNKNOWN
+				name = UNKNOWN
 			end
 			
 			entry.displayedMembers[i] = {
@@ -549,10 +612,15 @@ function QuickJoinEntry:New(guid, groupInfo)
 			-- Do NOT use activityName here - that's only for the tooltip!
 			local groupTitle = groupInfo.groupTitle or groupInfo._mockActivityName or UNKNOWN
 			
+			-- Get lfgListID from queue data for fetching fresh searchResultInfo in tooltip
+			local lfgListID = queue.queueData and queue.queueData.lfgListID
+			local queueType = queue.queueData and queue.queueData.queueType or queue.queueType or "lfg"
+			
 			entry.displayedQueues[i] = {
 				queueData = {
 					name = groupTitle,  -- Internal storage
-					queueType = queue.queueData and queue.queueData.queueType or queue.queueType or "lfg"
+					queueType = queueType,
+					lfgListID = lfgListID  -- IMPORTANT: Store lfgListID for tooltip leaderName lookup!
 				},
 				-- CRITICAL: Blizzard caches the queue name (QuickJoin.lua:386-393)
 				-- This is what gets displayed in the button!
@@ -562,6 +630,8 @@ function QuickJoinEntry:New(guid, groupInfo)
 				needTank = groupInfo.needTank or false,
 				needHealer = groupInfo.needHealer or false,
 				needDamage = groupInfo.needDamage or false,
+				-- Auto-accept flag from groupInfo (for tooltip display)
+				isAutoAccept = groupInfo.isAutoAccept or false,
 				isZombie = false -- Queue is active unless proven otherwise
 			}
 		end
@@ -578,6 +648,8 @@ function QuickJoinEntry:New(guid, groupInfo)
 			needTank = groupInfo.needTank or false,
 			needHealer = groupInfo.needHealer or false,
 			needDamage = groupInfo.needDamage or false,
+			-- Auto-accept flag from groupInfo (for tooltip display)
+			isAutoAccept = groupInfo.isAutoAccept or false,
 			isZombie = false
 		}
 	end
@@ -777,25 +849,41 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 		activityName = self.groupInfo.activityName
 	end
 	
-	-- Get leader name from first member (CHARACTER name-server, NOT account name!)
-	-- Try groupInfo.leaderName first (more reliable)
-	if self.groupInfo and self.groupInfo.leaderName then
-		leaderName = self.groupInfo.leaderName
-	elseif self.displayedMembers and #self.displayedMembers > 0 and self.displayedMembers[1] then
-		local memberGuid = self.displayedMembers[1].guid
-		if memberGuid then
-			-- Check if this is a mock GUID first
-			if self.groupInfo and self.groupInfo._mockLeaderName then
-				leaderName = self.groupInfo._mockLeaderName
-			else
-				-- Get CHARACTER name and realm from GUID (like Blizzard does)
-				local characterName, realmName = select(6, GetPlayerInfoByGUID(memberGuid))
-				if characterName then
-					-- Format: "Name-Server" or just "Name" if same server
-					if realmName and realmName ~= "" and realmName ~= GetNormalizedRealmName() then
-						leaderName = characterName .. "-" .. realmName
-					else
-						leaderName = characterName
+	-- Get leader name - CRITICAL FIX: For lfglist queues, use searchResultInfo.leaderName (CHARACTER name)!
+	-- Like Blizzard's LFGListUtil_SetSearchEntryTooltip, NOT the BNet account name from GetRelationshipInfo
+	
+	-- First, try to get fresh searchResultInfo.leaderName for lfglist queues
+	if self.displayedQueues and #self.displayedQueues > 0 and self.displayedQueues[1] then
+		local firstQueue = self.displayedQueues[1]
+		if firstQueue.queueData and firstQueue.queueData.queueType == "lfglist" and firstQueue.queueData.lfgListID then
+			-- CRITICAL: Fetch FRESH searchResultInfo to get CHARACTER name (not cached BNet name)
+			local searchResultInfo = C_LFGList.GetSearchResultInfo(firstQueue.queueData.lfgListID)
+			if searchResultInfo and searchResultInfo.leaderName then
+				leaderName = searchResultInfo.leaderName  -- This is CHARACTER name like "Tsveta-ChamberofAspects"
+			end
+		end
+	end
+	
+	-- Fallback to groupInfo.leaderName (may be BNet account name for non-lfglist queues, which is correct)
+	if not leaderName or leaderName == "" then
+		if self.groupInfo and self.groupInfo.leaderName then
+			leaderName = self.groupInfo.leaderName
+		elseif self.displayedMembers and #self.displayedMembers > 0 and self.displayedMembers[1] then
+			local memberGuid = self.displayedMembers[1].guid
+			if memberGuid then
+				-- Check if this is a mock GUID first
+				if self.groupInfo and self.groupInfo._mockLeaderName then
+					leaderName = self.groupInfo._mockLeaderName
+				else
+					-- Get CHARACTER name and realm from GUID (like Blizzard does)
+					local characterName, realmName = select(6, GetPlayerInfoByGUID(memberGuid))
+					if characterName then
+						-- Format: "Name-Server" or just "Name" if same server
+						if realmName and realmName ~= "" and realmName ~= GetNormalizedRealmName() then
+							leaderName = characterName .. "-" .. realmName
+						else
+							leaderName = characterName
+						end
 					end
 				end
 			end
@@ -902,6 +990,19 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 		tooltip:AddLine(rolesText, 1.0, 0.82, 0)
 	else
 		tooltip:AddLine(QUICK_JOIN_TOOLTIP_NO_AVAILABLE_ROLES or "No available roles", 1, 1, 1)
+	end
+	
+	-- Auto-Accept indicator (Blizzard's hasRelationshipWithLeader logic)
+	-- Only show if player has relationship with leader AND group is auto-accept
+	-- Auto-accept means you can join instantly without waiting for leader approval
+	local isAutoAccept = false
+	if self.displayedQueues and self.displayedQueues[1] then
+		isAutoAccept = self.displayedQueues[1].isAutoAccept and self.hasRelationshipWithLeader
+	end
+	
+	if isAutoAccept then
+		tooltip:AddLine(" ")
+		tooltip:AddLine(QUICK_JOIN_IS_AUTO_ACCEPT_TOOLTIP or "This group will automatically accept you.", LIGHTBLUE_FONT_COLOR.r, LIGHTBLUE_FONT_COLOR.g, LIGHTBLUE_FONT_COLOR.b)
 	end
 end
 

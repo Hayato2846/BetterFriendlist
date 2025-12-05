@@ -1367,8 +1367,10 @@ function Broker:OnClick(clickedFrame, button)
 			-- Toggle BetterFriendlist frame
 			ToggleFriendsFrame(1)
 		elseif action == "friends" then
-			-- Open Blizzard FriendsFrame directly
-			if BFL.OriginalToggleFriendsFrame then
+			-- Open Blizzard FriendsFrame directly (bypasses our hook)
+			if BFL.ShowBlizzardFriendsFrame then
+				BFL.ShowBlizzardFriendsFrame()
+			elseif BFL.OriginalToggleFriendsFrame then
 				BFL.OriginalToggleFriendsFrame(1)
 			else
 				ToggleFriendsFrame(1)

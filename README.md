@@ -34,12 +34,14 @@ Press **O** to open BetterFriendlist (replaces default Friends frame).
 - **Hide AFK** - exclude AFK/DND friends
 - **Retail Only** - filter out Classic/other versions
 
-**Sort Options** (dual sort system: primary + secondary):
+**Dual Sort System** (primary + secondary):
+
+Sort your friends list with two-level sorting - choose a primary sort, then a secondary sort for fine-tuned ordering:
 - **Status** - Online → Offline
 - **Name** - Alphabetical (A-Z)
 - **Level** - High to low
 - **Zone** - Alphabetical by location
-- **Activity** - Recently active first
+- **Activity** - Recently active first (based on your interactions)
 - **Game** - Same WoW version first
 - **Faction** - Same faction first (Alliance/Horde)
 - **Guild** - Guildmates first
@@ -50,6 +52,30 @@ Press **O** to open BetterFriendlist (replaces default Friends frame).
 - **Real-time search** across names, characters, and notes
 - **Instant filtering** as you type
 - **Works with all friend types** (Battle.net and WoW friends)
+
+---
+
+## 🖼️ Edit Mode Integration
+
+Fully integrated with WoW's Edit Mode system for complete UI customization:
+
+### Position & Size
+- **Drag anywhere** - Move your friends list window to any position
+- **Resize freely** - Width 380-800px, Height 400-1200px
+- **Per-layout settings** - Different positions/sizes for each Edit Mode layout
+- **Remembers position** - Your settings persist across sessions
+
+### Window Scale
+- **Scale 50% to 200%** - Make the window smaller or larger
+- **Perfect for any display** - 4K monitors, compact UIs, or accessibility needs
+- **Edit Mode slider** - Adjust scale directly in WoW's Edit Mode settings
+
+### How to Use
+1. Press **Escape** → **Edit Mode** (or `/editmode`)
+2. Click the **BetterFriendlist** window to select it
+3. **Drag** to reposition, **resize** with corner handles
+4. Use **Settings dialog** for precise Width, Height, and Scale values
+5. Exit Edit Mode to save
 
 ---
 
@@ -65,6 +91,8 @@ Press **O** to open BetterFriendlist (replaces default Friends frame).
 - **Hide Empty Groups** - Automatically hide groups with no online members
 - **Hide Max Level** - Declutter by hiding max-level displays
 - **Mobile as AFK** - Show Battle.net App friends with AFK status
+- **Treat Mobile as Offline** - Move mobile app friends to the Offline group
+- **Show Notes as Name** - Display your personal notes as the friend's name
 
 ### Visual Features
 - **Modern icon set** - Custom Feather Icons throughout the UI
@@ -93,6 +121,7 @@ Press **O** to open BetterFriendlist (replaces default Friends frame).
 - **Role icons** - Tank, Healer, DPS icons for each member
 - **Group management** - Clear view of all 8 groups
 - **Combat-aware** - Multi-select clears automatically in combat
+- **Responsive layout** - Groups adapt to window size
 
 ---
 
@@ -110,6 +139,7 @@ Press **O** to open BetterFriendlist (replaces default Friends frame).
 - **Level ranges** - Search within specific level ranges
 - **Zone search** - Find players in your current zone
 - **Detailed results** - Class, level, zone, guild information
+- **Responsive columns** - Adapts to window width
 
 ### Recent Allies
 - **Automatic tracking** - Remembers players you've grouped with
@@ -129,17 +159,35 @@ Press **O** to open BetterFriendlist (replaces default Friends frame).
 
 ---
 
-## 📊 Statistics
+## 📊 Activity Tracking & Statistics
 
+### Friend Activity Tracking
+- **Interaction history** - Tracks whispers, groups, and trades with each friend
+- **"Last Contact" tooltip** - Hover over friends to see when you last interacted
+- **Activity-based sorting** - Sort by most recently interacted friends
+- **Friendship health** - See which friendships need attention
+
+### Statistics Dashboard
 Track your social network with detailed statistics:
-
 - **Total friends** - Overall friend count
 - **Online/Offline breakdown** - Current online status
 - **Battle.net vs WoW** - Friend type distribution
 - **Class distribution** - Top classes among your friends
+- **Level distribution** - Average level and breakdown
 - **Realm distribution** - Top realms represented
 - **Faction split** - Alliance vs Horde breakdown
-- **Activity tracking** - Whispers, groups, trades tracked over time
+- **Game distribution** - WoW, Classic, Diablo, Hearthstone, etc.
+- **Mobile vs Desktop** - How friends connect
+
+---
+
+## 🔌 Addon Compatibility
+
+### RaiderIO Integration
+BetterFriendlist works seamlessly with RaiderIO:
+- **Tooltip scores** - RaiderIO data shows in friend tooltips
+- **Full compatibility** - Uses Blizzard's native FriendsTooltip system
+- **Other tooltip addons** - Works with any addon that hooks FriendsTooltip
 
 ---
 
@@ -147,14 +195,16 @@ Track your social network with detailed statistics:
 
 ### General Settings
 - **Compact Mode** - Toggle compact display
-- **Font Size** - Adjust text size
+- **Font Size** - Adjust text size (Small, Normal, Large)
 - **Quick Filter** - Set default filter on startup
+- **Treat Mobile as Offline** - Move mobile app friends to Offline group
+- **Show Notes as Name** - Display notes as friend names
 
 ### Groups Management
 - **Show Favorites** - Toggle Favorites group visibility
 - **Accordion Groups** - One group open at a time
 - **Hide Empty Groups** - Auto-hide groups with no online members
-- **Group Colors** - Customize group colors
+- **Group Colors** - Customize group colors with color picker
 - **Reorder Groups** - Drag to change group order
 
 ### Appearance Settings
@@ -170,6 +220,68 @@ Track your social network with detailed statistics:
 - **Import Settings** - Load configuration from another character
 - **Migrate from FriendGroups** - One-click import from FriendGroups addon
 - **Reset to Defaults** - Restore default settings
+- **Beta Features** - Enable experimental features
+
+---
+
+## 🧪 Beta Features (Experimental)
+
+Enable in **Settings → Advanced → Beta Features**
+
+### 🔔 Smart Notifications
+Get notified when friends come online or go offline:
+
+**Display Modes:**
+- **Toast notifications** - Up to 3 simultaneous toasts
+- **Chat messages** - Subtle chat-based alerts
+- **Disabled** - Turn off notifications entirely
+
+**Sound & Alerts:**
+- **Sound effects** - Optional notification sounds
+- **Offline notifications** - Separate toggle for offline alerts
+
+**Quiet Hours System:**
+Automatically silence notifications during:
+- **Manual Do Not Disturb** - Toggle DND mode anytime
+- **Combat encounters** - No distractions while fighting
+- **Dungeons, raids, and PvP** - Focus on group content
+- **Scheduled hours** - Set quiet times (default: 22:00-08:00)
+
+**Per-Friend & Per-Group Rules:**
+- **Right-click friends** → "Notification Settings"
+- **Whitelist** - Always notify (bypasses quiet hours)
+- **Blacklist** - Never notify
+- **Default** - Use global settings
+- **Group rules** - Apply rules to entire friend groups
+
+**Custom Message Templates:**
+- **Placeholders**: %name%, %game%, %level%, %zone%, %class%, %realm%
+- **Online message**: Customize what shows when friends log in
+- **Offline message**: Customize what shows when friends log off
+
+**Game-Specific Notifications:**
+- **WoW Login** - Friend logs into World of Warcraft
+- **Character Switch** - Friend changes characters
+- **Game Switch** - Friend switches to another game
+
+### 📊 Data Broker Integration
+Display your friends count on Data Broker bar addons:
+
+**Compatible Addons:**
+- Bazooka
+- ChocolateBar
+- TitanPanel
+- Any LDB-compatible display
+
+**Features:**
+- **Friends count** - Online/total display on your bar
+- **Rich tooltip** - Full friends list with game icons
+- **Quick actions** - Click to whisper, Alt+Click to invite
+- **Filter cycling** - Middle-click to cycle through filters
+- **Customizable** - Show icon, split by WoW/BNet, tooltip mode
+
+**Configuration:**
+Enable in Settings → Data Broker tab (requires Beta Features)
 
 ---
 
@@ -180,6 +292,7 @@ Track your social network with detailed statistics:
 - **Event-driven** - Efficient event handling system
 - **Minimal CPU usage** - Lightweight and responsive
 - **Instant loading** - Fast startup with no lag
+- **Throttled updates** - Prevents spam during rapid changes
 
 ---
 
@@ -214,6 +327,11 @@ Download from your favorite addon manager:
 3. Copy `BetterFriendlist` folder to `World of Warcraft\_retail_\Interface\AddOns\`
 4. Restart WoW or type `/reload` in-game
 
+### Optional: LibEditMode
+For full Edit Mode support (resize sliders, per-layout settings), install LibEditMode:
+- Automatically included when downloading from addon managers
+- Manual: Download from [CurseForge](https://www.curseforge.com/wow/addons/libeditmode)
+
 ---
 
 ## 🔄 Migrating from FriendGroups
@@ -232,27 +350,6 @@ BetterFriendlist includes a built-in migration tool:
 
 ---
 
-## 🧪 Beta Features (Experimental)
-
-Enable in **Settings → Advanced → Beta Features**
-
-### 🔔 Smart Notifications (v1.9.0)
-Get notified when friends come online or go offline:
-- **Display Modes**: Toast notifications, chat messages, or disabled
-- **Sound Effects**: Optional notification sounds (customizable)
-- **Offline Notifications**: Separate toggle for offline alerts
-- **Quiet Hours**: Silence notifications during:
-  - Manual Do Not Disturb mode
-  - Combat encounters
-  - Dungeons, raids, and PvP
-  - Scheduled hours (default: 22:00-08:00)
-- **Per-Friend Rules**: Right-click friends → "Notification Settings"
-  - Whitelist: Always notify (bypasses quiet hours)
-  - Blacklist: Never notify
-  - Default: Use global settings
-
----
-
 ## 💡 Tips & Tricks
 
 ### Friend Management
@@ -260,6 +357,12 @@ Get notified when friends come online or go offline:
 - **Shift+Drag** to add friend to multiple groups
 - **Regular Drag** to move friend (removes from other groups)
 - **Click a friend** to select them (enables Send Message button)
+- **Double-click** to quickly whisper a friend
+
+### Display Customization
+- **Show Notes as Name** - Great for remembering real names or nicknames
+- **Treat Mobile as Offline** - Keep your online list focused on actual players
+- **Window Scale** - Make the window bigger for better readability or smaller for more screen space
 
 ### Group Organization
 - **Create focused groups** - PvP, Raid Team, Guildies, IRL Friends, etc.
@@ -276,6 +379,12 @@ Get notified when friends come online or go offline:
 - **Select multiple before dragging** for bulk moves
 - **Drag onto players** to swap positions
 - **Use group headers** as drop zones for moving to groups
+
+### Notifications (Beta)
+- **Whitelist important friends** - Raid leaders, guild officers, close friends
+- **Blacklist spam accounts** - Friends who log in/out frequently
+- **Set quiet hours** - No notifications during sleep hours
+- **Custom messages** - Personalize notifications with friend details
 
 ---
 

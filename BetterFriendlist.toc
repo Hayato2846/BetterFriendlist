@@ -2,7 +2,7 @@
 ## Title: BetterFriendlist
 ## Notes: Complete replacement for WoW Friends frame - Custom groups, Raid management, Quick Join, and more!
 ## Author: Hayato2846
-## Version: 1.9.2
+## Version: 1.9.3-beta
 ## IconTexture: Interface\AddOns\BetterFriendlist\Textures\PortraitIcon.blp
 ## X-Curse-Project-ID: 1381771
 ## X-WoWI-ID: 26984
@@ -77,6 +77,7 @@ Modules\Dialogs.lua
 Modules\RAF.lua
 Modules\RaidFrame.lua
 Modules\QuickJoin.lua
+Modules\PreviewMode.lua
 
 # UI Callbacks
 UI\RaidFrameCallbacks.lua

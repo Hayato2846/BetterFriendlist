@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.9.3-beta] - 2025-12-05
+
+### 🔧 Quick Join Improvements (Beta)
+
+Fixes for the Quick Join tab to match Blizzard's behavior more accurately.
+
+### Fixed
+- **Leader Name Display** - Now shows the correct character name in Quick Join tooltips
+  - Previously showed the Battle.net account name (e.g., "Ywi") instead of the character name
+  - Now correctly shows the character name with realm (e.g., "Tsveta-ChamberofAspects")
+  - Matches Blizzard's tooltip behavior for LFG List groups
+
+### Improved
+- **Quick Join Data Handling** - Better extraction of LFG List group information
+  - Stores LFG List ID for fresh data lookup in tooltips
+  - Ensures character names are always up-to-date
+- **Friends Frame Hook** - Improved compatibility with other addons
+  - Added `ShowFriends` hook for broader coverage
+  - "Show Blizzard's Friendlist" menu option now works reliably
+  - Better documentation for ElvUI and similar addons that cache functions
+  - Note: If ElvUI or other addons cache `ToggleFriendsFrame` at load time, use the keybind or Data Broker instead
+
+---
+
 ## [1.9.2] - 2025-01-05
 
 ### 🔌 Data Broker Integration (Beta) & New Features

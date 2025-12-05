@@ -303,40 +303,97 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 			-- Version-aware success message
 			local versionSuffix = BFL.IsMidnight and " (Midnight)" or " (TWW)"
 			print("|cff00ff00BetterFriendlist v" .. BFL.VERSION .. versionSuffix .. "|r loaded successfully!")
+			
+			-- ============================================================================
+			-- Hook ToggleFriendsFrame to open BetterFriendlist instead
+			-- ============================================================================
+			-- Strategy based on cargBags/AdiBags approach:
+			-- 1. Replace global function immediately
+			-- 2. Use hooksecurefunc for close operations (taint-safe)
+			-- 3. NO OnShow hooks (can cause UIPanel state corruption)
+			--
+			-- IMPORTANT: Addons like ElvUI cache functions at load time with:
+			--   local ToggleFriendsFrame = ToggleFriendsFrame
+			-- For those cases, we cannot intercept. Users need to configure their
+			-- addon to use our keybind or DataBroker instead.
+			-- ============================================================================
+			
+			-- Flag to bypass hook when user explicitly wants Blizzard's frame
+			BFL.AllowBlizzardFriendsFrame = false
+			
+			-- Store original function for "Show Blizzard's Friendlist" option
+			if _G.ToggleFriendsFrame then
+				BFL.OriginalToggleFriendsFrame = _G.ToggleFriendsFrame
+				
+				-- Replace global with our version (taint-safe, not a protected function)
+				_G.ToggleFriendsFrame = function(tabIndex)
+					-- Allow original if explicitly requested
+					if BFL.AllowBlizzardFriendsFrame then
+						BFL:DebugPrint("[BFL] ToggleFriendsFrame: Allowing Blizzard (explicit)")
+						return BFL.OriginalToggleFriendsFrame(tabIndex)
+					end
+					
+					BFL:DebugPrint("[BFL] ToggleFriendsFrame: Opening BetterFriendlist")
+					
+					-- Toggle our frame (combat-safe, our frame is not protected)
+					if _G.ToggleBetterFriendsFrame then
+						_G.ToggleBetterFriendsFrame()
+					end
+				end
+				BFL:DebugPrint("|cff00ff00[BFL]|r ToggleFriendsFrame global replaced")
+			end
+			
+			-- Helper function to show Blizzard's FriendsFrame (bypasses our hook)
+			-- This is used by "Show Blizzard's Friendlist" menu option
+			BFL.ShowBlizzardFriendsFrame = function()
+				BFL.AllowBlizzardFriendsFrame = true
+				if BFL.OriginalToggleFriendsFrame then
+					BFL.OriginalToggleFriendsFrame()
+				elseif FriendsFrame then
+					-- Fallback: Direct ShowUIPanel (may taint in combat)
+					if not InCombatLockdown() then
+						ShowUIPanel(FriendsFrame)
+					else
+						print("|cffff8800BetterFriendlist:|r Cannot open Blizzard's frame in combat")
+					end
+				end
+				-- Reset flag after a brief delay (frame should be shown by then)
+				C_Timer.After(0.1, function()
+					BFL.AllowBlizzardFriendsFrame = false
+				end)
+			end
+			
+			-- Hook ShowFriends/HideFriends for additional coverage (taint-safe)
+			-- These are the internal functions Blizzard uses
+			if _G.ShowFriends then
+				BFL.OriginalShowFriends = _G.ShowFriends
+				_G.ShowFriends = function()
+					if BFL.AllowBlizzardFriendsFrame then
+						return BFL.OriginalShowFriends()
+					end
+					BFL:DebugPrint("[BFL] ShowFriends: Redirecting to BetterFriendlist")
+					if BetterFriendsFrame and not BetterFriendsFrame:IsShown() then
+						if _G.ToggleBetterFriendsFrame then
+							_G.ToggleBetterFriendsFrame()
+						end
+					end
+				end
+			end
+			
+			-- Note: We do NOT hook FriendsFrame:OnShow() because:
+			-- 1. Calling Hide()/HideUIPanel() in OnShow can corrupt UIPanel state
+			-- 2. It may cause taint in combat
+			-- 3. cargBags and AdiBags don't use this approach either
+			--
+			-- Limitation: If another addon cached ToggleFriendsFrame before us,
+			-- their calls will open Blizzard's frame. This is acceptable - users
+			-- can configure those addons to use BetterFriendlist's keybind instead.
 		end
 	elseif event == "PLAYER_LOGIN" then
 		-- Check for native event callbacks (12.0.0+)
 		if BetterFriendsFrame and BetterFriendsFrame.RegisterEventCallback then
 			BFL.UseNativeCallbacks = true
 			BFL:DebugPrint("|cff00ff00[BFL]|r Using native Frame:RegisterEventCallback (12.0.0+)")
-		end
-		
-		-- Hook ToggleFriendsFrame to open BetterFriendlist instead
-		-- This is taint-safe because:
-		-- 1. We're hooking a non-protected FrameXML function
-		-- 2. We're not modifying secure frames
-		-- 3. The hook is installed after PLAYER_LOGIN (all addons loaded)
-		if ToggleFriendsFrame then
-			-- Store original function
-			BFL.OriginalToggleFriendsFrame = ToggleFriendsFrame
-			
-			-- Replace with our version (always use BetterFriendlist)
-			-- Note: Menu option "Show Blizzard's Friendlist" calls OriginalToggleFriendsFrame directly
-			ToggleFriendsFrame = function(tabIndex)
-				BFL:DebugPrint("[BFL] ToggleFriendsFrame: Opening BetterFriendlist")
-				
-				-- Close Blizzard's frame if it's open
-				if FriendsFrame and FriendsFrame:IsShown() then
-					HideFriends()
-				end
-				
-				-- Toggle our frame
-				if _G.ToggleBetterFriendsFrame then
-					_G.ToggleBetterFriendsFrame()
-				end
-			end
-			
-			BFL:DebugPrint("|cff00ff00[BFL]|r ToggleFriendsFrame hooked successfully")
 		end
 		
 		-- Late initialization for modules that need PLAYER_LOGIN
@@ -736,6 +793,18 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		end
 	
 	-- ==========================================
+	-- Preview Mode Commands (for screenshots)
+	-- ==========================================
+	elseif msg:match("^preview") then
+		local PreviewMode = BFL:GetModule("PreviewMode")
+		if PreviewMode then
+			local fullArgs = msg:match("^preview%s*(.*)") or ""
+			PreviewMode:HandleCommand(fullArgs)
+		else
+			print("|cffff0000BetterFriendlist:|r PreviewMode module not loaded")
+		end
+	
+	-- ==========================================
 	-- Test Commands (was /bfltest)
 	-- ==========================================
 	elseif msg == "test" or msg == "test activity" then
@@ -776,6 +845,11 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		print("  |cffffffff/bfl mock|r - Create mock raid (legacy, same as /bfl raid mock)")
 		print("  |cffffffff/bfl invite|r - Add one mock friend invite")
 		print("  |cffffffff/bfl clearinvites|r - Remove all mock invites")
+		print("")
+		print("|cffffcc00Preview Mode (Screenshots):|r")
+		print("  |cffffffff/bfl preview|r - Enable full preview mode")
+		print("  |cffffffff/bfl preview off|r - Disable preview mode")
+		print("  |cff888888(Shows mock Friends, Groups, Raid, QuickJoin, WHO)|r")
 		print("")
 		print("|cffffcc00Raid Frame Commands:|r")
 		print("  |cffffffff/bfl raid mock|r - Create 25-player mock raid")

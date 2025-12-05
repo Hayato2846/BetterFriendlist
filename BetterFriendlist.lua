@@ -1679,8 +1679,11 @@ function BetterFriendsFrame_ShowContactsMenu(button)
 			end
 			
 			local menuButton = rootDescription:CreateButton(buttonTitle, function()
-				-- Use stored original function (combat-safe)
-				if BFL and BFL.OriginalToggleFriendsFrame then
+				-- Use helper function that bypasses our OnShow hook
+				if BFL and BFL.ShowBlizzardFriendsFrame then
+					BFL.ShowBlizzardFriendsFrame()
+				elseif BFL and BFL.OriginalToggleFriendsFrame then
+					-- Fallback to stored original function
 					BFL.OriginalToggleFriendsFrame()
 				else
 					-- Fallback to ShowUIPanel (may cause taint in combat)
