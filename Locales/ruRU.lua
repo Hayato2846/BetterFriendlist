@@ -218,4 +218,33 @@ if GetLocale() == "ruRU" then
 	L.SETTINGS_FRAME_HEIGHT = "Высота:"
 	L.SETTINGS_FRAME_RESET_SIZE = "Сбросить до 415x570"
 	L.SETTINGS_FRAME_APPLY_NOW = "Применить к текущей раскладке"
-	L.SETTINGS_FRAME_RESET_ALL = "Сбросить все раскладки"end
+	L.SETTINGS_FRAME_RESET_ALL = "Сбросить все раскладки"
+	
+	-- ========================================
+	-- DATA BROKER
+	-- ========================================
+	L.BROKER_TITLE = "BetterFriendlist"
+	L.BROKER_TOOLTIP_HEADER = "Друзья"
+	L.BROKER_TOOLTIP_FOOTER_LEFT = "ЛКМ: Переключить BetterFriendlist"
+	L.BROKER_TOOLTIP_FOOTER_RIGHT = "ПКМ: Настройки"
+	L.BROKER_SETTINGS_ENABLE = "Включить Data Broker"
+	L.BROKER_SETTINGS_SHOW_ICON = "Показать иконку"
+	L.BROKER_SETTINGS_TOOLTIP_MODE = "Уровень детализации подсказки"
+	L.BROKER_SETTINGS_CLICK_ACTION = "Действие ЛКМ"
+	L.BROKER_FILTER_CHANGED = "Фильтр изменён на: %s"
+	
+	-- ========================================
+	-- FEATURE REQUESTS (CurseForge User Feedback)
+	-- ========================================
+	-- Feature 1: Показывать Мобильных как Оффлайн
+	L.SETTINGS_TREAT_MOBILE_OFFLINE = "Показывать мобильных пользователей как оффлайн"
+	L.SETTINGS_TREAT_MOBILE_OFFLINE_DESC = "Отображать друзей с мобильного приложения в группе оффлайн"
+	
+	-- Feature 3: Показывать Заметки как Имя
+	L.SETTINGS_SHOW_NOTES_AS_NAME = "Показывать заметки как имя друга"
+	L.SETTINGS_SHOW_NOTES_AS_NAME_DESC = "Отображает заметки друзей как их имя, когда доступно"
+	
+	-- Feature 4: Масштаб Окна
+	L.SETTINGS_WINDOW_SCALE = "Масштаб окна"
+	L.SETTINGS_WINDOW_SCALE_DESC = "Масштабировать всё окно (50%% - 200%%)"
+end

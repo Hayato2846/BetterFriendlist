@@ -218,4 +218,33 @@ if GetLocale() == "zhCN" then
 	L.SETTINGS_FRAME_HEIGHT = "高度:"
 	L.SETTINGS_FRAME_RESET_SIZE = "重置为 415x570"
 	L.SETTINGS_FRAME_APPLY_NOW = "应用到当前布局"
-	L.SETTINGS_FRAME_RESET_ALL = "重置所有布局"end
+	L.SETTINGS_FRAME_RESET_ALL = "重置所有布局"
+	
+	-- ========================================
+	-- DATA BROKER
+	-- ========================================
+	L.BROKER_TITLE = "BetterFriendlist"
+	L.BROKER_TOOLTIP_HEADER = "好友"
+	L.BROKER_TOOLTIP_FOOTER_LEFT = "左键: 切换 BetterFriendlist"
+	L.BROKER_TOOLTIP_FOOTER_RIGHT = "右键: 设置"
+	L.BROKER_SETTINGS_ENABLE = "启用 Data Broker"
+	L.BROKER_SETTINGS_SHOW_ICON = "显示图标"
+	L.BROKER_SETTINGS_TOOLTIP_MODE = "提示框详细程度"
+	L.BROKER_SETTINGS_CLICK_ACTION = "左键动作"
+	L.BROKER_FILTER_CHANGED = "过滤器已更改为: %s"
+	
+	-- ========================================
+	-- FEATURE REQUESTS (CurseForge User Feedback)
+	-- ========================================
+	-- Feature 1: 将手机用户视为离线
+	L.SETTINGS_TREAT_MOBILE_OFFLINE = "将手机用户视为离线"
+	L.SETTINGS_TREAT_MOBILE_OFFLINE_DESC = "将使用手机应用的好友显示在离线组中"
+	
+	-- Feature 3: 显示备注作为名称
+	L.SETTINGS_SHOW_NOTES_AS_NAME = "显示备注作为好友名称"
+	L.SETTINGS_SHOW_NOTES_AS_NAME_DESC = "当有备注时，显示好友备注作为他们的名称"
+	
+	-- Feature 4: 窗口缩放
+	L.SETTINGS_WINDOW_SCALE = "窗口缩放"
+	L.SETTINGS_WINDOW_SCALE_DESC = "缩放整个窗口（50%% - 200%%）"
+end

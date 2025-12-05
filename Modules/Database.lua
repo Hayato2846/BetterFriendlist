@@ -22,6 +22,9 @@ local defaults = {
 	showRealmName = false, -- Show realm name for cross-realm friends (default: OFF)
 	grayOtherFaction = false, -- Gray out friends from other faction (default: OFF)
 	showMobileAsAFK = false, -- Show mobile friends with AFK status icon (default: OFF)
+	treatMobileAsOffline = false, -- Treat mobile friends as offline (display in Offline group) (default: OFF)
+	showNotesAsName = false, -- Show friend notes as display name when available (default: OFF)
+	windowScale = 1.0, -- Window scale factor: 0.5 = 50%, 1.0 = 100%, 2.0 = 200% (default: 100%)
 	hideMaxLevel = false, -- Hide level display for max level characters (default: OFF)
 	accordionGroups = false, -- Only allow one group to be open at a time (default: OFF)
 	showFavoritesGroup = true, -- Show the Favorites group (default: ON)
@@ -69,6 +72,12 @@ local defaults = {
 	notificationMessageWowLogin = "%name% logged into World of Warcraft", -- Template for WoW login
 	notificationMessageCharSwitch = "%name% switched to %char%", -- Template for character switch
 	notificationMessageGameSwitch = "%name% is now playing %game%", -- Template for game switch
+	-- Data Broker Settings (BETA Feature - requires enableBetaFeatures)
+	brokerEnabled = false, -- Enable Data Broker integration (default: OFF, Beta Feature)
+	brokerShowIcon = true, -- Show icon on display addons (default: ON)
+	brokerShowGroups = false, -- Split counts by WoW/BNet (default: OFF, shows combined)
+	brokerTooltipMode = "advanced", -- Tooltip detail level: "basic" or "advanced" (default: advanced)
+	brokerClickAction = "toggle", -- Left click action: "toggle", "friends", "settings" (default: toggle)
 	-- Migration tracking
 	friendGroupsMigrated = false, -- Track if FriendGroups migration has been completed
 	version = BFL.Version

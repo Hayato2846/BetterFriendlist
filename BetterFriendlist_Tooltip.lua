@@ -123,21 +123,40 @@ local function AddBetterFriendlistInfo()
 				end
 				
 				if anchorElement then
-					-- Position divider
+					-- Clear all constraints first to get accurate measurement
+					activityLine:ClearAllPoints()
+					activityLine:SetWidth(0)  -- Reset any fixed width
+					
+					-- Set text to measure width
+					activityLine:SetText(activityText)
+					
+					-- Calculate required width for activity text and adjust tooltip width if needed
+					-- Need left margin (6) + text width + right margin (6) + extra padding (8)
+					local stringWidth = activityLine:GetStringWidth()
+					local activityTextWidth = stringWidth + 28  -- 6px left + 6px right + 16px extra padding
+					local currentWidth = tooltip:GetWidth()
+					local newWidth = max(currentWidth, activityTextWidth)
+					
+					tooltip:SetWidth(newWidth + 8)  -- Add 8px extra padding to tooltip width
+					
+					-- Position divider anchored directly to tooltip, not to anchorElement for width
+					-- This ensures divider spans full tooltip width
 					divider:ClearAllPoints()
-					divider:SetPoint("TOPLEFT", anchorElement, "BOTTOMLEFT", 0, -6)
-					divider:SetPoint("TOPRIGHT", anchorElement, "BOTTOMRIGHT", 0, -6)
+					local anchorBottom = anchorElement:GetBottom()
+					local tooltipTop = tooltip:GetTop()
+					local yOffset = anchorBottom - tooltipTop - 6  -- Calculate absolute Y position
+					divider:SetPoint("TOPLEFT", tooltip, "TOPLEFT", 6, yOffset)
+					divider:SetPoint("TOPRIGHT", tooltip, "TOPRIGHT", -6, yOffset)
 					divider:Show()
 					
-					-- Position activity text below divider
+					-- Position activity text below divider, centered
 					activityLine:ClearAllPoints()
-					activityLine:SetPoint("TOPLEFT", divider, "BOTTOMLEFT", 0, -4)
-					activityLine:SetPoint("TOPRIGHT", divider, "BOTTOMRIGHT", 0, -4)
-					activityLine:SetText(activityText)
+					activityLine:SetPoint("TOP", divider, "BOTTOM", 0, -4)
+					activityLine:SetJustifyH("CENTER")
 					activityLine:Show()
 					
 					-- Extend tooltip height
-					local additionalHeight = 1 + 4 + activityLine:GetStringHeight() + 6
+					local additionalHeight = 1 + 4 + activityLine:GetStringHeight() + 8  -- 8px bottom padding
 					tooltip:SetHeight(tooltip:GetHeight() + additionalHeight)
 				else
 					divider:Hide()

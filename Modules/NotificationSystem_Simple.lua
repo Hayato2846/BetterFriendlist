@@ -1127,6 +1127,9 @@ NotificationSystem.quietMode = false
 --]]--------------------------------------------------
 
 function NotificationSystem:Initialize()
+    -- Register events for friend online/offline notifications
+    self:RegisterEvents()
+    
     -- Set up cooldown cleanup timer (runs every 60 seconds)
     C_Timer.NewTicker(60, function()
         if IsBetaEnabled() then

@@ -532,3 +532,32 @@ end
 _G.GetFriendUID = function(friend)
 	return Groups:GetFriendUID(friend)
 end
+
+-- Get sorted list of group IDs based on their configured order
+-- Excludes "nogroup" by default since it's displayed separately at the end
+function Groups:GetSortedGroupIds(includeNoGroup)
+	local allGroups = self:GetAll()
+	local sortedIds = {}
+	
+	for groupId, groupData in pairs(allGroups) do
+		if includeNoGroup or groupId ~= "nogroup" then
+			table.insert(sortedIds, {
+				id = groupId,
+				order = groupData.order or 999
+			})
+		end
+	end
+	
+	-- Sort by order value
+	table.sort(sortedIds, function(a, b)
+		return a.order < b.order
+	end)
+	
+	-- Extract just the IDs in sorted order
+	local result = {}
+	for _, entry in ipairs(sortedIds) do
+		table.insert(result, entry.id)
+	end
+	
+	return result
+end

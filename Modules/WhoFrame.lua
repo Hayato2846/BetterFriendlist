@@ -62,21 +62,45 @@ function WhoFrame:UpdateResponsiveLayout()
 	local frameWidth = frame:GetWidth()
 	
 	-- Calculate available width for column headers
-	-- Reserve space for: left padding (11px) + scrollbar (20px) + right padding (7px) = 38px
-	local availableWidth = frameWidth - 38
+	-- XML positions: NameHeader starts at x=4 (TOPLEFT from ListInset)
+	-- Reserve space for: 
+	--   - Left: NameHeader padding (4px)
+	--   - Right: Scrollbar (20px) + right padding (7px) = 27px
+	local headerLeftPadding = 4
+	local scrollbarAndPadding = 27  -- 20px scrollbar + 7px padding
+	local availableWidth = frameWidth - headerLeftPadding - scrollbarAndPadding
+	
+	-- CRITICAL: Headers overlap by -2px each (3 overlaps = 6px gained back)
+	-- NameHeader at x=4, then each subsequent header at x=-2 (overlap)
+	-- So we need to ADD back the overlap space to availableWidth
+	local headerOverlap = -2  -- Each header overlaps by 2px
+	local numOverlaps = 3     -- ColumnDropdown, LevelHeader, ClassHeader each overlap
+	local totalOverlapGain = numOverlaps * math.abs(headerOverlap)  -- 6px
+	
+	-- Adjust available width to account for overlaps
+	local effectiveWidth = availableWidth + totalOverlapGain
 	
 	-- Distribute widths proportionally:
 	-- Name: 32%, Column Dropdown: 29%, Level: 15%, Class: 24%
-	local nameWidth = math.floor(availableWidth * 0.32)
-	local columnWidth = math.floor(availableWidth * 0.29)
-	local levelWidth = math.floor(availableWidth * 0.15)
-	local classWidth = availableWidth - nameWidth - columnWidth - levelWidth -- Remaining space
+	local nameWidth = math.floor(effectiveWidth * 0.32)
+	local columnWidth = math.floor(effectiveWidth * 0.29)
+	local levelWidth = math.floor(effectiveWidth * 0.15)
+	local classWidth = effectiveWidth - nameWidth - columnWidth - levelWidth -- Remaining space
 	
 	-- Apply minimum widths
 	nameWidth = math.max(nameWidth, 80)
 	columnWidth = math.max(columnWidth, 70)
 	levelWidth = math.max(levelWidth, 40)
 	classWidth = math.max(classWidth, 60)
+	
+	-- CRITICAL: Store calculated widths for button layout
+	-- These will be used in InitButton() to position row content dynamically
+	self.columnWidths = {
+		name = nameWidth,
+		variable = columnWidth,
+		level = levelWidth,
+		class = classWidth
+	}
 	
 	-- Update column header widths
 	if whoFrame.NameHeader then
@@ -112,6 +136,69 @@ function WhoFrame:UpdateResponsiveLayout()
 	if whoFrame.WhoButton then
 		whoFrame.WhoButton:ClearAllPoints()
 		whoFrame.WhoButton:SetPoint("BOTTOMLEFT", whoFrame.ListInset, buttonsStartX, -26)
+	end
+	
+	-- REFRESH BUTTONS: Trigger re-layout of all visible buttons
+	-- This ensures row content repositions immediately when frame resizes
+	-- CRITICAL: Update ALL visible buttons, even if they have no data yet
+	if whoFrame.ScrollBox then
+		whoFrame.ScrollBox:ForEachFrame(function(button)
+			-- Check if button has valid element data (from DataProvider)
+			local elementData = button:GetElementData()
+			if elementData and elementData.info then
+				-- Re-apply layout with new column widths
+				self:InitButton(button, elementData)
+			elseif button.Name then
+				-- Button exists but has no data - still apply column widths for consistency
+				-- This ensures proper layout even before first Who results load
+				if self.columnWidths then
+					local widths = self.columnWidths
+					local headerLeftPadding = 4  -- Match NameHeader XML position
+					local headerGap = -2         -- Match XML header overlap
+					
+					-- Scale widths to fit button width (same logic as InitButton)
+					local buttonWidth = button:GetWidth()
+					local rightPadding = 2  -- Prevent text clipping
+					local totalHeaderWidth = widths.name + widths.variable + widths.level + widths.class - (3 * math.abs(headerGap))
+					local buttonContentWidth = buttonWidth - headerLeftPadding - rightPadding
+					local scaleFactor = buttonContentWidth / totalHeaderWidth
+					
+					local scaledName = math.floor(widths.name * scaleFactor)
+					local scaledVariable = math.floor(widths.variable * scaleFactor)
+					local scaledLevel = math.floor(widths.level * scaleFactor)
+					local scaledClass = buttonContentWidth - scaledName - scaledVariable - scaledLevel + (3 * math.abs(headerGap))
+					
+					-- Apply scaled widths
+					local nameStart = headerLeftPadding
+					button.Name:SetWidth(scaledName)
+					button.Name:SetJustifyH("CENTER")
+					button.Name:ClearAllPoints()
+					button.Name:SetPoint("LEFT", button, "LEFT", nameStart, 0)
+					button.Name:SetPoint("RIGHT", button, "LEFT", nameStart + scaledName, 0)
+					
+					local variableStart = nameStart + scaledName + headerGap
+					button.Variable:SetWidth(scaledVariable)
+					button.Variable:SetJustifyH("CENTER")
+					button.Variable:ClearAllPoints()
+					button.Variable:SetPoint("LEFT", button, "LEFT", variableStart, 0)
+					button.Variable:SetPoint("RIGHT", button, "LEFT", variableStart + scaledVariable, 0)
+					
+					local levelStart = variableStart + scaledVariable + headerGap
+					button.Level:SetWidth(scaledLevel)
+					button.Level:SetJustifyH("CENTER")
+					button.Level:ClearAllPoints()
+					button.Level:SetPoint("LEFT", button, "LEFT", levelStart, 0)
+					button.Level:SetPoint("RIGHT", button, "LEFT", levelStart + scaledLevel, 0)
+					
+					local classStart = levelStart + scaledLevel + headerGap
+					button.Class:SetWidth(scaledClass)
+					button.Class:SetJustifyH("CENTER")
+					button.Class:ClearAllPoints()
+					button.Class:SetPoint("LEFT", button, "LEFT", classStart, 0)
+					button.Class:SetPoint("RIGHT", button, "LEFT", classStart + scaledClass, 0)
+				end
+			end
+		end)
 	end
 end
 
@@ -171,6 +258,67 @@ function WhoFrame:InitButton(button, elementData)
 		if TimerunningUtil and TimerunningUtil.AddTinyIcon then
 			name = TimerunningUtil.AddTinyIcon(name)
 		end
+	end
+	
+	-- RESPONSIVE LAYOUT: Apply calculated column widths to button elements
+	-- This ensures row content aligns perfectly with column headers
+	-- All text elements are CENTER-justified to match header button alignment
+	if self.columnWidths then
+		local widths = self.columnWidths
+		
+		-- Match XML header positions EXACTLY:
+		-- NameHeader: x=4 from ListInset TOPLEFT
+		-- ColumnDropdown: x=-2 from NameHeader RIGHT (overlap)
+		-- LevelHeader: x=-2 from ColumnDropdown RIGHT (overlap)
+		-- ClassHeader: x=-2 from LevelHeader RIGHT (overlap)
+		local headerLeftPadding = 4  -- NameHeader starts at x=4 in XML
+		local headerGap = -2         -- Headers overlap by 2px in XML
+		
+		-- CRITICAL: Buttons are narrower than headers due to ScrollBox layout
+		-- We need to scale down the column widths proportionally to fit button width
+		local buttonWidth = button:GetWidth()
+		local rightPadding = 2  -- Small padding to prevent text clipping at button edge
+		local totalHeaderWidth = widths.name + widths.variable + widths.level + widths.class - (3 * math.abs(headerGap))
+		local buttonContentWidth = buttonWidth - headerLeftPadding - rightPadding  -- Available width in button
+		local scaleFactor = buttonContentWidth / totalHeaderWidth
+		
+		-- Scale all widths proportionally
+		local scaledName = math.floor(widths.name * scaleFactor)
+		local scaledVariable = math.floor(widths.variable * scaleFactor)
+		local scaledLevel = math.floor(widths.level * scaleFactor)
+		local scaledClass = buttonContentWidth - scaledName - scaledVariable - scaledLevel + (3 * math.abs(headerGap))
+		
+		-- Name column: Starts at x=4 (matching NameHeader XML position)
+		local nameStart = headerLeftPadding
+		button.Name:SetWidth(scaledName)
+		button.Name:SetJustifyH("CENTER")
+		button.Name:ClearAllPoints()
+		button.Name:SetPoint("LEFT", button, "LEFT", nameStart, 0)
+		button.Name:SetPoint("RIGHT", button, "LEFT", nameStart + scaledName, 0)
+		
+		-- Variable column: Positioned with -2px overlap (matching XML)
+		local variableStart = nameStart + scaledName + headerGap
+		button.Variable:SetWidth(scaledVariable)
+		button.Variable:SetJustifyH("CENTER")
+		button.Variable:ClearAllPoints()
+		button.Variable:SetPoint("LEFT", button, "LEFT", variableStart, 0)
+		button.Variable:SetPoint("RIGHT", button, "LEFT", variableStart + scaledVariable, 0)
+		
+		-- Level column: Positioned with -2px overlap (matching XML)
+		local levelStart = variableStart + scaledVariable + headerGap
+		button.Level:SetWidth(scaledLevel)
+		button.Level:SetJustifyH("CENTER")
+		button.Level:ClearAllPoints()
+		button.Level:SetPoint("LEFT", button, "LEFT", levelStart, 0)
+		button.Level:SetPoint("RIGHT", button, "LEFT", levelStart + scaledLevel, 0)
+		
+		-- Class column: Positioned with -2px overlap (matching XML)
+		local classStart = levelStart + scaledLevel + headerGap
+		button.Class:SetWidth(scaledClass)
+		button.Class:SetJustifyH("CENTER")
+		button.Class:ClearAllPoints()
+		button.Class:SetPoint("LEFT", button, "LEFT", classStart, 0)
+		button.Class:SetPoint("RIGHT", button, "LEFT", classStart + scaledClass, 0)
 	end
 	
 	-- Set button text

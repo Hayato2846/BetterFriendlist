@@ -247,4 +247,32 @@ if GetLocale() == "enUS" then
 	L.SETTINGS_FRAME_RESET_SIZE = "Reset to 415x570"
 	L.SETTINGS_FRAME_APPLY_NOW = "Apply to Current Layout"
 	L.SETTINGS_FRAME_RESET_ALL = "Reset All Layouts to Default"
+	
+	-- ========================================
+	-- DATA BROKER (STABLE FEATURE)
+	-- ========================================
+	L.BROKER_TITLE = "BetterFriendlist"
+	L.BROKER_TOOLTIP_HEADER = "Friends"
+	L.BROKER_TOOLTIP_FOOTER_LEFT = "Left Click: Toggle BetterFriendlist"
+	L.BROKER_TOOLTIP_FOOTER_RIGHT = "Right Click: Settings"
+	L.BROKER_SETTINGS_ENABLE = "Enable Data Broker"
+	L.BROKER_SETTINGS_SHOW_ICON = "Show Icon"
+	L.BROKER_SETTINGS_TOOLTIP_MODE = "Tooltip Detail Level"
+	L.BROKER_SETTINGS_CLICK_ACTION = "Left Click Action"
+	L.BROKER_FILTER_CHANGED = "Filter changed to: %s"
+	
+	-- ========================================
+	-- FEATURE REQUESTS (CurseForge User Feedback)
+	-- ========================================
+	-- Feature 1: Treat Mobile as Offline
+	L.SETTINGS_TREAT_MOBILE_OFFLINE = "Treat Mobile users as Offline"
+	L.SETTINGS_TREAT_MOBILE_OFFLINE_DESC = "Display friends using the Mobile App in the Offline group"
+	
+	-- Feature 3: Show Notes as Name
+	L.SETTINGS_SHOW_NOTES_AS_NAME = "Show Notes as Friend Name"
+	L.SETTINGS_SHOW_NOTES_AS_NAME_DESC = "Display friend notes as their name when available"
+	
+	-- Feature 4: Window Scale
+	L.SETTINGS_WINDOW_SCALE = "Window Scale"
+	L.SETTINGS_WINDOW_SCALE_DESC = "Scale the entire window (50%% - 200%%)"
 end

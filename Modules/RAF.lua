@@ -31,7 +31,7 @@ local latestRAFVersion = 0
 
 function RAF:OnLoad(frame)
 	if not C_RecruitAFriend then
-		print("BetterFriendlist: RAF system not available")
+		BFL:DebugPrint("BetterFriendlist: RAF system not available")
 		return
 	end
 	
@@ -907,7 +907,7 @@ function RAF:RecruitmentButton_OnClick(button)
 	end
 	
 	if not RecruitAFriendRecruitmentFrame then
-		print("Error: Could not load RecruitAFriendRecruitmentFrame")
+		BFL:DebugPrint("Error: Could not load RecruitAFriendRecruitmentFrame")
 		return
 	end
 	

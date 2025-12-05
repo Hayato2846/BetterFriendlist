@@ -218,4 +218,33 @@ if GetLocale() == "zhTW" then
 	L.SETTINGS_FRAME_HEIGHT = "高度:"
 	L.SETTINGS_FRAME_RESET_SIZE = "重設為 415x570"
 	L.SETTINGS_FRAME_APPLY_NOW = "套用到目前配置"
-	L.SETTINGS_FRAME_RESET_ALL = "重設所有配置"end
+	L.SETTINGS_FRAME_RESET_ALL = "重設所有配置"
+	
+	-- ========================================
+	-- DATA BROKER
+	-- ========================================
+	L.BROKER_TITLE = "BetterFriendlist"
+	L.BROKER_TOOLTIP_HEADER = "好友"
+	L.BROKER_TOOLTIP_FOOTER_LEFT = "左鍵: 切換 BetterFriendlist"
+	L.BROKER_TOOLTIP_FOOTER_RIGHT = "右鍵: 設定"
+	L.BROKER_SETTINGS_ENABLE = "啟用 Data Broker"
+	L.BROKER_SETTINGS_SHOW_ICON = "顯示圖示"
+	L.BROKER_SETTINGS_TOOLTIP_MODE = "提示框詳細程度"
+	L.BROKER_SETTINGS_CLICK_ACTION = "左鍵動作"
+	L.BROKER_FILTER_CHANGED = "篩選器已變更為: %s"
+	
+	-- ========================================
+	-- FEATURE REQUESTS (CurseForge User Feedback)
+	-- ========================================
+	-- Feature 1: 將手機用戶視為離線
+	L.SETTINGS_TREAT_MOBILE_OFFLINE = "將手機用戶視為離線"
+	L.SETTINGS_TREAT_MOBILE_OFFLINE_DESC = "將使用手機應用的好友顯示在離線群組中"
+	
+	-- Feature 3: 顯示備註作為名稱
+	L.SETTINGS_SHOW_NOTES_AS_NAME = "顯示備註作為好友名稱"
+	L.SETTINGS_SHOW_NOTES_AS_NAME_DESC = "當有備註時，顯示好友備註作為他們的名稱"
+	
+	-- Feature 4: 視窗縮放
+	L.SETTINGS_WINDOW_SCALE = "視窗縮放"
+	L.SETTINGS_WINDOW_SCALE_DESC = "縮放整個視窗（50%% - 200%%）"
+end

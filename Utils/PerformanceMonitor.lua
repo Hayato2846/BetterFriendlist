@@ -257,32 +257,12 @@ function PerformanceMonitor:EnableAutoMonitoring()
 	print("|cff00ff00BetterFriendlist Performance:|r Auto-monitoring enabled")
 end
 
--- Slash command integration
+-- Legacy slash command (redirects to /bfl perf)
+-- Kept for backwards compatibility
 SLASH_BFLPERF1 = "/bflperf"
 SlashCmdList["BFLPERF"] = function(msg)
-	local args = {}
-	for word in msg:gmatch("%S+") do
-		table.insert(args, word)
-	end
-	
-	local cmd = args[1] and args[1]:lower() or "report"
-	
-	if cmd == "report" or cmd == "show" then
-		PerformanceMonitor:Report()
-	elseif cmd == "reset" then
-		PerformanceMonitor:Reset()
-	elseif cmd == "enable" then
-		PerformanceMonitor:EnableAutoMonitoring()
-	elseif cmd == "memory" then
-		PerformanceMonitor:SampleMemory()
-		UpdateAddOnMemoryUsage()
-		local memory = GetAddOnMemoryUsage("BetterFriendlist") or 0
-		print(string.format("|cff00ff00BetterFriendlist Memory:|r %.2f KB", memory))
-	else
-		print("|cff00ff00BetterFriendlist Performance Commands:|r")
-		print("  |cffffcc00/bflperf report|r - Show performance statistics")
-		print("  |cffffcc00/bflperf reset|r - Reset statistics")
-		print("  |cffffcc00/bflperf enable|r - Enable auto-monitoring")
-		print("  |cffffcc00/bflperf memory|r - Check current memory usage")
-	end
+	-- Redirect to main /bfl command
+	local cmd = msg and msg:lower():trim() or ""
+	if cmd == "" then cmd = "report" end
+	SlashCmdList["BETTERFRIENDLIST"]("perf " .. cmd)
 end

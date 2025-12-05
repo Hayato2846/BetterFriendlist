@@ -218,4 +218,33 @@ if GetLocale() == "ptBR" then
 	L.SETTINGS_FRAME_HEIGHT = "Altura:"
 	L.SETTINGS_FRAME_RESET_SIZE = "Redefinir para 415x570"
 	L.SETTINGS_FRAME_APPLY_NOW = "Aplicar ao layout atual"
-	L.SETTINGS_FRAME_RESET_ALL = "Redefinir todos os layouts"end
+	L.SETTINGS_FRAME_RESET_ALL = "Redefinir todos os layouts"
+	
+	-- ========================================
+	-- DATA BROKER
+	-- ========================================
+	L.BROKER_TITLE = "BetterFriendlist"
+	L.BROKER_TOOLTIP_HEADER = "Amigos"
+	L.BROKER_TOOLTIP_FOOTER_LEFT = "Clique esquerdo: Alternar BetterFriendlist"
+	L.BROKER_TOOLTIP_FOOTER_RIGHT = "Clique direito: Configurações"
+	L.BROKER_SETTINGS_ENABLE = "Ativar Data Broker"
+	L.BROKER_SETTINGS_SHOW_ICON = "Mostrar ícone"
+	L.BROKER_SETTINGS_TOOLTIP_MODE = "Nível de detalhe do tooltip"
+	L.BROKER_SETTINGS_CLICK_ACTION = "Ação do clique esquerdo"
+	L.BROKER_FILTER_CHANGED = "Filtro alterado para: %s"
+	
+	-- ========================================
+	-- FEATURE REQUESTS (CurseForge User Feedback)
+	-- ========================================
+	-- Feature 1: Tratar Mobile como Offline
+	L.SETTINGS_TREAT_MOBILE_OFFLINE = "Tratar usuários mobile como offline"
+	L.SETTINGS_TREAT_MOBILE_OFFLINE_DESC = "Mostrar amigos usando o App Mobile no grupo offline"
+	
+	-- Feature 3: Mostrar Notas como Nome
+	L.SETTINGS_SHOW_NOTES_AS_NAME = "Mostrar notas como nome do amigo"
+	L.SETTINGS_SHOW_NOTES_AS_NAME_DESC = "Exibe as notas dos amigos como seu nome quando disponíveis"
+	
+	-- Feature 4: Escala da Janela
+	L.SETTINGS_WINDOW_SCALE = "Escala da janela"
+	L.SETTINGS_WINDOW_SCALE_DESC = "Escala a janela inteira (50%% - 200%%)"
+end

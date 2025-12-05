@@ -242,6 +242,9 @@ function BetterRaidFrame_Update()
 		-- Update member buttons via module
 		RaidFrame:UpdateAllMemberButtons()
 	end
+	
+	-- Always update control panel layout (adjusts for frame width changes)
+	RaidFrame:UpdateControlPanelLayout()
 end
 
 -- Update Control Panel Buttons (Enable/Disable based on state)

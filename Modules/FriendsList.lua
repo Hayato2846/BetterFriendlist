@@ -25,6 +25,10 @@ local BUTTON_TYPE_DIVIDER = 5
 local isUpdatingFriendsList = false
 local hasPendingUpdate = false
 
+-- Dirty flag: Set when data changes while frame is hidden
+-- When true, next time frame is shown, we need to re-render
+local needsRenderOnShow = false
+
 -- Selected friend for "Send Message" button (matching Blizzard's FriendsFrame)
 FriendsList.selectedFriend = nil
 FriendsList.selectedButton = nil  -- Reference to the selected button for highlight management
@@ -606,6 +610,19 @@ function FriendsList:Initialize()
 		self:OnFriendListUpdate(...)
 	end, 10)
 	
+	-- Additional events from Blizzard's FriendsFrame
+	BFL:RegisterEventCallback("BN_CONNECTED", function(...)
+		self:OnFriendListUpdate(...)
+	end, 10)
+	
+	BFL:RegisterEventCallback("BN_DISCONNECTED", function(...)
+		self:OnFriendListUpdate(...)
+	end, 10)
+	
+	BFL:RegisterEventCallback("GROUP_ROSTER_UPDATE", function(...)
+		self:OnFriendListUpdate(...)
+	end, 10)
+	
 	-- Register friend invite events
 	BFL:RegisterEventCallback("BN_FRIEND_INVITE_LIST_INITIALIZED", function()
 		self:UpdateFriendsList()
@@ -622,6 +639,26 @@ function FriendsList:Initialize()
 	BFL:RegisterEventCallback("BN_FRIEND_INVITE_REMOVED", function()
 		self:UpdateFriendsList()
 	end, 10)
+	
+	-- Hook OnShow to re-render if data changed while hidden
+	if BetterFriendsFrame then
+		BetterFriendsFrame:HookScript("OnShow", function()
+			if needsRenderOnShow then
+				BFL:DebugPrint("|cff00ffffFriendsList:|r Frame shown, dirty flag set - triggering refresh")
+				self:UpdateFriendsList()
+			end
+		end)
+		
+		-- Also hook ScrollFrame OnShow for tab switching
+		if BetterFriendsFrame.ScrollFrame then
+			BetterFriendsFrame.ScrollFrame:HookScript("OnShow", function()
+				if needsRenderOnShow then
+					BFL:DebugPrint("|cff00ffffFriendsList:|r ScrollFrame shown, dirty flag set - triggering refresh")
+					self:UpdateFriendsList()
+				end
+			end)
+		end
+	end
 end
 
 -- Handle friend list update events
@@ -726,6 +763,12 @@ function FriendsList:UpdateFriendsList()
 
 					elseif gameInfo.clientProgram == "BSAp" then
 						friend.gameName = "Mobile"
+						-- Feature: Treat Mobile as Offline (Phase Feature Request)
+						local treatMobileAsOffline = GetDB():Get("treatMobileAsOffline", false)
+						if treatMobileAsOffline then
+							friend.connected = false  -- Treat as offline for sorting/display
+							friend.isMobileButTreatedOffline = true  -- Flag for special display
+						end
 					elseif gameInfo.clientProgram == "App" then
 						friend.gameName = "In App"
 					else
@@ -766,6 +809,10 @@ function FriendsList:UpdateFriendsList()
 	
 	-- Build display list to update UI
 	self:BuildDisplayList()
+	
+	-- CRITICAL FIX: Render the display after building list
+	-- Without this, UI never updates after friend offline/online events
+	self:RenderDisplay()
 	
 	-- Release lock after update complete
 	isUpdatingFriendsList = false
@@ -1699,12 +1746,15 @@ end
 -- NEW: Simplified RenderDisplay using ScrollBox/DataProvider system (Phase 2)
 function FriendsList:RenderDisplay()
 	-- Skip update if frame is not shown (performance optimization)
+	-- But mark that we need to render when frame is shown
 	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
+		needsRenderOnShow = true
 		return
 	end
 	
 	-- Skip update if Friends list elements are hidden (means we're on another tab)
 	if BetterFriendsFrame.ScrollFrame and not BetterFriendsFrame.ScrollFrame:IsShown() then
+		needsRenderOnShow = true
 		return
 	end
 	
@@ -1712,9 +1762,13 @@ function FriendsList:RenderDisplay()
 	if BetterFriendsFrame.FriendsTabHeader then
 		local selectedTab = PanelTemplates_GetSelectedTab(BetterFriendsFrame.FriendsTabHeader)
 		if selectedTab and selectedTab ~= 1 then
+			needsRenderOnShow = true
 			return
 		end
 	end
+	
+	-- Clear dirty flag since we're rendering now
+	needsRenderOnShow = false
 	
 	-- Build DataProvider from friends list
 	local dataProvider = BuildDataProvider(self)
@@ -1724,6 +1778,11 @@ function FriendsList:RenderDisplay()
 	if self.scrollBox then
 		self.scrollBox:SetDataProvider(dataProvider, retainScrollPosition)
 	end
+end
+
+-- Check if render is needed (called when frame is shown)
+function FriendsList:NeedsRenderOnShow()
+	return needsRenderOnShow
 end
 
 -- ========================================
@@ -2212,7 +2271,7 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		end
 		
 		-- Clear dragged friend name
-		BetterFriendsList_DraggedFriend = nil
+		BetterFriendsList_DraggedFriend = ""
 	end)
 	
 	-- Get settings
@@ -2295,7 +2354,14 @@ function FriendsList:UpdateFriendButton(button, elementData)
 	
 	if friend.type == "bnet" then
 		-- Battle.net friend
-		local displayName = friend.accountName or friend.battleTag or "Unknown"
+		-- Feature: Show Notes as Name (Phase Feature Request)
+		local displayName
+		local showNotesAsName = GetDB():Get("showNotesAsName", false)
+		if showNotesAsName and friend.note and friend.note ~= "" then
+			displayName = friend.note
+		else
+			displayName = friend.accountName or friend.battleTag or "Unknown"
+		end
 		
 		-- Set background color
 		if friend.connected then
@@ -2638,9 +2704,14 @@ function FriendsList:UpdateFriendButton(button, elementData)
 			local isOppositeFaction = friend.factionName and friend.factionName ~= playerFactionGroup and friend.factionName ~= ""
 			local shouldGray = grayOtherFaction and isOppositeFaction
 			
-			-- Get display name: strips realm for same-realm friends unless showRealmName is enabled
+			-- Feature: Show Notes as Name (Phase Feature Request)
+			-- For WoW friends, check if notes should be used as display name
+			local showNotesAsName = GetDB():Get("showNotesAsName", false)
 			local characterName
-			if showRealmName then
+			if showNotesAsName and friend.notes and friend.notes ~= "" then
+				-- Use note as display name (no realm stripping needed)
+				characterName = friend.notes
+			elseif showRealmName then
 				-- Always show full "Name-Realm" format when setting is enabled
 				characterName = friend.name
 			else
@@ -2677,7 +2748,14 @@ function FriendsList:UpdateFriendButton(button, elementData)
 			end
 		else
 			-- Offline - gray (use display helper here too)
-			local displayName = BFL:GetWoWFriendDisplayName(friend.name)
+			-- Feature: Show Notes as Name (Phase Feature Request) - also for offline friends
+			local showNotesAsName = GetDB():Get("showNotesAsName", false)
+			local displayName
+			if showNotesAsName and friend.notes and friend.notes ~= "" then
+				displayName = friend.notes
+			else
+				displayName = BFL:GetWoWFriendDisplayName(friend.name)
+			end
 			line1Text = "|cff7f7f7f" .. displayName .. "|r"
 		end
 		
@@ -3068,21 +3146,29 @@ function FriendsList:UpdateSearchBoxWidth()
 	local wastedSpace = frameRight - rightmostElement
 	
 	-- ========================================
-	-- CALCULATE OPTIMAL SEARCHBOX WIDTH
+	-- CALCULATE OPTIMAL SEARCHBOX WIDTH (RESPONSIVE)
 	-- ========================================
-	-- Reserve MORE space for right-side elements to prevent clipping at dropdowns
-	-- Goal: Dropdowns have breathing room, no clipping even during resize
-	local fixedElementsWidth = 205  -- Increased from 192px to give dropdowns 13px more space
+	-- Fixed elements on the right side of the header:
+	-- - QuickFilter dropdown (~125px)
+	-- - Sort dropdown (~80px)
+	-- Total reserved space: ~205px (with padding)
+	local fixedElementsWidth = 205
 	local availableWidth = frameWidth - fixedElementsWidth
 	
-	-- Clamp SearchBox between 175px (functional minimum) and 340px (reduced maximum)
-	if availableWidth < 175 then
-		availableWidth = 175
-	elseif availableWidth > 340 then
-		availableWidth = 340
+	-- Clamp SearchBox to functional minimum (175px)
+	-- NO MAXIMUM: Scale up to max frame width (800px - 205px = 595px)
+	-- This allows SearchBox to grow with frame width for better UX
+	local minSearchBoxWidth = 175
+	
+	if availableWidth < minSearchBoxWidth then
+		availableWidth = minSearchBoxWidth
 	end
 	
+	-- Apply new width
 	header.SearchBox:SetWidth(availableWidth)
+	
+	BFL:DebugPrint(string.format("|cff00ffffFriendsList:|r SearchBox width updated: %.1fpx (frame width: %.1fpx)", 
+		availableWidth, frameWidth))
 end
 
 -- Export module to BFL namespace (required for BFL.FriendsList access)

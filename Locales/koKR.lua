@@ -218,4 +218,33 @@ if GetLocale() == "koKR" then
 	L.SETTINGS_FRAME_HEIGHT = "높이:"
 	L.SETTINGS_FRAME_RESET_SIZE = "415x570으로 재설정"
 	L.SETTINGS_FRAME_APPLY_NOW = "현재 레이아웃에 적용"
-	L.SETTINGS_FRAME_RESET_ALL = "모든 레이아웃 재설정"end
+	L.SETTINGS_FRAME_RESET_ALL = "모든 레이아웃 재설정"
+	
+	-- ========================================
+	-- DATA BROKER
+	-- ========================================
+	L.BROKER_TITLE = "BetterFriendlist"
+	L.BROKER_TOOLTIP_HEADER = "친구"
+	L.BROKER_TOOLTIP_FOOTER_LEFT = "좌클릭: BetterFriendlist 전환"
+	L.BROKER_TOOLTIP_FOOTER_RIGHT = "우클릭: 설정"
+	L.BROKER_SETTINGS_ENABLE = "Data Broker 활성화"
+	L.BROKER_SETTINGS_SHOW_ICON = "아이콘 표시"
+	L.BROKER_SETTINGS_TOOLTIP_MODE = "툴팁 세부 정보 수준"
+	L.BROKER_SETTINGS_CLICK_ACTION = "좌클릭 동작"
+	L.BROKER_FILTER_CHANGED = "필터가 %s(으)로 변경됨"
+	
+	-- ========================================
+	-- FEATURE REQUESTS (CurseForge User Feedback)
+	-- ========================================
+	-- Feature 1: 모바일 사용자를 오프라인으로 표시
+	L.SETTINGS_TREAT_MOBILE_OFFLINE = "모바일 사용자를 오프라인으로 표시"
+	L.SETTINGS_TREAT_MOBILE_OFFLINE_DESC = "모바일 앱을 사용하는 친구를 오프라인 그룹에 표시"
+	
+	-- Feature 3: 메모를 이름으로 표시
+	L.SETTINGS_SHOW_NOTES_AS_NAME = "메모를 친구 이름으로 표시"
+	L.SETTINGS_SHOW_NOTES_AS_NAME_DESC = "사용 가능한 경우 친구 메모를 이름으로 표시"
+	
+	-- Feature 4: 창 크기 조절
+	L.SETTINGS_WINDOW_SCALE = "창 크기 조절"
+	L.SETTINGS_WINDOW_SCALE_DESC = "전체 창 크기 조절 (50%% - 200%%)"
+end

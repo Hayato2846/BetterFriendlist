@@ -39,7 +39,10 @@ local filterMode = "all"
 
 -- Initialize (called from ADDON_LOADED)
 function QuickFilters:Initialize()
-	-- Nothing to initialize yet
+	-- Load current filter from database
+	if BetterFriendlistDB and BetterFriendlistDB.quickFilter then
+		filterMode = BetterFriendlistDB.quickFilter
+	end
 end
 
 -- Initialize Quick Filter Dropdown
@@ -47,8 +50,10 @@ function QuickFilters:InitDropdown(dropdown)
 	if not dropdown then return end
 	
 	-- Helper function to check if a filter mode is selected
+	-- IMPORTANT: Read from DB to stay in sync with external changes (e.g., Broker middle click)
 	local function IsSelected(mode)
-		return filterMode == mode
+		local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
+		return currentFilter == mode
 	end
 	
 	-- Helper function to set the filter mode
@@ -121,6 +126,11 @@ end
 function QuickFilters:SetFilter(mode)
 	filterMode = mode
 	
+	-- Update database to stay in sync
+	if BetterFriendlistDB then
+		BetterFriendlistDB.quickFilter = mode
+	end
+	
 	-- Update FriendsList module with new filter
 	local FriendsList = GetFriendsList()
 	if FriendsList then
@@ -133,11 +143,18 @@ end
 
 -- Get current filter mode
 function QuickFilters:GetFilter()
+	-- Prefer DB value to stay in sync with external changes
+	if BetterFriendlistDB and BetterFriendlistDB.quickFilter then
+		filterMode = BetterFriendlistDB.quickFilter
+	end
 	return filterMode
 end
 
 -- Get filter text for UI display
 function QuickFilters:GetFilterText()
+	-- ALWAYS read from DB to ensure correct text after external changes (e.g., Broker)
+	local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or filterMode
+	
 	local filterTexts = {
 		all = "All Friends",
 		online = "Online Only",
@@ -147,7 +164,7 @@ function QuickFilters:GetFilterText()
 		hideafk = "Hide AFK/DND",
 		retail = "Retail Only",
 	}
-	return filterTexts[filterMode] or "All Friends"
+	return filterTexts[currentFilter] or "All Friends"
 end
 
 -- Get filter icons table

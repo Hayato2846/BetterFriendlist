@@ -148,29 +148,90 @@ function MainFrameEditMode:SaveSize(layoutName, width, height)
 end
 
 --[[--------------------------------------------------
+    Scale Management (Feature Request: Window Scale)
+--]]--------------------------------------------------
+
+-- Scale constants
+local MIN_SCALE = 0.5  -- 50%
+local MAX_SCALE = 2.0  -- 200%
+local DEFAULT_SCALE = 1.0  -- 100%
+
+-- Apply scale to main frame
+function MainFrameEditMode:ApplyScale()
+    local frame = BetterFriendsFrame
+    if not frame then return end
+    
+    local scale = BetterFriendlistDB.windowScale or DEFAULT_SCALE
+    -- Clamp between valid range
+    scale = Clamp(scale, MIN_SCALE, MAX_SCALE)
+    
+    frame:SetScale(scale)
+    BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r Applied scale: " .. (scale * 100) .. "%")
+end
+
+-- Set scale and save to database
+function MainFrameEditMode:SetScale(scale)
+    -- Clamp between valid range
+    scale = Clamp(scale or DEFAULT_SCALE, MIN_SCALE, MAX_SCALE)
+    
+    -- Save to database
+    BetterFriendlistDB.windowScale = scale
+    
+    -- Apply immediately
+    self:ApplyScale()
+end
+
+-- Get current scale
+function MainFrameEditMode:GetScale()
+    return BetterFriendlistDB.windowScale or DEFAULT_SCALE
+end
+
+--[[--------------------------------------------------
     Responsive Update Triggers
 --]]--------------------------------------------------
 
 function MainFrameEditMode:TriggerResponsiveUpdates()
+    BFL:DebugPrint("|cffff00ffBFL:MainFrameEditMode:|r TriggerResponsiveUpdates() called")
+    
     -- Update FriendsList ScrollBox extent
     if BFL.FriendsList and BFL.FriendsList.UpdateScrollBoxExtent then
         BFL.FriendsList:UpdateScrollBoxExtent()
+        BFL:DebugPrint("  - FriendsList:UpdateScrollBoxExtent() called")
     end
     
     -- Update SearchBox width
     if BFL.FriendsList and BFL.FriendsList.UpdateSearchBoxWidth then
         BFL.FriendsList:UpdateSearchBoxWidth()
+        BFL:DebugPrint("  - FriendsList:UpdateSearchBoxWidth() called")
     end
     
     -- Update WhoFrame responsive layout
     if BFL.WhoFrame and BFL.WhoFrame.UpdateResponsiveLayout then
         BFL.WhoFrame:UpdateResponsiveLayout()
+        BFL:DebugPrint("  - WhoFrame:UpdateResponsiveLayout() called")
     end
     
-    -- Update RaidFrame layout
-    if BFL.RaidFrame and BFL.RaidFrame.UpdateGroupLayout then
-        BFL.RaidFrame:UpdateGroupLayout()
+    -- Update RaidFrame group layout (grid positioning and sizing)
+    local RaidFrame = BFL.Modules and BFL.Modules.RaidFrame
+    if RaidFrame and RaidFrame.UpdateGroupLayout then
+        BFL:DebugPrint("  - Calling RaidFrame:UpdateGroupLayout()...")
+        RaidFrame:UpdateGroupLayout()
+        BFL:DebugPrint("  - RaidFrame:UpdateGroupLayout() completed")
+    else
+        BFL:DebugPrint("  - RaidFrame or UpdateGroupLayout not available")
     end
+    
+    -- Update RaidFrame control panel layout (AllAssist, Counts, Button positioning)
+    -- Note: This is now called automatically by UpdateGroupLayout(), but we can call it separately too
+    if RaidFrame and RaidFrame.UpdateControlPanelLayout then
+        BFL:DebugPrint("  - Calling RaidFrame:UpdateControlPanelLayout()...")
+        RaidFrame:UpdateControlPanelLayout()
+        BFL:DebugPrint("  - RaidFrame:UpdateControlPanelLayout() completed")
+    else
+        BFL:DebugPrint("  - RaidFrame or UpdateControlPanelLayout not available")
+    end
+    
+    BFL:DebugPrint("|cffff00ffBFL:MainFrameEditMode:|r TriggerResponsiveUpdates() finished")
 end
 
 --[[--------------------------------------------------
@@ -245,6 +306,33 @@ function MainFrameEditMode:CreateEditModeSettings()
                 return string.format("%d px", value)
             end,
         },
+        {
+            name = "Window Scale",
+            kind = LEM.SettingType.Slider,
+            default = 100,  -- 100%
+            get = function(layoutName)
+                -- Return saved scale as percentage (50-200)
+                local scale = BetterFriendlistDB.windowScale or 1.0
+                return math.floor(scale * 100)
+            end,
+            set = function(layoutName, value)
+                -- Convert percentage to scale factor
+                local scale = value / 100
+                scale = math.max(MIN_SCALE, math.min(MAX_SCALE, scale))
+                
+                -- Save to DB
+                BetterFriendlistDB.windowScale = scale
+                
+                -- Apply scale
+                MainFrameEditMode:ApplyScale()
+            end,
+            minValue = 50,   -- 50%
+            maxValue = 200,  -- 200%
+            valueStep = 5,   -- 5% steps
+            formatter = function(value)
+                return string.format("%d%%", value)
+            end,
+        },
     }
     
     -- Register settings with LibEditMode
@@ -294,6 +382,11 @@ function MainFrameEditMode:OnEditModeExit()
     local frame = BetterFriendsFrame
     if not frame then return end
     
+    -- CRITICAL: Re-enable manual dragging after EditMode
+    -- LibEditMode sets frame:SetMovable(false) on exit, but we need manual dragging
+    frame:SetMovable(true)
+    frame:SetClampedToScreen(true)
+    
     -- Restore previous visibility state
     -- If frame was hidden before EditMode, hide it again
     if frame.wasHiddenBeforeEditMode then
@@ -301,7 +394,7 @@ function MainFrameEditMode:OnEditModeExit()
         frame.wasHiddenBeforeEditMode = nil
     end
     
-    BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r Edit Mode exited, visibility restored")
+    BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r Edit Mode exited, manual dragging re-enabled, visibility restored")
 end
 
 --[[--------------------------------------------------
@@ -353,6 +446,7 @@ function MainFrameEditMode:Initialize()
             if not self.editModeApplied then
                 MainFrameEditMode:ApplyPosition()
                 MainFrameEditMode:ApplySize()
+                MainFrameEditMode:ApplyScale()  -- Feature: Window Scale
                 self.editModeApplied = true
             end
         end)
@@ -382,6 +476,7 @@ function MainFrameEditMode:Initialize()
     if frame:IsShown() then
         self:ApplyPosition()
         self:ApplySize()
+        self:ApplyScale()  -- Feature: Window Scale
         frame.editModeApplied = true
     end
     

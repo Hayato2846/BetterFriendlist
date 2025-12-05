@@ -1531,7 +1531,8 @@
 			<Frame parentKey="WhoFrame" hidden="true" setAllPoints="true">
 				<Frames>
 					<!-- Search EditBox with WhoFrameEditBoxMixin -->
-					<EditBox parentKey="EditBox" inherits="SearchBoxTemplate" autoFocus="false" frameStrata="HIGH" historyLines="32" bytes="256" mixin="WhoFrameEditBoxMixin">
+					<!-- Note: Do NOT set frameStrata here - it would appear above EditMode overlay -->
+					<EditBox parentKey="EditBox" inherits="SearchBoxTemplate" autoFocus="false" historyLines="32" bytes="256" mixin="WhoFrameEditBoxMixin">
 						<KeyValues>
 							<KeyValue key="instructionText" value="WHO_LIST_SEARCH_INSTRUCTIONS" type="global"/>
 							<KeyValue key="instructionsFontObject" value="UserScaledFontGameDisableSmall" type="global"/>

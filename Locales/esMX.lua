@@ -220,4 +220,32 @@ if GetLocale() == "esMX" then
 	L.SETTINGS_FRAME_RESET_SIZE = "Restablecer a 415x570"
 	L.SETTINGS_FRAME_APPLY_NOW = "Aplicar al diseño actual"
 	L.SETTINGS_FRAME_RESET_ALL = "Restablecer todos los diseños"
+	
+	-- ========================================
+	-- DATA BROKER
+	-- ========================================
+	L.BROKER_TITLE = "BetterFriendlist"
+	L.BROKER_TOOLTIP_HEADER = "Amigos"
+	L.BROKER_TOOLTIP_FOOTER_LEFT = "Clic izquierdo: Alternar BetterFriendlist"
+	L.BROKER_TOOLTIP_FOOTER_RIGHT = "Clic derecho: Configuración"
+	L.BROKER_SETTINGS_ENABLE = "Activar Data Broker"
+	L.BROKER_SETTINGS_SHOW_ICON = "Mostrar icono"
+	L.BROKER_SETTINGS_TOOLTIP_MODE = "Nivel de detalle del tooltip"
+	L.BROKER_SETTINGS_CLICK_ACTION = "Acción del clic izquierdo"
+	L.BROKER_FILTER_CHANGED = "Filtro cambiado a: %s"
+	
+	-- ========================================
+	-- FEATURE REQUESTS (CurseForge User Feedback)
+	-- ========================================
+	-- Feature 1: Tratar Móvil como Desconectado
+	L.SETTINGS_TREAT_MOBILE_OFFLINE = "Tratar usuarios móviles como desconectados"
+	L.SETTINGS_TREAT_MOBILE_OFFLINE_DESC = "Mostrar amigos con la App Móvil en el grupo de desconectados"
+	
+	-- Feature 3: Mostrar Notas como Nombre
+	L.SETTINGS_SHOW_NOTES_AS_NAME = "Mostrar notas como nombre de amigo"
+	L.SETTINGS_SHOW_NOTES_AS_NAME_DESC = "Muestra las notas de amigos como su nombre cuando estén disponibles"
+	
+	-- Feature 4: Escala de Ventana
+	L.SETTINGS_WINDOW_SCALE = "Escala de ventana"
+	L.SETTINGS_WINDOW_SCALE_DESC = "Escala toda la ventana (50%% - 200%%)"
 end

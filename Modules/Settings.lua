@@ -275,24 +275,24 @@ local function ParseFriendGroupsNote(noteText)
 		return "", {}
 	end
 	
-	print("|cff00ffffBetterFriendlist Debug:|r     Parsing note:", noteText)
+	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r     Parsing note:", noteText)
 	
 	local parts = {strsplit("#", noteText)}
 	local actualNote = parts[1] or ""
 	local groups = {}
 	
-	print("|cff00ffffBetterFriendlist Debug:|r     Split into", #parts, "parts")
+	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r     Split into", #parts, "parts")
 	
 	for i = 2, #parts do
 		local groupName = strtrim(parts[i])
 		if groupName ~= "" then
 			table.insert(groups, groupName)
-			print("|cff00ffffBetterFriendlist Debug:|r     Found group:", groupName)
+			BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r     Found group:", groupName)
 		end
 	end
 	
-	print("|cff00ffffBetterFriendlist Debug:|r     Actual note:", actualNote)
-	print("|cff00ffffBetterFriendlist Debug:|r     Total groups found:", #groups)
+	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r     Actual note:", actualNote)
+	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r     Total groups found:", #groups)
 	
 	return actualNote, groups
 end
@@ -326,9 +326,9 @@ function Settings:Show()
 		self:LoadSettings()
 		self:RefreshTabs() -- Update tab visibility based on Beta features
 		settingsFrame:Show()
-		self:ShowTab(1)
+		self:ShowTab(currentTab or 1) -- Restore or show first tab
 	else
-		print("|cffff0000BetterFriendlist Settings:|r Frame not initialized!")
+		BFL:DebugPrint("|cffff0000BetterFriendlist Settings:|r Frame not initialized!")
 	end
 end
 
@@ -342,7 +342,8 @@ local TAB_DEFINITIONS = {
 	{id = 3, name = "Advanced", icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\sliders.blp", beta = false},
 	
 	-- Beta Tabs (only visible when enableBetaFeatures = true)
-	{id = 4, name = "Notifications", icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\bell.blp", beta = true},
+	{id = 4, name = "Data Broker", icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\activity.blp", beta = true},
+	{id = 5, name = "Notifications", icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\bell.blp", beta = true},
 	-- Future beta tabs go here...
 }
 
@@ -423,7 +424,7 @@ function Settings:RefreshTabs()
 		end
 	end
 	
-	-- Update panel - always set to highest tab ID in definitions
+	-- Update panel FIRST - let Blizzard do its thing
 	local maxTabId = 0
 	for _, tabDef in ipairs(TAB_DEFINITIONS) do
 		if tabDef.id > maxTabId then
@@ -432,6 +433,50 @@ function Settings:RefreshTabs()
 	end
 	PanelTemplates_SetNumTabs(settingsFrame, maxTabId)
 	PanelTemplates_UpdateTabs(settingsFrame)
+	
+	-- THEN reposition tabs dynamically: Check if Tab4 (Notifications) is visible
+	local tab4Visible = false
+	for _, tabDef in ipairs(visibleTabs) do
+		if tabDef.id == 5 then
+			tab5Visible = true
+			break
+		end
+	end
+	
+	local numVisible = #visibleTabs
+	
+	-- If we have 5+ tabs (meaning Beta is ON and Notifications tab is visible)
+	if tab5Visible and numVisible >= 5 then
+		BFL:DebugPrint("RefreshTabs: Repositioning Tab5 to second row (numVisible=" .. numVisible .. ")")
+		
+		-- Second row layout: Notifications tab (id=5) goes below first row
+		local tab1 = _G["BetterFriendlistSettingsFrameTab1"]
+		local tab5 = _G["BetterFriendlistSettingsFrameTab5"]
+		
+		if tab5 and tab1 and tab5:IsShown() then
+			tab5:ClearAllPoints()
+			-- Position below Tab1: +4px for proper spacing
+			tab5:SetPoint("TOPLEFT", tab1, "BOTTOMLEFT", 0, 8)
+			BFL:DebugPrint("RefreshTabs: Tab5 repositioned - anchors cleared and set to TOPLEFT of Tab1 BOTTOMLEFT")
+		else
+			BFL:DebugPrint("RefreshTabs: FAILED - tab5=" .. tostring(tab5 ~= nil) .. " tab1=" .. tostring(tab1 ~= nil) .. " shown=" .. tostring(tab5 and tab5:IsShown() or false))
+		end
+		
+		-- Move MainInset down to make room for second tab row
+		if settingsFrame.MainInset then
+			settingsFrame.MainInset:ClearAllPoints()
+			settingsFrame.MainInset:SetPoint("TOPLEFT", settingsFrame, "TOPLEFT", 4, -70)
+			settingsFrame.MainInset:SetPoint("BOTTOMRIGHT", settingsFrame, "BOTTOMRIGHT", 0, 2)
+		end
+	else
+		BFL:DebugPrint("RefreshTabs: Single row layout (tab5Visible=" .. tostring(tab5Visible) .. " numVisible=" .. numVisible .. ")")
+		-- Single row layout: Restore default MainInset position (tabs at y=-27)
+		if settingsFrame.MainInset then
+			settingsFrame.MainInset:ClearAllPoints()
+			settingsFrame.MainInset:SetPoint("TOPLEFT", settingsFrame, "TOPLEFT", 4, -45)
+			settingsFrame.MainInset:SetPoint("BOTTOMRIGHT", settingsFrame, "BOTTOMRIGHT", 0, 2)
+		end
+	end
 end
 
 -- Hide the settings window
@@ -446,8 +491,19 @@ function Settings:ShowTab(tabID)
 	if not settingsFrame then return end
 	
 	currentTab = tabID
-	settingsFrame.numTabs = 4
 	PanelTemplates_SetTab(settingsFrame, tabID)
+	
+	-- Manually update tab selection states (PanelTemplates can be confused by repositioning)
+	for i = 1, 10 do
+		local tab = _G["BetterFriendlistSettingsFrameTab" .. i]
+		if tab and tab:IsShown() then
+			if i == tabID then
+				PanelTemplates_SelectTab(tab)
+			else
+				PanelTemplates_DeselectTab(tab)
+			end
+		end
+	end
 	
 	local content = settingsFrame.ContentScrollFrame.Content
 	if content then
@@ -455,6 +511,7 @@ function Settings:ShowTab(tabID)
 		if content.GroupsTab then content.GroupsTab:Hide() end
 		if content.AdvancedTab then content.AdvancedTab:Hide() end
 		if content.NotificationsTab then content.NotificationsTab:Hide() end
+		if content.BrokerTab then content.BrokerTab:Hide() end
 		
 		if tabID == 1 and content.GeneralTab then
 			content.GeneralTab:Show()
@@ -465,7 +522,10 @@ function Settings:ShowTab(tabID)
 		elseif tabID == 3 and content.AdvancedTab then
 			content.AdvancedTab:Show()
 			self:RefreshAdvancedTab()
-		elseif tabID == 4 and content.NotificationsTab then
+		elseif tabID == 4 and content.BrokerTab then
+			content.BrokerTab:Show()
+			self:RefreshBrokerTab()
+		elseif tabID == 5 and content.NotificationsTab then
 			content.NotificationsTab:Show()
 			self:RefreshNotificationsTab()
 		end
@@ -490,9 +550,9 @@ function Settings:AdjustContentHeight(tabID)
 	elseif tabID == 3 then
 		activeTab = content.AdvancedTab
 	elseif tabID == 4 then
-		activeTab = content.StatisticsTab
+		activeTab = content.NotificationsTab
 	elseif tabID == 5 then
-		activeTab = content.StatisticsTab
+		activeTab = content.BrokerTab
 	end
 	
 	if not activeTab then return end
@@ -635,9 +695,8 @@ function Settings:SetFontSize(size)
 	
 	DB:Set("fontSize", size)
 	
-	if BetterFriendsFrame_UpdateDisplay then
-		BetterFriendsFrame_UpdateDisplay()
-	end
+	-- Force full display refresh for immediate font size update
+	BFL:ForceRefreshFriendsList()
 	
 	-- Refresh General Tab to update dropdown display
 	if currentTab == 1 then
@@ -654,7 +713,7 @@ end
 function Settings:DoReset()
 	local DB = GetDB()
 	if not DB then
-		print("|cffff0000BetterFriendlist Settings:|r Database not available!")
+		BFL:DebugPrint("|cffff0000BetterFriendlist Settings:|r Database not available!")
 		return
 	end
 	
@@ -667,14 +726,24 @@ function Settings:DoReset()
 	DB:Set("showRealmName", false)
 	DB:Set("grayOtherFaction", false)
 	DB:Set("showMobileAsAFK", false)
+	DB:Set("treatMobileAsOffline", false)  -- NEW: Feature Request
+	DB:Set("showNotesAsName", false)  -- NEW: Feature Request
+	DB:Set("windowScale", 1.0)  -- NEW: Feature Request
 	DB:Set("hideMaxLevel", false)
 	DB:Set("accordionGroups", false)
 	
 	self:LoadSettings()
 	
-	if BetterFriendsFrame_UpdateDisplay then
-		BetterFriendsFrame_UpdateDisplay()
+	-- Reset window scale to 100%
+	local MainFrameEditMode = BFL.Modules and BFL.Modules.MainFrameEditMode
+	if MainFrameEditMode and MainFrameEditMode.ApplyScale then
+		MainFrameEditMode:ApplyScale()
+	elseif BetterFriendsFrame then
+		BetterFriendsFrame:SetScale(1.0)
 	end
+	
+	-- Force full display refresh - reset affects all display settings
+	BFL:ForceRefreshFriendsList()
 	
 	print("|cff20ff20BetterFriendlist:|r " .. BFL_L.SETTINGS_RESET_SUCCESS)
 end
@@ -705,7 +774,7 @@ function Settings:RefreshGroupList_OLD()
 	
 	local Groups = GetGroups()
 	if not Groups then
-		print("|cffff0000BetterFriendlist Settings:|r Groups module not available!")
+		BFL:DebugPrint("|cffff0000BetterFriendlist Settings:|r Groups module not available!")
 		return
 	end
 	
@@ -834,9 +903,8 @@ function Settings:ShowColorPicker(groupId, groupName, colorSwatch)
 			end
 		end
 		
-		if BetterFriendsFrame_UpdateDisplay then
-			BetterFriendsFrame_UpdateDisplay()
-		end
+		-- Force full display refresh for immediate color update
+		BFL:ForceRefreshFriendsList()
 	end
 	info.cancelFunc = function(previousValues)
 		colorSwatch:SetColorTexture(previousValues.r, previousValues.g, previousValues.b)
@@ -853,9 +921,8 @@ function Settings:ShowColorPicker(groupId, groupName, colorSwatch)
 			end
 		end
 		
-		if BetterFriendsFrame_UpdateDisplay then
-			BetterFriendsFrame_UpdateDisplay()
-		end
+		-- Force full display refresh for immediate color update
+		BFL:ForceRefreshFriendsList()
 	end
 	
 	ColorPickerFrame:SetupColorPickerAndShow(info)
@@ -882,9 +949,8 @@ function Settings:DeleteGroup(groupId, groupName)
 				
 				Settings:RefreshGroupList()
 				
-				if BetterFriendsFrame_UpdateDisplay then
-					BetterFriendsFrame_UpdateDisplay()
-				end
+				-- Force full display refresh - groups affect display list structure
+				BFL:ForceRefreshFriendsList()
 			else
 				print("|cffff0000BetterFriendlist:|r Failed to delete group: " .. (err or "Unknown error"))
 			end
@@ -921,9 +987,8 @@ function Settings:RenameGroup(groupId, currentName)
 					if success then
 						print("|cff00ff00BetterFriendlist:|r Group renamed to '" .. newName .. "'")
 						Settings:RefreshGroupsTab()
-						if BetterFriendsFrame_UpdateDisplay then
-							BetterFriendsFrame_UpdateDisplay()
-						end
+						-- Force full display refresh - groups affect display list structure
+						BFL:ForceRefreshFriendsList()
 					else
 						print("|cffff0000BetterFriendlist:|r Failed to rename group")
 					end
@@ -940,9 +1005,8 @@ function Settings:RenameGroup(groupId, currentName)
 					if success then
 						print("|cff00ff00BetterFriendlist:|r Group renamed to '" .. newName .. "'")
 						Settings:RefreshGroupsTab()
-						if BetterFriendsFrame_UpdateDisplay then
-							BetterFriendsFrame_UpdateDisplay()
-						end
+						-- Force full display refresh - groups affect display list structure
+						BFL:ForceRefreshFriendsList()
 					else
 						print("|cffff0000BetterFriendlist:|r Failed to rename group")
 					end
@@ -967,19 +1031,19 @@ function Settings:MigrateFriendGroups(cleanupNotes)
 	local Groups = GetGroups()
 	
 	if not DB or not Groups then
-		print("|cffff0000BetterFriendlist:|r Migration failed - modules not loaded!")
+		BFL:DebugPrint("|cffff0000BetterFriendlist:|r Migration failed - modules not loaded!")
 		return
 	end
 	
 	-- Check if migration has already been completed
 	if DB:Get("friendGroupsMigrated") then
-		print("|cff00ffffBetterFriendlist:|r " .. BFL_L.MSG_MIGRATION_ALREADY_DONE)
+		BFL:DebugPrint("|cff00ffffBetterFriendlist:|r " .. BFL_L.MSG_MIGRATION_ALREADY_DONE)
 		return
 	end
 	
-	print("|cff00ffffBetterFriendlist:|r " .. BFL_L.MSG_MIGRATION_STARTING)
-	print("|cff00ffffBetterFriendlist:|r DB module:", DB and "OK" or "MISSING")
-	print("|cff00ffffBetterFriendlist:|r Groups module:", Groups and "OK" or "MISSING")
+	BFL:DebugPrint("|cff00ffffBetterFriendlist:|r " .. BFL_L.MSG_MIGRATION_STARTING)
+	BFL:DebugPrint("|cff00ffffBetterFriendlist:|r DB module:", DB and "OK" or "MISSING")
+	BFL:DebugPrint("|cff00ffffBetterFriendlist:|r Groups module:", Groups and "OK" or "MISSING")
 	
 	local migratedFriends = 0
 	local migratedGroups = {}
@@ -1024,7 +1088,7 @@ function Settings:MigrateFriendGroups(cleanupNotes)
 	end
 	
 	local numWoWFriends = C_FriendList.GetNumFriends()
-	print("|cff00ffffBetterFriendlist:|r Scanning", numWoWFriends, "WoW friends...")
+	BFL:DebugPrint("|cff00ffffBetterFriendlist:|r Scanning", numWoWFriends, "WoW friends...")
 	
 	for i = 1, numWoWFriends do
 		local info = C_FriendList.GetFriendInfoByIndex(i)
@@ -1075,7 +1139,7 @@ function Settings:MigrateFriendGroups(cleanupNotes)
 			groupNameMap[groupName] = groupId
 			migratedGroups[groupName] = true
 			table.insert(groupOrderArray, groupId)
-			print("|cff00ff00BetterFriendlist:|r   ✓ Created:", groupName, "(order:", currentOrder, ")")
+			BFL:DebugPrint("|cff00ff00BetterFriendlist:|r   ✓ Created:", groupName, "(order:", currentOrder, ")")
 			currentOrder = currentOrder + 1
 		else
 			-- Group already exists - get its ID by name
@@ -1085,13 +1149,13 @@ function Settings:MigrateFriendGroups(cleanupNotes)
 					groupNameMap[groupName] = existingGroupId
 					migratedGroups[groupName] = true
 					table.insert(groupOrderArray, existingGroupId)
-					print("|cffffff00BetterFriendlist:|r   [!] Existing:", groupName, "(using existing group)")
+					BFL:DebugPrint("|cffffff00BetterFriendlist:|r   [!] Existing:", groupName, "(using existing group)")
 					currentOrder = currentOrder + 1
 				else
-					print("|cffff0000BetterFriendlist:|r   ✗ FAILED:", groupName, "- Group exists but ID not found")
+					BFL:DebugPrint("|cffff0000BetterFriendlist:|r   ✗ FAILED:", groupName, "- Group exists but ID not found")
 				end
 			else
-				print("|cffff0000BetterFriendlist:|r   ✗ FAILED:", groupName, "-", tostring(groupId))
+				BFL:DebugPrint("|cffff0000BetterFriendlist:|r   ✗ FAILED:", groupName, "-", tostring(groupId))
 			end
 		end
 	end
@@ -1122,7 +1186,7 @@ function Settings:MigrateFriendGroups(cleanupNotes)
 	
 	-- PHASE 4: Clean up notes if requested
 	if cleanupNotes then
-		print("|cff00ffffBetterFriendlist:|r Phase 4 - Cleaning up notes...")
+		BFL:DebugPrint("|cff00ffffBetterFriendlist:|r Phase 4 - Cleaning up notes...")
 		
 		for friendUID, data in pairs(friendGroupAssignments) do
 			if data.isBNet then
@@ -1180,14 +1244,9 @@ function Settings:MigrateFriendGroups(cleanupNotes)
 	))
 	
 	print("|cff00ffffBetterFriendlist:|r Refreshing friends list...")
-	if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
-		if BetterFriendsFrame_UpdateDisplay then
-			BetterFriendsFrame_UpdateDisplay()
-			print("|cff00ff00BetterFriendlist:|r Friends list refreshed!")
-		end
-	else
-		print("|cffffff00BetterFriendlist:|r Friends frame not open - changes will appear when you open it.")
-	end
+	-- Force full refresh - migration creates new groups which affect display list structure
+	BFL:ForceRefreshFriendsList()
+	print("|cff00ff00BetterFriendlist:|r Friends list refreshed!")
 end
 
 -- Show migration dialog
@@ -1214,30 +1273,30 @@ end
 
 -- Debug: Print database contents
 function Settings:DebugDatabase()
-	print("|cff00ffffBetterFriendlist Debug:|r =================================")
-	print("|cff00ffffBetterFriendlist Debug:|r DATABASE STATE")
-	print("|cff00ffffBetterFriendlist Debug:|r =================================")
+	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r =================================")
+	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r DATABASE STATE")
+	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r =================================")
 	
 	if not BetterFriendlistDB then
-		print("|cffff0000BetterFriendlist Debug:|r BetterFriendlistDB is NIL!")
+		BFL:DebugPrint("|cffff0000BetterFriendlist Debug:|r BetterFriendlistDB is NIL!")
 		return
 	end
 	
-	print("|cff00ffffBetterFriendlist Debug:|r")
-	print("|cff00ffffBetterFriendlist Debug:|r CUSTOM GROUPS:")
+	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r")
+	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r CUSTOM GROUPS:")
 	if BetterFriendlistDB.customGroups then
 		local groupCount = 0
 		for groupId, groupInfo in pairs(BetterFriendlistDB.customGroups) do
 			groupCount = groupCount + 1
-			print(string.format("|cff00ffffBetterFriendlist Debug:|r   [%s] = %s", groupId, groupInfo.name or "UNNAMED"))
+			BFL:DebugPrint(string.format("|cff00ffffBetterFriendlist Debug:|r   [%s] = %s", groupId, groupInfo.name or "UNNAMED"))
 		end
-		print("|cff00ffffBetterFriendlist Debug:|r Total groups:", groupCount)
+		BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r Total groups:", groupCount)
 	else
-		print("|cffff0000BetterFriendlist Debug:|r customGroups table MISSING!")
+		BFL:DebugPrint("|cffff0000BetterFriendlist Debug:|r customGroups table MISSING!")
 	end
 	
-	print("|cff00ffffBetterFriendlist Debug:|r")
-	print("|cff00ffffBetterFriendlist Debug:|r FRIEND ASSIGNMENTS:")
+	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r")
+	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r FRIEND ASSIGNMENTS:")
 	if BetterFriendlistDB.friendGroups then
 		local friendCount = 0
 		local totalAssignments = 0
@@ -1263,67 +1322,67 @@ function Settings:DebugDatabase()
 		-- Sort and display
 		table.sort(assignedFriends)
 		for _, line in ipairs(assignedFriends) do
-			print(line)
+			BFL:DebugPrint(line)
 		end
 		
 		if friendCount == 0 then
-			print("|cff00ffffBetterFriendlist Debug:|r   (No friends assigned to custom groups)")
+			BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r   (No friends assigned to custom groups)")
 		end
-		print("|cff00ffffBetterFriendlist Debug:|r Total friends with assignments:", friendCount)
-		print("|cff00ffffBetterFriendlist Debug:|r Total assignments:", totalAssignments)
+		BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r Total friends with assignments:", friendCount)
+		BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r Total assignments:", totalAssignments)
 	else
-		print("|cffff0000BetterFriendlist Debug:|r friendGroups table MISSING!")
+		BFL:DebugPrint("|cffff0000BetterFriendlist Debug:|r friendGroups table MISSING!")
 	end
 	
-	print("|cff00ffffBetterFriendlist Debug:|r")
-	print("|cff00ffffBetterFriendlist Debug:|r GROUP ORDER:")
+	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r")
+	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r GROUP ORDER:")
 	if BetterFriendlistDB.groupOrder then
-		print("|cff00ffffBetterFriendlist Debug:|r", table.concat(BetterFriendlistDB.groupOrder, ", "))
+		BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r", table.concat(BetterFriendlistDB.groupOrder, ", "))
 	else
-		print("|cff00ffffBetterFriendlist Debug:|r Using default order (nil)")
+		BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r Using default order (nil)")
 	end
 	
 	-- Show current friends list
-	print("|cff00ffffBetterFriendlist Debug:|r")
-	print("|cff00ffffBetterFriendlist Debug:|r CURRENT FRIENDS:")
+	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r")
+	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r CURRENT FRIENDS:")
 	
 	-- Battle.net friends
 	local numBNetTotal, numBNetOnline = BNGetNumFriends()
-	print("|cff00ffffBetterFriendlist Debug:|r Battle.net Friends:", numBNetTotal, string.format("(%d online)", numBNetOnline))
+	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r Battle.net Friends:", numBNetTotal, string.format("(%d online)", numBNetOnline))
 	if numBNetTotal > 0 then
 		for i = 1, math.min(numBNetTotal, 10) do
 			local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
 			if accountInfo then
 				local status = accountInfo.gameAccountInfo and accountInfo.gameAccountInfo.isOnline and "|cff00ff00ONLINE|r" or "|cffaaaaaaOFFLINE|r"
 				local name = accountInfo.accountName ~= "???" and accountInfo.accountName or accountInfo.battleTag
-				print(string.format("|cff00ffffBetterFriendlist Debug:|r   [%d] %s - %s", i, name, status))
+				BFL:DebugPrint(string.format("|cff00ffffBetterFriendlist Debug:|r   [%d] %s - %s", i, name, status))
 			end
 		end
 		if numBNetTotal > 10 then
-			print(string.format("|cff00ffffBetterFriendlist Debug:|r   ... and %d more", numBNetTotal - 10))
+			BFL:DebugPrint(string.format("|cff00ffffBetterFriendlist Debug:|r   ... and %d more", numBNetTotal - 10))
 		end
 	end
 	
 	-- WoW friends
-	print("|cff00ffffBetterFriendlist Debug:|r")
+	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r")
 	local numWoWFriends = C_FriendList.GetNumFriends()
 	local numWoWOnline = C_FriendList.GetNumOnlineFriends()
-	print("|cff00ffffBetterFriendlist Debug:|r WoW Friends:", numWoWFriends, string.format("(%d online)", numWoWOnline))
+	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r WoW Friends:", numWoWFriends, string.format("(%d online)", numWoWOnline))
 	if numWoWFriends > 0 then
 		for i = 1, math.min(numWoWFriends, 10) do
 			local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
 			if friendInfo then
 				local status = friendInfo.connected and "|cff00ff00ONLINE|r" or "|cffaaaaaaOFFLINE|r"
 				local level = friendInfo.level and friendInfo.level > 0 and string.format(" (Lvl %d)", friendInfo.level) or ""
-				print(string.format("|cff00ffffBetterFriendlist Debug:|r   [%d] %s%s - %s", i, friendInfo.name, level, status))
+				BFL:DebugPrint(string.format("|cff00ffffBetterFriendlist Debug:|r   [%d] %s%s - %s", i, friendInfo.name, level, status))
 			end
 		end
 		if numWoWFriends > 10 then
-			print(string.format("|cff00ffffBetterFriendlist Debug:|r   ... and %d more", numWoWFriends - 10))
+			BFL:DebugPrint(string.format("|cff00ffffBetterFriendlist Debug:|r   ... and %d more", numWoWFriends - 10))
 		end
 	end
 	
-	print("|cff00ffffBetterFriendlist Debug:|r =================================")
+	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r =================================")
 end
 
 --------------------------------------------------------------------------
@@ -1503,10 +1562,8 @@ function Settings:ImportSettings(importString)
 	-- Reload Groups module (this will apply imported colors)
 	Groups:Initialize()
 	
-	-- Refresh UI
-	if BetterFriendsFrame_UpdateDisplay then
-		BetterFriendsFrame_UpdateDisplay()
-	end
+	-- Force full display refresh - import affects groups and display structure
+	BFL:ForceRefreshFriendsList()
 	
 	return true, nil
 end
@@ -1973,15 +2030,8 @@ function Settings:OnCompactModeChanged(checked)
 	
 	DB:Set("compactMode", checked)
 	
-	-- CRITICAL: Re-render display to recalculate button heights
-	local FriendsList = BFL:GetModule("FriendsList")
-	if FriendsList then
-		FriendsList:RenderDisplay()
-	end
-	
-	if BetterFriendsFrame_UpdateDisplay then
-		BetterFriendsFrame_UpdateDisplay()
-	end
+	-- CRITICAL: Force full display refresh to recalculate button heights
+	BFL:ForceRefreshFriendsList()
 end
 
 -- Callback for ShowBlizzardOption checkbox
@@ -1991,9 +2041,8 @@ function Settings:OnShowBlizzardOptionChanged(checked)
 	
 	DB:Set("showBlizzardOption", checked)
 	
-	if BetterFriendsFrame_UpdateDisplay then
-		BetterFriendsFrame_UpdateDisplay()
-	end
+	-- Force full display refresh for immediate update
+	BFL:ForceRefreshFriendsList()
 end
 
 -- Callback for ColorClassNames checkbox
@@ -2003,9 +2052,8 @@ function Settings:OnColorClassNamesChanged(checked)
 	
 	DB:Set("colorClassNames", checked)
 	
-	if BetterFriendsFrame_UpdateDisplay then
-		BetterFriendsFrame_UpdateDisplay()
-	end
+	-- Force full display refresh for immediate update
+	BFL:ForceRefreshFriendsList()
 end
 
 -- Callback for HideEmptyGroups checkbox
@@ -2015,9 +2063,8 @@ function Settings:OnHideEmptyGroupsChanged(checked)
 	
 	DB:Set("hideEmptyGroups", checked)
 	
-	if BetterFriendsFrame_UpdateDisplay then
-		BetterFriendsFrame_UpdateDisplay()
-	end
+	-- Affects which groups are shown - needs display list rebuild
+	BFL:ForceRefreshFriendsList()
 end
 
 -- Show Faction Icons toggle
@@ -2027,9 +2074,8 @@ function Settings:OnShowFactionIconsChanged(checked)
 	
 	DB:Set("showFactionIcons", checked)
 	
-	if BetterFriendsFrame_UpdateDisplay then
-		BetterFriendsFrame_UpdateDisplay()
-	end
+	-- Display-only change - re-render existing data
+	BFL:ForceRefreshFriendsList()
 end
 
 -- Show Realm Name toggle
@@ -2039,9 +2085,8 @@ function Settings:OnShowRealmNameChanged(checked)
 	
 	DB:Set("showRealmName", checked)
 	
-	if BetterFriendsFrame_UpdateDisplay then
-		BetterFriendsFrame_UpdateDisplay()
-	end
+	-- Display-only change - re-render existing data
+	BFL:ForceRefreshFriendsList()
 end
 
 -- Show Favorites Group toggle
@@ -2051,9 +2096,8 @@ function Settings:OnShowFavoritesGroupChanged(checked)
 	
 	DB:Set("showFavoritesGroup", checked)
 	
-	if BetterFriendsFrame_UpdateDisplay then
-		BetterFriendsFrame_UpdateDisplay()
-	end
+	-- Affects which groups are shown - needs display list rebuild
+	BFL:ForceRefreshFriendsList()
 end
 
 -- Gray Other Faction toggle
@@ -2063,9 +2107,8 @@ function Settings:OnGrayOtherFactionChanged(checked)
 	
 	DB:Set("grayOtherFaction", checked)
 	
-	if BetterFriendsFrame_UpdateDisplay then
-		BetterFriendsFrame_UpdateDisplay()
-	end
+	-- Display-only change - re-render existing data
+	BFL:ForceRefreshFriendsList()
 end
 
 -- Show Mobile as AFK toggle
@@ -2075,9 +2118,36 @@ function Settings:OnShowMobileAsAFKChanged(checked)
 	
 	DB:Set("showMobileAsAFK", checked)
 	
-	if BetterFriendsFrame_UpdateDisplay then
-		BetterFriendsFrame_UpdateDisplay()
+	-- Display-only change - re-render existing data
+	BFL:ForceRefreshFriendsList()
+end
+
+-- NEW: Treat Mobile as Offline toggle (Feature Request)
+function Settings:OnTreatMobileAsOfflineChanged(checked)
+	local DB = GetDB()
+	if not DB then return end
+	
+	DB:Set("treatMobileAsOffline", checked)
+	
+	-- IMPORTANT: This option affects data LOADING (not just display)
+	-- Must force full data reload from API, not just display update
+	-- UpdateFriendsList() re-reads all friends from C_BattleNet API
+	-- where treatMobileAsOffline logic is applied during data processing
+	local FriendsList = BFL and BFL:GetModule("FriendsList")
+	if FriendsList and FriendsList.UpdateFriendsList then
+		FriendsList:UpdateFriendsList()
 	end
+end
+
+-- NEW: Show Notes as Name toggle (Feature Request)
+function Settings:OnShowNotesAsNameChanged(checked)
+	local DB = GetDB()
+	if not DB then return end
+	
+	DB:Set("showNotesAsName", checked)
+	
+	-- Notes are already loaded in data, just need to re-render display
+	BFL:ForceRefreshFriendsList()
 end
 
 -- Hide Max Level toggle
@@ -2087,9 +2157,8 @@ function Settings:OnHideMaxLevelChanged(checked)
 	
 	DB:Set("hideMaxLevel", checked)
 	
-	if BetterFriendsFrame_UpdateDisplay then
-		BetterFriendsFrame_UpdateDisplay()
-	end
+	-- Display-only change - re-render existing data
+	BFL:ForceRefreshFriendsList()
 end
 
 -- Accordion Groups toggle
@@ -2099,9 +2168,8 @@ function Settings:OnAccordionGroupsChanged(checked)
 	
 	DB:Set("accordionGroups", checked)
 	
-	if BetterFriendsFrame_UpdateDisplay then
-		BetterFriendsFrame_UpdateDisplay()
-	end
+	-- Display-only change - re-render existing data
+	BFL:ForceRefreshFriendsList()
 end
 
 --------------------------------------------------------------------------
@@ -2174,6 +2242,20 @@ function Settings:RefreshGeneralTab()
 		function(val) self:OnShowMobileAsAFKChanged(val) end)
 	showMobileAsAFK:SetTooltip("Mobile as AFK", "Display AFK status icon for friends on mobile (BSAp only)")
 	table.insert(allFrames, showMobileAsAFK)
+	
+	-- NEW: Treat Mobile as Offline (Feature Request)
+	local treatMobileAsOffline = Components:CreateCheckbox(tab, BFL_L.SETTINGS_TREAT_MOBILE_OFFLINE or "Treat Mobile users as Offline", 
+		DB:Get("treatMobileAsOffline", false),
+		function(val) self:OnTreatMobileAsOfflineChanged(val) end)
+	treatMobileAsOffline:SetTooltip(BFL_L.SETTINGS_TREAT_MOBILE_OFFLINE or "Treat Mobile as Offline", BFL_L.SETTINGS_TREAT_MOBILE_OFFLINE_DESC or "Display friends using the Mobile App in the Offline group")
+	table.insert(allFrames, treatMobileAsOffline)
+	
+	-- NEW: Show Notes as Friend Name (Feature Request)
+	local showNotesAsName = Components:CreateCheckbox(tab, BFL_L.SETTINGS_SHOW_NOTES_AS_NAME or "Show Notes as Friend Name", 
+		DB:Get("showNotesAsName", false),
+		function(val) self:OnShowNotesAsNameChanged(val) end)
+	showNotesAsName:SetTooltip(BFL_L.SETTINGS_SHOW_NOTES_AS_NAME or "Show Notes as Name", BFL_L.SETTINGS_SHOW_NOTES_AS_NAME_DESC or "Display friend notes as their name when available")
+	table.insert(allFrames, showNotesAsName)
 	
 	-- Hide Max Level
 	local hideMaxLevel = Components:CreateCheckbox(tab, "Hide Level for Max Level Characters", 
@@ -2360,9 +2442,8 @@ function Settings:RefreshGroupsTab()
 					Groups:Initialize()
 					self:RefreshGroupsTab()
 					
-					if BetterFriendsFrame_UpdateDisplay then
-						BetterFriendsFrame_UpdateDisplay()
-					end
+					-- Force full display refresh - group order affects display list structure
+					BFL:ForceRefreshFriendsList()
 				end
 			end,
 			-- Move Down callback
@@ -2384,9 +2465,8 @@ function Settings:RefreshGroupsTab()
 					Groups:Initialize()
 					self:RefreshGroupsTab()
 					
-					if BetterFriendsFrame_UpdateDisplay then
-						BetterFriendsFrame_UpdateDisplay()
-					end
+					-- Force full display refresh - group order affects display list structure
+					BFL:ForceRefreshFriendsList()
 				end
 			end,
 			-- Rename callback (only for non-builtin groups)
@@ -2628,6 +2708,24 @@ function Settings:RefreshAdvancedTab()
 				print("|cff00ff00BetterFriendlist:|r Beta Features |cffff0000DISABLED|r")
 				print("|cffff8800[>]|r Beta tabs are now hidden")
 			end
+			
+			-- Check if Data Broker is enabled - requires UI reload
+			if BetterFriendlistDB.brokerEnabled then
+				local statusText = checked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"
+				StaticPopupDialogs["BFL_BETA_BROKER_RELOAD_CONFIRM"] = {
+					text = "Beta Features have been " .. statusText .. ".\n\nData Broker is enabled, so a UI reload is required for changes to take effect.\n\nReload now?",
+					button1 = "Reload Now",
+					button2 = "Later",
+					OnAccept = function()
+						ReloadUI()
+					end,
+					timeout = 0,
+					whileDead = true,
+					hideOnEscape = true,
+					preferredIndex = 3,
+				}
+				StaticPopup_Show("BFL_BETA_BROKER_RELOAD_CONFIRM")
+			end
 		end
 	)
 	betaToggle:SetPoint("TOPLEFT", 10, yOffset)
@@ -2655,6 +2753,20 @@ function Settings:RefreshAdvancedTab()
 	feature1Text:SetPoint("LEFT", feature1Icon, "RIGHT", 6, 0)
 	feature1Text:SetText("Smart Friend Notifications")
 	table.insert(allFrames, feature1Text)
+	yOffset = yOffset - 18
+	
+	-- Feature 2: Data Broker Integration
+	local feature2Icon = tab:CreateTexture(nil, "ARTWORK")
+	feature2Icon:SetSize(14, 14)
+	feature2Icon:SetPoint("TOPLEFT", 15, yOffset)
+	feature2Icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\activity")
+	feature2Icon:SetVertexColor(1, 0.53, 0) -- Orange (Beta theme)
+	table.insert(allFrames, feature2Icon)
+	
+	local feature2Text = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	feature2Text:SetPoint("LEFT", feature2Icon, "RIGHT", 6, 0)
+	feature2Text:SetText("Data Broker Integration")
+	table.insert(allFrames, feature2Text)
 	
 	-- Store components for cleanup
 	tab.components = allFrames
@@ -3641,6 +3753,164 @@ function Settings:RefreshNotificationsTab()
 	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
 	yPos = yPos - 40
 	frameIndex = frameIndex + 1
+	
+	-- Store components for cleanup
+	tab.components = allFrames
+end
+
+-- ===========================================
+-- DATA BROKER TAB (Tab ID 5)
+-- ===========================================
+function Settings:RefreshBrokerTab()
+	if not settingsFrame then return end
+	
+	local content = settingsFrame.ContentScrollFrame.Content
+	if not content or not content.BrokerTab then return end
+	
+	local tab = content.BrokerTab
+	local DB = GetDB()
+	if not DB then return end
+	
+	-- Clear existing content
+	if tab.components then
+		for _, component in ipairs(tab.components) do
+			if component.Hide then component:Hide() end
+		end
+	end
+	tab.components = {}
+	
+	local allFrames = {}
+	local yOffset = -20
+	
+	-- Header: Data Broker Integration
+	local header = Components:CreateHeader(tab, "Data Broker Integration")
+	header:SetPoint("TOPLEFT", 10, yOffset)
+	table.insert(allFrames, header)
+	yOffset = yOffset - 30
+	
+	-- Info Text
+	local infoText = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	infoText:SetPoint("TOPLEFT", 20, yOffset)
+	infoText:SetPoint("RIGHT", -20, 0)
+	infoText:SetJustifyH("LEFT")
+	infoText:SetWordWrap(true)
+	infoText:SetText("BetterFriendlist integrates with Data Broker display addons like Bazooka, ChocolateBar, and TitanPanel. Enable this feature to show friend counts and quick access in your display addon.")
+	table.insert(allFrames, infoText)
+	yOffset = yOffset - 55
+	
+	-- Enable Data Broker
+	local enableBroker = Components:CreateCheckbox(tab, "Enable Data Broker",
+		DB:Get("brokerEnabled", true),
+		function(val)
+			BetterFriendlistDB.brokerEnabled = val
+			-- Show confirmation dialog for reload
+			local statusText = val and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"
+			StaticPopupDialogs["BFL_BROKER_RELOAD_CONFIRM"] = {
+				text = "Data Broker has been " .. statusText .. ".\n\nA UI reload is required for this change to take effect.\n\nReload now?",
+				button1 = "Reload Now",
+				button2 = "Later",
+				OnAccept = function()
+					ReloadUI()
+				end,
+				timeout = 0,
+				whileDead = true,
+				hideOnEscape = true,
+				preferredIndex = 3,
+			}
+			StaticPopup_Show("BFL_BROKER_RELOAD_CONFIRM")
+		end)
+	enableBroker:SetPoint("TOPLEFT", 20, yOffset)
+	enableBroker:SetTooltip("Enable Data Broker", "Show BetterFriendlist in Data Broker display addons. Requires UI reload to take effect.")
+	table.insert(allFrames, enableBroker)
+	yOffset = yOffset - 35
+	
+	-- Show Icon
+	local showIcon = Components:CreateCheckbox(tab, "Show Icon on Display Addon",
+		DB:Get("brokerShowIcon", true),
+		function(val)
+			BetterFriendlistDB.brokerShowIcon = val
+		end)
+	showIcon:SetPoint("TOPLEFT", 20, yOffset)
+	showIcon:SetTooltip("Show Icon", "Display the BetterFriendlist icon on your display addon")
+	table.insert(allFrames, showIcon)
+	yOffset = yOffset - 35
+	
+	-- Split WoW/BNet Counts
+	local showGroups = Components:CreateCheckbox(tab, "Split WoW and BNet Friend Counts",
+		DB:Get("brokerShowGroups", false),
+		function(val)
+			BetterFriendlistDB.brokerShowGroups = val
+			-- Update broker text immediately
+			local Broker = BFL:GetModule("Broker")
+			if Broker and Broker.UpdateBrokerText then
+				Broker:UpdateBrokerText()
+			end
+		end)
+	showGroups:SetPoint("TOPLEFT", 20, yOffset)
+	showGroups:SetTooltip("Split Counts", "Show separate counts for WoW and Battle.net friends")
+	table.insert(allFrames, showGroups)
+	yOffset = yOffset - 35
+	
+	-- Tooltip Mode
+	local tooltipMode = Components:CreateDropdown(tab, "Tooltip Detail Level:",
+		{labels = {"Basic", "Advanced"}, values = {"basic", "advanced"}},
+		function(value) return value == DB:Get("brokerTooltipMode", "advanced") end,
+		function(value)
+			BetterFriendlistDB.brokerTooltipMode = value
+		end)
+	tooltipMode:SetPoint("TOPLEFT", 20, yOffset)
+	table.insert(allFrames, tooltipMode)
+	yOffset = yOffset - 40
+	
+	-- Click Action
+	local clickAction = Components:CreateDropdown(tab, "Left Click Action:",
+		{labels = {"Toggle BetterFriendlist", "Open Friends Frame", "Open Settings"}, values = {"toggle", "friends", "settings"}},
+		function(value) return value == DB:Get("brokerClickAction", "toggle") end,
+		function(value)
+			BetterFriendlistDB.brokerClickAction = value
+		end)
+	clickAction:SetPoint("TOPLEFT", 20, yOffset)
+	table.insert(allFrames, clickAction)
+	yOffset = yOffset - 60
+	
+	-- Instructions Header
+	local instructionsHeader = Components:CreateHeader(tab, "How to Use")
+	instructionsHeader:SetPoint("TOPLEFT", 10, yOffset)
+	table.insert(allFrames, instructionsHeader)
+	yOffset = yOffset - 30
+	
+	-- Instructions Text
+	local instructions = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	instructions:SetPoint("TOPLEFT", 20, yOffset)
+	instructions:SetPoint("RIGHT", -20, 0)
+	instructions:SetJustifyH("LEFT")
+	instructions:SetWordWrap(true)
+	instructions:SetText([[• Install a Data Broker display addon (Bazooka, ChocolateBar, or TitanPanel)
+• Enable Data Broker above (UI reload will be prompted)
+• The BetterFriendlist button will appear in your display addon
+• Hover for tooltip, left-click to open, right-click for settings, middle-click to cycle filters]])
+	table.insert(allFrames, instructions)
+	yOffset = yOffset - 85
+	
+	-- Compatibility Header
+	local compatHeader = Components:CreateHeader(tab, "Tested Display Addons")
+	compatHeader:SetPoint("TOPLEFT", 10, yOffset)
+	table.insert(allFrames, compatHeader)
+	yOffset = yOffset - 30
+	
+	-- Compatibility List
+	local compatList = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	compatList:SetPoint("TOPLEFT", 20, yOffset)
+	compatList:SetPoint("RIGHT", -20, 0)
+	compatList:SetJustifyH("LEFT")
+	compatList:SetWordWrap(true)
+	compatList:SetText([[✓ Bazooka - Panel addon (top/bottom bars)
+✓ ChocolateBar - Modern panel addon with themes
+✓ TitanPanel - Classic panel addon
+✓ Candy - Free-floating buttons
+✓ StatBlockCore - ElvUI integration]])
+	table.insert(allFrames, compatList)
+	yOffset = yOffset - 90
 	
 	-- Store components for cleanup
 	tab.components = allFrames

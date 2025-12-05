@@ -76,9 +76,9 @@ function ColorManager:SetGroupColor(groupId, r, g, b)
 		end
 	end
 	
-	-- Trigger display update if main frame exists
-	if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
-		BetterFriendsFrame_UpdateDisplay()
+	-- Force full display refresh for immediate color update
+	if BFL and BFL.ForceRefreshFriendsList then
+		BFL:ForceRefreshFriendsList()
 	end
 end
 
@@ -102,9 +102,9 @@ function ColorManager:ResetGroupColor(groupId)
 		end
 	end
 	
-	-- Trigger display update if main frame exists
-	if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
-		BetterFriendsFrame_UpdateDisplay()
+	-- Force full display refresh for immediate color update
+	if BFL and BFL.ForceRefreshFriendsList then
+		BFL:ForceRefreshFriendsList()
 	end
 end
 

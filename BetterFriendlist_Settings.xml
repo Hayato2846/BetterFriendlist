@@ -26,10 +26,10 @@
 				</Scripts>
 			</Frame>
 			
-			<!-- Tab 1: General - at top of MainInset -->
+			<!-- Tab 1: General - at top of frame -->
 			<Button name="$parentTab1" parentKey="Tab1" inherits="PanelTopTabButtonTemplate" text="General" id="1">
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeKey="$parent.MainInset" relativePoint="TOPLEFT" x="0" y="31" />
+					<Anchor point="TOPLEFT" relativeKey="$parent" relativePoint="TOPLEFT" x="6" y="-15" />
 				</Anchors>
 				<Scripts>
 					<OnClick>
@@ -59,14 +59,25 @@
 					</OnClick>
 				</Scripts>
 			</Button>
-			<!-- Tab 4: Notifications (shown only when Beta enabled) -->
-			<Button name="$parentTab4" parentKey="Tab4" inherits="PanelTopTabButtonTemplate" text="Notifications" id="4">
+			<!-- Tab 4: Data Broker -->
+			<Button name="$parentTab4" parentKey="Tab4" inherits="PanelTopTabButtonTemplate" text="Data Broker" id="4">
 				<Anchors>
 					<Anchor point="LEFT" relativeKey="$parent.Tab3" relativePoint="RIGHT" x="-15" y="0" />
 				</Anchors>
 				<Scripts>
 					<OnClick>
 						BetterFriendlistSettings_ShowTab(4)
+					</OnClick>
+				</Scripts>
+			</Button>
+			<!-- Tab 5: Notifications (Beta - goes to bottom row when visible) -->
+			<Button name="$parentTab5" parentKey="Tab5" inherits="PanelTopTabButtonTemplate" text="Notifications" id="5">
+				<Anchors>
+					<Anchor point="LEFT" relativeKey="$parent.Tab4" relativePoint="RIGHT" x="-15" y="0" />
+				</Anchors>
+				<Scripts>
+					<OnClick>
+						BetterFriendlistSettings_ShowTab(5)
 					</OnClick>
 				</Scripts>
 			</Button>
@@ -133,6 +144,14 @@
 				
 				<!-- Notifications Tab Content (BETA) -->
 				<Frame parentKey="NotificationsTab" hidden="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" />
+						<Anchor point="BOTTOMRIGHT" />
+					</Anchors>
+				</Frame>
+				
+				<!-- Data Broker Tab Content (STABLE) -->
+				<Frame parentKey="BrokerTab" hidden="true">
 					<Anchors>
 						<Anchor point="TOPLEFT" />
 						<Anchor point="BOTTOMRIGHT" />

@@ -1,4 +1,4 @@
-﻿-- BetterFriendlist.lua
+-- BetterFriendlist.lua
 -- A friends list replacement for World of Warcraft with Battle.net support
 -- Version 0.13
 -- UI GLUE LAYER - XML Callbacks and thin wrappers for modular backend
@@ -329,7 +329,12 @@ function BetterFriendsFrame_InitQuickFilterDropdown()
 	
 	-- Helper function to set the filter mode
 	local function SetSelected(mode)
-		if mode ~= filterMode then
+		-- ALWAYS read current filter from DB (not from stale filterMode variable)
+		local DB = BFL:GetModule("DB")
+		local db = DB and DB:Get() or {}
+		local currentFilter = db.quickFilter or filterMode or "all"
+		
+		if mode ~= currentFilter then
 			BetterFriendsFrame_SetQuickFilter(mode)
 		end
 	end
@@ -398,11 +403,16 @@ end
 function BetterFriendsFrame_SetQuickFilter(mode)
 	filterMode = mode
 	
-	-- Save to database
+	-- Save to database (ALWAYS update DB first for consistency)
 	local DB = BFL:GetModule("DB")
 	if DB then
 		local db = DB:Get()
 		db.quickFilter = filterMode
+	else
+		-- Fallback: direct DB access
+		if BetterFriendlistDB then
+			BetterFriendlistDB.quickFilter = filterMode
+		end
 	end
 	
 	-- Update FriendsList module with new filter
@@ -439,11 +449,11 @@ function GetFriendUID(friend)
 				end
 			end
 			-- Last resort: use bnetAccountID (will cause issues with persistence)
-			print("|cffff0000BetterFriendlist Warning:|r Using bnetAccountID for friend UID (battleTag unavailable)")
+			BFL:DebugPrint("|cffff0000BetterFriendlist Warning:|r Using bnetAccountID for friend UID (battleTag unavailable)")
 			return "bnet_" .. tostring(friend.bnetAccountID)
 		else
 			-- Should never happen
-			print("|cffff0000BetterFriendlist Error:|r BNet friend without bnetAccountID or battleTag!")
+			BFL:DebugPrint("|cffff0000BetterFriendlist Error:|r BNet friend without bnetAccountID or battleTag!")
 			return "bnet_unknown"
 		end
 	else
@@ -679,14 +689,12 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		local isOurMenu = _G.BetterFriendlist_IsOurMenu
 		_G.BetterFriendlist_IsOurMenu = false
 		
-		print("|cff00ffffBFL AddGroupsToFriendMenu called. Flag was:", isOurMenu)
-		
-		-- CRITICAL: Only add entries when menu is opened from our addon
+	BFL:DebugPrint("|cff00ffffBFL AddGroupsToFriendMenu called. Flag was:", isOurMenu)
 		if not isOurMenu then
-			print("|cffff0000BFL: Skipping menu entries (flag was false)")
+			BFL:DebugPrint("|cffff0000BFL: Skipping menu entries (flag was false)")
 			return
 		end
-		print("|cff00ff00BFL: Adding menu entries (flag was true)")
+		BFL:DebugPrint("|cff00ff00BFL: Adding menu entries (flag was true)")
 		
 		-- CRITICAL: Don't add group options for WHO players (non-friends)
 		if _G.BetterFriendlist_IsWhoPlayerMenu then
@@ -709,7 +717,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					if accountInfo.battleTag then
 						friendUID = "bnet_" .. accountInfo.battleTag
 					else
-						print("|cffff0000BetterFriendlist Warning:|r BNet friend without battleTag, using bnetAccountID")
+						BFL:DebugPrint("|cffff0000BetterFriendlist Warning:|r BNet friend without battleTag, using bnetAccountID")
 						friendUID = "bnet_" .. tostring(contextData.bnetIDAccount)
 					end
 					break
@@ -718,7 +726,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			
 			-- If not found in friends list (shouldn't happen), fallback to bnetAccountID
 			if not friendUID then
-				print("|cffff0000BetterFriendlist Warning:|r Could not find BNet friend, using bnetAccountID")
+				BFL:DebugPrint("|cffff0000BetterFriendlist Warning:|r Could not find BNet friend, using bnetAccountID")
 				friendUID = "bnet_" .. tostring(contextData.bnetIDAccount)
 			end
 		elseif contextData.name then
@@ -789,7 +797,8 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					local Groups = GetGroups()
 					if Groups then
 						Groups:ToggleFriendInGroup(friendUID, groupId)
-						BetterFriendsFrame_UpdateDisplay()
+						-- Force full display refresh - group membership affects display structure
+						BFL:ForceRefreshFriendsList()
 					end
 				end
 			)
@@ -804,7 +813,8 @@ frame:SetScript("OnEvent", function(self, event, ...)
 						for currentGroupId in pairs(friendCurrentGroups) do
 							Groups:RemoveFriendFromGroup(friendUID, currentGroupId)
 						end
-						BetterFriendsFrame_UpdateDisplay()
+						-- Force full display refresh - group membership affects display structure
+						BFL:ForceRefreshFriendsList()
 					end
 				end)
 			end

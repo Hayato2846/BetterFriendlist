@@ -1,9 +1,50 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to BetterFriendlist will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [1.9.2] - 2025-01-05
+
+### 🔌 Data Broker Integration (Beta) & New Features
+
+Display your online friends count on any Data Broker display addon, plus new customization options.
+
+### Added
+- **Data Broker Integration** (Beta Feature) - Show friends on display bars
+  - Works with Bazooka, ChocolateBar, TitanPanel, and other Data Broker displays
+  - Rich tooltip with full friends list, grouping, and game icons
+  - Click friends to whisper, Alt+Click to invite, Right-Click for context menu
+  - Middle-Click on broker icon to cycle through quick filters
+  - Configure in Settings → Data Broker tab (requires Beta Features enabled)
+- **Window Scale** - Scale your friends list window from 50% to 200%
+  - Available in Edit Mode settings (WoW's Edit Mode → select BetterFriendlist)
+  - Perfect for high-resolution displays or compact setups
+  - Scale is saved per Edit Mode layout
+- **Show Notes as Friend Name** - New option in General settings
+  - Display your personal notes as the friend's name in the list
+  - Great for remembering who people are by their real name or nickname
+- **Treat Mobile as Offline** - New option in General settings
+  - Friends using the Battle.net Mobile App can be shown in the Offline group
+  - Keeps your online friends list focused on people actually in games
+
+### Fixed
+- **Edit Mode Overlay** - Search box in Who tab no longer appears above the Edit Mode overlay
+  - Previously the search field would cover the Edit Mode selection when repositioning
+  - Now correctly stays below the overlay for smooth Edit Mode usage
+- **Raid Frame Control Panel** - Buttons now update correctly when resizing the window
+  - AllAssist button and member counts stay properly positioned after resize
+
+### Improved
+- **Who Tab Columns** - Better column width distribution
+  - Name, level, class columns now align perfectly with headers
+  - Responsive layout accounts for header overlaps correctly
+  - Row content scales smoothly with frame width changes
+- **Group Color Changes** - Colors update immediately without needing to scroll
+  - Same improvement for compact mode and font size changes
 
 ---
 

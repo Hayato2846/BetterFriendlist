@@ -218,4 +218,33 @@ if GetLocale() == "frFR" then
 	L.SETTINGS_FRAME_HEIGHT = "Hauteur:"
 	L.SETTINGS_FRAME_RESET_SIZE = "Réinitialiser à 415x570"
 	L.SETTINGS_FRAME_APPLY_NOW = "Appliquer à la disposition actuelle"
-	L.SETTINGS_FRAME_RESET_ALL = "Réinitialiser toutes les dispositions"end
+	L.SETTINGS_FRAME_RESET_ALL = "Réinitialiser toutes les dispositions"
+	
+	-- ========================================
+	-- DATA BROKER
+	-- ========================================
+	L.BROKER_TITLE = "BetterFriendlist"
+	L.BROKER_TOOLTIP_HEADER = "Amis"
+	L.BROKER_TOOLTIP_FOOTER_LEFT = "Clic gauche: Basculer BetterFriendlist"
+	L.BROKER_TOOLTIP_FOOTER_RIGHT = "Clic droit: Paramètres"
+	L.BROKER_SETTINGS_ENABLE = "Activer Data Broker"
+	L.BROKER_SETTINGS_SHOW_ICON = "Afficher l'icône"
+	L.BROKER_SETTINGS_TOOLTIP_MODE = "Niveau de détail de l'info-bulle"
+	L.BROKER_SETTINGS_CLICK_ACTION = "Action du clic gauche"
+	L.BROKER_FILTER_CHANGED = "Filtre modifié en: %s"
+	
+	-- ========================================
+	-- FEATURE REQUESTS (CurseForge User Feedback)
+	-- ========================================
+	-- Feature 1: Traiter Mobile comme Hors ligne
+	L.SETTINGS_TREAT_MOBILE_OFFLINE = "Traiter les utilisateurs mobiles comme hors ligne"
+	L.SETTINGS_TREAT_MOBILE_OFFLINE_DESC = "Afficher les amis utilisant l'application mobile dans le groupe hors ligne"
+	
+	-- Feature 3: Afficher Notes comme Nom
+	L.SETTINGS_SHOW_NOTES_AS_NAME = "Afficher les notes comme nom d'ami"
+	L.SETTINGS_SHOW_NOTES_AS_NAME_DESC = "Affiche les notes d'amis comme leur nom quand disponibles"
+	
+	-- Feature 4: Échelle de Fenêtre
+	L.SETTINGS_WINDOW_SCALE = "Échelle de fenêtre"
+	L.SETTINGS_WINDOW_SCALE_DESC = "Mettre à l'échelle toute la fenêtre (50%% - 200%%)"
+end

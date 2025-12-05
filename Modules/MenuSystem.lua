@@ -30,25 +30,52 @@ function MenuSystem:Initialize()
 end
 
 -- Open context menu for a friend
-function MenuSystem:OpenFriendMenu(button, friendType, friendID)
+-- For BNet: friendID = bnetIDAccount, extraData = {name, battleTag, connected}
+-- For WoW: friendID = friendIndex, extraData = {name, connected}
+function MenuSystem:OpenFriendMenu(button, friendType, friendID, extraData)
 	if not button or not friendType then return end
 	
+	extraData = extraData or {}
 	local menuType
-	if friendType == "BN" then
-		menuType = "BN_FRIEND"
-	else
-		menuType = "FRIEND"
-	end
+	local contextData
 	
-	local contextData = {
-		friendType = friendType,
-		friendID = friendID,
-		button = button,
-	}
+	if friendType == "BN" then
+		-- Determine if online or offline
+		local connected = extraData.connected
+		if connected == nil then connected = true end -- Default to online
+		
+		menuType = connected and "BN_FRIEND" or "BN_FRIEND_OFFLINE"
+		
+		-- BNet friends need full contextData like BetterFriendsList_ShowBNDropdown
+		contextData = {
+			name = extraData.name or "",
+			friendsList = true,
+			bnetIDAccount = friendID,
+			battleTag = extraData.battleTag,
+		}
+	else
+		-- WoW friends
+		local connected = extraData.connected
+		if connected == nil then connected = true end
+		
+		menuType = connected and "FRIEND" or "FRIEND_OFFLINE"
+		
+		-- Get name from extraData or look up by index
+		local name = extraData.name
+		if not name and type(friendID) == "number" then
+			local friendInfo = C_FriendList.GetFriendInfoByIndex(friendID)
+			name = friendInfo and friendInfo.name or ""
+		end
+		
+		contextData = {
+			name = name or "",
+			friendsList = true,
+		}
+	end
 	
 	-- Set flag to indicate this menu is opened from BetterFriendlist
 	_G.BetterFriendlist_IsOurMenu = true
-	print("|cff00ff00BFL MenuSystem: Flag set to TRUE, opening menu type:", menuType)
+	BFL:DebugPrint("|cff00ff00BFL MenuSystem: Flag set to TRUE, opening menu type:", menuType)
 	
 	UnitPopup_OpenMenu(menuType, contextData)
 end

@@ -69,16 +69,14 @@ end
 	- Returns green color for mock members to distinguish them from real players
 ]]
 function BetterFriendlist_GetRelationshipInfo(guid, missingNameFallback, clubId)
-	-- Check if this is a mock group member first
+	-- 1. Check if this is a mock group member first (BetterFriendlist-specific)
 	if QuickJoin and QuickJoin.mockGroups then
 		for groupGUID, mockGroup in pairs(QuickJoin.mockGroups) do
 			if mockGroup.members then
 				for _, member in ipairs(mockGroup.members) do
 					if member.guid == guid then
-						-- Found mock member! Return with green color (mock indicator)
 						local name = member.name or member.memberName or "MockPlayer"
-						-- Use green for mock members to distinguish them
-						local mockColor = "|cff00ff00"  -- Green
+						local mockColor = "|cff00ff00"  -- Green for mock members
 						return name, mockColor, "mock", nil
 					end
 				end
@@ -86,56 +84,51 @@ function BetterFriendlist_GetRelationshipInfo(guid, missingNameFallback, clubId)
 		end
 	end
 	
-	-- Check BattleNet friend first
+	-- 2. Check BattleNet friend (like Blizzard)
 	local accountInfo = C_BattleNet.GetAccountInfoByGUID(guid)
 	if accountInfo then
 		local accountName = accountInfo.accountName
-		local gameAccountInfo = accountInfo.gameAccountInfo
-		
-		-- CHANGED: Always use accountName (BNet display name), not character name
-		-- This ensures consistent display in Quick Join member list
-		local name = accountName
-		
-		local playerLink = GetBNPlayerLink(name, accountInfo.bnetAccountID, accountInfo.gameAccountInfo.playerGUID, 0, FRIENDS_BNET_NAME_COLOR_CODE)
-		return name, FRIENDS_BNET_NAME_COLOR_CODE, "bnfriend", playerLink
+		local playerLink = GetBNPlayerLink(accountName, accountName, accountInfo.bnetAccountID, 0, 0, 0)
+		return accountName, FRIENDS_BNET_NAME_COLOR_CODE, "bnfriend", playerLink
 	end
 	
-	-- Check WoW friend
-	local friendInfo = GetFriendInfoByGUID(guid)
-	if friendInfo and friendInfo.connected then
-		local name = friendInfo.name
-		if name then
-			local playerLink = GetPlayerLink(name, ("[%s]"):format(name))
-			return name, FRIENDS_WOW_NAME_COLOR_CODE, "wowfriend", playerLink
-		end
+	-- 3. CRITICAL FIX: GetPlayerInfoByGUID fallback (like Blizzard's SocialQueueUtil_GetRelationshipInfo)
+	-- This fixes "Unknown" name display for players without direct relationship
+	local name, normalizedRealmName = select(6, GetPlayerInfoByGUID(guid))
+	name = name or missingNameFallback
+	
+	local hasName = name ~= nil
+	if not hasName then
+		name = UNKNOWNOBJECT
+	elseif normalizedRealmName and normalizedRealmName ~= "" then
+		name = FULL_PLAYER_NAME:format(name, normalizedRealmName)
 	end
 	
-	-- Check guild member
-	if IsInGuild() then
-		local guildName, guildRankName, guildRankIndex, realm = GetGuildInfo("player")
-		for i = 1, GetNumGuildMembers() do
-			local name, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, memberGuid = GetGuildRosterInfo(i)
-			if memberGuid == guid and name then
-				local playerLink = GetPlayerLink(name, ("[%s]"):format(name))
-				return name, FRIENDS_WOW_NAME_COLOR_CODE, "guild", playerLink
-			end
-		end
+	local linkName = name
+	local playerLink
+	
+	if hasName then
+		playerLink = GetPlayerLink(linkName, name)
 	end
 	
-	-- Check club (community) member
+	-- 4. Check WoW friend (with already determined name)
+	if C_FriendList.IsFriend(guid) then
+		return name, FRIENDS_WOW_NAME_COLOR_CODE, "wowfriend", playerLink
+	end
+	
+	-- 5. Check guild member (with already determined name)
+	if IsGuildMember(guid) then
+		return name, RGBTableToColorCode(ChatTypeInfo.GUILD), "guild", playerLink
+	end
+	
+	-- 6. Check club/community (with already determined name) - FIX: Don't use GetMemberInfoForSelf!
 	local clubInfo = clubId and C_Club.GetClubInfo(clubId) or nil
 	if clubInfo then
-		local memberInfo = C_Club.GetMemberInfoForSelf(clubId)
-		if memberInfo and memberInfo.name then
-			local name = memberInfo.name
-			local playerLink = GetPlayerLink(name, ("[%s]"):format(name))
-			return name, FRIENDS_WOW_NAME_COLOR_CODE, "club", playerLink
-		end
+		return name, FRIENDS_WOW_NAME_COLOR_CODE, "club", playerLink
 	end
 	
-	-- Fallback: No relationship found
-	local name = missingNameFallback or UNKNOWN
-	return name, FRIENDS_WOW_NAME_COLOR_CODE, nil, nil
+	-- 7. Final fallback (name is already set by GetPlayerInfoByGUID)
+	return name, FRIENDS_WOW_NAME_COLOR_CODE, nil, playerLink
 end
 
 --[[ 
@@ -226,7 +219,12 @@ function QuickJoin:Update(forceUpdate)
 	for i, groupGUID in ipairs(groups) do
 		local groupInfo = self:GetGroupInfo(groupGUID)
 		
-		if groupInfo and groupInfo.canJoin and groupInfo.numQueues > 0 then
+		-- FIX: Explicitly exclude player's own group (defense in depth)
+		-- API should return canJoin=false for own group, but this ensures it
+		local leaderGUID = groupInfo and groupInfo.leaderGUID
+		local isOwnGroup = leaderGUID and C_AccountInfo.IsGUIDRelatedToLocalAccount(leaderGUID)
+		
+		if groupInfo and groupInfo.canJoin and groupInfo.numQueues > 0 and not isOwnGroup then
 			table.insert(self.availableGroups, groupGUID)
 		end
 	end
@@ -1015,6 +1013,20 @@ end
 
 -- Get formatted group name for display
 function QuickJoin:GetGroupDisplayName(groupGUID)
+	-- Check for mock data first
+	local mockGroup = self.mockGroups[groupGUID]
+	if mockGroup then
+		local leaderName = mockGroup.leaderName or "Unknown"
+		local numMembers = mockGroup.numMembers or 1
+		local color = "|cff00ff00"  -- Green for mock groups
+		
+		if numMembers > 1 then
+			return string.format("%s%s|r +%d", color, leaderName, numMembers - 1)
+		else
+			return string.format("%s%s|r", color, leaderName)
+		end
+	end
+	
 	local members = C_SocialQueue.GetGroupMembers(groupGUID)
 	if not members or #members == 0 then
 		return UNKNOWNOBJECT or "Unknown Group"
@@ -1054,6 +1066,12 @@ end
 
 -- Get formatted queue name for display
 function QuickJoin:GetQueueDisplayName(groupGUID)
+	-- Check for mock data first
+	local mockGroup = self.mockGroups[groupGUID]
+	if mockGroup then
+		return mockGroup.groupTitle or mockGroup.activityName or "Mock Activity"
+	end
+	
 	local queues = C_SocialQueue.GetGroupQueues(groupGUID)
 	if not queues or #queues == 0 or not queues[1] then
 		return "No Queue"
@@ -1091,141 +1109,679 @@ function QuickJoin:GetQueueDisplayName(groupGUID)
 end
 
 --[[ 
-	Mock Data System (Debug/Testing Only)
+	==========================================================================
+	PROFESSIONAL MOCK SYSTEM (Debug/Testing)
+	==========================================================================
+	
+	Purpose: Simulate Social Queue groups for testing Quick Join functionality
+	without requiring actual friends to be online and in groups.
+	
+	Design Principles:
+	1. Mock data follows EXACT Blizzard API structure (C_SocialQueue)
+	2. Mock groups integrate seamlessly with real groups
+	3. Dynamic updates simulate real-world scenarios (member joins/leaves)
+	4. Event simulation for testing event handlers
+	5. Comprehensive presets covering all queue types
+	
+	API Structure Reference:
+	- C_SocialQueue.GetGroupInfo(guid) → canJoin, numQueues, needTank, needHealer, needDamage, isSoloQueueParty, questSessionActive, leaderGUID
+	- C_SocialQueue.GetGroupMembers(guid) → {guid, clubId}[]
+	- C_SocialQueue.GetGroupQueues(guid) → {clientID, eligible, needTank, needHealer, needDamage, isAutoAccept, queueData}[]
+	
+	QueueData Types:
+	- "lfglist": LFG Finder groups (M+, raids) - has lfgListID
+	- "lfg": LFG Dungeon Finder - has lfgIDs[]
+	- "pvp": PvP queues - has battlefieldType, rated, teamSize
+	- "petbattle": Pet Battle queue
+	
+	Commands:
+	- /bfl qj mock           - Create comprehensive test data
+	- /bfl qj mock dungeon   - Create dungeon-specific mocks
+	- /bfl qj mock pvp       - Create PvP-specific mocks
+	- /bfl qj mock raid      - Create raid-specific mocks
+	- /bfl qj mock stress    - Create 50+ groups for stress testing
+	- /bfl qj add <params>   - Add custom mock group
+	- /bfl qj event <type>   - Simulate events (add, remove, update)
+	- /bfl qj list           - List all mock groups
+	- /bfl qj clear          - Remove all mock groups
 ]]
 
--- Create a mock group for testing
-function QuickJoin:CreateMockGroup(leaderName, activityName, numMembers, needTank, needHealer, needDamage, queueType, activityType, comment)
-	leaderName = leaderName or "TestPlayer"
-	activityName = activityName or "Heroic Dungeon"
-	numMembers = math.min(numMembers or 2, 2)  -- Maximum 2 members to avoid visual overload
-	needTank = needTank ~= false  -- default true
-	needHealer = needHealer ~= false
-	needDamage = needDamage ~= false
-	queueType = queueType or "lfglist"  -- default to lfglist (group icon + quotes)
-	activityType = activityType or activityName  -- Default to activityName if not specified
-	comment = comment or ""  -- Optional comment text
-	
-	-- Generate unique GUID
-	local guid = string.format("MockGroup-%d-%s", math.random(10000, 99999), leaderName)
-	
-	-- Mock player names - varied to show different relationship types
-	local mockNames = {
-		"Anduin", "Thrall", "Jaina", "Sylvanas", "Varian",
-		"Velen", "Malfurion", "Tyrande", "Genn", "Alleria"
-	}
-	
-	-- Create mock members
-	local members = {}
-	for i = 1, numMembers do
-		local memberName = (i == 1) and leaderName or mockNames[i] or ("Spieler" .. i)
-		table.insert(members, {
-			guid = string.format("Player-00000000-%08X", math.random(1, 999999)),
-			name = memberName,
-			memberName = memberName,
-			clubId = nil,
-		})
-	end
-	
-	-- Create mock queue with specified type
-	local queues = {
-		{
-			clientID = math.random(1000, 9999),
-			eligible = true,
-			needTank = needTank,
-			needHealer = needHealer,
-			needDamage = needDamage,
-			isAutoAccept = false,
-			queueData = {
-				queueType = queueType,  -- Use specified queue type
-				activityID = 1234,
-				lfgListID = (queueType == "lfglist") and math.random(10000, 99999) or nil,  -- Only for lfglist
-				name = activityName,  -- Group title
-				comment = comment,  -- Optional comment
-			}
-		}
-	}
-	
-	-- Store mock group with ALL required fields
-	self.mockGroups[guid] = {
-		canJoin = true,
-		numQueues = 1,
-		needTank = needTank,  -- FIXED: Use needTank not needsTank to match Blizzard API!
-		needHealer = needHealer,  -- FIXED: Use needHealer not needsHealer
-		needDamage = needDamage,  -- FIXED: Use needDamage not needsDPS
-		isSoloQueueParty = false,
-		questSessionActive = false,
-		leaderGUID = (members and #members > 0 and members[1]) and members[1].guid or "Unknown",
-		members = members,
-		queues = queues,
-		requestedToJoin = false,
-		numMembers = numMembers,
-		leaderName = leaderName,
-		-- IMPORTANT: For LFG List, this is the GROUP TITLE (not activity name!)
-		-- Blizzard displays searchResultInfo.name, which is the custom group name
-		groupTitle = activityName,  -- This is the custom group title, e.g. "M+ Gruppe sucht DD"
-		activityName = activityType,  -- This is the activity type for tooltip, e.g. "Mythic+ Dungeon"
-		activityIcon = "Interface\\Icons\\Achievement_Boss_Murmur",
-		queueInfo = "",
-		-- Mock-specific fields
-		_mockLeaderName = leaderName,
-		_mockActivityName = activityName,
-	}
-	
-	print(string.format("|cff00ff00BFL QuickJoin Mock:|r Created group '%s' - %s (%d members)", guid, activityName, numMembers))
-	return guid
+-- ============================================
+-- MOCK SYSTEM CONSTANTS
+-- ============================================
+
+local MOCK_PREFIX = "MockGroup-"
+
+-- Realistic player names (from WoW lore characters)
+local MOCK_PLAYER_NAMES = {
+	-- Alliance
+	"Anduin", "Jaina", "Genn", "Alleria", "Turalyon", "Velen", "Tyrande", "Malfurion",
+	"Muradin", "Mekkatorque", "Aysa", "Tess", "Shaw", "Magni", "Khadgar",
+	-- Horde
+	"Thrall", "Sylvanas", "Baine", "Lor'themar", "Thalyssra", "Gazlowe", "Ji", 
+	"Rokhan", "Geya'rah", "Calia", "Eitrigg", "Saurfang", "Vol'jin", "Rexxar",
+	-- Neutral
+	"Chromie", "Wrathion", "Alexstrasza", "Ysera", "Nozdormu", "Kalecgos"
+}
+
+-- Realistic activity names by type
+local MOCK_ACTIVITIES = {
+	lfglist_mythicplus = {
+		{"M+ Gruppe sucht DD", "Mythic+ Dungeon", "Need experienced DPS, voice preferred"},
+		{"NW +22 Timing Run", "Mythic+ Dungeon", "2.8k+ rio, have route"},
+		{"Mists Weekly - Chill", "Mythic+ Dungeon", "No timer pressure, all welcome"},
+		{"Keys for Vault", "Mythic+ Dungeon", "Any level, just for vault slots"},
+		{"CoS +20 Push", "Mythic+ Dungeon", "Going for KSH, need good players"},
+		{"BRH Fortified Farm", "Mythic+ Dungeon", "Quick runs, know the dungeon"},
+		{"Atal'Dazar +18", "Mythic+ Dungeon", "Learning route, be patient"},
+		{"Stonevault +25 Title", "Mythic+ Dungeon", "0.1% title push, 3k+ only"},
+	},
+	lfglist_raid = {
+		{"Nerub-ar Palace Normal", "Raid", "Full clear, new players welcome"},
+		{"NaP Heroic - AOTC Run", "Raid", "Link AOTC or 580+ ilvl"},
+		{"Queen Ansurek Only", "Raid", "Farm boss, know mechanics"},
+		{"Palace Mythic Progress", "Raid", "Guild run, need 1 healer"},
+	},
+	lfg_dungeon = {
+		{"Random Heroic", "Heroic Dungeon"},
+		{"Normal Dungeon", "Normal Dungeon"},
+		{"Timewalking", "Timewalking Dungeon"},
+		{"Follower Dungeon", "Follower Dungeon"},
+	},
+	pvp = {
+		{"RBG 2400+ Push", "Rated Battleground", "Voice required, have strats"},
+		{"Casual BGs", "Battleground", "Just for fun, no ragers"},
+		{"Arena 3v3 Practice", "Arena", "Learning comps, be chill"},
+		{"Solo Shuffle Warmup", "Solo Shuffle", "Getting games in"},
+		{"Epic BG Group", "Epic Battleground", "AV/IoC farm"},
+	},
+}
+
+-- Class data for realistic members
+local MOCK_CLASSES = {
+	{name = "WARRIOR", icon = "Interface\\Icons\\ClassIcon_Warrior", roles = {"TANK", "DAMAGER"}},
+	{name = "PALADIN", icon = "Interface\\Icons\\ClassIcon_Paladin", roles = {"TANK", "HEALER", "DAMAGER"}},
+	{name = "HUNTER", icon = "Interface\\Icons\\ClassIcon_Hunter", roles = {"DAMAGER"}},
+	{name = "ROGUE", icon = "Interface\\Icons\\ClassIcon_Rogue", roles = {"DAMAGER"}},
+	{name = "PRIEST", icon = "Interface\\Icons\\ClassIcon_Priest", roles = {"HEALER", "DAMAGER"}},
+	{name = "DEATHKNIGHT", icon = "Interface\\Icons\\ClassIcon_DeathKnight", roles = {"TANK", "DAMAGER"}},
+	{name = "SHAMAN", icon = "Interface\\Icons\\ClassIcon_Shaman", roles = {"HEALER", "DAMAGER"}},
+	{name = "MAGE", icon = "Interface\\Icons\\ClassIcon_Mage", roles = {"DAMAGER"}},
+	{name = "WARLOCK", icon = "Interface\\Icons\\ClassIcon_Warlock", roles = {"DAMAGER"}},
+	{name = "MONK", icon = "Interface\\Icons\\ClassIcon_Monk", roles = {"TANK", "HEALER", "DAMAGER"}},
+	{name = "DRUID", icon = "Interface\\Icons\\ClassIcon_Druid", roles = {"TANK", "HEALER", "DAMAGER"}},
+	{name = "DEMONHUNTER", icon = "Interface\\Icons\\ClassIcon_DemonHunter", roles = {"TANK", "DAMAGER"}},
+	{name = "EVOKER", icon = "Interface\\Icons\\ClassIcon_Evoker", roles = {"HEALER", "DAMAGER"}},
+}
+
+-- ============================================
+-- MOCK SYSTEM STATE
+-- ============================================
+-- Note: QuickJoin.mockGroups is initialized at module top (line ~40)
+
+QuickJoin.mockUpdateTimer = nil     -- Timer for dynamic updates
+QuickJoin.mockEventQueue = {}       -- Queued events for simulation
+QuickJoin.mockConfig = {
+	dynamicUpdates = true,          -- Enable/disable member count changes
+	updateInterval = 3.0,           -- Seconds between dynamic updates
+	eventSimulation = false,        -- Simulate SOCIAL_QUEUE events
+}
+
+-- ============================================
+-- MOCK GROUP CREATION
+-- ============================================
+
+--[[
+	Generate a unique mock GUID that follows WoW GUID format
+	Real format: "Player-ServerID-PlayerID" or "Party-0-GroupID"
+]]
+local function GenerateMockGUID()
+	-- Use smaller random range to avoid integer overflow (Lua max ~2^31)
+	return string.format("%s%d-%08X", MOCK_PREFIX, GetServerTime() % 100000, math.random(0x10000000, 0x7FFFFFFF))
 end
 
--- Remove a mock group
+--[[
+	Generate a mock player GUID
+	Real format: "Player-ServerID-PlayerID"
+]]
+local function GenerateMockPlayerGUID()
+	-- Use smaller random range to avoid integer overflow (Lua max ~2^31)
+	return string.format("Player-%05d-%08X", math.random(1, 99999), math.random(0x10000000, 0x7FFFFFFF))
+end
+
+--[[
+	Create mock members array following Blizzard API structure
+	@param count: Number of members (1-40)
+	@param leaderName: Name for the leader (first member)
+	@return: Array of SocialQueuePlayerInfo objects
+]]
+local function CreateMockMembers(count, leaderName)
+	local members = {}
+	local usedNames = {}
+	
+	for i = 1, count do
+		local name
+		if i == 1 and leaderName then
+			name = leaderName
+		else
+			-- Pick a unique random name
+			repeat
+				name = MOCK_PLAYER_NAMES[math.random(#MOCK_PLAYER_NAMES)]
+			until not usedNames[name] or #usedNames >= #MOCK_PLAYER_NAMES
+		end
+		usedNames[name] = true
+		
+		-- Create member following exact Blizzard structure
+		members[i] = {
+			guid = GenerateMockPlayerGUID(),
+			clubId = nil,  -- Only set for community members
+			-- BetterFriendlist extensions (for display)
+			name = name,
+			memberName = name,
+		}
+	end
+	
+	return members
+end
+
+--[[
+	Create mock queue data following Blizzard API structure
+	@param queueType: "lfglist", "lfg", "pvp", "petbattle"
+	@param activityName: Display name for the activity
+	@param comment: Optional comment/description
+	@param options: Additional options (needTank, needHealer, needDamage, rated, etc.)
+	@return: SocialQueueGroupQueueInfo object
+]]
+local function CreateMockQueueData(queueType, activityName, comment, options)
+	options = options or {}
+	
+	local queueData = {
+		queueType = queueType,
+	}
+	
+	if queueType == "lfglist" then
+		-- LFG List (Group Finder) - has lfgListID and name
+		queueData.lfgListID = math.random(100000, 999999)
+		queueData.activityID = math.random(1000, 9999)
+		queueData.name = activityName  -- Group title (shows in quotes)
+		queueData.comment = comment or ""
+	elseif queueType == "lfg" then
+		-- LFG Dungeon Finder - has lfgIDs array
+		queueData.lfgIDs = {math.random(1, 500)}  -- Dungeon ID
+	elseif queueType == "pvp" then
+		-- PvP Queue
+		queueData.battlefieldType = options.battlefieldType or "BATTLEGROUND"
+		queueData.rated = options.rated or false
+		queueData.teamSize = options.teamSize or 0
+		queueData.mapName = activityName
+	end
+	
+	return {
+		clientID = math.random(10000, 99999),
+		eligible = true,
+		needTank = options.needTank ~= false,
+		needHealer = options.needHealer ~= false,
+		needDamage = options.needDamage ~= false,
+		isAutoAccept = options.isAutoAccept or false,
+		queueData = queueData,
+	}
+end
+
+--[[
+	Create a complete mock group with all required data
+	@param params: Table with group parameters
+	  - leaderName: Leader name (required)
+	  - queueType: "lfglist", "lfg", "pvp" (default: "lfglist")
+	  - activityName: Activity/group name (required)
+	  - activityType: Type description for tooltip
+	  - comment: Optional comment
+	  - numMembers: 1-40 (default: random 1-5)
+	  - needTank: boolean (default: true)
+	  - needHealer: boolean (default: true)
+	  - needDamage: boolean (default: true)
+	@return: guid, groupData
+]]
+function QuickJoin:CreateMockGroup(params)
+	params = params or {}
+	
+	-- Validate required params
+	if not params.leaderName then
+		params.leaderName = MOCK_PLAYER_NAMES[math.random(#MOCK_PLAYER_NAMES)]
+	end
+	if not params.activityName then
+		params.activityName = "Test Group"
+	end
+	
+	-- Generate unique GUID
+	local guid = GenerateMockGUID()
+	
+	-- Create members
+	local numMembers = params.numMembers or math.random(1, 5)
+	numMembers = math.max(1, math.min(40, numMembers))
+	local members = CreateMockMembers(numMembers, params.leaderName)
+	
+	-- Create queue data
+	local queueType = params.queueType or "lfglist"
+	local queues = {
+		CreateMockQueueData(queueType, params.activityName, params.comment, {
+			needTank = params.needTank,
+			needHealer = params.needHealer,
+			needDamage = params.needDamage,
+			rated = params.rated,
+			battlefieldType = params.battlefieldType,
+			teamSize = params.teamSize,
+		})
+	}
+	
+	-- Build complete mock group following C_SocialQueue.GetGroupInfo structure
+	local mockGroup = {
+		-- Core API fields (match GetGroupInfo return values exactly)
+		canJoin = true,
+		numQueues = 1,
+		needTank = params.needTank ~= false,
+		needHealer = params.needHealer ~= false,
+		needDamage = params.needDamage ~= false,
+		isSoloQueueParty = false,
+		questSessionActive = false,
+		leaderGUID = members[1].guid,
+		
+		-- Extended data (from GetGroupMembers/GetGroupQueues)
+		members = members,
+		queues = queues,
+		
+		-- Calculated fields (for display)
+		numMembers = numMembers,
+		leaderName = params.leaderName,
+		groupTitle = params.activityName,
+		activityName = params.activityType or params.activityName,
+		activityIcon = params.icon or "Interface\\Icons\\Achievement_Boss_Murmur",
+		queueInfo = "",
+		requestedToJoin = false,
+		
+		-- Mock metadata
+		_isMock = true,
+		_created = GetTime(),
+		_queueType = queueType,
+	}
+	
+	-- Store mock group
+	self.mockGroups[guid] = mockGroup
+	
+	BFL:DebugPrint(string.format("|cff00ff00QuickJoin Mock:|r Created '%s' (%s, %d members)", 
+		params.activityName, queueType, numMembers))
+	
+	return guid, mockGroup
+end
+
+--[[
+	Remove a specific mock group
+	@param guid: Group GUID to remove
+	@return: true if removed, false if not found
+]]
 function QuickJoin:RemoveMockGroup(guid)
 	if self.mockGroups[guid] then
+		local name = self.mockGroups[guid].groupTitle or "Unknown"
 		self.mockGroups[guid] = nil
-		print(string.format("|cff00ff00BFL QuickJoin Mock:|r Removed group '%s'", guid))
-		self:Update()
+		BFL:DebugPrint(string.format("|cff00ff00QuickJoin Mock:|r Removed '%s'", name))
+		self:Update(true)
 		return true
 	end
 	return false
 end
 
--- Clear all mock groups
+--[[
+	Clear all mock groups and stop timers
+]]
 function QuickJoin:ClearMockGroups()
+	-- Stop dynamic update timer
+	if self.mockUpdateTimer then
+		self.mockUpdateTimer:Cancel()
+		self.mockUpdateTimer = nil
+	end
+	
+	-- Count and clear
 	local count = 0
-	for guid, _ in pairs(self.mockGroups) do
+	for guid in pairs(self.mockGroups) do
 		count = count + 1
 	end
-	self.mockGroups = {}
-	print(string.format("|cff00ff00BFL QuickJoin Mock:|r Cleared %d mock groups", count))
-	self:Update()
+	
+	wipe(self.mockGroups)
+	
+	BFL:DebugPrint(string.format("|cff00ff00QuickJoin Mock:|r Cleared %d mock groups", count))
+	print(string.format("|cff00ff00BFL QuickJoin:|r Cleared %d mock groups", count))
+	
+	self:Update(true)
 end
 
--- Get mock group display name
-function QuickJoin:GetMockGroupDisplayName(guid)
-	local mockGroup = self.mockGroups[guid]
-	if not mockGroup then
-		return self:GetGroupDisplayName(guid)
+-- ============================================
+-- MOCK PRESETS
+-- ============================================
+
+--[[
+	Create comprehensive mock data covering all scenarios
+]]
+function QuickJoin:CreateMockPreset_All()
+	self:ClearMockGroups()
+	
+	-- M+ Groups (lfglist)
+	for i, activity in ipairs(MOCK_ACTIVITIES.lfglist_mythicplus) do
+		if i <= 5 then  -- Limit to avoid overwhelming
+			self:CreateMockGroup({
+				leaderName = MOCK_PLAYER_NAMES[i],
+				queueType = "lfglist",
+				activityName = activity[1],
+				activityType = activity[2],
+				comment = activity[3],
+				numMembers = math.random(1, 4),
+				needTank = math.random() > 0.5,
+				needHealer = math.random() > 0.5,
+				needDamage = true,
+			})
+		end
 	end
 	
-	local leaderName = mockGroup._mockLeaderName or "Unknown"
-	local numMembers = mockGroup.members and #mockGroup.members or 1
+	-- Raid Groups
+	for i, activity in ipairs(MOCK_ACTIVITIES.lfglist_raid) do
+		if i <= 2 then
+			self:CreateMockGroup({
+				leaderName = MOCK_PLAYER_NAMES[10 + i],
+				queueType = "lfglist",
+				activityName = activity[1],
+				activityType = activity[2],
+				comment = activity[3],
+				numMembers = math.random(5, 15),
+				needTank = true,
+				needHealer = true,
+				needDamage = true,
+			})
+		end
+	end
 	
-	if numMembers > 1 then
-		return string.format("|cff00ff00%s|r +%d", leaderName, numMembers - 1)
-	else
-		return string.format("|cff00ff00%s|r", leaderName)
+	-- LFG Dungeon (lfg)
+	for i, activity in ipairs(MOCK_ACTIVITIES.lfg_dungeon) do
+		if i <= 2 then
+			self:CreateMockGroup({
+				leaderName = MOCK_PLAYER_NAMES[15 + i],
+				queueType = "lfg",
+				activityName = activity[1],
+				activityType = activity[2],
+				numMembers = math.random(1, 3),
+			})
+		end
+	end
+	
+	-- PvP Groups
+	for i, activity in ipairs(MOCK_ACTIVITIES.pvp) do
+		if i <= 2 then
+			self:CreateMockGroup({
+				leaderName = MOCK_PLAYER_NAMES[20 + i],
+				queueType = "pvp",
+				activityName = activity[1],
+				activityType = activity[2],
+				comment = activity[3],
+				numMembers = math.random(1, 5),
+				rated = i == 1,
+			})
+		end
+	end
+	
+	-- Start dynamic updates
+	self:StartMockDynamicUpdates()
+	
+	local count = 0
+	for _ in pairs(self.mockGroups) do count = count + 1 end
+	print(string.format("|cff00ff00BFL QuickJoin:|r Created %d mock groups (dynamic updates enabled)", count))
+	
+	self:Update(true)
+end
+
+--[[
+	Create dungeon-specific mocks
+]]
+function QuickJoin:CreateMockPreset_Dungeon()
+	self:ClearMockGroups()
+	
+	for i, activity in ipairs(MOCK_ACTIVITIES.lfglist_mythicplus) do
+		self:CreateMockGroup({
+			leaderName = MOCK_PLAYER_NAMES[i],
+			queueType = "lfglist",
+			activityName = activity[1],
+			activityType = activity[2],
+			comment = activity[3],
+			numMembers = math.random(1, 4),
+		})
+	end
+	
+	for i, activity in ipairs(MOCK_ACTIVITIES.lfg_dungeon) do
+		self:CreateMockGroup({
+			leaderName = MOCK_PLAYER_NAMES[10 + i],
+			queueType = "lfg",
+			activityName = activity[1],
+			activityType = activity[2],
+			numMembers = math.random(1, 4),
+		})
+	end
+	
+	self:StartMockDynamicUpdates()
+	
+	local count = 0
+	for _ in pairs(self.mockGroups) do count = count + 1 end
+	print(string.format("|cff00ff00BFL QuickJoin:|r Created %d dungeon mock groups", count))
+	
+	self:Update(true)
+end
+
+--[[
+	Create PvP-specific mocks
+]]
+function QuickJoin:CreateMockPreset_PvP()
+	self:ClearMockGroups()
+	
+	for i, activity in ipairs(MOCK_ACTIVITIES.pvp) do
+		self:CreateMockGroup({
+			leaderName = MOCK_PLAYER_NAMES[i],
+			queueType = "pvp",
+			activityName = activity[1],
+			activityType = activity[2],
+			comment = activity[3],
+			numMembers = math.random(1, 10),
+			rated = i <= 2,
+		})
+	end
+	
+	self:StartMockDynamicUpdates()
+	
+	local count = 0
+	for _ in pairs(self.mockGroups) do count = count + 1 end
+	print(string.format("|cff00ff00BFL QuickJoin:|r Created %d PvP mock groups", count))
+	
+	self:Update(true)
+end
+
+--[[
+	Create raid-specific mocks
+]]
+function QuickJoin:CreateMockPreset_Raid()
+	self:ClearMockGroups()
+	
+	for i, activity in ipairs(MOCK_ACTIVITIES.lfglist_raid) do
+		self:CreateMockGroup({
+			leaderName = MOCK_PLAYER_NAMES[i],
+			queueType = "lfglist",
+			activityName = activity[1],
+			activityType = activity[2],
+			comment = activity[3],
+			numMembers = math.random(5, 25),
+		})
+	end
+	
+	self:StartMockDynamicUpdates()
+	
+	local count = 0
+	for _ in pairs(self.mockGroups) do count = count + 1 end
+	print(string.format("|cff00ff00BFL QuickJoin:|r Created %d raid mock groups", count))
+	
+	self:Update(true)
+end
+
+--[[
+	Create many groups for stress testing scrollbar
+]]
+function QuickJoin:CreateMockPreset_Stress()
+	self:ClearMockGroups()
+	
+	-- Create 50 groups
+	for i = 1, 50 do
+		local activities = MOCK_ACTIVITIES.lfglist_mythicplus
+		local activity = activities[((i - 1) % #activities) + 1]
+		
+		self:CreateMockGroup({
+			leaderName = MOCK_PLAYER_NAMES[((i - 1) % #MOCK_PLAYER_NAMES) + 1] .. i,
+			queueType = "lfglist",
+			activityName = activity[1] .. " #" .. i,
+			activityType = activity[2],
+			comment = activity[3],
+			numMembers = math.random(1, 5),
+		})
+	end
+	
+	-- Don't enable dynamic updates for stress test (too much CPU)
+	
+	print("|cff00ff00BFL QuickJoin:|r Created 50 mock groups (stress test)")
+	
+	self:Update(true)
+end
+
+-- ============================================
+-- DYNAMIC UPDATE SYSTEM
+-- ============================================
+
+--[[
+	Start timer for dynamic mock updates (simulates real activity)
+]]
+function QuickJoin:StartMockDynamicUpdates()
+	-- Stop existing timer
+	if self.mockUpdateTimer then
+		self.mockUpdateTimer:Cancel()
+	end
+	
+	self.mockUpdateTimer = C_Timer.NewTicker(self.mockConfig.updateInterval, function()
+		self:ProcessMockDynamicUpdate()
+	end)
+	
+	BFL:DebugPrint("|cff00ff00QuickJoin Mock:|r Dynamic updates started")
+end
+
+--[[
+	Process one cycle of dynamic updates
+]]
+function QuickJoin:ProcessMockDynamicUpdate()
+	if not self.mockConfig.dynamicUpdates then return end
+	
+	local updated = false
+	
+	for guid, group in pairs(self.mockGroups) do
+		-- 30% chance to change member count
+		if math.random() < 0.3 then
+			local maxMembers = group._queueType == "lfglist" and 
+				(group.activityName and group.activityName:find("Raid") and 25 or 5) or 5
+			local newCount = math.random(1, maxMembers)
+			
+			if newCount ~= group.numMembers then
+				-- Update member count
+				group.numMembers = newCount
+				
+				-- Rebuild members array
+				group.members = CreateMockMembers(newCount, group.leaderName)
+				group.leaderGUID = group.members[1].guid
+				
+				updated = true
+				BFL:DebugPrint(string.format("|cff00ff00Mock Update:|r %s: %d members", 
+					group.leaderName, newCount))
+			end
+		end
+		
+		-- 10% chance to change role requirements
+		if math.random() < 0.1 then
+			group.needTank = math.random() > 0.3
+			group.needHealer = math.random() > 0.3
+			group.needDamage = math.random() > 0.2
+			if group.queues and group.queues[1] then
+				group.queues[1].needTank = group.needTank
+				group.queues[1].needHealer = group.needHealer
+				group.queues[1].needDamage = group.needDamage
+			end
+			updated = true
+		end
+	end
+	
+	if updated then
+		self:Update(true)
 	end
 end
 
--- Get mock queue display name
-function QuickJoin:GetMockQueueDisplayName(guid)
-	local mockGroup = self.mockGroups[guid]
-	if not mockGroup then
-		return self:GetQueueDisplayName(guid)
+-- ============================================
+-- EVENT SIMULATION
+-- ============================================
+
+--[[
+	Simulate SOCIAL_QUEUE_UPDATE event
+	@param eventType: "group_added", "group_removed", "group_updated"
+]]
+function QuickJoin:SimulateMockEvent(eventType)
+	if eventType == "group_added" then
+		-- Add a random new group
+		local activity = MOCK_ACTIVITIES.lfglist_mythicplus[math.random(#MOCK_ACTIVITIES.lfglist_mythicplus)]
+		self:CreateMockGroup({
+			leaderName = MOCK_PLAYER_NAMES[math.random(#MOCK_PLAYER_NAMES)],
+			queueType = "lfglist",
+			activityName = activity[1],
+			activityType = activity[2],
+			comment = activity[3],
+			numMembers = math.random(1, 4),
+		})
+		print("|cff00ff00BFL QuickJoin:|r Simulated: Group added")
+		
+	elseif eventType == "group_removed" then
+		-- Remove a random group
+		local guids = {}
+		for guid in pairs(self.mockGroups) do
+			table.insert(guids, guid)
+		end
+		if #guids > 0 then
+			local guid = guids[math.random(#guids)]
+			self:RemoveMockGroup(guid)
+			print("|cff00ff00BFL QuickJoin:|r Simulated: Group removed")
+		else
+			print("|cffff8800BFL QuickJoin:|r No mock groups to remove")
+		end
+		
+	elseif eventType == "group_updated" then
+		-- Update a random group
+		local guids = {}
+		for guid in pairs(self.mockGroups) do
+			table.insert(guids, guid)
+		end
+		if #guids > 0 then
+			local guid = guids[math.random(#guids)]
+			local group = self.mockGroups[guid]
+			group.numMembers = math.random(1, 5)
+			group.members = CreateMockMembers(group.numMembers, group.leaderName)
+			print(string.format("|cff00ff00BFL QuickJoin:|r Simulated: %s updated (%d members)", 
+				group.leaderName, group.numMembers))
+		else
+			print("|cffff8800BFL QuickJoin:|r No mock groups to update")
+		end
 	end
 	
-	return mockGroup._mockActivityName or "Unknown Activity"
+	self:Update(true)
 end
 
--- Slash command handler
+-- ============================================
+-- SLASH COMMAND HANDLER
+-- ============================================
+
+-- Legacy slash command (redirects to /bfl qj)
 SLASH_BFLQUICKJOIN1 = "/bflqj"
 SLASH_BFLQUICKJOIN2 = "/bflquickjoin"
 SlashCmdList["BFLQUICKJOIN"] = function(msg)
@@ -1237,123 +1793,114 @@ SlashCmdList["BFLQUICKJOIN"] = function(msg)
 	local cmd = args[1] and args[1]:lower() or "help"
 	
 	if cmd == "mock" then
-		-- Create mock groups showcasing all different queue types and display variants
-		-- Create MANY groups to test ScrollBar functionality
-		QuickJoin:ClearMockGroups()
+		local subCmd = args[2] and args[2]:lower() or "all"
 		
-		-- Stop any existing mock update timer
-		if QuickJoin.mockUpdateTimer then
-			QuickJoin.mockUpdateTimer:Cancel()
-			QuickJoin.mockUpdateTimer = nil
-		end
-		
-		-- LFGList groups (group icon + quotes)
-		QuickJoin:CreateMockGroup("Shadowmeld", "M+ Gruppe sucht DD", 2, true, false, true, "lfglist", "Mythic+ Dungeon", "Need experienced DPS for +20 keys")
-		QuickJoin:CreateMockGroup("Anduin", "M+ NW +22 Timing", 1, true, true, false, "lfglist", "Mythic+ Dungeon", "2.8k+ rio only")
-		QuickJoin:CreateMockGroup("Varian", "M+ Mists Weekly", 2, false, true, true, "lfglist", "Mythic+ Dungeon", "Chill key completion")
-		QuickJoin:CreateMockGroup("Alleria", "Keys for Vault", 1, true, false, true, "lfglist", "Mythic+ Dungeon", "Any level, just for vault")
-		QuickJoin:CreateMockGroup("Genn", "M+ BRH +20", 2, false, true, true, "lfglist", "Mythic+ Dungeon", "Push to 2k rio")
-		
-		-- LFG dungeon groups (eye icon, no quotes)
-		QuickJoin:CreateMockGroup("Thrall", "Random HC Dungeon", 1, false, true, true, "lfg", "Heroic Dungeon", "Chill run, all welcome")
-		QuickJoin:CreateMockGroup("Jaina", "Normal Dungeon", 2, true, false, false, "lfg", "Normal Dungeon", "Quick daily")
-		QuickJoin:CreateMockGroup("Sylvanas", "Timewalking", 1, false, true, true, "lfg", "Timewalking Dungeon", "Badge farming")
-		
-		-- PVP groups (eye icon, no quotes)
-		QuickJoin:CreateMockGroup("Malfurion", "Rated BG 2400+", 2, true, true, false, "pvp", "Rated Battleground", "Pushing rating, voice required")
-		QuickJoin:CreateMockGroup("Tyrande", "Random BG", 1, false, false, true, "pvp", "Battleground", "Just for fun")
-		QuickJoin:CreateMockGroup("Velen", "Arena 3v3", 2, true, true, true, "pvp", "Arena", "Practice session")
-		
-		-- Raid groups
-		QuickJoin:CreateMockGroup("Khadgar", "Nerub-ar Palace Normal", 2, true, true, true, "lfglist", "Raid", "Full clear, AOTC optional")
-		
-		QuickJoin:Update(true)  -- Force update (skip throttle)
-		
-		-- Start dynamic MemberCount update timer (every 3 seconds)
-		QuickJoin.mockUpdateTimer = C_Timer.NewTicker(3, function()
-			local updated = false
-			for guid, group in pairs(QuickJoin.mockGroups) do
-				-- Randomly change member count (1-2 members, max 5 for raids)
-				local maxMembers = (group.activityName == "Raid") and 5 or 2
-				local newCount = math.random(1, maxMembers)
-				if newCount ~= group.numMembers then
-					group.numMembers = newCount
-					-- Update members array
-					while #group.members < newCount do
-						local mockNames = {"Anduin", "Thrall", "Jaina", "Sylvanas", "Varian", "Velen", "Malfurion", "Tyrande", "Genn", "Alleria"}
-						local memberName = mockNames[#group.members + 1] or ("Player" .. (#group.members + 1))
-						table.insert(group.members, {
-							guid = string.format("Player-00000000-%08X", math.random(1, 999999)),
-							name = memberName,
-							memberName = memberName,
-							clubId = nil,
-						})
-					end
-					while #group.members > newCount do
-						table.remove(group.members)
-					end
-					updated = true
-					print(string.format("|cff00ff00Mock Update:|r %s now has %d members", group.leaderName, newCount))
-				end
-			end
-			if updated then
-				QuickJoin:Update(true)  -- Force update to refresh UI
-			end
-		end)
-		
-		-- Debug: Show what we created
-		local groups = QuickJoin:GetAllGroups()
-		print("|cff00ff00BFL QuickJoin:|r Created 12 mock groups (total groups: " .. #groups .. ")")
-		print("|cff00ff00BFL QuickJoin:|r Mock timer started - member counts will change every 3 seconds")
-		
-		-- Manually trigger UI update if frame exists
-		if BetterFriendsFrame and BetterFriendsFrame.QuickJoinFrame then
-			local qjFrame = BetterFriendsFrame.QuickJoinFrame
-			if qjFrame.QuickJoin then
-				BetterQuickJoinFrame_Update(qjFrame)
-			end
+		if subCmd == "dungeon" or subCmd == "m+" or subCmd == "mythic" then
+			QuickJoin:CreateMockPreset_Dungeon()
+		elseif subCmd == "pvp" or subCmd == "arena" or subCmd == "bg" then
+			QuickJoin:CreateMockPreset_PvP()
+		elseif subCmd == "raid" then
+			QuickJoin:CreateMockPreset_Raid()
+		elseif subCmd == "stress" or subCmd == "many" then
+			QuickJoin:CreateMockPreset_Stress()
+		else
+			QuickJoin:CreateMockPreset_All()
 		end
 		
 	elseif cmd == "add" then
-		-- Add a custom mock group
-		local leaderName = args[2] or "Player"
-		local activityName = args[3] or "Dungeon"
-		local numMembers = tonumber(args[4]) or 3
-		local guid = QuickJoin:CreateMockGroup(leaderName, activityName, numMembers)
-		QuickJoin:Update(true)  -- Force update (skip throttle)
+		-- /bfl qj add <leader> <activity> [members]
+		local leaderName = args[2] or "TestPlayer"
+		local activityName = args[3] or "Custom Group"
+		local numMembers = tonumber(args[4]) or 2
+		
+		QuickJoin:CreateMockGroup({
+			leaderName = leaderName,
+			activityName = activityName,
+			numMembers = numMembers,
+		})
+		QuickJoin:Update(true)
+		print(string.format("|cff00ff00BFL QuickJoin:|r Added mock group: %s - %s (%d members)", 
+			leaderName, activityName, numMembers))
+		
+	elseif cmd == "event" then
+		local eventType = args[2] and args[2]:lower() or "help"
+		
+		if eventType == "add" or eventType == "added" then
+			QuickJoin:SimulateMockEvent("group_added")
+		elseif eventType == "remove" or eventType == "removed" then
+			QuickJoin:SimulateMockEvent("group_removed")
+		elseif eventType == "update" or eventType == "updated" then
+			QuickJoin:SimulateMockEvent("group_updated")
+		else
+			print("|cff00ff00BFL QuickJoin Event Commands:|r")
+			print("  |cffffcc00/bfl qj event add|r - Simulate group added")
+			print("  |cffffcc00/bfl qj event remove|r - Simulate group removed")
+			print("  |cffffcc00/bfl qj event update|r - Simulate group updated")
+		end
 		
 	elseif cmd == "clear" then
-		-- Stop mock update timer
-		if QuickJoin.mockUpdateTimer then
-			QuickJoin.mockUpdateTimer:Cancel()
-			QuickJoin.mockUpdateTimer = nil
-			print("|cff00ff00BFL QuickJoin:|r Mock timer stopped")
-		end
-		-- Clear all mock groups
 		QuickJoin:ClearMockGroups()
 		
 	elseif cmd == "list" then
-		-- List all mock groups
 		print("|cff00ff00BFL QuickJoin Mock Groups:|r")
 		local count = 0
 		for guid, group in pairs(QuickJoin.mockGroups) do
 			count = count + 1
-			print(string.format("  %d. %s - %s (%d members)", count, group._mockLeaderName, group._mockActivityName, #group.members))
+			local queueType = group._queueType or "unknown"
+			print(string.format("  %d. |cff00ff00%s|r - %s (%s, %d members)", 
+				count, group.leaderName, group.groupTitle, queueType, group.numMembers))
 		end
 		if count == 0 then
-			print("  No mock groups (use '/bflqj mock' to create test groups)")
+			print("  |cff888888No mock groups. Use '/bfl qj mock' to create test data.|r")
+		end
+		
+	elseif cmd == "config" then
+		local setting = args[2] and args[2]:lower()
+		local value = args[3]
+		
+		if setting == "dynamic" then
+			QuickJoin.mockConfig.dynamicUpdates = (value == "on" or value == "true" or value == "1")
+			print(string.format("|cff00ff00BFL QuickJoin:|r Dynamic updates: %s", 
+				QuickJoin.mockConfig.dynamicUpdates and "ON" or "OFF"))
+		elseif setting == "interval" then
+			local interval = tonumber(value) or 3.0
+			QuickJoin.mockConfig.updateInterval = math.max(1.0, interval)
+			print(string.format("|cff00ff00BFL QuickJoin:|r Update interval: %.1f seconds", 
+				QuickJoin.mockConfig.updateInterval))
+		else
+			print("|cff00ff00BFL QuickJoin Config:|r")
+			print(string.format("  Dynamic updates: %s", QuickJoin.mockConfig.dynamicUpdates and "ON" or "OFF"))
+			print(string.format("  Update interval: %.1f seconds", QuickJoin.mockConfig.updateInterval))
+			print("")
+			print("  |cffffcc00/bfl qj config dynamic on|off|r")
+			print("  |cffffcc00/bfl qj config interval <seconds>|r")
 		end
 		
 	else
 		-- Help
 		print("|cff00ff00BFL QuickJoin Commands:|r")
-		print("  |cffffcc00/bflqj mock|r - Add 3 test groups to Quick Join list")
-		print("  |cffffcc00/bflqj add <name> <activity> <members>|r - Add custom mock group")
-		print("  |cffffcc00/bflqj list|r - List all mock groups")
-		print("  |cffffcc00/bflqj clear|r - Remove all mock groups")
-		print("  |cffffcc00/bflqj help|r - Show this help")
 		print("")
-		print("|cff888888Mock groups are added to real Quick Join entries and marked with green color.|r")
+		print("|cffffcc00Mock Data:|r")
+		print("  |cffffcc00/bfl qj mock|r - Create comprehensive test data")
+		print("  |cffffcc00/bfl qj mock dungeon|r - Dungeon/M+ groups only")
+		print("  |cffffcc00/bfl qj mock pvp|r - PvP groups only")
+		print("  |cffffcc00/bfl qj mock raid|r - Raid groups only")
+		print("  |cffffcc00/bfl qj mock stress|r - 50 groups (scrollbar test)")
+		print("")
+		print("|cffffcc00Management:|r")
+		print("  |cffffcc00/bfl qj add <name> <activity> [members]|r - Add custom group")
+		print("  |cffffcc00/bfl qj list|r - List all mock groups")
+		print("  |cffffcc00/bfl qj clear|r - Remove all mock groups")
+		print("")
+		print("|cffffcc00Event Simulation:|r")
+		print("  |cffffcc00/bfl qj event add|r - Simulate new group")
+		print("  |cffffcc00/bfl qj event remove|r - Simulate group leaving")
+		print("  |cffffcc00/bfl qj event update|r - Simulate group change")
+		print("")
+		print("|cffffcc00Configuration:|r")
+		print("  |cffffcc00/bfl qj config|r - Show/set mock configuration")
+		print("")
+		print("|cff888888Mock groups appear with real groups and are marked green.|r")
 	end
 end
 

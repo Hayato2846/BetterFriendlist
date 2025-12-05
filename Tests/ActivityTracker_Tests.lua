@@ -340,14 +340,16 @@ end)
 -- ========================================
 -- Slash Command to Run Tests
 -- ========================================
+-- Legacy slash commands (redirect to /bfl test)
+-- Kept for backwards compatibility
 SLASH_ACTIVITYTRACKER_TEST1 = "/bfltest"
 SLASH_ACTIVITYTRACKER_TEST2 = "/bflactivitytest"
 SlashCmdList["ACTIVITYTRACKER_TEST"] = function(msg)
 	if msg == "activity" or msg == "" then
 		TestRunner:Run()
 	else
-		print("|cffffcc00Usage:|r /bfltest activity - Run ActivityTracker tests")
+		print("|cffffcc00Usage:|r /bfl test - Run ActivityTracker tests")
 	end
 end
 
-print("|cff00ff00ActivityTracker Tests loaded. Use /bfltest activity to run tests.|r")
+print("|cff00ff00ActivityTracker Tests loaded. Use /bfl test to run tests.|r")

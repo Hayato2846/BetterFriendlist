@@ -236,10 +236,9 @@ function BFL:ForceRefreshFriendsList()
 		-- Clear pending update flag to prevent overwriting our forced refresh
 		FriendsList:ClearPendingUpdate()
 		
-		-- Force immediate refresh regardless of update state
-		-- This ensures collapse/expand actions work even during background updates
-		FriendsList:BuildDisplayList()
-		FriendsList:RenderDisplay()
+		-- Force immediate data update from WoW API
+		-- This ensures we have the latest friend data before rendering
+		FriendsList:UpdateFriendsList()
 	end
 end
 
@@ -375,7 +374,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 	end
 	
 	-- Debug print toggle
-	if msg == "print" then
+	if msg == "debug" then
 		BFL:ToggleDebugPrint()
 	
 	-- Legacy commands (from old BetterFriendlist.lua slash handler)
@@ -399,7 +398,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 				print("|cff20ff20BetterFriendlist:|r 'Show Blizzard's Friendlist' option is now |cffff0000disabled|r in the menu")
 			end
 		end
-	elseif msg == "debug" or msg == "debugdb" then
+	elseif msg == "database" or msg == "db" or msg == "debugdb" then
 		if _G.BetterFriendlistSettings_DebugDatabase then
 			_G.BetterFriendlistSettings_DebugDatabase()
 		else
@@ -665,6 +664,87 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 			print("|cffff0000BetterFriendlist:|r No mock invites active")
 		end
 	
+	-- ==========================================
+	-- Performance Monitoring Commands (was /bflperf)
+	-- ==========================================
+	elseif msg == "perf" or msg == "perf report" or msg == "perf show" then
+		local PerformanceMonitor = BFL:GetModule("PerformanceMonitor")
+		if PerformanceMonitor then
+			PerformanceMonitor:Report()
+		else
+			print("|cffff0000BetterFriendlist:|r PerformanceMonitor module not loaded")
+		end
+	elseif msg == "perf reset" then
+		local PerformanceMonitor = BFL:GetModule("PerformanceMonitor")
+		if PerformanceMonitor then
+			PerformanceMonitor:Reset()
+		else
+			print("|cffff0000BetterFriendlist:|r PerformanceMonitor module not loaded")
+		end
+	elseif msg == "perf enable" then
+		local PerformanceMonitor = BFL:GetModule("PerformanceMonitor")
+		if PerformanceMonitor then
+			PerformanceMonitor:EnableAutoMonitoring()
+		else
+			print("|cffff0000BetterFriendlist:|r PerformanceMonitor module not loaded")
+		end
+	elseif msg == "perf memory" then
+		local PerformanceMonitor = BFL:GetModule("PerformanceMonitor")
+		if PerformanceMonitor then
+			PerformanceMonitor:SampleMemory()
+		end
+		UpdateAddOnMemoryUsage()
+		local memory = GetAddOnMemoryUsage("BetterFriendlist") or 0
+		print(string.format("|cff00ff00BetterFriendlist Memory:|r %.2f KB", memory))
+	
+	-- ==========================================
+	-- Quick Join Commands (was /bflqj)
+	-- ==========================================
+	elseif msg:match("^qj") or msg:match("^quickjoin") then
+		local QuickJoin = BFL:GetModule("QuickJoin")
+		if not QuickJoin then
+			print("|cffff0000BetterFriendlist:|r QuickJoin module not loaded")
+			return
+		end
+		
+		-- Pass the full arguments to the QuickJoin handler
+		-- Extract everything after "qj " or "quickjoin "
+		local fullArgs = msg:match("^qj%s*(.*)") or msg:match("^quickjoin%s*(.*)") or ""
+		SlashCmdList["BFLQUICKJOIN"](fullArgs)
+	
+	-- ==========================================
+	-- Raid Frame Commands (was /bflmock)
+	-- ==========================================
+	elseif msg:match("^raid") then
+		local RaidFrame = BFL:GetModule("RaidFrame")
+		if not RaidFrame then
+			print("|cffff0000BetterFriendlist:|r RaidFrame module not loaded")
+			return
+		end
+		
+		-- Pass the full arguments to the RaidFrame handler
+		local fullArgs = msg:match("^raid%s*(.*)") or ""
+		SlashCmdList["BFLRAIDFRAME"](fullArgs)
+	
+	-- Legacy mock command (backwards compatibility)
+	elseif msg == "mock" or msg == "mockraid" then
+		local RaidFrame = BFL:GetModule("RaidFrame")
+		if RaidFrame then
+			RaidFrame:CreateMockRaidData()
+		else
+			print("|cffff0000BetterFriendlist:|r RaidFrame module not loaded")
+		end
+	
+	-- ==========================================
+	-- Test Commands (was /bfltest)
+	-- ==========================================
+	elseif msg == "test" or msg == "test activity" then
+		if SlashCmdList["ACTIVITYTRACKER_TEST"] then
+			SlashCmdList["ACTIVITYTRACKER_TEST"]("activity")
+		else
+			print("|cffff0000BetterFriendlist:|r ActivityTracker Tests not loaded")
+		end
+	
 	-- Help (or any other unrecognized command)
 	else
 		print("|cff00ff00=== BetterFriendlist v" .. BFL.VERSION .. " ===|r")
@@ -675,28 +755,46 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		print("  |cffffffff/bfl help|r - Show this help")
 		print("")
 		print("|cffffcc00Debug Commands:|r")
-		print("  |cffffffff/bfl debug print|r - Toggle debug output")
-		print("  |cffffffff/bfl debug|r - Show database state")
+	print("  |cffffffff/bfl debug|r - Toggle debug output")
+	print("  |cffffffff/bfl database|r - Show database state")
 		print("  |cffffffff/bfl activity|r - Show activity tracking data")
 		print("  |cffffffff/bfl stats|r - Show friend network statistics")
 		print("  |cffffffff/bfl testnotify|r - Test notification system (3 toasts)")
 		print("  |cffffffff/bfl testgrouprules|r - Test group notification rules")
 		print("")
 		print("|cffffcc00Quick Join Commands:|r")
-		print("  |cffffffff/bflqj mock|r - Create 3 test groups")
-		print("  |cffffffff/bflqj clear|r - Remove test groups")
-		print("  |cffffffff/bflqj list|r - List all mock groups")
-		print("  |cffffffff/bflqj disable|r - Use real Social Queue data")
+		print("  |cffffffff/bfl qj mock|r - Create comprehensive test data")
+		print("  |cffffffff/bfl qj mock dungeon|r - Dungeon/M+ groups only")
+		print("  |cffffffff/bfl qj mock pvp|r - PvP groups only")
+		print("  |cffffffff/bfl qj mock raid|r - Raid groups only")
+		print("  |cffffffff/bfl qj mock stress|r - 50 groups for scrollbar testing")
+		print("  |cffffffff/bfl qj event add|remove|update|r - Simulate events")
+		print("  |cffffffff/bfl qj clear|r - Remove all test groups")
+		print("  |cffffffff/bfl qj list|r - List all mock groups")
 		print("")
-		print("|cffffcc00Friend Invite Commands:|r")
-		print("  |cffffffff/bfl invite|r - Add one mock friend invite (repeatable)")
+		print("|cffffcc00Mock Commands:|r")
+		print("  |cffffffff/bfl mock|r - Create mock raid (legacy, same as /bfl raid mock)")
+		print("  |cffffffff/bfl invite|r - Add one mock friend invite")
 		print("  |cffffffff/bfl clearinvites|r - Remove all mock invites")
 		print("")
+		print("|cffffcc00Raid Frame Commands:|r")
+		print("  |cffffffff/bfl raid mock|r - Create 25-player mock raid")
+		print("  |cffffffff/bfl raid mock full|r - Create 40-player raid")
+		print("  |cffffffff/bfl raid mock small|r - Create 10-player raid")
+		print("  |cffffffff/bfl raid mock mythic|r - Create 20-player mythic raid")
+		print("  |cffffffff/bfl raid event readycheck|r - Simulate ready check")
+		print("  |cffffffff/bfl raid event rolechange|r - Simulate role changes")
+		print("  |cffffffff/bfl raid event move|r - Shuffle group assignments")
+		print("  |cffffffff/bfl raid clear|r - Remove mock data")
+		print("")
 		print("|cffffcc00Performance Monitoring:|r")
-		print("  |cffffffff/bflperf enable|r - Enable performance tracking")
-		print("  |cffffffff/bflperf report|r - Show performance stats")
-		print("  |cffffffff/bflperf reset|r - Reset statistics")
-		print("  |cffffffff/bflperf memory|r - Show memory usage")
+		print("  |cffffffff/bfl perf|r - Show performance stats")
+		print("  |cffffffff/bfl perf enable|r - Enable performance tracking")
+		print("  |cffffffff/bfl perf reset|r - Reset statistics")
+		print("  |cffffffff/bfl perf memory|r - Show memory usage")
+		print("")
+		print("|cffffcc00Test Commands:|r")
+		print("  |cffffffff/bfl test|r - Run ActivityTracker tests")
 		print("")
 		print("|cff20ff20For more help, see:|r |cff00ccffhttps://github.com/Hayato2846/BetterFriendlist|r")
 	end

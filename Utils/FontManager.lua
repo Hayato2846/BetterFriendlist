@@ -78,9 +78,9 @@ function FontManager:SetCompactMode(enabled)
 	
 	db:Set("compactMode", enabled)
 	
-	-- Trigger display update if main frame exists
-	if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
-		BetterFriendsFrame_UpdateDisplay()
+	-- Force full display refresh for immediate update
+	if BFL and BFL.ForceRefreshFriendsList then
+		BFL:ForceRefreshFriendsList()
 	end
 end
 
@@ -96,9 +96,9 @@ function FontManager:SetFontSize(size)
 	
 	db:Set("fontSize", size)
 	
-	-- Trigger display update if main frame exists
-	if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
-		BetterFriendsFrame_UpdateDisplay()
+	-- Force full display refresh for immediate update
+	if BFL and BFL.ForceRefreshFriendsList then
+		BFL:ForceRefreshFriendsList()
 	end
 end
 
