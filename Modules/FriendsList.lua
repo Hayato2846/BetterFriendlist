@@ -675,20 +675,20 @@ end
 
 -- Handle friend list update events
 function FriendsList:OnFriendListUpdate(...)
-	-- If an update is already in progress, mark that we need another update
-	if isUpdatingFriendsList then
-		hasPendingUpdate = true
+	-- Event Coalescing (Micro-Throttling)
+	-- Instead of updating immediately for every event, we schedule an update for the next frame.
+	-- This handles "event bursts" (e.g. 50 friends coming online at once) by updating only once.
+	
+	if self.updateTimer then
+		-- Timer already running, update will happen next frame
 		return
 	end
 	
-	-- Trigger immediate update
-	self:UpdateFriendsList()
-	
-	-- Process any pending update that occurred during our update
-	if hasPendingUpdate then
-		hasPendingUpdate = false
+	-- Schedule update for next frame (0 seconds = next frame)
+	self.updateTimer = C_Timer.After(0, function()
+		self.updateTimer = nil
 		self:UpdateFriendsList()
-	end
+	end)
 end
 
 -- Sync groups from Groups module
@@ -723,6 +723,15 @@ end
 
 -- Update the friends list from WoW API
 function FriendsList:UpdateFriendsList()
+	-- Visibility Optimization:
+	-- If the frame is hidden, we don't need to fetch data or rebuild the list.
+	-- Just mark it as dirty so it updates when shown.
+	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
+		needsRenderOnShow = true
+		isUpdatingFriendsList = false -- Ensure lock is released if it was somehow set
+		return
+	end
+
 	-- Prevent concurrent updates
 	if isUpdatingFriendsList then
 		hasPendingUpdate = true

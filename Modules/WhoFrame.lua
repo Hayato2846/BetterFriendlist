@@ -33,6 +33,9 @@ local selectedWhoButton = nil
 local cachedFontHeight = nil
 local cachedExtent = nil
 
+-- Dirty flag: Set when data changes while frame is hidden
+local needsRenderOnShow = false
+
 -- ========================================
 -- Module Lifecycle
 -- ========================================
@@ -42,6 +45,21 @@ function WhoFrame:Initialize()
 	BFL:RegisterEventCallback("WHO_LIST_UPDATE", function(...)
 		self:OnWhoListUpdate(...)
 	end, 10)
+	
+	-- Hook OnShow to re-render if data changed while hidden
+	if BetterFriendsFrame then
+		BetterFriendsFrame:HookScript("OnShow", function()
+			if needsRenderOnShow then
+				-- Only trigger update if we are on the Who tab (tab 3 usually, but let's check visibility)
+				if BetterFriendsFrame.WhoFrame and BetterFriendsFrame.WhoFrame:IsShown() then
+					if _G.BetterWhoFrame_Update then
+						_G.BetterWhoFrame_Update()
+					end
+					needsRenderOnShow = false
+				end
+			end
+		end)
+	end
 end
 
 -- Handle WHO_LIST_UPDATE event
@@ -385,6 +403,13 @@ end
 -- Update Who list display
 function WhoFrame:Update(forceRebuild)
 	if not BetterFriendsFrame or not BetterFriendsFrame.WhoFrame or not whoDataProvider then
+		return
+	end
+	
+	-- Visibility Optimization:
+	-- If the frame (or the Who tab) is hidden, don't rebuild the list.
+	if not BetterFriendsFrame:IsShown() or not BetterFriendsFrame.WhoFrame:IsShown() then
+		needsRenderOnShow = true
 		return
 	end
 	

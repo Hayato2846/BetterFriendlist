@@ -27,7 +27,6 @@ BFL:RegisterModule("QuickJoin", QuickJoin)
 
 -- Constants
 local MAX_DISPLAYED_MEMBERS = 8  -- Maximum members shown in group list
-local THROTTLE_INTERVAL = 1.0     -- Update throttle (max once per second)
 local TOAST_DURATION = 8.0        -- Toast button display duration
 
 -- Module State
@@ -40,6 +39,10 @@ QuickJoin.config = nil            -- Social Queue Config (from C_SocialQueue.Get
 QuickJoin.mockGroups = {}         -- Mock groups for testing (added to real groups)
 QuickJoin.selectedGUID = nil      -- Currently selected group GUID
 QuickJoin.selectedButtons = {}    -- Track button selection states
+
+-- Dirty flag: Set when data changes while frame is hidden
+local needsRenderOnShow = false
+local updateTimer = nil
 
 --[[
 	Helper: GetFriendInfoByGUID
@@ -211,6 +214,19 @@ function QuickJoin:Initialize()
 		self:CleanupCache()
 	end)
 	
+	-- Hook OnShow to re-render if data changed while hidden
+	if BetterFriendsFrame then
+		BetterFriendsFrame:HookScript("OnShow", function()
+			if needsRenderOnShow then
+				-- Only trigger update if we are on the QuickJoin tab
+				if BetterFriendsFrame.QuickJoinFrame and BetterFriendsFrame.QuickJoinFrame:IsShown() then
+					self:Update(true)
+					needsRenderOnShow = false
+				end
+			end
+		end)
+	end
+	
 	self.initialized = true
 end
 
@@ -234,19 +250,27 @@ end
 
 -- Update available groups list
 function QuickJoin:Update(forceUpdate)
-	-- Throttle updates (max once per second) unless forced
-	local now = GetTime()
-	if not forceUpdate and now - self.lastUpdate < THROTTLE_INTERVAL then
-		if not self.updateQueued then
-			self.updateQueued = true
-			C_Timer.After(THROTTLE_INTERVAL, function()
-				self:Update()
-			end)
-		end
+	-- Visibility Optimization:
+	-- If the frame (or the QuickJoin tab) is hidden, don't rebuild the list.
+	if not forceUpdate and (not BetterFriendsFrame or not BetterFriendsFrame:IsShown() or not BetterFriendsFrame.QuickJoinFrame or not BetterFriendsFrame.QuickJoinFrame:IsShown()) then
+		needsRenderOnShow = true
+		return
+	end
+
+	-- Event Coalescing (Micro-Throttling)
+	if not forceUpdate and updateTimer then
 		return
 	end
 	
-	self.lastUpdate = now
+	if not forceUpdate then
+		updateTimer = C_Timer.After(0, function()
+			updateTimer = nil
+			self:Update(true)
+		end)
+		return
+	end
+	
+	self.lastUpdate = GetTime()
 	self.updateQueued = false
 	
 	-- Get all available groups from Social Queue API

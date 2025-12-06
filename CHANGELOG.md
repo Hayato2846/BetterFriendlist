@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.9.5] - 2025-12-06
+
+### ⚡ Performance Optimization & Feature Requests
+
+Comprehensive performance refactoring and implementation of user-requested features.
+
+### Added
+- **Built-in Group Customization** - You can now rename and recolor "Favorites" and "No Group"
+  - Right-click on these group headers to access the new options
+  - Custom colors are persisted and synced across characters
+
+### Improved
+- **Data Broker Enhancements** - Significant upgrades to the Data Broker module
+  - **Advanced Tooltip**: Now uses LibQTip for a rich, multi-column display (Name, Status, Zone, Realm, Notes).
+  - **Interactive Group Headers**:
+    - **Collapse/Expand**: Left-click group headers in the tooltip to toggle visibility.
+    - **Context Menu**: Right-click headers to Rename, Change Color, or Delete groups directly from the tooltip.
+    - **Visual Feedback**: Added hover highlights and collapse indicators `(+)`/`(-)`.
+  - **Visual Consistency**: Tooltip now respects all Friendlist visual settings:
+    - **Notes as Name**: Uses your custom notes if enabled.
+    - **Class Colors**: Names are colored by class (respecting "Colorize names" setting).
+    - **Faction Icons**: Shows faction icons if enabled.
+    - **Grayed Out**: Respects "Gray out other faction" setting.
+  - **Text Formatting**: New options to toggle "Friends:" label and Total count (e.g. "5" vs "Friends: 5/10").
+  - **Fixed Footer**: Summary information is now pinned to the bottom of the tooltip.
+  - **Interactive Actions**:
+    - **Left-Click**: Toggle Friends List window.
+    - **Right-Click**: Open Settings.
+    - **Middle-Click**: Cycle through filters (All, Online, WoW, Battle.net).
+  - **Visual Polish**:
+    - **Game Icons**: Updated support for all modern Battle.net games (Diablo IV, Overwatch 2, Rumble, etc.).
+    - **Status Icons**: Clear indicators for Online, AFK, DND, and Mobile status.
+- **Smart Group Counts** - Group headers now show `(Shown/Total)` counts when filters are active (e.g., "Favorites (2/5)" when 3 are offline).
+- **Sorting Logic Overhaul** - "What You See Is What You Sort"
+  - **Smart Name Sorting**: Now respects "Show Notes as Name" setting. If you see a note, it sorts by that note.
+  - **BattleTag Sorting**: Sorts by the visible name only (e.g., "Jonas"), ignoring the hidden Real ID and discriminator (#1234).
+  - **Offline Sorting**: Offline friends are now automatically sorted by "Last Online" time (most recent first).
+- **Global Visibility Awareness** - The addon now intelligently pauses all processing when the frame is hidden
+  - **Friends List**: No longer processes updates in the background while playing
+  - **Raid Frame**: Completely dormant until the Raid tab is opened
+  - **Who Frame**: Zero CPU usage when not actively searching
+  - **Quick Join**: Social Queue updates are paused while the tab is closed
+  - **Result**: Massive CPU reduction during gameplay, especially in busy environments (cities, raids)
+- **Smart Event Coalescing** - Implemented micro-throttling (1-frame delay) for all list updates
+  - Replaces fixed-interval throttling with a smarter, responsive system
+  - Eliminates redundant calculations during "event bursts" (e.g., mass logins, zone changes, raid joins)
+  - Ensures the UI feels instant while preventing "update storms"
+- **Lazy Loading Architecture** - Tabs now only initialize and render when first clicked
+  - Reduces initial addon load time
+  - Prevents memory allocation for features you aren't currently using
+
+### Changed
+- **Sort Menu Cleanup** - Removed redundant "Sort by Note" option (functionality integrated into "Sort by Name")
+
 ## [1.9.4] - 2025-12-05
 
 ### 🔗 ElvUI Compatibility & Quick Join Fixes

@@ -35,6 +35,10 @@ RaidFrame.currentTab = TAB_MODE_ROSTER
 RaidFrame.savedInstances = {}       -- Saved instance data
 RaidFrame.pendingUpdate = false     -- Throttle flag for roster updates
 
+-- Dirty flag: Set when data changes while frame is hidden
+local needsRenderOnShow = false
+local isUpdatingRaid = false
+
 -- Difficulty constants (from Blizzard)
 RaidFrame.DIFFICULTY_PRIMARYRAID_NORMAL = 14
 RaidFrame.DIFFICULTY_PRIMARYRAID_HEROIC = 15
@@ -426,6 +430,17 @@ function RaidFrame:Initialize()
     
     -- Initial update of control panel (this will set label too)
     self:UpdateControlPanel()
+    
+    -- Hook OnShow to re-render if data changed while hidden
+    if BetterFriendsFrame then
+        BetterFriendsFrame:HookScript("OnShow", function()
+            if needsRenderOnShow then
+                BFL:DebugPrint("|cff00ffffRaidFrame:|r Frame shown, dirty flag set - triggering refresh")
+                self:OnRaidRosterUpdate()
+                needsRenderOnShow = false
+            end
+        end)
+    end
     
     BFL:DebugPrint("[BFL] RaidFrame initialized")
 end
@@ -1492,16 +1507,32 @@ end
 -- ========================================
 
 function RaidFrame:OnRaidRosterUpdate(...)
-	-- Immediate update for crisp UI response
-	-- Note: Blizzard fires RAID_ROSTER_UPDATE rarely enough that throttling isn't needed
-	self:UpdateRaidMembers()
-	self:BuildDisplayList()
-	
-	-- Update UI
-	self:UpdateAllMemberButtons()
-	self:UpdateControlPanel()
-    -- Note: We DON'T need to call BetterRaidFrame_Update() here anymore
-    -- The EveryoneAssistCheckbox handles its own state via events (GROUP_ROSTER_UPDATE)
+    -- Visibility Optimization:
+    -- If the frame is hidden, we don't need to fetch data or rebuild the list.
+    -- Just mark it as dirty so it updates when shown.
+    if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
+        needsRenderOnShow = true
+        return
+    end
+
+    -- Event Coalescing (Micro-Throttling)
+    if self.updateTimer then
+        return
+    end
+    
+    self.updateTimer = C_Timer.After(0, function()
+        self.updateTimer = nil
+        
+        -- Immediate update for crisp UI response
+        self:UpdateRaidMembers()
+        self:BuildDisplayList()
+        
+        -- Update UI
+        self:UpdateAllMemberButtons()
+        self:UpdateControlPanel()
+        -- Note: We DON'T need to call BetterRaidFrame_Update() here anymore
+        -- The EveryoneAssistCheckbox handles its own state via events (GROUP_ROSTER_UPDATE)
+    end)
 end
 
 function RaidFrame:OnGroupJoined(...)
