@@ -97,8 +97,10 @@ local GetClientInfo = setmetatable({
 })
 
 -- Status icon helper (AFK/DND) - smaller size for tooltip
-local function GetStatusIcon(isAFK, isDND)
-	if isAFK then
+local function GetStatusIcon(isAFK, isDND, isMobile)
+	local showMobileAsAFK = BetterFriendlistDB and BetterFriendlistDB.showMobileAsAFK
+
+	if isAFK or (isMobile and showMobileAsAFK) then
 		return "|TInterface\\FriendsFrame\\StatusIcon-Away:12:12:0:0:32:32:5:27:5:27|t"
 	elseif isDND then
 		return "|TInterface\\FriendsFrame\\StatusIcon-DnD:12:12:0:0:32:32:5:27:5:27|t"
@@ -548,15 +550,51 @@ function Broker:UpdateBrokerText()
 
 	-- Format text based on config
 	local text
+	local showLabel = BetterFriendlistDB.brokerShowLabel ~= false -- Default true
+	local showTotal = BetterFriendlistDB.brokerShowTotal ~= false -- Default true
+	
 	if BetterFriendlistDB.brokerShowGroups then
-		-- Split display: "5/10 WoW | 3/8 BNet"
-		text = string.format("%d/%d WoW | %d/%d BNet", wowOnline, wowTotal, bnetOnline, bnetTotal)
+		-- Split display: "[Icon] 5/10 | [Icon] 3/8"
+		local wowText = showTotal and string.format("%d/%d", wowOnline, wowTotal) or tostring(wowOnline)
+		local bnetText = showTotal and string.format("%d/%d", bnetOnline, bnetTotal) or tostring(bnetOnline)
+		
+		-- Use modern texture paths for icons (matching FriendsFrame style)
+		-- WoW Icon: 939375 (Requested by user) - Zoomed in (cropped) to match visual weight
+		local wowIcon = "|T939375:16:16:0:0:64:64:5:59:5:59|t"
+		-- BNet Icon: Custom "All Friends" icon from QuickFilter
+		local bnetIcon = "|TInterface\\AddOns\\BetterFriendlist\\Icons\\filter-all:16:16:0:0|t"
+		
+		-- Check visibility settings (default to true if nil)
+		local showWoWIcon = BetterFriendlistDB.brokerShowWoWIcon ~= false
+		local showBNetIcon = BetterFriendlistDB.brokerShowBNetIcon ~= false
+		
+		local wowPart = (showWoWIcon and (wowIcon .. " ") or "") .. wowText
+		local bnetPart = (showBNetIcon and (bnetIcon .. " ") or "") .. bnetText
+		
+		text = string.format("%s | %s", wowPart, bnetPart)
+		
+		if showLabel then
+			text = "Friends: " .. text
+		end
 	else
 		-- Combined display: "Friends: 8/18"
-		text = string.format("Friends: %d/%d", totalOnline, totalFriends)
+		local countText = showTotal and string.format("%d/%d", totalOnline, totalFriends) or tostring(totalOnline)
+		if showLabel then
+			text = string.format("Friends: %s", countText)
+		else
+			text = countText
+		end
 	end
 
 	dataObject.text = text
+
+	-- Update Icon
+	local showIcon = BetterFriendlistDB.brokerShowIcon ~= false -- Default true
+	if showIcon then
+		dataObject.icon = "Interface\\AddOns\\BetterFriendlist\\Textures\\PortraitIcon.blp"
+	else
+		dataObject.icon = nil -- Hide icon
+	end
 
 	BFL:DebugPrint(string.format("Broker: Updated text to '%s'", text))
 end
@@ -768,411 +806,80 @@ end
 -- LibQTip Tooltip (NEW)
 -- ========================================
 
-local function CreateLibQTipTooltip(anchorFrame)
-	if not LQT then
-		BFL:DebugPrint("Broker: LibQTip not available, skipping tooltip")
-		return nil
+-- Helper: Get display name (respects showNotesAsName)
+local function GetFriendDisplayName(friend)
+	local showNotes = BetterFriendlistDB and BetterFriendlistDB.showNotesAsName
+	if showNotes and friend.note and friend.note ~= "" then
+		return friend.note
 	end
+	return friend.accountName or friend.characterName or "Unknown"
+end
 
-	-- Acquire tooltip with 8 columns
-	-- Columns: Name(LEFT), Level(CENTER), Character(LEFT), Game(LEFT), Zone(LEFT), Realm(LEFT), Faction(LEFT), Notes(LEFT)
-	local tt = LQT:Acquire(tooltipKey, 8, "LEFT", "CENTER", "LEFT", "LEFT", "LEFT", "LEFT", "LEFT", "LEFT")
-	tt:Clear()
-	tt:SmartAnchorTo(anchorFrame)
-	tt:SetAutoHideDelay(0.25, anchorFrame)
-	tt:SetFrameStrata("HIGH") -- Lower than TOOLTIP so context menus appear above
-	tt:UpdateScrolling()
-
-	-- Header
-	local headerLine = tt:AddHeader()
-	tt:SetCell(headerLine, 1, C("dkyellow", "BetterFriendlist"), "GameFontNormalLarge", "LEFT", 8)
-	tt:AddSeparator()
-
-	-- Column Headers
-	local colLine = tt:AddLine(
-		C("ltyellow", "Name"),
-		C("ltyellow", "Lvl"),
-		C("ltyellow", "Character"),
-		C("ltyellow", "Game"),
-		C("ltyellow", "Zone"),
-		C("ltyellow", "Realm"),
-		C("ltyellow", "Faction"),
-		C("ltyellow", "Notes")
-	)
-	tt:AddSeparator()
-
-	local Groups = GetGroups()
-	local groupsData = Groups and Groups:GetAll() or {}
-
-	-- Get ALL online friends directly from API
-	local friends = {}
+-- Helper: Get colored level text
+local function GetColoredLevelText(level)
+	if not level or level == 0 then return "" end
 	
-	-- Check if mobile should be treated as offline
-	local treatMobileAsOffline = BetterFriendlistDB and BetterFriendlistDB.treatMobileAsOffline
-
-	-- BNet friends
-	if BNConnected() then
-		local numBNetTotal, numBNetOnline = BNGetNumFriends()
-		for i = 1, numBNetOnline do
-			local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
-			if accountInfo and accountInfo.gameAccountInfo and accountInfo.gameAccountInfo.isOnline then
-				local gameInfo = accountInfo.gameAccountInfo
-				local client = gameInfo.clientProgram or "App"
-				
-				-- Skip mobile users if treatMobileAsOffline is enabled
-				local isMobile = (client == "BSAp")
-				if treatMobileAsOffline and isMobile then
-					-- Skip this friend - treat as offline
-				else
-					-- Use battleTag for consistent UID with FriendsList (bnet_BattleTag#1234)
-					local friendUID = accountInfo.battleTag and ("bnet_" .. accountInfo.battleTag) or ("bnet_" .. tostring(accountInfo.bnetAccountID))
-					table.insert(friends, {
-						id = friendUID,
-						bnetAccountID = accountInfo.bnetAccountID,
-						battleTag = accountInfo.battleTag,
-						type = "bnet",
-						accountName = accountInfo.accountName or "Unknown",
-						characterName = gameInfo.characterName or "",
-						level = gameInfo.characterLevel or 0,
-						className = gameInfo.className or "UNKNOWN",
-						classID = gameInfo.classID,
-						client = client,
-						area = gameInfo.areaName or gameInfo.richPresence or "",
-						realmName = gameInfo.realmName or "",
-						factionName = gameInfo.factionName or "",
-						isAFK = accountInfo.isAFK,
-						isDND = accountInfo.isDND,
-						isMobile = isMobile,
-						broadcast = accountInfo.customMessage or "",
-						broadcastTime = accountInfo.customMessageTime,
-						note = accountInfo.note or "",
-						gameAccountID = gameInfo.gameAccountID
-					})
-				end
-			end
-		end
-	end
-
-	-- WoW friends
-	local numWoWFriends = C_FriendList.GetNumFriends()
-	for i = 1, numWoWFriends do
-		local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
-		if friendInfo and friendInfo.connected then
-			local fullName = friendInfo.name or ""
-			local name, realm = strsplit("-", fullName, 2)
-			-- Use normalized name for consistent UID with FriendsList (wow_Name-Realm)
-			local normalizedName = BFL:NormalizeWoWFriendName(fullName)
-			local friendUID = normalizedName and ("wow_" .. normalizedName) or ("wow_" .. fullName)
-			table.insert(friends, {
-				id = friendUID,
-				type = "wow",
-				accountName = name,
-				characterName = name,
-				fullName = fullName,
-				level = friendInfo.level or 0,
-				className = friendInfo.className or "UNKNOWN",
-				classID = friendInfo.classID,
-				client = "WoW",
-				area = friendInfo.area or "",
-				realmName = realm or GetRealmName(),
-				factionName = UnitFactionGroup("player"),
-				isAFK = friendInfo.afk,
-				isDND = friendInfo.dnd,
-				note = friendInfo.notes or ""
-			})
-		end
-	end
-
-	-- Apply current filter
-	local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
-	if currentFilter ~= "all" then
-		local filteredFriends = {}
-		for _, friend in ipairs(friends) do
-			local include = false
-
-			if currentFilter == "online" then
-				include = true -- already only online friends
-			elseif currentFilter == "offline" then
-				include = false -- skip all (no offline friends in tooltip)
-			elseif currentFilter == "wow" then
-				include = (friend.type == "wow" or friend.client == "WoW")
-			elseif currentFilter == "bnet" then
-				include = (friend.type == "bnet" and friend.client ~= "WoW")
-			elseif currentFilter == "hideafk" then
-				include = not (friend.isAFK or friend.isDND)
-			elseif currentFilter == "retail" then
-				include = (friend.client == "WoW" or friend.type == "wow")
-			end
-
-			if include then
-				table.insert(filteredFriends, friend)
-			end
-		end
-		friends = filteredFriends
-	end
-
-	-- Apply current sort mode (simplified sorting for tooltip)
-	local sortMode = BetterFriendlistDB and BetterFriendlistDB.primarySort or "status"
+	local hideMaxLevel = BetterFriendlistDB and BetterFriendlistDB.hideMaxLevel
+	local maxLevel = GetMaxLevelForPlayerExpansion()
 	
-	-- Simple sort comparator for tooltip
-	local function CompareFriends(a, b)
-		if sortMode == "name" then
-			local nameA = (a.characterName and a.characterName ~= "") and a.characterName or a.accountName
-			local nameB = (b.characterName and b.characterName ~= "") and b.characterName or b.accountName
-			return (nameA or ""):lower() < (nameB or ""):lower()
-		elseif sortMode == "level" then
-			local levelA = a.level or 0
-			local levelB = b.level or 0
-			if levelA ~= levelB then
-				return levelA > levelB
-			end
-			-- Secondary: name
-			local nameA = (a.characterName and a.characterName ~= "") and a.characterName or a.accountName
-			local nameB = (b.characterName and b.characterName ~= "") and b.characterName or b.accountName
-			return (nameA or ""):lower() < (nameB or ""):lower()
-		elseif sortMode == "zone" then
-			local zoneA = a.area or ""
-			local zoneB = b.area or ""
-			if zoneA ~= zoneB then
-				return zoneA:lower() < zoneB:lower()
-			end
-			-- Secondary: name
-			local nameA = (a.characterName and a.characterName ~= "") and a.characterName or a.accountName
-			local nameB = (b.characterName and b.characterName ~= "") and b.characterName or b.accountName
-			return (nameA or ""):lower() < (nameB or ""):lower()
-		elseif sortMode == "game" then
-			-- WoW first, then other games, then apps
-			local function GetGamePriority(friend)
-				if friend.client == "WoW" or friend.type == "wow" then return 0 end
-				if friend.client == "App" or friend.client == "BSAp" then return 2 end
-				return 1
-			end
-			local priorityA = GetGamePriority(a)
-			local priorityB = GetGamePriority(b)
-			if priorityA ~= priorityB then
-				return priorityA < priorityB
-			end
-			-- Secondary: name
-			local nameA = (a.characterName and a.characterName ~= "") and a.characterName or a.accountName
-			local nameB = (b.characterName and b.characterName ~= "") and b.characterName or b.accountName
-			return (nameA or ""):lower() < (nameB or ""):lower()
-		else
-			-- Default (status): Online first (all are online in tooltip), then by AFK/DND, then name
-			-- AFK/DND at bottom
-			local afkA = (a.isAFK or a.isDND) and 1 or 0
-			local afkB = (b.isAFK or b.isDND) and 1 or 0
-			if afkA ~= afkB then
-				return afkA < afkB
-			end
-			-- Secondary: name
-			local nameA = (a.characterName and a.characterName ~= "") and a.characterName or a.accountName
-			local nameB = (b.characterName and b.characterName ~= "") and b.characterName or b.accountName
-			return (nameA or ""):lower() < (nameB or ""):lower()
-		end
+	if hideMaxLevel and level == maxLevel then
+		return ""
 	end
 	
-	table.sort(friends, CompareFriends)
+	local color = GetQuestDifficultyColor(level)
+	return string.format("|cff%02x%02x%02x%d|r", color.r * 255, color.g * 255, color.b * 255, level)
+end
 
-	-- Group friends by custom groups
-	local groupedFriends = {}
-	local ungrouped = {}
+-- ========================================
+-- Fixed Footer Implementation
+-- ========================================
+local FOOTER_HEIGHT = 160 -- Height for the fixed footer area
+local MAX_TOOLTIP_HEIGHT = 690 -- Maximum height for the tooltip before scrolling
 
-	for _, friend in ipairs(friends) do
-		local friendGroups = BetterFriendlistDB and BetterFriendlistDB.friendGroups and
-		BetterFriendlistDB.friendGroups[friend.id] or {}
-		local assigned = false
-
-		for _, groupId in ipairs(friendGroups) do
-			if groupsData[groupId] then
-				groupedFriends[groupId] = groupedFriends[groupId] or {}
-				table.insert(groupedFriends[groupId], friend)
-				assigned = true
-			end
-		end
-
-		if not assigned then
-			table.insert(ungrouped, friend)
+local function RenderFixedFooter(footerFrame)
+	-- Clear previous content
+	if footerFrame.content then
+		for _, region in ipairs(footerFrame.content) do
+			region:Hide()
 		end
 	end
-
-	local displayedCount = 0
-
-	-- Display Battle.Net Friends Header
-	if BNConnected() then
-		local bnetLine = tt:AddLine()
-		tt:SetCell(bnetLine, 1, C("ltgray", "Battle.Net Friends"), nil, "LEFT", 8)
+	footerFrame.content = {}
+	
+	local function AddLine(text, font, r, g, b)
+		local fs = footerFrame:CreateFontString(nil, "OVERLAY", font or "GameTooltipTextSmall")
+		fs:SetText(text)
+		fs:SetJustifyH("LEFT")
+		fs:SetWordWrap(false) -- Prevent wrapping to avoid overlap with fixed offsets
+		if r then fs:SetTextColor(r, g, b) end
+		table.insert(footerFrame.content, fs)
+		return fs
+	end
+	
+	local function AddSeparator()
+		local tex = footerFrame:CreateTexture(nil, "ARTWORK")
+		tex:SetColorTexture(0.3, 0.3, 0.3, 0.5)
+		tex:SetHeight(1)
+		table.insert(footerFrame.content, tex)
+		return tex
 	end
 
-	-- Get sorted group IDs for consistent display order
-	local sortedGroupIds = Groups and Groups.GetSortedGroupIds and Groups:GetSortedGroupIds() or {}
-
-	-- Display grouped BNet friends in configured order
-	for _, groupId in ipairs(sortedGroupIds) do
-		local groupFriends = groupedFriends[groupId]
-		if groupFriends then
-			local groupInfo = groupsData[groupId]
-			if groupInfo then
-			local hasMembers = false
-			for _, friend in ipairs(groupFriends) do
-				if friend.type == "bnet" then
-					hasMembers = true
-					break
-				end
-			end
-
-			if hasMembers then
-				local groupLine = tt:AddLine()
-				tt:SetCell(groupLine, 1, "  " .. C("dkyellow", groupInfo.name), nil, "LEFT", 8)
-
-				for i, friend in ipairs(groupFriends) do
-					if friend.type == "bnet" then
-						local nameText = friend.characterName ~= "" and friend.characterName or friend.accountName
-						local statusIcon = GetStatusIcon(friend.isAFK, friend.isDND)
-						local clientInfo = GetClientInfo(friend.client)
-						local factionIcon = friend.client == "WoW" and GetFactionIcon(friend.factionName) or ""
-
-						local line = tt:AddLine(
-							"    " .. statusIcon .. " " .. friend.accountName,
-							friend.level > 0 and tostring(friend.level) or "",
-							ClassColorText(friend, nameText) .. (factionIcon ~= "" and " " .. factionIcon or ""),
-							clientInfo.iconStr .. " " .. clientInfo.short,
-							friend.area or "",
-							friend.realmName or "",
-							friend.factionName or "",
-							friend.note or ""
-						)
-
-						-- Hover highlight
-						tt:SetLineColor(line, 0, 0, 0, 0)
-						tt:SetLineScript(line, "OnEnter", function()
-							tt:SetLineColor(line, 0.2, 0.4, 0.6, 0.3)
-						end)
-						tt:SetLineScript(line, "OnLeave", function()
-							tt:SetLineColor(line, 0, 0, 0, 0)
-						end)
-
-						-- Click handler
-						tt:SetLineScript(line, "OnMouseUp", function(self, button)
-							OnFriendLineClick(nil, friend, button)
-						end)
-
-						displayedCount = displayedCount + 1
-					end
-				end
-			end
-			end
-		end
-	end
-
-	-- Display ungrouped BNet friends
-	local ungroupedBNet = {}
-	for _, friend in ipairs(ungrouped) do
-		if friend.type == "bnet" then
-			table.insert(ungroupedBNet, friend)
-		end
-	end
-
-	if #ungroupedBNet > 0 then
-		for i, friend in ipairs(ungroupedBNet) do
-			local nameText = friend.characterName ~= "" and friend.characterName or friend.accountName
-			local statusIcon = GetStatusIcon(friend.isAFK, friend.isDND)
-			local clientInfo = GetClientInfo(friend.client)
-			local factionIcon = friend.client == "WoW" and GetFactionIcon(friend.factionName) or ""
-
-			local line = tt:AddLine(
-				"  " .. statusIcon .. " " .. friend.accountName,
-				friend.level > 0 and tostring(friend.level) or "",
-				ClassColorText(friend, nameText) .. (factionIcon ~= "" and " " .. factionIcon or ""),
-				clientInfo.iconStr .. " " .. clientInfo.short,
-				friend.area or "",
-				friend.realmName or "",
-				friend.factionName or "",
-				friend.note or ""
-			)
-
-			-- Hover highlight
-			tt:SetLineColor(line, 0, 0, 0, 0)
-			tt:SetLineScript(line, "OnEnter", function()
-				tt:SetLineColor(line, 0.2, 0.4, 0.6, 0.3)
-			end)
-			tt:SetLineScript(line, "OnLeave", function()
-				tt:SetLineColor(line, 0, 0, 0, 0)
-			end)
-
-			-- Click handler
-			tt:SetLineScript(line, "OnMouseUp", function(self, button)
-				OnFriendLineClick(nil, friend, button)
-			end)
-
-			displayedCount = displayedCount + 1
-		end
-	end
-
-	-- WoW Friends Section
-	tt:AddSeparator()
-	local wowLine = tt:AddLine()
-	tt:SetCell(wowLine, 1, C("ltgray", "WoW Friends"), nil, "LEFT", 8)
-
-	-- Display ungrouped WoW friends
-	local ungroupedWoW = {}
-	for _, friend in ipairs(ungrouped) do
-		if friend.type == "wow" then
-			table.insert(ungroupedWoW, friend)
-		end
-	end
-
-	if #ungroupedWoW > 0 then
-		for i, friend in ipairs(ungroupedWoW) do
-			local statusIcon = GetStatusIcon(friend.isAFK, friend.isDND)
-			local clientInfo = GetClientInfo(friend.client)
-			local factionIcon = GetFactionIcon(friend.factionName)
-
-			local line = tt:AddLine(
-				statusIcon,
-				friend.level > 0 and tostring(friend.level) or "",
-				ClassColorText(friend, friend.characterName) .. (factionIcon ~= "" and " " .. factionIcon or ""),
-				clientInfo.iconStr .. " " .. clientInfo.short,
-				friend.area or "",
-				friend.realmName or "",
-				friend.factionName or "",
-				friend.note or ""
-			)
-
-			-- Hover highlight
-			tt:SetLineColor(line, 0, 0, 0, 0)
-			tt:SetLineScript(line, "OnEnter", function()
-				tt:SetLineColor(line, 0.2, 0.4, 0.6, 0.3)
-			end)
-			tt:SetLineScript(line, "OnLeave", function()
-				tt:SetLineColor(line, 0, 0, 0, 0)
-			end)
-
-			-- Click handler
-			tt:SetLineScript(line, "OnMouseUp", function(self, button)
-				OnFriendLineClick(nil, friend, button)
-			end)
-
-			displayedCount = displayedCount + 1
-		end
-	else
-		local emptyLine = tt:AddLine()
-		tt:SetCell(emptyLine, 1, C("gray", "  No WoW friends online"), nil, "LEFT", 8)
-	end
-
-	-- Footer
-	if displayedCount == 0 then
-		tt:AddSeparator()
-		local emptyLine = tt:AddLine()
-		tt:SetCell(emptyLine, 1, C("gray", "No friends online"), nil, "CENTER", 8)
-	end
-
-	tt:AddSeparator()
+	local yOffset = -5
+	
+	-- Separator
+	local sep1 = AddSeparator()
+	sep1:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
+	sep1:SetPoint("TOPRIGHT", footerFrame, "TOPRIGHT", -10, yOffset)
+	yOffset = yOffset - 5
+	
+	-- Total Online
 	local wowOnline, wowTotal, bnetOnline, bnetTotal = GetFriendCounts()
-	local totalLine = tt:AddLine()
-	tt:SetCell(totalLine, 1, string.format("Total: %d online / %d friends", wowOnline + bnetOnline, wowTotal + bnetTotal),
-		nil, "LEFT", 8)
-
-	-- Current filter with icon and text (same as QuickFilter dropdown)
+	local totalText = string.format(L("BROKER_TOTAL_ONLINE"), wowOnline + bnetOnline, wowTotal + bnetTotal)
+	local totalLine = AddLine(totalText, "GameTooltipText", 1, 1, 1)
+	totalLine:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
+	totalLine:SetPoint("RIGHT", footerFrame, "RIGHT", -10, yOffset)
+	yOffset = yOffset - 16
+	
+	-- Filter
 	local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
 	local QuickFilters = GetQuickFilters()
 	local filterText = "All Friends"
@@ -1185,49 +892,833 @@ local function CreateLibQTipTooltip(anchorFrame)
 			filterIcon = icons[currentFilter]
 		end
 	end
-
-	local filterLine = tt:AddLine()
+	
 	local filterDisplay = string.format("|T%s:16:16:0:0|t %s", filterIcon, C("ltyellow", filterText))
-	tt:SetCell(filterLine, 1, "Filter: " .. filterDisplay, nil, "LEFT", 8)
-
-	-- Current sort mode
-	local sortMode = BetterFriendlistDB and BetterFriendlistDB.primarySort or "status"
+	local filterLine = AddLine(L("BROKER_FILTER_LABEL") .. filterDisplay, "GameTooltipText")
+	filterLine:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
+	filterLine:SetPoint("RIGHT", footerFrame, "RIGHT", -10, yOffset)
+	yOffset = yOffset - 18
+	
+	-- Sort
+	local primarySort = BetterFriendlistDB and BetterFriendlistDB.primarySort or "status"
+	local secondarySort = BetterFriendlistDB and BetterFriendlistDB.secondarySort or "name"
+	
 	local sortNames = {
-		status = "Status",
-		name = "Name",
-		level = "Level",
-		zone = "Zone",
-		game = "Game",
-		faction = "Faction",
-		guild = "Guild",
-		class = "Class",
-		activity = "Activity"
+		status = "Status", name = "Name", level = "Level", zone = "Zone",
+		game = "Game", faction = "Faction", guild = "Guild", class = "Class",
+		activity = "Activity", realm = "Realm"
 	}
-	local sortLine = tt:AddLine()
-	tt:SetCell(sortLine, 1, "Sort: " .. C("ltyellow", sortNames[sortMode] or sortMode), nil, "LEFT", 8)
+	local sortIcons = {
+		status = "Interface\\AddOns\\BetterFriendlist\\Icons\\status",
+		name = "Interface\\AddOns\\BetterFriendlist\\Icons\\name",
+		level = "Interface\\AddOns\\BetterFriendlist\\Icons\\level",
+		zone = "Interface\\AddOns\\BetterFriendlist\\Icons\\zone",
+		game = "Interface\\AddOns\\BetterFriendlist\\Icons\\game",
+		faction = "Interface\\AddOns\\BetterFriendlist\\Icons\\faction",
+		guild = "Interface\\AddOns\\BetterFriendlist\\Icons\\guild",
+		class = "Interface\\AddOns\\BetterFriendlist\\Icons\\class",
+		activity = "Interface\\AddOns\\BetterFriendlist\\Icons\\activity",
+		realm = "Interface\\AddOns\\BetterFriendlist\\Icons\\realm"
+	}
+	
+	local function GetSortDisplay(mode)
+		local name = sortNames[mode] or mode
+		local icon = sortIcons[mode]
+		if icon then return string.format("|T%s:14:14:0:0|t %s", icon, name) end
+		return name
+	end
 
-	tt:AddSeparator()
-	local hint1 = tt:AddLine()
-	tt:SetCell(hint1, 1, C("ltgray", "--- Friend Line Actions ---"), nil, "CENTER", 8)
-	local hint2 = tt:AddLine()
-	tt:SetCell(hint2, 1,
-		C("ltblue", "Click Friend:") .. " Whisper • " .. C("ltblue", "Right-Click:") .. " Context Menu", nil, "LEFT",
-		8)
-	local hint3 = tt:AddLine()
-	tt:SetCell(hint3, 1, C("ltblue", "Alt+Click:") .. " Invite/Join • " .. C("ltblue", "Shift+Click:") .. " Copy to Chat", nil,
-		"LEFT", 8)
+	local sortText = GetSortDisplay(primarySort)
+	if secondarySort and secondarySort ~= primarySort and secondarySort ~= "none" then
+		sortText = sortText .. " > " .. GetSortDisplay(secondarySort)
+	end
+	
+	local sortLine = AddLine(L("BROKER_SORT_LABEL") .. C("ltyellow", sortText), "GameTooltipText")
+	sortLine:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
+	sortLine:SetPoint("RIGHT", footerFrame, "RIGHT", -10, yOffset)
+	yOffset = yOffset - 18
+	
+	-- Separator
+	local sep2 = AddSeparator()
+	sep2:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
+	sep2:SetPoint("TOPRIGHT", footerFrame, "TOPRIGHT", -10, yOffset)
+	yOffset = yOffset - 5
+	
+	-- Hints 1
+	local hint1 = AddLine(C("ltgray", L("BROKER_HINT_FRIEND_ACTIONS")), "GameTooltipTextSmall")
+	hint1:SetPoint("TOP", footerFrame, "TOP", 0, yOffset)
+	yOffset = yOffset - 14
+	
+	local hint2 = AddLine(C("ltblue", L("BROKER_HINT_CLICK_WHISPER")) .. L("BROKER_HINT_WHISPER") .. C("ltblue", L("BROKER_HINT_RIGHT_CLICK_MENU")) .. L("BROKER_HINT_CONTEXT_MENU"), "GameTooltipTextSmall")
+	hint2:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
+	hint2:SetPoint("RIGHT", footerFrame, "RIGHT", -10, yOffset)
+	yOffset = yOffset - 14
+	
+	local hint3 = AddLine(C("ltblue", L("BROKER_HINT_ALT_CLICK")) .. L("BROKER_HINT_INVITE") .. C("ltblue", L("BROKER_HINT_SHIFT_CLICK")) .. L("BROKER_HINT_COPY"), "GameTooltipTextSmall")
+	hint3:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
+	hint3:SetPoint("RIGHT", footerFrame, "RIGHT", -10, yOffset)
+	yOffset = yOffset - 14
+	
+	-- Separator
+	local sep3 = AddSeparator()
+	sep3:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
+	sep3:SetPoint("TOPRIGHT", footerFrame, "TOPRIGHT", -10, yOffset)
+	yOffset = yOffset - 5
+	
+	-- Hints 2
+	local hint4 = AddLine(C("ltgray", L("BROKER_HINT_ICON_ACTIONS")), "GameTooltipTextSmall")
+	hint4:SetPoint("TOP", footerFrame, "TOP", 0, yOffset)
+	yOffset = yOffset - 14
+	
+	local hint5 = AddLine(C("ltblue", L("BROKER_HINT_LEFT_CLICK")) .. L("BROKER_HINT_TOGGLE"), "GameTooltipTextSmall")
+	hint5:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
+	hint5:SetPoint("RIGHT", footerFrame, "RIGHT", -10, yOffset)
+	yOffset = yOffset - 14
+	
+	local hint6 = AddLine(C("ltblue", L("BROKER_HINT_RIGHT_CLICK")) .. L("BROKER_HINT_SETTINGS") .. C("ltblue", L("BROKER_HINT_MIDDLE_CLICK")) .. L("BROKER_HINT_CYCLE_FILTER"), "GameTooltipTextSmall")
+	hint6:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
+	hint6:SetPoint("RIGHT", footerFrame, "RIGHT", -10, yOffset)
+	yOffset = yOffset - 14
+end
 
+-- Helper: Check if any context menu is open
+local function IsMenuOpen()
+	-- Check Legacy Dropdowns (UIDropDownMenu)
+	if UIDROPDOWNMENU_OPEN_MENU and UIDROPDOWNMENU_OPEN_MENU:IsShown() then return true end
+	if _G.Lib_UIDROPDOWNMENU_OPEN_MENU and _G.Lib_UIDROPDOWNMENU_OPEN_MENU:IsShown() then return true end
+
+	-- Check Modern Menu System (11.x C_Menu)
+	if Menu and Menu.GetManager then
+		local manager = Menu.GetManager()
+		if manager and manager:GetOpenMenu() then
+			return true
+		end
+	end
+	
+	return false
+end
+
+-- Helper: Custom AutoHide that respects open menus
+local function SetupTooltipAutoHide(tooltip, anchorFrame)
+	tooltip:SetAutoHideDelay(nil) -- Disable LibQTip's built-in auto-hide
+	
+	if not tooltip.bflTimer then
+		tooltip.bflTimer = CreateFrame("Frame", nil, tooltip)
+	end
+	
+	local timer = tooltip.bflTimer
+	timer.hideTimer = 0
+	timer.checkTimer = 0
+	
+	timer:SetScript("OnUpdate", function(self, elapsed)
+		-- Safety: Stop if tooltip is already hidden
+		if not tooltip:IsShown() then
+			self:SetScript("OnUpdate", nil)
+			return
+		end
+
+		self.checkTimer = self.checkTimer + elapsed
+		if self.checkTimer < 0.1 then return end
+		
+		local checkInterval = self.checkTimer
+		self.checkTimer = 0
+		
+		-- Check if mouse is over tooltip or anchor
+		local isOver = tooltip:IsMouseOver() or (anchorFrame and anchorFrame:IsMouseOver())
+		
+		if isOver then
+			self.hideTimer = 0
+		else
+			-- Mouse is outside
+			if IsMenuOpen() then
+				self.hideTimer = 0 -- Reset timer if menu is open
+			else
+				self.hideTimer = self.hideTimer + checkInterval
+				if self.hideTimer >= 0.25 then
+					if LQT then LQT:Release(tooltip) end
+					self:SetScript("OnUpdate", nil)
+				end
+			end
+		end
+	end)
+end
+
+local function CreateLibQTipTooltip(anchorFrame)
+	if not LQT then
+		BFL:DebugPrint("Broker: LibQTip not available, skipping tooltip")
+		return nil
+	end
+
+	-- Define available columns and their default visibility
+	local columns = {
+		{ key = "Name",      label = L("BROKER_COLUMN_NAME"),      align = "LEFT",   default = true },
+		{ key = "Level",     label = L("BROKER_COLUMN_LEVEL"),       align = "CENTER", default = true },
+		{ key = "Character", label = L("BROKER_COLUMN_CHARACTER"), align = "LEFT",   default = true },
+		{ key = "Game",      label = L("BROKER_COLUMN_GAME"),      align = "LEFT",   default = true },
+		{ key = "Zone",      label = L("BROKER_COLUMN_ZONE"),      align = "LEFT",   default = true },
+		{ key = "Realm",     label = L("BROKER_COLUMN_REALM"),     align = "LEFT",   default = true },
+		{ key = "Notes",     label = L("BROKER_COLUMN_NOTES"),     align = "LEFT",   default = true }
+	}
+	
+	-- Get user-defined column order from DB
+	local columnOrder = BetterFriendlistDB and BetterFriendlistDB.brokerColumnOrder
+	local activeColumns = {}
+	
+	if columnOrder and #columnOrder > 0 then
+		-- Use user-defined order
+		for _, colKey in ipairs(columnOrder) do
+			-- Find column definition
+			local colDef = nil
+			for _, c in ipairs(columns) do
+				if c.key == colKey then
+					colDef = c
+					break
+				end
+			end
+			
+			if colDef then
+				-- Check visibility
+				local settingKey = "brokerShowCol" .. colKey
+				if BetterFriendlistDB[settingKey] ~= false then -- Default true
+					table.insert(activeColumns, colDef)
+				end
+			end
+		end
+	else
+		-- Use default order
+		for _, col in ipairs(columns) do
+			local settingKey = "brokerShowCol" .. col.key
+			if BetterFriendlistDB[settingKey] ~= false then -- Default true
+				table.insert(activeColumns, col)
+			end
+		end
+	end
+	
+	-- If no columns selected, force Name
+	if #activeColumns == 0 then
+		table.insert(activeColumns, columns[1])
+	end
+	
+	-- Build Acquire arguments
+	local numColumns = #activeColumns
+	local alignArgs = {}
+	for _, col in ipairs(activeColumns) do
+		table.insert(alignArgs, col.align)
+	end
+
+	-- Acquire tooltip
+	local tt = LQT:Acquire(tooltipKey, numColumns, unpack(alignArgs))
+	tt:Clear()
+	tt:SmartAnchorTo(anchorFrame)
+	tt.anchorFrame = anchorFrame -- Store anchor for refresh
+	SetupTooltipAutoHide(tt, anchorFrame)
+	tt:SetFrameStrata("HIGH") -- Lower than TOOLTIP so context menus appear above
+	
+	-- Hook OnHide to clean up layout changes when tooltip is released/hidden
+	-- This prevents our custom footer and layout from leaking to other addons that reuse this LibQTip frame
+	if not tt.bflCleanupHooked then
+		local oldOnHide = tt:GetScript("OnHide")
+		tt:SetScript("OnHide", function(self)
+			-- Hide our custom footer
+			if self.footerFrame then
+				self.footerFrame:Hide()
+			end
+			
+			-- Restore standard LibQTip anchors for ScrollFrame
+			if self.scrollFrame then
+				self.scrollFrame:ClearAllPoints()
+				self.scrollFrame:SetPoint("TOPLEFT", self, "TOPLEFT", 10, -10)
+				self.scrollFrame:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -10, 10)
+			end
+			
+			-- Restore standard LibQTip anchors for Slider
+			if self.slider then
+				self.slider:ClearAllPoints()
+				self.slider:SetPoint("TOPRIGHT", self, "TOPRIGHT", -10, -10)
+				self.slider:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -10, 10)
+			end
+			
+			if oldOnHide then
+				oldOnHide(self)
+			end
+		end)
+		tt.bflCleanupHooked = true
+	end
+	
+	-- Setup Fixed Footer Frame
+	if not tt.footerFrame then
+		tt.footerFrame = CreateFrame("Frame", nil, tt)
+		tt.footerFrame:SetPoint("BOTTOMLEFT", tt, "BOTTOMLEFT", 0, 0)
+		tt.footerFrame:SetPoint("BOTTOMRIGHT", tt, "BOTTOMRIGHT", 0, 0)
+		tt.footerFrame:SetHeight(FOOTER_HEIGHT)
+	end
+	tt.footerFrame:Show()
+	
+	-- Adjust ScrollFrame to respect footer
+	if tt.scrollFrame then
+		tt.scrollFrame:ClearAllPoints()
+		tt.scrollFrame:SetPoint("TOP", tt, "TOP", 0, -10) -- TOOLTIP_PADDING
+		tt.scrollFrame:SetPoint("LEFT", tt, "LEFT", 10, 0)
+		tt.scrollFrame:SetPoint("RIGHT", tt, "RIGHT", -10, 0)
+		tt.scrollFrame:SetPoint("BOTTOM", tt.footerFrame, "TOP", 0, 0)
+	end
+	
+	-- Render Footer Content
+	RenderFixedFooter(tt.footerFrame)
+	
+	-- Update Scrolling (Initial)
+	tt:UpdateScrolling(MAX_TOOLTIP_HEIGHT)
+
+	-- Header
+	local headerLine = tt:AddHeader()
+	tt:SetCell(headerLine, 1, C("dkyellow", "BetterFriendlist"), "GameFontNormalLarge", "LEFT", numColumns)
 	tt:AddSeparator()
-	local hint4 = tt:AddLine()
-	tt:SetCell(hint4, 1, C("ltgray", "--- Broker Icon Actions ---"), nil, "CENTER", 8)
-	local hint5 = tt:AddLine()
-	tt:SetCell(hint5, 1, C("ltblue", "Left Click:") .. " Toggle BetterFriendlist", nil, "LEFT", 8)
-	local hint6 = tt:AddLine()
-	tt:SetCell(hint6, 1, C("ltblue", "Right Click:") .. " Settings • " .. C("ltblue", "Middle Click:") .. " Cycle Filter",
-		nil, "LEFT", 8)
+
+	-- Column Headers
+	local headerCells = {}
+	for _, col in ipairs(activeColumns) do
+		table.insert(headerCells, C("ltyellow", col.label))
+	end
+	local colLine = tt:AddLine(unpack(headerCells))
+	tt:AddSeparator()
+
+	local Groups = GetGroups()
+	local groupsData = Groups and Groups:GetAll() or {}
+
+	-- Get ALL online friends directly from API
+	local friends = {}
+	
+	-- Check if mobile should be treated as offline
+	local treatMobileAsOffline = BetterFriendlistDB and BetterFriendlistDB.treatMobileAsOffline
+
+	-- Initialize group counts and buckets
+	local groupCounts = {}
+	local groupedFriends = {}
+	
+	-- Initialize for all known groups
+	for groupId, groupData in pairs(groupsData) do
+		groupCounts[groupId] = { total = 0, online = 0 }
+		groupedFriends[groupId] = {}
+	end
+	-- Ensure nogroup exists if not in groupsData
+	if not groupCounts["nogroup"] then
+		groupCounts["nogroup"] = { total = 0, online = 0 }
+		groupedFriends["nogroup"] = {}
+	end
+
+	-- Helper to process a friend (add to groups and counts)
+	local function ProcessFriend(friend)
+		local friendGroups = BetterFriendlistDB and BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friend.id] or {}
+		local assigned = false
+		local isOnline = friend.connected
+
+		-- Check Favorites (BNet only)
+		if friend.type == "bnet" and friend.isFavorite then
+			-- Only if favorites group is active (in groupsData)
+			if groupsData["favorites"] then
+				groupCounts["favorites"].total = groupCounts["favorites"].total + 1
+				if isOnline then
+					groupCounts["favorites"].online = groupCounts["favorites"].online + 1
+					table.insert(groupedFriends["favorites"], friend)
+				end
+				assigned = true
+			end
+		end
+
+		-- Check Custom Groups
+		for _, groupId in ipairs(friendGroups) do
+			if groupsData[groupId] then
+				groupCounts[groupId].total = groupCounts[groupId].total + 1
+				if isOnline then
+					groupCounts[groupId].online = groupCounts[groupId].online + 1
+					table.insert(groupedFriends[groupId], friend)
+				end
+				assigned = true
+			end
+		end
+
+		-- Check No Group
+		if not assigned then
+			-- Ensure nogroup exists in counts
+			if groupCounts["nogroup"] then
+				groupCounts["nogroup"].total = groupCounts["nogroup"].total + 1
+				if isOnline then
+					groupCounts["nogroup"].online = groupCounts["nogroup"].online + 1
+					table.insert(groupedFriends["nogroup"], friend)
+				end
+			end
+		end
+	end
+
+	-- Collect BNet Friends (ALL)
+	if BNConnected() then
+		local numBNetTotal = BNGetNumFriends()
+		for i = 1, numBNetTotal do
+			local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
+			if accountInfo then
+				local gameInfo = accountInfo.gameAccountInfo or {}
+				local isOnline = gameInfo.isOnline or false
+				local client = gameInfo.clientProgram or "App"
+				
+				-- Check mobile setting
+				local isMobile = (client == "BSAp")
+				if treatMobileAsOffline and isMobile then
+					isOnline = false
+				end
+				
+				-- Create friend object
+				local friendUID = accountInfo.battleTag and ("bnet_" .. accountInfo.battleTag) or ("bnet_" .. tostring(accountInfo.bnetAccountID))
+				
+				local friend = {
+					id = friendUID,
+					bnetAccountID = accountInfo.bnetAccountID,
+					battleTag = accountInfo.battleTag,
+					type = "bnet",
+					accountName = accountInfo.accountName or "Unknown",
+					characterName = gameInfo.characterName or "",
+					level = gameInfo.characterLevel or 0,
+					className = gameInfo.className or "UNKNOWN",
+					classID = gameInfo.classID,
+					client = client,
+					area = gameInfo.areaName or gameInfo.richPresence or "",
+					realmName = gameInfo.realmName or "",
+					factionName = gameInfo.factionName or "",
+					guildName = gameInfo.guildName or "",
+					timerunningSeasonID = gameInfo.timerunningSeasonID,
+					isAFK = accountInfo.isAFK,
+					isDND = accountInfo.isDND,
+					isMobile = isMobile,
+					broadcast = accountInfo.customMessage or "",
+					broadcastTime = accountInfo.customMessageTime,
+					note = accountInfo.note or "",
+					gameAccountID = gameInfo.gameAccountID,
+					connected = isOnline,
+					isFavorite = accountInfo.isFavorite
+				}
+				
+				ProcessFriend(friend)
+			end
+		end
+	end
+
+	-- Collect WoW Friends (ALL)
+	local numWoWFriends = C_FriendList.GetNumFriends()
+	for i = 1, numWoWFriends do
+		local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
+		if friendInfo then
+			local fullName = friendInfo.name or ""
+			local name, realm = strsplit("-", fullName, 2)
+			local normalizedName = BFL:NormalizeWoWFriendName(fullName)
+			local friendUID = normalizedName and ("wow_" .. normalizedName) or ("wow_" .. fullName)
+			
+			local friend = {
+				id = friendUID,
+				type = "wow",
+				accountName = name,
+				characterName = name,
+				fullName = fullName,
+				level = friendInfo.level or 0,
+				className = friendInfo.className or "UNKNOWN",
+				classID = friendInfo.classID,
+				client = "WoW",
+				area = friendInfo.area or "",
+				realmName = realm or GetRealmName(),
+				factionName = UnitFactionGroup("player"),
+				guildName = GetGuildInfo(fullName) or "",
+				isAFK = friendInfo.afk,
+				isDND = friendInfo.dnd,
+				note = friendInfo.notes or "",
+				connected = friendInfo.connected
+			}
+			
+			ProcessFriend(friend)
+		end
+	end
+
+	-- Apply current filter (to online friends only)
+	local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
+	if currentFilter ~= "all" then
+		for groupId, friends in pairs(groupedFriends) do
+			local filteredFriends = {}
+			for _, friend in ipairs(friends) do
+				local include = false
+
+				if currentFilter == "online" then
+					include = true -- already only online friends in groupedFriends
+				elseif currentFilter == "offline" then
+					include = false -- skip all (no offline friends in tooltip)
+				elseif currentFilter == "wow" then
+					include = (friend.type == "wow" or friend.client == "WoW")
+				elseif currentFilter == "bnet" then
+					include = (friend.type == "bnet" and friend.client ~= "WoW")
+				elseif currentFilter == "hideafk" then
+					include = not (friend.isAFK or friend.isDND)
+				elseif currentFilter == "retail" then
+					include = (friend.client == "WoW" or friend.type == "wow")
+				end
+
+				if include then
+					table.insert(filteredFriends, friend)
+				end
+			end
+			groupedFriends[groupId] = filteredFriends
+		end
+	end
+
+	-- Apply current sort mode (simplified sorting for tooltip)
+	local primarySort = BetterFriendlistDB and BetterFriendlistDB.primarySort or "status"
+	local secondarySort = BetterFriendlistDB and BetterFriendlistDB.secondarySort or "name"
+	
+	-- Simple sort comparator for tooltip
+	local function CompareFriends(a, b)
+		-- Helper to compare by a specific mode
+		local function CompareByMode(mode, a, b)
+			if mode == "name" then
+				local showNotesAsName = BetterFriendlistDB and BetterFriendlistDB.showNotesAsName
+				
+				local function GetName(f)
+					if showNotesAsName and f.note and f.note ~= "" then
+						return f.note
+					end
+					return (f.characterName and f.characterName ~= "") and f.characterName or f.accountName
+				end
+
+				local nameA = GetName(a)
+				local nameB = GetName(b)
+				if (nameA or ""):lower() ~= (nameB or ""):lower() then
+					return (nameA or ""):lower() < (nameB or ""):lower()
+				end
+			elseif mode == "level" then
+				local levelA = a.level or 0
+				local levelB = b.level or 0
+				if levelA ~= levelB then
+					return levelA > levelB
+				end
+			elseif mode == "zone" then
+				local zoneA = a.area or ""
+				local zoneB = b.area or ""
+				if zoneA:lower() ~= zoneB:lower() then
+					return zoneA:lower() < zoneB:lower()
+				end
+			elseif mode == "game" then
+				-- WoW first, then other games, then apps
+				local function GetGamePriority(friend)
+					if friend.client == "WoW" or friend.type == "wow" then return 0 end
+					if friend.client == "App" or friend.client == "BSAp" then return 2 end
+					return 1
+				end
+				local priorityA = GetGamePriority(a)
+				local priorityB = GetGamePriority(b)
+				if priorityA ~= priorityB then
+					return priorityA < priorityB
+				end
+			elseif mode == "status" then
+				-- AFK/DND at bottom
+				local afkA = (a.isAFK or a.isDND) and 1 or 0
+				local afkB = (b.isAFK or b.isDND) and 1 or 0
+				if afkA ~= afkB then
+					return afkA < afkB
+				end
+			elseif mode == "faction" then
+				local factionA = a.factionName or ""
+				local factionB = b.factionName or ""
+				if factionA ~= factionB then
+					return factionA < factionB
+				end
+			elseif mode == "guild" then
+				local guildA = a.guildName or ""
+				local guildB = b.guildName or ""
+				if guildA ~= guildB then
+					return guildA < guildB
+				end
+			elseif mode == "class" then
+				local classA = a.className or ""
+				local classB = b.className or ""
+				if classA ~= classB then
+					return classA < classB
+				end
+			elseif mode == "realm" then
+				local realmA = a.realmName or ""
+				local realmB = b.realmName or ""
+				if realmA ~= realmB then
+					return realmA < realmB
+				end
+			end
+			return nil -- Equal
+		end
+
+		-- Primary Sort
+		local primaryResult = CompareByMode(primarySort, a, b)
+		if primaryResult ~= nil then return primaryResult end
+
+		-- Secondary Sort
+		if secondarySort and secondarySort ~= primarySort and secondarySort ~= "none" then
+			local secondaryResult = CompareByMode(secondarySort, a, b)
+			if secondaryResult ~= nil then return secondaryResult end
+		end
+
+		-- Fallback: Name
+		return CompareByMode("name", a, b)
+	end
+	
+	-- Sort each group
+	for groupId, friends in pairs(groupedFriends) do
+		table.sort(friends, CompareFriends)
+	end
+
+	local displayedCount = 0
+
+	-- Helper to render a friend row
+	local function RenderFriendRow(friend, indentation)
+		local nameText = friend.characterName ~= "" and friend.characterName or friend.accountName
+		
+		-- Add Timerunning icon if applicable
+		if friend.timerunningSeasonID and TimerunningUtil and TimerunningUtil.AddSmallIcon then
+			nameText = TimerunningUtil.AddSmallIcon(nameText)
+		end
+
+		local statusIcon = GetStatusIcon(friend.isAFK, friend.isDND, friend.isMobile)
+		local clientInfo = GetClientInfo(friend.client)
+		
+		-- Faction Icon logic
+		local factionIcon = ""
+		if BetterFriendlistDB and BetterFriendlistDB.showFactionIcons then
+			if friend.client == "WoW" or friend.type == "wow" then
+				factionIcon = GetFactionIcon(friend.factionName)
+			end
+		end
+
+		-- Color Logic (Parity with FriendsList)
+		local playerFactionGroup = UnitFactionGroup("player")
+		local grayOtherFaction = BetterFriendlistDB and BetterFriendlistDB.grayOtherFaction
+		local colorClassNames = BetterFriendlistDB and BetterFriendlistDB.colorClassNames
+		if colorClassNames == nil then colorClassNames = true end -- Default true
+
+		local isOppositeFaction = friend.factionName and friend.factionName ~= playerFactionGroup and friend.factionName ~= ""
+		local shouldGray = grayOtherFaction and isOppositeFaction
+
+		-- Determine Name Column Color
+		local nameColor = "|cffffffff" -- Default white
+		if shouldGray then
+			nameColor = "|cff808080"
+		elseif friend.type == "bnet" then
+			nameColor = "|cff00ccff" -- BNet Blue
+		elseif friend.type == "wow" then
+			if colorClassNames then
+				local classColor = GetClassColorForFriend(friend)
+				nameColor = string.format("|cff%02x%02x%02x", classColor.r * 255, classColor.g * 255, classColor.b * 255)
+			else
+				nameColor = "|cffffffff"
+			end
+		end
+
+		local cellValues = {}
+		for _, col in ipairs(activeColumns) do
+			local val = ""
+			if col.key == "Name" then
+				-- Prepend status icon
+				local prefix = indentation .. statusIcon .. " "
+				val = prefix .. nameColor .. GetFriendDisplayName(friend) .. "|r"
+			elseif col.key == "Level" then
+				val = GetColoredLevelText(friend.level)
+			elseif col.key == "Character" then
+				-- Only show if we have a character name
+				if friend.characterName and friend.characterName ~= "" then
+					-- Add faction icon if enabled (matches FriendsList behavior)
+					local displayCharName = nameText
+					if factionIcon ~= "" then
+						displayCharName = factionIcon .. " " .. displayCharName
+					end
+
+					if shouldGray then
+						val = "|cff808080" .. displayCharName .. "|r"
+					elseif colorClassNames then
+						val = ClassColorText(friend, displayCharName)
+					else
+						val = displayCharName
+					end
+				else
+					val = ""
+				end
+			elseif col.key == "Game" then
+				val = clientInfo.iconStr .. " " .. clientInfo.short
+			elseif col.key == "Zone" then
+				val = friend.area or ""
+			elseif col.key == "Realm" then
+				val = friend.realmName or ""
+			elseif col.key == "Notes" then
+				val = friend.note or ""
+			end
+			table.insert(cellValues, val)
+		end
+		
+		local line = tt:AddLine(unpack(cellValues))
+
+		-- Hover highlight
+		tt:SetLineColor(line, 0, 0, 0, 0)
+		tt:SetLineScript(line, "OnEnter", function()
+			tt:SetLineColor(line, 0.2, 0.4, 0.6, 0.3)
+		end)
+		tt:SetLineScript(line, "OnLeave", function()
+			tt:SetLineColor(line, 0, 0, 0, 0)
+		end)
+
+		-- Click handler
+		tt:SetLineScript(line, "OnMouseUp", function(self, button)
+			OnFriendLineClick(nil, friend, button)
+		end)
+		
+		return line
+	end
+
+	-- Display Battle.Net Friends Header
+	-- if BNConnected() then
+	-- 	local bnetLine = tt:AddLine()
+	-- 	tt:SetCell(bnetLine, 1, C("ltgray", L("BROKER_HEADER_BNET")), nil, "LEFT", numColumns)
+	-- end
+
+	-- Get sorted group IDs for consistent display order (INCLUDE "nogroup" now)
+	local sortedGroupIds = Groups and Groups.GetSortedGroupIds and Groups:GetSortedGroupIds(true) or {}
+
+	-- Display grouped friends (BNet and WoW) in configured order
+	for _, groupId in ipairs(sortedGroupIds) do
+		local groupFriends = groupedFriends[groupId]
+		local counts = groupCounts[groupId]
+		
+		-- Only show if there are online friends
+		if groupFriends and #groupFriends > 0 then
+			local groupInfo = groupsData[groupId]
+			-- Handle nogroup special case if not in groupsData
+			if not groupInfo and groupId == "nogroup" then
+				groupInfo = { name = "No Group", color = {r=0.5, g=0.5, b=0.5}, builtin = true }
+			end
+			
+			if groupInfo then
+				local groupLine = tt:AddLine()
+				
+				-- Calculate color
+				local colorCode = "ffffffff" -- Default white
+				if groupInfo.color then
+					colorCode = string.format("ff%02x%02x%02x", groupInfo.color.r * 255, groupInfo.color.g * 255, groupInfo.color.b * 255)
+				end
+				
+				-- Header text with color and count (Online/Total)
+				local countText = string.format("%d/%d", counts.online, counts.total)
+				
+				-- Add collapse indicator
+				local collapsed = groupInfo.collapsed
+				local prefix = collapsed and "(+) " or "(-) "
+				
+				local headerText = string.format("|c%s%s%s|r (%s)", colorCode, prefix, groupInfo.name, countText)
+				tt:SetCell(groupLine, 1, "  " .. headerText, nil, "LEFT", numColumns)
+				
+				-- Hover Highlight for Group Header (Visual Feedback)
+				tt:SetLineScript(groupLine, "OnEnter", function(self)
+					tt:SetLineColor(groupLine, 0.2, 0.2, 0.2, 0.5)
+				end)
+				tt:SetLineScript(groupLine, "OnLeave", function(self)
+					tt:SetLineColor(groupLine, 0, 0, 0, 0)
+				end)
+				
+				-- Click Handler for Group Header
+				tt:SetLineScript(groupLine, "OnMouseUp", function(self, button)
+					-- LibQTip might not pass the button argument correctly in all versions
+					-- Use GetMouseButtonClicked() as fallback (standard WoW API since 10.0)
+					local actualButton = button or (GetMouseButtonClicked and GetMouseButtonClicked())
+					
+					-- Debug print to verify click is registered
+					BFL:DebugPrint("Broker: Group header clicked - " .. tostring(actualButton) .. " on group " .. tostring(groupId))
+					
+					if actualButton == "LeftButton" then
+						-- Toggle collapse state
+						if Groups and Groups.Toggle then
+							Groups:Toggle(groupId)
+							-- Refresh tooltip to show/hide friends
+							if Broker.RefreshTooltip then
+								Broker:RefreshTooltip()
+							end
+						end
+					elseif actualButton == "RightButton" then
+						-- Context Menu
+						if MenuUtil and MenuUtil.CreateContextMenu then
+							MenuUtil.CreateContextMenu(self, function(owner, rootDescription)
+								rootDescription:CreateTitle(groupInfo.name)
+								
+								-- Only show options for custom groups (not builtin)
+								if not groupInfo.builtin then
+									rootDescription:CreateButton("Rename Group", function()
+										StaticPopup_Show("BETTER_FRIENDLIST_RENAME_GROUP", nil, nil, groupId)
+									end)
+									
+									rootDescription:CreateButton("Change Color", function()
+										local FriendsList = BFL:GetModule("FriendsList")
+										if FriendsList and FriendsList.OpenColorPicker then 
+											FriendsList:OpenColorPicker(groupId) 
+										end
+									end)
+									
+									rootDescription:CreateButton("Delete Group", function()
+										StaticPopup_Show("BETTER_FRIENDLIST_DELETE_GROUP", nil, nil, groupId)
+									end)
+								end
+							end)
+						else
+							BFL:DebugPrint("Broker: MenuUtil not available")
+						end
+					end
+				end)
+
+				-- Render friends ONLY if not collapsed
+				if not collapsed then
+					for i, friend in ipairs(groupFriends) do
+						RenderFriendRow(friend, "    ") -- 4 spaces indentation for grouped friends
+						displayedCount = displayedCount + 1
+					end
+				end
+			end
+		end
+	end
+
+	-- Footer (Empty check only)
+	if displayedCount == 0 then
+		tt:AddSeparator()
+		local emptyLine = tt:AddLine()
+		tt:SetCell(emptyLine, 1, C("gray", L("BROKER_NO_FRIENDS_ONLINE")), nil, "CENTER", numColumns)
+	end
+
+	-- Update Scrolling with Max Height (adjusted for footer)
+	local maxContentHeight = MAX_TOOLTIP_HEIGHT - FOOTER_HEIGHT
+	tt:UpdateScrolling(maxContentHeight)
+	
+	-- Add space for footer to the calculated height
+	tt:SetHeight(tt:GetHeight() + FOOTER_HEIGHT)
+	
+	-- Fix Slider Anchor (must stop at footer)
+	if tt.slider and tt.slider:IsShown() then
+		tt.slider:ClearAllPoints()
+		tt.slider:SetPoint("TOPRIGHT", tt, "TOPRIGHT", -10, -10)
+		tt.slider:SetPoint("BOTTOMRIGHT", tt.footerFrame, "TOPRIGHT", -10, 0)
+		
+		-- Re-adjust scrollframe right point to accommodate slider
+		if tt.scrollFrame then
+			tt.scrollFrame:SetPoint("RIGHT", tt, "RIGHT", -30, 0) -- 10 padding + 20 slider space
+		end
+	end
 
 	tt:Show()
 	return tt
+end
+
+-- Refresh the tooltip (re-create it) to update content
+function Broker:RefreshTooltip()
+	if LQT and tooltip and tooltip:IsShown() then
+		local anchor = tooltip.anchorFrame
+		LQT:Release(tooltip)
+		tooltip = nil
+		if anchor then
+			tooltip = CreateLibQTipTooltip(anchor)
+		end
+	end
 end
 
 -- ========================================
@@ -1359,38 +1850,29 @@ function Broker:OnClick(clickedFrame, button)
 	local DB = GetDB()
 	if not DB or not BetterFriendlistDB then return end
 
+	local action = "none"
 	if button == "LeftButton" then
-		-- Left Click: Check config for action
-		local action = BetterFriendlistDB.brokerClickAction or "toggle"
-
-		if action == "toggle" then
-			-- Toggle BetterFriendlist frame
-			ToggleFriendsFrame(1)
-		elseif action == "friends" then
-			-- Open Blizzard FriendsFrame directly (bypasses our hook)
-			if BFL.ShowBlizzardFriendsFrame then
-				BFL.ShowBlizzardFriendsFrame()
-			elseif BFL.OriginalToggleFriendsFrame then
-				BFL.OriginalToggleFriendsFrame(1)
-			else
-				ToggleFriendsFrame(1)
-			end
-		elseif action == "settings" then
-			-- Open BFL Settings
-			local Settings = BFL:GetModule("Settings")
-			if Settings then
-				Settings:Show()
-			end
-		end
+		action = BetterFriendlistDB.brokerClickAction or "toggle"
 	elseif button == "RightButton" then
-		-- Right Click: Open FriendsList (if not already open) AND open Settings (Broker tab)
-		
-		-- First, ensure FriendsList is open
-		if not (FriendsFrame and FriendsFrame:IsShown()) then
+		action = BetterFriendlistDB.brokerRightClickAction or "settings"
+	elseif button == "MiddleButton" then
+		action = "cycle_filter"
+	end
+
+	if action == "toggle" then
+		-- Toggle BetterFriendlist frame
+		ToggleFriendsFrame(1)
+	elseif action == "friends" then
+		-- Open Blizzard FriendsFrame directly (bypasses our hook)
+		if BFL.ShowBlizzardFriendsFrame then
+			BFL.ShowBlizzardFriendsFrame()
+		elseif BFL.OriginalToggleFriendsFrame then
+			BFL.OriginalToggleFriendsFrame(1)
+		else
 			ToggleFriendsFrame(1)
 		end
-		
-		-- Then open Settings
+	elseif action == "settings" then
+		-- Open BFL Settings
 		local Settings = BFL:GetModule("Settings")
 		if Settings then
 			if BetterFriendlistSettingsFrame and BetterFriendlistSettingsFrame:IsShown() then
@@ -1400,7 +1882,10 @@ function Broker:OnClick(clickedFrame, button)
 				Settings:ShowTab(4) -- Data Broker tab
 			end
 		end
-	elseif button == "MiddleButton" then
+	elseif action == "bnet" then
+		-- Open Friends Frame (Standard)
+		ToggleFriendsFrame(1)
+	elseif action == "cycle_filter" then
 		-- Middle Click: Cycle quick filter
 		local currentFilter = BetterFriendlistDB.quickFilter or "all"
 		local currentIndex = 1
@@ -1427,6 +1912,9 @@ function Broker:OnClick(clickedFrame, button)
 				BetterFriendlistDB.quickFilter = nextFilter
 			end
 		end
+		
+		-- Force refresh to ensure UI updates immediately (fixes sync issue)
+		BFL:ForceRefreshFriendsList()
 
 		-- Close current tooltip and recreate with new filter
 		-- The tooltip will read the updated value from BetterFriendlistDB.quickFilter
@@ -1490,21 +1978,11 @@ function Broker:Initialize()
 	end
 
 	-- Create Data Broker object
-	dataObject = LDB:NewDataObject("BetterFriendlist", {
+	local dataObjectDef = {
 		type = "data source",
 		text = "Friends: 0/0",
 		icon = "Interface\\AddOns\\BetterFriendlist\\Textures\\PortraitIcon.blp",
 		label = L("BROKER_TITLE"),
-
-		OnEnter = function(anchorFrame)
-			-- Use LibQTip if available, otherwise fall back to GameTooltip
-			if LQT then
-				tooltip = CreateLibQTipTooltip(anchorFrame)
-			end
-		end,
-
-		-- OnLeave removed - LibQTip's SetAutoHideDelay handles tooltip hiding
-		-- This allows the tooltip to stay visible when hovering over it
 
 		OnTooltipShow = function(gameTooltip)
 			-- Fallback for display addons that use OnTooltipShow (without LibQTip support)
@@ -1521,7 +1999,21 @@ function Broker:Initialize()
 		OnClick = function(clickedFrame, button)
 			Broker:OnClick(clickedFrame, button)
 		end,
-	})
+	}
+
+	-- Only add OnEnter if LibQTip is available
+	-- LDB Spec: Display addons prefer OnEnter over OnTooltipShow.
+	-- If we define OnEnter but LQT is missing, the function would be empty and
+	-- the display addon would skip OnTooltipShow, resulting in NO tooltip.
+	if LQT then
+		dataObjectDef.OnEnter = function(anchorFrame)
+			tooltip = CreateLibQTipTooltip(anchorFrame)
+		end
+		-- We do NOT define OnLeave here to allow the display addon to handle its own cleanup/unhighlighting.
+		-- Our tooltip handles its own hiding via SetupTooltipAutoHide.
+	end
+
+	dataObject = LDB:NewDataObject("BetterFriendlist", dataObjectDef)
 
 	if dataObject then
 		BFL:DebugPrint("Broker: Data Broker object created successfully")

@@ -57,6 +57,10 @@ function Components:CreateCheckbox(parent, labelText, initialValue, callback)
 		callback(self:GetChecked())
 	end)
 	
+	-- Fix for ugly hover effect when no tooltip is present
+	checkBox:SetScript("OnEnter", function() end)
+	checkBox:SetScript("OnLeave", function() end)
+	
 	-- Tooltip support
 	holder.SetTooltip = function(_, title, desc)
 		checkBox:SetScript("OnEnter", function(self)

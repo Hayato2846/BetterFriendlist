@@ -240,6 +240,13 @@ function BFL:ForceRefreshFriendsList()
 		-- This ensures we have the latest friend data before rendering
 		FriendsList:UpdateFriendsList()
 	end
+	
+	-- Refresh QuickFilter Dropdown (if it exists)
+	-- This ensures the dropdown icon updates when filter changes externally (e.g. via Broker)
+	local QuickFilters = self:GetModule("QuickFilters")
+	if QuickFilters and BetterFriendsFrame and BetterFriendsFrame.FriendsTabHeader and BetterFriendsFrame.FriendsTabHeader.QuickFilterDropdown then
+		QuickFilters:RefreshDropdown(BetterFriendsFrame.FriendsTabHeader.QuickFilterDropdown)
+	end
 end
 
 -- Register initial events
@@ -253,6 +260,9 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 		if addonName == ADDON_NAME then
 			-- Get version dynamically from TOC file
 			BFL.VERSION = C_AddOns.GetAddOnMetadata("BetterFriendlist", "Version") or "Unknown"
+			
+			-- Link Localization
+			BFL.L = _G["BFL_L"]
 			
 			-- Initialize database
 			if BFL.DB then

@@ -136,6 +136,16 @@ function Groups:Initialize()
 		return
 	end
 	
+	-- Load built-in group overrides
+	local overrides = DB:Get("builtinGroupOverrides", {})
+	for groupId, overrideData in pairs(overrides) do
+		if self.groups[groupId] then
+			if overrideData.name then
+				self.groups[groupId].name = overrideData.name
+			end
+		end
+	end
+	
 	-- Migrate old bnetAccountID-based friend assignments to battleTag-based
 	self:MigrateFriendAssignments()
 	
@@ -340,20 +350,55 @@ function Groups:Rename(groupId, newName)
 		return false, "Group does not exist"
 	end
 	
-	if group.builtin then
-		return false, "Cannot rename built-in groups"
-	end
-	
 	-- Update in memory
 	group.name = newName
 	
-	-- Update in database
 	local DB = BFL:GetModule("DB")
-	local groupInfo = DB:GetCustomGroup(groupId)
-	if groupInfo then
-		groupInfo.name = newName
-		DB:SaveCustomGroup(groupId, groupInfo)
+	
+	if group.builtin then
+		-- Save override for built-in group
+		local overrides = DB:Get("builtinGroupOverrides", {})
+		overrides[groupId] = overrides[groupId] or {}
+		overrides[groupId].name = newName
+		DB:Set("builtinGroupOverrides", overrides)
+	else
+		-- Update custom group in database
+		local groupInfo = DB:GetCustomGroup(groupId)
+		if groupInfo then
+			groupInfo.name = newName
+			DB:SaveCustomGroup(groupId, groupInfo)
+		end
 	end
+	
+	-- Refresh Settings UI if open
+	local Settings = BFL:GetModule("Settings")
+	if Settings and BetterFriendlistSettingsFrame and BetterFriendlistSettingsFrame:IsShown() then
+		Settings:RefreshGroupList()
+	end
+	
+	return true
+end
+
+-- Set group color
+function Groups:SetColor(groupId, r, g, b)
+	if not groupId or not r or not g or not b then
+		return false, "Invalid parameters"
+	end
+	
+	local group = self.groups[groupId]
+	if not group then
+		return false, "Group does not exist"
+	end
+	
+	-- Update in memory
+	group.color = {r = r, g = g, b = b}
+	
+	local DB = BFL:GetModule("DB")
+	
+	-- Save to database (same structure for built-in and custom)
+	local groupColors = DB:Get("groupColors", {})
+	groupColors[groupId] = {r = r, g = g, b = b}
+	DB:Set("groupColors", groupColors)
 	
 	-- Refresh Settings UI if open
 	local Settings = BFL:GetModule("Settings")
@@ -413,6 +458,9 @@ function Groups:Toggle(groupId)
 	local DB = BFL:GetModule("DB")
 	DB:SetGroupState(groupId, group.collapsed)
 	
+	-- Force refresh of the friends list to update UI immediately
+	BFL:ForceRefreshFriendsList()
+	
 	return true
 end
 
@@ -428,6 +476,9 @@ function Groups:SetCollapsed(groupId, collapsed)
 	-- Save to database
 	local DB = BFL:GetModule("DB")
 	DB:SetGroupState(groupId, group.collapsed)
+	
+	-- Force refresh of the friends list to update UI immediately
+	BFL:ForceRefreshFriendsList()
 	
 	return true
 end

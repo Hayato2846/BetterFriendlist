@@ -75,6 +75,8 @@ local defaults = {
 	-- Data Broker Settings (BETA Feature - requires enableBetaFeatures)
 	brokerEnabled = false, -- Enable Data Broker integration (default: OFF, Beta Feature)
 	brokerShowIcon = true, -- Show icon on display addons (default: ON)
+	brokerShowLabel = true, -- Show label text (default: ON)
+	brokerShowTotal = true, -- Show total count (default: ON)
 	brokerShowGroups = false, -- Split counts by WoW/BNet (default: OFF, shows combined)
 	brokerTooltipMode = "advanced", -- Tooltip detail level: "basic" or "advanced" (default: advanced)
 	brokerClickAction = "toggle", -- Left click action: "toggle", "friends", "settings" (default: toggle)

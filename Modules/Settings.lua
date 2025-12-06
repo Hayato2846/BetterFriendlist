@@ -2469,22 +2469,22 @@ function Settings:RefreshGroupsTab()
 					BFL:ForceRefreshFriendsList()
 				end
 			end,
-			-- Rename callback (only for non-builtin groups)
-			not isBuiltin and function()
+			-- Rename callback (allow for all groups)
+			function()
 				self:RenameGroup(groupData.id, groupData.name)
-			end or nil,
-			-- Color callback (only for non-builtin groups)
-			not isBuiltin and function(colorSwatch)
+			end,
+			-- Color callback (allow for all groups)
+			function(colorSwatch)
 				self:ShowColorPicker(groupData.id, groupData.name, colorSwatch)
-			end or nil,
+			end,
 			-- Delete callback (only for non-builtin groups)
 			not isBuiltin and function()
 				self:DeleteGroup(groupData.id, groupData.name)
 			end or nil
 		)
 		
-		-- Set initial color for custom groups
-		if not isBuiltin and listItem.colorSwatch then
+		-- Set initial color for all groups
+		if listItem.colorSwatch then
 			local group = Groups:Get(groupData.id)
 			if group and group.color then
 				listItem.colorSwatch:SetColorTexture(group.color.r, group.color.g, group.color.b)
@@ -3515,6 +3515,10 @@ function Settings:RefreshNotificationsTab()
 				print("|cff00ff00BetterFriendlist:|r Group trigger " .. (trigger.enabled and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
 			end)
 			
+			-- Fix for ugly hover effect
+			enableBtn:SetScript("OnEnter", function() end)
+			enableBtn:SetScript("OnLeave", function() end)
+			
 			-- Delete button
 			local deleteBtn = CreateFrame("Button", nil, triggerFrame, "UIPanelButtonTemplate")
 			deleteBtn:SetSize(20, 20)
@@ -3780,23 +3784,18 @@ function Settings:RefreshBrokerTab()
 	tab.components = {}
 	
 	local allFrames = {}
-	local yOffset = -20
 	
 	-- Header: Data Broker Integration
-	local header = Components:CreateHeader(tab, "Data Broker Integration")
-	header:SetPoint("TOPLEFT", 10, yOffset)
+	local header = Components:CreateHeader(tab, BFL_L.BROKER_SETTINGS_HEADER_INTEGRATION)
 	table.insert(allFrames, header)
-	yOffset = yOffset - 30
 	
 	-- Info Text
 	local infoText = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-	infoText:SetPoint("TOPLEFT", 20, yOffset)
-	infoText:SetPoint("RIGHT", -20, 0)
+	infoText:SetWidth(360)
 	infoText:SetJustifyH("LEFT")
 	infoText:SetWordWrap(true)
-	infoText:SetText("BetterFriendlist integrates with Data Broker display addons like Bazooka, ChocolateBar, and TitanPanel. Enable this feature to show friend counts and quick access in your display addon.")
+	infoText:SetText(BFL_L.BROKER_SETTINGS_INFO)
 	table.insert(allFrames, infoText)
-	yOffset = yOffset - 55
 	
 	-- Enable Data Broker
 	local enableBroker = Components:CreateCheckbox(tab, "Enable Data Broker",
@@ -3819,98 +3818,208 @@ function Settings:RefreshBrokerTab()
 			}
 			StaticPopup_Show("BFL_BROKER_RELOAD_CONFIRM")
 		end)
-	enableBroker:SetPoint("TOPLEFT", 20, yOffset)
 	enableBroker:SetTooltip("Enable Data Broker", "Show BetterFriendlist in Data Broker display addons. Requires UI reload to take effect.")
 	table.insert(allFrames, enableBroker)
-	yOffset = yOffset - 35
 	
 	-- Show Icon
 	local showIcon = Components:CreateCheckbox(tab, "Show Icon on Display Addon",
 		DB:Get("brokerShowIcon", true),
 		function(val)
 			BetterFriendlistDB.brokerShowIcon = val
+			local Broker = BFL:GetModule("Broker")
+			if Broker and Broker.UpdateBrokerText then Broker:UpdateBrokerText() end
 		end)
-	showIcon:SetPoint("TOPLEFT", 20, yOffset)
 	showIcon:SetTooltip("Show Icon", "Display the BetterFriendlist icon on your display addon")
 	table.insert(allFrames, showIcon)
-	yOffset = yOffset - 35
 	
+	-- Show Label
+	local showLabel = Components:CreateCheckbox(tab, BFL_L.BROKER_SETTINGS_SHOW_LABEL,
+		DB:Get("brokerShowLabel", true),
+		function(val)
+			BetterFriendlistDB.brokerShowLabel = val
+			local Broker = BFL:GetModule("Broker")
+			if Broker and Broker.UpdateBrokerText then Broker:UpdateBrokerText() end
+		end)
+	showLabel:SetTooltip("Show Label", "Display 'Friends:' text before the count")
+	table.insert(allFrames, showLabel)
+
+	-- Show Total Count
+	local showTotal = Components:CreateCheckbox(tab, BFL_L.BROKER_SETTINGS_SHOW_TOTAL,
+		DB:Get("brokerShowTotal", true),
+		function(val)
+			BetterFriendlistDB.brokerShowTotal = val
+			local Broker = BFL:GetModule("Broker")
+			if Broker and Broker.UpdateBrokerText then Broker:UpdateBrokerText() end
+		end)
+	showTotal:SetTooltip("Show Total Count", "Display total friends count (e.g. '5/10') instead of just online count")
+	table.insert(allFrames, showTotal)
+
 	-- Split WoW/BNet Counts
-	local showGroups = Components:CreateCheckbox(tab, "Split WoW and BNet Friend Counts",
+	local showGroups = Components:CreateCheckbox(tab, BFL_L.BROKER_SETTINGS_SHOW_GROUPS,
 		DB:Get("brokerShowGroups", false),
 		function(val)
 			BetterFriendlistDB.brokerShowGroups = val
+			-- Refresh tab to show/hide sub-options
+			self:RefreshBrokerTab()
 			-- Update broker text immediately
 			local Broker = BFL:GetModule("Broker")
 			if Broker and Broker.UpdateBrokerText then
 				Broker:UpdateBrokerText()
 			end
 		end)
-	showGroups:SetPoint("TOPLEFT", 20, yOffset)
 	showGroups:SetTooltip("Split Counts", "Show separate counts for WoW and Battle.net friends")
 	table.insert(allFrames, showGroups)
-	yOffset = yOffset - 35
+
+	-- Sub-options for Split Counts (only visible if enabled)
+	if DB:Get("brokerShowGroups", false) then
+		-- Show WoW Icon
+		local showWoWIcon = Components:CreateCheckbox(tab, "Show WoW Icon",
+			DB:Get("brokerShowWoWIcon", true),
+			function(val)
+				BetterFriendlistDB.brokerShowWoWIcon = val
+				local Broker = BFL:GetModule("Broker")
+				if Broker and Broker.UpdateBrokerText then Broker:UpdateBrokerText() end
+			end)
+		showWoWIcon:SetTooltip("Show WoW Icon", "Display the World of Warcraft icon next to the WoW friend count")
+		-- Indent manually via anchor later or just add to list
+		table.insert(allFrames, showWoWIcon)
+
+		-- Show Battle.net Icon
+		local showBNetIcon = Components:CreateCheckbox(tab, "Show Battle.net Icon",
+			DB:Get("brokerShowBNetIcon", true),
+			function(val)
+				BetterFriendlistDB.brokerShowBNetIcon = val
+				local Broker = BFL:GetModule("Broker")
+				if Broker and Broker.UpdateBrokerText then Broker:UpdateBrokerText() end
+			end)
+		showBNetIcon:SetTooltip("Show Battle.net Icon", "Display the Battle.net icon next to the Battle.net friend count")
+		table.insert(allFrames, showBNetIcon)
+	end
 	
-	-- Tooltip Mode
-	local tooltipMode = Components:CreateDropdown(tab, "Tooltip Detail Level:",
-		{labels = {"Basic", "Advanced"}, values = {"basic", "advanced"}},
-		function(value) return value == DB:Get("brokerTooltipMode", "advanced") end,
-		function(value)
-			BetterFriendlistDB.brokerTooltipMode = value
+	-- Spacer
+	table.insert(allFrames, Components:CreateSpacer(tab))
+
+	-- Header: Tooltip Columns
+	local columnsHeader = Components:CreateHeader(tab, BFL_L.BROKER_SETTINGS_COLUMNS_HEADER)
+	table.insert(allFrames, columnsHeader)
+	
+	-- Column Reordering Logic
+	local availableColumns = {
+		{ key = "Name",      label = BFL_L.BROKER_COLUMN_NAME },
+		{ key = "Level",     label = BFL_L.BROKER_COLUMN_LEVEL },
+		{ key = "Character", label = BFL_L.BROKER_COLUMN_CHARACTER },
+		{ key = "Game",      label = BFL_L.BROKER_COLUMN_GAME },
+		{ key = "Zone",      label = BFL_L.BROKER_COLUMN_ZONE },
+		{ key = "Realm",     label = BFL_L.BROKER_COLUMN_REALM },
+		{ key = "Notes",     label = BFL_L.BROKER_COLUMN_NOTES }
+	}
+	
+	local currentOrder = DB:Get("brokerColumnOrder")
+	local orderedColumns = {}
+	
+	if currentOrder and #currentOrder > 0 then
+		for _, key in ipairs(currentOrder) do
+			for _, col in ipairs(availableColumns) do
+				if col.key == key then
+					table.insert(orderedColumns, col)
+					break
+				end
+			end
+		end
+		-- Add missing columns
+		for _, col in ipairs(availableColumns) do
+			local found = false
+			for _, ordered in ipairs(orderedColumns) do
+				if ordered.key == col.key then
+					found = true
+					break
+				end
+			end
+			if not found then
+				table.insert(orderedColumns, col)
+			end
+		end
+	else
+		-- Default order
+		orderedColumns = availableColumns
+	end
+	
+	-- Create reorderable list items
+	for i, col in ipairs(orderedColumns) do
+		local canMoveUp = i > 1
+		local canMoveDown = i < #orderedColumns
+		
+		-- Create a custom list item that includes a checkbox for visibility
+		local listItem = Components:CreateListItem(
+			tab,
+			col.label,
+			i,
+			-- Move Up
+			function()
+				if i > 1 then
+					local temp = orderedColumns[i-1]
+					orderedColumns[i-1] = orderedColumns[i]
+					orderedColumns[i] = temp
+					
+					local newOrder = {}
+					for _, c in ipairs(orderedColumns) do
+						table.insert(newOrder, c.key)
+					end
+					DB:Set("brokerColumnOrder", newOrder)
+					self:RefreshBrokerTab()
+				end
+			end,
+			-- Move Down
+			function()
+				if i < #orderedColumns then
+					local temp = orderedColumns[i+1]
+					orderedColumns[i+1] = orderedColumns[i]
+					orderedColumns[i] = temp
+					
+					local newOrder = {}
+					for _, c in ipairs(orderedColumns) do
+						table.insert(newOrder, c.key)
+					end
+					DB:Set("brokerColumnOrder", newOrder)
+					self:RefreshBrokerTab()
+				end
+			end,
+			nil, -- No rename
+			nil, -- No color
+			nil  -- No delete
+		)
+		
+		-- Hide unused buttons
+		if listItem.colorButton then listItem.colorButton:Hide() end
+		if listItem.orderText then listItem.orderText:Hide() end
+		
+		-- Add Checkbox to the list item
+		local isChecked = DB:Get("brokerShowCol" .. col.key, true)
+		local checkbox = CreateFrame("CheckButton", nil, listItem, "SettingsCheckboxTemplate")
+		checkbox:SetPoint("LEFT", listItem, "LEFT", 4, 0)
+		checkbox:SetSize(20, 20)
+		checkbox:SetChecked(isChecked)
+		checkbox:SetScript("OnClick", function(self)
+			local checked = self:GetChecked()
+			DB:Set("brokerShowCol" .. col.key, checked)
 		end)
-	tooltipMode:SetPoint("TOPLEFT", 20, yOffset)
-	table.insert(allFrames, tooltipMode)
-	yOffset = yOffset - 40
+		
+		-- Fix for ugly hover effect
+		checkbox:SetScript("OnEnter", function() end)
+		checkbox:SetScript("OnLeave", function() end)
+		
+		-- Adjust label position to make room for checkbox
+		if listItem.nameText then
+			listItem.nameText:ClearAllPoints()
+			listItem.nameText:SetPoint("LEFT", checkbox, "RIGHT", 10, 0)
+		end
+		
+		listItem:SetArrowState(canMoveUp, canMoveDown)
+		table.insert(allFrames, listItem)
+	end
 	
-	-- Click Action
-	local clickAction = Components:CreateDropdown(tab, "Left Click Action:",
-		{labels = {"Toggle BetterFriendlist", "Open Friends Frame", "Open Settings"}, values = {"toggle", "friends", "settings"}},
-		function(value) return value == DB:Get("brokerClickAction", "toggle") end,
-		function(value)
-			BetterFriendlistDB.brokerClickAction = value
-		end)
-	clickAction:SetPoint("TOPLEFT", 20, yOffset)
-	table.insert(allFrames, clickAction)
-	yOffset = yOffset - 60
-	
-	-- Instructions Header
-	local instructionsHeader = Components:CreateHeader(tab, "How to Use")
-	instructionsHeader:SetPoint("TOPLEFT", 10, yOffset)
-	table.insert(allFrames, instructionsHeader)
-	yOffset = yOffset - 30
-	
-	-- Instructions Text
-	local instructions = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-	instructions:SetPoint("TOPLEFT", 20, yOffset)
-	instructions:SetPoint("RIGHT", -20, 0)
-	instructions:SetJustifyH("LEFT")
-	instructions:SetWordWrap(true)
-	instructions:SetText([[• Install a Data Broker display addon (Bazooka, ChocolateBar, or TitanPanel)
-• Enable Data Broker above (UI reload will be prompted)
-• The BetterFriendlist button will appear in your display addon
-• Hover for tooltip, left-click to open, right-click for settings, middle-click to cycle filters]])
-	table.insert(allFrames, instructions)
-	yOffset = yOffset - 85
-	
-	-- Compatibility Header
-	local compatHeader = Components:CreateHeader(tab, "Tested Display Addons")
-	compatHeader:SetPoint("TOPLEFT", 10, yOffset)
-	table.insert(allFrames, compatHeader)
-	yOffset = yOffset - 30
-	
-	-- Compatibility List
-	local compatList = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-	compatList:SetPoint("TOPLEFT", 20, yOffset)
-	compatList:SetPoint("RIGHT", -20, 0)
-	compatList:SetJustifyH("LEFT")
-	compatList:SetWordWrap(true)
-	compatList:SetText([[✓ Bazooka - Panel addon (top/bottom bars)
-✓ ChocolateBar - Modern panel addon with themes
-✓ TitanPanel - Classic panel addon
-✓ Candy - Free-floating buttons
-✓ StatBlockCore - ElvUI integration]])
-	table.insert(allFrames, compatList)
-	yOffset = yOffset - 90
+	-- Anchor all frames vertically
+	Components:AnchorChain(allFrames, -5)
 	
 	-- Store components for cleanup
 	tab.components = allFrames

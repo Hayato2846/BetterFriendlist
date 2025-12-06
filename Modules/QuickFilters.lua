@@ -171,3 +171,20 @@ end
 function QuickFilters:GetIcons()
 	return FILTER_ICONS
 end
+
+-- Refresh the dropdown display (icon) based on current filter
+-- Called when filter changes externally (e.g. via Broker)
+function QuickFilters:RefreshDropdown(dropdown)
+	if not dropdown then return end
+	
+	-- Get current filter from DB
+	local currentFilter = self:GetFilter()
+	local icon = FILTER_ICONS[currentFilter]
+	
+	if icon then
+		-- Manually update the text to match the translator format
+		-- This forces the dropdown button to show the correct icon
+		local text = string.format("\124T%s:16:16:0:2\124t", icon)
+		dropdown:SetText(text)
+	end
+end

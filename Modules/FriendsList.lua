@@ -125,11 +125,16 @@ local function BuildDataProvider(self)
 		favorites = {},
 		nogroup = {}
 	}
+	local totalGroupCounts = {
+		favorites = 0,
+		nogroup = 0
+	}
 	
 	-- Initialize custom group tables
 	for groupId, groupData in pairs(friendGroups) do
 		if not groupData.builtin or groupId == "favorites" or groupId == "nogroup" then
 			groupedFriends[groupId] = groupedFriends[groupId] or {}
+			totalGroupCounts[groupId] = 0
 		end
 	end
 	
@@ -141,32 +146,38 @@ local function BuildDataProvider(self)
 	
 	-- Group friends
 	for _, friend in ipairs(self.friendsList) do
-		-- Apply filters
-		if self:PassesFilters(friend) then
-			local isInAnyGroup = false
-			local friendUID = GetFriendUID(friend)
-			
-			-- Check if favorite (Battle.net only)
-			if friend.type == "bnet" and friend.isFavorite then
-				table.insert(groupedFriends.favorites, friend)
+		local friendUID = GetFriendUID(friend)
+		local isFavorite = (friend.type == "bnet" and friend.isFavorite)
+		local customGroups = (BetterFriendlistDB and BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friendUID]) or {}
+		
+		-- Determine groups for this friend
+		local friendGroupIds = {}
+		local isInAnyGroup = false
+		
+		if isFavorite then
+			table.insert(friendGroupIds, "favorites")
+			isInAnyGroup = true
+		end
+		
+		for _, groupId in ipairs(customGroups) do
+			if type(groupId) == "string" and groupedFriends[groupId] then
+				table.insert(friendGroupIds, groupId)
 				isInAnyGroup = true
 			end
+		end
+		
+		if not isInAnyGroup then
+			table.insert(friendGroupIds, "nogroup")
+		end
+		
+		-- Update counts and lists
+		for _, groupId in ipairs(friendGroupIds) do
+			-- Increment total count
+			totalGroupCounts[groupId] = (totalGroupCounts[groupId] or 0) + 1
 			
-			-- Check for custom groups
-			if BetterFriendlistDB and BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friendUID] then
-				local groups = BetterFriendlistDB.friendGroups[friendUID]
-				for _, groupId in ipairs(groups) do
-					-- Skip invalid entries
-					if type(groupId) == "string" and groupedFriends[groupId] then
-						table.insert(groupedFriends[groupId], friend)
-						isInAnyGroup = true
-					end
-				end
-			end
-			
-			-- Add to "No Group" if not in any group
-			if not isInAnyGroup then
-				table.insert(groupedFriends.nogroup, friend)
+			-- Add to display list if passes filters
+			if self:PassesFilters(friend) then
+				table.insert(groupedFriends[groupId], friend)
 			end
 		end
 	end
@@ -207,6 +218,7 @@ local function BuildDataProvider(self)
 					groupId = groupData.id,
 					name = groupData.name,
 					count = #groupFriends,
+					totalCount = totalGroupCounts[groupData.id] or 0,
 					collapsed = groupData.collapsed
 				})
 				
@@ -833,6 +845,9 @@ function FriendsList:ApplySort()
 	local primarySort = self.sortMode
 	local secondarySort = self.secondarySort or "name" -- Default secondary: name
 	
+	-- DEBUG: Print sort modes
+	BFL:DebugPrint(string.format("BFL DEBUG: Sorting - Primary: %s, Secondary: %s", tostring(primarySort), tostring(secondarySort)))
+
 	table.sort(self.friendsList, function(a, b)
 		-- Apply primary sort first
 		local primaryResult = self:CompareFriends(a, b, primarySort)
@@ -848,10 +863,14 @@ function FriendsList:ApplySort()
 			end
 		end
 		
-		-- Fallback: sort by name
-		local nameA = a.type == "bnet" and (a.accountName or a.battleTag) or a.name
-		local nameB = b.type == "bnet" and (b.accountName or b.battleTag) or b.name
-		return (nameA or ""):lower() < (nameB or ""):lower()
+		-- Fallback: sort by name (using CompareFriends to respect showNotesAsName setting)
+		local fallbackResult = self:CompareFriends(a, b, "name")
+		if fallbackResult ~= nil then
+			return fallbackResult
+		end
+		
+		-- Ultimate fallback: stable sort by ID/Index if names are identical
+		return (a.index or 0) < (b.index or 0)
 	end)
 end
 
@@ -889,13 +908,55 @@ function FriendsList:CompareFriends(a, b, sortMode)
 			return aPriority < bPriority
 		end
 		
+		-- If both are offline (priority 3), sort by last online time (descending)
+		-- Higher timestamp = more recent = comes first
+		if aPriority == 3 then
+			local aTime = a.lastOnlineTime or 0
+			local bTime = b.lastOnlineTime or 0
+			if aTime ~= bTime then
+				return aTime > bTime
+			end
+		end
+		
 		-- Equal status - return nil to try secondary sort
 		return nil
 		
 	elseif sortMode == "name" then
-		local nameA = a.type == "bnet" and (a.accountName or a.battleTag) or a.name
-		local nameB = b.type == "bnet" and (b.accountName or b.battleTag) or b.name
+		local DB = GetDB()
+		local showNotesAsName = DB and DB:Get("showNotesAsName", false)
+
+		-- Use the exact same logic as UpdateFriendButton to determine the display name
+		local function GetDisplayName(friend)
+			if showNotesAsName and friend.note and friend.note ~= "" then
+				return friend.note
+			end
+			
+			-- PHASE 9C FIX: Use BattleTag (stripped) instead of AccountName
+			-- AccountName might be protected or not what user expects to sort by
+			if friend.battleTag then
+				local tag = friend.battleTag
+				local hashIndex = string.find(tag, "#")
+				if hashIndex then
+					return string.sub(tag, 1, hashIndex - 1)
+				end
+				return tag
+			end
+			
+			return friend.name or "Unknown"
+		end
+
+		local nameA = GetDisplayName(a)
+		local nameB = GetDisplayName(b)
+		
 		local aLower, bLower = (nameA or ""):lower(), (nameB or ""):lower()
+		
+		-- DEBUG: Log specific comparisons to understand sorting issues
+		-- Only log if one uses note and other doesn't, or specific names
+		-- if (nameA and nameA:find("Jonas")) or (nameB and nameB:find("Jonas")) then
+		-- 	BFL:DebugPrint(string.format("BFL SORT: '%s' vs '%s' -> %s", 
+		-- 		tostring(nameA), tostring(nameB), tostring(aLower < bLower)))
+		-- end
+		
 		if aLower ~= bLower then
 			return aLower < bLower
 		end
@@ -1585,6 +1646,42 @@ function FriendsList:RenameGroup(groupId, newName)
 	return success, err
 end
 
+-- Open color picker for a group
+function FriendsList:OpenColorPicker(groupId)
+	local Groups = GetGroups()
+	if not Groups then return end
+	
+	local group = Groups:Get(groupId)
+	if not group then return end
+	
+	local r, g, b = 1, 1, 1
+	if group.color then
+		r = group.color.r or 1
+		g = group.color.g or 1
+		b = group.color.b or 1
+	end
+	
+	local info = {
+		swatchFunc = function()
+			local newR, newG, newB = ColorPickerFrame:GetColorRGB()
+			Groups:SetColor(groupId, newR, newG, newB)
+			BFL:ForceRefreshFriendsList()
+		end,
+		cancelFunc = function(previousValues)
+			if previousValues then
+				Groups:SetColor(groupId, previousValues.r, previousValues.g, previousValues.b)
+				BFL:ForceRefreshFriendsList()
+			end
+		end,
+		r = r,
+		g = g,
+		b = b,
+		hasOpacity = false,
+	}
+	
+	ColorPickerFrame:SetupColorPickerAndShow(info)
+end
+
 -- Delete a group
 function FriendsList:DeleteGroup(groupId)
 	local Groups = GetGroups()
@@ -1824,7 +1921,11 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 	end
 	
 	-- Set header text with color
-	button:SetFormattedText("%s%s|r (%d)", colorCode, name, count)
+	local countText = count
+	if elementData.totalCount and elementData.totalCount > count then
+		countText = string.format("%d/%d", count, elementData.totalCount)
+	end
+	button:SetFormattedText("%s%s|r (%s)", colorCode, name, countText)
 	
 	-- Show/hide collapse arrows
 	button.DownArrow:SetShown(not collapsed)
@@ -1887,6 +1988,10 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 						
 						rootDescription:CreateButton("Rename Group", function()
 							StaticPopup_Show("BETTER_FRIENDLIST_RENAME_GROUP", nil, nil, self.groupId)
+						end)
+						
+						rootDescription:CreateButton("Change Color", function()
+							FriendsList:OpenColorPicker(self.groupId)
 						end)
 						
 						rootDescription:CreateButton("Delete Group", function()
@@ -2001,6 +2106,14 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 						if not groupData then return end
 						
 						rootDescription:CreateTitle(groupData.name)
+						
+						rootDescription:CreateButton("Rename Group", function()
+							StaticPopup_Show("BETTER_FRIENDLIST_RENAME_GROUP", nil, nil, self.groupId)
+						end)
+						
+						rootDescription:CreateButton("Change Color", function()
+							FriendsList:OpenColorPicker(self.groupId)
+						end)
 						
 						rootDescription:CreateButton("Invite All to Party", function()
 							FriendsList:InviteGroupToParty(self.groupId)

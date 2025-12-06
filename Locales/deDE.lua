@@ -248,7 +248,7 @@ if GetLocale() == "deDE" then
 	L.SETTINGS_FRAME_RESET_ALL = "Alle Layouts zurücksetzen"
 	
 	-- ========================================
-	-- DATA BROKER
+	-- DATA BROKER (STABLE FEATURE)
 	-- ========================================
 	L.BROKER_TITLE = "BetterFriendlist"
 	L.BROKER_TOOLTIP_HEADER = "Freunde"
@@ -258,7 +258,67 @@ if GetLocale() == "deDE" then
 	L.BROKER_SETTINGS_SHOW_ICON = "Icon anzeigen"
 	L.BROKER_SETTINGS_TOOLTIP_MODE = "Tooltip-Detailstufe"
 	L.BROKER_SETTINGS_CLICK_ACTION = "Linksklick-Aktion"
+	L.BROKER_ACTION_TOGGLE = "BetterFriendlist umschalten"
+	L.BROKER_ACTION_FRIENDS = "Freundesliste öffnen"
+	L.BROKER_ACTION_SETTINGS = "Einstellungen öffnen"
+	L.BROKER_SETTINGS_INFO = "BetterFriendlist integriert sich in Data Broker Anzeige-Addons wie Bazooka, ChocolateBar und TitanPanel. Aktiviere diese Funktion, um Freundeszahlen und Schnellzugriff in deinem Anzeige-Addon zu sehen."
 	L.BROKER_FILTER_CHANGED = "Filter geändert auf: %s"
+	
+	-- Broker Tooltip Strings
+	L.BROKER_HEADER_WOW = "WoW Freunde"
+	L.BROKER_HEADER_BNET = "Battle.Net Freunde"
+	L.BROKER_NO_WOW_ONLINE = "  Keine WoW-Freunde online"
+	L.BROKER_NO_FRIENDS_ONLINE = "Keine Freunde online"
+	L.BROKER_TOTAL_ONLINE = "Gesamt: %d online / %d Freunde"
+	L.BROKER_FILTER_LABEL = "Filter: "
+	L.BROKER_SORT_LABEL = "Sortierung: "
+	L.BROKER_HINT_FRIEND_ACTIONS = "--- Freund-Aktionen ---"
+	L.BROKER_HINT_CLICK_WHISPER = "Klick auf Freund:"
+	L.BROKER_HINT_WHISPER = " Flüstern • "
+	L.BROKER_HINT_RIGHT_CLICK_MENU = "Rechtsklick:"
+	L.BROKER_HINT_CONTEXT_MENU = " Kontextmenü"
+	L.BROKER_HINT_ALT_CLICK = "Alt+Klick:"
+	L.BROKER_HINT_INVITE = " Einladen/Beitreten • "
+	L.BROKER_HINT_SHIFT_CLICK = "Umschalt+Klick:"
+	L.BROKER_HINT_COPY = " In Chat kopieren"
+	L.BROKER_HINT_ICON_ACTIONS = "--- Broker Icon Aktionen ---"
+	L.BROKER_HINT_LEFT_CLICK = "Linksklick:"
+	L.BROKER_HINT_TOGGLE = " BetterFriendlist umschalten"
+	L.BROKER_HINT_RIGHT_CLICK = "Rechtsklick:"
+	L.BROKER_HINT_SETTINGS = " Einstellungen • "
+	L.BROKER_HINT_MIDDLE_CLICK = "Mittelklick:"
+	L.BROKER_HINT_CYCLE_FILTER = " Filter durchschalten"
+	
+	-- Data Broker Settings
+	L.BROKER_SETTINGS_SHOW_LABEL = "Label 'Freunde:' anzeigen"
+	L.BROKER_SETTINGS_SHOW_TOTAL = "Gesamtanzahl anzeigen"
+	L.BROKER_SETTINGS_SHOW_GROUPS = "WoW und BNet Zähler trennen"
+	L.BROKER_SETTINGS_HEADER_GENERAL = "Allgemeine Einstellungen"
+	L.BROKER_SETTINGS_HEADER_INTEGRATION = "Data Broker Integration"
+	L.BROKER_SETTINGS_HEADER_INTERACTION = "Interaktion"
+	L.BROKER_SETTINGS_HEADER_INSTRUCTIONS = "Anleitung"
+	L.BROKER_SETTINGS_HEADER_COMPATIBILITY = "Getestete Anzeige-Addons"
+	L.BROKER_SETTINGS_INSTRUCTIONS = "• Installiere ein Data Broker Anzeige-Addon (Bazooka, ChocolateBar oder TitanPanel)\n• Aktiviere Data Broker oben (UI Reload wird abgefragt)\n• Der BetterFriendlist Button erscheint in deinem Anzeige-Addon\n• Mouseover für Tooltip, Linksklick zum Öffnen, Rechtsklick für Einstellungen, Mittelklick zum Filter wechseln"
+	L.BROKER_SETTINGS_HEADER_COLUMNS = "Tooltip Spalten"
+	L.BROKER_SETTINGS_COLUMNS_HEADER = "Tooltip Spalten"
+	L.BROKER_COLUMN_NAME = "Name"
+	L.BROKER_COLUMN_LEVEL = "Stufe"
+	L.BROKER_COLUMN_CHARACTER = "Charakter"
+	L.BROKER_COLUMN_GAME = "Spiel / App"
+	L.BROKER_COLUMN_ZONE = "Zone"
+	L.BROKER_COLUMN_REALM = "Realm"
+	L.BROKER_COLUMN_FACTION = "Fraktion"
+	L.BROKER_COLUMN_NOTES = "Notizen"
+	
+	-- Broker Column Tooltips
+	L.BROKER_COLUMN_NAME_DESC = "Zeigt den Namen des Freundes (RealID oder Charaktername)"
+	L.BROKER_COLUMN_LEVEL_DESC = "Zeigt die Stufe des Charakters"
+	L.BROKER_COLUMN_CHARACTER_DESC = "Zeigt den Charakternamen und das Klassensymbol"
+	L.BROKER_COLUMN_GAME_DESC = "Zeigt das Spiel oder die App, die der Freund spielt"
+	L.BROKER_COLUMN_ZONE_DESC = "Zeigt die Zone, in der sich der Freund befindet"
+	L.BROKER_COLUMN_REALM_DESC = "Zeigt den Realm des Charakters"
+	L.BROKER_COLUMN_FACTION_DESC = "Zeigt das Fraktionssymbol (Allianz/Horde)"
+	L.BROKER_COLUMN_NOTES_DESC = "Zeigt Freundesnotizen an"
 	
 	-- ========================================
 	-- FEATURE REQUESTS (CurseForge User Feedback)
