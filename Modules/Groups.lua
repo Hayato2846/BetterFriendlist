@@ -15,6 +15,15 @@ local builtinGroups = {
 		color = {r = 1.0, g = 0.82, b = 0.0}, -- Gold
 		icon = "Interface\\FriendsFrame\\Battlenet-Battleneticon"
 	},
+	ingame = {
+		id = "ingame",
+		name = "In-Game",
+		collapsed = false,
+		builtin = true,
+		order = 2,
+		color = {r = 1.0, g = 0.82, b = 0.0}, -- Gold
+		icon = "Interface\\Icons\\Inv_misc_groupneedmore"
+	},
 	nogroup = {
 		id = "nogroup",
 		name = "No Group",
@@ -217,12 +226,17 @@ function Groups:GetAll()
 	end
 	
 	local showFavorites = DB:Get("showFavoritesGroup", true)
+	local enableInGame = DB:Get("enableInGameGroup", false)
 	
-	-- If Favorites should be hidden, filter it out
-	if not showFavorites then
+	-- Filter out hidden built-in groups
+	if not showFavorites or not enableInGame then
 		local filtered = {}
 		for id, group in pairs(self.groups) do
-			if id ~= "favorites" then
+			local keep = true
+			if id == "favorites" and not showFavorites then keep = false end
+			if id == "ingame" and not enableInGame then keep = false end
+			
+			if keep then
 				filtered[id] = group
 			end
 		end

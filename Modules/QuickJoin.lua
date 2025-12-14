@@ -40,6 +40,8 @@ QuickJoin.mockGroups = {}         -- Mock groups for testing (added to real grou
 QuickJoin.selectedGUID = nil      -- Currently selected group GUID
 QuickJoin.selectedButtons = {}    -- Track button selection states
 
+
+
 -- Dirty flag: Set when data changes while frame is hidden
 local needsRenderOnShow = false
 local updateTimer = nil
@@ -181,390 +183,61 @@ local function BetterFriendlist_HasRelationshipWithLeader(partyGuid)
 	return false
 end
 
+--[[
+	Helper: PopulateGroupMemberDetails
+	Populates leaderName, leaderColor, and otherFriends from the members list.
+	Shared logic for both Real and Mock groups.
+]]
+local function PopulateGroupMemberDetails(info)
+	if not info.members then return end
+	
+	-- Recalculate numMembers from actual member list if not set
+	if not info.numMembers or info.numMembers == 0 then
+		info.numMembers = #info.members
+	end
+	
+	info.otherFriends = {} -- Store names of other friends in the group
+	
+	if info.members and #info.members > 0 then
+		for i, member in ipairs(info.members) do
+			if member.guid then
+				local name, color, relationship, playerLink = BetterFriendlist_GetRelationshipInfo(member.guid, nil, member.clubId)
+				
+				-- Check if this member is the leader
+				local isLeader = (info.leaderGUID and member.guid == info.leaderGUID)
+				
+				-- Fallback: If no leaderGUID available, assume first member is leader (legacy behavior)
+				if not info.leaderGUID and i == 1 then
+					isLeader = true
+				end
+				
+				if isLeader then
+					if name and name ~= UNKNOWNOBJECT then
+						-- Always use the resolved name for the leader if found in members list
+						-- This ensures we use BNet/Friend name instead of Character name
+						info.leaderName = name
+						info.leaderColor = color -- Store color for leader
+					end
+				else
+					-- Check if this member is a friend (BNet or WoW) or Mock
+					if relationship == "bnfriend" or relationship == "wowfriend" or relationship == "mock" then
+						if name and name ~= UNKNOWNOBJECT then
+							-- Store colored name
+							local coloredName = (color or "|cffffffff") .. name .. "|r"
+							table.insert(info.otherFriends, coloredName)
+						end
+					end
+				end
+			end
+		end
+	end
+end
+
 --[[ 
 	Public API 
 ]]
 
--- Initialize the QuickJoin module
-function QuickJoin:Initialize()
-	if self.initialized then
-		return
-	end
-	
-	-- Get Social Queue Configuration
-	self.config = C_SocialQueue.GetConfig()
-	
-	if not self.config then
-		-- Set fallback config
-		self.config = {
-			TOASTS_DISABLED = false,
-			TOAST_DURATION = TOAST_DURATION,
-			DELAY_DURATION = 0.5,
-		}
-	end
-	
-	-- Register Events
-	self:RegisterEvents()
-	
-	-- Initial update
-	self:Update()
-	
-	-- Start periodic cache cleanup (every 5 minutes)
-	C_Timer.NewTicker(300, function()
-		self:CleanupCache()
-	end)
-	
-	-- Hook OnShow to re-render if data changed while hidden
-	if BetterFriendsFrame then
-		BetterFriendsFrame:HookScript("OnShow", function()
-			if needsRenderOnShow then
-				-- Only trigger update if we are on the QuickJoin tab
-				if BetterFriendsFrame.QuickJoinFrame and BetterFriendsFrame.QuickJoinFrame:IsShown() then
-					self:Update(true)
-					needsRenderOnShow = false
-				end
-			end
-		end)
-	end
-	
-	self.initialized = true
-end
-
--- Cleanup old cache entries (called every 5 minutes)
-function QuickJoin:CleanupCache()
-	local currentTime = GetTime()
-	local maxAge = 300 -- 5 minutes
-	local cleaned = 0
-	
-	for guid, cached in pairs(self.groupCache) do
-		if currentTime - cached.timestamp > maxAge then
-			self.groupCache[guid] = nil
-			cleaned = cleaned + 1
-		end
-	end
-	
-	if cleaned > 0 then
-		BFL:DebugPrint("QuickJoin: Cleaned up", cleaned, "old cache entries")
-	end
-end
-
--- Update available groups list
-function QuickJoin:Update(forceUpdate)
-	-- Visibility Optimization:
-	-- If the frame (or the QuickJoin tab) is hidden, don't rebuild the list.
-	if not forceUpdate and (not BetterFriendsFrame or not BetterFriendsFrame:IsShown() or not BetterFriendsFrame.QuickJoinFrame or not BetterFriendsFrame.QuickJoinFrame:IsShown()) then
-		needsRenderOnShow = true
-		return
-	end
-
-	-- Event Coalescing (Micro-Throttling)
-	if not forceUpdate and updateTimer then
-		return
-	end
-	
-	if not forceUpdate then
-		updateTimer = C_Timer.After(0, function()
-			updateTimer = nil
-			self:Update(true)
-		end)
-		return
-	end
-	
-	self.lastUpdate = GetTime()
-	self.updateQueued = false
-	
-	-- Get all available groups from Social Queue API
-	local groups = C_SocialQueue.GetAllGroups(false, false) or {}
-	
-	-- Add mock groups to the list (if any exist)
-	if next(self.mockGroups) ~= nil then
-		for guid, _ in pairs(self.mockGroups) do
-			table.insert(groups, guid)
-		end
-	end
-	
-	-- Clear old data
-	self.availableGroups = {}
-	
-	-- Build group cache
-	for i, groupGUID in ipairs(groups) do
-		local groupInfo = self:GetGroupInfo(groupGUID)
-		
-		-- FIX: Explicitly exclude player's own group (defense in depth)
-		-- API should return canJoin=false for own group, but this ensures it
-		local leaderGUID = groupInfo and groupInfo.leaderGUID
-		local isOwnGroup = leaderGUID and C_AccountInfo.IsGUIDRelatedToLocalAccount(leaderGUID)
-		
-		if groupInfo and groupInfo.canJoin and groupInfo.numQueues > 0 and not isOwnGroup then
-			table.insert(self.availableGroups, groupGUID)
-		end
-	end
-	
-	-- Sort groups by priority (BNet friends first, then WoW friends, then guild)
-	table.sort(self.availableGroups, function(a, b)
-		return self:GetGroupPriority(a) > self:GetGroupPriority(b)
-	end)
-	
-	-- Fire callback for UI update
-	if self.onUpdateCallback then
-		self.onUpdateCallback(self.availableGroups)
-	end
-	
-	-- Update tab counter
-	if BetterFriendsFrame and BetterFriendsFrame_UpdateQuickJoinTab then
-		BetterFriendsFrame_UpdateQuickJoinTab()
-	end
-end
-
--- Get information about a specific group
-function QuickJoin:GetGroupInfo(groupGUID)
-	if not groupGUID then
-		return nil
-	end
-	
-	-- Check for mock data first (mock groups are always prioritized)
-	if self.mockGroups[groupGUID] then
-		return self.mockGroups[groupGUID]
-	end
-	
-	-- Try to get cached info first
-	local cached = self.groupCache[groupGUID]
-	if cached and (GetTime() - cached.timestamp < 2.0) then
-		return cached.info
-	end
-	
-	-- Get fresh info from API
-	local canJoin, numQueues, needTank, needHealer, needDamage, isSoloQueueParty, questSessionActive, leaderGUID = C_SocialQueue.GetGroupInfo(groupGUID)
-	
-	if not canJoin then
-		return nil
-	end
-	
-	local info = {
-		canJoin = canJoin,
-		numQueues = numQueues,
-		needTank = needTank,
-		needHealer = needHealer,
-		needDamage = needDamage,
-		isSoloQueueParty = isSoloQueueParty,
-		questSessionActive = questSessionActive,
-		leaderGUID = leaderGUID,
-		members = C_SocialQueue.GetGroupMembers(groupGUID),
-		queues = C_SocialQueue.GetGroupQueues(groupGUID),
-		requestedToJoin = C_SocialQueue.GetGroupForPlayer(groupGUID) ~= nil,  -- Check if already requested
-		numMembers = 0,  -- Will be calculated below
-		leaderName = UNKNOWN,
-		activityName = UNKNOWN,
-		activityIcon = "Interface\\Icons\\INV_Misc_QuestionMark",
-		queueInfo = "",
-	}
-	
-	-- Calculate member count
-	if info.members then
-		info.numMembers = #info.members
-		
-		-- Get leader name using BetterFriendlist_GetRelationshipInfo (like Blizzard's SocialQueueUtil_GetHeaderName)
-		-- CRITICAL: C_SocialQueue.GetGroupMembers() returns SocialQueuePlayerInfo with only 'guid' and 'clubId' fields!
-		-- Fields like 'name', 'memberName', 'clubName' do NOT exist - must use GetRelationshipInfo to resolve name from GUID
-		if info.members and #info.members > 0 and info.members[1] then
-			local member = info.members[1]
-			
-			-- Use BetterFriendlist_GetRelationshipInfo to get name from GUID (exactly like Blizzard)
-			-- This function internally uses C_BattleNet.GetAccountInfoByGUID and GetPlayerInfoByGUID
-			if member.guid then
-				local name, color, relationship, playerLink = BetterFriendlist_GetRelationshipInfo(member.guid, nil, member.clubId)
-				if name and name ~= UNKNOWNOBJECT then
-					info.leaderName = name
-				end
-			end
-		end
-	end
-	
-	-- Get GROUP TITLE from queues (NOT activity name!)
-	-- Blizzard's approach: Display searchResultInfo.name for LFG List (the group's custom title)
-	if info.queues and #info.queues > 0 and info.queues[1] then
-		local queueData = info.queues[1].queueData
-		if queueData then
-			-- Get group title/name based on queue type
-			if queueData.queueType == "lfglist" and queueData.lfgListID then
-				-- For LFG List: Blizzard displays searchResultInfo.name (the custom group title)
-				-- NOT the activity name! (QuickJoin.lua doesn't even use activities)
-				local searchResultInfo = C_LFGList.GetSearchResultInfo(queueData.lfgListID)
-				if searchResultInfo then
-				
-				-- Protected strings are safe to use directly
-				info.groupTitle = searchResultInfo.name
-				
-				-- IMPORTANT: Use numMembers from searchResultInfo, NOT from members array!
-				-- members array only contains visible members (usually just leader)
-				if searchResultInfo.numMembers then
-					info.numMembers = searchResultInfo.numMembers
-				end
-				
-				-- IMPORTANT: Use leaderName and leaderFactionGroup from searchResultInfo!
-				if searchResultInfo.leaderName then
-					info.leaderName = searchResultInfo.leaderName
-				end
-				if searchResultInfo.leaderFactionGroup then
-					info.leaderFactionGroup = searchResultInfo.leaderFactionGroup
-				end
-				
-				-- Get role distribution using C_LFGList.GetSearchResultMemberCounts
-				local memberCounts = C_LFGList.GetSearchResultMemberCounts(queueData.lfgListID)
-				if memberCounts then
-					info.numTanks = memberCounts.TANK or 0
-					info.numHealers = memberCounts.HEALER or 0
-					info.numDPS = memberCounts.DAMAGER or 0
-				else
-					info.numTanks = 0
-					info.numHealers = 0
-					info.numDPS = 0
-				end
-				
-				-- Activity name für Tooltip
-				if searchResultInfo.activityIDs and #searchResultInfo.activityIDs > 0 and searchResultInfo.activityIDs[1] then
-					info.activityName = C_LFGList.GetActivityFullName(searchResultInfo.activityIDs[1], nil, searchResultInfo.isWarMode)
-				end
-				
-				-- Playstyle für Tooltip
-				if searchResultInfo.playstyle then
-					info.playstyle = searchResultInfo.playstyle
-				end
-				
-				-- Auto-Accept (Blizzard's isAutoAccept for auto-join groups)
-				if searchResultInfo.autoAccept then
-					info.isAutoAccept = true
-				end
-			else
-				-- Fallback if search result not available
-				info.groupTitle = "LFG Group"
-			end
-			elseif queueData.queueType == "pvp" then
-				info.groupTitle = "PvP"
-			elseif queueData.queueType == "dungeon" or queueData.lfgDungeonID then
-				-- Try to get dungeon name
-				if queueData.lfgDungeonID then
-					local dungeonName = GetLFGDungeonInfo(queueData.lfgDungeonID)
-					info.groupTitle = dungeonName or "Dungeon"
-				else
-					info.groupTitle = "Dungeon"
-				end
-			elseif queueData.queueType == "raid" then
-				info.groupTitle = "Raid"
-			else
-				info.groupTitle = queueData.queueType or info.queues[1].name or UNKNOWN
-			end
-			
-			-- Use generic icon for now (could be improved with queue-specific icons)
-			info.activityIcon = "Interface\\Icons\\Achievement_General_StayClassy"
-		end
-		
-		-- Build queue info string
-		if #info.queues > 1 then
-			info.queueInfo = string.format("%d activities", #info.queues)
-		end
-	end
-	
-	-- Cache the info
-	self.groupCache[groupGUID] = {
-		info = info,
-		timestamp = GetTime()
-	}
-	
-	return info
-end
-
--- Get all available groups
-function QuickJoin:GetAvailableGroups()
-	return self.availableGroups
-end
-
--- Request to join a group
-function QuickJoin:RequestToJoin(groupGUID, applyAsTank, applyAsHealer, applyAsDamage)
-	if not groupGUID then
-		return false
-	end
-	
-	-- Check if already in a group
-	if IsInGroup() then
-		UIErrorsFrame:AddMessage("You are already in a group!", 1.0, 0.1, 0.1, 1.0)
-		return false
-	end
-	
-	-- Check combat lockdown
-	if InCombatLockdown() then
-		UIErrorsFrame:AddMessage("Cannot join groups while in combat!", 1.0, 0.1, 0.1, 1.0)
-		return false
-	end
-	
-	-- Default to all roles if none specified
-	if not applyAsTank and not applyAsHealer and not applyAsDamage then
-		applyAsTank = true
-		applyAsHealer = true
-		applyAsDamage = true
-	end
-	
-	-- Handle mock groups (don't actually send request)
-	if self.mockGroups[groupGUID] then
-		UIErrorsFrame:AddMessage("|cff00ff00Mock join request sent (simulated only)", 0.1, 0.8, 1.0, 1.0)
-		return true
-	end
-	
-	local success = C_SocialQueue.RequestToJoin(groupGUID, applyAsTank, applyAsHealer, applyAsDamage)
-	
-	if not success then
-		UIErrorsFrame:AddMessage(QUICK_JOIN_FAILED or "Quick Join request failed", 1.0, 0.1, 0.1, 1.0)
-	end
-	
-	return success
-end
-
--- Get priority for sorting groups (higher = more important)
-function QuickJoin:GetGroupPriority(groupGUID)
-	local members = C_SocialQueue.GetGroupMembers(groupGUID)
-	if not members or #members == 0 then
-		return 0
-	end
-	
-	local priority = 0
-	
-	-- Sort members (leader first) - simple sort by checking if they're leader
-	table.sort(members, function(a, b)
-		-- Leader has isLeader flag or is first in original list
-		return (a.isLeader or false) and not (b.isLeader or false)
-	end)
-	
-	-- Check relationship with leader
-	if not members or #members == 0 or not members[1] then
-		return 0
-	end
-	local leaderGUID = members[1].guid
-	local accountInfo = C_BattleNet.GetAccountInfoByGUID(leaderGUID)
-	
-	if accountInfo then
-		-- BNet friend (highest priority)
-		priority = priority + 1000
-	else
-		-- Check for WoW friend
-		local friendInfo = GetFriendInfoByGUID(leaderGUID)
-		if friendInfo then
-			priority = priority + 500
-		else
-			-- Check for guild member
-			if IsInGuild() then
-				local guildName = GetGuildInfo("player")
-				local memberGuildName = GetGuildInfo("unit") -- TODO: Need proper unit token
-				if guildName and memberGuildName and guildName == memberGuildName then
-					priority = priority + 100
-				end
-			end
-		end
-	end
-	
-	return priority
-end
-
--- QuickJoinEntry - Blizzard-style entry object with ApplyToFrame and CalculateHeight methods
+-- QuickJoinEntry Class
 local QuickJoinEntry = {}
 QuickJoinEntry.__index = QuickJoinEntry
 
@@ -681,161 +354,15 @@ function QuickJoinEntry:New(guid, groupInfo)
 	return entry
 end
 
--- Apply entry data to button frame (Blizzard's HORIZONTAL layout)
--- Members (left) â†’ Icon (middle) â†’ Queues (right) ALL ON ONE LINE
-function QuickJoinEntry:ApplyToFrame(frame)
-	-- CRITICAL: Blizzard uses parentArray="Members" in XML for MemberName
-	-- This makes frame.MemberName accessible as frame.Members[0]
-	-- When i=1, frame.Members[i-1] = frame.Members[0] = frame.MemberName
-	
-	-- Members: Blizzard creates Members[] array dynamically (QuickJoin.lua:466-487)
-	for i = 1, #self.displayedMembers do
-		local member = self.displayedMembers[i]
-		
-		-- Blizzard's EXACT code (QuickJoin.lua:470-471):
-		-- local name, color, relationship, playerLink = SocialQueueUtil_GetRelationshipInfo(self.displayedMembers[i].guid, nil, self.displayedMembers[i].clubId);
-		local name, color, relationship, playerLink = BetterFriendlist_GetRelationshipInfo(member.guid, nil, member.clubId)
-		
-		-- Create/get the FontString for this member (EXACT Blizzard pattern)
-		local nameObj = frame.Members[i]
-		if not nameObj then
-			nameObj = frame:CreateFontString(nil, "ARTWORK", "UserScaledFontGameNormalSmall")
-			-- EXACT Blizzard code (QuickJoin.lua:473):
-			-- nameObj:SetPoint("TOPLEFT", frame.Members[i-1], "BOTTOMLEFT", 0, -QUICK_JOIN_NAME_SEPARATION);
-			-- When i=1, frame.Members[0] is frame.MemberName (because of parentArray in XML)
-			nameObj:SetPoint("TOPLEFT", frame.Members[i-1], "BOTTOMLEFT", 0, -5) -- QUICK_JOIN_NAME_SEPARATION = 5
-			frame.Members[i] = nameObj
-		end
-		
-		nameObj.playerLink = playerLink
-		nameObj.name = name
-		
-		-- WICHTIG: Verwende NAME für Anzeige, nicht playerLink!
-		-- playerLink enthält die bnetAccountID (z.B. "41") statt dem Namen
-		local displayName = name
-		
-		-- Apply color (QuickJoin.lua:480-485)
-		if not self:CanJoin() then
-			-- Disabled color if can't join
-			name = string.format("%s%s|r", DISABLED_FONT_COLOR_CODE, displayName)
-		else
-			-- Use relationship color code
-			name = string.format("%s%s|r", color, displayName)
-		end
-		
-		nameObj:SetText(name)
-		nameObj:Show()
-	end
-	
-	-- Hide unused member FontStrings (QuickJoin.lua:488-490)
-	for i = #self.displayedMembers + 1, #frame.Members do
-		frame.Members[i]:Hide()
-	end
-	
-	-- Queue Icon (MIDDLE, between members and queues) (QuickJoin.lua:492-497)
-	local useGroupIcon = self.displayedQueues and #self.displayedQueues > 0 and self.displayedQueues[1] and self.displayedQueues[1].queueData and self.displayedQueues[1].queueData.queueType == "lfglist"
-	if frame.Icon then
-		frame.Icon:SetAtlas(useGroupIcon and "socialqueuing-icon-group" or "socialqueuing-icon-eye")
-		-- Set height based on member names height (Blizzard: QuickJoin.lua:500)
-		-- frame.Icon:SetHeight(math.max(17, frame.MemberName:GetHeight()))
-		frame.Icon:SetHeight(math.max(17, frame.MemberName:GetHeight()))
-		-- Width based on height (aspect ratio ~0.95)
-		frame.Icon:SetWidth(math.max(16, frame.Icon:GetHeight() * 0.95))
-		
-		if self:CanJoin() then
-			frame.Icon:SetDesaturation(0)
-			frame.Icon:SetAlpha(0.9)
-		else
-			frame.Icon:SetDesaturation(1)
-			frame.Icon:SetAlpha(0.3)
-		end
-	end
-	
-	-- CRITICAL: Blizzard positions QueueName ONCE in Lua (QuickJoin.lua:512)
-	-- frame.QueueName:SetPoint("TOPLEFT", frame.MemberName, "TOPRIGHT", frame.Icon:GetWidth() + 4, 0);
-	-- But we already do this in XML! So we only need to update it if icon width changed
-	-- Actually, let's set it dynamically since icon size can change
-	if frame.QueueName then
-		frame.QueueName:ClearAllPoints()
-		frame.QueueName:SetPoint("TOPLEFT", frame.MemberName, "TOPRIGHT", frame.Icon:GetWidth() + 4, 0)
-	end
-	
-	-- Queues: Blizzard creates Queues[] array dynamically (QuickJoin.lua:512-537)
-	for i = 1, #self.displayedQueues do
-		local queue = self.displayedQueues[i]
-		
-		-- Create/get the FontString for this queue (EXACT Blizzard pattern)
-		local queueObj = frame.Queues[i]
-		if not queueObj then
-			queueObj = frame:CreateFontString(nil, "ARTWORK", "UserScaledFontGameNormalSmall")
-			-- EXACT Blizzard code (QuickJoin.lua:519):
-			-- queueObj:SetPoint("TOPLEFT", frame.Queues[i-1], "BOTTOMLEFT", 0, -QUICK_JOIN_NAME_SEPARATION);
-			-- When i=1, frame.Queues[0] is frame.QueueName (because of parentArray in XML)
-			queueObj:SetPoint("TOPLEFT", frame.Queues[i-1], "BOTTOMLEFT", 0, -5) -- QUICK_JOIN_NAME_SEPARATION = 5
-			frame.Queues[i] = queueObj
-		end
-		
-	-- Blizzard gets the cachedQueueName (QuickJoin.lua:530)
-	local queueName = queue.cachedQueueName
-	
-	if not queueName then
-		-- This should never happen in Blizzard's code
-		queueName = "Unknown Queue"
-	else
-		-- Blizzard wraps LFGList names in quotes (QuickJoin.lua:533-535)
-		if queue.queueData.queueType == "lfglist" then
-			queueName = string.format(LFG_LIST_IN_QUOTES, queueName)
-		end
-		
-		-- Blizzard adds comma if not last queue (QuickJoin.lua:537-539)
-		if i < #self.displayedQueues then
-			queueName = queueName .. PLAYER_LIST_DELIMITER -- This is ", "
-		end
-		
-		-- Apply disabled color if can't join (QuickJoin.lua:541-543)
-		if not self:CanJoin() then
-			queueName = DISABLED_FONT_COLOR_CODE .. queueName .. FONT_COLOR_CODE_CLOSE
-		end
-	end
-		
-		queueObj:SetText(queueName)
-		queueObj:Show()
-	end
-	
-	-- Hide unused queue FontStrings
-	for i = #self.displayedQueues + 1, #frame.Queues do
-		frame.Queues[i]:Hide()
-	end
-	
-	-- Update button height (Blizzard's calculation - QuickJoin.lua:556-575)
-	frame:SetHeight(self:CalculateHeight())
-end
-
--- Calculate button height based on content (Blizzard's formula - QuickJoin.lua:556-575)
-function QuickJoinEntry:CalculateHeight()
-	local bufferHeight = 13
-	local fontHeight = 12 -- UserScaledFontGameNormalSmall default height
-	local separation = 5  -- QUICK_JOIN_NAME_SEPARATION
-	
-	-- Height = one line per member OR one line per queue (whichever is MORE)
-	local height = fontHeight + separation
-	local namesHeight = height * #self.displayedMembers
-	local queuesHeight = height * math.min(#self.displayedQueues, 6) -- MAX_NUM_DISPLAYED_QUEUES = 6
-	
-	return bufferHeight + math.max(namesHeight, queuesHeight)
-end
-
--- Check if group is joinable
 function QuickJoinEntry:CanJoin()
 	return self.groupInfo and self.groupInfo.canJoin ~= false
 end
 
--- Apply entry to tooltip (EXACT Blizzard replication)
 function QuickJoinEntry:ApplyToTooltip(tooltip)
 	-- Blizzard's EXACT tooltip structure from LFGListUtil_SetSearchEntryTooltip (lines 4154-4312):
 	-- Blizzard uses HELPER FUNCTIONS that apply colors:
-	--   GameTooltip_AddHighlightLine() â†’ HIGHLIGHT_FONT_COLOR (1.0, 0.82, 0 = GOLD/YELLOW)
-	--   GameTooltip_AddNormalLine() â†’ NORMAL_FONT_COLOR (1.0, 1.0, 1.0 = WHITE)
+	--   GameTooltip_AddHighlightLine() -> HIGHLIGHT_FONT_COLOR (1.0, 0.82, 0 = GOLD/YELLOW)
+	--   GameTooltip_AddNormalLine() -> NORMAL_FONT_COLOR (1.0, 1.0, 1.0 = WHITE)
 	-- 
 	-- Colors:
 	--   - Activity Name: HIGHLIGHT_FONT_COLOR (1.0, 0.82, 0 = gold/yellow)
@@ -876,8 +403,14 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 	-- Get leader name - CRITICAL FIX: For lfglist queues, use searchResultInfo.leaderName (CHARACTER name)!
 	-- Like Blizzard's LFGListUtil_SetSearchEntryTooltip, NOT the BNet account name from GetRelationshipInfo
 	
-	-- First, try to get fresh searchResultInfo.leaderName for lfglist queues
-	if self.displayedQueues and #self.displayedQueues > 0 and self.displayedQueues[1] then
+	-- User Request: Prioritize BNet Name if available
+	local isBNetFriend = false
+	if self.groupInfo and self.groupInfo.leaderGUID and C_BattleNet.GetAccountInfoByGUID(self.groupInfo.leaderGUID) then
+		isBNetFriend = true
+	end
+	
+	-- First, try to get fresh searchResultInfo.leaderName for lfglist queues (ONLY if not BNet friend)
+	if not isBNetFriend and self.displayedQueues and #self.displayedQueues > 0 and self.displayedQueues[1] then
 		local firstQueue = self.displayedQueues[1]
 		if firstQueue.queueData and firstQueue.queueData.queueType == "lfglist" and firstQueue.queueData.lfgListID then
 			-- CRITICAL: Fetch FRESH searchResultInfo to get CHARACTER name (not cached BNet name)
@@ -1029,6 +562,923 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 		tooltip:AddLine(QUICK_JOIN_IS_AUTO_ACCEPT_TOOLTIP or "This group will automatically accept you.", LIGHTBLUE_FONT_COLOR.r, LIGHTBLUE_FONT_COLOR.g, LIGHTBLUE_FONT_COLOR.b)
 	end
 end
+
+-- Initialize the QuickJoin module
+function QuickJoin:Initialize()
+	if self.initialized then
+		return
+	end
+	
+	-- Get Social Queue Configuration
+	self.config = C_SocialQueue.GetConfig()
+	
+	if not self.config then
+		-- Set fallback config
+		self.config = {
+			TOASTS_DISABLED = false,
+			TOAST_DURATION = TOAST_DURATION,
+			DELAY_DURATION = 0.5,
+		}
+	end
+	
+	-- Register Events
+	self:RegisterEvents()
+	
+	-- Initialize ScrollBox (Phase 1: Activity Cards)
+	if BetterFriendsFrame and BetterFriendsFrame.QuickJoinFrame then
+		local scrollBoxContainer = BetterFriendsFrame.QuickJoinFrame.ContentInset.ScrollBoxContainer
+		local scrollBox = scrollBoxContainer.ScrollBox
+		local scrollBar = BetterFriendsFrame.QuickJoinFrame.ContentInset.ScrollBar
+		
+		-- Create DataProvider
+		self.dataProvider = CreateDataProvider()
+		
+		-- Initialize ScrollBox with Linear View
+		local view = CreateScrollBoxListLinearView()
+		view:SetElementInitializer("BetterFriendlistQuickJoinCardTemplate", function(button, elementData)
+			self:OnScrollBoxInitialize(button, elementData)
+		end)
+		
+		-- Set padding
+		view:SetPadding(5, 5, 5, 5, 2)
+		
+		ScrollUtil.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view)
+
+		-- Dynamic Width Adjustment based on ScrollBar visibility
+		local function UpdateScrollBoxWidth()
+			scrollBoxContainer:ClearAllPoints()
+			scrollBoxContainer:SetPoint("TOPLEFT", 4, -4)
+			if scrollBar:IsShown() then
+				scrollBoxContainer:SetPoint("BOTTOMRIGHT", -24, 4)
+			else
+				scrollBoxContainer:SetPoint("BOTTOMRIGHT", -4, 4)
+			end
+		end
+
+		scrollBar:HookScript("OnShow", UpdateScrollBoxWidth)
+		scrollBar:HookScript("OnHide", UpdateScrollBoxWidth)
+		
+		-- Initial check
+		UpdateScrollBoxWidth()
+	end
+	
+	-- Initial update
+	self:Update()
+	
+	-- Start periodic cache cleanup (every 5 minutes)
+	C_Timer.NewTicker(300, function()
+		self:CleanupCache()
+	end)
+	
+	-- Hook OnShow to re-render if data changed while hidden
+	if BetterFriendsFrame then
+		BetterFriendsFrame:HookScript("OnShow", function()
+			if needsRenderOnShow then
+				-- Only trigger update if we are on the QuickJoin tab
+				if BetterFriendsFrame.QuickJoinFrame and BetterFriendsFrame.QuickJoinFrame:IsShown() then
+					self:Update(true)
+					needsRenderOnShow = false
+				end
+			end
+		end)
+	end
+	
+	self.initialized = true
+end
+
+-- Initialize a card in the ScrollBox
+function QuickJoin:OnScrollBoxInitialize(button, elementData)
+	local entry = elementData
+	local info = entry.groupInfo
+	
+	-- 1. Set Icon (Activity Type)
+	if button.Icon then
+		local icon = info.activityIcon
+		if not icon or icon == 0 then
+			icon = 134400 -- Interface\Icons\INV_Misc_QuestionMark
+		end
+		
+		-- Debug Icon
+		-- BFL:DebugPrint("SetIcon:", info.groupTitle, icon, type(icon))
+		
+		button.Icon:SetTexture(icon)
+		
+		-- Handle EJ Icons (Crop to remove transparent padding)
+		if info.isEJIcon then
+			-- EJ Button images are usually in a texture atlas with padding
+			-- Standard crop for EJ list buttons (from EncounterJournal.xml):
+			button.Icon:SetTexCoord(0.00390625, 0.71484375, 0.0078125, 0.65625)
+		else
+			button.Icon:SetTexCoord(0, 1, 0, 1)
+		end
+		
+		button.Icon:SetShown(true)
+	end
+	
+	-- 2. Set Title (Group Name)
+	if button.Title then
+		button.Title:SetText(info.groupTitle or "Unknown Group")
+	end
+	
+	-- 3. Set Activity (New Line)
+	if button.Activity then
+		local activityName = info.activityName
+		if not activityName or activityName == UNKNOWN then
+			activityName = ""
+		end
+		button.Activity:SetText(activityName)
+	end
+	
+	-- 4. Set Details (Leader + Friends)
+	if button.Details then
+		-- Leader Name (colored)
+		local leaderName = info.leaderName or "Unknown"
+		local leaderColor = info.leaderColor or "|cffffffff"
+		local details = "Leader: " .. leaderColor .. leaderName .. "|r"
+		
+		-- Add other friends if present (already colored in GetGroupInfo)
+		if info.otherFriends and #info.otherFriends > 0 then
+			local friendsList = table.concat(info.otherFriends, ", ")
+			details = details .. " (+ " .. friendsList .. ")"
+		end
+		
+		button.Details:SetText(details)
+	end
+
+	-- 5. Set Member Count (New Frame)
+	if button.MemberCount then
+		local count = info.numMembers or 1
+		local tanks = info.numTanks or 0
+		local healers = info.numHealers or 0
+		local dps = info.numDPS or 0
+		
+		-- Format: "14 (1/2/11)" - Compact format to save space
+		-- Using a group icon texture would be nice, but text is clearer for now
+		button.MemberCount:SetText(string.format("|cffffd100%d|r |cffffffff(%d/%d/%d)|r", count, tanks, healers, dps))
+	end
+	
+	-- 6. Update Role Icons
+	if button.RoleContainer then
+		local container = button.RoleContainer
+		if container.TankIcon then container.TankIcon:SetShown(info.needTank) end
+		if container.HealerIcon then container.HealerIcon:SetShown(info.needHealer) end
+		if container.DPSIcon then container.DPSIcon:SetShown(info.needDamage) end
+		
+		-- Layout role icons (simple horizontal stack)
+		local lastIcon = nil
+		local icons = {container.TankIcon, container.HealerIcon, container.DPSIcon}
+		for _, icon in ipairs(icons) do
+			if icon and icon:IsShown() then
+				icon:ClearAllPoints()
+				if lastIcon then
+					icon:SetPoint("LEFT", lastIcon, "RIGHT", 2, 0)
+				else
+					icon:SetPoint("LEFT", container, "LEFT", 0, 0)
+				end
+				lastIcon = icon
+			end
+		end
+	end
+	
+	-- 5. Setup Join Button
+	if button.JoinButton then
+		button.JoinButton:SetEnabled(info.canJoin)
+		button.JoinButton:SetScript("OnClick", function()
+			self:RequestToJoin(entry.guid)
+		end)
+	end
+	
+	-- 6. CRITICAL: Store button references for selection system
+	button.guid = entry.guid
+	button.entry = entry
+	self.selectedButtons[entry.guid] = button
+	
+	-- 7. Setup Click Handler for selection
+	button:SetScript("OnClick", function(btn, mouseButton)
+		BetterQuickJoinGroupButton_OnClick(btn, mouseButton)
+	end)
+	
+	-- 8. Update selection visual if this button is the selected one
+	if button.Selected then
+		if self.selectedGUID == entry.guid then
+			button.Selected:Show()
+		else
+			button.Selected:Hide()
+		end
+	end
+	
+	-- 9. Tooltip
+	button:SetScript("OnEnter", function()
+		GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+		entry:ApplyToTooltip(GameTooltip)
+		GameTooltip:Show()
+	end)
+	button:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+end
+
+-- Cleanup old cache entries (called every 5 minutes)
+function QuickJoin:CleanupCache()
+	local currentTime = GetTime()
+	local maxAge = 300 -- 5 minutes
+	local cleaned = 0
+	
+	for guid, cached in pairs(self.groupCache) do
+		if currentTime - cached.timestamp > maxAge then
+			self.groupCache[guid] = nil
+			cleaned = cleaned + 1
+		end
+	end
+	
+	if cleaned > 0 then
+		BFL:DebugPrint("QuickJoin: Cleaned up", cleaned, "old cache entries")
+	end
+end
+
+-- Update available groups list
+function QuickJoin:Update(forceUpdate)
+	-- Event Coalescing (Micro-Throttling)
+	if not forceUpdate and updateTimer then
+		return
+	end
+	
+	if not forceUpdate then
+		updateTimer = C_Timer.After(0, function()
+			updateTimer = nil
+			self:Update(true)
+		end)
+		return
+	end
+	
+	self.lastUpdate = GetTime()
+	self.updateQueued = false
+	
+	-- Get all available groups from Social Queue API
+	local groups = C_SocialQueue.GetAllGroups(false, false) or {}
+	
+	-- Add mock groups to the list (if any exist)
+	if next(self.mockGroups) ~= nil then
+		for guid, _ in pairs(self.mockGroups) do
+			table.insert(groups, guid)
+		end
+	end
+	
+	-- Clear old data
+	self.availableGroups = {}
+	
+	-- Build group cache
+	for i, groupGUID in ipairs(groups) do
+		local groupInfo = self:GetGroupInfo(groupGUID)
+		
+		-- FIX: Explicitly exclude player's own group (defense in depth)
+		-- API should return canJoin=false for own group, but this ensures it
+		local leaderGUID = groupInfo and groupInfo.leaderGUID
+		local isOwnGroup = leaderGUID and C_AccountInfo.IsGUIDRelatedToLocalAccount(leaderGUID)
+		
+		if groupInfo and groupInfo.canJoin and groupInfo.numQueues > 0 and not isOwnGroup then
+			table.insert(self.availableGroups, groupGUID)
+		end
+	end
+	
+	-- Sort groups by priority (BNet friends first, then WoW friends, then guild)
+	table.sort(self.availableGroups, function(a, b)
+		return self:GetGroupPriority(a) > self:GetGroupPriority(b)
+	end)
+	
+	-- Update tab counter (ALWAYS update this, even if frame is hidden)
+	if BetterFriendsFrame and BetterFriendsFrame_UpdateQuickJoinTab then
+		BetterFriendsFrame_UpdateQuickJoinTab()
+	end
+	
+	-- Visibility Optimization:
+	-- If the frame (or the QuickJoin tab) is hidden, don't rebuild the ScrollBox.
+	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() or not BetterFriendsFrame.QuickJoinFrame or not BetterFriendsFrame.QuickJoinFrame:IsShown() then
+		needsRenderOnShow = true
+		return
+	end
+	
+	-- Update ScrollBox DataProvider
+	if self.dataProvider then
+		local entries = {}
+		for _, guid in ipairs(self.availableGroups) do
+			local groupInfo = self:GetGroupInfo(guid)
+			if groupInfo then
+				local entry = QuickJoinEntry:New(guid, groupInfo)
+				table.insert(entries, entry)
+			end
+		end
+		self.dataProvider:Flush()
+		self.dataProvider:InsertTable(entries)
+		
+		-- Update "No Groups" text
+		if BetterFriendsFrame and BetterFriendsFrame.QuickJoinFrame and BetterFriendsFrame.QuickJoinFrame.ContentInset.NoGroupsText then
+			BetterFriendsFrame.QuickJoinFrame.ContentInset.NoGroupsText:SetShown(#entries == 0)
+			if #entries == 0 then
+				BetterFriendsFrame.QuickJoinFrame.ContentInset.NoGroupsText:SetText(QUICK_JOIN_NO_GROUPS or "No groups available")
+			end
+		end
+	end
+	
+	-- Fire callback for UI update (Legacy support)
+	if self.onUpdateCallback then
+		self.onUpdateCallback(self.availableGroups)
+	end
+end
+
+-- Get information about a specific group
+function QuickJoin:GetGroupInfo(groupGUID)
+	if not groupGUID then
+		return nil
+	end
+	
+	-- Check for mock data first (mock groups are always prioritized)
+	if self.mockGroups[groupGUID] then
+		local mockGroup = self.mockGroups[groupGUID]
+		-- Ensure details are populated for mock groups
+		PopulateGroupMemberDetails(mockGroup)
+		
+		-- Try to resolve icon if missing (simulating real group behavior)
+		if not mockGroup.activityIcon or mockGroup.activityIcon == 0 then
+			self:ResolveMockIcon(mockGroup)
+		end
+		
+		return mockGroup
+	end
+	
+	-- Try to get cached info first
+	local cached = self.groupCache[groupGUID]
+	if cached and (GetTime() - cached.timestamp < 2.0) then
+		return cached.info
+	end
+	
+	-- Get fresh info from API
+	local canJoin, numQueues, needTank, needHealer, needDamage, isSoloQueueParty, questSessionActive, leaderGUID = C_SocialQueue.GetGroupInfo(groupGUID)
+	
+	if not canJoin then
+		return nil
+	end
+	
+	local info = {
+		canJoin = canJoin,
+		numQueues = numQueues,
+		needTank = needTank,
+		needHealer = needHealer,
+		needDamage = needDamage,
+		isSoloQueueParty = isSoloQueueParty,
+		questSessionActive = questSessionActive,
+		leaderGUID = leaderGUID,
+		members = C_SocialQueue.GetGroupMembers(groupGUID),
+		queues = C_SocialQueue.GetGroupQueues(groupGUID),
+		requestedToJoin = C_SocialQueue.GetGroupForPlayer(groupGUID) ~= nil,  -- Check if already requested
+		numMembers = 0,  -- Will be calculated below
+		leaderName = UNKNOWN,
+		activityName = UNKNOWN,
+		activityIcon = nil, -- Will be resolved later
+		queueInfo = "",
+	}
+	
+	-- Calculate member count
+	if info.members then
+		PopulateGroupMemberDetails(info)
+	end
+	
+	-- Get GROUP TITLE from queues (NOT activity name!)
+	-- Blizzard's approach: Display searchResultInfo.name for LFG List (the group's custom title)
+	if info.queues and #info.queues > 0 and info.queues[1] then
+		local queueData = info.queues[1].queueData
+		if queueData then
+			BFL:DebugPrint("QuickJoin Debug: Processing Group", groupGUID)
+			BFL:DebugPrint("  QueueType:", queueData.queueType)
+			
+			-- Get group title/name based on queue type
+			if queueData.queueType == "lfglist" and queueData.lfgListID then
+				BFL:DebugPrint("QuickJoin Debug: Processing Group", groupGUID)
+				BFL:DebugPrint("  QueueType:", queueData.queueType)
+				BFL:DebugPrint("  LFGList ID:", queueData.lfgListID)
+				
+				-- Detailed QueueData Dump
+				if queueData then
+					for k, v in pairs(queueData) do
+						BFL:DebugPrint(string.format("  queueData.%s = %s", tostring(k), tostring(v)))
+					end
+				end
+
+				-- For LFG List: Blizzard displays searchResultInfo.name (the custom group title)
+				-- NOT the activity name! (QuickJoin.lua doesn't even use activities)
+				local searchResultInfo = C_LFGList.GetSearchResultInfo(queueData.lfgListID)
+				
+				if searchResultInfo then
+					BFL:DebugPrint("  SearchResult Found for ID:", queueData.lfgListID)
+					-- Detailed SearchResult Dump
+					for k, v in pairs(searchResultInfo) do
+						BFL:DebugPrint(string.format("    searchResultInfo.%s = %s", tostring(k), tostring(v)))
+					end
+				
+					-- Protected strings are safe to use directly
+					info.groupTitle = searchResultInfo.name
+					
+					-- IMPORTANT: Use numMembers from searchResultInfo, NOT from members array!
+					-- members array only contains visible members (usually just leader)
+					if searchResultInfo.numMembers then
+						info.numMembers = searchResultInfo.numMembers
+					end
+					
+					-- IMPORTANT: Use leaderName and leaderFactionGroup from searchResultInfo!
+					if searchResultInfo.leaderName then
+						-- Only overwrite if NOT a BNet friend (User Request: Prioritize BNet Name)
+						local isBNetFriend = false
+						if info.leaderGUID and C_BattleNet.GetAccountInfoByGUID(info.leaderGUID) then
+							isBNetFriend = true
+						end
+						
+						if not isBNetFriend then
+							info.leaderName = searchResultInfo.leaderName
+						end
+					end
+					if searchResultInfo.leaderFactionGroup then
+						info.leaderFactionGroup = searchResultInfo.leaderFactionGroup
+					end
+					
+					-- Get role distribution using C_LFGList.GetSearchResultMemberCounts
+					local memberCounts = C_LFGList.GetSearchResultMemberCounts(queueData.lfgListID)
+					if memberCounts then
+						info.numTanks = memberCounts.TANK or 0
+						info.numHealers = memberCounts.HEALER or 0
+						info.numDPS = memberCounts.DAMAGER or 0
+					else
+						info.numTanks = 0
+						info.numHealers = 0
+						info.numDPS = 0
+					end
+					
+					-- Activity name & Icon
+					local activityID = searchResultInfo.activityID or queueData.activityID
+					
+					-- CRITICAL FIX: Handle activityIDs table (plural) which Blizzard uses now
+					if searchResultInfo.activityIDs then
+						BFL:DebugPrint("  activityIDs table found:")
+						for k, v in pairs(searchResultInfo.activityIDs) do
+							BFL:DebugPrint(string.format("    [%s] = %s", tostring(k), tostring(v)))
+						end
+						
+						if not activityID then
+							-- Try to grab the first ID (usually it's an array)
+							if searchResultInfo.activityIDs[1] then
+								activityID = searchResultInfo.activityIDs[1]
+							else
+								-- Fallback for non-array tables (key-value or set)
+								local k, v = next(searchResultInfo.activityIDs)
+								if v and type(v) == "number" then 
+									activityID = v 
+								elseif k and type(k) == "number" then
+									activityID = k
+								end
+							end
+							BFL:DebugPrint("  Resolved ActivityID from activityIDs table:", activityID)
+						end
+					end
+					
+					BFL:DebugPrint("  Resolved ActivityID:", activityID)
+					
+					if activityID then
+						local activityInfo = C_LFGList.GetActivityInfoTable(activityID)
+						if activityInfo then
+							BFL:DebugPrint("  ActivityInfo Found:", activityInfo.fullName)
+							info.activityName = activityInfo.fullName
+							
+							if activityInfo.groupFinderActivityGroupID then
+								local _, groupIcon = C_LFGList.GetActivityGroupInfo(activityInfo.groupFinderActivityGroupID)
+								BFL:DebugPrint("  GroupFinderActivityGroupID:", activityInfo.groupFinderActivityGroupID)
+								BFL:DebugPrint("  GroupIcon from API:", groupIcon)
+								
+								-- Blizzard sometimes returns garbage IDs (like 20 for Tazavesh)
+								-- Valid FileDataIDs are usually large numbers (> 10000)
+								if groupIcon and groupIcon > 10000 then
+									info.activityIcon = groupIcon
+								else
+									BFL:DebugPrint("  Ignored invalid GroupIcon from API:", groupIcon)
+								end
+							else
+								BFL:DebugPrint("  No GroupFinderActivityGroupID in ActivityInfo")
+							end
+							
+							-- Smart Fallback: Try to get icon from Encounter Journal via MapID
+							if (not info.activityIcon or info.activityIcon == 0) then
+								BFL:DebugPrint("  Smart Fallback: Checking MapID:", activityInfo.mapID)
+								
+								local currentMapID = activityInfo.mapID
+								local instanceID = 0
+								local depth = 0
+								
+								-- Traverse up the map hierarchy (max 3 levels)
+								while currentMapID and currentMapID > 0 and depth < 3 do
+									instanceID = EJ_GetInstanceForMap(currentMapID)
+									
+									if instanceID and instanceID > 0 then
+										break
+									end
+									
+									local mapInfo = C_Map.GetMapInfo(currentMapID)
+									if mapInfo and mapInfo.parentMapID then
+										currentMapID = mapInfo.parentMapID
+										depth = depth + 1
+									else
+										break
+									end
+								end
+								
+								if instanceID and instanceID > 0 then
+									local name, _, _, buttonImage = EJ_GetInstanceInfo(instanceID)
+									
+									if buttonImage and buttonImage ~= 0 then
+										info.activityIcon = buttonImage
+										info.isEJIcon = true
+										BFL:DebugPrint("  Smart Fallback: APPLIED EJ Icon:", buttonImage)
+									end
+								end
+							end
+							
+							-- Smart Fallback 2: Name-based lookup in Encounter Journal
+							-- If MapID lookup failed, try to find an instance with a matching name
+							if (not info.activityIcon or info.activityIcon == 0) and info.activityName then
+								BFL:DebugPrint("  Smart Fallback 2: Searching EJ by Name:", info.activityName)
+								
+								-- Clean activity name (remove difficulty suffix like " (Mythic)")
+								local cleanName = info.activityName:gsub("%s*%(.*%)", "")
+								
+								-- Normalize names for split-dungeons or complex names to improve EJ matching
+								if cleanName:find("Tazavesh") then cleanName = "Tazavesh" end
+								if cleanName:find("Mechagon") then cleanName = "Mechagon" end
+								if cleanName:find("Karazhan") then cleanName = "Karazhan" end
+								
+								BFL:DebugPrint("  Cleaned Name:", cleanName)
+								
+								-- Iterate through ALL tiers to find the instance
+								-- We iterate backwards from the latest tier (most likely content) down to Classic.
+								local numTiers = EJ_GetNumTiers()
+								local currentTier = EJ_GetCurrentTier()
+								
+								local tiersToCheck = {}
+								for i = numTiers, 1, -1 do
+									table.insert(tiersToCheck, i)
+								end
+								
+								for _, tier in ipairs(tiersToCheck) do
+									EJ_SelectTier(tier)
+									local index = 1
+									while true do
+										local instanceID, name, _, _, buttonImage = EJ_GetInstanceByIndex(index, true) -- Raid
+										if not instanceID then break end
+										
+										if name and (name == cleanName or name:find(cleanName, 1, true)) then
+											if buttonImage then
+												info.activityIcon = buttonImage
+												info.isEJIcon = true
+												BFL:DebugPrint("  Smart Fallback 2: Found Match (Raid):", name, buttonImage)
+												break
+											end
+										end
+										index = index + 1
+									end
+									
+									if info.activityIcon and info.activityIcon ~= 0 then break end
+									
+									index = 1
+									while true do
+										local instanceID, name, _, _, buttonImage = EJ_GetInstanceByIndex(index, false) -- Dungeon
+										if not instanceID then break end
+										
+										if name and (name == cleanName or name:find(cleanName, 1, true)) then
+											if buttonImage then
+												info.activityIcon = buttonImage
+												info.isEJIcon = true
+												BFL:DebugPrint("  Smart Fallback 2: Found Match (Dungeon):", name, buttonImage)
+												break
+											end
+										end
+										index = index + 1
+									end
+									
+									if info.activityIcon and info.activityIcon ~= 0 then break end
+								end
+								
+								-- Restore original tier
+								EJ_SelectTier(currentTier)
+							end
+							
+							-- Fallback if icon is missing or 0
+							if not info.activityIcon or info.activityIcon == 0 then
+								local catID = activityInfo.categoryID
+								BFL:DebugPrint("  Fallback Check - CategoryID:", catID)
+								
+								if catID == 2 then -- Dungeons
+									info.activityIcon = 525134 -- Fallback: Dungeon (Keystone)
+								elseif catID == 3 then -- Raids
+									info.activityIcon = 1536895 -- User Selected: Raid
+								elseif catID == 4 or catID == 5 or catID == 7 or catID == 8 or catID == 9 then -- PvP
+									info.activityIcon = 236396 -- User Selected: PvP
+								elseif catID == 1 then -- Questing
+									info.activityIcon = 409602 -- User Selected: Quest
+								elseif catID == 6 then -- Custom
+									info.activityIcon = 134149 -- User Selected: Custom
+								end
+								
+								-- Heuristic if category didn't match (e.g. Legacy Raids might have different ID)
+								if (not info.activityIcon or info.activityIcon == 0) then
+									if activityInfo.maxNumPlayers and activityInfo.maxNumPlayers > 5 then
+										info.activityIcon = 1536895 -- Assume Raid
+										BFL:DebugPrint("  Fallback Heuristic: Assumed Raid (>5 players)")
+									elseif activityInfo.maxNumPlayers and activityInfo.maxNumPlayers == 5 then
+										info.activityIcon = 525134 -- Assume Dungeon (Keystone)
+										BFL:DebugPrint("  Fallback Heuristic: Assumed Dungeon (5 players)")
+									end
+								end
+							end
+						else
+							BFL:DebugPrint("  ActivityInfo is NIL for ID:", activityID)
+						end
+					else
+						BFL:DebugPrint("  No ActivityID found in SearchResult or QueueData")
+					end
+
+					-- Fix for "???" Group Title: Use Activity Name if Title is missing/unknown
+					if (not info.groupTitle or info.groupTitle == "???" or info.groupTitle == "") and info.activityName and info.activityName ~= UNKNOWN then
+						info.groupTitle = info.activityName
+						BFL:DebugPrint("  Fixed GroupTitle using ActivityName:", info.groupTitle)
+					end
+					
+					-- Playstyle für Tooltip
+					if searchResultInfo.playstyle then
+						info.playstyle = searchResultInfo.playstyle
+					end
+					
+					-- Auto-Accept (Blizzard's isAutoAccept for auto-join groups)
+					if searchResultInfo.autoAccept then
+						info.isAutoAccept = true
+					end
+				else
+					BFL:DebugPrint("  SearchResult is NIL for ID:", queueData.lfgListID)
+					BFL:DebugPrint("  SearchResult is NIL for ID:", queueData.lfgListID)
+					-- Fallback if search result not available
+					info.groupTitle = "LFG Group"
+					
+					-- Try to get activity name from queueData if available
+					if queueData.activityID then
+						BFL:DebugPrint("  Fallback: Using queueData.activityID:", queueData.activityID)
+						local activityInfo = C_LFGList.GetActivityInfoTable(queueData.activityID)
+						if activityInfo then
+							info.activityName = activityInfo.fullName
+							BFL:DebugPrint("  Fallback Activity Name:", info.activityName)
+							
+							if activityInfo.groupFinderActivityGroupID then
+								local _, groupIcon = C_LFGList.GetActivityGroupInfo(activityInfo.groupFinderActivityGroupID)
+								if groupIcon then
+									info.activityIcon = groupIcon
+								end
+							end
+						end
+					else
+						BFL:DebugPrint("  Fallback: No activityID in queueData")
+					end
+				end
+			elseif queueData.queueType == "pvp" then
+				BFL:DebugPrint("  QueueType: PvP")
+				info.groupTitle = "PvP"
+				info.activityIcon = 236396 -- User Selected: PvP
+			elseif queueData.queueType == "dungeon" or queueData.lfgDungeonID then
+				BFL:DebugPrint("  QueueType: Dungeon, ID:", queueData.lfgDungeonID)
+				-- Try to get dungeon name
+				if queueData.lfgDungeonID then
+					local dungeonName, _, _, _, _, _, _, _, _, dungeonIcon = GetLFGDungeonInfo(queueData.lfgDungeonID)
+					info.groupTitle = dungeonName or "Dungeon"
+					BFL:DebugPrint("  Dungeon Name:", dungeonName)
+					if dungeonIcon then
+						info.activityIcon = dungeonIcon
+					end
+				else
+					info.groupTitle = "Dungeon"
+				end
+			elseif queueData.queueType == "raid" then
+				BFL:DebugPrint("  QueueType: Raid")
+				info.groupTitle = "Raid"
+				info.activityIcon = 1536895 -- User Selected: Raid
+			else
+				BFL:DebugPrint("  QueueType: Unknown/Other:", queueData.queueType)
+				info.groupTitle = queueData.queueType or info.queues[1].name or UNKNOWN
+			end
+		end
+		
+		-- Build queue info string
+		if #info.queues > 1 then
+			info.queueInfo = string.format("%d activities", #info.queues)
+		end
+	end
+	
+	-- FIX: Icon Overrides for known broken icons (Green Squares)
+	if info.activityName then
+		-- Add other overrides here if needed
+	end
+
+	-- Cache the info
+	self.groupCache[groupGUID] = {
+		info = info,
+		timestamp = GetTime()
+	}
+	
+	return info
+end
+
+--[[
+	Resolve icon for mock group using same logic as real groups
+]]
+function QuickJoin:ResolveMockIcon(info)
+	if info.activityIcon and info.activityIcon ~= 0 then return end
+	
+	-- 1. EJ Lookup (Name based) - "Smart Fallback 2" logic
+	if info.activityName then
+		-- Clean activity name (remove difficulty suffix like " (Mythic)")
+		local cleanName = info.activityName:gsub("%s*%(.*%)", "")
+		
+		-- Normalize names for split-dungeons or complex names to improve EJ matching
+		if cleanName:find("Tazavesh") then cleanName = "Tazavesh" end
+		if cleanName:find("Mechagon") then cleanName = "Mechagon" end
+		if cleanName:find("Karazhan") then cleanName = "Karazhan" end
+		
+		-- Iterate through ALL tiers to find the instance
+		local numTiers = EJ_GetNumTiers()
+		local currentTier = EJ_GetCurrentTier()
+		
+		local tiersToCheck = {}
+		for i = numTiers, 1, -1 do
+			table.insert(tiersToCheck, i)
+		end
+		
+		for _, tier in ipairs(tiersToCheck) do
+			EJ_SelectTier(tier)
+			local index = 1
+			while true do
+				local instanceID, name, _, _, buttonImage = EJ_GetInstanceByIndex(index, true) -- Raid
+				if not instanceID then break end
+				
+				if name and (name == cleanName or name:find(cleanName, 1, true)) then
+					if buttonImage and buttonImage ~= 0 then
+						info.activityIcon = buttonImage
+						info.isEJIcon = true
+						break
+					end
+				end
+				index = index + 1
+			end
+			
+			if info.activityIcon and info.activityIcon ~= 0 then break end
+			
+			index = 1
+			while true do
+				local instanceID, name, _, _, buttonImage = EJ_GetInstanceByIndex(index, false) -- Dungeon
+				if not instanceID then break end
+				
+				if name and (name == cleanName or name:find(cleanName, 1, true)) then
+					if buttonImage and buttonImage ~= 0 then
+						info.activityIcon = buttonImage
+						info.isEJIcon = true
+						break
+					end
+				end
+				index = index + 1
+			end
+			
+			if info.activityIcon and info.activityIcon ~= 0 then break end
+		end
+		
+		-- Restore original tier
+		EJ_SelectTier(currentTier)
+	end
+	
+	-- 2. Category Fallback (based on queueType/activityType)
+	if not info.activityIcon or info.activityIcon == 0 then
+		if info._queueType == "lfglist" then
+			if info.activityType == "Raid" or (info.activityName and info.activityName:find("Raid")) then
+				info.activityIcon = 1536895 -- Raid
+			elseif info.activityType == "Dungeon" or info.activityType == "Mythic+ Dungeon" or (info.activityName and info.activityName:find("Dungeon")) then
+				info.activityIcon = 525134 -- Dungeon
+			elseif info.activityType == "Questing" then
+				info.activityIcon = 409602 -- Quest
+			else
+				info.activityIcon = 134149 -- Custom/Other
+			end
+		elseif info._queueType == "lfg" then
+			 info.activityIcon = 525134 -- Dungeon
+		elseif info._queueType == "pvp" then
+			 info.activityIcon = 236396 -- PvP
+		end
+	end
+	
+	-- 3. Ultimate Fallback
+	if not info.activityIcon then
+		info.activityIcon = 134400
+	end
+end
+
+-- Get all available groups
+function QuickJoin:GetAvailableGroups()
+	return self.availableGroups
+end
+
+-- Request to join a group
+function QuickJoin:RequestToJoin(groupGUID, applyAsTank, applyAsHealer, applyAsDamage)
+	if not groupGUID then
+		return false
+	end
+	
+	-- Check if already in a group
+	if IsInGroup() then
+		UIErrorsFrame:AddMessage("You are already in a group!", 1.0, 0.1, 0.1, 1.0)
+		return false
+	end
+	
+	-- Check combat lockdown
+	if InCombatLockdown() then
+		UIErrorsFrame:AddMessage("Cannot join groups while in combat!", 1.0, 0.1, 0.1, 1.0)
+		return false
+	end
+	
+	-- Default to all roles if none specified
+	if not applyAsTank and not applyAsHealer and not applyAsDamage then
+		applyAsTank = true
+		applyAsHealer = true
+		applyAsDamage = true
+	end
+	
+	-- Handle mock groups (don't actually send request)
+	if self.mockGroups[groupGUID] then
+		UIErrorsFrame:AddMessage("|cff00ff00Mock join request sent (simulated only)", 0.1, 0.8, 1.0, 1.0)
+		return true
+	end
+	
+	local success = C_SocialQueue.RequestToJoin(groupGUID, applyAsTank, applyAsHealer, applyAsDamage)
+	
+	if not success then
+		UIErrorsFrame:AddMessage(QUICK_JOIN_FAILED or "Quick Join request failed", 1.0, 0.1, 0.1, 1.0)
+	end
+	
+	return success
+end
+
+-- Get priority for sorting groups (higher = more important)
+function QuickJoin:GetGroupPriority(groupGUID)
+	local members = C_SocialQueue.GetGroupMembers(groupGUID)
+	if not members or #members == 0 then
+		return 0
+	end
+	
+	local priority = 0
+	
+	-- Sort members (leader first) - simple sort by checking if they're leader
+	table.sort(members, function(a, b)
+		-- Leader has isLeader flag or is first in original list
+		return (a.isLeader or false) and not (b.isLeader or false)
+	end)
+	
+	-- Check relationship with leader
+	if not members or #members == 0 or not members[1] then
+		return 0
+	end
+	local leaderGUID = members[1].guid
+	local accountInfo = C_BattleNet.GetAccountInfoByGUID(leaderGUID)
+	
+	if accountInfo then
+		-- BNet friend (highest priority)
+		priority = priority + 1000
+	else
+		-- Check for WoW friend
+		local friendInfo = GetFriendInfoByGUID(leaderGUID)
+		if friendInfo then
+			priority = priority + 500
+		else
+			-- Check for guild member
+			if IsInGuild() then
+				local guildName = GetGuildInfo("player")
+				local memberGuildName = GetGuildInfo("unit") -- TODO: Need proper unit token
+				if guildName and memberGuildName and guildName == memberGuildName then
+					priority = priority + 100
+				end
+			end
+		end
+	end
+	
+	return priority
+end
+
+-- QuickJoinEntry methods (Legacy/Bottom definition merged with top)
+
+
+-- Apply entry data to button frame (Blizzard's HORIZONTAL layout)
+-- Members (left) â†’ Icon (middle) â†’ Queues (right) ALL ON ONE LINE
+
+
+-- Apply entry to tooltip (EXACT Blizzard replication)
+
 
 -- Get all available groups as QuickJoinEntry objects (public API)
 function QuickJoin:GetEntries()
@@ -1518,8 +1968,9 @@ function QuickJoin:CreateMockGroup(params)
 		numMembers = numMembers,
 		leaderName = params.leaderName,
 		groupTitle = params.activityName,
-		activityName = params.activityType or params.activityName,
-		activityIcon = params.icon or "Interface\\Icons\\Achievement_Boss_Murmur",
+		activityName = params.activityName, -- Prioritize specific name
+		activityType = params.activityType, -- Store type for fallback logic
+		activityIcon = params.icon, -- Allow nil to test resolution logic
 		queueInfo = "",
 		requestedToJoin = false,
 		
@@ -1527,6 +1978,11 @@ function QuickJoin:CreateMockGroup(params)
 		_isMock = true,
 		_created = GetTime(),
 		_queueType = queueType,
+		
+		-- Fake role distribution for display
+		numTanks = math.min(1, numMembers),
+		numHealers = math.min(1, math.max(0, numMembers - 1)),
+		numDPS = math.max(0, numMembers - 2),
 	}
 	
 	-- Store mock group
@@ -1601,6 +2057,7 @@ function QuickJoin:CreateMockPreset_All()
 				needTank = math.random() > 0.5,
 				needHealer = math.random() > 0.5,
 				needDamage = true,
+				icon = 525134, -- Mythic+ Keystone
 			})
 		end
 	end
@@ -1618,6 +2075,7 @@ function QuickJoin:CreateMockPreset_All()
 				needTank = true,
 				needHealer = true,
 				needDamage = true,
+				icon = 1536895, -- User Selected: Raid
 			})
 		end
 	end
@@ -1631,6 +2089,7 @@ function QuickJoin:CreateMockPreset_All()
 				activityName = activity[1],
 				activityType = activity[2],
 				numMembers = math.random(1, 3),
+				icon = 525134, -- Mythic+ Keystone
 			})
 		end
 	end
@@ -1646,9 +2105,61 @@ function QuickJoin:CreateMockPreset_All()
 				comment = activity[3],
 				numMembers = math.random(1, 5),
 				rated = i == 1,
+				icon = 2056011, -- Honor Symbol
 			})
 		end
 	end
+	
+	-- Fallback Icon Tests (Explicitly testing the fallback logic)
+	-- 1. Dungeon Fallback (inv_relics_hourglass: 525134)
+	self:CreateMockGroup({
+		leaderName = "DungeonFallback",
+		queueType = "lfg",
+		activityName = "Fallback: Dungeon Icon",
+		activityType = "Dungeon",
+		icon = 525134, -- Mythic+ Keystone
+		numMembers = 5,
+	})
+	
+	-- 2. Raid Fallback (Achievement_Boss_CThun: 463432)
+	self:CreateMockGroup({
+		leaderName = "RaidFallback",
+		queueType = "lfglist",
+		activityName = "Fallback: Raid Icon",
+		activityType = "Raid",
+		icon = 463432, -- Skull/Boss
+		numMembers = 20,
+	})
+	
+	-- 3. PvP Fallback (pvpcurrency-honor-horde: 2056011)
+	self:CreateMockGroup({
+		leaderName = "PvPFallback",
+		queueType = "pvp",
+		activityName = "Fallback: PvP Icon",
+		activityType = "Battleground",
+		icon = 2056011, -- Honor Symbol
+		numMembers = 10,
+	})
+	
+	-- 4. Questing Fallback (inv_misc_map02: 1500869)
+	self:CreateMockGroup({
+		leaderName = "QuestFallback",
+		queueType = "lfglist",
+		activityName = "Fallback: Quest Icon",
+		activityType = "Questing",
+		icon = 1500869, -- Map/Exploration
+		numMembers = 2,
+	})
+	
+	-- 5. Custom Fallback (Achievement_Reputation_01: 237272)
+	self:CreateMockGroup({
+		leaderName = "CustomFallback",
+		queueType = "lfglist",
+		activityName = "Fallback: Custom Icon",
+		activityType = "Custom",
+		icon = 237272, -- Handshake/Social
+		numMembers = 1,
+	})
 	
 	-- Start dynamic updates
 	self:StartMockDynamicUpdates()
@@ -1674,6 +2185,7 @@ function QuickJoin:CreateMockPreset_Dungeon()
 			activityType = activity[2],
 			comment = activity[3],
 			numMembers = math.random(1, 4),
+			icon = 525134, -- Mythic+ Keystone
 		})
 	end
 	
@@ -1684,6 +2196,7 @@ function QuickJoin:CreateMockPreset_Dungeon()
 			activityName = activity[1],
 			activityType = activity[2],
 			numMembers = math.random(1, 4),
+			icon = 525134, -- Mythic+ Keystone
 		})
 	end
 	
@@ -1711,6 +2224,7 @@ function QuickJoin:CreateMockPreset_PvP()
 			comment = activity[3],
 			numMembers = math.random(1, 10),
 			rated = i <= 2,
+			icon = 2056011, -- Honor Symbol
 		})
 	end
 	
@@ -1737,6 +2251,7 @@ function QuickJoin:CreateMockPreset_Raid()
 			activityType = activity[2],
 			comment = activity[3],
 			numMembers = math.random(5, 25),
+			icon = 1536895, -- User Selected: Raid
 		})
 	end
 	
@@ -1750,29 +2265,177 @@ function QuickJoin:CreateMockPreset_Raid()
 end
 
 --[[
+	Create mock groups to test all fallback icons
+]]
+function QuickJoin:CreateMockPreset_Icons()
+	self:ClearMockGroups()
+	
+	-- 1. Dungeon Fallback (Keystone: 525134)
+	self:CreateMockGroup({
+		leaderName = "DungeonFallback",
+		queueType = "lfg",
+		activityName = "Fallback: Dungeon",
+		activityType = "Dungeon",
+		icon = 525134,
+		numMembers = 5,
+	})
+	
+	-- 2. Raid Fallback (User Selected: 1536895)
+	self:CreateMockGroup({
+		leaderName = "RaidFallback",
+		queueType = "lfglist",
+		activityName = "Fallback: Raid",
+		activityType = "Raid",
+		icon = 1536895,
+		numMembers = 20,
+	})
+	
+	-- 3. PvP Fallback (User Selected: 236396)
+	self:CreateMockGroup({
+		leaderName = "PvPFallback",
+		queueType = "pvp",
+		activityName = "Fallback: PvP",
+		activityType = "Battleground",
+		icon = 236396,
+		numMembers = 10,
+	})
+	
+	-- 4. Questing Fallback (User Selected: 409602)
+	self:CreateMockGroup({
+		leaderName = "QuestFallback",
+		queueType = "lfglist",
+		activityName = "Fallback: Questing",
+		activityType = "Questing",
+		icon = 409602,
+		numMembers = 2,
+	})
+	
+	-- 5. Custom Fallback (User Selected: 134149)
+	self:CreateMockGroup({
+		leaderName = "CustomFallback",
+		queueType = "lfglist",
+		activityName = "Fallback: Custom",
+		activityType = "Custom",
+		icon = 134149,
+		numMembers = 1,
+	})
+	
+	-- 6. Default Question Mark (INV_Misc_QuestionMark: 134400)
+	-- This is the ultimate fallback if no icon is set
+	self:CreateMockGroup({
+		leaderName = "UltimateFallback",
+		queueType = "lfglist",
+		activityName = "Fallback: Default",
+		activityType = "Unknown",
+		icon = 134400,
+		numMembers = 3,
+	})
+
+	print("|cff00ff00BFL QuickJoin:|r Created fallback icon test groups")
+	
+	self:Update(true)
+end
+
+--[[
 	Create many groups for stress testing scrollbar
 ]]
 function QuickJoin:CreateMockPreset_Stress()
 	self:ClearMockGroups()
 	
+	local definitions = {
+		-- Raid Valid (Should find icon via EJ lookup)
+		{
+			leaderName = "RaidLeader",
+			queueType = "lfglist",
+			activityName = "Molten Core", -- Valid EJ Name (Classic Raid)
+			activityType = "Raid",
+			comment = "Valid Raid Activity (EJ Lookup)",
+			icon = nil, -- Force lookup
+		},
+		-- Raid Valid 2 (Should find icon via EJ lookup)
+		{
+			leaderName = "RaidLeader2",
+			queueType = "lfglist",
+			activityName = "Throne of the Four Winds", -- Valid EJ Name
+			activityType = "Raid",
+			comment = "Valid Raid Activity 2 (EJ Lookup)",
+			icon = nil, -- Force lookup
+		},
+		-- Raid Fallback (Should fallback to generic Raid icon)
+		{
+			leaderName = "RaidFallback",
+			queueType = "lfglist",
+			activityName = "Unknown Raid Activity",
+			activityType = "Raid",
+			comment = "Fallback Raid Icon",
+			icon = nil, -- Force lookup
+		},
+		-- M+ Valid (Should find icon via EJ lookup)
+		{
+			leaderName = "DungeonLeader",
+			queueType = "lfglist",
+			activityName = "The Stonevault", -- Valid EJ Name (TWW Dungeon)
+			activityType = "Mythic+ Dungeon",
+			comment = "Valid Dungeon Activity (EJ Lookup)",
+			icon = nil, -- Force lookup
+		},
+		-- Dungeon Valid 2 (Should find icon via EJ lookup)
+		{
+			leaderName = "DungeonLeader2",
+			queueType = "lfglist",
+			activityName = "End Time", -- Valid EJ Name
+			activityType = "Dungeon",
+			comment = "Valid Dungeon Activity 2 (EJ Lookup)",
+			icon = nil, -- Force lookup
+		},
+		-- M+ Fallback (Should fallback to generic Dungeon icon)
+		{
+			leaderName = "DungeonFallback",
+			queueType = "lfglist",
+			activityName = "Unknown Dungeon Activity",
+			activityType = "Dungeon",
+			comment = "Fallback Dungeon Icon",
+			icon = nil, -- Force lookup
+		},
+		-- PvP Valid (Should find icon via EJ lookup if exists, or fallback)
+		{
+			leaderName = "PvPLeader",
+			queueType = "pvp",
+			activityName = "Warsong Gulch",
+			activityType = "Battleground",
+			comment = "Valid PvP Activity",
+			icon = nil, -- Force lookup
+		},
+		-- PvP Fallback
+		{
+			leaderName = "PvPFallback",
+			queueType = "pvp",
+			activityName = "Unknown PvP",
+			activityType = "PvP",
+			comment = "Fallback PvP Icon",
+			icon = nil, -- Force lookup
+		}
+	}
+	
 	-- Create 50 groups
 	for i = 1, 50 do
-		local activities = MOCK_ACTIVITIES.lfglist_mythicplus
-		local activity = activities[((i - 1) % #activities) + 1]
+		local defIndex = ((i - 1) % #definitions) + 1
+		local def = definitions[defIndex]
 		
 		self:CreateMockGroup({
-			leaderName = MOCK_PLAYER_NAMES[((i - 1) % #MOCK_PLAYER_NAMES) + 1] .. i,
-			queueType = "lfglist",
-			activityName = activity[1] .. " #" .. i,
-			activityType = activity[2],
-			comment = activity[3],
+			leaderName = def.leaderName .. i,
+			queueType = def.queueType,
+			activityName = def.activityName,
+			activityType = def.activityType,
+			comment = def.comment,
 			numMembers = math.random(1, 5),
+			icon = def.icon
 		})
 	end
 	
 	-- Don't enable dynamic updates for stress test (too much CPU)
 	
-	print("|cff00ff00BFL QuickJoin:|r Created 50 mock groups (stress test)")
+	print("|cff00ff00BFL QuickJoin:|r Created 50 mock groups (stress test with valid/fallback pairs)")
 	
 	self:Update(true)
 end
@@ -1928,6 +2591,8 @@ SlashCmdList["BFLQUICKJOIN"] = function(msg)
 			QuickJoin:CreateMockPreset_Raid()
 		elseif subCmd == "stress" or subCmd == "many" then
 			QuickJoin:CreateMockPreset_Stress()
+		elseif subCmd == "icons" or subCmd == "fallback" then
+			QuickJoin:CreateMockPreset_Icons()
 		else
 			QuickJoin:CreateMockPreset_All()
 		end
@@ -2010,6 +2675,7 @@ SlashCmdList["BFLQUICKJOIN"] = function(msg)
 		print("  |cffffcc00/bfl qj mock dungeon|r - Dungeon/M+ groups only")
 		print("  |cffffcc00/bfl qj mock pvp|r - PvP groups only")
 		print("  |cffffcc00/bfl qj mock raid|r - Raid groups only")
+		print("  |cffffcc00/bfl qj mock icons|r - Test all fallback icons")
 		print("  |cffffcc00/bfl qj mock stress|r - 50 groups (scrollbar test)")
 		print("")
 		print("|cffffcc00Management:|r")
@@ -2149,16 +2815,16 @@ function QuickJoin:JoinQueue()
 	
 	-- Check if LFG List group
 	if groupInfo.lfgListInfo then
-		-- Show LFG List application dialog
+		-- Show LFG List application dialog (Blizzard's native dialog)
 		if LFGListApplicationDialog and LFGListApplicationDialog_Show then
 			LFGListApplicationDialog_Show(LFGListApplicationDialog, groupInfo.lfgListInfo.queueData.lfgListID)
 		else
 			UIErrorsFrame:AddMessage("LFG List dialog not available.", 1.0, 0.1, 0.1, 1.0)
 		end
 	else
-		-- Show role selection dialog for regular group
-		if BetterQuickJoinRoleSelectionFrame then
-			BetterQuickJoinRoleSelectionFrame:ShowForGroup(self.selectedGUID)
+		-- Show role selection dialog for regular group (Blizzard's native QuickJoinRoleSelectionFrame)
+		if QuickJoinRoleSelectionFrame and QuickJoinRoleSelectionFrame.ShowForGroup then
+			QuickJoinRoleSelectionFrame:ShowForGroup(self.selectedGUID)
 		else
 			UIErrorsFrame:AddMessage("Role selection dialog not available.", 1.0, 0.1, 0.1, 1.0)
 		end

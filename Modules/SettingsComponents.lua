@@ -185,6 +185,21 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 	holder.Label = label
 	holder.DropDown = dropdown
 	
+	-- Tooltip support
+	holder.SetTooltip = function(_, title, desc)
+		dropdown:SetScript("OnEnter", function(self)
+			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+			GameTooltip:SetText(title, 1, 1, 1)
+			if desc then
+				GameTooltip:AddLine(desc, 0.8, 0.8, 0.8, true)
+			end
+			GameTooltip:Show()
+		end)
+		dropdown:SetScript("OnLeave", function()
+			GameTooltip:Hide()
+		end)
+	end
+	
 	return holder
 end
 
@@ -197,17 +212,6 @@ function Components:CreateInsetSection(parent, height)
 	inset:SetPoint("RIGHT", -20, 0)
 	inset:SetHeight(height or 100)
 	return inset
-end
-
--- ========================================
--- BUTTON (Dynamic resize, centered or anchored)
--- ========================================
-function Components:CreateButton(parent, text, callback)
-	local button = CreateFrame("Button", nil, parent, "UIPanelDynamicResizeButtonTemplate")
-	button:SetText(text)
-	DynamicResizeButton_Resize(button)
-	button:SetScript("OnClick", callback)
-	return button
 end
 
 -- ========================================
@@ -246,108 +250,6 @@ function Components:CreateButtonRow(parent, leftText, rightText, leftCallback, r
 		rightButton:SetPoint("LEFT", leftButton, "RIGHT", 10, 0)
 		rightButton:SetScript("OnClick", rightCallback)
 		holder.RightButton = rightButton
-	end
-	
-	return holder
-end
-
--- ========================================
--- LIST ITEM WITH ARROW BUTTONS (For Group ordering)
--- ========================================
-function Components:CreateListItem(parent, text, upCallback, downCallback, editCallback, deleteCallback)
-	local holder = CreateFrame("Frame", nil, parent)
-	holder:SetHeight(32)
-	holder:SetPoint("LEFT")
-	holder:SetPoint("RIGHT")
-	
-	-- Background
-	holder.bg = holder:CreateTexture(nil, "BACKGROUND")
-	holder.bg:SetAllPoints()
-	holder.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
-	
-	-- Text Label (left side)
-	holder.text = holder:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	holder.text:SetPoint("LEFT", 10, 0)
-	holder.text:SetText(text)
-	holder.text:SetTextColor(1, 1, 1)
-	
-	-- Button container (right side)
-	local btnX = -10
-	local btnSpacing = 28
-	
-	-- Delete Button (rightmost)
-	if deleteCallback then
-		local deleteBtn = CreateFrame("Button", nil, holder)
-		deleteBtn:SetSize(24, 24)
-		deleteBtn:SetPoint("RIGHT", btnX, 0)
-		deleteBtn:SetNormalTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
-		deleteBtn:SetHighlightTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
-		deleteBtn:SetScript("OnClick", deleteCallback)
-		deleteBtn:SetScript("OnEnter", function(self)
-			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText("Delete", 1, 1, 1)
-			GameTooltip:Show()
-		end)
-		deleteBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-		holder.DeleteButton = deleteBtn
-		btnX = btnX - btnSpacing
-	end
-	
-	-- Edit Button
-	if editCallback then
-		local editBtn = CreateFrame("Button", nil, holder)
-		editBtn:SetSize(24, 24)
-		editBtn:SetPoint("RIGHT", btnX, 0)
-		editBtn:SetNormalTexture("Interface\\Buttons\\UI-GuildButton-PublicNote-Up")
-		editBtn:SetHighlightTexture("Interface\\Buttons\\UI-GuildButton-PublicNote-Up")
-		editBtn:SetScript("OnClick", editCallback)
-		editBtn:SetScript("OnEnter", function(self)
-			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText("Edit", 1, 1, 1)
-			GameTooltip:Show()
-		end)
-		editBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-		holder.EditButton = editBtn
-		btnX = btnX - btnSpacing
-	end
-	
-	-- Down Arrow
-	if downCallback then
-		local downBtn = CreateFrame("Button", nil, holder)
-		downBtn:SetSize(24, 24)
-		downBtn:SetPoint("RIGHT", btnX, 0)
-		downBtn:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up")
-		downBtn:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up")
-		downBtn:SetScript("OnClick", downCallback)
-		downBtn:SetScript("OnEnter", function(self)
-			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText("Move Down", 1, 1, 1)
-			GameTooltip:Show()
-		end)
-		downBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-		holder.DownButton = downBtn
-		btnX = btnX - btnSpacing
-	end
-	
-	-- Up Arrow
-	if upCallback then
-		local upBtn = CreateFrame("Button", nil, holder)
-		upBtn:SetSize(24, 24)
-		upBtn:SetPoint("RIGHT", btnX, 0)
-		upBtn:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Up")
-		upBtn:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Up")
-		upBtn:SetScript("OnClick", upCallback)
-		upBtn:SetScript("OnEnter", function(self)
-			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText("Move Up", 1, 1, 1)
-			GameTooltip:Show()
-		end)
-		upBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-		holder.UpButton = upBtn
-	end
-	
-	function holder:SetText(newText)
-		holder.text:SetText(newText)
 	end
 	
 	return holder

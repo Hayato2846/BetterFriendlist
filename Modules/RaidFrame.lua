@@ -4,6 +4,7 @@
 -- Version 0.14
 
 local ADDON_NAME, BFL = ...
+local FontManager = BFL.FontManager
 local RaidFrame = BFL:RegisterModule("RaidFrame", {})
 
 -- ========================================
@@ -77,10 +78,10 @@ function RaidFrame:UpdateGroupLayout()
     local availableWidth = insetWidth - containerPaddingX
     local availableHeight = insetHeight - containerPaddingY
     
-    BFL:DebugPrint("|cff00ff00=== RaidFrame Layout Debug ===|r")
-    BFL:DebugPrint(string.format("Frame size: %.1f x %.1f", frame:GetWidth(), frame:GetHeight()))
-    BFL:DebugPrint(string.format("Inset size: %.1f x %.1f", insetWidth, insetHeight))
-    BFL:DebugPrint(string.format("Available space: %.1f x %.1f", availableWidth, availableHeight))
+    -- BFL:DebugPrint("|cff00ff00=== RaidFrame Layout Debug ===|r")
+    -- BFL:DebugPrint(string.format("Frame size: %.1f x %.1f", frame:GetWidth(), frame:GetHeight()))
+    -- BFL:DebugPrint(string.format("Inset size: %.1f x %.1f", insetWidth, insetHeight))
+    -- BFL:DebugPrint(string.format("Available space: %.1f x %.1f", availableWidth, availableHeight))
     
     -- Group spacing and structure (from XML)
     local groupGapX = 4   -- Horizontal gap between groups (reduced from 10 for better space usage)
@@ -98,7 +99,7 @@ function RaidFrame:UpdateGroupLayout()
     local bestGroupHeight = 0
     local bestArea = 0  -- Maximize total group area
     
-BFL:DebugPrint("|cffff8800Testing grid configurations:|r")
+-- BFL:DebugPrint("|cffff8800Testing grid configurations:|r")
     
     -- Try ONLY valid grid configurations that use all 8 groups
     -- Valid layouts: 1×8, 2×4, 4×2, 8×1
@@ -131,8 +132,8 @@ BFL:DebugPrint("|cffff8800Testing grid configurations:|r")
         -- Calculate aspect ratio (width/height) - prefer more vertical layouts
         local aspectRatio = maxGroupWidth / maxGroupHeight
         
-        BFL:DebugPrint(string.format("  %dx%d: width=%.1f, height=%.1f (min=%.0f), area=%.0f, ratio=%.2f", 
-            cols, rows, maxGroupWidth, maxGroupHeight, minGroupHeight, groupArea, aspectRatio))
+        -- BFL:DebugPrint(string.format("  %dx%d: width=%.1f, height=%.1f (min=%.0f), area=%.0f, ratio=%.2f", 
+        --     cols, rows, maxGroupWidth, maxGroupHeight, minGroupHeight, groupArea, aspectRatio))
         
         -- Scoring system for layout selection
         -- Prefer configurations that:
@@ -164,7 +165,7 @@ BFL:DebugPrint("|cffff8800Testing grid configurations:|r")
     
     -- Fallback: If somehow no layout was selected, force 2×4 (most common)
     if bestGroupWidth == 0 or bestGroupHeight == 0 then
-        BFL:DebugPrint("|cffff0000WARNING: No valid layout found, forcing 2x4 grid|r")
+        -- BFL:DebugPrint("|cffff0000WARNING: No valid layout found, forcing 2x4 grid|r")
         bestCols = 2
         bestRows = 4
         local totalGapX = (bestCols - 1) * groupGapX
@@ -174,14 +175,14 @@ BFL:DebugPrint("|cffff8800Testing grid configurations:|r")
         bestArea = bestGroupWidth * bestGroupHeight
     end
     
-BFL:DebugPrint(string.format("|cff00ff00Best config: %dx%d grid, groups: %.1fx%.1f (area=%.0f)|r", 
-		bestCols, bestRows, bestGroupWidth, bestGroupHeight, bestArea))
+-- BFL:DebugPrint(string.format("|cff00ff00Best config: %dx%d grid, groups: %.1fx%.1f (area=%.0f)|r", 
+-- 		bestCols, bestRows, bestGroupWidth, bestGroupHeight, bestArea))
 	
 	-- Calculate proportional button dimensions
 	local newButtonHeight = (bestGroupHeight - groupHeaderHeight - (numButtons - 1) * buttonGap) / numButtons
 	local newButtonGap = buttonGap
 	
-	BFL:DebugPrint(string.format("Button dimensions: %.1fpx height, %.1fpx gap", newButtonHeight, newButtonGap))
+	-- BFL:DebugPrint(string.format("Button dimensions: %.1fpx height, %.1fpx gap", newButtonHeight, newButtonGap))
 	
 	groupsContainer:SetScale(1.0)
 	
@@ -258,8 +259,8 @@ BFL:DebugPrint(string.format("|cff00ff00Best config: %dx%d grid, groups: %.1fx%.
 			end
 			
 			if i == 1 then
-				BFL:DebugPrint(string.format("Group 1: pos=(%.1f, %.1f), size=%.1fx%.1f, buttonHeight=%.1f", 
-					xPos, yPos, bestGroupWidth, bestGroupHeight, newButtonHeight))
+				-- BFL:DebugPrint(string.format("Group 1: pos=(%.1f, %.1f), size=%.1fx%.1f, buttonHeight=%.1f", 
+				-- 	xPos, yPos, bestGroupWidth, bestGroupHeight, newButtonHeight))
 			end
 		end
 	end
@@ -274,24 +275,24 @@ end
 function RaidFrame:UpdateControlPanelLayout()
     local frame = BetterFriendsFrame
     if not frame or not frame.RaidFrame then
-        BFL:DebugPrint("|cffff0000[ControlPanel] BetterFriendsFrame or RaidFrame not found|r")
+        -- BFL:DebugPrint("|cffff0000[ControlPanel] BetterFriendsFrame or RaidFrame not found|r")
         return
     end
     
     local raidFrame = frame.RaidFrame
     local controlPanel = raidFrame.ControlPanel
     if not controlPanel then
-        BFL:DebugPrint("|cffff0000[ControlPanel] ControlPanel not found|r")
+        -- BFL:DebugPrint("|cffff0000[ControlPanel] ControlPanel not found|r")
         return
     end
     
-    BFL:DebugPrint(string.format("|cff00ffffBFL:RaidFrame:|r === ControlPanel Layout Calculation ==="))
+    -- BFL:DebugPrint(string.format("|cff00ffffBFL:RaidFrame:|r === ControlPanel Layout Calculation ==="))
     
     -- Get available width from ControlPanel
     local panelWidth = controlPanel:GetWidth()
     local panelHeight = controlPanel:GetHeight()
     
-    BFL:DebugPrint(string.format("  ControlPanel size: %.1f x %.1f", panelWidth, panelHeight))
+    -- BFL:DebugPrint(string.format("  ControlPanel size: %.1f x %.1f", panelWidth, panelHeight))
     
     -- Define layout constants
     local checkboxStartX = 35  -- Avatar clearance
@@ -316,35 +317,35 @@ function RaidFrame:UpdateControlPanelLayout()
     local memberCountWidth = controlPanel.MemberCount and controlPanel.MemberCount:GetStringWidth() or 50
     local centerSectionWidth = roleSummaryWidth + centerElementGap + memberCountWidth
     
-    BFL:DebugPrint(string.format("  Measured widths: Checkbox=%.1f, LabelText=%.1f, Button=%.1f", 
-        checkboxWidth, labelTextWidth, buttonWidth))
-    BFL:DebugPrint(string.format("  Center section: RoleSummary=%.1f + gap=%.1f + MemberCount=%.1f = %.1f total", 
-        roleSummaryWidth, centerElementGap, memberCountWidth, centerSectionWidth))
+    -- BFL:DebugPrint(string.format("  Measured widths: Checkbox=%.1f, LabelText=%.1f, Button=%.1f", 
+    --     checkboxWidth, labelTextWidth, buttonWidth))
+    -- BFL:DebugPrint(string.format("  Center section: RoleSummary=%.1f + gap=%.1f + MemberCount=%.1f = %.1f total", 
+    --     roleSummaryWidth, centerElementGap, memberCountWidth, centerSectionWidth))
     
     -- Calculate section boundaries with actual positions
     local leftSectionEnd = checkboxStartX + checkboxWidth + checkboxLabelGap + labelTextWidth
     local rightSectionStart = panelWidth - optimizedButtonWidth - buttonRightPadding
     local availableCenter = rightSectionStart - leftSectionEnd
     
-    BFL:DebugPrint(string.format("  Layout boundaries:"))
-    BFL:DebugPrint(string.format("    Left section: %.1f to %.1f", checkboxStartX, leftSectionEnd))
-    BFL:DebugPrint(string.format("    Right section: %.1f to %.1f (button width=%.1f)", rightSectionStart, panelWidth - buttonRightPadding, optimizedButtonWidth))
-    BFL:DebugPrint(string.format("    Available center: %.1f (need %.1f) - %s", 
-        availableCenter, centerSectionWidth, 
-        availableCenter >= centerSectionWidth and "|cff00ff00OK|r" or "|cffff0000TIGHT|r"))
+    -- BFL:DebugPrint(string.format("  Layout boundaries:"))
+    -- BFL:DebugPrint(string.format("    Left section: %.1f to %.1f", checkboxStartX, leftSectionEnd))
+    -- BFL:DebugPrint(string.format("    Right section: %.1f to %.1f (button width=%.1f)", rightSectionStart, panelWidth - buttonRightPadding, optimizedButtonWidth))
+    -- BFL:DebugPrint(string.format("    Available center: %.1f (need %.1f) - %s", 
+    --     availableCenter, centerSectionWidth, 
+    --     availableCenter >= centerSectionWidth and "|cff00ff00OK|r" or "|cffff0000TIGHT|r"))
     
     -- Calculate center position (true center of available space)
     local centerStart = leftSectionEnd + math.max(5, (availableCenter - centerSectionWidth) / 2)
     
-    BFL:DebugPrint(string.format("  Center section target: x=%.1f to %.1f", centerStart, centerStart + centerSectionWidth))
+    -- BFL:DebugPrint(string.format("  Center section target: x=%.1f to %.1f", centerStart, centerStart + centerSectionWidth))
     
     -- Reposition EveryoneAssistCheckbox (left side, vertically centered, avoid avatar clipping)
     if controlPanel.EveryoneAssistCheckbox then
         controlPanel.EveryoneAssistCheckbox:ClearAllPoints()
         controlPanel.EveryoneAssistCheckbox:SetPoint("TOPLEFT", controlPanel, "TOPLEFT", checkboxStartX, checkboxYOffset)
         local actualX, actualY = controlPanel.EveryoneAssistCheckbox:GetCenter()
-        BFL:DebugPrint(string.format("  ✓ EveryoneAssistCheckbox: Anchored at x=%d, y=%.1f (centered), Center=(%.1f, %.1f)", 
-            checkboxStartX, checkboxYOffset, actualX or -1, actualY or -1))
+        -- BFL:DebugPrint(string.format("  ✓ EveryoneAssistCheckbox: Anchored at x=%d, y=%.1f (centered), Center=(%.1f, %.1f)", 
+        --     checkboxStartX, checkboxYOffset, actualX or -1, actualY or -1))
     end
     
     -- Reposition EveryoneAssistLabel (right of checkbox)
@@ -353,8 +354,8 @@ function RaidFrame:UpdateControlPanelLayout()
         controlPanel.EveryoneAssistLabel:SetPoint("LEFT", controlPanel.EveryoneAssistCheckbox, "RIGHT", 2, 0)
         controlPanel.EveryoneAssistLabel:SetJustifyH("LEFT")
         local actualText = controlPanel.EveryoneAssistLabel:GetText()
-        BFL:DebugPrint(string.format("  ✓ EveryoneAssistLabel: Anchored to checkbox+2, Text='%s'", 
-            actualText or "nil"))
+        -- BFL:DebugPrint(string.format("  ✓ EveryoneAssistLabel: Anchored to checkbox+2, Text='%s'", 
+        --     actualText or "nil"))
     end
     
     -- Reposition RaidInfoButton (right side with reduced width)
@@ -364,8 +365,8 @@ function RaidFrame:UpdateControlPanelLayout()
         controlPanel.RaidInfoButton:SetWidth(optimizedButtonWidth)  -- Resize button
         local actualX = controlPanel.RaidInfoButton:GetLeft()
         local actualWidth = controlPanel.RaidInfoButton:GetWidth()
-        BFL:DebugPrint(string.format("  ✓ RaidInfoButton: Width=%.1f (optimized), x=-%.1f from right, Left edge=%.1f", 
-            actualWidth or -1, buttonRightPadding, actualX or -1))
+        -- BFL:DebugPrint(string.format("  ✓ RaidInfoButton: Width=%.1f (optimized), x=-%.1f from right, Left edge=%.1f", 
+        --     actualWidth or -1, buttonRightPadding, actualX or -1))
     end
     
     -- Reposition RoleSummary (centered in available space)
@@ -378,8 +379,8 @@ function RaidFrame:UpdateControlPanelLayout()
         local actualX = controlPanel.RoleSummary:GetLeft()
         local actualText = controlPanel.RoleSummary:GetText()
         local actualStringWidth = controlPanel.RoleSummary:GetStringWidth()
-        BFL:DebugPrint(string.format("  ✓ RoleSummary: Target x=%.1f, Actual x=%.1f, StringWidth=%.1f, Text='%s'", 
-            centerStart, actualX or -1, actualStringWidth, actualText or "nil"))
+        -- BFL:DebugPrint(string.format("  ✓ RoleSummary: Target x=%.1f, Actual x=%.1f, StringWidth=%.1f, Text='%s'", 
+        --     centerStart, actualX or -1, actualStringWidth, actualText or "nil"))
     end
     
     -- Reposition MemberCount (right of RoleSummary with reduced gap)
@@ -391,18 +392,118 @@ function RaidFrame:UpdateControlPanelLayout()
         local actualX = controlPanel.MemberCount:GetLeft()
         local actualText = controlPanel.MemberCount:GetText()
         local actualStringWidth = controlPanel.MemberCount:GetStringWidth()
-        BFL:DebugPrint(string.format("  ✓ MemberCount: Gap=%.1f, Actual x=%.1f, StringWidth=%.1f, Text='%s'", 
-            centerElementGap, actualX or -1, actualStringWidth, actualText or "nil"))
+        -- BFL:DebugPrint(string.format("  ✓ MemberCount: Gap=%.1f, Actual x=%.1f, StringWidth=%.1f, Text='%s'", 
+        --     centerElementGap, actualX or -1, actualStringWidth, actualText or "nil"))
     end
     
     -- Reposition CombatIcon (if visible, between counts and button)
     if controlPanel.CombatIcon then
         controlPanel.CombatIcon:ClearAllPoints()
         controlPanel.CombatIcon:SetPoint("RIGHT", controlPanel.RaidInfoButton, "LEFT", -5, -1)
-        BFL:DebugPrint(string.format("  CombatIcon: Anchored to RaidInfoButton, offset=-5"))
+        -- BFL:DebugPrint(string.format("  CombatIcon: Anchored to RaidInfoButton, offset=-5"))
     end
     
-    BFL:DebugPrint("|cff00ff00ControlPanel layout completed|r")
+    -- BFL:DebugPrint("|cff00ff00ControlPanel layout completed|r")
+end
+
+-- ========================================
+-- SECURE PROXY SYSTEM (Phase 8.3)
+-- ========================================
+
+
+
+--- Create the detached secure proxy button
+--- Uses modern Blizzard pattern with secure action types for Main Tank/Assist
+--- Reference: SecureTemplates.lua SECURE_ACTIONS.maintank and SECURE_ACTIONS.mainassist
+function RaidFrame:CreateSecureProxy()
+    if self.SecureProxy then return end
+    
+    -- Create the proxy frame
+    -- CRITICAL: Parent must be UIParent to avoid tainting the addon frame
+    local proxy = CreateFrame("Button", "BFL_RaidFrame_SecureProxy", UIParent, "SecureUnitButtonTemplate")
+    
+    -- Visual properties
+    proxy:SetFrameStrata("DIALOG") -- High strata to sit above everything
+    proxy:SetFrameLevel(9999) -- Ensure it is absolutely on top
+    proxy:Hide() -- Hidden by default
+    
+    -- Add Highlight Texture to Proxy
+    local highlight = proxy:CreateTexture(nil, "HIGHLIGHT")
+    highlight:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+    highlight:SetBlendMode("ADD")
+    highlight:SetAllPoints(proxy)
+    proxy:SetHighlightTexture(highlight)
+    
+    -- Secure Attributes
+    -- Let Left Click events fall through to the underlying visual button
+    -- This restores native Drag & Drop and Selection logic
+    if proxy.SetPassThroughButtons then
+        proxy:SetPassThroughButtons("LeftButton")
+    else
+        BFL:DebugPrint("Error: SetPassThroughButtons not supported")
+    end
+    
+    -- =====================================================
+    -- SECURE ACTION CONFIGURATION
+    -- =====================================================
+    -- These use Blizzard's built-in secure action types from SecureTemplates.lua
+    -- They execute SetPartyAssignment() in a SECURE context!
+    
+    -- Shift+Right-Click: Toggle Main Tank (SECURE!)
+    proxy:SetAttribute("shift-type2", "maintank")
+    proxy:SetAttribute("shift-action2", "toggle")
+    
+    -- Ctrl+Right-Click: Toggle Main Assist (SECURE!)
+    proxy:SetAttribute("ctrl-type2", "mainassist")
+    proxy:SetAttribute("ctrl-action2", "toggle")
+    
+    -- Normal Right-Click: Open standard unit menu via togglemenu (SECURE!)
+    -- This uses Blizzard's built-in menu determination logic
+    proxy:SetAttribute("*type2", "togglemenu")
+    
+    proxy:RegisterForClicks("AnyUp", "AnyDown")
+    
+    -- Script Handlers
+    proxy:SetScript("OnEnter", function(self)
+        -- Just update display properties - menu handling is done via frame.menu callback
+        local unit = self:GetAttribute("unit")
+        if unit then
+            local name = UnitName(unit)
+            self.unit = unit
+            self.name = name
+            self.id = tonumber(string.match(unit, "raid(%d+)"))
+            
+            BFL:DebugPrint("Proxy OnEnter: name=" .. tostring(name) .. " unit=" .. tostring(unit))
+        end
+        
+        -- Show tooltip
+        if self.unit then pcall(UnitFrame_UpdateTooltip, self) end
+    end)
+    
+    proxy:SetScript("OnLeave", function(self)
+        GameTooltip:Hide()
+        self:Hide()
+        self:ClearAllPoints()
+        self.visualButton = nil
+        self.unit = nil
+    end)
+    
+    -- Combat Protection
+    -- Force hide when entering combat
+    proxy:RegisterEvent("PLAYER_REGEN_DISABLED")
+    proxy:SetScript("OnEvent", function(self, event)
+        if event == "PLAYER_REGEN_DISABLED" then
+            self:Hide()
+            self:ClearAllPoints()
+            self.visualButton = nil
+        end
+    end)
+    
+    self.SecureProxy = proxy
+    BFL:DebugPrint("[BFL] SecureProxy created with SECURE Main Tank/Assist support")
+    BFL:DebugPrint("  Shift+RClick = Toggle Main Tank (SECURE)")
+    BFL:DebugPrint("  Ctrl+RClick = Toggle Main Assist (SECURE)")
+    BFL:DebugPrint("  RClick = RAID Menu (insecure)")
 end
 
 -- ========================================
@@ -427,6 +528,9 @@ function RaidFrame:Initialize()
     
     -- Initialize member buttons (XML templates)
     self:InitializeMemberButtons()
+    
+    -- Initialize Secure Proxy (Phase 8.3)
+    self:CreateSecureProxy()
     
     -- Initial update of control panel (this will set label too)
     self:UpdateControlPanel()
@@ -533,7 +637,7 @@ function RaidFrame:UpdateRaidMembers()
                 zone = zone,
                 online = online,
                 isDead = isDead,
-                role = role,  -- "TANK", "HEALER", "DAMAGER", "NONE"
+                role = role,  -- "MAINTANK", "MAINASSIST" or nil (raid assignment)
                 isML = isML,  -- Is master looter
                 unit = "raid" .. i,
             }
@@ -731,6 +835,9 @@ function RaidFrame:InitializeMemberButtons()
                     button.groupIndex = groupIndex
                     button.slotIndex = slotIndex
                     self.memberButtons[groupIndex][slotIndex] = button
+                    
+                    -- Note: Secure Proxy Link is handled by BetterRaidMemberButton_OnEnter in RaidFrameCallbacks.lua
+                    -- We don't need to hook it here anymore.
                 end
             end
         end
@@ -872,6 +979,23 @@ function RaidFrame:UpdateMemberButtonVisuals(button, member)
         end
     end
     
+    -- Update Main Tank / Main Assist icons (raid role assignment)
+    if button.MainTankIcon then
+        if member.role == "MAINTANK" then
+            button.MainTankIcon:Show()
+        else
+            button.MainTankIcon:Hide()
+        end
+    end
+    
+    if button.MainAssistIcon then
+        if member.role == "MAINASSIST" then
+            button.MainAssistIcon:Show()
+        else
+            button.MainAssistIcon:Hide()
+        end
+    end
+    
     -- Update ready check icon (will be updated by events)
     if button.ReadyCheckIcon then
         button.ReadyCheckIcon:Hide()  -- Hidden by default
@@ -905,10 +1029,10 @@ function RaidFrame:UpdateMemberCount()
     -- Add friend icon before the count (same icon as in Quick Filters "All Friends")
     local FRIEND_ICON = "|TInterface\\FriendsFrame\\UI-Toast-FriendOnlineIcon:16:16|t"
     local textToSet = FRIEND_ICON .. " " .. numMembers .. "/40"
-    BFL:DebugPrint("[BFL] UpdateMemberCount: Setting text to '" .. textToSet .. "' (numMembers=" .. numMembers .. ")")
+    -- BFL:DebugPrint("[BFL] UpdateMemberCount: Setting text to '" .. textToSet .. "' (numMembers=" .. numMembers .. ")")
     frame.ControlPanel.MemberCount:SetText(textToSet)
     local actualText = frame.ControlPanel.MemberCount:GetText()
-    BFL:DebugPrint("[BFL] UpdateMemberCount: Actual text after SetText: '" .. tostring(actualText) .. "'")
+    -- BFL:DebugPrint("[BFL] UpdateMemberCount: Actual text after SetText: '" .. tostring(actualText) .. "'")
 	
 	-- Trigger layout update to recalculate centering with new string width
 	self:UpdateControlPanelLayout()
@@ -921,7 +1045,7 @@ function RaidFrame:UpdateControlPanel()
         return
     end
     
-    BFL:DebugPrint("[BFL] UpdateControlPanel called")
+    -- BFL:DebugPrint("[BFL] UpdateControlPanel called")
     
     -- Set Assist All label if not already set
     if frame.ControlPanel.EveryoneAssistLabel then
@@ -929,7 +1053,7 @@ function RaidFrame:UpdateControlPanel()
         if not currentText or currentText == "" then
             local ASSIST_ICON = "|TInterface\\GroupFrame\\UI-Group-AssistantIcon:14:14|t"
             frame.ControlPanel.EveryoneAssistLabel:SetText("All " .. ASSIST_ICON)
-            BFL:DebugPrint("[BFL] Assist All label set: All " .. ASSIST_ICON)
+            -- BFL:DebugPrint("[BFL] Assist All label set: All " .. ASSIST_ICON)
         end
     end
     
@@ -1031,6 +1155,8 @@ function RaidFrame:UpdateMemberButton(button, memberData)
         if button.ClassIcon then button.ClassIcon:Hide() end
         if button.RankIcon then button.RankIcon:Hide() end
         if button.RoleIcon then button.RoleIcon:Hide() end
+        if button.MainTankIcon then button.MainTankIcon:Hide() end
+        if button.MainAssistIcon then button.MainAssistIcon:Hide() end
         if button.ReadyCheckIcon then button.ReadyCheckIcon:Hide() end
         
         -- Show "Empty" text
@@ -1064,6 +1190,8 @@ function RaidFrame:UpdateMemberButton(button, memberData)
     if button.ClassIcon then button.ClassIcon:Hide() end
     if button.RankIcon then button.RankIcon:Hide() end
     if button.RoleIcon then button.RoleIcon:Hide() end
+    if button.MainTankIcon then button.MainTankIcon:Hide() end
+    if button.MainAssistIcon then button.MainAssistIcon:Hide() end
     if button.ReadyCheckIcon then button.ReadyCheckIcon:Hide() end
     
     -- Store member data in button
@@ -1092,6 +1220,9 @@ function RaidFrame:UpdateMemberButton(button, memberData)
     if button.Level and memberData.level and memberData.level > 0 then
         button.Level:SetText(memberData.level)
         button.Level:Show()
+        if FontManager then
+            FontManager:ApplyFontSize(button.Level)
+        end
     elseif button.Level then
         button.Level:Hide()
     end
@@ -1113,7 +1244,14 @@ function RaidFrame:UpdateMemberButton(button, memberData)
         end
     end
     if button.Name then
-        button.Name:SetText(memberData.name or "")
+        local displayName = memberData.name or ""
+        if displayName:find("-") then
+            displayName = strsplit("-", displayName)
+        end
+        button.Name:SetText(displayName)
+        if FontManager then
+            FontManager:ApplyFontSize(button.Name)
+        end
     end
     
     -- Update class color tint overlay (subtle tint over textured background)
@@ -1159,6 +1297,23 @@ function RaidFrame:UpdateMemberButton(button, memberData)
         button.RoleIcon:Hide()
     end
     
+    -- Update Main Tank / Main Assist Icons (raid role assignment)
+    if button.MainTankIcon then
+        if memberData.role == "MAINTANK" then
+            button.MainTankIcon:Show()
+        else
+            button.MainTankIcon:Hide()
+        end
+    end
+    
+    if button.MainAssistIcon then
+        if memberData.role == "MAINASSIST" then
+            button.MainAssistIcon:Show()
+        else
+            button.MainAssistIcon:Hide()
+        end
+    end
+    
     -- Update Ready Check Icon (if active)
     if memberData.readyStatus then
         if memberData.readyStatus == "ready" then
@@ -1201,29 +1356,29 @@ function RaidFrame:UpdateCombatOverlay(inCombat)
     end
     local buttonsUpdated = 0
     
-    BFL:DebugPrint("[BFL] RaidFrame:UpdateCombatOverlay START - combatState: " .. tostring(combatState) .. " (param was: " .. tostring(inCombat) .. ")")
-    BFL:DebugPrint("[BFL] memberButtons structure: " .. tostring(self.memberButtons) .. ", type: " .. type(self.memberButtons))
+    -- BFL:DebugPrint("[BFL] RaidFrame:UpdateCombatOverlay START - combatState: " .. tostring(combatState) .. " (param was: " .. tostring(inCombat) .. ")")
+    -- BFL:DebugPrint("[BFL] memberButtons structure: " .. tostring(self.memberButtons) .. ", type: " .. type(self.memberButtons))
     
     for groupIndex = 1, 8 do
         if self.memberButtons[groupIndex] then
-            BFL:DebugPrint("[BFL] Processing group " .. groupIndex)
+            -- BFL:DebugPrint("[BFL] Processing group " .. groupIndex)
             for slotIndex = 1, 5 do
                 local button = self.memberButtons[groupIndex][slotIndex]
                 if button then
                     local isShown = button:IsShown()
-                    BFL:DebugPrint("[BFL] Button [" .. groupIndex .. "][" .. slotIndex .. "] - IsShown: " .. tostring(isShown) .. ", HasOverlay: " .. tostring(button.CombatOverlay ~= nil))
+                    -- BFL:DebugPrint("[BFL] Button [" .. groupIndex .. "][" .. slotIndex .. "] - IsShown: " .. tostring(isShown) .. ", HasOverlay: " .. tostring(button.CombatOverlay ~= nil))
                     
                     -- Ensure CombatOverlay exists
                     if not button.CombatOverlay then
-                        BFL:DebugPrint("[BFL] Button [" .. groupIndex .. "][" .. slotIndex .. "] missing CombatOverlay!")
+                        -- BFL:DebugPrint("[BFL] Button [" .. groupIndex .. "][" .. slotIndex .. "] missing CombatOverlay!")
                     else
                         if combatState and isShown then
                             button.CombatOverlay:Show()
                             buttonsUpdated = buttonsUpdated + 1
-                            BFL:DebugPrint("[BFL] Showed overlay on button [" .. groupIndex .. "][" .. slotIndex .. "]")
+                            -- BFL:DebugPrint("[BFL] Showed overlay on button [" .. groupIndex .. "][" .. slotIndex .. "]")
                         else
                             button.CombatOverlay:Hide()
-                            BFL:DebugPrint("[BFL] Hid overlay on button [" .. groupIndex .. "][" .. slotIndex .. "] (combatState=" .. tostring(combatState) .. ", isShown=" .. tostring(isShown) .. ")")
+                            -- BFL:DebugPrint("[BFL] Hid overlay on button [" .. groupIndex .. "][" .. slotIndex .. "] (combatState=" .. tostring(combatState) .. ", isShown=" .. tostring(isShown) .. ")")
                         end
                     end
                 end
@@ -1231,7 +1386,7 @@ function RaidFrame:UpdateCombatOverlay(inCombat)
         end
     end
     
-    BFL:DebugPrint("[BFL] Combat overlay updated on " .. buttonsUpdated .. " buttons (out of 40 possible)")
+    -- BFL:DebugPrint("[BFL] Combat overlay updated on " .. buttonsUpdated .. " buttons (out of 40 possible)")
 end
 
 -- ========================================
@@ -1763,7 +1918,7 @@ RaidFrame.mockConfig = {
 	@param subgroup: Group number (1-8)
 	@param role: Combat role (TANK, HEALER, DAMAGER, NONE)
 	@param rank: Raid rank (0=member, 1=assistant, 2=leader)
-	@param options: Additional options (online, isDead, zone)
+	@param options: Additional options (online, isDead, zone, raidRole)
 	@return: Member data table
 ]]
 local function CreateMockMember(index, name, classInfo, subgroup, role, rank, options)
@@ -1780,8 +1935,8 @@ local function CreateMockMember(index, name, classInfo, subgroup, role, rank, op
 		zone = options.zone or MOCK_ZONES[math.random(#MOCK_ZONES)],
 		online = options.online ~= false,  -- Default true
 		isDead = options.isDead or false,
-		role = role,
-		combatRole = role,
+		role = options.raidRole or nil,  -- MAINTANK, MAINASSIST or nil (from GetRaidRosterInfo)
+		combatRole = role,  -- TANK, HEALER, DAMAGER, NONE (from UnitGroupRolesAssigned)
 		isML = options.isML or false,
 		unit = "raid" .. index,
 		raidIndex = index,
@@ -1862,6 +2017,7 @@ local function GenerateRaidComposition(numMembers)
 		
 		members[index] = CreateMockMember(index, name, classInfo, 1, "TANK", rank, {
 			isML = (i == 1),  -- Leader is master looter
+			raidRole = (i == 1) and "MAINTANK" or ((i == 2) and "MAINASSIST" or nil),  -- First tank = MT, second = MA
 		})
 		index = index + 1
 	end
@@ -2145,6 +2301,8 @@ function RaidFrame:FixMockButtonVisuals()
 						if button.ClassIcon then button.ClassIcon:Hide() end
 						if button.RankIcon then button.RankIcon:Hide() end
 						if button.RoleIcon then button.RoleIcon:Hide() end
+						if button.MainTankIcon then button.MainTankIcon:Hide() end
+						if button.MainAssistIcon then button.MainAssistIcon:Hide() end
 						if button.ClassColorTint then
 							button.ClassColorTint:SetColorTexture(0.1, 0.1, 0.1, 0.3)
 						end

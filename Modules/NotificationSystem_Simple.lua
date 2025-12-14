@@ -26,7 +26,7 @@ local function GetActiveToasts()
         -- Verify all frames exist
         for i, frame in ipairs(activeToasts) do
             if not frame then
-                BFL:DebugPrint("|cffff0000BFL:NotificationSystem:|r Toast frame " .. i .. " not found!")
+                -- BFL:DebugPrint("|cffff0000BFL:NotificationSystem:|r Toast frame " .. i .. " not found!")
                 return nil
             end
         end
@@ -51,7 +51,7 @@ end
 local function GetAvailableToastSlot()
     local toasts = GetActiveToasts()
     if not toasts then
-        BFL:DebugPrint("|cffff0000BFL:NotificationSystem:|r Toast frames not available!")
+        -- BFL:DebugPrint("|cffff0000BFL:NotificationSystem:|r Toast frames not available!")
         return nil
     end
     
@@ -70,7 +70,7 @@ local function ShowToast(name, message, icon)
     if not frame then
         -- All 3 slots occupied, queue it
         table.insert(notificationQueue, {name = name, message = message, icon = icon})
-        BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r All 3 toast slots occupied, queued notification")
+        -- BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r All 3 toast slots occupied, queued notification")
         return true
     end
     
@@ -80,12 +80,19 @@ local function ShowToast(name, message, icon)
     
     if icon then
         frame.Icon:SetTexture(icon)
+        
+        -- Auto-color based on known icons
+        if icon:find("user%-check") then
+            frame.Icon:SetVertexColor(0.3, 1, 0.3, 1) -- Green
+        elseif icon:find("user%-x") then
+            frame.Icon:SetVertexColor(0.5, 0.5, 0.5, 1) -- Grey
+        else
+            frame.Icon:SetVertexColor(1, 1, 1, 1) -- White (Game icons etc)
+        end
     else
         frame.Icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\user-check")
+        frame.Icon:SetVertexColor(0.3, 1, 0.3, 1)
     end
-    
-    -- Color icon green
-    frame.Icon:SetVertexColor(0.3, 1, 0.3, 1)
     
     -- Play sound if enabled (only for first toast to avoid sound spam)
     if BetterFriendlistDB.notificationSoundEnabled and frame == activeToasts[1] then
@@ -104,7 +111,7 @@ local function InitializeToast()
     
     local toasts = GetActiveToasts()
     if not toasts then
-        BFL:DebugPrint("|cffff0000BFL:NotificationSystem:|r Cannot initialize toasts - frames not found!")
+        -- BFL:DebugPrint("|cffff0000BFL:NotificationSystem:|r Cannot initialize toasts - frames not found!")
         return
     end
     
@@ -132,7 +139,7 @@ local function InitializeToast()
     end
     
     toastInitialized = true
-    BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Initialized 3 toast frames")
+    -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Initialized 3 toast frames")
 end
 
 --[[--------------------------------------------------
@@ -157,11 +164,11 @@ function NotificationSystem:ShowNotification(friendName, message, iconTexture)
             ShowToast(friendName, message, iconTexture)
         else
             -- Fallback to chat
-            BFL:DebugPrint(string.format("|cff00ff00%s|r %s", friendName, message))
+            -- BFL:DebugPrint(string.format("|cff00ff00%s|r %s", friendName, message))
         end
     elseif displayMode == "chat" then
         -- Chat notification
-        BFL:DebugPrint(string.format("|cff00ff00%s|r %s", friendName, message))
+        -- BFL:DebugPrint(string.format("|cff00ff00%s|r %s", friendName, message))
     end
     -- "disabled" - do nothing
 end
@@ -199,7 +206,7 @@ function NotificationSystem:ShowTestNotification()
         "Interface\\AddOns\\BetterFriendlist\\Icons\\user-check"
     )
     
-    BFL:DebugPrint("Test notification triggered! (Mode: " .. (BetterFriendlistDB.notificationDisplayMode or "alert") .. ")")
+    -- BFL:DebugPrint("Test notification triggered! (Mode: " .. (BetterFriendlistDB.notificationDisplayMode or "alert") .. ")")
 end
 
 -- Test group notification rules
@@ -276,11 +283,11 @@ end
 function NotificationSystem:RegisterEvents()
     -- CRITICAL: Do NOT register events if Beta Features disabled
     if not IsBetaEnabled() then
-        BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Events NOT registered (Beta Features disabled)")
+        -- BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Events NOT registered (Beta Features disabled)")
         return
     end
     
-    BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Registering events (Beta Features enabled)")
+    -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Registering events (Beta Features enabled)")
     
     -- BattleNet Friend Online
     BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_ONLINE", function(bnetAccountID)
@@ -328,10 +335,10 @@ function NotificationSystem:CheckNotificationRules(friendUID)
         local friendRule = BetterFriendlistDB.notificationFriendRules[friendUID]
         
         if friendRule == "blacklist" then
-            BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Friend " .. friendUID .. " is blacklisted (per-friend rule)")
+            -- BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Friend " .. friendUID .. " is blacklisted (per-friend rule)")
             return false, false, "friend-blacklist"
         elseif friendRule == "whitelist" then
-            BFL:DebugPrint("|cf00ffffBFL:NotificationSystem:|r Friend " .. friendUID .. " is whitelisted (per-friend rule)")
+            -- BFL:DebugPrint("|cf00ffffBFL:NotificationSystem:|r Friend " .. friendUID .. " is whitelisted (per-friend rule)")
             return true, true, "friend-whitelist"  -- Bypass quiet time + cooldown
         end
     end
@@ -360,10 +367,10 @@ function NotificationSystem:CheckNotificationRules(friendUID)
         
         -- Priority: Whitelist > Blacklist
         if hasWhitelist then
-            BFL:DebugPrint("|cf00ffffBFL:NotificationSystem:|r Friend " .. friendUID .. " is whitelisted (group: " .. whitelistGroup .. ")")
+            -- BFL:DebugPrint("|cf00ffffBFL:NotificationSystem:|r Friend " .. friendUID .. " is whitelisted (group: " .. whitelistGroup .. ")")
             return true, true, "group-whitelist"  -- Bypass quiet time + cooldown
         elseif hasBlacklist then
-            BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Friend " .. friendUID .. " is blacklisted (group: " .. blacklistGroup .. ")")
+            -- BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Friend " .. friendUID .. " is blacklisted (group: " .. blacklistGroup .. ")")
             return false, false, "group-blacklist"
         end
     end
@@ -380,10 +387,10 @@ function NotificationSystem:CheckNotificationRules(friendUID)
                     if accountInfo.isFavorite and BetterFriendlistDB.notificationGroupRules then
                         local favRule = BetterFriendlistDB.notificationGroupRules["favorites"]
                         if favRule == "whitelist" then
-                            BFL:DebugPrint("|cf00ffffBFL:NotificationSystem:|r Friend " .. friendUID .. " is whitelisted (favorites group)")
+                            -- BFL:DebugPrint("|cf00ffffBFL:NotificationSystem:|r Friend " .. friendUID .. " is whitelisted (favorites group)")
                             return true, true, "favorites-whitelist"
                         elseif favRule == "blacklist" then
-                            BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Friend " .. friendUID .. " is blacklisted (favorites group)")
+                            -- BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Friend " .. friendUID .. " is blacklisted (favorites group)")
                             return false, false, "favorites-blacklist"
                         end
                     end
@@ -394,7 +401,7 @@ function NotificationSystem:CheckNotificationRules(friendUID)
     end
     
     -- 4. Default: Use global settings (no special rule)
-    BFL:DebugPrint("|cf00ffffBFL:NotificationSystem:|r Friend " .. friendUID .. " using default (global settings)")
+    -- BFL:DebugPrint("|cf00ffffBFL:NotificationSystem:|r Friend " .. friendUID .. " using default (global settings)")
     return true, false, "global"
 end
 
@@ -412,6 +419,7 @@ NotificationSystem.initialStateLoaded = false
 --]]--------------------------------------------------
 
 NotificationSystem.cooldownTimers = {} -- {friendUID = {online = timestamp, offline = timestamp, charSwitch = timestamp, gameSwitch = timestamp}}
+NotificationSystem.offlineTimers = {} -- {friendUID = timer}
 
 -- Cooldown durations per event type (in seconds)
 local COOLDOWN_DURATIONS = {
@@ -422,12 +430,21 @@ local COOLDOWN_DURATIONS = {
     wowLogin = 30,    -- WoW login (same as online)
 }
 
+local GLOBAL_COOLDOWN_DURATION = 5
+local OFFLINE_DEBOUNCE_DURATION = 5
+
 -- Check if notification is on cooldown for specific event type
 function NotificationSystem:IsOnCooldown(friendUID, eventType)
     eventType = eventType or "online" -- Default to online if not specified
     
     if not self.cooldownTimers[friendUID] then
         return false
+    end
+    
+    -- Check Global Cooldown
+    local lastGlobal = self.cooldownTimers[friendUID]["global"]
+    if lastGlobal and (GetTime() - lastGlobal < GLOBAL_COOLDOWN_DURATION) then
+        return true
     end
     
     local lastShown = self.cooldownTimers[friendUID][eventType]
@@ -448,10 +465,12 @@ function NotificationSystem:SetCooldown(friendUID, eventType)
         self.cooldownTimers[friendUID] = {}
     end
     
-    self.cooldownTimers[friendUID][eventType] = GetTime()
+    local currentTime = GetTime()
+    self.cooldownTimers[friendUID][eventType] = currentTime
+    self.cooldownTimers[friendUID]["global"] = currentTime -- Set global cooldown
     
     local duration = COOLDOWN_DURATIONS[eventType] or 30
-    BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Cooldown set for " .. friendUID .. " [" .. eventType .. "] (" .. duration .. "s)")
+    -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Cooldown set for " .. friendUID .. " [" .. eventType .. "] (" .. duration .. "s)")
 end
 
 -- Clean up expired cooldowns (called periodically)
@@ -487,7 +506,7 @@ function NotificationSystem:CleanupCooldowns()
 	end
 	
 	if #friendsToRemove > 0 then
-		BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Cooldown cleanup complete (removed " .. #friendsToRemove .. " expired friends)")
+		-- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Cooldown cleanup complete (removed " .. #friendsToRemove .. " expired friends)")
 	end
 end
 
@@ -507,7 +526,7 @@ function NotificationSystem:InitializeFriendStateCache()
         return
     end
     
-    BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Initializing friend state cache...")
+    -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Initializing friend state cache...")
     
     local numBNetFriends = BNGetNumFriends()
     for i = 1, numBNetFriends do
@@ -527,7 +546,7 @@ function NotificationSystem:InitializeFriendStateCache()
     end
     
     self.initialStateLoaded = true
-    BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Friend state cache initialized with " .. numBNetFriends .. " friends")
+    -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Friend state cache initialized with " .. numBNetFriends .. " friends")
 end
 
 -- Update friend state and return what changed
@@ -548,7 +567,7 @@ function NotificationSystem:UpdateFriendState(bnetAccountID, accountInfo)
     -- CRITICAL: Ignore if characterName is nil/empty (loading/transitioning)
     -- This prevents false "char switch" detections when data is temporarily missing
     if currentState.clientProgram == "WoW" and (not currentState.characterName or currentState.characterName == "") then
-        BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Ignoring state update for " .. bnetAccountID .. " (characterName is nil/empty)")
+        -- BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Ignoring state update for " .. bnetAccountID .. " (characterName is nil/empty)")
         return nil
     end
     
@@ -565,7 +584,7 @@ function NotificationSystem:UpdateFriendState(bnetAccountID, accountInfo)
            currentState.isOnline then
             -- This is likely a CHARACTER SWITCH in progress (transitioning through BNet state)
             -- DON'T trigger notification
-            BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Ignoring transient BNet state for " .. bnetAccountID .. " (likely char switch in progress: " .. previousState.characterName .. " → ?)")
+            -- BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Ignoring transient BNet state for " .. bnetAccountID .. " (likely char switch in progress: " .. previousState.characterName .. " → ?)")
             
             -- Store current state but don't trigger notification
             self.friendStateCache[bnetAccountID] = currentState
@@ -575,7 +594,7 @@ function NotificationSystem:UpdateFriendState(bnetAccountID, accountInfo)
         -- Detect WoW Login (wasn't in WoW, now is)
         if previousState.clientProgram ~= "WoW" and currentState.clientProgram == "WoW" then
             changeType = "wowLogin"
-            BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r WoW Login detected for " .. bnetAccountID .. " (was " .. (previousState.clientProgram or "nil") .. ", now WoW)")
+            -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r WoW Login detected for " .. bnetAccountID .. " (was " .. (previousState.clientProgram or "nil") .. ", now WoW)")
         -- Detect Character Switch (was in WoW, still in WoW, different character)
         elseif previousState.clientProgram == "WoW" and currentState.clientProgram == "WoW" then
             -- CRITICAL: Only detect switch if BOTH previous and current names are valid AND different
@@ -583,21 +602,21 @@ function NotificationSystem:UpdateFriendState(bnetAccountID, accountInfo)
                currentState.characterName and currentState.characterName ~= "" and
                previousState.characterName ~= currentState.characterName then
                 changeType = "charSwitch"
-                BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Char Switch detected for " .. bnetAccountID .. " (" .. previousState.characterName .. " -> " .. currentState.characterName .. ")")
+                -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Char Switch detected for " .. bnetAccountID .. " (" .. previousState.characterName .. " -> " .. currentState.characterName .. ")")
             end
         -- Detect Game Switch (switched to different game)
         elseif previousState.clientProgram ~= currentState.clientProgram and currentState.clientProgram ~= "WoW" then
             changeType = "gameSwitch"
-            BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Game Switch detected for " .. bnetAccountID .. " (" .. (previousState.clientProgram or "nil") .. " -> " .. (currentState.clientProgram or "nil") .. ")")
+            -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Game Switch detected for " .. bnetAccountID .. " (" .. (previousState.clientProgram or "nil") .. " -> " .. (currentState.clientProgram or "nil") .. ")")
         end
     else
         -- First time seeing this friend - DON'T trigger notification if initial state not loaded
         -- This prevents false positives when addon loads with friends already online
         if not self.initialStateLoaded then
-            BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Skipping first-time notification for " .. bnetAccountID .. " (initial state not loaded)")
+            -- BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Skipping first-time notification for " .. bnetAccountID .. " (initial state not loaded)")
         elseif currentState.clientProgram == "WoW" and currentState.isOnline then
             changeType = "wowLogin"
-            BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r First time seeing " .. bnetAccountID .. " in WoW, treating as WoW Login")
+            -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r First time seeing " .. bnetAccountID .. " in WoW, treating as WoW Login")
         end
     end
     
@@ -644,7 +663,7 @@ function NotificationSystem:CheckGroupTriggers()
                     
                     -- Set cooldown
                     trigger.lastTriggered = currentTime
-                    BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Group trigger fired: " .. triggerID)
+                    -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Group trigger fired: " .. triggerID)
                 end
             end
         end
@@ -806,6 +825,14 @@ function NotificationSystem:OnFriendOnline(friendType, bnetAccountID)
         end
     end
     
+    local isSwitch = false
+    if friendUID and self.offlineTimers[friendUID] then
+        self.offlineTimers[friendUID]:Cancel()
+        self.offlineTimers[friendUID] = nil
+        isSwitch = true
+        -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Character switch detected for " .. friendUID)
+    end
+    
     -- Check notification rules (per-friend + group rules)
     if friendUID then
         local shouldNotify, isWhitelisted, ruleSource = self:CheckNotificationRules(friendUID)
@@ -819,11 +846,12 @@ function NotificationSystem:OnFriendOnline(friendType, bnetAccountID)
             -- Whitelisted: Bypass quiet time and cooldown
             if friendName and friendUID then
                 local template = BetterFriendlistDB.notificationMessageOnline or "%name% is now online"
+                if isSwitch then template = "reconnected" end
                 local message = self:ReplaceMessageTemplate(template, friendData)
                 self:ShowNotification(friendName, message, icon)
                 self:SetCooldown(friendUID, "online")
             else
-                BFL:DebugPrint("|cffff0000BFL:NotificationSystem:|r Invalid friendUID - skipping whitelisted notification (online)")
+                -- BFL:DebugPrint("|cffff0000BFL:NotificationSystem:|r Invalid friendUID - skipping whitelisted notification (online)")
             end
             return
         end
@@ -836,20 +864,21 @@ function NotificationSystem:OnFriendOnline(friendType, bnetAccountID)
     
     -- Check cooldown (anti-spam)
     if friendUID and self:IsOnCooldown(friendUID) then
-        BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Friend " .. friendUID .. " on cooldown, skipping")
+        -- BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Friend " .. friendUID .. " on cooldown, skipping")
         return
     end
     
     if friendName then
         -- Use custom template (Phase 11)
         local template = BetterFriendlistDB.notificationMessageOnline or "%name% is now online"
+        if isSwitch then template = "reconnected" end
         local message = self:ReplaceMessageTemplate(template, friendData)
         self:ShowNotification(friendName, message, icon)
         
         -- Set cooldown AFTER showing notification
         if friendUID then
             self:SetCooldown(friendUID)
-            BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Cooldown set for " .. friendUID .. " (30s)")
+            -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Cooldown set for " .. friendUID .. " (30s)")
         end
     end
     
@@ -858,6 +887,35 @@ function NotificationSystem:OnFriendOnline(friendType, bnetAccountID)
 end
 
 function NotificationSystem:OnFriendOffline(friendType, bnetAccountID)
+    -- CRITICAL: Block if Beta Features disabled (defense in depth)
+    if not IsBetaEnabled() then return end
+    
+    -- Check if offline notifications are enabled
+    if not BetterFriendlistDB.notificationOfflineEnabled then return end
+    
+    if not BetterFriendlistDB.notificationDisplayMode or BetterFriendlistDB.notificationDisplayMode == "disabled" then return end
+    
+    -- Construct UID for timer
+    local friendUID
+    if friendType == "BNET" then
+        local accountInfo = C_BattleNet.GetAccountInfoByID(bnetAccountID)
+        if accountInfo then
+            friendUID = "bnet_" .. (accountInfo.battleTag or tostring(bnetAccountID))
+        end
+    end
+    
+    if not friendUID then return end
+    
+    -- Start Debounce Timer
+    if self.offlineTimers[friendUID] then self.offlineTimers[friendUID]:Cancel() end
+    
+    self.offlineTimers[friendUID] = C_Timer.After(OFFLINE_DEBOUNCE_DURATION, function()
+        self.offlineTimers[friendUID] = nil
+        self:ProcessFriendOffline(friendType, bnetAccountID)
+    end)
+end
+
+function NotificationSystem:ProcessFriendOffline(friendType, bnetAccountID)
     -- CRITICAL: Block if Beta Features disabled (defense in depth)
     if not IsBetaEnabled() then
         return
@@ -917,7 +975,7 @@ function NotificationSystem:OnFriendOffline(friendType, bnetAccountID)
                 self:ShowNotification(friendName, message, icon)
                 self:SetCooldown(friendUID, "offline")
             else
-                BFL:DebugPrint("|cffff0000BFL:NotificationSystem:|r Invalid friendUID - skipping whitelisted notification (offline)")
+                -- BFL:DebugPrint("|cffff0000BFL:NotificationSystem:|r Invalid friendUID - skipping whitelisted notification (offline)")
             end
             return
         end
@@ -929,7 +987,7 @@ function NotificationSystem:OnFriendOffline(friendType, bnetAccountID)
     end
         -- Check cooldown (anti-spam for rapid on/off) - use 'offline' event type (30s)
     if friendUID and self:IsOnCooldown(friendUID, "offline") then
-        BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Friend " .. friendUID .. " on cooldown [offline], skipping offline notification")
+        -- BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Friend " .. friendUID .. " on cooldown [offline], skipping offline notification")
         return
     end
     
@@ -974,7 +1032,7 @@ function NotificationSystem:OnFriendInfoChanged()
 		end
 	end
 	
-	BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r BN_FRIEND_INFO_CHANGED fired, processing " .. #friendsToProcess .. " friends")
+	--BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r BN_FRIEND_INFO_CHANGED fired, processing " .. #friendsToProcess .. " friends")
 	
 	-- Phase 2: Process each friend's state change safely
 	for _, bnetAccountID in ipairs(friendsToProcess) do
@@ -986,7 +1044,7 @@ function NotificationSystem:OnFriendInfoChanged()
 			local changeType, previousState, currentState = self:UpdateFriendState(bnetAccountID, accountInfo)
 			
 			if changeType then
-				BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Detected " .. changeType .. " for bnetID " .. bnetAccountID)
+				-- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Detected " .. changeType .. " for bnetID " .. bnetAccountID)
 				
 				-- Get display name (BattleTag without #1234)
 				local battleTag = accountInfo.battleTag or "Unknown"
@@ -1000,18 +1058,18 @@ function NotificationSystem:OnFriendInfoChanged()
                 
                 if not shouldNotify then
                     -- Blacklisted (friend or group)
-                    BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Friend " .. friendUID .. " blocked by " .. ruleSource .. ", skipping " .. changeType)
+                    -- BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Friend " .. friendUID .. " blocked by " .. ruleSource .. ", skipping " .. changeType)
                 end
                 
                 -- Only check quiet time and cooldown if NOT whitelisted
                 if shouldNotify and not isWhitelisted then
                     if IsQuietTime() then
-                        BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Quiet time active, skipping " .. changeType .. " for " .. friendUID)
+                        -- BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Quiet time active, skipping " .. changeType .. " for " .. friendUID)
                         shouldNotify = false
                     elseif self:IsOnCooldown(friendUID, changeType) then
                         -- Check cooldown for specific event type (Phase 14d)
                         -- charSwitch: 10s, gameSwitch: 10s, wowLogin: 30s
-                        BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Friend " .. friendUID .. " on cooldown [" .. changeType .. "], skipping " .. changeType)
+                        -- BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Friend " .. friendUID .. " on cooldown [" .. changeType .. "], skipping " .. changeType)
                         shouldNotify = false
                     end
                 end
@@ -1026,10 +1084,10 @@ function NotificationSystem:OnFriendInfoChanged()
                     end
                     
                     local isEnabled = BetterFriendlistDB[notificationType]
-                    BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Checking " .. notificationType .. " = " .. tostring(isEnabled))
+                    -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Checking " .. notificationType .. " = " .. tostring(isEnabled))
                     
                     if not isEnabled then
-                        BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r " .. notificationType .. " is disabled, skipping " .. changeType)
+                        -- BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r " .. notificationType .. " is disabled, skipping " .. changeType)
                         shouldNotify = false
                     end
                 end
@@ -1067,7 +1125,7 @@ function NotificationSystem:OnFriendInfoChanged()
                         -- Set cooldown with event-specific type (Phase 14d)
                         -- wowLogin uses 'wowLogin' (30s), charSwitch uses 'charSwitch' (10s), gameSwitch uses 'gameSwitch' (10s)
                         self:SetCooldown(friendUID, changeType)
-                        BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r " .. changeType .. " notification shown for " .. friendUID)
+                        -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r " .. changeType .. " notification shown for " .. friendUID)
                     end
                 end -- End shouldNotify
             end -- End if changeType check
@@ -1107,9 +1165,9 @@ function NotificationSystem:OnFriendListUpdate()
                     
                     -- Set cooldown AFTER showing notification
                     self:SetCooldown(friendUID)
-                    BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Cooldown set for " .. friendUID .. " (30s)")
+                    -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Cooldown set for " .. friendUID .. " (30s)")
                 else
-                    BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Friend " .. friendUID .. " on cooldown, skipping")
+                    -- BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Friend " .. friendUID .. " on cooldown, skipping")
                 end
             end
             
@@ -1134,11 +1192,11 @@ function NotificationSystem:Initialize()
     C_Timer.NewTicker(60, function()
         if IsBetaEnabled() then
             self:CleanupCooldowns()
-            BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Cooldown cleanup completed")
+            -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Cooldown cleanup completed")
         end
     end)
     
-    BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Module initialized (Cooldown: 30s, Cleanup: 60s)")
+    -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Module initialized (Cooldown: 30s, Cleanup: 60s)")
 end
 
 -- Export

@@ -225,9 +225,12 @@ function BetterQuickJoinFrame_JoinQueueButton_OnClick(self)
 end
 
 -- ========================================
--- Role Selection Frame (Blizzard-style dialog)
+-- DEPRECATED: Custom Role Selection Frame
+-- As of v2.0.0, we use Blizzard's native QuickJoinRoleSelectionFrame instead
+-- This code is kept for reference but is no longer used
 -- ========================================
 
+--[[ DEPRECATED - Now using Blizzard's QuickJoinRoleSelectionFrame
 BetterQuickJoinRoleSelectionFrame = BetterQuickJoinRoleSelectionFrame or CreateFrame("Frame", "BetterQuickJoinRoleSelectionFrame", UIParent, "BasicFrameTemplate")
 
 function BetterQuickJoinRoleSelectionFrame:ShowForGroup(guid)
@@ -292,3 +295,4 @@ function BetterQuickJoinGroupButton_OnJoinClick(button)
 	-- Close dialog
 	frame:Hide()
 end
+--]] -- End of DEPRECATED code

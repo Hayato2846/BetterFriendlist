@@ -21,6 +21,9 @@ local BUTTON_TYPE_INVITE_HEADER = 3
 local BUTTON_TYPE_INVITE = 4
 local BUTTON_TYPE_DIVIDER = 5
 
+-- Reference to Groups (Upvalue shared by all functions)
+local friendGroups = {}
+
 -- Race condition protection
 local isUpdatingFriendsList = false
 local hasPendingUpdate = false
@@ -85,9 +88,9 @@ local function BuildDataProvider(self)
 	-- Sync groups first
 	self:SyncGroups()
 	
-	-- Get friendGroups from Groups module
+	-- Get friendGroups from Groups module (SyncGroups updates the module-level friendGroups table)
 	local Groups = GetGroups()
-	local friendGroups = Groups and Groups:GetAll() or {}
+	-- friendGroups is now an upvalue, updated by SyncGroups()
 	
 	-- Add friend invites at top (real or mock)
 	local numInvites
@@ -123,18 +126,26 @@ local function BuildDataProvider(self)
 	-- Separate friends into groups
 	local groupedFriends = {
 		favorites = {},
-		nogroup = {}
+		nogroup = {},
+		ingame = {} -- Feature: In-Game Group
 	}
 	local totalGroupCounts = {
 		favorites = 0,
-		nogroup = 0
+		nogroup = 0,
+		ingame = 0
+	}
+	local onlineGroupCounts = {
+		favorites = 0,
+		nogroup = 0,
+		ingame = 0
 	}
 	
 	-- Initialize custom group tables
 	for groupId, groupData in pairs(friendGroups) do
-		if not groupData.builtin or groupId == "favorites" or groupId == "nogroup" then
+		if not groupData.builtin or groupId == "favorites" or groupId == "nogroup" or groupId == "ingame" then
 			groupedFriends[groupId] = groupedFriends[groupId] or {}
 			totalGroupCounts[groupId] = 0
+			onlineGroupCounts[groupId] = 0
 		end
 	end
 	
@@ -159,6 +170,43 @@ local function BuildDataProvider(self)
 			isInAnyGroup = true
 		end
 		
+		-- Feature: In-Game Group (Dynamic)
+		-- Only if enabled in settings
+		if GetDB():Get("enableInGameGroup", false) then
+			local mode = GetDB():Get("inGameGroupMode", "same_game")
+			local isInGame = false
+			
+			if mode == "any_game" then
+				-- Any Game: WoW friends (always online in game) OR BNet friends online in ANY game
+				if friend.type == "wow" and friend.connected then
+					isInGame = true
+				elseif friend.type == "bnet" and friend.connected and friend.gameAccountInfo and friend.gameAccountInfo.isOnline then
+					-- Check if actually in a game (clientProgram is set)
+					-- App and BSAp (Mobile) are not considered "In-Game" for this purpose usually, unless user wants "Online"
+					-- User said "friends who are in any game". Usually implies playing.
+					local client = friend.gameAccountInfo.clientProgram
+					if client and client ~= "" and client ~= "App" and client ~= "BSAp" then
+						isInGame = true
+					end
+				end
+			else
+				-- Same Game (Default): WoW friends OR BNet friends in SAME WoW version
+				if friend.type == "wow" and friend.connected then
+					isInGame = true
+				elseif friend.type == "bnet" and friend.connected and friend.gameAccountInfo and friend.gameAccountInfo.clientProgram == BNET_CLIENT_WOW then
+					-- Check Project ID (Retail vs Classic vs Classic Era)
+					if friend.gameAccountInfo.wowProjectID == WOW_PROJECT_ID then
+						isInGame = true
+					end
+				end
+			end
+			
+			if isInGame then
+				table.insert(friendGroupIds, "ingame")
+				isInAnyGroup = true
+			end
+		end
+		
 		for _, groupId in ipairs(customGroups) do
 			if type(groupId) == "string" and groupedFriends[groupId] then
 				table.insert(friendGroupIds, groupId)
@@ -174,6 +222,11 @@ local function BuildDataProvider(self)
 		for _, groupId in ipairs(friendGroupIds) do
 			-- Increment total count
 			totalGroupCounts[groupId] = (totalGroupCounts[groupId] or 0) + 1
+			
+			-- Increment online count
+			if friend.connected then
+				onlineGroupCounts[groupId] = (onlineGroupCounts[groupId] or 0) + 1
+			end
 			
 			-- Add to display list if passes filters
 			if self:PassesFilters(friend) then
@@ -219,6 +272,7 @@ local function BuildDataProvider(self)
 					name = groupData.name,
 					count = #groupFriends,
 					totalCount = totalGroupCounts[groupData.id] or 0,
+					onlineCount = onlineGroupCounts[groupData.id] or 0,
 					collapsed = groupData.collapsed
 				})
 				
@@ -503,13 +557,12 @@ end
 -- Module State
 -- ========================================
 FriendsList.friendsList = {}      -- Raw friends data from API
-FriendsList.displayList = {}      -- Processed display list with groups
 FriendsList.searchText = ""       -- Current search filter
 FriendsList.filterMode = "all"    -- Current filter mode: all, online, offline, wow, bnet
 FriendsList.sortMode = "status"   -- Current sort mode: status, name, level, zone
 
 -- Reference to Groups
-local friendGroups = {}
+-- local friendGroups = {} -- MOVED TO TOP OF FILE
 
 -- ========================================
 -- Private Helper Functions
@@ -571,6 +624,81 @@ local function GetFriendUID(friend)
 		local normalizedName = BFL:NormalizeWoWFriendName(friend.name)
 		return normalizedName and ("wow_" .. normalizedName) or nil
 	end
+end
+
+-- Get display name based on format setting
+function FriendsList:GetDisplayName(friend)
+	local DB = GetDB()
+	local format = DB and DB:Get("nameDisplayFormat", "%name%") or "%name%"
+	
+	-- 1. Prepare Data
+	local name = "Unknown"
+	local battletag = friend.battleTag or ""
+	local note = (friend.note or friend.notes or "")
+	local nickname = DB and DB:GetNickname(GetFriendUID(friend)) or ""
+	
+	if friend.type == "bnet" then
+		-- BNet: Use accountName as requested (RealID or BattleTag)
+		name = friend.accountName or "Unknown"
+	else
+		-- WoW: Name is Character Name
+		local fullName = friend.name or "Unknown"
+		local showRealmName = DB and DB:Get("showRealmName", false)
+		
+		if showRealmName then
+			name = fullName
+		else
+			local n, r = strsplit("-", fullName)
+			local playerRealm = GetNormalizedRealmName() -- Use normalized realm
+			
+			if r and r ~= playerRealm then
+				name = n .. "*" -- Indicate cross-realm
+			else
+				name = n
+			end
+		end
+	end
+
+	-- Process battletag to be short version as requested
+	if battletag ~= "" then
+		local hashIndex = string.find(battletag, "#")
+		if hashIndex then
+			battletag = string.sub(battletag, 1, hashIndex - 1)
+		end
+	end
+	
+	-- 2. Replace Tokens
+	-- Use function replacement to avoid issues with % characters in names
+	local result = format
+
+	-- Smart Fallback Logic:
+	-- If %nickname% is used but empty, and %name% is NOT in the format, use name as nickname
+	if nickname == "" and result:find("%%nickname%%") and not result:find("%%name%%") then
+		nickname = name
+	end
+	-- Same for %battletag% (e.g. for WoW friends)
+	if battletag == "" and result:find("%%battletag%%") and not result:find("%%name%%") then
+		battletag = name
+	end
+
+	result = result:gsub("%%name%%", function() return name end)
+	result = result:gsub("%%note%%", function() return note end)
+	result = result:gsub("%%nickname%%", function() return nickname end)
+	result = result:gsub("%%battletag%%", function() return battletag end)
+	
+	-- 3. Cleanup
+	-- Remove empty parentheses/brackets (e.g. "Name ()" -> "Name")
+	result = result:gsub("%(%)", "")
+	result = result:gsub("%[%]", "")
+	-- Trim whitespace
+	result = result:match("^%s*(.-)%s*$")
+	
+	-- 4. Fallback
+	if result == "" then
+		return name
+	end
+	
+	return result
 end
 
 -- ========================================
@@ -637,19 +765,22 @@ function FriendsList:Initialize()
 	
 	-- Register friend invite events
 	BFL:RegisterEventCallback("BN_FRIEND_INVITE_LIST_INITIALIZED", function()
-		self:UpdateFriendsList()
+		self:OnFriendListUpdate(true) -- Force immediate update
 	end, 10)
 	
 	BFL:RegisterEventCallback("BN_FRIEND_INVITE_ADDED", function()
+		-- Play sound immediately (Phase 1)
+		PlaySound(SOUNDKIT.UI_BNET_TOAST)
+		
 		local collapsed = GetCVarBool("friendInvitesCollapsed")
 		if collapsed then
 			self:FlashInviteHeader()
 		end
-		self:UpdateFriendsList()
+		self:OnFriendListUpdate(true) -- Force immediate update (Phase 2)
 	end, 10)
 	
 	BFL:RegisterEventCallback("BN_FRIEND_INVITE_REMOVED", function()
-		self:UpdateFriendsList()
+		self:OnFriendListUpdate(true) -- Force immediate update (Phase 2)
 	end, 10)
 	
 	-- Hook OnShow to re-render if data changed while hidden
@@ -674,18 +805,29 @@ function FriendsList:Initialize()
 end
 
 -- Handle friend list update events
-function FriendsList:OnFriendListUpdate(...)
+function FriendsList:OnFriendListUpdate(forceImmediate)
 	-- Event Coalescing (Micro-Throttling)
 	-- Instead of updating immediately for every event, we schedule an update for the next frame.
 	-- This handles "event bursts" (e.g. 50 friends coming online at once) by updating only once.
+	
+	-- Phase 2: Allow bypassing throttle for critical UI interactions (Invites)
+	if forceImmediate then
+		if self.updateTimer then
+			self.updateTimer:Cancel()
+			self.updateTimer = nil
+		end
+		self:UpdateFriendsList()
+		return
+	end
 	
 	if self.updateTimer then
 		-- Timer already running, update will happen next frame
 		return
 	end
 	
-	-- Schedule update for next frame (0 seconds = next frame)
-	self.updateTimer = C_Timer.After(0, function()
+	-- Schedule update with a small delay (0.1s) to batch multiple events
+	-- This significantly reduces CPU usage during login or mass status changes
+	self.updateTimer = C_Timer.After(0.1, function()
 		self.updateTimer = nil
 		self:UpdateFriendsList()
 	end)
@@ -719,6 +861,9 @@ function FriendsList:SyncGroups()
 			}
 		}
 	end
+	
+	-- Feature: In-Game Group (Dynamic)
+	-- Now handled by Groups module (Groups:GetAll filters it based on settings)
 end
 
 -- Update the friends list from WoW API
@@ -804,11 +949,14 @@ function FriendsList:UpdateFriendsList()
 	
 	-- Get WoW friends
 	local numWoWFriends = C_FriendList.GetNumFriends()
+	-- Optimization: Cache player realm to avoid repeated API calls in loop
+	local playerRealm = GetNormalizedRealmName()
+	
 	for i = 1, numWoWFriends do
 		local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
 		if friendInfo then
 			-- Normalize name to always include realm for consistent identification
-			local normalizedName = BFL:NormalizeWoWFriendName(friendInfo.name)
+			local normalizedName = BFL:NormalizeWoWFriendName(friendInfo.name, playerRealm)
 			
 			local friend = {
 				type = "wow",
@@ -828,9 +976,6 @@ function FriendsList:UpdateFriendsList()
 	self:ApplyFilters()
 	self:ApplySort()
 	
-	-- Build display list to update UI
-	self:BuildDisplayList()
-	
 	-- CRITICAL FIX: Render the display after building list
 	-- Without this, UI never updates after friend offline/online events
 	self:RenderDisplay()
@@ -846,7 +991,7 @@ end
 
 -- Apply search and filter to friends list
 function FriendsList:ApplyFilters()
-	-- Filter will be applied in BuildDisplayList
+	-- Filter is applied in RenderDisplay / BuildDataProvider
 end
 
 -- Apply sort order to friends list (with primary and secondary sort)
@@ -854,8 +999,8 @@ function FriendsList:ApplySort()
 	local primarySort = self.sortMode
 	local secondarySort = self.secondarySort or "name" -- Default secondary: name
 	
-	-- DEBUG: Print sort modes
-	BFL:DebugPrint(string.format("BFL DEBUG: Sorting - Primary: %s, Secondary: %s", tostring(primarySort), tostring(secondarySort)))
+	-- DEBUG: Print sort modes (Disabled to prevent spam)
+	-- BFL:DebugPrint(string.format("BFL DEBUG: Sorting - Primary: %s, Secondary: %s", tostring(primarySort), tostring(secondarySort)))
 
 	table.sort(self.friendsList, function(a, b)
 		-- Apply primary sort first
@@ -931,31 +1076,9 @@ function FriendsList:CompareFriends(a, b, sortMode)
 		return nil
 		
 	elseif sortMode == "name" then
-		local DB = GetDB()
-		local showNotesAsName = DB and DB:Get("showNotesAsName", false)
-
-		-- Use the exact same logic as UpdateFriendButton to determine the display name
-		local function GetDisplayName(friend)
-			if showNotesAsName and friend.note and friend.note ~= "" then
-				return friend.note
-			end
-			
-			-- PHASE 9C FIX: Use BattleTag (stripped) instead of AccountName
-			-- AccountName might be protected or not what user expects to sort by
-			if friend.battleTag then
-				local tag = friend.battleTag
-				local hashIndex = string.find(tag, "#")
-				if hashIndex then
-					return string.sub(tag, 1, hashIndex - 1)
-				end
-				return tag
-			end
-			
-			return friend.name or "Unknown"
-		end
-
-		local nameA = GetDisplayName(a)
-		local nameB = GetDisplayName(b)
+		-- Use the centralized GetDisplayName function to ensure sorting matches display
+		local nameA = self:GetDisplayName(a)
+		local nameB = self:GetDisplayName(b)
 		
 		local aLower, bLower = (nameA or ""):lower(), (nameB or ""):lower()
 		
@@ -1340,135 +1463,6 @@ function FriendsList:CompareFriends(a, b, sortMode)
 	return nil
 end
 
--- Build display list with groups and headers
-function FriendsList:BuildDisplayList()
-	wipe(self.displayList)
-	
-	-- Sync groups first
-	self:SyncGroups()
-	
-	-- Add friend invites at top
-	local numInvites = BNGetNumFriendInvites()
-	if numInvites and numInvites > 0 then
-		table.insert(self.displayList, {
-			type = BUTTON_TYPE_INVITE_HEADER,
-			count = numInvites,
-		})
-		
-		if not GetCVarBool("friendInvitesCollapsed") then
-			for i = 1, numInvites do
-				table.insert(self.displayList, {
-					type = BUTTON_TYPE_INVITE,
-					inviteIndex = i,
-				})
-			end
-		end
-	end
-	
-	-- Separate friends into groups
-	local groupedFriends = {
-		favorites = {},
-		nogroup = {}
-	}
-	
-	-- Initialize custom group tables
-	for groupId, groupData in pairs(friendGroups) do
-		if not groupData.builtin or groupId == "favorites" or groupId == "nogroup" then
-			groupedFriends[groupId] = groupedFriends[groupId] or {}
-		end
-	end
-	
-	-- Get DB
-	local DB = GetDB()
-	if not DB then 
-		return 
-	end
-	
-	-- Group friends
-	for _, friend in ipairs(self.friendsList) do
-		-- Apply filters
-		if self:PassesFilters(friend) then
-			local isInAnyGroup = false
-			local friendUID = GetFriendUID(friend)
-			
-			-- Check if favorite (Battle.net only)
-			if friend.type == "bnet" and friend.isFavorite then
-				table.insert(groupedFriends.favorites, friend)
-				isInAnyGroup = true
-			end
-			
-			-- Check for custom groups (DIRECT ACCESS TO DB LIKE OLD CODE)
-			if BetterFriendlistDB and BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friendUID] then
-				local groups = BetterFriendlistDB.friendGroups[friendUID]
-				for _, groupId in ipairs(groups) do
-					-- Skip invalid entries (corrupted data like boolean 'true')
-					if type(groupId) == "string" and groupedFriends[groupId] then
-						table.insert(groupedFriends[groupId], friend)
-						isInAnyGroup = true
-					end
-				end
-			end
-			
-			-- Add to "No Group" if not in any group
-			if not isInAnyGroup then
-				table.insert(groupedFriends.nogroup, friend)
-			end
-		end
-	end
-	
-	-- Build display list in group order
-	local orderedGroups = {}
-	for _, groupData in pairs(friendGroups) do
-		table.insert(orderedGroups, groupData)
-	end
-	table.sort(orderedGroups, function(a, b) return a.order < b.order end)
-	
-	for _, groupData in ipairs(orderedGroups) do
-		local groupFriends = groupedFriends[groupData.id]
-		
-		-- Check if we should skip empty groups based on setting
-		local hideEmptyGroups = GetDB():Get("hideEmptyGroups", false)
-		local shouldSkip = false
-		
-		if hideEmptyGroups and groupFriends then
-			-- Count online friends only
-			local onlineCount = 0
-			for _, friend in ipairs(groupFriends) do
-				if friend.connected then
-					onlineCount = onlineCount + 1
-				end
-			end
-			-- Skip if no online friends
-			shouldSkip = (onlineCount == 0)
-		elseif not groupFriends or #groupFriends == 0 then
-			-- Always skip if no friends at all
-			shouldSkip = true
-		end
-		
-		if not shouldSkip then
-			-- Add group header
-			table.insert(self.displayList, {
-				type = BUTTON_TYPE_GROUP_HEADER,
-				groupId = groupData.id,
-				name = groupData.name,
-				count = #groupFriends,
-				collapsed = groupData.collapsed
-			})
-			
-			-- Add friends if not collapsed
-			if not groupData.collapsed then
-				for _, friend in ipairs(groupFriends) do
-					table.insert(self.displayList, {
-						type = BUTTON_TYPE_FRIEND,
-						friend = friend,
-						groupId = groupData.id
-					})
-				end
-			end
-		end
-	end
-end
-
 -- Check if friend passes current filters
 function FriendsList:PassesFilters(friend)
 	-- Search text filter
@@ -1547,19 +1541,6 @@ function FriendsList:PassesFilters(friend)
 	end
 	
 	return true
-end
-
--- Get display list count
-function FriendsList:GetDisplayListCount()
-	return #self.displayList
-end
-
--- Get display list item
-function FriendsList:GetDisplayListItem(index)
-	if not self.displayList or not index or index < 1 or index > #self.displayList then
-		return nil
-	end
-	return self.displayList[index]
 end
 
 -- Get friend UID (public helper)
@@ -1796,7 +1777,7 @@ function FriendsList:ToggleFriendInGroup(friendUID, groupId)
 	end
 	
 	DB:Set("friendGroups", friendGroupsData)
-	self:BuildDisplayList()
+	self:RenderDisplay()
 	
 	return not isInGroup -- Return new state (true = added)
 end
@@ -1839,7 +1820,7 @@ function FriendsList:RemoveFriendFromGroup(friendUID, groupId)
 	end
 	
 	DB:Set("friendGroups", friendGroupsData)
-	self:BuildDisplayList()
+	self:RenderDisplay()
 end
 
 -- ========================================
@@ -1930,10 +1911,27 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 	end
 	
 	-- Set header text with color
-	local countText = count
-	if elementData.totalCount and elementData.totalCount > count then
-		countText = string.format("%d/%d", count, elementData.totalCount)
+	local DB = GetDB()
+	local format = DB and DB:Get("headerCountFormat", "visible") or "visible"
+	local countText = ""
+	
+	if format == "online" then
+		-- Show "Online / Total" (e.g. "3/10")
+		countText = string.format("%d/%d", elementData.onlineCount or 0, elementData.totalCount or 0)
+	elseif format == "both" then
+		-- Show "Filtered (Online) / Total" (e.g. "1 (3)/10")
+		-- count = Filtered (currently shown)
+		-- onlineCount = Total Online
+		-- totalCount = Total Members
+		countText = string.format("%d (%d)/%d", count, elementData.onlineCount or 0, elementData.totalCount or 0)
+	else -- "visible" (Default)
+		-- Show "Filtered / Total" (e.g. "3/10" or just "3" if same)
+		countText = count
+		if elementData.totalCount and elementData.totalCount > count then
+			countText = string.format("%d/%d", count, elementData.totalCount)
+		end
 	end
+	
 	button:SetFormattedText("%s%s|r (%s)", colorCode, name, countText)
 	
 	-- Show/hide collapse arrows
@@ -2274,13 +2272,22 @@ function FriendsList:UpdateFriendButton(button, elementData)
 								else
 									-- Hide highlight and restore original text (IDENTICAL to old system - GOLD color)
 									frame.dropHighlight:Hide()
+									-- Optimization: Use cached count from elementData if available
 									local memberCount = 0
-									if BetterFriendlistDB.friendGroups then
-										for _, groups in pairs(BetterFriendlistDB.friendGroups) do
-											for _, gid in ipairs(groups) do
-												if gid == frame.groupId then
-													memberCount = memberCount + 1
-													break
+									if frame.GetElementData then
+										local data = frame:GetElementData()
+										if data and data.count then
+											memberCount = data.count
+										end
+									else
+										-- Fallback (should not happen with ScrollBox)
+										if BetterFriendlistDB.friendGroups then
+											for _, groups in pairs(BetterFriendlistDB.friendGroups) do
+												for _, gid in ipairs(groups) do
+													if gid == frame.groupId then
+														memberCount = memberCount + 1
+														break
+													end
 												end
 											end
 										end
@@ -2476,14 +2483,8 @@ function FriendsList:UpdateFriendButton(button, elementData)
 	
 	if friend.type == "bnet" then
 		-- Battle.net friend
-		-- Feature: Show Notes as Name (Phase Feature Request)
-		local displayName
-		local showNotesAsName = GetDB():Get("showNotesAsName", false)
-		if showNotesAsName and friend.note and friend.note ~= "" then
-			displayName = friend.note
-		else
-			displayName = friend.accountName or friend.battleTag or "Unknown"
-		end
+		-- Feature: Flexible Name Format (Phase 15)
+		local displayName = self:GetDisplayName(friend)
 		
 		-- Set background color
 		if friend.connected then
@@ -2826,20 +2827,8 @@ function FriendsList:UpdateFriendButton(button, elementData)
 			local isOppositeFaction = friend.factionName and friend.factionName ~= playerFactionGroup and friend.factionName ~= ""
 			local shouldGray = grayOtherFaction and isOppositeFaction
 			
-			-- Feature: Show Notes as Name (Phase Feature Request)
-			-- For WoW friends, check if notes should be used as display name
-			local showNotesAsName = GetDB():Get("showNotesAsName", false)
-			local characterName
-			if showNotesAsName and friend.notes and friend.notes ~= "" then
-				-- Use note as display name (no realm stripping needed)
-				characterName = friend.notes
-			elseif showRealmName then
-				-- Always show full "Name-Realm" format when setting is enabled
-				characterName = friend.name
-			else
-				-- Strip realm for same-realm friends (default behavior)
-				characterName = BFL:GetWoWFriendDisplayName(friend.name)
-			end
+			-- Feature: Flexible Name Format (Phase 15)
+			local characterName = self:GetDisplayName(friend)
 			
 			-- Add faction icon if enabled
 			if showFactionIcons and friend.factionName then
@@ -2870,14 +2859,8 @@ function FriendsList:UpdateFriendButton(button, elementData)
 			end
 		else
 			-- Offline - gray (use display helper here too)
-			-- Feature: Show Notes as Name (Phase Feature Request) - also for offline friends
-			local showNotesAsName = GetDB():Get("showNotesAsName", false)
-			local displayName
-			if showNotesAsName and friend.notes and friend.notes ~= "" then
-				displayName = friend.notes
-			else
-				displayName = BFL:GetWoWFriendDisplayName(friend.name)
-			end
+			-- Feature: Flexible Name Format (Phase 15)
+			local displayName = self:GetDisplayName(friend)
 			line1Text = "|cff7f7f7f" .. displayName .. "|r"
 		end
 		

@@ -7,6 +7,99 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.0] - 2025-12-14
+
+### 🚀 Major Update - ElvUI Integration, Nicknames & UI Overhaul
+
+This is a comprehensive update bringing native ElvUI skin support, a custom nickname system, enhanced group displays, Quick Join visual redesign, Main Tank/Assist support in Raid, and numerous quality-of-life improvements across all tabs.
+
+### Added
+
+#### ElvUI Integration
+- **Native ElvUI Skin** - Full visual integration with ElvUI's styling
+  - Toggle on/off in Settings → General → "Enable ElvUI Skin"
+  - Skins all frames, tabs, buttons, scrollbars, dropdowns, and checkboxes
+  - Proper styling for Settings panel including dynamically created components
+  - Context menu checkbox skinning with ElvUI's visual style
+  - Requires UI reload when toggling (prompt included)
+
+#### Friends List Enhancements
+- **Custom Nicknames** - Assign personal nicknames to friends (separate from notes!)
+  - Right-click any friend → "Set Nickname"
+  - Use `%nickname%` token in Name Format to display it
+  - Perfect for remembering who people are by their real name
+  - Example: Display "John" instead of "RandomBattleTag#1234" while keeping notes for gameplay info
+- **Flexible Name Formatting** - New token-based name display system
+  - Available tokens: `%name%`, `%note%`, `%nickname%`, `%battletag%`
+  - Configure in Settings → General → Name Formatting
+  - Smart Fallback: If a token is empty (e.g., no nickname), falls back to account name automatically
+  - Example formats: `%nickname%`, `%name% (%nickname%)`, `%battletag%`
+- **Group Header Count Options** - Choose how friend counts are displayed
+  - "Filtered / Total" (default): Shows currently visible vs. total members
+  - "Online / Total": Shows online count vs. total members
+  - "Filtered (Online) / Total": Shows all three numbers
+  - Configure in Settings → General
+- **Dynamic "In-Game" Group** - Automatic group for friends currently playing
+  - Enable in Settings → General → "Show 'In-Game' Group"
+  - Two modes: "WoW Only" (same WoW version) or "Any Game" (any Battle.net game)
+  - Friends are automatically grouped when they're playing
+
+#### Raid Frame Improvements
+- **Main Tank & Main Assist Icons** - Visual indicators for raid role assignments
+  - Shield icon for Main Tanks, flag icon for Main Assists
+  - Automatically displays based on raid roster assignments
+- **Secure Main Tank/Assist Toggle** - Assign roles directly from BetterFriendlist
+  - Shift+Right-Click on raid member: Toggle Main Tank
+  - Ctrl+Right-Click on raid member: Toggle Main Assist
+  - Uses Blizzard's secure action system (works outside of combat)
+- **Realm Name Truncation** - Long realm names no longer cause text wrapping
+  - Names display cleanly without the realm suffix in raid buttons
+- **Font Scaling Support** - Raid member names and levels now respect your font size setting
+
+#### Quick Join Visual Overhaul
+- **Complete Card Redesign** - Modern, informative group cards
+  - Activity icon, title, and dungeon/raid name clearly visible
+  - Leader name shown in Details line
+  - Member count displayed in top-right corner
+  - Role icons (Tank/Healer/DPS) showing what's needed
+- **Selection Highlight** - Gold highlight when selecting a group
+- **Click-to-Select** - Left-click now properly selects groups for joining
+- **Improved Layout** - Better spacing, readable text, cleaner visual hierarchy
+
+#### Who Frame Fixes
+- **Dynamic Column Updates** - Changing the dropdown (Zone/Guild/Race) now immediately refreshes the list
+  - Previously required a new /who query; now updates instantly from cached data
+- **Text Alignment** - Name and variable columns now left-aligned for better readability
+- **Font Scaling** - All Who frame text now respects your font size setting
+- **Column Width Fix** - Long class names like "Death Knight" or "Demon Hunter" no longer overflow into the scrollbar
+
+### Improved
+
+#### Performance & Stability
+- **Debug Output Cleanup** - Removed excessive debug prints from Raid Frame layout calculations
+- **Font Manager Integration** - Consistent font scaling across all UI elements (Friends, Who, Raid)
+
+#### Data Broker
+- **Name Format Support** - Data Broker tooltip now respects your Name Formatting settings
+  - Uses the same `%nickname%`, `%battletag%`, `%note%` tokens
+  - Smart Fallback ensures names always display something useful
+- **Sorting Consistency** - Name sorting in tooltip matches the displayed name format
+
+#### Settings Panel
+- **Dropdown Tooltips** - All dropdown settings now have proper tooltip support
+- **Component Library Updates** - Improved SettingsComponents for better consistency
+- **ElvUI Checkbox Styling** - All checkboxes in settings properly skinned when ElvUI is enabled
+
+### Fixed
+
+- **QuickJoin Selection** - Fixed left-click not selecting groups (button initialization was incomplete)
+- **Who Frame Column Refresh** - Fixed columns not updating when changing dropdown selection
+- **Raid Frame Text Overflow** - Fixed long names causing layout issues
+- **RAF Reward Icon** - Fixed reward icon appearing desaturated when it shouldn't be
+- **Settings Panel ElvUI** - Fixed scrollbar, tabs, and input fields not being skinned properly
+
+---
+
 ## [1.9.5] - 2025-12-06
 
 ### ⚡ Performance Optimization & Feature Requests

@@ -806,13 +806,79 @@ end
 -- LibQTip Tooltip (NEW)
 -- ========================================
 
--- Helper: Get display name (respects showNotesAsName)
+-- Helper: Get display name (respects nameDisplayFormat and tokens)
 local function GetFriendDisplayName(friend)
-	local showNotes = BetterFriendlistDB and BetterFriendlistDB.showNotesAsName
-	if showNotes and friend.note and friend.note ~= "" then
-		return friend.note
+	local DB = GetDB()
+	local format = DB and DB:Get("nameDisplayFormat", "%name%") or "%name%"
+	
+	-- 1. Prepare Data
+	local name = "Unknown"
+	local battletag = friend.battleTag or ""
+	local note = friend.note or ""
+	local nickname = DB and DB:GetNickname(friend.id) or ""
+	
+	if friend.type == "bnet" then
+		-- BNet: Use accountName as requested (RealID or BattleTag)
+		name = friend.accountName or "Unknown"
+	else
+		-- WoW: Name is Character Name
+		local fullName = friend.fullName or friend.name or "Unknown"
+		local showRealmName = DB and DB:Get("showRealmName", false)
+		
+		if showRealmName then
+			name = fullName
+		else
+			local n, r = strsplit("-", fullName)
+			local playerRealm = GetNormalizedRealmName() -- Use normalized realm
+			
+			if r and r ~= playerRealm then
+				name = n .. "*" -- Indicate cross-realm
+			else
+				name = n
+			end
+		end
 	end
-	return friend.accountName or friend.characterName or "Unknown"
+
+	-- Process battletag to be short version as requested
+	if battletag ~= "" then
+		local hashIndex = string.find(battletag, "#")
+		if hashIndex then
+			battletag = string.sub(battletag, 1, hashIndex - 1)
+		end
+	end
+	
+	-- 2. Replace Tokens
+	-- Use function replacement to avoid issues with % characters in names
+	local result = format
+
+	-- Smart Fallback Logic:
+	-- If %nickname% is used but empty, and %name% is NOT in the format, use name as nickname
+	if nickname == "" and result:find("%%nickname%%") and not result:find("%%name%%") then
+		nickname = name
+	end
+	-- Same for %battletag% (e.g. for WoW friends)
+	if battletag == "" and result:find("%%battletag%%") and not result:find("%%name%%") then
+		battletag = name
+	end
+
+	result = result:gsub("%%name%%", function() return name end)
+	result = result:gsub("%%note%%", function() return note end)
+	result = result:gsub("%%nickname%%", function() return nickname end)
+	result = result:gsub("%%battletag%%", function() return battletag end)
+	
+	-- 3. Cleanup
+	-- Remove empty parentheses/brackets (e.g. "Name ()" -> "Name")
+	result = result:gsub("%(%)", "")
+	result = result:gsub("%[%]", "")
+	-- Trim whitespace
+	result = result:match("^%s*(.-)%s*$")
+	
+	-- 4. Fallback
+	if result == "" then
+		return name
+	end
+	
+	return result
 end
 
 -- Helper: Get colored level text
@@ -1374,17 +1440,10 @@ local function CreateLibQTipTooltip(anchorFrame)
 		-- Helper to compare by a specific mode
 		local function CompareByMode(mode, a, b)
 			if mode == "name" then
-				local showNotesAsName = BetterFriendlistDB and BetterFriendlistDB.showNotesAsName
+				-- Use the centralized GetFriendDisplayName function to ensure sorting matches display
+				local nameA = GetFriendDisplayName(a)
+				local nameB = GetFriendDisplayName(b)
 				
-				local function GetName(f)
-					if showNotesAsName and f.note and f.note ~= "" then
-						return f.note
-					end
-					return (f.characterName and f.characterName ~= "") and f.characterName or f.accountName
-				end
-
-				local nameA = GetName(a)
-				local nameB = GetName(b)
 				if (nameA or ""):lower() ~= (nameB or ""):lower() then
 					return (nameA or ""):lower() < (nameB or ""):lower()
 				end

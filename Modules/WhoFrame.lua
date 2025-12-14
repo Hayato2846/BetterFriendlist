@@ -3,6 +3,7 @@
 -- Manages WHO search, display, sorting, and selection
 
 local ADDON_NAME, BFL = ...
+local FontManager = BFL.FontManager
 
 -- Register Module
 local WhoFrame = BFL:RegisterModule("WhoFrame", {})
@@ -189,14 +190,14 @@ function WhoFrame:UpdateResponsiveLayout()
 					-- Apply scaled widths
 					local nameStart = headerLeftPadding
 					button.Name:SetWidth(scaledName)
-					button.Name:SetJustifyH("CENTER")
+					button.Name:SetJustifyH("LEFT")
 					button.Name:ClearAllPoints()
 					button.Name:SetPoint("LEFT", button, "LEFT", nameStart, 0)
 					button.Name:SetPoint("RIGHT", button, "LEFT", nameStart + scaledName, 0)
 					
 					local variableStart = nameStart + scaledName + headerGap
 					button.Variable:SetWidth(scaledVariable)
-					button.Variable:SetJustifyH("CENTER")
+					button.Variable:SetJustifyH("LEFT")
 					button.Variable:ClearAllPoints()
 					button.Variable:SetPoint("LEFT", button, "LEFT", variableStart, 0)
 					button.Variable:SetPoint("RIGHT", button, "LEFT", variableStart + scaledVariable, 0)
@@ -237,8 +238,16 @@ function WhoFrame:OnLoad(frame)
 		-- Cache font height to avoid repeated GetFontInfo calls
 		if not cachedFontHeight then
 			local fontObj = elementData.fontObject or GameFontNormalSmall
-			cachedFontHeight = GetFontInfo(fontObj).height
-			local padding = cachedFontHeight + 2
+			local _, fontHeight = fontObj:GetFont()
+			
+			-- Apply multiplier from FontManager
+			if FontManager then
+				local multiplier = FontManager:GetFontSizeMultiplier()
+				fontHeight = math.floor(fontHeight * multiplier + 0.5)
+			end
+			
+			cachedFontHeight = fontHeight
+			local padding = 4 -- Slightly more padding for readability
 			cachedExtent = cachedFontHeight + padding
 		end
 		return cachedExtent
@@ -258,6 +267,14 @@ function WhoFrame:OnLoad(frame)
 	C_Timer.After(0.1, function()
 		self:UpdateResponsiveLayout()
 	end)
+	
+	-- Register for font scale updates
+	if EventRegistry then
+		EventRegistry:RegisterCallback("TextSizeManager.OnTextScaleUpdated", function()
+			self:InvalidateFontCache()
+			self:Update(true) -- Force rebuild to re-measure
+		end, self)
+	end
 end
 
 -- Initialize individual Who button
@@ -309,7 +326,7 @@ function WhoFrame:InitButton(button, elementData)
 		-- Name column: Starts at x=4 (matching NameHeader XML position)
 		local nameStart = headerLeftPadding
 		button.Name:SetWidth(scaledName)
-		button.Name:SetJustifyH("CENTER")
+		button.Name:SetJustifyH("LEFT")
 		button.Name:ClearAllPoints()
 		button.Name:SetPoint("LEFT", button, "LEFT", nameStart, 0)
 		button.Name:SetPoint("RIGHT", button, "LEFT", nameStart + scaledName, 0)
@@ -317,7 +334,7 @@ function WhoFrame:InitButton(button, elementData)
 		-- Variable column: Positioned with -2px overlap (matching XML)
 		local variableStart = nameStart + scaledName + headerGap
 		button.Variable:SetWidth(scaledVariable)
-		button.Variable:SetJustifyH("CENTER")
+		button.Variable:SetJustifyH("LEFT")
 		button.Variable:ClearAllPoints()
 		button.Variable:SetPoint("LEFT", button, "LEFT", variableStart, 0)
 		button.Variable:SetPoint("RIGHT", button, "LEFT", variableStart + scaledVariable, 0)
@@ -347,6 +364,14 @@ function WhoFrame:InitButton(button, elementData)
 		button.Class:SetTextColor(classTextColor.r, classTextColor.g, classTextColor.b)
 	end
 	
+	-- Apply font scaling
+	if FontManager then
+		FontManager:ApplyFontSize(button.Name)
+		FontManager:ApplyFontSize(button.Level)
+		FontManager:ApplyFontSize(button.Class)
+		FontManager:ApplyFontSize(button.Variable)
+	end
+	
 	-- Variable column based on sort
 	local variableText
 	if whoSortValue == 2 then
@@ -373,6 +398,7 @@ end
 
 -- Send Who request
 function WhoFrame:SendWhoRequest(text)
+	if BFL then BFL:DebugPrint("WhoFrame:SendWhoRequest called with text: " .. tostring(text)) end
 	if not text or text == "" then
 		-- Use default Who command if no text provided
 		local level = UnitLevel("player")
@@ -774,8 +800,12 @@ function WhoFrameColumnDropdownMixin:OnLoad()
 			self:GenerateMenu()
 			
 			-- Update the Who list after changing sort
-			if _G.BetterWhoFrame_Update then
-				_G.BetterWhoFrame_Update()
+			-- CRITICAL: Must force rebuild because data count hasn't changed, 
+			-- but the displayed content (Variable column) has changed!
+			if WhoFrame and WhoFrame.Update then
+				WhoFrame:Update(true)
+			elseif _G.BetterWhoFrame_Update then
+				_G.BetterWhoFrame_Update(true)
 			end
 		end
 		

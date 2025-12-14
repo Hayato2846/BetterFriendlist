@@ -1,0 +1,115 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<!-- Quick Join Card Template -->
+	<Button name="BetterFriendlistQuickJoinCardTemplate" virtual="true" registerForClicks="LeftButtonUp, RightButtonUp">
+		<Size y="65"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<!-- Card Background -->
+				<Texture parentKey="Background">
+					<Color r="0.1" g="0.1" b="0.1" a="0.5"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="2" y="-2"/>
+						<Anchor point="BOTTOMRIGHT" x="-2" y="2"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<!-- Activity Icon (Smaller size as requested) -->
+				<Texture parentKey="Icon" file="Interface\Icons\INV_Misc_QuestionMark">
+					<Size x="40" y="40"/>
+					<Anchors>
+						<Anchor point="LEFT" x="2" y="3"/>
+					</Anchors>
+				</Texture>
+				<!-- Activity Title (e.g. "M+ 10 The Stonevault") -->
+				<FontString parentKey="Title" inherits="GameFontNormal" justifyH="LEFT" justifyV="MIDDLE" maxLines="1">
+					<Size y="14"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="46" y="-8"/>
+						<Anchor point="TOPRIGHT" x="-100" y="-8"/>
+					</Anchors>
+				</FontString>
+				<!-- Activity Name (e.g. "The Stonevault") -->
+				<FontString parentKey="Activity" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="MIDDLE" maxLines="1">
+					<Size y="12"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="46" y="-24"/>
+						<Anchor point="TOPRIGHT" x="-100" y="-24"/>
+					</Anchors>
+				</FontString>
+				<!-- Details (e.g. "Leader: PlayerName") -->
+				<FontString parentKey="Details" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="MIDDLE" maxLines="1">
+					<Size y="12"/>
+					<Color r="0.7" g="0.7" b="0.7"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="46" y="-40"/>
+						<Anchor point="TOPRIGHT" x="-10" y="-40"/>
+					</Anchors>
+				</FontString>
+				<!-- Member Count (Top Right) -->
+				<FontString parentKey="MemberCount" inherits="GameFontHighlightSmall" justifyH="RIGHT">
+					<Anchors>
+						<Anchor point="TOPRIGHT" x="-10" y="-8"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+			<Layer level="HIGHLIGHT">
+				<Texture parentKey="Highlight" file="Interface\QuestFrame\UI-QuestTitleHighlight" alphaMode="ADD" alpha="0.5">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="2" y="-2"/>
+						<Anchor point="BOTTOMRIGHT" x="-2" y="2"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<!-- Selection Highlight (shown when button is selected) -->
+				<Texture parentKey="Selected" file="Interface\QuestFrame\UI-QuestTitleHighlight" alphaMode="ADD" alpha="0.8" hidden="true">
+					<Color r="1" g="0.82" b="0"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="2" y="-2"/>
+						<Anchor point="BOTTOMRIGHT" x="-2" y="2"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Frames>
+			<!-- Role Icons Container (Aligned with Activity) -->
+			<Frame parentKey="RoleContainer">
+				<Size x="60" y="20"/>
+				<Anchors>
+					<Anchor point="TOPRIGHT" x="0" y="-20"/>
+				</Anchors>
+				<Layers>
+					<Layer level="ARTWORK">
+						<Texture parentKey="TankIcon" atlas="UI-LFG-RoleIcon-Tank-Micro-GroupFinder" hidden="true">
+							<Size x="16" y="16"/>
+							<Anchors>
+								<Anchor point="RIGHT" x="0" y="0"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="HealerIcon" atlas="UI-LFG-RoleIcon-Healer-Micro-GroupFinder" hidden="true">
+							<Size x="16" y="16"/>
+							<Anchors>
+								<Anchor point="RIGHT" relativeKey="$parent.TankIcon" relativePoint="LEFT" x="-2" y="0"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="DPSIcon" atlas="UI-LFG-RoleIcon-DPS-Micro-GroupFinder" hidden="true">
+							<Size x="16" y="16"/>
+							<Anchors>
+								<Anchor point="RIGHT" relativeKey="$parent.HealerIcon" relativePoint="LEFT" x="-2" y="0"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+			</Frame>
+
+			<!-- Join Button (visible on hover) -->
+			<Button parentKey="JoinButton" inherits="UIPanelButtonTemplate" text="JOIN" hidden="true">
+				<Size x="60" y="22"/>
+				<Anchors>
+					<Anchor point="RIGHT" x="-10" y="0"/>
+				</Anchors>
+			</Button>
+		</Frames>
+	</Button>
+</Ui>

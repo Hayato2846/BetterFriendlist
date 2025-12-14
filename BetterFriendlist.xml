@@ -715,6 +715,20 @@
 						<Anchor point="RIGHT" relativeKey="$parent.RoleIcon" relativePoint="LEFT" x="-5" y="1"/>
 					</Anchors>
 				</Texture>
+				<!-- Main Tank Icon (left of rank icon) -->
+				<Texture parentKey="MainTankIcon" hidden="true" file="Interface\GroupFrame\UI-Group-MainTankIcon">
+					<Size x="12" y="12"/>
+					<Anchors>
+						<Anchor point="RIGHT" relativeKey="$parent.RankIcon" relativePoint="LEFT" x="-2" y="0"/>
+					</Anchors>
+				</Texture>
+				<!-- Main Assist Icon (left of rank icon, same position as MainTank - only one shows) -->
+				<Texture parentKey="MainAssistIcon" hidden="true" file="Interface\GroupFrame\UI-Group-MainAssistIcon">
+					<Size x="12" y="12"/>
+					<Anchors>
+						<Anchor point="RIGHT" relativeKey="$parent.RankIcon" relativePoint="LEFT" x="-2" y="0"/>
+					</Anchors>
+				</Texture>
 				<!-- Ready Check Icon (center overlay) -->
 				<Texture parentKey="ReadyCheckIcon" hidden="true">
 					<Size x="20" y="20"/>
@@ -750,7 +764,7 @@
 				end
 			</OnDragStop>
 		</Scripts>
-		<HighlightTexture alphaMode="ADD" file="Interface\QuestFrame\UI-QuestTitleHighlight"/>
+		<HighlightTexture parentKey="Highlight" alphaMode="ADD" file="Interface\QuestFrame\UI-QuestTitleHighlight"/>
 	</Button>
 	
 	<!-- Quick Join Font Templates (used for dynamically created text) -->
@@ -2246,7 +2260,7 @@
 					<Button parentKey="JoinQueueButton" inherits="UIPanelButtonTemplate">
 						<Size x="150" y="22"/>
 						<Anchors>
-							<Anchor point="BOTTOMRIGHT" relativeKey="$parent.ScrollBoxContainer" relativePoint="BOTTOMRIGHT" x="25" y="-26"/>
+							<Anchor point="BOTTOMRIGHT" relativeKey="$parent" relativePoint="BOTTOMRIGHT" x="1" y="-22"/>
 						</Anchors>
 				<Scripts>
 					<OnClick>
@@ -2596,6 +2610,11 @@
 		</Layers>
 		<Scripts>
 			<OnUpdate>
+				-- Throttle updates to 1 second
+				self.lastUpdate = (self.lastUpdate or 0) + elapsed
+				if self.lastUpdate &lt; 1.0 then return end
+				self.lastUpdate = 0
+
 				-- Update tooltip if mouse is still over the button
 				if self.button and self.button:IsMouseOver() then
 					-- Check if button data has changed (due to scrolling)

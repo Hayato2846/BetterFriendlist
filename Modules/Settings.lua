@@ -728,6 +728,8 @@ function Settings:DoReset()
 	DB:Set("showMobileAsAFK", false)
 	DB:Set("treatMobileAsOffline", false)  -- NEW: Feature Request
 	DB:Set("showNotesAsName", false)  -- NEW: Feature Request
+	DB:Set("showNicknameAsName", false)  -- NEW: Feature Request
+	DB:Set("showNicknameInName", false)  -- NEW: Feature Request
 	DB:Set("windowScale", 1.0)  -- NEW: Feature Request
 	DB:Set("hideMaxLevel", false)
 	DB:Set("accordionGroups", false)
@@ -2139,16 +2141,6 @@ function Settings:OnTreatMobileAsOfflineChanged(checked)
 	end
 end
 
--- NEW: Show Notes as Name toggle (Feature Request)
-function Settings:OnShowNotesAsNameChanged(checked)
-	local DB = GetDB()
-	if not DB then return end
-	
-	DB:Set("showNotesAsName", checked)
-	
-	-- Notes are already loaded in data, just need to re-render display
-	BFL:ForceRefreshFriendsList()
-end
 
 -- Hide Max Level toggle
 function Settings:OnHideMaxLevelChanged(checked)
@@ -2169,6 +2161,31 @@ function Settings:OnAccordionGroupsChanged(checked)
 	DB:Set("accordionGroups", checked)
 	
 	-- Display-only change - re-render existing data
+	BFL:ForceRefreshFriendsList()
+end
+
+-- NEW: Enable In-Game Group toggle (Feature Request)
+function Settings:OnEnableInGameGroupChanged(checked)
+	local DB = GetDB()
+	if not DB then return end
+	
+	DB:Set("enableInGameGroup", checked)
+	
+	-- Affects group structure - needs full refresh
+	BFL:ForceRefreshFriendsList()
+	
+	-- Refresh settings to show/hide sub-option
+	self:RefreshGeneralTab()
+end
+
+-- NEW: In-Game Group Mode (Feature Request)
+function Settings:OnInGameGroupModeChanged(value)
+	local DB = GetDB()
+	if not DB then return end
+	
+	DB:Set("inGameGroupMode", value)
+	
+	-- Affects group structure - needs full refresh
 	BFL:ForceRefreshFriendsList()
 end
 
@@ -2250,13 +2267,6 @@ function Settings:RefreshGeneralTab()
 	treatMobileAsOffline:SetTooltip(BFL_L.SETTINGS_TREAT_MOBILE_OFFLINE or "Treat Mobile as Offline", BFL_L.SETTINGS_TREAT_MOBILE_OFFLINE_DESC or "Display friends using the Mobile App in the Offline group")
 	table.insert(allFrames, treatMobileAsOffline)
 	
-	-- NEW: Show Notes as Friend Name (Feature Request)
-	local showNotesAsName = Components:CreateCheckbox(tab, BFL_L.SETTINGS_SHOW_NOTES_AS_NAME or "Show Notes as Friend Name", 
-		DB:Get("showNotesAsName", false),
-		function(val) self:OnShowNotesAsNameChanged(val) end)
-	showNotesAsName:SetTooltip(BFL_L.SETTINGS_SHOW_NOTES_AS_NAME or "Show Notes as Name", BFL_L.SETTINGS_SHOW_NOTES_AS_NAME_DESC or "Display friend notes as their name when available")
-	table.insert(allFrames, showNotesAsName)
-	
 	-- Hide Max Level
 	local hideMaxLevel = Components:CreateCheckbox(tab, "Hide Level for Max Level Characters", 
 		DB:Get("hideMaxLevel", false),
@@ -2270,6 +2280,108 @@ function Settings:RefreshGeneralTab()
 		function(val) self:OnShowBlizzardOptionChanged(val) end)
 	showBlizzard:SetTooltip("Show Blizzard Friends Button", "Shows the original Blizzard Friends button in the social menu")
 	table.insert(allFrames, showBlizzard)
+
+	-- Enable ElvUI Skin
+	if _G.ElvUI then
+		local enableElvUISkin = Components:CreateCheckbox(tab, "Enable ElvUI Skin", 
+			DB:Get("enableElvUISkin", false),
+			function(val) 
+				-- Force boolean value
+				local boolVal = (val == true or val == 1)
+				DB:Set("enableElvUISkin", boolVal)
+				BFL:DebugPrint("Settings: Set enableElvUISkin to", tostring(boolVal))
+				
+				StaticPopupDialogs["BFL_ELVUI_RELOAD"] = {
+					text = "Changing ElvUI Skin settings requires a UI Reload.\nReload now?",
+					button1 = "Yes",
+					button2 = "No",
+					OnAccept = function() ReloadUI() end,
+					timeout = 0,
+					whileDead = true,
+					hideOnEscape = true,
+				}
+				StaticPopup_Show("BFL_ELVUI_RELOAD")
+			end)
+		enableElvUISkin:SetTooltip("Enable ElvUI Skin", "Enables the ElvUI skin for BetterFriendlist. Requires ElvUI to be installed and enabled.")
+		table.insert(allFrames, enableElvUISkin)
+	end
+	
+	-- Group Header Count Format
+	local headerCountFormatOptions = {
+		labels = {BFL_L.SETTINGS_HEADER_COUNT_VISIBLE, BFL_L.SETTINGS_HEADER_COUNT_ONLINE, BFL_L.SETTINGS_HEADER_COUNT_BOTH},
+		values = {"visible", "online", "both"}
+	}
+	local currentHeaderCountFormat = DB:Get("headerCountFormat", "visible")
+	
+	local headerCountFormatDropdown = Components:CreateDropdown(
+		tab, 
+		BFL_L.SETTINGS_HEADER_COUNT_FORMAT, 
+		headerCountFormatOptions, 
+		function(val) return val == currentHeaderCountFormat end,
+		function(val) 
+			DB:Set("headerCountFormat", val)
+			BFL:ForceRefreshFriendsList()
+		end
+	)
+	headerCountFormatDropdown:SetTooltip(BFL_L.SETTINGS_HEADER_COUNT_FORMAT, BFL_L.SETTINGS_HEADER_COUNT_FORMAT_DESC)
+	table.insert(allFrames, headerCountFormatDropdown)
+	
+	-- Spacer before next section
+	table.insert(allFrames, Components:CreateSpacer(tab))
+
+	-- Header: Name Formatting (Phase 15)
+	local nameFormatHeader = Components:CreateHeader(tab, "Name Formatting")
+	table.insert(allFrames, nameFormatHeader)
+
+	-- Name Format Description
+	local nameFormatDesc = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	nameFormatDesc:SetWidth(360)
+	nameFormatDesc:SetJustifyH("LEFT")
+	nameFormatDesc:SetWordWrap(true)
+	nameFormatDesc:SetTextColor(0.7, 0.7, 0.7)
+	nameFormatDesc:SetText("Customize how friend names are displayed using tokens:\n|cffffffff%name%|r - Account Name (RealID/BattleTag)\n|cffffffff%note%|r - Note (BNet or WoW)\n|cffffffff%nickname%|r - Custom Nickname\n|cffffffff%battletag%|r - Short BattleTag (no #1234)")
+	table.insert(allFrames, nameFormatDesc)
+
+	-- Name Format EditBox Container
+	local nameFormatContainer = CreateFrame("Frame", nil, tab)
+	nameFormatContainer:SetSize(360, 30)
+	
+	local nameFormatLabel = nameFormatContainer:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	nameFormatLabel:SetText("Format:")
+	nameFormatLabel:SetPoint("LEFT", 0, 0)
+	
+	local nameFormatBox = CreateFrame("EditBox", nil, nameFormatContainer, "InputBoxTemplate")
+	nameFormatBox:SetSize(280, 25)
+	nameFormatBox:SetPoint("LEFT", nameFormatLabel, "RIGHT", 10, 0)
+	nameFormatBox:SetAutoFocus(false)
+	nameFormatBox:SetText(DB:Get("nameDisplayFormat", "%name%"))
+	nameFormatBox:SetScript("OnEnterPressed", function(self)
+		self:ClearFocus()
+	end)
+	nameFormatBox:SetScript("OnEscapePressed", function(self)
+		self:ClearFocus()
+	end)
+	nameFormatBox:SetScript("OnEditFocusLost", function(self)
+		local text = self:GetText()
+		if text and text ~= "" then
+			DB:Set("nameDisplayFormat", text)
+			BFL:ForceRefreshFriendsList()
+		end
+	end)
+	
+	-- Add tooltip to EditBox
+	nameFormatBox:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText("Name Display Format", 1, 1, 1)
+		GameTooltip:AddLine("Enter a format string using tokens.", 0.8, 0.8, 0.8, true)
+		GameTooltip:AddLine("Example: %name% (%nickname%)", 0.8, 0.8, 0.8, true)
+		GameTooltip:Show()
+	end)
+	nameFormatBox:SetScript("OnLeave", function(self)
+		GameTooltip:Hide()
+	end)
+	
+	table.insert(allFrames, nameFormatContainer)
 	
 	-- Spacer before next section
 	table.insert(allFrames, Components:CreateSpacer(tab))
@@ -2305,6 +2417,32 @@ function Settings:RefreshGeneralTab()
 		function(val) self:OnShowFavoritesGroupChanged(val) end)
 	showFavorites:SetTooltip("Show Favorites Group", "Toggle visibility of the Favorites group in your friends list")
 	table.insert(allFrames, showFavorites)
+	
+	-- NEW: Enable In-Game Group (Feature Request)
+	local enableInGameGroup = Components:CreateCheckbox(tab, "Show 'In-Game' Group",
+		DB:Get("enableInGameGroup", false),
+		function(val) self:OnEnableInGameGroupChanged(val) end)
+	enableInGameGroup:SetTooltip("Show 'In-Game' Group", "Automatically groups friends playing games into a separate group")
+	table.insert(allFrames, enableInGameGroup)
+	
+	-- NEW: In-Game Group Mode (Sub-option)
+	if DB:Get("enableInGameGroup", false) then
+		local modeOptions = {
+			labels = {"WoW Only (Same Era)", "Any Game"},
+			values = {"same_game", "any_game"}
+		}
+		local currentMode = DB:Get("inGameGroupMode", "same_game")
+		
+		local modeDropdown = Components:CreateDropdown(
+			tab, 
+			"   Mode:", 
+			modeOptions, 
+			function(val) return val == currentMode end,
+			function(val) self:OnInGameGroupModeChanged(val) end
+		)
+		modeDropdown:SetTooltip("In-Game Group Mode", "Choose which friends to include in the In-Game group:\n\n|cffffffffWoW Only:|r Friends playing the same WoW version (Retail/Classic)\n|cffffffffAny Game:|r Friends playing any Battle.net game")
+		table.insert(allFrames, modeDropdown)
+	end
 	
 	-- Spacer before next section
 	table.insert(allFrames, Components:CreateSpacer(tab))

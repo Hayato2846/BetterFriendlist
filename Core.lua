@@ -177,7 +177,7 @@ end
 -- This ensures consistent identification across connected realms
 -- @param name: Friend name from API (e.g., "Name" or "Name-Realm")
 -- @return: Normalized name with realm (e.g., "Name-Realm")
-function BFL:NormalizeWoWFriendName(name)
+function BFL:NormalizeWoWFriendName(name, playerRealm)
 	if not name or name == "" then
 		return nil
 	end
@@ -189,9 +189,10 @@ function BFL:NormalizeWoWFriendName(name)
 	
 	-- Name has no realm - append current player's realm
 	-- Using GetNormalizedRealmName() which returns the connected realm name
-	local playerRealm = GetNormalizedRealmName()
-	if playerRealm and playerRealm ~= "" then
-		return name .. "-" .. playerRealm
+	-- Optimization: Allow passing playerRealm to avoid repeated API calls in loops
+	local realm = playerRealm or GetNormalizedRealmName()
+	if realm and realm ~= "" then
+		return name .. "-" .. realm
 	end
 	
 	-- Fallback: return name as-is if we can't determine realm
@@ -239,6 +240,24 @@ function BFL:ForceRefreshFriendsList()
 		-- Force immediate data update from WoW API
 		-- This ensures we have the latest friend data before rendering
 		FriendsList:UpdateFriendsList()
+	end
+	
+	-- Refresh WhoFrame font cache if loaded
+	local WhoFrame = self:GetModule("WhoFrame")
+	if WhoFrame then
+		WhoFrame:InvalidateFontCache()
+		-- If WhoFrame is visible, trigger update
+		if BetterFriendsFrame and BetterFriendsFrame.WhoFrame and BetterFriendsFrame.WhoFrame:IsShown() then
+			if _G.BetterWhoFrame_Update then
+				_G.BetterWhoFrame_Update(true)
+			end
+		end
+	end
+	
+	-- Refresh RaidFrame if loaded and visible
+	local RaidFrame = self:GetModule("RaidFrame")
+	if RaidFrame and BetterFriendsFrame and BetterFriendsFrame.RaidFrame and BetterFriendsFrame.RaidFrame:IsShown() then
+		RaidFrame:UpdateAllMemberButtons()
 	end
 	
 	-- Refresh QuickFilter Dropdown (if it exists)

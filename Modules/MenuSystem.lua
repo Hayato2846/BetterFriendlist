@@ -26,7 +26,38 @@ local isWhoPlayerMenu = false
 
 -- Initialize (called from ADDON_LOADED)
 function MenuSystem:Initialize()
-	-- No menu modifications needed currently
+	-- Define StaticPopup for Nicknames
+	StaticPopupDialogs["BETTER_FRIENDLIST_SET_NICKNAME"] = {
+		text = "Set Nickname for %s",
+		button1 = ACCEPT,
+		button2 = CANCEL,
+		hasEditBox = true,
+		OnShow = function(self, data)
+			self.EditBox:SetText(data.nickname or "")
+			self.EditBox:SetFocus()
+		end,
+		OnAccept = function(self, data)
+			local text = self.EditBox:GetText()
+			local DB = BFL:GetModule("DB")
+			if DB then
+				DB:SetNickname(data.uid, text)
+				BFL:ForceRefreshFriendsList()
+			end
+		end,
+		EditBoxOnEnterPressed = function(self, data)
+			local text = self:GetText()
+			local DB = BFL:GetModule("DB")
+			if DB then
+				DB:SetNickname(data.uid, text)
+				BFL:ForceRefreshFriendsList()
+			end
+			self:GetParent():Hide()
+		end,
+		timeout = 0,
+		whileDead = true,
+		hideOnEscape = true,
+		preferredIndex = 3,
+	}
 end
 
 -- Open context menu for a friend
@@ -52,6 +83,7 @@ function MenuSystem:OpenFriendMenu(button, friendType, friendID, extraData)
 			friendsList = true,
 			bnetIDAccount = friendID,
 			battleTag = extraData.battleTag,
+			uid = friendID, -- For Nickname
 		}
 	else
 		-- WoW friends
@@ -70,6 +102,7 @@ function MenuSystem:OpenFriendMenu(button, friendType, friendID, extraData)
 		contextData = {
 			name = name or "",
 			friendsList = true,
+			uid = name, -- For Nickname (WoW friends use name as UID)
 		}
 	end
 	
@@ -78,6 +111,9 @@ function MenuSystem:OpenFriendMenu(button, friendType, friendID, extraData)
 	BFL:DebugPrint("|cff00ff00BFL MenuSystem: Flag set to TRUE, opening menu type:", menuType)
 	
 	UnitPopup_OpenMenu(menuType, contextData)
+	
+	-- Clear flag immediately after opening
+	_G.BetterFriendlist_IsOurMenu = false
 end
 
 -- Open context menu for a group
@@ -141,4 +177,7 @@ function MenuSystem:OpenWhoPlayerMenu(button, whoInfo)
 	
 	-- Use FRIEND menu as base
 	UnitPopup_OpenMenu("FRIEND", contextData)
+	
+	-- Clear flag immediately after opening
+	self:SetWhoPlayerMenuFlag(false)
 end

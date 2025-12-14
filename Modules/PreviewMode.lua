@@ -176,6 +176,16 @@ end
 -- Generate mock friend groups with friends assigned
 local function GenerateMockGroups()
 	return {
+		-- Built-in Groups
+		{
+			id = "favorites",
+			name = "Favorites",
+			collapsed = false,
+			builtin = true,
+			order = 1,
+			color = {r = 1.0, g = 0.82, b = 0.0}, -- Gold
+			icon = "Interface\\FriendsFrame\\Battlenet-Battleneticon"
+		},
 		-- Custom groups (will be shown)
 		{
 			id = "raid_team",
@@ -220,6 +230,15 @@ local function GenerateMockGroups()
 			builtin = false,
 			order = 6,
 			color = {r = 1.0, g = 0.84, b = 0.0},  -- Gold
+			icon = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon"
+		},
+		{
+			id = "nogroup",
+			name = "No Group",
+			collapsed = false,
+			builtin = true,
+			order = 999,
+			color = {r = 0.5, g = 0.5, b = 0.5}, -- Gray
 			icon = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon"
 		},
 	}
@@ -525,6 +544,12 @@ function PreviewMode:Disable()
 		self.originalGroups = nil
 	end
 	
+	-- Restore original group order
+	if BetterFriendlistDB and self.originalGroupOrder then
+		BetterFriendlistDB.groupOrder = self.originalGroupOrder
+		self.originalGroupOrder = nil
+	end
+	
 	-- Restore original friendGroups in BetterFriendlistDB
 	if BetterFriendlistDB and BetterFriendlistDB.friendGroups then
 		-- Remove mock friend group assignments
@@ -666,7 +691,6 @@ function PreviewMode:ApplyMockFriends()
 			self:ApplySort()
 			
 			-- Build display list to update UI
-			self:BuildDisplayList()
 			self:RenderDisplay()
 		else
 			-- Call original function for real data
@@ -686,12 +710,36 @@ function PreviewMode:ApplyMockFriends()
 			end
 		end
 		
+		-- Wipe existing groups to prevent mixing real and mock data
+		wipe(Groups.groups)
+		
 		-- Inject mock groups directly into Groups.groups table
 		for _, mockGroup in ipairs(self.mockData.groups) do
 			Groups.groups[mockGroup.id] = mockGroup
 		end
 		
-		BFL:DebugPrint("|cff00ffffPreviewMode:|r Injected " .. #self.mockData.groups .. " mock groups into Groups.groups")
+		BFL:DebugPrint("|cff00ffffPreviewMode:|r Replaced Groups.groups with " .. #self.mockData.groups .. " mock groups")
+	end
+	
+	-- Mock group order for Settings tab
+	if BetterFriendlistDB then
+		if not self.originalGroupOrder then
+			self.originalGroupOrder = BetterFriendlistDB.groupOrder
+		end
+		
+		-- Create mock order list
+		local mockOrder = {}
+		local sortedMockGroups = {}
+		for _, group in ipairs(self.mockData.groups) do
+			table.insert(sortedMockGroups, group)
+		end
+		table.sort(sortedMockGroups, function(a, b) return (a.order or 999) < (b.order or 999) end)
+		
+		for _, group in ipairs(sortedMockGroups) do
+			table.insert(mockOrder, group.id)
+		end
+		
+		BetterFriendlistDB.groupOrder = mockOrder
 	end
 	
 	-- Inject mock friend group assignments directly into BetterFriendlistDB.friendGroups

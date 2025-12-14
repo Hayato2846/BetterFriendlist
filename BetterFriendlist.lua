@@ -63,11 +63,10 @@ end
 -- ========================================
 
 -- Constants
-local NUM_BUTTONS = 12  -- Number of visible buttons in scroll frame
+-- NUM_BUTTONS handled by ScrollBox
 
 -- Display state
-local friendsList = {}
-local displayList = {} -- Flat list with groups and friends for display
+-- friendsList handled by FriendsList module
 
 -- Button management handled by ScrollBox Factory pattern
 
@@ -266,13 +265,11 @@ local function UpdateFriendsList()
 		-- DON'T override sortMode - it's managed internally by FriendsList module
 		-- FriendsList:SetSortMode(currentSortMode)
 		
-		-- Update and build display list
+		-- Update friends list data
 		FriendsList:UpdateFriendsList()
-		FriendsList:BuildDisplayList()
 		
 		-- Sync local state for compatibility
 		friendsList = FriendsList.friendsList
-		displayList = FriendsList.displayList
 	end
 end
 
@@ -283,16 +280,6 @@ local UpdateFriendsDisplay
 local function GetGroupColorCode(groupId)
 	InitializeManagers()
 	return ColorManager:GetGroupColorCode(groupId)
-end
-
--- Build display list with groups (now delegates to FriendsList module)
-local function BuildDisplayList()
-	local FriendsList = GetFriendsList()
-	if FriendsList then
-		FriendsList:BuildDisplayList()
-		-- Sync local state for compatibility
-		displayList = FriendsList.displayList
-	end
 end
 
 -- ========================================
@@ -459,11 +446,6 @@ function GetFriendUID(friend)
 	else
 		return "wow_" .. (friend.name or "")
 	end
-end
-
--- Helper function to get displayList count (used by XML mouse wheel handler)
-function BetterFriendsFrame_GetDisplayListCount()
-	return #displayList
 end
 
 -- ========================================
@@ -765,8 +747,27 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			end
 		end
 		
-		-- Add divider and Groups submenu
+		-- Add divider and Header
 		rootDescription:CreateDivider()
+		rootDescription:CreateTitle("BetterFriendlist")
+
+		-- Add "Set Nickname" button
+		rootDescription:CreateButton("Set Nickname", function()
+			local DB = BFL:GetModule("DB")
+			local currentNickname = DB and DB:GetNickname(friendUID)
+			
+			-- Use contextData.name for display, fallback to battleTag if available
+			local displayName = contextData.name
+			if not displayName and contextData.battleTag then
+				displayName = contextData.battleTag
+			end
+			
+			StaticPopup_Show("BETTER_FRIENDLIST_SET_NICKNAME", displayName or "Friend", nil, {
+				uid = friendUID,
+				nickname = currentNickname
+			})
+		end)
+
 		local groupsButton = rootDescription:CreateButton("Groups")
 		
 		-- Add "Create Group" option at the top
@@ -842,7 +843,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		
 		-- Add Notification Settings submenu (Phase 9: Per-Friend Rules)
 		if BetterFriendlistDB.enableBetaFeatures then
-			rootDescription:CreateDivider()
+			-- Removed divider to consolidate under "BetterFriendlist" header
 			local notificationButton = rootDescription:CreateButton("Notification Settings")
 			
 			-- Checkbox for "Default (Use global settings)"
@@ -1607,6 +1608,7 @@ function BetterFriendsList_ShowDropdown(name, connected, lineID, chatType, chatF
 			chatFrame = chatFrame,
 			bnetIDAccount = nil,
 			guid = guid,
+			uid = name, -- For Nickname (WoW friends use name as UID)
 		}
 		
 		-- Set flag BEFORE opening menu (menu modifiers run during UnitPopup_OpenMenu)
@@ -1634,6 +1636,7 @@ function BetterFriendsList_ShowBNDropdown(name, connected, lineID, chatType, cha
 			chatFrame = chatFrame,
 			bnetIDAccount = bnetIDAccount,
 			battleTag = battleTag,
+			uid = bnetIDAccount, -- For Nickname (BNet friends use bnetIDAccount as UID)
 		}
 		
 		-- Set flag BEFORE opening menu (menu modifiers run during UnitPopup_OpenMenu)
@@ -1815,10 +1818,10 @@ function BetterWhoFrame_OnLoad(self)
 end
 
 -- WHO Frame Update (called from XML OnShow and event handlers)
-function BetterWhoFrame_Update()
+function BetterWhoFrame_Update(forceRebuild)
 	local WhoFrame = GetWhoFrame()
 	if WhoFrame then
-		WhoFrame:Update()
+		WhoFrame:Update(forceRebuild)
 	end
 end
 
@@ -2027,14 +2030,15 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex)
 	HideChildFrame(frame.QuickJoinFrame)
 	
 	-- Hide all friend list buttons explicitly
-	if tabIndex ~= 1 then
-		for i = 1, NUM_BUTTONS do
-			local xmlButton = frame.ScrollFrame and frame.ScrollFrame["Button" .. i]
-			if xmlButton then
-				HideChildFrame(xmlButton)
-			end
-		end
-	end
+	-- REMOVED: ScrollBox handles button visibility automatically
+	-- if tabIndex ~= 1 then
+	-- 	for i = 1, NUM_BUTTONS do
+	-- 		local xmlButton = frame.ScrollFrame and frame.ScrollFrame["Button" .. i]
+	-- 		if xmlButton then
+	-- 			HideChildFrame(xmlButton)
+	-- 		end
+	-- 	end
+	-- end
 	
 	-- Hide/show FriendsTabHeader based on tab
 	if frame.FriendsTabHeader then

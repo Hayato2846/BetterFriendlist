@@ -297,11 +297,12 @@ function RAF:UpdateNextReward(frame, nextReward)
 		
 		rewardPanel.NextRewardButton.Icon:SetTexture(nextReward.iconID)
 		
+		-- Fix: Never desaturate the icon (matches Blizzard UI behavior)
+		rewardPanel.NextRewardButton.Icon:SetDesaturated(false)
+		
 		if not nextReward.canClaim then
-			rewardPanel.NextRewardButton.Icon:SetDesaturated(true)
 			rewardPanel.NextRewardButton.IconOverlay:Show()
 		else
-			rewardPanel.NextRewardButton.Icon:SetDesaturated(false)
 			rewardPanel.NextRewardButton.IconOverlay:Hide()
 		end
 		rewardPanel.NextRewardButton:Show()

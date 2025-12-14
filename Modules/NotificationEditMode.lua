@@ -59,7 +59,8 @@ function NotificationEditMode:Initialize()
         BetterFriendlistDB.notificationToastPosition[layoutName].x = x
         BetterFriendlistDB.notificationToastPosition[layoutName].y = y
         
-        self:ApplyPosition(layoutName)
+        -- Don't re-apply position here, LibEditMode handles the drag
+        -- self:ApplyPosition(layoutName) 
         
         BFL:DebugPrint("|cff00ffffBFL:NotificationEditMode:|r Position saved: " .. point .. " (" .. x .. ", " .. y .. ")")
     end
@@ -122,6 +123,10 @@ function NotificationEditMode:OnEditModeEnter()
     local container = _G["BFL_NotificationToastContainer"]
     if not container then return end
     
+    -- Ensure container is visible for dragging
+    container:Show()
+    container:SetAlpha(1)
+    
     local toasts = {container.Toast1, container.Toast2, container.Toast3}
     
     for i, toast in ipairs(toasts) do
@@ -130,10 +135,14 @@ function NotificationEditMode:OnEditModeEnter()
             toast.Message:SetText("Notification preview for positioning")
             toast.Icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\user-check")
             toast.Icon:SetVertexColor(0.3, 1, 0.3, 1)
-            toast:SetAlpha(0.6) -- Semi-transparent preview
+            toast:SetAlpha(0.8) -- More visible preview
             toast:SetFrameStrata("BACKGROUND") -- Lower strata to not block Edit Mode UI
             toast:EnableMouse(false) -- Disable mouse to allow clicking through
             toast:Show()
+            
+            -- Stop fade animations
+            if toast.FadeIn then toast.FadeIn:Stop() end
+            if toast.FadeOut then toast.FadeOut:Stop() end
         end
     end
     

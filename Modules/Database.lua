@@ -13,17 +13,22 @@ local defaults = {
 	groupOrder = nil, -- nil = use default order (favorites, custom alphabetically, nogroup)
 	groupColors = {}, -- {groupId: {r, g, b}} - custom colors for group headers
 	friendActivity = {}, -- {friendUID: {lastWhisper, lastGroup, lastTrade}} - tracks friend interaction timestamps
+	nicknames = {}, -- {friendUID: "Nickname"} - custom nicknames for friends
 	-- Visual Settings
 	compactMode = false, -- Use compact button layout
+	enableElvUISkin = false, -- Enable ElvUI Skin (default: OFF)
 	fontSize = "normal", -- "small", "normal", "large"
 	colorClassNames = true, -- Color character names by class (default: ON)
 	hideEmptyGroups = false, -- Hide groups with no online friends (default: OFF)
+	headerCountFormat = "visible", -- Group header count format: "visible", "online", "both" (default: visible)
 	showFactionIcons = false, -- Show faction icons next to character names (default: OFF)
 	showRealmName = false, -- Show realm name for cross-realm friends (default: OFF)
 	grayOtherFaction = false, -- Gray out friends from other faction (default: OFF)
 	showMobileAsAFK = false, -- Show mobile friends with AFK status icon (default: OFF)
 	treatMobileAsOffline = false, -- Treat mobile friends as offline (display in Offline group) (default: OFF)
-	showNotesAsName = false, -- Show friend notes as display name when available (default: OFF)
+	nameDisplayFormat = "%name%", -- Display format: %name%, %note%, %nickname% (default: %name%)
+	enableInGameGroup = false, -- Enable dynamic "In-Game" group (default: OFF)
+	inGameGroupMode = "same_game", -- "same_game" (WoW matching project) or "any_game" (Any BNet game)
 	windowScale = 1.0, -- Window scale factor: 0.5 = 50%, 1.0 = 100%, 2.0 = 200% (default: 100%)
 	hideMaxLevel = false, -- Hide level display for max level characters (default: OFF)
 	accordionGroups = false, -- Only allow one group to be open at a time (default: OFF)
@@ -96,6 +101,45 @@ function DB:Initialize()
 		if BetterFriendlistDB[key] == nil then
 			BetterFriendlistDB[key] = type(value) == "table" and {} or value
 		end
+	end
+	
+	-- Debug: Check ElvUI Skin setting
+	if BetterFriendlistDB.enableElvUISkin then
+		BFL:DebugPrint("Database: ElvUI Skin is ENABLED")
+	else
+		BFL:DebugPrint("Database: ElvUI Skin is DISABLED")
+	end
+	
+	-- MIGRATION: Name Display Format (Phase 15)
+	-- Convert old boolean flags to new format string
+	if BetterFriendlistDB.showNotesAsName ~= nil or BetterFriendlistDB.showNicknameAsName ~= nil or BetterFriendlistDB.showNicknameInName ~= nil then
+		local showNotes = BetterFriendlistDB.showNotesAsName
+		local showNick = BetterFriendlistDB.showNicknameAsName
+		local showNickInName = BetterFriendlistDB.showNicknameInName
+		
+		local format = "%name%"
+		
+		if showNick then
+			format = "%nickname%"
+		elseif showNotes then
+			format = "%note%"
+		end
+		
+		if showNickInName then
+			-- If base format is already nickname, don't append nickname again
+			if format ~= "%nickname%" then
+				format = format .. " (%nickname%)"
+			end
+		end
+		
+		BetterFriendlistDB.nameDisplayFormat = format
+		
+		-- Remove old keys
+		BetterFriendlistDB.showNotesAsName = nil
+		BetterFriendlistDB.showNicknameAsName = nil
+		BetterFriendlistDB.showNicknameInName = nil
+		
+		BFL:DebugPrint("|cff00ff00BFL:Database:|r Migrated name display settings to: " .. format)
 	end
 	
 	-- Migration: Ensure defaultFrameWidth meets new minimum (380px)
@@ -244,4 +288,24 @@ function DB:GetAllFriendUIDs()
 		table.insert(uids, uid)
 	end
 	return uids
+end
+
+-- Get nickname
+function DB:GetNickname(friendUID)
+	if not friendUID then return nil end
+	return BetterFriendlistDB.nicknames and BetterFriendlistDB.nicknames[friendUID]
+end
+
+-- Set nickname
+function DB:SetNickname(friendUID, nickname)
+	if not friendUID then return end
+	if not BetterFriendlistDB.nicknames then
+		BetterFriendlistDB.nicknames = {}
+	end
+	
+	if nickname and nickname ~= "" then
+		BetterFriendlistDB.nicknames[friendUID] = nickname
+	else
+		BetterFriendlistDB.nicknames[friendUID] = nil
+	end
 end

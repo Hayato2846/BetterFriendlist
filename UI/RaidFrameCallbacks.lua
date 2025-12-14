@@ -446,11 +446,59 @@ function BetterRaidMemberButton_OnLoad(self)
 end
 
 function BetterRaidMemberButton_OnEnter(self)
+	BFL:DebugPrint("XML OnEnter called for " .. (self:GetName() or "unnamed") .. ", unit=" .. tostring(self.unit))
+	
+	-- Phase 8.3: If dragging, show highlight but skip proxy and tooltip
+	if BetterRaidFrame_DraggedUnit then
+		-- Show highlight on drop target during drag
+		if self.Highlight then
+			self.Highlight:Show()
+		end
+		return
+	end
+	
 	if not self.unit then
 		return
 	end
 	
-	-- Use Blizzard's standard UnitFrame tooltip (same as default raid frames)
+	-- Phase 8.3: Secure Proxy Logic
+	-- If out of combat, show the secure proxy on top of this button
+	-- ONLY if the button has a valid unit assigned
+	local RaidFrame = BFL:GetModule("RaidFrame")
+	if RaidFrame and RaidFrame.SecureProxy and not InCombatLockdown() and self.unit then
+		local proxy = RaidFrame.SecureProxy
+		
+		-- Link proxy to this visual button
+		proxy.visualButton = self
+		
+        -- Position proxy to cover this button exactly
+        proxy:ClearAllPoints()
+        proxy:SetPoint("TOPLEFT", self, "TOPLEFT", 0, 0)
+        proxy:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", 0, 0)
+        
+        -- Set secure unit attribute
+        proxy:SetAttribute("unit", self.unit)
+        -- CRITICAL: Set Lua field 'unit' as well, because UnitFrame_UpdateTooltip checks self.unit
+        proxy.unit = self.unit
+        
+        -- Show proxy (it will now intercept mouse events)
+        proxy:Show()
+        
+        BFL:DebugPrint("Proxy summoned via XML OnEnter for " .. tostring(self.unit))
+
+        -- Manually trigger OnEnter on the proxy immediately
+        -- (Because the mouse is already over it, but it just appeared)
+        local onEnter = proxy:GetScript("OnEnter")
+        if onEnter then
+            onEnter(proxy)
+        end
+        return
+    else
+        if not RaidFrame then BFL:DebugPrint("OnEnter: RaidFrame module missing") end
+        if RaidFrame and not RaidFrame.SecureProxy then BFL:DebugPrint("OnEnter: SecureProxy missing") end
+    end
+	
+	-- Fallback: Standard Insecure Tooltip (In Combat)
 	UnitFrame_UpdateTooltip(self)
 	
 	-- Highlight
@@ -460,6 +508,10 @@ function BetterRaidMemberButton_OnEnter(self)
 end
 
 function BetterRaidMemberButton_OnLeave(self)
+	-- Note: When SecureProxy is active, this OnLeave fires immediately 
+	-- because the proxy covers the button.
+    -- We allow the visual highlight to hide, because the Proxy now has its own highlight.
+	
 	GameTooltip:Hide()
 	
 	if self.Highlight then
@@ -468,6 +520,7 @@ function BetterRaidMemberButton_OnLeave(self)
 end
 
 function BetterRaidMemberButton_OnClick(self, button)
+	BFL:DebugPrint("XML OnClick called for " .. (self:GetName() or "unnamed") .. ", button=" .. tostring(button) .. ", unit=" .. tostring(self.unit))
 	if not self.unit or not self.name then
 		return
 	end
@@ -485,6 +538,7 @@ function BetterRaidMemberButton_OnClick(self, button)
 		local contextData = {
 			unit = self.unit,
 			name = self.name,
+			isBFL = true, -- Signal to MenuSystem to add custom buttons
 		}
 		UnitPopup_OpenMenu("RAID", contextData)
 	end

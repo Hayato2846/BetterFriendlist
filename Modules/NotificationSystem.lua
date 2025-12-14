@@ -24,18 +24,26 @@ local NotificationSystem = BFL:RegisterModule("NotificationSystem", {
 -- Constants
 local MODULE_NAME = "NotificationSystem"
 local COOLDOWN_DURATION = 30 -- Prevent spam (same alert every 30 seconds)
+local GLOBAL_COOLDOWN_DURATION = 5 -- Prevent burst spam (any alert for same friend every 5 seconds)
+local OFFLINE_DEBOUNCE_DURATION = 5 -- Wait 5s before showing offline toast to detect char switch
 
 -- Module State
 NotificationSystem.initialized = false
 NotificationSystem.quietMode = false
 NotificationSystem.lastNotifications = {} -- Track cooldowns
 NotificationSystem.alertSystem = nil -- AlertFrame SubSystem
+NotificationSystem.wowFriendCache = {} -- Cache for WoW friend states
+NotificationSystem.bnetFriendCache = {} -- Cache for BNet friend states (game tracking)
+NotificationSystem.offlineTimers = {} -- Track pending offline notifications
 
 -- Forward Declarations
 local CheckRules
 local ShowNotification
 local IsQuietTime
 local NotificationAlertFrame_SetUp
+local SnapshotWoWFriends
+local ProcessWoWFriendChanges
+local ExecuteOfflineNotification
 
 --[[--------------------------------------------------
     Module Lifecycle
@@ -55,16 +63,36 @@ function NotificationSystem:Initialize()
     -- Register events
     self:RegisterEvents()
     
+    -- Initial snapshot of WoW friends
+    SnapshotWoWFriends()
+    
     self.initialized = true
     BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r NotificationSystem initialized successfully")
 end
 
 function NotificationSystem:OnEnable()
     BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r NotificationSystem enabled")
+    
+    -- Disable Blizzard's default BNet toasts to prevent duplicates
+    if BNToastFrame then
+        self.originalToastDuration = BNToastFrame:GetDuration()
+        BNToastFrame:SetDuration(0) -- Effectively disables it
+    end
 end
 
 function NotificationSystem:OnDisable()
     BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r NotificationSystem disabled")
+    
+    -- Cancel all pending offline timers
+    for key, timer in pairs(self.offlineTimers) do
+        if timer then timer:Cancel() end
+    end
+    self.offlineTimers = {}
+    
+    -- Restore Blizzard's default BNet toasts
+    if BNToastFrame and self.originalToastDuration then
+        BNToastFrame:SetDuration(self.originalToastDuration)
+    end
 end
 
 --[[--------------------------------------------------
@@ -98,7 +126,11 @@ function NotificationSystem:InitializeDatabase()
     -- Notification Appearance Settings
     if not BetterFriendlistDB.notificationSettings then
         BetterFriendlistDB.notificationSettings = {
-            enabled = true
+            enabled = true,
+            onlyFavorites = false,
+            showApp = true,
+            showGameChanges = true,
+            showOffline = true
         }
     end
     
@@ -180,6 +212,11 @@ function NotificationSystem:RegisterEvents()
         self:OnFriendOffline("BNET", bnetAccountID)
     end)
     
+    BFL:RegisterEventCallback("BN_FRIEND_INFO_CHANGED", function(...)
+        local bnetAccountID = ...
+        self:OnFriendInfoChanged(bnetAccountID)
+    end)
+    
     -- WoW Friend Events
     BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function(...)
         self:OnFriendListUpdate()
@@ -188,12 +225,12 @@ function NotificationSystem:RegisterEvents()
     -- Combat Events (Quiet Hours)
     BFL:RegisterEventCallback("PLAYER_REGEN_DISABLED", function(...)
         self.quietMode = true
-        BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Combat started - Quiet mode enabled")
+        -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Combat started - Quiet mode enabled")
     end)
     
     BFL:RegisterEventCallback("PLAYER_REGEN_ENABLED", function(...)
         self.quietMode = false
-        BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Combat ended - Quiet mode disabled")
+        -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Combat ended - Quiet mode disabled")
     end)
     
     BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Events registered")
@@ -207,59 +244,191 @@ function NotificationSystem:OnFriendOnline(friendType, identifier)
     if not BetterFriendlistDB.notificationSettings.enabled then return end
     if IsQuietTime() then return end
     
-    BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Friend online: " .. tostring(identifier) .. " (" .. friendType .. ")")
+    -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Friend online: " .. tostring(identifier) .. " (" .. friendType .. ")")
+    
+    local isSwitch = false
+    -- Check for pending offline timer (Character Switch Detection)
+    local timerKey = friendType .. "_" .. tostring(identifier)
+    if self.offlineTimers[timerKey] then
+        -- Cancel offline timer -> It was a character switch!
+        self.offlineTimers[timerKey]:Cancel()
+        self.offlineTimers[timerKey] = nil
+        -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Character switch detected for " .. tostring(identifier))
+        isSwitch = true
+    end
     
     -- Get friend data
     local friendData = self:GetFriendData(friendType, identifier)
     if not friendData then return end
     
-    -- Check cooldown
+    -- Check cooldowns (Event-specific AND Global)
     local cooldownKey = friendType .. "_" .. tostring(identifier) .. "_ONLINE"
-    if self:IsOnCooldown(cooldownKey) then return end
+    local globalKey = friendType .. "_" .. tostring(identifier) .. "_GLOBAL"
+    
+    if self:IsOnCooldown(cooldownKey) or self:IsOnCooldown(globalKey) then return end
     
     -- Check notification rules (Phase 2)
     if CheckRules("ONLINE", friendData) then
         -- Show notification
         local message = "is now online"
-        if friendData.gameAccountInfo and friendData.gameAccountInfo.clientProgram then
+        if isSwitch then
+            message = "reconnected"
+        elseif friendData.gameAccountInfo and friendData.gameAccountInfo.clientProgram then
             local clientName = friendData.gameAccountInfo.clientProgram == BNET_CLIENT_WOW and "World of Warcraft" or friendData.gameAccountInfo.clientProgram
             message = "is now online playing " .. clientName
         end
         ShowNotification(friendData.name, "ONLINE", message, nil)
     end
     
-    -- Set cooldown
+    -- Set cooldowns
     self:SetCooldown(cooldownKey)
+    self:SetCooldown(globalKey)
 end
 
 function NotificationSystem:OnFriendOffline(friendType, identifier)
     if not BetterFriendlistDB.notificationSettings.enabled then return end
     if IsQuietTime() then return end
     
-    BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Friend offline: " .. tostring(identifier) .. " (" .. friendType .. ")")
+    -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Friend offline (Pending): " .. tostring(identifier) .. " (" .. friendType .. ")")
     
-    -- Get friend data
-    local friendData = self:GetFriendData(friendType, identifier)
+    -- Start Debounce Timer instead of showing immediately
+    local timerKey = friendType .. "_" .. tostring(identifier)
+    
+    -- Cancel existing timer if any (shouldn't happen usually)
+    if self.offlineTimers[timerKey] then
+        self.offlineTimers[timerKey]:Cancel()
+    end
+    
+    self.offlineTimers[timerKey] = C_Timer.After(OFFLINE_DEBOUNCE_DURATION, function()
+        self.offlineTimers[timerKey] = nil
+        ExecuteOfflineNotification(friendType, identifier)
+    end)
+end
+
+ExecuteOfflineNotification = function(friendType, identifier)
+    -- Re-check conditions (settings might have changed in 5s)
+    if not BetterFriendlistDB.notificationSettings.enabled then return end
+    if IsQuietTime() then return end
+
+    -- Get friend data (might be nil if fully removed, but we usually have cached name)
+    -- Note: GetFriendData might fail if friend is offline, so we might need to rely on cached data or pass name
+    -- For BNet, we can still get info usually. For WoW, we might need to pass name.
+    local friendData = NotificationSystem:GetFriendData(friendType, identifier)
+    
+    -- Fallback for WoW friends if not found (since they are offline now)
+    if not friendData and friendType == "WOW" then
+        friendData = { name = identifier, type = "WOW" }
+    end
+    
     if not friendData then return end
     
-    -- Check cooldown
+    -- Check cooldowns
     local cooldownKey = friendType .. "_" .. tostring(identifier) .. "_OFFLINE"
-    if self:IsOnCooldown(cooldownKey) then return end
+    local globalKey = friendType .. "_" .. tostring(identifier) .. "_GLOBAL"
     
-    -- Check notification rules (Phase 2)
+    if NotificationSystem:IsOnCooldown(cooldownKey) or NotificationSystem:IsOnCooldown(globalKey) then return end
+    
+    -- Check notification rules
     if CheckRules("OFFLINE", friendData) then
         -- Show notification
         local message = "has gone offline"
         ShowNotification(friendData.name, "OFFLINE", message, nil)
     end
     
-    -- Set cooldown
-    self:SetCooldown(cooldownKey)
+    -- Set cooldowns
+    NotificationSystem:SetCooldown(cooldownKey)
+    NotificationSystem:SetCooldown(globalKey)
+end
+
+function NotificationSystem:OnFriendInfoChanged(bnetAccountID)
+    if not BetterFriendlistDB.notificationSettings.enabled then return end
+    if not BetterFriendlistDB.notificationSettings.showGameChanges then return end
+    if IsQuietTime() then return end
+    
+    local friendData = self:GetFriendData("BNET", bnetAccountID)
+    if not friendData then return end
+    
+    -- Check if game changed
+    local oldProgram = self.bnetFriendCache[bnetAccountID]
+    local newProgram = friendData.clientProgram
+    
+    -- Update cache
+    self.bnetFriendCache[bnetAccountID] = newProgram
+    
+    -- Only notify if program changed AND it's not just going offline/online (handled by other events)
+    if oldProgram and newProgram and oldProgram ~= newProgram and newProgram ~= "App" and oldProgram ~= "App" then
+        -- Check cooldowns
+        local cooldownKey = "BNET_" .. tostring(bnetAccountID) .. "_GAMECHANGE"
+        local globalKey = "BNET_" .. tostring(bnetAccountID) .. "_GLOBAL"
+        
+        if self:IsOnCooldown(cooldownKey) or self:IsOnCooldown(globalKey) then return end
+        
+        -- Check notification rules
+        if CheckRules("GAME_CHANGE", friendData) then
+            local clientName = newProgram == BNET_CLIENT_WOW and "World of Warcraft" or newProgram
+            local message = "is now playing " .. clientName
+            ShowNotification(friendData.name, "ONLINE", message, nil)
+        end
+        
+        self:SetCooldown(cooldownKey)
+        self:SetCooldown(globalKey)
+    end
 end
 
 function NotificationSystem:OnFriendListUpdate()
-    -- This fires frequently, only process game changes
-    -- Full implementation in Phase 2
+    -- Process WoW friend changes
+    ProcessWoWFriendChanges()
+end
+
+--[[--------------------------------------------------
+    WoW Friend Tracking
+--]]--------------------------------------------------
+
+function SnapshotWoWFriends()
+    local numFriends = C_FriendList.GetNumFriends()
+    local playerRealm = GetNormalizedRealmName()
+    for i = 1, numFriends do
+        local info = C_FriendList.GetFriendInfoByIndex(i)
+        if info and info.name then
+            local normalizedName = BFL:NormalizeWoWFriendName(info.name, playerRealm)
+            NotificationSystem.wowFriendCache[normalizedName] = info.connected
+        end
+    end
+end
+
+function ProcessWoWFriendChanges()
+    local numFriends = C_FriendList.GetNumFriends()
+    local currentFriends = {}
+    local playerRealm = GetNormalizedRealmName()
+    
+    for i = 1, numFriends do
+        local info = C_FriendList.GetFriendInfoByIndex(i)
+        if info and info.name then
+            local normalizedName = BFL:NormalizeWoWFriendName(info.name, playerRealm)
+            currentFriends[normalizedName] = info.connected
+            
+            local wasConnected = NotificationSystem.wowFriendCache[normalizedName]
+            
+            -- Check for status change
+            if wasConnected ~= nil and wasConnected ~= info.connected then
+                if info.connected then
+                    NotificationSystem:OnFriendOnline("WOW", normalizedName)
+                else
+                    NotificationSystem:OnFriendOffline("WOW", normalizedName)
+                end
+            end
+            
+            -- Update cache
+            NotificationSystem.wowFriendCache[normalizedName] = info.connected
+        end
+    end
+    
+    -- Handle removed friends (optional cleanup)
+    for name, _ in pairs(NotificationSystem.wowFriendCache) do
+        if currentFriends[name] == nil then
+            NotificationSystem.wowFriendCache[name] = nil
+        end
+    end
 end
 
 --[[--------------------------------------------------
@@ -311,7 +480,14 @@ function NotificationSystem:IsOnCooldown(key)
     if not lastTime then return false end
     
     local elapsed = time() - lastTime
-    return elapsed < COOLDOWN_DURATION
+    
+    -- Determine duration based on key type
+    local duration = COOLDOWN_DURATION
+    if string.find(key, "_GLOBAL$") then
+        duration = GLOBAL_COOLDOWN_DURATION
+    end
+    
+    return elapsed < duration
 end
 
 function NotificationSystem:SetCooldown(key)
@@ -367,12 +543,35 @@ function IsQuietTime()
 end
 
 --[[--------------------------------------------------
-    Rule Checking (Stub for Phase 2)
+    Rule Checking
 --]]--------------------------------------------------
 
 function CheckRules(triggerType, friendData)
-    -- TODO: Implement in Phase 2 - Full rule engine with conditions
-    -- For now, show all notifications (basic implementation)
+    local settings = BetterFriendlistDB.notificationSettings
+    
+    -- 1. Offline Filter
+    if triggerType == "OFFLINE" and not settings.showOffline then
+        return false
+    end
+    
+    -- 2. Favorites Only Filter
+    if settings.onlyFavorites then
+        -- BNet favorites
+        if friendData.type == "BNET" then
+            local accountInfo = C_BattleNet.GetFriendAccountInfo(friendData.bnetAccountID)
+            if not accountInfo or not accountInfo.isFavorite then
+                return false
+            end
+        end
+        -- WoW favorites (check notes for [Fav] tag or similar if implemented, otherwise skip)
+        -- For now, WoW friends are not filtered by favorite status as API doesn't support it natively
+    end
+    
+    -- 3. App Filter (Hide "Online in App")
+    if not settings.showApp and friendData.clientProgram == "App" and triggerType == "ONLINE" then
+        return false
+    end
+    
     return true
 end
 
