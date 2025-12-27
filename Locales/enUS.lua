@@ -344,4 +344,12 @@ if GetLocale() == "enUS" then
 	L.BROKER_COLUMN_REALM_DESC = "Display the realm the character is on"
 	L.BROKER_COLUMN_FACTION_DESC = "Display the faction icon (Alliance/Horde)"
 	L.BROKER_COLUMN_NOTES_DESC = "Display friend notes"
+	
+	-- ========================================
+	-- CLASSIC COMPATIBILITY
+	-- ========================================
+	L.RECENT_ALLIES_NOT_AVAILABLE = "Recent Allies is not available in this version."
+	L.EDIT_MODE_NOT_AVAILABLE = "Edit Mode is not available in Classic. Use /bfl position to move the frame."
+	L.CLASSIC_COMPATIBILITY_INFO = "BetterFriendlist is running in Classic compatibility mode."
+	L.FEATURE_NOT_AVAILABLE_CLASSIC = "This feature is not available in Classic."
 end

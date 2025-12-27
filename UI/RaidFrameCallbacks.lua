@@ -179,11 +179,14 @@ function BetterRaidFrame_OnShow(self)
 	-- Update member buttons (using XML-defined slots)
 	RaidFrame:UpdateAllMemberButtons()
 	
-	-- Render display
-	BetterRaidFrame_Update()
-	
+    -- Ensure layout matches Mock (responsive sizing)
+    RaidFrame:UpdateGroupLayout()
+    
 	-- Update Raid Info button state
 	BetterRaidFrame_UpdateRaidInfoButton()
+	
+	-- Central Update Logic
+	BetterRaidFrame_Update()
 end
 
 -- OnHide: Cleanup
@@ -540,7 +543,8 @@ function BetterRaidMemberButton_OnClick(self, button)
 			name = self.name,
 			isBFL = true, -- Signal to MenuSystem to add custom buttons
 		}
-		UnitPopup_OpenMenu("RAID", contextData)
+		-- Use compatibility wrapper for Classic support
+		BFL.OpenContextMenu(self, "RAID", contextData, self.name)
 	end
 end
 

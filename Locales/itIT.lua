@@ -312,4 +312,12 @@ if GetLocale() == "itIT" then
 	-- Feature 4: Scala Finestra
 	L.SETTINGS_WINDOW_SCALE = "Scala finestra"
 	L.SETTINGS_WINDOW_SCALE_DESC = "Scala l'intera finestra (50%% - 200%%)"
+	
+	-- ========================================
+	-- CLASSIC COMPATIBILITY
+	-- ========================================
+	L.RECENT_ALLIES_NOT_AVAILABLE = "Alleati Recenti non disponibile in Classic"
+	L.EDIT_MODE_NOT_AVAILABLE = "Modalità Modifica non disponibile in Classic"
+	L.CLASSIC_COMPATIBILITY_INFO = "Esecuzione in modalità compatibilità Classic"
+	L.FEATURE_NOT_AVAILABLE_CLASSIC = "Questa funzionalità non è disponibile in Classic"
 end

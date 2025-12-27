@@ -305,6 +305,38 @@ function BetterFriendsFrame_InitQuickFilterDropdown()
 	local dropdown = BetterFriendsFrame.FriendsTabHeader.QuickFilterDropdown
 	if not dropdown then return end
 	
+	-- Classic Support: Use UIDropDownMenu
+	if BFL.IsClassic then
+		BFL:DebugPrint("|cff00ffffBetterFriendlist:|r Classic mode - using UIDropDownMenu for QuickFilterDropdown")
+		
+		UIDropDownMenu_SetWidth(dropdown, 70)
+		UIDropDownMenu_Initialize(dropdown, function(self, level)
+			local info = UIDropDownMenu_CreateInfo()
+			
+			local function AddFilterOption(mode, text, icon)
+				info.text = string.format("|T%s:14:14:0:0|t %s", icon, text)
+				info.value = mode
+				info.func = function()
+					BetterFriendsFrame_SetQuickFilter(mode)
+					UIDropDownMenu_SetText(dropdown, string.format("|T%s:14:14:-2:-2|t", icon))
+				end
+				info.checked = (filterMode == mode)
+				UIDropDownMenu_AddButton(info)
+			end
+
+			AddFilterOption("all", "All Friends", FILTER_ICONS.all)
+			AddFilterOption("online", "Online Only", FILTER_ICONS.online)
+			AddFilterOption("offline", "Offline Only", FILTER_ICONS.offline)
+			AddFilterOption("wow", "WoW Only", FILTER_ICONS.wow)
+			AddFilterOption("bnet", "Battle.net Only", FILTER_ICONS.bnet)
+		end)
+		
+		-- Set initial text
+		local currentIcon = FILTER_ICONS[filterMode] or FILTER_ICONS.all
+		UIDropDownMenu_SetText(dropdown, string.format("|T%s:14:14:-2:-2|t", currentIcon))
+		return
+	end
+	
 	-- Helper function to check if a filter mode is selected
 	local function IsSelected(mode)
 		-- Always read from DB when checking selection
@@ -619,6 +651,19 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		-- Sync groups from module (if available)
 		SyncGroups()
 		
+		-- Force initial friends list update (Classic: ensure list is populated on load)
+		if BFL.IsClassic then
+			local FriendsList = GetFriendsList()
+			if FriendsList and FriendsList.UpdateFriendsList then
+				BFL:DebugPrint("|cff00ffffADDON_LOADED:|r Scheduling initial Classic UpdateFriendsList")
+				C_Timer.After(0.5, function()
+					if FriendsList and FriendsList.UpdateFriendsList then
+						FriendsList:UpdateFriendsList()
+					end
+				end)
+			end
+		end
+		
 		-- Initialize FriendsList module (sets up ScrollBox)
 		local FriendsList = BFL:GetModule("FriendsList")
 		if FriendsList and FriendsList.Initialize then
@@ -920,6 +965,26 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				HideBetterFriendsFrame()
 			end)
 		end
+		
+		-- Classic Mode: Hide Retail-only tabs (Recent Allies, RAF)
+		-- Tab1 = Friends, Tab2 = Recent Allies, Tab3 = RAF, Tab4 = Sort (XML)
+		-- In Classic: Only Tab1 = Friends should be visible
+		if BFL.IsClassic and BetterFriendsFrame then
+			BFL:DebugPrint("|cffffcc00BFL:|r Classic mode - hiding Retail-only tabs (Recent Allies, RAF)")
+			
+			-- Hide Tab2 (Recent Allies) and Tab3 (RAF)
+			if BetterFriendsFrame.Tab2 then BetterFriendsFrame.Tab2:Hide() end
+			if BetterFriendsFrame.Tab3 then BetterFriendsFrame.Tab3:Hide() end
+			
+			-- Also hide the frames themselves
+			if BetterFriendsFrame.RecentAlliesFrame then BetterFriendsFrame.RecentAlliesFrame:Hide() end
+			if BetterFriendsFrame.RecruitAFriendFrame then BetterFriendsFrame.RecruitAFriendFrame:Hide() end
+			if BetterFriendsFrame.QuickJoinFrame then BetterFriendsFrame.QuickJoinFrame:Hide() end
+			
+			-- Set only 1 tab visible (Friends only)
+			PanelTemplates_SetNumTabs(BetterFriendsFrame, 1)
+			PanelTemplates_SetTab(BetterFriendsFrame, 1)
+		end
 	end
 	elseif event == "FRIENDLIST_UPDATE" or event == "BN_FRIEND_LIST_SIZE_CHANGED" or 
 	       event == "BN_FRIEND_ACCOUNT_ONLINE" or event == "BN_FRIEND_ACCOUNT_OFFLINE" or
@@ -1068,9 +1133,16 @@ end
 -- This avoids loading order conflicts
 
 -- Show specific tab content (11.2.5: 4 tabs - Friends, Recent Allies, RAF, Sort)
+-- In Classic: Only tab 1 (Friends) is available
 function BetterFriendsFrame_ShowTab(tabIndex)
 	local frame = BetterFriendsFrame
 	if not frame then return end
+	
+	-- Classic Guard: Only Friends tab (1) is available in Classic
+	if BFL.IsClassic and tabIndex ~= 1 then
+		BFL:DebugPrint("|cffffcc00BFL:|r Classic mode - tab\", tabIndex, \"not available, showing Friends tab")
+		tabIndex = 1
+	end
 	
 	-- Use hybrid helper functions for all child frames
 	HideChildFrame(frame.SortFrame)
@@ -1514,11 +1586,6 @@ function BetterFriendsList_Button_OnEnter(button)
 	GameTooltip:Show()
 end
 
--- Friend List Button OnLeave
-function BetterFriendsList_Button_OnLeave(button)
-	GameTooltip:Hide()
-end
-
 -- Button OnClick Handler (matching Blizzard's FriendsFrame_SelectFriend behavior)
 function BetterFriendsList_Button_OnClick(button, mouseButton)
 	if not button.friendInfo then
@@ -1616,7 +1683,8 @@ function BetterFriendsList_ShowDropdown(name, connected, lineID, chatType, chatF
 		
 		-- Determine menu type based on online status
 		local menuType = connected and "FRIEND" or "FRIEND_OFFLINE"
-		UnitPopup_OpenMenu(menuType, contextData)
+		-- Use compatibility wrapper for Classic support
+		BFL.OpenContextMenu(nil, menuType, contextData, name)
 	end
 end
 
@@ -1644,7 +1712,8 @@ function BetterFriendsList_ShowBNDropdown(name, connected, lineID, chatType, cha
 		
 		-- Determine menu type based on online status
 		local menuType = connected and "BN_FRIEND" or "BN_FRIEND_OFFLINE"
-		UnitPopup_OpenMenu(menuType, contextData)
+		-- Use compatibility wrapper for Classic support
+		BFL.OpenContextMenu(nil, menuType, contextData, name)
 	end
 end
 

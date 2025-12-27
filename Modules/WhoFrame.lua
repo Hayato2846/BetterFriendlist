@@ -149,75 +149,82 @@ function WhoFrame:UpdateResponsiveLayout()
 	end
 	
 	-- Update bottom button positions to be centered
-	local buttonsTotalWidth = 326 -- 85 (Refresh) + 1 + 120 (Add) + 1 + 120 (Invite) = 327
+	-- Restored centering logic to fix "too far right" issue in Retail
+	local buttonsTotalWidth = 327 -- 85 (Refresh) + 1 + 120 (Add) + 1 + 120 (Invite) = 327
 	local buttonsStartX = math.floor((frameWidth - buttonsTotalWidth) / 2)
 	
 	if whoFrame.WhoButton then
 		whoFrame.WhoButton:ClearAllPoints()
-		whoFrame.WhoButton:SetPoint("BOTTOMLEFT", whoFrame.ListInset, buttonsStartX, -26)
+		whoFrame.WhoButton:SetPoint("BOTTOMLEFT", whoFrame.ListInset, "BOTTOMLEFT", buttonsStartX, -26)
 	end
 	
 	-- REFRESH BUTTONS: Trigger re-layout of all visible buttons
 	-- This ensures row content repositions immediately when frame resizes
 	-- CRITICAL: Update ALL visible buttons, even if they have no data yet
 	if whoFrame.ScrollBox then
-		whoFrame.ScrollBox:ForEachFrame(function(button)
-			-- Check if button has valid element data (from DataProvider)
-			local elementData = button:GetElementData()
-			if elementData and elementData.info then
-				-- Re-apply layout with new column widths
-				self:InitButton(button, elementData)
-			elseif button.Name then
-				-- Button exists but has no data - still apply column widths for consistency
-				-- This ensures proper layout even before first Who results load
-				if self.columnWidths then
-					local widths = self.columnWidths
-					local headerLeftPadding = 4  -- Match NameHeader XML position
-					local headerGap = -2         -- Match XML header overlap
-					
-					-- Scale widths to fit button width (same logic as InitButton)
-					local buttonWidth = button:GetWidth()
-					local rightPadding = 2  -- Prevent text clipping
-					local totalHeaderWidth = widths.name + widths.variable + widths.level + widths.class - (3 * math.abs(headerGap))
-					local buttonContentWidth = buttonWidth - headerLeftPadding - rightPadding
-					local scaleFactor = buttonContentWidth / totalHeaderWidth
-					
-					local scaledName = math.floor(widths.name * scaleFactor)
-					local scaledVariable = math.floor(widths.variable * scaleFactor)
-					local scaledLevel = math.floor(widths.level * scaleFactor)
-					local scaledClass = buttonContentWidth - scaledName - scaledVariable - scaledLevel + (3 * math.abs(headerGap))
-					
-					-- Apply scaled widths
-					local nameStart = headerLeftPadding
-					button.Name:SetWidth(scaledName)
-					button.Name:SetJustifyH("LEFT")
-					button.Name:ClearAllPoints()
-					button.Name:SetPoint("LEFT", button, "LEFT", nameStart, 0)
-					button.Name:SetPoint("RIGHT", button, "LEFT", nameStart + scaledName, 0)
-					
-					local variableStart = nameStart + scaledName + headerGap
-					button.Variable:SetWidth(scaledVariable)
-					button.Variable:SetJustifyH("LEFT")
-					button.Variable:ClearAllPoints()
-					button.Variable:SetPoint("LEFT", button, "LEFT", variableStart, 0)
-					button.Variable:SetPoint("RIGHT", button, "LEFT", variableStart + scaledVariable, 0)
-					
-					local levelStart = variableStart + scaledVariable + headerGap
-					button.Level:SetWidth(scaledLevel)
-					button.Level:SetJustifyH("CENTER")
-					button.Level:ClearAllPoints()
-					button.Level:SetPoint("LEFT", button, "LEFT", levelStart, 0)
-					button.Level:SetPoint("RIGHT", button, "LEFT", levelStart + scaledLevel, 0)
-					
-					local classStart = levelStart + scaledLevel + headerGap
-					button.Class:SetWidth(scaledClass)
-					button.Class:SetJustifyH("CENTER")
-					button.Class:ClearAllPoints()
-					button.Class:SetPoint("LEFT", button, "LEFT", classStart, 0)
-					button.Class:SetPoint("RIGHT", button, "LEFT", classStart + scaledClass, 0)
+		-- Classic: Use classicWhoButtonPool instead of ForEachFrame (modern API)
+		if BFL.IsClassic and self.classicWhoButtonPool then
+			for i = 1, #self.classicWhoButtonPool do
+				local button = self.classicWhoButtonPool[i]
+				if button and button:IsShown() then
+					-- Check if button has valid element data
+					local elementData = button.elementData
+					if elementData and elementData.info then
+						-- Re-apply layout with new column widths
+						self:InitButton(button, elementData)
+					elseif button.Name then
+						-- Button exists but has no data - still apply column widths for consistency
+						-- This ensures proper layout even before first Who results load
+						if self.columnWidths then
+							local widths = self.columnWidths
+							local headerLeftPadding = 4  -- Match NameHeader XML position
+							local headerGap = -2         -- Match XML header overlap
+							
+							-- Scale widths to fit button width (same logic as InitButton)
+							local buttonWidth = button:GetWidth()
+							local rightPadding = 2  -- Prevent text clipping
+							local totalHeaderWidth = widths.name + widths.variable + widths.level + widths.class - (3 * math.abs(headerGap))
+							local buttonContentWidth = buttonWidth - headerLeftPadding - rightPadding
+							local scaleFactor = buttonContentWidth / totalHeaderWidth
+							
+							local scaledName = math.floor(widths.name * scaleFactor)
+							local scaledVariable = math.floor(widths.variable * scaleFactor)
+							local scaledLevel = math.floor(widths.level * scaleFactor)
+							local scaledClass = buttonContentWidth - scaledName - scaledVariable - scaledLevel + (3 * math.abs(headerGap))
+							
+							-- Apply scaled widths
+							local nameStart = headerLeftPadding
+							button.Name:SetWidth(scaledName)
+							button.Name:SetJustifyH("LEFT")
+							button.Name:ClearAllPoints()
+							button.Name:SetPoint("LEFT", button, "LEFT", nameStart, 0)
+							button.Name:SetPoint("RIGHT", button, "LEFT", nameStart + scaledName, 0)
+							
+							local variableStart = nameStart + scaledName + headerGap
+							button.Variable:SetWidth(scaledVariable)
+							button.Variable:SetJustifyH("LEFT")
+							button.Variable:ClearAllPoints()
+							button.Variable:SetPoint("LEFT", button, "LEFT", variableStart, 0)
+							button.Variable:SetPoint("RIGHT", button, "LEFT", variableStart + scaledVariable, 0)
+							
+							local levelStart = variableStart + scaledVariable + headerGap
+							button.Level:SetWidth(scaledLevel)
+							button.Level:SetJustifyH("CENTER")
+							button.Level:ClearAllPoints()
+							button.Level:SetPoint("LEFT", button, "LEFT", levelStart, 0)
+							button.Level:SetPoint("RIGHT", button, "LEFT", levelStart + scaledLevel, 0)
+							
+							local classStart = levelStart + scaledLevel + headerGap
+							button.Class:SetWidth(scaledClass)
+							button.Class:SetJustifyH("CENTER")
+							button.Class:ClearAllPoints()
+							button.Class:SetPoint("LEFT", button, "LEFT", classStart, 0)
+							button.Class:SetPoint("RIGHT", button, "LEFT", classStart + scaledClass, 0)
+						end
+					end
 				end
 			end
-		end)
+		end
 	end
 end
 
@@ -225,9 +232,17 @@ end
 -- WHO Frame Core Functions
 -- ========================================
 
--- Initialize Who Frame with ScrollBox
+-- Initialize Who Frame with ScrollBox (Retail) or FauxScrollFrame (Classic)
 function WhoFrame:OnLoad(frame)
-	-- Initialize ScrollBox with DataProvider
+	-- Classic: Use FauxScrollFrame approach
+	if BFL.IsClassic or not BFL.HasModernScrollBox then
+		BFL:DebugPrint("|cff00ffffWhoFrame:|r Using Classic FauxScrollFrame mode")
+		self:InitializeClassicWhoFrame(frame)
+		return
+	end
+	
+	-- Retail: Initialize ScrollBox with DataProvider
+	BFL:DebugPrint("|cff00ffffWhoFrame:|r Using Retail ScrollBox mode")
 	local view = CreateScrollBoxListLinearView()
 	view:SetElementInitializer("BetterWhoListButtonTemplate", function(button, elementData)
 		self:InitButton(button, elementData)
@@ -277,6 +292,246 @@ function WhoFrame:OnLoad(frame)
 	end
 end
 
+-- Initialize Classic WHO FauxScrollFrame
+function WhoFrame:InitializeClassicWhoFrame(frame)
+	self.classicWhoFrame = frame
+	self.classicWhoButtonPool = {}
+	self.classicWhoDataList = {}
+	
+	local BUTTON_HEIGHT = 16
+	local NUM_BUTTONS = 22
+	
+	-- Create buttons for Classic mode
+	-- Anchor to ScrollBox to respect Inset boundaries
+	local parentFrame = frame.ScrollBox or frame
+	for i = 1, NUM_BUTTONS do
+		local button = CreateFrame("Button", "BetterWhoListButton" .. i, parentFrame, "BetterWhoListButtonTemplate")
+		button:SetPoint("TOPLEFT", parentFrame, "TOPLEFT", 0, -((i - 1) * BUTTON_HEIGHT))
+		button:SetPoint("RIGHT", parentFrame, "RIGHT", 0, 0)
+		button:SetHeight(BUTTON_HEIGHT)
+		button.classicIndex = i
+		button:Hide()
+		self.classicWhoButtonPool[i] = button
+	end
+	
+	-- Create scroll bar if needed (use simple Slider, NOT UIPanelScrollBarTemplate which requires ScrollFrame parent)
+	if not frame.ClassicScrollBar then
+		-- CRITICAL: Remove old named scrollbar if it exists (from previous version)
+		-- The old code created "BetterWhoScrollBar" which triggers SecureScrollTemplates hooks
+		-- We must completely remove it before creating a new one
+		local oldScrollBar = _G["BetterWhoScrollBar"]
+		if oldScrollBar then
+			-- Unregister all events and scripts to prevent hooks from firing
+			oldScrollBar:UnregisterAllEvents()
+			oldScrollBar:SetScript("OnValueChanged", nil)
+			oldScrollBar:SetScript("OnMouseWheel", nil)
+			oldScrollBar:Hide()
+			oldScrollBar:SetParent(nil)
+			oldScrollBar:ClearAllPoints()
+			-- Remove from global namespace
+			_G["BetterWhoScrollBar"] = nil
+		end
+		
+		-- IMPORTANT: Do NOT use BackdropTemplate - it triggers Secure template chain that expects SetVerticalScroll
+		-- IMPORTANT: Create completely anonymous frame (no name) to avoid ANY template hooks
+		local scrollBar = CreateFrame("Slider", nil, frame)  -- Anonymous frame to avoid Secure template hooks
+		
+		-- Anchor to ListInset if available to ensure correct positioning
+		local inset = frame.ListInset or (frame:GetParent() and frame:GetParent().ListInset)
+		if inset then
+			-- Adjust for Up/Down buttons (20px) + padding (2px) = 22px
+			-- UpButton is attached to TOP of scrollBar, so scrollBar TOP must be lower
+			-- DownButton is attached to BOTTOM of scrollBar, so scrollBar BOTTOM must be higher
+			-- Move x by -2 to sit inside the inset border
+			scrollBar:SetPoint("TOPRIGHT", inset, "TOPRIGHT", -2, -22)
+			scrollBar:SetPoint("BOTTOMRIGHT", inset, "BOTTOMRIGHT", -2, 22)
+		else
+			scrollBar:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -4, -16)
+			scrollBar:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -4, 16)
+		end
+		
+		scrollBar:SetWidth(20)
+		scrollBar:SetOrientation("VERTICAL")
+		scrollBar:SetMinMaxValues(0, 0)
+		scrollBar:SetValueStep(1)
+		scrollBar:SetObeyStepOnDrag(true)
+		scrollBar:EnableMouseWheel(true)
+		
+		-- Add a subtle background track
+		local bg = scrollBar:CreateTexture(nil, "BACKGROUND")
+		bg:SetColorTexture(0, 0, 0, 0.2)
+		bg:SetAllPoints()
+		
+		-- Create thumb texture
+		local thumb = scrollBar:CreateTexture(nil, "OVERLAY")
+		thumb:SetTexture("Interface\\Buttons\\UI-ScrollBar-Knob")
+		thumb:SetSize(18, 24)
+		scrollBar:SetThumbTexture(thumb)
+		
+		-- Create up/down button backgrounds
+		local upButton = CreateFrame("Button", nil, scrollBar)
+		upButton:SetSize(20, 20) -- Larger buttons (20x20)
+		upButton:SetPoint("BOTTOM", scrollBar, "TOP", 0, 0)
+		upButton:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Up")
+		upButton:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Down")
+		upButton:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Highlight")
+		upButton:SetScript("OnClick", function()
+			scrollBar:SetValue(scrollBar:GetValue() - 1)
+		end)
+		
+		local downButton = CreateFrame("Button", nil, scrollBar)
+		downButton:SetSize(20, 20) -- Larger buttons (20x20)
+		downButton:SetPoint("TOP", scrollBar, "BOTTOM", 0, 0)
+		downButton:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up")
+		downButton:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Down")
+		downButton:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Highlight")
+		downButton:SetScript("OnClick", function()
+			scrollBar:SetValue(scrollBar:GetValue() + 1)
+		end)
+		
+		-- Mouse wheel support function
+		local function OnMouseWheel(self, delta)
+			if scrollBar:IsShown() then
+				scrollBar:SetValue(scrollBar:GetValue() - delta)
+			end
+		end
+		
+		-- Apply mousewheel to scrollbar, scrollbox, and buttons
+		scrollBar:SetScript("OnMouseWheel", OnMouseWheel)
+		if frame.ScrollBox then
+			frame.ScrollBox:SetScript("OnMouseWheel", OnMouseWheel)
+		end
+		
+		-- Apply to existing buttons in pool
+		for _, button in ipairs(self.classicWhoButtonPool) do
+			button:SetScript("OnMouseWheel", OnMouseWheel)
+		end
+		
+		scrollBar:SetScript("OnValueChanged", function(self, value)
+			WhoFrame:RenderClassicWhoButtons()
+		end)
+		
+		-- Set initial value AFTER scripts are registered (prevents SecureScrollTemplates error)
+		scrollBar:SetValue(0)
+		
+		frame.ClassicScrollBar = scrollBar
+	end
+	
+	-- Initialize selected who
+	frame.selectedWho = nil
+	frame.selectedName = ""
+	
+	-- Click outside to clear focus
+	frame:SetScript("OnMouseDown", function()
+		if frame.EditBox then
+			frame.EditBox:ClearFocus()
+		end
+	end)
+	
+	-- Apply initial responsive layout
+	C_Timer.After(0.1, function()
+		self:UpdateResponsiveLayout()
+	end)
+end
+
+-- Initialize Classic Dropdown (UIDropDownMenu)
+function WhoFrame:InitializeClassicDropdown(dropdown)
+	if not dropdown then return end
+	
+	UIDropDownMenu_Initialize(dropdown, function(self, level, menuList)
+		local info = UIDropDownMenu_CreateInfo()
+		
+		local function OnClick(self, arg1, arg2, checked)
+			WhoFrame:SetSortValue(arg1)
+			UIDropDownMenu_SetSelectedValue(dropdown, arg1)
+			-- Force update
+			if WhoFrame and WhoFrame.Update then
+				WhoFrame:Update(true)
+			end
+		end
+		
+		info.text = ZONE
+		info.value = 1
+		info.arg1 = 1
+		info.func = OnClick
+		info.checked = (WhoFrame:GetSortValue() == 1)
+		UIDropDownMenu_AddButton(info)
+		
+		info.text = GUILD
+		info.value = 2
+		info.arg1 = 2
+		info.func = OnClick
+		info.checked = (WhoFrame:GetSortValue() == 2)
+		UIDropDownMenu_AddButton(info)
+		
+		info.text = RACE
+		info.value = 3
+		info.arg1 = 3
+		info.func = OnClick
+		info.checked = (WhoFrame:GetSortValue() == 3)
+		UIDropDownMenu_AddButton(info)
+	end)
+	
+	UIDropDownMenu_SetWidth(dropdown, 80)
+	UIDropDownMenu_SetSelectedValue(dropdown, 1)
+end
+
+-- Render Classic WHO buttons
+function WhoFrame:RenderClassicWhoButtons()
+	if not self.classicWhoFrame or not self.classicWhoButtonPool then
+		return
+	end
+	
+	local dataList = self.classicWhoDataList or {}
+	local numItems = #dataList
+	local numButtons = #self.classicWhoButtonPool
+	
+	-- Calculate visible buttons based on ScrollBox height
+	local scrollBox = self.classicWhoFrame.ScrollBox
+	local visibleButtons = numButtons -- Default to pool size
+	if scrollBox then
+		local height = scrollBox:GetHeight()
+		if height and height > 0 then
+			visibleButtons = math.floor(height / 16) -- 16 is BUTTON_HEIGHT
+		end
+	end
+	
+	local offset = 0
+	if self.classicWhoFrame.ClassicScrollBar then
+		offset = math.floor(self.classicWhoFrame.ClassicScrollBar:GetValue() or 0)
+	end
+	
+	-- Update scroll bar range
+	if self.classicWhoFrame.ClassicScrollBar then
+		local maxValue = math.max(0, numItems - visibleButtons)
+		self.classicWhoFrame.ClassicScrollBar:SetMinMaxValues(0, maxValue)
+		
+		-- Visibility logic: Only show if there is something to scroll
+		if maxValue > 0 then
+			self.classicWhoFrame.ClassicScrollBar:Show()
+		else
+			self.classicWhoFrame.ClassicScrollBar:Hide()
+		end
+	end
+	
+	-- Render buttons
+	for i, button in ipairs(self.classicWhoButtonPool) do
+		-- Only show buttons that fit in the visible area
+		if i <= visibleButtons then
+			local dataIndex = offset + i
+			if dataIndex <= numItems then
+				local elementData = dataList[dataIndex]
+				self:InitButton(button, elementData)
+				button:Show()
+			else
+				button:Hide()
+			end
+		else
+			button:Hide()
+		end
+	end
+end
+
 -- Initialize individual Who button
 function WhoFrame:InitButton(button, elementData)
 	local index = elementData.index
@@ -302,11 +557,13 @@ function WhoFrame:InitButton(button, elementData)
 		local widths = self.columnWidths
 		
 		-- Match XML header positions EXACTLY:
-		-- NameHeader: x=4 from ListInset TOPLEFT
-		-- ColumnDropdown: x=-2 from NameHeader RIGHT (overlap)
-		-- LevelHeader: x=-2 from ColumnDropdown RIGHT (overlap)
-		-- ClassHeader: x=-2 from LevelHeader RIGHT (overlap)
-		local headerLeftPadding = 4  -- NameHeader starts at x=4 in XML
+		-- NameHeader: x=7 from WhoFrame TOPLEFT (not ListInset)
+		-- But buttons are inside ScrollBox which is inside ListInset
+		-- ListInset is at x=5. ScrollBox is at x=0 relative to ListInset.
+		-- So ScrollBox is at x=5 relative to WhoFrame.
+		-- NameHeader is at x=7 relative to WhoFrame.
+		-- So NameHeader is at x=2 relative to ScrollBox.
+		local headerLeftPadding = 2  -- Adjusted for ScrollBox relative position
 		local headerGap = -2         -- Headers overlap by 2px in XML
 		
 		-- CRITICAL: Buttons are narrower than headers due to ScrollBox layout
@@ -428,7 +685,15 @@ end
 
 -- Update Who list display
 function WhoFrame:Update(forceRebuild)
-	if not BetterFriendsFrame or not BetterFriendsFrame.WhoFrame or not whoDataProvider then
+	if not BetterFriendsFrame or not BetterFriendsFrame.WhoFrame then
+		return
+	end
+	
+	-- Classic: Check if using Classic mode
+	local isClassicMode = BFL.IsClassic or not BFL.HasModernScrollBox
+	
+	-- Retail: Check if DataProvider exists
+	if not isClassicMode and not whoDataProvider then
 		return
 	end
 	
@@ -451,9 +716,48 @@ function WhoFrame:Update(forceRebuild)
 	if displayedText ~= "" then
 		totalsText = totalsText .. "  " .. displayedText
 	end
-	BetterFriendsFrame.WhoFrame.ListInset.Totals:SetText(totalsText)
 	
-	-- PERFORMANCE: Only rebuild if count changed OR if forced (e.g., dropdown change)
+	-- Classic: Totals is a Frame with a Text FontString child
+	-- Retail: Totals is a FontString directly
+	local totalsElement = BetterFriendsFrame.WhoFrame.ListInset.Totals
+	if totalsElement then
+		if totalsElement.Text then
+			-- Classic XML structure: Frame.Text
+			totalsElement.Text:SetText(totalsText)
+		elseif totalsElement.SetText then
+			-- Retail XML structure: FontString directly
+			totalsElement:SetText(totalsText)
+		end
+	end
+	
+	-- PERFORMANCE: Cache fontObject reference instead of string lookup
+	local fontObj = GameFontNormalSmall
+	
+	-- Classic mode: Build data list and render
+	if isClassicMode then
+		self.classicWhoDataList = {}
+		for i = 1, numWhos do
+			local info = C_FriendList.GetWhoInfo(i)
+			if info then
+				-- Strip trailing dash from names (WoW API bug)
+				if info.fullName then
+					info.fullName = info.fullName:gsub("%-$", "")
+				end
+				if info.name then
+					info.name = info.name:gsub("%-$", "")
+				end
+				table.insert(self.classicWhoDataList, {
+					index = i,
+					info = info,
+					fontObject = fontObj
+				})
+			end
+		end
+		self:RenderClassicWhoButtons()
+		return
+	end
+	
+	-- Retail mode: PERFORMANCE: Only rebuild if count changed OR if forced (e.g., dropdown change)
 	local currentSize = whoDataProvider:GetSize()
 	if not forceRebuild and currentSize == numWhos and currentSize > 0 then
 		-- Data count unchanged, ScrollBox will automatically refresh from DataProvider
@@ -471,9 +775,6 @@ function WhoFrame:Update(forceRebuild)
 	
 	-- No sort active: build unsorted list
 	whoDataProvider:Flush()
-	
-	-- PERFORMANCE: Cache fontObject reference instead of string lookup
-	local fontObj = GameFontNormalSmall
 	
 	for i = 1, numWhos do
 		local info = C_FriendList.GetWhoInfo(i)
@@ -650,13 +951,13 @@ function WhoFrame:OnButtonClick(button, mouseButton)
 				if MenuSystem and MenuSystem.OpenWhoPlayerMenu then
 					MenuSystem:OpenWhoPlayerMenu(button, info)
 				else
-					-- Fallback: Use basic UnitPopup
+					-- Fallback: Use basic UnitPopup (with Classic compatibility)
 					local contextData = {
 						name = info.fullName,
 						server = info.fullGuildName,
 						guid = info.guid,
 					}
-					UnitPopup_OpenMenu("FRIEND", contextData)
+					BFL.OpenContextMenu(button, "FRIEND", contextData, info.fullName)
 				end
 			end
 		end

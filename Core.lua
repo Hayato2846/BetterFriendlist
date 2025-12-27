@@ -13,12 +13,30 @@ BFL.VERSION = "Unknown"
 _G.BFL = BFL
 
 --------------------------------------------------------------------------
--- Version Detection (Retail: Expansion Version)
+-- Version Detection (Retail & Classic)
 --------------------------------------------------------------------------
 local tocVersion = select(4, GetBuildInfo())  -- Returns TOC version (e.g., 110205)
 BFL.TOCVersion = tocVersion
-BFL.IsTWW = (tocVersion >= 110200 and tocVersion < 120000)    -- The War Within (11.x)
-BFL.IsMidnight = (tocVersion >= 120000)                       -- Midnight (12.x+)
+
+-- Classic Versions (check first - more specific)
+BFL.IsClassicEra = (tocVersion < 20000)                         -- Classic Era (1.x)
+BFL.IsMoPClassic = (tocVersion >= 50000 and tocVersion < 60000) -- MoP Classic (5.x)
+BFL.IsCataClassic = (tocVersion >= 40000 and tocVersion < 50000) -- Cata Classic (4.x) - legacy
+BFL.IsWrathClassic = (tocVersion >= 30000 and tocVersion < 40000) -- Wrath Classic (3.x) - legacy
+BFL.IsClassic = BFL.IsClassicEra or BFL.IsMoPClassic or BFL.IsCataClassic or BFL.IsWrathClassic
+
+-- Retail Expansions
+BFL.IsRetail = (tocVersion >= 100000)                           -- Dragonflight+ (10.x+)
+BFL.IsTWW = (tocVersion >= 110200 and tocVersion < 120000)      -- The War Within (11.x)
+BFL.IsMidnight = (tocVersion >= 120000)                         -- Midnight (12.x+)
+
+-- Feature Flags (detect what APIs are available)
+BFL.HasModernScrollBox = BFL.IsRetail                           -- ScrollBox API (Retail 10.0+)
+BFL.HasModernMenu = BFL.IsRetail                                -- MenuUtil, Menu.ModifyMenu (Retail 11.0+)
+BFL.HasRecentAllies = BFL.IsTWW or BFL.IsMidnight               -- C_RecentAllies (TWW 11.0.7+)
+BFL.HasEditMode = BFL.IsRetail                                  -- Edit Mode API (Retail 10.0+)
+BFL.HasModernDropdown = BFL.IsRetail                            -- WowStyle1DropdownTemplate (Retail 10.0+)
+BFL.HasModernColorPicker = BFL.IsRetail                         -- ColorPickerFrame:SetupColorPickerAndShow (Retail 10.1+)
 
 -- Feature Detection (detect available APIs for optional features)
 BFL.UseClassID = false              -- 11.2.7+ classID optimization
@@ -885,6 +903,43 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 			SlashCmdList["ACTIVITYTRACKER_TEST"]("activity")
 		else
 			print("|cffff0000BetterFriendlist:|r ActivityTracker Tests not loaded")
+		end
+	
+	-- ==========================================
+	-- Classic Compatibility Info
+	-- ==========================================
+	elseif msg == "compat" or msg == "compatibility" or msg == "classic" then
+		print("|cff00ff00=== BetterFriendlist Classic Compatibility ===|r")
+		print("")
+		print("|cffffcc00Client Version:|r")
+		print(string.format("  Interface Version: |cffffffff%d|r", select(4, GetBuildInfo())))
+		print(string.format("  Build: |cffffffff%s|r", select(1, GetBuildInfo())))
+		print("")
+		print("|cffffcc00Detected Flavor:|r")
+		if BFL.IsClassicEra then
+			print("  |cffffcc00Classic Era|r (Vanilla)")
+		elseif BFL.IsMoPClassic then
+			print("  |cff00ffffMists of Pandaria Classic|r")
+		elseif BFL.IsTWW then
+			print("  |cff00ff00The War Within|r (Retail)")
+		elseif BFL.IsMidnight then
+			print("  |cff8800ffMidnight|r (Retail)")
+		else
+			print("  |cffffffffRetail|r")
+		end
+		print("")
+		print("|cffffcc00Feature Availability:|r")
+		print(string.format("  Modern ScrollBox: %s", BFL.HasModernScrollBox and "|cff00ff00Yes|r" or "|cffff0000No|r"))
+		print(string.format("  Modern Menu System: %s", BFL.HasModernMenu and "|cff00ff00Yes|r" or "|cffff0000No|r"))
+		print(string.format("  Recent Allies: %s", BFL.HasRecentAllies and "|cff00ff00Yes|r" or "|cffff0000No|r"))
+		print(string.format("  Edit Mode: %s", BFL.HasEditMode and "|cff00ff00Yes|r" or "|cffff0000No|r"))
+		print(string.format("  Modern Dropdown: %s", BFL.HasModernDropdown and "|cff00ff00Yes|r" or "|cffff0000No|r"))
+		print(string.format("  Modern ColorPicker: %s", BFL.HasModernColorPicker and "|cff00ff00Yes|r" or "|cffff0000No|r"))
+		print("")
+		if BFL.Compat then
+			print("|cffffcc00Compatibility Layer:|r |cff00ff00Active|r")
+		else
+			print("|cffffcc00Compatibility Layer:|r |cffff0000Not Loaded|r")
 		end
 	
 	-- Help (or any other unrecognized command)

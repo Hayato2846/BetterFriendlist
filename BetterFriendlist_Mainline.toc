@@ -1,0 +1,104 @@
+## Interface: 120000
+## Title: BetterFriendlist
+## Notes: Complete replacement for WoW Friends frame - Custom groups, Raid management, Quick Join, and more!
+## Author: Hayato2846
+## Version: 2.0.1
+## IconTexture: Interface\AddOns\BetterFriendlist\Textures\PortraitIcon.blp
+## X-Curse-Project-ID: 1381771
+## X-WoWI-ID: 26984
+## X-Wago-ID: rNkPLl6a 
+## SavedVariables: BetterFriendlistDB
+## Bindings: Bindings.xml
+
+## Category: User Interface
+## Category-deDE: Benutzerinterface
+## Category-esES: Interfaz de usuario
+## Category-esMX: Interfaz de usuario
+## Category-frFR: Interface utilisateur
+## Category-itIT: Interfaccia utente
+## Category-koKR: 사용자 인터페이스
+## Category-ptBR: Interface do usuário
+## Category-ruRU: Интерфейс пользователя
+## Category-zhCN: 用户界面
+## Category-zhTW: 使用者介面
+
+# Libraries (loaded first)
+Libs\LibStub\LibStub.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
+Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+Libs\LibQTip-1.0\lib.xml
+Libs\LibEditMode\embed.xml
+
+# Core
+Core.lua
+
+# Compatibility Layer (loaded early for Classic)
+Utils\ClassicCompat.lua
+
+# Localization (loaded early)
+Locales\Locales.lua
+Locales\enUS.lua
+Locales\deDE.lua
+Locales\esES.lua
+Locales\esMX.lua
+Locales\frFR.lua
+Locales\itIT.lua
+Locales\koKR.lua
+Locales\ptBR.lua
+Locales\ruRU.lua
+Locales\zhCN.lua
+Locales\zhTW.lua
+
+# Utilities (loaded early for constants)
+Utils\FontManager.lua
+Utils\ColorManager.lua
+Utils\AnimationHelpers.lua
+Utils\PerformanceMonitor.lua
+
+# UI Constants (loaded BEFORE modules that need them)
+UI\FrameInitializer.lua
+
+# Modules
+Modules\Database.lua
+Modules\ActivityTracker.lua
+Modules\Statistics.lua
+Modules\NotificationSystem_Simple.lua
+Modules\NotificationEditMode.lua
+Modules\MainFrameEditMode.lua
+Modules\Groups.lua
+Modules\FriendsList.lua
+Modules\WhoFrame.lua
+Modules\IgnoreList.lua
+Modules\RecentAllies.lua
+Modules\MenuSystem.lua
+Modules\QuickFilters.lua
+Modules\Broker.lua
+Modules\SettingsComponents.lua
+Modules\Settings.lua
+Modules\Dialogs.lua
+# Modules\ButtonPool.lua  # DELETED: Replaced by ScrollBox Factory pattern in Phase 2
+Modules\RAF.lua
+Modules\RaidFrame.lua
+BetterFriendlist_QuickJoin.xml
+Modules\QuickJoin.lua
+Modules\PreviewMode.lua
+Modules\ElvUISkin.lua
+Modules\AddOnSkins.lua
+
+# UI Callbacks
+UI\RaidFrameCallbacks.lua
+UI\QuickJoinCallbacks.lua
+
+# Legacy (to be refactored)
+BetterFriendlist.lua
+BetterFriendlist.xml
+BetterFriendlist_InviteTemplates.xml
+BetterFriendlist_NotificationAlert.xml
+BetterFriendlist_Tooltip.lua
+
+# Settings
+BetterFriendlist_Settings.lua
+BetterFriendlist_Settings.xml
+
+# Tests (optional, for development)
+# Tests\Settings_GeneralTab_Tests.lua

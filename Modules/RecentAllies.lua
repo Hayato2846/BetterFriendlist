@@ -28,11 +28,33 @@ local RecentAlliesListEvents = {
 
 -- Initialize (called from ADDON_LOADED)
 function RecentAllies:Initialize()
-	-- Nothing to initialize yet
+	-- Recent Allies is TWW-only (11.0.7+)
+	if not BFL.HasRecentAllies then
+		BFL:DebugPrint("|cffffcc00BFL RecentAllies:|r Not available in Classic - module disabled")
+		return
+	end
+	-- Nothing else to initialize yet
 end
 
 -- Initialize Recent Allies Frame (RecentAlliesListMixin:OnLoad)
 function RecentAllies:OnLoad(frame)
+	-- Recent Allies is TWW-only (11.0.7+)
+	if not BFL.HasRecentAllies then
+		-- Show "Not Available" message for Classic users
+		local L = BFL.L or {}
+		local notAvailableText = frame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+		notAvailableText:SetPoint("CENTER")
+		notAvailableText:SetText(L["RECENT_ALLIES_NOT_AVAILABLE"] or "Recent Allies is not available in this version.")
+		notAvailableText:SetTextColor(0.5, 0.5, 0.5)
+		frame.UnavailableText = notAvailableText
+		
+		-- Hide ScrollBox elements if they exist
+		if frame.ScrollBox then frame.ScrollBox:Hide() end
+		if frame.ScrollBar then frame.ScrollBar:Hide() end
+		if frame.LoadingSpinner then frame.LoadingSpinner:Hide() end
+		return
+	end
+	
 	-- Initialize ScrollBox with element factory
 	local elementSpacing = 1
 	local topPadding, bottomPadding, leftPadding, rightPadding = 0, 0, 0, 0
@@ -289,7 +311,8 @@ function RecentAllies:OpenMenu(button)
 		bestMenu = recentAllyData.stateData.isOnline and "FRIEND" or "FRIEND_OFFLINE"
 	end
 	
-	UnitPopup_OpenMenu(bestMenu, contextData)
+	-- Use compatibility wrapper for Classic support
+	BFL.OpenContextMenu(button, bestMenu, contextData, contextData.name)
 end
 
 -- Build tooltip for recent ally (RecentAlliesEntryMixin:BuildRecentAllyTooltip)

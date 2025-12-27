@@ -110,7 +110,8 @@ function MenuSystem:OpenFriendMenu(button, friendType, friendID, extraData)
 	_G.BetterFriendlist_IsOurMenu = true
 	BFL:DebugPrint("|cff00ff00BFL MenuSystem: Flag set to TRUE, opening menu type:", menuType)
 	
-	UnitPopup_OpenMenu(menuType, contextData)
+	-- Use compatibility wrapper for Classic support
+	BFL.OpenContextMenu(button, menuType, contextData, contextData.name)
 	
 	-- Clear flag immediately after opening
 	_G.BetterFriendlist_IsOurMenu = false
@@ -175,8 +176,8 @@ function MenuSystem:OpenWhoPlayerMenu(button, whoInfo)
 		guid = whoInfo.guid,
 	}
 	
-	-- Use FRIEND menu as base
-	UnitPopup_OpenMenu("FRIEND", contextData)
+	-- Use FRIEND menu as base (compatibility wrapper for Classic)
+	BFL.OpenContextMenu(button, "FRIEND", contextData, contextData.name)
 	
 	-- Clear flag immediately after opening
 	self:SetWhoPlayerMenuFlag(false)

@@ -49,6 +49,50 @@ end
 function QuickFilters:InitDropdown(dropdown)
 	if not dropdown then return end
 	
+	-- Classic mode: Use UIDropDownMenu
+	if BFL.IsClassic or not BFL.HasModernDropdown then
+		BFL:DebugPrint("|cff00ffffQuickFilters:|r Classic mode - using UIDropDownMenu for Quick Filter dropdown")
+		
+		UIDropDownMenu_SetWidth(dropdown, 25)
+		UIDropDownMenu_Initialize(dropdown, function(self, level)
+			local info = UIDropDownMenu_CreateInfo()
+			
+			local function AddFilterOption(mode, label, icon)
+				info.text = string.format("|T%s:14:14:0:0|t %s", icon, label)
+				info.value = mode
+				info.func = function()
+					self:SetFilter(mode)
+					UIDropDownMenu_SetText(dropdown, string.format("|T%s:14:14:-2:-2|t", icon))
+				end
+				info.checked = (filterMode == mode)
+				UIDropDownMenu_AddButton(info)
+			end
+			
+			AddFilterOption("all", "All Friends", FILTER_ICONS.all)
+			AddFilterOption("online", "Online Only", FILTER_ICONS.online)
+			AddFilterOption("offline", "Offline Only", FILTER_ICONS.offline)
+			AddFilterOption("wow", "WoW Only", FILTER_ICONS.wow)
+			AddFilterOption("bnet", "Battle.net Only", FILTER_ICONS.bnet)
+			
+			-- Divider
+			info.text = " "
+			info.disabled = true
+			info.notCheckable = true
+			UIDropDownMenu_AddButton(info)
+			info.disabled = false
+			info.notCheckable = false
+			
+			AddFilterOption("hideafk", "Hide AFK/DND", FILTER_ICONS.hideafk)
+			AddFilterOption("retail", "Retail Only", FILTER_ICONS.retail)
+		end)
+		
+		-- Set initial selected text
+		local currentIcon = FILTER_ICONS[filterMode] or FILTER_ICONS.all
+		UIDropDownMenu_SetText(dropdown, string.format("|T%s:14:14:-2:-2|t", currentIcon))
+		
+		return
+	end
+	
 	-- Helper function to check if a filter mode is selected
 	-- IMPORTANT: Read from DB to stay in sync with external changes (e.g., Broker middle click)
 	local function IsSelected(mode)
@@ -185,6 +229,11 @@ function QuickFilters:RefreshDropdown(dropdown)
 		-- Manually update the text to match the translator format
 		-- This forces the dropdown button to show the correct icon
 		local text = string.format("\124T%s:16:16:0:2\124t", icon)
-		dropdown:SetText(text)
+		
+		if BFL.IsClassic or not BFL.HasModernDropdown then
+			UIDropDownMenu_SetText(dropdown, text)
+		elseif dropdown.SetText then
+			dropdown:SetText(text)
+		end
 	end
 end

@@ -74,14 +74,17 @@ local currentSortMode = "status"
 
 --------------------------------------------------------------------------
 -- STATUS DROPDOWN INITIALIZATION
+-- In Classic, WowStyle1DropdownTemplate doesn't exist, so we need to
+-- create a Classic-compatible dropdown or skip initialization
 --------------------------------------------------------------------------
 
 function FrameInitializer:InitializeStatusDropdown(frame)
-	if not frame or not frame.FriendsTabHeader or not frame.FriendsTabHeader.StatusDropdown then return end
+	if not frame or not frame.FriendsTabHeader then return end
+	if not frame.FriendsTabHeader.StatusDropdown then return end
 	
 	local dropdown = frame.FriendsTabHeader.StatusDropdown
 	
-	-- Set up status tracking
+	-- Get current Battle.net status
 	local bnetAFK, bnetDND = select(5, BNGetInfo())
 	local bnStatus
 	if bnetAFK then
@@ -92,6 +95,56 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 		bnStatus = FRIENDS_TEXTURE_ONLINE
 	end
 	
+	-- Classic: Use UIDropDownMenu API (old-style dropdown)
+	if BFL.IsClassic then
+		BFL:DebugPrint("|cff00ffffFrameInitializer:|r Classic mode - using UIDropDownMenu for StatusDropdown")
+		
+		UIDropDownMenu_SetWidth(dropdown, 38)
+		UIDropDownMenu_Initialize(dropdown, function(self, level)
+			local info = UIDropDownMenu_CreateInfo()
+			
+			-- Online option
+			info.text = string.format("|T%s.tga:14:14:0:0|t %s", FRIENDS_TEXTURE_ONLINE, FRIENDS_LIST_AVAILABLE)
+			info.value = FRIENDS_TEXTURE_ONLINE
+			info.func = function()
+				BNSetAFK(false)
+				BNSetDND(false)
+				bnStatus = FRIENDS_TEXTURE_ONLINE
+				UIDropDownMenu_SetText(dropdown, string.format("|T%s.tga:14:14:-2:-2|t", FRIENDS_TEXTURE_ONLINE))
+			end
+			info.checked = (bnStatus == FRIENDS_TEXTURE_ONLINE)
+			UIDropDownMenu_AddButton(info)
+			
+			-- AFK option
+			info.text = string.format("|T%s.tga:14:14:0:0|t %s", FRIENDS_TEXTURE_AFK, FRIENDS_LIST_AWAY)
+			info.value = FRIENDS_TEXTURE_AFK
+			info.func = function()
+				BNSetAFK(true)
+				bnStatus = FRIENDS_TEXTURE_AFK
+				UIDropDownMenu_SetText(dropdown, string.format("|T%s.tga:14:14:-2:-2|t", FRIENDS_TEXTURE_AFK))
+			end
+			info.checked = (bnStatus == FRIENDS_TEXTURE_AFK)
+			UIDropDownMenu_AddButton(info)
+			
+			-- DND option
+			info.text = string.format("|T%s.tga:14:14:0:0|t %s", FRIENDS_TEXTURE_DND, FRIENDS_LIST_BUSY)
+			info.value = FRIENDS_TEXTURE_DND
+			info.func = function()
+				BNSetDND(true)
+				bnStatus = FRIENDS_TEXTURE_DND
+				UIDropDownMenu_SetText(dropdown, string.format("|T%s.tga:14:14:-2:-2|t", FRIENDS_TEXTURE_DND))
+			end
+			info.checked = (bnStatus == FRIENDS_TEXTURE_DND)
+			UIDropDownMenu_AddButton(info)
+		end)
+		
+		-- Set initial selected text with smaller icon and left offset
+		UIDropDownMenu_SetText(dropdown, string.format("|T%s.tga:14:14:-2:-2|t", bnStatus))
+		
+		return
+	end
+	
+	-- Retail mode: Use modern WowStyle1DropdownTemplate
 	local function IsSelected(status)
 		return bnStatus == status
 	end
@@ -217,6 +270,41 @@ function FrameInitializer:InitializeSortDropdown(frame)
 	
 	local dropdown = frame.FriendsTabHeader.SortDropdown
 	
+	-- Classic mode: Use UIDropDownMenu
+	if BFL.IsClassic or not BFL.HasModernDropdown then
+		BFL:DebugPrint("|cff00ffffFrameInitializer:|r Classic mode - using UIDropDownMenu for SortDropdown")
+		
+		UIDropDownMenu_SetWidth(dropdown, 60)
+		UIDropDownMenu_Initialize(dropdown, function(self, level)
+			local info = UIDropDownMenu_CreateInfo()
+			
+			local function AddSortOption(sortMode, label, icon)
+				info.text = string.format("|T%s:14:14:0:0|t %s", icon, label)
+				info.value = sortMode
+				info.func = function()
+					currentSortMode = sortMode
+					UIDropDownMenu_SetText(dropdown, string.format("|T%s:14:14:-2:-2|t", icon))
+					-- Notify main file to update display
+					if _G.UpdateFriendsList then _G.UpdateFriendsList() end
+					if _G.UpdateFriendsDisplay then _G.UpdateFriendsDisplay() end
+				end
+				info.checked = (currentSortMode == sortMode)
+				UIDropDownMenu_AddButton(info)
+			end
+			
+			AddSortOption("status", "Sort by Status", SORT_ICONS.status)
+			AddSortOption("name", "Sort by Name", SORT_ICONS.name)
+			AddSortOption("level", "Sort by Level", SORT_ICONS.level)
+			AddSortOption("zone", "Sort by Zone", SORT_ICONS.zone)
+		end)
+		
+		-- Set initial selected text
+		local currentIcon = SORT_ICONS[currentSortMode] or SORT_ICONS.status
+		UIDropDownMenu_SetText(dropdown, string.format("|T%s:14:14:-2:-2|t", currentIcon))
+		
+		return
+	end
+	
 	local function IsSelected(sortMode)
 		return currentSortMode == sortMode
 	end
@@ -281,10 +369,97 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 	local header = frame.FriendsTabHeader
 	if not header.PrimarySortDropdown or not header.SecondarySortDropdown then return end
 	
-	-- Initialize Primary Sort Dropdown
-	local primaryDropdown = header.PrimarySortDropdown
 	local FriendsList = BFL:GetModule("FriendsList")
 	if not FriendsList then return end
+
+	-- Classic mode: Use UIDropDownMenu
+	if BFL.IsClassic or not BFL.HasModernDropdown then
+		BFL:DebugPrint("|cff00ffffFrameInitializer:|r Classic mode - using UIDropDownMenu for Primary/Secondary Sort dropdowns")
+		
+		-- Primary Sort Dropdown
+		local primaryDropdown = header.PrimarySortDropdown
+		UIDropDownMenu_SetWidth(primaryDropdown, 70)
+		UIDropDownMenu_Initialize(primaryDropdown, function(self, level)
+			local info = UIDropDownMenu_CreateInfo()
+			
+			local function AddPrimaryOption(sortMode, label, icon)
+				info.text = string.format("|T%s:14:14:0:0|t %s", icon, label)
+				info.value = sortMode
+				info.func = function()
+					FriendsList:SetSortMode(sortMode)
+					FriendsList:RenderDisplay()
+					UIDropDownMenu_SetText(primaryDropdown, string.format("|T%s:14:14:-2:-2|t", icon))
+				end
+				-- Check against DB/Module state
+				local DB = BFL:GetModule("DB")
+				local db = DB and DB:Get() or {}
+				local currentSort = db.primarySort or FriendsList.sortMode or "status"
+				info.checked = (currentSort == sortMode)
+				UIDropDownMenu_AddButton(info)
+			end
+			
+			AddPrimaryOption("status", "Sort by Status", SORT_ICONS.status)
+			AddPrimaryOption("name", "Sort by Name", SORT_ICONS.name)
+			AddPrimaryOption("level", "Sort by Level", SORT_ICONS.level)
+			AddPrimaryOption("zone", "Sort by Zone", SORT_ICONS.zone)
+			AddPrimaryOption("game", "Sort by Game", SORT_ICONS.game)
+			AddPrimaryOption("faction", "Sort by Faction", SORT_ICONS.faction)
+			AddPrimaryOption("guild", "Sort by Guild", SORT_ICONS.guild)
+			AddPrimaryOption("class", "Sort by Class", SORT_ICONS.class)
+			AddPrimaryOption("realm", "Sort by Realm", SORT_ICONS.realm)
+		end)
+		
+		-- Set initial text for Primary
+		local DB = BFL:GetModule("DB")
+		local db = DB and DB:Get() or {}
+		local currentPrimary = db.primarySort or FriendsList.sortMode or "status"
+		local primaryIcon = SORT_ICONS[currentPrimary] or SORT_ICONS.status
+		UIDropDownMenu_SetText(primaryDropdown, string.format("|T%s:14:14:-2:-2|t", primaryIcon))
+
+		-- Secondary Sort Dropdown
+		local secondaryDropdown = header.SecondarySortDropdown
+		UIDropDownMenu_SetWidth(secondaryDropdown, 70)
+		UIDropDownMenu_Initialize(secondaryDropdown, function(self, level)
+			local info = UIDropDownMenu_CreateInfo()
+			
+			local function AddSecondaryOption(sortMode, label, icon)
+				info.text = string.format("|T%s:14:14:0:0|t %s", icon, label)
+				info.value = sortMode
+				info.func = function()
+					FriendsList:SetSecondarySortMode(sortMode)
+					FriendsList:RenderDisplay()
+					UIDropDownMenu_SetText(secondaryDropdown, string.format("|T%s:14:14:-2:-2|t", icon))
+				end
+				
+				local DB = BFL:GetModule("DB")
+				local db = DB and DB:Get() or {}
+				local currentSort = db.secondarySort or FriendsList.secondarySort or "name"
+				info.checked = (currentSort == sortMode)
+				UIDropDownMenu_AddButton(info)
+			end
+			
+			AddSecondaryOption("none", "None", SORT_ICONS.none)
+			AddSecondaryOption("name", "then by Name", SORT_ICONS.name)
+			AddSecondaryOption("level", "then by Level", SORT_ICONS.level)
+			AddSecondaryOption("zone", "then by Zone", SORT_ICONS.zone)
+			AddSecondaryOption("activity", "then by Activity", SORT_ICONS.activity)
+			AddSecondaryOption("game", "then by Game", SORT_ICONS.game)
+			AddSecondaryOption("faction", "then by Faction", SORT_ICONS.faction)
+			AddSecondaryOption("guild", "then by Guild", SORT_ICONS.guild)
+			AddSecondaryOption("class", "then by Class", SORT_ICONS.class)
+			AddSecondaryOption("realm", "then by Realm", SORT_ICONS.realm)
+		end)
+		
+		-- Set initial text for Secondary
+		local currentSecondary = db.secondarySort or FriendsList.secondarySort or "name"
+		local secondaryIcon = SORT_ICONS[currentSecondary] or SORT_ICONS.name
+		UIDropDownMenu_SetText(secondaryDropdown, string.format("|T%s:14:14:-2:-2|t", secondaryIcon))
+		
+		return
+	end
+	
+	-- Initialize Primary Sort Dropdown
+	local primaryDropdown = header.PrimarySortDropdown
 	
 	local function IsPrimarySelected(sortMode)
 		-- Always read from DB when checking selection
@@ -415,10 +590,31 @@ end
 function FrameInitializer:InitializeTabs(frame)
 	if not frame or not frame.FriendsTabHeader then return end
 	
-	-- Set up the tabs on the FriendsTabHeader (11.2.5: 3 tabs - Friends, Recent Allies, RAF. Sort tab removed.)
-	PanelTemplates_SetNumTabs(frame.FriendsTabHeader, 3)
-	PanelTemplates_SetTab(frame.FriendsTabHeader, 1)
-	PanelTemplates_UpdateTabs(frame.FriendsTabHeader)
+	-- Classic: Only Friends tab is visible, but we need to tell PanelTemplates about it
+	-- In Classic, Tab2 and Tab3 exist in XML but are hidden by HideClassicOnlyTabs()
+	if BFL.IsClassic then
+		-- In Classic, we only have 1 active tab (Friends)
+		-- Tab2 and Tab3 exist in XML but are already positioned and will be hidden
+		-- IMPORTANT: Do NOT call PanelTemplates_SetTab as it triggers PanelTemplates_UpdateTabs
+		-- which tries to iterate over all tabs (including hidden ones)
+		frame.FriendsTabHeader.numTabs = 1
+		frame.FriendsTabHeader.selectedTab = 1
+		-- Manually select Tab1 (PanelTopTabButtonTemplate uses visual state, not SetChecked)
+		if frame.FriendsTabHeader.Tab1 then
+			-- Show tab as selected by hiding the tab's Left texture (makes it look pressed)
+			if frame.FriendsTabHeader.Tab1.Left then
+				frame.FriendsTabHeader.Tab1.Left:Hide()
+			end
+			if frame.FriendsTabHeader.Tab1.LeftDisabled then
+				frame.FriendsTabHeader.Tab1.LeftDisabled:Show()
+			end
+		end
+	else
+		-- Retail: Set up the tabs on the FriendsTabHeader (11.2.5: 3 tabs - Friends, Recent Allies, RAF. Sort tab removed.)
+		PanelTemplates_SetNumTabs(frame.FriendsTabHeader, 3)
+		PanelTemplates_SetTab(frame.FriendsTabHeader, 1)
+		PanelTemplates_UpdateTabs(frame.FriendsTabHeader)
+	end
 end
 
 --------------------------------------------------------------------------

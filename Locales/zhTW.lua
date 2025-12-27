@@ -278,4 +278,12 @@ if GetLocale() == "zhTW" then
 	-- Feature 4: 視窗縮放
 	L.SETTINGS_WINDOW_SCALE = "視窗縮放"
 	L.SETTINGS_WINDOW_SCALE_DESC = "縮放整個視窗（50%% - 200%%）"
+	
+	-- ========================================
+	-- CLASSIC COMPATIBILITY
+	-- ========================================
+	L.RECENT_ALLIES_NOT_AVAILABLE = "最近的盟友在Classic中不可用"
+	L.EDIT_MODE_NOT_AVAILABLE = "編輯模式在Classic中不可用"
+	L.CLASSIC_COMPATIBILITY_INFO = "正在Classic相容模式下執行"
+	L.FEATURE_NOT_AVAILABLE_CLASSIC = "此功能在Classic中不可用"
 end

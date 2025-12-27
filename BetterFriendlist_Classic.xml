@@ -1,0 +1,1592 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<!-- ========================================
+	     CLASSIC-COMPATIBLE XML
+	     - No Atlas textures (use file-based textures)
+	     - No RAF templates
+	     - No RecentAllies templates  
+	     - No QuickJoin templates
+	     - No WowStyle1DropdownTemplate (use UIDropDownMenuTemplate)
+	     ======================================== -->
+	
+	<!-- Friend Button Template (virtual) - Two-line layout -->
+	<Button name="BetterFriendsListButtonTemplate" virtual="true" registerForClicks="LeftButtonUp, RightButtonUp">
+		<!-- Width set dynamically in Lua via SetPoint("LEFT") and SetPoint("RIGHT") -->
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="background">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="2" y="-1" />
+						<Anchor point="BOTTOMRIGHT" x="-2" y="1" />
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<!-- Status Icon (Online/Offline) -->
+				<Texture file="Interface\FriendsFrame\StatusIcon-Online" parentKey="status">
+					<Size x="16" y="16" />
+					<Anchors>
+						<Anchor point="TOPLEFT" x="4" y="-9" />
+					</Anchors>
+				</Texture>
+				<!-- Friend Name (Line 1: BattleNet Name (CharacterName)) -->
+				<FontString parentKey="Name" inherits="FriendsFont_Normal" justifyH="LEFT" maxLines="1" nonSpaceWrap="false">
+					<Size x="280" y="0" />
+					<Anchors>
+						<Anchor point="TOPLEFT" x="24" y="-6" />
+					</Anchors>
+				</FontString>
+				<!-- Friend Info (Line 2: Level, Zone) -->
+				<FontString parentKey="Info" inherits="FriendsFont_Small" justifyH="LEFT">
+					<Size x="280" y="0" />
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeKey="$parent.Name" relativePoint="BOTTOMLEFT" x="0" y="-1" />
+					</Anchors>
+					<Color color="FRIENDS_GRAY_COLOR" />
+				</FontString>
+				<!-- Game Icon (WoW/Other Games) - positioned on the right with space for TravelPass button -->
+				<Texture parentKey="gameIcon">
+					<Size x="28" y="28" />
+					<Anchors>
+						<Anchor point="TOPRIGHT" x="-38" y="-3" />
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Frames>
+			<!-- TravelPass Invite Button - positioned at top right (NO ATLAS - use file textures) -->
+			<Button hidden="true" motionScriptsWhileDisabled="true" parentKey="travelPassButton">
+				<Size x="24" y="32"/>
+				<Anchors>
+					<Anchor point="TOPRIGHT" x="1" y="-1"/>
+				</Anchors>
+				<NormalTexture parentKey="NormalTexture" file="Interface\FriendsFrame\TravelPass-Invite">
+					<Size x="24" y="32"/>
+					<TexCoords left="0.01562500" right="0.39062500" top="0.27343750" bottom="0.52343750"/>
+				</NormalTexture>
+				<PushedTexture parentKey="PushedTexture" file="Interface\FriendsFrame\TravelPass-Invite">
+					<Size x="24" y="32"/>
+					<TexCoords left="0.42187500" right="0.79687500" top="0.27343750" bottom="0.52343750"/>
+				</PushedTexture>
+				<DisabledTexture parentKey="DisabledTexture" file="Interface\FriendsFrame\TravelPass-Invite">
+					<Size x="24" y="32"/>
+					<TexCoords left="0.01562500" right="0.39062500" top="0.00781250" bottom="0.25781250"/>
+				</DisabledTexture>
+				<HighlightTexture parentKey="HighlightTexture" file="Interface\FriendsFrame\TravelPass-Invite" alphaMode="ADD">
+					<Size x="24" y="32"/>
+					<TexCoords left="0.42187500" right="0.79687500" top="0.00781250" bottom="0.25781250"/>
+				</HighlightTexture>
+				<Scripts>
+					<OnClick>
+						BetterFriendsList_TravelPassButton_OnClick(self);
+					</OnClick>
+					<OnEnter>
+						BetterFriendsList_TravelPassButton_OnEnter(self);
+					</OnEnter>
+					<OnLeave>
+						GameTooltip:Hide();
+					</OnLeave>
+				</Scripts>
+			</Button>
+		</Frames>
+		<HighlightTexture file="Interface\QuestFrame\UI-QuestLogTitleHighlight" alphaMode="ADD" parentKey="highlight">
+			<Anchors>
+				<Anchor point="TOPLEFT" x="0" y="-1"/>
+				<Anchor point="BOTTOMRIGHT" x="0" y="1"/>
+			</Anchors>
+		</HighlightTexture>
+		<Scripts>
+			<OnClick>
+				BetterFriendsList_Button_OnClick(self, button);
+			</OnClick>
+			<OnEnter>
+				BetterFriendsList_Button_OnEnter(self);
+			</OnEnter>
+			<OnLeave>
+				BetterFriendsList_Button_OnLeave(self);
+			</OnLeave>
+		</Scripts>
+	</Button>
+	
+	<!-- Group Header Button Template -->
+	<Button name="BetterFriendsGroupHeaderTemplate" virtual="true" enableMouse="true">
+		<!-- Width set dynamically in Lua via SetPoint("LEFT") and SetPoint("RIGHT") -->
+		<NormalFont style="GameFontNormalLeft"/>
+		<HighlightFont style="GameFontHighlightLeft"/>
+		<Layers>
+			<Layer level="BACKGROUND" textureSubLevel="-1">
+				<Texture parentKey="BG" file="Interface\FrameGeneral\UI-Background-Rock" horizTile="true" vertTile="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="2" y="-1"/>
+						<Anchor point="BOTTOMRIGHT" x="-2" y="1"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<!-- Simple arrow textures (NO ATLAS) -->
+				<Texture parentKey="RightArrow" file="Interface\Buttons\UI-PlusButton-Up" hidden="true">
+					<Size x="12" y="12"/>
+					<Anchors>
+						<Anchor point="LEFT" x="8" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="DownArrow" file="Interface\Buttons\UI-MinusButton-Up" hidden="true">
+					<Size x="12" y="12"/>
+					<Anchors>
+						<Anchor point="LEFT" x="6" y="-2"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<ButtonText>
+			<Anchors>
+				<Anchor point="LEFT" x="22" y="0"/>
+			</Anchors>
+			<Color r="1.0" g="0.82" b="0.0"/>
+		</ButtonText>
+		<Scripts>
+			<OnMouseDown>
+				self.DownArrow:SetPoint("LEFT", 7, -3);
+				self.RightArrow:SetPoint("LEFT", 9, -1);
+			</OnMouseDown>
+			<OnMouseUp>
+				self.DownArrow:SetPoint("LEFT", 6, -2);
+				self.RightArrow:SetPoint("LEFT", 8, 0);
+			</OnMouseUp>
+			<OnClick>
+				PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON);
+				BetterFriendsList_ToggleGroup(self.groupId);
+			</OnClick>
+		</Scripts>
+		<HighlightTexture file="Interface\QuestFrame\UI-QuestLogTitleHighlight" alphaMode="ADD">
+			<Anchors>
+				<Anchor point="TOPLEFT" x="0" y="-1" />
+				<Anchor point="BOTTOMRIGHT" x="0" y="1" />
+			</Anchors>
+		</HighlightTexture>
+	</Button>
+	
+	<!-- Who List Button Template -->
+	<Button name="BetterWhoListButtonTemplate" virtual="true" registerForClicks="LeftButtonUp, RightButtonUp">
+		<Size x="298" y="16"/>
+		<Layers>
+			<Layer level="BORDER">
+				<FontString parentKey="Name" inherits="GameFontNormalSmall" maxLines="1" justifyH="LEFT">
+					<Size x="106"/>
+					<Anchors>
+						<Anchor point="LEFT" x="6"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="Variable" inherits="GameFontNormalSmall" maxLines="1" justifyH="LEFT">
+					<Size x="98"/>
+					<Anchors>
+						<Anchor point="LEFT" relativeKey="$parent.Name" relativePoint="RIGHT" x="5"/>
+					</Anchors>
+					<Color color="HIGHLIGHT_FONT_COLOR"/>
+				</FontString>
+				<FontString parentKey="Level" inherits="GameFontNormalSmall" justifyH="CENTER" maxLines="1">
+					<Size x="34"/>
+					<Anchors>
+						<Anchor point="LEFT" relativeKey="$parent.Variable" relativePoint="RIGHT" x="4"/>
+					</Anchors>
+					<Color color="HIGHLIGHT_FONT_COLOR"/>
+				</FontString>
+				<FontString parentKey="Class" inherits="GameFontNormalSmall" maxLines="1" justifyH="LEFT">
+					<Anchors>
+						<Anchor point="LEFT" relativeKey="$parent.Level" relativePoint="RIGHT" x="15"/>
+						<Anchor point="RIGHT"/>
+					</Anchors>
+					<Color color="HIGHLIGHT_FONT_COLOR"/>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnClick>
+				BetterWhoListButton_OnClick(self, button)
+			</OnClick>
+			<OnEnter>
+				if self.tooltipInfo then
+					local showTooltip = false
+					local lines = {}
+					
+					if self.Name:IsTruncated() then
+						table.insert(lines, self.tooltipInfo.fullName)
+						showTooltip = true
+					end
+					if self.Level:IsTruncated() then
+						table.insert(lines, format(WHO_LIST_LEVEL_TOOLTIP or "Level %d", self.tooltipInfo.level))
+						showTooltip = true
+					end
+					if self.Variable:IsTruncated() then
+						table.insert(lines, self.tooltipInfo.variableText)
+						showTooltip = true
+					end
+					
+					if showTooltip then
+						GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+						GameTooltip:SetText(lines[1] or "")
+						for i = 2, #lines do
+							GameTooltip:AddLine(lines[i], 1, 1, 1)
+						end
+						GameTooltip:Show()
+					end
+				end
+			</OnEnter>
+			<OnLeave>
+				GameTooltip:Hide()
+			</OnLeave>
+		</Scripts>
+		<HighlightTexture file="Interface\QuestFrame\UI-QuestTitleHighlight" setAllPoints="true" alphaMode="ADD"/>
+	</Button>
+	
+	<!-- Ignore List Button Template -->
+	<Button name="BetterIgnoreListButtonTemplate" virtual="true">
+		<Size x="298" y="16"/>
+		<Layers>
+			<Layer level="BORDER">
+				<FontString parentKey="name" inherits="GameFontNormal" justifyH="LEFT">
+					<Size x="288" y="12"/>
+					<Anchors>
+						<Anchor point="LEFT" x="10" y="1"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnClick>
+				BetterIgnoreListButton_OnClick(self);
+			</OnClick>
+		</Scripts>
+		<HighlightTexture file="Interface\QuestFrame\UI-QuestTitleHighlight" alphaMode="ADD"/>
+	</Button>
+	
+	<!-- Ignore List Header Templates -->
+	<Frame name="BetterFriendsFrameIgnoredHeaderTemplate" virtual="true" enableMouse="true">
+		<Size x="302" y="16"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<FontString parentKey="Title" inherits="GameFontHighlightLeft">
+					<Anchors>
+						<Anchor point="LEFT" x="5" y="1"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnLoad>
+				self.Title:SetText(IGNORED);
+			</OnLoad>
+		</Scripts>
+	</Frame>
+	
+	<Frame name="BetterFriendsFrameBlockedInviteHeaderTemplate" virtual="true" enableMouse="true">
+		<Size x="302" y="16"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<FontString parentKey="Title" inherits="GameFontHighlightLeft">
+					<Anchors>
+						<Anchor point="LEFT" x="5" y="1"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnLoad>
+				self.Title:SetText(BLOCKED_INVITES);
+			</OnLoad>
+		</Scripts>
+	</Frame>
+	
+	<!-- Saved Instance Button Template -->
+	<Button name="BetterSavedInstanceButtonTemplate" virtual="true">
+		<Size y="60"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture setAllPoints="true">
+					<Color r="0.1" g="0.1" b="0.1" a="0.8"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<FontString parentKey="Name" inherits="GameFontNormal" justifyH="LEFT">
+					<Size x="0" y="16"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="10" y="-8"/>
+						<Anchor point="TOPRIGHT" x="-10" y="-8"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="Difficulty" inherits="GameFontHighlightSmall" justifyH="LEFT">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeKey="$parent.Name" relativePoint="BOTTOMLEFT" x="0" y="-2"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="Progress" inherits="GameFontHighlightSmall" justifyH="LEFT">
+					<Anchors>
+						<Anchor point="LEFT" relativeKey="$parent.Difficulty" relativePoint="RIGHT" x="10" y="0"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="Reset" inherits="GameFontHighlightSmall" justifyH="RIGHT">
+					<Anchors>
+						<Anchor point="TOPRIGHT" relativeKey="$parent.Name" relativePoint="BOTTOMRIGHT" x="0" y="-2"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnEnter>
+				if self.instanceData then
+					GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+					GameTooltip:SetText(self.instanceData.name, 1, 1, 1);
+					GameTooltip:AddLine(self.instanceData.difficultyName, 0.7, 0.7, 0.7);
+					if self.instanceData.encounterProgress and self.instanceData.numEncounters then
+						GameTooltip:AddLine(string.format("Progress: %d/%d", self.instanceData.encounterProgress, self.instanceData.numEncounters), 0.5, 1, 0.5);
+					end
+					local timeLeft = SecondsToTime(self.instanceData.reset, true, nil, 3);
+					if self.instanceData.extended then
+						GameTooltip:AddLine("Extended - " .. timeLeft, 1, 0.5, 0);
+					elseif self.instanceData.locked then
+						GameTooltip:AddLine("Resets in: " .. timeLeft, 1, 1, 0);
+					else
+						GameTooltip:AddLine("Expired", 0.5, 0.5, 0.5);
+					end
+					GameTooltip:Show();
+				end
+			</OnEnter>
+			<OnLeave>
+				GameTooltip:Hide();
+			</OnLeave>
+		</Scripts>
+		<HighlightTexture setAllPoints="true" alphaMode="ADD">
+			<Color r="1" g="1" b="1" a="0.1"/>
+		</HighlightTexture>
+	</Button>
+	
+	<!-- ========================================
+	     RAID FRAME TEMPLATES
+	     ======================================== -->
+	
+	<Button name="BetterRaidMemberButtonTemplate" virtual="true">
+		<Size x="150" y="14"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Background" file="Interface\RaidFrame\Raid-Bar-Hp-Bg">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="-3" y="0"/>
+						<Anchor point="BOTTOMRIGHT" x="3" y="0"/>
+					</Anchors>
+					<TexCoords left="0" right="1" top="0" bottom="0.53125"/>
+				</Texture>
+			</Layer>
+			<Layer level="BACKGROUND" textureSubLevel="1">
+				<Texture parentKey="ClassColorTint">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="1" y="-1"/>
+						<Anchor point="BOTTOMRIGHT" x="-1" y="1"/>
+					</Anchors>
+					<Color r="0" g="0" b="0" a="0.5"/>
+				</Texture>
+			</Layer>
+			<Layer level="BORDER">
+				<Texture parentKey="CombatOverlay" hidden="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="1" y="-1"/>
+						<Anchor point="BOTTOMRIGHT" x="-1" y="1"/>
+					</Anchors>
+					<Color r="0.5" g="0.5" b="0.5" a="0.5"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture parentKey="ClassIcon" hidden="false">
+					<Size x="12" y="12"/>
+					<Anchors>
+						<Anchor point="LEFT" x="2" y="0"/>
+					</Anchors>
+				</Texture>
+				<FontString parentKey="Level" inherits="GameFontNormalSmall" justifyH="LEFT">
+					<Anchors>
+						<Anchor point="LEFT" relativeKey="$parent.ClassIcon" relativePoint="RIGHT" x="2" y="0"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="Name" inherits="GameFontNormalSmall" justifyH="LEFT">
+					<Anchors>
+						<Anchor point="LEFT" relativeKey="$parent.Level" relativePoint="RIGHT" x="2" y="0"/>
+						<Anchor point="RIGHT" x="-20" y="0"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="EmptyText" inherits="GameFontDisable" text="Empty" hidden="true">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture parentKey="RoleIcon" hidden="true">
+					<Size x="12" y="12"/>
+					<Anchors>
+						<Anchor point="RIGHT" x="-2" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="RankIcon" hidden="true">
+					<Size x="12" y="12"/>
+					<Anchors>
+						<Anchor point="RIGHT" relativeKey="$parent.RoleIcon" relativePoint="LEFT" x="-5" y="1"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="MainTankIcon" hidden="true" file="Interface\GroupFrame\UI-Group-MainTankIcon">
+					<Size x="10" y="10"/>
+					<Anchors>
+						<Anchor point="RIGHT" relativeKey="$parent.RankIcon" relativePoint="LEFT" x="-2" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="MainAssistIcon" hidden="true" file="Interface\GroupFrame\UI-Group-MainAssistIcon">
+					<Size x="10" y="10"/>
+					<Anchors>
+						<Anchor point="RIGHT" relativeKey="$parent.RankIcon" relativePoint="LEFT" x="-2" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="ReadyCheckIcon" hidden="true">
+					<Size x="14" y="14"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnLoad>
+				BetterRaidMemberButton_OnLoad(self);
+				self:RegisterForDrag("LeftButton");
+				self:SetMovable(true);
+			</OnLoad>
+			<OnEnter>
+				BetterRaidMemberButton_OnEnter(self);
+			</OnEnter>
+			<OnLeave>
+				BetterRaidMemberButton_OnLeave(self);
+			</OnLeave>
+			<OnClick>
+				BetterRaidMemberButton_OnClick(self, button);
+			</OnClick>
+			<OnDragStart>
+				if not InCombatLockdown() then
+					BetterRaidMemberButton_OnDragStart(self);
+				end
+			</OnDragStart>
+			<OnDragStop>
+				if not InCombatLockdown() then
+					BetterRaidMemberButton_OnDragStop(self);
+				end
+			</OnDragStop>
+		</Scripts>
+		<HighlightTexture parentKey="Highlight" alphaMode="ADD" file="Interface\QuestFrame\UI-QuestTitleHighlight"/>
+	</Button>
+	
+	<Frame name="BetterRaidGroupTemplate" virtual="true">
+		<Size x="150" y="85"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture setAllPoints="true">
+					<Color r="0" g="0" b="0" a="0"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<FontString parentKey="GroupTitle" inherits="GameFontNormalSmall" justifyH="CENTER">
+					<Anchors>
+						<Anchor point="TOP" x="0" y="-2"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Button parentKey="Slot1" inherits="BetterRaidMemberButtonTemplate" id="1">
+				<Anchors>
+					<Anchor point="TOP" x="0" y="-15"/>
+				</Anchors>
+			</Button>
+			<Button parentKey="Slot2" inherits="BetterRaidMemberButtonTemplate" id="2">
+				<Anchors>
+					<Anchor point="TOP" relativeKey="$parent.Slot1" relativePoint="BOTTOM" x="0" y="0"/>
+				</Anchors>
+			</Button>
+			<Button parentKey="Slot3" inherits="BetterRaidMemberButtonTemplate" id="3">
+				<Anchors>
+					<Anchor point="TOP" relativeKey="$parent.Slot2" relativePoint="BOTTOM" x="0" y="0"/>
+				</Anchors>
+			</Button>
+			<Button parentKey="Slot4" inherits="BetterRaidMemberButtonTemplate" id="4">
+				<Anchors>
+					<Anchor point="TOP" relativeKey="$parent.Slot3" relativePoint="BOTTOM" x="0" y="0"/>
+				</Anchors>
+			</Button>
+			<Button parentKey="Slot5" inherits="BetterRaidMemberButtonTemplate" id="5">
+				<Anchors>
+					<Anchor point="TOP" relativeKey="$parent.Slot4" relativePoint="BOTTOM" x="0" y="0"/>
+				</Anchors>
+			</Button>
+		</Frames>
+	</Frame>
+	
+	<!-- ========================================
+	     MAIN FRIENDS FRAME
+	     ======================================== -->
+	
+	<Frame name="BetterFriendsFrame" parent="UIParent" inherits="ButtonFrameTemplate" toplevel="true" movable="true" enableMouse="true" hidden="true">
+		<Size x="338" y="424"/>
+		<Anchors>
+			<Anchor point="TOPLEFT" x="16" y="-116" />
+		</Anchors>
+		<Layers>
+			<Layer level="OVERLAY" textureSubLevel="-1">
+				<Texture parentKey="PortraitIcon" file="Interface\AddOns\BetterFriendlist\Textures\PortraitIcon">
+					<Size x="60" y="60" />
+					<Anchors>
+						<Anchor point="TOPLEFT" x="-5" y="7" />
+					</Anchors>
+					<TexCoords left="0.08" right="0.92" top="0.08" bottom="0.92"/>
+				</Texture>
+				<MaskTexture parentKey="PortraitMask" file="Interface\CharacterFrame\TempPortraitAlphaMask" hWrapMode="CLAMPTOBLACKADDITIVE" vWrapMode="CLAMPTOBLACKADDITIVE">
+					<Size x="60" y="60" />
+					<Anchors>
+						<Anchor point="TOPLEFT" x="-5" y="7" />
+					</Anchors>
+					<MaskedTextures>
+						<MaskedTexture childKey="PortraitIcon"/>
+					</MaskedTextures>
+				</MaskTexture>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Frame name="BetterFriendsTabHeader" parentKey="FriendsTabHeader" setAllPoints="true">
+				<KeyValues>
+					<KeyValue key="maxTabWidth" value="110" type="number"/>
+				</KeyValues>
+				<Frames>
+					<!-- Replicate Blizzard's FriendsFrameBattlenetFrame structure -->
+					<Frame parentKey="BattlenetFrame">
+						<Size x="190" y="29"/>
+						<Anchors>
+							<Anchor point="TOP" relativeKey="$parent.$parent.TitleContainer" x="25" y="-26"/>
+						</Anchors>
+						<Layers>
+							<Layer level="BACKGROUND">
+								<Texture file="Interface\FriendsFrame\battlenet-friends-main" setAllPoints="true">
+									<TexCoords left="0.00390625" right="0.74609375" top="0.00195313" bottom="0.05859375"/>
+								</Texture>
+							</Layer>
+							<Layer level="ARTWORK">
+								<FontString parentKey="Tag" inherits="GameFontNormal">
+									<Anchors>
+										<Anchor point="CENTER"/>
+									</Anchors>
+									<Color r="0.345" g="0.667" b="0.867" />
+								</FontString>
+								<FontString parentKey="UnavailableLabel" inherits="FriendsFont_Normal" text="BATTLENET_UNAVAILABLE" hidden="true">
+									<Anchors>
+										<Anchor point="CENTER"/>
+									</Anchors>
+									<Color r="1" g="0.82" b="0"/>
+								</FontString>
+							</Layer>
+						</Layers>
+						<Frames>
+							<!-- Contacts Menu Button (Classic: Simple Button) -->
+							<Button parentKey="ContactsMenuButton" inherits="UIPanelButtonTemplate">
+								<Size x="28" y="28"/>
+								<Anchors>
+									<Anchor point="LEFT" relativePoint="RIGHT" x="1" y="0"/>
+								</Anchors>
+								<Layers>
+									<Layer level="ARTWORK">
+										<Texture parentKey="Icon" file="Interface\AddOns\BetterFriendlist\Icons\menu">
+											<Size x="16" y="16"/>
+											<Anchors>
+												<Anchor point="CENTER"/>
+											</Anchors>
+										</Texture>
+									</Layer>
+								</Layers>
+								<Scripts>
+									<OnEnter>
+										GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+										GameTooltip_SetTitle(GameTooltip, CONTACTS_MENU_NAME or "Menu");
+										GameTooltip:Show();
+									</OnEnter>
+									<OnLeave>
+										GameTooltip:Hide();
+									</OnLeave>
+									<OnClick>
+										BetterFriendsFrame_ShowContactsMenu(self);
+									</OnClick>
+								</Scripts>
+							</Button>
+							
+							<!-- Broadcast Edit Frame -->
+							<Frame parentKey="BroadcastFrame" frameStrata="HIGH" enableMouse="true" hidden="true">
+								<Size x="338" y="140"/>
+								<Anchors>
+									<Anchor point="TOPLEFT" x="-110" y="-24"/>
+								</Anchors>
+								<Layers>
+									<Layer level="ARTWORK">
+										<FontString text="BATTLENET_BROADCAST" inherits="GameFontNormalMed3">
+											<Anchors>
+												<Anchor point="TOP" y="-20"/>
+											</Anchors>
+										</FontString>
+									</Layer>
+								</Layers>
+								<Frames>
+									<Frame parentKey="Border" inherits="DialogBorderOpaqueTemplate"/>
+									<EditBox parentKey="EditBox" multiLine="false" letters="127" countInvisibleLetters="true" autoFocus="false">
+										<Size x="256" y="30"/>
+										<Anchors>
+											<Anchor point="TOP" y="-45"/>
+										</Anchors>
+										<Layers>
+											<Layer level="BACKGROUND">
+												<Texture parentKey="TopLeftBorder" file="Interface\Common\Common-Input-Border-TL">
+													<Size x="8" y="8"/>
+													<Anchors>
+														<Anchor point="TOPLEFT" x="-4" y="4"/>
+													</Anchors>
+												</Texture>
+												<Texture parentKey="TopRightBorder" file="Interface\Common\Common-Input-Border-TR">
+													<Size x="8" y="8"/>
+													<Anchors>
+														<Anchor point="TOPRIGHT" x="4" y="4"/>
+													</Anchors>
+												</Texture>
+												<Texture parentKey="TopBorder" file="Interface\Common\Common-Input-Border-T">
+													<Anchors>
+														<Anchor point="TOPLEFT" relativeKey="$parent.TopLeftBorder" relativePoint="TOPRIGHT"/>
+														<Anchor point="BOTTOMRIGHT" relativeKey="$parent.TopRightBorder" relativePoint="BOTTOMLEFT"/>
+													</Anchors>
+												</Texture>
+												<Texture parentKey="BottomLeftBorder" file="Interface\Common\Common-Input-Border-BL">
+													<Size x="8" y="8"/>
+													<Anchors>
+														<Anchor point="BOTTOMLEFT" x="-4" y="-3"/>
+													</Anchors>
+												</Texture>
+												<Texture parentKey="BottomRightBorder" file="Interface\Common\Common-Input-Border-BR">
+													<Size x="8" y="8"/>
+													<Anchors>
+														<Anchor point="BOTTOMRIGHT" x="4" y="-3"/>
+													</Anchors>
+												</Texture>
+												<Texture parentKey="BottomBorder" file="Interface\Common\Common-Input-Border-B">
+													<Anchors>
+														<Anchor point="TOPLEFT" relativeKey="$parent.BottomLeftBorder" relativePoint="TOPRIGHT"/>
+														<Anchor point="BOTTOMRIGHT" relativeKey="$parent.BottomRightBorder" relativePoint="BOTTOMLEFT"/>
+													</Anchors>
+												</Texture>
+												<Texture parentKey="LeftBorder" file="Interface\Common\Common-Input-Border-L">
+													<Anchors>
+														<Anchor point="TOPLEFT" relativeKey="$parent.TopLeftBorder" relativePoint="BOTTOMLEFT"/>
+														<Anchor point="BOTTOMRIGHT" relativeKey="$parent.BottomLeftBorder" relativePoint="TOPRIGHT"/>
+													</Anchors>
+												</Texture>
+												<Texture parentKey="RightBorder" file="Interface\Common\Common-Input-Border-R">
+													<Anchors>
+														<Anchor point="TOPLEFT" relativeKey="$parent.TopRightBorder" relativePoint="BOTTOMLEFT"/>
+														<Anchor point="BOTTOMRIGHT" relativeKey="$parent.BottomRightBorder" relativePoint="TOPRIGHT"/>
+													</Anchors>
+												</Texture>
+												<Texture parentKey="MiddleBorder" file="Interface\Common\Common-Input-Border-M">
+													<Anchors>
+														<Anchor point="TOPLEFT" relativeKey="$parent.LeftBorder" relativePoint="TOPRIGHT"/>
+														<Anchor point="BOTTOMRIGHT" relativeKey="$parent.RightBorder" relativePoint="BOTTOMLEFT"/>
+													</Anchors>
+												</Texture>
+											</Layer>
+											<Layer level="BORDER">
+												<FontString parentKey="PromptText" inherits="FriendsFont_Small" justifyH="LEFT" justifyV="MIDDLE" text="FRIENDS_LIST_ENTER_TEXT">
+													<Anchors>
+														<Anchor point="LEFT"/>
+													</Anchors>
+													<Color r="0.35" g="0.35" b="0.35"/>
+												</FontString>
+											</Layer>
+										</Layers>
+										<Scripts>
+											<OnTextChanged>
+												if self:GetText() ~= "" then
+													self.PromptText:Hide();
+												else
+													self.PromptText:Show();
+												end
+											</OnTextChanged>
+											<OnCursorChanged function="ScrollingEdit_OnCursorChanged"/>
+											<OnEscapePressed>
+												self:ClearFocus();
+											</OnEscapePressed>
+											<OnEnterPressed>
+												self:GetParent():SetBroadcast();
+											</OnEnterPressed>
+										</Scripts>
+										<FontString inherits="FriendsFont_Small" spacing="2"/>
+									</EditBox>
+									<Button parentKey="UpdateButton" inherits="UIPanelButtonTemplate" text="UPDATE">
+										<Size x="96" y="22"/>
+										<Anchors>
+											<Anchor point="BOTTOMLEFT" x="20" y="20"/>
+										</Anchors>
+										<Scripts>
+											<OnClick>
+												self:GetParent():SetBroadcast();
+											</OnClick>
+										</Scripts>
+									</Button>
+									<Button parentKey="CancelButton" inherits="UIPanelButtonTemplate" text="CANCEL">
+										<Size x="96" y="22"/>
+										<Anchors>
+											<Anchor point="BOTTOMRIGHT" x="-20" y="20"/>
+										</Anchors>
+										<Scripts>
+											<OnClick>
+												self:GetParent():HideFrame();
+											</OnClick>
+										</Scripts>
+									</Button>
+								</Frames>
+								<Scripts>
+									<OnLoad>
+										self.ContactsMenuButton = self:GetParent().ContactsMenuButton;
+									</OnLoad>
+								</Scripts>
+							</Frame>
+						</Frames>
+					</Frame>
+					
+					<!-- Status Dropdown (Classic: UIDropDownMenuTemplate) -->
+					<Frame parentKey="StatusDropdown" inherits="UIDropDownMenuTemplate">
+						<Anchors>
+							<Anchor point="RIGHT" relativeKey="$parent.BattlenetFrame" relativePoint="LEFT" x="10" y="-2"/>
+						</Anchors>
+					</Frame>
+					
+					<!-- Search Box -->
+					<EditBox parentKey="SearchBox" inherits="SearchBoxTemplate" autoFocus="false">
+						<KeyValues>
+							<KeyValue key="instructionText" value="Search friends..." type="string"/>
+						</KeyValues>
+						<Size y="28"/>
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeKey="$parent.$parent.Inset" x="10" y="50"/>
+							<Anchor point="TOPRIGHT" relativeKey="$parent.$parent.Inset" x="-10" y="50"/>
+						</Anchors>
+						<Scripts>
+							<OnTextChanged>
+								local text = self:GetText();
+								if text and text ~= "" then
+									self.Instructions:Hide();
+								else
+									self.Instructions:Show();
+								end
+								BetterFriendsFrame_OnSearchTextChanged(self);
+							</OnTextChanged>
+						</Scripts>
+					</EditBox>
+					
+					<!-- Quick Filter Dropdown (Classic: UIDropDownMenuTemplate) -->
+					<Frame parentKey="QuickFilterDropdown" inherits="UIDropDownMenuTemplate">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeKey="$parent.$parent.Inset" x="-10" y="75"/>
+						</Anchors>
+					</Frame>
+
+					<!-- Primary Sort Dropdown (Classic: UIDropDownMenuTemplate) -->
+					<Frame parentKey="PrimarySortDropdown" inherits="UIDropDownMenuTemplate">
+						<Anchors>
+							<Anchor point="LEFT" relativeKey="$parent.QuickFilterDropdown" relativePoint="RIGHT" x="-10" y="0"/>
+						</Anchors>
+					</Frame>
+
+					<!-- Secondary Sort Dropdown (Classic: UIDropDownMenuTemplate) -->
+					<Frame parentKey="SecondarySortDropdown" inherits="UIDropDownMenuTemplate">
+						<Anchors>
+							<Anchor point="LEFT" relativeKey="$parent.PrimarySortDropdown" relativePoint="RIGHT" x="-15" y="0"/>
+						</Anchors>
+					</Frame>
+					
+					<!-- Tab Buttons (Classic: Only Friends tab visible) -->
+					<Button name="BetterFriendsFrameTab1" parentKey="Tab1" inherits="PanelTopTabButtonTemplate" text="FRIENDS" id="1">
+						<Anchors>
+							<Anchor point="TOPLEFT" x="18" y="-100"/>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								PanelTemplates_Tab_OnClick(self, self:GetParent())
+								BetterFriendsFrame_ShowTab(1)
+							</OnClick>
+						</Scripts>
+					</Button>
+					<!-- Tab2 and Tab3 exist in XML but are hidden by Lua in Classic -->
+					<Button name="BetterFriendsFrameTab2" parentKey="Tab2" inherits="PanelTopTabButtonTemplate" text="CONTACTS_RECENT_ALLIES_TAB_NAME" id="2">
+						<Scripts>
+							<OnClick>
+								PanelTemplates_Tab_OnClick(self, self:GetParent())
+								BetterFriendsFrame_ShowTab(2)
+							</OnClick>
+						</Scripts>
+					</Button>
+					<Button name="BetterFriendsFrameTab3" parentKey="Tab3" inherits="PanelTopTabButtonTemplate" text="RECRUIT_A_FRIEND" id="3">
+						<Scripts>
+							<OnClick>
+								PanelTemplates_Tab_OnClick(self, self:GetParent())
+								BetterFriendsFrame_ShowTab(3)
+							</OnClick>
+						</Scripts>
+					</Button>
+				</Frames>
+			</Frame>
+			
+			<!-- Ignore List Window -->
+			<Frame parentKey="IgnoreListWindow" inherits="ButtonFrameTemplate" hidden="true">
+				<Size x="273" y="292"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativePoint="TOPRIGHT" x="5" y="-53"/>
+				</Anchors>
+				<Frames>
+					<Button parentKey="UnignorePlayerButton" inherits="UIPanelButtonTemplate" text="UNIGNORE_PLAYER_BUTTON_LABEL">
+						<Size x="130" y="22"/>
+						<Anchors>
+							<Anchor point="BOTTOM" y="8"/>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								BetterIgnoreList_Unignore();
+							</OnClick>
+						</Scripts>
+					</Button>
+					<!-- ScrollBox placeholder - FauxScrollFrame with ScrollBar created in Lua (IgnoreList.lua) -->
+					<Frame parentKey="ScrollBox">
+						<Anchors>
+							<Anchor point="TOPLEFT" x="1" y="1"/>
+							<Anchor point="BOTTOMRIGHT" x="-20"/>
+						</Anchors>
+					</Frame>
+				</Frames>
+				<Scripts>
+					<OnLoad>
+						BetterIgnoreListWindow_OnLoad(self);
+					</OnLoad>
+					<OnShow>
+						PlaySound(SOUNDKIT.IG_MAINMENU_OPEN);
+						IgnoreList_Update();
+					</OnShow>
+					<OnHide>
+						PlaySound(SOUNDKIT.IG_MAINMENU_CLOSE);
+					</OnHide>
+				</Scripts>
+			</Frame>
+			
+			<!-- Who Frame (Classic compatible - no ScrollBox) -->
+			<Frame parentKey="WhoFrame" setAllPoints="true" hidden="true">
+				<Frames>
+					<Frame parentKey="ListInset" inherits="InsetFrameTemplate">
+						<Anchors>
+							<Anchor point="TOPLEFT" x="5" y="-83"/>
+							<Anchor point="BOTTOMRIGHT" x="-5" y="50"/>
+						</Anchors>
+					</Frame>
+					
+					<!-- Totals moved out of ListInset for better anchoring -->
+					<Frame parentKey="Totals">
+						<Size y="14"/>
+						<Anchors>
+							<Anchor point="BOTTOM" relativeKey="$parent.EditBox" relativePoint="TOP" x="0" y="2"/>
+							<Anchor point="LEFT" x="10"/>
+							<Anchor point="RIGHT" x="-10"/>
+						</Anchors>
+						<Layers>
+							<Layer level="ARTWORK">
+								<FontString parentKey="Text" inherits="GameFontNormalSmall" justifyH="CENTER">
+									<Anchors>
+										<Anchor point="CENTER"/>
+									</Anchors>
+								</FontString>
+							</Layer>
+						</Layers>
+					</Frame>
+					
+					<!-- EditBox moved to Bottom to match Classic -->
+					<EditBox parentKey="EditBox" inherits="SearchBoxTemplate" autoFocus="false">
+						<Size x="296" y="20"/>
+						<Anchors>
+							<Anchor point="BOTTOMLEFT" x="18" y="26"/>
+						</Anchors>
+						<Scripts>
+							<OnEnterPressed>
+								self:ClearFocus()
+								local text = self:GetText()
+								BetterWhoFrame_SendWhoRequest(text)
+								BetterWhoFrame_SetSelectedButton(nil)
+							</OnEnterPressed>
+							<OnEscapePressed>
+								self:ClearFocus()
+							</OnEscapePressed>
+						</Scripts>
+					</EditBox>
+					
+					<!-- Column Dropdown (Classic: UIDropDownMenu instead of modern Dropdown) -->
+					<Frame parentKey="ColumnDropdown" inherits="UIDropDownMenuTemplate" frameStrata="HIGH">
+						<Anchors>
+							<Anchor point="TOPLEFT" x="87" y="-59"/> 
+						</Anchors>
+						<Scripts>
+							<OnLoad>
+								if BFL and BFL.WhoFrame then
+									BFL.WhoFrame:InitializeClassicDropdown(self)
+								else
+									-- Defer initialization if module not loaded yet
+									C_Timer.After(0.5, function()
+										if BFL and BFL.WhoFrame then
+											BFL.WhoFrame:InitializeClassicDropdown(self)
+										end
+									end)
+								end
+							</OnLoad>
+						</Scripts>
+					</Frame>
+					
+					<!-- Column Headers -->
+					<Button parentKey="NameHeader" inherits="WhoFrameColumnHeaderTemplate" frameStrata="HIGH">
+						<Anchors>
+							<Anchor point="TOPLEFT" x="7" y="-60"/>
+						</Anchors>
+						<Scripts>
+							<OnLoad>
+								self:SetText(NAME)
+								self:SetWidth(83)
+							</OnLoad>
+							<OnClick>
+								BetterWhoFrame_SortByColumn("name")
+							</OnClick>
+						</Scripts>
+					</Button>
+					
+					<Button parentKey="LevelHeader" inherits="WhoFrameColumnHeaderTemplate" frameStrata="HIGH">
+						<Anchors>
+							<Anchor point="TOPLEFT" x="198" y="-60"/>
+						</Anchors>
+						<Scripts>
+							<OnLoad>
+								self:SetText(LEVEL_ABBR)
+								self:SetWidth(32)
+							</OnLoad>
+							<OnClick>
+								BetterWhoFrame_SortByColumn("level")
+							</OnClick>
+						</Scripts>
+					</Button>
+					
+					<Button parentKey="ClassHeader" inherits="WhoFrameColumnHeaderTemplate" frameStrata="HIGH">
+						<Anchors>
+							<Anchor point="TOPLEFT" x="245" y="-60"/>
+						</Anchors>
+						<Scripts>
+							<OnLoad>
+								self:SetText(CLASS)
+								self:SetWidth(92)
+							</OnLoad>
+							<OnClick>
+								BetterWhoFrame_SortByColumn("class")
+							</OnClick>
+						</Scripts>
+					</Button>
+					
+					<!-- Bottom Buttons (Reordered to match Classic) -->
+					<Button parentKey="GroupInviteButton" inherits="UIPanelButtonTemplate" text="GROUP_INVITE">
+						<Size x="120" y="22"/>
+						<Anchors>
+							<Anchor point="BOTTOMRIGHT" x="-6" y="4"/>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								if BetterFriendsFrame.WhoFrame.selectedName then
+									C_PartyInfo.InviteUnit(BetterFriendsFrame.WhoFrame.selectedName)
+								end
+							</OnClick>
+						</Scripts>
+					</Button>
+					<Button parentKey="AddFriendButton" inherits="UIPanelButtonTemplate" text="ADD_FRIEND">
+						<Size x="120" y="22"/>
+						<Anchors>
+							<Anchor point="RIGHT" relativeKey="$parent.GroupInviteButton" relativePoint="LEFT" x="0" y="0"/>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								if BetterFriendsFrame.WhoFrame.selectedName then
+									C_FriendList.AddFriend(BetterFriendsFrame.WhoFrame.selectedName)
+								end
+							</OnClick>
+						</Scripts>
+					</Button>
+					<Button parentKey="WhoButton" inherits="UIPanelButtonTemplate" text="REFRESH">
+						<Size x="85" y="22"/>
+						<Anchors>
+							<Anchor point="RIGHT" relativeKey="$parent.AddFriendButton" relativePoint="LEFT" x="0" y="0"/>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								local text = BetterFriendsFrame.WhoFrame.EditBox:GetText()
+								BetterWhoFrame_SendWhoRequest(text)
+								BetterWhoFrame_SetSelectedButton(nil)
+								PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+								C_Timer.After(0.1, function()
+									if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
+										BetterFriendsFrame_ShowBottomTab(2)
+									end
+								end)
+							</OnClick>
+						</Scripts>
+					</Button>
+					
+					<!-- ScrollBox placeholder -->
+					<Frame parentKey="ScrollBox">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeKey="$parent.ListInset" x="10" y="-2"/>
+							<Anchor point="BOTTOMRIGHT" relativeKey="$parent.ListInset" x="-22" y="2"/>
+						</Anchors>
+						<Scripts>
+							<OnLoad>
+								self:SetClipsChildren(true)
+							</OnLoad>
+						</Scripts>
+					</Frame>
+				</Frames>
+				<Scripts>
+					<OnLoad>
+						BetterWhoFrame_OnLoad(self)
+						BetterFriendsFrame.WhoFrame.AddFriendButton:Disable()
+						BetterFriendsFrame.WhoFrame.GroupInviteButton:Disable()
+					</OnLoad>
+					<OnShow>
+						C_FriendList.SetWhoToUi(true)
+						if FriendsFrame then
+							FriendsFrame:UnregisterEvent("WHO_LIST_UPDATE")
+							if FriendsFrame.WhoFrame then
+								FriendsFrame.WhoFrame:Hide()
+							end
+						end
+						if EventRegistry then
+							EventRegistry:RegisterCallback("TextSizeManager.OnTextScaleUpdated", function()
+								if BetterWhoFrame_InvalidateFontCache then
+									BetterWhoFrame_InvalidateFontCache()
+								end
+								BetterWhoFrame_Update()
+							end, self)
+						end
+						BetterWhoFrame_Update()
+					</OnShow>
+					<OnHide>
+						if EventRegistry then
+							EventRegistry:UnregisterCallback("TextSizeManager.OnTextScaleUpdated", self)
+						end
+						if FriendsFrame then
+							FriendsFrame:RegisterEvent("WHO_LIST_UPDATE")
+						end
+						C_FriendList.SetWhoToUi(false)
+					</OnHide>
+				</Scripts>
+			</Frame>
+			
+			<!-- Portrait Button -->
+			<Button parentKey="PortraitButton" enableMouse="false">
+				<Size x="60" y="60" />
+				<Anchors>
+					<Anchor point="TOPLEFT" x="-5" y="7" />
+				</Anchors>
+			</Button>
+			
+			<!-- Scroll Frame Container - FauxScrollFrame with ScrollBar created in Lua (FriendsList.lua) -->
+			<!-- Size set dynamically in OnLoad: TOPLEFT to Inset +4,-4 / BOTTOMRIGHT to Inset -22,2 -->
+			<Frame parentKey="ScrollFrame">
+				<Scripts>
+					<OnLoad>
+						self:SetClipsChildren(true)
+					</OnLoad>
+				</Scripts>
+			</Frame>
+			
+			<!-- Bottom Buttons -->
+			<Button parentKey="AddFriendButton" inherits="UIPanelButtonTemplate" text="ADD_FRIEND">
+				<Size x="134" y="21"/>
+				<Anchors>
+					<Anchor point="BOTTOMLEFT" x="4" y="4"/>
+				</Anchors>
+				<Scripts>
+					<OnClick>
+						-- Try to use the advanced AddFriendFrame if available (matches Retail behavior)
+						if not AddFriendFrame then
+							LoadAddOn("Blizzard_FriendsFrame")
+						end
+
+						local name = GetUnitName("target", true);
+						if ( UnitIsPlayer("target") and UnitCanCooperate("player", "target") and not C_FriendList.GetFriendInfo(name) ) then
+							C_FriendList.AddFriend(name);
+							PlaySound(SOUNDKIT.U_CHAT_SCROLL_BUTTON);
+						else
+							local _, battleTag, _, _, _, _, isRIDEnabled = BNGetInfo();
+							if ( ( battleTag or isRIDEnabled ) and BNFeaturesEnabledAndConnected() ) then
+								if AddFriendEntryFrame_Collapse then
+									AddFriendEntryFrame_Collapse(true);
+								end
+								if AddFriendNameEditBox then
+									AddFriendFrame.editFocus = AddFriendNameEditBox;
+								end
+								StaticPopupSpecial_Show(AddFriendFrame);
+								if ( GetCVarBool("addFriendInfoShown") ) then
+									if AddFriendFrame_ShowEntry then
+										AddFriendFrame_ShowEntry();
+									end
+								else
+									if AddFriendFrame_ShowInfo then
+										AddFriendFrame_ShowInfo();
+									end
+								end
+							else
+								StaticPopup_Show("ADD_FRIEND");
+							end
+						end
+					</OnClick>
+				</Scripts>
+			</Button>
+			<Button parentKey="SendMessageButton" inherits="UIPanelButtonTemplate" text="SEND_MESSAGE">
+				<Size x="134" y="21"/>
+				<Anchors>
+					<Anchor point="BOTTOMRIGHT" x="-6" y="4"/>
+				</Anchors>
+				<Scripts>
+					<OnClick>
+						local FriendsList = BFL and BFL:GetModule("FriendsList")
+						if not FriendsList or not FriendsList.selectedFriend then
+							return
+						end
+						local friend = FriendsList.selectedFriend
+						if friend.type == "bnet" then
+							ChatFrame_SendBNetTell(friend.accountName or friend.battleTag)
+						elseif friend.type == "wow" and friend.name then
+							ChatFrame_SendTell(friend.name)
+						end
+					</OnClick>
+				</Scripts>
+			</Button>
+			
+			<!-- Raid Frame -->
+			<Frame parentKey="RaidFrame" hidden="true">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeKey="$parent" x="4" y="-10"/>
+					<Anchor point="BOTTOMRIGHT" relativeKey="$parent" x="-4" y="5"/>
+				</Anchors>
+				<Frames>
+					<Frame parentKey="ControlPanel">
+						<Size x="360" y="48"/>
+						<Anchors>
+							<Anchor point="TOPLEFT" x="14" y="-8"/>
+							<Anchor point="TOPRIGHT" x="-14" y="-8"/>
+						</Anchors>
+						<Frames>
+							<Button parentKey="RaidInfoButton" inherits="UIPanelButtonTemplate" text="Raid Info">
+								<Size x="90" y="22"/>
+								<Anchors>
+									<Anchor point="TOPRIGHT" x="10" y="-15"/>
+								</Anchors>
+								<Scripts>
+									<OnClick>
+										BetterRaidFrame_RaidInfoButton_OnClick(self);
+									</OnClick>
+								</Scripts>
+							</Button>
+							<CheckButton parentKey="EveryoneAssistCheckbox" inherits="UICheckButtonTemplate">
+								<Anchors>
+									<Anchor point="TOPLEFT" x="31" y="-10"/>
+								</Anchors>
+								<Scripts>
+									<OnLoad>
+										BetterRaidFrame_EveryoneAssistCheckbox_OnLoad(self);
+									</OnLoad>
+									<OnEvent>
+										BetterRaidFrame_EveryoneAssistCheckbox_OnEvent(self);
+									</OnEvent>
+									<OnClick>
+										BetterRaidFrame_EveryoneAssistCheckbox_OnClick(self);
+									</OnClick>
+								</Scripts>
+							</CheckButton>
+						</Frames>
+						<Layers>
+							<Layer level="OVERLAY">
+								<FontString parentKey="RoleSummary" inherits="GameFontHighlight" justifyH="LEFT">
+									<Anchors>
+										<Anchor point="RIGHT" relativeKey="$parent.RaidInfoButton" relativePoint="LEFT" x="-100" y="0"/>
+									</Anchors>
+								</FontString>
+								<FontString parentKey="MemberCount" inherits="GameFontHighlight" justifyH="LEFT">
+									<Anchors>
+										<Anchor point="LEFT" relativeKey="$parent.RoleSummary" relativePoint="RIGHT" x="5" y="0"/>
+									</Anchors>
+								</FontString>
+								<FontString parentKey="EveryoneAssistLabel" inherits="GameFontNormal">
+									<Anchors>
+										<Anchor point="LEFT" relativeKey="$parent.EveryoneAssistCheckbox" relativePoint="RIGHT" x="0" y="0"/>
+									</Anchors>
+								</FontString>
+							</Layer>
+						</Layers>
+						<Frames>
+							<Button parentKey="CombatIcon" hidden="true">
+								<Size x="16" y="16"/>
+								<Anchors>
+									<Anchor point="RIGHT" relativeKey="$parent.RaidInfoButton" relativePoint="LEFT" x="-3" y="-1"/>
+								</Anchors>
+								<Layers>
+									<Layer level="ARTWORK">
+										<Texture parentKey="Icon">
+											<Anchors>
+												<Anchor point="CENTER"/>
+											</Anchors>
+											<Size x="16" y="16"/>
+										</Texture>
+									</Layer>
+								</Layers>
+								<Scripts>
+									<OnLoad>
+										self.Icon:SetTexture("Interface\\DialogFrame\\UI-Dialog-Icon-AlertNew");
+										self.Icon:SetTexCoord(0, 1, 0, 1);
+									</OnLoad>
+									<OnEnter>
+										GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+										GameTooltip:SetText("In Combat", 1.0, 0.82, 0, 1.0);
+										GameTooltip:AddLine("Players cannot be moved between groups during combat.", 1.0, 1.0, 1.0, true);
+										GameTooltip:AddLine(" ", 1.0, 1.0, 1.0);
+										GameTooltip:AddLine("This restriction is enforced by Blizzard to prevent errors.", 0.8, 0.8, 0.8, true);
+										GameTooltip:Show();
+									</OnEnter>
+									<OnLeave>
+										GameTooltip:Hide();
+									</OnLeave>
+								</Scripts>
+							</Button>
+						</Frames>
+					</Frame>
+					
+					<Frame parentKey="GroupsInset" inherits="InsetFrameTemplate">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeKey="$parent.ControlPanel" relativePoint="BOTTOMLEFT" x="-4" y="5"/>
+							<Anchor point="BOTTOMRIGHT" x="-8" y="0"/>
+						</Anchors>
+						<Frames>
+							<Frame parentKey="GroupsContainer">
+								<Anchors>
+									<Anchor point="TOPLEFT" x="10" y="-2"/>
+									<Anchor point="BOTTOMRIGHT" x="-10" y="10"/>
+								</Anchors>
+								<Frames>
+									<Frame parentKey="Group1" inherits="BetterRaidGroupTemplate">
+										<Anchors>
+											<Anchor point="TOPLEFT" x="0" y="0"/>
+										</Anchors>
+									</Frame>
+									<Frame parentKey="Group2" inherits="BetterRaidGroupTemplate">
+										<Anchors>
+											<Anchor point="TOPLEFT" relativeKey="$parent.Group1" relativePoint="TOPRIGHT" x="10" y="0"/>
+										</Anchors>
+									</Frame>
+									<Frame parentKey="Group3" inherits="BetterRaidGroupTemplate">
+										<Anchors>
+											<Anchor point="TOPLEFT" relativeKey="$parent.Group1" relativePoint="BOTTOMLEFT" x="0" y="-8"/>
+										</Anchors>
+									</Frame>
+									<Frame parentKey="Group4" inherits="BetterRaidGroupTemplate">
+										<Anchors>
+											<Anchor point="TOPLEFT" relativeKey="$parent.Group3" relativePoint="TOPRIGHT" x="10" y="0"/>
+										</Anchors>
+									</Frame>
+									<Frame parentKey="Group5" inherits="BetterRaidGroupTemplate">
+										<Anchors>
+											<Anchor point="TOPLEFT" relativeKey="$parent.Group3" relativePoint="BOTTOMLEFT" x="0" y="-8"/>
+										</Anchors>
+									</Frame>
+									<Frame parentKey="Group6" inherits="BetterRaidGroupTemplate">
+										<Anchors>
+											<Anchor point="TOPLEFT" relativeKey="$parent.Group5" relativePoint="TOPRIGHT" x="10" y="0"/>
+										</Anchors>
+									</Frame>
+									<Frame parentKey="Group7" inherits="BetterRaidGroupTemplate">
+										<Anchors>
+											<Anchor point="TOPLEFT" relativeKey="$parent.Group5" relativePoint="BOTTOMLEFT" x="0" y="-8"/>
+										</Anchors>
+									</Frame>
+									<Frame parentKey="Group8" inherits="BetterRaidGroupTemplate">
+										<Anchors>
+											<Anchor point="TOPLEFT" relativeKey="$parent.Group7" relativePoint="TOPRIGHT" x="10" y="0"/>
+										</Anchors>
+									</Frame>
+								</Frames>
+							</Frame>
+						</Frames>
+					</Frame>
+				</Frames>
+				<Layers>
+					<Layer level="ARTWORK">
+						<FontString parentKey="NotInRaid" inherits="GameFontNormalLarge" text="Raid roster is only available when in a raid group." hidden="true" wordwrap="true" justifyH="CENTER" justifyV="MIDDLE">
+							<Anchors>
+								<Anchor point="LEFT" relativeKey="$parent.Inset" x="20" y="0"/>
+								<Anchor point="RIGHT" relativeKey="$parent.Inset" x="-20" y="0"/>
+							</Anchors>
+							<Color r="0.6" g="0.6" b="0.6"/>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnLoad>
+						self:RegisterEvent("UPDATE_INSTANCE_INFO");
+						self:RegisterEvent("GROUP_ROSTER_UPDATE");
+					</OnLoad>
+					<OnEvent>
+						if event == "UPDATE_INSTANCE_INFO" then
+							BetterRaidFrame_UpdateRaidInfoButton();
+						elseif event == "GROUP_ROSTER_UPDATE" then
+							if self:IsShown() then
+								BetterRaidFrame_Update();
+							end
+						end
+					</OnEvent>
+					<OnShow>
+						BetterRaidFrame_OnShow(self);
+					</OnShow>
+					<OnHide>
+						BetterRaidFrame_OnHide(self);
+					</OnHide>
+				</Scripts>
+			</Frame>
+			
+			<!-- Bottom Tabs (Friends, Who, Raid) - NO QuickJoin in Classic -->
+			<Button name="BetterFriendsFrameBottomTab1" parentKey="BottomTab1" inherits="CharacterFrameTabButtonTemplate" id="1" text="FRIENDS" frameStrata="LOW">
+				<Anchors>
+					<Anchor point="BOTTOMLEFT" x="5" y="-28"/>
+				</Anchors>
+				<Scripts>
+					<OnClick>
+						PanelTemplates_Tab_OnClick(self, BetterFriendsFrame)
+						BetterFriendsFrame_ShowBottomTab(1)
+						PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+					</OnClick>
+				</Scripts>
+			</Button>
+			<Button name="BetterFriendsFrameBottomTab2" parentKey="BottomTab2" inherits="CharacterFrameTabButtonTemplate" id="2" text="WHO" frameStrata="LOW">
+				<Anchors>
+					<Anchor point="LEFT" relativeKey="$parent.BottomTab1" relativePoint="RIGHT" x="-15" y="0"/>
+				</Anchors>
+				<Scripts>
+					<OnClick>
+						PanelTemplates_Tab_OnClick(self, BetterFriendsFrame)
+						BetterFriendsFrame_ShowBottomTab(2)
+					</OnClick>
+				</Scripts>
+			</Button>
+			<Button name="BetterFriendsFrameBottomTab3" parentKey="BottomTab3" inherits="CharacterFrameTabButtonTemplate" id="3" text="RAID" frameStrata="LOW">
+				<Anchors>
+					<Anchor point="LEFT" relativeKey="$parent.BottomTab2" relativePoint="RIGHT" x="-15" y="0"/>
+				</Anchors>
+				<Scripts>
+					<OnClick>
+						PanelTemplates_Tab_OnClick(self, BetterFriendsFrame)
+						BetterFriendsFrame_ShowBottomTab(3)
+					</OnClick>
+				</Scripts>
+			</Button>
+			<!-- BottomTab4 (QuickJoin) is NOT created in Classic -->
+		</Frames>
+		<Scripts>
+			<OnLoad>
+				self:RegisterForDrag("LeftButton")
+				self.TitleContainer.TitleText:SetText("BetterFriendlist")
+				
+				if self.Inset and self.FriendsTabHeader and self.FriendsTabHeader.Tab1 then
+					self.Inset:ClearAllPoints()
+					self.Inset:SetPoint("TOPLEFT", self.FriendsTabHeader.Tab1, "BOTTOMLEFT", -4, 1)
+					self.Inset:SetPoint("BOTTOMRIGHT", -6, 26)
+					if self.ScrollFrame then
+						self.ScrollFrame:ClearAllPoints()
+						self.ScrollFrame:SetPoint("TOPLEFT", self.Inset, "TOPLEFT", 4, -4)
+						self.ScrollFrame:SetPoint("BOTTOMRIGHT", self.Inset, "BOTTOMRIGHT", -4, 2)  -- -4 not -22! FauxScrollFrame reserves -22 in Lua
+					end
+				end
+				
+				-- Classic: Only 3 bottom tabs (no QuickJoin)
+				PanelTemplates_SetNumTabs(self, 3)
+				PanelTemplates_SetTab(self, 1)
+			</OnLoad>
+			<OnShow>
+				if BetterFriendsFrame_UpdateQuickJoinTab then
+					BetterFriendsFrame_UpdateQuickJoinTab()
+				end
+			</OnShow>
+			<OnDragStart>
+				self:StartMoving()
+			</OnDragStart>
+			<OnDragStop>
+				self:StopMovingOrSizing()
+			</OnDragStop>
+		</Scripts>
+	</Frame>
+	
+	<!-- Saved Instances Panel -->
+	<Frame name="BetterSavedInstancesFrame" parent="UIParent" toplevel="true" movable="true" enableMouse="true" clampedToScreen="true" hidden="true" inherits="ButtonFrameTemplate">
+		<Size x="320" y="480"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<FontString parentKey="TitleText" inherits="GameFontNormal" text="Saved Raid Lockouts">
+					<Anchors>
+						<Anchor point="TOP" x="0" y="-5"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Frame parentKey="Inset" inherits="InsetFrameTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="4" y="-24"/>
+					<Anchor point="BOTTOMRIGHT" x="-4" y="4"/>
+				</Anchors>
+			</Frame>
+			<!-- ScrollBox placeholder - FauxScrollFrame with ScrollBar created in Lua (SavedInstances) -->
+			<Frame parentKey="ScrollBox">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeKey="$parent.Inset" x="4" y="-4"/>
+					<Anchor point="BOTTOMRIGHT" relativeKey="$parent.Inset" x="-24" y="4"/>
+				</Anchors>
+			</Frame>
+			<Frame parentKey="NoInstancesFrame" hidden="true">
+				<Anchors>
+					<Anchor point="CENTER" relativeKey="$parent.Inset"/>
+				</Anchors>
+				<Layers>
+					<Layer level="ARTWORK">
+						<FontString parentKey="Text" inherits="GameFontNormal" text="You have no saved raid lockouts">
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnLoad>
+				ButtonFrameTemplate_HideButtonBar(self);
+				self:RegisterForDrag("LeftButton");
+			</OnLoad>
+			<OnShow>
+				BetterSavedInstancesFrame_OnShow(self);
+			</OnShow>
+			<OnHide>
+				BetterSavedInstancesFrame_OnHide(self);
+			</OnHide>
+			<OnDragStart>
+				self:StartMoving();
+			</OnDragStart>
+			<OnDragStop>
+				self:StopMovingOrSizing();
+			</OnDragStop>
+		</Scripts>
+	</Frame>
+	
+	<!-- Custom Friends Tooltip -->
+	<Frame name="BetterFriendsTooltip" frameStrata="TOOLTIP" hidden="true" clampedToScreen="true" inherits="TooltipBackdropTemplate" scale="0.7">
+		<Layers>
+			<Layer level="ARTWORK">
+				<FontString name="$parentHeader" inherits="FriendsFont_Normal" justifyH="LEFT">
+					<Size x="176" y="0"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="12" y="-12"/>
+					</Anchors>
+					<Color r="0.510" g="0.773" b="1" />
+				</FontString>
+				<FontString name="$parentGameAccount1Name" inherits="FriendsFont_Small" justifyH="LEFT">
+					<Size x="176" y="0"/>
+					<Anchors>
+						<Anchor point="LEFT" x="12" y="0"/>
+						<Anchor point="TOP" relativeTo="$parentHeader" relativePoint="BOTTOM" x="0" y="-4"/>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentGameAccount1Info" inherits="FriendsFont_Small" justifyH="LEFT">
+					<Size x="168" y="0"/>
+					<Anchors>
+						<Anchor point="LEFT" x="12" y="0"/>
+						<Anchor point="TOP" relativeTo="$parentGameAccount1Name" relativePoint="BOTTOM" x="0" y="-4"/>
+					</Anchors>
+					<Color r="0.486" g="0.518" b="0.541" />
+				</FontString>
+				<FontString name="$parentNoteText" inherits="FriendsFont_Small" justifyH="LEFT" justifyV="TOP">
+					<Size x="158" y="0"/>
+					<Anchors>
+						<Anchor point="LEFT" x="26" y="0"/>
+						<Anchor point="TOP" relativeTo="$parentGameAccount1Info" relativePoint="BOTTOM" x="0" y="-2"/>
+					</Anchors>
+					<Color r="1.0" g="0.82" b="0"/>
+				</FontString>
+				<Texture name="$parentNoteIcon" file="Interface/FriendsFrame/UI-FriendsFrame-Note">
+					<Size x="12" y="10"/>
+					<Anchors>
+						<Anchor point="TOPRIGHT" relativeTo="$parentNoteText" relativePoint="TOPLEFT" x="-1" y="0"/>
+					</Anchors>
+					<Color r="1.0" g="0.82" b="0"/>
+				</Texture>
+				<FontString name="$parentBroadcastText" inherits="FriendsFont_UserText" justifyH="LEFT" justifyV="TOP" nonspacewrap="true">
+					<Size x="102" y="0"/>
+					<Anchors>
+						<Anchor point="LEFT" x="26" y="0"/>
+						<Anchor point="TOP" relativeTo="$parentNoteText" relativePoint="BOTTOM" x="0" y="-2"/>
+					</Anchors>
+					<Color r="0.345" g="0.667" b="0.867" />
+				</FontString>
+				<Texture name="$parentBroadcastIcon" file="Interface\FriendsFrame\BroadcastIcon">
+					<Size x="14" y="14"/>
+					<Anchors>
+						<Anchor point="TOPRIGHT" relativeTo="$parentBroadcastText" relativePoint="TOPLEFT" x="-2" y="1"/>
+					</Anchors>
+				</Texture>
+				<FontString name="$parentLastOnline" inherits="FriendsFont_Small" justifyH="LEFT" justifyV="TOP">
+					<Size x="176" y="0"/>
+					<Anchors>
+						<Anchor point="LEFT" x="12" y="0"/>
+						<Anchor point="TOP" relativeTo="$parentBroadcastText" relativePoint="BOTTOM" x="0" y="-4"/>
+					</Anchors>
+					<Color r="0.486" g="0.518" b="0.541" />
+				</FontString>
+				<FontString name="$parentActivity" inherits="FriendsFont_Small" justifyH="LEFT" justifyV="TOP" hidden="true">
+					<Size x="176" y="0"/>
+					<Anchors>
+						<Anchor point="LEFT" x="12" y="0"/>
+						<Anchor point="TOP" relativeTo="$parentLastOnline" relativePoint="BOTTOM" x="0" y="-4"/>
+					</Anchors>
+					<Color r="0.667" g="0.667" b="0.667" />
+				</FontString>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnUpdate>
+				self.lastUpdate = (self.lastUpdate or 0) + elapsed
+				if self.lastUpdate &lt; 1.0 then return end
+				self.lastUpdate = 0
+				if self.button and self.button:IsMouseOver() then
+					if self.button.friendIndex and self.button.friendData then
+						if self.button.friendData.type == "wow" then
+							if self.button.friendData.index and self.button.friendData.index > 0 then
+								BetterFriendsList_Button_OnEnter(self.button)
+							else
+								self:Hide()
+							end
+						else
+							BetterFriendsList_Button_OnEnter(self.button)
+						end
+					else
+						self:Hide()
+					end
+				end
+			</OnUpdate>
+		</Scripts>
+	</Frame>
+</Ui>

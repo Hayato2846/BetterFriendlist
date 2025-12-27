@@ -18,6 +18,13 @@ local UI = BFL.UI.CONSTANTS
 -- ========================================
 
 function BetterQuickJoinFrame_OnLoad(self)
+	-- Classic Guard: QuickJoin/Social Queue is Retail-only
+	if BFL.IsClassic or not BFL.HasQuickJoin then
+		BFL:DebugPrint("|cffffcc00QuickJoinCallbacks:|r Not available in Classic - frame hidden")
+		self:Hide()
+		return
+	end
+	
 	-- Fix: Elements are nested inside ContentInset
 	local contentInset = self.ContentInset
 	if not contentInset then
@@ -33,7 +40,15 @@ function BetterQuickJoinFrame_OnLoad(self)
 		contentInset.JoinQueueButton:Disable()
 	end
 	
-	-- Initialize ScrollBox
+	-- Classic mode: Skip ScrollBox initialization (handled by QuickJoin module)
+	if BFL.IsClassic or not BFL.HasModernScrollBox then
+		BFL:DebugPrint("|cff00ffffQuickJoinCallbacks:|r Classic mode - skipping ScrollBox init")
+		self.QuickJoin = BFL and BFL:GetModule("QuickJoin")
+		self.selectedGUID = nil
+		return
+	end
+	
+	-- Retail: Initialize ScrollBox
 	if scrollBox and scrollBar then
 		-- Create view with Blizzard-style dynamic text creation
 		local view = CreateScrollBoxListLinearView()

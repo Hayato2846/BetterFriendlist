@@ -17,6 +17,8 @@
 	- QuickJoin:GetAvailableGroups()
 	- QuickJoin:RequestToJoin(guid, tank, healer, damage)
 	- QuickJoin:GetGroupInfo(guid)
+	
+	NOTE: QuickJoin/Social Queue is Retail-only. This module is disabled in Classic.
 ]]
 
 local addonName, BFL = ...
@@ -24,6 +26,9 @@ local addonName, BFL = ...
 -- Create Module
 local QuickJoin = {}
 BFL:RegisterModule("QuickJoin", QuickJoin)
+
+-- Classic Guard: QuickJoin/Social Queue doesn't exist in Classic
+BFL.HasQuickJoin = BFL.IsRetail and C_SocialQueue ~= nil
 
 -- Constants
 local MAX_DISPLAYED_MEMBERS = 8  -- Maximum members shown in group list
@@ -565,6 +570,13 @@ end
 
 -- Initialize the QuickJoin module
 function QuickJoin:Initialize()
+	-- Classic Guard: QuickJoin/Social Queue is Retail-only
+	if BFL.IsClassic or not BFL.HasQuickJoin then
+		BFL:DebugPrint("|cffffcc00BFL QuickJoin:|r Not available in Classic - module disabled")
+		self.initialized = true  -- Prevent future initialization attempts
+		return
+	end
+	
 	if self.initialized then
 		return
 	end
@@ -586,40 +598,48 @@ function QuickJoin:Initialize()
 	
 	-- Initialize ScrollBox (Phase 1: Activity Cards)
 	if BetterFriendsFrame and BetterFriendsFrame.QuickJoinFrame then
-		local scrollBoxContainer = BetterFriendsFrame.QuickJoinFrame.ContentInset.ScrollBoxContainer
-		local scrollBox = scrollBoxContainer.ScrollBox
-		local scrollBar = BetterFriendsFrame.QuickJoinFrame.ContentInset.ScrollBar
-		
-		-- Create DataProvider
-		self.dataProvider = CreateDataProvider()
-		
-		-- Initialize ScrollBox with Linear View
-		local view = CreateScrollBoxListLinearView()
-		view:SetElementInitializer("BetterFriendlistQuickJoinCardTemplate", function(button, elementData)
-			self:OnScrollBoxInitialize(button, elementData)
-		end)
-		
-		-- Set padding
-		view:SetPadding(5, 5, 5, 5, 2)
-		
-		ScrollUtil.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view)
+		-- Classic: Use FauxScrollFrame approach
+		if BFL.IsClassic or not BFL.HasModernScrollBox then
+			BFL:DebugPrint("|cff00ffffQuickJoin:|r Using Classic FauxScrollFrame mode")
+			self:InitializeClassicQuickJoin()
+		else
+			-- Retail: Use modern ScrollBox system
+			BFL:DebugPrint("|cff00ffffQuickJoin:|r Using Retail ScrollBox mode")
+			local scrollBoxContainer = BetterFriendsFrame.QuickJoinFrame.ContentInset.ScrollBoxContainer
+			local scrollBox = scrollBoxContainer.ScrollBox
+			local scrollBar = BetterFriendsFrame.QuickJoinFrame.ContentInset.ScrollBar
+			
+			-- Create DataProvider
+			self.dataProvider = CreateDataProvider()
+			
+			-- Initialize ScrollBox with Linear View
+			local view = CreateScrollBoxListLinearView()
+			view:SetElementInitializer("BetterFriendlistQuickJoinCardTemplate", function(button, elementData)
+				self:OnScrollBoxInitialize(button, elementData)
+			end)
+			
+			-- Set padding
+			view:SetPadding(5, 5, 5, 5, 2)
+			
+			ScrollUtil.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view)
 
-		-- Dynamic Width Adjustment based on ScrollBar visibility
-		local function UpdateScrollBoxWidth()
-			scrollBoxContainer:ClearAllPoints()
-			scrollBoxContainer:SetPoint("TOPLEFT", 4, -4)
-			if scrollBar:IsShown() then
-				scrollBoxContainer:SetPoint("BOTTOMRIGHT", -24, 4)
-			else
-				scrollBoxContainer:SetPoint("BOTTOMRIGHT", -4, 4)
+			-- Dynamic Width Adjustment based on ScrollBar visibility
+			local function UpdateScrollBoxWidth()
+				scrollBoxContainer:ClearAllPoints()
+				scrollBoxContainer:SetPoint("TOPLEFT", 4, -4)
+				if scrollBar:IsShown() then
+					scrollBoxContainer:SetPoint("BOTTOMRIGHT", -24, 4)
+				else
+					scrollBoxContainer:SetPoint("BOTTOMRIGHT", -4, 4)
+				end
 			end
-		end
 
-		scrollBar:HookScript("OnShow", UpdateScrollBoxWidth)
-		scrollBar:HookScript("OnHide", UpdateScrollBoxWidth)
-		
-		-- Initial check
-		UpdateScrollBoxWidth()
+			scrollBar:HookScript("OnShow", UpdateScrollBoxWidth)
+			scrollBar:HookScript("OnHide", UpdateScrollBoxWidth)
+			
+			-- Initial check
+			UpdateScrollBoxWidth()
+		end
 	end
 	
 	-- Initial update
@@ -644,6 +664,102 @@ function QuickJoin:Initialize()
 	end
 	
 	self.initialized = true
+end
+
+-- Initialize Classic FauxScrollFrame for QuickJoin
+function QuickJoin:InitializeClassicQuickJoin()
+	local quickJoinFrame = BetterFriendsFrame.QuickJoinFrame
+	if not quickJoinFrame then return end
+	
+	self.classicQuickJoinDataList = {}
+	self.classicQuickJoinButtonPool = {}
+	
+	local CARD_HEIGHT = 72  -- Height of QuickJoin cards
+	local NUM_CARDS = 5     -- Max visible cards
+	
+	-- Create content frame
+	local contentFrame = quickJoinFrame.ContentInset or quickJoinFrame
+	
+	-- Create buttons for Classic mode
+	for i = 1, NUM_CARDS do
+		local button = CreateFrame("Button", "BetterQuickJoinCard" .. i, contentFrame, "BetterFriendlistQuickJoinCardTemplate")
+		button:SetPoint("TOPLEFT", contentFrame, "TOPLEFT", 5, -((i - 1) * (CARD_HEIGHT + 2)) - 5)
+		button:SetPoint("RIGHT", contentFrame, "RIGHT", -27, 0)
+		button:SetHeight(CARD_HEIGHT)
+		button.classicIndex = i
+		button:Hide()
+		self.classicQuickJoinButtonPool[i] = button
+	end
+	
+	-- Create scroll bar
+	if not contentFrame.ClassicScrollBar then
+		-- CRITICAL: Do NOT use UIPanelScrollBarTemplate in Classic - it requires SetVerticalScroll method
+		local scrollBar = CreateFrame("Slider", nil, contentFrame)
+		scrollBar:SetPoint("TOPRIGHT", contentFrame, "TOPRIGHT", -4, -20)
+		scrollBar:SetPoint("BOTTOMRIGHT", contentFrame, "BOTTOMRIGHT", -4, 20)
+		scrollBar:SetWidth(16)
+		scrollBar:SetOrientation("VERTICAL")
+		scrollBar:SetMinMaxValues(0, 0)
+		scrollBar:SetValueStep(1)
+		scrollBar:SetObeyStepOnDrag(true)
+		scrollBar:EnableMouseWheel(true)
+		
+		-- Create thumb texture
+		local thumb = scrollBar:CreateTexture(nil, "OVERLAY")
+		thumb:SetTexture("Interface\\Buttons\\UI-ScrollBar-Knob")
+		thumb:SetSize(18, 24)
+		scrollBar:SetThumbTexture(thumb)
+		
+		scrollBar:SetScript("OnValueChanged", function(self, value)
+			QuickJoin:RenderClassicQuickJoinCards()
+		end)
+		scrollBar:SetScript("OnMouseWheel", function(self, delta)
+			self:SetValue(self:GetValue() - delta)
+		end)
+		scrollBar:SetValue(0)
+		contentFrame.ClassicScrollBar = scrollBar
+	end
+	
+	-- DataProvider placeholder for Classic
+	self.dataProvider = {
+		GetSize = function() return #QuickJoin.classicQuickJoinDataList end,
+		Flush = function() wipe(QuickJoin.classicQuickJoinDataList) end,
+		Insert = function(_, data) table.insert(QuickJoin.classicQuickJoinDataList, data) end,
+		Enumerate = function() return pairs(QuickJoin.classicQuickJoinDataList) end,
+	}
+end
+
+-- Render Classic QuickJoin cards
+function QuickJoin:RenderClassicQuickJoinCards()
+	if not self.classicQuickJoinButtonPool then return end
+	
+	local dataList = self.classicQuickJoinDataList or {}
+	local numItems = #dataList
+	local numButtons = #self.classicQuickJoinButtonPool
+	local offset = 0
+	
+	local contentFrame = BetterFriendsFrame.QuickJoinFrame.ContentInset or BetterFriendsFrame.QuickJoinFrame
+	if contentFrame.ClassicScrollBar then
+		offset = math.floor(contentFrame.ClassicScrollBar:GetValue() or 0)
+	end
+	
+	-- Update scroll bar range
+	if contentFrame.ClassicScrollBar then
+		local maxValue = math.max(0, numItems - numButtons)
+		contentFrame.ClassicScrollBar:SetMinMaxValues(0, maxValue)
+	end
+	
+	-- Render buttons
+	for i, button in ipairs(self.classicQuickJoinButtonPool) do
+		local dataIndex = offset + i
+		if dataIndex <= numItems then
+			local elementData = dataList[dataIndex]
+			self:OnScrollBoxInitialize(button, elementData)
+			button:Show()
+		else
+			button:Hide()
+		end
+	end
 end
 
 -- Initialize a card in the ScrollBox
@@ -868,8 +984,16 @@ function QuickJoin:Update(forceUpdate)
 				table.insert(entries, entry)
 			end
 		end
-		self.dataProvider:Flush()
-		self.dataProvider:InsertTable(entries)
+		
+		-- Classic mode: Use simple list and render
+		if BFL.IsClassic or not BFL.HasModernScrollBox then
+			self.classicQuickJoinDataList = entries
+			self:RenderClassicQuickJoinCards()
+		else
+			-- Retail mode: Use DataProvider
+			self.dataProvider:Flush()
+			self.dataProvider:InsertTable(entries)
+		end
 		
 		-- Update "No Groups" text
 		if BetterFriendsFrame and BetterFriendsFrame.QuickJoinFrame and BetterFriendsFrame.QuickJoinFrame.ContentInset.NoGroupsText then

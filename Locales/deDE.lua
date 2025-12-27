@@ -339,4 +339,12 @@ if GetLocale() == "deDE" then
 	-- Feature 4: Fenster-Skalierung
 	L.SETTINGS_WINDOW_SCALE = "Fenster-Skalierung"
 	L.SETTINGS_WINDOW_SCALE_DESC = "Skaliert das gesamte Fenster (50%% - 200%%)"
+	
+	-- ========================================
+	-- CLASSIC KOMPATIBILITÄT
+	-- ========================================
+	L.RECENT_ALLIES_NOT_AVAILABLE = "Letzte Verbündete ist in dieser Version nicht verfügbar."
+	L.EDIT_MODE_NOT_AVAILABLE = "Der Bearbeitungsmodus ist in Classic nicht verfügbar. Verwende /bfl position um das Fenster zu verschieben."
+	L.CLASSIC_COMPATIBILITY_INFO = "BetterFriendlist läuft im Classic-Kompatibilitätsmodus."
+	L.FEATURE_NOT_AVAILABLE_CLASSIC = "Diese Funktion ist in Classic nicht verfügbar."
 end

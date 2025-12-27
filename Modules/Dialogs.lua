@@ -282,10 +282,18 @@ function Dialogs:RegisterDialogs()
 		triggerFrame.groupLabel:SetPoint("TOPLEFT", 15, -60)
 		triggerFrame.groupLabel:SetText("Select Group:")
 		
-		-- Group dropdown
-		triggerFrame.groupDropdown = CreateFrame("DropdownButton", nil, triggerFrame, "WowStyle1DropdownTemplate")
-		triggerFrame.groupDropdown:SetWidth(360)
-		triggerFrame.groupDropdown:SetPoint("TOPLEFT", 15, -80)
+		-- Group dropdown (Classic-compatible)
+		if BFL.IsClassic or not BFL.HasModernDropdown then
+			-- Classic: Use UIDropDownMenuTemplate
+			triggerFrame.groupDropdown = CreateFrame("Frame", "BFL_GroupTriggerDropdown", triggerFrame, "UIDropDownMenuTemplate")
+			triggerFrame.groupDropdown:SetPoint("TOPLEFT", 0, -80)
+			UIDropDownMenu_SetWidth(triggerFrame.groupDropdown, 340)
+		else
+			-- Retail: Use modern WowStyle1DropdownTemplate
+			triggerFrame.groupDropdown = CreateFrame("DropdownButton", nil, triggerFrame, "WowStyle1DropdownTemplate")
+			triggerFrame.groupDropdown:SetWidth(360)
+			triggerFrame.groupDropdown:SetPoint("TOPLEFT", 15, -80)
+		end
 		
 		-- Threshold label
 		triggerFrame.thresholdLabel = triggerFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -297,21 +305,50 @@ function Dialogs:RegisterDialogs()
 		triggerFrame.thresholdValue:SetPoint("LEFT", triggerFrame.thresholdLabel, "RIGHT", 5, 0)
 		triggerFrame.thresholdValue:SetText("3")
 		
-		-- Threshold slider (full width)
-		triggerFrame.thresholdSlider = CreateFrame("Slider", nil, triggerFrame, "MinimalSliderWithSteppersTemplate")
-		triggerFrame.thresholdSlider:SetPoint("TOPLEFT", 15, -140)
-		triggerFrame.thresholdSlider:SetPoint("TOPRIGHT", -15, -140)
-		triggerFrame.thresholdSlider:SetHeight(20)
-		triggerFrame.thresholdSlider:Init(3, 1, 10, 9, {
-			[MinimalSliderWithSteppersMixin.Label.Right] = function(value)
-				return "" -- Empty string, we show value in thresholdValue instead
+		-- Threshold slider (full width) - Classic uses OptionsSliderTemplate
+		if BFL.IsClassic then
+			-- Classic: Use OptionsSliderTemplate
+			triggerFrame.thresholdSlider = CreateFrame("Slider", "BFL_TriggerThresholdSlider", triggerFrame, "OptionsSliderTemplate")
+			triggerFrame.thresholdSlider:SetPoint("TOPLEFT", 15, -150)
+			triggerFrame.thresholdSlider:SetPoint("TOPRIGHT", -15, -150)
+			triggerFrame.thresholdSlider:SetMinMaxValues(1, 10)
+			triggerFrame.thresholdSlider:SetValue(3)
+			triggerFrame.thresholdSlider:SetValueStep(1)
+			triggerFrame.thresholdSlider:SetObeyStepOnDrag(true)
+			
+			-- Hide default text elements
+			local name = triggerFrame.thresholdSlider:GetName()
+			if _G[name .. "Low"] then _G[name .. "Low"]:SetText("1") end
+			if _G[name .. "High"] then _G[name .. "High"]:SetText("10") end
+			if _G[name .. "Text"] then _G[name .. "Text"]:SetText("") end
+			
+			-- Update value display when slider changes
+			triggerFrame.thresholdSlider:SetScript("OnValueChanged", function(self, value)
+				value = math.floor(value + 0.5)
+				triggerFrame.thresholdValue:SetText(tostring(value))
+			end)
+			
+			-- Helper method for getting value
+			function triggerFrame.thresholdSlider:GetSliderValue()
+				return math.floor(self:GetValue() + 0.5)
 			end
-		})
-		
-		-- Update value display when slider changes
-		triggerFrame.thresholdSlider:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged, function(_, value)
-			triggerFrame.thresholdValue:SetText(tostring(value))
-		end)
+		else
+			-- Retail: Use modern MinimalSliderWithSteppersTemplate
+			triggerFrame.thresholdSlider = CreateFrame("Slider", nil, triggerFrame, "MinimalSliderWithSteppersTemplate")
+			triggerFrame.thresholdSlider:SetPoint("TOPLEFT", 15, -140)
+			triggerFrame.thresholdSlider:SetPoint("TOPRIGHT", -15, -140)
+			triggerFrame.thresholdSlider:SetHeight(20)
+			triggerFrame.thresholdSlider:Init(3, 1, 10, 9, {
+				[MinimalSliderWithSteppersMixin.Label.Right] = function(value)
+					return "" -- Empty string, we show value in thresholdValue instead
+				end
+			})
+			
+			-- Update value display when slider changes
+			triggerFrame.thresholdSlider:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged, function(_, value)
+				triggerFrame.thresholdValue:SetText(tostring(value))
+			end)
+		end
 		
 		-- Create button
 		local createBtn = CreateFrame("Button", nil, triggerFrame, "UIPanelButtonTemplate")
@@ -402,17 +439,38 @@ function Dialogs:RegisterDialogs()
 			-- Set default
 			self.selectedGroupId = groupOptions[1].id
 			
-			-- Setup dropdown menu
-			self.groupDropdown:SetupMenu(function(dropdown, rootDescription)
-				for _, option in ipairs(groupOptions) do
-					local button = rootDescription:CreateButton(option.name, function()
-						self.selectedGroupId = option.id
-					end)
-					button:SetIsSelected(function()
-						return self.selectedGroupId == option.id
-					end)
-				end
-			end)
+			-- Setup dropdown menu (Classic-compatible)
+			if BFL.IsClassic or not BFL.HasModernDropdown then
+				-- Classic: Use UIDropDownMenu_Initialize
+				UIDropDownMenu_Initialize(self.groupDropdown, function(frame, level)
+					level = level or 1
+					for _, option in ipairs(groupOptions) do
+						local info = UIDropDownMenu_CreateInfo()
+						info.text = option.name
+						info.value = option.id
+						info.checked = (self.selectedGroupId == option.id)
+						info.func = function()
+							self.selectedGroupId = option.id
+							UIDropDownMenu_SetText(self.groupDropdown, option.name)
+							CloseDropDownMenus()
+						end
+						UIDropDownMenu_AddButton(info, level)
+					end
+				end)
+				UIDropDownMenu_SetText(self.groupDropdown, groupOptions[1].name)
+			else
+				-- Retail: Use modern SetupMenu API
+				self.groupDropdown:SetupMenu(function(dropdown, rootDescription)
+					for _, option in ipairs(groupOptions) do
+						local button = rootDescription:CreateButton(option.name, function()
+							self.selectedGroupId = option.id
+						end)
+						button:SetIsSelected(function()
+							return self.selectedGroupId == option.id
+						end)
+					end
+				end)
+			end
 			
 			-- Reset slider and value display
 			self.thresholdSlider:SetValue(3)

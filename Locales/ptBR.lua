@@ -278,4 +278,12 @@ if GetLocale() == "ptBR" then
 	-- Feature 4: Escala da Janela
 	L.SETTINGS_WINDOW_SCALE = "Escala da janela"
 	L.SETTINGS_WINDOW_SCALE_DESC = "Escala a janela inteira (50%% - 200%%)"
+	
+	-- ========================================
+	-- CLASSIC COMPATIBILITY
+	-- ========================================
+	L.RECENT_ALLIES_NOT_AVAILABLE = "Aliados Recentes não disponível no Classic"
+	L.EDIT_MODE_NOT_AVAILABLE = "Modo de Edição não disponível no Classic"
+	L.CLASSIC_COMPATIBILITY_INFO = "Executando em modo de compatibilidade Classic"
+	L.FEATURE_NOT_AVAILABLE_CLASSIC = "Esta funcionalidade não está disponível no Classic"
 end

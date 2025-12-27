@@ -7,12 +7,17 @@
 -- - Reward system and claiming
 -- - Activity tracking
 -- - Integration with Blizzard's RAF frames
+--
+-- NOTE: RAF is Retail-only. This module is disabled in Classic.
 --------------------------------------------------------------------------
 
 local ADDON_NAME, BFL = ...
 
 -- Register the RAF module
 local RAF = BFL:RegisterModule("RAF", {})
+
+-- Classic Guard: RAF doesn't exist in Classic Era or MoP Classic
+BFL.HasRAF = BFL.IsRetail and C_RecruitAFriend ~= nil
 
 -- Local constants for RAF display
 local RECRUIT_HEIGHT = 45
@@ -30,6 +35,13 @@ local latestRAFVersion = 0
 --------------------------------------------------------------------------
 
 function RAF:OnLoad(frame)
+	-- Classic Guard: RAF is Retail-only
+	if BFL.IsClassic or not BFL.HasRAF then
+		BFL:DebugPrint("|cffffcc00BFL RAF:|r Not available in Classic - module disabled")
+		if frame then frame:Hide() end
+		return
+	end
+	
 	if not C_RecruitAFriend then
 		BFL:DebugPrint("BetterFriendlist: RAF system not available")
 		return
@@ -54,16 +66,24 @@ function RAF:OnLoad(frame)
 		frame.RecruitList.NoRecruitsDesc:SetText(RAF_NO_RECRUITS_DESC or "You have not recruited any friends yet.")
 	end
 	
-	-- Set up ScrollBox
+	-- Set up ScrollBox (Retail) or FauxScrollFrame (Classic)
 	if frame.RecruitList and frame.RecruitList.ScrollBox and frame.RecruitList.ScrollBar then
-		local view = CreateScrollBoxListLinearView()
-		view:SetElementExtentCalculator(function(dataIndex, elementData)
-			return elementData.isDivider and DIVIDER_HEIGHT or RECRUIT_HEIGHT
-		end)
-		view:SetElementInitializer("BetterRecruitListButtonTemplate", function(button, elementData)
-			BetterRecruitListButton_Init(button, elementData)
-		end)
-		ScrollUtil.InitScrollBoxListWithScrollBar(frame.RecruitList.ScrollBox, frame.RecruitList.ScrollBar, view)
+		-- Classic: Use FauxScrollFrame approach
+		if BFL.IsClassic or not BFL.HasModernScrollBox then
+			BFL:DebugPrint("|cff00ffffRAF:|r Using Classic FauxScrollFrame mode")
+			self:InitializeClassicRAF(frame)
+		else
+			-- Retail: Use ScrollBox
+			BFL:DebugPrint("|cff00ffffRAF:|r Using Retail ScrollBox mode")
+			local view = CreateScrollBoxListLinearView()
+			view:SetElementExtentCalculator(function(dataIndex, elementData)
+				return elementData.isDivider and DIVIDER_HEIGHT or RECRUIT_HEIGHT
+			end)
+			view:SetElementInitializer("BetterRecruitListButtonTemplate", function(button, elementData)
+				BetterRecruitListButton_Init(button, elementData)
+			end)
+			ScrollUtil.InitScrollBoxListWithScrollBar(frame.RecruitList.ScrollBox, frame.RecruitList.ScrollBar, view)
+		end
 	end
 	
 	-- Get RAF system info
@@ -76,6 +96,71 @@ function RAF:OnLoad(frame)
 	if C_RecruitAFriend.GetRAFInfo then
 		local rafInfo = C_RecruitAFriend.GetRAFInfo()
 		self:UpdateRAFInfo(frame, rafInfo)
+	end
+end
+
+-- Initialize Classic RAF FauxScrollFrame
+function RAF:InitializeClassicRAF(frame)
+	self.classicRAFFrame = frame
+	self.classicRAFButtonPool = {}
+	self.classicRAFDataList = {}
+	
+	local NUM_BUTTONS = 8
+	
+	-- Create buttons for Classic mode
+	for i = 1, NUM_BUTTONS do
+		local button = CreateFrame("Button", "BetterRecruitListButton" .. i, frame.RecruitList, "BetterRecruitListButtonTemplate")
+		button:SetPoint("TOPLEFT", frame.RecruitList, "TOPLEFT", 5, -((i - 1) * RECRUIT_HEIGHT) - 5)
+		button:SetPoint("RIGHT", frame.RecruitList, "RIGHT", -27, 0)
+		button:SetHeight(RECRUIT_HEIGHT)
+		button.classicIndex = i
+		button:Hide()
+		self.classicRAFButtonPool[i] = button
+	end
+	
+	-- Create scroll bar
+	if not frame.RecruitList.ClassicScrollBar then
+		local scrollBar = CreateFrame("Slider", "BetterRAFScrollBar", frame.RecruitList, "UIPanelScrollBarTemplate")
+		scrollBar:SetPoint("TOPRIGHT", frame.RecruitList, "TOPRIGHT", -4, -16)
+		scrollBar:SetPoint("BOTTOMRIGHT", frame.RecruitList, "BOTTOMRIGHT", -4, 16)
+		scrollBar:SetMinMaxValues(0, 0)
+		scrollBar:SetValue(0)
+		scrollBar:SetScript("OnValueChanged", function(self, value)
+			RAF:RenderClassicRAFButtons()
+		end)
+		frame.RecruitList.ClassicScrollBar = scrollBar
+	end
+end
+
+-- Render Classic RAF buttons
+function RAF:RenderClassicRAFButtons()
+	if not self.classicRAFButtonPool then return end
+	
+	local dataList = self.classicRAFDataList or {}
+	local numItems = #dataList
+	local numButtons = #self.classicRAFButtonPool
+	local offset = 0
+	
+	if self.classicRAFFrame and self.classicRAFFrame.RecruitList and self.classicRAFFrame.RecruitList.ClassicScrollBar then
+		offset = math.floor(self.classicRAFFrame.RecruitList.ClassicScrollBar:GetValue() or 0)
+	end
+	
+	-- Update scroll bar range
+	if self.classicRAFFrame and self.classicRAFFrame.RecruitList.ClassicScrollBar then
+		local maxValue = math.max(0, numItems - numButtons)
+		self.classicRAFFrame.RecruitList.ClassicScrollBar:SetMinMaxValues(0, maxValue)
+	end
+	
+	-- Render buttons
+	for i, button in ipairs(self.classicRAFButtonPool) do
+		local dataIndex = offset + i
+		if dataIndex <= numItems then
+			local elementData = dataList[dataIndex]
+			BetterRecruitListButton_Init(button, elementData)
+			button:Show()
+		else
+			button:Hide()
+		end
 	end
 end
 
@@ -235,19 +320,30 @@ function RAF:UpdateRecruitList(frame, recruits)
 	-- Process and sort recruits
 	local needDivider = ProcessAndSortRecruits(recruits)
 	
-	-- Build data provider with divider
-	local dataProvider = CreateDataProvider()
+	-- Build data list with divider
+	local dataList = {}
 	for index = 1, numRecruits do
 		local recruit = recruits[index]
 		if needDivider and not recruit.isOnline then
-			dataProvider:Insert({isDivider=true})
+			table.insert(dataList, {isDivider=true})
 			needDivider = false
 		end
-		dataProvider:Insert(recruit)
+		table.insert(dataList, recruit)
 	end
 	
-	-- Update ScrollBox
+	-- Classic mode: Use simple list and render
+	if BFL.IsClassic or not BFL.HasModernScrollBox then
+		self.classicRAFDataList = dataList
+		self:RenderClassicRAFButtons()
+		return
+	end
+	
+	-- Retail: Update ScrollBox with DataProvider
 	if frame.RecruitList.ScrollBox then
+		local dataProvider = CreateDataProvider()
+		for _, data in ipairs(dataList) do
+			dataProvider:Insert(data)
+		end
 		frame.RecruitList.ScrollBox:SetDataProvider(dataProvider, ScrollBoxConstants.RetainScrollPosition)
 	end
 end
@@ -532,7 +628,8 @@ function RAF:RecruitListButton_OnClick(button, mouseButton)
 			contextData.guid = recruitInfo.accountInfo.gameAccountInfo.playerGuid
 		end
 		
-		UnitPopup_OpenMenu("RAF_RECRUIT", contextData)
+		-- Use compatibility wrapper for Classic support
+		BFL.OpenContextMenu(button, "RAF_RECRUIT", contextData, contextData.name)
 	end
 end
 

@@ -312,4 +312,12 @@ if GetLocale() == "koKR" then
 	-- Feature 4: 창 크기 조절
 	L.SETTINGS_WINDOW_SCALE = "창 크기 조절"
 	L.SETTINGS_WINDOW_SCALE_DESC = "전체 창 크기 조절 (50%% - 200%%)"
+	
+	-- ========================================
+	-- CLASSIC COMPATIBILITY
+	-- ========================================
+	L.RECENT_ALLIES_NOT_AVAILABLE = "최근 동맹은 Classic에서 사용할 수 없습니다"
+	L.EDIT_MODE_NOT_AVAILABLE = "편집 모드는 Classic에서 사용할 수 없습니다"
+	L.CLASSIC_COMPATIBILITY_INFO = "Classic 호환 모드로 실행 중"
+	L.FEATURE_NOT_AVAILABLE_CLASSIC = "이 기능은 Classic에서 사용할 수 없습니다"
 end

@@ -313,4 +313,12 @@ if GetLocale() == "esMX" then
 	-- Feature 4: Escala de Ventana
 	L.SETTINGS_WINDOW_SCALE = "Escala de ventana"
 	L.SETTINGS_WINDOW_SCALE_DESC = "Escala toda la ventana (50%% - 200%%)"
+	
+	-- ========================================
+	-- CLASSIC COMPATIBILITY
+	-- ========================================
+	L.RECENT_ALLIES_NOT_AVAILABLE = "Aliados Recientes no está disponible en Classic"
+	L.EDIT_MODE_NOT_AVAILABLE = "El Modo de Edición no está disponible en Classic"
+	L.CLASSIC_COMPATIBILITY_INFO = "Ejecutando en modo de compatibilidad Classic"
+	L.FEATURE_NOT_AVAILABLE_CLASSIC = "Esta característica no está disponible en Classic"
 end

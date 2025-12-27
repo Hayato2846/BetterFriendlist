@@ -50,7 +50,15 @@ function IgnoreList:OnLoad(frame)
 		frame.ScrollBox:SetPoint("BOTTOMRIGHT", frame.Inset, -22, 2)
 	end
 	
-	-- Initialize ScrollBox with element factory (exact Blizzard implementation)
+	-- Classic: Use FauxScrollFrame approach
+	if BFL.IsClassic or not BFL.HasModernScrollBox then
+		BFL:DebugPrint("|cff00ffffIgnoreList:|r Using Classic FauxScrollFrame mode")
+		self:InitializeClassicIgnoreList(frame)
+		return
+	end
+	
+	-- Retail: Initialize ScrollBox with element factory (exact Blizzard implementation)
+	BFL:DebugPrint("|cff00ffffIgnoreList:|r Using Retail ScrollBox mode")
 	local scrollBoxView = CreateScrollBoxListLinearView()
 	scrollBoxView:SetElementFactory(function(factory, elementData)
 		if elementData.header then
@@ -63,6 +71,124 @@ function IgnoreList:OnLoad(frame)
 	end)
 	
 	ScrollUtil.InitScrollBoxListWithScrollBar(frame.ScrollBox, frame.ScrollBar, scrollBoxView)
+end
+
+-- Initialize Classic IgnoreList FauxScrollFrame
+function IgnoreList:InitializeClassicIgnoreList(frame)
+	self.classicIgnoreFrame = frame
+	self.classicIgnoreButtonPool = {}
+	self.classicIgnoreDataList = {}
+	
+	local BUTTON_HEIGHT = 16
+	local NUM_BUTTONS = 15
+	
+	-- Create buttons for Classic mode
+	for i = 1, NUM_BUTTONS do
+		local button = CreateFrame("Button", "BetterIgnoreListButton" .. i, frame.Inset or frame, "BetterIgnoreListButtonTemplate")
+		button:SetPoint("TOPLEFT", frame.Inset or frame, "TOPLEFT", 5, -((i - 1) * BUTTON_HEIGHT) - 5)
+		button:SetPoint("RIGHT", frame.Inset or frame, "RIGHT", -27, 0)
+		button:SetHeight(BUTTON_HEIGHT)
+		button.classicIndex = i
+		button:Hide()
+		self.classicIgnoreButtonPool[i] = button
+	end
+	
+	-- Create scroll bar
+	local parent = frame.Inset or frame
+	if not parent.ClassicScrollBar then
+		-- Clean up old named scrollbar if exists
+		if _G["BetterIgnoreScrollBar"] then
+			_G["BetterIgnoreScrollBar"]:Hide()
+			_G["BetterIgnoreScrollBar"] = nil
+		end
+		
+		-- Classic-compatible: Create anonymous Slider without template
+		local scrollBar = CreateFrame("Slider", nil, parent)
+		scrollBar:SetOrientation("VERTICAL")
+		scrollBar:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -4, -16)
+		scrollBar:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -4, 16)
+		scrollBar:SetWidth(16)
+		scrollBar:SetMinMaxValues(0, 0)
+		
+		-- Create thumb texture
+		local thumb = scrollBar:CreateTexture(nil, "OVERLAY")
+		thumb:SetTexture("Interface\\Buttons\\UI-ScrollBar-Knob")
+		thumb:SetSize(16, 24)
+		scrollBar:SetThumbTexture(thumb)
+		
+		-- Create up button
+		local up = CreateFrame("Button", nil, scrollBar)
+		up:SetSize(16, 16)
+		up:SetPoint("TOP", scrollBar, "TOP", 0, 0)
+		up:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Up")
+		up:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Down")
+		up:SetDisabledTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Disabled")
+		up:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Highlight")
+		up:SetScript("OnClick", function()
+			local value = scrollBar:GetValue()
+			scrollBar:SetValue(math.max(0, value - 1))
+		end)
+		
+		-- Create down button
+		local down = CreateFrame("Button", nil, scrollBar)
+		down:SetSize(16, 16)
+		down:SetPoint("BOTTOM", scrollBar, "BOTTOM", 0, 0)
+		down:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up")
+		down:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Down")
+		down:SetDisabledTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Disabled")
+		down:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Highlight")
+		down:SetScript("OnClick", function()
+			local value = scrollBar:GetValue()
+			local min, max = scrollBar:GetMinMaxValues()
+			scrollBar:SetValue(math.min(max, value + 1))
+		end)
+		
+		scrollBar:SetScript("OnValueChanged", function(self, value)
+			IgnoreList:RenderClassicIgnoreButtons()
+		end)
+		
+		-- Set value AFTER scripts are registered (Classic requirement)
+		scrollBar:SetValue(0)
+		
+		parent.ClassicScrollBar = scrollBar
+	end
+end
+
+-- Render Classic Ignore buttons
+function IgnoreList:RenderClassicIgnoreButtons()
+	if not self.classicIgnoreButtonPool then return end
+	
+	local dataList = self.classicIgnoreDataList or {}
+	local numItems = #dataList
+	local numButtons = #self.classicIgnoreButtonPool
+	local offset = 0
+	
+	local parent = self.classicIgnoreFrame.Inset or self.classicIgnoreFrame
+	if parent.ClassicScrollBar then
+		offset = math.floor(parent.ClassicScrollBar:GetValue() or 0)
+	end
+	
+	-- Update scroll bar range
+	if parent.ClassicScrollBar then
+		local maxValue = math.max(0, numItems - numButtons)
+		parent.ClassicScrollBar:SetMinMaxValues(0, maxValue)
+	end
+	
+	-- Render buttons
+	for i, button in ipairs(self.classicIgnoreButtonPool) do
+		local dataIndex = offset + i
+		if dataIndex <= numItems then
+			local elementData = dataList[dataIndex]
+			if not elementData.header then
+				self:InitButton(button, elementData)
+				button:Show()
+			else
+				button:Hide()
+			end
+		else
+			button:Hide()
+		end
+	end
 end
 
 -- Initialize a button in the ignore list (exact Blizzard implementation)
@@ -115,37 +241,50 @@ function IgnoreList:Update()
 		return
 	end
 	
-	local dataProvider = CreateDataProvider()
+	-- Build data list for both modes
+	local dataList = {}
 
 	local numIgnores = C_FriendList.GetNumIgnores()
 	-- Always show header, even when empty
-	dataProvider:Insert({header="BetterFriendsFrameIgnoredHeaderTemplate"})
+	table.insert(dataList, {header="BetterFriendsFrameIgnoredHeaderTemplate"})
 	if numIgnores and numIgnores > 0 then
 		for index = 1, numIgnores do
-			dataProvider:Insert({squelchType=SQUELCH_TYPE_IGNORE, index=index})
+			table.insert(dataList, {squelchType=SQUELCH_TYPE_IGNORE, index=index})
 		end
 	end
 
 	local numBlocks = BNGetNumBlocked()
 	if numBlocks and numBlocks > 0 then
-		dataProvider:Insert({header="BetterFriendsFrameBlockedInviteHeaderTemplate"})
+		table.insert(dataList, {header="BetterFriendsFrameBlockedInviteHeaderTemplate"})
 		for index = 1, numBlocks do
-			dataProvider:Insert({squelchType=SQUELCH_TYPE_BLOCK_INVITE, index=index})
+			table.insert(dataList, {squelchType=SQUELCH_TYPE_BLOCK_INVITE, index=index})
 		end
 	end
-	BetterFriendsFrame.IgnoreListWindow.ScrollBox:SetDataProvider(dataProvider, ScrollBoxConstants.RetainScrollPosition)
+	
+	-- Classic mode: Use simple list and render
+	if BFL.IsClassic or not BFL.HasModernScrollBox then
+		self.classicIgnoreDataList = dataList
+		self:RenderClassicIgnoreButtons()
+	else
+		-- Retail mode: Use DataProvider
+		local dataProvider = CreateDataProvider()
+		for _, data in ipairs(dataList) do
+			dataProvider:Insert(data)
+		end
+		BetterFriendsFrame.IgnoreListWindow.ScrollBox:SetDataProvider(dataProvider, ScrollBoxConstants.RetainScrollPosition)
+	end
 
 	local selectedSquelchType, selectedSquelchIndex = self:GetSelected()
 
 	local hasSelection = selectedSquelchType and selectedSquelchIndex > 0
 	if not hasSelection then
 		-- Auto-select first entry if nothing selected
-		local elementData = dataProvider:FindElementDataByPredicate(function(elementData)
-			return elementData.squelchType ~= nil
-		end)
-		if elementData then
-			self:SelectSquelched(elementData.squelchType, elementData.index)
-			hasSelection = true
+		for _, elementData in ipairs(dataList) do
+			if elementData.squelchType ~= nil then
+				self:SelectSquelched(elementData.squelchType, elementData.index)
+				hasSelection = true
+				break
+			end
 		end
 	end
 
@@ -164,9 +303,25 @@ function IgnoreList:SelectSquelched(squelchType, index)
 	BetterFriendsFrame.selectedSquelchType = squelchType
 
 	local function UpdateButtonSelection(type, index, selected)
-		local button = BetterFriendsFrame.IgnoreListWindow.ScrollBox:FindFrameByPredicate(function(button, elementData)
-			return elementData.squelchType == type and elementData.index == index
-		end)
+		local button = nil
+		
+		-- Classic mode: Manual iteration through button pool
+		if BFL.IsClassic or not BFL.HasModernScrollBox then
+			if self.classicIgnoreButtonPool then
+				for _, btn in ipairs(self.classicIgnoreButtonPool) do
+					if btn.type == type and btn.index == index then
+						button = btn
+						break
+					end
+				end
+			end
+		else
+			-- Retail mode: Use FindFrameByPredicate
+			button = BetterFriendsFrame.IgnoreListWindow.ScrollBox:FindFrameByPredicate(function(button, elementData)
+				return elementData.squelchType == type and elementData.index == index
+			end)
+		end
+		
 		if button then
 			self:SetButtonSelected(button, selected)
 		end

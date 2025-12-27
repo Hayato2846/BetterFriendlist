@@ -61,15 +61,18 @@ local INVITE_RESTRICTION_NO_GAME_ACCOUNTS = 12
 local function GetItemHeight(item, isCompactMode)
 	if not item then return 0 end
 	
-	if item.type == BUTTON_TYPE_GROUP_HEADER then
-		return 22  -- Header height (BetterFriendsGroupHeaderTemplate y="22")
-	elseif item.type == BUTTON_TYPE_INVITE_HEADER then
+	-- Support both .type (Retail) and .buttonType (Classic)
+	local itemType = item.type or item.buttonType
+	
+	if itemType == BUTTON_TYPE_GROUP_HEADER then
+		return 22
+	elseif itemType == BUTTON_TYPE_INVITE_HEADER then
 		return 22  -- Invite header height (BFL_FriendInviteHeaderTemplate y="22")
-	elseif item.type == BUTTON_TYPE_INVITE then
+	elseif itemType == BUTTON_TYPE_INVITE then
 		return 34  -- Invite button height (BFL_FriendInviteButtonTemplate y="34")
-	elseif item.type == BUTTON_TYPE_DIVIDER then
+	elseif itemType == BUTTON_TYPE_DIVIDER then
 		return 8  -- Divider height (BetterFriendsDividerTemplate y="8") - FIXED from 16!
-	elseif item.type == BUTTON_TYPE_FRIEND then
+	elseif itemType == BUTTON_TYPE_FRIEND then
 		return isCompactMode and 24 or 34  -- Friend button (BetterFriendsListButtonTemplate y="34", compactMode=24)
 	else
 		return 34  -- Default fallback
@@ -356,10 +359,10 @@ end
 -- Responsive ScrollBox Functions (Phase 3)
 -- ========================================
 
--- Update ScrollBox height when frame is resized (called from MainFrameEditMode)
+-- Update ScrollBox/ScrollFrame height when frame is resized (called from MainFrameEditMode)
 function FriendsList:UpdateScrollBoxExtent()
 	local frame = BetterFriendsFrame
-	if not frame or not frame.ScrollFrame or not frame.ScrollFrame.ScrollBox then
+	if not frame or not frame.ScrollFrame then
 		return
 	end
 	
@@ -379,7 +382,16 @@ function FriendsList:UpdateScrollBoxExtent()
 	scrollFrame:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 4, -4)
 	scrollFrame:SetPoint("BOTTOMRIGHT", frame.Inset, "BOTTOMRIGHT", -22, 2)
 	
-	-- Trigger ScrollBox redraw
+	-- Classic: Update FauxScrollFrame and re-render
+	if BFL.IsClassic or not BFL.HasModernScrollBox then
+		if self.classicScrollFrame and self.classicScrollFrame.FauxScrollFrame then
+			self.classicScrollFrame.FauxScrollFrame:SetHeight(availableHeight)
+		end
+		self:RenderClassicButtons()
+		return
+	end
+	
+	-- Retail: Trigger ScrollBox redraw
 	if self.scrollBox and self.scrollBox:GetDataProvider() then
 		self.scrollBox:FullUpdate(ScrollBoxConstants.UpdateImmediately)
 	end
@@ -409,13 +421,24 @@ end
 -- ScrollBox Initialization (NEW - Phase 1)
 -- ========================================
 
--- Initialize ScrollBox system (called once in Initialize())
--- Converts FauxScrollFrame to modern ScrollBox/DataProvider system
+-- Initialize scroll system (called once in Initialize())
+-- Retail: Modern ScrollBox/DataProvider system
+-- Classic: FauxScrollFrame with button pool
 function FriendsList:InitializeScrollBox()
 	local scrollFrame = BetterFriendsFrame.ScrollFrame
 	if not scrollFrame then
 		return
 	end
+	
+	-- Classic: Use FauxScrollFrame approach
+	if BFL.IsClassic or not BFL.HasModernScrollBox then
+		BFL:DebugPrint("|cff00ffffFriendsList:|r Using Classic FauxScrollFrame mode")
+		self:InitializeClassicScrollFrame(scrollFrame)
+		return
+	end
+	
+	-- Retail: Use modern ScrollBox system
+	BFL:DebugPrint("|cff00ffffFriendsList:|r Using Retail ScrollBox mode")
 	
 	-- Create ScrollBox if it doesn't exist
 	if not scrollFrame.ScrollBox then
@@ -447,6 +470,173 @@ function FriendsList:InitializeScrollBox()
 	-- Store reference for later use
 	self.scrollBox = scrollFrame.ScrollBox
 	self.scrollBar = scrollBar
+end
+
+-- ========================================
+-- Classic FauxScrollFrame Implementation
+-- ========================================
+
+-- Classic button pool configuration
+local CLASSIC_BUTTON_HEIGHT = 34
+local CLASSIC_COMPACT_BUTTON_HEIGHT = 24
+local CLASSIC_MAX_BUTTONS = 20  -- Max visible buttons
+
+-- Initialize Classic FauxScrollFrame with button pool
+function FriendsList:InitializeClassicScrollFrame(scrollFrame)
+	-- Store reference to scrollFrame for Classic mode
+	self.classicScrollFrame = scrollFrame
+	self.classicButtonPool = {}
+	self.classicDisplayList = {}
+	
+	-- Create FauxScrollFrame if needed
+	if not scrollFrame.FauxScrollFrame then
+		-- Create the scroll frame
+		local fauxScroll = CreateFrame("ScrollFrame", "BetterFriendsClassicScrollFrame", scrollFrame, "FauxScrollFrameTemplate")
+		fauxScroll:SetPoint("TOPLEFT", scrollFrame, "TOPLEFT", 0, 0)
+		fauxScroll:SetPoint("BOTTOMRIGHT", scrollFrame, "BOTTOMRIGHT", -22, 0)
+		scrollFrame.FauxScrollFrame = fauxScroll
+		
+		-- Set OnVerticalScroll handler
+		fauxScroll:SetScript("OnVerticalScroll", function(self, offset)
+			FauxScrollFrame_OnVerticalScroll(self, offset, CLASSIC_BUTTON_HEIGHT, function()
+				BFL.FriendsList:RenderClassicButtons()
+			end)
+		end)
+	end
+	
+	-- Create content frame for buttons (same size as FauxScrollFrame)
+	if not scrollFrame.ContentFrame then
+		local content = CreateFrame("Frame", nil, scrollFrame)
+		content:SetPoint("TOPLEFT", scrollFrame.FauxScrollFrame, "TOPLEFT", 0, 0)
+		content:SetPoint("BOTTOMRIGHT", scrollFrame.FauxScrollFrame, "BOTTOMRIGHT", 0, 0)
+		scrollFrame.ContentFrame = content
+	end
+	
+	-- Calculate how many buttons we need
+	local frameHeight = scrollFrame:GetHeight() or 400
+	local numButtons = math.ceil(frameHeight / CLASSIC_COMPACT_BUTTON_HEIGHT) + 5  -- +5 extra for variable heights (headers are smaller)
+	numButtons = math.min(numButtons, CLASSIC_MAX_BUTTONS)
+	
+	-- Create button pool using friend button template
+	for i = 1, numButtons do
+		local button = CreateFrame("Button", "BetterFriendsListButton" .. i, scrollFrame.ContentFrame, "BetterFriendsListButtonTemplate")
+		button:SetPoint("TOPLEFT", scrollFrame.ContentFrame, "TOPLEFT", 2, -((i - 1) * CLASSIC_BUTTON_HEIGHT))  -- 2px left padding
+		button:SetPoint("RIGHT", scrollFrame.ContentFrame, "RIGHT", 5, 0)  -- 12px - 2px right padding = 10px
+		button:SetHeight(CLASSIC_BUTTON_HEIGHT)
+		button.classicIndex = i
+		button:Hide()
+		self.classicButtonPool[i] = button
+	end
+	
+	-- Also create group header buttons
+	self.classicHeaderPool = {}
+	for i = 1, 10 do  -- Max 10 group headers
+		local header = CreateFrame("Button", "BetterFriendsGroupHeader" .. i, scrollFrame.ContentFrame, "BetterFriendsGroupHeaderTemplate")
+		header:SetPoint("LEFT", scrollFrame.ContentFrame, "LEFT", 2, 0)  -- 2px left padding
+		header:SetPoint("RIGHT", scrollFrame.ContentFrame, "RIGHT", 3, 0)  -- Match friend buttons
+		header:SetHeight(22)
+		header:Hide()
+		self.classicHeaderPool[i] = header
+	end
+	
+	BFL:DebugPrint(string.format("|cff00ffffFriendsList:|r Created Classic button pool with %d buttons", numButtons))
+end
+
+-- Render buttons in Classic FauxScrollFrame mode
+function FriendsList:RenderClassicButtons()
+	if not self.classicScrollFrame or not self.classicButtonPool then
+		return
+	end
+	
+	local displayList = self.classicDisplayList or {}
+	local numItems = #displayList
+	local offset = FauxScrollFrame_GetOffset(self.classicScrollFrame.FauxScrollFrame) or 0
+	local numButtons = #self.classicButtonPool
+	
+	-- Get compact mode setting
+	local DB = GetDB()
+	local isCompactMode = DB and DB:Get("compactMode", false)
+	
+	-- Calculate total content height for accurate scrolling with variable item heights
+	local totalHeight = 0
+	for _, elementData in ipairs(displayList) do
+		totalHeight = totalHeight + GetItemHeight(elementData, isCompactMode)
+	end
+	
+	-- Set ContentFrame height to actual content size (enables proper scrolling)
+	self.classicScrollFrame.ContentFrame:SetHeight(math.max(totalHeight, self.classicScrollFrame:GetHeight() or 400))
+	
+	-- Calculate number of VISIBLE buttons (not pool size!)
+	local scrollHeight = isCompactMode and CLASSIC_COMPACT_BUTTON_HEIGHT or CLASSIC_BUTTON_HEIGHT
+	local frameHeight = self.classicScrollFrame:GetHeight() or 400
+	local numVisibleButtons = math.floor(frameHeight / scrollHeight)
+	
+	FauxScrollFrame_Update(self.classicScrollFrame.FauxScrollFrame, numItems, numVisibleButtons, scrollHeight)
+	
+	-- Track current Y position for variable height items
+	local yOffset = 0
+	local buttonIndex = 1
+	local headerIndex = 1
+	
+	-- Hide all buttons and headers first
+	for _, button in ipairs(self.classicButtonPool) do
+		button:Hide()
+	end
+	for _, header in ipairs(self.classicHeaderPool) do
+		header:Hide()
+	end
+	
+	-- Render visible items
+	for i = 1, numButtons do
+		local dataIndex = offset + i
+		if dataIndex <= numItems then
+			local elementData = displayList[dataIndex]
+			
+			-- Use appropriate button type
+			local button
+			if elementData.buttonType == BUTTON_TYPE_GROUP_HEADER then
+				-- Use header from header pool
+				button = self.classicHeaderPool[headerIndex]
+				headerIndex = headerIndex + 1
+			else
+				-- Use friend button from button pool
+				button = self.classicButtonPool[buttonIndex]
+				buttonIndex = buttonIndex + 1
+			end
+			
+			if button and elementData then
+				-- Position button (set BOTH TOPLEFT and RIGHT for full width)
+				button:ClearAllPoints()
+				if elementData.buttonType == BUTTON_TYPE_GROUP_HEADER then
+					button:SetPoint("TOPLEFT", self.classicScrollFrame.ContentFrame, "TOPLEFT", 2, -yOffset)  -- 2px left padding
+					button:SetPoint("RIGHT", self.classicScrollFrame.ContentFrame, "RIGHT", 5, 0)  -- 12px - 2px right padding = 10px
+				else
+					-- Use friend button from button pool
+					button:SetPoint("TOPLEFT", self.classicScrollFrame.ContentFrame, "TOPLEFT", 2, -yOffset)  -- 2px left padding
+					button:SetPoint("RIGHT", self.classicScrollFrame.ContentFrame, "RIGHT", 3, 0)  -- 12px - 2px right padding = 10px
+				end
+				
+				-- Get height for this item type
+				local itemHeight = GetItemHeight(elementData, isCompactMode)
+				button:SetHeight(itemHeight)
+				
+				-- Update button based on type
+				if elementData.buttonType == BUTTON_TYPE_FRIEND then
+					self:UpdateFriendButton(button, elementData)
+				elseif elementData.buttonType == BUTTON_TYPE_GROUP_HEADER then
+					self:UpdateGroupHeaderButton(button, elementData)
+				elseif elementData.buttonType == BUTTON_TYPE_INVITE_HEADER then
+					self:UpdateInviteHeaderButton(button, elementData)
+				elseif elementData.buttonType == BUTTON_TYPE_INVITE then
+					self:UpdateInviteButton(button, elementData)
+				end
+				
+				button:Show()
+				yOffset = yOffset + itemHeight
+				buttonIndex = buttonIndex + 1
+			end
+		end
+	end
 end
 
 -- ========================================
@@ -889,9 +1079,10 @@ function FriendsList:UpdateFriendsList()
 	-- Sync groups first
 	self:SyncGroups()
 	
-	-- Get Battle.net friends
+	-- Get Battle.net friends (Classic: May not be available)
 	local bnetFriends = C_BattleNet.GetFriendNumGameAccounts and C_BattleNet.GetFriendAccountInfo or nil
-	if bnetFriends then
+	-- Classic safeguard: BNGetNumFriends may not exist
+	if bnetFriends and BNGetNumFriends then
 		local numBNetTotal, numBNetOnline = BNGetNumFriends()
 		
 		for i = 1, numBNetTotal do
@@ -914,14 +1105,38 @@ function FriendsList:UpdateFriendsList()
 				if accountInfo.gameAccountInfo and accountInfo.gameAccountInfo.isOnline then
 					local gameInfo = accountInfo.gameAccountInfo
 					if gameInfo.clientProgram == "WoW" or gameInfo.clientProgram == "WTCG" then
+						-- DEBUG: Log raw data for analysis
+						if BFL.DebugPrint then
+							BFL:DebugPrint(string.format("BNet Friend: %s (Prog: %s, Proj: %s, Class: %s, Area: %s, Rich: %s)", 
+								tostring(gameInfo.characterName),
+								tostring(gameInfo.clientProgram),
+								tostring(gameInfo.wowProjectID),
+								tostring(gameInfo.className),
+								tostring(gameInfo.areaName),
+								tostring(gameInfo.richPresence)
+							))
+						end
+
 						friend.characterName = gameInfo.characterName
 						friend.className = gameInfo.className
 						friend.classID = gameInfo.classID  -- 11.2.7+: Store classID for optimized class color lookup
 						friend.areaName = gameInfo.areaName
+						-- friend.richPresence = gameInfo.richPresence -- REVERTED: Caused issues with zone display
 						friend.level = gameInfo.characterLevel
 						friend.realmName = gameInfo.realmName
 						friend.factionName = gameInfo.factionName
 						friend.timerunningSeasonID = gameInfo.timerunningSeasonID
+						
+						-- Classic Fix: Parse richPresence if areaName is missing (e.g. "Zone - Realm")
+						if (not friend.areaName or friend.areaName == "") and gameInfo.richPresence then
+							local richZone, richRealm = strsplit("-", gameInfo.richPresence)
+							if richZone then
+								friend.areaName = strtrim(richZone)
+							end
+							if richRealm and (not friend.realmName or friend.realmName == "") then
+								friend.realmName = strtrim(richRealm)
+							end
+						end
 						
 						if gameInfo.timerunningSeasonID then
 							friend.timerunningSeasonID = gameInfo.timerunningSeasonID
@@ -958,14 +1173,26 @@ function FriendsList:UpdateFriendsList()
 			-- Normalize name to always include realm for consistent identification
 			local normalizedName = BFL:NormalizeWoWFriendName(friendInfo.name, playerRealm)
 			
+			-- Extract realm name from normalized name (Name-Realm)
+			local _, realmName = strsplit("-", normalizedName)
+			
+			-- Classic Fallback: Ensure area is populated
+			-- C_FriendList might return nil area in some Classic versions
+			local area = friendInfo.area
+			if (not area or area == "") and BFL.IsClassic and GetFriendInfo then
+				local _, _, _, classicArea = GetFriendInfo(i)
+				area = classicArea
+			end
+			
 			local friend = {
 				type = "wow",
 				index = i,
 				name = normalizedName, -- Always includes realm: "Name-Realm"
+				realmName = realmName, -- Explicitly store realm name for display
 				connected = friendInfo.connected,
 				level = friendInfo.level,
 				className = friendInfo.className,
-				area = friendInfo.area,
+				area = area,
 				notes = friendInfo.notes,
 			}
 			table.insert(self.friendsList, friend)
@@ -1830,7 +2057,7 @@ end
 -- RenderDisplay: Updates the visual display of the friends list
 -- This function handles ScrollBox rendering, button pool management, 
 -- friend button configuration (BNet/WoW), compact mode, and TravelPass buttons
--- NEW: Simplified RenderDisplay using ScrollBox/DataProvider system (Phase 2)
+-- Supports both Retail (ScrollBox/DataProvider) and Classic (FauxScrollFrame)
 function FriendsList:RenderDisplay()
 	-- Skip update if frame is not shown (performance optimization)
 	-- But mark that we need to render when frame is shown
@@ -1857,10 +2084,24 @@ function FriendsList:RenderDisplay()
 	-- Clear dirty flag since we're rendering now
 	needsRenderOnShow = false
 	
-	-- Build DataProvider from friends list
+	-- Build DataProvider from friends list (used by both Retail and Classic)
 	local dataProvider = BuildDataProvider(self)
 	
-	-- Update ScrollBox with automatic scroll position preservation!
+	-- Classic: Use FauxScrollFrame rendering
+	if BFL.IsClassic or not BFL.HasModernScrollBox then
+		-- Convert DataProvider to display list for Classic
+		self.classicDisplayList = {}
+		if dataProvider and dataProvider.Enumerate then
+			for _, elementData in dataProvider:Enumerate() do
+				table.insert(self.classicDisplayList, elementData)
+			end
+		end
+		-- Render with Classic button pool
+		self:RenderClassicButtons()
+		return
+	end
+	
+	-- Retail: Update ScrollBox with automatic scroll position preservation!
 	local retainScrollPosition = true
 	if self.scrollBox then
 		self.scrollBox:SetDataProvider(dataProvider, retainScrollPosition)
@@ -1934,9 +2175,13 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 	
 	button:SetFormattedText("%s%s|r (%s)", colorCode, name, countText)
 	
-	-- Show/hide collapse arrows
-	button.DownArrow:SetShown(not collapsed)
-	button.RightArrow:SetShown(collapsed)
+	-- Show/hide collapse arrows (check if they exist first - Classic XML has them)
+	if button.DownArrow then
+		button.DownArrow:SetShown(not collapsed)
+	end
+	if button.RightArrow then
+		button.RightArrow:SetShown(collapsed)
+	end
 	
 	-- Apply font scaling
 	local FontManager = GetFontManager()
@@ -2620,26 +2865,30 @@ function FriendsList:UpdateFriendButton(button, elementData)
 				end
 				
 				-- Set atlas based on faction for cross-faction invites
-				local playerFactionGroup = UnitFactionGroup("player")
-				local isCrossFaction = friend.gameAccountInfo and
-									   friend.gameAccountInfo.factionName and 
-									   friend.gameAccountInfo.factionName ~= playerFactionGroup
-				
-				if isCrossFaction then
-					if friend.gameAccountInfo.factionName == "Horde" then
-						button.travelPassButton.NormalTexture:SetAtlas("friendslist-invitebutton-horde-normal")
-						button.travelPassButton.PushedTexture:SetAtlas("friendslist-invitebutton-horde-pressed")
-						button.travelPassButton.DisabledTexture:SetAtlas("friendslist-invitebutton-horde-disabled")
-					elseif friend.gameAccountInfo.factionName == "Alliance" then
-						button.travelPassButton.NormalTexture:SetAtlas("friendslist-invitebutton-alliance-normal")
-						button.travelPassButton.PushedTexture:SetAtlas("friendslist-invitebutton-alliance-pressed")
-						button.travelPassButton.DisabledTexture:SetAtlas("friendslist-invitebutton-alliance-disabled")
+				-- CRITICAL: Classic Era does NOT support SetAtlas() - keep file-based textures from XML
+				if not BFL.IsClassic then
+					local playerFactionGroup = UnitFactionGroup("player")
+					local isCrossFaction = friend.gameAccountInfo and
+										   friend.gameAccountInfo.factionName and 
+										   friend.gameAccountInfo.factionName ~= playerFactionGroup
+					
+					if isCrossFaction then
+						if friend.gameAccountInfo.factionName == "Horde" then
+							button.travelPassButton.NormalTexture:SetAtlas("friendslist-invitebutton-horde-normal")
+							button.travelPassButton.PushedTexture:SetAtlas("friendslist-invitebutton-horde-pressed")
+							button.travelPassButton.DisabledTexture:SetAtlas("friendslist-invitebutton-horde-disabled")
+						elseif friend.gameAccountInfo.factionName == "Alliance" then
+							button.travelPassButton.NormalTexture:SetAtlas("friendslist-invitebutton-alliance-normal")
+							button.travelPassButton.PushedTexture:SetAtlas("friendslist-invitebutton-alliance-pressed")
+							button.travelPassButton.DisabledTexture:SetAtlas("friendslist-invitebutton-alliance-disabled")
+						end
+					else
+						button.travelPassButton.NormalTexture:SetAtlas("friendslist-invitebutton-default-normal")
+						button.travelPassButton.PushedTexture:SetAtlas("friendslist-invitebutton-default-pressed")
+						button.travelPassButton.DisabledTexture:SetAtlas("friendslist-invitebutton-default-disabled")
 					end
-				else
-					button.travelPassButton.NormalTexture:SetAtlas("friendslist-invitebutton-default-normal")
-					button.travelPassButton.PushedTexture:SetAtlas("friendslist-invitebutton-default-pressed")
-					button.travelPassButton.DisabledTexture:SetAtlas("friendslist-invitebutton-default-disabled")
 				end
+				-- Classic: Uses file-based textures from XML (Interface\FriendsFrame\TravelPass-Invite)
 				
 				button.travelPassButton:Show()
 			else
@@ -2667,7 +2916,7 @@ function FriendsList:UpdateFriendButton(button, elementData)
 				line1Text = "|cff00ccff" .. displayName .. "|r"
 			end
 			
-			if friend.characterName and friend.className then
+			if friend.characterName then
 				-- Add Timerunning icon if applicable
 				local characterName = friend.characterName
 				if friend.timerunningSeasonID and TimerunningUtil and TimerunningUtil.AddSmallIcon then
@@ -2694,7 +2943,7 @@ function FriendsList:UpdateFriendButton(button, elementData)
 			-- Check if class coloring is enabled
 			local useClassColor = GetDB():Get("colorClassNames", true)
 			
-			if useClassColor and not shouldGray then
+			if useClassColor and not shouldGray and friend.className then
 				-- Get class file (uses classID if available on 11.2.7+, falls back to className)
 				local classFile = GetClassFileForFriend(friend)
 				local classColor = classFile and RAID_CLASS_COLORS[classFile]
@@ -2721,7 +2970,8 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		-- In compact mode, append additional info to line1Text
 		if isCompactMode then
 			local hideMaxLevel = GetDB():Get("hideMaxLevel", false)
-			local maxLevel = GetMaxLevelForPlayerExpansion()
+			-- Classic-compatible: GetMaxLevelForPlayerExpansion() doesn't exist in Classic
+			local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or MAX_PLAYER_LEVEL or 60
 			
 			if friend.connected then
 				local infoText = ""
@@ -2759,7 +3009,8 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		-- Line 2: Level, Zone (in gray) - only used in normal mode
 		if not isCompactMode then
 			local hideMaxLevel = GetDB():Get("hideMaxLevel", false)
-			local maxLevel = GetMaxLevelForPlayerExpansion()
+			-- Classic-compatible: GetMaxLevelForPlayerExpansion() doesn't exist in Classic
+			local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or MAX_PLAYER_LEVEL or 60
 			
 			if friend.connected then
 				if friend.level and friend.areaName then
@@ -2867,7 +3118,8 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		-- In compact mode, append additional info to line1Text
 		if isCompactMode then
 			local hideMaxLevel = GetDB():Get("hideMaxLevel", false)
-			local maxLevel = GetMaxLevelForPlayerExpansion()
+			-- Classic-compatible: GetMaxLevelForPlayerExpansion() doesn't exist in Classic
+			local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or MAX_PLAYER_LEVEL or 60
 			
 			if friend.connected then
 				local infoText = ""
@@ -2898,7 +3150,8 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		-- Line 2: Level, Zone (in gray) - only used in normal mode
 		if not isCompactMode then
 			local hideMaxLevel = GetDB():Get("hideMaxLevel", false)
-			local maxLevel = GetMaxLevelForPlayerExpansion()
+			-- Classic-compatible: GetMaxLevelForPlayerExpansion() doesn't exist in Classic
+			local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or MAX_PLAYER_LEVEL or 60
 			
 			if friend.connected then
 				if friend.level and friend.area then
@@ -3253,6 +3506,13 @@ function FriendsList:UpdateSearchBoxWidth()
 	-- ========================================
 	-- CALCULATE OPTIMAL SEARCHBOX WIDTH (RESPONSIVE)
 	-- ========================================
+	
+	-- Classic Mode: Fixed width to fit dropdowns
+	if BFL.IsClassic then
+		-- Let XML anchors handle width (Full Width)
+		return
+	end
+
 	-- Fixed elements on the right side of the header:
 	-- - QuickFilter dropdown (~125px)
 	-- - Sort dropdown (~80px)

@@ -22,6 +22,12 @@ end
 --]]--------------------------------------------------
 
 function NotificationEditMode:Initialize()
+    -- STOP: Edit Mode is Retail-only (10.0+)
+    if not BFL.HasEditMode then
+        BFL:DebugPrint("|cffffcc00BFL:NotificationEditMode:|r Edit Mode not available in Classic")
+        return
+    end
+    
     -- STOP: Beta Features must be enabled
     if not IsBetaEnabled() then
         BFL:DebugPrint("|cffffcc00BFL:NotificationEditMode:|r Beta Features disabled - Edit Mode integration skipped")

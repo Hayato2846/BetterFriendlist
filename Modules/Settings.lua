@@ -3643,8 +3643,9 @@ function Settings:RefreshNotificationsTab()
 			label:SetPoint("LEFT", triggerFrame, "LEFT", 0, 0)
 			label:SetText(string.format("%d+ from '%s'", trigger.threshold, groupName))
 			
-			-- Enable/Disable toggle
-			local enableBtn = CreateFrame("CheckButton", nil, triggerFrame, "SettingsCheckboxTemplate")
+			-- Enable/Disable toggle (Classic-compatible template selection)
+			local checkboxTemplate = BFL.IsClassic and "InterfaceOptionsCheckButtonTemplate" or "SettingsCheckboxTemplate"
+			local enableBtn = CreateFrame("CheckButton", nil, triggerFrame, checkboxTemplate)
 			enableBtn:SetPoint("RIGHT", triggerFrame, "RIGHT", -40, 0)
 			enableBtn:SetSize(20, 20)
 			enableBtn:SetChecked(trigger.enabled)
@@ -4131,9 +4132,10 @@ function Settings:RefreshBrokerTab()
 		if listItem.colorButton then listItem.colorButton:Hide() end
 		if listItem.orderText then listItem.orderText:Hide() end
 		
-		-- Add Checkbox to the list item
+		-- Add Checkbox to the list item (Classic-compatible template selection)
 		local isChecked = DB:Get("brokerShowCol" .. col.key, true)
-		local checkbox = CreateFrame("CheckButton", nil, listItem, "SettingsCheckboxTemplate")
+		local checkboxTemplate = BFL.IsClassic and "InterfaceOptionsCheckButtonTemplate" or "SettingsCheckboxTemplate"
+		local checkbox = CreateFrame("CheckButton", nil, listItem, checkboxTemplate)
 		checkbox:SetPoint("LEFT", listItem, "LEFT", 4, 0)
 		checkbox:SetSize(20, 20)
 		checkbox:SetChecked(isChecked)

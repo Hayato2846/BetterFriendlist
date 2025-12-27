@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+- **Classic Era Support** - Added support for Classic Era and Mists of Pandaria Classic
+
+## [2.0.1] - 2025-12-14
+
+### Fixed
+
+- **Classic Friends List** - Fixed missing Zone (Instance) and Realm information for WoW friends in Classic versions
+  - Added fallback mechanism to retrieve area information when standard API returns nil
+  - Explicitly parses and stores realm names for correct display in cross-realm scenarios
+  - Ensures "Classic can do that!" parity with default UI
+- **Raid Frame Visibility** - Fixed raid buttons persisting on screen after leaving a group
+  - Buttons now properly hide when no member data is assigned
+  - Frame clears correctly when group is disbanded
+
 ## [2.0.0] - 2025-12-14
 
 ### 🚀 Major Update - ElvUI Integration, Nicknames & UI Overhaul

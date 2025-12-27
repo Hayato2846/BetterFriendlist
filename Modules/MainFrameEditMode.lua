@@ -1,10 +1,23 @@
 --[[
     MainFrameEditMode - Edit Mode Integration for Main Frame
     Allows users to position and resize the BetterFriendlist frame in Blizzard's Edit Mode
+    NOTE: Edit Mode is Retail-only (10.0+) - this module is disabled in Classic
 --]]
 
 local _, BFL = ...
 local MainFrameEditMode = {}
+
+-- Classic Guard: Edit Mode is Retail-only
+if BFL.IsClassic then
+    -- Register empty module so other code doesn't error
+    BFL.MainFrameEditMode = MainFrameEditMode
+    function MainFrameEditMode:Initialize() end
+    function MainFrameEditMode:ApplyPosition() end
+    function MainFrameEditMode:SavePosition() end
+    function MainFrameEditMode:ApplySize() end
+    function MainFrameEditMode:SaveSize() end
+    return
+end
 
 -- Check if LibEditMode is available (optional dependency)
 local LEM = LibStub and LibStub("LibEditMode", true)

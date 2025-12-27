@@ -278,4 +278,12 @@ if GetLocale() == "ruRU" then
 	-- Feature 4: Масштаб Окна
 	L.SETTINGS_WINDOW_SCALE = "Масштаб окна"
 	L.SETTINGS_WINDOW_SCALE_DESC = "Масштабировать всё окно (50%% - 200%%)"
+	
+	-- ========================================
+	-- CLASSIC COMPATIBILITY
+	-- ========================================
+	L.RECENT_ALLIES_NOT_AVAILABLE = "Недавние союзники недоступны в Classic"
+	L.EDIT_MODE_NOT_AVAILABLE = "Режим редактирования недоступен в Classic"
+	L.CLASSIC_COMPATIBILITY_INFO = "Работа в режиме совместимости Classic"
+	L.FEATURE_NOT_AVAILABLE_CLASSIC = "Эта функция недоступна в Classic"
 end

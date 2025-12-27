@@ -312,4 +312,12 @@ if GetLocale() == "frFR" then
 	-- Feature 4: Échelle de Fenêtre
 	L.SETTINGS_WINDOW_SCALE = "Échelle de fenêtre"
 	L.SETTINGS_WINDOW_SCALE_DESC = "Mettre à l'échelle toute la fenêtre (50%% - 200%%)"
+	
+	-- ========================================
+	-- CLASSIC COMPATIBILITY
+	-- ========================================
+	L.RECENT_ALLIES_NOT_AVAILABLE = "Alliés Récents non disponible en Classic"
+	L.EDIT_MODE_NOT_AVAILABLE = "Le Mode Édition non disponible en Classic"
+	L.CLASSIC_COMPATIBILITY_INFO = "Exécution en mode compatibilité Classic"
+	L.FEATURE_NOT_AVAILABLE_CLASSIC = "Cette fonctionnalité n'est pas disponible en Classic"
 end

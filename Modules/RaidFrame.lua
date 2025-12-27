@@ -47,6 +47,34 @@ RaidFrame.DIFFICULTY_PRIMARYRAID_MYTHIC = 16
 RaidFrame.DIFFICULTY_PRIMARYRAID_LFR = 17
 
 -- ========================================
+-- HELPER FUNCTIONS
+-- ========================================
+
+--- Get role icon string (Retail/Classic compatible)
+local function GetRoleIconString(role, size)
+    size = size or 16
+    if BFL.IsRetail then
+        if role == "TANK" then
+            return CreateAtlasMarkup("UI-LFG-RoleIcon-Tank-Micro-GroupFinder", size, size)
+        elseif role == "HEALER" then
+            return CreateAtlasMarkup("UI-LFG-RoleIcon-Healer-Micro-GroupFinder", size, size)
+        else
+            return CreateAtlasMarkup("UI-LFG-RoleIcon-DPS-Micro-GroupFinder", size, size)
+        end
+    else
+        -- Classic fallback using standard LFG role icons
+        -- Texture: Interface\LFGFrame\UI-LFG-ICON-PORTRAITROLES
+        if role == "TANK" then
+            return string.format("|TInterface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES:%d:%d:0:0:64:64:0:19:22:41|t", size, size)
+        elseif role == "HEALER" then
+            return string.format("|TInterface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES:%d:%d:0:0:64:64:20:39:1:20|t", size, size)
+        else
+            return string.format("|TInterface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES:%d:%d:0:0:64:64:20:39:22:41|t", size, size)
+        end
+    end
+end
+
+-- ========================================
 -- RESPONSIVE LAYOUT (PHASE 4)
 -- ========================================
 
@@ -298,7 +326,7 @@ function RaidFrame:UpdateControlPanelLayout()
     local checkboxStartX = 35  -- Avatar clearance
     local checkboxLabelGap = 2  -- Gap between checkbox and label
     local buttonRightPadding = 3  -- Padding from right edge
-    local centerElementGap = 8  -- Gap between RoleSummary and MemberCount (reduced from 10)
+    local centerElementGap = 5  -- Gap between RoleSummary and MemberCount (reduced from 8)
     
     -- Calculate dynamic Y-offset for vertical centering
     local checkboxHeight = controlPanel.EveryoneAssistCheckbox and controlPanel.EveryoneAssistCheckbox:GetHeight() or 24
@@ -327,6 +355,20 @@ function RaidFrame:UpdateControlPanelLayout()
     local rightSectionStart = panelWidth - optimizedButtonWidth - buttonRightPadding
     local availableCenter = rightSectionStart - leftSectionEnd
     
+    -- Auto-hide Assist Label if space is too tight (Classic fix)
+    if availableCenter < centerSectionWidth and controlPanel.EveryoneAssistLabel then
+        controlPanel.EveryoneAssistLabel:Hide()
+        leftSectionEnd = checkboxStartX + checkboxWidth + checkboxLabelGap -- Recalculate boundary
+        availableCenter = rightSectionStart - leftSectionEnd
+    elseif controlPanel.EveryoneAssistLabel then
+        -- Only show if in Raid (User Request: Fix visibility)
+        if IsInRaid() then
+            controlPanel.EveryoneAssistLabel:Show()
+        else
+            controlPanel.EveryoneAssistLabel:Hide()
+        end
+    end
+    
     -- BFL:DebugPrint(string.format("  Layout boundaries:"))
     -- BFL:DebugPrint(string.format("    Left section: %.1f to %.1f", checkboxStartX, leftSectionEnd))
     -- BFL:DebugPrint(string.format("    Right section: %.1f to %.1f (button width=%.1f)", rightSectionStart, panelWidth - buttonRightPadding, optimizedButtonWidth))
@@ -336,6 +378,11 @@ function RaidFrame:UpdateControlPanelLayout()
     
     -- Calculate center position (true center of available space)
     local centerStart = leftSectionEnd + math.max(5, (availableCenter - centerSectionWidth) / 2)
+
+    -- Shift -3px for Classic per user request
+    if not BFL.IsRetail then
+        centerStart = centerStart - 5
+    end
     
     -- BFL:DebugPrint(string.format("  Center section target: x=%.1f to %.1f", centerStart, centerStart + centerSectionWidth))
     
@@ -362,6 +409,9 @@ function RaidFrame:UpdateControlPanelLayout()
     if controlPanel.RaidInfoButton then
         controlPanel.RaidInfoButton:ClearAllPoints()
         controlPanel.RaidInfoButton:SetPoint("TOPRIGHT", controlPanel, "TOPRIGHT", -buttonRightPadding, -13)
+        if not BFL.IsRetail then
+            controlPanel.RaidInfoButton:SetPoint("TOPRIGHT", controlPanel, "TOPRIGHT", 2, -13)
+        end
         controlPanel.RaidInfoButton:SetWidth(optimizedButtonWidth)  -- Resize button
         local actualX = controlPanel.RaidInfoButton:GetLeft()
         local actualWidth = controlPanel.RaidInfoButton:GetWidth()
@@ -534,6 +584,7 @@ function RaidFrame:Initialize()
     
     -- Initial update of control panel (this will set label too)
     self:UpdateControlPanel()
+    self:UpdateGroupLayout() -- Ensure layout matches Mock (responsive sizing)
     
     -- Hook OnShow to re-render if data changed while hidden
     if BetterFriendsFrame then
@@ -791,6 +842,12 @@ function RaidFrame:UpdateAllMemberButtons()
         
         -- Update each slot in the group using self.memberButtons[]
         local members = membersByGroup[groupIndex]
+        local hasGroupMembers = #members > 0
+        
+        -- Hide group frame if empty (Clean Logic)
+        if groupFrame then
+            groupFrame:SetShown(hasGroupMembers)
+        end
         
         if self.memberButtons[groupIndex] then
             for slotIndex = 1, 5 do
@@ -1117,12 +1174,11 @@ function RaidFrame:UpdateRoleSummary()
     
     -- Format: Tank Icon + count, Healer Icon + count, DPS Icon + count
     -- Using Blizzard's modern micro role icons (same as in GroupFinder and FriendsFrame)
-    local iconSize = 16
+    local iconSize = 14 -- Reduced from 16 for better fit in Classic
     
-    -- Using the modern UI-LFG micro role icons
-    local tankIcon = CreateAtlasMarkup("UI-LFG-RoleIcon-Tank-Micro-GroupFinder", iconSize, iconSize)
-    local healIcon = CreateAtlasMarkup("UI-LFG-RoleIcon-Healer-Micro-GroupFinder", iconSize, iconSize)
-    local dpsIcon = CreateAtlasMarkup("UI-LFG-RoleIcon-DPS-Micro-GroupFinder", iconSize, iconSize)
+    local tankIcon = GetRoleIconString("TANK", iconSize)
+    local healIcon = GetRoleIconString("HEALER", iconSize)
+    local dpsIcon = GetRoleIconString("DAMAGER", iconSize)
     
     local text = string.format("%s %d  %s %d  %s %d", tankIcon, tanks, healIcon, healers, dpsIcon, dps)
     frame.ControlPanel.RoleSummary:SetText(text)
@@ -1137,10 +1193,10 @@ end
 function RaidFrame:UpdateMemberButton(button, memberData)
     if not button then return end
     
-    -- Show button even if empty (for visual consistency)
+    -- Always show button frame (User Request: NEVER hide buttons)
     button:Show()
     
-    -- If no member data, show empty slot
+    -- If no member data, clear content and return
     if not memberData then
         button.memberData = nil
         
@@ -1149,36 +1205,22 @@ function RaidFrame:UpdateMemberButton(button, memberData)
         button.name = nil
         button.raidSlot = nil
         
-        -- Hide all content
+        -- Clear visuals
         if button.Name then button.Name:SetText("") end
-        if button.Level then button.Level:SetText("") end
+        if button.Level then button.Level:SetText(""); button.Level:Hide() end
         if button.ClassIcon then button.ClassIcon:Hide() end
         if button.RankIcon then button.RankIcon:Hide() end
         if button.RoleIcon then button.RoleIcon:Hide() end
         if button.MainTankIcon then button.MainTankIcon:Hide() end
         if button.MainAssistIcon then button.MainAssistIcon:Hide() end
         if button.ReadyCheckIcon then button.ReadyCheckIcon:Hide() end
-        
-        -- Show "Empty" text
-        if button.EmptyText then button.EmptyText:Show() end
-        
-        -- Reset to empty slot appearance
-        if button.ClassColorTint then
-            button.ClassColorTint:SetColorTexture(0.1, 0.1, 0.1, 0.3)
-        end
-        
-        -- Update Combat Overlay even for empty slots
-        if button.CombatOverlay then
-            local inCombat = InCombatLockdown()
-            if inCombat then
-                button.CombatOverlay:Show()
-            else
-                button.CombatOverlay:Hide()
-            end
-        end
+        if button.ClassColorTint then button.ClassColorTint:SetColorTexture(0.1, 0.1, 0.1, 0.5) end
         
         return
     end
+    
+    -- Show button when occupied
+    button:Show()
     
     -- Hide "Empty" text when slot is occupied
     if button.EmptyText then button.EmptyText:Hide() end
@@ -1685,8 +1727,12 @@ function RaidFrame:OnRaidRosterUpdate(...)
         -- Update UI
         self:UpdateAllMemberButtons()
         self:UpdateControlPanel()
-        -- Note: We DON'T need to call BetterRaidFrame_Update() here anymore
-        -- The EveryoneAssistCheckbox handles its own state via events (GROUP_ROSTER_UPDATE)
+        self:UpdateGroupLayout() -- Ensure layout matches Mock (responsive sizing)
+        
+        -- Central Update Logic (Restored)
+        if BetterRaidFrame_Update then
+            BetterRaidFrame_Update()
+        end
     end)
 end
 
@@ -1698,6 +1744,11 @@ function RaidFrame:OnGroupJoined(...)
     -- Update UI
     self:UpdateAllMemberButtons()
     self:UpdateControlPanel()
+    self:UpdateGroupLayout()
+    
+    if BetterRaidFrame_Update then
+        BetterRaidFrame_Update()
+    end
 end
 
 function RaidFrame:OnGroupLeft(...)
@@ -1705,6 +1756,15 @@ function RaidFrame:OnGroupLeft(...)
     wipe(self.raidMembers)
     wipe(self.displayList)
     self.selectedMember = nil
+    
+    -- Update UI to clear buttons
+    self:UpdateAllMemberButtons()
+    self:UpdateControlPanel()
+    self:UpdateGroupLayout()
+    
+    if BetterRaidFrame_Update then
+        BetterRaidFrame_Update()
+    end
 end
 
 function RaidFrame:OnInstanceInfoUpdate(...)
@@ -2242,9 +2302,10 @@ function RaidFrame:UpdateMockControlPanel()
 			end
 		end
 		
-		local tankIcon = CreateAtlasMarkup("UI-LFG-RoleIcon-Tank-Micro-GroupFinder", 16, 16)
-		local healIcon = CreateAtlasMarkup("UI-LFG-RoleIcon-Healer-Micro-GroupFinder", 16, 16)
-		local dpsIcon = CreateAtlasMarkup("UI-LFG-RoleIcon-DPS-Micro-GroupFinder", 16, 16)
+		local iconSize = 14 -- Reduced from 16
+		local tankIcon = GetRoleIconString("TANK", iconSize)
+		local healIcon = GetRoleIconString("HEALER", iconSize)
+		local dpsIcon = GetRoleIconString("DAMAGER", iconSize)
 		controlPanel.RoleSummary:SetText(string.format("%s %d  %s %d  %s %d", tankIcon, tanks, healIcon, healers, dpsIcon, dps))
 	end
 	

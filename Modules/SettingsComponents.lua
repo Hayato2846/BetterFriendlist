@@ -32,6 +32,7 @@ end
 
 -- ========================================
 -- CHECKBOX (Label left, Checkbox right)
+-- Classic uses InterfaceOptionsCheckButtonTemplate, Retail uses SettingsCheckboxTemplate
 -- ========================================
 function Components:CreateCheckbox(parent, labelText, initialValue, callback)
 	local holder = CreateFrame("Frame", nil, parent)
@@ -39,18 +40,41 @@ function Components:CreateCheckbox(parent, labelText, initialValue, callback)
 	holder:SetPoint("LEFT", PADDING_LEFT, 0)
 	holder:SetPoint("RIGHT", -PADDING_RIGHT, 0)
 	
-	-- Checkbox: links positioniert
-	local checkBox = CreateFrame("CheckButton", nil, holder, "SettingsCheckboxTemplate")
-	checkBox:SetPoint("LEFT", holder, "LEFT", 0, 0)
-	checkBox:SetText(labelText)
-	checkBox:SetNormalFontObject(GameFontHighlight)
+	-- Choose template based on game version
+	local template = "SettingsCheckboxTemplate"
+	if BFL.IsClassic then
+		-- Classic: Use InterfaceOptionsCheckButtonTemplate or ChatConfigCheckButtonTemplate
+		template = "InterfaceOptionsCheckButtonTemplate"
+	end
 	
-	-- Label: rechts neben der Checkbox
-	local label = checkBox:GetFontString()
-	label:ClearAllPoints()
-	label:SetPoint("LEFT", checkBox, "RIGHT", 4, 0)
-	label:SetJustifyH("LEFT")
-	label:SetWidth(300)
+	-- Checkbox: links positioniert
+	local checkBox = CreateFrame("CheckButton", nil, holder, template)
+	checkBox:SetPoint("LEFT", holder, "LEFT", 0, 0)
+	
+	-- Handle label differently based on template
+	if BFL.IsClassic then
+		-- Classic template uses Text child
+		if checkBox.Text then
+			checkBox.Text:SetText(labelText)
+		else
+			-- Fallback: Create font string manually
+			local text = checkBox:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+			text:SetPoint("LEFT", checkBox, "RIGHT", 4, 0)
+			text:SetText(labelText)
+			checkBox.Text = text
+		end
+	else
+		-- Retail: Use SetText method
+		checkBox:SetText(labelText)
+		checkBox:SetNormalFontObject(GameFontHighlight)
+		
+		-- Label: rechts neben der Checkbox
+		local label = checkBox:GetFontString()
+		label:ClearAllPoints()
+		label:SetPoint("LEFT", checkBox, "RIGHT", 4, 0)
+		label:SetJustifyH("LEFT")
+		label:SetWidth(300)
+	end
 	
 	checkBox:SetChecked(initialValue)
 	checkBox:SetScript("OnClick", function(self)
@@ -130,7 +154,59 @@ end
 
 -- ========================================
 -- DROPDOWN (Label left, Dropdown right)
+-- Classic uses UIDropDownMenuTemplate, Retail uses WowStyle1DropdownTemplate
 -- ========================================
+
+-- Classic dropdown counter for unique names
+local classicDropdownCounter = 0
+
+-- Create Classic-style dropdown using UIDropDownMenu
+local function CreateClassicDropdown(parent, entries, isSelectedCallback, onSelectionCallback)
+	classicDropdownCounter = classicDropdownCounter + 1
+	local dropdownName = "BFLSettingsDropdown" .. classicDropdownCounter
+	
+	local dropdown = CreateFrame("Frame", dropdownName, parent, "UIDropDownMenuTemplate")
+	dropdown:SetWidth(180)
+	
+	local entryLabels = entries.labels
+	local entryValues = entries.values
+	
+	-- Store callbacks for later use
+	dropdown.isSelectedCallback = isSelectedCallback
+	dropdown.onSelectionCallback = onSelectionCallback
+	dropdown.entryLabels = entryLabels
+	dropdown.entryValues = entryValues
+	
+	-- Initialize the dropdown
+	UIDropDownMenu_Initialize(dropdown, function(self, level)
+		level = level or 1
+		for i = 1, #entryLabels do
+			local info = UIDropDownMenu_CreateInfo()
+			info.text = entryLabels[i]
+			info.value = entryValues[i]
+			info.checked = isSelectedCallback(entryValues[i])
+			info.func = function()
+				onSelectionCallback(entryValues[i])
+				UIDropDownMenu_SetText(dropdown, entryLabels[i])
+				CloseDropDownMenus()
+			end
+			UIDropDownMenu_AddButton(info, level)
+		end
+	end)
+	
+	-- Set initial text
+	for i = 1, #entryValues do
+		if isSelectedCallback(entryValues[i]) then
+			UIDropDownMenu_SetText(dropdown, entryLabels[i])
+			break
+		end
+	end
+	
+	UIDropDownMenu_SetWidth(dropdown, 150)
+	
+	return dropdown
+end
+
 function Components:CreateDropdown(parent, labelText, entries, isSelectedCallback, onSelectionCallback)
 	local holder = CreateFrame("Frame", nil, parent)
 	holder:SetHeight(COMPONENT_HEIGHT)
@@ -144,40 +220,48 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 	label:SetJustifyH("RIGHT")
 	label:SetText(labelText)
 	
-	-- Dropdown (right side)
-	local dropdown = CreateFrame("DropdownButton", nil, holder, "WowStyle1DropdownTemplate")
-	dropdown:SetWidth(180)
-	dropdown:SetPoint("LEFT", holder, "LEFT", 150, 0) -- Doubled from 75 to 150
+	local dropdown
 	
-	-- Initialize with provided entries using modern API
-	if entries and entries.labels and entries.values then
-		local entryLabels = entries.labels
-		local entryValues = entries.values
+	-- Classic mode: Use UIDropDownMenuTemplate
+	if BFL.IsClassic or not BFL.HasModernMenu then
+		dropdown = CreateClassicDropdown(holder, entries, isSelectedCallback, onSelectionCallback)
+		dropdown:SetPoint("LEFT", holder, "LEFT", 140, 0)
+	else
+		-- Retail: Use modern WowStyle1DropdownTemplate
+		dropdown = CreateFrame("DropdownButton", nil, holder, "WowStyle1DropdownTemplate")
+		dropdown:SetWidth(180)
+		dropdown:SetPoint("LEFT", holder, "LEFT", 150, 0) -- Doubled from 75 to 150
 		
-		-- Setup the dropdown menu using modern API
-		dropdown:SetupMenu(function(dropdown, rootDescription)
-			for i = 1, #entryLabels do
-				local radio = rootDescription:CreateButton(entryLabels[i], function() end, entryValues[i])
-				radio:SetIsSelected(function(value) return isSelectedCallback(value) end)
-				radio:SetResponder(function(value) onSelectionCallback(value) end)
-			end
-		end)
-		
-		-- SetSelectionTranslator: Shows the label of the selected value
-		dropdown:SetSelectionTranslator(function(selection)
-			for i = 1, #entryValues do
-				if entryValues[i] == selection.data then
-					return entryLabels[i]
+		-- Initialize with provided entries using modern API
+		if entries and entries.labels and entries.values then
+			local entryLabels = entries.labels
+			local entryValues = entries.values
+			
+			-- Setup the dropdown menu using modern API
+			dropdown:SetupMenu(function(dropdown, rootDescription)
+				for i = 1, #entryLabels do
+					local radio = rootDescription:CreateButton(entryLabels[i], function() end, entryValues[i])
+					radio:SetIsSelected(function(value) return isSelectedCallback(value) end)
+					radio:SetResponder(function(value) onSelectionCallback(value) end)
 				end
-			end
-			return entryLabels[1] -- Fallback
-		end)
-		
-		-- Set initial text based on selected value
-		for i = 1, #entryValues do
-			if isSelectedCallback(entryValues[i]) then
-				dropdown:SetText(entryLabels[i])
-				break
+			end)
+			
+			-- SetSelectionTranslator: Shows the label of the selected value
+			dropdown:SetSelectionTranslator(function(selection)
+				for i = 1, #entryValues do
+					if entryValues[i] == selection.data then
+						return entryLabels[i]
+					end
+				end
+				return entryLabels[1] -- Fallback
+			end)
+			
+			-- Set initial text based on selected value
+			for i = 1, #entryValues do
+				if isSelectedCallback(entryValues[i]) then
+					dropdown:SetText(entryLabels[i])
+					break
+				end
 			end
 		end
 	end
@@ -205,9 +289,29 @@ end
 
 -- ========================================
 -- INSET SECTION (Visual grouping)
+-- InsetFrameTemplate may not exist in Classic - create manual fallback
 -- ========================================
 function Components:CreateInsetSection(parent, height)
-	local inset = CreateFrame("Frame", nil, parent, "InsetFrameTemplate")
+	local inset
+	
+	-- Check if InsetFrameTemplate exists (may not be in all Classic versions)
+	if BFL.IsClassic then
+		-- Classic: Create simple bordered frame manually
+		inset = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+		inset:SetBackdrop({
+			bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+			edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+			tile = true,
+			tileSize = 16,
+			edgeSize = 16,
+			insets = { left = 4, right = 4, top = 4, bottom = 4 }
+		})
+		inset:SetBackdropBorderColor(0.6, 0.6, 0.6, 1)
+	else
+		-- Retail: Use standard InsetFrameTemplate
+		inset = CreateFrame("Frame", nil, parent, "InsetFrameTemplate")
+	end
+	
 	inset:SetPoint("LEFT", 20, 0)
 	inset:SetPoint("RIGHT", -20, 0)
 	inset:SetHeight(height or 100)
