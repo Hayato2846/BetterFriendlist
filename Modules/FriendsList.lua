@@ -1099,6 +1099,8 @@ function FriendsList:UpdateFriendsList()
 					isFavorite = accountInfo.isFavorite,
 					gameAccountInfo = accountInfo.gameAccountInfo,
 					lastOnlineTime = accountInfo.lastOnlineTime,
+					isAFK = accountInfo.isAFK,
+					isDND = accountInfo.isDND,
 				}
 				
 				-- If they're playing WoW, get game info (EXACT COPY OF OLD LOGIC)
@@ -1194,6 +1196,8 @@ function FriendsList:UpdateFriendsList()
 				className = friendInfo.className,
 				area = area,
 				notes = friendInfo.notes,
+				afk = friendInfo.afk,
+				dnd = friendInfo.dnd,
 			}
 			table.insert(self.friendsList, friend)
 		end
@@ -1272,14 +1276,28 @@ function FriendsList:CompareFriends(a, b, sortMode)
 				return 3 -- Offline lowest priority
 			end
 			
-			if friend.type == "bnet" and friend.gameAccountInfo then
-				local gameInfo = friend.gameAccountInfo
-				if gameInfo.isDND then return 1 end
-				if gameInfo.isAFK or gameInfo.clientProgram == "BSAp" then return 2 end
-				return 0
+			-- Check DND first (Priority 1)
+			local isDND = false
+			if friend.type == "bnet" then
+				-- Check both account status and game status
+				isDND = friend.isDND or (friend.gameAccountInfo and (friend.gameAccountInfo.isDND or friend.gameAccountInfo.isGameBusy))
+			elseif friend.type == "wow" then
+				isDND = friend.dnd
 			end
+			if isDND then return 1 end
+
+			-- Check AFK second (Priority 2)
+			local isAFK = false
+			if friend.type == "bnet" then
+				-- Check account status, game status, and mobile
+				isAFK = friend.isAFK or (friend.gameAccountInfo and (friend.gameAccountInfo.isAFK or friend.gameAccountInfo.isGameAFK))
+				if friend.gameAccountInfo and friend.gameAccountInfo.clientProgram == "BSAp" then isAFK = true end
+			elseif friend.type == "wow" then
+				isAFK = friend.afk
+			end
+			if isAFK then return 2 end
 			
-			return 0
+			return 0 -- Online (Priority 0)
 		end
 		
 		local aPriority = GetStatusPriority(a)
@@ -2742,7 +2760,13 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		local showMobileAsAFK = GetDB():Get("showMobileAsAFK", false)
 		if friend.connected then
 			local isMobile = friend.gameAccountInfo and friend.gameAccountInfo.clientProgram == "BSAp"
-			if showMobileAsAFK and isMobile then
+			-- Check both account status (App) and game status (WoW /afk)
+			local isAFK = friend.isAFK or (friend.gameAccountInfo and (friend.gameAccountInfo.isAFK or friend.gameAccountInfo.isGameAFK))
+			local isDND = friend.isDND or (friend.gameAccountInfo and (friend.gameAccountInfo.isDND or friend.gameAccountInfo.isGameBusy))
+			
+			if isDND then
+				button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-DnD")
+			elseif isAFK or (showMobileAsAFK and isMobile) then
 				button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Away")
 			else
 				button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Online")
@@ -3054,7 +3078,13 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		
 		-- Set status icon
 		if friend.connected then
-			button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Online")
+			if friend.dnd then
+				button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-DnD")
+			elseif friend.afk then
+				button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Away")
+			else
+				button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Online")
+			end
 		else
 			button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Offline")
 		end

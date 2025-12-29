@@ -1,4 +1,4 @@
-## Interface: 11508
+## Interface: 120001, 120000, 110207, 50503, 50500, 40402, 38000, 30405, 20505, 20504, 11508
 ## Title: BetterFriendlist
 ## Notes: Complete replacement for WoW Friends frame - Custom groups, Raid management, Quick Join, and more!
 ## Author: Hayato2846
@@ -6,9 +6,9 @@
 ## IconTexture: Interface\AddOns\BetterFriendlist\Textures\PortraitIcon.blp
 ## X-Curse-Project-ID: 1381771
 ## X-WoWI-ID: 26984
-## X-Wago-ID: rNkPLl6a
-## X-Flavor: Vanilla
+## X-Wago-ID: rNkPLl6a 
 ## SavedVariables: BetterFriendlistDB
+## Bindings: Bindings.xml
 
 ## Category: User Interface
 ## Category-deDE: Benutzerinterface
@@ -22,69 +22,64 @@
 ## Category-zhCN: 用户界面
 ## Category-zhTW: 使用者介面
 
-# Libraries (loaded first)
+# Libraries
 Libs\LibStub\LibStub.lua
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
 Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
 Libs\LibQTip-1.0\lib.xml
+Libs\LibEditMode\embed.xml [AllowLoadGameType mainline]
 
 # Core
 Core.lua
-
-# Compatibility Layer (loaded early for Classic)
 Utils\ClassicCompat.lua
 
-# Localization (loaded early)
+# Localization
 Locales\Locales.lua
-Locales\enUS.lua
-Locales\deDE.lua
-Locales\esES.lua
-Locales\esMX.lua
-Locales\frFR.lua
-Locales\itIT.lua
-Locales\koKR.lua
-Locales\ptBR.lua
-Locales\ruRU.lua
-Locales\zhCN.lua
-Locales\zhTW.lua
 
-# Utilities (loaded early for constants)
+# Utilities
 Utils\FontManager.lua
 Utils\ColorManager.lua
 Utils\AnimationHelpers.lua
 Utils\PerformanceMonitor.lua
 
-# UI Constants (loaded BEFORE modules that need them)
+# UI Constants
 UI\FrameInitializer.lua
 
 # Modules
 Modules\Database.lua
+Modules\Changelog.lua
 Modules\ActivityTracker.lua
 Modules\Statistics.lua
 Modules\NotificationSystem_Simple.lua
+Modules\NotificationEditMode.lua [AllowLoadGameType mainline]
+Modules\MainFrameEditMode.lua [AllowLoadGameType mainline]
 Modules\Groups.lua
 Modules\FriendsList.lua
 Modules\WhoFrame.lua
 Modules\IgnoreList.lua
-# Modules\RecentAllies.lua - RETAIL ONLY (requires modern social features)
+Modules\RecentAllies.lua [AllowLoadGameType mainline]
 Modules\MenuSystem.lua
 Modules\QuickFilters.lua
 Modules\Broker.lua
 Modules\SettingsComponents.lua
 Modules\Settings.lua
 Modules\Dialogs.lua
-# Modules\RAF.lua - RETAIL ONLY (uses UIPanelScrollBarTemplate + RAF API)
+Modules\RAF.lua [AllowLoadGameType mainline]
 Modules\RaidFrame.lua
-# Modules\QuickJoin.lua - RETAIL ONLY (uses UIPanelScrollBarTemplate + Quick Join API)
+BetterFriendlist_QuickJoin.xml [AllowLoadGameType mainline]
+Modules\QuickJoin.lua [AllowLoadGameType mainline]
 Modules\PreviewMode.lua
+Modules\ElvUISkin.lua [AllowLoadGameType mainline]
+Modules\AddOnSkins.lua [AllowLoadGameType mainline]
 
 # UI Callbacks
 UI\RaidFrameCallbacks.lua
-# UI\QuickJoinCallbacks.lua - RETAIL ONLY (Quick Join callbacks)
+UI\QuickJoinCallbacks.lua [AllowLoadGameType mainline]
 
-# Legacy (to be refactored) - Classic compatible XML
+# Legacy
 BetterFriendlist.lua
-BetterFriendlist_Classic.xml
+BetterFriendlist.xml [AllowLoadGameType mainline]
+BetterFriendlist_Classic.xml [AllowLoadGameType vanilla, tbc, wrath, cata, mists]
 BetterFriendlist_InviteTemplates.xml
 BetterFriendlist_NotificationAlert.xml
 BetterFriendlist_Tooltip.lua

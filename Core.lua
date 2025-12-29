@@ -20,10 +20,11 @@ BFL.TOCVersion = tocVersion
 
 -- Classic Versions (check first - more specific)
 BFL.IsClassicEra = (tocVersion < 20000)                         -- Classic Era (1.x)
-BFL.IsMoPClassic = (tocVersion >= 50000 and tocVersion < 60000) -- MoP Classic (5.x)
-BFL.IsCataClassic = (tocVersion >= 40000 and tocVersion < 50000) -- Cata Classic (4.x) - legacy
+BFL.IsTBCClassic = (tocVersion >= 20000 and tocVersion < 30000)   -- TBC Classic (2.x) - legacy
 BFL.IsWrathClassic = (tocVersion >= 30000 and tocVersion < 40000) -- Wrath Classic (3.x) - legacy
-BFL.IsClassic = BFL.IsClassicEra or BFL.IsMoPClassic or BFL.IsCataClassic or BFL.IsWrathClassic
+BFL.IsCataClassic = (tocVersion >= 40000 and tocVersion < 50000) -- Cata Classic (4.x) - legacy
+BFL.IsMoPClassic = (tocVersion >= 50000 and tocVersion < 60000) -- MoP Classic (5.x)
+BFL.IsClassic = BFL.IsClassicEra or BFL.IsMoPClassic or BFL.IsCataClassic or BFL.IsWrathClassic or BFL.IsTBCClassic
 
 -- Retail Expansions
 BFL.IsRetail = (tocVersion >= 100000)                           -- Dragonflight+ (10.x+)
@@ -348,7 +349,13 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 			end
 			
 			-- Version-aware success message
-			local versionSuffix = BFL.IsMidnight and " (Midnight)" or " (TWW)"
+			local versionSuffix = BFL.IsMidnight and " (Midnight)" 
+				or (BFL.IsClassicEra and " (Classic Era)")
+				or (BFL.IsMoPClassic and " (MoP Classic)")
+				or (BFL.IsCataClassic and " (Cata Classic)")
+				or (BFL.IsWrathClassic and " (Wrath Classic)")
+				or (BFL.IsTBCClassic and " (TBC Classic)")
+				or " (TWW)"
 			print("|cff00ff00BetterFriendlist v" .. BFL.VERSION .. versionSuffix .. "|r loaded successfully!")
 			
 			-- ============================================================================
@@ -942,7 +949,27 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 			print("|cffffcc00Compatibility Layer:|r |cffff0000Not Loaded|r")
 		end
 	
+	-- Reset Changelog State
+	elseif msg == "reset_changelog" or msg == "resetchangelog" then
+		local DB = BFL:GetModule("DB")
+		local Changelog = BFL:GetModule("Changelog")
+		if DB and Changelog then
+			DB:Set("lastChangelogVersion", "0.0.0")
+			Changelog:CheckVersion()
+			print("|cff00ff00BetterFriendlist:|r Changelog state reset. Glow should be visible.")
+		else
+			print("|cffff0000BetterFriendlist:|r Modules not loaded.")
+		end
+
 	-- Help (or any other unrecognized command)
+	elseif msg == "changelog" or msg == "changes" then
+		local Changelog = BFL:GetModule("Changelog")
+		if Changelog then
+			Changelog:Show()
+		else
+			print("|cffff0000BetterFriendlist:|r Changelog module not loaded")
+		end
+
 	else
 		print("|cff00ff00=== BetterFriendlist v" .. BFL.VERSION .. " ===|r")
 		print("")

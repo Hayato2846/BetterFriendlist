@@ -1827,12 +1827,42 @@
 				</Scripts>
 			</Frame>
 			<!-- Button to open default Blizzard Friends Frame -->
-			<!-- Portrait Button - disabled, no interaction -->
-			<Button parentKey="PortraitButton" enableMouse="false">
+			<!-- Portrait Button - enabled for changelog interaction -->
+			<Button parentKey="PortraitButton" enableMouse="true" frameLevel="1000">
 				<Size x="60" y="60" />
 				<Anchors>
 					<Anchor point="TOPLEFT" x="-5" y="7" />
 				</Anchors>
+				<Layers>
+					<Layer level="OVERLAY" textureSubLevel="7">
+						<Texture parentKey="Glow" file="Interface\PVPFrame\TournamentOrganizer" alphaMode="ADD" hidden="true">
+							<Size x="90" y="90"/>
+							<Anchors>
+								<Anchor point="TOPLEFT" x="-18" y="12"/>
+								<Anchor point="BOTTOMRIGHT" x="64" y="-64"/>
+							</Anchors>
+							<TexCoords left="0.8525390625" right="0.9775390625" top="0.0009765625" bottom="0.1259765625"/>
+							<Color r="1.0" g="1.0" b="1.0"/>
+						</Texture>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnClick>
+						local Changelog = BFL and BFL:GetModule("Changelog")
+						if Changelog then
+							Changelog:ToggleChangelog()
+						end
+					</OnClick>
+					<OnEnter>
+						local Changelog = BFL and BFL:GetModule("Changelog")
+						if Changelog then
+							Changelog:OnPortraitEnter(self)
+						end
+					</OnEnter>
+					<OnLeave>
+						GameTooltip:Hide()
+					</OnLeave>
+				</Scripts>
 			</Button>
 			<!-- Scroll Frame Container - NOW uses ScrollBox system (no more FauxScrollFrame!) -->
 			<Frame parentKey="ScrollFrame">

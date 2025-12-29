@@ -1351,8 +1351,8 @@ local function CreateLibQTipTooltip(anchorFrame)
 					factionName = gameInfo.factionName or "",
 					guildName = gameInfo.guildName or "",
 					timerunningSeasonID = gameInfo.timerunningSeasonID,
-					isAFK = accountInfo.isAFK,
-					isDND = accountInfo.isDND,
+					isAFK = accountInfo.isAFK or (gameInfo.isAFK or gameInfo.isGameAFK),
+					isDND = accountInfo.isDND or (gameInfo.isDND or gameInfo.isGameBusy),
 					isMobile = isMobile,
 					broadcast = accountInfo.customMessage or "",
 					broadcastTime = accountInfo.customMessageTime,
@@ -1472,11 +1472,18 @@ local function CreateLibQTipTooltip(anchorFrame)
 					return priorityA < priorityB
 				end
 			elseif mode == "status" then
-				-- AFK/DND at bottom
-				local afkA = (a.isAFK or a.isDND) and 1 or 0
-				local afkB = (b.isAFK or b.isDND) and 1 or 0
-				if afkA ~= afkB then
-					return afkA < afkB
+				-- Sort by DND/AFK priority (Online=0, DND=1, AFK=2)
+				local function GetStatusPriority(friend)
+					if friend.isDND then return 1 end
+					if friend.isAFK or friend.isMobile then return 2 end
+					return 0
+				end
+				
+				local priorityA = GetStatusPriority(a)
+				local priorityB = GetStatusPriority(b)
+				
+				if priorityA ~= priorityB then
+					return priorityA < priorityB
 				end
 			elseif mode == "faction" then
 				local factionA = a.factionName or ""

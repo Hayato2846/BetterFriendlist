@@ -533,26 +533,7 @@
 		<Anchors>
 			<Anchor point="TOPLEFT" x="16" y="-116" />
 		</Anchors>
-		<Layers>
-			<Layer level="OVERLAY" textureSubLevel="-1">
-				<Texture parentKey="PortraitIcon" file="Interface\AddOns\BetterFriendlist\Textures\PortraitIcon">
-					<Size x="60" y="60" />
-					<Anchors>
-						<Anchor point="TOPLEFT" x="-5" y="7" />
-					</Anchors>
-					<TexCoords left="0.08" right="0.92" top="0.08" bottom="0.92"/>
-				</Texture>
-				<MaskTexture parentKey="PortraitMask" file="Interface\CharacterFrame\TempPortraitAlphaMask" hWrapMode="CLAMPTOBLACKADDITIVE" vWrapMode="CLAMPTOBLACKADDITIVE">
-					<Size x="60" y="60" />
-					<Anchors>
-						<Anchor point="TOPLEFT" x="-5" y="7" />
-					</Anchors>
-					<MaskedTextures>
-						<MaskedTexture childKey="PortraitIcon"/>
-					</MaskedTextures>
-				</MaskTexture>
-			</Layer>
-		</Layers>
+		<!-- PortraitIcon is created in Lua (Changelog.lua:SetupClassicPortraitButton) -->
 		<Frames>
 			<Frame name="BetterFriendsTabHeader" parentKey="FriendsTabHeader" setAllPoints="true">
 				<KeyValues>
@@ -1090,13 +1071,8 @@
 				</Scripts>
 			</Frame>
 			
-			<!-- Portrait Button -->
-			<Button parentKey="PortraitButton" enableMouse="false">
-				<Size x="60" y="60" />
-				<Anchors>
-					<Anchor point="TOPLEFT" x="-5" y="7" />
-				</Anchors>
-			</Button>
+			<!-- PortraitButton is created in Lua (Changelog.lua:SetupClassicPortraitButton) -->
+			<!-- This avoids ButtonFrameTemplate conflicts -->
 			
 			<!-- Scroll Frame Container - FauxScrollFrame with ScrollBar created in Lua (FriendsList.lua) -->
 			<!-- Size set dynamically in OnLoad: TOPLEFT to Inset +4,-4 / BOTTOMRIGHT to Inset -22,2 -->

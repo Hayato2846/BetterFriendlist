@@ -451,12 +451,13 @@ end
 function BetterRaidMemberButton_OnEnter(self)
 	BFL:DebugPrint("XML OnEnter called for " .. (self:GetName() or "unnamed") .. ", unit=" .. tostring(self.unit))
 	
+	-- Always show highlight (even for empty slots)
+	if self.Highlight then
+		self.Highlight:Show()
+	end
+	
 	-- Phase 8.3: If dragging, show highlight but skip proxy and tooltip
 	if BetterRaidFrame_DraggedUnit then
-		-- Show highlight on drop target during drag
-		if self.Highlight then
-			self.Highlight:Show()
-		end
 		return
 	end
 	

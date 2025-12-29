@@ -844,9 +844,9 @@ function RaidFrame:UpdateAllMemberButtons()
         local members = membersByGroup[groupIndex]
         local hasGroupMembers = #members > 0
         
-        -- Hide group frame if empty (Clean Logic)
+        -- Always show group frame (User Request: Fix visibility)
         if groupFrame then
-            groupFrame:SetShown(hasGroupMembers)
+            groupFrame:Show()
         end
         
         if self.memberButtons[groupIndex] then
@@ -1215,6 +1215,12 @@ function RaidFrame:UpdateMemberButton(button, memberData)
         if button.MainAssistIcon then button.MainAssistIcon:Hide() end
         if button.ReadyCheckIcon then button.ReadyCheckIcon:Hide() end
         if button.ClassColorTint then button.ClassColorTint:SetColorTexture(0.1, 0.1, 0.1, 0.5) end
+        
+        -- Show "Empty" text
+        if button.EmptyText then
+            button.EmptyText:SetText("Empty")
+            button.EmptyText:Show()
+        end
         
         return
     end

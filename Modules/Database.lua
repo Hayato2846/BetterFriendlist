@@ -87,6 +87,7 @@ local defaults = {
 	brokerClickAction = "toggle", -- Left click action: "toggle", "friends", "settings" (default: toggle)
 	-- Migration tracking
 	friendGroupsMigrated = false, -- Track if FriendGroups migration has been completed
+	lastChangelogVersion = "0.0.0", -- Last version the user saw the changelog for
 	version = BFL.Version
 }
 

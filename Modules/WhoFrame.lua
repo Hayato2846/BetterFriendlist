@@ -150,12 +150,16 @@ function WhoFrame:UpdateResponsiveLayout()
 	
 	-- Update bottom button positions to be centered
 	-- Restored centering logic to fix "too far right" issue in Retail
-	local buttonsTotalWidth = 327 -- 85 (Refresh) + 1 + 120 (Add) + 1 + 120 (Invite) = 327
-	local buttonsStartX = math.floor((frameWidth - buttonsTotalWidth) / 2)
-	
-	if whoFrame.WhoButton then
-		whoFrame.WhoButton:ClearAllPoints()
-		whoFrame.WhoButton:SetPoint("BOTTOMLEFT", whoFrame.ListInset, "BOTTOMLEFT", buttonsStartX, -26)
+	-- CRITICAL: Do NOT apply this to Classic, as it breaks the XML anchor chain
+	-- In Classic, buttons are right-aligned and anchored to each other
+	if not BFL.IsClassic then
+		local buttonsTotalWidth = 327 -- 85 (Refresh) + 1 + 120 (Add) + 1 + 120 (Invite) = 327
+		local buttonsStartX = math.floor((frameWidth - buttonsTotalWidth) / 2)
+		
+		if whoFrame.WhoButton then
+			whoFrame.WhoButton:ClearAllPoints()
+			whoFrame.WhoButton:SetPoint("BOTTOMLEFT", whoFrame.ListInset, "BOTTOMLEFT", buttonsStartX, -26)
+		end
 	end
 	
 	-- REFRESH BUTTONS: Trigger re-layout of all visible buttons
