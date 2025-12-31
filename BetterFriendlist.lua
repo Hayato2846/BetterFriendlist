@@ -1638,8 +1638,8 @@ function BetterFriendsList_Button_OnClick(button, mouseButton)
 			end
 		else
 			-- WoW friend context menu
-			-- FIXED: Use guid instead of index to avoid stale data issues
-			local info = friendInfo.guid and C_FriendList.GetFriendInfo(friendInfo.guid) or nil
+			-- FIXED: Use index instead of guid (guid is not stored in friend data)
+			local info = C_FriendList.GetFriendInfoByIndex(friendInfo.index)
 			if info then
 				BetterFriendsList_ShowDropdown(
 					info.name,

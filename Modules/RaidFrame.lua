@@ -589,8 +589,9 @@ function RaidFrame:Initialize()
     -- Hook OnShow to re-render if data changed while hidden
     if BetterFriendsFrame then
         BetterFriendsFrame:HookScript("OnShow", function()
-            if needsRenderOnShow then
-                BFL:DebugPrint("|cff00ffffRaidFrame:|r Frame shown, dirty flag set - triggering refresh")
+            -- Always update if we have no data, or if dirty flag is set
+            if needsRenderOnShow or #self.raidMembers == 0 then
+                BFL:DebugPrint("|cff00ffffRaidFrame:|r Frame shown - triggering refresh")
                 self:OnRaidRosterUpdate()
                 needsRenderOnShow = false
             end
@@ -1723,7 +1724,9 @@ function RaidFrame:OnRaidRosterUpdate(...)
         return
     end
     
-    self.updateTimer = C_Timer.After(0, function()
+    -- Increase delay to 0.1s to ensure WoW API has updated data
+    -- This fixes issues where new members aren't visible immediately
+    self.updateTimer = C_Timer.After(0.1, function()
         self.updateTimer = nil
         
         -- Immediate update for crisp UI response
@@ -1731,9 +1734,9 @@ function RaidFrame:OnRaidRosterUpdate(...)
         self:BuildDisplayList()
         
         -- Update UI
-        self:UpdateAllMemberButtons()
+        -- Note: UpdateGroupLayout calls UpdateAllMemberButtons internally
         self:UpdateControlPanel()
-        self:UpdateGroupLayout() -- Ensure layout matches Mock (responsive sizing)
+        self:UpdateGroupLayout()
         
         -- Central Update Logic (Restored)
         if BetterRaidFrame_Update then
@@ -1743,18 +1746,8 @@ function RaidFrame:OnRaidRosterUpdate(...)
 end
 
 function RaidFrame:OnGroupJoined(...)
-    -- Update member list
-    self:UpdateRaidMembers()
-    self:BuildDisplayList()
-    
-    -- Update UI
-    self:UpdateAllMemberButtons()
-    self:UpdateControlPanel()
-    self:UpdateGroupLayout()
-    
-    if BetterRaidFrame_Update then
-        BetterRaidFrame_Update()
-    end
+    -- Use the throttled update to ensure data consistency
+    self:OnRaidRosterUpdate(...)
 end
 
 function RaidFrame:OnGroupLeft(...)
