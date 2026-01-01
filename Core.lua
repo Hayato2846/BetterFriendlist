@@ -186,6 +186,46 @@ function BFL:FireEventCallbacks(event, ...)
 		return
 	end
 	
+	-- Special handling for FRIENDLIST_UPDATE to prevent "script ran too long" errors
+	-- This event can fire multiple times rapidly and trigger heavy processing in multiple modules
+	if event == "FRIENDLIST_UPDATE" then
+		-- Debounce: Cancel pending update
+		if self.pendingUpdateTicker then
+			self.pendingUpdateTicker:Cancel()
+		end
+		
+		-- Schedule new update (0.2s delay to coalesce rapid updates)
+		self.pendingUpdateTicker = C_Timer.NewTimer(0.2, function()
+			self.pendingUpdateTicker = nil
+			
+			-- Run callbacks staggered to prevent frame freeze
+			local callbacks = self.EventCallbacks[event]
+			if not callbacks then return end
+			
+			local index = 1
+			local numCallbacks = #callbacks
+			
+			-- Process one callback every 0.05s
+			C_Timer.NewTicker(0.05, function(timer)
+				if index > numCallbacks then
+					timer:Cancel()
+					return
+				end
+				
+				local entry = callbacks[index]
+				if entry and entry.callback then
+					-- Use pcall to prevent one error from stopping the chain
+					local success, err = pcall(entry.callback)
+					if not success and BFL.debugPrintEnabled then
+						print("|cffff0000BFL Error in FRIENDLIST_UPDATE callback:|r " .. tostring(err))
+					end
+				end
+				index = index + 1
+			end)
+		end)
+		return
+	end
+	
 	for _, entry in ipairs(self.EventCallbacks[event]) do
 		entry.callback(...)
 	end
@@ -323,6 +363,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 			end
 			
 			-- Initialize NotificationSystem (cooldown timer, etc.)
+			-- Note: Initialize() calls RegisterEvents() internally if Beta is enabled
 			if BFL.NotificationSystem and BFL.NotificationSystem.Initialize then
 				BFL.NotificationSystem:Initialize()
 			end
@@ -335,17 +376,6 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 			-- Initialize MainFrameEditMode (Edit Mode integration for main frame)
 			if BFL.MainFrameEditMode and BFL.MainFrameEditMode.Initialize then
 				BFL.MainFrameEditMode:Initialize()
-			end
-			
-			-- Register module events after initialization
-			-- CRITICAL: Only register NotificationSystem events if Beta Features enabled
-			if BFL.NotificationSystem and BFL.NotificationSystem.RegisterEvents then
-				if BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures then
-					BFL.NotificationSystem:RegisterEvents()
-					BFL:DebugPrint("|cff00ffffBFL:|r NotificationSystem events registered (Beta enabled)")
-				else
-					BFL:DebugPrint("|cffffcc00BFL:|r NotificationSystem events NOT registered (Beta disabled)")
-				end
 			end
 			
 			-- Version-aware success message

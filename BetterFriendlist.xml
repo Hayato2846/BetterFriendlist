@@ -1579,8 +1579,8 @@
 					<!-- List Inset -->
 					<Frame parentKey="ListInset" inherits="InsetFrameTemplate">
 						<Anchors>
-							<Anchor point="TOPLEFT" relativeKey="$parent.$parent.Inset" x="4" y="40"/>
-							<Anchor point="BOTTOMRIGHT" relativeKey="$parent.$parent.Inset" x="-4" y="4"/>
+							<Anchor point="TOPLEFT" relativeKey="$parent.$parent.Inset" x="0" y="40"/>
+							<Anchor point="BOTTOMRIGHT" relativeKey="$parent.$parent.Inset" x="0" y="0"/>
 						</Anchors>
 						<Layers>
 							<Layer level="ARTWORK">
@@ -1718,9 +1718,9 @@
 					</Button>
 					<!-- Bottom Buttons -->
 					<Button parentKey="WhoButton" inherits="UIPanelButtonTemplate" text="REFRESH">
-						<Size x="85" y="22"/>
+						<Size x="85" y="21"/>
 						<Anchors>
-							<Anchor point="BOTTOMLEFT" relativeKey="$parent.ListInset" x="65" y="-26"/>
+							<Anchor point="BOTTOMLEFT" relativeKey="$parent.$parent" x="4" y="4"/>
 						</Anchors>
 						<Scripts>
 							<OnClick>
@@ -1738,7 +1738,7 @@
 						</Scripts>
 					</Button>
 					<Button parentKey="AddFriendButton" inherits="UIPanelButtonTemplate" text="ADD_FRIEND">
-						<Size x="120" y="22"/>
+						<Size x="120" y="21"/>
 						<Anchors>
 							<Anchor point="LEFT" relativeKey="$parent.WhoButton" relativePoint="RIGHT" x="1" y="0"/>
 						</Anchors>
@@ -1751,7 +1751,7 @@
 						</Scripts>
 					</Button>
 					<Button parentKey="GroupInviteButton" inherits="UIPanelButtonTemplate" text="GROUP_INVITE">
-						<Size x="120" y="22"/>
+						<Size x="120" y="21"/>
 						<Anchors>
 							<Anchor point="LEFT" relativeKey="$parent.AddFriendButton" relativePoint="RIGHT" x="1" y="0"/>
 						</Anchors>
@@ -2240,15 +2240,15 @@
 	<!-- Quick Join Frame (Tab 5) -->
 	<Frame parentKey="QuickJoinFrame" hidden="true">
 		<Anchors>
-			<Anchor point="TOPLEFT" relativeKey="$parent.Inset" x="10" y="-10"/>
-			<Anchor point="BOTTOMRIGHT" relativeKey="$parent.Inset" x="-10" y="40"/>
+			<Anchor point="TOPLEFT" relativeKey="$parent.Inset" x="0" y="-10"/>
+			<Anchor point="BOTTOMRIGHT" relativeKey="$parent.Inset" x="0" y="0"/>
 		</Anchors>
 		<Frames>
 			<!-- Content Inset with dark background (like Raid GroupsInset) -->
 			<Frame parentKey="ContentInset" inherits="InsetFrameTemplate">
 				<Anchors>
-					<Anchor point="TOPLEFT" x="-10" y="80"/>
-					<Anchor point="BOTTOMRIGHT" x="10" y="-42"/>
+					<Anchor point="TOPLEFT" x="0" y="80"/>
+					<Anchor point="BOTTOMRIGHT" x="0" y="0"/>
 				</Anchors>
 				<Layers>
 					<Layer level="ARTWORK">
@@ -2288,9 +2288,9 @@
 					
 					<!-- Request to Join Button (bottom-right, outside dark background) -->
 					<Button parentKey="JoinQueueButton" inherits="UIPanelButtonTemplate">
-						<Size x="150" y="22"/>
+						<Size x="150" y="21"/>
 						<Anchors>
-							<Anchor point="BOTTOMRIGHT" relativeKey="$parent" relativePoint="BOTTOMRIGHT" x="1" y="-22"/>
+							<Anchor point="BOTTOMRIGHT" relativeKey="$parent.$parent" x="0" y="-22"/>
 						</Anchors>
 				<Scripts>
 					<OnClick>

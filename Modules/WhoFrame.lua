@@ -156,9 +156,12 @@ function WhoFrame:UpdateResponsiveLayout()
 		local buttonsTotalWidth = 327 -- 85 (Refresh) + 1 + 120 (Add) + 1 + 120 (Invite) = 327
 		local buttonsStartX = math.floor((frameWidth - buttonsTotalWidth) / 2)
 		
+		-- REMOVED: Lua override of XML coordinates
+		-- The XML now handles the positioning correctly (y=4 relative to main frame)
 		if whoFrame.WhoButton then
 			whoFrame.WhoButton:ClearAllPoints()
-			whoFrame.WhoButton:SetPoint("BOTTOMLEFT", whoFrame.ListInset, "BOTTOMLEFT", buttonsStartX, -26)
+			-- User requested only X change, Y should remain 4 relative to frame bottom
+			whoFrame.WhoButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", buttonsStartX, 4)
 		end
 	end
 	

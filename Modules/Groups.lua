@@ -144,9 +144,13 @@ function Groups:RunSmartMigration()
 	local numFriends = C_FriendList.GetNumFriends()
 	if not numFriends or numFriends == 0 then
 		-- Try again later when list updates
-		BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function()
-			self:RunSmartMigration()
-		end)
+		-- Prevent multiple registrations
+		if not self.migrationListenerRegistered then
+			BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function()
+				self:RunSmartMigration()
+			end)
+			self.migrationListenerRegistered = true
+		end
 		return
 	end
 	
