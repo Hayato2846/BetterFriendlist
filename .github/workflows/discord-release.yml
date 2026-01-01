@@ -1,0 +1,103 @@
+name: Discord Release Notification
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Send Discord Notification
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          VERSION: ${{ github.event.release.tag_name }}
+          BODY: ${{ github.event.release.body }}
+        shell: python
+        run: |
+          import os
+          import json
+          import urllib.request
+
+          webhook_url = os.environ.get('DISCORD_WEBHOOK')
+          if not webhook_url:
+              print("Error: DISCORD_WEBHOOK secret is missing. Please add it to GitHub Secrets.")
+              exit(1)
+
+          version = os.environ.get('VERSION', 'Unknown')
+          
+          # Clean version string (remove 'v' prefix for the title)
+          clean_version = version
+          if version.startswith('v'):
+              clean_version = version[1:]
+
+          # Extract content from CHANGELOG.md
+          changelog_body = ""
+          try:
+              if os.path.exists('CHANGELOG.md'):
+                  with open('CHANGELOG.md', 'r', encoding='utf-8') as f:
+                      content = f.read()
+                      
+                      # Find start of current version section (e.g. "## [2.0.6]")
+                      start_marker = f"## [{clean_version}]"
+                      start_pos = content.find(start_marker)
+                      
+                      if start_pos != -1:
+                          # Find end of this section (start of next section "## [" or end of file)
+                          # Start searching after the marker to avoid finding the current one
+                          end_pos = content.find("## [", start_pos + len(start_marker))
+                          
+                          if end_pos == -1:
+                              section = content[start_pos:]
+                          else:
+                              section = content[start_pos:end_pos]
+                              
+                          # Remove the first line (header) and strip whitespace
+                          lines = section.split('\n')
+                          if len(lines) > 0:
+                              changelog_body = '\n'.join(lines[1:]).strip()
+                              print(f"Successfully extracted changelog for version {clean_version}")
+                      else:
+                          print(f"Version {clean_version} not found in CHANGELOG.md")
+          except Exception as e:
+              print(f"Error reading CHANGELOG.md: {e}")
+
+          # Use changelog body if found, otherwise fallback to release body
+          body = changelog_body if changelog_body else os.environ.get('BODY', '')
+
+          # Define Project Links
+          links = (
+              "[CurseForge](https://www.curseforge.com/wow/addons/betterfriendlist)\n"
+              "[Wago](https://addons.wago.io/addons/betterfriendlist)\n"
+              "[WoWInterface](https://www.wowinterface.com/downloads/info26984-BetterFriendlist.html)"
+          )
+
+          # Construct the message content
+          # Structure matches the requested screenshot:
+          # 1. Title (H1)
+          # 2. Links
+          # 3. Changelog Body
+          # 4. Ping
+          message_content = f"# Version {clean_version} released!\n\n{links}\n\n{body}"
+
+          # Construct JSON Payload
+          payload = {
+              "content": message_content,
+              "username": "BetterFriendlist",
+              "avatar_url": "https://media.forgecdn.net/avatars/1129/29/638666353678477363.png" # Icon from CurseForge
+          }
+
+          # Send Request
+          req = urllib.request.Request(webhook_url)
+          req.add_header('Content-Type', 'application/json')
+          req.add_header('User-Agent', 'GitHub-Action')
+
+          try:
+              response = urllib.request.urlopen(req, json.dumps(payload).encode('utf-8'))
+              print(f"Notification sent successfully. Status Code: {response.status}")
+          except Exception as e:
+              print(f"Failed to send notification: {e}")
+              exit(1)

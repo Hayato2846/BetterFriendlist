@@ -141,6 +141,43 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 		-- Set initial selected text with smaller icon and left offset
 		UIDropDownMenu_SetText(dropdown, string.format("|T%s.tga:14:14:-2:-2|t", bnStatus))
 		
+		-- Setup tooltip for Classic
+		-- Hook button as it consumes mouse events
+		local button = _G[dropdown:GetName() .. "Button"]
+		if button then
+			button:HookScript("OnEnter", function()
+				local statusText
+				if bnStatus == FRIENDS_TEXTURE_ONLINE then
+					statusText = FRIENDS_LIST_AVAILABLE
+				elseif bnStatus == FRIENDS_TEXTURE_AFK then
+					statusText = FRIENDS_LIST_AWAY
+				elseif bnStatus == FRIENDS_TEXTURE_DND then
+					statusText = FRIENDS_LIST_BUSY
+				end
+				
+				GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", UI_CONSTANTS.TOOLTIP_ANCHOR_Y, 0)
+				GameTooltip:SetText(string.format(FRIENDS_LIST_STATUS_TOOLTIP, statusText))
+				GameTooltip:Show()
+			end)
+			button:HookScript("OnLeave", GameTooltip_Hide)
+		else
+			dropdown:SetScript("OnEnter", function()
+				local statusText
+				if bnStatus == FRIENDS_TEXTURE_ONLINE then
+					statusText = FRIENDS_LIST_AVAILABLE
+				elseif bnStatus == FRIENDS_TEXTURE_AFK then
+					statusText = FRIENDS_LIST_AWAY
+				elseif bnStatus == FRIENDS_TEXTURE_DND then
+					statusText = FRIENDS_LIST_BUSY
+				end
+				
+				GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", UI_CONSTANTS.TOOLTIP_ANCHOR_Y, 0)
+				GameTooltip:SetText(string.format(FRIENDS_LIST_STATUS_TOOLTIP, statusText))
+				GameTooltip:Show()
+			end)
+			dropdown:SetScript("OnLeave", GameTooltip_Hide)
+		end
+		
 		return
 	end
 	
@@ -302,6 +339,30 @@ function FrameInitializer:InitializeSortDropdown(frame)
 		local currentIcon = SORT_ICONS[currentSortMode] or SORT_ICONS.status
 		UIDropDownMenu_SetText(dropdown, string.format("|T%s:14:14:-2:-2|t", currentIcon))
 		
+		-- Setup tooltip for Classic
+		-- Hook button as it consumes mouse events
+		local dropdownName = dropdown:GetName()
+		local buttonName = dropdownName and (dropdownName .. "Button")
+		local button = buttonName and _G[buttonName]
+		
+		if button then
+			button:HookScript("OnEnter", function()
+				local sortName = SORT_NAMES[currentSortMode] or "Status"
+				GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", UI_CONSTANTS.TOOLTIP_ANCHOR_Y, 0)
+				GameTooltip:SetText("Sort: " .. sortName)
+				GameTooltip:Show()
+			end)
+			button:HookScript("OnLeave", GameTooltip_Hide)
+		else
+			dropdown:SetScript("OnEnter", function()
+				local sortName = SORT_NAMES[currentSortMode] or "Status"
+				GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", UI_CONSTANTS.TOOLTIP_ANCHOR_Y, 0)
+				GameTooltip:SetText("Sort: " .. sortName)
+				GameTooltip:Show()
+			end)
+			dropdown:SetScript("OnLeave", GameTooltip_Hide)
+		end
+		
 		return
 	end
 	
@@ -454,6 +515,50 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 		local currentSecondary = db.secondarySort or FriendsList.secondarySort or "name"
 		local secondaryIcon = SORT_ICONS[currentSecondary] or SORT_ICONS.name
 		UIDropDownMenu_SetText(secondaryDropdown, string.format("|T%s:14:14:-2:-2|t", secondaryIcon))
+		
+		-- Setup tooltips for Classic
+		-- Hook buttons as they consume mouse events
+		local primaryButton = _G[primaryDropdown:GetName() .. "Button"]
+		if primaryButton then
+			primaryButton:HookScript("OnEnter", function()
+				local sortName = SORT_NAMES[FriendsList.sortMode] or "Status"
+				GameTooltip:SetOwner(primaryDropdown, "ANCHOR_RIGHT")
+				GameTooltip:SetText("Primary Sort: " .. sortName)
+				GameTooltip:AddLine("Main sorting criterion for friends list.", 1, 1, 1, true)
+				GameTooltip:Show()
+			end)
+			primaryButton:HookScript("OnLeave", GameTooltip_Hide)
+		else
+			primaryDropdown:SetScript("OnEnter", function()
+				local sortName = SORT_NAMES[FriendsList.sortMode] or "Status"
+				GameTooltip:SetOwner(primaryDropdown, "ANCHOR_RIGHT")
+				GameTooltip:SetText("Primary Sort: " .. sortName)
+				GameTooltip:AddLine("Main sorting criterion for friends list.", 1, 1, 1, true)
+				GameTooltip:Show()
+			end)
+			primaryDropdown:SetScript("OnLeave", GameTooltip_Hide)
+		end
+		
+		local secondaryButton = _G[secondaryDropdown:GetName() .. "Button"]
+		if secondaryButton then
+			secondaryButton:HookScript("OnEnter", function()
+				local sortName = FriendsList.secondarySort == "none" and "None" or (SORT_NAMES[FriendsList.secondarySort] or "Name")
+				GameTooltip:SetOwner(secondaryDropdown, "ANCHOR_RIGHT")
+				GameTooltip:SetText("Secondary Sort: " .. sortName)
+				GameTooltip:AddLine("Sort by this when primary values are equal.", 1, 1, 1, true)
+				GameTooltip:Show()
+			end)
+			secondaryButton:HookScript("OnLeave", GameTooltip_Hide)
+		else
+			secondaryDropdown:SetScript("OnEnter", function()
+				local sortName = FriendsList.secondarySort == "none" and "None" or (SORT_NAMES[FriendsList.secondarySort] or "Name")
+				GameTooltip:SetOwner(secondaryDropdown, "ANCHOR_RIGHT")
+				GameTooltip:SetText("Secondary Sort: " .. sortName)
+				GameTooltip:AddLine("Sort by this when primary values are equal.", 1, 1, 1, true)
+				GameTooltip:Show()
+			end)
+			secondaryDropdown:SetScript("OnLeave", GameTooltip_Hide)
+		end
 		
 		return
 	end

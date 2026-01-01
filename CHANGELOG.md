@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [2.0.7] - 2026-01-01
+
+### Fixed
+- **Classic Dropdowns** - Fixed missing tooltips and incorrect width for QuickFilter and Sort dropdowns in Classic versions.
+- **UI Insets** - Adjusted frame insets for better visual alignment.
+- **Who Frame Layout** - Fixed ScrollFrame clipping into the SearchBox and adjusted ScrollBar height in Classic.
+
 ## [2.0.6] - 2026-01-01
 
 ### Fixed

@@ -350,8 +350,9 @@ function WhoFrame:InitializeClassicWhoFrame(frame)
 			-- UpButton is attached to TOP of scrollBar, so scrollBar TOP must be lower
 			-- DownButton is attached to BOTTOM of scrollBar, so scrollBar BOTTOM must be higher
 			-- Move x by -2 to sit inside the inset border
+			-- Fix: Increase bottom offset to 38 to clear the EditBox (height 20 + padding)
 			scrollBar:SetPoint("TOPRIGHT", inset, "TOPRIGHT", -2, -22)
-			scrollBar:SetPoint("BOTTOMRIGHT", inset, "BOTTOMRIGHT", -2, 22)
+			scrollBar:SetPoint("BOTTOMRIGHT", inset, "BOTTOMRIGHT", -2, 38)
 		else
 			scrollBar:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -4, -16)
 			scrollBar:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -4, 16)

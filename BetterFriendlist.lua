@@ -305,117 +305,14 @@ function BetterFriendsFrame_InitQuickFilterDropdown()
 	local dropdown = BetterFriendsFrame.FriendsTabHeader.QuickFilterDropdown
 	if not dropdown then return end
 	
-	-- Classic Support: Use UIDropDownMenu
-	if BFL.IsClassic then
-		BFL:DebugPrint("|cff00ffffBetterFriendlist:|r Classic mode - using UIDropDownMenu for QuickFilterDropdown")
-		
-		UIDropDownMenu_SetWidth(dropdown, 70)
-		UIDropDownMenu_Initialize(dropdown, function(self, level)
-			local info = UIDropDownMenu_CreateInfo()
-			
-			local function AddFilterOption(mode, text, icon)
-				info.text = string.format("|T%s:14:14:0:0|t %s", icon, text)
-				info.value = mode
-				info.func = function()
-					BetterFriendsFrame_SetQuickFilter(mode)
-					UIDropDownMenu_SetText(dropdown, string.format("|T%s:14:14:-2:-2|t", icon))
-				end
-				info.checked = (filterMode == mode)
-				UIDropDownMenu_AddButton(info)
-			end
-
-			AddFilterOption("all", "All Friends", FILTER_ICONS.all)
-			AddFilterOption("online", "Online Only", FILTER_ICONS.online)
-			AddFilterOption("offline", "Offline Only", FILTER_ICONS.offline)
-			AddFilterOption("wow", "WoW Only", FILTER_ICONS.wow)
-			AddFilterOption("bnet", "Battle.net Only", FILTER_ICONS.bnet)
-		end)
-		
-		-- Set initial text
-		local currentIcon = FILTER_ICONS[filterMode] or FILTER_ICONS.all
-		UIDropDownMenu_SetText(dropdown, string.format("|T%s:14:14:-2:-2|t", currentIcon))
-		return
+	-- Delegate to QuickFilters module
+	local QuickFilters = GetQuickFilters()
+	if QuickFilters then
+		BFL:DebugPrint("BetterFriendlist: Delegating QuickFilter init to module")
+		QuickFilters:InitDropdown(dropdown)
+	else
+		BFL:DebugPrint("BetterFriendlist: QuickFilters module not found!")
 	end
-	
-	-- Helper function to check if a filter mode is selected
-	local function IsSelected(mode)
-		-- Always read from DB when checking selection
-		local DB = BFL:GetModule("DB")
-		local db = DB and DB:Get() or {}
-		local currentFilter = db.quickFilter or filterMode or "all"
-		return currentFilter == mode
-	end
-	
-	-- Helper function to set the filter mode
-	local function SetSelected(mode)
-		-- ALWAYS read current filter from DB (not from stale filterMode variable)
-		local DB = BFL:GetModule("DB")
-		local db = DB and DB:Get() or {}
-		local currentFilter = db.quickFilter or filterMode or "all"
-		
-		if mode ~= currentFilter then
-			BetterFriendsFrame_SetQuickFilter(mode)
-		end
-	end
-	
-	-- Helper function to create radio button with icon (using Texture format like StatusDropdown)
-	local function CreateRadio(rootDescription, text, mode)
-		local radio = rootDescription:CreateButton(text, function() end, mode)
-		radio:SetIsSelected(IsSelected)
-		radio:SetResponder(SetSelected)
-	end
-	
-	-- Set dropdown width (same as StatusDropdown)
-	dropdown:SetWidth(51)
-	
-	-- Setup the dropdown menu
-	dropdown:SetupMenu(function(dropdown, rootDescription)
-		rootDescription:SetTag("MENU_FRIENDS_QUICKFILTER")
-		
-		-- Format for icon + text in menu (like StatusDropdown)
-		local optionText = "\124T%s:16:16:0:0\124t %s"
-		
-		-- Create filter options with icons
-		local allText = string.format(optionText, FILTER_ICONS.all, "All Friends")
-		CreateRadio(rootDescription, allText, "all")
-		
-		local onlineText = string.format(optionText, FILTER_ICONS.online, "Online Only")
-		CreateRadio(rootDescription, onlineText, "online")
-		
-		local offlineText = string.format(optionText, FILTER_ICONS.offline, "Offline Only")
-		CreateRadio(rootDescription, offlineText, "offline")
-		
-		local wowText = string.format(optionText, FILTER_ICONS.wow, "WoW Only")
-		CreateRadio(rootDescription, wowText, "wow")
-		
-		local bnetText = string.format(optionText, FILTER_ICONS.bnet, "Battle.net Only")
-		CreateRadio(rootDescription, bnetText, "bnet")
-	end)
-	
-	-- SetSelectionTranslator: Shows only the icon (like StatusDropdown)
-	dropdown:SetSelectionTranslator(function(selection)
-		return string.format("\124T%s:16:16:0:0\124t", FILTER_ICONS[selection.data])
-	end)
-	
-	-- Setup tooltip
-	dropdown:SetScript("OnEnter", function()
-		local filterText = "All Friends"
-		if filterMode == "online" then
-			filterText = "Online Only"
-		elseif filterMode == "offline" then
-			filterText = "Offline Only"
-		elseif filterMode == "wow" then
-			filterText = "WoW Only"
-		elseif filterMode == "bnet" then
-			filterText = "Battle.net Only"
-		end
-		
-		GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
-		GameTooltip:SetText("Quick Filter: " .. filterText)
-		GameTooltip:Show()
-	end)
-	
-	dropdown:SetScript("OnLeave", GameTooltip_Hide)
 end
 
 -- Set the quick filter mode

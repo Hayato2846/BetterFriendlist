@@ -53,7 +53,7 @@ function QuickFilters:InitDropdown(dropdown)
 	if BFL.IsClassic or not BFL.HasModernDropdown then
 		BFL:DebugPrint("|cff00ffffQuickFilters:|r Classic mode - using UIDropDownMenu for Quick Filter dropdown")
 		
-		UIDropDownMenu_SetWidth(dropdown, 25)
+		UIDropDownMenu_SetWidth(dropdown, 70)
 		UIDropDownMenu_Initialize(dropdown, function(self, level)
 			local info = UIDropDownMenu_CreateInfo()
 			
@@ -89,6 +89,32 @@ function QuickFilters:InitDropdown(dropdown)
 		-- Set initial selected text
 		local currentIcon = FILTER_ICONS[filterMode] or FILTER_ICONS.all
 		UIDropDownMenu_SetText(dropdown, string.format("|T%s:14:14:-2:-2|t", currentIcon))
+		
+		-- Setup tooltip for Classic
+		-- We need to hook the button inside the dropdown frame because it consumes mouse events
+		local dropdownName = dropdown:GetName()
+		local buttonName = dropdownName and (dropdownName .. "Button")
+		local button = buttonName and _G[buttonName]
+		
+		if button then
+			button:HookScript("OnEnter", function()
+				local filterText = QuickFilters:GetFilterText()
+				
+				GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
+				GameTooltip:SetText("Quick Filter: " .. filterText)
+				GameTooltip:Show()
+			end)
+			button:HookScript("OnLeave", GameTooltip_Hide)
+		else
+			dropdown:SetScript("OnEnter", function()
+				local filterText = QuickFilters:GetFilterText()
+				
+				GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
+				GameTooltip:SetText("Quick Filter: " .. filterText)
+				GameTooltip:Show()
+			end)
+			dropdown:SetScript("OnLeave", GameTooltip_Hide)
+		end
 		
 		return
 	end
@@ -228,11 +254,14 @@ function QuickFilters:RefreshDropdown(dropdown)
 	if icon then
 		-- Manually update the text to match the translator format
 		-- This forces the dropdown button to show the correct icon
-		local text = string.format("\124T%s:16:16:0:2\124t", icon)
 		
 		if BFL.IsClassic or not BFL.HasModernDropdown then
+			-- Classic: Use 14x14 icon with -2:-2 offset to match InitDropdown
+			local text = string.format("\124T%s:14:14:-2:-2\124t", icon)
 			UIDropDownMenu_SetText(dropdown, text)
 		elseif dropdown.SetText then
+			-- Retail: Use 16x16 icon with 0:2 offset
+			local text = string.format("\124T%s:16:16:0:2\124t", icon)
 			dropdown:SetText(text)
 		end
 	end

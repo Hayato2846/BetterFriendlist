@@ -738,7 +738,7 @@
 					</Frame>
 					
 					<!-- Status Dropdown (Classic: UIDropDownMenuTemplate) -->
-					<Frame parentKey="StatusDropdown" inherits="UIDropDownMenuTemplate">
+					<Frame name="$parentStatusDropdown" parentKey="StatusDropdown" inherits="UIDropDownMenuTemplate">
 						<Anchors>
 							<Anchor point="RIGHT" relativeKey="$parent.BattlenetFrame" relativePoint="LEFT" x="10" y="-2"/>
 						</Anchors>
@@ -768,21 +768,21 @@
 					</EditBox>
 					
 					<!-- Quick Filter Dropdown (Classic: UIDropDownMenuTemplate) -->
-					<Frame parentKey="QuickFilterDropdown" inherits="UIDropDownMenuTemplate">
+					<Frame name="$parentQuickFilterDropdown" parentKey="QuickFilterDropdown" inherits="UIDropDownMenuTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT" relativeKey="$parent.$parent.Inset" x="-10" y="75"/>
 						</Anchors>
 					</Frame>
 
 					<!-- Primary Sort Dropdown (Classic: UIDropDownMenuTemplate) -->
-					<Frame parentKey="PrimarySortDropdown" inherits="UIDropDownMenuTemplate">
+					<Frame name="$parentPrimarySortDropdown" parentKey="PrimarySortDropdown" inherits="UIDropDownMenuTemplate">
 						<Anchors>
 							<Anchor point="LEFT" relativeKey="$parent.QuickFilterDropdown" relativePoint="RIGHT" x="-10" y="0"/>
 						</Anchors>
 					</Frame>
 
 					<!-- Secondary Sort Dropdown (Classic: UIDropDownMenuTemplate) -->
-					<Frame parentKey="SecondarySortDropdown" inherits="UIDropDownMenuTemplate">
+					<Frame name="$parentSecondarySortDropdown" parentKey="SecondarySortDropdown" inherits="UIDropDownMenuTemplate">
 						<Anchors>
 							<Anchor point="LEFT" relativeKey="$parent.PrimarySortDropdown" relativePoint="RIGHT" x="-15" y="0"/>
 						</Anchors>
@@ -861,12 +861,12 @@
 			</Frame>
 			
 			<!-- Who Frame (Classic compatible - no ScrollBox) -->
-			<Frame parentKey="WhoFrame" setAllPoints="true" hidden="true">
+			<Frame name="$parentWhoFrame" parentKey="WhoFrame" setAllPoints="true" hidden="true">
 				<Frames>
 					<Frame parentKey="ListInset" inherits="InsetFrameTemplate">
 						<Anchors>
-							<Anchor point="TOPLEFT" x="5" y="-83"/>
-							<Anchor point="BOTTOMRIGHT" x="-5" y="50"/>
+							<Anchor point="TOPLEFT" x="4" y="-83"/>
+							<Anchor point="BOTTOMRIGHT" x="-6" y="26"/>
 						</Anchors>
 					</Frame>
 					
@@ -891,9 +891,10 @@
 					
 					<!-- EditBox moved to Bottom to match Classic -->
 					<EditBox parentKey="EditBox" inherits="SearchBoxTemplate" autoFocus="false">
-						<Size x="296" y="20"/>
+						<Size y="20"/>
 						<Anchors>
-							<Anchor point="BOTTOMLEFT" x="18" y="26"/>
+							<Anchor point="BOTTOMLEFT" relativeKey="$parent.ListInset" x="10" y="5"/>
+							<Anchor point="BOTTOMRIGHT" relativeKey="$parent.ListInset" x="-10" y="5"/>
 						</Anchors>
 						<Scripts>
 							<OnEnterPressed>
@@ -909,7 +910,7 @@
 					</EditBox>
 					
 					<!-- Column Dropdown (Classic: UIDropDownMenu instead of modern Dropdown) -->
-					<Frame parentKey="ColumnDropdown" inherits="UIDropDownMenuTemplate" frameStrata="HIGH">
+					<Frame name="$parentColumnDropdown" parentKey="ColumnDropdown" inherits="UIDropDownMenuTemplate" frameStrata="HIGH">
 						<Anchors>
 							<Anchor point="TOPLEFT" x="87" y="-59"/> 
 						</Anchors>
@@ -975,37 +976,11 @@
 						</Scripts>
 					</Button>
 					
-					<!-- Bottom Buttons (Reordered to match Classic) -->
-					<Button parentKey="GroupInviteButton" inherits="UIPanelButtonTemplate" text="GROUP_INVITE">
-						<Size x="120" y="22"/>
-						<Anchors>
-							<Anchor point="BOTTOMRIGHT" x="-6" y="4"/>
-						</Anchors>
-						<Scripts>
-							<OnClick>
-								if BetterFriendsFrame.WhoFrame.selectedName then
-									C_PartyInfo.InviteUnit(BetterFriendsFrame.WhoFrame.selectedName)
-								end
-							</OnClick>
-						</Scripts>
-					</Button>
-					<Button parentKey="AddFriendButton" inherits="UIPanelButtonTemplate" text="ADD_FRIEND">
-						<Size x="120" y="22"/>
-						<Anchors>
-							<Anchor point="RIGHT" relativeKey="$parent.GroupInviteButton" relativePoint="LEFT" x="0" y="0"/>
-						</Anchors>
-						<Scripts>
-							<OnClick>
-								if BetterFriendsFrame.WhoFrame.selectedName then
-									C_FriendList.AddFriend(BetterFriendsFrame.WhoFrame.selectedName)
-								end
-							</OnClick>
-						</Scripts>
-					</Button>
+					<!-- Bottom Buttons (Aligned to match Retail) -->
 					<Button parentKey="WhoButton" inherits="UIPanelButtonTemplate" text="REFRESH">
-						<Size x="85" y="22"/>
+						<Size x="85" y="21"/>
 						<Anchors>
-							<Anchor point="RIGHT" relativeKey="$parent.AddFriendButton" relativePoint="LEFT" x="0" y="0"/>
+							<Anchor point="BOTTOMLEFT" relativeKey="$parent.$parent" x="4" y="4"/>
 						</Anchors>
 						<Scripts>
 							<OnClick>
@@ -1021,12 +996,38 @@
 							</OnClick>
 						</Scripts>
 					</Button>
+					<Button parentKey="AddFriendButton" inherits="UIPanelButtonTemplate" text="ADD_FRIEND">
+						<Size x="120" y="21"/>
+						<Anchors>
+							<Anchor point="LEFT" relativeKey="$parent.WhoButton" relativePoint="RIGHT" x="1" y="0"/>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								if BetterFriendsFrame.WhoFrame.selectedName then
+									C_FriendList.AddFriend(BetterFriendsFrame.WhoFrame.selectedName)
+								end
+							</OnClick>
+						</Scripts>
+					</Button>
+					<Button parentKey="GroupInviteButton" inherits="UIPanelButtonTemplate" text="GROUP_INVITE">
+						<Size x="120" y="21"/>
+						<Anchors>
+							<Anchor point="LEFT" relativeKey="$parent.AddFriendButton" relativePoint="RIGHT" x="1" y="0"/>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								if BetterFriendsFrame.WhoFrame.selectedName then
+									C_PartyInfo.InviteUnit(BetterFriendsFrame.WhoFrame.selectedName)
+								end
+							</OnClick>
+						</Scripts>
+					</Button>
 					
 					<!-- ScrollBox placeholder -->
 					<Frame parentKey="ScrollBox">
 						<Anchors>
 							<Anchor point="TOPLEFT" relativeKey="$parent.ListInset" x="10" y="-2"/>
-							<Anchor point="BOTTOMRIGHT" relativeKey="$parent.ListInset" x="-22" y="2"/>
+							<Anchor point="BOTTOMRIGHT" relativeKey="$parent.ListInset" x="-22" y="18"/>
 						</Anchors>
 						<Scripts>
 							<OnLoad>
