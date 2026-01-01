@@ -320,4 +320,14 @@ if GetLocale() == "koKR" then
 	L.EDIT_MODE_NOT_AVAILABLE = "편집 모드는 Classic에서 사용할 수 없습니다"
 	L.CLASSIC_COMPATIBILITY_INFO = "Classic 호환 모드로 실행 중"
 	L.FEATURE_NOT_AVAILABLE_CLASSIC = "이 기능은 Classic에서 사용할 수 없습니다"
+
+	-- ========================================
+	-- GLOBAL FRIEND SYNC
+	-- ========================================
+	L.SETTINGS_GLOBAL_SYNC_ENABLE = "Enable Global Friend Sync"
+	L.SETTINGS_GLOBAL_SYNC_DESC = "Synchronize your WoW friends list across all characters on this account."
+	L.SETTINGS_GLOBAL_SYNC_FEATURE = "Global Friend Sync"
+	L.SETTINGS_GLOBAL_SYNC_DELETION = "Enable Deletion"
+	L.SETTINGS_GLOBAL_SYNC_DELETION_DESC = "Allow the sync process to remove friends from your list if they are removed from the database."
+	L.SETTINGS_GLOBAL_SYNC_HEADER = "Synced Friends Database"
 end

@@ -286,4 +286,14 @@ if GetLocale() == "zhCN" then
 	L.EDIT_MODE_NOT_AVAILABLE = "编辑模式在Classic中不可用"
 	L.CLASSIC_COMPATIBILITY_INFO = "正在Classic兼容模式下运行"
 	L.FEATURE_NOT_AVAILABLE_CLASSIC = "此功能在Classic中不可用"
+
+	-- ========================================
+	-- GLOBAL FRIEND SYNC
+	-- ========================================
+	L.SETTINGS_GLOBAL_SYNC_ENABLE = "Enable Global Friend Sync"
+	L.SETTINGS_GLOBAL_SYNC_DESC = "Synchronize your WoW friends list across all characters on this account."
+	L.SETTINGS_GLOBAL_SYNC_FEATURE = "Global Friend Sync"
+	L.SETTINGS_GLOBAL_SYNC_DELETION = "Enable Deletion"
+	L.SETTINGS_GLOBAL_SYNC_DELETION_DESC = "Allow the sync process to remove friends from your list if they are removed from the database."
+	L.SETTINGS_GLOBAL_SYNC_HEADER = "Synced Friends Database"
 end

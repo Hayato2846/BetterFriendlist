@@ -81,6 +81,17 @@
 					</OnClick>
 				</Scripts>
 			</Button>
+			<!-- Tab 6: Global Sync (Beta) -->
+			<Button name="$parentTab6" parentKey="Tab6" inherits="PanelTopTabButtonTemplate" text="Global Sync" id="6">
+				<Anchors>
+					<Anchor point="LEFT" relativeKey="$parent.Tab5" relativePoint="RIGHT" x="-15" y="0" />
+				</Anchors>
+				<Scripts>
+					<OnClick>
+						BetterFriendlistSettings_ShowTab(6)
+					</OnClick>
+				</Scripts>
+			</Button>
 			
 			<!-- Tab Separator Line -->
 			<Frame parentKey="TabSeparator">
@@ -152,6 +163,14 @@
 				
 				<!-- Data Broker Tab Content (STABLE) -->
 				<Frame parentKey="BrokerTab" hidden="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" />
+						<Anchor point="BOTTOMRIGHT" />
+					</Anchors>
+				</Frame>
+				
+				<!-- Global Sync Tab Content (BETA) -->
+				<Frame parentKey="GlobalSyncTab" hidden="true">
 					<Anchors>
 						<Anchor point="TOPLEFT" />
 						<Anchor point="BOTTOMRIGHT" />

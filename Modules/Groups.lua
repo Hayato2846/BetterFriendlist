@@ -132,6 +132,83 @@ function Groups:MigrateFriendAssignments()
 	end
 end
 
+-- Smart migration for WoW friends (v2) - Fixes missing realm in UIDs
+function Groups:RunSmartMigration()
+	local DB = BFL:GetModule("DB")
+	if not DB then return end
+	
+	-- Check if already done
+	if DB:Get("wowUIDMigrationDone_v2") then return end
+	
+	-- We need friend list data to be loaded
+	local numFriends = C_FriendList.GetNumFriends()
+	if numFriends == 0 then
+		-- Try again later when list updates
+		BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function()
+			self:RunSmartMigration()
+		end)
+		return
+	end
+	
+	-- Perform migration
+	local friendGroups = DB:GetFriendGroups()
+	if not friendGroups then return end
+	
+	local changesMade = false
+	
+	-- Build a lookup of Name -> {FullNames...} from current friend list
+	local nameLookup = {}
+	for i = 1, numFriends do
+		local info = C_FriendList.GetFriendInfoByIndex(i)
+		if info and info.name then
+			-- Normalize to ensure we have the full Name-Realm format
+			local normalized = BFL:NormalizeWoWFriendName(info.name)
+			if normalized then
+				-- Extract short name (before hyphen)
+				local shortName = normalized:match("^([^%-]+)")
+				if shortName then
+					nameLookup[shortName] = nameLookup[shortName] or {}
+					table.insert(nameLookup[shortName], normalized)
+				end
+			end
+		end
+	end
+	
+	-- Check for old UIDs in database
+	for uid, groups in pairs(friendGroups) do
+		-- Look for "wow_Name" where Name has no hyphen
+		if type(uid) == "string" and uid:match("^wow_[^%-]+$") then
+			local shortName = uid:sub(5) -- Remove "wow_" prefix
+			
+			-- Check if we have EXACTLY ONE match in the friend list
+			local matches = nameLookup[shortName]
+			if matches and #matches == 1 then
+				local correctFullName = matches[1] -- e.g. "Copium-Mal'Ganis"
+				local newUID = "wow_" .. correctFullName
+				
+				-- Only migrate if the new UID is actually different (it should be, since old had no hyphen)
+				if newUID ~= uid then
+					-- Check if target already has groups (safety check)
+					local existing = DB:GetFriendGroups(newUID)
+					if not existing or #existing == 0 then
+						print("|cff00ff00BetterFriendlist:|r Migrating group settings for " .. shortName .. " -> " .. correctFullName)
+						DB:SetFriendGroups(newUID, groups)
+						DB:SetFriendGroups(uid, nil)
+						changesMade = true
+					end
+				end
+			end
+		end
+	end
+	
+	if changesMade then
+		BFL:ForceRefreshFriendsList()
+	end
+	
+	-- Mark as done
+	DB:Set("wowUIDMigrationDone_v2", true)
+end
+
 function Groups:Initialize()
 	-- Copy built-in groups
 	for id, data in pairs(builtinGroups) do
@@ -157,6 +234,9 @@ function Groups:Initialize()
 	
 	-- Migrate old bnetAccountID-based friend assignments to battleTag-based
 	self:MigrateFriendAssignments()
+	
+	-- Run smart migration for WoW friends (v2)
+	self:RunSmartMigration()
 	
 	local customGroups = DB:GetCustomGroups()
 	if not customGroups then return end

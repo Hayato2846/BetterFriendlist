@@ -347,4 +347,12 @@ if GetLocale() == "deDE" then
 	L.EDIT_MODE_NOT_AVAILABLE = "Der Bearbeitungsmodus ist in Classic nicht verfügbar. Verwende /bfl position um das Fenster zu verschieben."
 	L.CLASSIC_COMPATIBILITY_INFO = "BetterFriendlist läuft im Classic-Kompatibilitätsmodus."
 	L.FEATURE_NOT_AVAILABLE_CLASSIC = "Diese Funktion ist in Classic nicht verfügbar."
+	
+	-- Global Friend Sync
+	L.SETTINGS_GLOBAL_SYNC_ENABLE = "Globalen Freundes-Sync aktivieren"
+	L.SETTINGS_GLOBAL_SYNC_DESC = "Synchronisiert Freunde automatisch zwischen verknüpften Realms (z.B. Blackhand <-> Mal'Ganis)."
+	L.SETTINGS_GLOBAL_SYNC_FEATURE = "Globaler Freundes-Sync (Verknüpfte Realms)"
+	L.SETTINGS_GLOBAL_SYNC_DELETION = "Enable Deletion"
+	L.SETTINGS_GLOBAL_SYNC_DELETION_DESC = "Allow the sync process to remove friends from your list if they are removed from the database."
+	L.SETTINGS_GLOBAL_SYNC_HEADER = "Synced Friends Database"
 end

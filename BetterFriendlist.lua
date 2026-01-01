@@ -755,29 +755,60 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		
 		-- Determine friendUID from contextData
 		local friendUID
-		if contextData.bnetIDAccount then
-			-- For BNet friends, we need to look up the battleTag
-			local numBNet = BNGetNumFriends()
-			for i = 1, numBNet do
-				local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
-				if accountInfo and accountInfo.bnetAccountID == contextData.bnetIDAccount then
-					if accountInfo.battleTag then
-						friendUID = "bnet_" .. accountInfo.battleTag
-					else
-						BFL:DebugPrint("|cffff0000BetterFriendlist Warning:|r BNet friend without battleTag, using bnetAccountID")
-						friendUID = "bnet_" .. tostring(contextData.bnetIDAccount)
+		
+		-- PHASE 15 FIX: Try to resolve UID via FriendsList module first
+		-- This ensures 100% consistency with the list display (which works correctly)
+		local FriendsList = GetFriendsList()
+		if FriendsList and FriendsList.friendsList then
+			if contextData.bnetIDAccount then
+				-- Find BNet friend
+				for _, friend in ipairs(FriendsList.friendsList) do
+					if friend.type == "bnet" and friend.bnetAccountID == contextData.bnetIDAccount then
+						friendUID = FriendsList:GetFriendUID(friend)
+						BFL:DebugPrint("Resolved BNet UID via FriendsList:", friendUID)
+						break
 					end
-					break
+				end
+			elseif contextData.index then
+				-- Find WoW friend by index
+				for _, friend in ipairs(FriendsList.friendsList) do
+					if friend.type == "wow" and friend.index == contextData.index then
+						friendUID = FriendsList:GetFriendUID(friend)
+						BFL:DebugPrint("Resolved WoW UID via FriendsList:", friendUID)
+						break
+					end
 				end
 			end
-			
-			-- If not found in friends list (shouldn't happen), fallback to bnetAccountID
-			if not friendUID then
-				BFL:DebugPrint("|cffff0000BetterFriendlist Warning:|r Could not find BNet friend, using bnetAccountID")
-				friendUID = "bnet_" .. tostring(contextData.bnetIDAccount)
+		end
+		
+		-- Fallback if not resolved via module
+		if not friendUID then
+			if contextData.bnetIDAccount then
+				-- For BNet friends, we need to look up the battleTag
+				local numBNet = BNGetNumFriends()
+				for i = 1, numBNet do
+					local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
+					if accountInfo and accountInfo.bnetAccountID == contextData.bnetIDAccount then
+						if accountInfo.battleTag then
+							friendUID = "bnet_" .. accountInfo.battleTag
+						else
+							BFL:DebugPrint("|cffff0000BetterFriendlist Warning:|r BNet friend without battleTag, using bnetAccountID")
+							friendUID = "bnet_" .. tostring(contextData.bnetIDAccount)
+						end
+						break
+					end
+				end
+				
+				-- If not found in friends list (shouldn't happen), fallback to bnetAccountID
+				if not friendUID then
+					BFL:DebugPrint("|cffff0000BetterFriendlist Warning:|r Could not find BNet friend, using bnetAccountID")
+					friendUID = "bnet_" .. tostring(contextData.bnetIDAccount)
+				end
+			elseif contextData.name then
+				-- Normalize name to ensure it matches the format used in FriendsList module (Name-Realm)
+				local normalized = BFL:NormalizeWoWFriendName(contextData.name)
+				friendUID = "wow_" .. (normalized or contextData.name)
 			end
-		elseif contextData.name then
-			friendUID = "wow_" .. contextData.name
 		end
 		
 		if not friendUID then
@@ -1627,13 +1658,14 @@ function BetterFriendsList_Button_OnClick(button, mouseButton)
 					nil, -- lineID
 					nil, -- chatType
 					nil, -- chatFrame
-					true, -- friendsList
+					true, -- showMenuFlag (Pass TRUE to force menu show, NOT friendsList index)
 					accountInfo.bnetAccountID,
 					nil, -- communityClubID
 					nil, -- communityStreamID
 					nil, -- communityEpoch
 					nil, -- communityPosition
-					accountInfo.battleTag
+					accountInfo.battleTag,
+					friendInfo.index
 				)
 			end
 		else
@@ -1647,12 +1679,13 @@ function BetterFriendsList_Button_OnClick(button, mouseButton)
 					nil, -- lineID
 					nil, -- chatType
 					nil, -- chatFrame
-					true, -- friendsList
+					friendInfo.index, -- friendsList (Pass INDEX here, not true)
 					nil, -- communityClubID
 					nil, -- communityStreamID
 					nil, -- communityEpoch
 					nil, -- communityPosition
-					info.guid
+					info.guid,
+					friendInfo.index
 				)
 			end
 		end
@@ -1660,11 +1693,17 @@ function BetterFriendsList_Button_OnClick(button, mouseButton)
 end
 
 -- Show WoW Friend Context Menu (1:1 from Blizzard)
-function BetterFriendsList_ShowDropdown(name, connected, lineID, chatType, chatFrame, friendsList, communityClubID, communityStreamID, communityEpoch, communityPosition, guid)
+function BetterFriendsList_ShowDropdown(name, connected, lineID, chatType, chatFrame, friendsList, communityClubID, communityStreamID, communityEpoch, communityPosition, guid, index)
+	-- Ensure friendsList is a number (index) if possible
+	local actualIndex = index
+	if not actualIndex and type(friendsList) == "number" then
+		actualIndex = friendsList
+	end
+
 	if connected or friendsList then
 		local contextData = {
 			name = name,
-			friendsList = friendsList,
+			friendsList = actualIndex, -- RIO Fix: Pass index if available (MUST be number or nil)
 			lineID = lineID,
 			communityClubID = communityClubID,
 			communityStreamID = communityStreamID,
@@ -1676,6 +1715,8 @@ function BetterFriendsList_ShowDropdown(name, connected, lineID, chatType, chatF
 			bnetIDAccount = nil,
 			guid = guid,
 			uid = name, -- For Nickname (WoW friends use name as UID)
+			index = actualIndex, -- Required for some addons (e.g. RaiderIO)
+			friendsIndex = actualIndex, -- Alternative name used by Blizzard
 		}
 		
 		-- Set flag BEFORE opening menu (menu modifiers run during UnitPopup_OpenMenu)
@@ -1689,11 +1730,17 @@ function BetterFriendsList_ShowDropdown(name, connected, lineID, chatType, chatF
 end
 
 -- Show BattleNet Friend Context Menu (1:1 from Blizzard)
-function BetterFriendsList_ShowBNDropdown(name, connected, lineID, chatType, chatFrame, friendsList, bnetIDAccount, communityClubID, communityStreamID, communityEpoch, communityPosition, battleTag)
-	if connected or friendsList then
+function BetterFriendsList_ShowBNDropdown(name, connected, lineID, chatType, chatFrame, showMenuFlag, bnetIDAccount, communityClubID, communityStreamID, communityEpoch, communityPosition, battleTag, index)
+	-- Ensure friendsList is a number (index) if possible
+	local actualIndex = index
+	if not actualIndex and type(showMenuFlag) == "number" then
+		actualIndex = showMenuFlag
+	end
+
+	if connected or showMenuFlag then
 		local contextData = {
 			name = name,
-			friendsList = friendsList,
+			friendsList = nil, -- ALWAYS NIL for BNet friends (they use bnetIDAccount, not WoW friend index)
 			lineID = lineID,
 			communityClubID = communityClubID,
 			communityStreamID = communityStreamID,
@@ -1705,6 +1752,8 @@ function BetterFriendsList_ShowBNDropdown(name, connected, lineID, chatType, cha
 			bnetIDAccount = bnetIDAccount,
 			battleTag = battleTag,
 			uid = bnetIDAccount, -- For Nickname (BNet friends use bnetIDAccount as UID)
+			index = actualIndex, -- Required for some addons
+			friendsIndex = actualIndex, -- Alternative name
 		}
 		
 		-- Set flag BEFORE opening menu (menu modifiers run during UnitPopup_OpenMenu)
@@ -1712,6 +1761,7 @@ function BetterFriendsList_ShowBNDropdown(name, connected, lineID, chatType, cha
 		
 		-- Determine menu type based on online status
 		local menuType = connected and "BN_FRIEND" or "BN_FRIEND_OFFLINE"
+		
 		-- Use compatibility wrapper for Classic support
 		BFL.OpenContextMenu(nil, menuType, contextData, name)
 	end

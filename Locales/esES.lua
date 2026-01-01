@@ -321,4 +321,12 @@ if GetLocale() == "esES" then
 	L.EDIT_MODE_NOT_AVAILABLE = "El Modo Edición no está disponible en Classic"
 	L.CLASSIC_COMPATIBILITY_INFO = "Ejecutando en modo de compatibilidad Classic"
 	L.FEATURE_NOT_AVAILABLE_CLASSIC = "Esta característica no está disponible en Classic"
+	
+	-- Global Friend Sync
+	L.SETTINGS_GLOBAL_SYNC_ENABLE = "Enable Global Friend Sync"
+	L.SETTINGS_GLOBAL_SYNC_DESC = "Synchronize your WoW friends list across all characters on this account."
+	L.SETTINGS_GLOBAL_SYNC_FEATURE = "Global Friend Sync"
+	L.SETTINGS_GLOBAL_SYNC_DELETION = "Enable Deletion"
+	L.SETTINGS_GLOBAL_SYNC_DELETION_DESC = "Allow the sync process to remove friends from your list if they are removed from the database."
+	L.SETTINGS_GLOBAL_SYNC_HEADER = "Synced Friends Database"
 end

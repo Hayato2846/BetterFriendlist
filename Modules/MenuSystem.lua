@@ -81,6 +81,7 @@ function MenuSystem:OpenFriendMenu(button, friendType, friendID, extraData)
 		contextData = {
 			name = extraData.name or "",
 			friendsList = true,
+			accountInfo = C_BattleNet.GetAccountInfoByID(friendID), -- RIO Fix
 			bnetIDAccount = friendID,
 			battleTag = extraData.battleTag,
 			uid = friendID, -- For Nickname
@@ -101,8 +102,10 @@ function MenuSystem:OpenFriendMenu(button, friendType, friendID, extraData)
 		
 		contextData = {
 			name = name or "",
-			friendsList = true,
+			friendsList = (type(friendID) == "number") and friendID or true, -- RIO Fix
 			uid = name, -- For Nickname (WoW friends use name as UID)
+			index = (type(friendID) == "number") and friendID or nil,
+			friendsIndex = (type(friendID) == "number") and friendID or nil,
 		}
 	end
 	
