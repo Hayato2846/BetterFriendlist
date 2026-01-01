@@ -142,7 +142,7 @@ function Groups:RunSmartMigration()
 	
 	-- We need friend list data to be loaded
 	local numFriends = C_FriendList.GetNumFriends()
-	if numFriends == 0 then
+	if not numFriends or numFriends == 0 then
 		-- Try again later when list updates
 		BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function()
 			self:RunSmartMigration()
