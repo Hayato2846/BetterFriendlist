@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [2.0.6] - 2026-01-01
+
+### Fixed
+- **Battle.net Context Menu** - Fixed missing options in the right-click menu for Battle.net friends. Restored correct parameter passing to match Blizzard's expected format (regression from v2.0.5).
+
 ## [2.0.5] - 2026-01-01
 
 ### Fixed

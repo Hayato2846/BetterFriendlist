@@ -1740,7 +1740,7 @@ function BetterFriendsList_ShowBNDropdown(name, connected, lineID, chatType, cha
 	if connected or showMenuFlag then
 		local contextData = {
 			name = name,
-			friendsList = nil, -- ALWAYS NIL for BNet friends (they use bnetIDAccount, not WoW friend index)
+			friendsList = showMenuFlag, -- Restored v2.0.0 behavior (was nil)
 			lineID = lineID,
 			communityClubID = communityClubID,
 			communityStreamID = communityStreamID,
