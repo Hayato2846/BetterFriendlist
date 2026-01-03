@@ -1077,12 +1077,6 @@ local function SetupTooltipAutoHide(tooltip, anchorFrame)
 	timer.checkTimer = 0
 	
 	timer:SetScript("OnUpdate", function(self, elapsed)
-		-- Safety: Stop if tooltip is already hidden
-		if not tooltip:IsShown() then
-			self:SetScript("OnUpdate", nil)
-			return
-		end
-
 		self.checkTimer = self.checkTimer + elapsed
 		if self.checkTimer < 0.1 then return end
 		
@@ -1101,12 +1095,43 @@ local function SetupTooltipAutoHide(tooltip, anchorFrame)
 			else
 				self.hideTimer = self.hideTimer + checkInterval
 				if self.hideTimer >= 0.25 then
-					if LQT then LQT:Release(tooltip) end
+					if LQT then 
+						-- Safely release tooltip
+						pcall(function() LQT:Release(tooltip) end)
+					end
 					self:SetScript("OnUpdate", nil)
 				end
 			end
 		end
 	end)
+end
+
+local function TooltipCleanup(tooltip)
+	if not tooltip then return end
+	
+	-- Hide our custom footer
+	if tooltip.footerFrame then
+		tooltip.footerFrame:Hide()
+	end
+	
+	-- Ensure timer script is cleared (prevent leaks)
+	if tooltip.bflTimer then
+		tooltip.bflTimer:SetScript("OnUpdate", nil)
+	end
+	
+	-- Restore standard LibQTip anchors for ScrollFrame
+	if tooltip.scrollFrame then
+		tooltip.scrollFrame:ClearAllPoints()
+		tooltip.scrollFrame:SetPoint("TOPLEFT", tooltip, "TOPLEFT", 10, -10)
+		tooltip.scrollFrame:SetPoint("BOTTOMRIGHT", tooltip, "BOTTOMRIGHT", -10, 10)
+	end
+	
+	-- Restore standard LibQTip anchors for Slider
+	if tooltip.slider then
+		tooltip.slider:ClearAllPoints()
+		tooltip.slider:SetPoint("TOPRIGHT", tooltip, "TOPRIGHT", -10, -10)
+		tooltip.slider:SetPoint("BOTTOMRIGHT", tooltip, "BOTTOMRIGHT", -10, 10)
+	end
 end
 
 local function CreateLibQTipTooltip(anchorFrame)
@@ -1174,42 +1199,23 @@ local function CreateLibQTipTooltip(anchorFrame)
 
 	-- Acquire tooltip
 	local tt = LQT:Acquire(tooltipKey, numColumns, unpack(alignArgs))
+
+	-- Hook OnHide to clean up layout changes when tooltip is released/hidden
+	-- Always re-hook because LibQTip might clear scripts on Release
+	local oldOnHide = tt:GetScript("OnHide")
+	tt:SetScript("OnHide", function(self)
+		TooltipCleanup(self)
+		if oldOnHide then
+			pcall(oldOnHide, self)
+		end
+	end)
+
+	local status, err = xpcall(function()
 	tt:Clear()
 	tt:SmartAnchorTo(anchorFrame)
 	tt.anchorFrame = anchorFrame -- Store anchor for refresh
 	SetupTooltipAutoHide(tt, anchorFrame)
 	tt:SetFrameStrata("HIGH") -- Lower than TOOLTIP so context menus appear above
-	
-	-- Hook OnHide to clean up layout changes when tooltip is released/hidden
-	-- This prevents our custom footer and layout from leaking to other addons that reuse this LibQTip frame
-	if not tt.bflCleanupHooked then
-		local oldOnHide = tt:GetScript("OnHide")
-		tt:SetScript("OnHide", function(self)
-			-- Hide our custom footer
-			if self.footerFrame then
-				self.footerFrame:Hide()
-			end
-			
-			-- Restore standard LibQTip anchors for ScrollFrame
-			if self.scrollFrame then
-				self.scrollFrame:ClearAllPoints()
-				self.scrollFrame:SetPoint("TOPLEFT", self, "TOPLEFT", 10, -10)
-				self.scrollFrame:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -10, 10)
-			end
-			
-			-- Restore standard LibQTip anchors for Slider
-			if self.slider then
-				self.slider:ClearAllPoints()
-				self.slider:SetPoint("TOPRIGHT", self, "TOPRIGHT", -10, -10)
-				self.slider:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -10, 10)
-			end
-			
-			if oldOnHide then
-				oldOnHide(self)
-			end
-		end)
-		tt.bflCleanupHooked = true
-	end
 	
 	-- Setup Fixed Footer Frame
 	if not tt.footerFrame then
@@ -1772,6 +1778,17 @@ local function CreateLibQTipTooltip(anchorFrame)
 	end
 
 	tt:Show()
+	end, geterrorhandler())
+
+	if not status then
+		BFL:DebugPrint("Broker: Error populating tooltip: " .. tostring(err))
+		tt:Clear()
+		tt:AddLine("|cffff0000Error displaying tooltip|r")
+		tt:AddLine(tostring(err))
+		tt:Show()
+		SetupTooltipAutoHide(tt, anchorFrame)
+	end
+
 	return tt
 end
 

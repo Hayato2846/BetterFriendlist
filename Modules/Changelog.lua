@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.8] - 2026-01-03
+
+### Fixed
+- **Data Broker Conflict** - Fixed a conflict with other Data Broker addons (like Broker Everything) where tooltips could become empty or stuck.
+- **Tooltip Stability** - Improved robustness of tooltip cleanup and auto-hide logic to prevent resource leaks and ensure correct closing behavior.
+
 ## [2.0.7] - 2026-01-01
 
 ### Fixed
