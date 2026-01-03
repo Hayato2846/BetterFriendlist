@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.1] - 2026-01-03
+
+### Fixed
+- **FriendGroups Migration** - Fixed an issue where the migration could not be re-run if it had already been completed.
+
 ## [2.1.0] - 2026-01-03
 
 ### Added

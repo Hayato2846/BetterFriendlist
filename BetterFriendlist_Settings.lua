@@ -125,10 +125,10 @@ end
 end
 
 -- Migrate from FriendGroups addon
-function BetterFriendlistSettings_MigrateFriendGroups(cleanupNotes)
+function BetterFriendlistSettings_MigrateFriendGroups(cleanupNotes, force)
 local Settings = GetSettings()
 if Settings then
-Settings:MigrateFriendGroups(cleanupNotes)
+Settings:MigrateFriendGroups(cleanupNotes, force)
 end
 end
 

@@ -1035,7 +1035,7 @@ function Settings:RenameGroup(groupId, currentName)
 end
 
 -- Migrate from FriendGroups addon
-function Settings:MigrateFriendGroups(cleanupNotes)
+function Settings:MigrateFriendGroups(cleanupNotes, force)
 	local DB = GetDB()
 	local Groups = GetGroups()
 	
@@ -1045,7 +1045,7 @@ function Settings:MigrateFriendGroups(cleanupNotes)
 	end
 	
 	-- Check if migration has already been completed
-	if DB:Get("friendGroupsMigrated") then
+	if not force and DB:Get("friendGroupsMigrated") then
 		-- BFL:DebugPrint("|cff00ffffBetterFriendlist:|r " .. BFL_L.MSG_MIGRATION_ALREADY_DONE)
 		return
 	end
@@ -1266,10 +1266,10 @@ function Settings:ShowMigrationDialog()
 		button2 = BFL_L.DIALOG_MIGRATE_BTN2,
 		button3 = BFL_L.DIALOG_MIGRATE_BTN3,
 		OnAccept = function()
-			Settings:MigrateFriendGroups(true)
+			Settings:MigrateFriendGroups(true, true)
 		end,
 		OnCancel = function()
-			Settings:MigrateFriendGroups(false)
+			Settings:MigrateFriendGroups(false, true)
 		end,
 		timeout = 0,
 		whileDead = true,
