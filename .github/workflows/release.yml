@@ -82,9 +82,9 @@ jobs:
 
           # Define Project Links
           links = (
-              "[CurseForge](https://www.curseforge.com/wow/addons/betterfriendlist)\n"
-              "[Wago](https://addons.wago.io/addons/betterfriendlist)\n"
-              "[WoWInterface](https://www.wowinterface.com/downloads/info26984-BetterFriendlist.html)"
+              "[CurseForge](<https://www.curseforge.com/wow/addons/betterfriendlist/files>) | "
+              "[Wago](<https://addons.wago.io/addons/betterfriendlist/version>) | "
+              "[WoWInterface](<https://www.wowinterface.com/downloads/info26984-BetterFriendlist.html>)"
           )
 
           # Construct the message content
@@ -93,8 +93,8 @@ jobs:
           # Construct JSON Payload
           payload = {
               "content": message_content,
-              "username": "BetterFriendlist",
-              "avatar_url": "https://media.forgecdn.net/avatars/1129/29/638666353678477363.png"
+              "username": "BetterFriendlist Release",
+              "avatar_url": "https://media.forgecdn.net/avatars/thumbnails/1514/711/64/64/638983629917728143.png"
           }
 
           # Send Request
