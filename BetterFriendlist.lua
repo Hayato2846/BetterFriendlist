@@ -748,6 +748,10 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			StaticPopup_Show("BETTER_FRIENDLIST_CREATE_GROUP_AND_ADD_FRIEND", nil, nil, friendUID)
 		end)
 		
+		-- Get fresh groups list directly from module (bypass stale local cache)
+		local Groups = GetGroups()
+		local friendGroups = Groups and Groups:GetAll() or {}
+		
 		-- Count custom groups
 		local customGroupCount = 0
 		for groupId, groupData in pairs(friendGroups) do

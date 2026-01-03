@@ -157,6 +157,105 @@ function DB:Initialize()
 		self:MigrateData(BetterFriendlistDB.version, BFL.VERSION)
 		BetterFriendlistDB.version = BFL.VERSION
 	end
+	
+	-- Initialize CustomNames Sync if available
+	local lib = LibStub("CustomNames", true)
+	if lib then
+		-- BFL:DebugPrint("Database: CustomNames Library DETECTED and Sync enabled.")
+		
+		-- Push existing BFL nicknames to Library (One-way sync on load)
+		if BetterFriendlistDB.nicknames then
+			for uid, nickname in pairs(BetterFriendlistDB.nicknames) do
+				local libKey = self:GetLibKey(uid)
+				-- Only push if we have a valid lib key (not a raw bnet_ID that failed to resolve)
+				if libKey and nickname and not libKey:match("^bnet_") then
+					local libName = lib.Get(libKey)
+					-- Only push if Lib doesn't have a custom name yet (returns original name)
+					if libName == libKey then
+						lib.Set(libKey, nickname)
+						-- BFL:DebugPrint("Database: Synced " .. libKey .. " to CustomNames Lib")
+					end
+				end
+			end
+		end
+
+		-- Register callbacks to keep internal DB in sync
+		lib.RegisterCallback(self, "Name_Added", function(_, name, customName)
+			self:SetNicknameInternal(name, customName)
+		end)
+		lib.RegisterCallback(self, "Name_Update", function(_, name, customName)
+			self:SetNicknameInternal(name, customName)
+		end)
+		lib.RegisterCallback(self, "Name_Removed", function(_, name)
+			self:SetNicknameInternal(name, nil)
+		end)
+	else
+		-- BFL:DebugPrint("Database: CustomNames Library NOT detected.")
+	end
+end
+
+function DB:GetLibKey(friendUID)
+	if not friendUID then return nil end
+	
+	if friendUID:match("^wow_") then
+		-- WoW: Strip "wow_" prefix for Lib (Name-Realm)
+		return friendUID:gsub("^wow_", "")
+	elseif friendUID:match("^bnet_%d+") then
+		-- BNet ID: Resolve to BattleTag for Lib
+		local bnetID = tonumber(friendUID:match("^bnet_(%d+)"))
+		if bnetID then
+			local accountInfo = C_BattleNet.GetAccountInfoByID(bnetID)
+			if accountInfo and accountInfo.battleTag then
+				return accountInfo.battleTag
+			end
+		end
+	elseif friendUID:match("^bnet_") then
+		-- BNet Tag (legacy/fallback): Strip "bnet_"
+		return friendUID:gsub("^bnet_", "")
+	elseif friendUID:match("#") then
+		-- Already a BattleTag
+		return friendUID
+	end
+	
+	-- Fallback: Assume it's a WoW name without prefix (shouldn't happen with BFL UIDs but safe to return)
+	return friendUID
+end
+
+-- Internal setter for DB only (used by Sync and SetNickname)
+function DB:SetNicknameInternalDB(key, nickname)
+	if not key then return end
+	if not BetterFriendlistDB.nicknames then
+		BetterFriendlistDB.nicknames = {}
+	end
+	
+	if nickname and nickname ~= "" then
+		BetterFriendlistDB.nicknames[key] = nickname
+	else
+		BetterFriendlistDB.nicknames[key] = nil
+	end
+end
+
+-- Callback handler for CustomNames Sync
+function DB:SetNicknameInternal(name, nickname)
+	if not name then return end
+	-- BFL:DebugPrint("DB:SetNicknameInternal (Sync) for " .. tostring(name) .. " to " .. tostring(nickname))
+
+	-- Convert Lib Name back to DB Key
+	local dbKey = name
+	if not name:match("#") then 
+		-- It's a WoW Name (Name-Realm) -> Prepend "wow_" for BFL DB
+		dbKey = "wow_" .. name
+	else
+		-- It's a BattleTag -> Use as is (matches our BNet storage strategy)
+		dbKey = name
+	end
+	
+	self:SetNicknameInternalDB(dbKey, nickname)
+
+	-- Force UI Refresh to show new nickname immediately
+	if BFL and BFL.ForceRefreshFriendsList then
+		BFL:ForceRefreshFriendsList()
+	end
 end
 
 function DB:MigrateData(oldVersion, newVersion)
@@ -297,19 +396,59 @@ end
 -- Get nickname
 function DB:GetNickname(friendUID)
 	if not friendUID then return nil end
-	return BetterFriendlistDB.nicknames and BetterFriendlistDB.nicknames[friendUID]
+	
+	local libKey = self:GetLibKey(friendUID)
+	
+	-- 1. Try CustomNames Lib
+	local lib = LibStub("CustomNames", true)
+	if lib and libKey then
+		local customName = lib.Get(libKey)
+		if customName and customName ~= libKey then
+			-- BFL:DebugPrint("DB:GetNickname (Lib) found for " .. tostring(libKey) .. ": " .. tostring(customName))
+			return customName
+		end
+	end
+
+	-- 2. Fallback to Internal DB
+	-- For WoW friends, we use the original UID (wow_Name-Realm) as key
+	-- For BNet friends, we use the BattleTag (libKey) as key, because we can't map back to ID easily in Sync
+	
+	local dbKey = friendUID
+	if friendUID:match("^bnet_") and libKey then
+		dbKey = libKey -- Use BattleTag for BNet storage
+	end
+
+	local nickname = BetterFriendlistDB.nicknames and BetterFriendlistDB.nicknames[dbKey]
+	
+	if nickname then
+		-- BFL:DebugPrint("DB:GetNickname (Internal) found for " .. tostring(dbKey) .. ": " .. tostring(nickname))
+	end
+	return nickname
 end
 
 -- Set nickname
 function DB:SetNickname(friendUID, nickname)
 	if not friendUID then return end
-	if not BetterFriendlistDB.nicknames then
-		BetterFriendlistDB.nicknames = {}
+	
+	local libKey = self:GetLibKey(friendUID)
+	-- BFL:DebugPrint("DB:SetNickname called for " .. tostring(friendUID) .. " -> LibKey: " .. tostring(libKey) .. " Value: " .. tostring(nickname))
+	
+	-- 1. Update CustomNames Lib
+	local lib = LibStub("CustomNames", true)
+	if lib and libKey then
+		if nickname and nickname ~= "" then
+			lib.Set(libKey, nickname)
+		else
+			lib.Set(libKey, nil)
+		end
 	end
 	
-	if nickname and nickname ~= "" then
-		BetterFriendlistDB.nicknames[friendUID] = nickname
-	else
-		BetterFriendlistDB.nicknames[friendUID] = nil
+	-- 2. Update Internal DB
+	-- Determine DB Key (same logic as GetNickname)
+	local dbKey = friendUID
+	if friendUID:match("^bnet_") and libKey then
+		dbKey = libKey
 	end
+	
+	self:SetNicknameInternalDB(dbKey, nickname)
 end
