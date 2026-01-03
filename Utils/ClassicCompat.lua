@@ -75,7 +75,7 @@ function Compat.ModifyMenu(tag, callback)
         -- Classic: No direct equivalent
         -- Must use hooksecurefunc on specific functions
         -- This is handled per-case in individual modules
-        BFL:DebugPrint("|cffffcc00BFL Compat:|r Menu.ModifyMenu not available in Classic")
+        -- BFL:DebugPrint("|cffffcc00BFL Compat:|r Menu.ModifyMenu not available in Classic")
     end
 end
 

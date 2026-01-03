@@ -97,7 +97,7 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 	
 	-- Classic: Use UIDropDownMenu API (old-style dropdown)
 	if BFL.IsClassic then
-		BFL:DebugPrint("|cff00ffffFrameInitializer:|r Classic mode - using UIDropDownMenu for StatusDropdown")
+		-- BFL:DebugPrint("|cff00ffffFrameInitializer:|r Classic mode - using UIDropDownMenu for StatusDropdown")
 		
 		UIDropDownMenu_SetWidth(dropdown, 38)
 		UIDropDownMenu_Initialize(dropdown, function(self, level)
@@ -309,7 +309,7 @@ function FrameInitializer:InitializeSortDropdown(frame)
 	
 	-- Classic mode: Use UIDropDownMenu
 	if BFL.IsClassic or not BFL.HasModernDropdown then
-		BFL:DebugPrint("|cff00ffffFrameInitializer:|r Classic mode - using UIDropDownMenu for SortDropdown")
+		-- BFL:DebugPrint("|cff00ffffFrameInitializer:|r Classic mode - using UIDropDownMenu for SortDropdown")
 		
 		UIDropDownMenu_SetWidth(dropdown, 60)
 		UIDropDownMenu_Initialize(dropdown, function(self, level)
@@ -435,7 +435,7 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 
 	-- Classic mode: Use UIDropDownMenu
 	if BFL.IsClassic or not BFL.HasModernDropdown then
-		BFL:DebugPrint("|cff00ffffFrameInitializer:|r Classic mode - using UIDropDownMenu for Primary/Secondary Sort dropdowns")
+		-- BFL:DebugPrint("|cff00ffffFrameInitializer:|r Classic mode - using UIDropDownMenu for Primary/Secondary Sort dropdowns")
 		
 		-- Primary Sort Dropdown
 		local primaryDropdown = header.PrimarySortDropdown

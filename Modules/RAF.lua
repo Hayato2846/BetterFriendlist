@@ -37,13 +37,13 @@ local latestRAFVersion = 0
 function RAF:OnLoad(frame)
 	-- Classic Guard: RAF is Retail-only
 	if BFL.IsClassic or not BFL.HasRAF then
-		BFL:DebugPrint("|cffffcc00BFL RAF:|r Not available in Classic - module disabled")
+		-- BFL:DebugPrint("|cffffcc00BFL RAF:|r Not available in Classic - module disabled")
 		if frame then frame:Hide() end
 		return
 	end
 	
 	if not C_RecruitAFriend then
-		BFL:DebugPrint("BetterFriendlist: RAF system not available")
+		-- BFL:DebugPrint("BetterFriendlist: RAF system not available")
 		return
 	end
 	
@@ -70,11 +70,11 @@ function RAF:OnLoad(frame)
 	if frame.RecruitList and frame.RecruitList.ScrollBox and frame.RecruitList.ScrollBar then
 		-- Classic: Use FauxScrollFrame approach
 		if BFL.IsClassic or not BFL.HasModernScrollBox then
-			BFL:DebugPrint("|cff00ffffRAF:|r Using Classic FauxScrollFrame mode")
+			-- BFL:DebugPrint("|cff00ffffRAF:|r Using Classic FauxScrollFrame mode")
 			self:InitializeClassicRAF(frame)
 		else
 			-- Retail: Use ScrollBox
-			BFL:DebugPrint("|cff00ffffRAF:|r Using Retail ScrollBox mode")
+			-- BFL:DebugPrint("|cff00ffffRAF:|r Using Retail ScrollBox mode")
 			local view = CreateScrollBoxListLinearView()
 			view:SetElementExtentCalculator(function(dataIndex, elementData)
 				return elementData.isDivider and DIVIDER_HEIGHT or RECRUIT_HEIGHT
@@ -1005,7 +1005,7 @@ function RAF:RecruitmentButton_OnClick(button)
 	end
 	
 	if not RecruitAFriendRecruitmentFrame then
-		BFL:DebugPrint("Error: Could not load RecruitAFriendRecruitmentFrame")
+		-- BFL:DebugPrint("Error: Could not load RecruitAFriendRecruitmentFrame")
 		return
 	end
 	

@@ -225,7 +225,7 @@ function Dialogs:RegisterDialogs()
 				end
 			end
 			
-			BFL:DebugPrint("|cff00ff00All Edit Mode layouts reset to default|r")
+			-- BFL:DebugPrint("|cff00ff00All Edit Mode layouts reset to default|r")
 			print("|cff00ffffBetterFriendlist:|r All layouts reset. Use /editmode to reposition.")
 		end,
 		timeout = 0,

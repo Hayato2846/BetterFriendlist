@@ -369,7 +369,7 @@ end
 function PreviewMode:ApplyMockBattleTag()
 	local bnetFrame = self:GetBattleNetFrame()
 	if not bnetFrame or not bnetFrame.Tag then 
-		BFL:DebugPrint("|cffff0000PreviewMode:|r BattleNetFrame not found!")
+		-- BFL:DebugPrint("|cffff0000PreviewMode:|r BattleNetFrame not found!")
 		return 
 	end
 	
@@ -416,7 +416,7 @@ function PreviewMode:ApplyMockBattleTag()
 		end
 	end
 	
-	BFL:DebugPrint("|cff00ffffPreviewMode:|r Applied mock BattleTag: " .. self.MOCK_BATTLETAG)
+	-- BFL:DebugPrint("|cff00ffffPreviewMode:|r Applied mock BattleTag: " .. self.MOCK_BATTLETAG)
 end
 
 --[[
@@ -437,7 +437,7 @@ function PreviewMode:RestoreBattleTag()
 	if self.originalBattleTag then
 		bnetFrame.Tag:SetText(self.originalBattleTag)
 		self.originalBattleTag = nil
-		BFL:DebugPrint("|cff00ffffPreviewMode:|r Restored original BattleTag")
+		-- BFL:DebugPrint("|cff00ffffPreviewMode:|r Restored original BattleTag")
 	else
 		-- If we don't have the original, refresh from API
 		local _, battleTag = BNGetInfo()
@@ -718,7 +718,7 @@ function PreviewMode:ApplyMockFriends()
 			Groups.groups[mockGroup.id] = mockGroup
 		end
 		
-		BFL:DebugPrint("|cff00ffffPreviewMode:|r Replaced Groups.groups with " .. #self.mockData.groups .. " mock groups")
+		-- BFL:DebugPrint("|cff00ffffPreviewMode:|r Replaced Groups.groups with " .. #self.mockData.groups .. " mock groups")
 	end
 	
 	-- Mock group order for Settings tab
@@ -771,7 +771,7 @@ function PreviewMode:ApplyMockFriends()
 			injectedCount = injectedCount + 1
 		end
 		
-		BFL:DebugPrint("|cff00ffffPreviewMode:|r Injected " .. injectedCount .. " friend group assignments into BetterFriendlistDB.friendGroups")
+		-- BFL:DebugPrint("|cff00ffffPreviewMode:|r Injected " .. injectedCount .. " friend group assignments into BetterFriendlistDB.friendGroups")
 	end
 end
 
@@ -809,7 +809,7 @@ function PreviewMode:EnableRaidMock()
 		-- If mock mode is active, don't touch the raidMembers data at all
 		if raidSelf.mockEnabled then
 			-- Mock data already in raidMembers - do nothing
-			BFL:DebugPrint("|cff00ffffPreviewMode:|r Skipping UpdateRaidMembers (mock mode active)")
+			-- BFL:DebugPrint("|cff00ffffPreviewMode:|r Skipping UpdateRaidMembers (mock mode active)")
 			return
 		end
 		
@@ -823,7 +823,7 @@ function PreviewMode:EnableRaidMock()
 	RaidFrame.OnGroupLeft = function(raidSelf, ...)
 		if raidSelf.mockEnabled then
 			-- Mock mode active - do not clear data
-			BFL:DebugPrint("|cff00ffffPreviewMode:|r Skipping OnGroupLeft (mock mode active)")
+			-- BFL:DebugPrint("|cff00ffffPreviewMode:|r Skipping OnGroupLeft (mock mode active)")
 			return
 		end
 		
@@ -837,7 +837,7 @@ function PreviewMode:EnableRaidMock()
 	RaidFrame.OnGroupJoined = function(raidSelf, ...)
 		if raidSelf.mockEnabled then
 			-- Mock mode active - do not update from real group
-			BFL:DebugPrint("|cff00ffffPreviewMode:|r Skipping OnGroupJoined (mock mode active)")
+			-- BFL:DebugPrint("|cff00ffffPreviewMode:|r Skipping OnGroupJoined (mock mode active)")
 			return
 		end
 		
@@ -851,7 +851,7 @@ function PreviewMode:EnableRaidMock()
 	RaidFrame.OnRaidRosterUpdate = function(raidSelf, ...)
 		if raidSelf.mockEnabled then
 			-- Mock mode active - do not update from real roster
-			BFL:DebugPrint("|cff00ffffPreviewMode:|r Skipping OnRaidRosterUpdate (mock mode active)")
+			-- BFL:DebugPrint("|cff00ffffPreviewMode:|r Skipping OnRaidRosterUpdate (mock mode active)")
 			return
 		end
 		
@@ -864,7 +864,7 @@ function PreviewMode:EnableRaidMock()
 	-- Now activate the mock preset
 	if RaidFrame.CreateMockPreset_Standard then
 		RaidFrame:CreateMockPreset_Standard()
-		BFL:DebugPrint("|cff00ffffPreviewMode:|r Raid mock enabled with event overrides")
+		-- BFL:DebugPrint("|cff00ffffPreviewMode:|r Raid mock enabled with event overrides")
 	end
 end
 
@@ -997,7 +997,7 @@ end
 
 function PreviewMode:Initialize()
 	-- Module is ready
-	BFL:DebugPrint("|cff00ffffBFL:PreviewMode:|r Initialized")
+	-- BFL:DebugPrint("|cff00ffffBFL:PreviewMode:|r Initialized")
 end
 
 -- ============================================

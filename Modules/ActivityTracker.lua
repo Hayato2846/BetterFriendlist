@@ -95,18 +95,18 @@ end
 -- @param timestamp: Optional timestamp (defaults to current time)
 local function RecordActivity(friendUID, activityType, timestamp)
 	if not friendUID or friendUID == "" then
-		BFL:DebugPrint("ActivityTracker: Cannot record activity - invalid friendUID")
+		-- BFL:DebugPrint("ActivityTracker: Cannot record activity - invalid friendUID")
 		return false
 	end
 	
 	if not activityType then
-		BFL:DebugPrint("ActivityTracker: Cannot record activity - invalid activityType")
+		-- BFL:DebugPrint("ActivityTracker: Cannot record activity - invalid activityType")
 		return false
 	end
 	
 	local DB = GetDB()
 	if not DB then
-		BFL:DebugPrint("ActivityTracker: Cannot record activity - DB module not available")
+		-- BFL:DebugPrint("ActivityTracker: Cannot record activity - DB module not available")
 		return false
 	end
 	
@@ -124,7 +124,7 @@ local function RecordActivity(friendUID, activityType, timestamp)
 	-- Save back to database
 	DB:Set("friendActivity", friendActivity)
 	
-	BFL:DebugPrint(string.format("ActivityTracker: Recorded %s for %s at %d", activityType, friendUID, timestamp))
+	-- BFL:DebugPrint(string.format("ActivityTracker: Recorded %s for %s at %d", activityType, friendUID, timestamp))
 	return true
 end
 
@@ -138,7 +138,7 @@ function ActivityTracker:Initialize()
 		return
 	end
 	
-	BFL:DebugPrint("ActivityTracker: Initializing...")
+	-- BFL:DebugPrint("ActivityTracker: Initializing...")
 	
 	-- Register event callbacks for WoW whispers
 	BFL:RegisterEventCallback("CHAT_MSG_WHISPER", function(...)
@@ -171,12 +171,12 @@ function ActivityTracker:Initialize()
 	end, 50)
 	
 	self.initialized = true
-	BFL:DebugPrint("ActivityTracker: Initialized successfully")
+	-- BFL:DebugPrint("ActivityTracker: Initialized successfully")
 end
 
 -- Handle PLAYER_LOGIN event (cleanup old data)
 function ActivityTracker:OnPlayerLogin()
-	BFL:DebugPrint("ActivityTracker: Running PLAYER_LOGIN cleanup...")
+	-- BFL:DebugPrint("ActivityTracker: Running PLAYER_LOGIN cleanup...")
 	self:CleanupOldActivity()
 end
 
@@ -213,9 +213,9 @@ function ActivityTracker:CleanupOldActivity()
 	
 	if removedCount > 0 then
 		DB:Set("friendActivity", friendActivity)
-		BFL:DebugPrint(string.format("ActivityTracker: Cleaned up %d old activity records (older than %d days)", removedCount, MAX_ACTIVITY_AGE_DAYS))
+		-- BFL:DebugPrint(string.format("ActivityTracker: Cleaned up %d old activity records (older than %d days)", removedCount, MAX_ACTIVITY_AGE_DAYS))
 	else
-		BFL:DebugPrint("ActivityTracker: No old activity records to clean up")
+		-- BFL:DebugPrint("ActivityTracker: No old activity records to clean up")
 	end
 end
 
@@ -231,11 +231,11 @@ end
 -- Handle incoming whisper (CHAT_MSG_WHISPER)
 function ActivityTracker:OnWhisper(text, sender, languageName, channelName, target, flags, zoneChannelID, channelIndex, channelBaseName, languageID, lineID, guid, ...)
 	-- Debug: Log all parameters
-	BFL:DebugPrint(string.format("ActivityTracker: OnWhisper called - text='%s', sender='%s', target='%s', guid='%s'", 
-		tostring(text), tostring(sender), tostring(target), tostring(guid)))
+	-- BFL:DebugPrint(string.format("ActivityTracker: OnWhisper called - text='%s', sender='%s', target='%s', guid='%s'", 
+	-- 	tostring(text), tostring(sender), tostring(target), tostring(guid)))
 	
 	if not sender or sender == "" then
-		BFL:DebugPrint("ActivityTracker: OnWhisper - No sender")
+		-- BFL:DebugPrint("ActivityTracker: OnWhisper - No sender")
 		return
 	end
 	
@@ -244,7 +244,7 @@ function ActivityTracker:OnWhisper(text, sender, languageName, channelName, targ
 	if friendUID then
 		RecordActivity(friendUID, ACTIVITY_WHISPER)
 	else
-		BFL:DebugPrint(string.format("ActivityTracker: OnWhisper - Could not resolve sender '%s' to friend UID", sender))
+		-- BFL:DebugPrint(string.format("ActivityTracker: OnWhisper - Could not resolve sender '%s' to friend UID", sender))
 	end
 end
 

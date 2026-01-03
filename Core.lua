@@ -1,6 +1,6 @@
 -- Core.lua
 -- Main initialization file for BetterFriendlist addon
--- Version 2.0.7 - January 2026
+-- Version 2.0.9 - January 2026
 -- Complete replacement for WoW Friends frame with modular architecture
 
 -- Create addon namespace
@@ -416,7 +416,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 				BFL.OriginalFriendsFrameUIPanelSettings = UIPanelWindows["FriendsFrame"]
 				-- Remove from UIPanel system
 				UIPanelWindows["FriendsFrame"] = nil
-				BFL:DebugPrint("|cff00ff00[BFL]|r FriendsFrame removed from UIPanel system (combat-safe)")
+				-- BFL:DebugPrint("|cff00ff00[BFL]|r FriendsFrame removed from UIPanel system (combat-safe)")
 			end
 			
 			-- Store original function for "Show Blizzard's Friendlist" option
@@ -427,18 +427,18 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 				_G.ToggleFriendsFrame = function(tabIndex)
 					-- Allow original if explicitly requested
 					if BFL.AllowBlizzardFriendsFrame then
-						BFL:DebugPrint("[BFL] ToggleFriendsFrame: Allowing Blizzard (explicit)")
+						-- BFL:DebugPrint("[BFL] ToggleFriendsFrame: Allowing Blizzard (explicit)")
 						return BFL.OriginalToggleFriendsFrame(tabIndex)
 					end
 					
-					BFL:DebugPrint("[BFL] ToggleFriendsFrame: Opening BetterFriendlist, tabIndex: " .. tostring(tabIndex))
+					-- BFL:DebugPrint("[BFL] ToggleFriendsFrame: Opening BetterFriendlist, tabIndex: " .. tostring(tabIndex))
 					
 					-- Toggle our frame with the requested tab (combat-safe, our frame is not protected)
 					if _G.ToggleBetterFriendsFrame then
 						_G.ToggleBetterFriendsFrame(tabIndex)
 					end
 				end
-				BFL:DebugPrint("|cff00ff00[BFL]|r ToggleFriendsFrame global replaced")
+				-- BFL:DebugPrint("|cff00ff00[BFL]|r ToggleFriendsFrame global replaced")
 			end
 			
 			-- Helper function to show Blizzard's FriendsFrame (bypasses our hook)
@@ -468,7 +468,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 					if BFL.AllowBlizzardFriendsFrame then
 						return BFL.OriginalShowFriends()
 					end
-					BFL:DebugPrint("[BFL] ShowFriends: Redirecting to BetterFriendlist")
+					-- BFL:DebugPrint("[BFL] ShowFriends: Redirecting to BetterFriendlist")
 					if BetterFriendsFrame and not BetterFriendsFrame:IsShown() then
 						if _G.ToggleBetterFriendsFrame then
 							_G.ToggleBetterFriendsFrame()
@@ -489,14 +489,14 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 				FriendsFrame:HookScript("OnShow", function(self)
 					-- Skip if user explicitly wants Blizzard's frame
 					if BFL.AllowBlizzardFriendsFrame then
-						BFL:DebugPrint("[BFL] FriendsFrame:OnShow - Allowing (explicit)")
+						-- BFL:DebugPrint("[BFL] FriendsFrame:OnShow - Allowing (explicit)")
 						return
 					end
 					
 					-- Detect which tab was requested by reading Blizzard's selected tab
 					-- FRIEND_TAB_FRIENDS=1, FRIEND_TAB_WHO=2, FRIEND_TAB_RAID=3, FRIEND_TAB_QUICK_JOIN=4
 					local requestedTab = PanelTemplates_GetSelectedTab(FriendsFrame) or 1
-					BFL:DebugPrint("[BFL] FriendsFrame:OnShow - Intercepting, requested tab: " .. tostring(requestedTab))
+					-- BFL:DebugPrint("[BFL] FriendsFrame:OnShow - Intercepting, requested tab: " .. tostring(requestedTab))
 					
 					-- Hide Blizzard's frame immediately (combat-safe since not a UIPanel anymore)
 					FriendsFrame:Hide()
@@ -514,14 +514,14 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 						end
 					end
 				end)
-				BFL:DebugPrint("|cff00ff00[BFL]|r FriendsFrame:OnShow hooked for ElvUI compatibility")
+				-- BFL:DebugPrint("|cff00ff00[BFL]|r FriendsFrame:OnShow hooked for ElvUI compatibility")
 			end
 		end
 	elseif event == "PLAYER_LOGIN" then
 		-- Check for native event callbacks (12.0.0+)
 		if BetterFriendsFrame and BetterFriendsFrame.RegisterEventCallback then
 			BFL.UseNativeCallbacks = true
-			BFL:DebugPrint("|cff00ff00[BFL]|r Using native Frame:RegisterEventCallback (12.0.0+)")
+			-- BFL:DebugPrint("|cff00ff00[BFL]|r Using native Frame:RegisterEventCallback (12.0.0+)")
 		end
 		
 		-- Late initialization for modules that need PLAYER_LOGIN

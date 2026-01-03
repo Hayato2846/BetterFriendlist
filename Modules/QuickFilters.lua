@@ -51,7 +51,7 @@ function QuickFilters:InitDropdown(dropdown)
 	
 	-- Classic mode: Use UIDropDownMenu
 	if BFL.IsClassic or not BFL.HasModernDropdown then
-		BFL:DebugPrint("|cff00ffffQuickFilters:|r Classic mode - using UIDropDownMenu for Quick Filter dropdown")
+		-- BFL:DebugPrint("|cff00ffffQuickFilters:|r Classic mode - using UIDropDownMenu for Quick Filter dropdown")
 		
 		UIDropDownMenu_SetWidth(dropdown, 70)
 		UIDropDownMenu_Initialize(dropdown, function(self, level)

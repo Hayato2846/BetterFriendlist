@@ -490,7 +490,7 @@ function RaidFrame:CreateSecureProxy()
     if proxy.SetPassThroughButtons then
         proxy:SetPassThroughButtons("LeftButton")
     else
-        BFL:DebugPrint("Error: SetPassThroughButtons not supported")
+        -- BFL:DebugPrint("Error: SetPassThroughButtons not supported")
     end
     
     -- =====================================================
@@ -523,7 +523,7 @@ function RaidFrame:CreateSecureProxy()
             self.name = name
             self.id = tonumber(string.match(unit, "raid(%d+)"))
             
-            BFL:DebugPrint("Proxy OnEnter: name=" .. tostring(name) .. " unit=" .. tostring(unit))
+            -- BFL:DebugPrint("Proxy OnEnter: name=" .. tostring(name) .. " unit=" .. tostring(unit))
         end
         
         -- Show tooltip
@@ -550,10 +550,10 @@ function RaidFrame:CreateSecureProxy()
     end)
     
     self.SecureProxy = proxy
-    BFL:DebugPrint("[BFL] SecureProxy created with SECURE Main Tank/Assist support")
-    BFL:DebugPrint("  Shift+RClick = Toggle Main Tank (SECURE)")
-    BFL:DebugPrint("  Ctrl+RClick = Toggle Main Assist (SECURE)")
-    BFL:DebugPrint("  RClick = RAID Menu (insecure)")
+    -- BFL:DebugPrint("[BFL] SecureProxy created with SECURE Main Tank/Assist support")
+    -- BFL:DebugPrint("  Shift+RClick = Toggle Main Tank (SECURE)")
+    -- BFL:DebugPrint("  Ctrl+RClick = Toggle Main Assist (SECURE)")
+    -- BFL:DebugPrint("  RClick = RAID Menu (insecure)")
 end
 
 -- ========================================
@@ -591,14 +591,14 @@ function RaidFrame:Initialize()
         BetterFriendsFrame:HookScript("OnShow", function()
             -- Always update if we have no data, or if dirty flag is set
             if needsRenderOnShow or #self.raidMembers == 0 then
-                BFL:DebugPrint("|cff00ffffRaidFrame:|r Frame shown - triggering refresh")
+                -- BFL:DebugPrint("|cff00ffffRaidFrame:|r Frame shown - triggering refresh")
                 self:OnRaidRosterUpdate()
                 needsRenderOnShow = false
             end
         end)
     end
     
-    BFL:DebugPrint("[BFL] RaidFrame initialized")
+    -- BFL:DebugPrint("[BFL] RaidFrame initialized")
 end
 
 function RaidFrame:RegisterEvents()
@@ -1073,7 +1073,7 @@ end
 function RaidFrame:UpdateMemberCount()
     local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
     if not frame or not frame.ControlPanel or not frame.ControlPanel.MemberCount then
-        BFL:DebugPrint("[BFL] UpdateMemberCount: Frame check failed - frame=" .. tostring(frame) .. ", ControlPanel=" .. tostring(frame and frame.ControlPanel) .. ", MemberCount=" .. tostring(frame and frame.ControlPanel and frame.ControlPanel.MemberCount))
+        -- BFL:DebugPrint("[BFL] UpdateMemberCount: Frame check failed - frame=" .. tostring(frame) .. ", ControlPanel=" .. tostring(frame and frame.ControlPanel) .. ", MemberCount=" .. tostring(frame and frame.ControlPanel and frame.ControlPanel.MemberCount))
         return
     end
     
@@ -1394,7 +1394,7 @@ end
 --- @param inCombat boolean|nil Optional combat state (defaults to InCombatLockdown())
 function RaidFrame:UpdateCombatOverlay(inCombat)
     if not self.memberButtons then 
-        BFL:DebugPrint("[BFL] UpdateCombatOverlay: No member buttons")
+        -- BFL:DebugPrint("[BFL] UpdateCombatOverlay: No member buttons")
         return 
     end
     
@@ -2391,7 +2391,7 @@ function RaidFrame:StartMockDynamicUpdates()
 		self:ProcessMockDynamicUpdate()
 	end)
 	
-	BFL:DebugPrint("|cff00ff00RaidFrame Mock:|r Dynamic updates started (interval: " .. self.mockConfig.updateInterval .. "s)")
+	-- BFL:DebugPrint("|cff00ff00RaidFrame Mock:|r Dynamic updates started (interval: " .. self.mockConfig.updateInterval .. "s)")
 end
 
 --[[
@@ -2415,8 +2415,8 @@ function RaidFrame:ProcessMockDynamicUpdate()
 			member.online = not member.online
 			member.isDead = false  -- Coming online = alive
 			updated = true
-			BFL:DebugPrint(string.format("|cff00ff00Mock Update:|r %s is now %s", 
-				member.name, member.online and "online" or "offline"))
+			-- BFL:DebugPrint(string.format("|cff00ff00Mock Update:|r %s is now %s", 
+			-- 	member.name, member.online and "online" or "offline"))
 		end
 		
 	elseif updateType <= 35 then
@@ -2426,8 +2426,8 @@ function RaidFrame:ProcessMockDynamicUpdate()
 		if member and member.online then
 			member.isDead = not member.isDead
 			updated = true
-			BFL:DebugPrint(string.format("|cff00ff00Mock Update:|r %s %s", 
-				member.name, member.isDead and "died" or "revived"))
+			-- BFL:DebugPrint(string.format("|cff00ff00Mock Update:|r %s %s", 
+			-- 	member.name, member.isDead and "died" or "revived"))
 		end
 		
 	elseif updateType <= 50 then
@@ -2437,8 +2437,8 @@ function RaidFrame:ProcessMockDynamicUpdate()
 		if member and member.online then
 			member.zone = MOCK_ZONES[math.random(#MOCK_ZONES)]
 			updated = true
-			BFL:DebugPrint(string.format("|cff00ff00Mock Update:|r %s moved to %s", 
-				member.name, member.zone))
+			-- BFL:DebugPrint(string.format("|cff00ff00Mock Update:|r %s moved to %s", 
+			-- 	member.name, member.zone))
 		end
 		
 	elseif updateType <= 60 then
@@ -2452,8 +2452,8 @@ function RaidFrame:ProcessMockDynamicUpdate()
 				if newGroup ~= member.subgroup then
 					member.subgroup = newGroup
 					updated = true
-					BFL:DebugPrint(string.format("|cff00ff00Mock Update:|r %s moved to Group %d", 
-						member.name, newGroup))
+					-- BFL:DebugPrint(string.format("|cff00ff00Mock Update:|r %s moved to Group %d", 
+					-- 	member.name, newGroup))
 				end
 			end
 		end
@@ -2658,7 +2658,7 @@ function RaidFrame:ClearMockData()
 		end
 	end
 	
-	BFL:DebugPrint("|cff00ff00RaidFrame Mock:|r Cleared all mock data")
+	-- BFL:DebugPrint("|cff00ff00RaidFrame Mock:|r Cleared all mock data")
 	print("|cff00ff00BFL RaidFrame:|r Mock data cleared")
 end
 

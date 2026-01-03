@@ -432,13 +432,13 @@ function FriendsList:InitializeScrollBox()
 	
 	-- Classic: Use FauxScrollFrame approach
 	if BFL.IsClassic or not BFL.HasModernScrollBox then
-		BFL:DebugPrint("|cff00ffffFriendsList:|r Using Classic FauxScrollFrame mode")
+		-- BFL:DebugPrint("|cff00ffffFriendsList:|r Using Classic FauxScrollFrame mode")
 		self:InitializeClassicScrollFrame(scrollFrame)
 		return
 	end
 	
 	-- Retail: Use modern ScrollBox system
-	BFL:DebugPrint("|cff00ffffFriendsList:|r Using Retail ScrollBox mode")
+	-- BFL:DebugPrint("|cff00ffffFriendsList:|r Using Retail ScrollBox mode")
 	
 	-- Create ScrollBox if it doesn't exist
 	if not scrollFrame.ScrollBox then
@@ -539,7 +539,7 @@ function FriendsList:InitializeClassicScrollFrame(scrollFrame)
 		self.classicHeaderPool[i] = header
 	end
 	
-	BFL:DebugPrint(string.format("|cff00ffffFriendsList:|r Created Classic button pool with %d buttons", numButtons))
+	-- BFL:DebugPrint(string.format("|cff00ffffFriendsList:|r Created Classic button pool with %d buttons", numButtons))
 end
 
 -- Render buttons in Classic FauxScrollFrame mode
@@ -913,9 +913,9 @@ function FriendsList:Initialize()
 	C_Timer.After(0.1, function()
 		if BFL.FriendsList and BFL.FriendsList.UpdateSearchBoxWidth then
 			BFL.FriendsList:UpdateSearchBoxWidth()
-			BFL:DebugPrint("|cff00ffffFriendsList:Initialize:|r Called UpdateSearchBoxWidth")
+			-- BFL:DebugPrint("|cff00ffffFriendsList:Initialize:|r Called UpdateSearchBoxWidth")
 		else
-			BFL:DebugPrint("|cffff0000FriendsList:Initialize:|r UpdateSearchBoxWidth not found!")
+			-- BFL:DebugPrint("|cffff0000FriendsList:Initialize:|r UpdateSearchBoxWidth not found!")
 		end
 	end)
 	
@@ -977,7 +977,7 @@ function FriendsList:Initialize()
 	if BetterFriendsFrame then
 		BetterFriendsFrame:HookScript("OnShow", function()
 			if needsRenderOnShow then
-				BFL:DebugPrint("|cff00ffffFriendsList:|r Frame shown, dirty flag set - triggering refresh")
+				-- BFL:DebugPrint("|cff00ffffFriendsList:|r Frame shown, dirty flag set - triggering refresh")
 				self:UpdateFriendsList()
 			end
 		end)
@@ -986,7 +986,7 @@ function FriendsList:Initialize()
 		if BetterFriendsFrame.ScrollFrame then
 			BetterFriendsFrame.ScrollFrame:HookScript("OnShow", function()
 				if needsRenderOnShow then
-					BFL:DebugPrint("|cff00ffffFriendsList:|r ScrollFrame shown, dirty flag set - triggering refresh")
+					-- BFL:DebugPrint("|cff00ffffFriendsList:|r ScrollFrame shown, dirty flag set - triggering refresh")
 					self:UpdateFriendsList()
 				end
 			end)
@@ -1109,14 +1109,14 @@ function FriendsList:UpdateFriendsList()
 					if gameInfo.clientProgram == "WoW" or gameInfo.clientProgram == "WTCG" then
 						-- DEBUG: Log raw data for analysis
 						if BFL.DebugPrint then
-							BFL:DebugPrint(string.format("BNet Friend: %s (Prog: %s, Proj: %s, Class: %s, Area: %s, Rich: %s)", 
-								tostring(gameInfo.characterName),
-								tostring(gameInfo.clientProgram),
-								tostring(gameInfo.wowProjectID),
-								tostring(gameInfo.className),
-								tostring(gameInfo.areaName),
-								tostring(gameInfo.richPresence)
-							))
+							-- BFL:DebugPrint(string.format("BNet Friend: %s (Prog: %s, Proj: %s, Class: %s, Area: %s, Rich: %s)", 
+							-- 	tostring(gameInfo.characterName),
+							-- 	tostring(gameInfo.clientProgram),
+							-- 	tostring(gameInfo.wowProjectID),
+							-- 	tostring(gameInfo.className),
+							-- 	tostring(gameInfo.areaName),
+							-- 	tostring(gameInfo.richPresence)
+							-- ))
 						end
 
 						friend.characterName = gameInfo.characterName
@@ -3427,18 +3427,18 @@ end
 function FriendsList:UpdateSearchBoxWidth()
 	local frame = BetterFriendsFrame
 	if not frame then
-		BFL:DebugPrint("|cffff0000UpdateSearchBoxWidth: No frame|r")
+		-- BFL:DebugPrint("|cffff0000UpdateSearchBoxWidth: No frame|r")
 		return
 	end
 	
 	if not frame.FriendsTabHeader then
-		BFL:DebugPrint("|cffff0000UpdateSearchBoxWidth: No FriendsTabHeader|r")
+		-- BFL:DebugPrint("|cffff0000UpdateSearchBoxWidth: No FriendsTabHeader|r")
 		return
 	end
 	
 	local header = frame.FriendsTabHeader
 	if not header.SearchBox then
-		BFL:DebugPrint("|cffff0000UpdateSearchBoxWidth: No SearchBox|r")
+		-- BFL:DebugPrint("|cffff0000UpdateSearchBoxWidth: No SearchBox|r")
 		return
 	end
 	
@@ -3562,8 +3562,8 @@ function FriendsList:UpdateSearchBoxWidth()
 	-- Apply new width
 	header.SearchBox:SetWidth(availableWidth)
 	
-	BFL:DebugPrint(string.format("|cff00ffffFriendsList:|r SearchBox width updated: %.1fpx (frame width: %.1fpx)", 
-		availableWidth, frameWidth))
+	-- BFL:DebugPrint(string.format("|cff00ffffFriendsList:|r SearchBox width updated: %.1fpx (frame width: %.1fpx)", 
+	-- 	availableWidth, frameWidth))
 end
 
 -- Export module to BFL namespace (required for BFL.FriendsList access)

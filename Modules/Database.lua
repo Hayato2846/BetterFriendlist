@@ -109,9 +109,9 @@ function DB:Initialize()
 	
 	-- Debug: Check ElvUI Skin setting
 	if BetterFriendlistDB.enableElvUISkin then
-		BFL:DebugPrint("Database: ElvUI Skin is ENABLED")
+		-- BFL:DebugPrint("Database: ElvUI Skin is ENABLED")
 	else
-		BFL:DebugPrint("Database: ElvUI Skin is DISABLED")
+		-- BFL:DebugPrint("Database: ElvUI Skin is DISABLED")
 	end
 	
 	-- MIGRATION: Name Display Format (Phase 15)
@@ -143,13 +143,13 @@ function DB:Initialize()
 		BetterFriendlistDB.showNicknameAsName = nil
 		BetterFriendlistDB.showNicknameInName = nil
 		
-		BFL:DebugPrint("|cff00ff00BFL:Database:|r Migrated name display settings to: " .. format)
+		-- BFL:DebugPrint("|cff00ff00BFL:Database:|r Migrated name display settings to: " .. format)
 	end
 	
 	-- Migration: Ensure defaultFrameWidth meets new minimum (380px)
 	if BetterFriendlistDB.defaultFrameWidth and BetterFriendlistDB.defaultFrameWidth < 380 then
 		BetterFriendlistDB.defaultFrameWidth = 380
-		BFL:DebugPrint("|cff00ff00BFL:Database:|r Migrated defaultFrameWidth to 380 (old minimum was 350)")
+		-- BFL:DebugPrint("|cff00ff00BFL:Database:|r Migrated defaultFrameWidth to 380 (old minimum was 350)")
 	end
 	
 	-- Version migration if needed

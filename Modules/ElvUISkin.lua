@@ -30,7 +30,7 @@ function ElvUISkin:RegisterSkin()
 	-- Check if skin is enabled in BFL settings (Point 1)
 	-- Explicit check for false (nil means enabled by default if we wanted, but DB init sets it to false)
 	if BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin == false then
-		BFL:DebugPrint("ElvUISkin: Skin disabled in settings")
+		-- BFL:DebugPrint("ElvUISkin: Skin disabled in settings")
 		return
 	end
 
@@ -42,23 +42,89 @@ function ElvUISkin:RegisterSkin()
 	-- Register callback for skinning
 	-- This ensures our skin runs when ElvUI skins are applied
 	S:AddCallbackForAddon("BetterFriendlist", "BetterFriendlist", function()
-		self:SkinFrames(E, S)
+		BFL:DebugPrint("ElvUISkin: Callback triggered")
+		xpcall(function() self:SkinFrames(E, S) end, function(err) print("|cffff0000BetterFriendlist ElvUI Skin Error:|r " .. tostring(err)) end)
 	end)
 	
 	-- If BetterFriendlist is already loaded (which it is), try to skin immediately
 	-- This helps if ElvUI has already processed callbacks
-	self:SkinFrames(E, S)
+	BFL:DebugPrint("ElvUISkin: Direct call triggered")
+	xpcall(function() self:SkinFrames(E, S) end, function(err) print("|cffff0000BetterFriendlist ElvUI Skin Error:|r " .. tostring(err)) end)
 end
 
 function ElvUISkin:SkinFrames(E, S)
 	if not _G.BetterFriendsFrame then return end
 
+	BFL:DebugPrint("ElvUISkin: SkinFrames started")
 	local frame = _G.BetterFriendsFrame
 
 	-- Skin Main Frame
-	S:HandlePortraitFrame(frame)
+	BFL:DebugPrint("ElvUISkin: Skinning Main Frame")
+	if frame.PortraitContainer or frame.portrait then
+		S:HandlePortraitFrame(frame)
+	end
+
+	-- Skin Portrait Button (Changelog)
+	if frame.PortraitButton then
+		BFL:DebugPrint("ElvUISkin: Skinning PortraitButton")
+		local button = frame.PortraitButton
+		
+		-- Reset position and size to fit ElvUI style
+		button:ClearAllPoints()
+		button:SetPoint("TOPLEFT", frame, "TOPLEFT", 4, -4)
+		button:SetSize(42, 42) -- Standard icon size
+		button:SetFrameLevel(frame:GetFrameLevel() + 5)
+		
+		-- Create Backdrop
+		button:CreateBackdrop("Transparent")
+		
+		-- Handle Icon
+		-- Create a new texture to avoid mask/layer issues with the original
+		if not button.Icon then
+			button.Icon = button:CreateTexture(nil, "ARTWORK")
+			button.Icon:SetInside()
+			button.Icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Textures\\PortraitIcon")
+			button.Icon:SetTexCoord(unpack(E.TexCoords))
+		end
+		button.Icon:Show()
+		
+		-- Hide original icon and mask
+		if frame.PortraitIcon then frame.PortraitIcon:Hide() end
+		if frame.PortraitMask then frame.PortraitMask:Hide() end
+		
+		-- Handle Glow (New Version Indicator)
+		if button.Glow then
+			button.Glow:SetParent(button)
+			button.Glow:ClearAllPoints()
+			button.Glow:SetInside()
+			button.Glow:SetDrawLayer("OVERLAY")
+			-- Use a cleaner glow texture for ElvUI
+			button.Glow:SetTexture(E.Media.Textures.Highlight) 
+			button.Glow:SetVertexColor(1, 0.82, 0, 0.5)
+		end
+		
+		-- Add Hover Effect
+		button:HookScript("OnEnter", function(self)
+			if self.backdrop then
+				local color = E.media.rgbvaluecolor
+				if color then
+					self.backdrop:SetBackdropBorderColor(color.r, color.g, color.b)
+				end
+			end
+		end)
+		
+		button:HookScript("OnLeave", function(self)
+			if self.backdrop then
+				local color = E.media.bordercolor
+				if color then
+					self.backdrop:SetBackdropBorderColor(unpack(color))
+				end
+			end
+		end)
+	end
 
 	-- Skin Tabs (Top)
+	BFL:DebugPrint("ElvUISkin: Skinning Top Tabs")
 	for i = 1, 4 do
 		local tab = _G["BetterFriendsFrameTab"..i]
 		if tab then
@@ -75,6 +141,7 @@ function ElvUISkin:SkinFrames(E, S)
 	end
 
 	-- Skin Tabs (Bottom)
+	BFL:DebugPrint("ElvUISkin: Skinning Bottom Tabs")
 	for i = 1, 4 do
 		local tab = _G["BetterFriendsFrameBottomTab"..i]
 		if tab then
@@ -95,6 +162,7 @@ function ElvUISkin:SkinFrames(E, S)
 	end
 
 	-- Skin Insets
+	BFL:DebugPrint("ElvUISkin: Skinning Insets")
 	if frame.Inset then
 		frame.Inset:StripTextures()
 		frame.Inset:CreateBackdrop("Transparent")
@@ -112,14 +180,17 @@ function ElvUISkin:SkinFrames(E, S)
 	end
 
 	-- Skin RecruitAFriendFrame
+	BFL:DebugPrint("ElvUISkin: Skinning RAF")
 	self:SkinRecruitAFriend(E, S, frame)
 
 	-- Skin RecentAlliesFrame ScrollBar
+	BFL:DebugPrint("ElvUISkin: Skinning RecentAllies")
 	if frame.RecentAlliesFrame and frame.RecentAlliesFrame.ScrollBar then
 		S:HandleTrimScrollBar(frame.RecentAlliesFrame.ScrollBar)
 	end
 
 	-- Skin IgnoreListWindow
+	BFL:DebugPrint("ElvUISkin: Skinning IgnoreList")
 	if frame.IgnoreListWindow then
 		S:HandlePortraitFrame(frame.IgnoreListWindow)
 		
@@ -138,6 +209,7 @@ function ElvUISkin:SkinFrames(E, S)
 	end
 
 	-- Skin ScrollBars
+	BFL:DebugPrint("ElvUISkin: Skinning ScrollBars")
 	-- Friends List ScrollBar - Point 7
 	if frame.MinimalScrollBar then
 		S:HandleTrimScrollBar(frame.MinimalScrollBar)
@@ -160,6 +232,7 @@ function ElvUISkin:SkinFrames(E, S)
 	end
 
 	-- Skin Buttons
+	BFL:DebugPrint("ElvUISkin: Skinning Buttons")
 	-- Add Friend / Send Who / etc
 	if frame.AddFriendButton then S:HandleButton(frame.AddFriendButton) end
 	if frame.SendMessageButton then S:HandleButton(frame.SendMessageButton) end
@@ -189,6 +262,7 @@ function ElvUISkin:SkinFrames(E, S)
 	end
 
 	-- Skin TabHeader Elements
+	BFL:DebugPrint("ElvUISkin: Skinning TabHeader")
 	if frame.FriendsTabHeader then
 		-- Battlenet Frame & Broadcast Frame
 		if frame.FriendsTabHeader.BattlenetFrame then
@@ -269,6 +343,7 @@ function ElvUISkin:SkinFrames(E, S)
 	end
 
 	-- Skin Headers (Who Frame)
+	BFL:DebugPrint("ElvUISkin: Skinning WhoFrame Headers")
 	if frame.WhoFrame then
 		local headers = {frame.WhoFrame.NameHeader, frame.WhoFrame.LevelHeader, frame.WhoFrame.ClassHeader}
 		for _, header in ipairs(headers) do
@@ -307,6 +382,7 @@ function ElvUISkin:SkinFrames(E, S)
 	end
 	
 	-- Skin QuickJoin
+	BFL:DebugPrint("ElvUISkin: Skinning QuickJoin")
 	if frame.QuickJoinFrame then
 		if frame.QuickJoinFrame.ContentInset then
 			 frame.QuickJoinFrame.ContentInset:StripTextures()
@@ -326,6 +402,7 @@ function ElvUISkin:SkinFrames(E, S)
 	end
 	
 	-- Skin Raid Frame
+	BFL:DebugPrint("ElvUISkin: Skinning RaidFrame")
 	if frame.RaidFrame then
 		 -- Fix: Use GroupsInset instead of ListInset
 		 if frame.RaidFrame.GroupsInset then
@@ -351,19 +428,28 @@ function ElvUISkin:SkinFrames(E, S)
 	end
 
 	-- Hook Friends List (ScrollBox Items)
+	BFL:DebugPrint("ElvUISkin: Hooking FriendsList")
 	self:HookFriendsList(E, S)
 
 	-- Skin Settings Frame
+	BFL:DebugPrint("ElvUISkin: Skinning Settings")
 	self:SkinSettings(E, S)
 	
 	-- Skin Notifications
+	BFL:DebugPrint("ElvUISkin: Skinning Notifications")
 	self:SkinNotifications(E, S)
 	
 	-- Skin Broker
+	BFL:DebugPrint("ElvUISkin: Skinning Broker")
 	self:SkinBroker(E, S)
 	
 	-- Skin Context Menus
-	self:SkinContextMenus(E, S)
+	BFL:DebugPrint("ElvUISkin: Skinning ContextMenus")
+	xpcall(function() self:SkinContextMenus(E, S) end, function(err) print("|cffff0000BetterFriendlist ElvUI Menu Error:|r " .. tostring(err)) end)
+
+	-- Skin Changelog
+	BFL:DebugPrint("ElvUISkin: Skinning Changelog")
+	self:SkinChangelog(E, S)
 
 	BFL:DebugPrint("ElvUI Skin applied to BetterFriendlist")
 end
@@ -870,7 +956,7 @@ function ElvUISkin:SkinContextMenus(E, S)
 					end)
 				end)
 				BFL.MenuManagerHooked = true
-				BFL:DebugPrint("BFL: Hooked Menu Manager for SubMenus")
+				-- BFL:DebugPrint("BFL: Hooked Menu Manager for SubMenus")
 			end
 		end
 	end
@@ -882,4 +968,47 @@ function ElvUISkin:SkinContextMenus(E, S)
 	hooksecurefunc(MenuUtil, "CreateContextMenu", function(owner, generator)
 		HookMenuManager() -- Retry hooking if it wasn't ready
 	end)
+end
+
+function ElvUISkin:SkinChangelog(E, S)
+	local Changelog = BFL:GetModule("Changelog")
+	if not Changelog then return end
+
+	local function Skin()
+		local frame = _G.BetterFriendlistChangelogFrame
+		if not frame or frame.isSkinned then return end
+		
+		BFL:DebugPrint("ElvUISkin: Applying Skin to Changelog Window")
+		S:HandlePortraitFrame(frame)
+		
+		-- Skin Main Inset
+		if frame.MainInset then
+			frame.MainInset:StripTextures()
+			frame.MainInset:CreateBackdrop("Transparent")
+		end
+		
+		-- Skin Buttons
+		if frame.DiscordButton then S:HandleButton(frame.DiscordButton) end
+		if frame.GitHubButton then S:HandleButton(frame.GitHubButton) end
+		if frame.KoFiButton then S:HandleButton(frame.KoFiButton) end
+		
+		-- Skin ScrollBar
+		if frame.ScrollBar then
+			-- Retail
+			S:HandleTrimScrollBar(frame.ScrollBar)
+		elseif frame.ScrollFrame then
+			-- Classic or Fallback
+			local children = {frame.ScrollFrame:GetChildren()}
+			for _, child in ipairs(children) do
+				if child:IsObjectType("Slider") then
+					S:HandleScrollBar(child)
+				end
+			end
+		end
+		
+		frame.isSkinned = true
+	end
+
+	hooksecurefunc(Changelog, "CreateChangelogWindow", Skin)
+	Skin()
 end

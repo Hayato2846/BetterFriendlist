@@ -24,20 +24,20 @@ end
 function NotificationEditMode:Initialize()
     -- STOP: Edit Mode is Retail-only (10.0+)
     if not BFL.HasEditMode then
-        BFL:DebugPrint("|cffffcc00BFL:NotificationEditMode:|r Edit Mode not available in Classic")
+        -- BFL:DebugPrint("|cffffcc00BFL:NotificationEditMode:|r Edit Mode not available in Classic")
         return
     end
     
     -- STOP: Beta Features must be enabled
     if not IsBetaEnabled() then
-        BFL:DebugPrint("|cffffcc00BFL:NotificationEditMode:|r Beta Features disabled - Edit Mode integration skipped")
+        -- BFL:DebugPrint("|cffffcc00BFL:NotificationEditMode:|r Beta Features disabled - Edit Mode integration skipped")
         return
     end
     
     -- Get container frame
     local container = _G["BFL_NotificationToastContainer"]
     if not container then
-        BFL:DebugPrint("|cffff0000BFL:NotificationEditMode:|r Toast container not found!")
+        -- BFL:DebugPrint("|cffff0000BFL:NotificationEditMode:|r Toast container not found!")
         return
     end
     
@@ -46,8 +46,8 @@ function NotificationEditMode:Initialize()
     
     -- LibEditMode integration (optional)
     if not LEM then
-        BFL:DebugPrint("|cffffcc00BFL:NotificationEditMode:|r LibEditMode not found - using fixed position")
-        BFL:DebugPrint("|cffffcc00BFL:NotificationEditMode:|r Install LibEditMode for drag & drop support")
+        -- BFL:DebugPrint("|cffffcc00BFL:NotificationEditMode:|r LibEditMode not found - using fixed position")
+        -- BFL:DebugPrint("|cffffcc00BFL:NotificationEditMode:|r Install LibEditMode for drag & drop support")
         return
     end
     
@@ -68,7 +68,7 @@ function NotificationEditMode:Initialize()
         -- Don't re-apply position here, LibEditMode handles the drag
         -- self:ApplyPosition(layoutName) 
         
-        BFL:DebugPrint("|cff00ffffBFL:NotificationEditMode:|r Position saved: " .. point .. " (" .. x .. ", " .. y .. ")")
+        -- BFL:DebugPrint("|cff00ffffBFL:NotificationEditMode:|r Position saved: " .. point .. " (" .. x .. ", " .. y .. ")")
     end
     
     -- Default position
@@ -97,7 +97,7 @@ function NotificationEditMode:Initialize()
     -- Apply saved position on load
     self:ApplyPosition()
     
-    BFL:DebugPrint("|cff00ffffBFL:NotificationEditMode:|r Edit Mode integration initialized")
+    -- BFL:DebugPrint("|cff00ffffBFL:NotificationEditMode:|r Edit Mode integration initialized")
 end
 
 function NotificationEditMode:ApplyPosition(layoutName)
@@ -111,7 +111,7 @@ function NotificationEditMode:ApplyPosition(layoutName)
     if position then
         container:ClearAllPoints()
         container:SetPoint(position.point or "TOP", UIParent, position.point or "TOP", position.x or 0, position.y or -150)
-        BFL:DebugPrint("|cff00ffffBFL:NotificationEditMode:|r Applied position for layout '" .. layoutName .. "'")
+        -- BFL:DebugPrint("|cff00ffffBFL:NotificationEditMode:|r Applied position for layout '" .. layoutName .. "'")
     else
         -- Use default position
         container:ClearAllPoints()
@@ -152,7 +152,7 @@ function NotificationEditMode:OnEditModeEnter()
         end
     end
     
-    BFL:DebugPrint("|cff00ffffBFL:NotificationEditMode:|r Edit Mode entered, showing toast previews")
+    -- BFL:DebugPrint("|cff00ffffBFL:NotificationEditMode:|r Edit Mode entered, showing toast previews")
 end
 
 function NotificationEditMode:OnEditModeExit()
@@ -176,7 +176,7 @@ function NotificationEditMode:OnEditModeExit()
         end
     end
     
-    BFL:DebugPrint("|cff00ffffBFL:NotificationEditMode:|r Edit Mode exited, hiding toast previews")
+    -- BFL:DebugPrint("|cff00ffffBFL:NotificationEditMode:|r Edit Mode exited, hiding toast previews")
 end
 
 -- Public API

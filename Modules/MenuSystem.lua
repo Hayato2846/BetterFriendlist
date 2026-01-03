@@ -111,7 +111,7 @@ function MenuSystem:OpenFriendMenu(button, friendType, friendID, extraData)
 	
 	-- Set flag to indicate this menu is opened from BetterFriendlist
 	_G.BetterFriendlist_IsOurMenu = true
-	BFL:DebugPrint("|cff00ff00BFL MenuSystem: Flag set to TRUE, opening menu type:", menuType)
+	-- BFL:DebugPrint("|cff00ff00BFL MenuSystem: Flag set to TRUE, opening menu type:", menuType)
 	
 	-- Use compatibility wrapper for Classic support
 	BFL.OpenContextMenu(button, menuType, contextData, contextData.name)

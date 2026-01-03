@@ -52,13 +52,13 @@ function GlobalSync:Initialize()
         C_FriendList.ShowFriends()
     end
 
-    BFL:DebugPrint("GlobalSync Module Initialized")
+    -- BFL:DebugPrint("GlobalSync Module Initialized")
 end
 
 function GlobalSync:MigrateGlobalFriends()
     if BetterFriendlistDB.globalFriendsMigrated then return end
     
-    BFL:DebugPrint("GlobalSync: Starting migration to flat structure...")
+    -- BFL:DebugPrint("GlobalSync: Starting migration to flat structure...")
     
     local newStructure = {
         Alliance = {},
@@ -99,7 +99,7 @@ function GlobalSync:MigrateGlobalFriends()
     BetterFriendlistDB.GlobalFriends = newStructure
     BetterFriendlistDB.globalFriendsMigrated = true
     
-    BFL:DebugPrint("GlobalSync: Migration complete. Migrated " .. count .. " friends.")
+    -- BFL:DebugPrint("GlobalSync: Migration complete. Migrated " .. count .. " friends.")
 end
 
 function GlobalSync:HookDeletionAPIs()
@@ -141,7 +141,7 @@ function GlobalSync:HookDeletionAPIs()
         self:OnFriendNoteUpdated(name, notes)
     end)
     
-    BFL:DebugPrint("GlobalSync: Deletion APIs hooked.")
+    -- BFL:DebugPrint("GlobalSync: Deletion APIs hooked.")
 end
 
 function GlobalSync:OnFriendNoteUpdated(name, notes)
@@ -164,7 +164,7 @@ function GlobalSync:OnFriendNoteUpdated(name, notes)
     -- Update DB if entry exists
     if BetterFriendlistDB.GlobalFriends[faction] and BetterFriendlistDB.GlobalFriends[faction][friendUID] then
         BetterFriendlistDB.GlobalFriends[faction][friendUID].notes = notes
-        BFL:DebugPrint("GlobalSync: Updated DB note for " .. friendUID .. " (Hooked SetFriendNotes).")
+        -- BFL:DebugPrint("GlobalSync: Updated DB note for " .. friendUID .. " (Hooked SetFriendNotes).")
     end
 end
 
@@ -189,7 +189,7 @@ function GlobalSync:OnFriendAdded(name)
     if BetterFriendlistDB.GlobalFriends[faction] and BetterFriendlistDB.GlobalFriends[faction][friendUID] then
         if BetterFriendlistDB.GlobalFriends[faction][friendUID].deleted then
             BetterFriendlistDB.GlobalFriends[faction][friendUID].deleted = nil
-            BFL:DebugPrint("GlobalSync: Cleared deleted flag for " .. friendUID .. " (Re-added manually).")
+            -- BFL:DebugPrint("GlobalSync: Cleared deleted flag for " .. friendUID .. " (Re-added manually).")
         end
     end
 end
@@ -217,7 +217,7 @@ function GlobalSync:OnFriendRemoved(name)
         -- Mark as deleted instead of removing
         BetterFriendlistDB.GlobalFriends[faction][friendUID].deleted = true
         BetterFriendlistDB.GlobalFriends[faction][friendUID].deletedTime = time()
-        BFL:DebugPrint("GlobalSync: Marked " .. friendUID .. " as DELETED in Global DB.")
+        -- BFL:DebugPrint("GlobalSync: Marked " .. friendUID .. " as DELETED in Global DB.")
         
         -- Refresh Settings UI if open
         local Settings = BFL:GetModule("Settings")
@@ -299,7 +299,7 @@ function GlobalSync:ExportFriends(faction, realm)
                 if dbNote and dbNote ~= "" then
                     C_FriendList.SetFriendNotes(info.name, dbNote)
                     noteToSave = dbNote
-                    BFL:DebugPrint("GlobalSync: Restored note for " .. info.name)
+                    -- BFL:DebugPrint("GlobalSync: Restored note for " .. info.name)
                 end
                 BetterFriendlistDB.GlobalFriends[faction][friendUID].restoring = nil
             elseif dbNote and dbNote ~= "" then
@@ -307,7 +307,7 @@ function GlobalSync:ExportFriends(faction, realm)
                 if noteToSave ~= dbNote then
                     C_FriendList.SetFriendNotes(info.name, dbNote)
                     noteToSave = dbNote
-                    BFL:DebugPrint("GlobalSync: Enforced DB note for " .. info.name)
+                    -- BFL:DebugPrint("GlobalSync: Enforced DB note for " .. info.name)
                 end
             end
             
@@ -324,7 +324,7 @@ function GlobalSync:ExportFriends(faction, realm)
         end
     end
     
-    BFL:DebugPrint("GlobalSync: Exported " .. count .. " friends to flat DB.")
+    -- BFL:DebugPrint("GlobalSync: Exported " .. count .. " friends to flat DB.")
 end
 
 function GlobalSync:ImportFriends(faction, currentRealm)
@@ -376,7 +376,7 @@ function GlobalSync:ImportFriends(faction, currentRealm)
 
     -- Process queue
     if #friendsToAdd > 0 then
-        BFL:DebugPrint("GlobalSync: Found " .. #friendsToAdd .. " missing friends.")
+        -- BFL:DebugPrint("GlobalSync: Found " .. #friendsToAdd .. " missing friends.")
         self:ProcessAddQueue(friendsToAdd)
     end
 end
@@ -411,9 +411,9 @@ function GlobalSync:SyncDeletions(faction, currentRealm)
     
     -- Process removals
     if #friendsToRemove > 0 then
-        BFL:DebugPrint("GlobalSync: Found " .. #friendsToRemove .. " friends marked for deletion.")
+        -- BFL:DebugPrint("GlobalSync: Found " .. #friendsToRemove .. " friends marked for deletion.")
         for _, name in ipairs(friendsToRemove) do
-            BFL:DebugPrint("GlobalSync: Removing " .. name .. " (Synced Deletion)")
+            -- BFL:DebugPrint("GlobalSync: Removing " .. name .. " (Synced Deletion)")
             C_FriendList.RemoveFriend(name)
         end
     end
@@ -437,12 +437,12 @@ function GlobalSync:ProcessAddQueue(queue)
             if index > max then
                 timer:Cancel()
                 self.processingQueue = false
-                BFL:DebugPrint("GlobalSync: Finished syncing friends.")
+                -- BFL:DebugPrint("GlobalSync: Finished syncing friends.")
                 return
             end
             
             local name = queue[index]
-            BFL:DebugPrint("GlobalSync: Adding friend " .. name)
+            -- BFL:DebugPrint("GlobalSync: Adding friend " .. name)
             C_FriendList.AddFriend(name)
             
             index = index + 1

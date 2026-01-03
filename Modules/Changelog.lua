@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.9] - 2026-01-03
+
+### Added
+- **ElvUI Skin** - Added full skinning support for the Changelog window and the Portrait/Changelog button.
+- **ElvUI Stability** - Added comprehensive debug logging and error handling for the skinning process.
+
+### Improved
+- **Debug Logs** - Cleaned up global debug logs to reduce chat spam.
+
 ## [2.0.8] - 2026-01-03
 
 ### Fixed
@@ -1609,7 +1618,7 @@ function Changelog:SetupClassicPortraitButton()
     frame.PortraitButton = button
     frame.PortraitIcon = icon
     
-    BFL:DebugPrint("Changelog", "Classic PortraitButton created")
+    -- BFL:DebugPrint("Changelog", "Classic PortraitButton created")
 end
 
 function Changelog:CheckVersion()
@@ -1725,6 +1734,7 @@ function Changelog:CreateChangelogWindow()
     
     -- Create MainInset to match Settings style
     local mainInset = CreateFrame("Frame", nil, frame, "BackdropTemplate")
+    frame.MainInset = mainInset
     mainInset:SetPoint("TOPLEFT", 10, -25) -- Adjusted y since we don't have tabs
     mainInset:SetPoint("BOTTOMRIGHT", -4, 5) -- Adjusted y since we don't have bottom buttons
     
@@ -1762,6 +1772,7 @@ function Changelog:CreateChangelogWindow()
 
     -- Discord Button (Rightmost)
     local discordBtn = CreateFrame("Button", nil, headerFrame, "UIPanelButtonTemplate")
+    frame.DiscordButton = discordBtn
     discordBtn:SetSize(130, 24)
     discordBtn:SetPoint("RIGHT", -10, 0)
     discordBtn:SetText("   Discord")
@@ -1783,6 +1794,7 @@ function Changelog:CreateChangelogWindow()
 
     -- GitHub Button (Left of Discord)
     local githubBtn = CreateFrame("Button", nil, headerFrame, "UIPanelButtonTemplate")
+    frame.GitHubButton = githubBtn
     githubBtn:SetSize(130, 24)
     githubBtn:SetPoint("RIGHT", discordBtn, "LEFT", -10, 0)
     githubBtn:SetText("   GitHub Issues")
@@ -1804,6 +1816,7 @@ function Changelog:CreateChangelogWindow()
 
     -- Ko-fi Button (Left of GitHub)
     local kofiBtn = CreateFrame("Button", nil, headerFrame, "UIPanelButtonTemplate")
+    frame.KoFiButton = kofiBtn
     kofiBtn:SetSize(130, 24)
     kofiBtn:SetPoint("RIGHT", githubBtn, "LEFT", -10, 0)
     kofiBtn:SetText("   Support")
@@ -1829,6 +1842,7 @@ function Changelog:CreateChangelogWindow()
     if not BFL.IsClassic and ScrollUtil and ScrollUtil.InitScrollFrameWithScrollBar then
         -- Retail: Modern ScrollUtil
         scrollFrame = CreateFrame("ScrollFrame", nil, frame)
+        frame.ScrollFrame = scrollFrame
         scrollFrame:SetPoint("TOPLEFT", mainInset, "TOPLEFT", 8, -45) -- Adjusted for header
         scrollFrame:SetPoint("BOTTOMRIGHT", mainInset, "BOTTOMRIGHT", -25, 5)
         
@@ -1840,6 +1854,7 @@ function Changelog:CreateChangelogWindow()
         
         -- Create ScrollBar (EventFrame inheriting MinimalScrollBar)
         local scrollBar = CreateFrame("EventFrame", nil, frame, "MinimalScrollBar")
+        frame.ScrollBar = scrollBar
         scrollBar:SetPoint("TOPLEFT", scrollFrame, "TOPRIGHT", 6, 0)
         scrollBar:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", 6, 0)
         
@@ -1847,6 +1862,7 @@ function Changelog:CreateChangelogWindow()
     else
         -- Classic: Legacy UIPanelScrollFrameTemplate
         scrollFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
+        frame.ScrollFrame = scrollFrame
         scrollFrame:SetPoint("TOPLEFT", mainInset, "TOPLEFT", 8, -45) -- Adjusted for header
         scrollFrame:SetPoint("BOTTOMRIGHT", mainInset, "BOTTOMRIGHT", -25, 5)
     end

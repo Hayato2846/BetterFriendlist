@@ -572,7 +572,7 @@ end
 function QuickJoin:Initialize()
 	-- Classic Guard: QuickJoin/Social Queue is Retail-only
 	if BFL.IsClassic or not BFL.HasQuickJoin then
-		BFL:DebugPrint("|cffffcc00BFL QuickJoin:|r Not available in Classic - module disabled")
+		-- BFL:DebugPrint("|cffffcc00BFL QuickJoin:|r Not available in Classic - module disabled")
 		self.initialized = true  -- Prevent future initialization attempts
 		return
 	end
@@ -600,11 +600,11 @@ function QuickJoin:Initialize()
 	if BetterFriendsFrame and BetterFriendsFrame.QuickJoinFrame then
 		-- Classic: Use FauxScrollFrame approach
 		if BFL.IsClassic or not BFL.HasModernScrollBox then
-			BFL:DebugPrint("|cff00ffffQuickJoin:|r Using Classic FauxScrollFrame mode")
+			-- BFL:DebugPrint("|cff00ffffQuickJoin:|r Using Classic FauxScrollFrame mode")
 			self:InitializeClassicQuickJoin()
 		else
 			-- Retail: Use modern ScrollBox system
-			BFL:DebugPrint("|cff00ffffQuickJoin:|r Using Retail ScrollBox mode")
+			-- BFL:DebugPrint("|cff00ffffQuickJoin:|r Using Retail ScrollBox mode")
 			local scrollBoxContainer = BetterFriendsFrame.QuickJoinFrame.ContentInset.ScrollBoxContainer
 			local scrollBox = scrollBoxContainer.ScrollBox
 			local scrollBar = BetterFriendsFrame.QuickJoinFrame.ContentInset.ScrollBar
@@ -908,7 +908,7 @@ function QuickJoin:CleanupCache()
 	end
 	
 	if cleaned > 0 then
-		BFL:DebugPrint("QuickJoin: Cleaned up", cleaned, "old cache entries")
+		-- BFL:DebugPrint("QuickJoin: Cleaned up", cleaned, "old cache entries")
 	end
 end
 
@@ -1072,19 +1072,19 @@ function QuickJoin:GetGroupInfo(groupGUID)
 	if info.queues and #info.queues > 0 and info.queues[1] then
 		local queueData = info.queues[1].queueData
 		if queueData then
-			BFL:DebugPrint("QuickJoin Debug: Processing Group", groupGUID)
-			BFL:DebugPrint("  QueueType:", queueData.queueType)
+			-- BFL:DebugPrint("QuickJoin Debug: Processing Group", groupGUID)
+			-- BFL:DebugPrint("  QueueType:", queueData.queueType)
 			
 			-- Get group title/name based on queue type
 			if queueData.queueType == "lfglist" and queueData.lfgListID then
-				BFL:DebugPrint("QuickJoin Debug: Processing Group", groupGUID)
-				BFL:DebugPrint("  QueueType:", queueData.queueType)
-				BFL:DebugPrint("  LFGList ID:", queueData.lfgListID)
+				-- BFL:DebugPrint("QuickJoin Debug: Processing Group", groupGUID)
+				-- BFL:DebugPrint("  QueueType:", queueData.queueType)
+				-- BFL:DebugPrint("  LFGList ID:", queueData.lfgListID)
 				
 				-- Detailed QueueData Dump
 				if queueData then
 					for k, v in pairs(queueData) do
-						BFL:DebugPrint(string.format("  queueData.%s = %s", tostring(k), tostring(v)))
+						-- BFL:DebugPrint(string.format("  queueData.%s = %s", tostring(k), tostring(v)))
 					end
 				end
 
@@ -1093,10 +1093,10 @@ function QuickJoin:GetGroupInfo(groupGUID)
 				local searchResultInfo = C_LFGList.GetSearchResultInfo(queueData.lfgListID)
 				
 				if searchResultInfo then
-					BFL:DebugPrint("  SearchResult Found for ID:", queueData.lfgListID)
+					-- BFL:DebugPrint("  SearchResult Found for ID:", queueData.lfgListID)
 					-- Detailed SearchResult Dump
 					for k, v in pairs(searchResultInfo) do
-						BFL:DebugPrint(string.format("    searchResultInfo.%s = %s", tostring(k), tostring(v)))
+						-- BFL:DebugPrint(string.format("    searchResultInfo.%s = %s", tostring(k), tostring(v)))
 					end
 				
 					-- Protected strings are safe to use directly
@@ -1141,9 +1141,9 @@ function QuickJoin:GetGroupInfo(groupGUID)
 					
 					-- CRITICAL FIX: Handle activityIDs table (plural) which Blizzard uses now
 					if searchResultInfo.activityIDs then
-						BFL:DebugPrint("  activityIDs table found:")
+						-- BFL:DebugPrint("  activityIDs table found:")
 						for k, v in pairs(searchResultInfo.activityIDs) do
-							BFL:DebugPrint(string.format("    [%s] = %s", tostring(k), tostring(v)))
+							-- BFL:DebugPrint(string.format("    [%s] = %s", tostring(k), tostring(v)))
 						end
 						
 						if not activityID then
@@ -1159,37 +1159,37 @@ function QuickJoin:GetGroupInfo(groupGUID)
 									activityID = k
 								end
 							end
-							BFL:DebugPrint("  Resolved ActivityID from activityIDs table:", activityID)
+							-- BFL:DebugPrint("  Resolved ActivityID from activityIDs table:", activityID)
 						end
 					end
 					
-					BFL:DebugPrint("  Resolved ActivityID:", activityID)
+					-- BFL:DebugPrint("  Resolved ActivityID:", activityID)
 					
 					if activityID then
 						local activityInfo = C_LFGList.GetActivityInfoTable(activityID)
 						if activityInfo then
-							BFL:DebugPrint("  ActivityInfo Found:", activityInfo.fullName)
+							-- BFL:DebugPrint("  ActivityInfo Found:", activityInfo.fullName)
 							info.activityName = activityInfo.fullName
 							
 							if activityInfo.groupFinderActivityGroupID then
 								local _, groupIcon = C_LFGList.GetActivityGroupInfo(activityInfo.groupFinderActivityGroupID)
-								BFL:DebugPrint("  GroupFinderActivityGroupID:", activityInfo.groupFinderActivityGroupID)
-								BFL:DebugPrint("  GroupIcon from API:", groupIcon)
+								-- BFL:DebugPrint("  GroupFinderActivityGroupID:", activityInfo.groupFinderActivityGroupID)
+								-- BFL:DebugPrint("  GroupIcon from API:", groupIcon)
 								
 								-- Blizzard sometimes returns garbage IDs (like 20 for Tazavesh)
 								-- Valid FileDataIDs are usually large numbers (> 10000)
 								if groupIcon and groupIcon > 10000 then
 									info.activityIcon = groupIcon
 								else
-									BFL:DebugPrint("  Ignored invalid GroupIcon from API:", groupIcon)
+									-- BFL:DebugPrint("  Ignored invalid GroupIcon from API:", groupIcon)
 								end
 							else
-								BFL:DebugPrint("  No GroupFinderActivityGroupID in ActivityInfo")
+								-- BFL:DebugPrint("  No GroupFinderActivityGroupID in ActivityInfo")
 							end
 							
 							-- Smart Fallback: Try to get icon from Encounter Journal via MapID
 							if (not info.activityIcon or info.activityIcon == 0) then
-								BFL:DebugPrint("  Smart Fallback: Checking MapID:", activityInfo.mapID)
+								-- BFL:DebugPrint("  Smart Fallback: Checking MapID:", activityInfo.mapID)
 								
 								local currentMapID = activityInfo.mapID
 								local instanceID = 0
@@ -1218,7 +1218,7 @@ function QuickJoin:GetGroupInfo(groupGUID)
 									if buttonImage and buttonImage ~= 0 then
 										info.activityIcon = buttonImage
 										info.isEJIcon = true
-										BFL:DebugPrint("  Smart Fallback: APPLIED EJ Icon:", buttonImage)
+										-- BFL:DebugPrint("  Smart Fallback: APPLIED EJ Icon:", buttonImage)
 									end
 								end
 							end
@@ -1226,7 +1226,7 @@ function QuickJoin:GetGroupInfo(groupGUID)
 							-- Smart Fallback 2: Name-based lookup in Encounter Journal
 							-- If MapID lookup failed, try to find an instance with a matching name
 							if (not info.activityIcon or info.activityIcon == 0) and info.activityName then
-								BFL:DebugPrint("  Smart Fallback 2: Searching EJ by Name:", info.activityName)
+								-- BFL:DebugPrint("  Smart Fallback 2: Searching EJ by Name:", info.activityName)
 								
 								-- Clean activity name (remove difficulty suffix like " (Mythic)")
 								local cleanName = info.activityName:gsub("%s*%(.*%)", "")
@@ -1236,7 +1236,7 @@ function QuickJoin:GetGroupInfo(groupGUID)
 								if cleanName:find("Mechagon") then cleanName = "Mechagon" end
 								if cleanName:find("Karazhan") then cleanName = "Karazhan" end
 								
-								BFL:DebugPrint("  Cleaned Name:", cleanName)
+								-- BFL:DebugPrint("  Cleaned Name:", cleanName)
 								
 								-- Iterate through ALL tiers to find the instance
 								-- We iterate backwards from the latest tier (most likely content) down to Classic.
@@ -1259,7 +1259,7 @@ function QuickJoin:GetGroupInfo(groupGUID)
 											if buttonImage then
 												info.activityIcon = buttonImage
 												info.isEJIcon = true
-												BFL:DebugPrint("  Smart Fallback 2: Found Match (Raid):", name, buttonImage)
+												-- BFL:DebugPrint("  Smart Fallback 2: Found Match (Raid):", name, buttonImage)
 												break
 											end
 										end
@@ -1277,7 +1277,7 @@ function QuickJoin:GetGroupInfo(groupGUID)
 											if buttonImage then
 												info.activityIcon = buttonImage
 												info.isEJIcon = true
-												BFL:DebugPrint("  Smart Fallback 2: Found Match (Dungeon):", name, buttonImage)
+												-- BFL:DebugPrint("  Smart Fallback 2: Found Match (Dungeon):", name, buttonImage)
 												break
 											end
 										end
@@ -1294,7 +1294,7 @@ function QuickJoin:GetGroupInfo(groupGUID)
 							-- Fallback if icon is missing or 0
 							if not info.activityIcon or info.activityIcon == 0 then
 								local catID = activityInfo.categoryID
-								BFL:DebugPrint("  Fallback Check - CategoryID:", catID)
+								-- BFL:DebugPrint("  Fallback Check - CategoryID:", catID)
 								
 								if catID == 2 then -- Dungeons
 									info.activityIcon = 525134 -- Fallback: Dungeon (Keystone)
@@ -1312,24 +1312,24 @@ function QuickJoin:GetGroupInfo(groupGUID)
 								if (not info.activityIcon or info.activityIcon == 0) then
 									if activityInfo.maxNumPlayers and activityInfo.maxNumPlayers > 5 then
 										info.activityIcon = 1536895 -- Assume Raid
-										BFL:DebugPrint("  Fallback Heuristic: Assumed Raid (>5 players)")
+										-- BFL:DebugPrint("  Fallback Heuristic: Assumed Raid (>5 players)")
 									elseif activityInfo.maxNumPlayers and activityInfo.maxNumPlayers == 5 then
 										info.activityIcon = 525134 -- Assume Dungeon (Keystone)
-										BFL:DebugPrint("  Fallback Heuristic: Assumed Dungeon (5 players)")
+										-- BFL:DebugPrint("  Fallback Heuristic: Assumed Dungeon (5 players)")
 									end
 								end
 							end
 						else
-							BFL:DebugPrint("  ActivityInfo is NIL for ID:", activityID)
+							-- BFL:DebugPrint("  ActivityInfo is NIL for ID:", activityID)
 						end
 					else
-						BFL:DebugPrint("  No ActivityID found in SearchResult or QueueData")
+						-- BFL:DebugPrint("  No ActivityID found in SearchResult or QueueData")
 					end
 
 					-- Fix for "???" Group Title: Use Activity Name if Title is missing/unknown
 					if (not info.groupTitle or info.groupTitle == "???" or info.groupTitle == "") and info.activityName and info.activityName ~= UNKNOWN then
 						info.groupTitle = info.activityName
-						BFL:DebugPrint("  Fixed GroupTitle using ActivityName:", info.groupTitle)
+						-- BFL:DebugPrint("  Fixed GroupTitle using ActivityName:", info.groupTitle)
 					end
 					
 					-- Playstyle für Tooltip
@@ -1342,18 +1342,18 @@ function QuickJoin:GetGroupInfo(groupGUID)
 						info.isAutoAccept = true
 					end
 				else
-					BFL:DebugPrint("  SearchResult is NIL for ID:", queueData.lfgListID)
-					BFL:DebugPrint("  SearchResult is NIL for ID:", queueData.lfgListID)
+					-- BFL:DebugPrint("  SearchResult is NIL for ID:", queueData.lfgListID)
+					-- BFL:DebugPrint("  SearchResult is NIL for ID:", queueData.lfgListID)
 					-- Fallback if search result not available
 					info.groupTitle = "LFG Group"
 					
 					-- Try to get activity name from queueData if available
 					if queueData.activityID then
-						BFL:DebugPrint("  Fallback: Using queueData.activityID:", queueData.activityID)
+						-- BFL:DebugPrint("  Fallback: Using queueData.activityID:", queueData.activityID)
 						local activityInfo = C_LFGList.GetActivityInfoTable(queueData.activityID)
 						if activityInfo then
 							info.activityName = activityInfo.fullName
-							BFL:DebugPrint("  Fallback Activity Name:", info.activityName)
+							-- BFL:DebugPrint("  Fallback Activity Name:", info.activityName)
 							
 							if activityInfo.groupFinderActivityGroupID then
 								local _, groupIcon = C_LFGList.GetActivityGroupInfo(activityInfo.groupFinderActivityGroupID)
@@ -1363,20 +1363,20 @@ function QuickJoin:GetGroupInfo(groupGUID)
 							end
 						end
 					else
-						BFL:DebugPrint("  Fallback: No activityID in queueData")
+						-- BFL:DebugPrint("  Fallback: No activityID in queueData")
 					end
 				end
 			elseif queueData.queueType == "pvp" then
-				BFL:DebugPrint("  QueueType: PvP")
+				-- BFL:DebugPrint("  QueueType: PvP")
 				info.groupTitle = "PvP"
 				info.activityIcon = 236396 -- User Selected: PvP
 			elseif queueData.queueType == "dungeon" or queueData.lfgDungeonID then
-				BFL:DebugPrint("  QueueType: Dungeon, ID:", queueData.lfgDungeonID)
+				-- BFL:DebugPrint("  QueueType: Dungeon, ID:", queueData.lfgDungeonID)
 				-- Try to get dungeon name
 				if queueData.lfgDungeonID then
 					local dungeonName, _, _, _, _, _, _, _, _, dungeonIcon = GetLFGDungeonInfo(queueData.lfgDungeonID)
 					info.groupTitle = dungeonName or "Dungeon"
-					BFL:DebugPrint("  Dungeon Name:", dungeonName)
+					-- BFL:DebugPrint("  Dungeon Name:", dungeonName)
 					if dungeonIcon then
 						info.activityIcon = dungeonIcon
 					end
@@ -1384,11 +1384,11 @@ function QuickJoin:GetGroupInfo(groupGUID)
 					info.groupTitle = "Dungeon"
 				end
 			elseif queueData.queueType == "raid" then
-				BFL:DebugPrint("  QueueType: Raid")
+				-- BFL:DebugPrint("  QueueType: Raid")
 				info.groupTitle = "Raid"
 				info.activityIcon = 1536895 -- User Selected: Raid
 			else
-				BFL:DebugPrint("  QueueType: Unknown/Other:", queueData.queueType)
+				-- BFL:DebugPrint("  QueueType: Unknown/Other:", queueData.queueType)
 				info.groupTitle = queueData.queueType or info.queues[1].name or UNKNOWN
 			end
 		end
@@ -2112,8 +2112,8 @@ function QuickJoin:CreateMockGroup(params)
 	-- Store mock group
 	self.mockGroups[guid] = mockGroup
 	
-	BFL:DebugPrint(string.format("|cff00ff00QuickJoin Mock:|r Created '%s' (%s, %d members)", 
-		params.activityName, queueType, numMembers))
+	-- BFL:DebugPrint(string.format("|cff00ff00QuickJoin Mock:|r Created '%s' (%s, %d members)", 
+	-- 	params.activityName, queueType, numMembers))
 	
 	return guid, mockGroup
 end
@@ -2127,7 +2127,7 @@ function QuickJoin:RemoveMockGroup(guid)
 	if self.mockGroups[guid] then
 		local name = self.mockGroups[guid].groupTitle or "Unknown"
 		self.mockGroups[guid] = nil
-		BFL:DebugPrint(string.format("|cff00ff00QuickJoin Mock:|r Removed '%s'", name))
+		-- BFL:DebugPrint(string.format("|cff00ff00QuickJoin Mock:|r Removed '%s'", name))
 		self:Update(true)
 		return true
 	end
@@ -2152,7 +2152,7 @@ function QuickJoin:ClearMockGroups()
 	
 	wipe(self.mockGroups)
 	
-	BFL:DebugPrint(string.format("|cff00ff00QuickJoin Mock:|r Cleared %d mock groups", count))
+	-- BFL:DebugPrint(string.format("|cff00ff00QuickJoin Mock:|r Cleared %d mock groups", count))
 	print(string.format("|cff00ff00BFL QuickJoin:|r Cleared %d mock groups", count))
 	
 	self:Update(true)
@@ -2581,7 +2581,7 @@ function QuickJoin:StartMockDynamicUpdates()
 		self:ProcessMockDynamicUpdate()
 	end)
 	
-	BFL:DebugPrint("|cff00ff00QuickJoin Mock:|r Dynamic updates started")
+	-- BFL:DebugPrint("|cff00ff00QuickJoin Mock:|r Dynamic updates started")
 end
 
 --[[
@@ -2608,8 +2608,8 @@ function QuickJoin:ProcessMockDynamicUpdate()
 				group.leaderGUID = group.members[1].guid
 				
 				updated = true
-				BFL:DebugPrint(string.format("|cff00ff00Mock Update:|r %s: %d members", 
-					group.leaderName, newCount))
+				-- BFL:DebugPrint(string.format("|cff00ff00Mock Update:|r %s: %d members", 
+				-- 	group.leaderName, newCount))
 			end
 		end
 		

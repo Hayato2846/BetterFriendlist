@@ -275,24 +275,24 @@ local function ParseFriendGroupsNote(noteText)
 		return "", {}
 	end
 	
-	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r     Parsing note:", noteText)
+	-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r     Parsing note:", noteText)
 	
 	local parts = {strsplit("#", noteText)}
 	local actualNote = parts[1] or ""
 	local groups = {}
 	
-	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r     Split into", #parts, "parts")
+	-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r     Split into", #parts, "parts")
 	
 	for i = 2, #parts do
 		local groupName = strtrim(parts[i])
 		if groupName ~= "" then
 			table.insert(groups, groupName)
-			BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r     Found group:", groupName)
+			-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r     Found group:", groupName)
 		end
 	end
 	
-	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r     Actual note:", actualNote)
-	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r     Total groups found:", #groups)
+	-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r     Actual note:", actualNote)
+	-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r     Total groups found:", #groups)
 	
 	return actualNote, groups
 end
@@ -328,7 +328,7 @@ function Settings:Show()
 		settingsFrame:Show()
 		self:ShowTab(currentTab or 1) -- Restore or show first tab
 	else
-		BFL:DebugPrint("|cffff0000BetterFriendlist Settings:|r Frame not initialized!")
+		-- BFL:DebugPrint("|cffff0000BetterFriendlist Settings:|r Frame not initialized!")
 	end
 end
 
@@ -448,7 +448,7 @@ function Settings:RefreshTabs()
 	
 	-- If we have 5+ tabs (meaning Beta is ON and Notifications tab is visible)
 	if tab5Visible and numVisible >= 5 then
-		BFL:DebugPrint("RefreshTabs: Repositioning Tab5 to second row (numVisible=" .. numVisible .. ")")
+		-- BFL:DebugPrint("RefreshTabs: Repositioning Tab5 to second row (numVisible=" .. numVisible .. ")")
 		
 		-- Second row layout: Notifications tab (id=5) goes below first row
 		local tab1 = _G["BetterFriendlistSettingsFrameTab1"]
@@ -458,9 +458,9 @@ function Settings:RefreshTabs()
 			tab5:ClearAllPoints()
 			-- Position below Tab1: +4px for proper spacing
 			tab5:SetPoint("TOPLEFT", tab1, "BOTTOMLEFT", 0, 8)
-			BFL:DebugPrint("RefreshTabs: Tab5 repositioned - anchors cleared and set to TOPLEFT of Tab1 BOTTOMLEFT")
+			-- BFL:DebugPrint("RefreshTabs: Tab5 repositioned - anchors cleared and set to TOPLEFT of Tab1 BOTTOMLEFT")
 		else
-			BFL:DebugPrint("RefreshTabs: FAILED - tab5=" .. tostring(tab5 ~= nil) .. " tab1=" .. tostring(tab1 ~= nil) .. " shown=" .. tostring(tab5 and tab5:IsShown() or false))
+			-- BFL:DebugPrint("RefreshTabs: FAILED - tab5=" .. tostring(tab5 ~= nil) .. " tab1=" .. tostring(tab1 ~= nil) .. " shown=" .. tostring(tab5 and tab5:IsShown() or false))
 		end
 		
 		-- Move MainInset down to make room for second tab row
@@ -470,7 +470,7 @@ function Settings:RefreshTabs()
 			settingsFrame.MainInset:SetPoint("BOTTOMRIGHT", settingsFrame, "BOTTOMRIGHT", 0, 2)
 		end
 	else
-		BFL:DebugPrint("RefreshTabs: Single row layout (tab5Visible=" .. tostring(tab5Visible) .. " numVisible=" .. numVisible .. ")")
+		-- BFL:DebugPrint("RefreshTabs: Single row layout (tab5Visible=" .. tostring(tab5Visible) .. " numVisible=" .. numVisible .. ")")
 		-- Single row layout: Restore default MainInset position (tabs at y=-27)
 		if settingsFrame.MainInset then
 			settingsFrame.MainInset:ClearAllPoints()
@@ -720,7 +720,7 @@ end
 function Settings:DoReset()
 	local DB = GetDB()
 	if not DB then
-		BFL:DebugPrint("|cffff0000BetterFriendlist Settings:|r Database not available!")
+		-- BFL:DebugPrint("|cffff0000BetterFriendlist Settings:|r Database not available!")
 		return
 	end
 	
@@ -783,7 +783,7 @@ function Settings:RefreshGroupList_OLD()
 	
 	local Groups = GetGroups()
 	if not Groups then
-		BFL:DebugPrint("|cffff0000BetterFriendlist Settings:|r Groups module not available!")
+		-- BFL:DebugPrint("|cffff0000BetterFriendlist Settings:|r Groups module not available!")
 		return
 	end
 	
@@ -1040,19 +1040,19 @@ function Settings:MigrateFriendGroups(cleanupNotes)
 	local Groups = GetGroups()
 	
 	if not DB or not Groups then
-		BFL:DebugPrint("|cffff0000BetterFriendlist:|r Migration failed - modules not loaded!")
+		-- BFL:DebugPrint("|cffff0000BetterFriendlist:|r Migration failed - modules not loaded!")
 		return
 	end
 	
 	-- Check if migration has already been completed
 	if DB:Get("friendGroupsMigrated") then
-		BFL:DebugPrint("|cff00ffffBetterFriendlist:|r " .. BFL_L.MSG_MIGRATION_ALREADY_DONE)
+		-- BFL:DebugPrint("|cff00ffffBetterFriendlist:|r " .. BFL_L.MSG_MIGRATION_ALREADY_DONE)
 		return
 	end
 	
-	BFL:DebugPrint("|cff00ffffBetterFriendlist:|r " .. BFL_L.MSG_MIGRATION_STARTING)
-	BFL:DebugPrint("|cff00ffffBetterFriendlist:|r DB module:", DB and "OK" or "MISSING")
-	BFL:DebugPrint("|cff00ffffBetterFriendlist:|r Groups module:", Groups and "OK" or "MISSING")
+	-- BFL:DebugPrint("|cff00ffffBetterFriendlist:|r " .. BFL_L.MSG_MIGRATION_STARTING)
+	-- BFL:DebugPrint("|cff00ffffBetterFriendlist:|r DB module:", DB and "OK" or "MISSING")
+	-- BFL:DebugPrint("|cff00ffffBetterFriendlist:|r Groups module:", Groups and "OK" or "MISSING")
 	
 	local migratedFriends = 0
 	local migratedGroups = {}
@@ -1097,7 +1097,7 @@ function Settings:MigrateFriendGroups(cleanupNotes)
 	end
 	
 	local numWoWFriends = C_FriendList.GetNumFriends()
-	BFL:DebugPrint("|cff00ffffBetterFriendlist:|r Scanning", numWoWFriends, "WoW friends...")
+	-- BFL:DebugPrint("|cff00ffffBetterFriendlist:|r Scanning", numWoWFriends, "WoW friends...")
 	
 	for i = 1, numWoWFriends do
 		local info = C_FriendList.GetFriendInfoByIndex(i)
@@ -1148,7 +1148,7 @@ function Settings:MigrateFriendGroups(cleanupNotes)
 			groupNameMap[groupName] = groupId
 			migratedGroups[groupName] = true
 			table.insert(groupOrderArray, groupId)
-			BFL:DebugPrint("|cff00ff00BetterFriendlist:|r   ✓ Created:", groupName, "(order:", currentOrder, ")")
+			-- BFL:DebugPrint("|cff00ff00BetterFriendlist:|r   ✓ Created:", groupName, "(order:", currentOrder, ")")
 			currentOrder = currentOrder + 1
 		else
 			-- Group already exists - get its ID by name
@@ -1158,13 +1158,13 @@ function Settings:MigrateFriendGroups(cleanupNotes)
 					groupNameMap[groupName] = existingGroupId
 					migratedGroups[groupName] = true
 					table.insert(groupOrderArray, existingGroupId)
-					BFL:DebugPrint("|cffffff00BetterFriendlist:|r   [!] Existing:", groupName, "(using existing group)")
+					-- BFL:DebugPrint("|cffffff00BetterFriendlist:|r   [!] Existing:", groupName, "(using existing group)")
 					currentOrder = currentOrder + 1
 				else
-					BFL:DebugPrint("|cffff0000BetterFriendlist:|r   ✗ FAILED:", groupName, "- Group exists but ID not found")
+					-- BFL:DebugPrint("|cffff0000BetterFriendlist:|r   ✗ FAILED:", groupName, "- Group exists but ID not found")
 				end
 			else
-				BFL:DebugPrint("|cffff0000BetterFriendlist:|r   ✗ FAILED:", groupName, "-", tostring(groupId))
+				-- BFL:DebugPrint("|cffff0000BetterFriendlist:|r   ✗ FAILED:", groupName, "-", tostring(groupId))
 			end
 		end
 	end
@@ -1195,7 +1195,7 @@ function Settings:MigrateFriendGroups(cleanupNotes)
 	
 	-- PHASE 4: Clean up notes if requested
 	if cleanupNotes then
-		BFL:DebugPrint("|cff00ffffBetterFriendlist:|r Phase 4 - Cleaning up notes...")
+		-- BFL:DebugPrint("|cff00ffffBetterFriendlist:|r Phase 4 - Cleaning up notes...")
 		
 		for friendUID, data in pairs(friendGroupAssignments) do
 			if data.isBNet then
@@ -1282,30 +1282,30 @@ end
 
 -- Debug: Print database contents
 function Settings:DebugDatabase()
-	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r =================================")
-	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r DATABASE STATE")
-	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r =================================")
+	-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r =================================")
+	-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r DATABASE STATE")
+	-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r =================================")
 	
 	if not BetterFriendlistDB then
-		BFL:DebugPrint("|cffff0000BetterFriendlist Debug:|r BetterFriendlistDB is NIL!")
+		-- BFL:DebugPrint("|cffff0000BetterFriendlist Debug:|r BetterFriendlistDB is NIL!")
 		return
 	end
 	
-	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r")
-	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r CUSTOM GROUPS:")
+	-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r")
+	-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r CUSTOM GROUPS:")
 	if BetterFriendlistDB.customGroups then
 		local groupCount = 0
 		for groupId, groupInfo in pairs(BetterFriendlistDB.customGroups) do
 			groupCount = groupCount + 1
-			BFL:DebugPrint(string.format("|cff00ffffBetterFriendlist Debug:|r   [%s] = %s", groupId, groupInfo.name or "UNNAMED"))
+			-- BFL:DebugPrint(string.format("|cff00ffffBetterFriendlist Debug:|r   [%s] = %s", groupId, groupInfo.name or "UNNAMED"))
 		end
-		BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r Total groups:", groupCount)
+		-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r Total groups:", groupCount)
 	else
-		BFL:DebugPrint("|cffff0000BetterFriendlist Debug:|r customGroups table MISSING!")
+		-- BFL:DebugPrint("|cffff0000BetterFriendlist Debug:|r customGroups table MISSING!")
 	end
 	
-	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r")
-	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r FRIEND ASSIGNMENTS:")
+	-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r")
+	-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r FRIEND ASSIGNMENTS:")
 	if BetterFriendlistDB.friendGroups then
 		local friendCount = 0
 		local totalAssignments = 0
@@ -1331,67 +1331,67 @@ function Settings:DebugDatabase()
 		-- Sort and display
 		table.sort(assignedFriends)
 		for _, line in ipairs(assignedFriends) do
-			BFL:DebugPrint(line)
+			-- BFL:DebugPrint(line)
 		end
 		
 		if friendCount == 0 then
-			BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r   (No friends assigned to custom groups)")
+			-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r   (No friends assigned to custom groups)")
 		end
-		BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r Total friends with assignments:", friendCount)
-		BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r Total assignments:", totalAssignments)
+		-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r Total friends with assignments:", friendCount)
+		-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r Total assignments:", totalAssignments)
 	else
-		BFL:DebugPrint("|cffff0000BetterFriendlist Debug:|r friendGroups table MISSING!")
+		-- BFL:DebugPrint("|cffff0000BetterFriendlist Debug:|r friendGroups table MISSING!")
 	end
 	
-	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r")
-	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r GROUP ORDER:")
+	-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r")
+	-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r GROUP ORDER:")
 	if BetterFriendlistDB.groupOrder then
-		BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r", table.concat(BetterFriendlistDB.groupOrder, ", "))
+		-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r", table.concat(BetterFriendlistDB.groupOrder, ", "))
 	else
-		BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r Using default order (nil)")
+		-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r Using default order (nil)")
 	end
 	
 	-- Show current friends list
-	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r")
-	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r CURRENT FRIENDS:")
+	-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r")
+	-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r CURRENT FRIENDS:")
 	
 	-- Battle.net friends
 	local numBNetTotal, numBNetOnline = BNGetNumFriends()
-	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r Battle.net Friends:", numBNetTotal, string.format("(%d online)", numBNetOnline))
+	-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r Battle.net Friends:", numBNetTotal, string.format("(%d online)", numBNetOnline))
 	if numBNetTotal > 0 then
 		for i = 1, math.min(numBNetTotal, 10) do
 			local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
 			if accountInfo then
 				local status = accountInfo.gameAccountInfo and accountInfo.gameAccountInfo.isOnline and "|cff00ff00ONLINE|r" or "|cffaaaaaaOFFLINE|r"
 				local name = accountInfo.accountName ~= "???" and accountInfo.accountName or accountInfo.battleTag
-				BFL:DebugPrint(string.format("|cff00ffffBetterFriendlist Debug:|r   [%d] %s - %s", i, name, status))
+				-- BFL:DebugPrint(string.format("|cff00ffffBetterFriendlist Debug:|r   [%d] %s - %s", i, name, status))
 			end
 		end
 		if numBNetTotal > 10 then
-			BFL:DebugPrint(string.format("|cff00ffffBetterFriendlist Debug:|r   ... and %d more", numBNetTotal - 10))
+			-- BFL:DebugPrint(string.format("|cff00ffffBetterFriendlist Debug:|r   ... and %d more", numBNetTotal - 10))
 		end
 	end
 	
 	-- WoW friends
-	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r")
+	-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r")
 	local numWoWFriends = C_FriendList.GetNumFriends()
 	local numWoWOnline = C_FriendList.GetNumOnlineFriends()
-	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r WoW Friends:", numWoWFriends, string.format("(%d online)", numWoWOnline))
+	-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r WoW Friends:", numWoWFriends, string.format("(%d online)", numWoWOnline))
 	if numWoWFriends > 0 then
 		for i = 1, math.min(numWoWFriends, 10) do
 			local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
 			if friendInfo then
 				local status = friendInfo.connected and "|cff00ff00ONLINE|r" or "|cffaaaaaaOFFLINE|r"
 				local level = friendInfo.level and friendInfo.level > 0 and string.format(" (Lvl %d)", friendInfo.level) or ""
-				BFL:DebugPrint(string.format("|cff00ffffBetterFriendlist Debug:|r   [%d] %s%s - %s", i, friendInfo.name, level, status))
+				-- BFL:DebugPrint(string.format("|cff00ffffBetterFriendlist Debug:|r   [%d] %s%s - %s", i, friendInfo.name, level, status))
 			end
 		end
 		if numWoWFriends > 10 then
-			BFL:DebugPrint(string.format("|cff00ffffBetterFriendlist Debug:|r   ... and %d more", numWoWFriends - 10))
+			-- BFL:DebugPrint(string.format("|cff00ffffBetterFriendlist Debug:|r   ... and %d more", numWoWFriends - 10))
 		end
 	end
 	
-	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r =================================")
+	-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r =================================")
 end
 
 --------------------------------------------------------------------------
@@ -1708,14 +1708,14 @@ function Settings:RefreshStatistics()
 	-- Get Statistics module
 	local Statistics = BFL:GetModule("Statistics")
 	if not Statistics then
-		BFL:DebugPrint("Settings: Statistics module not available")
+		-- BFL:DebugPrint("Settings: Statistics module not available")
 		return
 	end
 	
 	-- Get statistics data
 	local stats = Statistics:GetStatistics()
 	if not stats then
-		BFL:DebugPrint("Settings: Failed to get statistics")
+		-- BFL:DebugPrint("Settings: Failed to get statistics")
 		return
 	end
 	
@@ -1883,7 +1883,7 @@ function Settings:RefreshStatistics()
 		statsTab.NotesAndFavorites:SetText(notesText)
 	end
 	
-	BFL:DebugPrint("Settings: Statistics refreshed successfully")
+	-- BFL:DebugPrint("Settings: Statistics refreshed successfully")
 end
 
 -- Create export frame
@@ -2296,7 +2296,7 @@ function Settings:RefreshGeneralTab()
 				-- Force boolean value
 				local boolVal = (val == true or val == 1)
 				DB:Set("enableElvUISkin", boolVal)
-				BFL:DebugPrint("Settings: Set enableElvUISkin to", tostring(boolVal))
+				-- BFL:DebugPrint("Settings: Set enableElvUISkin to", tostring(boolVal))
 				
 				StaticPopupDialogs["BFL_ELVUI_RELOAD"] = {
 					text = "Changing ElvUI Skin settings requires a UI Reload.\nReload now?",

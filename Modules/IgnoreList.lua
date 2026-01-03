@@ -52,13 +52,13 @@ function IgnoreList:OnLoad(frame)
 	
 	-- Classic: Use FauxScrollFrame approach
 	if BFL.IsClassic or not BFL.HasModernScrollBox then
-		BFL:DebugPrint("|cff00ffffIgnoreList:|r Using Classic FauxScrollFrame mode")
+		-- BFL:DebugPrint("|cff00ffffIgnoreList:|r Using Classic FauxScrollFrame mode")
 		self:InitializeClassicIgnoreList(frame)
 		return
 	end
 	
 	-- Retail: Initialize ScrollBox with element factory (exact Blizzard implementation)
-	BFL:DebugPrint("|cff00ffffIgnoreList:|r Using Retail ScrollBox mode")
+	-- BFL:DebugPrint("|cff00ffffIgnoreList:|r Using Retail ScrollBox mode")
 	local scrollBoxView = CreateScrollBoxListLinearView()
 	scrollBoxView:SetElementFactory(function(factory, elementData)
 		if elementData.header then

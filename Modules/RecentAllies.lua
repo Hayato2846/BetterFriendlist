@@ -30,7 +30,7 @@ local RecentAlliesListEvents = {
 function RecentAllies:Initialize()
 	-- Recent Allies is TWW-only (11.0.7+)
 	if not BFL.HasRecentAllies then
-		BFL:DebugPrint("|cffffcc00BFL RecentAllies:|r Not available in Classic - module disabled")
+		-- BFL:DebugPrint("|cffffcc00BFL RecentAllies:|r Not available in Classic - module disabled")
 		return
 	end
 	-- Nothing else to initialize yet

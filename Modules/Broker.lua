@@ -77,8 +77,7 @@ local GetClientInfo = setmetatable({
 		if not info then
 			-- Unknown game - create fallback entry
 			info = { icon = 134400, short = clientProgram or "Unknown", long = clientProgram or "Unknown Game" }
-			BFL:DebugPrint(string.format("Broker: Unknown game client '%s' - using fallback icon",
-				tostring(clientProgram)))
+			-- BFL:DebugPrint(string.format("Broker: Unknown game client '%s' - using fallback icon", tostring(clientProgram)))
 			rawset(t, clientProgram, info)
 		end
 
@@ -291,14 +290,14 @@ local function SmartInviteOrJoin(friendType, data)
 	if friendType == "bnet" then
 		-- BNet friend - must be in WoW
 		if data.client ~= "WoW" or not data.gameAccountID then
-			BFL:DebugPrint("Broker: BNet friend not in WoW, cannot invite/join")
+			-- BFL:DebugPrint("Broker: BNet friend not in WoW, cannot invite/join")
 			return
 		end
 		
 		if isLeader then
 			-- We can invite: Use BNInviteFriend
 			BNInviteFriend(data.gameAccountID)
-			BFL:DebugPrint(string.format("Broker: Invited BNet friend %s", data.accountName or "Unknown"))
+			-- BFL:DebugPrint(string.format("Broker: Invited BNet friend %s", data.accountName or "Unknown"))
 		else
 			-- We need to request to join their group
 			-- For BNet friends, we need to use their character name
@@ -308,9 +307,9 @@ local function SmartInviteOrJoin(friendType, data)
 					targetName = targetName .. "-" .. data.realmName
 				end
 				C_PartyInfo.RequestInviteFromUnit(targetName)
-				BFL:DebugPrint(string.format("Broker: Requested invite from %s", targetName))
+				-- BFL:DebugPrint(string.format("Broker: Requested invite from %s", targetName))
 			else
-				BFL:DebugPrint("Broker: Cannot request invite - no character name")
+				-- BFL:DebugPrint("Broker: Cannot request invite - no character name")
 			end
 		end
 		
@@ -318,18 +317,18 @@ local function SmartInviteOrJoin(friendType, data)
 		-- WoW friend
 		local targetName = data.fullName or data.characterName
 		if not targetName then
-			BFL:DebugPrint("Broker: WoW friend has no name, cannot invite/join")
+			-- BFL:DebugPrint("Broker: WoW friend has no name, cannot invite/join")
 			return
 		end
 		
 		if isLeader then
 			-- We can invite
 			C_PartyInfo.InviteUnit(targetName)
-			BFL:DebugPrint(string.format("Broker: Invited WoW friend %s", targetName))
+			-- BFL:DebugPrint(string.format("Broker: Invited WoW friend %s", targetName))
 		else
 			-- We need to request to join their group
 			C_PartyInfo.RequestInviteFromUnit(targetName)
-			BFL:DebugPrint(string.format("Broker: Requested invite from %s", targetName))
+			-- BFL:DebugPrint(string.format("Broker: Requested invite from %s", targetName))
 		end
 	end
 end
@@ -351,7 +350,7 @@ local function OpenFriendContextMenu(data)
 	
 	local MenuSystem = BFL:GetModule("MenuSystem")
 	if not MenuSystem then
-		BFL:DebugPrint("Broker: MenuSystem not available")
+		-- BFL:DebugPrint("Broker: MenuSystem not available")
 		return
 	end
 	
@@ -372,9 +371,9 @@ local function OpenFriendContextMenu(data)
 				connected = true, -- Broker only shows online friends
 			}
 			MenuSystem:OpenFriendMenu(contextMenuAnchor, "BN", bnetAccountID, extraData)
-			BFL:DebugPrint(string.format("Broker: Opening BNet context menu for %s", data.accountName or "Unknown"))
+			-- BFL:DebugPrint(string.format("Broker: Opening BNet context menu for %s", data.accountName or "Unknown"))
 		else
-			BFL:DebugPrint("Broker: Could not get bnetAccountID for context menu")
+			-- BFL:DebugPrint("Broker: Could not get bnetAccountID for context menu")
 		end
 		
 	elseif data.type == "wow" then
@@ -397,9 +396,9 @@ local function OpenFriendContextMenu(data)
 				connected = true, -- Broker only shows online friends
 			}
 			MenuSystem:OpenFriendMenu(contextMenuAnchor, "WOW", friendIndex, extraData)
-			BFL:DebugPrint(string.format("Broker: Opening WoW context menu for %s", data.characterName or "Unknown"))
+			-- BFL:DebugPrint(string.format("Broker: Opening WoW context menu for %s", data.characterName or "Unknown"))
 		else
-			BFL:DebugPrint("Broker: Could not find friend index for context menu")
+			-- BFL:DebugPrint("Broker: Could not find friend index for context menu")
 		end
 	end
 end
@@ -420,10 +419,10 @@ local function OnFriendLineClick(cell, data, mouseButton)
 			-- Shift+Click: Copy character name to chat editbox (WoW only)
 			if data.client == "WoW" and data.characterName and data.characterName ~= "" then
 				if AddNameToEditBox(data.characterName, data.realmName) then
-					BFL:DebugPrint(string.format("Broker: Copied '%s' to chat editbox", data.characterName))
+					-- BFL:DebugPrint(string.format("Broker: Copied '%s' to chat editbox", data.characterName))
 				end
 			else
-				BFL:DebugPrint("Broker: BNet friend not in WoW, cannot copy character name")
+				-- BFL:DebugPrint("Broker: BNet friend not in WoW, cannot copy character name")
 			end
 		elseif actualButton == "RightButton" then
 			-- Right Click: Open context menu (like FriendsList)
@@ -434,11 +433,11 @@ local function OnFriendLineClick(cell, data, mouseButton)
 				-- Use SetItemRef with BNplayer link - this is the modern way to whisper BNet friends
 				local bnetLink = "BNplayer:" .. (data.accountName or "Friend") .. ":" .. data.bnetAccountID
 				SetItemRef(bnetLink, bnetLink, "LeftButton")
-				BFL:DebugPrint(string.format("Broker: Opening BNet whisper to %s (ID: %d)", data.accountName or "Unknown", data.bnetAccountID))
+				-- BFL:DebugPrint(string.format("Broker: Opening BNet whisper to %s (ID: %d)", data.accountName or "Unknown", data.bnetAccountID))
 			elseif data.accountName and data.accountName ~= "" then
 				-- Fallback: try ChatFrame_SendSmartTell
 				ChatFrame_SendSmartTell(data.accountName)
-				BFL:DebugPrint(string.format("Broker: Opening BNet whisper to %s", data.accountName))
+				-- BFL:DebugPrint(string.format("Broker: Opening BNet whisper to %s", data.accountName))
 			end
 		end
 
@@ -451,7 +450,7 @@ local function OnFriendLineClick(cell, data, mouseButton)
 			-- Shift+Click: Copy name to chat editbox
 			if data.characterName then
 				if AddNameToEditBox(data.characterName, data.realmName) then
-					BFL:DebugPrint(string.format("Broker: Copied '%s' to chat editbox", data.characterName))
+					-- BFL:DebugPrint(string.format("Broker: Copied '%s' to chat editbox", data.characterName))
 				end
 			end
 		elseif actualButton == "RightButton" then
@@ -462,7 +461,7 @@ local function OnFriendLineClick(cell, data, mouseButton)
 			if data.fullName then
 				local whisperName = data.fullName:gsub(" ", "")
 				ChatFrame_SendTell(whisperName)
-				BFL:DebugPrint(string.format("Broker: Opening whisper to %s", whisperName))
+				-- BFL:DebugPrint(string.format("Broker: Opening whisper to %s", whisperName))
 			end
 		end
 	end
@@ -596,7 +595,7 @@ function Broker:UpdateBrokerText()
 		dataObject.icon = nil -- Hide icon
 	end
 
-	BFL:DebugPrint(string.format("Broker: Updated text to '%s'", text))
+	-- BFL:DebugPrint(string.format("Broker: Updated text to '%s'", text))
 end
 
 -- ========================================
@@ -1136,7 +1135,7 @@ end
 
 local function CreateLibQTipTooltip(anchorFrame)
 	if not LQT then
-		BFL:DebugPrint("Broker: LibQTip not available, skipping tooltip")
+		-- BFL:DebugPrint("Broker: LibQTip not available, skipping tooltip")
 		return nil
 	end
 
@@ -1699,7 +1698,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 					local actualButton = button or (GetMouseButtonClicked and GetMouseButtonClicked())
 					
 					-- Debug print to verify click is registered
-					BFL:DebugPrint("Broker: Group header clicked - " .. tostring(actualButton) .. " on group " .. tostring(groupId))
+					-- BFL:DebugPrint("Broker: Group header clicked - " .. tostring(actualButton) .. " on group " .. tostring(groupId))
 					
 					if actualButton == "LeftButton" then
 						-- Toggle collapse state
@@ -1735,7 +1734,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 								end
 							end)
 						else
-							BFL:DebugPrint("Broker: MenuUtil not available")
+							-- BFL:DebugPrint("Broker: MenuUtil not available")
 						end
 					end
 				end)
@@ -1781,7 +1780,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 	end, geterrorhandler())
 
 	if not status then
-		BFL:DebugPrint("Broker: Error populating tooltip: " .. tostring(err))
+		-- BFL:DebugPrint("Broker: Error populating tooltip: " .. tostring(err))
 		tt:Clear()
 		tt:AddLine("|cffff0000Error displaying tooltip|r")
 		tt:AddLine(tostring(err))
@@ -1926,7 +1925,7 @@ end
 function Broker:OnClick(clickedFrame, button)
 	-- Safety: Don't process clicks in combat
 	if InCombatLockdown() then
-		BFL:DebugPrint("Broker: Clicks disabled in combat")
+		-- BFL:DebugPrint("Broker: Clicks disabled in combat")
 		return
 	end
 
@@ -2019,7 +2018,7 @@ function Broker:OnClick(clickedFrame, button)
 			local filterName = nextFilter:sub(1, 1):upper() .. nextFilter:sub(2)
 			print(string.format(L("BROKER_FILTER_CHANGED"), filterName))
 
-			BFL:DebugPrint(string.format("Broker: Filter cycled to '%s'", nextFilter))
+			-- BFL:DebugPrint(string.format("Broker: Filter cycled to '%s'", nextFilter))
 		end
 	end
 end
@@ -2029,34 +2028,34 @@ end
 -- ========================================
 
 function Broker:Initialize()
-	BFL:DebugPrint("Broker: Initializing...")
+	-- BFL:DebugPrint("Broker: Initializing...")
 
 	-- BETA FEATURE CHECK: Only initialize if Beta Features are enabled
 	if not BetterFriendlistDB or not BetterFriendlistDB.enableBetaFeatures then
-		BFL:DebugPrint("Broker: Beta Features not enabled - Data Broker integration disabled")
+		-- BFL:DebugPrint("Broker: Beta Features not enabled - Data Broker integration disabled")
 		return
 	end
 
 	-- Check if LibDataBroker is available
 	if not LDB then
-		BFL:DebugPrint("Broker: LibDataBroker-1.1 not found - Data Broker integration disabled")
+		-- BFL:DebugPrint("Broker: LibDataBroker-1.1 not found - Data Broker integration disabled")
 		return
 	end
 	-- Check if LibQTip is available
 	if not LQT then
-		BFL:DebugPrint("Broker: LibQTip-1.0 not available - tooltips will be basic")
+		-- BFL:DebugPrint("Broker: LibQTip-1.0 not available - tooltips will be basic")
 	else
-		BFL:DebugPrint("Broker: LibQTip-1.0 loaded successfully")
+		-- BFL:DebugPrint("Broker: LibQTip-1.0 loaded successfully")
 	end
 	-- Check if enabled in config
 	local DB = GetDB()
 	if not DB or not BetterFriendlistDB then
-		BFL:DebugPrint("Broker: Database not initialized yet")
+		-- BFL:DebugPrint("Broker: Database not initialized yet")
 		return
 	end
 
 	if not BetterFriendlistDB.brokerEnabled then
-		BFL:DebugPrint("Broker: Disabled in settings")
+		-- BFL:DebugPrint("Broker: Disabled in settings")
 		return
 	end
 
@@ -2099,7 +2098,7 @@ function Broker:Initialize()
 	dataObject = LDB:NewDataObject("BetterFriendlist", dataObjectDef)
 
 	if dataObject then
-		BFL:DebugPrint("Broker: Data Broker object created successfully")
+		-- BFL:DebugPrint("Broker: Data Broker object created successfully")
 
 		-- Register events for auto-update
 		self:RegisterEvents()
@@ -2107,7 +2106,7 @@ function Broker:Initialize()
 		-- Initial text update
 		self:UpdateBrokerText()
 	else
-		BFL:DebugPrint("Broker: Failed to create Data Broker object")
+		-- BFL:DebugPrint("Broker: Failed to create Data Broker object")
 	end
 end
 
@@ -2123,11 +2122,11 @@ function Broker:RegisterEvents()
 	end
 
 	if not dataObject then
-		BFL:DebugPrint("Broker: Events not registered - no data object")
+		-- BFL:DebugPrint("Broker: Events not registered - no data object")
 		return
 	end
 
-	BFL:DebugPrint("Broker: Registering events...")
+	-- BFL:DebugPrint("Broker: Registering events...")
 
 	-- Friend status events
 	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_ONLINE", function(...)
@@ -2150,7 +2149,7 @@ function Broker:RegisterEvents()
 		Broker:UpdateBrokerText()
 	end)
 
-	BFL:DebugPrint("Broker: Events registered")
+	-- BFL:DebugPrint("Broker: Events registered")
 end
 
 -- ========================================
@@ -2159,7 +2158,7 @@ end
 
 function Broker:ToggleEnabled()
 	if not BetterFriendlistDB then
-		BFL:DebugPrint("|cffff0000BetterFriendlist:|r Database not initialized")
+		-- BFL:DebugPrint("|cffff0000BetterFriendlist:|r Database not initialized")
 		return
 	end
 

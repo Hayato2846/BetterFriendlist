@@ -115,7 +115,7 @@ end
 -- Module Initialization
 -- ========================================
 function Statistics:Initialize()
-	BFL:DebugPrint("|cff00ff00BetterFriendlist Statistics:|r Initialized (Enhanced - Phase 12)")
+	-- BFL:DebugPrint("|cff00ff00BetterFriendlist Statistics:|r Initialized (Enhanced - Phase 12)")
 end
 
 -- ========================================

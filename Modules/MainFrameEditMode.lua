@@ -73,7 +73,7 @@ function MainFrameEditMode:MigrateOldPosition(frame)
                 y = yOfs
             }
             
-            BFL:DebugPrint("|cff00ff00BFL:MainFrameEditMode:|r Migrated old position: " .. point .. " (" .. xOfs .. ", " .. yOfs .. ")")
+            -- BFL:DebugPrint("|cff00ff00BFL:MainFrameEditMode:|r Migrated old position: " .. point .. " (" .. xOfs .. ", " .. yOfs .. ")")
         end
     end
     
@@ -96,7 +96,7 @@ function MainFrameEditMode:ApplyPosition(layoutName)
     if position then
         frame:ClearAllPoints()
         frame:SetPoint(position.point or "CENTER", UIParent, position.point or "CENTER", position.x or 0, position.y or 0)
-        BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r Applied position for layout '" .. layoutName .. "'")
+        -- BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r Applied position for layout '" .. layoutName .. "'")
     else
         -- Use default position (center of screen)
         frame:ClearAllPoints()
@@ -114,7 +114,7 @@ function MainFrameEditMode:SavePosition(layoutName, point, x, y)
     BetterFriendlistDB.mainFramePosition[layoutName].x = x
     BetterFriendlistDB.mainFramePosition[layoutName].y = y
     
-    BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r Position saved: " .. point .. " (" .. x .. ", " .. y .. ")")
+    -- BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r Position saved: " .. point .. " (" .. x .. ", " .. y .. ")")
 end
 
 --[[--------------------------------------------------
@@ -132,7 +132,7 @@ function MainFrameEditMode:ApplySize(layoutName)
     
     if sizeData then
         width, height = ValidateSize(sizeData.width, sizeData.height)
-        BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r Applied size for layout '" .. layoutName .. "': " .. width .. "x" .. height)
+        -- BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r Applied size for layout '" .. layoutName .. "': " .. width .. "x" .. height)
     else
         -- Use default or user-preferred size
         width = BetterFriendlistDB.defaultFrameWidth or DEFAULT_WIDTH
@@ -179,7 +179,7 @@ function MainFrameEditMode:ApplyScale()
     scale = Clamp(scale, MIN_SCALE, MAX_SCALE)
     
     frame:SetScale(scale)
-    BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r Applied scale: " .. (scale * 100) .. "%")
+    -- BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r Applied scale: " .. (scale * 100) .. "%")
 end
 
 -- Set scale and save to database
@@ -204,47 +204,47 @@ end
 --]]--------------------------------------------------
 
 function MainFrameEditMode:TriggerResponsiveUpdates()
-    BFL:DebugPrint("|cffff00ffBFL:MainFrameEditMode:|r TriggerResponsiveUpdates() called")
+    -- BFL:DebugPrint("|cffff00ffBFL:MainFrameEditMode:|r TriggerResponsiveUpdates() called")
     
     -- Update FriendsList ScrollBox extent
     if BFL.FriendsList and BFL.FriendsList.UpdateScrollBoxExtent then
         BFL.FriendsList:UpdateScrollBoxExtent()
-        BFL:DebugPrint("  - FriendsList:UpdateScrollBoxExtent() called")
+        -- BFL:DebugPrint("  - FriendsList:UpdateScrollBoxExtent() called")
     end
     
     -- Update SearchBox width
     if BFL.FriendsList and BFL.FriendsList.UpdateSearchBoxWidth then
         BFL.FriendsList:UpdateSearchBoxWidth()
-        BFL:DebugPrint("  - FriendsList:UpdateSearchBoxWidth() called")
+        -- BFL:DebugPrint("  - FriendsList:UpdateSearchBoxWidth() called")
     end
     
     -- Update WhoFrame responsive layout
     if BFL.WhoFrame and BFL.WhoFrame.UpdateResponsiveLayout then
         BFL.WhoFrame:UpdateResponsiveLayout()
-        BFL:DebugPrint("  - WhoFrame:UpdateResponsiveLayout() called")
+        -- BFL:DebugPrint("  - WhoFrame:UpdateResponsiveLayout() called")
     end
     
     -- Update RaidFrame group layout (grid positioning and sizing)
     local RaidFrame = BFL.Modules and BFL.Modules.RaidFrame
     if RaidFrame and RaidFrame.UpdateGroupLayout then
-        BFL:DebugPrint("  - Calling RaidFrame:UpdateGroupLayout()...")
+        -- BFL:DebugPrint("  - Calling RaidFrame:UpdateGroupLayout()...")
         RaidFrame:UpdateGroupLayout()
-        BFL:DebugPrint("  - RaidFrame:UpdateGroupLayout() completed")
+        -- BFL:DebugPrint("  - RaidFrame:UpdateGroupLayout() completed")
     else
-        BFL:DebugPrint("  - RaidFrame or UpdateGroupLayout not available")
+        -- BFL:DebugPrint("  - RaidFrame or UpdateGroupLayout not available")
     end
     
     -- Update RaidFrame control panel layout (AllAssist, Counts, Button positioning)
     -- Note: This is now called automatically by UpdateGroupLayout(), but we can call it separately too
     if RaidFrame and RaidFrame.UpdateControlPanelLayout then
-        BFL:DebugPrint("  - Calling RaidFrame:UpdateControlPanelLayout()...")
+        -- BFL:DebugPrint("  - Calling RaidFrame:UpdateControlPanelLayout()...")
         RaidFrame:UpdateControlPanelLayout()
-        BFL:DebugPrint("  - RaidFrame:UpdateControlPanelLayout() completed")
+        -- BFL:DebugPrint("  - RaidFrame:UpdateControlPanelLayout() completed")
     else
-        BFL:DebugPrint("  - RaidFrame or UpdateControlPanelLayout not available")
+        -- BFL:DebugPrint("  - RaidFrame or UpdateControlPanelLayout not available")
     end
     
-    BFL:DebugPrint("|cffff00ffBFL:MainFrameEditMode:|r TriggerResponsiveUpdates() finished")
+    -- BFL:DebugPrint("|cffff00ffBFL:MainFrameEditMode:|r TriggerResponsiveUpdates() finished")
 end
 
 --[[--------------------------------------------------
@@ -351,7 +351,7 @@ function MainFrameEditMode:CreateEditModeSettings()
     -- Register settings with LibEditMode
     LEM:AddFrameSettings(frame, settings)
     
-    BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r EditMode settings registered (Width: " .. MIN_WIDTH .. "-" .. MAX_WIDTH .. ", Height: " .. MIN_HEIGHT .. "-" .. MAX_HEIGHT .. ")")
+    -- BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r EditMode settings registered (Width: " .. MIN_WIDTH .. "-" .. MAX_WIDTH .. ", Height: " .. MIN_HEIGHT .. "-" .. MAX_HEIGHT .. ")")
 end
 
 --[[--------------------------------------------------
@@ -388,7 +388,7 @@ function MainFrameEditMode:OnEditModeEnter()
         frame:Show()
     end
     
-    BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r Edit Mode entered (Settings dialog will appear on frame selection)")
+    -- BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r Edit Mode entered (Settings dialog will appear on frame selection)")
 end
 
 function MainFrameEditMode:OnEditModeExit()
@@ -407,7 +407,7 @@ function MainFrameEditMode:OnEditModeExit()
         frame.wasHiddenBeforeEditMode = nil
     end
     
-    BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r Edit Mode exited, manual dragging re-enabled, visibility restored")
+    -- BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r Edit Mode exited, manual dragging re-enabled, visibility restored")
 end
 
 --[[--------------------------------------------------
@@ -418,7 +418,7 @@ function MainFrameEditMode:Initialize()
     -- Get frame
     local frame = BetterFriendsFrame
     if not frame then
-        BFL:DebugPrint("|cffff0000BFL:MainFrameEditMode:|r BetterFriendsFrame not found!")
+        -- BFL:DebugPrint("|cffff0000BFL:MainFrameEditMode:|r BetterFriendsFrame not found!")
         return
     end
     
@@ -445,7 +445,7 @@ function MainFrameEditMode:Initialize()
     end
     
     frame:SetSize(width, height)
-    BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r Initial size set: " .. width .. "x" .. height)
+    -- BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r Initial size set: " .. width .. "x" .. height)
     
     -- Enable resizing (required even with Settings dialog)
     frame:SetResizable(true)
@@ -495,8 +495,8 @@ function MainFrameEditMode:Initialize()
     
     -- LibEditMode integration (optional)
     if not LEM then
-        BFL:DebugPrint("|cffffcc00BFL:MainFrameEditMode:|r LibEditMode not found - using fixed position")
-        BFL:DebugPrint("|cffffcc00BFL:MainFrameEditMode:|r Install LibEditMode for full Edit Mode support")
+        -- BFL:DebugPrint("|cffffcc00BFL:MainFrameEditMode:|r LibEditMode not found - using fixed position")
+        -- BFL:DebugPrint("|cffffcc00BFL:MainFrameEditMode:|r Install LibEditMode for full Edit Mode support")
         return
     end
     
@@ -539,7 +539,7 @@ function MainFrameEditMode:Initialize()
         MainFrameEditMode:ApplySize(layoutName)
     end)
     
-    BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r Edit Mode integration initialized with Width/Height settings")
+    -- BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r Edit Mode integration initialized with Width/Height settings")
 end
 
 -- Public API

@@ -243,13 +243,13 @@ end
 function WhoFrame:OnLoad(frame)
 	-- Classic: Use FauxScrollFrame approach
 	if BFL.IsClassic or not BFL.HasModernScrollBox then
-		BFL:DebugPrint("|cff00ffffWhoFrame:|r Using Classic FauxScrollFrame mode")
+		-- BFL:DebugPrint("|cff00ffffWhoFrame:|r Using Classic FauxScrollFrame mode")
 		self:InitializeClassicWhoFrame(frame)
 		return
 	end
 	
 	-- Retail: Initialize ScrollBox with DataProvider
-	BFL:DebugPrint("|cff00ffffWhoFrame:|r Using Retail ScrollBox mode")
+	-- BFL:DebugPrint("|cff00ffffWhoFrame:|r Using Retail ScrollBox mode")
 	local view = CreateScrollBoxListLinearView()
 	view:SetElementInitializer("BetterWhoListButtonTemplate", function(button, elementData)
 		self:InitButton(button, elementData)
@@ -663,7 +663,7 @@ end
 
 -- Send Who request
 function WhoFrame:SendWhoRequest(text)
-	if BFL then BFL:DebugPrint("WhoFrame:SendWhoRequest called with text: " .. tostring(text)) end
+	-- if BFL then BFL:DebugPrint("WhoFrame:SendWhoRequest called with text: " .. tostring(text)) end
 	if not text or text == "" then
 		-- Use default Who command if no text provided
 		local level = UnitLevel("player")

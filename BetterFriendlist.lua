@@ -308,10 +308,10 @@ function BetterFriendsFrame_InitQuickFilterDropdown()
 	-- Delegate to QuickFilters module
 	local QuickFilters = GetQuickFilters()
 	if QuickFilters then
-		BFL:DebugPrint("BetterFriendlist: Delegating QuickFilter init to module")
+		-- BFL:DebugPrint("BetterFriendlist: Delegating QuickFilter init to module")
 		QuickFilters:InitDropdown(dropdown)
 	else
-		BFL:DebugPrint("BetterFriendlist: QuickFilters module not found!")
+		-- BFL:DebugPrint("BetterFriendlist: QuickFilters module not found!")
 	end
 end
 
@@ -365,11 +365,11 @@ function GetFriendUID(friend)
 				end
 			end
 			-- Last resort: use bnetAccountID (will cause issues with persistence)
-			BFL:DebugPrint("|cffff0000BetterFriendlist Warning:|r Using bnetAccountID for friend UID (battleTag unavailable)")
+			-- BFL:DebugPrint("|cffff0000BetterFriendlist Warning:|r Using bnetAccountID for friend UID (battleTag unavailable)")
 			return "bnet_" .. tostring(friend.bnetAccountID)
 		else
 			-- Should never happen
-			BFL:DebugPrint("|cffff0000BetterFriendlist Error:|r BNet friend without bnetAccountID or battleTag!")
+			-- BFL:DebugPrint("|cffff0000BetterFriendlist Error:|r BNet friend without bnetAccountID or battleTag!")
 			return "bnet_unknown"
 		end
 	else
@@ -470,7 +470,7 @@ function ShowBetterFriendsFrame(tabIndex)
 	
 	-- Switch to requested tab if specified
 	if tabIndex and tabIndex >= 1 and tabIndex <= 4 then
-		BFL:DebugPrint("[BFL] ShowBetterFriendsFrame: Switching to tab " .. tabIndex)
+		-- BFL:DebugPrint("[BFL] ShowBetterFriendsFrame: Switching to tab " .. tabIndex)
 		PanelTemplates_SetTab(BetterFriendsFrame, tabIndex)
 		BetterFriendsFrame_ShowBottomTab(tabIndex)
 	end
@@ -495,7 +495,7 @@ end
 -- Toggle the friends frame
 -- tabIndex: Optional tab to show when opening (1=Friends, 2=Who, 3=Raid, 4=Quick Join)
 function ToggleBetterFriendsFrame(tabIndex)
-	BFL:DebugPrint("[BFL] ToggleBetterFriendsFrame() called - Frame shown: " .. tostring(BetterFriendsFrame:IsShown()) .. ", tabIndex: " .. tostring(tabIndex))
+	-- BFL:DebugPrint("[BFL] ToggleBetterFriendsFrame() called - Frame shown: " .. tostring(BetterFriendsFrame:IsShown()) .. ", tabIndex: " .. tostring(tabIndex))
 	
 	if BetterFriendsFrame:IsShown() then
 		-- If already shown and same tab (or no tab specified), close it
@@ -503,16 +503,16 @@ function ToggleBetterFriendsFrame(tabIndex)
 		if tabIndex and tabIndex >= 1 and tabIndex <= 4 then
 			local currentTab = PanelTemplates_GetSelectedTab(BetterFriendsFrame) or 1
 			if currentTab ~= tabIndex then
-				BFL:DebugPrint("[BFL] Switching from tab " .. currentTab .. " to tab " .. tabIndex)
+				-- BFL:DebugPrint("[BFL] Switching from tab " .. currentTab .. " to tab " .. tabIndex)
 				PanelTemplates_SetTab(BetterFriendsFrame, tabIndex)
 				BetterFriendsFrame_ShowBottomTab(tabIndex)
 				return
 			end
 		end
-		BFL:DebugPrint("[BFL] Hiding BetterFriendsFrame")
+		-- BFL:DebugPrint("[BFL] Hiding BetterFriendsFrame")
 		HideBetterFriendsFrame()
 	else
-		BFL:DebugPrint("[BFL] Showing BetterFriendsFrame")
+		-- BFL:DebugPrint("[BFL] Showing BetterFriendsFrame")
 		ShowBetterFriendsFrame(tabIndex)
 	end
 end
@@ -552,7 +552,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		if BFL.IsClassic then
 			local FriendsList = GetFriendsList()
 			if FriendsList and FriendsList.UpdateFriendsList then
-				BFL:DebugPrint("|cff00ffffADDON_LOADED:|r Scheduling initial Classic UpdateFriendsList")
+				-- BFL:DebugPrint("|cff00ffffADDON_LOADED:|r Scheduling initial Classic UpdateFriendsList")
 				C_Timer.After(0.5, function()
 					if FriendsList and FriendsList.UpdateFriendsList then
 						FriendsList:UpdateFriendsList()
@@ -633,12 +633,12 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		local isOurMenu = _G.BetterFriendlist_IsOurMenu
 		_G.BetterFriendlist_IsOurMenu = false
 		
-	BFL:DebugPrint("|cff00ffffBFL AddGroupsToFriendMenu called. Flag was:", isOurMenu)
+	-- BFL:DebugPrint("|cff00ffffBFL AddGroupsToFriendMenu called. Flag was:", isOurMenu)
 		if not isOurMenu then
-			BFL:DebugPrint("|cffff0000BFL: Skipping menu entries (flag was false)")
+			-- BFL:DebugPrint("|cffff0000BFL: Skipping menu entries (flag was false)")
 			return
 		end
-		BFL:DebugPrint("|cff00ff00BFL: Adding menu entries (flag was true)")
+		-- BFL:DebugPrint("|cff00ff00BFL: Adding menu entries (flag was true)")
 		
 		-- CRITICAL: Don't add group options for WHO players (non-friends)
 		if _G.BetterFriendlist_IsWhoPlayerMenu then
@@ -662,7 +662,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				for _, friend in ipairs(FriendsList.friendsList) do
 					if friend.type == "bnet" and friend.bnetAccountID == contextData.bnetIDAccount then
 						friendUID = FriendsList:GetFriendUID(friend)
-						BFL:DebugPrint("Resolved BNet UID via FriendsList:", friendUID)
+						-- BFL:DebugPrint("Resolved BNet UID via FriendsList:", friendUID)
 						break
 					end
 				end
@@ -671,7 +671,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				for _, friend in ipairs(FriendsList.friendsList) do
 					if friend.type == "wow" and friend.index == contextData.index then
 						friendUID = FriendsList:GetFriendUID(friend)
-						BFL:DebugPrint("Resolved WoW UID via FriendsList:", friendUID)
+						-- BFL:DebugPrint("Resolved WoW UID via FriendsList:", friendUID)
 						break
 					end
 				end
@@ -689,7 +689,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 						if accountInfo.battleTag then
 							friendUID = "bnet_" .. accountInfo.battleTag
 						else
-							BFL:DebugPrint("|cffff0000BetterFriendlist Warning:|r BNet friend without battleTag, using bnetAccountID")
+							-- BFL:DebugPrint("|cffff0000BetterFriendlist Warning:|r BNet friend without battleTag, using bnetAccountID")
 							friendUID = "bnet_" .. tostring(contextData.bnetIDAccount)
 						end
 						break
@@ -698,7 +698,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				
 				-- If not found in friends list (shouldn't happen), fallback to bnetAccountID
 				if not friendUID then
-					BFL:DebugPrint("|cffff0000BetterFriendlist Warning:|r Could not find BNet friend, using bnetAccountID")
+					-- BFL:DebugPrint("|cffff0000BetterFriendlist Warning:|r Could not find BNet friend, using bnetAccountID")
 					friendUID = "bnet_" .. tostring(contextData.bnetIDAccount)
 				end
 			elseif contextData.name then
@@ -898,7 +898,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		-- Tab1 = Friends, Tab2 = Recent Allies, Tab3 = RAF, Tab4 = Sort (XML)
 		-- In Classic: Only Tab1 = Friends should be visible
 		if BFL.IsClassic and BetterFriendsFrame then
-			BFL:DebugPrint("|cffffcc00BFL:|r Classic mode - hiding Retail-only tabs (Recent Allies, RAF)")
+			-- BFL:DebugPrint("|cffffcc00BFL:|r Classic mode - hiding Retail-only tabs (Recent Allies, RAF)")
 			
 			-- Hide Tab2 (Recent Allies) and Tab3 (RAF)
 			if BetterFriendsFrame.Tab2 then BetterFriendsFrame.Tab2:Hide() end
@@ -1002,18 +1002,18 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		end)
 		
 		-- Setup automatic keybind override (like BetterBags)
-		BFL:DebugPrint("[BFL] Setting up keybind override system...")
+		-- BFL:DebugPrint("[BFL] Setting up keybind override system...")
 		BFL.bindingFrame = BFL.bindingFrame or CreateFrame("Frame")
 		BFL.bindingFrame:RegisterEvent("PLAYER_LOGIN")
 		BFL.bindingFrame:RegisterEvent("UPDATE_BINDINGS")
 		BFL.bindingFrame:SetScript("OnEvent", function(self, event, ...)
-			BFL:DebugPrint("[BFL] Event received: " .. event)
+			-- BFL:DebugPrint("[BFL] Event received: " .. event)
 			BFL_CheckKeyBindings()
 		end)
 		
 		-- Trigger initial check after a short delay
 		C_Timer.After(1, function()
-			BFL:DebugPrint("[BFL] Running initial keybind check...")
+			-- BFL:DebugPrint("[BFL] Running initial keybind check...")
 			BFL_CheckKeyBindings()
 		end)
 	end
@@ -1022,10 +1022,10 @@ end)
 -- Automatic Keybind Override System (like BetterBags)
 -- Intercepts the default O-key and redirects it to our frame
 function BFL_CheckKeyBindings()
-	BFL:DebugPrint("[BFL] CheckKeyBindings called")
+	-- BFL:DebugPrint("[BFL] CheckKeyBindings called")
 	
 	if InCombatLockdown() then
-		BFL:DebugPrint("[BFL] In combat, delaying keybind check")
+		-- BFL:DebugPrint("[BFL] In combat, delaying keybind check")
 		BFL.bindingFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 		return
 	end
@@ -1038,23 +1038,23 @@ function BFL_CheckKeyBindings()
 		"TOGGLEFRIENDSFRAME"	-- Possible alternative name
 	}
 	
-	BFL:DebugPrint("[BFL] Checking " .. #bindings .. " binding names...")
+	-- BFL:DebugPrint("[BFL] Checking " .. #bindings .. " binding names...")
 	
 	for _, binding in pairs(bindings) do
 		local key, otherkey = GetBindingKey(binding)
-		BFL:DebugPrint("[BFL] Binding '" .. binding .. "': key1=" .. tostring(key) .. ", key2=" .. tostring(otherkey))
+		-- BFL:DebugPrint("[BFL] Binding '" .. binding .. "': key1=" .. tostring(key) .. ", key2=" .. tostring(otherkey))
 		
 		if key ~= nil then
 			SetOverrideBinding(BFL.bindingFrame, true, key, "BETTERFRIENDLIST_TOGGLE")
-			BFL:DebugPrint("[BFL] Override set: " .. key .. " -> BETTERFRIENDLIST_TOGGLE")
+			-- BFL:DebugPrint("[BFL] Override set: " .. key .. " -> BETTERFRIENDLIST_TOGGLE")
 		end
 		if otherkey ~= nil then
 			SetOverrideBinding(BFL.bindingFrame, true, otherkey, "BETTERFRIENDLIST_TOGGLE")
-			BFL:DebugPrint("[BFL] Override set: " .. otherkey .. " -> BETTERFRIENDLIST_TOGGLE")
+			-- BFL:DebugPrint("[BFL] Override set: " .. otherkey .. " -> BETTERFRIENDLIST_TOGGLE")
 		end
 	end
 	
-	BFL:DebugPrint("[BFL] Keybind override complete")
+	-- BFL:DebugPrint("[BFL] Keybind override complete")
 end
 
 -- Slash Commands are now in Core.lua
@@ -1068,7 +1068,7 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 	
 	-- Classic Guard: Only Friends tab (1) is available in Classic
 	if BFL.IsClassic and tabIndex ~= 1 then
-		BFL:DebugPrint("|cffffcc00BFL:|r Classic mode - tab\", tabIndex, \"not available, showing Friends tab")
+		-- BFL:DebugPrint("|cffffcc00BFL:|r Classic mode - tab\", tabIndex, \"not available, showing Friends tab")
 		tabIndex = 1
 	end
 	

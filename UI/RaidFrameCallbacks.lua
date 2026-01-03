@@ -287,13 +287,13 @@ function BetterRaidFrame_UpdateCombatOverlay(inCombat)
 	-- Only show combat overlay when in raid
 	local isInRaid = IsInRaid()
 	
-	BFL:DebugPrint("[BFL] UpdateCombatOverlay called: inCombat=" .. tostring(inCombat) .. ", isInRaid=" .. tostring(isInRaid))
+	-- BFL:DebugPrint("[BFL] UpdateCombatOverlay called: inCombat=" .. tostring(inCombat) .. ", isInRaid=" .. tostring(isInRaid))
 	
 	-- Update Combat Icon (shows between MemberCount and RaidInfo button)
 	-- Only show if in raid AND in combat
 	if frame.ControlPanel and frame.ControlPanel.CombatIcon then
 		frame.ControlPanel.CombatIcon:SetShown(isInRaid and inCombat)
-		BFL:DebugPrint("[BFL] Combat icon " .. (isInRaid and inCombat and "shown" or "hidden"))
+		-- BFL:DebugPrint("[BFL] Combat icon " .. (isInRaid and inCombat and "shown" or "hidden"))
 	end
 	
     -- Update member button overlays via RaidFrame module
@@ -302,7 +302,7 @@ function BetterRaidFrame_UpdateCombatOverlay(inCombat)
         local raidFrameModule = BFL.Modules and BFL.Modules.RaidFrame
         if raidFrameModule then
             raidFrameModule:UpdateCombatOverlay(inCombat)  -- Pass the parameter!
-            BFL:DebugPrint("[BFL] Member button overlays updated")
+            -- BFL:DebugPrint("[BFL] Member button overlays updated")
         end
     end
 end-- ========================================
@@ -449,7 +449,7 @@ function BetterRaidMemberButton_OnLoad(self)
 end
 
 function BetterRaidMemberButton_OnEnter(self)
-	BFL:DebugPrint("XML OnEnter called for " .. (self:GetName() or "unnamed") .. ", unit=" .. tostring(self.unit))
+	-- BFL:DebugPrint("XML OnEnter called for " .. (self:GetName() or "unnamed") .. ", unit=" .. tostring(self.unit))
 	
 	-- Always show highlight (even for empty slots)
 	if self.Highlight then
@@ -488,7 +488,7 @@ function BetterRaidMemberButton_OnEnter(self)
         -- Show proxy (it will now intercept mouse events)
         proxy:Show()
         
-        BFL:DebugPrint("Proxy summoned via XML OnEnter for " .. tostring(self.unit))
+        -- BFL:DebugPrint("Proxy summoned via XML OnEnter for " .. tostring(self.unit))
 
         -- Manually trigger OnEnter on the proxy immediately
         -- (Because the mouse is already over it, but it just appeared)
@@ -498,8 +498,8 @@ function BetterRaidMemberButton_OnEnter(self)
         end
         return
     else
-        if not RaidFrame then BFL:DebugPrint("OnEnter: RaidFrame module missing") end
-        if RaidFrame and not RaidFrame.SecureProxy then BFL:DebugPrint("OnEnter: SecureProxy missing") end
+        -- if not RaidFrame then BFL:DebugPrint("OnEnter: RaidFrame module missing") end
+        -- if RaidFrame and not RaidFrame.SecureProxy then BFL:DebugPrint("OnEnter: SecureProxy missing") end
     end
 	
 	-- Fallback: Standard Insecure Tooltip (In Combat)
@@ -524,7 +524,7 @@ function BetterRaidMemberButton_OnLeave(self)
 end
 
 function BetterRaidMemberButton_OnClick(self, button)
-	BFL:DebugPrint("XML OnClick called for " .. (self:GetName() or "unnamed") .. ", button=" .. tostring(button) .. ", unit=" .. tostring(self.unit))
+	-- BFL:DebugPrint("XML OnClick called for " .. (self:GetName() or "unnamed") .. ", button=" .. tostring(button) .. ", unit=" .. tostring(self.unit))
 	if not self.unit or not self.name then
 		return
 	end

@@ -52,7 +52,7 @@ local ExecuteOfflineNotification
 function NotificationSystem:Initialize()
     if self.initialized then return end
     
-    BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Initializing NotificationSystem...")
+    -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Initializing NotificationSystem...")
     
     -- Initialize database
     self:InitializeDatabase()
@@ -67,11 +67,11 @@ function NotificationSystem:Initialize()
     SnapshotWoWFriends()
     
     self.initialized = true
-    BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r NotificationSystem initialized successfully")
+    -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r NotificationSystem initialized successfully")
 end
 
 function NotificationSystem:OnEnable()
-    BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r NotificationSystem enabled")
+    -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r NotificationSystem enabled")
     
     -- Disable Blizzard's default BNet toasts to prevent duplicates
     if BNToastFrame then
@@ -81,7 +81,7 @@ function NotificationSystem:OnEnable()
 end
 
 function NotificationSystem:OnDisable()
-    BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r NotificationSystem disabled")
+    -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r NotificationSystem disabled")
     
     -- Cancel all pending offline timers
     for key, timer in pairs(self.offlineTimers) do
@@ -139,7 +139,7 @@ function NotificationSystem:InitializeDatabase()
         BetterFriendlistDB.notificationDisplayMode = "alert"
     end
     
-    BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Database initialized")
+    -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Database initialized")
 end
 
 --[[--------------------------------------------------
@@ -155,7 +155,7 @@ function NotificationSystem:InitializeAlertSystem()
         10  -- maxQueue (queue up to 10)
     )
     
-    BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r AlertFrame SubSystem registered")
+    -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r AlertFrame SubSystem registered")
 end
 
 function NotificationAlertFrame_SetUp(frame, friendName, statusType, message, iconTexture)
@@ -233,7 +233,7 @@ function NotificationSystem:RegisterEvents()
         -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Combat ended - Quiet mode disabled")
     end)
     
-    BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Events registered")
+    -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Events registered")
 end
 
 --[[--------------------------------------------------
