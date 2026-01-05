@@ -259,9 +259,20 @@ local function UpdateFriendsList()
 	local FriendsList = GetFriendsList()
 	
 	if FriendsList then
-		-- Set search and filter from local state
+		-- Set search text from local state
 		FriendsList:SetSearchText(searchText)
-		FriendsList:SetFilterMode(filterMode)
+		
+		-- CRITICAL: Read filterMode from DB instead of local variable to prevent stale values
+		local DB = BFL:GetModule("DB")
+		if DB then
+			local db = DB:Get()
+			if db and db.quickFilter then
+				FriendsList:SetFilterMode(db.quickFilter)
+				-- Update local cache
+				filterMode = db.quickFilter
+			end
+		end
+		
 		-- DON'T override sortMode - it's managed internally by FriendsList module
 		-- FriendsList:SetSortMode(currentSortMode)
 		
@@ -316,30 +327,26 @@ function BetterFriendsFrame_InitQuickFilterDropdown()
 end
 
 -- Set the quick filter mode
+-- DEPRECATED: This function is kept for backward compatibility only
+-- All filter management is now handled by QuickFilters module
 function BetterFriendsFrame_SetQuickFilter(mode)
-	filterMode = mode
-	
-	-- Save to database (ALWAYS update DB first for consistency)
-	local DB = BFL:GetModule("DB")
-	if DB then
-		local db = DB:Get()
-		db.quickFilter = filterMode
+	-- Delegate to QuickFilters module for consistent state management
+	local QuickFilters = GetQuickFilters()
+	if QuickFilters then
+		QuickFilters:SetFilter(mode)
+		-- QuickFilters:SetFilter already calls FriendsList:SetFilterMode and triggers refresh
+		-- No need to call UpdateFriendsList() here - it would cause double update
 	else
-		-- Fallback: direct DB access
+		-- Fallback if module not available
+		filterMode = mode
 		if BetterFriendlistDB then
 			BetterFriendlistDB.quickFilter = filterMode
 		end
+		local FriendsList = GetFriendsList()
+		if FriendsList then
+			FriendsList:SetFilterMode(filterMode)
+		end
 	end
-	
-	-- Update FriendsList module with new filter
-	local FriendsList = GetFriendsList()
-	if FriendsList then
-		FriendsList:SetFilterMode(filterMode)
-	end
-	
-	-- Refresh the friends list
-	UpdateFriendsList()
-	UpdateFriendsDisplay()
 end
 
 -- ========================================

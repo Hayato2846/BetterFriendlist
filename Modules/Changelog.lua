@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.2] - 2026-01-05
+
+### Fixed
+- **QuickFilter Persistence** - Fixed a bug where QuickFilter dropdown changes were not persistently saved, causing updates to apply previously cached values (reported by Loro).
+- **QuickFilter UI** - Removed the separator line between QuickFilter dropdown options.
+- **Hide AFK/DND** - Fixed "Hide AFK/DND" QuickFilter logic to correctly hide AFK/DND friends as expected.
+
 ## [2.1.1] - 2026-01-03
 
 ### Fixed

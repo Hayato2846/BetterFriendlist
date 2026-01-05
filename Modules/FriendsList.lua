@@ -897,11 +897,13 @@ end
 
 -- Initialize the module
 function FriendsList:Initialize()
-	-- Initialize sort modes from database
+	-- Initialize sort modes and filter from database
 	local DB = BFL:GetModule("DB")
 	local db = DB and DB:Get() or {}
 	self.sortMode = db.primarySort or "status"
 	self.secondarySort = db.secondarySort or "name"
+	-- CRITICAL: Load filterMode from DB to ensure consistency
+	self.filterMode = db.quickFilter or "all"
 	
 	-- Sync groups from Groups module
 	self:SyncGroups()
@@ -1762,10 +1764,10 @@ function FriendsList:PassesFilters(friend)
 		if friend.type ~= "bnet" then return false end
 		
 	elseif self.filterMode == "hideafk" then
-		-- Hide AFK/DND friends
-		if friend.type == "bnet" and friend.connected and friend.gameAccountInfo then
-			local gameInfo = friend.gameAccountInfo
-			if gameInfo.isAFK or gameInfo.isDND then
+		-- Hide AFK/DND friends (show all friends, but hide those who are AFK or DND)
+		if friend.type == "bnet" then
+			-- CRITICAL: isAFK/isDND are on friend object directly, not in gameAccountInfo
+			if friend.isAFK or friend.isDND then
 				return false
 			end
 		end

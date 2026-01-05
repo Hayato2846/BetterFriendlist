@@ -64,7 +64,9 @@ function QuickFilters:InitDropdown(dropdown)
 					self:SetFilter(mode)
 					UIDropDownMenu_SetText(dropdown, string.format("|T%s:14:14:-2:-2|t", icon))
 				end
-				info.checked = (filterMode == mode)
+				-- CRITICAL: Read from DB for checked state, not local variable
+				local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
+				info.checked = (currentFilter == mode)
 				UIDropDownMenu_AddButton(info)
 			end
 			
@@ -73,21 +75,13 @@ function QuickFilters:InitDropdown(dropdown)
 			AddFilterOption("offline", "Offline Only", FILTER_ICONS.offline)
 			AddFilterOption("wow", "WoW Only", FILTER_ICONS.wow)
 			AddFilterOption("bnet", "Battle.net Only", FILTER_ICONS.bnet)
-			
-			-- Divider
-			info.text = " "
-			info.disabled = true
-			info.notCheckable = true
-			UIDropDownMenu_AddButton(info)
-			info.disabled = false
-			info.notCheckable = false
-			
 			AddFilterOption("hideafk", "Hide AFK/DND", FILTER_ICONS.hideafk)
 			AddFilterOption("retail", "Retail Only", FILTER_ICONS.retail)
 		end)
 		
-		-- Set initial selected text
-		local currentIcon = FILTER_ICONS[filterMode] or FILTER_ICONS.all
+		-- Set initial selected text (read from DB, not local variable)
+		local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
+		local currentIcon = FILTER_ICONS[currentFilter] or FILTER_ICONS.all
 		UIDropDownMenu_SetText(dropdown, string.format("|T%s:14:14:-2:-2|t", currentIcon))
 		
 		-- Setup tooltip for Classic
@@ -128,7 +122,10 @@ function QuickFilters:InitDropdown(dropdown)
 	
 	-- Helper function to set the filter mode
 	local function SetSelected(mode)
-		if mode ~= filterMode then
+		-- CRITICAL: Read from DB to prevent race conditions
+		-- Using local filterMode variable can lead to stale comparisons when events fire during dropdown changes
+		local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
+		if mode ~= currentFilter then
 			self:SetFilter(mode)
 		end
 	end
@@ -166,8 +163,6 @@ function QuickFilters:InitDropdown(dropdown)
 		local bnetText = string.format(optionText, FILTER_ICONS.bnet, "Battle.net Only")
 		CreateRadio(rootDescription, bnetText, "bnet")
 		
-		rootDescription:CreateDivider()
-		
 		local hideafkText = string.format(optionText, FILTER_ICONS.hideafk, "Hide AFK/DND")
 		CreateRadio(rootDescription, hideafkText, "hideafk")
 		
@@ -194,17 +189,18 @@ end
 
 -- Set the quick filter mode
 function QuickFilters:SetFilter(mode)
-	filterMode = mode
-	
-	-- Update database to stay in sync
+	-- Update database FIRST to ensure consistency
 	if BetterFriendlistDB then
 		BetterFriendlistDB.quickFilter = mode
 	end
 	
-	-- Update FriendsList module with new filter
+	-- Update local cache AFTER DB write
+	filterMode = mode
+	
+	-- Update FriendsList module with new filter (use mode parameter, not cached variable)
 	local FriendsList = GetFriendsList()
 	if FriendsList then
-		FriendsList:SetFilterMode(filterMode)
+		FriendsList:SetFilterMode(mode)
 	end
 	
 	-- Return true to indicate filter changed (caller should refresh display)
@@ -213,11 +209,11 @@ end
 
 -- Get current filter mode
 function QuickFilters:GetFilter()
-	-- Prefer DB value to stay in sync with external changes
-	if BetterFriendlistDB and BetterFriendlistDB.quickFilter then
-		filterMode = BetterFriendlistDB.quickFilter
-	end
-	return filterMode
+	-- ALWAYS read from DB for consistency
+	local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
+	-- Update local cache
+	filterMode = currentFilter
+	return currentFilter
 end
 
 -- Get filter text for UI display
