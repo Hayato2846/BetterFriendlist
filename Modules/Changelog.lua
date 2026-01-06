@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.3] - 2026-01-06
+
+### Fixed
+- **Classic Portrait Button** - Fixed the PortraitButton frame strata and frame level. It now sits correctly above the frame but below dialogs (reported by Twoti).
+- **Classic Invites** - Fixed a Lua error when viewing friend invites in Classic versions (missing text element) (reported by Twoti).
+
 ## [2.1.2] - 2026-01-05
 
 ### Fixed
@@ -1560,11 +1566,14 @@ function Changelog:SetupClassicPortraitButton()
         frame.portrait:Hide() 
     end
     
-    -- Create clickable button as child of UIParent (completely independent)
-    local button = CreateFrame("Button", "BFL_ClassicPortraitButton", UIParent)
+    -- Create clickable button as child of the frame (ensures correct Z-ordering with other windows)
+    -- This fixes the issue where it covers other UI frames like CharacterInfo
+    local button = CreateFrame("Button", "BFL_ClassicPortraitButton", frame)
     button:SetSize(60, 60)
-    button:SetFrameStrata("TOOLTIP")
-    button:SetFrameLevel(9999)
+    
+    -- Ensure it sits above the frame background
+    button:SetFrameLevel(frame:GetFrameLevel() + 5)
+    
     button:EnableMouse(true)
     button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     
@@ -1605,7 +1614,7 @@ function Changelog:SetupClassicPortraitButton()
     
     -- Position relative to main frame
     button:ClearAllPoints()
-    button:SetPoint("TOPLEFT", frame, "TOPLEFT", -5, 7)
+    button:SetPoint("TOPLEFT", -5, 7)
     
     -- Click handler
     button:SetScript("OnClick", function(self, btn)
@@ -1627,14 +1636,9 @@ function Changelog:SetupClassicPortraitButton()
         GameTooltip:Hide()
     end)
     
-    -- Sync visibility with main frame
-    local function SyncVisibility()
-        button:SetShown(frame:IsShown())
-    end
-    
-    frame:HookScript("OnShow", SyncVisibility)
-    frame:HookScript("OnHide", SyncVisibility)
-    SyncVisibility()
+    -- No need to manual sync visibility if it's a child, but let's be safe if it gets parented elsewhere in future
+    -- Actually, child frame automatically hides when parent hides. 
+    -- But we keep the reference logic.
     
     -- Store reference
     frame.PortraitButton = button

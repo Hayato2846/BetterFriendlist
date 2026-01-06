@@ -539,6 +539,39 @@ function FriendsList:InitializeClassicScrollFrame(scrollFrame)
 		self.classicHeaderPool[i] = header
 	end
 	
+	-- Create invite header buttons (Phase 6 Fix)
+	self.classicInviteHeaderPool = {}
+	for i = 1, 5 do -- Max 5 invite headers (usually only 1)
+		local header = CreateFrame("Button", "BetterFriendsInviteHeader" .. i, scrollFrame.ContentFrame, "BFL_FriendInviteHeaderTemplate")
+		header:SetPoint("LEFT", scrollFrame.ContentFrame, "LEFT", 2, 0)
+		header:SetPoint("RIGHT", scrollFrame.ContentFrame, "RIGHT", 3, 0)
+		header:SetHeight(22)
+		header:Hide()
+		self.classicInviteHeaderPool[i] = header
+	end
+	
+	-- Create invite buttons (Phase 6 Fix)
+	self.classicInviteButtonPool = {}
+	for i = 1, 10 do -- Max 10 invites
+		local button = CreateFrame("Button", "BetterFriendsInviteButton" .. i, scrollFrame.ContentFrame, "BFL_FriendInviteButtonTemplate")
+		button:SetPoint("LEFT", scrollFrame.ContentFrame, "LEFT", 2, 0)
+		button:SetPoint("RIGHT", scrollFrame.ContentFrame, "RIGHT", 3, 0)
+		button:SetHeight(34)
+		button:Hide()
+		self.classicInviteButtonPool[i] = button
+	end
+	
+	-- Create divider buttons (Phase 6 Fix)
+	self.classicDividerPool = {}
+	for i = 1, 5 do -- Max 5 dividers
+		local divider = CreateFrame("Frame", "BetterFriendsDivider" .. i, scrollFrame.ContentFrame, "BetterFriendsDividerTemplate")
+		divider:SetPoint("LEFT", scrollFrame.ContentFrame, "LEFT", 2, 0)
+		divider:SetPoint("RIGHT", scrollFrame.ContentFrame, "RIGHT", 3, 0)
+		divider:SetHeight(8)
+		divider:Hide()
+		self.classicDividerPool[i] = divider
+	end
+	
 	-- BFL:DebugPrint(string.format("|cff00ffffFriendsList:|r Created Classic button pool with %d buttons", numButtons))
 end
 
@@ -577,14 +610,16 @@ function FriendsList:RenderClassicButtons()
 	local yOffset = 0
 	local buttonIndex = 1
 	local headerIndex = 1
+	local inviteHeaderIndex = 1
+	local inviteButtonIndex = 1
+	local dividerIndex = 1
 	
 	-- Hide all buttons and headers first
-	for _, button in ipairs(self.classicButtonPool) do
-		button:Hide()
-	end
-	for _, header in ipairs(self.classicHeaderPool) do
-		header:Hide()
-	end
+	for _, button in ipairs(self.classicButtonPool) do button:Hide() end
+	for _, header in ipairs(self.classicHeaderPool) do header:Hide() end
+	if self.classicInviteHeaderPool then for _, b in ipairs(self.classicInviteHeaderPool) do b:Hide() end end
+	if self.classicInviteButtonPool then for _, b in ipairs(self.classicInviteButtonPool) do b:Hide() end end
+	if self.classicDividerPool then for _, b in ipairs(self.classicDividerPool) do b:Hide() end end
 	
 	-- Render visible items
 	for i = 1, numButtons do
@@ -598,6 +633,24 @@ function FriendsList:RenderClassicButtons()
 				-- Use header from header pool
 				button = self.classicHeaderPool[headerIndex]
 				headerIndex = headerIndex + 1
+			elseif elementData.buttonType == BUTTON_TYPE_INVITE_HEADER then
+				-- Use invite header from pool
+				if self.classicInviteHeaderPool then
+					button = self.classicInviteHeaderPool[inviteHeaderIndex]
+					inviteHeaderIndex = inviteHeaderIndex + 1
+				end
+			elseif elementData.buttonType == BUTTON_TYPE_INVITE then
+				-- Use invite button from pool
+				if self.classicInviteButtonPool then
+					button = self.classicInviteButtonPool[inviteButtonIndex]
+					inviteButtonIndex = inviteButtonIndex + 1
+				end
+			elseif elementData.buttonType == BUTTON_TYPE_DIVIDER then
+				-- Use divider from pool
+				if self.classicDividerPool then
+					button = self.classicDividerPool[dividerIndex]
+					dividerIndex = dividerIndex + 1
+				end
 			else
 				-- Use friend button from button pool
 				button = self.classicButtonPool[buttonIndex]
@@ -607,14 +660,8 @@ function FriendsList:RenderClassicButtons()
 			if button and elementData then
 				-- Position button (set BOTH TOPLEFT and RIGHT for full width)
 				button:ClearAllPoints()
-				if elementData.buttonType == BUTTON_TYPE_GROUP_HEADER then
-					button:SetPoint("TOPLEFT", self.classicScrollFrame.ContentFrame, "TOPLEFT", 2, -yOffset)  -- 2px left padding
-					button:SetPoint("RIGHT", self.classicScrollFrame.ContentFrame, "RIGHT", 5, 0)  -- 12px - 2px right padding = 10px
-				else
-					-- Use friend button from button pool
-					button:SetPoint("TOPLEFT", self.classicScrollFrame.ContentFrame, "TOPLEFT", 2, -yOffset)  -- 2px left padding
-					button:SetPoint("RIGHT", self.classicScrollFrame.ContentFrame, "RIGHT", 3, 0)  -- 12px - 2px right padding = 10px
-				end
+				button:SetPoint("TOPLEFT", self.classicScrollFrame.ContentFrame, "TOPLEFT", 2, -yOffset)  -- 2px left padding
+				button:SetPoint("RIGHT", self.classicScrollFrame.ContentFrame, "RIGHT", 5, 0)  -- 12px - 2px right padding = 10px
 				
 				-- Get height for this item type
 				local itemHeight = GetItemHeight(elementData, isCompactMode)
@@ -633,8 +680,8 @@ function FriendsList:RenderClassicButtons()
 				
 				button:Show()
 				yOffset = yOffset + itemHeight
-				buttonIndex = buttonIndex + 1
 			end
+			-- Continue iterating to process other items in the logic (offset calculation)
 		end
 	end
 end

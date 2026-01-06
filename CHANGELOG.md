@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [2.1.3] - 2026-01-06
+### Fixed
+- **Classic Portrait Button** - Fixed the PortraitButton frame strata and frame level. It now sits correctly above the frame but below dialogs (reported by Twoti).
+- **Classic Invites** - Fixed a Lua error when viewing friend invites in Classic versions (missing text element) (reported by Twoti).
+
 ## [2.1.2] - 2026-01-05
 ### Fixed
 - **QuickFilter Persistence** - Fixed a bug where QuickFilter dropdown changes were not persistently saved, causing updates to apply previously cached values (reported by Loro).
