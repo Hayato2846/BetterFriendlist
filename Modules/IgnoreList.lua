@@ -50,6 +50,12 @@ function IgnoreList:OnLoad(frame)
 		frame.ScrollBox:SetPoint("BOTTOMRIGHT", frame.Inset, -22, 2)
 	end
 	
+	-- Localization Fix for Unignore Button
+	if frame.UnignorePlayerButton then
+		-- Use global string or fallback
+		frame.UnignorePlayerButton:SetText(UNIGNORE or "Unignore Player")
+	end
+	
 	-- Classic: Use FauxScrollFrame approach
 	if BFL.IsClassic or not BFL.HasModernScrollBox then
 		-- BFL:DebugPrint("|cff00ffffIgnoreList:|r Using Classic FauxScrollFrame mode")
@@ -102,46 +108,11 @@ function IgnoreList:InitializeClassicIgnoreList(frame)
 			_G["BetterIgnoreScrollBar"] = nil
 		end
 		
-		-- Classic-compatible: Create anonymous Slider without template
-		local scrollBar = CreateFrame("Slider", nil, parent)
-		scrollBar:SetOrientation("VERTICAL")
+		-- Use Standard UIPanelScrollBarTemplate
+		local scrollBar = CreateFrame("Slider", "BetterIgnoreListScrollBar", parent, "UIPanelScrollBarTemplate")
 		scrollBar:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -4, -16)
 		scrollBar:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -4, 16)
-		scrollBar:SetWidth(16)
-		scrollBar:SetMinMaxValues(0, 0)
-		
-		-- Create thumb texture
-		local thumb = scrollBar:CreateTexture(nil, "OVERLAY")
-		thumb:SetTexture("Interface\\Buttons\\UI-ScrollBar-Knob")
-		thumb:SetSize(16, 24)
-		scrollBar:SetThumbTexture(thumb)
-		
-		-- Create up button
-		local up = CreateFrame("Button", nil, scrollBar)
-		up:SetSize(16, 16)
-		up:SetPoint("TOP", scrollBar, "TOP", 0, 0)
-		up:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Up")
-		up:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Down")
-		up:SetDisabledTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Disabled")
-		up:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Highlight")
-		up:SetScript("OnClick", function()
-			local value = scrollBar:GetValue()
-			scrollBar:SetValue(math.max(0, value - 1))
-		end)
-		
-		-- Create down button
-		local down = CreateFrame("Button", nil, scrollBar)
-		down:SetSize(16, 16)
-		down:SetPoint("BOTTOM", scrollBar, "BOTTOM", 0, 0)
-		down:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up")
-		down:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Down")
-		down:SetDisabledTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Disabled")
-		down:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Highlight")
-		down:SetScript("OnClick", function()
-			local value = scrollBar:GetValue()
-			local min, max = scrollBar:GetMinMaxValues()
-			scrollBar:SetValue(math.min(max, value + 1))
-		end)
+		-- Adjust width slightly if needed, template usually handles it
 		
 		scrollBar:SetScript("OnValueChanged", function(self, value)
 			IgnoreList:RenderClassicIgnoreButtons()
@@ -245,8 +216,11 @@ function IgnoreList:Update()
 	local dataList = {}
 
 	local numIgnores = C_FriendList.GetNumIgnores()
-	-- Always show header, even when empty
-	table.insert(dataList, {header="BetterFriendsFrameIgnoredHeaderTemplate"})
+	-- Always show header, even when empty (except in Classic/FauxScrollFrame mode)
+	if not BFL.IsClassic and BFL.HasModernScrollBox then
+		table.insert(dataList, {header="BetterFriendsFrameIgnoredHeaderTemplate"})
+	end
+
 	if numIgnores and numIgnores > 0 then
 		for index = 1, numIgnores do
 			table.insert(dataList, {squelchType=SQUELCH_TYPE_IGNORE, index=index})
@@ -255,7 +229,9 @@ function IgnoreList:Update()
 
 	local numBlocks = BNGetNumBlocked()
 	if numBlocks and numBlocks > 0 then
-		table.insert(dataList, {header="BetterFriendsFrameBlockedInviteHeaderTemplate"})
+		if not BFL.IsClassic and BFL.HasModernScrollBox then
+			table.insert(dataList, {header="BetterFriendsFrameBlockedInviteHeaderTemplate"})
+		end
 		for index = 1, numBlocks do
 			table.insert(dataList, {squelchType=SQUELCH_TYPE_BLOCK_INVITE, index=index})
 		end
@@ -350,4 +326,23 @@ function IgnoreList:Toggle()
 	
 	frame.IgnoreListWindow:SetShown(not frame.IgnoreListWindow:IsShown())
 	PlaySound(SOUNDKIT.IG_CHAT_EMOTE_BUTTON)
+end
+
+-- ========================================
+-- Global XML Event Handlers
+-- ========================================
+
+function BetterIgnoreListButton_OnClick(button)
+	local IgnoreList = BFL:GetModule("IgnoreList")
+	if IgnoreList and button.type and button.index then
+		IgnoreList:SelectSquelched(button.type, button.index)
+		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+	end
+end
+
+function BetterIgnoreList_Unignore()
+	local IgnoreList = BFL:GetModule("IgnoreList")
+	if IgnoreList then
+		IgnoreList:Unignore()
+	end
 end

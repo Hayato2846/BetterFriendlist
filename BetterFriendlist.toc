@@ -2,7 +2,7 @@
 ## Title: BetterFriendlist
 ## Notes: Complete replacement for WoW Friends frame - Custom groups, Raid management, Quick Join, and more!
 ## Author: Hayato2846
-## Version: 2.1.3
+## Version: 2.1.4
 ## IconTexture: Interface\AddOns\BetterFriendlist\Textures\PortraitIcon.blp
 ## X-Curse-Project-ID: 1381771
 ## X-WoWI-ID: 26984
@@ -37,6 +37,8 @@ Utils\ClassicCompat.lua
 # Localization
 Locales\Locales.lua
 Locales\enUS.lua
+Locales\Guild_enUS.lua [AllowLoadGameType vanilla, tbc, wrath, cata, mists]
+Locales\Guild_deDE.lua [AllowLoadGameType vanilla, tbc, wrath, cata, mists]
 Locales\deDE.lua
 Locales\esES.lua
 Locales\esMX.lua
@@ -82,6 +84,8 @@ Modules\GlobalSync.lua
 Modules\Dialogs.lua
 Modules\RAF.lua [AllowLoadGameType mainline]
 Modules\RaidFrame.lua
+Modules\GuildRoster.lua [AllowLoadGameType vanilla, tbc, wrath, cata, mists]
+Modules\GuildDetails.lua [AllowLoadGameType vanilla, tbc, wrath, cata, mists]
 BetterFriendlist_QuickJoin.xml [AllowLoadGameType mainline]
 Modules\QuickJoin.lua [AllowLoadGameType mainline]
 Modules\PreviewMode.lua
@@ -96,6 +100,8 @@ UI\QuickJoinCallbacks.lua [AllowLoadGameType mainline]
 BetterFriendlist.lua
 BetterFriendlist.xml [AllowLoadGameType mainline]
 BetterFriendlist_Classic.xml [AllowLoadGameType vanilla, tbc, wrath, cata, mists]
+UI\GuildTab.xml [AllowLoadGameType vanilla, tbc, wrath, cata, mists]
+UI\GuildPopups.xml [AllowLoadGameType vanilla, tbc, wrath, cata, mists]
 BetterFriendlist_InviteTemplates.xml
 BetterFriendlist_NotificationAlert.xml
 BetterFriendlist_Tooltip.lua

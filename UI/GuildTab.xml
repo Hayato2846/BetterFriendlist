@@ -1,0 +1,423 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+    <Frame name="BFL_GuildFrame" parent="BetterFriendsFrame" hidden="true">
+        <Anchors>
+            <Anchor point="TOPLEFT" relativeKey="$parent.Inset" x="4" y="-4"/>
+            <Anchor point="BOTTOMRIGHT" relativeKey="$parent.Inset" x="-4" y="4"/>
+        </Anchors>
+        <Scripts>
+            <OnLoad>
+                -- Initialize buttons in Lua if needed, or rely on module Initialize
+                if BFL and BFL.GuildRoster then
+                    BFL.GuildRoster:OnFrameLoad(self)
+                end
+            </OnLoad>
+            <OnShow>
+                if BFL and BFL.GuildRoster then
+                    BFL.GuildRoster:RefreshDisplay()
+                end
+            </OnShow>
+        </Scripts>
+        
+        <Layers>
+            <Layer level="BACKGROUND">
+                <FontString name="BFL_GuildFrameTotals" 
+                            inherits="GameFontNormalSmall" 
+                            justifyH="LEFT">
+                    <Size x="0" y="16"/>
+                    <Anchors>
+                        <Anchor point="BOTTOMLEFT" relativeKey="$parent" relativePoint="BOTTOMLEFT" x="14" y="82"/>
+                    </Anchors>
+                </FontString>
+                
+                <FontString name="BFL_GuildFrameOnlineTotals" 
+                            inherits="GameFontNormalSmall" 
+                            justifyH="LEFT">
+                    <Size x="0" y="16"/>
+                    <Anchors>
+                        <Anchor point="LEFT" 
+                                relativeTo="BFL_GuildFrameTotals" 
+                                relativePoint="RIGHT" x="3" y="0"/>
+                    </Anchors>
+                </FontString>
+                
+                <!-- MOTD -->
+                <FontString name="BFL_GuildFrameNotesLabel" 
+                            inherits="GameFontNormalSmall" 
+                            justifyH="LEFT" 
+                            text="GUILD_MOTD_LABEL">
+                    <Size x="225" y="11"/>
+                    <Anchors>
+                        <Anchor point="BOTTOMLEFT" relativeKey="$parent" relativePoint="BOTTOMLEFT" x="12" y="60"/>
+                    </Anchors>
+                </FontString>
+                
+                <FontString name="BFL_GuildFrameNotesText" 
+                            inherits="GameFontHighlightSmall" 
+                            justifyH="LEFT" 
+                            justifyV="TOP">
+                    <Size x="315" y="32"/>
+                    <Anchors>
+                        <Anchor point="TOPLEFT" 
+                                relativeTo="BFL_GuildFrameNotesLabel" 
+                                relativePoint="BOTTOMLEFT" x="0" y="-2"/>
+                    </Anchors>
+                </FontString>
+            </Layer>
+        </Layers>
+        
+        <Frames>
+            <!-- Player Status Frame (Name, Zone, Level, Class) -->
+            <Frame name="BFL_GuildPlayerStatusFrame" hidden="false">
+                <Size x="300" y="200"/>
+                <Anchors>
+                    <Anchor point="TOPLEFT"/>
+                </Anchors>
+                
+                <Frames>
+                    <!-- Column Headers -->
+                    <Button name="BFL_GuildFrameColumnHeader1" 
+                            inherits="GuildFrameColumnHeaderTemplate" 
+                            text="NAME">
+                        <Anchors>
+                            <Anchor point="TOPLEFT" x="7" y="-24"/>
+                        </Anchors>
+                        <Scripts>
+                            <OnLoad>
+                                WhoFrameColumn_SetWidth(self, 83)
+                                self.sortType = "name"
+                            </OnLoad>
+                            <OnClick>
+                                BFL.GuildRoster:SortRoster(self.sortType)
+                                PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+                            </OnClick>
+                        </Scripts>
+                    </Button>
+                    
+                    <Button name="BFL_GuildFrameColumnHeader2"
+                            inherits="GuildFrameColumnHeaderTemplate"
+                            text="ZONE">
+                        <Anchors>
+                            <Anchor point="LEFT" 
+                                    relativeTo="BFL_GuildFrameColumnHeader1" 
+                                    relativePoint="RIGHT" x="-2" y="0"/>
+                        </Anchors>
+                        <Scripts>
+                            <OnLoad>
+                                WhoFrameColumn_SetWidth(self, 105)
+                                self.sortType = "zone"
+                            </OnLoad>
+                            <OnClick>
+                                BFL.GuildRoster:SortRoster(self.sortType)
+                                PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+                            </OnClick>
+                        </Scripts>
+                    </Button>
+                    
+                    <Button name="BFL_GuildFrameColumnHeader3"
+                            inherits="GuildFrameColumnHeaderTemplate"
+                            text="LEVEL_ABBR">
+                        <Anchors>
+                            <Anchor point="LEFT" 
+                                    relativeTo="BFL_GuildFrameColumnHeader2" 
+                                    relativePoint="RIGHT" x="-2" y="0"/>
+                        </Anchors>
+                        <Scripts>
+                            <OnLoad>
+                                WhoFrameColumn_SetWidth(self, 32)
+                                self.sortType = "level"
+                            </OnLoad>
+                            <OnClick>
+                                BFL.GuildRoster:SortRoster(self.sortType)
+                                PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+                            </OnClick>
+                        </Scripts>
+                    </Button>
+                    
+                    <Button name="BFL_GuildFrameColumnHeader4"
+                            inherits="GuildFrameColumnHeaderTemplate"
+                            text="CLASS">
+                        <Anchors>
+                            <Anchor point="LEFT" 
+                                    relativeTo="BFL_GuildFrameColumnHeader3" 
+                                    relativePoint="RIGHT" x="-2" y="0"/>
+                        </Anchors>
+                        <Scripts>
+                            <OnLoad>
+                                WhoFrameColumn_SetWidth(self, 92)
+                                self.sortType = "class"
+                            </OnLoad>
+                            <OnClick>
+                                BFL.GuildRoster:SortRoster(self.sortType)
+                                PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+                            </OnClick>
+                        </Scripts>
+                    </Button>
+                    
+                    <!-- Guild Member Buttons (13 visible) -->
+                    <Button name="BFL_GuildFrameButton1" 
+                            inherits="FriendsFrameGuildPlayerStatusButtonTemplate" 
+                            id="1">
+                        <Anchors>
+                            <Anchor point="TOPLEFT" x="3" y="-49"/>
+                        </Anchors>
+                        <Scripts>
+                            <OnClick>
+                                if BFL.GuildRoster then
+                                    BFL.GuildRoster:OnButtonClick(self, button)
+                                end
+                            </OnClick>
+                        </Scripts>
+                    </Button>
+                    <!-- Buttons 2-13 created in Lua -->
+                </Frames>
+            </Frame>
+            
+            <!-- Guild Status Frame (Name, Rank, Note, Last Online) -->
+            <Frame name="BFL_GuildStatusFrame" hidden="true">
+                <Size x="300" y="200"/>
+                <Anchors>
+                    <Anchor point="TOPLEFT"/>
+                </Anchors>
+                
+                <Frames>
+                    <!-- Column Headers -->
+                    <Button name="BFL_GuildFrameGuildStatusColumnHeader1"
+                            inherits="GuildFrameColumnHeaderTemplate"
+                            text="NAME">
+                        <Anchors>
+                            <Anchor point="TOPLEFT" x="7" y="-24"/>
+                        </Anchors>
+                        <Scripts>
+                            <OnLoad>
+                                WhoFrameColumn_SetWidth(self, 83)
+                                self.sortType = "name"
+                            </OnLoad>
+                            <OnClick>
+                                BFL.GuildRoster:SortRoster(self.sortType)
+                                PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+                            </OnClick>
+                        </Scripts>
+                    </Button>
+                    
+                    <Button name="BFL_GuildFrameGuildStatusColumnHeader2"
+                            inherits="GuildFrameColumnHeaderTemplate"
+                            text="RANK">
+                        <Anchors>
+                            <Anchor point="LEFT" 
+                                    relativeTo="BFL_GuildFrameGuildStatusColumnHeader1" 
+                                    relativePoint="RIGHT" x="-2" y="0"/>
+                        </Anchors>
+                        <Scripts>
+                            <OnLoad>
+                                WhoFrameColumn_SetWidth(self, 75)
+                                self.sortType = "rank"
+                            </OnLoad>
+                            <OnClick>
+                                BFL.GuildRoster:SortRoster(self.sortType)
+                                PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+                            </OnClick>
+                        </Scripts>
+                    </Button>
+                    
+                    <Button name="BFL_GuildFrameGuildStatusColumnHeader3"
+                            inherits="GuildFrameColumnHeaderTemplate"
+                            text="LABEL_NOTE">
+                        <Anchors>
+                            <Anchor point="LEFT" 
+                                    relativeTo="BFL_GuildFrameGuildStatusColumnHeader2" 
+                                    relativePoint="RIGHT" x="-2" y="0"/>
+                        </Anchors>
+                        <Scripts>
+                            <OnLoad>
+                                WhoFrameColumn_SetWidth(self, 75)
+                                self.sortType = "note"
+                            </OnLoad>
+                            <OnClick>
+                                BFL.GuildRoster:SortRoster(self.sortType)
+                                PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+                            </OnClick>
+                        </Scripts>
+                    </Button>
+                    
+                    <Button name="BFL_GuildFrameGuildStatusColumnHeader4"
+                            inherits="GuildFrameColumnHeaderTemplate"
+                            text="LASTONLINE">
+                        <Anchors>
+                            <Anchor point="LEFT" 
+                                    relativeTo="BFL_GuildFrameGuildStatusColumnHeader3" 
+                                    relativePoint="RIGHT" x="-2" y="0"/>
+                        </Anchors>
+                        <Scripts>
+                            <OnLoad>
+                                WhoFrameColumn_SetWidth(self, 75)
+                                self.sortType = "online"
+                            </OnLoad>
+                            <OnClick>
+                                BFL.GuildRoster:SortRoster(self.sortType)
+                                PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+                            </OnClick>
+                        </Scripts>
+                    </Button>
+                    
+                    <!-- Guild Status Buttons (13 visible) -->
+                    <Button name="BFL_GuildFrameGuildStatusButton1"
+                            inherits="FriendsFrameGuildStatusButtonTemplate"
+                            id="1">
+                        <Anchors>
+                            <Anchor point="TOPLEFT" 
+                                    relativeTo="BFL_GuildFrameButton1"/>
+                        </Anchors>
+                        <Scripts>
+                            <OnClick>
+                                BFL.GuildRoster:OnButtonClick(self, button)
+                            </OnClick>
+                        </Scripts>
+                    </Button>
+                    <!-- Buttons 2-13 created in Lua -->
+                </Frames>
+            </Frame>
+            
+            <!-- Scroll Frame -->
+            <ScrollFrame name="BFL_GuildListScrollFrame" 
+                         inherits="FauxScrollFrameTemplate">
+                <Size x="296"/>
+                <Anchors>
+                    <Anchor point="TOPRIGHT" x="-32" y="-51"/>
+                    <Anchor point="BOTTOM" x="0" y="100"/>
+                </Anchors>
+                <Scripts>
+                    <OnVerticalScroll>
+                        FauxScrollFrame_OnVerticalScroll(self, offset, 
+                            14, 
+                            function() 
+                                if BFL.GuildRoster then
+                                    BFL.GuildRoster:RefreshDisplay() 
+                                end
+                            end)
+                    </OnVerticalScroll>
+                </Scripts>
+            </ScrollFrame>
+            
+            <!-- Totals Display moved to Layers above -->
+            
+            <!-- Show Offline Checkbox -->
+            <Frame name="BFL_GuildFrameLFGFrame">
+                <Size x="210" y="23"/>
+                <Anchors>
+                    <Anchor point="TOPRIGHT" x="-10" y="0"/>
+                </Anchors>
+                <Frames>
+                    <CheckButton name="BFL_GuildFrameLFGButton">
+                        <Size x="30" y="30"/>
+                        <Anchors>
+                            <Anchor point="RIGHT" x="-8" y="0"/>
+                        </Anchors>
+                        <Scripts>
+                            <OnLoad>
+                                self:SetChecked(GetGuildRosterShowOffline())
+                            </OnLoad>
+                            <OnClick>
+                                PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+                                if BFL.GuildRoster then
+                                    BFL.GuildRoster:ToggleOfflineMembers()
+                                end
+                            </OnClick>
+                        </Scripts>
+                        <NormalTexture file="Interface\Buttons\UI-CheckBox-Up"/>
+                        <PushedTexture file="Interface\Buttons\UI-CheckBox-Down"/>
+                        <HighlightTexture file="Interface\Buttons\UI-CheckBox-Highlight" 
+                                          alphaMode="ADD"/>
+                        <CheckedTexture file="Interface\Buttons\UI-CheckBox-Check"/>
+                        <DisabledCheckedTexture 
+                            file="Interface\Buttons\UI-CheckBox-Check-Disabled"/>
+                    </CheckButton>
+                </Frames>
+            </Frame>
+            
+            <!-- Bottom Buttons -->
+            <Button name="BFL_GuildFrameGuildInformationButton" 
+                    inherits="UIPanelButtonTemplate" 
+                    text="GUILD_INFORMATION">
+                <Size x="123" y="22"/>
+                <Anchors>
+                    <Anchor point="BOTTOMLEFT" x="8" y="4"/>
+                </Anchors>
+                <Scripts>
+                    <OnClick>
+                        -- BFL.GuildInfo:Toggle()
+                        -- Placeholder
+                    </OnClick>
+                </Scripts>
+            </Button>
+            
+            <Button name="BFL_GuildFrameAddMemberButton" 
+                    inherits="UIPanelButtonTemplate" 
+                    text="ADDMEMBER">
+                <Size x="98" y="22"/>
+                <Anchors>
+                    <Anchor point="LEFT" 
+                            relativeTo="BFL_GuildFrameGuildInformationButton" 
+                            relativePoint="RIGHT" x="2" y="0"/>
+                </Anchors>
+                <Scripts>
+                    <OnClick>
+                        StaticPopup_Show("ADD_GUILDMEMBER")
+                    </OnClick>
+                    <OnUpdate>
+                        if CanGuildInvite() then
+                            self:Enable()
+                        else
+                            self:Disable()
+                        end
+                    </OnUpdate>
+                </Scripts>
+            </Button>
+            
+            <Button name="BFL_GuildFrameControlButton" 
+                    inherits="UIPanelButtonTemplate" 
+                    text="GUILDCONTROL">
+                <Size x="104" y="22"/>
+                <Anchors>
+                    <Anchor point="BOTTOMRIGHT" x="-6" y="4"/>
+                </Anchors>
+                <Scripts>
+                    <OnClick>
+                        -- BFL.GuildControl:Toggle()
+                        -- Placeholder
+                    </OnClick>
+                    <OnUpdate>
+                        if IsGuildLeader() then
+                            self:Enable()
+                        else
+                            self:Disable()
+                        end
+                    </OnUpdate>
+                </Scripts>
+            </Button>
+            
+            <!-- Toggle Display Mode Button -->
+            <Button name="BFL_GuildFrameGuildListToggleButton">
+                <Size x="32" y="32"/>
+                <Anchors>
+                    <Anchor point="LEFT" relativeTo="BFL_GuildFrameTotals" relativePoint="RIGHT" x="10" y="0"/>
+                </Anchors>
+                <Scripts>
+                    <OnClick>
+                        if BFL.GuildRoster then
+                            BFL.GuildRoster:ToggleDisplayMode()
+                        end
+                    </OnClick>
+                </Scripts>
+                <NormalTexture 
+                    file="Interface\Buttons\UI-SpellbookIcon-NextPage-Up"/>
+                <PushedTexture 
+                    file="Interface\Buttons\UI-SpellbookIcon-NextPage-Down"/>
+                <DisabledTexture 
+                    file="Interface\Buttons\UI-SpellbookIcon-NextPage-Disabled"/>
+                <HighlightTexture 
+                    file="Interface\Buttons\UI-Common-MouseHilight" 
+                    alphaMode="ADD"/>
+            </Button>
+        </Frames>
+    </Frame>
+</Ui>

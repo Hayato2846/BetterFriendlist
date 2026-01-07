@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [2.1.4] - 2026-01-07
+### Fixed
+- **Ignore List (Classic)** - Fixed visual layout issues in the Ignore List window:
+  - Removed top gap ensuring the empty list starts at the correct position.
+  - Replaced legacy scrollbar with standard UIPanelScrollBar for better visibility and usability.
+  - Fixed "Unignore Player" button text displaying as a variable name instead of localized text.
+
 ## [2.1.3] - 2026-01-06
 ### Fixed
 - **Classic Portrait Button** - Fixed the PortraitButton frame strata and frame level. It now sits correctly above the frame but below dialogs (reported by Twoti).

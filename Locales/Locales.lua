@@ -1,7 +1,7 @@
 -- Locales/Locales.lua
 -- Main Localization System for BetterFriendlist
 
-local ADDON_NAME = "BetterFriendlist"
+local ADDON_NAME, BFL = ...
 
 -- Initialize locale table
 BFL_LOCALE = {}
@@ -18,6 +18,7 @@ local L = setmetatable({}, {
 
 -- Make accessible globally for all addon modules
 _G["BFL_L"] = L
+BFL.L = L
 
 -- Debug function to check missing translations (can be removed in production)
 function BFL_GetMissingTranslations()

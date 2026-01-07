@@ -905,23 +905,49 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			end)
 		end
 		
-		-- Classic Mode: Hide Retail-only tabs (Recent Allies, RAF)
-		-- Tab1 = Friends, Tab2 = Recent Allies, Tab3 = RAF, Tab4 = Sort (XML)
-		-- In Classic: Only Tab1 = Friends should be visible
-		if BFL.IsClassic and BetterFriendsFrame then
-			-- BFL:DebugPrint("|cffffcc00BFL:|r Classic mode - hiding Retail-only tabs (Recent Allies, RAF)")
+-- TEMPORARY: Disable Guild Tab setup for background development
+if false and BFL.IsClassic and BetterFriendsFrame then
+			-- Classic has 4 main tabs: Friends(1), Who(2), Guild(3), Raid(4)
 			
-			-- Hide Tab2 (Recent Allies) and Tab3 (RAF)
-			if BetterFriendsFrame.Tab2 then BetterFriendsFrame.Tab2:Hide() end
-			if BetterFriendsFrame.Tab3 then BetterFriendsFrame.Tab3:Hide() end
+			-- TAB 3: Change "Raid" to "Guild"
+			if BetterFriendsFrame.BottomTab3 then
+				BetterFriendsFrame.BottomTab3:SetText(GUILD or "Guild")
+				BetterFriendsFrame.BottomTab3:SetScript("OnClick", function(self)
+					PanelTemplates_Tab_OnClick(self, BetterFriendsFrame)
+					BetterFriendsFrame_ShowBottomTab(3)
+					PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+				end)
+			end
+
+			-- TAB 4: Create "Raid" tab (was Guild)
+			if not BetterFriendsFrame.BottomTab4 then
+				local tab = CreateFrame("Button", "BetterFriendsFrameBottomTab4", BetterFriendsFrame, "CharacterFrameTabButtonTemplate")
+				tab:SetID(4)
+				tab:SetText(RAID or "Raid") 
+				-- Anchor: RIGHT of Tab 3
+				tab:SetPoint("LEFT", BetterFriendsFrame.BottomTab3, "RIGHT", -15, 0)
+				tab:SetFrameStrata("LOW")
+				
+				-- Script
+				tab:SetScript("OnClick", function(self)
+					PanelTemplates_Tab_OnClick(self, BetterFriendsFrame)
+					BetterFriendsFrame_ShowBottomTab(4)
+					PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+				end)
+				
+				BetterFriendsFrame.BottomTab4 = tab
+			end
 			
-			-- Also hide the frames themselves
-			if BetterFriendsFrame.RecentAlliesFrame then BetterFriendsFrame.RecentAlliesFrame:Hide() end
-			if BetterFriendsFrame.RecruitAFriendFrame then BetterFriendsFrame.RecruitAFriendFrame:Hide() end
-			if BetterFriendsFrame.QuickJoinFrame then BetterFriendsFrame.QuickJoinFrame:Hide() end
+			-- Setup Tabs Registry for PanelTemplates
+			BetterFriendsFrame.Tabs = {
+				BetterFriendsFrame.BottomTab1,
+				BetterFriendsFrame.BottomTab2,
+				BetterFriendsFrame.BottomTab3,
+				BetterFriendsFrame.BottomTab4
+			}
 			
-			-- Set only 1 tab visible (Friends only)
-			PanelTemplates_SetNumTabs(BetterFriendsFrame, 1)
+			-- Enable 4 Tabs
+			PanelTemplates_SetNumTabs(BetterFriendsFrame, 4)
 			PanelTemplates_SetTab(BetterFriendsFrame, 1)
 		end
 	end
@@ -1077,12 +1103,6 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 	local frame = BetterFriendsFrame
 	if not frame then return end
 	
-	-- Classic Guard: Only Friends tab (1) is available in Classic
-	if BFL.IsClassic and tabIndex ~= 1 then
-		-- BFL:DebugPrint("|cffffcc00BFL:|r Classic mode - tab\", tabIndex, \"not available, showing Friends tab")
-		tabIndex = 1
-	end
-	
 	-- Use hybrid helper functions for all child frames
 	HideChildFrame(frame.SortFrame)
 	HideChildFrame(frame.RecentAlliesFrame)
@@ -1093,6 +1113,15 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 	HideChildFrame(frame.SendMessageButton)
 	HideChildFrame(frame.RecruitmentButton)
 	
+	-- Additional Classic frames
+	HideChildFrame(frame.WhoFrame)
+	if BFL.IsClassic and _G.BFL_GuildFrame then
+		HideChildFrame(_G.BFL_GuildFrame)
+	end
+	if BFL.IsClassic and frame.RaidFrame then
+		HideChildFrame(frame.RaidFrame)
+	end
+
 	if tabIndex == 1 then
 		-- Show Friends list
 		ShowChildFrame(frame.ScrollFrame)
@@ -1101,20 +1130,24 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 		ShowChildFrame(frame.SendMessageButton)
 		UpdateFriendsDisplay()
 	elseif tabIndex == 2 then
-		-- Show Recent Allies
-		if frame.RecentAlliesFrame then
+		-- Retail: Recent Allies
+		if not BFL.IsClassic and frame.RecentAlliesFrame then
 			ShowChildFrame(frame.RecentAlliesFrame)
 			local RecentAllies = BFL:GetModule("RecentAllies")
 			if RecentAllies then
 				RecentAllies:Refresh(frame.RecentAlliesFrame, ScrollBoxConstants.RetainScrollPosition)
 			end
+		-- Classic: Who Frame
+		elseif BFL.IsClassic and frame.WhoFrame then
+			ShowChildFrame(frame.WhoFrame)
+			BetterWhoFrame_Update()
 		end
 	elseif tabIndex == 3 then
-		-- Show Recruit A Friend
-		if frame.RecruitAFriendFrame then
+		-- Retail: Recruit A Friend
+		if not BFL.IsClassic and frame.RecruitAFriendFrame then
 			ShowChildFrame(frame.RecruitAFriendFrame)
 			ShowChildFrame(frame.RecruitmentButton)
-			
+				
 			-- Initialize RAF data (match Blizzard's OnLoad behavior)
 			if C_RecruitAFriend and C_RecruitAFriend.IsSystemEnabled then
 				-- Ensure Blizzard's RecruitAFriendFrame is loaded and initialized
@@ -1163,10 +1196,25 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 				-- Request updated recruitment info (enables "Generate Link" functionality)
 				C_RecruitAFriend.RequestUpdatedRecruitmentInfo()
 			end
+		-- Classic: Guild Frame
+		elseif BFL.IsClassic and _G.BFL_GuildFrame then
+			-- TEMP: Guild Tab disabled, redirect Tab 3 (RAID) to RaidFrame
+			-- ShowChildFrame(_G.BFL_GuildFrame)
+			if frame.RaidFrame then
+				ShowChildFrame(frame.RaidFrame)
+			end
 		end
 	elseif tabIndex == 4 then
-		-- Show Sort options (11.2.5: restored from dropdown to tab)
-		ShowChildFrame(frame.SortFrame)
+		-- Retail: Sort options
+		if not BFL.IsClassic then
+			-- Show Sort options (11.2.5: restored from dropdown to tab)
+			ShowChildFrame(frame.SortFrame)
+		-- Classic: Raid Frame
+		else
+			if frame.RaidFrame then
+				ShowChildFrame(frame.RaidFrame)
+			end
+		end
 	end
 end
 
@@ -1204,6 +1252,9 @@ end
 
 -- Update Quick Join tab with group count (matching Blizzard's FriendsFrame_UpdateQuickJoinTab)
 function BetterFriendsFrame_UpdateQuickJoinTab()
+	-- Quick Join is Retail only
+	if BFL.IsClassic then return end
+
 	local frame = BetterFriendsFrame
 	if not frame or not frame.BottomTab4 then return end
 	
@@ -2056,6 +2107,11 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex)
 	HideChildFrame(frame.RecruitAFriendFrame)
 	HideChildFrame(frame.QuickJoinFrame)
 	
+	-- Classic: Guild Frame
+	if BFL.IsClassic and _G.BFL_GuildFrame then
+		HideChildFrame(_G.BFL_GuildFrame)
+	end
+	
 	-- Hide all friend list buttons explicitly
 	-- REMOVED: ScrollBox handles button visibility automatically
 	-- if tabIndex ~= 1 then
@@ -2081,7 +2137,8 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex)
 	
 	-- Hide/show Inset based on tab
 	if frame.Inset then
-		if tabIndex == 2 or tabIndex == 3 then
+		-- Classic Tab 4 (Guild) also needs Inset hidden
+		if tabIndex == 2 or tabIndex == 3 or (BFL.IsClassic and tabIndex == 4) then
 			HideChildFrame(frame.Inset)
 		else
 			ShowChildFrame(frame.Inset)
@@ -2100,13 +2157,28 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex)
 		ShowChildFrame(frame.WhoFrame)
 		BetterWhoFrame_Update()
 	elseif tabIndex == 3 then
-		-- Raid frame
-		ShowChildFrame(frame.RaidFrame)
+		if BFL.IsClassic then
+			-- Classic: Guild Frame
+			-- TEMP: Guild Tab disabled, redirect Tab 3 (RAID) to RaidFrame
+			if frame.RaidFrame then
+				ShowChildFrame(frame.RaidFrame)
+			end
+		else
+			-- Retail: Raid frame
+			ShowChildFrame(frame.RaidFrame)
+		end
 	elseif tabIndex == 4 then
-		-- Quick Join
-		ShowChildFrame(frame.QuickJoinFrame)
-		if BetterQuickJoinFrame_OnShow then
-			BetterQuickJoinFrame_OnShow(frame.QuickJoinFrame)
+		if BFL.IsClassic then
+			-- Classic: Raid Frame
+			if frame.RaidFrame then
+				ShowChildFrame(frame.RaidFrame)
+			end
+		else
+			-- Retail: Quick Join
+			ShowChildFrame(frame.QuickJoinFrame)
+			if BetterQuickJoinFrame_OnShow then
+				BetterQuickJoinFrame_OnShow(frame.QuickJoinFrame)
+			end
 		end
 	end
 end
