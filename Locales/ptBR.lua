@@ -17,7 +17,37 @@ if GetLocale() == "ptBR" then
 	L.DIALOG_RESET_SETTINGS_TEXT = "Redefinir todas as configurações para os valores padrão?"
 	L.DIALOG_RESET_BTN1 = "Redefinir"
 	L.DIALOG_RESET_BTN2 = "Cancelar"
-	L.DIALOG_MIGRATE_TEXT = "Migrar grupos de amigos de FriendGroups para BetterFriendlist?\n\nIsso irá:\n• Criar todos os grupos a partir das notas BNet\n• Atribuir amigos aos seus grupos\n• Opcionalmente limpar as notas\n\n|cffff0000Aviso: Isso não pode ser desfeito!|r"
+	L.DIALOG_UI_PANEL_RELOAD_TEXT = "Alterar a configuração de hierarquia da IU requer um recarregamento da interface.\n\nRecarregar agora?"
+	L.DIALOG_UI_PANEL_RELOAD_BTN1 = "Recarregar"
+	L.DIALOG_UI_PANEL_RELOAD_BTN2 = "Cancelar"
+	L.RAID_HELP_TITLE = "Ajuda de raide"
+	L.RAID_HELP_TEXT = "Clique para obter ajuda sobre a lista de raide."
+	L.RAID_HELP_MULTISELECT_TITLE = "Seleção múltipla"
+	L.RAID_HELP_MULTISELECT_TEXT = "Segure Ctrl e clique com o botão esquerdo para selecionar vários jogadores.\nUma vez selecionados, arraste e solte-os em qualquer grupo para movê-los todos de uma vez."
+	L.RAID_HELP_MAINTANK_TITLE = "Tanque principal"
+	L.RAID_HELP_MAINTANK_TEXT = "Shift + Clique direito em um jogador para defini-lo como tanque principal.\nUm ícone de tanque aparecerá ao lado de seu nome."
+	L.RAID_HELP_MAINASSIST_TITLE = "Assistente principal"
+	L.RAID_HELP_MAINASSIST_TEXT = "Ctrl + Clique direito em um jogador para defini-lo como assistente principal.\nUm ícone de assistente aparecerá ao lado de seu nome."
+	L.RAID_HELP_DRAGDROP_TITLE = "Arrastar e soltar"
+	L.RAID_HELP_DRAGDROP_TEXT = "Arraste qualquer jogador para movê-lo entre grupos.\nVocê também pode arrastar vários jogadores selecionados de uma vez.\nEspaços vazios podem ser usados para trocar posições."
+	L.RAID_HELP_COMBAT_TITLE = "Bloqueio de combate"
+	L.RAID_HELP_COMBAT_TEXT = "Os jogadores não podem ser movidos durante o combate.\nEsta é uma restrição da Blizzard para evitar erros."	L.RAID_INFO_UNAVAILABLE = "Nenhuma informação disponível"
+	L.RAID_NOT_IN_RAID = "Não está em Raide"
+	L.RAID_NOT_IN_RAID_DETAILS = "Você não está atualmente em um grupo de raide."
+	L.RAID_CREATE_BUTTON = "Criar Raide"
+	L.GROUP = "Grupo"
+	L.ALL = "Todos"
+	L.UNKNOWN_ERROR = "Erro desconhecido"
+	L.RAID_ERROR_NOT_ENOUGH_SPACE = "Espaço insuficiente: %d jogadores selecionados, %d vagas livres no Grupo %d"
+	L.RAID_MSG_BULK_MOVE_SUCCESS = "Movidos %d jogadores para o Grupo %d"
+	L.RAID_ERROR_BULK_MOVE_FAILED = "Falha ao mover %d jogadores"
+	L.RAID_ERROR_READY_CHECK_PERMISSION = "Você deve ser o líder da raide ou assistente para iniciar uma verificação de prontidão."
+	L.RAID_ERROR_NO_SAVED_INSTANCES = "Você não tem instâncias de raide salvas."
+	L.RAID_ERROR_LOAD_RAID_INFO = "Erro: Não foi possível carregar o quadro de Informações de Raide."
+	L.RAID_MSG_SWAP_SUCCESS = "%s <-> %s trocados"
+	L.RAID_ERROR_SWAP_FAILED = "Troca falhou: %s"
+	L.RAID_MSG_MOVE_SUCCESS = "%s movido para o Grupo %d"
+	L.RAID_ERROR_MOVE_FAILED = "Movimento falhou: %s"	L.DIALOG_MIGRATE_TEXT = "Migrar grupos de amigos do FriendGroups para o BetterFriendlist?\n\nIsso irá:\n• Criar todos os grupos a partir de notas da BNet\n• Atribuir amigos aos seus grupos\n• Opcionalmente limpar notas\n\n|cffff0000Aviso: Isso não pode ser desfeito!|r"
 	L.DIALOG_MIGRATE_BTN1 = "Migrar e Limpar Notas"
 	L.DIALOG_MIGRATE_BTN2 = "Apenas Migrar"
 	L.DIALOG_MIGRATE_BTN3 = "Cancelar"
@@ -285,8 +315,29 @@ if GetLocale() == "ptBR" then
 	L.RECENT_ALLIES_NOT_AVAILABLE = "Aliados Recentes não disponível no Classic"
 	L.EDIT_MODE_NOT_AVAILABLE = "Modo de Edição não disponível no Classic"
 	L.CLASSIC_COMPATIBILITY_INFO = "Executando em modo de compatibilidade Classic"
-	L.FEATURE_NOT_AVAILABLE_CLASSIC = "Esta funcionalidade não está disponível no Classic"
+	L.FEATURE_NOT_AVAILABLE_CLASSIC = "Esta funcionalidade não está disponível no Classic"	L.SETTINGS_CLOSE_ON_GUILD_TAB = "Fechar BetterFriendlist ao abrir Guilda"
+	L.SETTINGS_CLOSE_ON_GUILD_TAB_DESC = "Fechar automaticamente BetterFriendlist ao clicar na aba de Guilda"
+	L.SETTINGS_HIDE_GUILD_TAB = "Ocultar aba de Guilda"
+	L.SETTINGS_HIDE_GUILD_TAB_DESC = "Ocultar a aba de Guilda da lista de amigos"
+	L.SETTINGS_USE_UI_PANEL_SYSTEM = "Respeitar hierarquia de IU"
+	L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Impede que BetterFriendlist abra sobre outras janelas de IU (Personagem, Grimório, etc.). Requer /reload."
+	
+	-- ========================================
+	-- LAST ONLINE TIME FORMATS
+	-- ========================================
+	L.LASTONLINE_SECS = "< 1 min"
+	L.LASTONLINE_MINUTES = "%d min"
+	L.LASTONLINE_HOURS = "%d h"
+	L.LASTONLINE_DAYS = "%d dias"
+	L.LASTONLINE_MONTHS = "%d meses"
+	L.LASTONLINE_YEARS = "%d anos"
 
+	-- ========================================
+	-- GUILD UI WARNING
+	-- ========================================
+	L.CLASSIC_GUILD_UI_WARNING_TITLE = "UI de guilda clássica desativada"
+	L.CLASSIC_GUILD_UI_WARNING_TEXT = "BetterFriendlist desativou a UI de guilda clássica pois apenas a UI de guilda moderna da Blizzard é compatível com BetterFriendlist.\n\nA aba Guilda agora abre a UI de guilda moderna da Blizzard."
+	
 	-- ========================================
 	-- GLOBAL FRIEND SYNC
 	-- ========================================

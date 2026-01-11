@@ -10,6 +10,9 @@
 
 local addonName, BFL = ...
 
+-- Import localized strings
+local L = BFL.L
+
 -- Import UI constants
 local UI = BFL.UI.CONSTANTS
 
@@ -102,7 +105,7 @@ local function BulkMoveToGroup(targetSubgroup)
 	-- Validation: Enough space?
 	if selectedCount > freeSlots then
 		UIErrorsFrame:AddMessage(
-			string.format("Not enough space: %d players selected, %d free slots in Group %d",
+			string.format(L.RAID_ERROR_NOT_ENOUGH_SPACE,
 				selectedCount, freeSlots, targetSubgroup),
 			1.0, 0.1, 0.1, 1.0
 		)
@@ -140,7 +143,7 @@ local function BulkMoveToGroup(targetSubgroup)
 	-- Success feedback
 	if movedCount > 0 then
 		UIErrorsFrame:AddMessage(
-			string.format("Moved %d players to Group %d", movedCount, targetSubgroup),
+			string.format(L.RAID_MSG_BULK_MOVE_SUCCESS, movedCount, targetSubgroup),
 			0.0, 1.0, 0.0, 1.0
 		)
 		-- Note: Update handled by GROUP_ROSTER_UPDATE event with throttling
@@ -149,7 +152,7 @@ local function BulkMoveToGroup(targetSubgroup)
 	-- Error feedback if any failed
 	if failedCount > 0 then
 		UIErrorsFrame:AddMessage(
-			string.format("Failed to move %d players", failedCount),
+			string.format(L.RAID_ERROR_BULK_MOVE_FAILED, failedCount),
 			1.0, 0.1, 0.1, 1.0
 		)
 	end
@@ -314,7 +317,7 @@ function BetterRaidFrame_DoReadyCheck()
 	if UnitIsGroupLeader("player") or UnitIsGroupAssistant("player") then
 		DoReadyCheck()
 	else
-		UIErrorsFrame:AddMessage("You must be the raid leader or assistant to initiate a ready check.", 1.0, 0.1, 0.1, 1.0)
+		UIErrorsFrame:AddMessage(L.RAID_ERROR_READY_CHECK_PERMISSION, 1.0, 0.1, 0.1, 1.0)
 	end
 end
 
@@ -354,7 +357,7 @@ function BetterRaidFrame_RaidInfoButton_OnClick(self)
 	
 	if numSaved == 0 then
 		-- No saved instances, show message
-		UIErrorsFrame:AddMessage("You have no saved raid instances.", 1.0, 1.0, 1.0, 1.0)
+		UIErrorsFrame:AddMessage(L.RAID_ERROR_NO_SAVED_INSTANCES, 1.0, 1.0, 1.0, 1.0)
 		return
 	end
 	
@@ -365,7 +368,7 @@ function BetterRaidFrame_RaidInfoButton_OnClick(self)
 	
 	-- Check if RaidInfoFrame exists
 	if not RaidInfoFrame then
-		UIErrorsFrame:AddMessage("Error: Could not load Raid Info frame.", 1.0, 0.1, 0.1, 1.0)
+		UIErrorsFrame:AddMessage(L.RAID_ERROR_LOAD_RAID_INFO, 1.0, 0.1, 0.1, 1.0)
 		return
 	end
 	
@@ -707,7 +710,7 @@ function BetterRaidMemberButton_OnDragStop(self)
 					local targetName = GetRaidRosterInfo(targetRaidIndex)
 					if sourceName and targetName then
 						UIErrorsFrame:AddMessage(
-							string.format("%s <-> %s swapped", sourceName, targetName),
+							string.format(L.RAID_MSG_SWAP_SUCCESS, sourceName, targetName),
 							0.0, 1.0, 0.0, 1.0
 						)
 					end
@@ -715,7 +718,7 @@ function BetterRaidMemberButton_OnDragStop(self)
 				else
 					-- Error feedback (red toast)
 					UIErrorsFrame:AddMessage(
-						"Swap failed: " .. tostring(errorMsg or "Unknown error"),
+						string.format(L.RAID_ERROR_SWAP_FAILED, tostring(errorMsg or (L.UNKNOWN_ERROR or "Unknown error"))),
 						1.0, 0.1, 0.1, 1.0
 					)
 				end
@@ -729,7 +732,7 @@ function BetterRaidMemberButton_OnDragStop(self)
 				local playerName = GetRaidRosterInfo(sourceRaidIndex)
 				if playerName then
 					UIErrorsFrame:AddMessage(
-						string.format("%s moved to Group %d", playerName, targetSubgroup),
+						string.format(L.RAID_MSG_MOVE_SUCCESS, playerName, targetSubgroup),
 						0.0, 1.0, 0.0, 1.0
 					)
 				end
@@ -737,7 +740,7 @@ function BetterRaidMemberButton_OnDragStop(self)
 			else
 				-- Error feedback (red toast)
 				UIErrorsFrame:AddMessage(
-					"Move failed: " .. tostring(errorMsg or "Unknown error"),
+					string.format(L.RAID_ERROR_MOVE_FAILED, tostring(errorMsg or (L.UNKNOWN_ERROR or "Unknown error"))),
 					1.0, 0.1, 0.1, 1.0
 				)
 			end

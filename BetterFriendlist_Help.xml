@@ -1,0 +1,163 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<!-- BetterFriendlist Raid Roster Help Window -->
+	<Frame name="BetterFriendlistHelpFrame" parent="BetterFriendsFrame" inherits="ButtonFrameTemplate" hidden="true" frameStrata="HIGH" enableMouse="true" movable="false" toplevel="false">
+		<Size x="380" y="500" />
+		<Anchors>
+			<Anchor point="TOPLEFT" relativePoint="TOPRIGHT" x="5" y="0" />
+		</Anchors>
+		<Frames>
+			<!-- Modern Scroll Frame without child size specification -->
+			<ScrollFrame parentKey="ScrollFrame" inherits="UIPanelScrollFrameTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="12" y="-45" />
+					<Anchor point="BOTTOMRIGHT" x="-30" y="8" />
+				</Anchors>
+				<ScrollChild>
+					<Frame parentKey="Content">
+						<Size x="330" y="1"/>
+						<Layers>
+							<Layer level="ARTWORK">
+								<!-- Title -->
+								<FontString parentKey="Title" inherits="GameFontNormalLarge" text="Raid Roster Help" justifyH="LEFT">
+									<Anchors>
+										<Anchor point="TOPLEFT" x="10" y="-10"/>
+										<Anchor point="TOPRIGHT" x="-10" y="-10"/>
+									</Anchors>
+									<Color r="1.0" g="0.82" b="0"/>
+								</FontString>
+								
+								<!-- Section 1: Multi-Selection -->
+								<FontString parentKey="Section1Title" inherits="GameFontNormal" justifyH="LEFT">
+									<Anchors>
+										<Anchor point="TOPLEFT" relativeKey="$parent.Title" relativePoint="BOTTOMLEFT" x="0" y="-15"/>
+										<Anchor point="TOPRIGHT" relativeKey="$parent.Title" relativePoint="BOTTOMRIGHT" x="0" y="-15"/>
+									</Anchors>
+									<Color r="1.0" g="0.82" b="0"/>
+								</FontString>
+								<FontString parentKey="Section1Text" inherits="GameFontHighlight" justifyH="LEFT" justifyV="TOP">
+									<Size y="60"/>
+									<Anchors>
+										<Anchor point="TOPLEFT" relativeKey="$parent.Section1Title" relativePoint="BOTTOMLEFT" x="5" y="-5"/>
+										<Anchor point="TOPRIGHT" relativeKey="$parent.Section1Title" relativePoint="BOTTOMRIGHT" x="-5" y="-5"/>
+									</Anchors>
+								</FontString>
+								
+								<!-- Section 2: Main Tank -->
+								<FontString parentKey="Section2Title" inherits="GameFontNormal" justifyH="LEFT">
+									<Anchors>
+										<Anchor point="TOPLEFT" relativeKey="$parent.Section1Text" relativePoint="BOTTOMLEFT" x="-5" y="-15"/>
+										<Anchor point="TOPRIGHT" relativeKey="$parent.Section1Text" relativePoint="BOTTOMRIGHT" x="5" y="-15"/>
+									</Anchors>
+									<Color r="1.0" g="0.82" b="0"/>
+								</FontString>
+								<FontString parentKey="Section2Text" inherits="GameFontHighlight" justifyH="LEFT" justifyV="TOP">
+									<Size y="40"/>
+									<Anchors>
+										<Anchor point="TOPLEFT" relativeKey="$parent.Section2Title" relativePoint="BOTTOMLEFT" x="5" y="-5"/>
+										<Anchor point="TOPRIGHT" relativeKey="$parent.Section2Title" relativePoint="BOTTOMRIGHT" x="-5" y="-5"/>
+									</Anchors>
+								</FontString>
+								
+								<!-- Section 3: Main Assist -->
+								<FontString parentKey="Section3Title" inherits="GameFontNormal" justifyH="LEFT">
+									<Anchors>
+										<Anchor point="TOPLEFT" relativeKey="$parent.Section2Text" relativePoint="BOTTOMLEFT" x="-5" y="-15"/>
+										<Anchor point="TOPRIGHT" relativeKey="$parent.Section2Text" relativePoint="BOTTOMRIGHT" x="5" y="-15"/>
+									</Anchors>
+									<Color r="1.0" g="0.82" b="0"/>
+								</FontString>
+								<FontString parentKey="Section3Text" inherits="GameFontHighlight" justifyH="LEFT" justifyV="TOP">
+									<Size y="40"/>
+									<Anchors>
+										<Anchor point="TOPLEFT" relativeKey="$parent.Section3Title" relativePoint="BOTTOMLEFT" x="5" y="-5"/>
+										<Anchor point="TOPRIGHT" relativeKey="$parent.Section3Title" relativePoint="BOTTOMRIGHT" x="-5" y="-5"/>
+									</Anchors>
+								</FontString>
+								
+								<!-- Section 4: Drag & Drop -->
+								<FontString parentKey="Section4Title" inherits="GameFontNormal" justifyH="LEFT">
+									<Anchors>
+										<Anchor point="TOPLEFT" relativeKey="$parent.Section3Text" relativePoint="BOTTOMLEFT" x="-5" y="-15"/>
+										<Anchor point="TOPRIGHT" relativeKey="$parent.Section3Text" relativePoint="BOTTOMRIGHT" x="5" y="-15"/>
+									</Anchors>
+									<Color r="1.0" g="0.82" b="0"/>
+								</FontString>
+								<FontString parentKey="Section4Text" inherits="GameFontHighlight" justifyH="LEFT" justifyV="TOP">
+									<Size y="60"/>
+									<Anchors>
+										<Anchor point="TOPLEFT" relativeKey="$parent.Section4Title" relativePoint="BOTTOMLEFT" x="5" y="-5"/>
+										<Anchor point="TOPRIGHT" relativeKey="$parent.Section4Title" relativePoint="BOTTOMRIGHT" x="-5" y="-5"/>
+									</Anchors>
+								</FontString>
+								
+								<!-- Section 5: Combat Lock -->
+								<FontString parentKey="Section5Title" inherits="GameFontNormal" justifyH="LEFT">
+									<Anchors>
+										<Anchor point="TOPLEFT" relativeKey="$parent.Section4Text" relativePoint="BOTTOMLEFT" x="-5" y="-15"/>
+										<Anchor point="TOPRIGHT" relativeKey="$parent.Section4Text" relativePoint="BOTTOMRIGHT" x="5" y="-15"/>
+									</Anchors>
+									<Color r="1.0" g="0.82" b="0"/>
+								</FontString>
+								<FontString parentKey="Section5Text" inherits="GameFontHighlight" justifyH="LEFT" justifyV="TOP">
+									<Size y="40"/>
+									<Anchors>
+										<Anchor point="TOPLEFT" relativeKey="$parent.Section5Title" relativePoint="BOTTOMLEFT" x="5" y="-5"/>
+										<Anchor point="TOPRIGHT" relativeKey="$parent.Section5Title" relativePoint="BOTTOMRIGHT" x="-5" y="-5"/>
+									</Anchors>
+								</FontString>
+							</Layer>
+						</Layers>
+					</Frame>
+				</ScrollChild>
+			</ScrollFrame>
+		</Frames>
+		<Scripts>
+			<OnLoad>
+				self.TitleContainer.TitleText:SetText("Raid Roster Help")
+				ButtonFrameTemplate_HidePortrait(self)
+				ButtonFrameTemplate_HideAttic(self)
+				
+				-- Set localized text
+				local L = BFL and BFL.L or {}
+				local content = self.ScrollFrame.Content
+				
+				content.Section1Title:SetText(L.RAID_HELP_MULTISELECT_TITLE or "Multi-Selection")
+				content.Section1Text:SetText(L.RAID_HELP_MULTISELECT_TEXT or "Hold Ctrl and left-click to select multiple players.\nOnce selected, drag and drop them into any group to move them all at once.")
+				
+				content.Section2Title:SetText(L.RAID_HELP_MAINTANK_TITLE or "Main Tank")
+				content.Section2Text:SetText(L.RAID_HELP_MAINTANK_TEXT or "Shift + Right-Click on a player to set them as Main Tank.\nA tank icon will appear next to their name.")
+				
+				content.Section3Title:SetText(L.RAID_HELP_MAINASSIST_TITLE or "Main Assist")
+				content.Section3Text:SetText(L.RAID_HELP_MAINASSIST_TEXT or "Ctrl + Right-Click on a player to set them as Main Assist.\nAn assist icon will appear next to their name.")
+				
+				content.Section4Title:SetText(L.RAID_HELP_DRAGDROP_TITLE or "Drag and Drop")
+				content.Section4Text:SetText(L.RAID_HELP_DRAGDROP_TEXT or "Drag any player to move them between groups.\nYou can also drag multiple selected players at once.\nEmpty slots can be used to swap positions.")
+				
+				content.Section5Title:SetText(L.RAID_HELP_COMBAT_TITLE or "Combat Lock")
+				content.Section5Text:SetText(L.RAID_HELP_COMBAT_TEXT or "Players cannot be moved during combat.\nThis is a Blizzard restriction to prevent errors.")
+				
+				-- Calculate actual content height dynamically
+				local totalHeight = 10 -- Starting offset
+				local sections = {
+					content.Section1Title, content.Section1Text,
+					content.Section2Title, content.Section2Text,
+					content.Section3Title, content.Section3Text,
+					content.Section4Title, content.Section4Text,
+					content.Section5Title, content.Section5Text
+				}
+				
+				for _, fs in ipairs(sections) do
+					totalHeight = totalHeight + fs:GetStringHeight() + 5
+				end
+				
+				content:SetHeight(totalHeight + 20) -- Add bottom padding
+			</OnLoad>
+			<OnShow>
+				PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
+			</OnShow>
+			<OnHide>
+				PlaySound(SOUNDKIT.IG_MAINMENU_CLOSE)
+			</OnHide>
+		</Scripts>
+	</Frame>
+</Ui>

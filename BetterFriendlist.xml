@@ -1864,6 +1864,38 @@
 					</OnLeave>
 				</Scripts>
 			</Button>
+			
+			<!-- Help Button - shown only on Raid Tab, left of close button -->
+			<Button parentKey="HelpButton" hidden="true" frameStrata="HIGH" frameLevel="10">
+				<Size x="24" y="24"/>
+				<Anchors>
+					<Anchor point="TOPRIGHT" relativeKey="$parent.CloseButton" relativePoint="TOPLEFT" x="1" y="1"/>
+				</Anchors>
+				<Layers>
+					<Layer level="OVERLAY">
+						<Texture parentKey="Icon" file="Interface\AddOns\BetterFriendlist\Icons\help-circle.blp">
+							<Size x="18" y="18"/>
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnClick>
+						BetterFriendsFrame_HelpButton_OnClick(self);
+					</OnClick>
+					<OnEnter>
+						GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+						GameTooltip:SetText(BFL.L.RAID_HELP_TITLE or "Raid Roster Help", 1, 1, 1);
+						GameTooltip:AddLine(BFL.L.RAID_HELP_TEXT or "Click for help on using the raid roster.", 0.7, 0.7, 0.7, true);
+						GameTooltip:Show();
+					</OnEnter>
+					<OnLeave>
+						GameTooltip:Hide();
+					</OnLeave>
+				</Scripts>
+			</Button>
 			<!-- Scroll Frame Container - NOW uses ScrollBox system (no more FauxScrollFrame!) -->
 			<Frame parentKey="ScrollFrame">
 				<Size x="398" y="418"/>

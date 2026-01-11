@@ -17,6 +17,21 @@ if GetLocale() == "koKR" then
 	L.DIALOG_RESET_SETTINGS_TEXT = "모든 설정을 기본값으로 재설정하시겠습니까?"
 	L.DIALOG_RESET_BTN1 = "재설정"
 	L.DIALOG_RESET_BTN2 = "취소"
+	L.DIALOG_UI_PANEL_RELOAD_TEXT = "UI 계층 구조 설정 변경은 UI 재로드가 필요합니다.\n\n지금 재로드하시겠습니까?"
+	L.DIALOG_UI_PANEL_RELOAD_BTN1 = "재로드"
+	L.DIALOG_UI_PANEL_RELOAD_BTN2 = "취소"
+	L.RAID_HELP_TITLE = "공격대 도움말"
+	L.RAID_HELP_TEXT = "공격대 명단 사용법에 대한 도움말을 보려면 클릭하세요."
+	L.RAID_HELP_MULTISELECT_TITLE = "다중 선택"
+	L.RAID_HELP_MULTISELECT_TEXT = "Ctrl을 누른 채 왼쪽 클릭으로 여러 플레이어를 선택하세요.\n선택한 후 어떤 그룹으로든 끌어다 놓으면 모두 한번에 이동합니다."
+	L.RAID_HELP_MAINTANK_TITLE = "주 방어 탱커"
+	L.RAID_HELP_MAINTANK_TEXT = "Shift + 오른쪽 클릭으로 플레이어를 주 방어 탱커로 설정합니다.\n이름 옆에 탱커 아이콘이 나타납니다."
+	L.RAID_HELP_MAINASSIST_TITLE = "주 지원"
+	L.RAID_HELP_MAINASSIST_TEXT = "Ctrl + 오른쪽 클릭으로 플레이어를 주 지원으로 설정합니다.\n이름 옆에 지원 아이콘이 나타납니다."
+	L.RAID_HELP_DRAGDROP_TITLE = "끌어다 놓기"
+	L.RAID_HELP_DRAGDROP_TEXT = "플레이어를 끌어 그룹 간에 이동하세요.\n선택한 여러 플레이어를 한번에 끌어다 놓을 수도 있습니다.\n빈 슬롯을 사용하여 위치를 교환할 수 있습니다."
+	L.RAID_HELP_COMBAT_TITLE = "전투 잠금"
+	L.RAID_HELP_COMBAT_TEXT = "전투 중에는 플레이어를 이동할 수 없습니다.\n이는 오류를 방지하기 위한 Blizzard의 제한 사항입니다."
 	L.DIALOG_MIGRATE_TEXT = "FriendGroups에서 BetterFriendlist로 친구 그룹을 마이그레이션하시겠습니까?\n\n다음을 수행합니다:\n• BNet 메모에서 모든 그룹 생성\n• 친구를 그룹에 할당\n• 선택적으로 메모 정리\n\n|cffff0000경고: 이 작업은 취소할 수 없습니다!|r"
 	L.DIALOG_MIGRATE_BTN1 = "마이그레이션 및 메모 정리"
 	L.DIALOG_MIGRATE_BTN2 = "마이그레이션만"
@@ -320,6 +335,28 @@ if GetLocale() == "koKR" then
 	L.EDIT_MODE_NOT_AVAILABLE = "편집 모드는 Classic에서 사용할 수 없습니다"
 	L.CLASSIC_COMPATIBILITY_INFO = "Classic 호환 모드로 실행 중"
 	L.FEATURE_NOT_AVAILABLE_CLASSIC = "이 기능은 Classic에서 사용할 수 없습니다"
+	L.SETTINGS_CLOSE_ON_GUILD_TAB = "길드 열 때 BetterFriendlist 닫기"
+	L.SETTINGS_CLOSE_ON_GUILD_TAB_DESC = "길드 탭을 클릭할 때 BetterFriendlist를 자동으로 닫습니다"
+	L.SETTINGS_HIDE_GUILD_TAB = "길드 탭 숨기기"
+	L.SETTINGS_HIDE_GUILD_TAB_DESC = "친구 목록에서 길드 탭을 숨깁니다"
+	L.SETTINGS_USE_UI_PANEL_SYSTEM = "UI 계층 구조 준수"
+	L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "BetterFriendlist가 다른 UI 창(캐릭터, 주문서 등) 위에 열리지 않도록 합니다. /reload 필요."
+
+	-- ========================================
+	-- LAST ONLINE TIME FORMATS
+	-- ========================================
+	L.LASTONLINE_SECS = "< 1분"
+	L.LASTONLINE_MINUTES = "%d분"
+	L.LASTONLINE_HOURS = "%d시간"
+	L.LASTONLINE_DAYS = "%d일"
+	L.LASTONLINE_MONTHS = "%d개월"
+	L.LASTONLINE_YEARS = "%d년"
+
+	-- ========================================
+	-- GUILD UI WARNING
+	-- ========================================
+	L.CLASSIC_GUILD_UI_WARNING_TITLE = "클래식 길드 UI 비활성화됨"
+	L.CLASSIC_GUILD_UI_WARNING_TEXT = "BetterFriendlist는 Blizzard의 최신 길드 UI만 BetterFriendlist와 호환되므로 클래식 길드 UI 설정을 비활성화했습니다.\n\n길드 탭은 이제 Blizzard의 최신 길드 UI를 엽니다."
 
 	-- ========================================
 	-- GLOBAL FRIEND SYNC
@@ -330,4 +367,23 @@ if GetLocale() == "koKR" then
 	L.SETTINGS_GLOBAL_SYNC_DELETION = "Enable Deletion"
 	L.SETTINGS_GLOBAL_SYNC_DELETION_DESC = "Allow the sync process to remove friends from your list if they are removed from the database."
 	L.SETTINGS_GLOBAL_SYNC_HEADER = "Synced Friends Database"
+	
+	-- Raid Frame
+	L.RAID_INFO_UNAVAILABLE = "Raid information unavailable"
+	L.RAID_NOT_IN_RAID = "Not in a raid"
+	L.RAID_CREATE_BUTTON = "Create Raid"
+	L.RAID_CONVERT_BUTTON = "Convert to Raid"
+	L.GROUP = "Group"
+	L.ALL = "All"
+	L.RAID_ERROR_NOT_ENOUGH_SPACE = "Not enough space in group %d"
+	L.RAID_ERROR_MEMBER_EXISTS = "%s is already in group %d"
+	L.RAID_ERROR_NO_PERMISSION = "You don't have permission to move players"
+	L.RAID_ERROR_COMBAT_LOCKED = "Cannot move players during combat"
+	L.RAID_ERROR_INVALID_TARGET = "Invalid target"
+	L.RAID_ERROR_FATAL = "Fatal error: %s"
+	L.RAID_MSG_PLAYER_MOVED = "Moved %s to group %d"
+	L.RAID_MSG_SWAPPED = "Swapped %s and %s"
+	L.RAID_MSG_ROLE_CHANGED = "Changed role for %s"
+	L.RAID_MSG_GROUP_UPDATE = "Raid group update received"
+	L.RAID_MSG_SYNC_ERROR = "Sync error: %s"
 end

@@ -2171,6 +2171,100 @@ function Settings:OnAccordionGroupsChanged(checked)
 	BFL:ForceRefreshFriendsList()
 end
 
+-- Classic: Close on Guild Tab Click toggle
+function Settings:OnCloseOnGuildTabClickChanged(checked)
+	local DB = GetDB()
+	if not DB then return end
+	
+	DB:Set("closeOnGuildTabClick", checked)
+	-- No UI refresh needed - only affects Guild tab click behavior
+end
+
+-- Use UI Panel System toggle
+function Settings:OnUseUIPanelSystemChanged(checked)
+	local DB = GetDB()
+	if not DB then return end
+	
+	-- Save the pending state temporarily
+	DB.pendingUIPanelSystemChange = checked
+	
+	-- Show confirmation dialog
+	StaticPopup_Show("BFL_CONFIRM_UI_PANEL_RELOAD")
+end
+
+-- Legacy code (no longer needed with ReloadUI)
+--[[ function Settings:OnUseUIPanelSystemChanged_OLD(checked)
+	local DB = GetDB()
+	if not DB then return end
+	
+	DB:Set("useUIPanelSystem", checked)
+	
+	-- Apply immediately if frame is shown (only out of combat)
+	if BetterFriendsFrame and BetterFriendsFrame:IsShown() and not InCombatLockdown() then
+		if checked then
+			-- Configure attributes and switch to ShowUIPanel
+			if _G.ConfigureUIPanelAttributes then
+				_G.ConfigureUIPanelAttributes(true)
+			end
+			BetterFriendsFrame:Hide()
+			ShowUIPanel(BetterFriendsFrame)
+			BFL:DebugPrint("Switched to UI Panel System")
+		else
+			-- Disable attributes and switch to direct Show/Hide
+			-- CRITICAL: Use HideUIPanel first to properly unregister from UI Panel system
+			if UIPanelWindows["BetterFriendsFrame"] then
+				HideUIPanel(BetterFriendsFrame)
+			else
+				BetterFriendsFrame:Hide()
+			end
+			
+			-- Now disable attributes (this removes from UIPanelWindows)
+			if _G.ConfigureUIPanelAttributes then
+				_G.ConfigureUIPanelAttributes(false)
+			end
+			
+			-- Reopen with normal Show() (no longer a UIPanel)
+			BetterFriendsFrame:Show()
+			BFL:DebugPrint("Switched to direct Show/Hide")
+		end
+	elseif InCombatLockdown() then
+		BFL:DebugPrint("Setting saved - will apply after combat ends")
+	end
+end
+--]]
+
+-- Classic: Hide Guild Tab toggle
+function Settings:OnHideGuildTabChanged(checked)
+	local DB = GetDB()
+	if not DB then return end
+	
+	DB:Set("hideGuildTab", checked)
+	
+	-- Toggle Guild Tab visibility and reposition Raid tab immediately
+	if BetterFriendsFrame and BetterFriendsFrame.BottomTab3 then
+		if checked then
+			BetterFriendsFrame.BottomTab3:Hide()
+			-- Reposition Raid tab (Tab 4) next to WHO tab (Tab 2)
+			if BetterFriendsFrame.BottomTab4 then
+				BetterFriendsFrame.BottomTab4:ClearAllPoints()
+				BetterFriendsFrame.BottomTab4:SetPoint("LEFT", BetterFriendsFrame.BottomTab2, "RIGHT", -15, 0)
+			end
+		else
+			BetterFriendsFrame.BottomTab3:Show()
+			-- Restore Guild tab text and click handler
+			BetterFriendsFrame.BottomTab3:SetText(GUILD or "Guild")
+			BetterFriendsFrame.BottomTab3:SetScript("OnClick", function(self)
+				BetterFriendsFrame_HandleGuildTabClick()
+			end)
+			-- Reposition Raid tab (Tab 4) next to Guild tab (Tab 3)
+			if BetterFriendsFrame.BottomTab4 then
+				BetterFriendsFrame.BottomTab4:ClearAllPoints()
+				BetterFriendsFrame.BottomTab4:SetPoint("LEFT", BetterFriendsFrame.BottomTab3, "RIGHT", -15, 0)
+			end
+		end
+	end
+end
+
 -- NEW: Enable In-Game Group toggle (Feature Request)
 function Settings:OnEnableInGameGroupChanged(checked)
 	local DB = GetDB()
@@ -2410,6 +2504,29 @@ function Settings:RefreshGeneralTab()
 		function(val) self:OnCompactModeChanged(val) end)
 	compactMode:SetTooltip("Compact Mode", "Reduces button height to fit more friends on screen")
 	table.insert(allFrames, compactMode)
+	
+	-- Use UI Panel System
+	local useUIPanelSystem = Components:CreateCheckbox(tab, BFL.L.SETTINGS_USE_UI_PANEL_SYSTEM or "Use UI Panel System",
+		DB:Get("useUIPanelSystem", false),
+		function(val) self:OnUseUIPanelSystemChanged(val) end)
+	useUIPanelSystem:SetTooltip(BFL.L.SETTINGS_USE_UI_PANEL_SYSTEM or "Use UI Panel System", BFL.L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC or "Use Blizzard's UI Panel system for automatic repositioning when other windows are open (Character, Spellbook, etc.)")
+	table.insert(allFrames, useUIPanelSystem)
+	
+	-- Classic Only: Close on Guild Tab Click
+	if BFL.IsClassic then
+		local closeOnGuildTab = Components:CreateCheckbox(tab, BFL.L.SETTINGS_CLOSE_ON_GUILD_TAB or "Close BetterFriendlist when opening Guild",
+			DB:Get("closeOnGuildTabClick", false),
+			function(val) self:OnCloseOnGuildTabClickChanged(val) end)
+		closeOnGuildTab:SetTooltip(BFL.L.SETTINGS_CLOSE_ON_GUILD_TAB or "Close on Guild Tab", BFL.L.SETTINGS_CLOSE_ON_GUILD_TAB_DESC or "Automatically close BetterFriendlist when you click the Guild tab")
+		table.insert(allFrames, closeOnGuildTab)
+		
+		-- Hide Guild Tab
+		local hideGuildTab = Components:CreateCheckbox(tab, BFL.L.SETTINGS_HIDE_GUILD_TAB or "Hide Guild Tab",
+			DB:Get("hideGuildTab", false),
+			function(val) self:OnHideGuildTabChanged(val) end)
+		hideGuildTab:SetTooltip(BFL.L.SETTINGS_HIDE_GUILD_TAB or "Hide Guild Tab", BFL.L.SETTINGS_HIDE_GUILD_TAB_DESC or "Hide the Guild tab from the friends list (requires UI reload)")
+		table.insert(allFrames, hideGuildTab)
+	end
 	
 	-- Spacer before next section
 	table.insert(allFrames, Components:CreateSpacer(tab))

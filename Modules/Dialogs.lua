@@ -233,6 +233,35 @@ function Dialogs:RegisterDialogs()
 		hideOnEscape = true,
 		preferredIndex = 3,
 	}
+
+	-- Confirm UI Panel System Change (requires reload)
+	StaticPopupDialogs["BFL_CONFIRM_UI_PANEL_RELOAD"] = {
+		text = BFL.L.DIALOG_UI_PANEL_RELOAD_TEXT or "Changing the UI Hierarchy setting requires a UI reload.\n\nReload now?",
+		button1 = BFL.L.DIALOG_UI_PANEL_RELOAD_BTN1 or "Reload",
+		button2 = BFL.L.DIALOG_UI_PANEL_RELOAD_BTN2 or "Cancel",
+		OnAccept = function(self)
+			local DB = BFL:GetModule("DB")
+			if DB and DB.pendingUIPanelSystemChange ~= nil then
+				DB:Set("useUIPanelSystem", DB.pendingUIPanelSystemChange)
+				DB.pendingUIPanelSystemChange = nil
+				ReloadUI()
+			end
+		end,
+		OnCancel = function(self)
+			local DB = BFL:GetModule("DB")
+			if DB then
+				DB.pendingUIPanelSystemChange = nil
+				-- Revert checkbox to original state
+				if BFL.Settings and BFL.Settings.RefreshSettingsPanel then
+					BFL.Settings:RefreshSettingsPanel()
+				end
+			end
+		end,
+		timeout = 0,
+		whileDead = true,
+		hideOnEscape = true,
+		preferredIndex = 3,
+	}
 	
 	-- Add Group Trigger Dialog (Phase 10) - Using proper frame approach like Export/Import
 	local triggerFrame = nil

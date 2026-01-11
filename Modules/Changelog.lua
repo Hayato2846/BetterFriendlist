@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.5] - 2026-01-11
+### Added
+- **Localization Update** - Significantly improved translation coverage across all 11 supported languages, especially for Raid Frame and Help features.
+- **Asian Language Support** - Fixed issues with missing localization keys in Korean (koKR), Simplified Chinese (zhCN), and Traditional Chinese (zhTW).
+- **Classic Guild Support** - Added better support for guilds in Classic. The addon now automatically disables the 'Classic Guild UI' setting as it requires the modern Guild UI.
+- **Classic Guild Tab** - Added a Guild Tab in Classic which opens the modern guild window on click.
+- **Classic Settings** - Added two new settings in Classic: 'Hide Guild Tab' and 'Close BetterFriendlist when opening Guild'.
+- **UI Hierarchy** - Added a new setting for Retail and Classic: 'Respect UI Hierarchy'. This integrates BetterFriendlist into Blizzard's UI Panel System so it no longer overlaps other UI windows. (Requested by Surfingnet)
+- **Raid Frame Help** - Added a Help Button to the Raid Tab explaining unique features like Multi-Selection, Drag & Drop, and Main Tank/Assist assignments.
+
 ## [2.1.4] - 2026-01-07
 ### Fixed
 - **Ignore List (Classic)** - Fixed visual layout issues in the Ignore List window:

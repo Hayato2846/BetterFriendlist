@@ -460,6 +460,38 @@ function BetterFriendsFrame_OnSearchTextChanged(editBox)
 	end
 end
 
+-- Configure UI Panel Layout attributes for BetterFriendsFrame
+-- Made global for access from Settings module
+function ConfigureUIPanelAttributes(enable)
+	if not BetterFriendsFrame then return end
+	
+	if enable then
+		-- Enable UI Panel Layout system
+		BetterFriendsFrame:SetAttribute("UIPanelLayout-defined", true)
+		BetterFriendsFrame:SetAttribute("UIPanelLayout-enabled", true)
+		BetterFriendsFrame:SetAttribute("UIPanelLayout-area", "left")
+		BetterFriendsFrame:SetAttribute("UIPanelLayout-pushable", 0)  -- 8+ recommended for custom addons (Blizzard uses 0-7)
+		-- BetterFriendsFrame:SetAttribute("UIPanelLayout-width", width) -- Custom width is not recommended
+		BetterFriendsFrame:SetAttribute("UIPanelLayout-whileDead", true)
+		BFL:DebugPrint("UI Panel Layout attributes enabled")
+	else
+		-- Disable UI Panel Layout system
+		-- CRITICAL: Remove from UIPanelWindows first (ShowUIPanel auto-registers it)
+		if UIPanelWindows and UIPanelWindows["BetterFriendsFrame"] then
+			UIPanelWindows["BetterFriendsFrame"] = nil
+			BFL:DebugPrint("BetterFriendsFrame removed from UIPanelWindows")
+		end
+		
+		-- Then disable attributes (false disables, nil doesn't work reliably)
+		BetterFriendsFrame:SetAttribute("UIPanelLayout-defined", false)
+		BetterFriendsFrame:SetAttribute("UIPanelLayout-enabled", false)
+		BetterFriendsFrame:SetAttribute("UIPanelLayout-area", "")
+		BetterFriendsFrame:SetAttribute("UIPanelLayout-pushable", nil)
+		BetterFriendsFrame:SetAttribute("UIPanelLayout-whileDead", false)
+		BFL:DebugPrint("UI Panel Layout attributes disabled")
+	end
+end
+
 -- Show the friends frame
 -- tabIndex: Optional tab to show (1=Friends, 2=Who, 3=Raid, 4=Quick Join)
 function ShowBetterFriendsFrame(tabIndex)
@@ -472,8 +504,19 @@ function ShowBetterFriendsFrame(tabIndex)
 	-- Force immediate refresh to ensure mock invites are shown
 	BFL:ForceRefreshFriendsList()
 	
-	-- Direct :Show() - now combat-safe (no longer SECURE frame)
-	BetterFriendsFrame:Show()
+	-- Use UI Panel system if enabled (for auto-repositioning)
+	-- Note: ShowUIPanel is protected in combat (since 8.2.0), fallback to Show()
+	if BetterFriendlistDB and BetterFriendlistDB.useUIPanelSystem and not InCombatLockdown() then
+		-- Configure UI Panel Layout attributes
+		ConfigureUIPanelAttributes(true)
+		ShowUIPanel(BetterFriendsFrame)
+		BFL:DebugPrint("ShowUIPanel called")
+	else
+		-- Direct :Show() - combat-safe fallback
+		-- Ensure attributes are disabled when not using UI Panel system
+		ConfigureUIPanelAttributes(false)
+		BetterFriendsFrame:Show()
+	end
 	
 	-- Switch to requested tab if specified
 	if tabIndex and tabIndex >= 1 and tabIndex <= 4 then
@@ -495,8 +538,14 @@ function HideBetterFriendsFrame()
 		FriendsList.selectedButton = nil
 	end
 	
-	-- Direct :Hide() - now combat-safe (no longer SECURE frame)
-	BetterFriendsFrame:Hide()
+	-- Use UI Panel system if enabled
+	-- Note: HideUIPanel is protected in combat (since 8.2.0), fallback to Hide()
+	if BetterFriendlistDB and BetterFriendlistDB.useUIPanelSystem and not InCombatLockdown() then
+		HideUIPanel(BetterFriendsFrame)
+	else
+		-- Direct :Hide() - combat-safe fallback
+		BetterFriendsFrame:Hide()
+	end
 end
 
 -- Toggle the friends frame
@@ -545,7 +594,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		local addonName = ...
 		if addonName == "BetterFriendlist" then
 			-- Note: Version print is in Core.lua ADDON_LOADED handler (prevents duplicate)
-			
+		
 		-- Initialize menu system
 		InitializeMenuSystem()
 		
@@ -905,38 +954,50 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			end)
 		end
 		
--- TEMPORARY: Disable Guild Tab setup for background development
-if false and BFL.IsClassic and BetterFriendsFrame then
+if BFL.IsClassic and BetterFriendsFrame then
 			-- Classic has 4 main tabs: Friends(1), Who(2), Guild(3), Raid(4)
 			
-			-- TAB 3: Change "Raid" to "Guild"
+			local hideGuildTab = BetterFriendlistDB and BetterFriendlistDB.hideGuildTab
+			
+			-- TAB 3: Change "Raid" to "Guild" (unless user wants it hidden)
 			if BetterFriendsFrame.BottomTab3 then
+				-- Check if user wants to hide Guild tab
+				if hideGuildTab then
+					BetterFriendsFrame.BottomTab3:Hide()
+				else
+				-- Show and restore Guild tab
+				BetterFriendsFrame.BottomTab3:Show()
 				BetterFriendsFrame.BottomTab3:SetText(GUILD or "Guild")
 				BetterFriendsFrame.BottomTab3:SetScript("OnClick", function(self)
-					PanelTemplates_Tab_OnClick(self, BetterFriendsFrame)
-					BetterFriendsFrame_ShowBottomTab(3)
-					PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+					-- Guild Tab: Open Blizzard Guild Frame, return to Friends tab, close BFL
+					BetterFriendsFrame_HandleGuildTabClick()
 				end)
 			end
+		end
 
-			-- TAB 4: Create "Raid" tab (was Guild)
-			if not BetterFriendsFrame.BottomTab4 then
-				local tab = CreateFrame("Button", "BetterFriendsFrameBottomTab4", BetterFriendsFrame, "CharacterFrameTabButtonTemplate")
-				tab:SetID(4)
-				tab:SetText(RAID or "Raid") 
-				-- Anchor: RIGHT of Tab 3
-				tab:SetPoint("LEFT", BetterFriendsFrame.BottomTab3, "RIGHT", -15, 0)
-				tab:SetFrameStrata("LOW")
-				
-				-- Script
-				tab:SetScript("OnClick", function(self)
-					PanelTemplates_Tab_OnClick(self, BetterFriendsFrame)
-					BetterFriendsFrame_ShowBottomTab(4)
-					PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
-				end)
-				
-				BetterFriendsFrame.BottomTab4 = tab
+		-- TAB 4: Create "Raid" tab (was Guild)
+		if not BetterFriendsFrame.BottomTab4 then
+			local tab = CreateFrame("Button", "BetterFriendsFrameBottomTab4", BetterFriendsFrame, "CharacterFrameTabButtonTemplate")
+			tab:SetID(4)
+			tab:SetText(RAID or "Raid")
+			tab:SetFrameStrata("LOW")
+			tab:SetScript("OnClick", function(self)
+				PanelTemplates_Tab_OnClick(self, BetterFriendsFrame)
+				BetterFriendsFrame_ShowBottomTab(4)
+				PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+			end)
+			BetterFriendsFrame.BottomTab4 = tab
+		end
+		
+		-- Update Tab 4 position based on hideGuildTab setting
+		if BetterFriendsFrame.BottomTab4 then
+			BetterFriendsFrame.BottomTab4:ClearAllPoints()
+			if hideGuildTab then
+				BetterFriendsFrame.BottomTab4:SetPoint("LEFT", BetterFriendsFrame.BottomTab2, "RIGHT", -15, 0)
+			else
+				BetterFriendsFrame.BottomTab4:SetPoint("LEFT", BetterFriendsFrame.BottomTab3, "RIGHT", -15, 0)
 			end
+		end
 			
 			-- Setup Tabs Registry for PanelTemplates
 			BetterFriendsFrame.Tabs = {
@@ -1016,6 +1077,34 @@ if false and BFL.IsClassic and BetterFriendsFrame then
 			BetterWhoFrame_Update()
 		end
 	elseif event == "PLAYER_LOGIN" then
+		-- Classic: Auto-disable useClassicGuildUI CVar on every login
+		-- This ensures the setting persists across game restarts
+		if BFL.IsClassic then
+			local useClassicGuildUI = GetCVar("useClassicGuildUI")
+			if useClassicGuildUI == "1" then
+				SetCVar("useClassicGuildUI", "0")
+				
+				-- Show warning popup only on first detection
+				if not BetterFriendlistDB.classicGuildUIWarningShown then
+					BetterFriendlistDB.classicGuildUIWarningShown = true
+					
+					-- Define popup dialog
+					StaticPopupDialogs["BFL_CLASSIC_GUILD_UI_WARNING"] = {
+						text = (BFL.L.CLASSIC_GUILD_UI_WARNING_TITLE or "Classic Guild UI Disabled") .. "\n\n" .. (BFL.L.CLASSIC_GUILD_UI_WARNING_TEXT or "BetterFriendlist has disabled the 'Use Classic Guild UI' setting for proper integration.\n\nThe Guild tab now opens Blizzard's Guild Frame instead of showing it within BetterFriendlist."),
+						button1 = OKAY,
+						timeout = 0,
+						whileDead = true,
+						hideOnEscape = true,
+						preferredIndex = STATICPOPUP_NUMDIALOGS,
+					}
+					
+					C_Timer.After(1, function()
+						StaticPopup_Show("BFL_CLASSIC_GUILD_UI_WARNING")
+					end)
+				end
+			end
+		end
+		
 		-- Override Close Button to use our Hide function
 		if BetterFriendsFrame.CloseButton then
 			BetterFriendsFrame.CloseButton:SetScript("OnClick", function()
@@ -1115,9 +1204,6 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 	
 	-- Additional Classic frames
 	HideChildFrame(frame.WhoFrame)
-	if BFL.IsClassic and _G.BFL_GuildFrame then
-		HideChildFrame(_G.BFL_GuildFrame)
-	end
 	if BFL.IsClassic and frame.RaidFrame then
 		HideChildFrame(frame.RaidFrame)
 	end
@@ -1195,13 +1281,6 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 				
 				-- Request updated recruitment info (enables "Generate Link" functionality)
 				C_RecruitAFriend.RequestUpdatedRecruitmentInfo()
-			end
-		-- Classic: Guild Frame
-		elseif BFL.IsClassic and _G.BFL_GuildFrame then
-			-- TEMP: Guild Tab disabled, redirect Tab 3 (RAID) to RaidFrame
-			-- ShowChildFrame(_G.BFL_GuildFrame)
-			if frame.RaidFrame then
-				ShowChildFrame(frame.RaidFrame)
 			end
 		end
 	elseif tabIndex == 4 then
@@ -2089,6 +2168,30 @@ end
 -- BOTTOM TAB MANAGEMENT
 -- ========================================
 
+-- Handle Guild Tab Click (Classic only)
+-- Opens Blizzard Guild Frame, optionally closes BFL based on setting
+function BetterFriendsFrame_HandleGuildTabClick()
+	if not BFL.IsClassic then return end
+	
+	-- Check and disable useClassicGuildUI CVar before opening Guild Frame (silent, no popup)
+	local useClassicGuildUI = GetCVar("useClassicGuildUI")
+	if useClassicGuildUI == "1" then
+		SetCVar("useClassicGuildUI", "0")
+	end
+	
+	-- Toggle Blizzard Guild Frame
+	ToggleGuildFrame()
+	
+	-- Switch back to Friends tab (tab 1)
+	PanelTemplates_SetTab(BetterFriendsFrame, 1)
+	BetterFriendsFrame_ShowBottomTab(1)
+	
+	-- Close BFL Frame only if setting is enabled
+	if BetterFriendlistDB and BetterFriendlistDB.closeOnGuildTabClick then
+		HideUIPanel(BetterFriendsFrame)
+	end
+end
+
 -- Function to show specific bottom tab
 function BetterFriendsFrame_ShowBottomTab(tabIndex)
 	local frame = BetterFriendsFrame
@@ -2106,11 +2209,6 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex)
 	HideChildFrame(frame.RecentAlliesFrame)
 	HideChildFrame(frame.RecruitAFriendFrame)
 	HideChildFrame(frame.QuickJoinFrame)
-	
-	-- Classic: Guild Frame
-	if BFL.IsClassic and _G.BFL_GuildFrame then
-		HideChildFrame(_G.BFL_GuildFrame)
-	end
 	
 	-- Hide all friend list buttons explicitly
 	-- REMOVED: ScrollBox handles button visibility automatically
@@ -2145,34 +2243,55 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex)
 		end
 	end
 	
+	-- Show/hide Help button (only visible on Raid tab)
+	if frame.HelpButton then
+		local isRaidTab = false
+		if BFL.IsClassic then
+			-- Classic: Raid is Tab 4 (or Tab 3 if Guild hidden)
+			local hideGuildTab = BetterFriendlistDB and BetterFriendlistDB.hideGuildTab
+			isRaidTab = (hideGuildTab and tabIndex == 3) or (tabIndex == 4)
+		else
+			-- Retail: Raid is ALWAYS Tab 3
+			isRaidTab = (tabIndex == 3)
+		end
+		
+		if isRaidTab then
+			ShowChildFrame(frame.HelpButton)
+		else
+			HideChildFrame(frame.HelpButton)
+		end
+	end
+	
 	if tabIndex == 1 then
-		-- Friends list
+		-- Tab 1: Friends/Contacts list
 		ShowChildFrame(frame.ScrollFrame)
 		ShowChildFrame(frame.MinimalScrollBar)
 		ShowChildFrame(frame.AddFriendButton)
 		ShowChildFrame(frame.SendMessageButton)
 		UpdateFriendsDisplay()
 	elseif tabIndex == 2 then
-		-- Who frame
+		-- Tab 2: Who frame
 		ShowChildFrame(frame.WhoFrame)
 		BetterWhoFrame_Update()
 	elseif tabIndex == 3 then
 		if BFL.IsClassic then
-			-- Classic: Guild Frame
-			-- TEMP: Guild Tab disabled, redirect Tab 3 (RAID) to RaidFrame
-			if frame.RaidFrame then
+			-- Classic: Guild Tab (if visible) OR Raid (if Guild hidden)
+			local hideGuildTab = BetterFriendlistDB and BetterFriendlistDB.hideGuildTab
+			if hideGuildTab then
+				-- Guild hidden: Show Raid
 				ShowChildFrame(frame.RaidFrame)
+			else
+				-- Guild visible: Opens Blizzard's Guild Frame
+				-- No content shown here, handled by BetterFriendsFrame_HandleGuildTabClick()
 			end
 		else
-			-- Retail: Raid frame
+			-- Retail: Raid
 			ShowChildFrame(frame.RaidFrame)
 		end
 	elseif tabIndex == 4 then
 		if BFL.IsClassic then
-			-- Classic: Raid Frame
-			if frame.RaidFrame then
-				ShowChildFrame(frame.RaidFrame)
-			end
+			-- Classic: Raid (only when Guild tab is visible)
+			ShowChildFrame(frame.RaidFrame)
 		else
 			-- Retail: Quick Join
 			ShowChildFrame(frame.QuickJoinFrame)
@@ -2188,6 +2307,18 @@ end
 -- ========================================
 -- All WHO Frame functionality is delegated to Modules/WhoFrame.lua
 -- XML callbacks reference module methods directly via mixins
+
+-- ========================================
+-- Help Button Functions
+-- ========================================
+
+-- Help button click handler - shows detailed help about raid roster features
+function BetterFriendsFrame_HelpButton_OnClick(self)
+	-- Toggle help frame visibility
+	if BFL.HelpFrame then
+		BFL.HelpFrame:Toggle()
+	end
+end
 
 -- ========================================
 -- ========================================
@@ -2223,6 +2354,22 @@ end
 
 function BetterRecentAlliesEntry_OnLeave(self)
 	GameTooltip:Hide()
+end
+
+-- ========================================
+-- SLASH COMMANDS
+-- ========================================
+
+-- Reset Classic Guild UI warning flag (for testing)
+SLASH_BFLRESET1 = "/bflreset"
+SlashCmdList["BFLRESET"] = function(msg)
+	if msg == "warning" then
+		BetterFriendlistDB.classicGuildUIWarningShown = nil
+		print("|cff00ff00BetterFriendlist:|r Classic Guild UI warning flag reset. The popup will show on next login/reload.")
+	else
+		print("|cff00ff00BetterFriendlist Reset Commands:|r")
+		print("  |cffFFD100/bflreset warning|r - Reset Classic Guild UI warning popup")
+	end
 end
 
 -- ========================================

@@ -88,6 +88,11 @@ local defaults = {
 	brokerShowGroups = false, -- Split counts by WoW/BNet (default: OFF, shows combined)
 	brokerTooltipMode = "advanced", -- Tooltip detail level: "basic" or "advanced" (default: advanced)
 	brokerClickAction = "toggle", -- Left click action: "toggle", "friends", "settings" (default: toggle)
+	-- Classic Guild Tab Settings
+	closeOnGuildTabClick = false, -- Close BetterFriendlist when opening Guild Frame (Classic only, default: OFF)
+	hideGuildTab = false, -- Hide the Guild tab completely (Classic only, default: OFF)
+	-- UI Panel System
+	useUIPanelSystem = false, -- Use ShowUIPanel/HideUIPanel for automatic repositioning (default: OFF)
 	-- Migration tracking
 	friendGroupsMigrated = false, -- Track if FriendGroups migration has been completed
 	lastChangelogVersion = "0.0.0", -- Last version the user saw the changelog for

@@ -1,6 +1,6 @@
 -- Core.lua
 -- Main initialization file for BetterFriendlist addon
--- Version 2.1.4 - January 2026
+-- Version 2.1.5 - January 2026
 -- Complete replacement for WoW Friends frame with modular architecture
 
 -- Create addon namespace
@@ -989,6 +989,74 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 			print("|cff00ff00BetterFriendlist:|r Changelog state reset. Glow should be visible.")
 		else
 			print("|cffff0000BetterFriendlist:|r Modules not loaded.")
+		end
+	
+	-- Debug: Check UIPanelWindows settings
+	elseif msg == "checkpanel" or msg == "panel" then
+		print("|cff00ff00=== UI Panel System Debug ===|r")
+		print("")
+		
+		-- Check Blizzard FriendsFrame original settings (stored)
+		if BFL.OriginalFriendsFrameUIPanelSettings then
+			print("|cffffcc00Blizzard FriendsFrame (stored at load):|r")
+			local sortedKeys = {}
+			for k in pairs(BFL.OriginalFriendsFrameUIPanelSettings) do
+				table.insert(sortedKeys, k)
+			end
+			table.sort(sortedKeys)
+			for _, k in ipairs(sortedKeys) do
+				local v = BFL.OriginalFriendsFrameUIPanelSettings[k]
+				if k == "pushable" then
+					print(string.format("  %s: |cff00ff00%s|r  <-- BLIZZARD VALUE", k, tostring(v)))
+				else
+					print(string.format("  %s: |cffffffff%s|r", k, tostring(v)))
+				end
+			end
+			print("")
+		else
+			print("|cffff0000No stored Blizzard FriendsFrame settings|r")
+			print("")
+		end
+		
+		-- Check current BetterFriendsFrame attributes
+		if BetterFriendsFrame then
+			print("|cffffcc00BetterFriendsFrame attributes:|r")
+			local attrs = {
+				"UIPanelLayout-defined",
+				"UIPanelLayout-enabled",
+				"UIPanelLayout-area",
+				"UIPanelLayout-pushable",
+				"UIPanelLayout-whileDead"
+			}
+			for _, attr in ipairs(attrs) do
+				local val = BetterFriendsFrame:GetAttribute(attr)
+				print(string.format("  %s: |cffffffff%s|r", attr, tostring(val)))
+			end
+			print("")
+		end
+		
+		-- Check if in UIPanelWindows
+		if UIPanelWindows then
+			if UIPanelWindows["BetterFriendsFrame"] then
+				print("|cffffcc00BetterFriendsFrame in UIPanelWindows:|r |cff00ff00YES|r")
+				for k, v in pairs(UIPanelWindows["BetterFriendsFrame"]) do
+					print(string.format("  %s: |cffffffff%s|r", k, tostring(v)))
+				end
+			else
+				print("|cffffcc00BetterFriendsFrame in UIPanelWindows:|r |cffff0000NO|r")
+			end
+			print("")
+			
+			if UIPanelWindows["FriendsFrame"] then
+				print("|cffff8800WARNING:|r FriendsFrame is still in UIPanelWindows!")
+			end
+		end
+		
+		-- Check current setting
+		local DB = BFL:GetModule("DB")
+		if DB then
+			local setting = DB:Get("useUIPanelSystem")
+			print(string.format("|cffffcc00Current Setting:|r %s", setting and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
 		end
 
 	-- Help (or any other unrecognized command)

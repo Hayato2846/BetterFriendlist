@@ -17,7 +17,39 @@ if GetLocale() == "itIT" then
 	L.DIALOG_RESET_SETTINGS_TEXT = "Ripristinare tutte le impostazioni ai valori predefiniti?"
 	L.DIALOG_RESET_BTN1 = "Ripristina"
 	L.DIALOG_RESET_BTN2 = "Annulla"
-	L.DIALOG_MIGRATE_TEXT = "Migrare gruppi di amici da FriendGroups a BetterFriendlist?\n\nQuesto farà:\n• Creare tutti i gruppi dalle note BNet\n• Assegnare amici ai loro gruppi\n• Opzionalmente pulire le note\n\n|cffff0000Attenzione: Questa azione non può essere annullata!|r"
+	L.DIALOG_UI_PANEL_RELOAD_TEXT = "La modifica dell'impostazione di gerarchia UI richiede il ricaricamento dell'interfaccia.\n\nRicaricare ora?"
+	L.DIALOG_UI_PANEL_RELOAD_BTN1 = "Ricarica"
+	L.DIALOG_UI_PANEL_RELOAD_BTN2 = "Annulla"
+	L.RAID_HELP_TITLE = "Aiuto incursione"
+	L.RAID_HELP_TEXT = "Clicca per l'aiuto sull'elenco incursioni."
+	L.RAID_HELP_MULTISELECT_TITLE = "Selezione multipla"
+	L.RAID_HELP_MULTISELECT_TEXT = "Tieni premuto Ctrl e fai clic sinistro per selezionare più giocatori.\nUna volta selezionati, trascinali e rilasciali in qualsiasi gruppo per spostarli tutti insieme."
+	L.RAID_HELP_MAINTANK_TITLE = "Tank principale"
+	L.RAID_HELP_MAINTANK_TEXT = "Maiusc + Clic destro su un giocatore per impostarlo come tank principale.\nUn'icona tank apparirà accanto al suo nome."
+	L.RAID_HELP_MAINASSIST_TITLE = "Assistente principale"
+	L.RAID_HELP_MAINASSIST_TEXT = "Ctrl + Clic destro su un giocatore per impostarlo come assistente principale.\nUn'icona assistente apparirà accanto al suo nome."
+	L.RAID_HELP_DRAGDROP_TITLE = "Trascina e rilascia"
+	L.RAID_HELP_DRAGDROP_TEXT = "Trascina qualsiasi giocatore per spostarlo tra i gruppi.\nPuoi anche trascinare più giocatori selezionati contemporaneamente.\nGli slot vuoti possono essere usati per scambiare posizioni."
+	L.RAID_HELP_COMBAT_TITLE = "Blocco combattimento"
+	L.RAID_HELP_COMBAT_TEXT = "I giocatori non possono essere spostati durante il combattimento.\nQuesta è una restrizione Blizzard per prevenire errori."
+	L.RAID_INFO_UNAVAILABLE = "Nessuna info disponibile"
+	L.RAID_NOT_IN_RAID = "Non in Incursione"
+	L.RAID_NOT_IN_RAID_DETAILS = "Non sei attualmente in un gruppo di incursione."
+	L.RAID_CREATE_BUTTON = "Crea Incursione"
+	L.GROUP = "Gruppo"
+	L.ALL = "Tutti"
+	L.UNKNOWN_ERROR = "Errore sconosciuto"
+	L.RAID_ERROR_NOT_ENOUGH_SPACE = "Spazio insufficiente: %d giocatori selezionati, %d posti liberi nel Gruppo %d"
+	L.RAID_MSG_BULK_MOVE_SUCCESS = "Spostati %d giocatori nel Gruppo %d"
+	L.RAID_ERROR_BULK_MOVE_FAILED = "Impossibile spostare %d giocatori"
+	L.RAID_ERROR_READY_CHECK_PERMISSION = "Devi essere capo incursione o assistente per avviare un appello."
+	L.RAID_ERROR_NO_SAVED_INSTANCES = "Non hai istanze di incursione salvate."
+	L.RAID_ERROR_LOAD_RAID_INFO = "Errore: Impossibile caricare la finestra Info Incursione."
+	L.RAID_MSG_SWAP_SUCCESS = "%s <-> %s scambiati"
+	L.RAID_ERROR_SWAP_FAILED = "Scambio fallito: %s"
+	L.RAID_MSG_MOVE_SUCCESS = "%s spostato nel Gruppo %d"
+	L.RAID_ERROR_MOVE_FAILED = "Spostamento fallito: %s"
+	L.DIALOG_MIGRATE_TEXT = "Migrare i gruppi di amici da FriendGroups a BetterFriendlist?\n\nQuesto:\n• Creerà tutti i gruppi dalle note BNet\n• Assegnerà gli amici ai loro gruppi\n• Opzionalmente pulirà le note\n\n|cffff0000Attenzione: Questa operazione non può essere annullata!|r"
 	L.DIALOG_MIGRATE_BTN1 = "Migra e Pulisci Note"
 	L.DIALOG_MIGRATE_BTN2 = "Solo Migrazione"
 	L.DIALOG_MIGRATE_BTN3 = "Annulla"
@@ -320,7 +352,29 @@ if GetLocale() == "itIT" then
 	L.EDIT_MODE_NOT_AVAILABLE = "Modalità Modifica non disponibile in Classic"
 	L.CLASSIC_COMPATIBILITY_INFO = "Esecuzione in modalità compatibilità Classic"
 	L.FEATURE_NOT_AVAILABLE_CLASSIC = "Questa funzionalità non è disponibile in Classic"
+	L.SETTINGS_CLOSE_ON_GUILD_TAB = "Chiudi BetterFriendlist quando apri Gilda"
+	L.SETTINGS_CLOSE_ON_GUILD_TAB_DESC = "Chiudi automaticamente BetterFriendlist quando clicchi sulla scheda Gilda"
+	L.SETTINGS_HIDE_GUILD_TAB = "Nascondi scheda Gilda"
+	L.SETTINGS_HIDE_GUILD_TAB_DESC = "Nascondi la scheda Gilda dalla lista amici"
+	L.SETTINGS_USE_UI_PANEL_SYSTEM = "Rispetta gerarchia UI"
+	L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Impedisce a BetterFriendlist di aprirsi sopra altre finestre UI (Personaggio, Libro degli incantesimi, ecc.). Richiede /reload."
+	
+	-- ========================================
+	-- LAST ONLINE TIME FORMATS
+	-- ========================================
+	L.LASTONLINE_SECS = "< 1 min"
+	L.LASTONLINE_MINUTES = "%d min"
+	L.LASTONLINE_HOURS = "%d h"
+	L.LASTONLINE_DAYS = "%d giorni"
+	L.LASTONLINE_MONTHS = "%d mesi"
+	L.LASTONLINE_YEARS = "%d anni"
 
+	-- ========================================
+	-- GUILD UI WARNING
+	-- ========================================
+	L.CLASSIC_GUILD_UI_WARNING_TITLE = "UI gilda classica disattivata"
+	L.CLASSIC_GUILD_UI_WARNING_TEXT = "BetterFriendlist ha disattivato l'UI gilda classica poiché solo l'UI gilda moderna di Blizzard è compatibile con BetterFriendlist.\n\nLa scheda Gilda ora apre l'UI gilda moderna di Blizzard."
+	
 	-- ========================================
 	-- GLOBAL FRIEND SYNC
 	-- ========================================

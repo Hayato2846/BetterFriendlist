@@ -4,6 +4,7 @@
 -- Version 0.14
 
 local ADDON_NAME, BFL = ...
+local L = BFL.L
 local FontManager = BFL.FontManager
 local RaidFrame = BFL:RegisterModule("RaidFrame", {})
 
@@ -582,6 +583,20 @@ function RaidFrame:Initialize()
     -- Initialize Secure Proxy (Phase 8.3)
     self:CreateSecureProxy()
     
+    -- Localize Static UI Elements
+    local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
+    if frame then
+        -- Localize empty state text
+        if frame.NotInRaid then
+            frame.NotInRaid:SetText(L.RAID_NOT_IN_RAID_DETAILS or "You are not currently in a raid group.")
+        end
+        
+        -- Localize control panel buttons
+        if frame.ControlPanel and frame.ControlPanel.ConvertToRaidButton then
+            frame.ControlPanel.ConvertToRaidButton:SetText(L.RAID_CREATE_BUTTON or "Create Raid")
+        end
+    end
+    
     -- Initial update of control panel (this will set label too)
     self:UpdateControlPanel()
     self:UpdateGroupLayout() -- Ensure layout matches Mock (responsive sizing)
@@ -876,7 +891,7 @@ function RaidFrame:InitializeMemberButtons()
         if groupFrame then
             -- Set group title
             if groupFrame.GroupTitle then
-                groupFrame.GroupTitle:SetText("Group " .. groupIndex)
+                groupFrame.GroupTitle:SetText((L.GROUP or "Group") .. " " .. groupIndex)
             end
             
             -- Reference XML template buttons (already created)
@@ -1110,7 +1125,7 @@ function RaidFrame:UpdateControlPanel()
         local currentText = frame.ControlPanel.EveryoneAssistLabel:GetText()
         if not currentText or currentText == "" then
             local ASSIST_ICON = "|TInterface\\GroupFrame\\UI-Group-AssistantIcon:14:14|t"
-            frame.ControlPanel.EveryoneAssistLabel:SetText("All " .. ASSIST_ICON)
+            frame.ControlPanel.EveryoneAssistLabel:SetText((L.ALL or "All") .. " " .. ASSIST_ICON)
             -- BFL:DebugPrint("[BFL] Assist All label set: All " .. ASSIST_ICON)
         end
     end
@@ -1219,7 +1234,7 @@ function RaidFrame:UpdateMemberButton(button, memberData)
         
         -- Show "Empty" text
         if button.EmptyText then
-            button.EmptyText:SetText("Empty")
+            button.EmptyText:SetText(L.EMPTY_TEXT or "Empty")
             button.EmptyText:Show()
         end
         
