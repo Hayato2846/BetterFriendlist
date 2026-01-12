@@ -61,7 +61,7 @@ function QuickFilters:InitDropdown(dropdown)
 				info.text = string.format("|T%s:14:14:0:0|t %s", icon, label)
 				info.value = mode
 				info.func = function()
-					self:SetFilter(mode)
+					QuickFilters:SetFilter(mode)
 					UIDropDownMenu_SetText(dropdown, string.format("|T%s:14:14:-2:-2|t", icon))
 				end
 				-- CRITICAL: Read from DB for checked state, not local variable

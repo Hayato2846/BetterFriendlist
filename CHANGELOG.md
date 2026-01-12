@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [2.1.6] - 2026-01-12
+### Fixed
+- **Quick Filters (Classic)** - Fixed a Lua error ("attempt to call method 'SetFilter' a nil value") when selecting a filter in the Classic version (reported by Loro).
+
 ## [2.1.5] - 2026-01-11
 ### Added
 - **Localization Update** - Significantly improved translation coverage across all 11 supported languages, especially for Raid Frame and Help features.

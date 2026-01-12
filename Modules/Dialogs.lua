@@ -471,16 +471,18 @@ function Dialogs:RegisterDialogs()
 			-- Setup dropdown menu (Classic-compatible)
 			if BFL.IsClassic or not BFL.HasModernDropdown then
 				-- Classic: Use UIDropDownMenu_Initialize
+				-- Clssic: Use UIDropDownMenu API
 				UIDropDownMenu_Initialize(self.groupDropdown, function(frame, level)
 					level = level or 1
 					for _, option in ipairs(groupOptions) do
 						local info = UIDropDownMenu_CreateInfo()
 						info.text = option.name
 						info.value = option.id
-						info.checked = (self.selectedGroupId == option.id)
+						-- Use triggerFrame explicitely to avoid scope issues with 'self'
+						info.checked = (triggerFrame.selectedGroupId == option.id)
 						info.func = function()
-							self.selectedGroupId = option.id
-							UIDropDownMenu_SetText(self.groupDropdown, option.name)
+							triggerFrame.selectedGroupId = option.id
+							UIDropDownMenu_SetText(triggerFrame.groupDropdown, option.name)
 							CloseDropDownMenus()
 						end
 						UIDropDownMenu_AddButton(info, level)
