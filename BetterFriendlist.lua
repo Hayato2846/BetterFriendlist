@@ -6,6 +6,7 @@
 
 local ADDON_NAME, BFL = ...
 local ADDON_VERSION = BFL.Version
+local L = BFL.L
 
 -- ========================================
 -- MODULE ACCESSORS
@@ -190,6 +191,69 @@ end
 
 -- Search filter
 local searchText = ""
+
+-- Localization Function (Call on PLAYER_LOGIN)
+local function LocalizeUI()
+	local frame = BetterFriendsFrame
+	if not frame then return end
+
+	-- Ensure Global Strings for XML usage (Literals in XML)
+	_G.RAF_NEXT_REWARD_HELP_TEXT = L.RAF_NEXT_REWARD_HELP
+	_G.WHO_LIST_SEARCH_INSTRUCTIONS = L.WHO_LIST_SEARCH_INSTRUCTIONS
+	_G.WHO_LIST_LEVEL_TOOLTIP = L.WHO_LEVEL_FORMAT
+
+	-- Tabs (Main Frame)
+	if frame.FriendsTabHeader then
+		if frame.FriendsTabHeader.Tab1 then frame.FriendsTabHeader.Tab1:SetText(L.TAB_FRIENDS or FRIENDS) end
+		if frame.FriendsTabHeader.Tab2 then frame.FriendsTabHeader.Tab2:SetText(L.CONTACTS_RECENT_ALLIES_TAB_NAME) end
+		if frame.FriendsTabHeader.Tab3 then frame.FriendsTabHeader.Tab3:SetText(L.RECRUIT_A_FRIEND or RECRUIT_A_FRIEND) end
+	end
+
+	-- Search Box
+	if frame.FriendsTabHeader and frame.FriendsTabHeader.SearchBox and frame.FriendsTabHeader.SearchBox.Instructions then
+		frame.FriendsTabHeader.SearchBox.Instructions:SetText(L.SEARCH_FRIENDS_INSTRUCTION)
+	end
+	
+	-- Broadcast Frame
+	if frame.FriendsTabHeader and frame.FriendsTabHeader.BattlenetFrame then
+		local bnet = frame.FriendsTabHeader.BattlenetFrame
+		if bnet.UnavailableLabel then bnet.UnavailableLabel:SetText(L.BATTLENET_UNAVAILABLE) end
+		if bnet.BroadcastFrame then
+			if bnet.BroadcastFrame.PromptText then bnet.BroadcastFrame.PromptText:SetText(L.FRIENDS_LIST_ENTER_TEXT) end
+			if bnet.BroadcastFrame.UpdateButton then bnet.BroadcastFrame.UpdateButton:SetText(UPDATE) end
+			if bnet.BroadcastFrame.CancelButton then bnet.BroadcastFrame.CancelButton:SetText(CANCEL) end
+		end
+	end
+
+	-- Bottom Buttons
+	if frame.AddFriendButton then frame.AddFriendButton:SetText(ADD_FRIEND) end
+	if frame.SendMessageButton then frame.SendMessageButton:SetText(SEND_MESSAGE) end
+	if frame.RecruitmentButton then frame.RecruitmentButton:SetText(L.RAF_RECRUITMENT) end
+	
+	-- Who Frame Columns (Classic/Retail)
+	if frame.WhoFrame then
+		if frame.WhoFrame.NameHeader then frame.WhoFrame.NameHeader:SetText(NAME) end
+		if frame.WhoFrame.LevelHeader then frame.WhoFrame.LevelHeader:SetText(LEVEL_ABBR) end
+		if frame.WhoFrame.ClassHeader then frame.WhoFrame.ClassHeader:SetText(CLASS) end
+		if frame.WhoFrame.WhoButton then frame.WhoFrame.WhoButton:SetText(REFRESH) end
+		if frame.WhoFrame.AddFriendButton then frame.WhoFrame.AddFriendButton:SetText(ADD_FRIEND) end
+		if frame.WhoFrame.GroupInviteButton then frame.WhoFrame.GroupInviteButton:SetText(GROUP_INVITE) end
+	end
+
+	-- Settings Frame
+	if BetterFriendlistSettingsFrame then
+		local sFrame = BetterFriendlistSettingsFrame
+		if sFrame.TitleContainer and sFrame.TitleContainer.TitleText then
+			sFrame.TitleContainer.TitleText:SetText(L.SETTINGS_TITLE)
+		end
+		if sFrame.Tab1 then sFrame.Tab1:SetText(L.SETTINGS_TAB_GENERAL) end
+		if sFrame.Tab2 then sFrame.Tab2:SetText(L.SETTINGS_TAB_GROUPS) end
+		if sFrame.Tab3 then sFrame.Tab3:SetText(L.SETTINGS_TAB_ADVANCED) end
+		if sFrame.Tab4 then sFrame.Tab4:SetText(L.SETTINGS_TAB_DATABROKER) end
+		if sFrame.Tab5 then sFrame.Tab5:SetText(L.SETTINGS_TAB_NOTIFICATIONS) end
+		if sFrame.Tab6 then sFrame.Tab6:SetText(L.SETTINGS_TAB_GLOBAL_SYNC) end
+	end
+end
 
 -- Initialize the addon
 local frame = CreateFrame("Frame")
@@ -778,10 +842,10 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		
 		-- Add divider and Header
 		rootDescription:CreateDivider()
-		rootDescription:CreateTitle("BetterFriendlist")
+		rootDescription:CreateTitle(L.MENU_TITLE)
 
 		-- Add "Set Nickname" button
-		rootDescription:CreateButton("Set Nickname", function()
+		rootDescription:CreateButton(L.MENU_SET_NICKNAME, function()
 			local DB = BFL:GetModule("DB")
 			local currentNickname = DB and DB:GetNickname(friendUID)
 			
@@ -797,10 +861,10 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			})
 		end)
 
-		local groupsButton = rootDescription:CreateButton("Groups")
+		local groupsButton = rootDescription:CreateButton(L.MENU_GROUPS)
 		
 		-- Add "Create Group" option at the top
-		groupsButton:CreateButton("Create Group", function()
+		groupsButton:CreateButton(L.MENU_CREATE_GROUP, function()
 			StaticPopup_Show("BETTER_FRIENDLIST_CREATE_GROUP_AND_ADD_FRIEND", nil, nil, friendUID)
 		end)
 		
@@ -862,7 +926,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				
 				-- Add "Remove from All Groups" button
 				local Groups = GetGroups()
-				groupsButton:CreateButton("Remove from All Groups", function()
+				groupsButton:CreateButton(L.MENU_REMOVE_ALL_GROUPS, function()
 					if Groups then
 						for currentGroupId in pairs(friendCurrentGroups) do
 							Groups:RemoveFriendFromGroup(friendUID, currentGroupId)
@@ -877,11 +941,11 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		-- Add Notification Settings submenu (Phase 9: Per-Friend Rules)
 		if BetterFriendlistDB.enableBetaFeatures then
 			-- Removed divider to consolidate under "BetterFriendlist" header
-			local notificationButton = rootDescription:CreateButton("Notification Settings")
+			local notificationButton = rootDescription:CreateButton(L.MENU_NOTIFICATIONS)
 			
 			-- Checkbox for "Default (Use global settings)"
 			notificationButton:CreateCheckbox(
-				"Default (Use global settings)",
+				L.MENU_NOTIFICATIONS_DEFAULT,
 				function()
 					local rule = BetterFriendlistDB.notificationFriendRules and BetterFriendlistDB.notificationFriendRules[friendUID]
 					return not rule or rule == "default"
@@ -892,13 +956,13 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					end
 					BetterFriendlistDB.notificationFriendRules[friendUID] = "default"
 					local friendName = contextData.name or contextData.battleTag or "friend"
-					print("|cff00ff00BetterFriendlist:|r Notifications for " .. friendName .. " set to |cffffcc00Default|r (global settings)")
+					print(string.format(L.NOTIFICATIONS_SET_MSG_DEFAULT, friendName))
 				end
 			)
 			
 			-- Checkbox for "Whitelist (Always notify)"
 			notificationButton:CreateCheckbox(
-				"Whitelist (Always notify)",
+				L.MENU_NOTIFICATIONS_WHITELIST,
 				function()
 					local rule = BetterFriendlistDB.notificationFriendRules and BetterFriendlistDB.notificationFriendRules[friendUID]
 					return rule == "whitelist"
@@ -909,13 +973,13 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					end
 					BetterFriendlistDB.notificationFriendRules[friendUID] = "whitelist"
 					local friendName = contextData.name or contextData.battleTag or "friend"
-					print("|cff00ff00BetterFriendlist:|r Notifications for " .. friendName .. " set to |cff00ff00Whitelist|r (always notify)")
+					print(string.format(L.NOTIFICATIONS_SET_MSG_WHITELIST, friendName))
 				end
 			)
 			
 			-- Checkbox for "Blacklist (Never notify)"
 			notificationButton:CreateCheckbox(
-				"Blacklist (Never notify)",
+				L.MENU_NOTIFICATIONS_BLACKLIST,
 				function()
 					local rule = BetterFriendlistDB.notificationFriendRules and BetterFriendlistDB.notificationFriendRules[friendUID]
 					return rule == "blacklist"
@@ -926,7 +990,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					end
 					BetterFriendlistDB.notificationFriendRules[friendUID] = "blacklist"
 					local friendName = contextData.name or contextData.battleTag or "friend"
-					print("|cff00ff00BetterFriendlist:|r Notifications for " .. friendName .. " set to |cffff0000Blacklist|r (never notify)")
+					print(string.format(L.NOTIFICATIONS_SET_MSG_BLACKLIST, friendName))
 				end
 			)
 		end
@@ -1077,6 +1141,9 @@ if BFL.IsClassic and BetterFriendsFrame then
 			BetterWhoFrame_Update()
 		end
 	elseif event == "PLAYER_LOGIN" then
+		-- Localize UI Elements (replacing hardcoded XML text)
+		LocalizeUI()
+
 		-- Classic: Auto-disable useClassicGuildUI CVar on every login
 		-- This ensures the setting persists across game restarts
 		if BFL.IsClassic then
@@ -1321,12 +1388,12 @@ function BetterFriendlist_SetSortMethod(method)
 	
 	-- Provide feedback
 	local methodNames = {
-		status = "Status (Online First)",
-		name = "Name (A-Z)",
-		level = "Level (Highest First)",
-		zone = "Zone"
+		status = L.SORT_STATUS,
+		name = L.SORT_NAME,
+		level = L.SORT_LEVEL,
+		zone = L.SORT_ZONE
 	}
-	print("|cff00ff00Sort changed to:|r " .. (methodNames[method] or method))
+	print("|cff00ff00BetterFriendlist:|r " .. string.format(L.SORT_CHANGED, (methodNames[method] or method)))
 end
 
 -- Update Quick Join tab with group count (matching Blizzard's FriendsFrame_UpdateQuickJoinTab)
@@ -1525,19 +1592,19 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 	if restriction ~= INVITE_RESTRICTION_NONE then
 		local restrictionText = ""
 		if restriction == INVITE_RESTRICTION_CLIENT then
-			restrictionText = ERR_TRAVEL_PASS_NOT_WOW or "Friend is not playing World of Warcraft"
+			restrictionText = ERR_TRAVEL_PASS_NOT_WOW or L.TRAVEL_PASS_NOT_WOW
 		elseif restriction == INVITE_RESTRICTION_WOW_PROJECT_CLASSIC then
-			restrictionText = ERR_TRAVEL_PASS_WRONG_PROJECT_CLASSIC_OVERRIDE or "This friend is playing World of Warcraft Classic."
+			restrictionText = ERR_TRAVEL_PASS_WRONG_PROJECT_CLASSIC_OVERRIDE or L.TRAVEL_PASS_WOW_CLASSIC
 		elseif restriction == INVITE_RESTRICTION_WOW_PROJECT_MAINLINE then
-			restrictionText = ERR_TRAVEL_PASS_WRONG_PROJECT_MAINLINE_OVERRIDE or "This friend is playing World of Warcraft."
+			restrictionText = ERR_TRAVEL_PASS_WRONG_PROJECT_MAINLINE_OVERRIDE or L.TRAVEL_PASS_WOW_MAINLINE
 		elseif restriction == INVITE_RESTRICTION_WOW_PROJECT_ID then
-			restrictionText = ERR_TRAVEL_PASS_WRONG_PROJECT or "Friend is playing a different version of World of Warcraft"
+			restrictionText = ERR_TRAVEL_PASS_WRONG_PROJECT or L.TRAVEL_PASS_DIFFERENT_VERSION
 		elseif restriction == INVITE_RESTRICTION_INFO then
-			restrictionText = ERR_TRAVEL_PASS_NO_INFO or "Not enough information available"
+			restrictionText = ERR_TRAVEL_PASS_NO_INFO or L.TRAVEL_PASS_NO_INFO
 		elseif restriction == INVITE_RESTRICTION_REGION then
-			restrictionText = ERR_TRAVEL_PASS_DIFFERENT_REGION or "Friend is in a different region"
+			restrictionText = ERR_TRAVEL_PASS_DIFFERENT_REGION or L.TRAVEL_PASS_DIFFERENT_REGION
 		elseif restriction == INVITE_RESTRICTION_NO_GAME_ACCOUNTS then
-			restrictionText = "No game accounts available"
+			restrictionText = L.TRAVEL_PASS_NO_GAME_ACCOUNTS
 		end
 		
 		if restrictionText ~= "" then
@@ -1838,10 +1905,10 @@ function BetterFriendsFrame_ShowContactsMenu(button)
 		rootDescription:SetTag("CONTACTS_MENU");
 		
 		-- Add BetterFriendList title
-		rootDescription:CreateTitle("BetterFriendList");
+		rootDescription:CreateTitle(L.MENU_TITLE);
 		
 		-- Settings option
-		rootDescription:CreateButton("Settings", function()
+		rootDescription:CreateButton(L.MENU_SETTINGS, function()
 			BetterFriendlistSettings_Show()
 		end);
 		
@@ -1852,7 +1919,7 @@ function BetterFriendsFrame_ShowContactsMenu(button)
 			local inCombat = InCombatLockdown()
 			
 			-- Create button title with combat lock icon if in combat
-			local buttonTitle = "Show Blizzard's Friendlist"
+			local buttonTitle = L.MENU_SHOW_BLIZZARD
 			if inCombat then
 				-- Add combat lock icon (same as Raid Tab)
 				buttonTitle = "|TInterface\\DialogFrame\\UI-Dialog-Icon-AlertNew:16:16:0:0|t " .. buttonTitle
@@ -1882,8 +1949,8 @@ function BetterFriendsFrame_ShowContactsMenu(button)
 				menuButton:AddInitializer(function(btn, description, menuInstance)
 					btn:SetScript("OnEnter", function(self)
 						GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-						GameTooltip:SetText("Show Blizzard's Friendlist", 1, 1, 1)
-						GameTooltip:AddLine("Cannot toggle in combat", 1, 0.2, 0.2, true)
+						GameTooltip:SetText(L.MENU_SHOW_BLIZZARD, 1, 1, 1)
+						GameTooltip:AddLine(L.MENU_COMBAT_LOCKED, 1, 0.2, 0.2, true)
 						GameTooltip:Show()
 					end)
 					btn:SetScript("OnLeave", function()
@@ -1896,7 +1963,7 @@ function BetterFriendsFrame_ShowContactsMenu(button)
 		end
 		
 		-- Create Group option
-		rootDescription:CreateButton("Create Group", function()
+		rootDescription:CreateButton(L.MENU_CREATE_GROUP, function()
 			StaticPopup_Show("BETTER_FRIENDLIST_CREATE_GROUP")
 		end);
 		
@@ -1905,7 +1972,7 @@ function BetterFriendsFrame_ShowContactsMenu(button)
 		-- Broadcast option (only if BNet is connected)
 		local canUseBroadCastFrame = BNFeaturesEnabled() and BNConnected();
 		if canUseBroadCastFrame then
-			rootDescription:CreateButton(CONTACTS_MENU_BROADCAST_BUTTON_NAME or "Set Broadcast Message", function()
+			rootDescription:CreateButton(CONTACTS_MENU_BROADCAST_BUTTON_NAME or L.MENU_SET_BROADCAST, function()
 				local broadcastFrame = BetterFriendsFrame.FriendsTabHeader.BattlenetFrame.BroadcastFrame;
 				if broadcastFrame then
 					broadcastFrame:ToggleFrame();
@@ -1914,7 +1981,7 @@ function BetterFriendsFrame_ShowContactsMenu(button)
 		end
 		
 		-- Ignore List option
-		rootDescription:CreateButton(CONTACTS_MENU_IGNORE_BUTTON_NAME or "Manage Ignore List", function()
+		rootDescription:CreateButton(CONTACTS_MENU_IGNORE_BUTTON_NAME or L.MENU_MANAGE_IGNORE, function()
 			BetterFriendsFrame_ShowIgnoreList();
 		end);
 	end);
@@ -1947,16 +2014,16 @@ function BetterFriendsFrame_ShowIgnoreList()
 		-- Fallback: show console message
 		local numIgnores = C_FriendList.GetNumIgnores()
 		if numIgnores == 0 then
-			print("Your ignore list is empty.")
+			print(L.IGNORE_LIST_EMPTY)
 		else
-			print("Ignore List (" .. numIgnores .. " players):")
+			print(string.format(L.IGNORE_LIST_HEADER, numIgnores))
 			for i = 1, numIgnores do
 				local name = C_FriendList.GetIgnoreName(i)
 				if name then
 					print("  " .. i .. ". " .. name)
 				end
 			end
-			print("Use '/unignore <name>' to remove someone from your ignore list.")
+			print(L.IGNORE_LIST_HELP)
 		end
 	end
 end
@@ -2365,10 +2432,10 @@ SLASH_BFLRESET1 = "/bflreset"
 SlashCmdList["BFLRESET"] = function(msg)
 	if msg == "warning" then
 		BetterFriendlistDB.classicGuildUIWarningShown = nil
-		print("|cff00ff00BetterFriendlist:|r Classic Guild UI warning flag reset. The popup will show on next login/reload.")
+		print("|cff00ff00BetterFriendlist:|r " .. L.CMD_RESET_FILTER_SUCCESS)
 	else
-		print("|cff00ff00BetterFriendlist Reset Commands:|r")
-		print("  |cffFFD100/bflreset warning|r - Reset Classic Guild UI warning popup")
+		print("|cff00ff00BetterFriendlist " .. L.CMD_RESET_HEADER .. "|r")
+		print("  |cffFFD100/bflreset warning|r - " .. L.CMD_RESET_HELP_WARNING)
 	end
 end
 

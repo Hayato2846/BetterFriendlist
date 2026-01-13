@@ -51,12 +51,12 @@ function GuildDetails:ShowForMember(guildIndex)
     -- Last online
     if BFL_GuildMemberDetailOnlineText then
         if online then
-            BFL_GuildMemberDetailOnlineText:SetText(GUILD_ONLINE_LABEL or "Online")
+            BFL_GuildMemberDetailOnlineText:SetText(GUILD_ONLINE_LABEL or BFL.L.ONLINE_STATUS)
         else
             if BFL.GuildRoster and BFL.GuildRoster.GetLastOnlineText then
                 BFL_GuildMemberDetailOnlineText:SetText(BFL.GuildRoster:GetLastOnlineText(guildIndex))
             else
-                BFL_GuildMemberDetailOnlineText:SetText("Offline")
+                BFL_GuildMemberDetailOnlineText:SetText(BFL.L.OFFLINE_STATUS)
             end
         end
     end

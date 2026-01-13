@@ -9,6 +9,7 @@
 ]]
 
 local addonName, BFL = ...
+local L = BFL_LOCALE
 
 -- Import UI constants
 local UI = BFL.UI.CONSTANTS
@@ -153,7 +154,7 @@ function BetterQuickJoinFrame_Update(self)
 	-- Show/hide "no groups" text (Edge Case: No groups available)
 	if self.ContentInset and self.ContentInset.NoGroupsText then
 		-- Set localized text using WoW global variable
-		self.ContentInset.NoGroupsText:SetText(QUICK_JOIN_NO_GROUPS or "No groups available")
+		self.ContentInset.NoGroupsText:SetText(L.QUICK_JOIN_NO_GROUPS or QUICK_JOIN_NO_GROUPS or "No groups available")
 		self.ContentInset.NoGroupsText:SetShown(not entries or #entries == 0)
 	end
 	

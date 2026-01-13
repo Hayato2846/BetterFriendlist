@@ -5,6 +5,7 @@ local ADDON_NAME, BFL = ...
 BFL.SettingsComponents = {}
 
 local Components = BFL.SettingsComponents
+local L = BFL.L or BFL_L
 
 -- ========================================
 -- Constants
@@ -429,8 +430,8 @@ function Components:CreateListItem(parent, itemText, orderIndex, onMoveUp, onMov
 		holder.deleteButton:SetScript("OnEnter", function(self)
 			self.icon:SetVertexColor(1, 1, 1)
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText("Delete Group", 1, 0.1, 0.1)
-			GameTooltip:AddLine("Remove this custom group", 0.8, 0.8, 0.8, true)
+			GameTooltip:SetText(L.SETTINGS_DELETE_GROUP, 1, 0.1, 0.1)
+			GameTooltip:AddLine(L.SETTINGS_DELETE_GROUP_DESC, 0.8, 0.8, 0.8, true)
 			GameTooltip:Show()
 		end)
 		holder.deleteButton:SetScript("OnLeave", function(self)
@@ -459,8 +460,8 @@ function Components:CreateListItem(parent, itemText, orderIndex, onMoveUp, onMov
 	end)
 	holder.colorButton:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText("Group Color", 1, 1, 1)
-		GameTooltip:AddLine("Click to change the group color", 0.8, 0.8, 0.8, true)
+		GameTooltip:SetText(L.SETTINGS_GROUP_COLOR, 1, 1, 1)
+		GameTooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC, 0.8, 0.8, 0.8, true)
 		GameTooltip:Show()
 	end)
 	holder.colorButton:SetScript("OnLeave", function()
@@ -487,8 +488,8 @@ function Components:CreateListItem(parent, itemText, orderIndex, onMoveUp, onMov
 		holder.renameButton:SetScript("OnEnter", function(self)
 			self.icon:SetVertexColor(1, 1, 1)
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText("Rename Group", 1, 1, 1)
-			GameTooltip:AddLine("Change the group name", 0.8, 0.8, 0.8, true)
+			GameTooltip:SetText(L.SETTINGS_RENAME_GROUP, 1, 1, 1)
+			GameTooltip:AddLine(L.TOOLTIP_RENAME_DESC, 0.8, 0.8, 0.8, true)
 			GameTooltip:Show()
 		end)
 		holder.renameButton:SetScript("OnLeave", function(self)
@@ -516,8 +517,8 @@ function Components:CreateListItem(parent, itemText, orderIndex, onMoveUp, onMov
 	holder.downButton:SetScript("OnEnter", function(self)
 		self.icon:SetVertexColor(1, 1, 1)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText("Move Down", 1, 1, 1)
-		GameTooltip:AddLine("Move this group down in the list", 0.8, 0.8, 0.8, true)
+		GameTooltip:SetText(L.TOOLTIP_MOVE_DOWN, 1, 1, 1)
+		GameTooltip:AddLine(L.TOOLTIP_MOVE_DOWN_DESC, 0.8, 0.8, 0.8, true)
 		GameTooltip:Show()
 	end)
 	holder.downButton:SetScript("OnLeave", function(self)
@@ -544,8 +545,8 @@ function Components:CreateListItem(parent, itemText, orderIndex, onMoveUp, onMov
 	holder.upButton:SetScript("OnEnter", function(self)
 		self.icon:SetVertexColor(1, 1, 1)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText("Move Up", 1, 1, 1)
-		GameTooltip:AddLine("Move this group up in the list", 0.8, 0.8, 0.8, true)
+		GameTooltip:SetText(L.TOOLTIP_MOVE_UP, 1, 1, 1)
+		GameTooltip:AddLine(L.TOOLTIP_MOVE_UP_DESC, 0.8, 0.8, 0.8, true)
 		GameTooltip:Show()
 	end)
 	holder.upButton:SetScript("OnLeave", function(self)

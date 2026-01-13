@@ -41,10 +41,9 @@ function RecentAllies:OnLoad(frame)
 	-- Recent Allies is TWW-only (11.0.7+)
 	if not BFL.HasRecentAllies then
 		-- Show "Not Available" message for Classic users
-		local L = BFL.L or {}
 		local notAvailableText = frame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 		notAvailableText:SetPoint("CENTER")
-		notAvailableText:SetText(L["RECENT_ALLIES_NOT_AVAILABLE"] or "Recent Allies is not available in this version.")
+		notAvailableText:SetText(BFL.L.RECENT_ALLIES_NOT_AVAILABLE)
 		notAvailableText:SetTextColor(0.5, 0.5, 0.5)
 		frame.UnavailableText = notAvailableText
 		
@@ -123,7 +122,7 @@ function RecentAllies:Refresh(frame, retainScrollPosition)
 		if not frame.UnavailableText then
 			frame.UnavailableText = frame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 			frame.UnavailableText:SetPoint("CENTER")
-			frame.UnavailableText:SetText("Recent Allies system is not available.")
+			frame.UnavailableText:SetText(BFL.L.RECENT_ALLIES_SYSTEM_UNAVAILABLE)
 		end
 		frame.UnavailableText:Show()
 		return
@@ -211,7 +210,7 @@ function RecentAllies:InitializeEntry(button, elementData)
 	
 	-- Set level with "Lvl " prefix (Line 1, Part 2)
 	local levelColor = stateData.isOnline and NORMAL_FONT_COLOR or FRIENDS_GRAY_COLOR
-	button.CharacterData.Level:SetText(levelColor:WrapTextInColorCode("Lvl " .. tostring(characterData.level)))
+	button.CharacterData.Level:SetText(levelColor:WrapTextInColorCode(BFL.L.LEVEL_FORMAT:format(characterData.level)))
 	button.CharacterData.Level:SetWidth(button.CharacterData.Level:GetUnboundedStringWidth())
 	
 	-- Hide class name (no longer needed)
@@ -260,9 +259,9 @@ function RecentAllies:InitializeEntry(button, elementData)
 	-- Setup party button tooltip
 	button.PartyButton:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip_AddHighlightLine(GameTooltip, RECENT_ALLIES_PARTY_BUTTON_TOOLTIP or "Invite")
+		GameTooltip_AddHighlightLine(GameTooltip, BFL.L.RECENT_ALLIES_INVITE)
 		if not self:IsEnabled() then
-			GameTooltip_AddErrorLine(GameTooltip, RECENT_ALLIES_PARTY_BUTTON_OFFLINE_TOOLTIP or "Player is offline")
+			GameTooltip_AddErrorLine(GameTooltip, BFL.L.RECENT_ALLIES_PLAYER_OFFLINE)
 		end
 		GameTooltip:Show()
 	end)
@@ -278,7 +277,7 @@ function RecentAllies:InitializeEntry(button, elementData)
 				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 				local timeUntilExpiration = math.max(stateData.pinExpirationDate - GetServerTime(), 1)
 				local timeText = RecentAlliesUtil.GetFormattedTime(timeUntilExpiration)
-				GameTooltip_AddHighlightLine(GameTooltip, string.format("Pin expires in %s", timeText))
+				GameTooltip_AddHighlightLine(GameTooltip, BFL.L.RECENT_ALLIES_PIN_EXPIRES:format(timeText))
 				GameTooltip:Show()
 			end
 		end)
@@ -330,7 +329,7 @@ function RecentAllies:BuildTooltip(button, tooltip)
 	-- Race and level
 	local raceInfo = C_CreatureInfo.GetRaceInfo(characterData.raceID)
 	if raceInfo then
-		GameTooltip_AddHighlightLine(tooltip, string.format("Level %d %s", characterData.level, raceInfo.raceName))
+		GameTooltip_AddHighlightLine(tooltip, BFL.L.RECENT_ALLIES_LEVEL_RACE:format(characterData.level, raceInfo.raceName))
 	end
 	
 	-- Class
@@ -352,14 +351,14 @@ function RecentAllies:BuildTooltip(button, tooltip)
 	
 	-- Note
 	if interactionData.note and interactionData.note ~= "" then
-		GameTooltip_AddNormalLine(tooltip, string.format("Note: %s", interactionData.note))
+		GameTooltip_AddNormalLine(tooltip, BFL.L.RECENT_ALLIES_NOTE:format(interactionData.note))
 	end
 	
 	-- Most recent interaction
 	if interactionData.interactions and #interactionData.interactions > 0 and interactionData.interactions[1] then
 		GameTooltip_AddBlankLineToTooltip(tooltip)
 		local mostRecent = interactionData.interactions[1]
-		GameTooltip_AddNormalLine(tooltip, "Recent Activity:")
+		GameTooltip_AddNormalLine(tooltip, BFL.L.RECENT_ALLIES_ACTIVITY)
 		GameTooltip_AddHighlightLine(tooltip, mostRecent.description or "")
 	end
 end

@@ -258,7 +258,7 @@ function MainFrameEditMode:CreateEditModeSettings()
     -- Create settings for LibEditMode dialog (Sliders)
     local settings = {
         {
-            name = "Frame Width",
+            name = BFL.L.EDITMODE_FRAME_WIDTH,
             kind = LEM.SettingType.Slider,
             default = DEFAULT_WIDTH,
             get = function(layoutName)
@@ -289,7 +289,7 @@ function MainFrameEditMode:CreateEditModeSettings()
             end,
         },
         {
-            name = "Frame Height",
+            name = BFL.L.EDITMODE_FRAME_HEIGHT,
             kind = LEM.SettingType.Slider,
             default = DEFAULT_HEIGHT,
             get = function(layoutName)
@@ -320,7 +320,7 @@ function MainFrameEditMode:CreateEditModeSettings()
             end,
         },
         {
-            name = "Window Scale",
+            name = BFL.L.SETTINGS_WINDOW_SCALE,
             kind = LEM.SettingType.Slider,
             default = 100,  -- 100%
             get = function(layoutName)

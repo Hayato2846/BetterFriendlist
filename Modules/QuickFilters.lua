@@ -7,6 +7,9 @@ local ADDON_NAME, BFL = ...
 -- Register Module
 local QuickFilters = BFL:RegisterModule("QuickFilters", {})
 
+-- Localization
+local L = BFL.L
+
 -- ========================================
 -- Module Dependencies
 -- ========================================
@@ -70,13 +73,13 @@ function QuickFilters:InitDropdown(dropdown)
 				UIDropDownMenu_AddButton(info)
 			end
 			
-			AddFilterOption("all", "All Friends", FILTER_ICONS.all)
-			AddFilterOption("online", "Online Only", FILTER_ICONS.online)
-			AddFilterOption("offline", "Offline Only", FILTER_ICONS.offline)
-			AddFilterOption("wow", "WoW Only", FILTER_ICONS.wow)
-			AddFilterOption("bnet", "Battle.net Only", FILTER_ICONS.bnet)
-			AddFilterOption("hideafk", "Hide AFK/DND", FILTER_ICONS.hideafk)
-			AddFilterOption("retail", "Retail Only", FILTER_ICONS.retail)
+			AddFilterOption("all", L.FILTER_ALL, FILTER_ICONS.all)
+			AddFilterOption("online", L.FILTER_ONLINE, FILTER_ICONS.online)
+			AddFilterOption("offline", L.FILTER_OFFLINE, FILTER_ICONS.offline)
+			AddFilterOption("wow", L.FILTER_WOW, FILTER_ICONS.wow)
+			AddFilterOption("bnet", L.FILTER_BNET, FILTER_ICONS.bnet)
+			AddFilterOption("hideafk", L.FILTER_HIDE_AFK, FILTER_ICONS.hideafk)
+			AddFilterOption("retail", L.FILTER_RETAIL, FILTER_ICONS.retail)
 		end)
 		
 		-- Set initial selected text (read from DB, not local variable)
@@ -95,7 +98,7 @@ function QuickFilters:InitDropdown(dropdown)
 				local filterText = QuickFilters:GetFilterText()
 				
 				GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
-				GameTooltip:SetText("Quick Filter: " .. filterText)
+				GameTooltip:SetText(L.TOOLTIP_QUICK_FILTER .. filterText)
 				GameTooltip:Show()
 			end)
 			button:HookScript("OnLeave", GameTooltip_Hide)
@@ -104,7 +107,7 @@ function QuickFilters:InitDropdown(dropdown)
 				local filterText = QuickFilters:GetFilterText()
 				
 				GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
-				GameTooltip:SetText("Quick Filter: " .. filterText)
+				GameTooltip:SetText(L.TOOLTIP_QUICK_FILTER .. filterText)
 				GameTooltip:Show()
 			end)
 			dropdown:SetScript("OnLeave", GameTooltip_Hide)
@@ -148,25 +151,25 @@ function QuickFilters:InitDropdown(dropdown)
 		local optionText = "\124T%s:16:16:0:2\124t %s"
 		
 		-- Create filter options with icons
-		local allText = string.format(optionText, FILTER_ICONS.all, "All Friends")
+		local allText = string.format(optionText, FILTER_ICONS.all, L.FILTER_ALL)
 		CreateRadio(rootDescription, allText, "all")
 		
-		local onlineText = string.format(optionText, FILTER_ICONS.online, "Online Only")
+		local onlineText = string.format(optionText, FILTER_ICONS.online, L.FILTER_ONLINE)
 		CreateRadio(rootDescription, onlineText, "online")
 		
-		local offlineText = string.format(optionText, FILTER_ICONS.offline, "Offline Only")
+		local offlineText = string.format(optionText, FILTER_ICONS.offline, L.FILTER_OFFLINE)
 		CreateRadio(rootDescription, offlineText, "offline")
 		
-		local wowText = string.format(optionText, FILTER_ICONS.wow, "WoW Only")
+		local wowText = string.format(optionText, FILTER_ICONS.wow, L.FILTER_WOW)
 		CreateRadio(rootDescription, wowText, "wow")
 		
-		local bnetText = string.format(optionText, FILTER_ICONS.bnet, "Battle.net Only")
+		local bnetText = string.format(optionText, FILTER_ICONS.bnet, L.FILTER_BNET)
 		CreateRadio(rootDescription, bnetText, "bnet")
 		
-		local hideafkText = string.format(optionText, FILTER_ICONS.hideafk, "Hide AFK/DND")
+		local hideafkText = string.format(optionText, FILTER_ICONS.hideafk, L.FILTER_HIDE_AFK)
 		CreateRadio(rootDescription, hideafkText, "hideafk")
 		
-		local retailText = string.format(optionText, FILTER_ICONS.retail, "Retail Only")
+		local retailText = string.format(optionText, FILTER_ICONS.retail, L.FILTER_RETAIL)
 		CreateRadio(rootDescription, retailText, "retail")
 	end)
 	
@@ -180,7 +183,7 @@ function QuickFilters:InitDropdown(dropdown)
 		local filterText = self:GetFilterText()
 		
 		GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
-		GameTooltip:SetText("Quick Filter: " .. filterText)
+		GameTooltip:SetText(string.format(L.TOOLTIP_QUICK_FILTER or "Quick Filter: %s", filterText))
 		GameTooltip:Show()
 	end)
 	
@@ -222,15 +225,15 @@ function QuickFilters:GetFilterText()
 	local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or filterMode
 	
 	local filterTexts = {
-		all = "All Friends",
-		online = "Online Only",
-		offline = "Offline Only",
-		wow = "WoW Only",
-		bnet = "Battle.net Only",
-		hideafk = "Hide AFK/DND",
-		retail = "Retail Only",
+		all = L.FILTER_ALL,
+		online = L.FILTER_ONLINE,
+		offline = L.FILTER_OFFLINE,
+		wow = L.FILTER_WOW,
+		bnet = L.FILTER_BNET,
+		hideafk = L.FILTER_HIDE_AFK,
+		retail = L.FILTER_RETAIL,
 	}
-	return filterTexts[currentFilter] or "All Friends"
+	return filterTexts[currentFilter] or L.FILTER_ALL
 end
 
 -- Get filter icons table

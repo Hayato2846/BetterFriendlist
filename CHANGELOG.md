@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [2.1.7] - 2026-01-13
+### Fixed
+- **Localization (enUS & deDE)** - Significantly extended and polished translations for English and German. The German localization has been completely reworked to be less formal and more natural.
+
 ## [2.1.6] - 2026-01-12
 ### Fixed
 - **Quick Filters (Classic)** - Fixed a Lua error ("attempt to call method 'SetFilter' a nil value") when selecting a filter in the Classic version (reported by Loro).

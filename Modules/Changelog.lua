@@ -2,6 +2,7 @@
 -- Displays the changelog in a scrollable window
 
 local ADDON_NAME, BFL = ...
+local L = BFL.L
 local Changelog = BFL:RegisterModule("Changelog", {})
 
 local changelogFrame = nil
@@ -16,6 +17,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+
+## [2.1.7] - 2026-01-13
+### Fixed
+- **Localization (enUS & deDE)** - Significantly extended and polished translations for English and German. The German localization has been completely reworked to be less formal and more natural.
 
 ## [2.1.6] - 2026-01-12
 ### Fixed
@@ -1738,10 +1743,10 @@ function Changelog:OnPortraitEnter(button)
     local lastVersion = DB:Get("lastChangelogVersion", "0.0.0")
     
     if lastVersion ~= BFL.VERSION then
-        GameTooltip:AddLine("New Update Available!", 0, 1, 0)
-        GameTooltip:AddLine("Click to view Changelog", 1, 1, 1)
+        GameTooltip:AddLine(L.CHANGELOG_TOOLTIP_UPDATE, 0, 1, 0)
+        GameTooltip:AddLine(L.CHANGELOG_TOOLTIP_CLICK, 1, 1, 1)
     else
-        GameTooltip:AddLine("Click to view Changelog", 1, 1, 1)
+        GameTooltip:AddLine(L.CHANGELOG_TOOLTIP_CLICK, 1, 1, 1)
     end
     
     GameTooltip:Show()
@@ -1777,7 +1782,7 @@ function Changelog:CreateChangelogWindow()
     -- Hide default Inset
     if frame.Inset then frame.Inset:Hide() end
     
-    SetTitle(frame, "BetterFriendlist Changelog")
+    SetTitle(frame, L.CHANGELOG_TITLE)
     
     -- Create MainInset to match Settings style
     local mainInset = CreateFrame("Frame", nil, frame, "BackdropTemplate")
@@ -1815,14 +1820,14 @@ function Changelog:CreateChangelogWindow()
     -- Intro Text
     local headerText = headerFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     headerText:SetPoint("LEFT", 10, 0)
-    headerText:SetText("Community & Support:")
+    headerText:SetText(L.CHANGELOG_HEADER_COMMUNITY)
 
     -- Discord Button (Rightmost)
     local discordBtn = CreateFrame("Button", nil, headerFrame, "UIPanelButtonTemplate")
     frame.DiscordButton = discordBtn
     discordBtn:SetSize(130, 24)
     discordBtn:SetPoint("RIGHT", -10, 0)
-    discordBtn:SetText("   Discord")
+    discordBtn:SetText(L.CHANGELOG_DISCORD)
     
     local dcIcon = discordBtn:CreateTexture(nil, "ARTWORK")
     dcIcon:SetSize(14, 14)
@@ -1836,7 +1841,7 @@ function Changelog:CreateChangelogWindow()
     dcIcon:AddMaskTexture(dcMask)
     
     discordBtn:SetScript("OnClick", function()
-        ShowCopyDialog("https://discord.gg/dpaV8vh3w3", "Join our Discord Community")
+        ShowCopyDialog("https://discord.gg/dpaV8vh3w3", L.CHANGELOG_POPUP_DISCORD)
     end)
 
     -- GitHub Button (Left of Discord)
@@ -1844,7 +1849,7 @@ function Changelog:CreateChangelogWindow()
     frame.GitHubButton = githubBtn
     githubBtn:SetSize(130, 24)
     githubBtn:SetPoint("RIGHT", discordBtn, "LEFT", -10, 0)
-    githubBtn:SetText("   GitHub Issues")
+    githubBtn:SetText(L.CHANGELOG_GITHUB)
     
     local ghIcon = githubBtn:CreateTexture(nil, "ARTWORK")
     ghIcon:SetSize(14, 14)
@@ -1858,7 +1863,7 @@ function Changelog:CreateChangelogWindow()
     ghIcon:AddMaskTexture(ghMask)
     
     githubBtn:SetScript("OnClick", function()
-        ShowCopyDialog("https://github.com/Hayato2846/BetterFriendlist/issues", "Report Bugs / Request Features")
+        ShowCopyDialog("https://github.com/Hayato2846/BetterFriendlist/issues", L.CHANGELOG_POPUP_GITHUB)
     end)
 
     -- Ko-fi Button (Left of GitHub)
@@ -1866,7 +1871,7 @@ function Changelog:CreateChangelogWindow()
     frame.KoFiButton = kofiBtn
     kofiBtn:SetSize(130, 24)
     kofiBtn:SetPoint("RIGHT", githubBtn, "LEFT", -10, 0)
-    kofiBtn:SetText("   Support")
+    kofiBtn:SetText(L.CHANGELOG_SUPPORT)
     
     local kofiIcon = kofiBtn:CreateTexture(nil, "ARTWORK")
     kofiIcon:SetSize(14, 14)
@@ -1880,7 +1885,7 @@ function Changelog:CreateChangelogWindow()
     kofiIcon:AddMaskTexture(kofiMask)
     
     kofiBtn:SetScript("OnClick", function()
-        ShowCopyDialog("https://ko-fi.com/hayato2846", "Support Development")
+        ShowCopyDialog("https://ko-fi.com/hayato2846", L.CHANGELOG_POPUP_SUPPORT)
     end)
 
     -- ScrollFrame
@@ -1947,7 +1952,7 @@ function Changelog:CreateChangelogWindow()
         -- Title
         local title = header:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         title:SetPoint("LEFT", icon, "RIGHT", 5, 0)
-        title:SetText("Version " .. entryData.version)
+        title:SetText(string.format(L.CHANGELOG_HEADER_VERSION, entryData.version))
 
         -- Date
         local dateLabel = header:CreateFontString(nil, "OVERLAY", "GameFontNormal")

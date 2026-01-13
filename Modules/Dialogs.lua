@@ -203,9 +203,9 @@ function Dialogs:RegisterDialogs()
 	
 	-- Dialog for resetting all Edit Mode layouts (Phase 5)
 	StaticPopupDialogs["BETTER_FRIENDLIST_RESET_ALL_LAYOUTS"] = {
-		text = "Reset all saved frame sizes and positions for all Edit Mode layouts?\n\nThis cannot be undone!",
-		button1 = "Reset All",
-		button2 = "Cancel",
+		text = BFL.L.DIALOG_RESET_LAYOUTS_TEXT,
+		button1 = BFL.L.DIALOG_RESET_LAYOUTS_BTN1,
+		button2 = BFL.L.DIALOG_RESET_BTN2, -- Cancel
 		OnAccept = function(self)
 			-- Clear all layout data
 			BetterFriendlistDB.mainFrameSize = {}
@@ -226,7 +226,7 @@ function Dialogs:RegisterDialogs()
 			end
 			
 			-- BFL:DebugPrint("|cff00ff00All Edit Mode layouts reset to default|r")
-			print("|cff00ffffBetterFriendlist:|r All layouts reset. Use /editmode to reposition.")
+			print("|cff00ffffBetterFriendlist:|r " .. BFL.L.MSG_LAYOUTS_RESET)
 		end,
 		timeout = 0,
 		whileDead = true,
@@ -297,19 +297,19 @@ function Dialogs:RegisterDialogs()
 		-- Title
 		triggerFrame.title = triggerFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 		triggerFrame.title:SetPoint("TOP", 0, -5)
-		triggerFrame.title:SetText("Create Group Trigger")
+		triggerFrame.title:SetText(BFL.L.DIALOG_TRIGGER_TITLE)
 		
 		-- Info text
 		triggerFrame.info = triggerFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 		triggerFrame.info:SetPoint("TOPLEFT", 15, -30)
 		triggerFrame.info:SetPoint("TOPRIGHT", -15, -30)
 		triggerFrame.info:SetJustifyH("LEFT")
-		triggerFrame.info:SetText("Get notified when X friends from a group come online.")
+		triggerFrame.info:SetText(BFL.L.DIALOG_TRIGGER_INFO)
 		
 		-- Group label
 		triggerFrame.groupLabel = triggerFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 		triggerFrame.groupLabel:SetPoint("TOPLEFT", 15, -60)
-		triggerFrame.groupLabel:SetText("Select Group:")
+		triggerFrame.groupLabel:SetText(BFL.L.DIALOG_TRIGGER_SELECT_GROUP)
 		
 		-- Group dropdown (Classic-compatible)
 		if BFL.IsClassic or not BFL.HasModernDropdown then
@@ -327,7 +327,7 @@ function Dialogs:RegisterDialogs()
 		-- Threshold label
 		triggerFrame.thresholdLabel = triggerFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 		triggerFrame.thresholdLabel:SetPoint("TOPLEFT", 15, -120)
-		triggerFrame.thresholdLabel:SetText("Minimum Friends Online:")
+		triggerFrame.thresholdLabel:SetText(BFL.L.DIALOG_TRIGGER_MIN_FRIENDS)
 		
 		-- Threshold value display (next to label)
 		triggerFrame.thresholdValue = triggerFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -383,7 +383,7 @@ function Dialogs:RegisterDialogs()
 		local createBtn = CreateFrame("Button", nil, triggerFrame, "UIPanelButtonTemplate")
 		createBtn:SetSize(100, 25)
 		createBtn:SetPoint("BOTTOMRIGHT", -15, 15)
-		createBtn:SetText("Create")
+		createBtn:SetText(BFL.L.DIALOG_TRIGGER_CREATE)
 		createBtn:SetScript("OnClick", function()
 			local Groups = BFL:GetModule("Groups")
 			if not Groups then return end
@@ -393,7 +393,7 @@ function Dialogs:RegisterDialogs()
 			local threshold = tonumber(triggerFrame.thresholdValue:GetText()) or 3
 			
 			if not selectedGroup then
-				print("|cffff0000BetterFriendlist:|r Please select a group")
+				print("|cffff0000BetterFriendlist:|r " .. BFL.L.ERROR_SELECT_GROUP)
 				return
 			end
 			
@@ -412,7 +412,7 @@ function Dialogs:RegisterDialogs()
 			
 			local group = Groups:Get(selectedGroup)
 			local groupName = group and group.name or selectedGroup
-			print("|cff00ff00BetterFriendlist:|r Trigger created: " .. threshold .. "+ friends from '" .. groupName .. "'")
+			print("|cff00ff00BetterFriendlist:|r " .. string.format(BFL.L.MSG_TRIGGER_CREATED, threshold, groupName))
 			
 			-- Trigger list refresh via global callback if registered
 			if _G.BFL_RefreshNotificationTriggers then
@@ -426,7 +426,7 @@ function Dialogs:RegisterDialogs()
 		local cancelBtn = CreateFrame("Button", nil, triggerFrame, "UIPanelButtonTemplate")
 		cancelBtn:SetSize(100, 25)
 		cancelBtn:SetPoint("BOTTOMLEFT", 15, 15)
-		cancelBtn:SetText("Cancel")
+		cancelBtn:SetText(BFL.L.DIALOG_TRIGGER_CANCEL)
 		cancelBtn:SetScript("OnClick", function()
 			triggerFrame:Hide()
 		end)
@@ -460,7 +460,7 @@ function Dialogs:RegisterDialogs()
 			table.sort(groupOptions, function(a, b) return a.order < b.order end)
 			
 			if #groupOptions == 0 then
-				print("|cffff0000BetterFriendlist:|r No groups available. Create a custom group first.")
+				print("|cffff0000BetterFriendlist:|r " .. BFL.L.ERROR_NO_GROUPS)
 				self:Hide()
 				return
 			end

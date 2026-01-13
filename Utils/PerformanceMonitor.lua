@@ -133,18 +133,18 @@ function PerformanceMonitor:Reset()
 	end
 	self.stats.memory_samples = {}
 	self.stats.memory_max = 0
-	print("|cff00ff00BetterFriendlist Performance:|r Statistics reset")
+	print(BFL.L.PERF_HEADER_PREFIX .. " " .. BFL.L.PERF_STATS_RESET)
 end
 
 --[[
 	Print performance report
 ]]
 function PerformanceMonitor:Report()
-	print("|cff00ff00=== BetterFriendlist Performance Report ===|r")
+	print(BFL.L.PERF_REPORT_HEADER)
 	print("")
 	
 	-- QuickJoin operations
-	print("|cffffd700QuickJoin Operations:|r")
+	print(BFL.L.PERF_QJ_OPS)
 	self:PrintOperation("quickjoin_update", "Update()")
 	self:PrintOperation("quickjoin_getgroupinfo", "GetGroupInfo()")
 	self:PrintOperation("quickjoin_getentries", "GetEntries()")
@@ -152,12 +152,12 @@ function PerformanceMonitor:Report()
 	print("")
 	
 	-- Friends List operations (for comparison)
-	print("|cffffd700Friends List Operations:|r")
+	print(BFL.L.PERF_FRIENDS_OPS)
 	self:PrintOperation("friendslist_update", "UpdateDisplay()")
 	print("")
 	
 	-- Memory usage
-	print("|cffffd700Memory Usage:|r")
+	print(BFL.L.PERF_MEMORY)
 	UpdateAddOnMemoryUsage()
 	local currentMemory = GetAddOnMemoryUsage("BetterFriendlist") or 0
 	print(string.format("  Current: %.2f KB", currentMemory))
@@ -177,10 +177,10 @@ function PerformanceMonitor:Report()
 	print("")
 	
 	-- Performance targets
-	print("|cffffd700Performance Targets:|r")
-	print("  ✓ <16.6ms = 60 FPS")
-	print("  ✓ <33.3ms = 30 FPS")
-	print("  ✗ >50ms = Performance warning")
+	print(BFL.L.PERF_TARGETS)
+	print(BFL.L.PERF_FPS_60)
+	print(BFL.L.PERF_FPS_30)
+	print(BFL.L.PERF_WARNING)
 	print("")
 	
 	-- Overall assessment
@@ -254,7 +254,7 @@ function PerformanceMonitor:EnableAutoMonitoring()
 		PerformanceMonitor:SampleMemory()
 	end)
 	
-	print("|cff00ff00BetterFriendlist Performance:|r Auto-monitoring enabled")
+	print(BFL.L.PERF_HEADER_PREFIX .. " " .. BFL.L.PERF_AUTO_ENABLED)
 end
 
 -- Legacy slash command (redirects to /bfl perf)

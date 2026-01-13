@@ -3,6 +3,7 @@
 -- This allows compatibility with other addons (RaiderIO, etc.) that hook into FriendsTooltip
 
 local _, BFL = ...
+local L = BFL.L
 
 -- Constants (must match Blizzard's values)
 local FRIENDS_TOOLTIP_MAX_WIDTH = 200
@@ -97,7 +98,7 @@ local function AddBetterFriendlistInfo()
 			if lastActivity then
 				local activityLine, divider = EnsureActivityLine()
 				local timeSinceActivity = time() - lastActivity
-				local activityText = "|cff80c0ffLast contact:|r " .. SecondsToTime(timeSinceActivity) .. " ago"
+				local activityText = "|cff80c0ff" .. L.TOOLTIP_LAST_CONTACT .. "|r " .. SecondsToTime(timeSinceActivity) .. L.TOOLTIP_AGO
 				
 				-- Find the absolute bottom element to anchor below it
 				local anchorElement = nil

@@ -22,6 +22,7 @@
 ]]
 
 local addonName, BFL = ...
+local L = BFL.L
 
 -- Create Module
 local QuickJoin = {}
@@ -511,7 +512,7 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 	end
 	
 	-- Use color code format like MemberCount: gold "Leader:" + white name
-	local leaderText = string.format("|cffffd100Leader:|r |cffffffff%s|r", leaderNameWithFaction)
+	local leaderText = string.format("|cffffd100%s|r |cffffffff%s|r", L.LEADER_LABEL or "Leader:", leaderNameWithFaction)
 	tooltip:AddLine(leaderText)
 	
 	-- Line 4: Empty line (spacing) - BLIZZARD ADDS THIS BEFORE MEMBER COUNT
@@ -527,7 +528,7 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 	local healerCount = (self.groupInfo and self.groupInfo.numHealers) or 0  
 	local dpsCount = (self.groupInfo and self.groupInfo.numDPS) or 0
 	
-	local memberText = string.format("|cffffd100Members:|r |cffffffff%d (%d/%d/%d)|r", memberCount, tankCount, healerCount, dpsCount)
+	local memberText = string.format("|cffffd100%s|r |cffffffff%d (%d/%d/%d)|r", L.MEMBERS_LABEL or "Members:", memberCount, tankCount, healerCount, dpsCount)
 	tooltip:AddLine(memberText)
 	
 	-- Line 6: Empty line (spacing) - BLIZZARD ADDS THIS BEFORE AVAILABLE ROLES
@@ -548,10 +549,10 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 	if roleIcons ~= "" then
 		-- FIXED: Remove extra colon - global already has one colon
 		-- GOLD color (1.0, 0.82, 0) for "Available Roles:" text
-		local rolesText = (QUICK_JOIN_TOOLTIP_AVAILABLE_ROLES or "Available Roles") .. " " .. roleIcons
+		local rolesText = L.AVAILABLE_ROLES .. " " .. roleIcons
 		tooltip:AddLine(rolesText, 1.0, 0.82, 0)
 	else
-		tooltip:AddLine(QUICK_JOIN_TOOLTIP_NO_AVAILABLE_ROLES or "No available roles", 1, 1, 1)
+		tooltip:AddLine(L.NO_AVAILABLE_ROLES, 1, 1, 1)
 	end
 	
 	-- Auto-Accept indicator (Blizzard's hasRelationshipWithLeader logic)
@@ -564,7 +565,7 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 	
 	if isAutoAccept then
 		tooltip:AddLine(" ")
-		tooltip:AddLine(QUICK_JOIN_IS_AUTO_ACCEPT_TOOLTIP or "This group will automatically accept you.", LIGHTBLUE_FONT_COLOR.r, LIGHTBLUE_FONT_COLOR.g, LIGHTBLUE_FONT_COLOR.b)
+		tooltip:AddLine(L.AUTO_ACCEPT_TOOLTIP, LIGHTBLUE_FONT_COLOR.r, LIGHTBLUE_FONT_COLOR.g, LIGHTBLUE_FONT_COLOR.b)
 	end
 end
 
@@ -793,7 +794,7 @@ function QuickJoin:OnScrollBoxInitialize(button, elementData)
 	
 	-- 2. Set Title (Group Name)
 	if button.Title then
-		button.Title:SetText(info.groupTitle or "Unknown Group")
+		button.Title:SetText(info.groupTitle or L.UNKNOWN_GROUP)
 	end
 	
 	-- 3. Set Activity (New Line)
@@ -808,9 +809,9 @@ function QuickJoin:OnScrollBoxInitialize(button, elementData)
 	-- 4. Set Details (Leader + Friends)
 	if button.Details then
 		-- Leader Name (colored)
-		local leaderName = info.leaderName or "Unknown"
+		local leaderName = info.leaderName or L.UNKNOWN
 		local leaderColor = info.leaderColor or "|cffffffff"
-		local details = "Leader: " .. leaderColor .. leaderName .. "|r"
+		local details = L.LEADER_LABEL .. " " .. leaderColor .. leaderName .. "|r"
 		
 		-- Add other friends if present (already colored in GetGroupInfo)
 		if info.otherFriends and #info.otherFriends > 0 then
@@ -999,7 +1000,7 @@ function QuickJoin:Update(forceUpdate)
 		if BetterFriendsFrame and BetterFriendsFrame.QuickJoinFrame and BetterFriendsFrame.QuickJoinFrame.ContentInset.NoGroupsText then
 			BetterFriendsFrame.QuickJoinFrame.ContentInset.NoGroupsText:SetShown(#entries == 0)
 			if #entries == 0 then
-				BetterFriendsFrame.QuickJoinFrame.ContentInset.NoGroupsText:SetText(QUICK_JOIN_NO_GROUPS or "No groups available")
+				BetterFriendsFrame.QuickJoinFrame.ContentInset.NoGroupsText:SetText(L.QUICK_JOIN_NO_GROUPS or QUICK_JOIN_NO_GROUPS or "No groups available")
 			end
 		end
 	end
@@ -1536,7 +1537,7 @@ function QuickJoin:RequestToJoin(groupGUID, applyAsTank, applyAsHealer, applyAsD
 	
 	-- Handle mock groups (don't actually send request)
 	if self.mockGroups[groupGUID] then
-		UIErrorsFrame:AddMessage("|cff00ff00Mock join request sent (simulated only)", 0.1, 0.8, 1.0, 1.0)
+		UIErrorsFrame:AddMessage("|cff00ff00" .. (L.MOCK_JOIN_REQUEST_SENT or "Mock join request sent"), 0.1, 0.8, 1.0, 1.0)
 		return true
 	end
 	
@@ -1715,7 +1716,7 @@ function QuickJoin:GetGroupDisplayName(groupGUID)
 	-- Check for mock data first
 	local mockGroup = self.mockGroups[groupGUID]
 	if mockGroup then
-		local leaderName = mockGroup.leaderName or "Unknown"
+		local leaderName = mockGroup.leaderName or (L.UNKNOWN or "Unknown")
 		local numMembers = mockGroup.numMembers or 1
 		local color = "|cff00ff00"  -- Green for mock groups
 		
@@ -1728,7 +1729,7 @@ function QuickJoin:GetGroupDisplayName(groupGUID)
 	
 	local members = C_SocialQueue.GetGroupMembers(groupGUID)
 	if not members or #members == 0 then
-		return UNKNOWNOBJECT or "Unknown Group"
+		return UNKNOWNOBJECT or (L.UNKNOWN_GROUP or "Unknown Group")
 	end
 	
 	-- Sort members (leader first)
@@ -1738,10 +1739,10 @@ function QuickJoin:GetGroupDisplayName(groupGUID)
 	
 	-- Get leader name
 	if not members or #members == 0 or not members[1] then
-		return UNKNOWNOBJECT or "Unknown Group"
+		return UNKNOWNOBJECT or (L.UNKNOWN_GROUP or "Unknown Group")
 	end
 	
-	local leaderName = members[1].clubName or members[1].name or "Unknown"
+	local leaderName = members[1].clubName or members[1].name or (L.UNKNOWN or "Unknown")
 	local color = "|cffffffff"  -- Default white
 	
 	-- Try to determine relationship for color
@@ -1773,7 +1774,7 @@ function QuickJoin:GetQueueDisplayName(groupGUID)
 	
 	local queues = C_SocialQueue.GetGroupQueues(groupGUID)
 	if not queues or #queues == 0 or not queues[1] then
-		return "No Queue"
+		return L.NO_QUEUE or "No Queue"
 	end
 	
 	-- Get queue name from first queue
@@ -1784,16 +1785,16 @@ function QuickJoin:GetQueueDisplayName(groupGUID)
 		if queueData.queueType == "lfglist" and queueData.lfgListID then
 			local activityInfo = C_LFGList.GetActivityInfoTable(queueData.lfgListID)
 			if activityInfo then
-				queueName = activityInfo.fullName or activityInfo.shortName or "LFG Activity"
+				queueName = activityInfo.fullName or activityInfo.shortName or (L.LFG_ACTIVITY or "LFG Activity")
 			else
-				queueName = "LFG Activity"
+				queueName = L.LFG_ACTIVITY or "LFG Activity"
 			end
 		elseif queueData.queueType == "pvp" then
-			queueName = "PvP"
+			queueName = L.ACTIVITY_PVP or "PvP"
 		elseif queueData.queueType == "dungeon" then
-			queueName = "Dungeon"
+			queueName = L.ACTIVITY_DUNGEON or "Dungeon"
 		elseif queueData.queueType == "raid" then
-			queueName = "Raid"
+			queueName = L.ACTIVITY_RAID or "Raid"
 		else
 			queueName = queueData.queueType or "Unknown Activity"
 		end
@@ -2455,7 +2456,7 @@ function QuickJoin:CreateMockPreset_Icons()
 		numMembers = 3,
 	})
 
-	print("|cff00ff00BFL QuickJoin:|r Created fallback icon test groups")
+	print("|cff00ff00BFL QuickJoin:|r " .. BFL.L.QJ_MOCK_CREATED_FALLBACK)
 	
 	self:Update(true)
 end
@@ -2559,7 +2560,7 @@ function QuickJoin:CreateMockPreset_Stress()
 	
 	-- Don't enable dynamic updates for stress test (too much CPU)
 	
-	print("|cff00ff00BFL QuickJoin:|r Created 50 mock groups (stress test with valid/fallback pairs)")
+	print("|cff00ff00BFL QuickJoin:|r " .. BFL.L.QJ_MOCK_CREATED_STRESS)
 	
 	self:Update(true)
 end
@@ -2652,7 +2653,7 @@ function QuickJoin:SimulateMockEvent(eventType)
 			comment = activity[3],
 			numMembers = math.random(1, 4),
 		})
-		print("|cff00ff00BFL QuickJoin:|r Simulated: Group added")
+		print("|cff00ff00BFL QuickJoin:|r " .. BFL.L.QJ_SIM_ADDED)
 		
 	elseif eventType == "group_removed" then
 		-- Remove a random group
@@ -2663,9 +2664,9 @@ function QuickJoin:SimulateMockEvent(eventType)
 		if #guids > 0 then
 			local guid = guids[math.random(#guids)]
 			self:RemoveMockGroup(guid)
-			print("|cff00ff00BFL QuickJoin:|r Simulated: Group removed")
+			print("|cff00ff00BFL QuickJoin:|r " .. BFL.L.QJ_SIM_REMOVED)
 		else
-			print("|cffff8800BFL QuickJoin:|r No mock groups to remove")
+			print("|cffff8800BFL QuickJoin:|r " .. BFL.L.QJ_ERR_NO_GROUPS_REMOVE)
 		end
 		
 	elseif eventType == "group_updated" then
@@ -2679,10 +2680,10 @@ function QuickJoin:SimulateMockEvent(eventType)
 			local group = self.mockGroups[guid]
 			group.numMembers = math.random(1, 5)
 			group.members = CreateMockMembers(group.numMembers, group.leaderName)
-			print(string.format("|cff00ff00BFL QuickJoin:|r Simulated: %s updated (%d members)", 
+			print("|cff00ff00BFL QuickJoin:|r " .. string.format(BFL.L.QJ_SIM_UPDATED_FMT, 
 				group.leaderName, group.numMembers))
 		else
-			print("|cffff8800BFL QuickJoin:|r No mock groups to update")
+			print("|cffff8800BFL QuickJoin:|r " .. BFL.L.QJ_ERR_NO_GROUPS_UPDATE)
 		end
 	end
 	
@@ -2733,7 +2734,7 @@ SlashCmdList["BFLQUICKJOIN"] = function(msg)
 			numMembers = numMembers,
 		})
 		QuickJoin:Update(true)
-		print(string.format("|cff00ff00BFL QuickJoin:|r Added mock group: %s - %s (%d members)", 
+		print("|cff00ff00BFL QuickJoin:|r " .. string.format(BFL.L.QJ_ADDED_GROUP_FMT, 
 			leaderName, activityName, numMembers))
 		
 	elseif cmd == "event" then
@@ -2746,17 +2747,17 @@ SlashCmdList["BFLQUICKJOIN"] = function(msg)
 		elseif eventType == "update" or eventType == "updated" then
 			QuickJoin:SimulateMockEvent("group_updated")
 		else
-			print("|cff00ff00BFL QuickJoin Event Commands:|r")
-			print("  |cffffcc00/bfl qj event add|r - Simulate group added")
-			print("  |cffffcc00/bfl qj event remove|r - Simulate group removed")
-			print("  |cffffcc00/bfl qj event update|r - Simulate group updated")
+			print(BFL.L.QJ_EVENT_COMMANDS)
+			print("  |cffffcc00/bfl qj event add|r - " .. BFL.L.QJ_HELP_CMD_ADD_DESC)
+			print("  |cffffcc00/bfl qj event remove|r - " .. BFL.L.QJ_HELP_CMD_REMOVE_DESC)
+			print("  |cffffcc00/bfl qj event update|r - " .. BFL.L.QJ_HELP_CMD_UPDATE_DESC)
 		end
 		
 	elseif cmd == "clear" then
 		QuickJoin:ClearMockGroups()
 		
 	elseif cmd == "list" then
-		print("|cff00ff00BFL QuickJoin Mock Groups:|r")
+		print(BFL.L.QJ_LIST_HEADER)
 		local count = 0
 		for guid, group in pairs(QuickJoin.mockGroups) do
 			count = count + 1
@@ -2765,7 +2766,7 @@ SlashCmdList["BFLQUICKJOIN"] = function(msg)
 				count, group.leaderName, group.groupTitle, queueType, group.numMembers))
 		end
 		if count == 0 then
-			print("  |cff888888No mock groups. Use '/bfl qj mock' to create test data.|r")
+			print("  |cff888888" .. BFL.L.QJ_NO_GROUPS_HINT .. "|r")
 		end
 		
 	elseif cmd == "config" then
@@ -2774,17 +2775,17 @@ SlashCmdList["BFLQUICKJOIN"] = function(msg)
 		
 		if setting == "dynamic" then
 			QuickJoin.mockConfig.dynamicUpdates = (value == "on" or value == "true" or value == "1")
-			print(string.format("|cff00ff00BFL QuickJoin:|r Dynamic updates: %s", 
+			print("|cff00ff00BFL QuickJoin:|r " .. string.format(BFL.L.RAID_DYN_UPDATES, 
 				QuickJoin.mockConfig.dynamicUpdates and "ON" or "OFF"))
 		elseif setting == "interval" then
 			local interval = tonumber(value) or 3.0
 			QuickJoin.mockConfig.updateInterval = math.max(1.0, interval)
-			print(string.format("|cff00ff00BFL QuickJoin:|r Update interval: %.1f seconds", 
+			print("|cff00ff00BFL QuickJoin:|r " .. string.format(BFL.L.RAID_UPDATE_INTERVAL, 
 				QuickJoin.mockConfig.updateInterval))
 		else
-			print("|cff00ff00BFL QuickJoin Config:|r")
-			print(string.format("  Dynamic updates: %s", QuickJoin.mockConfig.dynamicUpdates and "ON" or "OFF"))
-			print(string.format("  Update interval: %.1f seconds", QuickJoin.mockConfig.updateInterval))
+			print(BFL.L.QJ_CONFIG_HEADER)
+			print(string.format(BFL.L.RAID_DYN_UPDATES_STATUS, QuickJoin.mockConfig.dynamicUpdates and "ON" or "OFF"))
+			print(string.format(BFL.L.RAID_UPDATE_INTERVAL_STATUS, QuickJoin.mockConfig.updateInterval))
 			print("")
 			print("  |cffffcc00/bfl qj config dynamic on|off|r")
 			print("  |cffffcc00/bfl qj config interval <seconds>|r")
@@ -2792,30 +2793,30 @@ SlashCmdList["BFLQUICKJOIN"] = function(msg)
 		
 	else
 		-- Help
-		print("|cff00ff00BFL QuickJoin Commands:|r")
+		print(BFL.L.CORE_HELP_QJ_COMMANDS)
 		print("")
-		print("|cffffcc00Mock Data:|r")
-		print("  |cffffcc00/bfl qj mock|r - Create comprehensive test data")
-		print("  |cffffcc00/bfl qj mock dungeon|r - Dungeon/M+ groups only")
-		print("  |cffffcc00/bfl qj mock pvp|r - PvP groups only")
-		print("  |cffffcc00/bfl qj mock raid|r - Raid groups only")
-		print("  |cffffcc00/bfl qj mock icons|r - Test all fallback icons")
-		print("  |cffffcc00/bfl qj mock stress|r - 50 groups (scrollbar test)")
+		print(BFL.L.CORE_HELP_MOCK_COMMANDS)
+		print(BFL.L.CORE_HELP_QJ_MOCK)
+		print(BFL.L.CORE_HELP_QJ_DUNGEON)
+		print(BFL.L.CORE_HELP_QJ_PVP)
+		print(BFL.L.CORE_HELP_QJ_RAID)
+		print(BFL.L.QJ_MOCK_ICONS_HELP)
+		print(BFL.L.CORE_HELP_QJ_STRESS)
 		print("")
-		print("|cffffcc00Management:|r")
-		print("  |cffffcc00/bfl qj add <name> <activity> [members]|r - Add custom group")
-		print("  |cffffcc00/bfl qj list|r - List all mock groups")
-		print("  |cffffcc00/bfl qj clear|r - Remove all mock groups")
+		print(BFL.L.RAID_HELP_MANAGEMENT)
+		print(BFL.L.QJ_CMD_ADD_HELP)
+		print(BFL.L.CORE_HELP_QJ_LIST)
+		print(BFL.L.CORE_HELP_QJ_CLEAR)
 		print("")
-		print("|cffffcc00Event Simulation:|r")
-		print("  |cffffcc00/bfl qj event add|r - Simulate new group")
-		print("  |cffffcc00/bfl qj event remove|r - Simulate group leaving")
-		print("  |cffffcc00/bfl qj event update|r - Simulate group change")
+		print(BFL.L.RAID_HELP_EVENTS)
+		print("  |cffffcc00/bfl qj event add|r - " .. BFL.L.QJ_HELP_CMD_ADD_DESC)
+		print("  |cffffcc00/bfl qj event remove|r - " .. BFL.L.QJ_HELP_CMD_REMOVE_DESC)
+		print("  |cffffcc00/bfl qj event update|r - " .. BFL.L.QJ_HELP_CMD_UPDATE_DESC)
 		print("")
-		print("|cffffcc00Configuration:|r")
-		print("  |cffffcc00/bfl qj config|r - Show/set mock configuration")
+		print(BFL.L.HELP_HEADER_CONFIGURATION)
+		print(BFL.L.QJ_CMD_CONFIG_HELP)
 		print("")
-		print("|cff888888Mock groups appear with real groups and are marked green.|r")
+		print(BFL.L.QJ_EXT_FOOTER)
 	end
 end
 

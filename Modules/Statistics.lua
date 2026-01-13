@@ -301,9 +301,9 @@ function Statistics:GetStatistics()
 					
 					-- Faction
 					if gameInfo.factionName then
-						if gameInfo.factionName == "Alliance" then
+						if gameInfo.factionName == "Alliance" or gameInfo.factionName == FACTION_ALLIANCE then
 							stats.factionCounts.alliance = stats.factionCounts.alliance + 1
-						elseif gameInfo.factionName == "Horde" then
+						elseif gameInfo.factionName == "Horde" or gameInfo.factionName == FACTION_HORDE then
 							stats.factionCounts.horde = stats.factionCounts.horde + 1
 						end
 					end

@@ -53,7 +53,7 @@ function IgnoreList:OnLoad(frame)
 	-- Localization Fix for Unignore Button
 	if frame.UnignorePlayerButton then
 		-- Use global string or fallback
-		frame.UnignorePlayerButton:SetText(UNIGNORE or "Unignore Player")
+		frame.UnignorePlayerButton:SetText(UNIGNORE or BFL.L.IGNORE_LIST_UNIGNORE)
 	end
 	
 	-- Classic: Use FauxScrollFrame approach

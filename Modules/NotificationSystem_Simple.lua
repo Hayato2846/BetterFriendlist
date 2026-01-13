@@ -176,8 +176,8 @@ end
 function NotificationSystem:ShowTestNotification()
     -- CRITICAL: Block if Beta Features disabled
     if not IsBetaEnabled() then
-        print("|cffff0000BetterFriendlist:|r Beta Features must be enabled to use notifications")
-        print("|cffffcc00[>]|r Enable in Settings > Advanced > Beta Features")
+        print("|cffff0000BetterFriendlist:|r " .. BFL.L.NOTIFICATION_BETA_REQUIRED)
+        print("|cffffcc00[>]|r " .. BFL.L.NOTIFICATION_BETA_ENABLE_HINT)
         return
     end
     
@@ -197,7 +197,7 @@ function NotificationSystem:ShowTestNotification()
     }
     
     -- Use custom template
-    local template = BetterFriendlistDB.notificationMessageOnline or "%name% is now online"
+    local template = BetterFriendlistDB.notificationMessageOnline or BFL.L.NOTIFICATION_TEMPLATE_ONLINE
     local message = self:ReplaceMessageTemplate(template, mockData)
     
     self:ShowNotification(
@@ -213,8 +213,8 @@ end
 function NotificationSystem:TestGroupRules()
     -- CRITICAL: Block if Beta Features disabled
     if not IsBetaEnabled() then
-        print("|cffff0000BetterFriendlist:|r Beta Features must be enabled to use notifications")
-        print("|cffffcc00[>]|r Enable in Settings > Advanced > Beta Features")
+        print("|cffff0000BetterFriendlist:|r " .. BFL.L.NOTIFICATION_BETA_REQUIRED)
+        print("|cffffcc00[>]|r " .. BFL.L.NOTIFICATION_BETA_ENABLE_HINT)
         return
     end
     
@@ -224,13 +224,13 @@ function NotificationSystem:TestGroupRules()
     -- Test with first BNet friend
     local numBNet = BNGetNumFriends()
     if numBNet == 0 then
-        print("|cffffcc00[>]|r No BattleNet friends found")
+        print("|cffffcc00[>]|r " .. BFL.L.NOTIFICATION_TEST_NO_BNET)
         return
     end
     
     local accountInfo = C_BattleNet.GetFriendAccountInfo(1)
     if not accountInfo then
-        print("|cffffcc00[>]|r Could not get friend info")
+        print("|cffffcc00[>]|r " .. BFL.L.NOTIFICATION_TEST_NO_INFO)
         return
     end
     
@@ -238,22 +238,22 @@ function NotificationSystem:TestGroupRules()
     local friendName = battleTag:match("^([^#]+)") or battleTag
     local friendUID = "bnet_" .. (accountInfo.battleTag or tostring(accountInfo.bnetAccountID))
     
-    print("|cff00ffffTesting with friend:|r " .. friendName .. " (UID: " .. friendUID .. ")")
+    print(string.format("|cff00ffff%s|r", string.format(BFL.L.NOTIFICATION_TEST_WITH_FRIEND, friendName, friendUID)))
     print(" ")
     
     -- Check rules
     local shouldNotify, isWhitelisted, ruleSource = self:CheckNotificationRules(friendUID)
     
     -- Display results
-    print("|cff00ffffRule Check Results:|r")
-    print("  Should Notify: " .. (shouldNotify and "|cff00ff00YES|r" or "|cffff0000NO|r"))
-    print("  Is Whitelisted: " .. (isWhitelisted and "|cff00ff00YES|r" or "|cffff0000NO|r"))
-    print("  Rule Source: |cffffcc00" .. ruleSource .. "|r")
+    print("|cff00ffff" .. BFL.L.NOTIFICATION_TEST_RULE_RESULTS .. "|r")
+    print(BFL.L.NOTIFICATION_TEST_SHOULD_NOTIFY .. (shouldNotify and "|cff00ff00" .. BFL.L.YES .. "|r" or "|cffff0000" .. BFL.L.NO .. "|r"))
+    print(BFL.L.NOTIFICATION_TEST_IS_WHITELISTED .. (isWhitelisted and "|cff00ff00" .. BFL.L.YES .. "|r" or "|cffff0000" .. BFL.L.NO .. "|r"))
+    print(BFL.L.NOTIFICATION_TEST_RULE_SOURCE .. "|cffffcc00" .. ruleSource .. "|r")
     print(" ")
     
     -- Show friend's groups
     if BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friendUID] then
-        print("|cff00ffffFriend's Groups:|r")
+        print("|cff00ffff" .. BFL.L.NOTIFICATION_TEST_FRIENDS_GROUPS .. "|r")
         for _, groupId in ipairs(BetterFriendlistDB.friendGroups[friendUID]) do
             local groupRule = BetterFriendlistDB.notificationGroupRules and BetterFriendlistDB.notificationGroupRules[groupId]
             local ruleText = groupRule or "default"
@@ -261,7 +261,7 @@ function NotificationSystem:TestGroupRules()
             print("  • " .. groupId .. ": " .. color .. ruleText .. "|r")
         end
     else
-        print("|cffffcc00Friend is not in any custom groups|r")
+        print("|cffffcc00" .. BFL.L.NOTIFICATION_TEST_NO_GROUPS .. "|r")
     end
     print(" ")
     
@@ -270,10 +270,10 @@ function NotificationSystem:TestGroupRules()
         local favRule = BetterFriendlistDB.notificationGroupRules and BetterFriendlistDB.notificationGroupRules["favorites"]
         local ruleText = favRule or "default"
         local color = favRule == "whitelist" and "|cff00ff00" or (favRule == "blacklist" and "|cffff0000" or "|cffffffff")
-        print("|cff00ffffFavorites Group:|r " .. color .. ruleText .. "|r")
+        print("|cff00ffff" .. BFL.L.NOTIFICATION_TEST_FAVORITES .. "|r " .. color .. ruleText .. "|r")
     end
     
-    print("|cff00ff00Test complete!|r")
+    print("|cff00ff00" .. BFL.L.NOTIFICATION_TEST_COMPLETE .. "|r")
 end
 
 -- ========================================
@@ -845,8 +845,8 @@ function NotificationSystem:OnFriendOnline(friendType, bnetAccountID)
         if isWhitelisted then
             -- Whitelisted: Bypass quiet time and cooldown
             if friendName and friendUID then
-                local template = BetterFriendlistDB.notificationMessageOnline or "%name% is now online"
-                if isSwitch then template = "reconnected" end
+                local template = BetterFriendlistDB.notificationMessageOnline or BFL.L.NOTIFICATION_TEMPLATE_ONLINE
+                if isSwitch then template = BFL.L.NOTIFICATION_RECONNECTED end
                 local message = self:ReplaceMessageTemplate(template, friendData)
                 self:ShowNotification(friendName, message, icon)
                 self:SetCooldown(friendUID, "online")
@@ -870,8 +870,8 @@ function NotificationSystem:OnFriendOnline(friendType, bnetAccountID)
     
     if friendName then
         -- Use custom template (Phase 11)
-        local template = BetterFriendlistDB.notificationMessageOnline or "%name% is now online"
-        if isSwitch then template = "reconnected" end
+        local template = BetterFriendlistDB.notificationMessageOnline or BFL.L.NOTIFICATION_TEMPLATE_ONLINE
+        if isSwitch then template = BFL.L.NOTIFICATION_RECONNECTED end
         local message = self:ReplaceMessageTemplate(template, friendData)
         self:ShowNotification(friendName, message, icon)
         
@@ -970,7 +970,7 @@ function NotificationSystem:ProcessFriendOffline(friendType, bnetAccountID)
         if isWhitelisted then
             -- Whitelisted: Bypass quiet time and cooldown
             if friendName and friendUID then
-                local template = BetterFriendlistDB.notificationMessageOffline or "%name% went offline"
+                local template = BetterFriendlistDB.notificationMessageOffline or BFL.L.NOTIFICATION_TEMPLATE_OFFLINE
                 local message = self:ReplaceMessageTemplate(template, friendData)
                 self:ShowNotification(friendName, message, icon)
                 self:SetCooldown(friendUID, "offline")
@@ -993,7 +993,7 @@ function NotificationSystem:ProcessFriendOffline(friendType, bnetAccountID)
     
     if friendName then
         -- Use custom template (Phase 11)
-        local template = BetterFriendlistDB.notificationMessageOffline or "%name% went offline"
+        local template = BetterFriendlistDB.notificationMessageOffline or BFL.L.NOTIFICATION_TEMPLATE_OFFLINE
         local message = self:ReplaceMessageTemplate(template, friendData)
         self:ShowNotification(friendName, message, icon)
         
@@ -1109,13 +1109,13 @@ function NotificationSystem:OnFriendInfoChanged()
                     local message
                     
                     if changeType == "wowLogin" then
-                        template = BetterFriendlistDB.notificationMessageWowLogin or "%name% logged into World of Warcraft"
+                        template = BetterFriendlistDB.notificationMessageWowLogin or BFL.L.NOTIFICATION_TEMPLATE_WOW_LOGIN
                         message = self:ReplaceMessageTemplate(template, friendData)
                     elseif changeType == "charSwitch" then
-                        template = BetterFriendlistDB.notificationMessageCharSwitch or "%name% switched character"
+                        template = BetterFriendlistDB.notificationMessageCharSwitch or BFL.L.NOTIFICATION_TEMPLATE_CHAR_SWITCH
                         message = self:ReplaceMessageTemplate(template, friendData)
                     elseif changeType == "gameSwitch" then
-                        template = BetterFriendlistDB.notificationMessageGameSwitch or "%name% is now playing %game%"
+                        template = BetterFriendlistDB.notificationMessageGameSwitch or BFL.L.NOTIFICATION_TEMPLATE_GAME_SWITCH
                         message = self:ReplaceMessageTemplate(template, friendData)
                     end
                     
@@ -1161,7 +1161,7 @@ function NotificationSystem:OnFriendListUpdate()
                 -- Check cooldown FIRST (anti-spam)
                 if not self:IsOnCooldown(friendUID) then
                     -- Friend just came online
-                    self:ShowNotification(friendInfo.name, "is now online", "Interface\\AddOns\\BetterFriendlist\\Icons\\user-check")
+                    self:ShowNotification(friendInfo.name, BFL.L.NOTIFICATION_IS_NOW_ONLINE, "Interface\\AddOns\\BetterFriendlist\\Icons\\user-check")
                     
                     -- Set cooldown AFTER showing notification
                     self:SetCooldown(friendUID)

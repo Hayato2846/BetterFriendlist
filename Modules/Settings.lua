@@ -9,6 +9,9 @@ local UI = BFL.UI.CONSTANTS
 -- Import Settings Components Library
 local Components = BFL.SettingsComponents
 
+-- Localization
+local L = BFL.L or BFL_L
+
 -- Register the Settings module
 local Settings = BFL:RegisterModule("Settings", {})
 
@@ -174,8 +177,8 @@ local function CreateGroupButton(parent, groupId, groupName, orderIndex)
 		
 		button.deleteButton:SetScript("OnEnter", function(self)
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText(BFL_L.TOOLTIP_DELETE_GROUP, 1, 0.2, 0.2)
-			GameTooltip:AddLine(BFL_L.TOOLTIP_DELETE_DESC, 0.8, 0.8, 0.8, true)
+			GameTooltip:SetText(L.TOOLTIP_DELETE_GROUP, 1, 0.2, 0.2)
+			GameTooltip:AddLine(L.TOOLTIP_DELETE_DESC, 0.8, 0.8, 0.8, true)
 			GameTooltip:Show()
 		end)
 		
@@ -337,14 +340,14 @@ end
 -- ===========================================
 local TAB_DEFINITIONS = {
 	-- Stable Tabs (always visible)
-	{id = 1, name = "General", icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\settings.blp", beta = false},
-	{id = 2, name = "Groups", icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\users.blp", beta = false},
-	{id = 3, name = "Advanced", icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\sliders.blp", beta = false},
+	{id = 1, name = L.SETTINGS_TAB_GENERAL, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\settings.blp", beta = false},
+	{id = 2, name = L.SETTINGS_TAB_GROUPS, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\users.blp", beta = false},
+	{id = 3, name = L.SETTINGS_TAB_ADVANCED, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\sliders.blp", beta = false},
 	
 	-- Beta Tabs (only visible when enableBetaFeatures = true)
-	{id = 4, name = "Data Broker", icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\activity.blp", beta = false},
-	{id = 5, name = "Notifications", icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\bell.blp", beta = true},
-	{id = 6, name = "Global Sync", icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\globe.blp", beta = true},
+	{id = 4, name = L.SETTINGS_TAB_DATABROKER, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\activity.blp", beta = false},
+	{id = 5, name = L.SETTINGS_TAB_NOTIFICATIONS, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\bell.blp", beta = true},
+	{id = 6, name = L.SETTINGS_TAB_GLOBAL_SYNC, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\globe.blp", beta = true},
 	-- Future beta tabs go here...
 }
 
@@ -810,7 +813,7 @@ function Settings:RefreshGroupList_OLD()
 			end
 		end
 	else
-		table.insert(orderedGroups, {id = "favorites", name = "Favorites", order = 1})
+		table.insert(orderedGroups, {id = "favorites", name = L.GROUP_FAVORITES, order = 1})
 		
 		local customGroups = {}
 		for groupId, group in pairs(allGroups) do
@@ -824,7 +827,7 @@ function Settings:RefreshGroupList_OLD()
 		end
 		
 		if allGroups["nogroup"] then
-			table.insert(orderedGroups, {id = "nogroup", name = "No Group", order = #orderedGroups + 1})
+			table.insert(orderedGroups, {id = "nogroup", name = L.GROUP_NO_GROUP, order = #orderedGroups + 1})
 		end
 	end
 	
@@ -940,28 +943,28 @@ end
 -- Delete a custom group
 function Settings:DeleteGroup(groupId, groupName)
 	StaticPopupDialogs["BETTERFRIENDLIST_DELETE_GROUP"] = {
-		text = string.format("Delete group '%s'?\n\nAll friends will be unassigned from this group.", groupName),
-		button1 = "Delete",
-		button2 = "Cancel",
+		text = string.format(L.DIALOG_DELETE_GROUP_SETTINGS, groupName),
+		button1 = L.DIALOG_DELETE_GROUP_BTN1,
+		button2 = L.DIALOG_DELETE_GROUP_BTN2,
 		OnAccept = function()
 			local Groups = GetGroups()
 			local DB = GetDB()
 			
 			if not Groups or not DB then
-				print("|cffff0000BetterFriendlist:|r Failed to delete group - modules not loaded")
+				print("|cffff0000BetterFriendlist:|r " .. L.ERROR_FAILED_DELETE_GROUP)
 				return
 			end
 			
 			local success, err = Groups:Delete(groupId)
 			if success then
-				print("|cff00ff00BetterFriendlist:|r " .. string.format(BFL_L.MSG_GROUP_DELETED, groupName))
+				print("|cff00ff00BetterFriendlist:|r " .. string.format(L.MSG_GROUP_DELETED, groupName))
 				
 				Settings:RefreshGroupList()
 				
 				-- Force full display refresh - groups affect display list structure
 				BFL:ForceRefreshFriendsList()
 			else
-				print("|cffff0000BetterFriendlist:|r Failed to delete group: " .. (err or "Unknown error"))
+				print("|cffff0000BetterFriendlist:|r " .. string.format(L.ERROR_FAILED_DELETE, (err or L.UNKNOWN_ERROR)))
 			end
 		end,
 		timeout = 0,
@@ -975,9 +978,9 @@ end
 -- Rename a custom group
 function Settings:RenameGroup(groupId, currentName)
 	StaticPopupDialogs["BETTERFRIENDLIST_RENAME_GROUP"] = {
-		text = string.format("Rename group '%s':", currentName),
-		button1 = "Rename",
-		button2 = "Cancel",
+		text = string.format(L.DIALOG_RENAME_GROUP_SETTINGS, currentName),
+		button1 = L.DIALOG_RENAME_GROUP_BTN1,
+		button2 = L.DIALOG_RENAME_GROUP_BTN2,
 		hasEditBox = true,
 		maxLetters = 32,
 		editBoxWidth = 200,
@@ -994,12 +997,12 @@ function Settings:RenameGroup(groupId, currentName)
 				if Groups then
 					local success = Groups:Rename(groupId, newName)
 					if success then
-						print("|cff00ff00BetterFriendlist:|r Group renamed to '" .. newName .. "'")
+						print("|cff00ff00BetterFriendlist:|r " .. string.format(L.MSG_GROUP_RENAMED, newName))
 						Settings:RefreshGroupsTab()
 						-- Force full display refresh - groups affect display list structure
 						BFL:ForceRefreshFriendsList()
 					else
-						print("|cffff0000BetterFriendlist:|r Failed to rename group")
+						print("|cffff0000BetterFriendlist:|r " .. L.ERROR_RENAME_FAILED)
 					end
 				end
 			end
@@ -1012,12 +1015,12 @@ function Settings:RenameGroup(groupId, currentName)
 				if Groups then
 					local success = Groups:Rename(groupId, newName)
 					if success then
-						print("|cff00ff00BetterFriendlist:|r Group renamed to '" .. newName .. "'")
+						print("|cff00ff00BetterFriendlist:|r " .. string.format(L.MSG_GROUP_RENAMED, newName))
 						Settings:RefreshGroupsTab()
 						-- Force full display refresh - groups affect display list structure
 						BFL:ForceRefreshFriendsList()
 					else
-						print("|cffff0000BetterFriendlist:|r Failed to rename group")
+						print("|cffff0000BetterFriendlist:|r " .. L.ERROR_RENAME_FAILED)
 					end
 				end
 			end
@@ -1401,7 +1404,7 @@ end
 -- Export all settings to a string
 function Settings:ExportSettings()
 	if not BetterFriendlistDB then
-		return nil, "Database not available"
+		return nil, L.ERROR_DB_NOT_AVAILABLE
 	end
 	
 	-- Collect data to export
@@ -1471,7 +1474,7 @@ function Settings:ExportSettings()
 	local serialized = self:SerializeTable(exportData)
 	
 	if not serialized then
-		return nil, "Failed to serialize data"
+		return nil, L.ERROR_EXPORT_SERIALIZE
 	end
 	
 	-- Encode to base64-like format for easy copy/paste
@@ -1483,29 +1486,29 @@ end
 -- Import settings from string
 function Settings:ImportSettings(importString)
 	if not importString or importString == "" then
-		return false, "Import string is empty"
+		return false, L.ERROR_IMPORT_EMPTY
 	end
 	
 	-- Decode from base64-like format
 	local decoded = self:DecodeString(importString)
 	if not decoded then
-		return false, "Failed to decode import string (invalid format)"
+		return false, L.ERROR_IMPORT_DECODE
 	end
 	
 	-- Deserialize
 	local importData = self:DeserializeTable(decoded)
 	if not importData then
-		return false, "Failed to deserialize data (corrupted string)"
+		return false, L.ERROR_IMPORT_DESERIALIZE
 	end
 	
 	-- Validate version
 	if not importData.version or importData.version ~= 1 then
-		return false, "Unsupported export version"
+		return false, L.ERROR_EXPORT_VERSION
 	end
 	
 	-- Validate structure
 	if not importData.customGroups or not importData.friendGroups then
-		return false, "Invalid export data structure"
+		return false, L.ERROR_EXPORT_STRUCTURE
 	end
 	
 	-- IMPORT DATA
@@ -1513,7 +1516,7 @@ function Settings:ImportSettings(importString)
 	local Groups = GetGroups()
 	
 	if not DB or not Groups then
-		return false, "Modules not available"
+		return false, L.ERROR_MODULES_NOT_LOADED
 	end
 	
 	-- Clear existing data
@@ -1727,18 +1730,18 @@ function Settings:RefreshStatistics()
 	
 	-- Update Overview section
 	if statsTab.TotalFriends then
-		statsTab.TotalFriends:SetText(string.format("Total Friends: %d", stats.totalFriends))
+		statsTab.TotalFriends:SetText(string.format(L.STATS_TOTAL_FRIENDS, stats.totalFriends))
 	end
 	
 	if statsTab.OnlineFriends then
 		local onlinePct = FormatPercent(stats.onlineFriends, stats.totalFriends)
 		local offlinePct = FormatPercent(stats.offlineFriends, stats.totalFriends)
-		statsTab.OnlineFriends:SetText(string.format("|cff00ff00Online: %d (%d%%)|r  |  |cff808080Offline: %d (%d%%)|r", 
+		statsTab.OnlineFriends:SetText(string.format(L.STATS_ONLINE_OFFLINE, 
 			stats.onlineFriends, onlinePct, stats.offlineFriends, offlinePct))
 	end
 	
 	if statsTab.FriendTypes then
-		statsTab.FriendTypes:SetText(string.format("|cff0070ddBattle.net Friends: %d|r  |  |cffffd700WoW Friends: %d|r", 
+		statsTab.FriendTypes:SetText(string.format(L.STATS_BNET_WOW, 
 			stats.bnetFriends, stats.wowFriends))
 	end
 	
@@ -1747,7 +1750,7 @@ function Settings:RefreshStatistics()
 		local totalHealthFriends = stats.totalFriends - (stats.friendshipHealth.unknown or 0)
 		if totalHealthFriends > 0 then
 			local healthText = string.format(
-				"|cff00ff00Active: %d (%d%%)|r\n|cffffd700Regular: %d (%d%%)|r\n|cffffaa00Drifting: %d (%d%%)|r\n|cffff6600Stale: %d (%d%%)|r\n|cffff0000Dormant: %d (%d%%)|r",
+				L.STATS_HEALTH_FMT,
 				stats.friendshipHealth.active, FormatPercent(stats.friendshipHealth.active, totalHealthFriends),
 				stats.friendshipHealth.regular, FormatPercent(stats.friendshipHealth.regular, totalHealthFriends),
 				stats.friendshipHealth.drifting, FormatPercent(stats.friendshipHealth.drifting, totalHealthFriends),
@@ -1756,7 +1759,7 @@ function Settings:RefreshStatistics()
 			)
 			statsTab.FriendshipHealth:SetText(healthText)
 		else
-			statsTab.FriendshipHealth:SetText("No health data available")
+			statsTab.FriendshipHealth:SetText(L.STATS_NO_HEALTH_DATA)
 		end
 	end
 	
@@ -1768,11 +1771,11 @@ function Settings:RefreshStatistics()
 			for i, class in ipairs(topClasses) do
 				if i > 1 then table.insert(classParts, "\n") end
 				local pct = FormatPercent(class.count, stats.totalFriends)
-				table.insert(classParts, string.format("%d. %s: %d (%d%%)", i, class.name, class.count, pct))
+				table.insert(classParts, string.format(L.STATS_CLASS_FMT, i, class.name, class.count, pct))
 			end
 			statsTab.ClassList:SetText(table.concat(classParts))
 		else
-			statsTab.ClassList:SetText("No class data available")
+			statsTab.ClassList:SetText(L.STATS_NO_CLASS_DATA)
 		end
 	end
 	
@@ -1780,7 +1783,17 @@ function Settings:RefreshStatistics()
 	if statsTab.LevelDistribution then
 		if stats.levelDistribution.leveledFriends > 0 then
 			local levelText = string.format(
-				"Max (80): %d\n70-79: %d\n60-69: %d\n<60: %d\nAverage: %.1f",
+				L.STATS_MAX_LEVEL,
+				stats.levelDistribution.maxLevel,
+				stats.levelDistribution.ranges[1].count,
+				stats.levelDistribution.ranges[2].count,
+				stats.levelDistribution.ranges[3].count,
+				stats.levelDistribution.ranges[3].count and stats.levelDistribution.average
+			)
+			-- Logic fix in my mind: code used stats.levelDistribution.average as last arg.
+			-- Let's check original code carefully.
+			local levelText = string.format(
+				L.STATS_MAX_LEVEL,
 				stats.levelDistribution.maxLevel,
 				stats.levelDistribution.ranges[1].count,
 				stats.levelDistribution.ranges[2].count,
@@ -1789,7 +1802,7 @@ function Settings:RefreshStatistics()
 			)
 			statsTab.LevelDistribution:SetText(levelText)
 		else
-			statsTab.LevelDistribution:SetText("No level data available")
+			statsTab.LevelDistribution:SetText(L.STATS_NO_LEVEL_DATA)
 		end
 	end
 	
@@ -1801,23 +1814,23 @@ function Settings:RefreshStatistics()
 			-- Add realm categories first
 			local samePct = FormatPercent(stats.realmDistribution.sameRealm, stats.totalFriends)
 			local otherPct = FormatPercent(stats.realmDistribution.otherRealms, stats.totalFriends)
-			table.insert(realmParts, string.format("Same Realm: %d (%d%%)  |  Other Realms: %d (%d%%)",
+			table.insert(realmParts, string.format(L.STATS_SAME_REALM,
 				stats.realmDistribution.sameRealm, samePct,
 				stats.realmDistribution.otherRealms, otherPct))
-			table.insert(realmParts, "\nTop Realms:")
+			table.insert(realmParts, L.STATS_TOP_REALMS)
 			for i, realm in ipairs(topRealms) do
-				table.insert(realmParts, string.format("\n%d. %s: %d", i, realm.name, realm.count))
+				table.insert(realmParts, string.format(L.STATS_REALM_FMT, i, realm.name, realm.count))
 			end
 			statsTab.RealmList:SetText(table.concat(realmParts))
 		else
-			statsTab.RealmList:SetText("No realm data available")
+			statsTab.RealmList:SetText(L.STATS_NO_REALM_DATA)
 		end
 	end
 	
 	-- Update Faction Distribution
 	if statsTab.FactionList then
 		local factionText = string.format(
-			"|cff0080ffAlliance: %d|r\n|cffff0000Horde: %d|r",
+			L.STATS_FACTION_DISTRIBUTION,
 			stats.factionCounts.alliance or 0,
 			stats.factionCounts.horde or 0
 		)
@@ -1831,26 +1844,26 @@ function Settings:RefreshStatistics()
 		if totalGamePlayers > 0 then
 			local gameParts = {}
 			if stats.gameCounts.wow > 0 then
-				table.insert(gameParts, string.format("WoW: %d", stats.gameCounts.wow))
+				table.insert(gameParts, string.format(L.STATS_GAME_WOW, stats.gameCounts.wow))
 			end
 			if stats.gameCounts.classic > 0 then
-				table.insert(gameParts, string.format("\nClassic: %d", stats.gameCounts.classic))
+				table.insert(gameParts, string.format(L.STATS_GAME_CLASSIC, stats.gameCounts.classic))
 			end
 			if stats.gameCounts.diablo > 0 then
-				table.insert(gameParts, string.format("\nDiablo IV: %d", stats.gameCounts.diablo))
+				table.insert(gameParts, string.format(L.STATS_GAME_DIABLO, stats.gameCounts.diablo))
 			end
 			if stats.gameCounts.hearthstone > 0 then
-				table.insert(gameParts, string.format("\nHearthstone: %d", stats.gameCounts.hearthstone))
+				table.insert(gameParts, string.format(L.STATS_GAME_HEARTHSTONE, stats.gameCounts.hearthstone))
 			end
 			if stats.gameCounts.mobile > 0 then
-				table.insert(gameParts, string.format("\nMobile: %d", stats.gameCounts.mobile))
+				table.insert(gameParts, string.format(L.STATS_GAME_MOBILE, stats.gameCounts.mobile))
 			end
 			if stats.gameCounts.other > 0 then
-				table.insert(gameParts, string.format("\nOther: %d", stats.gameCounts.other))
+				table.insert(gameParts, string.format(L.STATS_GAME_OTHER, stats.gameCounts.other))
 			end
 			statsTab.GameDistribution:SetText(table.concat(gameParts))
 		else
-			statsTab.GameDistribution:SetText("No game data available")
+			statsTab.GameDistribution:SetText(L.STATS_NO_GAME_DATA)
 		end
 	end
 	
@@ -1861,13 +1874,13 @@ function Settings:RefreshStatistics()
 			local desktopPct = FormatPercent(stats.mobileVsDesktop.desktop, total)
 			local mobilePct = FormatPercent(stats.mobileVsDesktop.mobile, total)
 			local mobileText = string.format(
-				"Desktop: %d (%d%%)\nMobile: %d (%d%%)",
+				L.STATS_MOBILE_DESKTOP,
 				stats.mobileVsDesktop.desktop, desktopPct,
 				stats.mobileVsDesktop.mobile, mobilePct
 			)
 			statsTab.MobileVsDesktop:SetText(mobileText)
 		else
-			statsTab.MobileVsDesktop:SetText("No mobile data available")
+			statsTab.MobileVsDesktop:SetText(L.STATS_NO_MOBILE_DATA)
 		end
 	end
 	
@@ -1876,7 +1889,7 @@ function Settings:RefreshStatistics()
 		local notesPct = FormatPercent(stats.notesAndFavorites.withNotes, stats.totalFriends)
 		local favPct = FormatPercent(stats.notesAndFavorites.favorites, stats.totalFriends)
 		local notesText = string.format(
-			"With Notes: %d (%d%%)\nFavorites: %d (%d%%)",
+			L.STATS_NOTES_FAVORITES,
 			stats.notesAndFavorites.withNotes, notesPct,
 			stats.notesAndFavorites.favorites, favPct
 		)
@@ -1902,14 +1915,14 @@ function Settings:CreateExportFrame()
 	-- Title
 	frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	frame.title:SetPoint("TOP", 0, -5)
-	frame.title:SetText("Export Settings")
+	frame.title:SetText(L.SETTINGS_EXPORT_TITLE)
 	
 	-- Info text
 	frame.info = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	frame.info:SetPoint("TOPLEFT", 15, -30)
 	frame.info:SetPoint("TOPRIGHT", -15, -30)
 	frame.info:SetJustifyH("LEFT")
-	frame.info:SetText("Copy the text below and save it. You can import it on another character or account.")
+	frame.info:SetText(L.SETTINGS_EXPORT_INFO)
 	
 	-- Scroll frame with edit box
 	local scrollFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
@@ -1932,7 +1945,7 @@ function Settings:CreateExportFrame()
 	local copyButton = CreateFrame("Button", nil, frame, "GameMenuButtonTemplate")
 	copyButton:SetPoint("BOTTOM", 0, 15)
 	copyButton:SetSize(120, 25)
-	copyButton:SetText("Select All")
+	copyButton:SetText(L.SETTINGS_EXPORT_BTN)
 	copyButton:SetNormalFontObject("GameFontNormal")
 	copyButton:SetHighlightFontObject("GameFontHighlight")
 	copyButton:SetScript("OnClick", function()
@@ -1959,14 +1972,14 @@ function Settings:CreateImportFrame()
 	-- Title
 	frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	frame.title:SetPoint("TOP", 0, -5)
-	frame.title:SetText("Import Settings")
+	frame.title:SetText(L.SETTINGS_IMPORT_TITLE)
 	
 	-- Info text
 	frame.info = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	frame.info:SetPoint("TOPLEFT", 15, -30)
 	frame.info:SetPoint("TOPRIGHT", -15, -30)
 	frame.info:SetJustifyH("LEFT")
-	frame.info:SetText("Paste your export string below and click Import.\n\n|cffff0000Warning: This will replace ALL your groups and assignments!|r")
+	frame.info:SetText(L.SETTINGS_IMPORT_INFO)
 	
 	-- Scroll frame with edit box
 	local scrollFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
@@ -1989,7 +2002,7 @@ function Settings:CreateImportFrame()
 	local importButton = CreateFrame("Button", nil, frame, "GameMenuButtonTemplate")
 	importButton:SetPoint("BOTTOM", -65, 15)
 	importButton:SetSize(120, 25)
-	importButton:SetText("Import")
+	importButton:SetText(L.SETTINGS_IMPORT_BTN)
 	importButton:SetNormalFontObject("GameFontNormal")
 	importButton:SetHighlightFontObject("GameFontHighlight")
 	importButton:SetScript("OnClick", function()
@@ -1997,13 +2010,13 @@ function Settings:CreateImportFrame()
 		local success, err = Settings:ImportSettings(importString)
 		
 		if success then
-			print("|cff00ff00BetterFriendlist:|r Import successful! All groups and assignments have been restored.")
+			print("|cff00ff00BetterFriendlist:|r " .. L.SETTINGS_IMPORT_SUCCESS)
 			frame:Hide()
 		else
-			print("|cffff0000BetterFriendlist:|r Import failed:", err or "Unknown error")
+			print("|cffff0000BetterFriendlist:|r " .. L.SETTINGS_IMPORT_FAILED .. (err or "Unknown error"))
 			-- Show error in UI
 			StaticPopupDialogs["BETTERFRIENDLIST_IMPORT_ERROR"] = {
-				text = "Import Failed!\n\n" .. (err or "Unknown error"),
+				text = L.SETTINGS_IMPORT_FAILED .. (err or "Unknown error"),
 				button1 = "OK",
 				timeout = 0,
 				whileDead = true,
@@ -2018,7 +2031,7 @@ function Settings:CreateImportFrame()
 	local cancelButton = CreateFrame("Button", nil, frame, "GameMenuButtonTemplate")
 	cancelButton:SetPoint("BOTTOM", 65, 15)
 	cancelButton:SetSize(120, 25)
-	cancelButton:SetText("Cancel")
+	cancelButton:SetText(L.SETTINGS_IMPORT_CANCEL)
 	cancelButton:SetNormalFontObject("GameFontNormal")
 	cancelButton:SetHighlightFontObject("GameFontHighlight")
 	cancelButton:SetScript("OnClick", function()
@@ -2316,75 +2329,75 @@ function Settings:RefreshGeneralTab()
 	local allFrames = {}
 	
 	-- Header: Display Options
-	local displayHeader = Components:CreateHeader(tab, "Display Options")
+	local displayHeader = Components:CreateHeader(tab, L.SETTINGS_DISPLAY_OPTIONS or "Display Options")
 	table.insert(allFrames, displayHeader)
 	
 	-- Color Class Names
-	local colorClassNames = Components:CreateCheckbox(tab, "Color Character Names by Class", 
+	local colorClassNames = Components:CreateCheckbox(tab, L.SETTINGS_COLOR_CLASS_NAMES, 
 		DB:Get("colorClassNames", true),
 		function(val) self:OnColorClassNamesChanged(val) end)
-	colorClassNames:SetTooltip("Class Colors", "Colors character names using their class color for easier identification")
+	colorClassNames:SetTooltip(L.SETTINGS_COLOR_CLASS_NAMES, L.SETTINGS_COLOR_CLASS_NAMES_DESC or "Colors character names using their class color for easier identification")
 	table.insert(allFrames, colorClassNames)
 	
 	-- Hide Empty Groups
-	local hideEmptyGroups = Components:CreateCheckbox(tab, "Hide Groups with No Online Friends",
+	local hideEmptyGroups = Components:CreateCheckbox(tab, L.SETTINGS_HIDE_EMPTY_GROUPS,
 		DB:Get("hideEmptyGroups", false),
 		function(val) self:OnHideEmptyGroupsChanged(val) end)
-	hideEmptyGroups:SetTooltip("Hide Empty Groups", "Automatically hides groups that have no online members")
+	hideEmptyGroups:SetTooltip(L.SETTINGS_HIDE_EMPTY_GROUPS, L.SETTINGS_HIDE_EMPTY_GROUPS_DESC or "Automatically hides groups that have no online members")
 	table.insert(allFrames, hideEmptyGroups)
 	
 	-- Show Faction Icons
-	local showFactionIcons = Components:CreateCheckbox(tab, "Show Faction Icons", 
+	local showFactionIcons = Components:CreateCheckbox(tab, L.SETTINGS_SHOW_FACTION_ICONS, 
 		DB:Get("showFactionIcons", true),
 		function(val) self:OnShowFactionIconsChanged(val) end)
-	showFactionIcons:SetTooltip("Show Faction Icons", "Display Alliance/Horde icons next to character names")
+	showFactionIcons:SetTooltip(L.SETTINGS_SHOW_FACTION_ICONS, L.SETTINGS_SHOW_FACTION_ICONS_DESC or "Display Alliance/Horde icons next to character names")
 	table.insert(allFrames, showFactionIcons)
 	
 	-- Show Realm Name
-	local showRealmName = Components:CreateCheckbox(tab, "Show Realm Name for Cross-Realm Friends",
+	local showRealmName = Components:CreateCheckbox(tab, L.SETTINGS_SHOW_REALM_NAME,
 		DB:Get("showRealmName", true),
 		function(val) self:OnShowRealmNameChanged(val) end)
-	showRealmName:SetTooltip("Show Realm Name", "Display the realm name for friends on different servers")
+	showRealmName:SetTooltip(L.SETTINGS_SHOW_REALM_NAME, L.SETTINGS_SHOW_REALM_NAME_DESC or "Display the realm name for friends on different servers")
 	table.insert(allFrames, showRealmName)
 	
 	-- Gray Other Faction
-	local grayOtherFaction = Components:CreateCheckbox(tab, "Gray Out Opposite Faction", 
+	local grayOtherFaction = Components:CreateCheckbox(tab, L.SETTINGS_GRAY_OTHER_FACTION, 
 		DB:Get("grayOtherFaction", false),
 		function(val) self:OnGrayOtherFactionChanged(val) end)
-	grayOtherFaction:SetTooltip("Gray Other Faction", "Make friends from the opposite faction appear grayed out")
+	grayOtherFaction:SetTooltip(L.SETTINGS_GRAY_OTHER_FACTION, L.SETTINGS_GRAY_OTHER_FACTION_DESC or "Make friends from the opposite faction appear grayed out")
 	table.insert(allFrames, grayOtherFaction)
 	
 	-- Show Mobile as AFK
-	local showMobileAsAFK = Components:CreateCheckbox(tab, "Show Mobile Friends as AFK", 
+	local showMobileAsAFK = Components:CreateCheckbox(tab, L.SETTINGS_SHOW_MOBILE_AS_AFK, 
 		DB:Get("showMobileAsAFK", false),
 		function(val) self:OnShowMobileAsAFKChanged(val) end)
-	showMobileAsAFK:SetTooltip("Mobile as AFK", "Display AFK status icon for friends on mobile (BSAp only)")
+	showMobileAsAFK:SetTooltip(L.SETTINGS_SHOW_MOBILE_AS_AFK, L.SETTINGS_SHOW_MOBILE_AS_AFK_DESC or "Display AFK status icon for friends on mobile (BSAp only)")
 	table.insert(allFrames, showMobileAsAFK)
 	
 	-- NEW: Treat Mobile as Offline (Feature Request)
-	local treatMobileAsOffline = Components:CreateCheckbox(tab, BFL_L.SETTINGS_TREAT_MOBILE_OFFLINE or "Treat Mobile users as Offline", 
+	local treatMobileAsOffline = Components:CreateCheckbox(tab, L.SETTINGS_TREAT_MOBILE_OFFLINE or "Treat Mobile users as Offline", 
 		DB:Get("treatMobileAsOffline", false),
 		function(val) self:OnTreatMobileAsOfflineChanged(val) end)
-	treatMobileAsOffline:SetTooltip(BFL_L.SETTINGS_TREAT_MOBILE_OFFLINE or "Treat Mobile as Offline", BFL_L.SETTINGS_TREAT_MOBILE_OFFLINE_DESC or "Display friends using the Mobile App in the Offline group")
+	treatMobileAsOffline:SetTooltip(L.SETTINGS_TREAT_MOBILE_OFFLINE or "Treat Mobile as Offline", L.SETTINGS_TREAT_MOBILE_OFFLINE_DESC or "Display friends using the Mobile App in the Offline group")
 	table.insert(allFrames, treatMobileAsOffline)
 	
 	-- Hide Max Level
-	local hideMaxLevel = Components:CreateCheckbox(tab, "Hide Level for Max Level Characters", 
+	local hideMaxLevel = Components:CreateCheckbox(tab, L.SETTINGS_HIDE_MAX_LEVEL, 
 		DB:Get("hideMaxLevel", false),
 		function(val) self:OnHideMaxLevelChanged(val) end)
-	hideMaxLevel:SetTooltip("Hide Max Level", "Don't display level number for characters at max level")
+	hideMaxLevel:SetTooltip(L.SETTINGS_HIDE_MAX_LEVEL, L.SETTINGS_HIDE_MAX_LEVEL_DESC or "Don't display level number for characters at max level")
 	table.insert(allFrames, hideMaxLevel)
 	
 	-- Show Blizzard Friend List Option
-	local showBlizzard = Components:CreateCheckbox(tab, "Show Blizzard Friends Button", 
+	local showBlizzard = Components:CreateCheckbox(tab, L.SETTINGS_SHOW_BLIZZARD, 
 		DB:Get("showBlizzardOption", false),
 		function(val) self:OnShowBlizzardOptionChanged(val) end)
-	showBlizzard:SetTooltip("Show Blizzard Friends Button", "Shows the original Blizzard Friends button in the social menu")
+	showBlizzard:SetTooltip(L.SETTINGS_SHOW_BLIZZARD, L.SETTINGS_SHOW_BLIZZARD_DESC or "Shows the original Blizzard Friends button in the social menu")
 	table.insert(allFrames, showBlizzard)
 
 	-- Enable ElvUI Skin
 	if _G.ElvUI then
-		local enableElvUISkin = Components:CreateCheckbox(tab, "Enable ElvUI Skin", 
+		local enableElvUISkin = Components:CreateCheckbox(tab, L.SETTINGS_ENABLE_ELVUI_SKIN or "Enable ElvUI Skin", 
 			DB:Get("enableElvUISkin", false),
 			function(val) 
 				-- Force boolean value
@@ -2393,9 +2406,9 @@ function Settings:RefreshGeneralTab()
 				-- BFL:DebugPrint("Settings: Set enableElvUISkin to", tostring(boolVal))
 				
 				StaticPopupDialogs["BFL_ELVUI_RELOAD"] = {
-					text = "Changing ElvUI Skin settings requires a UI Reload.\nReload now?",
-					button1 = "Yes",
-					button2 = "No",
+					text = L.DIALOG_ELVUI_RELOAD_TEXT or "Changing ElvUI Skin settings requires a UI Reload.\nReload now?",
+					button1 = L.DIALOG_ELVUI_RELOAD_BTN1 or "Yes",
+					button2 = L.DIALOG_ELVUI_RELOAD_BTN2 or "No",
 					OnAccept = function() ReloadUI() end,
 					timeout = 0,
 					whileDead = true,
@@ -2403,20 +2416,20 @@ function Settings:RefreshGeneralTab()
 				}
 				StaticPopup_Show("BFL_ELVUI_RELOAD")
 			end)
-		enableElvUISkin:SetTooltip("Enable ElvUI Skin", "Enables the ElvUI skin for BetterFriendlist. Requires ElvUI to be installed and enabled.")
+		enableElvUISkin:SetTooltip(L.SETTINGS_ENABLE_ELVUI_SKIN or "Enable ElvUI Skin", L.SETTINGS_ENABLE_ELVUI_SKIN_DESC or "Enables the ElvUI skin for BetterFriendlist. Requires ElvUI to be installed and enabled.")
 		table.insert(allFrames, enableElvUISkin)
 	end
 	
 	-- Group Header Count Format
 	local headerCountFormatOptions = {
-		labels = {BFL_L.SETTINGS_HEADER_COUNT_VISIBLE, BFL_L.SETTINGS_HEADER_COUNT_ONLINE, BFL_L.SETTINGS_HEADER_COUNT_BOTH},
+		labels = {L.SETTINGS_HEADER_COUNT_VISIBLE, L.SETTINGS_HEADER_COUNT_ONLINE, L.SETTINGS_HEADER_COUNT_BOTH},
 		values = {"visible", "online", "both"}
 	}
 	local currentHeaderCountFormat = DB:Get("headerCountFormat", "visible")
 	
 	local headerCountFormatDropdown = Components:CreateDropdown(
 		tab, 
-		BFL_L.SETTINGS_HEADER_COUNT_FORMAT, 
+		L.SETTINGS_HEADER_COUNT_FORMAT, 
 		headerCountFormatOptions, 
 		function(val) return val == currentHeaderCountFormat end,
 		function(val) 
@@ -2424,14 +2437,14 @@ function Settings:RefreshGeneralTab()
 			BFL:ForceRefreshFriendsList()
 		end
 	)
-	headerCountFormatDropdown:SetTooltip(BFL_L.SETTINGS_HEADER_COUNT_FORMAT, BFL_L.SETTINGS_HEADER_COUNT_FORMAT_DESC)
+	headerCountFormatDropdown:SetTooltip(L.SETTINGS_HEADER_COUNT_FORMAT, L.SETTINGS_HEADER_COUNT_FORMAT_DESC)
 	table.insert(allFrames, headerCountFormatDropdown)
 	
 	-- Spacer before next section
 	table.insert(allFrames, Components:CreateSpacer(tab))
 
 	-- Header: Name Formatting (Phase 15)
-	local nameFormatHeader = Components:CreateHeader(tab, "Name Formatting")
+	local nameFormatHeader = Components:CreateHeader(tab, L.SETTINGS_NAME_FORMAT_HEADER or "Name Formatting")
 	table.insert(allFrames, nameFormatHeader)
 
 	-- Name Format Description
@@ -2440,7 +2453,7 @@ function Settings:RefreshGeneralTab()
 	nameFormatDesc:SetJustifyH("LEFT")
 	nameFormatDesc:SetWordWrap(true)
 	nameFormatDesc:SetTextColor(0.7, 0.7, 0.7)
-	nameFormatDesc:SetText("Customize how friend names are displayed using tokens:\n|cffffffff%name%|r - Account Name (RealID/BattleTag)\n|cffffffff%note%|r - Note (BNet or WoW)\n|cffffffff%nickname%|r - Custom Nickname\n|cffffffff%battletag%|r - Short BattleTag (no #1234)")
+	nameFormatDesc:SetText(L.SETTINGS_NAME_FORMAT_DESC or "Customize how friend names are displayed using tokens:\n|cffffffff%name%|r - Account Name (RealID/BattleTag)\n|cffffffff%note%|r - Note (BNet or WoW)\n|cffffffff%nickname%|r - Custom Nickname\n|cffffffff%battletag%|r - Short BattleTag (no #1234)")
 	table.insert(allFrames, nameFormatDesc)
 
 	-- Name Format EditBox Container
@@ -2448,7 +2461,7 @@ function Settings:RefreshGeneralTab()
 	nameFormatContainer:SetSize(360, 30)
 	
 	local nameFormatLabel = nameFormatContainer:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-	nameFormatLabel:SetText("Format:")
+	nameFormatLabel:SetText(L.SETTINGS_NAME_FORMAT_LABEL or "Format:")
 	nameFormatLabel:SetPoint("LEFT", 0, 0)
 	
 	local nameFormatBox = CreateFrame("EditBox", nil, nameFormatContainer, "InputBoxTemplate")
@@ -2473,8 +2486,8 @@ function Settings:RefreshGeneralTab()
 	-- Add tooltip to EditBox
 	nameFormatBox:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText("Name Display Format", 1, 1, 1)
-		GameTooltip:AddLine("Enter a format string using tokens.", 0.8, 0.8, 0.8, true)
+		GameTooltip:SetText(L.SETTINGS_NAME_FORMAT_TOOLTIP or "Name Display Format", 1, 1, 1)
+		GameTooltip:AddLine(L.SETTINGS_NAME_FORMAT_TOOLTIP_DESC or "Enter a format string using tokens.", 0.8, 0.8, 0.8, true)
 		GameTooltip:AddLine("Example: %name% (%nickname%)", 0.8, 0.8, 0.8, true)
 		GameTooltip:Show()
 	end)
@@ -2488,43 +2501,43 @@ function Settings:RefreshGeneralTab()
 	table.insert(allFrames, Components:CreateSpacer(tab))
 	
 	-- Header: Behavior
-	local behaviorHeader = Components:CreateHeader(tab, "Behavior")
+	local behaviorHeader = Components:CreateHeader(tab, L.SETTINGS_BEHAVIOR_HEADER or "Behavior")
 	table.insert(allFrames, behaviorHeader)
 	
 	-- Accordion Groups
-	local accordionGroups = Components:CreateCheckbox(tab, "Accordion Mode (Only One Group Open)", 
+	local accordionGroups = Components:CreateCheckbox(tab, L.SETTINGS_ACCORDION_GROUPS, 
 		DB:Get("accordionGroups", true),
 		function(val) self:OnAccordionGroupsChanged(val) end)
-	accordionGroups:SetTooltip("Accordion Groups", "Only allow one group to be expanded at a time, automatically collapsing others")
+	accordionGroups:SetTooltip(L.SETTINGS_ACCORDION_GROUPS, L.SETTINGS_ACCORDION_GROUPS_DESC or "Only allow one group to be expanded at a time, automatically collapsing others")
 	table.insert(allFrames, accordionGroups)
 	
 	-- Compact Mode
-	local compactMode = Components:CreateCheckbox(tab, "Compact Mode",
+	local compactMode = Components:CreateCheckbox(tab, L.SETTINGS_COMPACT_MODE,
 		DB:Get("compactMode", false),
 		function(val) self:OnCompactModeChanged(val) end)
-	compactMode:SetTooltip("Compact Mode", "Reduces button height to fit more friends on screen")
+	compactMode:SetTooltip(L.SETTINGS_COMPACT_MODE, L.SETTINGS_COMPACT_MODE_DESC or "Reduces button height to fit more friends on screen")
 	table.insert(allFrames, compactMode)
 	
 	-- Use UI Panel System
-	local useUIPanelSystem = Components:CreateCheckbox(tab, BFL.L.SETTINGS_USE_UI_PANEL_SYSTEM or "Use UI Panel System",
+	local useUIPanelSystem = Components:CreateCheckbox(tab, L.SETTINGS_USE_UI_PANEL_SYSTEM or "Use UI Panel System",
 		DB:Get("useUIPanelSystem", false),
 		function(val) self:OnUseUIPanelSystemChanged(val) end)
-	useUIPanelSystem:SetTooltip(BFL.L.SETTINGS_USE_UI_PANEL_SYSTEM or "Use UI Panel System", BFL.L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC or "Use Blizzard's UI Panel system for automatic repositioning when other windows are open (Character, Spellbook, etc.)")
+	useUIPanelSystem:SetTooltip(L.SETTINGS_USE_UI_PANEL_SYSTEM or "Use UI Panel System", L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC or "Use Blizzard's UI Panel system for automatic repositioning when other windows are open (Character, Spellbook, etc.)")
 	table.insert(allFrames, useUIPanelSystem)
 	
 	-- Classic Only: Close on Guild Tab Click
 	if BFL.IsClassic then
-		local closeOnGuildTab = Components:CreateCheckbox(tab, BFL.L.SETTINGS_CLOSE_ON_GUILD_TAB or "Close BetterFriendlist when opening Guild",
+		local closeOnGuildTab = Components:CreateCheckbox(tab, L.SETTINGS_CLOSE_ON_GUILD_TAB or "Close BetterFriendlist when opening Guild",
 			DB:Get("closeOnGuildTabClick", false),
 			function(val) self:OnCloseOnGuildTabClickChanged(val) end)
-		closeOnGuildTab:SetTooltip(BFL.L.SETTINGS_CLOSE_ON_GUILD_TAB or "Close on Guild Tab", BFL.L.SETTINGS_CLOSE_ON_GUILD_TAB_DESC or "Automatically close BetterFriendlist when you click the Guild tab")
+		closeOnGuildTab:SetTooltip(L.SETTINGS_CLOSE_ON_GUILD_TAB or "Close on Guild Tab", L.SETTINGS_CLOSE_ON_GUILD_TAB_DESC or "Automatically close BetterFriendlist when you click the Guild tab")
 		table.insert(allFrames, closeOnGuildTab)
 		
 		-- Hide Guild Tab
-		local hideGuildTab = Components:CreateCheckbox(tab, BFL.L.SETTINGS_HIDE_GUILD_TAB or "Hide Guild Tab",
+		local hideGuildTab = Components:CreateCheckbox(tab, L.SETTINGS_HIDE_GUILD_TAB or "Hide Guild Tab",
 			DB:Get("hideGuildTab", false),
 			function(val) self:OnHideGuildTabChanged(val) end)
-		hideGuildTab:SetTooltip(BFL.L.SETTINGS_HIDE_GUILD_TAB or "Hide Guild Tab", BFL.L.SETTINGS_HIDE_GUILD_TAB_DESC or "Hide the Guild tab from the friends list (requires UI reload)")
+		hideGuildTab:SetTooltip(L.SETTINGS_HIDE_GUILD_TAB or "Hide Guild Tab", L.SETTINGS_HIDE_GUILD_TAB_DESC or "Hide the Guild tab from the friends list (requires UI reload)")
 		table.insert(allFrames, hideGuildTab)
 	end
 	
@@ -2532,39 +2545,39 @@ function Settings:RefreshGeneralTab()
 	table.insert(allFrames, Components:CreateSpacer(tab))
 	
 	-- Header: Group Management
-	local groupHeader = Components:CreateHeader(tab, "Group Management")
+	local groupHeader = Components:CreateHeader(tab, L.SETTINGS_GROUP_MANAGEMENT or "Group Management")
 	table.insert(allFrames, groupHeader)
 	
 	-- Show Favorites Group
-	local showFavorites = Components:CreateCheckbox(tab, "Show Favorites Group",
+	local showFavorites = Components:CreateCheckbox(tab, L.SETTINGS_SHOW_FAVORITES,
 		DB:Get("showFavoritesGroup", true),
 		function(val) self:OnShowFavoritesGroupChanged(val) end)
-	showFavorites:SetTooltip("Show Favorites Group", "Toggle visibility of the Favorites group in your friends list")
+	showFavorites:SetTooltip(L.SETTINGS_SHOW_FAVORITES, L.SETTINGS_SHOW_FAVORITES_DESC or "Toggle visibility of the Favorites group in your friends list")
 	table.insert(allFrames, showFavorites)
 	
 	-- NEW: Enable In-Game Group (Feature Request)
-	local enableInGameGroup = Components:CreateCheckbox(tab, "Show 'In-Game' Group",
+	local enableInGameGroup = Components:CreateCheckbox(tab, L.SETTINGS_SHOW_INGAME_GROUP or "Show 'In-Game' Group",
 		DB:Get("enableInGameGroup", false),
 		function(val) self:OnEnableInGameGroupChanged(val) end)
-	enableInGameGroup:SetTooltip("Show 'In-Game' Group", "Automatically groups friends playing games into a separate group")
+	enableInGameGroup:SetTooltip(L.SETTINGS_SHOW_INGAME_GROUP or "Show 'In-Game' Group", L.SETTINGS_SHOW_INGAME_GROUP_DESC or "Automatically groups friends playing games into a separate group")
 	table.insert(allFrames, enableInGameGroup)
 	
 	-- NEW: In-Game Group Mode (Sub-option)
 	if DB:Get("enableInGameGroup", false) then
 		local modeOptions = {
-			labels = {"WoW Only (Same Era)", "Any Game"},
+			labels = {L.SETTINGS_INGAME_MODE_WOW or "WoW Only (Same Era)", L.SETTINGS_INGAME_MODE_ANY or "Any Game"},
 			values = {"same_game", "any_game"}
 		}
 		local currentMode = DB:Get("inGameGroupMode", "same_game")
 		
 		local modeDropdown = Components:CreateDropdown(
 			tab, 
-			"   Mode:", 
+			L.SETTINGS_INGAME_MODE_LABEL or "   Mode:", 
 			modeOptions, 
 			function(val) return val == currentMode end,
 			function(val) self:OnInGameGroupModeChanged(val) end
 		)
-		modeDropdown:SetTooltip("In-Game Group Mode", "Choose which friends to include in the In-Game group:\n\n|cffffffffWoW Only:|r Friends playing the same WoW version (Retail/Classic)\n|cffffffffAny Game:|r Friends playing any Battle.net game")
+		modeDropdown:SetTooltip(L.SETTINGS_INGAME_MODE_TOOLTIP or "In-Game Group Mode", L.SETTINGS_INGAME_MODE_TOOLTIP_DESC or "Choose which friends to include in the In-Game group:\n\n|cffffffffWoW Only:|r Friends playing the same WoW version (Retail/Classic)\n|cffffffffAny Game:|r Friends playing any Battle.net game")
 		table.insert(allFrames, modeDropdown)
 	end
 	
@@ -2572,12 +2585,12 @@ function Settings:RefreshGeneralTab()
 	table.insert(allFrames, Components:CreateSpacer(tab))
 	
 	-- Header: Font Settings
-	local fontHeader = Components:CreateHeader(tab, "Font Settings")
+	local fontHeader = Components:CreateHeader(tab, L.SETTINGS_FONT_SETTINGS or "Font Settings")
 	table.insert(allFrames, fontHeader)
 	
 	-- Font Size Dropdown
 	local fontSizeOptions = {
-		labels = {"Small", "Medium", "Large"},
+		labels = {L.SETTINGS_FONT_SIZE_SMALL, L.SETTINGS_FONT_SIZE_NORMAL, L.SETTINGS_FONT_SIZE_LARGE},
 		values = {"small", "medium", "large"}
 	}
 	local currentFontSize = DB:Get("fontSize", "medium")
@@ -2590,7 +2603,7 @@ function Settings:RefreshGeneralTab()
 		self:SetFontSize(value)
 	end
 	
-	local fontSizeDropdown = Components:CreateDropdown(tab, "Font Size:", fontSizeOptions, isFontSizeSelected, onFontSizeChanged)
+	local fontSizeDropdown = Components:CreateDropdown(tab, L.SETTINGS_FONT_SIZE, fontSizeOptions, isFontSizeSelected, onFontSizeChanged)
 	table.insert(allFrames, fontSizeDropdown)
 	
 	-- Anchor all frames vertically
@@ -2622,7 +2635,7 @@ function Settings:RefreshGroupsTab()
 	local allFrames = {}
 	
 	-- Header: Group Order
-	local orderHeader = Components:CreateHeader(tab, "Group Order")
+	local orderHeader = Components:CreateHeader(tab, L.SETTINGS_GROUP_ORDER or "Group Order")
 	table.insert(allFrames, orderHeader)
 	
 	-- Get ordered groups
@@ -2758,6 +2771,34 @@ function Settings:RefreshGroupsTab()
 		-- Set arrow button states
 		listItem:SetArrowState(canMoveUp, canMoveDown)
 		
+		-- Set tooltips (localized)
+		if listItem.renameBtn then
+			listItem.renameBtn:SetScript("OnEnter", function(self)
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+				GameTooltip:SetText(L.SETTINGS_RENAME_GROUP, 1, 1, 1)
+				GameTooltip:AddLine(L.TOOLTIP_RENAME_DESC, nil, nil, nil, true)
+				GameTooltip:Show()
+			end)
+		end
+		
+		if listItem.colorBtn then
+			listItem.colorBtn:SetScript("OnEnter", function(self)
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+				GameTooltip:SetText(L.SETTINGS_GROUP_COLOR, 1, 1, 1)
+				GameTooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC, nil, nil, nil, true)
+				GameTooltip:Show()
+			end)
+		end
+		
+		if listItem.deleteBtn then
+			listItem.deleteBtn:SetScript("OnEnter", function(self)
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+				GameTooltip:SetText(L.SETTINGS_DELETE_GROUP, 1, 1, 1)
+				GameTooltip:AddLine(L.TOOLTIP_DELETE_DESC, nil, nil, nil, true)
+				GameTooltip:Show()
+			end)
+		end
+		
 		table.insert(allFrames, listItem)
 	end
 	
@@ -2805,21 +2846,21 @@ function Settings:RefreshAdvancedTab()
 	-- Title
 	local title = tab:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 	title:SetPoint("TOPLEFT", 10, yOffset)
-	title:SetText("Advanced Settings")
+	title:SetText(L.SETTINGS_TAB_ADVANCED or "Advanced Settings")
 	table.insert(allFrames, title)
 	yOffset = yOffset - 25
 	
 	-- Description
 	local desc = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 	desc:SetPoint("TOPLEFT", 10, yOffset)
-	desc:SetText("Advanced options and tools")
+	desc:SetText(L.SETTINGS_ADVANCED_DESC or "Advanced options and tools")
 	table.insert(allFrames, desc)
 	yOffset = yOffset - 30
 	
 	-- ===========================================
 	-- FriendGroups Migration Section
 	-- ===========================================
-	local migrationHeader = Components:CreateHeader(tab, "FriendGroups Migration")
+	local migrationHeader = Components:CreateHeader(tab, L.SETTINGS_MIGRATION_HEADER or "FriendGroups Migration")
 	migrationHeader:SetPoint("TOPLEFT", 10, yOffset)
 	table.insert(allFrames, migrationHeader)
 	yOffset = yOffset - 25
@@ -2830,18 +2871,18 @@ function Settings:RefreshAdvancedTab()
 	migrationDesc1:SetWidth(350)
 	migrationDesc1:SetJustifyH("LEFT")
 	migrationDesc1:SetWordWrap(true)
-	migrationDesc1:SetText("Migrate groups and friend assignments from FriendGroups addon. This will parse group information from BattleNet notes and create corresponding groups in BetterFriendlist.")
+	migrationDesc1:SetText(L.SETTINGS_MIGRATION_DESC or "Migrate groups and friend assignments from FriendGroups addon. This will parse group information from BattleNet notes and create corresponding groups in BetterFriendlist.")
 	table.insert(allFrames, migrationDesc1)
 	yOffset = yOffset - 35
 	
 	-- Migration button
 	local migrateButton = Components:CreateButton(
 		tab,
-		"Migrate from FriendGroups",
+		L.SETTINGS_MIGRATE_BTN or "Migrate from FriendGroups",
 		function()
 			self:ShowMigrationDialog()
 		end,
-		"Import groups from the FriendGroups addon"
+		L.SETTINGS_MIGRATE_TOOLTIP or "Import groups from the FriendGroups addon"
 	)
 	migrateButton:SetPoint("TOPLEFT", 10, yOffset)
 	migrateButton:SetSize(200, 24)
@@ -2851,7 +2892,7 @@ function Settings:RefreshAdvancedTab()
 	-- ===========================================
 	-- Export / Import Section
 	-- ===========================================
-	local exportHeader = Components:CreateHeader(tab, "Export / Import Settings")
+	local exportHeader = Components:CreateHeader(tab, L.SETTINGS_EXPORT_HEADER or "Export / Import Settings")
 	exportHeader:SetPoint("TOPLEFT", 10, yOffset)
 	table.insert(allFrames, exportHeader)
 	yOffset = yOffset - 25
@@ -2862,7 +2903,7 @@ function Settings:RefreshAdvancedTab()
 	exportDesc1:SetWidth(350)
 	exportDesc1:SetJustifyH("LEFT")
 	exportDesc1:SetWordWrap(true)
-	exportDesc1:SetText("Export your groups and friend assignments to share between characters or accounts. Perfect for players with multiple accounts who share Battle.net friends.")
+	exportDesc1:SetText(L.SETTINGS_EXPORT_DESC or "Export your groups and friend assignments to share between characters or accounts. Perfect for players with multiple accounts who share Battle.net friends.")
 	table.insert(allFrames, exportDesc1)
 	yOffset = yOffset - 35
 	
@@ -2870,18 +2911,18 @@ function Settings:RefreshAdvancedTab()
 	exportWarning:SetPoint("TOPLEFT", 10, yOffset)
 	exportWarning:SetPoint("RIGHT", -10, 0)
 	exportWarning:SetJustifyH("LEFT")
-	exportWarning:SetText("|cffff0000Warning: Importing will replace ALL your groups and assignments!|r")
+	exportWarning:SetText(L.SETTINGS_EXPORT_WARNING or "|cffff0000Warning: Importing will replace ALL your groups and assignments!|r")
 	table.insert(allFrames, exportWarning)
 	yOffset = yOffset - 25
 	
 	-- Export button
 	local exportButton = Components:CreateButton(
 		tab,
-		"Export Settings",
+		L.BUTTON_EXPORT,
 		function()
 			self:ShowExportDialog()
 		end,
-		"Export your groups and friend assignments"
+		L.SETTINGS_EXPORT_TOOLTIP or "Export your groups and friend assignments"
 	)
 	exportButton:SetPoint("TOPLEFT", 10, yOffset)
 	exportButton:SetSize(140, 24)
@@ -2890,11 +2931,11 @@ function Settings:RefreshAdvancedTab()
 	-- Import button
 	local importButton = Components:CreateButton(
 		tab,
-		"Import Settings",
+		L.SETTINGS_IMPORT_BTN,
 		function()
 			self:ShowImportDialog()
 		end,
-		"Import groups and friend assignments"
+		L.SETTINGS_IMPORT_TOOLTIP or "Import groups and friend assignments"
 	)
 	importButton:SetPoint("LEFT", exportButton, "RIGHT", 10, 0)
 	importButton:SetSize(140, 24)
@@ -2905,7 +2946,7 @@ function Settings:RefreshAdvancedTab()
 	-- ===========================================
 	-- Beta Features Section
 	-- ===========================================
-	local betaHeader = Components:CreateHeader(tab, "|cffff8800Beta Features|r") -- Orange for Beta
+	local betaHeader = Components:CreateHeader(tab, "|cffff8800" .. L.SETTINGS_BETA_FEATURES_TITLE .. "|r") -- Orange for Beta
 	betaHeader:SetPoint("TOPLEFT", 10, yOffset)
 	table.insert(allFrames, betaHeader)
 	yOffset = yOffset - 25
@@ -2916,7 +2957,7 @@ function Settings:RefreshAdvancedTab()
 	betaDesc:SetWidth(350)
 	betaDesc:SetJustifyH("LEFT")
 	betaDesc:SetWordWrap(true)
-	betaDesc:SetText("Enable experimental features that are still in development. These features may change or be removed in future versions.")
+	betaDesc:SetText(L.SETTINGS_BETA_FEATURES_DESC)
 	table.insert(allFrames, betaDesc)
 	yOffset = yOffset - 35
 	
@@ -2933,7 +2974,7 @@ function Settings:RefreshAdvancedTab()
 	warningText:SetWidth(330)
 	warningText:SetJustifyH("LEFT")
 	warningText:SetWordWrap(true)
-	warningText:SetText("Beta features may contain bugs, performance issues, or incomplete functionality. Use at your own risk.")
+	warningText:SetText(L.SETTINGS_BETA_FEATURES_WARNING)
 	warningText:SetTextColor(1, 0.53, 0) -- Orange (matching Beta theme)
 	table.insert(allFrames, warningText)
 	yOffset = yOffset - 35
@@ -2941,7 +2982,7 @@ function Settings:RefreshAdvancedTab()
 	-- Enable Beta Features Toggle
 	local betaToggle = Components:CreateCheckbox(
 		tab,
-		"Enable Beta Features",
+		L.SETTINGS_BETA_FEATURES_ENABLE,
 		BetterFriendlistDB.enableBetaFeatures or false,
 		function(checked)
 			BetterFriendlistDB.enableBetaFeatures = checked
@@ -2964,11 +3005,11 @@ function Settings:RefreshAdvancedTab()
 			
 			-- User feedback
 			if checked then
-				print("|cff00ff00BetterFriendlist:|r Beta Features |cff00ff00ENABLED|r")
-				print("|cffff8800[>]|r Beta tabs are now visible in Settings")
+				print("|cff00ff00BetterFriendlist:|r " .. L.SETTINGS_BETA_FEATURES_ENABLED)
+				print("|cffff8800[>]|r " .. L.SETTINGS_BETA_TABS_VISIBLE)
 			else
-				print("|cff00ff00BetterFriendlist:|r Beta Features |cffff0000DISABLED|r")
-				print("|cffff8800[>]|r Beta tabs are now hidden")
+				print("|cff00ff00BetterFriendlist:|r " .. L.SETTINGS_BETA_FEATURES_DISABLED)
+				print("|cffff8800[>]|r " .. L.SETTINGS_BETA_TABS_HIDDEN)
 			end
 			
 			-- Check if Data Broker is enabled - requires UI reload
@@ -2991,14 +3032,14 @@ function Settings:RefreshAdvancedTab()
 		end
 	)
 	betaToggle:SetPoint("TOPLEFT", 10, yOffset)
-	betaToggle:SetTooltip("Beta Features", "Enable experimental features like Smart Notifications and Bulk Operations")
+	betaToggle:SetTooltip(L.SETTINGS_BETA_FEATURES_TITLE, L.SETTINGS_BETA_FEATURES_TOOLTIP)
 	table.insert(allFrames, betaToggle)
 	yOffset = yOffset - 35
 
 	-- Beta feature list (informational)
 	local featureListTitle = tab:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 	featureListTitle:SetPoint("TOPLEFT", 10, yOffset)
-	featureListTitle:SetText("Currently available Beta features:")
+	featureListTitle:SetText(L.SETTINGS_BETA_FEATURES_LIST)
 	featureListTitle:SetTextColor(1, 0.53, 0) -- Orange (Beta theme)
 	table.insert(allFrames, featureListTitle)
 	yOffset = yOffset - 20
@@ -3049,21 +3090,21 @@ function Settings:RefreshStatisticsTab()
 	-- Title
 	local title = tab:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 	title:SetPoint("TOPLEFT", 10, yOffset)
-	title:SetText("Friend Network Statistics")
+	title:SetText(L.STATS_HEADER or "Friend Network Statistics")
 	table.insert(allFrames, title)
 	yOffset = yOffset - 25
 	
 	-- Description
 	local desc = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 	desc:SetPoint("TOPLEFT", 10, yOffset)
-	desc:SetText("Overview of your friend network and activity")
+	desc:SetText(L.STATS_DESC or "Overview of your friend network and activity")
 	table.insert(allFrames, desc)
 	yOffset = yOffset - 30
 	
 	-- ===========================================
 	-- Overview Section
 	-- ===========================================
-	local overviewHeader = Components:CreateHeader(tab, "Overview")
+	local overviewHeader = Components:CreateHeader(tab, L.STATS_OVERVIEW_HEADER or "Overview")
 	overviewHeader:SetPoint("TOPLEFT", 10, yOffset)
 	table.insert(allFrames, overviewHeader)
 	yOffset = yOffset - 25
@@ -3071,21 +3112,21 @@ function Settings:RefreshStatisticsTab()
 	-- Total Friends
 	tab.TotalFriends = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 	tab.TotalFriends:SetPoint("TOPLEFT", 20, yOffset)
-	tab.TotalFriends:SetText("Total Friends: --")
+	tab.TotalFriends:SetText(string.format(L.STATS_TOTAL_FRIENDS or "Total Friends: %s", "--"))
 	table.insert(allFrames, tab.TotalFriends)
 	yOffset = yOffset - 20
 	
 	-- Online/Offline
 	tab.OnlineFriends = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 	tab.OnlineFriends:SetPoint("TOPLEFT", 20, yOffset)
-	tab.OnlineFriends:SetText("Online: --  |  Offline: --")
+	tab.OnlineFriends:SetText(string.format(L.STATS_ONLINE_OFFLINE or "Online: %s  |  Offline: %s", "--", "--"))
 	table.insert(allFrames, tab.OnlineFriends)
 	yOffset = yOffset - 20
 	
 	-- Friend Types
 	tab.FriendTypes = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 	tab.FriendTypes:SetPoint("TOPLEFT", 20, yOffset)
-	tab.FriendTypes:SetText("Battle.net: --  |  WoW: --")
+	tab.FriendTypes:SetText(string.format(L.STATS_BNET_WOW or "Battle.net: %s  |  WoW: %s", "--", "--"))
 	table.insert(allFrames, tab.FriendTypes)
 	yOffset = yOffset - 30
 	
@@ -3097,7 +3138,7 @@ function Settings:RefreshStatisticsTab()
 	-- ===========================================
 	
 	-- Friendship Health Section
-	local healthHeader = Components:CreateHeader(tab, "Friendship Health")
+	local healthHeader = Components:CreateHeader(tab, L.STATS_HEALTH_HEADER or "Friendship Health")
 	healthHeader:SetPoint("TOPLEFT", 10, yOffset)
 	table.insert(allFrames, healthHeader)
 	yOffset = yOffset - 25
@@ -3106,12 +3147,12 @@ function Settings:RefreshStatisticsTab()
 	tab.FriendshipHealth:SetPoint("TOPLEFT", 20, yOffset)
 	tab.FriendshipHealth:SetWidth(210)
 	tab.FriendshipHealth:SetJustifyH("LEFT")
-	tab.FriendshipHealth:SetText("No health data available")
+	tab.FriendshipHealth:SetText(L.STATS_NO_DATA or "No health data available")
 	table.insert(allFrames, tab.FriendshipHealth)
 	yOffset = yOffset - 90
 	
 	-- Top 5 Classes Section
-	local classHeader = Components:CreateHeader(tab, "Top 5 Classes")
+	local classHeader = Components:CreateHeader(tab, L.STATS_CLASSES_HEADER or "Top 5 Classes")
 	classHeader:SetPoint("TOPLEFT", 10, yOffset)
 	table.insert(allFrames, classHeader)
 	yOffset = yOffset - 25
@@ -3120,12 +3161,12 @@ function Settings:RefreshStatisticsTab()
 	tab.ClassList:SetPoint("TOPLEFT", 20, yOffset)
 	tab.ClassList:SetWidth(210)
 	tab.ClassList:SetJustifyH("LEFT")
-	tab.ClassList:SetText("No class data available")
+	tab.ClassList:SetText(L.STATS_NO_DATA or "No class data available")
 	table.insert(allFrames, tab.ClassList)
 	yOffset = yOffset - 90
 	
 	-- Realm Clusters Section
-	local realmHeader = Components:CreateHeader(tab, "Realm Clusters")
+	local realmHeader = Components:CreateHeader(tab, L.STATS_REALMS_HEADER or "Realm Clusters")
 	realmHeader:SetPoint("TOPLEFT", 10, yOffset)
 	table.insert(allFrames, realmHeader)
 	yOffset = yOffset - 25
@@ -3134,12 +3175,12 @@ function Settings:RefreshStatisticsTab()
 	tab.RealmList:SetPoint("TOPLEFT", 20, yOffset)
 	tab.RealmList:SetWidth(210)
 	tab.RealmList:SetJustifyH("LEFT")
-	tab.RealmList:SetText("No realm data available")
+	tab.RealmList:SetText(L.STATS_NO_DATA or "No realm data available")
 	table.insert(allFrames, tab.RealmList)
 	yOffset = yOffset - 110
 	
 	-- Organization Section
-	local notesHeader = Components:CreateHeader(tab, "Organization")
+	local notesHeader = Components:CreateHeader(tab, L.STATS_ORGANIZATION_HEADER or "Organization")
 	notesHeader:SetPoint("TOPLEFT", 10, yOffset)
 	table.insert(allFrames, notesHeader)
 	yOffset = yOffset - 25
@@ -3148,7 +3189,7 @@ function Settings:RefreshStatisticsTab()
 	tab.NotesAndFavorites:SetPoint("TOPLEFT", 20, yOffset)
 	tab.NotesAndFavorites:SetWidth(210)
 	tab.NotesAndFavorites:SetJustifyH("LEFT")
-	tab.NotesAndFavorites:SetText("No data available")
+	tab.NotesAndFavorites:SetText(L.STATS_NO_DATA or "No data available")
 	table.insert(allFrames, tab.NotesAndFavorites)
 	yOffset = yOffset - 60
 	
@@ -3158,7 +3199,7 @@ function Settings:RefreshStatisticsTab()
 	yOffset = leftColumnStart
 	
 	-- Level Distribution Section
-	local levelHeader = Components:CreateHeader(tab, "Level Distribution")
+	local levelHeader = Components:CreateHeader(tab, L.STATS_LEVELS_HEADER or "Level Distribution")
 	levelHeader:SetPoint("TOPLEFT", 240, yOffset)
 	table.insert(allFrames, levelHeader)
 	yOffset = yOffset - 25
@@ -3167,12 +3208,12 @@ function Settings:RefreshStatisticsTab()
 	tab.LevelDistribution:SetPoint("TOPLEFT", 250, yOffset)
 	tab.LevelDistribution:SetWidth(190)
 	tab.LevelDistribution:SetJustifyH("LEFT")
-	tab.LevelDistribution:SetText("No level data available")
+	tab.LevelDistribution:SetText(L.STATS_NO_DATA or "No level data available")
 	table.insert(allFrames, tab.LevelDistribution)
 	yOffset = yOffset - 90
 	
 	-- Game Distribution Section
-	local gameHeader = Components:CreateHeader(tab, "Game Distribution")
+	local gameHeader = Components:CreateHeader(tab, L.STATS_GAMES_HEADER or "Game Distribution")
 	gameHeader:SetPoint("TOPLEFT", 240, yOffset)
 	table.insert(allFrames, gameHeader)
 	yOffset = yOffset - 25
@@ -3181,12 +3222,12 @@ function Settings:RefreshStatisticsTab()
 	tab.GameDistribution:SetPoint("TOPLEFT", 250, yOffset)
 	tab.GameDistribution:SetWidth(190)
 	tab.GameDistribution:SetJustifyH("LEFT")
-	tab.GameDistribution:SetText("No game data available")
+	tab.GameDistribution:SetText(L.STATS_NO_DATA or "No game data available")
 	table.insert(allFrames, tab.GameDistribution)
 	yOffset = yOffset - 90
 	
 	-- Mobile vs Desktop Section
-	local mobileHeader = Components:CreateHeader(tab, "Mobile vs. Desktop")
+	local mobileHeader = Components:CreateHeader(tab, L.STATS_MOBILE_HEADER or "Mobile vs. Desktop")
 	mobileHeader:SetPoint("TOPLEFT", 240, yOffset)
 	table.insert(allFrames, mobileHeader)
 	yOffset = yOffset - 25
@@ -3195,12 +3236,12 @@ function Settings:RefreshStatisticsTab()
 	tab.MobileVsDesktop:SetPoint("TOPLEFT", 250, yOffset)
 	tab.MobileVsDesktop:SetWidth(190)
 	tab.MobileVsDesktop:SetJustifyH("LEFT")
-	tab.MobileVsDesktop:SetText("No mobile data available")
+	tab.MobileVsDesktop:SetText(L.STATS_NO_DATA or "No mobile data available")
 	table.insert(allFrames, tab.MobileVsDesktop)
 	yOffset = yOffset - 60
 	
 	-- Faction Distribution Section
-	local factionHeader = Components:CreateHeader(tab, "Faction Distribution")
+	local factionHeader = Components:CreateHeader(tab, L.STATS_FACTIONS_HEADER or "Faction Distribution")
 	factionHeader:SetPoint("TOPLEFT", 240, yOffset)
 	table.insert(allFrames, factionHeader)
 	yOffset = yOffset - 25
@@ -3209,7 +3250,7 @@ function Settings:RefreshStatisticsTab()
 	tab.FactionList:SetPoint("TOPLEFT", 250, yOffset)
 	tab.FactionList:SetWidth(190)
 	tab.FactionList:SetJustifyH("LEFT")
-	tab.FactionList:SetText("No faction data available")
+	tab.FactionList:SetText(L.STATS_NO_DATA or "No faction data available")
 	table.insert(allFrames, tab.FactionList)
 	
 	-- ===========================================
@@ -3217,11 +3258,11 @@ function Settings:RefreshStatisticsTab()
 	-- ===========================================
 	local refreshButton = Components:CreateButton(
 		tab,
-		"Refresh Statistics",
+		L.STATS_REFRESH_BTN or "Refresh Statistics",
 		function()
 			self:RefreshStatistics()
 		end,
-		"Update statistics with current data"
+		L.STATS_REFRESH_TOOLTIP or "Update statistics with current data"
 	)
 	refreshButton:SetPoint("TOPLEFT", 10, yOffset)
 	refreshButton:SetSize(150, 24)
@@ -3260,7 +3301,7 @@ function Settings:RefreshNotificationsTab()
 	-- Header (Beta - Orange)
 	-- ===========================================
 	local betaHeader = tab:CreateFontString(nil, "ARTWORK", "GameFontNormalHuge")
-	betaHeader:SetText("|cffff8800Notifications|r") -- Orange for Beta feature
+	betaHeader:SetText("|cffff8800" .. (L.SETTINGS_TAB_NOTIFICATIONS or "Notifications") .. "|r") -- Orange for Beta feature
 	table.insert(allFrames, betaHeader)
 	
 	-- Description
@@ -3268,18 +3309,18 @@ function Settings:RefreshNotificationsTab()
 	desc:SetWidth(360)
 	desc:SetJustifyH("LEFT")
 	desc:SetWordWrap(true)
-	desc:SetText("Configure smart friend notifications. Get alerts when friends come online.")
+	desc:SetText(L.SETTINGS_NOTIFY_DESC or "Configure smart friend notifications. Get alerts when friends come online.")
 	table.insert(allFrames, desc)
 	
 	-- ===========================================
 	-- NOTIFICATION DISPLAY SECTION
 	-- ===========================================
-	local displayHeader = Components:CreateHeader(tab, "Notification Display")
+	local displayHeader = Components:CreateHeader(tab, L.SETTINGS_NOTIFY_DISPLAY_HEADER or "Notification Display")
 	table.insert(allFrames, displayHeader)
 	
 	-- Display Mode Dropdown
 	local displayModeOptions = {
-		labels = {"Toast Notification", "Chat Message Only", "Disabled"},
+		labels = {L.SETTINGS_NOTIFY_MODE_TOAST or "Toast Notification", L.SETTINGS_NOTIFY_MODE_CHAT or "Chat Message Only", L.SETTINGS_NOTIFY_MODE_DISABLED or "Disabled"},
 		values = {"alert", "chat", "disabled"}
 	}
 	local currentMode = BetterFriendlistDB.notificationDisplayMode or "alert"
@@ -3291,14 +3332,14 @@ function Settings:RefreshNotificationsTab()
 	local function onDisplayModeChanged(value)
 		BetterFriendlistDB.notificationDisplayMode = value
 		local modeNames = {
-			alert = "|cffffcc00Toast|r",
-			chat = "|cffffcc00Chat|r",
-			disabled = "|cffff0000DISABLED|r"
+			alert = "|cffffcc00" .. (L.SETTINGS_NOTIFY_MODE_TOAST or "Toast") .. "|r",
+			chat = "|cffffcc00" .. (L.SETTINGS_NOTIFY_MODE_CHAT or "Chat") .. "|r",
+			disabled = "|cffff0000" .. (L.SETTINGS_NOTIFY_MODE_DISABLED or "DISABLED") .. "|r"
 		}
-		print("|cff00ff00BetterFriendlist:|r Notification mode set to " .. (modeNames[value] or value))
+		print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_MODE_CHANGED or "Notification mode set to") .. " " .. (modeNames[value] or value))
 	end
 	
-	local displayModeDropdown = Components:CreateDropdown(tab, "Display Mode:", displayModeOptions, isDisplayModeSelected, onDisplayModeChanged)
+	local displayModeDropdown = Components:CreateDropdown(tab, L.SETTINGS_NOTIFY_DISPLAY_MODE or "Display Mode:", displayModeOptions, isDisplayModeSelected, onDisplayModeChanged)
 	table.insert(allFrames, displayModeDropdown)
 	
 	-- Mode Description
@@ -3306,7 +3347,7 @@ function Settings:RefreshNotificationsTab()
 	modeDesc:SetWidth(360)
 	modeDesc:SetJustifyH("LEFT")
 	modeDesc:SetWordWrap(true)
-	modeDesc:SetText(
+	modeDesc:SetText(L.SETTINGS_NOTIFY_MODE_DESC or
 		"|cffffcc00Toast Notification:|r Shows a compact notification when friends come online\n" ..
 		"|cffffcc00Chat Message Only:|r No popup, only shows messages in chat\n" ..
 		"|cffffcc00Disabled:|r No notifications at all"
@@ -3316,15 +3357,15 @@ function Settings:RefreshNotificationsTab()
 	-- Test Button
 	local testBtn = Components:CreateButton(
 		tab,
-		"Test Notification",
+		L.SETTINGS_NOTIFY_TEST_BTN or "Test Notification",
 		function()
 			if BFL.NotificationSystem and BFL.NotificationSystem.ShowTestNotification then
 				BFL.NotificationSystem:ShowTestNotification()
 			else
-				print("|cffff0000BetterFriendlist:|r Notification system not available")
+				print("|cffff0000BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_SYSTEM_ERROR or "Notification system not available"))
 			end
 		end,
-		"Trigger a test notification"
+		L.SETTINGS_NOTIFY_TEST_TOOLTIP or "Trigger a test notification"
 	)
 	testBtn:SetSize(150, 24)
 	table.insert(allFrames, testBtn)
@@ -3332,43 +3373,43 @@ function Settings:RefreshNotificationsTab()
 	-- ===========================================
 	-- SOUND SETTINGS SECTION
 	-- ===========================================
-	local soundHeader = Components:CreateHeader(tab, "Sound Settings")
+	local soundHeader = Components:CreateHeader(tab, L.SETTINGS_NOTIFY_SOUND_HEADER or "Sound Settings")
 	table.insert(allFrames, soundHeader)
 	
 	-- Enable Sound Checkbox
 	local soundToggle = Components:CreateCheckbox(
 		tab,
-		"Play sound with notifications",
+		L.SETTINGS_NOTIFY_SOUND_ENABLE or "Play sound with notifications",
 		BetterFriendlistDB.notificationSoundEnabled or false,
 		function(checked)
 			BetterFriendlistDB.notificationSoundEnabled = checked
 			if checked then
-				print("|cff00ff00BetterFriendlist:|r Notification sounds |cff00ff00ENABLED|r")
+				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_SOUND_ENABLED or "Notification sounds |cff00ff00ENABLED|r"))
 			else
-				print("|cff00ff00BetterFriendlist:|r Notification sounds |cffff0000DISABLED|r")
+				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_SOUND_DISABLED or "Notification sounds |cffff0000DISABLED|r"))
 			end
 		end
 	)
-	soundToggle:SetTooltip("Notification Sounds", "Play a sound effect when notifications appear. You can test the sound using the button above.")
+	soundToggle:SetTooltip(L.SETTINGS_NOTIFY_SOUND_TOOLTIP_TITLE or "Notification Sounds", L.SETTINGS_NOTIFY_SOUND_TOOLTIP_DESC or "Play a sound effect when notifications appear. You can test the sound using the button above.")
 	table.insert(allFrames, soundToggle)
 	
 	-- ===========================================
 	-- QUIET HOURS SECTION
 	-- ===========================================
-	local quietHeader = Components:CreateHeader(tab, "Quiet Hours")
+	local quietHeader = Components:CreateHeader(tab, L.SETTINGS_NOTIFY_QUIET_HEADER or "Quiet Hours")
 	table.insert(allFrames, quietHeader)
 	
 	-- Manual DND Toggle
 	local manualDND = Components:CreateCheckbox(
 		tab,
-		"Manual Do Not Disturb",
+		L.SETTINGS_NOTIFY_QUIET_MANUAL or "Manual Do Not Disturb",
 		BetterFriendlistDB.notificationQuietManual or false,
 		function(checked)
 			BetterFriendlistDB.notificationQuietManual = checked
 			if checked then
-				print("|cff00ff00BetterFriendlist:|r Manual DND |cff00ff00ENABLED|r - All notifications silenced")
+				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_MANUAL_DND_ENABLED or "Manual DND |cff00ff00ENABLED|r - All notifications silenced"))
 			else
-				print("|cff00ff00BetterFriendlist:|r Manual DND |cffff0000DISABLED|r")
+				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_MANUAL_DND_DISABLED or "Manual DND |cffff0000DISABLED|r"))
 			end
 		end
 	)
@@ -3378,11 +3419,11 @@ function Settings:RefreshNotificationsTab()
 	-- Combat Toggle
 	local combatQuiet = Components:CreateCheckbox(
 		tab,
-		"Silence during combat",
+		L.SETTINGS_NOTIFY_QUIET_COMBAT or "Silence during combat",
 		BetterFriendlistDB.notificationQuietCombat ~= false, -- Default: true
 		function(checked)
 			BetterFriendlistDB.notificationQuietCombat = checked
-			print("|cff00ff00BetterFriendlist:|r Combat quiet mode " .. (checked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
+			print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_COMBAT_QUIET or "Combat quiet mode") .. " " .. (checked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
 		end
 	)
 	combatQuiet:SetTooltip("Combat Silence", "Automatically silence notifications during combat encounters to avoid distractions.")
@@ -3391,11 +3432,11 @@ function Settings:RefreshNotificationsTab()
 	-- Instance Toggle
 	local instanceQuiet = Components:CreateCheckbox(
 		tab,
-		"Silence in instances (dungeons, raids, PvP)",
+		L.SETTINGS_NOTIFY_QUIET_INSTANCE or "Silence in instances (dungeons, raids, PvP)",
 		BetterFriendlistDB.notificationQuietInstance or false,
 		function(checked)
 			BetterFriendlistDB.notificationQuietInstance = checked
-			print("|cff00ff00BetterFriendlist:|r Instance quiet mode " .. (checked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
+			print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_INSTANCE_QUIET or "Instance quiet mode") .. " " .. (checked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
 		end
 	)
 	instanceQuiet:SetTooltip("Instance Silence", "Silence notifications when you are in dungeons, raids, battlegrounds, or arenas.")
@@ -3404,11 +3445,11 @@ function Settings:RefreshNotificationsTab()
 	-- Scheduled Quiet Hours Toggle
 	local scheduledQuiet = Components:CreateCheckbox(
 		tab,
-		"Scheduled quiet hours",
+		L.SETTINGS_NOTIFY_QUIET_SCHEDULED or "Scheduled quiet hours",
 		BetterFriendlistDB.notificationQuietScheduled or false,
 		function(checked)
 			BetterFriendlistDB.notificationQuietScheduled = checked
-			print("|cff00ff00BetterFriendlist:|r Scheduled quiet hours " .. (checked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
+			print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_SCHEDULED_QUIET or "Scheduled quiet hours") .. " " .. (checked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
 		end
 	)
 	scheduledQuiet:SetTooltip("Scheduled Quiet Hours", "Silence notifications during specific hours each day. Configure your preferred schedule below.")
@@ -3435,7 +3476,7 @@ function Settings:RefreshNotificationsTab()
 	local startMinutes = BetterFriendlistDB.notificationQuietScheduleStartMinutes or 1320 -- Default: 22:00 = 1320 minutes
 	local startHourSlider = Components:CreateSlider(
 		tab,
-		"Start Time:",
+		L.SETTINGS_NOTIFY_QUIET_START or "Start Time:",
 		0,
 		95,
 		MinutesToIndex(startMinutes),
@@ -3452,7 +3493,7 @@ function Settings:RefreshNotificationsTab()
 	local endMinutes = BetterFriendlistDB.notificationQuietScheduleEndMinutes or 480 -- Default: 08:00 = 480 minutes
 	local endHourSlider = Components:CreateSlider(
 		tab,
-		"End Time:",
+		L.SETTINGS_NOTIFY_QUIET_END or "End Time:",
 		0,
 		95,
 		MinutesToIndex(endMinutes),
@@ -3471,26 +3512,26 @@ function Settings:RefreshNotificationsTab()
 	scheduleInfo:SetJustifyH("LEFT")
 	scheduleInfo:SetWordWrap(true)
 	scheduleInfo:SetTextColor(0.7, 0.7, 0.7)
-	scheduleInfo:SetText("|cffffcc00Note:|r If start hour is greater than end hour, the schedule crosses midnight (e.g., 22:00-08:00).")
+	scheduleInfo:SetText(L.SETTINGS_NOTIFY_QUIET_NOTE or "|cffffcc00Note:|r If start hour is greater than end hour, the schedule crosses midnight (e.g., 22:00-08:00).")
 	table.insert(allFrames, scheduleInfo)
 	
 	-- ===========================================
 	-- OFFLINE NOTIFICATIONS SECTION
 	-- ===========================================
-	local offlineHeader = Components:CreateHeader(tab, "Offline Notifications")
+	local offlineHeader = Components:CreateHeader(tab, L.SETTINGS_NOTIFY_OFFLINE_HEADER or "Offline Notifications")
 	table.insert(allFrames, offlineHeader)
 	
 	-- Offline Notifications Toggle
 	local offlineToggle = Components:CreateCheckbox(
 		tab,
-		"Show notifications when friends go offline",
+		L.SETTINGS_NOTIFY_OFFLINE_ENABLE or "Show notifications when friends go offline",
 		BetterFriendlistDB.notificationOfflineEnabled or false,
 		function(checked)
 			BetterFriendlistDB.notificationOfflineEnabled = checked
 			if checked then
-				print("|cff00ff00BetterFriendlist:|r Offline notifications |cff00ff00ENABLED|r")
+				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_OFFLINE_ENABLED or "Offline notifications |cff00ff00ENABLED|r"))
 			else
-				print("|cff00ff00BetterFriendlist:|r Offline notifications |cffff0000DISABLED|r")
+				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_OFFLINE_DISABLED or "Offline notifications |cffff0000DISABLED|r"))
 			end
 		end
 	)
@@ -3500,20 +3541,20 @@ function Settings:RefreshNotificationsTab()
 	-- ===========================================
 	-- GAME-SPECIFIC NOTIFICATIONS SECTION (Phase 11.5)
 	-- ===========================================
-	local gameSpecificHeader = Components:CreateHeader(tab, "Game-Specific Notifications")
+	local gameSpecificHeader = Components:CreateHeader(tab, L.SETTINGS_NOTIFY_GAME_HEADER or "Game-Specific Notifications")
 	table.insert(allFrames, gameSpecificHeader)
 	
 	-- WoW Login Toggle
 	local wowLoginToggle = Components:CreateCheckbox(
 		tab,
-		"WoW Login: Notify when friend logs into World of Warcraft",
+		L.SETTINGS_NOTIFY_WOW_LOGIN or "WoW Login: Notify when friend logs into World of Warcraft",
 		BetterFriendlistDB.notificationWowLoginEnabled or false,
 		function(checked)
 			BetterFriendlistDB.notificationWowLoginEnabled = checked
 			if checked then
-				print("|cff00ff00BetterFriendlist:|r WoW Login notifications |cff00ff00ENABLED|r")
+				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_WOW_LOGIN_ENABLED or "WoW Login notifications |cff00ff00ENABLED|r"))
 			else
-				print("|cff00ff00BetterFriendlist:|r WoW Login notifications |cffff0000DISABLED|r")
+				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_WOW_LOGIN_DISABLED or "WoW Login notifications |cffff0000DISABLED|r"))
 			end
 		end
 	)
@@ -3523,14 +3564,14 @@ function Settings:RefreshNotificationsTab()
 	-- Character Switch Toggle
 	local charSwitchToggle = Components:CreateCheckbox(
 		tab,
-		"Character Switch: Notify when friend changes character",
+		L.SETTINGS_NOTIFY_CHAR_SWITCH or "Character Switch: Notify when friend changes character",
 		BetterFriendlistDB.notificationCharSwitchEnabled or false,
 		function(checked)
 			BetterFriendlistDB.notificationCharSwitchEnabled = checked
 			if checked then
-				print("|cff00ff00BetterFriendlist:|r Character switch notifications |cff00ff00ENABLED|r")
+				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_CHAR_SWITCH_ENABLED or "Character switch notifications |cff00ff00ENABLED|r"))
 			else
-				print("|cff00ff00BetterFriendlist:|r Character switch notifications |cffff0000DISABLED|r")
+				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_CHAR_SWITCH_DISABLED or "Character switch notifications |cffff0000DISABLED|r"))
 			end
 		end
 	)
@@ -3540,14 +3581,14 @@ function Settings:RefreshNotificationsTab()
 	-- Game Switch Toggle
 	local gameSwitchToggle = Components:CreateCheckbox(
 		tab,
-		"Game Switch: Notify when friend changes game",
+		L.SETTINGS_NOTIFY_GAME_SWITCH or "Game Switch: Notify when friend changes game",
 		BetterFriendlistDB.notificationGameSwitchEnabled or false,
 		function(checked)
 			BetterFriendlistDB.notificationGameSwitchEnabled = checked
 			if checked then
-				print("|cff00ff00BetterFriendlist:|r Game switch notifications |cff00ff00ENABLED|r")
+				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_GAME_SWITCH_ENABLED or "Game switch notifications |cff00ff00ENABLED|r"))
 			else
-				print("|cff00ff00BetterFriendlist:|r Game switch notifications |cffff0000DISABLED|r")
+				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_GAME_SWITCH_DISABLED or "Game switch notifications |cffff0000DISABLED|r"))
 			end
 		end
 	)
@@ -3557,7 +3598,7 @@ function Settings:RefreshNotificationsTab()
 	-- ===========================================
 	-- CUSTOM MESSAGES SECTION (Phase 11)
 	-- ===========================================
-	local messagesHeader = Components:CreateHeader(tab, "Custom Messages")
+	local messagesHeader = Components:CreateHeader(tab, L.SETTINGS_NOTIFY_MESSAGES_HEADER or "Custom Messages")
 	table.insert(allFrames, messagesHeader)
 	
 	local messagesDesc = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
@@ -3565,12 +3606,12 @@ function Settings:RefreshNotificationsTab()
 	messagesDesc:SetJustifyH("LEFT")
 	messagesDesc:SetWordWrap(true)
 	messagesDesc:SetTextColor(0.7, 0.7, 0.7)
-	messagesDesc:SetText("Customize notification messages. Available variables: %name%, %game%, %level%, %zone%, %class%, %realm%, %char%, %prevchar%")
+	messagesDesc:SetText(L.SETTINGS_NOTIFY_MESSAGES_DESC or "Customize notification messages. Available variables: %name%, %game%, %level%, %zone%, %class%, %realm%, %char%, %prevchar%")
 	table.insert(allFrames, messagesDesc)
 	
 	-- Online Message Label
 	local onlineMsgLabel = tab:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-	onlineMsgLabel:SetText("Online Message:")
+	onlineMsgLabel:SetText(L.SETTINGS_NOTIFY_MSG_ONLINE or "Online Message:")
 	onlineMsgLabel:SetPoint("LEFT", 0, 0)
 	table.insert(allFrames, onlineMsgLabel)
 	
@@ -3595,7 +3636,7 @@ function Settings:RefreshNotificationsTab()
 	
 	-- Offline Message Label
 	local offlineMsgLabel = tab:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-	offlineMsgLabel:SetText("Offline Message:")
+	offlineMsgLabel:SetText(L.SETTINGS_NOTIFY_MSG_OFFLINE or "Offline Message:")
 	offlineMsgLabel:SetPoint("LEFT", 0, 0)
 	table.insert(allFrames, offlineMsgLabel)
 	
@@ -3620,7 +3661,7 @@ function Settings:RefreshNotificationsTab()
 	
 	-- WoW Login Message Label (Phase 11.5)
 	local wowLoginMsgLabel = tab:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-	wowLoginMsgLabel:SetText("WoW Login Message:")
+	wowLoginMsgLabel:SetText(L.SETTINGS_NOTIFY_MSG_WOW_LOGIN or "WoW Login Message:")
 	wowLoginMsgLabel:SetPoint("LEFT", 0, 0)
 	table.insert(allFrames, wowLoginMsgLabel)
 	
@@ -3645,7 +3686,7 @@ function Settings:RefreshNotificationsTab()
 	
 	-- Character Switch Message Label
 	local charSwitchMsgLabel = tab:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-	charSwitchMsgLabel:SetText("Character Switch Message:")
+	charSwitchMsgLabel:SetText(L.SETTINGS_NOTIFY_MSG_CHAR_SWITCH or "Character Switch Message:")
 	charSwitchMsgLabel:SetPoint("LEFT", 0, 0)
 	table.insert(allFrames, charSwitchMsgLabel)
 	
@@ -3670,7 +3711,7 @@ function Settings:RefreshNotificationsTab()
 	
 	-- Game Switch Message Label
 	local gameSwitchMsgLabel = tab:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-	gameSwitchMsgLabel:SetText("Game Switch Message:")
+	gameSwitchMsgLabel:SetText(L.SETTINGS_NOTIFY_MSG_GAME_SWITCH or "Game Switch Message:")
 	gameSwitchMsgLabel:SetPoint("LEFT", 0, 0)
 	table.insert(allFrames, gameSwitchMsgLabel)
 	
@@ -3699,13 +3740,13 @@ function Settings:RefreshNotificationsTab()
 	previewInfo:SetJustifyH("LEFT")
 	previewInfo:SetWordWrap(true)
 	previewInfo:SetTextColor(0.7, 0.7, 0.7)
-	previewInfo:SetText("|cffffcc00Tip:|r Use the 'Test Notification' button above to preview your custom messages.")
+	previewInfo:SetText(L.SETTINGS_NOTIFY_PREVIEW_TIP or "|cffffcc00Tip:|r Use the 'Test Notification' button above to preview your custom messages.")
 	table.insert(allFrames, previewInfo)
 	
 	-- ===========================================
 	-- GROUP TRIGGERS SECTION (Phase 10)
 	-- ===========================================
-	local triggersHeader = Components:CreateHeader(tab, "Group Triggers")
+	local triggersHeader = Components:CreateHeader(tab, L.SETTINGS_NOTIFY_TRIGGERS_HEADER or "Group Triggers")
 	table.insert(allFrames, triggersHeader)
 	
 	local triggersDesc = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
@@ -3713,7 +3754,7 @@ function Settings:RefreshNotificationsTab()
 	triggersDesc:SetJustifyH("LEFT")
 	triggersDesc:SetWordWrap(true)
 	triggersDesc:SetTextColor(0.7, 0.7, 0.7)
-	triggersDesc:SetText("Get notified when a certain number of friends from a group come online. Example: Alert when 3+ M+ team members are online.")
+	triggersDesc:SetText(L.SETTINGS_NOTIFY_TRIGGERS_DESC or "Get notified when a certain number of friends from a group come online. Example: Alert when 3+ M+ team members are online.")
 	table.insert(allFrames, triggersDesc)
 	
 	-- Trigger list container
@@ -3757,7 +3798,7 @@ function Settings:RefreshNotificationsTab()
 			-- Trigger label
 			local label = triggerFrame:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 			label:SetPoint("LEFT", triggerFrame, "LEFT", 0, 0)
-			label:SetText(string.format("%d+ from '%s'", trigger.threshold, groupName))
+			label:SetText(string.format(L.SETTINGS_NOTIFY_TRIGGER_FORMAT or "%d+ from '%s'", trigger.threshold, groupName))
 			
 			-- Enable/Disable toggle (Classic-compatible template selection)
 			local checkboxTemplate = BFL.IsClassic and "InterfaceOptionsCheckButtonTemplate" or "SettingsCheckboxTemplate"
@@ -3767,7 +3808,7 @@ function Settings:RefreshNotificationsTab()
 			enableBtn:SetChecked(trigger.enabled)
 			enableBtn:SetScript("OnClick", function(self)
 				trigger.enabled = self:GetChecked()
-				print("|cff00ff00BetterFriendlist:|r Group trigger " .. (trigger.enabled and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
+				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_TRIGGER_PREFIX or "Group trigger") .. " " .. (trigger.enabled and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
 			end)
 			
 			-- Fix for ugly hover effect
@@ -3782,7 +3823,7 @@ function Settings:RefreshNotificationsTab()
 			deleteBtn:SetScript("OnClick", function()
 				BetterFriendlistDB.notificationGroupTriggers[triggerID] = nil
 				RefreshTriggerList()
-				print("|cff00ff00BetterFriendlist:|r Group trigger removed")
+				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_TRIGGER_REMOVED or "Group trigger removed"))
 			end)
 			
 			yOffset = yOffset - 30
@@ -3793,14 +3834,14 @@ function Settings:RefreshNotificationsTab()
 			local emptyText = triggerListContainer:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 			emptyText:SetPoint("TOPLEFT", triggerListContainer, "TOPLEFT", 0, 0)
 			emptyText:SetTextColor(0.5, 0.5, 0.5)
-			emptyText:SetText("No group triggers configured. Click 'Add Trigger' below.")
+			emptyText:SetText(L.SETTINGS_NOTIFY_NO_TRIGGERS or "No group triggers configured. Click 'Add Trigger' below.")
 		end
 	end
 	
 	-- Add Trigger button
 	local addTriggerBtn = CreateFrame("Button", nil, tab, "UIPanelButtonTemplate")
 	addTriggerBtn:SetSize(120, 25)
-	addTriggerBtn:SetText("Add Trigger")
+	addTriggerBtn:SetText(L.SETTINGS_NOTIFY_ADD_TRIGGER or "Add Trigger")
 	addTriggerBtn:SetScript("OnClick", function()
 		if _G.BFL_ShowGroupTriggerDialog then
 			_G.BFL_ShowGroupTriggerDialog()
@@ -4053,16 +4094,16 @@ function Settings:RefreshBrokerTab()
 	table.insert(allFrames, infoText)
 	
 	-- Enable Data Broker
-	local enableBroker = Components:CreateCheckbox(tab, "Enable Data Broker",
+	local enableBroker = Components:CreateCheckbox(tab, L.BROKER_SETTINGS_ENABLE or "Enable Data Broker",
 		DB:Get("brokerEnabled", true),
 		function(val)
 			BetterFriendlistDB.brokerEnabled = val
 			-- Show confirmation dialog for reload
-			local statusText = val and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"
+			local statusText = val and "|cff00ff00" .. (L.STATUS_ENABLED or "ENABLED") .. "|r" or "|cffff0000" .. (L.STATUS_DISABLED or "DISABLED") .. "|r"
 			StaticPopupDialogs["BFL_BROKER_RELOAD_CONFIRM"] = {
-				text = "Data Broker has been " .. statusText .. ".\n\nA UI reload is required for this change to take effect.\n\nReload now?",
-				button1 = "Reload Now",
-				button2 = "Later",
+				text = string.format(L.BROKER_SETTINGS_RELOAD_TEXT or "Data Broker has been %s.\n\nA UI reload is required for this change to take effect.\n\nReload now?", statusText),
+				button1 = L.BROKER_SETTINGS_RELOAD_BTN or "Reload Now",
+				button2 = L.BROKER_SETTINGS_RELOAD_CANCEL or "Later",
 				OnAccept = function()
 					ReloadUI()
 				end,
@@ -4073,40 +4114,40 @@ function Settings:RefreshBrokerTab()
 			}
 			StaticPopup_Show("BFL_BROKER_RELOAD_CONFIRM")
 		end)
-	enableBroker:SetTooltip("Enable Data Broker", "Show BetterFriendlist in Data Broker display addons. Requires UI reload to take effect.")
+	enableBroker:SetTooltip(L.BROKER_SETTINGS_ENABLE or "Enable Data Broker", L.BROKER_SETTINGS_ENABLE_TOOLTIP or "Show BetterFriendlist in Data Broker display addons. Requires UI reload to take effect.")
 	table.insert(allFrames, enableBroker)
 	
 	-- Show Icon
-	local showIcon = Components:CreateCheckbox(tab, "Show Icon on Display Addon",
+	local showIcon = Components:CreateCheckbox(tab, L.BROKER_SETTINGS_SHOW_ICON or "Show Icon on Display Addon",
 		DB:Get("brokerShowIcon", true),
 		function(val)
 			BetterFriendlistDB.brokerShowIcon = val
 			local Broker = BFL:GetModule("Broker")
 			if Broker and Broker.UpdateBrokerText then Broker:UpdateBrokerText() end
 		end)
-	showIcon:SetTooltip("Show Icon", "Display the BetterFriendlist icon on your display addon")
+	showIcon:SetTooltip(L.BROKER_SETTINGS_SHOW_ICON_TITLE or "Show Icon", L.BROKER_SETTINGS_SHOW_ICON_TOOLTIP or "Display the BetterFriendlist icon on your display addon")
 	table.insert(allFrames, showIcon)
 	
 	-- Show Label
-	local showLabel = Components:CreateCheckbox(tab, BFL_L.BROKER_SETTINGS_SHOW_LABEL,
+	local showLabel = Components:CreateCheckbox(tab, L.BROKER_SETTINGS_SHOW_LABEL or "Show Label",
 		DB:Get("brokerShowLabel", true),
 		function(val)
 			BetterFriendlistDB.brokerShowLabel = val
 			local Broker = BFL:GetModule("Broker")
 			if Broker and Broker.UpdateBrokerText then Broker:UpdateBrokerText() end
 		end)
-	showLabel:SetTooltip("Show Label", "Display 'Friends:' text before the count")
+	showLabel:SetTooltip(L.BROKER_SETTINGS_SHOW_LABEL_TITLE or "Show Label", L.BROKER_SETTINGS_SHOW_LABEL_TOOLTIP or "Display 'Friends:' text before the count")
 	table.insert(allFrames, showLabel)
 
 	-- Show Total Count
-	local showTotal = Components:CreateCheckbox(tab, BFL_L.BROKER_SETTINGS_SHOW_TOTAL,
+	local showTotal = Components:CreateCheckbox(tab, L.BROKER_SETTINGS_SHOW_TOTAL or "Show Total Count",
 		DB:Get("brokerShowTotal", true),
 		function(val)
 			BetterFriendlistDB.brokerShowTotal = val
 			local Broker = BFL:GetModule("Broker")
 			if Broker and Broker.UpdateBrokerText then Broker:UpdateBrokerText() end
 		end)
-	showTotal:SetTooltip("Show Total Count", "Display total friends count (e.g. '5/10') instead of just online count")
+	showTotal:SetTooltip(L.BROKER_SETTINGS_SHOW_TOTAL_TITLE or "Show Total Count", L.BROKER_SETTINGS_SHOW_TOTAL_TOOLTIP or "Display total friends count (e.g. '5/10') instead of just online count")
 	table.insert(allFrames, showTotal)
 
 	-- Split WoW/BNet Counts
@@ -4122,32 +4163,32 @@ function Settings:RefreshBrokerTab()
 				Broker:UpdateBrokerText()
 			end
 		end)
-	showGroups:SetTooltip("Split Counts", "Show separate counts for WoW and Battle.net friends")
+	showGroups:SetTooltip(L.BROKER_SETTINGS_SHOW_GROUPS_TITLE or "Split Counts", L.BROKER_SETTINGS_SHOW_GROUPS_TOOLTIP or "Show separate counts for WoW and Battle.net friends")
 	table.insert(allFrames, showGroups)
 
 	-- Sub-options for Split Counts (only visible if enabled)
 	if DB:Get("brokerShowGroups", false) then
 		-- Show WoW Icon
-		local showWoWIcon = Components:CreateCheckbox(tab, "Show WoW Icon",
+		local showWoWIcon = Components:CreateCheckbox(tab, L.BROKER_SETTINGS_SHOW_WOW_ICON or "Show WoW Icon",
 			DB:Get("brokerShowWoWIcon", true),
 			function(val)
 				BetterFriendlistDB.brokerShowWoWIcon = val
 				local Broker = BFL:GetModule("Broker")
 				if Broker and Broker.UpdateBrokerText then Broker:UpdateBrokerText() end
 			end)
-		showWoWIcon:SetTooltip("Show WoW Icon", "Display the World of Warcraft icon next to the WoW friend count")
+		showWoWIcon:SetTooltip(L.BROKER_SETTINGS_SHOW_WOW_ICON_TITLE or "Show WoW Icon", L.BROKER_SETTINGS_SHOW_WOW_ICON_TOOLTIP or "Display the World of Warcraft icon next to the WoW friend count")
 		-- Indent manually via anchor later or just add to list
 		table.insert(allFrames, showWoWIcon)
 
 		-- Show Battle.net Icon
-		local showBNetIcon = Components:CreateCheckbox(tab, "Show Battle.net Icon",
+		local showBNetIcon = Components:CreateCheckbox(tab, L.BROKER_SETTINGS_SHOW_BNET_ICON or "Show Battle.net Icon",
 			DB:Get("brokerShowBNetIcon", true),
 			function(val)
 				BetterFriendlistDB.brokerShowBNetIcon = val
 				local Broker = BFL:GetModule("Broker")
 				if Broker and Broker.UpdateBrokerText then Broker:UpdateBrokerText() end
 			end)
-		showBNetIcon:SetTooltip("Show Battle.net Icon", "Display the Battle.net icon next to the Battle.net friend count")
+		showBNetIcon:SetTooltip(L.BROKER_SETTINGS_SHOW_BNET_ICON_TITLE or "Show Battle.net Icon", L.BROKER_SETTINGS_SHOW_BNET_ICON_TOOLTIP or "Display the Battle.net icon next to the Battle.net friend count")
 		table.insert(allFrames, showBNetIcon)
 	end
 	
@@ -4305,7 +4346,7 @@ function Settings:RefreshGlobalSyncTab()
 	local allFrames = {}
 	
 	-- Header: Global Friend Sync
-	local header = Components:CreateHeader(tab, "Global Friend Sync")
+	local header = Components:CreateHeader(tab, L.SETTINGS_TAB_GLOBAL_SYNC or "Global Friend Sync")
 	table.insert(allFrames, header)
 	
 	-- Description
@@ -4313,57 +4354,57 @@ function Settings:RefreshGlobalSyncTab()
 	desc:SetWidth(360)
 	desc:SetJustifyH("LEFT")
 	desc:SetWordWrap(true)
-	desc:SetText(BFL_L.SETTINGS_GLOBAL_SYNC_DESC or "Synchronize your WoW friends list across all characters on this account.")
+	desc:SetText(L.SETTINGS_GLOBAL_SYNC_DESC or "Synchronize your WoW friends list across all characters on this account.")
 	table.insert(allFrames, desc)
 	
 	-- Enable Global Sync
-	local enableSync = Components:CreateCheckbox(tab, BFL_L.SETTINGS_GLOBAL_SYNC_ENABLE or "Enable Global Friend Sync",
+	local enableSync = Components:CreateCheckbox(tab, L.SETTINGS_GLOBAL_SYNC_ENABLE or "Enable Global Friend Sync",
 		DB:Get("enableGlobalSync", false),
 		function(val)
 			BetterFriendlistDB.enableGlobalSync = val
 			if val then
-				print("|cff00ff00BetterFriendlist:|r Global Sync |cff00ff00ENABLED|r")
+				print("|cff00ff00BetterFriendlist:|r Global Sync |cff00ff00" .. (L.STATUS_ENABLED or "ENABLED") .. "|r")
 				-- Trigger sync
 				local GlobalSync = BFL:GetModule("GlobalSync")
 				if GlobalSync then GlobalSync:OnFriendListUpdate() end
 			else
-				print("|cff00ff00BetterFriendlist:|r Global Sync |cffff0000DISABLED|r")
+				print("|cff00ff00BetterFriendlist:|r Global Sync |cffff0000" .. (L.STATUS_DISABLED or "DISABLED") .. "|r")
 			end
 			-- Refresh to update table state if needed
 			self:RefreshGlobalSyncTab()
 		end)
-	enableSync:SetTooltip("Enable Global Sync", "Automatically sync friends from other realms to this character.")
+	enableSync:SetTooltip(L.SETTINGS_GLOBAL_SYNC_ENABLE or "Enable Global Sync", L.SETTINGS_GLOBAL_SYNC_ENABLE_TOOLTIP or "Automatically sync friends from other realms to this character.")
 	table.insert(allFrames, enableSync)
 	
 	-- Enable Deletion
-	local enableDeletion = Components:CreateCheckbox(tab, BFL_L.SETTINGS_GLOBAL_SYNC_DELETION or "Enable Deletion",
+	local enableDeletion = Components:CreateCheckbox(tab, L.SETTINGS_GLOBAL_SYNC_DELETION or "Enable Deletion",
 		DB:Get("enableGlobalSyncDeletion", false),
 		function(val)
 			BetterFriendlistDB.enableGlobalSyncDeletion = val
 			if val then
-				print("|cff00ff00BetterFriendlist:|r Global Sync Deletion |cff00ff00ENABLED|r")
+				print("|cff00ff00BetterFriendlist:|r Global Sync Deletion |cff00ff00" .. (L.STATUS_ENABLED or "ENABLED") .. "|r")
 			else
-				print("|cff00ff00BetterFriendlist:|r Global Sync Deletion |cffff0000DISABLED|r")
+				print("|cff00ff00BetterFriendlist:|r Global Sync Deletion |cffff0000" .. (L.STATUS_DISABLED or "DISABLED") .. "|r")
 			end
 		end)
-	enableDeletion:SetTooltip(BFL_L.SETTINGS_GLOBAL_SYNC_DELETION or "Enable Deletion", BFL_L.SETTINGS_GLOBAL_SYNC_DELETION_DESC or "Allow the sync process to remove friends from your list if they are removed from the database.")
+	enableDeletion:SetTooltip(L.SETTINGS_GLOBAL_SYNC_DELETION or "Enable Deletion", L.SETTINGS_GLOBAL_SYNC_DELETION_DESC or "Allow the sync process to remove friends from your list if they are removed from the database.")
 	table.insert(allFrames, enableDeletion)
 
 	-- Show Deleted Friends
-	local showDeleted = Components:CreateCheckbox(tab, "Show Deleted Friends",
+	local showDeleted = Components:CreateCheckbox(tab, L.SETTINGS_GLOBAL_SYNC_SHOW_DELETED or "Show Deleted Friends",
 		self.showDeletedFriends or false,
 		function(val)
 			self.showDeletedFriends = val
 			self:RefreshGlobalSyncTab()
 		end)
-	showDeleted:SetTooltip("Show Deleted Friends", "Show friends that have been deleted from the database but are kept for history.")
+	showDeleted:SetTooltip(L.SETTINGS_GLOBAL_SYNC_SHOW_DELETED_TITLE or "Show Deleted Friends", L.SETTINGS_GLOBAL_SYNC_SHOW_DELETED_TOOLTIP or "Show friends that have been deleted from the database but are kept for history.")
 	table.insert(allFrames, showDeleted)
 	
 	-- Spacer
 	table.insert(allFrames, Components:CreateSpacer(tab))
 	
 	-- Header: Synced Friends
-	local listHeader = Components:CreateHeader(tab, BFL_L.SETTINGS_GLOBAL_SYNC_HEADER or "Synced Friends Database")
+	local listHeader = Components:CreateHeader(tab, L.SETTINGS_GLOBAL_SYNC_HEADER or "Synced Friends Database")
 	table.insert(allFrames, listHeader)
 	
 	-- Populate Table
@@ -4448,7 +4489,7 @@ function Settings:RefreshGlobalSyncTab()
 							end)
 							actionBtn:SetScript("OnEnter", function(self)
 								GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-								GameTooltip:SetText("Restore Friend")
+								GameTooltip:SetText(L.TOOLTIP_RESTORE_FRIEND or "Restore Friend")
 								GameTooltip:Show()
 							end)
 							actionBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -4496,7 +4537,7 @@ function Settings:RefreshGlobalSyncTab()
 							end)
 							actionBtn:SetScript("OnEnter", function(self)
 								GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-								GameTooltip:SetText("Delete Friend")
+								GameTooltip:SetText(L.TOOLTIP_DELETE_FRIEND or "Delete Friend")
 								GameTooltip:Show()
 							end)
 							actionBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -4509,9 +4550,9 @@ function Settings:RefreshGlobalSyncTab()
 						editBtn:SetNormalTexture("Interface\\Buttons\\UI-GuildButton-PublicNote-Up")
 						editBtn:SetScript("OnClick", function()
 							StaticPopupDialogs["BFL_EDIT_GLOBAL_NOTE"] = {
-								text = "Edit Note for " .. name,
-								button1 = "Save",
-								button2 = "Cancel",
+								text = string.format(L.POPUP_EDIT_NOTE_TITLE or "Edit Note for %s", name),
+								button1 = L.BUTTON_SAVE or "Save",
+								button2 = L.BUTTON_CANCEL or "Cancel",
 								hasEditBox = true,
 								OnShow = function(self)
 									self.EditBox:SetText(data.notes or "")

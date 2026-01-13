@@ -12,6 +12,7 @@
 --------------------------------------------------------------------------
 
 local ADDON_NAME, BFL = ...
+local L = BFL.L
 
 -- Register the RAF module
 local RAF = BFL:RegisterModule("RAF", {})
@@ -63,7 +64,7 @@ function RAF:OnLoad(frame)
 	
 	-- Set up no recruits text
 	if frame.RecruitList and frame.RecruitList.NoRecruitsDesc then
-		frame.RecruitList.NoRecruitsDesc:SetText(RAF_NO_RECRUITS_DESC or "You have not recruited any friends yet.")
+		frame.RecruitList.NoRecruitsDesc:SetText(L.RAF_NO_RECRUITS_DESC)
 	end
 	
 	-- Set up ScrollBox (Retail) or FauxScrollFrame (Classic)
@@ -263,9 +264,9 @@ local function ProcessAndSortRecruits(recruits)
 			end
 			
 			-- Handle pending recruits
-			if recruitInfo.nameText == "" and RAF_PENDING_RECRUIT then
-				recruitInfo.nameText = RAF_PENDING_RECRUIT
-				recruitInfo.plainName = RAF_PENDING_RECRUIT
+			if recruitInfo.nameText == "" and L.RAF_PENDING_RECRUIT then
+				recruitInfo.nameText = L.RAF_PENDING_RECRUIT
+				recruitInfo.plainName = L.RAF_PENDING_RECRUIT
 			end
 			
 			recruitInfo.accountInfo = accountInfo
@@ -290,8 +291,8 @@ local function ProcessAndSortRecruits(recruits)
 	-- Append recruit index for multiple accounts
 	for _, recruitInfo in ipairs(recruits) do
 		if seenAccounts[recruitInfo.bnetAccountID] > 1 and not recruitInfo.characterName then
-			if RAF_RECRUIT_NAME_MULTIPLE then
-				recruitInfo.nameText = RAF_RECRUIT_NAME_MULTIPLE:format(recruitInfo.nameText, recruitInfo.recruitIndex)
+			if L.RAF_RECRUIT_NAME_MULTIPLE then
+				recruitInfo.nameText = L.RAF_RECRUIT_NAME_MULTIPLE:format(recruitInfo.nameText, recruitInfo.recruitIndex)
 			end
 		end
 	end
@@ -314,7 +315,7 @@ function RAF:UpdateRecruitList(frame, recruits)
 	
 	-- Update header count
 	if frame.RecruitList.Header and frame.RecruitList.Header.Count then
-		frame.RecruitList.Header.Count:SetText(RAF_RECRUITED_FRIENDS_COUNT and RAF_RECRUITED_FRIENDS_COUNT:format(numRecruits, maxRecruits) or string.format("%d/%d", numRecruits, maxRecruits))
+		frame.RecruitList.Header.Count:SetText(L.RAF_RECRUITED_FRIENDS_COUNT and L.RAF_RECRUITED_FRIENDS_COUNT:format(numRecruits, maxRecruits) or string.format("%d/%d", numRecruits, maxRecruits))
 	end
 	
 	-- Process and sort recruits
@@ -368,13 +369,13 @@ function RAF:UpdateNextReward(frame, nextReward)
 	if rewardPanel.EarnInfo then
 		local earnText = ""
 		if nextReward.canClaim then
-			earnText = RAF_YOU_HAVE_EARNED or "You have earned:"
+			earnText = L.RAF_YOU_HAVE_EARNED
 		elseif nextReward.monthCost and nextReward.monthCost > 1 then
-			earnText = RAF_NEXT_REWARD_AFTER and RAF_NEXT_REWARD_AFTER:format(nextReward.monthCost - nextReward.availableInMonths, nextReward.monthCost) or "Next reward soon"
+			earnText = L.RAF_NEXT_REWARD_AFTER:format(nextReward.monthCost - nextReward.availableInMonths, nextReward.monthCost)
 		elseif nextReward.monthsRequired == 0 then
-			earnText = RAF_FIRST_REWARD or "First Reward:"
+			earnText = L.RAF_FIRST_REWARD
 		else
-			earnText = RAF_NEXT_REWARD or "Next Reward:"
+			earnText = L.RAF_NEXT_REWARD
 		end
 		rewardPanel.EarnInfo:SetText(earnText)
 		rewardPanel.EarnInfo:Show()
@@ -410,12 +411,12 @@ function RAF:UpdateNextReward(frame, nextReward)
 		if nextReward.petInfo and nextReward.petInfo.speciesName then
 			rewardName = nextReward.petInfo.speciesName
 		elseif nextReward.mountInfo and nextReward.mountInfo.mountID then
-			rewardName = C_MountJournal.GetMountInfoByID and C_MountJournal.GetMountInfoByID(nextReward.mountInfo.mountID) or "Mount"
+			rewardName = C_MountJournal.GetMountInfoByID and C_MountJournal.GetMountInfoByID(nextReward.mountInfo.mountID) or L.RAF_REWARD_MOUNT
 		elseif nextReward.titleInfo and nextReward.titleInfo.titleMaskID then
-			local titleName = TitleUtil.GetNameFromTitleMaskID and TitleUtil.GetNameFromTitleMaskID(nextReward.titleInfo.titleMaskID) or "Title"
-			rewardName = RAF_REWARD_TITLE and RAF_REWARD_TITLE:format(titleName) or titleName
+			local titleName = TitleUtil.GetNameFromTitleMaskID and TitleUtil.GetNameFromTitleMaskID(nextReward.titleInfo.titleMaskID) or L.RAF_REWARD_TITLE_DEFAULT
+			rewardName = L.RAF_REWARD_TITLE_FMT:format(titleName)
 		else
-			rewardName = RAF_BENEFIT4 or "Game Time"
+			rewardName = L.RAF_REWARD_GAMETIME
 		end
 		
 		rewardPanel.NextRewardName.Text:SetText(rewardName)
@@ -452,7 +453,7 @@ function RAF:UpdateRAFInfo(frame, rafInfo)
 		if latestVersionInfo then
 			local monthCount = latestVersionInfo.monthCount and latestVersionInfo.monthCount.lifetimeMonths or 0
 			-- Format: "X Months Subscribed by Friends"
-			local monthText = string.format(RAF_MONTH_COUNT or "%d Months Subscribed by Friends", monthCount)
+			local monthText = string.format(L.RAF_MONTH_COUNT, monthCount)
 			frame.RewardClaiming.MonthCount.Text:SetText(monthText)
 			frame.RewardClaiming.MonthCount:Show()
 		end
@@ -471,10 +472,10 @@ function RAF:UpdateRAFInfo(frame, rafInfo)
 		
 		if haveUnclaimedReward then
 			frame.RewardClaiming.ClaimOrViewRewardButton:SetEnabled(true)
-			frame.RewardClaiming.ClaimOrViewRewardButton:SetText(CLAIM_REWARD or "Claim Reward")
+			frame.RewardClaiming.ClaimOrViewRewardButton:SetText(L.RAF_CLAIM_REWARD)
 		else
 			frame.RewardClaiming.ClaimOrViewRewardButton:SetEnabled(true)
-			frame.RewardClaiming.ClaimOrViewRewardButton:SetText(RAF_VIEW_ALL_REWARDS or "View All Rewards")
+			frame.RewardClaiming.ClaimOrViewRewardButton:SetText(L.RAF_VIEW_ALL_REWARDS)
 		end
 	end
 end
@@ -552,13 +553,13 @@ function RAF:RecruitListButton_SetupRecruit(button, recruitInfo)
 		
 		-- Set info text based on subscription status
 		if recruitInfo.subStatus == Enum.RafRecruitSubStatus.Active then
-			button.InfoText:SetText(RAF_ACTIVE_RECRUIT or "Active")
+			button.InfoText:SetText(L.RAF_ACTIVE_RECRUIT)
 			button.InfoText:SetTextColor(GREEN_FONT_COLOR:GetRGB())
 		elseif recruitInfo.subStatus == Enum.RafRecruitSubStatus.Trial then
-			button.InfoText:SetText(RAF_TRIAL_RECRUIT or "Trial")
+			button.InfoText:SetText(L.RAF_TRIAL_RECRUIT)
 			button.InfoText:SetTextColor(NORMAL_FONT_COLOR:GetRGB())
 		else
-			button.InfoText:SetText(RAF_INACTIVE_RECRUIT or "Inactive")
+			button.InfoText:SetText(L.RAF_INACTIVE_RECRUIT)
 			button.InfoText:SetTextColor(GRAY_FONT_COLOR:GetRGB())
 		end
 	else
@@ -566,13 +567,13 @@ function RAF:RecruitListButton_SetupRecruit(button, recruitInfo)
 		button.InfoText:SetTextColor(GRAY_FONT_COLOR:GetRGB())
 		
 		if recruitInfo.subStatus == Enum.RafRecruitSubStatus.Inactive then
-			button.InfoText:SetText(RAF_INACTIVE_RECRUIT or "Inactive")
+			button.InfoText:SetText(L.RAF_INACTIVE_RECRUIT)
 		else
 			-- Show last online time
 			if recruitInfo.accountInfo and FriendsFrame_GetLastOnlineText then
 				button.InfoText:SetText(FriendsFrame_GetLastOnlineText(recruitInfo.accountInfo))
 			else
-				button.InfoText:SetText(FRIENDS_LIST_OFFLINE or "Offline")
+				button.InfoText:SetText(L.RAF_OFFLINE)
 			end
 		end
 	end
@@ -602,13 +603,13 @@ function RAF:RecruitListButton_OnEnter(button)
 	
 	local wrap = true
 	if maxRecruitMonths > 0 then
-		GameTooltip_AddNormalLine(GameTooltip, RAF_RECRUIT_TOOLTIP_DESC and RAF_RECRUIT_TOOLTIP_DESC:format(maxRecruitMonths) or string.format("Up to %d months", maxRecruitMonths), wrap)
+		GameTooltip_AddNormalLine(GameTooltip, L.RAF_TOOLTIP_DESC:format(maxRecruitMonths), wrap)
 		GameTooltip_AddBlankLineToTooltip(GameTooltip)
 	end
 	
 	if recruitInfo.monthsRemaining then
 		local usedMonths = math.max(maxRecruitMonths - recruitInfo.monthsRemaining, 0)
-		GameTooltip_AddColoredLine(GameTooltip, RAF_RECRUIT_TOOLTIP_MONTH_COUNT and RAF_RECRUIT_TOOLTIP_MONTH_COUNT:format(usedMonths, maxRecruitMonths) or string.format("%d / %d months", usedMonths, maxRecruitMonths), HIGHLIGHT_FONT_COLOR, wrap)
+		GameTooltip_AddColoredLine(GameTooltip, L.RAF_TOOLTIP_MONTH_COUNT:format(usedMonths, maxRecruitMonths), HIGHLIGHT_FONT_COLOR, wrap)
 	end
 	
 	GameTooltip:Show()
@@ -704,7 +705,7 @@ function RAF:RecruitActivityButton_OnEnter(button)
 	if questName then
 		GameTooltip_SetTitle(GameTooltip, questName, nil, wrap)
 		GameTooltip:SetMinimumWidth(300)
-		GameTooltip_AddNormalLine(GameTooltip, RAF_RECRUIT_ACTIVITY_DESCRIPTION and RAF_RECRUIT_ACTIVITY_DESCRIPTION:format(button.recruitInfo.nameText) or "Activity", true)
+		GameTooltip_AddNormalLine(GameTooltip, L.RAF_ACTIVITY_DESCRIPTION:format(button.recruitInfo.nameText), true)
 		
 		if C_RecruitAFriend.GetRecruitActivityRequirementsText then
 			local reqTextLines = C_RecruitAFriend.GetRecruitActivityRequirementsText(button.activityInfo.activityID, button.recruitInfo.acceptanceID)
@@ -720,9 +721,9 @@ function RAF:RecruitActivityButton_OnEnter(button)
 		GameTooltip_AddBlankLineToTooltip(GameTooltip)
 		
 		if button.activityInfo.state == Enum.RafRecruitActivityState.Incomplete then
-			GameTooltip_AddNormalLine(GameTooltip, QUEST_REWARDS or "Rewards", wrap)
+			GameTooltip_AddNormalLine(GameTooltip, L.RAF_REWARDS_LABEL, wrap)
 		else
-			GameTooltip_AddNormalLine(GameTooltip, YOU_EARNED_LABEL or "You earned:", wrap)
+			GameTooltip_AddNormalLine(GameTooltip, L.RAF_YOU_EARNED_LABEL, wrap)
 		end
 		
 		if GameTooltip_AddQuestRewardsToTooltip then
@@ -731,10 +732,10 @@ function RAF:RecruitActivityButton_OnEnter(button)
 		
 		if button.activityInfo.state == Enum.RafRecruitActivityState.Complete then
 			GameTooltip_AddBlankLineToTooltip(GameTooltip)
-			GameTooltip_AddInstructionLine(GameTooltip, CLICK_CHEST_TO_CLAIM_REWARD or "Click to claim reward", wrap)
+			GameTooltip_AddInstructionLine(GameTooltip, L.RAF_CLICK_TO_CLAIM, wrap)
 		end
 	else
-		GameTooltip_SetTitle(GameTooltip, RETRIEVING_DATA or "Loading...", RED_FONT_COLOR)
+		GameTooltip_SetTitle(GameTooltip, L.RAF_LOADING, RED_FONT_COLOR)
 	end
 	
 	self:RecruitActivityButton_UpdateIcon(button)
@@ -818,7 +819,7 @@ function RAF:ClaimOrViewRewardButton_OnClick(button)
 			if WowTokenRedemptionFrame_ShowDialog then
 				WowTokenRedemptionFrame_ShowDialog("RAF_GAME_TIME_REDEEM_CONFIRMATION_SUB", latestVersionInfo.rafVersion)
 			else
-				DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00Recruit-A-Friend:|r Game time reward available. Use the Blizzard UI to claim.", 1, 1, 0)
+				DEFAULT_CHAT_FRAME:AddMessage(L.RAF_GAME_TIME_MESSAGE, 1, 1, 0)
 			end
 		elseif C_RecruitAFriend.ClaimNextReward then
 			if C_RecruitAFriend.ClaimNextReward() then
@@ -961,41 +962,41 @@ end
 function RAF:DisplayRewardsInChat(rafInfo)
 	if not rafInfo or not rafInfo.versions then return end
 	
-	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00=== Recruit-A-Friend Rewards ===|r", 1, 1, 0)
+	DEFAULT_CHAT_FRAME:AddMessage(L.RAF_CHAT_HEADER, 1, 1, 0)
 	
 	for versionIndex, versionInfo in ipairs(rafInfo.versions) do
-		local versionName = versionIndex == 1 and "Current RAF" or "Legacy RAF v" .. versionInfo.rafVersion
+		local versionName = versionIndex == 1 and L.RAF_CHAT_CURRENT_VERSION or L.RAF_CHAT_LEGACY_VERSION:format(versionInfo.rafVersion)
 		DEFAULT_CHAT_FRAME:AddMessage("|cff00ccff" .. versionName .. ":|r", 0.8, 0.8, 1)
-		DEFAULT_CHAT_FRAME:AddMessage("  Months earned: " .. (versionInfo.monthCount and versionInfo.monthCount.lifetimeMonths or 0), 1, 1, 1)
-		DEFAULT_CHAT_FRAME:AddMessage("  Recruits: " .. (versionInfo.numRecruits or 0), 1, 1, 1)
+		DEFAULT_CHAT_FRAME:AddMessage(L.RAF_CHAT_MONTHS_EARNED:format(versionInfo.monthCount and versionInfo.monthCount.lifetimeMonths or 0), 1, 1, 1)
+		DEFAULT_CHAT_FRAME:AddMessage(L.RAF_CHAT_RECRUITS_COUNT:format(versionInfo.numRecruits or 0), 1, 1, 1)
 		
 		if versionInfo.rewards and #versionInfo.rewards > 0 then
-			DEFAULT_CHAT_FRAME:AddMessage("  Available Rewards:", 1, 1, 1)
+			DEFAULT_CHAT_FRAME:AddMessage(L.RAF_CHAT_AVAILABLE_REWARDS, 1, 1, 1)
 			for i, reward in ipairs(versionInfo.rewards) do
 				if i <= 5 then -- Show first 5 rewards
-					local status = reward.claimed and "|cff00ff00[Claimed]|r" or 
-								   reward.canClaim and "|cffffff00[Can Claim]|r" or
-								   reward.canAfford and "|cffff9900[Affordable]|r" or
-								   "|cff666666[Locked]|r"
+					local status = reward.claimed and L.RAF_CHAT_REWARD_CLAIMED or 
+								   reward.canClaim and L.RAF_CHAT_REWARD_CAN_CLAIM or
+								   reward.canAfford and L.RAF_CHAT_REWARD_AFFORDABLE or
+								   L.RAF_CHAT_REWARD_LOCKED
 					local rewardName = "Reward"
 					if reward.petInfo then
 						rewardName = reward.petInfo.speciesName or "Pet"
 					elseif reward.mountInfo then
 						local mountName = C_MountJournal.GetMountInfoByID and C_MountJournal.GetMountInfoByID(reward.mountInfo.mountID)
-						rewardName = mountName or "Mount"
+						rewardName = mountName or L.RAF_REWARD_MOUNT
 					elseif reward.titleInfo then
-						rewardName = TitleUtil.GetNameFromTitleMaskID and TitleUtil.GetNameFromTitleMaskID(reward.titleInfo.titleMaskID) or "Title"
+						rewardName = TitleUtil.GetNameFromTitleMaskID and TitleUtil.GetNameFromTitleMaskID(reward.titleInfo.titleMaskID) or L.RAF_REWARD_TITLE_DEFAULT
 					end
-					DEFAULT_CHAT_FRAME:AddMessage("    - " .. rewardName .. " " .. status .. " (" .. reward.monthsRequired .. " months)", 0.9, 0.9, 0.9)
+					DEFAULT_CHAT_FRAME:AddMessage(L.RAF_CHAT_REWARD_FMT:format(rewardName, status, reward.monthsRequired), 0.9, 0.9, 0.9)
 				end
 			end
 			if #versionInfo.rewards > 5 then
-				DEFAULT_CHAT_FRAME:AddMessage("    ... and " .. (#versionInfo.rewards - 5) .. " more rewards", 0.7, 0.7, 0.7)
+				DEFAULT_CHAT_FRAME:AddMessage(L.RAF_CHAT_MORE_REWARDS:format(#versionInfo.rewards - 5), 0.7, 0.7, 0.7)
 			end
 		end
 	end
 	
-	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00Use the in-game Recruit-A-Friend interface for full details.|r", 1, 1, 0)
+	DEFAULT_CHAT_FRAME:AddMessage(L.RAF_CHAT_USE_UI, 1, 1, 0)
 end
 
 function RAF:RecruitmentButton_OnClick(button)

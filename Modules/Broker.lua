@@ -573,13 +573,13 @@ function Broker:UpdateBrokerText()
 		text = string.format("%s | %s", wowPart, bnetPart)
 		
 		if showLabel then
-			text = "Friends: " .. text
+			text = L("BROKER_LABEL_FRIENDS") .. text
 		end
 	else
 		-- Combined display: "Friends: 8/18"
 		local countText = showTotal and string.format("%d/%d", totalOnline, totalFriends) or tostring(totalOnline)
 		if showLabel then
-			text = string.format("Friends: %s", countText)
+			text = string.format(L("BROKER_LABEL_FRIENDS") .. "%s", countText)
 		else
 			text = countText
 		end
@@ -604,31 +604,36 @@ end
 
 -- Basic Tooltip
 local function CreateBasicTooltip(tooltip)
-	tooltip:AddLine("BetterFriendlist", 1, 0.82, 0, 1)
+	tooltip:AddLine(L("BROKER_TITLE"), 1, 0.82, 0, 1)
 	tooltip:AddLine(" ")
 
 	local wowOnline, wowTotal, bnetOnline, bnetTotal = GetFriendCounts()
 
 	-- Summary
-	tooltip:AddDoubleLine("WoW Friends:", string.format("%d online / %d total", wowOnline, wowTotal), 1, 1, 1, 0, 1, 0)
-	tooltip:AddDoubleLine("BNet Friends:", string.format("%d online / %d total", bnetOnline, bnetTotal), 1, 1, 1, 0, 0.5,
+	tooltip:AddDoubleLine(L("BROKER_WOW_FRIENDS"), string.format(L("BROKER_ONLINE_TOTAL"), wowOnline, wowTotal), 1, 1, 1, 0, 1, 0)
+	tooltip:AddDoubleLine(L("BROKER_HEADER_BNET"), string.format(L("BROKER_ONLINE_TOTAL"), bnetOnline, bnetTotal), 1, 1, 1, 0, 0.5,
 		1)
 	tooltip:AddLine(" ")
 
 	-- Get current filter
 	local QuickFilters = GetQuickFilters()
 	local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
-	tooltip:AddDoubleLine("Current Filter:", currentFilter, 1, 1, 1, 1, 1, 0)
+	-- Localize current filter text
+	if QuickFilters then
+		local filterText = QuickFilters:GetFilterText()
+		if filterText then currentFilter = filterText end
+	end
+	tooltip:AddDoubleLine(L("BROKER_CURRENT_FILTER"), currentFilter, 1, 1, 1, 1, 1, 0)
 
 	tooltip:AddLine(" ")
 	tooltip:AddLine(L("BROKER_TOOLTIP_FOOTER_LEFT"), 0.5, 0.9, 1, 1)
 	tooltip:AddLine(L("BROKER_TOOLTIP_FOOTER_RIGHT"), 0.5, 0.9, 1, 1)
-	tooltip:AddLine("Middle Click: Cycle Filter", 0.5, 0.9, 1, 1)
+	tooltip:AddLine(L("BROKER_HINT_CYCLE_FILTER_FULL"), 0.5, 0.9, 1, 1)
 end
 
 -- Advanced Tooltip with Groups and Activity
 local function CreateAdvancedTooltip(tooltip)
-	tooltip:AddLine("BetterFriendlist", 1, 0.82, 0, 1)
+	tooltip:AddLine(L("BROKER_TITLE"), 1, 0.82, 0, 1)
 	tooltip:AddLine(" ")
 
 	local Groups = GetGroups()
@@ -714,7 +719,7 @@ local function CreateAdvancedTooltip(tooltip)
 
 			for i, friend in ipairs(groupFriends) do
 				if i > 5 then
-					tooltip:AddLine(string.format("  ... and %d more", #groupFriends - 5), 0.7, 0.7, 0.7)
+					tooltip:AddLine(string.format(L("BROKER_AND_MORE"), #groupFriends - 5), 0.7, 0.7, 0.7)
 					break
 				end
 
@@ -734,7 +739,7 @@ local function CreateAdvancedTooltip(tooltip)
 					if activities and activities.lastWhisper then
 						local timeStr = FormatTimeSince(activities.lastWhisper)
 						if timeStr then
-							activityText = string.format(" (whisper %s ago)", timeStr)
+							activityText = string.format(L("BROKER_WHISPER_AGO"), timeStr)
 						end
 					end
 				end
@@ -755,10 +760,10 @@ local function CreateAdvancedTooltip(tooltip)
 
 	-- Display ungrouped friends
 	if #ungrouped > 0 then
-		tooltip:AddLine("No Group", 0.7, 0.7, 0.7, 1)
+		tooltip:AddLine(L("GROUP_NO_GROUP"), 0.7, 0.7, 0.7, 1)
 		for i, friend in ipairs(ungrouped) do
 			if i > 5 then
-				tooltip:AddLine(string.format("  ... and %d more", #ungrouped - 5), 0.7, 0.7, 0.7)
+				tooltip:AddLine(string.format(L("BROKER_AND_MORE"), #ungrouped - 5), 0.7, 0.7, 0.7)
 				break
 			end
 
@@ -783,22 +788,27 @@ local function CreateAdvancedTooltip(tooltip)
 
 	-- Statistics
 	if displayedCount == 0 then
-		tooltip:AddLine("No friends online", 0.7, 0.7, 0.7)
+		tooltip:AddLine(L("BROKER_NO_FRIENDS_ONLINE"), 0.7, 0.7, 0.7)
 		tooltip:AddLine(" ")
 	end
 
 	local wowOnline, wowTotal, bnetOnline, bnetTotal = GetFriendCounts()
-	tooltip:AddDoubleLine("Total:", string.format("%d online / %d friends", wowOnline + bnetOnline, wowTotal + bnetTotal),
+	tooltip:AddDoubleLine(L("BROKER_TOTAL_LABEL"), string.format(L("BROKER_ONLINE_FRIENDS_COUNT"), wowOnline + bnetOnline, wowTotal + bnetTotal),
 		1, 1, 1, 0, 1, 0)
 
 	-- Current filter
 	local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
-	tooltip:AddDoubleLine("Filter:", currentFilter, 1, 1, 1, 1, 1, 0)
+	-- Localize current filter text
+	if GetQuickFilters() then
+		local filterText = GetQuickFilters():GetFilterText()
+		if filterText then currentFilter = filterText end
+	end
+	tooltip:AddDoubleLine(L("BROKER_FILTER_LABEL"), currentFilter, 1, 1, 1, 1, 1, 0)
 
 	tooltip:AddLine(" ")
-	tooltip:AddLine("Left Click: Toggle BetterFriendlist", 0.5, 0.9, 1, 1)
-	tooltip:AddLine("Right Click: Settings", 0.5, 0.9, 1, 1)
-	tooltip:AddLine("Middle Click: Cycle Filter", 0.5, 0.9, 1, 1)
+	tooltip:AddLine(L("BROKER_TOOLTIP_FOOTER_LEFT"), 0.5, 0.9, 1, 1)
+	tooltip:AddLine(L("BROKER_TOOLTIP_FOOTER_RIGHT"), 0.5, 0.9, 1, 1)
+	tooltip:AddLine(L("BROKER_HINT_CYCLE_FILTER_FULL"), 0.5, 0.9, 1, 1)
 end
 
 -- ========================================
@@ -947,7 +957,7 @@ local function RenderFixedFooter(footerFrame)
 	-- Filter
 	local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
 	local QuickFilters = GetQuickFilters()
-	local filterText = "All Friends"
+	local filterText = L("FILTER_ALL")
 	local filterIcon = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-all"
 
 	if QuickFilters then
@@ -969,9 +979,9 @@ local function RenderFixedFooter(footerFrame)
 	local secondarySort = BetterFriendlistDB and BetterFriendlistDB.secondarySort or "name"
 	
 	local sortNames = {
-		status = "Status", name = "Name", level = "Level", zone = "Zone",
-		game = "Game", faction = "Faction", guild = "Guild", class = "Class",
-		activity = "Activity", realm = "Realm"
+		status = L("SORT_STATUS"), name = L("SORT_NAME"), level = L("SORT_LEVEL"), zone = L("SORT_ZONE"),
+		game = L("SORT_GAME"), faction = L("SORT_FACTION"), guild = L("SORT_GUILD"), class = L("SORT_CLASS"),
+		activity = L("SORT_ACTIVITY"), realm = L("SORT_REALM")
 	}
 	local sortIcons = {
 		status = "Interface\\AddOns\\BetterFriendlist\\Icons\\status",
@@ -1242,7 +1252,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 
 	-- Header
 	local headerLine = tt:AddHeader()
-	tt:SetCell(headerLine, 1, C("dkyellow", "BetterFriendlist"), "GameFontNormalLarge", "LEFT", numColumns)
+	tt:SetCell(headerLine, 1, C("dkyellow", L("BROKER_TITLE")), "GameFontNormalLarge", "LEFT", numColumns)
 	tt:AddSeparator()
 
 	-- Column Headers
@@ -1661,7 +1671,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 			local groupInfo = groupsData[groupId]
 			-- Handle nogroup special case if not in groupsData
 			if not groupInfo and groupId == "nogroup" then
-				groupInfo = { name = "No Group", color = {r=0.5, g=0.5, b=0.5}, builtin = true }
+				groupInfo = { name = L("GROUP_NO_GROUP"), color = {r=0.5, g=0.5, b=0.5}, builtin = true }
 			end
 			
 			if groupInfo then
@@ -1717,18 +1727,18 @@ local function CreateLibQTipTooltip(anchorFrame)
 								
 								-- Only show options for custom groups (not builtin)
 								if not groupInfo.builtin then
-									rootDescription:CreateButton("Rename Group", function()
+									rootDescription:CreateButton(L("MENU_RENAME_GROUP"), function()
 										StaticPopup_Show("BETTER_FRIENDLIST_RENAME_GROUP", nil, nil, groupId)
 									end)
 									
-									rootDescription:CreateButton("Change Color", function()
+									rootDescription:CreateButton(L("MENU_CHANGE_COLOR"), function()
 										local FriendsList = BFL:GetModule("FriendsList")
 										if FriendsList and FriendsList.OpenColorPicker then 
 											FriendsList:OpenColorPicker(groupId) 
 										end
 									end)
 									
-									rootDescription:CreateButton("Delete Group", function()
+									rootDescription:CreateButton(L("MENU_DELETE_GROUP"), function()
 										StaticPopup_Show("BETTER_FRIENDLIST_DELETE_GROUP", nil, nil, groupId)
 									end)
 								end
@@ -1782,7 +1792,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 	if not status then
 		-- BFL:DebugPrint("Broker: Error populating tooltip: " .. tostring(err))
 		tt:Clear()
-		tt:AddLine("|cffff0000Error displaying tooltip|r")
+		tt:AddLine(L("ERROR_TOOLTIP_DISPLAY"))
 		tt:AddLine(tostring(err))
 		tt:Show()
 		SetupTooltipAutoHide(tt, anchorFrame)
@@ -1838,15 +1848,15 @@ local function CreateDetailTooltip(cell, data)
 	-- Status info
 	if data.isAFK or data.isDND then
 		local statusIcon = GetStatusIcon(data.isAFK, data.isDND)
-		local statusText = data.isAFK and "Away" or "Do Not Disturb"
-		local statusLine = tt2:AddLine(C("ltblue", "Status:"), "", "")
+		local statusText = data.isAFK and L("STATUS_AWAY") or L("STATUS_DND_FULL")
+		local statusLine = tt2:AddLine(C("ltblue", L("STATUS_LABEL")), "", "")
 		tt2:SetCell(statusLine, 2, statusIcon .. " " .. C("gold", statusText), nil, "RIGHT", 2)
 	end
 
 	-- Game/Client info with icon
 	if data.client then
 		local clientInfo = GetClientInfo(data.client)
-		local gameLine = tt2:AddLine(C("ltblue", "Game:"), "", "")
+		local gameLine = tt2:AddLine(C("ltblue", L("GAME_LABEL")), "", "")
 		tt2:SetCell(gameLine, 2, clientInfo.iconStr .. " " .. clientInfo.long, nil, "RIGHT", 2)
 	end
 
@@ -1854,27 +1864,27 @@ local function CreateDetailTooltip(cell, data)
 	if data.client == "WoW" then
 		-- Realm
 		if data.realmName and data.realmName ~= "" then
-			local realmLine = tt2:AddLine(C("ltblue", "Realm:"), data.realmName, "")
+			local realmLine = tt2:AddLine(C("ltblue", L("REALM_LABEL")), data.realmName, "")
 			tt2:SetCell(realmLine, 2, data.realmName, nil, "RIGHT", 2)
 		end
 
 		-- Class (with color)
 		if data.className and data.className ~= "UNKNOWN" then
-			local classLine = tt2:AddLine(C("ltblue", "Class:"), "", "")
+			local classLine = tt2:AddLine(C("ltblue", L("CLASS_LABEL")), "", "")
 			tt2:SetCell(classLine, 2, C(data.className, _G[data.className] or data.className), nil, "RIGHT", 2)
 		end
 
 		-- Faction with icon
 		if data.factionName and data.factionName ~= "" then
 			local factionIcon = GetFactionIcon(data.factionName)
-			local factionLine = tt2:AddLine(C("ltblue", "Faction:"), "", "")
+			local factionLine = tt2:AddLine(C("ltblue", L("FACTION_LABEL")), "", "")
 			tt2:SetCell(factionLine, 2, factionIcon .. " " .. data.factionName, nil, "RIGHT", 2)
 		end
 	end
 
 	-- Zone/Area
 	if data.area and data.area ~= "" then
-		local zoneLine = tt2:AddLine(C("ltblue", "Zone:"), "", "")
+		local zoneLine = tt2:AddLine(C("ltblue", L("ZONE_LABEL")), "", "")
 		tt2:SetCell(zoneLine, 2, data.area, nil, "RIGHT", 2)
 	end
 
@@ -1882,7 +1892,7 @@ local function CreateDetailTooltip(cell, data)
 	if data.note and data.note ~= "" then
 		tt2:AddSeparator()
 		local notesHeaderLine = tt2:AddLine()
-		tt2:SetCell(notesHeaderLine, 1, C("ltblue", "Note:"), nil, "LEFT", 3)
+		tt2:SetCell(notesHeaderLine, 1, C("ltblue", L("NOTE_LABEL")), nil, "LEFT", 3)
 		tt2:AddSeparator()
 		local notesLine = tt2:AddLine()
 		tt2:SetCell(notesLine, 1, C("white", data.note), nil, "LEFT", 3)
@@ -1892,7 +1902,7 @@ local function CreateDetailTooltip(cell, data)
 	if data.type == "bnet" and data.broadcast and data.broadcast ~= "" then
 		tt2:AddSeparator()
 		local broadcastHeaderLine = tt2:AddLine()
-		tt2:SetCell(broadcastHeaderLine, 1, C("ltblue", "Broadcast:"), nil, "LEFT", 3)
+		tt2:SetCell(broadcastHeaderLine, 1, C("ltblue", L("BROADCAST_LABEL")), nil, "LEFT", 3)
 		tt2:AddSeparator()
 		local broadcastLine = tt2:AddLine()
 		tt2:SetCell(broadcastLine, 1, C("white", data.broadcast), nil, "LEFT", 3)
@@ -1902,7 +1912,7 @@ local function CreateDetailTooltip(cell, data)
 			local timeSince = time() - data.broadcastTime
 			local timeText = SecondsToTime(timeSince)
 			local timeLine = tt2:AddLine()
-			tt2:SetCell(timeLine, 1, C("ltgray", string.format("(Active since: %s)", timeText)), nil, "RIGHT", 3)
+			tt2:SetCell(timeLine, 1, C("ltgray", string.format(L("ACTIVE_SINCE_FMT"), timeText)), nil, "RIGHT", 3)
 		end
 	end
 

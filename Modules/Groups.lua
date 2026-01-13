@@ -81,12 +81,12 @@ function Groups:MigrateFriendAssignments()
 	end
 	
 	-- Debug output
-	print("|cff00ff00BetterFriendlist:|r Migration check - Total friend mappings:", totalMappings)
+	print("|cff00ff00BetterFriendlist:|r " .. BFL.L.MIGRATION_DEBUG_TOTAL, totalMappings)
 	if not bnetMigrationDone then
-		print("|cff00ff00BetterFriendlist:|r Migration check - Old Battle.net format:", #oldBnetUIDs)
+		print("|cff00ff00BetterFriendlist:|r " .. BFL.L.MIGRATION_DEBUG_BNET, #oldBnetUIDs)
 	end
 	if not wowMigrationDone then
-		print("|cff00ff00BetterFriendlist:|r Migration check - WoW friends without realm:", #wowUIDsToMigrate)
+		print("|cff00ff00BetterFriendlist:|r " .. BFL.L.MIGRATION_DEBUG_WOW, #wowUIDsToMigrate)
 	end
 	
 	-- Migrate Battle.net UIDs
@@ -97,9 +97,9 @@ function Groups:MigrateFriendAssignments()
 		end
 		
 		-- Inform user about the migration
-		print("|cff00ff00BetterFriendlist:|r Battle.net friend assignments have been updated to use persistent identifiers.")
-		print("|cffff8800Note:|r Please re-assign your Battle.net friends to groups. This is a one-time migration.")
-		print("|cffaaaaaa(Reason: bnetAccountID is temporary and changes each session)|r")
+		print("|cff00ff00BetterFriendlist:|r " .. BFL.L.MIGRATION_BNET_UPDATED)
+		print("|cffff8800Note:|r " .. BFL.L.MIGRATION_BNET_REASSIGN)
+		print("|cffaaaaaa" .. BFL.L.MIGRATION_BNET_REASON .. "|r")
 		
 		DB:Set("bnetUIDMigrationDone_v2", true)
 	end
@@ -122,10 +122,10 @@ function Groups:MigrateFriendAssignments()
 				migrated = migrated + 1
 			end
 			
-			print("|cff00ff00BetterFriendlist:|r Migrated " .. migrated .. " WoW friend assignments to include realm names.")
-			print("|cffaaaaaa(Now using format: CharacterName-RealmName for consistent identification)|r")
+			print("|cff00ff00BetterFriendlist:|r " .. string.format(BFL.L.MIGRATION_WOW_RESULT, migrated))
+			print("|cffaaaaaa" .. BFL.L.MIGRATION_WOW_FORMAT .. "|r")
 		else
-			print("|cffff8800BetterFriendlist:|r Could not migrate WoW friend assignments (realm name unavailable).")
+			print("|cffff8800BetterFriendlist:|r " .. BFL.L.MIGRATION_WOW_FAIL)
 		end
 		
 		DB:Set("wowUIDMigrationDone_v1", true)
@@ -195,7 +195,7 @@ function Groups:RunSmartMigration()
 					-- Check if target already has groups (safety check)
 					local existing = DB:GetFriendGroups(newUID)
 					if not existing or #existing == 0 then
-						print("|cff00ff00BetterFriendlist:|r Migrating group settings for " .. shortName .. " -> " .. correctFullName)
+						print("|cff00ff00BetterFriendlist:|r " .. string.format(BFL.L.MIGRATION_SMART_MIGRATING, shortName, correctFullName))
 						DB:SetFriendGroups(newUID, groups)
 						DB:SetFriendGroups(uid, nil)
 						changesMade = true
@@ -214,6 +214,13 @@ function Groups:RunSmartMigration()
 end
 
 function Groups:Initialize()
+	-- Localize built-in group names
+	if BFL.L then
+		builtinGroups.favorites.name = BFL.L.GROUP_FAVORITES
+		builtinGroups.ingame.name = BFL.L.GROUP_INGAME
+		builtinGroups.nogroup.name = BFL.L.GROUP_NO_GROUP
+	end
+
 	-- Copy built-in groups
 	for id, data in pairs(builtinGroups) do
 		self.groups[id] = CopyTable(data)
@@ -348,7 +355,7 @@ end
 -- Create a new custom group
 function Groups:Create(groupName)
 	if not groupName or groupName == "" then
-		return false, "Group name cannot be empty"
+		return false, BFL.L.ERROR_GROUP_NAME_EMPTY
 	end
 	
 	-- Generate unique ID from name
@@ -356,7 +363,7 @@ function Groups:Create(groupName)
 	
 	-- Check if group already exists
 	if self.groups[groupId] then
-		return false, "Group already exists"
+		return false, BFL.L.ERROR_GROUP_EXISTS
 	end
 	
 	-- Find next order value (place custom groups between Favorites and No Group)
@@ -398,7 +405,7 @@ end
 -- Create a new custom group with specific order (for migration)
 function Groups:CreateWithOrder(groupName, orderValue)
 	if not groupName or groupName == "" then
-		return false, "Group name cannot be empty"
+		return false, BFL.L.ERROR_GROUP_NAME_EMPTY
 	end
 	
 	-- Generate unique ID from name
@@ -406,7 +413,7 @@ function Groups:CreateWithOrder(groupName, orderValue)
 	
 	-- Check if group already exists
 	if self.groups[groupId] then
-		return false, "Group already exists"
+		return false, BFL.L.ERROR_GROUP_EXISTS
 	end
 	
 	-- Create group with specified order
@@ -440,12 +447,12 @@ end
 -- Rename a custom group
 function Groups:Rename(groupId, newName)
 	if not groupId or not newName or newName == "" then
-		return false, "Invalid group name"
+		return false, BFL.L.ERROR_INVALID_GROUP_NAME
 	end
 	
 	local group = self.groups[groupId]
 	if not group then
-		return false, "Group does not exist"
+		return false, BFL.L.ERROR_GROUP_NOT_EXIST
 	end
 	
 	-- Update in memory
@@ -480,12 +487,12 @@ end
 -- Set group color
 function Groups:SetColor(groupId, r, g, b)
 	if not groupId or not r or not g or not b then
-		return false, "Invalid parameters"
+		return false, BFL.L.ERROR_INVALID_PARAMS
 	end
 	
 	local group = self.groups[groupId]
 	if not group then
-		return false, "Group does not exist"
+		return false, BFL.L.ERROR_GROUP_NOT_EXIST
 	end
 	
 	-- Update in memory
@@ -510,16 +517,16 @@ end
 -- Delete a custom group
 function Groups:Delete(groupId)
 	if not groupId then
-		return false, "Invalid group ID"
+		return false, BFL.L.ERROR_INVALID_GROUP_ID
 	end
 	
 	local group = self.groups[groupId]
 	if not group then
-		return false, "Group does not exist"
+		return false, BFL.L.ERROR_GROUP_NOT_EXIST
 	end
 	
 	if group.builtin then
-		return false, "Cannot delete built-in groups"
+		return false, BFL.L.ERROR_CANNOT_DELETE_BUILTIN
 	end
 	
 	-- Remove from memory

@@ -270,12 +270,12 @@ function NotificationSystem:OnFriendOnline(friendType, identifier)
     -- Check notification rules (Phase 2)
     if CheckRules("ONLINE", friendData) then
         -- Show notification
-        local message = "is now online"
+        local message = BFL.L.NOTIFICATION_IS_NOW_ONLINE
         if isSwitch then
-            message = "reconnected"
+            message = BFL.L.NOTIFICATION_RECONNECTED
         elseif friendData.gameAccountInfo and friendData.gameAccountInfo.clientProgram then
             local clientName = friendData.gameAccountInfo.clientProgram == BNET_CLIENT_WOW and "World of Warcraft" or friendData.gameAccountInfo.clientProgram
-            message = "is now online playing " .. clientName
+            message = string.format(BFL.L.NOTIFICATION_ONLINE_PLAYING_FMT, clientName)
         end
         ShowNotification(friendData.name, "ONLINE", message, nil)
     end
@@ -331,7 +331,7 @@ ExecuteOfflineNotification = function(friendType, identifier)
     -- Check notification rules
     if CheckRules("OFFLINE", friendData) then
         -- Show notification
-        local message = "has gone offline"
+        local message = BFL.L.NOTIFICATION_GONE_OFFLINE
         ShowNotification(friendData.name, "OFFLINE", message, nil)
     end
     
@@ -366,7 +366,7 @@ function NotificationSystem:OnFriendInfoChanged(bnetAccountID)
         -- Check notification rules
         if CheckRules("GAME_CHANGE", friendData) then
             local clientName = newProgram == BNET_CLIENT_WOW and "World of Warcraft" or newProgram
-            local message = "is now playing " .. clientName
+            local message = string.format(BFL.L.NOTIFICATION_PLAYING_FMT, clientName)
             ShowNotification(friendData.name, "ONLINE", message, nil)
         end
         
@@ -600,8 +600,8 @@ end
 --]]--------------------------------------------------
 
 function NotificationSystem:ShowTestNotification()
-    ShowNotification("TestPlayer", "ONLINE", "is now online playing World of Warcraft", nil)
-    print("|cff00ff00[BFL]|r Test notification triggered (display mode: " .. BetterFriendlistDB.notificationDisplayMode .. ")")
+    ShowNotification("TestPlayer", "ONLINE", string.format(BFL.L.NOTIFICATION_ONLINE_PLAYING_FMT, "World of Warcraft"), nil)
+    print("|cff00ff00[BFL]|r " .. string.format(BFL.L.NOTIFICATION_TEST_TRIGGERED, BetterFriendlistDB.notificationDisplayMode))
 end
 
 -- Export module

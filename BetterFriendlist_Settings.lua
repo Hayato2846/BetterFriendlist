@@ -272,9 +272,9 @@ end
 
 -- Reset settings confirmation
 StaticPopupDialogs["BETTER_FRIENDLIST_RESET_SETTINGS"] = {
-text = "Reset all BetterFriendlist settings to defaults?",
-button1 = "Reset",
-button2 = "Cancel",
+text = BFL.L.DIALOG_RESET_SETTINGS_TEXT,
+button1 = BFL.L.DIALOG_RESET_BTN1,
+button2 = BFL.L.DIALOG_RESET_BTN2,
 OnAccept = function()
 BetterFriendlistSettings_DoReset()
 end,

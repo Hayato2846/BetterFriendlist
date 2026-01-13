@@ -52,7 +52,7 @@ function NotificationEditMode:Initialize()
     end
     
     -- Set frame name for Edit Mode
-    container.editModeName = "BetterFriendlist Notifications"
+    container.editModeName = BFL.L.EDITMODE_NOTIFICATIONS_LABEL
     
     -- Position callback - save position when moved in Edit Mode
     local function OnPositionChanged(frame, layoutName, point, x, y)
@@ -137,8 +137,8 @@ function NotificationEditMode:OnEditModeEnter()
     
     for i, toast in ipairs(toasts) do
         if toast then
-            toast.Name:SetText("Preview " .. i)
-            toast.Message:SetText("Notification preview for positioning")
+            toast.Name:SetText(string.format(BFL.L.EDITMODE_PREVIEW_NAME, i))
+            toast.Message:SetText(BFL.L.EDITMODE_PREVIEW_MESSAGE)
             toast.Icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\user-check")
             toast.Icon:SetVertexColor(0.3, 1, 0.3, 1)
             toast:SetAlpha(0.8) -- More visible preview

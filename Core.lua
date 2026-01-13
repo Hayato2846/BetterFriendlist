@@ -1,6 +1,6 @@
 -- Core.lua
 -- Main initialization file for BetterFriendlist addon
--- Version 2.1.5 - January 2026
+-- Version 2.1.7 - January 2026
 -- Complete replacement for WoW Friends frame with modular architecture
 
 -- Create addon namespace
@@ -114,9 +114,9 @@ function BFL:ToggleDebugPrint()
 	self.debugPrintEnabled = BetterFriendlistDB.debugPrintEnabled
 	
 	if self.debugPrintEnabled then
-		print("|cff00ff00BetterFriendlist:|r Debug printing |cff00ff00ENABLED|r")
+		print("|cff00ff00BetterFriendlist:|r " .. BFL.L.DEBUG_ENABLED)
 	else
-		print("|cff00ff00BetterFriendlist:|r Debug printing |cffff0000DISABLED|r")
+		print("|cff00ff00BetterFriendlist:|r " .. BFL.L.DEBUG_DISABLED)
 	end
 end
 
@@ -386,7 +386,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 				or (BFL.IsWrathClassic and " (Wrath Classic)")
 				or (BFL.IsTBCClassic and " (TBC Classic)")
 				or " (TWW)"
-			print("|cff00ff00BetterFriendlist v" .. BFL.VERSION .. versionSuffix .. "|r loaded successfully!")
+			print(string.format(BFL.L.CORE_LOADED, BFL.VERSION, versionSuffix))
 			
 			-- ============================================================================
 			-- Hook ToggleFriendsFrame to open BetterFriendlist instead
@@ -561,40 +561,48 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 	-- Debug print toggle
 	if msg == "debug" then
 		BFL:ToggleDebugPrint()
+
+	-- Missing Locales tool
+	elseif msg == "missing" then
+		if BFL.ShowMissingLocalesFrame then
+			BFL:ShowMissingLocalesFrame()
+		else
+			print("|cffff0000BetterFriendlist:|r Missing Locales tool not available.")
+		end
 	
 	-- Legacy commands (from old BetterFriendlist.lua slash handler)
 	elseif msg == "show" then
 		if BFL.DB then
 			BFL.DB:Set("showBlizzardOption", true)
-			print("|cff20ff20BetterFriendlist:|r 'Show Blizzard's Friendlist' option is now |cff20ff20enabled|r in the menu")
+			print("|cff00ff00BetterFriendlist:|r " .. BFL.L.CORE_SHOW_BLIZZARD_ENABLED)
 		end
 	elseif msg == "hide" then
 		if BFL.DB then
 			BFL.DB:Set("showBlizzardOption", false)
-			print("|cff20ff20BetterFriendlist:|r 'Show Blizzard's Friendlist' option is now |cffff0000disabled|r in the menu")
+			print("|cff00ff00BetterFriendlist:|r " .. BFL.L.CORE_SHOW_BLIZZARD_DISABLED)
 		end
 	elseif msg == "toggle" then
 		if BFL.DB then
 			local current = BFL.DB:Get("showBlizzardOption", false)
 			BFL.DB:Set("showBlizzardOption", not current)
 			if not current then
-				print("|cff20ff20BetterFriendlist:|r 'Show Blizzard's Friendlist' option is now |cff20ff20enabled|r in the menu")
+				print("|cff00ff00BetterFriendlist:|r " .. BFL.L.CORE_SHOW_BLIZZARD_ENABLED)
 			else
-				print("|cff20ff20BetterFriendlist:|r 'Show Blizzard's Friendlist' option is now |cffff0000disabled|r in the menu")
+				print("|cff00ff00BetterFriendlist:|r " .. BFL.L.CORE_SHOW_BLIZZARD_DISABLED)
 			end
 		end
 	elseif msg == "database" or msg == "db" or msg == "debugdb" then
 		if _G.BetterFriendlistSettings_DebugDatabase then
 			_G.BetterFriendlistSettings_DebugDatabase()
 		else
-			print("|cffff0000BetterFriendlist:|r Debug function not available (settings not loaded)")
+			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_DEBUG_DB_NOT_AVAIL)
 		end
 	
 	-- Debug Activity Tracking
 	elseif msg == "activity" or msg == "debugactivity" then
 		local DB = BFL:GetModule("DB")
 		if not DB then
-			print("|cffff0000BetterFriendlist:|r DB module not available")
+			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_DB_MODULE_NOT_AVAIL)
 			return
 		end
 		
@@ -602,8 +610,8 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		local count = 0
 		for _ in pairs(friendActivity) do count = count + 1 end
 		
-		print("|cff00ff00=== BetterFriendlist Activity Tracking ===|r")
-		print(string.format("Total friends with activity: %d", count))
+		print(BFL.L.CORE_ACTIVITY_TRACKING_HEADER)
+		print(string.format(BFL.L.CORE_ACTIVITY_TOTAL_FRIENDS, count))
 		print("")
 		
 		for friendUID, activities in pairs(friendActivity) do
@@ -623,18 +631,18 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 	elseif msg == "testnotify" or msg == "testnotification" then
 		local NotificationSystem = BFL.NotificationSystem
 		if not NotificationSystem then
-			print("|cffff0000BetterFriendlist:|r NotificationSystem module not loaded")
+			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_NOTIFICATION_MODULE_NOT_LOADED)
 			return
 		end
 		
 		-- Check if Beta features enabled
 		if not BetterFriendlistDB.enableBetaFeatures then
-			print("|cffff0000BetterFriendlist:|r Beta Features are disabled!")
-			print("|cffffcc00Enable Beta Features in:|r ESC > AddOns > BetterFriendlist > General")
+			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_BETA_FEATURES_DISABLED_MSG)
+			print(BFL.L.CORE_BETA_ENABLE_HINT)
 			return
 		end
 		
-		print("|cff00ff00BetterFriendlist:|r Triggering 3 test notifications...")
+		print("|cff00ff00BetterFriendlist:|r " .. BFL.L.CORE_TRIGGERING_TEST_NOTIFICATIONS)
 		
 		-- Trigger 3 test notifications to demonstrate multi-toast system
 		NotificationSystem:ShowNotification("Test Friend 1", "is now online playing World of Warcraft", "Interface\\AddOns\\BetterFriendlist\\Icons\\user-check")
@@ -645,14 +653,14 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 			NotificationSystem:ShowNotification("Test Friend 3", "logged into World of Warcraft", "Interface\\AddOns\\BetterFriendlist\\Icons\\user-check")
 		end)
 		
-		print("|cff00ff00Success!|r You should see up to 3 toasts displayed simultaneously.")
-		print("|cffffcc00Tip:|r Open Edit Mode (ESC > Edit Mode) to reposition the notification area!")
+		print(BFL.L.CORE_TEST_NOTIFICATIONS_SUCCESS)
+		print(BFL.L.CORE_TEST_NOTIFICATIONS_TIP)
 	
 	-- Test Group Notification Rules
 	elseif msg == "testgrouprules" or msg == "testgroup" then
 		local NotificationSystem = BFL.NotificationSystem
 		if not NotificationSystem then
-			print("|cffff0000BetterFriendlist:|r NotificationSystem module not loaded")
+			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_NOTIFICATION_MODULE_NOT_LOADED)
 			return
 		end
 		
@@ -662,43 +670,43 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 	elseif msg == "stats" or msg == "statistics" then
 		local Statistics = BFL:GetModule("Statistics")
 		if not Statistics then
-			print("|cffff0000BetterFriendlist:|r Statistics module not loaded")
+			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_STATISTICS_MODULE_NOT_LOADED)
 			return
 		end
 		
 		local stats = Statistics:GetStatistics()
-		print("|cff00ff00=== BetterFriendlist Enhanced Statistics ===|r")
+		print(BFL.L.CORE_STATISTICS_HEADER)
 		print("")
 		
 		-- Overview
-		print("|cffffcc00Overview:|r")
-		print(string.format("  Total: |cffffffff%d|r  Online: |cff00ff00%d|r (%.0f%%)  Offline: |cffaaaaaa%d|r (%.0f%%)", 
+		print(BFL.L.CORE_STATS_OVERVIEW)
+		print(string.format(BFL.L.CORE_STATS_TOTAL_ONLINE_OFFLINE, 
 			stats.totalFriends, 
 			stats.onlineFriends, (stats.onlineFriends / math.max(stats.totalFriends, 1)) * 100,
 			stats.offlineFriends, (stats.offlineFriends / math.max(stats.totalFriends, 1)) * 100))
-		print(string.format("  Battle.net Friends: |cff0099ff%d|r  |  WoW Friends: |cffffd700%d|r", stats.bnetFriends, stats.wowFriends))
+		print(string.format(BFL.L.CORE_STATS_BNET_WOW, stats.bnetFriends, stats.wowFriends))
 		print("")
 		
 		-- Friendship Health
-		print("|cffffcc00Friendship Health:|r")
+		print(BFL.L.CORE_STATS_FRIENDSHIP_HEALTH)
 		local totalHealthFriends = stats.totalFriends - (stats.friendshipHealth.unknown or 0)
 		if totalHealthFriends > 0 then
-			print(string.format("  Active: |cff00ff00%d|r (%.0f%%)  Regular: |cffffd700%d|r (%.0f%%)  Drifting: |cffffaa00%d|r (%.0f%%)",
+			print(string.format(BFL.L.CORE_STATS_HEALTH_ACTIVE,
 				stats.friendshipHealth.active, (stats.friendshipHealth.active / totalHealthFriends) * 100,
 				stats.friendshipHealth.regular, (stats.friendshipHealth.regular / totalHealthFriends) * 100,
 				stats.friendshipHealth.drifting, (stats.friendshipHealth.drifting / totalHealthFriends) * 100))
-			print(string.format("  Stale: |cffff6600%d|r (%.0f%%)  Dormant: |cffff0000%d|r (%.0f%%)",
+			print(string.format(BFL.L.CORE_STATS_HEALTH_STALE,
 				stats.friendshipHealth.stale, (stats.friendshipHealth.stale / totalHealthFriends) * 100,
 				stats.friendshipHealth.dormant, (stats.friendshipHealth.dormant / totalHealthFriends) * 100))
 		else
-			print("  No health data available")
+			print(BFL.L.CORE_STATS_NO_HEALTH_DATA)
 		end
 		print("")
 		
 		-- Class Distribution (Top 5)
 		local topClasses = Statistics:GetTopClasses(5)
 		if #topClasses > 0 then
-			print("|cffffcc00Class Distribution (Top 5):|r")
+			print(BFL.L.CORE_STATS_CLASS_DISTRIBUTION)
 			for i, class in ipairs(topClasses) do
 				local pct = (class.count / math.max(stats.totalFriends, 1)) * 100
 				print(string.format("  %d. %s: |cffffffff%d|r (%.0f%%)", i, class.name, class.count, pct))
@@ -708,24 +716,24 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		
 		-- Level Distribution
 		if stats.levelDistribution.leveledFriends > 0 then
-			print("|cffffcc00Level Distribution:|r")
-			print(string.format("  Max (80): |cffffffff%d|r  70-79: |cffffffff%d|r  60-69: |cffffffff%d|r  <60: |cffffffff%d|r",
+			print(BFL.L.CORE_STATS_LEVEL_DISTRIBUTION)
+			print(string.format(BFL.L.CORE_STATS_LEVEL_BREAKDOWN,
 				stats.levelDistribution.maxLevel,
 				stats.levelDistribution.ranges[1].count,
 				stats.levelDistribution.ranges[2].count,
 				stats.levelDistribution.ranges[3].count))
-			print(string.format("  Average Level: |cffffffff%.1f|r", stats.levelDistribution.average))
+			print(string.format(BFL.L.CORE_STATS_AVG_LEVEL, stats.levelDistribution.average))
 			print("")
 		end
 		
 		-- Realm Clusters
 		local topRealms = Statistics:GetTopRealms(5)
 		if #topRealms > 0 then
-			print("|cffffcc00Realm Clusters:|r")
-			print(string.format("  Same Realm: |cffffffff%d|r (%.0f%%)  |  Other Realms: |cffffffff%d|r (%.0f%%)",
+			print(BFL.L.CORE_STATS_REALM_CLUSTERS)
+			print(string.format(BFL.L.CORE_STATS_REALM_BREAKDOWN,
 				stats.realmDistribution.sameRealm, (stats.realmDistribution.sameRealm / math.max(stats.totalFriends, 1)) * 100,
 				stats.realmDistribution.otherRealms, (stats.realmDistribution.otherRealms / math.max(stats.totalFriends, 1)) * 100))
-			print("  Top Realms:")
+			print(BFL.L.CORE_STATS_TOP_REALMS)
 			for i, realm in ipairs(topRealms) do
 				print(string.format("    %d. %s: |cffffffff%d|r", i, realm.name, realm.count))
 			end
@@ -734,8 +742,8 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		
 		-- Faction Split
 		if stats.factionCounts.alliance > 0 or stats.factionCounts.horde > 0 then
-			print("|cffffcc00Faction Split:|r")
-			print(string.format("  Alliance: |cff0080ff%d|r  |  Horde: |cffff0000%d|r",
+			print(BFL.L.CORE_STATS_FACTION_SPLIT)
+			print(string.format(BFL.L.CORE_STATS_FACTION_DATA,
 				stats.factionCounts.alliance, stats.factionCounts.horde))
 			print("")
 		end
@@ -744,43 +752,43 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		local totalGamePlayers = stats.gameCounts.wow + stats.gameCounts.classic + stats.gameCounts.diablo + 
 		                         stats.gameCounts.hearthstone + stats.gameCounts.starcraft + stats.gameCounts.mobile + stats.gameCounts.other
 		if totalGamePlayers > 0 then
-			print("|cffffcc00Game Distribution:|r")
+			print(BFL.L.CORE_STATS_GAME_DISTRIBUTION)
 			if stats.gameCounts.wow > 0 then
-				print(string.format("  WoW Retail: |cffffffff%d|r", stats.gameCounts.wow))
+				print(string.format(BFL.L.CORE_STATS_GAME_WOW, stats.gameCounts.wow))
 			end
 			if stats.gameCounts.classic > 0 then
-				print(string.format("  WoW Classic: |cffffffff%d|r", stats.gameCounts.classic))
+				print(string.format(BFL.L.CORE_STATS_GAME_CLASSIC, stats.gameCounts.classic))
 			end
 			if stats.gameCounts.diablo > 0 then
-				print(string.format("  Diablo IV: |cffffffff%d|r", stats.gameCounts.diablo))
+				print(string.format(BFL.L.CORE_STATS_GAME_DIABLO, stats.gameCounts.diablo))
 			end
 			if stats.gameCounts.hearthstone > 0 then
-				print(string.format("  Hearthstone: |cffffffff%d|r", stats.gameCounts.hearthstone))
+				print(string.format(BFL.L.CORE_STATS_GAME_HEARTHSTONE, stats.gameCounts.hearthstone))
 			end
 			if stats.gameCounts.starcraft > 0 then
-				print(string.format("  StarCraft: |cffffffff%d|r", stats.gameCounts.starcraft))
+				print(string.format(BFL.L.CORE_STATS_GAME_STARCRAFT, stats.gameCounts.starcraft))
 			end
 			if stats.gameCounts.mobile > 0 then
-				print(string.format("  Mobile App: |cffffffff%d|r", stats.gameCounts.mobile))
+				print(string.format(BFL.L.CORE_STATS_GAME_MOBILE, stats.gameCounts.mobile))
 			end
 			if stats.gameCounts.other > 0 then
-				print(string.format("  Other Games: |cffffffff%d|r", stats.gameCounts.other))
+				print(string.format(BFL.L.CORE_STATS_GAME_OTHER, stats.gameCounts.other))
 			end
 			print("")
 		end
 		
 		-- Mobile vs Desktop
 		if stats.mobileVsDesktop.desktop > 0 or stats.mobileVsDesktop.mobile > 0 then
-			print("|cffffcc00Mobile vs. Desktop:|r")
-			print(string.format("  Desktop: |cffffffff%d|r (%.0f%%)  Mobile: |cffffffff%d|r (%.0f%%)",
+			print(BFL.L.CORE_STATS_MOBILE_VS_DESKTOP)
+			print(string.format(BFL.L.CORE_STATS_MOBILE_DATA,
 				stats.mobileVsDesktop.desktop, (stats.mobileVsDesktop.desktop / math.max(stats.onlineFriends, 1)) * 100,
 				stats.mobileVsDesktop.mobile, (stats.mobileVsDesktop.mobile / math.max(stats.onlineFriends, 1)) * 100))
 			print("")
 		end
 		
 		-- Notes and Favorites
-		print("|cffffcc00Organization:|r")
-		print(string.format("  With Notes: |cffffffff%d|r (%.0f%%)  Favorites: |cffffffff%d|r (%.0f%%)",
+		print(BFL.L.CORE_STATS_ORGANIZATION)
+		print(string.format(BFL.L.CORE_STATS_ORG_DATA,
 			stats.notesAndFavorites.withNotes, (stats.notesAndFavorites.withNotes / math.max(stats.totalFriends, 1)) * 100,
 			stats.notesAndFavorites.favorites, (stats.notesAndFavorites.favorites / math.max(stats.totalFriends, 1)) * 100))
 	
@@ -797,7 +805,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 			-- Show settings frame
 			Settings:Show()
 		else
-			print("|cffff0000BetterFriendlist:|r Settings not loaded yet")
+			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_SETTINGS_NOT_LOADED)
 		end
 	
 	-- Mock Friend Invites
@@ -805,7 +813,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		-- Enable mock system if not already enabled
 		if not BFL.MockFriendInvites.enabled then
 			BFL.MockFriendInvites.enabled = true
-			print("|cff00ff00BetterFriendlist:|r Mock friend invites |cff00ff00ENABLED|r")
+			print("|cff00ff00BetterFriendlist:|r " .. BFL.L.CORE_MOCK_INVITES_ENABLED)
 		end
 		
 		-- Add ONE new mock invite
@@ -819,8 +827,8 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 			accountName = battleTag
 		})
 		
-		print(string.format("|cff00ff00BetterFriendlist:|r Added mock invite from |cffffffff%s|r (Total: %d)", battleTag, #BFL.MockFriendInvites.invites))
-		print("|cffffcc00Tip:|r Use |cffffffff/bfl clearinvites|r to remove all mock invites")
+		print(string.format("|cff00ff00BetterFriendlist:|r " .. BFL.L.CORE_MOCK_INVITE_ADDED, battleTag, #BFL.MockFriendInvites.invites))
+		print(BFL.L.CORE_MOCK_INVITE_TIP)
 		
 		-- Force immediate refresh
 		BFL:ForceRefreshFriendsList()
@@ -839,14 +847,14 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 			local count = #BFL.MockFriendInvites.invites
 			BFL.MockFriendInvites.enabled = false
 			BFL.MockFriendInvites.invites = {}
-			print(string.format("|cff00ff00BetterFriendlist:|r Removed %d mock invite(s) - Mock system |cffff0000DISABLED|r", count))
+			print(string.format("|cff00ff00BetterFriendlist:|r " .. BFL.L.CORE_MOCK_INVITES_CLEARED, count))
 			
 			-- Force immediate refresh
 			if count > 0 then
 				BFL:ForceRefreshFriendsList()
 			end
 		else
-			print("|cffff0000BetterFriendlist:|r No mock invites active")
+			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_NO_MOCK_INVITES)
 		end
 	
 	-- ==========================================
@@ -857,21 +865,21 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		if PerformanceMonitor then
 			PerformanceMonitor:Report()
 		else
-			print("|cffff0000BetterFriendlist:|r PerformanceMonitor module not loaded")
+			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_PERF_MONITOR_NOT_LOADED)
 		end
 	elseif msg == "perf reset" then
 		local PerformanceMonitor = BFL:GetModule("PerformanceMonitor")
 		if PerformanceMonitor then
 			PerformanceMonitor:Reset()
 		else
-			print("|cffff0000BetterFriendlist:|r PerformanceMonitor module not loaded")
+			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_PERF_MONITOR_NOT_LOADED)
 		end
 	elseif msg == "perf enable" then
 		local PerformanceMonitor = BFL:GetModule("PerformanceMonitor")
 		if PerformanceMonitor then
 			PerformanceMonitor:EnableAutoMonitoring()
 		else
-			print("|cffff0000BetterFriendlist:|r PerformanceMonitor module not loaded")
+			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_PERF_MONITOR_NOT_LOADED)
 		end
 	elseif msg == "perf memory" then
 		local PerformanceMonitor = BFL:GetModule("PerformanceMonitor")
@@ -880,7 +888,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		end
 		UpdateAddOnMemoryUsage()
 		local memory = GetAddOnMemoryUsage("BetterFriendlist") or 0
-		print(string.format("|cff00ff00BetterFriendlist Memory:|r %.2f KB", memory))
+		print(string.format("|cff00ff00BetterFriendlist " .. BFL.L.CORE_MEMORY_USAGE .. "|r", memory))
 	
 	-- ==========================================
 	-- Quick Join Commands (was /bflqj)
@@ -888,7 +896,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 	elseif msg:match("^qj") or msg:match("^quickjoin") then
 		local QuickJoin = BFL:GetModule("QuickJoin")
 		if not QuickJoin then
-			print("|cffff0000BetterFriendlist:|r QuickJoin module not loaded")
+			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_QUICKJOIN_NOT_LOADED)
 			return
 		end
 		
@@ -903,7 +911,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 	elseif msg:match("^raid") then
 		local RaidFrame = BFL:GetModule("RaidFrame")
 		if not RaidFrame then
-			print("|cffff0000BetterFriendlist:|r RaidFrame module not loaded")
+			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_RAIDFRAME_NOT_LOADED)
 			return
 		end
 		
@@ -917,7 +925,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		if RaidFrame then
 			RaidFrame:CreateMockRaidData()
 		else
-			print("|cffff0000BetterFriendlist:|r RaidFrame module not loaded")
+			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_RAIDFRAME_NOT_LOADED)
 		end
 	
 	-- ==========================================
@@ -929,7 +937,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 			local fullArgs = msg:match("^preview%s*(.*)") or ""
 			PreviewMode:HandleCommand(fullArgs)
 		else
-			print("|cffff0000BetterFriendlist:|r PreviewMode module not loaded")
+			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_PREVIEW_MODE_NOT_LOADED)
 		end
 	
 	-- ==========================================
@@ -939,44 +947,44 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		if SlashCmdList["ACTIVITYTRACKER_TEST"] then
 			SlashCmdList["ACTIVITYTRACKER_TEST"]("activity")
 		else
-			print("|cffff0000BetterFriendlist:|r ActivityTracker Tests not loaded")
+			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_ACTIVITY_TEST_NOT_LOADED)
 		end
 	
 	-- ==========================================
 	-- Classic Compatibility Info
 	-- ==========================================
 	elseif msg == "compat" or msg == "compatibility" or msg == "classic" then
-		print("|cff00ff00=== BetterFriendlist Classic Compatibility ===|r")
+		print(BFL.L.CORE_CLASSIC_COMPAT_HEADER)
 		print("")
-		print("|cffffcc00Client Version:|r")
+		print(BFL.L.CORE_CLIENT_VERSION)
 		print(string.format("  Interface Version: |cffffffff%d|r", select(4, GetBuildInfo())))
 		print(string.format("  Build: |cffffffff%s|r", select(1, GetBuildInfo())))
 		print("")
-		print("|cffffcc00Detected Flavor:|r")
+		print(BFL.L.CORE_DETECTED_FLAVOR)
 		if BFL.IsClassicEra then
-			print("  |cffffcc00Classic Era|r (Vanilla)")
+			print(BFL.L.CORE_FLAVOR_CLASSIC_ERA)
 		elseif BFL.IsMoPClassic then
-			print("  |cff00ffffMists of Pandaria Classic|r")
+			print(BFL.L.CORE_FLAVOR_MOP)
 		elseif BFL.IsTWW then
-			print("  |cff00ff00The War Within|r (Retail)")
+			print(BFL.L.CORE_FLAVOR_TWW)
 		elseif BFL.IsMidnight then
-			print("  |cff8800ffMidnight|r (Retail)")
+			print(BFL.L.CORE_FLAVOR_MIDNIGHT)
 		else
-			print("  |cffffffffRetail|r")
+			print(BFL.L.CORE_FLAVOR_RETAIL)
 		end
 		print("")
-		print("|cffffcc00Feature Availability:|r")
-		print(string.format("  Modern ScrollBox: %s", BFL.HasModernScrollBox and "|cff00ff00Yes|r" or "|cffff0000No|r"))
-		print(string.format("  Modern Menu System: %s", BFL.HasModernMenu and "|cff00ff00Yes|r" or "|cffff0000No|r"))
-		print(string.format("  Recent Allies: %s", BFL.HasRecentAllies and "|cff00ff00Yes|r" or "|cffff0000No|r"))
-		print(string.format("  Edit Mode: %s", BFL.HasEditMode and "|cff00ff00Yes|r" or "|cffff0000No|r"))
-		print(string.format("  Modern Dropdown: %s", BFL.HasModernDropdown and "|cff00ff00Yes|r" or "|cffff0000No|r"))
-		print(string.format("  Modern ColorPicker: %s", BFL.HasModernColorPicker and "|cff00ff00Yes|r" or "|cffff0000No|r"))
+		print(BFL.L.CORE_FEATURE_AVAILABILITY)
+		print(string.format(BFL.L.CORE_FEATURE_MODERN_SCROLLBOX, BFL.HasModernScrollBox and "|cff00ff00Yes|r" or "|cffff0000No|r"))
+		print(string.format(BFL.L.CORE_FEATURE_MODERN_MENU, BFL.HasModernMenu and "|cff00ff00Yes|r" or "|cffff0000No|r"))
+		print(string.format(BFL.L.CORE_FEATURE_RECENT_ALLIES, BFL.HasRecentAllies and "|cff00ff00Yes|r" or "|cffff0000No|r"))
+		print(string.format(BFL.L.CORE_FEATURE_EDIT_MODE, BFL.HasEditMode and "|cff00ff00Yes|r" or "|cffff0000No|r"))
+		print(string.format(BFL.L.CORE_FEATURE_MODERN_DROPDOWN, BFL.HasModernDropdown and "|cff00ff00Yes|r" or "|cffff0000No|r"))
+		print(string.format(BFL.L.CORE_FEATURE_MODERN_COLORPICKER, BFL.HasModernColorPicker and "|cff00ff00Yes|r" or "|cffff0000No|r"))
 		print("")
 		if BFL.Compat then
-			print("|cffffcc00Compatibility Layer:|r |cff00ff00Active|r")
+			print(string.format(BFL.L.CORE_COMPAT_LAYER, BFL.L.CORE_COMPAT_ACTIVE))
 		else
-			print("|cffffcc00Compatibility Layer:|r |cffff0000Not Loaded|r")
+			print(string.format(BFL.L.CORE_COMPAT_LAYER, BFL.L.CORE_COMPAT_NOT_LOADED))
 		end
 	
 	-- Reset Changelog State
@@ -986,19 +994,19 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		if DB and Changelog then
 			DB:Set("lastChangelogVersion", "0.0.0")
 			Changelog:CheckVersion()
-			print("|cff00ff00BetterFriendlist:|r Changelog state reset. Glow should be visible.")
+			print("|cff00ff00BetterFriendlist:|r " .. BFL.L.CORE_CHANGELOG_RESET)
 		else
-			print("|cffff0000BetterFriendlist:|r Modules not loaded.")
+			print("|cffff0000BetterFriendlist:|r " .. BFL.L.MSG_SETTINGS_RESET) -- Slightly reusing msg, but modules not loaded is better
 		end
 	
 	-- Debug: Check UIPanelWindows settings
 	elseif msg == "checkpanel" or msg == "panel" then
-		print("|cff00ff00=== UI Panel System Debug ===|r")
+		print(BFL.L.CORE_DEBUG_PANEL_HEADER)
 		print("")
 		
 		-- Check Blizzard FriendsFrame original settings (stored)
 		if BFL.OriginalFriendsFrameUIPanelSettings then
-			print("|cffffcc00Blizzard FriendsFrame (stored at load):|r")
+			print(BFL.L.CORE_DEBUG_BLIZZARD_SETTINGS)
 			local sortedKeys = {}
 			for k in pairs(BFL.OriginalFriendsFrameUIPanelSettings) do
 				table.insert(sortedKeys, k)
@@ -1014,13 +1022,13 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 			end
 			print("")
 		else
-			print("|cffff0000No stored Blizzard FriendsFrame settings|r")
+			print(BFL.L.CORE_DEBUG_NO_STORED)
 			print("")
 		end
 		
 		-- Check current BetterFriendsFrame attributes
 		if BetterFriendsFrame then
-			print("|cffffcc00BetterFriendsFrame attributes:|r")
+			print(BFL.L.CORE_DEBUG_BFL_ATTRS)
 			local attrs = {
 				"UIPanelLayout-defined",
 				"UIPanelLayout-enabled",
@@ -1038,17 +1046,17 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		-- Check if in UIPanelWindows
 		if UIPanelWindows then
 			if UIPanelWindows["BetterFriendsFrame"] then
-				print("|cffffcc00BetterFriendsFrame in UIPanelWindows:|r |cff00ff00YES|r")
+				print(BFL.L.CORE_DEBUG_UIPANEL_YES)
 				for k, v in pairs(UIPanelWindows["BetterFriendsFrame"]) do
 					print(string.format("  %s: |cffffffff%s|r", k, tostring(v)))
 				end
 			else
-				print("|cffffcc00BetterFriendsFrame in UIPanelWindows:|r |cffff0000NO|r")
+				print(BFL.L.CORE_DEBUG_UIPANEL_NO)
 			end
 			print("")
 			
 			if UIPanelWindows["FriendsFrame"] then
-				print("|cffff8800WARNING:|r FriendsFrame is still in UIPanelWindows!")
+				print(BFL.L.CORE_DEBUG_FRIENDSFRAME_WARNING)
 			end
 		end
 		
@@ -1056,7 +1064,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		local DB = BFL:GetModule("DB")
 		if DB then
 			local setting = DB:Get("useUIPanelSystem")
-			print(string.format("|cffffcc00Current Setting:|r %s", setting and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
+			print(string.format(BFL.L.CORE_DEBUG_CURRENT_SETTING, setting and BFL.L.STATUS_ENABLED or BFL.L.STATUS_DISABLED))
 		end
 
 	-- Help (or any other unrecognized command)
@@ -1065,64 +1073,64 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		if Changelog then
 			Changelog:Show()
 		else
-			print("|cffff0000BetterFriendlist:|r Changelog module not loaded")
+			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_CHANGELOG_NOT_LOADED)
 		end
 
 	else
-		print("|cff00ff00=== BetterFriendlist v" .. BFL.VERSION .. " ===|r")
+		print(string.format(BFL.L.CORE_HELP_TITLE, BFL.VERSION))
 		print("")
-		print("|cffffcc00Main Commands:|r")
-		print("  |cffffffff/bfl|r - Toggle BetterFriendlist frame")
-		print("  |cffffffff/bfl settings|r - Open settings panel")
-		print("  |cffffffff/bfl help|r - Show this help")
+		print(BFL.L.CORE_HELP_MAIN_COMMANDS)
+		print(BFL.L.CORE_HELP_CMD_TOGGLE)
+		print(BFL.L.CORE_HELP_CMD_SETTINGS)
+		print(BFL.L.CORE_HELP_CMD_HELP)
 		print("")
-		print("|cffffcc00Debug Commands:|r")
-	print("  |cffffffff/bfl debug|r - Toggle debug output")
-	print("  |cffffffff/bfl database|r - Show database state")
-		print("  |cffffffff/bfl activity|r - Show activity tracking data")
-		print("  |cffffffff/bfl stats|r - Show friend network statistics")
-		print("  |cffffffff/bfl testnotify|r - Test notification system (3 toasts)")
-		print("  |cffffffff/bfl testgrouprules|r - Test group notification rules")
+		print(BFL.L.CORE_HELP_DEBUG_COMMANDS)
+		print(BFL.L.CORE_HELP_CMD_DEBUG)
+		print(BFL.L.CORE_HELP_CMD_DATABASE)
+		print(BFL.L.CORE_HELP_CMD_ACTIVITY)
+		print(BFL.L.CORE_HELP_CMD_STATS)
+		print(BFL.L.CORE_HELP_CMD_TESTNOTIFY)
+		print(BFL.L.CORE_HELP_CMD_TESTGROUP)
 		print("")
-		print("|cffffcc00Quick Join Commands:|r")
-		print("  |cffffffff/bfl qj mock|r - Create comprehensive test data")
-		print("  |cffffffff/bfl qj mock dungeon|r - Dungeon/M+ groups only")
-		print("  |cffffffff/bfl qj mock pvp|r - PvP groups only")
-		print("  |cffffffff/bfl qj mock raid|r - Raid groups only")
-		print("  |cffffffff/bfl qj mock stress|r - 50 groups for scrollbar testing")
-		print("  |cffffffff/bfl qj event add|remove|update|r - Simulate events")
-		print("  |cffffffff/bfl qj clear|r - Remove all test groups")
-		print("  |cffffffff/bfl qj list|r - List all mock groups")
+		print(BFL.L.CORE_HELP_QJ_COMMANDS)
+		print(BFL.L.CORE_HELP_QJ_MOCK)
+		print(BFL.L.CORE_HELP_QJ_DUNGEON)
+		print(BFL.L.CORE_HELP_QJ_PVP)
+		print(BFL.L.CORE_HELP_QJ_RAID)
+		print(BFL.L.CORE_HELP_QJ_STRESS)
+		print(BFL.L.CORE_HELP_QJ_EVENT)
+		print(BFL.L.CORE_HELP_QJ_CLEAR)
+		print(BFL.L.CORE_HELP_QJ_LIST)
 		print("")
-		print("|cffffcc00Mock Commands:|r")
-		print("  |cffffffff/bfl mock|r - Create mock raid (legacy, same as /bfl raid mock)")
-		print("  |cffffffff/bfl invite|r - Add one mock friend invite")
-		print("  |cffffffff/bfl clearinvites|r - Remove all mock invites")
+		print(BFL.L.CORE_HELP_MOCK_COMMANDS)
+		print(BFL.L.CORE_HELP_MOCK_OLD)
+		print(BFL.L.CORE_HELP_INVITE)
+		print(BFL.L.CORE_HELP_CLEARINVITES)
 		print("")
-		print("|cffffcc00Preview Mode (Screenshots):|r")
-		print("  |cffffffff/bfl preview|r - Enable full preview mode")
-		print("  |cffffffff/bfl preview off|r - Disable preview mode")
-		print("  |cff888888(Shows mock Friends, Groups, Raid, QuickJoin, WHO)|r")
+		print(BFL.L.CORE_HELP_PREVIEW_COMMANDS)
+		print(BFL.L.CORE_HELP_PREVIEW_ON)
+		print(BFL.L.CORE_HELP_PREVIEW_OFF)
+		print(BFL.L.CORE_HELP_PREVIEW_DESC)
 		print("")
-		print("|cffffcc00Raid Frame Commands:|r")
-		print("  |cffffffff/bfl raid mock|r - Create 25-player mock raid")
-		print("  |cffffffff/bfl raid mock full|r - Create 40-player raid")
-		print("  |cffffffff/bfl raid mock small|r - Create 10-player raid")
-		print("  |cffffffff/bfl raid mock mythic|r - Create 20-player mythic raid")
-		print("  |cffffffff/bfl raid event readycheck|r - Simulate ready check")
-		print("  |cffffffff/bfl raid event rolechange|r - Simulate role changes")
-		print("  |cffffffff/bfl raid event move|r - Shuffle group assignments")
-		print("  |cffffffff/bfl raid clear|r - Remove mock data")
+		print(BFL.L.CORE_HELP_RAID_COMMANDS)
+		print(BFL.L.CORE_HELP_RAID_MOCK)
+		print(BFL.L.CORE_HELP_RAID_FULL)
+		print(BFL.L.CORE_HELP_RAID_SMALL)
+		print(BFL.L.CORE_HELP_RAID_MYTHIC)
+		print(BFL.L.CORE_HELP_RAID_READY)
+		print(BFL.L.CORE_HELP_RAID_ROLE)
+		print(BFL.L.CORE_HELP_RAID_MOVE)
+		print(BFL.L.CORE_HELP_RAID_CLEAR)
 		print("")
-		print("|cffffcc00Performance Monitoring:|r")
-		print("  |cffffffff/bfl perf|r - Show performance stats")
-		print("  |cffffffff/bfl perf enable|r - Enable performance tracking")
-		print("  |cffffffff/bfl perf reset|r - Reset statistics")
-		print("  |cffffffff/bfl perf memory|r - Show memory usage")
+		print(BFL.L.CORE_HELP_PERF_COMMANDS)
+		print(BFL.L.CORE_HELP_PERF_SHOW)
+		print(BFL.L.CORE_HELP_PERF_ENABLE)
+		print(BFL.L.CORE_HELP_PERF_RESET)
+		print(BFL.L.CORE_HELP_PERF_MEM)
 		print("")
-		print("|cffffcc00Test Commands:|r")
-		print("  |cffffffff/bfl test|r - Run ActivityTracker tests")
+		print(BFL.L.CORE_HELP_TEST_COMMANDS)
+		print(BFL.L.CORE_HELP_TEST_ACTIVITY)
 		print("")
-		print("|cff20ff20For more help, see:|r |cff00ccffhttps://github.com/Hayato2846/BetterFriendlist|r")
+		print(BFL.L.CORE_HELP_LINK)
 	end
 end

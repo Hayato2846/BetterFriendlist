@@ -1082,7 +1082,7 @@ function FriendsList:SyncGroups()
 		friendGroups = {
 			favorites = {
 				id = "favorites",
-				name = "Favorites",
+				name = BFL.L.GROUP_FAVORITES,
 				collapsed = false,
 				builtin = true,
 				order = 1,
@@ -1091,7 +1091,7 @@ function FriendsList:SyncGroups()
 			},
 			nogroup = {
 				id = "nogroup",
-				name = "No Group",
+				name = BFL.L.GROUP_NO_GROUP,
 				collapsed = false,
 				builtin = true,
 				order = 999,
@@ -1194,7 +1194,7 @@ function FriendsList:UpdateFriendsList()
 						end
 
 					elseif gameInfo.clientProgram == "BSAp" then
-						friend.gameName = "Mobile"
+						friend.gameName = BFL.L.STATUS_MOBILE
 						-- Feature: Treat Mobile as Offline (Phase Feature Request)
 						local treatMobileAsOffline = GetDB():Get("treatMobileAsOffline", false)
 						if treatMobileAsOffline then
@@ -1202,9 +1202,9 @@ function FriendsList:UpdateFriendsList()
 							friend.isMobileButTreatedOffline = true  -- Flag for special display
 						end
 					elseif gameInfo.clientProgram == "App" then
-						friend.gameName = "In App"
+						friend.gameName = BFL.L.STATUS_IN_APP
 					else
-						friend.gameName = gameInfo.clientProgram or "Unknown Game"
+						friend.gameName = gameInfo.clientProgram or BFL.L.UNKNOWN_GAME
 					end
 				end
 				
@@ -2277,7 +2277,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 				
 				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 				GameTooltip:SetText(groupData.name, 1, 1, 1)
-				GameTooltip:AddLine("Right-click for options", 0.7, 0.7, 0.7, true)
+				GameTooltip:AddLine(BFL.L.HINT_RIGHT_CLICK_OPTIONS, 0.7, 0.7, 0.7, true)
 				if not groupData.builtin then
 					GameTooltip:AddLine(BFL_L.TOOLTIP_DRAG_HERE, 0.5, 0.8, 1.0, true)
 				end
@@ -2305,21 +2305,21 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 						
 						rootDescription:CreateTitle(groupData.name)
 						
-						rootDescription:CreateButton("Rename Group", function()
+						rootDescription:CreateButton(BFL.L.MENU_RENAME_GROUP, function()
 							StaticPopup_Show("BETTER_FRIENDLIST_RENAME_GROUP", nil, nil, self.groupId)
 						end)
 						
-						rootDescription:CreateButton("Change Color", function()
+						rootDescription:CreateButton(BFL.L.MENU_CHANGE_COLOR, function()
 							FriendsList:OpenColorPicker(self.groupId)
 						end)
 						
-						rootDescription:CreateButton("Delete Group", function()
+						rootDescription:CreateButton(BFL.L.MENU_DELETE_GROUP, function()
 							StaticPopup_Show("BETTER_FRIENDLIST_DELETE_GROUP", nil, nil, self.groupId)
 						end)
 						
 						rootDescription:CreateDivider()
 						
-						rootDescription:CreateButton("Invite All to Party", function()
+						rootDescription:CreateButton(BFL.L.MENU_INVITE_GROUP, function()
 							FriendsList:InviteGroupToParty(self.groupId)
 						end)
 						
@@ -2327,10 +2327,10 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 						
 					-- Notification Rules for Group (Beta Features)
 					if BetterFriendlistDB.enableBetaFeatures then
-						local notificationButton = rootDescription:CreateButton("Notifications")
+						local notificationButton = rootDescription:CreateButton(BFL.L.MENU_NOTIFICATIONS)
 						
 						notificationButton:CreateRadio(
-							"Default (Use global settings)",
+							BFL.L.MENU_NOTIFY_DEFAULT,
 							function()
 								local rule = BetterFriendlistDB.notificationGroupRules and BetterFriendlistDB.notificationGroupRules[self.groupId]
 								return not rule or rule == "default"
@@ -2340,12 +2340,12 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 									BetterFriendlistDB.notificationGroupRules = {}
 								end
 								BetterFriendlistDB.notificationGroupRules[self.groupId] = "default"
-								print("|cff00ff00BetterFriendlist:|r Notifications for group '" .. groupData.name .. "' set to |cffffffffDefault|r")
+								print(string.format(BFL.L.MSG_NOTIFY_DEFAULT, groupData.name))
 							end
 						)
 						
 						notificationButton:CreateRadio(
-							"Whitelist (Always notify)",
+							BFL.L.MENU_NOTIFY_WHITELIST,
 							function()
 								local rule = BetterFriendlistDB.notificationGroupRules and BetterFriendlistDB.notificationGroupRules[self.groupId]
 								return rule == "whitelist"
@@ -2355,12 +2355,12 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 									BetterFriendlistDB.notificationGroupRules = {}
 								end
 								BetterFriendlistDB.notificationGroupRules[self.groupId] = "whitelist"
-								print("|cff00ff00BetterFriendlist:|r Notifications for group '" .. groupData.name .. "' set to |cff00ff00Whitelist|r (always notify)")
+								print(string.format(BFL.L.MSG_NOTIFY_WHITELIST, groupData.name))
 							end
 						)
 						
 						notificationButton:CreateRadio(
-							"Blacklist (Never notify)",
+							BFL.L.MENU_NOTIFY_BLACKLIST,
 							function()
 								local rule = BetterFriendlistDB.notificationGroupRules and BetterFriendlistDB.notificationGroupRules[self.groupId]
 								return rule == "blacklist"
@@ -2370,7 +2370,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 									BetterFriendlistDB.notificationGroupRules = {}
 								end
 								BetterFriendlistDB.notificationGroupRules[self.groupId] = "blacklist"
-								print("|cff00ff00BetterFriendlist:|r Notifications for group '" .. groupData.name .. "' set to |cffff0000Blacklist|r (never notify)")
+								print(string.format(BFL.L.MSG_NOTIFY_BLACKLIST, groupData.name))
 							end
 						)
 						
@@ -2378,14 +2378,14 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 					end
 					
 					-- Group-wide action buttons
-					rootDescription:CreateButton("Collapse All Groups", function()
+					rootDescription:CreateButton(BFL.L.MENU_COLLAPSE_ALL, function()
 						for gid in pairs(Groups.groups) do
 							Groups:SetCollapsed(gid, true)  -- true = force collapse
 						end
 						BFL:ForceRefreshFriendsList()
 					end)
 					
-					rootDescription:CreateButton("Expand All Groups", function()
+					rootDescription:CreateButton(BFL.L.MENU_EXPAND_ALL, function()
 						for gid in pairs(Groups.groups) do
 							Groups:SetCollapsed(gid, false)  -- false = force expand
 						end
@@ -2426,21 +2426,21 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 						
 						rootDescription:CreateTitle(groupData.name)
 						
-						rootDescription:CreateButton("Rename Group", function()
+						rootDescription:CreateButton(BFL.L.MENU_RENAME_GROUP, function()
 							StaticPopup_Show("BETTER_FRIENDLIST_RENAME_GROUP", nil, nil, self.groupId)
 						end)
 						
-						rootDescription:CreateButton("Change Color", function()
+						rootDescription:CreateButton(BFL.L.MENU_CHANGE_COLOR, function()
 							FriendsList:OpenColorPicker(self.groupId)
 						end)
 						
-						rootDescription:CreateButton("Invite All to Party", function()
+						rootDescription:CreateButton(BFL.L.MENU_INVITE_GROUP, function()
 							FriendsList:InviteGroupToParty(self.groupId)
 						end)
 						
 						rootDescription:CreateDivider()
 						
-						rootDescription:CreateButton("Collapse All Groups", function()
+						rootDescription:CreateButton(BFL.L.MENU_COLLAPSE_ALL, function()
 							if Groups then
 								for gid in pairs(Groups.groups) do
 									Groups:SetCollapsed(gid, true)  -- true = force collapse
@@ -2449,7 +2449,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 							end
 						end)
 						
-						rootDescription:CreateButton("Expand All Groups", function()
+						rootDescription:CreateButton(BFL.L.MENU_EXPAND_ALL, function()
 							if Groups then
 								for gid in pairs(Groups.groups) do
 									Groups:SetCollapsed(gid, false)  -- false = force expand
@@ -2579,7 +2579,7 @@ function FriendsList:UpdateFriendButton(button, elementData)
 								if isOver and BetterFriendsList_DraggedFriend then
 									-- Show highlight and update text (IDENTICAL to old system - GOLD color)
 									frame.dropHighlight:Show()
-									local headerText = string.format("|cffffd700Add %s to %s|r", BetterFriendsList_DraggedFriend, groupData.name)
+									local headerText = string.format(BFL.L.HEADER_ADD_FRIEND, BetterFriendsList_DraggedFriend, groupData.name)
 									frame:SetText(headerText)
 								else
 									-- Hide highlight and restore original text (IDENTICAL to old system - GOLD color)
@@ -3052,13 +3052,13 @@ function FriendsList:UpdateFriendButton(button, elementData)
 					if hideMaxLevel and friend.level == maxLevel then
 						infoText = " - " .. friend.areaName
 					else
-						infoText = string.format(" - Lvl %d, %s", friend.level, friend.areaName)
+						infoText = " - " .. string.format(L.LEVEL_FORMAT, friend.level) .. ", " .. friend.areaName
 					end
 				elseif friend.level then
 					if hideMaxLevel and friend.level == maxLevel then
-						infoText = " - Max Level"
+						infoText = " - " .. L.FRIEND_MAX_LEVEL
 					else
-						infoText = " - Lvl " .. friend.level
+						infoText = " - " .. string.format(L.LEVEL_FORMAT, friend.level)
 					end
 				elseif friend.areaName then
 					infoText = " - " .. friend.areaName
@@ -3090,13 +3090,13 @@ function FriendsList:UpdateFriendButton(button, elementData)
 					if hideMaxLevel and friend.level == maxLevel then
 						button.Info:SetText(friend.areaName)
 					else
-						button.Info:SetText(string.format("Lvl %d, %s", friend.level, friend.areaName))
+						button.Info:SetText(string.format(L.LEVEL_FORMAT, friend.level) .. ", " .. friend.areaName)
 					end
 				elseif friend.level then
 					if hideMaxLevel and friend.level == maxLevel then
-						button.Info:SetText("Max Level")
+						button.Info:SetText(L.FRIEND_MAX_LEVEL)
 					else
-						button.Info:SetText("Lvl " .. friend.level)
+						button.Info:SetText(string.format(L.LEVEL_FORMAT, friend.level))
 					end
 				elseif friend.areaName then
 					button.Info:SetText(friend.areaName)
@@ -3206,13 +3206,13 @@ function FriendsList:UpdateFriendButton(button, elementData)
 					if hideMaxLevel and friend.level == maxLevel then
 						infoText = " - " .. friend.area
 					else
-						infoText = string.format(" - Lvl %d, %s", friend.level, friend.area)
+						infoText = " - " .. string.format(L.LEVEL_FORMAT, friend.level) .. ", " .. friend.area
 					end
 				elseif friend.level then
 					if hideMaxLevel and friend.level == maxLevel then
-						infoText = " - Max Level"
+						infoText = " - " .. L.FRIEND_MAX_LEVEL
 					else
-						infoText = " - Lvl " .. friend.level
+						infoText = " - " .. string.format(L.LEVEL_FORMAT, friend.level)
 					end
 				elseif friend.area then
 					infoText = " - " .. friend.area
@@ -3237,13 +3237,13 @@ function FriendsList:UpdateFriendButton(button, elementData)
 					if hideMaxLevel and friend.level == maxLevel then
 						button.Info:SetText(friend.area)
 					else
-						button.Info:SetText(string.format("Lvl %d, %s", friend.level, friend.area))
+						button.Info:SetText(string.format(L.LEVEL_FORMAT, friend.level) .. ", " .. friend.area)
 					end
 				elseif friend.level then
 					if hideMaxLevel and friend.level == maxLevel then
-						button.Info:SetText("Max Level")
+						button.Info:SetText(L.FRIEND_MAX_LEVEL)
 					else
-						button.Info:SetText("Lvl " .. friend.level)
+						button.Info:SetText(string.format(L.LEVEL_FORMAT, friend.level))
 					end
 				elseif friend.area then
 					button.Info:SetText(friend.area)
@@ -3362,7 +3362,7 @@ function FriendsList:UpdateInviteButton(button, data)
 					for i, invite in ipairs(BFL.MockFriendInvites.invites) do
 						if invite.inviteID == parent.inviteID then
 							table.remove(BFL.MockFriendInvites.invites, i)
-							print("|cff00ff00BetterFriendlist:|r Accepted mock invite from " .. invite.accountName)
+							print("|cff00ff00BetterFriendlist:|r " .. string.format(BFL.L.MOCK_INVITE_ACCEPTED, invite.accountName))
 							break
 						end
 					end
@@ -3404,7 +3404,7 @@ function FriendsList:UpdateInviteButton(button, data)
 						for i, invite in ipairs(BFL.MockFriendInvites.invites) do
 							if invite.inviteID == inviteID then
 								table.remove(BFL.MockFriendInvites.invites, i)
-								print("|cffff0000BetterFriendlist:|r Declined mock invite from " .. invite.accountName)
+								print("|cffff0000BetterFriendlist:|r " .. string.format(BFL.L.MOCK_INVITE_DECLINED, invite.accountName))
 								break
 							end
 						end

@@ -28,7 +28,7 @@ local isWhoPlayerMenu = false
 function MenuSystem:Initialize()
 	-- Define StaticPopup for Nicknames
 	StaticPopupDialogs["BETTER_FRIENDLIST_SET_NICKNAME"] = {
-		text = "Set Nickname for %s",
+		text = BFL.L.MENU_SET_NICKNAME_FMT,
 		button1 = ACCEPT,
 		button2 = CANCEL,
 		hasEditBox = true,

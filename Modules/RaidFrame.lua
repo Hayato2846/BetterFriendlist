@@ -588,12 +588,12 @@ function RaidFrame:Initialize()
     if frame then
         -- Localize empty state text
         if frame.NotInRaid then
-            frame.NotInRaid:SetText(L.RAID_NOT_IN_RAID_DETAILS or "You are not currently in a raid group.")
+            frame.NotInRaid:SetText(L.RAID_NOT_IN_RAID_DETAILS)
         end
         
         -- Localize control panel buttons
         if frame.ControlPanel and frame.ControlPanel.ConvertToRaidButton then
-            frame.ControlPanel.ConvertToRaidButton:SetText(L.RAID_CREATE_BUTTON or "Create Raid")
+            frame.ControlPanel.ConvertToRaidButton:SetText(L.RAID_CREATE_BUTTON)
         end
     end
     
@@ -853,7 +853,7 @@ function RaidFrame:UpdateAllMemberButtons()
         -- Update group title
         local groupFrame = groupsContainer["Group" .. groupIndex]
         if groupFrame and groupFrame.GroupTitle then
-            groupFrame.GroupTitle:SetText("Group " .. groupIndex)
+            groupFrame.GroupTitle:SetText(string.format(L.RAID_GROUP_NAME, groupIndex))
         end
         
         -- Update each slot in the group using self.memberButtons[]
@@ -891,7 +891,7 @@ function RaidFrame:InitializeMemberButtons()
         if groupFrame then
             -- Set group title
             if groupFrame.GroupTitle then
-                groupFrame.GroupTitle:SetText((L.GROUP or "Group") .. " " .. groupIndex)
+                groupFrame.GroupTitle:SetText(string.format(L.RAID_GROUP_NAME, groupIndex))
             end
             
             -- Reference XML template buttons (already created)
@@ -1125,7 +1125,7 @@ function RaidFrame:UpdateControlPanel()
         local currentText = frame.ControlPanel.EveryoneAssistLabel:GetText()
         if not currentText or currentText == "" then
             local ASSIST_ICON = "|TInterface\\GroupFrame\\UI-Group-AssistantIcon:14:14|t"
-            frame.ControlPanel.EveryoneAssistLabel:SetText((L.ALL or "All") .. " " .. ASSIST_ICON)
+            frame.ControlPanel.EveryoneAssistLabel:SetText(L.ALL .. " " .. ASSIST_ICON)
             -- BFL:DebugPrint("[BFL] Assist All label set: All " .. ASSIST_ICON)
         end
     end
@@ -1234,7 +1234,7 @@ function RaidFrame:UpdateMemberButton(button, memberData)
         
         -- Show "Empty" text
         if button.EmptyText then
-            button.EmptyText:SetText(L.EMPTY_TEXT or "Empty")
+            button.EmptyText:SetText(L.EMPTY_TEXT)
             button.EmptyText:Show()
         end
         
@@ -1891,7 +1891,7 @@ function RaidFrame:OnCombatStart()
         
         -- Yellow warning toast
         UIErrorsFrame:AddMessage(
-            "Multi-selection cleared - entered combat",
+            L.MSG_MULTI_SELECTION_CLEARED,
             1.0, 0.8, 0.0, 1.0
         )
     end
@@ -2165,7 +2165,7 @@ function RaidFrame:CreateMockPreset_Standard()
 	self:ApplyMockData()
 	self:StartMockDynamicUpdates()
 	
-	print("|cff00ff00BFL RaidFrame:|r Created 25-player mock raid (5 groups)")
+	print("|cff00ff00BFL RaidFrame:|r " .. BFL.L.RAID_MOCK_CREATED_25)
 	print("  Tanks: 2, Healers: 5, DPS: 18")
 	print("  Leader + 2 Assistants assigned")
 end
@@ -2182,7 +2182,7 @@ function RaidFrame:CreateMockPreset_Full()
 	self:ApplyMockData()
 	self:StartMockDynamicUpdates()
 	
-	print("|cff00ff00BFL RaidFrame:|r Created 40-player mock raid (8 groups)")
+	print("|cff00ff00BFL RaidFrame:|r " .. BFL.L.RAID_MOCK_CREATED_40)
 	print("  Tanks: 2, Healers: 8, DPS: 30")
 	print("  Full scrollbar test!")
 end
@@ -2199,7 +2199,7 @@ function RaidFrame:CreateMockPreset_Small()
 	self:ApplyMockData()
 	self:StartMockDynamicUpdates()
 	
-	print("|cff00ff00BFL RaidFrame:|r Created 10-player mock raid (2 groups)")
+	print("|cff00ff00BFL RaidFrame:|r " .. BFL.L.RAID_MOCK_CREATED_10)
 	print("  Tanks: 2, Healers: 2, DPS: 6")
 end
 
@@ -2215,7 +2215,7 @@ function RaidFrame:CreateMockPreset_Mythic()
 	self:ApplyMockData()
 	self:StartMockDynamicUpdates()
 	
-	print("|cff00ff00BFL RaidFrame:|r Created 20-player mythic mock raid (4 groups)")
+	print("|cff00ff00BFL RaidFrame:|r " .. BFL.L.RAID_MOCK_CREATED_MYTHIC)
 	print("  Tanks: 2, Healers: 4, DPS: 14")
 	print("  Mythic composition!")
 end
@@ -2235,8 +2235,8 @@ function RaidFrame:CreateMockPreset_Stress()
 	self:ApplyMockData()
 	self:StartMockDynamicUpdates()
 	
-	print("|cff00ff00BFL RaidFrame:|r Stress test: 40 players with 1-second updates")
-	print("|cffff8800Warning:|r High CPU usage expected!")
+	print("|cff00ff00BFL RaidFrame:|r " .. BFL.L.RAID_MOCK_STRESS)
+	print(BFL.L.RAID_WARN_CPU)
 end
 
 -- ============================================
@@ -2492,11 +2492,11 @@ end
 ]]
 function RaidFrame:SimulateReadyCheck()
 	if not self.mockEnabled or #self.raidMembers == 0 then
-		print("|cffff8800BFL RaidFrame:|r No mock data. Use '/bfl raid mock' first.")
+		print(BFL.L.RAID_NO_MOCK_DATA)
 		return
 	end
 	
-	print("|cff00ff00BFL RaidFrame:|r Simulating Ready Check...")
+	print("|cff00ff00BFL RaidFrame:|r " .. BFL.L.RAID_SIM_READY_CHECK)
 	
 	-- Set all online members to "waiting"
 	for _, member in ipairs(self.raidMembers) do
@@ -2555,7 +2555,7 @@ end
 ]]
 function RaidFrame:SimulateRoleChanges()
 	if not self.mockEnabled or #self.raidMembers == 0 then
-		print("|cffff8800BFL RaidFrame:|r No mock data. Use '/bfl raid mock' first.")
+		print(BFL.L.RAID_NO_MOCK_DATA)
 		return
 	end
 	
@@ -2595,7 +2595,7 @@ end
 ]]
 function RaidFrame:SimulateGroupMoves()
 	if not self.mockEnabled or #self.raidMembers == 0 then
-		print("|cffff8800BFL RaidFrame:|r No mock data. Use '/bfl raid mock' first.")
+		print(BFL.L.RAID_NO_MOCK_DATA)
 		return
 	end
 	
@@ -2674,7 +2674,7 @@ function RaidFrame:ClearMockData()
 	end
 	
 	-- BFL:DebugPrint("|cff00ff00RaidFrame Mock:|r Cleared all mock data")
-	print("|cff00ff00BFL RaidFrame:|r Mock data cleared")
+	print("|cff00ff00BFL RaidFrame:|r " .. BFL.L.RAID_MOCK_CLEARED)
 end
 
 -- ============================================
@@ -2721,7 +2721,7 @@ SlashCmdList["BFLRAIDFRAME"] = function(msg)
 		elseif eventType == "move" or eventType == "shuffle" then
 			RaidFrame:SimulateGroupMoves()
 		else
-			print("|cff00ff00BFL RaidFrame Event Commands:|r")
+			print(BFL.L.RAID_EVENT_COMMANDS)
 			print("  |cffffcc00/bfl raid event readycheck|r - Simulate ready check")
 			print("  |cffffcc00/bfl raid event rolechange|r - Simulate role changes")
 			print("  |cffffcc00/bfl raid event move|r - Shuffle players between groups")
@@ -2733,19 +2733,19 @@ SlashCmdList["BFLRAIDFRAME"] = function(msg)
 		
 		if setting == "dynamic" then
 			RaidFrame.mockConfig.dynamicUpdates = (value == "on" or value == "true" or value == "1")
-			print(string.format("|cff00ff00BFL RaidFrame:|r Dynamic updates: %s", 
+			print("|cff00ff00BFL RaidFrame:|r " .. string.format(BFL.L.RAID_DYN_UPDATES, 
 				RaidFrame.mockConfig.dynamicUpdates and "ON" or "OFF"))
 		elseif setting == "interval" then
 			local interval = tonumber(value) or 5.0
 			RaidFrame.mockConfig.updateInterval = math.max(1.0, interval)
-			print(string.format("|cff00ff00BFL RaidFrame:|r Update interval: %.1f seconds", 
+			print("|cff00ff00BFL RaidFrame:|r " .. string.format(BFL.L.RAID_UPDATE_INTERVAL, 
 				RaidFrame.mockConfig.updateInterval))
 		else
-			print("|cff00ff00BFL RaidFrame Config:|r")
-			print(string.format("  Mock enabled: %s", RaidFrame.mockEnabled and "YES" or "NO"))
-			print(string.format("  Dynamic updates: %s", RaidFrame.mockConfig.dynamicUpdates and "ON" or "OFF"))
-			print(string.format("  Update interval: %.1f seconds", RaidFrame.mockConfig.updateInterval))
-			print(string.format("  Members: %d", #RaidFrame.raidMembers))
+			print(BFL.L.RAID_CONFIG_HEADER)
+			print(string.format(BFL.L.RAID_MOCK_ENABLED_STATUS, RaidFrame.mockEnabled and "YES" or "NO"))
+			print(string.format(BFL.L.RAID_DYN_UPDATES_STATUS, RaidFrame.mockConfig.dynamicUpdates and "ON" or "OFF"))
+			print(string.format(BFL.L.RAID_UPDATE_INTERVAL_STATUS, RaidFrame.mockConfig.updateInterval))
+			print(string.format(BFL.L.RAID_MEMBERS_STATUS, #RaidFrame.raidMembers))
 			print("")
 			print("  |cffffcc00/bfl raid config dynamic on|off|r")
 			print("  |cffffcc00/bfl raid config interval <seconds>|r")
@@ -2756,8 +2756,8 @@ SlashCmdList["BFLRAIDFRAME"] = function(msg)
 		
 	elseif cmd == "list" or cmd == "info" then
 		if RaidFrame.mockEnabled and #RaidFrame.raidMembers > 0 then
-			print("|cff00ff00BFL RaidFrame Mock Info:|r")
-			print(string.format("  Total members: %d", #RaidFrame.raidMembers))
+			print(BFL.L.RAID_INFO_HEADER)
+			print(string.format(BFL.L.RAID_TOTAL_MEMBERS, #RaidFrame.raidMembers))
 			
 			local tanks, healers, dps, offline, dead = 0, 0, 0, 0, 0
 			for _, member in ipairs(RaidFrame.raidMembers) do
@@ -2768,33 +2768,33 @@ SlashCmdList["BFLRAIDFRAME"] = function(msg)
 				if member.isDead then dead = dead + 1 end
 			end
 			
-			print(string.format("  Composition: %d Tanks, %d Healers, %d DPS", tanks, healers, dps))
-			print(string.format("  Status: %d offline, %d dead", offline, dead))
-			print(string.format("  Dynamic updates: %s", RaidFrame.mockConfig.dynamicUpdates and "ON" or "OFF"))
+			print(string.format(BFL.L.RAID_COMPOSITION, tanks, healers, dps))
+			print(string.format(BFL.L.RAID_STATUS, offline, dead))
+			print(string.format(BFL.L.RAID_DYN_UPDATES_STATUS, RaidFrame.mockConfig.dynamicUpdates and "ON" or "OFF"))
 		else
-			print("|cff888888BFL RaidFrame:|r No mock data active. Use '/bfl raid mock' to create.")
+			print(BFL.L.RAID_NO_MOCK_ACTIVE)
 		end
 		
 	else
 		-- Help
-		print("|cff00ff00BFL RaidFrame Commands:|r")
+		print(BFL.L.CORE_HELP_RAID_COMMANDS)
 		print("")
-		print("|cffffcc00Mock Data:|r")
-		print("  |cffffffff/bfl raid mock|r - Create 25-player raid (standard)")
-		print("  |cffffffff/bfl raid mock full|r - Create 40-player raid")
-		print("  |cffffffff/bfl raid mock small|r - Create 10-player raid")
-		print("  |cffffffff/bfl raid mock mythic|r - Create 20-player mythic raid")
-		print("  |cffffffff/bfl raid mock stress|r - Stress test (40 players, fast updates)")
+		print(BFL.L.CORE_HELP_MOCK_COMMANDS)
+		print(BFL.L.CORE_HELP_RAID_MOCK)
+		print(BFL.L.CORE_HELP_RAID_FULL)
+		print(BFL.L.CORE_HELP_RAID_SMALL)
+		print(BFL.L.CORE_HELP_RAID_MYTHIC)
+		print(BFL.L.RAID_CMD_STRESS)
 		print("")
-		print("|cffffcc00Event Simulation:|r")
-		print("  |cffffffff/bfl raid event readycheck|r - Simulate ready check")
-		print("  |cffffffff/bfl raid event rolechange|r - Simulate role changes")
-		print("  |cffffffff/bfl raid event move|r - Shuffle group assignments")
+		print(BFL.L.RAID_HELP_EVENTS)
+		print(BFL.L.CORE_HELP_RAID_READY)
+		print(BFL.L.CORE_HELP_RAID_ROLE)
+		print(BFL.L.CORE_HELP_RAID_MOVE)
 		print("")
-		print("|cffffcc00Management:|r")
-		print("  |cffffffff/bfl raid config|r - Show/set mock configuration")
-		print("  |cffffffff/bfl raid list|r - Show mock raid info")
-		print("  |cffffffff/bfl raid clear|r - Remove all mock data")
+		print(BFL.L.RAID_HELP_MANAGEMENT)
+		print(BFL.L.RAID_CMD_CONFIG)
+		print(BFL.L.RAID_CMD_LIST)
+		print(BFL.L.CORE_HELP_RAID_CLEAR)
 	end
 end
 
