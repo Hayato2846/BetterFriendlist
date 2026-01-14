@@ -3,27 +3,42 @@
 
 local ADDON_NAME, BFL = ...
 
--- Initialize locale table
-BFL_LOCALE = {}
+-- Initialize locale tables
+BFL_LOCALE = {}          -- Current locale
+BFL_LOCALE_ENUS = {}     -- English fallback
 
 -- Get current WoW locale
 local locale = GetLocale()
 
--- Localization accessor with fallback to key if translation not found
--- Also tracks missing keys for developer reporting
+-- Localization accessor with 3-tier fallback:
+-- 1. Current locale (e.g. deDE, frFR)
+-- 2. English (enUS) - FALLBACK
+-- 3. Key name - LAST RESORT (means enUS is also missing the key)
 BFL.MissingKeys = {}
 
 local L = setmetatable({}, {
 	__index = function(t, key)
+		-- Try current locale first
 		local translation = BFL_LOCALE[key]
-		if not translation then
-			-- Track missing key if not already tracked
-			if not BFL.MissingKeys[key] then
+		if translation then
+			return translation
+		end
+		
+		-- Fallback to enUS
+		local englishFallback = BFL_LOCALE_ENUS[key]
+		if englishFallback then
+			-- Track missing translation (but don't spam for enUS locale)
+			if locale ~= "enUS" and not BFL.MissingKeys[key] then
 				BFL.MissingKeys[key] = true
 			end
-			return key -- Fallback to key name
+			return englishFallback
 		end
-		return translation
+		
+		-- Last resort: return key name (means even enUS doesn't have it!)
+		if not BFL.MissingKeys[key] then
+			BFL.MissingKeys[key] = true
+		end
+		return key
 	end
 })
 

@@ -2331,11 +2331,42 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex)
 	
 	if tabIndex == 1 then
 		-- Tab 1: Friends/Contacts list
-		ShowChildFrame(frame.ScrollFrame)
-		ShowChildFrame(frame.MinimalScrollBar)
-		ShowChildFrame(frame.AddFriendButton)
-		ShowChildFrame(frame.SendMessageButton)
-		UpdateFriendsDisplay()
+		-- CRITICAL: Check which TOP tab is active (Friends/Recent Allies/RAF)
+		-- to show the correct content when switching from Who/Raid back to Contacts
+		if not BFL.IsClassic and frame.FriendsTabHeader then
+			local activeTopTab = PanelTemplates_GetSelectedTab(frame.FriendsTabHeader) or 1
+			
+			if activeTopTab == 1 then
+				-- Top Tab 1: Friends
+				ShowChildFrame(frame.ScrollFrame)
+				ShowChildFrame(frame.MinimalScrollBar)
+				ShowChildFrame(frame.AddFriendButton)
+				ShowChildFrame(frame.SendMessageButton)
+				UpdateFriendsDisplay()
+			elseif activeTopTab == 2 then
+				-- Top Tab 2: Recent Allies
+				if frame.RecentAlliesFrame then
+					ShowChildFrame(frame.RecentAlliesFrame)
+					local RecentAllies = BFL:GetModule("RecentAllies")
+					if RecentAllies then
+						RecentAllies:Refresh(frame.RecentAlliesFrame, ScrollBoxConstants.RetainScrollPosition)
+					end
+				end
+			elseif activeTopTab == 3 then
+				-- Top Tab 3: Recruit A Friend
+				if frame.RecruitAFriendFrame then
+					ShowChildFrame(frame.RecruitAFriendFrame)
+					ShowChildFrame(frame.RecruitmentButton)
+				end
+			end
+		else
+			-- Classic: Always show Friends list (only 1 top tab exists)
+			ShowChildFrame(frame.ScrollFrame)
+			ShowChildFrame(frame.MinimalScrollBar)
+			ShowChildFrame(frame.AddFriendButton)
+			ShowChildFrame(frame.SendMessageButton)
+			UpdateFriendsDisplay()
+		end
 	elseif tabIndex == 2 then
 		-- Tab 2: Who frame
 		ShowChildFrame(frame.WhoFrame)

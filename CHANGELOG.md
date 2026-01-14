@@ -6,9 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
-## [2.1.7] - 2026-01-13
+## [2.1.7] - 2026-01-14
 ### Fixed
-- **Localization (enUS & deDE)** - Significantly extended and polished translations for English and German. The German localization has been completely reworked to be less formal and more natural.
+- **Tab Switching Bug** - Fixed an issue where switching from "Who" or "Raid" back to "Contacts" would incorrectly display the Friends list even when "Recent Allies" or "Recruit A Friend" tabs were active.
+- **Localization Fallback** - Improved fallback logic for missing translations. The addon now automatically uses English text when a translation is missing instead of displaying variable names.
+- **Localization (All Languages)** - Significantly improved translations across all 11 supported languages. The German localization has been completely reworked to be less formal and more natural.
 
 ## [2.1.6] - 2026-01-12
 ### Fixed

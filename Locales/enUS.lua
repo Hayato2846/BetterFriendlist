@@ -1,9 +1,14 @@
 -- Locales/enUS.lua
 -- English (US) Localization
+-- This file is ALWAYS loaded as fallback for all locales
 
-local L = BFL_LOCALE
+-- Load into enUS fallback table (used by all locales)
+local L = BFL_LOCALE_ENUS
 
+-- Also load into main table if we're actually on enUS client
 if GetLocale() == "enUS" then
+	BFL_LOCALE = BFL_LOCALE_ENUS
+end
 	-- ========================================
 	-- DIALOGS & POPUPS
 	-- ========================================
@@ -659,6 +664,7 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Prevent BetterFriendlist from opening ove
 	-- RECRUIT A FRIEND (RAF)
 	-- ========================================
 	L.RECRUIT_A_FRIEND = "Recruit A Friend"
+	L.RAF_RECRUITMENT = "Recruitment"
 	L.RAF_NO_RECRUITS_DESC = "You have not recruited any friends yet."
 	L.RAF_PENDING_RECRUIT = "Pending Recruit"
 	L.RAF_RECRUIT_NAME_MULTIPLE = "%s (%d)"
@@ -1121,4 +1127,3 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Prevent BetterFriendlist from opening ove
 	-- ClassicCompat.lua
 	L.PERF_HEADER_PREFIX = "|cff00ff00BetterFriendlist Performance:|r"
 	L.COMPAT_GAME_VERSION = "|cffffcc00Game Version:|r"
-end
