@@ -3,6 +3,7 @@
 
 local ADDON_NAME, BFL = ...
 local FriendsList = BFL:RegisterModule("FriendsList", {})
+local L = BFL.L  -- Localization table
 
 -- ========================================
 -- Module Dependencies
