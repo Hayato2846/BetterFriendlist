@@ -82,7 +82,7 @@
 				<ButtonText/>
 				<Scripts>
 					<OnLoad>
-						self:SetText(BFL_L.INVITE_BUTTON_ACCEPT)
+						self:SetText(L.INVITE_BUTTON_ACCEPT)
 					</OnLoad>
 				</Scripts>
 			</Button>
@@ -96,7 +96,7 @@
 				<ButtonText/>
 				<Scripts>
 					<OnLoad>
-						self:SetText(BFL_L.INVITE_BUTTON_DECLINE)
+						self:SetText(L.INVITE_BUTTON_DECLINE)
 					</OnLoad>
 				</Scripts>
 			</Button>
@@ -126,3 +126,4 @@
 	</Frame>
 	
 </Ui>
+

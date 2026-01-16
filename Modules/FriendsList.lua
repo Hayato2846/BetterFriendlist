@@ -2268,8 +2268,8 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 		if isDragging and self.groupId and friendGroups[self.groupId] and not friendGroups[self.groupId].builtin then
 			-- Show drop target tooltip
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText(BFL_L.TOOLTIP_DROP_TO_ADD, 1, 1, 1)
-			GameTooltip:AddLine(BFL_L.TOOLTIP_HOLD_SHIFT, 0.7, 0.7, 0.7, true)
+			GameTooltip:SetText(L.TOOLTIP_DROP_TO_ADD, 1, 1, 1)
+			GameTooltip:AddLine(L.TOOLTIP_HOLD_SHIFT, 0.7, 0.7, 0.7, true)
 			GameTooltip:Show()
 		else
 			-- Show group info tooltip
@@ -2280,7 +2280,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 				GameTooltip:SetText(groupData.name, 1, 1, 1)
 				GameTooltip:AddLine(BFL.L.HINT_RIGHT_CLICK_OPTIONS, 0.7, 0.7, 0.7, true)
 				if not groupData.builtin then
-					GameTooltip:AddLine(BFL_L.TOOLTIP_DRAG_HERE, 0.5, 0.8, 1.0, true)
+					GameTooltip:AddLine(L.TOOLTIP_DRAG_HERE, 0.5, 0.8, 1.0, true)
 				end
 				GameTooltip:Show()
 			end
@@ -3105,14 +3105,14 @@ function FriendsList:UpdateFriendButton(button, elementData)
 					-- Show "Mobile" or "In App" without "Playing" prefix
 					button.Info:SetText(friend.gameName)
 				else
-					button.Info:SetText(BFL_L.ONLINE_STATUS)
+					button.Info:SetText(L.ONLINE_STATUS)
 				end
 			else
 				-- Offline - show last online time for Battle.net friends
 				if friend.lastOnlineTime then
 					button.Info:SetText(GetLastOnlineText(friend))
 				else
-					button.Info:SetText(BFL_L.OFFLINE_STATUS)
+					button.Info:SetText(L.OFFLINE_STATUS)
 				end
 			end
 		end  -- end of if not isCompactMode
@@ -3249,10 +3249,10 @@ function FriendsList:UpdateFriendButton(button, elementData)
 				elseif friend.area then
 					button.Info:SetText(friend.area)
 				else
-					button.Info:SetText(BFL_L.ONLINE_STATUS)
+					button.Info:SetText(L.ONLINE_STATUS)
 				end
 			else
-				button.Info:SetText(BFL_L.OFFLINE_STATUS)
+				button.Info:SetText(L.OFFLINE_STATUS)
 			end
 		end  -- end of if not isCompactMode
 	end -- end of if friend.type == "bnet"
@@ -3266,7 +3266,7 @@ end
 -- ========================================
 
 function FriendsList:UpdateInviteHeaderButton(button, data)
-	button.Text:SetFormattedText(BFL_L.INVITE_HEADER, data.count)
+	button.Text:SetFormattedText(L.INVITE_HEADER, data.count)
 	local collapsed = GetCVarBool("friendInvitesCollapsed")
 	button.DownArrow:SetShown(not collapsed)
 	button.RightArrow:SetShown(collapsed)
@@ -3318,7 +3318,7 @@ function FriendsList:UpdateInviteButton(button, data)
 	button.Name:SetText("|cff00ccff" .. accountName .. "|r")
 	
 	-- Set Info text ALWAYS
-	button.Info:SetText(BFL_L.INVITE_TAP_TEXT)
+	button.Info:SetText(L.INVITE_TAP_TEXT)
 	
 	-- Adjust positioning based on compact mode
 	button.Name:ClearAllPoints()
@@ -3620,6 +3620,7 @@ end
 BFL.FriendsList = FriendsList
 
 return FriendsList
+
 
 
 

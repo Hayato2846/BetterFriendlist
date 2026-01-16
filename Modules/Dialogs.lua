@@ -8,6 +8,7 @@
 --------------------------------------------------------------------------
 
 local ADDON_NAME, BFL = ...
+local L = BFL.L
 
 -- Register the Dialogs module
 local Dialogs = BFL:RegisterModule("Dialogs", {})
@@ -19,9 +20,9 @@ local Dialogs = BFL:RegisterModule("Dialogs", {})
 function Dialogs:RegisterDialogs()
 	-- Dialog for creating a new group
 	StaticPopupDialogs["BETTER_FRIENDLIST_CREATE_GROUP"] = {
-		text = BFL_L.DIALOG_CREATE_GROUP_TEXT,
-		button1 = BFL_L.DIALOG_CREATE_GROUP_BTN1,
-		button2 = BFL_L.DIALOG_CREATE_GROUP_BTN2,
+		text = L.DIALOG_CREATE_GROUP_TEXT,
+		button1 = L.DIALOG_CREATE_GROUP_BTN1,
+		button2 = L.DIALOG_CREATE_GROUP_BTN2,
 		hasEditBox = true,
 		OnAccept = function(self)
 			local groupName = self.EditBox:GetText()
@@ -63,9 +64,9 @@ function Dialogs:RegisterDialogs()
 
 	-- Dialog for creating a new group and adding a friend to it
 	StaticPopupDialogs["BETTER_FRIENDLIST_CREATE_GROUP_AND_ADD_FRIEND"] = {
-		text = BFL_L.DIALOG_CREATE_GROUP_TEXT,
-		button1 = BFL_L.DIALOG_CREATE_GROUP_BTN1,
-		button2 = BFL_L.DIALOG_CREATE_GROUP_BTN2,
+		text = L.DIALOG_CREATE_GROUP_TEXT,
+		button1 = L.DIALOG_CREATE_GROUP_BTN1,
+		button2 = L.DIALOG_CREATE_GROUP_BTN2,
 		hasEditBox = true,
 		OnAccept = function(self, friendUID)
 			local groupName = self.EditBox:GetText()
@@ -114,9 +115,9 @@ function Dialogs:RegisterDialogs()
 
 	-- Dialog for renaming a group
 	StaticPopupDialogs["BETTER_FRIENDLIST_RENAME_GROUP"] = {
-		text = BFL_L.DIALOG_RENAME_GROUP_TEXT,
-		button1 = BFL_L.DIALOG_RENAME_GROUP_BTN1,
-		button2 = BFL_L.DIALOG_RENAME_GROUP_BTN2,
+		text = L.DIALOG_RENAME_GROUP_TEXT,
+		button1 = L.DIALOG_RENAME_GROUP_BTN1,
+		button2 = L.DIALOG_RENAME_GROUP_BTN2,
 		hasEditBox = true,
 		OnAccept = function(self, data)
 			local newName = self.EditBox:GetText()
@@ -185,9 +186,9 @@ function Dialogs:RegisterDialogs()
 
 	-- Dialog for deleting a group
 	StaticPopupDialogs["BETTER_FRIENDLIST_DELETE_GROUP"] = {
-		text = BFL_L.DIALOG_DELETE_GROUP_TEXT,
-		button1 = BFL_L.DIALOG_DELETE_GROUP_BTN1,
-		button2 = BFL_L.DIALOG_DELETE_GROUP_BTN2,
+		text = L.DIALOG_DELETE_GROUP_TEXT,
+		button1 = L.DIALOG_DELETE_GROUP_BTN1,
+		button2 = L.DIALOG_DELETE_GROUP_BTN2,
 		OnAccept = function(self, data)
 			local groupId = data
 			local FriendsList = BFL:GetModule("FriendsList")
@@ -526,3 +527,4 @@ end
 
 -- Auto-register dialogs when module loads
 Dialogs:RegisterDialogs()
+

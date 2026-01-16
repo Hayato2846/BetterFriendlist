@@ -2,6 +2,7 @@
 -- Settings panel and configuration management module
 
 local ADDON_NAME, BFL = ...
+local L = BFL.L
 
 -- Import UI constants
 local UI = BFL.UI.CONSTANTS
@@ -101,8 +102,8 @@ local function CreateGroupButton(parent, groupId, groupName, orderIndex)
 		
 		button.editButton:SetScript("OnEnter", function(self)
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText(BFL_L.TOOLTIP_RENAME_GROUP, 1, 1, 1)
-			GameTooltip:AddLine(BFL_L.TOOLTIP_RENAME_DESC, 0.8, 0.8, 0.8, true)
+			GameTooltip:SetText(L.TOOLTIP_RENAME_GROUP, 1, 1, 1)
+			GameTooltip:AddLine(L.TOOLTIP_RENAME_DESC, 0.8, 0.8, 0.8, true)
 			GameTooltip:Show()
 		end)
 		
@@ -144,8 +145,8 @@ local function CreateGroupButton(parent, groupId, groupName, orderIndex)
 	
 	button.colorButton:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText(BFL_L.TOOLTIP_GROUP_COLOR, 1, 1, 1)
-		GameTooltip:AddLine(BFL_L.TOOLTIP_GROUP_COLOR_DESC, 0.8, 0.8, 0.8, true)
+		GameTooltip:SetText(L.TOOLTIP_GROUP_COLOR, 1, 1, 1)
+		GameTooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC, 0.8, 0.8, 0.8, true)
 		GameTooltip:Show()
 	end)
 	
@@ -630,6 +631,7 @@ function Settings:LoadSettings()
 	local DB = GetDB()
 	if not DB then return end
 	
+	if not settingsFrame or not settingsFrame.ContentScrollFrame then return end
 	local content = settingsFrame.ContentScrollFrame.Content
 	
 	-- General tab is now populated via RefreshGeneralTab() which reads DB directly
@@ -757,7 +759,7 @@ function Settings:DoReset()
 	-- Force full display refresh - reset affects all display settings
 	BFL:ForceRefreshFriendsList()
 	
-	print("|cff20ff20BetterFriendlist:|r " .. BFL_L.SETTINGS_RESET_SUCCESS)
+	print("|cff20ff20BetterFriendlist:|r " .. L.SETTINGS_RESET_SUCCESS)
 end
 
 -- Refresh the group list in the Groups tab (Legacy wrapper)
@@ -860,7 +862,7 @@ function Settings:SaveGroupOrder()
 	local DB = GetDB()
 	if DB then
 		DB:Set("groupOrder", newOrder)
-		print("|cff20ff20BetterFriendlist:|r " .. BFL_L.SETTINGS_GROUP_ORDER_SAVED)
+		print("|cff20ff20BetterFriendlist:|r " .. L.SETTINGS_GROUP_ORDER_SAVED)
 		
 		local Groups = GetGroups()
 		if Groups and Groups.Initialize then
@@ -1049,11 +1051,11 @@ function Settings:MigrateFriendGroups(cleanupNotes, force)
 	
 	-- Check if migration has already been completed
 	if not force and DB:Get("friendGroupsMigrated") then
-		-- BFL:DebugPrint("|cff00ffffBetterFriendlist:|r " .. BFL_L.MSG_MIGRATION_ALREADY_DONE)
+		-- BFL:DebugPrint("|cff00ffffBetterFriendlist:|r " .. L.MSG_MIGRATION_ALREADY_DONE)
 		return
 	end
 	
-	-- BFL:DebugPrint("|cff00ffffBetterFriendlist:|r " .. BFL_L.MSG_MIGRATION_STARTING)
+	-- BFL:DebugPrint("|cff00ffffBetterFriendlist:|r " .. L.MSG_MIGRATION_STARTING)
 	-- BFL:DebugPrint("|cff00ffffBetterFriendlist:|r DB module:", DB and "OK" or "MISSING")
 	-- BFL:DebugPrint("|cff00ffffBetterFriendlist:|r Groups module:", Groups and "OK" or "MISSING")
 	
@@ -1234,23 +1236,23 @@ function Settings:MigrateFriendGroups(cleanupNotes, force)
 		numGroups = numGroups + 1
 	end
 	
-	local cleanupMsg = cleanupNotes and ("\n|cff00ff00" .. BFL_L.SETTINGS_NOTES_CLEANED .. "|r") or ("\n|cffffff00" .. BFL_L.SETTINGS_NOTES_PRESERVED .. "|r")
+	local cleanupMsg = cleanupNotes and ("\n|cff00ff00" .. L.SETTINGS_NOTES_CLEANED .. "|r") or ("\n|cffffff00" .. L.SETTINGS_NOTES_PRESERVED .. "|r")
 	
 	-- Mark migration as completed
 	DB:Set("friendGroupsMigrated", true)
 	
 	print("|cff00ff00═══════════════════════════════════════")
-	print("|cff00ff00BetterFriendlist: " .. BFL_L.SETTINGS_MIGRATION_COMPLETE)
+	print("|cff00ff00BetterFriendlist: " .. L.SETTINGS_MIGRATION_COMPLETE)
 	print("|cff00ff00═══════════════════════════════════════")
 	print(string.format(
 		"|cff00ffff%s|r %d\n" ..
 		"|cff00ffff%s|r %d\n" ..
 		"|cff00ffff%s|r %d%s",
-		BFL_L.SETTINGS_MIGRATION_FRIENDS,
+		L.SETTINGS_MIGRATION_FRIENDS,
 		migratedFriends,
-		BFL_L.SETTINGS_MIGRATION_GROUPS,
+		L.SETTINGS_MIGRATION_GROUPS,
 		numGroups,
-		BFL_L.SETTINGS_MIGRATION_ASSIGNMENTS,
+		L.SETTINGS_MIGRATION_ASSIGNMENTS,
 		assignmentCount,
 		cleanupMsg
 	))
@@ -1264,10 +1266,10 @@ end
 -- Show migration dialog
 function Settings:ShowMigrationDialog()
 	StaticPopupDialogs["BETTERFRIENDLIST_MIGRATE_FRIENDGROUPS"] = {
-		text = BFL_L.DIALOG_MIGRATE_TEXT,
-		button1 = BFL_L.DIALOG_MIGRATE_BTN1,
-		button2 = BFL_L.DIALOG_MIGRATE_BTN2,
-		button3 = BFL_L.DIALOG_MIGRATE_BTN3,
+		text = L.DIALOG_MIGRATE_TEXT,
+		button1 = L.DIALOG_MIGRATE_BTN1,
+		button2 = L.DIALOG_MIGRATE_BTN2,
+		button3 = L.DIALOG_MIGRATE_BTN3,
 		OnAccept = function()
 			Settings:MigrateFriendGroups(true, true)
 		end,
@@ -3347,11 +3349,11 @@ function Settings:RefreshNotificationsTab()
 	modeDesc:SetWidth(360)
 	modeDesc:SetJustifyH("LEFT")
 	modeDesc:SetWordWrap(true)
-	modeDesc:SetText(L.SETTINGS_NOTIFY_MODE_DESC or
+	modeDesc:SetText(L.SETTINGS_NOTIFY_MODE_DESC or (
 		"|cffffcc00Toast Notification:|r Shows a compact notification when friends come online\n" ..
 		"|cffffcc00Chat Message Only:|r No popup, only shows messages in chat\n" ..
 		"|cffffcc00Disabled:|r No notifications at all"
-	)
+	))
 	table.insert(allFrames, modeDesc)
 	
 	-- Test Button
@@ -4082,7 +4084,7 @@ function Settings:RefreshBrokerTab()
 	local allFrames = {}
 	
 	-- Header: Data Broker Integration
-	local header = Components:CreateHeader(tab, BFL_L.BROKER_SETTINGS_HEADER_INTEGRATION)
+	local header = Components:CreateHeader(tab, L.BROKER_SETTINGS_HEADER_INTEGRATION)
 	table.insert(allFrames, header)
 	
 	-- Info Text
@@ -4090,7 +4092,7 @@ function Settings:RefreshBrokerTab()
 	infoText:SetWidth(360)
 	infoText:SetJustifyH("LEFT")
 	infoText:SetWordWrap(true)
-	infoText:SetText(BFL_L.BROKER_SETTINGS_INFO)
+	infoText:SetText(L.BROKER_SETTINGS_INFO)
 	table.insert(allFrames, infoText)
 	
 	-- Enable Data Broker
@@ -4151,7 +4153,7 @@ function Settings:RefreshBrokerTab()
 	table.insert(allFrames, showTotal)
 
 	-- Split WoW/BNet Counts
-	local showGroups = Components:CreateCheckbox(tab, BFL_L.BROKER_SETTINGS_SHOW_GROUPS,
+	local showGroups = Components:CreateCheckbox(tab, L.BROKER_SETTINGS_SHOW_GROUPS,
 		DB:Get("brokerShowGroups", false),
 		function(val)
 			BetterFriendlistDB.brokerShowGroups = val
@@ -4196,18 +4198,18 @@ function Settings:RefreshBrokerTab()
 	table.insert(allFrames, Components:CreateSpacer(tab))
 
 	-- Header: Tooltip Columns
-	local columnsHeader = Components:CreateHeader(tab, BFL_L.BROKER_SETTINGS_COLUMNS_HEADER)
+	local columnsHeader = Components:CreateHeader(tab, L.BROKER_SETTINGS_COLUMNS_HEADER)
 	table.insert(allFrames, columnsHeader)
 	
 	-- Column Reordering Logic
 	local availableColumns = {
-		{ key = "Name",      label = BFL_L.BROKER_COLUMN_NAME },
-		{ key = "Level",     label = BFL_L.BROKER_COLUMN_LEVEL },
-		{ key = "Character", label = BFL_L.BROKER_COLUMN_CHARACTER },
-		{ key = "Game",      label = BFL_L.BROKER_COLUMN_GAME },
-		{ key = "Zone",      label = BFL_L.BROKER_COLUMN_ZONE },
-		{ key = "Realm",     label = BFL_L.BROKER_COLUMN_REALM },
-		{ key = "Notes",     label = BFL_L.BROKER_COLUMN_NOTES }
+		{ key = "Name",      label = L.BROKER_COLUMN_NAME },
+		{ key = "Level",     label = L.BROKER_COLUMN_LEVEL },
+		{ key = "Character", label = L.BROKER_COLUMN_CHARACTER },
+		{ key = "Game",      label = L.BROKER_COLUMN_GAME },
+		{ key = "Zone",      label = L.BROKER_COLUMN_ZONE },
+		{ key = "Realm",     label = L.BROKER_COLUMN_REALM },
+		{ key = "Notes",     label = L.BROKER_COLUMN_NOTES }
 	}
 	
 	local currentOrder = DB:Get("brokerColumnOrder")
@@ -4610,4 +4612,5 @@ function Settings:RefreshGlobalSyncTab()
 end
 
 return Settings
+
 
