@@ -551,7 +551,7 @@ function Groups:Delete(groupId)
 end
 
 -- Toggle group collapsed state
-function Groups:Toggle(groupId)
+function Groups:Toggle(groupId, suppressUpdate)
 	local group = self.groups[groupId]
 	if not group then
 		return false
@@ -564,13 +564,15 @@ function Groups:Toggle(groupId)
 	DB:SetGroupState(groupId, group.collapsed)
 	
 	-- Force refresh of the friends list to update UI immediately
-	BFL:ForceRefreshFriendsList()
+	if not suppressUpdate then
+		BFL:ForceRefreshFriendsList()
+	end
 	
 	return true
 end
 
 -- Set group collapsed state (for Collapse/Expand All)
-function Groups:SetCollapsed(groupId, collapsed)
+function Groups:SetCollapsed(groupId, collapsed, suppressUpdate)
 	local group = self.groups[groupId]
 	if not group then
 		return false
@@ -583,7 +585,9 @@ function Groups:SetCollapsed(groupId, collapsed)
 	DB:SetGroupState(groupId, group.collapsed)
 	
 	-- Force refresh of the friends list to update UI immediately
-	BFL:ForceRefreshFriendsList()
+	if not suppressUpdate then
+		BFL:ForceRefreshFriendsList()
+	end
 	
 	return true
 end

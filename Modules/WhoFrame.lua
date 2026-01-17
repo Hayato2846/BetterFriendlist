@@ -259,8 +259,18 @@ function WhoFrame:OnLoad(frame)
 	view:SetElementExtentCalculator(function(dataIndex, elementData)
 		-- Cache font height to avoid repeated GetFontInfo calls
 		if not cachedFontHeight then
-			local fontObj = elementData.fontObject or GameFontNormalSmall
-			local _, fontHeight = fontObj:GetFont()
+			local fontObj = elementData.fontObject or "BetterFriendlistFontNormalSmall"
+			
+			-- Fix: Resolve font object if it's passed as a string name
+			if type(fontObj) == "string" then
+				fontObj = _G[fontObj] or GameFontNormalSmall -- Fallback if not found
+			end
+			
+			local fontHeight = 10 -- Fallback default
+			if fontObj and fontObj.GetFont then
+				local _, height = fontObj:GetFont()
+				if height then fontHeight = height end
+			end
 			
 			-- Apply multiplier from FontManager
 			if FontManager then
@@ -739,7 +749,7 @@ function WhoFrame:Update(forceRebuild)
 	end
 	
 	-- PERFORMANCE: Cache fontObject reference instead of string lookup
-	local fontObj = GameFontNormalSmall
+	local fontObj = "BetterFriendlistFontNormalSmall"
 	
 	-- Classic mode: Build data list and render
 	if isClassicMode then
@@ -909,7 +919,7 @@ function WhoFrame:SortByColumn(sortType, preserveDirection)
 	if whoDataProvider then
 		whoDataProvider:Flush()
 		
-		local fontObj = GameFontNormalSmall
+		local fontObj = "BetterFriendlistFontNormalSmall"
 		for i, entry in ipairs(whoData) do
 			whoDataProvider:Insert({
 				index = i,
@@ -1001,6 +1011,7 @@ function WhoFrameEditBoxMixin:OnLoad()
 	-- Just ensure Instructions has proper line wrapping
 	if self.Instructions then
 		self.Instructions:SetMaxLines(2)
+		self.Instructions:SetFontObject("BetterFriendlistFontDisableSmall")
 	end
 end
 
@@ -1071,10 +1082,10 @@ local WhoFrameColumnDropdownMixin = {}
 
 function WhoFrameColumnDropdownMixin:OnLoad()
 	-- Set up dropdown with user-scalable font
-	self.fontObject = "GameFontNormalSmall"
+	self.fontObject = "BetterFriendlistFontNormalSmall"
 	
 	if self.Text then
-		self.Text:SetFontObject(self.fontObject)
+		self.Text:SetFontObject("BetterFriendlistFontNormalSmall")
 		-- Fix font color: Use white instead of yellow
 		self.Text:SetTextColor(1, 1, 1)  -- RGB: white
 		self.Text:ClearAllPoints()
@@ -1122,6 +1133,13 @@ function WhoFrameColumnDropdownMixin:OnLoad()
 			local radio = rootDescription:CreateButton(text, function() end, {value = value, sortType = sortType})
 			radio:SetIsSelected(IsSelected)
 			radio:SetResponder(SetSelected)
+			radio:AddInitializer(function(button, description, menu)
+				-- Ensure dropdown items use the correct font
+				local fontString = button.fontString or button.Text
+				if fontString then
+					fontString:SetFontObject("BetterFriendlistFontNormalSmall")
+				end
+			end)
 		end
 		
 		CreateRadio(ZONE, 1, "zone")

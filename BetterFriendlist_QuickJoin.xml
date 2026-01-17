@@ -22,7 +22,7 @@
 					</Anchors>
 				</Texture>
 				<!-- Activity Title (e.g. "M+ 10 The Stonevault") -->
-				<FontString parentKey="Title" inherits="GameFontNormal" justifyH="LEFT" justifyV="MIDDLE" maxLines="1">
+				<FontString parentKey="Title" inherits="BetterFriendlistFontNormal" justifyH="LEFT" justifyV="MIDDLE" maxLines="1">
 					<Size y="14"/>
 					<Anchors>
 						<Anchor point="TOPLEFT" x="46" y="-8"/>
@@ -30,7 +30,7 @@
 					</Anchors>
 				</FontString>
 				<!-- Activity Name (e.g. "The Stonevault") -->
-				<FontString parentKey="Activity" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="MIDDLE" maxLines="1">
+				<FontString parentKey="Activity" inherits="BetterFriendlistFontHighlightSmall" justifyH="LEFT" justifyV="MIDDLE" maxLines="1">
 					<Size y="12"/>
 					<Anchors>
 						<Anchor point="TOPLEFT" x="46" y="-24"/>
@@ -38,7 +38,7 @@
 					</Anchors>
 				</FontString>
 				<!-- Details (e.g. "Leader: PlayerName") -->
-				<FontString parentKey="Details" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="MIDDLE" maxLines="1">
+				<FontString parentKey="Details" inherits="BetterFriendlistFontNormalSmall" justifyH="LEFT" justifyV="MIDDLE" maxLines="1">
 					<Size y="12"/>
 					<Color r="0.7" g="0.7" b="0.7"/>
 					<Anchors>
@@ -47,7 +47,7 @@
 					</Anchors>
 				</FontString>
 				<!-- Member Count (Top Right) -->
-				<FontString parentKey="MemberCount" inherits="GameFontHighlightSmall" justifyH="RIGHT">
+				<FontString parentKey="MemberCount" inherits="BetterFriendlistFontHighlightSmall" justifyH="RIGHT">
 					<Anchors>
 						<Anchor point="TOPRIGHT" x="-10" y="-8"/>
 					</Anchors>

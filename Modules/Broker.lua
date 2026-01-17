@@ -109,83 +109,19 @@ local function GetStatusIcon(isAFK, isDND, isMobile)
 end
 
 -- Convert localized className to classFile (e.g., "Krieger" -> "WARRIOR")
--- This is necessary because RAID_CLASS_COLORS uses classFile keys, not localized names
+-- Logic moved to BFL.ClassUtils
 local function GetClassFileFromClassName(className)
-	if not className or className == "" then 
-		return nil 
-	end
-	
-	-- First try: Direct uppercase match (works for English clients)
-	local upperClassName = string.upper(className)
-	if RAID_CLASS_COLORS[upperClassName] then
-		return upperClassName
-	end
-	
-	-- Second try: Match localized className against GetClassInfo()
-	local numClasses = GetNumClasses()
-	for i = 1, numClasses do
-		local localizedName, classFile = GetClassInfo(i)
-		if localizedName == className then
-			return classFile
-		end
-	end
-	
-	-- Third try: Handle gendered class names (German, French, Spanish, etc.)
-	local genderVariants = {}
-	
-	-- German: Remove "-in" suffix (Kriegerin → Krieger)
-	if className:len() > 2 and className:sub(-2) == "in" then
-		table.insert(genderVariants, className:sub(1, -3))
-	end
-	
-	-- French: Remove "-e" suffix
-	if className:len() > 1 and className:sub(-1) == "e" then
-		table.insert(genderVariants, className:sub(1, -2))
-	end
-	
-	-- Spanish: Replace "-a" with "-o"
-	if className:len() > 1 and className:sub(-1) == "a" then
-		table.insert(genderVariants, className:sub(1, -2) .. "o")
-	end
-	
-	-- Try matching gender variants
-	for _, variant in ipairs(genderVariants) do
-		for i = 1, numClasses do
-			local localizedName, classFile = GetClassInfo(i)
-			if localizedName == variant then
-				return classFile
-			end
-		end
-	end
-	
-	return nil
+	return BFL.ClassUtils:GetClassFileFromClassName(className)
 end
 
 -- Get classFile for friend data (prioritizes classID for 11.2.7+)
 local function GetClassFileForFriend(friend)
-	-- 11.2.7+: Use classID if available (fast, language-independent)
-	if BFL.UseClassID and friend.classID then
-		local classInfo = GetClassInfoByID(friend.classID)
-		if classInfo and classInfo.classFile then
-			return classInfo.classFile
-		end
-	end
-	
-	-- Fallback: Convert localized className
-	if friend.className then
-		return GetClassFileFromClassName(friend.className)
-	end
-	
-	return nil
+	return BFL.ClassUtils:GetClassFileForFriend(friend)
 end
 
 -- Get class color for friend (returns color table or white fallback)
 local function GetClassColorForFriend(friend)
-	local classFile = GetClassFileForFriend(friend)
-	if classFile and RAID_CLASS_COLORS[classFile] then
-		return RAID_CLASS_COLORS[classFile]
-	end
-	return { r = 1, g = 1, b = 1 } -- White fallback
+	return BFL.ClassUtils:GetClassColorForFriend(friend)
 end
 
 -- Color text using friend's class color (uses classID if available)
@@ -369,6 +305,8 @@ local function OpenFriendContextMenu(data)
 				name = data.accountName or data.characterName or "",
 				battleTag = data.battleTag,
 				connected = true, -- Broker only shows online friends
+				accountInfo = data.accountInfo,
+				index = data.index,
 			}
 			MenuSystem:OpenFriendMenu(contextMenuAnchor, "BN", bnetAccountID, extraData)
 			-- BFL:DebugPrint(string.format("Broker: Opening BNet context menu for %s", data.accountName or "Unknown"))
@@ -394,6 +332,7 @@ local function OpenFriendContextMenu(data)
 			local extraData = {
 				name = data.fullName or data.characterName or "",
 				connected = true, -- Broker only shows online friends
+				index = friendIndex,
 			}
 			MenuSystem:OpenFriendMenu(contextMenuAnchor, "WOW", friendIndex, extraData)
 			-- BFL:DebugPrint(string.format("Broker: Opening WoW context menu for %s", data.characterName or "Unknown"))
@@ -1252,7 +1191,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 
 	-- Header
 	local headerLine = tt:AddHeader()
-	tt:SetCell(headerLine, 1, C("dkyellow", L("BROKER_TITLE")), "GameFontNormalLarge", "LEFT", numColumns)
+	tt:SetCell(headerLine, 1, C("dkyellow", L("BROKER_TITLE")), BetterFriendlistFontNormalLarge, "LEFT", numColumns)
 	tt:AddSeparator()
 
 	-- Column Headers
@@ -1374,7 +1313,9 @@ local function CreateLibQTipTooltip(anchorFrame)
 					note = accountInfo.note or "",
 					gameAccountID = gameInfo.gameAccountID,
 					connected = isOnline,
-					isFavorite = accountInfo.isFavorite
+					isFavorite = accountInfo.isFavorite,
+					accountInfo = accountInfo,
+					index = i,
 				}
 				
 				ProcessFriend(friend)
@@ -1409,7 +1350,8 @@ local function CreateLibQTipTooltip(anchorFrame)
 				isAFK = friendInfo.afk,
 				isDND = friendInfo.dnd,
 				note = friendInfo.notes or "",
-				connected = friendInfo.connected
+				connected = friendInfo.connected,
+				index = i,
 			}
 			
 			ProcessFriend(friend)
@@ -1842,7 +1784,7 @@ local function CreateDetailTooltip(cell, data)
 	local headerLine = tt2:AddHeader()
 	local displayName = data.characterName and data.characterName ~= "" and data.characterName or data.accountName or
 	"Unknown"
-	tt2:SetCell(headerLine, 1, C("dkyellow", displayName), "GameFontNormalLarge", "LEFT", 3)
+	tt2:SetCell(headerLine, 1, C("dkyellow", displayName), BetterFriendlistFontNormalLarge, "LEFT", 3)
 	tt2:AddSeparator()
 
 	-- Status info

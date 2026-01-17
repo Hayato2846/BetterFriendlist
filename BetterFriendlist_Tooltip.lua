@@ -98,7 +98,7 @@ local function AddBetterFriendlistInfo()
 			if lastActivity then
 				local activityLine, divider = EnsureActivityLine()
 				local timeSinceActivity = time() - lastActivity
-				local activityText = "|cff80c0ff" .. L.TOOLTIP_LAST_CONTACT .. "|r " .. SecondsToTime(timeSinceActivity) .. L.TOOLTIP_AGO
+				local activityText = "|cff80c0ff" .. L.TOOLTIP_LAST_CONTACT .. "|r " .. (L.TOOLTIP_AGO_PREFIX or "") .. SecondsToTime(timeSinceActivity) .. (L.TOOLTIP_AGO or "")
 				
 				-- Find the absolute bottom element to anchor below it
 				local anchorElement = nil
@@ -203,21 +203,26 @@ function BetterFriendsList_Button_OnEnter(self)
 	}
 	
 	if friendData.type == "bnet" then
-		-- Battle.net friend - find the actual index for C_BattleNet API
-		local numBNet = BNGetNumFriends()
-		local actualBNetIndex = nil
-		
-		for i = 1, numBNet do
-			local tempInfo = C_BattleNet.GetFriendAccountInfo(i)
-			if tempInfo and tempInfo.bnetAccountID == friendData.bnetAccountID then
-				actualBNetIndex = i
-				break
-			end
-		end
-		
-		if actualBNetIndex then
+		if friendData._isMock then
 			fakeButton.buttonType = FRIENDS_BUTTON_TYPE_BNET
-			fakeButton.id = actualBNetIndex
+			fakeButton.id = friendData.index
+		else
+			-- Battle.net friend - find the actual index for C_BattleNet API
+			local numBNet = BNGetNumFriends()
+			local actualBNetIndex = nil
+			
+			for i = 1, numBNet do
+				local tempInfo = C_BattleNet.GetFriendAccountInfo(i)
+				if tempInfo and tempInfo.bnetAccountID == friendData.bnetAccountID then
+					actualBNetIndex = i
+					break
+				end
+			end
+			
+			if actualBNetIndex then
+				fakeButton.buttonType = FRIENDS_BUTTON_TYPE_BNET
+				fakeButton.id = actualBNetIndex
+			end
 		end
 	else
 		-- WoW friend
@@ -233,7 +238,7 @@ function BetterFriendsList_Button_OnEnter(self)
 	
 	-- Call Blizzard's tooltip population function via the mixin
 	-- We simulate OnEnter by setting up tooltip.button and calling the display logic
-	if BFL.IsClassic then
+	if BFL.IsClassic and not friendData._isMock then
 		-- Classic Era: We must use the real button frame (self) instead of fakeButton (table)
 		-- because FriendsFrame_OnUpdate expects a Frame object and will crash otherwise.
 		-- We also need to ensure self has the required properties for FriendsFrameTooltip_Show.
@@ -253,7 +258,10 @@ function BetterFriendsList_Button_OnEnter(self)
 		tooltip:Show()
 		return -- Let Blizzard handle the rest for Classic
 	else
-		tooltip.button = fakeButton
+		-- In Retail, use fakeButton. In Classic Mock mode, use nil (don't update)
+		if not BFL.IsClassic then
+			tooltip.button = fakeButton
+		end
 	end
 	
 	-- CRITICAL: Re-parent tooltip to UIParent so it shows even when FriendsFrame is hidden
@@ -274,7 +282,17 @@ function BetterFriendsList_Button_OnEnter(self)
 	local battleTag = ""
 	
 	if fakeButton.buttonType == FRIENDS_BUTTON_TYPE_BNET then
-		local accountInfo = C_BattleNet.GetFriendAccountInfo(fakeButton.id)
+		local accountInfo
+		if friendData._isMock then
+			accountInfo = friendData
+			-- Ensure gameAccountID exists for logic checks if gameAccountInfo is present
+			if accountInfo.gameAccountInfo and not accountInfo.gameAccountInfo.gameAccountID then
+				accountInfo.gameAccountInfo.gameAccountID = 1
+			end
+		else
+			accountInfo = C_BattleNet.GetFriendAccountInfo(fakeButton.id)
+		end
+		
 		if accountInfo then
 			local noCharacterName = true
 			local nameText, nameColor
@@ -411,8 +429,21 @@ function BetterFriendsList_Button_OnEnter(self)
 	end
 	
 	elseif fakeButton.buttonType == FRIENDS_BUTTON_TYPE_WOW then
-	local info = C_FriendList.GetFriendInfoByIndex(fakeButton.id)
-	if info then
+		local info
+		if friendData._isMock then
+			info = {
+				name = friendData.name or "Unknown",
+				level = friendData.level or 0,
+				className = friendData.className or "Unknown",
+				area = friendData.area or "Unknown",
+				connected = friendData.connected,
+				notes = friendData.notes,
+			}
+		else
+			info = C_FriendList.GetFriendInfoByIndex(fakeButton.id)
+		end
+
+		if info then
 			anchor = FriendsFrameTooltip_SetLine(FriendsTooltipHeader, nil, info.name)
 			if info.connected then
 				FriendsTooltipHeader:SetTextColor(FRIENDS_WOW_NAME_COLOR.r, FRIENDS_WOW_NAME_COLOR.g, FRIENDS_WOW_NAME_COLOR.b)

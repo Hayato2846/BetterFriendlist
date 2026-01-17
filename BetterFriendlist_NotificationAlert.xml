@@ -69,7 +69,7 @@
 			
 			<!-- Text - compact layout -->
 			<Layer level="OVERLAY">
-				<FontString parentKey="Name" inherits="GameFontNormal" justifyH="LEFT">
+				<FontString parentKey="Name" inherits="BetterFriendlistFontNormal" justifyH="LEFT">
 					<Size x="238" y="0"/>
 					<Anchors>
 						<Anchor point="TOPLEFT" x="52" y="-12"/>
@@ -77,7 +77,7 @@
 					<Color r="1" g="0.82" b="0" a="1"/>
 				</FontString>
 				
-				<FontString parentKey="Message" inherits="GameFontHighlightSmall" justifyH="LEFT">
+				<FontString parentKey="Message" inherits="BetterFriendlistFontHighlightSmall" justifyH="LEFT">
 					<Size x="238" y="0"/>
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeKey="$parent.Name" relativePoint="BOTTOMLEFT" x="0" y="-4"/>

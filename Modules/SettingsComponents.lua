@@ -1,4 +1,4 @@
--- SettingsComponents.lua
+﻿-- SettingsComponents.lua
 -- Reusable UI components for Settings panel (Platynator-style)
 
 local ADDON_NAME, BFL = ...
@@ -23,7 +23,7 @@ function Components:CreateHeader(parent, text)
 	local holder = CreateFrame("Frame", nil, parent)
 	holder:SetPoint("LEFT", PADDING_LEFT, 0)
 	holder:SetPoint("RIGHT", -PADDING_RIGHT, 0)
-	holder.text = holder:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+	holder.text = holder:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormalLarge")
 	holder.text:SetText(text)
 	holder.text:SetPoint("LEFT", 0, 0)
 	holder.text:SetJustifyH("LEFT")
@@ -59,7 +59,7 @@ function Components:CreateCheckbox(parent, labelText, initialValue, callback)
 			checkBox.Text:SetText(labelText)
 		else
 			-- Fallback: Create font string manually
-			local text = checkBox:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+			local text = checkBox:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
 			text:SetPoint("LEFT", checkBox, "RIGHT", 4, 0)
 			text:SetText(labelText)
 			checkBox.Text = text
@@ -67,7 +67,7 @@ function Components:CreateCheckbox(parent, labelText, initialValue, callback)
 	else
 		-- Retail: Use SetText method
 		checkBox:SetText(labelText)
-		checkBox:SetNormalFontObject(GameFontHighlight)
+		checkBox:SetNormalFontObject("BetterFriendlistFontHighlight")
 		
 		-- Label: rechts neben der Checkbox
 		local label = checkBox:GetFontString()
@@ -123,7 +123,7 @@ function Components:CreateSlider(parent, labelText, min, max, initialValue, form
 	holder:SetPoint("RIGHT", -PADDING_RIGHT, 0)
 	
 	-- Label (left side, right-justified)
-	holder.Label = holder:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	holder.Label = holder:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
 	holder.Label:SetJustifyH("RIGHT")
 	holder.Label:SetPoint("LEFT", 20, 0)
 	holder.Label:SetPoint("RIGHT", holder, "CENTER", -50, 0)
@@ -215,7 +215,7 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 	holder:SetPoint("RIGHT", -PADDING_RIGHT, 0)
 	
 	-- Label (left side, right-justified)
-	local label = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	local label = holder:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
 	label:SetPoint("LEFT", 0, 0)
 	label:SetPoint("LEFT", holder, "LEFT", 0, 0)
 	label:SetJustifyH("RIGHT")
@@ -233,6 +233,16 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 		dropdown:SetWidth(180)
 		dropdown:SetPoint("LEFT", holder, "LEFT", 150, 0) -- Doubled from 75 to 150
 		
+		-- Apply BetterFriendlist styling (Use STRINGS to ensure they are found)
+		dropdown:SetNormalFontObject("BetterFriendlistFontHighlightSmall")
+		dropdown:SetHighlightFontObject("BetterFriendlistFontHighlightSmall")
+		dropdown:SetDisabledFontObject("BetterFriendlistFontDisableSmall")
+		
+		-- Force update the text if it exists
+		if dropdown.Text then
+			dropdown.Text:SetFontObject("BetterFriendlistFontHighlightSmall")
+		end
+		
 		-- Initialize with provided entries using modern API
 		if entries and entries.labels and entries.values then
 			local entryLabels = entries.labels
@@ -244,6 +254,14 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 					local radio = rootDescription:CreateButton(entryLabels[i], function() end, entryValues[i])
 					radio:SetIsSelected(function(value) return isSelectedCallback(value) end)
 					radio:SetResponder(function(value) onSelectionCallback(value) end)
+					
+					-- Force font for dropdown items
+					radio:AddInitializer(function(button, description, menu)
+						local fontString = button.fontString or button.Text
+						if fontString then
+							fontString:SetFontObject("BetterFriendlistFontNormalSmall")
+						end
+					end)
 				end
 			end)
 			
@@ -399,13 +417,13 @@ function Components:CreateListItem(parent, itemText, orderIndex, onMoveUp, onMov
 	holder.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
 	
 	-- Order number
-	holder.orderText = holder:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	holder.orderText = holder:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
 	holder.orderText:SetPoint("LEFT", 10, 0)
 	holder.orderText:SetText(orderIndex)
 	holder.orderText:SetTextColor(0.7, 0.7, 0.7)
 	
 	-- Item text
-	holder.nameText = holder:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	holder.nameText = holder:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
 	holder.nameText:SetPoint("LEFT", holder.orderText, "RIGHT", 15, 0)
 	holder.nameText:SetText(itemText)
 	holder.nameText:SetTextColor(1, 0.82, 0)
@@ -580,6 +598,11 @@ function Components:CreateButton(parent, text, onClick, tooltip)
 	button:SetSize(180, 24)
 	button:SetText(text)
 	
+	-- Apply BetterFriendlist styling
+	button:SetNormalFontObject("BetterFriendlistFontNormal")
+	button:SetHighlightFontObject("BetterFriendlistFontHighlight")
+	button:SetDisabledFontObject("BetterFriendlistFontDisable")
+	
 	if onClick then
 		button:SetScript("OnClick", onClick)
 	end
@@ -602,3 +625,4 @@ end
 -- Export
 -- ========================================
 return Components
+

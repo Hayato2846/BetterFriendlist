@@ -117,21 +117,23 @@ local function GenerateMockBNetFriend(index, isOnline, options)
 		note = options.note or (math.random(3) == 1 and "Real friend from raids" or nil),
 		isFavorite = options.isFavorite or (index <= 3),
 		lastOnlineTime = not isOnline and (time() - math.random(86400, 604800)) or nil,
-		-- Game account info (for online players)
-		gameAccountInfo = isOnline and {
-			isOnline = true,
-			clientProgram = game.program,
-			gameName = game.name,
-			characterName = game.program == "WoW" and characterName or nil,
-			className = game.program == "WoW" and classInfo.name or nil,
-			classID = game.program == "WoW" and classInfo.classID or nil,
-			characterLevel = game.program == "WoW" and level or nil,
-			areaName = game.program == "WoW" and zone or nil,
-			realmName = game.program == "WoW" and "Blackrock" or nil,
-			factionName = game.program == "WoW" and faction or nil,
+		-- Game account info (always present to prevent errors in FriendsFrame_GetBNetAccountNameAndStatus)
+		gameAccountInfo = {
+			isOnline = isOnline,
+			gameAccountID = 1000 + index, -- Ensure valid ID
+			clientProgram = isOnline and game.program or "",
+			gameName = isOnline and game.name or "",
+			characterName = (isOnline and game.program == "WoW") and characterName or "",
+			className = (isOnline and game.program == "WoW") and classInfo.name or "",
+			classID = (isOnline and game.program == "WoW") and classInfo.classID or 0,
+			characterLevel = (isOnline and game.program == "WoW") and level or "",
+			areaName = (isOnline and game.program == "WoW") and zone or "",
+			realmName = (isOnline and game.program == "WoW") and "Blackrock" or "",
+			factionName = (isOnline and game.program == "WoW") and faction or "",
 			isDND = isDND,
 			isAFK = isAFK,
-		} or nil,
+			wowProjectID = (isOnline and game.program == "WoW") and 1 or 0,
+		},
 		-- Additional fields for display
 		characterName = isOnline and game.program == "WoW" and characterName or nil,
 		className = isOnline and game.program == "WoW" and classInfo.name or nil,

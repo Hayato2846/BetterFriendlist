@@ -60,7 +60,7 @@ function BetterQuickJoinFrame_OnLoad(self)
 			-- It has ApplyToFrame() method that dynamically creates FontStrings
 			
 			-- Store font object for dynamic text creation
-			button.fontObject = UserScaledFontGameNormalSmall
+			button.fontObject = BetterFriendlistFontNormalSmall
 			
 			-- Apply entry data to button (creates FontStrings dynamically)
 			elementData:ApplyToFrame(button)

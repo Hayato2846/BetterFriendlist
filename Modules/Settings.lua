@@ -1,4 +1,4 @@
--- Settings.lua
+﻿-- Settings.lua
 -- Settings panel and configuration management module
 
 local ADDON_NAME, BFL = ...
@@ -54,19 +54,19 @@ local function CreateGroupButton(parent, groupId, groupName, orderIndex)
 	button.bg:SetColorTexture(unpack(UI.BG_COLOR_DARK))
 	
 	-- Drag Handle (:::)
-	button.dragHandle = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	button.dragHandle = button:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
 	button.dragHandle:SetPoint("LEFT", UI.SPACING_SMALL, 0)
 	button.dragHandle:SetText(":::")
 	button.dragHandle:SetTextColor(unpack(UI.TEXT_COLOR_GRAY))
 	
 	-- Order Number
-	button.orderText = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	button.orderText = button:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
 	button.orderText:SetPoint("LEFT", button.dragHandle, "RIGHT", UI.SPACING_MEDIUM, 0)
 	button.orderText:SetText(orderIndex)
 	button.orderText:SetTextColor(0.7, 0.7, 0.7)
 	
 	-- Group Name
-	button.nameText = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	button.nameText = button:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
 	button.nameText:SetPoint("LEFT", button.orderText, "RIGHT", UI.SPACING_LARGE, 0)
 	button.nameText:SetText(groupName)
 	button.nameText:SetTextColor(1, 1, 1)
@@ -395,8 +395,19 @@ function Settings:RefreshTabs()
 	for _, tabDef in ipairs(visibleTabs) do
 		local tab = _G["BetterFriendlistSettingsFrameTab" .. tabDef.id]
 		if tab then
+			-- Ensure fonts are set to our custom objects via string names to be safe
+			tab:SetNormalFontObject("BetterFriendlistFontNormalSmall") 
+			tab:SetHighlightFontObject("BetterFriendlistFontHighlightSmall")
+			tab:SetDisabledFontObject("BetterFriendlistFontHighlightSmall") -- Selected = White
+			
 			-- Build tab text with icon and coloring
-			local color = tabDef.beta and COLOR_BETA or COLOR_STABLE
+			-- Only apply explicit color for Beta tabs (Orange). 
+			-- Stable tabs should use the FontObject's color (Gold unselected, White selected).
+			local colorPrefix = ""
+			if tabDef.beta then
+				colorPrefix = COLOR_BETA
+			end
+			
 			-- Icon with color tint: r:g:b values (255, 136, 0 for orange / 255, 255, 0 for gold)
 			local r, g, b
 			if tabDef.beta then
@@ -405,7 +416,12 @@ function Settings:RefreshTabs()
 				r, g, b = 255, 255, 0 -- Gold
 			end
 			local iconTexture = tabDef.icon and ("|T" .. tabDef.icon .. ":16:16:0:0:64:64:0:64:0:64:" .. r .. ":" .. g .. ":" .. b .. "|t ") or ""
-			local text = color .. iconTexture .. tabDef.name .. "|r"
+			local text = colorPrefix .. iconTexture .. tabDef.name
+			
+			-- Close color tag if we opened one
+			if tabDef.beta then
+				text = text .. "|r"
+			end
 			
 			tab:SetText(text)
 			tab:Show()
@@ -498,12 +514,22 @@ function Settings:ShowTab(tabID)
 	currentTab = tabID
 	PanelTemplates_SetTab(settingsFrame, tabID)
 	
-	-- Manually update tab selection states (PanelTemplates can be confused by repositioning)
+	-- Manually update tab selection states
 	for i = 1, 10 do
 		local tab = _G["BetterFriendlistSettingsFrameTab" .. i]
 		if tab and tab:IsShown() then
+			-- Ensure fonts are strictly enforcing BetterFriendlist style
+			tab:SetNormalFontObject("BetterFriendlistFontNormalSmall")
+			tab:SetHighlightFontObject("BetterFriendlistFontHighlightSmall")
+			tab:SetDisabledFontObject("BetterFriendlistFontHighlightSmall")
+
 			if i == tabID then
 				PanelTemplates_SelectTab(tab)
+				-- Force apply font to text if Disabled state didn't pick it up correctly
+				local fs = tab:GetFontString()
+				if fs then
+					fs:SetFontObject("BetterFriendlistFontHighlightSmall")
+				end
 			else
 				PanelTemplates_DeselectTab(tab)
 			end
@@ -1915,12 +1941,12 @@ function Settings:CreateExportFrame()
 	frame:Hide()
 	
 	-- Title
-	frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	frame.title = frame:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
 	frame.title:SetPoint("TOP", 0, -5)
 	frame.title:SetText(L.SETTINGS_EXPORT_TITLE)
 	
 	-- Info text
-	frame.info = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	frame.info = frame:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
 	frame.info:SetPoint("TOPLEFT", 15, -30)
 	frame.info:SetPoint("TOPRIGHT", -15, -30)
 	frame.info:SetJustifyH("LEFT")
@@ -1934,7 +1960,7 @@ function Settings:CreateExportFrame()
 	
 	local editBox = CreateFrame("EditBox", nil, scrollFrame)
 	editBox:SetMultiLine(true)
-	editBox:SetFontObject(GameFontHighlight)
+	editBox:SetFontObject(BetterFriendlistFontHighlight)
 	editBox:SetWidth(460)
 	editBox:SetAutoFocus(false)
 	editBox:SetScript("OnEscapePressed", function(self)
@@ -1948,8 +1974,8 @@ function Settings:CreateExportFrame()
 	copyButton:SetPoint("BOTTOM", 0, 15)
 	copyButton:SetSize(120, 25)
 	copyButton:SetText(L.SETTINGS_EXPORT_BTN)
-	copyButton:SetNormalFontObject("GameFontNormal")
-	copyButton:SetHighlightFontObject("GameFontHighlight")
+	copyButton:SetNormalFontObject("BetterFriendlistFontNormal")
+	copyButton:SetHighlightFontObject("BetterFriendlistFontHighlight")
 	copyButton:SetScript("OnClick", function()
 		editBox:HighlightText()
 		editBox:SetFocus()
@@ -1972,12 +1998,12 @@ function Settings:CreateImportFrame()
 	frame:Hide()
 	
 	-- Title
-	frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	frame.title = frame:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
 	frame.title:SetPoint("TOP", 0, -5)
 	frame.title:SetText(L.SETTINGS_IMPORT_TITLE)
 	
 	-- Info text
-	frame.info = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	frame.info = frame:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
 	frame.info:SetPoint("TOPLEFT", 15, -30)
 	frame.info:SetPoint("TOPRIGHT", -15, -30)
 	frame.info:SetJustifyH("LEFT")
@@ -1991,7 +2017,7 @@ function Settings:CreateImportFrame()
 	
 	local editBox = CreateFrame("EditBox", nil, scrollFrame)
 	editBox:SetMultiLine(true)
-	editBox:SetFontObject(GameFontHighlight)
+	editBox:SetFontObject(BetterFriendlistFontHighlight)
 	editBox:SetWidth(460)
 	editBox:SetAutoFocus(true)
 	editBox:SetScript("OnEscapePressed", function(self)
@@ -2005,8 +2031,8 @@ function Settings:CreateImportFrame()
 	importButton:SetPoint("BOTTOM", -65, 15)
 	importButton:SetSize(120, 25)
 	importButton:SetText(L.SETTINGS_IMPORT_BTN)
-	importButton:SetNormalFontObject("GameFontNormal")
-	importButton:SetHighlightFontObject("GameFontHighlight")
+	importButton:SetNormalFontObject("BetterFriendlistFontNormal")
+	importButton:SetHighlightFontObject("BetterFriendlistFontHighlight")
 	importButton:SetScript("OnClick", function()
 		local importString = editBox:GetText()
 		local success, err = Settings:ImportSettings(importString)
@@ -2034,8 +2060,8 @@ function Settings:CreateImportFrame()
 	cancelButton:SetPoint("BOTTOM", 65, 15)
 	cancelButton:SetSize(120, 25)
 	cancelButton:SetText(L.SETTINGS_IMPORT_CANCEL)
-	cancelButton:SetNormalFontObject("GameFontNormal")
-	cancelButton:SetHighlightFontObject("GameFontHighlight")
+	cancelButton:SetNormalFontObject("BetterFriendlistFontNormal")
+	cancelButton:SetHighlightFontObject("BetterFriendlistFontHighlight")
 	cancelButton:SetScript("OnClick", function()
 		frame:Hide()
 	end)
@@ -2437,10 +2463,84 @@ function Settings:RefreshGeneralTab()
 		function(val) 
 			DB:Set("headerCountFormat", val)
 			BFL:ForceRefreshFriendsList()
+			self:RefreshGeneralTab()
 		end
 	)
 	headerCountFormatDropdown:SetTooltip(L.SETTINGS_HEADER_COUNT_FORMAT, L.SETTINGS_HEADER_COUNT_FORMAT_DESC)
+	-- Shift 10px right to prevent clipping
+	if headerCountFormatDropdown.DropDown then
+		local point, relativeTo, relativePoint, xOfs, yOfs = headerCountFormatDropdown.DropDown:GetPoint(1)
+		if point then
+			headerCountFormatDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
+		end
+	end
 	table.insert(allFrames, headerCountFormatDropdown)
+
+	-- Group Header Alignment
+	local groupHeaderAlignOptions = {
+		labels = {L.SETTINGS_ALIGN_LEFT, L.SETTINGS_ALIGN_CENTER, L.SETTINGS_ALIGN_RIGHT},
+		values = {"LEFT", "CENTER", "RIGHT"}
+	}
+	local currentGroupHeaderAlign = DB:Get("groupHeaderAlign", "LEFT")
+	
+	local groupHeaderAlignDropdown = Components:CreateDropdown(
+		tab, 
+		L.SETTINGS_GROUP_HEADER_ALIGN, 
+		groupHeaderAlignOptions, 
+		function(val) return val == currentGroupHeaderAlign end,
+		function(val) 
+			DB:Set("groupHeaderAlign", val)
+			BFL:ForceRefreshFriendsList()
+			self:RefreshGeneralTab()
+		end
+	)
+	groupHeaderAlignDropdown:SetTooltip(L.SETTINGS_GROUP_HEADER_ALIGN, L.SETTINGS_GROUP_HEADER_ALIGN_DESC)
+	-- Shift 10px right to prevent clipping
+	if groupHeaderAlignDropdown.DropDown then
+		local point, relativeTo, relativePoint, xOfs, yOfs = groupHeaderAlignDropdown.DropDown:GetPoint(1)
+		if point then
+			groupHeaderAlignDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
+		end
+	end
+	table.insert(allFrames, groupHeaderAlignDropdown)
+
+	-- Show Group Arrow (Collapse/Expand)
+	local showGroupArrow = Components:CreateCheckbox(tab, L.SETTINGS_SHOW_GROUP_ARROW, 
+		DB:Get("showGroupArrow", true),
+		function(val) 
+			DB:Set("showGroupArrow", val)
+			BFL:ForceRefreshFriendsList()
+		end)
+	showGroupArrow:SetTooltip(L.SETTINGS_SHOW_GROUP_ARROW, L.SETTINGS_SHOW_GROUP_ARROW_DESC)
+	table.insert(allFrames, showGroupArrow)
+
+	-- Group Arrow Alignment
+	local groupArrowAlignOptions = {
+		labels = {L.SETTINGS_ALIGN_LEFT, L.SETTINGS_ALIGN_CENTER, L.SETTINGS_ALIGN_RIGHT},
+		values = {"LEFT", "CENTER", "RIGHT"}
+	}
+	local currentGroupArrowAlign = DB:Get("groupArrowAlign", "LEFT")
+	
+	local groupArrowAlignDropdown = Components:CreateDropdown(
+		tab, 
+		L.SETTINGS_GROUP_ARROW_ALIGN, 
+		groupArrowAlignOptions, 
+		function(val) return val == currentGroupArrowAlign end,
+		function(val) 
+			DB:Set("groupArrowAlign", val)
+			BFL:ForceRefreshFriendsList()
+			self:RefreshGeneralTab()
+		end
+	)
+	groupArrowAlignDropdown:SetTooltip(L.SETTINGS_GROUP_ARROW_ALIGN, L.SETTINGS_GROUP_ARROW_ALIGN_DESC)
+	-- Shift 10px right to prevent clipping
+	if groupArrowAlignDropdown.DropDown then
+		local point, relativeTo, relativePoint, xOfs, yOfs = groupArrowAlignDropdown.DropDown:GetPoint(1)
+		if point then
+			groupArrowAlignDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
+		end
+	end
+	table.insert(allFrames, groupArrowAlignDropdown)
 	
 	-- Spacer before next section
 	table.insert(allFrames, Components:CreateSpacer(tab))
@@ -2450,7 +2550,7 @@ function Settings:RefreshGeneralTab()
 	table.insert(allFrames, nameFormatHeader)
 
 	-- Name Format Description
-	local nameFormatDesc = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	local nameFormatDesc = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 	nameFormatDesc:SetWidth(360)
 	nameFormatDesc:SetJustifyH("LEFT")
 	nameFormatDesc:SetWordWrap(true)
@@ -2462,13 +2562,14 @@ function Settings:RefreshGeneralTab()
 	local nameFormatContainer = CreateFrame("Frame", nil, tab)
 	nameFormatContainer:SetSize(360, 30)
 	
-	local nameFormatLabel = nameFormatContainer:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	local nameFormatLabel = nameFormatContainer:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
 	nameFormatLabel:SetText(L.SETTINGS_NAME_FORMAT_LABEL or "Format:")
 	nameFormatLabel:SetPoint("LEFT", 0, 0)
 	
 	local nameFormatBox = CreateFrame("EditBox", nil, nameFormatContainer, "InputBoxTemplate")
 	nameFormatBox:SetSize(280, 25)
 	nameFormatBox:SetPoint("LEFT", nameFormatLabel, "RIGHT", 10, 0)
+	nameFormatBox:SetFontObject("BetterFriendlistFontHighlight")
 	nameFormatBox:SetAutoFocus(false)
 	nameFormatBox:SetText(DB:Get("nameDisplayFormat", "%name%"))
 	nameFormatBox:SetScript("OnEnterPressed", function(self)
@@ -2846,14 +2947,14 @@ function Settings:RefreshAdvancedTab()
 	local yOffset = -15
 	
 	-- Title
-	local title = tab:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+	local title = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormalLarge")
 	title:SetPoint("TOPLEFT", 10, yOffset)
 	title:SetText(L.SETTINGS_TAB_ADVANCED or "Advanced Settings")
 	table.insert(allFrames, title)
 	yOffset = yOffset - 25
 	
 	-- Description
-	local desc = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	local desc = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
 	desc:SetPoint("TOPLEFT", 10, yOffset)
 	desc:SetText(L.SETTINGS_ADVANCED_DESC or "Advanced options and tools")
 	table.insert(allFrames, desc)
@@ -2868,7 +2969,7 @@ function Settings:RefreshAdvancedTab()
 	yOffset = yOffset - 25
 	
 	-- Migration description
-	local migrationDesc1 = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	local migrationDesc1 = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 	migrationDesc1:SetPoint("TOPLEFT", 10, yOffset)
 	migrationDesc1:SetWidth(350)
 	migrationDesc1:SetJustifyH("LEFT")
@@ -2900,7 +3001,7 @@ function Settings:RefreshAdvancedTab()
 	yOffset = yOffset - 25
 	
 	-- Export/Import description
-	local exportDesc1 = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	local exportDesc1 = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 	exportDesc1:SetPoint("TOPLEFT", 10, yOffset)
 	exportDesc1:SetWidth(350)
 	exportDesc1:SetJustifyH("LEFT")
@@ -2909,7 +3010,7 @@ function Settings:RefreshAdvancedTab()
 	table.insert(allFrames, exportDesc1)
 	yOffset = yOffset - 35
 	
-	local exportWarning = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	local exportWarning = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 	exportWarning:SetPoint("TOPLEFT", 10, yOffset)
 	exportWarning:SetPoint("RIGHT", -10, 0)
 	exportWarning:SetJustifyH("LEFT")
@@ -2954,7 +3055,7 @@ function Settings:RefreshAdvancedTab()
 	yOffset = yOffset - 25
 	
 	-- Beta features description
-	local betaDesc = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	local betaDesc = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 	betaDesc:SetPoint("TOPLEFT", 10, yOffset)
 	betaDesc:SetWidth(350)
 	betaDesc:SetJustifyH("LEFT")
@@ -2971,7 +3072,7 @@ function Settings:RefreshAdvancedTab()
 	warningIcon:SetVertexColor(1, 0.65, 0)
 	table.insert(allFrames, warningIcon)
 	
-	local warningText = tab:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+	local warningText = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormalSmall")
 	warningText:SetPoint("LEFT", warningIcon, "RIGHT", 6, 0)
 	warningText:SetWidth(330)
 	warningText:SetJustifyH("LEFT")
@@ -3039,7 +3140,7 @@ function Settings:RefreshAdvancedTab()
 	yOffset = yOffset - 35
 
 	-- Beta feature list (informational)
-	local featureListTitle = tab:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	local featureListTitle = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
 	featureListTitle:SetPoint("TOPLEFT", 10, yOffset)
 	featureListTitle:SetText(L.SETTINGS_BETA_FEATURES_LIST)
 	featureListTitle:SetTextColor(1, 0.53, 0) -- Orange (Beta theme)
@@ -3056,7 +3157,7 @@ function Settings:RefreshAdvancedTab()
 			icon:SetVertexColor(1, 0.53, 0) -- Orange (Beta theme)
 			table.insert(allFrames, icon)
 			
-			local text = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+			local text = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 			text:SetPoint("LEFT", icon, "RIGHT", 6, 0)
 			text:SetText(tabDef.name)
 			table.insert(allFrames, text)
@@ -3090,14 +3191,14 @@ function Settings:RefreshStatisticsTab()
 	local yOffset = -15
 	
 	-- Title
-	local title = tab:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+	local title = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormalLarge")
 	title:SetPoint("TOPLEFT", 10, yOffset)
 	title:SetText(L.STATS_HEADER or "Friend Network Statistics")
 	table.insert(allFrames, title)
 	yOffset = yOffset - 25
 	
 	-- Description
-	local desc = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	local desc = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
 	desc:SetPoint("TOPLEFT", 10, yOffset)
 	desc:SetText(L.STATS_DESC or "Overview of your friend network and activity")
 	table.insert(allFrames, desc)
@@ -3112,21 +3213,21 @@ function Settings:RefreshStatisticsTab()
 	yOffset = yOffset - 25
 	
 	-- Total Friends
-	tab.TotalFriends = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	tab.TotalFriends = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
 	tab.TotalFriends:SetPoint("TOPLEFT", 20, yOffset)
 	tab.TotalFriends:SetText(string.format(L.STATS_TOTAL_FRIENDS or "Total Friends: %s", "--"))
 	table.insert(allFrames, tab.TotalFriends)
 	yOffset = yOffset - 20
 	
 	-- Online/Offline
-	tab.OnlineFriends = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	tab.OnlineFriends = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
 	tab.OnlineFriends:SetPoint("TOPLEFT", 20, yOffset)
 	tab.OnlineFriends:SetText(string.format(L.STATS_ONLINE_OFFLINE or "Online: %s  |  Offline: %s", "--", "--"))
 	table.insert(allFrames, tab.OnlineFriends)
 	yOffset = yOffset - 20
 	
 	-- Friend Types
-	tab.FriendTypes = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	tab.FriendTypes = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
 	tab.FriendTypes:SetPoint("TOPLEFT", 20, yOffset)
 	tab.FriendTypes:SetText(string.format(L.STATS_BNET_WOW or "Battle.net: %s  |  WoW: %s", "--", "--"))
 	table.insert(allFrames, tab.FriendTypes)
@@ -3145,7 +3246,7 @@ function Settings:RefreshStatisticsTab()
 	table.insert(allFrames, healthHeader)
 	yOffset = yOffset - 25
 	
-	tab.FriendshipHealth = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	tab.FriendshipHealth = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 	tab.FriendshipHealth:SetPoint("TOPLEFT", 20, yOffset)
 	tab.FriendshipHealth:SetWidth(210)
 	tab.FriendshipHealth:SetJustifyH("LEFT")
@@ -3159,7 +3260,7 @@ function Settings:RefreshStatisticsTab()
 	table.insert(allFrames, classHeader)
 	yOffset = yOffset - 25
 	
-	tab.ClassList = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	tab.ClassList = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 	tab.ClassList:SetPoint("TOPLEFT", 20, yOffset)
 	tab.ClassList:SetWidth(210)
 	tab.ClassList:SetJustifyH("LEFT")
@@ -3173,7 +3274,7 @@ function Settings:RefreshStatisticsTab()
 	table.insert(allFrames, realmHeader)
 	yOffset = yOffset - 25
 	
-	tab.RealmList = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	tab.RealmList = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 	tab.RealmList:SetPoint("TOPLEFT", 20, yOffset)
 	tab.RealmList:SetWidth(210)
 	tab.RealmList:SetJustifyH("LEFT")
@@ -3187,7 +3288,7 @@ function Settings:RefreshStatisticsTab()
 	table.insert(allFrames, notesHeader)
 	yOffset = yOffset - 25
 	
-	tab.NotesAndFavorites = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	tab.NotesAndFavorites = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 	tab.NotesAndFavorites:SetPoint("TOPLEFT", 20, yOffset)
 	tab.NotesAndFavorites:SetWidth(210)
 	tab.NotesAndFavorites:SetJustifyH("LEFT")
@@ -3206,7 +3307,7 @@ function Settings:RefreshStatisticsTab()
 	table.insert(allFrames, levelHeader)
 	yOffset = yOffset - 25
 	
-	tab.LevelDistribution = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	tab.LevelDistribution = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 	tab.LevelDistribution:SetPoint("TOPLEFT", 250, yOffset)
 	tab.LevelDistribution:SetWidth(190)
 	tab.LevelDistribution:SetJustifyH("LEFT")
@@ -3220,7 +3321,7 @@ function Settings:RefreshStatisticsTab()
 	table.insert(allFrames, gameHeader)
 	yOffset = yOffset - 25
 	
-	tab.GameDistribution = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	tab.GameDistribution = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 	tab.GameDistribution:SetPoint("TOPLEFT", 250, yOffset)
 	tab.GameDistribution:SetWidth(190)
 	tab.GameDistribution:SetJustifyH("LEFT")
@@ -3234,7 +3335,7 @@ function Settings:RefreshStatisticsTab()
 	table.insert(allFrames, mobileHeader)
 	yOffset = yOffset - 25
 	
-	tab.MobileVsDesktop = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	tab.MobileVsDesktop = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 	tab.MobileVsDesktop:SetPoint("TOPLEFT", 250, yOffset)
 	tab.MobileVsDesktop:SetWidth(190)
 	tab.MobileVsDesktop:SetJustifyH("LEFT")
@@ -3248,7 +3349,7 @@ function Settings:RefreshStatisticsTab()
 	table.insert(allFrames, factionHeader)
 	yOffset = yOffset - 25
 	
-	tab.FactionList = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	tab.FactionList = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 	tab.FactionList:SetPoint("TOPLEFT", 250, yOffset)
 	tab.FactionList:SetWidth(190)
 	tab.FactionList:SetJustifyH("LEFT")
@@ -3302,12 +3403,12 @@ function Settings:RefreshNotificationsTab()
 	-- ===========================================
 	-- Header (Beta - Orange)
 	-- ===========================================
-	local betaHeader = tab:CreateFontString(nil, "ARTWORK", "GameFontNormalHuge")
+	local betaHeader = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormalLarge")
 	betaHeader:SetText("|cffff8800" .. (L.SETTINGS_TAB_NOTIFICATIONS or "Notifications") .. "|r") -- Orange for Beta feature
 	table.insert(allFrames, betaHeader)
 	
 	-- Description
-	local desc = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	local desc = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
 	desc:SetWidth(360)
 	desc:SetJustifyH("LEFT")
 	desc:SetWordWrap(true)
@@ -3345,7 +3446,7 @@ function Settings:RefreshNotificationsTab()
 	table.insert(allFrames, displayModeDropdown)
 	
 	-- Mode Description
-	local modeDesc = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	local modeDesc = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 	modeDesc:SetWidth(360)
 	modeDesc:SetJustifyH("LEFT")
 	modeDesc:SetWordWrap(true)
@@ -3509,7 +3610,7 @@ function Settings:RefreshNotificationsTab()
 	table.insert(allFrames, endHourSlider)
 	
 	-- Scheduled Hours Info
-	local scheduleInfo = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	local scheduleInfo = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 	scheduleInfo:SetWidth(360)
 	scheduleInfo:SetJustifyH("LEFT")
 	scheduleInfo:SetWordWrap(true)
@@ -3603,7 +3704,7 @@ function Settings:RefreshNotificationsTab()
 	local messagesHeader = Components:CreateHeader(tab, L.SETTINGS_NOTIFY_MESSAGES_HEADER or "Custom Messages")
 	table.insert(allFrames, messagesHeader)
 	
-	local messagesDesc = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	local messagesDesc = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 	messagesDesc:SetWidth(360)
 	messagesDesc:SetJustifyH("LEFT")
 	messagesDesc:SetWordWrap(true)
@@ -3612,7 +3713,7 @@ function Settings:RefreshNotificationsTab()
 	table.insert(allFrames, messagesDesc)
 	
 	-- Online Message Label
-	local onlineMsgLabel = tab:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	local onlineMsgLabel = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
 	onlineMsgLabel:SetText(L.SETTINGS_NOTIFY_MSG_ONLINE or "Online Message:")
 	onlineMsgLabel:SetPoint("LEFT", 0, 0)
 	table.insert(allFrames, onlineMsgLabel)
@@ -3620,6 +3721,7 @@ function Settings:RefreshNotificationsTab()
 	-- Online Message EditBox
 	local onlineMsgBox = CreateFrame("EditBox", nil, tab, "InputBoxTemplate")
 	onlineMsgBox:SetSize(340, 25)
+	onlineMsgBox:SetFontObject("BetterFriendlistFontHighlight")
 	onlineMsgBox:SetAutoFocus(false)
 	onlineMsgBox:SetText(BetterFriendlistDB.notificationMessageOnline or "%name% is now online")
 	onlineMsgBox:SetScript("OnEnterPressed", function(self)
@@ -3637,7 +3739,7 @@ function Settings:RefreshNotificationsTab()
 	table.insert(allFrames, onlineMsgBox)
 	
 	-- Offline Message Label
-	local offlineMsgLabel = tab:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	local offlineMsgLabel = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
 	offlineMsgLabel:SetText(L.SETTINGS_NOTIFY_MSG_OFFLINE or "Offline Message:")
 	offlineMsgLabel:SetPoint("LEFT", 0, 0)
 	table.insert(allFrames, offlineMsgLabel)
@@ -3645,6 +3747,7 @@ function Settings:RefreshNotificationsTab()
 	-- Offline Message EditBox
 	local offlineMsgBox = CreateFrame("EditBox", nil, tab, "InputBoxTemplate")
 	offlineMsgBox:SetSize(340, 25)
+	offlineMsgBox:SetFontObject("BetterFriendlistFontHighlight")
 	offlineMsgBox:SetAutoFocus(false)
 	offlineMsgBox:SetText(BetterFriendlistDB.notificationMessageOffline or "%name% went offline")
 	offlineMsgBox:SetScript("OnEnterPressed", function(self)
@@ -3662,7 +3765,7 @@ function Settings:RefreshNotificationsTab()
 	table.insert(allFrames, offlineMsgBox)
 	
 	-- WoW Login Message Label (Phase 11.5)
-	local wowLoginMsgLabel = tab:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	local wowLoginMsgLabel = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
 	wowLoginMsgLabel:SetText(L.SETTINGS_NOTIFY_MSG_WOW_LOGIN or "WoW Login Message:")
 	wowLoginMsgLabel:SetPoint("LEFT", 0, 0)
 	table.insert(allFrames, wowLoginMsgLabel)
@@ -3670,6 +3773,7 @@ function Settings:RefreshNotificationsTab()
 	-- WoW Login Message EditBox
 	local wowLoginMsgBox = CreateFrame("EditBox", nil, tab, "InputBoxTemplate")
 	wowLoginMsgBox:SetSize(340, 25)
+	wowLoginMsgBox:SetFontObject("BetterFriendlistFontHighlight")
 	wowLoginMsgBox:SetAutoFocus(false)
 	wowLoginMsgBox:SetText(BetterFriendlistDB.notificationMessageWowLogin or "%name% logged into World of Warcraft")
 	wowLoginMsgBox:SetScript("OnEnterPressed", function(self)
@@ -3687,7 +3791,7 @@ function Settings:RefreshNotificationsTab()
 	table.insert(allFrames, wowLoginMsgBox)
 	
 	-- Character Switch Message Label
-	local charSwitchMsgLabel = tab:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	local charSwitchMsgLabel = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
 	charSwitchMsgLabel:SetText(L.SETTINGS_NOTIFY_MSG_CHAR_SWITCH or "Character Switch Message:")
 	charSwitchMsgLabel:SetPoint("LEFT", 0, 0)
 	table.insert(allFrames, charSwitchMsgLabel)
@@ -3695,6 +3799,7 @@ function Settings:RefreshNotificationsTab()
 	-- Character Switch Message EditBox
 	local charSwitchMsgBox = CreateFrame("EditBox", nil, tab, "InputBoxTemplate")
 	charSwitchMsgBox:SetSize(340, 25)
+	charSwitchMsgBox:SetFontObject("BetterFriendlistFontHighlight")
 	charSwitchMsgBox:SetAutoFocus(false)
 	charSwitchMsgBox:SetText(BetterFriendlistDB.notificationMessageCharSwitch or "%name% switched to %char%")
 	charSwitchMsgBox:SetScript("OnEnterPressed", function(self)
@@ -3712,7 +3817,7 @@ function Settings:RefreshNotificationsTab()
 	table.insert(allFrames, charSwitchMsgBox)
 	
 	-- Game Switch Message Label
-	local gameSwitchMsgLabel = tab:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	local gameSwitchMsgLabel = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
 	gameSwitchMsgLabel:SetText(L.SETTINGS_NOTIFY_MSG_GAME_SWITCH or "Game Switch Message:")
 	gameSwitchMsgLabel:SetPoint("LEFT", 0, 0)
 	table.insert(allFrames, gameSwitchMsgLabel)
@@ -3720,6 +3825,7 @@ function Settings:RefreshNotificationsTab()
 	-- Game Switch Message EditBox
 	local gameSwitchMsgBox = CreateFrame("EditBox", nil, tab, "InputBoxTemplate")
 	gameSwitchMsgBox:SetSize(340, 25)
+	gameSwitchMsgBox:SetFontObject("BetterFriendlistFontHighlight")
 	gameSwitchMsgBox:SetAutoFocus(false)
 	gameSwitchMsgBox:SetText(BetterFriendlistDB.notificationMessageGameSwitch or "%name% is now playing %game%")
 	gameSwitchMsgBox:SetScript("OnEnterPressed", function(self)
@@ -3737,7 +3843,7 @@ function Settings:RefreshNotificationsTab()
 	table.insert(allFrames, gameSwitchMsgBox)
 	
 	-- Preview Info Text
-	local previewInfo = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	local previewInfo = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 	previewInfo:SetWidth(360)
 	previewInfo:SetJustifyH("LEFT")
 	previewInfo:SetWordWrap(true)
@@ -3751,7 +3857,7 @@ function Settings:RefreshNotificationsTab()
 	local triggersHeader = Components:CreateHeader(tab, L.SETTINGS_NOTIFY_TRIGGERS_HEADER or "Group Triggers")
 	table.insert(allFrames, triggersHeader)
 	
-	local triggersDesc = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	local triggersDesc = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 	triggersDesc:SetWidth(360)
 	triggersDesc:SetJustifyH("LEFT")
 	triggersDesc:SetWordWrap(true)
@@ -3798,7 +3904,7 @@ function Settings:RefreshNotificationsTab()
 			local groupName = group and group.name or trigger.groupId
 			
 			-- Trigger label
-			local label = triggerFrame:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+			local label = triggerFrame:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
 			label:SetPoint("LEFT", triggerFrame, "LEFT", 0, 0)
 			label:SetText(string.format(L.SETTINGS_NOTIFY_TRIGGER_FORMAT or "%d+ from '%s'", trigger.threshold, groupName))
 			
@@ -3833,7 +3939,7 @@ function Settings:RefreshNotificationsTab()
 		
 		-- Show "No triggers" message if empty
 		if next(BetterFriendlistDB.notificationGroupTriggers) == nil then
-			local emptyText = triggerListContainer:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+			local emptyText = triggerListContainer:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 			emptyText:SetPoint("TOPLEFT", triggerListContainer, "TOPLEFT", 0, 0)
 			emptyText:SetTextColor(0.5, 0.5, 0.5)
 			emptyText:SetText(L.SETTINGS_NOTIFY_NO_TRIGGERS or "No group triggers configured. Click 'Add Trigger' below.")
@@ -4088,7 +4194,7 @@ function Settings:RefreshBrokerTab()
 	table.insert(allFrames, header)
 	
 	-- Info Text
-	local infoText = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	local infoText = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 	infoText:SetWidth(360)
 	infoText:SetJustifyH("LEFT")
 	infoText:SetWordWrap(true)
@@ -4352,7 +4458,7 @@ function Settings:RefreshGlobalSyncTab()
 	table.insert(allFrames, header)
 	
 	-- Description
-	local desc = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	local desc = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 	desc:SetWidth(360)
 	desc:SetJustifyH("LEFT")
 	desc:SetWordWrap(true)
@@ -4441,14 +4547,14 @@ function Settings:RefreshGlobalSyncTab()
 						end
 						
 						-- Name
-						local nameText = row:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+						local nameText = row:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
 						nameText:SetPoint("LEFT", 15, 0)
 						nameText:SetWidth(140)
 						nameText:SetJustifyH("LEFT")
 						nameText:SetText(name)
 						
 						-- Realm
-						local realmText = row:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+						local realmText = row:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 						realmText:SetPoint("LEFT", nameText, "RIGHT", 5, 0)
 						realmText:SetWidth(120)
 						realmText:SetJustifyH("LEFT")
@@ -4612,5 +4718,6 @@ function Settings:RefreshGlobalSyncTab()
 end
 
 return Settings
+
 
 

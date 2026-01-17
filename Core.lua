@@ -1,6 +1,6 @@
 -- Core.lua
 -- Main initialization file for BetterFriendlist addon
--- Version 2.1.9 - January 2026
+-- Version 2.2.0 - January 2026
 -- Complete replacement for WoW Friends frame with modular architecture
 
 -- Create addon namespace
@@ -117,6 +117,26 @@ function BFL:ToggleDebugPrint()
 		print("|cff00ff00BetterFriendlist:|r " .. BFL.L.DEBUG_ENABLED)
 	else
 		print("|cff00ff00BetterFriendlist:|r " .. BFL.L.DEBUG_DISABLED)
+	end
+end
+
+-- Open Configuration
+function BFL:OpenConfig()
+	local Settings = self:GetModule("Settings")
+	if Settings then
+		-- Check if settings frame is already shown
+		if _G.BetterFriendlistSettingsFrame and _G.BetterFriendlistSettingsFrame:IsShown() then
+			Settings:Hide()
+			return
+		end
+
+		-- Ensure main frame is visible first
+		if _G.BetterFriendsFrame and not _G.BetterFriendsFrame:IsShown() then
+			if _G.ToggleBetterFriendsFrame then
+				_G.ToggleBetterFriendsFrame()
+			end
+		end
+		Settings:Show()
 	end
 end
 

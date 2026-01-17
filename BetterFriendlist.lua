@@ -1258,6 +1258,29 @@ end
 function BetterFriendsFrame_ShowTab(tabIndex)
 	local frame = BetterFriendsFrame
 	if not frame then return end
+
+	-- FORCE FONT UPDATE: Ensure Custom Fonts win against ElvUI
+	for i = 1, 4 do
+		local tab = _G["BetterFriendsFrameTab" .. i]
+		if tab then
+			-- Ensure fonts are strictly enforcing BetterFriendlist style
+			-- Use Small font (10pt) to match Bottom Tabs (and standard Blizzard tabs)
+			tab:SetNormalFontObject("BetterFriendlistFontNormalSmall")
+			tab:SetHighlightFontObject("BetterFriendlistFontHighlightSmall")
+			tab:SetDisabledFontObject("BetterFriendlistFontHighlightSmall")
+			
+			if i == tabIndex then
+				-- Re-enforce selection state visually just to be safe
+				PanelTemplates_SelectTab(tab)
+				local fs = tab:GetFontString()
+				if fs then
+					fs:SetFontObject("BetterFriendlistFontHighlightSmall")
+				end
+			else
+				PanelTemplates_DeselectTab(tab)
+			end
+		end
+	end
 	
 	-- Use hybrid helper functions for all child frames
 	HideChildFrame(frame.SortFrame)
@@ -2264,6 +2287,28 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex)
 	local frame = BetterFriendsFrame
 	if not frame then return end
 	
+	-- FORCE FONT UPDATE: Ensure Custom Fonts win against ElvUI
+	for i = 1, 4 do
+		local tab = _G["BetterFriendsFrameBottomTab" .. i]
+		if tab then
+			-- Ensure fonts are strictly enforcing BetterFriendlist style
+			tab:SetNormalFontObject("BetterFriendlistFontNormalSmall")
+			tab:SetHighlightFontObject("BetterFriendlistFontHighlightSmall")
+			tab:SetDisabledFontObject("BetterFriendlistFontHighlightSmall")
+			
+			if i == tabIndex then
+				-- Re-enforce selection state visually just to be safe
+				PanelTemplates_SelectTab(tab)
+				local fs = tab:GetFontString()
+				if fs then
+					fs:SetFontObject("BetterFriendlistFontHighlightSmall")
+				end
+			else
+				PanelTemplates_DeselectTab(tab)
+			end
+		end
+	end
+
 	-- Use hybrid helper functions
 	HideChildFrame(frame.ScrollFrame)
 	HideChildFrame(frame.MinimalScrollBar)

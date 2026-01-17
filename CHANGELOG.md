@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [2.2.0] - 2026-01-17
+### Added
+- **Group Name Alignment** - Added a new option to align group headers (Left, Center, Right). Left alignment is now the default. (Reported by Drakblackz)
+- **Collapse/Expand Arrow** - Added options to hide the collapse/expand arrow and change its alignment (Left, Center, Right). Left is default. (Reported by Drakblackz)
+- **Settings Button** - Added a dedicated cogwheel button to the main frame for easier access to settings, making it more discoverable for new users. (Reported by Atom)
+
+### Fixed
+- **Class Coloring** - Fixed an issue with class coloring not working correctly for some languages. (Reported by Drakblackz)
+- **Performance** - Investigated and fixed small freezes that could occur when collapsing/expanding groups. (Reported by Drakblackz)
+- **ElvUI Skin** - Fixed a Lua error related to the ElvUI skin integration. (Reported by Seiryoku)
+- **ElvUI Skin** - Fixed skinning issues where ElvUI styles were not properly applied to some newer UI elements.
+- **Send Message Button** - Fixed the "Send Message" button not working correctly in some scenarios. (Reported by Kylani)
+- **Settings UI** - Fixed an issue where some dropdowns in general settings would not display their selected value.
+- **Font Scaling** - Fixed visual issues with dropdowns and tab texts when global font size is overridden by other addons (e.g., ElvUI). (Reported by Drakblackz)
+- **Sorting** - Fixed the Alphabetical Name sorter not working properly. (Reported by Drakblackz)
+
 ## [2.1.9] - 2026-01-16
 ### Added
 - **Global Ignore List Support** - Added a compatibility module for the "Global Ignore List" addon. The GIL window now correctly anchors to the BetterFriendlist frame (Main, Settings, Help, or Raid Info) and opens/closes automatically. (reported by Kiley01)

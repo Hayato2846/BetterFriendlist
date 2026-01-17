@@ -76,7 +76,7 @@ function HelpFrame:CreateFrame()
 	local L = BFL.L or {}
 	
 	-- Title
-	local title = content:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+	local title = content:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormalLarge")
 	title:SetPoint("TOPLEFT", 10, -10)
 	title:SetPoint("TOPRIGHT", -10, -10)
 	title:SetJustifyH("LEFT")
@@ -84,14 +84,14 @@ function HelpFrame:CreateFrame()
 	title:SetTextColor(1.0, 0.82, 0)
 	
 	-- Section 1: Multi-Selection
-	local section1Title = content:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	local section1Title = content:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
 	section1Title:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -15)
 	section1Title:SetPoint("TOPRIGHT", title, "BOTTOMRIGHT", 0, -15)
 	section1Title:SetJustifyH("LEFT")
 	section1Title:SetText(L.RAID_HELP_MULTISELECT_TITLE)
 	section1Title:SetTextColor(1.0, 0.82, 0)
 	
-	local section1Text = content:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	local section1Text = content:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
 	section1Text:SetPoint("TOPLEFT", section1Title, "BOTTOMLEFT", 5, -5)
 	section1Text:SetPoint("TOPRIGHT", section1Title, "BOTTOMRIGHT", -5, -5)
 	section1Text:SetJustifyH("LEFT")
@@ -99,14 +99,14 @@ function HelpFrame:CreateFrame()
 	section1Text:SetText(L.RAID_HELP_MULTISELECT_TEXT)
 	
 	-- Section 2: Main Tank
-	local section2Title = content:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	local section2Title = content:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
 	section2Title:SetPoint("TOPLEFT", section1Text, "BOTTOMLEFT", -5, -15)
 	section2Title:SetPoint("TOPRIGHT", section1Text, "BOTTOMRIGHT", 5, -15)
 	section2Title:SetJustifyH("LEFT")
 	section2Title:SetText(L.RAID_HELP_MAINTANK_TITLE)
 	section2Title:SetTextColor(1.0, 0.82, 0)
 	
-	local section2Text = content:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	local section2Text = content:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
 	section2Text:SetPoint("TOPLEFT", section2Title, "BOTTOMLEFT", 5, -5)
 	section2Text:SetPoint("TOPRIGHT", section2Title, "BOTTOMRIGHT", -5, -5)
 	section2Text:SetJustifyH("LEFT")
@@ -114,14 +114,14 @@ function HelpFrame:CreateFrame()
 	section2Text:SetText(L.RAID_HELP_MAINTANK_TEXT)
 	
 	-- Section 3: Main Assist
-	local section3Title = content:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	local section3Title = content:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
 	section3Title:SetPoint("TOPLEFT", section2Text, "BOTTOMLEFT", -5, -15)
 	section3Title:SetPoint("TOPRIGHT", section2Text, "BOTTOMRIGHT", 5, -15)
 	section3Title:SetJustifyH("LEFT")
 	section3Title:SetText(L.RAID_HELP_MAINASSIST_TITLE)
 	section3Title:SetTextColor(1.0, 0.82, 0)
 	
-	local section3Text = content:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	local section3Text = content:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
 	section3Text:SetPoint("TOPLEFT", section3Title, "BOTTOMLEFT", 5, -5)
 	section3Text:SetPoint("TOPRIGHT", section3Title, "BOTTOMRIGHT", -5, -5)
 	section3Text:SetJustifyH("LEFT")
@@ -129,14 +129,14 @@ function HelpFrame:CreateFrame()
 	section3Text:SetText(L.RAID_HELP_MAINASSIST_TEXT)
 	
 	-- Section 4: Drag & Drop
-	local section4Title = content:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	local section4Title = content:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
 	section4Title:SetPoint("TOPLEFT", section3Text, "BOTTOMLEFT", -5, -15)
 	section4Title:SetPoint("TOPRIGHT", section3Text, "BOTTOMRIGHT", 5, -15)
 	section4Title:SetJustifyH("LEFT")
 	section4Title:SetText(L.RAID_HELP_DRAGDROP_TITLE)
 	section4Title:SetTextColor(1.0, 0.82, 0)
 	
-	local section4Text = content:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	local section4Text = content:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
 	section4Text:SetPoint("TOPLEFT", section4Title, "BOTTOMLEFT", 5, -5)
 	section4Text:SetPoint("TOPRIGHT", section4Title, "BOTTOMRIGHT", -5, -5)
 	section4Text:SetJustifyH("LEFT")
@@ -144,14 +144,14 @@ function HelpFrame:CreateFrame()
 	section4Text:SetText(L.RAID_HELP_DRAGDROP_TEXT)
 	
 	-- Section 5: Combat Lock
-	local section5Title = content:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	local section5Title = content:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
 	section5Title:SetPoint("TOPLEFT", section4Text, "BOTTOMLEFT", -5, -15)
 	section5Title:SetPoint("TOPRIGHT", section4Text, "BOTTOMRIGHT", 5, -15)
 	section5Title:SetJustifyH("LEFT")
 	section5Title:SetText(L.RAID_HELP_COMBAT_TITLE)
 	section5Title:SetTextColor(1.0, 0.82, 0)
 	
-	local section5Text = content:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	local section5Text = content:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
 	section5Text:SetPoint("TOPLEFT", section5Title, "BOTTOMLEFT", 5, -5)
 	section5Text:SetPoint("TOPRIGHT", section5Title, "BOTTOMRIGHT", -5, -5)
 	section5Text:SetJustifyH("LEFT")

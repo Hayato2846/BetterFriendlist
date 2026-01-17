@@ -1,4 +1,114 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<!-- Fixed Font Definitions (Independent from GameFontNormalSmall) -->
+	
+	<!-- Normal (12pt) -->
+	<Font name="BetterFriendlistFontNormal" font="Fonts\FRIZQT__.TTF" virtual="true">
+		<FontHeight><AbsValue val="12"/></FontHeight>
+		<Shadow><Offset><AbsDimension x="1" y="-1"/></Offset><Color r="0" g="0" b="0"/></Shadow>
+		<Color color="NORMAL_FONT_COLOR"/>
+	</Font>
+	
+	<!-- Small (10pt) -->
+	<Font name="BetterFriendlistFontNormalSmall" font="Fonts\FRIZQT__.TTF" virtual="true">
+		<FontHeight><AbsValue val="10"/></FontHeight>
+		<Shadow><Offset><AbsDimension x="1" y="-1"/></Offset><Color r="0" g="0" b="0"/></Shadow>
+		<Color color="NORMAL_FONT_COLOR"/>
+	</Font>
+	
+	<!-- Highlight (12pt) -->
+	<Font name="BetterFriendlistFontHighlight" font="Fonts\FRIZQT__.TTF" virtual="true">
+		<FontHeight><AbsValue val="12"/></FontHeight>
+		<Shadow><Offset><AbsDimension x="1" y="-1"/></Offset><Color r="0" g="0" b="0"/></Shadow>
+		<Color color="HIGHLIGHT_FONT_COLOR"/>
+	</Font>
+	
+	<!-- Normal Left (12pt) -->
+	<Font name="BetterFriendlistFontNormalLeft" font="Fonts\FRIZQT__.TTF" virtual="true" justifyH="LEFT">
+		<FontHeight><AbsValue val="12"/></FontHeight>
+		<Shadow><Offset><AbsDimension x="1" y="-1"/></Offset><Color r="0" g="0" b="0"/></Shadow>
+		<Color color="NORMAL_FONT_COLOR"/>
+	</Font>
+	
+	<!-- Highlight Left (12pt) -->
+	<Font name="BetterFriendlistFontHighlightLeft" font="Fonts\FRIZQT__.TTF" virtual="true" justifyH="LEFT" >
+		<FontHeight><AbsValue val="12"/></FontHeight>
+		<Shadow><Offset><AbsDimension x="1" y="-1"/></Offset><Color r="0" g="0" b="0"/></Shadow>
+		<Color color="HIGHLIGHT_FONT_COLOR"/>
+	</Font>
+	
+	<!-- Highlight Small (10pt) -->
+	<Font name="BetterFriendlistFontHighlightSmall" font="Fonts\FRIZQT__.TTF" virtual="true">
+		<FontHeight><AbsValue val="10"/></FontHeight>
+		<Shadow><Offset><AbsDimension x="1" y="-1"/></Offset><Color r="0" g="0" b="0"/></Shadow>
+		<Color color="HIGHLIGHT_FONT_COLOR"/>
+	</Font>
+	
+	<!-- Disable (12pt) -->
+	<Font name="BetterFriendlistFontDisable" font="Fonts\FRIZQT__.TTF" virtual="true">
+		<FontHeight><AbsValue val="12"/></FontHeight>
+		<Shadow><Offset><AbsDimension x="1" y="-1"/></Offset><Color r="0" g="0" b="0"/></Shadow>
+		<Color r="0.5" g="0.5" b="0.5"/>
+	</Font>
+	
+	<!-- Disable Small (10pt) -->
+	<Font name="BetterFriendlistFontDisableSmall" font="Fonts\FRIZQT__.TTF" virtual="true">
+		<FontHeight><AbsValue val="10"/></FontHeight>
+		<Shadow><Offset><AbsDimension x="1" y="-1"/></Offset><Color r="0" g="0" b="0"/></Shadow>
+		<Color r="0.5" g="0.5" b="0.5"/>
+	</Font>
+	
+	<!-- Med3 / Large (14pt) -->
+	<Font name="BetterFriendlistFontNormalMed3" font="Fonts\FRIZQT__.TTF" virtual="true">
+		<FontHeight><AbsValue val="14"/></FontHeight>
+		<Shadow><Offset><AbsDimension x="1" y="-1"/></Offset><Color r="0" g="0" b="0"/></Shadow>
+		<Color color="NORMAL_FONT_COLOR"/>
+	</Font>
+	
+	<!-- Large (16pt) -->
+	<Font name="BetterFriendlistFontNormalLarge" font="Fonts\FRIZQT__.TTF" virtual="true">
+		<FontHeight><AbsValue val="16"/></FontHeight>
+		<Shadow><Offset><AbsDimension x="1" y="-1"/></Offset><Color r="0" g="0" b="0"/></Shadow>
+		<Color color="NORMAL_FONT_COLOR"/>
+	</Font>
+
+	<!-- Huge (20pt) -->
+	<Font name="BetterFriendlistFontNormalHuge" font="Fonts\FRIZQT__.TTF" virtual="true">
+		<FontHeight><AbsValue val="20"/></FontHeight>
+		<Shadow><Offset><AbsDimension x="1" y="-1"/></Offset><Color r="0" g="0" b="0"/></Shadow>
+		<Color color="NORMAL_FONT_COLOR"/>
+	</Font>
+	
+	<!-- Friends Normal (13pt) -->
+	<Font name="BetterFriendlistFriendsFontNormal" font="Fonts\FRIZQT__.TTF" virtual="true">
+		<FontHeight><AbsValue val="13"/></FontHeight>
+		<Shadow><Offset><AbsDimension x="1" y="-1"/></Offset><Color r="0" g="0" b="0"/></Shadow>
+		<Color color="NORMAL_FONT_COLOR"/>
+	</Font>
+	
+	<!-- Friends Small (10pt) -->
+	<Font name="BetterFriendlistFriendsFontSmall" font="Fonts\FRIZQT__.TTF" virtual="true">
+		<FontHeight><AbsValue val="10"/></FontHeight>
+		<Shadow><Offset><AbsDimension x="1" y="-1"/></Offset><Color r="0" g="0" b="0"/></Shadow>
+		<Color r="0.486" g="0.518" b="0.541"/>
+	</Font>
+	
+	<!-- Friends User Text (11pt) -->
+	<Font name="BetterFriendlistFriendsFontUserText" font="Fonts\FRIZQT__.TTF" virtual="true">
+		<FontHeight><AbsValue val="11"/></FontHeight>
+		<Shadow><Offset><AbsDimension x="1" y="-1"/></Offset><Color r="0" g="0" b="0"/></Shadow>
+		<Color color="NORMAL_FONT_COLOR"/>
+	</Font>
+	
+	<!-- 11pt Variant -->
+	<Font name="BetterFriendlistFont11" font="Fonts\FRIZQT__.TTF" virtual="true">
+		<FontHeight><AbsValue val="11"/></FontHeight>
+		<Shadow><Offset><AbsDimension x="1" y="-1"/></Offset><Color r="0" g="0" b="0"/></Shadow>
+		<Color color="FRIENDS_GRAY_COLOR"/>
+	</Font>
+
+	<!-- Alias for compatibility -->
+	<Font name="BetterFriendlistFixedSmallFont" inherits="BetterFriendlistFontNormalSmall" virtual="true"/> 
+
 	<!-- ========================================
 	     CLASSIC-COMPATIBLE XML
 	     - No Atlas textures (use file-based textures)
@@ -29,14 +139,14 @@
 					</Anchors>
 				</Texture>
 				<!-- Friend Name (Line 1: BattleNet Name (CharacterName)) -->
-				<FontString parentKey="Name" inherits="FriendsFont_Normal" justifyH="LEFT" maxLines="1" nonSpaceWrap="false">
+				<FontString parentKey="Name" inherits="BetterFriendlistFriendsFontNormal" justifyH="LEFT" maxLines="1" nonSpaceWrap="false">
 					<Size x="280" y="0" />
 					<Anchors>
 						<Anchor point="TOPLEFT" x="24" y="-6" />
 					</Anchors>
 				</FontString>
 				<!-- Friend Info (Line 2: Level, Zone) -->
-				<FontString parentKey="Info" inherits="FriendsFont_Small" justifyH="LEFT">
+				<FontString parentKey="Info" inherits="BetterFriendlistFriendsFontSmall" justifyH="LEFT">
 					<Size x="280" y="0" />
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeKey="$parent.Name" relativePoint="BOTTOMLEFT" x="0" y="-1" />
@@ -110,8 +220,8 @@
 	<!-- Group Header Button Template -->
 	<Button name="BetterFriendsGroupHeaderTemplate" virtual="true" enableMouse="true">
 		<!-- Width set dynamically in Lua via SetPoint("LEFT") and SetPoint("RIGHT") -->
-		<NormalFont style="GameFontNormalLeft"/>
-		<HighlightFont style="GameFontHighlightLeft"/>
+		<NormalFont style="BetterFriendlistFontNormalLeft"/>
+		<HighlightFont style="BetterFriendlistFontHighlightLeft"/>
 		<Layers>
 			<Layer level="BACKGROUND" textureSubLevel="-1">
 				<Texture parentKey="BG" file="Interface\FrameGeneral\UI-Background-Rock" horizTile="true" vertTile="true">
@@ -170,27 +280,27 @@
 		<Size x="298" y="16"/>
 		<Layers>
 			<Layer level="BORDER">
-				<FontString parentKey="Name" inherits="GameFontNormalSmall" maxLines="1" justifyH="LEFT">
+				<FontString parentKey="Name" inherits="BetterFriendlistFontNormalSmall" maxLines="1" justifyH="LEFT">
 					<Size x="106"/>
 					<Anchors>
 						<Anchor point="LEFT" x="6"/>
 					</Anchors>
 				</FontString>
-				<FontString parentKey="Variable" inherits="GameFontNormalSmall" maxLines="1" justifyH="LEFT">
+				<FontString parentKey="Variable" inherits="BetterFriendlistFontNormalSmall" maxLines="1" justifyH="LEFT">
 					<Size x="98"/>
 					<Anchors>
 						<Anchor point="LEFT" relativeKey="$parent.Name" relativePoint="RIGHT" x="5"/>
 					</Anchors>
 					<Color color="HIGHLIGHT_FONT_COLOR"/>
 				</FontString>
-				<FontString parentKey="Level" inherits="GameFontNormalSmall" justifyH="CENTER" maxLines="1">
+				<FontString parentKey="Level" inherits="BetterFriendlistFontNormalSmall" justifyH="CENTER" maxLines="1">
 					<Size x="34"/>
 					<Anchors>
 						<Anchor point="LEFT" relativeKey="$parent.Variable" relativePoint="RIGHT" x="4"/>
 					</Anchors>
 					<Color color="HIGHLIGHT_FONT_COLOR"/>
 				</FontString>
-				<FontString parentKey="Class" inherits="GameFontNormalSmall" maxLines="1" justifyH="LEFT">
+				<FontString parentKey="Class" inherits="BetterFriendlistFontNormalSmall" maxLines="1" justifyH="LEFT">
 					<Anchors>
 						<Anchor point="LEFT" relativeKey="$parent.Level" relativePoint="RIGHT" x="15"/>
 						<Anchor point="RIGHT"/>
@@ -243,7 +353,7 @@
 		<Size x="298" y="16"/>
 		<Layers>
 			<Layer level="BORDER">
-				<FontString parentKey="name" inherits="GameFontNormal" justifyH="LEFT">
+				<FontString parentKey="name" inherits="BetterFriendlistFontNormal" justifyH="LEFT">
 					<Size x="288" y="12"/>
 					<Anchors>
 						<Anchor point="LEFT" x="10" y="1"/>
@@ -264,7 +374,7 @@
 		<Size x="302" y="16"/>
 		<Layers>
 			<Layer level="ARTWORK">
-				<FontString parentKey="Title" inherits="GameFontHighlightLeft">
+				<FontString parentKey="Title" inherits="BetterFriendlistFontHighlightLeft">
 					<Anchors>
 						<Anchor point="LEFT" x="5" y="1"/>
 					</Anchors>
@@ -282,7 +392,7 @@
 		<Size x="302" y="16"/>
 		<Layers>
 			<Layer level="ARTWORK">
-				<FontString parentKey="Title" inherits="GameFontHighlightLeft">
+				<FontString parentKey="Title" inherits="BetterFriendlistFontHighlightLeft">
 					<Anchors>
 						<Anchor point="LEFT" x="5" y="1"/>
 					</Anchors>
@@ -306,24 +416,24 @@
 				</Texture>
 			</Layer>
 			<Layer level="ARTWORK">
-				<FontString parentKey="Name" inherits="GameFontNormal" justifyH="LEFT">
+				<FontString parentKey="Name" inherits="BetterFriendlistFontNormal" justifyH="LEFT">
 					<Size x="0" y="16"/>
 					<Anchors>
 						<Anchor point="TOPLEFT" x="10" y="-8"/>
 						<Anchor point="TOPRIGHT" x="-10" y="-8"/>
 					</Anchors>
 				</FontString>
-				<FontString parentKey="Difficulty" inherits="GameFontHighlightSmall" justifyH="LEFT">
+				<FontString parentKey="Difficulty" inherits="BetterFriendlistFontHighlightSmall" justifyH="LEFT">
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeKey="$parent.Name" relativePoint="BOTTOMLEFT" x="0" y="-2"/>
 					</Anchors>
 				</FontString>
-				<FontString parentKey="Progress" inherits="GameFontHighlightSmall" justifyH="LEFT">
+				<FontString parentKey="Progress" inherits="BetterFriendlistFontHighlightSmall" justifyH="LEFT">
 					<Anchors>
 						<Anchor point="LEFT" relativeKey="$parent.Difficulty" relativePoint="RIGHT" x="10" y="0"/>
 					</Anchors>
 				</FontString>
-				<FontString parentKey="Reset" inherits="GameFontHighlightSmall" justifyH="RIGHT">
+				<FontString parentKey="Reset" inherits="BetterFriendlistFontHighlightSmall" justifyH="RIGHT">
 					<Anchors>
 						<Anchor point="TOPRIGHT" relativeKey="$parent.Name" relativePoint="BOTTOMRIGHT" x="0" y="-2"/>
 					</Anchors>
@@ -400,18 +510,18 @@
 						<Anchor point="LEFT" x="2" y="0"/>
 					</Anchors>
 				</Texture>
-				<FontString parentKey="Level" inherits="GameFontNormalSmall" justifyH="LEFT">
+				<FontString parentKey="Level" inherits="BetterFriendlistFontNormalSmall" justifyH="LEFT">
 					<Anchors>
 						<Anchor point="LEFT" relativeKey="$parent.ClassIcon" relativePoint="RIGHT" x="2" y="0"/>
 					</Anchors>
 				</FontString>
-				<FontString parentKey="Name" inherits="GameFontNormalSmall" justifyH="LEFT">
+				<FontString parentKey="Name" inherits="BetterFriendlistFontNormalSmall" justifyH="LEFT">
 					<Anchors>
 						<Anchor point="LEFT" relativeKey="$parent.Level" relativePoint="RIGHT" x="2" y="0"/>
 						<Anchor point="RIGHT" x="-20" y="0"/>
 					</Anchors>
 				</FontString>
-				<FontString parentKey="EmptyText" inherits="GameFontDisable" text="Empty" hidden="true">
+				<FontString parentKey="EmptyText" inherits="BetterFriendlistFontDisable" text="Empty" hidden="true">
 					<Anchors>
 						<Anchor point="CENTER"/>
 					</Anchors>
@@ -488,7 +598,7 @@
 				</Texture>
 			</Layer>
 			<Layer level="ARTWORK">
-				<FontString parentKey="GroupTitle" inherits="GameFontNormalSmall" justifyH="CENTER">
+				<FontString parentKey="GroupTitle" inherits="BetterFriendlistFontNormalSmall" justifyH="CENTER">
 					<Anchors>
 						<Anchor point="TOP" x="0" y="-2"/>
 					</Anchors>
@@ -542,9 +652,9 @@
 				<Frames>
 					<!-- Replicate Blizzard's FriendsFrameBattlenetFrame structure -->
 					<Frame parentKey="BattlenetFrame">
-						<Size x="190" y="29"/>
+						<Size x="160" y="29"/>
 						<Anchors>
-							<Anchor point="TOP" relativeKey="$parent.$parent.TitleContainer" x="25" y="-26"/>
+							<Anchor point="TOP" relativeKey="$parent.$parent.TitleContainer" x="0" y="-26"/>
 						</Anchors>
 						<Layers>
 							<Layer level="BACKGROUND">
@@ -553,13 +663,13 @@
 								</Texture>
 							</Layer>
 							<Layer level="ARTWORK">
-								<FontString parentKey="Tag" inherits="GameFontNormal">
+								<FontString parentKey="Tag" inherits="BetterFriendlistFontNormal">
 									<Anchors>
 										<Anchor point="CENTER"/>
 									</Anchors>
 									<Color r="0.345" g="0.667" b="0.867" />
 								</FontString>
-								<FontString parentKey="UnavailableLabel" inherits="FriendsFont_Normal" text="BATTLENET_UNAVAILABLE" hidden="true">
+								<FontString parentKey="UnavailableLabel" inherits="BetterFriendlistFriendsFontNormal" text="BATTLENET_UNAVAILABLE" hidden="true">
 									<Anchors>
 										<Anchor point="CENTER"/>
 									</Anchors>
@@ -599,6 +709,37 @@
 								</Scripts>
 							</Button>
 							
+							<!-- Settings Button -->
+							<Button parentKey="SettingsButton" inherits="UIPanelButtonTemplate">
+								<Size x="28" y="28"/>
+								<Anchors>
+									<Anchor point="LEFT" relativeKey="$parent.ContactsMenuButton" relativePoint="RIGHT" x="1" y="0"/>
+								</Anchors>
+								<Layers>
+									<Layer level="ARTWORK">
+										<Texture parentKey="Icon" file="Interface\AddOns\BetterFriendlist\Icons\settings.blp">
+											<Size x="12" y="12"/>
+											<Anchors>
+												<Anchor point="CENTER"/>
+											</Anchors>
+										</Texture>
+									</Layer>
+								</Layers>
+								<Scripts>
+									<OnEnter>
+										GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+										GameTooltip:SetText(BFL and BFL.L and BFL.L.SETTINGS_TITLE or "Settings");
+										GameTooltip:Show();
+									</OnEnter>
+									<OnLeave>
+										GameTooltip:Hide();
+									</OnLeave>
+									<OnClick>
+										if BFL then BFL:OpenConfig() end
+									</OnClick>
+								</Scripts>
+							</Button>
+							
 							<!-- Broadcast Edit Frame -->
 							<Frame parentKey="BroadcastFrame" frameStrata="HIGH" enableMouse="true" hidden="true">
 								<Size x="338" y="140"/>
@@ -607,7 +748,7 @@
 								</Anchors>
 								<Layers>
 									<Layer level="ARTWORK">
-										<FontString text="BATTLENET_BROADCAST" inherits="GameFontNormalMed3">
+										<FontString text="BATTLENET_BROADCAST" inherits="BetterFriendlistFontNormalMed3">
 											<Anchors>
 												<Anchor point="TOP" y="-20"/>
 											</Anchors>
@@ -679,7 +820,7 @@
 												</Texture>
 											</Layer>
 											<Layer level="BORDER">
-												<FontString parentKey="PromptText" inherits="FriendsFont_Small" justifyH="LEFT" justifyV="MIDDLE" text="FRIENDS_LIST_ENTER_TEXT">
+												<FontString parentKey="PromptText" inherits="BetterFriendlistFriendsFontSmall" justifyH="LEFT" justifyV="MIDDLE" text="FRIENDS_LIST_ENTER_TEXT">
 													<Anchors>
 														<Anchor point="LEFT"/>
 													</Anchors>
@@ -703,7 +844,7 @@
 												self:GetParent():SetBroadcast();
 											</OnEnterPressed>
 										</Scripts>
-										<FontString inherits="FriendsFont_Small" spacing="2"/>
+										<FontString inherits="BetterFriendlistFriendsFontSmall" spacing="2"/>
 									</EditBox>
 									<Button parentKey="UpdateButton" inherits="UIPanelButtonTemplate" text="UPDATE">
 										<Size x="96" y="22"/>
@@ -740,7 +881,7 @@
 					<!-- Status Dropdown (Classic: UIDropDownMenuTemplate) -->
 					<Frame name="$parentStatusDropdown" parentKey="StatusDropdown" inherits="UIDropDownMenuTemplate">
 						<Anchors>
-							<Anchor point="RIGHT" relativeKey="$parent.BattlenetFrame" relativePoint="LEFT" x="10" y="-2"/>
+							<Anchor point="RIGHT" relativeKey="$parent.BattlenetFrame" relativePoint="LEFT" x="15" y="-2"/>
 						</Anchors>
 					</Frame>
 					
@@ -880,7 +1021,7 @@
 						</Anchors>
 						<Layers>
 							<Layer level="ARTWORK">
-								<FontString parentKey="Text" inherits="GameFontNormalSmall" justifyH="CENTER">
+								<FontString parentKey="Text" inherits="BetterFriendlistFontNormalSmall" justifyH="CENTER">
 									<Anchors>
 										<Anchor point="CENTER"/>
 									</Anchors>
@@ -1193,17 +1334,17 @@
 						</Frames>
 						<Layers>
 							<Layer level="OVERLAY">
-								<FontString parentKey="RoleSummary" inherits="GameFontHighlight" justifyH="LEFT">
+								<FontString parentKey="RoleSummary" inherits="BetterFriendlistFontHighlight" justifyH="LEFT">
 									<Anchors>
 										<Anchor point="RIGHT" relativeKey="$parent.RaidInfoButton" relativePoint="LEFT" x="-100" y="0"/>
 									</Anchors>
 								</FontString>
-								<FontString parentKey="MemberCount" inherits="GameFontHighlight" justifyH="LEFT">
+								<FontString parentKey="MemberCount" inherits="BetterFriendlistFontHighlight" justifyH="LEFT">
 									<Anchors>
 										<Anchor point="LEFT" relativeKey="$parent.RoleSummary" relativePoint="RIGHT" x="5" y="0"/>
 									</Anchors>
 								</FontString>
-								<FontString parentKey="EveryoneAssistLabel" inherits="GameFontNormal">
+								<FontString parentKey="EveryoneAssistLabel" inherits="BetterFriendlistFontNormal">
 									<Anchors>
 										<Anchor point="LEFT" relativeKey="$parent.EveryoneAssistCheckbox" relativePoint="RIGHT" x="0" y="0"/>
 									</Anchors>
@@ -1306,7 +1447,7 @@
 				</Frames>
 				<Layers>
 					<Layer level="ARTWORK">
-						<FontString parentKey="NotInRaid" inherits="GameFontNormalLarge" text="Raid roster is only available when in a raid group." hidden="true" wordwrap="true" justifyH="CENTER" justifyV="MIDDLE">
+						<FontString parentKey="NotInRaid" inherits="BetterFriendlistFontNormalMed3" text="Raid roster is only available when in a raid group." hidden="true" wordwrap="true" justifyH="CENTER" justifyV="MIDDLE">
 							<Anchors>
 								<Anchor point="LEFT" relativeKey="$parent.Inset" x="20" y="0"/>
 								<Anchor point="RIGHT" relativeKey="$parent.Inset" x="-20" y="0"/>
@@ -1446,7 +1587,7 @@
 		<Size x="320" y="480"/>
 		<Layers>
 			<Layer level="ARTWORK">
-				<FontString parentKey="TitleText" inherits="GameFontNormal" text="Saved Raid Lockouts">
+				<FontString parentKey="TitleText" inherits="BetterFriendlistFontNormal" text="Saved Raid Lockouts">
 					<Anchors>
 						<Anchor point="TOP" x="0" y="-5"/>
 					</Anchors>
@@ -1473,7 +1614,7 @@
 				</Anchors>
 				<Layers>
 					<Layer level="ARTWORK">
-						<FontString parentKey="Text" inherits="GameFontNormal" text="You have no saved raid lockouts">
+						<FontString parentKey="Text" inherits="BetterFriendlistFontNormal" text="You have no saved raid lockouts">
 							<Anchors>
 								<Anchor point="CENTER"/>
 							</Anchors>

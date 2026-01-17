@@ -237,10 +237,24 @@ function ElvUISkin:SkinFrames(E, S)
 	if frame.AddFriendButton then S:HandleButton(frame.AddFriendButton) end
 	if frame.SendMessageButton then S:HandleButton(frame.SendMessageButton) end
 	if frame.RecruitmentButton then S:HandleButton(frame.RecruitmentButton) end
+	
+	-- Skin HelpButton
+	if frame.HelpButton then 
+		-- Do not skin the framework of the HelpButton, only color the icon
+		-- S:HandleButton(frame.HelpButton) 
+		if frame.HelpButton.Icon then
+			frame.HelpButton.Icon:SetVertexColor(1, 1, 1)
+		end
+	end
 
-	-- Point 2: MenuButton
-	if frame.FriendsTabHeader and frame.FriendsTabHeader.BattlenetFrame and frame.FriendsTabHeader.BattlenetFrame.ContactsMenuButton then
-		S:HandleButton(frame.FriendsTabHeader.BattlenetFrame.ContactsMenuButton)
+	-- Point 2: MenuButton & SettingsButton
+	if frame.FriendsTabHeader and frame.FriendsTabHeader.BattlenetFrame then
+		if frame.FriendsTabHeader.BattlenetFrame.ContactsMenuButton then
+			S:HandleButton(frame.FriendsTabHeader.BattlenetFrame.ContactsMenuButton)
+		end
+		if frame.FriendsTabHeader.BattlenetFrame.SettingsButton then
+			S:HandleButton(frame.FriendsTabHeader.BattlenetFrame.SettingsButton)
+		end
 	end
 
 	if frame.WhoFrame then
@@ -450,6 +464,17 @@ function ElvUISkin:SkinFrames(E, S)
 	-- Skin Changelog
 	BFL:DebugPrint("ElvUISkin: Skinning Changelog")
 	self:SkinChangelog(E, S)
+	
+	-- Skin HelpFrame
+	BFL:DebugPrint("ElvUISkin: Skinning HelpFrame")
+	self:SkinHelpFrame(E, S)
+
+	-- Apply FontFix after Skinning to ensure correct font sizes
+	local FontFix = BFL:GetModule("FontFix")
+	if FontFix then
+		BFL:DebugPrint("ElvUISkin: Re-applying FontFix")
+		FontFix:ApplyFixedFonts()
+	end
 
 	BFL:DebugPrint("ElvUI Skin applied to BetterFriendlist")
 end
@@ -879,6 +904,8 @@ function ElvUISkin:SkinContextMenus(E, S)
 							-- Case B: Texture Swap on Background Region (or checkmark not found yet)
 							-- We hook the background region to see if it turns into a checkmark
 							local function UpdateTexture(self)
+								if not obj.BFLCheckmark then return end
+								
 								local tex = self:GetTexture()
 								local atlas = self:GetAtlas()
 								
@@ -1011,4 +1038,48 @@ function ElvUISkin:SkinChangelog(E, S)
 
 	hooksecurefunc(Changelog, "CreateChangelogWindow", Skin)
 	Skin()
+end
+
+function ElvUISkin:SkinHelpFrame(E, S)
+	local HelpFrame = BFL.HelpFrame or BFL:GetModule("HelpFrame")
+	if not HelpFrame then return end
+
+	local function Skin()
+		local frame = _G.BetterFriendlistHelpFrame
+		if not frame or frame.isSkinned then return end
+		
+		BFL:DebugPrint("ElvUISkin: Skinning HelpFrame")
+		S:HandlePortraitFrame(frame)
+		
+		-- Skin Inset if it exists (ButtonFrameTemplate feature)
+		if frame.Inset then
+			frame.Inset:StripTextures()
+			frame.Inset:CreateBackdrop("Transparent")
+		end
+		
+		-- Skin ScrollBar
+		if frame.ScrollBar then
+			S:HandleTrimScrollBar(frame.ScrollBar)
+		elseif frame.ScrollFrame then
+			-- Classic fallback or when using UIPanelScrollFrame
+			if frame.ScrollFrame.ScrollBar then
+				S:HandleScrollBar(frame.ScrollFrame.ScrollBar)
+			else
+				local scrollBar = _G[frame.ScrollFrame:GetName().."ScrollBar"]
+				if scrollBar then
+					S:HandleScrollBar(scrollBar)
+				end
+			end
+		end
+
+		frame.isSkinned = true
+	end
+
+	-- Hook creation
+	hooksecurefunc(HelpFrame, "CreateFrame", Skin)
+	-- Hook toggle as well just in case CreateFrame returns early but we missed skinning
+	hooksecurefunc(HelpFrame, "Toggle", Skin)
+	
+	-- Try to skin immediately if it exists
+	if _G.BetterFriendlistHelpFrame then Skin() end
 end

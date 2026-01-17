@@ -71,7 +71,7 @@ function BFL:ShowMissingLocalesFrame()
 	f.TitleText:SetPoint("TOP", 0, -5)
 
 	-- Instructions
-	local info = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	local info = f:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
 	info:SetPoint("TOPLEFT", 15, -35)
 	info:SetPoint("TOPRIGHT", -15, -35)
 	info:SetJustifyH("LEFT")

@@ -228,7 +228,7 @@ if GetLocale() == "frFR" then
 	L.ONLINE_STATUS = "En ligne"
 	L.OFFLINE_STATUS = "Hors ligne"
 	L.STATUS_MOBILE = "Mobile"
-	L.STATUS_IN_APP = "En App"
+	L.STATUS_IN_APP = "Dans l'application Blizzard"
 	L.UNKNOWN_GAME = "Jeu Inconnu"
 	L.BUTTON_ADD_FRIEND = "Ajouter Ami"
 	L.BUTTON_SEND_MESSAGE = "Envoyer Msg"
@@ -493,7 +493,8 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Évite chevauchements avec autres fenêtr
 
 	-- Tooltips
 	L.TOOLTIP_LAST_CONTACT = "Dernier contact :"
-	L.TOOLTIP_AGO = " il y a"
+	L.TOOLTIP_AGO = ""
+	L.TOOLTIP_AGO_PREFIX = "il y a "
 	L.TOOLTIP_LAST_ONLINE = "Dernière fois : %s"
 
 	-- Notifications

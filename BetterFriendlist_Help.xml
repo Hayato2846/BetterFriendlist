@@ -18,7 +18,7 @@
 						<Layers>
 							<Layer level="ARTWORK">
 								<!-- Title -->
-								<FontString parentKey="Title" inherits="GameFontNormalLarge" text="Raid Roster Help" justifyH="LEFT">
+								<FontString parentKey="Title" inherits="BetterFriendlistFontNormalMed3" text="Raid Roster Help" justifyH="LEFT">
 									<Anchors>
 										<Anchor point="TOPLEFT" x="10" y="-10"/>
 										<Anchor point="TOPRIGHT" x="-10" y="-10"/>
@@ -27,14 +27,14 @@
 								</FontString>
 								
 								<!-- Section 1: Multi-Selection -->
-								<FontString parentKey="Section1Title" inherits="GameFontNormal" justifyH="LEFT">
+								<FontString parentKey="Section1Title" inherits="BetterFriendlistFontNormal" justifyH="LEFT">
 									<Anchors>
 										<Anchor point="TOPLEFT" relativeKey="$parent.Title" relativePoint="BOTTOMLEFT" x="0" y="-15"/>
 										<Anchor point="TOPRIGHT" relativeKey="$parent.Title" relativePoint="BOTTOMRIGHT" x="0" y="-15"/>
 									</Anchors>
 									<Color r="1.0" g="0.82" b="0"/>
 								</FontString>
-								<FontString parentKey="Section1Text" inherits="GameFontHighlight" justifyH="LEFT" justifyV="TOP">
+								<FontString parentKey="Section1Text" inherits="BetterFriendlistFontHighlight" justifyH="LEFT" justifyV="TOP">
 									<Size y="60"/>
 									<Anchors>
 										<Anchor point="TOPLEFT" relativeKey="$parent.Section1Title" relativePoint="BOTTOMLEFT" x="5" y="-5"/>
@@ -43,14 +43,14 @@
 								</FontString>
 								
 								<!-- Section 2: Main Tank -->
-								<FontString parentKey="Section2Title" inherits="GameFontNormal" justifyH="LEFT">
+								<FontString parentKey="Section2Title" inherits="BetterFriendlistFontNormal" justifyH="LEFT">
 									<Anchors>
 										<Anchor point="TOPLEFT" relativeKey="$parent.Section1Text" relativePoint="BOTTOMLEFT" x="-5" y="-15"/>
 										<Anchor point="TOPRIGHT" relativeKey="$parent.Section1Text" relativePoint="BOTTOMRIGHT" x="5" y="-15"/>
 									</Anchors>
 									<Color r="1.0" g="0.82" b="0"/>
 								</FontString>
-								<FontString parentKey="Section2Text" inherits="GameFontHighlight" justifyH="LEFT" justifyV="TOP">
+								<FontString parentKey="Section2Text" inherits="BetterFriendlistFontHighlight" justifyH="LEFT" justifyV="TOP">
 									<Size y="40"/>
 									<Anchors>
 										<Anchor point="TOPLEFT" relativeKey="$parent.Section2Title" relativePoint="BOTTOMLEFT" x="5" y="-5"/>
@@ -59,14 +59,14 @@
 								</FontString>
 								
 								<!-- Section 3: Main Assist -->
-								<FontString parentKey="Section3Title" inherits="GameFontNormal" justifyH="LEFT">
+								<FontString parentKey="Section3Title" inherits="BetterFriendlistFontNormal" justifyH="LEFT">
 									<Anchors>
 										<Anchor point="TOPLEFT" relativeKey="$parent.Section2Text" relativePoint="BOTTOMLEFT" x="-5" y="-15"/>
 										<Anchor point="TOPRIGHT" relativeKey="$parent.Section2Text" relativePoint="BOTTOMRIGHT" x="5" y="-15"/>
 									</Anchors>
 									<Color r="1.0" g="0.82" b="0"/>
 								</FontString>
-								<FontString parentKey="Section3Text" inherits="GameFontHighlight" justifyH="LEFT" justifyV="TOP">
+								<FontString parentKey="Section3Text" inherits="BetterFriendlistFontHighlight" justifyH="LEFT" justifyV="TOP">
 									<Size y="40"/>
 									<Anchors>
 										<Anchor point="TOPLEFT" relativeKey="$parent.Section3Title" relativePoint="BOTTOMLEFT" x="5" y="-5"/>
@@ -75,14 +75,14 @@
 								</FontString>
 								
 								<!-- Section 4: Drag & Drop -->
-								<FontString parentKey="Section4Title" inherits="GameFontNormal" justifyH="LEFT">
+								<FontString parentKey="Section4Title" inherits="BetterFriendlistFontNormal" justifyH="LEFT">
 									<Anchors>
 										<Anchor point="TOPLEFT" relativeKey="$parent.Section3Text" relativePoint="BOTTOMLEFT" x="-5" y="-15"/>
 										<Anchor point="TOPRIGHT" relativeKey="$parent.Section3Text" relativePoint="BOTTOMRIGHT" x="5" y="-15"/>
 									</Anchors>
 									<Color r="1.0" g="0.82" b="0"/>
 								</FontString>
-								<FontString parentKey="Section4Text" inherits="GameFontHighlight" justifyH="LEFT" justifyV="TOP">
+								<FontString parentKey="Section4Text" inherits="BetterFriendlistFontHighlight" justifyH="LEFT" justifyV="TOP">
 									<Size y="60"/>
 									<Anchors>
 										<Anchor point="TOPLEFT" relativeKey="$parent.Section4Title" relativePoint="BOTTOMLEFT" x="5" y="-5"/>
@@ -91,14 +91,14 @@
 								</FontString>
 								
 								<!-- Section 5: Combat Lock -->
-								<FontString parentKey="Section5Title" inherits="GameFontNormal" justifyH="LEFT">
+								<FontString parentKey="Section5Title" inherits="BetterFriendlistFontNormal" justifyH="LEFT">
 									<Anchors>
 										<Anchor point="TOPLEFT" relativeKey="$parent.Section4Text" relativePoint="BOTTOMLEFT" x="-5" y="-15"/>
 										<Anchor point="TOPRIGHT" relativeKey="$parent.Section4Text" relativePoint="BOTTOMRIGHT" x="5" y="-15"/>
 									</Anchors>
 									<Color r="1.0" g="0.82" b="0"/>
 								</FontString>
-								<FontString parentKey="Section5Text" inherits="GameFontHighlight" justifyH="LEFT" justifyV="TOP">
+								<FontString parentKey="Section5Text" inherits="BetterFriendlistFontHighlight" justifyH="LEFT" justifyV="TOP">
 									<Size y="40"/>
 									<Anchors>
 										<Anchor point="TOPLEFT" relativeKey="$parent.Section5Title" relativePoint="BOTTOMLEFT" x="5" y="-5"/>
@@ -114,6 +114,7 @@
 		<Scripts>
 			<OnLoad>
 				self.TitleContainer.TitleText:SetText("Raid Roster Help")
+				self.TitleContainer.TitleText:SetFontObject("BetterFriendlistFontNormal")
 				ButtonFrameTemplate_HidePortrait(self)
 				ButtonFrameTemplate_HideAttic(self)
 				

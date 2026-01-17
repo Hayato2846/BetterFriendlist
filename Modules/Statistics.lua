@@ -22,17 +22,9 @@ local MAX_LEVEL = 80
 -- ========================================
 
 -- Get localized class file name from localized class name (for offline friends)
+-- Logic moved to BFL.ClassUtils (renamed from GetClassFileFromLocalizedName to GetClassFileFromClassName)
 local function GetClassFileFromLocalizedName(localizedClassName)
-	if not localizedClassName then return nil end
-	
-	for i = 1, GetNumClasses() do
-		local localizedName, classFile = GetClassInfo(i)
-		if localizedName == localizedClassName then
-			return classFile
-		end
-	end
-	
-	return nil
+	return BFL.ClassUtils:GetClassFileFromClassName(localizedClassName)
 end
 
 -- Check if realm is same or connected to player's realm

@@ -84,6 +84,18 @@ end
 	L.SETTINGS_HEADER_COUNT_VISIBLE = "Filtered / Total (Default)"
 	L.SETTINGS_HEADER_COUNT_ONLINE = "Online / Total"
 	L.SETTINGS_HEADER_COUNT_BOTH = "Filtered (Online) / Total"
+
+	-- Group Header Alignment
+	L.SETTINGS_GROUP_HEADER_ALIGN = "Group Header Alignment"
+	L.SETTINGS_GROUP_HEADER_ALIGN_DESC = "Set alignment of the group name text"
+	L.SETTINGS_ALIGN_LEFT = "Left"
+	L.SETTINGS_ALIGN_CENTER = "Center"
+	L.SETTINGS_ALIGN_RIGHT = "Right"
+	-- New Arrow Settings
+	L.SETTINGS_SHOW_GROUP_ARROW = "Show Collapse Arrow"
+	L.SETTINGS_SHOW_GROUP_ARROW_DESC = "Show or hide the arrow icon for collapsing groups"
+	L.SETTINGS_GROUP_ARROW_ALIGN = "Collapse Arrow Alignment"
+	L.SETTINGS_GROUP_ARROW_ALIGN_DESC = "Set alignment of the collapse/expand arrow icon"
 	L.SETTINGS_SHOW_FACTION_ICONS = "Show Faction Icons"
 	L.SETTINGS_SHOW_REALM_NAME = "Show Realm Name"
 	L.SETTINGS_GRAY_OTHER_FACTION = "Gray Out Other Faction"
@@ -499,6 +511,7 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Prevent BetterFriendlist from opening ove
 	-- Tooltips
 	L.TOOLTIP_LAST_CONTACT = "Last contact:"
 	L.TOOLTIP_AGO = " ago"
+	L.TOOLTIP_AGO_PREFIX = ""
 	L.TOOLTIP_LAST_ONLINE = "Last Online: %s"
 
 	-- Notifications

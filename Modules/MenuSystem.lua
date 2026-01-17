@@ -80,8 +80,7 @@ function MenuSystem:OpenFriendMenu(button, friendType, friendID, extraData)
 		-- BNet friends need full contextData like BetterFriendsList_ShowBNDropdown
 		contextData = {
 			name = extraData.name or "",
-			friendsList = true,
-			accountInfo = C_BattleNet.GetAccountInfoByID(friendID), -- RIO Fix
+			friendsList = extraData.index, -- Use numeric index if available (restores behavior from BetterFriendlist.lua)
 			bnetIDAccount = friendID,
 			battleTag = extraData.battleTag,
 			uid = friendID, -- For Nickname

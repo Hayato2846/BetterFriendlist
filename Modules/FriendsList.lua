@@ -702,93 +702,14 @@ end
 -- - Feminine: "Kriegerin", "Dämonenjägerin" (from gameAccountInfo.className)
 -- We need to strip gender suffixes before matching
 --
--- ⚠️ DEPRECATED: This function is now used only as FALLBACK via GetClassFileForFriend()
--- Use cases where this fallback is still needed:
--- - WoW-only friends (friendInfo.className, no classID available from API)
--- - Game versions < 11.2.7 (classID not available in BNetGameAccountInfo)
--- - When GetClassInfoByID() fails or returns invalid data
---
--- For 11.2.7+: GetClassFileForFriend() prioritizes classID for better performance
+-- ⚠️ DEPRECATED: Logic moved to BFL.ClassUtils
 local function GetClassFileFromClassName(className)
-	if not className or className == "" then 
-		return nil 
-	end
-	
-	-- First try: Direct uppercase match (works for English clients)
-	-- "Warrior" → "WARRIOR" → RAID_CLASS_COLORS["WARRIOR"] ✅
-	local upperClassName = string.upper(className)
-	if RAID_CLASS_COLORS[upperClassName] then
-		return upperClassName
-	end
-	
-	-- Second try: Match localized className against GetClassInfo()
-	-- This handles non-English clients where className is localized
-	-- German: "Krieger" matches GetClassInfo() → returns "WARRIOR"
-	local numClasses = GetNumClasses()
-	for i = 1, numClasses do
-		local localizedName, classFile = GetClassInfo(i)
-		if localizedName == className then
-			return classFile
-		end
-	end
-	
-	-- Third try: Handle gendered class names (German, French, Spanish, etc.)
-	-- German feminine forms add "-in" suffix: "Kriegerin" → "Krieger"
-	-- French feminine forms add "-e" suffix: "Guerrière" → "Guerrier"
-	-- Spanish feminine forms change "-o" to "-a": "Guerrera" → "Guerrero"
-	
-	-- Try removing German/French/Spanish feminine suffixes
-	local genderVariants = {}
-	
-	-- German: Remove "-in" suffix (Kriegerin → Krieger)
-	if className:len() > 2 and className:sub(-2) == "in" then
-		table.insert(genderVariants, className:sub(1, -3))
-	end
-	
-	-- French: Remove "-e" suffix (Guerrière → Guerrier, Chasseresse → Chasseur)
-	if className:len() > 1 and className:sub(-1) == "e" then
-		table.insert(genderVariants, className:sub(1, -2))
-	end
-	
-	-- Spanish: Replace "-a" with "-o" (Guerrera → Guerrero)
-	if className:len() > 1 and className:sub(-1) == "a" then
-		table.insert(genderVariants, className:sub(1, -2) .. "o")
-	end
-	
-	-- Try matching gender variants against GetClassInfo()
-	for _, variant in ipairs(genderVariants) do
-		for i = 1, numClasses do
-			local localizedName, classFile = GetClassInfo(i)
-			if localizedName == variant then
-				return classFile
-			end
-		end
-	end
-	
-	-- No match found
-	return nil
+	return BFL.ClassUtils:GetClassFileFromClassName(className)
 end
 
 -- Get class file for friend (optimized for 11.2.7+)
--- Priority: classID (11.2.7+) > className (fallback for 11.2.5 and WoW friends)
--- This function provides a dual system:
--- 1. Uses classID if available (fast, language-independent, BNet friends on 11.2.7+)
--- 2. Falls back to className conversion (slower, all languages, WoW friends + older versions)
 local function GetClassFileForFriend(friend)
-	-- 11.2.7+: Use classID if available (BNet friends only)
-	if BFL.UseClassID and friend.classID then
-		local classInfo = GetClassInfoByID(friend.classID)
-		if classInfo and classInfo.classFile then
-			return classInfo.classFile
-		end
-	end
-	
-	-- Fallback: Convert className (WoW friends + older game versions)
-	if friend.className then
-		return GetClassFileFromClassName(friend.className)
-	end
-	
-	return nil
+	return BFL.ClassUtils:GetClassFileForFriend(friend)
 end
 
 -- ========================================
@@ -865,7 +786,8 @@ local function GetFriendUID(friend)
 end
 
 -- Get display name based on format setting
-function FriendsList:GetDisplayName(friend)
+-- @param forSorting (boolean) If true, use BattleTag instead of AccountName for BNet friends (prevents sorting issues with protected strings)
+function FriendsList:GetDisplayName(friend, forSorting)
 	local DB = GetDB()
 	local format = DB and DB:Get("nameDisplayFormat", "%name%") or "%name%"
 	
@@ -876,8 +798,25 @@ function FriendsList:GetDisplayName(friend)
 	local nickname = DB and DB:GetNickname(GetFriendUID(friend)) or ""
 	
 	if friend.type == "bnet" then
-		-- BNet: Use accountName as requested (RealID or BattleTag)
-		name = friend.accountName or "Unknown"
+		if forSorting then
+			-- SORTING MODE: Use BattleTag (Short) instead of accountName
+			-- This avoids issues with protected strings in accountName affecting sort order
+			if friend.battleTag and friend.battleTag ~= "" then
+				local bTag = friend.battleTag
+				local hashIndex = string.find(bTag, "#")
+				if hashIndex then
+					name = string.sub(bTag, 1, hashIndex - 1)
+				else
+					name = bTag
+				end
+			else
+				-- Fallback if no battletag available (rare)
+				name = friend.accountName or "Unknown"
+			end
+		else
+			-- DISPLAY MODE: Use accountName as requested (RealID or BattleTag)
+			name = friend.accountName or "Unknown"
+		end
 	else
 		-- WoW: Name is Character Name
 		local fullName = friend.name or "Unknown"
@@ -912,6 +851,9 @@ function FriendsList:GetDisplayName(friend)
 	-- Smart Fallback Logic:
 	-- If %nickname% is used but empty, and %name% is NOT in the format, use name as nickname
 	if nickname == "" and result:find("%%nickname%%") and not result:find("%%name%%") then
+		-- Fallback to name.
+		-- NOTE: If forSorting=true and this is a BNet friend, 'name' has already been set to the BattleTag (the fix).
+		-- So this correctly propagates the fix to the nickname fallback for sorting.
 		nickname = name
 	end
 	-- Same for %battletag% (e.g. for WoW friends)
@@ -1297,6 +1239,20 @@ function FriendsList:ApplySort()
 				return secondaryResult
 			end
 		end
+
+		-- FALLBACK FOR OFFLINE FRIENDS: Sort by Last Online Time
+		-- If Primary/Secondary sort couldn't distinguish them (e.g. Status -> Game),
+		-- and both are offline, we want to see the most recently online friends first.
+		local aOffline = not ((a.type == "bnet" and a.connected) or (a.type == "wow" and a.connected))
+		local bOffline = not ((b.type == "bnet" and b.connected) or (b.type == "wow" and b.connected))
+
+		if aOffline and bOffline then
+			local aTime = a.lastOnlineTime or 0
+			local bTime = b.lastOnlineTime or 0
+			if aTime ~= bTime then
+				return aTime > bTime -- Recent first
+			end
+		end
 		
 		-- Fallback: sort by name (using CompareFriends to respect showNotesAsName setting)
 		local fallbackResult = self:CompareFriends(a, b, "name")
@@ -1357,23 +1313,14 @@ function FriendsList:CompareFriends(a, b, sortMode)
 			return aPriority < bPriority
 		end
 		
-		-- If both are offline (priority 3), sort by last online time (descending)
-		-- Higher timestamp = more recent = comes first
-		if aPriority == 3 then
-			local aTime = a.lastOnlineTime or 0
-			local bTime = b.lastOnlineTime or 0
-			if aTime ~= bTime then
-				return aTime > bTime
-			end
-		end
-		
 		-- Equal status - return nil to try secondary sort
 		return nil
 		
 	elseif sortMode == "name" then
 		-- Use the centralized GetDisplayName function to ensure sorting matches display
-		local nameA = self:GetDisplayName(a)
-		local nameB = self:GetDisplayName(b)
+		-- Pass true for the second argument to enable "Sorting Mode" (BattleTag instead of AccountName for BNet)
+		local nameA = self:GetDisplayName(a, true)
+		local nameB = self:GetDisplayName(b, true)
 		
 		local aLower, bLower = (nameA or ""):lower(), (nameB or ""):lower()
 		
@@ -1889,12 +1836,217 @@ end
 -- Group Management API
 -- ========================================
 
--- Toggle group collapsed state
+-- Helper: Get friends in a specific group (optimized for single group access)
+function FriendsList:GetFriendsForGroup(targetGroupId)
+	local groupFriends = {}
+	local DB = GetDB()
+	if not DB then return groupFriends end
+	
+	for _, friend in ipairs(self.friendsList) do
+		-- Apply filters first
+		if self:PassesFilters(friend) then
+			local friendUID = GetFriendUID(friend)
+			local isFavorite = (friend.type == "bnet" and friend.isFavorite)
+			local isInTargetGroup = false
+			local isInAnyGroup = false
+			
+			-- Check Favorites
+			if isFavorite then
+				if targetGroupId == "favorites" then isInTargetGroup = true end
+				isInAnyGroup = true
+			end
+			
+			-- Check In-Game Group
+			if GetDB():Get("enableInGameGroup", false) then
+				local mode = GetDB():Get("inGameGroupMode", "same_game")
+				local isInGame = false
+				
+				if mode == "any_game" then
+					if friend.type == "wow" and friend.connected then
+						isInGame = true
+					elseif friend.type == "bnet" and friend.connected and friend.gameAccountInfo and friend.gameAccountInfo.isOnline then
+						local client = friend.gameAccountInfo.clientProgram
+						if client and client ~= "" and client ~= "App" and client ~= "BSAp" then
+							isInGame = true
+						end
+					end
+				else
+					if friend.type == "wow" and friend.connected then
+						isInGame = true
+					elseif friend.type == "bnet" and friend.connected and friend.gameAccountInfo and friend.gameAccountInfo.clientProgram == BNET_CLIENT_WOW then
+						if friend.gameAccountInfo.wowProjectID == WOW_PROJECT_ID then
+							isInGame = true
+						end
+					end
+				end
+				
+				if isInGame then
+					if targetGroupId == "ingame" then isInTargetGroup = true end
+					isInAnyGroup = true
+				end
+			end
+			
+			-- Check Custom Groups
+			local customGroups = (BetterFriendlistDB and BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friendUID]) or {}
+			for _, groupId in ipairs(customGroups) do
+				if type(groupId) == "string" then
+					if groupId == targetGroupId then isInTargetGroup = true end
+					isInAnyGroup = true
+				end
+			end
+			
+			-- Check "No Group"
+			if not isInAnyGroup and targetGroupId == "nogroup" then
+				isInTargetGroup = true
+			end
+			
+			if isInTargetGroup then
+				table.insert(groupFriends, friend)
+			end
+		end
+	end
+	
+	return groupFriends
+end
+
+-- Attempt optimized group toggle without full list rebuild
+function FriendsList:OptimizedGroupToggle(groupId, expanding)
+	-- Only possible on Retail (ScrollBox)
+	if not self.scrollBox then return false end
+	
+	local dataProvider = self.scrollBox:GetDataProvider()
+	if not dataProvider then return false end
+	
+	local headerData = nil
+	local friendsToRemove = {}
+	local foundHeader = false
+	
+	-- Scan provider to find header and children
+	for _, data in dataProvider:Enumerate() do
+		if not foundHeader then
+			if data.buttonType == BUTTON_TYPE_GROUP_HEADER and data.groupId == groupId then
+				headerData = data
+				foundHeader = true
+				
+				-- If expanding, we just need the header, so we can stop scanning
+				if expanding then break end
+			end
+		else
+			-- We are in the group (Collapsing logic)
+			if data.buttonType == BUTTON_TYPE_FRIEND and data.groupId == groupId then
+				table.insert(friendsToRemove, data) -- Collect data to remove
+			else
+				-- Hit something else (another header or filtered out), stop
+				break
+			end
+		end
+	end
+	
+	if not headerData then return false end
+	
+	-- Update header state
+	headerData.collapsed = not expanding
+	
+	if not expanding then
+		-- COLLAPSING: Remove friends
+		-- Depending on DataProvider implementation, Remove(data) is usually available
+		if dataProvider.Remove then
+			for _, data in ipairs(friendsToRemove) do
+				dataProvider:Remove(data)
+			end
+		else
+			-- Fallback if Remove(data) missing (unlikely on Retail)
+			return false
+		end
+	else
+		-- EXPANDING: Insert friends
+		local friends = self:GetFriendsForGroup(groupId)
+		
+		-- Find insertion index
+		local insertIndex = nil
+		if dataProvider.FindIndex then
+			insertIndex = dataProvider:FindIndex(headerData)
+		end
+		
+		-- Fallback scan if needed
+		if not insertIndex then
+			local idx = 0
+			for _, data in dataProvider:Enumerate() do
+				idx = idx + 1
+				if data == headerData then insertIndex = idx; break end
+			end
+		end
+		
+		if insertIndex then
+			insertIndex = insertIndex + 1 -- Start inserting AFTER header
+			for _, friend in ipairs(friends) do
+				dataProvider:InsertAtIndex({
+					buttonType = BUTTON_TYPE_FRIEND,
+					friend = friend,
+					groupId = groupId
+				}, insertIndex)
+				insertIndex = insertIndex + 1
+			end
+		else
+			return false -- Should not happen header was found earlier
+		end
+	end
+	
+	-- Manually update header visual to reflect new state
+	self.scrollBox:ForEachFrame(function(frame, elementData)
+		if elementData == headerData then
+			self:UpdateGroupHeaderButton(frame, elementData)
+		end
+	end)
+	
+	return true
+end
+
+-- Toggle group collapsed state (Optimized)
 function FriendsList:ToggleGroup(groupId)
 	local Groups = GetGroups()
 	if not Groups then return end
 	
-	if Groups:Toggle(groupId) then
+	-- Handle Accordion Mode
+	-- Note: We do this before the main toggle to clear others
+	local DB = GetDB()
+	local accordionMode = DB and DB:Get("accordionGroups", false)
+	local needsFullRefresh = false
+	
+	if accordionMode then
+		local group = Groups:Get(groupId)
+		-- If we are expanding a closed group
+		if group and group.collapsed then
+			for gid, gData in pairs(Groups.groups) do
+				if gid ~= groupId and not gData.collapsed then
+					-- Force collapse, suppress update
+					Groups:SetCollapsed(gid, true, true)
+					needsFullRefresh = true -- Multiple changes, safer to full refresh
+				end
+			end
+		end
+	end
+	
+	-- Toggle the target group, suppress native update
+	if Groups:Toggle(groupId, true) then
+		if needsFullRefresh then
+			BFL:ForceRefreshFriendsList()
+			return
+		end
+		
+		-- Try optimized update first
+		local group = Groups:Get(groupId)
+		local expanding = not group.collapsed
+		
+		if self:OptimizedGroupToggle(groupId, expanding) then
+			-- Optimization successful!
+			return
+		end
+		
+		-- Fallback to full refresh
+		BFL:ForceRefreshFriendsList()
+	elseif needsFullRefresh then
+		-- Target group didn't change but others did (Accordion)
 		BFL:ForceRefreshFriendsList()
 	end
 end
@@ -2194,6 +2346,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 	
 	-- Store group data on button
 	button.groupId = groupId
+	button.elementData = elementData
 	
 	-- Create drop target highlight if it doesn't exist
 	if not button.dropHighlight then
@@ -2243,12 +2396,119 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 	
 	button:SetFormattedText("%s%s|r (%s)", colorCode, name, countText)
 	
-	-- Show/hide collapse arrows (check if they exist first - Classic XML has them)
-	if button.DownArrow then
-		button.DownArrow:SetShown(not collapsed)
+	-- Apply Text Alignment (Feature Request)
+	local align = DB and DB:Get("groupHeaderAlign", "LEFT") or "LEFT"
+	if button:GetFontString() then
+		button:GetFontString():ClearAllPoints()
+		
+		if align == "CENTER" then
+			button:GetFontString():SetPoint("CENTER", button, "CENTER", 0, 0)
+			button:GetFontString():SetJustifyH("CENTER")
+		elseif align == "RIGHT" then
+			-- Classic XML uses x=22 for LEFT, so we use x=-22 for RIGHT symmetry (minus arrow space)
+			-- Note: Button has arrows on both sides in template, but usually only one is shown.
+			button:GetFontString():SetPoint("RIGHT", button, "RIGHT", -22, 0)
+			button:GetFontString():SetJustifyH("RIGHT")
+		else -- "LEFT" (Default)
+			button:GetFontString():SetPoint("LEFT", button, "LEFT", 22, 0)
+			button:GetFontString():SetJustifyH("LEFT")
+		end
 	end
-	if button.RightArrow then
-		button.RightArrow:SetShown(collapsed)
+
+	-- Show/hide and align collapse arrows (Feature Request)
+	local showArrow = DB and DB:Get("showGroupArrow", true)
+	local arrowAlign = DB and DB:Get("groupArrowAlign", "LEFT") or "LEFT"
+
+	-- Reset visibility first
+	if button.DownArrow then button.DownArrow:Hide() end
+	if button.RightArrow then button.RightArrow:Hide() end
+
+	if showArrow then
+		local targetArrow = collapsed and button.RightArrow or button.DownArrow
+		if targetArrow then
+			targetArrow:Show()
+			targetArrow:ClearAllPoints()
+			
+			-- Restore normal textures first (resetting any overrides)
+			if BFL.IsClassic then
+				if targetArrow == button.RightArrow then
+					targetArrow:SetTexture("Interface\\Buttons\\UI-PlusButton-Up")
+				else
+					targetArrow:SetTexture("Interface\\Buttons\\UI-MinusButton-Up")
+				end
+			else
+				if targetArrow == button.RightArrow then
+					targetArrow:SetAtlas("friendslist-categorybutton-arrow-left")
+					targetArrow:SetRotation(0)
+				else
+					targetArrow:SetAtlas("friendslist-categorybutton-arrow-down")
+					targetArrow:SetRotation(0)
+				end
+			end
+
+			-- Base coordinates for unpressed state
+			local point, x, y
+			if arrowAlign == "RIGHT" then
+				point = "RIGHT"
+				
+				-- Override texture for Right Arrow (Collapsed state) to point Left
+				if targetArrow == button.RightArrow then
+					if not BFL.IsClassic then
+						targetArrow:SetAtlas("friendslist-categorybutton-arrow-left")
+						targetArrow:SetRotation(math.pi)
+					else
+						targetArrow:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\arrow-left")
+					end
+				end
+				
+				x = (targetArrow == button.DownArrow) and -8 or -6
+				y = (targetArrow == button.DownArrow) and -2 or 0
+			elseif arrowAlign == "CENTER" then
+				point = "CENTER"
+				
+				if align == "CENTER" then
+					-- If text is also centered, offset arrow to the left of text
+					local textWidth = 0
+					if button:GetFontString() then
+						textWidth = button:GetFontString():GetStringWidth() or 0
+					end
+					local offset = (textWidth / 2) + 12
+					x = -offset
+				else
+					x = (targetArrow == button.DownArrow) and 0 or 2
+				end
+
+				y = (targetArrow == button.DownArrow) and -2 or 0
+			else -- LEFT (Default)
+				point = "LEFT"
+				x = (targetArrow == button.DownArrow) and 6 or 8
+				y = (targetArrow == button.DownArrow) and -2 or 0
+			end
+			
+			targetArrow:SetPoint(point, x, y)
+			
+			-- Override mouse scripts to support alignment (only once per button)
+			if not button.isArrowScriptHooked then
+				button:SetScript("OnMouseDown", function(self)
+					if self.DownArrow and self.DownArrow:IsShown() then
+						local p, relativeTo, relativePoint, x, y = self.DownArrow:GetPoint()
+						if p then self.DownArrow:SetPoint(p, relativeTo, relativePoint, x + 1, y - 1) end
+					end
+					if self.RightArrow and self.RightArrow:IsShown() then
+						local p, relativeTo, relativePoint, x, y = self.RightArrow:GetPoint()
+						if p then self.RightArrow:SetPoint(p, relativeTo, relativePoint, x + 1, y - 1) end
+					end
+				end)
+				
+				button:SetScript("OnMouseUp", function(self)
+					-- Trigger update to reset positions based on current settings
+					if FriendsList and FriendsList.UpdateGroupHeaderButton and self.elementData then
+						FriendsList:UpdateGroupHeaderButton(self, self.elementData)
+					end
+				end)
+				button.isArrowScriptHooked = true
+			end
+		end
 	end
 	
 	-- Apply font scaling
@@ -2381,38 +2641,21 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 					-- Group-wide action buttons
 					rootDescription:CreateButton(BFL.L.MENU_COLLAPSE_ALL, function()
 						for gid in pairs(Groups.groups) do
-							Groups:SetCollapsed(gid, true)  -- true = force collapse
+							Groups:SetCollapsed(gid, true, true)  -- true = force collapse
 						end
 						BFL:ForceRefreshFriendsList()
 					end)
 					
 					rootDescription:CreateButton(BFL.L.MENU_EXPAND_ALL, function()
 						for gid in pairs(Groups.groups) do
-							Groups:SetCollapsed(gid, false)  -- false = force expand
+							Groups:SetCollapsed(gid, false, true)  -- false = force expand
 						end
 						BFL:ForceRefreshFriendsList()
 					end)
 				end)
 			else
 					-- Left click: toggle collapse
-					if Groups:Toggle(self.groupId) then
-						-- Check accordion mode
-						local DB = GetDB()
-						local accordionMode = DB and DB:Get("accordionGroups", false)
-						if accordionMode then
-							local clickedGroup = Groups:Get(self.groupId)
-							if clickedGroup and not clickedGroup.collapsed then
-								-- Opening this group - collapse all others
-								for gid in pairs(Groups.groups) do
-									if gid ~= self.groupId then
-										Groups:SetCollapsed(gid, true)  -- Force collapse
-									end
-								end
-							end
-						end
-						
-						BFL:ForceRefreshFriendsList()
-					end
+					FriendsList:ToggleGroup(self.groupId)
 				end
 			end)
 		else
@@ -2444,7 +2687,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 						rootDescription:CreateButton(BFL.L.MENU_COLLAPSE_ALL, function()
 							if Groups then
 								for gid in pairs(Groups.groups) do
-									Groups:SetCollapsed(gid, true)  -- true = force collapse
+									Groups:SetCollapsed(gid, true, true)  -- true = force collapse
 								end
 								BFL:ForceRefreshFriendsList()
 							end
@@ -2453,7 +2696,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 						rootDescription:CreateButton(BFL.L.MENU_EXPAND_ALL, function()
 							if Groups then
 								for gid in pairs(Groups.groups) do
-									Groups:SetCollapsed(gid, false)  -- false = force expand
+									Groups:SetCollapsed(gid, false, true)  -- false = force expand
 								end
 								BFL:ForceRefreshFriendsList()
 							end
@@ -2461,24 +2704,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 					end)
 				else
 					-- Left click: toggle collapse
-					if Groups:Toggle(self.groupId) then
-						-- Check accordion mode
-						local DB = GetDB()
-						local accordionMode = DB and DB:Get("accordionGroups", false)
-						if accordionMode then
-							local clickedGroup = Groups:Get(self.groupId)
-							if clickedGroup and not clickedGroup.collapsed then
-								-- Opening this group - collapse all others
-								for gid in pairs(Groups.groups) do
-									if gid ~= self.groupId then
-										Groups:SetCollapsed(gid, true)  -- Force collapse
-									end
-								end
-							end
-						end
-						
-						BFL:ForceRefreshFriendsList()
-					end
+					FriendsList:ToggleGroup(self.groupId)
 				end
 			end)
 		end
@@ -3268,8 +3494,116 @@ end
 function FriendsList:UpdateInviteHeaderButton(button, data)
 	button.Text:SetFormattedText(L.INVITE_HEADER, data.count)
 	local collapsed = GetCVarBool("friendInvitesCollapsed")
-	button.DownArrow:SetShown(not collapsed)
-	button.RightArrow:SetShown(collapsed)
+	
+	-- Store data on button for callbacks (important for OnMouseUp refresh)
+	button.elementData = data
+	
+	-- Get Database for settings
+	local DB = GetDB and GetDB() or BFL.Settings
+	
+	-- APPLY TEXT ALIGNMENT (Feature Request)
+	local align = DB and DB:Get("groupHeaderAlign", "LEFT") or "LEFT"
+	if button.Text then
+		button.Text:ClearAllPoints()
+		if align == "CENTER" then
+			button.Text:SetPoint("CENTER", button, "CENTER", 0, 0)
+			button.Text:SetJustifyH("CENTER")
+		elseif align == "RIGHT" then
+			button.Text:SetPoint("RIGHT", button, "RIGHT", -22, 0)
+			button.Text:SetJustifyH("RIGHT")
+		else -- "LEFT" (Default)
+			button.Text:SetPoint("LEFT", button, "LEFT", 22, 0)
+			button.Text:SetJustifyH("LEFT")
+		end
+	end
+
+	-- ARROW ALIGNMENT & VISIBILITY
+	local showArrow = DB and DB:Get("showGroupArrow", true)
+	local arrowAlign = DB and DB:Get("groupArrowAlign", "LEFT") or "LEFT"
+
+	-- Reset visibility
+	if button.DownArrow then button.DownArrow:Hide() end
+	if button.RightArrow then button.RightArrow:Hide() end
+
+	if showArrow then
+		local targetArrow = collapsed and button.RightArrow or button.DownArrow
+		if targetArrow then
+			targetArrow:Show()
+			targetArrow:ClearAllPoints()
+			
+			-- Restore normal textures (resetting overrides)
+			if BFL.IsClassic then
+				if targetArrow == button.RightArrow then
+					targetArrow:SetTexture("Interface\\Buttons\\UI-PlusButton-Up")
+				else
+					targetArrow:SetTexture("Interface\\Buttons\\UI-MinusButton-Up")
+				end
+			else
+				if targetArrow == button.RightArrow then
+					targetArrow:SetAtlas("friendslist-categorybutton-arrow-left")
+					targetArrow:SetRotation(0)
+				else
+					targetArrow:SetAtlas("friendslist-categorybutton-arrow-down")
+					targetArrow:SetRotation(0)
+				end
+			end
+
+			-- Position Calculation
+			local point, x, y
+			if arrowAlign == "RIGHT" then
+				point = "RIGHT"
+				-- Flip right arrow to point left if aligned right
+				if targetArrow == button.RightArrow then
+					if not BFL.IsClassic then
+						targetArrow:SetAtlas("friendslist-categorybutton-arrow-left")
+						targetArrow:SetRotation(math.pi)
+					else
+						targetArrow:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\arrow-left")
+					end
+				end
+				x = (targetArrow == button.DownArrow) and -8 or -6
+				y = (targetArrow == button.DownArrow) and -2 or 0
+			elseif arrowAlign == "CENTER" then
+				point = "CENTER"
+				if align == "CENTER" then
+					local textWidth = button.Text and button.Text:GetStringWidth() or 0
+					local offset = (textWidth / 2) + 12
+					x = -offset
+				else
+					x = (targetArrow == button.DownArrow) and 0 or 2
+				end
+				y = (targetArrow == button.DownArrow) and -2 or 0
+			else -- LEFT (Default)
+				point = "LEFT"
+				x = (targetArrow == button.DownArrow) and 6 or 8
+				y = (targetArrow == button.DownArrow) and -2 or 0
+			end
+			
+			targetArrow:SetPoint(point, x, y)
+			
+			-- Mouse Scripts for Arrow depression
+			if not button.isArrowScriptHooked then
+				button:SetScript("OnMouseDown", function(self)
+					if self.DownArrow and self.DownArrow:IsShown() then
+						local p, relativeTo, relativePoint, x, y = self.DownArrow:GetPoint()
+						if p then self.DownArrow:SetPoint(p, relativeTo, relativePoint, x + 1, y - 1) end
+					end
+					if self.RightArrow and self.RightArrow:IsShown() then
+						local p, relativeTo, relativePoint, x, y = self.RightArrow:GetPoint()
+						if p then self.RightArrow:SetPoint(p, relativeTo, relativePoint, x + 1, y - 1) end
+					end
+				end)
+				
+				button:SetScript("OnMouseUp", function(self)
+					-- Trigger update via element factory if possible, or just re-run this function
+					if FriendsList and FriendsList.UpdateInviteHeaderButton and self.elementData then
+						FriendsList:UpdateInviteHeaderButton(self, self.elementData)
+					end
+				end)
+				button.isArrowScriptHooked = true
+			end
+		end
+	end
 	
 	-- Apply font scaling to header text
 	local FontManager = BFL.FontManager

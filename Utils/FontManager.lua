@@ -111,10 +111,10 @@ function FontManager:GetRecommendedFont()
 	local fontSize = self:GetFontSizeMultiplier()
 	
 	if fontSize < 0.9 then
-		return "GameFontNormalSmall"
+		return "BetterFriendlistFontNormalSmall"
 	elseif fontSize > 1.1 then
-		return "GameFontNormal"
+		return "BetterFriendlistFontNormal"
 	else
-		return "GameFontNormalSmall"
+		return "BetterFriendlistFontNormalSmall"
 	end
 end

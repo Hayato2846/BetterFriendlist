@@ -296,19 +296,19 @@ function Dialogs:RegisterDialogs()
 		triggerFrame:Hide()
 		
 		-- Title
-		triggerFrame.title = triggerFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+		triggerFrame.title = triggerFrame:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
 		triggerFrame.title:SetPoint("TOP", 0, -5)
 		triggerFrame.title:SetText(BFL.L.DIALOG_TRIGGER_TITLE)
 		
 		-- Info text
-		triggerFrame.info = triggerFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		triggerFrame.info = triggerFrame:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
 		triggerFrame.info:SetPoint("TOPLEFT", 15, -30)
 		triggerFrame.info:SetPoint("TOPRIGHT", -15, -30)
 		triggerFrame.info:SetJustifyH("LEFT")
 		triggerFrame.info:SetText(BFL.L.DIALOG_TRIGGER_INFO)
 		
 		-- Group label
-		triggerFrame.groupLabel = triggerFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		triggerFrame.groupLabel = triggerFrame:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
 		triggerFrame.groupLabel:SetPoint("TOPLEFT", 15, -60)
 		triggerFrame.groupLabel:SetText(BFL.L.DIALOG_TRIGGER_SELECT_GROUP)
 		
@@ -326,12 +326,12 @@ function Dialogs:RegisterDialogs()
 		end
 		
 		-- Threshold label
-		triggerFrame.thresholdLabel = triggerFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		triggerFrame.thresholdLabel = triggerFrame:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
 		triggerFrame.thresholdLabel:SetPoint("TOPLEFT", 15, -120)
 		triggerFrame.thresholdLabel:SetText(BFL.L.DIALOG_TRIGGER_MIN_FRIENDS)
 		
 		-- Threshold value display (next to label)
-		triggerFrame.thresholdValue = triggerFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+		triggerFrame.thresholdValue = triggerFrame:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
 		triggerFrame.thresholdValue:SetPoint("LEFT", triggerFrame.thresholdLabel, "RIGHT", 5, 0)
 		triggerFrame.thresholdValue:SetText("3")
 		

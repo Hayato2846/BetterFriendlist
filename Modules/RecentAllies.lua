@@ -41,7 +41,7 @@ function RecentAllies:OnLoad(frame)
 	-- Recent Allies is TWW-only (11.0.7+)
 	if not BFL.HasRecentAllies then
 		-- Show "Not Available" message for Classic users
-		local notAvailableText = frame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+		local notAvailableText = frame:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
 		notAvailableText:SetPoint("CENTER")
 		notAvailableText:SetText(BFL.L.RECENT_ALLIES_NOT_AVAILABLE)
 		notAvailableText:SetTextColor(0.5, 0.5, 0.5)
@@ -120,7 +120,7 @@ function RecentAllies:Refresh(frame, retainScrollPosition)
 		self:SetLoadingSpinnerShown(frame, false)
 		-- Show a message that the system is not available
 		if not frame.UnavailableText then
-			frame.UnavailableText = frame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+			frame.UnavailableText = frame:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
 			frame.UnavailableText:SetPoint("CENTER")
 			frame.UnavailableText:SetText(BFL.L.RECENT_ALLIES_SYSTEM_UNAVAILABLE)
 		end

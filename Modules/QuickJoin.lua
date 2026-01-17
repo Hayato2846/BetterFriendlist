@@ -251,7 +251,7 @@ function QuickJoinEntry:New(guid, groupInfo)
 	local entry = setmetatable({}, QuickJoinEntry)
 	entry.guid = guid
 	entry.groupInfo = groupInfo or {}
-	entry.fontObject = UserScaledFontGameNormalSmall
+	entry.fontObject = BetterFriendlistFontNormalSmall
 	
 	-- Parse display data
 	entry.displayedMembers = {}

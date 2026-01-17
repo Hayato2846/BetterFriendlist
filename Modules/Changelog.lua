@@ -18,6 +18,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.2.0] - 2026-01-17
+### Added
+- **Group Name Alignment** - Added a new option to align group headers (Left, Center, Right). Left alignment is now the default. (Reported by Drakblackz)
+- **Collapse/Expand Arrow** - Added options to hide the collapse/expand arrow and change its alignment (Left, Center, Right). Left is default. (Reported by Drakblackz)
+- **Settings Button** - Added a dedicated cogwheel button to the main frame for easier access to settings, making it more discoverable for new users. (Reported by Atom)
+
+### Fixed
+- **Class Coloring** - Fixed an issue with class coloring not working correctly for some languages. (Reported by Drakblackz)
+- **Performance** - Investigated and fixed small freezes that could occur when collapsing/expanding groups. (Reported by Drakblackz)
+- **ElvUI Skin** - Fixed a Lua error related to the ElvUI skin integration. (Reported by Seiryoku)
+- **ElvUI Skin** - Fixed skinning issues where ElvUI styles were not properly applied to some newer UI elements.
+- **Send Message Button** - Fixed the "Send Message" button not working correctly in some scenarios. (Reported by Kylani)
+- **Settings UI** - Fixed an issue where some dropdowns in general settings would not display their selected value.
+- **Font Scaling** - Fixed visual issues with dropdowns and tab texts when global font size is overridden by other addons (e.g., ElvUI). (Reported by Drakblackz)
+- **Sorting** - Fixed the Alphabetical Name sorter not working properly. (Reported by Drakblackz)
+
 ## [2.1.9] - 2026-01-16
 ### Added
 - **Global Ignore List Support** - Added a compatibility module for the "Global Ignore List" addon. The GIL window now correctly anchors to the BetterFriendlist frame (Main, Settings, Help, or Raid Info) and opens/closes automatically. (reported by Kiley01)
@@ -1828,7 +1844,7 @@ function Changelog:CreateChangelogWindow()
     headerLine:SetColorTexture(0.4, 0.4, 0.4, 0.8)
 
     -- Intro Text
-    local headerText = headerFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local headerText = headerFrame:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
     headerText:SetPoint("LEFT", 10, 0)
     headerText:SetText(L.CHANGELOG_HEADER_COMMUNITY)
 
@@ -1960,12 +1976,12 @@ function Changelog:CreateChangelogWindow()
         icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\chevron-right.blp")
         
         -- Title
-        local title = header:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local title = header:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
         title:SetPoint("LEFT", icon, "RIGHT", 5, 0)
         title:SetText(string.format(L.CHANGELOG_HEADER_VERSION, entryData.version))
 
         -- Date
-        local dateLabel = header:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local dateLabel = header:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
         dateLabel:SetPoint("RIGHT", header, "RIGHT", -5, 0)
         dateLabel:SetText(entryData.date)
         
@@ -1977,14 +1993,14 @@ function Changelog:CreateChangelogWindow()
         local currentY = -5
         for _, block in ipairs(entryData.blocks) do
             if block.type == "h1" then
-                local fs = entryContent:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
+                local fs = entryContent:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontLarge")
                 fs:SetPoint("TOPLEFT", 10, currentY)
                 fs:SetWidth(510)
                 fs:SetJustifyH("LEFT")
                 fs:SetText(block.content)
                 currentY = currentY - fs:GetStringHeight() - 10
             elseif block.type == "h3" then
-                local fs = entryContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+                local fs = entryContent:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
                 fs:SetPoint("TOPLEFT", 10, currentY)
                 fs:SetWidth(510)
                 fs:SetJustifyH("LEFT")
@@ -1992,7 +2008,7 @@ function Changelog:CreateChangelogWindow()
                 fs:SetTextColor(1, 0.82, 0) -- Gold
                 currentY = currentY - fs:GetStringHeight() - 5
             elseif block.type == "h4" then
-                local fs = entryContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+                local fs = entryContent:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
                 fs:SetPoint("TOPLEFT", 10, currentY)
                 fs:SetWidth(510)
                 fs:SetJustifyH("LEFT")
@@ -2007,12 +2023,12 @@ function Changelog:CreateChangelogWindow()
                 currentY = currentY - 15
             elseif block.type == "list_item" then
                 -- Bullet
-                local bullet = entryContent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+                local bullet = entryContent:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
                 bullet:SetPoint("TOPLEFT", 15, currentY)
                 bullet:SetText("•")
                 
                 -- Text
-                local fs = entryContent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+                local fs = entryContent:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
                 fs:SetPoint("TOPLEFT", 30, currentY)
                 fs:SetWidth(490)
                 fs:SetJustifyH("LEFT")
@@ -2020,7 +2036,7 @@ function Changelog:CreateChangelogWindow()
                 
                 currentY = currentY - math.max(fs:GetStringHeight(), bullet:GetStringHeight()) - 5
             else -- text
-                local fs = entryContent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+                local fs = entryContent:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
                 fs:SetPoint("TOPLEFT", 10, currentY)
                 fs:SetWidth(510)
                 fs:SetJustifyH("LEFT")
