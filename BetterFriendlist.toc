@@ -22,8 +22,6 @@
 ## Category-ruRU: Интерфейс пользователя
 ## Category-zhCN: 用户界面
 ## Category-zhTW: 使用者介面
-## Dependencies: !!!Perfy
-## X-Perfy-Instrumented: true
 
 # Libraries
 Libs\LibStub\LibStub.lua

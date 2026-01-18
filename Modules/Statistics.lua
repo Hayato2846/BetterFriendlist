@@ -1,4 +1,4 @@
---[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua"); -- Modules/Statistics.lua
+-- Modules/Statistics.lua
 -- Friend network statistics and analytics module (ENHANCED - Phase 12)
 -- Now uses ALL Friends List API data (20+ fields) instead of just ActivityTracker
 
@@ -23,28 +23,28 @@ local MAX_LEVEL = 80
 
 -- Get localized class file name from localized class name (for offline friends)
 -- Logic moved to BFL.ClassUtils (renamed from GetClassFileFromLocalizedName to GetClassFileFromClassName)
-local function GetClassFileFromLocalizedName(localizedClassName) Perfy_Trace(Perfy_GetTime(), "Enter", "GetClassFileFromLocalizedName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:26:6");
-	return Perfy_Trace_Passthrough("Leave", "GetClassFileFromLocalizedName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:26:6", BFL.ClassUtils:GetClassFileFromClassName(localizedClassName))
+local function GetClassFileFromLocalizedName(localizedClassName)
+	return BFL.ClassUtils:GetClassFileFromClassName(localizedClassName)
 end
 
 -- Check if realm is same or connected to player's realm
-local function GetRealmCategory(realmName) Perfy_Trace(Perfy_GetTime(), "Enter", "GetRealmCategory file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:31:6");
-	if not realmName or realmName == "" then Perfy_Trace(Perfy_GetTime(), "Leave", "GetRealmCategory file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:31:6"); return "unknown" end
+local function GetRealmCategory(realmName)
+	if not realmName or realmName == "" then return "unknown" end
 	
 	local playerRealm = GetNormalizedRealmName()
 	if realmName == playerRealm then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "GetRealmCategory file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:31:6"); return "same"
+		return "same"
 	end
 	
 	-- TODO: Connected realm detection (WoW API doesn't provide this easily)
 	-- For now, treat all non-matching realms as "other"
-	Perfy_Trace(Perfy_GetTime(), "Leave", "GetRealmCategory file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:31:6"); return "other"
+	return "other"
 end
 
 -- Calculate friendship health score based on last activity
-local function CalculateFriendshipHealth(friendData, currentTime) Perfy_Trace(Perfy_GetTime(), "Enter", "CalculateFriendshipHealth file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:45:6");
+local function CalculateFriendshipHealth(friendData, currentTime)
 	local ActivityTracker = BFL:GetModule("ActivityTracker")
-	if not ActivityTracker then Perfy_Trace(Perfy_GetTime(), "Leave", "CalculateFriendshipHealth file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:45:6"); return "unknown" end
+	if not ActivityTracker then return "unknown" end
 	
 	-- Get UID for ActivityTracker lookup
 	local uid = nil
@@ -54,7 +54,7 @@ local function CalculateFriendshipHealth(friendData, currentTime) Perfy_Trace(Pe
 		uid = "wow_" .. friendData.name
 	end
 	
-	if not uid then Perfy_Trace(Perfy_GetTime(), "Leave", "CalculateFriendshipHealth file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:45:6"); return "unknown" end
+	if not uid then return "unknown" end
 	
 	-- Get last activity (whisper/group/trade)
 	local lastActivity = ActivityTracker:GetLastActivity(uid)
@@ -73,9 +73,9 @@ local function CalculateFriendshipHealth(friendData, currentTime) Perfy_Trace(Pe
 		local timeSinceActivity = currentTime - mostRecentActivity
 		
 		if timeSinceActivity <= DAYS_7 then
-			Perfy_Trace(Perfy_GetTime(), "Leave", "CalculateFriendshipHealth file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:45:6"); return "active"      -- Interacted within 7 days
+			return "active"      -- Interacted within 7 days
 		elseif timeSinceActivity <= DAYS_30 then
-			Perfy_Trace(Perfy_GetTime(), "Leave", "CalculateFriendshipHealth file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:45:6"); return "regular"     -- Interacted within 30 days
+			return "regular"     -- Interacted within 30 days
 		end
 	end
 	
@@ -86,36 +86,36 @@ local function CalculateFriendshipHealth(friendData, currentTime) Perfy_Trace(Pe
 		local timeSinceOnline = currentTime - lastOnline
 		
 		if timeSinceOnline <= DAYS_90 then
-			Perfy_Trace(Perfy_GetTime(), "Leave", "CalculateFriendshipHealth file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:45:6"); return "drifting"   -- Online within 90 days, but no interaction
+			return "drifting"   -- Online within 90 days, but no interaction
 		elseif timeSinceOnline <= DAYS_180 then
-			Perfy_Trace(Perfy_GetTime(), "Leave", "CalculateFriendshipHealth file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:45:6"); return "stale"      -- Online 90-180 days ago
+			return "stale"      -- Online 90-180 days ago
 		else
-			Perfy_Trace(Perfy_GetTime(), "Leave", "CalculateFriendshipHealth file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:45:6"); return "dormant"    -- Not seen in 180+ days
+			return "dormant"    -- Not seen in 180+ days
 		end
 	end
 	
 	-- Friend is currently online but no activity tracked
 	if friendData.connected then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "CalculateFriendshipHealth file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:45:6"); return "drifting"
+		return "drifting"
 	end
 	
 	-- No data available
-	Perfy_Trace(Perfy_GetTime(), "Leave", "CalculateFriendshipHealth file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:45:6"); return "unknown"
+	return "unknown"
 end
 
 -- ========================================
 -- Module Initialization
 -- ========================================
-function Statistics:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "Statistics:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:109:0");
+function Statistics:Initialize()
 	-- BFL:DebugPrint("|cff00ff00BetterFriendlist Statistics:|r Initialized (Enhanced - Phase 12)")
-Perfy_Trace(Perfy_GetTime(), "Leave", "Statistics:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:109:0"); end
+end
 
 -- ========================================
 -- Core Statistics Calculation
 -- ========================================
 
 -- Calculate comprehensive statistics using ALL API fields
-function Statistics:GetStatistics() Perfy_Trace(Perfy_GetTime(), "Enter", "Statistics:GetStatistics file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:118:0");
+function Statistics:GetStatistics()
 	local currentTime = time()
 	
 	-- Initialize comprehensive stats structure
@@ -373,7 +373,7 @@ function Statistics:GetStatistics() Perfy_Trace(Perfy_GetTime(), "Enter", "Stati
 		stats.levelDistribution.average = 0
 	end
 	
-	Perfy_Trace(Perfy_GetTime(), "Leave", "Statistics:GetStatistics file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:118:0"); return stats
+	return stats
 end
 
 -- ========================================
@@ -381,7 +381,7 @@ end
 -- ========================================
 
 -- Get top N realms by friend count
-function Statistics:GetTopRealms(n) Perfy_Trace(Perfy_GetTime(), "Enter", "Statistics:GetTopRealms file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:384:0");
+function Statistics:GetTopRealms(n)
 	local stats = self:GetStatistics()
 	local realms = {}
 	
@@ -389,7 +389,7 @@ function Statistics:GetTopRealms(n) Perfy_Trace(Perfy_GetTime(), "Enter", "Stati
 		table.insert(realms, {name = realm, count = count})
 	end
 	
-	table.sort(realms, function(a, b) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:392:20"); return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:392:20", a.count > b.count) end)
+	table.sort(realms, function(a, b) return a.count > b.count end)
 	
 	-- Return top N
 	local topRealms = {}
@@ -397,11 +397,11 @@ function Statistics:GetTopRealms(n) Perfy_Trace(Perfy_GetTime(), "Enter", "Stati
 		table.insert(topRealms, realms[i])
 	end
 	
-	Perfy_Trace(Perfy_GetTime(), "Leave", "Statistics:GetTopRealms file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:384:0"); return topRealms
+	return topRealms
 end
 
 -- Get top N classes by friend count (total = online + offline)
-function Statistics:GetTopClasses(n) Perfy_Trace(Perfy_GetTime(), "Enter", "Statistics:GetTopClasses file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:404:0");
+function Statistics:GetTopClasses(n)
 	local stats = self:GetStatistics()
 	local classes = {}
 	
@@ -409,7 +409,7 @@ function Statistics:GetTopClasses(n) Perfy_Trace(Perfy_GetTime(), "Enter", "Stat
 		table.insert(classes, {name = className, count = count})
 	end
 	
-	table.sort(classes, function(a, b) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:412:21"); return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:412:21", a.count > b.count) end)
+	table.sort(classes, function(a, b) return a.count > b.count end)
 	
 	-- Return top N
 	local topClasses = {}
@@ -417,43 +417,43 @@ function Statistics:GetTopClasses(n) Perfy_Trace(Perfy_GetTime(), "Enter", "Stat
 		table.insert(topClasses, classes[i])
 	end
 	
-	Perfy_Trace(Perfy_GetTime(), "Leave", "Statistics:GetTopClasses file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:404:0"); return topClasses
+	return topClasses
 end
 
 -- Get friendship health summary
-function Statistics:GetFriendshipHealthSummary() Perfy_Trace(Perfy_GetTime(), "Enter", "Statistics:GetFriendshipHealthSummary file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:424:0");
+function Statistics:GetFriendshipHealthSummary()
 	local stats = self:GetStatistics()
-	return Perfy_Trace_Passthrough("Leave", "Statistics:GetFriendshipHealthSummary file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:424:0", stats.friendshipHealth)
+	return stats.friendshipHealth
 end
 
 -- Get level distribution summary
-function Statistics:GetLevelDistribution() Perfy_Trace(Perfy_GetTime(), "Enter", "Statistics:GetLevelDistribution file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:430:0");
+function Statistics:GetLevelDistribution()
 	local stats = self:GetStatistics()
-	return Perfy_Trace_Passthrough("Leave", "Statistics:GetLevelDistribution file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:430:0", stats.levelDistribution)
+	return stats.levelDistribution
 end
 
 -- Get realm distribution summary
-function Statistics:GetRealmDistribution() Perfy_Trace(Perfy_GetTime(), "Enter", "Statistics:GetRealmDistribution file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:436:0");
+function Statistics:GetRealmDistribution()
 	local stats = self:GetStatistics()
-	return Perfy_Trace_Passthrough("Leave", "Statistics:GetRealmDistribution file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:436:0", stats.realmDistribution)
+	return stats.realmDistribution
 end
 
 -- Get game distribution summary
-function Statistics:GetGameDistribution() Perfy_Trace(Perfy_GetTime(), "Enter", "Statistics:GetGameDistribution file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:442:0");
+function Statistics:GetGameDistribution()
 	local stats = self:GetStatistics()
-	return Perfy_Trace_Passthrough("Leave", "Statistics:GetGameDistribution file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:442:0", stats.gameCounts)
+	return stats.gameCounts
 end
 
 -- Get mobile vs desktop summary
-function Statistics:GetMobileVsDesktop() Perfy_Trace(Perfy_GetTime(), "Enter", "Statistics:GetMobileVsDesktop file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:448:0");
+function Statistics:GetMobileVsDesktop()
 	local stats = self:GetStatistics()
-	return Perfy_Trace_Passthrough("Leave", "Statistics:GetMobileVsDesktop file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:448:0", stats.mobileVsDesktop)
+	return stats.mobileVsDesktop
 end
 
 -- Get class roles summary
-function Statistics:GetClassRoles() Perfy_Trace(Perfy_GetTime(), "Enter", "Statistics:GetClassRoles file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:454:0");
+function Statistics:GetClassRoles()
 	local stats = self:GetStatistics()
-	return Perfy_Trace_Passthrough("Leave", "Statistics:GetClassRoles file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua:454:0", stats.classRoles)
+	return stats.classRoles
 end
 
-Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Statistics.lua"); return Statistics
+return Statistics

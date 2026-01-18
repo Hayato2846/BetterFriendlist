@@ -1,4 +1,4 @@
---[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua"); -- RaidFrame.lua
+-- RaidFrame.lua
 -- Raid management system for BetterFriendlist
 -- Provides raid roster display, control panel, and saved instances info
 -- Version 0.14
@@ -52,28 +52,28 @@ RaidFrame.DIFFICULTY_PRIMARYRAID_LFR = 17
 -- ========================================
 
 --- Get role icon string (Retail/Classic compatible)
-local function GetRoleIconString(role, size) Perfy_Trace(Perfy_GetTime(), "Enter", "GetRoleIconString file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:55:6");
+local function GetRoleIconString(role, size)
     size = size or 16
     if BFL.IsRetail then
         if role == "TANK" then
-            return Perfy_Trace_Passthrough("Leave", "GetRoleIconString file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:55:6", CreateAtlasMarkup("UI-LFG-RoleIcon-Tank-Micro-GroupFinder", size, size))
+            return CreateAtlasMarkup("UI-LFG-RoleIcon-Tank-Micro-GroupFinder", size, size)
         elseif role == "HEALER" then
-            return Perfy_Trace_Passthrough("Leave", "GetRoleIconString file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:55:6", CreateAtlasMarkup("UI-LFG-RoleIcon-Healer-Micro-GroupFinder", size, size))
+            return CreateAtlasMarkup("UI-LFG-RoleIcon-Healer-Micro-GroupFinder", size, size)
         else
-            return Perfy_Trace_Passthrough("Leave", "GetRoleIconString file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:55:6", CreateAtlasMarkup("UI-LFG-RoleIcon-DPS-Micro-GroupFinder", size, size))
+            return CreateAtlasMarkup("UI-LFG-RoleIcon-DPS-Micro-GroupFinder", size, size)
         end
     else
         -- Classic fallback using standard LFG role icons
         -- Texture: Interface\LFGFrame\UI-LFG-ICON-PORTRAITROLES
         if role == "TANK" then
-            return Perfy_Trace_Passthrough("Leave", "GetRoleIconString file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:55:6", string.format("|TInterface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES:%d:%d:0:0:64:64:0:19:22:41|t", size, size))
+            return string.format("|TInterface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES:%d:%d:0:0:64:64:0:19:22:41|t", size, size)
         elseif role == "HEALER" then
-            return Perfy_Trace_Passthrough("Leave", "GetRoleIconString file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:55:6", string.format("|TInterface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES:%d:%d:0:0:64:64:20:39:1:20|t", size, size))
+            return string.format("|TInterface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES:%d:%d:0:0:64:64:20:39:1:20|t", size, size)
         else
-            return Perfy_Trace_Passthrough("Leave", "GetRoleIconString file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:55:6", string.format("|TInterface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES:%d:%d:0:0:64:64:20:39:22:41|t", size, size))
+            return string.format("|TInterface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES:%d:%d:0:0:64:64:20:39:22:41|t", size, size)
         end
     end
-Perfy_Trace(Perfy_GetTime(), "Leave", "GetRoleIconString file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:55:6"); end
+end
 
 -- ========================================
 -- RESPONSIVE LAYOUT (PHASE 4)
@@ -81,21 +81,21 @@ Perfy_Trace(Perfy_GetTime(), "Leave", "GetRoleIconString file://c:\\Program File
 
 -- Update group layout with proportional scaling (Phase 4)
 -- Icons remain 28x28 fixed (user decision: no icon scaling)
-function RaidFrame:UpdateGroupLayout() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:UpdateGroupLayout file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:84:0");
+function RaidFrame:UpdateGroupLayout()
     local frame = BetterFriendsFrame
     if not frame or not frame.RaidFrame then
-        Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateGroupLayout file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:84:0"); return
+        return
     end
     
     local raidFrame = frame.RaidFrame
     local groupsContainer = raidFrame.GroupsInset and raidFrame.GroupsInset.GroupsContainer
     if not groupsContainer then
-        Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateGroupLayout file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:84:0"); return
+        return
     end
     
     -- Get ACTUAL available space from GroupsInset
     local inset = raidFrame.GroupsInset
-    if not inset then Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateGroupLayout file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:84:0"); return end
+    if not inset then return end
     
     local insetWidth = inset:GetWidth()
     local insetHeight = inset:GetHeight()
@@ -299,20 +299,20 @@ function RaidFrame:UpdateGroupLayout() Perfy_Trace(Perfy_GetTime(), "Enter", "Ra
     -- Refresh all visible member buttons to reflect new sizes
     -- This ensures Name, Level, Icons are repositioned correctly
     self:UpdateAllMemberButtons()
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateGroupLayout file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:84:0"); end
+end
 
-function RaidFrame:UpdateControlPanelLayout() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:UpdateControlPanelLayout file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:304:0");
+function RaidFrame:UpdateControlPanelLayout()
     local frame = BetterFriendsFrame
     if not frame or not frame.RaidFrame then
         -- BFL:DebugPrint("|cffff0000[ControlPanel] BetterFriendsFrame or RaidFrame not found|r")
-        Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateControlPanelLayout file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:304:0"); return
+        return
     end
     
     local raidFrame = frame.RaidFrame
     local controlPanel = raidFrame.ControlPanel
     if not controlPanel then
         -- BFL:DebugPrint("|cffff0000[ControlPanel] ControlPanel not found|r")
-        Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateControlPanelLayout file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:304:0"); return
+        return
     end
     
     -- BFL:DebugPrint(string.format("|cff00ffffBFL:RaidFrame:|r === ControlPanel Layout Calculation ==="))
@@ -455,7 +455,7 @@ function RaidFrame:UpdateControlPanelLayout() Perfy_Trace(Perfy_GetTime(), "Ente
     end
     
     -- BFL:DebugPrint("|cff00ff00ControlPanel layout completed|r")
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateControlPanelLayout file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:304:0"); end
+end
 
 -- ========================================
 -- SECURE PROXY SYSTEM (Phase 8.3)
@@ -466,8 +466,8 @@ Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateControlPanelLayout file:/
 --- Create the detached secure proxy button
 --- Uses modern Blizzard pattern with secure action types for Main Tank/Assist
 --- Reference: SecureTemplates.lua SECURE_ACTIONS.maintank and SECURE_ACTIONS.mainassist
-function RaidFrame:CreateSecureProxy() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:CreateSecureProxy file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:469:0");
-    if self.SecureProxy then Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:CreateSecureProxy file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:469:0"); return end
+function RaidFrame:CreateSecureProxy()
+    if self.SecureProxy then return end
     
     -- Create the proxy frame
     -- CRITICAL: Parent must be UIParent to avoid tainting the addon frame
@@ -515,7 +515,7 @@ function RaidFrame:CreateSecureProxy() Perfy_Trace(Perfy_GetTime(), "Enter", "Ra
     proxy:RegisterForClicks("AnyUp", "AnyDown")
     
     -- Script Handlers
-    proxy:SetScript("OnEnter", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:518:31");
+    proxy:SetScript("OnEnter", function(self)
         -- Just update display properties - menu handling is done via frame.menu callback
         local unit = self:GetAttribute("unit")
         if unit then
@@ -529,39 +529,39 @@ function RaidFrame:CreateSecureProxy() Perfy_Trace(Perfy_GetTime(), "Enter", "Ra
         
         -- Show tooltip
         if self.unit then pcall(UnitFrame_UpdateTooltip, self) end
-    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:518:31"); end)
+    end)
     
-    proxy:SetScript("OnLeave", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:534:31");
+    proxy:SetScript("OnLeave", function(self)
         GameTooltip:Hide()
         self:Hide()
         self:ClearAllPoints()
         self.visualButton = nil
         self.unit = nil
-    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:534:31"); end)
+    end)
     
     -- Combat Protection
     -- Force hide when entering combat
     proxy:RegisterEvent("PLAYER_REGEN_DISABLED")
-    proxy:SetScript("OnEvent", function(self, event) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:545:31");
+    proxy:SetScript("OnEvent", function(self, event)
         if event == "PLAYER_REGEN_DISABLED" then
             self:Hide()
             self:ClearAllPoints()
             self.visualButton = nil
         end
-    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:545:31"); end)
+    end)
     
     self.SecureProxy = proxy
     -- BFL:DebugPrint("[BFL] SecureProxy created with SECURE Main Tank/Assist support")
     -- BFL:DebugPrint("  Shift+RClick = Toggle Main Tank (SECURE)")
     -- BFL:DebugPrint("  Ctrl+RClick = Toggle Main Assist (SECURE)")
     -- BFL:DebugPrint("  RClick = RAID Menu (insecure)")
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:CreateSecureProxy file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:469:0"); end
+end
 
 -- ========================================
 -- INITIALIZATION
 -- ========================================
 
-function RaidFrame:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:564:0");
+function RaidFrame:Initialize()
     -- Initialize state
     self.raidMembers = {}
     self.displayList = {}
@@ -603,77 +603,77 @@ function RaidFrame:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame
     
     -- Hook OnShow to re-render if data changed while hidden
     if BetterFriendsFrame then
-        BetterFriendsFrame:HookScript("OnShow", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:606:48");
+        BetterFriendsFrame:HookScript("OnShow", function()
             -- Always update if we have no data, or if dirty flag is set
             if needsRenderOnShow or #self.raidMembers == 0 then
                 -- BFL:DebugPrint("|cff00ffffRaidFrame:|r Frame shown - triggering refresh")
                 self:OnRaidRosterUpdate()
                 needsRenderOnShow = false
             end
-        Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:606:48"); end)
+        end)
     end
     
     -- BFL:DebugPrint("[BFL] RaidFrame initialized")
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:564:0"); end
+end
 
-function RaidFrame:RegisterEvents() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:RegisterEvents file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:619:0");
+function RaidFrame:RegisterEvents()
     -- Raid roster events
-    BFL:RegisterEventCallback("RAID_ROSTER_UPDATE", function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:621:52");
+    BFL:RegisterEventCallback("RAID_ROSTER_UPDATE", function(...)
         RaidFrame:OnRaidRosterUpdate(...)
-    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:621:52"); end, 50)
+    end, 50)
     
-    BFL:RegisterEventCallback("GROUP_ROSTER_UPDATE", function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:625:53");
+    BFL:RegisterEventCallback("GROUP_ROSTER_UPDATE", function(...)
         RaidFrame:OnRaidRosterUpdate(...)
-    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:625:53"); end, 50)
+    end, 50)
     
     -- Group events
-    BFL:RegisterEventCallback("GROUP_JOINED", function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:630:46");
+    BFL:RegisterEventCallback("GROUP_JOINED", function(...)
         RaidFrame:OnGroupJoined(...)
-    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:630:46"); end, 50)
+    end, 50)
     
-    BFL:RegisterEventCallback("GROUP_LEFT", function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:634:44");
+    BFL:RegisterEventCallback("GROUP_LEFT", function(...)
         RaidFrame:OnGroupLeft(...)
-    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:634:44"); end, 50)
+    end, 50)
     
     -- Role assignment events
-    BFL:RegisterEventCallback("PLAYER_ROLES_ASSIGNED", function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:639:55");
+    BFL:RegisterEventCallback("PLAYER_ROLES_ASSIGNED", function(...)
         RaidFrame:UpdateRoleSummary()
-    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:639:55"); end, 50)
+    end, 50)
     
     -- Instance info events
-    BFL:RegisterEventCallback("UPDATE_INSTANCE_INFO", function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:644:54");
+    BFL:RegisterEventCallback("UPDATE_INSTANCE_INFO", function(...)
         RaidFrame:OnInstanceInfoUpdate(...)
-    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:644:54"); end, 50)
+    end, 50)
     
-    BFL:RegisterEventCallback("PLAYER_DIFFICULTY_CHANGED", function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:648:59");
+    BFL:RegisterEventCallback("PLAYER_DIFFICULTY_CHANGED", function(...)
         RaidFrame:OnDifficultyChanged(...)
-    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:648:59"); end, 50)
+    end, 50)
     
     -- Ready Check events
-    BFL:RegisterEventCallback("READY_CHECK", function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:653:45");
+    BFL:RegisterEventCallback("READY_CHECK", function(...)
         RaidFrame:OnReadyCheck(...)
-    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:653:45"); end, 50)
+    end, 50)
     
-    BFL:RegisterEventCallback("READY_CHECK_CONFIRM", function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:657:53");
+    BFL:RegisterEventCallback("READY_CHECK_CONFIRM", function(...)
         RaidFrame:OnReadyCheckConfirm(...)
-    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:657:53"); end, 50)
+    end, 50)
     
-    BFL:RegisterEventCallback("READY_CHECK_FINISHED", function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:661:54");
+    BFL:RegisterEventCallback("READY_CHECK_FINISHED", function(...)
         RaidFrame:OnReadyCheckFinished(...)
-    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:661:54"); end, 50)
+    end, 50)
     
     -- Phase 8.2: Combat event to clear multi-selections
-    BFL:RegisterEventCallback("PLAYER_REGEN_DISABLED", function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:666:55");
+    BFL:RegisterEventCallback("PLAYER_REGEN_DISABLED", function(...)
         RaidFrame:OnCombatStart(...)
-    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:666:55"); end, 50)
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:RegisterEvents file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:619:0"); end
+    end, 50)
+end
 
 -- ========================================
 -- ROSTER MANAGER
 -- ========================================
 
 --- Update raid member list from WoW API
-function RaidFrame:UpdateRaidMembers() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:UpdateRaidMembers file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:676:0");
+function RaidFrame:UpdateRaidMembers()
     wipe(self.raidMembers)
     
     -- Check if we're in a raid
@@ -683,7 +683,7 @@ function RaidFrame:UpdateRaidMembers() Perfy_Trace(Perfy_GetTime(), "Enter", "Ra
             -- In party - show party members
             self:UpdatePartyMembers()
         end
-        Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateRaidMembers file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:676:0"); return
+        return
     end
     
     -- Get raid members
@@ -712,10 +712,10 @@ function RaidFrame:UpdateRaidMembers() Perfy_Trace(Perfy_GetTime(), "Enter", "Ra
             table.insert(self.raidMembers, member)
         end
     end
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateRaidMembers file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:676:0"); end
+end
 
 --- Update party members (when in party, not raid)
-function RaidFrame:UpdatePartyMembers() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:UpdatePartyMembers file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:718:0");
+function RaidFrame:UpdatePartyMembers()
     -- Player
     local playerName = UnitName("player")
     local playerLevel = UnitLevel("player")
@@ -764,10 +764,10 @@ function RaidFrame:UpdatePartyMembers() Perfy_Trace(Perfy_GetTime(), "Enter", "R
             })
         end
     end
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdatePartyMembers file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:718:0"); end
+end
 
 --- Build sorted display list
-function RaidFrame:BuildDisplayList() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:BuildDisplayList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:770:0");
+function RaidFrame:BuildDisplayList()
     wipe(self.displayList)
     
     -- Copy members to display list
@@ -777,57 +777,57 @@ function RaidFrame:BuildDisplayList() Perfy_Trace(Perfy_GetTime(), "Enter", "Rai
     
     -- Sort based on current sort mode
     self:SortDisplayList()
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:BuildDisplayList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:770:0"); end
+end
 
 --- Sort display list
-function RaidFrame:SortDisplayList() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:SortDisplayList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:783:0");
+function RaidFrame:SortDisplayList()
     if self.sortMode == SORT_MODE_GROUP then
         -- Sort by group then name
-        table.sort(self.displayList, function(a, b) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:786:37");
+        table.sort(self.displayList, function(a, b)
             if a.subgroup ~= b.subgroup then
-                return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:786:37", a.subgroup < b.subgroup)
+                return a.subgroup < b.subgroup
             end
-            return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:786:37", a.name < b.name)
+            return a.name < b.name
         end)
     elseif self.sortMode == SORT_MODE_NAME then
         -- Sort alphabetically
-        table.sort(self.displayList, function(a, b) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:794:37");
-            return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:794:37", a.name < b.name)
+        table.sort(self.displayList, function(a, b)
+            return a.name < b.name
         end)
     elseif self.sortMode == SORT_MODE_CLASS then
         -- Sort by class then name
-        table.sort(self.displayList, function(a, b) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:799:37");
+        table.sort(self.displayList, function(a, b)
             if a.classFileName ~= b.classFileName then
-                return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:799:37", a.classFileName < b.classFileName)
+                return a.classFileName < b.classFileName
             end
-            return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:799:37", a.name < b.name)
+            return a.name < b.name
         end)
     elseif self.sortMode == SORT_MODE_RANK then
         -- Sort by rank (leader > assist > member) then name
-        table.sort(self.displayList, function(a, b) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:807:37");
+        table.sort(self.displayList, function(a, b)
             if a.rank ~= b.rank then
-                return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:807:37", a.rank > b.rank)  -- Higher rank first
+                return a.rank > b.rank  -- Higher rank first
             end
-            return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:807:37", a.name < b.name)
+            return a.name < b.name
         end)
     end
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:SortDisplayList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:783:0"); end
+end
 
 -- ========================================
 -- MEMBER BUTTON MANAGEMENT
 -- ========================================
 
 --- Update all member buttons in the UI
-function RaidFrame:UpdateAllMemberButtons() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:UpdateAllMemberButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:821:0");
+function RaidFrame:UpdateAllMemberButtons()
     local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
     if not frame then
-        Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateAllMemberButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:821:0"); return
+        return
     end
     
     -- GroupsContainer is inside GroupsInset
     local groupsContainer = frame.GroupsInset and frame.GroupsInset.GroupsContainer
     if not groupsContainer then
-        Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateAllMemberButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:821:0"); return
+        return
     end
     
     -- Organize members by subgroup
@@ -875,15 +875,15 @@ function RaidFrame:UpdateAllMemberButtons() Perfy_Trace(Perfy_GetTime(), "Enter"
             end
         end
     end
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateAllMemberButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:821:0"); end
+end
 
 --- Initialize member buttons in all 8 groups
-function RaidFrame:InitializeMemberButtons() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:InitializeMemberButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:881:0");
+function RaidFrame:InitializeMemberButtons()
     local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
-    if not frame then Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:InitializeMemberButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:881:0"); return end
+    if not frame then return end
 
     local groupsContainer = frame.GroupsContainer or (frame.GroupsInset and frame.GroupsInset.GroupsContainer)
-    if not groupsContainer then Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:InitializeMemberButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:881:0"); return end
+    if not groupsContainer then return end
     
     -- Use existing XML template buttons (Slot1-Slot5)
     for groupIndex = 1, 8 do
@@ -915,11 +915,11 @@ function RaidFrame:InitializeMemberButtons() Perfy_Trace(Perfy_GetTime(), "Enter
             end
         end
     end
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:InitializeMemberButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:881:0"); end
+end
 
 --- Update all member buttons based on current raid roster
-function RaidFrame:UpdateMemberButtons() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:UpdateMemberButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:921:0");
-    if not self.memberButtons or not self.raidMembers then Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateMemberButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:921:0"); return end
+function RaidFrame:UpdateMemberButtons()
+    if not self.memberButtons or not self.raidMembers then return end
     
     -- First, hide all buttons
     for groupIndex = 1, 8 do
@@ -956,11 +956,11 @@ function RaidFrame:UpdateMemberButtons() Perfy_Trace(Perfy_GetTime(), "Enter", "
     
     -- Update combat overlay state
     self:UpdateCombatOverlay()
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateMemberButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:921:0"); end
+end
 
 --- Update visual appearance of a member button
-function RaidFrame:UpdateMemberButtonVisuals(button, member) Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:UpdateMemberButtonVisuals file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:962:0");
-    if not button or not member then Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateMemberButtonVisuals file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:962:0"); return end
+function RaidFrame:UpdateMemberButtonVisuals(button, member)
+    if not button or not member then return end
     
     -- Set secure unit attribute for targeting (must be set before combat)
     if not InCombatLockdown() and member.unit then
@@ -1082,14 +1082,14 @@ function RaidFrame:UpdateMemberButtonVisuals(button, member) Perfy_Trace(Perfy_G
             button.Background:SetAlpha(0.3)
         end
     end
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateMemberButtonVisuals file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:962:0"); end
+end
 
 --- Update Member Count display
-function RaidFrame:UpdateMemberCount() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:UpdateMemberCount file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1088:0");
+function RaidFrame:UpdateMemberCount()
     local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
     if not frame or not frame.ControlPanel or not frame.ControlPanel.MemberCount then
         -- BFL:DebugPrint("[BFL] UpdateMemberCount: Frame check failed - frame=" .. tostring(frame) .. ", ControlPanel=" .. tostring(frame and frame.ControlPanel) .. ", MemberCount=" .. tostring(frame and frame.ControlPanel and frame.ControlPanel.MemberCount))
-        Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateMemberCount file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1088:0"); return
+        return
     end
     
     local numMembers = 0
@@ -1109,13 +1109,13 @@ function RaidFrame:UpdateMemberCount() Perfy_Trace(Perfy_GetTime(), "Enter", "Ra
 	
 	-- Trigger layout update to recalculate centering with new string width
 	self:UpdateControlPanelLayout()
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateMemberCount file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1088:0"); end
+end
 
 --- Update Control Panel (role summary, member count, assist label)
-function RaidFrame:UpdateControlPanel() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:UpdateControlPanel file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1115:0");
+function RaidFrame:UpdateControlPanel()
     local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
     if not frame or not frame.ControlPanel then
-        Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateControlPanel file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1115:0"); return
+        return
     end
     
     -- BFL:DebugPrint("[BFL] UpdateControlPanel called")
@@ -1135,12 +1135,12 @@ function RaidFrame:UpdateControlPanel() Perfy_Trace(Perfy_GetTime(), "Enter", "R
     
     -- Update Member Count
     self:UpdateMemberCount()
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateControlPanel file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1115:0"); end
+end
 
-function RaidFrame:UpdateRoleSummary() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:UpdateRoleSummary file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1140:0");
+function RaidFrame:UpdateRoleSummary()
     local frame = BetterFriendsFrame.RaidFrame
     if not frame or not frame.ControlPanel or not frame.ControlPanel.RoleSummary then
-        Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateRoleSummary file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1140:0"); return
+        return
     end
     
     local tanks = 0
@@ -1201,13 +1201,13 @@ function RaidFrame:UpdateRoleSummary() Perfy_Trace(Perfy_GetTime(), "Enter", "Ra
 	
 	-- Trigger layout update to recalculate centering with new string width
 	self:UpdateControlPanelLayout()
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateRoleSummary file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1140:0"); end
+end
 
 --- Update a single member button with raid member data
 -- @param button: The button frame to update
 -- @param memberData: Table with member info (name, class, level, rank, role, etc.) - can be nil for empty slot
-function RaidFrame:UpdateMemberButton(button, memberData) Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:UpdateMemberButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1209:0");
-    if not button then Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateMemberButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1209:0"); return end
+function RaidFrame:UpdateMemberButton(button, memberData)
+    if not button then return end
     
     -- Always show button frame (User Request: NEVER hide buttons)
     button:Show()
@@ -1238,7 +1238,7 @@ function RaidFrame:UpdateMemberButton(button, memberData) Perfy_Trace(Perfy_GetT
             button.EmptyText:Show()
         end
         
-        Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateMemberButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1209:0"); return
+        return
     end
     
     -- Show button when occupied
@@ -1403,14 +1403,14 @@ function RaidFrame:UpdateMemberButton(button, memberData) Perfy_Trace(Perfy_GetT
             button.CombatOverlay:Hide()
         end
     end
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateMemberButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1209:0"); end
+end
 
 --- Update combat overlay on all buttons
 --- @param inCombat boolean|nil Optional combat state (defaults to InCombatLockdown())
-function RaidFrame:UpdateCombatOverlay(inCombat) Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:UpdateCombatOverlay file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1410:0");
+function RaidFrame:UpdateCombatOverlay(inCombat)
     if not self.memberButtons then 
         -- BFL:DebugPrint("[BFL] UpdateCombatOverlay: No member buttons")
-        Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateCombatOverlay file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1410:0"); return 
+        return 
     end
     
     -- Use passed parameter or query current state
@@ -1451,7 +1451,7 @@ function RaidFrame:UpdateCombatOverlay(inCombat) Perfy_Trace(Perfy_GetTime(), "E
     end
     
     -- BFL:DebugPrint("[BFL] Combat overlay updated on " .. buttonsUpdated .. " buttons (out of 40 possible)")
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateCombatOverlay file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1410:0"); end
+end
 
 -- ========================================
 -- MULTI-SELECT VISUAL HIGHLIGHTS (Phase 8.2)
@@ -1460,8 +1460,8 @@ Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateCombatOverlay file://c:\\
 --- Set drag highlight on a specific raid member button
 --- @param raidIndex number The raid index (raid1 = 1, raid2 = 2, etc.)
 --- @param isDragging boolean Whether to show or hide drag highlight
-function RaidFrame:SetButtonDragHighlight(raidIndex, isDragging) Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:SetButtonDragHighlight file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1463:0");
-    if not self.memberButtons then Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:SetButtonDragHighlight file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1463:0"); return end
+function RaidFrame:SetButtonDragHighlight(raidIndex, isDragging)
+    if not self.memberButtons then return end
     
     -- Find the button with this raidIndex
     for groupIndex = 1, 8 do
@@ -1485,19 +1485,19 @@ function RaidFrame:SetButtonDragHighlight(raidIndex, isDragging) Perfy_Trace(Per
                         else
                             button.DragHighlight:Hide()
                         end
-                        Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:SetButtonDragHighlight file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1463:0"); return
+                        return
                     end
                 end
             end
         end
     end
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:SetButtonDragHighlight file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1463:0"); end
+end
 
 --- Set selection highlight on a specific raid member button
 --- @param raidIndex number The raid index (raid1 = 1, raid2 = 2, etc.)
 --- @param isSelected boolean Whether to show or hide highlight
-function RaidFrame:SetButtonSelectionHighlight(raidIndex, isSelected) Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:SetButtonSelectionHighlight file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1499:0");
-    if not self.memberButtons then Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:SetButtonSelectionHighlight file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1499:0"); return end
+function RaidFrame:SetButtonSelectionHighlight(raidIndex, isSelected)
+    if not self.memberButtons then return end
     
     -- Find the button with this raidIndex
     for groupIndex = 1, 8 do
@@ -1529,124 +1529,124 @@ function RaidFrame:SetButtonSelectionHighlight(raidIndex, isSelected) Perfy_Trac
                                 button.SelectionHighlight:Hide()
                             end
                         end
-                        Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:SetButtonSelectionHighlight file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1499:0"); return
+                        return
                     end
                 end
             end
         end
     end
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:SetButtonSelectionHighlight file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1499:0"); end
+end
 
 --- Get number of raid members
-function RaidFrame:GetNumMembers() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:GetNumMembers file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1541:0");
-    return Perfy_Trace_Passthrough("Leave", "RaidFrame:GetNumMembers file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1541:0", #self.raidMembers)
+function RaidFrame:GetNumMembers()
+    return #self.raidMembers
 end
 
 --- Get selected member data
-function RaidFrame:GetSelectedMember() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:GetSelectedMember file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1546:0");
+function RaidFrame:GetSelectedMember()
     if not self.selectedMember then
-        Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:GetSelectedMember file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1546:0"); return nil
+        return nil
     end
     
     for _, member in ipairs(self.raidMembers) do
         if member.name == self.selectedMember then
-            Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:GetSelectedMember file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1546:0"); return member
+            return member
         end
     end
     
-    Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:GetSelectedMember file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1546:0"); return nil
+    return nil
 end
 
 --- Set selected member
-function RaidFrame:SetSelectedMember(name) Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:SetSelectedMember file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1561:0");
+function RaidFrame:SetSelectedMember(name)
     self.selectedMember = name
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:SetSelectedMember file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1561:0"); end
+end
 
 -- ========================================
 -- CONTROL PANEL
 -- ========================================
 
 --- Check if player can control raid
-function RaidFrame:CanControlRaid() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:CanControlRaid file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1570:0");
-    return Perfy_Trace_Passthrough("Leave", "RaidFrame:CanControlRaid file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1570:0", UnitIsGroupLeader("player") or UnitIsGroupAssistant("player"))
+function RaidFrame:CanControlRaid()
+    return UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")
 end
 
 --- Check if player is raid leader
-function RaidFrame:IsRaidLeader() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:IsRaidLeader file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1575:0");
-    return Perfy_Trace_Passthrough("Leave", "RaidFrame:IsRaidLeader file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1575:0", UnitIsGroupLeader("player"))
+function RaidFrame:IsRaidLeader()
+    return UnitIsGroupLeader("player")
 end
 
 --- Convert to raid
-function RaidFrame:ConvertToRaid() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:ConvertToRaid file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1580:0");
+function RaidFrame:ConvertToRaid()
     if not IsInGroup() then
-        Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:ConvertToRaid file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1580:0"); return false
+        return false
     end
     
     if IsInRaid() then
-        Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:ConvertToRaid file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1580:0"); return false  -- Already in raid
+        return false  -- Already in raid
     end
     
     C_PartyInfo.ConvertToRaid()
-    Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:ConvertToRaid file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1580:0"); return true
+    return true
 end
 
 --- Convert to party
-function RaidFrame:ConvertToParty() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:ConvertToParty file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1594:0");
+function RaidFrame:ConvertToParty()
     if not IsInRaid() then
-        Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:ConvertToParty file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1594:0"); return false
+        return false
     end
     
     if GetNumGroupMembers() > 5 then
-        Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:ConvertToParty file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1594:0"); return false  -- Too many members for party
+        return false  -- Too many members for party
     end
     
     C_PartyInfo.ConvertToParty()
-    Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:ConvertToParty file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1594:0"); return true
+    return true
 end
 
 --- Initiate ready check
-function RaidFrame:DoReadyCheck() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:DoReadyCheck file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1608:0");
+function RaidFrame:DoReadyCheck()
     if not self:CanControlRaid() then
-        Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:DoReadyCheck file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1608:0"); return false
+        return false
     end
     
     DoReadyCheck()
-    Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:DoReadyCheck file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1608:0"); return true
+    return true
 end
 
 --- Initiate role poll
-function RaidFrame:DoRolePoll() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:DoRolePoll file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1618:0");
+function RaidFrame:DoRolePoll()
     if not self:CanControlRaid() then
-        Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:DoRolePoll file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1618:0"); return false
+        return false
     end
     
     InitiateRolePoll()
-    Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:DoRolePoll file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1618:0"); return true
+    return true
 end
 
 --- Set raid difficulty
-function RaidFrame:SetRaidDifficulty(difficultyID) Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:SetRaidDifficulty file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1628:0");
+function RaidFrame:SetRaidDifficulty(difficultyID)
     if not self:IsRaidLeader() then
-        Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:SetRaidDifficulty file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1628:0"); return false
+        return false
     end
     
     SetRaidDifficultyID(difficultyID)
-    Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:SetRaidDifficulty file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1628:0"); return true
+    return true
 end
 
 --- Toggle everyone is assistant
-function RaidFrame:SetEveryoneIsAssistant(enabled) Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:SetEveryoneIsAssistant file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1638:0");
+function RaidFrame:SetEveryoneIsAssistant(enabled)
     if not self:IsRaidLeader() then
-        Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:SetEveryoneIsAssistant file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1638:0"); return false
+        return false
     end
     
     SetEveryoneIsAssistant(enabled)
-    Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:SetEveryoneIsAssistant file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1638:0"); return true
+    return true
 end
 
 --- Check if everyone is assistant
-function RaidFrame:GetEveryoneIsAssistant() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:GetEveryoneIsAssistant file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1648:0");
-    return Perfy_Trace_Passthrough("Leave", "RaidFrame:GetEveryoneIsAssistant file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1648:0", IsEveryoneAssistant())
+function RaidFrame:GetEveryoneIsAssistant()
+    return IsEveryoneAssistant()
 end
 
 -- ========================================
@@ -1654,12 +1654,12 @@ end
 -- ========================================
 
 --- Request saved instance info
-function RaidFrame:RequestInstanceInfo() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:RequestInstanceInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1657:0");
+function RaidFrame:RequestInstanceInfo()
     RequestRaidInfo()
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:RequestInstanceInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1657:0"); end
+end
 
 --- Update saved instances
-function RaidFrame:UpdateSavedInstances() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:UpdateSavedInstances file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1662:0");
+function RaidFrame:UpdateSavedInstances()
     wipe(self.savedInstances)
     
     local numSaved = GetNumSavedInstances()
@@ -1684,16 +1684,16 @@ function RaidFrame:UpdateSavedInstances() Perfy_Trace(Perfy_GetTime(), "Enter", 
             })
         end
     end
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateSavedInstances file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1662:0"); end
+end
 
 --- Extend raid lock
-function RaidFrame:ExtendRaidLock(instanceIndex) Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:ExtendRaidLock file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1690:0");
+function RaidFrame:ExtendRaidLock(instanceIndex)
     if not instanceIndex then
-        Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:ExtendRaidLock file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1690:0"); return false
+        return false
     end
     
     SetSavedInstanceExtend(instanceIndex, true)
-    Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:ExtendRaidLock file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1690:0"); return true
+    return true
 end
 
 -- ========================================
@@ -1701,9 +1701,9 @@ end
 -- ========================================
 
 --- Switch tabs (Roster / Info)
-function RaidFrame:SetTab(tabIndex) Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:SetTab file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1704:0");
+function RaidFrame:SetTab(tabIndex)
     if tabIndex < TAB_MODE_ROSTER or tabIndex > TAB_MODE_INFO then
-        Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:SetTab file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1704:0"); return false
+        return false
     end
     
     self.currentTab = tabIndex
@@ -1713,35 +1713,35 @@ function RaidFrame:SetTab(tabIndex) Perfy_Trace(Perfy_GetTime(), "Enter", "RaidF
         self:RequestInstanceInfo()
     end
     
-    Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:SetTab file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1704:0"); return true
+    return true
 end
 
 --- Get current tab
-function RaidFrame:GetCurrentTab() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:GetCurrentTab file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1720:0");
-    return Perfy_Trace_Passthrough("Leave", "RaidFrame:GetCurrentTab file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1720:0", self.currentTab)
+function RaidFrame:GetCurrentTab()
+    return self.currentTab
 end
 
 -- ========================================
 -- EVENT HANDLERS
 -- ========================================
 
-function RaidFrame:OnRaidRosterUpdate(...) Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:OnRaidRosterUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1728:0");
+function RaidFrame:OnRaidRosterUpdate(...)
     -- Visibility Optimization:
     -- If the frame is hidden, we don't need to fetch data or rebuild the list.
     -- Just mark it as dirty so it updates when shown.
     if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
         needsRenderOnShow = true
-        Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:OnRaidRosterUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1728:0"); return
+        return
     end
 
     -- Event Coalescing (Micro-Throttling)
     if self.updateTimer then
-        Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:OnRaidRosterUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1728:0"); return
+        return
     end
     
     -- Increase delay to 0.1s to ensure WoW API has updated data
     -- This fixes issues where new members aren't visible immediately
-    self.updateTimer = C_Timer.After(0.1, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1744:42");
+    self.updateTimer = C_Timer.After(0.1, function()
         self.updateTimer = nil
         
         -- Immediate update for crisp UI response
@@ -1757,15 +1757,15 @@ function RaidFrame:OnRaidRosterUpdate(...) Perfy_Trace(Perfy_GetTime(), "Enter",
         if BetterRaidFrame_Update then
             BetterRaidFrame_Update()
         end
-    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1744:42"); end)
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:OnRaidRosterUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1728:0"); end
+    end)
+end
 
-function RaidFrame:OnGroupJoined(...) Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:OnGroupJoined file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1763:0");
+function RaidFrame:OnGroupJoined(...)
     -- Use the throttled update to ensure data consistency
     self:OnRaidRosterUpdate(...)
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:OnGroupJoined file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1763:0"); end
+end
 
-function RaidFrame:OnGroupLeft(...) Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:OnGroupLeft file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1768:0");
+function RaidFrame:OnGroupLeft(...)
     -- Clear member list
     wipe(self.raidMembers)
     wipe(self.displayList)
@@ -1779,20 +1779,20 @@ function RaidFrame:OnGroupLeft(...) Perfy_Trace(Perfy_GetTime(), "Enter", "RaidF
     if BetterRaidFrame_Update then
         BetterRaidFrame_Update()
     end
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:OnGroupLeft file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1768:0"); end
+end
 
-function RaidFrame:OnInstanceInfoUpdate(...) Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:OnInstanceInfoUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1784:0");
+function RaidFrame:OnInstanceInfoUpdate(...)
     -- Update saved instances
     self:UpdateSavedInstances()
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:OnInstanceInfoUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1784:0"); end
+end
 
-function RaidFrame:OnDifficultyChanged(...) Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:OnDifficultyChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1789:0");
+function RaidFrame:OnDifficultyChanged(...)
     -- Difficulty changed - update control panel state
     -- UI will refresh on next render
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:OnDifficultyChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1789:0"); end
+end
 
 --- Handle Ready Check start
-function RaidFrame:OnReadyCheck(initiator, timeLeft) Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:OnReadyCheck file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1795:0");
+function RaidFrame:OnReadyCheck(initiator, timeLeft)
     -- Mark all members with their current ready check status
     for _, member in ipairs(self.raidMembers) do
         if member.unit then
@@ -1811,10 +1811,10 @@ function RaidFrame:OnReadyCheck(initiator, timeLeft) Perfy_Trace(Perfy_GetTime()
     
     -- Update all visible buttons
     self:RefreshMemberButtons()
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:OnReadyCheck file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1795:0"); end
+end
 
 --- Handle Ready Check confirmation
-function RaidFrame:OnReadyCheckConfirm(unitTarget, isReady) Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:OnReadyCheckConfirm file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1817:0");
+function RaidFrame:OnReadyCheckConfirm(unitTarget, isReady)
     -- Find member by unit and update status
     for _, member in ipairs(self.raidMembers) do
         if member.unit == unitTarget then
@@ -1827,28 +1827,28 @@ function RaidFrame:OnReadyCheckConfirm(unitTarget, isReady) Perfy_Trace(Perfy_Ge
     
     -- Update all visible buttons
     self:RefreshMemberButtons()
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:OnReadyCheckConfirm file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1817:0"); end
+end
 
 --- Handle Ready Check finished
-function RaidFrame:OnReadyCheckFinished(preempted) Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:OnReadyCheckFinished file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1833:0");
+function RaidFrame:OnReadyCheckFinished(preempted)
     -- Clear ready check status after a delay (like Blizzard does)
-    C_Timer.After(5, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1835:21");
+    C_Timer.After(5, function()
         for _, member in ipairs(self.raidMembers) do
             member.readyStatus = nil
         end
         
         -- Update all visible buttons
         self:RefreshMemberButtons()
-    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1835:21"); end)
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:OnReadyCheckFinished file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1833:0"); end
+    end)
+end
 
 --- Refresh all visible member buttons (for Ready Check updates)
-function RaidFrame:RefreshMemberButtons() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:RefreshMemberButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1846:0");
+function RaidFrame:RefreshMemberButtons()
     local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
-    if not frame then Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:RefreshMemberButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1846:0"); return end
+    if not frame then return end
     
     local groupsContainer = frame.GroupsInset and frame.GroupsInset.GroupsContainer
-    if not groupsContainer then Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:RefreshMemberButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1846:0"); return end
+    if not groupsContainer then return end
     
     -- Update each group's buttons
     for groupIndex = 1, 8 do
@@ -1871,14 +1871,14 @@ function RaidFrame:RefreshMemberButtons() Perfy_Trace(Perfy_GetTime(), "Enter", 
             end
         end
     end
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:RefreshMemberButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1846:0"); end
+end
 
 -- ========================================
 -- PHASE 8.2: MULTI-SELECT EVENT HANDLERS
 -- ========================================
 
 --- Handle combat start - clear all multi-selections
-function RaidFrame:OnCombatStart() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:OnCombatStart file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1881:0");
+function RaidFrame:OnCombatStart()
     -- Clear selections via global function in RaidFrameCallbacks.lua
     if BetterRaidFrame_SelectedPlayers and #BetterRaidFrame_SelectedPlayers > 0 then
         -- Clear visual highlights
@@ -1895,7 +1895,7 @@ function RaidFrame:OnCombatStart() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFr
             1.0, 0.8, 0.0, 1.0
         )
     end
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:OnCombatStart file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1881:0"); end
+end
 
 -- ========================================
 -- PROFESSIONAL MOCK SYSTEM (Debug/Testing)
@@ -1995,10 +1995,10 @@ RaidFrame.mockConfig = {
 	@param options: Additional options (online, isDead, zone, raidRole)
 	@return: Member data table
 ]]
-local function CreateMockMember(index, name, classInfo, subgroup, role, rank, options) Perfy_Trace(Perfy_GetTime(), "Enter", "CreateMockMember file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1998:6");
+local function CreateMockMember(index, name, classInfo, subgroup, role, rank, options)
 	options = options or {}
 	
-	return Perfy_Trace_Passthrough("Leave", "CreateMockMember file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:1998:6", {
+	return {
 		index = index,
 		name = name,
 		rank = rank or 0,
@@ -2017,7 +2017,7 @@ local function CreateMockMember(index, name, classInfo, subgroup, role, rank, op
 		-- Mock metadata
 		_isMock = true,
 		_created = GetTime(),
-	})
+	}
 end
 
 --[[
@@ -2025,7 +2025,7 @@ end
 	@param numMembers: Total members (10, 20, 25, or 40)
 	@return: Array of member data
 ]]
-local function GenerateRaidComposition(numMembers) Perfy_Trace(Perfy_GetTime(), "Enter", "GenerateRaidComposition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2028:6");
+local function GenerateRaidComposition(numMembers)
 	local members = {}
 	local usedNames = {}
 	
@@ -2050,7 +2050,7 @@ local function GenerateRaidComposition(numMembers) Perfy_Trace(Perfy_GetTime(), 
 	end
 	
 	-- Helper: Get unique name
-	local function getUniqueName() Perfy_Trace(Perfy_GetTime(), "Enter", "getUniqueName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2053:7");
+	local function getUniqueName()
 		local name
 		local attempts = 0
 		repeat
@@ -2063,11 +2063,11 @@ local function GenerateRaidComposition(numMembers) Perfy_Trace(Perfy_GetTime(), 
 			end
 		until not usedNames[name]
 		usedNames[name] = true
-		Perfy_Trace(Perfy_GetTime(), "Leave", "getUniqueName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2053:7"); return name
+		return name
 	end
 	
 	-- Helper: Get class for role
-	local function getClassForRole(role) Perfy_Trace(Perfy_GetTime(), "Enter", "getClassForRole file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2070:7");
+	local function getClassForRole(role)
 		local validClasses = {}
 		for _, classInfo in ipairs(MOCK_CLASSES) do
 			for _, classRole in ipairs(classInfo.roles) do
@@ -2077,7 +2077,7 @@ local function GenerateRaidComposition(numMembers) Perfy_Trace(Perfy_GetTime(), 
 				end
 			end
 		end
-		return Perfy_Trace_Passthrough("Leave", "getClassForRole file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2070:7", validClasses[math.random(#validClasses)])
+		return validClasses[math.random(#validClasses)]
 	end
 	
 	local index = 1
@@ -2146,7 +2146,7 @@ local function GenerateRaidComposition(numMembers) Perfy_Trace(Perfy_GetTime(), 
 		end
 	end
 	
-	Perfy_Trace(Perfy_GetTime(), "Leave", "GenerateRaidComposition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2028:6"); return members
+	return members
 end
 
 -- ============================================
@@ -2156,7 +2156,7 @@ end
 --[[
 	Create standard 25-player raid (Heroic/Normal)
 ]]
-function RaidFrame:CreateMockPreset_Standard() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:CreateMockPreset_Standard file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2159:0");
+function RaidFrame:CreateMockPreset_Standard()
 	self:ClearMockData()
 	self.mockEnabled = true
 	
@@ -2168,12 +2168,12 @@ function RaidFrame:CreateMockPreset_Standard() Perfy_Trace(Perfy_GetTime(), "Ent
 	print("|cff00ff00BFL RaidFrame:|r " .. BFL.L.RAID_MOCK_CREATED_25)
 	print("  Tanks: 2, Healers: 5, DPS: 18")
 	print("  Leader + 2 Assistants assigned")
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:CreateMockPreset_Standard file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2159:0"); end
+end
 
 --[[
 	Create full 40-player raid (Classic/Large events)
 ]]
-function RaidFrame:CreateMockPreset_Full() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:CreateMockPreset_Full file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2176:0");
+function RaidFrame:CreateMockPreset_Full()
 	self:ClearMockData()
 	self.mockEnabled = true
 	
@@ -2185,12 +2185,12 @@ function RaidFrame:CreateMockPreset_Full() Perfy_Trace(Perfy_GetTime(), "Enter",
 	print("|cff00ff00BFL RaidFrame:|r " .. BFL.L.RAID_MOCK_CREATED_40)
 	print("  Tanks: 2, Healers: 8, DPS: 30")
 	print("  Full scrollbar test!")
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:CreateMockPreset_Full file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2176:0"); end
+end
 
 --[[
 	Create small 10-player raid (Flex minimum)
 ]]
-function RaidFrame:CreateMockPreset_Small() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:CreateMockPreset_Small file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2193:0");
+function RaidFrame:CreateMockPreset_Small()
 	self:ClearMockData()
 	self.mockEnabled = true
 	
@@ -2201,12 +2201,12 @@ function RaidFrame:CreateMockPreset_Small() Perfy_Trace(Perfy_GetTime(), "Enter"
 	
 	print("|cff00ff00BFL RaidFrame:|r " .. BFL.L.RAID_MOCK_CREATED_10)
 	print("  Tanks: 2, Healers: 2, DPS: 6")
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:CreateMockPreset_Small file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2193:0"); end
+end
 
 --[[
 	Create 20-player mythic raid
 ]]
-function RaidFrame:CreateMockPreset_Mythic() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:CreateMockPreset_Mythic file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2209:0");
+function RaidFrame:CreateMockPreset_Mythic()
 	self:ClearMockData()
 	self.mockEnabled = true
 	
@@ -2218,12 +2218,12 @@ function RaidFrame:CreateMockPreset_Mythic() Perfy_Trace(Perfy_GetTime(), "Enter
 	print("|cff00ff00BFL RaidFrame:|r " .. BFL.L.RAID_MOCK_CREATED_MYTHIC)
 	print("  Tanks: 2, Healers: 4, DPS: 14")
 	print("  Mythic composition!")
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:CreateMockPreset_Mythic file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2209:0"); end
+end
 
 --[[
 	Create stress test with rapid changes
 ]]
-function RaidFrame:CreateMockPreset_Stress() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:CreateMockPreset_Stress file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2226:0");
+function RaidFrame:CreateMockPreset_Stress()
 	self:ClearMockData()
 	self.mockEnabled = true
 	
@@ -2237,7 +2237,7 @@ function RaidFrame:CreateMockPreset_Stress() Perfy_Trace(Perfy_GetTime(), "Enter
 	
 	print("|cff00ff00BFL RaidFrame:|r " .. BFL.L.RAID_MOCK_STRESS)
 	print(BFL.L.RAID_WARN_CPU)
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:CreateMockPreset_Stress file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2226:0"); end
+end
 
 -- ============================================
 -- MOCK DATA APPLICATION
@@ -2246,14 +2246,14 @@ Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:CreateMockPreset_Stress file://
 --[[
 	Apply mock data to the UI
 ]]
-function RaidFrame:ApplyMockData() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:ApplyMockData file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2249:0");
+function RaidFrame:ApplyMockData()
 	-- Build display list
 	self:BuildDisplayList()
 	self:UpdateMemberButtons()
 	
 	-- Force UI to show mock raid (bypass IsInRaid() checks)
 	local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
-	if not frame then Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:ApplyMockData file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2249:0"); return end
+	if not frame then return end
 	
 	-- Hide "Not in Raid" text
 	if frame.NotInRaid then
@@ -2273,14 +2273,14 @@ function RaidFrame:ApplyMockData() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFr
 	
 	-- Apply responsive layout
 	self:UpdateGroupLayout()
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:ApplyMockData file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2249:0"); end
+end
 
 --[[
 	Update control panel for mock data
 ]]
-function RaidFrame:UpdateMockControlPanel() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:UpdateMockControlPanel file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2281:0");
+function RaidFrame:UpdateMockControlPanel()
 	local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
-	if not frame or not frame.ControlPanel then Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateMockControlPanel file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2281:0"); return end
+	if not frame or not frame.ControlPanel then return end
 	
 	local controlPanel = frame.ControlPanel
 	
@@ -2325,17 +2325,17 @@ function RaidFrame:UpdateMockControlPanel() Perfy_Trace(Perfy_GetTime(), "Enter"
 	
 	-- Trigger layout update
 	self:UpdateControlPanelLayout()
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:UpdateMockControlPanel file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2281:0"); end
+end
 
 --[[
 	Fix button visuals for mock data
 ]]
-function RaidFrame:FixMockButtonVisuals() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:FixMockButtonVisuals file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2333:0");
+function RaidFrame:FixMockButtonVisuals()
 	local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
-	if not frame then Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:FixMockButtonVisuals file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2333:0"); return end
+	if not frame then return end
 	
 	local groupsContainer = frame.GroupsInset and frame.GroupsInset.GroupsContainer
-	if not groupsContainer then Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:FixMockButtonVisuals file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2333:0"); return end
+	if not groupsContainer then return end
 	
 	for groupIndex = 1, 8 do
 		local groupFrame = groupsContainer["Group" .. groupIndex]
@@ -2386,7 +2386,7 @@ function RaidFrame:FixMockButtonVisuals() Perfy_Trace(Perfy_GetTime(), "Enter", 
 			end
 		end
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:FixMockButtonVisuals file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2333:0"); end
+end
 
 -- ============================================
 -- DYNAMIC UPDATE SYSTEM
@@ -2395,29 +2395,29 @@ Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:FixMockButtonVisuals file://c:\
 --[[
 	Start timer for dynamic mock updates
 ]]
-function RaidFrame:StartMockDynamicUpdates() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:StartMockDynamicUpdates file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2398:0");
+function RaidFrame:StartMockDynamicUpdates()
 	if self.mockUpdateTimer then
 		self.mockUpdateTimer:Cancel()
 	end
 	
-	if not self.mockConfig.dynamicUpdates then Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:StartMockDynamicUpdates file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2398:0"); return end
+	if not self.mockConfig.dynamicUpdates then return end
 	
-	self.mockUpdateTimer = C_Timer.NewTicker(self.mockConfig.updateInterval, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2405:74");
+	self.mockUpdateTimer = C_Timer.NewTicker(self.mockConfig.updateInterval, function()
 		self:ProcessMockDynamicUpdate()
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2405:74"); end)
+	end)
 	
 	-- BFL:DebugPrint("|cff00ff00RaidFrame Mock:|r Dynamic updates started (interval: " .. self.mockConfig.updateInterval .. "s)")
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:StartMockDynamicUpdates file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2398:0"); end
+end
 
 --[[
 	Process one cycle of dynamic updates
 ]]
-function RaidFrame:ProcessMockDynamicUpdate() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:ProcessMockDynamicUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2415:0");
-	if not self.mockEnabled or not self.mockConfig.dynamicUpdates then Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:ProcessMockDynamicUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2415:0"); return end
+function RaidFrame:ProcessMockDynamicUpdate()
+	if not self.mockEnabled or not self.mockConfig.dynamicUpdates then return end
 	
 	-- Safety check: Need at least 3 members for meaningful updates
 	local memberCount = #self.raidMembers
-	if memberCount < 3 then Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:ProcessMockDynamicUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2415:0"); return end
+	if memberCount < 3 then return end
 	
 	local updated = false
 	local updateType = math.random(1, 100)
@@ -2481,7 +2481,7 @@ function RaidFrame:ProcessMockDynamicUpdate() Perfy_Trace(Perfy_GetTime(), "Ente
 		self:FixMockButtonVisuals()
 		self:UpdateMockControlPanel()
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:ProcessMockDynamicUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2415:0"); end
+end
 
 -- ============================================
 -- EVENT SIMULATION
@@ -2490,10 +2490,10 @@ Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:ProcessMockDynamicUpdate file:/
 --[[
 	Simulate a ready check
 ]]
-function RaidFrame:SimulateReadyCheck() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:SimulateReadyCheck file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2493:0");
+function RaidFrame:SimulateReadyCheck()
 	if not self.mockEnabled or #self.raidMembers == 0 then
 		print(BFL.L.RAID_NO_MOCK_DATA)
-		Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:SimulateReadyCheck file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2493:0"); return
+		return
 	end
 	
 	print("|cff00ff00BFL RaidFrame:|r " .. BFL.L.RAID_SIM_READY_CHECK)
@@ -2517,8 +2517,8 @@ function RaidFrame:SimulateReadyCheck() Perfy_Trace(Perfy_GetTime(), "Enter", "R
 	for i, member in ipairs(self.raidMembers) do
 		if member.online then
 			local delay = math.random(1, 80) / 10  -- 0.1 to 8.0 seconds
-			C_Timer.After(delay, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2520:24");
-				if not self.mockEnabled then Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2520:24"); return end
+			C_Timer.After(delay, function()
+				if not self.mockEnabled then return end
 				
 				-- 90% ready, 10% not ready
 				if math.random(1, 100) <= 90 then
@@ -2527,13 +2527,13 @@ function RaidFrame:SimulateReadyCheck() Perfy_Trace(Perfy_GetTime(), "Enter", "R
 					member.readyStatus = "notready"
 				end
 				self:RefreshMemberButtons()
-			Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2520:24"); end)
+			end)
 		end
 	end
 	
 	-- Clear ready check after duration
-	C_Timer.After(self.mockConfig.readyCheckDuration, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2535:51");
-		if not self.mockEnabled then Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2535:51"); return end
+	C_Timer.After(self.mockConfig.readyCheckDuration, function()
+		if not self.mockEnabled then return end
 		
 		local ready, notReady = 0, 0
 		for _, member in ipairs(self.raidMembers) do
@@ -2547,16 +2547,16 @@ function RaidFrame:SimulateReadyCheck() Perfy_Trace(Perfy_GetTime(), "Enter", "R
 		self:RefreshMemberButtons()
 		
 		print(string.format("|cff00ff00BFL RaidFrame:|r Ready Check finished: %d ready, %d not ready", ready, notReady))
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2535:51"); end)
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:SimulateReadyCheck file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2493:0"); end
+	end)
+end
 
 --[[
 	Simulate role changes
 ]]
-function RaidFrame:SimulateRoleChanges() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:SimulateRoleChanges file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2556:0");
+function RaidFrame:SimulateRoleChanges()
 	if not self.mockEnabled or #self.raidMembers == 0 then
 		print(BFL.L.RAID_NO_MOCK_DATA)
-		Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:SimulateRoleChanges file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2556:0"); return
+		return
 	end
 	
 	local changed = 0
@@ -2588,15 +2588,15 @@ function RaidFrame:SimulateRoleChanges() Perfy_Trace(Perfy_GetTime(), "Enter", "
 	self:UpdateMockControlPanel()
 	
 	print(string.format("|cff00ff00BFL RaidFrame:|r Simulated %d role changes", changed))
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:SimulateRoleChanges file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2556:0"); end
+end
 
 --[[
 	Simulate group moves (shuffle players)
 ]]
-function RaidFrame:SimulateGroupMoves() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:SimulateGroupMoves file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2596:0");
+function RaidFrame:SimulateGroupMoves()
 	if not self.mockEnabled or #self.raidMembers == 0 then
 		print(BFL.L.RAID_NO_MOCK_DATA)
-		Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:SimulateGroupMoves file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2596:0"); return
+		return
 	end
 	
 	local numGroups = math.ceil(#self.raidMembers / 5)
@@ -2618,7 +2618,7 @@ function RaidFrame:SimulateGroupMoves() Perfy_Trace(Perfy_GetTime(), "Enter", "R
 	self:FixMockButtonVisuals()
 	
 	print(string.format("|cff00ff00BFL RaidFrame:|r Moved %d players to different groups", moved))
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:SimulateGroupMoves file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2596:0"); end
+end
 
 -- ============================================
 -- MOCK DATA MANAGEMENT
@@ -2627,7 +2627,7 @@ Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:SimulateGroupMoves file://c:\\P
 --[[
 	Clear all mock data and stop timers
 ]]
-function RaidFrame:ClearMockData() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:ClearMockData file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2630:0");
+function RaidFrame:ClearMockData()
 	-- Stop dynamic update timer
 	if self.mockUpdateTimer then
 		self.mockUpdateTimer:Cancel()
@@ -2675,7 +2675,7 @@ function RaidFrame:ClearMockData() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFr
 	
 	-- BFL:DebugPrint("|cff00ff00RaidFrame Mock:|r Cleared all mock data")
 	print("|cff00ff00BFL RaidFrame:|r " .. BFL.L.RAID_MOCK_CLEARED)
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:ClearMockData file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2630:0"); end
+end
 
 -- ============================================
 -- SLASH COMMAND HANDLER
@@ -2684,11 +2684,11 @@ Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:ClearMockData file://c:\\Progra
 -- Legacy slash command (redirects to /bfl raid)
 SLASH_BFLMOCKRAID1 = "/bflmock"
 SLASH_BFLRAIDFRAME1 = "/bflraid"
-SlashCmdList["BFLMOCKRAID"] = function(msg) Perfy_Trace(Perfy_GetTime(), "Enter", "SlashCmdList.BFLMOCKRAID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2687:30");
+SlashCmdList["BFLMOCKRAID"] = function(msg)
 	SlashCmdList["BFLRAIDFRAME"](msg)
-Perfy_Trace(Perfy_GetTime(), "Leave", "SlashCmdList.BFLMOCKRAID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2687:30"); end
+end
 
-SlashCmdList["BFLRAIDFRAME"] = function(msg) Perfy_Trace(Perfy_GetTime(), "Enter", "SlashCmdList.BFLRAIDFRAME file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2691:31");
+SlashCmdList["BFLRAIDFRAME"] = function(msg)
 	local args = {}
 	for word in msg:gmatch("%S+") do
 		table.insert(args, word)
@@ -2796,12 +2796,12 @@ SlashCmdList["BFLRAIDFRAME"] = function(msg) Perfy_Trace(Perfy_GetTime(), "Enter
 		print(BFL.L.RAID_CMD_LIST)
 		print(BFL.L.CORE_HELP_RAID_CLEAR)
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "SlashCmdList.BFLRAIDFRAME file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2691:31"); end
+end
 
 -- Keep old CreateMockRaidData for backwards compatibility
-function RaidFrame:CreateMockRaidData() Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame:CreateMockRaidData file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2802:0");
+function RaidFrame:CreateMockRaidData()
 	self:CreateMockPreset_Standard()
-Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:CreateMockRaidData file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua:2802:0"); end
+end
 
 -- ========================================
 -- PUBLIC API SUMMARY
@@ -2842,4 +2842,4 @@ Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame:CreateMockRaidData file://c:\\P
     - /bflmock raid - Slash command
 ]]
 
-Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RaidFrame.lua"); return RaidFrame
+return RaidFrame

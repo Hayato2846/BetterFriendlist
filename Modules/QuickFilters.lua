@@ -1,4 +1,4 @@
---[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua"); -- Modules/QuickFilters.lua
+-- Modules/QuickFilters.lua
 -- Quick Filters System Module
 -- Manages the quick filter dropdown and filter state
 
@@ -14,8 +14,8 @@ local L = BFL.L
 -- Module Dependencies
 -- ========================================
 
-local function GetFriendsList() Perfy_Trace(Perfy_GetTime(), "Enter", "GetFriendsList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:17:6");
-	return Perfy_Trace_Passthrough("Leave", "GetFriendsList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:17:6", BFL:GetModule("FriendsList"))
+local function GetFriendsList()
+	return BFL:GetModule("FriendsList")
 end
 
 -- ========================================
@@ -41,37 +41,37 @@ local filterMode = "all"
 -- ========================================
 
 -- Initialize (called from ADDON_LOADED)
-function QuickFilters:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickFilters:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:44:0");
+function QuickFilters:Initialize()
 	-- Load current filter from database
 	if BetterFriendlistDB and BetterFriendlistDB.quickFilter then
 		filterMode = BetterFriendlistDB.quickFilter
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "QuickFilters:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:44:0"); end
+end
 
 -- Initialize Quick Filter Dropdown
-function QuickFilters:InitDropdown(dropdown) Perfy_Trace(Perfy_GetTime(), "Enter", "QuickFilters:InitDropdown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:52:0");
-	if not dropdown then Perfy_Trace(Perfy_GetTime(), "Leave", "QuickFilters:InitDropdown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:52:0"); return end
+function QuickFilters:InitDropdown(dropdown)
+	if not dropdown then return end
 	
 	-- Classic mode: Use UIDropDownMenu
 	if BFL.IsClassic or not BFL.HasModernDropdown then
 		-- BFL:DebugPrint("|cff00ffffQuickFilters:|r Classic mode - using UIDropDownMenu for Quick Filter dropdown")
 		
 		UIDropDownMenu_SetWidth(dropdown, 70)
-		UIDropDownMenu_Initialize(dropdown, function(self, level) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:60:38");
+		UIDropDownMenu_Initialize(dropdown, function(self, level)
 			local info = UIDropDownMenu_CreateInfo()
 			
-			local function AddFilterOption(mode, label, icon) Perfy_Trace(Perfy_GetTime(), "Enter", "AddFilterOption file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:63:9");
+			local function AddFilterOption(mode, label, icon)
 				info.text = string.format("|T%s:14:14:0:0|t %s", icon, label)
 				info.value = mode
-				info.func = function() Perfy_Trace(Perfy_GetTime(), "Enter", "info.func file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:66:16");
+				info.func = function()
 					QuickFilters:SetFilter(mode)
 					UIDropDownMenu_SetText(dropdown, string.format("|T%s:14:14:-2:-2|t", icon))
-				Perfy_Trace(Perfy_GetTime(), "Leave", "info.func file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:66:16"); end
+				end
 				-- CRITICAL: Read from DB for checked state, not local variable
 				local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
 				info.checked = (currentFilter == mode)
 				UIDropDownMenu_AddButton(info)
-			Perfy_Trace(Perfy_GetTime(), "Leave", "AddFilterOption file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:63:9"); end
+			end
 			
 			AddFilterOption("all", L.FILTER_ALL, FILTER_ICONS.all)
 			AddFilterOption("online", L.FILTER_ONLINE, FILTER_ICONS.online)
@@ -80,7 +80,7 @@ function QuickFilters:InitDropdown(dropdown) Perfy_Trace(Perfy_GetTime(), "Enter
 			AddFilterOption("bnet", L.FILTER_BNET, FILTER_ICONS.bnet)
 			AddFilterOption("hideafk", L.FILTER_HIDE_AFK, FILTER_ICONS.hideafk)
 			AddFilterOption("retail", L.FILTER_RETAIL, FILTER_ICONS.retail)
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:60:38"); end)
+		end)
 		
 		-- Set initial selected text (read from DB, not local variable)
 		local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
@@ -94,57 +94,57 @@ function QuickFilters:InitDropdown(dropdown) Perfy_Trace(Perfy_GetTime(), "Enter
 		local button = buttonName and _G[buttonName]
 		
 		if button then
-			button:HookScript("OnEnter", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:97:32");
+			button:HookScript("OnEnter", function()
 				local filterText = QuickFilters:GetFilterText()
 				
 				GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
 				GameTooltip:SetText(L.TOOLTIP_QUICK_FILTER .. filterText)
 				GameTooltip:Show()
-			Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:97:32"); end)
+			end)
 			button:HookScript("OnLeave", GameTooltip_Hide)
 		else
-			dropdown:SetScript("OnEnter", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:106:33");
+			dropdown:SetScript("OnEnter", function()
 				local filterText = QuickFilters:GetFilterText()
 				
 				GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
 				GameTooltip:SetText(L.TOOLTIP_QUICK_FILTER .. filterText)
 				GameTooltip:Show()
-			Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:106:33"); end)
+			end)
 			dropdown:SetScript("OnLeave", GameTooltip_Hide)
 		end
 		
-		Perfy_Trace(Perfy_GetTime(), "Leave", "QuickFilters:InitDropdown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:52:0"); return
+		return
 	end
 	
 	-- Helper function to check if a filter mode is selected
 	-- IMPORTANT: Read from DB to stay in sync with external changes (e.g., Broker middle click)
-	local function IsSelected(mode) Perfy_Trace(Perfy_GetTime(), "Enter", "IsSelected file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:121:7");
+	local function IsSelected(mode)
 		local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
-		return Perfy_Trace_Passthrough("Leave", "IsSelected file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:121:7", currentFilter == mode)
+		return currentFilter == mode
 	end
 	
 	-- Helper function to set the filter mode
-	local function SetSelected(mode) Perfy_Trace(Perfy_GetTime(), "Enter", "SetSelected file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:127:7");
+	local function SetSelected(mode)
 		-- CRITICAL: Read from DB to prevent race conditions
 		-- Using local filterMode variable can lead to stale comparisons when events fire during dropdown changes
 		local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
 		if mode ~= currentFilter then
 			self:SetFilter(mode)
 		end
-	Perfy_Trace(Perfy_GetTime(), "Leave", "SetSelected file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:127:7"); end
+	end
 	
 	-- Helper function to create radio button with icon
-	local function CreateRadio(rootDescription, text, mode) Perfy_Trace(Perfy_GetTime(), "Enter", "CreateRadio file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:137:7");
-		local radio = rootDescription:CreateButton(text, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:138:51"); Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:138:51"); end, mode)
+	local function CreateRadio(rootDescription, text, mode)
+		local radio = rootDescription:CreateButton(text, function() end, mode)
 		radio:SetIsSelected(IsSelected)
 		radio:SetResponder(SetSelected)
-	Perfy_Trace(Perfy_GetTime(), "Leave", "CreateRadio file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:137:7"); end
+	end
 	
 	-- Set dropdown width (same as StatusDropdown)
 	dropdown:SetWidth(51)
 	
 	-- Setup the dropdown menu
-	dropdown:SetupMenu(function(dropdown, rootDescription) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:147:20");
+	dropdown:SetupMenu(function(dropdown, rootDescription)
 		rootDescription:SetTag("MENU_FRIENDS_QUICKFILTER")
 		
 		-- Format for icon + text in menu (with vertical offset +2)
@@ -171,27 +171,27 @@ function QuickFilters:InitDropdown(dropdown) Perfy_Trace(Perfy_GetTime(), "Enter
 		
 		local retailText = string.format(optionText, FILTER_ICONS.retail, L.FILTER_RETAIL)
 		CreateRadio(rootDescription, retailText, "retail")
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:147:20"); end)
+	end)
 	
 	-- SetSelectionTranslator: Shows only the icon (with vertical offset +2)
-	dropdown:SetSelectionTranslator(function(selection) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:177:33");
-		return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:177:33", string.format("\124T%s:16:16:0:2\124t", FILTER_ICONS[selection.data]))
+	dropdown:SetSelectionTranslator(function(selection)
+		return string.format("\124T%s:16:16:0:2\124t", FILTER_ICONS[selection.data])
 	end)
 	
 	-- Setup tooltip
-	dropdown:SetScript("OnEnter", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:182:31");
+	dropdown:SetScript("OnEnter", function()
 		local filterText = self:GetFilterText()
 		
 		GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
 		GameTooltip:SetText(string.format(L.TOOLTIP_QUICK_FILTER or "Quick Filter: %s", filterText))
 		GameTooltip:Show()
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:182:31"); end)
+	end)
 	
 	dropdown:SetScript("OnLeave", GameTooltip_Hide)
-Perfy_Trace(Perfy_GetTime(), "Leave", "QuickFilters:InitDropdown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:52:0"); end
+end
 
 -- Set the quick filter mode
-function QuickFilters:SetFilter(mode) Perfy_Trace(Perfy_GetTime(), "Enter", "QuickFilters:SetFilter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:194:0");
+function QuickFilters:SetFilter(mode)
 	-- Update database FIRST to ensure consistency
 	if BetterFriendlistDB then
 		BetterFriendlistDB.quickFilter = mode
@@ -207,20 +207,20 @@ function QuickFilters:SetFilter(mode) Perfy_Trace(Perfy_GetTime(), "Enter", "Qui
 	end
 	
 	-- Return true to indicate filter changed (caller should refresh display)
-	Perfy_Trace(Perfy_GetTime(), "Leave", "QuickFilters:SetFilter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:194:0"); return true
+	return true
 end
 
 -- Get current filter mode
-function QuickFilters:GetFilter() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickFilters:GetFilter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:214:0");
+function QuickFilters:GetFilter()
 	-- ALWAYS read from DB for consistency
 	local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
 	-- Update local cache
 	filterMode = currentFilter
-	Perfy_Trace(Perfy_GetTime(), "Leave", "QuickFilters:GetFilter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:214:0"); return currentFilter
+	return currentFilter
 end
 
 -- Get filter text for UI display
-function QuickFilters:GetFilterText() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickFilters:GetFilterText file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:223:0");
+function QuickFilters:GetFilterText()
 	-- ALWAYS read from DB to ensure correct text after external changes (e.g., Broker)
 	local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or filterMode
 	
@@ -233,18 +233,18 @@ function QuickFilters:GetFilterText() Perfy_Trace(Perfy_GetTime(), "Enter", "Qui
 		hideafk = L.FILTER_HIDE_AFK,
 		retail = L.FILTER_RETAIL,
 	}
-	return Perfy_Trace_Passthrough("Leave", "QuickFilters:GetFilterText file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:223:0", filterTexts[currentFilter] or L.FILTER_ALL)
+	return filterTexts[currentFilter] or L.FILTER_ALL
 end
 
 -- Get filter icons table
-function QuickFilters:GetIcons() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickFilters:GetIcons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:240:0");
-	Perfy_Trace(Perfy_GetTime(), "Leave", "QuickFilters:GetIcons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:240:0"); return FILTER_ICONS
+function QuickFilters:GetIcons()
+	return FILTER_ICONS
 end
 
 -- Refresh the dropdown display (icon) based on current filter
 -- Called when filter changes externally (e.g. via Broker)
-function QuickFilters:RefreshDropdown(dropdown) Perfy_Trace(Perfy_GetTime(), "Enter", "QuickFilters:RefreshDropdown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:246:0");
-	if not dropdown then Perfy_Trace(Perfy_GetTime(), "Leave", "QuickFilters:RefreshDropdown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:246:0"); return end
+function QuickFilters:RefreshDropdown(dropdown)
+	if not dropdown then return end
 	
 	-- Get current filter from DB
 	local currentFilter = self:GetFilter()
@@ -264,6 +264,4 @@ function QuickFilters:RefreshDropdown(dropdown) Perfy_Trace(Perfy_GetTime(), "En
 			dropdown:SetText(text)
 		end
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "QuickFilters:RefreshDropdown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua:246:0"); end
-
-Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickFilters.lua");
+end

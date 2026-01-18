@@ -1,4 +1,4 @@
---[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Locales/zhTW.lua"); -- Locales/zhTW.lua
+-- Locales/zhTW.lua
 -- Chinese Traditional (繁體中文) Localization
 
 local L = BFL_LOCALE
@@ -1168,5 +1168,3 @@ if GetLocale() == "zhTW" then
 	L.UNKNOWN_ERROR = "未知錯誤"
 	L.UNKNOWN_GAME = "未知遊戲"
 end
-
-Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Locales/zhTW.lua");

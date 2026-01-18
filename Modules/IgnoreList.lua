@@ -1,4 +1,4 @@
---[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua"); -- Modules/IgnoreList.lua
+-- Modules/IgnoreList.lua
 -- Ignore List System Module
 -- Manages the ignore list window, player selection, and unignore functionality
 
@@ -22,12 +22,12 @@ local IgnoreList = BFL:RegisterModule("IgnoreList", {})
 -- ========================================
 
 -- Initialize (called from ADDON_LOADED)
-function IgnoreList:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "IgnoreList:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:25:0");
+function IgnoreList:Initialize()
 	-- Nothing to initialize yet
-Perfy_Trace(Perfy_GetTime(), "Leave", "IgnoreList:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:25:0"); end
+end
 
 -- Initialize Ignore List Window (FriendsIgnoreListMixin:OnLoad)
-function IgnoreList:OnLoad(frame) Perfy_Trace(Perfy_GetTime(), "Enter", "IgnoreList:OnLoad file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:30:0");
+function IgnoreList:OnLoad(frame)
 	-- Set up frame visuals matching Blizzard's InitializeFrameVisuals
 	ButtonFrameTemplate_HidePortrait(frame)
 	frame:SetTitle(IGNORE_LIST)
@@ -60,27 +60,27 @@ function IgnoreList:OnLoad(frame) Perfy_Trace(Perfy_GetTime(), "Enter", "IgnoreL
 	if BFL.IsClassic or not BFL.HasModernScrollBox then
 		-- BFL:DebugPrint("|cff00ffffIgnoreList:|r Using Classic FauxScrollFrame mode")
 		self:InitializeClassicIgnoreList(frame)
-		Perfy_Trace(Perfy_GetTime(), "Leave", "IgnoreList:OnLoad file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:30:0"); return
+		return
 	end
 	
 	-- Retail: Initialize ScrollBox with element factory (exact Blizzard implementation)
 	-- BFL:DebugPrint("|cff00ffffIgnoreList:|r Using Retail ScrollBox mode")
 	local scrollBoxView = CreateScrollBoxListLinearView()
-	scrollBoxView:SetElementFactory(function(factory, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:69:33");
+	scrollBoxView:SetElementFactory(function(factory, elementData)
 		if elementData.header then
 			factory(elementData.header)
 		else
-			factory("BetterIgnoreListButtonTemplate", function(button, data) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:73:45");
+			factory("BetterIgnoreListButtonTemplate", function(button, data)
 				IgnoreList:InitButton(button, data)
-			Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:73:45"); end)
+			end)
 		end
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:69:33"); end)
+	end)
 	
 	ScrollUtil.InitScrollBoxListWithScrollBar(frame.ScrollBox, frame.ScrollBar, scrollBoxView)
-Perfy_Trace(Perfy_GetTime(), "Leave", "IgnoreList:OnLoad file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:30:0"); end
+end
 
 -- Initialize Classic IgnoreList FauxScrollFrame
-function IgnoreList:InitializeClassicIgnoreList(frame) Perfy_Trace(Perfy_GetTime(), "Enter", "IgnoreList:InitializeClassicIgnoreList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:83:0");
+function IgnoreList:InitializeClassicIgnoreList(frame)
 	self.classicIgnoreFrame = frame
 	self.classicIgnoreButtonPool = {}
 	self.classicIgnoreDataList = {}
@@ -114,20 +114,20 @@ function IgnoreList:InitializeClassicIgnoreList(frame) Perfy_Trace(Perfy_GetTime
 		scrollBar:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -4, 16)
 		-- Adjust width slightly if needed, template usually handles it
 		
-		scrollBar:SetScript("OnValueChanged", function(self, value) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:117:40");
+		scrollBar:SetScript("OnValueChanged", function(self, value)
 			IgnoreList:RenderClassicIgnoreButtons()
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:117:40"); end)
+		end)
 		
 		-- Set value AFTER scripts are registered (Classic requirement)
 		scrollBar:SetValue(0)
 		
 		parent.ClassicScrollBar = scrollBar
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "IgnoreList:InitializeClassicIgnoreList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:83:0"); end
+end
 
 -- Render Classic Ignore buttons
-function IgnoreList:RenderClassicIgnoreButtons() Perfy_Trace(Perfy_GetTime(), "Enter", "IgnoreList:RenderClassicIgnoreButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:129:0");
-	if not self.classicIgnoreButtonPool then Perfy_Trace(Perfy_GetTime(), "Leave", "IgnoreList:RenderClassicIgnoreButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:129:0"); return end
+function IgnoreList:RenderClassicIgnoreButtons()
+	if not self.classicIgnoreButtonPool then return end
 	
 	local dataList = self.classicIgnoreDataList or {}
 	local numItems = #dataList
@@ -160,10 +160,10 @@ function IgnoreList:RenderClassicIgnoreButtons() Perfy_Trace(Perfy_GetTime(), "E
 			button:Hide()
 		end
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "IgnoreList:RenderClassicIgnoreButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:129:0"); end
+end
 
 -- Initialize a button in the ignore list (exact Blizzard implementation)
-function IgnoreList:InitButton(button, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "IgnoreList:InitButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:166:0");
+function IgnoreList:InitButton(button, elementData)
 	button.index = elementData.index
 
 	if elementData.squelchType == SQUELCH_TYPE_IGNORE then
@@ -183,10 +183,10 @@ function IgnoreList:InitButton(button, elementData) Perfy_Trace(Perfy_GetTime(),
 	local selectedSquelchType, selectedSquelchIndex = self:GetSelected()
 	local selected = (selectedSquelchType == button.type) and (selectedSquelchIndex == button.index)
 	self:SetButtonSelected(button, selected)
-Perfy_Trace(Perfy_GetTime(), "Leave", "IgnoreList:InitButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:166:0"); end
+end
 
 -- Get current selection (exact Blizzard implementation)
-function IgnoreList:GetSelected() Perfy_Trace(Perfy_GetTime(), "Enter", "IgnoreList:GetSelected file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:189:0");
+function IgnoreList:GetSelected()
 	local selectedSquelchType = BetterFriendsFrame.selectedSquelchType
 	local selectedSquelchIndex = 0
 	if selectedSquelchType == SQUELCH_TYPE_IGNORE then
@@ -194,22 +194,22 @@ function IgnoreList:GetSelected() Perfy_Trace(Perfy_GetTime(), "Enter", "IgnoreL
 	elseif selectedSquelchType == SQUELCH_TYPE_BLOCK_INVITE then
 		selectedSquelchIndex = BNGetSelectedBlock()
 	end
-	Perfy_Trace(Perfy_GetTime(), "Leave", "IgnoreList:GetSelected file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:189:0"); return selectedSquelchType, selectedSquelchIndex
+	return selectedSquelchType, selectedSquelchIndex
 end
 
 -- Set button selection state (exact Blizzard implementation)
-function IgnoreList:SetButtonSelected(button, selected) Perfy_Trace(Perfy_GetTime(), "Enter", "IgnoreList:SetButtonSelected file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:201:0");
+function IgnoreList:SetButtonSelected(button, selected)
 	if selected then
 		button:LockHighlight()
 	else
 		button:UnlockHighlight()
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "IgnoreList:SetButtonSelected file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:201:0"); end
+end
 
 -- Update the ignore list display (exact Blizzard implementation)
-function IgnoreList:Update() Perfy_Trace(Perfy_GetTime(), "Enter", "IgnoreList:Update file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:210:0");
+function IgnoreList:Update()
 	if not BetterFriendsFrame or not BetterFriendsFrame.IgnoreListWindow then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "IgnoreList:Update file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:210:0"); return
+		return
 	end
 	
 	-- Build data list for both modes
@@ -265,10 +265,10 @@ function IgnoreList:Update() Perfy_Trace(Perfy_GetTime(), "Enter", "IgnoreList:U
 	end
 
 	BetterFriendsFrame.IgnoreListWindow.UnignorePlayerButton:SetEnabled(hasSelection)
-Perfy_Trace(Perfy_GetTime(), "Leave", "IgnoreList:Update file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:210:0"); end
+end
 
 -- Select a squelched player (exact Blizzard implementation)
-function IgnoreList:SelectSquelched(squelchType, index) Perfy_Trace(Perfy_GetTime(), "Enter", "IgnoreList:SelectSquelched file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:271:0");
+function IgnoreList:SelectSquelched(squelchType, index)
 	local oldSquelchType, oldSquelchIndex = self:GetSelected()
 
 	if squelchType == SQUELCH_TYPE_IGNORE then
@@ -278,7 +278,7 @@ function IgnoreList:SelectSquelched(squelchType, index) Perfy_Trace(Perfy_GetTim
 	end
 	BetterFriendsFrame.selectedSquelchType = squelchType
 
-	local function UpdateButtonSelection(type, index, selected) Perfy_Trace(Perfy_GetTime(), "Enter", "UpdateButtonSelection file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:281:7");
+	local function UpdateButtonSelection(type, index, selected)
 		local button = nil
 		
 		-- Classic mode: Manual iteration through button pool
@@ -293,22 +293,22 @@ function IgnoreList:SelectSquelched(squelchType, index) Perfy_Trace(Perfy_GetTim
 			end
 		else
 			-- Retail mode: Use FindFrameByPredicate
-			button = BetterFriendsFrame.IgnoreListWindow.ScrollBox:FindFrameByPredicate(function(button, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:296:79");
-				return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:296:79", elementData.squelchType == type and elementData.index == index)
+			button = BetterFriendsFrame.IgnoreListWindow.ScrollBox:FindFrameByPredicate(function(button, elementData)
+				return elementData.squelchType == type and elementData.index == index
 			end)
 		end
 		
 		if button then
 			self:SetButtonSelected(button, selected)
 		end
-	Perfy_Trace(Perfy_GetTime(), "Leave", "UpdateButtonSelection file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:281:7"); end
+	end
 
 	UpdateButtonSelection(oldSquelchType, oldSquelchIndex, false)
 	UpdateButtonSelection(squelchType, index, true)
-Perfy_Trace(Perfy_GetTime(), "Leave", "IgnoreList:SelectSquelched file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:271:0"); end
+end
 
 -- Unignore the selected player (exact Blizzard implementation: FriendsFrameUnsquelchButton_OnClick)
-function IgnoreList:Unignore() Perfy_Trace(Perfy_GetTime(), "Enter", "IgnoreList:Unignore file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:311:0");
+function IgnoreList:Unignore()
 	local selectedSquelchType = BetterFriendsFrame.selectedSquelchType
 	if selectedSquelchType == SQUELCH_TYPE_IGNORE then
 		C_FriendList.DelIgnoreByIndex(C_FriendList.GetSelectedIgnore())
@@ -317,34 +317,32 @@ function IgnoreList:Unignore() Perfy_Trace(Perfy_GetTime(), "Enter", "IgnoreList
 		BNSetBlocked(blockID, false)
 	end
 	PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
-Perfy_Trace(Perfy_GetTime(), "Leave", "IgnoreList:Unignore file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:311:0"); end
+end
 
 -- Toggle Ignore List Window visibility (FriendsIgnoreListMixin:ToggleFrame)
-function IgnoreList:Toggle() Perfy_Trace(Perfy_GetTime(), "Enter", "IgnoreList:Toggle file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:323:0");
+function IgnoreList:Toggle()
 	local frame = BetterFriendsFrame
-	if not frame or not frame.IgnoreListWindow then Perfy_Trace(Perfy_GetTime(), "Leave", "IgnoreList:Toggle file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:323:0"); return end
+	if not frame or not frame.IgnoreListWindow then return end
 	
 	frame.IgnoreListWindow:SetShown(not frame.IgnoreListWindow:IsShown())
 	PlaySound(SOUNDKIT.IG_CHAT_EMOTE_BUTTON)
-Perfy_Trace(Perfy_GetTime(), "Leave", "IgnoreList:Toggle file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:323:0"); end
+end
 
 -- ========================================
 -- Global XML Event Handlers
 -- ========================================
 
-function BetterIgnoreListButton_OnClick(button) Perfy_Trace(Perfy_GetTime(), "Enter", "BetterIgnoreListButton_OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:335:0");
+function BetterIgnoreListButton_OnClick(button)
 	local IgnoreList = BFL:GetModule("IgnoreList")
 	if IgnoreList and button.type and button.index then
 		IgnoreList:SelectSquelched(button.type, button.index)
 		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "BetterIgnoreListButton_OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:335:0"); end
+end
 
-function BetterIgnoreList_Unignore() Perfy_Trace(Perfy_GetTime(), "Enter", "BetterIgnoreList_Unignore file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:343:0");
+function BetterIgnoreList_Unignore()
 	local IgnoreList = BFL:GetModule("IgnoreList")
 	if IgnoreList then
 		IgnoreList:Unignore()
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "BetterIgnoreList_Unignore file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua:343:0"); end
-
-Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/IgnoreList.lua");
+end

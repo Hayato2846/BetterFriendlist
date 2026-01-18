@@ -1,4 +1,4 @@
---[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua"); -- Modules/Broker.lua
+-- Modules/Broker.lua
 -- Data Broker Integration Module
 -- Exposes BetterFriendlist via LibDataBroker-1.1 for display addons (Bazooka, ChocolateBar, TitanPanel)
 
@@ -10,12 +10,12 @@ local Broker = BFL:RegisterModule("Broker", {})
 -- ========================================
 -- Module Dependencies
 -- ========================================
-local function GetDB() Perfy_Trace(Perfy_GetTime(), "Enter", "GetDB file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:13:6"); return Perfy_Trace_Passthrough("Leave", "GetDB file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:13:6", BFL:GetModule("DB")) end
-local function GetFriendsList() Perfy_Trace(Perfy_GetTime(), "Enter", "GetFriendsList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:14:6"); return Perfy_Trace_Passthrough("Leave", "GetFriendsList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:14:6", BFL:GetModule("FriendsList")) end
-local function GetGroups() Perfy_Trace(Perfy_GetTime(), "Enter", "GetGroups file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:15:6"); return Perfy_Trace_Passthrough("Leave", "GetGroups file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:15:6", BFL:GetModule("Groups")) end
-local function GetActivityTracker() Perfy_Trace(Perfy_GetTime(), "Enter", "GetActivityTracker file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:16:6"); return Perfy_Trace_Passthrough("Leave", "GetActivityTracker file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:16:6", BFL:GetModule("ActivityTracker")) end
-local function GetStatistics() Perfy_Trace(Perfy_GetTime(), "Enter", "GetStatistics file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:17:6"); return Perfy_Trace_Passthrough("Leave", "GetStatistics file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:17:6", BFL:GetModule("Statistics")) end
-local function GetQuickFilters() Perfy_Trace(Perfy_GetTime(), "Enter", "GetQuickFilters file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:18:6"); return Perfy_Trace_Passthrough("Leave", "GetQuickFilters file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:18:6", BFL:GetModule("QuickFilters")) end
+local function GetDB() return BFL:GetModule("DB") end
+local function GetFriendsList() return BFL:GetModule("FriendsList") end
+local function GetGroups() return BFL:GetModule("Groups") end
+local function GetActivityTracker() return BFL:GetModule("ActivityTracker") end
+local function GetStatistics() return BFL:GetModule("Statistics") end
+local function GetQuickFilters() return BFL:GetModule("QuickFilters") end
 
 -- ========================================
 -- Local Variables
@@ -72,7 +72,7 @@ local GetClientInfo = setmetatable({
 	-- Other
 	SCOR = { icon = 134400, short = "SOT", long = "Sea of Thieves" }
 }, {
-	__call = function(t, clientProgram) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:75:10");
+	__call = function(t, clientProgram)
 		local info = rawget(t, clientProgram)
 		if not info then
 			-- Unknown game - create fallback entry
@@ -91,63 +91,63 @@ local GetClientInfo = setmetatable({
 			info.type = (info.icon == 796351) and "App" or "Game"
 		end
 
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:75:10"); return info
+		return info
 	end
 })
 
 -- Status icon helper (AFK/DND) - smaller size for tooltip
-local function GetStatusIcon(isAFK, isDND, isMobile) Perfy_Trace(Perfy_GetTime(), "Enter", "GetStatusIcon file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:99:6");
+local function GetStatusIcon(isAFK, isDND, isMobile)
 	local showMobileAsAFK = BetterFriendlistDB and BetterFriendlistDB.showMobileAsAFK
 
 	if isAFK or (isMobile and showMobileAsAFK) then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "GetStatusIcon file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:99:6"); return "|TInterface\\FriendsFrame\\StatusIcon-Away:12:12:0:0:32:32:5:27:5:27|t"
+		return "|TInterface\\FriendsFrame\\StatusIcon-Away:12:12:0:0:32:32:5:27:5:27|t"
 	elseif isDND then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "GetStatusIcon file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:99:6"); return "|TInterface\\FriendsFrame\\StatusIcon-DnD:12:12:0:0:32:32:5:27:5:27|t"
+		return "|TInterface\\FriendsFrame\\StatusIcon-DnD:12:12:0:0:32:32:5:27:5:27|t"
 	else
-		Perfy_Trace(Perfy_GetTime(), "Leave", "GetStatusIcon file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:99:6"); return "|TInterface\\FriendsFrame\\StatusIcon-Online:12:12:0:0:32:32:5:27:5:27|t"
+		return "|TInterface\\FriendsFrame\\StatusIcon-Online:12:12:0:0:32:32:5:27:5:27|t"
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "GetStatusIcon file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:99:6"); end
+end
 
 -- Convert localized className to classFile (e.g., "Krieger" -> "WARRIOR")
 -- Logic moved to BFL.ClassUtils
-local function GetClassFileFromClassName(className) Perfy_Trace(Perfy_GetTime(), "Enter", "GetClassFileFromClassName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:113:6");
-	return Perfy_Trace_Passthrough("Leave", "GetClassFileFromClassName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:113:6", BFL.ClassUtils:GetClassFileFromClassName(className))
+local function GetClassFileFromClassName(className)
+	return BFL.ClassUtils:GetClassFileFromClassName(className)
 end
 
 -- Get classFile for friend data (prioritizes classID for 11.2.7+)
-local function GetClassFileForFriend(friend) Perfy_Trace(Perfy_GetTime(), "Enter", "GetClassFileForFriend file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:118:6");
-	return Perfy_Trace_Passthrough("Leave", "GetClassFileForFriend file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:118:6", BFL.ClassUtils:GetClassFileForFriend(friend))
+local function GetClassFileForFriend(friend)
+	return BFL.ClassUtils:GetClassFileForFriend(friend)
 end
 
 -- Get class color for friend (returns color table or white fallback)
-local function GetClassColorForFriend(friend) Perfy_Trace(Perfy_GetTime(), "Enter", "GetClassColorForFriend file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:123:6");
-	return Perfy_Trace_Passthrough("Leave", "GetClassColorForFriend file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:123:6", BFL.ClassUtils:GetClassColorForFriend(friend))
+local function GetClassColorForFriend(friend)
+	return BFL.ClassUtils:GetClassColorForFriend(friend)
 end
 
 -- Color text using friend's class color (uses classID if available)
-local function ClassColorText(friend, text) Perfy_Trace(Perfy_GetTime(), "Enter", "ClassColorText file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:128:6");
-	if not text then Perfy_Trace(Perfy_GetTime(), "Leave", "ClassColorText file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:128:6"); return "" end
+local function ClassColorText(friend, text)
+	if not text then return "" end
 	local classColor = GetClassColorForFriend(friend)
-	return Perfy_Trace_Passthrough("Leave", "ClassColorText file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:128:6", string.format("|cff%02x%02x%02x%s|r", classColor.r * 255, classColor.g * 255, classColor.b * 255, text))
+	return string.format("|cff%02x%02x%02x%s|r", classColor.r * 255, classColor.g * 255, classColor.b * 255, text)
 end
 
 -- Faction icon helper
-local function GetFactionIcon(factionName) Perfy_Trace(Perfy_GetTime(), "Enter", "GetFactionIcon file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:135:6");
-	if not factionName then Perfy_Trace(Perfy_GetTime(), "Leave", "GetFactionIcon file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:135:6"); return "" end
+local function GetFactionIcon(factionName)
+	if not factionName then return "" end
 
 	if factionName == "Alliance" then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "GetFactionIcon file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:135:6"); return "|TInterface\\FriendsFrame\\PlusManz-Alliance:16:16|t"
+		return "|TInterface\\FriendsFrame\\PlusManz-Alliance:16:16|t"
 	elseif factionName == "Horde" then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "GetFactionIcon file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:135:6"); return "|TInterface\\FriendsFrame\\PlusManz-Horde:16:16|t"
+		return "|TInterface\\FriendsFrame\\PlusManz-Horde:16:16|t"
 	else
-		Perfy_Trace(Perfy_GetTime(), "Leave", "GetFactionIcon file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:135:6"); return "" -- Neutral or unknown
+		return "" -- Neutral or unknown
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "GetFactionIcon file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:135:6"); end
+end
 
 -- Color wrapper helper
-local function C(color, text) Perfy_Trace(Perfy_GetTime(), "Enter", "C file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:148:6");
+local function C(color, text)
 	if not text then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "C file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:148:6"); return ""
+		return ""
 	end
 
 	local colors = {
@@ -173,18 +173,18 @@ local function C(color, text) Perfy_Trace(Perfy_GetTime(), "Enter", "C file://c:
 	end
 	
 	if classColor then
-		return Perfy_Trace_Passthrough("Leave", "C file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:148:6", string.format("|cff%02x%02x%02x%s|r", classColor.r * 255, classColor.g * 255, classColor.b * 255, text))
+		return string.format("|cff%02x%02x%02x%s|r", classColor.r * 255, classColor.g * 255, classColor.b * 255, text)
 	end
 
 	-- Otherwise use predefined or custom hex
 	local hex = colors[color] or color
-	return Perfy_Trace_Passthrough("Leave", "C file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:148:6", "|cff" .. hex .. text .. "|r")
+	return "|cff" .. hex .. text .. "|r"
 end
 
 -- Helper: Add friend name to active chat editbox (Shift+Click)
 -- Must be defined before OnFriendLineClick which uses it
-local function AddNameToEditBox(name, realm) Perfy_Trace(Perfy_GetTime(), "Enter", "AddNameToEditBox file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:186:6");
-	if not name then Perfy_Trace(Perfy_GetTime(), "Leave", "AddNameToEditBox file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:186:6"); return false end
+local function AddNameToEditBox(name, realm)
+	if not name then return false end
 
 	-- Add realm suffix if different from player's realm
 	local playerRealm = GetRealmName()
@@ -201,7 +201,7 @@ local function AddNameToEditBox(name, realm) Perfy_Trace(Perfy_GetTime(), "Enter
 	for _, editbox in ipairs(editboxes) do
 		if editbox and editbox:IsVisible() and editbox:HasFocus() then
 			editbox:Insert(name)
-			Perfy_Trace(Perfy_GetTime(), "Leave", "AddNameToEditBox file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:186:6"); return true
+			return true
 		end
 	end
 
@@ -210,15 +210,15 @@ local function AddNameToEditBox(name, realm) Perfy_Trace(Perfy_GetTime(), "Enter
 	if defaultEditBox then
 		ChatEdit_ActivateChat(defaultEditBox)
 		defaultEditBox:Insert(name)
-		Perfy_Trace(Perfy_GetTime(), "Leave", "AddNameToEditBox file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:186:6"); return true
+		return true
 	end
 
-	Perfy_Trace(Perfy_GetTime(), "Leave", "AddNameToEditBox file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:186:6"); return false
+	return false
 end
 
 -- Helper: Smart invite - either invite to group or request to join their group
-local function SmartInviteOrJoin(friendType, data) Perfy_Trace(Perfy_GetTime(), "Enter", "SmartInviteOrJoin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:220:6");
-	if not data then Perfy_Trace(Perfy_GetTime(), "Leave", "SmartInviteOrJoin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:220:6"); return end
+local function SmartInviteOrJoin(friendType, data)
+	if not data then return end
 	
 	local playerInGroup = IsInGroup(LE_PARTY_CATEGORY_HOME)
 	local isLeader = UnitIsGroupLeader("player") or not playerInGroup
@@ -227,7 +227,7 @@ local function SmartInviteOrJoin(friendType, data) Perfy_Trace(Perfy_GetTime(), 
 		-- BNet friend - must be in WoW
 		if data.client ~= "WoW" or not data.gameAccountID then
 			-- BFL:DebugPrint("Broker: BNet friend not in WoW, cannot invite/join")
-			Perfy_Trace(Perfy_GetTime(), "Leave", "SmartInviteOrJoin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:220:6"); return
+			return
 		end
 		
 		if isLeader then
@@ -254,7 +254,7 @@ local function SmartInviteOrJoin(friendType, data) Perfy_Trace(Perfy_GetTime(), 
 		local targetName = data.fullName or data.characterName
 		if not targetName then
 			-- BFL:DebugPrint("Broker: WoW friend has no name, cannot invite/join")
-			Perfy_Trace(Perfy_GetTime(), "Leave", "SmartInviteOrJoin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:220:6"); return
+			return
 		end
 		
 		if isLeader then
@@ -267,7 +267,7 @@ local function SmartInviteOrJoin(friendType, data) Perfy_Trace(Perfy_GetTime(), 
 			-- BFL:DebugPrint(string.format("Broker: Requested invite from %s", targetName))
 		end
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "SmartInviteOrJoin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:220:6"); end
+end
 
 -- Helper: Open context menu for friend (like FriendsList)
 -- Create a hidden anchor frame for context menus
@@ -275,8 +275,8 @@ local contextMenuAnchor = CreateFrame("Frame", "BFL_BrokerContextMenuAnchor", UI
 contextMenuAnchor:SetSize(1, 1)
 contextMenuAnchor:Hide()
 
-local function OpenFriendContextMenu(data) Perfy_Trace(Perfy_GetTime(), "Enter", "OpenFriendContextMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:278:6");
-	if not data then Perfy_Trace(Perfy_GetTime(), "Leave", "OpenFriendContextMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:278:6"); return end
+local function OpenFriendContextMenu(data)
+	if not data then return end
 	
 	-- Position anchor at cursor
 	local x, y = GetCursorPosition()
@@ -287,7 +287,7 @@ local function OpenFriendContextMenu(data) Perfy_Trace(Perfy_GetTime(), "Enter",
 	local MenuSystem = BFL:GetModule("MenuSystem")
 	if not MenuSystem then
 		-- BFL:DebugPrint("Broker: MenuSystem not available")
-		Perfy_Trace(Perfy_GetTime(), "Leave", "OpenFriendContextMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:278:6"); return
+		return
 	end
 	
 	if data.type == "bnet" then
@@ -340,11 +340,11 @@ local function OpenFriendContextMenu(data) Perfy_Trace(Perfy_GetTime(), "Enter",
 			-- BFL:DebugPrint("Broker: Could not find friend index for context menu")
 		end
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "OpenFriendContextMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:278:6"); end
+end
 
 -- Main click handler for friend lines in LibQTip tooltip
-local function OnFriendLineClick(cell, data, mouseButton) Perfy_Trace(Perfy_GetTime(), "Enter", "OnFriendLineClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:346:6");
-	if not data then Perfy_Trace(Perfy_GetTime(), "Leave", "OnFriendLineClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:346:6"); return end
+local function OnFriendLineClick(cell, data, mouseButton)
+	if not data then return end
 	
 	-- LibQTip doesn't pass mouseButton - we need to get it ourselves!
 	local actualButton = mouseButton or GetMouseButtonClicked()
@@ -404,34 +404,34 @@ local function OnFriendLineClick(cell, data, mouseButton) Perfy_Trace(Perfy_GetT
 			end
 		end
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "OnFriendLineClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:346:6"); end
+end
 
 -- Get localized string (fallback to key if L table not available)
-local function L(key) Perfy_Trace(Perfy_GetTime(), "Enter", "L file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:410:6");
+local function L(key)
 	if BFL.L and BFL.L[key] then
-		return Perfy_Trace_Passthrough("Leave", "L file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:410:6", BFL.L[key])
+		return BFL.L[key]
 	end
-	Perfy_Trace(Perfy_GetTime(), "Leave", "L file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:410:6"); return key
+	return key
 end
 
 -- Format time difference for activity tracker
-local function FormatTimeSince(timestamp) Perfy_Trace(Perfy_GetTime(), "Enter", "FormatTimeSince file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:418:6");
-	if not timestamp then Perfy_Trace(Perfy_GetTime(), "Leave", "FormatTimeSince file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:418:6"); return nil end
+local function FormatTimeSince(timestamp)
+	if not timestamp then return nil end
 	local diff = GetServerTime() - timestamp
 	if diff < 60 then
-		return Perfy_Trace_Passthrough("Leave", "FormatTimeSince file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:418:6", string.format("%ds", diff))
+		return string.format("%ds", diff)
 	elseif diff < 3600 then
-		return Perfy_Trace_Passthrough("Leave", "FormatTimeSince file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:418:6", string.format("%dm", math.floor(diff / 60)))
+		return string.format("%dm", math.floor(diff / 60))
 	elseif diff < 86400 then
-		return Perfy_Trace_Passthrough("Leave", "FormatTimeSince file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:418:6", string.format("%dh", math.floor(diff / 3600)))
+		return string.format("%dh", math.floor(diff / 3600))
 	else
-		return Perfy_Trace_Passthrough("Leave", "FormatTimeSince file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:418:6", string.format("%dd", math.floor(diff / 86400)))
+		return string.format("%dd", math.floor(diff / 86400))
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "FormatTimeSince file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:418:6"); end
+end
 
 -- Get friend counts (online/total) for WoW and BNet
 -- Respects treatMobileAsOffline setting
-local function GetFriendCounts() Perfy_Trace(Perfy_GetTime(), "Enter", "GetFriendCounts file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:434:6");
+local function GetFriendCounts()
 	local wowOnline, wowTotal = 0, 0
 	local bnetOnline, bnetTotal = 0, 0
 	local treatMobileAsOffline = BetterFriendlistDB and BetterFriendlistDB.treatMobileAsOffline
@@ -462,25 +462,25 @@ local function GetFriendCounts() Perfy_Trace(Perfy_GetTime(), "Enter", "GetFrien
 		end
 	end
 
-	Perfy_Trace(Perfy_GetTime(), "Leave", "GetFriendCounts file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:434:6"); return wowOnline, wowTotal, bnetOnline, bnetTotal
+	return wowOnline, wowTotal, bnetOnline, bnetTotal
 end
 
 -- ========================================
 -- Broker Text Update
 -- ========================================
 
-function Broker:UpdateBrokerText() Perfy_Trace(Perfy_GetTime(), "Enter", "Broker:UpdateBrokerText file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:472:0");
-	if not dataObject then Perfy_Trace(Perfy_GetTime(), "Leave", "Broker:UpdateBrokerText file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:472:0"); return end
+function Broker:UpdateBrokerText()
+	if not dataObject then return end
 
 	-- Throttle updates
 	local currentTime = GetTime()
 	if currentTime - lastUpdateTime < THROTTLE_INTERVAL then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "Broker:UpdateBrokerText file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:472:0"); return
+		return
 	end
 	lastUpdateTime = currentTime
 
 	local DB = GetDB()
-	if not DB or not BetterFriendlistDB then Perfy_Trace(Perfy_GetTime(), "Leave", "Broker:UpdateBrokerText file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:472:0"); return end
+	if not DB or not BetterFriendlistDB then return end
 
 	local wowOnline, wowTotal, bnetOnline, bnetTotal = GetFriendCounts()
 	local totalOnline = wowOnline + bnetOnline
@@ -535,14 +535,14 @@ function Broker:UpdateBrokerText() Perfy_Trace(Perfy_GetTime(), "Enter", "Broker
 	end
 
 	-- BFL:DebugPrint(string.format("Broker: Updated text to '%s'", text))
-Perfy_Trace(Perfy_GetTime(), "Leave", "Broker:UpdateBrokerText file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:472:0"); end
+end
 
 -- ========================================
 -- Tooltip Functions
 -- ========================================
 
 -- Basic Tooltip
-local function CreateBasicTooltip(tooltip) Perfy_Trace(Perfy_GetTime(), "Enter", "CreateBasicTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:545:6");
+local function CreateBasicTooltip(tooltip)
 	tooltip:AddLine(L("BROKER_TITLE"), 1, 0.82, 0, 1)
 	tooltip:AddLine(" ")
 
@@ -568,10 +568,10 @@ local function CreateBasicTooltip(tooltip) Perfy_Trace(Perfy_GetTime(), "Enter",
 	tooltip:AddLine(L("BROKER_TOOLTIP_FOOTER_LEFT"), 0.5, 0.9, 1, 1)
 	tooltip:AddLine(L("BROKER_TOOLTIP_FOOTER_RIGHT"), 0.5, 0.9, 1, 1)
 	tooltip:AddLine(L("BROKER_HINT_CYCLE_FILTER_FULL"), 0.5, 0.9, 1, 1)
-Perfy_Trace(Perfy_GetTime(), "Leave", "CreateBasicTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:545:6"); end
+end
 
 -- Advanced Tooltip with Groups and Activity
-local function CreateAdvancedTooltip(tooltip) Perfy_Trace(Perfy_GetTime(), "Enter", "CreateAdvancedTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:574:6");
+local function CreateAdvancedTooltip(tooltip)
 	tooltip:AddLine(L("BROKER_TITLE"), 1, 0.82, 0, 1)
 	tooltip:AddLine(" ")
 
@@ -748,14 +748,14 @@ local function CreateAdvancedTooltip(tooltip) Perfy_Trace(Perfy_GetTime(), "Ente
 	tooltip:AddLine(L("BROKER_TOOLTIP_FOOTER_LEFT"), 0.5, 0.9, 1, 1)
 	tooltip:AddLine(L("BROKER_TOOLTIP_FOOTER_RIGHT"), 0.5, 0.9, 1, 1)
 	tooltip:AddLine(L("BROKER_HINT_CYCLE_FILTER_FULL"), 0.5, 0.9, 1, 1)
-Perfy_Trace(Perfy_GetTime(), "Leave", "CreateAdvancedTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:574:6"); end
+end
 
 -- ========================================
 -- LibQTip Tooltip (NEW)
 -- ========================================
 
 -- Helper: Get display name (respects nameDisplayFormat and tokens)
-local function GetFriendDisplayName(friend) Perfy_Trace(Perfy_GetTime(), "Enter", "GetFriendDisplayName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:758:6");
+local function GetFriendDisplayName(friend)
 	local DB = GetDB()
 	local format = DB and DB:Get("nameDisplayFormat", "%name%") or "%name%"
 	
@@ -809,10 +809,10 @@ local function GetFriendDisplayName(friend) Perfy_Trace(Perfy_GetTime(), "Enter"
 		battletag = name
 	end
 
-	result = result:gsub("%%name%%", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:812:34"); Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:812:34"); return name end)
-	result = result:gsub("%%note%%", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:813:34"); Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:813:34"); return note end)
-	result = result:gsub("%%nickname%%", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:814:38"); Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:814:38"); return nickname end)
-	result = result:gsub("%%battletag%%", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:815:39"); Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:815:39"); return battletag end)
+	result = result:gsub("%%name%%", function() return name end)
+	result = result:gsub("%%note%%", function() return note end)
+	result = result:gsub("%%nickname%%", function() return nickname end)
+	result = result:gsub("%%battletag%%", function() return battletag end)
 	
 	-- 3. Cleanup
 	-- Remove empty parentheses/brackets (e.g. "Name ()" -> "Name")
@@ -823,25 +823,25 @@ local function GetFriendDisplayName(friend) Perfy_Trace(Perfy_GetTime(), "Enter"
 	
 	-- 4. Fallback
 	if result == "" then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "GetFriendDisplayName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:758:6"); return name
+		return name
 	end
 	
-	Perfy_Trace(Perfy_GetTime(), "Leave", "GetFriendDisplayName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:758:6"); return result
+	return result
 end
 
 -- Helper: Get colored level text
-local function GetColoredLevelText(level) Perfy_Trace(Perfy_GetTime(), "Enter", "GetColoredLevelText file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:833:6");
-	if not level or level == 0 then Perfy_Trace(Perfy_GetTime(), "Leave", "GetColoredLevelText file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:833:6"); return "" end
+local function GetColoredLevelText(level)
+	if not level or level == 0 then return "" end
 	
 	local hideMaxLevel = BetterFriendlistDB and BetterFriendlistDB.hideMaxLevel
 	local maxLevel = GetMaxLevelForPlayerExpansion()
 	
 	if hideMaxLevel and level == maxLevel then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "GetColoredLevelText file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:833:6"); return ""
+		return ""
 	end
 	
 	local color = GetQuestDifficultyColor(level)
-	return Perfy_Trace_Passthrough("Leave", "GetColoredLevelText file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:833:6", string.format("|cff%02x%02x%02x%d|r", color.r * 255, color.g * 255, color.b * 255, level))
+	return string.format("|cff%02x%02x%02x%d|r", color.r * 255, color.g * 255, color.b * 255, level)
 end
 
 -- ========================================
@@ -850,7 +850,7 @@ end
 local FOOTER_HEIGHT = 160 -- Height for the fixed footer area
 local MAX_TOOLTIP_HEIGHT = 690 -- Maximum height for the tooltip before scrolling
 
-local function RenderFixedFooter(footerFrame) Perfy_Trace(Perfy_GetTime(), "Enter", "RenderFixedFooter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:853:6");
+local function RenderFixedFooter(footerFrame)
 	-- Clear previous content
 	if footerFrame.content then
 		for _, region in ipairs(footerFrame.content) do
@@ -859,22 +859,22 @@ local function RenderFixedFooter(footerFrame) Perfy_Trace(Perfy_GetTime(), "Ente
 	end
 	footerFrame.content = {}
 	
-	local function AddLine(text, font, r, g, b) Perfy_Trace(Perfy_GetTime(), "Enter", "AddLine file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:862:7");
+	local function AddLine(text, font, r, g, b)
 		local fs = footerFrame:CreateFontString(nil, "OVERLAY", font or "GameTooltipTextSmall")
 		fs:SetText(text)
 		fs:SetJustifyH("LEFT")
 		fs:SetWordWrap(false) -- Prevent wrapping to avoid overlap with fixed offsets
 		if r then fs:SetTextColor(r, g, b) end
 		table.insert(footerFrame.content, fs)
-		Perfy_Trace(Perfy_GetTime(), "Leave", "AddLine file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:862:7"); return fs
+		return fs
 	end
 	
-	local function AddSeparator() Perfy_Trace(Perfy_GetTime(), "Enter", "AddSeparator file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:872:7");
+	local function AddSeparator()
 		local tex = footerFrame:CreateTexture(nil, "ARTWORK")
 		tex:SetColorTexture(0.3, 0.3, 0.3, 0.5)
 		tex:SetHeight(1)
 		table.insert(footerFrame.content, tex)
-		Perfy_Trace(Perfy_GetTime(), "Leave", "AddSeparator file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:872:7"); return tex
+		return tex
 	end
 
 	local yOffset = -5
@@ -935,11 +935,11 @@ local function RenderFixedFooter(footerFrame) Perfy_Trace(Perfy_GetTime(), "Ente
 		realm = "Interface\\AddOns\\BetterFriendlist\\Icons\\realm"
 	}
 	
-	local function GetSortDisplay(mode) Perfy_Trace(Perfy_GetTime(), "Enter", "GetSortDisplay file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:938:7");
+	local function GetSortDisplay(mode)
 		local name = sortNames[mode] or mode
 		local icon = sortIcons[mode]
-		if icon then return Perfy_Trace_Passthrough("Leave", "GetSortDisplay file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:938:7", string.format("|T%s:14:14:0:0|t %s", icon, name)) end
-		Perfy_Trace(Perfy_GetTime(), "Leave", "GetSortDisplay file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:938:7"); return name
+		if icon then return string.format("|T%s:14:14:0:0|t %s", icon, name) end
+		return name
 	end
 
 	local sortText = GetSortDisplay(primarySort)
@@ -993,27 +993,27 @@ local function RenderFixedFooter(footerFrame) Perfy_Trace(Perfy_GetTime(), "Ente
 	hint6:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
 	hint6:SetPoint("RIGHT", footerFrame, "RIGHT", -10, yOffset)
 	yOffset = yOffset - 14
-Perfy_Trace(Perfy_GetTime(), "Leave", "RenderFixedFooter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:853:6"); end
+end
 
 -- Helper: Check if any context menu is open
-local function IsMenuOpen() Perfy_Trace(Perfy_GetTime(), "Enter", "IsMenuOpen file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:999:6");
+local function IsMenuOpen()
 	-- Check Legacy Dropdowns (UIDropDownMenu)
-	if UIDROPDOWNMENU_OPEN_MENU and UIDROPDOWNMENU_OPEN_MENU:IsShown() then Perfy_Trace(Perfy_GetTime(), "Leave", "IsMenuOpen file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:999:6"); return true end
-	if _G.Lib_UIDROPDOWNMENU_OPEN_MENU and _G.Lib_UIDROPDOWNMENU_OPEN_MENU:IsShown() then Perfy_Trace(Perfy_GetTime(), "Leave", "IsMenuOpen file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:999:6"); return true end
+	if UIDROPDOWNMENU_OPEN_MENU and UIDROPDOWNMENU_OPEN_MENU:IsShown() then return true end
+	if _G.Lib_UIDROPDOWNMENU_OPEN_MENU and _G.Lib_UIDROPDOWNMENU_OPEN_MENU:IsShown() then return true end
 
 	-- Check Modern Menu System (11.x C_Menu)
 	if Menu and Menu.GetManager then
 		local manager = Menu.GetManager()
 		if manager and manager:GetOpenMenu() then
-			Perfy_Trace(Perfy_GetTime(), "Leave", "IsMenuOpen file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:999:6"); return true
+			return true
 		end
 	end
 	
-	Perfy_Trace(Perfy_GetTime(), "Leave", "IsMenuOpen file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:999:6"); return false
+	return false
 end
 
 -- Helper: Custom AutoHide that respects open menus
-local function SetupTooltipAutoHide(tooltip, anchorFrame) Perfy_Trace(Perfy_GetTime(), "Enter", "SetupTooltipAutoHide file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1016:6");
+local function SetupTooltipAutoHide(tooltip, anchorFrame)
 	tooltip:SetAutoHideDelay(nil) -- Disable LibQTip's built-in auto-hide
 	
 	if not tooltip.bflTimer then
@@ -1024,9 +1024,9 @@ local function SetupTooltipAutoHide(tooltip, anchorFrame) Perfy_Trace(Perfy_GetT
 	timer.hideTimer = 0
 	timer.checkTimer = 0
 	
-	timer:SetScript("OnUpdate", function(self, elapsed) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1027:29");
+	timer:SetScript("OnUpdate", function(self, elapsed)
 		self.checkTimer = self.checkTimer + elapsed
-		if self.checkTimer < 0.1 then Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1027:29"); return end
+		if self.checkTimer < 0.1 then return end
 		
 		local checkInterval = self.checkTimer
 		self.checkTimer = 0
@@ -1045,17 +1045,17 @@ local function SetupTooltipAutoHide(tooltip, anchorFrame) Perfy_Trace(Perfy_GetT
 				if self.hideTimer >= 0.25 then
 					if LQT then 
 						-- Safely release tooltip
-						pcall(function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1048:12"); LQT:Release(tooltip) Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1048:12"); end)
+						pcall(function() LQT:Release(tooltip) end)
 					end
 					self:SetScript("OnUpdate", nil)
 				end
 			end
 		end
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1027:29"); end)
-Perfy_Trace(Perfy_GetTime(), "Leave", "SetupTooltipAutoHide file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1016:6"); end
+	end)
+end
 
-local function TooltipCleanup(tooltip) Perfy_Trace(Perfy_GetTime(), "Enter", "TooltipCleanup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1057:6");
-	if not tooltip then Perfy_Trace(Perfy_GetTime(), "Leave", "TooltipCleanup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1057:6"); return end
+local function TooltipCleanup(tooltip)
+	if not tooltip then return end
 	
 	-- Hide our custom footer
 	if tooltip.footerFrame then
@@ -1080,12 +1080,12 @@ local function TooltipCleanup(tooltip) Perfy_Trace(Perfy_GetTime(), "Enter", "To
 		tooltip.slider:SetPoint("TOPRIGHT", tooltip, "TOPRIGHT", -10, -10)
 		tooltip.slider:SetPoint("BOTTOMRIGHT", tooltip, "BOTTOMRIGHT", -10, 10)
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "TooltipCleanup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1057:6"); end
+end
 
-local function CreateLibQTipTooltip(anchorFrame) Perfy_Trace(Perfy_GetTime(), "Enter", "CreateLibQTipTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1085:6");
+local function CreateLibQTipTooltip(anchorFrame)
 	if not LQT then
 		-- BFL:DebugPrint("Broker: LibQTip not available, skipping tooltip")
-		Perfy_Trace(Perfy_GetTime(), "Leave", "CreateLibQTipTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1085:6"); return nil
+		return nil
 	end
 
 	-- Define available columns and their default visibility
@@ -1151,14 +1151,14 @@ local function CreateLibQTipTooltip(anchorFrame) Perfy_Trace(Perfy_GetTime(), "E
 	-- Hook OnHide to clean up layout changes when tooltip is released/hidden
 	-- Always re-hook because LibQTip might clear scripts on Release
 	local oldOnHide = tt:GetScript("OnHide")
-	tt:SetScript("OnHide", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1154:24");
+	tt:SetScript("OnHide", function(self)
 		TooltipCleanup(self)
 		if oldOnHide then
 			pcall(oldOnHide, self)
 		end
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1154:24"); end)
+	end)
 
-	local status, err = xpcall(function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1161:28");
+	local status, err = xpcall(function()
 	tt:Clear()
 	tt:SmartAnchorTo(anchorFrame)
 	tt.anchorFrame = anchorFrame -- Store anchor for refresh
@@ -1227,7 +1227,7 @@ local function CreateLibQTipTooltip(anchorFrame) Perfy_Trace(Perfy_GetTime(), "E
 	end
 
 	-- Helper to process a friend (add to groups and counts)
-	local function ProcessFriend(friend) Perfy_Trace(Perfy_GetTime(), "Enter", "ProcessFriend file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1230:7");
+	local function ProcessFriend(friend)
 		local friendGroups = BetterFriendlistDB and BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friend.id] or {}
 		local assigned = false
 		local isOnline = friend.connected
@@ -1268,7 +1268,7 @@ local function CreateLibQTipTooltip(anchorFrame) Perfy_Trace(Perfy_GetTime(), "E
 				end
 			end
 		end
-	Perfy_Trace(Perfy_GetTime(), "Leave", "ProcessFriend file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1230:7"); end
+	end
 
 	-- Collect BNet Friends (ALL)
 	if BNConnected() then
@@ -1393,95 +1393,95 @@ local function CreateLibQTipTooltip(anchorFrame) Perfy_Trace(Perfy_GetTime(), "E
 	local secondarySort = BetterFriendlistDB and BetterFriendlistDB.secondarySort or "name"
 	
 	-- Simple sort comparator for tooltip
-	local function CompareFriends(a, b) Perfy_Trace(Perfy_GetTime(), "Enter", "CompareFriends file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1396:7");
+	local function CompareFriends(a, b)
 		-- Helper to compare by a specific mode
-		local function CompareByMode(mode, a, b) Perfy_Trace(Perfy_GetTime(), "Enter", "CompareByMode file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1398:8");
+		local function CompareByMode(mode, a, b)
 			if mode == "name" then
 				-- Use the centralized GetFriendDisplayName function to ensure sorting matches display
 				local nameA = GetFriendDisplayName(a)
 				local nameB = GetFriendDisplayName(b)
 				
 				if (nameA or ""):lower() ~= (nameB or ""):lower() then
-					return Perfy_Trace_Passthrough("Leave", "CompareByMode file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1398:8", (nameA or ""):lower() < (nameB or ""):lower())
+					return (nameA or ""):lower() < (nameB or ""):lower()
 				end
 			elseif mode == "level" then
 				local levelA = a.level or 0
 				local levelB = b.level or 0
 				if levelA ~= levelB then
-					return Perfy_Trace_Passthrough("Leave", "CompareByMode file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1398:8", levelA > levelB)
+					return levelA > levelB
 				end
 			elseif mode == "zone" then
 				local zoneA = a.area or ""
 				local zoneB = b.area or ""
 				if zoneA:lower() ~= zoneB:lower() then
-					return Perfy_Trace_Passthrough("Leave", "CompareByMode file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1398:8", zoneA:lower() < zoneB:lower())
+					return zoneA:lower() < zoneB:lower()
 				end
 			elseif mode == "game" then
 				-- WoW first, then other games, then apps
-				local function GetGamePriority(friend) Perfy_Trace(Perfy_GetTime(), "Enter", "GetGamePriority file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1421:10");
-					if friend.client == "WoW" or friend.type == "wow" then Perfy_Trace(Perfy_GetTime(), "Leave", "GetGamePriority file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1421:10"); return 0 end
-					if friend.client == "App" or friend.client == "BSAp" then Perfy_Trace(Perfy_GetTime(), "Leave", "GetGamePriority file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1421:10"); return 2 end
-					Perfy_Trace(Perfy_GetTime(), "Leave", "GetGamePriority file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1421:10"); return 1
+				local function GetGamePriority(friend)
+					if friend.client == "WoW" or friend.type == "wow" then return 0 end
+					if friend.client == "App" or friend.client == "BSAp" then return 2 end
+					return 1
 				end
 				local priorityA = GetGamePriority(a)
 				local priorityB = GetGamePriority(b)
 				if priorityA ~= priorityB then
-					return Perfy_Trace_Passthrough("Leave", "CompareByMode file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1398:8", priorityA < priorityB)
+					return priorityA < priorityB
 				end
 			elseif mode == "status" then
 				-- Sort by DND/AFK priority (Online=0, DND=1, AFK=2)
-				local function GetStatusPriority(friend) Perfy_Trace(Perfy_GetTime(), "Enter", "GetStatusPriority file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1433:10");
-					if friend.isDND then Perfy_Trace(Perfy_GetTime(), "Leave", "GetStatusPriority file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1433:10"); return 1 end
-					if friend.isAFK or friend.isMobile then Perfy_Trace(Perfy_GetTime(), "Leave", "GetStatusPriority file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1433:10"); return 2 end
-					Perfy_Trace(Perfy_GetTime(), "Leave", "GetStatusPriority file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1433:10"); return 0
+				local function GetStatusPriority(friend)
+					if friend.isDND then return 1 end
+					if friend.isAFK or friend.isMobile then return 2 end
+					return 0
 				end
 				
 				local priorityA = GetStatusPriority(a)
 				local priorityB = GetStatusPriority(b)
 				
 				if priorityA ~= priorityB then
-					return Perfy_Trace_Passthrough("Leave", "CompareByMode file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1398:8", priorityA < priorityB)
+					return priorityA < priorityB
 				end
 			elseif mode == "faction" then
 				local factionA = a.factionName or ""
 				local factionB = b.factionName or ""
 				if factionA ~= factionB then
-					return Perfy_Trace_Passthrough("Leave", "CompareByMode file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1398:8", factionA < factionB)
+					return factionA < factionB
 				end
 			elseif mode == "guild" then
 				local guildA = a.guildName or ""
 				local guildB = b.guildName or ""
 				if guildA ~= guildB then
-					return Perfy_Trace_Passthrough("Leave", "CompareByMode file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1398:8", guildA < guildB)
+					return guildA < guildB
 				end
 			elseif mode == "class" then
 				local classA = a.className or ""
 				local classB = b.className or ""
 				if classA ~= classB then
-					return Perfy_Trace_Passthrough("Leave", "CompareByMode file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1398:8", classA < classB)
+					return classA < classB
 				end
 			elseif mode == "realm" then
 				local realmA = a.realmName or ""
 				local realmB = b.realmName or ""
 				if realmA ~= realmB then
-					return Perfy_Trace_Passthrough("Leave", "CompareByMode file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1398:8", realmA < realmB)
+					return realmA < realmB
 				end
 			end
-			Perfy_Trace(Perfy_GetTime(), "Leave", "CompareByMode file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1398:8"); return nil -- Equal
+			return nil -- Equal
 		end
 
 		-- Primary Sort
 		local primaryResult = CompareByMode(primarySort, a, b)
-		if primaryResult ~= nil then Perfy_Trace(Perfy_GetTime(), "Leave", "CompareFriends file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1396:7"); return primaryResult end
+		if primaryResult ~= nil then return primaryResult end
 
 		-- Secondary Sort
 		if secondarySort and secondarySort ~= primarySort and secondarySort ~= "none" then
 			local secondaryResult = CompareByMode(secondarySort, a, b)
-			if secondaryResult ~= nil then Perfy_Trace(Perfy_GetTime(), "Leave", "CompareFriends file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1396:7"); return secondaryResult end
+			if secondaryResult ~= nil then return secondaryResult end
 		end
 
 		-- Fallback: Name
-		return Perfy_Trace_Passthrough("Leave", "CompareFriends file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1396:7", CompareByMode("name", a, b))
+		return CompareByMode("name", a, b)
 	end
 	
 	-- Sort each group
@@ -1492,7 +1492,7 @@ local function CreateLibQTipTooltip(anchorFrame) Perfy_Trace(Perfy_GetTime(), "E
 	local displayedCount = 0
 
 	-- Helper to render a friend row
-	local function RenderFriendRow(friend, indentation) Perfy_Trace(Perfy_GetTime(), "Enter", "RenderFriendRow file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1495:7");
+	local function RenderFriendRow(friend, indentation)
 		local nameText = friend.characterName ~= "" and friend.characterName or friend.accountName
 		
 		-- Add Timerunning icon if applicable
@@ -1579,19 +1579,19 @@ local function CreateLibQTipTooltip(anchorFrame) Perfy_Trace(Perfy_GetTime(), "E
 
 		-- Hover highlight
 		tt:SetLineColor(line, 0, 0, 0, 0)
-		tt:SetLineScript(line, "OnEnter", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1582:36");
+		tt:SetLineScript(line, "OnEnter", function()
 			tt:SetLineColor(line, 0.2, 0.4, 0.6, 0.3)
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1582:36"); end)
-		tt:SetLineScript(line, "OnLeave", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1585:36");
+		end)
+		tt:SetLineScript(line, "OnLeave", function()
 			tt:SetLineColor(line, 0, 0, 0, 0)
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1585:36"); end)
+		end)
 
 		-- Click handler
-		tt:SetLineScript(line, "OnMouseUp", function(self, button) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1590:38");
+		tt:SetLineScript(line, "OnMouseUp", function(self, button)
 			OnFriendLineClick(nil, friend, button)
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1590:38"); end)
+		end)
 		
-		Perfy_Trace(Perfy_GetTime(), "Leave", "RenderFriendRow file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1495:7"); return line
+		return line
 	end
 
 	-- Display Battle.Net Friends Header
@@ -1636,15 +1636,15 @@ local function CreateLibQTipTooltip(anchorFrame) Perfy_Trace(Perfy_GetTime(), "E
 				tt:SetCell(groupLine, 1, "  " .. headerText, nil, "LEFT", numColumns)
 				
 				-- Hover Highlight for Group Header (Visual Feedback)
-				tt:SetLineScript(groupLine, "OnEnter", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1639:43");
+				tt:SetLineScript(groupLine, "OnEnter", function(self)
 					tt:SetLineColor(groupLine, 0.2, 0.2, 0.2, 0.5)
-				Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1639:43"); end)
-				tt:SetLineScript(groupLine, "OnLeave", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1642:43");
+				end)
+				tt:SetLineScript(groupLine, "OnLeave", function(self)
 					tt:SetLineColor(groupLine, 0, 0, 0, 0)
-				Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1642:43"); end)
+				end)
 				
 				-- Click Handler for Group Header
-				tt:SetLineScript(groupLine, "OnMouseUp", function(self, button) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1647:45");
+				tt:SetLineScript(groupLine, "OnMouseUp", function(self, button)
 					-- LibQTip might not pass the button argument correctly in all versions
 					-- Use GetMouseButtonClicked() as fallback (standard WoW API since 10.0)
 					local actualButton = button or (GetMouseButtonClicked and GetMouseButtonClicked())
@@ -1664,32 +1664,32 @@ local function CreateLibQTipTooltip(anchorFrame) Perfy_Trace(Perfy_GetTime(), "E
 					elseif actualButton == "RightButton" then
 						-- Context Menu
 						if MenuUtil and MenuUtil.CreateContextMenu then
-							MenuUtil.CreateContextMenu(self, function(owner, rootDescription) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1667:40");
+							MenuUtil.CreateContextMenu(self, function(owner, rootDescription)
 								rootDescription:CreateTitle(groupInfo.name)
 								
 								-- Only show options for custom groups (not builtin)
 								if not groupInfo.builtin then
-									rootDescription:CreateButton(L("MENU_RENAME_GROUP"), function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1672:62");
+									rootDescription:CreateButton(L("MENU_RENAME_GROUP"), function()
 										StaticPopup_Show("BETTER_FRIENDLIST_RENAME_GROUP", nil, nil, groupId)
-									Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1672:62"); end)
+									end)
 									
-									rootDescription:CreateButton(L("MENU_CHANGE_COLOR"), function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1676:62");
+									rootDescription:CreateButton(L("MENU_CHANGE_COLOR"), function()
 										local FriendsList = BFL:GetModule("FriendsList")
 										if FriendsList and FriendsList.OpenColorPicker then 
 											FriendsList:OpenColorPicker(groupId) 
 										end
-									Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1676:62"); end)
+									end)
 									
-									rootDescription:CreateButton(L("MENU_DELETE_GROUP"), function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1683:62");
+									rootDescription:CreateButton(L("MENU_DELETE_GROUP"), function()
 										StaticPopup_Show("BETTER_FRIENDLIST_DELETE_GROUP", nil, nil, groupId)
-									Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1683:62"); end)
+									end)
 								end
-							Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1667:40"); end)
+							end)
 						else
 							-- BFL:DebugPrint("Broker: MenuUtil not available")
 						end
 					end
-				Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1647:45"); end)
+				end)
 
 				-- Render friends ONLY if not collapsed
 				if not collapsed then
@@ -1729,7 +1729,7 @@ local function CreateLibQTipTooltip(anchorFrame) Perfy_Trace(Perfy_GetTime(), "E
 	end
 
 	tt:Show()
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1161:28"); end, geterrorhandler())
+	end, geterrorhandler())
 
 	if not status then
 		-- BFL:DebugPrint("Broker: Error populating tooltip: " .. tostring(err))
@@ -1740,11 +1740,11 @@ local function CreateLibQTipTooltip(anchorFrame) Perfy_Trace(Perfy_GetTime(), "E
 		SetupTooltipAutoHide(tt, anchorFrame)
 	end
 
-	Perfy_Trace(Perfy_GetTime(), "Leave", "CreateLibQTipTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1085:6"); return tt
+	return tt
 end
 
 -- Refresh the tooltip (re-create it) to update content
-function Broker:RefreshTooltip() Perfy_Trace(Perfy_GetTime(), "Enter", "Broker:RefreshTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1747:0");
+function Broker:RefreshTooltip()
 	if LQT and tooltip and tooltip:IsShown() then
 		local anchor = tooltip.anchorFrame
 		LQT:Release(tooltip)
@@ -1753,7 +1753,7 @@ function Broker:RefreshTooltip() Perfy_Trace(Perfy_GetTime(), "Enter", "Broker:R
 			tooltip = CreateLibQTipTooltip(anchor)
 		end
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "Broker:RefreshTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1747:0"); end
+end
 
 -- ========================================
 -- LibQTip Detail Tooltip (Two-Tier System)
@@ -1763,8 +1763,8 @@ local detailTooltip = nil
 local detailTooltipKey = "BetterFriendlistBrokerDetailTT"
 
 -- Create detail tooltip on friend line hover
-local function CreateDetailTooltip(cell, data) Perfy_Trace(Perfy_GetTime(), "Enter", "CreateDetailTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1766:6");
-	if not LQT or not data then Perfy_Trace(Perfy_GetTime(), "Leave", "CreateDetailTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1766:6"); return end
+local function CreateDetailTooltip(cell, data)
+	if not LQT or not data then return end
 
 	-- Release previous detail tooltip if exists
 	if detailTooltip then
@@ -1860,29 +1860,29 @@ local function CreateDetailTooltip(cell, data) Perfy_Trace(Perfy_GetTime(), "Ent
 
 	tt2:Show()
 	detailTooltip = tt2
-Perfy_Trace(Perfy_GetTime(), "Leave", "CreateDetailTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1766:6"); end
+end
 
 -- Release detail tooltip on mouse leave
-local function ReleaseDetailTooltip() Perfy_Trace(Perfy_GetTime(), "Enter", "ReleaseDetailTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1866:6");
+local function ReleaseDetailTooltip()
 	if LQT and detailTooltip then
 		LQT:Release(detailTooltip)
 		detailTooltip = nil
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "ReleaseDetailTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1866:6"); end
+end
 
 -- ========================================
 -- Click Handlers (Data Broker)
 -- ========================================
 
-function Broker:OnClick(clickedFrame, button) Perfy_Trace(Perfy_GetTime(), "Enter", "Broker:OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1877:0");
+function Broker:OnClick(clickedFrame, button)
 	-- Safety: Don't process clicks in combat
 	if InCombatLockdown() then
 		-- BFL:DebugPrint("Broker: Clicks disabled in combat")
-		Perfy_Trace(Perfy_GetTime(), "Leave", "Broker:OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1877:0"); return
+		return
 	end
 
 	local DB = GetDB()
-	if not DB or not BetterFriendlistDB then Perfy_Trace(Perfy_GetTime(), "Leave", "Broker:OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1877:0"); return end
+	if not DB or not BetterFriendlistDB then return end
 
 	local action = "none"
 	if button == "LeftButton" then
@@ -1973,25 +1973,25 @@ function Broker:OnClick(clickedFrame, button) Perfy_Trace(Perfy_GetTime(), "Ente
 			-- BFL:DebugPrint(string.format("Broker: Filter cycled to '%s'", nextFilter))
 		end
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "Broker:OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1877:0"); end
+end
 
 -- ========================================
 -- Public API
 -- ========================================
 
-function Broker:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "Broker:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1982:0");
+function Broker:Initialize()
 	-- BFL:DebugPrint("Broker: Initializing...")
 
 	-- BETA FEATURE CHECK: Only initialize if Beta Features are enabled
 	if not BetterFriendlistDB or not BetterFriendlistDB.enableBetaFeatures then
 		-- BFL:DebugPrint("Broker: Beta Features not enabled - Data Broker integration disabled")
-		Perfy_Trace(Perfy_GetTime(), "Leave", "Broker:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1982:0"); return
+		return
 	end
 
 	-- Check if LibDataBroker is available
 	if not LDB then
 		-- BFL:DebugPrint("Broker: LibDataBroker-1.1 not found - Data Broker integration disabled")
-		Perfy_Trace(Perfy_GetTime(), "Leave", "Broker:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1982:0"); return
+		return
 	end
 	-- Check if LibQTip is available
 	if not LQT then
@@ -2003,12 +2003,12 @@ function Broker:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "Broker:Initi
 	local DB = GetDB()
 	if not DB or not BetterFriendlistDB then
 		-- BFL:DebugPrint("Broker: Database not initialized yet")
-		Perfy_Trace(Perfy_GetTime(), "Leave", "Broker:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1982:0"); return
+		return
 	end
 
 	if not BetterFriendlistDB.brokerEnabled then
 		-- BFL:DebugPrint("Broker: Disabled in settings")
-		Perfy_Trace(Perfy_GetTime(), "Leave", "Broker:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1982:0"); return
+		return
 	end
 
 	-- Create Data Broker object
@@ -2018,7 +2018,7 @@ function Broker:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "Broker:Initi
 		icon = "Interface\\AddOns\\BetterFriendlist\\Textures\\PortraitIcon.blp",
 		label = L("BROKER_TITLE"),
 
-		OnTooltipShow = function(gameTooltip) Perfy_Trace(Perfy_GetTime(), "Enter", "dataObjectDef.OnTooltipShow file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:2021:18");
+		OnTooltipShow = function(gameTooltip)
 			-- Fallback for display addons that use OnTooltipShow (without LibQTip support)
 			if not LQT and gameTooltip and gameTooltip.AddLine then
 				-- Choose tooltip mode
@@ -2028,11 +2028,11 @@ function Broker:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "Broker:Initi
 					CreateBasicTooltip(gameTooltip)
 				end
 			end
-		Perfy_Trace(Perfy_GetTime(), "Leave", "dataObjectDef.OnTooltipShow file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:2021:18"); end,
+		end,
 
-		OnClick = function(clickedFrame, button) Perfy_Trace(Perfy_GetTime(), "Enter", "dataObjectDef.OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:2033:12");
+		OnClick = function(clickedFrame, button)
 			Broker:OnClick(clickedFrame, button)
-		Perfy_Trace(Perfy_GetTime(), "Leave", "dataObjectDef.OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:2033:12"); end,
+		end,
 	}
 
 	-- Only add OnEnter if LibQTip is available
@@ -2040,9 +2040,9 @@ function Broker:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "Broker:Initi
 	-- If we define OnEnter but LQT is missing, the function would be empty and
 	-- the display addon would skip OnTooltipShow, resulting in NO tooltip.
 	if LQT then
-		dataObjectDef.OnEnter = function(anchorFrame) Perfy_Trace(Perfy_GetTime(), "Enter", "dataObjectDef.OnEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:2043:26");
+		dataObjectDef.OnEnter = function(anchorFrame)
 			tooltip = CreateLibQTipTooltip(anchorFrame)
-		Perfy_Trace(Perfy_GetTime(), "Leave", "dataObjectDef.OnEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:2043:26"); end
+		end
 		-- We do NOT define OnLeave here to allow the display addon to handle its own cleanup/unhighlighting.
 		-- Our tooltip handles its own hiding via SetupTooltipAutoHide.
 	end
@@ -2060,58 +2060,58 @@ function Broker:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "Broker:Initi
 	else
 		-- BFL:DebugPrint("Broker: Failed to create Data Broker object")
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "Broker:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:1982:0"); end
+end
 
-function Broker:RegisterEvents() Perfy_Trace(Perfy_GetTime(), "Enter", "Broker:RegisterEvents file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:2065:0");
+function Broker:RegisterEvents()
 	-- BETA FEATURE CHECK: Only register events if Beta Features are enabled
 	if not BetterFriendlistDB or not BetterFriendlistDB.enableBetaFeatures then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "Broker:RegisterEvents file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:2065:0"); return
+		return
 	end
 	
 	-- Check if enabled in broker settings
 	if not BetterFriendlistDB.brokerEnabled then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "Broker:RegisterEvents file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:2065:0"); return
+		return
 	end
 
 	if not dataObject then
 		-- BFL:DebugPrint("Broker: Events not registered - no data object")
-		Perfy_Trace(Perfy_GetTime(), "Leave", "Broker:RegisterEvents file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:2065:0"); return
+		return
 	end
 
 	-- BFL:DebugPrint("Broker: Registering events...")
 
 	-- Friend status events
-	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_ONLINE", function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:2084:55");
+	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_ONLINE", function(...)
 		Broker:UpdateBrokerText()
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:2084:55"); end)
+	end)
 
-	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_OFFLINE", function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:2088:56");
+	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_OFFLINE", function(...)
 		Broker:UpdateBrokerText()
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:2088:56"); end)
+	end)
 
-	BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:2092:48");
+	BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function(...)
 		Broker:UpdateBrokerText()
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:2092:48"); end)
+	end)
 
-	BFL:RegisterEventCallback("BN_CONNECTED", function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:2096:43");
+	BFL:RegisterEventCallback("BN_CONNECTED", function(...)
 		Broker:UpdateBrokerText()
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:2096:43"); end)
+	end)
 
-	BFL:RegisterEventCallback("BN_DISCONNECTED", function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:2100:46");
+	BFL:RegisterEventCallback("BN_DISCONNECTED", function(...)
 		Broker:UpdateBrokerText()
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:2100:46"); end)
+	end)
 
 	-- BFL:DebugPrint("Broker: Events registered")
-Perfy_Trace(Perfy_GetTime(), "Leave", "Broker:RegisterEvents file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:2065:0"); end
+end
 
 -- ========================================
 -- Slash Command Support
 -- ========================================
 
-function Broker:ToggleEnabled() Perfy_Trace(Perfy_GetTime(), "Enter", "Broker:ToggleEnabled file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:2111:0");
+function Broker:ToggleEnabled()
 	if not BetterFriendlistDB then
 		-- BFL:DebugPrint("|cffff0000BetterFriendlist:|r Database not initialized")
-		Perfy_Trace(Perfy_GetTime(), "Leave", "Broker:ToggleEnabled file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:2111:0"); return
+		return
 	end
 
 	BetterFriendlistDB.brokerEnabled = not BetterFriendlistDB.brokerEnabled
@@ -2121,8 +2121,8 @@ function Broker:ToggleEnabled() Perfy_Trace(Perfy_GetTime(), "Enter", "Broker:To
 	else
 		print("|cff00ff00BetterFriendlist:|r Data Broker |cffff0000DISABLED|r - /reload to apply")
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "Broker:ToggleEnabled file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua:2111:0"); end
+end
 
 -- Export module
 BFL.Broker = Broker
-Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Broker.lua"); return Broker
+return Broker

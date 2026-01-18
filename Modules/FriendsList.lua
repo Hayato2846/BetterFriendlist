@@ -1,4 +1,3 @@
---[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua"); -- Modules/FriendsList.lua
 -- Friends List Core Logic Module
 
 local ADDON_NAME, BFL = ...
@@ -8,10 +7,10 @@ local L = BFL.L  -- Localization table
 -- ========================================
 -- Module Dependencies
 -- ========================================
-local function GetDB() Perfy_Trace(Perfy_GetTime(), "Enter", "GetDB file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:11:6"); return Perfy_Trace_Passthrough("Leave", "GetDB file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:11:6", BFL:GetModule("DB")) end
-local function GetGroups() Perfy_Trace(Perfy_GetTime(), "Enter", "GetGroups file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:12:6"); return Perfy_Trace_Passthrough("Leave", "GetGroups file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:12:6", BFL:GetModule("Groups")) end
-local function GetColorManager() Perfy_Trace(Perfy_GetTime(), "Enter", "GetColorManager file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:13:6"); return Perfy_Trace_Passthrough("Leave", "GetColorManager file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:13:6", BFL.ColorManager) end
-local function GetFontManager() Perfy_Trace(Perfy_GetTime(), "Enter", "GetFontManager file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:14:6"); return Perfy_Trace_Passthrough("Leave", "GetFontManager file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:14:6", BFL.FontManager) end
+local function GetDB() return BFL:GetModule("DB") end
+local function GetGroups() return BFL:GetModule("Groups") end
+local function GetColorManager() return BFL.ColorManager end
+local function GetFontManager() return BFL.FontManager end
 
 -- ========================================
 -- Constants
@@ -59,26 +58,25 @@ local INVITE_RESTRICTION_NO_GAME_ACCOUNTS = 12
 -- Get height of a display list item based on its type
 -- CRITICAL: These heights MUST match XML template heights and ButtonPool SetHeight() calls
 -- Otherwise buttons will drift out of position!
-local function GetItemHeight(item, isCompactMode) Perfy_Trace(Perfy_GetTime(), "Enter", "GetItemHeight file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:62:6");
-	if not item then Perfy_Trace(Perfy_GetTime(), "Leave", "GetItemHeight file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:62:6"); return 0 end
+local function GetItemHeight(item, isCompactMode) if not item then return 0 end
 	
 	-- Support both .type (Retail) and .buttonType (Classic)
 	local itemType = item.type or item.buttonType
 	
 	if itemType == BUTTON_TYPE_GROUP_HEADER then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "GetItemHeight file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:62:6"); return 22
+		return 22
 	elseif itemType == BUTTON_TYPE_INVITE_HEADER then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "GetItemHeight file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:62:6"); return 22  -- Invite header height (BFL_FriendInviteHeaderTemplate y="22")
+		return 22  -- Invite header height (BFL_FriendInviteHeaderTemplate y="22")
 	elseif itemType == BUTTON_TYPE_INVITE then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "GetItemHeight file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:62:6"); return 34  -- Invite button height (BFL_FriendInviteButtonTemplate y="34")
+		return 34  -- Invite button height (BFL_FriendInviteButtonTemplate y="34")
 	elseif itemType == BUTTON_TYPE_DIVIDER then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "GetItemHeight file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:62:6"); return 8  -- Divider height (BetterFriendsDividerTemplate y="8") - FIXED from 16!
+		return 8  -- Divider height (BetterFriendsDividerTemplate y="8") - FIXED from 16!
 	elseif itemType == BUTTON_TYPE_FRIEND then
-		return Perfy_Trace_Passthrough("Leave", "GetItemHeight file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:62:6", isCompactMode and 24 or 34)  -- Friend button (BetterFriendsListButtonTemplate y="34", compactMode=24)
+		return isCompactMode and 24 or 34  -- Friend button (BetterFriendsListButtonTemplate y="34", compactMode=24)
 	else
-		Perfy_Trace(Perfy_GetTime(), "Leave", "GetItemHeight file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:62:6"); return 34  -- Default fallback
+		return 34  -- Default fallback
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "GetItemHeight file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:62:6"); end
+end
 
 -- ========================================
 -- ScrollBox/DataProvider Functions (NEW - Phase 1)
@@ -86,8 +84,7 @@ Perfy_Trace(Perfy_GetTime(), "Leave", "GetItemHeight file://c:\\Program Files (x
 
 -- Build DataProvider for ScrollBox system (replaces BuildDisplayList logic)
 -- Returns a DataProvider object with elementData for each button
-local function BuildDataProvider(self) Perfy_Trace(Perfy_GetTime(), "Enter", "BuildDataProvider file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:89:6");
-	local dataProvider = CreateDataProvider()
+local function BuildDataProvider(self) local dataProvider = CreateDataProvider()
 	
 	-- Sync groups first
 	self:SyncGroups()
@@ -156,7 +153,7 @@ local function BuildDataProvider(self) Perfy_Trace(Perfy_GetTime(), "Enter", "Bu
 	-- Get DB
 	local DB = GetDB()
 	if not DB then 
-		Perfy_Trace(Perfy_GetTime(), "Leave", "BuildDataProvider file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:89:6"); return dataProvider
+		return dataProvider
 	end
 	
 	-- PERFY OPTIMIZATION: Cache settings outside loop
@@ -248,7 +245,7 @@ local function BuildDataProvider(self) Perfy_Trace(Perfy_GetTime(), "Enter", "Bu
 	for _, groupData in pairs(friendGroups) do
 		table.insert(orderedGroups, groupData)
 	end
-	table.sort(orderedGroups, function(a, b) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:247:27"); return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:247:27", a.order < b.order) end)
+	table.sort(orderedGroups, function(a, b) return a.order < b.order end)
 	
 	for _, groupData in ipairs(orderedGroups) do
 		local groupFriends = groupedFriends[groupData.id]
@@ -298,13 +295,12 @@ local function BuildDataProvider(self) Perfy_Trace(Perfy_GetTime(), "Enter", "Bu
 		end
 	end
 	
-	Perfy_Trace(Perfy_GetTime(), "Leave", "BuildDataProvider file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:89:6"); return dataProvider
+	return dataProvider
 end
 
 -- Create element factory for ScrollBox button creation
 -- Returns a factory function that creates buttons based on elementData.buttonType
-local function CreateElementFactory(friendsList) Perfy_Trace(Perfy_GetTime(), "Enter", "CreateElementFactory file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:302:6");
-	-- Capture friendsList reference in closure
+local function CreateElementFactory(friendsList) -- Capture friendsList reference in closure
 	local self = friendsList
 	
 	-- Pre-define initializers to avoid closure allocation per row (Phase 9.3 Optimization)
@@ -324,8 +320,7 @@ local function CreateElementFactory(friendsList) Perfy_Trace(Perfy_GetTime(), "E
 		self:UpdateFriendButton(button, data)
 	end
 	
-	return Perfy_Trace_Passthrough("Leave", "CreateElementFactory file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:302:6", function(factory, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:306:8");
-		local buttonType = elementData.buttonType
+	return function(factory, elementData) local buttonType = elementData.buttonType
 		
 		if buttonType == BUTTON_TYPE_DIVIDER then
 			factory("BetterFriendsDividerTemplate")
@@ -342,31 +337,29 @@ local function CreateElementFactory(friendsList) Perfy_Trace(Perfy_GetTime(), "E
 		else -- BUTTON_TYPE_FRIEND
 			factory("BetterFriendsListButtonTemplate", InitFriendButton)
 		end
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:306:8"); end)
+	end
 end
 
 -- Create extent calculator for dynamic button heights
 -- Returns a function that calculates height based on elementData.buttonType
-local function CreateExtentCalculator(self) Perfy_Trace(Perfy_GetTime(), "Enter", "CreateExtentCalculator file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:337:6");
-	local DB = GetDB()
+local function CreateExtentCalculator(self) local DB = GetDB()
 	
-	return Perfy_Trace_Passthrough("Leave", "CreateExtentCalculator file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:337:6", function(dataIndex, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:340:8");
-		local isCompactMode = DB and DB:Get("compactMode", false)
+	return function(dataIndex, elementData) local isCompactMode = DB and DB:Get("compactMode", false)
 		
 		if elementData.buttonType == BUTTON_TYPE_GROUP_HEADER then
-			Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:340:8"); return 22
+			return 22
 		elseif elementData.buttonType == BUTTON_TYPE_INVITE_HEADER then
-			Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:340:8"); return 22
+			return 22
 		elseif elementData.buttonType == BUTTON_TYPE_INVITE then
-			Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:340:8"); return 34
+			return 34
 		elseif elementData.buttonType == BUTTON_TYPE_DIVIDER then
-			Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:340:8"); return 8
+			return 8
 		elseif elementData.buttonType == BUTTON_TYPE_FRIEND then
-			return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:340:8", isCompactMode and 24 or 34)
+			return isCompactMode and 24 or 34
 		else
-			Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:340:8"); return 34
+			return 34
 		end
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:340:8"); end)
+	end
 end
 
 -- ========================================
@@ -374,10 +367,9 @@ end
 -- ========================================
 
 -- Update ScrollBox/ScrollFrame height when frame is resized (called from MainFrameEditMode)
-function FriendsList:UpdateScrollBoxExtent() Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:UpdateScrollBoxExtent file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:364:0");
-	local frame = BetterFriendsFrame
+function FriendsList:UpdateScrollBoxExtent() local frame = BetterFriendsFrame
 	if not frame or not frame.ScrollFrame then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:UpdateScrollBoxExtent file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:364:0"); return
+		return
 	end
 	
 	-- Calculate available height for ScrollBox
@@ -402,20 +394,19 @@ function FriendsList:UpdateScrollBoxExtent() Perfy_Trace(Perfy_GetTime(), "Enter
 			self.classicScrollFrame.FauxScrollFrame:SetHeight(availableHeight)
 		end
 		self:RenderClassicButtons()
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:UpdateScrollBoxExtent file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:364:0"); return
+		return
 	end
 	
 	-- Retail: Trigger ScrollBox redraw
 	if self.scrollBox and self.scrollBox:GetDataProvider() then
 		self.scrollBox:FullUpdate(ScrollBoxConstants.UpdateImmediately)
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:UpdateScrollBoxExtent file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:364:0"); end
+end
 
 -- Get button width based on current frame size (Phase 3)
-function FriendsList:GetButtonWidth() Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:GetButtonWidth file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:402:0");
-	local frame = BetterFriendsFrame
+function FriendsList:GetButtonWidth() local frame = BetterFriendsFrame
 	if not frame then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:GetButtonWidth file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:402:0"); return 398  -- Default width from XML
+		return 398  -- Default width from XML
 	end
 	
 	-- Frame width minus padding, scrollbar, and inset borders
@@ -428,7 +419,7 @@ function FriendsList:GetButtonWidth() Perfy_Trace(Perfy_GetTime(), "Enter", "Fri
 		buttonWidth = 300
 	end
 	
-	Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:GetButtonWidth file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:402:0"); return buttonWidth
+	return buttonWidth
 end
 
 -- ========================================
@@ -438,17 +429,16 @@ end
 -- Initialize scroll system (called once in Initialize())
 -- Retail: Modern ScrollBox/DataProvider system
 -- Classic: FauxScrollFrame with button pool
-function FriendsList:InitializeScrollBox() Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:InitializeScrollBox file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:428:0");
-	local scrollFrame = BetterFriendsFrame.ScrollFrame
+function FriendsList:InitializeScrollBox() local scrollFrame = BetterFriendsFrame.ScrollFrame
 	if not scrollFrame then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:InitializeScrollBox file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:428:0"); return
+		return
 	end
 	
 	-- Classic: Use FauxScrollFrame approach
 	if BFL.IsClassic or not BFL.HasModernScrollBox then
 		-- BFL:DebugPrint("|cff00ffffFriendsList:|r Using Classic FauxScrollFrame mode")
 		self:InitializeClassicScrollFrame(scrollFrame)
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:InitializeScrollBox file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:428:0"); return
+		return
 	end
 	
 	-- Retail: Use modern ScrollBox system
@@ -466,7 +456,7 @@ function FriendsList:InitializeScrollBox() Perfy_Trace(Perfy_GetTime(), "Enter",
 	-- Use existing MinimalScrollBar (already defined in XML)
 	local scrollBar = BetterFriendsFrame.MinimalScrollBar
 	if not scrollBar then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:InitializeScrollBox file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:428:0"); return
+		return
 	end
 	
 	-- Create view with factory and extent calculator
@@ -484,7 +474,7 @@ function FriendsList:InitializeScrollBox() Perfy_Trace(Perfy_GetTime(), "Enter",
 	-- Store reference for later use
 	self.scrollBox = scrollFrame.ScrollBox
 	self.scrollBar = scrollBar
-Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:InitializeScrollBox file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:428:0"); end
+end
 
 -- ========================================
 -- Classic FauxScrollFrame Implementation
@@ -496,8 +486,7 @@ local CLASSIC_COMPACT_BUTTON_HEIGHT = 24
 local CLASSIC_MAX_BUTTONS = 20  -- Max visible buttons
 
 -- Initialize Classic FauxScrollFrame with button pool
-function FriendsList:InitializeClassicScrollFrame(scrollFrame) Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:InitializeClassicScrollFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:486:0");
-	-- Store reference to scrollFrame for Classic mode
+function FriendsList:InitializeClassicScrollFrame(scrollFrame) -- Store reference to scrollFrame for Classic mode
 	self.classicScrollFrame = scrollFrame
 	self.classicButtonPool = {}
 	self.classicDisplayList = {}
@@ -511,11 +500,9 @@ function FriendsList:InitializeClassicScrollFrame(scrollFrame) Perfy_Trace(Perfy
 		scrollFrame.FauxScrollFrame = fauxScroll
 		
 		-- Set OnVerticalScroll handler
-		fauxScroll:SetScript("OnVerticalScroll", function(self, offset) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:501:43");
-			FauxScrollFrame_OnVerticalScroll(self, offset, CLASSIC_BUTTON_HEIGHT, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:502:73");
-				BFL.FriendsList:RenderClassicButtons()
-			Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:502:73"); end)
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:501:43"); end)
+		fauxScroll:SetScript("OnVerticalScroll", function(self, offset) FauxScrollFrame_OnVerticalScroll(self, offset, CLASSIC_BUTTON_HEIGHT, function() BFL.FriendsList:RenderClassicButtons()
+			end)
+		end)
 	end
 	
 	-- Create content frame for buttons (same size as FauxScrollFrame)
@@ -587,12 +574,11 @@ function FriendsList:InitializeClassicScrollFrame(scrollFrame) Perfy_Trace(Perfy
 	end
 	
 	-- BFL:DebugPrint(string.format("|cff00ffffFriendsList:|r Created Classic button pool with %d buttons", numButtons))
-Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:InitializeClassicScrollFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:486:0"); end
+end
 
 -- Render buttons in Classic FauxScrollFrame mode
-function FriendsList:RenderClassicButtons() Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:RenderClassicButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:580:0");
-	if not self.classicScrollFrame or not self.classicButtonPool then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:RenderClassicButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:580:0"); return
+function FriendsList:RenderClassicButtons() if not self.classicScrollFrame or not self.classicButtonPool then
+		return
 	end
 	
 	local displayList = self.classicDisplayList or {}
@@ -698,7 +684,7 @@ function FriendsList:RenderClassicButtons() Perfy_Trace(Perfy_GetTime(), "Enter"
 			-- Continue iterating to process other items in the logic (offset calculation)
 		end
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:RenderClassicButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:580:0"); end
+end
 
 -- ========================================
 -- Legacy Helper Functions
@@ -716,13 +702,11 @@ Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:RenderClassicButtons file://c
 -- We need to strip gender suffixes before matching
 --
 -- ⚠️ DEPRECATED: Logic moved to BFL.ClassUtils
-local function GetClassFileFromClassName(className) Perfy_Trace(Perfy_GetTime(), "Enter", "GetClassFileFromClassName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:706:6");
-	return Perfy_Trace_Passthrough("Leave", "GetClassFileFromClassName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:706:6", BFL.ClassUtils:GetClassFileFromClassName(className))
+local function GetClassFileFromClassName(className) return BFL.ClassUtils:GetClassFileFromClassName(className)
 end
 
 -- Get class file for friend (optimized for 11.2.7+)
-local function GetClassFileForFriend(friend) Perfy_Trace(Perfy_GetTime(), "Enter", "GetClassFileForFriend file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:711:6");
-	return Perfy_Trace_Passthrough("Leave", "GetClassFileForFriend file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:711:6", BFL.ClassUtils:GetClassFileForFriend(friend))
+local function GetClassFileForFriend(friend) return BFL.ClassUtils:GetClassFileForFriend(friend)
 end
 
 -- ========================================
@@ -741,67 +725,62 @@ FriendsList.sortMode = "status"   -- Current sort mode: status, name, level, zon
 -- ========================================
 
 -- Count table entries (replacement for tsize)
-local function CountTableEntries(t) Perfy_Trace(Perfy_GetTime(), "Enter", "CountTableEntries file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:731:6");
-	local count = 0
+local function CountTableEntries(t) local count = 0
 	for _ in pairs(t) do
 		count = count + 1
 	end
-	Perfy_Trace(Perfy_GetTime(), "Leave", "CountTableEntries file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:731:6"); return count
+	return count
 end
 
 -- Get last online time text (from Blizzard's FriendsFrame)
-local function GetLastOnlineTime(timeDifference) Perfy_Trace(Perfy_GetTime(), "Enter", "GetLastOnlineTime file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:740:6");
-	if not timeDifference then
+local function GetLastOnlineTime(timeDifference) if not timeDifference then
 		timeDifference = 0
 	end
 	
 	timeDifference = time() - timeDifference
 	
 	if timeDifference < 60 then
-		return Perfy_Trace_Passthrough("Leave", "GetLastOnlineTime file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:740:6", LASTONLINE_SECS)
+		return LASTONLINE_SECS
 	elseif timeDifference >= 60 and timeDifference < 3600 then
-		return Perfy_Trace_Passthrough("Leave", "GetLastOnlineTime file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:740:6", string.format(LASTONLINE_MINUTES, math.floor(timeDifference / 60)))
+		return string.format(LASTONLINE_MINUTES, math.floor(timeDifference / 60))
 	elseif timeDifference >= 3600 and timeDifference < 86400 then
-		return Perfy_Trace_Passthrough("Leave", "GetLastOnlineTime file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:740:6", string.format(LASTONLINE_HOURS, math.floor(timeDifference / 3600)))
+		return string.format(LASTONLINE_HOURS, math.floor(timeDifference / 3600))
 	elseif timeDifference >= 86400 and timeDifference < 2592000 then
-		return Perfy_Trace_Passthrough("Leave", "GetLastOnlineTime file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:740:6", string.format(LASTONLINE_DAYS, math.floor(timeDifference / 86400)))
+		return string.format(LASTONLINE_DAYS, math.floor(timeDifference / 86400))
 	elseif timeDifference >= 2592000 and timeDifference < 31536000 then
-		return Perfy_Trace_Passthrough("Leave", "GetLastOnlineTime file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:740:6", string.format(LASTONLINE_MONTHS, math.floor(timeDifference / 2592000)))
+		return string.format(LASTONLINE_MONTHS, math.floor(timeDifference / 2592000))
 	else
-		return Perfy_Trace_Passthrough("Leave", "GetLastOnlineTime file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:740:6", string.format(LASTONLINE_YEARS, math.floor(timeDifference / 31536000)))
+		return string.format(LASTONLINE_YEARS, math.floor(timeDifference / 31536000))
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "GetLastOnlineTime file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:740:6"); end
+end
 
-local function GetLastOnlineText(accountInfo) Perfy_Trace(Perfy_GetTime(), "Enter", "GetLastOnlineText file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:762:6");
-	if not accountInfo or not accountInfo.lastOnlineTime or accountInfo.lastOnlineTime == 0 then
-		return Perfy_Trace_Passthrough("Leave", "GetLastOnlineText file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:762:6", FRIENDS_LIST_OFFLINE)
+local function GetLastOnlineText(accountInfo) if not accountInfo or not accountInfo.lastOnlineTime or accountInfo.lastOnlineTime == 0 then
+		return FRIENDS_LIST_OFFLINE
 	else
-		return Perfy_Trace_Passthrough("Leave", "GetLastOnlineText file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:762:6", string.format(BNET_LAST_ONLINE_TIME, GetLastOnlineTime(accountInfo.lastOnlineTime)))
+		return string.format(BNET_LAST_ONLINE_TIME, GetLastOnlineTime(accountInfo.lastOnlineTime))
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "GetLastOnlineText file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:762:6"); end
+end
 
 -- Get friend unique ID (matching BetterFriendlist.lua format)
-local function GetFriendUID(friend) Perfy_Trace(Perfy_GetTime(), "Enter", "GetFriendUID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:771:6");
-	if not friend then Perfy_Trace(Perfy_GetTime(), "Leave", "GetFriendUID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:771:6"); return nil end
+local function GetFriendUID(friend) if not friend then return nil end
 	if friend.type == "bnet" then
 		-- Use battleTag as persistent identifier (bnetAccountID is temporary per session)
 		if friend.battleTag then
-			return Perfy_Trace_Passthrough("Leave", "GetFriendUID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:771:6", "bnet_" .. friend.battleTag)
+			return "bnet_" .. friend.battleTag
 		else
 			-- Fallback to bnetAccountID only if battleTag is unavailable (should never happen)
-			return Perfy_Trace_Passthrough("Leave", "GetFriendUID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:771:6", "bnet_" .. tostring(friend.bnetAccountID or "unknown"))
+			return "bnet_" .. tostring(friend.bnetAccountID or "unknown")
 		end
 	else
 		-- WoW friends: Always use Name-Realm format for consistency
 		local normalizedName = BFL:NormalizeWoWFriendName(friend.name)
-		return Perfy_Trace_Passthrough("Leave", "GetFriendUID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:771:6", normalizedName and ("wow_" .. normalizedName) or nil)
+		return normalizedName and ("wow_" .. normalizedName) or nil
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "GetFriendUID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:771:6"); end
+end
 
 -- Get display name based on format setting
 -- @param forSorting (boolean) If true, use BattleTag instead of AccountName for BNet friends (prevents sorting issues with protected strings)
-function FriendsList:GetDisplayName(friend, forSorting) Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:GetDisplayName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:790:0");
-	-- PHASE 9.6: Display Name Caching
+function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.6: Display Name Caching
 	if not self.displayNameCache then self.displayNameCache = {} end
 
 	local DB = GetDB()
@@ -871,7 +850,7 @@ function FriendsList:GetDisplayName(friend, forSorting) Perfy_Trace(Perfy_GetTim
 	   cacheEntry.nickname == nickname and
 	   cacheEntry.name == name and
 	   cacheEntry.btag == battletag then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:GetDisplayName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:790:0"); return cacheEntry.result
+		return cacheEntry.result
 	end
 
 	-- 2. Replace Tokens
@@ -935,7 +914,7 @@ function FriendsList:GetDisplayName(friend, forSorting) Perfy_Trace(Perfy_GetTim
 		btag = battletag
 	}
 	
-	Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:GetDisplayName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:790:0"); return result
+	return result
 end
 
 -- ========================================
@@ -943,8 +922,7 @@ end
 -- ========================================
 
 -- Initialize the module
-function FriendsList:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:889:0");
-	-- Initialize sort modes and filter from database
+function FriendsList:Initialize() -- Initialize sort modes and filter from database
 	local DB = BFL:GetModule("DB")
 	local db = DB and DB:Get() or {}
 	self.sortMode = db.primarySort or "status"
@@ -959,56 +937,45 @@ function FriendsList:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "Friends
 	self:InitializeScrollBox()
 	
 	-- Initialize responsive SearchBox width
-	C_Timer.After(0.1, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:905:20");
-		if BFL.FriendsList and BFL.FriendsList.UpdateSearchBoxWidth then
+	C_Timer.After(0.1, function() if BFL.FriendsList and BFL.FriendsList.UpdateSearchBoxWidth then
 			BFL.FriendsList:UpdateSearchBoxWidth()
 			-- BFL:DebugPrint("|cff00ffffFriendsList:Initialize:|r Called UpdateSearchBoxWidth")
 		else
 			-- BFL:DebugPrint("|cffff0000FriendsList:Initialize:|r UpdateSearchBoxWidth not found!")
 		end
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:905:20"); end)
+	end)
 	
 	-- Register event callbacks for friend list updates
-	BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:915:48");
-		self:OnFriendListUpdate(...)
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:915:48"); end, 10)
+	BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function(...) self:OnFriendListUpdate(...)
+	end, 10)
 	
-	BFL:RegisterEventCallback("BN_FRIEND_LIST_SIZE_CHANGED", function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:919:58");
-		self:OnFriendListUpdate(...)
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:919:58"); end, 10)
+	BFL:RegisterEventCallback("BN_FRIEND_LIST_SIZE_CHANGED", function(...) self:OnFriendListUpdate(...)
+	end, 10)
 	
-	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_ONLINE", function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:923:55");
-		self:OnFriendListUpdate(...)
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:923:55"); end, 10)
+	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_ONLINE", function(...) self:OnFriendListUpdate(...)
+	end, 10)
 	
-	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_OFFLINE", function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:927:56");
-		self:OnFriendListUpdate(...)
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:927:56"); end, 10)
+	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_OFFLINE", function(...) self:OnFriendListUpdate(...)
+	end, 10)
 	
-	BFL:RegisterEventCallback("BN_FRIEND_INFO_CHANGED", function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:931:53");
-		self:OnFriendListUpdate(...)
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:931:53"); end, 10)
+	BFL:RegisterEventCallback("BN_FRIEND_INFO_CHANGED", function(...) self:OnFriendListUpdate(...)
+	end, 10)
 	
 	-- Additional events from Blizzard's FriendsFrame
-	BFL:RegisterEventCallback("BN_CONNECTED", function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:936:43");
-		self:OnFriendListUpdate(...)
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:936:43"); end, 10)
+	BFL:RegisterEventCallback("BN_CONNECTED", function(...) self:OnFriendListUpdate(...)
+	end, 10)
 	
-	BFL:RegisterEventCallback("BN_DISCONNECTED", function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:940:46");
-		self:OnFriendListUpdate(...)
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:940:46"); end, 10)
+	BFL:RegisterEventCallback("BN_DISCONNECTED", function(...) self:OnFriendListUpdate(...)
+	end, 10)
 	
-	BFL:RegisterEventCallback("GROUP_ROSTER_UPDATE", function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:944:50");
-		self:OnFriendListUpdate(...)
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:944:50"); end, 10)
+	BFL:RegisterEventCallback("GROUP_ROSTER_UPDATE", function(...) self:OnFriendListUpdate(...)
+	end, 10)
 	
 	-- Register friend invite events
-	BFL:RegisterEventCallback("BN_FRIEND_INVITE_LIST_INITIALIZED", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:949:64");
-		self:OnFriendListUpdate(true) -- Force immediate update
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:949:64"); end, 10)
+	BFL:RegisterEventCallback("BN_FRIEND_INVITE_LIST_INITIALIZED", function() self:OnFriendListUpdate(true) -- Force immediate update
+	end, 10)
 	
-	BFL:RegisterEventCallback("BN_FRIEND_INVITE_ADDED", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:953:53");
-		-- Play sound immediately (Phase 1)
+	BFL:RegisterEventCallback("BN_FRIEND_INVITE_ADDED", function() -- Play sound immediately (Phase 1)
 		PlaySound(SOUNDKIT.UI_BNET_TOAST)
 		
 		local collapsed = GetCVarBool("friendInvitesCollapsed")
@@ -1016,36 +983,32 @@ function FriendsList:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "Friends
 			self:FlashInviteHeader()
 		end
 		self:OnFriendListUpdate(true) -- Force immediate update (Phase 2)
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:953:53"); end, 10)
+	end, 10)
 	
-	BFL:RegisterEventCallback("BN_FRIEND_INVITE_REMOVED", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:964:55");
-		self:OnFriendListUpdate(true) -- Force immediate update (Phase 2)
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:964:55"); end, 10)
+	BFL:RegisterEventCallback("BN_FRIEND_INVITE_REMOVED", function() self:OnFriendListUpdate(true) -- Force immediate update (Phase 2)
+	end, 10)
 	
 	-- Hook OnShow to re-render if data changed while hidden
 	if BetterFriendsFrame then
-		BetterFriendsFrame:HookScript("OnShow", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:970:42");
-			if needsRenderOnShow then
+		BetterFriendsFrame:HookScript("OnShow", function() if needsRenderOnShow then
 				-- BFL:DebugPrint("|cff00ffffFriendsList:|r Frame shown, dirty flag set - triggering refresh")
 				self:UpdateFriendsList()
 			end
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:970:42"); end)
+		end)
 		
 		-- Also hook ScrollFrame OnShow for tab switching
 		if BetterFriendsFrame.ScrollFrame then
-			BetterFriendsFrame.ScrollFrame:HookScript("OnShow", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:979:55");
-				if needsRenderOnShow then
+			BetterFriendsFrame.ScrollFrame:HookScript("OnShow", function() if needsRenderOnShow then
 					-- BFL:DebugPrint("|cff00ffffFriendsList:|r ScrollFrame shown, dirty flag set - triggering refresh")
 					self:UpdateFriendsList()
 				end
-			Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:979:55"); end)
+			end)
 		end
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:889:0"); end
+end
 
 -- Handle friend list update events
-function FriendsList:OnFriendListUpdate(forceImmediate) Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:OnFriendListUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:990:0");
-	-- Event Coalescing (Micro-Throttling)
+function FriendsList:OnFriendListUpdate(forceImmediate) -- Event Coalescing (Micro-Throttling)
 	-- Instead of updating immediately for every event, we schedule an update for the next frame.
 	-- This handles "event bursts" (e.g. 50 friends coming online at once) by updating only once.
 	
@@ -1056,7 +1019,7 @@ function FriendsList:OnFriendListUpdate(forceImmediate) Perfy_Trace(Perfy_GetTim
 			self.updateTimer = nil
 		end
 		self:UpdateFriendsList()
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:OnFriendListUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:990:0"); return
+		return
 	end
 	
 	-- Phase 9.5 Strict Throttling: 
@@ -1065,25 +1028,23 @@ function FriendsList:OnFriendListUpdate(forceImmediate) Perfy_Trace(Perfy_GetTim
 	-- This saves valid memory/CPU cycles during gameplay when frame is closed.
 	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
 		needsRenderOnShow = true
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:OnFriendListUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:990:0"); return
+		return
 	end
 	
 	if self.updateTimer then
 		-- Timer already running, update will happen next frame
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:OnFriendListUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:990:0"); return
+		return
 	end
 	
 	-- Schedule update with a small delay (0.1s) to batch multiple events
 	-- This significantly reduces CPU usage during login or mass status changes
-	self.updateTimer = C_Timer.After(0.1, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1012:39");
-		self.updateTimer = nil
+	self.updateTimer = C_Timer.After(0.1, function() self.updateTimer = nil
 		self:UpdateFriendsList()
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1012:39"); end)
-Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:OnFriendListUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:990:0"); end
+	end)
+end
 
 -- Sync groups from Groups module
-function FriendsList:SyncGroups() Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:SyncGroups file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1019:0");
-	local Groups = GetGroups()
+function FriendsList:SyncGroups() local Groups = GetGroups()
 	if Groups then
 		friendGroups = Groups:GetAll()
 	else
@@ -1112,7 +1073,7 @@ function FriendsList:SyncGroups() Perfy_Trace(Perfy_GetTime(), "Enter", "Friends
 	
 	-- Feature: In-Game Group (Dynamic)
 	-- Now handled by Groups module (Groups:GetAll filters it based on settings)
-Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:SyncGroups file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1019:0"); end
+end
 
 -- ========================================
 -- Sorting Priority Calculation Helpers (Optimized)
@@ -1314,20 +1275,19 @@ local function CalculateRealmPriority(friend)
 end
 
 -- Update the friends list from WoW API
-function FriendsList:UpdateFriendsList() Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:UpdateFriendsList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1052:0");
-	-- Visibility Optimization:
+function FriendsList:UpdateFriendsList() -- Visibility Optimization:
 	-- If the frame is hidden, we don't need to fetch data or rebuild the list.
 	-- Just mark it as dirty so it updates when shown.
 	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
 		needsRenderOnShow = true
 		isUpdatingFriendsList = false -- Ensure lock is released if it was somehow set
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:UpdateFriendsList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1052:0"); return
+		return
 	end
 
 	-- Prevent concurrent updates
 	if isUpdatingFriendsList then
 		hasPendingUpdate = true
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:UpdateFriendsList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1052:0"); return
+		return
 	end
 	
 	isUpdatingFriendsList = true
@@ -1566,17 +1526,15 @@ function FriendsList:UpdateFriendsList() Perfy_Trace(Perfy_GetTime(), "Enter", "
 	
 	-- Release lock after update complete
 	isUpdatingFriendsList = false
-Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:UpdateFriendsList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1052:0"); end
+end
 
 -- Clear pending update flag (used by ForceRefreshFriendsList to prevent race conditions)
-function FriendsList:ClearPendingUpdate() Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:ClearPendingUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1211:0");
-	hasPendingUpdate = false
-Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:ClearPendingUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1211:0"); end
+function FriendsList:ClearPendingUpdate() hasPendingUpdate = false
+end
 
 -- Apply search and filter to friends list
-function FriendsList:ApplyFilters() Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:ApplyFilters file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1216:0");
-	-- Filter is applied in RenderDisplay / BuildDataProvider
-Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:ApplyFilters file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1216:0"); end
+function FriendsList:ApplyFilters() -- Filter is applied in RenderDisplay / BuildDataProvider
+end
 
 -- Optimized comparator to avoid closure allocation
 local function SortComparator(a, b)
@@ -1621,14 +1579,13 @@ local function SortComparator(a, b)
 end
 
 -- Apply sort order to friends list (with primary and secondary sort)
-function FriendsList:ApplySort() Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:ApplySort file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1221:0");
-	-- Store sort modes for the static comparator
+function FriendsList:ApplySort() -- Store sort modes for the static comparator
 	self.currentPrimarySort = self.sortMode
 	self.currentSecondarySort = self.secondarySort or "name"
 	
 	-- Use static comparator to avoid closure allocation (Phase 9.4 Optimization)
 	table.sort(self.friendsList, SortComparator)
-Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:ApplySort file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1221:0"); end
+end
 
 -- Compare two friends by a specific sort mode (returns true, false, or nil if equal)
 -- Compare two friends by a specific sort mode (Optimized)
@@ -1752,18 +1709,16 @@ function FriendsList:CompareFriends(a, b, sortMode)
 end
 
 -- Check if friend passes current filters
-function FriendsList:PassesFilters(friend) Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:PassesFilters file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1709:0");
-	-- Search text filter
+function FriendsList:PassesFilters(friend) -- Search text filter
 	if self.searchText and self.searchText ~= "" then
 		local searchLower = self.searchText:lower()
 		local found = false
 		
 		-- Helper function to check if a field contains the search text
-		local function contains(text) Perfy_Trace(Perfy_GetTime(), "Enter", "contains file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1716:8");
-			if text and text ~= "" and text ~= "???" then
-				return Perfy_Trace_Passthrough("Leave", "contains file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1716:8", text:lower():find(searchLower, 1, true) ~= nil)
+		local function contains(text) if text and text ~= "" and text ~= "???" then
+				return text:lower():find(searchLower, 1, true) ~= nil
 			end
-			Perfy_Trace(Perfy_GetTime(), "Leave", "contains file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1716:8"); return false
+			return false
 		end
 		
 		-- Search in multiple fields depending on friend type
@@ -1782,34 +1737,34 @@ function FriendsList:PassesFilters(friend) Perfy_Trace(Perfy_GetTime(), "Enter",
 		
 		-- If no match found in any field, filter out this friend
 		if not found then
-			Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:PassesFilters file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1709:0"); return false
+			return false
 		end
 	end
 	
 	-- Filter mode (use 'connected' field for both BNet and WoW friends)
 	if self.filterMode == "online" then
-		if not friend.connected then Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:PassesFilters file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1709:0"); return false end
+		if not friend.connected then return false end
 		
 	elseif self.filterMode == "offline" then
-		if friend.connected then Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:PassesFilters file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1709:0"); return false end
+		if friend.connected then return false end
 		
 	elseif self.filterMode == "wow" then
 		if friend.type == "bnet" then
 			-- BNet friend must be in WoW
-			if not friend.connected or not friend.gameAccountInfo then Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:PassesFilters file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1709:0"); return false end
-			if friend.gameAccountInfo.clientProgram ~= BNET_CLIENT_WOW then Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:PassesFilters file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1709:0"); return false end
+			if not friend.connected or not friend.gameAccountInfo then return false end
+			if friend.gameAccountInfo.clientProgram ~= BNET_CLIENT_WOW then return false end
 		end
 		-- WoW friends always pass
 		
 	elseif self.filterMode == "bnet" then
-		if friend.type ~= "bnet" then Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:PassesFilters file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1709:0"); return false end
+		if friend.type ~= "bnet" then return false end
 		
 	elseif self.filterMode == "hideafk" then
 		-- Hide AFK/DND friends (show all friends, but hide those who are AFK or DND)
 		if friend.type == "bnet" then
 			-- CRITICAL: isAFK/isDND are on friend object directly, not in gameAccountInfo
 			if friend.isAFK or friend.isDND then
-				Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:PassesFilters file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1709:0"); return false
+				return false
 			end
 		end
 		-- WoW friends don't have AFK/DND status, always show
@@ -1818,49 +1773,45 @@ function FriendsList:PassesFilters(friend) Perfy_Trace(Perfy_GetTime(), "Enter",
 		-- Show only Retail/Mainline WoW friends
 		if friend.type == "bnet" then
 			-- BNet friend must be in WoW Retail
-			if not friend.connected or not friend.gameAccountInfo then Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:PassesFilters file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1709:0"); return false end
-			if friend.gameAccountInfo.clientProgram ~= BNET_CLIENT_WOW then Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:PassesFilters file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1709:0"); return false end
+			if not friend.connected or not friend.gameAccountInfo then return false end
+			if friend.gameAccountInfo.clientProgram ~= BNET_CLIENT_WOW then return false end
 			-- Check if it's Retail (Mainline)
 			if friend.gameAccountInfo.wowProjectID and friend.gameAccountInfo.wowProjectID ~= WOW_PROJECT_MAINLINE then
-				Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:PassesFilters file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1709:0"); return false
+				return false
 			end
 		end
 		-- WoW friends are assumed to be on same version as player
 	end
 	
-	Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:PassesFilters file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1709:0"); return true
+	return true
 end
 
 -- Get friend UID (public helper)
-function FriendsList:GetFriendUID(friend) Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:GetFriendUID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1789:0");
-	return Perfy_Trace_Passthrough("Leave", "FriendsList:GetFriendUID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1789:0", GetFriendUID(friend))
+function FriendsList:GetFriendUID(friend) return GetFriendUID(friend)
 end
 
 -- Set search text
-function FriendsList:SetSearchText(text) Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:SetSearchText file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1794:0");
-	local newText = text or ""
+function FriendsList:SetSearchText(text) local newText = text or ""
 	if self.searchText == newText then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:SetSearchText file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1794:0"); return
+		return
 	end
 	self.searchText = newText
 	BFL:ForceRefreshFriendsList()
-Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:SetSearchText file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1794:0"); end
+end
 
 -- Set filter mode
-function FriendsList:SetFilterMode(mode) Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:SetFilterMode file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1800:0");
-	local newMode = mode or "all"
+function FriendsList:SetFilterMode(mode) local newMode = mode or "all"
 	if self.filterMode == newMode then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:SetFilterMode file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1800:0"); return
+		return
 	end
 	self.filterMode = newMode
 	BFL:ForceRefreshFriendsList()
-Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:SetFilterMode file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1800:0"); end
+end
 
 -- Set sort mode
-function FriendsList:SetSortMode(mode) Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:SetSortMode file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1806:0");
-	local newMode = mode or "status"
+function FriendsList:SetSortMode(mode) local newMode = mode or "status"
 	if self.sortMode == newMode then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:SetSortMode file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1806:0"); return
+		return
 	end
 	self.sortMode = newMode
 	
@@ -1873,12 +1824,11 @@ function FriendsList:SetSortMode(mode) Perfy_Trace(Perfy_GetTime(), "Enter", "Fr
 	
 	self:ApplySort()
 	BFL:ForceRefreshFriendsList()
-Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:SetSortMode file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1806:0"); end
+end
 
 -- Set secondary sort mode (for multi-criteria sorting)
-function FriendsList:SetSecondarySortMode(mode) Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:SetSecondarySortMode file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1821:0");
-	if self.secondarySort == mode then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:SetSecondarySortMode file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1821:0"); return
+function FriendsList:SetSecondarySortMode(mode) if self.secondarySort == mode then
+		return
 	end
 	self.secondarySort = mode
 	
@@ -1891,17 +1841,16 @@ function FriendsList:SetSecondarySortMode(mode) Perfy_Trace(Perfy_GetTime(), "En
 	
 	self:ApplySort()
 	BFL:ForceRefreshFriendsList()
-Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:SetSecondarySortMode file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1821:0"); end
+end
 
 -- ========================================
 -- Group Management API
 -- ========================================
 
 -- Helper: Get friends in a specific group (optimized for single group access)
-function FriendsList:GetFriendsForGroup(targetGroupId) Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:GetFriendsForGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1840:0");
-	local groupFriends = {}
+function FriendsList:GetFriendsForGroup(targetGroupId) local groupFriends = {}
 	local DB = GetDB()
-	if not DB then Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:GetFriendsForGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1840:0"); return groupFriends end
+	if not DB then return groupFriends end
 	
 	for _, friend in ipairs(self.friendsList) do
 		-- Apply filters first
@@ -1967,16 +1916,15 @@ function FriendsList:GetFriendsForGroup(targetGroupId) Perfy_Trace(Perfy_GetTime
 		end
 	end
 	
-	Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:GetFriendsForGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1840:0"); return groupFriends
+	return groupFriends
 end
 
 -- Attempt optimized group toggle without full list rebuild
-function FriendsList:OptimizedGroupToggle(groupId, expanding) Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:OptimizedGroupToggle file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1913:0");
-	-- Only possible on Retail (ScrollBox)
-	if not self.scrollBox then Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:OptimizedGroupToggle file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1913:0"); return false end
+function FriendsList:OptimizedGroupToggle(groupId, expanding) -- Only possible on Retail (ScrollBox)
+	if not self.scrollBox then return false end
 	
 	local dataProvider = self.scrollBox:GetDataProvider()
-	if not dataProvider then Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:OptimizedGroupToggle file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1913:0"); return false end
+	if not dataProvider then return false end
 	
 	local headerData = nil
 	local friendsToRemove = {}
@@ -2003,7 +1951,7 @@ function FriendsList:OptimizedGroupToggle(groupId, expanding) Perfy_Trace(Perfy_
 		end
 	end
 	
-	if not headerData then Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:OptimizedGroupToggle file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1913:0"); return false end
+	if not headerData then return false end
 	
 	-- Update header state
 	headerData.collapsed = not expanding
@@ -2017,7 +1965,7 @@ function FriendsList:OptimizedGroupToggle(groupId, expanding) Perfy_Trace(Perfy_
 			end
 		else
 			-- Fallback if Remove(data) missing (unlikely on Retail)
-			Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:OptimizedGroupToggle file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1913:0"); return false
+			return false
 		end
 	else
 		-- EXPANDING: Insert friends
@@ -2049,24 +1997,22 @@ function FriendsList:OptimizedGroupToggle(groupId, expanding) Perfy_Trace(Perfy_
 				insertIndex = insertIndex + 1
 			end
 		else
-			Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:OptimizedGroupToggle file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1913:0"); return false -- Should not happen header was found earlier
+			return false -- Should not happen header was found earlier
 		end
 	end
 	
 	-- Manually update header visual to reflect new state
-	self.scrollBox:ForEachFrame(function(frame, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1996:29");
-		if elementData == headerData then
+	self.scrollBox:ForEachFrame(function(frame, elementData) if elementData == headerData then
 			self:UpdateGroupHeaderButton(frame, elementData)
 		end
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1996:29"); end)
+	end)
 	
-	Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:OptimizedGroupToggle file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:1913:0"); return true
+	return true
 end
 
 -- Toggle group collapsed state (Optimized)
-function FriendsList:ToggleGroup(groupId) Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:ToggleGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2006:0");
-	local Groups = GetGroups()
-	if not Groups then Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:ToggleGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2006:0"); return end
+function FriendsList:ToggleGroup(groupId) local Groups = GetGroups()
+	if not Groups then return end
 	
 	-- Handle Accordion Mode
 	-- Note: We do this before the main toggle to clear others
@@ -2092,7 +2038,7 @@ function FriendsList:ToggleGroup(groupId) Perfy_Trace(Perfy_GetTime(), "Enter", 
 	if Groups:Toggle(groupId, true) then
 		if needsFullRefresh then
 			BFL:ForceRefreshFriendsList()
-			Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:ToggleGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2006:0"); return
+			return
 		end
 		
 		-- Try optimized update first
@@ -2101,7 +2047,7 @@ function FriendsList:ToggleGroup(groupId) Perfy_Trace(Perfy_GetTime(), "Enter", 
 		
 		if self:OptimizedGroupToggle(groupId, expanding) then
 			-- Optimization successful!
-			Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:ToggleGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2006:0"); return
+			return
 		end
 		
 		-- Fallback to full refresh
@@ -2110,13 +2056,12 @@ function FriendsList:ToggleGroup(groupId) Perfy_Trace(Perfy_GetTime(), "Enter", 
 		-- Target group didn't change but others did (Accordion)
 		BFL:ForceRefreshFriendsList()
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:ToggleGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2006:0"); end
+end
 
 -- Create a new custom group
-function FriendsList:CreateGroup(groupName) Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:CreateGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2055:0");
-	local Groups = GetGroups()
+function FriendsList:CreateGroup(groupName) local Groups = GetGroups()
 	if not Groups then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:CreateGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2055:0"); return false, "Groups module not available"
+		return false, "Groups module not available"
 	end
 	
 	local success, err = Groups:Create(groupName)
@@ -2125,14 +2070,13 @@ function FriendsList:CreateGroup(groupName) Perfy_Trace(Perfy_GetTime(), "Enter"
 		BFL:ForceRefreshFriendsList()
 	end
 	
-	Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:CreateGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2055:0"); return success, err
+	return success, err
 end
 
 -- Rename a group
-function FriendsList:RenameGroup(groupId, newName) Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:RenameGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2071:0");
-	local Groups = GetGroups()
+function FriendsList:RenameGroup(groupId, newName) local Groups = GetGroups()
 	if not Groups then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:RenameGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2071:0"); return false, "Groups module not available"
+		return false, "Groups module not available"
 	end
 	
 	local success, err = Groups:Rename(groupId, newName)
@@ -2141,16 +2085,15 @@ function FriendsList:RenameGroup(groupId, newName) Perfy_Trace(Perfy_GetTime(), 
 		BFL:ForceRefreshFriendsList()
 	end
 	
-	Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:RenameGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2071:0"); return success, err
+	return success, err
 end
 
 -- Open color picker for a group
-function FriendsList:OpenColorPicker(groupId) Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:OpenColorPicker file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2087:0");
-	local Groups = GetGroups()
-	if not Groups then Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:OpenColorPicker file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2087:0"); return end
+function FriendsList:OpenColorPicker(groupId) local Groups = GetGroups()
+	if not Groups then return end
 	
 	local group = Groups:Get(groupId)
-	if not group then Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:OpenColorPicker file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2087:0"); return end
+	if not group then return end
 	
 	local r, g, b = 1, 1, 1
 	if group.color then
@@ -2160,17 +2103,15 @@ function FriendsList:OpenColorPicker(groupId) Perfy_Trace(Perfy_GetTime(), "Ente
 	end
 	
 	local info = {
-		swatchFunc = function() Perfy_Trace(Perfy_GetTime(), "Enter", "info.swatchFunc file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2102:15");
-			local newR, newG, newB = ColorPickerFrame:GetColorRGB()
+		swatchFunc = function() local newR, newG, newB = ColorPickerFrame:GetColorRGB()
 			Groups:SetColor(groupId, newR, newG, newB)
 			BFL:ForceRefreshFriendsList()
-		Perfy_Trace(Perfy_GetTime(), "Leave", "info.swatchFunc file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2102:15"); end,
-		cancelFunc = function(previousValues) Perfy_Trace(Perfy_GetTime(), "Enter", "info.cancelFunc file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2107:15");
-			if previousValues then
+		end,
+		cancelFunc = function(previousValues) if previousValues then
 				Groups:SetColor(groupId, previousValues.r, previousValues.g, previousValues.b)
 				BFL:ForceRefreshFriendsList()
 			end
-		Perfy_Trace(Perfy_GetTime(), "Leave", "info.cancelFunc file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2107:15"); end,
+		end,
 		r = r,
 		g = g,
 		b = b,
@@ -2178,13 +2119,12 @@ function FriendsList:OpenColorPicker(groupId) Perfy_Trace(Perfy_GetTime(), "Ente
 	}
 	
 	ColorPickerFrame:SetupColorPickerAndShow(info)
-Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:OpenColorPicker file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2087:0"); end
+end
 
 -- Delete a group
-function FriendsList:DeleteGroup(groupId) Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:DeleteGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2123:0");
-	local Groups = GetGroups()
+function FriendsList:DeleteGroup(groupId) local Groups = GetGroups()
 	if not Groups then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:DeleteGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2123:0"); return false, "Groups module not available"
+		return false, "Groups module not available"
 	end
 	
 	local success, err = Groups:Delete(groupId)
@@ -2193,13 +2133,12 @@ function FriendsList:DeleteGroup(groupId) Perfy_Trace(Perfy_GetTime(), "Enter", 
 		BFL:ForceRefreshFriendsList()
 	end
 	
-	Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:DeleteGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2123:0"); return success, err
+	return success, err
 end
 
 -- Invite all online friends in a group to party
-function FriendsList:InviteGroupToParty(groupId) Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:InviteGroupToParty file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2139:0");
-	local DB = GetDB()
-	if not DB then Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:InviteGroupToParty file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2139:0"); return end
+function FriendsList:InviteGroupToParty(groupId) local DB = GetDB()
+	if not DB then return end
 	
 	local inviteCount = 0
 	
@@ -2256,12 +2195,11 @@ function FriendsList:InviteGroupToParty(groupId) Perfy_Trace(Perfy_GetTime(), "E
 			end
 		end
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:InviteGroupToParty file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2139:0"); end
+end
 
 -- Toggle friend in group
-function FriendsList:ToggleFriendInGroup(friendUID, groupId) Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:ToggleFriendInGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2201:0");
-	local DB = GetDB()
-	if not DB then Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:ToggleFriendInGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2201:0"); return end
+function FriendsList:ToggleFriendInGroup(friendUID, groupId) local DB = GetDB()
+	if not DB then return end
 	
 	local friendGroupsData = DB:Get("friendGroups", {})
 	friendGroupsData[friendUID] = friendGroupsData[friendUID] or {}
@@ -2287,33 +2225,31 @@ function FriendsList:ToggleFriendInGroup(friendUID, groupId) Perfy_Trace(Perfy_G
 	DB:Set("friendGroups", friendGroupsData)
 	self:RenderDisplay()
 	
-	return Perfy_Trace_Passthrough("Leave", "FriendsList:ToggleFriendInGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2201:0", not isInGroup) -- Return new state (true = added)
+	return not isInGroup -- Return new state (true = added)
 end
 
 -- Check if friend is in group
-function FriendsList:IsFriendInGroup(friendUID, groupId) Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:IsFriendInGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2233:0");
-	local DB = GetDB()
-	if not DB then Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:IsFriendInGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2233:0"); return false end
+function FriendsList:IsFriendInGroup(friendUID, groupId) local DB = GetDB()
+	if not DB then return false end
 	
 	local friendGroupsData = DB:Get("friendGroups", {})
-	if not friendGroupsData[friendUID] then Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:IsFriendInGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2233:0"); return false end
+	if not friendGroupsData[friendUID] then return false end
 	
 	for _, gid in ipairs(friendGroupsData[friendUID]) do
 		if gid == groupId then
-			Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:IsFriendInGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2233:0"); return true
+			return true
 		end
 	end
 	
-	Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:IsFriendInGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2233:0"); return false
+	return false
 end
 
 -- Remove friend from group
-function FriendsList:RemoveFriendFromGroup(friendUID, groupId) Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:RemoveFriendFromGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2250:0");
-	local DB = GetDB()
-	if not DB then Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:RemoveFriendFromGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2250:0"); return end
+function FriendsList:RemoveFriendFromGroup(friendUID, groupId) local DB = GetDB()
+	if not DB then return end
 	
 	local friendGroupsData = DB:Get("friendGroups", {})
-	if not friendGroupsData[friendUID] then Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:RemoveFriendFromGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2250:0"); return end
+	if not friendGroupsData[friendUID] then return end
 	
 	for i, gid in ipairs(friendGroupsData[friendUID]) do
 		if gid == groupId then
@@ -2329,7 +2265,7 @@ function FriendsList:RemoveFriendFromGroup(friendUID, groupId) Perfy_Trace(Perfy
 	
 	DB:Set("friendGroups", friendGroupsData)
 	self:RenderDisplay()
-Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:RemoveFriendFromGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2250:0"); end
+end
 
 -- ========================================
 -- Friends Display Rendering
@@ -2339,18 +2275,17 @@ Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:RemoveFriendFromGroup file://
 -- This function handles ScrollBox rendering, button pool management, 
 -- friend button configuration (BNet/WoW), compact mode, and TravelPass buttons
 -- Supports both Retail (ScrollBox/DataProvider) and Classic (FauxScrollFrame)
-function FriendsList:RenderDisplay() Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:RenderDisplay file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2281:0");
-	-- Skip update if frame is not shown (performance optimization)
+function FriendsList:RenderDisplay() -- Skip update if frame is not shown (performance optimization)
 	-- But mark that we need to render when frame is shown
 	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
 		needsRenderOnShow = true
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:RenderDisplay file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2281:0"); return
+		return
 	end
 	
 	-- Skip update if Friends list elements are hidden (means we're on another tab)
 	if BetterFriendsFrame.ScrollFrame and not BetterFriendsFrame.ScrollFrame:IsShown() then
 		needsRenderOnShow = true
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:RenderDisplay file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2281:0"); return
+		return
 	end
 	
 	-- Skip update if we're not on the Friends tab (tab 1)
@@ -2358,7 +2293,7 @@ function FriendsList:RenderDisplay() Perfy_Trace(Perfy_GetTime(), "Enter", "Frie
 		local selectedTab = PanelTemplates_GetSelectedTab(BetterFriendsFrame.FriendsTabHeader)
 		if selectedTab and selectedTab ~= 1 then
 			needsRenderOnShow = true
-			Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:RenderDisplay file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2281:0"); return
+			return
 		end
 	end
 	
@@ -2379,7 +2314,7 @@ function FriendsList:RenderDisplay() Perfy_Trace(Perfy_GetTime(), "Enter", "Frie
 		end
 		-- Render with Classic button pool
 		self:RenderClassicButtons()
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:RenderDisplay file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2281:0"); return
+		return
 	end
 	
 	-- Retail: Update ScrollBox with automatic scroll position preservation!
@@ -2387,11 +2322,10 @@ function FriendsList:RenderDisplay() Perfy_Trace(Perfy_GetTime(), "Enter", "Frie
 	if self.scrollBox then
 		self.scrollBox:SetDataProvider(dataProvider, retainScrollPosition)
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:RenderDisplay file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2281:0"); end
+end
 
 -- Check if render is needed (called when frame is shown)
-function FriendsList:NeedsRenderOnShow() Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:NeedsRenderOnShow file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2332:0");
-	Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:NeedsRenderOnShow file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2332:0"); return needsRenderOnShow
+function FriendsList:NeedsRenderOnShow() return needsRenderOnShow
 end
 
 -- ========================================
@@ -2399,8 +2333,7 @@ end
 -- ========================================
 
 -- Update group header button (NEW - Phase 1)
-function FriendsList:UpdateGroupHeaderButton(button, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:UpdateGroupHeaderButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2341:0");
-	local groupId = elementData.groupId
+function FriendsList:UpdateGroupHeaderButton(button, elementData) local groupId = elementData.groupId
 	local name = elementData.name
 	local count = elementData.count
 	local collapsed = elementData.collapsed
@@ -2550,8 +2483,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) Perfy_Trace(Pe
 			
 			-- Override mouse scripts to support alignment (only once per button)
 			if not button.isArrowScriptHooked then
-				button:SetScript("OnMouseDown", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2492:36");
-					if self.DownArrow and self.DownArrow:IsShown() then
+				button:SetScript("OnMouseDown", function(self) if self.DownArrow and self.DownArrow:IsShown() then
 						local p, relativeTo, relativePoint, x, y = self.DownArrow:GetPoint()
 						if p then self.DownArrow:SetPoint(p, relativeTo, relativePoint, x + 1, y - 1) end
 					end
@@ -2559,14 +2491,13 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) Perfy_Trace(Pe
 						local p, relativeTo, relativePoint, x, y = self.RightArrow:GetPoint()
 						if p then self.RightArrow:SetPoint(p, relativeTo, relativePoint, x + 1, y - 1) end
 					end
-				Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2492:36"); end)
+				end)
 				
-				button:SetScript("OnMouseUp", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2503:34");
-					-- Trigger update to reset positions based on current settings
+				button:SetScript("OnMouseUp", function(self) -- Trigger update to reset positions based on current settings
 					if FriendsList and FriendsList.UpdateGroupHeaderButton and self.elementData then
 						FriendsList:UpdateGroupHeaderButton(self, self.elementData)
 					end
-				Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2503:34"); end)
+				end)
 				button.isArrowScriptHooked = true
 			end
 		end
@@ -2579,8 +2510,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) Perfy_Trace(Pe
 	end
 	
 	-- Tooltips for group headers
-	button:SetScript("OnEnter", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2521:29");
-		-- Check if we're currently dragging a friend
+	button:SetScript("OnEnter", function(self) -- Check if we're currently dragging a friend
 		local isDragging = BetterFriendsList_DraggedFriend ~= nil
 		
 		local Groups = GetGroups()
@@ -2606,11 +2536,10 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) Perfy_Trace(Pe
 				GameTooltip:Show()
 			end
 		end
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2521:29"); end)
+	end)
 	
-	button:SetScript("OnLeave", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2550:29");
-		GameTooltip:Hide()
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2550:29"); end)
+	button:SetScript("OnLeave", function(self) GameTooltip:Hide()
+	end)
 	
 	-- Add right-click menu functionality
 	if Groups then
@@ -2618,32 +2547,26 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) Perfy_Trace(Pe
 		if group and not group.builtin then
 			-- Custom groups: Full context menu with Rename/Delete
 			button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-			button:SetScript("OnClick", function(self, buttonName) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2560:31");
-				if buttonName == "RightButton" then
+			button:SetScript("OnClick", function(self, buttonName) if buttonName == "RightButton" then
 					-- Open context menu for custom group header
-					MenuUtil.CreateContextMenu(self, function(owner, rootDescription) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2563:38");
-						local groupData = Groups:Get(self.groupId)
-						if not groupData then Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2563:38"); return end
+					MenuUtil.CreateContextMenu(self, function(owner, rootDescription) local groupData = Groups:Get(self.groupId)
+						if not groupData then return end
 						
 						rootDescription:CreateTitle(groupData.name)
 						
-						rootDescription:CreateButton(BFL.L.MENU_RENAME_GROUP, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2569:60");
-							StaticPopup_Show("BETTER_FRIENDLIST_RENAME_GROUP", nil, nil, self.groupId)
-						Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2569:60"); end)
+						rootDescription:CreateButton(BFL.L.MENU_RENAME_GROUP, function() StaticPopup_Show("BETTER_FRIENDLIST_RENAME_GROUP", nil, nil, self.groupId)
+						end)
 						
-						rootDescription:CreateButton(BFL.L.MENU_CHANGE_COLOR, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2573:60");
-							FriendsList:OpenColorPicker(self.groupId)
-						Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2573:60"); end)
+						rootDescription:CreateButton(BFL.L.MENU_CHANGE_COLOR, function() FriendsList:OpenColorPicker(self.groupId)
+						end)
 						
-						rootDescription:CreateButton(BFL.L.MENU_DELETE_GROUP, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2577:60");
-							StaticPopup_Show("BETTER_FRIENDLIST_DELETE_GROUP", nil, nil, self.groupId)
-						Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2577:60"); end)
+						rootDescription:CreateButton(BFL.L.MENU_DELETE_GROUP, function() StaticPopup_Show("BETTER_FRIENDLIST_DELETE_GROUP", nil, nil, self.groupId)
+						end)
 						
 						rootDescription:CreateDivider()
 						
-						rootDescription:CreateButton(BFL.L.MENU_INVITE_GROUP, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2583:60");
-							FriendsList:InviteGroupToParty(self.groupId)
-						Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2583:60"); end)
+						rootDescription:CreateButton(BFL.L.MENU_INVITE_GROUP, function() FriendsList:InviteGroupToParty(self.groupId)
+						end)
 						
 						rootDescription:CreateDivider()
 						
@@ -2653,127 +2576,112 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) Perfy_Trace(Pe
 						
 						notificationButton:CreateRadio(
 							BFL.L.MENU_NOTIFY_DEFAULT,
-							function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2595:7");
-								local rule = BetterFriendlistDB.notificationGroupRules and BetterFriendlistDB.notificationGroupRules[self.groupId]
-								return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2595:7", not rule or rule == "default")
+							function() local rule = BetterFriendlistDB.notificationGroupRules and BetterFriendlistDB.notificationGroupRules[self.groupId]
+								return not rule or rule == "default"
 							end,
-							function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2599:7");
-								if not BetterFriendlistDB.notificationGroupRules then
+							function() if not BetterFriendlistDB.notificationGroupRules then
 									BetterFriendlistDB.notificationGroupRules = {}
 								end
 								BetterFriendlistDB.notificationGroupRules[self.groupId] = "default"
 								print(string.format(BFL.L.MSG_NOTIFY_DEFAULT, groupData.name))
-							Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2599:7"); end
+							end
 						)
 						
 						notificationButton:CreateRadio(
 							BFL.L.MENU_NOTIFY_WHITELIST,
-							function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2610:7");
-								local rule = BetterFriendlistDB.notificationGroupRules and BetterFriendlistDB.notificationGroupRules[self.groupId]
-								return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2610:7", rule == "whitelist")
+							function() local rule = BetterFriendlistDB.notificationGroupRules and BetterFriendlistDB.notificationGroupRules[self.groupId]
+								return rule == "whitelist"
 							end,
-							function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2614:7");
-								if not BetterFriendlistDB.notificationGroupRules then
+							function() if not BetterFriendlistDB.notificationGroupRules then
 									BetterFriendlistDB.notificationGroupRules = {}
 								end
 								BetterFriendlistDB.notificationGroupRules[self.groupId] = "whitelist"
 								print(string.format(BFL.L.MSG_NOTIFY_WHITELIST, groupData.name))
-							Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2614:7"); end
+							end
 						)
 						
 						notificationButton:CreateRadio(
 							BFL.L.MENU_NOTIFY_BLACKLIST,
-							function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2625:7");
-								local rule = BetterFriendlistDB.notificationGroupRules and BetterFriendlistDB.notificationGroupRules[self.groupId]
-								return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2625:7", rule == "blacklist")
+							function() local rule = BetterFriendlistDB.notificationGroupRules and BetterFriendlistDB.notificationGroupRules[self.groupId]
+								return rule == "blacklist"
 							end,
-							function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2629:7");
-								if not BetterFriendlistDB.notificationGroupRules then
+							function() if not BetterFriendlistDB.notificationGroupRules then
 									BetterFriendlistDB.notificationGroupRules = {}
 								end
 								BetterFriendlistDB.notificationGroupRules[self.groupId] = "blacklist"
 								print(string.format(BFL.L.MSG_NOTIFY_BLACKLIST, groupData.name))
-							Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2629:7"); end
+							end
 						)
 						
 						rootDescription:CreateDivider()
 					end
 					
 					-- Group-wide action buttons
-					rootDescription:CreateButton(BFL.L.MENU_COLLAPSE_ALL, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2642:59");
-						for gid in pairs(Groups.groups) do
+					rootDescription:CreateButton(BFL.L.MENU_COLLAPSE_ALL, function() for gid in pairs(Groups.groups) do
 							Groups:SetCollapsed(gid, true, true)  -- true = force collapse
 						end
 						BFL:ForceRefreshFriendsList()
-					Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2642:59"); end)
+					end)
 					
-					rootDescription:CreateButton(BFL.L.MENU_EXPAND_ALL, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2649:57");
-						for gid in pairs(Groups.groups) do
+					rootDescription:CreateButton(BFL.L.MENU_EXPAND_ALL, function() for gid in pairs(Groups.groups) do
 							Groups:SetCollapsed(gid, false, true)  -- false = force expand
 						end
 						BFL:ForceRefreshFriendsList()
-					Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2649:57"); end)
-				Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2563:38"); end)
+					end)
+				end)
 			else
 					-- Left click: toggle collapse
 					FriendsList:ToggleGroup(self.groupId)
 				end
-			Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2560:31"); end)
+			end)
 		else
 			-- Built-in groups: Right-click for Collapse/Expand All + Invite
 			button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-			button:SetScript("OnClick", function(self, buttonName) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2664:31");
-				if buttonName == "RightButton" then
+			button:SetScript("OnClick", function(self, buttonName) if buttonName == "RightButton" then
 					-- Open context menu for built-in group header
-					MenuUtil.CreateContextMenu(self, function(owner, rootDescription) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2667:38");
-						local groupData = Groups:Get(self.groupId)
-						if not groupData then Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2667:38"); return end
+					MenuUtil.CreateContextMenu(self, function(owner, rootDescription) local groupData = Groups:Get(self.groupId)
+						if not groupData then return end
 						
 						rootDescription:CreateTitle(groupData.name)
 						
-						rootDescription:CreateButton(BFL.L.MENU_RENAME_GROUP, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2673:60");
-							StaticPopup_Show("BETTER_FRIENDLIST_RENAME_GROUP", nil, nil, self.groupId)
-						Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2673:60"); end)
+						rootDescription:CreateButton(BFL.L.MENU_RENAME_GROUP, function() StaticPopup_Show("BETTER_FRIENDLIST_RENAME_GROUP", nil, nil, self.groupId)
+						end)
 						
-						rootDescription:CreateButton(BFL.L.MENU_CHANGE_COLOR, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2677:60");
-							FriendsList:OpenColorPicker(self.groupId)
-						Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2677:60"); end)
+						rootDescription:CreateButton(BFL.L.MENU_CHANGE_COLOR, function() FriendsList:OpenColorPicker(self.groupId)
+						end)
 						
-						rootDescription:CreateButton(BFL.L.MENU_INVITE_GROUP, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2681:60");
-							FriendsList:InviteGroupToParty(self.groupId)
-						Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2681:60"); end)
+						rootDescription:CreateButton(BFL.L.MENU_INVITE_GROUP, function() FriendsList:InviteGroupToParty(self.groupId)
+						end)
 						
 						rootDescription:CreateDivider()
 						
-						rootDescription:CreateButton(BFL.L.MENU_COLLAPSE_ALL, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2687:60");
-							if Groups then
+						rootDescription:CreateButton(BFL.L.MENU_COLLAPSE_ALL, function() if Groups then
 								for gid in pairs(Groups.groups) do
 									Groups:SetCollapsed(gid, true, true)  -- true = force collapse
 								end
 								BFL:ForceRefreshFriendsList()
 							end
-						Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2687:60"); end)
+						end)
 						
-						rootDescription:CreateButton(BFL.L.MENU_EXPAND_ALL, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2696:58");
-							if Groups then
+						rootDescription:CreateButton(BFL.L.MENU_EXPAND_ALL, function() if Groups then
 								for gid in pairs(Groups.groups) do
 									Groups:SetCollapsed(gid, false, true)  -- false = force expand
 								end
 								BFL:ForceRefreshFriendsList()
 							end
-						Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2696:58"); end)
-					Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2667:38"); end)
+						end)
+					end)
 				else
 					-- Left click: toggle collapse
 					FriendsList:ToggleGroup(self.groupId)
 				end
-			Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2664:31"); end)
+			end)
 		end
 	end
 	
 	-- Ensure button is visible
 	button:Show()
-Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:UpdateGroupHeaderButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2341:0"); end
+end
 
 -- ========================================
 -- Friend Button Update (ScrollBox Factory Callback)
@@ -2968,8 +2876,7 @@ local function Button_OnDragStop(self)
 end
 
 -- Update friend button (called by ScrollBox factory for each visible friend)
-function FriendsList:UpdateFriendButton(button, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:UpdateFriendButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2722:0");
-	local friend = elementData.friend
+function FriendsList:UpdateFriendButton(button, elementData) local friend = elementData.friend
 	local groupId = elementData.groupId
 	
 	-- Store friend data on button for tooltip and context menu
@@ -3559,14 +3466,13 @@ function FriendsList:UpdateFriendButton(button, elementData) Perfy_Trace(Perfy_G
 	
 	-- Ensure button is visible
 	button:Show()
-Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:UpdateFriendButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:2722:0"); end
+end
 
 -- ========================================
 -- Friend Invite Functions
 -- ========================================
 
-function FriendsList:UpdateInviteHeaderButton(button, data) Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:UpdateInviteHeaderButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3494:0");
-	button.Text:SetFormattedText(L.INVITE_HEADER, data.count)
+function FriendsList:UpdateInviteHeaderButton(button, data) button.Text:SetFormattedText(L.INVITE_HEADER, data.count)
 	local collapsed = GetCVarBool("friendInvitesCollapsed")
 	
 	-- Store data on button for callbacks (important for OnMouseUp refresh)
@@ -3657,8 +3563,7 @@ function FriendsList:UpdateInviteHeaderButton(button, data) Perfy_Trace(Perfy_Ge
 			
 			-- Mouse Scripts for Arrow depression
 			if not button.isArrowScriptHooked then
-				button:SetScript("OnMouseDown", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3586:36");
-					if self.DownArrow and self.DownArrow:IsShown() then
+				button:SetScript("OnMouseDown", function(self) if self.DownArrow and self.DownArrow:IsShown() then
 						local p, relativeTo, relativePoint, x, y = self.DownArrow:GetPoint()
 						if p then self.DownArrow:SetPoint(p, relativeTo, relativePoint, x + 1, y - 1) end
 					end
@@ -3666,14 +3571,13 @@ function FriendsList:UpdateInviteHeaderButton(button, data) Perfy_Trace(Perfy_Ge
 						local p, relativeTo, relativePoint, x, y = self.RightArrow:GetPoint()
 						if p then self.RightArrow:SetPoint(p, relativeTo, relativePoint, x + 1, y - 1) end
 					end
-				Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3586:36"); end)
+				end)
 				
-				button:SetScript("OnMouseUp", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3597:34");
-					-- Trigger update via element factory if possible, or just re-run this function
+				button:SetScript("OnMouseUp", function(self) -- Trigger update via element factory if possible, or just re-run this function
 					if FriendsList and FriendsList.UpdateInviteHeaderButton and self.elementData then
 						FriendsList:UpdateInviteHeaderButton(self, self.elementData)
 					end
-				Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3597:34"); end)
+				end)
 				button.isArrowScriptHooked = true
 			end
 		end
@@ -3687,23 +3591,21 @@ function FriendsList:UpdateInviteHeaderButton(button, data) Perfy_Trace(Perfy_Ge
 	
 	-- Setup OnClick handler for collapse/expand (only once)
 	if not button.handlerRegistered then
-		button:SetScript("OnClick", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3616:30");
-			local collapsed = GetCVarBool("friendInvitesCollapsed")
+		button:SetScript("OnClick", function(self) local collapsed = GetCVarBool("friendInvitesCollapsed")
 			SetCVar("friendInvitesCollapsed", collapsed and "0" or "1")
 			
 			-- Force full rebuild of display list
 			BFL:ForceRefreshFriendsList()
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3616:30"); end)
+		end)
 		button.handlerRegistered = true
 	end
 	
 	-- Ensure button is visible
 	button:Show()
-Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:UpdateInviteHeaderButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3494:0"); end
+end
 
 -- Update invite button
-function FriendsList:UpdateInviteButton(button, data) Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:UpdateInviteButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3631:0");
-	local inviteID, accountName
+function FriendsList:UpdateInviteButton(button, data) local inviteID, accountName
 	
 	-- Get invite info from mock or real API
 	if BFL.MockFriendInvites.enabled then
@@ -3716,7 +3618,7 @@ function FriendsList:UpdateInviteButton(button, data) Perfy_Trace(Perfy_GetTime(
 		inviteID, accountName = BNGetFriendInviteInfo(data.inviteIndex)
 	end
 	
-	if not inviteID then Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:UpdateInviteButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3631:0"); return end
+	if not inviteID then return end
 	
 	-- Get current button height to determine if compact mode
 	local height = button:GetHeight()
@@ -3763,8 +3665,7 @@ function FriendsList:UpdateInviteButton(button, data) Perfy_Trace(Perfy_GetTime(
 	
 	-- Setup Accept button OnClick handler
 	if button.AcceptButton and not button.AcceptButton.handlerRegistered then
-		button.AcceptButton:SetScript("OnClick", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3692:43");
-			local parent = self:GetParent()
+		button.AcceptButton:SetScript("OnClick", function(self) local parent = self:GetParent()
 			if parent.inviteID then
 				if BFL.MockFriendInvites.enabled then
 					-- Mock: Remove from list and refresh
@@ -3781,15 +3682,14 @@ function FriendsList:UpdateInviteButton(button, data) Perfy_Trace(Perfy_GetTime(
 					BNAcceptFriendInvite(parent.inviteID)
 				end
 			end
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3692:43"); end)
+		end)
 		button.AcceptButton.handlerRegistered = true
 	end
 	
 	-- Setup Decline button OnClick handler
 	if button.DeclineButton and not button.DeclineButton.handlerRegistered then
-		button.DeclineButton:SetScript("OnClick", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3716:44");
-			local parent = self:GetParent()
-			if not parent.inviteID or not parent.inviteIndex then Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3716:44"); return end
+		button.DeclineButton:SetScript("OnClick", function(self) local parent = self:GetParent()
+			if not parent.inviteID or not parent.inviteIndex then return end
 			
 			local inviteID, accountName
 			
@@ -3804,11 +3704,9 @@ function FriendsList:UpdateInviteButton(button, data) Perfy_Trace(Perfy_GetTime(
 				inviteID, accountName = BNGetFriendInviteInfo(parent.inviteIndex)
 			end
 			
-			if not inviteID then Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3716:44"); return end
+			if not inviteID then return end
 			
-			MenuUtil.CreateContextMenu(self, function(owner, rootDescription) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3735:36");
-				rootDescription:CreateButton("Decline", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3736:44");
-					if BFL.MockFriendInvites.enabled then
+			MenuUtil.CreateContextMenu(self, function(owner, rootDescription) rootDescription:CreateButton("Decline", function() if BFL.MockFriendInvites.enabled then
 						-- Mock: Remove from list and refresh
 						for i, invite in ipairs(BFL.MockFriendInvites.invites) do
 							if invite.inviteID == inviteID then
@@ -3822,40 +3720,37 @@ function FriendsList:UpdateInviteButton(button, data) Perfy_Trace(Perfy_GetTime(
 						-- Real API call
 						BNDeclineFriendInvite(inviteID)
 					end
-				Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3736:44"); end)
+				end)
 				
 				if not BFL.MockFriendInvites.enabled then
-					rootDescription:CreateButton("Report Player", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3754:51");
-						if C_ReportSystem and C_ReportSystem.OpenReportPlayerDialog then
+					rootDescription:CreateButton("Report Player", function() if C_ReportSystem and C_ReportSystem.OpenReportPlayerDialog then
 							C_ReportSystem.OpenReportPlayerDialog(
 								C_ReportSystem.ReportType.InappropriateBattleNetName,
 								accountName
 							)
 						end
-					Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3754:51"); end)
-					rootDescription:CreateButton("Block Invites", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3762:51");
-						BNSetBlocked(inviteID, true)
-					Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3762:51"); end)
+					end)
+					rootDescription:CreateButton("Block Invites", function() BNSetBlocked(inviteID, true)
+					end)
 				end
-			Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3735:36"); end)
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3716:44"); end)
+			end)
+		end)
 		button.DeclineButton.handlerRegistered = true
 	end
 	
 	-- Ensure button is visible
 	button:Show()
-Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:UpdateInviteButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3631:0"); end
+end
 
 -- Flash invite header when new invite arrives while collapsed
-function FriendsList:FlashInviteHeader() Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:FlashInviteHeader file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3776:0");
-	if not self.scrollBox then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:FlashInviteHeader file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3776:0"); return
+function FriendsList:FlashInviteHeader() if not self.scrollBox then
+		return
 	end
 	
 	-- Get all currently visible frames from ScrollBox
 	local frames = self.scrollBox:GetFrames()
 	if not frames then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:FlashInviteHeader file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3776:0"); return
+		return
 	end
 	
 	-- Find the invite header button and flash it
@@ -3867,37 +3762,35 @@ function FriendsList:FlashInviteHeader() Perfy_Trace(Perfy_GetTime(), "Enter", "
 			break
 		end
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:FlashInviteHeader file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3776:0"); end
+end
 
 -- ========================================
 -- Event Hooks (for future Raid/QuickJoin integration)
 -- ========================================
-function FriendsList:FireEvent(eventName, ...) Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:FireEvent file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3801:0");
-	-- TODO: Implement event system for module communication
+function FriendsList:FireEvent(eventName, ...) -- TODO: Implement event system for module communication
 	-- This will allow Raid/QuickJoin modules to hook into friend list updates
-Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:FireEvent file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3801:0"); end
+end
 
 -- ========================================
 -- Responsive UI Functions
 -- ========================================
 
 -- Update SearchBox width dynamically based on available space
-function FriendsList:UpdateSearchBoxWidth() Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList:UpdateSearchBoxWidth file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3811:0");
-	local frame = BetterFriendsFrame
+function FriendsList:UpdateSearchBoxWidth() local frame = BetterFriendsFrame
 	if not frame then
 		-- BFL:DebugPrint("|cffff0000UpdateSearchBoxWidth: No frame|r")
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:UpdateSearchBoxWidth file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3811:0"); return
+		return
 	end
 	
 	if not frame.FriendsTabHeader then
 		-- BFL:DebugPrint("|cffff0000UpdateSearchBoxWidth: No FriendsTabHeader|r")
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:UpdateSearchBoxWidth file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3811:0"); return
+		return
 	end
 	
 	local header = frame.FriendsTabHeader
 	if not header.SearchBox then
 		-- BFL:DebugPrint("|cffff0000UpdateSearchBoxWidth: No SearchBox|r")
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:UpdateSearchBoxWidth file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3811:0"); return
+		return
 	end
 	
 	local frameWidth = frame:GetWidth()
@@ -3998,7 +3891,7 @@ function FriendsList:UpdateSearchBoxWidth() Perfy_Trace(Perfy_GetTime(), "Enter"
 	-- Classic Mode: Fixed width to fit dropdowns
 	if BFL.IsClassic then
 		-- Let XML anchors handle width (Full Width)
-		Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:UpdateSearchBoxWidth file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3811:0"); return
+		return
 	end
 
 	-- Fixed elements on the right side of the header:
@@ -4022,12 +3915,12 @@ function FriendsList:UpdateSearchBoxWidth() Perfy_Trace(Perfy_GetTime(), "Enter"
 	
 	-- BFL:DebugPrint(string.format("|cff00ffffFriendsList:|r SearchBox width updated: %.1fpx (frame width: %.1fpx)", 
 	-- 	availableWidth, frameWidth))
-Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList:UpdateSearchBoxWidth file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua:3811:0"); end
+end
 
 -- Export module to BFL namespace (required for BFL.FriendsList access)
 BFL.FriendsList = FriendsList
 
-Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/FriendsList.lua"); return FriendsList
+return FriendsList
 
 
 

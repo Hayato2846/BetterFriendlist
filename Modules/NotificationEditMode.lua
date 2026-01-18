@@ -1,4 +1,4 @@
---[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua"); --[[
+--[[
     NotificationEditMode - Edit Mode Integration for Toast Container
     Allows users to move notification toasts in Blizzard's Edit Mode
 --]]
@@ -13,32 +13,32 @@ local LEM = LibStub and LibStub("LibEditMode", true)
     Beta Feature Guard
 --]]--------------------------------------------------
 
-local function IsBetaEnabled() Perfy_Trace(Perfy_GetTime(), "Enter", "IsBetaEnabled file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua:16:6");
-    return Perfy_Trace_Passthrough("Leave", "IsBetaEnabled file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua:16:6", BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures == true)
+local function IsBetaEnabled()
+    return BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures == true
 end
 
 --[[--------------------------------------------------
     Edit Mode Setup
 --]]--------------------------------------------------
 
-function NotificationEditMode:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "NotificationEditMode:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua:24:0");
+function NotificationEditMode:Initialize()
     -- STOP: Edit Mode is Retail-only (10.0+)
     if not BFL.HasEditMode then
         -- BFL:DebugPrint("|cffffcc00BFL:NotificationEditMode:|r Edit Mode not available in Classic")
-        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationEditMode:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua:24:0"); return
+        return
     end
     
     -- STOP: Beta Features must be enabled
     if not IsBetaEnabled() then
         -- BFL:DebugPrint("|cffffcc00BFL:NotificationEditMode:|r Beta Features disabled - Edit Mode integration skipped")
-        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationEditMode:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua:24:0"); return
+        return
     end
     
     -- Get container frame
     local container = _G["BFL_NotificationToastContainer"]
     if not container then
         -- BFL:DebugPrint("|cffff0000BFL:NotificationEditMode:|r Toast container not found!")
-        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationEditMode:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua:24:0"); return
+        return
     end
     
     -- Apply saved position (works without LibEditMode)
@@ -48,14 +48,14 @@ function NotificationEditMode:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter",
     if not LEM then
         -- BFL:DebugPrint("|cffffcc00BFL:NotificationEditMode:|r LibEditMode not found - using fixed position")
         -- BFL:DebugPrint("|cffffcc00BFL:NotificationEditMode:|r Install LibEditMode for drag & drop support")
-        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationEditMode:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua:24:0"); return
+        return
     end
     
     -- Set frame name for Edit Mode
     container.editModeName = BFL.L.EDITMODE_NOTIFICATIONS_LABEL
     
     -- Position callback - save position when moved in Edit Mode
-    local function OnPositionChanged(frame, layoutName, point, x, y) Perfy_Trace(Perfy_GetTime(), "Enter", "OnPositionChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua:58:10");
+    local function OnPositionChanged(frame, layoutName, point, x, y)
         if not BetterFriendlistDB.notificationToastPosition then
             BetterFriendlistDB.notificationToastPosition = {}
         end
@@ -69,7 +69,7 @@ function NotificationEditMode:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter",
         -- self:ApplyPosition(layoutName) 
         
         -- BFL:DebugPrint("|cff00ffffBFL:NotificationEditMode:|r Position saved: " .. point .. " (" .. x .. ", " .. y .. ")")
-    Perfy_Trace(Perfy_GetTime(), "Leave", "OnPositionChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua:58:10"); end
+    end
     
     -- Default position
     local defaults = {
@@ -82,29 +82,29 @@ function NotificationEditMode:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter",
     LEM:AddFrame(container, OnPositionChanged, defaults)
     
     -- Register callbacks for Edit Mode enter/exit
-    LEM:RegisterCallback("enter", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua:85:34");
+    LEM:RegisterCallback("enter", function()
         NotificationEditMode:OnEditModeEnter()
-    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua:85:34"); end)
+    end)
     
-    LEM:RegisterCallback("exit", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua:89:33");
+    LEM:RegisterCallback("exit", function()
         NotificationEditMode:OnEditModeExit()
-    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua:89:33"); end)
+    end)
     
-    LEM:RegisterCallback("layout", function(layoutName) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua:93:35");
+    LEM:RegisterCallback("layout", function(layoutName)
         NotificationEditMode:ApplyPosition(layoutName)
-    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua:93:35"); end)
+    end)
     
     -- Apply saved position on load
     self:ApplyPosition()
     
     -- BFL:DebugPrint("|cff00ffffBFL:NotificationEditMode:|r Edit Mode integration initialized")
-Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationEditMode:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua:24:0"); end
+end
 
-function NotificationEditMode:ApplyPosition(layoutName) Perfy_Trace(Perfy_GetTime(), "Enter", "NotificationEditMode:ApplyPosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua:103:0");
+function NotificationEditMode:ApplyPosition(layoutName)
     layoutName = layoutName or (LEM and LEM.GetActiveLayoutName and LEM.GetActiveLayoutName()) or "Default"
     
     local container = _G["BFL_NotificationToastContainer"]
-    if not container then Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationEditMode:ApplyPosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua:103:0"); return end
+    if not container then return end
     
     local position = BetterFriendlistDB.notificationToastPosition and BetterFriendlistDB.notificationToastPosition[layoutName]
     
@@ -117,17 +117,17 @@ function NotificationEditMode:ApplyPosition(layoutName) Perfy_Trace(Perfy_GetTim
         container:ClearAllPoints()
         container:SetPoint("TOP", UIParent, "TOP", 0, -150)
     end
-Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationEditMode:ApplyPosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua:103:0"); end
+end
 
-function NotificationEditMode:OnEditModeEnter() Perfy_Trace(Perfy_GetTime(), "Enter", "NotificationEditMode:OnEditModeEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua:122:0");
+function NotificationEditMode:OnEditModeEnter()
     -- STOP: Beta Features must be enabled
     if not IsBetaEnabled() then
-        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationEditMode:OnEditModeEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua:122:0"); return
+        return
     end
     
     -- Show all 3 toast frames with preview content when entering Edit Mode
     local container = _G["BFL_NotificationToastContainer"]
-    if not container then Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationEditMode:OnEditModeEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua:122:0"); return end
+    if not container then return end
     
     -- Ensure container is visible for dragging
     container:Show()
@@ -153,17 +153,17 @@ function NotificationEditMode:OnEditModeEnter() Perfy_Trace(Perfy_GetTime(), "En
     end
     
     -- BFL:DebugPrint("|cff00ffffBFL:NotificationEditMode:|r Edit Mode entered, showing toast previews")
-Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationEditMode:OnEditModeEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua:122:0"); end
+end
 
-function NotificationEditMode:OnEditModeExit() Perfy_Trace(Perfy_GetTime(), "Enter", "NotificationEditMode:OnEditModeExit file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua:158:0");
+function NotificationEditMode:OnEditModeExit()
     -- STOP: Beta Features must be enabled
     if not IsBetaEnabled() then
-        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationEditMode:OnEditModeExit file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua:158:0"); return
+        return
     end
     
     -- Hide all preview toasts when exiting Edit Mode
     local container = _G["BFL_NotificationToastContainer"]
-    if not container then Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationEditMode:OnEditModeExit file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua:158:0"); return end
+    if not container then return end
     
     local toasts = {container.Toast1, container.Toast2, container.Toast3}
     
@@ -177,9 +177,7 @@ function NotificationEditMode:OnEditModeExit() Perfy_Trace(Perfy_GetTime(), "Ent
     end
     
     -- BFL:DebugPrint("|cff00ffffBFL:NotificationEditMode:|r Edit Mode exited, hiding toast previews")
-Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationEditMode:OnEditModeExit file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua:158:0"); end
+end
 
 -- Public API
 BFL.NotificationEditMode = NotificationEditMode
-
-Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationEditMode.lua");

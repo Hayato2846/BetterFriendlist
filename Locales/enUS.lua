@@ -1,4 +1,4 @@
---[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Locales/enUS.lua"); -- Locales/enUS.lua
+-- Locales/enUS.lua
 -- English (US) Localization
 -- This file is ALWAYS loaded as fallback for all locales
 
@@ -1140,5 +1140,3 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Prevent BetterFriendlist from opening ove
 	-- ClassicCompat.lua
 	L.PERF_HEADER_PREFIX = "|cff00ff00BetterFriendlist Performance:|r"
 	L.COMPAT_GAME_VERSION = "|cffffcc00Game Version:|r"
-
-Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Locales/enUS.lua");

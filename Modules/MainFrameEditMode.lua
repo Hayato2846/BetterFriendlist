@@ -1,4 +1,4 @@
---[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua"); --[[
+--[[
     MainFrameEditMode - Edit Mode Integration for Main Frame
     Allows users to position and resize the BetterFriendlist frame in Blizzard's Edit Mode
     NOTE: Edit Mode is Retail-only (10.0+) - this module is disabled in Classic
@@ -11,12 +11,12 @@ local MainFrameEditMode = {}
 if BFL.IsClassic then
     -- Register empty module so other code doesn't error
     BFL.MainFrameEditMode = MainFrameEditMode
-    function MainFrameEditMode:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "MainFrameEditMode:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:14:4"); Perfy_Trace(Perfy_GetTime(), "Leave", "MainFrameEditMode:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:14:4"); end
-    function MainFrameEditMode:ApplyPosition() Perfy_Trace(Perfy_GetTime(), "Enter", "MainFrameEditMode:ApplyPosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:15:4"); Perfy_Trace(Perfy_GetTime(), "Leave", "MainFrameEditMode:ApplyPosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:15:4"); end
-    function MainFrameEditMode:SavePosition() Perfy_Trace(Perfy_GetTime(), "Enter", "MainFrameEditMode:SavePosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:16:4"); Perfy_Trace(Perfy_GetTime(), "Leave", "MainFrameEditMode:SavePosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:16:4"); end
-    function MainFrameEditMode:ApplySize() Perfy_Trace(Perfy_GetTime(), "Enter", "MainFrameEditMode:ApplySize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:17:4"); Perfy_Trace(Perfy_GetTime(), "Leave", "MainFrameEditMode:ApplySize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:17:4"); end
-    function MainFrameEditMode:SaveSize() Perfy_Trace(Perfy_GetTime(), "Enter", "MainFrameEditMode:SaveSize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:18:4"); Perfy_Trace(Perfy_GetTime(), "Leave", "MainFrameEditMode:SaveSize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:18:4"); end
-    Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua"); return
+    function MainFrameEditMode:Initialize() end
+    function MainFrameEditMode:ApplyPosition() end
+    function MainFrameEditMode:SavePosition() end
+    function MainFrameEditMode:ApplySize() end
+    function MainFrameEditMode:SaveSize() end
+    return
 end
 
 -- Check if LibEditMode is available (optional dependency)
@@ -33,20 +33,20 @@ local MAX_HEIGHT = 1200
 local DEFAULT_WIDTH = 415
 local DEFAULT_HEIGHT = 570
 
-local function ValidateSize(width, height) Perfy_Trace(Perfy_GetTime(), "Enter", "ValidateSize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:36:6");
+local function ValidateSize(width, height)
     width = Clamp(width or DEFAULT_WIDTH, MIN_WIDTH, MAX_WIDTH)
     height = Clamp(height or DEFAULT_HEIGHT, MIN_HEIGHT, MAX_HEIGHT)
-    Perfy_Trace(Perfy_GetTime(), "Leave", "ValidateSize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:36:6"); return width, height
+    return width, height
 end
 
 --[[--------------------------------------------------
     Migration (One-Time)
 --]]--------------------------------------------------
 
-function MainFrameEditMode:MigrateOldPosition(frame) Perfy_Trace(Perfy_GetTime(), "Enter", "MainFrameEditMode:MigrateOldPosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:46:0");
+function MainFrameEditMode:MigrateOldPosition(frame)
     -- Check if migration already done
     if BetterFriendlistDB.mainFramePositionMigrated then
-        Perfy_Trace(Perfy_GetTime(), "Leave", "MainFrameEditMode:MigrateOldPosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:46:0"); return
+        return
     end
     
     -- Get current frame position (from WoW's layout-local.txt)
@@ -79,17 +79,17 @@ function MainFrameEditMode:MigrateOldPosition(frame) Perfy_Trace(Perfy_GetTime()
     
     -- Mark migration as done (even if no position to migrate)
     BetterFriendlistDB.mainFramePositionMigrated = true
-Perfy_Trace(Perfy_GetTime(), "Leave", "MainFrameEditMode:MigrateOldPosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:46:0"); end
+end
 
 --[[--------------------------------------------------
     Position Management
 --]]--------------------------------------------------
 
-function MainFrameEditMode:ApplyPosition(layoutName) Perfy_Trace(Perfy_GetTime(), "Enter", "MainFrameEditMode:ApplyPosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:88:0");
+function MainFrameEditMode:ApplyPosition(layoutName)
     layoutName = layoutName or (LEM and LEM.GetActiveLayoutName and LEM.GetActiveLayoutName()) or "Default"
     
     local frame = BetterFriendsFrame
-    if not frame then Perfy_Trace(Perfy_GetTime(), "Leave", "MainFrameEditMode:ApplyPosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:88:0"); return end
+    if not frame then return end
     
     local position = BetterFriendlistDB.mainFramePosition and BetterFriendlistDB.mainFramePosition[layoutName]
     
@@ -102,9 +102,9 @@ function MainFrameEditMode:ApplyPosition(layoutName) Perfy_Trace(Perfy_GetTime()
         frame:ClearAllPoints()
         frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     end
-Perfy_Trace(Perfy_GetTime(), "Leave", "MainFrameEditMode:ApplyPosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:88:0"); end
+end
 
-function MainFrameEditMode:SavePosition(layoutName, point, x, y) Perfy_Trace(Perfy_GetTime(), "Enter", "MainFrameEditMode:SavePosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:107:0");
+function MainFrameEditMode:SavePosition(layoutName, point, x, y)
     if not BetterFriendlistDB.mainFramePosition then
         BetterFriendlistDB.mainFramePosition = {}
     end
@@ -115,17 +115,17 @@ function MainFrameEditMode:SavePosition(layoutName, point, x, y) Perfy_Trace(Per
     BetterFriendlistDB.mainFramePosition[layoutName].y = y
     
     -- BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r Position saved: " .. point .. " (" .. x .. ", " .. y .. ")")
-Perfy_Trace(Perfy_GetTime(), "Leave", "MainFrameEditMode:SavePosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:107:0"); end
+end
 
 --[[--------------------------------------------------
     Size Management
 --]]--------------------------------------------------
 
-function MainFrameEditMode:ApplySize(layoutName) Perfy_Trace(Perfy_GetTime(), "Enter", "MainFrameEditMode:ApplySize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:124:0");
+function MainFrameEditMode:ApplySize(layoutName)
     layoutName = layoutName or (LEM and LEM.GetActiveLayoutName and LEM.GetActiveLayoutName()) or "Default"
     
     local frame = BetterFriendsFrame
-    if not frame then Perfy_Trace(Perfy_GetTime(), "Leave", "MainFrameEditMode:ApplySize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:124:0"); return end
+    if not frame then return end
     
     local sizeData = BetterFriendlistDB.mainFrameSize and BetterFriendlistDB.mainFrameSize[layoutName]
     local width, height
@@ -144,9 +144,9 @@ function MainFrameEditMode:ApplySize(layoutName) Perfy_Trace(Perfy_GetTime(), "E
     
     -- Trigger responsive updates
     self:TriggerResponsiveUpdates()
-Perfy_Trace(Perfy_GetTime(), "Leave", "MainFrameEditMode:ApplySize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:124:0"); end
+end
 
-function MainFrameEditMode:SaveSize(layoutName, width, height) Perfy_Trace(Perfy_GetTime(), "Enter", "MainFrameEditMode:SaveSize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:149:0");
+function MainFrameEditMode:SaveSize(layoutName, width, height)
     -- Validate and clamp
     width, height = ValidateSize(width, height)
     
@@ -158,7 +158,7 @@ function MainFrameEditMode:SaveSize(layoutName, width, height) Perfy_Trace(Perfy
         width = width,
         height = height
     }
-Perfy_Trace(Perfy_GetTime(), "Leave", "MainFrameEditMode:SaveSize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:149:0"); end
+end
 
 --[[--------------------------------------------------
     Scale Management (Feature Request: Window Scale)
@@ -170,9 +170,9 @@ local MAX_SCALE = 2.0  -- 200%
 local DEFAULT_SCALE = 1.0  -- 100%
 
 -- Apply scale to main frame
-function MainFrameEditMode:ApplyScale() Perfy_Trace(Perfy_GetTime(), "Enter", "MainFrameEditMode:ApplyScale file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:173:0");
+function MainFrameEditMode:ApplyScale()
     local frame = BetterFriendsFrame
-    if not frame then Perfy_Trace(Perfy_GetTime(), "Leave", "MainFrameEditMode:ApplyScale file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:173:0"); return end
+    if not frame then return end
     
     local scale = BetterFriendlistDB.windowScale or DEFAULT_SCALE
     -- Clamp between valid range
@@ -180,10 +180,10 @@ function MainFrameEditMode:ApplyScale() Perfy_Trace(Perfy_GetTime(), "Enter", "M
     
     frame:SetScale(scale)
     -- BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r Applied scale: " .. (scale * 100) .. "%")
-Perfy_Trace(Perfy_GetTime(), "Leave", "MainFrameEditMode:ApplyScale file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:173:0"); end
+end
 
 -- Set scale and save to database
-function MainFrameEditMode:SetScale(scale) Perfy_Trace(Perfy_GetTime(), "Enter", "MainFrameEditMode:SetScale file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:186:0");
+function MainFrameEditMode:SetScale(scale)
     -- Clamp between valid range
     scale = Clamp(scale or DEFAULT_SCALE, MIN_SCALE, MAX_SCALE)
     
@@ -192,18 +192,18 @@ function MainFrameEditMode:SetScale(scale) Perfy_Trace(Perfy_GetTime(), "Enter",
     
     -- Apply immediately
     self:ApplyScale()
-Perfy_Trace(Perfy_GetTime(), "Leave", "MainFrameEditMode:SetScale file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:186:0"); end
+end
 
 -- Get current scale
-function MainFrameEditMode:GetScale() Perfy_Trace(Perfy_GetTime(), "Enter", "MainFrameEditMode:GetScale file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:198:0");
-    return Perfy_Trace_Passthrough("Leave", "MainFrameEditMode:GetScale file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:198:0", BetterFriendlistDB.windowScale or DEFAULT_SCALE)
+function MainFrameEditMode:GetScale()
+    return BetterFriendlistDB.windowScale or DEFAULT_SCALE
 end
 
 --[[--------------------------------------------------
     Responsive Update Triggers
 --]]--------------------------------------------------
 
-function MainFrameEditMode:TriggerResponsiveUpdates() Perfy_Trace(Perfy_GetTime(), "Enter", "MainFrameEditMode:TriggerResponsiveUpdates file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:206:0");
+function MainFrameEditMode:TriggerResponsiveUpdates()
     -- BFL:DebugPrint("|cffff00ffBFL:MainFrameEditMode:|r TriggerResponsiveUpdates() called")
     
     -- Update FriendsList ScrollBox extent
@@ -245,15 +245,15 @@ function MainFrameEditMode:TriggerResponsiveUpdates() Perfy_Trace(Perfy_GetTime(
     end
     
     -- BFL:DebugPrint("|cffff00ffBFL:MainFrameEditMode:|r TriggerResponsiveUpdates() finished")
-Perfy_Trace(Perfy_GetTime(), "Leave", "MainFrameEditMode:TriggerResponsiveUpdates file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:206:0"); end
+end
 
 --[[--------------------------------------------------
     EditMode Settings (Width & Height Sliders)
 --]]--------------------------------------------------
 
-function MainFrameEditMode:CreateEditModeSettings() Perfy_Trace(Perfy_GetTime(), "Enter", "MainFrameEditMode:CreateEditModeSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:254:0");
+function MainFrameEditMode:CreateEditModeSettings()
     local frame = BetterFriendsFrame
-    if not frame or not LEM then Perfy_Trace(Perfy_GetTime(), "Leave", "MainFrameEditMode:CreateEditModeSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:254:0"); return end
+    if not frame or not LEM then return end
     
     -- Create settings for LibEditMode dialog (Sliders)
     local settings = {
@@ -261,15 +261,15 @@ function MainFrameEditMode:CreateEditModeSettings() Perfy_Trace(Perfy_GetTime(),
             name = BFL.L.EDITMODE_FRAME_WIDTH,
             kind = LEM.SettingType.Slider,
             default = DEFAULT_WIDTH,
-            get = function(layoutName) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:264:18");
+            get = function(layoutName)
                 -- Return saved width or current width
                 local savedSize = BetterFriendlistDB.mainFrameSize[layoutName]
                 if savedSize and savedSize.width then
-                    return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:264:18", savedSize.width)
+                    return savedSize.width
                 end
-                return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:264:18", frame:GetWidth())
+                return frame:GetWidth()
             end,
-            set = function(layoutName, value) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:272:18");
+            set = function(layoutName, value)
                 local currentHeight = frame:GetHeight()
                 
                 -- Apply size
@@ -280,27 +280,27 @@ function MainFrameEditMode:CreateEditModeSettings() Perfy_Trace(Perfy_GetTime(),
                 
                 -- Trigger responsive updates
                 MainFrameEditMode:TriggerResponsiveUpdates()
-            Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:272:18"); end,
+            end,
             minValue = MIN_WIDTH,
             maxValue = MAX_WIDTH,
             valueStep = 5,
-            formatter = function(value) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:287:24");
-                return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:287:24", string.format("%d px", value))
+            formatter = function(value)
+                return string.format("%d px", value)
             end,
         },
         {
             name = BFL.L.EDITMODE_FRAME_HEIGHT,
             kind = LEM.SettingType.Slider,
             default = DEFAULT_HEIGHT,
-            get = function(layoutName) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:295:18");
+            get = function(layoutName)
                 -- Return saved height or current height
                 local savedSize = BetterFriendlistDB.mainFrameSize[layoutName]
                 if savedSize and savedSize.height then
-                    return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:295:18", savedSize.height)
+                    return savedSize.height
                 end
-                return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:295:18", frame:GetHeight())
+                return frame:GetHeight()
             end,
-            set = function(layoutName, value) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:303:18");
+            set = function(layoutName, value)
                 local currentWidth = frame:GetWidth()
                 
                 -- Apply size
@@ -311,24 +311,24 @@ function MainFrameEditMode:CreateEditModeSettings() Perfy_Trace(Perfy_GetTime(),
                 
                 -- Trigger responsive updates
                 MainFrameEditMode:TriggerResponsiveUpdates()
-            Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:303:18"); end,
+            end,
             minValue = MIN_HEIGHT,
             maxValue = MAX_HEIGHT,
             valueStep = 10,
-            formatter = function(value) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:318:24");
-                return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:318:24", string.format("%d px", value))
+            formatter = function(value)
+                return string.format("%d px", value)
             end,
         },
         {
             name = BFL.L.SETTINGS_WINDOW_SCALE,
             kind = LEM.SettingType.Slider,
             default = 100,  -- 100%
-            get = function(layoutName) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:326:18");
+            get = function(layoutName)
                 -- Return saved scale as percentage (50-200)
                 local scale = BetterFriendlistDB.windowScale or 1.0
-                return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:326:18", math.floor(scale * 100))
+                return math.floor(scale * 100)
             end,
-            set = function(layoutName, value) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:331:18");
+            set = function(layoutName, value)
                 -- Convert percentage to scale factor
                 local scale = value / 100
                 scale = math.max(MIN_SCALE, math.min(MAX_SCALE, scale))
@@ -338,12 +338,12 @@ function MainFrameEditMode:CreateEditModeSettings() Perfy_Trace(Perfy_GetTime(),
                 
                 -- Apply scale
                 MainFrameEditMode:ApplyScale()
-            Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:331:18"); end,
+            end,
             minValue = 50,   -- 50%
             maxValue = 200,  -- 200%
             valueStep = 5,   -- 5% steps
-            formatter = function(value) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:345:24");
-                return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:345:24", string.format("%d%%", value))
+            formatter = function(value)
+                return string.format("%d%%", value)
             end,
         },
     }
@@ -352,32 +352,32 @@ function MainFrameEditMode:CreateEditModeSettings() Perfy_Trace(Perfy_GetTime(),
     LEM:AddFrameSettings(frame, settings)
     
     -- BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r EditMode settings registered (Width: " .. MIN_WIDTH .. "-" .. MAX_WIDTH .. ", Height: " .. MIN_HEIGHT .. "-" .. MAX_HEIGHT .. ")")
-Perfy_Trace(Perfy_GetTime(), "Leave", "MainFrameEditMode:CreateEditModeSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:254:0"); end
+end
 
 --[[--------------------------------------------------
     Callbacks
 --]]--------------------------------------------------
 
-local function OnPositionChanged(frame, layoutName, point, x, y) Perfy_Trace(Perfy_GetTime(), "Enter", "OnPositionChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:361:6");
+local function OnPositionChanged(frame, layoutName, point, x, y)
     MainFrameEditMode:SavePosition(layoutName, point, x, y)
     MainFrameEditMode:ApplyPosition(layoutName)
-Perfy_Trace(Perfy_GetTime(), "Leave", "OnPositionChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:361:6"); end
+end
 
-function MainFrameEditMode:OnSizeChanged(frame, layoutName, width, height) Perfy_Trace(Perfy_GetTime(), "Enter", "MainFrameEditMode:OnSizeChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:366:0");
+function MainFrameEditMode:OnSizeChanged(frame, layoutName, width, height)
     -- Save size
     self:SaveSize(layoutName, width, height)
     
     -- Apply size (with validation)
     self:ApplySize(layoutName)
-Perfy_Trace(Perfy_GetTime(), "Leave", "MainFrameEditMode:OnSizeChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:366:0"); end
+end
 
 --[[--------------------------------------------------
     Edit Mode Enter/Exit
 --]]--------------------------------------------------
 
-function MainFrameEditMode:OnEditModeEnter() Perfy_Trace(Perfy_GetTime(), "Enter", "MainFrameEditMode:OnEditModeEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:378:0");
+function MainFrameEditMode:OnEditModeEnter()
     local frame = BetterFriendsFrame
-    if not frame then Perfy_Trace(Perfy_GetTime(), "Leave", "MainFrameEditMode:OnEditModeEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:378:0"); return end
+    if not frame then return end
     
     -- Remember if frame was hidden before entering EditMode
     frame.wasHiddenBeforeEditMode = not frame:IsShown()
@@ -389,11 +389,11 @@ function MainFrameEditMode:OnEditModeEnter() Perfy_Trace(Perfy_GetTime(), "Enter
     end
     
     -- BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r Edit Mode entered (Settings dialog will appear on frame selection)")
-Perfy_Trace(Perfy_GetTime(), "Leave", "MainFrameEditMode:OnEditModeEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:378:0"); end
+end
 
-function MainFrameEditMode:OnEditModeExit() Perfy_Trace(Perfy_GetTime(), "Enter", "MainFrameEditMode:OnEditModeExit file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:394:0");
+function MainFrameEditMode:OnEditModeExit()
     local frame = BetterFriendsFrame
-    if not frame then Perfy_Trace(Perfy_GetTime(), "Leave", "MainFrameEditMode:OnEditModeExit file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:394:0"); return end
+    if not frame then return end
     
     -- CRITICAL: Re-enable manual dragging after EditMode
     -- LibEditMode sets frame:SetMovable(false) on exit, but we need manual dragging
@@ -408,18 +408,18 @@ function MainFrameEditMode:OnEditModeExit() Perfy_Trace(Perfy_GetTime(), "Enter"
     end
     
     -- BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r Edit Mode exited, manual dragging re-enabled, visibility restored")
-Perfy_Trace(Perfy_GetTime(), "Leave", "MainFrameEditMode:OnEditModeExit file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:394:0"); end
+end
 
 --[[--------------------------------------------------
     Initialization
 --]]--------------------------------------------------
 
-function MainFrameEditMode:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "MainFrameEditMode:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:417:0");
+function MainFrameEditMode:Initialize()
     -- Get frame
     local frame = BetterFriendsFrame
     if not frame then
         -- BFL:DebugPrint("|cffff0000BFL:MainFrameEditMode:|r BetterFriendsFrame not found!")
-        Perfy_Trace(Perfy_GetTime(), "Leave", "MainFrameEditMode:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:417:0"); return
+        return
     end
     
     -- MIGRATION: Import old frame position from WoW's layout-local.txt (one-time)
@@ -454,7 +454,7 @@ function MainFrameEditMode:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "M
     -- Hook OnShow to apply position/size BEFORE first display
     -- This ensures saved position/size is restored even without LibEditMode
     if not frame.editModeHooked then
-        frame:HookScript("OnShow", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:457:35");
+        frame:HookScript("OnShow", function(self)
             -- Only apply on first show or when coming from hidden state
             if not self.editModeApplied then
                 MainFrameEditMode:ApplyPosition()
@@ -462,10 +462,10 @@ function MainFrameEditMode:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "M
                 MainFrameEditMode:ApplyScale()  -- Feature: Window Scale
                 self.editModeApplied = true
             end
-        Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:457:35"); end)
+        end)
         
         -- Hook OnDragStop to save position when user manually moves frame
-        frame:HookScript("OnDragStop", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:468:39");
+        frame:HookScript("OnDragStop", function(self)
             self:StopMovingOrSizing()
             
             -- Save current position
@@ -474,13 +474,13 @@ function MainFrameEditMode:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "M
             if point then
                 MainFrameEditMode:SavePosition(layoutName, point, xOfs, yOfs)
             end
-        Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:468:39"); end)
+        end)
         
         -- Hook OnSizeChanged to trigger responsive updates (Phase 3)
-        frame:HookScript("OnSizeChanged", function(self, width, height) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:480:42");
+        frame:HookScript("OnSizeChanged", function(self, width, height)
             -- Trigger responsive updates for FriendsList and RaidFrame
             MainFrameEditMode:TriggerResponsiveUpdates()
-        Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:480:42"); end)
+        end)
         
         frame.editModeHooked = true
     end
@@ -497,7 +497,7 @@ function MainFrameEditMode:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "M
     if not LEM then
         -- BFL:DebugPrint("|cffffcc00BFL:MainFrameEditMode:|r LibEditMode not found - using fixed position")
         -- BFL:DebugPrint("|cffffcc00BFL:MainFrameEditMode:|r Install LibEditMode for full Edit Mode support")
-        Perfy_Trace(Perfy_GetTime(), "Leave", "MainFrameEditMode:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:417:0"); return
+        return
     end
     
     -- Default position
@@ -508,10 +508,10 @@ function MainFrameEditMode:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "M
     }
     
     -- Register the main frame directly with LibEditMode
-    LEM:AddFrame(frame, function(f, layoutName, point, x, y) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:511:24");
+    LEM:AddFrame(frame, function(f, layoutName, point, x, y)
         MainFrameEditMode:SavePosition(layoutName, point, x, y)
         MainFrameEditMode:ApplyPosition(layoutName)
-    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:511:24"); end, defaults)
+    end, defaults)
     
     -- Extend selection box to include bottom tabs
     -- LibEditMode creates a selection frame with SetAllPoints() - we need to adjust it
@@ -526,23 +526,21 @@ function MainFrameEditMode:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "M
     self:CreateEditModeSettings()
     
     -- Register callbacks for Edit Mode enter/exit
-    LEM:RegisterCallback("enter", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:529:34");
+    LEM:RegisterCallback("enter", function()
         MainFrameEditMode:OnEditModeEnter()
-    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:529:34"); end)
+    end)
     
-    LEM:RegisterCallback("exit", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:533:33");
+    LEM:RegisterCallback("exit", function()
         MainFrameEditMode:OnEditModeExit()
-    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:533:33"); end)
+    end)
     
-    LEM:RegisterCallback("layout", function(layoutName) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:537:35");
+    LEM:RegisterCallback("layout", function(layoutName)
         MainFrameEditMode:ApplyPosition(layoutName)
         MainFrameEditMode:ApplySize(layoutName)
-    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:537:35"); end)
+    end)
     
     -- BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r Edit Mode integration initialized with Width/Height settings")
-Perfy_Trace(Perfy_GetTime(), "Leave", "MainFrameEditMode:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua:417:0"); end
+end
 
 -- Public API
 BFL.MainFrameEditMode = MainFrameEditMode
-
-Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MainFrameEditMode.lua");

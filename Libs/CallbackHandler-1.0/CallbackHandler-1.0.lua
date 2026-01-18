@@ -1,10 +1,10 @@
---[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua"); --[[ $Id: CallbackHandler-1.0.lua 26 2022-12-12 15:09:39Z nevcairiel $ ]]
+--[[ $Id: CallbackHandler-1.0.lua 26 2022-12-12 15:09:39Z nevcairiel $ ]]
 local MAJOR, MINOR = "CallbackHandler-1.0", 8
 local CallbackHandler = LibStub:NewLibrary(MAJOR, MINOR)
 
-if not CallbackHandler then Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua"); return end -- No upgrade needed
+if not CallbackHandler then return end -- No upgrade needed
 
-local meta = {__index = function(tbl, key) Perfy_Trace(Perfy_GetTime(), "Enter", "meta.__index file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua:7:24"); tbl[key] = {} return Perfy_Trace_Passthrough("Leave", "meta.__index file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua:7:24", tbl[key]) end}
+local meta = {__index = function(tbl, key) tbl[key] = {} return tbl[key] end}
 
 -- Lua APIs
 local securecallfunction, error = securecallfunction, error
@@ -12,14 +12,14 @@ local setmetatable, rawget = setmetatable, rawget
 local next, select, pairs, type, tostring = next, select, pairs, type, tostring
 
 
-local function Dispatch(handlers, ...) Perfy_Trace(Perfy_GetTime(), "Enter", "Dispatch file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua:15:6");
+local function Dispatch(handlers, ...)
 	local index, method = next(handlers)
-	if not method then Perfy_Trace(Perfy_GetTime(), "Leave", "Dispatch file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua:15:6"); return end
+	if not method then return end
 	repeat
 		securecallfunction(method, ...)
 		index, method = next(handlers, index)
 	until not method
-Perfy_Trace(Perfy_GetTime(), "Leave", "Dispatch file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua:15:6"); end
+end
 
 --------------------------------------------------------------------------
 -- CallbackHandler:New
@@ -29,7 +29,7 @@ Perfy_Trace(Perfy_GetTime(), "Leave", "Dispatch file://c:\\Program Files (x86)\\
 --   UnregisterName    - name of the callback unregistration API, default "UnregisterCallback"
 --   UnregisterAllName - name of the API to unregister all callbacks, default "UnregisterAllCallbacks". false == don't publish this API.
 
-function CallbackHandler.New(_self, target, RegisterName, UnregisterName, UnregisterAllName) Perfy_Trace(Perfy_GetTime(), "Enter", "CallbackHandler.New file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua:32:0");
+function CallbackHandler.New(_self, target, RegisterName, UnregisterName, UnregisterAllName)
 
 	RegisterName = RegisterName or "RegisterCallback"
 	UnregisterName = UnregisterName or "UnregisterCallback"
@@ -46,8 +46,8 @@ function CallbackHandler.New(_self, target, RegisterName, UnregisterName, Unregi
 	local registry = { recurse=0, events=events }
 
 	-- registry:Fire() - fires the given event/message into the registry
-	function registry:Fire(eventname, ...) Perfy_Trace(Perfy_GetTime(), "Enter", "registry:Fire file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua:49:1");
-		if not rawget(events, eventname) or not next(events[eventname]) then Perfy_Trace(Perfy_GetTime(), "Leave", "registry:Fire file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua:49:1"); return end
+	function registry:Fire(eventname, ...)
+		if not rawget(events, eventname) or not next(events[eventname]) then return end
 		local oldrecurse = registry.recurse
 		registry.recurse = oldrecurse + 1
 
@@ -70,14 +70,14 @@ function CallbackHandler.New(_self, target, RegisterName, UnregisterName, Unregi
 			end
 			registry.insertQueue = nil
 		end
-	Perfy_Trace(Perfy_GetTime(), "Leave", "registry:Fire file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua:49:1"); end
+	end
 
 	-- Registration of a callback, handles:
 	--   self["method"], leads to self["method"](self, ...)
 	--   self with function ref, leads to functionref(...)
 	--   "addonId" (instead of self) with function ref, leads to functionref(...)
 	-- all with an optional arg, which, if present, gets passed as first argument (after self if present)
-	target[RegisterName] = function(self, eventname, method, ... --[[actually just a single arg]]) Perfy_Trace(Perfy_GetTime(), "Enter", "target.? file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua:80:24");
+	target[RegisterName] = function(self, eventname, method, ... --[[actually just a single arg]])
 		if type(eventname) ~= "string" then
 			error("Usage: "..RegisterName.."(eventname, method[, arg]): 'eventname' - string expected.", 2)
 		end
@@ -104,9 +104,9 @@ function CallbackHandler.New(_self, target, RegisterName, UnregisterName, Unregi
 
 			if select("#",...)>=1 then	-- this is not the same as testing for arg==nil!
 				local arg=select(1,...)
-				regfunc = function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "regfunc file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua:107:14"); self[method](self,arg,...) Perfy_Trace(Perfy_GetTime(), "Leave", "regfunc file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua:107:14"); end
+				regfunc = function(...) self[method](self,arg,...) end
 			else
-				regfunc = function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "regfunc file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua:109:14"); self[method](self,...) Perfy_Trace(Perfy_GetTime(), "Leave", "regfunc file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua:109:14"); end
+				regfunc = function(...) self[method](self,...) end
 			end
 		else
 			-- function ref with self=object or self="addonId" or self=thread
@@ -116,7 +116,7 @@ function CallbackHandler.New(_self, target, RegisterName, UnregisterName, Unregi
 
 			if select("#",...)>=1 then	-- this is not the same as testing for arg==nil!
 				local arg=select(1,...)
-				regfunc = function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "regfunc file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua:119:14"); method(arg,...) Perfy_Trace(Perfy_GetTime(), "Leave", "regfunc file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua:119:14"); end
+				regfunc = function(...) method(arg,...) end
 			else
 				regfunc = method
 			end
@@ -137,10 +137,10 @@ function CallbackHandler.New(_self, target, RegisterName, UnregisterName, Unregi
 			registry.insertQueue = registry.insertQueue or setmetatable({},meta)
 			registry.insertQueue[eventname][self] = regfunc
 		end
-	Perfy_Trace(Perfy_GetTime(), "Leave", "target.? file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua:80:24"); end
+	end
 
 	-- Unregister a callback
-	target[UnregisterName] = function(self, eventname) Perfy_Trace(Perfy_GetTime(), "Enter", "target.? file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua:143:26");
+	target[UnregisterName] = function(self, eventname)
 		if not self or self==target then
 			error("Usage: "..UnregisterName.."(eventname): bad 'self'", 2)
 		end
@@ -157,11 +157,11 @@ function CallbackHandler.New(_self, target, RegisterName, UnregisterName, Unregi
 		if registry.insertQueue and rawget(registry.insertQueue, eventname) and registry.insertQueue[eventname][self] then
 			registry.insertQueue[eventname][self] = nil
 		end
-	Perfy_Trace(Perfy_GetTime(), "Leave", "target.? file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua:143:26"); end
+	end
 
 	-- OPTIONAL: Unregister all callbacks for given selfs/addonIds
 	if UnregisterAllName then
-		target[UnregisterAllName] = function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "target.? file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua:164:30");
+		target[UnregisterAllName] = function(...)
 			if select("#",...)<1 then
 				error("Usage: "..UnregisterAllName.."([whatFor]): missing 'self' or \"addonId\" to unregister events for.", 2)
 			end
@@ -189,10 +189,10 @@ function CallbackHandler.New(_self, target, RegisterName, UnregisterName, Unregi
 					end
 				end
 			end
-		Perfy_Trace(Perfy_GetTime(), "Leave", "target.? file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua:164:30"); end
+		end
 	end
 
-	Perfy_Trace(Perfy_GetTime(), "Leave", "CallbackHandler.New file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua:32:0"); return registry
+	return registry
 end
 
 
@@ -200,5 +200,3 @@ end
 -- try to upgrade old implicit embeds since the system is selfcontained and
 -- relies on closures to work.
 
-
-Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua");

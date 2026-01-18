@@ -1,4 +1,4 @@
---[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/AnimationHelpers.lua"); --------------------------------------------------------------------------
+--------------------------------------------------------------------------
 -- AnimationHelpers.lua
 -- Utility functions for creating animations
 --------------------------------------------------------------------------
@@ -6,7 +6,7 @@
 local ADDON_NAME, BFL = ...
 
 -- Animation Helpers (exposed globally for use in main addon)
-_G.BFL_CreatePulseAnimation = function(frame) Perfy_Trace(Perfy_GetTime(), "Enter", "_G.BFL_CreatePulseAnimation file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/AnimationHelpers.lua:9:30");
+_G.BFL_CreatePulseAnimation = function(frame)
 	if not frame.pulseAnim then
 		local animGroup = frame:CreateAnimationGroup()
 		
@@ -22,10 +22,10 @@ _G.BFL_CreatePulseAnimation = function(frame) Perfy_Trace(Perfy_GetTime(), "Ente
 		
 		frame.pulseAnim = animGroup
 	end
-	return Perfy_Trace_Passthrough("Leave", "_G.BFL_CreatePulseAnimation file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/AnimationHelpers.lua:9:30", frame.pulseAnim)
+	return frame.pulseAnim
 end
 
-_G.BFL_CreateFadeOutAnimation = function(frame, onFinished) Perfy_Trace(Perfy_GetTime(), "Enter", "_G.BFL_CreateFadeOutAnimation file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/AnimationHelpers.lua:28:32");
+_G.BFL_CreateFadeOutAnimation = function(frame, onFinished)
 	if not frame.fadeOutAnim then
 		local animGroup = frame:CreateAnimationGroup()
 		
@@ -39,7 +39,5 @@ _G.BFL_CreateFadeOutAnimation = function(frame, onFinished) Perfy_Trace(Perfy_Ge
 		
 		frame.fadeOutAnim = animGroup
 	end
-	return Perfy_Trace_Passthrough("Leave", "_G.BFL_CreateFadeOutAnimation file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/AnimationHelpers.lua:28:32", frame.fadeOutAnim)
+	return frame.fadeOutAnim
 end
-
-Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/AnimationHelpers.lua");

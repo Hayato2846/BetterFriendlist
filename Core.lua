@@ -1,4 +1,4 @@
---[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua"); -- Core.lua
+-- Core.lua
 -- Main initialization file for BetterFriendlist addon
 -- Version 2.2.0 - January 2026
 -- Complete replacement for WoW Friends frame with modular architecture
@@ -51,7 +51,7 @@ BFL.MockFriendInvites = {
 }
 
 -- Detect optional features based on API availability
-local function DetectOptionalFeatures() Perfy_Trace(Perfy_GetTime(), "Enter", "DetectOptionalFeatures file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:54:6");
+local function DetectOptionalFeatures()
 	-- 11.2.7+ classID support for performance optimization
 	if GetClassInfoByID then
 		BFL.UseClassID = true
@@ -74,7 +74,7 @@ local function DetectOptionalFeatures() Perfy_Trace(Perfy_GetTime(), "Enter", "D
 			print("|cff00ff00BetterFriendlist:|r Secret Values API detected (12.0.0+)")
 		end
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "DetectOptionalFeatures file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:54:6"); end
+end
 
 -- Module registry
 BFL.Modules = {}
@@ -93,18 +93,18 @@ BFL.EventCallbacks = {}
 BFL.debugPrintEnabled = false
 
 -- Debug print function (replaces all print() calls except version print)
-function BFL:DebugPrint(...) Perfy_Trace(Perfy_GetTime(), "Enter", "BFL:DebugPrint file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:96:0");
+function BFL:DebugPrint(...)
 	-- Use cached flag for instant access (no DB lookup)
 	if self.debugPrintEnabled then
 		print(...)
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "BFL:DebugPrint file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:96:0"); end
+end
 
 -- Toggle debug print mode (slash command)
-function BFL:ToggleDebugPrint() Perfy_Trace(Perfy_GetTime(), "Enter", "BFL:ToggleDebugPrint file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:104:0");
+function BFL:ToggleDebugPrint()
 	if not BetterFriendlistDB then
 		print("|cffff0000BetterFriendlist:|r Database not initialized yet. Try again after login.")
-		Perfy_Trace(Perfy_GetTime(), "Leave", "BFL:ToggleDebugPrint file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:104:0"); return
+		return
 	end
 	
 	-- Toggle in DB
@@ -118,16 +118,16 @@ function BFL:ToggleDebugPrint() Perfy_Trace(Perfy_GetTime(), "Enter", "BFL:Toggl
 	else
 		print("|cff00ff00BetterFriendlist:|r " .. BFL.L.DEBUG_DISABLED)
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "BFL:ToggleDebugPrint file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:104:0"); end
+end
 
 -- Open Configuration
-function BFL:OpenConfig() Perfy_Trace(Perfy_GetTime(), "Enter", "BFL:OpenConfig file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:124:0");
+function BFL:OpenConfig()
 	local Settings = self:GetModule("Settings")
 	if Settings then
 		-- Check if settings frame is already shown
 		if _G.BetterFriendlistSettingsFrame and _G.BetterFriendlistSettingsFrame:IsShown() then
 			Settings:Hide()
-			Perfy_Trace(Perfy_GetTime(), "Leave", "BFL:OpenConfig file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:124:0"); return
+			return
 		end
 
 		-- Ensure main frame is visible first
@@ -138,30 +138,30 @@ function BFL:OpenConfig() Perfy_Trace(Perfy_GetTime(), "Enter", "BFL:OpenConfig 
 		end
 		Settings:Show()
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "BFL:OpenConfig file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:124:0"); end
+end
 
 -- Register a module
-function BFL:RegisterModule(name, module) Perfy_Trace(Perfy_GetTime(), "Enter", "BFL:RegisterModule file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:144:0");
+function BFL:RegisterModule(name, module)
 	if self.Modules[name] then
 		error(string.format("Module '%s' is already registered!", name))
 	end
 	self.Modules[name] = module
-	Perfy_Trace(Perfy_GetTime(), "Leave", "BFL:RegisterModule file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:144:0"); return module
+	return module
 end
 
 -- Get a module
-function BFL:GetModule(name) Perfy_Trace(Perfy_GetTime(), "Enter", "BFL:GetModule file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:153:0");
-	return Perfy_Trace_Passthrough("Leave", "BFL:GetModule file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:153:0", self.Modules[name])
+function BFL:GetModule(name)
+	return self.Modules[name]
 end
 
 -- Count table entries (for non-sequential tables)
-function BFL:TableCount(tbl) Perfy_Trace(Perfy_GetTime(), "Enter", "BFL:TableCount file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:158:0");
-	if not tbl then Perfy_Trace(Perfy_GetTime(), "Leave", "BFL:TableCount file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:158:0"); return 0 end
+function BFL:TableCount(tbl)
+	if not tbl then return 0 end
 	local count = 0
 	for _ in pairs(tbl) do
 		count = count + 1
 	end
-	Perfy_Trace(Perfy_GetTime(), "Leave", "BFL:TableCount file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:158:0"); return count
+	return count
 end
 
 --------------------------------------------------------------------------
@@ -178,7 +178,7 @@ local eventFrame = CreateFrame("Frame")
 -- @param event: The event name (e.g., "FRIENDLIST_UPDATE")
 -- @param callback: Function to call when event fires
 -- @param priority: Optional priority (lower = called first), default 50
-function BFL:RegisterEventCallback(event, callback, priority) Perfy_Trace(Perfy_GetTime(), "Enter", "BFL:RegisterEventCallback file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:181:0");
+function BFL:RegisterEventCallback(event, callback, priority)
 	priority = priority or 50
 	
 	if not self.EventCallbacks[event] then
@@ -193,17 +193,17 @@ function BFL:RegisterEventCallback(event, callback, priority) Perfy_Trace(Perfy_
 	})
 	
 	-- Sort by priority
-	table.sort(self.EventCallbacks[event], function(a, b) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:196:40");
-		return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:196:40", a.priority < b.priority)
+	table.sort(self.EventCallbacks[event], function(a, b)
+		return a.priority < b.priority
 	end)
-Perfy_Trace(Perfy_GetTime(), "Leave", "BFL:RegisterEventCallback file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:181:0"); end
+end
 
 -- Fire all callbacks for an event
 -- @param event: The event name
 -- @param ...: Event arguments
-function BFL:FireEventCallbacks(event, ...) Perfy_Trace(Perfy_GetTime(), "Enter", "BFL:FireEventCallbacks file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:204:0");
+function BFL:FireEventCallbacks(event, ...)
 	if not self.EventCallbacks[event] then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "BFL:FireEventCallbacks file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:204:0"); return
+		return
 	end
 	
 	-- Special handling for FRIENDLIST_UPDATE to prevent "script ran too long" errors
@@ -215,21 +215,21 @@ function BFL:FireEventCallbacks(event, ...) Perfy_Trace(Perfy_GetTime(), "Enter"
 		end
 		
 		-- Schedule new update (0.2s delay to coalesce rapid updates)
-		self.pendingUpdateTicker = C_Timer.NewTimer(0.2, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:218:51");
+		self.pendingUpdateTicker = C_Timer.NewTimer(0.2, function()
 			self.pendingUpdateTicker = nil
 			
 			-- Run callbacks staggered to prevent frame freeze
 			local callbacks = self.EventCallbacks[event]
-			if not callbacks then Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:218:51"); return end
+			if not callbacks then return end
 			
 			local index = 1
 			local numCallbacks = #callbacks
 			
 			-- Process one callback every 0.05s
-			C_Timer.NewTicker(0.05, function(timer) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:229:27");
+			C_Timer.NewTicker(0.05, function(timer)
 				if index > numCallbacks then
 					timer:Cancel()
-					Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:229:27"); return
+					return
 				end
 				
 				local entry = callbacks[index]
@@ -241,29 +241,29 @@ function BFL:FireEventCallbacks(event, ...) Perfy_Trace(Perfy_GetTime(), "Enter"
 					end
 				end
 				index = index + 1
-			Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:229:27"); end)
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:218:51"); end)
-		Perfy_Trace(Perfy_GetTime(), "Leave", "BFL:FireEventCallbacks file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:204:0"); return
+			end)
+		end)
+		return
 	end
 	
 	for _, entry in ipairs(self.EventCallbacks[event]) do
 		entry.callback(...)
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "BFL:FireEventCallbacks file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:204:0"); end
+end
 
 -- Normalize WoW friend name to always include realm
 -- If name doesn't contain "-", append current player's realm
 -- This ensures consistent identification across connected realms
 -- @param name: Friend name from API (e.g., "Name" or "Name-Realm")
 -- @return: Normalized name with realm (e.g., "Name-Realm")
-function BFL:NormalizeWoWFriendName(name, playerRealm) Perfy_Trace(Perfy_GetTime(), "Enter", "BFL:NormalizeWoWFriendName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:259:0");
+function BFL:NormalizeWoWFriendName(name, playerRealm)
 	if not name or name == "" then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "BFL:NormalizeWoWFriendName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:259:0"); return nil
+		return nil
 	end
 	
 	-- If name already contains realm separator, it's already normalized
 	if string.find(name, "-") then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "BFL:NormalizeWoWFriendName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:259:0"); return name
+		return name
 	end
 	
 	-- Name has no realm - append current player's realm
@@ -271,11 +271,11 @@ function BFL:NormalizeWoWFriendName(name, playerRealm) Perfy_Trace(Perfy_GetTime
 	-- Optimization: Allow passing playerRealm to avoid repeated API calls in loops
 	local realm = playerRealm or GetNormalizedRealmName()
 	if realm and realm ~= "" then
-		return Perfy_Trace_Passthrough("Leave", "BFL:NormalizeWoWFriendName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:259:0", name .. "-" .. realm)
+		return name .. "-" .. realm
 	end
 	
 	-- Fallback: return name as-is if we can't determine realm
-	Perfy_Trace(Perfy_GetTime(), "Leave", "BFL:NormalizeWoWFriendName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:259:0"); return name
+	return name
 end
 
 -- Get display name for WoW friend (strips realm if it matches player's realm)
@@ -283,34 +283,34 @@ end
 -- Display shows "Name" for same realm, "Name-Realm" for different realms
 -- @param fullName: The normalized name from database (e.g., "Renzai-Blackhand")
 -- @return: Display name ("Renzai" if same realm, "Renzai-Blackhand" if different)
-function BFL:GetWoWFriendDisplayName(fullName) Perfy_Trace(Perfy_GetTime(), "Enter", "BFL:GetWoWFriendDisplayName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:286:0");
+function BFL:GetWoWFriendDisplayName(fullName)
 	if not fullName or fullName == "" then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "BFL:GetWoWFriendDisplayName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:286:0"); return fullName
+		return fullName
 	end
 	
 	-- Split name and realm
 	local name, realm = strsplit("-", fullName, 2)
 	if not realm then
 		-- No realm separator found, return as-is
-		Perfy_Trace(Perfy_GetTime(), "Leave", "BFL:GetWoWFriendDisplayName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:286:0"); return fullName
+		return fullName
 	end
 	
 	-- Check if realm matches player's realm
 	local playerRealm = GetNormalizedRealmName()
 	if realm == playerRealm then
 		-- Same realm: return name only
-		Perfy_Trace(Perfy_GetTime(), "Leave", "BFL:GetWoWFriendDisplayName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:286:0"); return name
+		return name
 	else
 		-- Different realm: return full "Name-Realm"
-		Perfy_Trace(Perfy_GetTime(), "Leave", "BFL:GetWoWFriendDisplayName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:286:0"); return fullName
+		return fullName
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "BFL:GetWoWFriendDisplayName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:286:0"); end
+end
 
 -- Force immediate refresh of the friends list display
 -- This bypasses the normal update throttling and immediately rebuilds and renders the display
 -- Can be called from any module to ensure instant visual updates (e.g., after mock data changes)
 -- Also clears any pending updates to prevent race conditions with collapse/expand actions
-function BFL:ForceRefreshFriendsList() Perfy_Trace(Perfy_GetTime(), "Enter", "BFL:ForceRefreshFriendsList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:313:0");
+function BFL:ForceRefreshFriendsList()
 	local FriendsList = self:GetModule("FriendsList")
 	if FriendsList then
 		-- Clear pending update flag to prevent overwriting our forced refresh
@@ -345,14 +345,14 @@ function BFL:ForceRefreshFriendsList() Perfy_Trace(Perfy_GetTime(), "Enter", "BF
 	if QuickFilters and BetterFriendsFrame and BetterFriendsFrame.FriendsTabHeader and BetterFriendsFrame.FriendsTabHeader.QuickFilterDropdown then
 		QuickFilters:RefreshDropdown(BetterFriendsFrame.FriendsTabHeader.QuickFilterDropdown)
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "BFL:ForceRefreshFriendsList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:313:0"); end
+end
 
 -- Register initial events
 eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
 
 -- Event handler
-eventFrame:SetScript("OnEvent", function(self, event, ...) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:355:32");
+eventFrame:SetScript("OnEvent", function(self, event, ...)
 	if event == "ADDON_LOADED" then
 		local addonName = ...
 		if addonName == ADDON_NAME then
@@ -444,11 +444,11 @@ eventFrame:SetScript("OnEvent", function(self, event, ...) Perfy_Trace(Perfy_Get
 				BFL.OriginalToggleFriendsFrame = _G.ToggleFriendsFrame
 				
 				-- Replace global with our version (taint-safe, not a protected function)
-				_G.ToggleFriendsFrame = function(tabIndex) Perfy_Trace(Perfy_GetTime(), "Enter", "_G.ToggleFriendsFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:447:28");
+				_G.ToggleFriendsFrame = function(tabIndex)
 					-- Allow original if explicitly requested
 					if BFL.AllowBlizzardFriendsFrame then
 						-- BFL:DebugPrint("[BFL] ToggleFriendsFrame: Allowing Blizzard (explicit)")
-						return Perfy_Trace_Passthrough("Leave", "_G.ToggleFriendsFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:447:28", BFL.OriginalToggleFriendsFrame(tabIndex))
+						return BFL.OriginalToggleFriendsFrame(tabIndex)
 					end
 					
 					-- BFL:DebugPrint("[BFL] ToggleFriendsFrame: Opening BetterFriendlist, tabIndex: " .. tostring(tabIndex))
@@ -457,13 +457,13 @@ eventFrame:SetScript("OnEvent", function(self, event, ...) Perfy_Trace(Perfy_Get
 					if _G.ToggleBetterFriendsFrame then
 						_G.ToggleBetterFriendsFrame(tabIndex)
 					end
-				Perfy_Trace(Perfy_GetTime(), "Leave", "_G.ToggleFriendsFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:447:28"); end
+				end
 				-- BFL:DebugPrint("|cff00ff00[BFL]|r ToggleFriendsFrame global replaced")
 			end
 			
 			-- Helper function to show Blizzard's FriendsFrame (bypasses our hook)
 			-- This is used by "Show Blizzard's Friendlist" menu option
-			BFL.ShowBlizzardFriendsFrame = function() Perfy_Trace(Perfy_GetTime(), "Enter", "BFL.ShowBlizzardFriendsFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:466:34");
+			BFL.ShowBlizzardFriendsFrame = function()
 				BFL.AllowBlizzardFriendsFrame = true
 				-- Temporarily restore UIPanel settings for proper positioning
 				if BFL.OriginalFriendsFrameUIPanelSettings then
@@ -476,17 +476,17 @@ eventFrame:SetScript("OnEvent", function(self, event, ...) Perfy_Trace(Perfy_Get
 					FriendsFrame:Show()
 				end
 				-- Reset flag and UIPanel settings after a brief delay
-				C_Timer.After(0.1, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:479:23");
+				C_Timer.After(0.1, function()
 					BFL.AllowBlizzardFriendsFrame = false
-				Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:479:23"); end)
-			Perfy_Trace(Perfy_GetTime(), "Leave", "BFL.ShowBlizzardFriendsFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:466:34"); end
+				end)
+			end
 			
 			-- Hook ShowFriends for additional coverage (taint-safe)
 			if _G.ShowFriends then
 				BFL.OriginalShowFriends = _G.ShowFriends
-				_G.ShowFriends = function() Perfy_Trace(Perfy_GetTime(), "Enter", "_G.ShowFriends file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:487:21");
+				_G.ShowFriends = function()
 					if BFL.AllowBlizzardFriendsFrame then
-						return Perfy_Trace_Passthrough("Leave", "_G.ShowFriends file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:487:21", BFL.OriginalShowFriends())
+						return BFL.OriginalShowFriends()
 					end
 					-- BFL:DebugPrint("[BFL] ShowFriends: Redirecting to BetterFriendlist")
 					if BetterFriendsFrame and not BetterFriendsFrame:IsShown() then
@@ -494,7 +494,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...) Perfy_Trace(Perfy_Get
 							_G.ToggleBetterFriendsFrame()
 						end
 					end
-				Perfy_Trace(Perfy_GetTime(), "Leave", "_G.ShowFriends file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:487:21"); end
+				end
 			end
 			
 			-- ============================================================================
@@ -506,11 +506,11 @@ eventFrame:SetScript("OnEvent", function(self, event, ...) Perfy_Trace(Perfy_Get
 			-- We detect which tab was requested by checking FriendsFrame's selected tab.
 			-- ============================================================================
 			if FriendsFrame then
-				FriendsFrame:HookScript("OnShow", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:509:38");
+				FriendsFrame:HookScript("OnShow", function(self)
 					-- Skip if user explicitly wants Blizzard's frame
 					if BFL.AllowBlizzardFriendsFrame then
 						-- BFL:DebugPrint("[BFL] FriendsFrame:OnShow - Allowing (explicit)")
-						Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:509:38"); return
+						return
 					end
 					
 					-- Detect which tab was requested by reading Blizzard's selected tab
@@ -533,7 +533,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...) Perfy_Trace(Perfy_Get
 							end
 						end
 					end
-				Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:509:38"); end)
+				end)
 				-- BFL:DebugPrint("|cff00ff00[BFL]|r FriendsFrame:OnShow hooked for ElvUI compatibility")
 			end
 		end
@@ -554,7 +554,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...) Perfy_Trace(Perfy_Get
 	
 	-- Fire event callbacks for all events
 	BFL:FireEventCallbacks(event, ...)
-Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:355:32"); end)
+end)
 
 -- Expose namespace globally for backward compatibility
 _G.BetterFriendlist = BFL
@@ -565,7 +565,7 @@ _G.BetterFriendlist = BFL
 
 -- Main slash command handler
 SLASH_BETTERFRIENDLIST1 = "/bfl"
-SlashCmdList["BETTERFRIENDLIST"] = function(msg) Perfy_Trace(Perfy_GetTime(), "Enter", "SlashCmdList.BETTERFRIENDLIST file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:568:35");
+SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 	msg = msg:lower():trim()
 	
 	-- Toggle frame (no parameters)
@@ -575,7 +575,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg) Perfy_Trace(Perfy_GetTime(), "E
 		else
 			print("|cffff0000BetterFriendlist:|r Frame not loaded yet")
 		end
-		Perfy_Trace(Perfy_GetTime(), "Leave", "SlashCmdList.BETTERFRIENDLIST file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:568:35"); return
+		return
 	end
 	
 	-- Debug print toggle
@@ -623,7 +623,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg) Perfy_Trace(Perfy_GetTime(), "E
 		local DB = BFL:GetModule("DB")
 		if not DB then
 			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_DB_MODULE_NOT_AVAIL)
-			Perfy_Trace(Perfy_GetTime(), "Leave", "SlashCmdList.BETTERFRIENDLIST file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:568:35"); return
+			return
 		end
 		
 		local friendActivity = DB:Get("friendActivity") or {}
@@ -652,26 +652,26 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg) Perfy_Trace(Perfy_GetTime(), "E
 		local NotificationSystem = BFL.NotificationSystem
 		if not NotificationSystem then
 			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_NOTIFICATION_MODULE_NOT_LOADED)
-			Perfy_Trace(Perfy_GetTime(), "Leave", "SlashCmdList.BETTERFRIENDLIST file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:568:35"); return
+			return
 		end
 		
 		-- Check if Beta features enabled
 		if not BetterFriendlistDB.enableBetaFeatures then
 			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_BETA_FEATURES_DISABLED_MSG)
 			print(BFL.L.CORE_BETA_ENABLE_HINT)
-			Perfy_Trace(Perfy_GetTime(), "Leave", "SlashCmdList.BETTERFRIENDLIST file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:568:35"); return
+			return
 		end
 		
 		print("|cff00ff00BetterFriendlist:|r " .. BFL.L.CORE_TRIGGERING_TEST_NOTIFICATIONS)
 		
 		-- Trigger 3 test notifications to demonstrate multi-toast system
 		NotificationSystem:ShowNotification("Test Friend 1", "is now online playing World of Warcraft", "Interface\\AddOns\\BetterFriendlist\\Icons\\user-check")
-		C_Timer.After(0.2, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:669:21");
+		C_Timer.After(0.2, function()
 			NotificationSystem:ShowNotification("Test Friend 2", "switched to Warrior", "Interface\\AddOns\\BetterFriendlist\\Icons\\user-check")
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:669:21"); end)
-		C_Timer.After(0.4, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:672:21");
+		end)
+		C_Timer.After(0.4, function()
 			NotificationSystem:ShowNotification("Test Friend 3", "logged into World of Warcraft", "Interface\\AddOns\\BetterFriendlist\\Icons\\user-check")
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:672:21"); end)
+		end)
 		
 		print(BFL.L.CORE_TEST_NOTIFICATIONS_SUCCESS)
 		print(BFL.L.CORE_TEST_NOTIFICATIONS_TIP)
@@ -681,7 +681,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg) Perfy_Trace(Perfy_GetTime(), "E
 		local NotificationSystem = BFL.NotificationSystem
 		if not NotificationSystem then
 			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_NOTIFICATION_MODULE_NOT_LOADED)
-			Perfy_Trace(Perfy_GetTime(), "Leave", "SlashCmdList.BETTERFRIENDLIST file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:568:35"); return
+			return
 		end
 		
 		NotificationSystem:TestGroupRules()
@@ -691,7 +691,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg) Perfy_Trace(Perfy_GetTime(), "E
 		local Statistics = BFL:GetModule("Statistics")
 		if not Statistics then
 			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_STATISTICS_MODULE_NOT_LOADED)
-			Perfy_Trace(Perfy_GetTime(), "Leave", "SlashCmdList.BETTERFRIENDLIST file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:568:35"); return
+			return
 		end
 		
 		local stats = Statistics:GetStatistics()
@@ -917,7 +917,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg) Perfy_Trace(Perfy_GetTime(), "E
 		local QuickJoin = BFL:GetModule("QuickJoin")
 		if not QuickJoin then
 			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_QUICKJOIN_NOT_LOADED)
-			Perfy_Trace(Perfy_GetTime(), "Leave", "SlashCmdList.BETTERFRIENDLIST file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:568:35"); return
+			return
 		end
 		
 		-- Pass the full arguments to the QuickJoin handler
@@ -932,7 +932,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg) Perfy_Trace(Perfy_GetTime(), "E
 		local RaidFrame = BFL:GetModule("RaidFrame")
 		if not RaidFrame then
 			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_RAIDFRAME_NOT_LOADED)
-			Perfy_Trace(Perfy_GetTime(), "Leave", "SlashCmdList.BETTERFRIENDLIST file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:568:35"); return
+			return
 		end
 		
 		-- Pass the full arguments to the RaidFrame handler
@@ -1153,6 +1153,4 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg) Perfy_Trace(Perfy_GetTime(), "E
 		print("")
 		print(BFL.L.CORE_HELP_LINK)
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "SlashCmdList.BETTERFRIENDLIST file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua:568:35"); end
-
-Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Core.lua");
+end

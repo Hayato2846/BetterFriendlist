@@ -1,4 +1,4 @@
-﻿--[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua"); -- SettingsComponents.lua
+﻿-- SettingsComponents.lua
 -- Reusable UI components for Settings panel (Platynator-style)
 
 local ADDON_NAME, BFL = ...
@@ -19,7 +19,7 @@ local SPACING_OPTION = -10
 -- ========================================
 -- HEADERS
 -- ========================================
-function Components:CreateHeader(parent, text) Perfy_Trace(Perfy_GetTime(), "Enter", "Components:CreateHeader file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:22:0");
+function Components:CreateHeader(parent, text)
 	local holder = CreateFrame("Frame", nil, parent)
 	holder:SetPoint("LEFT", PADDING_LEFT, 0)
 	holder:SetPoint("RIGHT", -PADDING_RIGHT, 0)
@@ -28,14 +28,14 @@ function Components:CreateHeader(parent, text) Perfy_Trace(Perfy_GetTime(), "Ent
 	holder.text:SetPoint("LEFT", 0, 0)
 	holder.text:SetJustifyH("LEFT")
 	holder:SetHeight(COMPONENT_HEIGHT)
-	Perfy_Trace(Perfy_GetTime(), "Leave", "Components:CreateHeader file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:22:0"); return holder
+	return holder
 end
 
 -- ========================================
 -- CHECKBOX (Label left, Checkbox right)
 -- Classic uses InterfaceOptionsCheckButtonTemplate, Retail uses SettingsCheckboxTemplate
 -- ========================================
-function Components:CreateCheckbox(parent, labelText, initialValue, callback) Perfy_Trace(Perfy_GetTime(), "Enter", "Components:CreateCheckbox file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:38:0");
+function Components:CreateCheckbox(parent, labelText, initialValue, callback)
 	local holder = CreateFrame("Frame", nil, parent)
 	holder:SetHeight(COMPONENT_HEIGHT)
 	holder:SetPoint("LEFT", PADDING_LEFT, 0)
@@ -78,45 +78,45 @@ function Components:CreateCheckbox(parent, labelText, initialValue, callback) Pe
 	end
 	
 	checkBox:SetChecked(initialValue)
-	checkBox:SetScript("OnClick", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:81:31");
+	checkBox:SetScript("OnClick", function(self)
 		callback(self:GetChecked())
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:81:31"); end)
+	end)
 	
 	-- Fix for ugly hover effect when no tooltip is present
-	checkBox:SetScript("OnEnter", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:86:31"); Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:86:31"); end)
-	checkBox:SetScript("OnLeave", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:87:31"); Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:87:31"); end)
+	checkBox:SetScript("OnEnter", function() end)
+	checkBox:SetScript("OnLeave", function() end)
 	
 	-- Tooltip support
-	holder.SetTooltip = function(_, title, desc) Perfy_Trace(Perfy_GetTime(), "Enter", "holder.SetTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:90:21");
-		checkBox:SetScript("OnEnter", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:91:32");
+	holder.SetTooltip = function(_, title, desc)
+		checkBox:SetScript("OnEnter", function(self)
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 			GameTooltip:SetText(title, 1, 1, 1)
 			if desc then
 				GameTooltip:AddLine(desc, 0.8, 0.8, 0.8, true)
 			end
 			GameTooltip:Show()
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:91:32"); end)
-		checkBox:SetScript("OnLeave", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:99:32");
+		end)
+		checkBox:SetScript("OnLeave", function()
 			GameTooltip:Hide()
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:99:32"); end)
-	Perfy_Trace(Perfy_GetTime(), "Leave", "holder.SetTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:90:21"); end
+		end)
+	end
 	
-	function holder:SetValue(value) Perfy_Trace(Perfy_GetTime(), "Enter", "holder:SetValue file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:104:1");
+	function holder:SetValue(value)
 		checkBox:SetChecked(value)
-	Perfy_Trace(Perfy_GetTime(), "Leave", "holder:SetValue file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:104:1"); end
+	end
 	
-	function holder:GetValue() Perfy_Trace(Perfy_GetTime(), "Enter", "holder:GetValue file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:108:1");
-		return Perfy_Trace_Passthrough("Leave", "holder:GetValue file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:108:1", checkBox:GetChecked())
+	function holder:GetValue()
+		return checkBox:GetChecked()
 	end
 	
 	holder.checkBox = checkBox
-	Perfy_Trace(Perfy_GetTime(), "Leave", "Components:CreateCheckbox file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:38:0"); return holder
+	return holder
 end
 
 -- ========================================
 -- SLIDER (Label left, Slider right)
 -- ========================================
-function Components:CreateSlider(parent, labelText, min, max, initialValue, formatter, callback) Perfy_Trace(Perfy_GetTime(), "Enter", "Components:CreateSlider file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:119:0");
+function Components:CreateSlider(parent, labelText, min, max, initialValue, formatter, callback)
 	local holder = CreateFrame("Frame", nil, parent)
 	holder:SetHeight(COMPONENT_HEIGHT)
 	holder:SetPoint("LEFT", PADDING_LEFT, 0)
@@ -138,19 +138,19 @@ function Components:CreateSlider(parent, labelText, min, max, initialValue, form
 		[MinimalSliderWithSteppersMixin.Label.Right] = formatter
 	})
 	
-	holder.Slider:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged, function(_, value) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:141:85");
+	holder.Slider:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged, function(_, value)
 		callback(value)
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:141:85"); end)
+	end)
 	
-	function holder:SetValue(value) Perfy_Trace(Perfy_GetTime(), "Enter", "holder:SetValue file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:145:1");
+	function holder:SetValue(value)
 		holder.Slider:SetValue(value)
-	Perfy_Trace(Perfy_GetTime(), "Leave", "holder:SetValue file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:145:1"); end
-	
-	function holder:GetValue() Perfy_Trace(Perfy_GetTime(), "Enter", "holder:GetValue file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:149:1");
-		return Perfy_Trace_Passthrough("Leave", "holder:GetValue file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:149:1", holder.Slider:GetValue())
 	end
 	
-	Perfy_Trace(Perfy_GetTime(), "Leave", "Components:CreateSlider file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:119:0"); return holder
+	function holder:GetValue()
+		return holder.Slider:GetValue()
+	end
+	
+	return holder
 end
 
 -- ========================================
@@ -162,7 +162,7 @@ end
 local classicDropdownCounter = 0
 
 -- Create Classic-style dropdown using UIDropDownMenu
-local function CreateClassicDropdown(parent, entries, isSelectedCallback, onSelectionCallback) Perfy_Trace(Perfy_GetTime(), "Enter", "CreateClassicDropdown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:165:6");
+local function CreateClassicDropdown(parent, entries, isSelectedCallback, onSelectionCallback)
 	classicDropdownCounter = classicDropdownCounter + 1
 	local dropdownName = "BFLSettingsDropdown" .. classicDropdownCounter
 	
@@ -179,21 +179,21 @@ local function CreateClassicDropdown(parent, entries, isSelectedCallback, onSele
 	dropdown.entryValues = entryValues
 	
 	-- Initialize the dropdown
-	UIDropDownMenu_Initialize(dropdown, function(self, level) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:182:37");
+	UIDropDownMenu_Initialize(dropdown, function(self, level)
 		level = level or 1
 		for i = 1, #entryLabels do
 			local info = UIDropDownMenu_CreateInfo()
 			info.text = entryLabels[i]
 			info.value = entryValues[i]
 			info.checked = isSelectedCallback(entryValues[i])
-			info.func = function() Perfy_Trace(Perfy_GetTime(), "Enter", "info.func file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:189:15");
+			info.func = function()
 				onSelectionCallback(entryValues[i])
 				UIDropDownMenu_SetText(dropdown, entryLabels[i])
 				CloseDropDownMenus()
-			Perfy_Trace(Perfy_GetTime(), "Leave", "info.func file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:189:15"); end
+			end
 			UIDropDownMenu_AddButton(info, level)
 		end
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:182:37"); end)
+	end)
 	
 	-- Set initial text
 	for i = 1, #entryValues do
@@ -205,10 +205,10 @@ local function CreateClassicDropdown(parent, entries, isSelectedCallback, onSele
 	
 	UIDropDownMenu_SetWidth(dropdown, 150)
 	
-	Perfy_Trace(Perfy_GetTime(), "Leave", "CreateClassicDropdown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:165:6"); return dropdown
+	return dropdown
 end
 
-function Components:CreateDropdown(parent, labelText, entries, isSelectedCallback, onSelectionCallback) Perfy_Trace(Perfy_GetTime(), "Enter", "Components:CreateDropdown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:211:0");
+function Components:CreateDropdown(parent, labelText, entries, isSelectedCallback, onSelectionCallback)
 	local holder = CreateFrame("Frame", nil, parent)
 	holder:SetHeight(COMPONENT_HEIGHT)
 	holder:SetPoint("LEFT", PADDING_LEFT, 0)
@@ -249,30 +249,30 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 			local entryValues = entries.values
 			
 			-- Setup the dropdown menu using modern API
-			dropdown:SetupMenu(function(dropdown, rootDescription) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:252:22");
+			dropdown:SetupMenu(function(dropdown, rootDescription)
 				for i = 1, #entryLabels do
-					local radio = rootDescription:CreateButton(entryLabels[i], function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:254:64"); Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:254:64"); end, entryValues[i])
-					radio:SetIsSelected(function(value) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:255:25"); return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:255:25", isSelectedCallback(value)) end)
-					radio:SetResponder(function(value) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:256:24"); onSelectionCallback(value) Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:256:24"); end)
+					local radio = rootDescription:CreateButton(entryLabels[i], function() end, entryValues[i])
+					radio:SetIsSelected(function(value) return isSelectedCallback(value) end)
+					radio:SetResponder(function(value) onSelectionCallback(value) end)
 					
 					-- Force font for dropdown items
-					radio:AddInitializer(function(button, description, menu) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:259:26");
+					radio:AddInitializer(function(button, description, menu)
 						local fontString = button.fontString or button.Text
 						if fontString then
 							fontString:SetFontObject("BetterFriendlistFontNormalSmall")
 						end
-					Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:259:26"); end)
+					end)
 				end
-			Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:252:22"); end)
+			end)
 			
 			-- SetSelectionTranslator: Shows the label of the selected value
-			dropdown:SetSelectionTranslator(function(selection) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:269:35");
+			dropdown:SetSelectionTranslator(function(selection)
 				for i = 1, #entryValues do
 					if entryValues[i] == selection.data then
-						return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:269:35", entryLabels[i])
+						return entryLabels[i]
 					end
 				end
-				return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:269:35", entryLabels[1]) -- Fallback
+				return entryLabels[1] -- Fallback
 			end)
 			
 			-- Set initial text based on selected value
@@ -289,28 +289,28 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 	holder.DropDown = dropdown
 	
 	-- Tooltip support
-	holder.SetTooltip = function(_, title, desc) Perfy_Trace(Perfy_GetTime(), "Enter", "holder.SetTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:292:21");
-		dropdown:SetScript("OnEnter", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:293:32");
+	holder.SetTooltip = function(_, title, desc)
+		dropdown:SetScript("OnEnter", function(self)
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 			GameTooltip:SetText(title, 1, 1, 1)
 			if desc then
 				GameTooltip:AddLine(desc, 0.8, 0.8, 0.8, true)
 			end
 			GameTooltip:Show()
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:293:32"); end)
-		dropdown:SetScript("OnLeave", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:301:32");
+		end)
+		dropdown:SetScript("OnLeave", function()
 			GameTooltip:Hide()
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:301:32"); end)
-	Perfy_Trace(Perfy_GetTime(), "Leave", "holder.SetTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:292:21"); end
+		end)
+	end
 	
-	Perfy_Trace(Perfy_GetTime(), "Leave", "Components:CreateDropdown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:211:0"); return holder
+	return holder
 end
 
 -- ========================================
 -- INSET SECTION (Visual grouping)
 -- InsetFrameTemplate may not exist in Classic - create manual fallback
 -- ========================================
-function Components:CreateInsetSection(parent, height) Perfy_Trace(Perfy_GetTime(), "Enter", "Components:CreateInsetSection file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:313:0");
+function Components:CreateInsetSection(parent, height)
 	local inset
 	
 	-- Check if InsetFrameTemplate exists (may not be in all Classic versions)
@@ -334,24 +334,24 @@ function Components:CreateInsetSection(parent, height) Perfy_Trace(Perfy_GetTime
 	inset:SetPoint("LEFT", 20, 0)
 	inset:SetPoint("RIGHT", -20, 0)
 	inset:SetHeight(height or 100)
-	Perfy_Trace(Perfy_GetTime(), "Leave", "Components:CreateInsetSection file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:313:0"); return inset
+	return inset
 end
 
 -- ========================================
 -- SPACER (Empty frame for spacing)
 -- ========================================
-function Components:CreateSpacer(parent, height) Perfy_Trace(Perfy_GetTime(), "Enter", "Components:CreateSpacer file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:343:0");
+function Components:CreateSpacer(parent, height)
 	local spacer = CreateFrame("Frame", nil, parent)
 	spacer:SetHeight(height or math.abs(SPACING_SECTION))
 	spacer:SetPoint("LEFT")
 	spacer:SetPoint("RIGHT")
-	Perfy_Trace(Perfy_GetTime(), "Leave", "Components:CreateSpacer file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:343:0"); return spacer
+	return spacer
 end
 
 -- ========================================
 -- ROW WITH TWO BUTTONS (For Arrow Up/Down controls)
 -- ========================================
-function Components:CreateButtonRow(parent, leftText, rightText, leftCallback, rightCallback) Perfy_Trace(Perfy_GetTime(), "Enter", "Components:CreateButtonRow file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:354:0");
+function Components:CreateButtonRow(parent, leftText, rightText, leftCallback, rightCallback)
 	local holder = CreateFrame("Frame", nil, parent)
 	holder:SetHeight(COMPONENT_HEIGHT)
 	holder:SetPoint("LEFT", PADDING_LEFT, 0)
@@ -375,13 +375,13 @@ function Components:CreateButtonRow(parent, leftText, rightText, leftCallback, r
 		holder.RightButton = rightButton
 	end
 	
-	Perfy_Trace(Perfy_GetTime(), "Leave", "Components:CreateButtonRow file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:354:0"); return holder
+	return holder
 end
 
 -- ========================================
 -- Helper: Anchor chain for vertical stacking
 -- ========================================
-function Components:AnchorChain(frames, startY) Perfy_Trace(Perfy_GetTime(), "Enter", "Components:AnchorChain file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:384:0");
+function Components:AnchorChain(frames, startY)
 	startY = startY or 0
 	for i, frame in ipairs(frames) do
 		if i == 1 then
@@ -400,12 +400,12 @@ function Components:AnchorChain(frames, startY) Perfy_Trace(Perfy_GetTime(), "En
 			frame:SetPoint("TOP", prevFrame, "BOTTOM", 0, spacing)
 		end
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "Components:AnchorChain file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:384:0"); end
+end
 
 -- ========================================
 -- LIST ITEM (With Up/Down arrows for reordering)
 -- ========================================
-function Components:CreateListItem(parent, itemText, orderIndex, onMoveUp, onMoveDown, onRename, onColor, onDelete) Perfy_Trace(Perfy_GetTime(), "Enter", "Components:CreateListItem file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:408:0");
+function Components:CreateListItem(parent, itemText, orderIndex, onMoveUp, onMoveDown, onRename, onColor, onDelete)
 	local holder = CreateFrame("Frame", nil, parent)
 	holder:SetHeight(40)
 	holder:SetPoint("LEFT", PADDING_LEFT, 0)
@@ -442,20 +442,20 @@ function Components:CreateListItem(parent, itemText, orderIndex, onMoveUp, onMov
 		deleteIcon:SetVertexColor(1, 0.82, 0)
 		holder.deleteButton.icon = deleteIcon
 		
-		holder.deleteButton:SetScript("OnClick", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:445:43");
+		holder.deleteButton:SetScript("OnClick", function()
 			if onDelete then onDelete() end
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:445:43"); end)
-		holder.deleteButton:SetScript("OnEnter", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:448:43");
+		end)
+		holder.deleteButton:SetScript("OnEnter", function(self)
 			self.icon:SetVertexColor(1, 1, 1)
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 			GameTooltip:SetText(L.SETTINGS_DELETE_GROUP, 1, 0.1, 0.1)
 			GameTooltip:AddLine(L.SETTINGS_DELETE_GROUP_DESC, 0.8, 0.8, 0.8, true)
 			GameTooltip:Show()
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:448:43"); end)
-		holder.deleteButton:SetScript("OnLeave", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:455:43");
+		end)
+		holder.deleteButton:SetScript("OnLeave", function(self)
 			self.icon:SetVertexColor(1, 0.82, 0)
 			GameTooltip:Hide()
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:455:43"); end)
+		end)
 	end
 	
 	-- Color button (fixed position, always visible)
@@ -473,18 +473,18 @@ function Components:CreateListItem(parent, itemText, orderIndex, onMoveUp, onMov
 	holder.colorSwatch:SetColorTexture(1, 0.82, 0)
 	
 	holder.colorButton:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
-	holder.colorButton:SetScript("OnClick", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:476:41");
+	holder.colorButton:SetScript("OnClick", function()
 		if onColor then onColor(holder.colorSwatch) end
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:476:41"); end)
-	holder.colorButton:SetScript("OnEnter", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:479:41");
+	end)
+	holder.colorButton:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		GameTooltip:SetText(L.SETTINGS_GROUP_COLOR, 1, 1, 1)
 		GameTooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC, 0.8, 0.8, 0.8, true)
 		GameTooltip:Show()
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:479:41"); end)
-	holder.colorButton:SetScript("OnLeave", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:485:41");
+	end)
+	holder.colorButton:SetScript("OnLeave", function()
 		GameTooltip:Hide()
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:485:41"); end)
+	end)
 	
 	-- Rename button (fixed position, optional)
 	if onRename then
@@ -500,20 +500,20 @@ function Components:CreateListItem(parent, itemText, orderIndex, onMoveUp, onMov
 		renameIcon:SetVertexColor(1, 0.82, 0)
 		holder.renameButton.icon = renameIcon
 		
-		holder.renameButton:SetScript("OnClick", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:503:43");
+		holder.renameButton:SetScript("OnClick", function()
 			if onRename then onRename() end
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:503:43"); end)
-		holder.renameButton:SetScript("OnEnter", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:506:43");
+		end)
+		holder.renameButton:SetScript("OnEnter", function(self)
 			self.icon:SetVertexColor(1, 1, 1)
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 			GameTooltip:SetText(L.SETTINGS_RENAME_GROUP, 1, 1, 1)
 			GameTooltip:AddLine(L.TOOLTIP_RENAME_DESC, 0.8, 0.8, 0.8, true)
 			GameTooltip:Show()
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:506:43"); end)
-		holder.renameButton:SetScript("OnLeave", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:513:43");
+		end)
+		holder.renameButton:SetScript("OnLeave", function(self)
 			self.icon:SetVertexColor(1, 0.82, 0)
 			GameTooltip:Hide()
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:513:43"); end)
+		end)
 	end
 	
 	-- Down Arrow button (fixed position)
@@ -529,20 +529,20 @@ function Components:CreateListItem(parent, itemText, orderIndex, onMoveUp, onMov
 	downIcon:SetVertexColor(1, 0.82, 0)
 	holder.downButton.icon = downIcon
 	
-	holder.downButton:SetScript("OnClick", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:532:40");
+	holder.downButton:SetScript("OnClick", function()
 		if onMoveDown then onMoveDown() end
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:532:40"); end)
-	holder.downButton:SetScript("OnEnter", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:535:40");
+	end)
+	holder.downButton:SetScript("OnEnter", function(self)
 		self.icon:SetVertexColor(1, 1, 1)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		GameTooltip:SetText(L.TOOLTIP_MOVE_DOWN, 1, 1, 1)
 		GameTooltip:AddLine(L.TOOLTIP_MOVE_DOWN_DESC, 0.8, 0.8, 0.8, true)
 		GameTooltip:Show()
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:535:40"); end)
-	holder.downButton:SetScript("OnLeave", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:542:40");
+	end)
+	holder.downButton:SetScript("OnLeave", function(self)
 		self.icon:SetVertexColor(1, 0.82, 0)
 		GameTooltip:Hide()
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:542:40"); end)
+	end)
 	
 	-- Up Arrow button (fixed position)
 	holder.upButton = CreateFrame("Button", nil, holder, "UIPanelButtonTemplate")
@@ -557,43 +557,43 @@ function Components:CreateListItem(parent, itemText, orderIndex, onMoveUp, onMov
 	upIcon:SetVertexColor(1, 0.82, 0)
 	holder.upButton.icon = upIcon
 	
-	holder.upButton:SetScript("OnClick", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:560:38");
+	holder.upButton:SetScript("OnClick", function()
 		if onMoveUp then onMoveUp() end
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:560:38"); end)
-	holder.upButton:SetScript("OnEnter", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:563:38");
+	end)
+	holder.upButton:SetScript("OnEnter", function(self)
 		self.icon:SetVertexColor(1, 1, 1)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		GameTooltip:SetText(L.TOOLTIP_MOVE_UP, 1, 1, 1)
 		GameTooltip:AddLine(L.TOOLTIP_MOVE_UP_DESC, 0.8, 0.8, 0.8, true)
 		GameTooltip:Show()
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:563:38"); end)
-	holder.upButton:SetScript("OnLeave", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:570:38");
+	end)
+	holder.upButton:SetScript("OnLeave", function(self)
 		self.icon:SetVertexColor(1, 0.82, 0)
 		GameTooltip:Hide()
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:570:38"); end)
+	end)
 	
 	-- Store order index
 	holder.orderIndex = orderIndex
 	
 	-- Function to update order display
-	function holder:SetOrderIndex(newIndex) Perfy_Trace(Perfy_GetTime(), "Enter", "holder:SetOrderIndex file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:579:1");
+	function holder:SetOrderIndex(newIndex)
 		holder.orderIndex = newIndex
 		holder.orderText:SetText(newIndex)
-	Perfy_Trace(Perfy_GetTime(), "Leave", "holder:SetOrderIndex file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:579:1"); end
+	end
 	
 	-- Function to enable/disable arrow buttons
-	function holder:SetArrowState(canMoveUp, canMoveDown) Perfy_Trace(Perfy_GetTime(), "Enter", "holder:SetArrowState file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:585:1");
+	function holder:SetArrowState(canMoveUp, canMoveDown)
 		holder.upButton:SetEnabled(canMoveUp)
 		holder.downButton:SetEnabled(canMoveDown)
-	Perfy_Trace(Perfy_GetTime(), "Leave", "holder:SetArrowState file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:585:1"); end
+	end
 	
-	Perfy_Trace(Perfy_GetTime(), "Leave", "Components:CreateListItem file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:408:0"); return holder
+	return holder
 end
 
 -- ========================================
 -- CreateButton
 -- ========================================
-function Components:CreateButton(parent, text, onClick, tooltip) Perfy_Trace(Perfy_GetTime(), "Enter", "Components:CreateButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:596:0");
+function Components:CreateButton(parent, text, onClick, tooltip)
 	local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
 	button:SetSize(180, 24)
 	button:SetText(text)
@@ -608,21 +608,21 @@ function Components:CreateButton(parent, text, onClick, tooltip) Perfy_Trace(Per
 	end
 	
 	if tooltip then
-		button:SetScript("OnEnter", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:611:30");
+		button:SetScript("OnEnter", function(self)
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 			GameTooltip:SetText(tooltip, nil, nil, nil, nil, true)
 			GameTooltip:Show()
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:611:30"); end)
-		button:SetScript("OnLeave", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:616:30");
+		end)
+		button:SetScript("OnLeave", function(self)
 			GameTooltip:Hide()
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:616:30"); end)
+		end)
 	end
 	
-	Perfy_Trace(Perfy_GetTime(), "Leave", "Components:CreateButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua:596:0"); return button
+	return button
 end
 
 -- ========================================
 -- Export
 -- ========================================
-Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/SettingsComponents.lua"); return Components
+return Components
 
