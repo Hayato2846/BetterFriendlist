@@ -1007,6 +1007,7 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Prevent BetterFriendlist from opening ove
 	L.CORE_HELP_CMD_TOGGLE = "  |cffffffff/bfl|r - Toggle BetterFriendlist frame"
 	L.CORE_HELP_CMD_SETTINGS = "  |cffffffff/bfl settings|r - Open settings panel"
 	L.CORE_HELP_CMD_HELP = "  |cffffffff/bfl help|r - Show this help"
+	L.CORE_HELP_CMD_CHANGELOG = "  |cffffffff/bfl changelog|r - Open changelog window"
 	L.CORE_HELP_DEBUG_COMMANDS = "|cffffcc00Debug Commands:|r"
 	L.CORE_HELP_CMD_DEBUG = "  |cffffffff/bfl debug|r - Toggle debug output"
 	L.CORE_HELP_CMD_DATABASE = "  |cffffffff/bfl database|r - Show database state"

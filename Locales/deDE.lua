@@ -975,6 +975,7 @@ if GetLocale() == "deDE" then
 	L.CORE_HELP_CMD_TOGGLE = "  |cffffffff/bfl|r - BetterFriendlist Fenster umschalten"
 	L.CORE_HELP_CMD_SETTINGS = "  |cffffffff/bfl settings|r - Einstellungs-Panel öffnen"
 	L.CORE_HELP_CMD_HELP = "  |cffffffff/bfl help|r - Diese Hilfe anzeigen"
+	L.CORE_HELP_CMD_CHANGELOG = "  |cffffffff/bfl changelog|r - Öffnet das Änderungsprotokoll"
 	L.CORE_HELP_DEBUG_COMMANDS = "|cffffcc00Debug-Befehle:|r"
 	L.CORE_HELP_CMD_DEBUG = "  |cffffffff/bfl debug|r - Debug-Ausgabe umschalten"
 	L.CORE_HELP_CMD_DATABASE = "  |cffffffff/bfl database|r - Datenbank-Status anzeigen"

@@ -1001,6 +1001,7 @@ if GetLocale() == "zhCN" then
 	L.CORE_HELP_CMD_TOGGLE = "  |cffffffff/bfl|r - Toggle"
 	L.CORE_HELP_CMD_SETTINGS = "  |cffffffff/bfl settings|r - Config"
 	L.CORE_HELP_CMD_HELP = "  |cffffffff/bfl help|r - Help"
+	L.CORE_HELP_CMD_CHANGELOG = "  |cffffffff/bfl changelog|r - Open changelog window"
 	L.CORE_HELP_DEBUG_COMMANDS = "|cffffcc00Debug:|r"
 	L.CORE_HELP_CMD_DEBUG = "  |cffffffff/bfl debug|r - Toggle debug"
 	L.CORE_HELP_CMD_DATABASE = "  |cffffffff/bfl database|r - Show DB"
