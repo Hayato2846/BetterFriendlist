@@ -1,4 +1,4 @@
--- Modules/RecentAllies.lua
+--[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua"); -- Modules/RecentAllies.lua
 -- Recent Allies System Module
 -- Manages the recent allies list, data provider, and player interactions
 
@@ -27,17 +27,17 @@ local RecentAlliesListEvents = {
 -- ========================================
 
 -- Initialize (called from ADDON_LOADED)
-function RecentAllies:Initialize()
+function RecentAllies:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "RecentAllies:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:30:0");
 	-- Recent Allies is TWW-only (11.0.7+)
 	if not BFL.HasRecentAllies then
 		-- BFL:DebugPrint("|cffffcc00BFL RecentAllies:|r Not available in Classic - module disabled")
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "RecentAllies:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:30:0"); return
 	end
 	-- Nothing else to initialize yet
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RecentAllies:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:30:0"); end
 
 -- Initialize Recent Allies Frame (RecentAlliesListMixin:OnLoad)
-function RecentAllies:OnLoad(frame)
+function RecentAllies:OnLoad(frame) Perfy_Trace(Perfy_GetTime(), "Enter", "RecentAllies:OnLoad file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:40:0");
 	-- Recent Allies is TWW-only (11.0.7+)
 	if not BFL.HasRecentAllies then
 		-- Show "Not Available" message for Classic users
@@ -51,7 +51,7 @@ function RecentAllies:OnLoad(frame)
 		if frame.ScrollBox then frame.ScrollBox:Hide() end
 		if frame.ScrollBar then frame.ScrollBar:Hide() end
 		if frame.LoadingSpinner then frame.LoadingSpinner:Hide() end
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "RecentAllies:OnLoad file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:40:0"); return
 	end
 	
 	-- Initialize ScrollBox with element factory
@@ -59,13 +59,13 @@ function RecentAllies:OnLoad(frame)
 	local topPadding, bottomPadding, leftPadding, rightPadding = 0, 0, 0, 0
 	local view = CreateScrollBoxListLinearView(topPadding, bottomPadding, leftPadding, rightPadding, elementSpacing)
 	
-	view:SetElementFactory(function(factory, elementData)
+	view:SetElementFactory(function(factory, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:62:24");
 		if elementData.isDivider then
 			factory("BetterRecentAlliesDividerTemplate")
 		else
-			factory("BetterRecentAlliesEntryTemplate", function(button, elementData)
+			factory("BetterRecentAlliesEntryTemplate", function(button, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:66:46");
 				RecentAllies:InitializeEntry(button, elementData)
-				button:SetScript("OnClick", function(btn, mouseButtonName)
+				button:SetScript("OnClick", function(btn, mouseButtonName) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:68:32");
 					if mouseButtonName == "LeftButton" then
 						PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
 						-- Selection behavior
@@ -82,16 +82,16 @@ function RecentAllies:OnLoad(frame)
 					elseif mouseButtonName == "RightButton" then
 						RecentAllies:OpenMenu(btn)
 					end
-				end)
-			end)
+				Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:68:32"); end)
+			Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:66:46"); end)
 		end
-	end)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:62:24"); end)
 	
 	ScrollUtil.InitScrollBoxListWithScrollBar(frame.ScrollBox, frame.ScrollBar, view)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RecentAllies:OnLoad file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:40:0"); end
 
 -- Show Recent Allies Frame (RecentAlliesListMixin:OnShow)
-function RecentAllies:OnShow(frame)
+function RecentAllies:OnShow(frame) Perfy_Trace(Perfy_GetTime(), "Enter", "RecentAllies:OnShow file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:94:0");
 	FrameUtil.RegisterFrameForEvents(frame, RecentAlliesListEvents)
 	
 	-- Show spinner initially, will hide when data is ready
@@ -99,22 +99,22 @@ function RecentAllies:OnShow(frame)
 	
 	-- Refresh will check if data is ready and hide spinner if it is
 	self:Refresh(frame, ScrollBoxConstants.DiscardScrollPosition)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RecentAllies:OnShow file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:94:0"); end
 
 -- Hide Recent Allies Frame (RecentAlliesListMixin:OnHide)
-function RecentAllies:OnHide(frame)
+function RecentAllies:OnHide(frame) Perfy_Trace(Perfy_GetTime(), "Enter", "RecentAllies:OnHide file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:105:0");
 	FrameUtil.UnregisterFrameForEvents(frame, RecentAlliesListEvents)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RecentAllies:OnHide file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:105:0"); end
 
 -- Event handler (RecentAlliesListMixin:OnEvent)
-function RecentAllies:OnEvent(frame, event, ...)
+function RecentAllies:OnEvent(frame, event, ...) Perfy_Trace(Perfy_GetTime(), "Enter", "RecentAllies:OnEvent file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:110:0");
 	if event == "RECENT_ALLIES_CACHE_UPDATE" then
 		self:Refresh(frame, ScrollBoxConstants.RetainScrollPosition)
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RecentAllies:OnEvent file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:110:0"); end
 
 -- Refresh the list (RecentAlliesListMixin:Refresh)
-function RecentAllies:Refresh(frame, retainScrollPosition)
+function RecentAllies:Refresh(frame, retainScrollPosition) Perfy_Trace(Perfy_GetTime(), "Enter", "RecentAllies:Refresh file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:117:0");
 	-- Check if the Recent Allies system is enabled at all
 	if not C_RecentAllies or not C_RecentAllies.IsSystemEnabled() then
 		self:SetLoadingSpinnerShown(frame, false)
@@ -125,7 +125,7 @@ function RecentAllies:Refresh(frame, retainScrollPosition)
 			frame.UnavailableText:SetText(BFL.L.RECENT_ALLIES_SYSTEM_UNAVAILABLE)
 		end
 		frame.UnavailableText:Show()
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "RecentAllies:Refresh file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:117:0"); return
 	end
 	
 	-- Hide unavailable message if it exists
@@ -139,40 +139,40 @@ function RecentAllies:Refresh(frame, retainScrollPosition)
 	
 	if not dataReady then
 		-- Data will load automatically, and we'll get RECENT_ALLIES_CACHE_UPDATE event
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "RecentAllies:Refresh file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:117:0"); return
 	end
 	
 	local dataProvider = self:BuildDataProvider()
 	frame.ScrollBox:SetDataProvider(dataProvider, retainScrollPosition)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RecentAllies:Refresh file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:117:0"); end
 
 -- Build data provider (RecentAlliesListMixin:BuildRecentAlliesDataProvider)
-function RecentAllies:BuildDataProvider()
+function RecentAllies:BuildDataProvider() Perfy_Trace(Perfy_GetTime(), "Enter", "RecentAllies:BuildDataProvider file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:150:0");
 	-- Get recent allies (presorted by pin state, online status, most recent interaction, alphabetically)
 	local recentAllies = C_RecentAllies.GetRecentAllies()
 	local dataProvider = CreateDataProvider(recentAllies)
 	
 	-- Insert divider between pinned and unpinned allies
-	local firstUnpinnedIndex = dataProvider:FindIndexByPredicate(function(elementData)
-		return not elementData.stateData.pinExpirationDate
+	local firstUnpinnedIndex = dataProvider:FindIndexByPredicate(function(elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:156:62");
+		return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:156:62", not elementData.stateData.pinExpirationDate)
 	end)
 	
 	if firstUnpinnedIndex and firstUnpinnedIndex > 1 then
 		dataProvider:InsertAtIndex({ isDivider = true }, firstUnpinnedIndex)
 	end
 	
-	return dataProvider
+	Perfy_Trace(Perfy_GetTime(), "Leave", "RecentAllies:BuildDataProvider file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:150:0"); return dataProvider
 end
 
 -- Set loading spinner visibility (RecentAlliesListMixin:SetLoadingSpinnerShown)
-function RecentAllies:SetLoadingSpinnerShown(frame, shown)
+function RecentAllies:SetLoadingSpinnerShown(frame, shown) Perfy_Trace(Perfy_GetTime(), "Enter", "RecentAllies:SetLoadingSpinnerShown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:168:0");
 	frame.LoadingSpinner:SetShown(shown)
 	frame.ScrollBox:SetShown(not shown)
 	frame.ScrollBar:SetShown(not shown)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RecentAllies:SetLoadingSpinnerShown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:168:0"); end
 
 -- Initialize a recent ally entry button (RecentAlliesEntryMixin:Initialize)
-function RecentAllies:InitializeEntry(button, elementData)
+function RecentAllies:InitializeEntry(button, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "RecentAllies:InitializeEntry file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:175:0");
 	button.elementData = elementData
 	
 	local characterData = elementData.characterData
@@ -250,29 +250,29 @@ function RecentAllies:InitializeEntry(button, elementData)
 	button.PartyButton:SetEnabled(stateData.isOnline)
 	
 	-- Setup party button click handler
-	button.PartyButton:SetScript("OnClick", function()
+	button.PartyButton:SetScript("OnClick", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:253:41");
 		if characterData and characterData.fullName then
 			C_PartyInfo.InviteUnit(characterData.fullName)
 		end
-	end)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:253:41"); end)
 	
 	-- Setup party button tooltip
-	button.PartyButton:SetScript("OnEnter", function(self)
+	button.PartyButton:SetScript("OnEnter", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:260:41");
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		GameTooltip_AddHighlightLine(GameTooltip, BFL.L.RECENT_ALLIES_INVITE)
 		if not self:IsEnabled() then
 			GameTooltip_AddErrorLine(GameTooltip, BFL.L.RECENT_ALLIES_PLAYER_OFFLINE)
 		end
 		GameTooltip:Show()
-	end)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:260:41"); end)
 	
-	button.PartyButton:SetScript("OnLeave", function()
+	button.PartyButton:SetScript("OnLeave", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:269:41");
 		GameTooltip:Hide()
-	end)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:269:41"); end)
 	
 	-- Setup pin display tooltip
 	if button.StateIconContainer.PinDisplay then
-		button.StateIconContainer.PinDisplay:SetScript("OnEnter", function(self)
+		button.StateIconContainer.PinDisplay:SetScript("OnEnter", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:275:60");
 			if stateData.pinExpirationDate then
 				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 				local timeUntilExpiration = math.max(stateData.pinExpirationDate - GetServerTime(), 1)
@@ -280,18 +280,18 @@ function RecentAllies:InitializeEntry(button, elementData)
 				GameTooltip_AddHighlightLine(GameTooltip, BFL.L.RECENT_ALLIES_PIN_EXPIRES:format(timeText))
 				GameTooltip:Show()
 			end
-		end)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:275:60"); end)
 		
-		button.StateIconContainer.PinDisplay:SetScript("OnLeave", function()
+		button.StateIconContainer.PinDisplay:SetScript("OnLeave", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:285:60");
 			GameTooltip:Hide()
-		end)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:285:60"); end)
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RecentAllies:InitializeEntry file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:175:0"); end
 
 -- Open context menu for recent ally
-function RecentAllies:OpenMenu(button)
+function RecentAllies:OpenMenu(button) Perfy_Trace(Perfy_GetTime(), "Enter", "RecentAllies:OpenMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:292:0");
 	local elementData = button.elementData
-	if not elementData then return end
+	if not elementData then Perfy_Trace(Perfy_GetTime(), "Leave", "RecentAllies:OpenMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:292:0"); return end
 	
 	local recentAllyData = elementData
 	local contextData = {
@@ -312,12 +312,12 @@ function RecentAllies:OpenMenu(button)
 	
 	-- Use compatibility wrapper for Classic support
 	BFL.OpenContextMenu(button, bestMenu, contextData, contextData.name)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RecentAllies:OpenMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:292:0"); end
 
 -- Build tooltip for recent ally (RecentAlliesEntryMixin:BuildRecentAllyTooltip)
-function RecentAllies:BuildTooltip(button, tooltip)
+function RecentAllies:BuildTooltip(button, tooltip) Perfy_Trace(Perfy_GetTime(), "Enter", "RecentAllies:BuildTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:318:0");
 	local elementData = button.elementData
-	if not elementData then return end
+	if not elementData then Perfy_Trace(Perfy_GetTime(), "Leave", "RecentAllies:BuildTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:318:0"); return end
 	
 	local characterData = elementData.characterData
 	local stateData = elementData.stateData
@@ -361,4 +361,6 @@ function RecentAllies:BuildTooltip(button, tooltip)
 		GameTooltip_AddNormalLine(tooltip, BFL.L.RECENT_ALLIES_ACTIVITY)
 		GameTooltip_AddHighlightLine(tooltip, mostRecent.description or "")
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RecentAllies:BuildTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua:318:0"); end
+
+Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RecentAllies.lua");

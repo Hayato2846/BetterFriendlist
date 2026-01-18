@@ -1,4 +1,4 @@
--- BetterFriendlist_Tooltip.lua
+--[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua"); -- BetterFriendlist_Tooltip.lua
 -- Friend list tooltip functionality using Blizzard's native FriendsTooltip
 -- This allows compatibility with other addons (RaiderIO, etc.) that hook into FriendsTooltip
 
@@ -10,36 +10,36 @@ local FRIENDS_TOOLTIP_MAX_WIDTH = 200
 local FRIENDS_TOOLTIP_MARGIN_WIDTH = 12
 
 -- Local helper functions (copied from Blizzard's FriendsFrame.lua since they're local there)
-local function ShowRichPresenceOnly(client, wowProjectID, faction, realmID, areaName)
+local function ShowRichPresenceOnly(client, wowProjectID, faction, realmID, areaName) Perfy_Trace(Perfy_GetTime(), "Enter", "ShowRichPresenceOnly file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua:13:6");
 	local playerFactionGroup = UnitFactionGroup("player")
 	local playerRealmID = GetRealmID and GetRealmID() or 0
 	
 	if (client ~= BNET_CLIENT_WOW) or (wowProjectID ~= WOW_PROJECT_ID) then
 		-- If they are not in wow or in a different version of wow, always show rich presence only
-		return true
+		Perfy_Trace(Perfy_GetTime(), "Leave", "ShowRichPresenceOnly file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua:13:6"); return true
 	elseif (WOW_PROJECT_ID == WOW_PROJECT_CLASSIC) and ((faction ~= playerFactionGroup) or (realmID ~= playerRealmID)) then
 		-- If we are both in wow classic and our factions or realms don't match, show rich presence only
-		return true
+		Perfy_Trace(Perfy_GetTime(), "Leave", "ShowRichPresenceOnly file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua:13:6"); return true
 	else
 		-- Otherwise show more detailed info about them
-		return not areaName
+		return Perfy_Trace_Passthrough("Leave", "ShowRichPresenceOnly file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua:13:6", not areaName)
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "ShowRichPresenceOnly file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua:13:6"); end
 
-local function CanCooperateWithGameAccount(accountInfo)
+local function CanCooperateWithGameAccount(accountInfo) Perfy_Trace(Perfy_GetTime(), "Enter", "CanCooperateWithGameAccount file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua:29:6");
 	if not accountInfo or not accountInfo.gameAccountInfo then
-		return false
+		Perfy_Trace(Perfy_GetTime(), "Leave", "CanCooperateWithGameAccount file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua:29:6"); return false
 	end
 	local gameAccountInfo = accountInfo.gameAccountInfo
 	local playerFactionGroup = UnitFactionGroup("player")
 	
 	-- Must be same faction and have valid realm
-	return gameAccountInfo.factionName == playerFactionGroup and 
-	       gameAccountInfo.realmID and gameAccountInfo.realmID > 0
+	return Perfy_Trace_Passthrough("Leave", "CanCooperateWithGameAccount file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua:29:6", gameAccountInfo.factionName == playerFactionGroup and 
+	       gameAccountInfo.realmID and gameAccountInfo.realmID > 0)
 end
 
 -- Create our custom activity line inside FriendsTooltip
-local function EnsureActivityLine()
+local function EnsureActivityLine() Perfy_Trace(Perfy_GetTime(), "Enter", "EnsureActivityLine file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua:42:6");
 	if not FriendsTooltip.BFLActivityText then
 		-- Create a divider line
 		local divider = FriendsTooltip:CreateTexture(nil, "ARTWORK")
@@ -54,15 +54,15 @@ local function EnsureActivityLine()
 		activityText:SetWordWrap(false)
 		FriendsTooltip.BFLActivityText = activityText
 	end
-	return FriendsTooltip.BFLActivityText, FriendsTooltip.BFLActivityDivider
+	return Perfy_Trace_Passthrough("Leave", "EnsureActivityLine file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua:42:6", FriendsTooltip.BFLActivityText, FriendsTooltip.BFLActivityDivider)
 end
 
 -- Hook into FriendsTooltip:Show() to add our custom activity tracking info
-local function AddBetterFriendlistInfo()
+local function AddBetterFriendlistInfo() Perfy_Trace(Perfy_GetTime(), "Enter", "AddBetterFriendlistInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua:61:6");
 	local tooltip = FriendsTooltip
 	local button = tooltip.button or tooltip.BFL_button
 	
-	if not button then return end
+	if not button then Perfy_Trace(Perfy_GetTime(), "Leave", "AddBetterFriendlistInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua:61:6"); return end
 	
 	-- Get friendData from our button if it exists, or use Blizzard's button properties
 	local friendData = button.friendData
@@ -176,15 +176,15 @@ local function AddBetterFriendlistInfo()
 			FriendsTooltip.BFLActivityDivider:Hide()
 		end
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "AddBetterFriendlistInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua:61:6"); end
 
 -- Hook FriendsTooltip:Show to add our info after Blizzard populates it
 hooksecurefunc(FriendsTooltip, "Show", AddBetterFriendlistInfo)
 
 -- Button OnEnter handler - Use Blizzard's native FriendsTooltip
-function BetterFriendsList_Button_OnEnter(self)
+function BetterFriendsList_Button_OnEnter(self) Perfy_Trace(Perfy_GetTime(), "Enter", "BetterFriendsList_Button_OnEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua:185:0");
 	if not self.friendIndex or not self.friendData then
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "BetterFriendsList_Button_OnEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua:185:0"); return
 	end
 
 	local friendData = self.friendData
@@ -198,8 +198,8 @@ function BetterFriendsList_Button_OnEnter(self)
 		-- Store our custom friendData for AddBetterFriendlistInfo
 		friendData = friendData,
 		-- Blizzard's code expects these methods on the button
-		OnEnter = function() end,
-		OnLeave = function() end,
+		OnEnter = function() Perfy_Trace(Perfy_GetTime(), "Enter", "fakeButton.OnEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua:201:12"); Perfy_Trace(Perfy_GetTime(), "Leave", "fakeButton.OnEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua:201:12"); end,
+		OnLeave = function() Perfy_Trace(Perfy_GetTime(), "Enter", "fakeButton.OnLeave file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua:202:12"); Perfy_Trace(Perfy_GetTime(), "Leave", "fakeButton.OnLeave file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua:202:12"); end,
 	}
 	
 	if friendData.type == "bnet" then
@@ -233,7 +233,7 @@ function BetterFriendsList_Button_OnEnter(self)
 	end
 	
 	if not fakeButton.buttonType or not fakeButton.id then
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "BetterFriendsList_Button_OnEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua:185:0"); return
 	end
 	
 	-- Call Blizzard's tooltip population function via the mixin
@@ -256,7 +256,7 @@ function BetterFriendsList_Button_OnEnter(self)
 		end
 		
 		tooltip:Show()
-		return -- Let Blizzard handle the rest for Classic
+		Perfy_Trace(Perfy_GetTime(), "Leave", "BetterFriendsList_Button_OnEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua:185:0"); return -- Let Blizzard handle the rest for Classic
 	else
 		-- In Retail, use fakeButton. In Classic Mock mode, use nil (don't update)
 		if not BFL.IsClassic then
@@ -500,11 +500,11 @@ function BetterFriendsList_Button_OnEnter(self)
 				text = ""
 				
 				if C_Texture.IsTitleIconTextureReady(gameAccountInfo.clientProgram, Enum.TitleIconVersion.Small) then
-					C_Texture.GetTitleIconTexture(gameAccountInfo.clientProgram, Enum.TitleIconVersion.Small, function(success, texture)
+					C_Texture.GetTitleIconTexture(gameAccountInfo.clientProgram, Enum.TitleIconVersion.Small, function(success, texture) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua:503:95");
 						if success then
 							text = BNet_GetClientEmbeddedTexture(texture, 32, 32, 0).." "
 						end
-					end)
+					Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua:503:95"); end)
 				end
 				
 				if (gameAccountInfo.clientProgram == BNET_CLIENT_WOW) and 
@@ -575,10 +575,10 @@ function BetterFriendsList_Button_OnEnter(self)
 	
 	-- Classic Era logic handled above (early return)
 
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "BetterFriendsList_Button_OnEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua:185:0"); end
 
 -- Button OnLeave handler
-function BetterFriendsList_Button_OnLeave(self)
+function BetterFriendsList_Button_OnLeave(self) Perfy_Trace(Perfy_GetTime(), "Enter", "BetterFriendsList_Button_OnLeave file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua:581:0");
 	local tooltip = FriendsTooltip
 	if BFL.IsClassic then
 		tooltip.button = nil
@@ -586,4 +586,6 @@ function BetterFriendsList_Button_OnLeave(self)
 		tooltip.button = nil
 	end
 	tooltip:Hide()
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "BetterFriendsList_Button_OnLeave file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua:581:0"); end
+
+Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\BetterFriendlist_Tooltip.lua");

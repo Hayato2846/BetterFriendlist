@@ -1,4 +1,4 @@
--- Modules/MenuSystem.lua
+--[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MenuSystem.lua"); -- Modules/MenuSystem.lua
 -- Context Menu System Module
 -- Manages context menus for friends, groups, and other UI elements
 
@@ -25,26 +25,26 @@ local isWhoPlayerMenu = false
 -- ========================================
 
 -- Initialize (called from ADDON_LOADED)
-function MenuSystem:Initialize()
+function MenuSystem:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "MenuSystem:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MenuSystem.lua:28:0");
 	-- Define StaticPopup for Nicknames
 	StaticPopupDialogs["BETTER_FRIENDLIST_SET_NICKNAME"] = {
 		text = BFL.L.MENU_SET_NICKNAME_FMT,
 		button1 = ACCEPT,
 		button2 = CANCEL,
 		hasEditBox = true,
-		OnShow = function(self, data)
+		OnShow = function(self, data) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MenuSystem.lua:35:11");
 			self.EditBox:SetText(data.nickname or "")
 			self.EditBox:SetFocus()
-		end,
-		OnAccept = function(self, data)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MenuSystem.lua:35:11"); end,
+		OnAccept = function(self, data) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MenuSystem.lua:39:13");
 			local text = self.EditBox:GetText()
 			local DB = BFL:GetModule("DB")
 			if DB then
 				DB:SetNickname(data.uid, text)
 				BFL:ForceRefreshFriendsList()
 			end
-		end,
-		EditBoxOnEnterPressed = function(self, data)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MenuSystem.lua:39:13"); end,
+		EditBoxOnEnterPressed = function(self, data) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MenuSystem.lua:47:26");
 			local text = self:GetText()
 			local DB = BFL:GetModule("DB")
 			if DB then
@@ -52,19 +52,19 @@ function MenuSystem:Initialize()
 				BFL:ForceRefreshFriendsList()
 			end
 			self:GetParent():Hide()
-		end,
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MenuSystem.lua:47:26"); end,
 		timeout = 0,
 		whileDead = true,
 		hideOnEscape = true,
 		preferredIndex = 3,
 	}
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "MenuSystem:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MenuSystem.lua:28:0"); end
 
 -- Open context menu for a friend
 -- For BNet: friendID = bnetIDAccount, extraData = {name, battleTag, connected}
 -- For WoW: friendID = friendIndex, extraData = {name, connected}
-function MenuSystem:OpenFriendMenu(button, friendType, friendID, extraData)
-	if not button or not friendType then return end
+function MenuSystem:OpenFriendMenu(button, friendType, friendID, extraData) Perfy_Trace(Perfy_GetTime(), "Enter", "MenuSystem:OpenFriendMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MenuSystem.lua:66:0");
+	if not button or not friendType then Perfy_Trace(Perfy_GetTime(), "Leave", "MenuSystem:OpenFriendMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MenuSystem.lua:66:0"); return end
 	
 	extraData = extraData or {}
 	local menuType
@@ -117,32 +117,32 @@ function MenuSystem:OpenFriendMenu(button, friendType, friendID, extraData)
 	
 	-- Clear flag immediately after opening
 	_G.BetterFriendlist_IsOurMenu = false
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "MenuSystem:OpenFriendMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MenuSystem.lua:66:0"); end
 
 -- Open context menu for a group
-function MenuSystem:OpenGroupMenu(button, groupData)
-	if not button or not groupData then return end
+function MenuSystem:OpenGroupMenu(button, groupData) Perfy_Trace(Perfy_GetTime(), "Enter", "MenuSystem:OpenGroupMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MenuSystem.lua:123:0");
+	if not button or not groupData then Perfy_Trace(Perfy_GetTime(), "Leave", "MenuSystem:OpenGroupMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MenuSystem.lua:123:0"); return end
 	
 	-- For now, groups don't have special context menus
 	-- This can be extended later with group management options
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "MenuSystem:OpenGroupMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MenuSystem.lua:123:0"); end
 
 -- Set WHO player menu flag
-function MenuSystem:SetWhoPlayerMenuFlag(value)
+function MenuSystem:SetWhoPlayerMenuFlag(value) Perfy_Trace(Perfy_GetTime(), "Enter", "MenuSystem:SetWhoPlayerMenuFlag file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MenuSystem.lua:131:0");
 	isWhoPlayerMenu = value
 	-- Store in global for backwards compatibility
 	_G.BetterFriendlist_IsWhoPlayerMenu = value
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "MenuSystem:SetWhoPlayerMenuFlag file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MenuSystem.lua:131:0"); end
 
 -- Get WHO player menu flag
-function MenuSystem:GetWhoPlayerMenuFlag()
-	return isWhoPlayerMenu
+function MenuSystem:GetWhoPlayerMenuFlag() Perfy_Trace(Perfy_GetTime(), "Enter", "MenuSystem:GetWhoPlayerMenuFlag file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MenuSystem.lua:138:0");
+	Perfy_Trace(Perfy_GetTime(), "Leave", "MenuSystem:GetWhoPlayerMenuFlag file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MenuSystem.lua:138:0"); return isWhoPlayerMenu
 end
 
 -- Open context menu for WHO player
-function MenuSystem:OpenWhoPlayerMenu(button, whoInfo)
+function MenuSystem:OpenWhoPlayerMenu(button, whoInfo) Perfy_Trace(Perfy_GetTime(), "Enter", "MenuSystem:OpenWhoPlayerMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MenuSystem.lua:143:0");
 	if not button or not whoInfo then
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "MenuSystem:OpenWhoPlayerMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MenuSystem.lua:143:0"); return
 	end
 	
 	-- Set flag to indicate this is a WHO player menu
@@ -183,4 +183,6 @@ function MenuSystem:OpenWhoPlayerMenu(button, whoInfo)
 	
 	-- Clear flag immediately after opening
 	self:SetWhoPlayerMenuFlag(false)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "MenuSystem:OpenWhoPlayerMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MenuSystem.lua:143:0"); end
+
+Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/MenuSystem.lua");

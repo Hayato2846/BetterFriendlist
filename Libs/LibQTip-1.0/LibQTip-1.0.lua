@@ -1,4 +1,4 @@
-local MAJOR = "LibQTip-1.0"
+--[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua"); local MAJOR = "LibQTip-1.0"
 local MINOR = 49 -- Should be manually increased
 local LibStub = _G.LibStub
 
@@ -7,7 +7,7 @@ assert(LibStub, MAJOR .. " requires LibStub")
 local lib, oldMinor = LibStub:NewLibrary(MAJOR, MINOR)
 
 if not lib then
-    return
+    Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua"); return
 end -- No upgrade needed
 
 ------------------------------------------------------------------------------
@@ -115,7 +115,7 @@ local CELL_MARGIN_V = 3
 -- @return tooltip Frame object - the acquired tooltip.
 -- @usage Acquire a tooltip with at least 5 columns, justification : left, center, left, left, left
 -- <pre>local tip = LibStub('LibQTip-1.0'):Acquire('MyFooBarTooltip', 5, "LEFT", "CENTER")</pre>
-function lib:Acquire(key, ...)
+function lib:Acquire(key, ...) Perfy_Trace(Perfy_GetTime(), "Enter", "lib:Acquire file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:118:0");
     if key == nil then
         error("attempt to use a nil key", 2)
     end
@@ -137,30 +137,30 @@ function lib:Acquire(key, ...)
         end
     end
 
-    return tooltip
+    Perfy_Trace(Perfy_GetTime(), "Leave", "lib:Acquire file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:118:0"); return tooltip
 end
 
-function lib:Release(tooltip)
+function lib:Release(tooltip) Perfy_Trace(Perfy_GetTime(), "Enter", "lib:Release file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:143:0");
     local key = tooltip and tooltip.key
 
     if not key or activeTooltips[key] ~= tooltip then
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "lib:Release file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:143:0"); return
     end
 
     ReleaseTooltip(tooltip)
     activeTooltips[key] = nil
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "lib:Release file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:143:0"); end
 
-function lib:IsAcquired(key)
+function lib:IsAcquired(key) Perfy_Trace(Perfy_GetTime(), "Enter", "lib:IsAcquired file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:154:0");
     if key == nil then
         error("attempt to use a nil key", 2)
     end
 
-    return not (not activeTooltips[key])
+    return Perfy_Trace_Passthrough("Leave", "lib:IsAcquired file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:154:0", not (not activeTooltips[key]))
 end
 
-function lib:IterateTooltips()
-    return pairs(activeTooltips)
+function lib:IterateTooltips() Perfy_Trace(Perfy_GetTime(), "Enter", "lib:IterateTooltips file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:162:0");
+    return Perfy_Trace_Passthrough("Leave", "lib:IterateTooltips file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:162:0", pairs(activeTooltips))
 end
 
 ------------------------------------------------------------------------------
@@ -168,16 +168,16 @@ end
 ------------------------------------------------------------------------------
 local frameHeap = lib.frameHeap
 
-local function AcquireFrame(parent)
+local function AcquireFrame(parent) Perfy_Trace(Perfy_GetTime(), "Enter", "AcquireFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:171:6");
     local frame = tremove(frameHeap) or CreateFrame("Frame", nil, nil, BackdropTemplateMixin and "BackdropTemplate")
     frame:SetParent(parent)
     --@debug@
     usedFrames = usedFrames + 1
     --@end-debug@
-    return frame
+    Perfy_Trace(Perfy_GetTime(), "Leave", "AcquireFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:171:6"); return frame
 end
 
-local function ReleaseFrame(frame)
+local function ReleaseFrame(frame) Perfy_Trace(Perfy_GetTime(), "Enter", "ReleaseFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:180:6");
     frame:Hide()
     frame:SetParent(nil)
     frame:ClearAllPoints()
@@ -189,27 +189,27 @@ local function ReleaseFrame(frame)
     --@debug@
     usedFrames = usedFrames - 1
     --@end-debug@
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "ReleaseFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:180:6"); end
 
 ------------------------------------------------------------------------------
 -- Timer cache
 ------------------------------------------------------------------------------
 local timerHeap = lib.timerHeap
 
-local function AcquireTimer(parent)
+local function AcquireTimer(parent) Perfy_Trace(Perfy_GetTime(), "Enter", "AcquireTimer file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:199:6");
     local frame = tremove(timerHeap) or CreateFrame("Frame")
     frame:SetParent(parent)
-    return frame
+    Perfy_Trace(Perfy_GetTime(), "Leave", "AcquireTimer file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:199:6"); return frame
 end
 
-local function ReleaseTimer(frame)
+local function ReleaseTimer(frame) Perfy_Trace(Perfy_GetTime(), "Enter", "ReleaseTimer file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:205:6");
     frame:Hide()
     frame:SetParent(nil)
 
     ClearFrameScripts(frame)
 
     tinsert(timerHeap, frame)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "ReleaseTimer file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:205:6"); end
 
 ------------------------------------------------------------------------------
 -- Dirty layout handler
@@ -219,12 +219,12 @@ lib.layoutCleaner = lib.layoutCleaner or CreateFrame("Frame")
 local layoutCleaner = lib.layoutCleaner
 layoutCleaner.registry = layoutCleaner.registry or {}
 
-function layoutCleaner:RegisterForCleanup(tooltip)
+function layoutCleaner:RegisterForCleanup(tooltip) Perfy_Trace(Perfy_GetTime(), "Enter", "layoutCleaner:RegisterForCleanup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:222:0");
     self.registry[tooltip] = true
     self:Show()
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "layoutCleaner:RegisterForCleanup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:222:0"); end
 
-function layoutCleaner:CleanupLayouts()
+function layoutCleaner:CleanupLayouts() Perfy_Trace(Perfy_GetTime(), "Enter", "layoutCleaner:CleanupLayouts file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:227:0");
     self:Hide()
 
     for tooltip in pairs(self.registry) do
@@ -232,14 +232,14 @@ function layoutCleaner:CleanupLayouts()
     end
 
     wipe(self.registry)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "layoutCleaner:CleanupLayouts file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:227:0"); end
 
 layoutCleaner:SetScript("OnUpdate", layoutCleaner.CleanupLayouts)
 
 ------------------------------------------------------------------------------
 -- CellProvider and Cell
 ------------------------------------------------------------------------------
-function providerPrototype:AcquireCell()
+function providerPrototype:AcquireCell() Perfy_Trace(Perfy_GetTime(), "Enter", "providerPrototype:AcquireCell file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:242:0");
     local cell = tremove(self.heap)
 
     if not cell then
@@ -253,12 +253,12 @@ function providerPrototype:AcquireCell()
 
     self.cells[cell] = true
 
-    return cell
+    Perfy_Trace(Perfy_GetTime(), "Leave", "providerPrototype:AcquireCell file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:242:0"); return cell
 end
 
-function providerPrototype:ReleaseCell(cell)
+function providerPrototype:ReleaseCell(cell) Perfy_Trace(Perfy_GetTime(), "Enter", "providerPrototype:ReleaseCell file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:259:0");
     if not self.cells[cell] then
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "providerPrototype:ReleaseCell file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:259:0"); return
     end
 
     if type(cell.ReleaseCell) == "function" then
@@ -267,17 +267,17 @@ function providerPrototype:ReleaseCell(cell)
 
     self.cells[cell] = nil
     tinsert(self.heap, cell)
+Perfy_Trace(Perfy_GetTime(), "Leave", "providerPrototype:ReleaseCell file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:259:0"); end
+
+function providerPrototype:GetCellPrototype() Perfy_Trace(Perfy_GetTime(), "Enter", "providerPrototype:GetCellPrototype file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:272:0");
+    return Perfy_Trace_Passthrough("Leave", "providerPrototype:GetCellPrototype file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:272:0", self.cellPrototype, self.cellMetatable)
 end
 
-function providerPrototype:GetCellPrototype()
-    return self.cellPrototype, self.cellMetatable
+function providerPrototype:IterateCells() Perfy_Trace(Perfy_GetTime(), "Enter", "providerPrototype:IterateCells file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:276:0");
+    return Perfy_Trace_Passthrough("Leave", "providerPrototype:IterateCells file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:276:0", pairs(self.cells))
 end
 
-function providerPrototype:IterateCells()
-    return pairs(self.cells)
-end
-
-function lib:CreateCellProvider(baseProvider)
+function lib:CreateCellProvider(baseProvider) Perfy_Trace(Perfy_GetTime(), "Enter", "lib:CreateCellProvider file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:280:0");
     local cellBaseMetatable, cellBasePrototype
 
     if baseProvider and baseProvider.GetCellPrototype then
@@ -294,7 +294,7 @@ function lib:CreateCellProvider(baseProvider)
     newCellProvider.cellPrototype = newCellPrototype
     newCellProvider.cellMetatable = {__index = newCellPrototype}
 
-    return newCellProvider, newCellPrototype, cellBasePrototype
+    Perfy_Trace(Perfy_GetTime(), "Leave", "lib:CreateCellProvider file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:280:0"); return newCellProvider, newCellPrototype, cellBasePrototype
 end
 
 ------------------------------------------------------------------------------
@@ -307,12 +307,12 @@ end
 local labelProvider = lib.LabelProvider
 local labelPrototype = lib.LabelPrototype
 
-function labelPrototype:InitializeCell()
+function labelPrototype:InitializeCell() Perfy_Trace(Perfy_GetTime(), "Enter", "labelPrototype:InitializeCell file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:310:0");
     self.fontString = self:CreateFontString()
     self.fontString:SetFontObject(_G.GameTooltipText)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "labelPrototype:InitializeCell file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:310:0"); end
 
-function labelPrototype:SetupCell(tooltip, value, justification, font, leftPadding, rightPadding, maxWidth, minWidth, ...)
+function labelPrototype:SetupCell(tooltip, value, justification, font, leftPadding, rightPadding, maxWidth, minWidth, ...) Perfy_Trace(Perfy_GetTime(), "Enter", "labelPrototype:SetupCell file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:315:0");
     local fontString = self.fontString
     local line = tooltip.lines[self._line]
 
@@ -356,21 +356,21 @@ function labelPrototype:SetupCell(tooltip, value, justification, font, leftPaddi
     self._paddingL = leftPadding
     self._paddingR = rightPadding
 
-    return width, height
+    Perfy_Trace(Perfy_GetTime(), "Leave", "labelPrototype:SetupCell file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:315:0"); return width, height
 end
 
-function labelPrototype:getContentHeight()
+function labelPrototype:getContentHeight() Perfy_Trace(Perfy_GetTime(), "Enter", "labelPrototype:getContentHeight file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:362:0");
     local fontString = self.fontString
     fontString:SetWidth(self:GetWidth() - (self._paddingL + self._paddingR))
 
     local height = self.fontString:GetHeight()
     fontString:SetWidth(0)
 
-    return height
+    Perfy_Trace(Perfy_GetTime(), "Leave", "labelPrototype:getContentHeight file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:362:0"); return height
 end
 
-function labelPrototype:GetPosition()
-    return self._line, self._column
+function labelPrototype:GetPosition() Perfy_Trace(Perfy_GetTime(), "Enter", "labelPrototype:GetPosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:372:0");
+    return Perfy_Trace_Passthrough("Leave", "labelPrototype:GetPosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:372:0", self._line, self._column)
 end
 
 ------------------------------------------------------------------------------
@@ -379,7 +379,7 @@ end
 local tooltipHeap = lib.tooltipHeap
 
 -- Returns a tooltip
-function AcquireTooltip()
+function AcquireTooltip() Perfy_Trace(Perfy_GetTime(), "Enter", "AcquireTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:382:0");
     local tooltip = tremove(tooltipHeap)
 
     if not tooltip then
@@ -403,13 +403,13 @@ function AcquireTooltip()
     --@debug@
     usedTooltips = usedTooltips + 1
     --@end-debug@
-    return tooltip
+    Perfy_Trace(Perfy_GetTime(), "Leave", "AcquireTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:382:0"); return tooltip
 end
 
 -- Cleans the tooltip and stores it in the cache
-function ReleaseTooltip(tooltip)
+function ReleaseTooltip(tooltip) Perfy_Trace(Perfy_GetTime(), "Enter", "ReleaseTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:410:0");
     if tooltip.releasing then
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "ReleaseTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:410:0"); return
     end
 
     tooltip.releasing = true
@@ -476,24 +476,24 @@ function ReleaseTooltip(tooltip)
     --@debug@
     usedTooltips = usedTooltips - 1
     --@end-debug@
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "ReleaseTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:410:0"); end
 
 ------------------------------------------------------------------------------
 -- Cell 'cache' (just a wrapper to the provider's cache)
 ------------------------------------------------------------------------------
 -- Returns a cell for the given tooltip from the given provider
-function AcquireCell(tooltip, provider)
+function AcquireCell(tooltip, provider) Perfy_Trace(Perfy_GetTime(), "Enter", "AcquireCell file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:485:0");
     local cell = provider:AcquireCell(tooltip)
 
     cell:SetParent(tooltip.scrollChild)
     cell:SetFrameLevel(tooltip.scrollChild:GetFrameLevel() + 3)
     cell._provider = provider
 
-    return cell
+    Perfy_Trace(Perfy_GetTime(), "Leave", "AcquireCell file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:485:0"); return cell
 end
 
 -- Cleans the cell hands it to its provider for storing
-function ReleaseCell(cell)
+function ReleaseCell(cell) Perfy_Trace(Perfy_GetTime(), "Enter", "ReleaseCell file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:496:0");
     if cell.fontString and cell.r then
         cell.fontString:SetTextColor(cell.r, cell.g, cell.b, cell.a)
     end
@@ -513,7 +513,7 @@ function ReleaseCell(cell)
 
     cell._provider:ReleaseCell(cell)
     cell._provider = nil
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "ReleaseCell file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:496:0"); end
 
 ------------------------------------------------------------------------------
 -- Table cache
@@ -521,27 +521,27 @@ end
 local tableHeap = lib.tableHeap
 
 -- Returns a table
-function AcquireTable()
+function AcquireTable() Perfy_Trace(Perfy_GetTime(), "Enter", "AcquireTable file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:524:0");
     local tbl = tremove(tableHeap) or {}
     --@debug@
     usedTables = usedTables + 1
     --@end-debug@
-    return tbl
+    Perfy_Trace(Perfy_GetTime(), "Leave", "AcquireTable file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:524:0"); return tbl
 end
 
 -- Cleans the table and stores it in the cache
-function ReleaseTable(tableInstance)
+function ReleaseTable(tableInstance) Perfy_Trace(Perfy_GetTime(), "Enter", "ReleaseTable file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:533:0");
     wipe(tableInstance)
     tinsert(tableHeap, tableInstance)
     --@debug@
     usedTables = usedTables - 1
     --@end-debug@
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "ReleaseTable file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:533:0"); end
 
 ------------------------------------------------------------------------------
 -- Tooltip prototype
 ------------------------------------------------------------------------------
-function InitializeTooltip(tooltip, key)
+function InitializeTooltip(tooltip, key) Perfy_Trace(Perfy_GetTime(), "Enter", "InitializeTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:544:0");
     ----------------------------------------------------------------------
     -- (Re)set frame settings
     ----------------------------------------------------------------------
@@ -588,32 +588,32 @@ function InitializeTooltip(tooltip, key)
     tooltip:SetAutoHideDelay(nil)
     tooltip:Hide()
     ResetTooltipSize(tooltip)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "InitializeTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:544:0"); end
 
-function tipPrototype:SetDefaultProvider(myProvider)
+function tipPrototype:SetDefaultProvider(myProvider) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:SetDefaultProvider file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:593:0");
     if not myProvider then
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:SetDefaultProvider file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:593:0"); return
     end
 
     self.labelProvider = myProvider
+Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:SetDefaultProvider file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:593:0"); end
+
+function tipPrototype:GetDefaultProvider() Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:GetDefaultProvider file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:601:0");
+    return Perfy_Trace_Passthrough("Leave", "tipPrototype:GetDefaultProvider file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:601:0", self.labelProvider)
 end
 
-function tipPrototype:GetDefaultProvider()
-    return self.labelProvider
-end
-
-local function checkJustification(justification, level, silent)
+local function checkJustification(justification, level, silent) Perfy_Trace(Perfy_GetTime(), "Enter", "checkJustification file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:605:6");
     if justification ~= "LEFT" and justification ~= "CENTER" and justification ~= "RIGHT" then
         if silent then
-            return false
+            Perfy_Trace(Perfy_GetTime(), "Leave", "checkJustification file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:605:6"); return false
         end
         error("invalid justification, must one of LEFT, CENTER or RIGHT, not: " .. tostring(justification), level + 1)
     end
 
-    return true
+    Perfy_Trace(Perfy_GetTime(), "Leave", "checkJustification file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:605:6"); return true
 end
 
-function tipPrototype:SetColumnLayout(numColumns, ...)
+function tipPrototype:SetColumnLayout(numColumns, ...) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:SetColumnLayout file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:616:0");
     if type(numColumns) ~= "number" or numColumns < 1 then
         error("number of columns must be a positive number, not: " .. tostring(numColumns), 2)
     end
@@ -629,9 +629,9 @@ function tipPrototype:SetColumnLayout(numColumns, ...)
             self:AddColumn(justification)
         end
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:SetColumnLayout file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:616:0"); end
 
-function tipPrototype:AddColumn(justification)
+function tipPrototype:AddColumn(justification) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:AddColumn file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:634:0");
     justification = justification or "LEFT"
     checkJustification(justification, 2)
 
@@ -657,18 +657,18 @@ function tipPrototype:AddColumn(justification)
     column:Show()
     self.columns[colNum] = column
 
-    return colNum
+    Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:AddColumn file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:634:0"); return colNum
 end
 
 ------------------------------------------------------------------------------
 -- Convenient methods
 ------------------------------------------------------------------------------
-function tipPrototype:Release()
+function tipPrototype:Release() Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:Release file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:666:0");
     lib:Release(self)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:Release file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:666:0"); end
 
-function tipPrototype:IsAcquiredBy(key)
-    return key ~= nil and self.key == key
+function tipPrototype:IsAcquiredBy(key) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:IsAcquiredBy file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:670:0");
+    return Perfy_Trace_Passthrough("Leave", "tipPrototype:IsAcquiredBy file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:670:0", key ~= nil and self.key == key)
 end
 
 ------------------------------------------------------------------------------
@@ -676,7 +676,7 @@ end
 ------------------------------------------------------------------------------
 local RawSetScript = lib.frameMetatable.__index.SetScript
 
-function ClearTooltipScripts(tooltip)
+function ClearTooltipScripts(tooltip) Perfy_Trace(Perfy_GetTime(), "Enter", "ClearTooltipScripts file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:679:0");
     if tooltip.scripts then
         for scriptType in pairs(tooltip.scripts) do
             RawSetScript(tooltip, scriptType, nil)
@@ -684,9 +684,9 @@ function ClearTooltipScripts(tooltip)
 
         tooltip.scripts = ReleaseTable(tooltip.scripts)
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "ClearTooltipScripts file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:679:0"); end
 
-function tipPrototype:SetScript(scriptType, handler)
+function tipPrototype:SetScript(scriptType, handler) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:SetScript file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:689:0");
     RawSetScript(self, scriptType, handler)
 
     if handler then
@@ -698,13 +698,13 @@ function tipPrototype:SetScript(scriptType, handler)
     elseif self.scripts then
         self.scripts[scriptType] = nil
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:SetScript file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:689:0"); end
 
 -- That might break some addons ; those addons were breaking other
 -- addons' tooltip though.
-function tipPrototype:HookScript()
+function tipPrototype:HookScript() Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:HookScript file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:705:0");
     geterrorhandler()(":HookScript is not allowed on LibQTip tooltips")
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:HookScript file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:705:0"); end
 
 ------------------------------------------------------------------------------
 -- Scrollbar data and functions
@@ -719,11 +719,11 @@ local BACKDROP_SLIDER_8_8 = BACKDROP_SLIDER_8_8 or {
     insets = { left = 3, right = 3, top = 6, bottom = 6 },
 };
 
-local function slider_OnValueChanged(self)
+local function slider_OnValueChanged(self) Perfy_Trace(Perfy_GetTime(), "Enter", "slider_OnValueChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:722:6");
     self.scrollFrame:SetVerticalScroll(self:GetValue())
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "slider_OnValueChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:722:6"); end
 
-local function tooltip_OnMouseWheel(self, delta)
+local function tooltip_OnMouseWheel(self, delta) Perfy_Trace(Perfy_GetTime(), "Enter", "tooltip_OnMouseWheel file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:726:6");
     local slider = self.slider
     local currentValue = slider:GetValue()
     local minValue, maxValue = slider:GetMinMaxValues()
@@ -734,15 +734,15 @@ local function tooltip_OnMouseWheel(self, delta)
     elseif delta > 0 and currentValue > minValue then
         slider:SetValue(max(minValue, currentValue - stepValue))
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "tooltip_OnMouseWheel file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:726:6"); end
 
 -- Set the step size for the scroll bar
-function tipPrototype:SetScrollStep(step)
+function tipPrototype:SetScrollStep(step) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:SetScrollStep file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:740:0");
     self.step = step
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:SetScrollStep file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:740:0"); end
 
 -- will resize the tooltip to fit the screen and show a scrollbar if needed
-function tipPrototype:UpdateScrolling(maxheight)
+function tipPrototype:UpdateScrolling(maxheight) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:UpdateScrolling file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:745:0");
     self:SetClampedToScreen(false)
 
     -- all data is in the tooltip; fix colspan width and prevent the layout cleaner from messing up the tooltip later
@@ -804,12 +804,12 @@ function tipPrototype:UpdateScrolling(maxheight)
             self:SetScript("OnMouseWheel", nil)
         end
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:UpdateScrolling file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:745:0"); end
 
 ------------------------------------------------------------------------------
 -- Tooltip methods for changing its contents.
 ------------------------------------------------------------------------------
-function tipPrototype:Clear()
+function tipPrototype:Clear() Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:Clear file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:812:0");
     for i, line in ipairs(self.lines) do
         for _, cell in pairs(line.cells) do
             if cell then
@@ -838,9 +838,9 @@ function tipPrototype:Clear()
     self.cell_margin_v = nil
 
     ResetTooltipSize(self)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:Clear file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:812:0"); end
 
-function tipPrototype:SetCellMarginH(size)
+function tipPrototype:SetCellMarginH(size) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:SetCellMarginH file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:843:0");
     if #self.lines > 0 then
         error("Unable to set horizontal margin while the tooltip has lines.", 2)
     end
@@ -850,9 +850,9 @@ function tipPrototype:SetCellMarginH(size)
     end
 
     self.cell_margin_h = size
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:SetCellMarginH file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:843:0"); end
 
-function tipPrototype:SetCellMarginV(size)
+function tipPrototype:SetCellMarginV(size) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:SetCellMarginV file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:855:0");
     if #self.lines > 0 then
         error("Unable to set vertical margin while the tooltip has lines.", 2)
     end
@@ -862,9 +862,9 @@ function tipPrototype:SetCellMarginV(size)
     end
 
     self.cell_margin_v = size
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:SetCellMarginV file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:855:0"); end
 
-function SetTooltipSize(tooltip, width, height)
+function SetTooltipSize(tooltip, width, height) Perfy_Trace(Perfy_GetTime(), "Enter", "SetTooltipSize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:867:0");
     tooltip.height = height
     tooltip.width = width
 
@@ -873,32 +873,32 @@ function SetTooltipSize(tooltip, width, height)
 
     tooltip.scrollChild:SetHeight(height)
     tooltip.scrollChild:SetWidth(width)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "SetTooltipSize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:867:0"); end
 
 -- Add 2 pixels to height so dangling letters (g, y, p, j, etc) are not clipped.
-function ResetTooltipSize(tooltip)
+function ResetTooltipSize(tooltip) Perfy_Trace(Perfy_GetTime(), "Enter", "ResetTooltipSize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:879:0");
     local h_margin = tooltip.cell_margin_h or CELL_MARGIN_H
 
     SetTooltipSize(tooltip, max(0, (h_margin * (#tooltip.columns - 1)) + (h_margin / 2)), 2)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "ResetTooltipSize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:879:0"); end
 
-local function EnlargeColumn(tooltip, column, width)
+local function EnlargeColumn(tooltip, column, width) Perfy_Trace(Perfy_GetTime(), "Enter", "EnlargeColumn file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:885:6");
     if width > column.width then
         SetTooltipSize(tooltip, tooltip.width + width - column.width, tooltip.height)
 
         column.width = width
         column:SetWidth(width)
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "EnlargeColumn file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:885:6"); end
 
-local function ResizeLine(tooltip, line, height)
+local function ResizeLine(tooltip, line, height) Perfy_Trace(Perfy_GetTime(), "Enter", "ResizeLine file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:894:6");
     SetTooltipSize(tooltip, tooltip.width, tooltip.height + height - line.height)
 
     line.height = height
     line:SetHeight(height)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "ResizeLine file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:894:6"); end
 
-function FixCellSizes(tooltip)
+function FixCellSizes(tooltip) Perfy_Trace(Perfy_GetTime(), "Enter", "FixCellSizes file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:901:0");
     local columns = tooltip.columns
     local colspans = tooltip.colspans
     local lines = tooltip.lines
@@ -961,9 +961,9 @@ function FixCellSizes(tooltip)
             end
         end
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "FixCellSizes file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:901:0"); end
 
-local function _SetCell(tooltip, lineNum, colNum, value, font, justification, colSpan, provider, ...)
+local function _SetCell(tooltip, lineNum, colNum, value, font, justification, colSpan, provider, ...) Perfy_Trace(Perfy_GetTime(), "Enter", "_SetCell file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:966:6");
     local line = tooltip.lines[lineNum]
     local cells = line.cells
 
@@ -979,7 +979,7 @@ local function _SetCell(tooltip, lineNum, colNum, value, font, justification, co
             ReleaseCell(cell)
         end
 
-        return lineNum, colNum
+        Perfy_Trace(Perfy_GetTime(), "Leave", "_SetCell file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:966:6"); return lineNum, colNum
     end
 
     font = font or (line.is_header and tooltip.headerFont or tooltip.regularFont)
@@ -1084,14 +1084,14 @@ local function _SetCell(tooltip, lineNum, colNum, value, font, justification, co
     end
 
     if rightColNum < tooltipWidth then
-        return lineNum, rightColNum + 1
+        return Perfy_Trace_Passthrough("Leave", "_SetCell file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:966:6", lineNum, rightColNum + 1)
     else
-        return lineNum, nil
+        Perfy_Trace(Perfy_GetTime(), "Leave", "_SetCell file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:966:6"); return lineNum, nil
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "_SetCell file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:966:6"); end
 
 do
-    local function CreateLine(tooltip, font, ...)
+    local function CreateLine(tooltip, font, ...) Perfy_Trace(Perfy_GetTime(), "Enter", "CreateLine file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1094:10");
         if #tooltip.columns == 0 then
             error("column layout should be defined before adding line", 3)
         end
@@ -1129,19 +1129,19 @@ do
             end
         end
 
-        return lineNum, colNum
+        Perfy_Trace(Perfy_GetTime(), "Leave", "CreateLine file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1094:10"); return lineNum, colNum
     end
 
-    function tipPrototype:AddLine(...)
-        return CreateLine(self, self.regularFont, ...)
+    function tipPrototype:AddLine(...) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:AddLine file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1135:4");
+        return Perfy_Trace_Passthrough("Leave", "tipPrototype:AddLine file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1135:4", CreateLine(self, self.regularFont, ...))
     end
 
-    function tipPrototype:AddHeader(...)
+    function tipPrototype:AddHeader(...) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:AddHeader file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1139:4");
         local line, col = CreateLine(self, self.headerFont, ...)
 
         self.lines[line].is_header = true
 
-        return line, col
+        Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:AddHeader file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1139:4"); return line, col
     end
 end -- do-block
 
@@ -1149,7 +1149,7 @@ local GenericBackdrop = {
     bgFile = "Interface\\Tooltips\\UI-Tooltip-Background"
 }
 
-function tipPrototype:AddSeparator(height, r, g, b, a)
+function tipPrototype:AddSeparator(height, r, g, b, a) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:AddSeparator file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1152:0");
     local lineNum, colNum = self:AddLine()
     local line = self.lines[lineNum]
     local color = _G.NORMAL_FONT_COLOR
@@ -1163,10 +1163,10 @@ function tipPrototype:AddSeparator(height, r, g, b, a)
     line:SetBackdrop(GenericBackdrop)
     line:SetBackdropColor(r or color.r, g or color.g, b or color.b, a or 1)
 
-    return lineNum, colNum
+    Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:AddSeparator file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1152:0"); return lineNum, colNum
 end
 
-function tipPrototype:SetCellColor(lineNum, colNum, r, g, b, a)
+function tipPrototype:SetCellColor(lineNum, colNum, r, g, b, a) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:SetCellColor file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1169:0");
     local cell = self.lines[lineNum].cells[colNum]
 
     if cell then
@@ -1175,9 +1175,9 @@ function tipPrototype:SetCellColor(lineNum, colNum, r, g, b, a)
         cell:SetBackdrop(GenericBackdrop)
         cell:SetBackdropColor(r or sr, g or sg, b or sb, a or sa)
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:SetCellColor file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1169:0"); end
 
-function tipPrototype:SetColumnColor(colNum, r, g, b, a)
+function tipPrototype:SetColumnColor(colNum, r, g, b, a) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:SetColumnColor file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1180:0");
     local column = self.columns[colNum]
 
     if column then
@@ -1185,9 +1185,9 @@ function tipPrototype:SetColumnColor(colNum, r, g, b, a)
         column:SetBackdrop(GenericBackdrop)
         column:SetBackdropColor(r or sr, g or sg, b or sb, a or sa)
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:SetColumnColor file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1180:0"); end
 
-function tipPrototype:SetLineColor(lineNum, r, g, b, a)
+function tipPrototype:SetLineColor(lineNum, r, g, b, a) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:SetLineColor file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1190:0");
     local line = self.lines[lineNum]
 
     if line then
@@ -1196,14 +1196,14 @@ function tipPrototype:SetLineColor(lineNum, r, g, b, a)
         line:SetBackdrop(GenericBackdrop)
         line:SetBackdropColor(r or sr, g or sg, b or sb, a or sa)
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:SetLineColor file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1190:0"); end
 
-function tipPrototype:SetCellTextColor(lineNum, colNum, r, g, b, a)
+function tipPrototype:SetCellTextColor(lineNum, colNum, r, g, b, a) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:SetCellTextColor file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1201:0");
     local line = self.lines[lineNum]
     local column = self.columns[colNum]
 
     if not line or not column then
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:SetCellTextColor file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1201:0"); return
     end
 
     local cell = self.lines[lineNum].cells[colNum]
@@ -1219,40 +1219,40 @@ function tipPrototype:SetCellTextColor(lineNum, colNum, r, g, b, a)
 
         cell.fontString:SetTextColor(r or cell.r, g or cell.g, b or cell.b, a or cell.a)
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:SetCellTextColor file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1201:0"); end
 
-function tipPrototype:SetColumnTextColor(colNum, r, g, b, a)
+function tipPrototype:SetColumnTextColor(colNum, r, g, b, a) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:SetColumnTextColor file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1224:0");
     if not self.columns[colNum] then
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:SetColumnTextColor file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1224:0"); return
     end
 
     for lineIndex = 1, #self.lines do
         self:SetCellTextColor(lineIndex, colNum, r, g, b, a)
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:SetColumnTextColor file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1224:0"); end
 
-function tipPrototype:SetLineTextColor(lineNum, r, g, b, a)
+function tipPrototype:SetLineTextColor(lineNum, r, g, b, a) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:SetLineTextColor file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1234:0");
     local line = self.lines[lineNum]
 
     if not line then
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:SetLineTextColor file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1234:0"); return
     end
 
     for cellIndex = 1, #line.cells do
         self:SetCellTextColor(lineNum, line.cells[cellIndex]._column, r, g, b, a)
     end
+Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:SetLineTextColor file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1234:0"); end
+
+function tipPrototype:SetHighlightTexture(...) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:SetHighlightTexture file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1246:0");
+    return Perfy_Trace_Passthrough("Leave", "tipPrototype:SetHighlightTexture file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1246:0", highlightTexture:SetTexture(...))
 end
 
-function tipPrototype:SetHighlightTexture(...)
-    return highlightTexture:SetTexture(...)
-end
-
-function tipPrototype:SetHighlightTexCoord(...)
+function tipPrototype:SetHighlightTexCoord(...) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:SetHighlightTexCoord file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1250:0");
     highlightTexture:SetTexCoord(...)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:SetHighlightTexCoord file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1250:0"); end
 
 do
-    local function checkFont(font, level, silent)
+    local function checkFont(font, level, silent) Perfy_Trace(Perfy_GetTime(), "Enter", "checkFont file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1255:10");
         local bad = false
 
         if not font then
@@ -1269,30 +1269,30 @@ do
 
         if bad then
             if silent then
-                return false
+                Perfy_Trace(Perfy_GetTime(), "Leave", "checkFont file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1255:10"); return false
             end
 
             error("font must be a Font instance or a string matching the name of a global Font instance, not: " .. tostring(font), level + 1)
         end
-        return true
+        Perfy_Trace(Perfy_GetTime(), "Leave", "checkFont file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1255:10"); return true
     end
 
-    function tipPrototype:SetFont(font)
+    function tipPrototype:SetFont(font) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:SetFont file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1280:4");
         local is_string = type(font) == "string"
 
         checkFont(font, 2)
         self.regularFont = is_string and _G[font] or font
-    end
+    Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:SetFont file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1280:4"); end
 
-    function tipPrototype:SetHeaderFont(font)
+    function tipPrototype:SetHeaderFont(font) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:SetHeaderFont file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1287:4");
         local is_string = type(font) == "string"
 
         checkFont(font, 2)
         self.headerFont = is_string and _G[font] or font
-    end
+    Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:SetHeaderFont file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1287:4"); end
 
     -- TODO: fixed argument positions / remove checks for performance?
-    function tipPrototype:SetCell(lineNum, colNum, value, ...)
+    function tipPrototype:SetCell(lineNum, colNum, value, ...) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:SetCell file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1295:4");
         -- Mandatory argument checking
         if type(lineNum) ~= "number" then
             error("line number must be a number, not: " .. tostring(lineNum), 2)
@@ -1324,31 +1324,31 @@ do
             i, provider = i + 1, arg
         end
 
-        return _SetCell(self, lineNum, colNum, value, font, justification, colSpan, provider, select(i, ...))
+        return Perfy_Trace_Passthrough("Leave", "tipPrototype:SetCell file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1295:4", _SetCell(self, lineNum, colNum, value, font, justification, colSpan, provider, select(i, ...)))
     end
 end -- do-block
 
-function tipPrototype:GetFont()
-    return self.regularFont
+function tipPrototype:GetFont() Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:GetFont file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1331:0");
+    return Perfy_Trace_Passthrough("Leave", "tipPrototype:GetFont file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1331:0", self.regularFont)
 end
 
-function tipPrototype:GetHeaderFont()
-    return self.headerFont
+function tipPrototype:GetHeaderFont() Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:GetHeaderFont file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1335:0");
+    return Perfy_Trace_Passthrough("Leave", "tipPrototype:GetHeaderFont file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1335:0", self.headerFont)
 end
 
-function tipPrototype:GetLineCount()
-    return #self.lines
+function tipPrototype:GetLineCount() Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:GetLineCount file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1339:0");
+    return Perfy_Trace_Passthrough("Leave", "tipPrototype:GetLineCount file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1339:0", #self.lines)
 end
 
-function tipPrototype:GetColumnCount()
-    return #self.columns
+function tipPrototype:GetColumnCount() Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:GetColumnCount file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1343:0");
+    return Perfy_Trace_Passthrough("Leave", "tipPrototype:GetColumnCount file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1343:0", #self.columns)
 end
 
 ------------------------------------------------------------------------------
 -- Frame Scripts
 ------------------------------------------------------------------------------
 local scripts = {
-    OnEnter = function(frame, ...)
+    OnEnter = function(frame, ...) Perfy_Trace(Perfy_GetTime(), "Enter", "scripts.OnEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1351:14");
         highlightFrame:SetParent(frame)
         highlightFrame:SetAllPoints(frame)
         highlightFrame:Show()
@@ -1356,8 +1356,8 @@ local scripts = {
         if frame._OnEnter_func then
             frame:_OnEnter_func(frame._OnEnter_arg, ...)
         end
-    end,
-    OnLeave = function(frame, ...)
+    Perfy_Trace(Perfy_GetTime(), "Leave", "scripts.OnEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1351:14"); end,
+    OnLeave = function(frame, ...) Perfy_Trace(Perfy_GetTime(), "Enter", "scripts.OnLeave file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1360:14");
         highlightFrame:Hide()
         highlightFrame:ClearAllPoints()
         highlightFrame:SetParent(nil)
@@ -1365,21 +1365,21 @@ local scripts = {
         if frame._OnLeave_func then
             frame:_OnLeave_func(frame._OnLeave_arg, ...)
         end
-    end,
-    OnMouseDown = function(frame, ...)
+    Perfy_Trace(Perfy_GetTime(), "Leave", "scripts.OnLeave file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1360:14"); end,
+    OnMouseDown = function(frame, ...) Perfy_Trace(Perfy_GetTime(), "Enter", "scripts.OnMouseDown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1369:18");
         frame:_OnMouseDown_func(frame._OnMouseDown_arg, ...)
-    end,
-    OnMouseUp = function(frame, ...)
+    Perfy_Trace(Perfy_GetTime(), "Leave", "scripts.OnMouseDown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1369:18"); end,
+    OnMouseUp = function(frame, ...) Perfy_Trace(Perfy_GetTime(), "Enter", "scripts.OnMouseUp file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1372:16");
         frame:_OnMouseUp_func(frame._OnMouseUp_arg, ...)
-    end,
-    OnReceiveDrag = function(frame, ...)
+    Perfy_Trace(Perfy_GetTime(), "Leave", "scripts.OnMouseUp file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1372:16"); end,
+    OnReceiveDrag = function(frame, ...) Perfy_Trace(Perfy_GetTime(), "Enter", "scripts.OnReceiveDrag file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1375:20");
         frame:_OnReceiveDrag_func(frame._OnReceiveDrag_arg, ...)
-    end
+    Perfy_Trace(Perfy_GetTime(), "Leave", "scripts.OnReceiveDrag file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1375:20"); end
 }
 
-function SetFrameScript(frame, script, func, arg)
+function SetFrameScript(frame, script, func, arg) Perfy_Trace(Perfy_GetTime(), "Enter", "SetFrameScript file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1380:0");
     if not scripts[script] then
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "SetFrameScript file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1380:0"); return
     end
 
     frame["_" .. script .. "_func"] = func
@@ -1403,9 +1403,9 @@ function SetFrameScript(frame, script, func, arg)
         frame:SetScript("OnEnter", nil)
         frame:SetScript("OnLeave", nil)
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "SetFrameScript file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1380:0"); end
 
-function ClearFrameScripts(frame)
+function ClearFrameScripts(frame) Perfy_Trace(Perfy_GetTime(), "Enter", "ClearFrameScripts file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1408:0");
     if frame._OnEnter_func or frame._OnLeave_func or frame._OnMouseDown_func or frame._OnMouseUp_func or frame._OnReceiveDrag_func then
         frame:EnableMouse(false)
 
@@ -1429,30 +1429,30 @@ function ClearFrameScripts(frame)
         frame._OnMouseUp_func = nil
         frame._OnMouseUp_arg = nil
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "ClearFrameScripts file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1408:0"); end
 
-function tipPrototype:SetLineScript(lineNum, script, func, arg)
+function tipPrototype:SetLineScript(lineNum, script, func, arg) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:SetLineScript file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1434:0");
     SetFrameScript(self.lines[lineNum], script, func, arg)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:SetLineScript file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1434:0"); end
 
-function tipPrototype:SetColumnScript(colNum, script, func, arg)
+function tipPrototype:SetColumnScript(colNum, script, func, arg) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:SetColumnScript file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1438:0");
     SetFrameScript(self.columns[colNum], script, func, arg)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:SetColumnScript file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1438:0"); end
 
-function tipPrototype:SetCellScript(lineNum, colNum, script, func, arg)
+function tipPrototype:SetCellScript(lineNum, colNum, script, func, arg) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:SetCellScript file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1442:0");
     local cell = self.lines[lineNum].cells[colNum]
 
     if cell then
         SetFrameScript(cell, script, func, arg)
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:SetCellScript file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1442:0"); end
 
 ------------------------------------------------------------------------------
 -- Auto-hiding feature
 ------------------------------------------------------------------------------
 
 -- Script of the auto-hiding child frame
-local function AutoHideTimerFrame_OnUpdate(self, elapsed)
+local function AutoHideTimerFrame_OnUpdate(self, elapsed) Perfy_Trace(Perfy_GetTime(), "Enter", "AutoHideTimerFrame_OnUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1455:6");
     self.checkElapsed = self.checkElapsed + elapsed
 
     if self.checkElapsed > 0.1 then
@@ -1468,13 +1468,13 @@ local function AutoHideTimerFrame_OnUpdate(self, elapsed)
 
         self.checkElapsed = 0
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "AutoHideTimerFrame_OnUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1455:6"); end
 
 -- Usage:
 -- :SetAutoHideDelay(0.25) => hides after 0.25sec outside of the tooltip
 -- :SetAutoHideDelay(0.25, someFrame) => hides after 0.25sec outside of both the tooltip and someFrame
 -- :SetAutoHideDelay() => disable auto-hiding (default)
-function tipPrototype:SetAutoHideDelay(delay, alternateFrame, releaseHandler)
+function tipPrototype:SetAutoHideDelay(delay, alternateFrame, releaseHandler) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:SetAutoHideDelay file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1477:0");
     local timerFrame = self.autoHideTimerFrame
     delay = tonumber(delay) or 0
 
@@ -1508,25 +1508,25 @@ function tipPrototype:SetAutoHideDelay(delay, alternateFrame, releaseHandler)
 
         ReleaseTimer(timerFrame)
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:SetAutoHideDelay file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1477:0"); end
 
 ------------------------------------------------------------------------------
 -- "Smart" Anchoring
 ------------------------------------------------------------------------------
-local function GetTipAnchor(frame)
+local function GetTipAnchor(frame) Perfy_Trace(Perfy_GetTime(), "Enter", "GetTipAnchor file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1516:6");
     local x, y = frame:GetCenter()
 
     if not x or not y then
-        return "TOPLEFT", "BOTTOMLEFT"
+        Perfy_Trace(Perfy_GetTime(), "Leave", "GetTipAnchor file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1516:6"); return "TOPLEFT", "BOTTOMLEFT"
     end
 
     local hhalf = (x > UIParent:GetWidth() * 2 / 3) and "RIGHT" or (x < UIParent:GetWidth() / 3) and "LEFT" or ""
     local vhalf = (y > UIParent:GetHeight() / 2) and "TOP" or "BOTTOM"
 
-    return vhalf .. hhalf, frame, (vhalf == "TOP" and "BOTTOM" or "TOP") .. hhalf
+    return Perfy_Trace_Passthrough("Leave", "GetTipAnchor file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1516:6", vhalf .. hhalf, frame, (vhalf == "TOP" and "BOTTOM" or "TOP") .. hhalf)
 end
 
-function tipPrototype:SmartAnchorTo(frame)
+function tipPrototype:SmartAnchorTo(frame) Perfy_Trace(Perfy_GetTime(), "Enter", "tipPrototype:SmartAnchorTo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1529:0");
     if not frame then
         error("Invalid frame provided.", 2)
     end
@@ -1534,14 +1534,14 @@ function tipPrototype:SmartAnchorTo(frame)
     self:ClearAllPoints()
     self:SetClampedToScreen(true)
     self:SetPoint(GetTipAnchor(frame))
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "tipPrototype:SmartAnchorTo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1529:0"); end
 
 ------------------------------------------------------------------------------
 -- Debug slashcmds
 ------------------------------------------------------------------------------
 -- @debug @
 local print = print
-local function PrintStats()
+local function PrintStats() Perfy_Trace(Perfy_GetTime(), "Enter", "PrintStats file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1544:6");
     local tipCache = tostring(#tooltipHeap)
     local frameCache = tostring(#frameHeap)
     local tableCache = tostring(#tableHeap)
@@ -1558,8 +1558,10 @@ local function PrintStats()
         end
         print("- " .. k)
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PrintStats file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua:1544:6"); end
 
 SLASH_LibQTip1 = "/qtip"
 _G.SlashCmdList["LibQTip"] = PrintStats
 --@end-debug@
+
+Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibQTip-1.0/LibQTip-1.0.lua");

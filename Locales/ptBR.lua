@@ -1,4 +1,4 @@
--- Locales/ptBR.lua
+--[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Locales/ptBR.lua"); -- Locales/ptBR.lua
 -- Portuguese (Brazil) Localization
 
 local L = BFL_LOCALE
@@ -1130,3 +1130,5 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita sobreposição. Requer reload."
 	L.SETTINGS_COLOR_CLASS_NAMES_DESC = "Colore nomes de amigos na cor de sua classe"
 
 end
+
+Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Locales/ptBR.lua");

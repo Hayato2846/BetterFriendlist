@@ -1,4 +1,4 @@
--- Modules/WhoFrame.lua
+--[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua"); -- Modules/WhoFrame.lua
 -- WHO Frame System Module
 -- Manages WHO search, display, sorting, and selection
 
@@ -41,15 +41,15 @@ local needsRenderOnShow = false
 -- Module Lifecycle
 -- ========================================
 
-function WhoFrame:Initialize()
+function WhoFrame:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "WhoFrame:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:44:0");
 	-- Register event callback for WHO list updates
-	BFL:RegisterEventCallback("WHO_LIST_UPDATE", function(...)
+	BFL:RegisterEventCallback("WHO_LIST_UPDATE", function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:46:46");
 		self:OnWhoListUpdate(...)
-	end, 10)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:46:46"); end, 10)
 	
 	-- Hook OnShow to re-render if data changed while hidden
 	if BetterFriendsFrame then
-		BetterFriendsFrame:HookScript("OnShow", function()
+		BetterFriendsFrame:HookScript("OnShow", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:52:42");
 			if needsRenderOnShow then
 				-- Only trigger update if we are on the Who tab (tab 3 usually, but let's check visibility)
 				if BetterFriendsFrame.WhoFrame and BetterFriendsFrame.WhoFrame:IsShown() then
@@ -59,23 +59,23 @@ function WhoFrame:Initialize()
 					needsRenderOnShow = false
 				end
 			end
-		end)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:52:42"); end)
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:44:0"); end
 
 -- Handle WHO_LIST_UPDATE event
-function WhoFrame:OnWhoListUpdate(...)
+function WhoFrame:OnWhoListUpdate(...) Perfy_Trace(Perfy_GetTime(), "Enter", "WhoFrame:OnWhoListUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:67:0");
 	-- Update will be triggered by the UI if WHO frame is visible
 	-- This callback ensures the module is aware of the event
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:OnWhoListUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:67:0"); end
 
 -- ========================================
 -- Responsive Layout Functions
 -- ========================================
 
-function WhoFrame:UpdateResponsiveLayout()
+function WhoFrame:UpdateResponsiveLayout() Perfy_Trace(Perfy_GetTime(), "Enter", "WhoFrame:UpdateResponsiveLayout file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:76:0");
 	local frame = BetterFriendsFrame
-	if not frame or not frame.WhoFrame then return end
+	if not frame or not frame.WhoFrame then Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:UpdateResponsiveLayout file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:76:0"); return end
 	
 	local whoFrame = frame.WhoFrame
 	local frameWidth = frame:GetWidth()
@@ -233,30 +233,30 @@ function WhoFrame:UpdateResponsiveLayout()
 			end
 		end
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:UpdateResponsiveLayout file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:76:0"); end
 
 -- ========================================
 -- WHO Frame Core Functions
 -- ========================================
 
 -- Initialize Who Frame with ScrollBox (Retail) or FauxScrollFrame (Classic)
-function WhoFrame:OnLoad(frame)
+function WhoFrame:OnLoad(frame) Perfy_Trace(Perfy_GetTime(), "Enter", "WhoFrame:OnLoad file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:243:0");
 	-- Classic: Use FauxScrollFrame approach
 	if BFL.IsClassic or not BFL.HasModernScrollBox then
 		-- BFL:DebugPrint("|cff00ffffWhoFrame:|r Using Classic FauxScrollFrame mode")
 		self:InitializeClassicWhoFrame(frame)
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:OnLoad file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:243:0"); return
 	end
 	
 	-- Retail: Initialize ScrollBox with DataProvider
 	-- BFL:DebugPrint("|cff00ffffWhoFrame:|r Using Retail ScrollBox mode")
 	local view = CreateScrollBoxListLinearView()
-	view:SetElementInitializer("BetterWhoListButtonTemplate", function(button, elementData)
+	view:SetElementInitializer("BetterWhoListButtonTemplate", function(button, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:254:59");
 		self:InitButton(button, elementData)
-	end)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:254:59"); end)
 	
 	-- PERFORMANCE: Cache font height calculation (all buttons use same font)
-	view:SetElementExtentCalculator(function(dataIndex, elementData)
+	view:SetElementExtentCalculator(function(dataIndex, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:259:33");
 		-- Cache font height to avoid repeated GetFontInfo calls
 		if not cachedFontHeight then
 			local fontObj = elementData.fontObject or "BetterFriendlistFontNormalSmall"
@@ -282,7 +282,7 @@ function WhoFrame:OnLoad(frame)
 			local padding = 4 -- Slightly more padding for readability
 			cachedExtent = cachedFontHeight + padding
 		end
-		return cachedExtent
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:259:33"); return cachedExtent
 	end)
 	
 	ScrollUtil.InitScrollBoxListWithScrollBar(frame.ScrollBox, frame.ScrollBar, view)
@@ -296,21 +296,21 @@ function WhoFrame:OnLoad(frame)
 	frame.selectedName = ""
 	
 	-- Apply initial responsive layout
-	C_Timer.After(0.1, function()
+	C_Timer.After(0.1, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:299:20");
 		self:UpdateResponsiveLayout()
-	end)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:299:20"); end)
 	
 	-- Register for font scale updates
 	if EventRegistry then
-		EventRegistry:RegisterCallback("TextSizeManager.OnTextScaleUpdated", function()
+		EventRegistry:RegisterCallback("TextSizeManager.OnTextScaleUpdated", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:305:71");
 			self:InvalidateFontCache()
 			self:Update(true) -- Force rebuild to re-measure
-		end, self)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:305:71"); end, self)
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:OnLoad file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:243:0"); end
 
 -- Initialize Classic WHO FauxScrollFrame
-function WhoFrame:InitializeClassicWhoFrame(frame)
+function WhoFrame:InitializeClassicWhoFrame(frame) Perfy_Trace(Perfy_GetTime(), "Enter", "WhoFrame:InitializeClassicWhoFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:313:0");
 	self.classicWhoFrame = frame
 	self.classicWhoButtonPool = {}
 	self.classicWhoDataList = {}
@@ -393,9 +393,9 @@ function WhoFrame:InitializeClassicWhoFrame(frame)
 		upButton:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Up")
 		upButton:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Down")
 		upButton:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Highlight")
-		upButton:SetScript("OnClick", function()
+		upButton:SetScript("OnClick", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:396:32");
 			scrollBar:SetValue(scrollBar:GetValue() - 1)
-		end)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:396:32"); end)
 		
 		local downButton = CreateFrame("Button", nil, scrollBar)
 		downButton:SetSize(20, 20) -- Larger buttons (20x20)
@@ -403,16 +403,16 @@ function WhoFrame:InitializeClassicWhoFrame(frame)
 		downButton:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up")
 		downButton:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Down")
 		downButton:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Highlight")
-		downButton:SetScript("OnClick", function()
+		downButton:SetScript("OnClick", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:406:34");
 			scrollBar:SetValue(scrollBar:GetValue() + 1)
-		end)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:406:34"); end)
 		
 		-- Mouse wheel support function
-		local function OnMouseWheel(self, delta)
+		local function OnMouseWheel(self, delta) Perfy_Trace(Perfy_GetTime(), "Enter", "OnMouseWheel file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:411:8");
 			if scrollBar:IsShown() then
 				scrollBar:SetValue(scrollBar:GetValue() - delta)
 			end
-		end
+		Perfy_Trace(Perfy_GetTime(), "Leave", "OnMouseWheel file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:411:8"); end
 		
 		-- Apply mousewheel to scrollbar, scrollbox, and buttons
 		scrollBar:SetScript("OnMouseWheel", OnMouseWheel)
@@ -425,9 +425,9 @@ function WhoFrame:InitializeClassicWhoFrame(frame)
 			button:SetScript("OnMouseWheel", OnMouseWheel)
 		end
 		
-		scrollBar:SetScript("OnValueChanged", function(self, value)
+		scrollBar:SetScript("OnValueChanged", function(self, value) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:428:40");
 			WhoFrame:RenderClassicWhoButtons()
-		end)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:428:40"); end)
 		
 		-- Set initial value AFTER scripts are registered (prevents SecureScrollTemplates error)
 		scrollBar:SetValue(0)
@@ -440,33 +440,33 @@ function WhoFrame:InitializeClassicWhoFrame(frame)
 	frame.selectedName = ""
 	
 	-- Click outside to clear focus
-	frame:SetScript("OnMouseDown", function()
+	frame:SetScript("OnMouseDown", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:443:32");
 		if frame.EditBox then
 			frame.EditBox:ClearFocus()
 		end
-	end)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:443:32"); end)
 	
 	-- Apply initial responsive layout
-	C_Timer.After(0.1, function()
+	C_Timer.After(0.1, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:450:20");
 		self:UpdateResponsiveLayout()
-	end)
-end
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:450:20"); end)
+Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:InitializeClassicWhoFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:313:0"); end
 
 -- Initialize Classic Dropdown (UIDropDownMenu)
-function WhoFrame:InitializeClassicDropdown(dropdown)
-	if not dropdown then return end
+function WhoFrame:InitializeClassicDropdown(dropdown) Perfy_Trace(Perfy_GetTime(), "Enter", "WhoFrame:InitializeClassicDropdown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:456:0");
+	if not dropdown then Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:InitializeClassicDropdown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:456:0"); return end
 	
-	UIDropDownMenu_Initialize(dropdown, function(self, level, menuList)
+	UIDropDownMenu_Initialize(dropdown, function(self, level, menuList) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:459:37");
 		local info = UIDropDownMenu_CreateInfo()
 		
-		local function OnClick(self, arg1, arg2, checked)
+		local function OnClick(self, arg1, arg2, checked) Perfy_Trace(Perfy_GetTime(), "Enter", "OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:462:8");
 			WhoFrame:SetSortValue(arg1)
 			UIDropDownMenu_SetSelectedValue(dropdown, arg1)
 			-- Force update
 			if WhoFrame and WhoFrame.Update then
 				WhoFrame:Update(true)
 			end
-		end
+		Perfy_Trace(Perfy_GetTime(), "Leave", "OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:462:8"); end
 		
 		info.text = ZONE
 		info.value = 1
@@ -488,16 +488,16 @@ function WhoFrame:InitializeClassicDropdown(dropdown)
 		info.func = OnClick
 		info.checked = (WhoFrame:GetSortValue() == 3)
 		UIDropDownMenu_AddButton(info)
-	end)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:459:37"); end)
 	
 	UIDropDownMenu_SetWidth(dropdown, 80)
 	UIDropDownMenu_SetSelectedValue(dropdown, 1)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:InitializeClassicDropdown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:456:0"); end
 
 -- Render Classic WHO buttons
-function WhoFrame:RenderClassicWhoButtons()
+function WhoFrame:RenderClassicWhoButtons() Perfy_Trace(Perfy_GetTime(), "Enter", "WhoFrame:RenderClassicWhoButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:498:0");
 	if not self.classicWhoFrame or not self.classicWhoButtonPool then
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:RenderClassicWhoButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:498:0"); return
 	end
 	
 	local dataList = self.classicWhoDataList or {}
@@ -548,10 +548,10 @@ function WhoFrame:RenderClassicWhoButtons()
 			button:Hide()
 		end
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:RenderClassicWhoButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:498:0"); end
 
 -- Initialize individual Who button
-function WhoFrame:InitButton(button, elementData)
+function WhoFrame:InitButton(button, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "WhoFrame:InitButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:554:0");
 	local index = elementData.index
 	local info = elementData.info
 	button.index = index
@@ -669,10 +669,10 @@ function WhoFrame:InitButton(button, elementData)
 	-- Update selection state
 	local selected = BetterFriendsFrame.WhoFrame.selectedWho == index
 	self:SetButtonSelected(button, selected)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:InitButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:554:0"); end
 
 -- Send Who request
-function WhoFrame:SendWhoRequest(text)
+function WhoFrame:SendWhoRequest(text) Perfy_Trace(Perfy_GetTime(), "Enter", "WhoFrame:SendWhoRequest file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:675:0");
 	-- if BFL then BFL:DebugPrint("WhoFrame:SendWhoRequest called with text: " .. tostring(text)) end
 	if not text or text == "" then
 		-- Use default Who command if no text provided
@@ -699,12 +699,12 @@ function WhoFrame:SendWhoRequest(text)
 	C_FriendList.SetWhoToUi(true)
 	
 	C_FriendList.SendWho(text)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:SendWhoRequest file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:675:0"); end
 
 -- Update Who list display
-function WhoFrame:Update(forceRebuild)
+function WhoFrame:Update(forceRebuild) Perfy_Trace(Perfy_GetTime(), "Enter", "WhoFrame:Update file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:705:0");
 	if not BetterFriendsFrame or not BetterFriendsFrame.WhoFrame then
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:Update file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:705:0"); return
 	end
 	
 	-- Classic: Check if using Classic mode
@@ -712,14 +712,14 @@ function WhoFrame:Update(forceRebuild)
 	
 	-- Retail: Check if DataProvider exists
 	if not isClassicMode and not whoDataProvider then
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:Update file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:705:0"); return
 	end
 	
 	-- Visibility Optimization:
 	-- If the frame (or the Who tab) is hidden, don't rebuild the list.
 	if not BetterFriendsFrame:IsShown() or not BetterFriendsFrame.WhoFrame:IsShown() then
 		needsRenderOnShow = true
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:Update file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:705:0"); return
 	end
 	
 	local numWhos, totalCount = C_FriendList.GetNumWhoResults()
@@ -772,7 +772,7 @@ function WhoFrame:Update(forceRebuild)
 			end
 		end
 		self:RenderClassicWhoButtons()
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:Update file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:705:0"); return
 	end
 	
 	-- Retail mode: PERFORMANCE: Only rebuild if count changed OR if forced (e.g., dropdown change)
@@ -780,7 +780,7 @@ function WhoFrame:Update(forceRebuild)
 	if not forceRebuild and currentSize == numWhos and currentSize > 0 then
 		-- Data count unchanged, ScrollBox will automatically refresh from DataProvider
 		-- No need to Flush and rebuild - just return
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:Update file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:705:0"); return
 	end
 	
 	-- If a sort is active, delegate to SortByColumn instead of building unsorted
@@ -788,7 +788,7 @@ function WhoFrame:Update(forceRebuild)
 		-- Re-apply current sort - it will rebuild the DataProvider sorted
 		-- Use preserveDirection=true to avoid toggling
 		self:SortByColumn(BetterFriendsFrame.WhoFrame.currentSort, true)
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:Update file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:705:0"); return
 	end
 	
 	-- No sort active: build unsorted list
@@ -812,10 +812,10 @@ function WhoFrame:Update(forceRebuild)
 			})
 		end
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:Update file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:705:0"); end
 
 -- Set selected Who button
-function WhoFrame:SetSelectedButton(button)
+function WhoFrame:SetSelectedButton(button) Perfy_Trace(Perfy_GetTime(), "Enter", "WhoFrame:SetSelectedButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:818:0");
 	if selectedWhoButton then
 		self:SetButtonSelected(selectedWhoButton, false)
 	end
@@ -836,19 +836,19 @@ function WhoFrame:SetSelectedButton(button)
 		BetterFriendsFrame.WhoFrame.GroupInviteButton:Disable()
 		BetterFriendsFrame.WhoFrame.AddFriendButton:Disable()
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:SetSelectedButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:818:0"); end
 
 -- Set button selection visual state
-function WhoFrame:SetButtonSelected(button, selected)
+function WhoFrame:SetButtonSelected(button, selected) Perfy_Trace(Perfy_GetTime(), "Enter", "WhoFrame:SetButtonSelected file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:842:0");
 	if selected then
 		button:LockHighlight()
 	else
 		button:UnlockHighlight()
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:SetButtonSelected file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:842:0"); end
 
 -- Sort by column
-function WhoFrame:SortByColumn(sortType, preserveDirection)
+function WhoFrame:SortByColumn(sortType, preserveDirection) Perfy_Trace(Perfy_GetTime(), "Enter", "WhoFrame:SortByColumn file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:851:0");
 	-- Store current sort type for client-side sorting
 	if not BetterFriendsFrame.WhoFrame.currentSort then
 		BetterFriendsFrame.WhoFrame.currentSort = "name"
@@ -871,7 +871,7 @@ function WhoFrame:SortByColumn(sortType, preserveDirection)
 	-- Client-side sort: Get all WHO data and sort it locally
 	local numWhos = C_FriendList.GetNumWhoResults()
 	if numWhos == 0 then
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:SortByColumn file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:851:0"); return
 	end
 	
 	-- Collect all WHO data
@@ -884,7 +884,7 @@ function WhoFrame:SortByColumn(sortType, preserveDirection)
 	end
 	
 	-- Sort the data based on sort type
-	table.sort(whoData, function(a, b)
+	table.sort(whoData, function(a, b) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:887:21");
 		local aVal, bVal
 		
 		if sortType == "name" then
@@ -909,11 +909,11 @@ function WhoFrame:SortByColumn(sortType, preserveDirection)
 		
 		-- Apply sort direction
 		if BetterFriendsFrame.WhoFrame.sortAscending then
-			return aVal < bVal
+			return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:887:21", aVal < bVal)
 		else
-			return aVal > bVal
+			return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:887:21", aVal > bVal)
 		end
-	end)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:887:21"); end)
 	
 	-- Rebuild DataProvider with sorted data
 	if whoDataProvider then
@@ -928,26 +928,26 @@ function WhoFrame:SortByColumn(sortType, preserveDirection)
 			})
 		end
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:SortByColumn file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:851:0"); end
 
 -- Set whoSortValue (for dropdown)
-function WhoFrame:SetSortValue(value)
+function WhoFrame:SetSortValue(value) Perfy_Trace(Perfy_GetTime(), "Enter", "WhoFrame:SetSortValue file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:934:0");
 	whoSortValue = value
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:SetSortValue file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:934:0"); end
 
 -- Get whoSortValue
-function WhoFrame:GetSortValue()
-	return whoSortValue
+function WhoFrame:GetSortValue() Perfy_Trace(Perfy_GetTime(), "Enter", "WhoFrame:GetSortValue file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:939:0");
+	Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:GetSortValue file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:939:0"); return whoSortValue
 end
 
 -- Invalidate font cache (called when font scale changes)
-function WhoFrame:InvalidateFontCache()
+function WhoFrame:InvalidateFontCache() Perfy_Trace(Perfy_GetTime(), "Enter", "WhoFrame:InvalidateFontCache file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:944:0");
 	cachedFontHeight = nil
 	cachedExtent = nil
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:InvalidateFontCache file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:944:0"); end
 
 -- Handle button click
-function WhoFrame:OnButtonClick(button, mouseButton)
+function WhoFrame:OnButtonClick(button, mouseButton) Perfy_Trace(Perfy_GetTime(), "Enter", "WhoFrame:OnButtonClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:950:0");
 	if mouseButton == "LeftButton" then
 		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
 		self:SetSelectedButton(button)
@@ -980,7 +980,7 @@ function WhoFrame:OnButtonClick(button, mouseButton)
 			end
 		end
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrame:OnButtonClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:950:0"); end
 
 -- ========================================
 -- Module Export
@@ -993,7 +993,7 @@ end
 -- WHO EditBox Mixin (Blizzard 11.2.5 compatible)
 local WhoFrameEditBoxMixin = {}
 
-function WhoFrameEditBoxMixin:OnLoad()
+function WhoFrameEditBoxMixin:OnLoad() Perfy_Trace(Perfy_GetTime(), "Enter", "WhoFrameEditBoxMixin:OnLoad file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:996:0");
 	-- SearchBoxTemplate OnLoad already ran (inherit="append")
 	-- KeyValues (instructionText, instructionsFontObject) are already set by SearchBoxTemplate
 	
@@ -1013,14 +1013,14 @@ function WhoFrameEditBoxMixin:OnLoad()
 		self.Instructions:SetMaxLines(2)
 		self.Instructions:SetFontObject("BetterFriendlistFontDisableSmall")
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrameEditBoxMixin:OnLoad file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:996:0"); end
 
-function WhoFrameEditBoxMixin:OnShow()
+function WhoFrameEditBoxMixin:OnShow() Perfy_Trace(Perfy_GetTime(), "Enter", "WhoFrameEditBoxMixin:OnShow file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1018:0");
 	-- Register for font scale updates
 	if EventRegistry then
-		EventRegistry:RegisterCallback("TextSizeManager.OnTextScaleUpdated", function()
+		EventRegistry:RegisterCallback("TextSizeManager.OnTextScaleUpdated", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1021:71");
 			self:AdjustHeightToFitInstructions()
-		end, self)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1021:71"); end, self)
 	end
 	
 	-- Adjust height initially
@@ -1028,25 +1028,25 @@ function WhoFrameEditBoxMixin:OnShow()
 	
 	-- Clear focus
 	EditBox_ClearFocus(self)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrameEditBoxMixin:OnShow file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1018:0"); end
 
-function WhoFrameEditBoxMixin:OnHide()
+function WhoFrameEditBoxMixin:OnHide() Perfy_Trace(Perfy_GetTime(), "Enter", "WhoFrameEditBoxMixin:OnHide file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1033:0");
 	-- Unregister from font scale updates
 	if EventRegistry then
 		EventRegistry:UnregisterCallback("TextSizeManager.OnTextScaleUpdated", self)
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrameEditBoxMixin:OnHide file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1033:0"); end
 
-function WhoFrameEditBoxMixin:AdjustHeightToFitInstructions()
-	if not self.Instructions then return end
+function WhoFrameEditBoxMixin:AdjustHeightToFitInstructions() Perfy_Trace(Perfy_GetTime(), "Enter", "WhoFrameEditBoxMixin:AdjustHeightToFitInstructions file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1040:0");
+	if not self.Instructions then Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrameEditBoxMixin:AdjustHeightToFitInstructions file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1040:0"); return end
 	
 	local linesShown = math.min(self.Instructions:GetNumLines(), self.Instructions:GetMaxLines())
 	local totalInstructionHeight = linesShown * self.Instructions:GetLineHeight()
 	local padding = 20
 	self:SetHeight(totalInstructionHeight + padding)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrameEditBoxMixin:AdjustHeightToFitInstructions file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1040:0"); end
 
-function WhoFrameEditBoxMixin:OnEnterPressed()
+function WhoFrameEditBoxMixin:OnEnterPressed() Perfy_Trace(Perfy_GetTime(), "Enter", "WhoFrameEditBoxMixin:OnEnterPressed file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1049:0");
 	local text = self:GetText()
 	self:ClearFocus()
 	
@@ -1056,31 +1056,31 @@ function WhoFrameEditBoxMixin:OnEnterPressed()
 	end
 	
 	-- Update the Who list after search (wait for server response)
-	C_Timer.After(0.3, function()
+	C_Timer.After(0.3, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1059:20");
 		if BetterFriendsFrame and BetterFriendsFrame.WhoFrame and BetterFriendsFrame.WhoFrame:IsShown() then
 			if _G.BetterWhoFrame_Update then
 				_G.BetterWhoFrame_Update()
 			end
 		end
-	end)
-end
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1059:20"); end)
+Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrameEditBoxMixin:OnEnterPressed file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1049:0"); end
 
-function WhoFrameEditBoxMixin:OnEnter()
+function WhoFrameEditBoxMixin:OnEnter() Perfy_Trace(Perfy_GetTime(), "Enter", "WhoFrameEditBoxMixin:OnEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1068:0");
 	if self.Instructions:IsShown() and self.Instructions:IsTruncated() then
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		GameTooltip:AddLine(WHO_LIST_SEARCH_INSTRUCTIONS or "Enter player name or search criteria", 1, 1, 1, true)
 		GameTooltip:Show()
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrameEditBoxMixin:OnEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1068:0"); end
 
-function WhoFrameEditBoxMixin:OnLeave()
+function WhoFrameEditBoxMixin:OnLeave() Perfy_Trace(Perfy_GetTime(), "Enter", "WhoFrameEditBoxMixin:OnLeave file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1076:0");
 	GameTooltip:Hide()
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrameEditBoxMixin:OnLeave file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1076:0"); end
 
 -- WHO Column Dropdown Mixin (Variable Column: Zone/Guild/Race)
 local WhoFrameColumnDropdownMixin = {}
 
-function WhoFrameColumnDropdownMixin:OnLoad()
+function WhoFrameColumnDropdownMixin:OnLoad() Perfy_Trace(Perfy_GetTime(), "Enter", "WhoFrameColumnDropdownMixin:OnLoad file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1083:0");
 	-- Set up dropdown with user-scalable font
 	self.fontObject = "BetterFriendlistFontNormalSmall"
 	
@@ -1098,22 +1098,22 @@ function WhoFrameColumnDropdownMixin:OnLoad()
 	end
 	
 	-- CRITICAL: Set selection translator BEFORE SetupMenu
-	self:SetSelectionTranslator(function(selection)
+	self:SetSelectionTranslator(function(selection) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1101:29");
 		-- selection.data contains {value, sortType}
 		local selectionTexts = {ZONE, GUILD, RACE}
-		return selectionTexts[selection.data.value] or ZONE
+		return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1101:29", selectionTexts[selection.data.value] or ZONE)
 	end)
 	
 	-- Setup menu generator
-	self:SetupMenu(function(dropdown, rootDescription)
+	self:SetupMenu(function(dropdown, rootDescription) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1108:16");
 		rootDescription:SetTag("MENU_WHO_COLUMN")
 		
 		-- Create radio group for column selection
-		local function IsSelected(data)
-			return WhoFrame:GetSortValue() == data.value
+		local function IsSelected(data) Perfy_Trace(Perfy_GetTime(), "Enter", "IsSelected file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1112:8");
+			return Perfy_Trace_Passthrough("Leave", "IsSelected file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1112:8", WhoFrame:GetSortValue() == data.value)
 		end
 		
-		local function SetSelected(data)
+		local function SetSelected(data) Perfy_Trace(Perfy_GetTime(), "Enter", "SetSelected file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1116:8");
 			WhoFrame:SetSortValue(data.value)
 			
 			-- Force dropdown to update its text immediately
@@ -1127,26 +1127,26 @@ function WhoFrameColumnDropdownMixin:OnLoad()
 			elseif _G.BetterWhoFrame_Update then
 				_G.BetterWhoFrame_Update(true)
 			end
-		end
+		Perfy_Trace(Perfy_GetTime(), "Leave", "SetSelected file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1116:8"); end
 		
-		local function CreateRadio(text, value, sortType)
-			local radio = rootDescription:CreateButton(text, function() end, {value = value, sortType = sortType})
+		local function CreateRadio(text, value, sortType) Perfy_Trace(Perfy_GetTime(), "Enter", "CreateRadio file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1132:8");
+			local radio = rootDescription:CreateButton(text, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1133:52"); Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1133:52"); end, {value = value, sortType = sortType})
 			radio:SetIsSelected(IsSelected)
 			radio:SetResponder(SetSelected)
-			radio:AddInitializer(function(button, description, menu)
+			radio:AddInitializer(function(button, description, menu) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1136:24");
 				-- Ensure dropdown items use the correct font
 				local fontString = button.fontString or button.Text
 				if fontString then
 					fontString:SetFontObject("BetterFriendlistFontNormalSmall")
 				end
-			end)
-		end
+			Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1136:24"); end)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "CreateRadio file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1132:8"); end
 		
 		CreateRadio(ZONE, 1, "zone")
 		CreateRadio(GUILD, 2, "guild")
 		CreateRadio(RACE, 3, "race")
-	end)
-end
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1108:16"); end)
+Perfy_Trace(Perfy_GetTime(), "Leave", "WhoFrameColumnDropdownMixin:OnLoad file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1083:0"); end
 
 -- Export mixins globally for XML access
 _G.WhoFrameEditBoxMixin = WhoFrameEditBoxMixin
@@ -1157,11 +1157,11 @@ _G.WhoFrameColumnDropdownMixin = WhoFrameColumnDropdownMixin
 -- ========================================
 
 -- Global wrapper for WHO list button OnClick
-function _G.BetterWhoListButton_OnClick(button, mouseButton)
+function _G.BetterWhoListButton_OnClick(button, mouseButton) Perfy_Trace(Perfy_GetTime(), "Enter", "_G.BetterWhoListButton_OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1160:0");
 	if WhoFrame and WhoFrame.OnButtonClick then
 		WhoFrame:OnButtonClick(button, mouseButton)
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "_G.BetterWhoListButton_OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua:1160:0"); end
 
 -- ========================================
 -- Module Return
@@ -1170,4 +1170,4 @@ end
 -- Export module to BFL namespace (required for BFL.WhoFrame access)
 BFL.WhoFrame = WhoFrame
 
-return WhoFrame
+Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/WhoFrame.lua"); return WhoFrame

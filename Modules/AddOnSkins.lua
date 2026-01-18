@@ -1,4 +1,4 @@
--- Modules/AddOnSkins.lua
+--[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua"); -- Modules/AddOnSkins.lua
 -- AddOnSkins Support Module for BetterFriendlist
 -- Clean implementation based on AddOnSkins API
 
@@ -8,16 +8,16 @@ local AddOnSkinsSupport = BFL:RegisterModule("AddOnSkinsSupport", {})
 -- Forward declaration
 local SkinBetterFriendlist
 
-function AddOnSkinsSupport:Initialize()
+function AddOnSkinsSupport:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "AddOnSkinsSupport:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:11:0");
 	-- Check if AddOnSkins is loaded
 	if _G.AddOnSkins then
 		--self:RegisterSkin()
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "AddOnSkinsSupport:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:11:0"); end
 
-function AddOnSkinsSupport:RegisterSkin()
+function AddOnSkinsSupport:RegisterSkin() Perfy_Trace(Perfy_GetTime(), "Enter", "AddOnSkinsSupport:RegisterSkin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:18:0");
 	local AS, L, S, R = unpack(AddOnSkins)
-	if not AS then return end
+	if not AS then Perfy_Trace(Perfy_GetTime(), "Leave", "AddOnSkinsSupport:RegisterSkin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:18:0"); return end
 	
 	-- 1. Register the skin
 	-- We use ADDON_LOADED so AS attempts to skin when it sees us (or when we tell it we are here)
@@ -25,11 +25,11 @@ function AddOnSkinsSupport:RegisterSkin()
 	-- 4. Trigger the skin immediately
 	-- Since we likely loaded after AS, we need to tell it to skin us now
 	AS:CallSkin('BetterFriendlist', SkinBetterFriendlist, 'ADDON_LOADED')
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "AddOnSkinsSupport:RegisterSkin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:18:0"); end
 
 -- Helper for 11.x Dropdowns
-local function SkinDropDown(S, obj, width)
-	if not obj then return end
+local function SkinDropDown(S, obj, width) Perfy_Trace(Perfy_GetTime(), "Enter", "SkinDropDown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:31:6");
+	if not obj then Perfy_Trace(Perfy_GetTime(), "Leave", "SkinDropDown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:31:6"); return end
 	
 	-- Check for new DropdownButton intrinsic
 	local isNewDropdown = false
@@ -46,18 +46,18 @@ local function SkinDropDown(S, obj, width)
 	else
 		if S.HandleDropDownBox then S:HandleDropDownBox(obj, width) end
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "SkinDropDown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:31:6"); end
 
-SkinBetterFriendlist = function(event, addon)
+SkinBetterFriendlist = function(event, addon) Perfy_Trace(Perfy_GetTime(), "Enter", "SkinBetterFriendlist file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:51:23");
 	-- Prevent multiple executions
-	if BFL.AddOnSkinsSkinned then return end
+	if BFL.AddOnSkinsSkinned then Perfy_Trace(Perfy_GetTime(), "Leave", "SkinBetterFriendlist file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:51:23"); return end
 	BFL.AddOnSkinsSkinned = true
 
 	local AS = unpack(_G.AddOnSkins)
 	local S = AS.Skins
 	
 	local frame = _G.BetterFriendsFrame
-	if not frame then return end
+	if not frame then Perfy_Trace(Perfy_GetTime(), "Leave", "SkinBetterFriendlist file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:51:23"); return end
 
 	-- Main Frame
 	S:HandlePortraitFrame(frame, true)
@@ -263,35 +263,35 @@ SkinBetterFriendlist = function(event, addon)
 		local C = BFL.SettingsComponents
 		
 		local oldCreateCheckbox = C.CreateCheckbox
-		C.CreateCheckbox = function(...)
+		C.CreateCheckbox = function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "C.CreateCheckbox file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:266:21");
 			local holder = oldCreateCheckbox(...)
 			if holder and holder.checkBox then S:HandleCheckBox(holder.checkBox) end
-			return holder
+			Perfy_Trace(Perfy_GetTime(), "Leave", "C.CreateCheckbox file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:266:21"); return holder
 		end
 		
 		local oldCreateSlider = C.CreateSlider
-		C.CreateSlider = function(...)
+		C.CreateSlider = function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "C.CreateSlider file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:273:19");
 			local holder = oldCreateSlider(...)
 			if holder and holder.Slider and S.HandleSliderFrame then S:HandleSliderFrame(holder.Slider) end
-			return holder
+			Perfy_Trace(Perfy_GetTime(), "Leave", "C.CreateSlider file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:273:19"); return holder
 		end
 		
 		local oldCreateDropdown = C.CreateDropdown
-		C.CreateDropdown = function(...)
+		C.CreateDropdown = function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "C.CreateDropdown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:280:21");
 			local holder = oldCreateDropdown(...)
 			if holder and holder.DropDown then SkinDropDown(S, holder.DropDown) end
-			return holder
+			Perfy_Trace(Perfy_GetTime(), "Leave", "C.CreateDropdown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:280:21"); return holder
 		end
 		
 		local oldCreateButton = C.CreateButton
-		C.CreateButton = function(...)
+		C.CreateButton = function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "C.CreateButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:287:19");
 			local button = oldCreateButton(...)
 			if button then S:HandleButton(button) end
-			return button
+			Perfy_Trace(Perfy_GetTime(), "Leave", "C.CreateButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:287:19"); return button
 		end
 		
 		local oldCreateListItem = C.CreateListItem
-		C.CreateListItem = function(...)
+		C.CreateListItem = function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "C.CreateListItem file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:294:21");
 			local holder = oldCreateListItem(...)
 			if holder then
 				if holder.deleteButton then S:HandleButton(holder.deleteButton) end
@@ -304,7 +304,7 @@ SkinBetterFriendlist = function(event, addon)
 					S:CreateBackdrop(holder, "Transparent")
 				end
 			end
-			return holder
+			Perfy_Trace(Perfy_GetTime(), "Leave", "C.CreateListItem file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:294:21"); return holder
 		end
 		
 		C.IsSkinnedByAS = true
@@ -318,23 +318,23 @@ SkinBetterFriendlist = function(event, addon)
 			S:CreateBackdrop(toast, "Transparent")
 		end
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "SkinBetterFriendlist file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:51:23"); end
 
 -- Hook Friends List
-local function HookFriendsList(AS)
+local function HookFriendsList(AS) Perfy_Trace(Perfy_GetTime(), "Enter", "HookFriendsList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:324:6");
 	local S = AS.Skins
 	local FriendsList = BFL:GetModule("FriendsList")
-	if not FriendsList then return end
+	if not FriendsList then Perfy_Trace(Perfy_GetTime(), "Leave", "HookFriendsList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:324:6"); return end
 	
-	hooksecurefunc(FriendsList, "UpdateGroupHeaderButton", function(_, button, elementData)
+	hooksecurefunc(FriendsList, "UpdateGroupHeaderButton", function(_, button, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:329:56");
 		if not button.isSkinned then
 			S:HandleButton(button)
 			if button.BG then button.BG:SetTexture(nil) end
 			button.isSkinned = true
 		end
-	end)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:329:56"); end)
 	
-	hooksecurefunc(FriendsList, "UpdateFriendButton", function(_, button, elementData)
+	hooksecurefunc(FriendsList, "UpdateFriendButton", function(_, button, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:337:51");
 		if not button.isSkinned then
 			if button.travelPassButton then
 				S:HandleButton(button.travelPassButton)
@@ -346,28 +346,30 @@ local function HookFriendsList(AS)
 			end
 			button.isSkinned = true
 		end
-	end)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:337:51"); end)
 	
-	hooksecurefunc(FriendsList, "UpdateInviteHeaderButton", function(_, button, elementData)
+	hooksecurefunc(FriendsList, "UpdateInviteHeaderButton", function(_, button, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:351:57");
 		if not button.isSkinned then
 			S:HandleButton(button)
 			button.isSkinned = true
 		end
-	end)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:351:57"); end)
 	
-	hooksecurefunc(FriendsList, "UpdateInviteButton", function(_, button, elementData)
+	hooksecurefunc(FriendsList, "UpdateInviteButton", function(_, button, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:358:51");
 		if not button.isSkinned then
 			if button.AcceptButton then S:HandleButton(button.AcceptButton) end
 			if button.DeclineButton then S:HandleButton(button.DeclineButton) end
 			button.isSkinned = true
 		end
-	end)
-end
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:358:51"); end)
+Perfy_Trace(Perfy_GetTime(), "Leave", "HookFriendsList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:324:6"); end
 
 -- Append hook call to skin function
 local originalSkin = SkinBetterFriendlist
-SkinBetterFriendlist = function(event, addon)
+SkinBetterFriendlist = function(event, addon) Perfy_Trace(Perfy_GetTime(), "Enter", "SkinBetterFriendlist file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:369:23");
 	originalSkin(event, addon)
 	local AS = unpack(_G.AddOnSkins)
 	HookFriendsList(AS)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "SkinBetterFriendlist file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua:369:23"); end
+
+Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/AddOnSkins.lua");

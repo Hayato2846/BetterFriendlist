@@ -1,4 +1,4 @@
--- Modules/PreviewMode.lua
+--[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua"); -- Modules/PreviewMode.lua
 -- Unified Preview Mode System for Screenshots and Demonstrations
 -- Version 1.0 - December 2025
 --
@@ -91,7 +91,7 @@ local MOCK_GAMES = {
 -- ============================================
 
 -- Generate mock Battle.net friend data
-local function GenerateMockBNetFriend(index, isOnline, options)
+local function GenerateMockBNetFriend(index, isOnline, options) Perfy_Trace(Perfy_GetTime(), "Enter", "GenerateMockBNetFriend file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:94:6");
 	options = options or {}
 	
 	local classInfo = MOCK_CLASSES[math.random(#MOCK_CLASSES)]
@@ -107,7 +107,7 @@ local function GenerateMockBNetFriend(index, isOnline, options)
 	local isDND = options.isDND or (isOnline and math.random(10) == 1)
 	local isAFK = options.isAFK or (isOnline and not isDND and math.random(8) == 1)
 	
-	return {
+	return Perfy_Trace_Passthrough("Leave", "GenerateMockBNetFriend file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:94:6", {
 		type = "bnet",
 		index = index,
 		bnetAccountID = 1000000 + index,
@@ -145,11 +145,11 @@ local function GenerateMockBNetFriend(index, isOnline, options)
 		gameName = isOnline and game.program ~= "WoW" and game.name or nil,
 		-- Mock marker
 		_isMock = true,
-	}
+	})
 end
 
 -- Generate mock WoW-only friend data
-local function GenerateMockWoWFriend(index, isOnline, options)
+local function GenerateMockWoWFriend(index, isOnline, options) Perfy_Trace(Perfy_GetTime(), "Enter", "GenerateMockWoWFriend file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:152:6");
 	options = options or {}
 	
 	local classInfo = MOCK_CLASSES[math.random(#MOCK_CLASSES)]
@@ -157,7 +157,7 @@ local function GenerateMockWoWFriend(index, isOnline, options)
 	local level = options.level or math.random(70, 80)
 	local name = options.name or MOCK_NAMES[(index % #MOCK_NAMES) + 1]
 	
-	return {
+	return Perfy_Trace_Passthrough("Leave", "GenerateMockWoWFriend file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:152:6", {
 		type = "wow",
 		index = index,
 		name = name .. "-Blackrock",
@@ -168,7 +168,7 @@ local function GenerateMockWoWFriend(index, isOnline, options)
 		notes = options.notes or (math.random(4) == 1 and "Met in dungeon" or nil),
 		-- Mock marker
 		_isMock = true,
-	}
+	})
 end
 
 -- ============================================
@@ -176,8 +176,8 @@ end
 -- ============================================
 
 -- Generate mock friend groups with friends assigned
-local function GenerateMockGroups()
-	return {
+local function GenerateMockGroups() Perfy_Trace(Perfy_GetTime(), "Enter", "GenerateMockGroups file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:179:6");
+	return Perfy_Trace_Passthrough("Leave", "GenerateMockGroups file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:179:6", {
 		-- Built-in Groups
 		{
 			id = "favorites",
@@ -243,7 +243,7 @@ local function GenerateMockGroups()
 			color = {r = 0.5, g = 0.5, b = 0.5}, -- Gray
 			icon = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon"
 		},
-	}
+	})
 end
 
 -- Group assignments for mock friends (by battleTag - must match MOCK_BATTLETAGS exactly!)
@@ -295,7 +295,7 @@ local MOCK_WOW_GROUP_ASSIGNMENTS = {
 -- MOCK WHO RESULTS
 -- ============================================
 
-local function GenerateMockWhoResults()
+local function GenerateMockWhoResults() Perfy_Trace(Perfy_GetTime(), "Enter", "GenerateMockWhoResults file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:298:6");
 	local results = {}
 	local numResults = math.random(15, 30)
 	
@@ -326,7 +326,7 @@ local function GenerateMockWhoResults()
 		}
 	end
 	
-	return results
+	Perfy_Trace(Perfy_GetTime(), "Leave", "GenerateMockWhoResults file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:298:6"); return results
 end
 
 -- ============================================
@@ -358,21 +358,21 @@ PreviewMode.MOCK_BATTLETAG = "YourName#1234"
 --[[
 	Get the BattleNet frame where the BattleTag is displayed
 ]]
-function PreviewMode:GetBattleNetFrame()
-	if not BetterFriendsFrame then return nil end
-	if not BetterFriendsFrame.FriendsTabHeader then return nil end
-	return BetterFriendsFrame.FriendsTabHeader.BattlenetFrame
+function PreviewMode:GetBattleNetFrame() Perfy_Trace(Perfy_GetTime(), "Enter", "PreviewMode:GetBattleNetFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:361:0");
+	if not BetterFriendsFrame then Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:GetBattleNetFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:361:0"); return nil end
+	if not BetterFriendsFrame.FriendsTabHeader then Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:GetBattleNetFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:361:0"); return nil end
+	return Perfy_Trace_Passthrough("Leave", "PreviewMode:GetBattleNetFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:361:0", BetterFriendsFrame.FriendsTabHeader.BattlenetFrame)
 end
 
 --[[
 	Apply mock BattleTag to the BattleNet frame
 	This hides the user's real BattleTag for screenshots
 ]]
-function PreviewMode:ApplyMockBattleTag()
+function PreviewMode:ApplyMockBattleTag() Perfy_Trace(Perfy_GetTime(), "Enter", "PreviewMode:ApplyMockBattleTag file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:371:0");
 	local bnetFrame = self:GetBattleNetFrame()
 	if not bnetFrame or not bnetFrame.Tag then 
 		-- BFL:DebugPrint("|cffff0000PreviewMode:|r BattleNetFrame not found!")
-		return 
+		Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:ApplyMockBattleTag file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:371:0"); return 
 	end
 	
 	-- Store original BattleTag text for restoration
@@ -396,7 +396,7 @@ function PreviewMode:ApplyMockBattleTag()
 	if FrameInitializer and not self.originalInitializeBattlenetFrame then
 		self.originalInitializeBattlenetFrame = FrameInitializer.InitializeBattlenetFrame
 		
-		FrameInitializer.InitializeBattlenetFrame = function(initSelf, frame)
+		FrameInitializer.InitializeBattlenetFrame = function(initSelf, frame) Perfy_Trace(Perfy_GetTime(), "Enter", "FrameInitializer.InitializeBattlenetFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:399:46");
 			-- Call original function first
 			if PreviewMode.originalInitializeBattlenetFrame then
 				PreviewMode.originalInitializeBattlenetFrame(initSelf, frame)
@@ -415,18 +415,18 @@ function PreviewMode:ApplyMockBattleTag()
 					bnFrame.Tag:SetText(mockTag)
 				end
 			end
-		end
+		Perfy_Trace(Perfy_GetTime(), "Leave", "FrameInitializer.InitializeBattlenetFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:399:46"); end
 	end
 	
 	-- BFL:DebugPrint("|cff00ffffPreviewMode:|r Applied mock BattleTag: " .. self.MOCK_BATTLETAG)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:ApplyMockBattleTag file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:371:0"); end
 
 --[[
 	Restore the original BattleTag
 ]]
-function PreviewMode:RestoreBattleTag()
+function PreviewMode:RestoreBattleTag() Perfy_Trace(Perfy_GetTime(), "Enter", "PreviewMode:RestoreBattleTag file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:427:0");
 	local bnetFrame = self:GetBattleNetFrame()
-	if not bnetFrame or not bnetFrame.Tag then return end
+	if not bnetFrame or not bnetFrame.Tag then Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:RestoreBattleTag file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:427:0"); return end
 	
 	-- Restore original InitializeBattlenetFrame function
 	local FrameInitializer = BFL:GetModule("FrameInitializer")
@@ -452,7 +452,7 @@ function PreviewMode:RestoreBattleTag()
 			bnetFrame.Tag:SetText(battleTag)
 		end
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:RestoreBattleTag file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:427:0"); end
 
 -- ============================================
 -- PREVIEW MODE ACTIVATION
@@ -462,10 +462,10 @@ end
 	Enable Preview Mode
 	Creates and displays comprehensive mock data for screenshots
 ]]
-function PreviewMode:Enable()
+function PreviewMode:Enable() Perfy_Trace(Perfy_GetTime(), "Enter", "PreviewMode:Enable file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:465:0");
 	if self.enabled then
 		print("|cffff8800BetterFriendlist:|r Preview mode is already enabled!")
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:Enable file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:465:0"); return
 	end
 	
 	print("|cff00ff00BetterFriendlist:|r |cffffd700Preview Mode ENABLED|r")
@@ -503,16 +503,16 @@ function PreviewMode:Enable()
 	print("  |cffffffff• BattleTag hidden (" .. self.MOCK_BATTLETAG .. ")|r")
 	print("")
 	print("|cffffcc00Tip:|r Use |cffffffff/bfl preview off|r to disable preview mode")
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:Enable file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:465:0"); end
 
 --[[
 	Disable Preview Mode
 	Restores real data and removes all mock content
 ]]
-function PreviewMode:Disable()
+function PreviewMode:Disable() Perfy_Trace(Perfy_GetTime(), "Enter", "PreviewMode:Disable file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:512:0");
 	if not self.enabled then
 		print("|cffff8800BetterFriendlist:|r Preview mode is not enabled!")
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:Disable file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:512:0"); return
 	end
 	
 	print("|cff00ff00BetterFriendlist:|r |cffffd700Preview Mode DISABLED|r")
@@ -584,24 +584,24 @@ function PreviewMode:Disable()
 	self:RefreshAllUI()
 	
 	print("|cff888888All preview data removed. Real friend data restored.|r")
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:Disable file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:512:0"); end
 
 --[[
 	Toggle Preview Mode
 ]]
-function PreviewMode:Toggle()
+function PreviewMode:Toggle() Perfy_Trace(Perfy_GetTime(), "Enter", "PreviewMode:Toggle file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:592:0");
 	if self.enabled then
 		self:Disable()
 	else
 		self:Enable()
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:Toggle file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:592:0"); end
 
 -- ============================================
 -- MOCK DATA GENERATION
 -- ============================================
 
-function PreviewMode:GenerateMockFriends()
+function PreviewMode:GenerateMockFriends() Perfy_Trace(Perfy_GetTime(), "Enter", "PreviewMode:GenerateMockFriends file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:604:0");
 	self.mockData.friends = {}
 	
 	-- Generate 8 online BNet friends with varied status
@@ -646,9 +646,9 @@ function PreviewMode:GenerateMockFriends()
 			name = MOCK_NAMES[i + 24],
 		}))
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:GenerateMockFriends file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:604:0"); end
 
-function PreviewMode:GenerateMockGroupsData()
+function PreviewMode:GenerateMockGroupsData() Perfy_Trace(Perfy_GetTime(), "Enter", "PreviewMode:GenerateMockGroupsData file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:651:0");
 	self.mockData.groups = GenerateMockGroups()
 	
 	-- Combine BNet and WoW group assignments
@@ -659,7 +659,7 @@ function PreviewMode:GenerateMockGroupsData()
 	for k, v in pairs(MOCK_WOW_GROUP_ASSIGNMENTS) do
 		self.mockData.groupAssignments[k] = v
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:GenerateMockGroupsData file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:651:0"); end
 
 -- ============================================
 -- MOCK DATA APPLICATION
@@ -669,9 +669,9 @@ end
 	Apply mock friends to the FriendsList module
 	This injects mock data into the friends display
 ]]
-function PreviewMode:ApplyMockFriends()
+function PreviewMode:ApplyMockFriends() Perfy_Trace(Perfy_GetTime(), "Enter", "PreviewMode:ApplyMockFriends file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:672:0");
 	local FriendsList = BFL:GetModule("FriendsList")
-	if not FriendsList then return end
+	if not FriendsList then Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:ApplyMockFriends file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:672:0"); return end
 	
 	-- Store the current friendsList generation function
 	if not self.originalUpdateFriendsList then
@@ -679,7 +679,7 @@ function PreviewMode:ApplyMockFriends()
 	end
 	
 	-- Override UpdateFriendsList to inject mock data
-	FriendsList.UpdateFriendsList = function(self)
+	FriendsList.UpdateFriendsList = function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "FriendsList.UpdateFriendsList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:682:33");
 		if PreviewMode.enabled and #PreviewMode.mockData.friends > 0 then
 			-- Use mock data instead of real API data
 			wipe(self.friendsList)
@@ -698,7 +698,7 @@ function PreviewMode:ApplyMockFriends()
 			-- Call original function for real data
 			PreviewMode.originalUpdateFriendsList(self)
 		end
-	end
+	Perfy_Trace(Perfy_GetTime(), "Leave", "FriendsList.UpdateFriendsList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:682:33"); end
 	
 	-- Apply mock groups to Groups module
 	-- IMPORTANT: We need to inject directly into Groups.groups table
@@ -735,7 +735,7 @@ function PreviewMode:ApplyMockFriends()
 		for _, group in ipairs(self.mockData.groups) do
 			table.insert(sortedMockGroups, group)
 		end
-		table.sort(sortedMockGroups, function(a, b) return (a.order or 999) < (b.order or 999) end)
+		table.sort(sortedMockGroups, function(a, b) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:738:31"); return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:738:31", (a.order or 999) < (b.order or 999)) end)
 		
 		for _, group in ipairs(sortedMockGroups) do
 			table.insert(mockOrder, group.id)
@@ -775,15 +775,15 @@ function PreviewMode:ApplyMockFriends()
 		
 		-- BFL:DebugPrint("|cff00ffffPreviewMode:|r Injected " .. injectedCount .. " friend group assignments into BetterFriendlistDB.friendGroups")
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:ApplyMockFriends file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:672:0"); end
 
 -- ============================================
 -- EXISTING MOCK SYSTEM INTEGRATION
 -- ============================================
 
-function PreviewMode:EnableRaidMock()
+function PreviewMode:EnableRaidMock() Perfy_Trace(Perfy_GetTime(), "Enter", "PreviewMode:EnableRaidMock file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:784:0");
 	local RaidFrame = BFL:GetModule("RaidFrame")
-	if not RaidFrame then return end
+	if not RaidFrame then Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:EnableRaidMock file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:784:0"); return end
 	
 	-- Store original UpdateRaidMembers function BEFORE activating mock
 	-- This is critical to prevent mock data from being wiped!
@@ -807,72 +807,72 @@ function PreviewMode:EnableRaidMock()
 	end
 	
 	-- Override UpdateRaidMembers to preserve mock data when mockEnabled is true
-	RaidFrame.UpdateRaidMembers = function(raidSelf)
+	RaidFrame.UpdateRaidMembers = function(raidSelf) Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame.UpdateRaidMembers file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:810:31");
 		-- If mock mode is active, don't touch the raidMembers data at all
 		if raidSelf.mockEnabled then
 			-- Mock data already in raidMembers - do nothing
 			-- BFL:DebugPrint("|cff00ffffPreviewMode:|r Skipping UpdateRaidMembers (mock mode active)")
-			return
+			Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame.UpdateRaidMembers file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:810:31"); return
 		end
 		
 		-- Not in mock mode - use original function
 		if PreviewMode.originalUpdateRaidMembers then
 			PreviewMode.originalUpdateRaidMembers(raidSelf)
 		end
-	end
+	Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame.UpdateRaidMembers file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:810:31"); end
 	
 	-- Override OnGroupLeft to preserve mock data when mockEnabled is true
-	RaidFrame.OnGroupLeft = function(raidSelf, ...)
+	RaidFrame.OnGroupLeft = function(raidSelf, ...) Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame.OnGroupLeft file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:825:25");
 		if raidSelf.mockEnabled then
 			-- Mock mode active - do not clear data
 			-- BFL:DebugPrint("|cff00ffffPreviewMode:|r Skipping OnGroupLeft (mock mode active)")
-			return
+			Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame.OnGroupLeft file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:825:25"); return
 		end
 		
 		-- Not in mock mode - use original function
 		if PreviewMode.originalOnGroupLeft then
 			PreviewMode.originalOnGroupLeft(raidSelf, ...)
 		end
-	end
+	Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame.OnGroupLeft file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:825:25"); end
 	
 	-- Override OnGroupJoined to preserve mock data when mockEnabled is true
-	RaidFrame.OnGroupJoined = function(raidSelf, ...)
+	RaidFrame.OnGroupJoined = function(raidSelf, ...) Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame.OnGroupJoined file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:839:27");
 		if raidSelf.mockEnabled then
 			-- Mock mode active - do not update from real group
 			-- BFL:DebugPrint("|cff00ffffPreviewMode:|r Skipping OnGroupJoined (mock mode active)")
-			return
+			Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame.OnGroupJoined file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:839:27"); return
 		end
 		
 		-- Not in mock mode - use original function
 		if PreviewMode.originalOnGroupJoined then
 			PreviewMode.originalOnGroupJoined(raidSelf, ...)
 		end
-	end
+	Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame.OnGroupJoined file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:839:27"); end
 	
 	-- Override OnRaidRosterUpdate to preserve mock data when mockEnabled is true  
-	RaidFrame.OnRaidRosterUpdate = function(raidSelf, ...)
+	RaidFrame.OnRaidRosterUpdate = function(raidSelf, ...) Perfy_Trace(Perfy_GetTime(), "Enter", "RaidFrame.OnRaidRosterUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:853:32");
 		if raidSelf.mockEnabled then
 			-- Mock mode active - do not update from real roster
 			-- BFL:DebugPrint("|cff00ffffPreviewMode:|r Skipping OnRaidRosterUpdate (mock mode active)")
-			return
+			Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame.OnRaidRosterUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:853:32"); return
 		end
 		
 		-- Not in mock mode - use original function
 		if PreviewMode.originalOnRaidRosterUpdate then
 			PreviewMode.originalOnRaidRosterUpdate(raidSelf, ...)
 		end
-	end
+	Perfy_Trace(Perfy_GetTime(), "Leave", "RaidFrame.OnRaidRosterUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:853:32"); end
 	
 	-- Now activate the mock preset
 	if RaidFrame.CreateMockPreset_Standard then
 		RaidFrame:CreateMockPreset_Standard()
 		-- BFL:DebugPrint("|cff00ffffPreviewMode:|r Raid mock enabled with event overrides")
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:EnableRaidMock file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:784:0"); end
 
-function PreviewMode:DisableRaidMock()
+function PreviewMode:DisableRaidMock() Perfy_Trace(Perfy_GetTime(), "Enter", "PreviewMode:DisableRaidMock file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:873:0");
 	local RaidFrame = BFL:GetModule("RaidFrame")
-	if not RaidFrame then return end
+	if not RaidFrame then Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:DisableRaidMock file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:873:0"); return end
 	
 	-- Restore original UpdateRaidMembers function
 	if self.originalUpdateRaidMembers then
@@ -902,23 +902,23 @@ function PreviewMode:DisableRaidMock()
 	if RaidFrame.ClearMockData then
 		RaidFrame:ClearMockData()
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:DisableRaidMock file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:873:0"); end
 
-function PreviewMode:EnableQuickJoinMock()
+function PreviewMode:EnableQuickJoinMock() Perfy_Trace(Perfy_GetTime(), "Enter", "PreviewMode:EnableQuickJoinMock file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:907:0");
 	local QuickJoin = BFL:GetModule("QuickJoin")
 	if QuickJoin and QuickJoin.CreateMockPreset_All then
 		QuickJoin:CreateMockPreset_All()
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:EnableQuickJoinMock file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:907:0"); end
 
-function PreviewMode:DisableQuickJoinMock()
+function PreviewMode:DisableQuickJoinMock() Perfy_Trace(Perfy_GetTime(), "Enter", "PreviewMode:DisableQuickJoinMock file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:914:0");
 	local QuickJoin = BFL:GetModule("QuickJoin")
 	if QuickJoin and QuickJoin.ClearMockGroups then
 		QuickJoin:ClearMockGroups()
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:DisableQuickJoinMock file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:914:0"); end
 
-function PreviewMode:EnableWhoMock()
+function PreviewMode:EnableWhoMock() Perfy_Trace(Perfy_GetTime(), "Enter", "PreviewMode:EnableWhoMock file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:921:0");
 	-- Generate mock WHO results
 	self.mockData.whoResults = GenerateMockWhoResults()
 	
@@ -931,31 +931,31 @@ function PreviewMode:EnableWhoMock()
 			-- We'll hook into the WhoFrame update instead
 		end
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:EnableWhoMock file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:921:0"); end
 
-function PreviewMode:DisableWhoMock()
+function PreviewMode:DisableWhoMock() Perfy_Trace(Perfy_GetTime(), "Enter", "PreviewMode:DisableWhoMock file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:936:0");
 	self.mockData.whoResults = {}
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:DisableWhoMock file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:936:0"); end
 
-function PreviewMode:EnableInviteMock()
+function PreviewMode:EnableInviteMock() Perfy_Trace(Perfy_GetTime(), "Enter", "PreviewMode:EnableInviteMock file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:940:0");
 	-- Use existing mock invite system
 	BFL.MockFriendInvites.enabled = true
 	BFL.MockFriendInvites.invites = {
 		{inviteID = 1000001, accountName = "NewFriend#1234"},
 		{inviteID = 1000002, accountName = "GuildRecruit#5678"},
 	}
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:EnableInviteMock file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:940:0"); end
 
-function PreviewMode:DisableInviteMock()
+function PreviewMode:DisableInviteMock() Perfy_Trace(Perfy_GetTime(), "Enter", "PreviewMode:DisableInviteMock file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:949:0");
 	BFL.MockFriendInvites.enabled = false
 	BFL.MockFriendInvites.invites = {}
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:DisableInviteMock file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:949:0"); end
 
 -- ============================================
 -- UI REFRESH
 -- ============================================
 
-function PreviewMode:RefreshAllUI()
+function PreviewMode:RefreshAllUI() Perfy_Trace(Perfy_GetTime(), "Enter", "PreviewMode:RefreshAllUI file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:958:0");
 	-- Refresh friends list
 	local FriendsList = BFL:GetModule("FriendsList")
 	if FriendsList and FriendsList.UpdateFriendsList then
@@ -991,22 +991,22 @@ function PreviewMode:RefreshAllUI()
 			_G.ToggleBetterFriendsFrame()
 		end
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:RefreshAllUI file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:958:0"); end
 
 -- ============================================
 -- MODULE INITIALIZATION
 -- ============================================
 
-function PreviewMode:Initialize()
+function PreviewMode:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "PreviewMode:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:1000:0");
 	-- Module is ready
 	-- BFL:DebugPrint("|cff00ffffBFL:PreviewMode:|r Initialized")
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:1000:0"); end
 
 -- ============================================
 -- SLASH COMMAND HANDLER (Called from Core.lua)
 -- ============================================
 
-function PreviewMode:HandleCommand(args)
+function PreviewMode:HandleCommand(args) Perfy_Trace(Perfy_GetTime(), "Enter", "PreviewMode:HandleCommand file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:1009:0");
 	local cmd = args and args:lower() or ""
 	
 	if cmd == "" or cmd == "on" or cmd == "enable" then
@@ -1034,7 +1034,7 @@ function PreviewMode:HandleCommand(args)
 		print("|cff888888Preview mode displays realistic mock data for screenshots.|r")
 		print("|cff888888It includes: Friends, Groups, Raid, QuickJoin, and Invites.|r")
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PreviewMode:HandleCommand file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua:1009:0"); end
 
 -- Return module
-return PreviewMode
+Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/PreviewMode.lua"); return PreviewMode

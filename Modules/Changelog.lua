@@ -1,4 +1,4 @@
--- Modules/Changelog.lua
+--[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua"); -- Modules/Changelog.lua
 -- Displays the changelog in a scrollable window
 
 local ADDON_NAME, BFL = ...
@@ -1458,15 +1458,15 @@ This is the first stable release of BetterFriendlist, representing complete feat
 ]]
 
 -- Helper to set title safely across versions
-local function SetTitle(frame, title)
+local function SetTitle(frame, title) Perfy_Trace(Perfy_GetTime(), "Enter", "SetTitle file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1461:6");
     if frame.TitleText and frame.TitleText.SetText then
         frame.TitleText:SetText(title)
     elseif frame.TitleContainer and frame.TitleContainer.TitleText then
         frame.TitleContainer.TitleText:SetText(title)
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "SetTitle file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1461:6"); end
 
-local function StripEmojis(text)
+local function StripEmojis(text) Perfy_Trace(Perfy_GetTime(), "Enter", "StripEmojis file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1469:6");
     -- 1. Replace specific symbols
     text = text:gsub("→", ">")
     
@@ -1482,10 +1482,10 @@ local function StripEmojis(text)
     -- 3. Catch-all for 4-byte characters (Generic Emoji range)
     text = text:gsub("[\240-\247][\128-\191][\128-\191][\128-\191]", "")
     
-    return text
+    Perfy_Trace(Perfy_GetTime(), "Leave", "StripEmojis file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1469:6"); return text
 end
 
-local function CleanLine(line)
+local function CleanLine(line) Perfy_Trace(Perfy_GetTime(), "Enter", "CleanLine file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1488:6");
     -- Remove comments
     line = line:gsub("/%*.-%*/", "")
     -- Remove emojis
@@ -1493,18 +1493,18 @@ local function CleanLine(line)
     -- Remove backticks
     line = line:gsub("`", "")
     -- Trim whitespace
-    return line:gsub("^%s+", "")
+    return Perfy_Trace_Passthrough("Leave", "CleanLine file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1488:6", line:gsub("^%s+", ""))
 end
 
-local function FormatInline(text)
+local function FormatInline(text) Perfy_Trace(Perfy_GetTime(), "Enter", "FormatInline file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1499:6");
     -- Bold **text**
     text = text:gsub("%*%*(.-)%*%*", "|cffffffff%1|r")
     -- Links
     text = text:gsub("%[(.-)%]%((.-)%)", "|cff66bbff%1|r")
-    return text
+    Perfy_Trace(Perfy_GetTime(), "Leave", "FormatInline file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1499:6"); return text
 end
 
-local function ParseChangelog(text)
+local function ParseChangelog(text) Perfy_Trace(Perfy_GetTime(), "Enter", "ParseChangelog file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1507:6");
     local entries = {}
     local currentEntry = nil
     
@@ -1561,43 +1561,43 @@ local function ParseChangelog(text)
         table.insert(entries, currentEntry)
     end
     
-    return entries
+    Perfy_Trace(Perfy_GetTime(), "Leave", "ParseChangelog file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1507:6"); return entries
 end
 
-local function RecalculateHeight(contentFrame, entryFrames)
+local function RecalculateHeight(contentFrame, entryFrames) Perfy_Trace(Perfy_GetTime(), "Enter", "RecalculateHeight file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1567:6");
     local totalHeight = 10
     for _, frame in ipairs(entryFrames) do
         totalHeight = totalHeight + frame:GetHeight() + 5
     end
     contentFrame:SetHeight(totalHeight)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RecalculateHeight file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1567:6"); end
 
-local function ShowCopyDialog(url, title)
+local function ShowCopyDialog(url, title) Perfy_Trace(Perfy_GetTime(), "Enter", "ShowCopyDialog file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1575:6");
     StaticPopupDialogs["BETTERFRIENDLIST_COPY_URL"] = {
         text = title or "Copy URL",
         button1 = "Close",
         hasEditBox = true,
         editBoxWidth = 350,
-        OnShow = function(self)
+        OnShow = function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1581:17");
             self.EditBox:SetText(url)
             self.EditBox:SetFocus()
             self.EditBox:HighlightText()
-        end,
-        EditBoxOnEnterPressed = function(self)
+        Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1581:17"); end,
+        EditBoxOnEnterPressed = function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1586:32");
             self:GetParent():Hide()
-        end,
-        EditBoxOnEscapePressed = function(self)
+        Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1586:32"); end,
+        EditBoxOnEscapePressed = function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1589:33");
             self:GetParent():Hide()
-        end,
+        Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1589:33"); end,
         timeout = 0,
         whileDead = true,
         hideOnEscape = true,
         preferredIndex = 3,
     }
     StaticPopup_Show("BETTERFRIENDLIST_COPY_URL")
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "ShowCopyDialog file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1575:6"); end
 
-function Changelog:Initialize()
+function Changelog:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "Changelog:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1600:0");
     -- Setup PortraitButton for Classic - create entirely in Lua for full control
     if BFL.IsClassic and BetterFriendsFrame then
         self:SetupClassicPortraitButton()
@@ -1605,12 +1605,12 @@ function Changelog:Initialize()
     
     -- Check version and show glow if needed
     self:CheckVersion()
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "Changelog:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1600:0"); end
 
-function Changelog:SetupClassicPortraitButton()
+function Changelog:SetupClassicPortraitButton() Perfy_Trace(Perfy_GetTime(), "Enter", "Changelog:SetupClassicPortraitButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1610:0");
     local frame = BetterFriendsFrame
     if not frame then 
-        return 
+        Perfy_Trace(Perfy_GetTime(), "Leave", "Changelog:SetupClassicPortraitButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1610:0"); return 
     end
     
     -- Hide the default portrait from ButtonFrameTemplate
@@ -1669,24 +1669,24 @@ function Changelog:SetupClassicPortraitButton()
     button:SetPoint("TOPLEFT", -5, 7)
     
     -- Click handler
-    button:SetScript("OnClick", function(self, btn)
+    button:SetScript("OnClick", function(self, btn) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1672:32");
         local Changelog = BFL:GetModule("Changelog")
         if Changelog then
             Changelog:ToggleChangelog()
         end
-    end)
+    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1672:32"); end)
     
     -- Hover handlers
-    button:SetScript("OnEnter", function(self)
+    button:SetScript("OnEnter", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1680:32");
         local Changelog = BFL:GetModule("Changelog")
         if Changelog then
             Changelog:OnPortraitEnter(self)
         end
-    end)
+    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1680:32"); end)
     
-    button:SetScript("OnLeave", function(self)
+    button:SetScript("OnLeave", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1687:32");
         GameTooltip:Hide()
-    end)
+    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1687:32"); end)
     
     -- No need to manual sync visibility if it's a child, but let's be safe if it gets parented elsewhere in future
     -- Actually, child frame automatically hides when parent hides. 
@@ -1697,9 +1697,9 @@ function Changelog:SetupClassicPortraitButton()
     frame.PortraitIcon = icon
     
     -- BFL:DebugPrint("Changelog", "Classic PortraitButton created")
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "Changelog:SetupClassicPortraitButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1610:0"); end
 
-function Changelog:CheckVersion()
+function Changelog:CheckVersion() Perfy_Trace(Perfy_GetTime(), "Enter", "Changelog:CheckVersion file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1702:0");
     local DB = BFL:GetModule("DB")
     local lastVersion = DB:Get("lastChangelogVersion", "0.0.0")
     local currentVersion = BFL.VERSION
@@ -1709,9 +1709,9 @@ function Changelog:CheckVersion()
     else
         self:ShowGlow(false)
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "Changelog:CheckVersion file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1702:0"); end
 
-function Changelog:ShowGlow(show)
+function Changelog:ShowGlow(show) Perfy_Trace(Perfy_GetTime(), "Enter", "Changelog:ShowGlow file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1714:0");
     if BetterFriendsFrame and BetterFriendsFrame.PortraitButton then
         local button = BetterFriendsFrame.PortraitButton
         
@@ -1743,9 +1743,9 @@ function Changelog:ShowGlow(show)
             if button.NewLabel then button.NewLabel:Hide() end
         end
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "Changelog:ShowGlow file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1714:0"); end
 
-function Changelog:ToggleChangelog()
+function Changelog:ToggleChangelog() Perfy_Trace(Perfy_GetTime(), "Enter", "Changelog:ToggleChangelog file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1748:0");
     if not changelogFrame then
         self:CreateChangelogWindow()
     end
@@ -1759,9 +1759,9 @@ function Changelog:ToggleChangelog()
         DB:Set("lastChangelogVersion", BFL.VERSION)
         self:ShowGlow(false)
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "Changelog:ToggleChangelog file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1748:0"); end
 
-function Changelog:OnPortraitEnter(button)
+function Changelog:OnPortraitEnter(button) Perfy_Trace(Perfy_GetTime(), "Enter", "Changelog:OnPortraitEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1764:0");
     GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
     GameTooltip:SetText("BetterFriendlist " .. (BFL.VERSION or ""), 1, 0.82, 0)
     
@@ -1776,13 +1776,13 @@ function Changelog:OnPortraitEnter(button)
     end
     
     GameTooltip:Show()
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "Changelog:OnPortraitEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1764:0"); end
 
-function Changelog:Show()
+function Changelog:Show() Perfy_Trace(Perfy_GetTime(), "Enter", "Changelog:Show file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1781:0");
     self:ToggleChangelog()
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "Changelog:Show file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1781:0"); end
 
-function Changelog:CreateChangelogWindow()
+function Changelog:CreateChangelogWindow() Perfy_Trace(Perfy_GetTime(), "Enter", "Changelog:CreateChangelogWindow file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1785:0");
     -- Use ButtonFrameTemplate to match Settings window
     local frame = CreateFrame("Frame", "BetterFriendlistChangelogFrame", UIParent, "ButtonFrameTemplate")
     frame:SetSize(600, 500)
@@ -1866,9 +1866,9 @@ function Changelog:CreateChangelogWindow()
     dcMask:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\discord.blp")
     dcIcon:AddMaskTexture(dcMask)
     
-    discordBtn:SetScript("OnClick", function()
+    discordBtn:SetScript("OnClick", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1869:36");
         ShowCopyDialog("https://discord.gg/dpaV8vh3w3", L.CHANGELOG_POPUP_DISCORD)
-    end)
+    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1869:36"); end)
 
     -- GitHub Button (Left of Discord)
     local githubBtn = CreateFrame("Button", nil, headerFrame, "UIPanelButtonTemplate")
@@ -1888,9 +1888,9 @@ function Changelog:CreateChangelogWindow()
     ghMask:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\github.blp")
     ghIcon:AddMaskTexture(ghMask)
     
-    githubBtn:SetScript("OnClick", function()
+    githubBtn:SetScript("OnClick", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1891:35");
         ShowCopyDialog("https://github.com/Hayato2846/BetterFriendlist/issues", L.CHANGELOG_POPUP_GITHUB)
-    end)
+    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1891:35"); end)
 
     -- Ko-fi Button (Left of GitHub)
     local kofiBtn = CreateFrame("Button", nil, headerFrame, "UIPanelButtonTemplate")
@@ -1910,9 +1910,9 @@ function Changelog:CreateChangelogWindow()
     kofiMask:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\kofi.blp")
     kofiIcon:AddMaskTexture(kofiMask)
     
-    kofiBtn:SetScript("OnClick", function()
+    kofiBtn:SetScript("OnClick", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1913:33");
         ShowCopyDialog("https://ko-fi.com/hayato2846", L.CHANGELOG_POPUP_SUPPORT)
-    end)
+    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1913:33"); end)
 
     -- ScrollFrame
     local scrollFrame
@@ -2051,7 +2051,7 @@ function Changelog:CreateChangelogWindow()
         -- Toggle Logic
         local isExpanded = (i == 1)
         
-        local function UpdateState()
+        local function UpdateState() Perfy_Trace(Perfy_GetTime(), "Enter", "UpdateState file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:2054:14");
             if isExpanded then
                 entryContent:Show()
                 entryFrame:SetHeight(20 + 5 + contentHeight)
@@ -2061,13 +2061,13 @@ function Changelog:CreateChangelogWindow()
                 entryFrame:SetHeight(20)
                 icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\chevron-right.blp")
             end
-        end
+        Perfy_Trace(Perfy_GetTime(), "Leave", "UpdateState file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:2054:14"); end
         
-        header:SetScript("OnClick", function()
+        header:SetScript("OnClick", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:2066:36");
             isExpanded = not isExpanded
             UpdateState()
             RecalculateHeight(content, entryFrames)
-        end)
+        Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:2066:36"); end)
         
         UpdateState()
         
@@ -2079,4 +2079,6 @@ function Changelog:CreateChangelogWindow()
     
     changelogFrame = frame
     frame:Hide()
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "Changelog:CreateChangelogWindow file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua:1785:0"); end
+
+Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Changelog.lua");

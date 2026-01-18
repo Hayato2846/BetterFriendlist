@@ -1,4 +1,4 @@
--- Utils/ClassicCompat.lua
+--[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua"); -- Utils/ClassicCompat.lua
 -- Compatibility Layer for Classic Era and MoP Classic
 -- Provides wrapper functions for APIs that differ between Retail and Classic
 -- Version 1.0 - December 2025
@@ -15,22 +15,22 @@ local Compat = BFL.Compat
 -- Retail 11.0+: C_AddOns.GetAddOnMetadata(addon, field)
 -- Classic: GetAddOnMetadata(addon, field) (global function)
 
-function Compat.GetAddOnMetadata(addon, field)
+function Compat.GetAddOnMetadata(addon, field) Perfy_Trace(Perfy_GetTime(), "Enter", "Compat.GetAddOnMetadata file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:18:0");
     if C_AddOns and C_AddOns.GetAddOnMetadata then
-        return C_AddOns.GetAddOnMetadata(addon, field)
+        return Perfy_Trace_Passthrough("Leave", "Compat.GetAddOnMetadata file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:18:0", C_AddOns.GetAddOnMetadata(addon, field))
     elseif GetAddOnMetadata then
-        return GetAddOnMetadata(addon, field)
+        return Perfy_Trace_Passthrough("Leave", "Compat.GetAddOnMetadata file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:18:0", GetAddOnMetadata(addon, field))
     end
-    return nil
+    Perfy_Trace(Perfy_GetTime(), "Leave", "Compat.GetAddOnMetadata file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:18:0"); return nil
 end
 
-function Compat.GetAddOnInfo(addon)
+function Compat.GetAddOnInfo(addon) Perfy_Trace(Perfy_GetTime(), "Enter", "Compat.GetAddOnInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:27:0");
     if C_AddOns and C_AddOns.GetAddOnInfo then
-        return C_AddOns.GetAddOnInfo(addon)
+        return Perfy_Trace_Passthrough("Leave", "Compat.GetAddOnInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:27:0", C_AddOns.GetAddOnInfo(addon))
     elseif GetAddOnInfo then
-        return GetAddOnInfo(addon)
+        return Perfy_Trace_Passthrough("Leave", "Compat.GetAddOnInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:27:0", GetAddOnInfo(addon))
     end
-    return nil
+    Perfy_Trace(Perfy_GetTime(), "Leave", "Compat.GetAddOnInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:27:0"); return nil
 end
 
 ------------------------------------------------------------
@@ -47,7 +47,7 @@ local dropdownCounter = 1
 -- @param menuGenerator: Function that returns menu items
 --   For Retail: Standard MenuUtil generator function
 --   For Classic: Should return a table in EasyMenu format
-function Compat.CreateContextMenu(owner, menuGenerator)
+function Compat.CreateContextMenu(owner, menuGenerator) Perfy_Trace(Perfy_GetTime(), "Enter", "Compat.CreateContextMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:50:0");
     if MenuUtil and MenuUtil.CreateContextMenu then
         -- Retail: Modern Menu API
         MenuUtil.CreateContextMenu(owner, menuGenerator)
@@ -62,12 +62,12 @@ function Compat.CreateContextMenu(owner, menuGenerator)
             EasyMenu(menuTable, menuFrame, owner or "cursor", 0, 0, "MENU")
         end
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "Compat.CreateContextMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:50:0"); end
 
 -- Hook into UnitPopup menus
 -- @param tag: Menu tag (e.g., "FRIEND", "BN_FRIEND")
 -- @param callback: Function to call when menu opens
-function Compat.ModifyMenu(tag, callback)
+function Compat.ModifyMenu(tag, callback) Perfy_Trace(Perfy_GetTime(), "Enter", "Compat.ModifyMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:70:0");
     if Menu and Menu.ModifyMenu then
         -- Retail: Direct hook
         Menu.ModifyMenu(tag, callback)
@@ -77,11 +77,11 @@ function Compat.ModifyMenu(tag, callback)
         -- This is handled per-case in individual modules
         -- BFL:DebugPrint("|cffffcc00BFL Compat:|r Menu.ModifyMenu not available in Classic")
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "Compat.ModifyMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:70:0"); end
 
 -- Convert Retail menu generator to Classic EasyMenu format
 -- Helper for modules that need to support both
-function Compat.CreateEasyMenuTable(items)
+function Compat.CreateEasyMenuTable(items) Perfy_Trace(Perfy_GetTime(), "Enter", "Compat.CreateEasyMenuTable file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:84:0");
     local menuTable = {}
     for _, item in ipairs(items) do
         local menuItem = {
@@ -98,7 +98,7 @@ function Compat.CreateEasyMenuTable(items)
     end
     -- Add cancel button
     table.insert(menuTable, { text = CANCEL, notCheckable = true })
-    return menuTable
+    Perfy_Trace(Perfy_GetTime(), "Leave", "Compat.CreateEasyMenuTable file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:84:0"); return menuTable
 end
 
 ------------------------------------------------------------
@@ -107,7 +107,7 @@ end
 -- Retail 11.0+: UnitPopup_OpenMenu(menuType, contextData)
 -- Classic: UnitPopup_ShowMenu(dropdown, which, unit, name, userData)
 
-function Compat.OpenUnitPopupMenu(menuType, contextData)
+function Compat.OpenUnitPopupMenu(menuType, contextData) Perfy_Trace(Perfy_GetTime(), "Enter", "Compat.OpenUnitPopupMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:110:0");
     if UnitPopup_OpenMenu then
         -- Retail: Modern API
         UnitPopup_OpenMenu(menuType, contextData)
@@ -126,7 +126,7 @@ function Compat.OpenUnitPopupMenu(menuType, contextData)
             UnitPopup_ShowMenu(dropdown, menuType, unit, name, contextData)
         end
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "Compat.OpenUnitPopupMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:110:0"); end
 
 ------------------------------------------------------------
 -- Dropdown Compatibility
@@ -139,54 +139,54 @@ end
 -- @param name: Unique name for the dropdown
 -- @param width: Dropdown width
 -- @return dropdown frame
-function Compat.CreateDropdown(parent, name, width)
+function Compat.CreateDropdown(parent, name, width) Perfy_Trace(Perfy_GetTime(), "Enter", "Compat.CreateDropdown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:142:0");
     width = width or 150
     
     if BFL.HasModernDropdown then
         -- Retail: Modern dropdown
         local dropdown = CreateFrame("DropdownButton", name, parent, "WowStyle1DropdownTemplate")
         dropdown:SetWidth(width)
-        return dropdown
+        Perfy_Trace(Perfy_GetTime(), "Leave", "Compat.CreateDropdown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:142:0"); return dropdown
     else
         -- Classic: UIDropDownMenu
         local dropdown = CreateFrame("Frame", name or ("BFLDropdown" .. dropdownCounter), parent, "UIDropDownMenuTemplate")
         dropdownCounter = dropdownCounter + 1
         UIDropDownMenu_SetWidth(dropdown, width)
-        return dropdown
+        Perfy_Trace(Perfy_GetTime(), "Leave", "Compat.CreateDropdown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:142:0"); return dropdown
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "Compat.CreateDropdown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:142:0"); end
 
 -- Initialize dropdown with options
 -- @param dropdown: The dropdown frame
 -- @param options: Table with { labels = {...}, values = {...} }
 -- @param getter: Function(value) -> boolean (is this value selected?)
 -- @param setter: Function(value) called when selection changes
-function Compat.InitializeDropdown(dropdown, options, getter, setter)
+function Compat.InitializeDropdown(dropdown, options, getter, setter) Perfy_Trace(Perfy_GetTime(), "Enter", "Compat.InitializeDropdown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:164:0");
     if BFL.HasModernDropdown and dropdown.SetupMenu then
         -- Retail: Modern API
-        dropdown:SetupMenu(function(dropdown, rootDescription)
+        dropdown:SetupMenu(function(dropdown, rootDescription) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:167:27");
             for i, label in ipairs(options.labels) do
                 local value = options.values[i]
                 rootDescription:CreateRadio(label, getter, setter, value)
             end
-        end)
+        Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:167:27"); end)
     else
         -- Classic: UIDropDownMenu
-        UIDropDownMenu_Initialize(dropdown, function(self, level, menuList)
+        UIDropDownMenu_Initialize(dropdown, function(self, level, menuList) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:175:44");
             level = level or 1
             for i, label in ipairs(options.labels) do
                 local info = UIDropDownMenu_CreateInfo()
                 info.text = label
                 info.value = options.values[i]
                 info.checked = getter(options.values[i])
-                info.func = function(self)
+                info.func = function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "info.func file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:182:28");
                     setter(self.value)
                     UIDropDownMenu_SetSelectedValue(dropdown, self.value)
                     CloseDropDownMenus()
-                end
+                Perfy_Trace(Perfy_GetTime(), "Leave", "info.func file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:182:28"); end
                 UIDropDownMenu_AddButton(info, level)
             end
-        end)
+        Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:175:44"); end)
         
         -- Set initial selection
         for i, value in ipairs(options.values) do
@@ -197,7 +197,7 @@ function Compat.InitializeDropdown(dropdown, options, getter, setter)
             end
         end
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "Compat.InitializeDropdown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:164:0"); end
 
 ------------------------------------------------------------
 -- ColorPicker Compatibility
@@ -205,25 +205,25 @@ end
 -- Retail 10.1+: ColorPickerFrame:SetupColorPickerAndShow(info)
 -- Classic: ColorPickerFrame.func = ..., ColorPickerFrame:Show()
 
-function Compat.ShowColorPicker(r, g, b, a, callback, cancelCallback)
+function Compat.ShowColorPicker(r, g, b, a, callback, cancelCallback) Perfy_Trace(Perfy_GetTime(), "Enter", "Compat.ShowColorPicker file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:208:0");
     if BFL.HasModernColorPicker and ColorPickerFrame.SetupColorPickerAndShow then
         -- Retail: Modern API
         local info = {
-            swatchFunc = function()
+            swatchFunc = function() Perfy_Trace(Perfy_GetTime(), "Enter", "info.swatchFunc file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:212:25");
                 local newR, newG, newB = ColorPickerFrame:GetColorRGB()
                 local newA = ColorPickerFrame:GetColorAlpha()
                 callback(newR, newG, newB, newA)
-            end,
-            cancelFunc = function()
+            Perfy_Trace(Perfy_GetTime(), "Leave", "info.swatchFunc file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:212:25"); end,
+            cancelFunc = function() Perfy_Trace(Perfy_GetTime(), "Enter", "info.cancelFunc file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:217:25");
                 if cancelCallback then
                     cancelCallback(r, g, b, a)
                 end
-            end,
-            opacityFunc = function()
+            Perfy_Trace(Perfy_GetTime(), "Leave", "info.cancelFunc file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:217:25"); end,
+            opacityFunc = function() Perfy_Trace(Perfy_GetTime(), "Enter", "info.opacityFunc file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:222:26");
                 local newR, newG, newB = ColorPickerFrame:GetColorRGB()
                 local newA = ColorPickerFrame:GetColorAlpha()
                 callback(newR, newG, newB, newA)
-            end,
+            Perfy_Trace(Perfy_GetTime(), "Leave", "info.opacityFunc file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:222:26"); end,
             r = r,
             g = g,
             b = b,
@@ -233,15 +233,15 @@ function Compat.ShowColorPicker(r, g, b, a, callback, cancelCallback)
         ColorPickerFrame:SetupColorPickerAndShow(info)
     else
         -- Classic: Legacy API
-        ColorPickerFrame.func = function()
+        ColorPickerFrame.func = function() Perfy_Trace(Perfy_GetTime(), "Enter", "ColorPickerFrame.func file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:236:32");
             local newR, newG, newB = ColorPickerFrame:GetColorRGB()
             callback(newR, newG, newB, a)
-        end
-        ColorPickerFrame.cancelFunc = function()
+        Perfy_Trace(Perfy_GetTime(), "Leave", "ColorPickerFrame.func file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:236:32"); end
+        ColorPickerFrame.cancelFunc = function() Perfy_Trace(Perfy_GetTime(), "Enter", "ColorPickerFrame.cancelFunc file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:240:38");
             if cancelCallback then
                 cancelCallback(r, g, b, a)
             end
-        end
+        Perfy_Trace(Perfy_GetTime(), "Leave", "ColorPickerFrame.cancelFunc file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:240:38"); end
         ColorPickerFrame.hasOpacity = (a ~= nil)
         if a then
             ColorPickerFrame.opacity = 1 - a  -- Classic uses inverted opacity
@@ -251,7 +251,7 @@ function Compat.ShowColorPicker(r, g, b, a, callback, cancelCallback)
         ColorPickerFrame.previousValues = { r = r, g = g, b = b, a = a }
         ColorPickerFrame:Show()
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "Compat.ShowColorPicker file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:208:0"); end
 
 ------------------------------------------------------------
 -- C_BattleNet Compatibility
@@ -262,10 +262,10 @@ end
 -- Get BNet friend info with consistent return format
 -- @param friendIndex: 1-based friend index
 -- @return accountInfo table (Retail format)
-function Compat.GetBNetFriendInfo(friendIndex)
+function Compat.GetBNetFriendInfo(friendIndex) Perfy_Trace(Perfy_GetTime(), "Enter", "Compat.GetBNetFriendInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:265:0");
     if C_BattleNet and C_BattleNet.GetFriendAccountInfo then
         -- Modern API (available in Retail AND Classic)
-        return C_BattleNet.GetFriendAccountInfo(friendIndex)
+        return Perfy_Trace_Passthrough("Leave", "Compat.GetBNetFriendInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:265:0", C_BattleNet.GetFriendAccountInfo(friendIndex))
     elseif BNGetFriendInfo then
         -- Legacy Classic API (fallback, rarely needed)
         local presenceID, presenceName, battleTag, isBattleTagPresence, 
@@ -273,7 +273,7 @@ function Compat.GetBNetFriendInfo(friendIndex)
               messageText, noteText, isRIDFriend, broadcastTime, canSoR = BNGetFriendInfo(friendIndex)
         
         -- Convert to Retail-style table
-        return {
+        return Perfy_Trace_Passthrough("Leave", "Compat.GetBNetFriendInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:265:0", {
             bnetAccountID = presenceID,
             accountName = presenceName,
             battleTag = battleTag,
@@ -289,15 +289,15 @@ function Compat.GetBNetFriendInfo(friendIndex)
             isDND = isDND,
             customMessage = messageText,
             note = noteText,
-        }
+        })
     end
-    return nil
+    Perfy_Trace(Perfy_GetTime(), "Leave", "Compat.GetBNetFriendInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:265:0"); return nil
 end
 
 -- Get game account info for a BNet friend
-function Compat.GetBNetFriendGameAccountInfo(friendIndex, gameAccountIndex)
+function Compat.GetBNetFriendGameAccountInfo(friendIndex, gameAccountIndex) Perfy_Trace(Perfy_GetTime(), "Enter", "Compat.GetBNetFriendGameAccountInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:298:0");
     if C_BattleNet and C_BattleNet.GetFriendGameAccountInfo then
-        return C_BattleNet.GetFriendGameAccountInfo(friendIndex, gameAccountIndex)
+        return Perfy_Trace_Passthrough("Leave", "Compat.GetBNetFriendGameAccountInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:298:0", C_BattleNet.GetFriendGameAccountInfo(friendIndex, gameAccountIndex))
     elseif BNGetFriendGameAccountInfo then
         -- Legacy API
         local hasFocus, characterName, client, realmName, realmID, faction, race, class, 
@@ -305,7 +305,7 @@ function Compat.GetBNetFriendGameAccountInfo(friendIndex, gameAccountIndex)
               gameAccountID, bnetAccountID, isGameAFK, isGameBusy, playerGuid, wowProjectID, 
               isWowMobile, canSoR, characterDisplayName, displayNameOverride = BNGetFriendGameAccountInfo(friendIndex, gameAccountIndex)
         
-        return {
+        return Perfy_Trace_Passthrough("Leave", "Compat.GetBNetFriendGameAccountInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:298:0", {
             hasFocus = hasFocus,
             characterName = characterName,
             clientProgram = client,
@@ -326,9 +326,9 @@ function Compat.GetBNetFriendGameAccountInfo(friendIndex, gameAccountIndex)
             playerGuid = playerGuid,
             wowProjectID = wowProjectID,
             isWowMobile = isWowMobile,
-        }
+        })
     end
-    return nil
+    Perfy_Trace(Perfy_GetTime(), "Leave", "Compat.GetBNetFriendGameAccountInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:298:0"); return nil
 end
 
 ------------------------------------------------------------
@@ -337,29 +337,29 @@ end
 -- This API exists ONLY in TWW (11.0.7+)
 -- In Classic/MoP: Return empty/disabled
 
-function Compat.IsRecentAlliesAvailable()
-    return C_RecentAllies ~= nil and C_RecentAllies.IsSystemEnabled ~= nil
+function Compat.IsRecentAlliesAvailable() Perfy_Trace(Perfy_GetTime(), "Enter", "Compat.IsRecentAlliesAvailable file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:340:0");
+    return Perfy_Trace_Passthrough("Leave", "Compat.IsRecentAlliesAvailable file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:340:0", C_RecentAllies ~= nil and C_RecentAllies.IsSystemEnabled ~= nil)
 end
 
-function Compat.IsRecentAlliesSystemEnabled()
+function Compat.IsRecentAlliesSystemEnabled() Perfy_Trace(Perfy_GetTime(), "Enter", "Compat.IsRecentAlliesSystemEnabled file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:344:0");
     if Compat.IsRecentAlliesAvailable() then
-        return C_RecentAllies.IsSystemEnabled()
+        return Perfy_Trace_Passthrough("Leave", "Compat.IsRecentAlliesSystemEnabled file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:344:0", C_RecentAllies.IsSystemEnabled())
     end
-    return false
+    Perfy_Trace(Perfy_GetTime(), "Leave", "Compat.IsRecentAlliesSystemEnabled file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:344:0"); return false
 end
 
-function Compat.GetRecentAllies()
+function Compat.GetRecentAllies() Perfy_Trace(Perfy_GetTime(), "Enter", "Compat.GetRecentAllies file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:351:0");
     if Compat.IsRecentAlliesAvailable() and C_RecentAllies.GetRecentAllies then
-        return C_RecentAllies.GetRecentAllies()
+        return Perfy_Trace_Passthrough("Leave", "Compat.GetRecentAllies file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:351:0", C_RecentAllies.GetRecentAllies())
     end
-    return {} -- Empty in Classic
+    return Perfy_Trace_Passthrough("Leave", "Compat.GetRecentAllies file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:351:0", {}) -- Empty in Classic
 end
 
-function Compat.IsRecentAllyDataReady()
+function Compat.IsRecentAllyDataReady() Perfy_Trace(Perfy_GetTime(), "Enter", "Compat.IsRecentAllyDataReady file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:358:0");
     if Compat.IsRecentAlliesAvailable() and C_RecentAllies.IsRecentAllyDataReady then
-        return C_RecentAllies.IsRecentAllyDataReady()
+        return Perfy_Trace_Passthrough("Leave", "Compat.IsRecentAllyDataReady file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:358:0", C_RecentAllies.IsRecentAllyDataReady())
     end
-    return true -- Return true so we don't show loading spinner forever
+    Perfy_Trace(Perfy_GetTime(), "Leave", "Compat.IsRecentAllyDataReady file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:358:0"); return true -- Return true so we don't show loading spinner forever
 end
 
 ------------------------------------------------------------
@@ -371,8 +371,8 @@ end
 -- NOTE: Full ScrollBox abstraction is complex and handled in individual modules
 -- These are helper utilities
 
-function Compat.HasModernScrollBox()
-    return CreateScrollBoxListLinearView ~= nil and ScrollUtil ~= nil
+function Compat.HasModernScrollBox() Perfy_Trace(Perfy_GetTime(), "Enter", "Compat.HasModernScrollBox file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:374:0");
+    return Perfy_Trace_Passthrough("Leave", "Compat.HasModernScrollBox file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:374:0", CreateScrollBoxListLinearView ~= nil and ScrollUtil ~= nil)
 end
 
 -- Create button pool for Classic scroll frames
@@ -381,7 +381,7 @@ end
 -- @param numButtons: Number of buttons to create
 -- @param buttonHeight: Height of each button
 -- @return table of button frames
-function Compat.CreateButtonPool(parent, templateName, numButtons, buttonHeight)
+function Compat.CreateButtonPool(parent, templateName, numButtons, buttonHeight) Perfy_Trace(Perfy_GetTime(), "Enter", "Compat.CreateButtonPool file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:384:0");
     local pool = {}
     for i = 1, numButtons do
         local button = CreateFrame("Button", parent:GetName() .. "Button" .. i, parent, templateName)
@@ -390,7 +390,7 @@ function Compat.CreateButtonPool(parent, templateName, numButtons, buttonHeight)
         button.index = i
         pool[i] = button
     end
-    return pool
+    Perfy_Trace(Perfy_GetTime(), "Leave", "Compat.CreateButtonPool file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:384:0"); return pool
 end
 
 -- Update FauxScrollFrame display
@@ -400,7 +400,7 @@ end
 -- @param buttonHeight: Height of each button
 -- @param updateFunc: Function(button, dataIndex, data) to update button display
 -- @param dataList: List of data items
-function Compat.UpdateFauxScrollFrame(scrollFrame, numItems, buttonPool, buttonHeight, updateFunc, dataList)
+function Compat.UpdateFauxScrollFrame(scrollFrame, numItems, buttonPool, buttonHeight, updateFunc, dataList) Perfy_Trace(Perfy_GetTime(), "Enter", "Compat.UpdateFauxScrollFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:403:0");
     local offset = FauxScrollFrame_GetOffset(scrollFrame)
     local numButtons = #buttonPool
     
@@ -416,7 +416,7 @@ function Compat.UpdateFauxScrollFrame(scrollFrame, numItems, buttonPool, buttonH
             button:Hide()
         end
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "Compat.UpdateFauxScrollFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:403:0"); end
 
 ------------------------------------------------------------
 -- Atlas/Texture Compatibility
@@ -450,15 +450,15 @@ local ATLAS_FALLBACKS = {
 -- @param texture: Texture object
 -- @param atlasName: Atlas name to try
 -- @param fallbackFile: Optional explicit fallback file path
-function Compat.SetTextureOrAtlas(texture, atlasName, fallbackFile)
-    if not texture then return end
+function Compat.SetTextureOrAtlas(texture, atlasName, fallbackFile) Perfy_Trace(Perfy_GetTime(), "Enter", "Compat.SetTextureOrAtlas file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:453:0");
+    if not texture then Perfy_Trace(Perfy_GetTime(), "Leave", "Compat.SetTextureOrAtlas file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:453:0"); return end
     
     if BFL.IsRetail and texture.SetAtlas then
         -- Retail: Try atlas first
-        local success = pcall(function()
+        local success = pcall(function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:458:30");
             texture:SetAtlas(atlasName)
-        end)
-        if success then return end
+        Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:458:30"); end)
+        if success then Perfy_Trace(Perfy_GetTime(), "Leave", "Compat.SetTextureOrAtlas file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:453:0"); return end
     end
     
     -- Classic or atlas failed: Use fallback
@@ -469,7 +469,7 @@ function Compat.SetTextureOrAtlas(texture, atlasName, fallbackFile)
         -- Last resort: try as direct texture path
         texture:SetTexture(atlasName)
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "Compat.SetTextureOrAtlas file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:453:0"); end
 
 ------------------------------------------------------------
 -- Frame Template Compatibility
@@ -488,18 +488,18 @@ local TEMPLATE_MAPPINGS = {
 }
 
 -- Get the appropriate template name for the current game version
-function Compat.GetTemplateName(retailTemplate)
+function Compat.GetTemplateName(retailTemplate) Perfy_Trace(Perfy_GetTime(), "Enter", "Compat.GetTemplateName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:491:0");
     if BFL.IsRetail then
-        return retailTemplate
+        Perfy_Trace(Perfy_GetTime(), "Leave", "Compat.GetTemplateName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:491:0"); return retailTemplate
     end
-    return TEMPLATE_MAPPINGS[retailTemplate] or retailTemplate
+    return Perfy_Trace_Passthrough("Leave", "Compat.GetTemplateName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:491:0", TEMPLATE_MAPPINGS[retailTemplate] or retailTemplate)
 end
 
 -- Check if a template exists
-function Compat.TemplateExists(templateName)
+function Compat.TemplateExists(templateName) Perfy_Trace(Perfy_GetTime(), "Enter", "Compat.TemplateExists file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:499:0");
     -- This is a rough check - some templates may exist but not be detected
-    return _G[templateName] ~= nil or 
-           (C_XMLUtil and C_XMLUtil.GetTemplateInfo and C_XMLUtil.GetTemplateInfo(templateName) ~= nil)
+    return Perfy_Trace_Passthrough("Leave", "Compat.TemplateExists file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:499:0", _G[templateName] ~= nil or 
+           (C_XMLUtil and C_XMLUtil.GetTemplateInfo and C_XMLUtil.GetTemplateInfo(templateName) ~= nil))
 end
 
 ------------------------------------------------------------
@@ -517,32 +517,32 @@ local CLASSIC_ONLY_EVENTS = {
 }
 
 -- Check if an event exists in the current game version
-function Compat.EventExists(eventName)
+function Compat.EventExists(eventName) Perfy_Trace(Perfy_GetTime(), "Enter", "Compat.EventExists file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:520:0");
     -- Events in the retail-only list
     for _, event in ipairs(RETAIL_ONLY_EVENTS) do
         if event == eventName then
-            return BFL.IsRetail
+            return Perfy_Trace_Passthrough("Leave", "Compat.EventExists file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:520:0", BFL.IsRetail)
         end
     end
     
     -- Events in the classic-only list
     for _, event in ipairs(CLASSIC_ONLY_EVENTS) do
         if event == eventName then
-            return BFL.IsClassic
+            return Perfy_Trace_Passthrough("Leave", "Compat.EventExists file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:520:0", BFL.IsClassic)
         end
     end
     
     -- Assume event exists in all versions
-    return true
+    Perfy_Trace(Perfy_GetTime(), "Leave", "Compat.EventExists file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:520:0"); return true
 end
 
 -- Safe event registration
-function Compat.RegisterEvent(frame, eventName)
+function Compat.RegisterEvent(frame, eventName) Perfy_Trace(Perfy_GetTime(), "Enter", "Compat.RegisterEvent file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:540:0");
     if Compat.EventExists(eventName) then
         frame:RegisterEvent(eventName)
-        return true
+        Perfy_Trace(Perfy_GetTime(), "Leave", "Compat.RegisterEvent file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:540:0"); return true
     end
-    return false
+    Perfy_Trace(Perfy_GetTime(), "Leave", "Compat.RegisterEvent file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:540:0"); return false
 end
 
 ------------------------------------------------------------
@@ -550,7 +550,7 @@ end
 ------------------------------------------------------------
 
 -- Print Classic compatibility info
-function Compat.PrintInfo()
+function Compat.PrintInfo() Perfy_Trace(Perfy_GetTime(), "Enter", "Compat.PrintInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:553:0");
     print(BFL.L.CORE_CLASSIC_COMPAT_HEADER)
     print(string.format("TOC Version: |cffffffff%d|r", BFL.TOCVersion))
     print("")
@@ -567,13 +567,13 @@ function Compat.PrintInfo()
     print(string.format("  Recent Allies: %s", BFL.HasRecentAllies and "|cff00ff00Yes|r" or "|cffff0000No|r"))
     print(string.format("  Edit Mode: %s", BFL.HasEditMode and "|cff00ff00Yes|r" or "|cffff0000No|r"))
     print(string.format("  Modern ColorPicker: %s", BFL.HasModernColorPicker and "|cff00ff00Yes|r" or "|cffff0000No|r"))
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "Compat.PrintInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:553:0"); end
 
 -- Register slash command for classic info
 SLASH_BFLCOMPAT1 = "/bflcompat"
-SlashCmdList["BFLCOMPAT"] = function(msg)
+SlashCmdList["BFLCOMPAT"] = function(msg) Perfy_Trace(Perfy_GetTime(), "Enter", "SlashCmdList.BFLCOMPAT file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:574:28");
     Compat.PrintInfo()
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "SlashCmdList.BFLCOMPAT file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:574:28"); end
 
 ------------------------------------------------------------
 -- Global Aliases for Convenience
@@ -581,9 +581,9 @@ end
 -- These aliases allow direct access via BFL.FunctionName instead of BFL.Compat.FunctionName
 
 -- Context Menu (UnitPopup) - Used by many modules
-BFL.OpenContextMenu = function(button, menuType, contextData, name)
+BFL.OpenContextMenu = function(button, menuType, contextData, name) Perfy_Trace(Perfy_GetTime(), "Enter", "BFL.OpenContextMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:584:22");
     Compat.OpenUnitPopupMenu(menuType, contextData)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "BFL.OpenContextMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua:584:22"); end
 
 -- Dropdown Creation
 BFL.CreateDropdown = Compat.CreateDropdown
@@ -591,3 +591,5 @@ BFL.InitializeDropdown = Compat.InitializeDropdown
 
 -- ColorPicker
 BFL.ShowColorPicker = Compat.ShowColorPicker
+
+Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/ClassicCompat.lua");

@@ -1,4 +1,4 @@
--- Locales/zhCN.lua
+--[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Locales/zhCN.lua"); -- Locales/zhCN.lua
 -- Chinese Simplified (简体中文) Localization
 
 local L = BFL_LOCALE
@@ -1150,3 +1150,5 @@ if GetLocale() == "zhCN" then
 	L.SETTINGS_NOTIFY_MODE_DESC = "|cffffcc00弹出通知:|r 紧凑弹出窗口\n|cffffcc00聊天消息:|r 聊天窗口文本\n|cffffcc00已禁用:|r 无通知"
 
 end
+
+Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Locales/zhCN.lua");

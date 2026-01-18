@@ -1,4 +1,4 @@
-local _, BFL = ...
+--[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua"); local _, BFL = ...
 local GlobalSync = {}
 BFL.GlobalSync = GlobalSync
 
@@ -13,23 +13,23 @@ local pendingAdds = {}
 local processingQueue = false
 
 -- Helper: Check if Beta is enabled
-local function IsBetaEnabled()
-    return BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures == true
+local function IsBetaEnabled() Perfy_Trace(Perfy_GetTime(), "Enter", "IsBetaEnabled file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:16:6");
+    return Perfy_Trace_Passthrough("Leave", "IsBetaEnabled file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:16:6", BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures == true)
 end
 
 -- Helper: Get Normalized Realm Name
-local function GetRealmName()
-    return GetNormalizedRealmName()
+local function GetRealmName() Perfy_Trace(Perfy_GetTime(), "Enter", "GetRealmName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:21:6");
+    return Perfy_Trace_Passthrough("Leave", "GetRealmName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:21:6", GetNormalizedRealmName())
 end
 
 -- Helper: Get Faction
-local function GetFaction()
+local function GetFaction() Perfy_Trace(Perfy_GetTime(), "Enter", "GetFaction file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:26:6");
     local faction = UnitFactionGroup("player")
-    return faction
+    Perfy_Trace(Perfy_GetTime(), "Leave", "GetFaction file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:26:6"); return faction
 end
 
-function GlobalSync:Initialize()
-    if not IsBetaEnabled() then return end
+function GlobalSync:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "GlobalSync:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:31:0");
+    if not IsBetaEnabled() then Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:31:0"); return end
     
     -- Initialize DB structure if missing
     if not BetterFriendlistDB.GlobalFriends then
@@ -53,10 +53,10 @@ function GlobalSync:Initialize()
     end
 
     -- BFL:DebugPrint("GlobalSync Module Initialized")
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:31:0"); end
 
-function GlobalSync:MigrateGlobalFriends()
-    if BetterFriendlistDB.globalFriendsMigrated then return end
+function GlobalSync:MigrateGlobalFriends() Perfy_Trace(Perfy_GetTime(), "Enter", "GlobalSync:MigrateGlobalFriends file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:58:0");
+    if BetterFriendlistDB.globalFriendsMigrated then Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:MigrateGlobalFriends file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:58:0"); return end
     
     -- BFL:DebugPrint("GlobalSync: Starting migration to flat structure...")
     
@@ -100,22 +100,22 @@ function GlobalSync:MigrateGlobalFriends()
     BetterFriendlistDB.globalFriendsMigrated = true
     
     -- BFL:DebugPrint("GlobalSync: Migration complete. Migrated " .. count .. " friends.")
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:MigrateGlobalFriends file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:58:0"); end
 
-function GlobalSync:HookDeletionAPIs()
-    if self.hooksInstalled then return end
+function GlobalSync:HookDeletionAPIs() Perfy_Trace(Perfy_GetTime(), "Enter", "GlobalSync:HookDeletionAPIs file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:105:0");
+    if self.hooksInstalled then Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:HookDeletionAPIs file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:105:0"); return end
     self.hooksInstalled = true
     
     -- Hook C_FriendList.RemoveFriend (Secure Hook is fine as we just need to know it happened)
     -- This handles /removefriend command and some UI actions
-    hooksecurefunc(C_FriendList, "RemoveFriend", function(name)
+    hooksecurefunc(C_FriendList, "RemoveFriend", function(name) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:111:49");
         self:OnFriendRemoved(name)
-    end)
+    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:111:49"); end)
     
     -- Hook C_FriendList.RemoveFriendByIndex (Must replace to get name before removal)
     -- This handles the right-click menu removal
     local originalRemoveByIndex = C_FriendList.RemoveFriendByIndex
-    C_FriendList.RemoveFriendByIndex = function(index)
+    C_FriendList.RemoveFriendByIndex = function(index) Perfy_Trace(Perfy_GetTime(), "Enter", "C_FriendList.RemoveFriendByIndex file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:118:39");
         -- Get info before removal
         local info = C_FriendList.GetFriendInfoByIndex(index)
         local nameToRemove = info and info.name
@@ -128,30 +128,30 @@ function GlobalSync:HookDeletionAPIs()
             self:OnFriendRemoved(nameToRemove)
         end
         
-        return result
+        Perfy_Trace(Perfy_GetTime(), "Leave", "C_FriendList.RemoveFriendByIndex file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:118:39"); return result
     end
     
     -- Hook C_FriendList.AddFriend to clear deleted flag if re-added
-    hooksecurefunc(C_FriendList, "AddFriend", function(name)
+    hooksecurefunc(C_FriendList, "AddFriend", function(name) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:135:46");
         self:OnFriendAdded(name)
-    end)
+    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:135:46"); end)
     
     -- Hook C_FriendList.SetFriendNotes to update DB immediately
-    hooksecurefunc(C_FriendList, "SetFriendNotes", function(name, notes)
+    hooksecurefunc(C_FriendList, "SetFriendNotes", function(name, notes) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:140:51");
         self:OnFriendNoteUpdated(name, notes)
-    end)
+    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:140:51"); end)
     
     -- BFL:DebugPrint("GlobalSync: Deletion APIs hooked.")
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:HookDeletionAPIs file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:105:0"); end
 
-function GlobalSync:OnFriendNoteUpdated(name, notes)
-    if not IsBetaEnabled() then return end
-    if not name then return end
+function GlobalSync:OnFriendNoteUpdated(name, notes) Perfy_Trace(Perfy_GetTime(), "Enter", "GlobalSync:OnFriendNoteUpdated file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:147:0");
+    if not IsBetaEnabled() then Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:OnFriendNoteUpdated file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:147:0"); return end
+    if not name then Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:OnFriendNoteUpdated file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:147:0"); return end
     
     local faction = GetFaction()
     local realm = GetRealmName()
     
-    if not faction or not realm then return end
+    if not faction or not realm then Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:OnFriendNoteUpdated file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:147:0"); return end
     
     -- Construct FriendUID
     local friendUID
@@ -166,16 +166,16 @@ function GlobalSync:OnFriendNoteUpdated(name, notes)
         BetterFriendlistDB.GlobalFriends[faction][friendUID].notes = notes
         -- BFL:DebugPrint("GlobalSync: Updated DB note for " .. friendUID .. " (Hooked SetFriendNotes).")
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:OnFriendNoteUpdated file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:147:0"); end
 
-function GlobalSync:OnFriendAdded(name)
-    if not IsBetaEnabled() then return end
-    if not name then return end
+function GlobalSync:OnFriendAdded(name) Perfy_Trace(Perfy_GetTime(), "Enter", "GlobalSync:OnFriendAdded file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:171:0");
+    if not IsBetaEnabled() then Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:OnFriendAdded file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:171:0"); return end
+    if not name then Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:OnFriendAdded file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:171:0"); return end
     
     local faction = GetFaction()
     local realm = GetRealmName()
     
-    if not faction or not realm then return end
+    if not faction or not realm then Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:OnFriendAdded file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:171:0"); return end
     
     -- Construct FriendUID
     local friendUID
@@ -192,17 +192,17 @@ function GlobalSync:OnFriendAdded(name)
             -- BFL:DebugPrint("GlobalSync: Cleared deleted flag for " .. friendUID .. " (Re-added manually).")
         end
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:OnFriendAdded file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:171:0"); end
 
-function GlobalSync:OnFriendRemoved(name)
-    if not IsBetaEnabled() then return end
-    if not BetterFriendlistDB.enableGlobalSyncDeletion then return end
-    if not name then return end
+function GlobalSync:OnFriendRemoved(name) Perfy_Trace(Perfy_GetTime(), "Enter", "GlobalSync:OnFriendRemoved file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:197:0");
+    if not IsBetaEnabled() then Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:OnFriendRemoved file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:197:0"); return end
+    if not BetterFriendlistDB.enableGlobalSyncDeletion then Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:OnFriendRemoved file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:197:0"); return end
+    if not name then Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:OnFriendRemoved file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:197:0"); return end
     
     local faction = GetFaction()
     local realm = GetRealmName()
     
-    if not faction or not realm then return end
+    if not faction or not realm then Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:OnFriendRemoved file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:197:0"); return end
     
     -- Construct FriendUID to find in DB
     local friendUID
@@ -225,32 +225,32 @@ function GlobalSync:OnFriendRemoved(name)
             Settings:RefreshGlobalSyncTab()
         end
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:OnFriendRemoved file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:197:0"); end
 
-function GlobalSync:RegisterEvents()
-    if not IsBetaEnabled() then return end
+function GlobalSync:RegisterEvents() Perfy_Trace(Perfy_GetTime(), "Enter", "GlobalSync:RegisterEvents file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:230:0");
+    if not IsBetaEnabled() then Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:RegisterEvents file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:230:0"); return end
 
-    BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function()
+    BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:233:51");
         self:OnFriendListUpdate()
-    end)
-end
+    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:233:51"); end)
+Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:RegisterEvents file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:230:0"); end
 
-function GlobalSync:OnFriendListUpdate()
-    if not IsBetaEnabled() then return end
+function GlobalSync:OnFriendListUpdate() Perfy_Trace(Perfy_GetTime(), "Enter", "GlobalSync:OnFriendListUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:238:0");
+    if not IsBetaEnabled() then Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:OnFriendListUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:238:0"); return end
     
     -- Throttle updates
-    if self.updateTimer then return end
-    self.updateTimer = C_Timer.NewTimer(2, function()
+    if self.updateTimer then Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:OnFriendListUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:238:0"); return end
+    self.updateTimer = C_Timer.NewTimer(2, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:243:43");
         self:PerformSync()
         self.updateTimer = nil
-    end)
-end
+    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:243:43"); end)
+Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:OnFriendListUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:238:0"); end
 
-function GlobalSync:PerformSync()
+function GlobalSync:PerformSync() Perfy_Trace(Perfy_GetTime(), "Enter", "GlobalSync:PerformSync file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:249:0");
     local faction = GetFaction()
     local realm = GetRealmName()
     
-    if not faction or not realm then return end
+    if not faction or not realm then Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:PerformSync file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:249:0"); return end
     
     -- 1. Export current friends to DB
     self:ExportFriends(faction, realm)
@@ -260,9 +260,9 @@ function GlobalSync:PerformSync()
     
     -- 3. Sync Deletions (Remove friends marked as deleted)
     self:SyncDeletions(faction, realm)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:PerformSync file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:249:0"); end
 
-function GlobalSync:ExportFriends(faction, realm)
+function GlobalSync:ExportFriends(faction, realm) Perfy_Trace(Perfy_GetTime(), "Enter", "GlobalSync:ExportFriends file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:265:0");
     local numFriends = C_FriendList.GetNumFriends()
     
     -- Ensure faction table exists
@@ -325,14 +325,14 @@ function GlobalSync:ExportFriends(faction, realm)
     end
     
     -- BFL:DebugPrint("GlobalSync: Exported " .. count .. " friends to flat DB.")
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:ExportFriends file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:265:0"); end
 
-function GlobalSync:ImportFriends(faction, currentRealm)
+function GlobalSync:ImportFriends(faction, currentRealm) Perfy_Trace(Perfy_GetTime(), "Enter", "GlobalSync:ImportFriends file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:330:0");
     -- Check if sync is enabled in settings (default false)
-    if not BetterFriendlistDB.enableGlobalSync then return end
+    if not BetterFriendlistDB.enableGlobalSync then Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:ImportFriends file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:330:0"); return end
 
     -- Ensure faction table exists
-    if not BetterFriendlistDB.GlobalFriends[faction] then return end
+    if not BetterFriendlistDB.GlobalFriends[faction] then Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:ImportFriends file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:330:0"); return end
 
     local friendsToAdd = {}
     local currentFriendList = {}
@@ -379,12 +379,12 @@ function GlobalSync:ImportFriends(faction, currentRealm)
         -- BFL:DebugPrint("GlobalSync: Found " .. #friendsToAdd .. " missing friends.")
         self:ProcessAddQueue(friendsToAdd)
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:ImportFriends file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:330:0"); end
 
-function GlobalSync:SyncDeletions(faction, currentRealm)
+function GlobalSync:SyncDeletions(faction, currentRealm) Perfy_Trace(Perfy_GetTime(), "Enter", "GlobalSync:SyncDeletions file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:384:0");
     -- Check if deletion sync is enabled
-    if not BetterFriendlistDB.enableGlobalSyncDeletion then return end
-    if not BetterFriendlistDB.GlobalFriends[faction] then return end
+    if not BetterFriendlistDB.enableGlobalSyncDeletion then Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:SyncDeletions file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:384:0"); return end
+    if not BetterFriendlistDB.GlobalFriends[faction] then Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:SyncDeletions file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:384:0"); return end
     
     local friendsToRemove = {}
     
@@ -417,20 +417,20 @@ function GlobalSync:SyncDeletions(faction, currentRealm)
             C_FriendList.RemoveFriend(name)
         end
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:SyncDeletions file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:384:0"); end
 
-function GlobalSync:ProcessAddQueue(queue)
-    if self.processingQueue then return end
+function GlobalSync:ProcessAddQueue(queue) Perfy_Trace(Perfy_GetTime(), "Enter", "GlobalSync:ProcessAddQueue file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:422:0");
+    if self.processingQueue then Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:ProcessAddQueue file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:422:0"); return end
     self.processingQueue = true
     
     local index = 1
     local max = #queue
     
-    C_Timer.NewTicker(0.5, function(timer)
+    C_Timer.NewTicker(0.5, function(timer) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:429:27");
         if not IsBetaEnabled() or not BetterFriendlistDB.enableGlobalSync then
             timer:Cancel()
             self.processingQueue = false
-            return
+            Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:429:27"); return
         end
 
         for i = 1, BATCH_SIZE do
@@ -438,7 +438,7 @@ function GlobalSync:ProcessAddQueue(queue)
                 timer:Cancel()
                 self.processingQueue = false
                 -- BFL:DebugPrint("GlobalSync: Finished syncing friends.")
-                return
+                Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:429:27"); return
             end
             
             local name = queue[index]
@@ -447,8 +447,10 @@ function GlobalSync:ProcessAddQueue(queue)
             
             index = index + 1
         end
-    end)
-end
+    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:429:27"); end)
+Perfy_Trace(Perfy_GetTime(), "Leave", "GlobalSync:ProcessAddQueue file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua:422:0"); end
 
 -- Register module
 BFL.Modules[MODULE_NAME] = GlobalSync
+
+Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/GlobalSync.lua");

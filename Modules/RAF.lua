@@ -1,4 +1,4 @@
---------------------------------------------------------------------------
+--[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua"); --------------------------------------------------------------------------
 -- RAF Module - Recruit-A-Friend System
 --------------------------------------------------------------------------
 -- This module handles all Recruit-A-Friend functionality including:
@@ -35,17 +35,17 @@ local latestRAFVersion = 0
 -- RAF Frame Initialization and Event Handling
 --------------------------------------------------------------------------
 
-function RAF:OnLoad(frame)
+function RAF:OnLoad(frame) Perfy_Trace(Perfy_GetTime(), "Enter", "RAF:OnLoad file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:38:0");
 	-- Classic Guard: RAF is Retail-only
 	if BFL.IsClassic or not BFL.HasRAF then
 		-- BFL:DebugPrint("|cffffcc00BFL RAF:|r Not available in Classic - module disabled")
 		if frame then frame:Hide() end
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:OnLoad file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:38:0"); return
 	end
 	
 	if not C_RecruitAFriend then
 		-- BFL:DebugPrint("BetterFriendlist: RAF system not available")
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:OnLoad file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:38:0"); return
 	end
 	
 	-- Check if RAF is enabled
@@ -77,12 +77,12 @@ function RAF:OnLoad(frame)
 			-- Retail: Use ScrollBox
 			-- BFL:DebugPrint("|cff00ffffRAF:|r Using Retail ScrollBox mode")
 			local view = CreateScrollBoxListLinearView()
-			view:SetElementExtentCalculator(function(dataIndex, elementData)
-				return elementData.isDivider and DIVIDER_HEIGHT or RECRUIT_HEIGHT
+			view:SetElementExtentCalculator(function(dataIndex, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:80:35");
+				return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:80:35", elementData.isDivider and DIVIDER_HEIGHT or RECRUIT_HEIGHT)
 			end)
-			view:SetElementInitializer("BetterRecruitListButtonTemplate", function(button, elementData)
+			view:SetElementInitializer("BetterRecruitListButtonTemplate", function(button, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:83:65");
 				BetterRecruitListButton_Init(button, elementData)
-			end)
+			Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:83:65"); end)
 			ScrollUtil.InitScrollBoxListWithScrollBar(frame.RecruitList.ScrollBox, frame.RecruitList.ScrollBar, view)
 		end
 	end
@@ -98,10 +98,10 @@ function RAF:OnLoad(frame)
 		local rafInfo = C_RecruitAFriend.GetRAFInfo()
 		self:UpdateRAFInfo(frame, rafInfo)
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:OnLoad file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:38:0"); end
 
 -- Initialize Classic RAF FauxScrollFrame
-function RAF:InitializeClassicRAF(frame)
+function RAF:InitializeClassicRAF(frame) Perfy_Trace(Perfy_GetTime(), "Enter", "RAF:InitializeClassicRAF file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:104:0");
 	self.classicRAFFrame = frame
 	self.classicRAFButtonPool = {}
 	self.classicRAFDataList = {}
@@ -126,16 +126,16 @@ function RAF:InitializeClassicRAF(frame)
 		scrollBar:SetPoint("BOTTOMRIGHT", frame.RecruitList, "BOTTOMRIGHT", -4, 16)
 		scrollBar:SetMinMaxValues(0, 0)
 		scrollBar:SetValue(0)
-		scrollBar:SetScript("OnValueChanged", function(self, value)
+		scrollBar:SetScript("OnValueChanged", function(self, value) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:129:40");
 			RAF:RenderClassicRAFButtons()
-		end)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:129:40"); end)
 		frame.RecruitList.ClassicScrollBar = scrollBar
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:InitializeClassicRAF file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:104:0"); end
 
 -- Render Classic RAF buttons
-function RAF:RenderClassicRAFButtons()
-	if not self.classicRAFButtonPool then return end
+function RAF:RenderClassicRAFButtons() Perfy_Trace(Perfy_GetTime(), "Enter", "RAF:RenderClassicRAFButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:137:0");
+	if not self.classicRAFButtonPool then Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:RenderClassicRAFButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:137:0"); return end
 	
 	local dataList = self.classicRAFDataList or {}
 	local numItems = #dataList
@@ -163,9 +163,9 @@ function RAF:RenderClassicRAFButtons()
 			button:Hide()
 		end
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:RenderClassicRAFButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:137:0"); end
 
-function RAF:OnEvent(frame, event, ...)
+function RAF:OnEvent(frame, event, ...) Perfy_Trace(Perfy_GetTime(), "Enter", "RAF:OnEvent file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:168:0");
 	if event == "RAF_SYSTEM_ENABLED_STATUS" then
 		local rafEnabled = ...
 		frame.rafEnabled = rafEnabled
@@ -189,46 +189,46 @@ function RAF:OnEvent(frame, event, ...)
 			self:UpdateRecruitList(frame, frame.rafInfo.recruits)
 		end
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:OnEvent file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:168:0"); end
 
-function RAF:OnHide(frame)
+function RAF:OnHide(frame) Perfy_Trace(Perfy_GetTime(), "Enter", "RAF:OnHide file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:194:0");
 	-- Hide splash frame if shown
 	if frame.SplashFrame then
 		frame.SplashFrame:Hide()
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:OnHide file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:194:0"); end
 
 --------------------------------------------------------------------------
 -- RAF System Info Management
 --------------------------------------------------------------------------
 
-function RAF:UpdateSystemInfo(rafSystemInfo)
+function RAF:UpdateSystemInfo(rafSystemInfo) Perfy_Trace(Perfy_GetTime(), "Enter", "RAF:UpdateSystemInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:205:0");
 	if rafSystemInfo then
 		maxRecruits = rafSystemInfo.maxRecruits or 0
 		maxRecruitMonths = rafSystemInfo.maxRecruitMonths or 0
 		maxRecruitLinkUses = rafSystemInfo.maxRecruitmentUses or 0
 		daysInCycle = rafSystemInfo.daysInCycle or 0
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:UpdateSystemInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:205:0"); end
 
 --------------------------------------------------------------------------
 -- Recruit List Management
 --------------------------------------------------------------------------
 
 -- Sort recruits by online status, version, and name
-local function SortRecruits(a, b)
+local function SortRecruits(a, b) Perfy_Trace(Perfy_GetTime(), "Enter", "SortRecruits file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:219:6");
 	if a.isOnline ~= b.isOnline then
-		return a.isOnline
+		return Perfy_Trace_Passthrough("Leave", "SortRecruits file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:219:6", a.isOnline)
 	else
 		if a.versionRecruited ~= b.versionRecruited then
-			return a.versionRecruited > b.versionRecruited
+			return Perfy_Trace_Passthrough("Leave", "SortRecruits file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:219:6", a.versionRecruited > b.versionRecruited)
 		end
-		return (a.nameText or "") < (b.nameText or "")
+		return Perfy_Trace_Passthrough("Leave", "SortRecruits file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:219:6", (a.nameText or "") < (b.nameText or ""))
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "SortRecruits file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:219:6"); end
 
 -- Process and sort recruits with divider logic
-local function ProcessAndSortRecruits(recruits)
+local function ProcessAndSortRecruits(recruits) Perfy_Trace(Perfy_GetTime(), "Enter", "ProcessAndSortRecruits file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:231:6");
 	local seenAccounts = {}
 	local haveOnlineFriends = false
 	local haveOfflineFriends = false
@@ -300,11 +300,11 @@ local function ProcessAndSortRecruits(recruits)
 	-- Sort by online status, version, and name
 	table.sort(recruits, SortRecruits)
 	
-	return haveOnlineFriends and haveOfflineFriends
+	return Perfy_Trace_Passthrough("Leave", "ProcessAndSortRecruits file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:231:6", haveOnlineFriends and haveOfflineFriends)
 end
 
-function RAF:UpdateRecruitList(frame, recruits)
-	if not frame or not frame.RecruitList then return end
+function RAF:UpdateRecruitList(frame, recruits) Perfy_Trace(Perfy_GetTime(), "Enter", "RAF:UpdateRecruitList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:306:0");
+	if not frame or not frame.RecruitList then Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:UpdateRecruitList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:306:0"); return end
 	
 	local numRecruits = #recruits
 	
@@ -336,7 +336,7 @@ function RAF:UpdateRecruitList(frame, recruits)
 	if BFL.IsClassic or not BFL.HasModernScrollBox then
 		self.classicRAFDataList = dataList
 		self:RenderClassicRAFButtons()
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:UpdateRecruitList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:306:0"); return
 	end
 	
 	-- Retail: Update ScrollBox with DataProvider
@@ -347,14 +347,14 @@ function RAF:UpdateRecruitList(frame, recruits)
 		end
 		frame.RecruitList.ScrollBox:SetDataProvider(dataProvider, ScrollBoxConstants.RetainScrollPosition)
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:UpdateRecruitList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:306:0"); end
 
 --------------------------------------------------------------------------
 -- Reward Display Management
 --------------------------------------------------------------------------
 
-function RAF:UpdateNextReward(frame, nextReward)
-	if not frame or not frame.RewardClaiming then return end
+function RAF:UpdateNextReward(frame, nextReward) Perfy_Trace(Perfy_GetTime(), "Enter", "RAF:UpdateNextReward file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:356:0");
+	if not frame or not frame.RewardClaiming then Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:UpdateNextReward file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:356:0"); return end
 	
 	local rewardPanel = frame.RewardClaiming
 	
@@ -362,7 +362,7 @@ function RAF:UpdateNextReward(frame, nextReward)
 		if rewardPanel.EarnInfo then rewardPanel.EarnInfo:Hide() end
 		if rewardPanel.NextRewardButton then rewardPanel.NextRewardButton:Hide() end
 		if rewardPanel.NextRewardName then rewardPanel.NextRewardName:Hide() end
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:UpdateNextReward file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:356:0"); return
 	end
 	
 	-- Set earn info text
@@ -430,10 +430,10 @@ function RAF:UpdateNextReward(frame, nextReward)
 		
 		rewardPanel.NextRewardName:Show()
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:UpdateNextReward file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:356:0"); end
 
-function RAF:UpdateRAFInfo(frame, rafInfo)
-	if not frame or not rafInfo then return end
+function RAF:UpdateRAFInfo(frame, rafInfo) Perfy_Trace(Perfy_GetTime(), "Enter", "RAF:UpdateRAFInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:435:0");
+	if not frame or not rafInfo then Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:UpdateRAFInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:435:0"); return end
 	
 	frame.rafInfo = rafInfo
 	
@@ -478,26 +478,26 @@ function RAF:UpdateRAFInfo(frame, rafInfo)
 			frame.RewardClaiming.ClaimOrViewRewardButton:SetText(L.RAF_VIEW_ALL_REWARDS)
 		end
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:UpdateRAFInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:435:0"); end
 
-function RAF:ShowSplashScreen(frame)
-	if not frame or not frame.SplashFrame then return end
+function RAF:ShowSplashScreen(frame) Perfy_Trace(Perfy_GetTime(), "Enter", "RAF:ShowSplashScreen file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:483:0");
+	if not frame or not frame.SplashFrame then Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:ShowSplashScreen file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:483:0"); return end
 	frame.SplashFrame:Show()
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:ShowSplashScreen file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:483:0"); end
 
 --------------------------------------------------------------------------
 -- Recruit Button Handlers (Global Functions for XML)
 --------------------------------------------------------------------------
 
-function RAF:RecruitListButton_Init(button, elementData)
+function RAF:RecruitListButton_Init(button, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "RAF:RecruitListButton_Init file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:492:0");
 	if elementData.isDivider then
 		self:RecruitListButton_SetupDivider(button)
 	else
 		self:RecruitListButton_SetupRecruit(button, elementData)
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:RecruitListButton_Init file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:492:0"); end
 
-function RAF:RecruitListButton_SetupDivider(button)
+function RAF:RecruitListButton_SetupDivider(button) Perfy_Trace(Perfy_GetTime(), "Enter", "RAF:RecruitListButton_SetupDivider file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:500:0");
 	button.DividerTexture:Show()
 	button.Background:Hide()
 	button.Name:Hide()
@@ -512,9 +512,9 @@ function RAF:RecruitListButton_SetupDivider(button)
 	button:Disable()
 	button.recruitInfo = nil
 	button:Show()
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:RecruitListButton_SetupDivider file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:500:0"); end
 
-function RAF:RecruitListButton_SetupRecruit(button, recruitInfo)
+function RAF:RecruitListButton_SetupRecruit(button, recruitInfo) Perfy_Trace(Perfy_GetTime(), "Enter", "RAF:RecruitListButton_SetupRecruit file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:517:0");
 	button.DividerTexture:Hide()
 	button.Background:Show()
 	button.Name:Show()
@@ -589,10 +589,10 @@ function RAF:RecruitListButton_SetupRecruit(button, recruitInfo)
 	end
 	
 	button:Show()
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:RecruitListButton_SetupRecruit file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:517:0"); end
 
-function RAF:RecruitListButton_OnEnter(button)
-	if not button.recruitInfo then return end
+function RAF:RecruitListButton_OnEnter(button) Perfy_Trace(Perfy_GetTime(), "Enter", "RAF:RecruitListButton_OnEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:594:0");
+	if not button.recruitInfo then Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:RecruitListButton_OnEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:594:0"); return end
 	
 	local recruitInfo = button.recruitInfo
 	GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
@@ -613,9 +613,9 @@ function RAF:RecruitListButton_OnEnter(button)
 	end
 	
 	GameTooltip:Show()
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:RecruitListButton_OnEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:594:0"); end
 
-function RAF:RecruitListButton_OnClick(button, mouseButton)
+function RAF:RecruitListButton_OnClick(button, mouseButton) Perfy_Trace(Perfy_GetTime(), "Enter", "RAF:RecruitListButton_OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:618:0");
 	if mouseButton == "RightButton" and button.recruitInfo then
 		local recruitInfo = button.recruitInfo
 		local contextData = {
@@ -632,16 +632,16 @@ function RAF:RecruitListButton_OnClick(button, mouseButton)
 		-- Use compatibility wrapper for Classic support
 		BFL.OpenContextMenu(button, "RAF_RECRUIT", contextData, contextData.name)
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:RecruitListButton_OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:618:0"); end
 
 --------------------------------------------------------------------------
 -- Recruit Activity Button Handlers
 --------------------------------------------------------------------------
 
-function RAF:RecruitActivityButton_Setup(button, activityInfo, recruitInfo)
+function RAF:RecruitActivityButton_Setup(button, activityInfo, recruitInfo) Perfy_Trace(Perfy_GetTime(), "Enter", "RAF:RecruitActivityButton_Setup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:641:0");
 	if not activityInfo then
 		button:Hide()
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:RecruitActivityButton_Setup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:641:0"); return
 	end
 	
 	button.activityInfo = activityInfo
@@ -649,10 +649,10 @@ function RAF:RecruitActivityButton_Setup(button, activityInfo, recruitInfo)
 	
 	self:RecruitActivityButton_UpdateIcon(button)
 	button:Show()
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:RecruitActivityButton_Setup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:641:0"); end
 
-function RAF:RecruitActivityButton_UpdateIcon(button)
-	if not button.activityInfo then return end
+function RAF:RecruitActivityButton_UpdateIcon(button) Perfy_Trace(Perfy_GetTime(), "Enter", "RAF:RecruitActivityButton_UpdateIcon file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:654:0");
+	if not button.activityInfo then Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:RecruitActivityButton_UpdateIcon file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:654:0"); return end
 	
 	local useAtlasSize = true
 	if button:IsMouseOver() then
@@ -670,26 +670,26 @@ function RAF:RecruitActivityButton_UpdateIcon(button)
 			button.Icon:SetAtlas("RecruitAFriend_RecruitedFriends_ClaimedChest", useAtlasSize)
 		end
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:RecruitActivityButton_UpdateIcon file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:654:0"); end
 
-function RAF:RecruitActivityButton_OnClick(button)
-	if not button.activityInfo or not button.recruitInfo then return end
+function RAF:RecruitActivityButton_OnClick(button) Perfy_Trace(Perfy_GetTime(), "Enter", "RAF:RecruitActivityButton_OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:675:0");
+	if not button.activityInfo or not button.recruitInfo then Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:RecruitActivityButton_OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:675:0"); return end
 	
 	if button.activityInfo.state == Enum.RafRecruitActivityState.Complete then
 		if C_RecruitAFriend.ClaimActivityReward then
 			if C_RecruitAFriend.ClaimActivityReward(button.activityInfo.activityID, button.recruitInfo.acceptanceID) then
 				PlaySound(SOUNDKIT.RAF_RECRUIT_REWARD_CLAIM)
-				C_Timer.After(0.3, function()
+				C_Timer.After(0.3, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:682:23");
 					button.activityInfo.state = Enum.RafRecruitActivityState.RewardClaimed
 					RAF:RecruitActivityButton_UpdateIcon(button)
-				end)
+				Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:682:23"); end)
 			end
 		end
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:RecruitActivityButton_OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:675:0"); end
 
-function RAF:RecruitActivityButton_OnEnter(button)
-	if not button.activityInfo or not button.recruitInfo then return end
+function RAF:RecruitActivityButton_OnEnter(button) Perfy_Trace(Perfy_GetTime(), "Enter", "RAF:RecruitActivityButton_OnEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:691:0");
+	if not button.activityInfo or not button.recruitInfo then Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:RecruitActivityButton_OnEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:691:0"); return end
 	
 	-- Enable highlight on parent recruit list button
 	local parent = button:GetParent()
@@ -740,9 +740,9 @@ function RAF:RecruitActivityButton_OnEnter(button)
 	
 	self:RecruitActivityButton_UpdateIcon(button)
 	GameTooltip:Show()
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:RecruitActivityButton_OnEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:691:0"); end
 
-function RAF:RecruitActivityButton_OnLeave(button)
+function RAF:RecruitActivityButton_OnLeave(button) Perfy_Trace(Perfy_GetTime(), "Enter", "RAF:RecruitActivityButton_OnLeave file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:745:0");
 	-- Disable highlight on parent recruit list button
 	local parent = button:GetParent()
 	if parent then
@@ -751,15 +751,15 @@ function RAF:RecruitActivityButton_OnLeave(button)
 	
 	GameTooltip_Hide()
 	RAF:RecruitActivityButton_UpdateIcon(button)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:RecruitActivityButton_OnLeave file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:745:0"); end
 
 --------------------------------------------------------------------------
 -- Next Reward Button Handlers
 --------------------------------------------------------------------------
 
-function RAF:NextRewardButton_OnClick(button, mouseButton)
+function RAF:NextRewardButton_OnClick(button, mouseButton) Perfy_Trace(Perfy_GetTime(), "Enter", "RAF:NextRewardButton_OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:760:0");
 	local frame = button:GetParent():GetParent()
-	if not frame or not frame.rafInfo then return end
+	if not frame or not frame.rafInfo then Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:NextRewardButton_OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:760:0"); return end
 	
 	local latestVersionInfo = frame.rafInfo.versions and #frame.rafInfo.versions > 0 and frame.rafInfo.versions[1]
 	local nextReward = latestVersionInfo and latestVersionInfo.nextReward
@@ -778,16 +778,16 @@ function RAF:NextRewardButton_OnClick(button, mouseButton)
 			ChatFrame_OpenChat(link)
 		end
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:NextRewardButton_OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:760:0"); end
 
-function RAF:NextRewardButton_OnEnter(button)
+function RAF:NextRewardButton_OnEnter(button) Perfy_Trace(Perfy_GetTime(), "Enter", "RAF:NextRewardButton_OnEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:783:0");
 	local frame = button:GetParent():GetParent()
-	if not frame or not frame.rafInfo then return end
+	if not frame or not frame.rafInfo then Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:NextRewardButton_OnEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:783:0"); return end
 	
 	local latestVersionInfo = frame.rafInfo.versions and #frame.rafInfo.versions > 0 and frame.rafInfo.versions[1]
 	local nextReward = latestVersionInfo and latestVersionInfo.nextReward
 	
-	if not nextReward or not nextReward.itemID then return end
+	if not nextReward or not nextReward.itemID then Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:NextRewardButton_OnEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:783:0"); return end
 	
 	GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
 	GameTooltip:SetItemByID(nextReward.itemID)
@@ -797,15 +797,15 @@ function RAF:NextRewardButton_OnEnter(button)
 	else
 		ResetCursor()
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:NextRewardButton_OnEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:783:0"); end
 
 --------------------------------------------------------------------------
 -- Claim/View Reward Button Handler
 --------------------------------------------------------------------------
 
-function RAF:ClaimOrViewRewardButton_OnClick(button)
+function RAF:ClaimOrViewRewardButton_OnClick(button) Perfy_Trace(Perfy_GetTime(), "Enter", "RAF:ClaimOrViewRewardButton_OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:806:0");
 	local frame = button:GetParent():GetParent()
-	if not frame or not frame.rafInfo then return end
+	if not frame or not frame.rafInfo then Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:ClaimOrViewRewardButton_OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:806:0"); return end
 	
 	local latestVersionInfo = frame.rafInfo.versions and #frame.rafInfo.versions > 0 and frame.rafInfo.versions[1]
 	local nextReward = latestVersionInfo and latestVersionInfo.nextReward
@@ -825,12 +825,12 @@ function RAF:ClaimOrViewRewardButton_OnClick(button)
 			if C_RecruitAFriend.ClaimNextReward() then
 				PlaySound(SOUNDKIT.RAF_RECRUIT_REWARD_CLAIM)
 				-- Refresh RAF info after claim
-				C_Timer.After(0.5, function()
+				C_Timer.After(0.5, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:828:23");
 					local rafInfo = C_RecruitAFriend.GetRAFInfo()
 					if rafInfo then
 						RAF:UpdateRAFInfo(frame, rafInfo)
 					end
-				end)
+				Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:828:23"); end)
 			end
 		end
 	else
@@ -865,7 +865,7 @@ function RAF:ClaimOrViewRewardButton_OnClick(button)
 				
 				RecruitAFriendFrame.callbacks = RecruitAFriendFrame.callbacks or {}
 				
-				RecruitAFriendFrame.TriggerEvent = function(self, event, ...)
+				RecruitAFriendFrame.TriggerEvent = function(self, event, ...) Perfy_Trace(Perfy_GetTime(), "Enter", "RecruitAFriendFrame.TriggerEvent file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:868:39");
 					-- Handle NewRewardTabSelected event
 					if event == "NewRewardTabSelected" then
 						local newRAFVersion = ...
@@ -886,46 +886,46 @@ function RAF:ClaimOrViewRewardButton_OnClick(button)
 					if originalTriggerEvent and originalTriggerEvent ~= self.TriggerEvent then
 						originalTriggerEvent(self, event, ...)
 					end
-				end
+				Perfy_Trace(Perfy_GetTime(), "Leave", "RecruitAFriendFrame.TriggerEvent file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:868:39"); end
 				
 				-- Add helper methods that RecruitAFriendFrame needs (always set these)
-				RecruitAFriendFrame.GetSelectedRAFVersion = function(self)
-					return self.selectedRAFVersion
+				RecruitAFriendFrame.GetSelectedRAFVersion = function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "RecruitAFriendFrame.GetSelectedRAFVersion file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:892:48");
+					return Perfy_Trace_Passthrough("Leave", "RecruitAFriendFrame.GetSelectedRAFVersion file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:892:48", self.selectedRAFVersion)
 				end
 				
-				RecruitAFriendFrame.GetSelectedRAFVersionInfo = function(self)
+				RecruitAFriendFrame.GetSelectedRAFVersionInfo = function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "RecruitAFriendFrame.GetSelectedRAFVersionInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:896:52");
 					if not self.rafInfo or not self.rafInfo.versions then 
-						return nil 
+						Perfy_Trace(Perfy_GetTime(), "Leave", "RecruitAFriendFrame.GetSelectedRAFVersionInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:896:52"); return nil 
 					end
 					for _, versionInfo in ipairs(self.rafInfo.versions) do
 						if versionInfo.rafVersion == self.selectedRAFVersion then
-							return versionInfo
+							Perfy_Trace(Perfy_GetTime(), "Leave", "RecruitAFriendFrame.GetSelectedRAFVersionInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:896:52"); return versionInfo
 						end
 					end
-					return self.rafInfo.versions[1] -- Fallback to first version
+					return Perfy_Trace_Passthrough("Leave", "RecruitAFriendFrame.GetSelectedRAFVersionInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:896:52", self.rafInfo.versions[1]) -- Fallback to first version
 				end
 				
-				RecruitAFriendFrame.GetLatestRAFVersion = function(self)
+				RecruitAFriendFrame.GetLatestRAFVersion = function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "RecruitAFriendFrame.GetLatestRAFVersion file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:908:46");
 					if self.rafInfo and self.rafInfo.versions and #self.rafInfo.versions > 0 then
-						return self.rafInfo.versions[1].rafVersion
+						return Perfy_Trace_Passthrough("Leave", "RecruitAFriendFrame.GetLatestRAFVersion file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:908:46", self.rafInfo.versions[1].rafVersion)
 					end
-					return nil
+					Perfy_Trace(Perfy_GetTime(), "Leave", "RecruitAFriendFrame.GetLatestRAFVersion file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:908:46"); return nil
 				end
 				
-				RecruitAFriendFrame.IsLegacyRAFVersion = function(self, rafVersion)
+				RecruitAFriendFrame.IsLegacyRAFVersion = function(self, rafVersion) Perfy_Trace(Perfy_GetTime(), "Enter", "RecruitAFriendFrame.IsLegacyRAFVersion file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:915:45");
 					-- All versions except the latest are considered legacy
 					local latestVersion = self:GetLatestRAFVersion()
-					return rafVersion ~= latestVersion
+					return Perfy_Trace_Passthrough("Leave", "RecruitAFriendFrame.IsLegacyRAFVersion file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:915:45", rafVersion ~= latestVersion)
 				end
 				
-				RecruitAFriendFrame.GetRAFVersionInfo = function(self, rafVersion)
-					if not self.rafInfo or not self.rafInfo.versions then return nil end
+				RecruitAFriendFrame.GetRAFVersionInfo = function(self, rafVersion) Perfy_Trace(Perfy_GetTime(), "Enter", "RecruitAFriendFrame.GetRAFVersionInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:921:44");
+					if not self.rafInfo or not self.rafInfo.versions then Perfy_Trace(Perfy_GetTime(), "Leave", "RecruitAFriendFrame.GetRAFVersionInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:921:44"); return nil end
 					for _, versionInfo in ipairs(self.rafInfo.versions) do
 						if versionInfo.rafVersion == rafVersion then
-							return versionInfo
+							Perfy_Trace(Perfy_GetTime(), "Leave", "RecruitAFriendFrame.GetRAFVersionInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:921:44"); return versionInfo
 						end
 					end
-					return nil
+					Perfy_Trace(Perfy_GetTime(), "Leave", "RecruitAFriendFrame.GetRAFVersionInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:921:44"); return nil
 				end
 			end
 			
@@ -953,14 +953,14 @@ function RAF:ClaimOrViewRewardButton_OnClick(button)
 			self:DisplayRewardsInChat(frame.rafInfo)
 		end
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:ClaimOrViewRewardButton_OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:806:0"); end
 
 --------------------------------------------------------------------------
 -- Utility Functions
 --------------------------------------------------------------------------
 
-function RAF:DisplayRewardsInChat(rafInfo)
-	if not rafInfo or not rafInfo.versions then return end
+function RAF:DisplayRewardsInChat(rafInfo) Perfy_Trace(Perfy_GetTime(), "Enter", "RAF:DisplayRewardsInChat file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:962:0");
+	if not rafInfo or not rafInfo.versions then Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:DisplayRewardsInChat file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:962:0"); return end
 	
 	DEFAULT_CHAT_FRAME:AddMessage(L.RAF_CHAT_HEADER, 1, 1, 0)
 	
@@ -997,9 +997,9 @@ function RAF:DisplayRewardsInChat(rafInfo)
 	end
 	
 	DEFAULT_CHAT_FRAME:AddMessage(L.RAF_CHAT_USE_UI, 1, 1, 0)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:DisplayRewardsInChat file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:962:0"); end
 
-function RAF:RecruitmentButton_OnClick(button)
+function RAF:RecruitmentButton_OnClick(button) Perfy_Trace(Perfy_GetTime(), "Enter", "RAF:RecruitmentButton_OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:1002:0");
 	-- Ensure RecruitAFriendRecruitmentFrame is loaded
 	if not RecruitAFriendRecruitmentFrame then
 		LoadAddOn("Blizzard_RecruitAFriend")
@@ -1007,7 +1007,7 @@ function RAF:RecruitmentButton_OnClick(button)
 	
 	if not RecruitAFriendRecruitmentFrame then
 		-- BFL:DebugPrint("Error: Could not load RecruitAFriendRecruitmentFrame")
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:RecruitmentButton_OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:1002:0"); return
 	end
 	
 	-- Toggle recruitment frame (exact Blizzard logic)
@@ -1023,4 +1023,6 @@ function RAF:RecruitmentButton_OnClick(button)
 		
 		StaticPopupSpecial_Show(RecruitAFriendRecruitmentFrame)
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "RAF:RecruitmentButton_OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua:1002:0"); end
+
+Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/RAF.lua");

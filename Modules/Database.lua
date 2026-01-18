@@ -1,4 +1,4 @@
--- Modules/Database.lua
+--[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua"); -- Modules/Database.lua
 -- Database module for managing SavedVariables
 
 local ADDON_NAME, BFL = ...
@@ -102,7 +102,7 @@ local defaults = {
 	version = BFL.Version
 }
 
-function DB:Initialize()
+function DB:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "DB:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:105:0");
 	-- Initialize SavedVariables
 	if not BetterFriendlistDB then
 		BetterFriendlistDB = {}
@@ -188,50 +188,50 @@ function DB:Initialize()
 		end
 
 		-- Register callbacks to keep internal DB in sync
-		lib.RegisterCallback(self, "Name_Added", function(_, name, customName)
+		lib.RegisterCallback(self, "Name_Added", function(_, name, customName) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:191:43");
 			self:SetNicknameInternal(name, customName)
-		end)
-		lib.RegisterCallback(self, "Name_Update", function(_, name, customName)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:191:43"); end)
+		lib.RegisterCallback(self, "Name_Update", function(_, name, customName) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:194:44");
 			self:SetNicknameInternal(name, customName)
-		end)
-		lib.RegisterCallback(self, "Name_Removed", function(_, name)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:194:44"); end)
+		lib.RegisterCallback(self, "Name_Removed", function(_, name) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:197:45");
 			self:SetNicknameInternal(name, nil)
-		end)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:197:45"); end)
 	else
 		-- BFL:DebugPrint("Database: CustomNames Library NOT detected.")
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "DB:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:105:0"); end
 
-function DB:GetLibKey(friendUID)
-	if not friendUID then return nil end
+function DB:GetLibKey(friendUID) Perfy_Trace(Perfy_GetTime(), "Enter", "DB:GetLibKey file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:205:0");
+	if not friendUID then Perfy_Trace(Perfy_GetTime(), "Leave", "DB:GetLibKey file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:205:0"); return nil end
 	
 	if friendUID:match("^wow_") then
 		-- WoW: Strip "wow_" prefix for Lib (Name-Realm)
-		return friendUID:gsub("^wow_", "")
+		return Perfy_Trace_Passthrough("Leave", "DB:GetLibKey file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:205:0", friendUID:gsub("^wow_", ""))
 	elseif friendUID:match("^bnet_%d+") then
 		-- BNet ID: Resolve to BattleTag for Lib
 		local bnetID = tonumber(friendUID:match("^bnet_(%d+)"))
 		if bnetID then
 			local accountInfo = C_BattleNet.GetAccountInfoByID(bnetID)
 			if accountInfo and accountInfo.battleTag then
-				return accountInfo.battleTag
+				return Perfy_Trace_Passthrough("Leave", "DB:GetLibKey file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:205:0", accountInfo.battleTag)
 			end
 		end
 	elseif friendUID:match("^bnet_") then
 		-- BNet Tag (legacy/fallback): Strip "bnet_"
-		return friendUID:gsub("^bnet_", "")
+		return Perfy_Trace_Passthrough("Leave", "DB:GetLibKey file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:205:0", friendUID:gsub("^bnet_", ""))
 	elseif friendUID:match("#") then
 		-- Already a BattleTag
-		return friendUID
+		Perfy_Trace(Perfy_GetTime(), "Leave", "DB:GetLibKey file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:205:0"); return friendUID
 	end
 	
 	-- Fallback: Assume it's a WoW name without prefix (shouldn't happen with BFL UIDs but safe to return)
-	return friendUID
+	Perfy_Trace(Perfy_GetTime(), "Leave", "DB:GetLibKey file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:205:0"); return friendUID
 end
 
 -- Internal setter for DB only (used by Sync and SetNickname)
-function DB:SetNicknameInternalDB(key, nickname)
-	if not key then return end
+function DB:SetNicknameInternalDB(key, nickname) Perfy_Trace(Perfy_GetTime(), "Enter", "DB:SetNicknameInternalDB file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:233:0");
+	if not key then Perfy_Trace(Perfy_GetTime(), "Leave", "DB:SetNicknameInternalDB file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:233:0"); return end
 	if not BetterFriendlistDB.nicknames then
 		BetterFriendlistDB.nicknames = {}
 	end
@@ -241,11 +241,11 @@ function DB:SetNicknameInternalDB(key, nickname)
 	else
 		BetterFriendlistDB.nicknames[key] = nil
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "DB:SetNicknameInternalDB file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:233:0"); end
 
 -- Callback handler for CustomNames Sync
-function DB:SetNicknameInternal(name, nickname)
-	if not name then return end
+function DB:SetNicknameInternal(name, nickname) Perfy_Trace(Perfy_GetTime(), "Enter", "DB:SetNicknameInternal file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:247:0");
+	if not name then Perfy_Trace(Perfy_GetTime(), "Leave", "DB:SetNicknameInternal file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:247:0"); return end
 	-- BFL:DebugPrint("DB:SetNicknameInternal (Sync) for " .. tostring(name) .. " to " .. tostring(nickname))
 
 	-- Convert Lib Name back to DB Key
@@ -264,82 +264,82 @@ function DB:SetNicknameInternal(name, nickname)
 	if BFL and BFL.ForceRefreshFriendsList then
 		BFL:ForceRefreshFriendsList()
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "DB:SetNicknameInternal file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:247:0"); end
 
-function DB:MigrateData(oldVersion, newVersion)
+function DB:MigrateData(oldVersion, newVersion) Perfy_Trace(Perfy_GetTime(), "Enter", "DB:MigrateData file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:269:0");
 	-- Future: Add data migration logic here
 	-- print("Migrating data from", oldVersion or "unknown", "to", newVersion)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "DB:MigrateData file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:269:0"); end
 
 -- Get a value from the database
-function DB:Get(key, default)
+function DB:Get(key, default) Perfy_Trace(Perfy_GetTime(), "Enter", "DB:Get file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:275:0");
 	-- If no key provided, return entire database
 	if key == nil then
-		return BetterFriendlistDB
+		return Perfy_Trace_Passthrough("Leave", "DB:Get file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:275:0", BetterFriendlistDB)
 	end
 	
 	if BetterFriendlistDB[key] ~= nil then
-		return BetterFriendlistDB[key]
+		return Perfy_Trace_Passthrough("Leave", "DB:Get file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:275:0", BetterFriendlistDB[key])
 	end
-	return default
+	Perfy_Trace(Perfy_GetTime(), "Leave", "DB:Get file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:275:0"); return default
 end
 
 -- Set a value in the database
-function DB:Set(key, value)
+function DB:Set(key, value) Perfy_Trace(Perfy_GetTime(), "Enter", "DB:Set file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:288:0");
 	BetterFriendlistDB[key] = value
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "DB:Set file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:288:0"); end
 
 -- Get group state (collapsed/expanded)
-function DB:GetGroupState(groupId)
-	return BetterFriendlistDB.groupStates[groupId]
+function DB:GetGroupState(groupId) Perfy_Trace(Perfy_GetTime(), "Enter", "DB:GetGroupState file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:293:0");
+	return Perfy_Trace_Passthrough("Leave", "DB:GetGroupState file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:293:0", BetterFriendlistDB.groupStates[groupId])
 end
 
 -- Set group state
-function DB:SetGroupState(groupId, collapsed)
+function DB:SetGroupState(groupId, collapsed) Perfy_Trace(Perfy_GetTime(), "Enter", "DB:SetGroupState file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:298:0");
 	BetterFriendlistDB.groupStates[groupId] = collapsed
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "DB:SetGroupState file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:298:0"); end
 
 -- Get custom groups
-function DB:GetCustomGroups()
-	return BetterFriendlistDB.customGroups
+function DB:GetCustomGroups() Perfy_Trace(Perfy_GetTime(), "Enter", "DB:GetCustomGroups file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:303:0");
+	return Perfy_Trace_Passthrough("Leave", "DB:GetCustomGroups file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:303:0", BetterFriendlistDB.customGroups)
 end
 
 -- Get custom group info
-function DB:GetCustomGroup(groupId)
-	return BetterFriendlistDB.customGroups[groupId]
+function DB:GetCustomGroup(groupId) Perfy_Trace(Perfy_GetTime(), "Enter", "DB:GetCustomGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:308:0");
+	return Perfy_Trace_Passthrough("Leave", "DB:GetCustomGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:308:0", BetterFriendlistDB.customGroups[groupId])
 end
 
 -- Save custom group
-function DB:SaveCustomGroup(groupId, groupInfo)
+function DB:SaveCustomGroup(groupId, groupInfo) Perfy_Trace(Perfy_GetTime(), "Enter", "DB:SaveCustomGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:313:0");
 	BetterFriendlistDB.customGroups[groupId] = groupInfo
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "DB:SaveCustomGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:313:0"); end
 
 -- Delete custom group
-function DB:DeleteCustomGroup(groupId)
+function DB:DeleteCustomGroup(groupId) Perfy_Trace(Perfy_GetTime(), "Enter", "DB:DeleteCustomGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:318:0");
 	BetterFriendlistDB.customGroups[groupId] = nil
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "DB:DeleteCustomGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:318:0"); end
 
 -- Get friend's groups
-function DB:GetFriendGroups(friendUID)
+function DB:GetFriendGroups(friendUID) Perfy_Trace(Perfy_GetTime(), "Enter", "DB:GetFriendGroups file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:323:0");
 	-- If friendUID is provided, return groups for that specific friend
 	if friendUID then
-		return BetterFriendlistDB.friendGroups[friendUID] or {}
+		return Perfy_Trace_Passthrough("Leave", "DB:GetFriendGroups file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:323:0", BetterFriendlistDB.friendGroups[friendUID] or {})
 	end
 	-- If no friendUID provided, return ALL friendGroups mappings
-	return BetterFriendlistDB.friendGroups or {}
+	return Perfy_Trace_Passthrough("Leave", "DB:GetFriendGroups file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:323:0", BetterFriendlistDB.friendGroups or {})
 end
 
 -- Set friend's groups
-function DB:SetFriendGroups(friendUID, groups)
+function DB:SetFriendGroups(friendUID, groups) Perfy_Trace(Perfy_GetTime(), "Enter", "DB:SetFriendGroups file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:333:0");
 	if not groups or #groups == 0 then
 		BetterFriendlistDB.friendGroups[friendUID] = nil
 	else
 		BetterFriendlistDB.friendGroups[friendUID] = groups
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "DB:SetFriendGroups file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:333:0"); end
 
 -- Add friend to group
-function DB:AddFriendToGroup(friendUID, groupId)
+function DB:AddFriendToGroup(friendUID, groupId) Perfy_Trace(Perfy_GetTime(), "Enter", "DB:AddFriendToGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:342:0");
 	if not BetterFriendlistDB.friendGroups[friendUID] then
 		BetterFriendlistDB.friendGroups[friendUID] = {}
 	end
@@ -347,18 +347,18 @@ function DB:AddFriendToGroup(friendUID, groupId)
 	-- Check if already in group
 	for _, gid in ipairs(BetterFriendlistDB.friendGroups[friendUID]) do
 		if gid == groupId then
-			return false -- Already in group
+			Perfy_Trace(Perfy_GetTime(), "Leave", "DB:AddFriendToGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:342:0"); return false -- Already in group
 		end
 	end
 	
 	table.insert(BetterFriendlistDB.friendGroups[friendUID], groupId)
-	return true
+	Perfy_Trace(Perfy_GetTime(), "Leave", "DB:AddFriendToGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:342:0"); return true
 end
 
 -- Remove friend from group
-function DB:RemoveFriendFromGroup(friendUID, groupId)
+function DB:RemoveFriendFromGroup(friendUID, groupId) Perfy_Trace(Perfy_GetTime(), "Enter", "DB:RemoveFriendFromGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:359:0");
 	if not BetterFriendlistDB.friendGroups[friendUID] then
-		return false
+		Perfy_Trace(Perfy_GetTime(), "Leave", "DB:RemoveFriendFromGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:359:0"); return false
 	end
 	
 	for i = #BetterFriendlistDB.friendGroups[friendUID], 1, -1 do
@@ -370,40 +370,40 @@ function DB:RemoveFriendFromGroup(friendUID, groupId)
 				BetterFriendlistDB.friendGroups[friendUID] = nil
 			end
 			
-			return true
+			Perfy_Trace(Perfy_GetTime(), "Leave", "DB:RemoveFriendFromGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:359:0"); return true
 		end
 	end
 	
-	return false
+	Perfy_Trace(Perfy_GetTime(), "Leave", "DB:RemoveFriendFromGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:359:0"); return false
 end
 
 -- Check if friend is in group
-function DB:IsFriendInGroup(friendUID, groupId)
+function DB:IsFriendInGroup(friendUID, groupId) Perfy_Trace(Perfy_GetTime(), "Enter", "DB:IsFriendInGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:381:0");
 	if not BetterFriendlistDB.friendGroups[friendUID] then
-		return false
+		Perfy_Trace(Perfy_GetTime(), "Leave", "DB:IsFriendInGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:381:0"); return false
 	end
 	
 	for _, gid in ipairs(BetterFriendlistDB.friendGroups[friendUID]) do
 		if gid == groupId then
-			return true
+			Perfy_Trace(Perfy_GetTime(), "Leave", "DB:IsFriendInGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:381:0"); return true
 		end
 	end
 	
-	return false
+	Perfy_Trace(Perfy_GetTime(), "Leave", "DB:IsFriendInGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:381:0"); return false
 end
 
 -- Get all friends in database
-function DB:GetAllFriendUIDs()
+function DB:GetAllFriendUIDs() Perfy_Trace(Perfy_GetTime(), "Enter", "DB:GetAllFriendUIDs file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:396:0");
 	local uids = {}
 	for uid in pairs(BetterFriendlistDB.friendGroups) do
 		table.insert(uids, uid)
 	end
-	return uids
+	Perfy_Trace(Perfy_GetTime(), "Leave", "DB:GetAllFriendUIDs file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:396:0"); return uids
 end
 
 -- Get nickname
-function DB:GetNickname(friendUID)
-	if not friendUID then return nil end
+function DB:GetNickname(friendUID) Perfy_Trace(Perfy_GetTime(), "Enter", "DB:GetNickname file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:405:0");
+	if not friendUID then Perfy_Trace(Perfy_GetTime(), "Leave", "DB:GetNickname file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:405:0"); return nil end
 	
 	local libKey = self:GetLibKey(friendUID)
 	
@@ -413,7 +413,7 @@ function DB:GetNickname(friendUID)
 		local customName = lib.Get(libKey)
 		if customName and customName ~= libKey then
 			-- BFL:DebugPrint("DB:GetNickname (Lib) found for " .. tostring(libKey) .. ": " .. tostring(customName))
-			return customName
+			Perfy_Trace(Perfy_GetTime(), "Leave", "DB:GetNickname file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:405:0"); return customName
 		end
 	end
 
@@ -431,12 +431,12 @@ function DB:GetNickname(friendUID)
 	if nickname then
 		-- BFL:DebugPrint("DB:GetNickname (Internal) found for " .. tostring(dbKey) .. ": " .. tostring(nickname))
 	end
-	return nickname
+	Perfy_Trace(Perfy_GetTime(), "Leave", "DB:GetNickname file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:405:0"); return nickname
 end
 
 -- Set nickname
-function DB:SetNickname(friendUID, nickname)
-	if not friendUID then return end
+function DB:SetNickname(friendUID, nickname) Perfy_Trace(Perfy_GetTime(), "Enter", "DB:SetNickname file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:438:0");
+	if not friendUID then Perfy_Trace(Perfy_GetTime(), "Leave", "DB:SetNickname file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:438:0"); return end
 	
 	local libKey = self:GetLibKey(friendUID)
 	-- BFL:DebugPrint("DB:SetNickname called for " .. tostring(friendUID) .. " -> LibKey: " .. tostring(libKey) .. " Value: " .. tostring(nickname))
@@ -459,4 +459,6 @@ function DB:SetNickname(friendUID, nickname)
 	end
 	
 	self:SetNicknameInternalDB(dbKey, nickname)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "DB:SetNickname file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua:438:0"); end
+
+Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Database.lua");

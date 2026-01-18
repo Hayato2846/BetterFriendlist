@@ -1,4 +1,4 @@
---[[
+--[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua"); --[[
     NotificationSystem - Simple Toast Notifications
     Clean, working implementation without AlertFrame complexity
 --]]
@@ -15,7 +15,7 @@ local toastInitialized = false
 local activeToasts = nil
 
 -- Get active toast frames (lazy initialization)
-local function GetActiveToasts()
+local function GetActiveToasts() Perfy_Trace(Perfy_GetTime(), "Enter", "GetActiveToasts file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:18:6");
     if not activeToasts then
         activeToasts = {
             _G["BFL_FriendNotificationToast1"],
@@ -27,11 +27,11 @@ local function GetActiveToasts()
         for i, frame in ipairs(activeToasts) do
             if not frame then
                 -- BFL:DebugPrint("|cffff0000BFL:NotificationSystem:|r Toast frame " .. i .. " not found!")
-                return nil
+                Perfy_Trace(Perfy_GetTime(), "Leave", "GetActiveToasts file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:18:6"); return nil
             end
         end
     end
-    return activeToasts
+    Perfy_Trace(Perfy_GetTime(), "Leave", "GetActiveToasts file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:18:6"); return activeToasts
 end
 
 --[[--------------------------------------------------
@@ -39,8 +39,8 @@ end
     CRITICAL: Nothing in this module should work if Beta Features are disabled
 --]]--------------------------------------------------
 
-local function IsBetaEnabled()
-    return BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures == true
+local function IsBetaEnabled() Perfy_Trace(Perfy_GetTime(), "Enter", "IsBetaEnabled file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:42:6");
+    return Perfy_Trace_Passthrough("Leave", "IsBetaEnabled file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:42:6", BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures == true)
 end
 
 --[[--------------------------------------------------
@@ -48,22 +48,22 @@ end
 --]]--------------------------------------------------
 
 -- Find next available toast slot (up to 3 simultaneous toasts)
-local function GetAvailableToastSlot()
+local function GetAvailableToastSlot() Perfy_Trace(Perfy_GetTime(), "Enter", "GetAvailableToastSlot file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:51:6");
     local toasts = GetActiveToasts()
     if not toasts then
         -- BFL:DebugPrint("|cffff0000BFL:NotificationSystem:|r Toast frames not available!")
-        return nil
+        Perfy_Trace(Perfy_GetTime(), "Leave", "GetAvailableToastSlot file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:51:6"); return nil
     end
     
     for i, frame in ipairs(toasts) do
         if frame and not frame:IsShown() then
-            return frame
+            Perfy_Trace(Perfy_GetTime(), "Leave", "GetAvailableToastSlot file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:51:6"); return frame
         end
     end
-    return nil -- All 3 slots occupied
+    Perfy_Trace(Perfy_GetTime(), "Leave", "GetAvailableToastSlot file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:51:6"); return nil -- All 3 slots occupied
 end
 
-local function ShowToast(name, message, icon)
+local function ShowToast(name, message, icon) Perfy_Trace(Perfy_GetTime(), "Enter", "ShowToast file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:66:6");
     -- Find available toast slot
     local frame = GetAvailableToastSlot()
     
@@ -71,7 +71,7 @@ local function ShowToast(name, message, icon)
         -- All 3 slots occupied, queue it
         table.insert(notificationQueue, {name = name, message = message, icon = icon})
         -- BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r All 3 toast slots occupied, queued notification")
-        return true
+        Perfy_Trace(Perfy_GetTime(), "Leave", "ShowToast file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:66:6"); return true
     end
     
     -- Set content
@@ -103,53 +103,53 @@ local function ShowToast(name, message, icon)
     frame:Show()
     frame.FadeIn:Play()
     
-    return true
+    Perfy_Trace(Perfy_GetTime(), "Leave", "ShowToast file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:66:6"); return true
 end
 
-local function InitializeToast()
-    if toastInitialized then return end
+local function InitializeToast() Perfy_Trace(Perfy_GetTime(), "Enter", "InitializeToast file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:109:6");
+    if toastInitialized then Perfy_Trace(Perfy_GetTime(), "Leave", "InitializeToast file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:109:6"); return end
     
     local toasts = GetActiveToasts()
     if not toasts then
         -- BFL:DebugPrint("|cffff0000BFL:NotificationSystem:|r Cannot initialize toasts - frames not found!")
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "InitializeToast file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:109:6"); return
     end
     
     -- Set up animation callbacks for all 3 toast frames
     for i, frame in ipairs(toasts) do
         
         -- FadeIn -> FadeOut
-        frame.FadeIn:SetScript("OnFinished", function(self)
+        frame.FadeIn:SetScript("OnFinished", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:122:45");
             self:GetParent().FadeOut:Play()
-        end)
+        Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:122:45"); end)
         
         -- FadeOut -> Hide and process queue
-        frame.FadeOut:SetScript("OnFinished", function(self)
+        frame.FadeOut:SetScript("OnFinished", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:127:46");
             local toast = self:GetParent()
             toast:Hide()
             
             -- Show next queued notification (after small delay for smooth transition)
             if #notificationQueue > 0 then
                 local next = table.remove(notificationQueue, 1)
-                C_Timer.After(0.3, function()
+                C_Timer.After(0.3, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:134:35");
                     ShowToast(next.name, next.message, next.icon)
-                end)
+                Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:134:35"); end)
             end
-        end)
+        Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:127:46"); end)
     end
     
     toastInitialized = true
     -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Initialized 3 toast frames")
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "InitializeToast file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:109:6"); end
 
 --[[--------------------------------------------------
     Public API
 --]]--------------------------------------------------
 
-function NotificationSystem:ShowNotification(friendName, message, iconTexture)
+function NotificationSystem:ShowNotification(friendName, message, iconTexture) Perfy_Trace(Perfy_GetTime(), "Enter", "NotificationSystem:ShowNotification file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:149:0");
     -- CRITICAL: Block if Beta Features disabled
     if not IsBetaEnabled() then
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:ShowNotification file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:149:0"); return
     end
     
     -- Initialize on first use
@@ -171,14 +171,14 @@ function NotificationSystem:ShowNotification(friendName, message, iconTexture)
         -- BFL:DebugPrint(string.format("|cff00ff00%s|r %s", friendName, message))
     end
     -- "disabled" - do nothing
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:ShowNotification file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:149:0"); end
 
-function NotificationSystem:ShowTestNotification()
+function NotificationSystem:ShowTestNotification() Perfy_Trace(Perfy_GetTime(), "Enter", "NotificationSystem:ShowTestNotification file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:176:0");
     -- CRITICAL: Block if Beta Features disabled
     if not IsBetaEnabled() then
         print("|cffff0000BetterFriendlist:|r " .. BFL.L.NOTIFICATION_BETA_REQUIRED)
         print("|cffffcc00[>]|r " .. BFL.L.NOTIFICATION_BETA_ENABLE_HINT)
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:ShowTestNotification file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:176:0"); return
     end
     
     -- Initialize if needed
@@ -207,15 +207,15 @@ function NotificationSystem:ShowTestNotification()
     )
     
     -- BFL:DebugPrint("Test notification triggered! (Mode: " .. (BetterFriendlistDB.notificationDisplayMode or "alert") .. ")")
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:ShowTestNotification file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:176:0"); end
 
 -- Test group notification rules
-function NotificationSystem:TestGroupRules()
+function NotificationSystem:TestGroupRules() Perfy_Trace(Perfy_GetTime(), "Enter", "NotificationSystem:TestGroupRules file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:213:0");
     -- CRITICAL: Block if Beta Features disabled
     if not IsBetaEnabled() then
         print("|cffff0000BetterFriendlist:|r " .. BFL.L.NOTIFICATION_BETA_REQUIRED)
         print("|cffffcc00[>]|r " .. BFL.L.NOTIFICATION_BETA_ENABLE_HINT)
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:TestGroupRules file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:213:0"); return
     end
     
     print("|cff00ff00BetterFriendlist:|r Testing Group Notification Rules...")
@@ -225,13 +225,13 @@ function NotificationSystem:TestGroupRules()
     local numBNet = BNGetNumFriends()
     if numBNet == 0 then
         print("|cffffcc00[>]|r " .. BFL.L.NOTIFICATION_TEST_NO_BNET)
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:TestGroupRules file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:213:0"); return
     end
     
     local accountInfo = C_BattleNet.GetFriendAccountInfo(1)
     if not accountInfo then
         print("|cffffcc00[>]|r " .. BFL.L.NOTIFICATION_TEST_NO_INFO)
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:TestGroupRules file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:213:0"); return
     end
     
     local battleTag = accountInfo.battleTag or "Unknown"
@@ -274,46 +274,46 @@ function NotificationSystem:TestGroupRules()
     end
     
     print("|cff00ff00" .. BFL.L.NOTIFICATION_TEST_COMPLETE .. "|r")
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:TestGroupRules file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:213:0"); end
 
 -- ========================================
 -- Event System
 -- ========================================
 
-function NotificationSystem:RegisterEvents()
+function NotificationSystem:RegisterEvents() Perfy_Trace(Perfy_GetTime(), "Enter", "NotificationSystem:RegisterEvents file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:283:0");
     -- CRITICAL: Do NOT register events if Beta Features disabled
     if not IsBetaEnabled() then
         -- BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Events NOT registered (Beta Features disabled)")
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:RegisterEvents file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:283:0"); return
     end
     
     -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Registering events (Beta Features enabled)")
     
     -- BattleNet Friend Online
-    BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_ONLINE", function(bnetAccountID)
+    BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_ONLINE", function(bnetAccountID) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:293:58");
         self:OnFriendOnline("BNET", bnetAccountID)
-    end)
+    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:293:58"); end)
     
     -- BattleNet Friend Offline
-    BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_OFFLINE", function(bnetAccountID)
+    BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_OFFLINE", function(bnetAccountID) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:298:59");
         self:OnFriendOffline("BNET", bnetAccountID)
-    end)
+    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:298:59"); end)
     
     -- WoW Friends (need to track status changes)
-    BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function()
+    BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:303:51");
         self:OnFriendListUpdate()
-    end)
+    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:303:51"); end)
     
     -- Phase 11.5: BattleNet Friend Info Changed (game/character changes)
-    BFL:RegisterEventCallback("BN_FRIEND_INFO_CHANGED", function()
+    BFL:RegisterEventCallback("BN_FRIEND_INFO_CHANGED", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:308:56");
         self:OnFriendInfoChanged()
-    end)
+    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:308:56"); end)
     
     -- Initialize friend state cache on PLAYER_LOGIN (avoid false positives on addon load)
-    BFL:RegisterEventCallback("PLAYER_LOGIN", function()
+    BFL:RegisterEventCallback("PLAYER_LOGIN", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:313:46");
         self:InitializeFriendStateCache()
-    end)
-end
+    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:313:46"); end)
+Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:RegisterEvents file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:283:0"); end
 
 -- Track previous online state for WoW friends
 NotificationSystem.lastWoWFriendState = {}
@@ -329,17 +329,17 @@ NotificationSystem.friendStateCache = {}
 
 -- Check if friend should trigger notification based on rules
 -- Returns: shouldNotify (bool), isWhitelisted (bool), ruleSource (string)
-function NotificationSystem:CheckNotificationRules(friendUID)
+function NotificationSystem:CheckNotificationRules(friendUID) Perfy_Trace(Perfy_GetTime(), "Enter", "NotificationSystem:CheckNotificationRules file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:332:0");
     -- 1. Check per-friend rule (HIGHEST PRIORITY)
     if BetterFriendlistDB.notificationFriendRules then
         local friendRule = BetterFriendlistDB.notificationFriendRules[friendUID]
         
         if friendRule == "blacklist" then
             -- BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Friend " .. friendUID .. " is blacklisted (per-friend rule)")
-            return false, false, "friend-blacklist"
+            Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:CheckNotificationRules file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:332:0"); return false, false, "friend-blacklist"
         elseif friendRule == "whitelist" then
             -- BFL:DebugPrint("|cf00ffffBFL:NotificationSystem:|r Friend " .. friendUID .. " is whitelisted (per-friend rule)")
-            return true, true, "friend-whitelist"  -- Bypass quiet time + cooldown
+            Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:CheckNotificationRules file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:332:0"); return true, true, "friend-whitelist"  -- Bypass quiet time + cooldown
         end
     end
     
@@ -368,10 +368,10 @@ function NotificationSystem:CheckNotificationRules(friendUID)
         -- Priority: Whitelist > Blacklist
         if hasWhitelist then
             -- BFL:DebugPrint("|cf00ffffBFL:NotificationSystem:|r Friend " .. friendUID .. " is whitelisted (group: " .. whitelistGroup .. ")")
-            return true, true, "group-whitelist"  -- Bypass quiet time + cooldown
+            Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:CheckNotificationRules file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:332:0"); return true, true, "group-whitelist"  -- Bypass quiet time + cooldown
         elseif hasBlacklist then
             -- BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Friend " .. friendUID .. " is blacklisted (group: " .. blacklistGroup .. ")")
-            return false, false, "group-blacklist"
+            Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:CheckNotificationRules file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:332:0"); return false, false, "group-blacklist"
         end
     end
     
@@ -388,10 +388,10 @@ function NotificationSystem:CheckNotificationRules(friendUID)
                         local favRule = BetterFriendlistDB.notificationGroupRules["favorites"]
                         if favRule == "whitelist" then
                             -- BFL:DebugPrint("|cf00ffffBFL:NotificationSystem:|r Friend " .. friendUID .. " is whitelisted (favorites group)")
-                            return true, true, "favorites-whitelist"
+                            Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:CheckNotificationRules file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:332:0"); return true, true, "favorites-whitelist"
                         elseif favRule == "blacklist" then
                             -- BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Friend " .. friendUID .. " is blacklisted (favorites group)")
-                            return false, false, "favorites-blacklist"
+                            Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:CheckNotificationRules file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:332:0"); return false, false, "favorites-blacklist"
                         end
                     end
                     break
@@ -402,7 +402,7 @@ function NotificationSystem:CheckNotificationRules(friendUID)
     
     -- 4. Default: Use global settings (no special rule)
     -- BFL:DebugPrint("|cf00ffffBFL:NotificationSystem:|r Friend " .. friendUID .. " using default (global settings)")
-    return true, false, "global"
+    Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:CheckNotificationRules file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:332:0"); return true, false, "global"
 end
 
 -- Flag to track if initial state has been captured
@@ -434,31 +434,31 @@ local GLOBAL_COOLDOWN_DURATION = 5
 local OFFLINE_DEBOUNCE_DURATION = 5
 
 -- Check if notification is on cooldown for specific event type
-function NotificationSystem:IsOnCooldown(friendUID, eventType)
+function NotificationSystem:IsOnCooldown(friendUID, eventType) Perfy_Trace(Perfy_GetTime(), "Enter", "NotificationSystem:IsOnCooldown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:437:0");
     eventType = eventType or "online" -- Default to online if not specified
     
     if not self.cooldownTimers[friendUID] then
-        return false
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:IsOnCooldown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:437:0"); return false
     end
     
     -- Check Global Cooldown
     local lastGlobal = self.cooldownTimers[friendUID]["global"]
     if lastGlobal and (GetTime() - lastGlobal < GLOBAL_COOLDOWN_DURATION) then
-        return true
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:IsOnCooldown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:437:0"); return true
     end
     
     local lastShown = self.cooldownTimers[friendUID][eventType]
     if not lastShown then
-        return false
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:IsOnCooldown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:437:0"); return false
     end
     
     local duration = COOLDOWN_DURATIONS[eventType] or 30
     local elapsed = GetTime() - lastShown
-    return elapsed < duration
+    return Perfy_Trace_Passthrough("Leave", "NotificationSystem:IsOnCooldown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:437:0", elapsed < duration)
 end
 
 -- Set cooldown for specific event type
-function NotificationSystem:SetCooldown(friendUID, eventType)
+function NotificationSystem:SetCooldown(friendUID, eventType) Perfy_Trace(Perfy_GetTime(), "Enter", "NotificationSystem:SetCooldown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:461:0");
     eventType = eventType or "online" -- Default to online if not specified
     
     if not self.cooldownTimers[friendUID] then
@@ -471,10 +471,10 @@ function NotificationSystem:SetCooldown(friendUID, eventType)
     
     local duration = COOLDOWN_DURATIONS[eventType] or 30
     -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Cooldown set for " .. friendUID .. " [" .. eventType .. "] (" .. duration .. "s)")
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:SetCooldown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:461:0"); end
 
 -- Clean up expired cooldowns (called periodically)
-function NotificationSystem:CleanupCooldowns()
+function NotificationSystem:CleanupCooldowns() Perfy_Trace(Perfy_GetTime(), "Enter", "NotificationSystem:CleanupCooldowns file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:477:0");
     local currentTime = GetTime()
 	local friendsToRemove = {}
 	
@@ -508,7 +508,7 @@ function NotificationSystem:CleanupCooldowns()
 	if #friendsToRemove > 0 then
 		-- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Cooldown cleanup complete (removed " .. #friendsToRemove .. " expired friends)")
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:CleanupCooldowns file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:477:0"); end
 
 --[[--------------------------------------------------
     Friend State Tracking (Phase 11.5)
@@ -516,14 +516,14 @@ end
 --]]--------------------------------------------------
 
 -- Get cached friend state
-function NotificationSystem:GetFriendState(bnetAccountID)
-    return self.friendStateCache[bnetAccountID]
+function NotificationSystem:GetFriendState(bnetAccountID) Perfy_Trace(Perfy_GetTime(), "Enter", "NotificationSystem:GetFriendState file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:519:0");
+    return Perfy_Trace_Passthrough("Leave", "NotificationSystem:GetFriendState file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:519:0", self.friendStateCache[bnetAccountID])
 end
 
 -- Initialize friend state cache (called on PLAYER_LOGIN)
-function NotificationSystem:InitializeFriendStateCache()
+function NotificationSystem:InitializeFriendStateCache() Perfy_Trace(Perfy_GetTime(), "Enter", "NotificationSystem:InitializeFriendStateCache file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:524:0");
     if self.initialStateLoaded then
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:InitializeFriendStateCache file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:524:0"); return
     end
     
     -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Initializing friend state cache...")
@@ -547,13 +547,13 @@ function NotificationSystem:InitializeFriendStateCache()
     
     self.initialStateLoaded = true
     -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Friend state cache initialized with " .. numBNetFriends .. " friends")
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:InitializeFriendStateCache file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:524:0"); end
 
 -- Update friend state and return what changed
 -- Returns: changeType ("wowLogin", "charSwitch", "gameSwitch", nil)
-function NotificationSystem:UpdateFriendState(bnetAccountID, accountInfo)
+function NotificationSystem:UpdateFriendState(bnetAccountID, accountInfo) Perfy_Trace(Perfy_GetTime(), "Enter", "NotificationSystem:UpdateFriendState file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:554:0");
     if not accountInfo or not accountInfo.gameAccountInfo then
-        return nil
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:UpdateFriendState file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:554:0"); return nil
     end
     
     local gameInfo = accountInfo.gameAccountInfo
@@ -568,7 +568,7 @@ function NotificationSystem:UpdateFriendState(bnetAccountID, accountInfo)
     -- This prevents false "char switch" detections when data is temporarily missing
     if currentState.clientProgram == "WoW" and (not currentState.characterName or currentState.characterName == "") then
         -- BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Ignoring state update for " .. bnetAccountID .. " (characterName is nil/empty)")
-        return nil
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:UpdateFriendState file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:554:0"); return nil
     end
     
     local previousState = self:GetFriendState(bnetAccountID)
@@ -588,7 +588,7 @@ function NotificationSystem:UpdateFriendState(bnetAccountID, accountInfo)
             
             -- Store current state but don't trigger notification
             self.friendStateCache[bnetAccountID] = currentState
-            return nil, previousState, currentState
+            Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:UpdateFriendState file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:554:0"); return nil, previousState, currentState
         end
         
         -- Detect WoW Login (wasn't in WoW, now is)
@@ -623,21 +623,21 @@ function NotificationSystem:UpdateFriendState(bnetAccountID, accountInfo)
     -- Store current state
     self.friendStateCache[bnetAccountID] = currentState
     
-    return changeType, previousState, currentState
+    Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:UpdateFriendState file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:554:0"); return changeType, previousState, currentState
 end
 
 -- Check group triggers (Phase 10)
 local TRIGGER_COOLDOWN = 300 -- 5 minutes between trigger notifications
 
-function NotificationSystem:CheckGroupTriggers()
+function NotificationSystem:CheckGroupTriggers() Perfy_Trace(Perfy_GetTime(), "Enter", "NotificationSystem:CheckGroupTriggers file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:632:0");
     if not BetterFriendlistDB.notificationGroupTriggers then
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:CheckGroupTriggers file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:632:0"); return
     end
     
     -- Get Groups module to access group membership
     local Groups = BFL:GetModule("Groups")
     if not Groups then
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:CheckGroupTriggers file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:632:0"); return
     end
     
     local currentTime = GetTime()
@@ -668,10 +668,10 @@ function NotificationSystem:CheckGroupTriggers()
             end
         end
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:CheckGroupTriggers file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:632:0"); end
 
 -- Count online friends in a specific group
-function NotificationSystem:CountOnlineFriendsInGroup(groupId)
+function NotificationSystem:CountOnlineFriendsInGroup(groupId) Perfy_Trace(Perfy_GetTime(), "Enter", "NotificationSystem:CountOnlineFriendsInGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:674:0");
     local count = 0
     
     -- Get all Battle.net friends
@@ -717,26 +717,26 @@ function NotificationSystem:CountOnlineFriendsInGroup(groupId)
         end
     end
     
-    return count
+    Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:CountOnlineFriendsInGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:674:0"); return count
 end
 
 -- Check if in quiet mode (combat, instance, manual DND, scheduled)
-local function IsQuietTime()
+local function IsQuietTime() Perfy_Trace(Perfy_GetTime(), "Enter", "IsQuietTime file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:724:6");
     -- Manual DND mode (highest priority)
     if BetterFriendlistDB.notificationQuietManual then
-        return true
+        Perfy_Trace(Perfy_GetTime(), "Leave", "IsQuietTime file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:724:6"); return true
     end
     
     -- Combat detection
     if BetterFriendlistDB.notificationQuietCombat and UnitAffectingCombat("player") then
-        return true
+        Perfy_Trace(Perfy_GetTime(), "Leave", "IsQuietTime file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:724:6"); return true
     end
     
     -- Instance detection (dungeons, raids, battlegrounds, arenas)
     if BetterFriendlistDB.notificationQuietInstance then
         local inInstance, instanceType = IsInInstance()
         if inInstance and (instanceType == "party" or instanceType == "raid" or instanceType == "pvp" or instanceType == "arena") then
-            return true
+            Perfy_Trace(Perfy_GetTime(), "Leave", "IsQuietTime file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:724:6"); return true
         end
     end
     
@@ -754,22 +754,22 @@ local function IsQuietTime()
         if startMinutes > endMinutes then
             -- e.g., 22:00 (1320) - 08:00 (480)
             if currentMinutes >= startMinutes or currentMinutes < endMinutes then
-                return true
+                Perfy_Trace(Perfy_GetTime(), "Leave", "IsQuietTime file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:724:6"); return true
             end
         else
             -- e.g., 08:00 (480) - 22:00 (1320)
             if currentMinutes >= startMinutes and currentMinutes < endMinutes then
-                return true
+                Perfy_Trace(Perfy_GetTime(), "Leave", "IsQuietTime file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:724:6"); return true
             end
         end
     end
     
-    return false
+    Perfy_Trace(Perfy_GetTime(), "Leave", "IsQuietTime file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:724:6"); return false
 end
 
 -- Replace template variables in custom message (Phase 11 + 11.5)
-function NotificationSystem:ReplaceMessageTemplate(template, friendData)
-    if not template then return nil end
+function NotificationSystem:ReplaceMessageTemplate(template, friendData) Perfy_Trace(Perfy_GetTime(), "Enter", "NotificationSystem:ReplaceMessageTemplate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:771:0");
+    if not template then Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:ReplaceMessageTemplate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:771:0"); return nil end
     
     local message = template
     message = message:gsub("%%name%%", friendData.name or "Unknown")
@@ -782,17 +782,17 @@ function NotificationSystem:ReplaceMessageTemplate(template, friendData)
     message = message:gsub("%%char%%", friendData.char or "")
     message = message:gsub("%%prevchar%%", friendData.prevchar or "")
     
-    return message
+    Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:ReplaceMessageTemplate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:771:0"); return message
 end
 
-function NotificationSystem:OnFriendOnline(friendType, bnetAccountID)
+function NotificationSystem:OnFriendOnline(friendType, bnetAccountID) Perfy_Trace(Perfy_GetTime(), "Enter", "NotificationSystem:OnFriendOnline file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:788:0");
     -- CRITICAL: Block if Beta Features disabled (defense in depth)
     if not IsBetaEnabled() then
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:OnFriendOnline file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:788:0"); return
     end
     
     if not BetterFriendlistDB.notificationDisplayMode or BetterFriendlistDB.notificationDisplayMode == "disabled" then
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:OnFriendOnline file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:788:0"); return
     end
     
     -- Get friend info FIRST (need friendUID for rule checking)
@@ -839,7 +839,7 @@ function NotificationSystem:OnFriendOnline(friendType, bnetAccountID)
         
         if not shouldNotify then
             -- Blacklisted (friend or group)
-            return
+            Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:OnFriendOnline file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:788:0"); return
         end
         
         if isWhitelisted then
@@ -853,19 +853,19 @@ function NotificationSystem:OnFriendOnline(friendType, bnetAccountID)
             else
                 -- BFL:DebugPrint("|cffff0000BFL:NotificationSystem:|r Invalid friendUID - skipping whitelisted notification (online)")
             end
-            return
+            Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:OnFriendOnline file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:788:0"); return
         end
     end
     
     -- Check quiet time (only if NOT whitelisted)
     if IsQuietTime() then
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:OnFriendOnline file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:788:0"); return
     end
     
     -- Check cooldown (anti-spam)
     if friendUID and self:IsOnCooldown(friendUID) then
         -- BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Friend " .. friendUID .. " on cooldown, skipping")
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:OnFriendOnline file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:788:0"); return
     end
     
     if friendName then
@@ -884,16 +884,16 @@ function NotificationSystem:OnFriendOnline(friendType, bnetAccountID)
     
     -- Check group triggers (Phase 10)
     self:CheckGroupTriggers()
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:OnFriendOnline file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:788:0"); end
 
-function NotificationSystem:OnFriendOffline(friendType, bnetAccountID)
+function NotificationSystem:OnFriendOffline(friendType, bnetAccountID) Perfy_Trace(Perfy_GetTime(), "Enter", "NotificationSystem:OnFriendOffline file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:889:0");
     -- CRITICAL: Block if Beta Features disabled (defense in depth)
-    if not IsBetaEnabled() then return end
+    if not IsBetaEnabled() then Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:OnFriendOffline file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:889:0"); return end
     
     -- Check if offline notifications are enabled
-    if not BetterFriendlistDB.notificationOfflineEnabled then return end
+    if not BetterFriendlistDB.notificationOfflineEnabled then Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:OnFriendOffline file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:889:0"); return end
     
-    if not BetterFriendlistDB.notificationDisplayMode or BetterFriendlistDB.notificationDisplayMode == "disabled" then return end
+    if not BetterFriendlistDB.notificationDisplayMode or BetterFriendlistDB.notificationDisplayMode == "disabled" then Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:OnFriendOffline file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:889:0"); return end
     
     -- Construct UID for timer
     local friendUID
@@ -904,30 +904,30 @@ function NotificationSystem:OnFriendOffline(friendType, bnetAccountID)
         end
     end
     
-    if not friendUID then return end
+    if not friendUID then Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:OnFriendOffline file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:889:0"); return end
     
     -- Start Debounce Timer
     if self.offlineTimers[friendUID] then self.offlineTimers[friendUID]:Cancel() end
     
-    self.offlineTimers[friendUID] = C_Timer.After(OFFLINE_DEBOUNCE_DURATION, function()
+    self.offlineTimers[friendUID] = C_Timer.After(OFFLINE_DEBOUNCE_DURATION, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:912:77");
         self.offlineTimers[friendUID] = nil
         self:ProcessFriendOffline(friendType, bnetAccountID)
-    end)
-end
+    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:912:77"); end)
+Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:OnFriendOffline file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:889:0"); end
 
-function NotificationSystem:ProcessFriendOffline(friendType, bnetAccountID)
+function NotificationSystem:ProcessFriendOffline(friendType, bnetAccountID) Perfy_Trace(Perfy_GetTime(), "Enter", "NotificationSystem:ProcessFriendOffline file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:918:0");
     -- CRITICAL: Block if Beta Features disabled (defense in depth)
     if not IsBetaEnabled() then
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:ProcessFriendOffline file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:918:0"); return
     end
     
     -- Check if offline notifications are enabled
     if not BetterFriendlistDB.notificationOfflineEnabled then
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:ProcessFriendOffline file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:918:0"); return
     end
     
     if not BetterFriendlistDB.notificationDisplayMode or BetterFriendlistDB.notificationDisplayMode == "disabled" then
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:ProcessFriendOffline file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:918:0"); return
     end
     
     -- Get friend info FIRST (need friendUID for rule checking)
@@ -964,7 +964,7 @@ function NotificationSystem:ProcessFriendOffline(friendType, bnetAccountID)
         
         if not shouldNotify then
             -- Blacklisted (friend or group)
-            return
+            Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:ProcessFriendOffline file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:918:0"); return
         end
         
         if isWhitelisted then
@@ -977,18 +977,18 @@ function NotificationSystem:ProcessFriendOffline(friendType, bnetAccountID)
             else
                 -- BFL:DebugPrint("|cffff0000BFL:NotificationSystem:|r Invalid friendUID - skipping whitelisted notification (offline)")
             end
-            return
+            Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:ProcessFriendOffline file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:918:0"); return
         end
     end
     
     -- Check quiet time (only if NOT whitelisted)
     if IsQuietTime() then
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:ProcessFriendOffline file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:918:0"); return
     end
         -- Check cooldown (anti-spam for rapid on/off) - use 'offline' event type (30s)
     if friendUID and self:IsOnCooldown(friendUID, "offline") then
         -- BFL:DebugPrint("|cffffcc00BFL:NotificationSystem:|r Friend " .. friendUID .. " on cooldown [offline], skipping offline notification")
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:ProcessFriendOffline file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:918:0"); return
     end
     
     if friendName then
@@ -1002,21 +1002,36 @@ function NotificationSystem:ProcessFriendOffline(friendType, bnetAccountID)
             self:SetCooldown(friendUID, "offline")
         end
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:ProcessFriendOffline file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:918:0"); end
 
 --[[--------------------------------------------------
     Phase 11.5: Game/Character Change Detection
 --]]--------------------------------------------------
 
-function NotificationSystem:OnFriendInfoChanged()
+function NotificationSystem:OnFriendInfoChanged() Perfy_Trace(Perfy_GetTime(), "Enter", "NotificationSystem:OnFriendInfoChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:1011:0");
     -- CRITICAL: Block if Beta Features disabled
     if not IsBetaEnabled() then
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:OnFriendInfoChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:1011:0"); return
     end
+    
+    -- Phase 9.4: Throttle high-frequency updates (0.5s debounce)
+    if self.infoChangeTimer then
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:OnFriendInfoChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:1011:0"); return
+    end
+    
+    self.infoChangeTimer = C_Timer.After(0.5, function()
+        self.infoChangeTimer = nil
+        self:ProcessFriendInfoChanges()
+    end)
+    Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:OnFriendInfoChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:1011:0"); end
+
+function NotificationSystem:ProcessFriendInfoChanges()
+    -- CRITICAL: Block if Beta Features disabled
+    if not IsBetaEnabled() then return end
     
     -- Check if notification system is enabled
     if not BetterFriendlistDB.notificationDisplayMode or BetterFriendlistDB.notificationDisplayMode == "disabled" then
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:OnFriendInfoChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:1011:0"); return
     end
     
     -- BN_FRIEND_INFO_CHANGED doesn't pass parameters, iterate through all BNet friends
@@ -1131,21 +1146,21 @@ function NotificationSystem:OnFriendInfoChanged()
             end -- End if changeType check
         end -- End if accountInfo check
     end -- End for loop
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:OnFriendInfoChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:1011:0"); end
 
-function NotificationSystem:OnFriendListUpdate()
+function NotificationSystem:OnFriendListUpdate() Perfy_Trace(Perfy_GetTime(), "Enter", "NotificationSystem:OnFriendListUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:1136:0");
     -- CRITICAL: Block if Beta Features disabled (defense in depth)
     if not IsBetaEnabled() then
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:OnFriendListUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:1136:0"); return
     end
     
     if not BetterFriendlistDB.notificationDisplayMode or BetterFriendlistDB.notificationDisplayMode == "disabled" then
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:OnFriendListUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:1136:0"); return
     end
     
     -- Check quiet time
     if IsQuietTime() then
-        return
+        Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:OnFriendListUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:1136:0"); return
     end
     
     -- Track WoW friend status changes
@@ -1174,7 +1189,7 @@ function NotificationSystem:OnFriendListUpdate()
             self.lastWoWFriendState[friendUID] = isOnline
         end
     end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:OnFriendListUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:1136:0"); end
 
 -- Compatibility properties for Core.lua checks
 NotificationSystem.initialized = true
@@ -1184,20 +1199,22 @@ NotificationSystem.quietMode = false
     Initialization
 --]]--------------------------------------------------
 
-function NotificationSystem:Initialize()
+function NotificationSystem:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "NotificationSystem:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:1187:0");
     -- Register events for friend online/offline notifications
     self:RegisterEvents()
     
     -- Set up cooldown cleanup timer (runs every 60 seconds)
-    C_Timer.NewTicker(60, function()
+    C_Timer.NewTicker(60, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:1192:26");
         if IsBetaEnabled() then
             self:CleanupCooldowns()
             -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Cooldown cleanup completed")
         end
-    end)
+    Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:1192:26"); end)
     
     -- BFL:DebugPrint("|cff00ffffBFL:NotificationSystem:|r Module initialized (Cooldown: 30s, Cleanup: 60s)")
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "NotificationSystem:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua:1187:0"); end
 
 -- Export
 BFL.NotificationSystem = NotificationSystem
+
+Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/NotificationSystem_Simple.lua");

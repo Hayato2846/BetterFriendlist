@@ -1,4 +1,4 @@
---[[
+--[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua"); --[[
 	QuickJoinCallbacks.lua
 	
 	UI Glue Layer for Quick Join Frame
@@ -18,18 +18,18 @@ local UI = BFL.UI.CONSTANTS
 -- QUICK JOIN FRAME CALLBACKS
 -- ========================================
 
-function BetterQuickJoinFrame_OnLoad(self)
+function BetterQuickJoinFrame_OnLoad(self) Perfy_Trace(Perfy_GetTime(), "Enter", "BetterQuickJoinFrame_OnLoad file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:21:0");
 	-- Classic Guard: QuickJoin/Social Queue is Retail-only
 	if BFL.IsClassic or not BFL.HasQuickJoin then
 		-- BFL:DebugPrint("|cffffcc00QuickJoinCallbacks:|r Not available in Classic - frame hidden")
 		self:Hide()
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "BetterQuickJoinFrame_OnLoad file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:21:0"); return
 	end
 	
 	-- Fix: Elements are nested inside ContentInset
 	local contentInset = self.ContentInset
 	if not contentInset then
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "BetterQuickJoinFrame_OnLoad file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:21:0"); return
 	end
 	
 	local scrollBox = contentInset.ScrollBoxContainer and contentInset.ScrollBoxContainer.ScrollBox
@@ -46,7 +46,7 @@ function BetterQuickJoinFrame_OnLoad(self)
 		-- BFL:DebugPrint("|cff00ffffQuickJoinCallbacks:|r Classic mode - skipping ScrollBox init")
 		self.QuickJoin = BFL and BFL:GetModule("QuickJoin")
 		self.selectedGUID = nil
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "BetterQuickJoinFrame_OnLoad file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:21:0"); return
 	end
 	
 	-- Retail: Initialize ScrollBox
@@ -55,7 +55,7 @@ function BetterQuickJoinFrame_OnLoad(self)
 		local view = CreateScrollBoxListLinearView()
 		
 		-- Element initializer - button setup
-		view:SetElementInitializer("BetterQuickJoinGroupButtonTemplate", function(button, elementData)
+		view:SetElementInitializer("BetterQuickJoinGroupButtonTemplate", function(button, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:58:67");
 			-- elementData is a QuickJoinEntry from QuickJoin module
 			-- It has ApplyToFrame() method that dynamically creates FontStrings
 			
@@ -83,11 +83,11 @@ function BetterQuickJoinFrame_OnLoad(self)
 			if button.Highlight then
 				button.Highlight:SetAlpha(selected and 0 or UI.ALPHA_DIMMED)
 			end
-		end)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:58:67"); end)
 		
 		-- Dynamic height calculator (matches Blizzard's approach)
-		view:SetElementExtentCalculator(function(dataIndex, elementData)
-			return elementData:CalculateHeight()
+		view:SetElementExtentCalculator(function(dataIndex, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:89:34");
+			return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:89:34", elementData:CalculateHeight())
 		end)
 		
 		-- Initialize ScrollBox with view
@@ -111,41 +111,41 @@ function BetterQuickJoinFrame_OnLoad(self)
 	-- Store reference to QuickJoin module
 	self.QuickJoin = BFL and BFL:GetModule("QuickJoin")
 	self.selectedGUID = nil
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "BetterQuickJoinFrame_OnLoad file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:21:0"); end
 
-function BetterQuickJoinFrame_OnShow(self)
+function BetterQuickJoinFrame_OnShow(self) Perfy_Trace(Perfy_GetTime(), "Enter", "BetterQuickJoinFrame_OnShow file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:116:0");
 	-- Get QuickJoin module directly from BFL (more reliable)
 	local QuickJoin = BFL and BFL:GetModule("QuickJoin")
 	if QuickJoin then
 		-- Register update callback
-		QuickJoin:SetUpdateCallback(function()
+		QuickJoin:SetUpdateCallback(function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:121:30");
 			BetterQuickJoinFrame_Update(self)
-		 end)
+		 Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:121:30"); end)
 		
 		QuickJoin:Update(true)  -- Force immediate update
 	end
 	
 	-- Initial UI update
 	BetterQuickJoinFrame_Update(self)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "BetterQuickJoinFrame_OnShow file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:116:0"); end
 
-function BetterQuickJoinFrame_OnHide(self)
+function BetterQuickJoinFrame_OnHide(self) Perfy_Trace(Perfy_GetTime(), "Enter", "BetterQuickJoinFrame_OnHide file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:132:0");
 	-- Cleanup
 	local QuickJoin = BFL and BFL:GetModule("QuickJoin")
 	if QuickJoin then
 		QuickJoin:SetUpdateCallback(nil)
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "BetterQuickJoinFrame_OnHide file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:132:0"); end
 
-function BetterQuickJoinFrame_Update(self)
+function BetterQuickJoinFrame_Update(self) Perfy_Trace(Perfy_GetTime(), "Enter", "BetterQuickJoinFrame_Update file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:140:0");
 	if not self or not self.ScrollBox then 
-		return 
+		Perfy_Trace(Perfy_GetTime(), "Leave", "BetterQuickJoinFrame_Update file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:140:0"); return 
 	end
 	
 	-- Get QuickJoin module directly from BFL (more reliable than storing reference)
 	local QuickJoin = BFL and BFL:GetModule("QuickJoin")
 	if not QuickJoin then 
-		return 
+		Perfy_Trace(Perfy_GetTime(), "Leave", "BetterQuickJoinFrame_Update file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:140:0"); return 
 	end
 	
 	-- Get QuickJoin entries (these are QuickJoinEntry objects with ApplyToFrame and CalculateHeight methods)
@@ -164,14 +164,14 @@ function BetterQuickJoinFrame_Update(self)
 	
 	-- Update Join button state (handles "already in group" and "combat" edge cases)
 	QuickJoin:UpdateJoinButtonState()
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "BetterQuickJoinFrame_Update file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:140:0"); end
 
 -- ========================================
 -- Quick Join Button Functions (Blizzard-style callbacks)
 -- ========================================
 
-function BetterQuickJoinGroupButton_OnEnter(self)
-	if not self.entry then return end
+function BetterQuickJoinGroupButton_OnEnter(self) Perfy_Trace(Perfy_GetTime(), "Enter", "BetterQuickJoinGroupButton_OnEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:173:0");
+	if not self.entry then Perfy_Trace(Perfy_GetTime(), "Leave", "BetterQuickJoinGroupButton_OnEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:173:0"); return end
 	
 	-- Update entry's groupInfo reference to get latest data (for dynamic updates like member count changes)
 	local QuickJoin = BFL and BFL:GetModule("QuickJoin")
@@ -194,9 +194,9 @@ function BetterQuickJoinGroupButton_OnEnter(self)
 	if self.HoverHighlight then
 		self.HoverHighlight:Show()
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "BetterQuickJoinGroupButton_OnEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:173:0"); end
 
-function BetterQuickJoinGroupButton_OnLeave(self)
+function BetterQuickJoinGroupButton_OnLeave(self) Perfy_Trace(Perfy_GetTime(), "Enter", "BetterQuickJoinGroupButton_OnLeave file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:199:0");
 	GameTooltip:Hide()
 	
 	-- Hide hover highlight and restore selection if needed
@@ -209,16 +209,16 @@ function BetterQuickJoinGroupButton_OnLeave(self)
 	if QuickJoin and self.guid == QuickJoin.selectedGUID and self.Selected then
 		self.Selected:Show()
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "BetterQuickJoinGroupButton_OnLeave file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:199:0"); end
 
-function BetterQuickJoinGroupButton_OnClick(self, button)
+function BetterQuickJoinGroupButton_OnClick(self, button) Perfy_Trace(Perfy_GetTime(), "Enter", "BetterQuickJoinGroupButton_OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:214:0");
 	local QuickJoin = BFL and BFL:GetModule("QuickJoin")
-	if not QuickJoin then return end
+	if not QuickJoin then Perfy_Trace(Perfy_GetTime(), "Leave", "BetterQuickJoinGroupButton_OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:214:0"); return end
 	
 	-- Edge Case: Don't allow selection/interaction during combat
 	if InCombatLockdown() then
 		UIErrorsFrame:AddMessage(ERR_NOT_IN_COMBAT, 1.0, 0.1, 0.1, 1.0)
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "BetterQuickJoinGroupButton_OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:214:0"); return
 	end
 	
 	if button == "LeftButton" then
@@ -230,15 +230,15 @@ function BetterQuickJoinGroupButton_OnClick(self, button)
 		-- Show context menu
 		QuickJoin:OpenContextMenu(self.guid, self)
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "BetterQuickJoinGroupButton_OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:214:0"); end
 
 -- Join Queue Button Handler
-function BetterQuickJoinFrame_JoinQueueButton_OnClick(self)
+function BetterQuickJoinFrame_JoinQueueButton_OnClick(self) Perfy_Trace(Perfy_GetTime(), "Enter", "BetterQuickJoinFrame_JoinQueueButton_OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:236:0");
 	local QuickJoin = BFL and BFL:GetModule("QuickJoin")
 	if QuickJoin then
 		QuickJoin:JoinQueue()
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "BetterQuickJoinFrame_JoinQueueButton_OnClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua:236:0"); end
 
 -- ========================================
 -- DEPRECATED: Custom Role Selection Frame
@@ -312,3 +312,5 @@ function BetterQuickJoinGroupButton_OnJoinClick(button)
 	frame:Hide()
 end
 --]] -- End of DEPRECATED code
+
+Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\UI/QuickJoinCallbacks.lua");

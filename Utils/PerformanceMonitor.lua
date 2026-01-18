@@ -1,4 +1,4 @@
---[[
+--[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua"); --[[
 	Performance Monitor Utility
 	
 	Provides performance profiling for BetterFriendlist operations.
@@ -37,16 +37,16 @@ PerformanceMonitor.activeTimers = {}
 --[[
 	Start timing an operation
 ]]
-function PerformanceMonitor:Start(operation)
+function PerformanceMonitor:Start(operation) Perfy_Trace(Perfy_GetTime(), "Enter", "PerformanceMonitor:Start file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:40:0");
 	self.activeTimers[operation] = debugprofilestop()
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PerformanceMonitor:Start file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:40:0"); end
 
 --[[
 	Stop timing an operation and record statistics
 ]]
-function PerformanceMonitor:Stop(operation)
+function PerformanceMonitor:Stop(operation) Perfy_Trace(Perfy_GetTime(), "Enter", "PerformanceMonitor:Stop file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:47:0");
 	local startTime = self.activeTimers[operation]
-	if not startTime then return end
+	if not startTime then Perfy_Trace(Perfy_GetTime(), "Leave", "PerformanceMonitor:Stop file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:47:0"); return end
 	
 	local elapsed = debugprofilestop() - startTime
 	self.activeTimers[operation] = nil
@@ -68,12 +68,12 @@ function PerformanceMonitor:Stop(operation)
 	if elapsed > 50 then -- 50ms threshold (= 20 FPS)
 		print(string.format("|cffff0000[Performance Warning]|r %s took %.2f ms (threshold: 50ms)", operation, elapsed))
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PerformanceMonitor:Stop file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:47:0"); end
 
 --[[
 	Record a single measurement without start/stop
 ]]
-function PerformanceMonitor:Record(operation, elapsedTime)
+function PerformanceMonitor:Record(operation, elapsedTime) Perfy_Trace(Perfy_GetTime(), "Enter", "PerformanceMonitor:Record file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:76:0");
 	local stat = self.stats[operation]
 	if not stat then
 		stat = { count = 0, totalTime = 0, maxTime = 0, minTime = math.huge }
@@ -88,12 +88,12 @@ function PerformanceMonitor:Record(operation, elapsedTime)
 	if elapsedTime > 50 then
 		print(string.format("|cffff0000[Performance Warning]|r %s took %.2f ms (threshold: 50ms)", operation, elapsedTime))
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PerformanceMonitor:Record file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:76:0"); end
 
 --[[
 	Sample current memory usage
 ]]
-function PerformanceMonitor:SampleMemory()
+function PerformanceMonitor:SampleMemory() Perfy_Trace(Perfy_GetTime(), "Enter", "PerformanceMonitor:SampleMemory file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:96:0");
 	UpdateAddOnMemoryUsage()
 	local memory = GetAddOnMemoryUsage("BetterFriendlist") or 0
 	
@@ -108,21 +108,21 @@ function PerformanceMonitor:SampleMemory()
 	if #self.stats.memory_samples > 100 then
 		table.remove(self.stats.memory_samples, 1)
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PerformanceMonitor:SampleMemory file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:96:0"); end
 
 --[[
 	Get average time for an operation
 ]]
-function PerformanceMonitor:GetAverage(operation)
+function PerformanceMonitor:GetAverage(operation) Perfy_Trace(Perfy_GetTime(), "Enter", "PerformanceMonitor:GetAverage file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:116:0");
 	local stat = self.stats[operation]
-	if not stat or stat.count == 0 then return 0 end
-	return stat.totalTime / stat.count
+	if not stat or stat.count == 0 then Perfy_Trace(Perfy_GetTime(), "Leave", "PerformanceMonitor:GetAverage file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:116:0"); return 0 end
+	return Perfy_Trace_Passthrough("Leave", "PerformanceMonitor:GetAverage file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:116:0", stat.totalTime / stat.count)
 end
 
 --[[
 	Reset all statistics
 ]]
-function PerformanceMonitor:Reset()
+function PerformanceMonitor:Reset() Perfy_Trace(Perfy_GetTime(), "Enter", "PerformanceMonitor:Reset file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:125:0");
 	for operation, stat in pairs(self.stats) do
 		if type(stat) == "table" and stat.count then
 			stat.count = 0
@@ -134,12 +134,12 @@ function PerformanceMonitor:Reset()
 	self.stats.memory_samples = {}
 	self.stats.memory_max = 0
 	print(BFL.L.PERF_HEADER_PREFIX .. " " .. BFL.L.PERF_STATS_RESET)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PerformanceMonitor:Reset file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:125:0"); end
 
 --[[
 	Print performance report
 ]]
-function PerformanceMonitor:Report()
+function PerformanceMonitor:Report() Perfy_Trace(Perfy_GetTime(), "Enter", "PerformanceMonitor:Report file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:142:0");
 	print(BFL.L.PERF_REPORT_HEADER)
 	print("")
 	
@@ -194,19 +194,19 @@ function PerformanceMonitor:Report()
 		
 		print(string.format("|cffffd700Overall Assessment:|r %s (%.1f FPS)", status, fps))
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PerformanceMonitor:Report file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:142:0"); end
 
 --[[
 	Print single operation statistics
 ]]
-function PerformanceMonitor:PrintOperation(operation, displayName)
+function PerformanceMonitor:PrintOperation(operation, displayName) Perfy_Trace(Perfy_GetTime(), "Enter", "PerformanceMonitor:PrintOperation file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:202:0");
 	local stat = self.stats[operation]
 	if not stat or stat.count == 0 then
 		print(string.format("  %s: No data", displayName))
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "PerformanceMonitor:PrintOperation file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:202:0"); return
 	end
 	
-	if stat.count == 0 then return end
+	if stat.count == 0 then Perfy_Trace(Perfy_GetTime(), "Leave", "PerformanceMonitor:PrintOperation file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:202:0"); return end
 	local avg = stat.totalTime / stat.count
 	local status = avg < 16.6 and "✓" or avg < 50 and "⚠" or "✗"
 	
@@ -215,54 +215,56 @@ function PerformanceMonitor:PrintOperation(operation, displayName)
 	print(string.format("    Avg: %.2f ms", avg))
 	print(string.format("    Min: %.2f ms", stat.minTime == math.huge and 0 or stat.minTime))
 	print(string.format("    Max: %.2f ms", stat.maxTime))
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PerformanceMonitor:PrintOperation file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:202:0"); end
 
 --[[
 	Enable automatic performance monitoring
 ]]
-function PerformanceMonitor:EnableAutoMonitoring()
+function PerformanceMonitor:EnableAutoMonitoring() Perfy_Trace(Perfy_GetTime(), "Enter", "PerformanceMonitor:EnableAutoMonitoring file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:223:0");
 	-- Hook into QuickJoin:Update
 	local QuickJoin = BFL:GetModule("QuickJoin")
 	if QuickJoin then
 		local originalUpdate = QuickJoin.Update
-		QuickJoin.Update = function(self, ...)
+		QuickJoin.Update = function(self, ...) Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin.Update file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:228:21");
 			PerformanceMonitor:Start("quickjoin_update")
 			local result = originalUpdate(self, ...)
 			PerformanceMonitor:Stop("quickjoin_update")
-			return result
+			Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin.Update file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:228:21"); return result
 		end
 		
 		local originalGetGroupInfo = QuickJoin.GetGroupInfo
-		QuickJoin.GetGroupInfo = function(self, ...)
+		QuickJoin.GetGroupInfo = function(self, ...) Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin.GetGroupInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:236:27");
 			PerformanceMonitor:Start("quickjoin_getgroupinfo")
 			local result = originalGetGroupInfo(self, ...)
 			PerformanceMonitor:Stop("quickjoin_getgroupinfo")
-			return result
+			Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin.GetGroupInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:236:27"); return result
 		end
 		
 		local originalGetEntries = QuickJoin.GetEntries
-		QuickJoin.GetEntries = function(self, ...)
+		QuickJoin.GetEntries = function(self, ...) Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin.GetEntries file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:244:25");
 			PerformanceMonitor:Start("quickjoin_getentries")
 			local result = originalGetEntries(self, ...)
 			PerformanceMonitor:Stop("quickjoin_getentries")
-			return result
+			Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin.GetEntries file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:244:25"); return result
 		end
 	end
 	
 	-- Memory sampling timer
-	C_Timer.NewTicker(5, function()
+	C_Timer.NewTicker(5, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:253:22");
 		PerformanceMonitor:SampleMemory()
-	end)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:253:22"); end)
 	
 	print(BFL.L.PERF_HEADER_PREFIX .. " " .. BFL.L.PERF_AUTO_ENABLED)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PerformanceMonitor:EnableAutoMonitoring file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:223:0"); end
 
 -- Legacy slash command (redirects to /bfl perf)
 -- Kept for backwards compatibility
 SLASH_BFLPERF1 = "/bflperf"
-SlashCmdList["BFLPERF"] = function(msg)
+SlashCmdList["BFLPERF"] = function(msg) Perfy_Trace(Perfy_GetTime(), "Enter", "SlashCmdList.BFLPERF file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:263:26");
 	-- Redirect to main /bfl command
 	local cmd = msg and msg:lower():trim() or ""
 	if cmd == "" then cmd = "report" end
 	SlashCmdList["BETTERFRIENDLIST"]("perf " .. cmd)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "SlashCmdList.BFLPERF file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua:263:26"); end
+
+Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Utils/PerformanceMonitor.lua");

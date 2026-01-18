@@ -1,4 +1,4 @@
---------------------------------------------------------------------------
+--[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua"); --------------------------------------------------------------------------
 -- Dialogs Module - StaticPopup Dialog Management
 --------------------------------------------------------------------------
 -- This module manages all StaticPopup dialogs for the addon including:
@@ -17,14 +17,14 @@ local Dialogs = BFL:RegisterModule("Dialogs", {})
 -- Dialog Registration
 --------------------------------------------------------------------------
 
-function Dialogs:RegisterDialogs()
+function Dialogs:RegisterDialogs() Perfy_Trace(Perfy_GetTime(), "Enter", "Dialogs:RegisterDialogs file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:20:0");
 	-- Dialog for creating a new group
 	StaticPopupDialogs["BETTER_FRIENDLIST_CREATE_GROUP"] = {
 		text = L.DIALOG_CREATE_GROUP_TEXT,
 		button1 = L.DIALOG_CREATE_GROUP_BTN1,
 		button2 = L.DIALOG_CREATE_GROUP_BTN2,
 		hasEditBox = true,
-		OnAccept = function(self)
+		OnAccept = function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:27:13");
 			local groupName = self.EditBox:GetText()
 			if groupName and groupName ~= "" then
 				local Groups = BFL:GetModule("Groups")
@@ -36,8 +36,8 @@ function Dialogs:RegisterDialogs()
 					end
 				end
 			end
-		end,
-		EditBoxOnEnterPressed = function(self)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:27:13"); end,
+		EditBoxOnEnterPressed = function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:40:26");
 			local parent = self:GetParent()
 			local groupName = self:GetText()
 			if groupName and groupName ~= "" then
@@ -49,13 +49,13 @@ function Dialogs:RegisterDialogs()
 				end
 			end
 			parent:Hide()
-		end,
-		EditBoxOnEscapePressed = function(self)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:40:26"); end,
+		EditBoxOnEscapePressed = function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:53:27");
 			self:GetParent():Hide()
-		end,
-		OnShow = function(self)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:53:27"); end,
+		OnShow = function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:56:11");
 			self.EditBox:SetFocus()
-		end,
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:56:11"); end,
 		timeout = 0,
 		whileDead = true,
 		hideOnEscape = true,
@@ -68,7 +68,7 @@ function Dialogs:RegisterDialogs()
 		button1 = L.DIALOG_CREATE_GROUP_BTN1,
 		button2 = L.DIALOG_CREATE_GROUP_BTN2,
 		hasEditBox = true,
-		OnAccept = function(self, friendUID)
+		OnAccept = function(self, friendUID) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:71:13");
 			local groupName = self.EditBox:GetText()
 			if groupName and groupName ~= "" then
 				local Groups = BFL:GetModule("Groups")
@@ -83,8 +83,8 @@ function Dialogs:RegisterDialogs()
 					end
 				end
 			end
-		end,
-		EditBoxOnEnterPressed = function(self, friendUID)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:71:13"); end,
+		EditBoxOnEnterPressed = function(self, friendUID) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:87:26");
 			local parent = self:GetParent()
 			local groupName = self:GetText()
 			if groupName and groupName ~= "" then
@@ -100,13 +100,13 @@ function Dialogs:RegisterDialogs()
 				end
 			end
 			parent:Hide()
-		end,
-		EditBoxOnEscapePressed = function(self)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:87:26"); end,
+		EditBoxOnEscapePressed = function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:104:27");
 			self:GetParent():Hide()
-		end,
-		OnShow = function(self)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:104:27"); end,
+		OnShow = function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:107:11");
 			self.EditBox:SetFocus()
-		end,
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:107:11"); end,
 		timeout = 0,
 		whileDead = true,
 		hideOnEscape = true,
@@ -119,7 +119,7 @@ function Dialogs:RegisterDialogs()
 		button1 = L.DIALOG_RENAME_GROUP_BTN1,
 		button2 = L.DIALOG_RENAME_GROUP_BTN2,
 		hasEditBox = true,
-		OnAccept = function(self, data)
+		OnAccept = function(self, data) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:122:13");
 			local newName = self.EditBox:GetText()
 			if newName and newName ~= "" then
 				local FriendsList = BFL and BFL:GetModule("FriendsList")
@@ -137,8 +137,8 @@ function Dialogs:RegisterDialogs()
 					end
 				end
 			end
-		end,
-		EditBoxOnEnterPressed = function(self, data)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:122:13"); end,
+		EditBoxOnEnterPressed = function(self, data) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:141:26");
 			local parent = self:GetParent()
 			local newName = self:GetText()
 			if newName and newName ~= "" then
@@ -158,11 +158,11 @@ function Dialogs:RegisterDialogs()
 				end
 			end
 			parent:Hide()
-		end,
-		EditBoxOnEscapePressed = function(self)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:141:26"); end,
+		EditBoxOnEscapePressed = function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:162:27");
 			self:GetParent():Hide()
-		end,
-		OnShow = function(self, data)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:162:27"); end,
+		OnShow = function(self, data) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:165:11");
 			-- Get group info from Groups module
 			local Groups = BFL and BFL:GetModule("Groups")
 			local groupName = ""
@@ -177,7 +177,7 @@ function Dialogs:RegisterDialogs()
 			self.EditBox:SetText(groupName)
 			self.EditBox:SetFocus()
 			self.EditBox:HighlightText()
-		end,
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:165:11"); end,
 		timeout = 0,
 		whileDead = true,
 		hideOnEscape = true,
@@ -189,13 +189,13 @@ function Dialogs:RegisterDialogs()
 		text = L.DIALOG_DELETE_GROUP_TEXT,
 		button1 = L.DIALOG_DELETE_GROUP_BTN1,
 		button2 = L.DIALOG_DELETE_GROUP_BTN2,
-		OnAccept = function(self, data)
+		OnAccept = function(self, data) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:192:13");
 			local groupId = data
 			local FriendsList = BFL:GetModule("FriendsList")
 			if FriendsList then
 				FriendsList:DeleteGroup(groupId)
 			end
-		end,
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:192:13"); end,
 		timeout = 0,
 		whileDead = true,
 		hideOnEscape = true,
@@ -207,7 +207,7 @@ function Dialogs:RegisterDialogs()
 		text = BFL.L.DIALOG_RESET_LAYOUTS_TEXT,
 		button1 = BFL.L.DIALOG_RESET_LAYOUTS_BTN1,
 		button2 = BFL.L.DIALOG_RESET_BTN2, -- Cancel
-		OnAccept = function(self)
+		OnAccept = function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:210:13");
 			-- Clear all layout data
 			BetterFriendlistDB.mainFrameSize = {}
 			BetterFriendlistDB.mainFramePosition = {}
@@ -228,7 +228,7 @@ function Dialogs:RegisterDialogs()
 			
 			-- BFL:DebugPrint("|cff00ff00All Edit Mode layouts reset to default|r")
 			print("|cff00ffffBetterFriendlist:|r " .. BFL.L.MSG_LAYOUTS_RESET)
-		end,
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:210:13"); end,
 		timeout = 0,
 		whileDead = true,
 		hideOnEscape = true,
@@ -240,15 +240,15 @@ function Dialogs:RegisterDialogs()
 		text = BFL.L.DIALOG_UI_PANEL_RELOAD_TEXT or "Changing the UI Hierarchy setting requires a UI reload.\n\nReload now?",
 		button1 = BFL.L.DIALOG_UI_PANEL_RELOAD_BTN1 or "Reload",
 		button2 = BFL.L.DIALOG_UI_PANEL_RELOAD_BTN2 or "Cancel",
-		OnAccept = function(self)
+		OnAccept = function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:243:13");
 			local DB = BFL:GetModule("DB")
 			if DB and DB.pendingUIPanelSystemChange ~= nil then
 				DB:Set("useUIPanelSystem", DB.pendingUIPanelSystemChange)
 				DB.pendingUIPanelSystemChange = nil
 				ReloadUI()
 			end
-		end,
-		OnCancel = function(self)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:243:13"); end,
+		OnCancel = function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:251:13");
 			local DB = BFL:GetModule("DB")
 			if DB then
 				DB.pendingUIPanelSystemChange = nil
@@ -257,7 +257,7 @@ function Dialogs:RegisterDialogs()
 					BFL.Settings:RefreshSettingsPanel()
 				end
 			end
-		end,
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:251:13"); end,
 		timeout = 0,
 		whileDead = true,
 		hideOnEscape = true,
@@ -267,10 +267,10 @@ function Dialogs:RegisterDialogs()
 	-- Add Group Trigger Dialog (Phase 10) - Using proper frame approach like Export/Import
 	local triggerFrame = nil
 	
-	function Dialogs:CreateGroupTriggerDialog()
+	function Dialogs:CreateGroupTriggerDialog() Perfy_Trace(Perfy_GetTime(), "Enter", "Dialogs:CreateGroupTriggerDialog file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:270:1");
 		if triggerFrame then
 			triggerFrame:Show()
-			return
+			Perfy_Trace(Perfy_GetTime(), "Leave", "Dialogs:CreateGroupTriggerDialog file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:270:1"); return
 		end
 		
 		triggerFrame = CreateFrame("Frame", "BFL_GroupTriggerDialog", UIParent, "BasicFrameTemplateWithInset")
@@ -353,14 +353,14 @@ function Dialogs:RegisterDialogs()
 			if _G[name .. "Text"] then _G[name .. "Text"]:SetText("") end
 			
 			-- Update value display when slider changes
-			triggerFrame.thresholdSlider:SetScript("OnValueChanged", function(self, value)
+			triggerFrame.thresholdSlider:SetScript("OnValueChanged", function(self, value) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:356:60");
 				value = math.floor(value + 0.5)
 				triggerFrame.thresholdValue:SetText(tostring(value))
-			end)
+			Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:356:60"); end)
 			
 			-- Helper method for getting value
-			function triggerFrame.thresholdSlider:GetSliderValue()
-				return math.floor(self:GetValue() + 0.5)
+			function triggerFrame.thresholdSlider:GetSliderValue() Perfy_Trace(Perfy_GetTime(), "Enter", "thresholdSlider:GetSliderValue file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:362:3");
+				return Perfy_Trace_Passthrough("Leave", "thresholdSlider:GetSliderValue file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:362:3", math.floor(self:GetValue() + 0.5))
 			end
 		else
 			-- Retail: Use modern MinimalSliderWithSteppersTemplate
@@ -369,15 +369,15 @@ function Dialogs:RegisterDialogs()
 			triggerFrame.thresholdSlider:SetPoint("TOPRIGHT", -15, -140)
 			triggerFrame.thresholdSlider:SetHeight(20)
 			triggerFrame.thresholdSlider:Init(3, 1, 10, 9, {
-				[MinimalSliderWithSteppersMixin.Label.Right] = function(value)
-					return "" -- Empty string, we show value in thresholdValue instead
+				[MinimalSliderWithSteppersMixin.Label.Right] = function(value) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:372:51");
+					Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:372:51"); return "" -- Empty string, we show value in thresholdValue instead
 				end
 			})
 			
 			-- Update value display when slider changes
-			triggerFrame.thresholdSlider:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged, function(_, value)
+			triggerFrame.thresholdSlider:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged, function(_, value) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:378:102");
 				triggerFrame.thresholdValue:SetText(tostring(value))
-			end)
+			Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:378:102"); end)
 		end
 		
 		-- Create button
@@ -385,9 +385,9 @@ function Dialogs:RegisterDialogs()
 		createBtn:SetSize(100, 25)
 		createBtn:SetPoint("BOTTOMRIGHT", -15, 15)
 		createBtn:SetText(BFL.L.DIALOG_TRIGGER_CREATE)
-		createBtn:SetScript("OnClick", function()
+		createBtn:SetScript("OnClick", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:388:33");
 			local Groups = BFL:GetModule("Groups")
-			if not Groups then return end
+			if not Groups then Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:388:33"); return end
 			
 			local selectedGroup = triggerFrame.selectedGroupId
 			-- Get value from display text (more reliable than GetValue)
@@ -395,7 +395,7 @@ function Dialogs:RegisterDialogs()
 			
 			if not selectedGroup then
 				print("|cffff0000BetterFriendlist:|r " .. BFL.L.ERROR_SELECT_GROUP)
-				return
+				Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:388:33"); return
 			end
 			
 			local triggerID = "trigger_" .. selectedGroup .. "_" .. threshold .. "_" .. time()
@@ -421,19 +421,19 @@ function Dialogs:RegisterDialogs()
 			end
 			
 			triggerFrame:Hide()
-		end)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:388:33"); end)
 		
 		-- Cancel button
 		local cancelBtn = CreateFrame("Button", nil, triggerFrame, "UIPanelButtonTemplate")
 		cancelBtn:SetSize(100, 25)
 		cancelBtn:SetPoint("BOTTOMLEFT", 15, 15)
 		cancelBtn:SetText(BFL.L.DIALOG_TRIGGER_CANCEL)
-		cancelBtn:SetScript("OnClick", function()
+		cancelBtn:SetScript("OnClick", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:431:33");
 			triggerFrame:Hide()
-		end)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:431:33"); end)
 		
 		-- OnShow: Populate dropdown and reposition
-		triggerFrame:SetScript("OnShow", function(self)
+		triggerFrame:SetScript("OnShow", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:436:35");
 			-- Reposition next to Settings if open
 			self:ClearAllPoints()
 			if BetterFriendlistSettingsFrame and BetterFriendlistSettingsFrame:IsShown() then
@@ -445,7 +445,7 @@ function Dialogs:RegisterDialogs()
 			local Groups = BFL:GetModule("Groups")
 			if not Groups then
 				self:Hide()
-				return
+				Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:436:35"); return
 			end
 			
 			local allGroups = Groups:GetAll()
@@ -458,12 +458,12 @@ function Dialogs:RegisterDialogs()
 			end
 			
 			-- Sort by order field (same as in Settings UI)
-			table.sort(groupOptions, function(a, b) return a.order < b.order end)
+			table.sort(groupOptions, function(a, b) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:461:28"); return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:461:28", a.order < b.order) end)
 			
 			if #groupOptions == 0 then
 				print("|cffff0000BetterFriendlist:|r " .. BFL.L.ERROR_NO_GROUPS)
 				self:Hide()
-				return
+				Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:436:35"); return
 			end
 			
 			-- Set default
@@ -473,7 +473,7 @@ function Dialogs:RegisterDialogs()
 			if BFL.IsClassic or not BFL.HasModernDropdown then
 				-- Classic: Use UIDropDownMenu_Initialize
 				-- Clssic: Use UIDropDownMenu API
-				UIDropDownMenu_Initialize(self.groupDropdown, function(frame, level)
+				UIDropDownMenu_Initialize(self.groupDropdown, function(frame, level) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:476:50");
 					level = level or 1
 					for _, option in ipairs(groupOptions) do
 						local info = UIDropDownMenu_CreateInfo()
@@ -481,45 +481,45 @@ function Dialogs:RegisterDialogs()
 						info.value = option.id
 						-- Use triggerFrame explicitely to avoid scope issues with 'self'
 						info.checked = (triggerFrame.selectedGroupId == option.id)
-						info.func = function()
+						info.func = function() Perfy_Trace(Perfy_GetTime(), "Enter", "info.func file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:484:18");
 							triggerFrame.selectedGroupId = option.id
 							UIDropDownMenu_SetText(triggerFrame.groupDropdown, option.name)
 							CloseDropDownMenus()
-						end
+						Perfy_Trace(Perfy_GetTime(), "Leave", "info.func file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:484:18"); end
 						UIDropDownMenu_AddButton(info, level)
 					end
-				end)
+				Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:476:50"); end)
 				UIDropDownMenu_SetText(self.groupDropdown, groupOptions[1].name)
 			else
 				-- Retail: Use modern SetupMenu API
-				self.groupDropdown:SetupMenu(function(dropdown, rootDescription)
+				self.groupDropdown:SetupMenu(function(dropdown, rootDescription) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:495:33");
 					for _, option in ipairs(groupOptions) do
-						local button = rootDescription:CreateButton(option.name, function()
+						local button = rootDescription:CreateButton(option.name, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:497:63");
 							self.selectedGroupId = option.id
-						end)
-						button:SetIsSelected(function()
-							return self.selectedGroupId == option.id
+						Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:497:63"); end)
+						button:SetIsSelected(function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:500:27");
+							return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:500:27", self.selectedGroupId == option.id)
 						end)
 					end
-				end)
+				Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:495:33"); end)
 			end
 			
 			-- Reset slider and value display
 			self.thresholdSlider:SetValue(3)
 			self.thresholdValue:SetText("3")
-		end)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:436:35"); end)
 		
 		triggerFrame:Show()
-	end
+	Perfy_Trace(Perfy_GetTime(), "Leave", "Dialogs:CreateGroupTriggerDialog file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:270:1"); end
 	
 	-- Global accessor
-	_G.BFL_ShowGroupTriggerDialog = function()
+	_G.BFL_ShowGroupTriggerDialog = function() Perfy_Trace(Perfy_GetTime(), "Enter", "_G.BFL_ShowGroupTriggerDialog file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:516:33");
 		local Dialogs = BFL:GetModule("Dialogs")
 		if Dialogs then
 			Dialogs:CreateGroupTriggerDialog()
 		end
-	end
-end
+	Perfy_Trace(Perfy_GetTime(), "Leave", "_G.BFL_ShowGroupTriggerDialog file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:516:33"); end
+Perfy_Trace(Perfy_GetTime(), "Leave", "Dialogs:RegisterDialogs file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua:20:0"); end
 
 --------------------------------------------------------------------------
 -- Module Initialization
@@ -528,3 +528,5 @@ end
 -- Auto-register dialogs when module loads
 Dialogs:RegisterDialogs()
 
+
+Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Dialogs.lua");

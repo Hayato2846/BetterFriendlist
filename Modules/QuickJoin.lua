@@ -1,4 +1,4 @@
-﻿--[[
+﻿--[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua"); --[[
 	QuickJoin Module
 	
 	Provides Social Queue functionality for joining friends' groups.
@@ -57,18 +57,18 @@ local updateTimer = nil
 	C_FriendList.GetFriendInfoByGUID() does NOT exist in WoW 11.2!
 	We need to iterate through all friends and match by GUID.
 ]]
-local function GetFriendInfoByGUID(guid)
-	if not guid then return nil end
+local function GetFriendInfoByGUID(guid) Perfy_Trace(Perfy_GetTime(), "Enter", "GetFriendInfoByGUID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:60:6");
+	if not guid then Perfy_Trace(Perfy_GetTime(), "Leave", "GetFriendInfoByGUID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:60:6"); return nil end
 	
 	local numFriends = C_FriendList.GetNumFriends()
 	for i = 1, numFriends do
 		local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
 		if friendInfo and friendInfo.guid == guid then
-			return friendInfo
+			Perfy_Trace(Perfy_GetTime(), "Leave", "GetFriendInfoByGUID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:60:6"); return friendInfo
 		end
 	end
 	
-	return nil
+	Perfy_Trace(Perfy_GetTime(), "Leave", "GetFriendInfoByGUID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:60:6"); return nil
 end
 
 --[[
@@ -79,7 +79,7 @@ end
 	- Mock group member GUIDs are checked against QuickJoin.mockGroups
 	- Returns green color for mock members to distinguish them from real players
 ]]
-function BetterFriendlist_GetRelationshipInfo(guid, missingNameFallback, clubId)
+function BetterFriendlist_GetRelationshipInfo(guid, missingNameFallback, clubId) Perfy_Trace(Perfy_GetTime(), "Enter", "BetterFriendlist_GetRelationshipInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:82:0");
 	-- 1. Check if this is a mock group member first (BetterFriendlist-specific)
 	if QuickJoin and QuickJoin.mockGroups then
 		for groupGUID, mockGroup in pairs(QuickJoin.mockGroups) do
@@ -88,7 +88,7 @@ function BetterFriendlist_GetRelationshipInfo(guid, missingNameFallback, clubId)
 					if member.guid == guid then
 						local name = member.name or member.memberName or "MockPlayer"
 						local mockColor = "|cff00ff00"  -- Green for mock members
-						return name, mockColor, "mock", nil
+						Perfy_Trace(Perfy_GetTime(), "Leave", "BetterFriendlist_GetRelationshipInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:82:0"); return name, mockColor, "mock", nil
 					end
 				end
 			end
@@ -100,7 +100,7 @@ function BetterFriendlist_GetRelationshipInfo(guid, missingNameFallback, clubId)
 	if accountInfo then
 		local accountName = accountInfo.accountName
 		local playerLink = GetBNPlayerLink(accountName, accountName, accountInfo.bnetAccountID, 0, 0, 0)
-		return accountName, FRIENDS_BNET_NAME_COLOR_CODE, "bnfriend", playerLink
+		return Perfy_Trace_Passthrough("Leave", "BetterFriendlist_GetRelationshipInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:82:0", accountName, FRIENDS_BNET_NAME_COLOR_CODE, "bnfriend", playerLink)
 	end
 	
 	-- 3. CRITICAL FIX: GetPlayerInfoByGUID fallback (like Blizzard's SocialQueueUtil_GetRelationshipInfo)
@@ -124,22 +124,22 @@ function BetterFriendlist_GetRelationshipInfo(guid, missingNameFallback, clubId)
 	
 	-- 4. Check WoW friend (with already determined name)
 	if C_FriendList.IsFriend(guid) then
-		return name, FRIENDS_WOW_NAME_COLOR_CODE, "wowfriend", playerLink
+		return Perfy_Trace_Passthrough("Leave", "BetterFriendlist_GetRelationshipInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:82:0", name, FRIENDS_WOW_NAME_COLOR_CODE, "wowfriend", playerLink)
 	end
 	
 	-- 5. Check guild member (with already determined name)
 	if IsGuildMember(guid) then
-		return name, RGBTableToColorCode(ChatTypeInfo.GUILD), "guild", playerLink
+		return Perfy_Trace_Passthrough("Leave", "BetterFriendlist_GetRelationshipInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:82:0", name, RGBTableToColorCode(ChatTypeInfo.GUILD), "guild", playerLink)
 	end
 	
 	-- 6. Check club/community (with already determined name) - FIX: Don't use GetMemberInfoForSelf!
 	local clubInfo = clubId and C_Club.GetClubInfo(clubId) or nil
 	if clubInfo then
-		return name, FRIENDS_WOW_NAME_COLOR_CODE, "club", playerLink
+		return Perfy_Trace_Passthrough("Leave", "BetterFriendlist_GetRelationshipInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:82:0", name, FRIENDS_WOW_NAME_COLOR_CODE, "club", playerLink)
 	end
 	
 	-- 7. Final fallback (name is already set by GetPlayerInfoByGUID)
-	return name, FRIENDS_WOW_NAME_COLOR_CODE, nil, playerLink
+	return Perfy_Trace_Passthrough("Leave", "BetterFriendlist_GetRelationshipInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:82:0", name, FRIENDS_WOW_NAME_COLOR_CODE, nil, playerLink)
 end
 
 --[[
@@ -154,10 +154,10 @@ local relationshipPriorityOrdering = {
 	["club"] = 4,
 }
 
-local function BetterFriendlist_SortGroupMembers(members)
-	if not members then return members end
+local function BetterFriendlist_SortGroupMembers(members) Perfy_Trace(Perfy_GetTime(), "Enter", "BetterFriendlist_SortGroupMembers file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:157:6");
+	if not members then Perfy_Trace(Perfy_GetTime(), "Leave", "BetterFriendlist_SortGroupMembers file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:157:6"); return members end
 	
-	table.sort(members, function(lhs, rhs)
+	table.sort(members, function(lhs, rhs) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:160:21");
 		local lhsName, _, lhsRelationship = BetterFriendlist_GetRelationshipInfo(lhs.guid, nil, lhs.clubId)
 		local rhsName, _, rhsRelationship = BetterFriendlist_GetRelationshipInfo(rhs.guid, nil, rhs.clubId)
 		
@@ -165,14 +165,14 @@ local function BetterFriendlist_SortGroupMembers(members)
 		if lhsRelationship ~= rhsRelationship then
 			local lhsPriority = lhsRelationship and relationshipPriorityOrdering[lhsRelationship] or 10
 			local rhsPriority = rhsRelationship and relationshipPriorityOrdering[rhsRelationship] or 10
-			return lhsPriority < rhsPriority
+			return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:160:21", lhsPriority < rhsPriority)
 		end
 		
 		-- Same relationship type: sort alphabetically by name
-		return strcmputf8i(lhsName or "", rhsName or "") < 0
+		return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:160:21", strcmputf8i(lhsName or "", rhsName or "") < 0)
 	end)
 	
-	return members
+	Perfy_Trace(Perfy_GetTime(), "Leave", "BetterFriendlist_SortGroupMembers file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:157:6"); return members
 end
 
 --[[
@@ -180,13 +180,13 @@ end
 	Checks if the player has a relationship with the group leader
 	Used for auto-accept logic in tooltips
 ]]
-local function BetterFriendlist_HasRelationshipWithLeader(partyGuid)
+local function BetterFriendlist_HasRelationshipWithLeader(partyGuid) Perfy_Trace(Perfy_GetTime(), "Enter", "BetterFriendlist_HasRelationshipWithLeader file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:183:6");
 	local leaderGuid = select(8, C_SocialQueue.GetGroupInfo(partyGuid))
 	if leaderGuid then
 		local _, _, relationship = BetterFriendlist_GetRelationshipInfo(leaderGuid)
-		return relationship ~= nil
+		return Perfy_Trace_Passthrough("Leave", "BetterFriendlist_HasRelationshipWithLeader file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:183:6", relationship ~= nil)
 	end
-	return false
+	Perfy_Trace(Perfy_GetTime(), "Leave", "BetterFriendlist_HasRelationshipWithLeader file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:183:6"); return false
 end
 
 --[[
@@ -194,8 +194,8 @@ end
 	Populates leaderName, leaderColor, and otherFriends from the members list.
 	Shared logic for both Real and Mock groups.
 ]]
-local function PopulateGroupMemberDetails(info)
-	if not info.members then return end
+local function PopulateGroupMemberDetails(info) Perfy_Trace(Perfy_GetTime(), "Enter", "PopulateGroupMemberDetails file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:197:6");
+	if not info.members then Perfy_Trace(Perfy_GetTime(), "Leave", "PopulateGroupMemberDetails file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:197:6"); return end
 	
 	-- Recalculate numMembers from actual member list if not set
 	if not info.numMembers or info.numMembers == 0 then
@@ -237,7 +237,7 @@ local function PopulateGroupMemberDetails(info)
 			end
 		end
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "PopulateGroupMemberDetails file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:197:6"); end
 
 --[[ 
 	Public API 
@@ -247,7 +247,7 @@ end
 local QuickJoinEntry = {}
 QuickJoinEntry.__index = QuickJoinEntry
 
-function QuickJoinEntry:New(guid, groupInfo)
+function QuickJoinEntry:New(guid, groupInfo) Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoinEntry:New file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:250:0");
 	local entry = setmetatable({}, QuickJoinEntry)
 	entry.guid = guid
 	entry.groupInfo = groupInfo or {}
@@ -357,14 +357,14 @@ function QuickJoinEntry:New(guid, groupInfo)
 		}
 	end
 	
-	return entry
+	Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoinEntry:New file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:250:0"); return entry
 end
 
-function QuickJoinEntry:CanJoin()
-	return self.groupInfo and self.groupInfo.canJoin ~= false
+function QuickJoinEntry:CanJoin() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoinEntry:CanJoin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:363:0");
+	return Perfy_Trace_Passthrough("Leave", "QuickJoinEntry:CanJoin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:363:0", self.groupInfo and self.groupInfo.canJoin ~= false)
 end
 
-function QuickJoinEntry:ApplyToTooltip(tooltip)
+function QuickJoinEntry:ApplyToTooltip(tooltip) Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoinEntry:ApplyToTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:367:0");
 	-- Blizzard's EXACT tooltip structure from LFGListUtil_SetSearchEntryTooltip (lines 4154-4312):
 	-- Blizzard uses HELPER FUNCTIONS that apply colors:
 	--   GameTooltip_AddHighlightLine() -> HIGHLIGHT_FONT_COLOR (1.0, 0.82, 0 = GOLD/YELLOW)
@@ -567,19 +567,19 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 		tooltip:AddLine(" ")
 		tooltip:AddLine(L.AUTO_ACCEPT_TOOLTIP, LIGHTBLUE_FONT_COLOR.r, LIGHTBLUE_FONT_COLOR.g, LIGHTBLUE_FONT_COLOR.b)
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoinEntry:ApplyToTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:367:0"); end
 
 -- Initialize the QuickJoin module
-function QuickJoin:Initialize()
+function QuickJoin:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:573:0");
 	-- Classic Guard: QuickJoin/Social Queue is Retail-only
 	if BFL.IsClassic or not BFL.HasQuickJoin then
 		-- BFL:DebugPrint("|cffffcc00BFL QuickJoin:|r Not available in Classic - module disabled")
 		self.initialized = true  -- Prevent future initialization attempts
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:573:0"); return
 	end
 	
 	if self.initialized then
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:573:0"); return
 	end
 	
 	-- Get Social Queue Configuration
@@ -615,9 +615,9 @@ function QuickJoin:Initialize()
 			
 			-- Initialize ScrollBox with Linear View
 			local view = CreateScrollBoxListLinearView()
-			view:SetElementInitializer("BetterFriendlistQuickJoinCardTemplate", function(button, elementData)
+			view:SetElementInitializer("BetterFriendlistQuickJoinCardTemplate", function(button, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:618:71");
 				self:OnScrollBoxInitialize(button, elementData)
-			end)
+			Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:618:71"); end)
 			
 			-- Set padding
 			view:SetPadding(5, 5, 5, 5, 2)
@@ -625,7 +625,7 @@ function QuickJoin:Initialize()
 			ScrollUtil.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view)
 
 			-- Dynamic Width Adjustment based on ScrollBar visibility
-			local function UpdateScrollBoxWidth()
+			local function UpdateScrollBoxWidth() Perfy_Trace(Perfy_GetTime(), "Enter", "UpdateScrollBoxWidth file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:628:9");
 				scrollBoxContainer:ClearAllPoints()
 				scrollBoxContainer:SetPoint("TOPLEFT", 4, -4)
 				if scrollBar:IsShown() then
@@ -633,7 +633,7 @@ function QuickJoin:Initialize()
 				else
 					scrollBoxContainer:SetPoint("BOTTOMRIGHT", -4, 4)
 				end
-			end
+			Perfy_Trace(Perfy_GetTime(), "Leave", "UpdateScrollBoxWidth file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:628:9"); end
 
 			scrollBar:HookScript("OnShow", UpdateScrollBoxWidth)
 			scrollBar:HookScript("OnHide", UpdateScrollBoxWidth)
@@ -647,13 +647,13 @@ function QuickJoin:Initialize()
 	self:Update()
 	
 	-- Start periodic cache cleanup (every 5 minutes)
-	C_Timer.NewTicker(300, function()
+	C_Timer.NewTicker(300, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:650:24");
 		self:CleanupCache()
-	end)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:650:24"); end)
 	
 	-- Hook OnShow to re-render if data changed while hidden
 	if BetterFriendsFrame then
-		BetterFriendsFrame:HookScript("OnShow", function()
+		BetterFriendsFrame:HookScript("OnShow", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:656:42");
 			if needsRenderOnShow then
 				-- Only trigger update if we are on the QuickJoin tab
 				if BetterFriendsFrame.QuickJoinFrame and BetterFriendsFrame.QuickJoinFrame:IsShown() then
@@ -661,16 +661,16 @@ function QuickJoin:Initialize()
 					needsRenderOnShow = false
 				end
 			end
-		end)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:656:42"); end)
 	end
 	
 	self.initialized = true
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:573:0"); end
 
 -- Initialize Classic FauxScrollFrame for QuickJoin
-function QuickJoin:InitializeClassicQuickJoin()
+function QuickJoin:InitializeClassicQuickJoin() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:InitializeClassicQuickJoin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:671:0");
 	local quickJoinFrame = BetterFriendsFrame.QuickJoinFrame
-	if not quickJoinFrame then return end
+	if not quickJoinFrame then Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:InitializeClassicQuickJoin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:671:0"); return end
 	
 	self.classicQuickJoinDataList = {}
 	self.classicQuickJoinButtonPool = {}
@@ -711,28 +711,28 @@ function QuickJoin:InitializeClassicQuickJoin()
 		thumb:SetSize(18, 24)
 		scrollBar:SetThumbTexture(thumb)
 		
-		scrollBar:SetScript("OnValueChanged", function(self, value)
+		scrollBar:SetScript("OnValueChanged", function(self, value) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:714:40");
 			QuickJoin:RenderClassicQuickJoinCards()
-		end)
-		scrollBar:SetScript("OnMouseWheel", function(self, delta)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:714:40"); end)
+		scrollBar:SetScript("OnMouseWheel", function(self, delta) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:717:38");
 			self:SetValue(self:GetValue() - delta)
-		end)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:717:38"); end)
 		scrollBar:SetValue(0)
 		contentFrame.ClassicScrollBar = scrollBar
 	end
 	
 	-- DataProvider placeholder for Classic
 	self.dataProvider = {
-		GetSize = function() return #QuickJoin.classicQuickJoinDataList end,
-		Flush = function() wipe(QuickJoin.classicQuickJoinDataList) end,
-		Insert = function(_, data) table.insert(QuickJoin.classicQuickJoinDataList, data) end,
-		Enumerate = function() return pairs(QuickJoin.classicQuickJoinDataList) end,
+		GetSize = function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:726:12"); return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:726:12", #QuickJoin.classicQuickJoinDataList) end,
+		Flush = function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:727:10"); wipe(QuickJoin.classicQuickJoinDataList) Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:727:10"); end,
+		Insert = function(_, data) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:728:11"); table.insert(QuickJoin.classicQuickJoinDataList, data) Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:728:11"); end,
+		Enumerate = function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:729:14"); return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:729:14", pairs(QuickJoin.classicQuickJoinDataList)) end,
 	}
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:InitializeClassicQuickJoin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:671:0"); end
 
 -- Render Classic QuickJoin cards
-function QuickJoin:RenderClassicQuickJoinCards()
-	if not self.classicQuickJoinButtonPool then return end
+function QuickJoin:RenderClassicQuickJoinCards() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:RenderClassicQuickJoinCards file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:734:0");
+	if not self.classicQuickJoinButtonPool then Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:RenderClassicQuickJoinCards file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:734:0"); return end
 	
 	local dataList = self.classicQuickJoinDataList or {}
 	local numItems = #dataList
@@ -761,10 +761,10 @@ function QuickJoin:RenderClassicQuickJoinCards()
 			button:Hide()
 		end
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:RenderClassicQuickJoinCards file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:734:0"); end
 
 -- Initialize a card in the ScrollBox
-function QuickJoin:OnScrollBoxInitialize(button, elementData)
+function QuickJoin:OnScrollBoxInitialize(button, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:OnScrollBoxInitialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:767:0");
 	local entry = elementData
 	local info = entry.groupInfo
 	
@@ -860,9 +860,9 @@ function QuickJoin:OnScrollBoxInitialize(button, elementData)
 	-- 5. Setup Join Button
 	if button.JoinButton then
 		button.JoinButton:SetEnabled(info.canJoin)
-		button.JoinButton:SetScript("OnClick", function()
+		button.JoinButton:SetScript("OnClick", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:863:41");
 			self:RequestToJoin(entry.guid)
-		end)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:863:41"); end)
 	end
 	
 	-- 6. CRITICAL: Store button references for selection system
@@ -871,9 +871,9 @@ function QuickJoin:OnScrollBoxInitialize(button, elementData)
 	self.selectedButtons[entry.guid] = button
 	
 	-- 7. Setup Click Handler for selection
-	button:SetScript("OnClick", function(btn, mouseButton)
+	button:SetScript("OnClick", function(btn, mouseButton) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:874:29");
 		BetterQuickJoinGroupButton_OnClick(btn, mouseButton)
-	end)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:874:29"); end)
 	
 	-- 8. Update selection visual if this button is the selected one
 	if button.Selected then
@@ -885,18 +885,18 @@ function QuickJoin:OnScrollBoxInitialize(button, elementData)
 	end
 	
 	-- 9. Tooltip
-	button:SetScript("OnEnter", function()
+	button:SetScript("OnEnter", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:888:29");
 		GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
 		entry:ApplyToTooltip(GameTooltip)
 		GameTooltip:Show()
-	end)
-	button:SetScript("OnLeave", function()
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:888:29"); end)
+	button:SetScript("OnLeave", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:893:29");
 		GameTooltip:Hide()
-	end)
-end
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:893:29"); end)
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:OnScrollBoxInitialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:767:0"); end
 
 -- Cleanup old cache entries (called every 5 minutes)
-function QuickJoin:CleanupCache()
+function QuickJoin:CleanupCache() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:CleanupCache file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:899:0");
 	local currentTime = GetTime()
 	local maxAge = 300 -- 5 minutes
 	local cleaned = 0
@@ -911,21 +911,21 @@ function QuickJoin:CleanupCache()
 	if cleaned > 0 then
 		-- BFL:DebugPrint("QuickJoin: Cleaned up", cleaned, "old cache entries")
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:CleanupCache file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:899:0"); end
 
 -- Update available groups list
-function QuickJoin:Update(forceUpdate)
+function QuickJoin:Update(forceUpdate) Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:Update file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:917:0");
 	-- Event Coalescing (Micro-Throttling)
 	if not forceUpdate and updateTimer then
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:Update file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:917:0"); return
 	end
 	
 	if not forceUpdate then
-		updateTimer = C_Timer.After(0, function()
+		updateTimer = C_Timer.After(0, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:924:33");
 			updateTimer = nil
 			self:Update(true)
-		end)
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:924:33"); end)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:Update file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:917:0"); return
 	end
 	
 	self.lastUpdate = GetTime()
@@ -959,8 +959,8 @@ function QuickJoin:Update(forceUpdate)
 	end
 	
 	-- Sort groups by priority (BNet friends first, then WoW friends, then guild)
-	table.sort(self.availableGroups, function(a, b)
-		return self:GetGroupPriority(a) > self:GetGroupPriority(b)
+	table.sort(self.availableGroups, function(a, b) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:962:34");
+		return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:962:34", self:GetGroupPriority(a) > self:GetGroupPriority(b))
 	end)
 	
 	-- Update tab counter (ALWAYS update this, even if frame is hidden)
@@ -972,7 +972,7 @@ function QuickJoin:Update(forceUpdate)
 	-- If the frame (or the QuickJoin tab) is hidden, don't rebuild the ScrollBox.
 	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() or not BetterFriendsFrame.QuickJoinFrame or not BetterFriendsFrame.QuickJoinFrame:IsShown() then
 		needsRenderOnShow = true
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:Update file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:917:0"); return
 	end
 	
 	-- Update ScrollBox DataProvider
@@ -1009,12 +1009,12 @@ function QuickJoin:Update(forceUpdate)
 	if self.onUpdateCallback then
 		self.onUpdateCallback(self.availableGroups)
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:Update file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:917:0"); end
 
 -- Get information about a specific group
-function QuickJoin:GetGroupInfo(groupGUID)
+function QuickJoin:GetGroupInfo(groupGUID) Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:GetGroupInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1015:0");
 	if not groupGUID then
-		return nil
+		Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:GetGroupInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1015:0"); return nil
 	end
 	
 	-- Check for mock data first (mock groups are always prioritized)
@@ -1028,20 +1028,20 @@ function QuickJoin:GetGroupInfo(groupGUID)
 			self:ResolveMockIcon(mockGroup)
 		end
 		
-		return mockGroup
+		Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:GetGroupInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1015:0"); return mockGroup
 	end
 	
 	-- Try to get cached info first
 	local cached = self.groupCache[groupGUID]
 	if cached and (GetTime() - cached.timestamp < 2.0) then
-		return cached.info
+		return Perfy_Trace_Passthrough("Leave", "QuickJoin:GetGroupInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1015:0", cached.info)
 	end
 	
 	-- Get fresh info from API
 	local canJoin, numQueues, needTank, needHealer, needDamage, isSoloQueueParty, questSessionActive, leaderGUID = C_SocialQueue.GetGroupInfo(groupGUID)
 	
 	if not canJoin then
-		return nil
+		Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:GetGroupInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1015:0"); return nil
 	end
 	
 	local info = {
@@ -1411,14 +1411,14 @@ function QuickJoin:GetGroupInfo(groupGUID)
 		timestamp = GetTime()
 	}
 	
-	return info
+	Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:GetGroupInfo file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1015:0"); return info
 end
 
 --[[
 	Resolve icon for mock group using same logic as real groups
 ]]
-function QuickJoin:ResolveMockIcon(info)
-	if info.activityIcon and info.activityIcon ~= 0 then return end
+function QuickJoin:ResolveMockIcon(info) Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:ResolveMockIcon file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1420:0");
+	if info.activityIcon and info.activityIcon ~= 0 then Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:ResolveMockIcon file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1420:0"); return end
 	
 	-- 1. EJ Lookup (Name based) - "Smart Fallback 2" logic
 	if info.activityName then
@@ -1503,29 +1503,29 @@ function QuickJoin:ResolveMockIcon(info)
 	if not info.activityIcon then
 		info.activityIcon = 134400
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:ResolveMockIcon file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1420:0"); end
 
 -- Get all available groups
-function QuickJoin:GetAvailableGroups()
-	return self.availableGroups
+function QuickJoin:GetAvailableGroups() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:GetAvailableGroups file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1509:0");
+	return Perfy_Trace_Passthrough("Leave", "QuickJoin:GetAvailableGroups file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1509:0", self.availableGroups)
 end
 
 -- Request to join a group
-function QuickJoin:RequestToJoin(groupGUID, applyAsTank, applyAsHealer, applyAsDamage)
+function QuickJoin:RequestToJoin(groupGUID, applyAsTank, applyAsHealer, applyAsDamage) Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:RequestToJoin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1514:0");
 	if not groupGUID then
-		return false
+		Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:RequestToJoin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1514:0"); return false
 	end
 	
 	-- Check if already in a group
 	if IsInGroup() then
 		UIErrorsFrame:AddMessage("You are already in a group!", 1.0, 0.1, 0.1, 1.0)
-		return false
+		Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:RequestToJoin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1514:0"); return false
 	end
 	
 	-- Check combat lockdown
 	if InCombatLockdown() then
 		UIErrorsFrame:AddMessage("Cannot join groups while in combat!", 1.0, 0.1, 0.1, 1.0)
-		return false
+		Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:RequestToJoin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1514:0"); return false
 	end
 	
 	-- Default to all roles if none specified
@@ -1538,7 +1538,7 @@ function QuickJoin:RequestToJoin(groupGUID, applyAsTank, applyAsHealer, applyAsD
 	-- Handle mock groups (don't actually send request)
 	if self.mockGroups[groupGUID] then
 		UIErrorsFrame:AddMessage("|cff00ff00" .. (L.MOCK_JOIN_REQUEST_SENT or "Mock join request sent"), 0.1, 0.8, 1.0, 1.0)
-		return true
+		Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:RequestToJoin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1514:0"); return true
 	end
 	
 	local success = C_SocialQueue.RequestToJoin(groupGUID, applyAsTank, applyAsHealer, applyAsDamage)
@@ -1547,27 +1547,27 @@ function QuickJoin:RequestToJoin(groupGUID, applyAsTank, applyAsHealer, applyAsD
 		UIErrorsFrame:AddMessage(QUICK_JOIN_FAILED or "Quick Join request failed", 1.0, 0.1, 0.1, 1.0)
 	end
 	
-	return success
+	Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:RequestToJoin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1514:0"); return success
 end
 
 -- Get priority for sorting groups (higher = more important)
-function QuickJoin:GetGroupPriority(groupGUID)
+function QuickJoin:GetGroupPriority(groupGUID) Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:GetGroupPriority file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1554:0");
 	local members = C_SocialQueue.GetGroupMembers(groupGUID)
 	if not members or #members == 0 then
-		return 0
+		Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:GetGroupPriority file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1554:0"); return 0
 	end
 	
 	local priority = 0
 	
 	-- Sort members (leader first) - simple sort by checking if they're leader
-	table.sort(members, function(a, b)
+	table.sort(members, function(a, b) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1563:21");
 		-- Leader has isLeader flag or is first in original list
-		return (a.isLeader or false) and not (b.isLeader or false)
+		return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1563:21", (a.isLeader or false) and not (b.isLeader or false))
 	end)
 	
 	-- Check relationship with leader
 	if not members or #members == 0 or not members[1] then
-		return 0
+		Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:GetGroupPriority file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1554:0"); return 0
 	end
 	local leaderGUID = members[1].guid
 	local accountInfo = C_BattleNet.GetAccountInfoByGUID(leaderGUID)
@@ -1592,7 +1592,7 @@ function QuickJoin:GetGroupPriority(groupGUID)
 		end
 	end
 	
-	return priority
+	Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:GetGroupPriority file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1554:0"); return priority
 end
 
 -- QuickJoinEntry methods (Legacy/Bottom definition merged with top)
@@ -1606,7 +1606,7 @@ end
 
 
 -- Get all available groups as QuickJoinEntry objects (public API)
-function QuickJoin:GetEntries()
+function QuickJoin:GetEntries() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:GetEntries file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1609:0");
 	local entries = {}
 	local groups = self.availableGroups or {}
 	
@@ -1618,53 +1618,53 @@ function QuickJoin:GetEntries()
 		end
 	end
 	
-	return entries
+	Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:GetEntries file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1609:0"); return entries
 end
 
 -- Get all available groups as GUIDs (legacy API for tab counter)
-function QuickJoin:GetAllGroups()
-	return self.availableGroups or {}
+function QuickJoin:GetAllGroups() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:GetAllGroups file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1625:0");
+	return Perfy_Trace_Passthrough("Leave", "QuickJoin:GetAllGroups file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1625:0", self.availableGroups or {})
 end
 
 -- Set callback for UI updates
-function QuickJoin:SetUpdateCallback(callback)
+function QuickJoin:SetUpdateCallback(callback) Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:SetUpdateCallback file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1630:0");
 	self.onUpdateCallback = callback
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:SetUpdateCallback file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1630:0"); end
 
 --[[ 
 	Event Handlers 
 ]]
 
-function QuickJoin:RegisterEvents()
+function QuickJoin:RegisterEvents() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:RegisterEvents file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1638:0");
 	-- Register for Social Queue events
-	BFL:RegisterEventCallback("SOCIAL_QUEUE_UPDATE", function(groupGUID, numAddedItems)
+	BFL:RegisterEventCallback("SOCIAL_QUEUE_UPDATE", function(groupGUID, numAddedItems) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1640:50");
 		self:OnSocialQueueUpdate(groupGUID, numAddedItems)
-	end, 10)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1640:50"); end, 10)
 	
-	BFL:RegisterEventCallback("SOCIAL_QUEUE_CONFIG_UPDATED", function()
+	BFL:RegisterEventCallback("SOCIAL_QUEUE_CONFIG_UPDATED", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1644:58");
 		self:OnConfigUpdated()
-	end, 10)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1644:58"); end, 10)
 	
-	BFL:RegisterEventCallback("GROUP_JOINED", function()
+	BFL:RegisterEventCallback("GROUP_JOINED", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1648:43");
 		self:OnGroupJoined()
-	end, 10)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1648:43"); end, 10)
 	
-	BFL:RegisterEventCallback("GROUP_LEFT", function()
+	BFL:RegisterEventCallback("GROUP_LEFT", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1652:41");
 		self:OnGroupLeft()
-	end, 10)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1652:41"); end, 10)
 	
-	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_ONLINE", function()
+	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_ONLINE", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1656:55");
 		-- Friend came online, might have a group
 		self:Update()
-	end, 10)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1656:55"); end, 10)
 	
-	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_OFFLINE", function()
+	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_OFFLINE", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1661:56");
 		-- Friend went offline, remove their groups
 		self:Update()
-	end, 10)
-end
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1661:56"); end, 10)
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:RegisterEvents file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1638:0"); end
 
-function QuickJoin:OnSocialQueueUpdate(groupGUID, numAddedItems)
+function QuickJoin:OnSocialQueueUpdate(groupGUID, numAddedItems) Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:OnSocialQueueUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1667:0");
 	-- Specific group updated
 	if groupGUID then
 		-- Invalidate cache for this group
@@ -1690,29 +1690,29 @@ function QuickJoin:OnSocialQueueUpdate(groupGUID, numAddedItems)
 	
 	-- Full update
 	self:Update()
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:OnSocialQueueUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1667:0"); end
 
-function QuickJoin:OnConfigUpdated()
+function QuickJoin:OnConfigUpdated() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:OnConfigUpdated file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1695:0");
 	-- Reload configuration
 	self.config = C_SocialQueue.GetConfig()
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:OnConfigUpdated file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1695:0"); end
 
-function QuickJoin:OnGroupJoined()
+function QuickJoin:OnGroupJoined() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:OnGroupJoined file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1700:0");
 	-- Player joined a group, update available groups
 	self:Update()
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:OnGroupJoined file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1700:0"); end
 
-function QuickJoin:OnGroupLeft()
+function QuickJoin:OnGroupLeft() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:OnGroupLeft file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1705:0");
 	-- Player left a group, update available groups
 	self:Update()
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:OnGroupLeft file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1705:0"); end
 
 --[[ 
 	Utility Functions 
 ]]
 
 -- Get formatted group name for display
-function QuickJoin:GetGroupDisplayName(groupGUID)
+function QuickJoin:GetGroupDisplayName(groupGUID) Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:GetGroupDisplayName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1715:0");
 	-- Check for mock data first
 	local mockGroup = self.mockGroups[groupGUID]
 	if mockGroup then
@@ -1721,25 +1721,25 @@ function QuickJoin:GetGroupDisplayName(groupGUID)
 		local color = "|cff00ff00"  -- Green for mock groups
 		
 		if numMembers > 1 then
-			return string.format("%s%s|r +%d", color, leaderName, numMembers - 1)
+			return Perfy_Trace_Passthrough("Leave", "QuickJoin:GetGroupDisplayName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1715:0", string.format("%s%s|r +%d", color, leaderName, numMembers - 1))
 		else
-			return string.format("%s%s|r", color, leaderName)
+			return Perfy_Trace_Passthrough("Leave", "QuickJoin:GetGroupDisplayName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1715:0", string.format("%s%s|r", color, leaderName))
 		end
 	end
 	
 	local members = C_SocialQueue.GetGroupMembers(groupGUID)
 	if not members or #members == 0 then
-		return UNKNOWNOBJECT or (L.UNKNOWN_GROUP or "Unknown Group")
+		return Perfy_Trace_Passthrough("Leave", "QuickJoin:GetGroupDisplayName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1715:0", UNKNOWNOBJECT or (L.UNKNOWN_GROUP or "Unknown Group"))
 	end
 	
 	-- Sort members (leader first)
-	table.sort(members, function(a, b)
-		return (a.isLeader or false) and not (b.isLeader or false)
+	table.sort(members, function(a, b) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1736:21");
+		return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1736:21", (a.isLeader or false) and not (b.isLeader or false))
 	end)
 	
 	-- Get leader name
 	if not members or #members == 0 or not members[1] then
-		return UNKNOWNOBJECT or (L.UNKNOWN_GROUP or "Unknown Group")
+		return Perfy_Trace_Passthrough("Leave", "QuickJoin:GetGroupDisplayName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1715:0", UNKNOWNOBJECT or (L.UNKNOWN_GROUP or "Unknown Group"))
 	end
 	
 	local leaderName = members[1].clubName or members[1].name or (L.UNKNOWN or "Unknown")
@@ -1761,20 +1761,20 @@ function QuickJoin:GetGroupDisplayName(groupGUID)
 		leaderName = string.format("%s +%d", leaderName, #members - 1)
 	end
 	
-	return string.format("%s%s|r", color, leaderName)
+	return Perfy_Trace_Passthrough("Leave", "QuickJoin:GetGroupDisplayName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1715:0", string.format("%s%s|r", color, leaderName))
 end
 
 -- Get formatted queue name for display
-function QuickJoin:GetQueueDisplayName(groupGUID)
+function QuickJoin:GetQueueDisplayName(groupGUID) Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:GetQueueDisplayName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1768:0");
 	-- Check for mock data first
 	local mockGroup = self.mockGroups[groupGUID]
 	if mockGroup then
-		return mockGroup.groupTitle or mockGroup.activityName or "Mock Activity"
+		return Perfy_Trace_Passthrough("Leave", "QuickJoin:GetQueueDisplayName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1768:0", mockGroup.groupTitle or mockGroup.activityName or "Mock Activity")
 	end
 	
 	local queues = C_SocialQueue.GetGroupQueues(groupGUID)
 	if not queues or #queues == 0 or not queues[1] then
-		return L.NO_QUEUE or "No Queue"
+		return Perfy_Trace_Passthrough("Leave", "QuickJoin:GetQueueDisplayName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1768:0", L.NO_QUEUE or "No Queue")
 	end
 	
 	-- Get queue name from first queue
@@ -1805,7 +1805,7 @@ function QuickJoin:GetQueueDisplayName(groupGUID)
 		queueName = string.format("%s +%d", queueName, #queues - 1)
 	end
 	
-	return queueName
+	Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:GetQueueDisplayName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1768:0"); return queueName
 end
 
 --[[ 
@@ -1935,18 +1935,18 @@ QuickJoin.mockConfig = {
 	Generate a unique mock GUID that follows WoW GUID format
 	Real format: "Player-ServerID-PlayerID" or "Party-0-GroupID"
 ]]
-local function GenerateMockGUID()
+local function GenerateMockGUID() Perfy_Trace(Perfy_GetTime(), "Enter", "GenerateMockGUID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1938:6");
 	-- Use smaller random range to avoid integer overflow (Lua max ~2^31)
-	return string.format("%s%d-%08X", MOCK_PREFIX, GetServerTime() % 100000, math.random(0x10000000, 0x7FFFFFFF))
+	return Perfy_Trace_Passthrough("Leave", "GenerateMockGUID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1938:6", string.format("%s%d-%08X", MOCK_PREFIX, GetServerTime() % 100000, math.random(0x10000000, 0x7FFFFFFF)))
 end
 
 --[[
 	Generate a mock player GUID
 	Real format: "Player-ServerID-PlayerID"
 ]]
-local function GenerateMockPlayerGUID()
+local function GenerateMockPlayerGUID() Perfy_Trace(Perfy_GetTime(), "Enter", "GenerateMockPlayerGUID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1947:6");
 	-- Use smaller random range to avoid integer overflow (Lua max ~2^31)
-	return string.format("Player-%05d-%08X", math.random(1, 99999), math.random(0x10000000, 0x7FFFFFFF))
+	return Perfy_Trace_Passthrough("Leave", "GenerateMockPlayerGUID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1947:6", string.format("Player-%05d-%08X", math.random(1, 99999), math.random(0x10000000, 0x7FFFFFFF)))
 end
 
 --[[
@@ -1955,7 +1955,7 @@ end
 	@param leaderName: Name for the leader (first member)
 	@return: Array of SocialQueuePlayerInfo objects
 ]]
-local function CreateMockMembers(count, leaderName)
+local function CreateMockMembers(count, leaderName) Perfy_Trace(Perfy_GetTime(), "Enter", "CreateMockMembers file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1958:6");
 	local members = {}
 	local usedNames = {}
 	
@@ -1981,7 +1981,7 @@ local function CreateMockMembers(count, leaderName)
 		}
 	end
 	
-	return members
+	Perfy_Trace(Perfy_GetTime(), "Leave", "CreateMockMembers file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1958:6"); return members
 end
 
 --[[
@@ -1992,7 +1992,7 @@ end
 	@param options: Additional options (needTank, needHealer, needDamage, rated, etc.)
 	@return: SocialQueueGroupQueueInfo object
 ]]
-local function CreateMockQueueData(queueType, activityName, comment, options)
+local function CreateMockQueueData(queueType, activityName, comment, options) Perfy_Trace(Perfy_GetTime(), "Enter", "CreateMockQueueData file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1995:6");
 	options = options or {}
 	
 	local queueData = {
@@ -2016,7 +2016,7 @@ local function CreateMockQueueData(queueType, activityName, comment, options)
 		queueData.mapName = activityName
 	end
 	
-	return {
+	return Perfy_Trace_Passthrough("Leave", "CreateMockQueueData file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:1995:6", {
 		clientID = math.random(10000, 99999),
 		eligible = true,
 		needTank = options.needTank ~= false,
@@ -2024,7 +2024,7 @@ local function CreateMockQueueData(queueType, activityName, comment, options)
 		needDamage = options.needDamage ~= false,
 		isAutoAccept = options.isAutoAccept or false,
 		queueData = queueData,
-	}
+	})
 end
 
 --[[
@@ -2041,7 +2041,7 @@ end
 	  - needDamage: boolean (default: true)
 	@return: guid, groupData
 ]]
-function QuickJoin:CreateMockGroup(params)
+function QuickJoin:CreateMockGroup(params) Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:CreateMockGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2044:0");
 	params = params or {}
 	
 	-- Validate required params
@@ -2116,7 +2116,7 @@ function QuickJoin:CreateMockGroup(params)
 	-- BFL:DebugPrint(string.format("|cff00ff00QuickJoin Mock:|r Created '%s' (%s, %d members)", 
 	-- 	params.activityName, queueType, numMembers))
 	
-	return guid, mockGroup
+	Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:CreateMockGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2044:0"); return guid, mockGroup
 end
 
 --[[
@@ -2124,21 +2124,21 @@ end
 	@param guid: Group GUID to remove
 	@return: true if removed, false if not found
 ]]
-function QuickJoin:RemoveMockGroup(guid)
+function QuickJoin:RemoveMockGroup(guid) Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:RemoveMockGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2127:0");
 	if self.mockGroups[guid] then
 		local name = self.mockGroups[guid].groupTitle or "Unknown"
 		self.mockGroups[guid] = nil
 		-- BFL:DebugPrint(string.format("|cff00ff00QuickJoin Mock:|r Removed '%s'", name))
 		self:Update(true)
-		return true
+		Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:RemoveMockGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2127:0"); return true
 	end
-	return false
+	Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:RemoveMockGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2127:0"); return false
 end
 
 --[[
 	Clear all mock groups and stop timers
 ]]
-function QuickJoin:ClearMockGroups()
+function QuickJoin:ClearMockGroups() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:ClearMockGroups file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2141:0");
 	-- Stop dynamic update timer
 	if self.mockUpdateTimer then
 		self.mockUpdateTimer:Cancel()
@@ -2157,7 +2157,7 @@ function QuickJoin:ClearMockGroups()
 	print(string.format("|cff00ff00BFL QuickJoin:|r Cleared %d mock groups", count))
 	
 	self:Update(true)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:ClearMockGroups file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2141:0"); end
 
 -- ============================================
 -- MOCK PRESETS
@@ -2166,7 +2166,7 @@ end
 --[[
 	Create comprehensive mock data covering all scenarios
 ]]
-function QuickJoin:CreateMockPreset_All()
+function QuickJoin:CreateMockPreset_All() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:CreateMockPreset_All file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2169:0");
 	self:ClearMockGroups()
 	
 	-- M+ Groups (lfglist)
@@ -2294,12 +2294,12 @@ function QuickJoin:CreateMockPreset_All()
 	print(string.format("|cff00ff00BFL QuickJoin:|r Created %d mock groups (dynamic updates enabled)", count))
 	
 	self:Update(true)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:CreateMockPreset_All file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2169:0"); end
 
 --[[
 	Create dungeon-specific mocks
 ]]
-function QuickJoin:CreateMockPreset_Dungeon()
+function QuickJoin:CreateMockPreset_Dungeon() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:CreateMockPreset_Dungeon file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2302:0");
 	self:ClearMockGroups()
 	
 	for i, activity in ipairs(MOCK_ACTIVITIES.lfglist_mythicplus) do
@@ -2332,12 +2332,12 @@ function QuickJoin:CreateMockPreset_Dungeon()
 	print(string.format("|cff00ff00BFL QuickJoin:|r Created %d dungeon mock groups", count))
 	
 	self:Update(true)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:CreateMockPreset_Dungeon file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2302:0"); end
 
 --[[
 	Create PvP-specific mocks
 ]]
-function QuickJoin:CreateMockPreset_PvP()
+function QuickJoin:CreateMockPreset_PvP() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:CreateMockPreset_PvP file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2340:0");
 	self:ClearMockGroups()
 	
 	for i, activity in ipairs(MOCK_ACTIVITIES.pvp) do
@@ -2360,12 +2360,12 @@ function QuickJoin:CreateMockPreset_PvP()
 	print(string.format("|cff00ff00BFL QuickJoin:|r Created %d PvP mock groups", count))
 	
 	self:Update(true)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:CreateMockPreset_PvP file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2340:0"); end
 
 --[[
 	Create raid-specific mocks
 ]]
-function QuickJoin:CreateMockPreset_Raid()
+function QuickJoin:CreateMockPreset_Raid() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:CreateMockPreset_Raid file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2368:0");
 	self:ClearMockGroups()
 	
 	for i, activity in ipairs(MOCK_ACTIVITIES.lfglist_raid) do
@@ -2387,12 +2387,12 @@ function QuickJoin:CreateMockPreset_Raid()
 	print(string.format("|cff00ff00BFL QuickJoin:|r Created %d raid mock groups", count))
 	
 	self:Update(true)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:CreateMockPreset_Raid file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2368:0"); end
 
 --[[
 	Create mock groups to test all fallback icons
 ]]
-function QuickJoin:CreateMockPreset_Icons()
+function QuickJoin:CreateMockPreset_Icons() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:CreateMockPreset_Icons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2395:0");
 	self:ClearMockGroups()
 	
 	-- 1. Dungeon Fallback (Keystone: 525134)
@@ -2459,12 +2459,12 @@ function QuickJoin:CreateMockPreset_Icons()
 	print("|cff00ff00BFL QuickJoin:|r " .. BFL.L.QJ_MOCK_CREATED_FALLBACK)
 	
 	self:Update(true)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:CreateMockPreset_Icons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2395:0"); end
 
 --[[
 	Create many groups for stress testing scrollbar
 ]]
-function QuickJoin:CreateMockPreset_Stress()
+function QuickJoin:CreateMockPreset_Stress() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:CreateMockPreset_Stress file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2467:0");
 	self:ClearMockGroups()
 	
 	local definitions = {
@@ -2563,7 +2563,7 @@ function QuickJoin:CreateMockPreset_Stress()
 	print("|cff00ff00BFL QuickJoin:|r " .. BFL.L.QJ_MOCK_CREATED_STRESS)
 	
 	self:Update(true)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:CreateMockPreset_Stress file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2467:0"); end
 
 -- ============================================
 -- DYNAMIC UPDATE SYSTEM
@@ -2572,24 +2572,24 @@ end
 --[[
 	Start timer for dynamic mock updates (simulates real activity)
 ]]
-function QuickJoin:StartMockDynamicUpdates()
+function QuickJoin:StartMockDynamicUpdates() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:StartMockDynamicUpdates file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2575:0");
 	-- Stop existing timer
 	if self.mockUpdateTimer then
 		self.mockUpdateTimer:Cancel()
 	end
 	
-	self.mockUpdateTimer = C_Timer.NewTicker(self.mockConfig.updateInterval, function()
+	self.mockUpdateTimer = C_Timer.NewTicker(self.mockConfig.updateInterval, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2581:74");
 		self:ProcessMockDynamicUpdate()
-	end)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2581:74"); end)
 	
 	-- BFL:DebugPrint("|cff00ff00QuickJoin Mock:|r Dynamic updates started")
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:StartMockDynamicUpdates file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2575:0"); end
 
 --[[
 	Process one cycle of dynamic updates
 ]]
-function QuickJoin:ProcessMockDynamicUpdate()
-	if not self.mockConfig.dynamicUpdates then return end
+function QuickJoin:ProcessMockDynamicUpdate() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:ProcessMockDynamicUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2591:0");
+	if not self.mockConfig.dynamicUpdates then Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:ProcessMockDynamicUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2591:0"); return end
 	
 	local updated = false
 	
@@ -2631,7 +2631,7 @@ function QuickJoin:ProcessMockDynamicUpdate()
 	if updated then
 		self:Update(true)
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:ProcessMockDynamicUpdate file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2591:0"); end
 
 -- ============================================
 -- EVENT SIMULATION
@@ -2641,7 +2641,7 @@ end
 	Simulate SOCIAL_QUEUE_UPDATE event
 	@param eventType: "group_added", "group_removed", "group_updated"
 ]]
-function QuickJoin:SimulateMockEvent(eventType)
+function QuickJoin:SimulateMockEvent(eventType) Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:SimulateMockEvent file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2644:0");
 	if eventType == "group_added" then
 		-- Add a random new group
 		local activity = MOCK_ACTIVITIES.lfglist_mythicplus[math.random(#MOCK_ACTIVITIES.lfglist_mythicplus)]
@@ -2688,7 +2688,7 @@ function QuickJoin:SimulateMockEvent(eventType)
 	end
 	
 	self:Update(true)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:SimulateMockEvent file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2644:0"); end
 
 -- ============================================
 -- SLASH COMMAND HANDLER
@@ -2697,7 +2697,7 @@ end
 -- Legacy slash command (redirects to /bfl qj)
 SLASH_BFLQUICKJOIN1 = "/bflqj"
 SLASH_BFLQUICKJOIN2 = "/bflquickjoin"
-SlashCmdList["BFLQUICKJOIN"] = function(msg)
+SlashCmdList["BFLQUICKJOIN"] = function(msg) Perfy_Trace(Perfy_GetTime(), "Enter", "SlashCmdList.BFLQUICKJOIN file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2700:31");
 	local args = {}
 	for word in msg:gmatch("%S+") do
 		table.insert(args, word)
@@ -2818,13 +2818,13 @@ SlashCmdList["BFLQUICKJOIN"] = function(msg)
 		print("")
 		print(BFL.L.QJ_EXT_FOOTER)
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "SlashCmdList.BFLQUICKJOIN file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2700:31"); end
 
 --[[
 	SelectGroup - Select a group for joining
 	@param guid - Group GUID to select (nil to deselect)
 ]]
-function QuickJoin:SelectGroup(guid)
+function QuickJoin:SelectGroup(guid) Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:SelectGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2827:0");
 	local oldGUID = self.selectedGUID
 	self.selectedGUID = guid
 	
@@ -2839,14 +2839,14 @@ function QuickJoin:SelectGroup(guid)
 	
 	-- Update Join button state
 	self:UpdateJoinButtonState()
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:SelectGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2827:0"); end
 
 --[[
 	GetSelectedGroup - Get currently selected group
 	@return guid - Selected group GUID or nil
 ]]
-function QuickJoin:GetSelectedGroup()
-	return self.selectedGUID
+function QuickJoin:GetSelectedGroup() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:GetSelectedGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2848:0");
+	return Perfy_Trace_Passthrough("Leave", "QuickJoin:GetSelectedGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2848:0", self.selectedGUID)
 end
 
 --[[
@@ -2854,7 +2854,7 @@ end
 	@param guid - Group GUID
 	@param selected - true to mark selected, false to deselect
 ]]
-function QuickJoin:UpdateButtonSelection(guid, selected)
+function QuickJoin:UpdateButtonSelection(guid, selected) Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:UpdateButtonSelection file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2857:0");
 	if self.selectedButtons[guid] then
 		local button = self.selectedButtons[guid]
 		if button.Selected then
@@ -2862,14 +2862,14 @@ function QuickJoin:UpdateButtonSelection(guid, selected)
 		end
 		-- Don't manipulate Highlight here - it's controlled by OnEnter/OnLeave
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:UpdateButtonSelection file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2857:0"); end
 
 --[[
 	UpdateJoinButtonState - Enable/disable Join button based on state
 ]]
-function QuickJoin:UpdateJoinButtonState()
+function QuickJoin:UpdateJoinButtonState() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:UpdateJoinButtonState file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2870:0");
 	local frame = BetterFriendsFrame and BetterFriendsFrame.QuickJoinFrame
-	if not frame or not frame.ContentInset or not frame.ContentInset.JoinQueueButton then return end
+	if not frame or not frame.ContentInset or not frame.ContentInset.JoinQueueButton then Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:UpdateJoinButtonState file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2870:0"); return end
 	
 	local button = frame.ContentInset.JoinQueueButton
 	
@@ -2877,14 +2877,14 @@ function QuickJoin:UpdateJoinButtonState()
 	if IsInGroup(LE_PARTY_CATEGORY_HOME) then
 		button:Disable()
 		button.tooltip = QUICK_JOIN_ALREADY_IN_PARTY
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:UpdateJoinButtonState file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2870:0"); return
 	end
 	
 	-- Check if group selected
 	if not self.selectedGUID then
 		button:Disable()
 		button.tooltip = nil
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:UpdateJoinButtonState file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2870:0"); return
 	end
 	
 	-- Check if group still exists
@@ -2892,7 +2892,7 @@ function QuickJoin:UpdateJoinButtonState()
 	if not groupInfo then
 		button:Disable()
 		button.tooltip = nil
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:UpdateJoinButtonState file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2870:0"); return
 	end
 	
 	-- Enable button
@@ -2905,7 +2905,7 @@ function QuickJoin:UpdateJoinButtonState()
 	else
 		button:SetText(JOIN_QUEUE)
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:UpdateJoinButtonState file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2870:0"); end
 
 --[[
 	JoinQueue - Attempt to join the selected group
@@ -2915,27 +2915,27 @@ end
 	- In combat lockdown
 	- Missing dialog frames
 ]]
-function QuickJoin:JoinQueue()
-	if not self.selectedGUID then return end
+function QuickJoin:JoinQueue() Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:JoinQueue file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2918:0");
+	if not self.selectedGUID then Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:JoinQueue file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2918:0"); return end
 	
 	-- Edge Case: Group disappeared since selection
 	local groupInfo = self:GetGroupInfo(self.selectedGUID)
 	if not groupInfo then
 		UIErrorsFrame:AddMessage(ERR_PARTY_NOT_FOUND or "Group is no longer available.", 1.0, 0.1, 0.1, 1.0)
 		self:SelectGroup(nil)
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:JoinQueue file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2918:0"); return
 	end
 	
 	-- Edge Case: Already in a group (double-check, button should be disabled)
 	if IsInGroup(LE_PARTY_CATEGORY_HOME) then
 		UIErrorsFrame:AddMessage(ALREADY_IN_GROUP or "You are already in a group.", 1.0, 0.1, 0.1, 1.0)
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:JoinQueue file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2918:0"); return
 	end
 	
 	-- Edge Case: Combat lockdown (double-check, button should be disabled)
 	if InCombatLockdown() then
 		UIErrorsFrame:AddMessage(ERR_NOT_IN_COMBAT or "Cannot join groups in combat.", 1.0, 0.1, 0.1, 1.0)
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:JoinQueue file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2918:0"); return
 	end
 	
 	-- Check if LFG List group
@@ -2954,40 +2954,42 @@ function QuickJoin:JoinQueue()
 			UIErrorsFrame:AddMessage("Role selection dialog not available.", 1.0, 0.1, 0.1, 1.0)
 		end
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:JoinQueue file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2918:0"); end
 
 --[[
 	OpenContextMenu - Show right-click context menu for a group
 	@param guid - Group GUID
 	@param anchorFrame - Frame to anchor menu to
 ]]
-function QuickJoin:OpenContextMenu(guid, anchorFrame)
-	if not guid then return end
+function QuickJoin:OpenContextMenu(guid, anchorFrame) Perfy_Trace(Perfy_GetTime(), "Enter", "QuickJoin:OpenContextMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2964:0");
+	if not guid then Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:OpenContextMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2964:0"); return end
 	
 	local groupInfo = self:GetGroupInfo(guid)
 	if not groupInfo or not groupInfo.members or #groupInfo.members == 0 then
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:OpenContextMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2964:0"); return
 	end
 	
 	-- Get first member (leader) for context
-	if not groupInfo.members[1] then return end
+	if not groupInfo.members[1] then Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:OpenContextMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2964:0"); return end
 	local leaderInfo = groupInfo.members[1]
-	if not leaderInfo then return end
+	if not leaderInfo then Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:OpenContextMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2964:0"); return end
 	
 	-- Create context menu
-	MenuUtil.CreateContextMenu(anchorFrame, function(owner, rootDescription)
+	MenuUtil.CreateContextMenu(anchorFrame, function(owner, rootDescription) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2978:41");
 		-- Title: Leader name
 		rootDescription:CreateTitle(leaderInfo.name or UNKNOWN)
 		
 		-- Whisper button
-		rootDescription:CreateButton(WHISPER, function()
+		rootDescription:CreateButton(WHISPER, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2983:40");
 			if leaderInfo.playerLink then
 				local link, text = LinkUtil.SplitLink(leaderInfo.playerLink)
 				SetItemRef(link, text, "LeftButton")
 			end
-		end)
-	end)
-end
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2983:40"); end)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2978:41"); end)
+Perfy_Trace(Perfy_GetTime(), "Leave", "QuickJoin:OpenContextMenu file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua:2964:0"); end
 
 -- Export module
 BFL.QuickJoin = QuickJoin
+
+Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/QuickJoin.lua");

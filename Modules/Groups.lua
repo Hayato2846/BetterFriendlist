@@ -1,4 +1,4 @@
--- Modules/Groups.lua
+--[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua"); -- Modules/Groups.lua
 -- Group management module
 
 local ADDON_NAME, BFL = ...
@@ -39,18 +39,18 @@ local builtinGroups = {
 Groups.groups = {}
 
 -- Migrate old bnetAccountID-based UIDs to battleTag-based UIDs
-function Groups:MigrateFriendAssignments()
+function Groups:MigrateFriendAssignments() Perfy_Trace(Perfy_GetTime(), "Enter", "Groups:MigrateFriendAssignments file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:42:0");
 	local DB = BFL:GetModule("DB")
-	if not DB then return end
+	if not DB then Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:MigrateFriendAssignments file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:42:0"); return end
 	local friendGroups = DB:GetFriendGroups() -- Get ALL friendGroups
-	if not friendGroups then return end
+	if not friendGroups then Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:MigrateFriendAssignments file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:42:0"); return end
 	
 	-- Check if Battle.net migration has already been done
 	local bnetMigrationDone = DB:Get("bnetUIDMigrationDone_v2") -- Changed flag name to force re-run
 	local wowMigrationDone = DB:Get("wowUIDMigrationDone_v1") -- New migration for WoW friends
 	
 	if bnetMigrationDone and wowMigrationDone then
-		return -- Already migrated
+		Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:MigrateFriendAssignments file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:42:0"); return -- Already migrated
 	end
 	
 	-- Count old-style UIDs
@@ -130,15 +130,15 @@ function Groups:MigrateFriendAssignments()
 		
 		DB:Set("wowUIDMigrationDone_v1", true)
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:MigrateFriendAssignments file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:42:0"); end
 
 -- Smart migration for WoW friends (v2) - Fixes missing realm in UIDs
-function Groups:RunSmartMigration()
+function Groups:RunSmartMigration() Perfy_Trace(Perfy_GetTime(), "Enter", "Groups:RunSmartMigration file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:136:0");
 	local DB = BFL:GetModule("DB")
-	if not DB then return end
+	if not DB then Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:RunSmartMigration file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:136:0"); return end
 	
 	-- Check if already done
-	if DB:Get("wowUIDMigrationDone_v2") then return end
+	if DB:Get("wowUIDMigrationDone_v2") then Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:RunSmartMigration file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:136:0"); return end
 	
 	-- We need friend list data to be loaded
 	local numFriends = C_FriendList.GetNumFriends()
@@ -146,17 +146,17 @@ function Groups:RunSmartMigration()
 		-- Try again later when list updates
 		-- Prevent multiple registrations
 		if not self.migrationListenerRegistered then
-			BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function()
+			BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:149:50");
 				self:RunSmartMigration()
-			end)
+			Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:149:50"); end)
 			self.migrationListenerRegistered = true
 		end
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:RunSmartMigration file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:136:0"); return
 	end
 	
 	-- Perform migration
 	local friendGroups = DB:GetFriendGroups()
-	if not friendGroups then return end
+	if not friendGroups then Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:RunSmartMigration file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:136:0"); return end
 	
 	local changesMade = false
 	
@@ -211,9 +211,9 @@ function Groups:RunSmartMigration()
 	
 	-- Mark as done
 	DB:Set("wowUIDMigrationDone_v2", true)
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:RunSmartMigration file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:136:0"); end
 
-function Groups:Initialize()
+function Groups:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "Groups:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:216:0");
 	-- Localize built-in group names
 	if BFL.L then
 		builtinGroups.favorites.name = BFL.L.GROUP_FAVORITES
@@ -230,7 +230,7 @@ function Groups:Initialize()
 	local DB = BFL:GetModule("DB")
 	if not DB or not BetterFriendlistDB then
 		-- DB not ready yet, skip initialization
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:216:0"); return
 	end
 	
 	-- Load built-in group overrides
@@ -250,7 +250,7 @@ function Groups:Initialize()
 	self:RunSmartMigration()
 	
 	local customGroups = DB:GetCustomGroups()
-	if not customGroups then return end
+	if not customGroups then Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:216:0"); return end
 	
 	for groupId, groupInfo in pairs(customGroups) do
 		self.groups[groupId] = {
@@ -305,15 +305,15 @@ function Groups:Initialize()
 			end
 		end
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:216:0"); end
 
 -- Get all groups
-function Groups:GetAll()
+function Groups:GetAll() Perfy_Trace(Perfy_GetTime(), "Enter", "Groups:GetAll file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:311:0");
 	-- Check if DB is initialized before checking settings
 	local DB = BFL:GetModule("DB")
 	if not DB or not BetterFriendlistDB then
 		-- DB not yet initialized, return all groups including favorites
-		return self.groups
+		return Perfy_Trace_Passthrough("Leave", "Groups:GetAll file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:311:0", self.groups)
 	end
 	
 	local showFavorites = DB:Get("showFavoritesGroup", true)
@@ -331,31 +331,31 @@ function Groups:GetAll()
 				filtered[id] = group
 			end
 		end
-		return filtered
+		Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:GetAll file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:311:0"); return filtered
 	end
 	
-	return self.groups
+	return Perfy_Trace_Passthrough("Leave", "Groups:GetAll file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:311:0", self.groups)
 end
 
 -- Get a specific group
-function Groups:Get(groupId)
-	return self.groups[groupId]
+function Groups:Get(groupId) Perfy_Trace(Perfy_GetTime(), "Enter", "Groups:Get file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:341:0");
+	return Perfy_Trace_Passthrough("Leave", "Groups:Get file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:341:0", self.groups[groupId])
 end
 
 -- Get group ID by name (for migration)
-function Groups:GetGroupIdByName(groupName)
+function Groups:GetGroupIdByName(groupName) Perfy_Trace(Perfy_GetTime(), "Enter", "Groups:GetGroupIdByName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:346:0");
 	for groupId, groupData in pairs(self.groups) do
 		if groupData.name == groupName then
-			return groupId
+			Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:GetGroupIdByName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:346:0"); return groupId
 		end
 	end
-	return nil
+	Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:GetGroupIdByName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:346:0"); return nil
 end
 
 -- Create a new custom group
-function Groups:Create(groupName)
+function Groups:Create(groupName) Perfy_Trace(Perfy_GetTime(), "Enter", "Groups:Create file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:356:0");
 	if not groupName or groupName == "" then
-		return false, BFL.L.ERROR_GROUP_NAME_EMPTY
+		return Perfy_Trace_Passthrough("Leave", "Groups:Create file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:356:0", false, BFL.L.ERROR_GROUP_NAME_EMPTY)
 	end
 	
 	-- Generate unique ID from name
@@ -363,7 +363,7 @@ function Groups:Create(groupName)
 	
 	-- Check if group already exists
 	if self.groups[groupId] then
-		return false, BFL.L.ERROR_GROUP_EXISTS
+		return Perfy_Trace_Passthrough("Leave", "Groups:Create file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:356:0", false, BFL.L.ERROR_GROUP_EXISTS)
 	end
 	
 	-- Find next order value (place custom groups between Favorites and No Group)
@@ -399,13 +399,13 @@ function Groups:Create(groupName)
 		Settings:RefreshGroupList()
 	end
 	
-	return true, groupId
+	Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:Create file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:356:0"); return true, groupId
 end
 
 -- Create a new custom group with specific order (for migration)
-function Groups:CreateWithOrder(groupName, orderValue)
+function Groups:CreateWithOrder(groupName, orderValue) Perfy_Trace(Perfy_GetTime(), "Enter", "Groups:CreateWithOrder file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:406:0");
 	if not groupName or groupName == "" then
-		return false, BFL.L.ERROR_GROUP_NAME_EMPTY
+		return Perfy_Trace_Passthrough("Leave", "Groups:CreateWithOrder file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:406:0", false, BFL.L.ERROR_GROUP_NAME_EMPTY)
 	end
 	
 	-- Generate unique ID from name
@@ -413,7 +413,7 @@ function Groups:CreateWithOrder(groupName, orderValue)
 	
 	-- Check if group already exists
 	if self.groups[groupId] then
-		return false, BFL.L.ERROR_GROUP_EXISTS
+		return Perfy_Trace_Passthrough("Leave", "Groups:CreateWithOrder file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:406:0", false, BFL.L.ERROR_GROUP_EXISTS)
 	end
 	
 	-- Create group with specified order
@@ -441,18 +441,18 @@ function Groups:CreateWithOrder(groupName, orderValue)
 		Settings:RefreshGroupList()
 	end
 	
-	return true, groupId
+	Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:CreateWithOrder file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:406:0"); return true, groupId
 end
 
 -- Rename a custom group
-function Groups:Rename(groupId, newName)
+function Groups:Rename(groupId, newName) Perfy_Trace(Perfy_GetTime(), "Enter", "Groups:Rename file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:448:0");
 	if not groupId or not newName or newName == "" then
-		return false, BFL.L.ERROR_INVALID_GROUP_NAME
+		return Perfy_Trace_Passthrough("Leave", "Groups:Rename file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:448:0", false, BFL.L.ERROR_INVALID_GROUP_NAME)
 	end
 	
 	local group = self.groups[groupId]
 	if not group then
-		return false, BFL.L.ERROR_GROUP_NOT_EXIST
+		return Perfy_Trace_Passthrough("Leave", "Groups:Rename file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:448:0", false, BFL.L.ERROR_GROUP_NOT_EXIST)
 	end
 	
 	-- Update in memory
@@ -481,18 +481,18 @@ function Groups:Rename(groupId, newName)
 		Settings:RefreshGroupList()
 	end
 	
-	return true
+	Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:Rename file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:448:0"); return true
 end
 
 -- Set group color
-function Groups:SetColor(groupId, r, g, b)
+function Groups:SetColor(groupId, r, g, b) Perfy_Trace(Perfy_GetTime(), "Enter", "Groups:SetColor file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:488:0");
 	if not groupId or not r or not g or not b then
-		return false, BFL.L.ERROR_INVALID_PARAMS
+		return Perfy_Trace_Passthrough("Leave", "Groups:SetColor file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:488:0", false, BFL.L.ERROR_INVALID_PARAMS)
 	end
 	
 	local group = self.groups[groupId]
 	if not group then
-		return false, BFL.L.ERROR_GROUP_NOT_EXIST
+		return Perfy_Trace_Passthrough("Leave", "Groups:SetColor file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:488:0", false, BFL.L.ERROR_GROUP_NOT_EXIST)
 	end
 	
 	-- Update in memory
@@ -511,22 +511,22 @@ function Groups:SetColor(groupId, r, g, b)
 		Settings:RefreshGroupList()
 	end
 	
-	return true
+	Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:SetColor file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:488:0"); return true
 end
 
 -- Delete a custom group
-function Groups:Delete(groupId)
+function Groups:Delete(groupId) Perfy_Trace(Perfy_GetTime(), "Enter", "Groups:Delete file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:518:0");
 	if not groupId then
-		return false, BFL.L.ERROR_INVALID_GROUP_ID
+		return Perfy_Trace_Passthrough("Leave", "Groups:Delete file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:518:0", false, BFL.L.ERROR_INVALID_GROUP_ID)
 	end
 	
 	local group = self.groups[groupId]
 	if not group then
-		return false, BFL.L.ERROR_GROUP_NOT_EXIST
+		return Perfy_Trace_Passthrough("Leave", "Groups:Delete file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:518:0", false, BFL.L.ERROR_GROUP_NOT_EXIST)
 	end
 	
 	if group.builtin then
-		return false, BFL.L.ERROR_CANNOT_DELETE_BUILTIN
+		return Perfy_Trace_Passthrough("Leave", "Groups:Delete file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:518:0", false, BFL.L.ERROR_CANNOT_DELETE_BUILTIN)
 	end
 	
 	-- Remove from memory
@@ -547,14 +547,14 @@ function Groups:Delete(groupId)
 		DB:RemoveFriendFromGroup(friendUID, groupId)
 	end
 	
-	return true
+	Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:Delete file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:518:0"); return true
 end
 
 -- Toggle group collapsed state
-function Groups:Toggle(groupId, suppressUpdate)
+function Groups:Toggle(groupId, suppressUpdate) Perfy_Trace(Perfy_GetTime(), "Enter", "Groups:Toggle file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:554:0");
 	local group = self.groups[groupId]
 	if not group then
-		return false
+		Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:Toggle file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:554:0"); return false
 	end
 	
 	group.collapsed = not group.collapsed
@@ -568,14 +568,14 @@ function Groups:Toggle(groupId, suppressUpdate)
 		BFL:ForceRefreshFriendsList()
 	end
 	
-	return true
+	Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:Toggle file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:554:0"); return true
 end
 
 -- Set group collapsed state (for Collapse/Expand All)
-function Groups:SetCollapsed(groupId, collapsed, suppressUpdate)
+function Groups:SetCollapsed(groupId, collapsed, suppressUpdate) Perfy_Trace(Perfy_GetTime(), "Enter", "Groups:SetCollapsed file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:575:0");
 	local group = self.groups[groupId]
 	if not group then
-		return false
+		Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:SetCollapsed file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:575:0"); return false
 	end
 	
 	group.collapsed = collapsed
@@ -589,51 +589,51 @@ function Groups:SetCollapsed(groupId, collapsed, suppressUpdate)
 		BFL:ForceRefreshFriendsList()
 	end
 	
-	return true
+	Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:SetCollapsed file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:575:0"); return true
 end
 
 -- Check if friend is in group
-function Groups:IsFriendInGroup(friendUID, groupId)
+function Groups:IsFriendInGroup(friendUID, groupId) Perfy_Trace(Perfy_GetTime(), "Enter", "Groups:IsFriendInGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:596:0");
 	local DB = BFL:GetModule("DB")
-	return DB:IsFriendInGroup(friendUID, groupId)
+	return Perfy_Trace_Passthrough("Leave", "Groups:IsFriendInGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:596:0", DB:IsFriendInGroup(friendUID, groupId))
 end
 
 -- Toggle friend in group (add if not present, remove if present)
-function Groups:ToggleFriendInGroup(friendUID, groupId)
+function Groups:ToggleFriendInGroup(friendUID, groupId) Perfy_Trace(Perfy_GetTime(), "Enter", "Groups:ToggleFriendInGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:602:0");
 	if not friendUID or not groupId then
-		return false
+		Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:ToggleFriendInGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:602:0"); return false
 	end
 	
 	-- Don't allow adding to builtin groups (except they're managed automatically)
 	if self.groups[groupId] and self.groups[groupId].builtin then
-		return false
+		Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:ToggleFriendInGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:602:0"); return false
 	end
 	
 	local DB = BFL:GetModule("DB")
 	
 	if DB:IsFriendInGroup(friendUID, groupId) then
 		-- Remove from group
-		return DB:RemoveFriendFromGroup(friendUID, groupId)
+		return Perfy_Trace_Passthrough("Leave", "Groups:ToggleFriendInGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:602:0", DB:RemoveFriendFromGroup(friendUID, groupId))
 	else
 		-- Add to group
-		return DB:AddFriendToGroup(friendUID, groupId)
+		return Perfy_Trace_Passthrough("Leave", "Groups:ToggleFriendInGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:602:0", DB:AddFriendToGroup(friendUID, groupId))
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:ToggleFriendInGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:602:0"); end
 
 -- Remove friend from group
-function Groups:RemoveFriendFromGroup(friendUID, groupId)
+function Groups:RemoveFriendFromGroup(friendUID, groupId) Perfy_Trace(Perfy_GetTime(), "Enter", "Groups:RemoveFriendFromGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:624:0");
 	local DB = BFL:GetModule("DB")
-	return DB:RemoveFriendFromGroup(friendUID, groupId)
+	return Perfy_Trace_Passthrough("Leave", "Groups:RemoveFriendFromGroup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:624:0", DB:RemoveFriendFromGroup(friendUID, groupId))
 end
 
 -- Get all groups a friend is in
-function Groups:GetFriendGroups(friendUID)
+function Groups:GetFriendGroups(friendUID) Perfy_Trace(Perfy_GetTime(), "Enter", "Groups:GetFriendGroups file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:630:0");
 	local DB = BFL:GetModule("DB")
-	return DB:GetFriendGroups(friendUID)
+	return Perfy_Trace_Passthrough("Leave", "Groups:GetFriendGroups file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:630:0", DB:GetFriendGroups(friendUID))
 end
 
 -- Get count of friends in a group
-function Groups:GetMemberCount(groupId, friendsList)
+function Groups:GetMemberCount(groupId, friendsList) Perfy_Trace(Perfy_GetTime(), "Enter", "Groups:GetMemberCount file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:636:0");
 	local count = 0
 	local DB = BFL:GetModule("DB")
 	
@@ -669,33 +669,33 @@ function Groups:GetMemberCount(groupId, friendsList)
 		end
 	end
 	
-	return count
+	Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:GetMemberCount file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:636:0"); return count
 end
 
 -- Helper function to get friend unique ID
-function Groups:GetFriendUID(friend)
-	if not friend then return nil end
+function Groups:GetFriendUID(friend) Perfy_Trace(Perfy_GetTime(), "Enter", "Groups:GetFriendUID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:676:0");
+	if not friend then Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:GetFriendUID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:676:0"); return nil end
 	if friend.type == "bnet" then
 		-- Use battleTag as persistent identifier (bnetAccountID is temporary per session)
 		if friend.battleTag then
-			return "bnet_" .. friend.battleTag
+			return Perfy_Trace_Passthrough("Leave", "Groups:GetFriendUID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:676:0", "bnet_" .. friend.battleTag)
 		else
 			-- Fallback to bnetAccountID only if battleTag is unavailable (should never happen)
-			return "bnet_" .. tostring(friend.bnetAccountID or "unknown")
+			return Perfy_Trace_Passthrough("Leave", "Groups:GetFriendUID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:676:0", "bnet_" .. tostring(friend.bnetAccountID or "unknown"))
 		end
 	else
-		return "wow_" .. (friend.name or "")
+		return Perfy_Trace_Passthrough("Leave", "Groups:GetFriendUID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:676:0", "wow_" .. (friend.name or ""))
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:GetFriendUID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:676:0"); end
 
 -- Expose GetFriendUID globally for backward compatibility
-_G.GetFriendUID = function(friend)
-	return Groups:GetFriendUID(friend)
+_G.GetFriendUID = function(friend) Perfy_Trace(Perfy_GetTime(), "Enter", "_G.GetFriendUID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:692:18");
+	return Perfy_Trace_Passthrough("Leave", "_G.GetFriendUID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:692:18", Groups:GetFriendUID(friend))
 end
 
 -- Get sorted list of group IDs based on their configured order
 -- Excludes "nogroup" by default since it's displayed separately at the end
-function Groups:GetSortedGroupIds(includeNoGroup)
+function Groups:GetSortedGroupIds(includeNoGroup) Perfy_Trace(Perfy_GetTime(), "Enter", "Groups:GetSortedGroupIds file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:698:0");
 	local allGroups = self:GetAll()
 	local sortedIds = {}
 	
@@ -709,8 +709,8 @@ function Groups:GetSortedGroupIds(includeNoGroup)
 	end
 	
 	-- Sort by order value
-	table.sort(sortedIds, function(a, b)
-		return a.order < b.order
+	table.sort(sortedIds, function(a, b) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:712:23");
+		return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:712:23", a.order < b.order)
 	end)
 	
 	-- Extract just the IDs in sorted order
@@ -719,5 +719,7 @@ function Groups:GetSortedGroupIds(includeNoGroup)
 		table.insert(result, entry.id)
 	end
 	
-	return result
+	Perfy_Trace(Perfy_GetTime(), "Leave", "Groups:GetSortedGroupIds file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua:698:0"); return result
 end
+
+Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/Groups.lua");

@@ -1,4 +1,4 @@
-local _, BFL = ...
+--[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Data/ConnectedRealms.lua"); local _, BFL = ...
 
 -- Comprehensive list of Connected Realms
 -- Source: Wowpedia (Dec 2025)
@@ -260,11 +260,11 @@ local groupsCN = {
 }
 
 -- Helper to normalize realm names (remove spaces for consistent keys)
-local function Normalize(name)
-    if not name then return "" end
+local function Normalize(name) Perfy_Trace(Perfy_GetTime(), "Enter", "Normalize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Data/ConnectedRealms.lua:263:6");
+    if not name then Perfy_Trace(Perfy_GetTime(), "Leave", "Normalize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Data/ConnectedRealms.lua:263:6"); return "" end
     -- gsub returns 2 values (string, count), we only want the string
     -- otherwise table.insert receives 3 args and treats the string as a position index
-    return (name:gsub("%s", ""))
+    return Perfy_Trace_Passthrough("Leave", "Normalize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Data/ConnectedRealms.lua:263:6", (name:gsub("%s", "")))
 end
 
 -- Generate bidirectional lookup table based on current region
@@ -272,24 +272,24 @@ BFL.ConnectedRealms = {}
 
 -- Determine current region
 -- 1: US, 2: KR, 3: EU, 4: TW, 5: CN
-local function GetRegionID()
+local function GetRegionID() Perfy_Trace(Perfy_GetTime(), "Enter", "GetRegionID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Data/ConnectedRealms.lua:275:6");
     -- Try GetCurrentRegion first (wrapped in pcall)
     if GetCurrentRegion then
         local success, region = pcall(GetCurrentRegion)
         if success and type(region) == "number" then
-            return region
+            Perfy_Trace(Perfy_GetTime(), "Leave", "GetRegionID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Data/ConnectedRealms.lua:275:6"); return region
         end
     end
 
     -- Fallback to portal CVar
     local portal = GetCVar("portal")
-    if portal == "US" then return 1 end
-    if portal == "KR" then return 2 end
-    if portal == "EU" then return 3 end
-    if portal == "TW" then return 4 end
-    if portal == "CN" then return 5 end
+    if portal == "US" then Perfy_Trace(Perfy_GetTime(), "Leave", "GetRegionID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Data/ConnectedRealms.lua:275:6"); return 1 end
+    if portal == "KR" then Perfy_Trace(Perfy_GetTime(), "Leave", "GetRegionID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Data/ConnectedRealms.lua:275:6"); return 2 end
+    if portal == "EU" then Perfy_Trace(Perfy_GetTime(), "Leave", "GetRegionID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Data/ConnectedRealms.lua:275:6"); return 3 end
+    if portal == "TW" then Perfy_Trace(Perfy_GetTime(), "Leave", "GetRegionID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Data/ConnectedRealms.lua:275:6"); return 4 end
+    if portal == "CN" then Perfy_Trace(Perfy_GetTime(), "Leave", "GetRegionID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Data/ConnectedRealms.lua:275:6"); return 5 end
     
-    return 1 -- Default to US
+    Perfy_Trace(Perfy_GetTime(), "Leave", "GetRegionID file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Data/ConnectedRealms.lua:275:6"); return 1 -- Default to US
 end
 
 local regionID = GetRegionID()
@@ -324,8 +324,10 @@ for _, group in ipairs(activeGroups) do
 end
 
 -- Helper to get connected realms (safe access)
-function BFL:GetConnectedRealms(realm)
-    if not realm then return {} end
+function BFL:GetConnectedRealms(realm) Perfy_Trace(Perfy_GetTime(), "Enter", "BFL:GetConnectedRealms file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Data/ConnectedRealms.lua:327:0");
+    if not realm then return Perfy_Trace_Passthrough("Leave", "BFL:GetConnectedRealms file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Data/ConnectedRealms.lua:327:0", {}) end
     local key = Normalize(realm)
-    return BFL.ConnectedRealms[key] or { key }
+    return Perfy_Trace_Passthrough("Leave", "BFL:GetConnectedRealms file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Data/ConnectedRealms.lua:327:0", BFL.ConnectedRealms[key] or { key })
 end
+
+Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Data/ConnectedRealms.lua");

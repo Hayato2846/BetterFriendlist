@@ -1,4 +1,4 @@
--- Modules/HelpFrame.lua
+--[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/HelpFrame.lua"); -- Modules/HelpFrame.lua
 -- Creates the modern Help Frame with ScrollUtil
 
 local _, BFL = ...
@@ -7,9 +7,9 @@ BFL.HelpFrame = HelpFrame
 
 local helpFrame = nil
 
-function HelpFrame:CreateFrame()
+function HelpFrame:CreateFrame() Perfy_Trace(Perfy_GetTime(), "Enter", "HelpFrame:CreateFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/HelpFrame.lua:10:0");
 	if helpFrame then
-		return helpFrame
+		Perfy_Trace(Perfy_GetTime(), "Leave", "HelpFrame:CreateFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/HelpFrame.lua:10:0"); return helpFrame
 	end
 	
 	-- Use ButtonFrameTemplate to match Settings window
@@ -176,19 +176,19 @@ function HelpFrame:CreateFrame()
 	content:SetHeight(totalHeight + 20) -- Add bottom padding
 	
 	-- Sound effects
-	frame:SetScript("OnShow", function()
+	frame:SetScript("OnShow", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/HelpFrame.lua:179:27");
 		PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
-	end)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/HelpFrame.lua:179:27"); end)
 	
-	frame:SetScript("OnHide", function()
+	frame:SetScript("OnHide", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/HelpFrame.lua:183:27");
 		PlaySound(SOUNDKIT.IG_MAINMENU_CLOSE)
-	end)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/HelpFrame.lua:183:27"); end)
 	
 	helpFrame = frame
-	return frame
+	Perfy_Trace(Perfy_GetTime(), "Leave", "HelpFrame:CreateFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/HelpFrame.lua:10:0"); return frame
 end
 
-function HelpFrame:Toggle()
+function HelpFrame:Toggle() Perfy_Trace(Perfy_GetTime(), "Enter", "HelpFrame:Toggle file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/HelpFrame.lua:191:0");
 	local frame = self:CreateFrame()
 	
 	if frame:IsShown() then
@@ -196,15 +196,17 @@ function HelpFrame:Toggle()
 	else
 		frame:Show()
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "HelpFrame:Toggle file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/HelpFrame.lua:191:0"); end
 
-function HelpFrame:Show()
+function HelpFrame:Show() Perfy_Trace(Perfy_GetTime(), "Enter", "HelpFrame:Show file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/HelpFrame.lua:201:0");
 	local frame = self:CreateFrame()
 	frame:Show()
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "HelpFrame:Show file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/HelpFrame.lua:201:0"); end
 
-function HelpFrame:Hide()
+function HelpFrame:Hide() Perfy_Trace(Perfy_GetTime(), "Enter", "HelpFrame:Hide file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/HelpFrame.lua:206:0");
 	if helpFrame then
 		helpFrame:Hide()
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "HelpFrame:Hide file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/HelpFrame.lua:206:0"); end
+
+Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/HelpFrame.lua");

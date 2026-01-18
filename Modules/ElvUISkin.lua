@@ -1,4 +1,4 @@
--- Modules/ElvUISkin.lua
+--[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua"); -- Modules/ElvUISkin.lua
 -- ElvUI Skinning Module for BetterFriendlist
 -- Adds native ElvUI skin support
 
@@ -7,7 +7,7 @@ local ADDON_NAME, BFL = ...
 -- Register Module
 local ElvUISkin = BFL:RegisterModule("ElvUISkin", {})
 
-function ElvUISkin:Initialize()
+function ElvUISkin:Initialize() Perfy_Trace(Perfy_GetTime(), "Enter", "ElvUISkin:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:10:0");
 	-- Check if ElvUI is loaded immediately
 	if _G.ElvUI then
 		self:RegisterSkin()
@@ -15,45 +15,45 @@ function ElvUISkin:Initialize()
 		-- Wait for ElvUI to load (in case BFL loads first)
 		local listener = CreateFrame("Frame")
 		listener:RegisterEvent("ADDON_LOADED")
-		listener:SetScript("OnEvent", function(f, event, addonName)
+		listener:SetScript("OnEvent", function(f, event, addonName) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:18:32");
 			if addonName == "ElvUI" then
 				self:RegisterSkin()
 				f:UnregisterEvent("ADDON_LOADED")
 			end
-		end)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:18:32"); end)
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "ElvUISkin:Initialize file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:10:0"); end
 
-function ElvUISkin:RegisterSkin()
-	if not _G.ElvUI then return end
+function ElvUISkin:RegisterSkin() Perfy_Trace(Perfy_GetTime(), "Enter", "ElvUISkin:RegisterSkin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:27:0");
+	if not _G.ElvUI then Perfy_Trace(Perfy_GetTime(), "Leave", "ElvUISkin:RegisterSkin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:27:0"); return end
 	
 	-- Check if skin is enabled in BFL settings (Point 1)
 	-- Explicit check for false (nil means enabled by default if we wanted, but DB init sets it to false)
 	if BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin == false then
 		-- BFL:DebugPrint("ElvUISkin: Skin disabled in settings")
-		return
+		Perfy_Trace(Perfy_GetTime(), "Leave", "ElvUISkin:RegisterSkin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:27:0"); return
 	end
 
 	BFL:DebugPrint("ElvUISkin: Registering skin...")
 	local E, L, V, P, G = unpack(_G.ElvUI)
 	local S = E:GetModule('Skins')
-	if not S then return end
+	if not S then Perfy_Trace(Perfy_GetTime(), "Leave", "ElvUISkin:RegisterSkin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:27:0"); return end
 
 	-- Register callback for skinning
 	-- This ensures our skin runs when ElvUI skins are applied
-	S:AddCallbackForAddon("BetterFriendlist", "BetterFriendlist", function()
+	S:AddCallbackForAddon("BetterFriendlist", "BetterFriendlist", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:44:63");
 		BFL:DebugPrint("ElvUISkin: Callback triggered")
-		xpcall(function() self:SkinFrames(E, S) end, function(err) print("|cffff0000BetterFriendlist ElvUI Skin Error:|r " .. tostring(err)) end)
-	end)
+		xpcall(function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:46:9"); self:SkinFrames(E, S) Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:46:9"); end, function(err) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:46:47"); print("|cffff0000BetterFriendlist ElvUI Skin Error:|r " .. tostring(err)) Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:46:47"); end)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:44:63"); end)
 	
 	-- If BetterFriendlist is already loaded (which it is), try to skin immediately
 	-- This helps if ElvUI has already processed callbacks
 	BFL:DebugPrint("ElvUISkin: Direct call triggered")
-	xpcall(function() self:SkinFrames(E, S) end, function(err) print("|cffff0000BetterFriendlist ElvUI Skin Error:|r " .. tostring(err)) end)
-end
+	xpcall(function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:52:8"); self:SkinFrames(E, S) Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:52:8"); end, function(err) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:52:46"); print("|cffff0000BetterFriendlist ElvUI Skin Error:|r " .. tostring(err)) Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:52:46"); end)
+Perfy_Trace(Perfy_GetTime(), "Leave", "ElvUISkin:RegisterSkin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:27:0"); end
 
-function ElvUISkin:SkinFrames(E, S)
-	if not _G.BetterFriendsFrame then return end
+function ElvUISkin:SkinFrames(E, S) Perfy_Trace(Perfy_GetTime(), "Enter", "ElvUISkin:SkinFrames file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:55:0");
+	if not _G.BetterFriendsFrame then Perfy_Trace(Perfy_GetTime(), "Leave", "ElvUISkin:SkinFrames file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:55:0"); return end
 
 	BFL:DebugPrint("ElvUISkin: SkinFrames started")
 	local frame = _G.BetterFriendsFrame
@@ -104,23 +104,23 @@ function ElvUISkin:SkinFrames(E, S)
 		end
 		
 		-- Add Hover Effect
-		button:HookScript("OnEnter", function(self)
+		button:HookScript("OnEnter", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:107:31");
 			if self.backdrop then
 				local color = E.media.rgbvaluecolor
 				if color then
 					self.backdrop:SetBackdropBorderColor(color.r, color.g, color.b)
 				end
 			end
-		end)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:107:31"); end)
 		
-		button:HookScript("OnLeave", function(self)
+		button:HookScript("OnLeave", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:116:31");
 			if self.backdrop then
 				local color = E.media.bordercolor
 				if color then
 					self.backdrop:SetBackdropBorderColor(unpack(color))
 				end
 			end
-		end)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:116:31"); end)
 	end
 
 	-- Skin Tabs (Top)
@@ -299,23 +299,23 @@ function ElvUISkin:SkinFrames(E, S)
 			
 			-- Add Hover Effect (like ElvUI)
 			bnet:EnableMouse(true)
-			bnet:SetScript("OnEnter", function(self)
+			bnet:SetScript("OnEnter", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:302:29");
 				if self.backdrop then
 					local c = _G.FRIENDS_BNET_NAME_COLOR
 					if c then
 						self.backdrop:SetBackdropBorderColor(c.r, c.g, c.b)
 					end
 				end
-			end)
+			Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:302:29"); end)
 			
-			bnet:SetScript("OnLeave", function(self)
+			bnet:SetScript("OnLeave", function(self) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:311:29");
 				if self.backdrop then
 					local c = E.media.bordercolor
 					if c then
 						self.backdrop:SetBackdropBorderColor(unpack(c))
 					end
 				end
-			end)
+			Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:311:29"); end)
 			
 			if bnet.BroadcastFrame then
 				bnet.BroadcastFrame:StripTextures()
@@ -459,7 +459,7 @@ function ElvUISkin:SkinFrames(E, S)
 	
 	-- Skin Context Menus
 	BFL:DebugPrint("ElvUISkin: Skinning ContextMenus")
-	xpcall(function() self:SkinContextMenus(E, S) end, function(err) print("|cffff0000BetterFriendlist ElvUI Menu Error:|r " .. tostring(err)) end)
+	xpcall(function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:462:8"); self:SkinContextMenus(E, S) Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:462:8"); end, function(err) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:462:52"); print("|cffff0000BetterFriendlist ElvUI Menu Error:|r " .. tostring(err)) Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:462:52"); end)
 
 	-- Skin Changelog
 	BFL:DebugPrint("ElvUISkin: Skinning Changelog")
@@ -477,24 +477,24 @@ function ElvUISkin:SkinFrames(E, S)
 	end
 
 	BFL:DebugPrint("ElvUI Skin applied to BetterFriendlist")
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "ElvUISkin:SkinFrames file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:55:0"); end
 
-function ElvUISkin:HookFriendsList(E, S)
+function ElvUISkin:HookFriendsList(E, S) Perfy_Trace(Perfy_GetTime(), "Enter", "ElvUISkin:HookFriendsList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:482:0");
 	local FriendsList = BFL:GetModule("FriendsList")
-	if not FriendsList then return end
+	if not FriendsList then Perfy_Trace(Perfy_GetTime(), "Leave", "ElvUISkin:HookFriendsList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:482:0"); return end
 	
 	-- Hook Group Header
-	hooksecurefunc(FriendsList, "UpdateGroupHeaderButton", function(_, button, elementData)
+	hooksecurefunc(FriendsList, "UpdateGroupHeaderButton", function(_, button, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:487:56");
 		if not button.isSkinned then
 			S:HandleButton(button)
 			-- Strip the custom background texture if it exists
 			if button.BG then button.BG:SetTexture(nil) end
 			button.isSkinned = true
 		end
-	end)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:487:56"); end)
 	
 	-- Hook Friend Button
-	hooksecurefunc(FriendsList, "UpdateFriendButton", function(_, button, elementData)
+	hooksecurefunc(FriendsList, "UpdateFriendButton", function(_, button, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:497:51");
 		if not button.isSkinned then
 			-- Don't full skin friend buttons as they are list items
 			-- But we can skin the travel pass button - Point 3: Fix texture size
@@ -509,29 +509,29 @@ function ElvUISkin:HookFriendsList(E, S)
 			end
 			button.isSkinned = true
 		end
-	end)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:497:51"); end)
 	
 	-- Hook Invite Header
-	hooksecurefunc(FriendsList, "UpdateInviteHeaderButton", function(_, button, elementData)
+	hooksecurefunc(FriendsList, "UpdateInviteHeaderButton", function(_, button, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:515:57");
 		if not button.isSkinned then
 			S:HandleButton(button)
 			button.isSkinned = true
 		end
-	end)
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:515:57"); end)
 	
 	-- Hook Invite Button
-	hooksecurefunc(FriendsList, "UpdateInviteButton", function(_, button, elementData)
+	hooksecurefunc(FriendsList, "UpdateInviteButton", function(_, button, elementData) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:523:51");
 		if not button.isSkinned then
 			if button.AcceptButton then S:HandleButton(button.AcceptButton) end
 			if button.DeclineButton then S:HandleButton(button.DeclineButton) end
 			button.isSkinned = true
 		end
-	end)
-end
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:523:51"); end)
+Perfy_Trace(Perfy_GetTime(), "Leave", "ElvUISkin:HookFriendsList file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:482:0"); end
 
-function ElvUISkin:SkinRecruitAFriend(E, S, frame)
+function ElvUISkin:SkinRecruitAFriend(E, S, frame) Perfy_Trace(Perfy_GetTime(), "Enter", "ElvUISkin:SkinRecruitAFriend file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:532:0");
 	local raf = frame.RecruitAFriendFrame
-	if not raf then return end
+	if not raf then Perfy_Trace(Perfy_GetTime(), "Leave", "ElvUISkin:SkinRecruitAFriend file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:532:0"); return end
 
 	-- Skin Main Elements
 	if raf.Border then raf.Border:StripTextures() end
@@ -628,11 +628,11 @@ function ElvUISkin:SkinRecruitAFriend(E, S, frame)
 			S:HandleButton(raf.SplashFrame.OKButton)
 		end
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "ElvUISkin:SkinRecruitAFriend file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:532:0"); end
 
-function ElvUISkin:SkinSettings(E, S)
+function ElvUISkin:SkinSettings(E, S) Perfy_Trace(Perfy_GetTime(), "Enter", "ElvUISkin:SkinSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:633:0");
 	local frame = _G.BetterFriendlistSettingsFrame
-	if not frame then return end
+	if not frame then Perfy_Trace(Perfy_GetTime(), "Leave", "ElvUISkin:SkinSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:633:0"); return end
 	
 	S:HandlePortraitFrame(frame)
 	
@@ -659,8 +659,8 @@ function ElvUISkin:SkinSettings(E, S)
 	-- Hook Refresh functions to skin EditBoxes (Point 3)
 	local Settings = BFL:GetModule("Settings")
 	if Settings then
-		local function SkinEditBoxesInTab(tab)
-			if not tab or not tab.components then return end
+		local function SkinEditBoxesInTab(tab) Perfy_Trace(Perfy_GetTime(), "Enter", "SkinEditBoxesInTab file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:662:8");
+			if not tab or not tab.components then Perfy_Trace(Perfy_GetTime(), "Leave", "SkinEditBoxesInTab file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:662:8"); return end
 			for _, comp in ipairs(tab.components) do
 				-- Check if it's an EditBox (or container with EditBox)
 				if comp:IsObjectType("EditBox") then
@@ -674,21 +674,21 @@ function ElvUISkin:SkinSettings(E, S)
 					end
 				end
 			end
-		end
+		Perfy_Trace(Perfy_GetTime(), "Leave", "SkinEditBoxesInTab file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:662:8"); end
 
-		hooksecurefunc(Settings, "RefreshGeneralTab", function()
+		hooksecurefunc(Settings, "RefreshGeneralTab", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:679:48");
 			local content = frame.ContentScrollFrame.Content
 			if content and content.GeneralTab then
 				SkinEditBoxesInTab(content.GeneralTab)
 			end
-		end)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:679:48"); end)
 
-		hooksecurefunc(Settings, "RefreshNotificationsTab", function()
+		hooksecurefunc(Settings, "RefreshNotificationsTab", function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:686:54");
 			local content = frame.ContentScrollFrame.Content
 			if content and content.NotificationsTab then
 				SkinEditBoxesInTab(content.NotificationsTab)
 			end
-		end)
+		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:686:54"); end)
 	end
 	
 	-- Hook Components to skin dynamic elements
@@ -698,47 +698,47 @@ function ElvUISkin:SkinSettings(E, S)
 		-- Checkbox
 		if not C.IsSkinned then
 			local oldCreateCheckbox = C.CreateCheckbox
-			C.CreateCheckbox = function(...)
+			C.CreateCheckbox = function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "C.CreateCheckbox file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:701:22");
 				local holder = oldCreateCheckbox(...)
 				if holder and holder.checkBox then
 					S:HandleCheckBox(holder.checkBox)
 				end
-				return holder
+				Perfy_Trace(Perfy_GetTime(), "Leave", "C.CreateCheckbox file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:701:22"); return holder
 			end
 			
 			-- Slider
 			local oldCreateSlider = C.CreateSlider
-			C.CreateSlider = function(...)
+			C.CreateSlider = function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "C.CreateSlider file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:711:20");
 				local holder = oldCreateSlider(...)
 				if holder and holder.Slider then
 					S:HandleSliderFrame(holder.Slider)
 				end
-				return holder
+				Perfy_Trace(Perfy_GetTime(), "Leave", "C.CreateSlider file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:711:20"); return holder
 			end
 			
 			-- Dropdown
 			local oldCreateDropdown = C.CreateDropdown
-			C.CreateDropdown = function(...)
+			C.CreateDropdown = function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "C.CreateDropdown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:721:22");
 				local holder = oldCreateDropdown(...)
 				if holder and holder.DropDown then
 					S:HandleDropDownBox(holder.DropDown)
 				end
-				return holder
+				Perfy_Trace(Perfy_GetTime(), "Leave", "C.CreateDropdown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:721:22"); return holder
 			end
 			
 			-- Button
 			local oldCreateButton = C.CreateButton
-			C.CreateButton = function(...)
+			C.CreateButton = function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "C.CreateButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:731:20");
 				local button = oldCreateButton(...)
 				if button then
 					S:HandleButton(button)
 				end
-				return button
+				Perfy_Trace(Perfy_GetTime(), "Leave", "C.CreateButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:731:20"); return button
 			end
 			
 			-- List Item (Group Management)
 			local oldCreateListItem = C.CreateListItem
-			C.CreateListItem = function(...)
+			C.CreateListItem = function(...) Perfy_Trace(Perfy_GetTime(), "Enter", "C.CreateListItem file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:741:22");
 				local holder = oldCreateListItem(...)
 				if holder then
 					if holder.deleteButton then S:HandleButton(holder.deleteButton) end
@@ -753,15 +753,15 @@ function ElvUISkin:SkinSettings(E, S)
 						holder:CreateBackdrop("Transparent")
 					end
 				end
-				return holder
+				Perfy_Trace(Perfy_GetTime(), "Leave", "C.CreateListItem file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:741:22"); return holder
 			end
 			
 			C.IsSkinned = true
 		end
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "ElvUISkin:SkinSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:633:0"); end
 
-function ElvUISkin:SkinNotifications(E, S)
+function ElvUISkin:SkinNotifications(E, S) Perfy_Trace(Perfy_GetTime(), "Enter", "ElvUISkin:SkinNotifications file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:764:0");
 	-- Skin Toast Frames
 	for i = 1, 3 do
 		local toast = _G["BFL_FriendNotificationToast"..i]
@@ -775,14 +775,14 @@ function ElvUISkin:SkinNotifications(E, S)
 			end
 		end
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "ElvUISkin:SkinNotifications file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:764:0"); end
 
-function ElvUISkin:SkinBroker(E, S)
+function ElvUISkin:SkinBroker(E, S) Perfy_Trace(Perfy_GetTime(), "Enter", "ElvUISkin:SkinBroker file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:780:0");
 	-- Hook LibQTip to skin tooltips
 	local LQT = LibStub("LibQTip-1.0", true)
 	if LQT and not LQT.IsSkinnedByBFL then
 		local oldAcquire = LQT.Acquire
-		LQT.Acquire = function(self, key, ...)
+		LQT.Acquire = function(self, key, ...) Perfy_Trace(Perfy_GetTime(), "Enter", "LQT.Acquire file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:785:16");
 			local tooltip = oldAcquire(self, key, ...)
 			if key == "BetterFriendlistBrokerTT" or key == "BetterFriendlistBrokerDetailTT" then
 				if not tooltip.isSkinned then
@@ -791,25 +791,25 @@ function ElvUISkin:SkinBroker(E, S)
 					tooltip.isSkinned = true
 				end
 			end
-			return tooltip
+			Perfy_Trace(Perfy_GetTime(), "Leave", "LQT.Acquire file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:785:16"); return tooltip
 		end
 		LQT.IsSkinnedByBFL = true
 	end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "ElvUISkin:SkinBroker file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:780:0"); end
 
-function ElvUISkin:SkinContextMenus(E, S)
+function ElvUISkin:SkinContextMenus(E, S) Perfy_Trace(Perfy_GetTime(), "Enter", "ElvUISkin:SkinContextMenus file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:800:0");
 	-- Hook MenuUtil to skin context menus
-	if not MenuUtil then return end
+	if not MenuUtil then Perfy_Trace(Perfy_GetTime(), "Leave", "ElvUISkin:SkinContextMenus file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:800:0"); return end
 	
 	-- Helper to skin a single frame in the menu
-	local function SkinMenuFrame(frame)
-		if not frame then return end
+	local function SkinMenuFrame(frame) Perfy_Trace(Perfy_GetTime(), "Enter", "SkinMenuFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:805:7");
+		if not frame then Perfy_Trace(Perfy_GetTime(), "Leave", "SkinMenuFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:805:7"); return end
 		
 		-- Recursive search for CheckButtons and Checkbox-like Buttons
-		local function FindAndSkin(obj, depth)
-			if not obj then return end
+		local function FindAndSkin(obj, depth) Perfy_Trace(Perfy_GetTime(), "Enter", "FindAndSkin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:809:8");
+			if not obj then Perfy_Trace(Perfy_GetTime(), "Leave", "FindAndSkin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:809:8"); return end
 			depth = depth or 0
-			if depth > 15 then return end -- Prevent infinite recursion
+			if depth > 15 then Perfy_Trace(Perfy_GetTime(), "Leave", "FindAndSkin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:809:8"); return end -- Prevent infinite recursion
 			
 			local objType = obj:GetObjectType()
 			
@@ -888,13 +888,13 @@ function ElvUISkin:SkinContextMenus(E, S)
 							-- Case A: Separate Checkmark Region
 							checkmarkRegion:SetAlpha(0)
 							
-							local function UpdateCheck()
+							local function UpdateCheck() Perfy_Trace(Perfy_GetTime(), "Enter", "UpdateCheck file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:891:13");
 								if checkmarkRegion:IsShown() then
 									obj.BFLCheckmark:Show()
 								else
 									obj.BFLCheckmark:Hide()
 								end
-							end
+							Perfy_Trace(Perfy_GetTime(), "Leave", "UpdateCheck file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:891:13"); end
 							
 							hooksecurefunc(checkmarkRegion, "Show", UpdateCheck)
 							hooksecurefunc(checkmarkRegion, "Hide", UpdateCheck)
@@ -903,8 +903,8 @@ function ElvUISkin:SkinContextMenus(E, S)
 						else
 							-- Case B: Texture Swap on Background Region (or checkmark not found yet)
 							-- We hook the background region to see if it turns into a checkmark
-							local function UpdateTexture(self)
-								if not obj.BFLCheckmark then return end
+							local function UpdateTexture(self) Perfy_Trace(Perfy_GetTime(), "Enter", "UpdateTexture file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:906:13");
+								if not obj.BFLCheckmark then Perfy_Trace(Perfy_GetTime(), "Leave", "UpdateTexture file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:906:13"); return end
 								
 								local tex = self:GetTexture()
 								local atlas = self:GetAtlas()
@@ -918,7 +918,7 @@ function ElvUISkin:SkinContextMenus(E, S)
 								else
 									obj.BFLCheckmark:Hide()
 								end
-							end
+							Perfy_Trace(Perfy_GetTime(), "Leave", "UpdateTexture file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:906:13"); end
 							
 							hooksecurefunc(checkboxRegion, "SetTexture", UpdateTexture)
 							hooksecurefunc(checkboxRegion, "SetAtlas", UpdateTexture)
@@ -941,21 +941,21 @@ function ElvUISkin:SkinContextMenus(E, S)
 			if obj.GetScrollTarget then
 				FindAndSkin(obj:GetScrollTarget(), depth + 1)
 			end
-		end
+		Perfy_Trace(Perfy_GetTime(), "Leave", "FindAndSkin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:809:8"); end
 		
 		FindAndSkin(frame)
-	end
+	Perfy_Trace(Perfy_GetTime(), "Leave", "SkinMenuFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:805:7"); end
 	
 	-- Hook Menu Manager to catch ALL menus (including submenus)
-	local function HookMenuManager()
-		if BFL.MenuManagerHooked then return end
+	local function HookMenuManager() Perfy_Trace(Perfy_GetTime(), "Enter", "HookMenuManager file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:950:7");
+		if BFL.MenuManagerHooked then Perfy_Trace(Perfy_GetTime(), "Leave", "HookMenuManager file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:950:7"); return end
 		
 		if Menu and Menu.GetManager then
 			local manager = Menu.GetManager()
 			if manager and manager.OpenMenu then
-				hooksecurefunc(manager, "OpenMenu", function(self, menu)
+				hooksecurefunc(manager, "OpenMenu", function(self, menu) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:956:40");
 					-- Wait a frame for the menu to be created and populated
-					C_Timer.After(0.05, function()
+					C_Timer.After(0.05, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:958:25");
 						-- Get the currently open menu (which should be the one we just opened)
 						local openMenu = manager:GetOpenMenu()
 						if openMenu then
@@ -968,11 +968,11 @@ function ElvUISkin:SkinContextMenus(E, S)
 								-- Hook ScrollBox to skin new frames as they appear
 								if openMenu.ScrollBox then
 									if openMenu.ScrollBox.RegisterCallback then
-										pcall(function()
-											openMenu.ScrollBox:RegisterCallback("OnAcquiredFrame", function(o, frame, elementData, isNew)
+										pcall(function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:971:16");
+											openMenu.ScrollBox:RegisterCallback("OnAcquiredFrame", function(o, frame, elementData, isNew) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:972:66");
 												SkinMenuFrame(frame)
-											end, self)
-										end)
+											Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:972:66"); end, self)
+										Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:971:16"); end)
 									end
 								end
 							end
@@ -980,30 +980,30 @@ function ElvUISkin:SkinContextMenus(E, S)
 							-- Always scan the menu for items (initial population)
 							SkinMenuFrame(openMenu)
 						end
-					end)
-				end)
+					Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:958:25"); end)
+				Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:956:40"); end)
 				BFL.MenuManagerHooked = true
 				-- BFL:DebugPrint("BFL: Hooked Menu Manager for SubMenus")
 			end
 		end
-	end
+	Perfy_Trace(Perfy_GetTime(), "Leave", "HookMenuManager file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:950:7"); end
 
 	-- Try to hook immediately
 	HookMenuManager()
 	
 	-- Also hook CreateContextMenu as a backup/trigger
-	hooksecurefunc(MenuUtil, "CreateContextMenu", function(owner, generator)
+	hooksecurefunc(MenuUtil, "CreateContextMenu", function(owner, generator) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:995:47");
 		HookMenuManager() -- Retry hooking if it wasn't ready
-	end)
-end
+	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:995:47"); end)
+Perfy_Trace(Perfy_GetTime(), "Leave", "ElvUISkin:SkinContextMenus file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:800:0"); end
 
-function ElvUISkin:SkinChangelog(E, S)
+function ElvUISkin:SkinChangelog(E, S) Perfy_Trace(Perfy_GetTime(), "Enter", "ElvUISkin:SkinChangelog file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:1000:0");
 	local Changelog = BFL:GetModule("Changelog")
-	if not Changelog then return end
+	if not Changelog then Perfy_Trace(Perfy_GetTime(), "Leave", "ElvUISkin:SkinChangelog file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:1000:0"); return end
 
-	local function Skin()
+	local function Skin() Perfy_Trace(Perfy_GetTime(), "Enter", "Skin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:1004:7");
 		local frame = _G.BetterFriendlistChangelogFrame
-		if not frame or frame.isSkinned then return end
+		if not frame or frame.isSkinned then Perfy_Trace(Perfy_GetTime(), "Leave", "Skin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:1004:7"); return end
 		
 		BFL:DebugPrint("ElvUISkin: Applying Skin to Changelog Window")
 		S:HandlePortraitFrame(frame)
@@ -1034,19 +1034,19 @@ function ElvUISkin:SkinChangelog(E, S)
 		end
 		
 		frame.isSkinned = true
-	end
+	Perfy_Trace(Perfy_GetTime(), "Leave", "Skin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:1004:7"); end
 
 	hooksecurefunc(Changelog, "CreateChangelogWindow", Skin)
 	Skin()
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "ElvUISkin:SkinChangelog file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:1000:0"); end
 
-function ElvUISkin:SkinHelpFrame(E, S)
+function ElvUISkin:SkinHelpFrame(E, S) Perfy_Trace(Perfy_GetTime(), "Enter", "ElvUISkin:SkinHelpFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:1043:0");
 	local HelpFrame = BFL.HelpFrame or BFL:GetModule("HelpFrame")
-	if not HelpFrame then return end
+	if not HelpFrame then Perfy_Trace(Perfy_GetTime(), "Leave", "ElvUISkin:SkinHelpFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:1043:0"); return end
 
-	local function Skin()
+	local function Skin() Perfy_Trace(Perfy_GetTime(), "Enter", "Skin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:1047:7");
 		local frame = _G.BetterFriendlistHelpFrame
-		if not frame or frame.isSkinned then return end
+		if not frame or frame.isSkinned then Perfy_Trace(Perfy_GetTime(), "Leave", "Skin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:1047:7"); return end
 		
 		BFL:DebugPrint("ElvUISkin: Skinning HelpFrame")
 		S:HandlePortraitFrame(frame)
@@ -1073,7 +1073,7 @@ function ElvUISkin:SkinHelpFrame(E, S)
 		end
 
 		frame.isSkinned = true
-	end
+	Perfy_Trace(Perfy_GetTime(), "Leave", "Skin file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:1047:7"); end
 
 	-- Hook creation
 	hooksecurefunc(HelpFrame, "CreateFrame", Skin)
@@ -1082,4 +1082,6 @@ function ElvUISkin:SkinHelpFrame(E, S)
 	
 	-- Try to skin immediately if it exists
 	if _G.BetterFriendlistHelpFrame then Skin() end
-end
+Perfy_Trace(Perfy_GetTime(), "Leave", "ElvUISkin:SkinHelpFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua:1043:0"); end
+
+Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Modules/ElvUISkin.lua");
