@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [2.2.2] - 2026-01-18
+### Fixed
+- **Font Support** - Reverted the friend name font to `GameFontNormal`. This restores support for the 4 standard fonts (including Asian/Cyrillic characters).
+- **ElvUI Interaction** - **Note:** ElvUI Font Size settings now apply to the Friend Name again.
+- **Workaround** - This is a temporary workaround. Proper independent font settings will be added in the next version.
+
 ## [2.2.1] - 2026-01-18
 ### Fixed
 - **Slash Commands** - Cleanup of slash commands.

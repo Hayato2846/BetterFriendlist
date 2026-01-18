@@ -2951,7 +2951,8 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 	-- Apply font size settings
 	local FontManager = GetFontManager()
 	if FontManager then
-		FontManager:ApplyFontSize(button.Name)
+		-- REVERTED: Do not apply custom scaling to Name (GameFontNormal native fallback support)
+		-- FontManager:ApplyFontSize(button.Name)
 		FontManager:ApplyFontSize(button.Info)
 	end
 	

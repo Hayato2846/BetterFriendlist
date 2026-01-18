@@ -271,7 +271,7 @@
 					</Anchors>
 				</Texture>
 				<!-- Friend Name (Line 1: BattleNet Name (CharacterName)) -->
-				<FontString parentKey="Name" inherits="BetterFriendlistFriendsFontNormal" justifyH="LEFT" maxLines="1" nonSpaceWrap="false">
+				<FontString parentKey="Name" inherits="GameFontNormal" justifyH="LEFT" maxLines="1" nonSpaceWrap="false">
 					<Size x="280" y="0" />
 					<Anchors>
 						<Anchor point="TOPLEFT" x="24" y="-6" />
