@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [2.2.1] - 2026-01-18
+### Fixed
+- **Slash Commands** - Cleanup of slash commands.
+- **Performance** - Fixed performance issues. (Reported by Drakblackz)
+- **Menu System** - Fixed issue where menus would not close properly, likely due to mouse cursor changes. (Reported by Atom)
+
 ## [2.2.0] - 2026-01-17
 ### Added
 - **Group Name Alignment** - Added a new option to align group headers (Left, Center, Right). Left alignment is now the default. (Reported by Drakblackz)

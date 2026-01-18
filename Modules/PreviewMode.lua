@@ -603,6 +603,30 @@ end
 
 function PreviewMode:GenerateMockFriends()
 	self.mockData.friends = {}
+	self.mockData.groupAssignments = {} -- Clean start for assignments
+	
+	-- Generate 4 International Friends for Font Testing (KR, SC, TC, RU)
+	local intFriends = {
+		{ name = "안녕하세요", tag = "안녕하세요#1111", uid="bnet_안녕하세요#1111", group="raid_team" }, 
+		{ name = "你好世界", tag = "你好世界#2222", uid="bnet_你好世界#2222", group="mythic_plus" }, 
+		{ name = "哈囉世界", tag = "哈囉世界#3333", uid="bnet_哈囉世界#3333", group="pvp_friends" }, 
+		{ name = "Россия", tag = "Россия#4444", uid="bnet_Россия#4444", group="irl_friends" }, -- Explicit Cyrillic in BattleTag AND Character Name
+	}
+	
+	for i, data in ipairs(intFriends) do
+		local options = {
+			battleTag = data.tag,
+			accountName = data.name, -- Distinct account name
+			characterName = data.name,
+			game = {program = "WoW", name = "World of Warcraft"},
+			note = "Font Test",
+			isFavorite = false, -- Not favorites, per user request
+		}
+		-- print("BFL Preview: Adding " .. data.tag) -- Debug print
+		table.insert(self.mockData.friends, GenerateMockBNetFriend(200 + i, true, options))
+		-- Assign to specific normal groups to integrate them into the preview
+		self.mockData.groupAssignments[data.uid] = {data.group}
+	end
 	
 	-- Generate 8 online BNet friends with varied status
 	for i = 1, 8 do
@@ -652,7 +676,9 @@ function PreviewMode:GenerateMockGroupsData()
 	self.mockData.groups = GenerateMockGroups()
 	
 	-- Combine BNet and WoW group assignments
-	self.mockData.groupAssignments = {}
+	-- NOTE: Do NOT wipe table here, as GenerateMockFriends may have added entries!
+	-- self.mockData.groupAssignments = {} 
+	
 	for k, v in pairs(MOCK_GROUP_ASSIGNMENTS) do
 		self.mockData.groupAssignments[k] = v
 	end
