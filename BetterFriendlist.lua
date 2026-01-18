@@ -1873,7 +1873,7 @@ end
 
 -- Contacts Menu (11.2.5 - replaces broadcast button, includes ignore list)
 -- Uses MenuUtil like Blizzard's ContactsMenuMixin
-function BetterFriendsFrame_ShowContactsMenu(button) local menu = MenuUtil.CreateContextMenu(button, function(ownerRegion, rootDescription) rootDescription:SetTag("CONTACTS_MENU");
+function BetterFriendsFrame_ShowContactsMenu(button) local generator = function(ownerRegion, rootDescription) rootDescription:SetTag("BFL_CONTACTS_MENU");
 		
 		-- Add BetterFriendList title
 		rootDescription:CreateTitle(L.MENU_TITLE);
@@ -1947,10 +1947,42 @@ function BetterFriendsFrame_ShowContactsMenu(button) local menu = MenuUtil.Creat
 		-- Ignore List option
 		rootDescription:CreateButton(CONTACTS_MENU_IGNORE_BUTTON_NAME or L.MENU_MANAGE_IGNORE, function() BetterFriendsFrame_ShowIgnoreList();
 		end);
-	end);
+	end
+
+	-- Use DropdownButtonMixin (Retail 11.0+) to ensure correct anchoring
+	if button.SetupMenu and button.OpenMenu then
+		-- Setup once and restore native Toggle behavior
+		if not button._bflMenuInitialized then
+			button._bflMenuInitialized = true
+			button:SetupMenu(generator)
+			
+			-- Fix: Template overrides OnMouseDown, breaking Mixin behavior.
+			-- Hook OnMouseDown to properly toggle the menu.
+			if button.HookScript then
+				button:HookScript("OnMouseDown", function(self)
+					if self.ToggleMenu then
+						self:ToggleMenu()
+					end
+				end)
+			end
+			
+			-- Disable OnClick to prevent "Double Toggle" (Close on MouseDown -> Re-open on MouseUp)
+			if button.SetScript then
+				button:SetScript("OnClick", nil)
+			end
+			
+			-- Open initially (since we missed the MouseDown hook for this first click)
+			button:OpenMenu()
+		end
+		return
+	end
 	
-	-- Store menu instance in global table (survives local scope)
-	table.insert(_G.BFL_ActiveContactsMenus, menu)
+	-- Fallback: Manual creation (forces cursor anchor, but tries to fix it)
+	local menu = MenuUtil.CreateContextMenu(button, generator)
+	
+	if menu then
+		table.insert(_G.BFL_ActiveContactsMenus, menu)
+	end
 	
 	-- Hook menu's Hide to track when it closes (but DON'T remove from list yet)
 	if menu and not menu._bflHooked then
