@@ -661,6 +661,7 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Prevent BetterFriendlist from opening ove
 
 	-- Ignore List
 	L.IGNORE_LIST_UNIGNORE = "Unignore Player"
+L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 
 	-- ========================================
 	-- RECENT ALLIES (Retail 11.0.7+)
@@ -804,7 +805,7 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Prevent BetterFriendlist from opening ove
 	-- ========================================
 	-- Name Formatting
 	L.SETTINGS_NAME_FORMAT_HEADER = "Name Formatting"
-	L.SETTINGS_NAME_FORMAT_DESC = "Customize how friend names are displayed using tokens:\n|cffffffff%name%|r - Account Name (RealID/BattleTag)\n|cffffffff%note%|r - Note (BNet or WoW)\n|cffffffff%nickname%|r - Custom Nickname\n|cffffffff%battletag%|r - Short BattleTag (no #1234)"
+	L.SETTINGS_NAME_FORMAT_DESC = "Customize how friend names are displayed using tokens:\n|cffFFD100%name%|r - Account Name (RealID/BattleTag)\n|cffFFD100%note%|r - Note (BNet or WoW)\n|cffFFD100%nickname%|r - Custom Nickname\n|cffFFD100%battletag%|r - Short BattleTag (no #1234)"
 	L.SETTINGS_NAME_FORMAT_LABEL = "Format:"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP = "Name Display Format"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP_DESC = "Enter a format string using tokens."
@@ -896,6 +897,13 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Prevent BetterFriendlist from opening ove
 	L.SETTINGS_NOTIFY_GAME_SWITCH = "Game Switch: Notify when friend changes game"
 	L.SETTINGS_NOTIFY_GAME_SWITCH_ENABLED = "Game Switch notifications |cff00ff00ENABLED|r"
 	L.SETTINGS_NOTIFY_GAME_SWITCH_DISABLED = "Game Switch notifications |cffff0000DISABLED|r"
+
+	-- Font Settings
+	L.SETTINGS_FRIEND_NAME_SETTINGS = "Friend Name Settings"
+	L.SETTINGS_FRIEND_INFO_SETTINGS = "Friend Info Settings"
+	L.SETTINGS_FONT_FACE = "Font Face"
+	L.SETTINGS_FONT_SIZE_NUM = "Font Size"
+	L.SETTINGS_FONT_COLOR = "Font Color"
 
 	-- Missing Descriptions
 	L.SETTINGS_HIDE_EMPTY_GROUPS_DESC = "Automatically hides groups that have no online members"

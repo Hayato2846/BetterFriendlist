@@ -313,6 +313,11 @@ end
 function BFL:ForceRefreshFriendsList()
 	local FriendsList = self:GetModule("FriendsList")
 	if FriendsList then
+		-- Update font cache (colors, sizes, etc) in case settings changed
+		if FriendsList.UpdateFontCache then
+			FriendsList:UpdateFontCache()
+		end
+
 		-- Clear pending update flag to prevent overwriting our forced refresh
 		FriendsList:ClearPendingUpdate()
 		
@@ -380,6 +385,21 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 				if module.Initialize then
 					module:Initialize()
 				end
+			end
+
+			-- Best Practice: Register LibSharedMedia callbacks (Platynator-style)
+			-- Ensures fonts update immediately if a new font is registered (e.g. by another addon)
+			local LSM = LibStub("LibSharedMedia-3.0", true)
+			if LSM then
+				local function OnMediaUpdate(event, mediaType, key)
+					if mediaType == LSM.MediaType.FONT then
+						if BFL.ForceRefreshFriendsList then
+							BFL:ForceRefreshFriendsList()
+						end
+					end
+				end
+				LSM.RegisterCallback("BetterFriendlist", "LibSharedMedia_Registered", OnMediaUpdate)
+				LSM.RegisterCallback("BetterFriendlist", "LibSharedMedia_SetGlobal", OnMediaUpdate)
 			end
 			
 			-- Initialize NotificationSystem (cooldown timer, etc.)
@@ -1007,18 +1027,27 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 			print(string.format(BFL.L.CORE_COMPAT_LAYER, BFL.L.CORE_COMPAT_NOT_LOADED))
 		end
 	
-	-- Reset Changelog State
+	-- Use internal reset function
 	elseif msg == "reset_changelog" or msg == "resetchangelog" then
 		local DB = BFL:GetModule("DB")
 		local Changelog = BFL:GetModule("Changelog")
 		if DB and Changelog then
 			DB:Set("lastChangelogVersion", "0.0.0")
 			Changelog:CheckVersion()
-			print("|cff00ff00BetterFriendlist:|r " .. BFL.L.CORE_CHANGELOG_RESET)
+			print("|cff00ff00BetterFriendlist:|r " .. (BFL.L.CORE_CHANGELOG_RESET or "Changelog reset."))
 		else
-			print("|cffff0000BetterFriendlist:|r " .. BFL.L.MSG_SETTINGS_RESET) -- Slightly reusing msg, but modules not loaded is better
+			print("|cffff0000BetterFriendlist:|r " .. (BFL.L.MSG_SETTINGS_RESET or "Could not reset changelog.")) 
 		end
-	
+
+	-- TEMPORARY: Reset Font Colors (Phase 20)
+	elseif msg == "resetcolors" then
+		local DB = BFL:GetModule("DB")
+		if DB then
+			DB:ResetFontColors()
+		else
+			print("|cffff0000BetterFriendlist:|r Database module not loaded.")
+		end
+
 	-- Debug: Check UIPanelWindows settings
 	elseif msg == "checkpanel" or msg == "panel" then
 		print(BFL.L.CORE_DEBUG_PANEL_HEADER)

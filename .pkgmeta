@@ -13,6 +13,9 @@ externals:
   Libs/LibEditMode:
     url: https://github.com/p3lim-wow/LibEditMode
     tag: latest
+  Libs/LibSharedMedia-3.0:
+    url: https://repos.curseforge.com/wow/libsharedmedia-3-0/trunk
+    tag: latest
 
 ignore:
   - .git

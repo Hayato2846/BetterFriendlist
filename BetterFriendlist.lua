@@ -1406,6 +1406,25 @@ end
 -- TRAVEL PASS BUTTON HANDLERS
 --------------------------------------------------------------------------
 
+local CLASS_ID_TO_GAME_MODE = {
+	[14] = Enum.GameMode.Plunderstorm,
+	[15] = Enum.GameMode.WoWHack,
+}
+
+local function CanInviteByGameMode(gameAccountInfo)
+	if not C_GameRules or not C_GameRules.GetActiveGameMode then return true end
+	
+	local otherGameMode = CLASS_ID_TO_GAME_MODE[gameAccountInfo.classID]
+	local activeGameMode = C_GameRules.GetActiveGameMode()
+	
+	if otherGameMode then
+		return otherGameMode == activeGameMode
+	else
+		-- If we're both in standard we can invite them.
+		return activeGameMode == Enum.GameMode.Standard
+	end
+end
+
 -- TravelPass Button Handlers
 function BetterFriendsList_TravelPassButton_OnClick(self) local friendData = self.friendData
 	if not friendData or friendData.type ~= "bnet" then return end
@@ -1423,7 +1442,61 @@ function BetterFriendsList_TravelPassButton_OnClick(self) local friendData = sel
 	end
 	
 	if not actualIndex then return end
+
+	-- USE BLIZZARD LOGIC (Retail)
+	-- Fixes "Join" button not working (Request vs Invite) and Cross-Faction logic
+	if FriendsFrame_InviteOrRequestToJoin and FriendsFrame_SetupTravelPassDropdown then
+		-- Check Valid Game Accounts (Ported from FriendsFrame.lua)
+		local numGameAccounts = C_BattleNet.GetFriendNumGameAccounts(actualIndex)
+		local numValidGameAccounts = 0
+		local lastGameAccountID, lastGameAccountGUID
+		local playerFactionGroup = UnitFactionGroup("player")
+		local playerRealmID = GetRealmID()
+		local WOW_PROJECT_ID = WOW_PROJECT_ID
+		
+		for i = 1, numGameAccounts do
+			local gameAccountInfo = C_BattleNet.GetFriendGameAccountInfo(actualIndex, i)
+			local isValid = true
+			
+			-- Basic checks
+			if gameAccountInfo.clientProgram ~= BNET_CLIENT_WOW then isValid = false end
+			if gameAccountInfo.wowProjectID ~= WOW_PROJECT_ID then isValid = false end
+			if gameAccountInfo.realmID == 0 then isValid = false end
+			if not gameAccountInfo.isInCurrentRegion then isValid = false end
+			
+			-- Cross-faction checks
+			if isValid and gameAccountInfo.factionName ~= playerFactionGroup then
+				if C_QuestSession and C_QuestSession.Exists() then
+					isValid = false
+				elseif C_PartyInfo and C_PartyInfo.CanFormCrossFactionParties and not C_PartyInfo.CanFormCrossFactionParties() then
+					isValid = false
+				end
+			end
+			
+			-- Game Mode Check
+			if isValid and not CanInviteByGameMode(gameAccountInfo) then
+				isValid = false
+			end
+			
+			if isValid then
+				numValidGameAccounts = numValidGameAccounts + 1
+				lastGameAccountID = gameAccountInfo.gameAccountID
+				lastGameAccountGUID = gameAccountInfo.playerGuid
+			end
+		end
+		
+		if numValidGameAccounts == 1 then
+			-- Single valid account: Auto-Invite or Request Join
+			FriendsFrame_InviteOrRequestToJoin(lastGameAccountGUID, lastGameAccountID)
+		else
+			-- Multiple valid (or 0 valid): Show Dropdown
+			-- Blizzard's dropdown logic handles the "0 valid" case by showing disabled buttons
+			FriendsFrame_SetupTravelPassDropdown(actualIndex, self)
+		end
+		return
+	end
 	
+	-- CLASSIC FALLBACK (Legacy Logic)
 	-- Check if friend has multiple game accounts
 	local numGameAccounts = C_BattleNet.GetFriendNumGameAccounts(actualIndex)
 	
@@ -1451,6 +1524,26 @@ function BetterFriendsList_TravelPassButton_OnClick(self) local friendData = sel
 	end
 end
 
+local inviteTypeToButtonText = {
+	["INVITE"] = TRAVEL_PASS_INVITE,
+	["SUGGEST_INVITE"] = SUGGEST_INVITE,
+	["REQUEST_INVITE"] = REQUEST_INVITE,
+	["INVITE_CROSS_FACTION"] = TRAVEL_PASS_INVITE_CROSS_FACTION,
+	["SUGGEST_INVITE_CROSS_FACTION"] = SUGGEST_INVITE,
+	["REQUEST_INVITE_CROSS_FACTION"] = REQUEST_INVITE,
+}
+
+local inviteTypeIsCrossFaction = {
+	["INVITE_CROSS_FACTION"] = true,
+	["SUGGEST_INVITE_CROSS_FACTION"] = true,
+	["REQUEST_INVITE_CROSS_FACTION"] = true,
+}
+
+local FACTION_LABELS_FROM_STRING = {
+	["Alliance"] = FACTION_ALLIANCE,
+	["Horde"] = FACTION_HORDE,
+}
+
 function BetterFriendsList_TravelPassButton_OnEnter(self) local friendData = self.friendData
 	if not friendData then return end
 	
@@ -1474,7 +1567,55 @@ function BetterFriendsList_TravelPassButton_OnEnter(self) local friendData = sel
 		return
 	end
 	
-	-- Check for invite restrictions (matching Blizzard's logic)
+	-- USE BLIZZARD LOGIC (Retail 11.0+)
+	if FriendsFrame_GetDisplayedInviteTypeAndGuid and FriendsFrame_GetInviteRestriction and FriendsFrame_GetInviteRestrictionText then
+		local inviteType, guid, factionName = FriendsFrame_GetDisplayedInviteTypeAndGuid(actualIndex)
+		local restriction = FriendsFrame_GetInviteRestriction(actualIndex)
+		
+		if inviteType and inviteTypeToButtonText[inviteType] then
+			GameTooltip:SetText(inviteTypeToButtonText[inviteType], HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b)
+			
+			if inviteTypeIsCrossFaction[inviteType] and factionName then
+				local factionLabel = FACTION_LABELS_FROM_STRING[factionName] or (factionName == "Horde" and FACTION_HORDE or FACTION_ALLIANCE)
+				if CROSS_FACTION_INVITE_TOOLTIP then
+					GameTooltip:AddLine(CROSS_FACTION_INVITE_TOOLTIP:format(factionLabel), nil, nil, nil, true)
+				end
+			end
+			
+			if restriction == INVITE_RESTRICTION_NONE then
+				if (inviteType == "REQUEST_INVITE" or inviteType == "REQUEST_INVITE_CROSS_FACTION") and C_SocialQueue then
+					-- Show who is in the group (Social Queue)
+					local group = C_SocialQueue.GetGroupForPlayer(guid)
+					local members = C_SocialQueue.GetGroupMembers(group)
+					local numDisplayed = 0
+					if members then
+						for i=1, #members do
+							if members[i].guid ~= guid then
+								if numDisplayed == 0 then
+									GameTooltip:AddLine(SOCIAL_QUEUE_ALSO_IN_GROUP)
+								elseif numDisplayed >= 7 then
+									GameTooltip:AddLine(SOCIAL_QUEUE_AND_MORE, GRAY_FONT_COLOR.r, GRAY_FONT_COLOR.g, GRAY_FONT_COLOR.b, 1)
+									break
+								end
+								
+								local name, color = SocialQueueUtil_GetRelationshipInfo(members[i].guid, nil, members[i].clubId)
+								GameTooltip:AddLine(color..name..FONT_COLOR_CODE_CLOSE)
+								numDisplayed = numDisplayed + 1
+							end
+						end
+					end
+				end
+			else
+				GameTooltip:AddLine(FriendsFrame_GetInviteRestrictionText(restriction), RED_FONT_COLOR.r, RED_FONT_COLOR.g, RED_FONT_COLOR.b, true)
+			end
+			
+			GameTooltip:Show()
+			return
+		end
+	end
+	
+	-- CLASSIC FALLBACK (Legacy Logic)
+	-- Check for invite restrictions (matching Blizzard's Check code)
 	local restriction = nil  -- Will be set to NO_GAME_ACCOUNTS if no valid accounts found
 	local numGameAccounts = C_BattleNet.GetFriendNumGameAccounts(actualIndex)
 	local playerFactionGroup = UnitFactionGroup("player")
@@ -1945,7 +2086,7 @@ function BetterFriendsFrame_ShowContactsMenu(button) local generator = function(
 		end
 		
 		-- Ignore List option
-		rootDescription:CreateButton(CONTACTS_MENU_IGNORE_BUTTON_NAME or L.MENU_MANAGE_IGNORE, function() BetterFriendsFrame_ShowIgnoreList();
+		rootDescription:CreateButton(CONTACTS_MENU_IGNORE_BUTTON_NAME or L.MENU_IGNORE_LIST, function() BetterFriendsFrame_ShowIgnoreList();
 		end);
 	end
 

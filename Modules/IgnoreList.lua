@@ -56,6 +56,23 @@ function IgnoreList:OnLoad(frame)
 		frame.UnignorePlayerButton:SetText(UNIGNORE or BFL.L.IGNORE_LIST_UNIGNORE)
 	end
 	
+	-- Global Ignore List Integration
+	if frame.GlobalIgnoreListButton then
+		-- Safe check for addon loaded
+		local loaded = false
+		if C_AddOns and C_AddOns.IsAddOnLoaded then
+			loaded = C_AddOns.IsAddOnLoaded("GlobalIgnoreList")
+		elseif IsAddOnLoaded then
+			loaded = IsAddOnLoaded("GlobalIgnoreList")
+		end
+
+		if loaded then
+			frame.GlobalIgnoreListButton:Show()
+		else
+			frame.GlobalIgnoreListButton:Hide()
+		end
+	end
+	
 	-- Classic: Use FauxScrollFrame approach
 	if BFL.IsClassic or not BFL.HasModernScrollBox then
 		-- BFL:DebugPrint("|cff00ffffIgnoreList:|r Using Classic FauxScrollFrame mode")
@@ -212,6 +229,19 @@ function IgnoreList:Update()
 		return
 	end
 	
+	-- Global Ignore List Integration Check
+	local ignoreFrame = BetterFriendsFrame.IgnoreListWindow
+	if ignoreFrame.GlobalIgnoreListButton then
+		local loaded = false
+		if C_AddOns and C_AddOns.IsAddOnLoaded then
+			loaded = C_AddOns.IsAddOnLoaded("GlobalIgnoreList")
+		elseif IsAddOnLoaded then
+			loaded = IsAddOnLoaded("GlobalIgnoreList")
+		end
+		
+		ignoreFrame.GlobalIgnoreListButton:SetShown(loaded)
+	end
+	
 	-- Build data list for both modes
 	local dataList = {}
 
@@ -344,5 +374,39 @@ function BetterIgnoreList_Unignore()
 	local IgnoreList = BFL:GetModule("IgnoreList")
 	if IgnoreList then
 		IgnoreList:Unignore()
+	end
+end
+
+function BetterIgnoreList_ToggleGIL()
+	-- 1. Try to toggle existing frame directly (Best way)
+	local gilFrame = _G["GIL"]
+	if gilFrame then
+		gilFrame:SetShown(not gilFrame:IsShown())
+		if gilFrame:IsShown() then
+			PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+		else
+			PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_OFF)
+		end
+		return
+	end
+
+	-- 2. If frame doesn't exist, try to load it via slash command
+	local loaded = false
+	if C_AddOns and C_AddOns.IsAddOnLoaded then
+		loaded = C_AddOns.IsAddOnLoaded("GlobalIgnoreList")
+	elseif IsAddOnLoaded then
+		loaded = IsAddOnLoaded("GlobalIgnoreList")
+	end
+	
+	if loaded then
+		if SlashCmdList and SlashCmdList["GIGNORE"] then
+			-- This creates the frame AND shows it
+			SlashCmdList["GIGNORE"]("ui")
+			PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+		else
+			if BFL then
+				BFL:DebugPrint("BetterIgnoreList_ToggleGIL: GlobalIgnoreList loaded but SlashCmdList['GIGNORE'] is missing.")
+			end
+		end
 	end
 end

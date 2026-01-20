@@ -71,6 +71,9 @@ function Compat:Setup()
 			self:UpdateAnchor() 
 		end)
 	end
+	
+	-- Hook IgnoreList Module
+	self:HookIgnoreListFrame()
 end
 
 function Compat:HookSettingsFrame()
@@ -108,6 +111,16 @@ function Compat:HookRaidInfoFrame()
 	end
 end
 
+function Compat:HookIgnoreListFrame()
+	if self.ignoreListFrameHooked then return end
+	
+	if BetterFriendsFrame and BetterFriendsFrame.IgnoreListWindow then
+		BetterFriendsFrame.IgnoreListWindow:HookScript("OnShow", function() self:UpdateAnchor() end)
+		BetterFriendsFrame.IgnoreListWindow:HookScript("OnHide", function() self:UpdateAnchor() end)
+		self.ignoreListFrameHooked = true
+	end
+end
+
 function Compat:UpdateAnchor()
 	-- Check if GIL frame exists and is shown
 	local gilFrame = _G["GIL"]
@@ -122,6 +135,11 @@ function Compat:UpdateAnchor()
 	local settingsFrame = _G["BetterFriendlistSettingsFrame"]
 	if settingsFrame and settingsFrame:IsShown() then
 		anchor = settingsFrame
+	end
+	
+	-- Ignore List Frame
+	if BetterFriendsFrame and BetterFriendsFrame.IgnoreListWindow and BetterFriendsFrame.IgnoreListWindow:IsShown() then
+		anchor = BetterFriendsFrame.IgnoreListWindow
 	end
 	
 	-- Help Frame (takes precedence if both are somehow shown, or typically exclusive)
@@ -143,6 +161,9 @@ function Compat:UpdateAnchor()
 end
 
 function Compat:OnFriendsShow()
+	-- Ensure hooks are ready (esp. for IgnoreList which might load late)
+	self:HookIgnoreListFrame()
+	
 	-- Check user preference in GIL DB
 	if GlobalIgnoreDB and GlobalIgnoreDB.openWithFriends then
 		-- Ensure GIL is shown (creates frame if needed)

@@ -786,7 +786,7 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita sovrapposizioni. Richiede reload."
 	-- ========================================
 	-- Name Formatting
 	L.SETTINGS_NAME_FORMAT_HEADER = "Formato Nome"
-	L.SETTINGS_NAME_FORMAT_DESC = "Personalizza:\n|cffffffff%name%|r - Nome\n|cffffffff%note%|r - Nota\n|cffffffff%nickname%|r - Soprannome\n|cffffffff%battletag%|r - Tag"
+	L.SETTINGS_NAME_FORMAT_DESC = "Personalizza:\n|cffFFD100%name%|r - Nome\n|cffFFD100%note%|r - Nota\n|cffFFD100%nickname%|r - Soprannome\n|cffFFD100%battletag%|r - Tag"
 	L.SETTINGS_NAME_FORMAT_LABEL = "Formato:"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP = "Formato Nome"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP_DESC = "Inserisci formato."

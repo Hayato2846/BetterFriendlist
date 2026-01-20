@@ -728,18 +728,8 @@ end
 
 -- Set font size and save immediately
 function Settings:SetFontSize(size)
-	local DB = GetDB()
-	if not DB then return end
-	
-	DB:Set("fontSize", size)
-	
-	-- Force full display refresh for immediate font size update
-	BFL:ForceRefreshFriendsList()
-	
-	-- Refresh General Tab to update dropdown display
-	if currentTab == 1 then
-		self:RefreshGeneralTab()
-	end
+	-- REMOVED: Global font scaling disabled (User Request 2026-01-20)
+	-- Do nothing
 end
 
 -- Reset to defaults
@@ -757,7 +747,7 @@ function Settings:DoReset()
 	
 	DB:Set("showBlizzardOption", false)
 	DB:Set("compactMode", false)
-	DB:Set("fontSize", "normal")
+	-- DB:Set("fontSize", "normal") -- REMOVED
 	DB:Set("colorClassNames", true)
 	DB:Set("hideEmptyGroups", false)
 	DB:Set("showFactionIcons", false)
@@ -2360,79 +2350,107 @@ function Settings:RefreshGeneralTab()
 	local displayHeader = Components:CreateHeader(tab, L.SETTINGS_DISPLAY_OPTIONS or "Display Options")
 	table.insert(allFrames, displayHeader)
 	
-	-- Color Class Names
-	local colorClassNames = Components:CreateCheckbox(tab, L.SETTINGS_COLOR_CLASS_NAMES, 
-		DB:Get("colorClassNames", true),
-		function(val) self:OnColorClassNamesChanged(val) end)
-	colorClassNames:SetTooltip(L.SETTINGS_COLOR_CLASS_NAMES, L.SETTINGS_COLOR_CLASS_NAMES_DESC or "Colors character names using their class color for easier identification")
-	table.insert(allFrames, colorClassNames)
-	
-	-- Hide Empty Groups
-	local hideEmptyGroups = Components:CreateCheckbox(tab, L.SETTINGS_HIDE_EMPTY_GROUPS,
-		DB:Get("hideEmptyGroups", false),
-		function(val) self:OnHideEmptyGroupsChanged(val) end)
-	hideEmptyGroups:SetTooltip(L.SETTINGS_HIDE_EMPTY_GROUPS, L.SETTINGS_HIDE_EMPTY_GROUPS_DESC or "Automatically hides groups that have no online members")
-	table.insert(allFrames, hideEmptyGroups)
-	
-	-- Show Faction Icons
-	local showFactionIcons = Components:CreateCheckbox(tab, L.SETTINGS_SHOW_FACTION_ICONS, 
-		DB:Get("showFactionIcons", true),
-		function(val) self:OnShowFactionIconsChanged(val) end)
-	showFactionIcons:SetTooltip(L.SETTINGS_SHOW_FACTION_ICONS, L.SETTINGS_SHOW_FACTION_ICONS_DESC or "Display Alliance/Horde icons next to character names")
-	table.insert(allFrames, showFactionIcons)
-	
-	-- Show Realm Name
-	local showRealmName = Components:CreateCheckbox(tab, L.SETTINGS_SHOW_REALM_NAME,
-		DB:Get("showRealmName", true),
-		function(val) self:OnShowRealmNameChanged(val) end)
-	showRealmName:SetTooltip(L.SETTINGS_SHOW_REALM_NAME, L.SETTINGS_SHOW_REALM_NAME_DESC or "Display the realm name for friends on different servers")
-	table.insert(allFrames, showRealmName)
-	
-	-- Gray Other Faction
-	local grayOtherFaction = Components:CreateCheckbox(tab, L.SETTINGS_GRAY_OTHER_FACTION, 
-		DB:Get("grayOtherFaction", false),
-		function(val) self:OnGrayOtherFactionChanged(val) end)
-	grayOtherFaction:SetTooltip(L.SETTINGS_GRAY_OTHER_FACTION, L.SETTINGS_GRAY_OTHER_FACTION_DESC or "Make friends from the opposite faction appear grayed out")
-	table.insert(allFrames, grayOtherFaction)
-	
-	-- Show Mobile as AFK
-	local showMobileAsAFK = Components:CreateCheckbox(tab, L.SETTINGS_SHOW_MOBILE_AS_AFK, 
-		DB:Get("showMobileAsAFK", false),
-		function(val) self:OnShowMobileAsAFKChanged(val) end)
-	showMobileAsAFK:SetTooltip(L.SETTINGS_SHOW_MOBILE_AS_AFK, L.SETTINGS_SHOW_MOBILE_AS_AFK_DESC or "Display AFK status icon for friends on mobile (BSAp only)")
-	table.insert(allFrames, showMobileAsAFK)
-	
-	-- NEW: Treat Mobile as Offline (Feature Request)
-	local treatMobileAsOffline = Components:CreateCheckbox(tab, L.SETTINGS_TREAT_MOBILE_OFFLINE or "Treat Mobile users as Offline", 
-		DB:Get("treatMobileAsOffline", false),
-		function(val) self:OnTreatMobileAsOfflineChanged(val) end)
-	treatMobileAsOffline:SetTooltip(L.SETTINGS_TREAT_MOBILE_OFFLINE or "Treat Mobile as Offline", L.SETTINGS_TREAT_MOBILE_OFFLINE_DESC or "Display friends using the Mobile App in the Offline group")
-	table.insert(allFrames, treatMobileAsOffline)
-	
-	-- Hide Max Level
-	local hideMaxLevel = Components:CreateCheckbox(tab, L.SETTINGS_HIDE_MAX_LEVEL, 
-		DB:Get("hideMaxLevel", false),
-		function(val) self:OnHideMaxLevelChanged(val) end)
-	hideMaxLevel:SetTooltip(L.SETTINGS_HIDE_MAX_LEVEL, L.SETTINGS_HIDE_MAX_LEVEL_DESC or "Don't display level number for characters at max level")
-	table.insert(allFrames, hideMaxLevel)
-	
-	-- Show Blizzard Friend List Option
-	local showBlizzard = Components:CreateCheckbox(tab, L.SETTINGS_SHOW_BLIZZARD, 
-		DB:Get("showBlizzardOption", false),
-		function(val) self:OnShowBlizzardOptionChanged(val) end)
-	showBlizzard:SetTooltip(L.SETTINGS_SHOW_BLIZZARD, L.SETTINGS_SHOW_BLIZZARD_DESC or "Shows the original Blizzard Friends button in the social menu")
-	table.insert(allFrames, showBlizzard)
+-- Row 1: Color Class Names & Hide Empty Groups
+	table.insert(allFrames, Components:CreateDoubleCheckbox(tab,
+		{
+			label = L.SETTINGS_COLOR_CLASS_NAMES,
+			initialValue = DB:Get("colorClassNames", true),
+			callback = function(val) self:OnColorClassNamesChanged(val) end,
+			tooltipTitle = L.SETTINGS_COLOR_CLASS_NAMES,
+			tooltipDesc = L.SETTINGS_COLOR_CLASS_NAMES_DESC or "Colors character names using their class color for easier identification"
+		},
+		{
+			label = L.SETTINGS_HIDE_EMPTY_GROUPS,
+			initialValue = DB:Get("hideEmptyGroups", false),
+			callback = function(val) self:OnHideEmptyGroupsChanged(val) end,
+			tooltipTitle = L.SETTINGS_HIDE_EMPTY_GROUPS,
+			tooltipDesc = L.SETTINGS_HIDE_EMPTY_GROUPS_DESC or "Automatically hides groups that have no online members"
+		}
+	))
 
-	-- Enable ElvUI Skin
+	-- Row 2: Show Faction Icons & Show Realm Name
+	table.insert(allFrames, Components:CreateDoubleCheckbox(tab,
+		{
+			label = L.SETTINGS_SHOW_FACTION_ICONS,
+			initialValue = DB:Get("showFactionIcons", true),
+			callback = function(val) self:OnShowFactionIconsChanged(val) end,
+			tooltipTitle = L.SETTINGS_SHOW_FACTION_ICONS,
+			tooltipDesc = L.SETTINGS_SHOW_FACTION_ICONS_DESC or "Display Alliance/Horde icons next to character names"
+		},
+		{
+			label = L.SETTINGS_SHOW_REALM_NAME,
+			initialValue = DB:Get("showRealmName", true),
+			callback = function(val) self:OnShowRealmNameChanged(val) end,
+			tooltipTitle = L.SETTINGS_SHOW_REALM_NAME,
+			tooltipDesc = L.SETTINGS_SHOW_REALM_NAME_DESC or "Display the realm name for friends on different servers"
+		}
+	))
+
+	-- Row 3: Gray Other Faction & Show Mobile as AFK
+	table.insert(allFrames, Components:CreateDoubleCheckbox(tab,
+		{
+			label = L.SETTINGS_GRAY_OTHER_FACTION,
+			initialValue = DB:Get("grayOtherFaction", false),
+			callback = function(val) self:OnGrayOtherFactionChanged(val) end,
+			tooltipTitle = L.SETTINGS_GRAY_OTHER_FACTION,
+			tooltipDesc = L.SETTINGS_GRAY_OTHER_FACTION_DESC or "Make friends from the opposite faction appear grayed out"
+		},
+		{
+			label = L.SETTINGS_SHOW_MOBILE_AS_AFK,
+			initialValue = DB:Get("showMobileAsAFK", false),
+			callback = function(val) self:OnShowMobileAsAFKChanged(val) end,
+			tooltipTitle = L.SETTINGS_SHOW_MOBILE_AS_AFK,
+			tooltipDesc = L.SETTINGS_SHOW_MOBILE_AS_AFK_DESC or "Display AFK status icon for friends on mobile (BSAp only)"
+		}
+	))
+
+	-- Row 4: Treat Mobile as Offline & Hide Max Level
+	table.insert(allFrames, Components:CreateDoubleCheckbox(tab,
+		{
+			label = L.SETTINGS_TREAT_MOBILE_OFFLINE or "Treat Mobile users as Offline",
+			initialValue = DB:Get("treatMobileAsOffline", false),
+			callback = function(val) self:OnTreatMobileAsOfflineChanged(val) end,
+			tooltipTitle = L.SETTINGS_TREAT_MOBILE_OFFLINE or "Treat Mobile as Offline",
+			tooltipDesc = L.SETTINGS_TREAT_MOBILE_OFFLINE_DESC or "Display friends using the Mobile App in the Offline group"
+		},
+		{
+			label = L.SETTINGS_HIDE_MAX_LEVEL,
+			initialValue = DB:Get("hideMaxLevel", false),
+			callback = function(val) self:OnHideMaxLevelChanged(val) end,
+			tooltipTitle = L.SETTINGS_HIDE_MAX_LEVEL,
+			tooltipDesc = L.SETTINGS_HIDE_MAX_LEVEL_DESC or "Don't display level number for characters at max level"
+		}
+	))
+
+	-- Row 5: Show Blizzard Option & Show Collapse Arrow (re-grouped)
+	table.insert(allFrames, Components:CreateDoubleCheckbox(tab,
+		{
+			label = L.SETTINGS_SHOW_BLIZZARD,
+			initialValue = DB:Get("showBlizzardOption", false),
+			callback = function(val) self:OnShowBlizzardOptionChanged(val) end,
+			tooltipTitle = L.SETTINGS_SHOW_BLIZZARD,
+			tooltipDesc = L.SETTINGS_SHOW_BLIZZARD_DESC or "Shows the original Blizzard Friends button in the social menu"
+		},
+		{
+			label = L.SETTINGS_SHOW_GROUP_ARROW,
+			initialValue = DB:Get("showGroupArrow", true),
+			callback = function(val) 
+				DB:Set("showGroupArrow", val)
+				BFL:ForceRefreshFriendsList()
+			end,
+			tooltipTitle = L.SETTINGS_SHOW_GROUP_ARROW,
+			tooltipDesc = L.SETTINGS_SHOW_GROUP_ARROW_DESC
+		}
+	))
+
+	-- Row 6: ElvUI Skin (if available) - moved to separate row
 	if _G.ElvUI then
-		local enableElvUISkin = Components:CreateCheckbox(tab, L.SETTINGS_ENABLE_ELVUI_SKIN or "Enable ElvUI Skin", 
+		local elvUICheckbox = Components:CreateCheckbox(tab, 
+			L.SETTINGS_ENABLE_ELVUI_SKIN or "Enable ElvUI Skin",
 			DB:Get("enableElvUISkin", false),
-			function(val) 
-				-- Force boolean value
+			function(val)
 				local boolVal = (val == true or val == 1)
 				DB:Set("enableElvUISkin", boolVal)
-				-- BFL:DebugPrint("Settings: Set enableElvUISkin to", tostring(boolVal))
-				
 				StaticPopupDialogs["BFL_ELVUI_RELOAD"] = {
 					text = L.DIALOG_ELVUI_RELOAD_TEXT or "Changing ElvUI Skin settings requires a UI Reload.\nReload now?",
 					button1 = L.DIALOG_ELVUI_RELOAD_BTN1 or "Yes",
@@ -2443,9 +2461,13 @@ function Settings:RefreshGeneralTab()
 					hideOnEscape = true,
 				}
 				StaticPopup_Show("BFL_ELVUI_RELOAD")
-			end)
-		enableElvUISkin:SetTooltip(L.SETTINGS_ENABLE_ELVUI_SKIN or "Enable ElvUI Skin", L.SETTINGS_ENABLE_ELVUI_SKIN_DESC or "Enables the ElvUI skin for BetterFriendlist. Requires ElvUI to be installed and enabled.")
-		table.insert(allFrames, enableElvUISkin)
+			end
+		)
+		elvUICheckbox:SetTooltip(
+			L.SETTINGS_ENABLE_ELVUI_SKIN or "Enable ElvUI Skin",
+			L.SETTINGS_ENABLE_ELVUI_SKIN_DESC or "Enables the ElvUI skin for BetterFriendlist. Requires ElvUI to be installed and enabled."
+		)
+		table.insert(allFrames, elvUICheckbox)
 	end
 	
 	-- Group Header Count Format
@@ -2504,16 +2526,6 @@ function Settings:RefreshGeneralTab()
 	end
 	table.insert(allFrames, groupHeaderAlignDropdown)
 
-	-- Show Group Arrow (Collapse/Expand)
-	local showGroupArrow = Components:CreateCheckbox(tab, L.SETTINGS_SHOW_GROUP_ARROW, 
-		DB:Get("showGroupArrow", true),
-		function(val) 
-			DB:Set("showGroupArrow", val)
-			BFL:ForceRefreshFriendsList()
-		end)
-	showGroupArrow:SetTooltip(L.SETTINGS_SHOW_GROUP_ARROW, L.SETTINGS_SHOW_GROUP_ARROW_DESC)
-	table.insert(allFrames, showGroupArrow)
-
 	-- Group Arrow Alignment
 	local groupArrowAlignOptions = {
 		labels = {L.SETTINGS_ALIGN_LEFT, L.SETTINGS_ALIGN_CENTER, L.SETTINGS_ALIGN_RIGHT},
@@ -2551,24 +2563,29 @@ function Settings:RefreshGeneralTab()
 
 	-- Name Format Description
 	local nameFormatDesc = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-	nameFormatDesc:SetWidth(360)
+	nameFormatDesc:SetWidth(450) -- Increased width to match grid
+	nameFormatDesc:SetPoint("LEFT", 20, 0) -- Align with components
 	nameFormatDesc:SetJustifyH("LEFT")
 	nameFormatDesc:SetWordWrap(true)
-	nameFormatDesc:SetTextColor(0.7, 0.7, 0.7)
-	nameFormatDesc:SetText(L.SETTINGS_NAME_FORMAT_DESC or "Customize how friend names are displayed using tokens:\n|cffffffff%name%|r - Account Name (RealID/BattleTag)\n|cffffffff%note%|r - Note (BNet or WoW)\n|cffffffff%nickname%|r - Custom Nickname\n|cffffffff%battletag%|r - Short BattleTag (no #1234)")
+	nameFormatDesc:SetTextColor(1, 1, 1)
+	nameFormatDesc:SetText(L.SETTINGS_NAME_FORMAT_DESC or "Customize how friend names are displayed using tokens:\n|cffFFD100%name%|r - Account Name (RealID/BattleTag)\n|cffFFD100%note%|r - Note (BNet or WoW)\n|cffFFD100%nickname%|r - Custom Nickname\n|cffFFD100%battletag%|r - Short BattleTag (no #1234)")
 	table.insert(allFrames, nameFormatDesc)
 
 	-- Name Format EditBox Container
 	local nameFormatContainer = CreateFrame("Frame", nil, tab)
-	nameFormatContainer:SetSize(360, 30)
+	nameFormatContainer:SetSize(450, 30)
+	nameFormatContainer:SetPoint("LEFT", 20, 0) -- Align with components
 	
 	local nameFormatLabel = nameFormatContainer:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
 	nameFormatLabel:SetText(L.SETTINGS_NAME_FORMAT_LABEL or "Format:")
 	nameFormatLabel:SetPoint("LEFT", 0, 0)
+	nameFormatLabel:SetWidth(100) -- LABEL_WIDTH 100
+	nameFormatLabel:SetJustifyH("LEFT")
 	
 	local nameFormatBox = CreateFrame("EditBox", nil, nameFormatContainer, "InputBoxTemplate")
-	nameFormatBox:SetSize(280, 25)
-	nameFormatBox:SetPoint("LEFT", nameFormatLabel, "RIGHT", 10, 0)
+	nameFormatBox:SetSize(200, 25) -- FIELD_WIDTH 200
+	nameFormatBox:SetPoint("LEFT", nameFormatContainer, "LEFT", 110, 0) -- CONTROL_OFFSET 110
+
 	nameFormatBox:SetFontObject("BetterFriendlistFontHighlight")
 	nameFormatBox:SetAutoFocus(false)
 	nameFormatBox:SetText(DB:Get("nameDisplayFormat", "%name%"))
@@ -2607,64 +2624,86 @@ function Settings:RefreshGeneralTab()
 	local behaviorHeader = Components:CreateHeader(tab, L.SETTINGS_BEHAVIOR_HEADER or "Behavior")
 	table.insert(allFrames, behaviorHeader)
 	
-	-- Accordion Groups
-	local accordionGroups = Components:CreateCheckbox(tab, L.SETTINGS_ACCORDION_GROUPS, 
-		DB:Get("accordionGroups", true),
-		function(val) self:OnAccordionGroupsChanged(val) end)
-	accordionGroups:SetTooltip(L.SETTINGS_ACCORDION_GROUPS, L.SETTINGS_ACCORDION_GROUPS_DESC or "Only allow one group to be expanded at a time, automatically collapsing others")
-	table.insert(allFrames, accordionGroups)
+	-- Row 1: Accordion Groups & Compact Mode
+	table.insert(allFrames, Components:CreateDoubleCheckbox(tab,
+		{
+			label = L.SETTINGS_ACCORDION_GROUPS,
+			initialValue = DB:Get("accordionGroups", true),
+			callback = function(val) self:OnAccordionGroupsChanged(val) end,
+			tooltipTitle = L.SETTINGS_ACCORDION_GROUPS,
+			tooltipDesc = L.SETTINGS_ACCORDION_GROUPS_DESC or "Only allow one group to be expanded at a time, automatically collapsing others"
+		},
+		{
+			label = L.SETTINGS_COMPACT_MODE,
+			initialValue = DB:Get("compactMode", false),
+			callback = function(val) self:OnCompactModeChanged(val) end,
+			tooltipTitle = L.SETTINGS_COMPACT_MODE,
+			tooltipDesc = L.SETTINGS_COMPACT_MODE_DESC or "Reduces button height to fit more friends on screen"
+		}
+	))
 	
-	-- Compact Mode
-	local compactMode = Components:CreateCheckbox(tab, L.SETTINGS_COMPACT_MODE,
-		DB:Get("compactMode", false),
-		function(val) self:OnCompactModeChanged(val) end)
-	compactMode:SetTooltip(L.SETTINGS_COMPACT_MODE, L.SETTINGS_COMPACT_MODE_DESC or "Reduces button height to fit more friends on screen")
-	table.insert(allFrames, compactMode)
-	
-	-- Use UI Panel System
-	local useUIPanelSystem = Components:CreateCheckbox(tab, L.SETTINGS_USE_UI_PANEL_SYSTEM or "Use UI Panel System",
-		DB:Get("useUIPanelSystem", false),
-		function(val) self:OnUseUIPanelSystemChanged(val) end)
-	useUIPanelSystem:SetTooltip(L.SETTINGS_USE_UI_PANEL_SYSTEM or "Use UI Panel System", L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC or "Use Blizzard's UI Panel system for automatic repositioning when other windows are open (Character, Spellbook, etc.)")
-	table.insert(allFrames, useUIPanelSystem)
-	
-	-- Classic Only: Close on Guild Tab Click
+	-- Row 2: Use UI Panel System & (Classic: Close on Guild Tab)
+	local closeOnGuildConfig = nil
 	if BFL.IsClassic then
-		local closeOnGuildTab = Components:CreateCheckbox(tab, L.SETTINGS_CLOSE_ON_GUILD_TAB or "Close BetterFriendlist when opening Guild",
-			DB:Get("closeOnGuildTabClick", false),
-			function(val) self:OnCloseOnGuildTabClickChanged(val) end)
-		closeOnGuildTab:SetTooltip(L.SETTINGS_CLOSE_ON_GUILD_TAB or "Close on Guild Tab", L.SETTINGS_CLOSE_ON_GUILD_TAB_DESC or "Automatically close BetterFriendlist when you click the Guild tab")
-		table.insert(allFrames, closeOnGuildTab)
-		
-		-- Hide Guild Tab
-		local hideGuildTab = Components:CreateCheckbox(tab, L.SETTINGS_HIDE_GUILD_TAB or "Hide Guild Tab",
-			DB:Get("hideGuildTab", false),
-			function(val) self:OnHideGuildTabChanged(val) end)
-		hideGuildTab:SetTooltip(L.SETTINGS_HIDE_GUILD_TAB or "Hide Guild Tab", L.SETTINGS_HIDE_GUILD_TAB_DESC or "Hide the Guild tab from the friends list (requires UI reload)")
-		table.insert(allFrames, hideGuildTab)
+		closeOnGuildConfig = {
+			label = L.SETTINGS_CLOSE_ON_GUILD_TAB or "Close BetterFriendlist when opening Guild",
+			initialValue = DB:Get("closeOnGuildTabClick", false),
+			callback = function(val) self:OnCloseOnGuildTabClickChanged(val) end,
+			tooltipTitle = L.SETTINGS_CLOSE_ON_GUILD_TAB or "Close on Guild Tab",
+			tooltipDesc = L.SETTINGS_CLOSE_ON_GUILD_TAB_DESC or "Automatically close BetterFriendlist when you click the Guild tab"
+		}
+	end
+	
+	table.insert(allFrames, Components:CreateDoubleCheckbox(tab,
+		{
+			label = L.SETTINGS_USE_UI_PANEL_SYSTEM or "Use UI Panel System",
+			initialValue = DB:Get("useUIPanelSystem", false),
+			callback = function(val) self:OnUseUIPanelSystemChanged(val) end,
+			tooltipTitle = L.SETTINGS_USE_UI_PANEL_SYSTEM or "Use UI Panel System",
+			tooltipDesc = L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC or "Use Blizzard's UI Panel system for automatic repositioning when other windows are open (Character, Spellbook, etc.)"
+		},
+		closeOnGuildConfig
+	))
+	
+	-- Row 3 (Classic Only): Hide Guild Tab
+	if BFL.IsClassic then
+		table.insert(allFrames, Components:CreateDoubleCheckbox(tab,
+			{
+				label = L.SETTINGS_HIDE_GUILD_TAB or "Hide Guild Tab",
+				initialValue = DB:Get("hideGuildTab", false),
+				callback = function(val) self:OnHideGuildTabChanged(val) end,
+				tooltipTitle = L.SETTINGS_HIDE_GUILD_TAB or "Hide Guild Tab",
+				tooltipDesc = L.SETTINGS_HIDE_GUILD_TAB_DESC or "Hide the Guild tab from the friends list (requires UI reload)"
+			},
+			nil
+		))
 	end
 	
 	-- Spacer before next section
 	table.insert(allFrames, Components:CreateSpacer(tab))
-	
+
 	-- Header: Group Management
 	local groupHeader = Components:CreateHeader(tab, L.SETTINGS_GROUP_MANAGEMENT or "Group Management")
 	table.insert(allFrames, groupHeader)
-	
-	-- Show Favorites Group
-	local showFavorites = Components:CreateCheckbox(tab, L.SETTINGS_SHOW_FAVORITES,
-		DB:Get("showFavoritesGroup", true),
-		function(val) self:OnShowFavoritesGroupChanged(val) end)
-	showFavorites:SetTooltip(L.SETTINGS_SHOW_FAVORITES, L.SETTINGS_SHOW_FAVORITES_DESC or "Toggle visibility of the Favorites group in your friends list")
-	table.insert(allFrames, showFavorites)
-	
-	-- NEW: Enable In-Game Group (Feature Request)
-	local enableInGameGroup = Components:CreateCheckbox(tab, L.SETTINGS_SHOW_INGAME_GROUP or "Show 'In-Game' Group",
-		DB:Get("enableInGameGroup", false),
-		function(val) self:OnEnableInGameGroupChanged(val) end)
-	enableInGameGroup:SetTooltip(L.SETTINGS_SHOW_INGAME_GROUP or "Show 'In-Game' Group", L.SETTINGS_SHOW_INGAME_GROUP_DESC or "Automatically groups friends playing games into a separate group")
-	table.insert(allFrames, enableInGameGroup)
-	
+
+	-- Row 4: Show Favorites & Show In-Game Group
+	table.insert(allFrames, Components:CreateDoubleCheckbox(tab,
+		{
+			label = L.SETTINGS_SHOW_FAVORITES,
+			initialValue = DB:Get("showFavoritesGroup", true),
+			callback = function(val) self:OnShowFavoritesGroupChanged(val) end,
+			tooltipTitle = L.SETTINGS_SHOW_FAVORITES,
+			tooltipDesc = L.SETTINGS_SHOW_FAVORITES_DESC or "Toggle visibility of the Favorites group in your friends list"
+		},
+		{
+			label = L.SETTINGS_SHOW_INGAME_GROUP or "Show 'In-Game' Group",
+			initialValue = DB:Get("enableInGameGroup", false),
+			callback = function(val) self:OnEnableInGameGroupChanged(val) end,
+			tooltipTitle = L.SETTINGS_SHOW_INGAME_GROUP or "Show 'In-Game' Group",
+			tooltipDesc = L.SETTINGS_SHOW_INGAME_GROUP_DESC or "Automatically groups friends playing games into a separate group"
+		}
+	))
+
 	-- NEW: In-Game Group Mode (Sub-option)
 	if DB:Get("enableInGameGroup", false) then
 		local modeOptions = {
@@ -2687,27 +2726,156 @@ function Settings:RefreshGeneralTab()
 	-- Spacer before next section
 	table.insert(allFrames, Components:CreateSpacer(tab))
 	
-	-- Header: Font Settings
-	local fontHeader = Components:CreateHeader(tab, L.SETTINGS_FONT_SETTINGS or "Font Settings")
-	table.insert(allFrames, fontHeader)
+	-- Header: Font Settings (REMOVED)
+	-- local fontHeader = Components:CreateHeader(tab, L.SETTINGS_FONT_SETTINGS or "Font Settings")
+	-- table.insert(allFrames, fontHeader)
 	
-	-- Font Size Dropdown
-	local fontSizeOptions = {
-		labels = {L.SETTINGS_FONT_SIZE_SMALL, L.SETTINGS_FONT_SIZE_NORMAL, L.SETTINGS_FONT_SIZE_LARGE},
-		values = {"small", "medium", "large"}
-	}
-	local currentFontSize = DB:Get("fontSize", "medium")
+	-- Font Size Dropdown (REMOVED: User Request 2026-01-20)
+	-- Global scaling found counterproductive. 
+	-- local fontSizeOptions = {
+	-- 	labels = {L.SETTINGS_FONT_SIZE_SMALL, L.SETTINGS_FONT_SIZE_NORMAL, L.SETTINGS_FONT_SIZE_LARGE},
+	-- 	values = {"small", "medium", "large"}
+	-- }
+	-- local currentFontSize = DB:Get("fontSize", "medium")
 	
-	local function isFontSizeSelected(value)
-		return value == currentFontSize
+	-- local function isFontSizeSelected(value)
+	-- 	return value == currentFontSize
+	-- end
+	
+	-- local function onFontSizeChanged(value)
+	-- 	self:SetFontSize(value)
+	-- end
+	
+	-- local fontSizeDropdown = Components:CreateDropdown(tab, L.SETTINGS_FONT_SIZE, fontSizeOptions, isFontSizeSelected, onFontSizeChanged)
+	-- table.insert(allFrames, fontSizeDropdown)
+
+	-- =========================================================================
+	-- NEW: Specific Friend Name/Info Settings
+	-- =========================================================================
+	
+	local LSM = LibStub("LibSharedMedia-3.0")
+	local fontList = LSM:List("font")
+	local fontOptions = { labels = fontList, values = fontList }
+
+	-- -------------------------------------------------------------------------
+	-- Friend Name Settings
+	-- -------------------------------------------------------------------------
+	table.insert(allFrames, Components:CreateSpacer(tab))
+	local nameFontHeader = Components:CreateHeader(tab, L.SETTINGS_FRIEND_NAME_SETTINGS or "Friend Name Settings")
+	table.insert(allFrames, nameFontHeader)
+
+	-- Name Font Face
+	local currentNameFont = DB:Get("fontFriendName", "Friz Quadrata TT")
+	local nameFontDropdown = Components:CreateDropdown(
+		tab, 
+		"Font:", -- Changed from "Font Face:" (User Request)
+		fontOptions, 
+		function(val) return val == currentNameFont end,
+		function(val) 
+			DB:Set("fontFriendName", val)
+			-- Defer update to next frame (like Platynator) to ensure resource availability
+			C_Timer.After(0.01, function()
+				BFL:ForceRefreshFriendsList()
+				self:RefreshGeneralTab() -- Refresh to update dropdown label
+			end)
+		end
+	)
+	-- Shift 10px right to prevent clipping (matching other dropdowns)
+	if nameFontDropdown.DropDown then
+		local point, relativeTo, relativePoint, xOfs, yOfs = nameFontDropdown.DropDown:GetPoint(1)
+		if point then
+			nameFontDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
+		end
 	end
+	table.insert(allFrames, nameFontDropdown)
+
+	-- Name Font Size & Color
+	local currentNameSize = DB:Get("fontSizeFriendName", 13)
+	local currentNameColor = DB:Get("fontColorFriendName") or {r=1, g=0.82, b=0, a=1}
 	
-	local function onFontSizeChanged(value)
-		self:SetFontSize(value)
+	local nameSizeColorRow = Components:CreateSliderWithColorPicker(
+		tab,
+		L.SETTINGS_FONT_SIZE_NUM or "Font Size:",
+		8, 24, -- Min/Max
+		currentNameSize, -- Current Value
+		function(val) return tostring(val) end, -- Label formatter
+		function(val)
+			DB:Set("fontSizeFriendName", val)
+			-- Defer update to next frame
+			C_Timer.After(0.01, function()
+				BFL:ForceRefreshFriendsList()
+			end)
+		end,
+		currentNameColor,
+		function(r, g, b, a)
+			DB:Set("fontColorFriendName", {r=r, g=g, b=b, a=a})
+			-- Defer update to next frame
+			C_Timer.After(0.01, function()
+				BFL:ForceRefreshFriendsList()
+			end)
+		end
+	)
+	table.insert(allFrames, nameSizeColorRow)
+
+	-- -------------------------------------------------------------------------
+	-- Friend Info Settings
+	-- -------------------------------------------------------------------------
+	table.insert(allFrames, Components:CreateSpacer(tab))
+	local infoFontHeader = Components:CreateHeader(tab, L.SETTINGS_FRIEND_INFO_SETTINGS or "Friend Info Settings")
+	table.insert(allFrames, infoFontHeader)
+
+	-- Info Font Face
+	local currentInfoFont = DB:Get("fontFriendInfo", "Friz Quadrata TT")
+	local infoFontDropdown = Components:CreateDropdown(
+		tab, 
+		"Font:",  -- Changed from "Font Face:" (User Request)
+		fontOptions, 
+		function(val) return val == currentInfoFont end,
+		function(val) 
+			DB:Set("fontFriendInfo", val)
+			-- Defer update to next frame
+			C_Timer.After(0.01, function()
+				BFL:ForceRefreshFriendsList()
+				self:RefreshGeneralTab() -- Refresh to update dropdown label
+			end)
+		end
+	)
+	-- Shift 10px right to prevent clipping
+	if infoFontDropdown.DropDown then
+		local point, relativeTo, relativePoint, xOfs, yOfs = infoFontDropdown.DropDown:GetPoint(1)
+		if point then
+			infoFontDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
+		end
 	end
+	table.insert(allFrames, infoFontDropdown)
+
+	-- Info Font Size & Color
+	local currentInfoSize = DB:Get("fontSizeFriendInfo", 10)
+	local currentInfoColor = DB:Get("fontColorFriendInfo") or {r=0.5, g=0.5, b=0.5, a=1}
 	
-	local fontSizeDropdown = Components:CreateDropdown(tab, L.SETTINGS_FONT_SIZE, fontSizeOptions, isFontSizeSelected, onFontSizeChanged)
-	table.insert(allFrames, fontSizeDropdown)
+	local infoSizeColorRow = Components:CreateSliderWithColorPicker(
+		tab,
+		L.SETTINGS_FONT_SIZE_NUM or "Font Size:",
+		8, 24, -- Min/Max
+		currentInfoSize, -- Current Value
+		function(val) return tostring(val) end, -- Label formatter
+		function(val)
+			DB:Set("fontSizeFriendInfo", val)
+			-- Defer update to next frame
+			C_Timer.After(0.01, function()
+				BFL:ForceRefreshFriendsList()
+			end)
+		end,
+		currentInfoColor,
+		function(r, g, b, a)
+			DB:Set("fontColorFriendInfo", {r=r, g=g, b=b, a=a})
+			-- Defer update to next frame
+			C_Timer.After(0.01, function()
+				BFL:ForceRefreshFriendsList()
+			end)
+		end
+	)
+	table.insert(allFrames, infoSizeColorRow)
 	
 	-- Anchor all frames vertically
 	Components:AnchorChain(allFrames, -5)

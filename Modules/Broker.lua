@@ -1525,7 +1525,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 		if shouldGray then
 			nameColor = "|cff808080"
 		elseif friend.type == "bnet" then
-			nameColor = "|cff00ccff" -- BNet Blue
+			nameColor = FRIENDS_BNET_NAME_COLOR_CODE or "|cff82c5ff" -- BNet Blue
 		elseif friend.type == "wow" then
 			if colorClassNames then
 				local classColor = GetClassColorForFriend(friend)

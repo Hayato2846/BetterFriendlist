@@ -3,6 +3,7 @@
 local ADDON_NAME, BFL = ...
 local FriendsList = BFL:RegisterModule("FriendsList", {})
 local L = BFL.L  -- Localization table
+local LSM = LibStub("LibSharedMedia-3.0")
 
 -- ========================================
 -- Module Dependencies
@@ -1005,6 +1006,41 @@ function FriendsList:Initialize() -- Initialize sort modes and filter from datab
 			end)
 		end
 	end
+	
+	-- Initialize font cache (Performance Optimization)
+	self:UpdateFontCache()
+end
+
+-- Update cached font paths and colors to avoid lookups in render loop
+function FriendsList:UpdateFontCache() 
+	if not self.fontCache then self.fontCache = {} end
+	
+	local DB = GetDB()
+	if not DB then return end
+
+	-- Function to safely get color table
+	local function GetColor(key)
+		local c = DB:Get(key)
+		if c and c.r and c.g and c.b then
+			return c.r, c.g, c.b, c.a or 1
+		end
+		-- Default fallbacks if DB is missing or corrupt
+		if key == "fontColorFriendName" then return 1, 0.82, 0, 1 end -- Gold/Yellow
+		if key == "fontColorFriendInfo" then return 0.5, 0.5, 0.5, 1 end -- Gray
+		return 1, 1, 1, 1
+	end
+
+	-- Name Font
+	local nameFontName = DB:Get("fontFriendName", "Friz Quadrata TT")
+	self.fontCache.namePath = LSM:Fetch("font", nameFontName)
+	self.fontCache.nameSize = DB:Get("fontSizeFriendName", 13)
+	self.fontCache.nameR, self.fontCache.nameG, self.fontCache.nameB, self.fontCache.nameA = GetColor("fontColorFriendName")
+
+	-- Info Font
+	local infoFontName = DB:Get("fontFriendInfo", "Friz Quadrata TT")
+	self.fontCache.infoPath = LSM:Fetch("font", infoFontName)
+	self.fontCache.infoSize = DB:Get("fontSizeFriendInfo", 10)
+	self.fontCache.infoR, self.fontCache.infoG, self.fontCache.infoB, self.fontCache.infoA = GetColor("fontColorFriendInfo")
 end
 
 -- Handle friend list update events
@@ -2938,7 +2974,20 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 	else
 		button.Name:SetPoint("LEFT", 44, 7)  -- Upper position for two lines
 	end
-	button.Name:SetTextColor(1, 1, 1) -- White
+
+	-- Apply Friend Name Font Settings (Optimized)
+	if self.fontCache and self.fontCache.namePath then
+		local _, _, currentFlags = button.Name:GetFont()
+		
+		-- Use FontManager to apply font with Alphabet support
+		if BFL.FontManager and BFL.FontManager.ApplyFont then
+			BFL.FontManager:ApplyFont(button.Name, self.fontCache.namePath, self.fontCache.nameSize, currentFlags)
+		else
+			button.Name:SetFont(self.fontCache.namePath, self.fontCache.nameSize, currentFlags)
+		end
+		
+		button.Name:SetTextColor(self.fontCache.nameR, self.fontCache.nameG, self.fontCache.nameB, self.fontCache.nameA)
+	end
 	
 	-- Show/hide friend elements based on compact mode
 	button.status:Show()
@@ -2946,14 +2995,20 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 		button.Info:Hide()  -- Hide second line in compact mode
 	else
 		button.Info:Show()
-	end
-	
-	-- Apply font size settings
-	local FontManager = GetFontManager()
-	if FontManager then
-		-- REVERTED: Do not apply custom scaling to Name (GameFontNormal native fallback support)
-		-- FontManager:ApplyFontSize(button.Name)
-		FontManager:ApplyFontSize(button.Info)
+
+		-- Apply Friend Info Font Settings (Optimized)
+		if self.fontCache and self.fontCache.infoPath then
+			local _, _, currentFlags = button.Info:GetFont()
+			
+			-- Use FontManager to apply font with Alphabet support
+			if BFL.FontManager and BFL.FontManager.ApplyFont then
+				BFL.FontManager:ApplyFont(button.Info, self.fontCache.infoPath, self.fontCache.infoSize, currentFlags)
+			else
+				button.Info:SetFont(self.fontCache.infoPath, self.fontCache.infoSize, currentFlags)
+			end
+			
+			button.Info:SetTextColor(self.fontCache.infoR, self.fontCache.infoG, self.fontCache.infoB, self.fontCache.infoA)
+		end
 	end
 	
 	-- Adjust icon positions and sizes for compact mode
@@ -3195,7 +3250,9 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 			if shouldGray then
 				line1Text = "|cff808080" .. displayName .. "|r"
 			else
-				line1Text = "|cff00ccff" .. displayName .. "|r"
+				-- REMOVED: (FRIENDS_BNET_NAME_COLOR_CODE or "|cff82c5ff") wrapper
+				-- Now uses button.Name:SetTextColor() from settings
+				line1Text = displayName
 			end
 			
 			if friend.characterName then
@@ -3274,14 +3331,18 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 				elseif friend.gameName then
 					infoText = " - " .. friend.gameName
 				end
-				-- Add info in gray color
+				-- Add info in user-defined info color
 				if infoText ~= "" then
-					line1Text = line1Text .. "|cff7f7f7f" .. infoText .. "|r"
+					local infoColor = GetDB():Get("fontColorFriendInfo") or {r=0.5, g=0.5, b=0.5, a=1}
+					local infoHex = string.format("|cff%02x%02x%02x", infoColor.r*255, infoColor.g*255, infoColor.b*255)
+					line1Text = line1Text .. infoHex .. infoText .. "|r"
 				end
 			else
 				-- Offline - add last online time
 				if friend.lastOnlineTime then
-					line1Text = line1Text .. " |cff7f7f7f- " .. GetLastOnlineText(friend) .. "|r"
+					local infoColor = GetDB():Get("fontColorFriendInfo") or {r=0.5, g=0.5, b=0.5, a=1}
+					local infoHex = string.format("|cff%02x%02x%02x", infoColor.r*255, infoColor.g*255, infoColor.b*255)
+					line1Text = line1Text .. " " .. infoHex .. "- " .. GetLastOnlineText(friend) .. "|r"
 				end
 			end
 		end
@@ -3626,7 +3687,7 @@ function FriendsList:UpdateInviteButton(button, data) local inviteID, accountNam
 	local isCompact = height < 25
 	
 	-- Set name with cyan color (BNet style)
-	button.Name:SetText("|cff00ccff" .. accountName .. "|r")
+	button.Name:SetText((FRIENDS_BNET_NAME_COLOR_CODE or "|cff82c5ff") .. accountName .. "|r")
 	
 	-- Set Info text ALWAYS
 	button.Info:SetText(L.INVITE_TAP_TEXT)

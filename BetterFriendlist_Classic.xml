@@ -979,6 +979,35 @@
 							</OnClick>
 						</Scripts>
 					</Button>
+					<Button parentKey="GlobalIgnoreListButton" inherits="UIPanelButtonTemplate" hidden="true">
+						<Size x="28" y="22"/>
+						<Anchors>
+							<Anchor point="LEFT" relativeKey="$parent.UnignorePlayerButton" relativePoint="RIGHT" x="5" y="0"/>
+						</Anchors>
+						<Layers>
+							<Layer level="ARTWORK">
+								<Texture parentKey="Icon" file="Interface\AddOns\BetterFriendlist\Icons\globe">
+									<Size x="14" y="14"/>
+									<Anchors>
+										<Anchor point="CENTER"/>
+									</Anchors>
+								</Texture>
+							</Layer>
+						</Layers>
+						<Scripts>
+							<OnClick>
+								BetterIgnoreList_ToggleGIL();
+							</OnClick>
+							<OnEnter>
+								GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+								GameTooltip:SetText(BFL and BFL.L and BFL.L.IGNORE_LIST_GLOBAL_IGNORE_LIST or "Global Ignore List", 1, 1, 1);
+								GameTooltip:Show();
+							</OnEnter>
+							<OnLeave>
+								GameTooltip:Hide();
+							</OnLeave>
+						</Scripts>
+					</Button>
 					<!-- ScrollBox placeholder - FauxScrollFrame with ScrollBar created in Lua (IgnoreList.lua) -->
 					<Frame parentKey="ScrollBox">
 						<Anchors>

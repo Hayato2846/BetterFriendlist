@@ -797,7 +797,7 @@ L.RAF_NEXT_REWARD_HELP_TEXT = "Reward Info"
 -- ========================================
 -- Name Formatting
 L.SETTINGS_NAME_FORMAT_HEADER = "Name Format"
-L.SETTINGS_NAME_FORMAT_DESC = "Customize:\n|cffffffff%name%|r -Name\n|cffffffff%note%|r -Note\n|cffffffff%nickname%|r -Nickname\n|cffffffff%battletag%|r -Tag"
+L.SETTINGS_NAME_FORMAT_DESC = "Customize:\n|cffFFD100%name%|r -Name\n|cffFFD100%note%|r -Note\n|cffFFD100%nickname%|r -Nickname\n|cffFFD100%battletag%|r -Tag"
 L.SETTINGS_NAME_FORMAT_LABEL = "Формат:"
 L.SETTINGS_NAME_FORMAT_TOOLTIP = "Name Format"
 L.SETTINGS_NAME_FORMAT_TOOLTIP_DESC = "Enter format."

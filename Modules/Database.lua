@@ -18,6 +18,14 @@ local defaults = {
 	compactMode = false, -- Use compact button layout
 	enableElvUISkin = false, -- Enable ElvUI Skin (default: OFF)
 	fontSize = "normal", -- "small", "normal", "large"
+	-- Font Customization (LibSharedMedia)
+	fontFriendName = "Friz Quadrata TT",
+	fontSizeFriendName = 13,
+	fontColorFriendName = {r = 0.510, g = 0.773, b = 1.0, a = 1}, -- Blizzard BNet Blue {r=0.51, g=0.773, b=1.0}
+	fontFriendInfo = "Friz Quadrata TT",
+	fontSizeFriendInfo = 10,
+	fontColorFriendInfo = {r = 0.510, g = 0.510, b = 0.510, a = 1}, -- Blizzard Gray {r=0.51, g=0.51, b=0.51}
+
 	colorClassNames = true, -- Color character names by class (default: ON)
 	hideEmptyGroups = false, -- Hide groups with no online friends (default: OFF)
 	headerCountFormat = "visible", -- Group header count format: "visible", "online", "both" (default: visible)
@@ -102,6 +110,21 @@ local defaults = {
 	version = BFL.Version
 }
 
+function DB:InternalDeepCopy(orig)
+	local orig_type = type(orig)
+	local copy
+	if orig_type == 'table' then
+		copy = {}
+		for orig_key, orig_value in next, orig, nil do
+			copy[self:InternalDeepCopy(orig_key)] = self:InternalDeepCopy(orig_value)
+		end
+		setmetatable(copy, self:InternalDeepCopy(getmetatable(orig)))
+	else -- number, string, boolean, etc
+		copy = orig
+	end
+	return copy
+end
+
 function DB:Initialize()
 	-- Initialize SavedVariables
 	if not BetterFriendlistDB then
@@ -111,7 +134,25 @@ function DB:Initialize()
 	-- Apply defaults
 	for key, value in pairs(defaults) do
 		if BetterFriendlistDB[key] == nil then
-			BetterFriendlistDB[key] = type(value) == "table" and {} or value
+			if type(value) == "table" then
+				BetterFriendlistDB[key] = self:InternalDeepCopy(value)
+			else
+				BetterFriendlistDB[key] = value
+			end
+		end
+	end
+	
+	-- MIGRATION: Fix Color Tables initialized as empty tables (Bug fix Phase 20)
+	-- Check if color settings are empty tables and reset to defaults
+	local colorKeys = {"fontColorFriendName", "fontColorFriendInfo"}
+	for _, key in ipairs(colorKeys) do
+		local dbVal = BetterFriendlistDB[key]
+		if type(dbVal) == "table" and (dbVal.r == nil or dbVal.g == nil or dbVal.b == nil) then
+			-- Reset to default if any color component is missing
+			if defaults[key] then
+				BetterFriendlistDB[key] = self:InternalDeepCopy(defaults[key])
+				-- BFL:DebugPrint("Database: Fixed corrupted color table for " .. key)
+			end
 		end
 	end
 	
@@ -272,6 +313,24 @@ function DB:MigrateData(oldVersion, newVersion)
 end
 
 -- Get a value from the database
+function DB:ResetFontColors()
+	-- Reset font colors to Blizzard defaults
+	if defaults.fontColorFriendName then
+		BetterFriendlistDB.fontColorFriendName = self:InternalDeepCopy(defaults.fontColorFriendName)
+	end
+	if defaults.fontColorFriendInfo then
+		BetterFriendlistDB.fontColorFriendInfo = self:InternalDeepCopy(defaults.fontColorFriendInfo)
+	end
+	
+	-- Force full display refresh
+	if BFL and BFL.ForceRefreshFriendsList then
+		BFL:ForceRefreshFriendsList()
+	end
+	
+	-- BFL:DebugPrint("Database: Font colors reset to defaults.")
+	print("|cff00ff00BetterFriendlist:|r Font colors reset to Blizzard defaults.")
+end
+
 function DB:Get(key, default)
 	-- If no key provided, return entire database
 	if key == nil then

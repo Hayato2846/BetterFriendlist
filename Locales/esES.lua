@@ -786,7 +786,7 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita solapamientos con otras ventanas (P
 	-- ========================================
 	-- Name Formatting
 	L.SETTINGS_NAME_FORMAT_HEADER = "Formato de Nombre"
-	L.SETTINGS_NAME_FORMAT_DESC = "Personaliza cómo se muestran los nombres:\n|cffffffff%name%|r - Nombre Cuenta (RealID/BattleTag)\n|cffffffff%note%|r - Nota\n|cffffffff%nickname%|r - Apodo\n|cffffffff%battletag%|r - BattleTag Corto"
+	L.SETTINGS_NAME_FORMAT_DESC = "Personaliza cómo se muestran los nombres:\n|cffFFD100%name%|r - Nombre Cuenta (RealID/BattleTag)\n|cffFFD100%note%|r - Nota\n|cffFFD100%nickname%|r - Apodo\n|cffFFD100%battletag%|r - BattleTag Corto"
 	L.SETTINGS_NAME_FORMAT_LABEL = "Formato:"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP = "Formato de Nombre"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP_DESC = "Introduce una cadena de formato usando tokens."

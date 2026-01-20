@@ -787,7 +787,7 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Évite chevauchements avec autres fenêtr
 	-- ========================================
 	-- Name Formatting
 	L.SETTINGS_NAME_FORMAT_HEADER = "Format Nom"
-	L.SETTINGS_NAME_FORMAT_DESC = "Personnaliser affichage :\n|cffffffff%name%|r - Nom Compte\n|cffffffff%note%|r - Note\n|cffffffff%nickname%|r - Surnom\n|cffffffff%battletag%|r - BattleTag Court"
+	L.SETTINGS_NAME_FORMAT_DESC = "Personnaliser affichage :\n|cffFFD100%name%|r - Nom Compte\n|cffFFD100%note%|r - Note\n|cffFFD100%nickname%|r - Surnom\n|cffFFD100%battletag%|r - BattleTag Court"
 	L.SETTINGS_NAME_FORMAT_LABEL = "Format :"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP = "Format Nom"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP_DESC = "Entrez une chaîne de format."

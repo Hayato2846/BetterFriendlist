@@ -1,4 +1,4 @@
--- Locales/deDE.lua
+﻿-- Locales/deDE.lua
 -- German (Deutsch) Localization
 
 local L = BFL_LOCALE
@@ -429,6 +429,7 @@ if GetLocale() == "deDE" then
 	L.FILTER_WOW = "Nur WoW"
 	L.GROUP_INGAME = "Im Spiel"
 	L.IGNORE_LIST_UNIGNORE = "Ignorieren aufheben"
+L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	L.MENU_SET_NICKNAME_FMT = "Spitznamen für %s festlegen"
 	L.MIGRATION_DEBUG_BNET = "Migrations-Check - Altes Battle.net Format:"
 	L.MIGRATION_DEBUG_TOTAL = "Migrations-Check - Gesamte Freundes-Zuordnungen:"
@@ -499,7 +500,7 @@ if GetLocale() == "deDE" then
 	L.SETTINGS_MIGRATE_TOOLTIP = "Gruppen aus dem FriendGroups Addon importieren"
 	L.SETTINGS_MIGRATION_DESC = "Migriert Gruppen und Zuweisungen vom FriendGroups Addon (basierend auf BNet-Notizen)."
 	L.SETTINGS_MIGRATION_HEADER = "FriendGroups Migration"
-	L.SETTINGS_NAME_FORMAT_DESC = "Namensanzeige anpassen:\n|cffffffff%name%|r - Name (RealID/BattleTag)\n|cffffffff%note%|r - Notiz\n|cffffffff%nickname%|r - Spitzname\n|cffffffff%battletag%|r - Kurzer BattleTag"
+	L.SETTINGS_NAME_FORMAT_DESC = "Namensanzeige anpassen:\n|cffFFD100%name%|r - Name (RealID/BattleTag)\n|cffFFD100%note%|r - Notiz\n|cffFFD100%nickname%|r - Spitzname\n|cffFFD100%battletag%|r - Kurzer BattleTag"
 	L.SETTINGS_NAME_FORMAT_HEADER = "Namensformatierung"
 	L.SETTINGS_NAME_FORMAT_LABEL = "Format:"
 	L.SETTINGS_NOTIFY_ADD_TRIGGER = "Trigger hinzufügen"

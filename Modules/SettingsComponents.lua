@@ -10,30 +10,40 @@ local L = BFL.L or BFL_L
 -- ========================================
 -- Constants
 -- ========================================
-local COMPONENT_HEIGHT = 15
-local PADDING_LEFT = 5
-local PADDING_RIGHT = 5
-local SPACING_SECTION = -10
+local COMPONENT_HEIGHT = 24 -- Taller for better touch targets/readability
+local FIELD_WIDTH = 140      -- Default button width
+local PADDING_LEFT = 20
+local PADDING_RIGHT = 20
+local SPACING_SECTION = -15
 local SPACING_OPTION = -10
+
+-- Layout Grid Constants (Dynamic)
+-- We use percentages for responsiveness
+local LABEL_PCT = 0.30       -- Label takes 30% of available width
+local CONTROL_GAP = 10       -- Gap between Label and Control
+
+-- Alignment Tweaks (Visual Correction)
+local DROPDOWN_X_OFFSET = -8 -- Shift Dropdowns left to align visually with Checkboxes
+local DROPDOWN_WIDTH_BONUS = 8 -- Add the shift back as width
 
 -- ========================================
 -- HEADERS
 -- ========================================
 function Components:CreateHeader(parent, text)
 	local holder = CreateFrame("Frame", nil, parent)
-	holder:SetPoint("LEFT", PADDING_LEFT, 0)
+	holder:SetPoint("LEFT", 5, 0)
 	holder:SetPoint("RIGHT", -PADDING_RIGHT, 0)
 	holder.text = holder:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormalLarge")
 	holder.text:SetText(text)
 	holder.text:SetPoint("LEFT", 0, 0)
+	holder.text:SetPoint("RIGHT", 0, 0)
 	holder.text:SetJustifyH("LEFT")
-	holder:SetHeight(COMPONENT_HEIGHT)
+	holder:SetHeight(COMPONENT_HEIGHT + 5) -- More breathing room
 	return holder
 end
 
 -- ========================================
--- CHECKBOX (Label left, Checkbox right)
--- Classic uses InterfaceOptionsCheckButtonTemplate, Retail uses SettingsCheckboxTemplate
+-- CHECKBOX (Label Left, Checkbox Right - Grid Aligned)
 -- ========================================
 function Components:CreateCheckbox(parent, labelText, initialValue, callback)
 	local holder = CreateFrame("Frame", nil, parent)
@@ -41,40 +51,50 @@ function Components:CreateCheckbox(parent, labelText, initialValue, callback)
 	holder:SetPoint("LEFT", PADDING_LEFT, 0)
 	holder:SetPoint("RIGHT", -PADDING_RIGHT, 0)
 	
+	-- Label: Dynamic Width, Left Aligned
+	local label = holder:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
+	label:SetPoint("LEFT", 0, 0)
+	label:SetJustifyH("LEFT")
+	label:SetText(labelText)
+
 	-- Choose template based on game version
 	local template = "SettingsCheckboxTemplate"
 	if BFL.IsClassic then
-		-- Classic: Use InterfaceOptionsCheckButtonTemplate or ChatConfigCheckButtonTemplate
 		template = "InterfaceOptionsCheckButtonTemplate"
 	end
 	
-	-- Checkbox: links positioniert
+	-- Checkbox dynamic positioning
 	local checkBox = CreateFrame("CheckButton", nil, holder, template)
-	checkBox:SetPoint("LEFT", holder, "LEFT", 0, 0)
 	
-	-- Handle label differently based on template
-	if BFL.IsClassic then
-		-- Classic template uses Text child
-		if checkBox.Text then
-			checkBox.Text:SetText(labelText)
-		else
-			-- Fallback: Create font string manually
-			local text = checkBox:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
-			text:SetPoint("LEFT", checkBox, "RIGHT", 4, 0)
-			text:SetText(labelText)
-			checkBox.Text = text
-		end
+	-- Dynamic Resizing Handler
+	holder:SetScript("OnSizeChanged", function(self, width, height)
+		local labelWidth = width * LABEL_PCT
+		label:SetWidth(labelWidth)
+		-- Checkbox starts after label
+		checkBox:SetPoint("LEFT", self, "LEFT", labelWidth + CONTROL_GAP, 0)
+	end)
+	
+	-- Trigger initial layout
+	if holder:GetWidth() > 0 then
+		holder:GetScript("OnSizeChanged")(holder, holder:GetWidth(), holder:GetHeight())
+	end
+	
+	-- Standardize text cleaning (we use external label now)
+	if checkBox.Text then
+		checkBox.Text:SetText("")
 	else
-		-- Retail: Use SetText method
-		checkBox:SetText(labelText)
-		checkBox:SetNormalFontObject("BetterFriendlistFontHighlight")
-		
-		-- Label: rechts neben der Checkbox
-		local label = checkBox:GetFontString()
-		label:ClearAllPoints()
-		label:SetPoint("LEFT", checkBox, "RIGHT", 4, 0)
-		label:SetJustifyH("LEFT")
-		label:SetWidth(300)
+		-- Try to find fontstring region if .Text alias doesn't exist
+		local regions = {checkBox:GetRegions()}
+		for _, region in ipairs(regions) do
+			if region:GetObjectType() == "FontString" then
+				region:SetText("")
+			end
+		end
+	end
+	
+	-- For Retail, SetText might work directly
+	if checkBox.SetText then
+		checkBox:SetText("")
 	end
 	
 	checkBox:SetChecked(initialValue)
@@ -82,11 +102,10 @@ function Components:CreateCheckbox(parent, labelText, initialValue, callback)
 		callback(self:GetChecked())
 	end)
 	
-	-- Fix for ugly hover effect when no tooltip is present
+	-- Clean tooltip handling
 	checkBox:SetScript("OnEnter", function() end)
 	checkBox:SetScript("OnLeave", function() end)
 	
-	-- Tooltip support
 	holder.SetTooltip = function(_, title, desc)
 		checkBox:SetScript("OnEnter", function(self)
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -109,12 +128,13 @@ function Components:CreateCheckbox(parent, labelText, initialValue, callback)
 		return checkBox:GetChecked()
 	end
 	
+	holder.Label = label -- Expose label
 	holder.checkBox = checkBox
 	return holder
 end
 
 -- ========================================
--- SLIDER (Label left, Slider right)
+-- SLIDER (Label Left, Slider Right - Grid Aligned)
 -- ========================================
 function Components:CreateSlider(parent, labelText, min, max, initialValue, formatter, callback)
 	local holder = CreateFrame("Frame", nil, parent)
@@ -122,18 +142,31 @@ function Components:CreateSlider(parent, labelText, min, max, initialValue, form
 	holder:SetPoint("LEFT", PADDING_LEFT, 0)
 	holder:SetPoint("RIGHT", -PADDING_RIGHT, 0)
 	
-	-- Label (left side, right-justified)
+	-- Label: Dynamic Width, Left Aligned
 	holder.Label = holder:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
-	holder.Label:SetJustifyH("RIGHT")
-	holder.Label:SetPoint("LEFT", 20, 0)
-	holder.Label:SetPoint("RIGHT", holder, "CENTER", -50, 0)
+	holder.Label:SetJustifyH("LEFT")
+	holder.Label:SetPoint("LEFT", 0, 0)
 	holder.Label:SetText(labelText)
 	
-	-- Slider (right side)
+	-- Slider: Dynamic positioning
 	holder.Slider = CreateFrame("Slider", nil, holder, "MinimalSliderWithSteppersTemplate")
-	holder.Slider:SetPoint("LEFT", holder, "CENTER", -32, 0)
-	holder.Slider:SetPoint("RIGHT", -45, 0)
 	holder.Slider:SetHeight(20)
+	
+	-- Dynamic Resizing Handler
+	holder:SetScript("OnSizeChanged", function(self, width, height)
+		local labelWidth = width * LABEL_PCT
+		holder.Label:SetWidth(labelWidth)
+		
+		holder.Slider:ClearAllPoints()
+		holder.Slider:SetPoint("LEFT", self, "LEFT", labelWidth + CONTROL_GAP, 0)
+		holder.Slider:SetPoint("RIGHT", self, "RIGHT", 0, 0)
+	end)
+
+	-- Trigger initial layout
+	if holder:GetWidth() > 0 then
+		holder:GetScript("OnSizeChanged")(holder, holder:GetWidth(), holder:GetHeight())
+	end
+	
 	holder.Slider:Init(initialValue, min, max, max - min, {
 		[MinimalSliderWithSteppersMixin.Label.Right] = formatter
 	})
@@ -154,31 +187,24 @@ function Components:CreateSlider(parent, labelText, min, max, initialValue, form
 end
 
 -- ========================================
--- DROPDOWN (Label left, Dropdown right)
--- Classic uses UIDropDownMenuTemplate, Retail uses WowStyle1DropdownTemplate
+-- DROPDOWN (Label Left, Dropdown Right - Grid Aligned)
 -- ========================================
-
--- Classic dropdown counter for unique names
+-- Classic dropdown counter
 local classicDropdownCounter = 0
 
--- Create Classic-style dropdown using UIDropDownMenu
 local function CreateClassicDropdown(parent, entries, isSelectedCallback, onSelectionCallback)
 	classicDropdownCounter = classicDropdownCounter + 1
 	local dropdownName = "BFLSettingsDropdown" .. classicDropdownCounter
 	
 	local dropdown = CreateFrame("Frame", dropdownName, parent, "UIDropDownMenuTemplate")
-	dropdown:SetWidth(180)
+	-- Note: UIDropDownMenu widths are quirky. 150 width + padding buttons ~ 180 total
 	
 	local entryLabels = entries.labels
 	local entryValues = entries.values
 	
-	-- Store callbacks for later use
 	dropdown.isSelectedCallback = isSelectedCallback
 	dropdown.onSelectionCallback = onSelectionCallback
-	dropdown.entryLabels = entryLabels
-	dropdown.entryValues = entryValues
 	
-	-- Initialize the dropdown
 	UIDropDownMenu_Initialize(dropdown, function(self, level)
 		level = level or 1
 		for i = 1, #entryLabels do
@@ -195,7 +221,6 @@ local function CreateClassicDropdown(parent, entries, isSelectedCallback, onSele
 		end
 	end)
 	
-	-- Set initial text
 	for i = 1, #entryValues do
 		if isSelectedCallback(entryValues[i]) then
 			UIDropDownMenu_SetText(dropdown, entryLabels[i])
@@ -204,78 +229,69 @@ local function CreateClassicDropdown(parent, entries, isSelectedCallback, onSele
 	end
 	
 	UIDropDownMenu_SetWidth(dropdown, 150)
+	UIDropDownMenu_JustifyText(dropdown, "LEFT")
 	
 	return dropdown
 end
 
 function Components:CreateDropdown(parent, labelText, entries, isSelectedCallback, onSelectionCallback)
 	local holder = CreateFrame("Frame", nil, parent)
-	holder:SetHeight(COMPONENT_HEIGHT)
+	holder:SetHeight(COMPONENT_HEIGHT + 8) -- Dropdowns are taller
 	holder:SetPoint("LEFT", PADDING_LEFT, 0)
 	holder:SetPoint("RIGHT", -PADDING_RIGHT, 0)
 	
-	-- Label (left side, right-justified)
+	-- Label: Dynamic Width, Left Aligned
 	local label = holder:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
 	label:SetPoint("LEFT", 0, 0)
-	label:SetPoint("LEFT", holder, "LEFT", 0, 0)
-	label:SetJustifyH("RIGHT")
+	label:SetJustifyH("LEFT")
 	label:SetText(labelText)
 	
 	local dropdown
 	
-	-- Classic mode: Use UIDropDownMenuTemplate
 	if BFL.IsClassic or not BFL.HasModernMenu then
 		dropdown = CreateClassicDropdown(holder, entries, isSelectedCallback, onSelectionCallback)
-		dropdown:SetPoint("LEFT", holder, "LEFT", 140, 0)
+		-- Classic dropdown dynamic positioning handled in OnSizeChanged below
 	else
-		-- Retail: Use modern WowStyle1DropdownTemplate
+		-- Retail WowStyle1DropdownTemplate
 		dropdown = CreateFrame("DropdownButton", nil, holder, "WowStyle1DropdownTemplate")
-		dropdown:SetWidth(180)
-		dropdown:SetPoint("LEFT", holder, "LEFT", 150, 0) -- Doubled from 75 to 150
 		
-		-- Apply BetterFriendlist styling (Use STRINGS to ensure they are found)
 		dropdown:SetNormalFontObject("BetterFriendlistFontHighlightSmall")
 		dropdown:SetHighlightFontObject("BetterFriendlistFontHighlightSmall")
 		dropdown:SetDisabledFontObject("BetterFriendlistFontDisableSmall")
 		
-		-- Force update the text if it exists
 		if dropdown.Text then
 			dropdown.Text:SetFontObject("BetterFriendlistFontHighlightSmall")
+			dropdown.Text:SetJustifyH("LEFT")
 		end
 		
-		-- Initialize with provided entries using modern API
 		if entries and entries.labels and entries.values then
 			local entryLabels = entries.labels
 			local entryValues = entries.values
 			
-			-- Setup the dropdown menu using modern API
 			dropdown:SetupMenu(function(dropdown, rootDescription)
 				for i = 1, #entryLabels do
 					local radio = rootDescription:CreateButton(entryLabels[i], function() end, entryValues[i])
 					radio:SetIsSelected(function(value) return isSelectedCallback(value) end)
 					radio:SetResponder(function(value) onSelectionCallback(value) end)
 					
-					-- Force font for dropdown items
-					radio:AddInitializer(function(button, description, menu)
-						local fontString = button.fontString or button.Text
-						if fontString then
-							fontString:SetFontObject("BetterFriendlistFontNormalSmall")
+					radio:AddInitializer(function(button)
+						if button.fontString then
+							button.fontString:SetFontObject("BetterFriendlistFontNormalSmall")
 						end
 					end)
 				end
 			end)
 			
-			-- SetSelectionTranslator: Shows the label of the selected value
 			dropdown:SetSelectionTranslator(function(selection)
 				for i = 1, #entryValues do
 					if entryValues[i] == selection.data then
 						return entryLabels[i]
 					end
 				end
-				return entryLabels[1] -- Fallback
+				return entryLabels[1]
 			end)
 			
-			-- Set initial text based on selected value
+			-- Initial text
 			for i = 1, #entryValues do
 				if isSelectedCallback(entryValues[i]) then
 					dropdown:SetText(entryLabels[i])
@@ -285,10 +301,36 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 		end
 	end
 	
+	-- Dynamic Resizing Handler
+	holder:SetScript("OnSizeChanged", function(self, width, height)
+		local labelWidth = width * LABEL_PCT
+		label:SetWidth(labelWidth)
+		
+		local dropdownStart = labelWidth + CONTROL_GAP
+		
+		-- Dropdown positioning
+		if BFL.IsClassic or not BFL.HasModernMenu then
+			dropdown:ClearAllPoints()
+			dropdown:SetPoint("LEFT", self, "LEFT", dropdownStart - 15 + DROPDOWN_X_OFFSET, 0)
+			-- Calculate remaining width for Classic dropdown (adjusting for its padding quirk)
+			local remainingWidth = width - dropdownStart - 20 - PADDING_RIGHT -- approximate
+			UIDropDownMenu_SetWidth(dropdown, remainingWidth + DROPDOWN_WIDTH_BONUS)
+		else
+			dropdown:ClearAllPoints()
+			dropdown:SetPoint("LEFT", self, "LEFT", dropdownStart + DROPDOWN_X_OFFSET, 0)
+			-- Retail dropdowns behave better with anchors
+			dropdown:SetPoint("RIGHT", self, "RIGHT", 0, 0)
+		end
+	end)
+
+	-- Trigger initial layout
+	if holder:GetWidth() > 0 then
+		holder:GetScript("OnSizeChanged")(holder, holder:GetWidth(), holder:GetHeight())
+	end
+	
 	holder.Label = label
 	holder.DropDown = dropdown
 	
-	-- Tooltip support
 	holder.SetTooltip = function(_, title, desc)
 		dropdown:SetScript("OnEnter", function(self)
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -302,6 +344,258 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 			GameTooltip:Hide()
 		end)
 	end
+	
+	return holder
+end
+
+-- ========================================
+-- COLOR PICKER (Label Left, Button Right - Grid Aligned)
+-- ========================================
+function Components:CreateColorPicker(parent, labelText, initialColor, callback)
+	local holder = CreateFrame("Frame", nil, parent)
+	holder:SetHeight(COMPONENT_HEIGHT)
+	holder:SetPoint("LEFT", PADDING_LEFT, 0)
+	holder:SetPoint("RIGHT", -PADDING_RIGHT, 0)
+	
+	-- Label
+	local label = holder:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
+	label:SetPoint("LEFT", 0, 0)
+	label:SetJustifyH("LEFT")
+	label:SetText(labelText)
+	
+	-- Color Button starts at CONTROL_OFFSET
+	local colorButton = CreateFrame("Button", nil, holder)
+	colorButton:SetSize(28, 28)
+	
+	-- Dynamic Resizing Handler
+	holder:SetScript("OnSizeChanged", function(self, width, height)
+		local labelWidth = width * LABEL_PCT
+		label:SetWidth(labelWidth)
+		colorButton:SetPoint("LEFT", self, "LEFT", labelWidth + CONTROL_GAP, 0)
+	end)
+
+	-- Trigger initial layout
+	if holder:GetWidth() > 0 then
+		holder:GetScript("OnSizeChanged")(holder, holder:GetWidth(), holder:GetHeight())
+	end
+	
+	local colorBorder = colorButton:CreateTexture(nil, "BACKGROUND")
+	colorBorder:SetAllPoints(colorButton)
+	colorBorder:SetColorTexture(0, 0, 0, 1) -- Black border
+	
+	local colorSwatch = colorButton:CreateTexture(nil, "ARTWORK")
+	colorSwatch:SetPoint("TOPLEFT", colorButton, "TOPLEFT", 3, -3)
+	colorSwatch:SetPoint("BOTTOMRIGHT", colorButton, "BOTTOMRIGHT", -3, 3)
+	
+	-- Highlight
+	colorButton:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
+	
+	-- Tooltip
+	colorButton:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(L.SETTINGS_FONT_COLOR or "Font Color", 1, 1, 1)
+		GameTooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 0.8, 0.8, 0.8, true)
+		GameTooltip:Show()
+	end)
+	colorButton:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+	
+	if initialColor then
+		colorSwatch:SetColorTexture(initialColor.r, initialColor.g, initialColor.b, initialColor.a or 1)
+	else
+		colorSwatch:SetColorTexture(1, 1, 1, 1)
+	end
+	
+	-- Expose update method
+	function holder:SetColor(r, g, b, a)
+		holder.currentColor = {r=r, g=g, b=b, a=a or 1}
+		colorSwatch:SetColorTexture(r, g, b, a or 1)
+	end
+	
+	-- Store initial
+	holder:SetColor(initialColor and initialColor.r or 1, initialColor and initialColor.g or 1, initialColor and initialColor.b or 1, initialColor and initialColor.a or 1)
+	
+	colorButton:SetScript("OnClick", function()
+		local r, g, b, a = holder.currentColor.r, holder.currentColor.g, holder.currentColor.b, holder.currentColor.a or 1
+		
+		local info = {
+			r = r, g = g, b = b, opacity = a, hasOpacity = true,
+			swatchFunc = function()
+				local nr, ng, nb = ColorPickerFrame:GetColorRGB()
+				local na = ColorPickerFrame:GetOpacity()
+				holder:SetColor(nr, ng, nb, na)
+				if callback then callback(nr, ng, nb, na) end
+			end,
+			opacityFunc = function()
+				local nr, ng, nb = ColorPickerFrame:GetColorRGB()
+				local na = ColorPickerFrame:GetOpacity()
+				holder:SetColor(nr, ng, nb, na)
+				if callback then callback(nr, ng, nb, na) end
+			end,
+			cancelFunc = function(prev)
+				holder:SetColor(prev.r, prev.g, prev.b, prev.opacity)
+				if callback then callback(prev.r, prev.g, prev.b, prev.opacity) end
+			end
+		}
+		
+		if ColorPickerFrame.SetupColorPickerAndShow then
+			ColorPickerFrame:SetupColorPickerAndShow(info)
+		else
+			ColorPickerFrame.func = info.swatchFunc
+			ColorPickerFrame.opacityFunc = info.opacityFunc
+			ColorPickerFrame.cancelFunc = info.cancelFunc
+			ColorPickerFrame.hasOpacity = info.hasOpacity
+			ColorPickerFrame.opacity = info.opacity
+			ColorPickerFrame:SetColorRGB(info.r, info.g, info.b)
+			ColorPickerFrame:Show()
+		end
+	end)
+	
+	return holder
+end
+
+-- ========================================
+-- SLIDER WITH COLOR PICKER (Combined Row)
+-- ========================================
+function Components:CreateSliderWithColorPicker(parent, labelText, min, max, initialValue, formatter, sliderCallback, initialColor, colorCallback)
+	local holder = CreateFrame("Frame", nil, parent)
+	holder:SetHeight(COMPONENT_HEIGHT)
+	holder:SetPoint("LEFT", PADDING_LEFT, 0)
+	holder:SetPoint("RIGHT", -PADDING_RIGHT, 0)
+	
+	-- Label
+	holder.Label = holder:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
+	holder.Label:SetJustifyH("LEFT")
+	holder.Label:SetPoint("LEFT", 0, 0)
+	holder.Label:SetText(labelText)
+	
+	-- Color Button (Right aligned)
+	local colorButton = CreateFrame("Button", nil, holder)
+	colorButton:SetSize(28, 28)
+	
+	local colorBorder = colorButton:CreateTexture(nil, "BACKGROUND")
+	colorBorder:SetAllPoints(colorButton)
+	colorBorder:SetColorTexture(0, 0, 0, 1) -- Black border
+	
+	local colorSwatch = colorButton:CreateTexture(nil, "ARTWORK")
+	colorSwatch:SetPoint("TOPLEFT", colorButton, "TOPLEFT", 3, -3)
+	colorSwatch:SetPoint("BOTTOMRIGHT", colorButton, "BOTTOMRIGHT", -3, 3)
+	
+	-- Highlight
+	colorButton:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
+	
+	-- Tooltip
+	colorButton:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(L.SETTINGS_FONT_COLOR or "Font Color", 1, 1, 1)
+		GameTooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 0.8, 0.8, 0.8, true)
+		GameTooltip:Show()
+	end)
+	colorButton:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+	
+	-- Color Logic
+	holder.currentColor = initialColor or {r=1, g=1, b=1, a=1}
+	colorSwatch:SetColorTexture(holder.currentColor.r, holder.currentColor.g, holder.currentColor.b, holder.currentColor.a or 1)
+	
+	colorButton:SetScript("OnClick", function()
+		local r, g, b, a = holder.currentColor.r, holder.currentColor.g, holder.currentColor.b, holder.currentColor.a or 1
+		
+		local info = {
+			r = r, g = g, b = b, opacity = a, hasOpacity = true,
+			swatchFunc = function()
+				local nr, ng, nb = ColorPickerFrame:GetColorRGB()
+				-- Retail 11.x uses GetColorAlpha, not GetOpacity for ColorPickerFrame when using new API mixin
+				local na = 1
+				if ColorPickerFrame.GetColorAlpha then
+					na = ColorPickerFrame:GetColorAlpha()
+				elseif ColorPickerFrame.GetOpacity then
+					na = ColorPickerFrame:GetOpacity()
+				end
+				
+				holder.currentColor = {r=nr, g=ng, b=nb, a=na}
+				colorSwatch:SetColorTexture(nr, ng, nb, na)
+				if colorCallback then colorCallback(nr, ng, nb, na) end
+			end,
+			opacityFunc = function()
+				local nr, ng, nb = ColorPickerFrame:GetColorRGB()
+				-- Retail 11.x uses GetColorAlpha, not GetOpacity for ColorPickerFrame when using new API mixin
+				local na = 1
+				if ColorPickerFrame.GetColorAlpha then
+					na = ColorPickerFrame:GetColorAlpha()
+				elseif ColorPickerFrame.GetOpacity then
+					na = ColorPickerFrame:GetOpacity()
+				end
+				
+				holder.currentColor = {r=nr, g=ng, b=nb, a=na}
+				colorSwatch:SetColorTexture(nr, ng, nb, na)
+				if colorCallback then colorCallback(nr, ng, nb, na) end
+			end,
+			cancelFunc = function(prev)
+				holder.currentColor = {r=prev.r, g=prev.g, b=prev.b, a=prev.opacity}
+				colorSwatch:SetColorTexture(prev.r, prev.g, prev.b, prev.opacity)
+				if colorCallback then colorCallback(prev.r, prev.g, prev.b, prev.opacity) end
+			end
+		}
+		
+		if ColorPickerFrame.SetupColorPickerAndShow then
+			ColorPickerFrame:SetupColorPickerAndShow(info)
+		else
+			ColorPickerFrame.func = info.swatchFunc
+			ColorPickerFrame.opacityFunc = info.opacityFunc
+			ColorPickerFrame.cancelFunc = info.cancelFunc
+			ColorPickerFrame.hasOpacity = info.hasOpacity
+			ColorPickerFrame.opacity = info.opacity
+			ColorPickerFrame:SetColorRGB(info.r, info.g, info.b)
+			ColorPickerFrame:Show()
+		end
+	end)
+
+	-- Slider (Left of Color Button)
+	holder.Slider = CreateFrame("Slider", nil, holder, "MinimalSliderWithSteppersTemplate")
+	holder.Slider:SetHeight(20)
+	
+	-- Value Label (Centered in gap)
+	holder.ValueLabel = holder:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
+	holder.ValueLabel:SetJustifyH("CENTER")
+	
+	-- Layout Handler
+	holder:SetScript("OnSizeChanged", function(self, width, height)
+		local labelWidth = width * LABEL_PCT
+		holder.Label:SetWidth(labelWidth)
+		
+		-- Color Button hard anchored Right
+		colorButton:SetPoint("RIGHT", self, "RIGHT", 0, 0)
+		
+		-- Value Label centered between Slider and ColorButton
+		-- Reserve ~40px for value
+		holder.ValueLabel:SetWidth(30)
+		holder.ValueLabel:ClearAllPoints()
+		holder.ValueLabel:SetPoint("RIGHT", colorButton, "LEFT", -5, 0)
+		
+		-- Slider fills space between Label and ValueLabel
+		holder.Slider:ClearAllPoints()
+		holder.Slider:SetPoint("LEFT", self, "LEFT", labelWidth + CONTROL_GAP, 0)
+		holder.Slider:SetPoint("RIGHT", holder.ValueLabel, "LEFT", -5, 0)
+	end)
+
+	-- Trigger Layout
+	if holder:GetWidth() > 0 then
+		holder:GetScript("OnSizeChanged")(holder, holder:GetWidth(), holder:GetHeight())
+	end
+	
+	-- Init slider without built-in label (we use our own)
+	holder.Slider:Init(initialValue, min, max, max - min, {})
+	
+	-- Set initial text
+	holder.ValueLabel:SetText(formatter(initialValue))
+	
+	holder.Slider:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged, function(_, value)
+		sliderCallback(value)
+		holder.ValueLabel:SetText(formatter(value))
+	end)
 	
 	return holder
 end
@@ -595,7 +889,7 @@ end
 -- ========================================
 function Components:CreateButton(parent, text, onClick, tooltip)
 	local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-	button:SetSize(180, 24)
+	button:SetSize(FIELD_WIDTH, 24)
 	button:SetText(text)
 	
 	-- Apply BetterFriendlist styling
@@ -619,6 +913,112 @@ function Components:CreateButton(parent, text, onClick, tooltip)
 	end
 	
 	return button
+end
+
+-- ========================================
+-- DOUBLE CHECKBOX ROW (Two columns, Dynamic)
+-- ========================================
+function Components:CreateDoubleCheckbox(parent, leftData, rightData)
+	local holder = CreateFrame("Frame", nil, parent)
+	holder:SetHeight(COMPONENT_HEIGHT)
+	holder:SetPoint("LEFT", PADDING_LEFT, 0)
+	holder:SetPoint("RIGHT", -PADDING_RIGHT, 0)
+	
+	local template = "SettingsCheckboxTemplate"
+	if BFL.IsClassic then
+		template = "InterfaceOptionsCheckButtonTemplate"
+	end
+	
+	-- Create Left Pair (Label + Checkbox)
+	local leftLabel, leftCheck
+	if leftData then
+		leftLabel = holder:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
+		leftLabel:SetJustifyH("LEFT")
+		leftLabel:SetText(leftData.label)
+		
+		leftCheck = CreateFrame("CheckButton", nil, holder, template)
+		
+		if leftCheck.Text then leftCheck.Text:SetText("") end
+		if leftCheck.SetText then leftCheck:SetText("") end
+		local regions = {leftCheck:GetRegions()}
+		for _, region in ipairs(regions) do
+			if region:GetObjectType() == "FontString" then region:SetText("") end
+		end
+		
+		leftCheck:SetChecked(leftData.initialValue)
+		leftCheck:SetScript("OnClick", function(self) if leftData.callback then leftData.callback(self:GetChecked()) end end)
+		leftCheck:SetScript("OnEnter", function(self)
+			if leftData.tooltipTitle then
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+				GameTooltip:SetText(leftData.tooltipTitle, 1, 1, 1)
+				if leftData.tooltipDesc then GameTooltip:AddLine(leftData.tooltipDesc, 0.8, 0.8, 0.8, true) end
+				GameTooltip:Show()
+			end
+		end)
+		leftCheck:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	end
+	
+	-- Create Right Pair (Label + Checkbox)
+	local rightLabel, rightCheck
+	if rightData then
+		rightLabel = holder:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
+		rightLabel:SetJustifyH("LEFT")
+		rightLabel:SetText(rightData.label)
+		
+		rightCheck = CreateFrame("CheckButton", nil, holder, template)
+		
+		if rightCheck.Text then rightCheck.Text:SetText("") end
+		if rightCheck.SetText then rightCheck:SetText("") end
+		local regions = {rightCheck:GetRegions()}
+		for _, region in ipairs(regions) do
+			if region:GetObjectType() == "FontString" then region:SetText("") end
+		end
+		
+		rightCheck:SetChecked(rightData.initialValue)
+		rightCheck:SetScript("OnClick", function(self) if rightData.callback then rightData.callback(self:GetChecked()) end end)
+		rightCheck:SetScript("OnEnter", function(self)
+			if rightData.tooltipTitle then
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+				GameTooltip:SetText(rightData.tooltipTitle, 1, 1, 1)
+				if rightData.tooltipDesc then GameTooltip:AddLine(rightData.tooltipDesc, 0.8, 0.8, 0.8, true) end
+				GameTooltip:Show()
+			end
+		end)
+		rightCheck:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	end
+	
+	-- Dynamic Resizing Handler
+	holder:SetScript("OnSizeChanged", function(self, width, height)
+		local labelWidth = width * LABEL_PCT
+		
+		-- Position Left Pair
+		if leftLabel and leftCheck then
+			leftLabel:SetWidth(labelWidth)
+			leftLabel:SetPoint("LEFT", self, "LEFT", 0, 0)
+			leftCheck:SetPoint("LEFT", self, "LEFT", labelWidth + CONTROL_GAP, 0)
+		end
+		
+		-- Position Right Pair
+		if rightLabel and rightCheck then
+			-- Align Right Column: Checkbox right edge matches frame right edge (flush with Dropdowns)
+			rightCheck:ClearAllPoints()
+			rightCheck:SetPoint("RIGHT", self, "RIGHT", 0, 0)
+			
+			rightLabel:ClearAllPoints()
+			rightLabel:SetPoint("RIGHT", rightCheck, "LEFT", -CONTROL_GAP, 0)
+			rightLabel:SetWidth(labelWidth) -- Optional: Force width for consistency or let it flow
+			-- For visual symmetry, we might want to justify Right? Or keep Left?
+			-- User asked for alignment. If we keep Left Justify but anchor Right, it might look odd if text is short.
+			-- Let's stick to Left Justify for reading, but the block is anchored Right.
+		end
+	end)
+
+	-- Trigger initial layout
+	if holder:GetWidth() > 0 then
+		holder:GetScript("OnSizeChanged")(holder, holder:GetWidth(), holder:GetHeight())
+	end
+	
+	return holder
 end
 
 -- ========================================
