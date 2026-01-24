@@ -139,6 +139,11 @@ function DB:InternalDeepCopy(orig)
 end
 
 function DB:Initialize()
+	-- Initialize Settings Version Counter (Optimization)
+	if not BFL.SettingsVersion then
+		BFL.SettingsVersion = 1
+	end
+
 	-- Initialize SavedVariables
 	if not BetterFriendlistDB then
 		BetterFriendlistDB = {}
@@ -358,6 +363,10 @@ end
 
 -- Set a value in the database
 function DB:Set(key, value)
+	-- Optimization: Increment version counter to invalidate render caches
+	if BFL.SettingsVersion then
+		BFL.SettingsVersion = BFL.SettingsVersion + 1
+	end
 	BetterFriendlistDB[key] = value
 end
 

@@ -3115,6 +3115,270 @@ local function Button_OnDragStop(self)
 	BetterFriendsList_DraggedFriend = ""
 end
 
+-- ========================================
+-- Friend Text Optimization (Phase 21)
+-- ========================================
+
+-- Helper: Get formatted text for friend button (Cached)
+-- This moves expensive string concatenation out of the render loop
+function FriendsList:GetFormattedButtonText(friend)
+	local DB = GetDB()
+	local isCompactMode = DB:Get("compactMode", false)
+	local currentSettingsVersion = BFL.SettingsVersion or 1
+	
+	-- Check cache (Fastest Path)
+	if friend._cache_text_version == currentSettingsVersion and 
+	   friend._cache_text_compact == isCompactMode and
+	   friend._cache_text_line1 then
+		return friend._cache_text_line1, friend._cache_text_line2
+	end
+	
+	-- Cache Miss - Calculate text (Slow Path - Happens once per friend/setting change)
+	local line1Text = ""
+	local line2Text = ""
+	
+	local displayName = friend.displayName or self:GetDisplayName(friend)
+	
+	if friend.type == "bnet" then
+		-- Battle.net Friend
+		local playerFactionGroup = UnitFactionGroup("player")
+		local grayOtherFaction = DB:Get("grayOtherFaction", false)
+		local showFactionIcons = DB:Get("showFactionIcons", false)
+		local showRealmName = DB:Get("showRealmName", false)
+		
+		if friend.connected then
+			local isOppositeFaction = friend.factionName and friend.factionName ~= playerFactionGroup and friend.factionName ~= ""
+			local shouldGray = grayOtherFaction and isOppositeFaction
+			
+			if shouldGray then
+				line1Text = "|cff808080" .. displayName .. "|r"
+			else
+				line1Text = displayName
+			end
+			
+			if friend.characterName then
+				local characterName = friend.characterName
+				if friend.timerunningSeasonID and TimerunningUtil and TimerunningUtil.AddSmallIcon then
+					characterName = TimerunningUtil.AddSmallIcon(characterName)
+				end
+				
+				if showFactionIcons and friend.factionName then
+					if friend.factionName == "Horde" then
+						characterName = "|TInterface\\FriendsFrame\\PlusManz-Horde:12:12:0:0|t" .. characterName
+					elseif friend.factionName == "Alliance" then
+						characterName = "|TInterface\\FriendsFrame\\PlusManz-Alliance:12:12:0:0|t" .. characterName
+					end
+				end
+				
+				if showRealmName and friend.realmName and friend.realmName ~= "" then
+					local playerRealm = GetRealmName()
+					if friend.realmName ~= playerRealm then
+						characterName = characterName .. " - " .. friend.realmName
+					end
+				end
+				
+				local useClassColor = DB:Get("colorClassNames", true)
+				
+				if useClassColor and not shouldGray and friend.className then
+					local classFile = GetClassFileForFriend(friend)
+					local classColor = classFile and RAID_CLASS_COLORS[classFile]
+					
+					if classColor then
+						line1Text = line1Text .. " |c" .. (classColor.colorStr or "ffffffff") .. "(" .. characterName .. ")|r"
+					else
+						line1Text = line1Text .. " (" .. characterName .. ")"
+					end
+				else
+					if shouldGray then
+						line1Text = line1Text .. " (|cff808080" .. characterName .. "|r)"
+					else
+						line1Text = line1Text .. " (" .. characterName .. ")"
+					end
+				end
+			end
+		else
+			-- Offline
+			line1Text = "|cff7f7f7f" .. displayName .. "|r"
+		end
+		
+		-- Compact Mode Append
+		if isCompactMode then
+			local hideMaxLevel = DB:Get("hideMaxLevel", false)
+			local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or MAX_PLAYER_LEVEL or 60
+			
+			if friend.connected then
+				local infoText = ""
+				if friend.level and friend.areaName then
+					if hideMaxLevel and friend.level == maxLevel then
+						infoText = " - " .. friend.areaName
+					else
+						infoText = " - " .. string.format(L.LEVEL_FORMAT, friend.level) .. ", " .. friend.areaName
+					end
+				elseif friend.level then
+					if hideMaxLevel and friend.level == maxLevel then
+						infoText = " - " .. L.FRIEND_MAX_LEVEL
+					else
+						infoText = " - " .. string.format(L.LEVEL_FORMAT, friend.level)
+					end
+				elseif friend.areaName then
+					infoText = " - " .. friend.areaName
+				elseif friend.gameName then
+					infoText = " - " .. friend.gameName
+				end
+				
+				if infoText ~= "" then
+					local infoColor = DB:Get("fontColorFriendInfo") or {r=0.5, g=0.5, b=0.5, a=1}
+					local infoHex = string.format("|cff%02x%02x%02x", infoColor.r*255, infoColor.g*255, infoColor.b*255)
+					line1Text = line1Text .. infoHex .. infoText .. "|r"
+				end
+			else
+				if friend.lastOnlineTime then
+					local infoColor = DB:Get("fontColorFriendInfo") or {r=0.5, g=0.5, b=0.5, a=1}
+					local infoHex = string.format("|cff%02x%02x%02x", infoColor.r*255, infoColor.g*255, infoColor.b*255)
+					line1Text = line1Text .. " " .. infoHex .. "- " .. GetLastOnlineText(friend) .. "|r"
+				end
+			end
+		else
+			-- Normal Mode Line 2
+			local hideMaxLevel = DB:Get("hideMaxLevel", false)
+			local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or MAX_PLAYER_LEVEL or 60
+			
+			if friend.connected then
+				if friend.level and friend.areaName then
+					if hideMaxLevel and friend.level == maxLevel then
+						line2Text = friend.areaName
+					else
+						line2Text = string.format(L.LEVEL_FORMAT, friend.level) .. ", " .. friend.areaName
+					end
+				elseif friend.level then
+					if hideMaxLevel and friend.level == maxLevel then
+						line2Text = L.FRIEND_MAX_LEVEL
+					else
+						line2Text = string.format(L.LEVEL_FORMAT, friend.level)
+					end
+				elseif friend.areaName then
+					line2Text = friend.areaName
+				elseif friend.gameName then
+					line2Text = friend.gameName
+				else
+					line2Text = L.ONLINE_STATUS
+				end
+			else
+				if friend.lastOnlineTime then
+					line2Text = GetLastOnlineText(friend)
+				else
+					line2Text = L.OFFLINE_STATUS
+				end
+			end
+		end
+		
+	else
+		-- WoW Friend
+		local playerFactionGroup = UnitFactionGroup("player")
+		local grayOtherFaction = DB:Get("grayOtherFaction", false)
+		local showFactionIcons = DB:Get("showFactionIcons", false)
+		local showRealmName = DB:Get("showRealmName", false)
+		
+		if friend.connected then
+			local isOppositeFaction = friend.factionName and friend.factionName ~= playerFactionGroup and friend.factionName ~= ""
+			local shouldGray = grayOtherFaction and isOppositeFaction
+			
+			local characterName = displayName
+			
+			if showFactionIcons and friend.factionName then
+				if friend.factionName == "Horde" then
+					characterName = "|TInterface\\FriendsFrame\\PlusManz-Horde:12:12:0:0|t" .. characterName
+				elseif friend.factionName == "Alliance" then
+					characterName = "|TInterface\\FriendsFrame\\PlusManz-Alliance:12:12:0:0|t" .. characterName
+				end
+			end
+			
+			local useClassColor = DB:Get("colorClassNames", true)
+			
+			if useClassColor and not shouldGray then
+				local classFile = GetClassFileFromClassName(friend.className)
+				local classColor = classFile and RAID_CLASS_COLORS[classFile]
+				if classColor then
+					line1Text = "|c" .. (classColor.colorStr or "ffffffff") .. characterName .. "|r"
+				else
+					line1Text = characterName
+				end
+			else
+				if shouldGray then
+					line1Text = "|cff808080" .. characterName .. "|r"
+				else
+					line1Text = characterName
+				end
+			end
+		else
+			line1Text = "|cff7f7f7f" .. displayName .. "|r"
+		end
+		
+		-- Compact Mode Append
+		if isCompactMode then
+			local hideMaxLevel = DB:Get("hideMaxLevel", false)
+			local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or MAX_PLAYER_LEVEL or 60
+			
+			if friend.connected then
+				local infoText = ""
+				if friend.level and friend.area then
+					if hideMaxLevel and friend.level == maxLevel then
+						infoText = " - " .. friend.area
+					else
+						infoText = " - " .. string.format(L.LEVEL_FORMAT, friend.level) .. ", " .. friend.area
+					end
+				elseif friend.level then
+					if hideMaxLevel and friend.level == maxLevel then
+						infoText = " - " .. L.FRIEND_MAX_LEVEL
+					else
+						infoText = " - " .. string.format(L.LEVEL_FORMAT, friend.level)
+					end
+				elseif friend.area then
+					infoText = " - " .. friend.area
+				end
+				
+				if infoText ~= "" then
+					line1Text = line1Text .. "|cff7f7f7f" .. infoText .. "|r"
+				end
+			end
+		else
+			-- Normal Mode Line 2
+			local hideMaxLevel = DB:Get("hideMaxLevel", false)
+			local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or MAX_PLAYER_LEVEL or 60
+			
+			if friend.connected then
+				if friend.level and friend.area then
+					if hideMaxLevel and friend.level == maxLevel then
+						line2Text = friend.area
+					else
+						line2Text = string.format(L.LEVEL_FORMAT, friend.level) .. ", " .. friend.area
+					end
+				elseif friend.level then
+					if hideMaxLevel and friend.level == maxLevel then
+						line2Text = L.FRIEND_MAX_LEVEL
+					else
+						line2Text = string.format(L.LEVEL_FORMAT, friend.level)
+					end
+				elseif friend.area then
+					line2Text = friend.area
+				else
+					line2Text = L.ONLINE_STATUS
+				end
+			else
+				line2Text = L.OFFLINE_STATUS
+			end
+		end
+	end
+	
+	-- Store in cache
+	friend._cache_text_version = currentSettingsVersion
+	friend._cache_text_compact = isCompactMode
+	friend._cache_text_line1 = line1Text
+	friend._cache_text_line2 = line2Text
+	
+	return line1Text, line2Text
+end
+
 -- Update friend button (called by ScrollBox factory for each visible friend)
 function FriendsList:UpdateFriendButton(button, elementData) local friend = elementData.friend
 	local groupId = elementData.groupId
@@ -3458,158 +3722,8 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 			end
 		end
 		
-		-- Line 1: BattleNet Name (CharacterName)
-		-- BattleNet Name in blue/cyan Battle.net color, CharacterName in class color
-		local line1Text = ""
-		local playerFactionGroup = UnitFactionGroup("player")
-		local grayOtherFaction = GetDB():Get("grayOtherFaction", false)
-		local showFactionIcons = GetDB():Get("showFactionIcons", false)
-		local showRealmName = GetDB():Get("showRealmName", false)
-		
-		if friend.connected then
-			-- Check if friend is from opposite faction
-			local isOppositeFaction = friend.factionName and friend.factionName ~= playerFactionGroup and friend.factionName ~= ""
-			local shouldGray = grayOtherFaction and isOppositeFaction
-			
-			-- Use Battle.net blue color for the account name (or gray if opposite faction)
-			if shouldGray then
-				line1Text = "|cff808080" .. displayName .. "|r"
-			else
-				-- REMOVED: (FRIENDS_BNET_NAME_COLOR_CODE or "|cff82c5ff") wrapper
-				-- Now uses button.Name:SetTextColor() from settings
-				line1Text = displayName
-			end
-			
-			if friend.characterName then
-				-- Add Timerunning icon if applicable
-				local characterName = friend.characterName
-				if friend.timerunningSeasonID and TimerunningUtil and TimerunningUtil.AddSmallIcon then
-					characterName = TimerunningUtil.AddSmallIcon(characterName)
-				end
-				
-				-- Add faction icon if enabled
-				if showFactionIcons and friend.factionName then
-					if friend.factionName == "Horde" then
-						characterName = "|TInterface\\FriendsFrame\\PlusManz-Horde:12:12:0:0|t" .. characterName
-					elseif friend.factionName == "Alliance" then
-						characterName = "|TInterface\\FriendsFrame\\PlusManz-Alliance:12:12:0:0|t" .. characterName
-					end
-				end
-				
-				-- Add realm name if enabled and available
-				if showRealmName and friend.realmName and friend.realmName ~= "" then
-					local playerRealm = GetRealmName()
-					if friend.realmName ~= playerRealm then
-						characterName = characterName .. " - " .. friend.realmName
-					end
-				end
-				
-			-- Check if class coloring is enabled
-			local useClassColor = GetDB():Get("colorClassNames", true)
-			
-			if useClassColor and not shouldGray and friend.className then
-				-- Get class file (uses classID if available on 11.2.7+, falls back to className)
-				local classFile = GetClassFileForFriend(friend)
-				local classColor = classFile and RAID_CLASS_COLORS[classFile]
-				
-				if classColor then
-					line1Text = line1Text .. " |c" .. (classColor.colorStr or "ffffffff") .. "(" .. characterName .. ")|r"
-				else
-					line1Text = line1Text .. " (" .. characterName .. ")"
-				end
-			else
-				-- No class coloring or opposite faction gray - just show character name
-				if shouldGray then
-					line1Text = line1Text .. " (|cff808080" .. characterName .. "|r)"
-				else
-					line1Text = line1Text .. " (" .. characterName .. ")"
-				end
-			end
-			end
-		else
-			-- Offline - use gray
-			line1Text = "|cff7f7f7f" .. displayName .. "|r"
-		end
-		
-		-- In compact mode, append additional info to line1Text
-		if isCompactMode then
-			local hideMaxLevel = GetDB():Get("hideMaxLevel", false)
-			-- Classic-compatible: GetMaxLevelForPlayerExpansion() doesn't exist in Classic
-			local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or MAX_PLAYER_LEVEL or 60
-			
-			if friend.connected then
-				local infoText = ""
-				if friend.level and friend.areaName then
-					if hideMaxLevel and friend.level == maxLevel then
-						infoText = " - " .. friend.areaName
-					else
-						infoText = " - " .. string.format(L.LEVEL_FORMAT, friend.level) .. ", " .. friend.areaName
-					end
-				elseif friend.level then
-					if hideMaxLevel and friend.level == maxLevel then
-						infoText = " - " .. L.FRIEND_MAX_LEVEL
-					else
-						infoText = " - " .. string.format(L.LEVEL_FORMAT, friend.level)
-					end
-				elseif friend.areaName then
-					infoText = " - " .. friend.areaName
-				elseif friend.gameName then
-					infoText = " - " .. friend.gameName
-				end
-				-- Add info in user-defined info color
-				if infoText ~= "" then
-					local infoColor = GetDB():Get("fontColorFriendInfo") or {r=0.5, g=0.5, b=0.5, a=1}
-					local infoHex = string.format("|cff%02x%02x%02x", infoColor.r*255, infoColor.g*255, infoColor.b*255)
-					line1Text = line1Text .. infoHex .. infoText .. "|r"
-				end
-			else
-				-- Offline - add last online time
-				if friend.lastOnlineTime then
-					local infoColor = GetDB():Get("fontColorFriendInfo") or {r=0.5, g=0.5, b=0.5, a=1}
-					local infoHex = string.format("|cff%02x%02x%02x", infoColor.r*255, infoColor.g*255, infoColor.b*255)
-					line1Text = line1Text .. " " .. infoHex .. "- " .. GetLastOnlineText(friend) .. "|r"
-				end
-			end
-		end
-		
-		button.Name:SetText(line1Text)
-		
-		-- Line 2: Level, Zone (in gray) - only used in normal mode
-		if not isCompactMode then
-			local hideMaxLevel = GetDB():Get("hideMaxLevel", false)
-			-- Classic-compatible: GetMaxLevelForPlayerExpansion() doesn't exist in Classic
-			local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or MAX_PLAYER_LEVEL or 60
-			
-			if friend.connected then
-				if friend.level and friend.areaName then
-					if hideMaxLevel and friend.level == maxLevel then
-						button.Info:SetText(friend.areaName)
-					else
-						button.Info:SetText(string.format(L.LEVEL_FORMAT, friend.level) .. ", " .. friend.areaName)
-					end
-				elseif friend.level then
-					if hideMaxLevel and friend.level == maxLevel then
-						button.Info:SetText(L.FRIEND_MAX_LEVEL)
-					else
-						button.Info:SetText(string.format(L.LEVEL_FORMAT, friend.level))
-					end
-				elseif friend.areaName then
-					button.Info:SetText(friend.areaName)
-				elseif friend.gameName then
-					-- Show "Mobile" or "In App" without "Playing" prefix
-					button.Info:SetText(friend.gameName)
-				else
-					button.Info:SetText(L.ONLINE_STATUS)
-				end
-			else
-				-- Offline - show last online time for Battle.net friends
-				if friend.lastOnlineTime then
-					button.Info:SetText(GetLastOnlineText(friend))
-				else
-					button.Info:SetText(L.OFFLINE_STATUS)
-				end
-			end
-		end  -- end of if not isCompactMode
+		-- Text handled by optimized shared cache (Phase 21)
+
 		
 	else
 		-- WoW friend
@@ -3640,116 +3754,17 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 			button.travelPassButton:Hide()
 		end
 		
-		-- Line 1: Character Name (in class color if enabled)
-		local line1Text = ""
-		local playerFactionGroup = UnitFactionGroup("player")
-		local grayOtherFaction = GetDB():Get("grayOtherFaction", false)
-		local showFactionIcons = GetDB():Get("showFactionIcons", false)
-		local showRealmName = GetDB():Get("showRealmName", false)
-		
-		if friend.connected then
-			-- Check if friend is from opposite faction
-			local isOppositeFaction = friend.factionName and friend.factionName ~= playerFactionGroup and friend.factionName ~= ""
-			local shouldGray = grayOtherFaction and isOppositeFaction
-			
-			-- Feature: Flexible Name Format (Phase 15)
-			local characterName = friend.displayName or self:GetDisplayName(friend)
-			
-			-- Add faction icon if enabled
-			if showFactionIcons and friend.factionName then
-				if friend.factionName == "Horde" then
-					characterName = "|TInterface\\FriendsFrame\\PlusManz-Horde:12:12:0:0|t" .. characterName
-				elseif friend.factionName == "Alliance" then
-					characterName = "|TInterface\\FriendsFrame\\PlusManz-Alliance:12:12:0:0|t" .. characterName
-				end
-			end
-			
-			local useClassColor = GetDB():Get("colorClassNames", true)
-			
-			if useClassColor and not shouldGray then
-				-- Convert class name to English class file for RAID_CLASS_COLORS
-				local classFile = GetClassFileFromClassName(friend.className)
-				local classColor = classFile and RAID_CLASS_COLORS[classFile]
-				if classColor then
-					line1Text = "|c" .. (classColor.colorStr or "ffffffff") .. characterName .. "|r"
-				else
-					line1Text = characterName
-				end
-			else
-				if shouldGray then
-					line1Text = "|cff808080" .. characterName .. "|r"
-				else
-					line1Text = characterName
-				end
-			end
-		else
-			-- Offline - gray (use display helper here too)
-			-- Feature: Flexible Name Format (Phase 15)
-			local displayName = friend.displayName or self:GetDisplayName(friend)
-			line1Text = "|cff7f7f7f" .. displayName .. "|r"
-		end
-		
-		-- In compact mode, append additional info to line1Text
-		if isCompactMode then
-			local hideMaxLevel = GetDB():Get("hideMaxLevel", false)
-			-- Classic-compatible: GetMaxLevelForPlayerExpansion() doesn't exist in Classic
-			local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or MAX_PLAYER_LEVEL or 60
-			
-			if friend.connected then
-				local infoText = ""
-				if friend.level and friend.area then
-					if hideMaxLevel and friend.level == maxLevel then
-						infoText = " - " .. friend.area
-					else
-						infoText = " - " .. string.format(L.LEVEL_FORMAT, friend.level) .. ", " .. friend.area
-					end
-				elseif friend.level then
-					if hideMaxLevel and friend.level == maxLevel then
-						infoText = " - " .. L.FRIEND_MAX_LEVEL
-					else
-						infoText = " - " .. string.format(L.LEVEL_FORMAT, friend.level)
-					end
-				elseif friend.area then
-					infoText = " - " .. friend.area
-				end
-				-- Add info in gray color
-				if infoText ~= "" then
-					line1Text = line1Text .. "|cff7f7f7f" .. infoText .. "|r"
-				end
-			end
-		end
-		
-		button.Name:SetText(line1Text)
-		
-		-- Line 2: Level, Zone (in gray) - only used in normal mode
-		if not isCompactMode then
-			local hideMaxLevel = GetDB():Get("hideMaxLevel", false)
-			-- Classic-compatible: GetMaxLevelForPlayerExpansion() doesn't exist in Classic
-			local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or MAX_PLAYER_LEVEL or 60
-			
-			if friend.connected then
-				if friend.level and friend.area then
-					if hideMaxLevel and friend.level == maxLevel then
-						button.Info:SetText(friend.area)
-					else
-						button.Info:SetText(string.format(L.LEVEL_FORMAT, friend.level) .. ", " .. friend.area)
-					end
-				elseif friend.level then
-					if hideMaxLevel and friend.level == maxLevel then
-						button.Info:SetText(L.FRIEND_MAX_LEVEL)
-					else
-						button.Info:SetText(string.format(L.LEVEL_FORMAT, friend.level))
-					end
-				elseif friend.area then
-					button.Info:SetText(friend.area)
-				else
-					button.Info:SetText(L.ONLINE_STATUS)
-				end
-			else
-				button.Info:SetText(L.OFFLINE_STATUS)
-			end
-		end  -- end of if not isCompactMode
+		-- Text handled by optimized shared cache (Phase 21)
+
 	end -- end of if friend.type == "bnet"
+	
+	-- OPTIMIZED: Use cached text generation (Phase 21)
+	local line1Text, line2Text = self:GetFormattedButtonText(friend)
+	
+	button.Name:SetText(line1Text)
+	if not isCompactMode then
+		button.Info:SetText(line2Text)
+	end
 	
 	-- Ensure button is visible
 	button:Show()
