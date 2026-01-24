@@ -37,3 +37,6 @@ release_notes.txt
 *.wtf
 *.toc.bak
 *.log
+# Perfy Instrumentation Logs
+stacks-cpu.txt
+stacks-memory.txt

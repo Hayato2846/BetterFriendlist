@@ -797,36 +797,57 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 
 	local DB = GetDB()
 	local format = DB and DB:Get("nameDisplayFormat", "%name%") or "%name%"
-	
-	-- 1. Prepare Data
-	local name = "Unknown"
-	local battletag = friend.battleTag or ""
+	local uid = friend.uid or GetFriendUID(friend)
 	local note = (friend.note or friend.notes or "")
-	local uid = friend.uid or GetFriendUID(friend) -- Use available UID
 	local nickname = DB and DB:GetNickname(uid) or ""
+	local showRealmName = DB and DB:Get("showRealmName", false)
+
+	-- Inputs for validation
+	local rawName = friend.name
+	local rawBattleTag = friend.battleTag
+	local rawAccountName = friend.accountName
+
+	-- CACHE CHECK (Persistent with Validation)
+	if not self.displayNameCache[uid] then self.displayNameCache[uid] = {} end
+	local modeKey = forSorting and 2 or 1
+	local cacheEntry = self.displayNameCache[uid][modeKey]
+	
+	-- Check if cache is valid (inputs haven't changed)
+	if cacheEntry and 
+	   cacheEntry.format == format and
+	   cacheEntry.showRealmName == showRealmName and
+	   cacheEntry.note == note and
+	   cacheEntry.nickname == nickname and
+	   cacheEntry.rawName == rawName and
+	   cacheEntry.rawAccountName == rawAccountName and
+	   cacheEntry.rawBattleTag == rawBattleTag then
+		return cacheEntry.result
+	end
+
+	-- 1. Prepare Data (Only on Cache Miss)
+	local name = "Unknown"
+	local battletag = rawBattleTag or ""
 	
 	if friend.type == "bnet" then
 		if forSorting then
 			-- SORTING MODE: Use BattleTag (Short) first
-			if friend.battleTag and friend.battleTag ~= "" then
-				local bTag = friend.battleTag
-				local hashIndex = string.find(bTag, "#")
+			if rawBattleTag and rawBattleTag ~= "" then
+				local hashIndex = string.find(rawBattleTag, "#")
 				if hashIndex then
-					name = string.sub(bTag, 1, hashIndex - 1)
+					name = string.sub(rawBattleTag, 1, hashIndex - 1)
 				else
-					name = bTag
+					name = rawBattleTag
 				end
 			else
-				name = friend.accountName or "Unknown"
+				name = rawAccountName or "Unknown"
 			end
 		else
 			-- DISPLAY MODE: Use accountName
-			name = friend.accountName or "Unknown"
+			name = rawAccountName or "Unknown"
 		end
 	else
 		-- WoW: Name is Character Name
-		local fullName = friend.name or "Unknown"
-		local showRealmName = DB and DB:Get("showRealmName", false)
+		local fullName = rawName or "Unknown"
 		
 		if showRealmName then
 			name = fullName
@@ -848,23 +869,6 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		if hashIndex then
 			battletag = string.sub(battletag, 1, hashIndex - 1)
 		end
-	end
-	
-	-- CACHE CHECK (Persistent with Validation)
-	-- Use nested table [uid][forSorting] to avoid string concatenation for keys
-	if not self.displayNameCache[uid] then self.displayNameCache[uid] = {} end
-	local modeKey = forSorting and 2 or 1 -- Avoid boolean keys if desired, or just use boolean
-	
-	local cacheEntry = self.displayNameCache[uid][modeKey]
-	
-	-- Check if cache is valid (inputs haven't changed)
-	if cacheEntry and 
-	   cacheEntry.format == format and
-	   cacheEntry.note == note and
-	   cacheEntry.nickname == nickname and
-	   cacheEntry.name == name and
-	   cacheEntry.btag == battletag then
-		return cacheEntry.result
 	end
 
 	-- 2. Replace Tokens
@@ -913,10 +917,12 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 	self.displayNameCache[uid][modeKey] = {
 		result = result,
 		format = format,
+		showRealmName = showRealmName,
 		note = note,
 		nickname = nickname,
-		name = name,
-		btag = battletag
+		rawName = rawName,
+		rawBattleTag = rawBattleTag,
+		rawAccountName = rawAccountName
 	}
 	
 	return result
