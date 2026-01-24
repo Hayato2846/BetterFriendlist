@@ -89,32 +89,35 @@ end
 
 -- Build DataProvider for ScrollBox system (replaces BuildDisplayList logic)
 -- Returns a DataProvider object with elementData for each button
-local function BuildDataProvider(self) local dataProvider = CreateDataProvider()
+-- Build Display List (Optimization: Returns simplified table instead of DataProvider)
+-- This allows for diffing before committing to ScrollBox
+local function BuildDisplayList(self) 
+	local displayList = {}
 	
-	-- Sync groups first
-	self:SyncGroups()
+	-- Optimization: SyncGroups removed (Called by UpdateFriendsList before Render)
+	-- self:SyncGroups()
 	
-	-- Get friendGroups from Groups module (SyncGroups updates the module-level friendGroups table)
+	-- Get friendGroups from Groups module
 	local Groups = GetGroups()
-	-- friendGroups is now an upvalue, updated by SyncGroups()
+	local friendGroups = Groups and Groups:GetAll() or friendGroups -- Fallback to upvalue if nil
 	
 	-- Add friend invites at top (real or mock)
 	local numInvites
-	if BFL.MockFriendInvites.enabled then
+	if BFL.MockFriendInvites and BFL.MockFriendInvites.enabled then
 		numInvites = #BFL.MockFriendInvites.invites
 	else
-		numInvites = BNGetNumFriendInvites()
+		numInvites = BNGetNumFriendInvites and BNGetNumFriendInvites() or 0
 	end
 	
 	if numInvites and numInvites > 0 then
-		dataProvider:Insert({
+		table.insert(displayList, {
 			buttonType = BUTTON_TYPE_INVITE_HEADER,
 			count = numInvites,
 		})
 		
 		if not GetCVarBool("friendInvitesCollapsed") then
 			for i = 1, numInvites do
-				dataProvider:Insert({
+				table.insert(displayList, {
 					buttonType = BUTTON_TYPE_INVITE,
 					inviteIndex = i,
 				})
@@ -122,7 +125,7 @@ local function BuildDataProvider(self) local dataProvider = CreateDataProvider()
 			
 			-- Add divider if there are friends below
 			if #self.friendsList > 0 then
-				dataProvider:Insert({
+				table.insert(displayList, {
 					buttonType = BUTTON_TYPE_DIVIDER
 				})
 			end
@@ -158,12 +161,13 @@ local function BuildDataProvider(self) local dataProvider = CreateDataProvider()
 	-- Get DB
 	local DB = GetDB()
 	if not DB then 
-		return dataProvider
+		return displayList -- Return empty list if DB missing
 	end
 	
 	-- PERFY OPTIMIZATION: Cache settings outside loop
 	local enableInGameGroup = DB:Get("enableInGameGroup", false)
 	local inGameGroupMode = DB:Get("inGameGroupMode", "same_game")
+	local BNET_CLIENT_WOW = BNET_CLIENT_WOW or "WoW"
 	
 	-- Group friends
 	for _, friend in ipairs(self.friendsList) do
@@ -192,8 +196,6 @@ local function BuildDataProvider(self) local dataProvider = CreateDataProvider()
 					isInGame = true
 				elseif friend.type == "bnet" and friend.connected and friend.gameAccountInfo and friend.gameAccountInfo.isOnline then
 					-- Check if actually in a game (clientProgram is set)
-					-- App and BSAp (Mobile) are not considered "In-Game" for this purpose usually, unless user wants "Online"
-					-- User said "friends who are in any game". Usually implies playing.
 					local client = friend.gameAccountInfo.clientProgram
 					if client and client ~= "" and client ~= "App" and client ~= "BSAp" then
 						isInGame = true
@@ -245,24 +247,28 @@ local function BuildDataProvider(self) local dataProvider = CreateDataProvider()
 		end
 	end
 	
-	-- Build data provider in group order
+	-- Build display list in group order
 	local orderedGroups = {}
 	for _, groupData in pairs(friendGroups) do
-		table.insert(orderedGroups, groupData)
+		-- Safety check for groupData structure
+		if type(groupData) == "table" then
+			table.insert(orderedGroups, groupData)
+		end
 	end
-	table.sort(orderedGroups, function(a, b) return a.order < b.order end)
+	table.sort(orderedGroups, function(a, b) return (a.order or 999) < (b.order or 999) end)
+	
+	local hideEmptyGroups = DB:Get("hideEmptyGroups", false)
 	
 	for _, groupData in ipairs(orderedGroups) do
 		local groupFriends = groupedFriends[groupData.id]
 		
-		-- Only process if group has friends
+		-- Only process if group has friends table (might be nil if not initialized)
 		if groupFriends then
 			-- Check if we should skip empty groups
-			local hideEmptyGroups = GetDB():Get("hideEmptyGroups", false)
 			local shouldSkip = false
 			
 			if hideEmptyGroups then
-				-- Count online friends only
+				-- Count online friends only (for display purpose)
 				local onlineCount = 0
 				for _, friend in ipairs(groupFriends) do
 					if friend.connected then
@@ -276,7 +282,7 @@ local function BuildDataProvider(self) local dataProvider = CreateDataProvider()
 			
 			if not shouldSkip then
 				-- Add group header
-				dataProvider:Insert({
+				table.insert(displayList, {
 					buttonType = BUTTON_TYPE_GROUP_HEADER,
 					groupId = groupData.id,
 					name = groupData.name,
@@ -289,7 +295,7 @@ local function BuildDataProvider(self) local dataProvider = CreateDataProvider()
 				-- Add friends if not collapsed
 				if not groupData.collapsed then
 					for _, friend in ipairs(groupFriends) do
-						dataProvider:Insert({
+						table.insert(displayList, {
 							buttonType = BUTTON_TYPE_FRIEND,
 							friend = friend,
 							groupId = groupData.id
@@ -300,7 +306,7 @@ local function BuildDataProvider(self) local dataProvider = CreateDataProvider()
 		end
 	end
 	
-	return dataProvider
+	return displayList
 end
 
 -- Create element factory for ScrollBox button creation
@@ -2365,6 +2371,27 @@ end
 -- Friends Display Rendering
 -- ========================================
 
+-- Helper to compare element data for structural equivalence
+local function CompareElementData(a, b)
+	if not a or not b then return false end
+	if a.buttonType ~= b.buttonType then return false end
+	
+	if a.buttonType == BUTTON_TYPE_FRIEND then
+		-- Structure is maintained if it's the same friend object reference
+		-- Friend objects are recycled but stable for the sorted list index order
+		return a.friend == b.friend
+	elseif a.buttonType == BUTTON_TYPE_GROUP_HEADER then
+		-- For headers, we check ID and if collapsed state matches
+		-- Counts might change, but that's a property update, not a structure update
+		return a.groupId == b.groupId and a.collapsed == b.collapsed
+	elseif a.buttonType == BUTTON_TYPE_INVITE then
+		return a.inviteIndex == b.inviteIndex
+	else
+		-- Dividers, headers, etc match by type
+		return true
+	end
+end
+
 -- RenderDisplay: Updates the visual display of the friends list
 -- This function handles ScrollBox rendering, button pool management, 
 -- friend button configuration (BNet/WoW), compact mode, and TravelPass buttons
@@ -2394,27 +2421,93 @@ function FriendsList:RenderDisplay() -- Skip update if frame is not shown (perfo
 	-- Clear dirty flag since we're rendering now
 	needsRenderOnShow = false
 	
-	-- Build DataProvider from friends list (used by both Retail and Classic)
-	local dataProvider = BuildDataProvider(self)
+	-- Build Display List (Returns simple table now)
+	local newDisplayList = BuildDisplayList(self)
 	
 	-- Classic: Use FauxScrollFrame rendering
 	if BFL.IsClassic or not BFL.HasModernScrollBox then
 		-- Convert DataProvider to display list for Classic
-		self.classicDisplayList = {}
-		if dataProvider and dataProvider.Enumerate then
-			for _, elementData in dataProvider:Enumerate() do
-				table.insert(self.classicDisplayList, elementData)
-			end
-		end
+		self.classicDisplayList = newDisplayList
 		-- Render with Classic button pool
 		self:RenderClassicButtons()
 		return
 	end
 	
-	-- Retail: Update ScrollBox with automatic scroll position preservation!
-	local retainScrollPosition = true
+	-- Retail: Optimized ScrollBox Rendering using Diffing
 	if self.scrollBox then
-		self.scrollBox:SetDataProvider(dataProvider, retainScrollPosition)
+		local currentProvider = self.scrollBox:GetDataProvider()
+		local structureChanged = true
+		
+		-- Check if structure has changed
+		if currentProvider then
+			local currentSize = (currentProvider.GetSize and currentProvider:GetSize()) or (currentProvider.Count and currentProvider:Count()) or 0
+			
+			if currentSize == #newDisplayList then
+				structureChanged = false
+				local index = 1
+				-- Enumerate is linear, so this compares in order
+				for _, oldData in currentProvider:Enumerate() do
+					local newData = newDisplayList[index]
+					if not CompareElementData(oldData, newData) then
+						structureChanged = true
+						break
+					end
+					index = index + 1
+				end
+			end
+		end
+		
+		if not structureChanged then
+			-- SMART UPDATE: Structure is identical, so we just update properties
+			-- This avoids a full ScrollBox layout/rebuild!
+			
+			local index = 1
+			for _, oldData in currentProvider:Enumerate() do
+				local newData = newDisplayList[index]
+				
+				-- Copy value properties from new data to old data (in place)
+				-- This ensures the existing elementData has the latest counts/states
+				if newData.buttonType == BUTTON_TYPE_GROUP_HEADER then
+					oldData.count = newData.count
+					oldData.totalCount = newData.totalCount
+					oldData.onlineCount = newData.onlineCount
+					-- name matches (checked by ID)
+				elseif newData.buttonType == BUTTON_TYPE_FRIEND then
+					-- friend reference is same, so data inside friend object is already new
+					-- Nothing to copy unless we add friend-specific overrides in elementData
+				end
+				
+				index = index + 1
+			end
+			
+			-- Force visible frames to refresh their visual state
+			-- Loop only visible frames (SUPER FAST)
+			self.scrollBox:ForEachFrame(function(frame, elementData)
+				if elementData.buttonType == BUTTON_TYPE_FRIEND then
+					self:UpdateFriendButton(frame, elementData)
+				elseif elementData.buttonType == BUTTON_TYPE_GROUP_HEADER then
+					self:UpdateGroupHeaderButton(frame, elementData)
+				elseif elementData.buttonType == BUTTON_TYPE_INVITE then
+					self:UpdateInviteButton(frame, elementData)
+				elseif elementData.buttonType == BUTTON_TYPE_INVITE_HEADER then
+					self:UpdateInviteHeaderButton(frame, elementData)
+				end
+			end)
+			
+			-- Debugging
+			-- if BFL.DebugPrint then BFL:DebugPrint("Smart Render: Skipped Layout") end
+			return
+		end
+		
+		-- Structure Changed: Full Rebuild
+		-- if BFL.DebugPrint then BFL:DebugPrint("Full Render: Rebuilding DataProvider") end
+		
+		local dataProvider = CreateDataProvider()
+		-- Bulk insert is usually faster if available, but Insert loop is fine
+		for _, data in ipairs(newDisplayList) do
+			dataProvider:Insert(data)
+		end
+		self.scrollBox:SetDataProvider(dataProvider, true) -- retainScrollPosition = true
 	end
 end
 
