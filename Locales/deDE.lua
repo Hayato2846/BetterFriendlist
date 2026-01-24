@@ -1,4 +1,4 @@
-﻿-- Locales/deDE.lua
+-- Locales/deDE.lua
 -- German (Deutsch) Localization
 
 local L = BFL_LOCALE
@@ -61,6 +61,7 @@ if GetLocale() == "deDE" then
 	-- SETTINGS PANEL
 	-- ========================================
 	L.SETTINGS_TAB_GENERAL = "Allgemein"
+	L.SETTINGS_TAB_FONTS = "Fonts"
 	L.SETTINGS_TAB_GROUPS = "Gruppen"
 	L.SETTINGS_TAB_APPEARANCE = "Aussehen"
 	L.SETTINGS_TAB_ADVANCED = "Erweitert"
@@ -68,6 +69,18 @@ if GetLocale() == "deDE" then
 	L.SETTINGS_SHOW_BLIZZARD = "Blizzards Freundeslisten-Option anzeigen"
 	L.SETTINGS_COMPACT_MODE = "Kompakt-Modus"
 	L.SETTINGS_FONT_SIZE = "Schriftgröße"
+	L.SETTINGS_FONT_COLOR = "Schriftfarbe"
+
+	-- Group Header Settings (Phase 21)
+	L.SETTINGS_GROUP_HEADER_SETTINGS = "Gruppenkopf-Einstellungen"
+	L.SETTINGS_GROUP_FONT_HEADER = "Gruppenkopf-Schriftart"
+	L.SETTINGS_GROUP_COLOR_HEADER = "Gruppenkopf-Farben"
+	L.SETTINGS_INHERIT_GROUP_COUNT_COLOR = "Farbe von Gruppe erben"
+	L.SETTINGS_INHERIT_GROUP_ARROW_COLOR = "Farbe von Gruppe erben"
+	L.TOOLTIP_RIGHT_CLICK_INHERIT = "Rechtsklick um von Gruppe zu erben"
+	L.SETTINGS_INHERIT_TOOLTIP = "(Geerbt von Gruppe)"
+	L.SETTINGS_COLOR_GROUP_COUNT = "Gruppenzähler-Farbe"
+	L.SETTINGS_COLOR_GROUP_ARROW = "Pfeilfarbe"
 	L.SETTINGS_FONT_SIZE_SMALL = "Klein (Kompakt, 10px)"
 	L.SETTINGS_FONT_SIZE_NORMAL = "Normal (12px)"
 	L.SETTINGS_FONT_SIZE_LARGE = "Groß (14px)"
@@ -254,8 +267,14 @@ if GetLocale() == "deDE" then
 	L.SETTINGS_NOTIFY_MODE_TOAST = "Toast (Popup)"
 	L.SETTINGS_NOTIFY_MODE_CHAT = "Chat-Nachricht"
 	L.SETTINGS_NOTIFY_MODE_DISABLED = "Deaktiviert"
+	L.SETTINGS_NOTIFY_MODE_NONE = "Deaktiviert"
+	L.SETTINGS_NOTIFY_MODE_BOTH = "Beide"
+	L.SETTINGS_NOTIFY_TEST = "Test-Benachrichtigung"
 	L.SETTINGS_NOTIFY_MODE_DESC = "|cffffcc00Toast:|r Kompaktes Popup\n|cffffcc00Chat-Nachricht:|r Text im Chat-Fenster\n|cffffcc00Deaktiviert:|r Keine Benachrichtigungen"
 	L.SETTINGS_NOTIFY_TEST_BTN = "Benachrichtigung testen"
+	L.SETTINGS_NOTIFY_SOUND = "Ton bei Benachrichtigung abspielen"
+	L.SETTINGS_NOTIFY_DND = "Bitte nicht stören (Alle Benachrichtigungen stummschalten)"
+	L.SETTINGS_NOTIFY_DND_MODE = "Bitte nicht stören Modus"
 	L.SETTINGS_NOTIFY_SOUND_HEADER = "Sound-Einstellungen"
 	L.SETTINGS_NOTIFY_SOUND_ENABLE = "Sound bei Benachrichtigungen abspielen"
 	L.SETTINGS_NOTIFY_SOUND_ENABLED = "Benachrichtigungs-Sounds |cff00ff00AKTIVIERT|r"
@@ -1089,4 +1108,14 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	-- Misc
 	L.FRIEND_MAX_LEVEL = "Max-Stufe"
 	L.COMPAT_GAME_VERSION = "|cffffcc00Spiel-Version:|r"
+
+	-- Font Outline/Shadow Settings
+	L.SETTINGS_FONT_OUTLINE = "Font Outline"
+	L.SETTINGS_FONT_SHADOW = "Font Shadow"
+	L.SETTINGS_FONT_OUTLINE_NONE = "None"
+	L.SETTINGS_FONT_OUTLINE_NORMAL = "Outline"
+	L.SETTINGS_FONT_OUTLINE_THICK = "Thick Outline"
+	L.SETTINGS_FONT_OUTLINE_MONOCHROME = "Monochrome"
+	L.SETTINGS_GROUP_COUNT_COLOR = "Zählerfarbe"
+	L.SETTINGS_GROUP_ARROW_COLOR = "Pfeilfarbe"
 end

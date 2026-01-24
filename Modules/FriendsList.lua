@@ -1034,12 +1034,16 @@ function FriendsList:UpdateFontCache()
 	local nameFontName = DB:Get("fontFriendName", "Friz Quadrata TT")
 	self.fontCache.namePath = LSM:Fetch("font", nameFontName)
 	self.fontCache.nameSize = DB:Get("fontSizeFriendName", 13)
+	self.fontCache.nameOutline = DB:Get("fontOutlineFriendName", "NONE")
+	self.fontCache.nameShadow = DB:Get("fontShadowFriendName", false)
 	self.fontCache.nameR, self.fontCache.nameG, self.fontCache.nameB, self.fontCache.nameA = GetColor("fontColorFriendName")
 
 	-- Info Font
 	local infoFontName = DB:Get("fontFriendInfo", "Friz Quadrata TT")
 	self.fontCache.infoPath = LSM:Fetch("font", infoFontName)
 	self.fontCache.infoSize = DB:Get("fontSizeFriendInfo", 10)
+	self.fontCache.infoOutline = DB:Get("fontOutlineFriendInfo", "NONE")
+	self.fontCache.infoShadow = DB:Get("fontShadowFriendInfo", false)
 	self.fontCache.infoR, self.fontCache.infoG, self.fontCache.infoB, self.fontCache.infoA = GetColor("fontColorFriendInfo")
 end
 
@@ -1450,34 +1454,36 @@ function FriendsList:UpdateFriendsList() -- Visibility Optimization:
 			-- Normalize name to always include realm for consistent identification
 			local normalizedName = BFL:NormalizeWoWFriendName(friendInfo.name, playerRealm)
 			
-			-- Extract realm name from normalized name (Name-Realm)
-			local _, realmName = strsplit("-", normalizedName)
-			
-			-- Classic Fallback: Ensure area is populated
-			-- C_FriendList might return nil area in some Classic versions
-			local area = friendInfo.area
-			if (not area or area == "") and BFL.IsClassic and GetFriendInfo then
-				local _, _, _, classicArea = GetFriendInfo(i)
-				area = classicArea
+			if normalizedName then
+				-- Extract realm name from normalized name (Name-Realm)
+				local _, realmName = strsplit("-", normalizedName)
+				
+				-- Classic Fallback: Ensure area is populated
+				-- C_FriendList might return nil area in some Classic versions
+				local area = friendInfo.area
+				if (not area or area == "") and BFL.IsClassic and GetFriendInfo then
+					local _, _, _, classicArea = GetFriendInfo(i)
+					area = classicArea
+				end
+				
+				local friend = GetNextFriendObject()
+				
+				friend.type = "wow"
+				friend.index = i
+				friend.name = normalizedName -- Always includes realm: "Name-Realm"
+				
+				-- PHASE 9.6: Cache UID
+				friend.uid = "wow_" .. normalizedName
+				
+				friend.realmName = realmName -- Explicitly store realm name for display
+				friend.connected = friendInfo.connected
+				friend.level = friendInfo.level
+				friend.className = friendInfo.className
+				friend.area = area
+				friend.notes = friendInfo.notes
+				friend.afk = friendInfo.afk
+				friend.dnd = friendInfo.dnd
 			end
-			
-			local friend = GetNextFriendObject()
-			
-			friend.type = "wow"
-			friend.index = i
-			friend.name = normalizedName -- Always includes realm: "Name-Realm"
-			
-			-- PHASE 9.6: Cache UID
-			friend.uid = "wow_" .. normalizedName
-			
-			friend.realmName = realmName -- Explicitly store realm name for display
-			friend.connected = friendInfo.connected
-			friend.level = friendInfo.level
-			friend.className = friendInfo.className
-			friend.area = area
-			friend.notes = friendInfo.notes
-			friend.afk = friendInfo.afk
-			friend.dnd = friendInfo.dnd
 		end
 	end
 	
@@ -2374,6 +2380,8 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) local groupId 
 	local count = elementData.count
 	local collapsed = elementData.collapsed
 	
+	local Groups = GetGroups()
+
 	-- Store group data on button
 	button.groupId = groupId
 	button.elementData = elementData
@@ -2387,23 +2395,41 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) local groupId 
 		button.dropHighlight = dropHighlight
 	end
 	
-	-- Get Groups module
-	local Groups = GetGroups()
+	-- Get group color (Default name color)
+	local r, g, b = 1, 1, 1 -- Default white
+	local colorCode = "|cffffffff"
 	
-	-- Get group color
-	local colorCode = "|cffffffff"  -- Default white
+	-- Count and Arrow Colors (Default to Group Color)
+	local countR, countG, countB = 1, 1, 1
+	local arrowR, arrowG, arrowB = 1, 1, 1
+	
 	if Groups then
 		local group = Groups:Get(groupId)
 		if group and group.color then
-			local r = group.color.r or group.color[1] or 1
-			local g = group.color.g or group.color[2] or 1
-			local b = group.color.b or group.color[3] or 1
+			r = group.color.r or group.color[1] or 1
+			g = group.color.g or group.color[2] or 1
+			b = group.color.b or group.color[3] or 1
 			colorCode = string.format("|cff%02x%02x%02x", r * 255, g * 255, b * 255)
+		end
+		
+		-- Default to group color
+		countR, countG, countB = r, g, b
+		arrowR, arrowG, arrowB = r, g, b
+		
+		-- Override if specific colors are set
+		if group and group.countColor then
+			countR, countG, countB = group.countColor.r, group.countColor.g, group.countColor.b
+		end
+		if group and group.arrowColor then
+			arrowR, arrowG, arrowB = group.arrowColor.r, group.arrowColor.g, group.arrowColor.b
 		end
 	end
 	
-	-- Set header text with color
 	local DB = GetDB()
+	-- Count Color Code
+	local countColorCode = string.format("|cff%02x%02x%02x", countR*255, countG*255, countB*255)
+	
+	-- Set header text with color
 	local format = DB and DB:Get("headerCountFormat", "visible") or "visible"
 	local countText = ""
 	
@@ -2412,9 +2438,6 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) local groupId 
 		countText = string.format("%d/%d", elementData.onlineCount or 0, elementData.totalCount or 0)
 	elseif format == "both" then
 		-- Show "Filtered (Online) / Total" (e.g. "1 (3)/10")
-		-- count = Filtered (currently shown)
-		-- onlineCount = Total Online
-		-- totalCount = Total Members
 		countText = string.format("%d (%d)/%d", count, elementData.onlineCount or 0, elementData.totalCount or 0)
 	else -- "visible" (Default)
 		-- Show "Filtered / Total" (e.g. "3/10" or just "3" if same)
@@ -2424,24 +2447,59 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) local groupId 
 		end
 	end
 	
-	button:SetFormattedText("%s%s|r (%s)", colorCode, name, countText)
+	-- Apply Name and Count colors separately
+	button:SetFormattedText("%s%s|r %s(%s)|r", colorCode, name, countColorCode, countText)
 	
-	-- Apply Text Alignment (Feature Request)
+	-- Apply Text Alignment and Font Settings (Feature Request)
 	local align = DB and DB:Get("groupHeaderAlign", "LEFT") or "LEFT"
+	
 	if button:GetFontString() then
-		button:GetFontString():ClearAllPoints()
+		local fs = button:GetFontString()
+		fs:ClearAllPoints()
 		
+		-- Alignment
 		if align == "CENTER" then
-			button:GetFontString():SetPoint("CENTER", button, "CENTER", 0, 0)
-			button:GetFontString():SetJustifyH("CENTER")
+			fs:SetPoint("CENTER", button, "CENTER", 0, 0)
+			fs:SetJustifyH("CENTER")
 		elseif align == "RIGHT" then
 			-- Classic XML uses x=22 for LEFT, so we use x=-22 for RIGHT symmetry (minus arrow space)
-			-- Note: Button has arrows on both sides in template, but usually only one is shown.
-			button:GetFontString():SetPoint("RIGHT", button, "RIGHT", -22, 0)
-			button:GetFontString():SetJustifyH("RIGHT")
+			fs:SetPoint("RIGHT", button, "RIGHT", -22, 0)
+			fs:SetJustifyH("RIGHT")
 		else -- "LEFT" (Default)
-			button:GetFontString():SetPoint("LEFT", button, "LEFT", 22, 0)
-			button:GetFontString():SetJustifyH("LEFT")
+			fs:SetPoint("LEFT", button, "LEFT", 22, 0)
+			fs:SetJustifyH("LEFT")
+		end
+		
+		-- Font Settings
+		if DB then
+			local fontName = DB:Get("fontGroupHeader", "Friz Quadrata TT")
+			local fontSize = DB:Get("fontSizeGroupHeader", 12)
+			local fontOutline = DB:Get("fontOutlineGroupHeader", "NONE")
+			local fontShadow = DB:Get("fontShadowGroupHeader", false)
+			
+			local fontPath = LSM:Fetch("font", fontName)
+			-- Use FontManager to apply font with Alphabet support
+			if fontPath and BFL.FontManager and BFL.FontManager.GetOrCreateFontFamily then
+				-- For Group Headers (Buttons), we must set the Normal/Highlight FontObject
+				-- instead of just setting the FontString, otherwise interaction resets it
+				local familyObj = BFL.FontManager:GetOrCreateFontFamily(fontPath, fontSize, fontOutline, fontShadow)
+				if familyObj then
+					button:SetNormalFontObject(familyObj)
+					button:SetHighlightFontObject(familyObj)
+					-- Also set current fs immediately to ensure visual update
+					fs:SetFontObject(familyObj)
+				end
+			elseif fontPath then
+				fs:SetFont(fontPath, fontSize, fontOutline)
+				
+				if fontShadow then
+					fs:SetShadowColor(0, 0, 0, 1)
+					fs:SetShadowOffset(1, -1)
+				else
+					fs:SetShadowColor(0, 0, 0, 0)
+					fs:SetShadowOffset(0, 0)
+				end
+			end
 		end
 	end
 
@@ -2457,6 +2515,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) local groupId 
 		local targetArrow = collapsed and button.RightArrow or button.DownArrow
 		if targetArrow then
 			targetArrow:Show()
+			targetArrow:SetVertexColor(arrowR, arrowG, arrowB)
 			targetArrow:ClearAllPoints()
 			
 			-- Restore normal textures first (resetting any overrides)
@@ -2977,13 +3036,21 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 
 	-- Apply Friend Name Font Settings (Optimized)
 	if self.fontCache and self.fontCache.namePath then
-		local _, _, currentFlags = button.Name:GetFont()
+		local outline = self.fontCache.nameOutline
+		if outline == "NONE" then outline = "" end
 		
 		-- Use FontManager to apply font with Alphabet support
 		if BFL.FontManager and BFL.FontManager.ApplyFont then
-			BFL.FontManager:ApplyFont(button.Name, self.fontCache.namePath, self.fontCache.nameSize, currentFlags)
+			BFL.FontManager:ApplyFont(button.Name, self.fontCache.namePath, self.fontCache.nameSize, outline, self.fontCache.nameShadow)
 		else
-			button.Name:SetFont(self.fontCache.namePath, self.fontCache.nameSize, currentFlags)
+			button.Name:SetFont(self.fontCache.namePath, self.fontCache.nameSize, outline)
+			if self.fontCache.nameShadow then
+				button.Name:SetShadowColor(0, 0, 0, 1)
+				button.Name:SetShadowOffset(1, -1)
+			else
+				button.Name:SetShadowColor(0, 0, 0, 0)
+				button.Name:SetShadowOffset(0, 0)
+			end
 		end
 		
 		button.Name:SetTextColor(self.fontCache.nameR, self.fontCache.nameG, self.fontCache.nameB, self.fontCache.nameA)
@@ -2998,13 +3065,22 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 
 		-- Apply Friend Info Font Settings (Optimized)
 		if self.fontCache and self.fontCache.infoPath then
-			local _, _, currentFlags = button.Info:GetFont()
+			local outline = self.fontCache.infoOutline
+			if outline == "NONE" then outline = "" end
 			
 			-- Use FontManager to apply font with Alphabet support
 			if BFL.FontManager and BFL.FontManager.ApplyFont then
-				BFL.FontManager:ApplyFont(button.Info, self.fontCache.infoPath, self.fontCache.infoSize, currentFlags)
+				BFL.FontManager:ApplyFont(button.Info, self.fontCache.infoPath, self.fontCache.infoSize, outline, self.fontCache.infoShadow)
 			else
-				button.Info:SetFont(self.fontCache.infoPath, self.fontCache.infoSize, currentFlags)
+				button.Info:SetFont(self.fontCache.infoPath, self.fontCache.infoSize, outline)
+				
+				if self.fontCache.infoShadow then
+					button.Info:SetShadowColor(0, 0, 0, 1)
+					button.Info:SetShadowOffset(1, -1)
+				else
+					button.Info:SetShadowColor(0, 0, 0, 0)
+					button.Info:SetShadowOffset(0, 0)
+				end
 			end
 			
 			button.Info:SetTextColor(self.fontCache.infoR, self.fontCache.infoG, self.fontCache.infoB, self.fontCache.infoA)
@@ -3288,7 +3364,7 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 				local classColor = classFile and RAID_CLASS_COLORS[classFile]
 				
 				if classColor then
-					line1Text = line1Text .. " (|c" .. (classColor.colorStr or "ffffffff") .. characterName .. "|r)"
+					line1Text = line1Text .. " |c" .. (classColor.colorStr or "ffffffff") .. "(" .. characterName .. ")|r"
 				else
 					line1Text = line1Text .. " (" .. characterName .. ")"
 				end

@@ -342,13 +342,14 @@ end
 local TAB_DEFINITIONS = {
 	-- Stable Tabs (always visible)
 	{id = 1, name = L.SETTINGS_TAB_GENERAL, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\settings.blp", beta = false},
-	{id = 2, name = L.SETTINGS_TAB_GROUPS, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\users.blp", beta = false},
-	{id = 3, name = L.SETTINGS_TAB_ADVANCED, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\sliders.blp", beta = false},
+	{id = 2, name = L.SETTINGS_TAB_FONTS, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\type.blp", beta = false},
+	{id = 3, name = L.SETTINGS_TAB_GROUPS, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\users.blp", beta = false},
+	{id = 4, name = L.SETTINGS_TAB_ADVANCED, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\sliders.blp", beta = false},
 	
 	-- Beta Tabs (only visible when enableBetaFeatures = true)
-	{id = 4, name = L.SETTINGS_TAB_DATABROKER, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\activity.blp", beta = false},
-	{id = 5, name = L.SETTINGS_TAB_NOTIFICATIONS, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\bell.blp", beta = true},
-	{id = 6, name = L.SETTINGS_TAB_GLOBAL_SYNC, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\globe.blp", beta = true},
+	{id = 5, name = L.SETTINGS_TAB_DATABROKER, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\activity.blp", beta = false},
+	{id = 6, name = L.SETTINGS_TAB_NOTIFICATIONS, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\bell.blp", beta = true},
+	{id = 7, name = L.SETTINGS_TAB_GLOBAL_SYNC, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\globe.blp", beta = true},
 	-- Future beta tabs go here...
 }
 
@@ -455,33 +456,15 @@ function Settings:RefreshTabs()
 	PanelTemplates_SetNumTabs(settingsFrame, maxTabId)
 	PanelTemplates_UpdateTabs(settingsFrame)
 	
-	-- THEN reposition tabs dynamically: Check if Tab4 (Notifications) is visible
-	local tab4Visible = false
-	for _, tabDef in ipairs(visibleTabs) do
-		if tabDef.id == 5 then
-			tab5Visible = true
-			break
-		end
-	end
+	-- THEN reposition tabs dynamically
+	-- Start second row at Tab 6 (Notifications) if visible
+	local tab1 = _G["BetterFriendlistSettingsFrameTab1"]
+	local tab6 = _G["BetterFriendlistSettingsFrameTab6"]
 	
-	local numVisible = #visibleTabs
-	
-	-- If we have 5+ tabs (meaning Beta is ON and Notifications tab is visible)
-	if tab5Visible and numVisible >= 5 then
-		-- BFL:DebugPrint("RefreshTabs: Repositioning Tab5 to second row (numVisible=" .. numVisible .. ")")
-		
-		-- Second row layout: Notifications tab (id=5) goes below first row
-		local tab1 = _G["BetterFriendlistSettingsFrameTab1"]
-		local tab5 = _G["BetterFriendlistSettingsFrameTab5"]
-		
-		if tab5 and tab1 and tab5:IsShown() then
-			tab5:ClearAllPoints()
-			-- Position below Tab1: +4px for proper spacing
-			tab5:SetPoint("TOPLEFT", tab1, "BOTTOMLEFT", 0, 8)
-			-- BFL:DebugPrint("RefreshTabs: Tab5 repositioned - anchors cleared and set to TOPLEFT of Tab1 BOTTOMLEFT")
-		else
-			-- BFL:DebugPrint("RefreshTabs: FAILED - tab5=" .. tostring(tab5 ~= nil) .. " tab1=" .. tostring(tab1 ~= nil) .. " shown=" .. tostring(tab5 and tab5:IsShown() or false))
-		end
+	if tab6 and tab1 and tab6:IsShown() then
+		tab6:ClearAllPoints()
+		-- Position below Tab1: +4px for proper spacing (copied from legacy logic)
+		tab6:SetPoint("TOPLEFT", tab1, "BOTTOMLEFT", 0, 8)
 		
 		-- Move MainInset down to make room for second tab row
 		if settingsFrame.MainInset then
@@ -490,7 +473,6 @@ function Settings:RefreshTabs()
 			settingsFrame.MainInset:SetPoint("BOTTOMRIGHT", settingsFrame, "BOTTOMRIGHT", 0, 2)
 		end
 	else
-		-- BFL:DebugPrint("RefreshTabs: Single row layout (tab5Visible=" .. tostring(tab5Visible) .. " numVisible=" .. numVisible .. ")")
 		-- Single row layout: Restore default MainInset position (tabs at y=-27)
 		if settingsFrame.MainInset then
 			settingsFrame.MainInset:ClearAllPoints()
@@ -539,6 +521,7 @@ function Settings:ShowTab(tabID)
 	local content = settingsFrame.ContentScrollFrame.Content
 	if content then
 		if content.GeneralTab then content.GeneralTab:Hide() end
+		if content.FontsTab then content.FontsTab:Hide() end
 		if content.GroupsTab then content.GroupsTab:Hide() end
 		if content.AdvancedTab then content.AdvancedTab:Hide() end
 		if content.NotificationsTab then content.NotificationsTab:Hide() end
@@ -548,19 +531,22 @@ function Settings:ShowTab(tabID)
 		if tabID == 1 and content.GeneralTab then
 			content.GeneralTab:Show()
 			self:RefreshGeneralTab()
-		elseif tabID == 2 and content.GroupsTab then
+		elseif tabID == 2 and content.FontsTab then
+			content.FontsTab:Show()
+			self:RefreshFontsTab()
+		elseif tabID == 3 and content.GroupsTab then
 			content.GroupsTab:Show()
 			self:RefreshGroupsTab()
-		elseif tabID == 3 and content.AdvancedTab then
+		elseif tabID == 4 and content.AdvancedTab then
 			content.AdvancedTab:Show()
 			self:RefreshAdvancedTab()
-		elseif tabID == 4 and content.BrokerTab then
+		elseif tabID == 5 and content.BrokerTab then
 			content.BrokerTab:Show()
 			self:RefreshBrokerTab()
-		elseif tabID == 5 and content.NotificationsTab then
+		elseif tabID == 6 and content.NotificationsTab then
 			content.NotificationsTab:Show()
 			self:RefreshNotificationsTab()
-		elseif tabID == 6 and content.GlobalSyncTab then
+		elseif tabID == 7 and content.GlobalSyncTab then
 			content.GlobalSyncTab:Show()
 			self:RefreshGlobalSyncTab()
 		end
@@ -581,14 +567,16 @@ function Settings:AdjustContentHeight(tabID)
 	if tabID == 1 then
 		activeTab = content.GeneralTab
 	elseif tabID == 2 then
-		activeTab = content.GroupsTab
+		activeTab = content.FontsTab
 	elseif tabID == 3 then
-		activeTab = content.AdvancedTab
+		activeTab = content.GroupsTab
 	elseif tabID == 4 then
-		activeTab = content.NotificationsTab
+		activeTab = content.AdvancedTab
 	elseif tabID == 5 then
 		activeTab = content.BrokerTab
 	elseif tabID == 6 then
+		activeTab = content.NotificationsTab
+	elseif tabID == 7 then
 		activeTab = content.GlobalSyncTab
 	end
 	
@@ -894,6 +882,187 @@ function Settings:SaveGroupOrder()
 end
 
 -- Show color picker for a group
+function Settings:ShowGroupCountColorPicker(groupId, groupName, colorSwatch, isReset)
+	local DB = GetDB()
+	if not DB then return end
+	
+	-- Handle Reset (Right Click)
+	if isReset then
+		local groupCountColors = DB:Get("groupCountColors") or {}
+		groupCountColors[groupId] = nil
+		DB:Set("groupCountColors", groupCountColors)
+		
+		-- Update UI swatch to "inherited" grey look or the actual inherited color?
+		-- We should probably update it to the inherited color for better feedback, 
+		-- or grey if we want to signify "unset". 
+		-- SettingsComponents logic sets it to grey if initial is nil.
+		-- Let's just force a full refresh.
+		
+		local Groups = GetGroups()
+		if Groups then Groups:Initialize() end
+		
+		BFL:ForceRefreshFriendsList()
+		self:RefreshGroupsTab() -- Update the swatch in the list
+		return
+	end
+	
+	local Groups = GetGroups()
+	local r, g, b = 1, 1, 1
+	
+	if Groups then
+		local group = Groups:Get(groupId)
+		if group then
+			-- Start with current count color, or fallback to group color (or default white)
+			if group.countColor then
+				r, g, b = group.countColor.r, group.countColor.g, group.countColor.b
+			elseif group.color then
+				r, g, b = group.color.r, group.color.g, group.color.b
+			end
+		end
+	end
+	
+	local info = {}
+	info.r = r
+	info.g = g
+	info.b = b
+	info.opacity = 1.0
+	info.hasOpacity = false
+	info.swatchFunc = function()
+		local newR, newG, newB = ColorPickerFrame:GetColorRGB()
+		
+		colorSwatch:SetColorTexture(newR, newG, newB)
+		
+		local groupCountColors = DB:Get("groupCountColors") or {}
+		groupCountColors[groupId] = {r = newR, g = newG, b = newB}
+		DB:Set("groupCountColors", groupCountColors)
+		
+		local Groups = GetGroups()
+		if Groups then
+			local group = Groups:Get(groupId)
+			if group then
+				group.countColor = {r = newR, g = newG, b = newB}
+			end
+		end
+		
+		BFL:ForceRefreshFriendsList()
+	end
+	info.cancelFunc = function(previousValues)
+		colorSwatch:SetColorTexture(previousValues.r, previousValues.g, previousValues.b)
+		
+		-- Note: Cancellation doesn't revert to "nil" if it was nil before, 
+		-- it reverts to the RGB value we started with. This is acceptable.
+		-- If user wants to reset to inherit, they can Right-Click.
+		
+		local groupCountColors = DB:Get("groupCountColors") or {}
+		groupCountColors[groupId] = {r = previousValues.r, g = previousValues.g, b = previousValues.b}
+		DB:Set("groupCountColors", groupCountColors)
+		
+		local Groups = GetGroups()
+		if Groups then
+			local group = Groups:Get(groupId)
+			if group then
+				group.countColor = {r = previousValues.r, g = previousValues.g, b = previousValues.b}
+			end
+		end
+		
+		BFL:ForceRefreshFriendsList()
+	end
+	
+	if ColorPickerFrame.SetupColorPickerAndShow then
+		ColorPickerFrame:SetupColorPickerAndShow(info)
+	else
+		ColorPickerFrame.func = info.swatchFunc
+		ColorPickerFrame.cancelFunc = info.cancelFunc
+		ColorPickerFrame:SetColorRGB(info.r, info.g, info.b)
+		ColorPickerFrame:Show()
+	end
+end
+
+function Settings:ShowGroupArrowColorPicker(groupId, groupName, colorSwatch, isReset)
+	local DB = GetDB()
+	if not DB then return end
+	
+	-- Handle Reset (Right Click)
+	if isReset then
+		local groupArrowColors = DB:Get("groupArrowColors") or {}
+		groupArrowColors[groupId] = nil
+		DB:Set("groupArrowColors", groupArrowColors)
+		
+		local Groups = GetGroups()
+		if Groups then Groups:Initialize() end
+		
+		BFL:ForceRefreshFriendsList()
+		self:RefreshGroupsTab()
+		return
+	end
+	
+	local Groups = GetGroups()
+	local r, g, b = 1, 1, 1
+	
+	if Groups then
+		local group = Groups:Get(groupId)
+		if group then
+			if group.arrowColor then
+				r, g, b = group.arrowColor.r, group.arrowColor.g, group.arrowColor.b
+			elseif group.color then
+				r, g, b = group.color.r, group.color.g, group.color.b
+			end
+		end
+	end
+	
+	local info = {}
+	info.r = r
+	info.g = g
+	info.b = b
+	info.opacity = 1.0
+	info.hasOpacity = false
+	info.swatchFunc = function()
+		local newR, newG, newB = ColorPickerFrame:GetColorRGB()
+		
+		colorSwatch:SetColorTexture(newR, newG, newB)
+		
+		local groupArrowColors = DB:Get("groupArrowColors") or {}
+		groupArrowColors[groupId] = {r = newR, g = newG, b = newB}
+		DB:Set("groupArrowColors", groupArrowColors)
+		
+		local Groups = GetGroups()
+		if Groups then
+			local group = Groups:Get(groupId)
+			if group then
+				group.arrowColor = {r = newR, g = newG, b = newB}
+			end
+		end
+		
+		BFL:ForceRefreshFriendsList()
+	end
+	info.cancelFunc = function(previousValues)
+		colorSwatch:SetColorTexture(previousValues.r, previousValues.g, previousValues.b)
+		
+		local groupArrowColors = DB:Get("groupArrowColors") or {}
+		groupArrowColors[groupId] = {r = previousValues.r, g = previousValues.g, b = previousValues.b}
+		DB:Set("groupArrowColors", groupArrowColors)
+		
+		local Groups = GetGroups()
+		if Groups then
+			local group = Groups:Get(groupId)
+			if group then
+				group.arrowColor = {r = previousValues.r, g = previousValues.g, b = previousValues.b}
+			end
+		end
+		
+		BFL:ForceRefreshFriendsList()
+	end
+	
+	if ColorPickerFrame.SetupColorPickerAndShow then
+		ColorPickerFrame:SetupColorPickerAndShow(info)
+	else
+		ColorPickerFrame.func = info.swatchFunc
+		ColorPickerFrame.cancelFunc = info.cancelFunc
+		ColorPickerFrame:SetColorRGB(info.r, info.g, info.b)
+		ColorPickerFrame:Show()
+	end
+end
+
 function Settings:ShowColorPicker(groupId, groupName, colorSwatch)
 	local DB = GetDB()
 	if not DB then return end
@@ -2422,26 +2591,14 @@ function Settings:RefreshGeneralTab()
 		}
 	))
 
-	-- Row 5: Show Blizzard Option & Show Collapse Arrow (re-grouped)
-	table.insert(allFrames, Components:CreateDoubleCheckbox(tab,
-		{
-			label = L.SETTINGS_SHOW_BLIZZARD,
-			initialValue = DB:Get("showBlizzardOption", false),
-			callback = function(val) self:OnShowBlizzardOptionChanged(val) end,
-			tooltipTitle = L.SETTINGS_SHOW_BLIZZARD,
-			tooltipDesc = L.SETTINGS_SHOW_BLIZZARD_DESC or "Shows the original Blizzard Friends button in the social menu"
-		},
-		{
-			label = L.SETTINGS_SHOW_GROUP_ARROW,
-			initialValue = DB:Get("showGroupArrow", true),
-			callback = function(val) 
-				DB:Set("showGroupArrow", val)
-				BFL:ForceRefreshFriendsList()
-			end,
-			tooltipTitle = L.SETTINGS_SHOW_GROUP_ARROW,
-			tooltipDesc = L.SETTINGS_SHOW_GROUP_ARROW_DESC
-		}
-	))
+	-- Row 5: Show Blizzard Option
+	local blizzardOption = Components:CreateCheckbox(tab,
+		L.SETTINGS_SHOW_BLIZZARD,
+		DB:Get("showBlizzardOption", false),
+		function(val) self:OnShowBlizzardOptionChanged(val) end
+	)
+	blizzardOption:SetTooltip(L.SETTINGS_SHOW_BLIZZARD, L.SETTINGS_SHOW_BLIZZARD_DESC or "Shows the original Blizzard Friends button in the social menu")
+	table.insert(allFrames, blizzardOption)
 
 	-- Row 6: ElvUI Skin (if available) - moved to separate row
 	if _G.ElvUI then
@@ -2469,91 +2626,7 @@ function Settings:RefreshGeneralTab()
 		)
 		table.insert(allFrames, elvUICheckbox)
 	end
-	
-	-- Group Header Count Format
-	local headerCountFormatOptions = {
-		labels = {L.SETTINGS_HEADER_COUNT_VISIBLE, L.SETTINGS_HEADER_COUNT_ONLINE, L.SETTINGS_HEADER_COUNT_BOTH},
-		values = {"visible", "online", "both"}
-	}
-	local currentHeaderCountFormat = DB:Get("headerCountFormat", "visible")
-	
-	local headerCountFormatDropdown = Components:CreateDropdown(
-		tab, 
-		L.SETTINGS_HEADER_COUNT_FORMAT, 
-		headerCountFormatOptions, 
-		function(val) return val == currentHeaderCountFormat end,
-		function(val) 
-			DB:Set("headerCountFormat", val)
-			BFL:ForceRefreshFriendsList()
-			self:RefreshGeneralTab()
-		end
-	)
-	headerCountFormatDropdown:SetTooltip(L.SETTINGS_HEADER_COUNT_FORMAT, L.SETTINGS_HEADER_COUNT_FORMAT_DESC)
-	-- Shift 10px right to prevent clipping
-	if headerCountFormatDropdown.DropDown then
-		local point, relativeTo, relativePoint, xOfs, yOfs = headerCountFormatDropdown.DropDown:GetPoint(1)
-		if point then
-			headerCountFormatDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
-		end
-	end
-	table.insert(allFrames, headerCountFormatDropdown)
 
-	-- Group Header Alignment
-	local groupHeaderAlignOptions = {
-		labels = {L.SETTINGS_ALIGN_LEFT, L.SETTINGS_ALIGN_CENTER, L.SETTINGS_ALIGN_RIGHT},
-		values = {"LEFT", "CENTER", "RIGHT"}
-	}
-	local currentGroupHeaderAlign = DB:Get("groupHeaderAlign", "LEFT")
-	
-	local groupHeaderAlignDropdown = Components:CreateDropdown(
-		tab, 
-		L.SETTINGS_GROUP_HEADER_ALIGN, 
-		groupHeaderAlignOptions, 
-		function(val) return val == currentGroupHeaderAlign end,
-		function(val) 
-			DB:Set("groupHeaderAlign", val)
-			BFL:ForceRefreshFriendsList()
-			self:RefreshGeneralTab()
-		end
-	)
-	groupHeaderAlignDropdown:SetTooltip(L.SETTINGS_GROUP_HEADER_ALIGN, L.SETTINGS_GROUP_HEADER_ALIGN_DESC)
-	-- Shift 10px right to prevent clipping
-	if groupHeaderAlignDropdown.DropDown then
-		local point, relativeTo, relativePoint, xOfs, yOfs = groupHeaderAlignDropdown.DropDown:GetPoint(1)
-		if point then
-			groupHeaderAlignDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
-		end
-	end
-	table.insert(allFrames, groupHeaderAlignDropdown)
-
-	-- Group Arrow Alignment
-	local groupArrowAlignOptions = {
-		labels = {L.SETTINGS_ALIGN_LEFT, L.SETTINGS_ALIGN_CENTER, L.SETTINGS_ALIGN_RIGHT},
-		values = {"LEFT", "CENTER", "RIGHT"}
-	}
-	local currentGroupArrowAlign = DB:Get("groupArrowAlign", "LEFT")
-	
-	local groupArrowAlignDropdown = Components:CreateDropdown(
-		tab, 
-		L.SETTINGS_GROUP_ARROW_ALIGN, 
-		groupArrowAlignOptions, 
-		function(val) return val == currentGroupArrowAlign end,
-		function(val) 
-			DB:Set("groupArrowAlign", val)
-			BFL:ForceRefreshFriendsList()
-			self:RefreshGeneralTab()
-		end
-	)
-	groupArrowAlignDropdown:SetTooltip(L.SETTINGS_GROUP_ARROW_ALIGN, L.SETTINGS_GROUP_ARROW_ALIGN_DESC)
-	-- Shift 10px right to prevent clipping
-	if groupArrowAlignDropdown.DropDown then
-		local point, relativeTo, relativePoint, xOfs, yOfs = groupArrowAlignDropdown.DropDown:GetPoint(1)
-		if point then
-			groupArrowAlignDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
-		end
-	end
-	table.insert(allFrames, groupArrowAlignDropdown)
-	
 	-- Spacer before next section
 	table.insert(allFrames, Components:CreateSpacer(tab))
 
@@ -2732,51 +2805,64 @@ function Settings:RefreshGeneralTab()
 	
 	-- Font Size Dropdown (REMOVED: User Request 2026-01-20)
 	-- Global scaling found counterproductive. 
-	-- local fontSizeOptions = {
-	-- 	labels = {L.SETTINGS_FONT_SIZE_SMALL, L.SETTINGS_FONT_SIZE_NORMAL, L.SETTINGS_FONT_SIZE_LARGE},
-	-- 	values = {"small", "medium", "large"}
-	-- }
-	-- local currentFontSize = DB:Get("fontSize", "medium")
 	
-	-- local function isFontSizeSelected(value)
-	-- 	return value == currentFontSize
-	-- end
+	-- Anchor all frames vertically
+	Components:AnchorChain(allFrames, -5)
 	
-	-- local function onFontSizeChanged(value)
-	-- 	self:SetFontSize(value)
-	-- end
-	
-	-- local fontSizeDropdown = Components:CreateDropdown(tab, L.SETTINGS_FONT_SIZE, fontSizeOptions, isFontSizeSelected, onFontSizeChanged)
-	-- table.insert(allFrames, fontSizeDropdown)
+	-- Store components for cleanup
+	tab.components = allFrames
+end
 
-	-- =========================================================================
-	-- NEW: Specific Friend Name/Info Settings
-	-- =========================================================================
+function Settings:RefreshFontsTab()
+	if not settingsFrame or not Components then return end
+
+	local content = settingsFrame.ContentScrollFrame.Content
+	if not content or not content.FontsTab then return end
+
+	local tab = content.FontsTab
+	local DB = GetDB()
 	
+	-- Clear existing content (but keep the tab frame itself)
+	if tab.components then
+		for _, component in ipairs(tab.components) do
+			if component.Hide then component:Hide() end
+		end
+	end
+	tab.components = {}
+
+	local allFrames = {}
+
+	-- Font Library
 	local LSM = LibStub("LibSharedMedia-3.0")
 	local fontList = LSM:List("font")
 	local fontOptions = { labels = fontList, values = fontList }
+	
+	local outlineOptions = {
+		labels = {L.SETTINGS_FONT_OUTLINE_NONE, L.SETTINGS_FONT_OUTLINE_NORMAL, L.SETTINGS_FONT_OUTLINE_THICK, L.SETTINGS_FONT_OUTLINE_MONOCHROME},
+		values = {"NONE", "OUTLINE", "THICKOUTLINE", "MONOCHROME"}
+	}
 
 	-- -------------------------------------------------------------------------
 	-- Friend Name Settings
 	-- -------------------------------------------------------------------------
-	table.insert(allFrames, Components:CreateSpacer(tab))
 	local nameFontHeader = Components:CreateHeader(tab, L.SETTINGS_FRIEND_NAME_SETTINGS or "Friend Name Settings")
 	table.insert(allFrames, nameFontHeader)
 
 	-- Name Font Face
 	local currentNameFont = DB:Get("fontFriendName", "Friz Quadrata TT")
+	local currentNameSize = DB:Get("fontSizeFriendName", 12)
+	local currentNameColor = DB:Get("fontColorFriendName", {r=1, g=1, b=1, a=1})
 	local nameFontDropdown = Components:CreateDropdown(
 		tab, 
-		"Font:", -- Changed from "Font Face:" (User Request)
+		"Font:",  -- Use generic label as per request to move code
 		fontOptions, 
 		function(val) return val == currentNameFont end,
 		function(val) 
 			DB:Set("fontFriendName", val)
-			-- Defer update to next frame (like Platynator) to ensure resource availability
+			-- Defer update to next frame to ensure resource availability
 			C_Timer.After(0.01, function()
 				BFL:ForceRefreshFriendsList()
-				self:RefreshGeneralTab() -- Refresh to update dropdown label
+				self:RefreshFontsTab(tab) -- Refresh to update dropdown label
 			end)
 		end
 	)
@@ -2789,11 +2875,8 @@ function Settings:RefreshGeneralTab()
 	end
 	table.insert(allFrames, nameFontDropdown)
 
-	-- Name Font Size & Color
-	local currentNameSize = DB:Get("fontSizeFriendName", 13)
-	local currentNameColor = DB:Get("fontColorFriendName") or {r=1, g=0.82, b=0, a=1}
-	
-	local nameSizeColorRow = Components:CreateSliderWithColorPicker(
+	-- Name Font Size
+	local nameSizeSlider = Components:CreateSlider(
 		tab,
 		L.SETTINGS_FONT_SIZE_NUM or "Font Size:",
 		8, 24, -- Min/Max
@@ -2801,21 +2884,70 @@ function Settings:RefreshGeneralTab()
 		function(val) return tostring(val) end, -- Label formatter
 		function(val)
 			DB:Set("fontSizeFriendName", val)
-			-- Defer update to next frame
-			C_Timer.After(0.01, function()
-				BFL:ForceRefreshFriendsList()
-			end)
-		end,
-		currentNameColor,
-		function(r, g, b, a)
-			DB:Set("fontColorFriendName", {r=r, g=g, b=b, a=a})
-			-- Defer update to next frame
 			C_Timer.After(0.01, function()
 				BFL:ForceRefreshFriendsList()
 			end)
 		end
 	)
-	table.insert(allFrames, nameSizeColorRow)
+	table.insert(allFrames, nameSizeSlider)
+
+	-- Name Font Color
+	local nameColorPicker = Components:CreateColorPicker(
+		tab,
+		L.SETTINGS_FONT_COLOR,
+		currentNameColor,
+		function(r, g, b, a)
+			DB:Set("fontColorFriendName", {r=r, g=g, b=b, a=a})
+			C_Timer.After(0.01, function()
+				BFL:ForceRefreshFriendsList()
+			end)
+		end
+	)
+	table.insert(allFrames, nameColorPicker)
+
+	-- Name Font Outline
+	local currentNameOutline = DB:Get("fontOutlineFriendName", "NONE")
+	local nameOutlineDropdown = Components:CreateDropdown(
+		tab, 
+		L.SETTINGS_FONT_OUTLINE, 
+		outlineOptions, 
+		function(val) return val == (DB:Get("fontOutlineFriendName", "NONE")) end,
+		function(val) 
+			DB:Set("fontOutlineFriendName", val)
+			C_Timer.After(0.01, function()
+				BFL:ForceRefreshFriendsList()
+			end)
+		end
+	)
+	-- Shift 10px right to prevent clipping
+	if nameOutlineDropdown.DropDown then
+		local point, relativeTo, relativePoint, xOfs, yOfs = nameOutlineDropdown.DropDown:GetPoint(1)
+		if point then
+			nameOutlineDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
+		end
+	end
+	table.insert(allFrames, nameOutlineDropdown)
+
+	-- Name Font Shadow (Temporarily Disabled)
+	local currentNameShadow = DB:Get("fontShadowFriendName", false)
+	local nameShadowCheckbox = Components:CreateCheckbox(
+		tab,
+		L.SETTINGS_FONT_SHADOW,
+		currentNameShadow,
+		function(checked)
+			-- Disabled: No op
+		end
+	)
+	
+	-- Force disable UI
+	if nameShadowCheckbox.checkBox then
+		nameShadowCheckbox.checkBox:Disable()
+		nameShadowCheckbox.checkBox:SetEnabled(false)
+	end
+	
+	-- Set tooltip
+	nameShadowCheckbox:SetTooltip(L.SETTINGS_FONT_SHADOW, "|cffff0000Feature temporarily disabled (coming later)|r")
+	table.insert(allFrames, nameShadowCheckbox)
 
 	-- -------------------------------------------------------------------------
 	-- Friend Info Settings
@@ -2826,6 +2958,8 @@ function Settings:RefreshGeneralTab()
 
 	-- Info Font Face
 	local currentInfoFont = DB:Get("fontFriendInfo", "Friz Quadrata TT")
+	local currentInfoSize = DB:Get("fontSizeFriendInfo", 12)
+	local currentInfoColor = DB:Get("fontColorFriendInfo", {r=0.82, g=0.82, b=0.82, a=1})
 	local infoFontDropdown = Components:CreateDropdown(
 		tab, 
 		"Font:",  -- Changed from "Font Face:" (User Request)
@@ -2836,7 +2970,7 @@ function Settings:RefreshGeneralTab()
 			-- Defer update to next frame
 			C_Timer.After(0.01, function()
 				BFL:ForceRefreshFriendsList()
-				self:RefreshGeneralTab() -- Refresh to update dropdown label
+				self:RefreshFontsTab(tab) -- Refresh to update dropdown label
 			end)
 		end
 	)
@@ -2849,11 +2983,8 @@ function Settings:RefreshGeneralTab()
 	end
 	table.insert(allFrames, infoFontDropdown)
 
-	-- Info Font Size & Color
-	local currentInfoSize = DB:Get("fontSizeFriendInfo", 10)
-	local currentInfoColor = DB:Get("fontColorFriendInfo") or {r=0.5, g=0.5, b=0.5, a=1}
-	
-	local infoSizeColorRow = Components:CreateSliderWithColorPicker(
+	-- Info Font Size
+	local infoSizeSlider = Components:CreateSlider(
 		tab,
 		L.SETTINGS_FONT_SIZE_NUM or "Font Size:",
 		8, 24, -- Min/Max
@@ -2865,7 +2996,14 @@ function Settings:RefreshGeneralTab()
 			C_Timer.After(0.01, function()
 				BFL:ForceRefreshFriendsList()
 			end)
-		end,
+		end
+	)
+	table.insert(allFrames, infoSizeSlider)
+
+	-- Info Font Color
+	local infoColorPicker = Components:CreateColorPicker(
+		tab,
+		L.SETTINGS_FONT_COLOR,
 		currentInfoColor,
 		function(r, g, b, a)
 			DB:Set("fontColorFriendInfo", {r=r, g=g, b=b, a=a})
@@ -2875,7 +3013,51 @@ function Settings:RefreshGeneralTab()
 			end)
 		end
 	)
-	table.insert(allFrames, infoSizeColorRow)
+	table.insert(allFrames, infoColorPicker)
+
+	-- Info Font Outline
+	local currentInfoOutline = DB:Get("fontOutlineFriendInfo", "NONE")
+	local infoOutlineDropdown = Components:CreateDropdown(
+		tab, 
+		L.SETTINGS_FONT_OUTLINE, 
+		outlineOptions, 
+		function(val) return val == (DB:Get("fontOutlineFriendInfo", "NONE")) end,
+		function(val) 
+			DB:Set("fontOutlineFriendInfo", val)
+			C_Timer.After(0.01, function()
+				BFL:ForceRefreshFriendsList()
+			end)
+		end
+	)
+	-- Shift 10px right to prevent clipping (matching other dropdowns)
+	if infoOutlineDropdown.DropDown then
+		local point, relativeTo, relativePoint, xOfs, yOfs = infoOutlineDropdown.DropDown:GetPoint(1)
+		if point then
+			infoOutlineDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
+		end
+	end
+	table.insert(allFrames, infoOutlineDropdown)
+
+	-- Info Font Shadow (Temporarily Disabled)
+	local currentInfoShadow = DB:Get("fontShadowFriendInfo", false)
+	local infoShadowCheckbox = Components:CreateCheckbox(
+		tab,
+		L.SETTINGS_FONT_SHADOW,
+		currentInfoShadow,
+		function(checked)
+			-- Disabled: No op
+		end
+	)
+	
+	-- Force disable UI
+	if infoShadowCheckbox.checkBox then
+		infoShadowCheckbox.checkBox:Disable()
+		infoShadowCheckbox.checkBox:SetEnabled(false)
+	end
+	
+	-- Set tooltip using standard component method
+	infoShadowCheckbox:SetTooltip(L.SETTINGS_FONT_SHADOW, "|cffff0000Feature temporarily disabled (coming later)|r")
+	table.insert(allFrames, infoShadowCheckbox)
 	
 	-- Anchor all frames vertically
 	Components:AnchorChain(allFrames, -5)
@@ -2904,6 +3086,211 @@ function Settings:RefreshGroupsTab()
 	tab.components = {}
 	
 	local allFrames = {}
+
+	-- Common Font Options
+	local LSM = LibStub("LibSharedMedia-3.0")
+	local fontList = LSM:List("font")
+	local fontOptions = { labels = fontList, values = fontList }
+	
+	local outlineOptions = {
+		labels = {L.SETTINGS_FONT_OUTLINE_NONE, L.SETTINGS_FONT_OUTLINE_NORMAL, L.SETTINGS_FONT_OUTLINE_THICK, L.SETTINGS_FONT_OUTLINE_MONOCHROME},
+		values = {"NONE", "OUTLINE", "THICKOUTLINE", "MONOCHROME"}
+	}
+
+	-- ===========================================
+	-- MOVED SETTINGS (From General)
+	-- ===========================================
+	local headerSettingsHeader = Components:CreateHeader(tab, L.SETTINGS_GROUP_HEADER_SETTINGS or "Group Header Settings")
+	table.insert(allFrames, headerSettingsHeader)
+
+	-- Row 1: Group Header Count Format & Group Arrow
+	local headerCountFormatOptions = {
+		labels = {L.SETTINGS_HEADER_COUNT_VISIBLE, L.SETTINGS_HEADER_COUNT_ONLINE, L.SETTINGS_HEADER_COUNT_BOTH},
+		values = {"visible", "online", "both"}
+	}
+	
+	local headerCountDropdown = Components:CreateDropdown(
+		tab, 
+		L.SETTINGS_HEADER_COUNT_FORMAT, 
+		headerCountFormatOptions, 
+		function(val) return val == DB:Get("headerCountFormat", "visible") end,
+		function(val) 
+			DB:Set("headerCountFormat", val)
+			BFL:ForceRefreshFriendsList()
+			self:RefreshGroupsTab() -- Self refresh to update visible state if needed
+		end
+	)
+	-- Shift dropdown to prevent clipping
+	if headerCountDropdown.DropDown then
+		local point, relativeTo, relativePoint, xOfs, yOfs = headerCountDropdown.DropDown:GetPoint(1)
+		if point then
+			headerCountDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
+		end
+	end
+	table.insert(allFrames, headerCountDropdown)
+	
+	-- Group Header Alignment
+	local groupHeaderAlignOptions = {
+		labels = {L.SETTINGS_ALIGN_LEFT, L.SETTINGS_ALIGN_CENTER, L.SETTINGS_ALIGN_RIGHT},
+		values = {"LEFT", "CENTER", "RIGHT"}
+	}
+	local groupHeaderAlignDropdown = Components:CreateDropdown(
+		tab, 
+		L.SETTINGS_GROUP_HEADER_ALIGN, 
+		groupHeaderAlignOptions, 
+		function(val) return val == DB:Get("groupHeaderAlign", "LEFT") end,
+		function(val) 
+			DB:Set("groupHeaderAlign", val)
+			BFL:ForceRefreshFriendsList()
+			self:RefreshGroupsTab()
+		end
+	)
+	-- Shift dropdown to prevent clipping
+	if groupHeaderAlignDropdown.DropDown then
+		local point, relativeTo, relativePoint, xOfs, yOfs = groupHeaderAlignDropdown.DropDown:GetPoint(1)
+		if point then
+			groupHeaderAlignDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
+		end
+	end
+	table.insert(allFrames, groupHeaderAlignDropdown)
+	
+	-- Group Arrow Alignment
+	local groupArrowAlignOptions = {
+		labels = {L.SETTINGS_ALIGN_LEFT, L.SETTINGS_ALIGN_CENTER, L.SETTINGS_ALIGN_RIGHT},
+		values = {"LEFT", "CENTER", "RIGHT"}
+	}
+	local groupArrowAlignDropdown = Components:CreateDropdown(
+		tab, 
+		L.SETTINGS_GROUP_ARROW_ALIGN, 
+		groupArrowAlignOptions, 
+		function(val) return val == DB:Get("groupArrowAlign", "LEFT") end,
+		function(val) 
+			DB:Set("groupArrowAlign", val)
+			BFL:ForceRefreshFriendsList()
+			self:RefreshGroupsTab()
+		end
+	)
+	-- Shift dropdown to prevent clipping
+	if groupArrowAlignDropdown.DropDown then
+		local point, relativeTo, relativePoint, xOfs, yOfs = groupArrowAlignDropdown.DropDown:GetPoint(1)
+		if point then
+			groupArrowAlignDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
+		end
+	end
+	table.insert(allFrames, groupArrowAlignDropdown)
+	
+	-- Show Arrow Checkbox
+	local showArrowCheckbox = Components:CreateCheckbox(
+		tab,
+		L.SETTINGS_SHOW_GROUP_ARROW,
+		DB:Get("showGroupArrow", true),
+		function(val) 
+			DB:Set("showGroupArrow", val)
+			BFL:ForceRefreshFriendsList()
+		end
+	)
+	table.insert(allFrames, showArrowCheckbox)
+	 
+	-- Spacer
+	table.insert(allFrames, Components:CreateSpacer(tab))
+
+	-- ===========================================
+	-- NEW FONT SETTINGS
+	-- ===========================================
+	local fontHeader = Components:CreateHeader(tab, L.SETTINGS_GROUP_FONT_HEADER or "Group Header Font")
+	table.insert(allFrames, fontHeader)
+	
+	-- Group Font Dropdown
+	local currentGroupFont = DB:Get("fontGroupHeader", "Friz Quadrata TT")
+	local groupFontDropdown = Components:CreateDropdown(
+		tab, 
+		"Font:", 
+		fontOptions, 
+		function(val) return val == currentGroupFont end,
+		function(val) 
+			DB:Set("fontGroupHeader", val)
+			-- Defer update
+			C_Timer.After(0.01, function()
+				BFL:ForceRefreshFriendsList()
+				self:RefreshGroupsTab()
+			end)
+		end
+	)
+	if groupFontDropdown.DropDown then
+		local point, relativeTo, relativePoint, xOfs, yOfs = groupFontDropdown.DropDown:GetPoint(1)
+		if point then
+			groupFontDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
+		end
+	end
+	table.insert(allFrames, groupFontDropdown)
+	
+	-- Group Font Size
+	local currentGroupSize = DB:Get("fontSizeGroupHeader", 12)
+	local GroupSizeSlider = Components:CreateSlider(
+		tab,
+		L.SETTINGS_FONT_SIZE_NUM or "Font Size:",
+		8, 24, -- Min/Max
+		currentGroupSize, -- Current Value
+		function(val) return tostring(val) end, -- Label formatter
+		function(val)
+			DB:Set("fontSizeGroupHeader", val)
+			C_Timer.After(0.01, function()
+				BFL:ForceRefreshFriendsList()
+			end)
+		end
+	)
+	table.insert(allFrames, GroupSizeSlider)
+	
+	-- Group Font Outline
+	local currentGroupOutline = DB:Get("fontOutlineGroupHeader", "NONE")
+	local GroupOutlineDropdown = Components:CreateDropdown(
+		tab, 
+		L.SETTINGS_FONT_OUTLINE, 
+		outlineOptions, 
+		function(val) return val == currentGroupOutline end,
+		function(val) 
+			DB:Set("fontOutlineGroupHeader", val)
+			C_Timer.After(0.01, function()
+				BFL:ForceRefreshFriendsList()
+			end)
+		end
+	)
+	if GroupOutlineDropdown.DropDown then
+		local point, relativeTo, relativePoint, xOfs, yOfs = GroupOutlineDropdown.DropDown:GetPoint(1)
+		if point then
+			GroupOutlineDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
+		end
+	end
+	table.insert(allFrames, GroupOutlineDropdown)
+	
+	-- Group Font Shadow (Temporarily Disabled)
+	local currentGroupShadow = DB:Get("fontShadowGroupHeader", false)
+	local groupShadowCheckbox = Components:CreateCheckbox(
+		tab,
+		L.SETTINGS_FONT_SHADOW or "Font Shadow",
+		currentGroupShadow,
+		function(checked)
+			-- Disabled: No op
+		end
+	)
+	
+	-- Force disable UI
+	if groupShadowCheckbox.checkBox then
+		groupShadowCheckbox.checkBox:Disable()
+		groupShadowCheckbox.checkBox:SetEnabled(false)
+	end
+	
+	-- Set tooltip
+	groupShadowCheckbox:SetTooltip(L.SETTINGS_FONT_SHADOW, "|cffff0000Feature temporarily disabled (coming later)|r")
+	table.insert(allFrames, groupShadowCheckbox)
+	
+	-- Spacer
+	table.insert(allFrames, Components:CreateSpacer(tab))
+	
+	-- ===========================================
+	-- NEW COLOR SETTINGS
+	-- Spacer
+	table.insert(allFrames, Components:CreateSpacer(tab))
 	
 	-- Header: Group Order
 	local orderHeader = Components:CreateHeader(tab, L.SETTINGS_GROUP_ORDER or "Group Order")
@@ -3026,7 +3413,23 @@ function Settings:RefreshGroupsTab()
 			-- Delete callback (only for non-builtin groups)
 			not isBuiltin and function()
 				self:DeleteGroup(groupData.id, groupData.name)
-			end or nil
+			end or nil,
+			-- Count Color Callback (New)
+			function(colorSwatch, isReset)
+				self:ShowGroupCountColorPicker(groupData.id, groupData.name, colorSwatch, isReset)
+			end,
+			-- Arrow Color Callback (New)
+			function(colorSwatch, isReset)
+				self:ShowGroupArrowColorPicker(groupData.id, groupData.name, colorSwatch, isReset)
+			end,
+			-- Initial Colors (New)
+			{
+				count = Groups:Get(groupData.id) and (Groups:Get(groupData.id).countColor or Groups:Get(groupData.id).color),
+				arrow = Groups:Get(groupData.id) and (Groups:Get(groupData.id).arrowColor or Groups:Get(groupData.id).color),
+				countSet = Groups:Get(groupData.id) and Groups:Get(groupData.id).countColor,
+				arrowSet = Groups:Get(groupData.id) and Groups:Get(groupData.id).arrowColor,
+				fallback = Groups:Get(groupData.id) and Groups:Get(groupData.id).color or {r=1, g=1, b=1}
+			}
 		)
 		
 		-- Set initial color for all groups
@@ -3081,25 +3484,12 @@ function Settings:RefreshGroupsTab()
 end
 
 -- Refresh Advanced Tab
+-- Refresh Advanced Tab
 function Settings:RefreshAdvancedTab()
-	if not settingsFrame then 
-		print("RefreshAdvancedTab: settingsFrame is nil")
-		return 
-	end
-	if not Components then 
-		print("RefreshAdvancedTab: Components is nil")
-		return 
-	end
+	if not settingsFrame or not Components then return end
 	
 	local content = settingsFrame.ContentScrollFrame.Content
-	if not content then 
-		print("RefreshAdvancedTab: content is nil")
-		return 
-	end
-	if not content.AdvancedTab then 
-		print("RefreshAdvancedTab: AdvancedTab is nil")
-		return 
-	end
+	if not content or not content.AdvancedTab then return end
 	
 	local tab = content.AdvancedTab
 	
@@ -3112,39 +3502,24 @@ function Settings:RefreshAdvancedTab()
 	tab.components = {}
 	
 	local allFrames = {}
-	local yOffset = -15
 	
 	-- Title
-	local title = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormalLarge")
-	title:SetPoint("TOPLEFT", 10, yOffset)
-	title:SetText(L.SETTINGS_TAB_ADVANCED or "Advanced Settings")
+	local title = Components:CreateHeader(tab, L.SETTINGS_TAB_ADVANCED or "Advanced Settings")
 	table.insert(allFrames, title)
-	yOffset = yOffset - 25
 	
 	-- Description
-	local desc = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
-	desc:SetPoint("TOPLEFT", 10, yOffset)
-	desc:SetText(L.SETTINGS_ADVANCED_DESC or "Advanced options and tools")
-	table.insert(allFrames, desc)
-	yOffset = yOffset - 30
+	table.insert(allFrames, Components:CreateLabel(tab, L.SETTINGS_ADVANCED_DESC or "Advanced options and tools"))
+
+	-- Spacer
+	table.insert(allFrames, Components:CreateSpacer(tab))
 	
 	-- ===========================================
 	-- FriendGroups Migration Section
 	-- ===========================================
-	local migrationHeader = Components:CreateHeader(tab, L.SETTINGS_MIGRATION_HEADER or "FriendGroups Migration")
-	migrationHeader:SetPoint("TOPLEFT", 10, yOffset)
-	table.insert(allFrames, migrationHeader)
-	yOffset = yOffset - 25
+	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_MIGRATION_HEADER or "FriendGroups Migration"))
 	
 	-- Migration description
-	local migrationDesc1 = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-	migrationDesc1:SetPoint("TOPLEFT", 10, yOffset)
-	migrationDesc1:SetWidth(350)
-	migrationDesc1:SetJustifyH("LEFT")
-	migrationDesc1:SetWordWrap(true)
-	migrationDesc1:SetText(L.SETTINGS_MIGRATION_DESC or "Migrate groups and friend assignments from FriendGroups addon. This will parse group information from BattleNet notes and create corresponding groups in BetterFriendlist.")
-	table.insert(allFrames, migrationDesc1)
-	yOffset = yOffset - 35
+	table.insert(allFrames, Components:CreateLabel(tab, L.SETTINGS_MIGRATION_DESC or "Migrate groups and friend assignments from FriendGroups addon. This will parse group information from BattleNet notes and create corresponding groups in BetterFriendlist.", true))
 	
 	-- Migration button
 	local migrateButton = Components:CreateButton(
@@ -3155,100 +3530,106 @@ function Settings:RefreshAdvancedTab()
 		end,
 		L.SETTINGS_MIGRATE_TOOLTIP or "Import groups from the FriendGroups addon"
 	)
-	migrateButton:SetPoint("TOPLEFT", 10, yOffset)
 	migrateButton:SetSize(200, 24)
-	table.insert(allFrames, migrateButton)
-	yOffset = yOffset - 40
+	-- Center the migrate button
+	migrateButton:ClearAllPoints()
+	migrateButton:SetPoint("CENTER", tab, "CENTER", 0, 0) -- This point will be overridden by AnchorChain? No, AnchorChain sets TOP. We need a container if we want horizontal centering?
+	-- Wait, Components:CreateButton returns a button. AnchorChain sets its TOP point. It usually lacks LEFT/RIGHT.
+	-- If we want it centered, we need to wrap it or set a point that conflicts less?
+	-- AnchorChain sets "TOP". If we set "CENTER" x-offset it might work if we set relative to parent center?
+	-- But AnchorChain uses "TOP" relative to previous element.
+	-- Ideally we put it in a container like btnRow.
+	
+	local migrateBtnRow = CreateFrame("Frame", nil, tab)
+	migrateBtnRow:SetHeight(30)
+	migrateBtnRow:SetPoint("LEFT", 20, 0)
+	migrateBtnRow:SetPoint("RIGHT", -20, 0)
+	
+	migrateButton:SetParent(migrateBtnRow)
+	migrateButton:ClearAllPoints()
+	migrateButton:SetPoint("CENTER", migrateBtnRow, "CENTER", 0, 0)
+	
+	table.insert(allFrames, migrateBtnRow)
+	
+	-- Spacer
+	table.insert(allFrames, Components:CreateSpacer(tab))
 	
 	-- ===========================================
 	-- Export / Import Section
 	-- ===========================================
-	local exportHeader = Components:CreateHeader(tab, L.SETTINGS_EXPORT_HEADER or "Export / Import Settings")
-	exportHeader:SetPoint("TOPLEFT", 10, yOffset)
-	table.insert(allFrames, exportHeader)
-	yOffset = yOffset - 25
+	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_EXPORT_HEADER or "Export / Import Settings"))
 	
 	-- Export/Import description
-	local exportDesc1 = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-	exportDesc1:SetPoint("TOPLEFT", 10, yOffset)
-	exportDesc1:SetWidth(350)
-	exportDesc1:SetJustifyH("LEFT")
-	exportDesc1:SetWordWrap(true)
-	exportDesc1:SetText(L.SETTINGS_EXPORT_DESC or "Export your groups and friend assignments to share between characters or accounts. Perfect for players with multiple accounts who share Battle.net friends.")
-	table.insert(allFrames, exportDesc1)
-	yOffset = yOffset - 35
+	table.insert(allFrames, Components:CreateLabel(tab, L.SETTINGS_EXPORT_DESC or "Export your groups and friend assignments to share between characters or accounts. Perfect for players with multiple accounts who share Battle.net friends.", true))
 	
-	local exportWarning = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-	exportWarning:SetPoint("TOPLEFT", 10, yOffset)
-	exportWarning:SetPoint("RIGHT", -10, 0)
-	exportWarning:SetJustifyH("LEFT")
-	exportWarning:SetText(L.SETTINGS_EXPORT_WARNING or "|cffff0000Warning: Importing will replace ALL your groups and assignments!|r")
+	-- Export Warning
+	local exportWarning = Components:CreateLabel(tab, L.SETTINGS_EXPORT_WARNING or "|cffff0000Warning: Importing will replace ALL your groups and assignments!|r", true)
 	table.insert(allFrames, exportWarning)
-	yOffset = yOffset - 25
+	
+	-- Export/Import Buttons Row
+	local btnRow = CreateFrame("Frame", nil, tab)
+	btnRow:SetHeight(30)
+	btnRow:SetPoint("LEFT", 20, 0)
+	btnRow:SetPoint("RIGHT", -20, 0)
 	
 	-- Export button
 	local exportButton = Components:CreateButton(
-		tab,
+		btnRow,
 		L.BUTTON_EXPORT,
 		function()
 			self:ShowExportDialog()
 		end,
 		L.SETTINGS_EXPORT_TOOLTIP or "Export your groups and friend assignments"
 	)
-	exportButton:SetPoint("TOPLEFT", 10, yOffset)
 	exportButton:SetSize(140, 24)
-	table.insert(allFrames, exportButton)
+	exportButton:SetPoint("RIGHT", btnRow, "CENTER", -5, 0)
 	
 	-- Import button
 	local importButton = Components:CreateButton(
-		tab,
+		btnRow,
 		L.SETTINGS_IMPORT_BTN,
 		function()
 			self:ShowImportDialog()
 		end,
 		L.SETTINGS_IMPORT_TOOLTIP or "Import groups and friend assignments"
 	)
-	importButton:SetPoint("LEFT", exportButton, "RIGHT", 10, 0)
 	importButton:SetSize(140, 24)
-	table.insert(allFrames, importButton)
+	importButton:SetPoint("LEFT", btnRow, "CENTER", 5, 0)
 	
-	yOffset = yOffset - 50
+	table.insert(allFrames, btnRow)
+	
+	-- Spacer
+	table.insert(allFrames, Components:CreateSpacer(tab))
 	
 	-- ===========================================
 	-- Beta Features Section
 	-- ===========================================
-	local betaHeader = Components:CreateHeader(tab, "|cffff8800" .. L.SETTINGS_BETA_FEATURES_TITLE .. "|r") -- Orange for Beta
-	betaHeader:SetPoint("TOPLEFT", 10, yOffset)
-	table.insert(allFrames, betaHeader)
-	yOffset = yOffset - 25
+	table.insert(allFrames, Components:CreateHeader(tab, "|cffff8800" .. L.SETTINGS_BETA_FEATURES_TITLE .. "|r"))
 	
 	-- Beta features description
-	local betaDesc = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-	betaDesc:SetPoint("TOPLEFT", 10, yOffset)
-	betaDesc:SetWidth(350)
-	betaDesc:SetJustifyH("LEFT")
-	betaDesc:SetWordWrap(true)
-	betaDesc:SetText(L.SETTINGS_BETA_FEATURES_DESC)
-	table.insert(allFrames, betaDesc)
-	yOffset = yOffset - 35
+	table.insert(allFrames, Components:CreateLabel(tab, L.SETTINGS_BETA_FEATURES_DESC, true))
 	
-	-- Warning icon + text (before checkbox)
-	local warningIcon = tab:CreateTexture(nil, "ARTWORK")
+	-- Warning icon + text container
+	local warningFrame = CreateFrame("Frame", nil, tab)
+	warningFrame:SetHeight(45)
+	warningFrame:SetPoint("LEFT", 20, 0)
+	warningFrame:SetPoint("RIGHT", -20, 0)
+	
+	local warningIcon = warningFrame:CreateTexture(nil, "ARTWORK")
 	warningIcon:SetSize(16, 16)
-	warningIcon:SetPoint("TOPLEFT", 10, yOffset)
+	warningIcon:SetPoint("TOPLEFT", 0, -2)
 	warningIcon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\alert-triangle")
 	warningIcon:SetVertexColor(1, 0.65, 0)
-	table.insert(allFrames, warningIcon)
 	
-	local warningText = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormalSmall")
+	local warningText = warningFrame:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormalSmall")
 	warningText:SetPoint("LEFT", warningIcon, "RIGHT", 6, 0)
-	warningText:SetWidth(330)
+	warningText:SetPoint("RIGHT", warningFrame, "RIGHT", 0, 0)
 	warningText:SetJustifyH("LEFT")
 	warningText:SetWordWrap(true)
 	warningText:SetText(L.SETTINGS_BETA_FEATURES_WARNING)
-	warningText:SetTextColor(1, 0.53, 0) -- Orange (matching Beta theme)
-	table.insert(allFrames, warningText)
-	yOffset = yOffset - 35
+	warningText:SetTextColor(1, 0.53, 0) -- Orange
+	
+	table.insert(allFrames, warningFrame)
 	
 	-- Enable Beta Features Toggle
 	local betaToggle = Components:CreateCheckbox(
@@ -3302,37 +3683,42 @@ function Settings:RefreshAdvancedTab()
 			end
 		end
 	)
-	betaToggle:SetPoint("TOPLEFT", 10, yOffset)
 	betaToggle:SetTooltip(L.SETTINGS_BETA_FEATURES_TITLE, L.SETTINGS_BETA_FEATURES_TOOLTIP)
 	table.insert(allFrames, betaToggle)
-	yOffset = yOffset - 35
 
 	-- Beta feature list (informational)
-	local featureListTitle = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
-	featureListTitle:SetPoint("TOPLEFT", 10, yOffset)
+	local listContainer = CreateFrame("Frame", nil, tab)
+	listContainer:SetPoint("LEFT", 20, 0)
+	listContainer:SetPoint("RIGHT", -20, 0)
+	
+	local featureListTitle = listContainer:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
+	featureListTitle:SetPoint("TOPLEFT", 0, 0)
 	featureListTitle:SetText(L.SETTINGS_BETA_FEATURES_LIST)
-	featureListTitle:SetTextColor(1, 0.53, 0) -- Orange (Beta theme)
-	table.insert(allFrames, featureListTitle)
-	yOffset = yOffset - 20
+	featureListTitle:SetTextColor(1, 0.53, 0) -- Orange
 	
 	-- Dynamic list from TAB_DEFINITIONS
+	local listY = -20
 	for _, tabDef in ipairs(TAB_DEFINITIONS) do
 		if tabDef.beta then
-			local icon = tab:CreateTexture(nil, "ARTWORK")
+			local icon = listContainer:CreateTexture(nil, "ARTWORK")
 			icon:SetSize(14, 14)
-			icon:SetPoint("TOPLEFT", 15, yOffset)
+			icon:SetPoint("TOPLEFT", 5, listY)
 			icon:SetTexture(tabDef.icon)
-			icon:SetVertexColor(1, 0.53, 0) -- Orange (Beta theme)
-			table.insert(allFrames, icon)
+			icon:SetVertexColor(1, 0.53, 0) -- Orange
 			
-			local text = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
+			local text = listContainer:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 			text:SetPoint("LEFT", icon, "RIGHT", 6, 0)
+			text:SetPoint("TOP", icon, "TOP", 0, -1)
 			text:SetText(tabDef.name)
-			table.insert(allFrames, text)
 			
-			yOffset = yOffset - 18
+			listY = listY - 18
 		end
 	end
+	listContainer:SetHeight(math.abs(listY) + 10)
+	table.insert(allFrames, listContainer)
+	
+	-- Anchor all frames vertically
+	Components:AnchorChain(allFrames, -15)
 	
 	-- Store components for cleanup
 	tab.components = allFrames
@@ -3568,130 +3954,100 @@ function Settings:RefreshNotificationsTab()
 	
 	local allFrames = {}
 	
-	-- ===========================================
-	-- Header (Beta - Orange)
-	-- ===========================================
-	local betaHeader = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormalLarge")
-	betaHeader:SetText("|cffff8800" .. (L.SETTINGS_TAB_NOTIFICATIONS or "Notifications") .. "|r") -- Orange for Beta feature
-	table.insert(allFrames, betaHeader)
+	-- BETA Header
+	if BetterFriendlistDB.enableBetaFeatures then
+		local betaHeader = Components:CreateHeader(tab, L.SETTINGS_TAB_NOTIFICATIONS .. " (BETA)")
+		betaHeader.text:SetTextColor(1, 0.5, 0) -- Orange
+		table.insert(allFrames, betaHeader)
+	end
 	
 	-- Description
-	local desc = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
-	desc:SetWidth(360)
-	desc:SetJustifyH("LEFT")
-	desc:SetWordWrap(true)
-	desc:SetText(L.SETTINGS_NOTIFY_DESC or "Configure smart friend notifications. Get alerts when friends come online.")
+	local desc = Components:CreateLabel(tab, L.SETTINGS_NOTIFY_DESC or "Customize how and when you want to be notified about friend activity.", true, {r=0.7, g=0.7, b=0.7})
 	table.insert(allFrames, desc)
-	
+
 	-- ===========================================
-	-- NOTIFICATION DISPLAY SECTION
+	-- VISUAL & SOUND
 	-- ===========================================
-	local displayHeader = Components:CreateHeader(tab, L.SETTINGS_NOTIFY_DISPLAY_HEADER or "Notification Display")
+	local displayHeader = Components:CreateHeader(tab, L.SETTINGS_NOTIFY_DISPLAY_HEADER or "Display & Sound")
 	table.insert(allFrames, displayHeader)
 	
 	-- Display Mode Dropdown
-	local displayModeOptions = {
-		labels = {L.SETTINGS_NOTIFY_MODE_TOAST or "Toast Notification", L.SETTINGS_NOTIFY_MODE_CHAT or "Chat Message Only", L.SETTINGS_NOTIFY_MODE_DISABLED or "Disabled"},
-		values = {"alert", "chat", "disabled"}
-	}
-	local currentMode = BetterFriendlistDB.notificationDisplayMode or "alert"
+	local dropdownMode = Components:CreateDropdown(
+		tab,
+		L.SETTINGS_NOTIFY_DISPLAY_MODE or "Notification Style:",
+		{
+			labels = {
+				L.SETTINGS_NOTIFY_MODE_TOAST or "Toast (Blizzard Style)", 
+				L.SETTINGS_NOTIFY_MODE_CHAT or "Chat Message", 
+				L.SETTINGS_NOTIFY_MODE_BOTH or "Both", 
+				L.SETTINGS_NOTIFY_MODE_NONE or "Disabled"
+			},
+			values = {"alert", "chat", "both", "disabled"}
+		},
+		function(value) return value == BetterFriendlistDB.notificationDisplayMode end,
+		function(value)
+			BetterFriendlistDB.notificationDisplayMode = value
+			print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_MODE_CHANGED or "Notification mode changed to:") .. " " .. value)
+		end
+	)
+	dropdownMode:SetTooltip(L.SETTINGS_NOTIFY_DISPLAY_MODE or "Notification Style", "Choose how notifications appear on your screen.")
+	table.insert(allFrames, dropdownMode)
 	
-	local function isDisplayModeSelected(value)
-		return value == BetterFriendlistDB.notificationDisplayMode
-	end
-	
-	local function onDisplayModeChanged(value)
-		BetterFriendlistDB.notificationDisplayMode = value
-		local modeNames = {
-			alert = "|cffffcc00" .. (L.SETTINGS_NOTIFY_MODE_TOAST or "Toast") .. "|r",
-			chat = "|cffffcc00" .. (L.SETTINGS_NOTIFY_MODE_CHAT or "Chat") .. "|r",
-			disabled = "|cffff0000" .. (L.SETTINGS_NOTIFY_MODE_DISABLED or "DISABLED") .. "|r"
-		}
-		print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_MODE_CHANGED or "Notification mode set to") .. " " .. (modeNames[value] or value))
-	end
-	
-	local displayModeDropdown = Components:CreateDropdown(tab, L.SETTINGS_NOTIFY_DISPLAY_MODE or "Display Mode:", displayModeOptions, isDisplayModeSelected, onDisplayModeChanged)
-	table.insert(allFrames, displayModeDropdown)
-	
-	-- Mode Description
-	local modeDesc = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-	modeDesc:SetWidth(360)
-	modeDesc:SetJustifyH("LEFT")
-	modeDesc:SetWordWrap(true)
-	modeDesc:SetText(L.SETTINGS_NOTIFY_MODE_DESC or (
-		"|cffffcc00Toast Notification:|r Shows a compact notification when friends come online\n" ..
-		"|cffffcc00Chat Message Only:|r No popup, only shows messages in chat\n" ..
-		"|cffffcc00Disabled:|r No notifications at all"
-	))
+	local modeDesc = Components:CreateLabel(tab, L.SETTINGS_NOTIFY_MODE_DESC or "Toast: Popup at bottom-middle of screen.\nChat: Message in chat window.\nBoth: Show both.\nDisabled: No notifications.", true, {r=0.7, g=0.7, b=0.7})
 	table.insert(allFrames, modeDesc)
 	
 	-- Test Button
-	local testBtn = Components:CreateButton(
-		tab,
-		L.SETTINGS_NOTIFY_TEST_BTN or "Test Notification",
-		function()
-			if BFL.NotificationSystem and BFL.NotificationSystem.ShowTestNotification then
-				BFL.NotificationSystem:ShowTestNotification()
-			else
-				print("|cffff0000BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_SYSTEM_ERROR or "Notification system not available"))
-			end
-		end,
-		L.SETTINGS_NOTIFY_TEST_TOOLTIP or "Trigger a test notification"
-	)
-	testBtn:SetSize(150, 24)
+	local testBtn = Components:CreateButton(tab, L.SETTINGS_NOTIFY_TEST or "Test Notification", function()
+		if BFL.NotificationSystem and BFL.NotificationSystem.ShowTestNotification then
+			BFL.NotificationSystem:ShowTestNotification()
+		else
+			print("|cffff0000BetterFriendlist:|r Notification system not ready")
+		end
+	end)
 	table.insert(allFrames, testBtn)
 	
-	-- ===========================================
-	-- SOUND SETTINGS SECTION
-	-- ===========================================
-	local soundHeader = Components:CreateHeader(tab, L.SETTINGS_NOTIFY_SOUND_HEADER or "Sound Settings")
-	table.insert(allFrames, soundHeader)
-	
-	-- Enable Sound Checkbox
+	-- Sound Toggle
 	local soundToggle = Components:CreateCheckbox(
 		tab,
-		L.SETTINGS_NOTIFY_SOUND_ENABLE or "Play sound with notifications",
+		L.SETTINGS_NOTIFY_SOUND or "Play sound on notification",
 		BetterFriendlistDB.notificationSoundEnabled or false,
 		function(checked)
 			BetterFriendlistDB.notificationSoundEnabled = checked
 			if checked then
-				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_SOUND_ENABLED or "Notification sounds |cff00ff00ENABLED|r"))
+				PlaySound(BFL.IsClassic and 8959 or 12867) -- SOUNDKIT.RAID_WARNING
+				print("|cff00ff00BetterFriendlist:|r Sound |cff00ff00ENABLED|r")
 			else
-				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_SOUND_DISABLED or "Notification sounds |cffff0000DISABLED|r"))
+				print("|cff00ff00BetterFriendlist:|r Sound |cffff0000DISABLED|r")
 			end
 		end
 	)
-	soundToggle:SetTooltip(L.SETTINGS_NOTIFY_SOUND_TOOLTIP_TITLE or "Notification Sounds", L.SETTINGS_NOTIFY_SOUND_TOOLTIP_DESC or "Play a sound effect when notifications appear. You can test the sound using the button above.")
+	soundToggle:SetTooltip("Notification Sound", "Play a sound effect when a friend comes online or goes offline.")
 	table.insert(allFrames, soundToggle)
 	
 	-- ===========================================
-	-- QUIET HOURS SECTION
+	-- QUIET HOURS & FILTERS
 	-- ===========================================
-	local quietHeader = Components:CreateHeader(tab, L.SETTINGS_NOTIFY_QUIET_HEADER or "Quiet Hours")
+	local quietHeader = Components:CreateHeader(tab, L.SETTINGS_NOTIFY_QUIET_HEADER or "Quiet Hours & Filters")
 	table.insert(allFrames, quietHeader)
 	
 	-- Manual DND Toggle
-	local manualDND = Components:CreateCheckbox(
+	local dndToggle = Components:CreateCheckbox(
 		tab,
-		L.SETTINGS_NOTIFY_QUIET_MANUAL or "Manual Do Not Disturb",
+		L.SETTINGS_NOTIFY_DND or "Do Not Disturb (Silence all notifications)",
 		BetterFriendlistDB.notificationQuietManual or false,
 		function(checked)
 			BetterFriendlistDB.notificationQuietManual = checked
-			if checked then
-				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_MANUAL_DND_ENABLED or "Manual DND |cff00ff00ENABLED|r - All notifications silenced"))
-			else
-				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_MANUAL_DND_DISABLED or "Manual DND |cffff0000DISABLED|r"))
-			end
+			print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_DND_MODE or "Do Not Disturb mode") .. " " .. (checked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
 		end
 	)
-	manualDND:SetTooltip("Manual Do Not Disturb", "Manually silence all notifications until you disable this option. Takes highest priority over all other settings.")
-	table.insert(allFrames, manualDND)
+	dndToggle:SetTooltip("Do Not Disturb", "Temporarily silence all notifications without changing your settings.")
+	table.insert(allFrames, dndToggle)
 	
-	-- Combat Toggle
+	-- Combat Silence
 	local combatQuiet = Components:CreateCheckbox(
 		tab,
-		L.SETTINGS_NOTIFY_QUIET_COMBAT or "Silence during combat",
-		BetterFriendlistDB.notificationQuietCombat ~= false, -- Default: true
+		L.SETTINGS_NOTIFY_QUIET_COMBAT or "Silence while in combat",
+		BetterFriendlistDB.notificationQuietCombat or false,
 		function(checked)
 			BetterFriendlistDB.notificationQuietCombat = checked
 			print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_COMBAT_QUIET or "Combat quiet mode") .. " " .. (checked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
@@ -3778,12 +4134,7 @@ function Settings:RefreshNotificationsTab()
 	table.insert(allFrames, endHourSlider)
 	
 	-- Scheduled Hours Info
-	local scheduleInfo = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-	scheduleInfo:SetWidth(360)
-	scheduleInfo:SetJustifyH("LEFT")
-	scheduleInfo:SetWordWrap(true)
-	scheduleInfo:SetTextColor(0.7, 0.7, 0.7)
-	scheduleInfo:SetText(L.SETTINGS_NOTIFY_QUIET_NOTE or "|cffffcc00Note:|r If start hour is greater than end hour, the schedule crosses midnight (e.g., 22:00-08:00).")
+	local scheduleInfo = Components:CreateLabel(tab, L.SETTINGS_NOTIFY_QUIET_NOTE or "|cffffcc00Note:|r If start hour is greater than end hour, the schedule crosses midnight (e.g., 22:00-08:00).", true, {r=0.7, g=0.7, b=0.7})
 	table.insert(allFrames, scheduleInfo)
 	
 	-- ===========================================
@@ -3872,151 +4223,76 @@ function Settings:RefreshNotificationsTab()
 	local messagesHeader = Components:CreateHeader(tab, L.SETTINGS_NOTIFY_MESSAGES_HEADER or "Custom Messages")
 	table.insert(allFrames, messagesHeader)
 	
-	local messagesDesc = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-	messagesDesc:SetWidth(360)
-	messagesDesc:SetJustifyH("LEFT")
-	messagesDesc:SetWordWrap(true)
-	messagesDesc:SetTextColor(0.7, 0.7, 0.7)
-	messagesDesc:SetText(L.SETTINGS_NOTIFY_MESSAGES_DESC or "Customize notification messages. Available variables: %name%, %game%, %level%, %zone%, %class%, %realm%, %char%, %prevchar%")
+	local messagesDesc = Components:CreateLabel(tab, L.SETTINGS_NOTIFY_MESSAGES_DESC or "Customize notification messages. Available variables: %name%, %game%, %level%, %zone%, %class%, %realm%, %char%, %prevchar%", true, {r=0.7, g=0.7, b=0.7})
 	table.insert(allFrames, messagesDesc)
 	
-	-- Online Message Label
-	local onlineMsgLabel = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
-	onlineMsgLabel:SetText(L.SETTINGS_NOTIFY_MSG_ONLINE or "Online Message:")
-	onlineMsgLabel:SetPoint("LEFT", 0, 0)
-	table.insert(allFrames, onlineMsgLabel)
-	
-	-- Online Message EditBox
-	local onlineMsgBox = CreateFrame("EditBox", nil, tab, "InputBoxTemplate")
-	onlineMsgBox:SetSize(340, 25)
-	onlineMsgBox:SetFontObject("BetterFriendlistFontHighlight")
-	onlineMsgBox:SetAutoFocus(false)
-	onlineMsgBox:SetText(BetterFriendlistDB.notificationMessageOnline or "%name% is now online")
-	onlineMsgBox:SetScript("OnEnterPressed", function(self)
-		self:ClearFocus()
-	end)
-	onlineMsgBox:SetScript("OnEscapePressed", function(self)
-		self:ClearFocus()
-	end)
-	onlineMsgBox:SetScript("OnEditFocusLost", function(self)
-		local text = self:GetText()
-		if text and text ~= "" then
-			BetterFriendlistDB.notificationMessageOnline = text
+	-- Online Message
+	local onlineMsgInput = Components:CreateInput(
+		tab,
+		L.SETTINGS_NOTIFY_MSG_ONLINE or "Online Message:",
+		BetterFriendlistDB.notificationMessageOnline or "%name% is now online",
+		function(value)
+			if value and value ~= "" then
+				BetterFriendlistDB.notificationMessageOnline = value
+			end
 		end
-	end)
-	table.insert(allFrames, onlineMsgBox)
+	)
+	table.insert(allFrames, onlineMsgInput)
 	
-	-- Offline Message Label
-	local offlineMsgLabel = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
-	offlineMsgLabel:SetText(L.SETTINGS_NOTIFY_MSG_OFFLINE or "Offline Message:")
-	offlineMsgLabel:SetPoint("LEFT", 0, 0)
-	table.insert(allFrames, offlineMsgLabel)
-	
-	-- Offline Message EditBox
-	local offlineMsgBox = CreateFrame("EditBox", nil, tab, "InputBoxTemplate")
-	offlineMsgBox:SetSize(340, 25)
-	offlineMsgBox:SetFontObject("BetterFriendlistFontHighlight")
-	offlineMsgBox:SetAutoFocus(false)
-	offlineMsgBox:SetText(BetterFriendlistDB.notificationMessageOffline or "%name% went offline")
-	offlineMsgBox:SetScript("OnEnterPressed", function(self)
-		self:ClearFocus()
-	end)
-	offlineMsgBox:SetScript("OnEscapePressed", function(self)
-		self:ClearFocus()
-	end)
-	offlineMsgBox:SetScript("OnEditFocusLost", function(self)
-		local text = self:GetText()
-		if text and text ~= "" then
-			BetterFriendlistDB.notificationMessageOffline = text
+	-- Offline Message
+	local offlineMsgInput = Components:CreateInput(
+		tab,
+		L.SETTINGS_NOTIFY_MSG_OFFLINE or "Offline Message:",
+		BetterFriendlistDB.notificationMessageOffline or "%name% went offline",
+		function(value)
+			if value and value ~= "" then
+				BetterFriendlistDB.notificationMessageOffline = value
+			end
 		end
-	end)
-	table.insert(allFrames, offlineMsgBox)
+	)
+	table.insert(allFrames, offlineMsgInput)
 	
-	-- WoW Login Message Label (Phase 11.5)
-	local wowLoginMsgLabel = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
-	wowLoginMsgLabel:SetText(L.SETTINGS_NOTIFY_MSG_WOW_LOGIN or "WoW Login Message:")
-	wowLoginMsgLabel:SetPoint("LEFT", 0, 0)
-	table.insert(allFrames, wowLoginMsgLabel)
-	
-	-- WoW Login Message EditBox
-	local wowLoginMsgBox = CreateFrame("EditBox", nil, tab, "InputBoxTemplate")
-	wowLoginMsgBox:SetSize(340, 25)
-	wowLoginMsgBox:SetFontObject("BetterFriendlistFontHighlight")
-	wowLoginMsgBox:SetAutoFocus(false)
-	wowLoginMsgBox:SetText(BetterFriendlistDB.notificationMessageWowLogin or "%name% logged into World of Warcraft")
-	wowLoginMsgBox:SetScript("OnEnterPressed", function(self)
-		self:ClearFocus()
-	end)
-	wowLoginMsgBox:SetScript("OnEscapePressed", function(self)
-		self:ClearFocus()
-	end)
-	wowLoginMsgBox:SetScript("OnEditFocusLost", function(self)
-		local text = self:GetText()
-		if text and text ~= "" then
-			BetterFriendlistDB.notificationMessageWowLogin = text
+	-- WoW Login Message (Phase 11.5)
+	local wowLoginMsgInput = Components:CreateInput(
+		tab,
+		L.SETTINGS_NOTIFY_MSG_WOW_LOGIN or "WoW Login Message:",
+		BetterFriendlistDB.notificationMessageWowLogin or "%name% logged into World of Warcraft",
+		function(value)
+			if value and value ~= "" then
+				BetterFriendlistDB.notificationMessageWowLogin = value
+			end
 		end
-	end)
-	table.insert(allFrames, wowLoginMsgBox)
+	)
+	table.insert(allFrames, wowLoginMsgInput)
 	
-	-- Character Switch Message Label
-	local charSwitchMsgLabel = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
-	charSwitchMsgLabel:SetText(L.SETTINGS_NOTIFY_MSG_CHAR_SWITCH or "Character Switch Message:")
-	charSwitchMsgLabel:SetPoint("LEFT", 0, 0)
-	table.insert(allFrames, charSwitchMsgLabel)
-	
-	-- Character Switch Message EditBox
-	local charSwitchMsgBox = CreateFrame("EditBox", nil, tab, "InputBoxTemplate")
-	charSwitchMsgBox:SetSize(340, 25)
-	charSwitchMsgBox:SetFontObject("BetterFriendlistFontHighlight")
-	charSwitchMsgBox:SetAutoFocus(false)
-	charSwitchMsgBox:SetText(BetterFriendlistDB.notificationMessageCharSwitch or "%name% switched to %char%")
-	charSwitchMsgBox:SetScript("OnEnterPressed", function(self)
-		self:ClearFocus()
-	end)
-	charSwitchMsgBox:SetScript("OnEscapePressed", function(self)
-		self:ClearFocus()
-	end)
-	charSwitchMsgBox:SetScript("OnEditFocusLost", function(self)
-		local text = self:GetText()
-		if text and text ~= "" then
-			BetterFriendlistDB.notificationMessageCharSwitch = text
+	-- Character Switch Message
+	local charSwitchMsgInput = Components:CreateInput(
+		tab,
+		L.SETTINGS_NOTIFY_MSG_CHAR_SWITCH or "Character Switch Message:",
+		BetterFriendlistDB.notificationMessageCharSwitch or "%name% switched to %char%",
+		function(value)
+			if value and value ~= "" then
+				BetterFriendlistDB.notificationMessageCharSwitch = value
+			end
 		end
-	end)
-	table.insert(allFrames, charSwitchMsgBox)
+	)
+	table.insert(allFrames, charSwitchMsgInput)
 	
-	-- Game Switch Message Label
-	local gameSwitchMsgLabel = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
-	gameSwitchMsgLabel:SetText(L.SETTINGS_NOTIFY_MSG_GAME_SWITCH or "Game Switch Message:")
-	gameSwitchMsgLabel:SetPoint("LEFT", 0, 0)
-	table.insert(allFrames, gameSwitchMsgLabel)
-	
-	-- Game Switch Message EditBox
-	local gameSwitchMsgBox = CreateFrame("EditBox", nil, tab, "InputBoxTemplate")
-	gameSwitchMsgBox:SetSize(340, 25)
-	gameSwitchMsgBox:SetFontObject("BetterFriendlistFontHighlight")
-	gameSwitchMsgBox:SetAutoFocus(false)
-	gameSwitchMsgBox:SetText(BetterFriendlistDB.notificationMessageGameSwitch or "%name% is now playing %game%")
-	gameSwitchMsgBox:SetScript("OnEnterPressed", function(self)
-		self:ClearFocus()
-	end)
-	gameSwitchMsgBox:SetScript("OnEscapePressed", function(self)
-		self:ClearFocus()
-	end)
-	gameSwitchMsgBox:SetScript("OnEditFocusLost", function(self)
-		local text = self:GetText()
-		if text and text ~= "" then
-			BetterFriendlistDB.notificationMessageGameSwitch = text
+	-- Game Switch Message
+	local gameSwitchMsgInput = Components:CreateInput(
+		tab,
+		L.SETTINGS_NOTIFY_MSG_GAME_SWITCH or "Game Switch Message:",
+		BetterFriendlistDB.notificationMessageGameSwitch or "%name% is now playing %game%",
+		function(value)
+			if value and value ~= "" then
+				BetterFriendlistDB.notificationMessageGameSwitch = value
+			end
 		end
-	end)
-	table.insert(allFrames, gameSwitchMsgBox)
+	)
+	table.insert(allFrames, gameSwitchMsgInput)
 	
 	-- Preview Info Text
-	local previewInfo = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-	previewInfo:SetWidth(360)
-	previewInfo:SetJustifyH("LEFT")
-	previewInfo:SetWordWrap(true)
-	previewInfo:SetTextColor(0.7, 0.7, 0.7)
-	previewInfo:SetText(L.SETTINGS_NOTIFY_PREVIEW_TIP or "|cffffcc00Tip:|r Use the 'Test Notification' button above to preview your custom messages.")
+	local previewInfo = Components:CreateLabel(tab, L.SETTINGS_NOTIFY_PREVIEW_TIP or "|cffffcc00Tip:|r Use the 'Test Notification' button above to preview your custom messages.", true, {r=0.7, g=0.7, b=0.7})
 	table.insert(allFrames, previewInfo)
 	
 	-- ===========================================
@@ -4025,17 +4301,14 @@ function Settings:RefreshNotificationsTab()
 	local triggersHeader = Components:CreateHeader(tab, L.SETTINGS_NOTIFY_TRIGGERS_HEADER or "Group Triggers")
 	table.insert(allFrames, triggersHeader)
 	
-	local triggersDesc = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-	triggersDesc:SetWidth(360)
-	triggersDesc:SetJustifyH("LEFT")
-	triggersDesc:SetWordWrap(true)
-	triggersDesc:SetTextColor(0.7, 0.7, 0.7)
-	triggersDesc:SetText(L.SETTINGS_NOTIFY_TRIGGERS_DESC or "Get notified when a certain number of friends from a group come online. Example: Alert when 3+ M+ team members are online.")
+	local triggersDesc = Components:CreateLabel(tab, L.SETTINGS_NOTIFY_TRIGGERS_DESC or "Get notified when a certain number of friends from a group come online. Example: Alert when 3+ M+ team members are online.", true, {r=0.7, g=0.7, b=0.7})
 	table.insert(allFrames, triggersDesc)
 	
-	-- Trigger list container
+	-- Trigger list container (Custom frame kept, but sized/anchored better)
 	local triggerListContainer = CreateFrame("Frame", nil, tab)
-	triggerListContainer:SetSize(360, 100)
+	triggerListContainer:SetSize(360, 100) -- Initial height
+	triggerListContainer:SetPoint("LEFT", 5, 0)
+	triggerListContainer:SetPoint("RIGHT", -5, 0)
 	table.insert(allFrames, triggerListContainer)
 	
 	-- Function to refresh trigger list
@@ -4046,7 +4319,7 @@ function Settings:RefreshNotificationsTab()
 			child:SetParent(nil)
 		end
 		
-		-- Clear all font strings (includes the "No triggers" message)
+		-- Clear all font strings
 		for _, region in ipairs({triggerListContainer:GetRegions()}) do
 			if region:GetObjectType() == "FontString" then
 				region:Hide()
@@ -4060,12 +4333,15 @@ function Settings:RefreshNotificationsTab()
 		
 		local yOffset = 0
 		local Groups = BFL:GetModule("Groups")
+		local triggerCount = 0
 		
 		-- Show each trigger
 		for triggerID, trigger in pairs(BetterFriendlistDB.notificationGroupTriggers) do
+			triggerCount = triggerCount + 1
 			local triggerFrame = CreateFrame("Frame", nil, triggerListContainer)
 			triggerFrame:SetSize(360, 25)
-			triggerFrame:SetPoint("TOPLEFT", triggerListContainer, "TOPLEFT", 0, yOffset)
+			triggerFrame:SetPoint("TOPLEFT", triggerListContainer, "TOPLEFT", 10, yOffset) -- Added margin
+			triggerFrame:SetPoint("RIGHT", triggerListContainer, "RIGHT", -10, 0)
 			
 			-- Get group name
 			local group = Groups and Groups:Get(trigger.groupId)
@@ -4076,7 +4352,7 @@ function Settings:RefreshNotificationsTab()
 			label:SetPoint("LEFT", triggerFrame, "LEFT", 0, 0)
 			label:SetText(string.format(L.SETTINGS_NOTIFY_TRIGGER_FORMAT or "%d+ from '%s'", trigger.threshold, groupName))
 			
-			-- Enable/Disable toggle (Classic-compatible template selection)
+			-- Enable/Disable toggle
 			local checkboxTemplate = BFL.IsClassic and "InterfaceOptionsCheckButtonTemplate" or "SettingsCheckboxTemplate"
 			local enableBtn = CreateFrame("CheckButton", nil, triggerFrame, checkboxTemplate)
 			enableBtn:SetPoint("RIGHT", triggerFrame, "RIGHT", -40, 0)
@@ -4086,8 +4362,6 @@ function Settings:RefreshNotificationsTab()
 				trigger.enabled = self:GetChecked()
 				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_TRIGGER_PREFIX or "Group trigger") .. " " .. (trigger.enabled and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
 			end)
-			
-			-- Fix for ugly hover effect
 			enableBtn:SetScript("OnEnter", function() end)
 			enableBtn:SetScript("OnLeave", function() end)
 			
@@ -4106,19 +4380,20 @@ function Settings:RefreshNotificationsTab()
 		end
 		
 		-- Show "No triggers" message if empty
-		if next(BetterFriendlistDB.notificationGroupTriggers) == nil then
+		if triggerCount == 0 then
 			local emptyText = triggerListContainer:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-			emptyText:SetPoint("TOPLEFT", triggerListContainer, "TOPLEFT", 0, 0)
+			emptyText:SetPoint("TOPLEFT", triggerListContainer, "TOPLEFT", 10, 0)
 			emptyText:SetTextColor(0.5, 0.5, 0.5)
 			emptyText:SetText(L.SETTINGS_NOTIFY_NO_TRIGGERS or "No group triggers configured. Click 'Add Trigger' below.")
+			yOffset = -20
 		end
+		
+		-- Resize container based on content
+		triggerListContainer:SetHeight(math.abs(yOffset) + 10)
 	end
 	
 	-- Add Trigger button
-	local addTriggerBtn = CreateFrame("Button", nil, tab, "UIPanelButtonTemplate")
-	addTriggerBtn:SetSize(120, 25)
-	addTriggerBtn:SetText(L.SETTINGS_NOTIFY_ADD_TRIGGER or "Add Trigger")
-	addTriggerBtn:SetScript("OnClick", function()
+	local addTriggerBtn = Components:CreateButton(tab, L.SETTINGS_NOTIFY_ADD_TRIGGER or "Add Trigger", function()
 		if _G.BFL_ShowGroupTriggerDialog then
 			_G.BFL_ShowGroupTriggerDialog()
 		end
@@ -4132,203 +4407,7 @@ function Settings:RefreshNotificationsTab()
 	_G.BFL_RefreshNotificationTriggers = RefreshTriggerList
 	
 	-- Anchor all frames vertically with proper spacing
-	local yPos = -15
-	local frameIndex = 1
-	
-	-- BETA Header (1)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 30
-	frameIndex = frameIndex + 1
-	
-	-- Description (2)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 45
-	frameIndex = frameIndex + 1
-	
-	-- Notification Display Header (3)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 50
-	frameIndex = frameIndex + 1
-	
-	-- Display Mode Dropdown (4)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 35
-	frameIndex = frameIndex + 1
-	
-	-- Mode Description (5)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 50
-	frameIndex = frameIndex + 1
-	
-	-- Test Button (6)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 35
-	frameIndex = frameIndex + 1
-	
-	-- Sound Settings Header (7)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 30
-	frameIndex = frameIndex + 1
-	
-	-- Sound Toggle Checkbox (8)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 35
-	frameIndex = frameIndex + 1
-	
-	-- Quiet Hours Header (9)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 30
-	frameIndex = frameIndex + 1
-	
-	-- Manual DND Toggle (10)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 25
-	frameIndex = frameIndex + 1
-	
-	-- Combat Quiet Toggle (11)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 25
-	frameIndex = frameIndex + 1
-	
-	-- Instance Quiet Toggle (12)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 25
-	frameIndex = frameIndex + 1
-	
-	-- Scheduled Quiet Toggle (13)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 25
-	frameIndex = frameIndex + 1
-	
-	-- Start Hour Slider (14)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 25
-	frameIndex = frameIndex + 1
-	
-	-- End Hour Slider (15)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 25
-	frameIndex = frameIndex + 1
-	
-	-- Schedule Info Text (16)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 35
-	frameIndex = frameIndex + 1
-	
-	-- Offline Notifications Header (17)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 30
-	frameIndex = frameIndex + 1
-	
-	-- Offline Toggle (18)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 35
-	frameIndex = frameIndex + 1
-	
-	-- Game-Specific Notifications Header (19) [Phase 11.5]
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 30
-	frameIndex = frameIndex + 1
-	
-	-- WoW Login Toggle (20)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 25
-	frameIndex = frameIndex + 1
-	
-	-- Character Switch Toggle (21)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 25
-	frameIndex = frameIndex + 1
-	
-	-- Game Switch Toggle (22)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 35
-	frameIndex = frameIndex + 1
-	
-	-- Custom Messages Header (23)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 30
-	frameIndex = frameIndex + 1
-	
-	-- Custom Messages Description (24)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 45
-	frameIndex = frameIndex + 1
-	
-	-- Online Message Label (25)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 20
-	frameIndex = frameIndex + 1
-	
-	-- Online Message EditBox (26)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 35
-	frameIndex = frameIndex + 1
-	
-	-- Offline Message Label (27)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 20
-	frameIndex = frameIndex + 1
-	
-	-- Offline Message EditBox (28)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 35
-	frameIndex = frameIndex + 1
-	
-	-- WoW Login Message Label (29) [Phase 11.5]
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 20
-	frameIndex = frameIndex + 1
-	
-	-- WoW Login Message EditBox (30)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 35
-	frameIndex = frameIndex + 1
-	
-	-- Character Switch Message Label (31)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 20
-	frameIndex = frameIndex + 1
-	
-	-- Character Switch Message EditBox (32)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 35
-	frameIndex = frameIndex + 1
-	
-	-- Game Switch Message Label (33)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 20
-	frameIndex = frameIndex + 1
-	
-	-- Game Switch Message EditBox (34)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 35
-	frameIndex = frameIndex + 1
-	
-	-- Preview Info Text (35)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 35
-	frameIndex = frameIndex + 1
-	
-	-- Group Triggers Header (36)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 30
-	frameIndex = frameIndex + 1
-	
-	-- Group Triggers Description (37)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 45
-	frameIndex = frameIndex + 1
-	
-	-- Trigger List Container (38)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 110
-	frameIndex = frameIndex + 1
-	
-	-- Add Trigger Button (39)
-	allFrames[frameIndex]:SetPoint("TOPLEFT", tab, "TOPLEFT", 10, yPos)
-	yPos = yPos - 40
-	frameIndex = frameIndex + 1
+	Components:AnchorChain(allFrames, -5)
 	
 	-- Store components for cleanup
 	tab.components = allFrames
@@ -4362,11 +4441,7 @@ function Settings:RefreshBrokerTab()
 	table.insert(allFrames, header)
 	
 	-- Info Text
-	local infoText = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-	infoText:SetWidth(360)
-	infoText:SetJustifyH("LEFT")
-	infoText:SetWordWrap(true)
-	infoText:SetText(L.BROKER_SETTINGS_INFO)
+	local infoText = Components:CreateLabel(tab, L.BROKER_SETTINGS_INFO, true)
 	table.insert(allFrames, infoText)
 	
 	-- Enable Data Broker
@@ -4453,7 +4528,7 @@ function Settings:RefreshBrokerTab()
 				if Broker and Broker.UpdateBrokerText then Broker:UpdateBrokerText() end
 			end)
 		showWoWIcon:SetTooltip(L.BROKER_SETTINGS_SHOW_WOW_ICON_TITLE or "Show WoW Icon", L.BROKER_SETTINGS_SHOW_WOW_ICON_TOOLTIP or "Display the World of Warcraft icon next to the WoW friend count")
-		-- Indent manually via anchor later or just add to list
+		
 		table.insert(allFrames, showWoWIcon)
 
 		-- Show Battle.net Icon
@@ -4465,6 +4540,7 @@ function Settings:RefreshBrokerTab()
 				if Broker and Broker.UpdateBrokerText then Broker:UpdateBrokerText() end
 			end)
 		showBNetIcon:SetTooltip(L.BROKER_SETTINGS_SHOW_BNET_ICON_TITLE or "Show Battle.net Icon", L.BROKER_SETTINGS_SHOW_BNET_ICON_TOOLTIP or "Display the Battle.net icon next to the Battle.net friend count")
+		
 		table.insert(allFrames, showBNetIcon)
 	end
 	
@@ -4626,11 +4702,7 @@ function Settings:RefreshGlobalSyncTab()
 	table.insert(allFrames, header)
 	
 	-- Description
-	local desc = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-	desc:SetWidth(360)
-	desc:SetJustifyH("LEFT")
-	desc:SetWordWrap(true)
-	desc:SetText(L.SETTINGS_GLOBAL_SYNC_DESC or "Synchronize your WoW friends list across all characters on this account.")
+	local desc = Components:CreateLabel(tab, L.SETTINGS_GLOBAL_SYNC_DESC or "Synchronize your WoW friends list across all characters on this account.", true)
 	table.insert(allFrames, desc)
 	
 	-- Enable Global Sync
@@ -4698,7 +4770,9 @@ function Settings:RefreshGlobalSyncTab()
 						count = count + 1
 						
 						local row = CreateFrame("Frame", nil, tab)
-						row:SetSize(380, rowHeight)
+						row:SetHeight(rowHeight)
+						row:SetPoint("LEFT", 20, 0)
+						row:SetPoint("RIGHT", -20, 0)
 						
 						-- Background (alternating)
 						if count % 2 == 0 then
@@ -4716,16 +4790,18 @@ function Settings:RefreshGlobalSyncTab()
 						
 						-- Name
 						local nameText = row:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
-						nameText:SetPoint("LEFT", 15, 0)
-						nameText:SetWidth(140)
+						nameText:SetPoint("LEFT", 0, 0)
+						nameText:SetWidth(155) -- Increased from 140
 						nameText:SetJustifyH("LEFT")
+						nameText:SetWordWrap(false)
 						nameText:SetText(name)
 						
 						-- Realm
 						local realmText = row:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 						realmText:SetPoint("LEFT", nameText, "RIGHT", 5, 0)
-						realmText:SetWidth(120)
+						realmText:SetWidth(135) -- Increased from 120
 						realmText:SetJustifyH("LEFT")
+						realmText:SetWordWrap(false)
 						realmText:SetText(realm)
 						
 						-- Faction Icon

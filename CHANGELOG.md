@@ -6,11 +6,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
-## [2.2.3] - 2026-01-18
-### Fixed
-- **Global Ignore List Button** - Fixed an issue where the "Global Ignore List" button in the Ignore tab would not open the GIL window when clicked. Added a more robust toggle mechanism that properly opens/closes the window and plays sound effects.
-- **Font Settings Stability** - Improved font settings application stability by deferring updates.
-
 ## [2.2.2] - 2026-01-18
 ### Fixed
 - **Font Support** - Reverted the friend name font to `GameFontNormal`. This restores support for the 4 standard fonts (including Asian/Cyrillic characters).

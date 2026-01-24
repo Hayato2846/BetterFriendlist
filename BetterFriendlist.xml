@@ -251,7 +251,7 @@
 	</Button>
 	
 	<!-- Friend Button Template (virtual) - Two-line layout -->
-	<Button name="BetterFriendsListButtonTemplate" virtual="true" registerForClicks="LeftButtonUp, RightButtonUp">
+	<Button name="BetterFriendsListButtonTemplate" virtual="true" registerForClicks="LeftButtonUp, RightButtonUp" inherits="SecureHandlerClickTemplate">
 		<Size x="375" y="34" />
 		<Layers>
 			<Layer level="BACKGROUND">

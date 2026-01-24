@@ -1,7 +1,7 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 	<!-- BetterFriendlist Settings Side Panel -->
 	<Frame name="BetterFriendlistSettingsFrame" parent="BetterFriendsFrame" inherits="ButtonFrameTemplate" hidden="true" frameStrata="HIGH" enableMouse="true" movable="false" toplevel="false">
-		<Size x="420" y="520" />
+		<Size x="440" y="520" />
 		<Anchors>
 			<Anchor point="TOPLEFT" relativePoint="TOPRIGHT" x="5" y="0" />
 		</Anchors>
@@ -110,6 +110,20 @@
 					</OnClick>
 				</Scripts>
 			</Button>
+			<!-- Tab 7: Future use -->
+			<Button name="$parentTab7" parentKey="Tab7" inherits="PanelTopTabButtonTemplate" text="" id="7">
+				<NormalFont style="BetterFriendlistFontNormalSmall"/>
+				<HighlightFont style="BetterFriendlistFontHighlightSmall"/>
+				<DisabledFont style="BetterFriendlistFontHighlightSmall"/>
+				<Anchors>
+					<Anchor point="LEFT" relativeKey="$parent.Tab6" relativePoint="RIGHT" x="-15" y="0" />
+				</Anchors>
+				<Scripts>
+					<OnClick>
+						BetterFriendlistSettings_ShowTab(7)
+					</OnClick>
+				</Scripts>
+			</Button>
 			
 			<!-- Tab Separator Line -->
 			<Frame parentKey="TabSeparator">
@@ -135,7 +149,7 @@
 			</Anchors>
 			<ScrollChild>
 				<Frame parentKey="Content">
-						<Size x="360" y="600" />
+						<Size x="380" y="600" />
 					<Frames>
 						<!-- General Tab Content -->
 						<!-- General Tab - Populated by Lua (SettingsComponents) -->
@@ -146,6 +160,14 @@
 							</Anchors>
 						</Frame>
 							
+						<!-- Fonts Tab - Populated by Lua (SettingsComponents) -->
+						<Frame parentKey="FontsTab" hidden="true">
+							<Anchors>
+								<Anchor point="TOPLEFT" />
+								<Anchor point="BOTTOMRIGHT" />
+							</Anchors>
+						</Frame>
+
 						<!-- Groups Tab Content -->
 						<!-- Groups Tab - Populated by Lua (SettingsComponents) -->
 						<Frame parentKey="GroupsTab" hidden="true">

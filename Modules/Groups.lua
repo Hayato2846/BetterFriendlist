@@ -81,54 +81,68 @@ function Groups:MigrateFriendAssignments()
 	end
 	
 	-- Debug output
-	print("|cff00ff00BetterFriendlist:|r " .. BFL.L.MIGRATION_DEBUG_TOTAL, totalMappings)
+	-- Use BFL:DebugPrint to avoid spamming the user on every reload
+	BFL:DebugPrint(BFL.L.MIGRATION_DEBUG_TOTAL .. " " .. totalMappings)
 	if not bnetMigrationDone then
-		print("|cff00ff00BetterFriendlist:|r " .. BFL.L.MIGRATION_DEBUG_BNET, #oldBnetUIDs)
+		BFL:DebugPrint(BFL.L.MIGRATION_DEBUG_BNET .. " " .. #oldBnetUIDs)
 	end
 	if not wowMigrationDone then
-		print("|cff00ff00BetterFriendlist:|r " .. BFL.L.MIGRATION_DEBUG_WOW, #wowUIDsToMigrate)
+		BFL:DebugPrint(BFL.L.MIGRATION_DEBUG_WOW .. " " .. #wowUIDsToMigrate)
 	end
 	
 	-- Migrate Battle.net UIDs
-	if not bnetMigrationDone and #oldBnetUIDs > 0 then
-		-- Remove old-style UIDs (they are now invalid and can't be migrated)
-		for _, uid in ipairs(oldBnetUIDs) do
-			DB:SetFriendGroups(uid, nil) -- Remove assignment
+	if not bnetMigrationDone then
+		if #oldBnetUIDs > 0 then
+			-- Remove old-style UIDs (they are now invalid and can't be migrated)
+			for _, uid in ipairs(oldBnetUIDs) do
+				DB:SetFriendGroups(uid, nil) -- Remove assignment
+			end
+			
+			-- Inform user about the migration
+			print("|cff00ff00BetterFriendlist:|r " .. BFL.L.MIGRATION_BNET_UPDATED)
+			print("|cffff8800Note:|r " .. BFL.L.MIGRATION_BNET_REASSIGN)
+			print("|cffaaaaaa" .. BFL.L.MIGRATION_BNET_REASON .. "|r")
 		end
-		
-		-- Inform user about the migration
-		print("|cff00ff00BetterFriendlist:|r " .. BFL.L.MIGRATION_BNET_UPDATED)
-		print("|cffff8800Note:|r " .. BFL.L.MIGRATION_BNET_REASSIGN)
-		print("|cffaaaaaa" .. BFL.L.MIGRATION_BNET_REASON .. "|r")
-		
+		-- Fix: Always set done flag even if 0 items found
 		DB:Set("bnetUIDMigrationDone_v2", true)
 	end
 	
 	-- Migrate WoW UIDs (add realm)
-	if not wowMigrationDone and #wowUIDsToMigrate > 0 then
-		local playerRealm = GetNormalizedRealmName()
-		local migrated = 0
+	if not wowMigrationDone then
+		local markWoWDone = false
 		
-		if playerRealm and playerRealm ~= "" then
-			for _, entry in ipairs(wowUIDsToMigrate) do
-				local newUID = "wow_" .. entry.charName .. "-" .. playerRealm
-				
-				-- Copy groups to new UID
-				DB:SetFriendGroups(newUID, entry.groups)
-				
-				-- Remove old UID
-				DB:SetFriendGroups(entry.oldUID, nil)
-				
-				migrated = migrated + 1
-			end
+		if #wowUIDsToMigrate > 0 then
+			local playerRealm = GetNormalizedRealmName()
+			local migrated = 0
 			
-			print("|cff00ff00BetterFriendlist:|r " .. string.format(BFL.L.MIGRATION_WOW_RESULT, migrated))
-			print("|cffaaaaaa" .. BFL.L.MIGRATION_WOW_FORMAT .. "|r")
+			if playerRealm and playerRealm ~= "" then
+				for _, entry in ipairs(wowUIDsToMigrate) do
+					local newUID = "wow_" .. entry.charName .. "-" .. playerRealm
+					
+					-- Copy groups to new UID
+					DB:SetFriendGroups(newUID, entry.groups)
+					
+					-- Remove old UID
+					DB:SetFriendGroups(entry.oldUID, nil)
+					
+					migrated = migrated + 1
+				end
+				
+				print("|cff00ff00BetterFriendlist:|r " .. string.format(BFL.L.MIGRATION_WOW_RESULT, migrated))
+				print("|cffaaaaaa" .. BFL.L.MIGRATION_WOW_FORMAT .. "|r")
+				markWoWDone = true
+			else
+				print("|cffff8800BetterFriendlist:|r " .. BFL.L.MIGRATION_WOW_FAIL)
+				-- Do not mark as done, try again later when realm is available
+			end
 		else
-			print("|cffff8800BetterFriendlist:|r " .. BFL.L.MIGRATION_WOW_FAIL)
+			-- Nothing to migrate, mark as done
+			markWoWDone = true
 		end
 		
-		DB:Set("wowUIDMigrationDone_v1", true)
+		if markWoWDone then
+			DB:Set("wowUIDMigrationDone_v1", true)
+		end
 	end
 end
 
@@ -278,6 +292,26 @@ function Groups:Initialize()
 		for groupId, color in pairs(groupColors) do
 			if self.groups[groupId] and color.r and color.g and color.b then
 				self.groups[groupId].color = {r = color.r, g = color.g, b = color.b}
+			end
+		end
+	end
+	
+	-- Apply custom group count colors
+	local groupCountColors = DB:Get("groupCountColors")
+	if groupCountColors and type(groupCountColors) == "table" then
+		for groupId, color in pairs(groupCountColors) do
+			if self.groups[groupId] and color.r and color.g and color.b then
+				self.groups[groupId].countColor = {r = color.r, g = color.g, b = color.b}
+			end
+		end
+	end
+	
+	-- Apply custom group arrow colors
+	local groupArrowColors = DB:Get("groupArrowColors")
+	if groupArrowColors and type(groupArrowColors) == "table" then
+		for groupId, color in pairs(groupArrowColors) do
+			if self.groups[groupId] and color.r and color.g and color.b then
+				self.groups[groupId].arrowColor = {r = color.r, g = color.g, b = color.b}
 			end
 		end
 	end

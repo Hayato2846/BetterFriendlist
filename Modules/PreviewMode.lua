@@ -95,7 +95,7 @@ local function GenerateMockBNetFriend(index, isOnline, options)
 	options = options or {}
 	
 	local classInfo = MOCK_CLASSES[math.random(#MOCK_CLASSES)]
-	local zone = MOCK_ZONES[math.random(#MOCK_ZONES)]
+	local zone = options.zone or MOCK_ZONES[math.random(#MOCK_ZONES)]
 	local game = options.game or MOCK_GAMES[math.random(#MOCK_GAMES)]
 	local level = options.level or (isOnline and math.random(70, 80) or math.random(1, 80))
 	local battleTag = options.battleTag or MOCK_BATTLETAGS[(index % #MOCK_BATTLETAGS) + 1]
@@ -232,6 +232,43 @@ local function GenerateMockGroups()
 			builtin = false,
 			order = 6,
 			color = {r = 1.0, g = 0.84, b = 0.0},  -- Gold
+			icon = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon"
+		},
+		-- International Test Groups (Non-Roman)
+		{
+			id = "group_korea",
+			name = "테스트 그룹 (KR)",
+			collapsed = false,
+			builtin = false,
+			order = 7,
+			color = {r = 0.4, g = 1.0, b = 0.4},  -- Mint
+			icon = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon"
+		},
+		{
+			id = "group_china",
+			name = "测试组 (CN)",
+			collapsed = false,
+			builtin = false,
+			order = 8,
+			color = {r = 1.0, g = 0.4, b = 0.4},  -- Redish
+			icon = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon"
+		},
+		{
+			id = "group_russia",
+			name = "Тестовая группа (RU)",
+			collapsed = false,
+			builtin = false,
+			order = 9,
+			color = {r = 0.4, g = 0.4, b = 1.0},  -- Blueish
+			icon = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon"
+		},
+		{
+			id = "group_japan",
+			name = "テストグループ (JP)",
+			collapsed = false,
+			builtin = false,
+			order = 10,
+			color = {r = 1.0, g = 0.6, b = 0.8},  -- Pink
 			icon = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon"
 		},
 		{
@@ -605,12 +642,48 @@ function PreviewMode:GenerateMockFriends()
 	self.mockData.friends = {}
 	self.mockData.groupAssignments = {} -- Clean start for assignments
 	
-	-- Generate 4 International Friends for Font Testing (KR, SC, TC, RU)
+	-- Generate International Friends for Font Testing (KR, SC, TC, RU, JP)
 	local intFriends = {
-		{ name = "안녕하세요", tag = "안녕하세요#1111", uid="bnet_안녕하세요#1111", group="raid_team" }, 
-		{ name = "你好世界", tag = "你好世界#2222", uid="bnet_你好世界#2222", group="mythic_plus" }, 
-		{ name = "哈囉世界", tag = "哈囉世界#3333", uid="bnet_哈囉世界#3333", group="pvp_friends" }, 
-		{ name = "Россия", tag = "Россия#4444", uid="bnet_Россия#4444", group="irl_friends" }, -- Explicit Cyrillic in BattleTag AND Character Name
+		{ 
+			name = "안녕하세요", 
+			tag = "안녕하세요#1111", 
+			uid="bnet_안녕하세요#1111", 
+			group="group_korea", 
+			note="한국어 폰트 테스트 (Korean)",
+			zone="서울 (Seoul)"
+		}, 
+		{ 
+			name = "你好世界", 
+			tag = "你好世界#2222", 
+			uid="bnet_你好世界#2222", 
+			group="group_china", 
+			note="中文备注测试 (Simp. Chinese)",
+			zone="奥格瑞玛 (Orgrimmar)"
+		}, 
+		{ 
+			name = "哈囉世界", 
+			tag = "哈囉世界#3333", 
+			uid="bnet_哈囉世界#3333", 
+			group="group_china", 
+			note="繁體中文備註 (Trad. Chinese)",
+			zone="暴風城 (Stormwind)"
+		}, 
+		{ 
+			name = "Россия", 
+			tag = "Россия#4444", 
+			uid="bnet_Россия#4444", 
+			group="group_russia", 
+			note="Проверка шрифтов (Russian)",
+			zone="Даларан (Dalaran)" 
+		},
+		{ 
+			name = "こんにちは", 
+			tag = "こんにちは#5555", 
+			uid="bnet_こんにちは#5555", 
+			group="group_japan", 
+			note="日本語テスト (Japanese)",
+			zone="ドラゴンの島 (Dragon Isles)" 
+		},
 	}
 	
 	for i, data in ipairs(intFriends) do
@@ -619,7 +692,8 @@ function PreviewMode:GenerateMockFriends()
 			accountName = data.name, -- Distinct account name
 			characterName = data.name,
 			game = {program = "WoW", name = "World of Warcraft"},
-			note = "Font Test",
+			note = data.note,
+			zone = data.zone,
 			isFavorite = false, -- Not favorites, per user request
 		}
 		-- print("BFL Preview: Adding " .. data.tag) -- Debug print
@@ -788,13 +862,9 @@ function PreviewMode:ApplyMockFriends()
 			BetterFriendlistDB.friendGroups = {}
 		end
 		
-		-- Inject mock assignments (combine BNet and WoW assignments)
+		-- Inject mock assignments (using the consolidated mockData table)
 		local injectedCount = 0
-		for uid, groups in pairs(MOCK_GROUP_ASSIGNMENTS) do
-			BetterFriendlistDB.friendGroups[uid] = groups
-			injectedCount = injectedCount + 1
-		end
-		for uid, groups in pairs(MOCK_WOW_GROUP_ASSIGNMENTS) do
+		for uid, groups in pairs(self.mockData.groupAssignments) do
 			BetterFriendlistDB.friendGroups[uid] = groups
 			injectedCount = injectedCount + 1
 		end

@@ -12,6 +12,8 @@ local defaults = {
 	showBlizzardOption = false, -- Show "Show Blizzard's Friendlist" in menu
 	groupOrder = nil, -- nil = use default order (favorites, custom alphabetically, nogroup)
 	groupColors = {}, -- {groupId: {r, g, b}} - custom colors for group headers
+	groupCountColors = {}, -- {groupId: {r, g, b}} - custom colors for group counts (overrides global)
+	groupArrowColors = {}, -- {groupId: {r, g, b}} - custom colors for group arrows (overrides global)
 	friendActivity = {}, -- {friendUID: {lastWhisper, lastGroup, lastTrade}} - tracks friend interaction timestamps
 	nicknames = {}, -- {friendUID: "Nickname"} - custom nicknames for friends
 	-- Visual Settings
@@ -20,11 +22,22 @@ local defaults = {
 	fontSize = "normal", -- "small", "normal", "large"
 	-- Font Customization (LibSharedMedia)
 	fontFriendName = "Friz Quadrata TT",
-	fontSizeFriendName = 13,
+	fontSizeFriendName = 12,
+	fontOutlineFriendName = "NONE",
+	fontShadowFriendName = false,
 	fontColorFriendName = {r = 0.510, g = 0.773, b = 1.0, a = 1}, -- Blizzard BNet Blue {r=0.51, g=0.773, b=1.0}
 	fontFriendInfo = "Friz Quadrata TT",
 	fontSizeFriendInfo = 10,
+	fontOutlineFriendInfo = "NONE",
+	fontShadowFriendInfo = false,
 	fontColorFriendInfo = {r = 0.510, g = 0.510, b = 0.510, a = 1}, -- Blizzard Gray {r=0.51, g=0.51, b=0.51}
+	-- Group Header Font Customization
+	fontGroupHeader = "Friz Quadrata TT",
+	fontSizeGroupHeader = 12,
+	fontOutlineGroupHeader = "NONE",
+	fontShadowGroupHeader = false,
+	colorGroupCount = nil, -- Default: nil (Inherit from Group Color)
+	colorGroupArrow = nil, -- Default: nil (Inherit from Group Color)
 
 	colorClassNames = true, -- Color character names by class (default: ON)
 	hideEmptyGroups = false, -- Hide groups with no online friends (default: OFF)

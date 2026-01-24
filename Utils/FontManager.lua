@@ -14,125 +14,130 @@ local LSM = LibStub("LibSharedMedia-3.0")
 local GetDB = function() return BFL:GetModule("DB") end
 
 -- ========================================
--- Font Family Logic (Alphabet Support)
+-- Advanced Font Family System (Chattynator-Implementation)
 -- ========================================
-local fontObjectCache = {}
 
--- Alphabets supported by WoW API
--- Matches standardized FontFamilies list for modern API
-local FONT_ALPHABETS = {
-	"roman",
-	"korean",
-	"simplifiedchinese",
-	"traditionalchinese",
-	"russian",
-}
+local FONT_CACHE = {}
+-- NOTE: "japanese" is excluded as it is not a standard CreateFontFamily member key in all client versions.
+-- CJK characters for Japanese are typically covered by the "korean" or Chinese fonts in WoW's fallback system.
+local ALPHABETS = {"roman", "korean", "simplifiedchinese", "traditionalchinese", "russian"}
 
--- Determine current alphabet based on locale
-local currentAlphabet = "roman"
-local locale = GetLocale()
-if locale == "koKR" then
-	currentAlphabet = "korean"
-elseif locale == "zhCN" then
-	currentAlphabet = "simplifiedchinese"
-elseif locale == "zhTW" then
-	currentAlphabet = "traditionalchinese"
-elseif locale == "ruRU" then
-	currentAlphabet = "russian"
+-- Map Locale to Alphabet
+local function GetLocaleAlphabet()
+    local locale = GetLocale()
+    if locale == "koKR" then return "korean"
+    elseif locale == "zhCN" then return "simplifiedchinese"
+    elseif locale == "zhTW" then return "traditionalchinese"
+    elseif locale == "ruRU" then return "russian"
+    -- jaJP uses standard fonts (often maps to Roman or Korean internally)
+    -- We default to "roman" so the user's chosen font is used for the main text.
+    else return "roman" end
 end
 
--- Get or create a Font Family Object that handles proper alphabet fallback
--- This mimics modern WoW internal logic to support CJK/Cyrillic characters even if the user-selected font lacks them
-function FontManager:GetFontFamily(fontPath, size, flags)
-	-- Fallback if API not available (Classic/Older clients)
-	-- Note: CreateFontFamily is global in modern Retail/TWW
-	if not CreateFontFamily then
-		return nil
-	end
+local CURRENT_ALPHABET = GetLocaleAlphabet()
+local FAMILY_COUNTER = 0
 
-	-- Create cache key
-	local safeFlags = flags or ""
-	local key = string.format("%s_%d_%s", fontPath, size, safeFlags)
-	if fontObjectCache[key] then
-		return fontObjectCache[key]
-	end
-
-	-- Generate safe unique global name
-	local safeKey = key:gsub("[^%w]", "")
-	local globalName = "BFL_FontFamily_" .. safeKey
-	
-	-- Check global if exists (shared resource)
-	if _G[globalName] then
-		fontObjectCache[key] = _G[globalName]
-		return _G[globalName]
-	end
-	
-	-- Build members table
-	local members = {}
-	local coreFont = GameFontNormal
-	
-	for _, alphabet in ipairs(FONT_ALPHABETS) do
-		-- Retrieve the font object Blizzard uses for this alphabet
-		local fontForAlphabet = coreFont:GetFontObjectForAlphabet(alphabet)
-		
-		-- Get the PHYSICAL file path Blizzard uses for this alphabet (e.g., Arial.ttf or generic CJK font)
-		local file, sysSize, _ = nil, nil, nil
-		if fontForAlphabet then
-			file, sysSize, _ = fontForAlphabet:GetFont()
-		end
-		
-		-- Logic: 
-		-- Use User Font for current locale's native alphabet.
-		-- Use System Font for all other alphabets (Fallback).
-		
-		local fileToUse = file
-		local heightToUse = sysSize or size
-		
-		-- Strict Override: Only use User Font if it MATCHES key alphabet
-		if alphabet == currentAlphabet then
-			fileToUse = fontPath
-			heightToUse = size
-		else
-			-- Fallback: Use system file (already fetched above)
-		end
-		
-		table.insert(members, {
-			alphabet = alphabet,
-			file = fileToUse,
-			height = heightToUse, 
-			flags = safeFlags
-		})
-	end
-	
-	-- Create the family
-	-- Pcall to be safe against API changes
-	local success, result = pcall(CreateFontFamily, globalName, members)
-	
-	if success and result then
-		fontObjectCache[key] = result
-		return result
-	else
-		-- Warning is always printed
-		return nil
-	end
+-- Generate and Cache FontFamily
+function FontManager:GetOrCreateFontFamily(fontPath, size, flags, shadow)
+    -- Normalize inputs
+    size = math.floor(size + 0.5) -- Round to integer
+    flags = flags or ""
+    if flags == "NONE" then flags = "" end
+    
+    local shadowKey = shadow and "SHADOW" or "NONE"
+    
+    -- Create Cache Key
+    local cacheKey = string.format("%s_%d_%s_%s", fontPath, size, flags, shadowKey)
+    
+    if FONT_CACHE[cacheKey] then
+        return FONT_CACHE[cacheKey]
+    end
+    
+    -- Create Unique Global Name
+    FAMILY_COUNTER = FAMILY_COUNTER + 1
+    local familyName = "BFL_GenFont_" .. FAMILY_COUNTER
+    
+    -- Build Family Members
+    local members = {}
+    local baseFont = _G["ChatFontNormal"] -- Safe fallback source
+    
+    for _, alphabet in ipairs(ALPHABETS) do
+        local memberDef = {}
+        
+        memberDef.alphabet = alphabet
+        memberDef.height = size
+        memberDef.flags = flags
+        
+        if alphabet == CURRENT_ALPHABET then
+             -- Active locale: Use user's chosen font
+             memberDef.file = fontPath
+        else
+            -- Secondary alphabet: Try to use system fallback
+            local defaultFile = nil
+            if baseFont then
+                 local defaultObj = baseFont:GetFontObjectForAlphabet(alphabet)
+                 if defaultObj then
+                     defaultFile, _, _ = defaultObj:GetFont()
+                 end
+            end
+            
+            -- Keep user font as last resort if system default is missing
+            memberDef.file = defaultFile or fontPath
+        end
+        
+        table.insert(members, memberDef)
+    end
+    
+    -- Create the Font Family Object
+    local success, familyObj = pcall(CreateFontFamily, familyName, members)
+    
+    if not success or not familyObj then
+        BFL:DebugPrint("CreateFontFamily failed for: " .. fontPath)
+        return nil
+    end
+    
+    -- Apply Shadow to all members
+    local targetShadowParams = shadow and {1, -1, 0, 0, 0, 1} or {0, 0, 0, 0, 0, 0}
+    
+    for _, alphabet in ipairs(ALPHABETS) do
+        local memberObj = familyObj:GetFontObjectForAlphabet(alphabet)
+        if memberObj then
+            memberObj:SetShadowOffset(targetShadowParams[1], targetShadowParams[2])
+            memberObj:SetShadowColor(targetShadowParams[3], targetShadowParams[4], targetShadowParams[5], targetShadowParams[6])
+        end
+    end
+    
+    -- Cache it
+    FONT_CACHE[cacheKey] = familyObj
+    return familyObj
 end
 
--- Apply font to a FontString using Family if available, else SetFont
--- Use this instead of simple SetFont() to enable Alphabet support
-function FontManager:ApplyFont(fontString, fontPath, size, flags)
-	if not fontString then return end
-	
-	-- Phase 16: Alphabet Support check
-	-- Try to get the complex layout family
-	local family = self:GetFontFamily(fontPath, size, flags)
-	
-	if family then
-		fontString:SetFontObject(family)
-	else
-		-- Fallback to standard SetFont (no alphabet handling)
-		-- This happens on Classic or if CreateFontFamily fails
-		fontString:SetFont(fontPath, size, flags)
-	end
+-- ========================================
+-- Font Family Logic
+-- ========================================
+
+-- Apply font to a FontString using the robust Family system
+function FontManager:ApplyFont(fontString, fontPath, size, flags, shadow)
+    if not fontString or not fontPath then return end
+
+    -- Attempt to get/create the FontFamily object
+    local familyObj = self:GetOrCreateFontFamily(fontPath, size, flags, shadow)
+    
+    if familyObj then
+        -- Apply the Family Object
+        fontString:SetFontObject(familyObj)
+    else
+        -- Fallback: Use SetFont directly if Family creation failed
+        -- This loses alphabet backups but keeps text visible
+        fontString:SetFont(fontPath, size, flags)
+        if shadow then
+            fontString:SetShadowOffset(1, -1)
+            fontString:SetShadowColor(0, 0, 0, 1)
+        else
+            fontString:SetShadowOffset(0, 0)
+            fontString:SetShadowColor(0, 0, 0, 0)
+        end
+    end
 end
 
 -- ========================================
@@ -141,48 +146,48 @@ end
 
 -- Get button height based on compact mode setting
 function FontManager:GetButtonHeight()
-	local db = GetDB()
-	if db and db:Get("compactMode", false) then
-		return 24 -- Compact height
-	end
-	return 34 -- Normal height
+local db = GetDB()
+if db and db:Get("compactMode", false) then
+return 24 -- Compact height
+end
+return 34 -- Normal height
 end
 
 -- Get font size multiplier based on settings
 function FontManager:GetFontSizeMultiplier()
-	-- REMOVED: Global scaling disabled (User Request 2026-01-20)
-	return 1.0
+-- REMOVED: Global scaling disabled (User Request 2026-01-20)
+return 1.0
 end
 
 -- Apply font size to a font string based on settings
 function FontManager:ApplyFontSize(fontString)
-	-- REMOVED: Global font scaling disabled (User Request 2026-01-20)
-	-- No-op to preserve original XML/CreateFontString sizes
+-- REMOVED: Global font scaling disabled (User Request 2026-01-20)
+-- No-op to preserve original XML/CreateFontString sizes
 end
 
 -- Get compact mode setting
 function FontManager:GetCompactMode()
-	local db = GetDB()
-	if not db then return false end
-	return db:Get("compactMode", false)
+local db = GetDB()
+if not db then return false end
+return db:Get("compactMode", false)
 end
 
 -- Set compact mode (triggers UI refresh)
 function FontManager:SetCompactMode(enabled)
-	local db = GetDB()
-	if not db then return end
-	
-	db:Set("compactMode", enabled)
-	
-	-- Force full display refresh for immediate update
-	if BFL and BFL.ForceRefreshFriendsList then
-		BFL:ForceRefreshFriendsList()
-	end
+local db = GetDB()
+if not db then return end
+
+db:Set("compactMode", enabled)
+
+-- Force full display refresh for immediate update
+if BFL and BFL.ForceRefreshFriendsList then
+BFL:ForceRefreshFriendsList()
+end
 end
 
 -- Set font size (triggers UI refresh)
 function FontManager:SetFontSize(size)
-	-- REMOVED: Global font scaling disabled (User Request 2026-01-20)
+-- REMOVED: Global font scaling disabled (User Request 2026-01-20)
 end
 
 -- ========================================
@@ -191,13 +196,13 @@ end
 
 -- Get recommended font object based on settings
 function FontManager:GetRecommendedFont()
-	local fontSize = self:GetFontSizeMultiplier()
-	
-	if fontSize < 0.9 then
-		return "BetterFriendlistFontNormalSmall"
-	elseif fontSize > 1.1 then
-		return "BetterFriendlistFontNormal"
-	else
-		return "BetterFriendlistFontNormalSmall"
-	end
+local fontSize = self:GetFontSizeMultiplier()
+
+if fontSize < 0.9 then
+return "BetterFriendlistFontNormalSmall"
+elseif fontSize > 1.1 then
+return "BetterFriendlistFontNormal"
+else
+return "BetterFriendlistFontNormalSmall"
+end
 end
