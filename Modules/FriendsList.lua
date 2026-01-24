@@ -1509,6 +1509,18 @@ function FriendsList:UpdateFriendsList() -- Visibility Optimization:
 	-- PERFY OPTIMIZATION: Cache ActivityTracker module reference
 	local ActivityTracker = BFL and BFL:GetModule("ActivityTracker")
 	
+	-- OPTIMIZATION (Phase 9.8): Selective Sort Key Calculation
+	-- Only calculate expensive keys if they are actually used for sorting
+	local primarySort = self.sortMode or "status"
+	local secondarySort = self.secondarySort or "name"
+	
+	local needGame = (primarySort == "game" or secondarySort == "game")
+	local needFaction = (primarySort == "faction" or secondarySort == "faction")
+	local needGuild = (primarySort == "guild" or secondarySort == "guild")
+	local needClass = (primarySort == "class" or secondarySort == "class")
+	local needRealm = (primarySort == "realm" or secondarySort == "realm")
+	local needZone = (primarySort == "zone" or secondarySort == "zone")
+	
 	for _, friend in ipairs(self.friendsList) do
 		-- Status Priority (Always used)
 		friend._sort_status = CalculateStatusPriority(friend)
@@ -1523,33 +1535,63 @@ function FriendsList:UpdateFriendsList() -- Visibility Optimization:
 		friend._sort_level = friend.level or 0
 		
 		-- Game Priority (For game sort)
-		friend._sort_game = CalculateGamePriority(friend)
+		if needGame then
+			friend._sort_game = CalculateGamePriority(friend)
+		else
+			friend._sort_game = nil
+		end
 		
 		-- Faction Priority (For faction sort)
-		friend._sort_faction = CalculateFactionPriority(friend)
+		if needFaction then
+			friend._sort_faction = CalculateFactionPriority(friend)
+		else
+			friend._sort_faction = nil
+		end
 		
 		-- Guild Priority (For guild sort)
-		local gp, gName = CalculateGuildPriority(friend)
-		friend._sort_guildPriority = gp
-		friend._sort_guildName = gName and gName:lower() or ""
+		if needGuild then
+			local gp, gName = CalculateGuildPriority(friend)
+			friend._sort_guildPriority = gp
+			friend._sort_guildName = gName and gName:lower() or ""
+		else
+			friend._sort_guildPriority = nil
+			friend._sort_guildName = nil
+		end
 		
 		-- Class Priority
-		local cp, cName = CalculateClassPriority(friend)
-		friend._sort_classPriority = cp
-		friend._sort_className = cName -- Already file string (WARRIOR etc)
+		if needClass then
+			local cp, cName = CalculateClassPriority(friend)
+			friend._sort_classPriority = cp
+			friend._sort_className = cName -- Already file string (WARRIOR etc)
+		else
+			friend._sort_classPriority = nil
+			friend._sort_className = nil
+		end
 		
 		-- Realm Priority
-		local rp, rName = CalculateRealmPriority(friend)
-		friend._sort_realmPriority = rp
-		friend._sort_realmName = rName and rName:lower() or ""
+		if needRealm then
+			local rp, rName = CalculateRealmPriority(friend)
+			friend._sort_realmPriority = rp
+			friend._sort_realmName = rName and rName:lower() or ""
+		else
+			friend._sort_realmPriority = nil
+			friend._sort_realmName = nil
+		end
 		
 		-- Zone Priority (Complex: Online+Zone > Online > Offline)
 		local isOnline = ((friend.type == "bnet" and friend.connected) or (friend.type == "wow" and friend.connected))
-		local zoneName = (friend.areaName or friend.area or "")
-		local hasZone = isOnline and zoneName ~= ""
-		friend._sort_hasZone = hasZone
-		friend._sort_zoneName = zoneName:lower()
-		friend._sort_isOnline = isOnline -- Cached for fallback and zone sort
+		-- Needed for status checks anyway
+		friend._sort_isOnline = isOnline 
+
+		if needZone then
+			local zoneName = (friend.areaName or friend.area or "")
+			local hasZone = isOnline and zoneName ~= ""
+			friend._sort_hasZone = hasZone
+			friend._sort_zoneName = zoneName:lower()
+		else
+			friend._sort_hasZone = nil
+			friend._sort_zoneName = nil
+		end
 		
 		-- Activity (Hybrid Activity + Last Online)
 		local activityTime = 0
@@ -2990,15 +3032,19 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 	button.groupId = groupId
 	
 	-- Store friendInfo for context menu (matches OnClick handler)
-	button.friendInfo = {
-		type = friend.type,
-		index = friend.index,
-		name = friend.name or friend.accountName or friend.battleTag,
-		connected = friend.connected,
-		guid = friend.guid,
-		bnetAccountID = friend.bnetAccountID,
-		battleTag = friend.battleTag
-	}
+	-- OPTIMIZED (Phase 9.8): Reuse table to reduce memory churn
+	if not button.friendInfo then
+		button.friendInfo = {}
+	end
+	
+	local info = button.friendInfo
+	info.type = friend.type
+	info.index = friend.index
+	info.name = friend.name or friend.accountName or friend.battleTag
+	info.connected = friend.connected
+	info.guid = friend.guid
+	info.bnetAccountID = friend.bnetAccountID
+	info.battleTag = friend.battleTag
 	
 	-- Create selection highlight texture if it doesn't exist (blue, like Blizzard)
 	if not button.selectionHighlight then
