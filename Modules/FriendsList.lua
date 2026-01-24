@@ -29,6 +29,10 @@ local friendGroups = {}
 local isUpdatingFriendsList = false
 local hasPendingUpdate = false
 
+-- Performance Caches (Phase 9.7)
+local uidCache = {} -- Interned strings for UIDs (bnet_Tag123)
+local displayFormatBlueprint = nil -- Parsed structure for fast string building
+
 -- Dirty flag: Set when data changes while frame is hidden
 -- When true, next time frame is shown, we need to re-render
 local needsRenderOnShow = false
@@ -767,7 +771,14 @@ local function GetFriendUID(friend) if not friend then return nil end
 	if friend.type == "bnet" then
 		-- Use battleTag as persistent identifier (bnetAccountID is temporary per session)
 		if friend.battleTag then
-			return "bnet_" .. friend.battleTag
+			-- Phase 9.7: UID Interning to reduce string garbage
+			local tag = friend.battleTag
+			local cached = uidCache[tag]
+			if not cached then
+				cached = "bnet_" .. tag
+				uidCache[tag] = cached
+			end
+			return cached
 		else
 			-- Fallback to bnetAccountID only if battleTag is unavailable (should never happen)
 			return "bnet_" .. tostring(friend.bnetAccountID or "unknown")
@@ -781,7 +792,7 @@ end
 
 -- Get display name based on format setting
 -- @param forSorting (boolean) If true, use BattleTag instead of AccountName for BNet friends (prevents sorting issues with protected strings)
-function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.6: Display Name Caching
+function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Name Caching (Persistent)
 	if not self.displayNameCache then self.displayNameCache = {} end
 
 	local DB = GetDB()
@@ -791,13 +802,12 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.6: Display Na
 	local name = "Unknown"
 	local battletag = friend.battleTag or ""
 	local note = (friend.note or friend.notes or "")
-	local uid = GetFriendUID(friend)
+	local uid = friend.uid or GetFriendUID(friend) -- Use available UID
 	local nickname = DB and DB:GetNickname(uid) or ""
 	
 	if friend.type == "bnet" then
 		if forSorting then
-			-- SORTING MODE: Use BattleTag (Short) instead of accountName
-			-- This avoids issues with protected strings in accountName affecting sort order
+			-- SORTING MODE: Use BattleTag (Short) first
 			if friend.battleTag and friend.battleTag ~= "" then
 				local bTag = friend.battleTag
 				local hashIndex = string.find(bTag, "#")
@@ -807,11 +817,10 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.6: Display Na
 					name = bTag
 				end
 			else
-				-- Fallback if no battletag available (rare)
 				name = friend.accountName or "Unknown"
 			end
 		else
-			-- DISPLAY MODE: Use accountName as requested (RealID or BattleTag)
+			-- DISPLAY MODE: Use accountName
 			name = friend.accountName or "Unknown"
 		end
 	else
@@ -823,7 +832,7 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.6: Display Na
 			name = fullName
 		else
 			local n, r = strsplit("-", fullName)
-			local playerRealm = GetNormalizedRealmName() -- Use normalized realm
+			local playerRealm = GetNormalizedRealmName()
 			
 			if r and r ~= playerRealm then
 				name = n .. "*" -- Indicate cross-realm
@@ -841,10 +850,14 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.6: Display Na
 		end
 	end
 	
-	-- CACHE CHECK
-	local cacheKey = (uid or "unknown") .. (forSorting and "_s" or "_d")
-	local cacheEntry = self.displayNameCache[cacheKey]
+	-- CACHE CHECK (Persistent with Validation)
+	-- Use nested table [uid][forSorting] to avoid string concatenation for keys
+	if not self.displayNameCache[uid] then self.displayNameCache[uid] = {} end
+	local modeKey = forSorting and 2 or 1 -- Avoid boolean keys if desired, or just use boolean
 	
+	local cacheEntry = self.displayNameCache[uid][modeKey]
+	
+	-- Check if cache is valid (inputs haven't changed)
 	if cacheEntry and 
 	   cacheEntry.format == format and
 	   cacheEntry.note == note and
@@ -859,20 +872,13 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.6: Display Na
 	local result = format
 
 	-- Smart Fallback Logic:
-	-- If %nickname% is used but empty, and %name% is NOT in the format, use name as nickname
 	if nickname == "" and result:find("%%nickname%%") and not result:find("%%name%%") then
-		-- Fallback to name.
-		-- NOTE: If forSorting=true and this is a BNet friend, 'name' has already been set to the BattleTag (the fix).
-		-- So this correctly propagates the fix to the nickname fallback for sorting.
 		nickname = name
 	end
-	-- Same for %battletag% (e.g. for WoW friends)
 	if battletag == "" and result:find("%%battletag%%") and not result:find("%%name%%") then
 		battletag = name
 	end
 
-	-- Optimize replacement: Escape special chars (%) in values and standard string replacement
-	-- Check existence first to avoid unnecessary gsub calls
 	if result:find("%%name%%") then
 		local safeName = name:gsub("%%", "%%%%")
 		result = result:gsub("%%name%%", safeName)
@@ -894,10 +900,8 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.6: Display Na
 	end
 	
 	-- 3. Cleanup
-	-- Remove empty parentheses/brackets (e.g. "Name ()" -> "Name")
 	result = result:gsub("%(%)", "")
 	result = result:gsub("%[%]", "")
-	-- Trim whitespace
 	result = result:match("^%s*(.-)%s*$")
 	
 	-- 4. Fallback
@@ -905,8 +909,8 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.6: Display Na
 		result = name
 	end
 	
-	-- Cache the result
-	self.displayNameCache[cacheKey] = {
+	-- Update Cache
+	self.displayNameCache[uid][modeKey] = {
 		result = result,
 		format = format,
 		note = note,
