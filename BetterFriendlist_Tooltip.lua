@@ -69,20 +69,10 @@ local function AddBetterFriendlistInfo()
 	local friendUID = nil
 	
 	if friendData then
-		-- Our BetterFriendlist button
-		if friendData.type == "bnet" and friendData.battleTag then
-			friendUID = "bnet_" .. friendData.battleTag
-		elseif friendData.type == "wow" and friendData.name then
-			friendUID = "wow_" .. friendData.name
-		end
-	elseif button.buttonType then
-		-- Blizzard's FriendsFrame button
-		if button.buttonType == FRIENDS_BUTTON_TYPE_BNET then
-			local accountInfo = C_BattleNet.GetFriendAccountInfo(button.id)
-			if accountInfo and accountInfo.battleTag then
-				friendUID = "bnet_" .. accountInfo.battleTag
-			end
-		elseif button.buttonType == FRIENDS_BUTTON_TYPE_WOW then
+		-- Optimization: Use pre-calculated UID from friendData (Phase 21)
+		if friendData.uid then
+			friendUID = friendData.uid
+		elseif friendData.type == "bnet" and friendData.battleTag then
 			local info = C_FriendList.GetFriendInfoByIndex(button.id)
 			if info and info.name then
 				friendUID = "wow_" .. info.name
@@ -207,22 +197,11 @@ function BetterFriendsList_Button_OnEnter(self)
 			fakeButton.buttonType = FRIENDS_BUTTON_TYPE_BNET
 			fakeButton.id = friendData.index
 		else
-			-- Battle.net friend - find the actual index for C_BattleNet API
-			local numBNet = BNGetNumFriends()
-			local actualBNetIndex = nil
-			
-			for i = 1, numBNet do
-				local tempInfo = C_BattleNet.GetFriendAccountInfo(i)
-				if tempInfo and tempInfo.bnetAccountID == friendData.bnetAccountID then
-					actualBNetIndex = i
-					break
-				end
-			end
-			
-			if actualBNetIndex then
-				fakeButton.buttonType = FRIENDS_BUTTON_TYPE_BNET
-				fakeButton.id = actualBNetIndex
-			end
+			-- Battle.net friend
+			-- Optimization: Trust the index from friendData (Phase 21)
+			-- This avoids the O(N) linear search through all friends on every mouseover
+			fakeButton.buttonType = FRIENDS_BUTTON_TYPE_BNET
+			fakeButton.id = friendData.index
 		end
 	else
 		-- WoW friend
