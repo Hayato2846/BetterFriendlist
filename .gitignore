@@ -40,3 +40,6 @@ release_notes.txt
 # Perfy Instrumentation Logs
 stacks-cpu.txt
 stacks-memory.txt
+
+# Backup folders
+Libs - Kopie/
