@@ -1116,6 +1116,31 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 			print(string.format(BFL.L.CORE_DEBUG_CURRENT_SETTING, setting and BFL.L.STATUS_ENABLED or BFL.L.STATUS_DISABLED))
 		end
 
+	-- Test Translations (Encoding Check)
+	elseif msg == "testlocales" or msg == "testencoding" or msg == "testenc" then
+		print("|cff00ff00BetterFriendlist:|r " .. (BFL.L.CORE_HELP_TEST_LOCALES or "Testing Localization Encoding..."))
+		print("Locale: " .. GetLocale())
+		
+		-- List of strings with special characters to test
+		local testKeys = {
+			"DIALOG_DELETE_GROUP_TEXT", -- é, ê, û
+			"NOTIFICATIONS_SET_MSG_BLACKLIST", -- é, à
+			"CORE_STATISTICS_HEADER", -- é
+			"SETTINGS_BETA_FEATURES_ENABLED", -- é, È
+			"DIALOG_MIGRATE_TEXT", -- é, è
+			"FILTER_SEARCH_ONLINE", -- varies by locale
+			"STATUS_AFK" -- varies
+		}
+		
+		for _, key in ipairs(testKeys) do
+			if BFL.L[key] then
+				print(string.format("|cffffcc00%s:|r %s", key, BFL.L[key]))
+			else
+				print(string.format("|cffff0000Missing:|r %s", key))
+			end
+		end
+		print("|cff00ff00End of Test|r")
+
 	-- Help (or any other unrecognized command)
 	elseif msg == "changelog" or msg == "changes" then
 		local Changelog = BFL:GetModule("Changelog")
