@@ -405,7 +405,7 @@ function MainFrameEditMode:OnEditModeExit()
     
     -- Restore previous visibility state
     -- If frame was hidden before EditMode, hide it again
-    if frame.wasHiddenBeforeEditMode then
+    if frame.wasHiddenBeforeEditMode and frame:IsShown() then
         frame:Hide()
     end
     
@@ -485,6 +485,11 @@ function MainFrameEditMode:Initialize()
         frame:HookScript("OnSizeChanged", function(self, width, height)
             -- Trigger responsive updates for FriendsList and RaidFrame
             MainFrameEditMode:TriggerResponsiveUpdates()
+        end)
+        
+        -- Hook OnHide to reset applied flag (fixes re-opening issues)
+        frame:HookScript("OnHide", function(self)
+            self.editModeApplied = false
         end)
         
         frame.editModeHooked = true

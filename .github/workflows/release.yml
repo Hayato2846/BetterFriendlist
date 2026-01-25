@@ -82,19 +82,30 @@ jobs:
 
           # Define Project Links
           links = (
-              "[CurseForge](<https://www.curseforge.com/wow/addons/betterfriendlist/files>) | "
-              "[Wago](<https://addons.wago.io/addons/betterfriendlist/version>) | "
-              "[WoWInterface](<https://www.wowinterface.com/downloads/info26984-BetterFriendlist.html>)"
+              "[CurseForge](https://www.curseforge.com/wow/addons/betterfriendlist/files) | "
+              "[Wago](https://addons.wago.io/addons/betterfriendlist/version) | "
+              "[WoWInterface](https://www.wowinterface.com/downloads/info26984-BetterFriendlist.html)"
           )
 
-          # Construct the message content
-          message_content = f"# Version {clean_version} released!\n\n{links}\n\n{body}"
+          # Truncate body if too long for Embed Description (Limit is 4096)
+          # We leave some buffer for links and headers
+          if len(body) > 3500:
+              body = body[:3500] + "\n...(truncated)"
 
-          # Construct JSON Payload
+          # Construct JSON Payload with Embed
           payload = {
-              "content": message_content,
               "username": "BetterFriendlist Release",
-              "avatar_url": "https://media.forgecdn.net/avatars/thumbnails/1514/711/64/64/638983629917728143.png"
+              "avatar_url": "https://media.forgecdn.net/avatars/thumbnails/1514/711/64/64/638983629917728143.png",
+              "embeds": [
+                  {
+                      "title": f"Version {clean_version} released!",
+                      "description": f"{links}\n\n{body}",
+                      "color": 16766720, # Gold color
+                      "footer": {
+                          "text": "BetterFriendlist - World of Warcraft Addon"
+                      }
+                  }
+              ]
           }
 
           # Send Request

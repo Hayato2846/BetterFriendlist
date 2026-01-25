@@ -458,7 +458,9 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 	if not leaderName or leaderName == "" then leaderName = "???" end
 	
 	-- Line 1: Group Title (white, word-wrap enabled)
-	tooltip:SetText(groupTitle, 1, 1, 1, true)
+	-- Fix: GameTooltip:SetText arguments are (text, r, g, b, alpha, wrap)
+	-- We must explicitly provide alpha (1) before the wrap boolean (true)
+	tooltip:SetText(groupTitle, 1, 1, 1, 1, true)
 	
 	-- Line 2: Activity Name (GOLD - HIGHLIGHT_FONT_COLOR: 1.0, 0.82, 0) - Only if different from group title and not empty
 	if activityName and activityName ~= groupTitle and activityName ~= "" then
@@ -547,12 +549,11 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 	end
 	
 	if roleIcons ~= "" then
-		-- FIXED: Remove extra colon - global already has one colon
-		-- GOLD color (1.0, 0.82, 0) for "Available Roles:" text
-		local rolesText = L.AVAILABLE_ROLES .. " " .. roleIcons
-		tooltip:AddLine(rolesText, 1.0, 0.82, 0)
+		-- GOLD color (1.0, 0.82, 0) for "Available Roles:" text, avoid AddLine argument issues
+		local rolesText = "|cffffd100" .. L.AVAILABLE_ROLES .. "|r " .. roleIcons
+		tooltip:AddLine(rolesText)
 	else
-		tooltip:AddLine(L.NO_AVAILABLE_ROLES, 1, 1, 1)
+		tooltip:AddLine(L.NO_AVAILABLE_ROLES)
 	end
 	
 	-- Auto-Accept indicator (Blizzard's hasRelationshipWithLeader logic)
