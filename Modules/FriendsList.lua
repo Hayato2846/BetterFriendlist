@@ -2666,9 +2666,9 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) local groupId 
 			-- Restore normal textures first (resetting any overrides)
 			if BFL.IsClassic then
 				if targetArrow == button.RightArrow then
-					targetArrow:SetTexture("Interface\\Buttons\\UI-PlusButton-Up")
+					targetArrow:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\chevron-right")
 				else
-					targetArrow:SetTexture("Interface\\Buttons\\UI-MinusButton-Up")
+					targetArrow:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\chevron-down")
 				end
 			else
 				if targetArrow == button.RightArrow then
@@ -2691,7 +2691,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) local groupId 
 						targetArrow:SetAtlas("friendslist-categorybutton-arrow-left")
 						targetArrow:SetRotation(math.pi)
 					else
-						targetArrow:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\arrow-left")
+						targetArrow:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\chevron-left")
 					end
 				end
 				
@@ -3816,9 +3816,9 @@ function FriendsList:UpdateInviteHeaderButton(button, data) button.Text:SetForma
 			-- Restore normal textures (resetting overrides)
 			if BFL.IsClassic then
 				if targetArrow == button.RightArrow then
-					targetArrow:SetTexture("Interface\\Buttons\\UI-PlusButton-Up")
+					targetArrow:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\chevron-right")
 				else
-					targetArrow:SetTexture("Interface\\Buttons\\UI-MinusButton-Up")
+					targetArrow:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\chevron-down")
 				end
 			else
 				if targetArrow == button.RightArrow then
@@ -3840,7 +3840,7 @@ function FriendsList:UpdateInviteHeaderButton(button, data) button.Text:SetForma
 						targetArrow:SetAtlas("friendslist-categorybutton-arrow-left")
 						targetArrow:SetRotation(math.pi)
 					else
-						targetArrow:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\arrow-left")
+						targetArrow:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\chevron-left")
 					end
 				end
 				x = (targetArrow == button.DownArrow) and -8 or -6

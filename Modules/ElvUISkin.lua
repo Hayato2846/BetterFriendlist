@@ -7,6 +7,16 @@ local ADDON_NAME, BFL = ...
 -- Register Module
 local ElvUISkin = BFL:RegisterModule("ElvUISkin", {})
 
+-- Helper to handle scrollbars across Retail and Classic
+local function SkinScrollBar(S, scrollBar)
+	if not scrollBar then return end
+	if S.HandleTrimScrollBar then
+		S:HandleTrimScrollBar(scrollBar)
+	elseif S.HandleScrollBar then
+		S:HandleScrollBar(scrollBar)
+	end
+end
+
 function ElvUISkin:Initialize()
 	-- Check if ElvUI is loaded immediately
 	if _G.ElvUI then
@@ -48,8 +58,13 @@ function ElvUISkin:RegisterSkin()
 	
 	-- If BetterFriendlist is already loaded (which it is), try to skin immediately
 	-- This helps if ElvUI has already processed callbacks
-	BFL:DebugPrint("ElvUISkin: Direct call triggered")
-	xpcall(function() self:SkinFrames(E, S) end, function(err) print("|cffff0000BetterFriendlist ElvUI Skin Error:|r " .. tostring(err)) end)
+	-- Point 9: Only run direct call if ElvUI is fully initialized to avoid PixelPerfect errors
+	if E.initialized then
+		BFL:DebugPrint("ElvUISkin: Direct call triggered")
+		xpcall(function() self:SkinFrames(E, S) end, function(err) print("|cffff0000BetterFriendlist ElvUI Skin Error:|r " .. tostring(err)) end)
+	else
+		BFL:DebugPrint("ElvUISkin: Skipping direct call (ElvUI not initialized)")
+	end
 end
 
 function ElvUISkin:SkinFrames(E, S)
@@ -61,7 +76,9 @@ function ElvUISkin:SkinFrames(E, S)
 	-- Skin Main Frame
 	BFL:DebugPrint("ElvUISkin: Skinning Main Frame")
 	if frame.PortraitContainer or frame.portrait then
-		S:HandlePortraitFrame(frame)
+		-- Use pcall to safeguard against ElvUI PixelPerfect errors (nil comparisons) 
+		-- in case the frame isn't fully dimensioned yet
+		pcall(function() S:HandlePortraitFrame(frame) end)
 	end
 
 	-- Skin Portrait Button (Changelog)
@@ -83,7 +100,8 @@ function ElvUISkin:SkinFrames(E, S)
 		if not button.Icon then
 			button.Icon = button:CreateTexture(nil, "ARTWORK")
 			button.Icon:SetInside()
-			button.Icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Textures\\PortraitIcon")
+			-- Fixed: Use .blp extension for Classic compatibility
+			button.Icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Textures\\PortraitIcon.blp")
 			button.Icon:SetTexCoord(unpack(E.TexCoords))
 		end
 		button.Icon:Show()
@@ -186,7 +204,7 @@ function ElvUISkin:SkinFrames(E, S)
 	-- Skin RecentAlliesFrame ScrollBar
 	BFL:DebugPrint("ElvUISkin: Skinning RecentAllies")
 	if frame.RecentAlliesFrame and frame.RecentAlliesFrame.ScrollBar then
-		S:HandleTrimScrollBar(frame.RecentAlliesFrame.ScrollBar)
+		SkinScrollBar(S, frame.RecentAlliesFrame.ScrollBar)
 	end
 
 	-- Skin IgnoreListWindow
@@ -200,7 +218,7 @@ function ElvUISkin:SkinFrames(E, S)
 		end
 		
 		if frame.IgnoreListWindow.ScrollBar then
-			S:HandleTrimScrollBar(frame.IgnoreListWindow.ScrollBar)
+			SkinScrollBar(S, frame.IgnoreListWindow.ScrollBar)
 		end
 		
 		if frame.IgnoreListWindow.UnignorePlayerButton then
@@ -211,24 +229,35 @@ function ElvUISkin:SkinFrames(E, S)
 	-- Skin ScrollBars
 	BFL:DebugPrint("ElvUISkin: Skinning ScrollBars")
 	-- Friends List ScrollBar - Point 7
-	if frame.MinimalScrollBar then
-		S:HandleTrimScrollBar(frame.MinimalScrollBar)
-	elseif frame.ScrollBar then
-		if S.HandleMinimalScrollBar then
-			S:HandleMinimalScrollBar(frame.ScrollBar)
+	
+	-- Check for Retail Minimal, Standard, or Classic ScrollBar (often on ScrollFrame)
+	local scrollBar = frame.MinimalScrollBar or frame.ScrollBar
+	if not scrollBar and frame.ScrollFrame then
+		-- Classic FauxScrollFrame often names it $parentScrollBar
+		if frame.ScrollFrame.ScrollBar then
+			scrollBar = frame.ScrollFrame.ScrollBar
+		elseif frame.ScrollFrame:GetName() then
+			scrollBar = _G[frame.ScrollFrame:GetName().."ScrollBar"]
+		end
+	end
+
+	if scrollBar then
+		-- Use specific handler if available
+		if frame.MinimalScrollBar and S.HandleMinimalScrollBar then
+			S:HandleMinimalScrollBar(frame.MinimalScrollBar)
 		else
-			S:HandleScrollBar(frame.ScrollBar)
+			SkinScrollBar(S, scrollBar)
 		end
 	end
 
 	-- Who Frame ScrollBar
 	if frame.WhoFrame and frame.WhoFrame.ScrollBar then
-		S:HandleTrimScrollBar(frame.WhoFrame.ScrollBar)
+		SkinScrollBar(S, frame.WhoFrame.ScrollBar)
 	end
 	
 	-- Raid Frame ScrollBar
 	if frame.RaidFrame and frame.RaidFrame.ScrollBar then
-		S:HandleTrimScrollBar(frame.RaidFrame.ScrollBar)
+		SkinScrollBar(S, frame.RaidFrame.ScrollBar)
 	end
 
 	-- Skin Buttons
@@ -337,22 +366,63 @@ function ElvUISkin:SkinFrames(E, S)
 			S:HandleEditBox(frame.FriendsTabHeader.SearchBox)
 		end
 		
-		-- Dropdowns - Point 3: Fix width
-		if frame.FriendsTabHeader.StatusDropdown then S:HandleDropDownBox(frame.FriendsTabHeader.StatusDropdown) end
+		-- Dropdowns - Point 3: Fix width & Layout (Classic adjustments)
+		-- Common function to skin and size dropdowns
+		local function SkinAndSizeDropdown(dropdown, width, height)
+			if not dropdown then return end
+			S:HandleDropDownBox(dropdown)
+			dropdown:SetWidth(width)
+			dropdown:SetHeight(height)
+			
+			-- Also force the button to match height if needed
+			local button = _G[dropdown:GetName().."Button"]
+			if button then
+				button:SetHeight(height)
+			end
+		end
+
+		if frame.FriendsTabHeader.StatusDropdown then 
+			SkinAndSizeDropdown(frame.FriendsTabHeader.StatusDropdown, 70, 22)
+		end
 		
 		if frame.FriendsTabHeader.QuickFilterDropdown then 
-			S:HandleDropDownBox(frame.FriendsTabHeader.QuickFilterDropdown)
-			frame.FriendsTabHeader.QuickFilterDropdown:SetWidth(51)
+			SkinAndSizeDropdown(frame.FriendsTabHeader.QuickFilterDropdown, 85, 22)
+			
+			-- Classic: Fix Anchoring
+			frame.FriendsTabHeader.QuickFilterDropdown:ClearAllPoints()
+			-- Anchor below SearchBox with small gap relative to proper edges
+			if frame.FriendsTabHeader.SearchBox then
+				frame.FriendsTabHeader.SearchBox:ClearAllPoints()
+				
+				-- Point 10: Anchor to BnetFrame per user request
+				if frame.FriendsTabHeader.BattlenetFrame then
+					frame.FriendsTabHeader.SearchBox:SetPoint("TOP", frame.FriendsTabHeader.BattlenetFrame, "BOTTOM", 0, -10)
+					frame.FriendsTabHeader.SearchBox:SetPoint("LEFT", frame.Inset, "LEFT", 10, 0)
+					frame.FriendsTabHeader.SearchBox:SetPoint("RIGHT", frame.Inset, "RIGHT", -10, 0)
+				else
+					-- Fallback logic just in case
+					frame.FriendsTabHeader.SearchBox:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 10, -50)
+					frame.FriendsTabHeader.SearchBox:SetPoint("TOPRIGHT", frame.Inset, "TOPRIGHT", -10, -50)
+				end
+				
+				frame.FriendsTabHeader.QuickFilterDropdown:SetPoint("TOPLEFT", frame.FriendsTabHeader.SearchBox, "BOTTOMLEFT", 0, -5)
+			end
 		end
 		
 		if frame.FriendsTabHeader.PrimarySortDropdown then 
-			S:HandleDropDownBox(frame.FriendsTabHeader.PrimarySortDropdown)
-			frame.FriendsTabHeader.PrimarySortDropdown:SetWidth(51)
+			SkinAndSizeDropdown(frame.FriendsTabHeader.PrimarySortDropdown, 85, 22)
+			
+			-- Anchor to QuickFilter with positive spacing (ElvUI removes the transparent padding)
+			frame.FriendsTabHeader.PrimarySortDropdown:ClearAllPoints()
+			frame.FriendsTabHeader.PrimarySortDropdown:SetPoint("LEFT", frame.FriendsTabHeader.QuickFilterDropdown, "RIGHT", 5, 0)
 		end
 		
 		if frame.FriendsTabHeader.SecondarySortDropdown then 
-			S:HandleDropDownBox(frame.FriendsTabHeader.SecondarySortDropdown)
-			frame.FriendsTabHeader.SecondarySortDropdown:SetWidth(51)
+			SkinAndSizeDropdown(frame.FriendsTabHeader.SecondarySortDropdown, 85, 22)
+			
+			-- Anchor to PrimarySort
+			frame.FriendsTabHeader.SecondarySortDropdown:ClearAllPoints()
+			frame.FriendsTabHeader.SecondarySortDropdown:SetPoint("LEFT", frame.FriendsTabHeader.PrimarySortDropdown, "RIGHT", 5, 0)
 		end
 	end
 
@@ -403,7 +473,7 @@ function ElvUISkin:SkinFrames(E, S)
 			 frame.QuickJoinFrame.ContentInset:CreateBackdrop("Transparent")
 			 
 			 if frame.QuickJoinFrame.ContentInset.ScrollBar then
-				 S:HandleTrimScrollBar(frame.QuickJoinFrame.ContentInset.ScrollBar)
+				 SkinScrollBar(S, frame.QuickJoinFrame.ContentInset.ScrollBar)
 			 end
 		end
 		
@@ -447,7 +517,7 @@ function ElvUISkin:SkinFrames(E, S)
 
 	-- Skin Settings Frame
 	BFL:DebugPrint("ElvUISkin: Skinning Settings")
-	self:SkinSettings(E, S)
+	xpcall(function() self:SkinSettings(E, S) end, function(err) BFL:DebugPrint("ElvUISkin: Error skinning Settings: " .. tostring(err)) end)
 	
 	-- Skin Notifications
 	BFL:DebugPrint("ElvUISkin: Skinning Notifications")
@@ -463,11 +533,11 @@ function ElvUISkin:SkinFrames(E, S)
 
 	-- Skin Changelog
 	BFL:DebugPrint("ElvUISkin: Skinning Changelog")
-	self:SkinChangelog(E, S)
+	xpcall(function() self:SkinChangelog(E, S) end, function(err) BFL:DebugPrint("ElvUISkin: Error skinning Changelog: " .. tostring(err)) end)
 	
 	-- Skin HelpFrame
 	BFL:DebugPrint("ElvUISkin: Skinning HelpFrame")
-	self:SkinHelpFrame(E, S)
+	xpcall(function() self:SkinHelpFrame(E, S) end, function(err) BFL:DebugPrint("ElvUISkin: Error skinning HelpFrame: " .. tostring(err)) end)
 
 	-- Apply FontFix after Skinning to ensure correct font sizes
 	local FontFix = BFL:GetModule("FontFix")
@@ -591,7 +661,7 @@ function ElvUISkin:SkinRecruitAFriend(E, S, frame)
 		end
 		
 		if raf.RecruitList.ScrollBar then
-			S:HandleTrimScrollBar(raf.RecruitList.ScrollBar)
+			SkinScrollBar(S, raf.RecruitList.ScrollBar)
 		end
 		
 		-- Header
@@ -640,8 +710,11 @@ function ElvUISkin:SkinSettings(E, S)
 	for i = 1, 10 do
 		local tab = _G["BetterFriendlistSettingsFrameTab"..i]
 		if tab then
-			S:HandleTab(tab)
-			tab:SetHeight(32) -- Fixed height
+			-- Classic Safety: Ensure tab has ID and text (skipped/hidden tabs might crash)
+			if tab:IsShown() and (tab.GetText and tab:GetText() and tab:GetText() ~= "") then
+				S:HandleTab(tab)
+				tab:SetHeight(32) -- Fixed height
+			end
 		end
 	end
 	
@@ -1022,7 +1095,7 @@ function ElvUISkin:SkinChangelog(E, S)
 		-- Skin ScrollBar
 		if frame.ScrollBar then
 			-- Retail
-			S:HandleTrimScrollBar(frame.ScrollBar)
+			SkinScrollBar(S, frame.ScrollBar)
 		elseif frame.ScrollFrame then
 			-- Classic or Fallback
 			local children = {frame.ScrollFrame:GetChildren()}
@@ -1059,15 +1132,15 @@ function ElvUISkin:SkinHelpFrame(E, S)
 		
 		-- Skin ScrollBar
 		if frame.ScrollBar then
-			S:HandleTrimScrollBar(frame.ScrollBar)
+			SkinScrollBar(S, frame.ScrollBar)
 		elseif frame.ScrollFrame then
 			-- Classic fallback or when using UIPanelScrollFrame
 			if frame.ScrollFrame.ScrollBar then
-				S:HandleScrollBar(frame.ScrollFrame.ScrollBar)
-			else
+				SkinScrollBar(S, frame.ScrollFrame.ScrollBar)
+			elseif frame.ScrollFrame:GetName() then
 				local scrollBar = _G[frame.ScrollFrame:GetName().."ScrollBar"]
 				if scrollBar then
-					S:HandleScrollBar(scrollBar)
+					SkinScrollBar(S, scrollBar)
 				end
 			end
 		end

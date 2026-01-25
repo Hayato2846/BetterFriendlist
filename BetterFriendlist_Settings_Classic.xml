@@ -92,6 +92,17 @@
 					</OnClick>
 				</Scripts>
 			</Button>
+			<!-- Tab 7: Future use -->
+			<Button name="$parentTab7" parentKey="Tab7" inherits="PanelTopTabButtonTemplate" text="" id="7">
+				<Anchors>
+					<Anchor point="LEFT" relativeKey="$parent.Tab6" relativePoint="RIGHT" x="-5" y="0" />
+				</Anchors>
+				<Scripts>
+					<OnClick>
+						BetterFriendlistSettings_ShowTab(7)
+					</OnClick>
+				</Scripts>
+			</Button>
 			
 			<!-- Content Scroll Frame - below tabs, above buttons inside MainInset -->
 			<ScrollFrame parentKey="ContentScrollFrame" inherits="UIPanelScrollFrameTemplate">
@@ -105,6 +116,14 @@
 						<Frames>
 							<!-- General Tab Content -->
 							<Frame parentKey="GeneralTab" hidden="false">
+								<Anchors>
+									<Anchor point="TOPLEFT" />
+									<Anchor point="BOTTOMRIGHT" />
+								</Anchors>
+							</Frame>
+							
+							<!-- Fonts Tab Content -->
+							<Frame parentKey="FontsTab" hidden="true">
 								<Anchors>
 									<Anchor point="TOPLEFT" />
 									<Anchor point="BOTTOMRIGHT" />
@@ -209,7 +228,7 @@
 				end
 				
 				-- Setup tab system
-				PanelTemplates_SetNumTabs(self, 3)
+				PanelTemplates_SetNumTabs(self, 7)
 				PanelTemplates_SetTab(self, 1)
 				
 				-- Initialize

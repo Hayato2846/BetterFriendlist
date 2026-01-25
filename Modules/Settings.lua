@@ -2601,7 +2601,7 @@ function Settings:RefreshGeneralTab()
 	table.insert(allFrames, blizzardOption)
 
 	-- Row 6: ElvUI Skin (if available) - moved to separate row
-	if _G.ElvUI then
+	if _G.ElvUI and WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
 		local elvUICheckbox = Components:CreateCheckbox(tab, 
 			L.SETTINGS_ENABLE_ELVUI_SKIN or "Enable ElvUI Skin",
 			DB:Get("enableElvUISkin", false),
@@ -3284,11 +3284,6 @@ function Settings:RefreshGroupsTab()
 	groupShadowCheckbox:SetTooltip(L.SETTINGS_FONT_SHADOW, "|cffff0000Feature temporarily disabled (coming later)|r")
 	table.insert(allFrames, groupShadowCheckbox)
 	
-	-- Spacer
-	table.insert(allFrames, Components:CreateSpacer(tab))
-	
-	-- ===========================================
-	-- NEW COLOR SETTINGS
 	-- Spacer
 	table.insert(allFrames, Components:CreateSpacer(tab))
 	
