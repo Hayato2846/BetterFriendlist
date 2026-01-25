@@ -387,7 +387,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 				end
 			end
 
-			-- Best Practice: Register LibSharedMedia callbacks (Platynator-style)
+			-- Best Practice: Register LibSharedMedia callbacks (modern approach)
 			-- Ensures fonts update immediately if a new font is registered (e.g. by another addon)
 			local LSM = LibStub("LibSharedMedia-3.0", true)
 			if LSM then

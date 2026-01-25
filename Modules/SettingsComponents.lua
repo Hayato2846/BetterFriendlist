@@ -1,5 +1,5 @@
 ﻿-- SettingsComponents.lua
--- Reusable UI components for Settings panel (Platynator-style)
+-- Reusable UI components for Settings panel
 
 local ADDON_NAME, BFL = ...
 BFL.SettingsComponents = {}

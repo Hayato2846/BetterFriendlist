@@ -35,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Performance** - Implemented the second iteration of performance fixes for smoother scrolling and updates.
 - **Housing System** - Fixed an issue preventing players from visiting friends' houses.
 - **Startup Stability** - Fixed an issue where BetterFriendlist would remain open if other addons forcibly entered and exited Edit Mode during startup.
+- **Combat Protection** - Added combat protection for UI Panel attributes.
+- **Activity Tracker** - Added secret value protection in ActivityTracker for Midnight.
 
 ## [2.2.2] - 2026-01-18
 ### Fixed

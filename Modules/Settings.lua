@@ -2491,7 +2491,7 @@ function Settings:OnInGameGroupModeChanged(value)
 end
 
 --------------------------------------------------------------------------
--- NEW: PLATYNATOR-STYLE TAB REFRESH FUNCTIONS
+-- NEW: TAB REFRESH FUNCTIONS
 --------------------------------------------------------------------------
 
 -- Refresh General Tab with new component library

@@ -14,7 +14,7 @@ local LSM = LibStub("LibSharedMedia-3.0")
 local GetDB = function() return BFL:GetModule("DB") end
 
 -- ========================================
--- Advanced Font Family System (Chattynator-Implementation)
+-- Advanced Font Family System
 -- ========================================
 
 local FONT_CACHE = {}
