@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.2.5] - 2026-01-25
 ### Fixed
+- **Combat Blocking Fix** - Fixed a critical issue where the Friends List window could not be opened during combat, even when UI Panel settings were disabled. This resolves the "ADDON_ACTION_BLOCKED" error caused by unnecessary secure templates.
 - **Localization** - Fixed encoding issues in English localization (enUS) where bullets and arrows were displayed as corrupted characters.
 
 ## [2.2.4] - 2026-01-25
