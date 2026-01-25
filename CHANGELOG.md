@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+
+## [2.2.4] - 2026-01-25
+### Fixed
+- **Mojibake Fix** - Fixed an issue where localized text (German, French, etc.) could display incorrect characters. (Core.lua)
+- **QuickJoin** - Fixed quick join tooltips.
+- **Edit Mode** - Fixed visibility issues when entering Edit Mode.
+
 ## [2.2.3] - 2026-01-25
 ### Added
 - **Typography Settings** - Added detailed font customization for Friend Names, Friend Info, and Group Headers. (Shadow settings coming soon).
