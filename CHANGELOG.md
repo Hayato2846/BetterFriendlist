@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [2.2.3] - 2026-01-25
+### Fixed
+- **Edit Mode** - Fixed an issue where the BetterFriendlist frame would remain open after reloading UI if another addon triggered Edit Mode during startup.
+
 ## [2.2.2] - 2026-01-18
 ### Fixed
 - **Font Support** - Reverted the friend name font to `GameFontNormal`. This restores support for the 4 standard fonts (including Asian/Cyrillic characters).

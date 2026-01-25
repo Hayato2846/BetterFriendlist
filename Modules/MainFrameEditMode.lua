@@ -379,8 +379,11 @@ function MainFrameEditMode:OnEditModeEnter()
     local frame = BetterFriendsFrame
     if not frame then return end
     
-    -- Remember if frame was hidden before entering EditMode
-    frame.wasHiddenBeforeEditMode = not frame:IsShown()
+    -- Only capture state if we haven't already (prevent double-entry overwriting)
+    -- This handles edge cases where Edit Mode events fire multiple times
+    if frame.wasHiddenBeforeEditMode == nil then
+        frame.wasHiddenBeforeEditMode = not frame:IsShown()
+    end
     
     -- Show frame in EditMode (even if user had it closed)
     -- This allows positioning/resizing even when frame is normally hidden
@@ -404,8 +407,10 @@ function MainFrameEditMode:OnEditModeExit()
     -- If frame was hidden before EditMode, hide it again
     if frame.wasHiddenBeforeEditMode then
         frame:Hide()
-        frame.wasHiddenBeforeEditMode = nil
     end
+    
+    -- ALWAYS clear the flag to reset state for the next Edit Mode session
+    frame.wasHiddenBeforeEditMode = nil
     
     -- BFL:DebugPrint("|cff00ffffBFL:MainFrameEditMode:|r Edit Mode exited, manual dragging re-enabled, visibility restored")
 end
