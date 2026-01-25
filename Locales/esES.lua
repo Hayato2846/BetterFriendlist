@@ -1,9 +1,9 @@
 -- Locales/esES.lua
 -- Spanish (EU) Localization
 
+local ADDON_NAME, BFL = ...
+BFL:RegisterLocale("esES", function()
 local L = BFL_LOCALE
-
-if GetLocale() == "esES" then
 	-- ========================================
 	-- DIALOGS & POPUPS
 	-- ========================================
@@ -1158,4 +1158,4 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita solapamientos con otras ventanas (P
 	L.SETTINGS_FONT_OUTLINE_MONOCHROME = "Monochrome"
 	L.SETTINGS_GROUP_COUNT_COLOR = "Count Color"
 	L.SETTINGS_GROUP_ARROW_COLOR = "Arrow Color"
-end
+end)

@@ -3,7 +3,7 @@
 -- Extracted from BetterFriendlist.lua to reduce main file complexity
 
 local ADDON_NAME, BFL = ...
-local L = BFL_LOCALE  -- Localization shortcut
+local L = BFL.L  -- Localization shortcut (Use Proxy Table for Fallbacks)
 
 --------------------------------------------------------------------------
 -- UI CONSTANTS

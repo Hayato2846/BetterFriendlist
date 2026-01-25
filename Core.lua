@@ -1116,6 +1116,19 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 			print(string.format(BFL.L.CORE_DEBUG_CURRENT_SETTING, setting and BFL.L.STATUS_ENABLED or BFL.L.STATUS_DISABLED))
 		end
 
+	-- Localization Switching
+	elseif msg:match("^loc") or msg:match("^setloc") or msg:match("^setlocale") then
+		local newLocale = msg:match("^loc%s+(%w+)") or msg:match("^setloc%s+(%w+)") or msg:match("^setlocale%s+(%w+)")
+		if newLocale then
+			if BFL.SetLocale then
+				BFL:SetLocale(newLocale)
+			else
+				print("|cffff0000BetterFriendlist:|r Localization system update required.")
+			end
+		else
+			print("Usage: /bfl loc <locale> (e.g. /bfl loc frFR)")
+		end
+
 	-- Test Translations (Encoding Check)
 	elseif msg == "testlocales" or msg == "testencoding" or msg == "testenc" then
 		print("|cff00ff00BetterFriendlist:|r " .. (BFL.L.CORE_HELP_TEST_LOCALES or "Testing Localization Encoding..."))

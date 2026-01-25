@@ -1,9 +1,9 @@
 -- Locales/deDE.lua
 -- German (Deutsch) Localization
 
+local ADDON_NAME, BFL = ...
+BFL:RegisterLocale("deDE", function()
 local L = BFL_LOCALE
-
-if GetLocale() == "deDE" then
 	-- ========================================
 	-- DIALOGS & POPUPS
 	-- ========================================
@@ -1118,4 +1118,4 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	L.SETTINGS_FONT_OUTLINE_MONOCHROME = "Monochrome"
 	L.SETTINGS_GROUP_COUNT_COLOR = "Zählerfarbe"
 	L.SETTINGS_GROUP_ARROW_COLOR = "Pfeilfarbe"
-end
+end)

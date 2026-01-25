@@ -2,13 +2,11 @@
 -- English (US) Localization
 -- This file is ALWAYS loaded as fallback for all locales
 
+local ADDON_NAME, BFL = ...
+
+local function LoadEnUS()
 -- Load into enUS fallback table (used by all locales)
 local L = BFL_LOCALE_ENUS
-
--- Also load into main table if we're actually on enUS client
-if GetLocale() == "enUS" then
-	BFL_LOCALE = BFL_LOCALE_ENUS
-end
 	-- ========================================
 	-- DIALOGS & POPUPS
 	-- ========================================
@@ -1178,3 +1176,10 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	L.SETTINGS_FONT_OUTLINE_MONOCHROME = "Monochrome"
 	L.SETTINGS_GROUP_COUNT_COLOR = "Count Color"
 	L.SETTINGS_GROUP_ARROW_COLOR = "Arrow Color"
+end
+
+-- Always load enUS immediately to ensure fallback strings exist
+LoadEnUS()
+
+-- Register for locale system
+BFL:RegisterLocale("enUS", LoadEnUS)

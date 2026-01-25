@@ -1,9 +1,9 @@
 -- Locales/frFR.lua
 -- French Localization
 
+local ADDON_NAME, BFL = ...
+BFL:RegisterLocale("frFR", function()
 local L = BFL_LOCALE
-
-if GetLocale() == "frFR" then
 	-- ========================================
 	-- DIALOGS & POPUPS
 	-- ========================================
@@ -1159,4 +1159,4 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Évite chevauchements avec autres fenêtr
 	L.SETTINGS_FONT_OUTLINE_MONOCHROME = "Monochrome"
 	L.SETTINGS_GROUP_COUNT_COLOR = "Count Color"
 	L.SETTINGS_GROUP_ARROW_COLOR = "Arrow Color"
-end
+end)

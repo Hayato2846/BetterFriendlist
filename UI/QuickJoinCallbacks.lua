@@ -9,7 +9,7 @@
 ]]
 
 local addonName, BFL = ...
-local L = BFL_LOCALE
+local L = BFL.L
 
 -- Import UI constants
 local UI = BFL.UI.CONSTANTS

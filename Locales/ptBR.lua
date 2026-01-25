@@ -1,9 +1,9 @@
 -- Locales/ptBR.lua
 -- Portuguese (Brazil) Localization
 
+local ADDON_NAME, BFL = ...
+BFL:RegisterLocale("ptBR", function()
 local L = BFL_LOCALE
-
-if GetLocale() == "ptBR" then
 	-- ========================================
 	-- DIALOGS & POPUPS
 	-- ========================================
@@ -1158,4 +1158,4 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita sobreposição. Requer reload."
 	L.SETTINGS_FONT_OUTLINE_MONOCHROME = "Monochrome"
 	L.SETTINGS_GROUP_COUNT_COLOR = "Count Color"
 	L.SETTINGS_GROUP_ARROW_COLOR = "Arrow Color"
-end
+end)

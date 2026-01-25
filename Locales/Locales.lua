@@ -6,9 +6,11 @@ local ADDON_NAME, BFL = ...
 -- Initialize locale tables
 BFL_LOCALE = {}          -- Current locale
 BFL_LOCALE_ENUS = {}     -- English fallback
+BFL.Locales = {}         -- Registry for locale functions
 
--- Get current WoW locale
-local locale = GetLocale()
+-- Get initial WoW locale
+local initialLocale = GetLocale()
+BFL.ConfiguredLocale = initialLocale
 
 -- Localization accessor with 3-tier fallback:
 -- 1. Current locale (e.g. deDE, frFR)
@@ -28,7 +30,8 @@ local L = setmetatable({}, {
 		local englishFallback = BFL_LOCALE_ENUS[key]
 		if englishFallback then
 			-- Track missing translation (but don't spam for enUS locale)
-			if locale ~= "enUS" and not BFL.MissingKeys[key] then
+			-- Use ConfiguredLocale instead of GetLocale()
+			if BFL.ConfiguredLocale ~= "enUS" and not BFL.MissingKeys[key] then
 				BFL.MissingKeys[key] = true
 			end
 			return englishFallback
@@ -45,6 +48,58 @@ local L = setmetatable({}, {
 -- Make accessible globally for all addon modules
 _G["BFL_L"] = L
 BFL.L = L
+
+-- Register a locale function
+function BFL:RegisterLocale(localeName, loadFunc)
+	self.Locales[localeName] = loadFunc
+	
+	-- Immediately load if this matches our initial locale
+	if localeName == self.ConfiguredLocale then
+		loadFunc()
+	end
+end
+
+-- Switch locale at runtime (for testing)
+function BFL:SetLocale(newLocale)
+	-- Normalize input to handle case-insensitivity (e.g. "frfr" -> "frFR")
+	local targetKey = newLocale
+	
+	-- If exact match not found, try case-insensitive search
+	if not self.Locales[targetKey] then
+		local lowerTarget = newLocale:lower()
+		for key, _ in pairs(self.Locales) do
+			if key:lower() == lowerTarget then
+				targetKey = key
+				break
+			end
+		end
+	end
+
+	if not self.Locales[targetKey] and targetKey ~= "enUS" then 
+		print("|cffff0000BFL:|r Locale " .. newLocale .. " not found!")
+		return 
+	end
+
+	self.ConfiguredLocale = targetKey
+	
+	-- Safety: If BFL_LOCALE points to BFL_LOCALE_ENUS (reference equality), 
+	-- do NOT wipe it, instead point to a new table.
+	if BFL_LOCALE == BFL_LOCALE_ENUS then
+		BFL_LOCALE = {}
+	else
+		wipe(BFL_LOCALE)
+	end
+	
+	-- Run the registered function for the new locale
+	if self.Locales[targetKey] then
+		self.Locales[targetKey]()
+	else
+		-- Fallback if we switch to a locale with no file but it is valid? 
+		-- Should not happen with our setup.
+	end
+	
+	print("|cff00ff00BFL:|r Leveled up! Switched locale to " .. targetKey)
+end
 
 -- Developer Tool: Show Missing Translations Frame
 function BFL:ShowMissingLocalesFrame()
