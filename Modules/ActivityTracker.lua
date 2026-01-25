@@ -22,6 +22,15 @@ local ACTIVITY_WHISPER = "lastWhisper"
 local ACTIVITY_GROUP = "lastGroup"
 local ACTIVITY_TRADE = "lastTrade"
 
+-- 12.0.0+ Secret Values Compatibility
+-- Checks if a value is a "Secret" (tainted/restricted) which cannot be inspected or used as table keys
+local function IsSecret(value)
+	if issecretvalue then
+		return issecretvalue(value)
+	end
+	return false
+end
+
 -- ========================================
 -- Module State
 -- ========================================
@@ -37,6 +46,8 @@ ActivityTracker.lastGroupRoster = {} -- Track who was in group last check
 -- @param name: Character name (may or may not include realm)
 -- @return friendUID or nil
 local function GetFriendUIDFromName(name)
+	if IsSecret(name) then return nil end -- 12.0.0 Safety
+
 	if not name or name == "" then
 		return nil
 	end
@@ -49,9 +60,13 @@ local function GetFriendUIDFromName(name)
 	for i = 1, numWoWFriends do
 		local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
 		if friendInfo and friendInfo.name then
-			local friendBaseName = friendInfo.name:match("^([^-]+)") or friendInfo.name
-			if friendBaseName == baseName then
-				return "wow_" .. friendInfo.name
+			if IsSecret(friendInfo.name) then -- 12.0.0 Safety
+				-- Skip secret names
+			else
+				local friendBaseName = friendInfo.name:match("^([^-]+)") or friendInfo.name
+				if friendBaseName == baseName then
+					return "wow_" .. friendInfo.name
+				end
 			end
 		end
 	end
@@ -64,11 +79,16 @@ local function GetFriendUIDFromName(name)
 			-- Check if this BNet friend has a WoW character with matching name
 			local gameInfo = accountInfo.gameAccountInfo
 			if gameInfo.isOnline and gameInfo.characterName then
-				local charBaseName = gameInfo.characterName:match("^([^-]+)") or gameInfo.characterName
-				if charBaseName == baseName then
-					-- Use battleTag as persistent identifier
-					if accountInfo.battleTag then
-						return "bnet_" .. accountInfo.battleTag
+				if IsSecret(gameInfo.characterName) then -- 12.0.0 Safety
+					-- Skip secret character names
+				else
+					local charBaseName = gameInfo.characterName:match("^([^-]+)") or gameInfo.characterName
+					if charBaseName == baseName then
+						-- Use battleTag as persistent identifier
+						if accountInfo.battleTag then
+							if IsSecret(accountInfo.battleTag) then return nil end -- 12.0.0 Safety
+							return "bnet_" .. accountInfo.battleTag
+						end
 					end
 				end
 			end
@@ -82,6 +102,8 @@ end
 -- @param battleTag: BattleTag string (e.g., "Name#1234")
 -- @return friendUID or nil
 local function GetFriendUIDFromBattleTag(battleTag)
+	if IsSecret(battleTag) then return nil end -- 12.0.0 Safety
+
 	if not battleTag or battleTag == "" then
 		return nil
 	end
@@ -94,6 +116,8 @@ end
 -- @param activityType: Type of activity (ACTIVITY_WHISPER, ACTIVITY_GROUP, ACTIVITY_TRADE)
 -- @param timestamp: Optional timestamp (defaults to current time)
 local function RecordActivity(friendUID, activityType, timestamp)
+	if IsSecret(friendUID) then return false end -- 12.0.0 Safety: Secrets cannot be table keys
+
 	if not friendUID or friendUID == "" then
 		-- BFL:DebugPrint("ActivityTracker: Cannot record activity - invalid friendUID")
 		return false
@@ -234,6 +258,8 @@ function ActivityTracker:OnWhisper(text, sender, languageName, channelName, targ
 	-- BFL:DebugPrint(string.format("ActivityTracker: OnWhisper called - text='%s', sender='%s', target='%s', guid='%s'", 
 	-- 	tostring(text), tostring(sender), tostring(target), tostring(guid)))
 	
+	if IsSecret(sender) then return end -- 12.0.0 Safety
+
 	if not sender or sender == "" then
 		-- BFL:DebugPrint("ActivityTracker: OnWhisper - No sender")
 		return
@@ -250,6 +276,8 @@ end
 
 -- Handle outgoing whisper (CHAT_MSG_WHISPER_INFORM)
 function ActivityTracker:OnWhisperSent(text, recipient, ...)
+	if IsSecret(recipient) then return end -- 12.0.0 Safety
+
 	if not recipient or recipient == "" then
 		return
 	end
@@ -263,6 +291,8 @@ end
 
 -- Handle incoming BNet whisper (CHAT_MSG_BN_WHISPER)
 function ActivityTracker:OnBNetWhisper(text, sender, languageName, channelName, playerName2, specialFlags, zoneChannelID, channelIndex, channelBaseName, languageID, lineID, guid, bnSenderID, ...)
+	if IsSecret(bnSenderID) then return end -- 12.0.0 Safety
+
 	if not bnSenderID then
 		return
 	end
@@ -279,6 +309,8 @@ end
 
 -- Handle outgoing BNet whisper (CHAT_MSG_BN_WHISPER_INFORM)
 function ActivityTracker:OnBNetWhisperSent(text, recipient, languageName, channelName, playerName2, specialFlags, zoneChannelID, channelIndex, channelBaseName, languageID, lineID, guid, bnSenderID, ...)
+	if IsSecret(bnSenderID) then return end -- 12.0.0 Safety
+
 	if not bnSenderID then
 		return
 	end
@@ -308,10 +340,10 @@ function ActivityTracker:OnGroupRosterUpdate()
 	
 	for i = 1, numGroupMembers do
 		local name, realm = UnitName("party" .. i)
-		if name then
+		if name and not IsSecret(name) then -- 12.0.0 Safety
 			-- Construct full name (Name-Realm or just Name for same realm)
 			local fullName = name
-			if realm and realm ~= "" then
+			if realm and realm ~= "" and not IsSecret(realm) then -- Realm check too
 				fullName = name .. "-" .. realm
 			end
 			currentRoster[fullName] = true
@@ -335,7 +367,7 @@ function ActivityTracker:OnTradeShow()
 	-- Get trade target name
 	local targetName = UnitName("NPC") -- Trade target is always "NPC" unit
 	
-	if targetName and targetName ~= "" then
+	if targetName and targetName ~= "" and not IsSecret(targetName) then -- 12.0.0 Safety
 		local friendUID = GetFriendUIDFromName(targetName)
 		if friendUID then
 			RecordActivity(friendUID, ACTIVITY_TRADE)

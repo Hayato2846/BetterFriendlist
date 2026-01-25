@@ -517,6 +517,19 @@ end
 -- Made global for access from Settings module
 function ConfigureUIPanelAttributes(enable) if not BetterFriendsFrame then return end
 	
+	-- Optimization: Don't update if in combat (SetAttribute is restricted)
+	if InCombatLockdown() then
+		return
+	end
+
+	-- Optimization: Don't set attributes if they are already in the desired state
+	local isDefined = BetterFriendsFrame:GetAttribute("UIPanelLayout-defined")
+	if enable and isDefined then
+		return
+	elseif not enable and not isDefined then
+		return
+	end
+	
 	if enable then
 		-- Enable UI Panel Layout system
 		BetterFriendsFrame:SetAttribute("UIPanelLayout-defined", true)
