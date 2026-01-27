@@ -120,6 +120,150 @@ function BFL:ToggleDebugPrint()
 	end
 end
 
+-- Update Portrait Visibility based on Simple Mode setting
+function BFL:UpdatePortraitVisibility()
+	-- Need to use raw DB access here or get module
+	local DB = self:GetModule("DB")
+	if not DB then return end
+	
+	local simpleMode = DB:Get("simpleMode", false)
+	local frame = BetterFriendsFrame
+	
+	if frame then
+		local shouldShow = not simpleMode
+		
+		-- Standard Hiding (The Nice Way)
+		if frame.PortraitContainer then frame.PortraitContainer:SetShown(shouldShow) end
+		if frame.portrait then frame.portrait:SetShown(shouldShow) end
+		if frame.PortraitButton then frame.PortraitButton:SetShown(shouldShow) end
+		if frame.PortraitIcon then frame.PortraitIcon:SetShown(shouldShow) end
+		if frame.PortraitMask then frame.PortraitMask:SetShown(shouldShow) end
+		if frame.SetPortraitShown then frame:SetPortraitShown(shouldShow) end
+		
+		-- Also hide Global Portrait (Usually the Icon)
+		local globalPortrait = _G[frame:GetName() .. "Portrait"]
+		if globalPortrait then globalPortrait:SetShown(shouldShow) end
+
+		-- DEEP SEARCH (The "Find that Ring" Way)
+		-- We scan the frame regions AND immediate children's regions
+		
+		local function ProcessRegions(objectToScan)
+			if not objectToScan then return end
+			
+			local subRegions = {objectToScan:GetRegions()}
+			for i, region in ipairs(subRegions) do
+				if region:IsObjectType("Texture") then
+					local atlas = region:GetAtlas()
+					local texture = region:GetTexture()
+					
+					-- Strategy 1: SWAP the structural corner (The "Hole" for the portrait)
+					-- We must check for BOTH the original (Portrait) and the swapped (Metal) atlas
+					-- otherwise we can't swap back because we won't recognize the region anymore.
+					if atlas and (atlas == "UI-Frame-PortraitMetal-CornerTopLeft" or atlas == "UI-Frame-Metal-CornerTopLeft") then
+						if shouldShow then
+							-- Restore original portrait corner (Open with hole)
+							region:SetAtlas("UI-Frame-PortraitMetal-CornerTopLeft")
+						else
+							-- Swap to standard square corner (Closed hole)
+							region:SetAtlas("UI-Frame-Metal-CornerTopLeft")
+						end
+					end
+
+					-- Strategy 2: HIDE the overlay ring (The shiny gold/blue circle)
+					local isRingOverlay = false
+					
+					-- Check Atlas (Ring Overlays only)
+					if atlas and (
+						atlas == "UI-Frame-Portrait" or 
+						atlas == "UI-Frame-Portrait-Blue" or 
+						atlas == "player-portrait-frame"
+					) then
+						isRingOverlay = true
+					end
+					
+					-- Check Texture Path (Legacy/Classic rings)
+					-- explicit exclude "PortraitMetal" to avoid hiding the border again
+					if texture and type(texture) == "string" and (
+						(texture:find("UI%-Frame%-Portrait") and not texture:find("PortraitMetal")) or 
+						texture:find("PortraitRing")
+					) then
+						isRingOverlay = true
+					end
+
+					-- Check Texture IDs
+					-- 136453: UI-Frame-Portrait (Ring)
+					-- 609653: UI-Frame-Portrait-Blue (Ring)
+					if texture and type(texture) == "number" and (
+						texture == 136453 or 
+						texture == 609653 
+					) then
+						isRingOverlay = true
+					end
+					
+					if isRingOverlay then
+						region:SetShown(shouldShow)
+						region:SetAlpha(shouldShow and 1 or 0)
+					end
+				end
+			end
+		end
+
+		-- Scan Frame and Children
+		ProcessRegions(frame)
+		if frame.GetChildren then
+			local children = {frame:GetChildren()}
+			for _, child in ipairs(children) do
+				ProcessRegions(child)
+			end
+		end
+
+		-- Title Adjustment (Layout Fix)
+		if frame.TitleContainer then
+			local xOffset = shouldShow and 58 or 5 
+			frame.TitleContainer:ClearAllPoints()
+			frame.TitleContainer:SetPoint("TOPLEFT", frame, "TOPLEFT", xOffset, -1)
+			frame.TitleContainer:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -24, -1)
+		end
+		
+		-- BNet Frame Width Adjustment (Simple Mode Optimization)
+		if frame.FriendsTabHeader and frame.FriendsTabHeader.BattlenetFrame then
+			local bnetFrame = frame.FriendsTabHeader.BattlenetFrame
+			local baseWidth = 190 -- Default XML width
+			-- Increase width by 65px in Simple Mode to utilize recovered space
+			local extraWidth = shouldShow and 0 or 65
+			bnetFrame:SetWidth(baseWidth + extraWidth)
+		end
+
+		-- Search Row & Tab Adjustment (Simple Mode Layout Shift)
+		if frame.FriendsTabHeader then
+			local header = frame.FriendsTabHeader
+			local elementsToHide = {
+				header.SearchBox,
+				header.QuickFilterDropdown,
+				header.PrimarySortDropdown,
+				header.SecondarySortDropdown
+			}
+			
+			for _, elem in ipairs(elementsToHide) do
+				if elem then elem:SetShown(shouldShow) end
+			end
+			
+			-- Move Tabs Upwards to fill the gap
+			if header.Tab1 then
+				header.Tab1:ClearAllPoints()
+				if shouldShow then
+					-- Default Position (Standard Mode)
+					header.Tab1:SetPoint("TOPLEFT", header, "TOPLEFT", 18, -95)
+				else
+					-- Shifted Position (Simple Mode)
+					-- Move up to roughly where SearchBox was (y=-55 to -60)
+					header.Tab1:SetPoint("TOPLEFT", header, "TOPLEFT", 18, -60)
+				end
+			end
+		end
+	end
+end
+
 -- Open Configuration
 function BFL:OpenConfig()
 	local Settings = self:GetModule("Settings")
@@ -574,6 +718,20 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 	
 	-- Fire event callbacks for all events
 	BFL:FireEventCallbacks(event, ...)
+	
+	-- Update Portrait Visibility on Login
+	if event == "PLAYER_LOGIN" then
+		-- Hook OnShow to ensure portrait visibility persists despite template resets
+		-- ButtonFrameTemplate can reset portrait visibility on show, so we re-apply our rules every time
+		if BetterFriendsFrame then
+			BetterFriendsFrame:HookScript("OnShow", function()
+				BFL:UpdatePortraitVisibility()
+			end)
+		end
+		
+		-- Initial update
+		BFL:UpdatePortraitVisibility()
+	end
 end)
 
 -- Expose namespace globally for backward compatibility

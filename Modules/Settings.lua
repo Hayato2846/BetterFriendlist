@@ -2535,6 +2535,19 @@ function Settings:OnUseUIPanelSystemChanged(checked)
 	StaticPopup_Show("BFL_CONFIRM_UI_PANEL_RELOAD")
 end
 
+-- Simple Mode Toggle
+function Settings:OnSimpleModeChanged(checked)
+	local DB = GetDB()
+	if not DB then return end
+	
+	DB:Set("simpleMode", checked)
+	
+	-- Update Portrait Visibility immediately
+	if BFL.UpdatePortraitVisibility then
+		BFL:UpdatePortraitVisibility()
+	end
+end
+
 -- Legacy code (no longer needed with ReloadUI)
 --[[ function Settings:OnUseUIPanelSystemChanged_OLD(checked)
 	local DB = GetDB()
@@ -2858,7 +2871,15 @@ function Settings:RefreshGeneralTab()
 		}
 	))
 	
-	-- Row 2: Use UI Panel System & (Classic: Close on Guild Tab)
+	-- Row 2: Use UI Panel System & Simple Mode & (Classic: Close on Guild Tab)
+	local simpleModeConfig = {
+		label = L.SETTINGS_SIMPLE_MODE or "Simple Mode",
+		initialValue = DB:Get("simpleMode", false),
+		callback = function(val) self:OnSimpleModeChanged(val) end,
+		tooltipTitle = L.SETTINGS_SIMPLE_MODE or "Simple Mode",
+		tooltipDesc = L.SETTINGS_SIMPLE_MODE_DESC or "Hides the player portrait and adds a changelog option to the contacts menu."
+	}
+
 	local closeOnGuildConfig = nil
 	if BFL.IsClassic then
 		closeOnGuildConfig = {
@@ -2870,6 +2891,7 @@ function Settings:RefreshGeneralTab()
 		}
 	end
 	
+	-- Row 2: Use UI Panel System & Simple Mode
 	table.insert(allFrames, Components:CreateDoubleCheckbox(tab,
 		{
 			label = L.SETTINGS_USE_UI_PANEL_SYSTEM or "Use UI Panel System",
@@ -2878,10 +2900,10 @@ function Settings:RefreshGeneralTab()
 			tooltipTitle = L.SETTINGS_USE_UI_PANEL_SYSTEM or "Use UI Panel System",
 			tooltipDesc = L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC or "Use Blizzard's UI Panel system for automatic repositioning when other windows are open (Character, Spellbook, etc.)"
 		},
-		closeOnGuildConfig
+		simpleModeConfig
 	))
 	
-	-- Row 3 (Classic Only): Hide Guild Tab
+	-- Row 3 (Classic Only): Hide Guild Tab & Close on Guild Tab
 	if BFL.IsClassic then
 		table.insert(allFrames, Components:CreateDoubleCheckbox(tab,
 			{
@@ -2891,7 +2913,7 @@ function Settings:RefreshGeneralTab()
 				tooltipTitle = L.SETTINGS_HIDE_GUILD_TAB or "Hide Guild Tab",
 				tooltipDesc = L.SETTINGS_HIDE_GUILD_TAB_DESC or "Hide the Guild tab from the friends list (requires UI reload)"
 			},
-			nil
+			closeOnGuildConfig
 		))
 	end
 	

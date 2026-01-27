@@ -4,6 +4,9 @@
 local ADDON_NAME, BFL = ...
 BFL:RegisterLocale("zhCN", function()
 local L = BFL_LOCALE
+	L.SETTINGS_SIMPLE_MODE = "Simple Mode"
+	L.SETTINGS_SIMPLE_MODE_DESC = "Disables the player portrait, hides search/sort options, widens the frame, and shifts tabs for a compact layout."
+	L.MENU_CHANGELOG = "Changelog"
 	L.DIALOG_CREATE_GROUP_TEXT = "输入新分组的名称："
 	L.DIALOG_CREATE_GROUP_BTN1 = "创建"
 	L.DIALOG_CREATE_GROUP_BTN2 = "取消"

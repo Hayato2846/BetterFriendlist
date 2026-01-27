@@ -4,6 +4,9 @@
 local ADDON_NAME, BFL = ...
 BFL:RegisterLocale("deDE", function()
 local L = BFL_LOCALE
+	L.SETTINGS_SIMPLE_MODE = "Simple Mode"
+	L.SETTINGS_SIMPLE_MODE_DESC = "Deaktiviert das Porträt, blendet Such/Sortieroptionen aus, verbreitert das Fenster und verschiebt Tabs für ein kompaktes Layout."
+	L.MENU_CHANGELOG = "Changelog"
 	-- ========================================
 	-- DIALOGS & POPUPS
 	-- ========================================

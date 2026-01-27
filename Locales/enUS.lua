@@ -7,6 +7,9 @@ local ADDON_NAME, BFL = ...
 local function LoadEnUS()
 -- Load into enUS fallback table (used by all locales)
 local L = BFL_LOCALE_ENUS
+	L.SETTINGS_SIMPLE_MODE = "Simple Mode"
+	L.SETTINGS_SIMPLE_MODE_DESC = "Disables the player portrait, hides search/sort options, widens the frame, and shifts tabs for a compact layout."
+	L.MENU_CHANGELOG = "Changelog"
 	-- ========================================
 	-- DIALOGS & POPUPS
 	-- ========================================

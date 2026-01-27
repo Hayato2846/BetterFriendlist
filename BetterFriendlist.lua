@@ -2036,6 +2036,15 @@ function BetterFriendsFrame_ShowContactsMenu(button) local generator = function(
 		rootDescription:CreateButton(L.MENU_SETTINGS, function() BetterFriendlistSettings_Show()
 		end);
 		
+		-- Changelog option (Simple Mode only)
+		local DB = GetDB()
+		if DB and DB:Get("simpleMode", false) then
+			rootDescription:CreateButton(L.MENU_CHANGELOG or "Changelog", function()
+				local Changelog = BFL:GetModule("Changelog")
+				if Changelog then Changelog:Show() end
+			end);
+		end
+		
 		-- Show Blizzard's Friendlist option (conditional based on setting)
 		local DB = GetDB()
 		if DB and DB:Get("showBlizzardOption", false) then
