@@ -286,7 +286,7 @@ local SORT_NAMES = {
 local function FormatIconText(iconData, text)
 	-- Check if it's a texture path (starts with "Interface")
 	if type(iconData) == "string" and iconData:match("^Interface") then
-		return string.format("\124T%s:16:16:0:2\124t %s", iconData, text)
+		return string.format("\124T%s:16:16:0:0\124t %s", iconData, text)
 	else
 		-- Font Awesome icon - use directly with color
 		return string.format("|cFF00CCFF%s|r %s", iconData, text)
@@ -296,7 +296,7 @@ end
 -- Helper: Format icon only for dropdown button
 local function FormatIconOnly(iconData)
 	if type(iconData) == "string" and iconData:match("^Interface") then
-		return string.format("\124T%s:16:16:0:2\124t", iconData)
+		return string.format("\124T%s:16:16:0:0\124t", iconData)
 	else
 		-- Font Awesome icon
 		return string.format("|cFF00CCFF%s|r", iconData)

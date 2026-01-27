@@ -104,8 +104,8 @@ local defaults = {
 	notificationMessageWowLogin = "%name% logged into World of Warcraft", -- Template for WoW login
 	notificationMessageCharSwitch = "%name% switched to %char%", -- Template for character switch
 	notificationMessageGameSwitch = "%name% is now playing %game%", -- Template for game switch
-	-- Data Broker Settings (BETA Feature - requires enableBetaFeatures)
-	brokerEnabled = false, -- Enable Data Broker integration (default: OFF, Beta Feature)
+	-- Data Broker Settings
+	brokerEnabled = false, -- Enable Data Broker integration (default: OFF)
 	brokerShowIcon = true, -- Show icon on display addons (default: ON)
 	brokerShowLabel = true, -- Show label text (default: ON)
 	brokerShowTotal = true, -- Show total count (default: ON)

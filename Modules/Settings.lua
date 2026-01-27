@@ -279,24 +279,24 @@ local function ParseFriendGroupsNote(noteText)
 		return "", {}
 	end
 	
-	-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r     Parsing note:", noteText)
+	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r     Parsing note:", noteText)
 	
 	local parts = {strsplit("#", noteText)}
 	local actualNote = parts[1] or ""
 	local groups = {}
 	
-	-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r     Split into", #parts, "parts")
+	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r     Split into", #parts, "parts")
 	
 	for i = 2, #parts do
 		local groupName = strtrim(parts[i])
 		if groupName ~= "" then
 			table.insert(groups, groupName)
-			-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r     Found group:", groupName)
+			BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r     Found group:", groupName)
 		end
 	end
 	
-	-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r     Actual note:", actualNote)
-	-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r     Total groups found:", #groups)
+	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r     Actual note:", actualNote)
+	BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r     Total groups found:", #groups)
 	
 	return actualNote, groups
 end
@@ -1236,13 +1236,13 @@ function Settings:MigrateFriendGroups(cleanupNotes, force)
 	
 	-- Check if migration has already been completed
 	if not force and DB:Get("friendGroupsMigrated") then
-		-- BFL:DebugPrint("|cff00ffffBetterFriendlist:|r " .. L.MSG_MIGRATION_ALREADY_DONE)
+		BFL:DebugPrint("|cff00ffffBetterFriendlist:|r " .. L.MSG_MIGRATION_ALREADY_DONE)
 		return
 	end
 	
-	-- BFL:DebugPrint("|cff00ffffBetterFriendlist:|r " .. L.MSG_MIGRATION_STARTING)
-	-- BFL:DebugPrint("|cff00ffffBetterFriendlist:|r DB module:", DB and "OK" or "MISSING")
-	-- BFL:DebugPrint("|cff00ffffBetterFriendlist:|r Groups module:", Groups and "OK" or "MISSING")
+	BFL:DebugPrint("|cff00ffffBetterFriendlist:|r " .. L.MSG_MIGRATION_STARTING)
+	BFL:DebugPrint("|cff00ffffBetterFriendlist:|r DB module:", DB and "OK" or "MISSING")
+	BFL:DebugPrint("|cff00ffffBetterFriendlist:|r Groups module:", Groups and "OK" or "MISSING")
 	
 	local migratedFriends = 0
 	local migratedGroups = {}
@@ -1294,26 +1294,40 @@ function Settings:MigrateFriendGroups(cleanupNotes, force)
 		if info then
 			-- Normalize name to always include realm
 			local name = BFL:NormalizeWoWFriendName(info.name)
-			local noteText = info.notes
 			
-			if noteText and noteText ~= "" then
-				local actualNote, friendGroups = ParseFriendGroupsNote(noteText)
+			-- Debug Logs for WoW Friend Migration
+			if name then
+				BFL:DebugPrint("  Found WoW friend:", name, "Note:", info.notes)
+				local noteText = info.notes
 				
-				if #friendGroups > 0 then
-					local friendUID = "wow_" .. name
-					friendGroupAssignments[friendUID] = {
-						groups = friendGroups,
-						actualNote = actualNote,
-						isBNet = false,
-						characterName = name
-					}
+				if noteText and noteText ~= "" then
+					local actualNote, friendGroups = ParseFriendGroupsNote(noteText)
 					
-					for _, groupName in ipairs(friendGroups) do
-						if groupName ~= "[Favorites]" and groupName ~= "[No Group]" and groupName ~= "" then
-							allGroupNames[groupName] = true
+					BFL:DebugPrint("    Parsed Note:", actualNote, "Groups Found:", #friendGroups)
+					
+					if #friendGroups > 0 then
+						local friendUID = "wow_" .. name
+						BFL:DebugPrint("    Assigning to Groups. UID:", friendUID)
+						
+						friendGroupAssignments[friendUID] = {
+							groups = friendGroups,
+							actualNote = actualNote,
+							isBNet = false,
+							characterName = name
+						}
+						
+						for _, groupName in ipairs(friendGroups) do
+							BFL:DebugPrint("      Group:", groupName)
+							if groupName ~= "[Favorites]" and groupName ~= "[No Group]" and groupName ~= "" then
+								allGroupNames[groupName] = true
+							end
 						end
 					end
+				else
+					BFL:DebugPrint("    No note found or empty.")
 				end
+			else
+				BFL:DebugPrint("  Name normalization failed for:", info.name)
 			end
 		end
 	end
@@ -1338,7 +1352,7 @@ function Settings:MigrateFriendGroups(cleanupNotes, force)
 			groupNameMap[groupName] = groupId
 			migratedGroups[groupName] = true
 			table.insert(groupOrderArray, groupId)
-			-- BFL:DebugPrint("|cff00ff00BetterFriendlist:|r   ✓ Created:", groupName, "(order:", currentOrder, ")")
+			BFL:DebugPrint("|cff00ff00BetterFriendlist:|r   ✓ Created:", groupName, "(order:", currentOrder, ")")
 			currentOrder = currentOrder + 1
 		else
 			-- Group already exists - get its ID by name
@@ -1348,13 +1362,13 @@ function Settings:MigrateFriendGroups(cleanupNotes, force)
 					groupNameMap[groupName] = existingGroupId
 					migratedGroups[groupName] = true
 					table.insert(groupOrderArray, existingGroupId)
-					-- BFL:DebugPrint("|cffffff00BetterFriendlist:|r   [!] Existing:", groupName, "(using existing group)")
+					BFL:DebugPrint("|cffffff00BetterFriendlist:|r   [!] Existing:", groupName, "(using existing group)")
 					currentOrder = currentOrder + 1
 				else
-					-- BFL:DebugPrint("|cffff0000BetterFriendlist:|r   ✗ FAILED:", groupName, "- Group exists but ID not found")
+					BFL:DebugPrint("|cffff0000BetterFriendlist:|r   ✗ FAILED:", groupName, "- Group exists but ID not found")
 				end
 			else
-				-- BFL:DebugPrint("|cffff0000BetterFriendlist:|r   ✗ FAILED:", groupName, "-", tostring(groupId))
+				BFL:DebugPrint("|cffff0000BetterFriendlist:|r   ✗ FAILED:", groupName, "-", tostring(groupId))
 			end
 		end
 	end
@@ -1596,11 +1610,91 @@ function Settings:ExportSettings()
 	
 	-- Collect data to export
 	local exportData = {
-		version = 1, -- Export format version
+		version = 2, -- Export format version (v2 includes all settings)
+		-- Structure
 		customGroups = {},
 		friendGroups = {},
 		groupOrder = {},
 		groupStates = {},
+		groupColors = {},
+		-- General Settings
+		compactMode = BetterFriendlistDB.compactMode,
+		enableElvUISkin = BetterFriendlistDB.enableElvUISkin,
+		fontSize = BetterFriendlistDB.fontSize,
+		windowScale = BetterFriendlistDB.windowScale,
+		hideMaxLevel = BetterFriendlistDB.hideMaxLevel,
+		accordionGroups = BetterFriendlistDB.accordionGroups,
+		showFavoritesGroup = BetterFriendlistDB.showFavoritesGroup,
+		colorClassNames = BetterFriendlistDB.colorClassNames,
+		hideEmptyGroups = BetterFriendlistDB.hideEmptyGroups,
+		headerCountFormat = BetterFriendlistDB.headerCountFormat,
+		groupHeaderAlign = BetterFriendlistDB.groupHeaderAlign,
+		showGroupArrow = BetterFriendlistDB.showGroupArrow,
+		groupArrowAlign = BetterFriendlistDB.groupArrowAlign,
+		showFactionIcons = BetterFriendlistDB.showFactionIcons,
+		showRealmName = BetterFriendlistDB.showRealmName,
+		grayOtherFaction = BetterFriendlistDB.grayOtherFaction,
+		showMobileAsAFK = BetterFriendlistDB.showMobileAsAFK,
+		treatMobileAsOffline = BetterFriendlistDB.treatMobileAsOffline,
+		nameDisplayFormat = BetterFriendlistDB.nameDisplayFormat,
+		enableInGameGroup = BetterFriendlistDB.enableInGameGroup,
+		inGameGroupMode = BetterFriendlistDB.inGameGroupMode,
+		-- Font Settings
+		fontFriendName = BetterFriendlistDB.fontFriendName,
+		fontSizeFriendName = BetterFriendlistDB.fontSizeFriendName,
+		fontOutlineFriendName = BetterFriendlistDB.fontOutlineFriendName,
+		fontShadowFriendName = BetterFriendlistDB.fontShadowFriendName,
+		fontColorFriendName = BetterFriendlistDB.fontColorFriendName,
+		fontFriendInfo = BetterFriendlistDB.fontFriendInfo,
+		fontSizeFriendInfo = BetterFriendlistDB.fontSizeFriendInfo,
+		fontOutlineFriendInfo = BetterFriendlistDB.fontOutlineFriendInfo,
+		fontShadowFriendInfo = BetterFriendlistDB.fontShadowFriendInfo,
+		fontColorFriendInfo = BetterFriendlistDB.fontColorFriendInfo,
+		fontGroupHeader = BetterFriendlistDB.fontGroupHeader,
+		fontSizeGroupHeader = BetterFriendlistDB.fontSizeGroupHeader,
+		fontOutlineGroupHeader = BetterFriendlistDB.fontOutlineGroupHeader,
+		fontShadowGroupHeader = BetterFriendlistDB.fontShadowGroupHeader,
+		colorGroupCount = BetterFriendlistDB.colorGroupCount,
+		colorGroupArrow = BetterFriendlistDB.colorGroupArrow,
+		-- Sort & Filter
+		primarySort = BetterFriendlistDB.primarySort,
+		secondarySort = BetterFriendlistDB.secondarySort,
+		-- Notifications
+		notificationDisplayMode = BetterFriendlistDB.notificationDisplayMode,
+		notificationSoundEnabled = BetterFriendlistDB.notificationSoundEnabled,
+		notificationOfflineEnabled = BetterFriendlistDB.notificationOfflineEnabled,
+		notificationWowLoginEnabled = BetterFriendlistDB.notificationWowLoginEnabled,
+		notificationCharSwitchEnabled = BetterFriendlistDB.notificationCharSwitchEnabled,
+		notificationGameSwitchEnabled = BetterFriendlistDB.notificationGameSwitchEnabled,
+		notificationQuietCombat = BetterFriendlistDB.notificationQuietCombat,
+		notificationQuietInstance = BetterFriendlistDB.notificationQuietInstance,
+		notificationQuietManual = BetterFriendlistDB.notificationQuietManual,
+		notificationQuietScheduled = BetterFriendlistDB.notificationQuietScheduled,
+		notificationQuietScheduleStartMinutes = BetterFriendlistDB.notificationQuietScheduleStartMinutes,
+		notificationQuietScheduleEndMinutes = BetterFriendlistDB.notificationQuietScheduleEndMinutes,
+		notificationMessageOnline = BetterFriendlistDB.notificationMessageOnline,
+		notificationMessageOffline = BetterFriendlistDB.notificationMessageOffline,
+		notificationMessageWowLogin = BetterFriendlistDB.notificationMessageWowLogin,
+		notificationMessageCharSwitch = BetterFriendlistDB.notificationMessageCharSwitch,
+		notificationMessageGameSwitch = BetterFriendlistDB.notificationMessageGameSwitch,
+		notificationFriendRules = BetterFriendlistDB.notificationFriendRules,
+		notificationGroupRules = BetterFriendlistDB.notificationGroupRules,
+		notificationGroupTriggers = BetterFriendlistDB.notificationGroupTriggers,
+		notificationToastPosition = BetterFriendlistDB.notificationToastPosition,
+		-- Broker
+		brokerEnabled = BetterFriendlistDB.brokerEnabled,
+		brokerShowIcon = BetterFriendlistDB.brokerShowIcon,
+		brokerShowLabel = BetterFriendlistDB.brokerShowLabel,
+		brokerShowTotal = BetterFriendlistDB.brokerShowTotal,
+		brokerShowGroups = BetterFriendlistDB.brokerShowGroups,
+		brokerTooltipMode = BetterFriendlistDB.brokerTooltipMode,
+		brokerClickAction = BetterFriendlistDB.brokerClickAction,
+		-- Sync
+		enableGlobalSync = BetterFriendlistDB.enableGlobalSync,
+		enableGlobalSyncDeletion = BetterFriendlistDB.enableGlobalSyncDeletion,
+		-- Other
+		nicknames = BetterFriendlistDB.nicknames,
+		enableBetaFeatures = BetterFriendlistDB.enableBetaFeatures,
 	}
 	
 	-- Export custom groups with all properties
@@ -1689,7 +1783,7 @@ function Settings:ImportSettings(importString)
 	end
 	
 	-- Validate version
-	if not importData.version or importData.version ~= 1 then
+	if not importData.version or (importData.version ~= 1 and importData.version ~= 2) then
 		return false, L.ERROR_EXPORT_VERSION
 	end
 	
@@ -1706,27 +1800,31 @@ function Settings:ImportSettings(importString)
 		return false, L.ERROR_MODULES_NOT_LOADED
 	end
 	
-	-- Clear existing data
+	-- Clear existing data (Common to v1 and v2)
 	BetterFriendlistDB.customGroups = {}
 	BetterFriendlistDB.friendGroups = {}
 	BetterFriendlistDB.groupOrder = {}
 	BetterFriendlistDB.groupStates = {}
 	
 	-- Import custom groups
-	for groupId, groupInfo in pairs(importData.customGroups) do
-		BetterFriendlistDB.customGroups[groupId] = {
-			name = groupInfo.name,
-			collapsed = groupInfo.collapsed or false,
-			order = groupInfo.order or 2,
-			color = groupInfo.color or {r = 1.0, g = 0.82, b = 0.0}
-		}
+	if importData.customGroups then
+		for groupId, groupInfo in pairs(importData.customGroups) do
+			BetterFriendlistDB.customGroups[groupId] = {
+				name = groupInfo.name,
+				collapsed = groupInfo.collapsed or false,
+				order = groupInfo.order or 2,
+				color = groupInfo.color or {r = 1.0, g = 0.82, b = 0.0}
+			}
+		end
 	end
 	
 	-- Import friend assignments
-	for friendUID, groups in pairs(importData.friendGroups) do
-		BetterFriendlistDB.friendGroups[friendUID] = {}
-		for _, groupId in ipairs(groups) do
-			table.insert(BetterFriendlistDB.friendGroups[friendUID], groupId)
+	if importData.friendGroups then
+		for friendUID, groups in pairs(importData.friendGroups) do
+			BetterFriendlistDB.friendGroups[friendUID] = {}
+			for _, groupId in ipairs(groups) do
+				table.insert(BetterFriendlistDB.friendGroups[friendUID], groupId)
+			end
 		end
 	end
 	
@@ -1754,6 +1852,51 @@ function Settings:ImportSettings(importString)
 					g = color.g,
 					b = color.b
 				}
+			end
+		end
+	end
+
+	-- Version 2: Import all other settings
+	if importData.version >= 2 then
+		local keysToImport = {
+			-- General
+			"compactMode", "enableElvUISkin", "fontSize", "windowScale", 
+			"hideMaxLevel", "accordionGroups", "showFavoritesGroup", "colorClassNames",
+			"hideEmptyGroups", "headerCountFormat", "groupHeaderAlign", "showGroupArrow",
+			"groupArrowAlign", "showFactionIcons", "showRealmName", "grayOtherFaction",
+			"showMobileAsAFK", "treatMobileAsOffline", "nameDisplayFormat", 
+			"enableInGameGroup", "inGameGroupMode",
+			-- Fonts
+			"fontFriendName", "fontSizeFriendName", "fontOutlineFriendName", "fontShadowFriendName",
+			"fontColorFriendName", "fontFriendInfo", "fontSizeFriendInfo", "fontOutlineFriendInfo",
+			"fontShadowFriendInfo", "fontColorFriendInfo", "fontGroupHeader", "fontSizeGroupHeader",
+			"fontOutlineGroupHeader", "fontShadowGroupHeader", "colorGroupCount", "colorGroupArrow",
+			-- Sort & Filter
+			"primarySort", "secondarySort",
+			-- Notifications
+			"notificationDisplayMode", "notificationSoundEnabled",
+			"notificationOfflineEnabled", "notificationWowLoginEnabled",
+			"notificationCharSwitchEnabled", "notificationGameSwitchEnabled",
+			"notificationQuietCombat", "notificationQuietInstance", "notificationQuietManual",
+			"notificationQuietScheduled", "notificationQuietScheduleStartMinutes", 
+			"notificationQuietScheduleEndMinutes",
+			"notificationMessageOnline", "notificationMessageOffline",
+			"notificationMessageWowLogin", "notificationMessageCharSwitch",
+			"notificationMessageGameSwitch",
+			"notificationFriendRules", "notificationGroupRules", "notificationGroupTriggers",
+			"notificationToastPosition",
+			-- Broker
+			"brokerEnabled", "brokerShowIcon", "brokerShowLabel", 
+			"brokerShowTotal", "brokerShowGroups", "brokerTooltipMode", "brokerClickAction",
+			-- Sync
+			"enableGlobalSync", "enableGlobalSyncDeletion",
+			-- Other
+			"nicknames", "enableBetaFeatures"
+		}
+
+		for _, key in ipairs(keysToImport) do
+			if importData[key] ~= nil then
+				BetterFriendlistDB[key] = importData[key]
 			end
 		end
 	end
@@ -3659,23 +3802,7 @@ function Settings:RefreshAdvancedTab()
 				print("|cffff8800[>]|r " .. L.SETTINGS_BETA_TABS_HIDDEN)
 			end
 			
-			-- Check if Data Broker is enabled - requires UI reload
-			if BetterFriendlistDB.brokerEnabled then
-				local statusText = checked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"
-				StaticPopupDialogs["BFL_BETA_BROKER_RELOAD_CONFIRM"] = {
-					text = "Beta Features have been " .. statusText .. ".\n\nData Broker is enabled, so a UI reload is required for changes to take effect.\n\nReload now?",
-					button1 = "Reload Now",
-					button2 = "Later",
-					OnAccept = function()
-						ReloadUI()
-					end,
-					timeout = 0,
-					whileDead = true,
-					hideOnEscape = true,
-					preferredIndex = 3,
-				}
-				StaticPopup_Show("BFL_BETA_BROKER_RELOAD_CONFIRM")
-			end
+			-- Data Broker is stable now, no reload required when toggling Beta features
 		end
 	)
 	betaToggle:SetTooltip(L.SETTINGS_BETA_FEATURES_TITLE, L.SETTINGS_BETA_FEATURES_TOOLTIP)
@@ -4766,8 +4893,8 @@ function Settings:RefreshGlobalSyncTab()
 						
 						local row = CreateFrame("Frame", nil, tab)
 						row:SetHeight(rowHeight)
-						row:SetPoint("LEFT", 20, 0)
-						row:SetPoint("RIGHT", -20, 0)
+						row:SetPoint("LEFT", 5, 0) -- Maximized width (was 20)
+						row:SetPoint("RIGHT", -5, 0) -- Maximized width (was -20)
 						
 						-- Background (alternating)
 						if count % 2 == 0 then
@@ -4785,8 +4912,8 @@ function Settings:RefreshGlobalSyncTab()
 						
 						-- Name
 						local nameText = row:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
-						nameText:SetPoint("LEFT", 0, 0)
-						nameText:SetWidth(155) -- Increased from 140
+						nameText:SetPoint("LEFT", 5, 0)
+						nameText:SetWidth(130) -- Optimized to prevent clipping (was 155)
 						nameText:SetJustifyH("LEFT")
 						nameText:SetWordWrap(false)
 						nameText:SetText(name)
@@ -4794,7 +4921,7 @@ function Settings:RefreshGlobalSyncTab()
 						-- Realm
 						local realmText = row:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 						realmText:SetPoint("LEFT", nameText, "RIGHT", 5, 0)
-						realmText:SetWidth(135) -- Increased from 120
+						realmText:SetWidth(120) -- Optimized to prevent clipping (was 135)
 						realmText:SetJustifyH("LEFT")
 						realmText:SetWordWrap(false)
 						realmText:SetText(realm)
@@ -4941,6 +5068,13 @@ function Settings:RefreshGlobalSyncTab()
 							}
 							StaticPopup_Show("BFL_EDIT_GLOBAL_NOTE")
 						end)
+						
+						editBtn:SetScript("OnEnter", function(self)
+							GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+							GameTooltip:SetText(L.TOOLTIP_EDIT_NOTE or "Edit Note")
+							GameTooltip:Show()
+						end)
+						editBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 						
 						table.insert(allFrames, row)
 					end

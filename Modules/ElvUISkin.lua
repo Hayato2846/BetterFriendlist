@@ -70,6 +70,33 @@ end
 function ElvUISkin:SkinFrames(E, S)
 	if not _G.BetterFriendsFrame then return end
 
+	-- Ensure Tab Text is centered (Hook for updates)
+	if not self.TabHookInstalled then
+		local function FixTabCenter(tab)
+			if tab and tab:GetName() then
+				local name = tab:GetName()
+				if string.find(name, "BetterFriendsFrameTab") or 
+				   string.find(name, "BetterFriendlistSettingsFrameTab") or 
+				   string.find(name, "BetterFriendsFrameBottomTab") then
+					local text = tab.Text or (tab.GetFontString and tab:GetFontString())
+					if text then
+						text:ClearAllPoints()
+						text:SetPoint("CENTER", tab, "CENTER", 0, 0)
+					end
+				end
+			end
+		end
+
+		if _G.PanelTemplates_SelectTab then
+			hooksecurefunc("PanelTemplates_SelectTab", FixTabCenter)
+		end
+		if _G.PanelTemplates_DeselectTab then
+			hooksecurefunc("PanelTemplates_DeselectTab", FixTabCenter)
+		end
+		
+		self.TabHookInstalled = true
+	end
+
 	BFL:DebugPrint("ElvUISkin: SkinFrames started")
 	local frame = _G.BetterFriendsFrame
 
@@ -153,7 +180,7 @@ function ElvUISkin:SkinFrames(E, S)
 			local text = tab.Text or (tab.GetFontString and tab:GetFontString())
 			if text then
 				text:ClearAllPoints()
-				text:SetPoint("CENTER", tab, "CENTER", 0, 10) -- Move text up by 2 pixels
+				text:SetPoint("CENTER", tab, "CENTER", 0, 0) -- Text centered
 			end
 		end
 	end
@@ -375,9 +402,12 @@ function ElvUISkin:SkinFrames(E, S)
 			dropdown:SetHeight(height)
 			
 			-- Also force the button to match height if needed
-			local button = _G[dropdown:GetName().."Button"]
-			if button then
-				button:SetHeight(height)
+			local name = dropdown:GetName()
+			if name then
+				local button = _G[name.."Button"]
+				if button then
+					button:SetHeight(height)
+				end
 			end
 		end
 
@@ -386,31 +416,32 @@ function ElvUISkin:SkinFrames(E, S)
 		end
 		
 		if frame.FriendsTabHeader.QuickFilterDropdown then 
-			SkinAndSizeDropdown(frame.FriendsTabHeader.QuickFilterDropdown, 85, 22)
+			-- Use smaller width (50) to fit in one row
+			SkinAndSizeDropdown(frame.FriendsTabHeader.QuickFilterDropdown, 50, 30)
 			
-			-- Classic: Fix Anchoring
-			frame.FriendsTabHeader.QuickFilterDropdown:ClearAllPoints()
+			-- Classic: Fix Anchoring - Only apply if needed, for now use XML layout
+			-- frame.FriendsTabHeader.QuickFilterDropdown:ClearAllPoints()
 			-- Anchor below SearchBox with small gap relative to proper edges
-			if frame.FriendsTabHeader.SearchBox then
-				frame.FriendsTabHeader.SearchBox:ClearAllPoints()
-				
-				-- Point 10: Anchor to BnetFrame per user request
-				if frame.FriendsTabHeader.BattlenetFrame then
-					frame.FriendsTabHeader.SearchBox:SetPoint("TOP", frame.FriendsTabHeader.BattlenetFrame, "BOTTOM", 0, -10)
-					frame.FriendsTabHeader.SearchBox:SetPoint("LEFT", frame.Inset, "LEFT", 10, 0)
-					frame.FriendsTabHeader.SearchBox:SetPoint("RIGHT", frame.Inset, "RIGHT", -10, 0)
-				else
-					-- Fallback logic just in case
-					frame.FriendsTabHeader.SearchBox:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 10, -50)
-					frame.FriendsTabHeader.SearchBox:SetPoint("TOPRIGHT", frame.Inset, "TOPRIGHT", -10, -50)
-				end
-				
-				frame.FriendsTabHeader.QuickFilterDropdown:SetPoint("TOPLEFT", frame.FriendsTabHeader.SearchBox, "BOTTOMLEFT", 0, -5)
-			end
+			-- if frame.FriendsTabHeader.SearchBox then
+			-- 	frame.FriendsTabHeader.SearchBox:ClearAllPoints()
+			-- 	
+			-- 	-- Point 10: Anchor to BnetFrame per user request
+			-- 	if frame.FriendsTabHeader.BattlenetFrame then
+			-- 		frame.FriendsTabHeader.SearchBox:SetPoint("TOP", frame.FriendsTabHeader.BattlenetFrame, "BOTTOM", 0, -10)
+			-- 		frame.FriendsTabHeader.SearchBox:SetPoint("LEFT", frame.Inset, "LEFT", 10, 0)
+			-- 		frame.FriendsTabHeader.SearchBox:SetPoint("RIGHT", frame.Inset, "RIGHT", -10, 0)
+			-- 	else
+			-- 		-- Fallback logic just in case
+			-- 		frame.FriendsTabHeader.SearchBox:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 10, -50)
+			-- 		frame.FriendsTabHeader.SearchBox:SetPoint("TOPRIGHT", frame.Inset, "TOPRIGHT", -10, -50)
+			-- 	end
+			-- 	
+			-- 	frame.FriendsTabHeader.QuickFilterDropdown:SetPoint("TOPLEFT", frame.FriendsTabHeader.SearchBox, "BOTTOMLEFT", 0, -5)
+			-- end
 		end
 		
 		if frame.FriendsTabHeader.PrimarySortDropdown then 
-			SkinAndSizeDropdown(frame.FriendsTabHeader.PrimarySortDropdown, 85, 22)
+			SkinAndSizeDropdown(frame.FriendsTabHeader.PrimarySortDropdown, 50, 30)
 			
 			-- Anchor to QuickFilter with positive spacing (ElvUI removes the transparent padding)
 			frame.FriendsTabHeader.PrimarySortDropdown:ClearAllPoints()
@@ -418,7 +449,7 @@ function ElvUISkin:SkinFrames(E, S)
 		end
 		
 		if frame.FriendsTabHeader.SecondarySortDropdown then 
-			SkinAndSizeDropdown(frame.FriendsTabHeader.SecondarySortDropdown, 85, 22)
+			SkinAndSizeDropdown(frame.FriendsTabHeader.SecondarySortDropdown, 50, 30)
 			
 			-- Anchor to PrimarySort
 			frame.FriendsTabHeader.SecondarySortDropdown:ClearAllPoints()
@@ -710,10 +741,16 @@ function ElvUISkin:SkinSettings(E, S)
 	for i = 1, 10 do
 		local tab = _G["BetterFriendlistSettingsFrameTab"..i]
 		if tab then
-			-- Classic Safety: Ensure tab has ID and text (skipped/hidden tabs might crash)
-			if tab:IsShown() and (tab.GetText and tab:GetText() and tab:GetText() ~= "") then
-				S:HandleTab(tab)
-				tab:SetHeight(32) -- Fixed height
+			-- Fixed: Removed IsShown() check to ensure all tabs (including Beta/Global Sync)
+			-- are skinned even if hidden during initial load. 
+			-- Tabs should exist if XML defines them.
+			S:HandleTab(tab)
+			tab:SetHeight(28) -- Fixed height
+			
+			local text = tab.Text or (tab.GetFontString and tab:GetFontString())
+			if text then
+				text:ClearAllPoints()
+				text:SetPoint("CENTER", tab, "CENTER", 0, 0)
 			end
 		end
 	end
@@ -749,6 +786,41 @@ function ElvUISkin:SkinSettings(E, S)
 			end
 		end
 
+		-- Hook RefreshTabs to ensure tabs stay skinned after visibility changes
+		-- RefreshTabs calls PanelTemplates_UpdateTabs which might restore textures
+		hooksecurefunc(Settings, "RefreshTabs", function()
+			-- Adjust Tab1 Position (2px lower to fit ElvUI header better)
+			local tab1 = _G["BetterFriendlistSettingsFrameTab1"]
+			if tab1 then
+				tab1:ClearAllPoints()
+				tab1:SetPoint("TOPLEFT", _G.BetterFriendlistSettingsFrame, "TOPLEFT", 6, -19)
+			end
+
+			for i = 1, 10 do
+				local tab = _G["BetterFriendlistSettingsFrameTab"..i]
+				if tab and tab:IsShown() then
+					S:HandleTab(tab)
+					tab:SetHeight(28)
+					
+					local text = tab.Text or (tab.GetFontString and tab:GetFontString())
+					if text then
+						text:ClearAllPoints()
+						text:SetPoint("CENTER", tab, "CENTER", 0, 0)
+					end
+				end
+			end
+			
+			-- Adjust Tab Spacing for ElvUI (Gap between rows)
+			local tab1 = _G["BetterFriendlistSettingsFrameTab1"]
+			local tab6 = _G["BetterFriendlistSettingsFrameTab6"]
+			
+			if tab1 and tab6 and tab6:IsShown() then
+				tab6:ClearAllPoints()
+				-- Create a 0px gap between rows (negative Y)
+				tab6:SetPoint("TOPLEFT", tab1, "BOTTOMLEFT", 0, 0)
+			end
+		end)
+
 		hooksecurefunc(Settings, "RefreshGeneralTab", function()
 			local content = frame.ContentScrollFrame.Content
 			if content and content.GeneralTab then
@@ -760,6 +832,51 @@ function ElvUISkin:SkinSettings(E, S)
 			local content = frame.ContentScrollFrame.Content
 			if content and content.NotificationsTab then
 				SkinEditBoxesInTab(content.NotificationsTab)
+			end
+		end)
+		
+		-- Hook Global Sync Tab (Point 5: Skin dynamic headers and buttons)
+		hooksecurefunc(Settings, "RefreshGlobalSyncTab", function()
+			local content = frame.ContentScrollFrame.Content
+			if content and content.GlobalSyncTab then
+				local tab = content.GlobalSyncTab
+				
+				-- Skin Layout Headers (if they weren't caught by CreateHeader hook)
+				-- We can iterate children to find unskinned buttons or headers
+				local children = {tab:GetChildren()}
+				for _, child in ipairs(children) do
+					-- Case 1: Direct Button (unlikely in Global Sync, but possible)
+					if child:IsObjectType("Button") and not child.isSkinned then
+						-- Filter for the small action buttons (size 20x20 usually)
+						local w, h = child:GetSize()
+						if w < 30 and h < 30 then
+							S:HandleButton(child)
+							child.isSkinned = true
+						end
+					
+					-- Case 2: Row Frame containing Button
+					elseif child:IsObjectType("Frame") then
+						-- Check children of the row for the action button
+						local rowChildren = {child:GetChildren()}
+						for _, btn in ipairs(rowChildren) do
+							-- Skin Buttons (except Edit Note button which has a specific texture)
+							if btn:IsObjectType("Button") and not btn.isSkinned then
+								local w, h = btn:GetSize()
+								if w < 30 and h < 30 then
+									-- Check for Edit Note Icon
+									local icon = btn:GetNormalTexture()
+									local iconPath = icon and icon:GetTexture()
+									local isEditNote = iconPath and (type(iconPath) == "string" and string.find(iconPath, "UI%-GuildButton%-PublicNote"))
+									
+									if not isEditNote then
+										S:HandleButton(btn)
+										btn.isSkinned = true
+									end
+								end
+							end
+						end
+					end
+				end
 			end
 		end)
 	end
@@ -779,12 +896,97 @@ function ElvUISkin:SkinSettings(E, S)
 				return holder
 			end
 			
+			-- Double Checkbox
+			local oldCreateDoubleCheckbox = C.CreateDoubleCheckbox
+			C.CreateDoubleCheckbox = function(...)
+				local holder = oldCreateDoubleCheckbox(...)
+				if holder then
+					if holder.LeftCheckbox then S:HandleCheckBox(holder.LeftCheckbox) end
+					if holder.RightCheckbox then S:HandleCheckBox(holder.RightCheckbox) end
+				end
+				return holder
+			end
+			
 			-- Slider
 			local oldCreateSlider = C.CreateSlider
 			C.CreateSlider = function(...)
 				local holder = oldCreateSlider(...)
 				if holder and holder.Slider then
-					S:HandleSliderFrame(holder.Slider)
+					local slider = holder.Slider
+					slider:StripTextures()
+					slider:CreateBackdrop("Transparent")
+					if slider.backdrop then
+						slider.backdrop:SetPoint("TOPLEFT", 0, -5)
+						slider.backdrop:SetPoint("BOTTOMRIGHT", 0, 5)
+					end
+					
+					local thumb = slider:GetThumbTexture()
+					if thumb then
+						thumb:SetAlpha(0)
+						if not slider.BFLThumb then
+							local t = slider:CreateTexture(nil, "OVERLAY")
+							t:SetTexture(E.Media.Textures.Melli or 130751)
+							t:SetVertexColor(1, 0.82, 0)
+							t:SetSize(10, 18)
+							t:SetPoint("CENTER", thumb, "CENTER")
+							slider.BFLThumb = t
+						end
+					end
+					
+					if slider.Back then 
+						S:HandleNextPrevButton(slider.Back, "left") 
+						slider.Back:SetSize(16, 16)
+					end
+					if slider.Forward then 
+						S:HandleNextPrevButton(slider.Forward, "right") 
+						slider.Forward:SetSize(16, 16)
+					end
+				end
+				return holder
+			end
+			
+			-- SliderWithColorPicker
+			local oldCreateSliderColor = C.CreateSliderWithColorPicker
+			C.CreateSliderWithColorPicker = function(...)
+				local holder = oldCreateSliderColor(...)
+				if holder and holder.Slider then
+					-- Aggressive Skinning for MinimalSliderWithSteppersTemplate
+					local slider = holder.Slider
+					
+					-- 1. Strip all textures (removes default Blizzard borders/track art)
+					slider:StripTextures()
+					
+					-- 2. Create proper ElvUI Backdrop (The Track)
+					slider:CreateBackdrop("Transparent")
+					if slider.backdrop then
+						slider.backdrop:SetPoint("TOPLEFT", 0, -5) -- Adjust height of track
+						slider.backdrop:SetPoint("BOTTOMRIGHT", 0, 5)
+					end
+					
+					-- 3. Handle Thumb
+					local thumb = slider:GetThumbTexture()
+					if thumb then
+						thumb:SetAlpha(0) -- Hide default geometry
+						
+						if not slider.BFLThumb then
+							local t = slider:CreateTexture(nil, "OVERLAY")
+							t:SetTexture(E.Media.Textures.Melli or 130751)
+							t:SetVertexColor(1, 0.82, 0)
+							t:SetSize(10, 18)
+							t:SetPoint("CENTER", thumb, "CENTER")
+							slider.BFLThumb = t
+						end
+					end
+
+					-- 4. Skin Stepper Buttons
+					if slider.Back then 
+						S:HandleNextPrevButton(slider.Back, "left") 
+						slider.Back:SetSize(16, 16) -- Force size
+					end
+					if slider.Forward then 
+						S:HandleNextPrevButton(slider.Forward, "right") 
+						slider.Forward:SetSize(16, 16)
+					end
 				end
 				return holder
 			end

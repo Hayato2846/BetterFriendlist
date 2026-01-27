@@ -34,6 +34,9 @@ local FILTER_CYCLE = { "all", "online", "wow", "bnet" }
 local tooltip = nil
 local tooltipKey = "BetterFriendlistBrokerTT"
 
+-- Detail Tooltip reference (Forward declared for helper access)
+local detailTooltip = nil 
+
 -- ========================================
 -- Helper Functions
 -- ========================================
@@ -1023,6 +1026,7 @@ local function SetupTooltipAutoHide(tooltip, anchorFrame)
 	local timer = tooltip.bflTimer
 	timer.hideTimer = 0
 	timer.checkTimer = 0
+	timer.menuOpenTimer = 0 -- Failsafe timer
 	
 	timer:SetScript("OnUpdate", function(self, elapsed)
 		self.checkTimer = self.checkTimer + elapsed
@@ -1031,17 +1035,39 @@ local function SetupTooltipAutoHide(tooltip, anchorFrame)
 		local checkInterval = self.checkTimer
 		self.checkTimer = 0
 		
-		-- Check if mouse is over tooltip or anchor
-		local isOver = tooltip:IsMouseOver() or (anchorFrame and anchorFrame:IsMouseOver())
+		-- Check if mouse is over tooltip, detail tooltip, or anchor
+		-- Use safe method calls in case frames are invalid
+		local isOver = (tooltip.IsMouseOver and tooltip:IsMouseOver()) 
+		
+		if not isOver and anchorFrame and anchorFrame.IsMouseOver and anchorFrame:IsMouseOver() then
+			isOver = true
+		end
+
+		if not isOver and detailTooltip and detailTooltip.IsShown and detailTooltip:IsShown() and detailTooltip.IsMouseOver and detailTooltip:IsMouseOver() then
+			isOver = true
+		end
 		
 		if isOver then
 			self.hideTimer = 0
+			self.menuOpenTimer = 0 -- Reset failsafe
 		else
 			-- Mouse is outside
 			if IsMenuOpen() then
-				self.hideTimer = 0 -- Reset timer if menu is open
+				self.hideTimer = 0 -- Reset hide timer if menu is open
+				
+				-- Failsafe: If menu has been open for > 4 seconds while mouse is NOT over tooltip, force close
+				-- This prevents tooltip from getting stuck if a menu remains open indefinitely (bug/taint)
+				self.menuOpenTimer = (self.menuOpenTimer or 0) + checkInterval
+				if self.menuOpenTimer > 4.0 then
+					if LQT then 
+						pcall(function() LQT:Release(tooltip) end)
+					end
+					self:SetScript("OnUpdate", nil)
+				end
 			else
 				self.hideTimer = self.hideTimer + checkInterval
+				self.menuOpenTimer = 0
+				
 				if self.hideTimer >= 0.25 then
 					if LQT then 
 						-- Safely release tooltip
@@ -1759,7 +1785,6 @@ end
 -- LibQTip Detail Tooltip (Two-Tier System)
 -- ========================================
 
-local detailTooltip = nil
 local detailTooltipKey = "BetterFriendlistBrokerDetailTT"
 
 -- Create detail tooltip on friend line hover
@@ -1982,9 +2007,14 @@ end
 function Broker:Initialize()
 	-- BFL:DebugPrint("Broker: Initializing...")
 
-	-- BETA FEATURE CHECK: Only initialize if Beta Features are enabled
-	if not BetterFriendlistDB or not BetterFriendlistDB.enableBetaFeatures then
-		-- BFL:DebugPrint("Broker: Beta Features not enabled - Data Broker integration disabled")
+	-- Check if Broker is enabled in options (unless Beta features override is needed)
+	-- If Beta features are enabled, we might want to force it or handle it differently, 
+	-- but generally we should respect the specific setting.
+	-- Allowing initialization if brokerEnabled is explicitly TRUE (regardless of beta flag)
+	local isEnabled = BetterFriendlistDB and BetterFriendlistDB.brokerEnabled
+	
+	if not isEnabled then
+		-- BFL:DebugPrint("Broker: Feature disabled in settings")
 		return
 	end
 

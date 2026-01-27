@@ -137,7 +137,8 @@ function Components:CreateSlider(parent, labelText, min, max, initialValue, form
 	
 	-- Slider: Dynamic positioning
 	holder.Slider = CreateFrame("Slider", nil, holder, "MinimalSliderWithSteppersTemplate")
-	holder.Slider:SetHeight(20)
+	holder.Slider:SetHeight(16) -- Slightly smaller height for better look
+	holder.Slider:SetWidth(FIXED_CONTROL_WIDTH) -- Set initial width immediately to avoid layout issues
 	
 	-- Dynamic Resizing Handler
 	holder:SetScript("OnSizeChanged", function(self, width, height)
@@ -549,7 +550,7 @@ function Components:CreateSliderWithColorPicker(parent, labelText, min, max, ini
 
 	-- Slider (Left of Color Button)
 	holder.Slider = CreateFrame("Slider", nil, holder, "MinimalSliderWithSteppersTemplate")
-	holder.Slider:SetHeight(20)
+	holder.Slider:SetHeight(16)
 	
 	-- Value Label (Centered in gap)
 	holder.ValueLabel = holder:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
@@ -584,6 +585,9 @@ function Components:CreateSliderWithColorPicker(parent, labelText, min, max, ini
 	end)
 
 	-- Trigger Layout
+	-- Force initial width on slider in case layout trigger fails (default to minWidth)
+	holder.Slider:SetWidth(150)
+	
 	if holder:GetWidth() > 0 then
 		holder:GetScript("OnSizeChanged")(holder, holder:GetWidth(), holder:GetHeight())
 	end
@@ -1105,6 +1109,10 @@ function Components:CreateDoubleCheckbox(parent, leftData, rightData)
 		end)
 		rightCheck:SetScript("OnLeave", function() GameTooltip:Hide() end)
 	end
+	
+	-- Expose Checkboxes for Skinning
+	holder.LeftCheckbox = leftCheck
+	holder.RightCheckbox = rightCheck
 	
 	-- Dynamic Resizing Handler
 	holder:SetScript("OnSizeChanged", function(self, width, height)

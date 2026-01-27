@@ -148,7 +148,7 @@ function QuickFilters:InitDropdown(dropdown)
 		rootDescription:SetTag("MENU_FRIENDS_QUICKFILTER")
 		
 		-- Format for icon + text in menu (with vertical offset +2)
-		local optionText = "\124T%s:16:16:0:2\124t %s"
+		local optionText = "\124T%s:16:16:0:0\124t %s"
 		
 		-- Create filter options with icons
 		local allText = string.format(optionText, FILTER_ICONS.all, L.FILTER_ALL)
@@ -173,9 +173,9 @@ function QuickFilters:InitDropdown(dropdown)
 		CreateRadio(rootDescription, retailText, "retail")
 	end)
 	
-	-- SetSelectionTranslator: Shows only the icon (with vertical offset +2)
+	-- SetSelectionTranslator: Shows only the icon (centered)
 	dropdown:SetSelectionTranslator(function(selection)
-		return string.format("\124T%s:16:16:0:2\124t", FILTER_ICONS[selection.data])
+		return string.format("\124T%s:16:16:0:0\124t", FILTER_ICONS[selection.data])
 	end)
 	
 	-- Setup tooltip
@@ -259,8 +259,8 @@ function QuickFilters:RefreshDropdown(dropdown)
 			local text = string.format("\124T%s:14:14:-2:-2\124t", icon)
 			UIDropDownMenu_SetText(dropdown, text)
 		elseif dropdown.SetText then
-			-- Retail: Use 16x16 icon with 0:2 offset
-			local text = string.format("\124T%s:16:16:0:2\124t", icon)
+			-- Retail: Use 16x16 icon with 0:0 offset (centered)
+			local text = string.format("\124T%s:16:16:0:0\124t", icon)
 			dropdown:SetText(text)
 		end
 	end

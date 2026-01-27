@@ -1370,28 +1370,31 @@ function QuickJoin:GetGroupInfo(groupGUID)
 				end
 			elseif queueData.queueType == "pvp" then
 				-- BFL:DebugPrint("  QueueType: PvP")
-				info.groupTitle = "PvP"
+				info.groupTitle = self:ResolveQueueName(info.queues[1]) or "PvP"
 				info.activityIcon = 236396 -- User Selected: PvP
-			elseif queueData.queueType == "dungeon" or queueData.lfgDungeonID then
-				-- BFL:DebugPrint("  QueueType: Dungeon, ID:", queueData.lfgDungeonID)
-				-- Try to get dungeon name
-				if queueData.lfgDungeonID then
-					local dungeonName, _, _, _, _, _, _, _, _, dungeonIcon = GetLFGDungeonInfo(queueData.lfgDungeonID)
-					info.groupTitle = dungeonName or "Dungeon"
-					-- BFL:DebugPrint("  Dungeon Name:", dungeonName)
-					if dungeonIcon then
-						info.activityIcon = dungeonIcon
-					end
+				
+			elseif queueData.queueType == "lfg" then
+				-- BFL:DebugPrint("  QueueType: LFG (Dungeon/Raid Finder)")
+				info.groupTitle = self:ResolveQueueName(info.queues[1]) or "Dungeon Finder"
+				
+				-- Try to determine if it's a raid or dungeon for icon
+				if info.groupTitle:find(SOCIAL_QUEUE_FORMAT_RAID or "(Raid)") then
+					info.activityIcon = 1536895 -- Raid
 				else
-					info.groupTitle = "Dungeon"
+					info.activityIcon = 525134 -- Dungeon
 				end
+				
+			elseif queueData.queueType == "dungeon" or queueData.lfgDungeonID then
+				-- Legacy/Fallback handling
+				info.groupTitle = self:ResolveQueueName(info.queues[1]) or "Dungeon"
+				info.activityIcon = 525134 -- Dungeon
+				
 			elseif queueData.queueType == "raid" then
-				-- BFL:DebugPrint("  QueueType: Raid")
-				info.groupTitle = "Raid"
-				info.activityIcon = 1536895 -- User Selected: Raid
+				info.groupTitle = self:ResolveQueueName(info.queues[1]) or "Raid"
+				info.activityIcon = 1536895 -- Raid
 			else
 				-- BFL:DebugPrint("  QueueType: Unknown/Other:", queueData.queueType)
-				info.groupTitle = queueData.queueType or info.queues[1].name or UNKNOWN
+				info.groupTitle = self:ResolveQueueName(info.queues[1]) or queueData.queueType or info.queues[1].name or UNKNOWN
 			end
 		end
 		
@@ -1413,6 +1416,77 @@ function QuickJoin:GetGroupInfo(groupGUID)
 	}
 	
 	return info
+end
+
+--[[
+	Resolve queue name based on Blizzard's SocialQueueUtil implementation
+	Fixes missing details for PvP, Dungeons, and Raids
+]]
+function QuickJoin:ResolveQueueName(queue)
+	if not queue or not queue.queueData then return nil end
+	local queueData = queue.queueData
+	local queueType = queueData.queueType
+	
+	if queueType == "lfg" then
+		-- Dungeon/Raid Finder
+		local names = {}
+		if queueData.lfgIDs then
+			for _, lfgID in ipairs(queueData.lfgIDs) do
+				local name, typeID, subtypeID, _, _, _, _, _, _, _, _, _, _, _, isHoliday, _, _, isTimeWalker = GetLFGDungeonInfo(lfgID)
+				
+				if name then
+					if isTimeWalker or isHoliday or typeID == TYPEID_RANDOM_DUNGEON then
+						-- Name remains unchanged
+					elseif subtypeID == LFG_SUBTYPEID_DUNGEON then
+						-- SOCIAL_QUEUE_FORMAT_DUNGEON = "%s (Dungeon)"
+						name = string.format(SOCIAL_QUEUE_FORMAT_DUNGEON or "%s (Dungeon)", name)
+					elseif subtypeID == LFG_SUBTYPEID_HEROIC then
+						-- SOCIAL_QUEUE_FORMAT_HEROIC_DUNGEON = "%s (Heroic)"
+						name = string.format(SOCIAL_QUEUE_FORMAT_HEROIC_DUNGEON or "%s (Heroic)", name)
+					elseif subtypeID == LFG_SUBTYPEID_RAID then
+						-- SOCIAL_QUEUE_FORMAT_RAID = "%s (Raid)"
+						name = string.format(SOCIAL_QUEUE_FORMAT_RAID or "%s (Raid)", name)
+					elseif subtypeID == LFG_SUBTYPEID_FLEXRAID then
+						name = string.format(SOCIAL_QUEUE_FORMAT_RAID or "%s (Raid)", name)
+					elseif subtypeID == LFG_SUBTYPEID_WORLDPVP then
+						-- SOCIAL_QUEUE_FORMAT_WORLDPVP = "%s (PvP)"
+						name = string.format(SOCIAL_QUEUE_FORMAT_WORLDPVP or "%s (PvP)", name)
+					end
+					table.insert(names, name)
+				end
+			end
+		end
+		
+		if #names > 0 then
+			return table.concat(names, " + ")
+		end
+		
+	elseif queueType == "pvp" then
+		-- PvP Queues
+		if queueData.isBrawl and C_PvP.GetAvailableBrawlInfo then
+			local brawlInfo = C_PvP.GetAvailableBrawlInfo()
+			if brawlInfo and brawlInfo.active and brawlInfo.name then
+				return brawlInfo.name
+			end
+			return L.ACTIVITY_BRAWL or "Brawl"
+		elseif queueData.battlefieldType == "BATTLEGROUND" then
+			if queueData.mapName then
+				name = string.format(SOCIAL_QUEUE_FORMAT_BATTLEGROUND or "%s (Battleground)", queueData.mapName)
+				return name
+			end
+			return L.ACTIVITY_BATTLEGROUND or "Battleground"
+		elseif queueData.battlefieldType == "ARENA" then
+			if queueData.teamSize then
+				return string.format(SOCIAL_QUEUE_FORMAT_ARENA or "%dv%d Arena", queueData.teamSize, queueData.teamSize)
+			end
+			return L.ACTIVITY_ARENA or "Arena"
+		elseif queueData.battlefieldType == "ARENASKIRMISH" then
+			return SOCIAL_QUEUE_FORMAT_ARENA_SKIRMISH or "Arena Skirmish"
+		end
+		return L.ACTIVITY_PVP or "PvP"
+	end
+	
+	return nil
 end
 
 --[[
