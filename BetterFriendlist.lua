@@ -2356,8 +2356,12 @@ function BetterRAF_DisplayRewardsInChat(rafInfo) local RAF = GetRAF()
 end
 
 function BetterRAF_RecruitmentButton_OnClick(button) local RAF = GetRAF()
-	if RAF then
-		RAF:RecruitmentButton_OnClick(button)
+	if RecruitAFriendRecruitmentFrame:IsShown() then
+		StaticPopupSpecial_Hide(RecruitAFriendRecruitmentFrame);
+	else
+		C_RecruitAFriend.RequestUpdatedRecruitmentInfo();
+		RecruitAFriendRewardsFrame:Hide();
+		StaticPopupSpecial_Show(RecruitAFriendRecruitmentFrame);
 	end
 end
 

@@ -8,7 +8,7 @@
 ## X-WoWI-ID: 26984
 ## X-Wago-ID: rNkPLl6a 
 ## SavedVariables: BetterFriendlistDB
-## OptionalDeps: LibStub, CallbackHandler-1.0, LibDataBroker-1.1, LibQTip-1.0, LibEditMode, CustomNames
+## OptionalDeps: LibStub, CallbackHandler-1.0, LibDataBroker-1.1, LibQTip-1.0, LibEditMode, CustomNames, FriendListColors
 ## Bindings: Bindings.xml
 
 ## Category: User Interface

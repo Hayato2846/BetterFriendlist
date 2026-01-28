@@ -3138,6 +3138,54 @@ function FriendsList:GetFormattedButtonText(friend)
 	local line2Text = ""
 	
 	local displayName = friend.displayName or self:GetDisplayName(friend)
+
+	-- External Formatter Support (FriendListColors)
+	-- If FriendListColors is loaded, use it to format the name text (Line 1)
+	local usedExternalFormatter = false
+	-- Safety check: Ensure Format function exists (avoids error with old FLC versions)
+	if _G.FriendListColors and type(_G.FriendListColors.Format) == "function" then
+		local flcData = {}
+		flcData.isBNet = (friend.type == "bnet")
+		
+		-- Match Native FLC Logic: Only treat as "Online" for coloring if playing WoW
+		-- FLC's internal package logic only merges game data (including isOnline) if client is WoW
+		if friend.type == "bnet" then
+			local isWoW = (friend.gameAccountInfo and friend.gameAccountInfo.clientProgram == "WoW")
+			flcData.isOnline = isWoW and friend.connected
+			flcData.connected = isWoW and friend.connected
+		else
+			flcData.isOnline = friend.connected
+			flcData.connected = friend.connected
+		end
+		
+		flcData.notes = friend.note or friend.notes
+		
+		if friend.type == "bnet" then
+			flcData.accountName = friend.accountName
+			flcData.battleTag = friend.battleTag
+			flcData.characterName = friend.characterName
+			flcData.level = friend.level
+			flcData.className = friend.className
+			flcData.areaName = friend.areaName
+			flcData.factionName = friend.factionName
+			flcData.timerunningSeasonID = friend.timerunningSeasonID
+			flcData.gameAccountInfo = friend.gameAccountInfo
+			-- Support for default FLC behavior
+			flcData.name = friend.characterName or friend.accountName
+		else
+			flcData.name = friend.name
+			flcData.level = friend.level
+			flcData.className = friend.className
+			flcData.area = friend.area
+		end
+		
+		-- Use pcall for safety against external errors
+		local success, flcText = pcall(_G.FriendListColors.Format, flcData)
+		if success and flcText and flcText ~= "" then
+			line1Text = flcText
+			usedExternalFormatter = true
+		end
+	end
 	
 	if friend.type == "bnet" then
 		-- Battle.net Friend
@@ -3147,95 +3195,101 @@ function FriendsList:GetFormattedButtonText(friend)
 		local showRealmName = DB:Get("showRealmName", false)
 		
 		if friend.connected then
-			local isOppositeFaction = friend.factionName and friend.factionName ~= playerFactionGroup and friend.factionName ~= ""
-			local shouldGray = grayOtherFaction and isOppositeFaction
-			
-			if shouldGray then
-				line1Text = "|cff808080" .. displayName .. "|r"
-			else
-				line1Text = displayName
-			end
-			
-			if friend.characterName then
-				local characterName = friend.characterName
-				if friend.timerunningSeasonID and TimerunningUtil and TimerunningUtil.AddSmallIcon then
-					characterName = TimerunningUtil.AddSmallIcon(characterName)
-				end
+			if not usedExternalFormatter then
+				local isOppositeFaction = friend.factionName and friend.factionName ~= playerFactionGroup and friend.factionName ~= ""
+				local shouldGray = grayOtherFaction and isOppositeFaction
 				
-				if showFactionIcons and friend.factionName then
-					if friend.factionName == "Horde" then
-						characterName = "|TInterface\\FriendsFrame\\PlusManz-Horde:12:12:0:0|t" .. characterName
-					elseif friend.factionName == "Alliance" then
-						characterName = "|TInterface\\FriendsFrame\\PlusManz-Alliance:12:12:0:0|t" .. characterName
-					end
-				end
-				
-				if showRealmName and friend.realmName and friend.realmName ~= "" then
-					local playerRealm = GetRealmName()
-					if friend.realmName ~= playerRealm then
-						characterName = characterName .. " - " .. friend.realmName
-					end
-				end
-				
-				local useClassColor = DB:Get("colorClassNames", true)
-				
-				if useClassColor and not shouldGray and friend.className then
-					local classFile = GetClassFileForFriend(friend)
-					local classColor = classFile and RAID_CLASS_COLORS[classFile]
-					
-					if classColor then
-						line1Text = line1Text .. " |c" .. (classColor.colorStr or "ffffffff") .. "(" .. characterName .. ")|r"
-					else
-						line1Text = line1Text .. " (" .. characterName .. ")"
-					end
+				if shouldGray then
+					line1Text = "|cff808080" .. displayName .. "|r"
 				else
-					if shouldGray then
-						line1Text = line1Text .. " (|cff808080" .. characterName .. "|r)"
+					line1Text = displayName
+				end
+				
+				if friend.characterName then
+					local characterName = friend.characterName
+					if friend.timerunningSeasonID and TimerunningUtil and TimerunningUtil.AddSmallIcon then
+						characterName = TimerunningUtil.AddSmallIcon(characterName)
+					end
+					
+					if showFactionIcons and friend.factionName then
+						if friend.factionName == "Horde" then
+							characterName = "|TInterface\\FriendsFrame\\PlusManz-Horde:12:12:0:0|t" .. characterName
+						elseif friend.factionName == "Alliance" then
+							characterName = "|TInterface\\FriendsFrame\\PlusManz-Alliance:12:12:0:0|t" .. characterName
+						end
+					end
+					
+					if showRealmName and friend.realmName and friend.realmName ~= "" then
+						local playerRealm = GetRealmName()
+						if friend.realmName ~= playerRealm then
+							characterName = characterName .. " - " .. friend.realmName
+						end
+					end
+					
+					local useClassColor = DB:Get("colorClassNames", true)
+					
+					if useClassColor and not shouldGray and friend.className then
+						local classFile = GetClassFileForFriend(friend)
+						local classColor = classFile and RAID_CLASS_COLORS[classFile]
+						
+						if classColor then
+							line1Text = line1Text .. " |c" .. (classColor.colorStr or "ffffffff") .. "(" .. characterName .. ")|r"
+						else
+							line1Text = line1Text .. " (" .. characterName .. ")"
+						end
 					else
-						line1Text = line1Text .. " (" .. characterName .. ")"
+						if shouldGray then
+							line1Text = line1Text .. " (|cff808080" .. characterName .. "|r)"
+						else
+							line1Text = line1Text .. " (" .. characterName .. ")"
+						end
 					end
 				end
 			end
 		else
 			-- Offline
-			line1Text = "|cff7f7f7f" .. displayName .. "|r"
+			if not usedExternalFormatter then
+				line1Text = "|cff7f7f7f" .. displayName .. "|r"
+			end
 		end
 		
 		-- Compact Mode Append
 		if isCompactMode then
-			local hideMaxLevel = DB:Get("hideMaxLevel", false)
-			local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or MAX_PLAYER_LEVEL or 60
-			
-			if friend.connected then
-				local infoText = ""
-				if friend.level and friend.areaName then
-					if hideMaxLevel and friend.level == maxLevel then
-						infoText = " - " .. friend.areaName
-					else
-						infoText = " - " .. string.format(L.LEVEL_FORMAT, friend.level) .. ", " .. friend.areaName
-					end
-				elseif friend.level then
-					if hideMaxLevel and friend.level == maxLevel then
-						infoText = " - " .. L.FRIEND_MAX_LEVEL
-					else
-						infoText = " - " .. string.format(L.LEVEL_FORMAT, friend.level)
-					end
-				elseif friend.areaName then
-					infoText = " - " .. friend.areaName
-				elseif friend.gameName then
-					infoText = " - " .. friend.gameName
-				end
+			if not usedExternalFormatter then
+				local hideMaxLevel = DB:Get("hideMaxLevel", false)
+				local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or MAX_PLAYER_LEVEL or 60
 				
-				if infoText ~= "" then
-					local infoColor = DB:Get("fontColorFriendInfo") or {r=0.5, g=0.5, b=0.5, a=1}
-					local infoHex = string.format("|cff%02x%02x%02x", infoColor.r*255, infoColor.g*255, infoColor.b*255)
-					line1Text = line1Text .. infoHex .. infoText .. "|r"
-				end
-			else
-				if friend.lastOnlineTime then
-					local infoColor = DB:Get("fontColorFriendInfo") or {r=0.5, g=0.5, b=0.5, a=1}
-					local infoHex = string.format("|cff%02x%02x%02x", infoColor.r*255, infoColor.g*255, infoColor.b*255)
-					line1Text = line1Text .. " " .. infoHex .. "- " .. GetLastOnlineText(friend) .. "|r"
+				if friend.connected then
+					local infoText = ""
+					if friend.level and friend.areaName then
+						if hideMaxLevel and friend.level == maxLevel then
+							infoText = " - " .. friend.areaName
+						else
+							infoText = " - " .. string.format(L.LEVEL_FORMAT, friend.level) .. ", " .. friend.areaName
+						end
+					elseif friend.level then
+						if hideMaxLevel and friend.level == maxLevel then
+							infoText = " - " .. L.FRIEND_MAX_LEVEL
+						else
+							infoText = " - " .. string.format(L.LEVEL_FORMAT, friend.level)
+						end
+					elseif friend.areaName then
+						infoText = " - " .. friend.areaName
+					elseif friend.gameName then
+						infoText = " - " .. friend.gameName
+					end
+					
+					if infoText ~= "" then
+						local infoColor = DB:Get("fontColorFriendInfo") or {r=0.5, g=0.5, b=0.5, a=1}
+						local infoHex = string.format("|cff%02x%02x%02x", infoColor.r*255, infoColor.g*255, infoColor.b*255)
+						line1Text = line1Text .. infoHex .. infoText .. "|r"
+					end
+				else
+					if friend.lastOnlineTime then
+						local infoColor = DB:Get("fontColorFriendInfo") or {r=0.5, g=0.5, b=0.5, a=1}
+						local infoHex = string.format("|cff%02x%02x%02x", infoColor.r*255, infoColor.g*255, infoColor.b*255)
+						line1Text = line1Text .. " " .. infoHex .. "- " .. GetLastOnlineText(friend) .. "|r"
+					end
 				end
 			end
 		else
@@ -3280,65 +3334,71 @@ function FriendsList:GetFormattedButtonText(friend)
 		local showRealmName = DB:Get("showRealmName", false)
 		
 		if friend.connected then
-			local isOppositeFaction = friend.factionName and friend.factionName ~= playerFactionGroup and friend.factionName ~= ""
-			local shouldGray = grayOtherFaction and isOppositeFaction
-			
-			local characterName = displayName
-			
-			if showFactionIcons and friend.factionName then
-				if friend.factionName == "Horde" then
-					characterName = "|TInterface\\FriendsFrame\\PlusManz-Horde:12:12:0:0|t" .. characterName
-				elseif friend.factionName == "Alliance" then
-					characterName = "|TInterface\\FriendsFrame\\PlusManz-Alliance:12:12:0:0|t" .. characterName
+			if not usedExternalFormatter then
+				local isOppositeFaction = friend.factionName and friend.factionName ~= playerFactionGroup and friend.factionName ~= ""
+				local shouldGray = grayOtherFaction and isOppositeFaction
+				
+				local characterName = displayName
+				
+				if showFactionIcons and friend.factionName then
+					if friend.factionName == "Horde" then
+						characterName = "|TInterface\\FriendsFrame\\PlusManz-Horde:12:12:0:0|t" .. characterName
+					elseif friend.factionName == "Alliance" then
+						characterName = "|TInterface\\FriendsFrame\\PlusManz-Alliance:12:12:0:0|t" .. characterName
+					end
 				end
-			end
-			
-			local useClassColor = DB:Get("colorClassNames", true)
-			
-			if useClassColor and not shouldGray then
-				local classFile = GetClassFileFromClassName(friend.className)
-				local classColor = classFile and RAID_CLASS_COLORS[classFile]
-				if classColor then
-					line1Text = "|c" .. (classColor.colorStr or "ffffffff") .. characterName .. "|r"
+				
+				local useClassColor = DB:Get("colorClassNames", true)
+				
+				if useClassColor and not shouldGray then
+					local classFile = GetClassFileFromClassName(friend.className)
+					local classColor = classFile and RAID_CLASS_COLORS[classFile]
+					if classColor then
+						line1Text = "|c" .. (classColor.colorStr or "ffffffff") .. characterName .. "|r"
+					else
+						line1Text = characterName
+					end
 				else
-					line1Text = characterName
-				end
-			else
-				if shouldGray then
-					line1Text = "|cff808080" .. characterName .. "|r"
-				else
-					line1Text = characterName
+					if shouldGray then
+						line1Text = "|cff808080" .. characterName .. "|r"
+					else
+						line1Text = characterName
+					end
 				end
 			end
 		else
-			line1Text = "|cff7f7f7f" .. displayName .. "|r"
+			if not usedExternalFormatter then
+				line1Text = "|cff7f7f7f" .. displayName .. "|r"
+			end
 		end
 		
 		-- Compact Mode Append
 		if isCompactMode then
-			local hideMaxLevel = DB:Get("hideMaxLevel", false)
-			local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or MAX_PLAYER_LEVEL or 60
-			
-			if friend.connected then
-				local infoText = ""
-				if friend.level and friend.area then
-					if hideMaxLevel and friend.level == maxLevel then
-						infoText = " - " .. friend.area
-					else
-						infoText = " - " .. string.format(L.LEVEL_FORMAT, friend.level) .. ", " .. friend.area
-					end
-				elseif friend.level then
-					if hideMaxLevel and friend.level == maxLevel then
-						infoText = " - " .. L.FRIEND_MAX_LEVEL
-					else
-						infoText = " - " .. string.format(L.LEVEL_FORMAT, friend.level)
-					end
-				elseif friend.area then
-					infoText = " - " .. friend.area
-				end
+			if not usedExternalFormatter then
+				local hideMaxLevel = DB:Get("hideMaxLevel", false)
+				local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or MAX_PLAYER_LEVEL or 60
 				
-				if infoText ~= "" then
-					line1Text = line1Text .. "|cff7f7f7f" .. infoText .. "|r"
+				if friend.connected then
+					local infoText = ""
+					if friend.level and friend.area then
+						if hideMaxLevel and friend.level == maxLevel then
+							infoText = " - " .. friend.area
+						else
+							infoText = " - " .. string.format(L.LEVEL_FORMAT, friend.level) .. ", " .. friend.area
+						end
+					elseif friend.level then
+						if hideMaxLevel and friend.level == maxLevel then
+							infoText = " - " .. L.FRIEND_MAX_LEVEL
+						else
+							infoText = " - " .. string.format(L.LEVEL_FORMAT, friend.level)
+						end
+					elseif friend.area then
+						infoText = " - " .. friend.area
+					end
+					
+					if infoText ~= "" then
+						line1Text = line1Text .. "|cff7f7f7f" .. infoText .. "|r"
+					end
 				end
 			end
 		else
