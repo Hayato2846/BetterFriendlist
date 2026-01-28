@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.2.6] - 2026-01-25
+### Fixed
+- **Simple Mode (Classic)** - Fixed an issue where the "Simple Mode" toggle did not work correctly in Classic versions. It now creates a Compact Mode (hides search/dropdowns) while preserving the portrait to maintain visual integrity.
+- **Classic Layout** - Optimized layout for Classic versions (centered dropdowns, improved spacing).
+
 ## [2.2.5] - 2026-01-25
 ### Fixed
 - **Combat Blocking Fix** - Fixed a critical issue where the Friends List window could not be opened during combat, even when UI Panel settings were disabled. This resolves the "ADDON_ACTION_BLOCKED" error caused by unnecessary secure templates.

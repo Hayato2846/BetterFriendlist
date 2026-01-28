@@ -131,18 +131,20 @@ function BFL:UpdatePortraitVisibility()
 	
 	if frame then
 		local shouldShow = not simpleMode
+
+		local shouldShowPortrait = shouldShow
 		
 		-- Standard Hiding (The Nice Way)
-		if frame.PortraitContainer then frame.PortraitContainer:SetShown(shouldShow) end
-		if frame.portrait then frame.portrait:SetShown(shouldShow) end
-		if frame.PortraitButton then frame.PortraitButton:SetShown(shouldShow) end
-		if frame.PortraitIcon then frame.PortraitIcon:SetShown(shouldShow) end
-		if frame.PortraitMask then frame.PortraitMask:SetShown(shouldShow) end
-		if frame.SetPortraitShown then frame:SetPortraitShown(shouldShow) end
+		if frame.PortraitContainer then frame.PortraitContainer:SetShown(shouldShowPortrait) end
+		if frame.portrait then frame.portrait:SetShown(shouldShowPortrait) end
+		if frame.PortraitButton then frame.PortraitButton:SetShown(shouldShowPortrait) end
+		if frame.PortraitIcon then frame.PortraitIcon:SetShown(shouldShowPortrait) end
+		if frame.PortraitMask then frame.PortraitMask:SetShown(shouldShowPortrait) end
+		if frame.SetPortraitShown then frame:SetPortraitShown(shouldShowPortrait) end
 		
 		-- Also hide Global Portrait (Usually the Icon)
 		local globalPortrait = _G[frame:GetName() .. "Portrait"]
-		if globalPortrait then globalPortrait:SetShown(shouldShow) end
+		if globalPortrait then globalPortrait:SetShown(shouldShowPortrait) end
 
 		-- DEEP SEARCH (The "Find that Ring" Way)
 		-- We scan the frame regions AND immediate children's regions
@@ -150,27 +152,133 @@ function BFL:UpdatePortraitVisibility()
 		local function ProcessRegions(objectToScan)
 			if not objectToScan then return end
 			
+			local objectName = (objectToScan.GetName and objectToScan:GetName()) or "Anonymous"
+			-- BFL:DebugPrint("Scanning Object: " .. objectName)
+
 			local subRegions = {objectToScan:GetRegions()}
 			for i, region in ipairs(subRegions) do
 				if region:IsObjectType("Texture") then
-					local atlas = region:GetAtlas()
+					local regionName = region:GetName()
 					local texture = region:GetTexture()
+					local atlas = region:GetAtlas()
+					
+					-- Debug Logging for Troubleshooting
+					if BFL.debugPrintEnabled then
+						local texStr = (type(texture) == "string") and texture or tostring(texture)
+						local atlasStr = atlas or "nil"
+						local debugName = regionName or "Anonymous"
+						BFL:DebugPrint(string.format("[Region %d] %s | Tex: %s | Atlas: %s", i, debugName, texStr, atlasStr))
+					end
 					
 					-- Strategy 1: SWAP the structural corner (The "Hole" for the portrait)
-					-- We must check for BOTH the original (Portrait) and the swapped (Metal) atlas
-					-- otherwise we can't swap back because we won't recognize the region anymore.
+					-- We update this to also check for explicit Region Names (safest for standard frames)
+					
+					local isTargetCorner = false
+					
+					-- Check Retail Atlas
 					if atlas and (atlas == "UI-Frame-PortraitMetal-CornerTopLeft" or atlas == "UI-Frame-Metal-CornerTopLeft") then
-						if shouldShow then
+						isTargetCorner = true
+					end
+					
+					-- Check Classic Texture Path
+					if BFL.IsClassic and type(texture) == "string" then
+						local texLower = texture:lower()
+						if (texLower:find("friendsframe") and texLower:find("topleft")) or 
+						   (texLower:find("ui%-friendsframe%-topleft")) then
+							isTargetCorner = true
+						end
+					end
+					
+					-- Check Explicit Name (Fix for Shared Texture IDs in Classic)
+					if regionName and regionName:find("TopLeftCorner") then
+						isTargetCorner = true
+					end
+
+					if isTargetCorner then
+						if BFL.debugPrintEnabled then BFL:DebugPrint("   => MATCH: Target Corner found") end
+						
+						local parentFrame = objectToScan
+						
+						if shouldShowPortrait then
 							-- Restore original portrait corner (Open with hole)
-							region:SetAtlas("UI-Frame-PortraitMetal-CornerTopLeft")
+							region:Show() -- Ensure visible
+							region:SetAlpha(1)
+							region:SetVertexColor(1, 1, 1, 1)
+							
+							if parentFrame.SimpleCornerPatch then
+								parentFrame.SimpleCornerPatch:Hide()
+							end
+							
+							if BFL.IsClassic then
+								region:SetTexture(374156) -- Original Classic FileID for FriendFrame TopLeft
+								region:SetTexCoord(0, 1, 0, 1) 
+							else
+								region:SetAtlas("UI-Frame-PortraitMetal-CornerTopLeft", true)
+							end
 						else
 							-- Swap to standard square corner (Closed hole)
-							region:SetAtlas("UI-Frame-Metal-CornerTopLeft")
+							
+							if BFL.IsClassic then
+								-- Classic workaround: Use a separate patch texture to ensure correct sizing and draw layer
+								region:Hide() -- Hide the original hole-corner
+								
+								local patch = parentFrame.SimpleCornerPatch
+								if not patch then
+									-- Start with a clean texture
+									-- SubLevel 7 guarantees it stays on top of other borders (SubLayers -1 to 4 usually)
+									patch = parentFrame:CreateTexture(nil, "OVERLAY", nil, 7)
+									parentFrame.SimpleCornerPatch = patch
+								end
+								
+								-- Always update anchor and texture (in case they were lost or frame resized)
+								patch:ClearAllPoints()
+								if region and region.GetPoint then
+									local point, relativeTo, relativePoint, xOfs, yOfs = region:GetPoint(1)
+									if point then
+										patch:SetPoint(point, relativeTo, relativePoint, xOfs, yOfs)
+									else
+										patch:SetPoint("TOPLEFT", parentFrame, "TOPLEFT", -2, 2)
+									end
+								else
+									patch:SetPoint("TOPLEFT", parentFrame, "TOPLEFT", -2, 2)
+								end
+
+								patch:SetSize(32, 32)
+								-- Use Common-Input-Border-TL as it is confirmed to exist in Classic XMLs
+								patch:SetTexture("Interface\\Common\\Common-Input-Border-TL")
+								
+								patch:Show()
+								-- Tint it Silver (Input borders are usually grey/white, so this fits)
+								patch:SetVertexColor(0.8, 0.8, 0.8, 1)
+								
+								if BFL.debugPrintEnabled then
+									BFL:DebugPrint("   => Replaced with SimpleCornerPatch (Common-Input-TL).")
+								end
+							else
+								-- Retail supports Atlas fully
+								region:Show() 
+								region:SetAlpha(1)
+								region:SetVertexColor(1, 1, 1, 1) -- Ensure full visibility/no tint
+								region:SetAtlas("UI-Frame-Metal-CornerTopLeft", true) -- Force atlas size (square)
+								
+								-- Ensure patch is hidden in Retail too (just in case)
+								if parentFrame.SimpleCornerPatch then
+									parentFrame.SimpleCornerPatch:Hide()
+								end
+							end
 						end
 					end
 
 					-- Strategy 2: HIDE the overlay ring (The shiny gold/blue circle)
 					local isRingOverlay = false
+					
+					-- Safety: If it's the corner, it CANNOT be the ring
+					if not isTargetCorner then
+						-- Check Explicit Name (Primary Fix)
+					-- "PortraitFrame" is the standard name for the overlay ring in ButtonFrameTemplate
+					if regionName and regionName:find("PortraitFrame") then
+						isRingOverlay = true
+					end
 					
 					-- Check Atlas (Ring Overlays only)
 					if atlas and (
@@ -183,11 +291,18 @@ function BFL:UpdatePortraitVisibility()
 					
 					-- Check Texture Path (Legacy/Classic rings)
 					-- explicit exclude "PortraitMetal" to avoid hiding the border again
-					if texture and type(texture) == "string" and (
-						(texture:find("UI%-Frame%-Portrait") and not texture:find("PortraitMetal")) or 
-						texture:find("PortraitRing")
-					) then
-						isRingOverlay = true
+					if texture and type(texture) == "string" then
+						local texLower = texture:lower()
+						if (texLower:find("portrait") and not texLower:find("metal")) then
+							-- Candidates for rings:
+							if texLower:find("ui%-frame%-portrait") or        -- Standard
+							   texLower:find("ui%-friendsframe%-portrait") or -- Classic FriendsFrame
+							   texLower:find("portraitring") or               -- Rare variation
+							   texLower:find("player%-portrait")              -- Player frame style
+							then
+								isRingOverlay = true
+							end
+						end
 					end
 
 					-- Check Texture IDs
@@ -201,8 +316,10 @@ function BFL:UpdatePortraitVisibility()
 					end
 					
 					if isRingOverlay then
-						region:SetShown(shouldShow)
-						region:SetAlpha(shouldShow and 1 or 0)
+						if BFL.debugPrintEnabled then BFL:DebugPrint("   => MATCH: Ring Overlay found (Hiding)") end
+						region:SetShown(shouldShowPortrait)
+						region:SetAlpha(shouldShowPortrait and 1 or 0)
+					end
 					end
 				end
 			end
@@ -213,13 +330,19 @@ function BFL:UpdatePortraitVisibility()
 		if frame.GetChildren then
 			local children = {frame:GetChildren()}
 			for _, child in ipairs(children) do
-				ProcessRegions(child)
+				-- CRITICAL FIX: Skip the Settings Frame!
+				-- The Settings Frame is parented to BetterFriendsFrame but has its own portrait logic.
+				-- Applying the main frame's portrait textures to it causes visual glitches.
+				local childName = child.GetName and child:GetName()
+				if childName ~= "BetterFriendlistSettingsFrame" then
+					ProcessRegions(child)
+				end
 			end
 		end
 
 		-- Title Adjustment (Layout Fix)
 		if frame.TitleContainer then
-			local xOffset = shouldShow and 58 or 5 
+			local xOffset = shouldShowPortrait and 58 or 5 
 			frame.TitleContainer:ClearAllPoints()
 			frame.TitleContainer:SetPoint("TOPLEFT", frame, "TOPLEFT", xOffset, -1)
 			frame.TitleContainer:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -24, -1)
@@ -229,8 +352,14 @@ function BFL:UpdatePortraitVisibility()
 		if frame.FriendsTabHeader and frame.FriendsTabHeader.BattlenetFrame then
 			local bnetFrame = frame.FriendsTabHeader.BattlenetFrame
 			local baseWidth = 190 -- Default XML width
+
+			-- Classic Specific: Reduce width by 30px to prevent overlapping/crowding
+			if BFL.IsClassic then
+				baseWidth = baseWidth - 30
+			end
+			
 			-- Increase width by 65px in Simple Mode to utilize recovered space
-			local extraWidth = shouldShow and 0 or 65
+			local extraWidth = shouldShowPortrait and 0 or 65
 			bnetFrame:SetWidth(baseWidth + extraWidth)
 		end
 
@@ -253,11 +382,41 @@ function BFL:UpdatePortraitVisibility()
 				header.Tab1:ClearAllPoints()
 				if shouldShow then
 					-- Default Position (Standard Mode)
-					header.Tab1:SetPoint("TOPLEFT", header, "TOPLEFT", 18, -95)
+					if BFL.IsClassic then
+						-- Classic: More spacing (Shift down)
+						header.Tab1:SetPoint("TOPLEFT", header, "TOPLEFT", 18, -120)
+					else
+						-- Retail: Standard
+						header.Tab1:SetPoint("TOPLEFT", header, "TOPLEFT", 18, -95)
+					end
 				else
 					-- Shifted Position (Simple Mode)
 					-- Move up to roughly where SearchBox was (y=-55 to -60)
 					header.Tab1:SetPoint("TOPLEFT", header, "TOPLEFT", 18, -60)
+				end
+			end
+
+			-- Classic Layout Adjustments (Vertical Spacing for standard elements)
+			if BFL.IsClassic and shouldShow then
+				-- Center the 3 dropdowns: Anchor Middle (PrimarySort) to Top Center
+				if header.PrimarySortDropdown then
+					header.PrimarySortDropdown:ClearAllPoints()
+					header.PrimarySortDropdown:SetPoint("TOP", header, "TOP", 0, -60)
+				end
+				
+				-- Anchor Left (QuickFilter) relative to Middle
+				if header.QuickFilterDropdown and header.PrimarySortDropdown then
+					header.QuickFilterDropdown:ClearAllPoints()
+					-- Replicate the visual overlap (~10px) from XML
+					header.QuickFilterDropdown:SetPoint("TOPRIGHT", header.PrimarySortDropdown, "TOPLEFT", 10, 0)
+				end
+				
+				-- Adjust SearchBox (Row 2) - Move down to create breathing room
+				-- Must set TWO points or explicit width to ensure visibility after ClearAllPoints
+				if header.SearchBox then
+					header.SearchBox:ClearAllPoints()
+					header.SearchBox:SetPoint("TOPLEFT", header, "TOPLEFT", 18, -90)
+					header.SearchBox:SetPoint("TOPRIGHT", header, "TOPRIGHT", -18, -90)
 				end
 			end
 		end
@@ -759,6 +918,63 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 	-- Debug print toggle
 	if msg == "debug" then
 		BFL:ToggleDebugPrint()
+
+	-- Debug Corner (Diagnostic tool for Classic corner issues)
+	elseif msg == "debugcorner" then
+		print("--- BFL Debug Corner ---")
+		local frame = BetterFriendsFrame
+		if not frame then print("Frame not found"); return end
+
+		-- Check the original XML region
+		local regionName = "BetterFriendsFrameTopLeftCorner"
+		local region = _G[regionName]
+		if region then
+			print("Original Region: " .. regionName)
+			print("  IsShown: " .. tostring(region:IsShown()))
+			local w, h = region:GetSize()
+			print("  Size: " .. tostring(w) .. "x" .. tostring(h))
+			local tex = region:GetTexture()
+			print("  Texture: " .. tostring(tex))
+			print("  Alpha: " .. tostring(region:GetAlpha()))
+			local layer, sub = region:GetDrawLayer()
+			print("  Layer: " .. tostring(layer) .. " (" .. tostring(sub) .. ")")
+			local nPoints = region:GetNumPoints()
+			print("  NumPoints: " .. nPoints)
+			if nPoints > 0 then
+				local point, relTo, relPoint, x, y = region:GetPoint(1)
+				local relName = (relTo and relTo.GetName) and relTo:GetName() or tostring(relTo)
+				print("  Point 1: " .. tostring(point) .. " -> " .. relName .. " [" .. tostring(x) .. ", " .. tostring(y) .. "]")
+			end
+		else
+			print("Original Region (" .. regionName .. ") not found in global namespace")
+		end
+
+		-- Check our custom patch
+		if frame.SimpleCornerPatch then
+			print("Patch Region (SimpleCornerPatch) found on frame")
+			local p = frame.SimpleCornerPatch
+			print("  IsShown: " .. tostring(p:IsShown()))
+			local w, h = p:GetSize()
+			print("  Size: " .. tostring(w) .. "x" .. tostring(h))
+			local tex = p:GetTexture()
+			print("  Texture: " .. tostring(tex))
+			local r, g, b, a = p:GetVertexColor()
+			print(string.format("  VertexColor: %.2f, %.2f, %.2f, %.2f", r or 0, g or 0, b or 0, a or 1))
+			local layer, sub = p:GetDrawLayer()
+			print("  Layer: " .. tostring(layer) .. " (" .. tostring(sub) .. ")")
+			
+			local nPoints = p:GetNumPoints()
+			if nPoints > 0 then
+				local point, relTo, relPoint, x, y = p:GetPoint(1)
+				local relName = (relTo and relTo.GetName) and relTo:GetName() or tostring(relTo)
+				print("  Point 1: " .. tostring(point) .. " -> " .. relName .. " [" .. tostring(x) .. ", " .. tostring(y) .. "]")
+			else
+				print("  WARNING: Patch has NO points set!")
+			end
+		else
+			print("Patch Region (SimpleCornerPatch) NOT found on frame")
+		end
+		print("------------------------")
 
 	-- Missing Locales tool
 	elseif msg == "missing" then
