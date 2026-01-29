@@ -805,7 +805,6 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 	local format = self.settingsCache and self.settingsCache.nameDisplayFormat or (DB and DB:Get("nameDisplayFormat", "%name%") or "%name%")
 	local uid = friend.uid or GetFriendUID(friend)
 	local note = (friend.note or friend.notes or "")
-	local nickname = DB and DB:GetNickname(uid) or ""
 	local showRealmName = self.settingsCache and self.settingsCache.showRealmName or (DB and DB:Get("showRealmName", false))
 
 	-- Inputs for validation
@@ -823,14 +822,20 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 	   cacheEntry.format == format and
 	   cacheEntry.showRealmName == showRealmName and
 	   cacheEntry.note == note and
-	   cacheEntry.nickname == nickname and
 	   cacheEntry.rawName == rawName and
 	   cacheEntry.rawAccountName == rawAccountName and
 	   cacheEntry.rawBattleTag == rawBattleTag then
-		return cacheEntry.result
+		-- Optimization: Only fetch nickname if other cache parameters match
+		local nickname = DB and DB:GetNickname(uid) or ""
+		if cacheEntry.nickname == nickname then
+			return cacheEntry.result
+		end
 	end
 
 	-- 1. Prepare Data (Only on Cache Miss)
+	-- Fetch nickname now if we haven't already (lazy load)
+	local nickname = DB and DB:GetNickname(uid) or ""
+	
 	local name = "Unknown"
 	local battletag = rawBattleTag or ""
 	

@@ -4,6 +4,9 @@
 local ADDON_NAME, BFL = ...
 local DB = BFL:RegisterModule("DB", {})
 
+-- Optimization: Cache CustomNames Lib usage
+local CustomNamesLib = nil
+
 -- Default values
 local defaults = {
 	groupStates = {},
@@ -226,7 +229,9 @@ function DB:Initialize()
 	end
 	
 	-- Initialize CustomNames Sync if available
-	local lib = LibStub("CustomNames", true)
+	CustomNamesLib = LibStub("CustomNames", true)
+	local lib = CustomNamesLib
+	
 	if lib then
 		-- BFL:DebugPrint("Database: CustomNames Library DETECTED and Sync enabled.")
 		
@@ -488,10 +493,9 @@ function DB:GetNickname(friendUID)
 	
 	local libKey = self:GetLibKey(friendUID)
 	
-	-- 1. Try CustomNames Lib
-	local lib = LibStub("CustomNames", true)
-	if lib and libKey then
-		local customName = lib.Get(libKey)
+	-- 1. Try CustomNames Lib (Optimized Cache)
+	if CustomNamesLib and libKey then
+		local customName = CustomNamesLib.Get(libKey)
 		if customName and customName ~= libKey then
 			-- BFL:DebugPrint("DB:GetNickname (Lib) found for " .. tostring(libKey) .. ": " .. tostring(customName))
 			return customName
@@ -523,12 +527,11 @@ function DB:SetNickname(friendUID, nickname)
 	-- BFL:DebugPrint("DB:SetNickname called for " .. tostring(friendUID) .. " -> LibKey: " .. tostring(libKey) .. " Value: " .. tostring(nickname))
 	
 	-- 1. Update CustomNames Lib
-	local lib = LibStub("CustomNames", true)
-	if lib and libKey then
+	if CustomNamesLib and libKey then
 		if nickname and nickname ~= "" then
-			lib.Set(libKey, nickname)
+			CustomNamesLib.Set(libKey, nickname)
 		else
-			lib.Set(libKey, nil)
+			CustomNamesLib.Set(libKey, nil)
 		end
 	end
 	
