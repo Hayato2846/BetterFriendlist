@@ -165,8 +165,8 @@ local function BuildDisplayList(self)
 	end
 	
 	-- PERFY OPTIMIZATION: Cache settings outside loop
-	local enableInGameGroup = DB:Get("enableInGameGroup", false)
-	local inGameGroupMode = DB:Get("inGameGroupMode", "same_game")
+	local enableInGameGroup = self.settingsCache and self.settingsCache.enableInGameGroup or DB:Get("enableInGameGroup", false)
+	local inGameGroupMode = self.settingsCache and self.settingsCache.inGameGroupMode or DB:Get("inGameGroupMode", "same_game")
 	local BNET_CLIENT_WOW = BNET_CLIENT_WOW or "WoW"
 	
 	-- Group friends
@@ -257,7 +257,7 @@ local function BuildDisplayList(self)
 	end
 	table.sort(orderedGroups, function(a, b) return (a.order or 999) < (b.order or 999) end)
 	
-	local hideEmptyGroups = DB:Get("hideEmptyGroups", false)
+	local hideEmptyGroups = self.settingsCache and self.settingsCache.hideEmptyGroups or DB:Get("hideEmptyGroups", false)
 	
 	for _, groupData in ipairs(orderedGroups) do
 		local groupFriends = groupedFriends[groupData.id]
@@ -355,7 +355,7 @@ end
 -- Returns a function that calculates height based on elementData.buttonType
 local function CreateExtentCalculator(self) local DB = GetDB()
 	
-	return function(dataIndex, elementData) local isCompactMode = DB and DB:Get("compactMode", false)
+	return function(dataIndex, elementData) local isCompactMode = self.settingsCache and self.settingsCache.compactMode or (DB and DB:Get("compactMode", false))
 		
 		if elementData.buttonType == BUTTON_TYPE_GROUP_HEADER then
 			return 22
@@ -599,7 +599,7 @@ function FriendsList:RenderClassicButtons() if not self.classicScrollFrame or no
 	
 	-- Get compact mode setting
 	local DB = GetDB()
-	local isCompactMode = DB and DB:Get("compactMode", false)
+	local isCompactMode = self.settingsCache and self.settingsCache.compactMode or (DB and DB:Get("compactMode", false))
 	
 	-- Calculate total content height for accurate scrolling with variable item heights
 	local totalHeight = 0
@@ -802,11 +802,11 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 	if not self.displayNameCache then self.displayNameCache = {} end
 
 	local DB = GetDB()
-	local format = DB and DB:Get("nameDisplayFormat", "%name%") or "%name%"
+	local format = self.settingsCache and self.settingsCache.nameDisplayFormat or (DB and DB:Get("nameDisplayFormat", "%name%") or "%name%")
 	local uid = friend.uid or GetFriendUID(friend)
 	local note = (friend.note or friend.notes or "")
 	local nickname = DB and DB:GetNickname(uid) or ""
-	local showRealmName = DB and DB:Get("showRealmName", false)
+	local showRealmName = self.settingsCache and self.settingsCache.showRealmName or (DB and DB:Get("showRealmName", false))
 
 	-- Inputs for validation
 	local rawName = friend.name
@@ -947,6 +947,9 @@ function FriendsList:Initialize() -- Initialize sort modes and filter from datab
 	-- CRITICAL: Load filterMode from DB to ensure consistency
 	self.filterMode = db.quickFilter or "all"
 	
+	-- Initialize settings cache
+	self:UpdateSettingsCache()
+	
 	-- Sync groups from Groups module
 	self:SyncGroups()
 	
@@ -1061,6 +1064,28 @@ function FriendsList:UpdateFontCache()
 	self.fontCache.infoOutline = DB:Get("fontOutlineFriendInfo", "NONE")
 	self.fontCache.infoShadow = DB:Get("fontShadowFriendInfo", false)
 	self.fontCache.infoR, self.fontCache.infoG, self.fontCache.infoB, self.fontCache.infoA = GetColor("fontColorFriendInfo")
+end
+
+-- Update cached settings to avoid DB lookups in render loop
+function FriendsList:UpdateSettingsCache()
+	local DB = GetDB()
+	if not DB then return end
+	
+	self.settingsCache = self.settingsCache or {}
+	self.settingsCache.nameDisplayFormat = DB:Get("nameDisplayFormat", "%name%")
+	self.settingsCache.showRealmName = DB:Get("showRealmName", false)
+	self.settingsCache.enableInGameGroup = DB:Get("enableInGameGroup", false)
+	self.settingsCache.inGameGroupMode = DB:Get("inGameGroupMode", "same_game")
+	self.settingsCache.hideEmptyGroups = DB:Get("hideEmptyGroups", false)
+	self.settingsCache.compactMode = DB:Get("compactMode", false)
+	self.settingsCache.grayOtherFaction = DB:Get("grayOtherFaction", false)
+	self.settingsCache.showFactionIcons = DB:Get("showFactionIcons", false)
+	self.settingsCache.colorClassNames = DB:Get("colorClassNames", true)
+	self.settingsCache.hideMaxLevel = DB:Get("hideMaxLevel", false)
+	self.settingsCache.showGameIcon = DB:Get("showGameIcon", true)
+	self.settingsCache.showMobileAsAFK = DB:Get("showMobileAsAFK", false)
+	self.settingsCache.treatMobileAsOffline = DB:Get("treatMobileAsOffline", false)
+	self.settingsCache.fontColorFriendInfo = DB:Get("fontColorFriendInfo") or {r=0.5, g=0.5, b=0.5, a=1}
 end
 
 -- Handle friend list update events
@@ -1347,6 +1372,9 @@ function FriendsList:UpdateFriendsList() -- Visibility Optimization:
 	end
 	
 	isUpdatingFriendsList = true
+	
+	-- Update settings cache before processing
+	self:UpdateSettingsCache()
 	
 	-- PHASE 9.6: Object Pooling Optimization
 	-- Instead of wipe(self.friendsList), we overwrite existing entries to reduce garbage
@@ -3123,7 +3151,7 @@ end
 -- This moves expensive string concatenation out of the render loop
 function FriendsList:GetFormattedButtonText(friend)
 	local DB = GetDB()
-	local isCompactMode = DB:Get("compactMode", false)
+	local isCompactMode = self.settingsCache and self.settingsCache.compactMode or DB:Get("compactMode", false)
 	local currentSettingsVersion = BFL.SettingsVersion or 1
 	
 	-- Check cache (Fastest Path)
@@ -3190,9 +3218,9 @@ function FriendsList:GetFormattedButtonText(friend)
 	if friend.type == "bnet" then
 		-- Battle.net Friend
 		local playerFactionGroup = UnitFactionGroup("player")
-		local grayOtherFaction = DB:Get("grayOtherFaction", false)
-		local showFactionIcons = DB:Get("showFactionIcons", false)
-		local showRealmName = DB:Get("showRealmName", false)
+		local grayOtherFaction = self.settingsCache and self.settingsCache.grayOtherFaction or DB:Get("grayOtherFaction", false)
+		local showFactionIcons = self.settingsCache and self.settingsCache.showFactionIcons or DB:Get("showFactionIcons", false)
+		local showRealmName = self.settingsCache and self.settingsCache.showRealmName or DB:Get("showRealmName", false)
 		
 		if friend.connected then
 			if not usedExternalFormatter then
@@ -3226,7 +3254,7 @@ function FriendsList:GetFormattedButtonText(friend)
 						end
 					end
 					
-					local useClassColor = DB:Get("colorClassNames", true)
+					local useClassColor = self.settingsCache and self.settingsCache.colorClassNames or DB:Get("colorClassNames", true)
 					
 					if useClassColor and not shouldGray and friend.className then
 						local classFile = GetClassFileForFriend(friend)
@@ -3256,7 +3284,7 @@ function FriendsList:GetFormattedButtonText(friend)
 		-- Compact Mode Append
 		if isCompactMode then
 			if not usedExternalFormatter then
-				local hideMaxLevel = DB:Get("hideMaxLevel", false)
+				local hideMaxLevel = self.settingsCache and self.settingsCache.hideMaxLevel or DB:Get("hideMaxLevel", false)
 				local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or MAX_PLAYER_LEVEL or 60
 				
 				if friend.connected then
@@ -3280,13 +3308,13 @@ function FriendsList:GetFormattedButtonText(friend)
 					end
 					
 					if infoText ~= "" then
-						local infoColor = DB:Get("fontColorFriendInfo") or {r=0.5, g=0.5, b=0.5, a=1}
+						local infoColor = self.settingsCache and self.settingsCache.fontColorFriendInfo or (DB:Get("fontColorFriendInfo") or {r=0.5, g=0.5, b=0.5, a=1})
 						local infoHex = string.format("|cff%02x%02x%02x", infoColor.r*255, infoColor.g*255, infoColor.b*255)
 						line1Text = line1Text .. infoHex .. infoText .. "|r"
 					end
 				else
 					if friend.lastOnlineTime then
-						local infoColor = DB:Get("fontColorFriendInfo") or {r=0.5, g=0.5, b=0.5, a=1}
+						local infoColor = self.settingsCache and self.settingsCache.fontColorFriendInfo or (DB:Get("fontColorFriendInfo") or {r=0.5, g=0.5, b=0.5, a=1})
 						local infoHex = string.format("|cff%02x%02x%02x", infoColor.r*255, infoColor.g*255, infoColor.b*255)
 						line1Text = line1Text .. " " .. infoHex .. "- " .. GetLastOnlineText(friend) .. "|r"
 					end
@@ -3294,7 +3322,7 @@ function FriendsList:GetFormattedButtonText(friend)
 			end
 		else
 			-- Normal Mode Line 2
-			local hideMaxLevel = DB:Get("hideMaxLevel", false)
+			local hideMaxLevel = self.settingsCache and self.settingsCache.hideMaxLevel or DB:Get("hideMaxLevel", false)
 			local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or MAX_PLAYER_LEVEL or 60
 			
 			if friend.connected then
@@ -3329,9 +3357,9 @@ function FriendsList:GetFormattedButtonText(friend)
 	else
 		-- WoW Friend
 		local playerFactionGroup = UnitFactionGroup("player")
-		local grayOtherFaction = DB:Get("grayOtherFaction", false)
-		local showFactionIcons = DB:Get("showFactionIcons", false)
-		local showRealmName = DB:Get("showRealmName", false)
+		local grayOtherFaction = self.settingsCache and self.settingsCache.grayOtherFaction or DB:Get("grayOtherFaction", false)
+		local showFactionIcons = self.settingsCache and self.settingsCache.showFactionIcons or DB:Get("showFactionIcons", false)
+		local showRealmName = self.settingsCache and self.settingsCache.showRealmName or DB:Get("showRealmName", false)
 		
 		if friend.connected then
 			if not usedExternalFormatter then
@@ -3348,7 +3376,7 @@ function FriendsList:GetFormattedButtonText(friend)
 					end
 				end
 				
-				local useClassColor = DB:Get("colorClassNames", true)
+				local useClassColor = self.settingsCache and self.settingsCache.colorClassNames or DB:Get("colorClassNames", true)
 				
 				if useClassColor and not shouldGray then
 					local classFile = GetClassFileFromClassName(friend.className)
@@ -3375,7 +3403,7 @@ function FriendsList:GetFormattedButtonText(friend)
 		-- Compact Mode Append
 		if isCompactMode then
 			if not usedExternalFormatter then
-				local hideMaxLevel = DB:Get("hideMaxLevel", false)
+				local hideMaxLevel = self.settingsCache and self.settingsCache.hideMaxLevel or DB:Get("hideMaxLevel", false)
 				local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or MAX_PLAYER_LEVEL or 60
 				
 				if friend.connected then
@@ -3403,7 +3431,7 @@ function FriendsList:GetFormattedButtonText(friend)
 			end
 		else
 			-- Normal Mode Line 2
-			local hideMaxLevel = DB:Get("hideMaxLevel", false)
+			local hideMaxLevel = self.settingsCache and self.settingsCache.hideMaxLevel or DB:Get("hideMaxLevel", false)
 			local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or MAX_PLAYER_LEVEL or 60
 			
 			if friend.connected then
@@ -3493,8 +3521,8 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 	
 	-- Get settings
 	local DB = GetDB()
-	local isCompactMode = DB and DB:Get("compactMode", false)
-	local showGameIcon = DB and DB:Get("showGameIcon", true)
+	local isCompactMode = self.settingsCache and self.settingsCache.compactMode or (DB and DB:Get("compactMode", false))
+	local showGameIcon = self.settingsCache and self.settingsCache.showGameIcon or (DB and DB:Get("showGameIcon", true))
 	
 	-- Hide arrows if they exist
 	if button.RightArrow then button.RightArrow:Hide() end
@@ -3619,7 +3647,7 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 		end
 		
 		-- Set status icon (BSAp shows as AFK if setting enabled)
-		local showMobileAsAFK = GetDB():Get("showMobileAsAFK", false)
+		local showMobileAsAFK = self.settingsCache and self.settingsCache.showMobileAsAFK or DB:Get("showMobileAsAFK", false)
 		if friend.connected then
 			local isMobile = friend.gameAccountInfo and friend.gameAccountInfo.clientProgram == "BSAp"
 			-- Check both account status (App) and game status (WoW /afk)
