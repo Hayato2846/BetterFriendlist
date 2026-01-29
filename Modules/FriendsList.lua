@@ -1038,6 +1038,7 @@ end
 -- Update cached font paths and colors to avoid lookups in render loop
 function FriendsList:UpdateFontCache() 
 	if not self.fontCache then self.fontCache = {} end
+	self.fontCacheVersion = (self.fontCacheVersion or 0) + 1
 	
 	local DB = GetDB()
 	if not DB then return end
@@ -3526,51 +3527,110 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 	
 	-- Get settings
 	local DB = GetDB()
-	local isCompactMode = self.settingsCache and self.settingsCache.compactMode or (DB and DB:Get("compactMode", false))
-	local showGameIcon = self.settingsCache and self.settingsCache.showGameIcon or (DB and DB:Get("showGameIcon", true))
+	local isCompactMode = self.settingsCache and self.settingsCache.compactMode
+	if isCompactMode == nil then isCompactMode = (DB and DB:Get("compactMode", false)) end
+	local showGameIcon = self.settingsCache and self.settingsCache.showGameIcon
+	if showGameIcon == nil then showGameIcon = (DB and DB:Get("showGameIcon", true)) end
 	
 	-- Hide arrows if they exist
 	if button.RightArrow then button.RightArrow:Hide() end
 	if button.DownArrow then button.DownArrow:Hide() end
 	
-	-- Reset name position based on compact mode
-	if isCompactMode then
-		button.Name:SetPoint("LEFT", 44, 0)  -- Centered vertically for single line
-	else
-		button.Name:SetPoint("LEFT", 44, 7)  -- Upper position for two lines
-	end
+	-- OPTIMIZATION: Layout Caching (Phase 9.9)
+	-- Only update layout if CompactMode state changed for this button
+	if button.lastCompactMode ~= isCompactMode then
+		button.lastCompactMode = isCompactMode
 
-	-- Apply Friend Name Font Settings (Optimized)
-	if self.fontCache and self.fontCache.namePath then
-		local outline = self.fontCache.nameOutline
-		if outline == "NONE" then outline = "" end
-		
-		-- Use FontManager to apply font with Alphabet support
-		if BFL.FontManager and BFL.FontManager.ApplyFont then
-			BFL.FontManager:ApplyFont(button.Name, self.fontCache.namePath, self.fontCache.nameSize, outline, self.fontCache.nameShadow)
+		-- Reset name position based on compact mode
+		if isCompactMode then
+			button.Name:SetPoint("LEFT", 44, 0)  -- Centered vertically for single line
 		else
-			button.Name:SetFont(self.fontCache.namePath, self.fontCache.nameSize, outline)
-			if self.fontCache.nameShadow then
-				button.Name:SetShadowColor(0, 0, 0, 1)
-				button.Name:SetShadowOffset(1, -1)
-			else
-				button.Name:SetShadowColor(0, 0, 0, 0)
-				button.Name:SetShadowOffset(0, 0)
-			end
+			button.Name:SetPoint("LEFT", 44, 7)  -- Upper position for two lines
+		end
+
+		-- Show/hide friend elements based on compact mode
+		if isCompactMode then
+			button.Info:Hide()  -- Hide second line in compact mode
+		else
+			button.Info:Show()
 		end
 		
-		button.Name:SetTextColor(self.fontCache.nameR, self.fontCache.nameG, self.fontCache.nameB, self.fontCache.nameA)
+		-- Adjust icon positions and sizes for compact mode
+		if isCompactMode then
+			-- Status icon: move up to align with single-line text
+			button.status:ClearAllPoints()
+			button.status:SetPoint("TOPLEFT", 4, -4)  -- Higher position (was -9)
+			
+			-- Game icon: reduce size for compact mode
+			button.gameIcon:SetSize(20, 20)  -- Smaller (was 28x28)
+			button.gameIcon:ClearAllPoints()
+			button.gameIcon:SetPoint("TOPRIGHT", -30, -2)  -- Moved 8px right total
+			
+			-- TravelPass button: reduce size for compact mode
+			if button.travelPassButton then
+				button.travelPassButton:SetSize(18, 24)  -- Smaller (was 24x32)
+				button.travelPassButton:ClearAllPoints()
+				button.travelPassButton:SetPoint("TOPRIGHT", 0, 0)  -- Moved 8px right total
+				
+				-- Scale textures
+				button.travelPassButton.NormalTexture:SetSize(18, 24)
+				button.travelPassButton.PushedTexture:SetSize(18, 24)
+				button.travelPassButton.DisabledTexture:SetSize(18, 24)
+				button.travelPassButton.HighlightTexture:SetSize(18, 24)
+			end
+		else
+			-- Normal mode: restore original positions and sizes
+			button.status:ClearAllPoints()
+			button.status:SetPoint("TOPLEFT", 4, -9)  -- Original position
+			
+			button.gameIcon:SetSize(28, 28)  -- Original size
+			button.gameIcon:ClearAllPoints()
+			button.gameIcon:SetPoint("TOPRIGHT", -30, -3)  -- Moved 8px right total
+			
+			-- TravelPass button: restore original size
+			if button.travelPassButton then
+				button.travelPassButton:SetSize(24, 32)  -- Original size
+				button.travelPassButton:ClearAllPoints()
+				button.travelPassButton:SetPoint("TOPRIGHT", 0, -1)  -- Moved 8px right total
+				
+				-- Restore texture sizes
+				button.travelPassButton.NormalTexture:SetSize(24, 32)
+				button.travelPassButton.PushedTexture:SetSize(24, 32)
+				button.travelPassButton.DisabledTexture:SetSize(24, 32)
+				button.travelPassButton.HighlightTexture:SetSize(24, 32)
+			end
+		end
 	end
-	
-	-- Show/hide friend elements based on compact mode
-	button.status:Show()
-	if isCompactMode then
-		button.Info:Hide()  -- Hide second line in compact mode
-	else
-		button.Info:Show()
 
-		-- Apply Friend Info Font Settings (Optimized)
-		if self.fontCache and self.fontCache.infoPath then
+	-- OPTIMIZATION: Font Caching (Phase 9.9)
+	-- Only apply font if settings changed (version check)
+	if self.fontCache and button.lastFontVersion ~= self.fontCacheVersion then
+		button.lastFontVersion = self.fontCacheVersion
+
+		-- Apply Friend Name Font Settings
+		if self.fontCache.namePath then
+			local outline = self.fontCache.nameOutline
+			if outline == "NONE" then outline = "" end
+			
+			-- Use FontManager to apply font with Alphabet support
+			if BFL.FontManager and BFL.FontManager.ApplyFont then
+				BFL.FontManager:ApplyFont(button.Name, self.fontCache.namePath, self.fontCache.nameSize, outline, self.fontCache.nameShadow)
+			else
+				button.Name:SetFont(self.fontCache.namePath, self.fontCache.nameSize, outline)
+				if self.fontCache.nameShadow then
+					button.Name:SetShadowColor(0, 0, 0, 1)
+					button.Name:SetShadowOffset(1, -1)
+				else
+					button.Name:SetShadowColor(0, 0, 0, 0)
+					button.Name:SetShadowOffset(0, 0)
+				end
+			end
+			
+			button.Name:SetTextColor(self.fontCache.nameR, self.fontCache.nameG, self.fontCache.nameB, self.fontCache.nameA)
+		end
+		
+		-- Apply Friend Info Font Settings
+		if not isCompactMode and self.fontCache.infoPath then
 			local outline = self.fontCache.infoOutline
 			if outline == "NONE" then outline = "" end
 			
@@ -3593,51 +3653,8 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 		end
 	end
 	
-	-- Adjust icon positions and sizes for compact mode
-	if isCompactMode then
-		-- Status icon: move up to align with single-line text
-		button.status:ClearAllPoints()
-		button.status:SetPoint("TOPLEFT", 4, -4)  -- Higher position (was -9)
-		
-		-- Game icon: reduce size for compact mode
-		button.gameIcon:SetSize(20, 20)  -- Smaller (was 28x28)
-		button.gameIcon:ClearAllPoints()
-		button.gameIcon:SetPoint("TOPRIGHT", -30, -2)  -- Moved 8px right total
-		
-		-- TravelPass button: reduce size for compact mode
-		if button.travelPassButton then
-			button.travelPassButton:SetSize(18, 24)  -- Smaller (was 24x32)
-			button.travelPassButton:ClearAllPoints()
-			button.travelPassButton:SetPoint("TOPRIGHT", 0, 0)  -- Moved 8px right total
-			
-			-- Scale textures
-			button.travelPassButton.NormalTexture:SetSize(18, 24)
-			button.travelPassButton.PushedTexture:SetSize(18, 24)
-			button.travelPassButton.DisabledTexture:SetSize(18, 24)
-			button.travelPassButton.HighlightTexture:SetSize(18, 24)
-		end
-	else
-		-- Normal mode: restore original positions and sizes
-		button.status:ClearAllPoints()
-		button.status:SetPoint("TOPLEFT", 4, -9)  -- Original position
-		
-		button.gameIcon:SetSize(28, 28)  -- Original size
-		button.gameIcon:ClearAllPoints()
-		button.gameIcon:SetPoint("TOPRIGHT", -30, -3)  -- Moved 8px right total
-		
-		-- TravelPass button: restore original size
-		if button.travelPassButton then
-			button.travelPassButton:SetSize(24, 32)  -- Original size
-			button.travelPassButton:ClearAllPoints()
-			button.travelPassButton:SetPoint("TOPRIGHT", 0, -1)  -- Moved 8px right total
-			
-			-- Restore texture sizes
-			button.travelPassButton.NormalTexture:SetSize(24, 32)
-			button.travelPassButton.PushedTexture:SetSize(24, 32)
-			button.travelPassButton.DisabledTexture:SetSize(24, 32)
-			button.travelPassButton.HighlightTexture:SetSize(24, 32)
-		end
-	end
+	-- Ensure status is shown (needed if button was recycled or hidden elsewhere)
+	button.status:Show()
 	
 	if friend.type == "bnet" then
 		-- Battle.net friend
