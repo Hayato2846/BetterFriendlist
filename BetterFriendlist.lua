@@ -2036,9 +2036,11 @@ function BetterFriendsFrame_ShowContactsMenu(button) local generator = function(
 		rootDescription:CreateButton(L.MENU_SETTINGS, function() BetterFriendlistSettings_Show()
 		end);
 		
-		-- Changelog option (Simple Mode only)
+		-- Changelog option (Simple Mode OR Classic+ElvUI)
 		local DB = GetDB()
-		if DB and DB:Get("simpleMode", false) then
+		local simpleMode = DB and DB:Get("simpleMode", false) or false
+		local isElvUIActive = BFL.IsClassic and _G.ElvUI and BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin ~= false
+		if simpleMode or isElvUIActive then
 			rootDescription:CreateButton(L.MENU_CHANGELOG or "Changelog", function()
 				local Changelog = BFL:GetModule("Changelog")
 				if Changelog then Changelog:Show() end
@@ -2447,7 +2449,12 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex) local frame = BetterFriendsF
 		if tabIndex == 1 then
 			ShowChildFrame(frame.FriendsTabHeader)
 			if frame.FriendsTabHeader.SearchBox then
-				ShowChildFrame(frame.FriendsTabHeader.SearchBox)
+				local simpleMode = BetterFriendlistDB and BetterFriendlistDB.simpleMode
+				if not simpleMode then
+					ShowChildFrame(frame.FriendsTabHeader.SearchBox)
+				else
+					HideChildFrame(frame.FriendsTabHeader.SearchBox)
+				end
 			end
 		else
 			HideChildFrame(frame.FriendsTabHeader)

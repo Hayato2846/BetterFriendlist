@@ -222,6 +222,20 @@ local function CreateClassicDropdown(parent, entries, isSelectedCallback, onSele
 	UIDropDownMenu_SetWidth(dropdown, 150)
 	UIDropDownMenu_JustifyText(dropdown, "LEFT")
 	
+	-- Classic + ElvUI: Expand clickable button area
+	if BFL.IsClassic then
+		local isElvUIActive = _G.ElvUI and BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin ~= false
+		if isElvUIActive then
+			local button = _G[dropdownName.."Button"]
+			if button then
+				-- Make button fill the entire dropdown width (150px base + padding)
+				button:SetSize(150, 24)
+				button:ClearAllPoints()
+				button:SetPoint("CENTER", dropdown, "CENTER", 0, 0)
+			end
+		end
+	end
+	
 	return dropdown
 end
 

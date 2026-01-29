@@ -10,7 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.2.6] - 2026-01-25
 ### Fixed
 - **Simple Mode (Classic)** - Fixed an issue where the "Simple Mode" toggle did not work correctly in Classic versions. It now creates a Compact Mode (hides search/dropdowns) while preserving the portrait to maintain visual integrity.
-- **Classic Layout** - Optimized layout for Classic versions (centered dropdowns, improved spacing).
+- **Classic Layout** - Optimized layout for Classic versions (centered dropdowns, improved spacing). Reduced BNet Frame width by 40px in simple mode for better fit.
+- **SearchBox Bug** - Fixed an issue where the SearchBox would reappear when switching tabs while Simple Mode was active.
+- **Localization** - Added missing localization keys for the "Reload Required" dialog in all 11 supported languages.
 
 ## [2.2.5] - 2026-01-25
 ### Fixed

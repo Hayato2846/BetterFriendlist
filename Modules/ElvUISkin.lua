@@ -23,10 +23,11 @@ function ElvUISkin:Initialize()
 		self:RegisterSkin()
 	else
 		-- Wait for ElvUI to load (in case BFL loads first)
+		-- Check for "ElvUI" or "ElvUI_Classic" or generic _G.ElvUI presence
 		local listener = CreateFrame("Frame")
 		listener:RegisterEvent("ADDON_LOADED")
 		listener:SetScript("OnEvent", function(f, event, addonName)
-			if addonName == "ElvUI" then
+			if addonName == "ElvUI" or addonName == "ElvUI_Classic" or _G.ElvUI then
 				self:RegisterSkin()
 				f:UnregisterEvent("ADDON_LOADED")
 			end
@@ -39,31 +40,34 @@ function ElvUISkin:RegisterSkin()
 	
 	-- Check if skin is enabled in BFL settings (Point 1)
 	-- Explicit check for false (nil means enabled by default if we wanted, but DB init sets it to false)
-	if BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin == false then
-		-- BFL:DebugPrint("ElvUISkin: Skin disabled in settings")
+	local isEnabled = BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin
+	if isEnabled == false then
+		print("|cff00ffffBFL ElvUI:|r Skin disabled in settings (DB.enableElvUISkin = false)")
 		return
 	end
 
-	BFL:DebugPrint("ElvUISkin: Registering skin...")
+	print("|cff00ffffBFL ElvUI:|r Registering skin...")
 	local E, L, V, P, G = unpack(_G.ElvUI)
 	local S = E:GetModule('Skins')
-	if not S then return end
+	if not S then 
+		print("|cff00ffffBFL ElvUI:|r Skins module not found!")
+		return 
+	end
 
 	-- Register callback for skinning
 	-- This ensures our skin runs when ElvUI skins are applied
+	-- Try both typical addon names to be safe
 	S:AddCallbackForAddon("BetterFriendlist", "BetterFriendlist", function()
-		BFL:DebugPrint("ElvUISkin: Callback triggered")
+		print("|cff00ffffBFL ElvUI:|r Callback triggered")
 		xpcall(function() self:SkinFrames(E, S) end, function(err) print("|cffff0000BetterFriendlist ElvUI Skin Error:|r " .. tostring(err)) end)
 	end)
 	
-	-- If BetterFriendlist is already loaded (which it is), try to skin immediately
-	-- This helps if ElvUI has already processed callbacks
-	-- Point 9: Only run direct call if ElvUI is fully initialized to avoid PixelPerfect errors
+	-- Force run if ElvUI is already initialized (Classic fix)
 	if E.initialized then
-		BFL:DebugPrint("ElvUISkin: Direct call triggered")
+		print("|cff00ffffBFL ElvUI:|r Direct call triggered (E.initialized=true)")
 		xpcall(function() self:SkinFrames(E, S) end, function(err) print("|cffff0000BetterFriendlist ElvUI Skin Error:|r " .. tostring(err)) end)
 	else
-		BFL:DebugPrint("ElvUISkin: Skipping direct call (ElvUI not initialized)")
+		print("|cff00ffffBFL ElvUI:|r Direct call skipped (E.initialized=false)")
 	end
 end
 
@@ -113,59 +117,92 @@ function ElvUISkin:SkinFrames(E, S)
 		BFL:DebugPrint("ElvUISkin: Skinning PortraitButton")
 		local button = frame.PortraitButton
 		
-		-- Reset position and size to fit ElvUI style
-		button:ClearAllPoints()
-		button:SetPoint("TOPLEFT", frame, "TOPLEFT", 4, -4)
-		button:SetSize(42, 42) -- Standard icon size
-		button:SetFrameLevel(frame:GetFrameLevel() + 5)
-		
-		-- Create Backdrop
-		button:CreateBackdrop("Transparent")
-		
-		-- Handle Icon
-		-- Create a new texture to avoid mask/layer issues with the original
-		if not button.Icon then
-			button.Icon = button:CreateTexture(nil, "ARTWORK")
-			button.Icon:SetInside()
-			-- Fixed: Use .blp extension for Classic compatibility
-			button.Icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Textures\\PortraitIcon.blp")
-			button.Icon:SetTexCoord(unpack(E.TexCoords))
-		end
-		button.Icon:Show()
-		
-		-- Hide original icon and mask
-		if frame.PortraitIcon then frame.PortraitIcon:Hide() end
-		if frame.PortraitMask then frame.PortraitMask:Hide() end
-		
-		-- Handle Glow (New Version Indicator)
-		if button.Glow then
-			button.Glow:SetParent(button)
-			button.Glow:ClearAllPoints()
-			button.Glow:SetInside()
-			button.Glow:SetDrawLayer("OVERLAY")
-			-- Use a cleaner glow texture for ElvUI
-			button.Glow:SetTexture(E.Media.Textures.Highlight) 
-			button.Glow:SetVertexColor(1, 0.82, 0, 0.5)
+		-- Classic: Hide portrait when ElvUI active and NOT in Simple Mode
+		-- (Changelog will be accessible via Contacts Menu instead)
+		local shouldSkinPortrait = true
+		if BFL.IsClassic then
+			local DB = BFL:GetModule("DB")
+			local simpleMode = DB and DB:Get("simpleMode", false) or false
+			if not simpleMode then
+				button:Hide()
+				shouldSkinPortrait = false
+			end
 		end
 		
-		-- Add Hover Effect
-		button:HookScript("OnEnter", function(self)
-			if self.backdrop then
-				local color = E.media.rgbvaluecolor
-				if color then
-					self.backdrop:SetBackdropBorderColor(color.r, color.g, color.b)
-				end
-			end
-		end)
+		if shouldSkinPortrait then
+			-- Reset position and size to fit ElvUI style
+			button:ClearAllPoints()
+			button:SetPoint("TOPLEFT", frame, "TOPLEFT", 4, -4)
+			button:SetSize(42, 42) -- Standard ElvUI icon size (square)
+			button:SetFrameLevel(frame:GetFrameLevel() + 5)
 		
-		button:HookScript("OnLeave", function(self)
-			if self.backdrop then
-				local color = E.media.bordercolor
-				if color then
-					self.backdrop:SetBackdropBorderColor(unpack(color))
+			-- Create Backdrop
+			button:CreateBackdrop("Transparent")
+			
+			-- Handle Icon
+			if BFL.IsClassic then
+				-- Classic: Hide the old circular icon and create a new square one
+				if button.Icon then
+					button.Icon:Hide()
 				end
+				
+				-- Create new square icon without mask
+				if not button.ElvUIIcon then
+					button.ElvUIIcon = button:CreateTexture(nil, "ARTWORK")
+					button.ElvUIIcon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Textures\\PortraitIcon.blp")
+				end
+				button.ElvUIIcon:ClearAllPoints()
+				button.ElvUIIcon:SetInside(button.backdrop)
+				button.ElvUIIcon:SetTexCoord(unpack(E.TexCoords)) -- Square crop
+				button.ElvUIIcon:Show()
+				
+				-- Reference for consistency
+				button.Icon = button.ElvUIIcon
+			elseif not button.Icon then
+				-- Retail: Create a new texture
+				button.Icon = button:CreateTexture(nil, "ARTWORK")
+				button.Icon:SetInside(button.backdrop)
+				button.Icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Textures\\PortraitIcon.blp")
+				button.Icon:SetTexCoord(unpack(E.TexCoords))
+				button.Icon:Show()
 			end
-		end)
+			
+			-- Hide original icon and mask (if different from button.Icon)
+			if frame.PortraitIcon and frame.PortraitIcon ~= button.Icon then 
+				frame.PortraitIcon:Hide() 
+			end
+			if frame.PortraitMask then frame.PortraitMask:Hide() end
+			
+			-- Handle Glow (New Version Indicator)
+			if button.Glow then
+				button.Glow:SetParent(button)
+				button.Glow:ClearAllPoints()
+				button.Glow:SetInside(button.backdrop)
+				button.Glow:SetDrawLayer("OVERLAY")
+				-- Use a cleaner glow texture for ElvUI
+				button.Glow:SetTexture(E.Media.Textures.Highlight) 
+				button.Glow:SetVertexColor(1, 0.82, 0, 0.5)
+			end
+			
+			-- Add Hover Effect
+			button:HookScript("OnEnter", function(self)
+				if self.backdrop then
+					local color = E.media.rgbvaluecolor
+					if color then
+						self.backdrop:SetBackdropBorderColor(color.r, color.g, color.b)
+					end
+				end
+			end)
+			
+			button:HookScript("OnLeave", function(self)
+				if self.backdrop then
+					local color = E.media.bordercolor
+					if color then
+						self.backdrop:SetBackdropBorderColor(unpack(color))
+					end
+				end
+			end)
+		end
 	end
 
 	-- Skin Tabs (Top)
@@ -275,6 +312,24 @@ function ElvUISkin:SkinFrames(E, S)
 		else
 			SkinScrollBar(S, scrollBar)
 		end
+	else
+		-- Classic: Hook InitializeClassicScrollFrame to skin ScrollBar immediately after creation
+		if BFL.IsClassic then
+			local FriendsList = BFL:GetModule("FriendsList")
+			if FriendsList and FriendsList.InitializeClassicScrollFrame then
+				hooksecurefunc(FriendsList, "InitializeClassicScrollFrame", function(self, scrollFrame)
+					-- ScrollBar is created by FauxScrollFrameTemplate with name $parentScrollBar
+					if scrollFrame and scrollFrame.FauxScrollFrame then
+						local classicScrollBar = _G["BetterFriendsClassicScrollFrameScrollBar"]
+						if classicScrollBar and not classicScrollBar.isSkinned then
+							SkinScrollBar(S, classicScrollBar)
+							classicScrollBar.isSkinned = true
+							BFL:DebugPrint("ElvUISkin: Classic ScrollBar skinned")
+						end
+					end
+				end)
+			end
+		end
 	end
 
 	-- Who Frame ScrollBar
@@ -311,6 +366,9 @@ function ElvUISkin:SkinFrames(E, S)
 		if frame.FriendsTabHeader.BattlenetFrame.SettingsButton then
 			S:HandleButton(frame.FriendsTabHeader.BattlenetFrame.SettingsButton)
 		end
+		
+		-- Classic: Reposition buttons 15px to the right (already anchored to bnet, which moved)
+		-- No additional changes needed as they inherit bnet's new position
 	end
 
 	if frame.WhoFrame then
@@ -328,7 +386,27 @@ function ElvUISkin:SkinFrames(E, S)
 		end
 		
 		-- Dropdown
-		if frame.WhoFrame.ColumnDropdown then S:HandleDropDownBox(frame.WhoFrame.ColumnDropdown) end
+		if frame.WhoFrame.ColumnDropdown then
+			S:HandleDropDownBox(frame.WhoFrame.ColumnDropdown)
+			
+			-- Classic: Expand clickable button area
+			if BFL.IsClassic then
+				local dropdown = frame.WhoFrame.ColumnDropdown
+				local name = dropdown:GetName()
+				if name then
+					local button = _G[name.."Button"]
+					if button then
+						-- Get dropdown width to match button size
+						local width = dropdown:GetWidth()
+						if width > 0 then
+							button:SetSize(width, 24)
+							button:ClearAllPoints()
+							button:SetPoint("CENTER", dropdown, "CENTER", 0, 0)
+						end
+					end
+				end
+			end
+		end
 	end
 
 	-- Skin TabHeader Elements
@@ -343,6 +421,14 @@ function ElvUISkin:SkinFrames(E, S)
 			bnet:CreateBackdrop("Transparent")
 			bnet.backdrop:SetPoint("TOPLEFT", 0, 0)
 			bnet.backdrop:SetPoint("BOTTOMRIGHT", 0, 0)
+			
+			-- Classic: Reduce width to make room for StatusDropdown
+			if BFL.IsClassic then
+				bnet:SetWidth(180)
+				-- Reposition 62px from right edge (use same anchor as Core.lua for consistency)
+				bnet:ClearAllPoints()
+				bnet:SetPoint("TOPRIGHT", frame.FriendsTabHeader, "TOPRIGHT", -62, -27)
+			end
 			
 			if bnet.Tag then
 				bnet.Tag:SetParent(bnet.backdrop)
@@ -391,14 +477,30 @@ function ElvUISkin:SkinFrames(E, S)
 		-- SearchBox
 		if frame.FriendsTabHeader.SearchBox then
 			S:HandleEditBox(frame.FriendsTabHeader.SearchBox)
+			
+			-- Classic: Position below dropdowns
+			if BFL.IsClassic then
+				frame.FriendsTabHeader.SearchBox:ClearAllPoints()
+				frame.FriendsTabHeader.SearchBox:SetPoint("TOP", frame.FriendsTabHeader.BattlenetFrame, "BOTTOM", 0, -35)
+				frame.FriendsTabHeader.SearchBox:SetPoint("LEFT", frame.Inset, "LEFT", 10, 0)
+				frame.FriendsTabHeader.SearchBox:SetPoint("RIGHT", frame.Inset, "RIGHT", -10, 0)
+			end
 		end
 		
 		-- Dropdowns - Point 3: Fix width & Layout (Classic adjustments)
 		-- Common function to skin and size dropdowns
 		local function SkinAndSizeDropdown(dropdown, width, height)
 			if not dropdown then return end
-			S:HandleDropDownBox(dropdown)
-			dropdown:SetWidth(width)
+			if S.HandleDropDownBox then
+				S:HandleDropDownBox(dropdown, width)
+			end
+			
+			-- Classic uses UIDropDownMenu, Retail uses modern dropdown
+			if BFL.IsClassic and UIDropDownMenu_SetWidth then
+				UIDropDownMenu_SetWidth(dropdown, width)
+			else
+				dropdown:SetWidth(width)
+			end
 			dropdown:SetHeight(height)
 			
 			-- Also force the button to match height if needed
@@ -412,48 +514,139 @@ function ElvUISkin:SkinFrames(E, S)
 		end
 
 		if frame.FriendsTabHeader.StatusDropdown then 
-			SkinAndSizeDropdown(frame.FriendsTabHeader.StatusDropdown, 70, 22)
+			if BFL.IsClassic then
+				-- Classic: Keep visual width at 38px but expand clickable area
+				local dropdown = frame.FriendsTabHeader.StatusDropdown
+				
+				if S.HandleDropDownBox then
+					S:HandleDropDownBox(dropdown, 38)
+				end
+				
+				UIDropDownMenu_SetWidth(dropdown, 38)
+				
+				-- Expand the clickable button area
+				local name = dropdown:GetName()
+				if name then
+					local button = _G[name.."Button"]
+					if button then
+						-- Make button fill the entire dropdown width
+						button:SetSize(38, 24)
+						button:ClearAllPoints()
+						button:SetPoint("CENTER", dropdown, "CENTER", 0, 0)
+					end
+				end
+				
+				-- Reposition: 1px gap left of BattlenetFrame
+				dropdown:ClearAllPoints()
+				dropdown:SetPoint("RIGHT", frame.FriendsTabHeader.BattlenetFrame, "LEFT", -1, 0)
+			else
+				SkinAndSizeDropdown(frame.FriendsTabHeader.StatusDropdown, 70, 22)
+			end
 		end
 		
 		if frame.FriendsTabHeader.QuickFilterDropdown then 
-			-- Use smaller width (50) to fit in one row
-			SkinAndSizeDropdown(frame.FriendsTabHeader.QuickFilterDropdown, 50, 30)
-			
-			-- Classic: Fix Anchoring - Only apply if needed, for now use XML layout
-			-- frame.FriendsTabHeader.QuickFilterDropdown:ClearAllPoints()
-			-- Anchor below SearchBox with small gap relative to proper edges
-			-- if frame.FriendsTabHeader.SearchBox then
-			-- 	frame.FriendsTabHeader.SearchBox:ClearAllPoints()
-			-- 	
-			-- 	-- Point 10: Anchor to BnetFrame per user request
-			-- 	if frame.FriendsTabHeader.BattlenetFrame then
-			-- 		frame.FriendsTabHeader.SearchBox:SetPoint("TOP", frame.FriendsTabHeader.BattlenetFrame, "BOTTOM", 0, -10)
-			-- 		frame.FriendsTabHeader.SearchBox:SetPoint("LEFT", frame.Inset, "LEFT", 10, 0)
-			-- 		frame.FriendsTabHeader.SearchBox:SetPoint("RIGHT", frame.Inset, "RIGHT", -10, 0)
-			-- 	else
-			-- 		-- Fallback logic just in case
-			-- 		frame.FriendsTabHeader.SearchBox:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 10, -50)
-			-- 		frame.FriendsTabHeader.SearchBox:SetPoint("TOPRIGHT", frame.Inset, "TOPRIGHT", -10, -50)
-			-- 	end
-			-- 	
-			-- 	frame.FriendsTabHeader.QuickFilterDropdown:SetPoint("TOPLEFT", frame.FriendsTabHeader.SearchBox, "BOTTOMLEFT", 0, -5)
-			-- end
+			if BFL.IsClassic then
+				-- Classic: Keep visual width at 38px but expand clickable area
+				local dropdown = frame.FriendsTabHeader.QuickFilterDropdown
+				
+				if S.HandleDropDownBox then
+					S:HandleDropDownBox(dropdown, 38)
+				end
+				
+				UIDropDownMenu_SetWidth(dropdown, 38)
+				
+				-- Expand the clickable button area
+				local name = dropdown:GetName()
+				if name then
+					local button = _G[name.."Button"]
+					if button then
+						-- Make button fill the entire dropdown width
+						button:SetSize(38, 24)
+						button:ClearAllPoints()
+						button:SetPoint("CENTER", dropdown, "CENTER", 0, 0)
+					end
+				end
+				
+				-- Position centered in frame (3 dropdowns: 38+3+38+3+38 = 120px total width)
+				-- Center at x=0 relative to frame center
+				dropdown:ClearAllPoints()
+				dropdown:SetPoint("BOTTOMLEFT", frame.FriendsTabHeader.BattlenetFrame, "BOTTOM", -150, -35)
+			else
+				-- Retail: Use smaller width (50) to fit in one row
+				SkinAndSizeDropdown(frame.FriendsTabHeader.QuickFilterDropdown, 50, 30)
+			end
 		end
 		
 		if frame.FriendsTabHeader.PrimarySortDropdown then 
-			SkinAndSizeDropdown(frame.FriendsTabHeader.PrimarySortDropdown, 50, 30)
-			
-			-- Anchor to QuickFilter with positive spacing (ElvUI removes the transparent padding)
-			frame.FriendsTabHeader.PrimarySortDropdown:ClearAllPoints()
-			frame.FriendsTabHeader.PrimarySortDropdown:SetPoint("LEFT", frame.FriendsTabHeader.QuickFilterDropdown, "RIGHT", 5, 0)
+			if BFL.IsClassic then
+				-- Classic: Keep visual width at 38px but expand clickable area
+				local dropdown = frame.FriendsTabHeader.PrimarySortDropdown
+				
+				if S.HandleDropDownBox then
+					S:HandleDropDownBox(dropdown, 38)
+				end
+				
+				UIDropDownMenu_SetWidth(dropdown, 38)
+				
+				-- Expand the clickable button area
+				local name = dropdown:GetName()
+				if name then
+					local button = _G[name.."Button"]
+					if button then
+						-- Make button fill the entire dropdown width
+						button:SetSize(38, 24)
+						button:ClearAllPoints()
+						button:SetPoint("CENTER", dropdown, "CENTER", 0, 0)
+					end
+				end
+				
+				-- Anchor to QuickFilter with small gap
+				dropdown:ClearAllPoints()
+				dropdown:SetPoint("LEFT", frame.FriendsTabHeader.QuickFilterDropdown, "RIGHT", 3, 0)
+			else
+				-- Retail: Keep existing size
+				SkinAndSizeDropdown(frame.FriendsTabHeader.PrimarySortDropdown, 50, 30)
+				
+				-- Anchor to QuickFilter with positive spacing (ElvUI removes the transparent padding)
+				frame.FriendsTabHeader.PrimarySortDropdown:ClearAllPoints()
+				frame.FriendsTabHeader.PrimarySortDropdown:SetPoint("LEFT", frame.FriendsTabHeader.QuickFilterDropdown, "RIGHT", 5, 0)
+			end
 		end
 		
 		if frame.FriendsTabHeader.SecondarySortDropdown then 
-			SkinAndSizeDropdown(frame.FriendsTabHeader.SecondarySortDropdown, 50, 30)
-			
-			-- Anchor to PrimarySort
-			frame.FriendsTabHeader.SecondarySortDropdown:ClearAllPoints()
-			frame.FriendsTabHeader.SecondarySortDropdown:SetPoint("LEFT", frame.FriendsTabHeader.PrimarySortDropdown, "RIGHT", 5, 0)
+			if BFL.IsClassic then
+				-- Classic: Keep visual width at 38px but expand clickable area
+				local dropdown = frame.FriendsTabHeader.SecondarySortDropdown
+				
+				if S.HandleDropDownBox then
+					S:HandleDropDownBox(dropdown, 38)
+				end
+				
+				UIDropDownMenu_SetWidth(dropdown, 38)
+				
+				-- Expand the clickable button area
+				local name = dropdown:GetName()
+				if name then
+					local button = _G[name.."Button"]
+					if button then
+						-- Make button fill the entire dropdown width
+						button:SetSize(38, 24)
+						button:ClearAllPoints()
+						button:SetPoint("CENTER", dropdown, "CENTER", 0, 0)
+					end
+				end
+				
+				-- Anchor to PrimarySort with small gap
+				dropdown:ClearAllPoints()
+				dropdown:SetPoint("LEFT", frame.FriendsTabHeader.PrimarySortDropdown, "RIGHT", 3, 0)
+			else
+				-- Retail: Keep existing size
+				SkinAndSizeDropdown(frame.FriendsTabHeader.SecondarySortDropdown, 50, 30)
+				
+				-- Anchor to PrimarySort
+				frame.FriendsTabHeader.SecondarySortDropdown:ClearAllPoints()
+				frame.FriendsTabHeader.SecondarySortDropdown:SetPoint("LEFT", frame.FriendsTabHeader.PrimarySortDropdown, "RIGHT", 5, 0)
+			end
 		end
 	end
 
@@ -598,8 +791,8 @@ function ElvUISkin:HookFriendsList(E, S)
 	hooksecurefunc(FriendsList, "UpdateFriendButton", function(_, button, elementData)
 		if not button.isSkinned then
 			-- Don't full skin friend buttons as they are list items
-			-- But we can skin the travel pass button - Point 3: Fix texture size
-			if button.travelPassButton then
+			-- But we can skin the travel pass button in Retail only (not in Classic)
+			if not BFL.IsClassic and button.travelPassButton then
 				S:HandleButton(button.travelPassButton)
 				-- Ensure icon remains visible and sized correctly
 				if button.travelPassButton.NormalTexture then

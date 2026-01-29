@@ -2544,7 +2544,23 @@ function Settings:OnSimpleModeChanged(checked)
 	
 	-- Update Portrait Visibility immediately
 	if BFL.UpdatePortraitVisibility then
-		BFL:UpdatePortraitVisibility()
+		BFL:UpdatePortraitVisibility("SettingsToggle")
+	end
+	
+	-- Classic Fix: Prompt for Reload on Simple Mode toggle
+	-- The Atlas texture system in Classic is unstable dynamically but works fine on login
+	if BFL.IsClassic then
+		StaticPopupDialogs["BFL_SIMPLE_MODE_RELOAD"] = {
+			text = (L.MSG_RELOAD_REQUIRED or "A reload is required to apply this change correctly in Classic.") .. "\n\n" .. (L.MSG_RELOAD_NOW or "Reload UI now?"),
+			button1 = ACCEPT,
+			button2 = CANCEL,
+			OnAccept = ReloadUI,
+			timeout = 0,
+			whileDead = true,
+			hideOnEscape = true,
+			preferredIndex = 3,
+		}
+		StaticPopup_Show("BFL_SIMPLE_MODE_RELOAD")
 	end
 end
 
@@ -2757,7 +2773,7 @@ function Settings:RefreshGeneralTab()
 	table.insert(allFrames, blizzardOption)
 
 	-- Row 6: ElvUI Skin (if available) - moved to separate row
-	if _G.ElvUI and WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
+	if _G.ElvUI then
 		local elvUICheckbox = Components:CreateCheckbox(tab, 
 			L.SETTINGS_ENABLE_ELVUI_SKIN or "Enable ElvUI Skin",
 			DB:Get("enableElvUISkin", false),

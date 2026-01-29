@@ -90,7 +90,7 @@ Modules\GuildDetails.lua [AllowLoadGameType vanilla, tbc, wrath, cata, mists]
 BetterFriendlist_QuickJoin.xml [AllowLoadGameType mainline]
 Modules\QuickJoin.lua [AllowLoadGameType mainline]
 Modules\PreviewMode.lua
-Modules\ElvUISkin.lua [AllowLoadGameType mainline]
+Modules\ElvUISkin.lua
 Modules\AddOnSkins.lua [AllowLoadGameType mainline]
 Modules\Compat_GlobalIgnoreList.lua
 Modules\FontFix.lua

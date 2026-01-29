@@ -56,7 +56,11 @@ function QuickFilters:InitDropdown(dropdown)
 	if BFL.IsClassic or not BFL.HasModernDropdown then
 		-- BFL:DebugPrint("|cff00ffffQuickFilters:|r Classic mode - using UIDropDownMenu for Quick Filter dropdown")
 		
-		UIDropDownMenu_SetWidth(dropdown, 70)
+		-- Only set width if ElvUI is not active (ElvUI Skin handles sizing)
+		local isElvUIActive = _G.ElvUI and BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin ~= false
+		if not isElvUIActive then
+			UIDropDownMenu_SetWidth(dropdown, 70)
+		end
 		UIDropDownMenu_Initialize(dropdown, function(self, level)
 			local info = UIDropDownMenu_CreateInfo()
 			
@@ -98,7 +102,7 @@ function QuickFilters:InitDropdown(dropdown)
 				local filterText = QuickFilters:GetFilterText()
 				
 				GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
-				GameTooltip:SetText(L.TOOLTIP_QUICK_FILTER .. filterText)
+				GameTooltip:SetText(string.format(L.TOOLTIP_QUICK_FILTER or "Quick Filter: %s", filterText))
 				GameTooltip:Show()
 			end)
 			button:HookScript("OnLeave", GameTooltip_Hide)
@@ -107,7 +111,7 @@ function QuickFilters:InitDropdown(dropdown)
 				local filterText = QuickFilters:GetFilterText()
 				
 				GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
-				GameTooltip:SetText(L.TOOLTIP_QUICK_FILTER .. filterText)
+				GameTooltip:SetText(string.format(L.TOOLTIP_QUICK_FILTER or "Quick Filter: %s", filterText))
 				GameTooltip:Show()
 			end)
 			dropdown:SetScript("OnLeave", GameTooltip_Hide)

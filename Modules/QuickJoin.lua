@@ -110,7 +110,7 @@ function BetterFriendlist_GetRelationshipInfo(guid, missingNameFallback, clubId)
 	
 	local hasName = name ~= nil
 	if not hasName then
-		name = UNKNOWNOBJECT
+		name = ""
 	elseif normalizedRealmName and normalizedRealmName ~= "" then
 		name = FULL_PLAYER_NAME:format(name, normalizedRealmName)
 	end
@@ -218,7 +218,7 @@ local function PopulateGroupMemberDetails(info)
 				end
 				
 				if isLeader then
-					if name and name ~= UNKNOWNOBJECT then
+					if name and name ~= "" then
 						-- Always use the resolved name for the leader if found in members list
 						-- This ensures we use BNet/Friend name instead of Character name
 						info.leaderName = name
@@ -227,7 +227,7 @@ local function PopulateGroupMemberDetails(info)
 				else
 					-- Check if this member is a friend (BNet or WoW) or Mock
 					if relationship == "bnfriend" or relationship == "wowfriend" or relationship == "mock" then
-						if name and name ~= UNKNOWNOBJECT then
+						if name and name ~= "" then
 							-- Store colored name
 							local coloredName = (color or "|cffffffff") .. name .. "|r"
 							table.insert(info.otherFriends, coloredName)
@@ -282,15 +282,15 @@ function QuickJoinEntry:New(guid, groupInfo)
 			-- CRITICAL: C_SocialQueue.GetGroupMembers() only returns 'guid' and 'clubId'!
 			-- Fields like 'name', 'memberName' do NOT exist - must resolve name from GUID
 			local name
-			if i == 1 and groupInfo.leaderName and groupInfo.leaderName ~= UNKNOWN then
+			if i == 1 and groupInfo.leaderName and groupInfo.leaderName ~= "" then
 				-- Use pre-resolved leaderName for first member if available
 				name = groupInfo.leaderName
 			elseif member.guid then
 				-- Resolve name from GUID using BetterFriendlist_GetRelationshipInfo
 				local resolvedName = BetterFriendlist_GetRelationshipInfo(member.guid, nil, member.clubId)
-				name = resolvedName or UNKNOWN
+				name = resolvedName or ""
 			else
-				name = UNKNOWN
+				name = ""
 			end
 			
 			entry.displayedMembers[i] = {
@@ -303,7 +303,7 @@ function QuickJoinEntry:New(guid, groupInfo)
 		-- Fallback: Use leader name if no members array
 		entry.displayedMembers[1] = {
 			guid = guid,
-			name = groupInfo.leaderName or groupInfo._mockLeaderName or UNKNOWN,
+			name = groupInfo.leaderName or groupInfo._mockLeaderName or "",
 			clubId = nil
 		}
 	end
@@ -313,7 +313,7 @@ function QuickJoinEntry:New(guid, groupInfo)
 		for i, queue in ipairs(groupInfo.queues) do
 			-- Use groupTitle from groupInfo (the custom group name, e.g., "Wo ist Hayato")
 			-- Do NOT use activityName here - that's only for the tooltip!
-			local groupTitle = groupInfo.groupTitle or groupInfo._mockActivityName or UNKNOWN
+			local groupTitle = groupInfo.groupTitle or groupInfo._mockActivityName or ""
 			
 			-- Get lfgListID from queue data for fetching fresh searchResultInfo in tooltip
 			local lfgListID = queue.queueData and queue.queueData.lfgListID
@@ -340,7 +340,7 @@ function QuickJoinEntry:New(guid, groupInfo)
 		end
 	else
 		-- Fallback: Create one queue entry with group title
-		local groupTitle = groupInfo.groupTitle or groupInfo._mockActivityName or UNKNOWN
+		local groupTitle = groupInfo.groupTitle or groupInfo._mockActivityName or ""
 		entry.displayedQueues[1] = {
 			queueData = {
 				name = groupTitle,
@@ -453,17 +453,22 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 		end
 	end
 	
-	-- SAFE fallbacks (don't use UNKNOWN!)
-	if not groupTitle or groupTitle == "" then groupTitle = "???" end
-	if not leaderName or leaderName == "" then leaderName = "???" end
+	-- SAFE fallbacks - empty strings are OK
+	if not groupTitle then groupTitle = "" end
+	if not leaderName then leaderName = "" end
 	
 	-- Line 1: Group Title (white, word-wrap enabled)
 	-- Fix: GameTooltip:SetText arguments are (text, r, g, b, alpha, wrap)
 	-- We must explicitly provide alpha (1) before the wrap boolean (true)
-	tooltip:SetText(groupTitle, 1, 1, 1, 1, true)
+	-- Only show if not empty
+	if groupTitle ~= "" then
+		tooltip:SetText(groupTitle, 1, 1, 1, 1, true)
+	else
+		tooltip:SetText(" ", 1, 1, 1, 1, true) -- Fallback: single space to avoid empty tooltip
+	end
 	
 	-- Line 2: Activity Name (GOLD - HIGHLIGHT_FONT_COLOR: 1.0, 0.82, 0) - Only if different from group title and not empty
-	if activityName and activityName ~= groupTitle and activityName ~= "" then
+	if activityName and activityName ~= "" and activityName ~= groupTitle then
 		tooltip:AddLine(activityName, 1.0, 0.82, 0)
 	end
 	
@@ -514,8 +519,11 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 	end
 	
 	-- Use color code format like MemberCount: gold "Leader:" + white name
-	local leaderText = string.format("|cffffd100%s|r |cffffffff%s|r", L.LEADER_LABEL or "Leader:", leaderNameWithFaction)
-	tooltip:AddLine(leaderText)
+	-- Only show if leader name is not empty
+	if leaderName ~= "" then
+		local leaderText = string.format("|cffffd100%s|r |cffffffff%s|r", L.LEADER_LABEL or "Leader:", leaderNameWithFaction)
+		tooltip:AddLine(leaderText)
+	end
 	
 	-- Line 4: Empty line (spacing) - BLIZZARD ADDS THIS BEFORE MEMBER COUNT
 	tooltip:AddLine(" ")
@@ -795,13 +803,13 @@ function QuickJoin:OnScrollBoxInitialize(button, elementData)
 	
 	-- 2. Set Title (Group Name)
 	if button.Title then
-		button.Title:SetText(info.groupTitle or L.UNKNOWN_GROUP)
+		button.Title:SetText(info.groupTitle or "")
 	end
 	
 	-- 3. Set Activity (New Line)
 	if button.Activity then
 		local activityName = info.activityName
-		if not activityName or activityName == UNKNOWN then
+		if not activityName or activityName == "" then
 			activityName = ""
 		end
 		button.Activity:SetText(activityName)
@@ -810,14 +818,23 @@ function QuickJoin:OnScrollBoxInitialize(button, elementData)
 	-- 4. Set Details (Leader + Friends)
 	if button.Details then
 		-- Leader Name (colored)
-		local leaderName = info.leaderName or L.UNKNOWN
+		local leaderName = info.leaderName or ""
 		local leaderColor = info.leaderColor or "|cffffffff"
-		local details = L.LEADER_LABEL .. " " .. leaderColor .. leaderName .. "|r"
+		local details = ""
+		
+		-- Only show leader if name is not empty
+		if leaderName ~= "" then
+			details = L.LEADER_LABEL .. " " .. leaderColor .. leaderName .. "|r"
+		end
 		
 		-- Add other friends if present (already colored in GetGroupInfo)
 		if info.otherFriends and #info.otherFriends > 0 then
 			local friendsList = table.concat(info.otherFriends, ", ")
-			details = details .. " (+ " .. friendsList .. ")"
+			if details ~= "" then
+				details = details .. " (+ " .. friendsList .. ")"
+			else
+				details = "+ " .. friendsList
+			end
 		end
 		
 		button.Details:SetText(details)
@@ -1058,8 +1075,8 @@ function QuickJoin:GetGroupInfo(groupGUID)
 		queues = C_SocialQueue.GetGroupQueues(groupGUID),
 		requestedToJoin = C_SocialQueue.GetGroupForPlayer(groupGUID) ~= nil,  -- Check if already requested
 		numMembers = 0,  -- Will be calculated below
-		leaderName = UNKNOWN,
-		activityName = UNKNOWN,
+		leaderName = "",
+		activityName = "",
 		activityIcon = nil, -- Will be resolved later
 		queueInfo = "",
 	}
@@ -1090,7 +1107,7 @@ function QuickJoin:GetGroupInfo(groupGUID)
 					end
 				end
 
-				-- For LFG List: Blizzard displays searchResultInfo.name (the custom group title)
+			-- For LFG List: Blizzard displays searchResultInfo.name (the custom group title)
 				-- NOT the activity name! (QuickJoin.lua doesn't even use activities)
 				local searchResultInfo = C_LFGList.GetSearchResultInfo(queueData.lfgListID)
 				
@@ -1296,28 +1313,34 @@ function QuickJoin:GetGroupInfo(groupGUID)
 							-- Fallback if icon is missing or 0
 							if not info.activityIcon or info.activityIcon == 0 then
 								local catID = activityInfo.categoryID
-								-- BFL:DebugPrint("  Fallback Check - CategoryID:", catID)
+								-- BFL:DebugPrint("          Icon missing, trying category fallback: categoryID="..tostring(catID))
 								
 								if catID == 2 then -- Dungeons
 									info.activityIcon = 525134 -- Fallback: Dungeon (Keystone)
+									-- BFL:DebugPrint("          ✅ Applied Dungeon fallback icon: 525134")
 								elseif catID == 3 then -- Raids
 									info.activityIcon = 1536895 -- User Selected: Raid
+									-- BFL:DebugPrint("          ✅ Applied Raid fallback icon: 1536895")
 								elseif catID == 4 or catID == 5 or catID == 7 or catID == 8 or catID == 9 then -- PvP
 									info.activityIcon = 236396 -- User Selected: PvP
+									-- BFL:DebugPrint("          ✅ Applied PvP fallback icon: 236396")
 								elseif catID == 1 then -- Questing
 									info.activityIcon = 409602 -- User Selected: Quest
+									-- BFL:DebugPrint("          ✅ Applied Quest fallback icon: 409602")
 								elseif catID == 6 then -- Custom
 									info.activityIcon = 134149 -- User Selected: Custom
+									-- BFL:DebugPrint("          ✅ Applied Custom fallback icon: 134149")
 								end
 								
 								-- Heuristic if category didn't match (e.g. Legacy Raids might have different ID)
 								if (not info.activityIcon or info.activityIcon == 0) then
+									-- BFL:DebugPrint("          Category fallback failed, trying player count heuristic: maxNumPlayers="..tostring(activityInfo.maxNumPlayers))
 									if activityInfo.maxNumPlayers and activityInfo.maxNumPlayers > 5 then
 										info.activityIcon = 1536895 -- Assume Raid
-										-- BFL:DebugPrint("  Fallback Heuristic: Assumed Raid (>5 players)")
+										-- BFL:DebugPrint("          ✅ Heuristic: Assumed Raid (>5 players): 1536895")
 									elseif activityInfo.maxNumPlayers and activityInfo.maxNumPlayers == 5 then
 										info.activityIcon = 525134 -- Assume Dungeon (Keystone)
-										-- BFL:DebugPrint("  Fallback Heuristic: Assumed Dungeon (5 players)")
+										-- BFL:DebugPrint("          ✅ Heuristic: Assumed Dungeon (5 players): 525134")
 									end
 								end
 							end
@@ -1326,10 +1349,6 @@ function QuickJoin:GetGroupInfo(groupGUID)
 						end
 					else
 						-- BFL:DebugPrint("  No ActivityID found in SearchResult or QueueData")
-					end
-
-					-- Fix for "???" Group Title: Use Activity Name if Title is missing/unknown
-					if (not info.groupTitle or info.groupTitle == "???" or info.groupTitle == "") and info.activityName and info.activityName ~= UNKNOWN then
 						info.groupTitle = info.activityName
 						-- BFL:DebugPrint("  Fixed GroupTitle using ActivityName:", info.groupTitle)
 					end
@@ -1345,28 +1364,26 @@ function QuickJoin:GetGroupInfo(groupGUID)
 					end
 				else
 					-- BFL:DebugPrint("  SearchResult is NIL for ID:", queueData.lfgListID)
-					-- BFL:DebugPrint("  SearchResult is NIL for ID:", queueData.lfgListID)
 					-- Fallback if search result not available
 					info.groupTitle = "LFG Group"
 					
 					-- Try to get activity name from queueData if available
 					if queueData.activityID then
-						-- BFL:DebugPrint("  Fallback: Using queueData.activityID:", queueData.activityID)
+						-- BFL:DebugPrint("      Fallback: Using queueData.activityID="..tostring(queueData.activityID))
 						local activityInfo = C_LFGList.GetActivityInfoTable(queueData.activityID)
 						if activityInfo then
 							info.activityName = activityInfo.fullName
-							-- BFL:DebugPrint("  Fallback Activity Name:", info.activityName)
-							
-							if activityInfo.groupFinderActivityGroupID then
-								local _, groupIcon = C_LFGList.GetActivityGroupInfo(activityInfo.groupFinderActivityGroupID)
-								if groupIcon then
-									info.activityIcon = groupIcon
-								end
+							-- BFL:DebugPrint("      Fallback Activity Name: \""..(info.activityName or "NIL").."\"")
+							local _, groupIcon = C_LFGList.GetActivityGroupInfo(activityInfo.groupFinderActivityGroupID)
+							if groupIcon then
+								info.activityIcon = groupIcon
 							end
+							else
+								-- BFL:DebugPrint("  ActivityInfo is NIL for ID:", queueData.activityID)
+							end
+						else
+							-- BFL:DebugPrint("  Fallback: No activityID in queueData")
 						end
-					else
-						-- BFL:DebugPrint("  Fallback: No activityID in queueData")
-					end
 				end
 			elseif queueData.queueType == "pvp" then
 				-- BFL:DebugPrint("  QueueType: PvP")
@@ -1394,7 +1411,7 @@ function QuickJoin:GetGroupInfo(groupGUID)
 				info.activityIcon = 1536895 -- Raid
 			else
 				-- BFL:DebugPrint("  QueueType: Unknown/Other:", queueData.queueType)
-				info.groupTitle = self:ResolveQueueName(info.queues[1]) or queueData.queueType or info.queues[1].name or UNKNOWN
+				info.groupTitle = self:ResolveQueueName(info.queues[1]) or queueData.queueType or info.queues[1].name or ""
 			end
 		end
 		
@@ -1791,7 +1808,7 @@ function QuickJoin:GetGroupDisplayName(groupGUID)
 	-- Check for mock data first
 	local mockGroup = self.mockGroups[groupGUID]
 	if mockGroup then
-		local leaderName = mockGroup.leaderName or (L.UNKNOWN or "Unknown")
+		local leaderName = mockGroup.leaderName or ""
 		local numMembers = mockGroup.numMembers or 1
 		local color = "|cff00ff00"  -- Green for mock groups
 		
@@ -1804,7 +1821,7 @@ function QuickJoin:GetGroupDisplayName(groupGUID)
 	
 	local members = C_SocialQueue.GetGroupMembers(groupGUID)
 	if not members or #members == 0 then
-		return UNKNOWNOBJECT or (L.UNKNOWN_GROUP or "Unknown Group")
+		return ""
 	end
 	
 	-- Sort members (leader first)
@@ -1814,10 +1831,10 @@ function QuickJoin:GetGroupDisplayName(groupGUID)
 	
 	-- Get leader name
 	if not members or #members == 0 or not members[1] then
-		return UNKNOWNOBJECT or (L.UNKNOWN_GROUP or "Unknown Group")
+		return ""
 	end
 	
-	local leaderName = members[1].clubName or members[1].name or (L.UNKNOWN or "Unknown")
+	local leaderName = members[1].clubName or members[1].name or ""
 	local color = "|cffffffff"  -- Default white
 	
 	-- Try to determine relationship for color
@@ -1844,25 +1861,25 @@ function QuickJoin:GetQueueDisplayName(groupGUID)
 	-- Check for mock data first
 	local mockGroup = self.mockGroups[groupGUID]
 	if mockGroup then
-		return mockGroup.groupTitle or mockGroup.activityName or "Mock Activity"
+		return mockGroup.groupTitle or mockGroup.activityName or ""
 	end
 	
 	local queues = C_SocialQueue.GetGroupQueues(groupGUID)
 	if not queues or #queues == 0 or not queues[1] then
-		return L.NO_QUEUE or "No Queue"
+		return ""
 	end
 	
 	-- Get queue name from first queue
-	local queueName = "Unknown Activity"
+	local queueName = ""
 	local queueData = queues[1].queueData
 	
 	if queueData then
 		if queueData.queueType == "lfglist" and queueData.lfgListID then
 			local activityInfo = C_LFGList.GetActivityInfoTable(queueData.lfgListID)
 			if activityInfo then
-				queueName = activityInfo.fullName or activityInfo.shortName or (L.LFG_ACTIVITY or "LFG Activity")
+				queueName = activityInfo.fullName or activityInfo.shortName or ""
 			else
-				queueName = L.LFG_ACTIVITY or "LFG Activity"
+				queueName = ""
 			end
 		elseif queueData.queueType == "pvp" then
 			queueName = L.ACTIVITY_PVP or "PvP"
@@ -1871,7 +1888,7 @@ function QuickJoin:GetQueueDisplayName(groupGUID)
 		elseif queueData.queueType == "raid" then
 			queueName = L.ACTIVITY_RAID or "Raid"
 		else
-			queueName = queueData.queueType or "Unknown Activity"
+			queueName = queueData.queueType or ""
 		end
 	end
 	
@@ -2201,7 +2218,7 @@ end
 ]]
 function QuickJoin:RemoveMockGroup(guid)
 	if self.mockGroups[guid] then
-		local name = self.mockGroups[guid].groupTitle or "Unknown"
+		local name = self.mockGroups[guid].groupTitle or ""
 		self.mockGroups[guid] = nil
 		-- BFL:DebugPrint(string.format("|cff00ff00QuickJoin Mock:|r Removed '%s'", name))
 		self:Update(true)
