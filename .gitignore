@@ -1,45 +1,30 @@
-# Editor and IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS files
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# Development files (keep local, don't push to GitHub)
-docs/
+.git
+.github
+.pkgmeta
+.vscode
+.ai-context
+memory-bank
+/old_version
+*.log
+*.zip
+*.ps1
 plans/
 reference/
 predecessor/
-.ai-context/
-*.png
+docs/
 
-# All markdown files except README.md
+# Ignore documentation files but keep README and CHANGELOG
 *.md
 !README.md
-README_BBCODE.txt
+!CHANGELOG.md
 
-# Build and package files
-*.zip
-release/
-.release/
-release_notes.txt
+# Ignore text files
+*.txt
 
-# Scripts
-*.py
+# Ignore image files
+*.png
 
-# WoW Cache
+# Ignore backup files
 *.bak
-*.wtf
-*.toc.bak
-*.log
-# Perfy Instrumentation Logs
-stacks-cpu.txt
-stacks-memory.txt
+*.lua.bak
 
-# Backup folders
-Libs - Kopie/
