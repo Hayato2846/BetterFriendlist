@@ -791,16 +791,17 @@ function ElvUISkin:HookFriendsList(E, S)
 	hooksecurefunc(FriendsList, "UpdateFriendButton", function(_, button, elementData)
 		if not button.isSkinned then
 			-- Don't full skin friend buttons as they are list items
+			-- BFL: Travelpass button should NOT be skinned (User request)
 			-- But we can skin the travel pass button in Retail only (not in Classic)
-			if not BFL.IsClassic and button.travelPassButton then
-				S:HandleButton(button.travelPassButton)
-				-- Ensure icon remains visible and sized correctly
-				if button.travelPassButton.NormalTexture then
-					button.travelPassButton.NormalTexture:SetAlpha(1)
-					button.travelPassButton.NormalTexture:SetSize(22, 22)
-					button.travelPassButton.NormalTexture:SetPoint("CENTER")
-				end
-			end
+			-- if not BFL.IsClassic and button.travelPassButton then
+			-- 	S:HandleButton(button.travelPassButton)
+			-- 	-- Ensure icon remains visible and sized correctly
+			-- 	if button.travelPassButton.NormalTexture then
+			-- 		button.travelPassButton.NormalTexture:SetAlpha(1)
+			-- 		button.travelPassButton.NormalTexture:SetSize(22, 22)
+			-- 		button.travelPassButton.NormalTexture:SetPoint("CENTER")
+			-- 	end
+			-- end
 			button.isSkinned = true
 		end
 	end)
