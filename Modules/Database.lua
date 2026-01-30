@@ -146,6 +146,11 @@ function DB:Initialize()
 	if not BFL.SettingsVersion then
 		BFL.SettingsVersion = 1
 	end
+	
+	-- Initialize Nickname Cache Version (Phase 6 Optimization)
+	if not BFL.NicknameCacheVersion then
+		BFL.NicknameCacheVersion = 1
+	end
 
 	-- Initialize SavedVariables
 	if not BetterFriendlistDB then
@@ -304,6 +309,11 @@ function DB:SetNicknameInternalDB(key, nickname)
 		BetterFriendlistDB.nicknames[key] = nickname
 	else
 		BetterFriendlistDB.nicknames[key] = nil
+	end
+	
+	-- Invalidate Nickname Cache on change (Phase 6)
+	if BFL.NicknameCacheVersion then
+		BFL.NicknameCacheVersion = BFL.NicknameCacheVersion + 1
 	end
 end
 

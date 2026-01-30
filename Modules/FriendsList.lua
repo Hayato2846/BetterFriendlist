@@ -840,6 +840,7 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 	local uid = friend.uid or GetFriendUID(friend)
 	local note = (friend.note or friend.notes or "")
 	local showRealmName = self.settingsCache and self.settingsCache.showRealmName or (DB and DB:Get("showRealmName", false))
+	local nicknameVersion = BFL.NicknameCacheVersion or 0 -- Phase 6: Version Check
 
 	-- Inputs for validation
 	local rawName = friend.name
@@ -858,12 +859,9 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 	   cacheEntry.note == note and
 	   cacheEntry.rawName == rawName and
 	   cacheEntry.rawAccountName == rawAccountName and
-	   cacheEntry.rawBattleTag == rawBattleTag then
-		-- Optimization: Only fetch nickname if other cache parameters match
-		local nickname = DB and DB:GetNickname(uid) or ""
-		if cacheEntry.nickname == nickname then
-			return cacheEntry.result
-		end
+	   cacheEntry.rawBattleTag == rawBattleTag and
+	   cacheEntry.nicknameVersion == nicknameVersion then -- Phase 6: Check version instead of value
+		return cacheEntry.result
 	end
 
 	-- 1. Prepare Data (Only on Cache Miss)
@@ -964,7 +962,7 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		format = format,
 		showRealmName = showRealmName,
 		note = note,
-		nickname = nickname,
+		nicknameVersion = nicknameVersion, -- Phase 6: Store version
 		rawName = rawName,
 		rawBattleTag = rawBattleTag,
 		rawAccountName = rawAccountName
