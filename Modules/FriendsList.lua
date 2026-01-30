@@ -1489,6 +1489,73 @@ function FriendsList:UpdateFriendsList() -- Visibility Optimization:
 						friend.gameName = gameInfo.clientProgram or BFL.L.UNKNOWN_GAME
 					end
 				end
+
+				-- PHASE 4 OPTIMIZATION: Pre-calculate Invite Status
+				-- Moves O(N^2) complexity from Render Loop to Data Update
+				friend.canInvite = false
+				friend.inviteAtlas = nil 
+				
+				if friend.connected then
+					local restriction = nil
+					local numGameAccounts = C_BattleNet.GetFriendNumGameAccounts(i)
+					
+					for k = 1, numGameAccounts do
+						local gameAccountInfo = C_BattleNet.GetFriendGameAccountInfo(i, k)
+						if gameAccountInfo then
+							if gameAccountInfo.clientProgram == BNET_CLIENT_WOW then
+								if gameAccountInfo.wowProjectID and WOW_PROJECT_ID then
+									if gameAccountInfo.wowProjectID == WOW_PROJECT_CLASSIC and WOW_PROJECT_ID ~= WOW_PROJECT_CLASSIC then
+										if not restriction then restriction = INVITE_RESTRICTION_WOW_PROJECT_CLASSIC end
+									elseif gameAccountInfo.wowProjectID == WOW_PROJECT_MAINLINE and WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE then
+										if not restriction then restriction = INVITE_RESTRICTION_WOW_PROJECT_MAINLINE end
+									elseif gameAccountInfo.wowProjectID ~= WOW_PROJECT_ID then
+										if not restriction then restriction = INVITE_RESTRICTION_WOW_PROJECT_ID end
+									elseif gameAccountInfo.realmID == 0 then
+										if not restriction then restriction = INVITE_RESTRICTION_INFO end
+									elseif not gameAccountInfo.isInCurrentRegion then
+										restriction = INVITE_RESTRICTION_REGION
+									else
+										restriction = INVITE_RESTRICTION_NONE
+										break
+									end
+								elseif gameAccountInfo.realmID == 0 then
+									if not restriction then restriction = INVITE_RESTRICTION_INFO end
+								elseif not gameAccountInfo.isInCurrentRegion then
+									restriction = INVITE_RESTRICTION_REGION
+								elseif gameAccountInfo.realmID and gameAccountInfo.realmID ~= 0 then
+									restriction = INVITE_RESTRICTION_NONE
+									break
+								end
+							else
+								if not restriction then restriction = INVITE_RESTRICTION_CLIENT end
+							end
+						end
+					end
+					
+					if not restriction then restriction = INVITE_RESTRICTION_NO_GAME_ACCOUNTS end
+					
+					if restriction == INVITE_RESTRICTION_NONE then
+						friend.canInvite = true
+						
+						-- Calculate Cross-Faction Atlas
+						if not BFL.IsClassic then
+							local playerFactionGroup = UnitFactionGroup("player")
+							local isCrossFaction = accountInfo.gameAccountInfo and
+												   accountInfo.gameAccountInfo.factionName and 
+												   accountInfo.gameAccountInfo.factionName ~= playerFactionGroup
+							
+							if isCrossFaction then
+								if accountInfo.gameAccountInfo.factionName == "Horde" then
+									friend.inviteAtlas = "horde" -- Marker for 'friendslist-invitebutton-horde-xxx'
+								elseif accountInfo.gameAccountInfo.factionName == "Alliance" then
+									friend.inviteAtlas = "alliance" -- Marker for 'friendslist-invitebutton-alliance-xxx'
+								end
+							else
+								friend.inviteAtlas = "default" -- Marker for default
+							end
+						end
+					end
+				end
 			end
 		end
 	end
@@ -3661,15 +3728,24 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 		-- Feature: Flexible Name Format (Phase 15)
 		local displayName = friend.displayName or self:GetDisplayName(friend)
 		
-		-- Set background color
+		-- Set background color (Optimized Phase 4: State Check)
+		local bgR, bgG, bgB, bgA
 		if friend.connected then
-			button.background:SetColorTexture(FRIENDS_BNET_BACKGROUND_COLOR.r, FRIENDS_BNET_BACKGROUND_COLOR.g, FRIENDS_BNET_BACKGROUND_COLOR.b, FRIENDS_BNET_BACKGROUND_COLOR.a)
+			bgR, bgG, bgB, bgA = FRIENDS_BNET_BACKGROUND_COLOR.r, FRIENDS_BNET_BACKGROUND_COLOR.g, FRIENDS_BNET_BACKGROUND_COLOR.b, FRIENDS_BNET_BACKGROUND_COLOR.a
 		else
-			button.background:SetColorTexture(FRIENDS_OFFLINE_BACKGROUND_COLOR.r, FRIENDS_OFFLINE_BACKGROUND_COLOR.g, FRIENDS_OFFLINE_BACKGROUND_COLOR.b, FRIENDS_OFFLINE_BACKGROUND_COLOR.a)
+			bgR, bgG, bgB, bgA = FRIENDS_OFFLINE_BACKGROUND_COLOR.r, FRIENDS_OFFLINE_BACKGROUND_COLOR.g, FRIENDS_OFFLINE_BACKGROUND_COLOR.b, FRIENDS_OFFLINE_BACKGROUND_COLOR.a
+		end
+		
+		if button.lastBgR ~= bgR or button.lastBgG ~= bgG or button.lastBgB ~= bgB then
+			button.background:SetColorTexture(bgR, bgG, bgB, bgA)
+			button.lastBgR, button.lastBgG, button.lastBgB = bgR, bgG, bgB
 		end
 		
 		-- Set status icon (BSAp shows as AFK if setting enabled)
+		-- Optimized Phase 4: State Check
 		local showMobileAsAFK = self.settingsCache and self.settingsCache.showMobileAsAFK or DB:Get("showMobileAsAFK", false)
+		local statusTexture
+		
 		if friend.connected then
 			local isMobile = friend.gameAccountInfo and friend.gameAccountInfo.clientProgram == "BSAp"
 			-- Check both account status (App) and game status (WoW /afk)
@@ -3677,14 +3753,19 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 			local isDND = friend.isDND or (friend.gameAccountInfo and (friend.gameAccountInfo.isDND or friend.gameAccountInfo.isGameBusy))
 			
 			if isDND then
-				button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-DnD")
+				statusTexture = "Interface\\FriendsFrame\\StatusIcon-DnD"
 			elseif isAFK or (showMobileAsAFK and isMobile) then
-				button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Away")
+				statusTexture = "Interface\\FriendsFrame\\StatusIcon-Away"
 			else
-				button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Online")
+				statusTexture = "Interface\\FriendsFrame\\StatusIcon-Online"
 			end
 		else
-			button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Offline")
+			statusTexture = "Interface\\FriendsFrame\\StatusIcon-Offline"
+		end
+		
+		if button.lastStatusTexture ~= statusTexture then
+			button.status:SetTexture(statusTexture)
+			button.lastStatusTexture = statusTexture
 		end
 		
 		-- Set game icon using Blizzard's modern API
@@ -3692,142 +3773,67 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 			local clientProgram = friend.gameAccountInfo.clientProgram
 			
 			-- Use Blizzard's modern texture API (11.0+) for ALL client programs including Battle.net App
-			C_Texture.SetTitleIconTexture(button.gameIcon, clientProgram, Enum.TitleIconVersion.Medium)
+			-- Optimized Phase 4: Avoid C-Call if unnecessary (though SetTitleIconTexture is fast, avoiding it is faster)
+			if button.lastClientProgram ~= clientProgram then
+				C_Texture.SetTitleIconTexture(button.gameIcon, clientProgram, Enum.TitleIconVersion.Medium)
+				button.lastClientProgram = clientProgram
+			end
 			
 			-- Fade icon for WoW friends on different project versions
 			local fadeIcon = (clientProgram == BNET_CLIENT_WOW) and (friend.gameAccountInfo.wowProjectID ~= WOW_PROJECT_ID)
-			if fadeIcon then
-				button.gameIcon:SetAlpha(0.6)
-			else
-				button.gameIcon:SetAlpha(1)
+			local targetAlpha = fadeIcon and 0.6 or 1
+			
+			if button.lastGameIconAlpha ~= targetAlpha then
+				button.gameIcon:SetAlpha(targetAlpha)
+				button.lastGameIconAlpha = targetAlpha
 			end
 			
 			button.gameIcon:Show()
 		else
 			button.gameIcon:Hide()
+			button.lastClientProgram = nil -- Reset state
 		end
 		
 		-- Handle TravelPass button for Battle.net friends
+		-- Optimized Phase 4: Use Pre-Calculated Data (O(1) complexity)
 		if button.travelPassButton then
-			-- Show for ALL online Battle.net friends (matching Blizzard's behavior)
 			if friend.connected then
 				-- Store friend index for click handler
 				button.travelPassButton.friendIndex = friend.index
 				button.travelPassButton.friendData = friend
 				
-				-- Get the actual Battle.net friend index for restriction checking
-				local numBNet = BNGetNumFriends()
-				local actualBNetIndex = nil
-				for i = 1, numBNet do
-					local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
-					if accountInfo and accountInfo.bnetAccountID == friend.bnetAccountID then
-						actualBNetIndex = i
-						break
-					end
-				end
-				
-				-- Calculate invite restriction (matching Blizzard's logic)
-				local restriction = nil  -- Will be set to NO_GAME_ACCOUNTS if no valid accounts found
-				if actualBNetIndex then
-					local numGameAccounts = C_BattleNet.GetFriendNumGameAccounts(actualBNetIndex)
-					
-					for i = 1, numGameAccounts do
-						local gameAccountInfo = C_BattleNet.GetFriendGameAccountInfo(actualBNetIndex, i)
-						if gameAccountInfo then
-							if gameAccountInfo.clientProgram == BNET_CLIENT_WOW then
-								-- Check WoW version compatibility
-								if gameAccountInfo.wowProjectID and WOW_PROJECT_ID then
-									if gameAccountInfo.wowProjectID == WOW_PROJECT_CLASSIC and WOW_PROJECT_ID ~= WOW_PROJECT_CLASSIC then
-										-- Friend is on Classic, we're not
-										if not restriction then
-											restriction = INVITE_RESTRICTION_WOW_PROJECT_CLASSIC
-										end
-									elseif gameAccountInfo.wowProjectID == WOW_PROJECT_MAINLINE and WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE then
-										-- Friend is on Mainline, we're not
-										if not restriction then
-											restriction = INVITE_RESTRICTION_WOW_PROJECT_MAINLINE
-										end
-									elseif gameAccountInfo.wowProjectID ~= WOW_PROJECT_ID then
-										-- Different WoW version (other)
-										if not restriction then
-											restriction = INVITE_RESTRICTION_WOW_PROJECT_ID
-										end
-									elseif gameAccountInfo.realmID == 0 then
-										-- No realm info
-										if not restriction then
-											restriction = INVITE_RESTRICTION_INFO
-										end
-									elseif not gameAccountInfo.isInCurrentRegion then
-										-- Different region
-										restriction = INVITE_RESTRICTION_REGION
-									else
-										-- At least one valid WoW account that can be invited
-										restriction = INVITE_RESTRICTION_NONE
-										break
-									end
-								elseif gameAccountInfo.realmID == 0 then
-									-- No realm info
-									if not restriction then
-										restriction = INVITE_RESTRICTION_INFO
-									end
-								elseif not gameAccountInfo.isInCurrentRegion then
-									-- Different region
-									restriction = INVITE_RESTRICTION_REGION
-								elseif gameAccountInfo.realmID and gameAccountInfo.realmID ~= 0 then
-									-- Valid WoW account (no project ID check needed)
-									restriction = INVITE_RESTRICTION_NONE
-									break
-								end
-							else
-								-- Non-WoW client (App, BSAp, etc.)
-								if not restriction then
-									restriction = INVITE_RESTRICTION_CLIENT
-								end
-							end
-						end
-					end
-				end
-				
-				-- If no restriction was set, means no game accounts at all
-				if not restriction then
-					restriction = INVITE_RESTRICTION_NO_GAME_ACCOUNTS
-				end
-				
-				-- Enable/disable button based on restriction
-				if restriction == INVITE_RESTRICTION_NONE then
+				-- Enable/disable button based on restriction (Pre-calculated)
+				if friend.canInvite then
 					button.travelPassButton:Enable()
 				else
 					button.travelPassButton:Disable()
 				end
 				
 				-- Set atlas based on faction for cross-faction invites
-				-- CRITICAL: Classic Era does NOT support SetAtlas() - keep file-based textures from XML
-				if not BFL.IsClassic then
-					local playerFactionGroup = UnitFactionGroup("player")
-					local isCrossFaction = friend.gameAccountInfo and
-										   friend.gameAccountInfo.factionName and 
-										   friend.gameAccountInfo.factionName ~= playerFactionGroup
-					
-					if isCrossFaction then
-						if friend.gameAccountInfo.factionName == "Horde" then
+				if not BFL.IsClassic and friend.inviteAtlas then
+					if button.lastInviteAtlas ~= friend.inviteAtlas then
+						button.lastInviteAtlas = friend.inviteAtlas
+						
+						if friend.inviteAtlas == "horde" then
 							button.travelPassButton.NormalTexture:SetAtlas("friendslist-invitebutton-horde-normal")
 							button.travelPassButton.PushedTexture:SetAtlas("friendslist-invitebutton-horde-pressed")
 							button.travelPassButton.DisabledTexture:SetAtlas("friendslist-invitebutton-horde-disabled")
-						elseif friend.gameAccountInfo.factionName == "Alliance" then
+						elseif friend.inviteAtlas == "alliance" then
 							button.travelPassButton.NormalTexture:SetAtlas("friendslist-invitebutton-alliance-normal")
 							button.travelPassButton.PushedTexture:SetAtlas("friendslist-invitebutton-alliance-pressed")
 							button.travelPassButton.DisabledTexture:SetAtlas("friendslist-invitebutton-alliance-disabled")
+						else -- default
+							button.travelPassButton.NormalTexture:SetAtlas("friendslist-invitebutton-default-normal")
+							button.travelPassButton.PushedTexture:SetAtlas("friendslist-invitebutton-default-pressed")
+							button.travelPassButton.DisabledTexture:SetAtlas("friendslist-invitebutton-default-disabled")
 						end
-					else
-						button.travelPassButton.NormalTexture:SetAtlas("friendslist-invitebutton-default-normal")
-						button.travelPassButton.PushedTexture:SetAtlas("friendslist-invitebutton-default-pressed")
-						button.travelPassButton.DisabledTexture:SetAtlas("friendslist-invitebutton-default-disabled")
 					end
 				end
 				-- Classic: Uses file-based textures from XML (Interface\FriendsFrame\TravelPass-Invite)
 				
 				button.travelPassButton:Show()
 			else
+				button.lastInviteAtlas = nil -- Reset state
 				button.travelPassButton:Hide()
 			end
 		end
@@ -3837,27 +3843,40 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 		
 	else
 		-- WoW friend
-		-- Set background color
+		-- Set background color (Optimized Phase 4: State Check)
+		local bgR, bgG, bgB, bgA
 		if friend.connected then
-			button.background:SetColorTexture(FRIENDS_WOW_BACKGROUND_COLOR.r, FRIENDS_WOW_BACKGROUND_COLOR.g, FRIENDS_WOW_BACKGROUND_COLOR.b, FRIENDS_WOW_BACKGROUND_COLOR.a)
+			bgR, bgG, bgB, bgA = FRIENDS_WOW_BACKGROUND_COLOR.r, FRIENDS_WOW_BACKGROUND_COLOR.g, FRIENDS_WOW_BACKGROUND_COLOR.b, FRIENDS_WOW_BACKGROUND_COLOR.a
 		else
-			button.background:SetColorTexture(FRIENDS_OFFLINE_BACKGROUND_COLOR.r, FRIENDS_OFFLINE_BACKGROUND_COLOR.g, FRIENDS_OFFLINE_BACKGROUND_COLOR.b, FRIENDS_OFFLINE_BACKGROUND_COLOR.a)
+			bgR, bgG, bgB, bgA = FRIENDS_OFFLINE_BACKGROUND_COLOR.r, FRIENDS_OFFLINE_BACKGROUND_COLOR.g, FRIENDS_OFFLINE_BACKGROUND_COLOR.b, FRIENDS_OFFLINE_BACKGROUND_COLOR.a
+		end
+		
+		if button.lastBgR ~= bgR or button.lastBgG ~= bgG or button.lastBgB ~= bgB then
+			button.background:SetColorTexture(bgR, bgG, bgB, bgA)
+			button.lastBgR, button.lastBgG, button.lastBgB = bgR, bgG, bgB
 		end
 		
 		-- Set status icon
+		local statusTexture
 		if friend.connected then
 			if friend.dnd then
-				button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-DnD")
+				statusTexture = "Interface\\FriendsFrame\\StatusIcon-DnD"
 			elseif friend.afk then
-				button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Away")
+				statusTexture = "Interface\\FriendsFrame\\StatusIcon-Away"
 			else
-				button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Online")
+				statusTexture = "Interface\\FriendsFrame\\StatusIcon-Online"
 			end
 		else
-			button.status:SetTexture("Interface\\FriendsFrame\\StatusIcon-Offline")
+			statusTexture = "Interface\\FriendsFrame\\StatusIcon-Offline"
+		end
+		
+		if button.lastStatusTexture ~= statusTexture then
+			button.status:SetTexture(statusTexture)
+			button.lastStatusTexture = statusTexture
 		end
 		
 		button.gameIcon:Hide()
+		button.lastClientProgram = nil -- Reset state
 		
 		-- Hide TravelPass button for WoW friends (they don't have it)
 		if button.travelPassButton then
@@ -3871,9 +3890,17 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 	-- OPTIMIZED: Use cached text generation (Phase 21)
 	local line1Text, line2Text = self:GetFormattedButtonText(friend)
 	
-	button.Name:SetText(line1Text)
+	-- Optimized Phase 4: State Check for Text
+	if button.lastLine1Text ~= line1Text then
+		button.Name:SetText(line1Text)
+		button.lastLine1Text = line1Text
+	end
+	
 	if not isCompactMode then
-		button.Info:SetText(line2Text)
+		if button.lastLine2Text ~= line2Text then
+			button.Info:SetText(line2Text)
+			button.lastLine2Text = line2Text
+		end
 	end
 	
 	-- Ensure button is visible
