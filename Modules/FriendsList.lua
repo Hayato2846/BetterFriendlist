@@ -49,6 +49,9 @@ local INVITE_RESTRICTION_REALM = 3
 local INVITE_RESTRICTION_INFO = 4
 local INVITE_RESTRICTION_CLIENT = 5
 local INVITE_RESTRICTION_WOW_PROJECT_ID = 6
+
+-- Forward Declarations for Drag Handlers (Phase 9.2 / Phase 5)
+local Button_OnDragStart, Button_OnDragStop, Button_OnDragUpdate
 local INVITE_RESTRICTION_WOW_PROJECT_MAINLINE = 7
 local INVITE_RESTRICTION_WOW_PROJECT_CLASSIC = 8
 local INVITE_RESTRICTION_MOBILE = 9
@@ -328,6 +331,37 @@ local function CreateElementFactory(friendsList) -- Capture friendsList referenc
 	end
 	
 	local function InitFriendButton(button, data)
+		-- One-time setup for recycled buttons (Phase 5 Optimization)
+		if not button.initialized then
+			-- Create drag overlay
+			if not button.dragOverlay then
+				local dragOverlay = button:CreateTexture(nil, "OVERLAY")
+				dragOverlay:SetAllPoints()
+				dragOverlay:SetColorTexture(1.0, 0.843, 0.0, 0.5) -- Gold with 50% alpha
+				dragOverlay:SetBlendMode("ADD")
+				dragOverlay:Hide()
+				button.dragOverlay = dragOverlay
+			end
+
+			-- Create selection highlight
+			if not button.selectionHighlight then
+				local selectionHighlight = button:CreateTexture(nil, "BACKGROUND")
+				selectionHighlight:SetTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
+				selectionHighlight:SetBlendMode("ADD")
+				selectionHighlight:SetAllPoints()
+				selectionHighlight:SetVertexColor(0.510, 0.773, 1.0, 0.5)
+				selectionHighlight:Hide()
+				button.selectionHighlight = selectionHighlight
+			end
+
+			-- Enable drag
+			button:RegisterForDrag("LeftButton")
+			button:SetScript("OnDragStart", Button_OnDragStart)
+			button:SetScript("OnDragStop", Button_OnDragStop)
+
+			button.initialized = true
+		end
+
 		self:UpdateFriendButton(button, data)
 	end
 	
@@ -3033,7 +3067,7 @@ end
 -- ========================================
 
 -- Drag OnUpdate Handler
-local function Button_OnDragUpdate(self)
+Button_OnDragUpdate = function(self)
 	-- Get cursor position
 	local cursorX, cursorY = GetCursorPosition()
 	local scale = UIParent:GetEffectiveScale()
@@ -3098,7 +3132,7 @@ local function Button_OnDragUpdate(self)
 end
 
 -- Drag OnStart Handler
-local function Button_OnDragStart(self)
+Button_OnDragStart = function(self)
 	if self.friendData then
 		-- Store friend name for header text updates
 		BetterFriendsList_DraggedFriend = self.friendData.name or self.friendData.accountName or self.friendData.battleTag or "Unknown"
@@ -3116,7 +3150,7 @@ local function Button_OnDragStart(self)
 end
 
 -- Drag OnStop Handler
-local function Button_OnDragStop(self)
+Button_OnDragStop = function(self)
 	-- Disable OnUpdate
 	self:SetScript("OnUpdate", nil)
 	
@@ -3549,48 +3583,7 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 	button.friendData = friend
 	button.groupId = groupId
 	
-	-- Store friendInfo for context menu (matches OnClick handler)
-	-- OPTIMIZED (Phase 9.8): Reuse table to reduce memory churn
-	if not button.friendInfo then
-		button.friendInfo = {}
-	end
-	
-	local info = button.friendInfo
-	info.type = friend.type
-	info.index = friend.index
-	info.name = friend.name or friend.accountName or friend.battleTag
-	info.connected = friend.connected
-	info.guid = friend.guid
-	info.bnetAccountID = friend.bnetAccountID
-	info.battleTag = friend.battleTag
-	
-	-- Create selection highlight texture if it doesn't exist (blue, like Blizzard)
-	if not button.selectionHighlight then
-		local selectionHighlight = button:CreateTexture(nil, "BACKGROUND")
-		selectionHighlight:SetTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
-		selectionHighlight:SetBlendMode("ADD")
-		selectionHighlight:SetAllPoints()
-		selectionHighlight:SetVertexColor(0.510, 0.773, 1.0, 0.5)  -- Blue with alpha
-		selectionHighlight:Hide()
-		button.selectionHighlight = selectionHighlight
-	end
-	
-	-- Enable drag and drop for group assignment
-	button:RegisterForDrag("LeftButton")
-	
-	-- Create drag overlay if it doesn't exist (same gold color as RaidFrame)
-	if not button.dragOverlay then
-		local dragOverlay = button:CreateTexture(nil, "OVERLAY")
-		dragOverlay:SetAllPoints()
-		dragOverlay:SetColorTexture(1.0, 0.843, 0.0, 0.5) -- Gold with 50% alpha (matching RaidFrame)
-		dragOverlay:SetBlendMode("ADD")
-		dragOverlay:Hide()
-		button.dragOverlay = dragOverlay
-	end
-	
-	-- Use hoisted handlers to avoid closure creation (Phase 9.2)
-	button:SetScript("OnDragStart", Button_OnDragStart)
-	button:SetScript("OnDragStop", Button_OnDragStop)
+	-- [Phase 5 Optimized] Static setup moved to InitFriendButton (friendInfo removed, using friendData)
 	
 	-- Get settings
 	local DB = GetDB()

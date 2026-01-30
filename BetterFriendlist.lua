@@ -1853,7 +1853,8 @@ function BetterFriendsList_Button_OnEnter(button) if not button.friendData then 
 end
 
 -- Button OnClick Handler (matching Blizzard's FriendsFrame_SelectFriend behavior)
-function BetterFriendsList_Button_OnClick(button, mouseButton) if not button.friendInfo then
+function BetterFriendsList_Button_OnClick(button, mouseButton)
+	if not button.friendData then
 		return
 	end
 	
@@ -1879,12 +1880,12 @@ function BetterFriendsList_Button_OnClick(button, mouseButton) if not button.fri
 	elseif mouseButton == "RightButton" then
 		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
 		
-		local friendInfo = button.friendInfo
+		local friendData = button.friendData
 		
-		if friendInfo.type == "bnet" then
+		if friendData.type == "bnet" then
 			-- BattleNet friend context menu
 			-- FIXED: Use bnetAccountID instead of index to avoid stale data issues
-			local accountInfo = friendInfo.bnetAccountID and C_BattleNet.GetAccountInfoByID(friendInfo.bnetAccountID) or nil
+			local accountInfo = friendData.bnetAccountID and C_BattleNet.GetAccountInfoByID(friendData.bnetAccountID) or nil
 			if accountInfo then
 				BetterFriendsList_ShowBNDropdown(
 					accountInfo.accountName,
@@ -1899,13 +1900,13 @@ function BetterFriendsList_Button_OnClick(button, mouseButton) if not button.fri
 					nil, -- communityEpoch
 					nil, -- communityPosition
 					accountInfo.battleTag,
-					friendInfo.index
+					friendData.index
 				)
 			end
 		else
 			-- WoW friend context menu
 			-- FIXED: Use index instead of guid (guid is not stored in friend data)
-			local info = C_FriendList.GetFriendInfoByIndex(friendInfo.index)
+			local info = C_FriendList.GetFriendInfoByIndex(friendData.index)
 			if info then
 				BetterFriendsList_ShowDropdown(
 					info.name,
@@ -1913,13 +1914,13 @@ function BetterFriendsList_Button_OnClick(button, mouseButton) if not button.fri
 					nil, -- lineID
 					nil, -- chatType
 					nil, -- chatFrame
-					friendInfo.index, -- friendsList (Pass INDEX here, not true)
+					friendData.index, -- friendsList (Pass INDEX here, not true)
 					nil, -- communityClubID
 					nil, -- communityStreamID
 					nil, -- communityEpoch
 					nil, -- communityPosition
 					info.guid,
-					friendInfo.index
+					friendData.index
 				)
 			end
 		end
