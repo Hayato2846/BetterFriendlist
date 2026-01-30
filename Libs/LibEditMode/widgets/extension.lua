@@ -1,13 +1,13 @@
---[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/extension.lua"); local MINOR = 13
+local MINOR = 14
 local lib, minor = LibStub('LibEditMode')
 if minor > MINOR then
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/extension.lua"); return
+	return
 end
 
 local internal = lib.internal
 
 local extensionMixin = {}
-function extensionMixin:Update(systemID, subSystemID) Perfy_Trace(Perfy_GetTime(), "Enter", "extensionMixin:Update file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/extension.lua:10:0");
+function extensionMixin:Update(systemID, subSystemID)
 	self.systemID = systemID
 	self.subSystemID = subSystemID
 
@@ -27,19 +27,32 @@ function extensionMixin:Update(systemID, subSystemID) Perfy_Trace(Perfy_GetTime(
 	-- show and update layout
 	self:Show()
 	self:Layout()
-Perfy_Trace(Perfy_GetTime(), "Leave", "extensionMixin:Update file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/extension.lua:10:0"); end
+end
 
-function extensionMixin:UpdateSettings() Perfy_Trace(Perfy_GetTime(), "Enter", "extensionMixin:UpdateSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/extension.lua:32:0");
+function extensionMixin:RefreshWidgets()
+	for _, widget in next, self.Settings.widgets do
+		if widget.Refresh then
+			widget:Refresh()
+		end
+	end
+
+	self:Layout()
+end
+
+function extensionMixin:UpdateSettings()
+	self.Settings.widgets = table.wipe(self.Settings.widgets or {})
+
 	local settings, num = internal:GetSystemSettings(self.systemID, self.subSystemID)
 	local isEmpty = num == 0
 	if not isEmpty then
 		for index, data in next, settings do
 			local pool = internal:GetPool(data.kind)
 			if pool then
-				local setting = pool:Acquire(self.Settings)
-				setting.layoutIndex = index
-				setting:Setup(data)
-				setting:Show()
+				local widget = pool:Acquire(self.Settings)
+				widget.layoutIndex = index
+				widget:Setup(data)
+
+				table.insert(self.Settings.widgets, widget)
 			end
 		end
 	end
@@ -49,10 +62,10 @@ function extensionMixin:UpdateSettings() Perfy_Trace(Perfy_GetTime(), "Enter", "
 	self.Settings.ResetButton.ignoreInLayout = isEmpty
 	self.Settings.ResetButton:SetEnabled(not isEmpty)
 
-	Perfy_Trace(Perfy_GetTime(), "Leave", "extensionMixin:UpdateSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/extension.lua:32:0"); return num
+	return num
 end
 
-function extensionMixin:UpdateButtons(numSettings) Perfy_Trace(Perfy_GetTime(), "Enter", "extensionMixin:UpdateButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/extension.lua:55:0");
+function extensionMixin:UpdateButtons(numSettings)
 	local buttons, num = internal:GetSystemSettingsButtons(self.systemID, self.subSystemID)
 	local isEmpty = num == 0
 	if not isEmpty then
@@ -73,9 +86,9 @@ function extensionMixin:UpdateButtons(numSettings) Perfy_Trace(Perfy_GetTime(), 
 	end
 
 	self.Buttons.ignoreInLayout = isEmpty
-Perfy_Trace(Perfy_GetTime(), "Leave", "extensionMixin:UpdateButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/extension.lua:55:0"); end
+end
 
-function extensionMixin:ResetSettings() Perfy_Trace(Perfy_GetTime(), "Enter", "extensionMixin:ResetSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/extension.lua:78:0");
+function extensionMixin:ResetSettings()
 	local settings, num = internal:GetSystemSettings(self.systemID, self.subSystemID)
 	if num > 0 then
 		for _, data in next, settings do
@@ -86,9 +99,9 @@ function extensionMixin:ResetSettings() Perfy_Trace(Perfy_GetTime(), "Enter", "e
 
 		self:Update(self.systemID, self.subSystemID)
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "extensionMixin:ResetSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/extension.lua:78:0"); end
+end
 
-function internal:CreateExtension() Perfy_Trace(Perfy_GetTime(), "Enter", "internal:CreateExtension file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/extension.lua:91:0");
+function internal:CreateExtension()
 	local extension = Mixin(CreateFrame('Frame', nil, UIParent, 'ResizeLayoutFrame'), extensionMixin)
 	extension:SetSize(64, 64)
 	extension:SetPoint('TOP', EditModeSystemSettingsDialog, 'BOTTOM', 0, 0)
@@ -117,7 +130,5 @@ function internal:CreateExtension() Perfy_Trace(Perfy_GetTime(), "Enter", "inter
 	extensionButtons.spacing = 2
 	extension.Buttons = extensionButtons
 
-	Perfy_Trace(Perfy_GetTime(), "Leave", "internal:CreateExtension file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/extension.lua:91:0"); return extension
+	return extension
 end
-
-Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/extension.lua");

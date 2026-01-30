@@ -1,7 +1,7 @@
---[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dialog.lua"); local MINOR = 13
+local MINOR = 14
 local lib, minor = LibStub('LibEditMode')
 if minor > MINOR then
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dialog.lua"); return
+	return
 end
 
 local CENTER = {
@@ -14,7 +14,7 @@ local internal = lib.internal
 
 -- replica of EditModeSystemSettingsDialog
 local dialogMixin = {}
-function dialogMixin:Update(selection) Perfy_Trace(Perfy_GetTime(), "Enter", "dialogMixin:Update file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dialog.lua:17:0");
+function dialogMixin:Update(selection)
 	self.selection = selection
 
 	self.Title:SetText(selection.system:GetSystemName())
@@ -24,20 +24,33 @@ function dialogMixin:Update(selection) Perfy_Trace(Perfy_GetTime(), "Enter", "di
 	-- show and update layout
 	self:Show()
 	self:Layout()
-Perfy_Trace(Perfy_GetTime(), "Leave", "dialogMixin:Update file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dialog.lua:17:0"); end
+end
 
-function dialogMixin:UpdateSettings() Perfy_Trace(Perfy_GetTime(), "Enter", "dialogMixin:UpdateSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dialog.lua:29:0");
+function dialogMixin:RefreshWidgets()
+	for _, widget in next, self.Settings.widgets do
+		if widget.Refresh then
+			widget:Refresh()
+		end
+	end
+
+	self:Layout()
+end
+
+function dialogMixin:UpdateSettings()
 	internal.ReleaseAllPools()
+
+	self.Settings.widgets = table.wipe(self.Settings.widgets or {})
 
 	local settings, num = internal:GetFrameSettings(self.selection.parent)
 	if num > 0 then
 		for index, data in next, settings do
 			local pool = internal:GetPool(data.kind)
 			if pool then
-				local setting = pool:Acquire(self.Settings)
-				setting.layoutIndex = index
-				setting:Setup(data)
-				setting:Show()
+				local widget = pool:Acquire(self.Settings)
+				widget.layoutIndex = index
+				widget:Setup(data)
+
+				table.insert(self.Settings.widgets, widget)
 			end
 		end
 	end
@@ -45,29 +58,29 @@ function dialogMixin:UpdateSettings() Perfy_Trace(Perfy_GetTime(), "Enter", "dia
 	self.Settings.ResetButton.layoutIndex = num + 1
 	self.Settings.Divider.layoutIndex = num + 2
 	self.Settings.ResetButton:SetEnabled(num > 0)
-Perfy_Trace(Perfy_GetTime(), "Leave", "dialogMixin:UpdateSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dialog.lua:29:0"); end
+end
 
-function dialogMixin:Reset() Perfy_Trace(Perfy_GetTime(), "Enter", "dialogMixin:Reset file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dialog.lua:50:0");
+function dialogMixin:Reset()
 	self.selection = nil
 	self:ClearAllPoints()
 	self:SetPoint('BOTTOMRIGHT', UIParent, -250, 250)
-Perfy_Trace(Perfy_GetTime(), "Leave", "dialogMixin:Reset file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dialog.lua:50:0"); end
-
-local function closeEnough(a, b) Perfy_Trace(Perfy_GetTime(), "Enter", "closeEnough file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dialog.lua:56:6");
-	return Perfy_Trace_Passthrough("Leave", "closeEnough file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dialog.lua:56:6", math.abs(a - b) < 0.01)
 end
 
-local function isDefaultPosition(parent) Perfy_Trace(Perfy_GetTime(), "Enter", "isDefaultPosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dialog.lua:60:6");
+local function closeEnough(a, b)
+	return math.abs(a - b) < 0.01
+end
+
+local function isDefaultPosition(parent)
 	local point, _, _, x, y = parent:GetPoint()
 	local default = lib:GetFrameDefaultPosition(parent)
 	if not default then
 		default = CopyTable(CENTER)
 	end
 
-	return Perfy_Trace_Passthrough("Leave", "isDefaultPosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dialog.lua:60:6", point == default.point and closeEnough(x, default.x) and closeEnough(y, default.y))
+	return point == default.point and closeEnough(x, default.x) and closeEnough(y, default.y)
 end
 
-function dialogMixin:UpdateButtons() Perfy_Trace(Perfy_GetTime(), "Enter", "dialogMixin:UpdateButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dialog.lua:70:0");
+function dialogMixin:UpdateButtons()
 	local parent = self.selection.parent
 	local buttons, num = internal:GetFrameButtons(parent)
 	if num > 0 then
@@ -88,9 +101,9 @@ function dialogMixin:UpdateButtons() Perfy_Trace(Perfy_GetTime(), "Enter", "dial
 	resetPosition:Show()
 	resetPosition:SetEnabled(not isDefaultPosition(parent))
 	self.Buttons.ResetPositionButton = resetPosition
-Perfy_Trace(Perfy_GetTime(), "Leave", "dialogMixin:UpdateButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dialog.lua:70:0"); end
+end
 
-function dialogMixin:ResetSettings() Perfy_Trace(Perfy_GetTime(), "Enter", "dialogMixin:ResetSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dialog.lua:93:0");
+function dialogMixin:ResetSettings()
 	local settings, num = internal:GetFrameSettings(self.selection.parent)
 	if num > 0 then
 		for _, data in next, settings do
@@ -101,12 +114,12 @@ function dialogMixin:ResetSettings() Perfy_Trace(Perfy_GetTime(), "Enter", "dial
 
 		self:Update(self.selection)
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "dialogMixin:ResetSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dialog.lua:93:0"); end
+end
 
-function dialogMixin:ResetPosition() Perfy_Trace(Perfy_GetTime(), "Enter", "dialogMixin:ResetPosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dialog.lua:106:0");
+function dialogMixin:ResetPosition()
 	if InCombatLockdown() then
 		-- TODO: maybe add a warning?
-		Perfy_Trace(Perfy_GetTime(), "Leave", "dialogMixin:ResetPosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dialog.lua:106:0"); return
+		return
 	end
 
 	local parent = self.selection.parent
@@ -120,14 +133,14 @@ function dialogMixin:ResetPosition() Perfy_Trace(Perfy_GetTime(), "Enter", "dial
 	self.Buttons.ResetPositionButton:SetEnabled(false)
 
 	internal:TriggerCallback(parent, pos.point, pos.x, pos.y)
-Perfy_Trace(Perfy_GetTime(), "Leave", "dialogMixin:ResetPosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dialog.lua:106:0"); end
+end
 
 local BIG_STEP = 10
 local SMALL_STEP = 1
 
-function dialogMixin:OnKeyDown(key) Perfy_Trace(Perfy_GetTime(), "Enter", "dialogMixin:OnKeyDown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dialog.lua:128:0");
+function dialogMixin:OnKeyDown(key)
 	if InCombatLockdown() then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "dialogMixin:OnKeyDown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dialog.lua:128:0"); return
+		return
 	end
 
 	if self.selection then
@@ -147,9 +160,9 @@ function dialogMixin:OnKeyDown(key) Perfy_Trace(Perfy_GetTime(), "Enter", "dialo
 	else
 		self:SetPropagateKeyboardInput(true) -- protected
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "dialogMixin:OnKeyDown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dialog.lua:128:0"); end
+end
 
-function internal:CreateDialog() Perfy_Trace(Perfy_GetTime(), "Enter", "internal:CreateDialog file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dialog.lua:152:0");
+function internal:CreateDialog()
 	local dialog = Mixin(CreateFrame('Frame', nil, UIParent, 'ResizeLayoutFrame'), dialogMixin)
 	dialog:SetSize(300, 350)
 	dialog:SetFrameStrata('DIALOG')
@@ -181,9 +194,9 @@ function internal:CreateDialog() Perfy_Trace(Perfy_GetTime(), "Enter", "internal
 	local dialogClose = CreateFrame('Button', nil, dialog, 'UIPanelCloseButton')
 	dialogClose:SetPoint('TOPRIGHT')
 	dialogClose.ignoreInLayout = true
-	dialogClose:HookScript('OnClick', function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dialog.lua:184:35");
+	dialogClose:HookScript('OnClick', function()
 		dialog:Reset()
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dialog.lua:184:35"); end)
+	end)
 	dialog.Close = dialogClose
 
 	local dialogSettings = CreateFrame('Frame', nil, dialog, 'VerticalLayoutFrame')
@@ -206,7 +219,5 @@ function internal:CreateDialog() Perfy_Trace(Perfy_GetTime(), "Enter", "internal
 	dialogButtons.spacing = 2
 	dialog.Buttons = dialogButtons
 
-	Perfy_Trace(Perfy_GetTime(), "Leave", "internal:CreateDialog file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dialog.lua:152:0"); return dialog
+	return dialog
 end
-
-Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dialog.lua");

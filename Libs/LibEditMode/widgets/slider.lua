@@ -1,10 +1,10 @@
---[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/slider.lua"); local MINOR = 13
+local MINOR = 14
 local lib, minor = LibStub('LibEditMode')
 if minor > MINOR then
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/slider.lua"); return
+	return
 end
 
-local function showTooltip(self) Perfy_Trace(Perfy_GetTime(), "Enter", "showTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/slider.lua:7:6");
+local function showTooltip(self)
 	if self.setting and self.setting.desc then
 		SettingsTooltip:SetOwner(self, 'ANCHOR_NONE')
 		SettingsTooltip:SetPoint('BOTTOMRIGHT', self, 'TOPLEFT')
@@ -12,13 +12,13 @@ local function showTooltip(self) Perfy_Trace(Perfy_GetTime(), "Enter", "showTool
 		SettingsTooltip:AddLine(self.setting.desc)
 		SettingsTooltip:Show()
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "showTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/slider.lua:7:6"); end
+end
 
 local sliderMixin = {}
-function sliderMixin:Setup(data) Perfy_Trace(Perfy_GetTime(), "Enter", "sliderMixin:Setup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/slider.lua:18:0");
+function sliderMixin:Setup(data)
 	self.setting = data
 	self.Label:SetText(data.name)
-	self:SetEnabled(not data.disabled)
+	self:Refresh()
 
 	self.initInProgress = true
 	self.formatters = {}
@@ -28,21 +28,38 @@ function sliderMixin:Setup(data) Perfy_Trace(Perfy_GetTime(), "Enter", "sliderMi
 	local steps = (data.maxValue - data.minValue) / stepSize
 	self.Slider:Init(data.get(lib:GetActiveLayoutName()) or data.default, data.minValue or 0, data.maxValue or 1, steps, self.formatters)
 	self.initInProgress = false
-Perfy_Trace(Perfy_GetTime(), "Leave", "sliderMixin:Setup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/slider.lua:18:0"); end
+end
 
-function sliderMixin:OnSliderValueChanged(value) Perfy_Trace(Perfy_GetTime(), "Enter", "sliderMixin:OnSliderValueChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/slider.lua:33:0");
+function sliderMixin:Refresh()
+	local data = self.setting
+	if type(data.disabled) == 'function' then
+		self:SetEnabled(not data.disabled(lib:GetActiveLayoutName()))
+	else
+		self:SetEnabled(not data.disabled)
+	end
+
+	if type(data.hidden) == 'function' then
+		self:SetShown(not data.hidden(lib:GetActiveLayoutName()))
+	else
+		self:SetShown(not data.hidden)
+	end
+end
+
+function sliderMixin:OnSliderValueChanged(value)
 	if not self.initInProgress then
 		self.setting.set(lib:GetActiveLayoutName(), value, false)
-	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "sliderMixin:OnSliderValueChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/slider.lua:33:0"); end
 
-function sliderMixin:SetEnabled(enabled) Perfy_Trace(Perfy_GetTime(), "Enter", "sliderMixin:SetEnabled file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/slider.lua:39:0");
+		self:GetParent():GetParent():RefreshWidgets()
+	end
+end
+
+function sliderMixin:SetEnabled(enabled)
 	self.Slider:SetEnabled(enabled)
 	self.Label:SetTextColor((enabled and WHITE_FONT_COLOR or DISABLED_FONT_COLOR):GetRGB())
 	self.EditBox:SetShown(enabled)
-Perfy_Trace(Perfy_GetTime(), "Leave", "sliderMixin:SetEnabled file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/slider.lua:39:0"); end
+end
 
-local function onEditFocus(self) Perfy_Trace(Perfy_GetTime(), "Enter", "onEditFocus file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/slider.lua:45:6");
+local function onEditFocus(self)
 	local parent = self:GetParent()
 
 	-- hide slider
@@ -58,9 +75,9 @@ local function onEditFocus(self) Perfy_Trace(Perfy_GetTime(), "Enter", "onEditFo
 	-- TODO: maybe flatten the value here
 	self:SetText(parent.Slider.Slider:GetValue())
 	self:SetCursorPosition(0)
-Perfy_Trace(Perfy_GetTime(), "Leave", "onEditFocus file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/slider.lua:45:6"); end
+end
 
-local function onEditSubmit(self) Perfy_Trace(Perfy_GetTime(), "Enter", "onEditSubmit file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/slider.lua:63:6");
+local function onEditSubmit(self)
 	local parent = self:GetParent()
 
 	-- get bounds and value
@@ -74,9 +91,9 @@ local function onEditSubmit(self) Perfy_Trace(Perfy_GetTime(), "Enter", "onEditS
 	end
 
 	self:ClearFocus()
-Perfy_Trace(Perfy_GetTime(), "Leave", "onEditSubmit file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/slider.lua:63:6"); end
+end
 
-local function onEditReset(self) Perfy_Trace(Perfy_GetTime(), "Enter", "onEditReset file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/slider.lua:79:6");
+local function onEditReset(self)
 	local parent = self:GetParent()
 	parent.Slider:Show()
 
@@ -87,9 +104,9 @@ local function onEditReset(self) Perfy_Trace(Perfy_GetTime(), "Enter", "onEditRe
 	self:SetPoint('RIGHT', parent.Slider.RightText, 5, 0)
 	self:SetPoint('TOPLEFT', parent.Slider.RightText)
 	self:SetPoint('BOTTOMLEFT', parent.Slider.RightText)
-Perfy_Trace(Perfy_GetTime(), "Leave", "onEditReset file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/slider.lua:79:6"); end
+end
 
-lib.internal:CreatePool(lib.SettingType.Slider, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/slider.lua:92:48");
+lib.internal:CreatePool(lib.SettingType.Slider, function()
 	local frame = CreateFrame('Frame', nil, UIParent, 'EditModeSettingSliderTemplate')
 	frame:SetScript('OnLeave', DefaultTooltipMixin.OnLeave)
 	frame:SetScript('OnEnter', showTooltip)
@@ -114,10 +131,8 @@ lib.internal:CreatePool(lib.SettingType.Slider, function() Perfy_Trace(Perfy_Get
 	frame.EditBox = editBox
 
 	frame:OnLoad()
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/slider.lua:92:48"); return frame
-end, function(_, frame) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/slider.lua:118:5");
+	return frame
+end, function(_, frame)
 	frame:Hide()
 	frame.layoutIndex = nil
-Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/slider.lua:118:5"); end)
-
-Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/slider.lua");
+end)

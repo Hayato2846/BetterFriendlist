@@ -1,12 +1,16 @@
---[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua"); local MINOR = 13
+local MINOR = 14
 local lib = LibStub:NewLibrary('LibEditMode', MINOR)
 if not lib then
 	-- this or a newer version is already loaded
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua"); return
+	return
 end
 
 lib.internal = {} -- internal methods, do not use directly
 local internal = lib.internal
+
+-- keep a variable stored for the latest version, used to avoid hooks and events
+-- firing for older versions of the library when it has been "globally" upgraded with LibStub
+lib.hookVersion = MINOR
 
 lib.frameSelections = lib.frameSelections or {}
 lib.frameCallbacks = lib.frameCallbacks or {}
@@ -29,23 +33,23 @@ lib.subSystemButtons = lib.subSystemButtons or {}
 lib.layoutCache = lib.layoutCache or {}
 
 local layoutNames = setmetatable({'Modern', 'Classic'}, {
-	__index = function(t, key) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:32:11");
+	__index = function(t, key)
 		if key > 2 then
 			-- the first 2 indices are reserved for 'Modern' and 'Classic' layouts, and anything
 			-- else are custom ones, although GetLayouts() doesn't return data for the 'Modern'
 			-- and 'Classic' layouts, so we'll have to substract and check
 			local layouts = lib.layoutCache
 			if (key - 2) <= #layouts then
-				return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:32:11", layouts[key - 2].layoutName)
+				return layouts[key - 2].layoutName
 			end
 		else
 			-- also work for 'Modern' and 'Classic'
 			rawget(t, key)
 		end
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:32:11"); end
+	end
 })
 
-local function resetDialogs() Perfy_Trace(Perfy_GetTime(), "Enter", "resetDialogs file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:48:6");
+local function resetDialogs()
 	if internal.dialog then
 		internal.dialog:Hide()
 	end
@@ -53,9 +57,9 @@ local function resetDialogs() Perfy_Trace(Perfy_GetTime(), "Enter", "resetDialog
 	if internal.extension then
 		internal.extension:Hide()
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "resetDialogs file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:48:6"); end
+end
 
-local function resetSelection() Perfy_Trace(Perfy_GetTime(), "Enter", "resetSelection file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:58:6");
+local function resetSelection()
 	for frame, selection in next, lib.frameSelections do
 		if selection.isSelected then
 			frame:SetMovable(false)
@@ -68,28 +72,28 @@ local function resetSelection() Perfy_Trace(Perfy_GetTime(), "Enter", "resetSele
 			selection:ShowHighlighted()
 		end
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "resetSelection file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:58:6"); end
+end
 
-local function onDragStart(self) Perfy_Trace(Perfy_GetTime(), "Enter", "onDragStart file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:73:6");
+local function onDragStart(self)
 	if InCombatLockdown() then
 		-- TODO: maybe add a warning?
-		Perfy_Trace(Perfy_GetTime(), "Leave", "onDragStart file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:73:6"); return
+		return
 	end
 
 	self:RegisterEvent('PLAYER_REGEN_DISABLED')
 	self.parent:StartMoving()
-Perfy_Trace(Perfy_GetTime(), "Leave", "onDragStart file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:73:6"); end
+end
 
-local function normalizePosition(frame) Perfy_Trace(Perfy_GetTime(), "Enter", "normalizePosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:83:6");
+local function normalizePosition(frame)
 	-- ripped out of LibWindow-1.1, which is Public Domain
 	local parent = frame:GetParent()
 	if not parent then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "normalizePosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:83:6"); return
+		return
 	end
 
 	local scale = frame:GetScale()
 	if not scale then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "normalizePosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:83:6"); return
+		return
 	end
 
 	local left = frame:GetLeft() * scale
@@ -126,13 +130,13 @@ local function normalizePosition(frame) Perfy_Trace(Perfy_GetTime(), "Enter", "n
 		point = 'CENTER'
 	end
 
-	return Perfy_Trace_Passthrough("Leave", "normalizePosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:83:6", point, x / scale, y / scale)
+	return point, x / scale, y / scale
 end
 
-local function updatePosition(selection, xDelta, yDelta) Perfy_Trace(Perfy_GetTime(), "Enter", "updatePosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:132:6");
+local function updatePosition(selection, xDelta, yDelta)
 	if InCombatLockdown() then
 		-- TODO: maybe add a warning?
-		Perfy_Trace(Perfy_GetTime(), "Leave", "updatePosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:132:6"); return
+		return
 	end
 
 	local parent = selection.parent
@@ -146,11 +150,11 @@ local function updatePosition(selection, xDelta, yDelta) Perfy_Trace(Perfy_GetTi
 	if selection.isSelected then
 		internal.dialog:Update(selection)
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "updatePosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:132:6"); end
+end
 
-local function onDragStop(self) Perfy_Trace(Perfy_GetTime(), "Enter", "onDragStop file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:151:6");
+local function onDragStop(self)
 	if InCombatLockdown() then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "onDragStop file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:151:6"); return
+		return
 	end
 
 	local parent = self.parent
@@ -161,17 +165,16 @@ local function onDragStop(self) Perfy_Trace(Perfy_GetTime(), "Enter", "onDragSto
 	-- FrameXML/EditModeUtil.lua
 
 	updatePosition(self)
-Perfy_Trace(Perfy_GetTime(), "Leave", "onDragStop file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:151:6"); end
+end
 
-local function onMouseDown(self) Perfy_Trace(Perfy_GetTime(), "Enter", "onMouseDown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:166:6"); -- replacement for EditModeSystemMixin:SelectSystem()
+local function onMouseDown(self) -- replacement for EditModeSystemMixin:SelectSystem()
 	if InCombatLockdown() then
 		-- TODO: maybe add a warning?
-		Perfy_Trace(Perfy_GetTime(), "Leave", "onMouseDown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:166:6"); return
+		return
 	end
 
-	resetDialogs()
-	resetSelection()
-	EditModeManagerFrame:ClearSelectedSystem() -- possible taint
+	EventRegistry:TriggerEvent('EditModeExternal.hideDialog')
+	EditModeManagerFrame:ClearSelectedSystem() -- taint
 
 	if not self.isSelected then
 		self.parent:SetMovable(true)
@@ -183,9 +186,9 @@ local function onMouseDown(self) Perfy_Trace(Perfy_GetTime(), "Enter", "onMouseD
 
 		internal.dialog:Update(self)
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "onMouseDown file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:166:6"); end
+end
 
-local function onEditModeEnter() Perfy_Trace(Perfy_GetTime(), "Enter", "onEditModeEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:188:6");
+local function onEditModeEnter()
 	lib.isEditing = true
 
 	resetDialogs()
@@ -194,9 +197,9 @@ local function onEditModeEnter() Perfy_Trace(Perfy_GetTime(), "Enter", "onEditMo
 	for _, callback in next, lib.anonCallbacksEnter do
 		securecallfunction(callback)
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "onEditModeEnter file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:188:6"); end
+end
 
-local function onEditModeExit() Perfy_Trace(Perfy_GetTime(), "Enter", "onEditModeExit file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:199:6");
+local function onEditModeExit()
 	lib.isEditing = false
 
 	resetDialogs()
@@ -205,9 +208,9 @@ local function onEditModeExit() Perfy_Trace(Perfy_GetTime(), "Enter", "onEditMod
 	for _, callback in next, lib.anonCallbacksExit do
 		securecallfunction(callback)
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "onEditModeExit file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:199:6"); end
+end
 
-local function onEditModeChanged(_, layoutInfo) Perfy_Trace(Perfy_GetTime(), "Enter", "onEditModeChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:210:6");
+local function onEditModeChanged(_, layoutInfo)
 	local activeLayout = layoutInfo.activeLayout
 	if activeLayout ~= lib.activeLayout then
 		lib.activeLayout = activeLayout
@@ -227,18 +230,17 @@ local function onEditModeChanged(_, layoutInfo) Perfy_Trace(Perfy_GetTime(), "En
 
 		-- TODO: we should update the position of the button here, let the user not deal with that
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "onEditModeChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:210:6"); end
+end
 
-local function onSpecChanged(_, unit) Perfy_Trace(Perfy_GetTime(), "Enter", "onSpecChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:232:6");
+local function onSpecChanged(_, unit)
 	if unit ~= 'player' then
-		Perfy_Trace(Perfy_GetTime(), "Leave", "onSpecChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:232:6"); return
+		return
 	end
 
 	onEditModeChanged(nil, C_EditMode.GetLayouts())
-Perfy_Trace(Perfy_GetTime(), "Leave", "onSpecChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:232:6"); end
+end
 
-local layoutCopySource
-local function onEditModeLayoutChanged() Perfy_Trace(Perfy_GetTime(), "Enter", "onEditModeLayoutChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:241:6");
+local function onEditModeLayoutChanged()
 	local layoutInfo = C_EditMode.GetLayouts()
 	local layouts = layoutInfo.layouts
 
@@ -248,7 +250,7 @@ local function onEditModeLayoutChanged() Perfy_Trace(Perfy_GetTime(), "Enter", "
 		for index, layout in next, layouts do
 			if not lib.layoutCache[index] then
 				for _, callback in next, lib.anonCallbacksCreate do
-					securecallfunction(callback, layout.layoutName, index, layoutCopySource and layoutCopySource.layoutName)
+					securecallfunction(callback, layout.layoutName, index, lib._layoutCopySource and lib._layoutCopySource.layoutName)
 				end
 			end
 		end
@@ -288,7 +290,7 @@ local function onEditModeLayoutChanged() Perfy_Trace(Perfy_GetTime(), "Enter", "
 					-- the currently active layout was renamed, we trigger a layout update
 					lib.activeLayout = nil
 					onEditModeChanged(nil, layoutInfo)
-					Perfy_Trace(Perfy_GetTime(), "Leave", "onEditModeLayoutChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:241:6"); return -- no need to proceed, the remaining tasks are already handled
+					return -- no need to proceed, the remaining tasks are already handled
 				end
 
 				break
@@ -296,54 +298,80 @@ local function onEditModeLayoutChanged() Perfy_Trace(Perfy_GetTime(), "Enter", "
 		end
 	end
 
-	layoutCopySource = nil
+	lib._layoutCopySource = nil
 	lib.layoutCache = layouts
-Perfy_Trace(Perfy_GetTime(), "Leave", "onEditModeLayoutChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:241:6"); end
+end
 
-local isManagerHooked = false
-
-local function hookManager() Perfy_Trace(Perfy_GetTime(), "Enter", "hookManager file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:305:6");
+do -- deal with hooks and events
 	-- listen for layout changes
-	EventRegistry:RegisterFrameEventAndCallback('EDIT_MODE_LAYOUTS_UPDATED', onEditModeChanged)
-	EventRegistry:RegisterFrameEventAndCallback('PLAYER_SPECIALIZATION_CHANGED', onSpecChanged)
-	EventRegistry:RegisterCallback('EditMode.SavedLayouts', onEditModeLayoutChanged)
+	EventRegistry:RegisterFrameEventAndCallback('EDIT_MODE_LAYOUTS_UPDATED', function(...)
+		if lib.hookVersion == MINOR then
+			onEditModeChanged(...)
+		end
+	end)
+
+	EventRegistry:RegisterFrameEventAndCallback('PLAYER_SPECIALIZATION_CHANGED', function(...)
+		if lib.hookVersion == MINOR then
+			onSpecChanged(...)
+		end
+	end)
+	EventRegistry:RegisterCallback('EditMode.SavedLayouts', function(...)
+		if lib.hookVersion == MINOR then
+			onEditModeLayoutChanged(...)
+		end
+	end)
 
 	-- hook EditMode shown state, since QuickKeybindMode will hide/show EditMode
-	EditModeManagerFrame:HookScript('OnShow', onEditModeEnter)
-	EditModeManagerFrame:HookScript('OnHide', onEditModeExit)
+	EditModeManagerFrame:HookScript('OnShow', function(...)
+		if lib.hookVersion == MINOR then
+			onEditModeEnter(...)
+		end
+	end)
+	EditModeManagerFrame:HookScript('OnHide', function(...)
+		if lib.hookVersion == MINOR then
+			onEditModeExit(...)
+		end
+	end)
 
 	-- we don't want any custom frames dangling around
-	EditModeSystemSettingsDialog:HookScript('OnHide', resetDialogs)
+	EditModeSystemSettingsDialog:HookScript('OnHide', function(...)
+		if lib.hookVersion == MINOR then
+			resetDialogs(...)
+		end
+	end)
 
 	-- unselect our selections whenever a system is selected and try to add an extension
-	hooksecurefunc(EditModeManagerFrame, 'SelectSystem', function(_, systemFrame) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:319:54");
-		resetDialogs()
-		resetSelection()
+	hooksecurefunc(EditModeManagerFrame, 'SelectSystem', function(_, systemFrame)
+		if lib.hookVersion == MINOR then
+			resetDialogs()
+			resetSelection()
 
-		if internal.dialog then
-			internal.dialog:Reset()
+			if internal.dialog then
+				internal.dialog:Reset() -- can this be moved to resetDialogs ?
+			end
+
+			local systemID = systemFrame.system
+			local subSystemID = systemFrame.systemIndex
+			local isKnownSystem = lib.systemSettings[systemID] or lib.systemButtons[systemID]
+			local isKnownSubSystem = subSystemID and ((lib.subSystemSettings[systemID] and lib.subSystemSettings[systemID][subSystemID]) or (lib.subSystemButtons[systemID] and lib.subSystemButtons[systemID][subSystemID]))
+			if isKnownSystem or isKnownSubSystem then
+				internal.extension:Update(systemID, isKnownSubSystem and subSystemID or nil)
+			end
 		end
+	end)
 
-		local systemID = systemFrame.system
-		local subSystemID = systemFrame.systemIndex
-		local isKnownSystem = lib.systemSettings[systemID] or lib.systemButtons[systemID]
-		local isKnownSubSystem = subSystemID and ((lib.subSystemSettings[systemID] and lib.subSystemSettings[systemID][subSystemID]) or (lib.subSystemButtons[systemID] and lib.subSystemButtons[systemID][subSystemID]))
-		if isKnownSystem or isKnownSubSystem then
-			internal.extension:Update(systemID, isKnownSubSystem and subSystemID or nil)
+	hooksecurefunc(EditModeManagerFrame, 'ShowNewLayoutDialog', function(_, sourceLayout)
+		if lib.hookVersion == MINOR then
+			lib._layoutCopySource = sourceLayout
 		end
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:319:54"); end)
+	end)
+end
 
-	hooksecurefunc(EditModeManagerFrame, 'ShowNewLayoutDialog', function(_, sourceLayout) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:336:61");
-		layoutCopySource = sourceLayout
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:336:61"); end)
-
-	-- fetch layout info in case EDIT_MODE_LAYOUTS_UPDATED already fired
-	if lib.layoutCache then
-		onEditModeChanged(nil, C_EditMode.GetLayouts()) -- introduces a little latency
-	end
-
-	isManagerHooked = true
-Perfy_Trace(Perfy_GetTime(), "Leave", "hookManager file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:305:6"); end
+-- custom global callback hook that all addons that add custom dialogs should respond to
+EventRegistry:RegisterCallback('EditModeExternal.hideDialog', function()
+	resetDialogs()
+	resetSelection()
+end)
 
 --[[ LibEditMode:AddFrame(_frame, callback, default_) ![](https://img.shields.io/badge/function-blue)
 Register a frame to be controlled by the Edit Mode.
@@ -359,7 +387,7 @@ The `default` table must contain the following entries:
 * `x`: horizontal offset from the anchor point _(number)_
 * `y`: vertical offset from the anchor point _(number)_
 --]]
-function lib:AddFrame(frame, callback, default, name) Perfy_Trace(Perfy_GetTime(), "Enter", "lib:AddFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:362:0");
+function lib:AddFrame(frame, callback, default, name)
 	local selection = CreateFrame('Frame', nil, frame, 'EditModeSystemSelectionTemplate')
 	selection:SetAllPoints()
 	selection:SetScript('OnMouseDown', onMouseDown)
@@ -370,8 +398,8 @@ function lib:AddFrame(frame, callback, default, name) Perfy_Trace(Perfy_GetTime(
 
 	-- as of 11.2 the template requires a system name to work correctly
 	selection.system = {
-		GetSystemName = function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:373:18");
-			return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:373:18", name or frame.editModeName or frame:GetName())
+		GetSystemName = function()
+			return name or frame.editModeName or frame:GetName()
 		end
 	}
 
@@ -381,15 +409,16 @@ function lib:AddFrame(frame, callback, default, name) Perfy_Trace(Perfy_GetTime(
 
 	if not internal.dialog then
 		internal.dialog = internal:CreateDialog()
-		internal.dialog:HookScript('OnHide', function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:384:39");
+		internal.dialog:HookScript('OnHide', function()
 			resetSelection()
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:384:39"); end)
+		end)
 
-		if not isManagerHooked then
-			hookManager()
+		-- fetch layout info in case EDIT_MODE_LAYOUTS_UPDATED already fired
+		if lib.layoutCache then
+			onEditModeChanged(nil, C_EditMode.GetLayouts()) -- introduces a little latency
 		end
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "lib:AddFrame file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:362:0"); end
+end
 
 --[[ LibEditMode:AddFrameSettings(_frame, settings_) ![](https://img.shields.io/badge/function-blue)
 Register extra settings that will be displayed in a dialog attached to the frame in the Edit Mode.
@@ -397,13 +426,13 @@ Register extra settings that will be displayed in a dialog attached to the frame
 * `frame`: frame widget already registered with [AddFrame](#libeditmodeaddframeframe-callback-default-)
 * `settings`: table containing [SettingObject](Types#settingobject) entries _(table, number indexed)_
 --]]
-function lib:AddFrameSettings(frame, settings) Perfy_Trace(Perfy_GetTime(), "Enter", "lib:AddFrameSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:400:0");
+function lib:AddFrameSettings(frame, settings)
 	if not lib.frameSelections[frame] then
 		error('frame must be registered')
 	end
 
 	lib.frameSettings[frame] = settings
-Perfy_Trace(Perfy_GetTime(), "Leave", "lib:AddFrameSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:400:0"); end
+end
 
 --[[ LibEditMode:EnableFrameSetting(_frame, settingName_) ![](https://img.shields.io/badge/function-blue)
 Enables a setting on a frame.
@@ -411,7 +440,7 @@ Enables a setting on a frame.
 * `frame`: frame widget already registered with [AddFrame](#libeditmodeaddframeframe-callback-default-)
 * `settingName`: a setting already registered with [AddFrameSettings](#libeditmodeaddframesettingsframe-settings-)
 --]]
-function lib:EnableFrameSetting(frame, settingName) Perfy_Trace(Perfy_GetTime(), "Enter", "lib:EnableFrameSetting file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:414:0");
+function lib:EnableFrameSetting(frame, settingName)
 	local settings = internal:GetFrameSettings(frame)
 	if settings then
 		for _, setting in next, settings do
@@ -422,7 +451,7 @@ function lib:EnableFrameSetting(frame, settingName) Perfy_Trace(Perfy_GetTime(),
 			end
 		end
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "lib:EnableFrameSetting file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:414:0"); end
+end
 
 --[[ LibEditMode:DisableFrameSetting(_frame, settingName_) ![](https://img.shields.io/badge/function-blue)
 Disables a setting on a frame.
@@ -430,7 +459,7 @@ Disables a setting on a frame.
 * `frame`: frame widget already registered with [AddFrame](#libeditmodeaddframeframe-callback-default-)
 * `settingName`: a setting already registered with [AddFrameSettings](#libeditmodeaddframesettingsframe-settings-)
 --]]
-function lib:DisableFrameSetting(frame, settingName) Perfy_Trace(Perfy_GetTime(), "Enter", "lib:DisableFrameSetting file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:433:0");
+function lib:DisableFrameSetting(frame, settingName)
 	local settings = internal:GetFrameSettings(frame)
 	if settings then
 		for _, setting in next, settings do
@@ -441,7 +470,7 @@ function lib:DisableFrameSetting(frame, settingName) Perfy_Trace(Perfy_GetTime()
 			end
 		end
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "lib:DisableFrameSetting file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:433:0"); end
+end
 
 --[[ LibEditMode:AddFrameSettingsButton(_frame, data_) ![](https://img.shields.io/badge/function-blue)
 
@@ -452,13 +481,13 @@ Register extra button that will be displayed in a dialog attached to the frame i
 * `frame`: frame widget already registered with [AddFrame](#libeditmodeaddframeframe-callback-default-)
 * `data`: [ButtonObject](Types#buttonobject) _(table)_
 --]]
-function lib:AddFrameSettingsButton(frame, data) Perfy_Trace(Perfy_GetTime(), "Enter", "lib:AddFrameSettingsButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:455:0");
+function lib:AddFrameSettingsButton(frame, data)
 	if not lib.frameButtons[frame] then
 		lib.frameButtons[frame] = {}
 	end
 
 	table.insert(lib.frameButtons[frame], data)
-Perfy_Trace(Perfy_GetTime(), "Leave", "lib:AddFrameSettingsButton file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:455:0"); end
+end
 
 --[[ LibEditMode:AddFrameSettingsButtons(_frame, buttons_) ![](https://img.shields.io/badge/function-blue)
 Register extra buttons that will be displayed in a dialog attached to the frame in the Edit Mode.
@@ -466,7 +495,7 @@ Register extra buttons that will be displayed in a dialog attached to the frame 
 * `frame`: frame widget already registered with [AddFrame](#libeditmodeaddframeframe-callback-default-)
 * `buttons`: table containing [ButtonObject](Types#buttonobject) entries _(table, number indexed)_
 --]]
-function lib:AddFrameSettingsButtons(frame, buttons) Perfy_Trace(Perfy_GetTime(), "Enter", "lib:AddFrameSettingsButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:469:0");
+function lib:AddFrameSettingsButtons(frame, buttons)
 	if not lib.frameButtons[frame] then
 		lib.frameButtons[frame] = {}
 	end
@@ -474,17 +503,17 @@ function lib:AddFrameSettingsButtons(frame, buttons) Perfy_Trace(Perfy_GetTime()
 	for _, button in next, buttons do
 		table.insert(lib.frameButtons[frame], button)
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "lib:AddFrameSettingsButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:469:0"); end
+end
 
 --[[ LibEditMode:RefreshFrameSettings(_frame_) ![](https://img.shields.io/badge/function-blue)
 Refresh the dialog attached to the frame.
 --]]
-function lib:RefreshFrameSettings(frame) Perfy_Trace(Perfy_GetTime(), "Enter", "lib:RefreshFrameSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:482:0");
+function lib:RefreshFrameSettings(frame)
 	local selection = lib.frameSelections[frame]
 	if selection and internal.dialog and internal.dialog.selection == selection and internal.dialog:IsVisible() then
 		internal.dialog:Update(selection)
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "lib:RefreshFrameSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:482:0"); end
+end
 
 --[[ LibEditMode:AddSystemSettings(_systemID, settings[, subSystemID]_) ![](https://img.shields.io/badge/function-blue)
 Register extra settings for a Blizzard system, it will be displayed in an dialog attached to the system's dialog in the Edit Mode.
@@ -493,7 +522,7 @@ Register extra settings for a Blizzard system, it will be displayed in an dialog
 * `settings`: table containing [SettingObject](Types#settingobject) entries _(table, number indexed)_
 * `subSystemID`: optional ID of a subsystem of a system registered with the Edit Mode. See [`Enum.EditMode...SystemIndices`](https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_APIDocumentationGenerated/EditModeManagerConstantsDocumentation.lua).
 --]]
-function lib:AddSystemSettings(systemID, settings, subSystemID) Perfy_Trace(Perfy_GetTime(), "Enter", "lib:AddSystemSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:496:0");
+function lib:AddSystemSettings(systemID, settings, subSystemID)
 	if subSystemID then
 		if not lib.subSystemSettings[systemID] then
 			lib.subSystemSettings[systemID] = {}
@@ -520,10 +549,11 @@ function lib:AddSystemSettings(systemID, settings, subSystemID) Perfy_Trace(Perf
 		internal.extension = internal:CreateExtension()
 	end
 
-	if not isManagerHooked then
-		hookManager()
+	-- fetch layout info in case EDIT_MODE_LAYOUTS_UPDATED already fired
+	if lib.layoutCache then
+		onEditModeChanged(nil, C_EditMode.GetLayouts()) -- introduces a little latency
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "lib:AddSystemSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:496:0"); end
+end
 
 --[[ LibEditMode:EnableSystemSetting(_systemID, settingName[, subSystemID]_) ![](https://img.shields.io/badge/function-blue)
 Enables a setting on a frame.
@@ -532,7 +562,7 @@ Enables a setting on a frame.
 * `settingName`: a setting already registered with [AddSystemSettings](#libeditmodeaddsystemsettingssystemid-settings-)
 * `subSystemID`: optional ID of a subsystem of a system registered with the Edit Mode. See [`Enum.EditMode...SystemIndices`](https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_APIDocumentationGenerated/EditModeManagerConstantsDocumentation.lua).
 --]]
-function lib:EnableSystemSetting(systemID, settingName, subSystemID) Perfy_Trace(Perfy_GetTime(), "Enter", "lib:EnableSystemSetting file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:535:0");
+function lib:EnableSystemSetting(systemID, settingName, subSystemID)
 	local settings = internal:GetSystemSettings(systemID, subSystemID)
 	if settings then
 		for _, setting in next, settings do
@@ -543,7 +573,7 @@ function lib:EnableSystemSetting(systemID, settingName, subSystemID) Perfy_Trace
 			end
 		end
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "lib:EnableSystemSetting file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:535:0"); end
+end
 
 --[[ LibEditMode:DisableSystemSetting(_systemID, settingName[, subSystemID]_) ![](https://img.shields.io/badge/function-blue)
 Disables a setting on a frame.
@@ -552,7 +582,7 @@ Disables a setting on a frame.
 * `settingName`: a setting already registered with [AddSystemSettings](#libeditmodeaddsystemsettingssystemid-settings-)
 * `subSystemID`: optional ID of a subsystem of a system registered with the Edit Mode. See [`Enum.EditMode...SystemIndices`](https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_APIDocumentationGenerated/EditModeManagerConstantsDocumentation.lua).
 --]]
-function lib:DisableSystemSetting(systemID, settingName, subSystemID) Perfy_Trace(Perfy_GetTime(), "Enter", "lib:DisableSystemSetting file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:555:0");
+function lib:DisableSystemSetting(systemID, settingName, subSystemID)
 	local settings = internal:GetSystemSettings(systemID, subSystemID)
 	if settings then
 		for _, setting in next, settings do
@@ -563,7 +593,7 @@ function lib:DisableSystemSetting(systemID, settingName, subSystemID) Perfy_Trac
 			end
 		end
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "lib:DisableSystemSetting file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:555:0"); end
+end
 
 --[[ LibEditMode:AddSystemSettingsButtons(_systemID, buttons[, subSystemID]_) ![](https://img.shields.io/badge/function-blue)
 Register extra buttons for a Blizzard system, it will be displayed in a dialog attached to the system's dialog in the Edit Mode.
@@ -572,7 +602,7 @@ Register extra buttons for a Blizzard system, it will be displayed in a dialog a
 * `buttons`: table containing [ButtonObject](Types#buttonobject) entries _(table, number indexed)_
 * `subSystemID`: optional ID of a subsystem of a system registered with the Edit Mode. See [`Enum.EditMode...SystemIndices`](https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_APIDocumentationGenerated/EditModeManagerConstantsDocumentation.lua).
 --]]
-function lib:AddSystemSettingsButtons(systemID, buttons, subSystemID) Perfy_Trace(Perfy_GetTime(), "Enter", "lib:AddSystemSettingsButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:575:0");
+function lib:AddSystemSettingsButtons(systemID, buttons, subSystemID)
 	if subSystemID then
 		if not lib.subSystemButtons[systemID] then
 			lib.subSystemButtons[systemID] = {}
@@ -599,10 +629,11 @@ function lib:AddSystemSettingsButtons(systemID, buttons, subSystemID) Perfy_Trac
 		internal.extension = internal:CreateExtension()
 	end
 
-	if not isManagerHooked then
-		hookManager()
+	-- fetch layout info in case EDIT_MODE_LAYOUTS_UPDATED already fired
+	if lib.layoutCache then
+		onEditModeChanged(nil, C_EditMode.GetLayouts()) -- introduces a little latency
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "lib:AddSystemSettingsButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:575:0"); end
+end
 
 --[[ LibEditMode:RegisterCallback(_event, callback_) ![](https://img.shields.io/badge/function-blue)
 Register extra callbacks whenever an event within the Edit Mode triggers.
@@ -640,7 +671,7 @@ LibEditMode:RegisterCallback('rename', function(oldLayoutName, newLayoutName, la
 end)
 ```
 --]]
-function lib:RegisterCallback(event, callback) Perfy_Trace(Perfy_GetTime(), "Enter", "lib:RegisterCallback file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:643:0");
+function lib:RegisterCallback(event, callback)
 	assert(event and type(event) == 'string', 'event must be a string')
 	assert(callback and type(callback) == 'function', 'callback must be a function')
 
@@ -664,7 +695,7 @@ function lib:RegisterCallback(event, callback) Perfy_Trace(Perfy_GetTime(), "Ent
 	else
 		error('invalid callback event "' .. event .. '"')
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "lib:RegisterCallback file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:643:0"); end
+end
 
 --[[ LibEditMode:GetActiveLayout() ![](https://img.shields.io/badge/function-blue)
 Returns the active Edit Mode layout.
@@ -672,8 +703,8 @@ Returns the active Edit Mode layout.
 This will not return valid data until after the layout has been loaded from the server.  
 Data will be available for the ["layout" callback](#libeditmoderegistercallbackevent-callback).
 --]]
-function lib:GetActiveLayout() Perfy_Trace(Perfy_GetTime(), "Enter", "lib:GetActiveLayout file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:675:0");
-	return Perfy_Trace_Passthrough("Leave", "lib:GetActiveLayout file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:675:0", lib.activeLayout)
+function lib:GetActiveLayout()
+	return lib.activeLayout
 end
 
 --[[ LibEditMode:GetActiveLayoutName() ![](https://img.shields.io/badge/function-blue)
@@ -682,15 +713,15 @@ Returns the active Edit Mode layout name.
 This will not return valid data until after the layout has been loaded from the server.  
 Data will be available for the ["layout" callback](#libeditmoderegistercallbackevent-callback).
 --]]
-function lib:GetActiveLayoutName() Perfy_Trace(Perfy_GetTime(), "Enter", "lib:GetActiveLayoutName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:685:0");
-	return Perfy_Trace_Passthrough("Leave", "lib:GetActiveLayoutName file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:685:0", lib.activeLayout and layoutNames[lib.activeLayout])
+function lib:GetActiveLayoutName()
+	return lib.activeLayout and layoutNames[lib.activeLayout]
 end
 
 --[[ LibEditMode:IsInEditMode() ![](https://img.shields.io/badge/function-blue)
 Returns whether the Edit Mode is currently active.
 --]]
-function lib:IsInEditMode() Perfy_Trace(Perfy_GetTime(), "Enter", "lib:IsInEditMode file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:692:0");
-	return Perfy_Trace_Passthrough("Leave", "lib:IsInEditMode file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:692:0", not not lib.isEditing)
+function lib:IsInEditMode()
+	return not not lib.isEditing
 end
 
 --[[ LibEditMode:GetFrameDefaultPosition(_frame_) ![](https://img.shields.io/badge/function-blue)
@@ -702,55 +733,55 @@ Returns:
 
 * `defaultPosition`: table registered with the frame in [AddFrame](#libeditmodeaddframeframe-callback-default-) _(table)_
 --]]
-function lib:GetFrameDefaultPosition(frame) Perfy_Trace(Perfy_GetTime(), "Enter", "lib:GetFrameDefaultPosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:705:0");
-	return Perfy_Trace_Passthrough("Leave", "lib:GetFrameDefaultPosition file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:705:0", lib.frameDefaults[frame])
+function lib:GetFrameDefaultPosition(frame)
+	return lib.frameDefaults[frame]
 end
 
-function internal:TriggerCallback(frame, ...) Perfy_Trace(Perfy_GetTime(), "Enter", "internal:TriggerCallback file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:709:0");
+function internal:TriggerCallback(frame, ...)
 	if lib.frameCallbacks[frame] then
 		securecallfunction(lib.frameCallbacks[frame], frame, layoutNames[lib.activeLayout], ...)
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "internal:TriggerCallback file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:709:0"); end
+end
 
-function internal:GetFrameSettings(frame) Perfy_Trace(Perfy_GetTime(), "Enter", "internal:GetFrameSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:715:0");
+function internal:GetFrameSettings(frame)
 	if lib.frameSettings[frame] then
-		return Perfy_Trace_Passthrough("Leave", "internal:GetFrameSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:715:0", lib.frameSettings[frame], #lib.frameSettings[frame])
+		return lib.frameSettings[frame], #lib.frameSettings[frame]
 	else
-		Perfy_Trace(Perfy_GetTime(), "Leave", "internal:GetFrameSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:715:0"); return nil, 0
+		return nil, 0
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "internal:GetFrameSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:715:0"); end
+end
 
-function internal:GetFrameButtons(frame) Perfy_Trace(Perfy_GetTime(), "Enter", "internal:GetFrameButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:723:0");
+function internal:GetFrameButtons(frame)
 	if lib.frameButtons[frame] then
-		return Perfy_Trace_Passthrough("Leave", "internal:GetFrameButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:723:0", lib.frameButtons[frame], #lib.frameButtons[frame])
+		return lib.frameButtons[frame], #lib.frameButtons[frame]
 	else
-		Perfy_Trace(Perfy_GetTime(), "Leave", "internal:GetFrameButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:723:0"); return nil, 0
+		return nil, 0
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "internal:GetFrameButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:723:0"); end
+end
 
-function internal:MoveParent(selection, x, y) Perfy_Trace(Perfy_GetTime(), "Enter", "internal:MoveParent file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:731:0");
+function internal:MoveParent(selection, x, y)
 	updatePosition(selection, x, y)
-Perfy_Trace(Perfy_GetTime(), "Leave", "internal:MoveParent file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:731:0"); end
+end
 
-function internal:GetSystemSettings(systemID, subSystemID) Perfy_Trace(Perfy_GetTime(), "Enter", "internal:GetSystemSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:735:0");
+function internal:GetSystemSettings(systemID, subSystemID)
 	if subSystemID and lib.subSystemSettings[systemID] and lib.subSystemSettings[systemID][subSystemID] then
-		return Perfy_Trace_Passthrough("Leave", "internal:GetSystemSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:735:0", lib.subSystemSettings[systemID][subSystemID], #lib.subSystemSettings[systemID][subSystemID])
+		return lib.subSystemSettings[systemID][subSystemID], #lib.subSystemSettings[systemID][subSystemID]
 	elseif lib.systemSettings[systemID] then
-		return Perfy_Trace_Passthrough("Leave", "internal:GetSystemSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:735:0", lib.systemSettings[systemID], #lib.systemSettings[systemID])
+		return lib.systemSettings[systemID], #lib.systemSettings[systemID]
 	else
-		Perfy_Trace(Perfy_GetTime(), "Leave", "internal:GetSystemSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:735:0"); return nil, 0
+		return nil, 0
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "internal:GetSystemSettings file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:735:0"); end
+end
 
-function internal:GetSystemSettingsButtons(systemID, subSystemID) Perfy_Trace(Perfy_GetTime(), "Enter", "internal:GetSystemSettingsButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:745:0");
+function internal:GetSystemSettingsButtons(systemID, subSystemID)
 	if subSystemID and lib.subSystemButtons[systemID] and lib.subSystemButtons[systemID][subSystemID] then
-		return Perfy_Trace_Passthrough("Leave", "internal:GetSystemSettingsButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:745:0", lib.subSystemButtons[systemID][subSystemID], #lib.subSystemButtons[systemID][subSystemID])
+		return lib.subSystemButtons[systemID][subSystemID], #lib.subSystemButtons[systemID][subSystemID]
 	elseif lib.systemButtons[systemID] then
-		return Perfy_Trace_Passthrough("Leave", "internal:GetSystemSettingsButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:745:0", lib.systemButtons[systemID], #lib.systemButtons[systemID])
+		return lib.systemButtons[systemID], #lib.systemButtons[systemID]
 	else
-		Perfy_Trace(Perfy_GetTime(), "Leave", "internal:GetSystemSettingsButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:745:0"); return nil, 0
+		return nil, 0
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "internal:GetSystemSettingsButtons file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua:745:0"); end
+end
 
 --[[ Types:header
 
@@ -766,11 +797,13 @@ Table containing the following entries:
 | default  | default value for the setting          | any                         | yes      |
 | get      | getter for the current value           | function                    | yes      |
 | set      | setter for the new value               | function                    | yes      |
-| disabled | whether the setting should be disabled | boolean                     | no       |
+| disabled | whether the setting should be disabled | boolean/function            | no       |
+| hidden   | whether the setting should be hidden   | boolean/function            | no       |
 
 - The getter passes `layoutName` as the sole argument and expects a value in return.
 - The setter passes (`layoutName`, `newValue`, `fromReset`) and expects no returns.
 - The description is shown in a tooltip.
+- The `disabled` and `hidden` options, if added as functions, must return a boolean
 
 Depending on the setting type there are additional required and optional entries:
 
@@ -817,6 +850,22 @@ Table containing the following entries:
 The `default` field and the getter expects a [ColorMixin](https://warcraft.wiki.gg/wiki/ColorMixin) object, and the setter will pass one as its value.  
 Even if `hasOpacity` is set to `false` (which is the default value) the ColorMixin object will contain an alpha value, this is the default behavior of the ColorMixin.
 
+### Divider
+
+| key       | value                            | type    | required | default |
+|:----------|:---------------------------------|:--------|:---------|:--------|
+| hideLabel | whether or not to hide the label | boolean | no       | false   |
+
+### Expander
+
+| key            | value                            | type    | required | default |
+|:---------------|:---------------------------------|:--------|:---------|:--------|
+| hideArrow      | whether or not to hide the arrow | boolean | no       | false   |
+| expandedLabel  | text to display when expanded    | string  | no       |         |
+| collapsedLabel | text to display when collapsed   | string  | no       |         |
+
+For `expandedLabel` or `collapsedLabel` to work _both_ have to be defined. Otherwise the setting `name` will be used.
+
 ## ButtonObject ![](https://img.shields.io/badge/object-teal)
 
 Table containing the following entries:
@@ -835,8 +884,7 @@ One of:
 - `Slider`
 - `Divider`
 - `ColorPicker`
+- `Expander`
 --]]
 lib.SettingType = CopyTable(Enum.EditModeSettingDisplayType)
 lib.SettingType.ColorPicker = 10 -- leave some room for blizzard expansion
-
-Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/LibEditMode.lua");

@@ -1,10 +1,10 @@
---[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dropdown.lua"); local MINOR = 13
+local MINOR = 14
 local lib, minor = LibStub('LibEditMode')
 if minor > MINOR then
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dropdown.lua"); return
+	return
 end
 
-local function showTooltip(self) Perfy_Trace(Perfy_GetTime(), "Enter", "showTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dropdown.lua:7:6");
+local function showTooltip(self)
 	if self.setting and self.setting.desc then
 		SettingsTooltip:SetOwner(self, 'ANCHOR_NONE')
 		SettingsTooltip:SetPoint('BOTTOMRIGHT', self, 'TOPLEFT')
@@ -12,9 +12,9 @@ local function showTooltip(self) Perfy_Trace(Perfy_GetTime(), "Enter", "showTool
 		SettingsTooltip:AddLine(self.setting.desc)
 		SettingsTooltip:Show()
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "showTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dropdown.lua:7:6"); end
+end
 
-local function get(data) Perfy_Trace(Perfy_GetTime(), "Enter", "get file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dropdown.lua:17:6");
+local function get(data)
 	local value = data.get(lib:GetActiveLayoutName())
 	if value then
 		if data.multiple then
@@ -22,32 +22,34 @@ local function get(data) Perfy_Trace(Perfy_GetTime(), "Enter", "get file://c:\\P
 
 			for _, v in next, value do
 				if v == data.value then
-					Perfy_Trace(Perfy_GetTime(), "Leave", "get file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dropdown.lua:17:6"); return true
+					return true
 				end
 			end
 		else
-			return Perfy_Trace_Passthrough("Leave", "get file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dropdown.lua:17:6", value == data.value)
+			return value == data.value
 		end
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "get file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dropdown.lua:17:6"); end
+end
 
-local function set(data) Perfy_Trace(Perfy_GetTime(), "Enter", "set file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dropdown.lua:34:6");
+local function set(data)
 	data.set(lib:GetActiveLayoutName(), data.value, false)
-Perfy_Trace(Perfy_GetTime(), "Leave", "set file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dropdown.lua:34:6"); end
+
+	data.widget:GetParent():GetParent():RefreshWidgets()
+end
 
 local dropdownMixin = {}
-function dropdownMixin:Setup(data) Perfy_Trace(Perfy_GetTime(), "Enter", "dropdownMixin:Setup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dropdown.lua:39:0");
+function dropdownMixin:Setup(data)
 	self.setting = data
 	self.Label:SetText(data.name)
-	self:SetEnabled(not data.disabled)
+	self:Refresh()
 
 	if data.generator then
 		-- let the user have full control
-		self.Dropdown:SetupMenu(function(owner, rootDescription) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dropdown.lua:46:26");
+		self.Dropdown:SetupMenu(function(owner, rootDescription)
 			pcall(data.generator, owner, rootDescription, data)
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dropdown.lua:46:26"); end)
+		end)
 	elseif data.values then
-		self.Dropdown:SetupMenu(function(_, rootDescription) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dropdown.lua:50:26");
+		self.Dropdown:SetupMenu(function(_, rootDescription)
 			if data.height then
 				rootDescription:SetScrollMode(data.height)
 			end
@@ -59,6 +61,7 @@ function dropdownMixin:Setup(data) Perfy_Trace(Perfy_GetTime(), "Enter", "dropdo
 						set = data.set,
 						value = value.value or value.text,
 						multiple = data.multiple,
+						widget = self,
 					})
 				else
 					rootDescription:CreateRadio(value.text, get, set, {
@@ -66,19 +69,35 @@ function dropdownMixin:Setup(data) Perfy_Trace(Perfy_GetTime(), "Enter", "dropdo
 						set = data.set,
 						value = value.value or value.text,
 						multiple = data.multiple,
+						widget = self,
 					})
 				end
 			end
-		Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dropdown.lua:50:26"); end)
+		end)
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "dropdownMixin:Setup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dropdown.lua:39:0"); end
+end
 
-function dropdownMixin:SetEnabled(enabled) Perfy_Trace(Perfy_GetTime(), "Enter", "dropdownMixin:SetEnabled file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dropdown.lua:76:0");
+function dropdownMixin:Refresh()
+	local data = self.setting
+	if type(data.disabled) == 'function' then
+		self:SetEnabled(not data.disabled(lib:GetActiveLayoutName()))
+	else
+		self:SetEnabled(not data.disabled)
+	end
+
+	if type(data.hidden) == 'function' then
+		self:SetShown(not data.hidden(lib:GetActiveLayoutName()))
+	else
+		self:SetShown(not data.hidden)
+	end
+end
+
+function dropdownMixin:SetEnabled(enabled)
 	self.Dropdown:SetEnabled(enabled)
 	self.Label:SetTextColor((enabled and WHITE_FONT_COLOR or DISABLED_FONT_COLOR):GetRGB())
-Perfy_Trace(Perfy_GetTime(), "Leave", "dropdownMixin:SetEnabled file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dropdown.lua:76:0"); end
+end
 
-lib.internal:CreatePool(lib.SettingType.Dropdown, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dropdown.lua:81:50");
+lib.internal:CreatePool(lib.SettingType.Dropdown, function()
 	local frame = CreateFrame('Frame', nil, UIParent, 'ResizeLayoutFrame')
 	frame:SetScript('OnLeave', DefaultTooltipMixin.OnLeave)
 	frame:SetScript('OnEnter', showTooltip)
@@ -96,10 +115,8 @@ lib.internal:CreatePool(lib.SettingType.Dropdown, function() Perfy_Trace(Perfy_G
 	dropdown:SetSize(200, 30)
 	frame.Dropdown = dropdown
 
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dropdown.lua:81:50"); return frame
-end, function(_, frame) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dropdown.lua:100:5");
+	return frame
+end, function(_, frame)
 	frame:Hide()
 	frame.layoutIndex = nil
-Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dropdown.lua:100:5"); end)
-
-Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/dropdown.lua");
+end)

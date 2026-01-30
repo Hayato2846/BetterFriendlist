@@ -1,10 +1,10 @@
---[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/colorpicker.lua"); local MINOR = 13
+local MINOR = 14
 local lib, minor = LibStub('LibEditMode')
 if minor > MINOR then
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/colorpicker.lua"); return
+	return
 end
 
-local function showTooltip(self) Perfy_Trace(Perfy_GetTime(), "Enter", "showTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/colorpicker.lua:7:6");
+local function showTooltip(self)
 	if self.setting and self.setting.desc then
 		SettingsTooltip:SetOwner(self, 'ANCHOR_NONE')
 		SettingsTooltip:SetPoint('BOTTOMRIGHT', self, 'TOPLEFT')
@@ -12,9 +12,9 @@ local function showTooltip(self) Perfy_Trace(Perfy_GetTime(), "Enter", "showTool
 		SettingsTooltip:AddLine(self.setting.desc)
 		SettingsTooltip:Show()
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "showTooltip file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/colorpicker.lua:7:6"); end
+end
 
-local function onColorChanged(self) Perfy_Trace(Perfy_GetTime(), "Enter", "onColorChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/colorpicker.lua:17:6");
+local function onColorChanged(self)
 	local r, g, b = ColorPickerFrame:GetColorRGB()
 	if self.colorInfo.hasOpacity then
 		local a = ColorPickerFrame:GetColorAlpha()
@@ -22,17 +22,17 @@ local function onColorChanged(self) Perfy_Trace(Perfy_GetTime(), "Enter", "onCol
 	else
 		self:OnColorChanged(CreateColor(r, g, b))
 	end
-Perfy_Trace(Perfy_GetTime(), "Leave", "onColorChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/colorpicker.lua:17:6"); end
+end
 
-local function onColorCancel(self) Perfy_Trace(Perfy_GetTime(), "Enter", "onColorCancel file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/colorpicker.lua:27:6");
+local function onColorCancel(self)
 	self:OnColorChanged(self.oldValue)
-Perfy_Trace(Perfy_GetTime(), "Leave", "onColorCancel file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/colorpicker.lua:27:6"); end
+end
 
 local colorPickerMixin = {}
-function colorPickerMixin:Setup(data) Perfy_Trace(Perfy_GetTime(), "Enter", "colorPickerMixin:Setup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/colorpicker.lua:32:0");
+function colorPickerMixin:Setup(data)
 	self.setting = data
 	self.Label:SetText(data.name)
-	self:SetEnabled(not data.disabled)
+	self:Refresh()
 
 	local value = data.get(lib:GetActiveLayoutName())
 	if value == nil then
@@ -52,9 +52,24 @@ function colorPickerMixin:Setup(data) Perfy_Trace(Perfy_GetTime(), "Enter", "col
 	}
 
 	self.Swatch:SetColorRGB(r, g, b)
-Perfy_Trace(Perfy_GetTime(), "Leave", "colorPickerMixin:Setup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/colorpicker.lua:32:0"); end
+end
 
-function colorPickerMixin:OnColorChanged(color) Perfy_Trace(Perfy_GetTime(), "Enter", "colorPickerMixin:OnColorChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/colorpicker.lua:57:0");
+function colorPickerMixin:Refresh()
+	local data = self.setting
+	if type(data.disabled) == 'function' then
+		self:SetEnabled(not data.disabled(lib:GetActiveLayoutName()))
+	else
+		self:SetEnabled(not data.disabled)
+	end
+
+	if type(data.hidden) == 'function' then
+		self:SetShown(not data.hidden(lib:GetActiveLayoutName()))
+	else
+		self:SetShown(not data.hidden)
+	end
+end
+
+function colorPickerMixin:OnColorChanged(color)
 	self.setting.set(lib:GetActiveLayoutName(), color, false)
 
 	local r, g, b, a = color:GetRGBA()
@@ -65,14 +80,16 @@ function colorPickerMixin:OnColorChanged(color) Perfy_Trace(Perfy_GetTime(), "En
 	self.colorInfo.g = g
 	self.colorInfo.b = b
 	self.colorInfo.opacity = a
-Perfy_Trace(Perfy_GetTime(), "Leave", "colorPickerMixin:OnColorChanged file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/colorpicker.lua:57:0"); end
 
-function colorPickerMixin:SetEnabled(enabled) Perfy_Trace(Perfy_GetTime(), "Enter", "colorPickerMixin:SetEnabled file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/colorpicker.lua:70:0");
+	self:GetParent():GetParent():RefreshWidgets()
+end
+
+function colorPickerMixin:SetEnabled(enabled)
 	self.Swatch:SetEnabled(enabled)
 	self.Label:SetTextColor((enabled and WHITE_FONT_COLOR or DISABLED_FONT_COLOR):GetRGB())
-Perfy_Trace(Perfy_GetTime(), "Leave", "colorPickerMixin:SetEnabled file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/colorpicker.lua:70:0"); end
+end
 
-local function onSwatchClick(self) Perfy_Trace(Perfy_GetTime(), "Enter", "onSwatchClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/colorpicker.lua:75:6");
+local function onSwatchClick(self)
 	local parent = self:GetParent()
 	local info = parent.colorInfo
 
@@ -80,9 +97,9 @@ local function onSwatchClick(self) Perfy_Trace(Perfy_GetTime(), "Enter", "onSwat
 	parent.oldValue = CreateColor(info.r, info.g, info.b, info.opacity)
 
 	ColorPickerFrame:SetupColorPickerAndShow(info)
-Perfy_Trace(Perfy_GetTime(), "Leave", "onSwatchClick file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/colorpicker.lua:75:6"); end
+end
 
-lib.internal:CreatePool(lib.SettingType.ColorPicker, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/colorpicker.lua:85:53");
+lib.internal:CreatePool(lib.SettingType.ColorPicker, function()
 	local frame = CreateFrame('Frame', nil, UIParent, 'ResizeLayoutFrame')
 	frame.fixedHeight = 32 -- default attribute
 	frame:Hide() -- default state
@@ -102,10 +119,8 @@ lib.internal:CreatePool(lib.SettingType.ColorPicker, function() Perfy_Trace(Perf
 	Swatch:SetScript('OnClick', onSwatchClick)
 	frame.Swatch = Swatch
 
-	return Perfy_Trace_Passthrough("Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/colorpicker.lua:85:53", Mixin(frame, colorPickerMixin))
-end, function(_, frame) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/colorpicker.lua:106:5");
+	return Mixin(frame, colorPickerMixin)
+end, function(_, frame)
 	frame:Hide()
 	frame.layoutIndex = nil
-Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/colorpicker.lua:106:5"); end)
-
-Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/colorpicker.lua");
+end)

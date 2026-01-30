@@ -1,34 +1,43 @@
---[[Perfy has instrumented this file]] local Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough = Perfy_GetTime, Perfy_Trace, Perfy_Trace_Passthrough; Perfy_Trace(Perfy_GetTime(), "Enter", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/divider.lua"); local MINOR = 13
+local MINOR = 14
 local lib, minor = LibStub('LibEditMode')
 if minor > MINOR then
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/divider.lua"); return
+	return
 end
 
 lib.SettingType.Divider = 'divider'
 
 local dividerMixin = {}
-function dividerMixin:Setup(data) Perfy_Trace(Perfy_GetTime(), "Enter", "dividerMixin:Setup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/divider.lua:10:0");
+function dividerMixin:Setup(data)
 	self.setting = data
-	self.Label:SetText(data.name)
-Perfy_Trace(Perfy_GetTime(), "Leave", "dividerMixin:Setup file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/divider.lua:10:0"); end
+	self.Label:SetText(data.hideLabel and '' or data.name)
+	self:Refresh()
+end
 
-lib.internal:CreatePool(lib.SettingType.Divider, function() Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/divider.lua:15:49");
+function dividerMixin:Refresh()
+	local data = self.setting
+	if type(data.hidden) == 'function' then
+		self:SetShown(not data.hidden(lib:GetActiveLayoutName()))
+	else
+		self:SetShown(not data.hidden)
+	end
+end
+
+lib.internal:CreatePool(lib.SettingType.Divider, function()
 	local frame = Mixin(CreateFrame('Frame', nil, UIParent), dividerMixin)
 	frame:SetSize(330, 16)
+	frame.align = 'center'
 
 	local texture = frame:CreateTexture(nil, 'ARTWORK')
 	texture:SetAllPoints()
 	texture:SetTexture([[Interface\FriendsFrame\UI-FriendsFrame-OnlineDivider]])
 
-	local label = frame:CreateFontString(nil, nil, 'GameFontHighlightLarge')
+	local label = frame:CreateFontString(nil, nil, 'GameFontHighlightMedium')
 	label:SetAllPoints()
 	frame.Label = label
 
-	Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/divider.lua:15:49"); return frame
-end, function(_, frame) Perfy_Trace(Perfy_GetTime(), "Enter", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/divider.lua:28:5");
+	return frame
+end, function(_, frame)
 	frame:Hide()
 	frame.Label:SetText()
 	frame.layoutIndex = nil
-Perfy_Trace(Perfy_GetTime(), "Leave", "(anonymous) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/divider.lua:28:5"); end)
-
-Perfy_Trace(Perfy_GetTime(), "Leave", "(main chunk) file://c:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\BetterFriendlist\\Libs/LibEditMode/widgets/divider.lua");
+end)
