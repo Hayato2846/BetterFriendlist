@@ -19,6 +19,7 @@ function FrameSettings:Initialize()
     if not self.db.mainFrameSize then self.db.mainFrameSize = {} end
     if not self.db.mainFramePosition then self.db.mainFramePosition = {} end
     if not self.db.windowScale then self.db.windowScale = 1.0 end
+    if self.db.lockWindow == nil then self.db.lockWindow = false end
     
     -- Ensure "Default" entries exist
     if not self.db.mainFrameSize[LAYOUT_KEY] then
@@ -60,6 +61,29 @@ function FrameSettings:ApplySettings()
     self:ApplySize()
     self:ApplyScale()
     self:ApplyPosition()
+    self:ApplyLock()
+end
+
+function FrameSettings:ApplyLock(locked)
+    local frame = BFL.MainFrame
+    if not frame then return end
+
+    local isLocked = locked
+    if isLocked == nil then
+        isLocked = self.db.lockWindow
+    end
+    
+    -- Save if explicitly changed
+    if locked ~= nil then
+        self.db.lockWindow = locked
+    end
+
+    frame:SetMovable(not isLocked)
+    if isLocked then
+        frame:RegisterForDrag() -- Unregister drag events
+    else
+        frame:RegisterForDrag("LeftButton")
+    end
 end
 
 function FrameSettings:ApplySize(bgWidth, bgHeight)

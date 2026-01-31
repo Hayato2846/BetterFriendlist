@@ -102,6 +102,7 @@ local defaults = {
 	mainFrameSize = {}, -- {[layoutName] = {width, height}} - Main frame size per layout
 	mainFramePosition = {}, -- {[layoutName] = {point, x, y}} - Main frame position per layout
 	mainFramePositionMigrated = false, -- Track if old position has been migrated (one-time)
+	lockWindow = false, -- Lock the frame to prevent movement
 	defaultFrameWidth = 415, -- User-customizable default width (350-800)
 	defaultFrameHeight = 570, -- User-customizable default height (400-1200)
 	-- Phase 11.5: Game-Specific Notifications

@@ -3111,6 +3111,21 @@ function Settings:RefreshGeneralTab()
 	)
 	table.insert(allFrames, scaleInput)
 	
+	-- Lock Window Checkbox
+	local lockCheckbox = Components:CreateCheckbox(
+		tab,
+		L.SETTINGS_LOCK_WINDOW or "Lock Window",
+		DB:Get("lockWindow", false),
+		function(checked)
+			local FrameSettings = BFL:GetModule("FrameSettings")
+			if FrameSettings then
+				FrameSettings:ApplyLock(checked)
+			end
+		end
+	)
+	lockCheckbox:SetTooltip(L.SETTINGS_LOCK_WINDOW or "Lock Window", L.SETTINGS_LOCK_WINDOW_DESC or "Prevent the main window from being moved.")
+	table.insert(allFrames, lockCheckbox)
+	
 	-- Anchor all frames vertically
 	Components:AnchorChain(allFrames, -5)
 	

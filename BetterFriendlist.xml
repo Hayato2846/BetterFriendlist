@@ -2638,7 +2638,9 @@
 				BetterSavedInstancesFrame_OnHide(self);
 			</OnHide>
 			<OnDragStart>
-				self:StartMoving();
+				if self:IsMovable() then
+					self:StartMoving();
+				end
 			</OnDragStart>
 			<OnDragStop>
 				self:StopMovingOrSizing();
@@ -2744,7 +2746,9 @@
 				end
 			</OnShow>
 			<OnDragStart>
-				self:StartMoving()
+				if self:IsMovable() then
+					self:StartMoving()
+				end
 			</OnDragStart>
 			<OnDragStop>
 				self:StopMovingOrSizing()

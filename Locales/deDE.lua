@@ -73,6 +73,8 @@ local L = BFL_LOCALE
 	L.SETTINGS_TAB_STATISTICS = "Statistiken"
 	L.SETTINGS_SHOW_BLIZZARD = "Blizzards Freundeslisten-Option anzeigen"
 	L.SETTINGS_COMPACT_MODE = "Kompakt-Modus"
+	L.SETTINGS_LOCK_WINDOW = "Fenster sperren"
+	L.SETTINGS_LOCK_WINDOW_DESC = "Sperrt das Fenster, um versehentliches Verschieben zu verhindern."
 	L.SETTINGS_FONT_SIZE = "Schriftgröße"
 	L.SETTINGS_FONT_COLOR = "Schriftfarbe"
 
