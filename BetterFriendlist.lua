@@ -236,7 +236,6 @@ local function LocalizeUI() local frame = BetterFriendsFrame
 		if sFrame.Tab2 then sFrame.Tab2:SetText(L.SETTINGS_TAB_GROUPS) end
 		if sFrame.Tab3 then sFrame.Tab3:SetText(L.SETTINGS_TAB_ADVANCED) end
 		if sFrame.Tab4 then sFrame.Tab4:SetText(L.SETTINGS_TAB_DATABROKER) end
-		if sFrame.Tab5 then sFrame.Tab5:SetText(L.SETTINGS_TAB_NOTIFICATIONS) end
 		if sFrame.Tab6 then sFrame.Tab6:SetText(L.SETTINGS_TAB_GLOBAL_SYNC) end
 	end
 end

@@ -163,7 +163,9 @@ function Components:CreateSlider(parent, labelText, min, max, initialValue, form
 	})
 	
 	holder.Slider:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged, function(_, value)
-		callback(value)
+		if not holder.isUpdatingStep then
+			callback(value)
+		end
 	end)
 	
 	function holder:SetValue(value)
@@ -172,6 +174,34 @@ function Components:CreateSlider(parent, labelText, min, max, initialValue, form
 	
 	function holder:GetValue()
 		return holder.Slider:GetValue()
+	end
+	
+	function holder:SetStep(step)
+		-- Block callback to prevent unwanted updates during re-init
+		holder.isUpdatingStep = true
+		
+		-- Use current value or initial value if current is unavailable/zero/bad
+		local currentVal = holder.Slider:GetValue()
+		if not currentVal or (currentVal == 0 and min > 0) then
+			currentVal = initialValue
+		end
+		
+		-- Re-Initialize with correct step count to fix buttons and drag snapping
+		local steps = (max - min) / step
+		holder.Slider:Init(currentVal, min, max, steps, {
+			[MinimalSliderWithSteppersMixin.Label.Right] = formatter
+		})
+		
+		if holder.Slider.SetValueStep then
+			holder.Slider:SetValueStep(step)
+		end
+		if holder.Slider.SetObeyStepOnDrag then
+			holder.Slider:SetObeyStepOnDrag(true)
+		end
+		holder.Slider.stepSize = step
+		
+		-- Restore callback processing
+		holder.isUpdatingStep = false
 	end
 	
 	return holder
@@ -613,9 +643,47 @@ function Components:CreateSliderWithColorPicker(parent, labelText, min, max, ini
 	holder.ValueLabel:SetText(formatter(initialValue))
 	
 	holder.Slider:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged, function(_, value)
-		sliderCallback(value)
-		holder.ValueLabel:SetText(formatter(value))
+		if not holder.isUpdatingStep then
+			sliderCallback(value)
+			holder.ValueLabel:SetText(formatter(value))
+		end
 	end)
+	
+	function holder:SetValue(value)
+		holder.Slider:SetValue(value)
+		holder.ValueLabel:SetText(formatter(value))
+	end
+	
+	function holder:GetValue()
+		return holder.Slider:GetValue()
+	end
+	
+	function holder:SetStep(step)
+		-- Block callback to prevent unwanted updates during re-init
+		holder.isUpdatingStep = true
+		
+		-- Use current value or initial value if current is unavailable/zero/bad
+		local currentVal = holder.Slider:GetValue()
+		if not currentVal or (currentVal == 0 and min > 0) then
+			currentVal = initialValue
+		end
+		
+		-- Re-Initialize with correct step count to fix buttons and drag snapping
+		local steps = (max - min) / step
+		holder.Slider:Init(currentVal, min, max, steps, {})
+
+		if holder.Slider.SetValueStep then
+			holder.Slider:SetValueStep(step)
+		end
+		if holder.Slider.SetObeyStepOnDrag then
+			holder.Slider:SetObeyStepOnDrag(true)
+		end
+		-- Fix for MinimalSliderWithSteppersMixin buttons and internal logic
+		holder.Slider.stepSize = step
+		
+		-- Restore callback processing
+		holder.isUpdatingStep = false
+	end
 	
 	return holder
 end
@@ -1211,7 +1279,7 @@ function Components:CreateInput(parent, labelText, initialValue, callback)
 	
 	inputBox:SetScript("OnEnterPressed", function(self)
 		self:ClearFocus()
-		if callback then callback(self:GetText()) end
+		if callback then callback(self:GetText(), self) end
 	end)
 	
 	inputBox:SetScript("OnEscapePressed", function(self)
@@ -1220,7 +1288,7 @@ function Components:CreateInput(parent, labelText, initialValue, callback)
 	end)
 	
 	inputBox:SetScript("OnEditFocusLost", function(self)
-		if callback then callback(self:GetText()) end
+		if callback then callback(self:GetText(), self) end
 	end)
 	
 	holder.Label = label

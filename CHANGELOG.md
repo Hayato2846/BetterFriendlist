@@ -7,10 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2.2.8] - 2026-02-01
+## [DRAFT]
 ### Added
 - **Favorite Icons** - Added an option to toggle the star icon for favorites directly on the friend button (Settings -> General).
 - **Faction Backgrounds** - Added an option to show faction-colored backgrounds (Blue/Red) for friends in the list (Settings -> General).
+
+### Fixed
+- **ElvUI Skin** - Fixed a Lua error ("index field 'BFLCheckmark'") that could occur when other addons (like ToyBoxEnhanced) create menus that BetterFriendlist tries to skin.
 
 ## [2.2.7] - 2026-01-31
 ### Fixed

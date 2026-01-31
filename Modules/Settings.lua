@@ -348,8 +348,7 @@ local TAB_DEFINITIONS = {
 	
 	-- Beta Tabs (only visible when enableBetaFeatures = true)
 	{id = 5, name = L.SETTINGS_TAB_DATABROKER, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\activity.blp", beta = false},
-	{id = 6, name = L.SETTINGS_TAB_NOTIFICATIONS, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\bell.blp", beta = true},
-	{id = 7, name = L.SETTINGS_TAB_GLOBAL_SYNC, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\globe.blp", beta = true},
+	{id = 6, name = L.SETTINGS_TAB_GLOBAL_SYNC, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\globe.blp", beta = true},
 	-- Future beta tabs go here...
 }
 
@@ -524,7 +523,6 @@ function Settings:ShowTab(tabID)
 		if content.FontsTab then content.FontsTab:Hide() end
 		if content.GroupsTab then content.GroupsTab:Hide() end
 		if content.AdvancedTab then content.AdvancedTab:Hide() end
-		if content.NotificationsTab then content.NotificationsTab:Hide() end
 		if content.BrokerTab then content.BrokerTab:Hide() end
 		if content.GlobalSyncTab then content.GlobalSyncTab:Hide() end
 		
@@ -543,10 +541,7 @@ function Settings:ShowTab(tabID)
 		elseif tabID == 5 and content.BrokerTab then
 			content.BrokerTab:Show()
 			self:RefreshBrokerTab()
-		elseif tabID == 6 and content.NotificationsTab then
-			content.NotificationsTab:Show()
-			self:RefreshNotificationsTab()
-		elseif tabID == 7 and content.GlobalSyncTab then
+		elseif tabID == 6 and content.GlobalSyncTab then
 			content.GlobalSyncTab:Show()
 			self:RefreshGlobalSyncTab()
 		end
@@ -575,8 +570,6 @@ function Settings:AdjustContentHeight(tabID)
 	elseif tabID == 5 then
 		activeTab = content.BrokerTab
 	elseif tabID == 6 then
-		activeTab = content.NotificationsTab
-	elseif tabID == 7 then
 		activeTab = content.GlobalSyncTab
 	end
 	
@@ -3031,12 +3024,92 @@ function Settings:RefreshGeneralTab()
 	-- Spacer before next section
 	table.insert(allFrames, Components:CreateSpacer(tab))
 	
-	-- Header: Font Settings (REMOVED)
-	-- local fontHeader = Components:CreateHeader(tab, L.SETTINGS_FONT_SETTINGS or "Font Settings")
-	-- table.insert(allFrames, fontHeader)
-	
-	-- Font Size Dropdown (REMOVED: User Request 2026-01-20)
-	-- Global scaling found counterproductive. 
+	-- Header: Frame Dimensions
+	local frameHeader = Components:CreateHeader(tab, L.SETTINGS_FRAME_DIMENSIONS_HEADER or "Frame Dimensions")
+	table.insert(allFrames, frameHeader)
+
+	-- Helper for input validation
+	local function ValidateAndApply(val, min, max, applyFunc, editBox, isFloat)
+		local num = tonumber(val)
+		if num then
+			-- Clamp
+			if num < min then num = min end
+			if num > max then num = max end
+			
+			if not isFloat then 
+				num = math.floor(num + 0.5) 
+			end
+			
+			applyFunc(num)
+			
+			if editBox then 
+				editBox:SetText(tostring(num)) 
+			end
+		end
+	end
+
+	-- Frame Width Input
+	local width = 415
+	local dbSize = DB:Get("mainFrameSize")
+	if dbSize and dbSize["Default"] and dbSize["Default"].width then
+		width = dbSize["Default"].width
+	end
+
+	local widthInput = Components:CreateInput(
+		tab,
+		(L.SETTINGS_FRAME_WIDTH or "Width:") .. " (380-800)",
+		tostring(width), -- Current Value
+		function(val, editBox)
+			ValidateAndApply(val, 380, 800, function(v)
+				local FrameSettings = BFL:GetModule("FrameSettings")
+				if FrameSettings then
+					FrameSettings:ApplySize(v, nil)
+					BFL:ForceRefreshFriendsList()
+				end
+			end, editBox, false)
+		end
+	)
+	table.insert(allFrames, widthInput)
+
+	-- Frame Height Input
+	local height = 570
+	if dbSize and dbSize["Default"] and dbSize["Default"].height then
+		height = dbSize["Default"].height
+	end
+
+	local heightInput = Components:CreateInput(
+		tab,
+		(L.SETTINGS_FRAME_HEIGHT or "Height:") .. " (400-1200)",
+		tostring(height), -- Current Value
+		function(val, editBox)
+			ValidateAndApply(val, 400, 1200, function(v)
+				local FrameSettings = BFL:GetModule("FrameSettings")
+				if FrameSettings then
+					FrameSettings:ApplySize(nil, v)
+					BFL:ForceRefreshFriendsList()
+				end
+			end, editBox, false)
+		end
+	)
+	table.insert(allFrames, heightInput)
+
+	-- Frame Scale Input
+	local scaleInput = Components:CreateInput(
+		tab,
+		(L.SETTINGS_FRAME_SCALE or "Scale:") .. " (0.5-2.0)",
+		tostring(DB:Get("windowScale", 1.0)), -- Current Value
+		function(val, editBox)
+			ValidateAndApply(val, 0.5, 2.0, function(v)
+				local FrameSettings = BFL:GetModule("FrameSettings")
+				if FrameSettings then
+					FrameSettings:ApplyScale(v)
+					-- Scale touches everything, might need layout update
+					BFL:ForceRefreshFriendsList() 
+				end
+			end, editBox, true)
+		end
+	)
+	table.insert(allFrames, scaleInput)
 	
 	-- Anchor all frames vertically
 	Components:AnchorChain(allFrames, -5)
@@ -4141,487 +4214,6 @@ function Settings:RefreshStatisticsTab()
 	
 	-- Trigger initial data refresh
 	self:RefreshStatistics()
-end
-
--- ========================================
--- Notifications Tab (BETA)
--- ========================================
-
-function Settings:RefreshNotificationsTab()
-	if not settingsFrame or not Components then return end
-	
-	local content = settingsFrame.ContentScrollFrame.Content
-	if not content or not content.NotificationsTab then return end
-	
-	local tab = content.NotificationsTab
-	
-	-- Clear existing content
-	if tab.components then
-		for _, component in ipairs(tab.components) do
-			if component.Hide then component:Hide() end
-		end
-	end
-	tab.components = {}
-	
-	local allFrames = {}
-	
-	-- BETA Header
-	if BetterFriendlistDB.enableBetaFeatures then
-		local betaHeader = Components:CreateHeader(tab, L.SETTINGS_TAB_NOTIFICATIONS .. " (BETA)")
-		betaHeader.text:SetTextColor(1, 0.5, 0) -- Orange
-		table.insert(allFrames, betaHeader)
-	end
-	
-	-- Description
-	local desc = Components:CreateLabel(tab, L.SETTINGS_NOTIFY_DESC or "Customize how and when you want to be notified about friend activity.", true, {r=0.7, g=0.7, b=0.7})
-	table.insert(allFrames, desc)
-
-	-- ===========================================
-	-- VISUAL & SOUND
-	-- ===========================================
-	local displayHeader = Components:CreateHeader(tab, L.SETTINGS_NOTIFY_DISPLAY_HEADER or "Display & Sound")
-	table.insert(allFrames, displayHeader)
-	
-	-- Display Mode Dropdown
-	local dropdownMode = Components:CreateDropdown(
-		tab,
-		L.SETTINGS_NOTIFY_DISPLAY_MODE or "Notification Style:",
-		{
-			labels = {
-				L.SETTINGS_NOTIFY_MODE_TOAST or "Toast (Blizzard Style)", 
-				L.SETTINGS_NOTIFY_MODE_CHAT or "Chat Message", 
-				L.SETTINGS_NOTIFY_MODE_BOTH or "Both", 
-				L.SETTINGS_NOTIFY_MODE_NONE or "Disabled"
-			},
-			values = {"alert", "chat", "both", "disabled"}
-		},
-		function(value) return value == BetterFriendlistDB.notificationDisplayMode end,
-		function(value)
-			BetterFriendlistDB.notificationDisplayMode = value
-			BFL:DebugPrint((L.SETTINGS_NOTIFY_MODE_CHANGED or "Notification mode changed to:") .. " " .. value)
-		end
-	)
-	dropdownMode:SetTooltip(L.SETTINGS_NOTIFY_DISPLAY_MODE or "Notification Style", "Choose how notifications appear on your screen.")
-	table.insert(allFrames, dropdownMode)
-	
-	local modeDesc = Components:CreateLabel(tab, L.SETTINGS_NOTIFY_MODE_DESC or "Toast: Popup at bottom-middle of screen.\nChat: Message in chat window.\nBoth: Show both.\nDisabled: No notifications.", true, {r=0.7, g=0.7, b=0.7})
-	table.insert(allFrames, modeDesc)
-	
-	-- Test Button
-	local testBtn = Components:CreateButton(tab, L.SETTINGS_NOTIFY_TEST or "Test Notification", function()
-		if BFL.NotificationSystem and BFL.NotificationSystem.ShowTestNotification then
-			BFL.NotificationSystem:ShowTestNotification()
-		else
-			BFL:DebugPrint("Notification system not ready")
-		end
-	end)
-	table.insert(allFrames, testBtn)
-	
-	-- Sound Toggle
-	local soundToggle = Components:CreateCheckbox(
-		tab,
-		L.SETTINGS_NOTIFY_SOUND or "Play sound on notification",
-		BetterFriendlistDB.notificationSoundEnabled or false,
-		function(checked)
-			BetterFriendlistDB.notificationSoundEnabled = checked
-			if checked then
-				PlaySound(BFL.IsClassic and 8959 or 12867) -- SOUNDKIT.RAID_WARNING
-				BFL:DebugPrint("Sound |cff00ff00ENABLED|r")
-			else
-				BFL:DebugPrint("Sound |cffff0000DISABLED|r")
-			end
-		end
-	)
-	soundToggle:SetTooltip("Notification Sound", "Play a sound effect when a friend comes online or goes offline.")
-	table.insert(allFrames, soundToggle)
-	
-	-- ===========================================
-	-- QUIET HOURS & FILTERS
-	-- ===========================================
-	local quietHeader = Components:CreateHeader(tab, L.SETTINGS_NOTIFY_QUIET_HEADER or "Quiet Hours & Filters")
-	table.insert(allFrames, quietHeader)
-	
-	-- Manual DND Toggle
-	local dndToggle = Components:CreateCheckbox(
-		tab,
-		L.SETTINGS_NOTIFY_DND or "Do Not Disturb (Silence all notifications)",
-		BetterFriendlistDB.notificationQuietManual or false,
-		function(checked)
-			BetterFriendlistDB.notificationQuietManual = checked
-			BFL:DebugPrint((L.SETTINGS_NOTIFY_DND_MODE or "Do Not Disturb mode") .. " " .. (checked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
-		end
-	)
-	dndToggle:SetTooltip("Do Not Disturb", "Temporarily silence all notifications without changing your settings.")
-	table.insert(allFrames, dndToggle)
-	
-	-- Combat Silence
-	local combatQuiet = Components:CreateCheckbox(
-		tab,
-		L.SETTINGS_NOTIFY_QUIET_COMBAT or "Silence while in combat",
-		BetterFriendlistDB.notificationQuietCombat or false,
-		function(checked)
-			BetterFriendlistDB.notificationQuietCombat = checked
-			BFL:DebugPrint((L.SETTINGS_NOTIFY_COMBAT_QUIET or "Combat quiet mode") .. " " .. (checked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
-		end
-	)
-	combatQuiet:SetTooltip("Combat Silence", "Automatically silence notifications during combat encounters to avoid distractions.")
-	table.insert(allFrames, combatQuiet)
-	
-	-- Instance Toggle
-	local instanceQuiet = Components:CreateCheckbox(
-		tab,
-		L.SETTINGS_NOTIFY_QUIET_INSTANCE or "Silence in instances (dungeons, raids, PvP)",
-		BetterFriendlistDB.notificationQuietInstance or false,
-		function(checked)
-			BetterFriendlistDB.notificationQuietInstance = checked
-			BFL:DebugPrint((L.SETTINGS_NOTIFY_INSTANCE_QUIET or "Instance quiet mode") .. " " .. (checked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
-		end
-	)
-	instanceQuiet:SetTooltip("Instance Silence", "Silence notifications when you are in dungeons, raids, battlegrounds, or arenas.")
-	table.insert(allFrames, instanceQuiet)
-	
-	-- Scheduled Quiet Hours Toggle
-	local scheduledQuiet = Components:CreateCheckbox(
-		tab,
-		L.SETTINGS_NOTIFY_QUIET_SCHEDULED or "Scheduled quiet hours",
-		BetterFriendlistDB.notificationQuietScheduled or false,
-		function(checked)
-			BetterFriendlistDB.notificationQuietScheduled = checked
-			BFL:DebugPrint((L.SETTINGS_NOTIFY_SCHEDULED_QUIET or "Scheduled quiet hours") .. " " .. (checked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
-		end
-	)
-	scheduledQuiet:SetTooltip("Scheduled Quiet Hours", "Silence notifications during specific hours each day. Configure your preferred schedule below.")
-	table.insert(allFrames, scheduledQuiet)
-	
-	-- Helper: Convert minutes to slider index (0-95)
-	local function MinutesToIndex(minutes)
-		return math.floor(minutes / 15)
-	end
-	
-	-- Helper: Convert slider index to minutes
-	local function IndexToMinutes(index)
-		return index * 15
-	end
-	
-	-- Helper: Format minutes as HH:MM
-	local function FormatTime(minutes)
-		local hours = math.floor(minutes / 60)
-		local mins = minutes % 60
-		return string.format("%02d:%02d", hours, mins)
-	end
-	
-	-- Start Time Slider (0-95 = 00:00 to 23:45 in 15-minute steps)
-	local startMinutes = BetterFriendlistDB.notificationQuietScheduleStartMinutes or 1320 -- Default: 22:00 = 1320 minutes
-	local startHourSlider = Components:CreateSlider(
-		tab,
-		L.SETTINGS_NOTIFY_QUIET_START or "Start Time:",
-		0,
-		95,
-		MinutesToIndex(startMinutes),
-		function(value)
-			return FormatTime(IndexToMinutes(value))
-		end,
-		function(value)
-			BetterFriendlistDB.notificationQuietScheduleStartMinutes = IndexToMinutes(value)
-		end
-	)
-	table.insert(allFrames, startHourSlider)
-	
-	-- End Time Slider (0-95 = 00:00 to 23:45 in 15-minute steps)
-	local endMinutes = BetterFriendlistDB.notificationQuietScheduleEndMinutes or 480 -- Default: 08:00 = 480 minutes
-	local endHourSlider = Components:CreateSlider(
-		tab,
-		L.SETTINGS_NOTIFY_QUIET_END or "End Time:",
-		0,
-		95,
-		MinutesToIndex(endMinutes),
-		function(value)
-			return FormatTime(IndexToMinutes(value))
-		end,
-		function(value)
-			BetterFriendlistDB.notificationQuietScheduleEndMinutes = IndexToMinutes(value)
-		end
-	)
-	table.insert(allFrames, endHourSlider)
-	
-	-- Scheduled Hours Info
-	local scheduleInfo = Components:CreateLabel(tab, L.SETTINGS_NOTIFY_QUIET_NOTE or "|cffffcc00Note:|r If start hour is greater than end hour, the schedule crosses midnight (e.g., 22:00-08:00).", true, {r=0.7, g=0.7, b=0.7})
-	table.insert(allFrames, scheduleInfo)
-	
-	-- ===========================================
-	-- OFFLINE NOTIFICATIONS SECTION
-	-- ===========================================
-	local offlineHeader = Components:CreateHeader(tab, L.SETTINGS_NOTIFY_OFFLINE_HEADER or "Offline Notifications")
-	table.insert(allFrames, offlineHeader)
-	
-	-- Offline Notifications Toggle
-	local offlineToggle = Components:CreateCheckbox(
-		tab,
-		L.SETTINGS_NOTIFY_OFFLINE_ENABLE or "Show notifications when friends go offline",
-		BetterFriendlistDB.notificationOfflineEnabled or false,
-		function(checked)
-			BetterFriendlistDB.notificationOfflineEnabled = checked
-			if checked then
-				BFL:DebugPrint(L.SETTINGS_NOTIFY_OFFLINE_ENABLED or "Offline notifications |cff00ff00ENABLED|r")
-			else
-				BFL:DebugPrint(L.SETTINGS_NOTIFY_OFFLINE_DISABLED or "Offline notifications |cffff0000DISABLED|r")
-			end
-		end
-	)
-	offlineToggle:SetTooltip("Offline Notifications", "Show notifications when friends log off. These are independent from online notifications and respect all quiet hours settings.")
-	table.insert(allFrames, offlineToggle)
-	
-	-- ===========================================
-	-- GAME-SPECIFIC NOTIFICATIONS SECTION (Phase 11.5)
-	-- ===========================================
-	local gameSpecificHeader = Components:CreateHeader(tab, L.SETTINGS_NOTIFY_GAME_HEADER or "Game-Specific Notifications")
-	table.insert(allFrames, gameSpecificHeader)
-	
-	-- WoW Login Toggle
-	local wowLoginToggle = Components:CreateCheckbox(
-		tab,
-		L.SETTINGS_NOTIFY_WOW_LOGIN or "WoW Login: Notify when friend logs into World of Warcraft",
-		BetterFriendlistDB.notificationWowLoginEnabled or false,
-		function(checked)
-			BetterFriendlistDB.notificationWowLoginEnabled = checked
-			if checked then
-				BFL:DebugPrint(L.SETTINGS_NOTIFY_WOW_LOGIN_ENABLED or "WoW Login notifications |cff00ff00ENABLED|r")
-			else
-				BFL:DebugPrint(L.SETTINGS_NOTIFY_WOW_LOGIN_DISABLED or "WoW Login notifications |cffff0000DISABLED|r")
-			end
-		end
-	)
-	wowLoginToggle:SetTooltip("WoW Login Notifications", "Get notified when a Battle.net friend starts World of Warcraft (even if they were already online in another game).")
-	table.insert(allFrames, wowLoginToggle)
-	
-	-- Character Switch Toggle
-	local charSwitchToggle = Components:CreateCheckbox(
-		tab,
-		L.SETTINGS_NOTIFY_CHAR_SWITCH or "Character Switch: Notify when friend changes character",
-		BetterFriendlistDB.notificationCharSwitchEnabled or false,
-		function(checked)
-			BetterFriendlistDB.notificationCharSwitchEnabled = checked
-			if checked then
-				BFL:DebugPrint(L.SETTINGS_NOTIFY_CHAR_SWITCH_ENABLED or "Character switch notifications |cff00ff00ENABLED|r")
-			else
-				BFL:DebugPrint(L.SETTINGS_NOTIFY_CHAR_SWITCH_DISABLED or "Character switch notifications |cffff0000DISABLED|r")
-			end
-		end
-	)
-	charSwitchToggle:SetTooltip("Character Switch Notifications", "Get notified when a friend switches to a different character in World of Warcraft.")
-	table.insert(allFrames, charSwitchToggle)
-	
-	-- Game Switch Toggle
-	local gameSwitchToggle = Components:CreateCheckbox(
-		tab,
-		L.SETTINGS_NOTIFY_GAME_SWITCH or "Game Switch: Notify when friend changes game",
-		BetterFriendlistDB.notificationGameSwitchEnabled or false,
-		function(checked)
-			BetterFriendlistDB.notificationGameSwitchEnabled = checked
-			if checked then
-				BFL:DebugPrint(L.SETTINGS_NOTIFY_GAME_SWITCH_ENABLED or "Game switch notifications |cff00ff00ENABLED|r")
-			else
-				BFL:DebugPrint(L.SETTINGS_NOTIFY_GAME_SWITCH_DISABLED or "Game switch notifications |cffff0000DISABLED|r")
-			end
-		end
-	)
-	gameSwitchToggle:SetTooltip("Game Switch Notifications", "Get notified when a friend switches from WoW to another Battle.net game (Diablo, Overwatch, etc.).")
-	table.insert(allFrames, gameSwitchToggle)
-	
-	-- ===========================================
-	-- CUSTOM MESSAGES SECTION (Phase 11)
-	-- ===========================================
-	local messagesHeader = Components:CreateHeader(tab, L.SETTINGS_NOTIFY_MESSAGES_HEADER or "Custom Messages")
-	table.insert(allFrames, messagesHeader)
-	
-	local messagesDesc = Components:CreateLabel(tab, L.SETTINGS_NOTIFY_MESSAGES_DESC or "Customize notification messages. Available variables: %name%, %game%, %level%, %zone%, %class%, %realm%, %char%, %prevchar%", true, {r=0.7, g=0.7, b=0.7})
-	table.insert(allFrames, messagesDesc)
-	
-	-- Online Message
-	local onlineMsgInput = Components:CreateInput(
-		tab,
-		L.SETTINGS_NOTIFY_MSG_ONLINE or "Online Message:",
-		BetterFriendlistDB.notificationMessageOnline or "%name% is now online",
-		function(value)
-			if value and value ~= "" then
-				BetterFriendlistDB.notificationMessageOnline = value
-			end
-		end
-	)
-	table.insert(allFrames, onlineMsgInput)
-	
-	-- Offline Message
-	local offlineMsgInput = Components:CreateInput(
-		tab,
-		L.SETTINGS_NOTIFY_MSG_OFFLINE or "Offline Message:",
-		BetterFriendlistDB.notificationMessageOffline or "%name% went offline",
-		function(value)
-			if value and value ~= "" then
-				BetterFriendlistDB.notificationMessageOffline = value
-			end
-		end
-	)
-	table.insert(allFrames, offlineMsgInput)
-	
-	-- WoW Login Message (Phase 11.5)
-	local wowLoginMsgInput = Components:CreateInput(
-		tab,
-		L.SETTINGS_NOTIFY_MSG_WOW_LOGIN or "WoW Login Message:",
-		BetterFriendlistDB.notificationMessageWowLogin or "%name% logged into World of Warcraft",
-		function(value)
-			if value and value ~= "" then
-				BetterFriendlistDB.notificationMessageWowLogin = value
-			end
-		end
-	)
-	table.insert(allFrames, wowLoginMsgInput)
-	
-	-- Character Switch Message
-	local charSwitchMsgInput = Components:CreateInput(
-		tab,
-		L.SETTINGS_NOTIFY_MSG_CHAR_SWITCH or "Character Switch Message:",
-		BetterFriendlistDB.notificationMessageCharSwitch or "%name% switched to %char%",
-		function(value)
-			if value and value ~= "" then
-				BetterFriendlistDB.notificationMessageCharSwitch = value
-			end
-		end
-	)
-	table.insert(allFrames, charSwitchMsgInput)
-	
-	-- Game Switch Message
-	local gameSwitchMsgInput = Components:CreateInput(
-		tab,
-		L.SETTINGS_NOTIFY_MSG_GAME_SWITCH or "Game Switch Message:",
-		BetterFriendlistDB.notificationMessageGameSwitch or "%name% is now playing %game%",
-		function(value)
-			if value and value ~= "" then
-				BetterFriendlistDB.notificationMessageGameSwitch = value
-			end
-		end
-	)
-	table.insert(allFrames, gameSwitchMsgInput)
-	
-	-- Preview Info Text
-	local previewInfo = Components:CreateLabel(tab, L.SETTINGS_NOTIFY_PREVIEW_TIP or "|cffffcc00Tip:|r Use the 'Test Notification' button above to preview your custom messages.", true, {r=0.7, g=0.7, b=0.7})
-	table.insert(allFrames, previewInfo)
-	
-	-- ===========================================
-	-- GROUP TRIGGERS SECTION (Phase 10)
-	-- ===========================================
-	local triggersHeader = Components:CreateHeader(tab, L.SETTINGS_NOTIFY_TRIGGERS_HEADER or "Group Triggers")
-	table.insert(allFrames, triggersHeader)
-	
-	local triggersDesc = Components:CreateLabel(tab, L.SETTINGS_NOTIFY_TRIGGERS_DESC or "Get notified when a certain number of friends from a group come online. Example: Alert when 3+ M+ team members are online.", true, {r=0.7, g=0.7, b=0.7})
-	table.insert(allFrames, triggersDesc)
-	
-	-- Trigger list container (Custom frame kept, but sized/anchored better)
-	local triggerListContainer = CreateFrame("Frame", nil, tab)
-	triggerListContainer:SetSize(360, 100) -- Initial height
-	triggerListContainer:SetPoint("LEFT", 5, 0)
-	triggerListContainer:SetPoint("RIGHT", -5, 0)
-	table.insert(allFrames, triggerListContainer)
-	
-	-- Function to refresh trigger list
-	local function RefreshTriggerList()
-		-- Clear existing children
-		for _, child in ipairs({triggerListContainer:GetChildren()}) do
-			child:Hide()
-			child:SetParent(nil)
-		end
-		
-		-- Clear all font strings
-		for _, region in ipairs({triggerListContainer:GetRegions()}) do
-			if region:GetObjectType() == "FontString" then
-				region:Hide()
-				region:SetText("")
-			end
-		end
-		
-		if not BetterFriendlistDB.notificationGroupTriggers then
-			BetterFriendlistDB.notificationGroupTriggers = {}
-		end
-		
-		local yOffset = 0
-		local Groups = BFL:GetModule("Groups")
-		local triggerCount = 0
-		
-		-- Show each trigger
-		for triggerID, trigger in pairs(BetterFriendlistDB.notificationGroupTriggers) do
-			triggerCount = triggerCount + 1
-			local triggerFrame = CreateFrame("Frame", nil, triggerListContainer)
-			triggerFrame:SetSize(360, 25)
-			triggerFrame:SetPoint("TOPLEFT", triggerListContainer, "TOPLEFT", 10, yOffset) -- Added margin
-			triggerFrame:SetPoint("RIGHT", triggerListContainer, "RIGHT", -10, 0)
-			
-			-- Get group name
-			local group = Groups and Groups:Get(trigger.groupId)
-			local groupName = group and group.name or trigger.groupId
-			
-			-- Trigger label
-			local label = triggerFrame:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
-			label:SetPoint("LEFT", triggerFrame, "LEFT", 0, 0)
-			label:SetText(string.format(L.SETTINGS_NOTIFY_TRIGGER_FORMAT or "%d+ from '%s'", trigger.threshold, groupName))
-			
-			-- Enable/Disable toggle
-			local checkboxTemplate = BFL.IsClassic and "InterfaceOptionsCheckButtonTemplate" or "SettingsCheckboxTemplate"
-			local enableBtn = CreateFrame("CheckButton", nil, triggerFrame, checkboxTemplate)
-			enableBtn:SetPoint("RIGHT", triggerFrame, "RIGHT", -40, 0)
-			enableBtn:SetSize(20, 20)
-			enableBtn:SetChecked(trigger.enabled)
-			enableBtn:SetScript("OnClick", function(self)
-				trigger.enabled = self:GetChecked()
-				BFL:DebugPrint((L.SETTINGS_NOTIFY_TRIGGER_PREFIX or "Group trigger") .. " " .. (trigger.enabled and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
-			end)
-			enableBtn:SetScript("OnEnter", function() end)
-			enableBtn:SetScript("OnLeave", function() end)
-			
-			-- Delete button
-			local deleteBtn = CreateFrame("Button", nil, triggerFrame, "UIPanelButtonTemplate")
-			deleteBtn:SetSize(20, 20)
-			deleteBtn:SetPoint("RIGHT", triggerFrame, "RIGHT", 0, 0)
-			deleteBtn:SetText("X")
-			deleteBtn:SetScript("OnClick", function()
-				BetterFriendlistDB.notificationGroupTriggers[triggerID] = nil
-				RefreshTriggerList()
-				BFL:DebugPrint(L.SETTINGS_NOTIFY_TRIGGER_REMOVED or "Group trigger removed")
-			end)
-			
-			yOffset = yOffset - 30
-		end
-		
-		-- Show "No triggers" message if empty
-		if triggerCount == 0 then
-			local emptyText = triggerListContainer:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-			emptyText:SetPoint("TOPLEFT", triggerListContainer, "TOPLEFT", 10, 0)
-			emptyText:SetTextColor(0.5, 0.5, 0.5)
-			emptyText:SetText(L.SETTINGS_NOTIFY_NO_TRIGGERS or "No group triggers configured. Click 'Add Trigger' below.")
-			yOffset = -20
-		end
-		
-		-- Resize container based on content
-		triggerListContainer:SetHeight(math.abs(yOffset) + 10)
-	end
-	
-	-- Add Trigger button
-	local addTriggerBtn = Components:CreateButton(tab, L.SETTINGS_NOTIFY_ADD_TRIGGER or "Add Trigger", function()
-		if _G.BFL_ShowGroupTriggerDialog then
-			_G.BFL_ShowGroupTriggerDialog()
-		end
-	end)
-	table.insert(allFrames, addTriggerBtn)
-	
-	-- Initial refresh
-	RefreshTriggerList()
-	
-	-- Register global refresh callback for dialog
-	_G.BFL_RefreshNotificationTriggers = RefreshTriggerList
-	
-	-- Anchor all frames vertically with proper spacing
-	Components:AnchorChain(allFrames, -5)
-	
-	-- Store components for cleanup
-	tab.components = allFrames
 end
 
 -- ===========================================

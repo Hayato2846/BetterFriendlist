@@ -691,20 +691,9 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 				LSM.RegisterCallback("BetterFriendlist", "LibSharedMedia_SetGlobal", OnMediaUpdate)
 			end
 			
-			-- Initialize NotificationSystem (cooldown timer, etc.)
-			-- Note: Initialize() calls RegisterEvents() internally if Beta is enabled
-			if BFL.NotificationSystem and BFL.NotificationSystem.Initialize then
-				BFL.NotificationSystem:Initialize()
-			end
-			
-			-- Initialize NotificationEditMode (Edit Mode integration, optional dependency)
-			if BFL.NotificationEditMode and BFL.NotificationEditMode.Initialize then
-				BFL.NotificationEditMode:Initialize()
-			end
-			
-			-- Initialize MainFrameEditMode (Edit Mode integration for main frame)
-			if BFL.MainFrameEditMode and BFL.MainFrameEditMode.Initialize then
-				BFL.MainFrameEditMode:Initialize()
+			-- Initialize FrameSettings (Size/Position management)
+			if BFL.FrameSettings and BFL.FrameSettings.Initialize then
+				BFL.FrameSettings:Initialize()
 			end
 			
 			-- Version-aware success message
@@ -1034,45 +1023,6 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 				BFL:DebugPrint(string.format("  lastTrade: %d (%s ago)", activities.lastTrade, SecondsToTime(time() - activities.lastTrade)))
 			end
 		end
-	
-	-- Test Notifications
-	elseif msg == "testnotify" or msg == "testnotification" then
-		local NotificationSystem = BFL.NotificationSystem
-		if not NotificationSystem then
-			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_NOTIFICATION_MODULE_NOT_LOADED)
-			return
-		end
-		
-		-- Check if Beta features enabled
-		if not BetterFriendlistDB.enableBetaFeatures then
-			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_BETA_FEATURES_DISABLED_MSG)
-			print(BFL.L.CORE_BETA_ENABLE_HINT)
-			return
-		end
-		
-		print("|cff00ff00BetterFriendlist:|r " .. BFL.L.CORE_TRIGGERING_TEST_NOTIFICATIONS)
-		
-		-- Trigger 3 test notifications to demonstrate multi-toast system
-		NotificationSystem:ShowNotification("Test Friend 1", "is now online playing World of Warcraft", "Interface\\AddOns\\BetterFriendlist\\Icons\\user-check")
-		C_Timer.After(0.2, function()
-			NotificationSystem:ShowNotification("Test Friend 2", "switched to Warrior", "Interface\\AddOns\\BetterFriendlist\\Icons\\user-check")
-		end)
-		C_Timer.After(0.4, function()
-			NotificationSystem:ShowNotification("Test Friend 3", "logged into World of Warcraft", "Interface\\AddOns\\BetterFriendlist\\Icons\\user-check")
-		end)
-		
-		print(BFL.L.CORE_TEST_NOTIFICATIONS_SUCCESS)
-		print(BFL.L.CORE_TEST_NOTIFICATIONS_TIP)
-	
-	-- Test Group Notification Rules
-	elseif msg == "testgrouprules" or msg == "testgroup" then
-		local NotificationSystem = BFL.NotificationSystem
-		if not NotificationSystem then
-			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_NOTIFICATION_MODULE_NOT_LOADED)
-			return
-		end
-		
-		NotificationSystem:TestGroupRules()
 	
 	-- Statistics
 	elseif msg == "stats" or msg == "statistics" then

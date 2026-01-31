@@ -2,13 +2,13 @@
 ## Title: BetterFriendlist
 ## Notes: Complete replacement for WoW Friends frame - Custom groups, Raid management, Quick Join, and more!
 ## Author: Hayato2846
-## Version: 2.2.8
+## Version: 2.2.7
 ## IconTexture: Interface\AddOns\BetterFriendlist\Textures\PortraitIcon.blp
 ## X-Curse-Project-ID: 1381771
 ## X-WoWI-ID: 26984
 ## X-Wago-ID: rNkPLl6a 
 ## SavedVariables: BetterFriendlistDB
-## OptionalDeps: LibStub, CallbackHandler-1.0, LibDataBroker-1.1, LibQTip-1.0, LibEditMode, CustomNames, FriendListColors
+## OptionalDeps: LibStub, CallbackHandler-1.0, LibDataBroker-1.1, LibQTip-1.0, CustomNames, FriendListColors
 ## Bindings: Bindings.xml
 
 ## Category: User Interface
@@ -28,7 +28,6 @@ Libs\LibStub\LibStub.lua
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
 Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
 Libs\LibQTip-1.0\lib.xml
-Libs\LibEditMode\embed.xml [AllowLoadGameType mainline]
 Libs\LibSharedMedia-3.0\lib.xml
 
 # Core
@@ -69,9 +68,7 @@ Modules\Changelog.lua
 Modules\HelpFrame.lua
 Modules\ActivityTracker.lua
 Modules\Statistics.lua
-Modules\NotificationSystem_Simple.lua
-Modules\NotificationEditMode.lua [AllowLoadGameType mainline]
-Modules\MainFrameEditMode.lua [AllowLoadGameType mainline]
+Modules\FrameSettings.lua
 Modules\Groups.lua
 Modules\FriendsList.lua
 Modules\WhoFrame.lua
@@ -104,7 +101,6 @@ BetterFriendlist.lua
 BetterFriendlist.xml [AllowLoadGameType mainline]
 BetterFriendlist_Classic.xml [AllowLoadGameType vanilla, tbc, wrath, cata, mists]
 BetterFriendlist_InviteTemplates.xml
-BetterFriendlist_NotificationAlert.xml
 BetterFriendlist_Tooltip.lua
 
 # Settings

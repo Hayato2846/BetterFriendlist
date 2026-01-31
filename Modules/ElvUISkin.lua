@@ -1461,6 +1461,7 @@ function ElvUISkin:SkinContextMenus(E, S)
 							checkmarkRegion:SetAlpha(0)
 							
 							local function UpdateCheck()
+								if not obj.BFLCheckmark then return end
 								if checkmarkRegion:IsShown() then
 									obj.BFLCheckmark:Show()
 								else
