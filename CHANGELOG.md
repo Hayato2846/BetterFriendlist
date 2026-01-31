@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.2.7] - 2026-01-30
+### Added
+- **Simple Mode Menus** - Integrated "Quick Filters", "Sort", and "Show Search" toggle into the Contacts Menu when Simple Mode is enabled.
+
 ## [2.2.6] - 2026-01-25
 ### Fixed
 - **Simple Mode (Classic)** - Fixed an issue where the "Simple Mode" toggle did not work correctly in Classic versions. It now creates a Compact Mode (hides search/dropdowns) while preserving the portrait to maintain visual integrity.

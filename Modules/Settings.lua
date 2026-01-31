@@ -2541,6 +2541,30 @@ function Settings:OnSimpleModeChanged(checked)
 	if not DB then return end
 	
 	DB:Set("simpleMode", checked)
+
+	-- Update Main Frame Layout (Show/Hide Tabs) FIRST
+	-- This ensures the Frame is on Tab 1 (Friends) and contexts like ScrollFrame visibility are established
+	-- BEFORE we try to calculate SearchBox visibility/parenting.
+	if BetterFriendsFrame_ShowBottomTab then
+		BetterFriendsFrame_ShowBottomTab(1)
+	end
+	
+	-- Refresh Friends List Layout immediately
+	-- Force UpdateScrollBoxExtent explicitly for instant UI feedback (SearchBox position)
+	local FriendsList = BFL:GetModule("FriendsList")
+	if FriendsList and FriendsList.UpdateScrollBoxExtent then
+		FriendsList:UpdateScrollBoxExtent()
+		-- Double-tap: Update again on next frame to catch any layout resolution issues (SearchBox)
+		C_Timer.After(0.01, function() 
+			if FriendsList and FriendsList.UpdateScrollBoxExtent then 
+				FriendsList:UpdateScrollBoxExtent() 
+			end
+		end)
+	end
+	
+	if BFL.ForceRefreshFriendsList then
+		BFL:ForceRefreshFriendsList()
+	end
 	
 	-- Update Portrait Visibility immediately
 	if BFL.UpdatePortraitVisibility then

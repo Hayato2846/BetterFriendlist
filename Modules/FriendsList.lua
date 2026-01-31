@@ -21,6 +21,7 @@ local BUTTON_TYPE_GROUP_HEADER = 2
 local BUTTON_TYPE_INVITE_HEADER = 3
 local BUTTON_TYPE_INVITE = 4
 local BUTTON_TYPE_DIVIDER = 5
+local BUTTON_TYPE_SEARCH = 6
 
 -- Reference to Groups (Upvalue shared by all functions)
 local friendGroups = {}
@@ -35,7 +36,7 @@ local displayFormatBlueprint = nil -- Parsed structure for fast string building
 
 -- Dirty flag: Set when data changes while frame is hidden
 -- When true, next time frame is shown, we need to re-render
-local needsRenderOnShow = false
+local needsRenderOnShow = true -- Default to true to force initial render
 
 -- Selected friend for "Send Message" button (matching Blizzard's FriendsFrame)
 FriendsList.selectedFriend = nil
@@ -79,6 +80,8 @@ local function GetItemHeight(item, isCompactMode) if not item then return 0 end
 		return 34  -- Invite button height (BFL_FriendInviteButtonTemplate y="34")
 	elseif itemType == BUTTON_TYPE_DIVIDER then
 		return 8  -- Divider height (BetterFriendsDividerTemplate y="8") - FIXED from 16!
+	elseif itemType == BUTTON_TYPE_SEARCH then
+		return 30
 	elseif itemType == BUTTON_TYPE_FRIEND then
 		return isCompactMode and 24 or 34  -- Friend button (BetterFriendsListButtonTemplate y="34", compactMode=24)
 	else
@@ -100,9 +103,28 @@ local function BuildDisplayList(self)
 	-- Optimization: SyncGroups removed (Called by UpdateFriendsList before Render)
 	-- self:SyncGroups()
 	
+	-- Get DB
+	local DB = GetDB()
+	if not DB then 
+		return displayList -- Return empty list if DB missing
+	end
+	
 	-- Get friendGroups from Groups module
 	local Groups = GetGroups()
 	local friendGroups = Groups and Groups:GetAll() or friendGroups -- Fallback to upvalue if nil
+
+	-- Feature: Embedded Search Box (Simple Mode)
+	-- REFACTORED (Phase 21): Use Persistent SearchBox instead of ScrollBox row
+	-- Logic moved to UpdateLayout / UpdateScrollBoxExtent
+	-- local simpleMode = DB:Get("simpleMode", false)
+	-- local showSearch = DB:Get("simpleModeShowSearch", true)
+	
+	-- if simpleMode and showSearch then
+	-- 	table.insert(displayList, {
+	-- 		buttonType = BUTTON_TYPE_SEARCH,
+	-- 		searchText = self.searchText or ""
+	-- 	})
+	-- end
 	
 	-- Add friend invites at top (real or mock)
 	local numInvites
@@ -330,6 +352,9 @@ local function CreateElementFactory(friendsList) -- Capture friendsList referenc
 		self:UpdateGroupHeaderButton(button, data)
 	end
 	
+	-- REFACTORED (Phase 21): Removed InitSearchBox - using Persistent Frame
+	-- local function InitSearchBox(frame, data) ... end
+
 	local function InitFriendButton(button, data)
 		-- One-time setup for recycled buttons (Phase 5 Optimization)
 		if not button.initialized then
@@ -379,6 +404,9 @@ local function CreateElementFactory(friendsList) -- Capture friendsList referenc
 		elseif buttonType == BUTTON_TYPE_GROUP_HEADER then
 			factory("BetterFriendsGroupHeaderTemplate", InitGroupHeader)
 			
+		-- elseif buttonType == BUTTON_TYPE_SEARCH then
+		-- 	factory("BetterFriendsSearchBoxTemplate", InitSearchBox)
+
 		else -- BUTTON_TYPE_FRIEND
 			factory("BetterFriendsListButtonTemplate", InitFriendButton)
 		end
@@ -399,6 +427,8 @@ local function CreateExtentCalculator(self) local DB = GetDB()
 			return 34
 		elseif elementData.buttonType == BUTTON_TYPE_DIVIDER then
 			return 8
+		elseif elementData.buttonType == BUTTON_TYPE_SEARCH then
+			return 30
 		elseif elementData.buttonType == BUTTON_TYPE_FRIEND then
 			return isCompactMode and 24 or 34
 		else
@@ -411,41 +441,104 @@ end
 -- Responsive ScrollBox Functions (Phase 3)
 -- ========================================
 
+-- Update SearchBox visibility and anchors (Phase 22 Fix)
+function FriendsList:UpdateSearchBoxState()
+	local frame = BetterFriendsFrame
+	if not frame or not frame.ScrollFrame then return end
+	
+	local DB = GetDB()
+	local simpleMode = DB and DB:Get("simpleMode", false)
+	local showSearch = DB and DB:Get("simpleModeShowSearch", true)
+	local searchBox = frame.FriendsTabHeader and frame.FriendsTabHeader.SearchBox
+	local scrollFrame = frame.ScrollFrame
+	
+	-- Check if we are on the Friends tab
+	-- We use the global PanelTemplates logic since BetterFriendsFrame inherits it
+	local isFriendsTab = (PanelTemplates_GetSelectedTab(frame) or 1) == 1
+
+	-- Relaxed check: If the scroll frame is shown, we are definitely on the friends tab
+	-- This fixes Scenario 3 where toggling simpleMode hides variable elements
+	if scrollFrame and scrollFrame:IsShown() then
+		isFriendsTab = true
+	end
+	
+	if simpleMode then
+		if showSearch and searchBox then
+			-- Persistent SearchBox Mode (Simple Mode - SHOW)
+			-- We reparent to the main frame to keep it visible even when TabHeader is hidden
+			searchBox:SetParent(frame)
+			searchBox:ClearAllPoints()
+			
+			-- Shifted 2px to the right to correct centering (Left: 8, Right: -4)
+			searchBox:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 8, -5)
+			searchBox:SetPoint("TOPRIGHT", frame.Inset, "TOPRIGHT", -4, -5)
+			
+			searchBox:SetWidth(0) -- Let anchors decide width
+			searchBox:SetHeight(28) 
+			searchBox:SetFrameLevel(frame:GetFrameLevel() + 20)
+			
+			-- Ensure it's shown ONLY if we are on the Friends tab or ScrollFrame is visible
+			if isFriendsTab or (scrollFrame and scrollFrame:IsShown()) then 
+				searchBox:Show() 
+			else
+				searchBox:Hide()
+			end
+			
+			-- Push ScrollFrame down
+			scrollFrame:ClearAllPoints()
+			scrollFrame:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 4, -35)
+			scrollFrame:SetPoint("BOTTOMRIGHT", frame.Inset, "BOTTOMRIGHT", -22, 2)
+		elseif searchBox then
+			-- Persistent SearchBox Mode (Simple Mode - HIDE)
+			searchBox:Hide()
+			
+			-- Reset ScrollFrame to top
+			scrollFrame:ClearAllPoints()
+			scrollFrame:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 4, -4)
+			scrollFrame:SetPoint("BOTTOMRIGHT", frame.Inset, "BOTTOMRIGHT", -22, 2)
+		end
+	else
+		-- Normal Mode
+		if searchBox and frame.FriendsTabHeader then
+			searchBox:SetParent(frame.FriendsTabHeader)
+			searchBox:ClearAllPoints()
+			
+			-- Restore XML exact layout
+			-- <Anchor point="TOPLEFT" relativeKey="$parent.$parent.Inset" x="10" y="60"/>
+			searchBox:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 10, 60)
+			searchBox:SetWidth(220) -- Restore fixed width
+			searchBox:SetHeight(28)
+			
+			-- CRITICAL FIX: Ensure SearchBox is visible in Normal Mode
+			if not searchBox:IsShown() then
+				searchBox:Show()
+			end
+			
+			-- ALSO Ensure TabHeader is visible if on Friends Tab
+			if isFriendsTab and not frame.FriendsTabHeader:IsShown() then
+				frame.FriendsTabHeader:Show()
+			end
+		end
+		
+		-- Restore ScrollFrame (Normal Mode usually has header space if not Simple)
+		scrollFrame:ClearAllPoints()
+		scrollFrame:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 4, -4)
+		scrollFrame:SetPoint("BOTTOMRIGHT", frame.Inset, "BOTTOMRIGHT", -22, 2)
+	end
+end
+
 -- Update ScrollBox/ScrollFrame height when frame is resized (called from MainFrameEditMode)
 function FriendsList:UpdateScrollBoxExtent() local frame = BetterFriendsFrame
 	if not frame or not frame.ScrollFrame then
 		return
 	end
 	
-	-- Calculate available height for ScrollBox
-	-- Frame structure: TitleContainer (30px) + FriendsTabHeader (30px) + Inset.Top (10px) + Bottom buttons (26px) + padding
-	local frameHeight = frame:GetHeight()
-	local availableHeight = frameHeight - 120  -- Conservative calculation
+	-- Update SearchBox state and anchors
+	self:UpdateSearchBoxState()
 	
-	-- Ensure minimum height
-	if availableHeight < 200 then
-		availableHeight = 200
-	end
-	
-	-- Update ScrollFrame size (anchored to Inset, so this adjusts the content area)
-	local scrollFrame = frame.ScrollFrame
-	scrollFrame:ClearAllPoints()
-	scrollFrame:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 4, -4)
-	scrollFrame:SetPoint("BOTTOMRIGHT", frame.Inset, "BOTTOMRIGHT", -22, 2)
-	
-	-- Classic: Update FauxScrollFrame and re-render
-	if BFL.IsClassic or not BFL.HasModernScrollBox then
-		if self.classicScrollFrame and self.classicScrollFrame.FauxScrollFrame then
-			self.classicScrollFrame.FauxScrollFrame:SetHeight(availableHeight)
-		end
-		self:RenderClassicButtons()
-		return
-	end
-	
-	-- Retail: Trigger ScrollBox redraw
-	if self.scrollBox and self.scrollBox:GetDataProvider() then
-		self.scrollBox:FullUpdate(ScrollBoxConstants.UpdateImmediately)
-	end
+	-- Retail: ScrollBox updates automatically with anchor changes
+	-- We do NOT trigger FullUpdate here as it causes lag/delay (Regression Phase 21)
+	-- Pass
 end
 
 -- Get button width based on current frame size (Phase 3)
@@ -993,12 +1086,22 @@ function FriendsList:Initialize() -- Initialize sort modes and filter from datab
 	-- Initialize ScrollBox system (NEW - Phase 1)
 	self:InitializeScrollBox()
 	
+	-- Force Initial Layout (Fix for delayed SearchBox in Simple Mode)
+	self:UpdateScrollBoxExtent()
+	
+	-- CRITICAL FIX (Phase 22): Immediate Data Population
+	-- Instead of waiting for the first event throttler, we force an update immediately
+	-- to populate the list instantly on Reload/Login. 
+	-- BFL.BetterFriendlist_OnEvent -> ADDON_LOADED usually works, but this guarantees it.
+	self:UpdateFriendsList(true)
+	
 	-- Initialize responsive SearchBox width
 	C_Timer.After(0.1, function() if BFL.FriendsList and BFL.FriendsList.UpdateSearchBoxWidth then
 			BFL.FriendsList:UpdateSearchBoxWidth()
-			-- BFL:DebugPrint("|cff00ffffFriendsList:Initialize:|r Called UpdateSearchBoxWidth")
-		else
-			-- BFL:DebugPrint("|cffff0000FriendsList:Initialize:|r UpdateSearchBoxWidth not found!")
+		end
+		-- Also ensure extent is correct if frame wasn't ready
+		if self.UpdateScrollBoxExtent then
+			self:UpdateScrollBoxExtent()
 		end
 	end)
 	
@@ -1047,7 +1150,13 @@ function FriendsList:Initialize() -- Initialize sort modes and filter from datab
 	
 	-- Hook OnShow to re-render if data changed while hidden
 	if BetterFriendsFrame then
-		BetterFriendsFrame:HookScript("OnShow", function() if needsRenderOnShow then
+		BetterFriendsFrame:HookScript("OnShow", function() 
+			-- CRITICAL FIX: Update layout immediately when shown
+			-- This ensures SearchBox appears instantly in Simple Mode,
+			-- instead of waiting for the threaded UpdateFriendsList -> RenderDisplay cycle
+			self:UpdateScrollBoxExtent()
+			
+			if needsRenderOnShow then
 				-- BFL:DebugPrint("|cff00ffffFriendsList:|r Frame shown, dirty flag set - triggering refresh")
 				self:UpdateFriendsList()
 			end
@@ -1055,10 +1164,9 @@ function FriendsList:Initialize() -- Initialize sort modes and filter from datab
 		
 		-- Also hook ScrollFrame OnShow for tab switching
 		if BetterFriendsFrame.ScrollFrame then
-			BetterFriendsFrame.ScrollFrame:HookScript("OnShow", function() if needsRenderOnShow then
-					-- BFL:DebugPrint("|cff00ffffFriendsList:|r ScrollFrame shown, dirty flag set - triggering refresh")
-					self:UpdateFriendsList()
-				end
+			BetterFriendsFrame.ScrollFrame:HookScript("OnShow", function() 
+				-- Force layout here too, as switching tabs shows ScrollFrame
+				self:UpdateScrollBoxExtent()
 			end)
 		end
 	end
@@ -1394,10 +1502,10 @@ local function CalculateRealmPriority(friend)
 end
 
 -- Update the friends list from WoW API
-function FriendsList:UpdateFriendsList() -- Visibility Optimization:
+function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimization:
 	-- If the frame is hidden, we don't need to fetch data or rebuild the list.
 	-- Just mark it as dirty so it updates when shown.
-	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
+	if (not BetterFriendsFrame or not BetterFriendsFrame:IsShown()) and not ignoreVisibility then
 		needsRenderOnShow = true
 		isUpdatingFriendsList = false -- Ensure lock is released if it was somehow set
 		return
@@ -1755,7 +1863,7 @@ function FriendsList:UpdateFriendsList() -- Visibility Optimization:
 	
 	-- CRITICAL FIX: Render the display after building list
 	-- Without this, UI never updates after friend offline/online events
-	self:RenderDisplay()
+	self:RenderDisplay(ignoreVisibility)
 	
 	-- Release lock after update complete
 	isUpdatingFriendsList = false
@@ -2074,6 +2182,82 @@ function FriendsList:SetSecondarySortMode(mode) if self.secondarySort == mode th
 	
 	self:ApplySort()
 	BFL:ForceRefreshFriendsList()
+end
+
+-- Helper to populate the Sort menu for the Contacts menu
+function FriendsList:PopulateSortMenu(rootDescription, sortType)
+	local L = BFL.L
+	local FrameInitializer = BFL.FrameInitializer
+	local UI = BFL.UI
+	
+	-- Sort Icons (mirrored from FrameInitializer)
+	local SORT_ICONS = {
+		status = "Interface\\AddOns\\BetterFriendlist\\Icons\\status",
+		name = "Interface\\AddOns\\BetterFriendlist\\Icons\\name",
+		level = "Interface\\AddOns\\BetterFriendlist\\Icons\\level",
+		zone = "Interface\\AddOns\\BetterFriendlist\\Icons\\zone",
+		activity = "Interface\\AddOns\\BetterFriendlist\\Icons\\activity",
+		game = "Interface\\AddOns\\BetterFriendlist\\Icons\\game",
+		faction = "Interface\\AddOns\\BetterFriendlist\\Icons\\faction",
+		guild = "Interface\\AddOns\\BetterFriendlist\\Icons\\guild",
+		class = "Interface\\AddOns\\BetterFriendlist\\Icons\\class",
+		realm = "Interface\\AddOns\\BetterFriendlist\\Icons\\realm",
+		none = "Interface\\BUTTONS\\UI-GroupLoot-Pass-Up"
+	}
+	
+	local function FormatIconText(iconData, text)
+		return string.format("\124T%s:16:16:0:0\124t %s", iconData, text)
+	end
+	
+	if sortType == "primary" then
+		local function IsPrimarySelected(mode)
+			return self.sortMode == mode
+		end
+		
+		local function SetPrimarySelected(mode)
+			self:SetSortMode(mode)
+		end
+		
+		local function CreatePrimaryRadio(root, text, mode)
+			-- Use Native Radio implementation
+			root:CreateRadio(text, IsPrimarySelected, SetPrimarySelected, mode)
+		end
+		
+		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.status, L.SORT_STATUS), "status")
+		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.name, L.SORT_NAME), "name")
+		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.level, L.SORT_LEVEL), "level")
+		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.zone, L.SORT_ZONE), "zone")
+		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.game, L.SORT_GAME), "game")
+		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.faction, L.SORT_FACTION), "faction")
+		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.guild, L.SORT_GUILD), "guild")
+		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.class, L.SORT_CLASS), "class")
+		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.realm, L.SORT_REALM), "realm")
+		
+	elseif sortType == "secondary" then
+		local function IsSecondarySelected(mode)
+			return self.secondarySort == mode
+		end
+		
+		local function SetSecondarySelected(mode)
+			self:SetSecondarySortMode(mode)
+		end
+		
+		local function CreateSecondaryRadio(root, text, mode)
+			-- Use Native Radio implementation
+			root:CreateRadio(text, IsSecondarySelected, SetSecondarySelected, mode)
+		end
+		
+		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.none, L.SORT_NONE), "none")
+		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.name, L.SORT_NAME), "name")
+		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.level, L.SORT_LEVEL), "level")
+		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.zone, L.SORT_ZONE), "zone")
+		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.activity, L.SORT_ACTIVITY), "activity")
+		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.game, L.SORT_GAME), "game")
+		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.faction, L.SORT_FACTION), "faction")
+		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.guild, L.SORT_GUILD), "guild")
+		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.class, L.SORT_CLASS), "class")
+		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.realm, L.SORT_REALM), "realm")
+	end
 end
 
 -- ========================================
@@ -2519,25 +2703,19 @@ local function CompareElementData(a, b)
 		return a.groupId == b.groupId and a.collapsed == b.collapsed
 	elseif a.buttonType == BUTTON_TYPE_INVITE then
 		return a.inviteIndex == b.inviteIndex
-	else
-		-- Dividers, headers, etc match by type
-		return true
+	elseif a.buttonType == BUTTON_TYPE_SEARCH then
+		return true -- Always matches, content updated dynamically
 	end
 end
 
--- RenderDisplay: Updates the visual display of the friends list
--- This function handles ScrollBox rendering, button pool management, 
--- friend button configuration (BNet/WoW), compact mode, and TravelPass buttons
--- Supports both Retail (ScrollBox/DataProvider) and Classic (FauxScrollFrame)
-function FriendsList:RenderDisplay() -- Skip update if frame is not shown (performance optimization)
-	-- But mark that we need to render when frame is shown
-	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
-		needsRenderOnShow = true
-		return
-	end
-	
+-- Friends Display Rendering
+function FriendsList:RenderDisplay(ignoreVisibility)
+	-- REFACTORED (Phase 21): Ensure layout (SearchBox) matches current settings
+	-- MOVED UP: Must happen even if frame is hidden to avoid SearchBox pop-in delay on show
+	self:UpdateScrollBoxExtent()
+
 	-- Skip update if Friends list elements are hidden (means we're on another tab)
-	if BetterFriendsFrame.ScrollFrame and not BetterFriendsFrame.ScrollFrame:IsShown() then
+	if BetterFriendsFrame.ScrollFrame and not BetterFriendsFrame.ScrollFrame:IsShown() and not ignoreVisibility then
 		needsRenderOnShow = true
 		return
 	end

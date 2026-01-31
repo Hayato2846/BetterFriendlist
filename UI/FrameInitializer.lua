@@ -203,9 +203,7 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 	end
 	
 	local function CreateRadio(rootDescription, text, status)
-		local radio = rootDescription:CreateButton(text, function() end, status)
-		radio:SetIsSelected(IsSelected)
-		radio:SetResponder(SetSelected)
+		rootDescription:CreateRadio(text, IsSelected, SetSelected, status)
 	end
 	
 	dropdown:SetWidth(UI_CONSTANTS.DROPDOWN_WIDTH)
@@ -381,9 +379,7 @@ function FrameInitializer:InitializeSortDropdown(frame)
 	end
 	
 	local function CreateRadio(rootDescription, text, sortMode)
-		local radio = rootDescription:CreateButton(text, function() end, sortMode)
-		radio:SetIsSelected(IsSelected)
-		radio:SetResponder(SetSelected)
+		rootDescription:CreateRadio(text, IsSelected, SetSelected, sortMode)
 	end
 	
 	-- Narrower width to match QuickFilters style
@@ -589,9 +585,7 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 	end
 	
 	local function CreatePrimaryRadio(rootDescription, text, sortMode)
-		local radio = rootDescription:CreateButton(text, function() end, sortMode)
-		radio:SetIsSelected(IsPrimarySelected)
-		radio:SetResponder(SetPrimarySelected)
+		rootDescription:CreateRadio(text, IsPrimarySelected, SetPrimarySelected, sortMode)
 	end
 	
 	primaryDropdown:SetupMenu(function(dropdown, rootDescription)
@@ -645,9 +639,7 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 	end
 	
 	local function CreateSecondaryRadio(rootDescription, text, sortMode)
-		local radio = rootDescription:CreateButton(text, function() end, sortMode)
-		radio:SetIsSelected(IsSecondarySelected)
-		radio:SetResponder(SetSecondarySelected)
+		rootDescription:CreateRadio(text, IsSecondarySelected, SetSecondarySelected, sortMode)
 	end
 	
 	secondaryDropdown:SetupMenu(function(dropdown, rootDescription)

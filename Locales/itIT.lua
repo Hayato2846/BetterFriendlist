@@ -1164,4 +1164,6 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita sovrapposizioni. Richiede reload."
 	L.SETTINGS_GROUP_COUNT_COLOR = "Count Color"
 	L.SETTINGS_GROUP_ARROW_COLOR = "Arrow Color"
 	L.TOOLTIP_EDIT_NOTE = "Modifica nota"
+	L.MENU_SHOW_SEARCH = "Mostra ricerca"
+	L.MENU_QUICK_FILTER = "Filtro rapido"
 end)

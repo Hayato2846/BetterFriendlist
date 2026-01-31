@@ -1230,6 +1230,19 @@ end
 function BetterFriendsFrame_ShowTab(tabIndex) local frame = BetterFriendsFrame
 	if not frame then return end
 
+	-- SEARCHBOX VISIBILITY IS NOW MANAGED ENTIRELY BY FriendsList:UpdateScrollBoxExtent()
+	-- We force a layout update immediately if switching to Tab 1 to ensure SearchBox appears instantly
+	if tabIndex == 1 then
+		local FriendsList = BFL:GetModule("FriendsList")
+		if FriendsList and FriendsList.UpdateScrollBoxExtent then
+			FriendsList:UpdateScrollBoxExtent()
+		end
+	else
+		-- If switching away from Tab 1, we can safely hide it (or rely on UpdateScrollBoxExtent next render)
+		local searchBox = frame.FriendsTabHeader and frame.FriendsTabHeader.SearchBox
+		if searchBox then searchBox:Hide() end
+	end
+
 	-- FORCE FONT UPDATE: Ensure Custom Fonts win against ElvUI
 	for i = 1, 4 do
 		local tab = _G["BetterFriendsFrameTab" .. i]
@@ -2032,10 +2045,52 @@ function BetterFriendsFrame_ShowContactsMenu(button) local generator = function(
 		
 		-- Add BetterFriendList title
 		rootDescription:CreateTitle(L.MENU_TITLE);
-		
-		-- Settings option
+
+        -- Settings option
 		rootDescription:CreateButton(L.MENU_SETTINGS, function() BetterFriendlistSettings_Show()
 		end);
+        
+        rootDescription:CreateDivider();
+
+		-- Simple Mode ONLY: Include "Quick Filter" and "Sort" menus here 
+		local DB = GetDB()
+		local simpleMode = DB and DB:Get("simpleMode", false) or false
+		if simpleMode then
+			-- Search Toggle
+			local searchToggle = rootDescription:CreateCheckbox(
+				L.MENU_SHOW_SEARCH or "Show Search",
+				function() return DB and DB:Get("simpleModeShowSearch", true) end,
+				function() 
+					if DB then 
+						local current = DB:Get("simpleModeShowSearch", true)
+						DB:Set("simpleModeShowSearch", not current)
+						BFL:ForceRefreshFriendsList()
+					end
+				end
+			)
+            
+			-- Quick Filter Submenu
+            local filterSubmenu = rootDescription:CreateButton(L.MENU_QUICK_FILTER or "Quick Filter")
+            local QuickFilters = BFL:GetModule("QuickFilters")
+            if QuickFilters and QuickFilters.PopulateMenu then
+                QuickFilters:PopulateMenu(filterSubmenu)
+            end
+
+            -- Sort Submenu
+            local sortSubmenu = rootDescription:CreateButton(L.Sort or "Sort")
+            local FriendsList = BFL:GetModule("FriendsList")
+            if FriendsList and FriendsList.PopulateSortMenu then
+                 -- Primary Sort
+                 local primarySort = sortSubmenu:CreateButton("Primary")
+                 FriendsList:PopulateSortMenu(primarySort, "primary")
+
+                 -- Secondary Sort
+                 local secondarySort = sortSubmenu:CreateButton("Secondary")
+                 FriendsList:PopulateSortMenu(secondarySort, "secondary")
+            end
+            
+		    rootDescription:CreateDivider();
+		end
 		
 		-- Changelog option (Simple Mode OR Classic+ElvUI)
 		local DB = GetDB()
@@ -2399,6 +2454,13 @@ end
 function BetterFriendsFrame_ShowBottomTab(tabIndex) local frame = BetterFriendsFrame
 	if not frame then return end
 	
+	-- CRITICAL: Update the Frame's selected tab index so PanelTemplates_GetSelectedTab returns correct value
+	-- This fixes 'isFriendsTab' checks in other modules (like FriendsList:UpdateSearchBoxState)
+	PanelTemplates_SetTab(frame, tabIndex)
+	
+	-- SEARCHBOX VISIBILITY IS NOW MANAGED ENTIRELY BY FriendsList:UpdateScrollBoxExtent()
+	-- We do not manually hide it here to prevent race conditions (Scenario 1 fix)
+	
 	-- FORCE FONT UPDATE: Ensure Custom Fonts win against ElvUI
 	for i = 1, 4 do
 		local tab = _G["BetterFriendsFrameBottomTab" .. i]
@@ -2449,14 +2511,6 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex) local frame = BetterFriendsF
 	if frame.FriendsTabHeader then
 		if tabIndex == 1 then
 			ShowChildFrame(frame.FriendsTabHeader)
-			if frame.FriendsTabHeader.SearchBox then
-				local simpleMode = BetterFriendlistDB and BetterFriendlistDB.simpleMode
-				if not simpleMode then
-					ShowChildFrame(frame.FriendsTabHeader.SearchBox)
-				else
-					HideChildFrame(frame.FriendsTabHeader.SearchBox)
-				end
-			end
 		else
 			HideChildFrame(frame.FriendsTabHeader)
 		end
@@ -2559,6 +2613,12 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex) local frame = BetterFriendsF
 				BetterQuickJoinFrame_OnShow(frame.QuickJoinFrame)
 			end
 		end
+	end
+
+	-- Force update of SearchBox state (Fix for visibility bugs)
+	local FriendsList = BFL:GetModule("FriendsList")
+	if FriendsList and FriendsList.UpdateSearchBoxState then
+		FriendsList:UpdateSearchBoxState()
 	end
 end
 

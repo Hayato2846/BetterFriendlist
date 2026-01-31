@@ -139,9 +139,7 @@ function QuickFilters:InitDropdown(dropdown)
 	
 	-- Helper function to create radio button with icon
 	local function CreateRadio(rootDescription, text, mode)
-		local radio = rootDescription:CreateButton(text, function() end, mode)
-		radio:SetIsSelected(IsSelected)
-		radio:SetResponder(SetSelected)
+		rootDescription:CreateRadio(text, IsSelected, SetSelected, mode)
 	end
 	
 	-- Set dropdown width (same as StatusDropdown)
@@ -268,4 +266,48 @@ function QuickFilters:RefreshDropdown(dropdown)
 			dropdown:SetText(text)
 		end
 	end
+end
+
+-- Populate a Menu description (for Contacts Menu integration)
+function QuickFilters:PopulateMenu(rootDescription)
+	local L = BFL.L
+	local FILTER_ICONS = self:GetIcons()
+	
+	-- Format for icon + text in menu
+	local optionText = "\124T%s:16:16:0:0\124t %s"
+	
+	local function IsSelected(mode)
+		local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
+		return currentFilter == mode
+	end
+	
+	local function SetSelected(mode)
+		self:SetFilter(mode)
+	end
+	
+	local function CreateRadio(root, text, mode)
+		root:CreateRadio(text, IsSelected, SetSelected, mode)
+	end
+
+	-- Create filter options with icons
+	local allText = string.format(optionText, FILTER_ICONS.all, L.FILTER_ALL)
+	CreateRadio(rootDescription, allText, "all")
+	
+	local onlineText = string.format(optionText, FILTER_ICONS.online, L.FILTER_ONLINE)
+	CreateRadio(rootDescription, onlineText, "online")
+	
+	local offlineText = string.format(optionText, FILTER_ICONS.offline, L.FILTER_OFFLINE)
+	CreateRadio(rootDescription, offlineText, "offline")
+	
+	local wowText = string.format(optionText, FILTER_ICONS.wow, L.FILTER_WOW)
+	CreateRadio(rootDescription, wowText, "wow")
+	
+	local bnetText = string.format(optionText, FILTER_ICONS.bnet, L.FILTER_BNET)
+	CreateRadio(rootDescription, bnetText, "bnet")
+	
+	local hideafkText = string.format(optionText, FILTER_ICONS.hideafk, L.FILTER_HIDE_AFK)
+	CreateRadio(rootDescription, hideafkText, "hideafk")
+	
+	local retailText = string.format(optionText, FILTER_ICONS.retail, L.FILTER_RETAIL)
+	CreateRadio(rootDescription, retailText, "retail")
 end

@@ -1182,6 +1182,8 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	L.SETTINGS_GROUP_COUNT_COLOR = "Count Color"
 	L.SETTINGS_GROUP_ARROW_COLOR = "Arrow Color"
 	L.TOOLTIP_EDIT_NOTE = "Edit Note"
+	L.MENU_SHOW_SEARCH = "Show Search"
+	L.MENU_QUICK_FILTER = "Quick Filter"
 end
 
 -- Always load enUS immediately to ensure fallback strings exist

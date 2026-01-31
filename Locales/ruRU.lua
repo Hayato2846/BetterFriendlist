@@ -1184,4 +1184,6 @@ L.COMPAT_GAME_VERSION = "|cffffcc00Ver:|r"
 	L.SETTINGS_GROUP_COUNT_COLOR = "Count Color"
 	L.SETTINGS_GROUP_ARROW_COLOR = "Arrow Color"
 	L.TOOLTIP_EDIT_NOTE = "Редактировать заметку"
+	L.MENU_SHOW_SEARCH = "Показать поиск"
+	L.MENU_QUICK_FILTER = "Быстрый фильтр"
 end)

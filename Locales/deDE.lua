@@ -1124,4 +1124,6 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	L.SETTINGS_GROUP_COUNT_COLOR = "Zählerfarbe"
 	L.SETTINGS_GROUP_ARROW_COLOR = "Pfeilfarbe"
 	L.TOOLTIP_EDIT_NOTE = "Notiz bearbeiten"
+	L.MENU_SHOW_SEARCH = "Suche anzeigen"
+	L.MENU_QUICK_FILTER = "Schnellfilter"
 end)

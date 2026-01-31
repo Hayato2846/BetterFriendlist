@@ -250,6 +250,30 @@
 		</Scripts>
 	</Button>
 	
+	<!-- Search Box Template for ScrollBox -->
+	<Frame name="BetterFriendsSearchBoxTemplate" virtual="true">
+		<Size y="30"/>
+		<Frames>
+			<EditBox parentKey="SearchBox" inherits="SearchBoxTemplate" autoFocus="false">
+				<Size y="20"/>
+				<Anchors>
+					<Anchor point="LEFT" x="10"/>
+					<Anchor point="RIGHT" x="-10"/>
+				</Anchors>
+				<Scripts>
+					<OnLoad>
+						SearchBoxTemplate_OnLoad(self);
+						self:SetFontObject("BetterFriendlistFontHighlight");
+						if self.Instructions then
+							self.Instructions:SetFontObject("BetterFriendlistFontDisable");
+							self.Instructions:SetJustifyH("LEFT")
+						end
+					</OnLoad>
+				</Scripts>
+			</EditBox>
+		</Frames>
+	</Frame>
+	
 	<!-- Friend Button Template (virtual) - Two-line layout -->
 	<Button name="BetterFriendsListButtonTemplate" virtual="true" registerForClicks="LeftButtonUp, RightButtonUp">
 		<Size x="375" y="34" />

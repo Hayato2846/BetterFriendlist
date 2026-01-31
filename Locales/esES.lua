@@ -1164,4 +1164,6 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita solapamientos con otras ventanas (P
 	L.SETTINGS_GROUP_COUNT_COLOR = "Count Color"
 	L.SETTINGS_GROUP_ARROW_COLOR = "Arrow Color"
 	L.TOOLTIP_EDIT_NOTE = "Editar nota"
+	L.MENU_SHOW_SEARCH = "Mostrar búsqueda"
+	L.MENU_QUICK_FILTER = "Filtro rápido"
 end)

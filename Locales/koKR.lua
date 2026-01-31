@@ -1176,4 +1176,6 @@ local L = BFL_LOCALE
 	L.SETTINGS_GROUP_COUNT_COLOR = "Count Color"
 	L.SETTINGS_GROUP_ARROW_COLOR = "Arrow Color"
 	L.TOOLTIP_EDIT_NOTE = "메모 편집"
+	L.MENU_SHOW_SEARCH = "검색 표시"
+	L.MENU_QUICK_FILTER = "빠른 필터"
 end)
