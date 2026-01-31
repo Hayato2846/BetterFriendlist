@@ -63,16 +63,14 @@ local function DetectOptionalFeatures()
 	end
 	
 	-- Print version info (only if debug enabled)
-	if BFL.debugPrintEnabled then
-		local versionName = BFL.IsMidnight and "Midnight (12.x)" or "The War Within (11.x)"
-		print(string.format("|cff00ff00BetterFriendlist:|r TOC %d (%s)", tocVersion, versionName))
-		
-		if BFL.UseClassID then
-			print("|cff00ff00BetterFriendlist:|r Using classID optimization (11.2.7+)")
-		end
-		if BFL.HasSecretValues then
-			print("|cff00ff00BetterFriendlist:|r Secret Values API detected (12.0.0+)")
-		end
+	local versionName = BFL.IsMidnight and "Midnight (12.x)" or "The War Within (11.x)"
+	BFL:DebugPrint(string.format("|cff00ff00BetterFriendlist:|r TOC %d (%s)", tocVersion, versionName))
+	
+	if BFL.UseClassID then
+		BFL:DebugPrint("|cff00ff00BetterFriendlist:|r Using classID optimization (11.2.7+)")
+	end
+	if BFL.HasSecretValues then
+		BFL:DebugPrint("|cff00ff00BetterFriendlist:|r Secret Values API detected (12.0.0+)")
 	end
 end
 
@@ -526,8 +524,8 @@ function BFL:FireEventCallbacks(event, ...)
 				if entry and entry.callback then
 					-- Use pcall to prevent one error from stopping the chain
 					local success, err = pcall(entry.callback)
-					if not success and BFL.debugPrintEnabled then
-						print("|cffff0000BFL Error in FRIENDLIST_UPDATE callback:|r " .. tostring(err))
+					if not success then
+						BFL:DebugPrint("|cffff0000BFL Error in FRIENDLIST_UPDATE callback:|r " .. tostring(err))
 					end
 				end
 				index = index + 1
@@ -909,58 +907,58 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 	-- Debug Corner (Diagnostic tool for Classic corner issues)
 	elseif msg == "debugcorner" then
 		local frame = BetterFriendsFrame
-		if not frame then print("Frame not found"); return end
+		if not frame then BFL:DebugPrint("Frame not found"); return end
 
 		-- Check the original XML region
 		local regionName = "BetterFriendsFrameTopLeftCorner"
 		local region = _G[regionName]
 		if region then
-			print("Original Region: " .. regionName)
-			print("  IsShown: " .. tostring(region:IsShown()))
+			BFL:DebugPrint("Original Region: " .. regionName)
+			BFL:DebugPrint("  IsShown: " .. tostring(region:IsShown()))
 			local w, h = region:GetSize()
-			print("  Size: " .. tostring(w) .. "x" .. tostring(h))
+			BFL:DebugPrint("  Size: " .. tostring(w) .. "x" .. tostring(h))
 			local tex = region:GetTexture()
-			print("  Texture: " .. tostring(tex))
-			print("  Alpha: " .. tostring(region:GetAlpha()))
+			BFL:DebugPrint("  Texture: " .. tostring(tex))
+			BFL:DebugPrint("  Alpha: " .. tostring(region:GetAlpha()))
 			local layer, sub = region:GetDrawLayer()
-			print("  Layer: " .. tostring(layer) .. " (" .. tostring(sub) .. ")")
+			BFL:DebugPrint("  Layer: " .. tostring(layer) .. " (" .. tostring(sub) .. ")")
 			local nPoints = region:GetNumPoints()
-			print("  NumPoints: " .. nPoints)
+			BFL:DebugPrint("  NumPoints: " .. nPoints)
 			if nPoints > 0 then
 				local point, relTo, relPoint, x, y = region:GetPoint(1)
 				local relName = (relTo and relTo.GetName) and relTo:GetName() or tostring(relTo)
-				print("  Point 1: " .. tostring(point) .. " -> " .. relName .. " [" .. tostring(x) .. ", " .. tostring(y) .. "]")
+				BFL:DebugPrint("  Point 1: " .. tostring(point) .. " -> " .. relName .. " [" .. tostring(x) .. ", " .. tostring(y) .. "]")
 			end
 		else
-			print("Original Region (" .. regionName .. ") not found in global namespace")
+			BFL:DebugPrint("Original Region (" .. regionName .. ") not found in global namespace")
 		end
 
 		-- Check our custom patch
 		if frame.SimpleCornerPatch then
-			print("Patch Region (SimpleCornerPatch) found on frame")
+			BFL:DebugPrint("Patch Region (SimpleCornerPatch) found on frame")
 			local p = frame.SimpleCornerPatch
-			print("  IsShown: " .. tostring(p:IsShown()))
+			BFL:DebugPrint("  IsShown: " .. tostring(p:IsShown()))
 			local w, h = p:GetSize()
-			print("  Size: " .. tostring(w) .. "x" .. tostring(h))
+			BFL:DebugPrint("  Size: " .. tostring(w) .. "x" .. tostring(h))
 			local tex = p:GetTexture()
-			print("  Texture: " .. tostring(tex))
+			BFL:DebugPrint("  Texture: " .. tostring(tex))
 			local r, g, b, a = p:GetVertexColor()
-			print(string.format("  VertexColor: %.2f, %.2f, %.2f, %.2f", r or 0, g or 0, b or 0, a or 1))
+			BFL:DebugPrint(string.format("  VertexColor: %.2f, %.2f, %.2f, %.2f", r or 0, g or 0, b or 0, a or 1))
 			local layer, sub = p:GetDrawLayer()
-			print("  Layer: " .. tostring(layer) .. " (" .. tostring(sub) .. ")")
+			BFL:DebugPrint("  Layer: " .. tostring(layer) .. " (" .. tostring(sub) .. ")")
 			
 			local nPoints = p:GetNumPoints()
 			if nPoints > 0 then
 				local point, relTo, relPoint, x, y = p:GetPoint(1)
 				local relName = (relTo and relTo.GetName) and relTo:GetName() or tostring(relTo)
-				print("  Point 1: " .. tostring(point) .. " -> " .. relName .. " [" .. tostring(x) .. ", " .. tostring(y) .. "]")
+				BFL:DebugPrint("  Point 1: " .. tostring(point) .. " -> " .. relName .. " [" .. tostring(x) .. ", " .. tostring(y) .. "]")
 			else
-				print("  WARNING: Patch has NO points set!")
+				BFL:DebugPrint("  WARNING: Patch has NO points set!")
 			end
 		else
-			print("Patch Region (SimpleCornerPatch) NOT found on frame")
+			BFL:DebugPrint("Patch Region (SimpleCornerPatch) NOT found on frame")
 		end
-		print("------------------------")
+		BFL:DebugPrint("------------------------")
 
 	-- Missing Locales tool
 	elseif msg == "missing" then
@@ -1010,20 +1008,20 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		local count = 0
 		for _ in pairs(friendActivity) do count = count + 1 end
 		
-		print(BFL.L.CORE_ACTIVITY_TRACKING_HEADER)
-		print(string.format(BFL.L.CORE_ACTIVITY_TOTAL_FRIENDS, count))
-		print("")
+		BFL:DebugPrint(BFL.L.CORE_ACTIVITY_TRACKING_HEADER)
+		BFL:DebugPrint(string.format(BFL.L.CORE_ACTIVITY_TOTAL_FRIENDS, count))
+		BFL:DebugPrint("")
 		
 		for friendUID, activities in pairs(friendActivity) do
-			print("|cffffcc00" .. friendUID .. "|r")
+			BFL:DebugPrint("|cffffcc00" .. friendUID .. "|r")
 			if activities.lastWhisper then
-				print(string.format("  lastWhisper: %d (%s ago)", activities.lastWhisper, SecondsToTime(time() - activities.lastWhisper)))
+				BFL:DebugPrint(string.format("  lastWhisper: %d (%s ago)", activities.lastWhisper, SecondsToTime(time() - activities.lastWhisper)))
 			end
 			if activities.lastGroup then
-				print(string.format("  lastGroup: %d (%s ago)", activities.lastGroup, SecondsToTime(time() - activities.lastGroup)))
+				BFL:DebugPrint(string.format("  lastGroup: %d (%s ago)", activities.lastGroup, SecondsToTime(time() - activities.lastGroup)))
 			end
 			if activities.lastTrade then
-				print(string.format("  lastTrade: %d (%s ago)", activities.lastTrade, SecondsToTime(time() - activities.lastTrade)))
+				BFL:DebugPrint(string.format("  lastTrade: %d (%s ago)", activities.lastTrade, SecondsToTime(time() - activities.lastTrade)))
 			end
 		end
 	
@@ -1075,120 +1073,120 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		end
 		
 		local stats = Statistics:GetStatistics()
-		print(BFL.L.CORE_STATISTICS_HEADER)
-		print("")
+		BFL:DebugPrint(BFL.L.CORE_STATISTICS_HEADER)
+		BFL:DebugPrint("")
 		
 		-- Overview
-		print(BFL.L.CORE_STATS_OVERVIEW)
-		print(string.format(BFL.L.CORE_STATS_TOTAL_ONLINE_OFFLINE, 
+		BFL:DebugPrint(BFL.L.CORE_STATS_OVERVIEW)
+		BFL:DebugPrint(string.format(BFL.L.CORE_STATS_TOTAL_ONLINE_OFFLINE, 
 			stats.totalFriends, 
 			stats.onlineFriends, (stats.onlineFriends / math.max(stats.totalFriends, 1)) * 100,
 			stats.offlineFriends, (stats.offlineFriends / math.max(stats.totalFriends, 1)) * 100))
-		print(string.format(BFL.L.CORE_STATS_BNET_WOW, stats.bnetFriends, stats.wowFriends))
-		print("")
+		BFL:DebugPrint(string.format(BFL.L.CORE_STATS_BNET_WOW, stats.bnetFriends, stats.wowFriends))
+		BFL:DebugPrint("")
 		
 		-- Friendship Health
-		print(BFL.L.CORE_STATS_FRIENDSHIP_HEALTH)
+		BFL:DebugPrint(BFL.L.CORE_STATS_FRIENDSHIP_HEALTH)
 		local totalHealthFriends = stats.totalFriends - (stats.friendshipHealth.unknown or 0)
 		if totalHealthFriends > 0 then
-			print(string.format(BFL.L.CORE_STATS_HEALTH_ACTIVE,
+			BFL:DebugPrint(string.format(BFL.L.CORE_STATS_HEALTH_ACTIVE,
 				stats.friendshipHealth.active, (stats.friendshipHealth.active / totalHealthFriends) * 100,
 				stats.friendshipHealth.regular, (stats.friendshipHealth.regular / totalHealthFriends) * 100,
 				stats.friendshipHealth.drifting, (stats.friendshipHealth.drifting / totalHealthFriends) * 100))
-			print(string.format(BFL.L.CORE_STATS_HEALTH_STALE,
+			BFL:DebugPrint(string.format(BFL.L.CORE_STATS_HEALTH_STALE,
 				stats.friendshipHealth.stale, (stats.friendshipHealth.stale / totalHealthFriends) * 100,
 				stats.friendshipHealth.dormant, (stats.friendshipHealth.dormant / totalHealthFriends) * 100))
 		else
-			print(BFL.L.CORE_STATS_NO_HEALTH_DATA)
+			BFL:DebugPrint(BFL.L.CORE_STATS_NO_HEALTH_DATA)
 		end
-		print("")
+		BFL:DebugPrint("")
 		
 		-- Class Distribution (Top 5)
 		local topClasses = Statistics:GetTopClasses(5)
 		if #topClasses > 0 then
-			print(BFL.L.CORE_STATS_CLASS_DISTRIBUTION)
+			BFL:DebugPrint(BFL.L.CORE_STATS_CLASS_DISTRIBUTION)
 			for i, class in ipairs(topClasses) do
 				local pct = (class.count / math.max(stats.totalFriends, 1)) * 100
-				print(string.format("  %d. %s: |cffffffff%d|r (%.0f%%)", i, class.name, class.count, pct))
+				BFL:DebugPrint(string.format("  %d. %s: |cffffffff%d|r (%.0f%%)", i, class.name, class.count, pct))
 			end
-			print("")
+			BFL:DebugPrint("")
 		end
 		
 		-- Level Distribution
 		if stats.levelDistribution.leveledFriends > 0 then
-			print(BFL.L.CORE_STATS_LEVEL_DISTRIBUTION)
-			print(string.format(BFL.L.CORE_STATS_LEVEL_BREAKDOWN,
+			BFL:DebugPrint(BFL.L.CORE_STATS_LEVEL_DISTRIBUTION)
+			BFL:DebugPrint(string.format(BFL.L.CORE_STATS_LEVEL_BREAKDOWN,
 				stats.levelDistribution.maxLevel,
 				stats.levelDistribution.ranges[1].count,
 				stats.levelDistribution.ranges[2].count,
 				stats.levelDistribution.ranges[3].count))
-			print(string.format(BFL.L.CORE_STATS_AVG_LEVEL, stats.levelDistribution.average))
-			print("")
+			BFL:DebugPrint(string.format(BFL.L.CORE_STATS_AVG_LEVEL, stats.levelDistribution.average))
+			BFL:DebugPrint("")
 		end
 		
 		-- Realm Clusters
 		local topRealms = Statistics:GetTopRealms(5)
 		if #topRealms > 0 then
-			print(BFL.L.CORE_STATS_REALM_CLUSTERS)
-			print(string.format(BFL.L.CORE_STATS_REALM_BREAKDOWN,
+			BFL:DebugPrint(BFL.L.CORE_STATS_REALM_CLUSTERS)
+			BFL:DebugPrint(string.format(BFL.L.CORE_STATS_REALM_BREAKDOWN,
 				stats.realmDistribution.sameRealm, (stats.realmDistribution.sameRealm / math.max(stats.totalFriends, 1)) * 100,
 				stats.realmDistribution.otherRealms, (stats.realmDistribution.otherRealms / math.max(stats.totalFriends, 1)) * 100))
-			print(BFL.L.CORE_STATS_TOP_REALMS)
+			BFL:DebugPrint(BFL.L.CORE_STATS_TOP_REALMS)
 			for i, realm in ipairs(topRealms) do
-				print(string.format("    %d. %s: |cffffffff%d|r", i, realm.name, realm.count))
+				BFL:DebugPrint(string.format("    %d. %s: |cffffffff%d|r", i, realm.name, realm.count))
 			end
-			print("")
+			BFL:DebugPrint("")
 		end
 		
 		-- Faction Split
 		if stats.factionCounts.alliance > 0 or stats.factionCounts.horde > 0 then
-			print(BFL.L.CORE_STATS_FACTION_SPLIT)
-			print(string.format(BFL.L.CORE_STATS_FACTION_DATA,
+			BFL:DebugPrint(BFL.L.CORE_STATS_FACTION_SPLIT)
+			BFL:DebugPrint(string.format(BFL.L.CORE_STATS_FACTION_DATA,
 				stats.factionCounts.alliance, stats.factionCounts.horde))
-			print("")
+			BFL:DebugPrint("")
 		end
 		
 		-- Game Distribution
 		local totalGamePlayers = stats.gameCounts.wow + stats.gameCounts.classic + stats.gameCounts.diablo + 
 		                         stats.gameCounts.hearthstone + stats.gameCounts.starcraft + stats.gameCounts.mobile + stats.gameCounts.other
 		if totalGamePlayers > 0 then
-			print(BFL.L.CORE_STATS_GAME_DISTRIBUTION)
+			BFL:DebugPrint(BFL.L.CORE_STATS_GAME_DISTRIBUTION)
 			if stats.gameCounts.wow > 0 then
-				print(string.format(BFL.L.CORE_STATS_GAME_WOW, stats.gameCounts.wow))
+				BFL:DebugPrint(string.format(BFL.L.CORE_STATS_GAME_WOW, stats.gameCounts.wow))
 			end
 			if stats.gameCounts.classic > 0 then
-				print(string.format(BFL.L.CORE_STATS_GAME_CLASSIC, stats.gameCounts.classic))
+				BFL:DebugPrint(string.format(BFL.L.CORE_STATS_GAME_CLASSIC, stats.gameCounts.classic))
 			end
 			if stats.gameCounts.diablo > 0 then
-				print(string.format(BFL.L.CORE_STATS_GAME_DIABLO, stats.gameCounts.diablo))
+				BFL:DebugPrint(string.format(BFL.L.CORE_STATS_GAME_DIABLO, stats.gameCounts.diablo))
 			end
 			if stats.gameCounts.hearthstone > 0 then
-				print(string.format(BFL.L.CORE_STATS_GAME_HEARTHSTONE, stats.gameCounts.hearthstone))
+				BFL:DebugPrint(string.format(BFL.L.CORE_STATS_GAME_HEARTHSTONE, stats.gameCounts.hearthstone))
 			end
 			if stats.gameCounts.starcraft > 0 then
-				print(string.format(BFL.L.CORE_STATS_GAME_STARCRAFT, stats.gameCounts.starcraft))
+				BFL:DebugPrint(string.format(BFL.L.CORE_STATS_GAME_STARCRAFT, stats.gameCounts.starcraft))
 			end
 			if stats.gameCounts.mobile > 0 then
-				print(string.format(BFL.L.CORE_STATS_GAME_MOBILE, stats.gameCounts.mobile))
+				BFL:DebugPrint(string.format(BFL.L.CORE_STATS_GAME_MOBILE, stats.gameCounts.mobile))
 			end
 			if stats.gameCounts.other > 0 then
-				print(string.format(BFL.L.CORE_STATS_GAME_OTHER, stats.gameCounts.other))
+				BFL:DebugPrint(string.format(BFL.L.CORE_STATS_GAME_OTHER, stats.gameCounts.other))
 			end
-			print("")
+			BFL:DebugPrint("")
 		end
 		
 		-- Mobile vs Desktop
 		if stats.mobileVsDesktop.desktop > 0 or stats.mobileVsDesktop.mobile > 0 then
-			print(BFL.L.CORE_STATS_MOBILE_VS_DESKTOP)
-			print(string.format(BFL.L.CORE_STATS_MOBILE_DATA,
+			BFL:DebugPrint(BFL.L.CORE_STATS_MOBILE_VS_DESKTOP)
+			BFL:DebugPrint(string.format(BFL.L.CORE_STATS_MOBILE_DATA,
 				stats.mobileVsDesktop.desktop, (stats.mobileVsDesktop.desktop / math.max(stats.onlineFriends, 1)) * 100,
 				stats.mobileVsDesktop.mobile, (stats.mobileVsDesktop.mobile / math.max(stats.onlineFriends, 1)) * 100))
-			print("")
+			BFL:DebugPrint("")
 		end
 		
 		-- Notes and Favorites
-		print(BFL.L.CORE_STATS_ORGANIZATION)
-		print(string.format(BFL.L.CORE_STATS_ORG_DATA,
+		BFL:DebugPrint(BFL.L.CORE_STATS_ORGANIZATION)
+		BFL:DebugPrint(string.format(BFL.L.CORE_STATS_ORG_DATA,
 			stats.notesAndFavorites.withNotes, (stats.notesAndFavorites.withNotes / math.max(stats.totalFriends, 1)) * 100,
 			stats.notesAndFavorites.favorites, (stats.notesAndFavorites.favorites / math.max(stats.totalFriends, 1)) * 100))
 	
@@ -1354,37 +1352,37 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 	-- Classic Compatibility Info
 	-- ==========================================
 	elseif msg == "compat" or msg == "compatibility" or msg == "classic" then
-		print(BFL.L.CORE_CLASSIC_COMPAT_HEADER)
-		print("")
-		print(BFL.L.CORE_CLIENT_VERSION)
-		print(string.format("  Interface Version: |cffffffff%d|r", select(4, GetBuildInfo())))
-		print(string.format("  Build: |cffffffff%s|r", select(1, GetBuildInfo())))
-		print("")
-		print(BFL.L.CORE_DETECTED_FLAVOR)
+		BFL:DebugPrint(BFL.L.CORE_CLASSIC_COMPAT_HEADER)
+		BFL:DebugPrint("")
+		BFL:DebugPrint(BFL.L.CORE_CLIENT_VERSION)
+		BFL:DebugPrint(string.format("  Interface Version: |cffffffff%d|r", select(4, GetBuildInfo())))
+		BFL:DebugPrint(string.format("  Build: |cffffffff%s|r", select(1, GetBuildInfo())))
+		BFL:DebugPrint("")
+		BFL:DebugPrint(BFL.L.CORE_DETECTED_FLAVOR)
 		if BFL.IsClassicEra then
-			print(BFL.L.CORE_FLAVOR_CLASSIC_ERA)
+			BFL:DebugPrint(BFL.L.CORE_FLAVOR_CLASSIC_ERA)
 		elseif BFL.IsMoPClassic then
-			print(BFL.L.CORE_FLAVOR_MOP)
+			BFL:DebugPrint(BFL.L.CORE_FLAVOR_MOP)
 		elseif BFL.IsTWW then
-			print(BFL.L.CORE_FLAVOR_TWW)
+			BFL:DebugPrint(BFL.L.CORE_FLAVOR_TWW)
 		elseif BFL.IsMidnight then
-			print(BFL.L.CORE_FLAVOR_MIDNIGHT)
+			BFL:DebugPrint(BFL.L.CORE_FLAVOR_MIDNIGHT)
 		else
-			print(BFL.L.CORE_FLAVOR_RETAIL)
+			BFL:DebugPrint(BFL.L.CORE_FLAVOR_RETAIL)
 		end
-		print("")
-		print(BFL.L.CORE_FEATURE_AVAILABILITY)
-		print(string.format(BFL.L.CORE_FEATURE_MODERN_SCROLLBOX, BFL.HasModernScrollBox and "|cff00ff00Yes|r" or "|cffff0000No|r"))
-		print(string.format(BFL.L.CORE_FEATURE_MODERN_MENU, BFL.HasModernMenu and "|cff00ff00Yes|r" or "|cffff0000No|r"))
-		print(string.format(BFL.L.CORE_FEATURE_RECENT_ALLIES, BFL.HasRecentAllies and "|cff00ff00Yes|r" or "|cffff0000No|r"))
-		print(string.format(BFL.L.CORE_FEATURE_EDIT_MODE, BFL.HasEditMode and "|cff00ff00Yes|r" or "|cffff0000No|r"))
-		print(string.format(BFL.L.CORE_FEATURE_MODERN_DROPDOWN, BFL.HasModernDropdown and "|cff00ff00Yes|r" or "|cffff0000No|r"))
-		print(string.format(BFL.L.CORE_FEATURE_MODERN_COLORPICKER, BFL.HasModernColorPicker and "|cff00ff00Yes|r" or "|cffff0000No|r"))
-		print("")
+		BFL:DebugPrint("")
+		BFL:DebugPrint(BFL.L.CORE_FEATURE_AVAILABILITY)
+		BFL:DebugPrint(string.format(BFL.L.CORE_FEATURE_MODERN_SCROLLBOX, BFL.HasModernScrollBox and "|cff00ff00Yes|r" or "|cffff0000No|r"))
+		BFL:DebugPrint(string.format(BFL.L.CORE_FEATURE_MODERN_MENU, BFL.HasModernMenu and "|cff00ff00Yes|r" or "|cffff0000No|r"))
+		BFL:DebugPrint(string.format(BFL.L.CORE_FEATURE_RECENT_ALLIES, BFL.HasRecentAllies and "|cff00ff00Yes|r" or "|cffff0000No|r"))
+		BFL:DebugPrint(string.format(BFL.L.CORE_FEATURE_EDIT_MODE, BFL.HasEditMode and "|cff00ff00Yes|r" or "|cffff0000No|r"))
+		BFL:DebugPrint(string.format(BFL.L.CORE_FEATURE_MODERN_DROPDOWN, BFL.HasModernDropdown and "|cff00ff00Yes|r" or "|cffff0000No|r"))
+		BFL:DebugPrint(string.format(BFL.L.CORE_FEATURE_MODERN_COLORPICKER, BFL.HasModernColorPicker and "|cff00ff00Yes|r" or "|cffff0000No|r"))
+		BFL:DebugPrint("")
 		if BFL.Compat then
-			print(string.format(BFL.L.CORE_COMPAT_LAYER, BFL.L.CORE_COMPAT_ACTIVE))
+			BFL:DebugPrint(string.format(BFL.L.CORE_COMPAT_LAYER, BFL.L.CORE_COMPAT_ACTIVE))
 		else
-			print(string.format(BFL.L.CORE_COMPAT_LAYER, BFL.L.CORE_COMPAT_NOT_LOADED))
+			BFL:DebugPrint(string.format(BFL.L.CORE_COMPAT_LAYER, BFL.L.CORE_COMPAT_NOT_LOADED))
 		end
 	
 	-- Use internal reset function
@@ -1410,12 +1408,12 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 
 	-- Debug: Check UIPanelWindows settings
 	elseif msg == "checkpanel" or msg == "panel" then
-		print(BFL.L.CORE_DEBUG_PANEL_HEADER)
-		print("")
+		BFL:DebugPrint(BFL.L.CORE_DEBUG_PANEL_HEADER)
+		BFL:DebugPrint("")
 		
 		-- Check Blizzard FriendsFrame original settings (stored)
 		if BFL.OriginalFriendsFrameUIPanelSettings then
-			print(BFL.L.CORE_DEBUG_BLIZZARD_SETTINGS)
+			BFL:DebugPrint(BFL.L.CORE_DEBUG_BLIZZARD_SETTINGS)
 			local sortedKeys = {}
 			for k in pairs(BFL.OriginalFriendsFrameUIPanelSettings) do
 				table.insert(sortedKeys, k)
@@ -1424,20 +1422,20 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 			for _, k in ipairs(sortedKeys) do
 				local v = BFL.OriginalFriendsFrameUIPanelSettings[k]
 				if k == "pushable" then
-					print(string.format("  %s: |cff00ff00%s|r  <-- BLIZZARD VALUE", k, tostring(v)))
+					BFL:DebugPrint(string.format("  %s: |cff00ff00%s|r  <-- BLIZZARD VALUE", k, tostring(v)))
 				else
-					print(string.format("  %s: |cffffffff%s|r", k, tostring(v)))
+					BFL:DebugPrint(string.format("  %s: |cffffffff%s|r", k, tostring(v)))
 				end
 			end
-			print("")
+			BFL:DebugPrint("")
 		else
-			print(BFL.L.CORE_DEBUG_NO_STORED)
-			print("")
+			BFL:DebugPrint(BFL.L.CORE_DEBUG_NO_STORED)
+			BFL:DebugPrint("")
 		end
 		
 		-- Check current BetterFriendsFrame attributes
 		if BetterFriendsFrame then
-			print(BFL.L.CORE_DEBUG_BFL_ATTRS)
+			BFL:DebugPrint(BFL.L.CORE_DEBUG_BFL_ATTRS)
 			local attrs = {
 				"UIPanelLayout-defined",
 				"UIPanelLayout-enabled",
@@ -1447,25 +1445,25 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 			}
 			for _, attr in ipairs(attrs) do
 				local val = BetterFriendsFrame:GetAttribute(attr)
-				print(string.format("  %s: |cffffffff%s|r", attr, tostring(val)))
+				BFL:DebugPrint(string.format("  %s: |cffffffff%s|r", attr, tostring(val)))
 			end
-			print("")
+			BFL:DebugPrint("")
 		end
 		
 		-- Check if in UIPanelWindows
 		if UIPanelWindows then
 			if UIPanelWindows["BetterFriendsFrame"] then
-				print(BFL.L.CORE_DEBUG_UIPANEL_YES)
+				BFL:DebugPrint(BFL.L.CORE_DEBUG_UIPANEL_YES)
 				for k, v in pairs(UIPanelWindows["BetterFriendsFrame"]) do
-					print(string.format("  %s: |cffffffff%s|r", k, tostring(v)))
+					BFL:DebugPrint(string.format("  %s: |cffffffff%s|r", k, tostring(v)))
 				end
 			else
-				print(BFL.L.CORE_DEBUG_UIPANEL_NO)
+				BFL:DebugPrint(BFL.L.CORE_DEBUG_UIPANEL_NO)
 			end
-			print("")
+			BFL:DebugPrint("")
 			
 			if UIPanelWindows["FriendsFrame"] then
-				print(BFL.L.CORE_DEBUG_FRIENDSFRAME_WARNING)
+				BFL:DebugPrint(BFL.L.CORE_DEBUG_FRIENDSFRAME_WARNING)
 			end
 		end
 		
@@ -1473,7 +1471,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		local DB = BFL:GetModule("DB")
 		if DB then
 			local setting = DB:Get("useUIPanelSystem")
-			print(string.format(BFL.L.CORE_DEBUG_CURRENT_SETTING, setting and BFL.L.STATUS_ENABLED or BFL.L.STATUS_DISABLED))
+			BFL:DebugPrint(string.format(BFL.L.CORE_DEBUG_CURRENT_SETTING, setting and BFL.L.STATUS_ENABLED or BFL.L.STATUS_DISABLED))
 		end
 
 	-- Localization Switching
@@ -1491,8 +1489,8 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 
 	-- Test Translations (Encoding Check)
 	elseif msg == "testlocales" or msg == "testencoding" or msg == "testenc" then
-		print("|cff00ff00BetterFriendlist:|r " .. (BFL.L.CORE_HELP_TEST_LOCALES or "Testing Localization Encoding..."))
-		print("Locale: " .. GetLocale())
+		BFL:DebugPrint("|cff00ff00BetterFriendlist:|r " .. (BFL.L.CORE_HELP_TEST_LOCALES or "Testing Localization Encoding..."))
+		BFL:DebugPrint("Locale: " .. GetLocale())
 		
 		-- List of strings with special characters to test
 		local testKeys = {
@@ -1507,12 +1505,12 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		
 		for _, key in ipairs(testKeys) do
 			if BFL.L[key] then
-				print(string.format("|cffffcc00%s:|r %s", key, BFL.L[key]))
+				BFL:DebugPrint(string.format("|cffffcc00%s:|r %s", key, BFL.L[key]))
 			else
-				print(string.format("|cffff0000Missing:|r %s", key))
+				BFL:DebugPrint(string.format("|cffff0000Missing:|r %s", key))
 			end
 		end
-		print("|cff00ff00End of Test|r")
+		BFL:DebugPrint("|cff00ff00End of Test|r")
 
 	-- Help (or any other unrecognized command)
 	elseif msg == "changelog" or msg == "changes" then

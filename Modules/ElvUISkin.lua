@@ -58,15 +58,15 @@ function ElvUISkin:RegisterSkin()
 	-- Explicit check for false (nil means enabled by default if we wanted, but DB init sets it to false)
 	local isEnabled = BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin
 	if isEnabled == false then
-		print("|cff00ffffBFL ElvUI:|r Skin disabled in settings (DB.enableElvUISkin = false)")
+		BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Skin disabled in settings (DB.enableElvUISkin = false)")
 		return
 	end
 
-	print("|cff00ffffBFL ElvUI:|r Registering skin...")
+	BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Registering skin...")
 	local E, L, V, P, G = unpack(_G.ElvUI)
 	local RealS = E:GetModule('Skins')
 	if not RealS then 
-		print("|cff00ffffBFL ElvUI:|r Skins module not found!")
+		BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Skins module not found!")
 		return 
 	end
 
@@ -104,16 +104,16 @@ function ElvUISkin:RegisterSkin()
 	-- This ensures our skin runs when ElvUI skins are applied
 	-- Try both typical addon names to be safe
 	S:AddCallbackForAddon("BetterFriendlist", "BetterFriendlist", function()
-		print("|cff00ffffBFL ElvUI:|r Callback triggered")
-		xpcall(function() self:SkinFrames(E, S) end, function(err) print("|cffff0000BetterFriendlist ElvUI Skin Error:|r " .. tostring(err)) end)
+		BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Callback triggered")
+		xpcall(function() self:SkinFrames(E, S) end, function(err) BFL:DebugPrint("|cffff0000BetterFriendlist ElvUI Skin Error:|r " .. tostring(err)) end)
 	end)
 	
 	-- Force run if ElvUI is already initialized (Classic fix)
 	if E.initialized then
-		print("|cff00ffffBFL ElvUI:|r Direct call triggered (E.initialized=true)")
-		xpcall(function() self:SkinFrames(E, S) end, function(err) print("|cffff0000BetterFriendlist ElvUI Skin Error:|r " .. tostring(err)) end)
+		BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Direct call triggered (E.initialized=true)")
+		xpcall(function() self:SkinFrames(E, S) end, function(err) BFL:DebugPrint("|cffff0000BetterFriendlist ElvUI Skin Error:|r " .. tostring(err)) end)
 	else
-		print("|cff00ffffBFL ElvUI:|r Direct call skipped (E.initialized=false)")
+		BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Direct call skipped (E.initialized=false)")
 	end
 end
 
@@ -826,7 +826,7 @@ function ElvUISkin:SkinFrames(E, S)
 	
 	-- Skin Context Menus
 	BFL:DebugPrint("ElvUISkin: Skinning ContextMenus")
-	xpcall(function() self:SkinContextMenus(E, S) end, function(err) print("|cffff0000BetterFriendlist ElvUI Menu Error:|r " .. tostring(err)) end)
+	xpcall(function() self:SkinContextMenus(E, S) end, function(err) BFL:DebugPrint("|cffff0000BetterFriendlist ElvUI Menu Error:|r " .. tostring(err)) end)
 
 	-- Skin Changelog
 	BFL:DebugPrint("ElvUISkin: Skinning Changelog")

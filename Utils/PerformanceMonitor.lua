@@ -66,7 +66,7 @@ function PerformanceMonitor:Stop(operation)
 	
 	-- Warn if operation is slow
 	if elapsed > 50 then -- 50ms threshold (= 20 FPS)
-		print(string.format("|cffff0000[Performance Warning]|r %s took %.2f ms (threshold: 50ms)", operation, elapsed))
+		BFL:DebugPrint(string.format("[Performance Warning] %s took %.2f ms (threshold: 50ms)", operation, elapsed))
 	end
 end
 
@@ -86,7 +86,7 @@ function PerformanceMonitor:Record(operation, elapsedTime)
 	stat.minTime = math.min(stat.minTime, elapsedTime)
 	
 	if elapsedTime > 50 then
-		print(string.format("|cffff0000[Performance Warning]|r %s took %.2f ms (threshold: 50ms)", operation, elapsedTime))
+		BFL:DebugPrint(string.format("[Performance Warning] %s took %.2f ms (threshold: 50ms)", operation, elapsedTime))
 	end
 end
 
@@ -133,35 +133,35 @@ function PerformanceMonitor:Reset()
 	end
 	self.stats.memory_samples = {}
 	self.stats.memory_max = 0
-	print(BFL.L.PERF_HEADER_PREFIX .. " " .. BFL.L.PERF_STATS_RESET)
+	BFL:DebugPrint(BFL.L.PERF_HEADER_PREFIX .. " " .. BFL.L.PERF_STATS_RESET)
 end
 
 --[[
 	Print performance report
 ]]
 function PerformanceMonitor:Report()
-	print(BFL.L.PERF_REPORT_HEADER)
-	print("")
+	BFL:DebugPrint(BFL.L.PERF_REPORT_HEADER)
+	BFL:DebugPrint("")
 	
 	-- QuickJoin operations
-	print(BFL.L.PERF_QJ_OPS)
+	BFL:DebugPrint(BFL.L.PERF_QJ_OPS)
 	self:PrintOperation("quickjoin_update", "Update()")
 	self:PrintOperation("quickjoin_getgroupinfo", "GetGroupInfo()")
 	self:PrintOperation("quickjoin_getentries", "GetEntries()")
 	self:PrintOperation("quickjoin_applytoframe", "ApplyToFrame()")
-	print("")
+	BFL:DebugPrint("")
 	
 	-- Friends List operations (for comparison)
-	print(BFL.L.PERF_FRIENDS_OPS)
+	BFL:DebugPrint(BFL.L.PERF_FRIENDS_OPS)
 	self:PrintOperation("friendslist_update", "UpdateDisplay()")
-	print("")
+	BFL:DebugPrint("")
 	
 	-- Memory usage
-	print(BFL.L.PERF_MEMORY)
+	BFL:DebugPrint(BFL.L.PERF_MEMORY)
 	UpdateAddOnMemoryUsage()
 	local currentMemory = GetAddOnMemoryUsage("BetterFriendlist") or 0
-	print(string.format("  Current: %.2f KB", currentMemory))
-	print(string.format("  Peak: %.2f KB", self.stats.memory_max))
+	BFL:DebugPrint(string.format("  Current: %.2f KB", currentMemory))
+	BFL:DebugPrint(string.format("  Peak: %.2f KB", self.stats.memory_max))
 	
 	if #self.stats.memory_samples > 0 then
 		local totalMemory = 0
@@ -171,17 +171,17 @@ function PerformanceMonitor:Report()
 		local sampleCount = #self.stats.memory_samples
 		if sampleCount > 0 then
 			local avgMemory = totalMemory / sampleCount
-			print(string.format("  Average (last %d samples): %.2f KB", sampleCount, avgMemory))
+			BFL:DebugPrint(string.format("  Average (last %d samples): %.2f KB", sampleCount, avgMemory))
 		end
 	end
-	print("")
+	BFL:DebugPrint("")
 	
 	-- Performance targets
-	print(BFL.L.PERF_TARGETS)
-	print(BFL.L.PERF_FPS_60)
-	print(BFL.L.PERF_FPS_30)
-	print(BFL.L.PERF_WARNING)
-	print("")
+	BFL:DebugPrint(BFL.L.PERF_TARGETS)
+	BFL:DebugPrint(BFL.L.PERF_FPS_60)
+	BFL:DebugPrint(BFL.L.PERF_FPS_30)
+	BFL:DebugPrint(BFL.L.PERF_WARNING)
+	BFL:DebugPrint("")
 	
 	-- Overall assessment
 	local quickJoinAvg = self:GetAverage("quickjoin_update")
@@ -192,7 +192,7 @@ function PerformanceMonitor:Report()
 			or quickJoinAvg < 50 and "|cffffaa00OK|r"
 			or "|cffff0000NEEDS OPTIMIZATION|r"
 		
-		print(string.format("|cffffd700Overall Assessment:|r %s (%.1f FPS)", status, fps))
+		BFL:DebugPrint(string.format("Overall Assessment: %s (%.1f FPS)", status, fps))
 	end
 end
 
@@ -202,7 +202,7 @@ end
 function PerformanceMonitor:PrintOperation(operation, displayName)
 	local stat = self.stats[operation]
 	if not stat or stat.count == 0 then
-		print(string.format("  %s: No data", displayName))
+		BFL:DebugPrint(string.format("  %s: No data", displayName))
 		return
 	end
 	
@@ -210,11 +210,11 @@ function PerformanceMonitor:PrintOperation(operation, displayName)
 	local avg = stat.totalTime / stat.count
 	local status = avg < 16.6 and "✓" or avg < 50 and "⚠" or "✗"
 	
-	print(string.format("  %s %s:", status, displayName))
-	print(string.format("    Calls: %d", stat.count))
-	print(string.format("    Avg: %.2f ms", avg))
-	print(string.format("    Min: %.2f ms", stat.minTime == math.huge and 0 or stat.minTime))
-	print(string.format("    Max: %.2f ms", stat.maxTime))
+	BFL:DebugPrint(string.format("  %s %s:", status, displayName))
+	BFL:DebugPrint(string.format("    Calls: %d", stat.count))
+	BFL:DebugPrint(string.format("    Avg: %.2f ms", avg))
+	BFL:DebugPrint(string.format("    Min: %.2f ms", stat.minTime == math.huge and 0 or stat.minTime))
+	BFL:DebugPrint(string.format("    Max: %.2f ms", stat.maxTime))
 end
 
 --[[
@@ -254,7 +254,7 @@ function PerformanceMonitor:EnableAutoMonitoring()
 		PerformanceMonitor:SampleMemory()
 	end)
 	
-	print(BFL.L.PERF_HEADER_PREFIX .. " " .. BFL.L.PERF_AUTO_ENABLED)
+	BFL:DebugPrint(BFL.L.PERF_HEADER_PREFIX .. " " .. BFL.L.PERF_AUTO_ENABLED)
 end
 
 -- Legacy slash command (redirects to /bfl perf)

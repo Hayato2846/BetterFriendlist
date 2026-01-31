@@ -2165,9 +2165,9 @@ function RaidFrame:CreateMockPreset_Standard()
 	self:ApplyMockData()
 	self:StartMockDynamicUpdates()
 	
-	print("|cff00ff00BFL RaidFrame:|r " .. BFL.L.RAID_MOCK_CREATED_25)
-	print("  Tanks: 2, Healers: 5, DPS: 18")
-	print("  Leader + 2 Assistants assigned")
+	BFL:DebugPrint("BFL RaidFrame: " .. BFL.L.RAID_MOCK_CREATED_25)
+	BFL:DebugPrint("  Tanks: 2, Healers: 5, DPS: 18")
+	BFL:DebugPrint("  Leader + 2 Assistants assigned")
 end
 
 --[[
@@ -2182,9 +2182,9 @@ function RaidFrame:CreateMockPreset_Full()
 	self:ApplyMockData()
 	self:StartMockDynamicUpdates()
 	
-	print("|cff00ff00BFL RaidFrame:|r " .. BFL.L.RAID_MOCK_CREATED_40)
-	print("  Tanks: 2, Healers: 8, DPS: 30")
-	print("  Full scrollbar test!")
+	BFL:DebugPrint("BFL RaidFrame: " .. BFL.L.RAID_MOCK_CREATED_40)
+	BFL:DebugPrint("  Tanks: 2, Healers: 8, DPS: 30")
+	BFL:DebugPrint("  Full scrollbar test!")
 end
 
 --[[
@@ -2199,8 +2199,8 @@ function RaidFrame:CreateMockPreset_Small()
 	self:ApplyMockData()
 	self:StartMockDynamicUpdates()
 	
-	print("|cff00ff00BFL RaidFrame:|r " .. BFL.L.RAID_MOCK_CREATED_10)
-	print("  Tanks: 2, Healers: 2, DPS: 6")
+	BFL:DebugPrint("BFL RaidFrame: " .. BFL.L.RAID_MOCK_CREATED_10)
+	BFL:DebugPrint("  Tanks: 2, Healers: 2, DPS: 6")
 end
 
 --[[
@@ -2215,9 +2215,9 @@ function RaidFrame:CreateMockPreset_Mythic()
 	self:ApplyMockData()
 	self:StartMockDynamicUpdates()
 	
-	print("|cff00ff00BFL RaidFrame:|r " .. BFL.L.RAID_MOCK_CREATED_MYTHIC)
-	print("  Tanks: 2, Healers: 4, DPS: 14")
-	print("  Mythic composition!")
+	BFL:DebugPrint("BFL RaidFrame: " .. BFL.L.RAID_MOCK_CREATED_MYTHIC)
+	BFL:DebugPrint("  Tanks: 2, Healers: 4, DPS: 14")
+	BFL:DebugPrint("  Mythic composition!")
 end
 
 --[[
@@ -2235,8 +2235,8 @@ function RaidFrame:CreateMockPreset_Stress()
 	self:ApplyMockData()
 	self:StartMockDynamicUpdates()
 	
-	print("|cff00ff00BFL RaidFrame:|r " .. BFL.L.RAID_MOCK_STRESS)
-	print(BFL.L.RAID_WARN_CPU)
+	BFL:DebugPrint("BFL RaidFrame: " .. BFL.L.RAID_MOCK_STRESS)
+	BFL:DebugPrint(BFL.L.RAID_WARN_CPU)
 end
 
 -- ============================================
@@ -2492,11 +2492,11 @@ end
 ]]
 function RaidFrame:SimulateReadyCheck()
 	if not self.mockEnabled or #self.raidMembers == 0 then
-		print(BFL.L.RAID_NO_MOCK_DATA)
+		BFL:DebugPrint(BFL.L.RAID_NO_MOCK_DATA)
 		return
 	end
 	
-	print("|cff00ff00BFL RaidFrame:|r " .. BFL.L.RAID_SIM_READY_CHECK)
+	BFL:DebugPrint("BFL RaidFrame: " .. BFL.L.RAID_SIM_READY_CHECK)
 	
 	-- Set all online members to "waiting"
 	for _, member in ipairs(self.raidMembers) do
@@ -2546,7 +2546,7 @@ function RaidFrame:SimulateReadyCheck()
 		end
 		self:RefreshMemberButtons()
 		
-		print(string.format("|cff00ff00BFL RaidFrame:|r Ready Check finished: %d ready, %d not ready", ready, notReady))
+		BFL:DebugPrint(string.format("BFL RaidFrame: Ready Check finished: %d ready, %d not ready", ready, notReady))
 	end)
 end
 
@@ -2555,7 +2555,7 @@ end
 ]]
 function RaidFrame:SimulateRoleChanges()
 	if not self.mockEnabled or #self.raidMembers == 0 then
-		print(BFL.L.RAID_NO_MOCK_DATA)
+		BFL:DebugPrint(BFL.L.RAID_NO_MOCK_DATA)
 		return
 	end
 	
@@ -2587,7 +2587,7 @@ function RaidFrame:SimulateRoleChanges()
 	self:FixMockButtonVisuals()
 	self:UpdateMockControlPanel()
 	
-	print(string.format("|cff00ff00BFL RaidFrame:|r Simulated %d role changes", changed))
+	BFL:DebugPrint(string.format("BFL RaidFrame: Simulated %d role changes", changed))
 end
 
 --[[
@@ -2595,7 +2595,7 @@ end
 ]]
 function RaidFrame:SimulateGroupMoves()
 	if not self.mockEnabled or #self.raidMembers == 0 then
-		print(BFL.L.RAID_NO_MOCK_DATA)
+		BFL:DebugPrint(BFL.L.RAID_NO_MOCK_DATA)
 		return
 	end
 	
@@ -2617,7 +2617,7 @@ function RaidFrame:SimulateGroupMoves()
 	self:UpdateMemberButtons()
 	self:FixMockButtonVisuals()
 	
-	print(string.format("|cff00ff00BFL RaidFrame:|r Moved %d players to different groups", moved))
+	BFL:DebugPrint(string.format("BFL RaidFrame: Moved %d players to different groups", moved))
 end
 
 -- ============================================
@@ -2674,7 +2674,7 @@ function RaidFrame:ClearMockData()
 	end
 	
 	-- BFL:DebugPrint("|cff00ff00RaidFrame Mock:|r Cleared all mock data")
-	print("|cff00ff00BFL RaidFrame:|r " .. BFL.L.RAID_MOCK_CLEARED)
+	BFL:DebugPrint("BFL RaidFrame: " .. BFL.L.RAID_MOCK_CLEARED)
 end
 
 -- ============================================
@@ -2733,22 +2733,22 @@ SlashCmdList["BFLRAIDFRAME"] = function(msg)
 		
 		if setting == "dynamic" then
 			RaidFrame.mockConfig.dynamicUpdates = (value == "on" or value == "true" or value == "1")
-			print("|cff00ff00BFL RaidFrame:|r " .. string.format(BFL.L.RAID_DYN_UPDATES, 
+			BFL:DebugPrint("|cff00ff00BFL RaidFrame:|r " .. string.format(BFL.L.RAID_DYN_UPDATES, 
 				RaidFrame.mockConfig.dynamicUpdates and "ON" or "OFF"))
 		elseif setting == "interval" then
 			local interval = tonumber(value) or 5.0
 			RaidFrame.mockConfig.updateInterval = math.max(1.0, interval)
-			print("|cff00ff00BFL RaidFrame:|r " .. string.format(BFL.L.RAID_UPDATE_INTERVAL, 
+			BFL:DebugPrint("|cff00ff00BFL RaidFrame:|r " .. string.format(BFL.L.RAID_UPDATE_INTERVAL, 
 				RaidFrame.mockConfig.updateInterval))
 		else
-			print(BFL.L.RAID_CONFIG_HEADER)
-			print(string.format(BFL.L.RAID_MOCK_ENABLED_STATUS, RaidFrame.mockEnabled and "YES" or "NO"))
-			print(string.format(BFL.L.RAID_DYN_UPDATES_STATUS, RaidFrame.mockConfig.dynamicUpdates and "ON" or "OFF"))
-			print(string.format(BFL.L.RAID_UPDATE_INTERVAL_STATUS, RaidFrame.mockConfig.updateInterval))
-			print(string.format(BFL.L.RAID_MEMBERS_STATUS, #RaidFrame.raidMembers))
-			print("")
-			print("  |cffffcc00/bfl raid config dynamic on|off|r")
-			print("  |cffffcc00/bfl raid config interval <seconds>|r")
+			BFL:DebugPrint(BFL.L.RAID_CONFIG_HEADER)
+			BFL:DebugPrint(string.format(BFL.L.RAID_MOCK_ENABLED_STATUS, RaidFrame.mockEnabled and "YES" or "NO"))
+			BFL:DebugPrint(string.format(BFL.L.RAID_DYN_UPDATES_STATUS, RaidFrame.mockConfig.dynamicUpdates and "ON" or "OFF"))
+			BFL:DebugPrint(string.format(BFL.L.RAID_UPDATE_INTERVAL_STATUS, RaidFrame.mockConfig.updateInterval))
+			BFL:DebugPrint(string.format(BFL.L.RAID_MEMBERS_STATUS, #RaidFrame.raidMembers))
+			BFL:DebugPrint("")
+			BFL:DebugPrint("  |cffffcc00/bfl raid config dynamic on|off|r")
+			BFL:DebugPrint("  |cffffcc00/bfl raid config interval <seconds>|r")
 		end
 		
 	elseif cmd == "clear" then
@@ -2756,8 +2756,8 @@ SlashCmdList["BFLRAIDFRAME"] = function(msg)
 		
 	elseif cmd == "list" or cmd == "info" then
 		if RaidFrame.mockEnabled and #RaidFrame.raidMembers > 0 then
-			print(BFL.L.RAID_INFO_HEADER)
-			print(string.format(BFL.L.RAID_TOTAL_MEMBERS, #RaidFrame.raidMembers))
+			BFL:DebugPrint(BFL.L.RAID_INFO_HEADER)
+			BFL:DebugPrint(string.format(BFL.L.RAID_TOTAL_MEMBERS, #RaidFrame.raidMembers))
 			
 			local tanks, healers, dps, offline, dead = 0, 0, 0, 0, 0
 			for _, member in ipairs(RaidFrame.raidMembers) do
@@ -2768,11 +2768,11 @@ SlashCmdList["BFLRAIDFRAME"] = function(msg)
 				if member.isDead then dead = dead + 1 end
 			end
 			
-			print(string.format(BFL.L.RAID_COMPOSITION, tanks, healers, dps))
-			print(string.format(BFL.L.RAID_STATUS, offline, dead))
-			print(string.format(BFL.L.RAID_DYN_UPDATES_STATUS, RaidFrame.mockConfig.dynamicUpdates and "ON" or "OFF"))
+			BFL:DebugPrint(string.format(BFL.L.RAID_COMPOSITION, tanks, healers, dps))
+			BFL:DebugPrint(string.format(BFL.L.RAID_STATUS, offline, dead))
+			BFL:DebugPrint(string.format(BFL.L.RAID_DYN_UPDATES_STATUS, RaidFrame.mockConfig.dynamicUpdates and "ON" or "OFF"))
 		else
-			print(BFL.L.RAID_NO_MOCK_ACTIVE)
+			BFL:DebugPrint(BFL.L.RAID_NO_MOCK_ACTIVE)
 		end
 		
 	else

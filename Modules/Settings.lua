@@ -763,7 +763,7 @@ function Settings:DoReset()
 	-- Force full display refresh - reset affects all display settings
 	BFL:ForceRefreshFriendsList()
 	
-	print("|cff20ff20BetterFriendlist:|r " .. L.SETTINGS_RESET_SUCCESS)
+	BFL:DebugPrint("|cff20ff20BetterFriendlist:|r " .. L.SETTINGS_RESET_SUCCESS)
 end
 
 -- Refresh the group list in the Groups tab (Legacy wrapper)
@@ -866,7 +866,7 @@ function Settings:SaveGroupOrder()
 	local DB = GetDB()
 	if DB then
 		DB:Set("groupOrder", newOrder)
-		print("|cff20ff20BetterFriendlist:|r " .. L.SETTINGS_GROUP_ORDER_SAVED)
+		BFL:DebugPrint("|cff20ff20BetterFriendlist:|r " .. L.SETTINGS_GROUP_ORDER_SAVED)
 		
 		local Groups = GetGroups()
 		if Groups and Groups.Initialize then
@@ -1138,20 +1138,20 @@ function Settings:DeleteGroup(groupId, groupName)
 			local DB = GetDB()
 			
 			if not Groups or not DB then
-				print("|cffff0000BetterFriendlist:|r " .. L.ERROR_FAILED_DELETE_GROUP)
+				BFL:DebugPrint("|cffff0000BetterFriendlist:|r " .. L.ERROR_FAILED_DELETE_GROUP)
 				return
 			end
 			
 			local success, err = Groups:Delete(groupId)
 			if success then
-				print("|cff00ff00BetterFriendlist:|r " .. string.format(L.MSG_GROUP_DELETED, groupName))
+				BFL:DebugPrint("|cff00ff00BetterFriendlist:|r " .. string.format(L.MSG_GROUP_DELETED, groupName))
 				
 				Settings:RefreshGroupList()
 				
 				-- Force full display refresh - groups affect display list structure
 				BFL:ForceRefreshFriendsList()
 			else
-				print("|cffff0000BetterFriendlist:|r " .. string.format(L.ERROR_FAILED_DELETE, (err or L.UNKNOWN_ERROR)))
+				BFL:DebugPrint("|cffff0000BetterFriendlist:|r " .. string.format(L.ERROR_FAILED_DELETE, (err or L.UNKNOWN_ERROR)))
 			end
 		end,
 		timeout = 0,
@@ -1184,12 +1184,12 @@ function Settings:RenameGroup(groupId, currentName)
 				if Groups then
 					local success = Groups:Rename(groupId, newName)
 					if success then
-						print("|cff00ff00BetterFriendlist:|r " .. string.format(L.MSG_GROUP_RENAMED, newName))
+						BFL:DebugPrint("|cff00ff00BetterFriendlist:|r " .. string.format(L.MSG_GROUP_RENAMED, newName))
 						Settings:RefreshGroupsTab()
 						-- Force full display refresh - groups affect display list structure
 						BFL:ForceRefreshFriendsList()
 					else
-						print("|cffff0000BetterFriendlist:|r " .. L.ERROR_RENAME_FAILED)
+						BFL:DebugPrint("|cffff0000BetterFriendlist:|r " .. L.ERROR_RENAME_FAILED)
 					end
 				end
 			end
@@ -1202,12 +1202,12 @@ function Settings:RenameGroup(groupId, currentName)
 				if Groups then
 					local success = Groups:Rename(groupId, newName)
 					if success then
-						print("|cff00ff00BetterFriendlist:|r " .. string.format(L.MSG_GROUP_RENAMED, newName))
+						BFL:DebugPrint("|cff00ff00BetterFriendlist:|r " .. string.format(L.MSG_GROUP_RENAMED, newName))
 						Settings:RefreshGroupsTab()
 						-- Force full display refresh - groups affect display list structure
 						BFL:ForceRefreshFriendsList()
 					else
-						print("|cffff0000BetterFriendlist:|r " .. L.ERROR_RENAME_FAILED)
+						BFL:DebugPrint("|cffff0000BetterFriendlist:|r " .. L.ERROR_RENAME_FAILED)
 					end
 				end
 			end
@@ -1252,10 +1252,10 @@ function Settings:MigrateFriendGroups(cleanupNotes, force)
 	local friendGroupAssignments = {}
 	
 	-- PHASE 1: Collect all group names from all friends
-	print("|cff00ffffBetterFriendlist:|r Phase 1 - Collecting group names...")
+	BFL:DebugPrint("|cff00ffffBetterFriendlist:|r Phase 1 - Collecting group names...")
 	
 	local numBNetFriends = BNGetNumFriends()
-	print("|cff00ffffBetterFriendlist:|r Scanning", numBNetFriends, "BattleNet friends...")
+	BFL:DebugPrint("|cff00ffffBetterFriendlist:|r Scanning", numBNetFriends, "BattleNet friends...")
 	
 	for i = 1, numBNetFriends do
 		local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
@@ -1333,7 +1333,7 @@ function Settings:MigrateFriendGroups(cleanupNotes, force)
 	end
 	
 	-- PHASE 2: Create groups in alphabetical order
-	print("|cff00ffffBetterFriendlist:|r Phase 2 - Creating groups in alphabetical order...")
+	BFL:DebugPrint("|cff00ffffBetterFriendlist:|r Phase 2 - Creating groups in alphabetical order...")
 	
 	local sortedGroupNames = {}
 	for groupName in pairs(allGroupNames) do
@@ -1341,7 +1341,7 @@ function Settings:MigrateFriendGroups(cleanupNotes, force)
 	end
 	table.sort(sortedGroupNames)
 	
-	print("|cff00ffffBetterFriendlist:|r Creating", #sortedGroupNames, "groups...")
+	BFL:DebugPrint("|cff00ffffBetterFriendlist:|r Creating", #sortedGroupNames, "groups...")
 	
 	local currentOrder = 2
 	local groupOrderArray = {"favorites"}
@@ -1376,10 +1376,10 @@ function Settings:MigrateFriendGroups(cleanupNotes, force)
 	table.insert(groupOrderArray, "nogroup")
 	
 	DB:Set("groupOrder", groupOrderArray)
-	print("|cff00ffffBetterFriendlist:|r Group order saved:", table.concat(groupOrderArray, ", "))
+	BFL:DebugPrint("|cff00ffffBetterFriendlist:|r Group order saved:", table.concat(groupOrderArray, ", "))
 	
 	-- PHASE 3: Assign friends to groups
-	print("|cff00ffffBetterFriendlist:|r Phase 3 - Assigning friends to groups...")
+	BFL:DebugPrint("|cff00ffffBetterFriendlist:|r Phase 3 - Assigning friends to groups...")
 	
 	for friendUID, data in pairs(friendGroupAssignments) do
 		migratedFriends = migratedFriends + 1
@@ -1440,10 +1440,10 @@ function Settings:MigrateFriendGroups(cleanupNotes, force)
 	-- Mark migration as completed
 	DB:Set("friendGroupsMigrated", true)
 	
-	print("|cff00ff00═══════════════════════════════════════")
-	print("|cff00ff00BetterFriendlist: " .. L.SETTINGS_MIGRATION_COMPLETE)
-	print("|cff00ff00═══════════════════════════════════════")
-	print(string.format(
+	BFL:DebugPrint("|cff00ff00═══════════════════════════════════════")
+	BFL:DebugPrint("|cff00ff00BetterFriendlist: " .. L.SETTINGS_MIGRATION_COMPLETE)
+	BFL:DebugPrint("|cff00ff00═══════════════════════════════════════")
+	BFL:DebugPrint(string.format(
 		"|cff00ffff%s|r %d\n" ..
 		"|cff00ffff%s|r %d\n" ..
 		"|cff00ffff%s|r %d%s",
@@ -1456,10 +1456,10 @@ function Settings:MigrateFriendGroups(cleanupNotes, force)
 		cleanupMsg
 	))
 	
-	print("|cff00ffffBetterFriendlist:|r Refreshing friends list...")
+	BFL:DebugPrint("|cff00ffffBetterFriendlist:|r Refreshing friends list...")
 	-- Force full refresh - migration creates new groups which affect display list structure
 	BFL:ForceRefreshFriendsList()
-	print("|cff00ff00BetterFriendlist:|r Friends list refreshed!")
+	BFL:DebugPrint("|cff00ff00BetterFriendlist:|r Friends list refreshed!")
 end
 
 -- Show migration dialog
@@ -1998,7 +1998,7 @@ function Settings:ShowExportDialog()
 	local exportString, err = self:ExportSettings()
 	
 	if not exportString then
-		print("|cffff0000BetterFriendlist:|r Export failed:", err or "Unknown error")
+		BFL:DebugPrint("Export failed:", err or "Unknown error")
 		return
 	end
 	
@@ -2013,7 +2013,7 @@ function Settings:ShowExportDialog()
 	self.exportFrame.scrollFrame.editBox:SetFocus()
 	self.exportFrame:Show()
 	
-	print("|cff00ff00BetterFriendlist:|r Export complete! Copy the text from the dialog.")
+	BFL:DebugPrint("Export complete! Copy the text from the dialog.")
 end
 
 -- Show import dialog
@@ -2340,10 +2340,10 @@ function Settings:CreateImportFrame()
 		local success, err = Settings:ImportSettings(importString)
 		
 		if success then
-			print("|cff00ff00BetterFriendlist:|r " .. L.SETTINGS_IMPORT_SUCCESS)
+			BFL:DebugPrint(L.SETTINGS_IMPORT_SUCCESS)
 			frame:Hide()
 		else
-			print("|cffff0000BetterFriendlist:|r " .. L.SETTINGS_IMPORT_FAILED .. (err or "Unknown error"))
+			BFL:DebugPrint(L.SETTINGS_IMPORT_FAILED .. (err or "Unknown error"))
 			-- Show error in UI
 			StaticPopupDialogs["BETTERFRIENDLIST_IMPORT_ERROR"] = {
 				text = L.SETTINGS_IMPORT_FAILED .. (err or "Unknown error"),
@@ -3857,11 +3857,11 @@ function Settings:RefreshAdvancedTab()
 			
 			-- User feedback
 			if checked then
-				print("|cff00ff00BetterFriendlist:|r " .. L.SETTINGS_BETA_FEATURES_ENABLED)
-				print("|cffff8800[>]|r " .. L.SETTINGS_BETA_TABS_VISIBLE)
+				BFL:DebugPrint(L.SETTINGS_BETA_FEATURES_ENABLED)
+				BFL:DebugPrint(L.SETTINGS_BETA_TABS_VISIBLE)
 			else
-				print("|cff00ff00BetterFriendlist:|r " .. L.SETTINGS_BETA_FEATURES_DISABLED)
-				print("|cffff8800[>]|r " .. L.SETTINGS_BETA_TABS_HIDDEN)
+				BFL:DebugPrint(L.SETTINGS_BETA_FEATURES_DISABLED)
+				BFL:DebugPrint(L.SETTINGS_BETA_TABS_HIDDEN)
 			end
 			
 			-- Data Broker is stable now, no reload required when toggling Beta features
@@ -4171,7 +4171,7 @@ function Settings:RefreshNotificationsTab()
 		function(value) return value == BetterFriendlistDB.notificationDisplayMode end,
 		function(value)
 			BetterFriendlistDB.notificationDisplayMode = value
-			print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_MODE_CHANGED or "Notification mode changed to:") .. " " .. value)
+			BFL:DebugPrint((L.SETTINGS_NOTIFY_MODE_CHANGED or "Notification mode changed to:") .. " " .. value)
 		end
 	)
 	dropdownMode:SetTooltip(L.SETTINGS_NOTIFY_DISPLAY_MODE or "Notification Style", "Choose how notifications appear on your screen.")
@@ -4185,7 +4185,7 @@ function Settings:RefreshNotificationsTab()
 		if BFL.NotificationSystem and BFL.NotificationSystem.ShowTestNotification then
 			BFL.NotificationSystem:ShowTestNotification()
 		else
-			print("|cffff0000BetterFriendlist:|r Notification system not ready")
+			BFL:DebugPrint("Notification system not ready")
 		end
 	end)
 	table.insert(allFrames, testBtn)
@@ -4199,9 +4199,9 @@ function Settings:RefreshNotificationsTab()
 			BetterFriendlistDB.notificationSoundEnabled = checked
 			if checked then
 				PlaySound(BFL.IsClassic and 8959 or 12867) -- SOUNDKIT.RAID_WARNING
-				print("|cff00ff00BetterFriendlist:|r Sound |cff00ff00ENABLED|r")
+				BFL:DebugPrint("Sound |cff00ff00ENABLED|r")
 			else
-				print("|cff00ff00BetterFriendlist:|r Sound |cffff0000DISABLED|r")
+				BFL:DebugPrint("Sound |cffff0000DISABLED|r")
 			end
 		end
 	)
@@ -4221,7 +4221,7 @@ function Settings:RefreshNotificationsTab()
 		BetterFriendlistDB.notificationQuietManual or false,
 		function(checked)
 			BetterFriendlistDB.notificationQuietManual = checked
-			print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_DND_MODE or "Do Not Disturb mode") .. " " .. (checked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
+			BFL:DebugPrint((L.SETTINGS_NOTIFY_DND_MODE or "Do Not Disturb mode") .. " " .. (checked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
 		end
 	)
 	dndToggle:SetTooltip("Do Not Disturb", "Temporarily silence all notifications without changing your settings.")
@@ -4234,7 +4234,7 @@ function Settings:RefreshNotificationsTab()
 		BetterFriendlistDB.notificationQuietCombat or false,
 		function(checked)
 			BetterFriendlistDB.notificationQuietCombat = checked
-			print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_COMBAT_QUIET or "Combat quiet mode") .. " " .. (checked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
+			BFL:DebugPrint((L.SETTINGS_NOTIFY_COMBAT_QUIET or "Combat quiet mode") .. " " .. (checked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
 		end
 	)
 	combatQuiet:SetTooltip("Combat Silence", "Automatically silence notifications during combat encounters to avoid distractions.")
@@ -4247,7 +4247,7 @@ function Settings:RefreshNotificationsTab()
 		BetterFriendlistDB.notificationQuietInstance or false,
 		function(checked)
 			BetterFriendlistDB.notificationQuietInstance = checked
-			print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_INSTANCE_QUIET or "Instance quiet mode") .. " " .. (checked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
+			BFL:DebugPrint((L.SETTINGS_NOTIFY_INSTANCE_QUIET or "Instance quiet mode") .. " " .. (checked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
 		end
 	)
 	instanceQuiet:SetTooltip("Instance Silence", "Silence notifications when you are in dungeons, raids, battlegrounds, or arenas.")
@@ -4260,7 +4260,7 @@ function Settings:RefreshNotificationsTab()
 		BetterFriendlistDB.notificationQuietScheduled or false,
 		function(checked)
 			BetterFriendlistDB.notificationQuietScheduled = checked
-			print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_SCHEDULED_QUIET or "Scheduled quiet hours") .. " " .. (checked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
+			BFL:DebugPrint((L.SETTINGS_NOTIFY_SCHEDULED_QUIET or "Scheduled quiet hours") .. " " .. (checked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
 		end
 	)
 	scheduledQuiet:SetTooltip("Scheduled Quiet Hours", "Silence notifications during specific hours each day. Configure your preferred schedule below.")
@@ -4335,9 +4335,9 @@ function Settings:RefreshNotificationsTab()
 		function(checked)
 			BetterFriendlistDB.notificationOfflineEnabled = checked
 			if checked then
-				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_OFFLINE_ENABLED or "Offline notifications |cff00ff00ENABLED|r"))
+				BFL:DebugPrint(L.SETTINGS_NOTIFY_OFFLINE_ENABLED or "Offline notifications |cff00ff00ENABLED|r")
 			else
-				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_OFFLINE_DISABLED or "Offline notifications |cffff0000DISABLED|r"))
+				BFL:DebugPrint(L.SETTINGS_NOTIFY_OFFLINE_DISABLED or "Offline notifications |cffff0000DISABLED|r")
 			end
 		end
 	)
@@ -4358,9 +4358,9 @@ function Settings:RefreshNotificationsTab()
 		function(checked)
 			BetterFriendlistDB.notificationWowLoginEnabled = checked
 			if checked then
-				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_WOW_LOGIN_ENABLED or "WoW Login notifications |cff00ff00ENABLED|r"))
+				BFL:DebugPrint(L.SETTINGS_NOTIFY_WOW_LOGIN_ENABLED or "WoW Login notifications |cff00ff00ENABLED|r")
 			else
-				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_WOW_LOGIN_DISABLED or "WoW Login notifications |cffff0000DISABLED|r"))
+				BFL:DebugPrint(L.SETTINGS_NOTIFY_WOW_LOGIN_DISABLED or "WoW Login notifications |cffff0000DISABLED|r")
 			end
 		end
 	)
@@ -4375,9 +4375,9 @@ function Settings:RefreshNotificationsTab()
 		function(checked)
 			BetterFriendlistDB.notificationCharSwitchEnabled = checked
 			if checked then
-				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_CHAR_SWITCH_ENABLED or "Character switch notifications |cff00ff00ENABLED|r"))
+				BFL:DebugPrint(L.SETTINGS_NOTIFY_CHAR_SWITCH_ENABLED or "Character switch notifications |cff00ff00ENABLED|r")
 			else
-				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_CHAR_SWITCH_DISABLED or "Character switch notifications |cffff0000DISABLED|r"))
+				BFL:DebugPrint(L.SETTINGS_NOTIFY_CHAR_SWITCH_DISABLED or "Character switch notifications |cffff0000DISABLED|r")
 			end
 		end
 	)
@@ -4392,9 +4392,9 @@ function Settings:RefreshNotificationsTab()
 		function(checked)
 			BetterFriendlistDB.notificationGameSwitchEnabled = checked
 			if checked then
-				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_GAME_SWITCH_ENABLED or "Game switch notifications |cff00ff00ENABLED|r"))
+				BFL:DebugPrint(L.SETTINGS_NOTIFY_GAME_SWITCH_ENABLED or "Game switch notifications |cff00ff00ENABLED|r")
 			else
-				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_GAME_SWITCH_DISABLED or "Game switch notifications |cffff0000DISABLED|r"))
+				BFL:DebugPrint(L.SETTINGS_NOTIFY_GAME_SWITCH_DISABLED or "Game switch notifications |cffff0000DISABLED|r")
 			end
 		end
 	)
@@ -4544,7 +4544,7 @@ function Settings:RefreshNotificationsTab()
 			enableBtn:SetChecked(trigger.enabled)
 			enableBtn:SetScript("OnClick", function(self)
 				trigger.enabled = self:GetChecked()
-				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_TRIGGER_PREFIX or "Group trigger") .. " " .. (trigger.enabled and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
+				BFL:DebugPrint((L.SETTINGS_NOTIFY_TRIGGER_PREFIX or "Group trigger") .. " " .. (trigger.enabled and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
 			end)
 			enableBtn:SetScript("OnEnter", function() end)
 			enableBtn:SetScript("OnLeave", function() end)
@@ -4557,7 +4557,7 @@ function Settings:RefreshNotificationsTab()
 			deleteBtn:SetScript("OnClick", function()
 				BetterFriendlistDB.notificationGroupTriggers[triggerID] = nil
 				RefreshTriggerList()
-				print("|cff00ff00BetterFriendlist:|r " .. (L.SETTINGS_NOTIFY_TRIGGER_REMOVED or "Group trigger removed"))
+				BFL:DebugPrint(L.SETTINGS_NOTIFY_TRIGGER_REMOVED or "Group trigger removed")
 			end)
 			
 			yOffset = yOffset - 30
@@ -4895,12 +4895,12 @@ function Settings:RefreshGlobalSyncTab()
 		function(val)
 			BetterFriendlistDB.enableGlobalSync = val
 			if val then
-				print("|cff00ff00BetterFriendlist:|r Global Sync |cff00ff00" .. (L.STATUS_ENABLED or "ENABLED") .. "|r")
+				BFL:DebugPrint("Global Sync |cff00ff00" .. (L.STATUS_ENABLED or "ENABLED") .. "|r")
 				-- Trigger sync
 				local GlobalSync = BFL:GetModule("GlobalSync")
 				if GlobalSync then GlobalSync:OnFriendListUpdate() end
 			else
-				print("|cff00ff00BetterFriendlist:|r Global Sync |cffff0000" .. (L.STATUS_DISABLED or "DISABLED") .. "|r")
+				BFL:DebugPrint("Global Sync |cffff0000" .. (L.STATUS_DISABLED or "DISABLED") .. "|r")
 			end
 			-- Refresh to update table state if needed
 			self:RefreshGlobalSyncTab()
@@ -4914,9 +4914,9 @@ function Settings:RefreshGlobalSyncTab()
 		function(val)
 			BetterFriendlistDB.enableGlobalSyncDeletion = val
 			if val then
-				print("|cff00ff00BetterFriendlist:|r Global Sync Deletion |cff00ff00" .. (L.STATUS_ENABLED or "ENABLED") .. "|r")
+				BFL:DebugPrint("Global Sync Deletion |cff00ff00" .. (L.STATUS_ENABLED or "ENABLED") .. "|r")
 			else
-				print("|cff00ff00BetterFriendlist:|r Global Sync Deletion |cffff0000" .. (L.STATUS_DISABLED or "DISABLED") .. "|r")
+				BFL:DebugPrint("Global Sync Deletion |cffff0000" .. (L.STATUS_DISABLED or "DISABLED") .. "|r")
 			end
 		end)
 	enableDeletion:SetTooltip(L.SETTINGS_GLOBAL_SYNC_DELETION or "Enable Deletion", L.SETTINGS_GLOBAL_SYNC_DELETION_DESC or "Allow the sync process to remove friends from your list if they are removed from the database.")
@@ -5019,7 +5019,7 @@ function Settings:RefreshGlobalSyncTab()
 								
 								-- Add back to friend list
 								C_FriendList.AddFriend(friendUID)
-								print("|cff00ff00BetterFriendlist:|r Restored " .. name .. " to friend list.")
+								BFL:DebugPrint("Restored " .. name .. " to friend list.")
 								
 								self:RefreshGlobalSyncTab()
 							end)
@@ -5056,7 +5056,7 @@ function Settings:RefreshGlobalSyncTab()
 											
 											if match then
 												C_FriendList.RemoveFriend(info.name) -- Use the name from the API
-												print("|cff00ff00BetterFriendlist:|r Removed " .. info.name .. " from friend list.")
+												BFL:DebugPrint("Removed " .. info.name .. " from friend list.")
 												removed = true
 												break
 											end
@@ -5114,7 +5114,7 @@ function Settings:RefreshGlobalSyncTab()
 											
 											if match then
 												C_FriendList.SetFriendNotes(info.name, text)
-												print("|cff00ff00BetterFriendlist:|r Updated note for " .. info.name)
+												BFL:DebugPrint("Updated note for " .. info.name)
 												break
 											end
 										end

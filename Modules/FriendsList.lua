@@ -3169,7 +3169,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) local groupId 
 									BetterFriendlistDB.notificationGroupRules = {}
 								end
 								BetterFriendlistDB.notificationGroupRules[self.groupId] = "default"
-								print(string.format(BFL.L.MSG_NOTIFY_DEFAULT, groupData.name))
+								BFL:DebugPrint(string.format(BFL.L.MSG_NOTIFY_DEFAULT, groupData.name))
 							end
 						)
 						
@@ -3182,7 +3182,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) local groupId 
 									BetterFriendlistDB.notificationGroupRules = {}
 								end
 								BetterFriendlistDB.notificationGroupRules[self.groupId] = "whitelist"
-								print(string.format(BFL.L.MSG_NOTIFY_WHITELIST, groupData.name))
+								BFL:DebugPrint(string.format(BFL.L.MSG_NOTIFY_WHITELIST, groupData.name))
 							end
 						)
 						
@@ -3195,7 +3195,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) local groupId 
 									BetterFriendlistDB.notificationGroupRules = {}
 								end
 								BetterFriendlistDB.notificationGroupRules[self.groupId] = "blacklist"
-								print(string.format(BFL.L.MSG_NOTIFY_BLACKLIST, groupData.name))
+								BFL:DebugPrint(string.format(BFL.L.MSG_NOTIFY_BLACKLIST, groupData.name))
 							end
 						)
 						
@@ -4315,7 +4315,7 @@ function FriendsList:UpdateInviteButton(button, data) local inviteID, accountNam
 					for i, invite in ipairs(BFL.MockFriendInvites.invites) do
 						if invite.inviteID == parent.inviteID then
 							table.remove(BFL.MockFriendInvites.invites, i)
-							print("|cff00ff00BetterFriendlist:|r " .. string.format(BFL.L.MOCK_INVITE_ACCEPTED, invite.accountName))
+							BFL:DebugPrint("|cff00ff00BetterFriendlist:|r " .. string.format(BFL.L.MOCK_INVITE_ACCEPTED, invite.accountName))
 							break
 						end
 					end
@@ -4354,7 +4354,7 @@ function FriendsList:UpdateInviteButton(button, data) local inviteID, accountNam
 						for i, invite in ipairs(BFL.MockFriendInvites.invites) do
 							if invite.inviteID == inviteID then
 								table.remove(BFL.MockFriendInvites.invites, i)
-								print("|cffff0000BetterFriendlist:|r " .. string.format(BFL.L.MOCK_INVITE_DECLINED, invite.accountName))
+								BFL:DebugPrint("|cffff0000BetterFriendlist:|r " .. string.format(BFL.L.MOCK_INVITE_DECLINED, invite.accountName))
 								break
 							end
 						end

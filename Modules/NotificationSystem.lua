@@ -590,7 +590,7 @@ function ShowNotification(friendName, statusType, message, iconTexture)
     elseif displayMode == "chat" then
         -- Print to chat
         local colorCode = statusType == "ONLINE" and "|cff00ff00" or "|cff808080"
-        print(string.format("%s[BFL]|r %s: %s", colorCode, friendName, message))
+        BFL:DebugPrint(string.format("%s%s: %s", colorCode, friendName, message))
     end
     -- displayMode == "disabled" - do nothing
 end
@@ -601,7 +601,7 @@ end
 
 function NotificationSystem:ShowTestNotification()
     ShowNotification("TestPlayer", "ONLINE", string.format(BFL.L.NOTIFICATION_ONLINE_PLAYING_FMT, "World of Warcraft"), nil)
-    print("|cff00ff00[BFL]|r " .. string.format(BFL.L.NOTIFICATION_TEST_TRIGGERED, BetterFriendlistDB.notificationDisplayMode))
+    BFL:DebugPrint(string.format(BFL.L.NOTIFICATION_TEST_TRIGGERED, BetterFriendlistDB.notificationDisplayMode))
 end
 
 -- Export module
