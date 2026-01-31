@@ -7,25 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2.2.9] - 2026-02-02
-### Fixed
-- **Edit Mode SearchBox** - Fixed an issue where the SearchBox width would revert to a fixed size after resizing the frame in Retail EditMode, ensuring it now stays responsive.
-
-## [2.2.8] - 2026-02-01
-### Fixed
-- **Classic Crash Fix** - Fixed a critical Lua error (`'for' limit must be a number`) that could occur on login or reload in Classic versions when the friend list API returned `nil` instead of 0.
-- **API Hardening** - Preemptively strengthened 20+ other API calls across the addon to prevent similar crashes in future Classic updates or under rare conditions.
-
-## [2.2.7] - 2026-01-30
+## [2.2.6] - 2026-01-31
 ### Added
-- **Simple Mode Menus** - Integrated "Quick Filters", "Sort", and "Show Search" toggle into the Contacts Menu when Simple Mode is enabled.
+- **Copy Character Name** - Added a new option to the context menu to copy character names (Name-Realm) for better inviting/messaging
+- **Simple Mode** - Added Simple Mode in Settings -> General. Simple Mode hides specific elements (Search, Filter, Sort, BFL Avatar) and moves corresponding functions in the menu button
+- **ElvUI Skin Tabs** - Improved alignment of tab text and overall layout of all tabs of BFL in ElvUI Skin
 
-## [2.2.6] - 2026-01-25
 ### Fixed
-- **Simple Mode (Classic)** - Fixed an issue where the "Simple Mode" toggle did not work correctly in Classic versions. It now creates a Compact Mode (hides search/dropdowns) while preserving the portrait to maintain visual integrity.
-- **Classic Layout** - Optimized layout for Classic versions (centered dropdowns, improved spacing). Reduced BNet Frame width by 40px in simple mode for better fit.
-- **SearchBox Bug** - Fixed an issue where the SearchBox would reappear when switching tabs while Simple Mode was active.
-- **Localization** - Added missing localization keys for the "Reload Required" dialog in all 11 supported languages.
+- **Friend Groups Migration** - Fixed an issue with FriendGroups Migration for WoW friends. Added more debug logs to better help with issues.
+- **ElvUI Skin Retail** - Fixed an error with ElvUI Retail Skinning
+- **ElvUI Skin Classic** - Fixed and enabled ElvUI Classic Skin
+- **QuickJoin Informations** - Fixed an issue with shown QuickJoin informations lacking details of queued content type
+- **Broker Integration** - Fixed an issue that disabled the Broker BFL Plugin
+- **Performance** - Third iteration of performance added. If anything feels odd don't hesitate to contact
+- **RAF** - Fixed an issue blocking the usage of copy link button in RAF Frame
+- **Global Sync** - Fixed an error occuring while having own characters in sync added
 
 ## [2.2.5] - 2026-01-25
 ### Fixed

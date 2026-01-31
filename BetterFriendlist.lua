@@ -852,6 +852,50 @@ frame:SetScript("OnEvent", function(self, event, ...) if event == "ADDON_LOADED"
 			})
 		end)
 
+		-- Copy Character Name option
+		local copyNameText = nil
+		if contextData.bnetIDAccount then
+			local accountInfo = C_BattleNet.GetAccountInfoByID(contextData.bnetIDAccount)
+			if accountInfo and accountInfo.gameAccountInfo and accountInfo.gameAccountInfo.characterName then
+				local charName = accountInfo.gameAccountInfo.characterName
+				local realmName = accountInfo.gameAccountInfo.realmName
+				if realmName and realmName ~= "" then
+					copyNameText = charName .. "-" .. realmName
+				else
+					copyNameText = charName
+				end
+			end
+		elseif contextData.name then
+			copyNameText = contextData.name
+		end
+		
+		if copyNameText then
+			rootDescription:CreateButton(L.MENU_COPY_CHARACTER_NAME, function()
+				StaticPopupDialogs["BETTERFRIENDLIST_COPY_URL"] = {
+					text = L.COPY_CHARACTER_NAME_POPUP_TITLE,
+					button1 = "Close",
+					hasEditBox = true,
+					editBoxWidth = 350,
+					OnShow = function(self)
+						self.EditBox:SetText(copyNameText)
+						self.EditBox:SetFocus()
+						self.EditBox:HighlightText()
+					end,
+					EditBoxOnEnterPressed = function(self)
+						self:GetParent():Hide()
+					end,
+					EditBoxOnEscapePressed = function(self)
+						self:GetParent():Hide()
+					end,
+					timeout = 0,
+					whileDead = true,
+					hideOnEscape = true,
+					preferredIndex = 3,
+				}
+				StaticPopup_Show("BETTERFRIENDLIST_COPY_URL")
+			end)
+		end
+
 		local groupsButton = rootDescription:CreateButton(L.MENU_GROUPS)
 		
 		-- Add "Create Group" option at the top

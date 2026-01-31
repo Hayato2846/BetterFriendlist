@@ -182,6 +182,8 @@ local L = BFL_LOCALE
 	L.MENU_SET_BROADCAST = "Définir Message Diffusion"
 	L.MENU_IGNORE_LIST = "Gérer Liste Ignorés"
 	L.MENU_BETTERFRIENDLIST_TITLE = "BetterFriendList"
+	L.MENU_COPY_CHARACTER_NAME = "Copier le nom du personnage"
+	L.COPY_CHARACTER_NAME_POPUP_TITLE = "Copier le nom du personnage"
 	
 	-- ========================================
 	-- TOOLTIPS
@@ -1055,7 +1057,7 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Évite chevauchements avec autres fenêtr
 	L.CORE_HELP_TEST_COMMANDS = "|cffffcc00Tests :|r"
 	L.CORE_HELP_TEST_ACTIVITY = "  |cffffffff/bfl test|r - Tests Activité"
 	L.CORE_HELP_LINK = "|cff20ff20Aide :|r |cff00ccffhttps://github.com/Hayato2846/BetterFriendlist|r"
-	L.CORE_LOADED = "|cff00ff00BetterFriendlist v%s%s|r chargé !"
+	L.CORE_LOADED = "|cff00ff00BetterFriendlist v%s%s|r. Chargé. Discord: /bfl discord"
 	L.MOCK_INVITE_ACCEPTED = "Accepté inv. test %s"
 	L.MOCK_INVITE_DECLINED = "Refusé inv. test %s"
 

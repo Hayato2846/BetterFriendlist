@@ -185,7 +185,9 @@ L.BUTTON_EXPORT = "Export"
 	L.MENU_SETTINGS = "Settings"
 	L.MENU_SET_BROADCAST = "Set Broadcast Message"
 	L.MENU_IGNORE_LIST = "Manage Ignore List"
+	L.MENU_COPY_CHARACTER_NAME = "Copy Character Name"
 	L.MENU_BETTERFRIENDLIST_TITLE = "BetterFriendList"
+	L.COPY_CHARACTER_NAME_POPUP_TITLE = "Copy Character Name"
 	
 	-- ========================================
 	-- TOOLTIPS
@@ -1079,7 +1081,7 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	L.CORE_HELP_TEST_COMMANDS = "|cffffcc00Test Commands:|r"
 	L.CORE_HELP_TEST_ACTIVITY = "  |cffffffff/bfl test|r - Run ActivityTracker tests"
 	L.CORE_HELP_LINK = "|cff20ff20For more help, see:|r |cff00ccffhttps://github.com/Hayato2846/BetterFriendlist|r"
-	L.CORE_LOADED = "|cff00ff00BetterFriendlist v%s%s|r loaded successfully!"
+	L.CORE_LOADED = "|cff00ff00BetterFriendlist v%s%s|r. Report features or bugs on Discord: /bfl discord"
 	L.MOCK_INVITE_ACCEPTED = "Accepted mock invite from %s"
 	L.MOCK_INVITE_DECLINED = "Declined mock invite from %s"
 

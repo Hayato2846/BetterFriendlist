@@ -178,7 +178,9 @@ L.MENU_EXPAND_ALL = "Развернуть Все Группы"
 L.MENU_SETTINGS = "Настройки"
 L.MENU_SET_BROADCAST = "Установить Широковещательное Сообщение"
 L.MENU_IGNORE_LIST = "Управление Списком Игнорирования"
-L.MENU_BETTERFRIENDLIST_TITLE = "BetterFriendList"
+	L.MENU_BETTERFRIENDLIST_TITLE = "BetterFriendList"
+	L.MENU_COPY_CHARACTER_NAME = "Копировать имя персонажа"
+	L.COPY_CHARACTER_NAME_POPUP_TITLE = "Копировать имя персонажа"
 
 -- ========================================
 -- TOOLTIPS
@@ -1063,7 +1065,7 @@ L.CORE_HELP_PERF_MEM = "  |cffffffff/bfl perf memory|r - Memory"
 L.CORE_HELP_TEST_COMMANDS = "|cffffcc00Test:|r"
 L.CORE_HELP_TEST_ACTIVITY = "  |cffffffff/bfl test|r - Test"
 L.CORE_HELP_LINK = "|cff20ff20Help:|r |cff00ccffhttps://github.com/Hayato2846/BetterFriendlist|r"
-L.CORE_LOADED = "|cff00ff00Загружено|r"
+L.CORE_LOADED = "|cff00ff00BetterFriendlist v%s%s|r. Загружено. Discord: /bfl discord"
 L.MOCK_INVITE_ACCEPTED = "Accepted %s"
 L.MOCK_INVITE_DECLINED = "Declined %s"
 

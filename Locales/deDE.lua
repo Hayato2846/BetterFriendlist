@@ -180,7 +180,9 @@ local L = BFL_LOCALE
 	L.MENU_SETTINGS = "Einstellungen"
 	L.MENU_SET_BROADCAST = "Broadcast-Nachricht setzen"
 	L.MENU_IGNORE_LIST = "Ignorierliste verwalten"
+	L.MENU_COPY_CHARACTER_NAME = "Charakternamen kopieren"
 	L.MENU_BETTERFRIENDLIST_TITLE = "BetterFriendList"
+	L.COPY_CHARACTER_NAME_POPUP_TITLE = "Charakternamen kopieren"
 	
 	-- ========================================
 	-- TOOLTIPS
@@ -440,7 +442,7 @@ local L = BFL_LOCALE
 	-- ========================================
 	L.BATTLENET_UNAVAILABLE = "Battle.net nicht verfügbar"
 	L.CONTACTS_RECENT_ALLIES_TAB_NAME = "Letzte Mitspieler"
-	L.CORE_LOADED = "|cff00ff00BetterFriendlist v%s%s|r erfolgreich geladen!"
+	L.CORE_LOADED = "|cff00ff00BetterFriendlist v%s%s|r. Melde Fehler oder Features im Discord: /bfl discord"
 	L.DIALOG_RESET_LAYOUTS_BTN1 = "Alles zurücksetzen"
 	L.DIALOG_RESET_LAYOUTS_TEXT = "Alle gespeicherten Fenstergrößen und -positionen für alle Bearbeitungsmodus-Layouts zurücksetzen?\n\nDies kann nicht rückgängig gemacht werden!"
 	L.EDITMODE_FRAME_HEIGHT = "Fensterhöhe"

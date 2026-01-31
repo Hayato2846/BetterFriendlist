@@ -354,6 +354,8 @@ function GlobalSync:ImportFriends(faction, currentRealm)
         end
     end
 
+    local currentPlayerName = UnitName("player")
+
     -- Iterate FLAT structure: [Faction][FriendUID]
     for friendUID, data in pairs(BetterFriendlistDB.GlobalFriends[faction]) do
         -- Skip if marked as deleted
@@ -364,12 +366,17 @@ function GlobalSync:ImportFriends(faction, currentRealm)
                 local name, realm = string.match(friendUID, "^(.+)%-(.+)$")
                 
                 if name and realm then
-                    local nameToAdd = friendUID -- Default to full Name-Realm
-                    
-                    -- If on same realm, we can try adding just the name, but Name-Realm is safer
-                    -- Blizzard API handles Name-Realm correctly even for same realm
-                    
-                    table.insert(friendsToAdd, nameToAdd)
+                    -- Fix #25: Prevent adding self
+                    local isSelf = (name == currentPlayerName) and (string.gsub(realm, "%s+", "") == currentRealm)
+
+                    if not isSelf then
+                        local nameToAdd = friendUID -- Default to full Name-Realm
+                        
+                        -- If on same realm, we can try adding just the name, but Name-Realm is safer
+                        -- Blizzard API handles Name-Realm correctly even for same realm
+                        
+                        table.insert(friendsToAdd, nameToAdd)
+                    end
                 end
             end
         end

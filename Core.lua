@@ -1,6 +1,6 @@
 -- Core.lua
 -- Main initialization file for BetterFriendlist addon
--- Version 2.2.9 - February 2026
+-- Version 2.2.6 - January 2026
 -- Complete replacement for WoW Friends frame with modular architecture
 
 -- Create addon namespace
@@ -904,6 +904,15 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 	-- Debug print toggle
 	if msg == "debug" then
 		BFL:ToggleDebugPrint()
+
+	-- Discord Popup
+	elseif msg == "discord" then
+		local Changelog = BFL:GetModule("Changelog")
+		if Changelog then
+			Changelog:ShowDiscordPopup()
+		else
+			print("|cffff0000BetterFriendlist:|r " .. (BFL.L.CORE_CHANGELOG_NOT_LOADED or "Changelog module not loaded"))
+		end
 
 	-- Debug Corner (Diagnostic tool for Classic corner issues)
 	elseif msg == "debugcorner" then

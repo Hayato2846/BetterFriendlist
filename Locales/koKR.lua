@@ -182,6 +182,8 @@ local L = BFL_LOCALE
 	L.MENU_SET_BROADCAST = "방송 메시지 설정"
 	L.MENU_IGNORE_LIST = "차단 목록 관리"
 	L.MENU_BETTERFRIENDLIST_TITLE = "BetterFriendList"
+	L.MENU_COPY_CHARACTER_NAME = "캐릭터 이름 복사"
+	L.COPY_CHARACTER_NAME_POPUP_TITLE = "캐릭터 이름 복사"
 	
 	-- ========================================
 	-- TOOLTIPS
@@ -1055,7 +1057,7 @@ local L = BFL_LOCALE
 	L.CORE_HELP_TEST_COMMANDS = "|cffffcc00Test:|r"
 	L.CORE_HELP_TEST_ACTIVITY = "  |cffffffff/bfl test|r - Test"
 	L.CORE_HELP_LINK = "|cff20ff20Help:|r |cff00ccffhttps://github.com/Hayato2846/BetterFriendlist|r"
-	L.CORE_LOADED = "|cff00ff00로드됨|r"
+	L.CORE_LOADED = "|cff00ff00BetterFriendlist v%s%s|r. 로드됨. Discord: /bfl discord"
 	L.MOCK_INVITE_ACCEPTED = "Accepted %s"
 	L.MOCK_INVITE_DECLINED = "Declined %s"
 
