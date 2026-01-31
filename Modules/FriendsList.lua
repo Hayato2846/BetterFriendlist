@@ -513,7 +513,13 @@ function FriendsList:UpdateSearchBoxState()
 				-- Restore XML exact layout (Retail)
 				-- <Anchor point="TOPLEFT" relativeKey="$parent.$parent.Inset" x="10" y="60"/>
 				searchBox:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 10, 60)
-				searchBox:SetWidth(220) -- Restore fixed width
+				
+				-- Fixed: Do not hardcode width (220), use responsive width calculation (Phase 28)
+				if self.UpdateSearchBoxWidth then
+					self:UpdateSearchBoxWidth()
+				else
+					searchBox:SetWidth(220) -- Fallback
+				end
 			end
 
 			searchBox:SetHeight(28)

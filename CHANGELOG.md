@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.2.9] - 2026-02-02
+### Fixed
+- **Edit Mode SearchBox** - Fixed an issue where the SearchBox width would revert to a fixed size after resizing the frame in Retail EditMode, ensuring it now stays responsive.
+
 ## [2.2.8] - 2026-02-01
 ### Fixed
 - **Classic Crash Fix** - Fixed a critical Lua error (`'for' limit must be a number`) that could occur on login or reload in Classic versions when the friend list API returned `nil` instead of 0.

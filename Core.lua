@@ -1,6 +1,6 @@
 -- Core.lua
 -- Main initialization file for BetterFriendlist addon
--- Version 2.2.8 - February 2026
+-- Version 2.2.9 - February 2026
 -- Complete replacement for WoW Friends frame with modular architecture
 
 -- Create addon namespace
@@ -327,11 +327,12 @@ function BFL:UpdatePortraitVisibility(reason)
 				baseWidth = baseWidth - 40
 			end
 			
-			local extraWidth = shouldShowPortrait and 0 or 65
+			local extraWidth = shouldShowPortrait and 0 or 45
 
 			-- Further reduce width by 10px for Classic Simple Mode (User Request: Add 20px back from previous -30)
+			-- Update: Removed reduction because base is now 55 (matching Classic target)
 			if BFL.IsClassic and not shouldShowPortrait then
-				extraWidth = extraWidth - 10
+				extraWidth = extraWidth + 10
 			end
 			
 			local totalWidth = baseWidth + extraWidth
