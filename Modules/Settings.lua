@@ -348,7 +348,7 @@ local TAB_DEFINITIONS = {
 	
 	-- Beta Tabs (only visible when enableBetaFeatures = true)
 	{id = 5, name = L.SETTINGS_TAB_DATABROKER, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\activity.blp", beta = false},
-	{id = 6, name = L.SETTINGS_TAB_GLOBAL_SYNC, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\globe.blp", beta = true},
+	{id = 6, name = L.SETTINGS_TAB_GLOBAL_SYNC, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\globe.blp", beta = false},
 	-- Future beta tabs go here...
 }
 
@@ -3986,35 +3986,46 @@ function Settings:RefreshAdvancedTab()
 	table.insert(allFrames, betaToggle)
 
 	-- Beta feature list (informational)
-	local listContainer = CreateFrame("Frame", nil, tab)
-	listContainer:SetPoint("LEFT", 20, 0)
-	listContainer:SetPoint("RIGHT", -20, 0)
-	
-	local featureListTitle = listContainer:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
-	featureListTitle:SetPoint("TOPLEFT", 0, 0)
-	featureListTitle:SetText(L.SETTINGS_BETA_FEATURES_LIST)
-	featureListTitle:SetTextColor(1, 0.53, 0) -- Orange
-	
-	-- Dynamic list from TAB_DEFINITIONS
-	local listY = -20
+	-- Only show if there are actual beta features
+	local hasBetaFeatures = false
 	for _, tabDef in ipairs(TAB_DEFINITIONS) do
 		if tabDef.beta then
-			local icon = listContainer:CreateTexture(nil, "ARTWORK")
-			icon:SetSize(14, 14)
-			icon:SetPoint("TOPLEFT", 5, listY)
-			icon:SetTexture(tabDef.icon)
-			icon:SetVertexColor(1, 0.53, 0) -- Orange
-			
-			local text = listContainer:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-			text:SetPoint("LEFT", icon, "RIGHT", 6, 0)
-			text:SetPoint("TOP", icon, "TOP", 0, -1)
-			text:SetText(tabDef.name)
-			
-			listY = listY - 18
+			hasBetaFeatures = true
+			break
 		end
 	end
-	listContainer:SetHeight(math.abs(listY) + 10)
-	table.insert(allFrames, listContainer)
+	
+	if hasBetaFeatures then
+		local listContainer = CreateFrame("Frame", nil, tab)
+		listContainer:SetPoint("LEFT", 20, 0)
+		listContainer:SetPoint("RIGHT", -20, 0)
+		
+		local featureListTitle = listContainer:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
+		featureListTitle:SetPoint("TOPLEFT", 0, 0)
+		featureListTitle:SetText(L.SETTINGS_BETA_FEATURES_LIST)
+		featureListTitle:SetTextColor(1, 0.53, 0) -- Orange
+		
+		-- Dynamic list from TAB_DEFINITIONS
+		local listY = -20
+		for _, tabDef in ipairs(TAB_DEFINITIONS) do
+			if tabDef.beta then
+				local icon = listContainer:CreateTexture(nil, "ARTWORK")
+				icon:SetSize(14, 14)
+				icon:SetPoint("TOPLEFT", 5, listY)
+				icon:SetTexture(tabDef.icon)
+				icon:SetVertexColor(1, 0.53, 0) -- Orange
+				
+				local text = listContainer:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
+				text:SetPoint("LEFT", icon, "RIGHT", 6, 0)
+				text:SetPoint("TOP", icon, "TOP", 0, -1)
+				text:SetText(tabDef.name)
+				
+				listY = listY - 18
+			end
+		end
+		listContainer:SetHeight(math.abs(listY) + 10)
+		table.insert(allFrames, listContainer)
+	end
 	
 	-- Anchor all frames vertically
 	Components:AnchorChain(allFrames, -15)

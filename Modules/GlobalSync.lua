@@ -12,11 +12,6 @@ local syncTimer = nil
 local pendingAdds = {}
 local processingQueue = false
 
--- Helper: Check if Beta is enabled
-local function IsBetaEnabled()
-    return BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures == true
-end
-
 -- Helper: Get Normalized Realm Name
 local function GetRealmName()
     return GetNormalizedRealmName()
@@ -29,8 +24,6 @@ local function GetFaction()
 end
 
 function GlobalSync:Initialize()
-    if not IsBetaEnabled() then return end
-    
     -- Initialize DB structure if missing
     if not BetterFriendlistDB.GlobalFriends then
         BetterFriendlistDB.GlobalFriends = {
@@ -145,7 +138,6 @@ function GlobalSync:HookDeletionAPIs()
 end
 
 function GlobalSync:OnFriendNoteUpdated(name, notes)
-    if not IsBetaEnabled() then return end
     if not name then return end
     
     local faction = GetFaction()
@@ -169,7 +161,6 @@ function GlobalSync:OnFriendNoteUpdated(name, notes)
 end
 
 function GlobalSync:OnFriendAdded(name)
-    if not IsBetaEnabled() then return end
     if not name then return end
     
     local faction = GetFaction()
@@ -195,7 +186,6 @@ function GlobalSync:OnFriendAdded(name)
 end
 
 function GlobalSync:OnFriendRemoved(name)
-    if not IsBetaEnabled() then return end
     if not BetterFriendlistDB.enableGlobalSyncDeletion then return end
     if not name then return end
     
@@ -228,16 +218,12 @@ function GlobalSync:OnFriendRemoved(name)
 end
 
 function GlobalSync:RegisterEvents()
-    if not IsBetaEnabled() then return end
-
     BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function()
         self:OnFriendListUpdate()
     end)
 end
 
 function GlobalSync:OnFriendListUpdate()
-    if not IsBetaEnabled() then return end
-    
     -- Throttle updates
     if self.updateTimer then return end
     self.updateTimer = C_Timer.NewTimer(2, function()
@@ -435,7 +421,7 @@ function GlobalSync:ProcessAddQueue(queue)
     local max = #queue
     
     C_Timer.NewTicker(0.5, function(timer)
-        if not IsBetaEnabled() or not BetterFriendlistDB.enableGlobalSync then
+        if not BetterFriendlistDB.enableGlobalSync then
             timer:Cancel()
             self.processingQueue = false
             return

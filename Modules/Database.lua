@@ -73,7 +73,7 @@ local defaults = {
 	debugPrintEnabled = false, -- Toggle debug prints with /bfl debug print
 	-- Beta Features
 	enableBetaFeatures = false, -- Enable experimental Beta features (default: OFF)
-	-- Global Sync Settings (Beta)
+	-- Global Sync Settings
 	enableGlobalSync = false, -- Enable Global Friend Sync (default: OFF)
 	enableGlobalSyncDeletion = false, -- Enable deletion of friends during sync (default: OFF)
 	-- Notification Settings (Beta)
