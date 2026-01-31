@@ -58,8 +58,12 @@ local defaults = {
 	inGameGroupMode = "same_game", -- "same_game" (WoW matching project) or "any_game" (Any BNet game)
 	windowScale = 1.0, -- Window scale factor: 0.5 = 50%, 1.0 = 100%, 2.0 = 200% (default: 100%)
 	hideMaxLevel = false, -- Hide level display for max level characters (default: OFF)
+	colorLevelByDifficulty = true, -- Color level text by difficulty (grey/green/yellow/orange/red) (default: ON)
+	showNoteIcon = false, -- Show a note icon if the friend has a note (default: OFF)
 	accordionGroups = false, -- Only allow one group to be open at a time (default: OFF)
 	showFavoritesGroup = true, -- Show the Favorites group (default: ON)
+	enableFavoriteIcon = true, -- Show the Favorite icon on the friend button (default: ON)
+	showFactionBg = false, -- Show faction color as background (default: OFF)
 	-- Sort Settings
 	primarySort = "status", -- Primary sort method: status, name, level, zone (default: status)
 	secondarySort = "name", -- Secondary sort method: none, name, level, zone (default: name)

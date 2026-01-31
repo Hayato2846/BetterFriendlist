@@ -1168,4 +1168,10 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita sobreposição. Requer reload."
 	L.TOOLTIP_EDIT_NOTE = "Editar nota"
 	L.MENU_SHOW_SEARCH = "Mostrar busca"
 	L.MENU_QUICK_FILTER = "Filtro rápido"
+
+	-- Favorites & Faction Settings
+	L.SETTINGS_ENABLE_FAVORITE_ICON = "Habilitar Ícone de Favorito"
+	L.SETTINGS_ENABLE_FAVORITE_ICON_DESC = "Mostra um ícone de estrela no botão do amigo para favoritos."
+	L.SETTINGS_SHOW_FACTION_BG = "Mostrar Fundo da Facção"
+	L.SETTINGS_SHOW_FACTION_BG_DESC = "Mostra a cor da facção como fundo para o botão do amigo."
 end)

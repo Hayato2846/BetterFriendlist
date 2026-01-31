@@ -1188,4 +1188,10 @@ L.COMPAT_GAME_VERSION = "|cffffcc00Ver:|r"
 	L.TOOLTIP_EDIT_NOTE = "Редактировать заметку"
 	L.MENU_SHOW_SEARCH = "Показать поиск"
 	L.MENU_QUICK_FILTER = "Быстрый фильтр"
+
+	-- Favorites & Faction Settings
+	L.SETTINGS_ENABLE_FAVORITE_ICON = "Включить значок избранного"
+	L.SETTINGS_ENABLE_FAVORITE_ICON_DESC = "Показывает значок звезды на кнопке друга для избранных."
+	L.SETTINGS_SHOW_FACTION_BG = "Показать фон фракции"
+	L.SETTINGS_SHOW_FACTION_BG_DESC = "Показывает цвет фракции в качестве фона для кнопки друга."
 end)

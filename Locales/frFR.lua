@@ -1169,4 +1169,10 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Évite chevauchements avec autres fenêtr
 	L.TOOLTIP_EDIT_NOTE = "Modifier la note"
 	L.MENU_SHOW_SEARCH = "Afficher la recherche"
 	L.MENU_QUICK_FILTER = "Filtre rapide"
+
+	-- Favorites & Faction Settings
+	L.SETTINGS_ENABLE_FAVORITE_ICON = "Activer l'Icône Favori"
+	L.SETTINGS_ENABLE_FAVORITE_ICON_DESC = "Affiche une icône étoile sur le bouton ami pour les favoris."
+	L.SETTINGS_SHOW_FACTION_BG = "Afficher Fond de Faction"
+	L.SETTINGS_SHOW_FACTION_BG_DESC = "Affiche la couleur de la faction comme fond pour le bouton ami."
 end)

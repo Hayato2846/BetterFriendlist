@@ -1168,4 +1168,10 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita solapamientos con otras ventanas (P
 	L.TOOLTIP_EDIT_NOTE = "Editar nota"
 	L.MENU_SHOW_SEARCH = "Mostrar búsqueda"
 	L.MENU_QUICK_FILTER = "Filtro rápido"
+
+	-- Favorites & Faction Settings
+	L.SETTINGS_ENABLE_FAVORITE_ICON = "Habilitar Icono Favorito"
+	L.SETTINGS_ENABLE_FAVORITE_ICON_DESC = "Muestra un icono de estrella en el botón del amigo para favoritos."
+	L.SETTINGS_SHOW_FACTION_BG = "Mostrar Fondo de Facción"
+	L.SETTINGS_SHOW_FACTION_BG_DESC = "Muestra el color de la facción como fondo para el botón del amigo."
 end)

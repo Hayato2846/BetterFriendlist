@@ -1186,6 +1186,12 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	L.TOOLTIP_EDIT_NOTE = "Edit Note"
 	L.MENU_SHOW_SEARCH = "Show Search"
 	L.MENU_QUICK_FILTER = "Quick Filter"
+
+	-- Favorites & Faction Settings
+	L.SETTINGS_ENABLE_FAVORITE_ICON = "Enable Favorite Icon"
+	L.SETTINGS_ENABLE_FAVORITE_ICON_DESC = "Display a star icon on the friend button for favorites."
+	L.SETTINGS_SHOW_FACTION_BG = "Show Faction Background"
+	L.SETTINGS_SHOW_FACTION_BG_DESC = "Show faction color as background for friend buttons."
 end
 
 -- Always load enUS immediately to ensure fallback strings exist

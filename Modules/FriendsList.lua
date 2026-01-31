@@ -379,6 +379,13 @@ local function CreateElementFactory(friendsList) -- Capture friendsList referenc
 				button.selectionHighlight = selectionHighlight
 			end
 
+			-- Create favorite icon (Phase 5 Optimization: Static Init)
+			if not button.favoriteIcon then
+				button.favoriteIcon = button:CreateTexture(nil, "OVERLAY")
+				button.favoriteIcon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\star")
+				button.favoriteIcon:Hide()
+			end
+
 			-- Enable drag
 			button:RegisterForDrag("LeftButton")
 			button:SetScript("OnDragStart", Button_OnDragStart)
@@ -1272,7 +1279,12 @@ function FriendsList:UpdateSettingsCache()
 	self.settingsCache.showGameIcon = DB:Get("showGameIcon", true)
 	self.settingsCache.showMobileAsAFK = DB:Get("showMobileAsAFK", false)
 	self.settingsCache.treatMobileAsOffline = DB:Get("treatMobileAsOffline", false)
+	self.settingsCache.enableFavoriteIcon = DB:Get("enableFavoriteIcon", false)
+	self.settingsCache.showFactionBg = DB:Get("showFactionBg", false)
 	self.settingsCache.fontColorFriendInfo = DB:Get("fontColorFriendInfo") or {r=0.5, g=0.5, b=0.5, a=1}
+	
+	-- Cache player faction for background rendering (Optimized Phase 4.1)
+	self.playerFaction = UnitFactionGroup("player")
 end
 
 -- Handle friend list update events
@@ -1928,6 +1940,11 @@ local function SortComparator(a, b)
 	local primaryResult = self:CompareFriends(a, b, primarySort)
 	if primaryResult ~= nil then
 		return primaryResult
+	end
+	
+	-- Primary sort is equal (Same Group): Prioritize Favorites
+	if a.isFavorite ~= b.isFavorite then
+		return a.isFavorite -- true (Favorite) comes before false (Non-Favorite)
 	end
 	
 	-- If primary sort is equal, use secondary sort
@@ -3881,8 +3898,10 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 
 	-- OPTIMIZATION: Font Caching (Phase 9.9)
 	-- Only apply font if settings changed (version check)
+	local fontChanged = false
 	if self.fontCache and button.lastFontVersion ~= self.fontCacheVersion then
 		button.lastFontVersion = self.fontCacheVersion
+		fontChanged = true
 
 		-- Apply Friend Name Font Settings
 		if self.fontCache.namePath then
@@ -3942,13 +3961,39 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 		local bgR, bgG, bgB, bgA
 		if friend.connected then
 			bgR, bgG, bgB, bgA = FRIENDS_BNET_BACKGROUND_COLOR.r, FRIENDS_BNET_BACKGROUND_COLOR.g, FRIENDS_BNET_BACKGROUND_COLOR.b, FRIENDS_BNET_BACKGROUND_COLOR.a
+			
+			-- Phase 4.1: Faction Background
+			if self.settingsCache.showFactionBg then
+				local faction = friend.factionName
+				if not faction and friend.gameAccountInfo then faction = friend.gameAccountInfo.factionName end
+				
+				-- English Faction (Alliance/Horde)
+				local playerFaction = self.playerFaction
+				
+				-- Expanded Logic: Check for English, German, and Player Faction match
+				-- Note: We check for "Alliance" (English) and "Allianz" (German) explicitly as requested
+				if faction == "Alliance" or faction == "Allianz" then
+					bgR, bgG, bgB, bgA = 0.0, 0.44, 0.87, 0.2 -- Alliance Blue
+				elseif faction == "Horde" then
+					bgR, bgG, bgB, bgA = 0.80, 0.16, 0.16, 0.2 -- Horde Red
+				elseif playerFaction and faction == playerFaction then
+					-- Fallback: If localized string matches player faction return
+					if playerFaction == "Alliance" then
+						bgR, bgG, bgB, bgA = 0.0, 0.44, 0.87, 0.2
+					elseif playerFaction == "Horde" then
+						bgR, bgG, bgB, bgA = 0.80, 0.16, 0.16, 0.2
+					end
+				else
+				end
+			end
 		else
 			bgR, bgG, bgB, bgA = FRIENDS_OFFLINE_BACKGROUND_COLOR.r, FRIENDS_OFFLINE_BACKGROUND_COLOR.g, FRIENDS_OFFLINE_BACKGROUND_COLOR.b, FRIENDS_OFFLINE_BACKGROUND_COLOR.a
 		end
 		
-		if button.lastBgR ~= bgR or button.lastBgG ~= bgG or button.lastBgB ~= bgB then
+		-- Explicit check for ANY change including Alpha
+		if button.lastBgR ~= bgR or button.lastBgG ~= bgG or button.lastBgB ~= bgB or button.lastBgA ~= bgA then
 			button.background:SetColorTexture(bgR, bgG, bgB, bgA)
-			button.lastBgR, button.lastBgG, button.lastBgB = bgR, bgG, bgB
+			button.lastBgR, button.lastBgG, button.lastBgB, button.lastBgA = bgR, bgG, bgB, bgA
 		end
 		
 		-- Set status icon (BSAp shows as AFK if setting enabled)
@@ -4057,13 +4102,25 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 		local bgR, bgG, bgB, bgA
 		if friend.connected then
 			bgR, bgG, bgB, bgA = FRIENDS_WOW_BACKGROUND_COLOR.r, FRIENDS_WOW_BACKGROUND_COLOR.g, FRIENDS_WOW_BACKGROUND_COLOR.b, FRIENDS_WOW_BACKGROUND_COLOR.a
+			
+			-- Phase 4.1: Faction Background
+			if self.settingsCache.showFactionBg then
+				-- WoW friends are typically same faction as player
+				local playerFaction = self.playerFaction
+				
+				if playerFaction == "Alliance" then
+					bgR, bgG, bgB, bgA = 0.0, 0.44, 0.87, 0.2 -- Alliance Blue
+				elseif playerFaction == "Horde" then
+					bgR, bgG, bgB, bgA = 0.80, 0.16, 0.16, 0.2 -- Horde Red
+				end
+			end
 		else
 			bgR, bgG, bgB, bgA = FRIENDS_OFFLINE_BACKGROUND_COLOR.r, FRIENDS_OFFLINE_BACKGROUND_COLOR.g, FRIENDS_OFFLINE_BACKGROUND_COLOR.b, FRIENDS_OFFLINE_BACKGROUND_COLOR.a
 		end
 		
-		if button.lastBgR ~= bgR or button.lastBgG ~= bgG or button.lastBgB ~= bgB then
+		if button.lastBgR ~= bgR or button.lastBgG ~= bgG or button.lastBgB ~= bgB or button.lastBgA ~= bgA then
 			button.background:SetColorTexture(bgR, bgG, bgB, bgA)
-			button.lastBgR, button.lastBgG, button.lastBgB = bgR, bgG, bgB
+			button.lastBgR, button.lastBgG, button.lastBgB, button.lastBgA = bgR, bgG, bgB, bgA
 		end
 		
 		-- Set status icon
@@ -4101,9 +4158,73 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 	local line1Text, line2Text = self:GetFormattedButtonText(friend)
 	
 	-- Optimized Phase 4: State Check for Text
+	local textChanged = false
 	if button.lastLine1Text ~= line1Text then
 		button.Name:SetText(line1Text)
 		button.lastLine1Text = line1Text
+		textChanged = true
+	end
+
+	-- Favorites Icon (Feature: Display Favorites)
+	-- PERFY OPTIMIZATION: Dirty Checking for Layout
+	local isFavorite = friend.isFavorite
+	local showFavIcon = isFavorite and self.settingsCache.enableFavoriteIcon
+
+	-- We check if favorite state changed OR if the text changed (which means width changed)
+	-- Also check if font changed, as that affects text width
+	if button.lastIsFavorite ~= showFavIcon or (showFavIcon and (textChanged or fontChanged)) then
+		button.lastIsFavorite = showFavIcon
+
+		if showFavIcon then
+			-- Ensure icon exists (Safety fallback)
+			if not button.favoriteIcon then
+				button.favoriteIcon = button:CreateTexture(nil, "OVERLAY")
+				button.favoriteIcon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\star")
+			end
+
+			-- Position Update Logic (Hoisted for reuse)
+			local function UpdateFavoriteIconPosition()
+				if not button or not button.Name or not button.favoriteIcon then return end
+				
+				-- Expensive layout operations only run when needed
+				local currentHeight = button.Name:GetStringHeight()
+				-- Fallback if GetStringHeight returns 0
+				if not currentHeight or currentHeight == 0 then
+					local _, size = button.Name:GetFont()
+					currentHeight = size or 12
+				end
+				
+				local iconSize = currentHeight * 0.70
+				button.favoriteIcon:SetSize(iconSize, iconSize)
+				
+				-- Re-measure width (crucial for delayed updates)
+				local currentWidth = button.Name:GetStringWidth() or 0
+				
+				button.favoriteIcon:ClearAllPoints()
+				-- Offset relative to text start + text width
+				button.favoriteIcon:SetPoint("LEFT", button.Name, "LEFT", currentWidth + 1, currentHeight * 0.3)
+				button.favoriteIcon:Show()
+			end
+			
+			-- Apply immediately
+			UpdateFavoriteIconPosition()
+			
+			-- CRITICAL FIX: Re-apply on next frame if font changed or on reload.
+			-- After /reload or SetFont, GetStringWidth() often returns 0 or incorrect values.
+			local targetFriend = friend
+			if fontChanged or textChanged or needsRenderOnShow then -- Apply delay if any layout factor changed
+				C_Timer.After(0, function()
+					-- Only update if the button still belongs to the same friend
+					if button and button.friendData == targetFriend then
+						UpdateFavoriteIconPosition()
+					end
+				end)
+			end
+		else
+			if button.favoriteIcon then
+				button.favoriteIcon:Hide()
+			end
+		end
 	end
 	
 	if not isCompactMode then

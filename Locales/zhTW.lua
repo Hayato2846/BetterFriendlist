@@ -1206,4 +1206,10 @@ local L = BFL_LOCALE
 	L.TOOLTIP_EDIT_NOTE = "編輯備註"
 	L.MENU_SHOW_SEARCH = "顯示搜尋"
 	L.MENU_QUICK_FILTER = "快速過濾"
+
+	-- Favorites & Faction Settings
+	L.SETTINGS_ENABLE_FAVORITE_ICON = "啟用最愛圖示"
+	L.SETTINGS_ENABLE_FAVORITE_ICON_DESC = "在好友按鈕上顯示星星圖示以標記最愛。"
+	L.SETTINGS_SHOW_FACTION_BG = "顯示陣營背景"
+	L.SETTINGS_SHOW_FACTION_BG_DESC = "將陣營顏色顯示為好友按鈕的背景。"
 end)

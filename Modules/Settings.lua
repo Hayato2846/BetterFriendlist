@@ -739,6 +739,7 @@ function Settings:DoReset()
 	DB:Set("colorClassNames", true)
 	DB:Set("hideEmptyGroups", false)
 	DB:Set("showFactionIcons", false)
+	DB:Set("showFactionBg", false)
 	DB:Set("showRealmName", false)
 	DB:Set("grayOtherFaction", false)
 	DB:Set("showMobileAsAFK", false)
@@ -2733,7 +2734,7 @@ function Settings:RefreshGeneralTab()
 		}
 	))
 
-	-- Row 2: Show Faction Icons & Show Realm Name
+	-- Row 2: Show Faction Icons & Show Faction Background
 	table.insert(allFrames, Components:CreateDoubleCheckbox(tab,
 		{
 			label = L.SETTINGS_SHOW_FACTION_ICONS,
@@ -2743,11 +2744,15 @@ function Settings:RefreshGeneralTab()
 			tooltipDesc = L.SETTINGS_SHOW_FACTION_ICONS_DESC or "Display Alliance/Horde icons next to character names"
 		},
 		{
-			label = L.SETTINGS_SHOW_REALM_NAME,
-			initialValue = DB:Get("showRealmName", true),
-			callback = function(val) self:OnShowRealmNameChanged(val) end,
-			tooltipTitle = L.SETTINGS_SHOW_REALM_NAME,
-			tooltipDesc = L.SETTINGS_SHOW_REALM_NAME_DESC or "Display the realm name for friends on different servers"
+			label = L.SETTINGS_SHOW_FACTION_BG,
+			initialValue = DB:Get("showFactionBg", false),
+			callback = function(val) 
+				local DB = GetDB()
+				DB:Set("showFactionBg", val) 
+				BFL:ForceRefreshFriendsList()
+			end,
+			tooltipTitle = L.SETTINGS_SHOW_FACTION_BG,
+			tooltipDesc = L.SETTINGS_SHOW_FACTION_BG_DESC or "Show faction color as background for friend buttons."
 		}
 	))
 
@@ -2787,7 +2792,29 @@ function Settings:RefreshGeneralTab()
 		}
 	))
 
-	-- Row 5: Show Blizzard Option
+	-- Row 5: Enable Favorite Icon & Show Realm Name
+	table.insert(allFrames, Components:CreateDoubleCheckbox(tab,
+		{
+			label = L.SETTINGS_ENABLE_FAVORITE_ICON,
+			initialValue = DB:Get("enableFavoriteIcon", true),
+			callback = function(val) 
+				local DB = GetDB()
+				DB:Set("enableFavoriteIcon", val) 
+				BFL:ForceRefreshFriendsList()
+			end,
+			tooltipTitle = L.SETTINGS_ENABLE_FAVORITE_ICON,
+			tooltipDesc = L.SETTINGS_ENABLE_FAVORITE_ICON_DESC or "Display a star icon on the friend button for favorites."
+		},
+		{
+			label = L.SETTINGS_SHOW_REALM_NAME,
+			initialValue = DB:Get("showRealmName", true),
+			callback = function(val) self:OnShowRealmNameChanged(val) end,
+			tooltipTitle = L.SETTINGS_SHOW_REALM_NAME,
+			tooltipDesc = L.SETTINGS_SHOW_REALM_NAME_DESC or "Display the realm name for friends on different servers"
+		}
+	))
+
+	-- Row 6: Show Blizzard Option
 	local blizzardOption = Components:CreateCheckbox(tab,
 		L.SETTINGS_SHOW_BLIZZARD,
 		DB:Get("showBlizzardOption", false),

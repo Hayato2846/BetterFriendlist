@@ -1128,4 +1128,10 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	L.TOOLTIP_EDIT_NOTE = "Notiz bearbeiten"
 	L.MENU_SHOW_SEARCH = "Suche anzeigen"
 	L.MENU_QUICK_FILTER = "Schnellfilter"
+
+	-- Favorites & Faction Settings
+	L.SETTINGS_ENABLE_FAVORITE_ICON = "Favoriten-Icon aktivieren"
+	L.SETTINGS_ENABLE_FAVORITE_ICON_DESC = "Zeigt ein Stern-Symbol auf dem Freundes-Button für Favoriten an."
+	L.SETTINGS_SHOW_FACTION_BG = "Fraktions-Hintergrund anzeigen"
+	L.SETTINGS_SHOW_FACTION_BG_DESC = "Zeigt die Fraktionsfarbe als Hintergrund für Freundes-Buttons an."
 end)

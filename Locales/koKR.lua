@@ -1180,4 +1180,10 @@ local L = BFL_LOCALE
 	L.TOOLTIP_EDIT_NOTE = "메모 편집"
 	L.MENU_SHOW_SEARCH = "검색 표시"
 	L.MENU_QUICK_FILTER = "빠른 필터"
+
+	-- Favorites & Faction Settings
+	L.SETTINGS_ENABLE_FAVORITE_ICON = "즐겨찾기 아이콘 사용"
+	L.SETTINGS_ENABLE_FAVORITE_ICON_DESC = "즐겨찾기 친구 버튼에 별 아이콘을 표시합니다."
+	L.SETTINGS_SHOW_FACTION_BG = "진영 배경 표시"
+	L.SETTINGS_SHOW_FACTION_BG_DESC = "친구 버튼의 배경으로 진영 색상을 표시합니다."
 end)
