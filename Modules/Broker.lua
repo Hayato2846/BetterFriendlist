@@ -319,7 +319,7 @@ local function OpenFriendContextMenu(data)
 		
 	elseif data.type == "wow" then
 		-- For WoW friends, we need to find the friend index
-		local numFriends = C_FriendList.GetNumFriends()
+		local numFriends = C_FriendList.GetNumFriends() or 0
 		local friendIndex = nil
 		
 		for i = 1, numFriends do
@@ -605,7 +605,7 @@ local function CreateAdvancedTooltip(tooltip)
 	end
 
 	-- WoW friends
-	local numWoWFriends = C_FriendList.GetNumFriends()
+	local numWoWFriends = C_FriendList.GetNumFriends() or 0
 	for i = 1, numWoWFriends do
 		local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
 		if friendInfo and friendInfo.connected then
@@ -1350,7 +1350,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 	end
 
 	-- Collect WoW Friends (ALL)
-	local numWoWFriends = C_FriendList.GetNumFriends()
+	local numWoWFriends = C_FriendList.GetNumFriends() or 0
 	for i = 1, numWoWFriends do
 		local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
 		if friendInfo then

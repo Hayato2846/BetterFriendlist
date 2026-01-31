@@ -307,7 +307,7 @@ function Statistics:GetStatistics()
 	-- ========================================
 	-- Analyze WoW Friends
 	-- ========================================
-	local numWoW = C_FriendList.GetNumFriends()
+	local numWoW = C_FriendList.GetNumFriends() or 0
 	stats.wowFriends = numWoW
 	
 	for i = 1, numWoW do

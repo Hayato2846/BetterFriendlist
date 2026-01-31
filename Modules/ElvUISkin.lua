@@ -10,6 +10,22 @@ local ElvUISkin = BFL:RegisterModule("ElvUISkin", {})
 -- Helper to handle scrollbars across Retail and Classic
 local function SkinScrollBar(S, scrollBar)
 	if not scrollBar then return end
+	
+	-- Validation: Ensure scrollBar is an object
+	if not scrollBar.IsObjectType then return end
+
+	local isClassic = BFL and BFL.IsClassic
+	
+	if isClassic then
+		-- Classic Override: Always use HandleScrollBar
+		-- HandleTrimScrollBar does not exist or shouldn't be used in Classic environments
+		if S.HandleScrollBar then
+			S:HandleScrollBar(scrollBar)
+		end
+		return
+	end
+
+	-- Retail: Check for TrimScrollBar first
 	if S.HandleTrimScrollBar then
 		S:HandleTrimScrollBar(scrollBar)
 	elseif S.HandleScrollBar then
@@ -48,11 +64,41 @@ function ElvUISkin:RegisterSkin()
 
 	print("|cff00ffffBFL ElvUI:|r Registering skin...")
 	local E, L, V, P, G = unpack(_G.ElvUI)
-	local S = E:GetModule('Skins')
-	if not S then 
+	local RealS = E:GetModule('Skins')
+	if not RealS then 
 		print("|cff00ffffBFL ElvUI:|r Skins module not found!")
 		return 
 	end
+
+	-- Create Safety Proxy to prevent nil value crashes in ElvUI Skins module
+	local S = setmetatable({}, {
+		__index = function(t, k)
+			local val = RealS[k]
+			if type(val) == "function" then
+				return function(_, arg1, ...)
+					-- Protect Handlers from nil arguments
+					if arg1 == nil and (
+						k == "HandleButton" or 
+						k == "HandleCheckBox" or 
+						k == "HandleEditBox" or 
+						k == "HandleTab" or 
+						k == "HandleScrollBar" or 
+						k == "HandleDropDownBox" or
+						k == "HandlePortraitFrame" 
+					) then
+						-- Silently ignore nil calls to prevent crashes
+						return
+					end
+					return val(RealS, arg1, ...) -- Pass RealS as self
+				end
+			else
+				return val
+			end
+		end,
+		__newindex = function(t, k, v)
+			RealS[k] = v
+		end
+	})
 
 	-- Register callback for skinning
 	-- This ensures our skin runs when ElvUI skins are applied
@@ -291,16 +337,19 @@ function ElvUISkin:SkinFrames(E, S)
 		
 		-- Skin Global Ignore List Button (if active)
 		if frame.IgnoreListWindow.GlobalIgnoreListButton then
-			S:HandleButton(frame.IgnoreListWindow.GlobalIgnoreListButton)
-			
-			-- Preserve the Icon (HandleButton calls StripTextures which hides ARTWORK)
-			if frame.IgnoreListWindow.GlobalIgnoreListButton.Icon then
-				-- Move to OVERLAY to ensure it sits on top of the new backdrop
-				frame.IgnoreListWindow.GlobalIgnoreListButton.Icon:SetDrawLayer("OVERLAY")
+			-- Fix: Check if GlobalIgnoreListButton is actually a button (it might be a frame in some cases)
+			if frame.IgnoreListWindow.GlobalIgnoreListButton:IsObjectType("Button") then
+				S:HandleButton(frame.IgnoreListWindow.GlobalIgnoreListButton)
 				
-				-- Ensure it is visible
-				frame.IgnoreListWindow.GlobalIgnoreListButton.Icon:SetAlpha(1)
-				frame.IgnoreListWindow.GlobalIgnoreListButton.Icon:Show()
+				-- Preserve the Icon (HandleButton calls StripTextures which hides ARTWORK)
+				if frame.IgnoreListWindow.GlobalIgnoreListButton.Icon then
+					-- Move to OVERLAY to ensure it sits on top of the new backdrop
+					frame.IgnoreListWindow.GlobalIgnoreListButton.Icon:SetDrawLayer("OVERLAY")
+					
+					-- Ensure it is visible
+					frame.IgnoreListWindow.GlobalIgnoreListButton.Icon:SetAlpha(1)
+					frame.IgnoreListWindow.GlobalIgnoreListButton.Icon:Show()
+				end
 			end
 		end
 	end
@@ -320,12 +369,21 @@ function ElvUISkin:SkinFrames(E, S)
 		end
 	end
 
+	-- Explicit Check for Classic Manual ScrollBar (Fix Phase 27)
+	if not scrollBar and BFL.IsClassic then
+		local classicSB = _G["BetterFriendsClassicScrollFrameScrollBar"]
+		if classicSB then
+			scrollBar = classicSB
+		end
+	end
+
 	if scrollBar then
 		-- Use specific handler if available
 		if frame.MinimalScrollBar and S.HandleMinimalScrollBar then
-			S:HandleMinimalScrollBar(frame.MinimalScrollBar)
+			pcall(S.HandleMinimalScrollBar, S, frame.MinimalScrollBar)
 		else
-			SkinScrollBar(S, scrollBar)
+			-- Fix: Wrap ScrollBar skinning in pcall to prevent crashes on malformed scrollbars
+			pcall(SkinScrollBar, S, scrollBar)
 		end
 	else
 		-- Classic: Hook InitializeClassicScrollFrame to skin ScrollBar immediately after creation
@@ -376,10 +434,10 @@ function ElvUISkin:SkinFrames(E, S)
 	-- Point 2: MenuButton & SettingsButton
 	if frame.FriendsTabHeader and frame.FriendsTabHeader.BattlenetFrame then
 		if frame.FriendsTabHeader.BattlenetFrame.ContactsMenuButton then
-			S:HandleButton(frame.FriendsTabHeader.BattlenetFrame.ContactsMenuButton)
+			pcall(S.HandleButton, S, frame.FriendsTabHeader.BattlenetFrame.ContactsMenuButton)
 		end
 		if frame.FriendsTabHeader.BattlenetFrame.SettingsButton then
-			S:HandleButton(frame.FriendsTabHeader.BattlenetFrame.SettingsButton)
+			pcall(S.HandleButton, S, frame.FriendsTabHeader.BattlenetFrame.SettingsButton)
 		end
 		
 		-- Classic: Reposition buttons 15px to the right (already anchored to bnet, which moved)
@@ -387,9 +445,9 @@ function ElvUISkin:SkinFrames(E, S)
 	end
 
 	if frame.WhoFrame then
-		if frame.WhoFrame.WhoButton then S:HandleButton(frame.WhoFrame.WhoButton) end
-		if frame.WhoFrame.AddFriendButton then S:HandleButton(frame.WhoFrame.AddFriendButton) end
-		if frame.WhoFrame.GroupInviteButton then S:HandleButton(frame.WhoFrame.GroupInviteButton) end
+		if frame.WhoFrame.WhoButton then pcall(S.HandleButton, S, frame.WhoFrame.WhoButton) end
+		if frame.WhoFrame.AddFriendButton then pcall(S.HandleButton, S, frame.WhoFrame.AddFriendButton) end
+		if frame.WhoFrame.GroupInviteButton then pcall(S.HandleButton, S, frame.WhoFrame.GroupInviteButton) end
 		
 		-- EditBox
 		if frame.WhoFrame.EditBox then 
@@ -792,6 +850,15 @@ function ElvUISkin:HookFriendsList(E, S)
 	local FriendsList = BFL:GetModule("FriendsList")
 	if not FriendsList then return end
 	
+	-- Explicitly skin Classic ScrollBar if it exists now (Backup for initialization order)
+	if BFL.IsClassic then
+		local classicSB = _G["BetterFriendsClassicScrollFrameScrollBar"]
+		if classicSB and not classicSB.isSkinned then
+			SkinScrollBar(S, classicSB)
+			classicSB.isSkinned = true
+		end
+	end
+
 	-- Hook Group Header
 	hooksecurefunc(FriendsList, "UpdateGroupHeaderButton", function(_, button, elementData)
 		if not button.isSkinned then
@@ -837,6 +904,27 @@ function ElvUISkin:HookFriendsList(E, S)
 			button.isSkinned = true
 		end
 	end)
+
+	-- Hook UpdateSearchBoxState to enforce ElvUI positioning in Classic Normal Mode
+	if FriendsList.UpdateSearchBoxState then
+		hooksecurefunc(FriendsList, "UpdateSearchBoxState", function()
+			if BFL.IsClassic then
+				local DB = BFL:GetModule("DB")
+				local simpleMode = DB and DB:Get("simpleMode", false)
+				
+				if not simpleMode then
+					local frame = _G.BetterFriendsFrame
+					if frame and frame.FriendsTabHeader and frame.FriendsTabHeader.SearchBox and frame.FriendsTabHeader.BattlenetFrame then
+						local searchBox = frame.FriendsTabHeader.SearchBox
+						searchBox:ClearAllPoints()
+						searchBox:SetPoint("TOP", frame.FriendsTabHeader.BattlenetFrame, "BOTTOM", 0, -35)
+						searchBox:SetPoint("LEFT", frame.Inset, "LEFT", 10, 0)
+						searchBox:SetPoint("RIGHT", frame.Inset, "RIGHT", -10, 0)
+					end
+				end
+			end
+		end)
+	end
 end
 
 function ElvUISkin:SkinRecruitAFriend(E, S, frame)

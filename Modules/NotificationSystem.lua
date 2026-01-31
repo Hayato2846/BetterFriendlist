@@ -385,7 +385,7 @@ end
 --]]--------------------------------------------------
 
 function SnapshotWoWFriends()
-    local numFriends = C_FriendList.GetNumFriends()
+    local numFriends = C_FriendList.GetNumFriends() or 0
     local playerRealm = GetNormalizedRealmName()
     for i = 1, numFriends do
         local info = C_FriendList.GetFriendInfoByIndex(i)
@@ -397,7 +397,7 @@ function SnapshotWoWFriends()
 end
 
 function ProcessWoWFriendChanges()
-    local numFriends = C_FriendList.GetNumFriends()
+    local numFriends = C_FriendList.GetNumFriends() or 0
     local currentFriends = {}
     local playerRealm = GetNormalizedRealmName()
     
@@ -452,7 +452,7 @@ function NotificationSystem:GetFriendData(friendType, identifier)
         }
     elseif friendType == "WOW" then
         -- WoW friend (by name)
-        for i = 1, C_FriendList.GetNumFriends() do
+        for i = 1, (C_FriendList.GetNumFriends() or 0) do
             local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
             if friendInfo and friendInfo.name == identifier then
                 return {

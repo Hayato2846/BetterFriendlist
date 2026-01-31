@@ -1,6 +1,6 @@
 -- Core.lua
 -- Main initialization file for BetterFriendlist addon
--- Version 2.2.7 - January 2026
+-- Version 2.2.8 - February 2026
 -- Complete replacement for WoW Friends frame with modular architecture
 
 -- Create addon namespace
@@ -362,7 +362,7 @@ function BFL:UpdatePortraitVisibility(reason)
 		if frame.FriendsTabHeader then
 			local header = frame.FriendsTabHeader
 			local elementsToHide = {
-				header.SearchBox,
+				-- header.SearchBox, -- Managed by FriendsList module to prevent conflicts
 				header.QuickFilterDropdown,
 				header.PrimarySortDropdown,
 				header.SecondarySortDropdown
@@ -402,9 +402,8 @@ function BFL:UpdatePortraitVisibility(reason)
 				end
 				
 				if header.SearchBox then
-					header.SearchBox:ClearAllPoints()
-					header.SearchBox:SetPoint("TOPLEFT", header, "TOPLEFT", 18, -90)
-					header.SearchBox:SetPoint("TOPRIGHT", header, "TOPRIGHT", -18, -90)
+					-- Managed by FriendsList:UpdateSearchBoxState (Phase 22)
+					-- Do not override here to avoid race conditions/jumping
 				end
 			end
 		end

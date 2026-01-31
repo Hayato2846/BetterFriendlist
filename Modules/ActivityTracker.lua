@@ -56,7 +56,7 @@ local function GetFriendUIDFromName(name)
 	local baseName = name:match("^([^-]+)") or name
 	
 	-- Check WoW friends first
-	local numWoWFriends = C_FriendList.GetNumFriends()
+	local numWoWFriends = C_FriendList.GetNumFriends() or 0
 	for i = 1, numWoWFriends do
 		local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
 		if friendInfo and friendInfo.name then

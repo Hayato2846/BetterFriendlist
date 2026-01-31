@@ -674,7 +674,7 @@ function NotificationSystem:CountOnlineFriendsInGroup(groupId) local count = 0
     end
     
     -- Get all WoW friends
-    local numWoW = C_FriendList.GetNumFriends()
+    local numWoW = C_FriendList.GetNumFriends() or 0
     for i = 1, numWoW do
         local info = C_FriendList.GetFriendInfoByIndex(i)
         if info and info.connected then
@@ -1131,7 +1131,7 @@ function NotificationSystem:OnFriendListUpdate() -- CRITICAL: Block if Beta Feat
     end
     
     -- Track WoW friend status changes
-    local numFriends = C_FriendList.GetNumFriends()
+    local numFriends = C_FriendList.GetNumFriends() or 0
     for i = 1, numFriends do
         local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
         if friendInfo then

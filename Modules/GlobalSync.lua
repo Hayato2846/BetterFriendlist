@@ -263,7 +263,8 @@ function GlobalSync:PerformSync()
 end
 
 function GlobalSync:ExportFriends(faction, realm)
-    local numFriends = C_FriendList.GetNumFriends()
+    local numFriends = C_FriendList.GetNumFriends() or 0
+
     
     -- Ensure faction table exists
     if not BetterFriendlistDB.GlobalFriends[faction] then
@@ -338,7 +339,7 @@ function GlobalSync:ImportFriends(faction, currentRealm)
     local currentFriendList = {}
     
     -- Cache current friends for quick lookup
-    local numFriends = C_FriendList.GetNumFriends()
+    local numFriends = C_FriendList.GetNumFriends() or 0
     for i = 1, numFriends do
         local info = C_FriendList.GetFriendInfoByIndex(i)
         if info and info.name then
@@ -389,7 +390,7 @@ function GlobalSync:SyncDeletions(faction, currentRealm)
     local friendsToRemove = {}
     
     -- Iterate current friends
-    local numFriends = C_FriendList.GetNumFriends()
+    local numFriends = C_FriendList.GetNumFriends() or 0
     for i = 1, numFriends do
         local info = C_FriendList.GetFriendInfoByIndex(i)
         if info and info.name then

@@ -155,7 +155,7 @@ function Groups:RunSmartMigration()
 	if DB:Get("wowUIDMigrationDone_v2") then return end
 	
 	-- We need friend list data to be loaded
-	local numFriends = C_FriendList.GetNumFriends()
+	local numFriends = C_FriendList.GetNumFriends() or 0
 	if not numFriends or numFriends == 0 then
 		-- Try again later when list updates
 		-- Prevent multiple registrations

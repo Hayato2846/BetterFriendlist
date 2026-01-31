@@ -1249,8 +1249,8 @@
 			<!-- Size set dynamically in OnLoad: TOPLEFT to Inset +4,-4 / BOTTOMRIGHT to Inset -22,2 -->
 			<Frame parentKey="ScrollFrame">
 				<Scripts>
+					<!-- ClipsChildren removed to allow ScrollBar to sit in the gutter -->
 					<OnLoad>
-						self:SetClipsChildren(true)
 					</OnLoad>
 				</Scripts>
 			</Frame>
@@ -1589,7 +1589,7 @@
 					if self.ScrollFrame then
 						self.ScrollFrame:ClearAllPoints()
 						self.ScrollFrame:SetPoint("TOPLEFT", self.Inset, "TOPLEFT", 4, -4)
-						self.ScrollFrame:SetPoint("BOTTOMRIGHT", self.Inset, "BOTTOMRIGHT", -4, 2)  -- -4 not -22! FauxScrollFrame reserves -22 in Lua
+						self.ScrollFrame:SetPoint("BOTTOMRIGHT", self.Inset, "BOTTOMRIGHT", -22, 2)
 					end
 				end
 				

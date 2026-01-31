@@ -60,7 +60,7 @@ local updateTimer = nil
 local function GetFriendInfoByGUID(guid)
 	if not guid then return nil end
 	
-	local numFriends = C_FriendList.GetNumFriends()
+	local numFriends = C_FriendList.GetNumFriends() or 0
 	for i = 1, numFriends do
 		local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
 		if friendInfo and friendInfo.guid == guid then

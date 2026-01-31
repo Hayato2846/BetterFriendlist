@@ -503,10 +503,19 @@ function FriendsList:UpdateSearchBoxState()
 			searchBox:SetParent(frame.FriendsTabHeader)
 			searchBox:ClearAllPoints()
 			
-			-- Restore XML exact layout
-			-- <Anchor point="TOPLEFT" relativeKey="$parent.$parent.Inset" x="10" y="60"/>
-			searchBox:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 10, 60)
-			searchBox:SetWidth(220) -- Restore fixed width
+			if BFL.IsClassic then
+				-- Classic Normal Mode: Restore XML Defaults
+				-- XML: <Anchor point="TOPLEFT" relativeKey="$parent.$parent.Inset" x="10" y="50"/>
+				searchBox:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 10, 50)
+				searchBox:SetPoint("TOPRIGHT", frame.Inset, "TOPRIGHT", -10, 50) 
+				searchBox:SetWidth(0) -- Let anchors decide width
+			else
+				-- Restore XML exact layout (Retail)
+				-- <Anchor point="TOPLEFT" relativeKey="$parent.$parent.Inset" x="10" y="60"/>
+				searchBox:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 10, 60)
+				searchBox:SetWidth(220) -- Restore fixed width
+			end
+
 			searchBox:SetHeight(28)
 			
 			-- CRITICAL FIX: Ensure SearchBox is visible in Normal Mode
@@ -634,9 +643,25 @@ function FriendsList:InitializeClassicScrollFrame(scrollFrame) -- Store referenc
 		-- Create the scroll frame
 		local fauxScroll = CreateFrame("ScrollFrame", "BetterFriendsClassicScrollFrame", scrollFrame, "FauxScrollFrameTemplate")
 		fauxScroll:SetPoint("TOPLEFT", scrollFrame, "TOPLEFT", 0, 0)
-		fauxScroll:SetPoint("BOTTOMRIGHT", scrollFrame, "BOTTOMRIGHT", -22, 0)
+		-- Fix Phase 27: Remove double padding (ScrollFrame is already -22, so we don't need another -22 here)
+		fauxScroll:SetPoint("BOTTOMRIGHT", scrollFrame, "BOTTOMRIGHT", 0, 0)
 		scrollFrame.FauxScrollFrame = fauxScroll
 		
+		-- Z-Order Fix: Ensure ScrollBar (child of fauxScroll) is above content
+		fauxScroll:SetFrameLevel(scrollFrame:GetFrameLevel() + 10)
+
+		-- Fix ScrollBar Anchor: Re-anchor to be outside the list (in the reserved 22px space)
+		-- Note: We removed SetClipsChildren(true) from the XML to allow this
+		local scrollBar = _G[fauxScroll:GetName() .. "ScrollBar"] or _G["BetterFriendsClassicScrollFrameScrollBar"]
+		if scrollBar then
+			scrollBar:ClearAllPoints()
+			scrollBar:SetPoint("TOPLEFT", fauxScroll, "TOPRIGHT", 0, -16)
+			scrollBar:SetPoint("BOTTOMLEFT", fauxScroll, "BOTTOMRIGHT", 0, 16)
+		end
+		
+		-- Explicitly disable clipping on the container to ensure ScrollBar (outside) is visible
+		scrollFrame:SetClipsChildren(false)
+
 		-- Set OnVerticalScroll handler
 		fauxScroll:SetScript("OnVerticalScroll", function(self, offset) FauxScrollFrame_OnVerticalScroll(self, offset, CLASSIC_BUTTON_HEIGHT, function() BFL.FriendsList:RenderClassicButtons()
 			end)
@@ -649,6 +674,13 @@ function FriendsList:InitializeClassicScrollFrame(scrollFrame) -- Store referenc
 		content:SetPoint("TOPLEFT", scrollFrame.FauxScrollFrame, "TOPLEFT", 0, 0)
 		content:SetPoint("BOTTOMRIGHT", scrollFrame.FauxScrollFrame, "BOTTOMRIGHT", 0, 0)
 		scrollFrame.ContentFrame = content
+		
+		-- Ensure content frame clips its children (buttons) so they don't overflow the viewport
+		-- This prevents the "too long" list overlapping bottom buttons
+		content:SetClipsChildren(true)
+		
+		-- Z-Order Fix: Ensure content is below ScrollBar
+		content:SetFrameLevel(scrollFrame:GetFrameLevel() + 1)
 	end
 	
 	-- Calculate how many buttons we need
@@ -734,8 +766,10 @@ function FriendsList:RenderClassicButtons() if not self.classicScrollFrame or no
 		totalHeight = totalHeight + GetItemHeight(elementData, isCompactMode)
 	end
 	
-	-- Set ContentFrame height to actual content size (enables proper scrolling)
-	self.classicScrollFrame.ContentFrame:SetHeight(math.max(totalHeight, self.classicScrollFrame:GetHeight() or 400))
+	-- FIX: Do NOT set ContentFrame height to totalHeight for FauxScrollFrame.
+	-- This causes the frame to expand downwards and overlap other UI elements.
+	-- ContentFrame should remain anchored to the viewport (set in InitializeClassicScrollFrame).
+	-- self.classicScrollFrame.ContentFrame:SetHeight(math.max(totalHeight, self.classicScrollFrame:GetHeight() or 400))
 	
 	-- Calculate number of VISIBLE buttons (not pool size!)
 	local scrollHeight = isCompactMode and CLASSIC_COMPACT_BUTTON_HEIGHT or CLASSIC_BUTTON_HEIGHT
@@ -797,9 +831,10 @@ function FriendsList:RenderClassicButtons() if not self.classicScrollFrame or no
 			
 			if button and elementData then
 				-- Position button (set BOTH TOPLEFT and RIGHT for full width)
+				-- Right point set to -2 (small padding) because ScrollFrame is already -22 from edge
 				button:ClearAllPoints()
 				button:SetPoint("TOPLEFT", self.classicScrollFrame.ContentFrame, "TOPLEFT", 2, -yOffset)  -- 2px left padding
-				button:SetPoint("RIGHT", self.classicScrollFrame.ContentFrame, "RIGHT", 5, 0)  -- 12px - 2px right padding = 10px
+				button:SetPoint("RIGHT", self.classicScrollFrame.ContentFrame, "RIGHT", -2, 0)
 				
 				-- Get height for this item type
 				local itemHeight = GetItemHeight(elementData, isCompactMode)
@@ -1701,7 +1736,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 	end
 	
 	-- Get WoW friends
-	local numWoWFriends = C_FriendList.GetNumFriends()
+	local numWoWFriends = C_FriendList.GetNumFriends() or 0
 	-- Optimization: Cache player realm to avoid repeated API calls in loop
 	local playerRealm = GetNormalizedRealmName()
 	
@@ -4385,6 +4420,13 @@ end
 
 -- Update SearchBox width dynamically based on available space
 function FriendsList:UpdateSearchBoxWidth() local frame = BetterFriendsFrame
+	-- Fix: Simple Mode and Classic checks
+	local DB = GetDB()
+	local simpleMode = DB and DB:Get("simpleMode", false)
+	
+	if simpleMode then return end
+	if BFL.IsClassic then return end
+
 	if not frame then
 		-- BFL:DebugPrint("|cffff0000UpdateSearchBoxWidth: No frame|r")
 		return

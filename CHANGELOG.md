@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.2.8] - 2026-02-01
+### Fixed
+- **Classic Crash Fix** - Fixed a critical Lua error (`'for' limit must be a number`) that could occur on login or reload in Classic versions when the friend list API returned `nil` instead of 0.
+- **API Hardening** - Preemptively strengthened 20+ other API calls across the addon to prevent similar crashes in future Classic updates or under rare conditions.
+
 ## [2.2.7] - 2026-01-30
 ### Added
 - **Simple Mode Menus** - Integrated "Quick Filters", "Sort", and "Show Search" toggle into the Contacts Menu when Simple Mode is enabled.

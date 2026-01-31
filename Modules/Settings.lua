@@ -1286,7 +1286,7 @@ function Settings:MigrateFriendGroups(cleanupNotes, force)
 		end
 	end
 	
-	local numWoWFriends = C_FriendList.GetNumFriends()
+	local numWoWFriends = C_FriendList.GetNumFriends() or 0
 	-- BFL:DebugPrint("|cff00ffffBetterFriendlist:|r Scanning", numWoWFriends, "WoW friends...")
 	
 	for i = 1, numWoWFriends do
@@ -1578,7 +1578,7 @@ function Settings:DebugDatabase()
 	
 	-- WoW friends
 	-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r")
-	local numWoWFriends = C_FriendList.GetNumFriends()
+	local numWoWFriends = C_FriendList.GetNumFriends() or 0
 	local numWoWOnline = C_FriendList.GetNumOnlineFriends()
 	-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r WoW Friends:", numWoWFriends, string.format("(%d online)", numWoWOnline))
 	if numWoWFriends > 0 then
@@ -5041,7 +5041,7 @@ function Settings:RefreshGlobalSyncTab()
 								if BetterFriendlistDB.enableGlobalSyncDeletion then
 									local removed = false
 									-- Check if friend exists in current list
-									for i = 1, C_FriendList.GetNumFriends() do
+									for i = 1, (C_FriendList.GetNumFriends() or 0) do
 										local info = C_FriendList.GetFriendInfoByIndex(i)
 										if info then
 											-- Robust matching: Check GUID first, then Name-Realm, then Name
@@ -5099,7 +5099,7 @@ function Settings:RefreshGlobalSyncTab()
 									BetterFriendlistDB.GlobalFriends[faction][friendUID].notes = text
 									
 									-- Update In-Game Friend Note if friend exists locally
-									for i = 1, C_FriendList.GetNumFriends() do
+									for i = 1, (C_FriendList.GetNumFriends() or 0) do
 										local info = C_FriendList.GetFriendInfoByIndex(i)
 										if info then
 											-- Robust matching
