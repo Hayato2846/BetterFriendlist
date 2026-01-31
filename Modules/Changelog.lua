@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.2.7] - 2026-01-31
+### Fixed
+- **Library** - Fixed potential issues with LibQTip library integration.
+
 ## [2.2.6] - 2026-01-31
 ### Added
 - **Simple Mode** - Added Simple Mode in Settings -> General. Simple Mode hides specific elements (Search, Filter, Sort, BFL Avatar) and moves corresponding functions in the menu button
