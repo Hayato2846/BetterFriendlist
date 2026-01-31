@@ -288,6 +288,21 @@ function ElvUISkin:SkinFrames(E, S)
 		if frame.IgnoreListWindow.UnignorePlayerButton then
 			S:HandleButton(frame.IgnoreListWindow.UnignorePlayerButton)
 		end
+		
+		-- Skin Global Ignore List Button (if active)
+		if frame.IgnoreListWindow.GlobalIgnoreListButton then
+			S:HandleButton(frame.IgnoreListWindow.GlobalIgnoreListButton)
+			
+			-- Preserve the Icon (HandleButton calls StripTextures which hides ARTWORK)
+			if frame.IgnoreListWindow.GlobalIgnoreListButton.Icon then
+				-- Move to OVERLAY to ensure it sits on top of the new backdrop
+				frame.IgnoreListWindow.GlobalIgnoreListButton.Icon:SetDrawLayer("OVERLAY")
+				
+				-- Ensure it is visible
+				frame.IgnoreListWindow.GlobalIgnoreListButton.Icon:SetAlpha(1)
+				frame.IgnoreListWindow.GlobalIgnoreListButton.Icon:Show()
+			end
+		end
 	end
 
 	-- Skin ScrollBars
