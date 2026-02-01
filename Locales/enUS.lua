@@ -1049,6 +1049,27 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	L.SETTINGS_ENABLE_FAVORITE_ICON_DESC = "Display a star icon on the friend button for favorites."
 	L.SETTINGS_SHOW_FACTION_BG = "Show Faction Background"
 	L.SETTINGS_SHOW_FACTION_BG_DESC = "Show faction color as background for friend buttons."
+
+	-- ========================================
+	-- STREAMER MODE (Phase 24)
+	-- ========================================
+	L.STREAMER_MODE_TITLE = "Streamer Mode"
+	L.STREAMER_MODE_DESC = "Options to protect privacy while streaming or recording."
+	L.SETTINGS_ENABLE_STREAMER_MODE = "Show Streamer Mode Button"
+	L.STREAMER_MODE_ENABLE_DESC = "Shows a button in the main window to toggle Streamer Mode."
+	L.STREAMER_MODE_HIDDEN_NAME = "Hidden Name Format"
+	L.STREAMER_MODE_HEADER_TEXT = "Custom Header Text"
+	L.STREAMER_MODE_HEADER_TEXT_DESC = "Text to display in the Battle.net header when Streamer Mode is active (e.g., 'Stream Mode')."
+	L.STREAMER_MODE_BUTTON_TOOLTIP = "Toggle Streamer Mode"
+	L.STREAMER_MODE_BUTTON_DESC = "Click to toggle privacy mode on/off."
+	L.SETTINGS_PRIVACY_OPTIONS = "Privacy Options"
+	L.SETTINGS_STREAMER_NAME_FORMAT = "Name Formatting"
+	L.SETTINGS_STREAMER_NAME_FORMAT_DESC = "Choose how names are displayed in Streamer Mode."
+	L.SETTINGS_STREAMER_NAME_FORMAT_BATTLENET = "Force BattleTag"
+	L.SETTINGS_STREAMER_NAME_FORMAT_NICKNAME = "Force Nickname"
+	L.SETTINGS_STREAMER_NAME_FORMAT_NOTE = "Force Note"
+	L.SETTINGS_STREAMER_USE_PURPLE_HEADER = "Use Purple Header Color"
+	L.SETTINGS_STREAMER_USE_PURPLE_HEADER_DESC = "Changes the background color of the Battle.net header frame to Twitch purple when Streamer Mode is active."
 end
 
 -- Always load enUS immediately to ensure fallback strings exist

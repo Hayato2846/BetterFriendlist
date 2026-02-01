@@ -974,6 +974,33 @@ end
 -- Get display name based on format setting
 -- @param forSorting (boolean) If true, use BattleTag instead of AccountName for BNet friends (prevents sorting issues with protected strings)
 function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Name Caching (Persistent)
+	-- [STREAMER MODE START]
+	if BFL.StreamerMode and BFL.StreamerMode:IsActive() then
+		local DB = GetDB()
+		local mode = DB and DB:Get("streamerModeNameFormat", "battletag") or "battletag"
+		
+		-- Default Safe Name (ShortTag or CharName)
+		local safeName = friend.name
+		if friend.battleTag then
+			safeName = friend.battleTag:match("([^#]+)") or friend.battleTag
+		end
+		
+		local result = safeName
+		
+		if mode == "nickname" then
+			local uid = friend.uid or GetFriendUID(friend)
+			local nickname = DB and DB:GetNickname(uid) or ""
+			if nickname ~= "" then result = nickname end
+		elseif mode == "note" then
+			local note = (friend.note or friend.notes or "")
+			if note ~= "" then result = note end
+		end
+
+		if forSorting then return result end
+		return result
+	end
+	-- [STREAMER MODE END]
+
 	if not self.displayNameCache then self.displayNameCache = {} end
 
 	local DB = GetDB()
@@ -3448,6 +3475,12 @@ end
 -- This moves expensive string concatenation out of the render loop
 function FriendsList:GetFormattedButtonText(friend)
 	local DB = GetDB()
+
+	-- [STREAMER MODE LOGIC INTEGRATED]
+	-- We removed the early return here to allow formatted names (e.g. Nicknames)
+	-- AND show friend info (Character Name, Zone, etc.) which is desired by the user.
+	-- GetDisplayName (called below) handles the primary name masking.
+
 	local isCompactMode = self.settingsCache and self.settingsCache.compactMode or DB:Get("compactMode", false)
 	local currentSettingsVersion = BFL.SettingsVersion or 1
 	

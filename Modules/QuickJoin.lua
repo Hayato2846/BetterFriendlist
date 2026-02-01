@@ -98,6 +98,24 @@ function BetterFriendlist_GetRelationshipInfo(guid, missingNameFallback, clubId)
 	-- 2. Check BattleNet friend (like Blizzard)
 	local accountInfo = C_BattleNet.GetAccountInfoByGUID(guid)
 	if accountInfo then
+		-- [STREAMER MODE CHECK]
+		if BFL.StreamerMode and BFL.StreamerMode:IsActive() then
+			local FL = BFL:GetModule("FriendsList")
+			if FL then
+				local friendObj = {
+					type = "bnet",
+					name = accountInfo.accountName,
+					accountName = accountInfo.accountName,
+					battleTag = accountInfo.battleTag,
+					note = accountInfo.note,
+					uid = guid
+				}
+				local safeName = FL:GetDisplayName(friendObj)
+				-- Return masked name, default color, type, and NO LINK (to prevent leaking real ID in link)
+				return safeName, FRIENDS_BNET_NAME_COLOR_CODE, "bnfriend", nil
+			end
+		end
+
 		local accountName = accountInfo.accountName
 		local playerLink = GetBNPlayerLink(accountName, accountName, accountInfo.bnetAccountID, 0, 0, 0)
 		return accountName, FRIENDS_BNET_NAME_COLOR_CODE, "bnfriend", playerLink
@@ -106,6 +124,24 @@ function BetterFriendlist_GetRelationshipInfo(guid, missingNameFallback, clubId)
 	-- 3. CRITICAL FIX: GetPlayerInfoByGUID fallback (like Blizzard's SocialQueueUtil_GetRelationshipInfo)
 	-- This fixes "Unknown" name display for players without direct relationship
 	local name, normalizedRealmName = select(6, GetPlayerInfoByGUID(guid))
+	
+	-- [STREAMER MODE CHECK FOR WOW FRIENDS]
+	if BFL.StreamerMode and BFL.StreamerMode:IsActive() and C_FriendList.IsFriend(guid) then
+		local FL = BFL:GetModule("FriendsList")
+		local friendInfo = GetFriendInfoByGUID(guid) -- Use local helper (reliable)
+		
+		if FL and friendInfo then
+			local friendObj = {
+				type = "wow",
+				name = friendInfo.name,
+				note = friendInfo.notes,
+				uid = guid
+			}
+			local safeName = FL:GetDisplayName(friendObj)
+			return safeName, FRIENDS_WOW_NAME_COLOR_CODE, "wowfriend", nil
+		end
+	end
+
 	name = name or missingNameFallback
 	
 	local hasName = name ~= nil

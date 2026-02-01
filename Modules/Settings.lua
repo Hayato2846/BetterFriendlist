@@ -346,9 +346,12 @@ local TAB_DEFINITIONS = {
 	{id = 3, name = L.SETTINGS_TAB_GROUPS, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\users.blp", beta = false},
 	{id = 4, name = L.SETTINGS_TAB_ADVANCED, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\sliders.blp", beta = false},
 	
-	-- Beta Tabs (only visible when enableBetaFeatures = true)
+	-- Data Broker & Global Sync (Stable)
 	{id = 5, name = L.SETTINGS_TAB_DATABROKER, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\activity.blp", beta = false},
 	{id = 6, name = L.SETTINGS_TAB_GLOBAL_SYNC, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\globe.blp", beta = false},
+	
+	-- Special Tabs (Force to new line)
+	{id = 7, name = L.STREAMER_MODE_TITLE, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\twitch.blp", beta = false},
 	-- Future beta tabs go here...
 }
 
@@ -424,6 +427,9 @@ function Settings:RefreshTabs()
 			end
 			
 			tab:SetText(text)
+
+			-- Increase padding to 20 (standard is heavier padding) to prevent tight text
+			PanelTemplates_TabResize(tab, 20)
 			tab:Show()
 		end
 	end
@@ -455,11 +461,44 @@ function Settings:RefreshTabs()
 	PanelTemplates_SetNumTabs(settingsFrame, maxTabId)
 	PanelTemplates_UpdateTabs(settingsFrame)
 	
-	-- Single row layout: Restore default MainInset position (tabs at y=-27)
+	-- Force 2nd row layout (Global Sync + Streamer Mode)
+	local tab1 = _G["BetterFriendlistSettingsFrameTab1"]
+	local tab6 = _G["BetterFriendlistSettingsFrameTab6"]
+	local tab7 = _G["BetterFriendlistSettingsFrameTab7"]
+	local isTwoRows = false
+	
+	-- Position Tab 6 (Global Sync) at start of 2nd row
+	if tab6 and tab6:IsShown() and tab1 then
+		tab6:ClearAllPoints()
+		-- Reduce vertical gap: Use positive Y offset (8) to tuck row 2 tighter to row 1 (moved up 3px)
+		tab6:SetPoint("TOPLEFT", tab1, "BOTTOMLEFT", 0, 8) 
+		isTwoRows = true
+	end
+
+	-- Position Tab 7 (Streamer Mode)
+	if tab7 and tab7:IsShown() then
+		tab7:ClearAllPoints()
+		if tab6 and tab6:IsShown() then
+			-- Attach to right of Tab 6 with positive offset (5) as requested
+			tab7:SetPoint("LEFT", tab6, "RIGHT", 5, 0)
+			isTwoRows = true
+		elseif tab1 then
+			-- Fallback: Start 2nd row if Tab 6 is hidden
+			tab7:SetPoint("TOPLEFT", tab1, "BOTTOMLEFT", 0, 8)
+			isTwoRows = true
+		end
+	end
+	
 	if settingsFrame.MainInset then
 		settingsFrame.MainInset:ClearAllPoints()
-		settingsFrame.MainInset:SetPoint("TOPLEFT", settingsFrame, "TOPLEFT", 4, -45)
-		settingsFrame.MainInset:SetPoint("BOTTOMRIGHT", settingsFrame, "BOTTOMRIGHT", 0, 2)
+		if isTwoRows then
+			-- 2 Rows: Tighter top inset (-72 instead of -80)
+			settingsFrame.MainInset:SetPoint("TOPLEFT", settingsFrame, "TOPLEFT", 4, -72)
+		else
+			-- 1 Row: Standard top inset
+			settingsFrame.MainInset:SetPoint("TOPLEFT", settingsFrame, "TOPLEFT", 4, -45)
+		end
+		settingsFrame.MainInset:SetPoint("BOTTOMRIGHT", settingsFrame, "BOTTOMRIGHT", -4, 4)
 	end
 end
 
@@ -505,6 +544,7 @@ function Settings:ShowTab(tabID)
 		if content.FontsTab then content.FontsTab:Hide() end
 		if content.GroupsTab then content.GroupsTab:Hide() end
 		if content.AdvancedTab then content.AdvancedTab:Hide() end
+		if content.StreamerTab then content.StreamerTab:Hide() end
 		if content.BrokerTab then content.BrokerTab:Hide() end
 		if content.GlobalSyncTab then content.GlobalSyncTab:Hide() end
 		
@@ -526,6 +566,9 @@ function Settings:ShowTab(tabID)
 		elseif tabID == 6 and content.GlobalSyncTab then
 			content.GlobalSyncTab:Show()
 			self:RefreshGlobalSyncTab()
+		elseif tabID == 7 and content.StreamerTab then
+			content.StreamerTab:Show()
+			self:RefreshStreamerTab()
 		end
 		
 		-- Adjust content height dynamically after tab is shown
@@ -553,6 +596,8 @@ function Settings:AdjustContentHeight(tabID)
 		activeTab = content.BrokerTab
 	elseif tabID == 6 then
 		activeTab = content.GlobalSyncTab
+	elseif tabID == 7 then
+		activeTab = content.StreamerTab
 	end
 	
 	if not activeTab then return end
@@ -4745,7 +4790,111 @@ function Settings:RefreshGlobalSyncTab()
 	tab.components = allFrames
 end
 
+
+
+-- Refresh Streamer Mode Tab
+function Settings:RefreshStreamerTab()
+	if not settingsFrame or not Components then return end
+
+	local content = settingsFrame.ContentScrollFrame.Content
+	if not content or not content.StreamerTab then return end
+
+	local tab = content.StreamerTab
+	local DB = GetDB()
+
+	-- Clear existing content
+	if tab.components then
+		for _, component in ipairs(tab.components) do
+			if component.Hide then component:Hide() end
+		end
+	end
+	tab.components = {}
+
+	local allFrames = {}
+
+	-- Title
+	local title = Components:CreateHeader(tab, L.STREAMER_MODE_TITLE or "Streamer Mode")
+	table.insert(allFrames, title)
+
+	-- Enable Streamer Mode Toggle
+	local enableToggle = Components:CreateCheckbox(
+		tab,
+		L.SETTINGS_ENABLE_STREAMER_MODE or "Show Streamer Mode Button",
+		DB:Get("showStreamerModeButton", true),
+		function(checked)
+			DB:Set("showStreamerModeButton", checked)
+			local StreamerMode = BFL:GetModule("StreamerMode")
+			if StreamerMode then
+				StreamerMode:UpdateState()
+			end
+		end
+	)
+	enableToggle:SetTooltip(L.STREAMER_MODE_TITLE, L.STREAMER_MODE_ENABLE_DESC)
+	table.insert(allFrames, enableToggle)
+
+	-- Header: Privacy Options
+	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_PRIVACY_OPTIONS or "Privacy Options"))
+
+	-- 1. Custom Header Text Input
+	local headerBox = Components:CreateInput(
+		tab,
+		L.STREAMER_MODE_HEADER_TEXT or "Custom Header Text",
+		DB:Get("streamerModeHeaderText", "Streamer Mode"),
+		function(val)
+			DB:Set("streamerModeHeaderText", val)
+			-- Update live if active
+			local StreamerMode = BFL:GetModule("StreamerMode")
+			if StreamerMode then
+				StreamerMode:UpdateState()
+			end
+		end
+	)
+	table.insert(allFrames, headerBox)
+	
+	-- 3. Name Formatting Dropdown
+	local formatOptions = {
+		labels = {
+			L.SETTINGS_STREAMER_NAME_FORMAT_BATTLENET or "Force BattleTag",
+			L.SETTINGS_STREAMER_NAME_FORMAT_NICKNAME or "Force Nickname",
+			L.SETTINGS_STREAMER_NAME_FORMAT_NOTE or "Force Note"
+		},
+		values = {"battletag", "nickname", "note"}
+	}
+
+	local formatDropdown = Components:CreateDropdown(
+		tab,
+		L.SETTINGS_STREAMER_NAME_FORMAT or "Name Formatting",
+		formatOptions,
+		function(val) return val == DB:Get("streamerModeNameFormat", "battletag") end,
+		function(val)
+			DB:Set("streamerModeNameFormat", val)
+			-- Refresh Friends List to update names if active
+			local StreamerMode = BFL:GetModule("StreamerMode")
+			if StreamerMode and StreamerMode:IsActive() then
+				if BFL.ForceRefreshFriendsList then
+					BFL:ForceRefreshFriendsList()
+				end
+			end
+		end
+	)
+	-- Shift dropdown to prevent clipping (matching other dropdowns in Settings.lua)
+	if formatDropdown.DropDown then
+		local point, relativeTo, relativePoint, xOfs, yOfs = formatDropdown.DropDown:GetPoint(1)
+		if point then
+			formatDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
+		end
+	end
+	-- Add tooltip
+	if formatDropdown.SetTooltip then
+		formatDropdown:SetTooltip(L.SETTINGS_STREAMER_NAME_FORMAT, L.SETTINGS_STREAMER_NAME_FORMAT_DESC)
+	end
+	table.insert(allFrames, formatDropdown)
+
+	-- Anchor all frames vertically
+	Components:AnchorChain(allFrames, -5)
+
+	-- Store components for cleanup
+	tab.components = allFrames
+end
+
 return Settings
-
-
-

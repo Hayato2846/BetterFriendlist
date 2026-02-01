@@ -62,6 +62,7 @@ Data\ConnectedRealms.lua
 UI\FrameInitializer.lua
 
 # Modules
+Modules\StreamerMode.lua
 Modules\HouseListProxy.lua [AllowLoadGameType mainline]
 Modules\Database.lua
 Modules\Changelog.lua

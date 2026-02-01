@@ -9,10 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [DRAFT]
 ### Added
+- **Streamer Mode Visibility** - Character names and game info (Rich Presence) are now visible in Streamer Mode, while the primary name remains masked (Nickname/Note).
+- **Consistent Masking** - Name formatting (Nickname/Note) is now correctly applied to Friend Tooltips and Quick Join groups in Streamer Mode.
 - **Favorite Icons** - Added an option to toggle the star icon for favorites directly on the friend button (Settings -> General).
 - **Faction Backgrounds** - Added an option to show faction-colored backgrounds (Blue/Red) for friends in the list (Settings -> General).
+- **Streamer Mode** - Added customizable name masking (BattleTag, Nickname, Note) and optional purple header background (Settings -> Streamer Mode).
 
 ### Fixed
+- **Context Menu Privacy** - Right-click menu headers now respect Streamer Mode masking, displaying the safe name (Nickname/Note) instead of the Real Name.
 - **ElvUI Skin** - Fixed a Lua error ("index field 'BFLCheckmark'") that could occur when other addons (like ToyBoxEnhanced) create menus that BetterFriendlist tries to skin.
 
 ## [2.2.7] - 2026-01-31

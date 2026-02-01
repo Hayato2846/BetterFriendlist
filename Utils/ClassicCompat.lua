@@ -108,6 +108,63 @@ end
 -- Classic: UnitPopup_ShowMenu(dropdown, which, unit, name, userData)
 
 function Compat.OpenUnitPopupMenu(menuType, contextData)
+    -- Streamer Mode Interception for Context Menu Header (Added 2026-02-01)
+    if BFL.StreamerMode and BFL.StreamerMode:IsActive() and contextData then
+        local FriendsList = BFL:GetModule("FriendsList")
+        if FriendsList and FriendsList.friendsList then
+            local friend = nil
+            
+            -- 1. Try BNet ID (Most reliable for BNet)
+            if contextData.bnetIDAccount then
+                for _, f in ipairs(FriendsList.friendsList) do
+                    if f.type == "bnet" and f.bnetAccountID == contextData.bnetIDAccount then
+                        friend = f
+                        break
+                    end
+                end
+            end
+            
+            -- 2. Try Friend Index (Most reliable for WoW)
+            -- contextData.friendsList is the index for WoW friends in UnitPopup (confusing name by Blizz)
+            if not friend and contextData.friendsList and type(contextData.friendsList) == "number" then
+                 for _, f in ipairs(FriendsList.friendsList) do
+                    if f.type == "wow" and f.index == contextData.friendsList then
+                        friend = f
+                        break
+                    end
+                end
+            end
+
+            -- 3. Try GUID (WoW fallback)
+            if not friend and contextData.guid then
+                for _, f in ipairs(FriendsList.friendsList) do
+                    if f.type == "wow" and f.guid == contextData.guid then
+                        friend = f
+                        break
+                    end
+                end
+            end
+            
+            -- 4. Try Name (Last resort fallback)
+            if not friend and contextData.name then
+                for _, f in ipairs(FriendsList.friendsList) do
+                    if f.type == "wow" and (f.name == contextData.name or f.characterName == contextData.name) then
+                         friend = f
+                         break
+                    end
+                end
+            end
+
+            if friend then
+                -- Get the safe masked name (Nickname or Note or BattleTag)
+                local safeName = FriendsList:GetDisplayName(friend)
+                if safeName and safeName ~= "" then
+                    contextData.name = safeName
+                end
+            end
+        end
+    end
+
     if UnitPopup_OpenMenu then
         -- Retail: Modern API
         UnitPopup_OpenMenu(menuType, contextData)

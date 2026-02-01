@@ -1257,12 +1257,11 @@ function Components:CreateInput(parent, labelText, initialValue, callback)
 	
 	-- Dynamic Resizing Handler
 	holder:SetScript("OnSizeChanged", function(self, width, height)
-		local maxWidth = 300
-		local minWidth = 160
-		local inputWidth = math.max(minWidth, math.min(maxWidth, width * 0.5))
+		-- Use fixed width for alignment consistency
+		local inputWidth = FIXED_CONTROL_WIDTH
 		
 		inputBox:ClearAllPoints()
-		inputBox:SetPoint("RIGHT", self, "RIGHT", -5, 0)
+		inputBox:SetPoint("RIGHT", self, "RIGHT", 0, 0)
 		inputBox:SetWidth(inputWidth)
 		
 		label:ClearAllPoints()

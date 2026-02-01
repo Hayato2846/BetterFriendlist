@@ -276,16 +276,23 @@ function BetterFriendsList_Button_OnEnter(self)
 			local noCharacterName = true
 			local nameText, nameColor
 			
-			-- Classic Era: FriendsFrame_GetBNetAccountNameAndStatus doesn't exist
-			if BFL.IsClassic or not FriendsFrame_GetBNetAccountNameAndStatus then
-				-- Fallback: Use accountName and default color
-				nameText = accountInfo.accountName or accountInfo.battleTag or "Unknown"
+			-- [STREAMER MODE CHECK]
+			if BFL.StreamerMode and BFL.StreamerMode:IsActive() and friendData then
+				-- Force Streamer Mode compatible name
+				nameText = BFL:GetModule("FriendsList"):GetDisplayName(friendData)
 				nameColor = FRIENDS_BNET_NAME_COLOR
 			else
-				-- Retail: Use Blizzard's function
-				nameText, nameColor = FriendsFrame_GetBNetAccountNameAndStatus(accountInfo, noCharacterName)
+				-- Classic Era: FriendsFrame_GetBNetAccountNameAndStatus doesn't exist
+				if BFL.IsClassic or not FriendsFrame_GetBNetAccountNameAndStatus then
+					-- Fallback: Use accountName and default color
+					nameText = accountInfo.accountName or accountInfo.battleTag or "Unknown"
+					nameColor = FRIENDS_BNET_NAME_COLOR
+				else
+					-- Retail: Use Blizzard's function
+					nameText, nameColor = FriendsFrame_GetBNetAccountNameAndStatus(accountInfo, noCharacterName)
+				end
 			end
-			
+
 			battleTag = accountInfo.battleTag
 			
 			anchor = FriendsFrameTooltip_SetLine(FriendsTooltipHeader, nil, nameText)
@@ -423,7 +430,12 @@ function BetterFriendsList_Button_OnEnter(self)
 		end
 
 		if info then
-			anchor = FriendsFrameTooltip_SetLine(FriendsTooltipHeader, nil, info.name)
+			-- [STREAMER MODE CHECK]
+			local displayName = info.name
+			if BFL.StreamerMode and BFL.StreamerMode:IsActive() and friendData then
+				displayName = BFL:GetModule("FriendsList"):GetDisplayName(friendData)
+			end
+			anchor = FriendsFrameTooltip_SetLine(FriendsTooltipHeader, nil, displayName)
 			if info.connected then
 				FriendsTooltipHeader:SetTextColor(FRIENDS_WOW_NAME_COLOR.r, FRIENDS_WOW_NAME_COLOR.g, FRIENDS_WOW_NAME_COLOR.b)
 				FriendsFrameTooltip_SetLine(FriendsTooltipGameAccount1Name, nil, string.format(FRIENDS_LEVEL_TEMPLATE, info.level, info.className))

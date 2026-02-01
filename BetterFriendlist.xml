@@ -1030,7 +1030,7 @@
 						</Anchors>
 						<Layers>
 							<Layer level="BACKGROUND">
-								<Texture file="Interface\FriendsFrame\battlenet-friends-main" setAllPoints="true">
+								<Texture parentKey="Background" file="Interface\FriendsFrame\battlenet-friends-main" setAllPoints="true">
 									<TexCoords left="0.00390625" right="0.74609375" top="0.00195313" bottom="0.05859375"/>
 								</Texture>
 							</Layer>
@@ -2014,11 +2014,54 @@
 				</Scripts>
 			</Button>
 			
-			<!-- Help Button - shown only on Raid Tab, left of close button -->
-			<Button parentKey="HelpButton" hidden="true" frameStrata="HIGH" frameLevel="10">
+			<!-- Streamer Mode Button -->
+			<Button parentKey="StreamerModeButton" hidden="false" frameStrata="HIGH" frameLevel="10">
 				<Size x="24" y="24"/>
 				<Anchors>
 					<Anchor point="TOPRIGHT" relativeKey="$parent.CloseButton" relativePoint="TOPLEFT" x="1" y="1"/>
+				</Anchors>
+				<Layers>
+					<Layer level="OVERLAY">
+						<Texture parentKey="Icon" file="Interface\AddOns\BetterFriendlist\Icons\twitch.blp">
+							<Size x="18" y="18"/>
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnShow>
+						local StreamerMode = BFL and BFL:GetModule("StreamerMode")
+						if StreamerMode then
+							StreamerMode:UpdateState()
+						end
+					</OnShow>
+					<OnClick>
+						local StreamerMode = BFL and BFL:GetModule("StreamerMode")
+						if StreamerMode then
+							StreamerMode:Toggle()
+						end
+					</OnClick>
+					<OnEnter>
+						GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+						GameTooltip:SetText(BFL.L.STREAMER_MODE_TITLE or "Streamer Mode", 1, 1, 1);
+						local status = (BetterFriendlistDB and BetterFriendlistDB.streamerModeActive) and (BFL.L.STATUS_ENABLED or "Enabled") or (BFL.L.STATUS_DISABLED or "Disabled")
+						GameTooltip:AddLine(BFL.L.STREAMER_MODE_BUTTON_DESC or "Click to toggle privacy mode.", 0.7, 0.7, 0.7, true);
+						GameTooltip:AddLine(status, 1, 1, 1);
+						GameTooltip:Show();
+					</OnEnter>
+					<OnLeave>
+						GameTooltip:Hide();
+					</OnLeave>
+				</Scripts>
+			</Button>
+
+			<!-- Help Button - shown only on Raid Tab -->
+			<Button parentKey="HelpButton" hidden="true" frameStrata="HIGH" frameLevel="10">
+				<Size x="24" y="24"/>
+				<Anchors>
+					<Anchor point="TOPRIGHT" relativeKey="$parent.StreamerModeButton" relativePoint="TOPLEFT" x="0" y="0"/>
 				</Anchors>
 				<Layers>
 					<Layer level="OVERLAY">
