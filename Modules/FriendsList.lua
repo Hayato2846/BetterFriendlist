@@ -980,12 +980,17 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		local mode = DB and DB:Get("streamerModeNameFormat", "battletag") or "battletag"
 		
 		-- Default Safe Name (ShortTag or CharName)
-		local safeName = friend.name
+		local safeName = friend.name -- Valid for WoW friends (Character Name)
+		
 		if friend.battleTag then
 			safeName = friend.battleTag:match("([^#]+)") or friend.battleTag
+		elseif friend.type == "bnet" then
+			-- Fallback for BNet friends if BattleTag is missing (Safety Net)
+			-- CRITICAL: Never use friend.accountName (Real ID) in Streamer Mode
+			safeName = "Unknown"
 		end
 		
-		local result = safeName
+		local result = safeName or "Unknown"
 		
 		if mode == "nickname" then
 			local uid = friend.uid or GetFriendUID(friend)

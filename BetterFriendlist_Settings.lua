@@ -38,10 +38,10 @@ end
 
 -- Switch between tabs
 function BetterFriendlistSettings_ShowTab(tabID)
-local Settings = GetSettings()
-if Settings then
-Settings:ShowTab(tabID)
-end
+	local Settings = GetSettings()
+	if Settings then
+		Settings:SelectCategory(tabID)
+	end
 end
 
 -- Load settings from database into UI
@@ -104,7 +104,7 @@ end
 function BetterFriendlistSettings_RefreshTabs()
 	local Settings = GetSettings()
 	if Settings then
-		Settings:RefreshTabs()
+		Settings:RefreshCategories()
 	end
 end
 

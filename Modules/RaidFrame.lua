@@ -817,12 +817,50 @@ end
 -- MEMBER BUTTON MANAGEMENT
 -- ========================================
 
+--- Cache font settings from DB to avoid repetitive lookups
+function RaidFrame:CacheFontSettings()
+    local db = BetterFriendlistDB or {}
+    
+    -- Determine default font props
+    local defaultFontName, defaultFontSize, defaultFontOutline = _G.GameFontNormal:GetFont()
+    
+    -- Raid Name Text Settings
+    local fontName = db.fontRaidName or defaultFontName
+    local fontSize = db.fontSizeRaidName or defaultFontSize or 10
+    local fontOutline = db.fontOutlineRaidName or "NORMAL"
+    local fontShadow = db.fontShadowRaidName -- boolean
+    
+    -- Map outline
+    local outlineValue = ""
+    if fontOutline == "THINOUTLINE" then outlineValue = "OUTLINE" 
+    elseif fontOutline == "THICKOUTLINE" then outlineValue = "THICKOUTLINE"
+    elseif fontOutline == "MONOCHROME" then outlineValue = "MONOCHROME"
+    end
+    
+    -- Resolve path
+    local SharedMedia = LibStub and LibStub("LibSharedMedia-3.0", true)
+    local fontPath = fontName
+    if SharedMedia then
+        -- Only fetch if it looks like a name, not a path
+        if not fontName:find("\\") then
+            fontPath = SharedMedia:Fetch("font", fontName) or fontName
+        end
+    end
+    
+    self.fontCache = {
+        name = { path = fontPath, size = fontSize, outline = outlineValue, shadow = fontShadow }
+    }
+end
+
 --- Update all member buttons in the UI
 function RaidFrame:UpdateAllMemberButtons()
     local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
     if not frame then
         return
     end
+    
+    -- Update font cache before processing buttons
+    self:CacheFontSettings()
     
     -- GroupsContainer is inside GroupsInset
     local groupsContainer = frame.GroupsInset and frame.GroupsInset.GroupsContainer
@@ -920,6 +958,9 @@ end
 --- Update all member buttons based on current raid roster
 function RaidFrame:UpdateMemberButtons()
     if not self.memberButtons or not self.raidMembers then return end
+    
+    -- Ensure fonts are cached
+    self:CacheFontSettings()
     
     -- First, hide all buttons
     for groupIndex = 1, 8 do
@@ -1313,7 +1354,19 @@ function RaidFrame:UpdateMemberButton(button, memberData)
             displayName = strsplit("-", displayName)
         end
         button.Name:SetText(displayName)
-        if FontManager then
+        
+        -- Apply cached raid font
+        if self.fontCache and self.fontCache.name then
+            local fc = self.fontCache.name
+            button.Name:SetFont(fc.path, fc.size, fc.outline)
+            
+            if fc.shadow then
+                button.Name:SetShadowOffset(1, -1)
+            else
+                button.Name:SetShadowOffset(0, 0)
+            end
+        elseif FontManager then
+            -- Fallback
             FontManager:ApplyFontSize(button.Name)
         end
     end

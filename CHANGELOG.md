@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Context Menu Privacy** - Right-click menu headers now respect Streamer Mode masking, displaying the safe name (Nickname/Note) instead of the Real Name.
 - **ElvUI Skin** - Fixed a Lua error ("index field 'BFLCheckmark'") that could occur when other addons (like ToyBoxEnhanced) create menus that BetterFriendlist tries to skin.
+- **Tab Resizing** - Tabs now respect a minimum width (60px for Top, 80px for Bottom) to prevent them from becoming too narrow when text is short (e.g., "Sort" or "Who").
+- **Streamer Mode Refresh** - Quick Join tab now updates immediately when toggling Streamer Mode.
+- **Streamer Mode Safety** - Added explicit fallback protection to ensure Real Names (Account Name) are NEVER displayed, even if BattleTag data is missing. It now defaults to "Unknown" instead of risking a privacy leak.
+- **Tab Sizing** - Restored original padding for Top Tabs to prevent them from shrinking when switching tabs.
 
 ## [2.2.7] - 2026-01-31
 ### Fixed

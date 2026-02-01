@@ -1080,38 +1080,37 @@ function ElvUISkin:SkinSettings(E, S)
 			end
 		end
 
-		-- Hook RefreshTabs to ensure tabs stay skinned after visibility changes
-		-- RefreshTabs calls PanelTemplates_UpdateTabs which might restore textures
-		hooksecurefunc(Settings, "RefreshTabs", function()
-			-- Adjust Tab1 Position (2px lower to fit ElvUI header better)
-			local tab1 = _G["BetterFriendlistSettingsFrameTab1"]
-			if tab1 then
-				tab1:ClearAllPoints()
-				tab1:SetPoint("TOPLEFT", _G.BetterFriendlistSettingsFrame, "TOPLEFT", 6, -19)
-			end
+		-- Hook RefreshCategories to skin the new vertical buttons
+		hooksecurefunc(Settings, "RefreshCategories", function()
+			local frame = _G.BetterFriendlistSettingsFrame
+			if frame and frame.CategoryList then
+				-- Skin the Category List container
+				if not frame.CategoryList.isSkinned then
+					frame.CategoryList:StripTextures()
+					frame.CategoryList:CreateBackdrop("Transparent")
+					frame.CategoryList.isSkinned = true
+				end
 
-			for i = 1, 10 do
-				local tab = _G["BetterFriendlistSettingsFrameTab"..i]
-				if tab and tab:IsShown() then
-					S:HandleTab(tab)
-					tab:SetHeight(28)
-					
-					local text = tab.Text or (tab.GetFontString and tab:GetFontString())
-					if text then
-						text:ClearAllPoints()
-						text:SetPoint("CENTER", tab, "CENTER", 0, 0)
+				-- Skin Buttons
+				local children = {frame.CategoryList:GetChildren()}
+				for _, child in ipairs(children) do
+					if child:IsObjectType("Button") and not child.isSkinned then
+						S:HandleButton(child)
+						-- Remove default highlight/selected textures as ElvUI adds its own
+						child:SetHighlightTexture("") 
+						
+						-- Adjust text position if needed
+						if child.text then
+							child.text:ClearAllPoints()
+							child.text:SetPoint("LEFT", child, "LEFT", 30, 0)
+						end
+						
+						-- Hook OnClick or similar if necessary to update selected state visual
+						-- But our SelectCategory logic handles text color, which is fine.
+						
+						child.isSkinned = true
 					end
 				end
-			end
-			
-			-- Adjust Tab Spacing for ElvUI (Gap between rows)
-			local tab1 = _G["BetterFriendlistSettingsFrameTab1"]
-			local tab6 = _G["BetterFriendlistSettingsFrameTab6"]
-			
-			if tab1 and tab6 and tab6:IsShown() then
-				tab6:ClearAllPoints()
-				-- Create a 0px gap between rows (negative Y)
-				tab6:SetPoint("TOPLEFT", tab1, "BOTTOMLEFT", 0, 0)
 			end
 		end)
 

@@ -105,6 +105,108 @@ local function ApplyFontSize(fontString) InitializeManagers()
 	FontManager:ApplyFontSize(fontString)
 end
 
+-- Apply Font Settings to Tabs (Called when settings change or frame shown)
+function BFL:ApplyTabFonts()
+	local db = BetterFriendlistDB
+	if not db then return end
+	
+	-- Determine default font props from game standard
+	local defaultFontName, defaultFontSize, defaultFontOutline = _G.GameFontNormalSmall:GetFont()
+	
+	-- Default values: Fallback to standard game font if not set
+	local fontName = db.fontTabText or defaultFontName
+	local fontSize = db.fontSizeTabText or defaultFontSize
+	local fontOutline = db.fontOutlineTabText or "NORMAL"
+	-- Shadow disabled per UI constraint, but we clear it to be safe
+	
+	-- Map outline values to API strings
+	local outlineValue = ""
+	if fontOutline == "THINOUTLINE" then outlineValue = "OUTLINE" 
+	elseif fontOutline == "THICKOUTLINE" then outlineValue = "THICKOUTLINE"
+	elseif fontOutline == "MONOCHROME" then outlineValue = "MONOCHROME"
+	end
+	
+	-- Resolve font path using LSM if available
+	local fontPath = fontName
+	local SharedMedia = LibStub and LibStub("LibSharedMedia-3.0", true)
+	if SharedMedia then
+		-- Only fetch if it looks like a name, not a path
+		if not fontName:find("\\") then
+			fontPath = SharedMedia:Fetch("font", fontName) or fontName
+		end
+	end
+	
+	-- Update the shared font objects (used by all tabs)
+	if _G.BetterFriendlistFontNormalSmall then
+		_G.BetterFriendlistFontNormalSmall:SetFont(fontPath, fontSize, outlineValue)
+		_G.BetterFriendlistFontNormalSmall:SetShadowOffset(0, 0) -- Shadow always off for cleanliness
+	end
+	
+	if _G.BetterFriendlistFontHighlightSmall then
+		_G.BetterFriendlistFontHighlightSmall:SetFont(fontPath, fontSize, outlineValue)
+		_G.BetterFriendlistFontHighlightSmall:SetShadowOffset(0, 0)
+	end
+    
+    -- Update specific tabs and force resize
+	local tabs = {
+		_G.BetterFriendsFrameBottomTab1,
+		_G.BetterFriendsFrameBottomTab2,
+		_G.BetterFriendsFrameBottomTab3,
+		_G.BetterFriendsFrameBottomTab4,
+		_G.BetterFriendsFrameTab1,
+		_G.BetterFriendsFrameTab2,
+		_G.BetterFriendsFrameTab3
+	}
+	
+	for _, tab in ipairs(tabs) do
+		if tab then
+			-- Force update fontstring directly (in case object update doesn't propagate immediately)
+            local fs = tab:GetFontString()
+            if fs then
+                fs:SetFont(fontPath, fontSize, outlineValue)
+				fs:SetShadowOffset(0, 0)
+				-- Ensure no width constraint on the text itself so it calculates full width
+				fs:SetWidth(0) 
+            end
+            
+            -- Recalculate width
+            if PanelTemplates_TabResize then
+				-- Determine configuration based on tab type
+				local padding = 30 -- Default padding for Top Tabs (Larger to match original look)
+				local minWidth = 60 -- Default min width
+				local tabName = tab:GetName()
+
+				if tabName and tabName:find("BottomTab") then
+					padding = 20 -- Compact padding for bottom tabs
+					minWidth = 80 -- Standard width for Bottom Tabs
+				end
+				
+			    -- Standard resize with correct padding to set base textures correctly
+				-- padding (arg2) is added to the text width
+				-- minWidth (arg4) ensures the tab doesn't get too small
+			    PanelTemplates_TabResize(tab, padding, nil, minWidth)
+				
+				-- Apply custom width constraints (Safety net)
+				if fs then
+					local textWidth = fs:GetStringWidth()
+					local calculatedWidth = textWidth + padding
+					
+					-- Width Logic:
+					-- 1. Must fit text + padding (Dynamic Expansion)
+					-- 2. Must respect minimum width (No shrinking below default)
+					local finalWidth = math.max(calculatedWidth, minWidth)
+					
+					-- Only force width if our calculated/min width is larger than what TabResize set
+					-- This ensures we never shrink the tab, only expand it if necessary
+					if tab:GetWidth() < finalWidth then
+						tab:SetWidth(finalWidth)
+					end
+				end
+            end
+		end
+	end
+end
+
 -- Animation helper functions (now in Utils/AnimationHelpers.lua)
 -- Access via _G.BFL_CreatePulseAnimation and _G.BFL_CreateFadeOutAnimation
 
@@ -2445,6 +2547,9 @@ end
 -- Function to show specific bottom tab
 function BetterFriendsFrame_ShowBottomTab(tabIndex) local frame = BetterFriendsFrame
 	if not frame then return end
+	
+	-- Apply custom tab fonts from DB settings
+	BFL:ApplyTabFonts()
 	
 	-- CRITICAL: Update the Frame's selected tab index so PanelTemplates_GetSelectedTab returns correct value
 	-- This fixes 'isFriendsTab' checks in other modules (like FriendsList:UpdateSearchBoxState)

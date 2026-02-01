@@ -28,6 +28,12 @@ function StreamerMode:Toggle()
     if BFL.ForceRefreshFriendsList then
         BFL:ForceRefreshFriendsList()
     end
+
+    -- Refresh QuickJoin List to update names (Streamer Mode Toggled)
+    local QuickJoin = BFL:GetModule("QuickJoin")
+    if QuickJoin then
+        QuickJoin:Update(true)
+    end
     
     -- Print status
     if BetterFriendlistDB.streamerModeActive then

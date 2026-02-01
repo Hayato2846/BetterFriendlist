@@ -777,6 +777,8 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	-- Font Settings
 	L.SETTINGS_FRIEND_NAME_SETTINGS = "Friend Name Settings"
 	L.SETTINGS_FRIEND_INFO_SETTINGS = "Friend Info Settings"
+	L.SETTINGS_FONT_TABS_TITLE = "Tabs Text"
+	L.SETTINGS_FONT_RAID_TITLE = "Raid Name Text"
 	L.SETTINGS_FONT_FACE = "Font Face"
 	L.SETTINGS_FONT_SIZE_NUM = "Font Size"
 	L.SETTINGS_FONT_COLOR = "Font Color"

@@ -34,6 +34,18 @@ local defaults = {
 	fontOutlineFriendInfo = "NONE",
 	fontShadowFriendInfo = false,
 	fontColorFriendInfo = {r = 0.510, g = 0.510, b = 0.510, a = 1}, -- Blizzard Gray {r=0.51, g=0.51, b=0.51}
+	-- Tab Font Customization
+	fontTabText = "Friz Quadrata TT",
+	fontSizeTabText = 12,
+	fontOutlineTabText = "NONE",
+	fontShadowTabText = false,
+	fontColorTabText = {r = 1.0, g = 0.82, b = 0.0, a = 1}, -- Normal/Highlight yellow {r=1.0, g=0.82, b=0}
+	-- Raid Name Font Customization
+	fontRaidName = "Friz Quadrata TT",
+	fontSizeRaidName = 12,
+	fontOutlineRaidName = "NONE",
+	fontShadowRaidName = false,
+	fontColorRaidName = {r = 1.0, g = 0.82, b = 0.0, a = 1}, -- Class color override usually applies, but default valid
 	-- Group Header Font Customization
 	fontGroupHeader = "Friz Quadrata TT",
 	fontSizeGroupHeader = 12,

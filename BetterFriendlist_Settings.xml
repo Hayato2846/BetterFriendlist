@@ -1,16 +1,25 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 	<!-- BetterFriendlist Settings Side Panel -->
 	<Frame name="BetterFriendlistSettingsFrame" parent="BetterFriendsFrame" inherits="ButtonFrameTemplate" hidden="true" frameStrata="HIGH" enableMouse="true" movable="false" toplevel="false">
-		<Size x="440" y="520" />
+		<Size x="800" y="550" />
 		<Anchors>
 			<Anchor point="TOPLEFT" relativePoint="TOPRIGHT" x="5" y="0" />
 		</Anchors>
 		<Frames>
+			<!-- Navigation List (Left Side) -->
+			<Frame parentKey="CategoryList">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="10" y="-30" />
+					<Anchor point="BOTTOMLEFT" x="10" y="10" />
+				</Anchors>
+				<Size x="150" y="0"/> <!-- Width will be set dynamically -->
+			</Frame>
+
 			<!-- Single Main Inset Frame - contains everything -->
 			<Frame parentKey="MainInset" mixin="BackdropTemplateMixin">
 				<Anchors>
-					<Anchor point="TOPLEFT" x="10" y="-50" />
-					<Anchor point="BOTTOMRIGHT" x="-4" y="25" />
+					<Anchor point="TOPLEFT" relativeKey="$parent.CategoryList" relativePoint="TOPRIGHT" x="10" y="0" />
+					<Anchor point="BOTTOMRIGHT" relativeKey="$parent" relativePoint="BOTTOMRIGHT" x="-10" y="10" />
 				</Anchors>
 				<Scripts>
 					<OnLoad>
@@ -26,132 +35,15 @@
 				</Scripts>
 			</Frame>
 			
-			<!-- Tab 1: General - at top of frame -->
-			<Button name="$parentTab1" parentKey="Tab1" inherits="PanelTopTabButtonTemplate" text="General" id="1">
-				<NormalFont style="BetterFriendlistFontNormalSmall"/>
-				<HighlightFont style="BetterFriendlistFontHighlightSmall"/>
-				<DisabledFont style="BetterFriendlistFontHighlightSmall"/>
+			<!-- Content Scroll Frame - anchored to MainInset -->
+			<ScrollFrame parentKey="ContentScrollFrame" inherits="UIPanelScrollFrameTemplate">
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeKey="$parent" relativePoint="TOPLEFT" x="6" y="-18" />
+					<Anchor point="TOPLEFT" relativeKey="$parent.MainInset" relativePoint="TOPLEFT" x="8" y="-5" />
+					<Anchor point="BOTTOMRIGHT" relativeKey="$parent.MainInset" relativePoint="BOTTOMRIGHT" x="-25" y="1" />
 				</Anchors>
-				<Scripts>
-					<OnClick>
-						BetterFriendlistSettings_ShowTab(1)
-					</OnClick>
-				</Scripts>
-			</Button>
-			<!-- Tab 2: Groups -->
-			<Button name="$parentTab2" parentKey="Tab2" inherits="PanelTopTabButtonTemplate" text="Groups" id="2">
-				<NormalFont style="BetterFriendlistFontNormalSmall"/>
-				<HighlightFont style="BetterFriendlistFontHighlightSmall"/>
-				<DisabledFont style="BetterFriendlistFontHighlightSmall"/>
-				<Anchors>
-					<Anchor point="LEFT" relativeKey="$parent.Tab1" relativePoint="RIGHT" x="-15" y="0" />
-				</Anchors>
-				<Scripts>
-					<OnClick>
-						BetterFriendlistSettings_ShowTab(2)
-					</OnClick>
-				</Scripts>
-			</Button>
-			<!-- Tab 3: Advanced -->
-			<Button name="$parentTab3" parentKey="Tab3" inherits="PanelTopTabButtonTemplate" text="Advanced" id="3">
-				<NormalFont style="BetterFriendlistFontNormalSmall"/>
-				<HighlightFont style="BetterFriendlistFontHighlightSmall"/>
-				<DisabledFont style="BetterFriendlistFontHighlightSmall"/>
-				<Anchors>
-					<Anchor point="LEFT" relativeKey="$parent.Tab2" relativePoint="RIGHT" x="-15" y="0" />
-				</Anchors>
-				<Scripts>
-					<OnClick>
-						BetterFriendlistSettings_ShowTab(3)
-					</OnClick>
-				</Scripts>
-			</Button>
-			<!-- Tab 4: Data Broker -->
-			<Button name="$parentTab4" parentKey="Tab4" inherits="PanelTopTabButtonTemplate" text="Data Broker" id="4">
-				<NormalFont style="BetterFriendlistFontNormalSmall"/>
-				<HighlightFont style="BetterFriendlistFontHighlightSmall"/>
-				<DisabledFont style="BetterFriendlistFontHighlightSmall"/>
-				<Anchors>
-					<Anchor point="LEFT" relativeKey="$parent.Tab3" relativePoint="RIGHT" x="-15" y="0" />
-				</Anchors>
-				<Scripts>
-					<OnClick>
-						BetterFriendlistSettings_ShowTab(4)
-					</OnClick>
-				</Scripts>
-			</Button>
-
-			<!-- Tab 5: Streamer Mode -->
-			<Button name="$parentTab5" parentKey="Tab5" inherits="PanelTopTabButtonTemplate" text="Streamer Mode" id="5">
-				<NormalFont style="BetterFriendlistFontNormalSmall"/>
-				<HighlightFont style="BetterFriendlistFontHighlightSmall"/>
-				<DisabledFont style="BetterFriendlistFontHighlightSmall"/>
-				<Anchors>
-					<Anchor point="LEFT" relativeKey="$parent.Tab4" relativePoint="RIGHT" x="-15" y="0" />
-				</Anchors>
-				<Scripts>
-					<OnClick>
-						BetterFriendlistSettings_ShowTab(5)
-					</OnClick>
-				</Scripts>
-			</Button>
-
-			<!-- Tab 6: Global Sync (Beta) -->
-			<Button name="$parentTab6" parentKey="Tab6" inherits="PanelTopTabButtonTemplate" text="Global Sync" id="6">
-				<NormalFont style="BetterFriendlistFontNormalSmall"/>
-				<HighlightFont style="BetterFriendlistFontHighlightSmall"/>
-				<DisabledFont style="BetterFriendlistFontHighlightSmall"/>
-				<Anchors>
-					<Anchor point="LEFT" relativeKey="$parent.Tab5" relativePoint="RIGHT" x="-15" y="0" />
-				</Anchors>
-				<Scripts>
-					<OnClick>
-						BetterFriendlistSettings_ShowTab(6)
-					</OnClick>
-				</Scripts>
-			</Button>
-			<!-- Tab 7: Future use -->
-			<Button name="$parentTab7" parentKey="Tab7" inherits="PanelTopTabButtonTemplate" text="" id="7">
-				<NormalFont style="BetterFriendlistFontNormalSmall"/>
-				<HighlightFont style="BetterFriendlistFontHighlightSmall"/>
-				<DisabledFont style="BetterFriendlistFontHighlightSmall"/>
-				<Anchors>
-					<Anchor point="LEFT" relativeKey="$parent.Tab6" relativePoint="RIGHT" x="-15" y="0" />
-				</Anchors>
-				<Scripts>
-					<OnClick>
-						BetterFriendlistSettings_ShowTab(7)
-					</OnClick>
-				</Scripts>
-			</Button>
-			
-			<!-- Tab Separator Line -->
-			<Frame parentKey="TabSeparator">
-				<Size x="0" y="1"/>
-				<Anchors>
-					<Anchor point="TOPLEFT" relativeKey="$parent.MainInset" relativePoint="TOPLEFT" x="5" y="-3"/>
-					<Anchor point="TOPRIGHT" relativeKey="$parent.MainInset" relativePoint="TOPRIGHT" x="-5" y="-3"/>
-				</Anchors>
-				<Layers>
-					<Layer level="OVERLAY">
-						<Texture>
-							<Color r="0.25" g="0.25" b="0.25" a="1"/>
-						</Texture>
-					</Layer>
-				</Layers>
-			</Frame>
-			
-		<!-- Content Scroll Frame - below tabs, above buttons inside MainInset -->
-		<ScrollFrame parentKey="ContentScrollFrame" inherits="UIPanelScrollFrameTemplate">
-			<Anchors>
-				<Anchor point="TOPLEFT" relativeKey="$parent.MainInset" relativePoint="TOPLEFT" x="8" y="-5" />
-				<Anchor point="BOTTOMRIGHT" relativeKey="$parent.MainInset" relativePoint="BOTTOMRIGHT" x="-25" y="1" />
-			</Anchors>
-			<ScrollChild>
-				<Frame parentKey="Content">
-						<Size x="380" y="600" />
+				<ScrollChild>
+					<Frame parentKey="Content">
+						<Size y="600" />
 					<Frames>
 						<!-- General Tab Content -->
 						<!-- General Tab - Populated by Lua (SettingsComponents) -->
@@ -262,10 +154,6 @@
 			if self.Inset then
 				self.Inset:Hide()
 			end
-			
-			-- Setup tab system
-			PanelTemplates_SetNumTabs(self, 3)
-			PanelTemplates_SetTab(self, 1)
 			
 			-- Initialize
 			if BetterFriendlistSettings_OnLoad then
