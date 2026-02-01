@@ -77,9 +77,8 @@ function Dialogs:RegisterDialogs()
 					if success then
 						-- Add friend to the newly created group
 						Groups:ToggleFriendInGroup(friendUID, groupId)
-						if BetterFriendsFrame_UpdateDisplay then
-							BetterFriendsFrame_UpdateDisplay()
-						end
+						-- Force full display refresh - groups affect display structure
+						BFL:ForceRefreshFriendsList()
 					end
 				end
 			end
