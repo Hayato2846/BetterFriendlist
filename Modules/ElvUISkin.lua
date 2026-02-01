@@ -816,9 +816,6 @@ function ElvUISkin:SkinFrames(E, S)
 	BFL:DebugPrint("ElvUISkin: Skinning Settings")
 	xpcall(function() self:SkinSettings(E, S) end, function(err) BFL:DebugPrint("ElvUISkin: Error skinning Settings: " .. tostring(err)) end)
 	
-	-- Skin Notifications
-	BFL:DebugPrint("ElvUISkin: Skinning Notifications")
-	self:SkinNotifications(E, S)
 	
 	-- Skin Broker
 	BFL:DebugPrint("ElvUISkin: Skinning Broker")
@@ -1125,13 +1122,6 @@ function ElvUISkin:SkinSettings(E, S)
 			end
 		end)
 
-		hooksecurefunc(Settings, "RefreshNotificationsTab", function()
-			local content = frame.ContentScrollFrame.Content
-			if content and content.NotificationsTab then
-				SkinEditBoxesInTab(content.NotificationsTab)
-			end
-		end)
-		
 		-- Hook Global Sync Tab (Point 5: Skin dynamic headers and buttons)
 		hooksecurefunc(Settings, "RefreshGlobalSyncTab", function()
 			local content = frame.ContentScrollFrame.Content
@@ -1333,21 +1323,7 @@ function ElvUISkin:SkinSettings(E, S)
 	end
 end
 
-function ElvUISkin:SkinNotifications(E, S)
-	-- Skin Toast Frames
-	for i = 1, 3 do
-		local toast = _G["BFL_FriendNotificationToast"..i]
-		if toast then
-			toast:StripTextures()
-			toast:CreateBackdrop("Transparent")
-			
-			-- Adjust icon position if needed
-			if toast.Icon then
-				-- toast.Icon:SetTexCoord(unpack(E.TexCoords)) -- If we want square icons
-			end
-		end
-	end
-end
+
 
 function ElvUISkin:SkinBroker(E, S)
 	-- Hook LibQTip to skin tooltips

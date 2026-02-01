@@ -310,14 +310,7 @@ SkinBetterFriendlist = function(event, addon)
 		C.IsSkinnedByAS = true
 	end
 
-	-- Notifications
-	for i = 1, 3 do
-		local toast = _G["BFL_FriendNotificationToast"..i]
-		if toast then
-			S:StripTextures(toast)
-			S:CreateBackdrop(toast, "Transparent")
-		end
-	end
+
 end
 
 -- Hook Friends List

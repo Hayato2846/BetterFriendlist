@@ -76,28 +76,7 @@ local defaults = {
 	-- Global Sync Settings
 	enableGlobalSync = false, -- Enable Global Friend Sync (default: OFF)
 	enableGlobalSyncDeletion = false, -- Enable deletion of friends during sync (default: OFF)
-	-- Notification Settings (Beta)
-	notificationDisplayMode = "alert", -- Display mode: "alert", "chat", "disabled" (default: alert)
-	notificationSoundEnabled = true, -- Play sound with notifications (default: true)
-	notificationOfflineEnabled = false, -- Show notifications when friends go offline (default: false)
-	-- Quiet Hours Settings
-	notificationQuietCombat = true, -- Silence notifications during combat (default: true)
-	notificationQuietInstance = false, -- Silence notifications in instances (default: false)
-	notificationQuietManual = false, -- Manual DND mode (default: false)
-	notificationQuietScheduled = false, -- Enable scheduled quiet hours (default: false)
-	notificationQuietScheduleStartMinutes = 1320, -- Quiet hours start in minutes since midnight (default: 22:00 = 1320)
-	notificationQuietScheduleEndMinutes = 480, -- Quiet hours end in minutes since midnight (default: 08:00 = 480)
-	-- Per-Friend Rules
-	notificationFriendRules = {}, -- Per-friend notification rules: {[friendUID] = "whitelist"/"blacklist"/"default"}
-	-- Per-Group Rules (NEW: Phase 14.1)
-	notificationGroupRules = {}, -- Per-group notification rules: {[groupId] = "whitelist"/"blacklist"/"default"}
-	-- Group Triggers
-	notificationGroupTriggers = {}, -- Group triggers: {[triggerID] = {groupId, threshold, enabled, lastTriggered}}
-	-- Custom Message Templates
-	notificationMessageOnline = "%name% is now online", -- Template for online notifications (default)
-	notificationMessageOffline = "%name% went offline", -- Template for offline notifications (default)
-	-- Toast Container Position (Edit Mode)
-	notificationToastPosition = {}, -- {[layoutName] = {point, x, y}} - Toast container position per layout
+	
 	-- Main Frame Edit Mode (Phase EditMode)
 	mainFrameSize = {}, -- {[layoutName] = {width, height}} - Main frame size per layout
 	mainFramePosition = {}, -- {[layoutName] = {point, x, y}} - Main frame position per layout
@@ -105,13 +84,7 @@ local defaults = {
 	lockWindow = false, -- Lock the frame to prevent movement
 	defaultFrameWidth = 415, -- User-customizable default width (350-800)
 	defaultFrameHeight = 570, -- User-customizable default height (400-1200)
-	-- Phase 11.5: Game-Specific Notifications
-	notificationWowLoginEnabled = true, -- Show notifications when friend logs into WoW (default: true)
-	notificationCharSwitchEnabled = false, -- Show notifications when friend switches character (default: false)
-	notificationGameSwitchEnabled = false, -- Show notifications when friend switches game (default: false)
-	notificationMessageWowLogin = "%name% logged into World of Warcraft", -- Template for WoW login
-	notificationMessageCharSwitch = "%name% switched to %char%", -- Template for character switch
-	notificationMessageGameSwitch = "%name% is now playing %game%", -- Template for game switch
+	
 	-- Data Broker Settings
 	brokerEnabled = false, -- Enable Data Broker integration (default: OFF)
 	brokerShowIcon = true, -- Show icon on display addons (default: ON)

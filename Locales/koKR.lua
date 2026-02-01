@@ -281,47 +281,12 @@ local L = BFL_LOCALE
 	-- ========================================
 	-- NOTIFICATIONS TAB
 	-- ========================================
-	L.SETTINGS_NOTIFICATIONS_TITLE = "알림"
-	L.SETTINGS_NOTIFICATIONS_DESC = "친구 로그인/로그아웃 알림 구성"
-	L.SETTINGS_NOTIFICATIONS_DISPLAY_HEADER = "알림 표시"
-	L.SETTINGS_NOTIFICATIONS_DISPLAY_MODE = "표시 모드"
-	L.SETTINGS_NOTIFICATIONS_MODE_TOAST = "토스트 알림"
-	L.SETTINGS_NOTIFICATIONS_MODE_CHAT = "채팅 메시지만"
-	L.SETTINGS_NOTIFICATIONS_MODE_DISABLED = "비활성화됨"
-	L.SETTINGS_NOTIFICATIONS_MODE_DESC = "|cffffcc00토스트 알림:|r 친구가 온라인 상태가 되면 간단한 알림을 표시합니다\n|cffffcc00채팅 메시지만:|r 팝업 없이 채팅 메시지만 표시합니다\n|cffffcc00비활성화됨:|r 알림 없음"
-	L.SETTINGS_NOTIFICATIONS_TEST_BUTTON = "알림 테스트"
-	L.SETTINGS_NOTIFY_TEST_BTN = "Test Notif"
-	L.SETTINGS_NOTIFY_TEST_TOOLTIP = "Launch Test"
-	L.SETTINGS_NOTIFY_SYSTEM_ERROR = "Notify System Unavailable"
 
-	L.SETTINGS_NOTIFICATIONS_SOUND_HEADER = "사운드 설정"
-	L.SETTINGS_NOTIFY_SOUND_HEADER = "사운드 설정"
-	L.SETTINGS_NOTIFY_SOUND = "알림 소리 재생"
-	L.SETTINGS_NOTIFY_DND_MODE = "방해 금지 모드"
-	L.SETTINGS_NOTIFY_DND = "방해 금지 (지정된 소리 끄기)"
-	L.SETTINGS_NOTIFICATIONS_SOUND_ENABLE = "알림과 함께 사운드 재생"
-	L.SETTINGS_NOTIFY_SOUND_ENABLE = "Play Sound"
-	L.SETTINGS_NOTIFICATIONS_SOUND_ENABLED = "알림 사운드 |cff00ff00활성화됨|r"
-	L.SETTINGS_NOTIFY_SOUND_ENABLED = "Sounds |cff00ff00ON|r"
-	L.SETTINGS_NOTIFICATIONS_SOUND_DISABLED = "알림 사운드 |cffff0000비활성화됨|r"
-	L.SETTINGS_NOTIFY_SOUND_DISABLED = "Sounds |cffff0000OFF|r"
-	L.SETTINGS_NOTIFY_SOUND_TOOLTIP_TITLE = "Notif Sounds"
-	L.SETTINGS_NOTIFY_SOUND_TOOLTIP_DESC = "Plays sound effect."
 	
-	L.SETTINGS_NOTIFICATIONS_COMING_SOON = "공개 예정"
-	L.SETTINGS_NOTIFICATIONS_FUTURE_FEATURES = "• 친구별 알림 규칙\n• 그룹 트리거 (그룹 Y의 X명 친구 온라인)\n• 조용한 시간 (전투, 인스턴스, 일정)\n• 사용자 지정 알림 메시지\n• 오프라인 알림"
-	L.SETTINGS_NOTIFICATIONS_QUIET_HOURS = "|cffffcc00자동 조용한 시간:|r\n• 전투 중 (방해 없음)\n• 향후: 인스턴스 감지, 수동 DND, 예약된 시간"
 	
 	-- ========================================
 	-- NOTIFICATION MESSAGES
 	-- ========================================
-	L.NOTIFICATION_MODE_CHANGED = "알림 모드가 %s(으)로 설정되었습니다"
-	L.NOTIFICATION_TEST_MESSAGE = "테스트 알림입니다"
-	L.NOTIFICATION_FRIEND_ONLINE = "%s님이 온라인 상태입니다"
-	L.NOTIFICATION_FRIEND_PLAYING = "%s님이 온라인 상태입니다 [%s 플레이 중]"
-	L.NOTIFICATION_SYSTEM_UNAVAILABLE = "알림 시스템을 사용할 수 없습니다"
-	L.NOTIFICATION_BETA_REQUIRED = "알림을 사용하려면 베타 기능이 활성화되어야 합니다"
-	L.NOTIFICATION_BETA_ENABLE_HINT = "→ 설정 > 고급 > 베타 기능에서 활성화하세요"
 	
 	-- ========================================
 	-- EDIT MODE FRAME SIZE (PHASE 5)
@@ -526,40 +491,11 @@ local L = BFL_LOCALE
 	L.TOOLTIP_LAST_ONLINE = "마지막 온라인: %s"
 
 	-- Notifications
-	L.NOTIFICATION_GROUP_ALERT = "그룹 알림"
-	L.NOTIFICATION_GROUP_ALERT_MSG = "%d friends from '%s' online"
-	L.NOTIFICATION_RECONNECTED = "님이 재접속했습니다"
-	L.NOTIFICATION_IS_NOW_ONLINE = "님이 현재 온라인입니다"
-	L.NOTIFICATION_WENT_OFFLINE = "%s went offline"
-	L.NOTIFICATION_LOGGED_IN_WOW = "%s logged into WoW"
-	L.NOTIFICATION_SWITCHED_CHAR = "%s switched char"
-	L.NOTIFICATION_PLAYING_GAME = "%s playing %s"
-	L.NOTIFICATION_ONLINE_PLAYING_FMT = "online playing %s"
-	L.NOTIFICATION_PLAYING_FMT = "playing %s"
-	L.NOTIFICATION_GONE_OFFLINE = "gone offline"
-	L.NOTIFICATION_TEST_TRIGGERED = "Test Notif (mode: %s)"
-	L.NOTIFICATION_TEST_RULE_RESULTS = "Rule Results:"
-	L.NOTIFICATION_TEST_SHOULD_NOTIFY = "  Notify: "
-	L.NOTIFICATION_TEST_IS_WHITELISTED = "  Whitelist: "
-	L.NOTIFICATION_TEST_RULE_SOURCE = "  Source: "
-	L.NOTIFICATION_TEST_FRIENDS_GROUPS = "Friend Groups:"
-	L.NOTIFICATION_TEST_NO_GROUPS = "No groups"
-	L.NOTIFICATION_TEST_FAVORITES = "Favorites:"
-	L.NOTIFICATION_TEST_COMPLETE = "테스트 완료!"
-	L.NOTIFICATION_TEST_NO_BNET = "No BNet friends"
-	L.NOTIFICATION_TEST_NO_INFO = "No friend info"
-	L.NOTIFICATION_TEST_WITH_FRIEND = "Test with: %s (UID: %s)"
 	L.YES = "YES"
 	L.NO = "NO"
 
 	-- Notification Templates (Defaults)
-	L.NOTIFICATION_TEMPLATE_ONLINE = "%name% online"
-	L.NOTIFICATION_TEMPLATE_OFFLINE = "%name% offline"
-	L.NOTIFICATION_TEMPLATE_WOW_LOGIN = "%name% in WoW"
-	L.NOTIFICATION_TEMPLATE_CHAR_SWITCH = "%name% switched char"
-	L.NOTIFICATION_TEMPLATE_GAME_SWITCH = "%name% playing %game%"
 
-	L.EDITMODE_NOTIFICATIONS_LABEL = "BFL Notifications"
 	L.EDITMODE_PREVIEW_NAME = "미리보기 %d"
 	L.EDITMODE_PREVIEW_MESSAGE = "Preview Position"
 	L.EDITMODE_FRAME_WIDTH = "Width"
@@ -570,7 +506,6 @@ local L = BFL_LOCALE
 	L.DIALOG_RESET_LAYOUTS_BTN1 = "Reset"
 	L.MSG_LAYOUTS_RESET = "Layouts reset."
 	L.DIALOG_TRIGGER_TITLE = "Create Trigger"
-	L.DIALOG_TRIGGER_INFO = "Notify if X friends online."
 	L.DIALOG_TRIGGER_SELECT_GROUP = "Group:"
 	L.DIALOG_TRIGGER_MIN_FRIENDS = "Min Friends:"
 	L.DIALOG_TRIGGER_CREATE = "생성"
@@ -653,13 +588,6 @@ local L = BFL_LOCALE
 	L.BROADCAST_LABEL = "Msg:"
 	L.ACTIVE_SINCE_FMT = "활성화: %s"
 	L.HINT_RIGHT_CLICK_OPTIONS = "Right-Click Options"
-	L.MENU_NOTIFICATIONS = "알림"
-	L.MENU_NOTIFY_DEFAULT = "Default"
-	L.MENU_NOTIFY_WHITELIST = "Whitelist"
-	L.MENU_NOTIFY_BLACKLIST = "Blacklist"
-	L.MSG_NOTIFY_DEFAULT = "|cff00ff00BFL:|r Notifications '%s': |cffffffffDefault|r"
-	L.MSG_NOTIFY_WHITELIST = "|cff00ff00BFL:|r Notifications '%s': |cff00ff00Whitelist|r"
-	L.MSG_NOTIFY_BLACKLIST = "|cff00ff00BFL:|r Notifications '%s': |cffff0000Blacklist|r"
 	L.HEADER_ADD_FRIEND = "|cffffd700%s을(를) %s에 추가|r"
 
 	-- Groups (Additional)
@@ -732,7 +660,6 @@ local L = BFL_LOCALE
 	-- SETTINGS (Additional)
 	-- ========================================
 	L.SETTINGS_TAB_DATABROKER = "Data Broker"
-	L.SETTINGS_TAB_NOTIFICATIONS = "알림"
 	L.MSG_GROUP_RENAMED = "Group renamed '%s'"
 	L.ERROR_RENAME_FAILED = "Rename failed"
 	L.SETTINGS_GROUP_ORDER_SAVED_DEBUG = "Group order: %s"
@@ -784,12 +711,6 @@ local L = BFL_LOCALE
 	L.MENU_SHOW_BLIZZARD = "Show Blizzard List"
 	L.MENU_COMBAT_LOCKED = "Combat Locked"
 	L.MENU_SET_NICKNAME = "별명 설정"
-	L.MENU_NOTIFICATIONS_DEFAULT = "Default"
-	L.MENU_NOTIFICATIONS_WHITELIST = "Whitelist"
-	L.MENU_NOTIFICATIONS_BLACKLIST = "Blacklist"
-	L.NOTIFICATIONS_SET_MSG_DEFAULT = "|cff00ff00BFL:|r Notif %s |cffffcc00Default|r"
-	L.NOTIFICATIONS_SET_MSG_WHITELIST = "|cff00ff00BFL:|r Notif %s |cff00ff00Whitelist|r"
-	L.NOTIFICATIONS_SET_MSG_BLACKLIST = "|cff00ff00BFL:|r Notif %s |cffff0000Blacklist|r"
 
 	-- ========================================
 	-- XML LOCALIZATION KEYS
@@ -860,52 +781,10 @@ local L = BFL_LOCALE
 	L.STATS_REFRESH_TOOLTIP = "Refresh Stats"
 
 	-- Notifications (Detailed)
-	L.SETTINGS_NOTIFY_MESSAGES_HEADER = "Personal Msg."
-	L.SETTINGS_NOTIFY_MESSAGES_DESC = "Vars: %name%, %game%"
-	L.SETTINGS_NOTIFY_MSG_ONLINE = "Msg Online:"
-	L.SETTINGS_NOTIFY_MSG_OFFLINE = "Msg Offline:"
-	L.SETTINGS_NOTIFY_MSG_WOW_LOGIN = "Msg Login WoW:"
-	L.SETTINGS_NOTIFY_MSG_CHAR_SWITCH = "Msg Switch Char:"
-	L.SETTINGS_NOTIFY_MSG_GAME_SWITCH = "Msg Switch Game:"
-	L.SETTINGS_NOTIFY_PREVIEW_TIP = "|cffffcc00Tip:|r Use 'Test' above."
-	L.SETTINGS_NOTIFY_TRIGGERS_HEADER = "Triggers"
-	L.SETTINGS_NOTIFY_TRIGGERS_DESC = "Notify if X friends online."
-	L.SETTINGS_NOTIFY_TRIGGER_FORMAT = "%d+ of '%s'"
-	L.SETTINGS_NOTIFY_TRIGGER_PREFIX = "Trigger"
-	L.SETTINGS_NOTIFY_TRIGGER_REMOVED = "Removed"
-	L.SETTINGS_NOTIFY_NO_TRIGGERS = "None."
-	L.SETTINGS_NOTIFY_ADD_TRIGGER = "Add"
 
 	-- Quiet Hours & Filters
-	L.SETTINGS_NOTIFY_QUIET_HEADER = "조용한 시간"
-	L.SETTINGS_NOTIFY_QUIET_MANUAL = "Manual DND"
-	L.SETTINGS_NOTIFY_MANUAL_DND_ENABLED = "DND Man. |cff00ff00ON|r"
-	L.SETTINGS_NOTIFY_MANUAL_DND_DISABLED = "DND Man. |cffff0000OFF|r"
-	L.SETTINGS_NOTIFY_QUIET_COMBAT = "Combat Quiet"
-	L.SETTINGS_NOTIFY_COMBAT_QUIET = "Combat Quiet"
-	L.SETTINGS_NOTIFY_QUIET_INSTANCE = "Instance Quiet"
-	L.SETTINGS_NOTIFY_INSTANCE_QUIET = "Instance Quiet"
-	L.SETTINGS_NOTIFY_QUIET_SCHEDULED = "Schedule"
-	L.SETTINGS_NOTIFY_SCHEDULED_QUIET = "Schedule"
-	L.SETTINGS_NOTIFY_QUIET_START = "Start:"
-	L.SETTINGS_NOTIFY_QUIET_END = "End:"
-	L.SETTINGS_NOTIFY_QUIET_NOTE = "|cffffcc00Note:|r Crosses midnight if start > end."
 	
 	-- Notification Toggles
-	L.SETTINGS_NOTIFY_OFFLINE_HEADER = "오프라인 알림"
-	L.SETTINGS_NOTIFY_OFFLINE_ENABLE = "Notify Offline"
-	L.SETTINGS_NOTIFY_OFFLINE_ENABLED = "Offline Notif |cff00ff00ON|r"
-	L.SETTINGS_NOTIFY_OFFLINE_DISABLED = "Offline Notif |cffff0000OFF|r"
-	L.SETTINGS_NOTIFY_GAME_HEADER = "Specific Notifications"
-	L.SETTINGS_NOTIFY_WOW_LOGIN = "WoW Login: Notify"
-	L.SETTINGS_NOTIFY_WOW_LOGIN_ENABLED = "WoW Log |cff00ff00ON|r"
-	L.SETTINGS_NOTIFY_WOW_LOGIN_DISABLED = "WoW Log |cffff0000OFF|r"
-	L.SETTINGS_NOTIFY_CHAR_SWITCH = "Char Switch: Notify"
-	L.SETTINGS_NOTIFY_CHAR_SWITCH_ENABLED = "Char Switch |cff00ff00ON|r"
-	L.SETTINGS_NOTIFY_CHAR_SWITCH_DISABLED = "Char Switch |cffff0000OFF|r"
-	L.SETTINGS_NOTIFY_GAME_SWITCH = "Game Switch: Notify"
-	L.SETTINGS_NOTIFY_GAME_SWITCH_ENABLED = "Game Switch |cff00ff00ON|r"
-	L.SETTINGS_NOTIFY_GAME_SWITCH_DISABLED = "Game Switch |cffff0000OFF|r"
 
 	-- Missing Descriptions
 	L.SETTINGS_HIDE_EMPTY_GROUPS_DESC = "Hide Empty"
@@ -936,12 +815,8 @@ local L = BFL_LOCALE
 	L.CORE_DB_MODULE_NOT_AVAIL = "DB Module unavail"
 	L.CORE_ACTIVITY_TRACKING_HEADER = "|cff00ff00=== Activity ===|r"
 	L.CORE_ACTIVITY_TOTAL_FRIENDS = "Friends Active: %d"
-	L.CORE_NOTIFICATION_MODULE_NOT_LOADED = "Notif Module not loaded"
 	L.CORE_BETA_FEATURES_DISABLED_MSG = "Beta Disabled!"
 	L.CORE_BETA_ENABLE_HINT = "|cffffcc00Enable:|r ESC > AddOns > BFL"
-	L.CORE_TRIGGERING_TEST_NOTIFICATIONS = "Testing notif..."
-	L.CORE_TEST_NOTIFICATIONS_SUCCESS = "|cff00ff00Success!|r"
-	L.CORE_TEST_NOTIFICATIONS_TIP = "|cffffcc00Tip:|r Use Edit Mode."
 	L.CORE_STATISTICS_MODULE_NOT_LOADED = "Stats not loaded"
 	L.CORE_STATISTICS_HEADER = "|cff00ff00=== Statistics ===|r"
 	L.CORE_STATS_OVERVIEW = "|cffffcc00Summary:|r"
@@ -1023,7 +898,6 @@ local L = BFL_LOCALE
 	L.CORE_HELP_CMD_DATABASE = "  |cffffffff/bfl database|r - Show DB"
 	L.CORE_HELP_CMD_ACTIVITY = "  |cffffffff/bfl activity|r - Show Activity"
 	L.CORE_HELP_CMD_STATS = "  |cffffffff/bfl stats|r - Show Stats"
-	L.CORE_HELP_CMD_TESTNOTIFY = "  |cffffffff/bfl testnotify|r - Test Notif"
 	L.CORE_HELP_CMD_TESTGROUP = "  |cffffffff/bfl testgrouprules|r - Test Rules"
 	L.CORE_HELP_QJ_COMMANDS = "|cffffcc00Quick Join:|r"
 	L.CORE_HELP_QJ_MOCK = "  |cffffffff/bfl qj mock|r - Mock"
@@ -1157,17 +1031,6 @@ local L = BFL_LOCALE
 	L.MOBILE_STATUS = "모바일"
 	L.RAF_RECRUITMENT = "친구 초대"
 	L.SETTINGS_COLOR_CLASS_NAMES_DESC = "직업 이름을 직업 색상으로 표시"
-	L.SETTINGS_NOTIFY_TITLE = "알림"
-	L.SETTINGS_NOTIFY_DESC = "스마트 친구 알림을 설정합니다."
-	L.SETTINGS_NOTIFY_DISPLAY_HEADER = "표시"
-	L.SETTINGS_NOTIFY_DISPLAY_MODE = "모드:"
-	L.SETTINGS_NOTIFY_MODE_TOAST = "토스트 (팝업)"
-	L.SETTINGS_NOTIFY_MODE_CHAT = "채팅 메시지"
-	L.SETTINGS_NOTIFY_MODE_DISABLED = "비활성화"
-	L.SETTINGS_NOTIFY_MODE_NONE = "비활성화"
-	L.SETTINGS_NOTIFY_MODE_BOTH = "모두"
-	L.SETTINGS_NOTIFY_TEST = "테스트 알림"
-	L.SETTINGS_NOTIFY_MODE_DESC = "|cffffcc00토스트:|r 간편한 팝업\n|cffffcc00채팅 메시지:|r 채팅창 텍스트\n|cffffcc00비활성화:|r 알림 없음"
 
 
 	-- Font Outline/Shadow Settings

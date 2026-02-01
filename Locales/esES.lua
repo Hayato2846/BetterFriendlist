@@ -281,45 +281,12 @@ L.BUTTON_EXPORT = "Exportar"
 	-- ========================================
 	-- NOTIFICATIONS TAB
 	-- ========================================
-	L.SETTINGS_NOTIFY_TITLE = "Notificaciones"
-	L.SETTINGS_NOTIFY_DESC = "Configura notificaciones inteligentes. Recibe alertas cuando tus amigos se conecten."
-	L.SETTINGS_NOTIFY_DISPLAY_HEADER = "Visualización"
-	L.SETTINGS_NOTIFY_DISPLAY_MODE = "Modo de Visualización:"
-	L.SETTINGS_NOTIFY_MODE_TOAST = "Notificación Toast"
-	L.SETTINGS_NOTIFY_MODE_CHAT = "Solo Mensaje de Chat"
-	L.SETTINGS_NOTIFY_MODE_DISABLED = "Deshabilitado"
-	L.SETTINGS_NOTIFY_MODE_NONE = "Deshabilitado"
-	L.SETTINGS_NOTIFY_MODE_BOTH = "Ambos"
-	L.SETTINGS_NOTIFY_TEST = "Notificación de prueba"
-	L.SETTINGS_NOTIFY_MODE_DESC = "|cffffcc00Toast:|r Muestra una notificación emergente compacta\n|cffffcc00Chat:|r Solo muestra mensaje en el chat\n|cffffcc00Deshabilitado:|r Sin notificaciones"
-	L.SETTINGS_NOTIFY_TEST_BTN = "Probar Notificación"
-	L.SETTINGS_NOTIFY_TEST_TOOLTIP = "Lanzar notificación de prueba"
-	L.SETTINGS_NOTIFY_SYSTEM_ERROR = "Sistema de notificaciones no disponible"
 	
-	L.SETTINGS_NOTIFY_SOUND_HEADER = "Sonidos"
-	L.SETTINGS_NOTIFY_SOUND = "Reproducir sonido al notificar"
-	L.SETTINGS_NOTIFY_DND = "No Molestar (Silenciar todas)"
-	L.SETTINGS_NOTIFY_DND_MODE = "Modo No Molestar"
-	L.SETTINGS_NOTIFY_SOUND_ENABLE = "Reproducir sonido"
-	L.SETTINGS_NOTIFY_SOUND_ENABLED = "Sonidos |cff00ff00HABILITADOS|r"
-	L.SETTINGS_NOTIFY_SOUND_DISABLED = "Sonidos |cffff0000DESHABILITADOS|r"
-	L.SETTINGS_NOTIFY_SOUND_TOOLTIP_TITLE = "Sonidos de Notificación"
-	L.SETTINGS_NOTIFY_SOUND_TOOLTIP_DESC = "Reproduce un efecto de sonido al notificar. Puedes probarlo con el botón de arriba."
 	
-	L.SETTINGS_NOTIFICATIONS_COMING_SOON = "Próximamente"
-	L.SETTINGS_NOTIFICATIONS_FUTURE_FEATURES = "• Reglas por amigo\n• Disparadores de grupo\n• Horas de silencio\n• Mensajes personalizados\n• Alertas de desconexión"
-	L.SETTINGS_NOTIFICATIONS_QUIET_HOURS = "|cffffcc00Horas de silencio automáticas:|r\n• En combate\n• Futuro: Instancias, DND manual, horario"
 	
 	-- ========================================
 	-- NOTIFICATION MESSAGES
 	-- ========================================
-	L.NOTIFICATION_MODE_CHANGED = "Modo de notificación: %s"
-	L.NOTIFICATION_TEST_MESSAGE = "Esta es una notificación de prueba"
-	L.NOTIFICATION_FRIEND_ONLINE = "%s se ha conectado"
-	L.NOTIFICATION_FRIEND_PLAYING = "%s se ha conectado [jugando %s]"
-	L.NOTIFICATION_SYSTEM_UNAVAILABLE = "Sistema de notificación no disponible"
-	L.NOTIFICATION_BETA_REQUIRED = "Debes habilitar las Funciones Beta para usar notificaciones"
-	L.NOTIFICATION_BETA_ENABLE_HINT = "→ Habilitar en Configuración > Avanzado > Funciones Beta"
 	
 	-- ========================================
 	-- EDIT MODE FRAME SIZE (PHASE 5)
@@ -524,40 +491,11 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita solapamientos con otras ventanas (P
 	L.TOOLTIP_LAST_ONLINE = "Última vez: %s"
 
 	-- Notifications
-	L.NOTIFICATION_GROUP_ALERT = "Alerta de Grupo"
-	L.NOTIFICATION_GROUP_ALERT_MSG = "%d amigos de '%s' están conectados"
-	L.NOTIFICATION_RECONNECTED = "reconectado"
-	L.NOTIFICATION_IS_NOW_ONLINE = "se ha conectado"
-	L.NOTIFICATION_WENT_OFFLINE = "%s se ha desconectado"
-	L.NOTIFICATION_LOGGED_IN_WOW = "%s entró a World of Warcraft"
-	L.NOTIFICATION_SWITCHED_CHAR = "%s cambió de personaje"
-	L.NOTIFICATION_PLAYING_GAME = "%s está jugando a %s"
-	L.NOTIFICATION_ONLINE_PLAYING_FMT = "se ha conectado jugando %s"
-	L.NOTIFICATION_PLAYING_FMT = "está jugando %s"
-	L.NOTIFICATION_GONE_OFFLINE = "se ha desconectado"
-	L.NOTIFICATION_TEST_TRIGGERED = "Notificación de prueba lanzada (modo: %s)"
-	L.NOTIFICATION_TEST_RULE_RESULTS = "Resultados de Reglas:"
-	L.NOTIFICATION_TEST_SHOULD_NOTIFY = "  Debe Notificar: "
-	L.NOTIFICATION_TEST_IS_WHITELISTED = "  Está en Lista Blanca: "
-	L.NOTIFICATION_TEST_RULE_SOURCE = "  Fuente de Regla: "
-	L.NOTIFICATION_TEST_FRIENDS_GROUPS = "Grupos del Amigo:"
-	L.NOTIFICATION_TEST_NO_GROUPS = "Amigo no está en grupos personalizados"
-	L.NOTIFICATION_TEST_FAVORITES = "Grupo Favoritos:"
-	L.NOTIFICATION_TEST_COMPLETE = "¡Prueba completa!"
-	L.NOTIFICATION_TEST_NO_BNET = "No se encontraron amigos BattleNet"
-	L.NOTIFICATION_TEST_NO_INFO = "No se pudo obtener info del amigo"
-	L.NOTIFICATION_TEST_WITH_FRIEND = "Probando con amigo: %s (UID: %s)"
 	L.YES = "SÍ"
 	L.NO = "NO"
 
 	-- Notification Templates (Defaults)
-	L.NOTIFICATION_TEMPLATE_ONLINE = "%name% se ha conectado"
-	L.NOTIFICATION_TEMPLATE_OFFLINE = "%name% se ha desconectado"
-	L.NOTIFICATION_TEMPLATE_WOW_LOGIN = "%name% entró a World of Warcraft"
-	L.NOTIFICATION_TEMPLATE_CHAR_SWITCH = "%name% cambió de personaje"
-	L.NOTIFICATION_TEMPLATE_GAME_SWITCH = "%name% está jugando a %game%"
 
-	L.EDITMODE_NOTIFICATIONS_LABEL = "BetterFriendlist Notificaciones"
 	L.EDITMODE_PREVIEW_NAME = "Vista Previa %d"
 	L.EDITMODE_PREVIEW_MESSAGE = "Vista previa para posicionar"
 	L.EDITMODE_FRAME_WIDTH = "Ancho del Marco"
@@ -653,13 +591,6 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita solapamientos con otras ventanas (P
 	L.BROADCAST_LABEL = "Difusión:"
 	L.ACTIVE_SINCE_FMT = "(Activo desde: %s)"
 	L.HINT_RIGHT_CLICK_OPTIONS = "Clic-dcho para opciones"
-	L.MENU_NOTIFICATIONS = "Notificaciones"
-	L.MENU_NOTIFY_DEFAULT = "Defecto (Usar config global)"
-	L.MENU_NOTIFY_WHITELIST = "Lista Blanca (Siempre notificar)"
-	L.MENU_NOTIFY_BLACKLIST = "Lista Negra (Nunca notificar)"
-	L.MSG_NOTIFY_DEFAULT = "|cff00ff00BetterFriendlist:|r Notificaciones para grupo '%s' establecidas a |cffffffffDefecto|r"
-	L.MSG_NOTIFY_WHITELIST = "|cff00ff00BetterFriendlist:|r Notificaciones para grupo '%s' establecidas a |cff00ff00Lista Blanca|r"
-	L.MSG_NOTIFY_BLACKLIST = "|cff00ff00BetterFriendlist:|r Notificaciones para grupo '%s' establecidas a |cffff0000Lista Negra|r"
 	L.HEADER_ADD_FRIEND = "|cffffd700Añadir %s a %s|r"
 
 	-- Groups (Additional)
@@ -732,7 +663,6 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita solapamientos con otras ventanas (P
 	-- SETTINGS (Additional)
 	-- ========================================
 	L.SETTINGS_TAB_DATABROKER = "Data Broker"
-	L.SETTINGS_TAB_NOTIFICATIONS = "Notificaciones"
 	L.MSG_GROUP_RENAMED = "Grupo renombrado a '%s'"
 	L.ERROR_RENAME_FAILED = "Fallo al renombrar grupo"
 	L.SETTINGS_GROUP_ORDER_SAVED_DEBUG = "Orden de grupo guardado: %s"
@@ -784,12 +714,6 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita solapamientos con otras ventanas (P
 	L.MENU_SHOW_BLIZZARD = "Mostrar Lista Amigos Blizzard"
 	L.MENU_COMBAT_LOCKED = "No se puede alternar en combate"
 	L.MENU_SET_NICKNAME = "Establecer Apodo"
-	L.MENU_NOTIFICATIONS_DEFAULT = "Defecto (Usar config global)"
-	L.MENU_NOTIFICATIONS_WHITELIST = "Lista Blanca (Siempre notificar)"
-	L.MENU_NOTIFICATIONS_BLACKLIST = "Lista Negra (Nunca notificar)"
-	L.NOTIFICATIONS_SET_MSG_DEFAULT = "|cff00ff00BetterFriendlist:|r Notificaciones para %s en |cffffcc00Defecto|r"
-	L.NOTIFICATIONS_SET_MSG_WHITELIST = "|cff00ff00BetterFriendlist:|r Notificaciones para %s en |cff00ff00Lista Blanca|r"
-	L.NOTIFICATIONS_SET_MSG_BLACKLIST = "|cff00ff00BetterFriendlist:|r Notificaciones para %s en |cffff0000Lista Negra|r"
 
 	-- ========================================
 	-- XML LOCALIZATION KEYS
@@ -859,52 +783,10 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita solapamientos con otras ventanas (P
 	L.STATS_REFRESH_TOOLTIP = "Actualizar datos"
 
 	-- Notifications (Detailed)
-	L.SETTINGS_NOTIFY_MESSAGES_HEADER = "Mensajes Personalizados"
-	L.SETTINGS_NOTIFY_MESSAGES_DESC = "Personaliza mensajes. Variables: %name%, %game%, %level%, %zone%, %class%, %realm%"
-	L.SETTINGS_NOTIFY_MSG_ONLINE = "Mensaje Online:"
-	L.SETTINGS_NOTIFY_MSG_OFFLINE = "Mensaje Offline:"
-	L.SETTINGS_NOTIFY_MSG_WOW_LOGIN = "Mensaje Login WoW:"
-	L.SETTINGS_NOTIFY_MSG_CHAR_SWITCH = "Mensaje Cambio Pj:"
-	L.SETTINGS_NOTIFY_MSG_GAME_SWITCH = "Mensaje Cambio Juego:"
-	L.SETTINGS_NOTIFY_PREVIEW_TIP = "|cffffcc00Tip:|r Usa 'Probar Notificación' arriba."
-	L.SETTINGS_NOTIFY_TRIGGERS_HEADER = "Disparadores Grupo"
-	L.SETTINGS_NOTIFY_TRIGGERS_DESC = "Notificar cuando X amigos de un grupo conecten."
-	L.SETTINGS_NOTIFY_TRIGGER_FORMAT = "%d+ de '%s'"
-	L.SETTINGS_NOTIFY_TRIGGER_PREFIX = "Disparador grupo"
-	L.SETTINGS_NOTIFY_TRIGGER_REMOVED = "Disparador eliminado"
-	L.SETTINGS_NOTIFY_NO_TRIGGERS = "Sin disparadores. Clic 'Añadir' abajo."
-	L.SETTINGS_NOTIFY_ADD_TRIGGER = "Añadir Disparador"
 
 	-- Quiet Hours & Filters
-	L.SETTINGS_NOTIFY_QUIET_HEADER = "Horas Silencio"
-	L.SETTINGS_NOTIFY_QUIET_MANUAL = "DND Manual"
-	L.SETTINGS_NOTIFY_MANUAL_DND_ENABLED = "DND Manual |cff00ff00HABILITADO|r"
-	L.SETTINGS_NOTIFY_MANUAL_DND_DISABLED = "DND Manual |cffff0000DESHABILITADO|r"
-	L.SETTINGS_NOTIFY_QUIET_COMBAT = "Silencio en combate"
-	L.SETTINGS_NOTIFY_COMBAT_QUIET = "Modo silencio combate"
-	L.SETTINGS_NOTIFY_QUIET_INSTANCE = "Silencio en instancias"
-	L.SETTINGS_NOTIFY_INSTANCE_QUIET = "Modo silencio instancia"
-	L.SETTINGS_NOTIFY_QUIET_SCHEDULED = "Horario silencio"
-	L.SETTINGS_NOTIFY_SCHEDULED_QUIET = "Horario silencio"
-	L.SETTINGS_NOTIFY_QUIET_START = "Hora Inicio:"
-	L.SETTINGS_NOTIFY_QUIET_END = "Hora Fin:"
-	L.SETTINGS_NOTIFY_QUIET_NOTE = "|cffffcc00Nota:|r Si inicio > fin, cruza medianoche."
 	
 	-- Notification Toggles
-	L.SETTINGS_NOTIFY_OFFLINE_HEADER = "Notificaciones Offline"
-	L.SETTINGS_NOTIFY_OFFLINE_ENABLE = "Notificar desconexiones"
-	L.SETTINGS_NOTIFY_OFFLINE_ENABLED = "Notif. Offline |cff00ff00ON|r"
-	L.SETTINGS_NOTIFY_OFFLINE_DISABLED = "Notif. Offline |cffff0000OFF|r"
-	L.SETTINGS_NOTIFY_GAME_HEADER = "Notificaciones Específicas"
-	L.SETTINGS_NOTIFY_WOW_LOGIN = "Login WoW: Notificar entrar a WoW"
-	L.SETTINGS_NOTIFY_WOW_LOGIN_ENABLED = "Notif. Login WoW |cff00ff00ON|r"
-	L.SETTINGS_NOTIFY_WOW_LOGIN_DISABLED = "Notif. Login WoW |cffff0000OFF|r"
-	L.SETTINGS_NOTIFY_CHAR_SWITCH = "Cambio Pj: Notificar cambio personaje"
-	L.SETTINGS_NOTIFY_CHAR_SWITCH_ENABLED = "Notif. Cambio Pj |cff00ff00ON|r"
-	L.SETTINGS_NOTIFY_CHAR_SWITCH_DISABLED = "Notif. Cambio Pj |cffff0000OFF|r"
-	L.SETTINGS_NOTIFY_GAME_SWITCH = "Cambio Juego: Notificar cambio juego"
-	L.SETTINGS_NOTIFY_GAME_SWITCH_ENABLED = "Notif. Cambio Juego |cff00ff00ON|r"
-	L.SETTINGS_NOTIFY_GAME_SWITCH_DISABLED = "Notif. Cambio Juego |cffff0000OFF|r"
 
 	-- Missing Descriptions
 	L.SETTINGS_HIDE_EMPTY_GROUPS_DESC = "Oculta grupos sin miembros online"
@@ -935,12 +817,8 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita solapamientos con otras ventanas (P
 	L.CORE_DB_MODULE_NOT_AVAIL = "Módulo BD no disponible"
 	L.CORE_ACTIVITY_TRACKING_HEADER = "|cff00ff00=== Rastreo Actividad ===|r"
 	L.CORE_ACTIVITY_TOTAL_FRIENDS = "Amigos con actividad: %d"
-	L.CORE_NOTIFICATION_MODULE_NOT_LOADED = "Módulo Notif. no cargado"
 	L.CORE_BETA_FEATURES_DISABLED_MSG = "¡Funciones Beta desactivadas!"
 	L.CORE_BETA_ENABLE_HINT = "|cffffcc00Habilitar:|r ESC > AddOns > BetterFriendlist"
-	L.CORE_TRIGGERING_TEST_NOTIFICATIONS = "Lanzando 3 notificaciones prueba..."
-	L.CORE_TEST_NOTIFICATIONS_SUCCESS = "|cff00ff00¡Éxito!|r Deberías ver 3 toasts."
-	L.CORE_TEST_NOTIFICATIONS_TIP = "|cffffcc00Tip:|r Abre Modo Edición para mover."
 	L.CORE_STATISTICS_MODULE_NOT_LOADED = "Módulo Estadísticas no cargado"
 	L.CORE_STATISTICS_HEADER = "|cff00ff00=== Estadísticas ===|r"
 	L.CORE_STATS_OVERVIEW = "|cffffcc00Resumen:|r"
@@ -1022,7 +900,6 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita solapamientos con otras ventanas (P
 	L.CORE_HELP_CMD_DATABASE = "  |cffffffff/bfl database|r - Ver BD"
 	L.CORE_HELP_CMD_ACTIVITY = "  |cffffffff/bfl activity|r - Ver actividad"
 	L.CORE_HELP_CMD_STATS = "  |cffffffff/bfl stats|r - Ver estadísticas"
-	L.CORE_HELP_CMD_TESTNOTIFY = "  |cffffffff/bfl testnotify|r - Probar notif"
 	L.CORE_HELP_CMD_TESTGROUP = "  |cffffffff/bfl testgrouprules|r - Probar reglas grupo"
 	L.CORE_HELP_QJ_COMMANDS = "|cffffcc00Quick Join:|r"
 	L.CORE_HELP_QJ_MOCK = "  |cffffffff/bfl qj mock|r - Crear datos prueba"

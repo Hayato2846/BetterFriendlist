@@ -455,29 +455,11 @@ function Settings:RefreshTabs()
 	PanelTemplates_SetNumTabs(settingsFrame, maxTabId)
 	PanelTemplates_UpdateTabs(settingsFrame)
 	
-	-- THEN reposition tabs dynamically
-	-- Start second row at Tab 6 (Notifications) if visible
-	local tab1 = _G["BetterFriendlistSettingsFrameTab1"]
-	local tab6 = _G["BetterFriendlistSettingsFrameTab6"]
-	
-	if tab6 and tab1 and tab6:IsShown() then
-		tab6:ClearAllPoints()
-		-- Position below Tab1: +4px for proper spacing (copied from legacy logic)
-		tab6:SetPoint("TOPLEFT", tab1, "BOTTOMLEFT", 0, 8)
-		
-		-- Move MainInset down to make room for second tab row
-		if settingsFrame.MainInset then
-			settingsFrame.MainInset:ClearAllPoints()
-			settingsFrame.MainInset:SetPoint("TOPLEFT", settingsFrame, "TOPLEFT", 4, -70)
-			settingsFrame.MainInset:SetPoint("BOTTOMRIGHT", settingsFrame, "BOTTOMRIGHT", 0, 2)
-		end
-	else
-		-- Single row layout: Restore default MainInset position (tabs at y=-27)
-		if settingsFrame.MainInset then
-			settingsFrame.MainInset:ClearAllPoints()
-			settingsFrame.MainInset:SetPoint("TOPLEFT", settingsFrame, "TOPLEFT", 4, -45)
-			settingsFrame.MainInset:SetPoint("BOTTOMRIGHT", settingsFrame, "BOTTOMRIGHT", 0, 2)
-		end
+	-- Single row layout: Restore default MainInset position (tabs at y=-27)
+	if settingsFrame.MainInset then
+		settingsFrame.MainInset:ClearAllPoints()
+		settingsFrame.MainInset:SetPoint("TOPLEFT", settingsFrame, "TOPLEFT", 4, -45)
+		settingsFrame.MainInset:SetPoint("BOTTOMRIGHT", settingsFrame, "BOTTOMRIGHT", 0, 2)
 	end
 end
 
@@ -1653,28 +1635,6 @@ function Settings:ExportSettings()
 		-- Sort & Filter
 		primarySort = BetterFriendlistDB.primarySort,
 		secondarySort = BetterFriendlistDB.secondarySort,
-		-- Notifications
-		notificationDisplayMode = BetterFriendlistDB.notificationDisplayMode,
-		notificationSoundEnabled = BetterFriendlistDB.notificationSoundEnabled,
-		notificationOfflineEnabled = BetterFriendlistDB.notificationOfflineEnabled,
-		notificationWowLoginEnabled = BetterFriendlistDB.notificationWowLoginEnabled,
-		notificationCharSwitchEnabled = BetterFriendlistDB.notificationCharSwitchEnabled,
-		notificationGameSwitchEnabled = BetterFriendlistDB.notificationGameSwitchEnabled,
-		notificationQuietCombat = BetterFriendlistDB.notificationQuietCombat,
-		notificationQuietInstance = BetterFriendlistDB.notificationQuietInstance,
-		notificationQuietManual = BetterFriendlistDB.notificationQuietManual,
-		notificationQuietScheduled = BetterFriendlistDB.notificationQuietScheduled,
-		notificationQuietScheduleStartMinutes = BetterFriendlistDB.notificationQuietScheduleStartMinutes,
-		notificationQuietScheduleEndMinutes = BetterFriendlistDB.notificationQuietScheduleEndMinutes,
-		notificationMessageOnline = BetterFriendlistDB.notificationMessageOnline,
-		notificationMessageOffline = BetterFriendlistDB.notificationMessageOffline,
-		notificationMessageWowLogin = BetterFriendlistDB.notificationMessageWowLogin,
-		notificationMessageCharSwitch = BetterFriendlistDB.notificationMessageCharSwitch,
-		notificationMessageGameSwitch = BetterFriendlistDB.notificationMessageGameSwitch,
-		notificationFriendRules = BetterFriendlistDB.notificationFriendRules,
-		notificationGroupRules = BetterFriendlistDB.notificationGroupRules,
-		notificationGroupTriggers = BetterFriendlistDB.notificationGroupTriggers,
-		notificationToastPosition = BetterFriendlistDB.notificationToastPosition,
 		-- Broker
 		brokerEnabled = BetterFriendlistDB.brokerEnabled,
 		brokerShowIcon = BetterFriendlistDB.brokerShowIcon,
@@ -1867,18 +1827,6 @@ function Settings:ImportSettings(importString)
 			"fontOutlineGroupHeader", "fontShadowGroupHeader", "colorGroupCount", "colorGroupArrow",
 			-- Sort & Filter
 			"primarySort", "secondarySort",
-			-- Notifications
-			"notificationDisplayMode", "notificationSoundEnabled",
-			"notificationOfflineEnabled", "notificationWowLoginEnabled",
-			"notificationCharSwitchEnabled", "notificationGameSwitchEnabled",
-			"notificationQuietCombat", "notificationQuietInstance", "notificationQuietManual",
-			"notificationQuietScheduled", "notificationQuietScheduleStartMinutes", 
-			"notificationQuietScheduleEndMinutes",
-			"notificationMessageOnline", "notificationMessageOffline",
-			"notificationMessageWowLogin", "notificationMessageCharSwitch",
-			"notificationMessageGameSwitch",
-			"notificationFriendRules", "notificationGroupRules", "notificationGroupTriggers",
-			"notificationToastPosition",
 			-- Broker
 			"brokerEnabled", "brokerShowIcon", "brokerShowLabel", 
 			"brokerShowTotal", "brokerShowGroups", "brokerTooltipMode", "brokerClickAction",

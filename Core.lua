@@ -1455,7 +1455,6 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		-- List of strings with special characters to test
 		local testKeys = {
 			"DIALOG_DELETE_GROUP_TEXT", -- é, ê, û
-			"NOTIFICATIONS_SET_MSG_BLACKLIST", -- é, à
 			"CORE_STATISTICS_HEADER", -- é
 			"SETTINGS_BETA_FEATURES_ENABLED", -- é, È
 			"DIALOG_MIGRATE_TEXT", -- é, è

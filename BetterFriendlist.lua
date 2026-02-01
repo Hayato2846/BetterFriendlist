@@ -967,57 +967,6 @@ frame:SetScript("OnEvent", function(self, event, ...) if event == "ADDON_LOADED"
 				end)
 			end
 		end
-		
-		-- Add Notification Settings submenu (Phase 9: Per-Friend Rules)
-		if BetterFriendlistDB.enableBetaFeatures then
-			-- Removed divider to consolidate under "BetterFriendlist" header
-			local notificationButton = rootDescription:CreateButton(L.MENU_NOTIFICATIONS)
-			
-			-- Checkbox for "Default (Use global settings)"
-			notificationButton:CreateCheckbox(
-				L.MENU_NOTIFICATIONS_DEFAULT,
-				function() local rule = BetterFriendlistDB.notificationFriendRules and BetterFriendlistDB.notificationFriendRules[friendUID]
-					return not rule or rule == "default"
-				end,
-				function() if not BetterFriendlistDB.notificationFriendRules then
-						BetterFriendlistDB.notificationFriendRules = {}
-					end
-					BetterFriendlistDB.notificationFriendRules[friendUID] = "default"
-					local friendName = contextData.name or contextData.battleTag or "friend"
-					print(string.format(L.NOTIFICATIONS_SET_MSG_DEFAULT, friendName))
-				end
-			)
-			
-			-- Checkbox for "Whitelist (Always notify)"
-			notificationButton:CreateCheckbox(
-				L.MENU_NOTIFICATIONS_WHITELIST,
-				function() local rule = BetterFriendlistDB.notificationFriendRules and BetterFriendlistDB.notificationFriendRules[friendUID]
-					return rule == "whitelist"
-				end,
-				function() if not BetterFriendlistDB.notificationFriendRules then
-						BetterFriendlistDB.notificationFriendRules = {}
-					end
-					BetterFriendlistDB.notificationFriendRules[friendUID] = "whitelist"
-					local friendName = contextData.name or contextData.battleTag or "friend"
-					print(string.format(L.NOTIFICATIONS_SET_MSG_WHITELIST, friendName))
-				end
-			)
-			
-			-- Checkbox for "Blacklist (Never notify)"
-			notificationButton:CreateCheckbox(
-				L.MENU_NOTIFICATIONS_BLACKLIST,
-				function() local rule = BetterFriendlistDB.notificationFriendRules and BetterFriendlistDB.notificationFriendRules[friendUID]
-					return rule == "blacklist"
-				end,
-				function() if not BetterFriendlistDB.notificationFriendRules then
-						BetterFriendlistDB.notificationFriendRules = {}
-					end
-					BetterFriendlistDB.notificationFriendRules[friendUID] = "blacklist"
-					local friendName = contextData.name or contextData.battleTag or "friend"
-					print(string.format(L.NOTIFICATIONS_SET_MSG_BLACKLIST, friendName))
-				end
-			)
-		end
 	end
 		
 		-- Register for BattleNet friend menus (online and offline)

@@ -278,47 +278,12 @@ local L = BFL_LOCALE
 	-- ========================================
 	-- NOTIFICATIONS TAB
 	-- ========================================
-	L.SETTINGS_NOTIFICATIONS_TITLE = "通知"
-	L.SETTINGS_NOTIFICATIONS_DESC = "配置好友上线/下线通知"
-	L.SETTINGS_NOTIFICATIONS_DISPLAY_HEADER = "通知显示"
-	L.SETTINGS_NOTIFICATIONS_DISPLAY_MODE = "显示模式"
-	L.SETTINGS_NOTIFICATIONS_MODE_TOAST = "弹出通知"
-	L.SETTINGS_NOTIFICATIONS_MODE_CHAT = "仅聊天消息"
-	L.SETTINGS_NOTIFICATIONS_MODE_DISABLED = "已禁用"
-	L.SETTINGS_NOTIFICATIONS_MODE_DESC = "|cffffcc00弹出通知：|r 当好友上线时显示简洁的通知\n|cffffcc00仅聊天消息：|r 无弹出窗口，仅在聊天中显示消息\n|cffffcc00已禁用：|r 无通知"
-	L.SETTINGS_NOTIFICATIONS_TEST_BUTTON = "测试通知"
-	L.SETTINGS_NOTIFY_TEST_BTN = "Test Notif"
-	L.SETTINGS_NOTIFY_TEST_TOOLTIP = "Launch Test"
-	L.SETTINGS_NOTIFY_SYSTEM_ERROR = "Notify System Unavailable"
 	
-	L.SETTINGS_NOTIFICATIONS_SOUND_HEADER = "声音设置"
-	L.SETTINGS_NOTIFY_SOUND_HEADER = "声音设置"
-	L.SETTINGS_NOTIFY_SOUND = "通知时播放声音"
-	L.SETTINGS_NOTIFY_DND_MODE = "请勿打扰模式"
-	L.SETTINGS_NOTIFY_DND = "请勿打扰（静音所有通知）"
-	L.SETTINGS_NOTIFICATIONS_SOUND_ENABLE = "通知时播放声音"
-	L.SETTINGS_NOTIFY_SOUND_ENABLE = "Play Sound"
-	L.SETTINGS_NOTIFICATIONS_SOUND_ENABLED = "通知声音 |cff00ff00已启用|r"
-	L.SETTINGS_NOTIFY_SOUND_ENABLED = "Sounds |cff00ff00ON|r"
-	L.SETTINGS_NOTIFICATIONS_SOUND_DISABLED = "通知声音 |cffff0000已禁用|r"
-	L.SETTINGS_NOTIFY_SOUND_DISABLED = "Sounds |cffff0000OFF|r"
-	L.SETTINGS_NOTIFY_SOUND_TOOLTIP_TITLE = "Notif Sounds"
-	L.SETTINGS_NOTIFY_SOUND_TOOLTIP_DESC = "Plays sound effect."
 	
-	L.SETTINGS_NOTIFICATIONS_COMING_SOON = "即将推出"
-	L.SETTINGS_NOTIFICATIONS_FUTURE_FEATURES = "• 单个好友通知规则\n• 群组触发器（群组 Y 的 X 个好友在线）\n• 安静时段（战斗、副本、时间表）\n• 自定义通知消息\n• 离线通知"
-	L.SETTINGS_NOTIFICATIONS_QUIET_HOURS = "|cffffcc00自动安静时段：|r\n• 战斗中（不打扰）\n• 未来：副本检测、手动勿扰、预定时间"
 	
 	-- ========================================
 	-- NOTIFICATION MESSAGES
 	-- ========================================
-	L.NOTIFICATION_MODE_CHANGED = "通知模式已设置为 %s"
-	L.NOTIFICATION_TEST_MESSAGE = "这是测试通知"
-	L.NOTIFICATION_FRIEND_ONLINE = "%s 现在在线"
-	L.NOTIFICATION_FRIEND_PLAYING = "%s 现在在线 [正在玩 %s]"
-	L.NOTIFICATION_SYSTEM_UNAVAILABLE = "通知系统不可用"
-	L.NOTIFICATION_BETA_REQUIRED = "必须启用测试功能才能使用通知"
-	L.NOTIFICATION_BETA_ENABLE_HINT = "→ 在设置 > 高级 > 测试功能中启用"	
 	
 	-- ========================================
 	-- EDIT MODE FRAME SIZE (PHASE 5)
@@ -534,40 +499,11 @@ local L = BFL_LOCALE
 	L.TOOLTIP_LAST_ONLINE = "最后上线: %s"
 
 	-- Notifications
-	L.NOTIFICATION_GROUP_ALERT = "队伍提醒"
-	L.NOTIFICATION_GROUP_ALERT_MSG = "%d friends from '%s' online"
-	L.NOTIFICATION_RECONNECTED = "已重新连接"
-	L.NOTIFICATION_IS_NOW_ONLINE = "现已上线"
-	L.NOTIFICATION_WENT_OFFLINE = "%s went offline"
-	L.NOTIFICATION_LOGGED_IN_WOW = "%s logged into WoW"
-	L.NOTIFICATION_SWITCHED_CHAR = "%s switched char"
-	L.NOTIFICATION_PLAYING_GAME = "%s playing %s"
-	L.NOTIFICATION_ONLINE_PLAYING_FMT = "online playing %s"
-	L.NOTIFICATION_PLAYING_FMT = "playing %s"
-	L.NOTIFICATION_GONE_OFFLINE = "gone offline"
-	L.NOTIFICATION_TEST_TRIGGERED = "Test Notif (mode: %s)"
-	L.NOTIFICATION_TEST_RULE_RESULTS = "Rule Results:"
-	L.NOTIFICATION_TEST_SHOULD_NOTIFY = "  Notify: "
-	L.NOTIFICATION_TEST_IS_WHITELISTED = "  Whitelist: "
-	L.NOTIFICATION_TEST_RULE_SOURCE = "  Source: "
-	L.NOTIFICATION_TEST_FRIENDS_GROUPS = "Friend Groups:"
-	L.NOTIFICATION_TEST_NO_GROUPS = "No groups"
-	L.NOTIFICATION_TEST_FAVORITES = "Favorites:"
-	L.NOTIFICATION_TEST_COMPLETE = "测试完成!"
-	L.NOTIFICATION_TEST_NO_BNET = "No BNet friends"
-	L.NOTIFICATION_TEST_NO_INFO = "No friend info"
-	L.NOTIFICATION_TEST_WITH_FRIEND = "Test with: %s (UID: %s)"
 	L.YES = "YES"
 	L.NO = "NO"
 
 	-- Notification Templates (Defaults)
-	L.NOTIFICATION_TEMPLATE_ONLINE = "%name% online"
-	L.NOTIFICATION_TEMPLATE_OFFLINE = "%name% offline"
-	L.NOTIFICATION_TEMPLATE_WOW_LOGIN = "%name% in WoW"
-	L.NOTIFICATION_TEMPLATE_CHAR_SWITCH = "%name% switched char"
-	L.NOTIFICATION_TEMPLATE_GAME_SWITCH = "%name% playing %game%"
 
-	L.EDITMODE_NOTIFICATIONS_LABEL = "BFL Notifications"
 	L.EDITMODE_PREVIEW_NAME = "预览 %d"
 	L.EDITMODE_PREVIEW_MESSAGE = "Preview Position"
 	L.EDITMODE_FRAME_WIDTH = "Width"
@@ -578,7 +514,6 @@ local L = BFL_LOCALE
 	L.DIALOG_RESET_LAYOUTS_BTN1 = "Reset"
 	L.MSG_LAYOUTS_RESET = "Layouts reset."
 	L.DIALOG_TRIGGER_TITLE = "Create Trigger"
-	L.DIALOG_TRIGGER_INFO = "Notify if X friends online."
 	L.DIALOG_TRIGGER_SELECT_GROUP = "Group:"
 	L.DIALOG_TRIGGER_MIN_FRIENDS = "Min Friends:"
 	L.DIALOG_TRIGGER_CREATE = "创建"
@@ -661,13 +596,6 @@ local L = BFL_LOCALE
 	L.BROADCAST_LABEL = "Msg:"
 	L.ACTIVE_SINCE_FMT = "活跃时间：%s"
 	L.HINT_RIGHT_CLICK_OPTIONS = "Right-Click Options"
-	L.MENU_NOTIFICATIONS = "通知"
-	L.MENU_NOTIFY_DEFAULT = "Default"
-	L.MENU_NOTIFY_WHITELIST = "Whitelist"
-	L.MENU_NOTIFY_BLACKLIST = "Blacklist"
-	L.MSG_NOTIFY_DEFAULT = "|cff00ff00BFL:|r Notifications '%s': |cffffffffDefault|r"
-	L.MSG_NOTIFY_WHITELIST = "|cff00ff00BFL:|r Notifications '%s': |cff00ff00Whitelist|r"
-	L.MSG_NOTIFY_BLACKLIST = "|cff00ff00BFL:|r Notifications '%s': |cffff0000Blacklist|r"
 	L.HEADER_ADD_FRIEND = "|cffffd700将%s添加到%s|r"
 
 	-- Groups (Additional)
@@ -740,7 +668,6 @@ local L = BFL_LOCALE
 	-- SETTINGS (Additional)
 	-- ========================================
 	L.SETTINGS_TAB_DATABROKER = "Data Broker"
-	L.SETTINGS_TAB_NOTIFICATIONS = "通知"
 	L.MSG_GROUP_RENAMED = "Group renamed '%s'"
 	L.ERROR_RENAME_FAILED = "Rename failed"
 	L.SETTINGS_GROUP_ORDER_SAVED_DEBUG = "Group order: %s"
@@ -792,12 +719,6 @@ local L = BFL_LOCALE
 	L.MENU_SHOW_BLIZZARD = "Show Blizzard List"
 	L.MENU_COMBAT_LOCKED = "Combat Locked"
 	L.MENU_SET_NICKNAME = "设置昵称"
-	L.MENU_NOTIFICATIONS_DEFAULT = "Default"
-	L.MENU_NOTIFICATIONS_WHITELIST = "Whitelist"
-	L.MENU_NOTIFICATIONS_BLACKLIST = "Blacklist"
-	L.NOTIFICATIONS_SET_MSG_DEFAULT = "|cff00ff00BFL:|r Notif %s |cffffcc00Default|r"
-	L.NOTIFICATIONS_SET_MSG_WHITELIST = "|cff00ff00BFL:|r Notif %s |cff00ff00Whitelist|r"
-	L.NOTIFICATIONS_SET_MSG_BLACKLIST = "|cff00ff00BFL:|r Notif %s |cffff0000Blacklist|r"
 
 	-- ========================================
 	-- XML LOCALIZATION KEYS
@@ -868,52 +789,10 @@ local L = BFL_LOCALE
 	L.STATS_REFRESH_TOOLTIP = "Refresh Stats"
 
 	-- Notifications (Detailed)
-	L.SETTINGS_NOTIFY_MESSAGES_HEADER = "Personal Msg."
-	L.SETTINGS_NOTIFY_MESSAGES_DESC = "Vars: %name%, %game%"
-	L.SETTINGS_NOTIFY_MSG_ONLINE = "Msg Online:"
-	L.SETTINGS_NOTIFY_MSG_OFFLINE = "Msg Offline:"
-	L.SETTINGS_NOTIFY_MSG_WOW_LOGIN = "Msg Login WoW:"
-	L.SETTINGS_NOTIFY_MSG_CHAR_SWITCH = "Msg Switch Char:"
-	L.SETTINGS_NOTIFY_MSG_GAME_SWITCH = "Msg Switch Game:"
-	L.SETTINGS_NOTIFY_PREVIEW_TIP = "|cffffcc00Tip:|r Use 'Test' above."
-	L.SETTINGS_NOTIFY_TRIGGERS_HEADER = "Triggers"
-	L.SETTINGS_NOTIFY_TRIGGERS_DESC = "Notify if X friends online."
-	L.SETTINGS_NOTIFY_TRIGGER_FORMAT = "%d+ of '%s'"
-	L.SETTINGS_NOTIFY_TRIGGER_PREFIX = "Trigger"
-	L.SETTINGS_NOTIFY_TRIGGER_REMOVED = "Removed"
-	L.SETTINGS_NOTIFY_NO_TRIGGERS = "None."
-	L.SETTINGS_NOTIFY_ADD_TRIGGER = "Add"
 
 	-- Quiet Hours & Filters
-	L.SETTINGS_NOTIFY_QUIET_HEADER = "免打扰时段"
-	L.SETTINGS_NOTIFY_QUIET_MANUAL = "Manual DND"
-	L.SETTINGS_NOTIFY_MANUAL_DND_ENABLED = "DND Man. |cff00ff00ON|r"
-	L.SETTINGS_NOTIFY_MANUAL_DND_DISABLED = "DND Man. |cffff0000OFF|r"
-	L.SETTINGS_NOTIFY_QUIET_COMBAT = "Combat Quiet"
-	L.SETTINGS_NOTIFY_COMBAT_QUIET = "Combat Quiet"
-	L.SETTINGS_NOTIFY_QUIET_INSTANCE = "Instance Quiet"
-	L.SETTINGS_NOTIFY_INSTANCE_QUIET = "Instance Quiet"
-	L.SETTINGS_NOTIFY_QUIET_SCHEDULED = "Schedule"
-	L.SETTINGS_NOTIFY_SCHEDULED_QUIET = "Schedule"
-	L.SETTINGS_NOTIFY_QUIET_START = "Start:"
-	L.SETTINGS_NOTIFY_QUIET_END = "End:"
-	L.SETTINGS_NOTIFY_QUIET_NOTE = "|cffffcc00Note:|r Crosses midnight if start > end."
 	
 	-- Notification Toggles
-	L.SETTINGS_NOTIFY_OFFLINE_HEADER = "离线通知"
-	L.SETTINGS_NOTIFY_OFFLINE_ENABLE = "Notify Offline"
-	L.SETTINGS_NOTIFY_OFFLINE_ENABLED = "Offline Notif |cff00ff00ON|r"
-	L.SETTINGS_NOTIFY_OFFLINE_DISABLED = "Offline Notif |cffff0000OFF|r"
-	L.SETTINGS_NOTIFY_GAME_HEADER = "Specific Notifications"
-	L.SETTINGS_NOTIFY_WOW_LOGIN = "WoW Login: Notify"
-	L.SETTINGS_NOTIFY_WOW_LOGIN_ENABLED = "WoW Log |cff00ff00ON|r"
-	L.SETTINGS_NOTIFY_WOW_LOGIN_DISABLED = "WoW Log |cffff0000OFF|r"
-	L.SETTINGS_NOTIFY_CHAR_SWITCH = "Char Switch: Notify"
-	L.SETTINGS_NOTIFY_CHAR_SWITCH_ENABLED = "Char Switch |cff00ff00ON|r"
-	L.SETTINGS_NOTIFY_CHAR_SWITCH_DISABLED = "Char Switch |cffff0000OFF|r"
-	L.SETTINGS_NOTIFY_GAME_SWITCH = "Game Switch: Notify"
-	L.SETTINGS_NOTIFY_GAME_SWITCH_ENABLED = "Game Switch |cff00ff00ON|r"
-	L.SETTINGS_NOTIFY_GAME_SWITCH_DISABLED = "Game Switch |cffff0000OFF|r"
 
 	-- Missing Descriptions
 	L.SETTINGS_HIDE_EMPTY_GROUPS_DESC = "Hide Empty"
@@ -944,12 +823,8 @@ local L = BFL_LOCALE
 	L.CORE_DB_MODULE_NOT_AVAIL = "DB Module unavail"
 	L.CORE_ACTIVITY_TRACKING_HEADER = "|cff00ff00=== Activity ===|r"
 	L.CORE_ACTIVITY_TOTAL_FRIENDS = "Friends Active: %d"
-	L.CORE_NOTIFICATION_MODULE_NOT_LOADED = "Notif Module not loaded"
 	L.CORE_BETA_FEATURES_DISABLED_MSG = "Beta Disabled!"
 	L.CORE_BETA_ENABLE_HINT = "|cffffcc00Enable:|r ESC > AddOns > BFL"
-	L.CORE_TRIGGERING_TEST_NOTIFICATIONS = "Testing notif..."
-	L.CORE_TEST_NOTIFICATIONS_SUCCESS = "|cff00ff00Success!|r"
-	L.CORE_TEST_NOTIFICATIONS_TIP = "|cffffcc00Tip:|r Use Edit Mode."
 	L.CORE_STATISTICS_MODULE_NOT_LOADED = "Stats not loaded"
 	L.CORE_STATISTICS_HEADER = "|cff00ff00=== Statistics ===|r"
 	L.CORE_STATS_OVERVIEW = "|cffffcc00Summary:|r"
@@ -1031,7 +906,6 @@ local L = BFL_LOCALE
 	L.CORE_HELP_CMD_DATABASE = "  |cffffffff/bfl database|r - Show DB"
 	L.CORE_HELP_CMD_ACTIVITY = "  |cffffffff/bfl activity|r - Show Activity"
 	L.CORE_HELP_CMD_STATS = "  |cffffffff/bfl stats|r - Show Stats"
-	L.CORE_HELP_CMD_TESTNOTIFY = "  |cffffffff/bfl testnotify|r - Test Notif"
 	L.CORE_HELP_CMD_TESTGROUP = "  |cffffffff/bfl testgrouprules|r - Test Rules"
 	L.CORE_HELP_QJ_COMMANDS = "|cffffcc00Quick Join:|r"
 	L.CORE_HELP_QJ_MOCK = "  |cffffffff/bfl qj mock|r - Mock"
@@ -1165,17 +1039,6 @@ local L = BFL_LOCALE
 	L.MOBILE_STATUS = "移动版"
 	L.RAF_RECRUITMENT = "战友招募"
 	L.SETTINGS_COLOR_CLASS_NAMES_DESC = "用职业颜色显示好友名字"
-	L.SETTINGS_NOTIFY_TITLE = "通知"
-	L.SETTINGS_NOTIFY_DESC = "配置智能好友通知。"
-	L.SETTINGS_NOTIFY_DISPLAY_HEADER = "显示"
-	L.SETTINGS_NOTIFY_DISPLAY_MODE = "模式："
-	L.SETTINGS_NOTIFY_MODE_TOAST = "弹出通知"
-	L.SETTINGS_NOTIFY_MODE_CHAT = "聊天消息"
-	L.SETTINGS_NOTIFY_MODE_DISABLED = "已禁用"
-	L.SETTINGS_NOTIFY_MODE_NONE = "已禁用"
-	L.SETTINGS_NOTIFY_MODE_BOTH = "两者"
-	L.SETTINGS_NOTIFY_TEST = "测试通知"
-	L.SETTINGS_NOTIFY_MODE_DESC = "|cffffcc00弹出通知:|r 紧凑弹出窗口\n|cffffcc00聊天消息:|r 聊天窗口文本\n|cffffcc00已禁用:|r 无通知"
 
 
 	-- Font Outline/Shadow Settings

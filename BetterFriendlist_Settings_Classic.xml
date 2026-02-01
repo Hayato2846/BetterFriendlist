@@ -70,21 +70,11 @@
 					</OnClick>
 				</Scripts>
 			</Button>
-			<!-- Tab 5: Notifications (Beta) -->
-			<Button name="$parentTab5" parentKey="Tab5" inherits="PanelTopTabButtonTemplate" text="Notifications" id="5">
-				<Anchors>
-					<Anchor point="LEFT" relativeKey="$parent.Tab4" relativePoint="RIGHT" x="-5" y="0" />
-				</Anchors>
-				<Scripts>
-					<OnClick>
-						BetterFriendlistSettings_ShowTab(5)
-					</OnClick>
-				</Scripts>
-			</Button>
+
 			<!-- Tab 6: Global Sync (Beta) -->
 			<Button name="$parentTab6" parentKey="Tab6" inherits="PanelTopTabButtonTemplate" text="Global Sync" id="6">
 				<Anchors>
-					<Anchor point="LEFT" relativeKey="$parent.Tab5" relativePoint="RIGHT" x="-5" y="0" />
+					<Anchor point="LEFT" relativeKey="$parent.Tab4" relativePoint="RIGHT" x="-5" y="0" />
 				</Anchors>
 				<Scripts>
 					<OnClick>
@@ -154,14 +144,7 @@
 								</Anchors>
 							</Frame>
 							
-							<!-- Notifications Tab Content (BETA) -->
-							<Frame parentKey="NotificationsTab" hidden="true">
-								<Anchors>
-									<Anchor point="TOPLEFT" />
-									<Anchor point="BOTTOMRIGHT" />
-								</Anchors>
-							</Frame>
-							
+
 							<!-- Data Broker Tab Content (STABLE) -->
 							<Frame parentKey="BrokerTab" hidden="true">
 								<Anchors>

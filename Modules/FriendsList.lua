@@ -3179,51 +3179,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) local groupId 
 						
 						rootDescription:CreateDivider()
 						
-					-- Notification Rules for Group (Beta Features)
-					if BetterFriendlistDB.enableBetaFeatures then
-						local notificationButton = rootDescription:CreateButton(BFL.L.MENU_NOTIFICATIONS)
-						
-						notificationButton:CreateRadio(
-							BFL.L.MENU_NOTIFY_DEFAULT,
-							function() local rule = BetterFriendlistDB.notificationGroupRules and BetterFriendlistDB.notificationGroupRules[self.groupId]
-								return not rule or rule == "default"
-							end,
-							function() if not BetterFriendlistDB.notificationGroupRules then
-									BetterFriendlistDB.notificationGroupRules = {}
-								end
-								BetterFriendlistDB.notificationGroupRules[self.groupId] = "default"
-								BFL:DebugPrint(string.format(BFL.L.MSG_NOTIFY_DEFAULT, groupData.name))
-							end
-						)
-						
-						notificationButton:CreateRadio(
-							BFL.L.MENU_NOTIFY_WHITELIST,
-							function() local rule = BetterFriendlistDB.notificationGroupRules and BetterFriendlistDB.notificationGroupRules[self.groupId]
-								return rule == "whitelist"
-							end,
-							function() if not BetterFriendlistDB.notificationGroupRules then
-									BetterFriendlistDB.notificationGroupRules = {}
-								end
-								BetterFriendlistDB.notificationGroupRules[self.groupId] = "whitelist"
-								BFL:DebugPrint(string.format(BFL.L.MSG_NOTIFY_WHITELIST, groupData.name))
-							end
-						)
-						
-						notificationButton:CreateRadio(
-							BFL.L.MENU_NOTIFY_BLACKLIST,
-							function() local rule = BetterFriendlistDB.notificationGroupRules and BetterFriendlistDB.notificationGroupRules[self.groupId]
-								return rule == "blacklist"
-							end,
-							function() if not BetterFriendlistDB.notificationGroupRules then
-									BetterFriendlistDB.notificationGroupRules = {}
-								end
-								BetterFriendlistDB.notificationGroupRules[self.groupId] = "blacklist"
-								BFL:DebugPrint(string.format(BFL.L.MSG_NOTIFY_BLACKLIST, groupData.name))
-							end
-						)
-						
-						rootDescription:CreateDivider()
-					end
+
 					
 					-- Group-wide action buttons
 					rootDescription:CreateButton(BFL.L.MENU_COLLAPSE_ALL, function() for gid in pairs(Groups.groups) do
