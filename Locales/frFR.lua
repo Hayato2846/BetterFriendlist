@@ -742,6 +742,7 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Évite chevauchements avec autres fenêtr
 	L.SETTINGS_NAME_FORMAT_LABEL = "Format :"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP = "Format Nom"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP_DESC = "Entrez une chaîne de format."
+	L.SETTINGS_NAME_FORMAT_DISABLED_FRIENDLISTCOLORS = "This setting is disabled because the addon 'FriendListColors' is managing name colors/formats."
 
 	-- In-Game Group
 	L.SETTINGS_SHOW_INGAME_GROUP = "Groupe 'En Jeu'"

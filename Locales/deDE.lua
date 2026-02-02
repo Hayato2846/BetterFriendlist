@@ -765,6 +765,7 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	-- Settings Extended
 	L.SETTINGS_NAME_FORMAT_TOOLTIP = "Namensanzeigeformat"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP_DESC = "Gib einen Format-String mit Tokens ein."
+	L.SETTINGS_NAME_FORMAT_DISABLED_FRIENDLISTCOLORS = "This setting is disabled because the addon 'FriendListColors' is managing name colors/formats."
 	L.SETTINGS_INGAME_MODE_WOW = "Nur WoW (Gleiche Ära)"
 	L.SETTINGS_INGAME_MODE_ANY = "Jedes Spiel"
 	L.SETTINGS_INGAME_MODE_LABEL = "   Modus:"

@@ -3505,8 +3505,14 @@ function FriendsList:GetFormattedButtonText(friend)
 	-- External Formatter Support (FriendListColors)
 	-- If FriendListColors is loaded, use it to format the name text (Line 1)
 	local usedExternalFormatter = false
-	-- Safety check: Ensure Format function exists (avoids error with old FLC versions)
-	if _G.FriendListColors and type(_G.FriendListColors.Format) == "function" then
+	-- Safety check: Ensure Format function exists
+	-- Only supporting the official public API (FriendListColorsAPI)
+	local formatFunc = nil
+	if _G.FriendListColorsAPI and type(_G.FriendListColorsAPI.Format) == "function" then
+		formatFunc = _G.FriendListColorsAPI.Format
+	end
+
+	if formatFunc then
 		local flcData = {}
 		flcData.isBNet = (friend.type == "bnet")
 		
@@ -3543,7 +3549,7 @@ function FriendsList:GetFormattedButtonText(friend)
 		end
 		
 		-- Use pcall for safety against external errors
-		local success, flcText = pcall(_G.FriendListColors.Format, flcData)
+		local success, flcText = pcall(formatFunc, flcData)
 		if success and flcText and flcText ~= "" then
 			line1Text = flcText
 			usedExternalFormatter = true

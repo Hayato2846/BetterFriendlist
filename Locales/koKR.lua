@@ -738,6 +738,7 @@ local L = BFL_LOCALE
 	L.SETTINGS_NAME_FORMAT_LABEL = "형식:"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP = "Name Format"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP_DESC = "Enter format."
+	L.SETTINGS_NAME_FORMAT_DISABLED_FRIENDLISTCOLORS = "This setting is disabled because the addon 'FriendListColors' is managing name colors/formats."
 
 	-- In-Game Group
 	L.SETTINGS_SHOW_INGAME_GROUP = "'In Game' Group"

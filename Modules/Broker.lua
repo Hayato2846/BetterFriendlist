@@ -2048,9 +2048,25 @@ function Broker:Initialize()
 		icon = "Interface\\AddOns\\BetterFriendlist\\Textures\\PortraitIcon.blp",
 		label = L("BROKER_TITLE"),
 
-		OnTooltipShow = function(gameTooltip)
-			-- Fallback for display addons that use OnTooltipShow (without LibQTip support)
-			if not LQT and gameTooltip and gameTooltip.AddLine then
+		OnClick = function(clickedFrame, button)
+			Broker:OnClick(clickedFrame, button)
+		end,
+	}
+
+	-- Define Tooltip Handlers based on LibQTip availability
+	-- LDB Spec: Display addons prefer OnEnter over OnTooltipShow.
+	if LQT then
+		-- Use OnEnter for rich LibQTip tooltip
+		dataObjectDef.OnEnter = function(anchorFrame)
+			tooltip = CreateLibQTipTooltip(anchorFrame)
+		end
+		-- We do NOT define OnLeave here to allow the display addon to handle its own cleanup/unhighlighting.
+		-- Our tooltip handles its own hiding via SetupTooltipAutoHide.
+	else
+		-- Fallback: Use OnTooltipShow for standard GameTooltip
+		-- Only defined if LQT is missing, so display addons don't prioritize this over OnEnter
+		dataObjectDef.OnTooltipShow = function(gameTooltip)
+			if gameTooltip and gameTooltip.AddLine then
 				-- Choose tooltip mode
 				if BetterFriendlistDB.brokerTooltipMode == "advanced" then
 					CreateAdvancedTooltip(gameTooltip)
@@ -2058,23 +2074,7 @@ function Broker:Initialize()
 					CreateBasicTooltip(gameTooltip)
 				end
 			end
-		end,
-
-		OnClick = function(clickedFrame, button)
-			Broker:OnClick(clickedFrame, button)
-		end,
-	}
-
-	-- Only add OnEnter if LibQTip is available
-	-- LDB Spec: Display addons prefer OnEnter over OnTooltipShow.
-	-- If we define OnEnter but LQT is missing, the function would be empty and
-	-- the display addon would skip OnTooltipShow, resulting in NO tooltip.
-	if LQT then
-		dataObjectDef.OnEnter = function(anchorFrame)
-			tooltip = CreateLibQTipTooltip(anchorFrame)
 		end
-		-- We do NOT define OnLeave here to allow the display addon to handle its own cleanup/unhighlighting.
-		-- Our tooltip handles its own hiding via SetupTooltipAutoHide.
 	end
 
 	dataObject = LDB:NewDataObject("BetterFriendlist", dataObjectDef)

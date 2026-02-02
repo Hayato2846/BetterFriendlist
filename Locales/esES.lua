@@ -741,6 +741,7 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita solapamientos con otras ventanas (P
 	L.SETTINGS_NAME_FORMAT_LABEL = "Formato:"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP = "Formato de Nombre"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP_DESC = "Introduce una cadena de formato usando tokens."
+	L.SETTINGS_NAME_FORMAT_DISABLED_FRIENDLISTCOLORS = "This setting is disabled because the addon 'FriendListColors' is managing name colors/formats."
 
 	-- In-Game Group
 	L.SETTINGS_SHOW_INGAME_GROUP = "Mostrar Grupo 'En Juego'"

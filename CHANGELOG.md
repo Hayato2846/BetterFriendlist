@@ -15,7 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Faction Backgrounds** - Added an option to show faction-colored backgrounds (Blue/Red) for friends in the list (Settings -> General).
 - **Streamer Mode** - Added customizable name masking (BattleTag, Nickname, Note) and optional purple header background (Settings -> Streamer Mode).
 
+### Changed
+- **Compatibility** - Automatically disables Name Format settings when "FriendListColors" addon is detected to prevent conflicts.
+- **UI Layout** - Shifted the Font Size sliders in the Settings panel 10px to the left to improve alignment with other elements.
+
 ### Fixed
+- **Broker Tooltip** - Resolved an issue where the tooltip would not display correctly with display addons like ChocolateBar.
 - **Context Menu Privacy** - Right-click menu headers now respect Streamer Mode masking, displaying the safe name (Nickname/Note) instead of the Real Name.
 - **ElvUI Skin** - Fixed a Lua error ("index field 'BFLCheckmark'") that could occur when other addons (like ToyBoxEnhanced) create menus that BetterFriendlist tries to skin.
 - **Tab Resizing** - Tabs now respect a minimum width (60px for Top, 80px for Bottom) to prevent them from becoming too narrow when text is short (e.g., "Sort" or "Who").

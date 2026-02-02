@@ -144,7 +144,7 @@ function Components:CreateSlider(parent, labelText, min, max, initialValue, form
 	holder:SetScript("OnSizeChanged", function(self, width, height)
 		-- Sliders now use FIXED_CONTROL_WIDTH to align with Dropdowns
 		holder.Slider:ClearAllPoints()
-		holder.Slider:SetPoint("RIGHT", self, "RIGHT", 0, 0)
+		holder.Slider:SetPoint("RIGHT", self, "RIGHT", -20, 0)
 		holder.Slider:SetWidth(FIXED_CONTROL_WIDTH)
 		
 		-- Label takes remaining space

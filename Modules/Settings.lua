@@ -2852,8 +2852,14 @@ function Settings:RefreshGeneralTab()
 	nameFormatDesc:SetPoint("LEFT", 20, 0) -- Align with components
 	nameFormatDesc:SetJustifyH("LEFT")
 	nameFormatDesc:SetWordWrap(true)
-	nameFormatDesc:SetTextColor(1, 1, 1)
-	nameFormatDesc:SetText(L.SETTINGS_NAME_FORMAT_DESC or "Customize how friend names are displayed using tokens:\n|cffFFD100%name%|r - Account Name (RealID/BattleTag)\n|cffFFD100%note%|r - Note (BNet or WoW)\n|cffFFD100%nickname%|r - Custom Nickname\n|cffFFD100%battletag%|r - Short BattleTag (no #1234)")
+	
+	-- MODIFIED: Show warning text if FriendListColors is active, otherwise show instructions
+	if _G.FriendListColorsAPI then
+		nameFormatDesc:SetText("|cffFF3333" .. (L.SETTINGS_NAME_FORMAT_DISABLED_FRIENDLISTCOLORS or "This setting is disabled because the addon 'FriendListColors' is managing name colors/formats.") .. "|r")
+	else
+		nameFormatDesc:SetTextColor(1, 1, 1)
+		nameFormatDesc:SetText(L.SETTINGS_NAME_FORMAT_DESC or "Customize how friend names are displayed using tokens:\n|cffFFD100%name%|r - Account Name (RealID/BattleTag)\n|cffFFD100%note%|r - Note (BNet or WoW)\n|cffFFD100%nickname%|r - Custom Nickname\n|cffFFD100%battletag%|r - Short BattleTag (no #1234)")
+	end
 	table.insert(allFrames, nameFormatDesc)
 
 	-- Name Format EditBox Container
@@ -2891,15 +2897,30 @@ function Settings:RefreshGeneralTab()
 	-- Add tooltip to EditBox
 	nameFormatBox:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText(L.SETTINGS_NAME_FORMAT_TOOLTIP or "Name Display Format", 1, 1, 1)
-		GameTooltip:AddLine(L.SETTINGS_NAME_FORMAT_TOOLTIP_DESC or "Enter a format string using tokens.", 0.8, 0.8, 0.8, true)
-		GameTooltip:AddLine("Example: %name% (%nickname%)", 0.8, 0.8, 0.8, true)
+		
+		if _G.FriendListColorsAPI then
+			GameTooltip:SetText(L.SETTINGS_NAME_FORMAT_TOOLTIP or "Name Display Format", 0.5, 0.5, 0.5)
+			GameTooltip:AddLine(L.SETTINGS_NAME_FORMAT_DISABLED_FRIENDLISTCOLORS or "This setting is disabled because the addon 'FriendListColors' is managing name colors/formats.", 1, 0.2, 0.2, true)
+		else
+			GameTooltip:SetText(L.SETTINGS_NAME_FORMAT_TOOLTIP or "Name Display Format", 1, 1, 1)
+			GameTooltip:AddLine(L.SETTINGS_NAME_FORMAT_TOOLTIP_DESC or "Enter a format string using tokens.", 0.8, 0.8, 0.8, true)
+			GameTooltip:AddLine("Example: %name% (%nickname%)", 0.8, 0.8, 0.8, true)
+		end
+		
 		GameTooltip:Show()
 	end)
 	nameFormatBox:SetScript("OnLeave", function(self)
 		GameTooltip:Hide()
 	end)
 	
+	-- Disable Name Formatting if FriendListColors is active
+	if _G.FriendListColorsAPI then
+		nameFormatBox:Disable()
+		nameFormatBox:SetTextColor(0.5, 0.5, 0.5)
+		if nameFormatLabel then nameFormatLabel:SetTextColor(0.5, 0.5, 0.5) end
+		-- Description text is handled above (shown in red)
+	end
+
 	table.insert(allFrames, nameFormatContainer)
 	
 	-- Spacer before next section

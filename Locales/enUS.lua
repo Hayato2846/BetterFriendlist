@@ -733,6 +733,7 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	L.SETTINGS_NAME_FORMAT_LABEL = "Format:"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP = "Name Display Format"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP_DESC = "Enter a format string using tokens."
+	L.SETTINGS_NAME_FORMAT_DISABLED_FRIENDLISTCOLORS = "This setting is disabled because the addon 'FriendListColors' is managing name colors/formats."
 
 	-- In-Game Group
 	L.SETTINGS_SHOW_INGAME_GROUP = "Show 'In-Game' Group"
