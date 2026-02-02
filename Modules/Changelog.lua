@@ -18,13 +18,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [DRAFT]
+## [2.2.8] - 2026-02-02
 ### Added
-- **Favorite Icons** - Added an option to toggle the star icon for favorites directly on the friend button (Settings -> General).
+- **Streamer Mode** - Added Streamer Mode! When enabled you can toggle streamer mode to hide friend informations like Real IDs or your own battletag for privacy reasons. Real IDs will be hidden for following UI elements: Friend Name, Friend Tooltip, QuickJoin. You can change your own BattleTag with custom text in settings.
+- **Favorite Icons** - Added an option to toggle the star icon for favorites directly on the friend button (Settings -> General). While enabled, favorite friends will be sorted above other friends in the same sorting subgroup.
 - **Faction Backgrounds** - Added an option to show faction-colored backgrounds (Blue/Red) for friends in the list (Settings -> General).
+- **Friend List Colors Support** - Automatically disables Name Format settings when "FriendListColors" addon is detected. When Friend List Colors is enabled all the name formatting actions will be led by the addon (Streamer Mode excluded).
+- **Settings Layout** - Updated settings layout to better support future categories.
+- **More Font Settings** - Added Font Settings for Tab Texts and Raid Player Name.
+- **Window Lock Option** - Added option to lock the window to prevent moving it accidentally.
+
+### Changed
+- **Global Sync** - Global Sync is now flagged as stable feature and can be used without enabling beta features in BFL.
+
+### Removed
+- **Edit Mode** - Abandoned BFL's Edit Mode Support for now. Settings for width, height and scale can be found in settings instead. If the position, width, height or scale is different after the update please adjust it again - I wasn't able to restore all variants of Edit Mode Profiles to my settings. Sorry for the inconvenience!
+- **Notification System** - Removed Notification Beta System for now. Might be added again in the future
 
 ### Fixed
+- **Broker Tooltip** - Resolved an issue where the tooltip would not display correctly with display addons like ChocolateBar.
 - **ElvUI Skin** - Fixed a Lua error ("index field 'BFLCheckmark'") that could occur when other addons (like ToyBoxEnhanced) create menus that BetterFriendlist tries to skin.
+- **Groups Cache** - Fixed an issue with groups caching sometimes not updating properly when changing groups of a friend.
 
 ## [2.2.7] - 2026-01-31
 ### Fixed

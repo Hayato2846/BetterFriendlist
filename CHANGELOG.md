@@ -7,26 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [DRAFT]
+## [2.2.8] - 2026-02-02
 ### Added
-- **Streamer Mode Visibility** - Character names and game info (Rich Presence) are now visible in Streamer Mode, while the primary name remains masked (Nickname/Note).
-- **Consistent Masking** - Name formatting (Nickname/Note) is now correctly applied to Friend Tooltips and Quick Join groups in Streamer Mode.
-- **Favorite Icons** - Added an option to toggle the star icon for favorites directly on the friend button (Settings -> General).
+- **Streamer Mode** - Added Streamer Mode! When enabled you can toggle streamer mode to hide friend informations like Real IDs or your own battletag for privacy reasons. Real IDs will be hidden for following UI elements: Friend Name, Friend Tooltip, QuickJoin. You can change your own BattleTag with custom text in settings.
+- **Favorite Icons** - Added an option to toggle the star icon for favorites directly on the friend button (Settings -> General). While enabled, favorite friends will be sorted above other friends in the same sorting subgroup.
 - **Faction Backgrounds** - Added an option to show faction-colored backgrounds (Blue/Red) for friends in the list (Settings -> General).
-- **Streamer Mode** - Added customizable name masking (BattleTag, Nickname, Note) and optional purple header background (Settings -> Streamer Mode).
+- **Friend List Colors Support** - Automatically disables Name Format settings when "FriendListColors" addon is detected. When Friend List Colors is enabled all the name formatting actions will be led by the addon (Streamer Mode excluded).
+- **Settings Layout** - Updated settings layout to better support future categories.
+- **More Font Settings** - Added Font Settings for Tab Texts and Raid Player Name.
+- **Window Lock Option** - Added option to lock the window to prevent moving it accidentally.
 
 ### Changed
-- **Compatibility** - Automatically disables Name Format settings when "FriendListColors" addon is detected to prevent conflicts.
-- **UI Layout** - Shifted the Font Size sliders in the Settings panel 10px to the left to improve alignment with other elements.
+- **Global Sync** - Global Sync is now flagged as stable feature and can be used without enabling beta features in BFL.
+
+### Removed
+- **Edit Mode** - Abandoned BFL's Edit Mode Support for now. Settings for width, height and scale can be found in settings instead. If the position, width, height or scale is different after the update please adjust it again - I wasn't able to restore all variants of Edit Mode Profiles to my settings. Sorry for the inconvenience!
+- **Notification System** - Removed Notification Beta System for now. Might be added again in the future
 
 ### Fixed
 - **Broker Tooltip** - Resolved an issue where the tooltip would not display correctly with display addons like ChocolateBar.
-- **Context Menu Privacy** - Right-click menu headers now respect Streamer Mode masking, displaying the safe name (Nickname/Note) instead of the Real Name.
 - **ElvUI Skin** - Fixed a Lua error ("index field 'BFLCheckmark'") that could occur when other addons (like ToyBoxEnhanced) create menus that BetterFriendlist tries to skin.
-- **Tab Resizing** - Tabs now respect a minimum width (60px for Top, 80px for Bottom) to prevent them from becoming too narrow when text is short (e.g., "Sort" or "Who").
-- **Streamer Mode Refresh** - Quick Join tab now updates immediately when toggling Streamer Mode.
-- **Streamer Mode Safety** - Added explicit fallback protection to ensure Real Names (Account Name) are NEVER displayed, even if BattleTag data is missing. It now defaults to "Unknown" instead of risking a privacy leak.
-- **Tab Sizing** - Restored original padding for Top Tabs to prevent them from shrinking when switching tabs.
+- **Groups Cache** - Fixed an issue with groups caching sometimes not updating properly when changing groups of a friend.
 
 ## [2.2.7] - 2026-01-31
 ### Fixed
