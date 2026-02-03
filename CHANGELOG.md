@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [DRAFT]
+## [2.2.9] - 2026-02-03
 ### Fixed
-- **Friend Button Layout** - Fixed an issue where the friend name text would not resize correctly when resizing the friends list window. It now dynamically adjusts width to fit new dimensions.
+- **Friend Button Layout** - Fixed an issue where Friend Name and Friend Info would not resize properly after adjusting Width via Settings.
+- **Database Initialization** - Fixed a database initialization error.
+- **QuickFilters** - Fixed a QuickFilter database issue causing filters to not update properly.
 
 ## [2.2.8] - 2026-02-02
 ### Added
