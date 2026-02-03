@@ -391,6 +391,19 @@ local function CreateElementFactory(friendsList) -- Capture friendsList referenc
 			button:SetScript("OnDragStart", Button_OnDragStart)
 			button:SetScript("OnDragStop", Button_OnDragStop)
 
+			-- FIX: Responsive Layout (Phase 28)
+			-- Ensure text width updates when button width changes (e.g. resizing frame)
+			if not button.resizeHooked then
+				button:SetScript("OnSizeChanged", function(self, width, height)
+					local padding = self.textRightPadding or 80 -- Default fallback
+					local nameWidth = width - 44 - padding
+					if nameWidth < 10 then nameWidth = 10 end
+					if self.Name then self.Name:SetWidth(nameWidth) end
+					if self.Info then self.Info:SetWidth(nameWidth) end
+				end)
+				button.resizeHooked = true
+			end
+
 			button.initialized = true
 		end
 
@@ -2236,6 +2249,14 @@ function FriendsList:SetFilterMode(mode) local newMode = mode or "all"
 		return
 	end
 	self.filterMode = newMode
+	
+	-- Save to database
+	local DB = BFL:GetModule("DB")
+	if DB then
+		local db = DB:Get()
+		db.quickFilter = self.filterMode
+	end
+	
 	BFL:ForceRefreshFriendsList()
 end
 
@@ -4231,6 +4252,25 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 		if button.lastLine2Text ~= line2Text then
 			button.Info:SetText(line2Text)
 			button.lastLine2Text = line2Text
+		end
+	end
+	
+	-- Auto-Resize Text: Calculate dynamic padding based on visible right-side elements
+	local padding = 25 -- Base padding (safe margin from right edge)
+	
+	-- GameIcon (Status/Client) is at -38, width 28 -> Left edge at -66
+	if button.gameIcon and button.gameIcon:IsShown() then
+		padding = 80 -- Clear -66px with margin
+	-- TravelPass (Invite) is at -8, width 24 -> Left edge at -32
+	elseif button.travelPassButton and button.travelPassButton:IsShown() then
+		padding = 45 -- Clear -32px with margin
+	end
+	
+	if button.textRightPadding ~= padding then
+		button.textRightPadding = padding
+		-- Force update immediately if padding changed
+		if button:GetScript("OnSizeChanged") then
+			button:GetScript("OnSizeChanged")(button, button:GetWidth(), button:GetHeight())
 		end
 	end
 	

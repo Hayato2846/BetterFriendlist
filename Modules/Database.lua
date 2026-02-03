@@ -81,6 +81,10 @@ local defaults = {
 	secondarySort = "name", -- Secondary sort method: none, name, level, zone (default: name)
 	-- Filter Settings
 	quickFilter = "all", -- Quick filter mode: all, online, offline, wow, bnet (default: all)
+	-- Streamer Mode
+	streamerModeActive = false, -- Enable Streamer Mode (default: OFF)
+	showStreamerModeButton = true, -- Show Streamer Mode button (default: ON)
+	streamerModeHeaderText = "Streamer Mode", -- Text to replace BattleTag with
 	-- Debug Settings
 	debugPrintEnabled = false, -- Toggle debug prints with /bfl debug print
 	-- Beta Features

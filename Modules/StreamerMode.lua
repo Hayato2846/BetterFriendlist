@@ -6,11 +6,8 @@ BFL.StreamerMode = StreamerMode
 BFL.Modules["StreamerMode"] = StreamerMode
 
 function StreamerMode:Initialize()
-    -- Initialize DB Settings
-    local db = BetterFriendlistDB
-    if db.streamerModeActive == nil then db.streamerModeActive = false end
-    if db.showStreamerModeButton == nil then db.showStreamerModeButton = true end
-    if db.streamerModeHeaderText == nil then db.streamerModeHeaderText = "Streamer Mode" end
+    -- Enable Streamer Mode if DB has it active (defaults handled in Database.lua)
+    self:UpdateState()
     
     -- Find the XML button
     if BetterFriendsFrame and BetterFriendsFrame.StreamerModeButton then

@@ -1993,7 +1993,8 @@ local MOCK_PLAYER_NAMES = {
 	"Chromie", "Wrathion", "Alexstrasza", "Ysera", "Nozdormu", "Kalecgos", "Ebonhorn",
 	-- Common MMO-style Names
 	"Shadowblade", "Lightforge", "Stormwind", "Ironhammer", "Darkflame", "Frostweaver",
-	"Sunfire", "Moonshade", "Earthshaker", "Windwalker", "Bloodfang", "Steelclaw"
+	"Sunfire", "Moonshade", "Earthshaker", "Windwalker", "Bloodfang", "Steelclaw",
+	"VeryLongNamePleaseTruncateMeCorrectlyOrResizeMeIfYouCanDoThatWithoutBreakingLayout"
 }
 
 -- Class data with role assignments
@@ -2164,7 +2165,15 @@ local function GenerateRaidComposition(numMembers)
 	local currentGroup = 3
 	local membersInGroup = 0
 	for i = 1, numDPS do
-		local name = getUniqueName()
+		local name
+		if i == 1 then
+			-- Force one long name for testing truncation/resizing
+			name = "VeryLongNamePleaseTruncateMeCorrectlyOrResizeMeIfYouCanDoThatWithoutBreakingLayout"
+			usedNames[name] = true
+		else
+			name = getUniqueName()
+		end
+		
 		local classInfo = getClassForRole("DAMAGER")
 		local rank = (i == 1) and 1 or 0  -- First DPS is assistant
 		

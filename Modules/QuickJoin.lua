@@ -1989,7 +1989,8 @@ local MOCK_PLAYER_NAMES = {
 	"Thrall", "Sylvanas", "Baine", "Lor'themar", "Thalyssra", "Gazlowe", "Ji", 
 	"Rokhan", "Geya'rah", "Calia", "Eitrigg", "Saurfang", "Vol'jin", "Rexxar",
 	-- Neutral
-	"Chromie", "Wrathion", "Alexstrasza", "Ysera", "Nozdormu", "Kalecgos"
+	"Chromie", "Wrathion", "Alexstrasza", "Ysera", "Nozdormu", "Kalecgos",
+	"VeryLongNamePleaseTruncateMeCorrectlyOrResizeMeIfYouCanDoThatWithoutBreakingLayout"
 }
 
 -- Realistic activity names by type
@@ -2003,12 +2004,14 @@ local MOCK_ACTIVITIES = {
 		{"BRH Fortified Farm", "Mythic+ Dungeon", "Quick runs, know the dungeon"},
 		{"Atal'Dazar +18", "Mythic+ Dungeon", "Learning route, be patient"},
 		{"Stonevault +25 Title", "Mythic+ Dungeon", "0.1% title push, 3k+ only"},
+		{"ThisIsAVeryLongSocialQueueTitleThatIdeallyShouldTruncateOrWrapCorrectlyInTheList", "Mythic+ Dungeon", "Testing long names in Social Queue"},
 	},
 	lfglist_raid = {
 		{"Nerub-ar Palace Normal", "Raid", "Full clear, new players welcome"},
 		{"NaP Heroic - AOTC Run", "Raid", "Link AOTC or 580+ ilvl"},
 		{"Queen Ansurek Only", "Raid", "Farm boss, know mechanics"},
 		{"Palace Mythic Progress", "Raid", "Guild run, need 1 healer"},
+		{"AnotherVeryLongRaidTitleForTestingTruncationInTheSocialQueueListLayout", "Raid", "Testing long raid names"},
 	},
 	lfg_dungeon = {
 		{"Random Heroic", "Heroic Dungeon"},

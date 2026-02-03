@@ -657,8 +657,9 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 			BFL.L = _G["BFL_L"]
 			
 			-- Initialize database
-			if BFL.DB then
-				BFL.DB:Initialize()
+			local DB = BFL:GetModule("DB")
+			if DB then
+				DB:Initialize()
 			end
 			
 			-- Load debug flag from DB
@@ -671,7 +672,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 			
 			-- Initialize all modules
 			for name, module in pairs(BFL.Modules) do
-				if module.Initialize then
+				if name ~= "DB" and module.Initialize then
 					module:Initialize()
 				end
 			end

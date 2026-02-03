@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+### Fixed
+- **Friend Button Layout** - Fixed an issue where the friend name text would not resize correctly when resizing the friends list window. It now dynamically adjusts width to fit new dimensions.
+
 ## [2.2.8] - 2026-02-02
 ### Added
 - **Streamer Mode** - Added Streamer Mode! When enabled you can toggle streamer mode to hide friend informations like Real IDs or your own battletag for privacy reasons. Real IDs will be hidden for following UI elements: Friend Name, Friend Tooltip, QuickJoin. You can change your own BattleTag with custom text in settings.

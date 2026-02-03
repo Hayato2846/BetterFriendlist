@@ -37,7 +37,8 @@ local MOCK_NAMES = {
 	"Shadowblade", "Lightforge", "Stormwind", "Ironhammer", "Darkflame", "Frostweaver",
 	"Sunfire", "Moonshade", "Earthshaker", "Windwalker", "Bloodfang", "Steelclaw",
 	"Nightwhisper", "Dawnbringer", "Fireheart", "Icefury", "Thunderstrike", "Soulkeeper",
-	"Starseeker", "Voidwalker", "Felguard", "Spiritbinder", "Stormrage", "Proudmoore"
+	"Starseeker", "Voidwalker", "Felguard", "Spiritbinder", "Stormrage", "Proudmoore",
+	"VeryLongNamePleaseTruncateMeCorrectlyOrResizeMeIfYouCanDoThatWithoutBreakingLayout"
 }
 
 -- Battle Tags for mock BNet friends
@@ -684,6 +685,14 @@ function PreviewMode:GenerateMockFriends()
 			note="日本語テスト (Japanese)",
 			zone="ドラゴンの島 (Dragon Isles)" 
 		},
+		{ 
+			name = "VeryLongNamePleaseTruncateMeCorrectlyOrResizeMeIfYouCanDoThatWithoutBreakingLayout", 
+			tag = "LongName#9999", 
+			uid="bnet_LongName#9999", 
+			group="favorites", 
+			note="This is a test entry for testing the font string resize behavior when resizing the frame width.",
+			zone="Stormwind City" 
+		},
 	}
 	
 	for i, data in ipairs(intFriends) do
@@ -737,6 +746,12 @@ function PreviewMode:GenerateMockFriends()
 			name = MOCK_NAMES[i + 20],
 		}))
 	end
+
+	-- Add explicit Long Name WoW Friend
+	table.insert(self.mockData.friends, GenerateMockWoWFriend(150, true, {
+		name = "VeryLongNamePleaseTruncateMeCorrectlyOrResizeMeIfYouCanDoThatWithoutBreakingLayout",
+		notes = "Testing WoW friend name truncation logic",
+	}))
 	
 	-- Generate 4 offline WoW-only friends
 	for i = 5, 8 do
@@ -744,6 +759,12 @@ function PreviewMode:GenerateMockFriends()
 			name = MOCK_NAMES[i + 24],
 		}))
 	end
+	
+	-- Add explicit Long Name WoW Friend (Offline)
+	table.insert(self.mockData.friends, GenerateMockWoWFriend(151, false, {
+		name = "VeryLongNamePleaseTruncateMeCorrectlyOrResizeMeIfYouCanDoThatWithoutBreakingLayout", 
+		notes = "Testing Offline WoW friend name truncation logic",
+	}))
 end
 
 function PreviewMode:GenerateMockGroupsData()
