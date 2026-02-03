@@ -208,18 +208,27 @@ function RecentAllies:InitializeEntry(button, elementData)
 	button.CharacterData.Name:SetText(nameColor:WrapTextInColorCode(characterData.name))
 	button.CharacterData.Name:SetWidth(math.min(button.CharacterData.Name:GetUnboundedStringWidth(), 150))
 	
-	-- Set level with "Lvl " prefix (Line 1, Part 2)
+	-- Set level (Line 1, Part 2)
 	local levelColor = stateData.isOnline and NORMAL_FONT_COLOR or FRIENDS_GRAY_COLOR
-	button.CharacterData.Level:SetText(levelColor:WrapTextInColorCode(BFL.L.LEVEL_FORMAT:format(characterData.level)))
+	button.CharacterData.Level:SetText(levelColor:WrapTextInColorCode(characterData.level))
 	button.CharacterData.Level:SetWidth(button.CharacterData.Level:GetUnboundedStringWidth())
 	
-	-- Hide class name (no longer needed)
-	button.CharacterData.Class:SetText("")
+	-- Class (Line 1, Part 3)
+	if classInfo then
+		local classColor = stateData.isOnline and GetClassColorObj(classInfo.classFile) or FRIENDS_GRAY_COLOR
+		button.CharacterData.Class:SetText(classColor:WrapTextInColorCode(classInfo.className))
+	else
+		button.CharacterData.Class:SetText("")
+	end
 	
 	-- Update divider colors
 	if button.CharacterData.Dividers then
 		for _, divider in ipairs(button.CharacterData.Dividers) do
-			divider:SetVertexColor(levelColor:GetRGB())
+			if divider.SetTextColor then
+				divider:SetTextColor(levelColor:GetRGB())
+			else
+				divider:SetVertexColor(levelColor:GetRGB())
+			end
 		end
 	end
 	

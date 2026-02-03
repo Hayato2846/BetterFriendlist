@@ -386,6 +386,30 @@ function Groups:GetGroupIdByName(groupName)
 	return nil
 end
 
+-- Validate if a group name can be used
+function Groups:ValidateGroupName(groupName, currentGroupId)
+	if not groupName or groupName:gsub("%s+", "") == "" then
+		return false, BFL.L.ERROR_GROUP_NAME_EMPTY or "Group name cannot be empty"
+	end
+	
+	-- Generate unique ID from name (same logic as Create)
+	local potentialId = "custom_" .. groupName:gsub("%s+", "_"):lower()
+	local existingGroup = self.groups[potentialId]
+	
+	if existingGroup then
+		-- If we are renaming and the collision is with ourselves, it's fine
+		if currentGroupId and existingGroup.id == currentGroupId then
+			return true
+		end
+		
+		-- Also check if name matches exactly another group (just to be safe against ID collisions)
+		-- although ID collision implies name collision in our scheme usually
+		return false, BFL.L.ERROR_GROUP_EXISTS or "Group already exists"
+	end
+	
+	return true
+end
+
 -- Create a new custom group
 function Groups:Create(groupName)
 	if not groupName or groupName == "" then
@@ -482,6 +506,12 @@ end
 function Groups:Rename(groupId, newName)
 	if not groupId or not newName or newName == "" then
 		return false, BFL.L.ERROR_INVALID_GROUP_NAME
+	end
+	
+	-- Verify name validity using our centralized validator
+	local isValid, errorMsg = self:ValidateGroupName(newName, groupId)
+	if not isValid then
+		return false, errorMsg
 	end
 	
 	local group = self.groups[groupId]

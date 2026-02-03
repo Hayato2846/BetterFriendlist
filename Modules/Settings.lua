@@ -98,7 +98,7 @@ local function CreateGroupButton(parent, groupId, groupName, orderIndex)
 		end
 		
 		button.editButton:SetScript("OnClick", function(self)
-			StaticPopup_Show("BETTER_FRIENDLIST_RENAME_GROUP", nil, nil, groupId)
+			Settings:RenameGroup(groupId, groupName)
 		end)
 		
 		button.editButton:SetScript("OnEnter", function(self)
@@ -1190,64 +1190,9 @@ end
 
 -- Rename a custom group
 function Settings:RenameGroup(groupId, currentName)
-	StaticPopupDialogs["BETTERFRIENDLIST_RENAME_GROUP"] = {
-		text = string.format(L.DIALOG_RENAME_GROUP_SETTINGS, currentName),
-		button1 = L.DIALOG_RENAME_GROUP_BTN1,
-		button2 = L.DIALOG_RENAME_GROUP_BTN2,
-		hasEditBox = true,
-		maxLetters = 32,
-		editBoxWidth = 200,
-		OnShow = function(self)
-			self.EditBox:SetText(currentName)
-			self.EditBox:SetMaxLetters(32)
-			self.EditBox:SetFocus()
-			self.EditBox:HighlightText()
-		end,
-		OnAccept = function(self)
-			local newName = self.EditBox:GetText()
-			if newName and newName ~= "" and newName ~= currentName then
-				local Groups = BFL:GetModule("Groups")
-				if Groups then
-					local success = Groups:Rename(groupId, newName)
-					if success then
-						BFL:DebugPrint("|cff00ff00BetterFriendlist:|r " .. string.format(L.MSG_GROUP_RENAMED, newName))
-						Settings:RefreshGroupsTab()
-						-- Force full display refresh - groups affect display list structure
-						BFL:ForceRefreshFriendsList()
-					else
-						BFL:DebugPrint("|cffff0000BetterFriendlist:|r " .. L.ERROR_RENAME_FAILED)
-					end
-				end
-			end
-		end,
-		EditBoxOnEnterPressed = function(self)
-			local parent = self:GetParent()
-			local newName = parent.EditBox:GetText()
-			if newName and newName ~= "" and newName ~= currentName then
-				local Groups = BFL:GetModule("Groups")
-				if Groups then
-					local success = Groups:Rename(groupId, newName)
-					if success then
-						BFL:DebugPrint("|cff00ff00BetterFriendlist:|r " .. string.format(L.MSG_GROUP_RENAMED, newName))
-						Settings:RefreshGroupsTab()
-						-- Force full display refresh - groups affect display list structure
-						BFL:ForceRefreshFriendsList()
-					else
-						BFL:DebugPrint("|cffff0000BetterFriendlist:|r " .. L.ERROR_RENAME_FAILED)
-					end
-				end
-			end
-			parent:Hide()
-		end,
-		EditBoxOnEscapePressed = function(self)
-			self:GetParent():Hide()
-		end,
-		timeout = 0,
-		whileDead = true,
-		hideOnEscape = true,
-		preferredIndex = 3,
-	}
-	StaticPopup_Show("BETTERFRIENDLIST_RENAME_GROUP")
+	-- Use the centralized rename dialog from Dialogs.lua which has full validation support.
+	-- Pass groupId as data (4th arg) so OnShow/OnAccept can use it.
+	StaticPopup_Show("BETTER_FRIENDLIST_RENAME_GROUP", nil, nil, groupId)
 end
 
 -- Migrate from FriendGroups addon

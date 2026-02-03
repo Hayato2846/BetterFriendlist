@@ -16,6 +16,7 @@ local L = BFL_LOCALE
 	L.DIALOG_RENAME_GROUP_TEXT = "Gib einen neuen Namen für die Gruppe ein:"
 	L.DIALOG_RENAME_GROUP_BTN1 = "Umbenennen"
 	L.DIALOG_RENAME_GROUP_BTN2 = "Abbrechen"
+	L.DIALOG_RENAME_GROUP_SETTINGS = "Gruppe '%s' umbenennen:"
 	L.DIALOG_DELETE_GROUP_TEXT = "Gruppe wirklich löschen?\n\n|cffff0000Alle Freunde werden aus dieser Gruppe entfernt.|r"
 	L.DIALOG_DELETE_GROUP_BTN1 = "Löschen"
 	L.DIALOG_DELETE_GROUP_BTN2 = "Abbrechen"
@@ -167,6 +168,10 @@ local L = BFL_LOCALE
 	L.SORT_REALM = "Realm"
 	L.SORT_CHANGED = "Sortierung geändert auf: %s"
 	L.SORT_NONE = "Keine"
+	L.SORT_PRIMARY_LABEL = "Primäre Sortierung"
+	L.SORT_SECONDARY_LABEL = "Sekundäre Sortierung"
+	L.SORT_PRIMARY_DESC = "Wähle, wie die Freundesliste sortiert werden soll."
+	L.SORT_SECONDARY_DESC = "Sortiere hiernach, wenn primäre Werte gleich sind."
 	
 	-- ========================================
 	-- MENUS & CONTEXT MENUS
@@ -433,7 +438,7 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	L.RAF_MONTH_COUNT = "%d Monate von Freunden abonniert"
 	L.RAF_NEXT_REWARD_HELP = "Informationen zu 'Werbt einen Freund'-Belohnungen"
 	L.RAF_NO_RECRUITS_DESC = "Du hast noch keine Freunde geworben."
-	L.RAF_RECRUITED_FRIENDS_COUNT = "%d / %d Geworbene Freunde"
+	L.RAF_RECRUITED_FRIENDS_COUNT = "%d / %d"
 	L.RAF_RECRUITMENT = "Werbt einen Freund"
 	L.RAF_VIEW_ALL_REWARDS = "Alle Belohnungen ansehen"
 	L.RAID_GROUP_NAME = "Gruppe %d"

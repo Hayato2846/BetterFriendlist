@@ -86,7 +86,7 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 	local dropdown = frame.FriendsTabHeader.StatusDropdown
 	
 	-- Get current Battle.net status
-	local bnetAFK, bnetDND = select(5, BNGetInfo())
+	local bnetAFK, bnetDND = BFL.GetMyBNetStatus()
 	local bnStatus
 	if bnetAFK then
 		bnStatus = FRIENDS_TEXTURE_AFK
@@ -108,8 +108,7 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 			info.text = string.format("|T%s.tga:14:14:0:0|t %s", FRIENDS_TEXTURE_ONLINE, FRIENDS_LIST_AVAILABLE)
 			info.value = FRIENDS_TEXTURE_ONLINE
 			info.func = function()
-				BNSetAFK(false)
-				BNSetDND(false)
+				BFL.SetMyBNetStatus("online")
 				bnStatus = FRIENDS_TEXTURE_ONLINE
 				UIDropDownMenu_SetText(dropdown, string.format("|T%s.tga:14:14:-2:-2|t", FRIENDS_TEXTURE_ONLINE))
 			end
@@ -120,7 +119,7 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 			info.text = string.format("|T%s.tga:14:14:0:0|t %s", FRIENDS_TEXTURE_AFK, FRIENDS_LIST_AWAY)
 			info.value = FRIENDS_TEXTURE_AFK
 			info.func = function()
-				BNSetAFK(true)
+				BFL.SetMyBNetStatus("afk")
 				bnStatus = FRIENDS_TEXTURE_AFK
 				UIDropDownMenu_SetText(dropdown, string.format("|T%s.tga:14:14:-2:-2|t", FRIENDS_TEXTURE_AFK))
 			end
@@ -131,7 +130,7 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 			info.text = string.format("|T%s.tga:14:14:0:0|t %s", FRIENDS_TEXTURE_DND, FRIENDS_LIST_BUSY)
 			info.value = FRIENDS_TEXTURE_DND
 			info.func = function()
-				BNSetDND(true)
+				BFL.SetMyBNetStatus("dnd")
 				bnStatus = FRIENDS_TEXTURE_DND
 				UIDropDownMenu_SetText(dropdown, string.format("|T%s.tga:14:14:-2:-2|t", FRIENDS_TEXTURE_DND))
 			end
@@ -192,12 +191,11 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 			bnStatus = status
 			
 			if status == FRIENDS_TEXTURE_ONLINE then
-				BNSetAFK(false)
-				BNSetDND(false)
+				BFL.SetMyBNetStatus("online")
 			elseif status == FRIENDS_TEXTURE_AFK then
-				BNSetAFK(true)
+				BFL.SetMyBNetStatus("afk")
 			elseif status == FRIENDS_TEXTURE_DND then
-				BNSetDND(true)
+				BFL.SetMyBNetStatus("dnd")
 			end
 		end
 	end
@@ -528,8 +526,8 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 			primaryButton:HookScript("OnEnter", function()
 				local sortName = SORT_NAMES[FriendsList.sortMode] or "Status"
 				GameTooltip:SetOwner(primaryDropdown, "ANCHOR_RIGHT")
-				GameTooltip:SetText("Primary Sort: " .. sortName)
-				GameTooltip:AddLine("Main sorting criterion for friends list.", 1, 1, 1, true)
+				GameTooltip:SetText(L.SORT_PRIMARY_LABEL .. ": " .. sortName)
+				GameTooltip:AddLine(L.SORT_PRIMARY_DESC, 1, 1, 1, true)
 				GameTooltip:Show()
 			end)
 			primaryButton:HookScript("OnLeave", GameTooltip_Hide)
@@ -537,8 +535,8 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 			primaryDropdown:SetScript("OnEnter", function()
 				local sortName = SORT_NAMES[FriendsList.sortMode] or "Status"
 				GameTooltip:SetOwner(primaryDropdown, "ANCHOR_RIGHT")
-				GameTooltip:SetText("Primary Sort: " .. sortName)
-				GameTooltip:AddLine("Main sorting criterion for friends list.", 1, 1, 1, true)
+				GameTooltip:SetText(L.SORT_PRIMARY_LABEL .. ": " .. sortName)
+				GameTooltip:AddLine(L.SORT_PRIMARY_DESC, 1, 1, 1, true)
 				GameTooltip:Show()
 			end)
 			primaryDropdown:SetScript("OnLeave", GameTooltip_Hide)
@@ -549,8 +547,8 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 			secondaryButton:HookScript("OnEnter", function()
 				local sortName = FriendsList.secondarySort == "none" and "None" or (SORT_NAMES[FriendsList.secondarySort] or "Name")
 				GameTooltip:SetOwner(secondaryDropdown, "ANCHOR_RIGHT")
-				GameTooltip:SetText("Secondary Sort: " .. sortName)
-				GameTooltip:AddLine("Sort by this when primary values are equal.", 1, 1, 1, true)
+				GameTooltip:SetText(L.SORT_SECONDARY_LABEL .. ": " .. sortName)
+				GameTooltip:AddLine(L.SORT_SECONDARY_DESC, 1, 1, 1, true)
 				GameTooltip:Show()
 			end)
 			secondaryButton:HookScript("OnLeave", GameTooltip_Hide)
@@ -558,8 +556,8 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 			secondaryDropdown:SetScript("OnEnter", function()
 				local sortName = FriendsList.secondarySort == "none" and "None" or (SORT_NAMES[FriendsList.secondarySort] or "Name")
 				GameTooltip:SetOwner(secondaryDropdown, "ANCHOR_RIGHT")
-				GameTooltip:SetText("Secondary Sort: " .. sortName)
-				GameTooltip:AddLine("Sort by this when primary values are equal.", 1, 1, 1, true)
+				GameTooltip:SetText(L.SORT_SECONDARY_LABEL .. ": " .. sortName)
+				GameTooltip:AddLine(L.SORT_SECONDARY_DESC, 1, 1, 1, true)
 				GameTooltip:Show()
 			end)
 			secondaryDropdown:SetScript("OnLeave", GameTooltip_Hide)
@@ -616,8 +614,8 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 	primaryDropdown:SetScript("OnEnter", function()
 		local sortName = SORT_NAMES[FriendsList.sortMode] or "Status"
 		GameTooltip:SetOwner(primaryDropdown, "ANCHOR_RIGHT")
-		GameTooltip:SetText("Primary Sort: " .. sortName)
-		GameTooltip:AddLine("Main sorting criterion for friends list.", 1, 1, 1, true)
+		GameTooltip:SetText(L.SORT_PRIMARY_LABEL .. ": " .. sortName)
+		GameTooltip:AddLine(L.SORT_PRIMARY_DESC, 1, 1, 1, true)
 		GameTooltip:Show()
 	end)
 	primaryDropdown:SetScript("OnLeave", GameTooltip_Hide)
@@ -672,8 +670,8 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 	secondaryDropdown:SetScript("OnEnter", function()
 		local sortName = FriendsList.secondarySort == "none" and "None" or (SORT_NAMES[FriendsList.secondarySort] or "Name")
 		GameTooltip:SetOwner(secondaryDropdown, "ANCHOR_RIGHT")
-		GameTooltip:SetText("Secondary Sort: " .. sortName)
-		GameTooltip:AddLine("Sort by this when primary values are equal.", 1, 1, 1, true)
+		GameTooltip:SetText(L.SORT_SECONDARY_LABEL .. ": " .. sortName)
+		GameTooltip:AddLine(L.SORT_SECONDARY_DESC, 1, 1, 1, true)
 		GameTooltip:Show()
 	end)
 	secondaryDropdown:SetScript("OnLeave", GameTooltip_Hide)

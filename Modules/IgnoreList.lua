@@ -246,12 +246,13 @@ function IgnoreList:Update()
 	local dataList = {}
 
 	local numIgnores = C_FriendList.GetNumIgnores()
-	-- Always show header, even when empty (except in Classic/FauxScrollFrame mode)
-	if not BFL.IsClassic and BFL.HasModernScrollBox then
-		table.insert(dataList, {header="BetterFriendsFrameIgnoredHeaderTemplate"})
-	end
-
+	
 	if numIgnores and numIgnores > 0 then
+		-- Only show header if there are actually ignored players
+		if not BFL.IsClassic and BFL.HasModernScrollBox then
+			table.insert(dataList, {header="BetterFriendsFrameIgnoredHeaderTemplate"})
+		end
+
 		for index = 1, numIgnores do
 			table.insert(dataList, {squelchType=SQUELCH_TYPE_IGNORE, index=index})
 		end

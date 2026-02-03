@@ -13,6 +13,7 @@ local L = BFL_LOCALE
 	L.DIALOG_RENAME_GROUP_TEXT = "输入分组的新名称："
 	L.DIALOG_RENAME_GROUP_BTN1 = "重命名"
 	L.DIALOG_RENAME_GROUP_BTN2 = "取消"
+	L.DIALOG_RENAME_GROUP_SETTINGS = "重命名组 '%s'："
 	L.DIALOG_DELETE_GROUP_TEXT = "确定要删除此分组吗？\n\n|cffff0000这将移除该分组中的所有好友。|r"
 	L.DIALOG_DELETE_GROUP_BTN1 = "删除"
 	L.DIALOG_DELETE_GROUP_BTN2 = "取消"
@@ -165,6 +166,10 @@ local L = BFL_LOCALE
 	L.SORT_REALM = "服务器"
 	L.SORT_CHANGED = "排序已更改为：%s"
 	L.SORT_NONE = "None"
+	L.SORT_PRIMARY_LABEL = "Primary Sort"
+	L.SORT_SECONDARY_LABEL = "Secondary Sort"
+	L.SORT_PRIMARY_DESC = "Choose how the friendlist is sorted."
+	L.SORT_SECONDARY_DESC = "Sort by this when primary values are equal."
 	
 	-- ========================================
 	-- MENUS & CONTEXT MENUS
@@ -626,7 +631,7 @@ local L = BFL_LOCALE
 	L.RAF_NO_RECRUITS_DESC = "No recruits."
 	L.RAF_PENDING_RECRUIT = "Pending"
 	L.RAF_RECRUIT_NAME_MULTIPLE = "%s (%d)"
-	L.RAF_RECRUITED_FRIENDS_COUNT = "%d / %d Recruits"
+	L.RAF_RECRUITED_FRIENDS_COUNT = "%d / %d"
 	L.RAF_YOU_HAVE_EARNED = "Earned:"
 	L.RAF_NEXT_REWARD_AFTER = "Next in %d/%d months"
 	L.RAF_FIRST_REWARD = "First:"

@@ -294,7 +294,17 @@ local function LocalizeUI() local frame = BetterFriendsFrame
 	if frame.FriendsTabHeader then
 		if frame.FriendsTabHeader.Tab1 then frame.FriendsTabHeader.Tab1:SetText(L.TAB_FRIENDS or FRIENDS) end
 		if frame.FriendsTabHeader.Tab2 then frame.FriendsTabHeader.Tab2:SetText(L.CONTACTS_RECENT_ALLIES_TAB_NAME) end
-		if frame.FriendsTabHeader.Tab3 then frame.FriendsTabHeader.Tab3:SetText(L.RECRUIT_A_FRIEND or RECRUIT_A_FRIEND) end
+		if frame.FriendsTabHeader.Tab3 then 
+			frame.FriendsTabHeader.Tab3:SetText(L.RECRUIT_A_FRIEND or RECRUIT_A_FRIEND)
+			-- Check if RAF is enabled
+			if not BFL.IsClassic and C_RecruitAFriend and C_RecruitAFriend.IsEnabled then
+				if not C_RecruitAFriend.IsEnabled() then
+					frame.FriendsTabHeader.Tab3:Hide()
+				end
+			elseif not BFL.IsClassic then
+				frame.FriendsTabHeader.Tab3:Hide()
+			end
+		end
 	end
 
 	-- Search Box
@@ -842,6 +852,110 @@ frame:SetScript("OnEvent", function(self, event, ...) if event == "ADDON_LOADED"
 	-- According to https://warcraft.wiki.gg/wiki/Blizzard_Menu_implementation_guide
 	-- UnitPopup menus use "MENU_UNIT_<UNIT_TYPE>" format
 	
+	-- Fix for "Copy Character Name" protected action error
+	-- Replaces the protected Blizzard button with a safe BFL version in generic menus
+	local function BFL_ReplaceCopyNameButton(owner, rootDescription, contextData)
+		if not rootDescription or not rootDescription.EnumerateElementDescriptions then return end
+
+		local targetText = COPY_CHARACTER_NAME -- Blizzard global string
+		local foundAndReplaced = false
+		
+		-- Loop through all elements in the menu
+		for _, elementDescription in rootDescription:EnumerateElementDescriptions() do
+			-- Check text (handle function or string)
+			local text = elementDescription.text
+			if type(text) == "function" then 
+				local success, result = pcall(text)
+				if success then text = result end
+			end
+			
+			-- Check for match: Text match OR Data match
+			local isMatch = false
+			
+			-- Match by global string (localized) or fallback english
+			if text and (text == targetText or text == "Copy Character Name" or (L and text == L.MENU_COPY_CHARACTER_NAME)) then
+				isMatch = true
+			-- Match by internal data key (Blizzard usually uses this for UnitPopup)
+			elseif elementDescription.data == "COPY_CHARACTER_NAME" then
+				isMatch = true
+			end
+			
+			if isMatch then
+				-- Hijack the click handler
+				elementDescription:SetResponder(function()
+					-- Resolve Name Lazy (at click time) for maximum accuracy
+					local copyNameText = nil
+					
+					if contextData.bnetIDAccount then
+						local accountInfo = C_BattleNet.GetAccountInfoByID(contextData.bnetIDAccount)
+						if accountInfo then
+							-- 1. Try Character Name (if in-game)
+							if accountInfo.gameAccountInfo and accountInfo.gameAccountInfo.characterName then
+								local charName = accountInfo.gameAccountInfo.characterName
+								local realmName = accountInfo.gameAccountInfo.realmName
+								if realmName and realmName ~= "" then
+									copyNameText = charName .. "-" .. realmName
+								else
+									copyNameText = charName
+								end
+							end
+							
+							-- 2. Try BattleTag (if Valid and Character Name failed, or as backup)
+							if (not copyNameText or copyNameText == "") and accountInfo.battleTag then
+								copyNameText = accountInfo.battleTag
+							end
+							
+							-- 3. Try Real Name (Account Name) if nothing else
+							if (not copyNameText or copyNameText == "") and accountInfo.accountName then
+								copyNameText = accountInfo.accountName
+							end
+						end
+					end
+					
+					-- 4. Fallback to contextData.name (Generic)
+					if (not copyNameText or copyNameText == "") and contextData.name then
+						copyNameText = contextData.name
+					end
+
+					StaticPopupDialogs["BETTERFRIENDLIST_COPY_URL"] = {
+						text = L.COPY_CHARACTER_NAME_POPUP_TITLE,
+						button1 = CLOSE,
+						hasEditBox = true,
+						editBoxWidth = 350,
+						OnShow = function(self)
+							self.EditBox:SetText(copyNameText or "")
+							self.EditBox:SetFocus()
+							self.EditBox:HighlightText()
+						end,
+						EditBoxOnEnterPressed = function(self)
+							self:GetParent():Hide()
+						end,
+						EditBoxOnEscapePressed = function(self)
+							self:GetParent():Hide()
+						end,
+						timeout = 0,
+						whileDead = true,
+						hideOnEscape = true,
+						preferredIndex = 3,
+					}
+					StaticPopup_Show("BETTERFRIENDLIST_COPY_URL")
+				end)
+				
+				-- Update text to our localized version if available
+				if L and L.MENU_COPY_CHARACTER_NAME and elementDescription.SetText then
+					elementDescription:SetText(L.MENU_COPY_CHARACTER_NAME)
+				end
+				
+				foundAndReplaced = true
+				-- break -- Don't break, in case of duplicates
+			end
+		end
+		-- Re-add "Create if missing" logic? 
+		-- No, if Blizzard hides the button (e.g. unknown generic unit), we probably shouldn't force it unless we know we have data.
+		-- But for BNet friends, we now support BattleTag/RealName fallback, so maybe we COULD add it if missing?
+		-- For now, sticking to "Replace Existing" to fix the crash.
+	end
+
 	local function AddGroupsToFriendMenu(owner, rootDescription, contextData) -- Check and reset flag in one atomic operation
 		local isOurMenu = _G.BetterFriendlist_IsOurMenu
 		_G.BetterFriendlist_IsOurMenu = false
@@ -971,30 +1085,90 @@ frame:SetScript("OnEvent", function(self, event, ...) if event == "ADDON_LOADED"
 		end
 		
 		if copyNameText then
-			rootDescription:CreateButton(L.MENU_COPY_CHARACTER_NAME, function()
-				StaticPopupDialogs["BETTERFRIENDLIST_COPY_URL"] = {
-					text = L.COPY_CHARACTER_NAME_POPUP_TITLE,
-					button1 = "Close",
-					hasEditBox = true,
-					editBoxWidth = 350,
-					OnShow = function(self)
-						self.EditBox:SetText(copyNameText)
-						self.EditBox:SetFocus()
-						self.EditBox:HighlightText()
-					end,
-					EditBoxOnEnterPressed = function(self)
-						self:GetParent():Hide()
-					end,
-					EditBoxOnEscapePressed = function(self)
-						self:GetParent():Hide()
-					end,
-					timeout = 0,
-					whileDead = true,
-					hideOnEscape = true,
-					preferredIndex = 3,
-				}
-				StaticPopup_Show("BETTERFRIENDLIST_COPY_URL")
-			end)
+			-- Fixed Logic: Find the existing broken button/option and hijacked it, or create new if missing
+			local foundAndReplaced = false
+			local targetText = COPY_CHARACTER_NAME or "Copy Character Name"
+			
+			for _, elementDescription in rootDescription:EnumerateElementDescriptions() do
+				-- Check text (handle both string and function)
+				local text = elementDescription.text
+				if type(text) == "function" then 
+					local success, result = pcall(text)
+					if success then text = result end
+				end
+				
+				-- Check for match: Text match OR Data match (Bit safer for UnitPopup)
+				local isMatch = false
+				
+				if text and (text == targetText or (L and text == L.MENU_COPY_CHARACTER_NAME)) then
+					isMatch = true
+				elseif elementDescription.data == "COPY_CHARACTER_NAME" then
+					isMatch = true
+				end
+				
+				if isMatch then
+					-- Found the Blizzard button (or a duplicate). Overwrite its responder to use ours.
+					elementDescription:SetResponder(function()
+						StaticPopupDialogs["BETTERFRIENDLIST_COPY_URL"] = {
+							text = L.COPY_CHARACTER_NAME_POPUP_TITLE,
+							button1 = "Close",
+							hasEditBox = true,
+							editBoxWidth = 350,
+							OnShow = function(self)
+								self.EditBox:SetText(copyNameText)
+								self.EditBox:SetFocus()
+								self.EditBox:HighlightText()
+							end,
+							EditBoxOnEnterPressed = function(self)
+								self:GetParent():Hide()
+							end,
+							EditBoxOnEscapePressed = function(self)
+								self:GetParent():Hide()
+							end,
+							timeout = 0,
+							whileDead = true,
+							hideOnEscape = true,
+							preferredIndex = 3,
+						}
+						StaticPopup_Show("BETTERFRIENDLIST_COPY_URL")
+					end)
+					
+					-- Force update text to indicate we took over (and fixing visual string)
+					if L and L.MENU_COPY_CHARACTER_NAME then
+						elementDescription:SetText(L.MENU_COPY_CHARACTER_NAME)
+					end
+					
+					foundAndReplaced = true
+					-- Do not break loop; in case Blizzard added it multiple times (rare) or we want to catch all instances
+				end
+			end
+
+			if not foundAndReplaced then
+				rootDescription:CreateButton(L.MENU_COPY_CHARACTER_NAME, function()
+					StaticPopupDialogs["BETTERFRIENDLIST_COPY_URL"] = {
+						text = L.COPY_CHARACTER_NAME_POPUP_TITLE,
+						button1 = "Close",
+						hasEditBox = true,
+						editBoxWidth = 350,
+						OnShow = function(self)
+							self.EditBox:SetText(copyNameText)
+							self.EditBox:SetFocus()
+							self.EditBox:HighlightText()
+						end,
+						EditBoxOnEnterPressed = function(self)
+							self:GetParent():Hide()
+						end,
+						EditBoxOnEscapePressed = function(self)
+							self:GetParent():Hide()
+						end,
+						timeout = 0,
+						whileDead = true,
+						hideOnEscape = true,
+						preferredIndex = 3,
+					}
+					StaticPopup_Show("BETTERFRIENDLIST_COPY_URL")
+				end)
+			end
 		end
 
 		local groupsButton = rootDescription:CreateButton(L.MENU_GROUPS)
@@ -1073,6 +1247,16 @@ frame:SetScript("OnEvent", function(self, event, ...) if event == "ADDON_LOADED"
 		
 		-- Register for BattleNet friend menus (online and offline)
 		if Menu and Menu.ModifyMenu then
+			-- Fix "Copy Character Name" button (Must be registered BEFORE AddGroupsToFriendMenu)
+			Menu.ModifyMenu("MENU_UNIT_BN_FRIEND", BFL_ReplaceCopyNameButton)
+			Menu.ModifyMenu("MENU_UNIT_BN_FRIEND_OFFLINE", BFL_ReplaceCopyNameButton)
+			Menu.ModifyMenu("MENU_UNIT_FRIEND", BFL_ReplaceCopyNameButton)
+			Menu.ModifyMenu("MENU_UNIT_FRIEND_OFFLINE", BFL_ReplaceCopyNameButton)
+			Menu.ModifyMenu("MENU_UNIT_RAF_RECRUIT", BFL_ReplaceCopyNameButton)
+			Menu.ModifyMenu("MENU_UNIT_RECENT_ALLY", BFL_ReplaceCopyNameButton)
+			Menu.ModifyMenu("MENU_UNIT_RECENT_ALLY_OFFLINE", BFL_ReplaceCopyNameButton)
+			Menu.ModifyMenu("MENU_UNIT_WHO", BFL_ReplaceCopyNameButton)
+
 			Menu.ModifyMenu("MENU_UNIT_BN_FRIEND", AddGroupsToFriendMenu)
 			Menu.ModifyMenu("MENU_UNIT_BN_FRIEND_OFFLINE", AddGroupsToFriendMenu)
 			
@@ -1332,9 +1516,19 @@ function BetterFriendsFrame_ShowTab(tabIndex) local frame = BetterFriendsFrame
 			FriendsList:UpdateScrollBoxExtent()
 		end
 	else
-		-- If switching away from Tab 1, we can safely hide it (or rely on UpdateScrollBoxExtent next render)
+		-- If switching away from Tab 1
 		local searchBox = frame.FriendsTabHeader and frame.FriendsTabHeader.SearchBox
-		if searchBox then searchBox:Hide() end
+		
+		-- Fix: Only hide if in Simple Mode (where it is inside the list view)
+		-- In Normal Mode, searchBox is in the header and should remain visible for sub-tabs
+		local DB = BFL:GetModule("DB")
+		local simpleMode = DB and DB:Get("simpleMode", false)
+		
+		if simpleMode then
+			if searchBox then searchBox:Hide() end
+		else
+			if searchBox then searchBox:Show() end
+		end
 	end
 
 	-- FORCE FONT UPDATE: Ensure Custom Fonts win against ElvUI
@@ -1398,7 +1592,9 @@ function BetterFriendsFrame_ShowTab(tabIndex) local frame = BetterFriendsFrame
 		end
 	elseif tabIndex == 3 then
 		-- Retail: Recruit A Friend
-		if not BFL.IsClassic and frame.RecruitAFriendFrame then
+		-- Check IsEnabled() as requested
+		local rafEnabled = C_RecruitAFriend and C_RecruitAFriend.IsEnabled and C_RecruitAFriend.IsEnabled()
+		if not BFL.IsClassic and frame.RecruitAFriendFrame and rafEnabled then
 			ShowChildFrame(frame.RecruitAFriendFrame)
 			ShowChildFrame(frame.RecruitmentButton)
 				
@@ -1518,8 +1714,8 @@ function BetterFriendsFrame_UpdateQuickJoinTab() -- Quick Join is Retail only
 	-- Update tab text with count
 	frame.BottomTab4:SetText(QUICK_JOIN.." "..string.format(NUMBER_IN_PARENTHESES, numGroups))
 	
-	-- Resize tab to fit text (0 = no padding)
-	PanelTemplates_TabResize(frame.BottomTab4, 0)
+	-- Resize tab to fit text (matching ApplyTabFonts parameters: padding=20, minWidth=80)
+	PanelTemplates_TabResize(frame.BottomTab4, 20, nil, 80)
 end
 
 --------------------------------------------------------------------------
@@ -1982,6 +2178,11 @@ function BetterFriendsList_Button_OnClick(button, mouseButton)
 			-- Show selection highlight (blue, like Blizzard)
 			if button.selectionHighlight then
 				button.selectionHighlight:Show()
+			end
+			
+			-- Update Send Message button state
+			if FriendsList.UpdateSendMessageButton then
+				FriendsList:UpdateSendMessageButton()
 			end
 		end
 	elseif mouseButton == "RightButton" then

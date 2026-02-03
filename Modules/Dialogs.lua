@@ -17,6 +17,84 @@ local Dialogs = BFL:RegisterModule("Dialogs", {})
 -- Dialog Registration
 --------------------------------------------------------------------------
 
+-- Helper to add error label to dialog if it doesn't exist
+local function EnsureErrorLabel(dialog)
+	if not dialog.BFL_ErrorLabel then
+		local errorLabel = dialog:CreateFontString(nil, "ARTWORK", "GameFontRedSmall")
+		errorLabel:SetPoint("TOP", dialog.EditBox, "BOTTOM", 0, 0)
+		errorLabel:SetPoint("LEFT", dialog, "LEFT", 30, 0)
+		errorLabel:SetPoint("RIGHT", dialog, "RIGHT", -30, 0)
+		errorLabel:SetWordWrap(true)
+		dialog.BFL_ErrorLabel = errorLabel
+	end
+	return dialog.BFL_ErrorLabel
+end
+
+-- Shared validation logic
+local function ValidateDialogInput(editBox, isRename)
+	local dialog = editBox:GetParent()
+	local text = editBox:GetText()
+	local Groups = BFL:GetModule("Groups")
+	local errorLabel = EnsureErrorLabel(dialog)
+	
+	-- Safely get the accept button (Button1)
+	local button1 = dialog.button1
+	
+	-- Last resort: Check global name if we have one (covers Button1)
+	if not button1 and dialog.GetName and dialog:GetName() then
+		button1 = _G[dialog:GetName().."Button1"]
+	end
+
+	-- Absolute fallback for standard StaticPopup1 (Common case)
+	if not button1 and dialog == StaticPopup1 and _G["StaticPopup1Button1"] then
+		button1 = _G["StaticPopup1Button1"]
+	end
+
+	-- Ultimate fallback: Scan children for the button (Robustness for renamed/hooked frames)
+	if not button1 and dialog.GetChildren then
+		local children = {dialog:GetChildren()}
+		for _, child in ipairs(children) do
+			if child and child.GetObjectType and child:GetObjectType() == "Button" and child.GetText then
+				local btnText = child:GetText()
+				-- Check for Create or Rename button text
+				if btnText and (btnText == L.DIALOG_CREATE_GROUP_BTN1 or btnText == L.DIALOG_RENAME_GROUP_BTN1) then
+					button1 = child
+					break
+				end
+			end
+		end
+	end
+	
+	if not Groups then return end
+	
+	local currentGroupId = isRename and dialog.data or nil
+	local isValid, errorMsg = Groups:ValidateGroupName(text, currentGroupId)
+
+	-- Debug visualization for troubleshooting
+	-- if BFL.DebugPrint then
+	-- 	BFL:DebugPrint("Validation:", text, "| Rename:", isRename, "| Valid:", isValid, "| ButtonFound:", (button1 ~= nil))
+	-- end
+	
+	if isValid then
+		if button1 then
+			button1:Enable()
+		end
+		if errorLabel then
+			errorLabel:SetText("")
+			-- Reset text color if needed, typically standard
+			editBox:SetTextColor(1, 1, 1)
+		end
+	else
+		if button1 then
+			button1:Disable()
+		end
+		if errorLabel then
+			errorLabel:SetText(errorMsg or "")
+			editBox:SetTextColor(1, 0.5, 0.5) -- Reddish text to indicate error
+		end
+	end
+end
+
 function Dialogs:RegisterDialogs()
 	-- Dialog for creating a new group
 	StaticPopupDialogs["BETTER_FRIENDLIST_CREATE_GROUP"] = {
@@ -26,35 +104,40 @@ function Dialogs:RegisterDialogs()
 		hasEditBox = true,
 		OnAccept = function(self)
 			local groupName = self.EditBox:GetText()
-			if groupName and groupName ~= "" then
-				local Groups = BFL:GetModule("Groups")
-				if Groups then
+			local Groups = BFL:GetModule("Groups")
+			if Groups then
+				local isValid = Groups:ValidateGroupName(groupName)
+				if isValid then
 					local success, groupId = Groups:Create(groupName)
 					if success then
-						-- Force full display refresh - groups affect display structure
 						BFL:ForceRefreshFriendsList()
 					end
 				end
 			end
 		end,
+		EditBoxOnTextChanged = function(self)
+			ValidateDialogInput(self, false)
+		end,
 		EditBoxOnEnterPressed = function(self)
 			local parent = self:GetParent()
 			local groupName = self:GetText()
-			if groupName and groupName ~= "" then
-				local Groups = BFL:GetModule("Groups")
-				if Groups then
+			local Groups = BFL:GetModule("Groups")
+			if Groups then
+				-- Double check validation before proceeding on Enter
+				local isValid = Groups:ValidateGroupName(groupName)
+				if isValid then
 					Groups:Create(groupName)
-					-- Force full display refresh - groups affect display structure
 					BFL:ForceRefreshFriendsList()
+					parent:Hide()
 				end
 			end
-			parent:Hide()
 		end,
 		EditBoxOnEscapePressed = function(self)
 			self:GetParent():Hide()
 		end,
 		OnShow = function(self)
 			self.EditBox:SetFocus()
+			ValidateDialogInput(self.EditBox, false) -- Validate initial state
 		end,
 		timeout = 0,
 		whileDead = true,
@@ -70,41 +153,44 @@ function Dialogs:RegisterDialogs()
 		hasEditBox = true,
 		OnAccept = function(self, friendUID)
 			local groupName = self.EditBox:GetText()
-			if groupName and groupName ~= "" then
-				local Groups = BFL:GetModule("Groups")
-				if Groups then
+			local Groups = BFL:GetModule("Groups")
+			if Groups then
+				local isValid = Groups:ValidateGroupName(groupName)
+				if isValid then
 					local success, groupId = Groups:Create(groupName)
 					if success then
-						-- Add friend to the newly created group
 						Groups:ToggleFriendInGroup(friendUID, groupId)
-						-- Force full display refresh - groups affect display structure
 						BFL:ForceRefreshFriendsList()
 					end
 				end
 			end
 		end,
+		EditBoxOnTextChanged = function(self)
+			ValidateDialogInput(self, false)
+		end,
 		EditBoxOnEnterPressed = function(self, friendUID)
 			local parent = self:GetParent()
 			local groupName = self:GetText()
-			if groupName and groupName ~= "" then
-				local Groups = BFL:GetModule("Groups")
-				if Groups then
+			local Groups = BFL:GetModule("Groups")
+			if Groups then
+				-- Double check validation
+				local isValid = Groups:ValidateGroupName(groupName)
+				if isValid then
 					local success, groupId = Groups:Create(groupName)
 					if success then
-						-- Add friend to the newly created group
 						Groups:ToggleFriendInGroup(friendUID, groupId)
-						-- Force full display refresh - groups affect display structure
 						BFL:ForceRefreshFriendsList()
+						parent:Hide()
 					end
 				end
 			end
-			parent:Hide()
 		end,
 		EditBoxOnEscapePressed = function(self)
 			self:GetParent():Hide()
 		end,
 		OnShow = function(self)
 			self.EditBox:SetFocus()
+			ValidateDialogInput(self.EditBox, false) -- Validate initial state
 		end,
 		timeout = 0,
 		whileDead = true,
@@ -120,43 +206,45 @@ function Dialogs:RegisterDialogs()
 		hasEditBox = true,
 		OnAccept = function(self, data)
 			local newName = self.EditBox:GetText()
-			if newName and newName ~= "" then
-				local FriendsList = BFL and BFL:GetModule("FriendsList")
-				if FriendsList then
-					local success, err = FriendsList:RenameGroup(data, newName)
-					if success then
-						-- Refresh settings group list if it's open
-						local Settings = BFL and BFL:GetModule("Settings")
-						if Settings then
-							Settings:RefreshGroupList()
-						end
-						
-						-- Force full display refresh - groups affect display structure
-						BFL:ForceRefreshFriendsList()
+			local FriendsList = BFL and BFL:GetModule("FriendsList")
+			if FriendsList then
+				-- We assume validation passed because button was enabled
+				local success, err = FriendsList:RenameGroup(data, newName)
+				if success then
+					local Settings = BFL and BFL:GetModule("Settings")
+					if Settings then
+						Settings:RefreshGroupList()
 					end
+					BFL:ForceRefreshFriendsList()
 				end
 			end
+		end,
+		EditBoxOnTextChanged = function(self)
+			ValidateDialogInput(self, true)
 		end,
 		EditBoxOnEnterPressed = function(self, data)
 			local parent = self:GetParent()
 			local newName = self:GetText()
-			if newName and newName ~= "" then
-				local FriendsList = BFL and BFL:GetModule("FriendsList")
-				if FriendsList then
-					local success, err = FriendsList:RenameGroup(data, newName)
-					if success then
-						-- Refresh settings group list if it's open
-						local Settings = BFL and BFL:GetModule("Settings")
-						if Settings then
-							Settings:RefreshGroupList()
+			
+			-- Double check validation manually if needed, or rely on visual state logic
+			local Groups = BFL:GetModule("Groups")
+			if Groups then
+				local isValid = Groups:ValidateGroupName(newName, data)
+				if isValid then
+					local FriendsList = BFL and BFL:GetModule("FriendsList")
+					if FriendsList then
+						local success, err = FriendsList:RenameGroup(data, newName)
+						if success then
+							local Settings = BFL and BFL:GetModule("Settings")
+							if Settings then
+								Settings:RefreshGroupList()
+							end
+							BFL:ForceRefreshFriendsList()
+							parent:Hide()
 						end
-						
-						-- Force full display refresh - groups affect display structure
-						BFL:ForceRefreshFriendsList()
 					end
 				end
 			end
-			parent:Hide()
 		end,
 		EditBoxOnEscapePressed = function(self)
 			self:GetParent():Hide()
@@ -176,6 +264,7 @@ function Dialogs:RegisterDialogs()
 			self.EditBox:SetText(groupName)
 			self.EditBox:SetFocus()
 			self.EditBox:HighlightText()
+			ValidateDialogInput(self.EditBox, true) -- Validate initial state
 		end,
 		timeout = 0,
 		whileDead = true,

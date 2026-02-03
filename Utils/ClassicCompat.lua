@@ -633,6 +633,51 @@ SlashCmdList["BFLCOMPAT"] = function(msg)
 end
 
 ------------------------------------------------------------
+-- Battle.net Status Compatibility
+------------------------------------------------------------
+-- Retail 12.0.1+ removed BNSetAFK/BNSetDND
+-- Support modern C_BattleNet.GetMyAccountInfo
+
+function Compat.GetMyBNetStatus()
+    if C_BattleNet and C_BattleNet.GetMyAccountInfo then
+        local info = C_BattleNet.GetMyAccountInfo()
+        if info then
+            return info.isAFK, info.isDND
+        end
+    elseif BNGetInfo then
+        return select(5, BNGetInfo())
+    end
+    return false, false
+end
+
+function Compat.SetMyBNetStatus(status) 
+    -- status: "online", "afk", "dnd"
+    if status == "online" then
+        -- Modern API (12.0.1+)
+        if C_BattleNet and C_BattleNet.SetAFK then
+            C_BattleNet.SetAFK(false)
+            C_BattleNet.SetDND(false)
+        -- Legacy/Classic API
+        elseif BNSetAFK then 
+            BNSetAFK(false) 
+            if BNSetDND then BNSetDND(false) end
+        end
+    elseif status == "afk" then
+        if C_BattleNet and C_BattleNet.SetAFK then
+            C_BattleNet.SetAFK(true)
+        elseif BNSetAFK then 
+            BNSetAFK(true) 
+        end
+    elseif status == "dnd" then
+        if C_BattleNet and C_BattleNet.SetDND then
+            C_BattleNet.SetDND(true)
+        elseif BNSetDND then 
+            BNSetDND(true) 
+        end
+    end
+end
+
+------------------------------------------------------------
 -- Global Aliases for Convenience
 ------------------------------------------------------------
 -- These aliases allow direct access via BFL.FunctionName instead of BFL.Compat.FunctionName
@@ -648,3 +693,7 @@ BFL.InitializeDropdown = Compat.InitializeDropdown
 
 -- ColorPicker
 BFL.ShowColorPicker = Compat.ShowColorPicker
+
+-- BNet Status
+BFL.GetMyBNetStatus = Compat.GetMyBNetStatus
+BFL.SetMyBNetStatus = Compat.SetMyBNetStatus

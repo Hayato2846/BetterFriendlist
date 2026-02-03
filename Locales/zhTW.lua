@@ -13,6 +13,7 @@ local L = BFL_LOCALE
 	L.DIALOG_RENAME_GROUP_TEXT = "輸入分組的新名稱："
 	L.DIALOG_RENAME_GROUP_BTN1 = "重新命名"
 	L.DIALOG_RENAME_GROUP_BTN2 = "取消"
+	L.DIALOG_RENAME_GROUP_SETTINGS = "重新命名群組 '%s'："
 	L.DIALOG_DELETE_GROUP_TEXT = "確定要刪除此分組嗎？\n\n|cffff0000這將移除該分組中的所有好友。|r"
 	L.DIALOG_DELETE_GROUP_BTN1 = "刪除"
 	L.DIALOG_DELETE_GROUP_BTN2 = "取消"
@@ -529,7 +530,7 @@ local L = BFL_LOCALE
 	L.RAF_NO_RECRUITS_DESC = "No recruits."
 	L.RAF_PENDING_RECRUIT = "Pending"
 	L.RAF_RECRUIT_NAME_MULTIPLE = "%s (%d)"
-	L.RAF_RECRUITED_FRIENDS_COUNT = "%d / %d Recruits"
+	L.RAF_RECRUITED_FRIENDS_COUNT = "%d / %d"
 	L.RAF_YOU_HAVE_EARNED = "Earned:"
 	L.RAF_NEXT_REWARD_AFTER = "Next in %d/%d months"
 	L.RAF_FIRST_REWARD = "First:"
@@ -1049,6 +1050,10 @@ local L = BFL_LOCALE
 	-- ========================================
 	-- Sort
 	L.SORT_NONE = "無"
+	L.SORT_PRIMARY_LABEL = "Primary Sort"
+	L.SORT_SECONDARY_LABEL = "Secondary Sort"
+	L.SORT_PRIMARY_DESC = "Choose how the friendlist is sorted."
+	L.SORT_SECONDARY_DESC = "Sort by this when primary values are equal."
 	
 	-- Status
 	L.STATUS_IN_APP = "在應用程式中"

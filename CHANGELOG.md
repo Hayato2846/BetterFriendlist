@@ -7,13 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2.2.9] - 2026-02-03
+## [DRAFT]
+### Fixed
+- **API Modernization** - Replace deprecated `BNSetAFK` and `BNSetDND` APIs with `C_BattleNet.SetAFK` and `C_BattleNet.SetDND` for Retail 12.0.1+.
+- **Recent Allies & Recruit A Friend** - Fixed scrollbar positioning and length to match the Friends List standard.
+- **Search Box Visibility** - Fixed an issue where the search box would disappear when switching to "Recent Allies" or "Recruit A Friend" tabs in Normal Mode. Now it remains visible unless Simple Mode is enabled.
+- **Send Message Button** - Fixed the "Send Message" button not being disabled when selecting an offline WoW friend.
+- **Localization** - Fixed a missing localization key in the 'Rename Group' dialog within settings across all languages.
+
+## [2.2.9]       - 2026-02-03
 ### Fixed
 - **Friend Button Layout** - Fixed an issue where Friend Name and Friend Info would not resize properly after adjusting Width via Settings.
 - **Database Initialization** - Fixed a database initialization error.
 - **QuickFilters** - Fixed a QuickFilter database issue causing filters to not update properly.
 
-## [2.2.8] - 2026-02-02
+## [2.2.8]       - 2026-02-02
 ### Added
 - **Streamer Mode** - Added Streamer Mode! When enabled you can toggle streamer mode to hide friend informations like Real IDs or your own battletag for privacy reasons. Real IDs will be hidden for following UI elements: Friend Name, Friend Tooltip, QuickJoin. You can change your own BattleTag with custom text in settings.
 - **Favorite Icons** - Added an option to toggle the star icon for favorites directly on the friend button (Settings -> General). While enabled, favorite friends will be sorted above other friends in the same sorting subgroup.
@@ -35,11 +43,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **ElvUI Skin** - Fixed a Lua error ("index field 'BFLCheckmark'") that could occur when other addons (like ToyBoxEnhanced) create menus that BetterFriendlist tries to skin.
 - **Groups Cache** - Fixed an issue with groups caching sometimes not updating properly when changing groups of a friend.
 
-## [2.2.7] - 2026-01-31
+## [2.2.7]       - 2026-01-31
 ### Fixed
 - **Library** - Fixed potential issues with LibQTip library integration.
 
-## [2.2.6] - 2026-01-31
+## [2.2.6]       - 2026-01-31
 ### Added
 - **Copy Character Name** - Added a new option to the context menu to copy character names (Name-Realm) for better inviting/messaging
 - **Simple Mode** - Added Simple Mode in Settings -> General. Simple Mode hides specific elements (Search, Filter, Sort, BFL Avatar) and moves corresponding functions in the menu button
@@ -55,18 +63,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **RAF** - Fixed an issue blocking the usage of copy link button in RAF Frame
 - **Global Sync** - Fixed an error occuring while having own characters in sync added
 
-## [2.2.5] - 2026-01-25
+## [2.2.5]       - 2026-01-25
 ### Fixed
 - **Combat Blocking Fix** - Fixed a critical issue where the Friends List window could not be opened during combat, even when UI Panel settings were disabled. This resolves the "ADDON_ACTION_BLOCKED" error caused by unnecessary secure templates.
 - **Localization** - Fixed encoding issues in English localization (enUS) where bullets and arrows were displayed as corrupted characters.
 
-## [2.2.4] - 2026-01-25
+## [2.2.4]       - 2026-01-25
 ### Fixed
 - **Mojibake Fix** - Fixed an issue where localized text (German, French, etc.) could display incorrect characters. (Core.lua)
 - **QuickJoin** - Fixed quick join tooltips.
 - **Edit Mode** - Fixed visibility issues when entering Edit Mode.
 
-## [2.2.3] - 2026-01-25
+## [2.2.3]       - 2026-01-25
 ### Added
 - **Typography Settings** - Added detailed font customization for Friend Names, Friend Info, and Group Headers. (Shadow settings coming soon).
 - **Ignore List Enhancements** - Added support for "Global Ignore List" addon in our improved Ignore List frame, including a quick-toggle button.
@@ -86,19 +94,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Combat Protection** - Added combat protection for UI Panel attributes.
 - **Activity Tracker** - Added secret value protection in ActivityTracker for Midnight.
 
-## [2.2.2] - 2026-01-18
+## [2.2.2]       - 2026-01-18
 ### Fixed
 - **Font Support** - Reverted the friend name font to `GameFontNormal`. This restores support for the 4 standard fonts (including Asian/Cyrillic characters).
 - **ElvUI Interaction** - **Note:** ElvUI Font Size settings now apply to the Friend Name again.
 - **Workaround** - This is a temporary workaround. Proper independent font settings will be added in the next version.
 
-## [2.2.1] - 2026-01-18
+## [2.2.1]       - 2026-01-18
 ### Fixed
 - **Slash Commands** - Cleanup of slash commands.
 - **Performance** - Fixed performance issues. (Reported by Drakblackz)
 - **Menu System** - Fixed issue where menus would not close properly, likely due to mouse cursor changes. (Reported by Atom)
 
-## [2.2.0] - 2026-01-17
+## [2.2.0]       - 2026-01-17
 ### Added
 - **Group Name Alignment** - Added a new option to align group headers (Left, Center, Right). Left alignment is now the default. (Reported by Drakblackz)
 - **Collapse/Expand Arrow** - Added options to hide the collapse/expand arrow and change its alignment (Left, Center, Right). Left is default. (Reported by Drakblackz)
@@ -114,25 +122,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Font Scaling** - Fixed visual issues with dropdowns and tab texts when global font size is overridden by other addons (e.g., ElvUI). (Reported by Drakblackz)
 - **Sorting** - Fixed the Alphabetical Name sorter not working properly. (Reported by Drakblackz)
 
-## [2.1.9] - 2026-01-16
+## [2.1.9]       - 2026-01-16
 ### Added
 - **Global Ignore List Support** - Added a compatibility module for the "Global Ignore List" addon. The GIL window now correctly anchors to the BetterFriendlist frame (Main, Settings, Help, or Raid Info) and opens/closes automatically. (reported by Kiley01)
 
-## [2.1.8] - 2026-01-15
+## [2.1.8]       - 2026-01-15
 ### Fixed
 - **Critical Crash Fix** - Fixed "attempt to index global 'L' (a nil value)" error that prevented the Friends List from opening after the 2.1.7 update. Added missing localization table reference in FriendsList.lua.
 
-## [2.1.7] - 2026-01-14
+## [2.1.7]       - 2026-01-14
 ### Fixed
 - **Tab Switching Bug** - Fixed an issue where switching from "Who" or "Raid" back to "Contacts" would incorrectly display the Friends list even when "Recent Allies" or "Recruit A Friend" tabs were active.
 - **Localization Fallback** - Improved fallback logic for missing translations. The addon now automatically uses English text when a translation is missing instead of displaying variable names.
 - **Localization (All Languages)** - Significantly improved translations across all 11 supported languages. The German localization has been completely reworked to be less formal and more natural.
 
-## [2.1.6] - 2026-01-12
+## [2.1.6]       - 2026-01-12
 ### Fixed
 - **Quick Filters (Classic)** - Fixed a Lua error ("attempt to call method 'SetFilter' a nil value") when selecting a filter in the Classic version (reported by Loro).
 
-## [2.1.5] - 2026-01-11
+## [2.1.5]       - 2026-01-11
 ### Added
 - **Localization Update** - Significantly improved translation coverage across all 11 supported languages, especially for Raid Frame and Help features.
 - **Asian Language Support** - Fixed issues with missing localization keys in Korean (koKR), Simplified Chinese (zhCN), and Traditional Chinese (zhTW).
@@ -142,36 +150,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **UI Hierarchy** - Added a new setting for Retail and Classic: 'Respect UI Hierarchy'. This integrates BetterFriendlist into Blizzard's UI Panel System so it no longer overlaps other UI windows. (Requested by Surfingnet)
 - **Raid Frame Help** - Added a Help Button to the Raid Tab explaining unique features like Multi-Selection, Drag & Drop, and Main Tank/Assist assignments.
 
-## [2.1.4] - 2026-01-07
+## [2.1.4]       - 2026-01-07
 ### Fixed
 - **Ignore List (Classic)** - Fixed visual layout issues in the Ignore List window:
   - Removed top gap ensuring the empty list starts at the correct position.
   - Replaced legacy scrollbar with standard UIPanelScrollBar for better visibility and usability.
   - Fixed "Unignore Player" button text displaying as a variable name instead of localized text.
 
-## [2.1.3] - 2026-01-06
+## [2.1.3]       - 2026-01-06
 ### Fixed
 - **Classic Portrait Button** - Fixed the PortraitButton frame strata and frame level. It now sits correctly above the frame but below dialogs (reported by Twoti).
 - **Classic Invites** - Fixed a Lua error when viewing friend invites in Classic versions (missing text element) (reported by Twoti).
 
-## [2.1.2] - 2026-01-05
+## [2.1.2]       - 2026-01-05
 ### Fixed
 - **QuickFilter Persistence** - Fixed a bug where QuickFilter dropdown changes were not persistently saved, causing updates to apply previously cached values (reported by Loro).
 - **QuickFilter UI** - Removed the separator line between QuickFilter dropdown options.
 - **Hide AFK/DND** - Fixed "Hide AFK/DND" QuickFilter logic to correctly hide AFK/DND friends as expected.
 
-## [2.1.1] - 2026-01-03
+## [2.1.1]       - 2026-01-03
 ### Fixed
 - **FriendGroups Migration** - Fixed an issue where the migration tool could not be re-run if it had been run previously (or if the flag was set). You can now force a re-migration via the Settings dialog.
 
-## [2.1.0] - 2026-01-03
+## [2.1.0]       - 2026-01-03
 ### Added
 - **CustomNames Support** - Added support for the `CustomNames` library to sync nicknames (Thanks Jods!).
 
 ### Fixed
 - **Group Cache** - Fixed an issue where newly created groups were not immediately available in the cache (reported by m33shoq).
 
-## [2.0.9] - 2026-01-03
+## [2.0.9]       - 2026-01-03
 ### Added
 - **ElvUI Skin** - Added full skinning support for the Changelog window and the Portrait/Changelog button.
 - **ElvUI Stability** - Added comprehensive debug logging and error handling for the skinning process.
@@ -179,24 +187,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Improved
 - **Debug Logs** - Cleaned up global debug logs to reduce chat spam.
 
-## [2.0.8] - 2026-01-03
+## [2.0.8]       - 2026-01-03
 ### Fixed
 - **Data Broker Conflict** - Fixed a conflict with other Data Broker addons (like Broker Everything) where tooltips could become empty or stuck.
 - **Tooltip Stability** - Improved robustness of tooltip cleanup and auto-hide logic to prevent resource leaks and ensure correct closing behavior.
 
-## [2.0.7] - 2026-01-01
+## [2.0.7]       - 2026-01-01
 
 ### Fixed
 - **Classic Dropdowns** - Fixed missing tooltips and incorrect width for QuickFilter and Sort dropdowns in Classic versions.
 - **UI Insets** - Adjusted frame insets for better visual alignment.
 - **Who Frame Layout** - Fixed ScrollFrame clipping into the SearchBox and adjusted ScrollBar height in Classic.
 
-## [2.0.6] - 2026-01-01
+## [2.0.6]       - 2026-01-01
 
 ### Fixed
 - **Battle.net Context Menu** - Fixed missing options in the right-click menu for Battle.net friends. Restored correct parameter passing to match Blizzard's expected format (regression from v2.0.5).
 
-## [2.0.5] - 2026-01-01
+## [2.0.5]       - 2026-01-01
 
 ### Fixed
 - **Crash Fix** - Fixed a crash ("script ran too long") caused by infinite recursion in group migration.
@@ -204,12 +212,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Who Frame** - Improved UI positioning for buttons in the Who tab (centering).
 - **Quick Join** - Minor UI adjustments in the Quick Join tab.
 
-## [2.0.4] - 2026-01-01
+## [2.0.4]       - 2026-01-01
 
 ### Fixed
 - **Crash Fix** - Fixed a Lua error that could occur when logging in if the friend list was not yet fully initialized (`'for' limit must be a number`).
 
-## [2.0.3] - 2026-01-01
+## [2.0.3]       - 2026-01-01
 
 ### Added
 - **Global Friend Sync** (Beta) - Automatically syncs your WoW friends across all your characters. Includes support for Connected Realms (e.g. syncing friends between "Burning Blade" and "Draenor"). Configurable via Settings -> Advanced -> Beta Features.
@@ -220,14 +228,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Group Creation** - Fixed an issue when creating groups via right-click on WoW Friends.
 
-## [2.0.2] - 2025-12-31
+## [2.0.2]       - 2025-12-31
 
 ### Fixed
 - **WoW Friend Context Menu** - Fixed an issue where right-clicking WoW friends would not open the context menu.
 - **Localization** - Fixed missing translations for dialogs and settings (e.g., Create Group dialog).
 - **Raid Frame** - Fixed an issue where new raid members were not immediately visible upon joining.
 
-## [2.0.1] - 2025-12-29
+## [2.0.1]       - 2025-12-29
 
 ### Added
 - **Full Classic Support** - Added support for Classic Era, TBC Classic, Wrath Classic, Cataclysm Classic, and Mists of Pandaria Classic.
@@ -236,7 +244,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **AFK/DND Status Display** - Fixed an issue where AFK and DND statuses were not correctly displayed in the Friendlist and DataBroker. (Thanks to Toxicator from CF!)
 
-## [2.0.0] - 2025-12-14
+## [2.0.0]       - 2025-12-14
 
 ### 🚀 Major Update - ElvUI Integration, Nicknames & UI Overhaul
 
@@ -329,7 +337,7 @@ This is a comprehensive update bringing native ElvUI skin support, a custom nick
 
 ---
 
-## [1.9.5] - 2025-12-06
+## [1.9.5]       - 2025-12-06
 
 ### ⚡ Performance Optimization & Feature Requests
 
@@ -383,7 +391,7 @@ Comprehensive performance refactoring and implementation of user-requested featu
 ### Changed
 - **Sort Menu Cleanup** - Removed redundant "Sort by Note" option (functionality integrated into "Sort by Name")
 
-## [1.9.4] - 2025-12-05
+## [1.9.4]       - 2025-12-05
 
 ### 🔗 ElvUI Compatibility & Quick Join Fixes
 
@@ -417,7 +425,7 @@ Full compatibility with ElvUI and other UI replacement addons, plus Quick Join i
 
 ---
 
-## [1.9.2] - 2025-01-05
+## [1.9.2]       - 2025-01-05
 
 ### 🔌 Data Broker Integration (Beta) & New Features
 
@@ -458,7 +466,7 @@ Display your online friends count on any Data Broker display addon, plus new cus
 
 ---
 
-## [1.9.1] - 2025-11-29
+## [1.9.1]       - 2025-11-29
 
 **🎯 Edit Mode & RaiderIO Integration**
 
@@ -492,7 +500,7 @@ Resize and position your friends list window freely, plus seamless integration w
 
 ---
 
-## [1.9.0] - 2025-11-25
+## [1.9.0]       - 2025-11-25
 
 **🔔 Beta Feature - Smart Notifications**
 
@@ -549,7 +557,7 @@ Complete notification system with friend status alerts, quiet hours, per-friend 
 
 ---
 
-## [1.8.2] - 2025-11-21
+## [1.8.2]       - 2025-11-21
 
 **🚀 Major Update - Friend Management & Combat Protection**
 
@@ -592,7 +600,7 @@ Complete redesign of friend name handling, WoW friend realm consistency, and com
 
 ---
 
-## [1.8.1] - 2025-11-16
+## [1.8.1]       - 2025-11-16
 
 **🐛 Bug Fix**
 
@@ -605,7 +613,7 @@ Fixed compact mode toggle causing errors.
 
 ---
 
-## [1.8.0] - 2025-11-16
+## [1.8.0]       - 2025-11-16
 
 **🔧 Version Management & Bug Fixes**
 
@@ -627,7 +635,7 @@ Improved version management and fixed critical startup errors.
 
 ---
 
-## [1.7.5] - 2025-11-16
+## [1.7.5]       - 2025-11-16
 
 **🔧 Better Performance & Documentation**
 
@@ -654,7 +662,7 @@ Faster class color display and improved documentation.
 
 ---
 
-## [1.7.4] - 2025-11-16
+## [1.7.4]       - 2025-11-16
 
 **🐛 Critical Bug Fixes**
 
@@ -681,7 +689,7 @@ Fixed two critical bugs affecting core Friends List functionality.
 
 ---
 
-## [1.7.3] - 2025-11-16
+## [1.7.3]       - 2025-11-16
 
 **🎯 Raid Frame Drag & Drop Enhancements**
 
@@ -705,7 +713,7 @@ Improved drag & drop reliability and consistency for multi-select operations in 
 
 ---
 
-## [1.7.1] - 2025-11-16
+## [1.7.1]       - 2025-11-16
 
 **🔧 Core Refactoring & Enhancements**
 
@@ -726,7 +734,7 @@ Major internal refactoring with performance improvements and enhanced drag & dro
 
 ---
 
-## [1.7.0] - 2025-11-15
+## [1.7.0]       - 2025-11-15
 
 **✨ Enhanced Sorting System & Visual Upgrade**
 
@@ -767,7 +775,7 @@ Added 5 new sort modes, fixed critical bugs, and completely redesigned all UI ic
 
 ---
 
-## [1.6.8] - 2025-11-15
+## [1.6.8]       - 2025-11-15
 
 **📝 Documentation Cleanup**
 
@@ -780,7 +788,7 @@ Removed technical details from changelog to keep it user-friendly.
 
 ---
 
-## [1.6.7] - 2025-11-15
+## [1.6.7]       - 2025-11-15
 
 **🌍 Class Colors for All Languages**
 
@@ -794,7 +802,7 @@ Class names now show in proper colors for all languages, including German, Frenc
 
 ---
 
-## [1.6.5] - 2025-11-15
+## [1.6.5]       - 2025-11-15
 
 **🔧 Friends List Scroll Fix**
 
@@ -807,7 +815,7 @@ Fixed scroll frame height calculation to prevent entries from being cut off.
 
 ---
 
-## [1.6.0] - 2025-11-14
+## [1.6.0]       - 2025-11-14
 
 **🎮 Raid Frame Enhancements**
 
@@ -831,7 +839,7 @@ Hold Ctrl and click players to select multiple (up to 5 per move). Drag any sele
 
 ---
 
-## [1.5.0-beta] - 2025-11-12
+## [1.5.0-beta]  - 2025-11-12
 
 **🌍 Multi-Language Support**
 
@@ -859,7 +867,7 @@ Your WoW language is automatically detected and applied!
 
 ---
 
-## [1.4.0-beta] - 2025-11-12
+## [1.4.0-beta]  - 2025-11-12
 
 **📨 Friend Request Display**
 
@@ -875,7 +883,7 @@ Battle.net friend invites now appear directly in your friends list.
 
 ---
 
-## [1.3.4-beta] - 2025-11-11
+## [1.3.4-beta]  - 2025-11-11
 
 **🔧 Code Quality & Export Fix**
 
@@ -890,7 +898,7 @@ Battle.net friend invites now appear directly in your friends list.
 
 ---
 
-## [1.3.3-beta] - 2025-11-11
+## [1.3.3-beta]  - 2025-11-11
 
 **⚡ Scroll Fix & Performance**
 
@@ -903,7 +911,7 @@ Battle.net friend invites now appear directly in your friends list.
 
 ---
 
-## [1.3.2-beta] - 2025-11-11
+## [1.3.2-beta]  - 2025-11-11
 
 **🛡️ High Severity Fixes**
 
@@ -914,7 +922,7 @@ Battle.net friend invites now appear directly in your friends list.
 
 ---
 
-## [1.3.1-beta] - 2025-11-11
+## [1.3.1-beta]  - 2025-11-11
 
 **🐛 Critical Bug Fixes**
 
@@ -925,7 +933,7 @@ Battle.net friend invites now appear directly in your friends list.
 
 ---
 
-## [1.3.0-beta] - 2025-11-10
+## [1.3.0-beta]  - 2025-11-10
 
 **📊 Activity Tracking & Statistics - Beta Release**
 
@@ -1199,7 +1207,7 @@ This release focuses on visual polish, improved UI consistency, and feature refi
 
 ---
 
-## [1.1.0] - 2025-11-09
+## [1.1.0]       - 2025-11-09
 
 **📋 Export & Import System**
 
@@ -1234,7 +1242,7 @@ Settings portability with hex-encoded export/import functionality.
 
 ---
 
-## [1.0.0] - 2025-11-09
+## [1.0.0]       - 2025-11-09
 
 **🎉 Initial Stable Release - Feature Complete!**
 
@@ -1355,7 +1363,7 @@ This is the first stable release of BetterFriendlist, representing complete feat
 
 ---
 
-## [0.15.0] - 2025-11-08
+## [0.15.0]      - 2025-11-08
 
 ### Added
 - Phase 10.5: Misc Changes & Bug Fixes
@@ -1381,7 +1389,7 @@ This is the first stable release of BetterFriendlist, representing complete feat
 
 ---
 
-## [0.14.0] - 2025-11-06
+## [0.14.0]      - 2025-11-06
 
 ### Added
 - Phase 9: Quick Join Implementation (COMPLETE)
@@ -1396,7 +1404,7 @@ This is the first stable release of BetterFriendlist, representing complete feat
 
 ---
 
-## [0.13.0] - 2025-11-05
+## [0.13.0]      - 2025-11-05
 
 ### Added
 - Phase 8: Raid Frame Implementation (COMPLETE)
@@ -1414,7 +1422,7 @@ This is the first stable release of BetterFriendlist, representing complete feat
 
 ---
 
-## [0.12.0] - 2025-11-03
+## [0.12.0]      - 2025-11-03
 
 ### Added
 - Phase 5: UI Initialization Cleanup
@@ -1430,7 +1438,7 @@ This is the first stable release of BetterFriendlist, representing complete feat
 
 ---
 
-## [0.11.0] - 2025-11-02
+## [0.11.0]      - 2025-11-02
 
 ### Added
 - Phase 4: Event System Reorganization
@@ -1447,7 +1455,7 @@ This is the first stable release of BetterFriendlist, representing complete feat
 
 ---
 
-## [0.10.0] - 2025-11-01
+## [0.10.0]      - 2025-11-01
 
 ### Added
 - Phase 3: Button Pool Management Module
@@ -1461,7 +1469,7 @@ This is the first stable release of BetterFriendlist, representing complete feat
 
 ---
 
-## [0.9.0] - 2025-10-31
+## [0.9.0]       - 2025-10-31
 
 ### Added
 - Phase 1-2: Core Modularization
@@ -1475,7 +1483,7 @@ This is the first stable release of BetterFriendlist, representing complete feat
 
 ---
 
-## [1.1.0] - 2025-11-09
+## [1.1.0]       - 2025-11-09
 
 **Feature Release: Export/Import System**
 

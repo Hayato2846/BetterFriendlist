@@ -16,6 +16,7 @@ local L = BFL_LOCALE
 	L.DIALOG_RENAME_GROUP_TEXT = "그룹의 새 이름을 입력하세요:"
 	L.DIALOG_RENAME_GROUP_BTN1 = "이름 변경"
 	L.DIALOG_RENAME_GROUP_BTN2 = "취소"
+	L.DIALOG_RENAME_GROUP_SETTINGS = "그룹 '%s' 이름 변경:"
 	L.DIALOG_DELETE_GROUP_TEXT = "이 그룹을 삭제하시겠습니까?\n\n|cffff0000이 그룹의 모든 친구가 제거됩니다.|r"
 	L.DIALOG_DELETE_GROUP_BTN1 = "삭제"
 	L.DIALOG_DELETE_GROUP_BTN2 = "취소"
@@ -168,6 +169,10 @@ local L = BFL_LOCALE
 	L.SORT_REALM = "서버"
 	L.SORT_CHANGED = "정렬 변경: %s"
 	L.SORT_NONE = "None"
+	L.SORT_PRIMARY_LABEL = "Primary Sort"
+	L.SORT_SECONDARY_LABEL = "Secondary Sort"
+	L.SORT_PRIMARY_DESC = "Choose how the friendlist is sorted."
+	L.SORT_SECONDARY_DESC = "Sort by this when primary values are equal."
 	
 	-- ========================================
 	-- MENUS & CONTEXT MENUS
@@ -618,7 +623,7 @@ local L = BFL_LOCALE
 	L.RAF_NO_RECRUITS_DESC = "No recruits."
 	L.RAF_PENDING_RECRUIT = "Pending"
 	L.RAF_RECRUIT_NAME_MULTIPLE = "%s (%d)"
-	L.RAF_RECRUITED_FRIENDS_COUNT = "%d / %d Recruits"
+	L.RAF_RECRUITED_FRIENDS_COUNT = "%d / %d"
 	L.RAF_YOU_HAVE_EARNED = "Earned:"
 	L.RAF_NEXT_REWARD_AFTER = "Next in %d/%d months"
 	L.RAF_FIRST_REWARD = "First:"

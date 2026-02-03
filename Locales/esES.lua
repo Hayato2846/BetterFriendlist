@@ -16,6 +16,7 @@ local L = BFL_LOCALE
 	L.DIALOG_RENAME_GROUP_TEXT = "Introduce un nuevo nombre para el grupo:"
 	L.DIALOG_RENAME_GROUP_BTN1 = "Renombrar"
 	L.DIALOG_RENAME_GROUP_BTN2 = "Cancelar"
+	L.DIALOG_RENAME_GROUP_SETTINGS = "Renombrar grupo '%s':"
 	L.DIALOG_DELETE_GROUP_TEXT = "¿Estás seguro de que quieres eliminar este grupo?\n\n|cffff0000Esto eliminará todos los amigos de este grupo.|r"
 	L.DIALOG_DELETE_GROUP_BTN1 = "Eliminar"
 	L.DIALOG_DELETE_GROUP_BTN2 = "Cancelar"
@@ -168,6 +169,10 @@ L.BUTTON_EXPORT = "Exportar"
 	L.SORT_REALM = "Reino"
 	L.SORT_CHANGED = "Orden cambiado a: %s"
 	L.SORT_NONE = "Ninguno"
+	L.SORT_PRIMARY_LABEL = "Primary Sort"
+	L.SORT_SECONDARY_LABEL = "Secondary Sort"
+	L.SORT_PRIMARY_DESC = "Choose how the friendlist is sorted."
+	L.SORT_SECONDARY_DESC = "Sort by this when primary values are equal."
 	
 	-- ========================================
 	-- MENUS & CONTEXT MENUS
@@ -621,7 +626,7 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita solapamientos con otras ventanas (P
 	L.RAF_NO_RECRUITS_DESC = "Aún no has reclutado amigos."
 	L.RAF_PENDING_RECRUIT = "Recluta Pendiente"
 	L.RAF_RECRUIT_NAME_MULTIPLE = "%s (%d)"
-	L.RAF_RECRUITED_FRIENDS_COUNT = "%d / %d Amigos Reclutados"
+	L.RAF_RECRUITED_FRIENDS_COUNT = "%d / %d"
 	L.RAF_YOU_HAVE_EARNED = "Has ganado:"
 	L.RAF_NEXT_REWARD_AFTER = "Próxima recompensa tras %d/%d meses"
 	L.RAF_FIRST_REWARD = "Primera Recompensa:"

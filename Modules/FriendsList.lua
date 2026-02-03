@@ -490,11 +490,16 @@ function FriendsList:UpdateSearchBoxState()
 			searchBox:ClearAllPoints()
 			
 			-- Shifted 2px to the right to correct centering (Left: 8, Right: -4)
-			searchBox:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 8, -5)
-			searchBox:SetPoint("TOPRIGHT", frame.Inset, "TOPRIGHT", -4, -5)
+			-- Adjusted (Phase 29): Reduced top padding (-5 -> -2) to reduce "air" above
+			-- Adjusted (Phase 30): Optimized Simple Mode spacing based on user feedback
+			searchBox:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 8, -1)
+			-- Adjusted (Phase 31): Extended width to right edge (was -4)
+			searchBox:SetPoint("TOPRIGHT", frame.Inset, "TOPRIGHT", -1, -1)
 			
 			searchBox:SetWidth(0) -- Let anchors decide width
-			searchBox:SetHeight(28) 
+			-- Adjusted (Phase 30): Reduced height (28 -> 22) for tighter layout
+			-- Note: SearchBoxTemplate textures might clip if too small, but 22 is usually safe for standard fonts.
+			searchBox:SetHeight(22) 
 			searchBox:SetFrameLevel(frame:GetFrameLevel() + 20)
 			
 			-- Ensure it's shown ONLY if we are on the Friends tab or ScrollFrame is visible
@@ -505,8 +510,9 @@ function FriendsList:UpdateSearchBoxState()
 			end
 			
 			-- Push ScrollFrame down
+			-- Adjusted (Phase 30): Maximum tightness (-25 -> -22)
 			scrollFrame:ClearAllPoints()
-			scrollFrame:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 4, -35)
+			scrollFrame:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 4, -22)
 			scrollFrame:SetPoint("BOTTOMRIGHT", frame.Inset, "BOTTOMRIGHT", -22, 2)
 		elseif searchBox then
 			-- Persistent SearchBox Mode (Simple Mode - HIDE)
@@ -526,13 +532,15 @@ function FriendsList:UpdateSearchBoxState()
 			if BFL.IsClassic then
 				-- Classic Normal Mode: Restore XML Defaults
 				-- XML: <Anchor point="TOPLEFT" relativeKey="$parent.$parent.Inset" x="10" y="50"/>
-				searchBox:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 10, 50)
+				-- Adjusted (Phase 29): Shifted 0.5px left for pixel-perfect alignment
+				searchBox:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 9.5, 50)
 				searchBox:SetPoint("TOPRIGHT", frame.Inset, "TOPRIGHT", -10, 50) 
 				searchBox:SetWidth(0) -- Let anchors decide width
 			else
 				-- Restore XML exact layout (Retail)
 				-- <Anchor point="TOPLEFT" relativeKey="$parent.$parent.Inset" x="10" y="60"/>
-				searchBox:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 10, 60)
+				-- Adjusted (Phase 29): Shifted 0.5px left for pixel-perfect alignment
+				searchBox:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 9.5, 60)
 				
 				-- Fixed: Do not hardcode width (220), use responsive width calculation (Phase 28)
 				if self.UpdateSearchBoxWidth then
@@ -1155,6 +1163,32 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 	}
 	
 	return result
+end
+
+-- Update "Send Message" button state based on selection
+function FriendsList:UpdateSendMessageButton()
+    local frame = BetterFriendsFrame
+    if not frame or not frame.SendMessageButton then return end
+    
+    local button = frame.SendMessageButton
+    local friend = self.selectedFriend
+    
+    if not friend then
+        button:Disable()
+        return
+    end
+    
+    if friend.type == "wow" then
+        if friend.connected then
+            button:Enable()
+        else
+            button:Disable()
+        end
+    elseif friend.type == "bnet" then
+        -- BNet friends can receive messages via app even if appearing offline/away
+        -- Blizzard enables it for all BNet friends
+        button:Enable()
+    end
 end
 
 -- ========================================
@@ -1963,6 +1997,9 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 	-- Without this, UI never updates after friend offline/online events
 	self:RenderDisplay(ignoreVisibility)
 	
+    -- Update Send Message button state based on current selection status
+    self:UpdateSendMessageButton()
+
 	-- Release lock after update complete
 	isUpdatingFriendsList = false
 end
