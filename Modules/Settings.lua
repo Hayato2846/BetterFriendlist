@@ -82,19 +82,20 @@ local function CreateGroupButton(parent, groupId, groupName, orderIndex)
 		
 		local bg = button.editButton:CreateTexture(nil, "BACKGROUND")
 		bg:SetAllPoints()
-		bg:SetColorTexture(unpack(UI.BG_COLOR_MEDIUM))
+		bg:SetColorTexture(0, 0, 0, 1)
 		
 		local texture = button.editButton:CreateTexture(nil, "ARTWORK")
-		texture:SetSize(UI.BUTTON_SIZE_SMALL, UI.BUTTON_SIZE_SMALL)
-		texture:SetPoint("CENTER")
+		texture:SetPoint("TOPLEFT", button.editButton, "TOPLEFT", UI.SPACING_TINY, -UI.SPACING_TINY)
+		texture:SetPoint("BOTTOMRIGHT", button.editButton, "BOTTOMRIGHT", -UI.SPACING_TINY, UI.SPACING_TINY)
 		texture:SetTexture("Interface\\Buttons\\UI-GuildButton-PublicNote-Up")
 		button.editButton.texture = texture
 		
 		button.editButton:SetHighlightTexture("Interface\\Buttons\\UI-GuildButton-PublicNote-Up")
 		local highlightTex = button.editButton:GetHighlightTexture()
 		if highlightTex then
-			highlightTex:SetSize(UI.BUTTON_SIZE_SMALL, UI.BUTTON_SIZE_SMALL)
-			highlightTex:SetPoint("CENTER")
+			highlightTex:ClearAllPoints()
+			highlightTex:SetPoint("TOPLEFT", button.editButton, "TOPLEFT", UI.SPACING_TINY, -UI.SPACING_TINY)
+			highlightTex:SetPoint("BOTTOMRIGHT", button.editButton, "BOTTOMRIGHT", -UI.SPACING_TINY, UI.SPACING_TINY)
 		end
 		
 		button.editButton:SetScript("OnClick", function(self)
@@ -138,7 +139,8 @@ local function CreateGroupButton(parent, groupId, groupName, orderIndex)
 		end
 	end
 	
-	button.colorButton:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
+	-- Highlight removed by user request
+	-- button.colorButton:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
 	
 	button.colorButton:SetScript("OnClick", function(self)
 		Settings:ShowColorPicker(groupId, groupName, button.colorSwatch)
@@ -146,7 +148,7 @@ local function CreateGroupButton(parent, groupId, groupName, orderIndex)
 	
 	button.colorButton:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText(L.TOOLTIP_GROUP_COLOR, 1, 1, 1)
+		GameTooltip:SetText(L.TOOLTIP_GROUP_COLOR, 1, 0.82, 0)
 		GameTooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC, 0.8, 0.8, 0.8, true)
 		GameTooltip:Show()
 	end)
@@ -158,17 +160,23 @@ local function CreateGroupButton(parent, groupId, groupName, orderIndex)
 	-- Delete Button (only for custom groups)
 	if not isBuiltIn then
 		button.deleteButton = CreateFrame("Button", nil, button)
-		button.deleteButton:SetSize(UI.BUTTON_SIZE_SMALL, UI.BUTTON_SIZE_SMALL)
+		button.deleteButton:SetSize(24, 24)
 		button.deleteButton:SetPoint("RIGHT", -UI.SPACING_MEDIUM, 0)
 		
+		local bg = button.deleteButton:CreateTexture(nil, "BACKGROUND")
+		bg:SetAllPoints()
+		bg:SetColorTexture(0, 0, 0, 1)
+		
 		local texture = button.deleteButton:CreateTexture(nil, "ARTWORK")
-		texture:SetAllPoints()
+		texture:SetPoint("TOPLEFT", button.deleteButton, "TOPLEFT", UI.SPACING_TINY, -UI.SPACING_TINY)
+		texture:SetPoint("BOTTOMRIGHT", button.deleteButton, "BOTTOMRIGHT", -UI.SPACING_TINY, UI.SPACING_TINY)
 		texture:SetAtlas("transmog-icon-remove", true)
 		texture:SetVertexColor(0.9, 0.2, 0.2)
 		button.deleteButton.texture = texture
 		
 		local highlight = button.deleteButton:CreateTexture(nil, "HIGHLIGHT")
-		highlight:SetAllPoints()
+		highlight:SetPoint("TOPLEFT", button.deleteButton, "TOPLEFT", UI.SPACING_TINY, -UI.SPACING_TINY)
+		highlight:SetPoint("BOTTOMRIGHT", button.deleteButton, "BOTTOMRIGHT", -UI.SPACING_TINY, UI.SPACING_TINY)
 		highlight:SetAtlas("transmog-icon-remove", true)
 		highlight:SetVertexColor(1, 0.4, 0.4)
 		highlight:SetAlpha(0.8)
@@ -912,20 +920,22 @@ function Settings:ShowGroupCountColorPicker(groupId, groupName, colorSwatch, isR
 	local DB = GetDB()
 	if not DB then return end
 	
-	-- Handle Reset (Right Click)
+	-- Handle Reset (Right Click) - Snapshot Group Color
 	if isReset then
+		local Groups = GetGroups()
+		local group = Groups and Groups:Get(groupId)
+		local r, g, b = 1, 1, 1
+		if group and group.color then
+			r, g, b = group.color.r, group.color.g, group.color.b
+		end
+
 		local groupCountColors = DB:Get("groupCountColors") or {}
-		groupCountColors[groupId] = nil
+		groupCountColors[groupId] = {r = r, g = g, b = b}
 		DB:Set("groupCountColors", groupCountColors)
 		
-		-- Update UI swatch to "inherited" grey look or the actual inherited color?
-		-- We should probably update it to the inherited color for better feedback, 
-		-- or grey if we want to signify "unset". 
-		-- SettingsComponents logic sets it to grey if initial is nil.
-		-- Let's just force a full refresh.
-		
-		local Groups = GetGroups()
-		if Groups then Groups:Initialize() end
+		if group then
+			group.countColor = {r = r, g = g, b = b}
+		end
 		
 		BFL:ForceRefreshFriendsList()
 		self:RefreshGroupsTab() -- Update the swatch in the list
@@ -946,6 +956,12 @@ function Settings:ShowGroupCountColorPicker(groupId, groupName, colorSwatch, isR
 			end
 		end
 	end
+	
+	-- Robust Cleanup: Ensure no stale callbacks or state exist
+	ColorPickerFrame:Hide()
+	ColorPickerFrame.func = nil
+	ColorPickerFrame.opacityFunc = nil
+	ColorPickerFrame.cancelFunc = nil
 	
 	local info = {}
 	info.r = r
@@ -975,10 +991,6 @@ function Settings:ShowGroupCountColorPicker(groupId, groupName, colorSwatch, isR
 	info.cancelFunc = function(previousValues)
 		colorSwatch:SetColorTexture(previousValues.r, previousValues.g, previousValues.b)
 		
-		-- Note: Cancellation doesn't revert to "nil" if it was nil before, 
-		-- it reverts to the RGB value we started with. This is acceptable.
-		-- If user wants to reset to inherit, they can Right-Click.
-		
 		local groupCountColors = DB:Get("groupCountColors") or {}
 		groupCountColors[groupId] = {r = previousValues.r, g = previousValues.g, b = previousValues.b}
 		DB:Set("groupCountColors", groupCountColors)
@@ -996,9 +1008,17 @@ function Settings:ShowGroupCountColorPicker(groupId, groupName, colorSwatch, isR
 	
 	if ColorPickerFrame.SetupColorPickerAndShow then
 		ColorPickerFrame:SetupColorPickerAndShow(info)
+		-- Force update the color RGB again to ensure internal wheel state is synced
+		-- This fixes an issue in some WoW versions where the picker remembers previous drag position
+		if ColorPickerFrame.SetColorRGB then
+			ColorPickerFrame:SetColorRGB(info.r, info.g, info.b)
+		end
 	else
 		ColorPickerFrame.func = info.swatchFunc
 		ColorPickerFrame.cancelFunc = info.cancelFunc
+		ColorPickerFrame.opacityFunc = nil
+		ColorPickerFrame.hasOpacity = info.hasOpacity
+		ColorPickerFrame.opacity = info.opacity
 		ColorPickerFrame:SetColorRGB(info.r, info.g, info.b)
 		ColorPickerFrame:Show()
 	end
@@ -1008,14 +1028,22 @@ function Settings:ShowGroupArrowColorPicker(groupId, groupName, colorSwatch, isR
 	local DB = GetDB()
 	if not DB then return end
 	
-	-- Handle Reset (Right Click)
+	-- Handle Reset (Right Click) - Snapshot Group Color
 	if isReset then
+		local Groups = GetGroups()
+		local group = Groups and Groups:Get(groupId)
+		local r, g, b = 1, 1, 1
+		if group and group.color then
+			r, g, b = group.color.r, group.color.g, group.color.b
+		end
+
 		local groupArrowColors = DB:Get("groupArrowColors") or {}
-		groupArrowColors[groupId] = nil
+		groupArrowColors[groupId] = {r = r, g = g, b = b}
 		DB:Set("groupArrowColors", groupArrowColors)
 		
-		local Groups = GetGroups()
-		if Groups then Groups:Initialize() end
+		if group then
+			group.arrowColor = {r = r, g = g, b = b}
+		end
 		
 		BFL:ForceRefreshFriendsList()
 		self:RefreshGroupsTab()
@@ -1035,6 +1063,12 @@ function Settings:ShowGroupArrowColorPicker(groupId, groupName, colorSwatch, isR
 			end
 		end
 	end
+	
+	-- Robust Cleanup
+	ColorPickerFrame:Hide()
+	ColorPickerFrame.func = nil
+	ColorPickerFrame.opacityFunc = nil
+	ColorPickerFrame.cancelFunc = nil
 	
 	local info = {}
 	info.r = r
@@ -1081,9 +1115,16 @@ function Settings:ShowGroupArrowColorPicker(groupId, groupName, colorSwatch, isR
 	
 	if ColorPickerFrame.SetupColorPickerAndShow then
 		ColorPickerFrame:SetupColorPickerAndShow(info)
+		-- Fix for sticky color wheel state
+		if ColorPickerFrame.SetColorRGB then
+			ColorPickerFrame:SetColorRGB(info.r, info.g, info.b)
+		end
 	else
 		ColorPickerFrame.func = info.swatchFunc
 		ColorPickerFrame.cancelFunc = info.cancelFunc
+		ColorPickerFrame.opacityFunc = nil
+		ColorPickerFrame.hasOpacity = info.hasOpacity
+		ColorPickerFrame.opacity = info.opacity
 		ColorPickerFrame:SetColorRGB(info.r, info.g, info.b)
 		ColorPickerFrame:Show()
 	end
@@ -1104,6 +1145,12 @@ function Settings:ShowColorPicker(groupId, groupName, colorSwatch)
 			r, g, b = 1, 0.82, 0
 		end
 	end
+	
+	-- Robust Cleanup
+	ColorPickerFrame:Hide()
+	ColorPickerFrame.func = nil
+	ColorPickerFrame.opacityFunc = nil
+	ColorPickerFrame.cancelFunc = nil
 	
 	local info = {}
 	info.r = r
@@ -1130,6 +1177,9 @@ function Settings:ShowColorPicker(groupId, groupName, colorSwatch)
 		
 		-- Force full display refresh for immediate color update
 		BFL:ForceRefreshFriendsList()
+		
+		-- Refresh Settings UI to update inherited swatches
+		if self.RefreshGroupsTab then self:RefreshGroupsTab() end
 	end
 	info.cancelFunc = function(previousValues)
 		colorSwatch:SetColorTexture(previousValues.r, previousValues.g, previousValues.b)
@@ -1148,9 +1198,26 @@ function Settings:ShowColorPicker(groupId, groupName, colorSwatch)
 		
 		-- Force full display refresh for immediate color update
 		BFL:ForceRefreshFriendsList()
+		
+		-- Refresh Settings UI to update inherited swatches
+		if self.RefreshGroupsTab then self:RefreshGroupsTab() end
 	end
 	
-	ColorPickerFrame:SetupColorPickerAndShow(info)
+	if ColorPickerFrame.SetupColorPickerAndShow then
+		ColorPickerFrame:SetupColorPickerAndShow(info)
+		-- Fix for sticky color wheel state
+		if ColorPickerFrame.SetColorRGB then
+			ColorPickerFrame:SetColorRGB(info.r, info.g, info.b)
+		end
+	else
+		ColorPickerFrame.func = info.swatchFunc
+		ColorPickerFrame.cancelFunc = info.cancelFunc
+		ColorPickerFrame.opacityFunc = nil
+		ColorPickerFrame.hasOpacity = info.hasOpacity
+		ColorPickerFrame.opacity = info.opacity
+		ColorPickerFrame:SetColorRGB(info.r, info.g, info.b)
+		ColorPickerFrame:Show()
+	end
 end
 
 -- Delete a custom group
@@ -3543,12 +3610,12 @@ function Settings:RefreshGroupsTab()
 	local DB = GetDB()
 	if not DB then return end
 	
-	-- Clear existing content (but keep the tab frame itself)
-	if tab.components then
-		for _, component in ipairs(tab.components) do
-			if component.Hide then component:Hide() end
-		end
+	-- Clear existing content using GetChildren for robustness against reference leaks
+	local children = {tab:GetChildren()}
+	for _, child in ipairs(children) do
+		if child.Hide then child:Hide() end
 	end
+	-- Legacy compatibility (keep table clear)
 	tab.components = {}
 	
 	local allFrames = {}
@@ -3808,61 +3875,79 @@ function Settings:RefreshGroupsTab()
 	end
 	
 	-- Create list items for each group
+	local listItems = {}
+	
 	for i, groupData in ipairs(orderedGroups) do
-		local canMoveUp = i > 1
-		local canMoveDown = i < #orderedGroups
 		local isBuiltin = groupData.builtin
+		
+		local onDragStart = function(btn)
+			
+			-- Only update background highlights in OnUpdate to be efficient
+			btn:SetScript("OnUpdate", function(self)
+				local cursorX, cursorY = GetCursorPosition()
+				local scale = UIParent:GetEffectiveScale()
+				cursorX = cursorX / scale
+				cursorY = cursorY / scale
+				
+				for _, otherItem in ipairs(listItems) do
+					if otherItem ~= self and otherItem:IsVisible() then
+						local left, bottom, width, height = otherItem:GetRect()
+						if left and cursorX >= left and cursorX <= left + width and
+						   cursorY >= bottom and cursorY <= bottom + height then
+							otherItem.bg:SetColorTexture(0.3, 0.3, 0.3, 0.7)
+						else
+							otherItem.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
+						end
+					end
+				end
+			end)
+		end
+		
+		local onDragStop = function(btn)
+			btn:SetScript("OnUpdate", nil)
+			
+			local targetIndex = nil
+			local cursorX, cursorY = GetCursorPosition()
+			local scale = UIParent:GetEffectiveScale()
+			cursorX = cursorX / scale
+			cursorY = cursorY / scale
+			
+			for _, otherItem in ipairs(listItems) do
+				otherItem.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5) -- Reset
+				if otherItem ~= btn and otherItem:IsVisible() then
+					local left, bottom, width, height = otherItem:GetRect()
+					if left and cursorX >= left and cursorX <= left + width and
+					   cursorY >= bottom and cursorY <= bottom + height then
+						targetIndex = otherItem.orderIndex
+					end
+				end
+			end
+			
+			if targetIndex and targetIndex ~= btn.orderIndex then
+				-- Perform Move
+				local itemToMove = table.remove(orderedGroups, btn.orderIndex)
+				table.insert(orderedGroups, targetIndex, itemToMove)
+				
+				-- Save
+				local newOrder = {}
+				for _, g in ipairs(orderedGroups) do
+					table.insert(newOrder, g.id)
+				end
+				DB:Set("groupOrder", newOrder)
+				
+				-- Refresh
+				Groups:Initialize()
+				self:RefreshGroupsTab()
+				BFL:ForceRefreshFriendsList()
+			end
+		end
 		
 		local listItem = Components:CreateListItem(
 			tab,
 			groupData.name,
 			i,
-			-- Move Up callback
-			function()
-				if i > 1 then
-					-- Swap with previous
-					local temp = orderedGroups[i-1]
-					orderedGroups[i-1] = orderedGroups[i]
-					orderedGroups[i] = temp
-					
-					-- Save new order
-					local newOrder = {}
-					for _, g in ipairs(orderedGroups) do
-						table.insert(newOrder, g.id)
-					end
-					DB:Set("groupOrder", newOrder)
-					
-					-- Refresh display
-					Groups:Initialize()
-					self:RefreshGroupsTab()
-					
-					-- Force full display refresh - group order affects display list structure
-					BFL:ForceRefreshFriendsList()
-				end
-			end,
-			-- Move Down callback
-			function()
-				if i < #orderedGroups then
-					-- Swap with next
-					local temp = orderedGroups[i+1]
-					orderedGroups[i+1] = orderedGroups[i]
-					orderedGroups[i] = temp
-					
-					-- Save new order
-					local newOrder = {}
-					for _, g in ipairs(orderedGroups) do
-						table.insert(newOrder, g.id)
-					end
-					DB:Set("groupOrder", newOrder)
-					
-					-- Refresh display
-					Groups:Initialize()
-					self:RefreshGroupsTab()
-					
-					-- Force full display refresh - group order affects display list structure
-					BFL:ForceRefreshFriendsList()
-				end
-			end,
+			onDragStart,
+			onDragStop,
 			-- Rename callback (allow for all groups)
 			function()
 				self:RenameGroup(groupData.id, groupData.name)
@@ -3885,11 +3970,11 @@ function Settings:RefreshGroupsTab()
 			end,
 			-- Initial Colors (New)
 			{
-				count = Groups:Get(groupData.id) and (Groups:Get(groupData.id).countColor or Groups:Get(groupData.id).color),
-				arrow = Groups:Get(groupData.id) and (Groups:Get(groupData.id).arrowColor or Groups:Get(groupData.id).color),
+				count = Groups:Get(groupData.id) and Groups:Get(groupData.id).countColor,
+				arrow = Groups:Get(groupData.id) and Groups:Get(groupData.id).arrowColor,
 				countSet = Groups:Get(groupData.id) and Groups:Get(groupData.id).countColor,
 				arrowSet = Groups:Get(groupData.id) and Groups:Get(groupData.id).arrowColor,
-				fallback = Groups:Get(groupData.id) and Groups:Get(groupData.id).color or {r=1, g=1, b=1}
+				fallback = {r=1, g=1, b=1}
 			}
 		)
 		
@@ -3903,37 +3988,35 @@ function Settings:RefreshGroupsTab()
 			end
 		end
 		
-		-- Set arrow button states
-		listItem:SetArrowState(canMoveUp, canMoveDown)
-		
-		-- Set tooltips (localized)
-		if listItem.renameBtn then
-			listItem.renameBtn:SetScript("OnEnter", function(self)
+		-- Update tooltips properties for new component structure
+		if listItem.renameButton then
+			listItem.renameButton:SetScript("OnEnter", function(self)
 				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 				GameTooltip:SetText(L.SETTINGS_RENAME_GROUP, 1, 1, 1)
-				GameTooltip:AddLine(L.TOOLTIP_RENAME_DESC, nil, nil, nil, true)
+				GameTooltip:AddLine(L.TOOLTIP_RENAME_DESC, 1, 1, 1, true)
 				GameTooltip:Show()
 			end)
 		end
 		
-		if listItem.colorBtn then
-			listItem.colorBtn:SetScript("OnEnter", function(self)
+		if listItem.colorButton then
+			listItem.colorButton:SetScript("OnEnter", function(self)
 				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-				GameTooltip:SetText(L.SETTINGS_GROUP_COLOR, 1, 1, 1)
-				GameTooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC, nil, nil, nil, true)
+				GameTooltip:SetText(L.SETTINGS_GROUP_COLOR, 1, 0.82, 0)
+				GameTooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC, 1, 1, 1, true)
 				GameTooltip:Show()
 			end)
 		end
 		
-		if listItem.deleteBtn then
-			listItem.deleteBtn:SetScript("OnEnter", function(self)
+		if listItem.deleteButton then
+			listItem.deleteButton:SetScript("OnEnter", function(self)
 				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 				GameTooltip:SetText(L.SETTINGS_DELETE_GROUP, 1, 1, 1)
-				GameTooltip:AddLine(L.TOOLTIP_DELETE_DESC, nil, nil, nil, true)
+				GameTooltip:AddLine(L.TOOLTIP_DELETE_DESC, 1, 1, 1, true)
 				GameTooltip:Show()
 			end)
 		end
 		
+		table.insert(listItems, listItem)
 		table.insert(allFrames, listItem)
 	end
 	
@@ -4401,12 +4484,12 @@ function Settings:RefreshBrokerTab()
 	local DB = GetDB()
 	if not DB then return end
 	
-	-- Clear existing content
-	if tab.components then
-		for _, component in ipairs(tab.components) do
-			if component.Hide then component:Hide() end
-		end
+	-- Clear existing content using GetChildren for robustness against reference leaks
+	local children = {tab:GetChildren()}
+	for _, child in ipairs(children) do
+		if child.Hide then child:Hide() end
 	end
+	-- Legacy compatibility (keep table clear)
 	tab.components = {}
 	
 	local allFrames = {}
@@ -4568,45 +4651,72 @@ function Settings:RefreshBrokerTab()
 	end
 	
 	-- Create reorderable list items
+	local listItems = {}
+	
 	for i, col in ipairs(orderedColumns) do
-		local canMoveUp = i > 1
-		local canMoveDown = i < #orderedColumns
+		local onDragStart = function(btn)
+			btn:SetScript("OnUpdate", function(self)
+				local cursorX, cursorY = GetCursorPosition()
+				local scale = UIParent:GetEffectiveScale()
+				cursorX = cursorX / scale
+				cursorY = cursorY / scale
+				
+				for _, otherItem in ipairs(listItems) do
+					if otherItem ~= self and otherItem:IsVisible() then
+						local left, bottom, width, height = otherItem:GetRect()
+						if left and cursorX >= left and cursorX <= left + width and
+						   cursorY >= bottom and cursorY <= bottom + height then
+							otherItem.bg:SetColorTexture(0.3, 0.3, 0.3, 0.7)
+						else
+							otherItem.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
+						end
+					end
+				end
+			end)
+		end
 		
+		local onDragStop = function(btn)
+			btn:SetScript("OnUpdate", nil)
+			
+			local targetIndex = nil
+			local cursorX, cursorY = GetCursorPosition()
+			local scale = UIParent:GetEffectiveScale()
+			cursorX = cursorX / scale
+			cursorY = cursorY / scale
+			
+			for _, otherItem in ipairs(listItems) do
+				otherItem.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5) -- Reset
+				if otherItem ~= btn and otherItem:IsVisible() then
+					local left, bottom, width, height = otherItem:GetRect()
+					if left and cursorX >= left and cursorX <= left + width and
+					   cursorY >= bottom and cursorY <= bottom + height then
+						targetIndex = otherItem.orderIndex
+					end
+				end
+			end
+			
+			if targetIndex and targetIndex ~= btn.orderIndex then
+				-- Move
+				local itemToMove = table.remove(orderedColumns, btn.orderIndex)
+				table.insert(orderedColumns, targetIndex, itemToMove)
+				
+				-- Save
+				local newOrder = {}
+				for _, c in ipairs(orderedColumns) do
+					table.insert(newOrder, c.key)
+				end
+				DB:Set("brokerColumnOrder", newOrder)
+				self:RefreshBrokerTab()
+			end
+		end
+
 		-- Create a custom list item that includes a checkbox for visibility
 		local listItem = Components:CreateListItem(
 			tab,
 			col.label,
 			i,
-			-- Move Up
-			function()
-				if i > 1 then
-					local temp = orderedColumns[i-1]
-					orderedColumns[i-1] = orderedColumns[i]
-					orderedColumns[i] = temp
-					
-					local newOrder = {}
-					for _, c in ipairs(orderedColumns) do
-						table.insert(newOrder, c.key)
-					end
-					DB:Set("brokerColumnOrder", newOrder)
-					self:RefreshBrokerTab()
-				end
-			end,
-			-- Move Down
-			function()
-				if i < #orderedColumns then
-					local temp = orderedColumns[i+1]
-					orderedColumns[i+1] = orderedColumns[i]
-					orderedColumns[i] = temp
-					
-					local newOrder = {}
-					for _, c in ipairs(orderedColumns) do
-						table.insert(newOrder, c.key)
-					end
-					DB:Set("brokerColumnOrder", newOrder)
-					self:RefreshBrokerTab()
-				end
-			end,
+			onDragStart,
+			onDragStop,
 			nil, -- No rename
 			nil, -- No color
 			nil  -- No delete
@@ -4638,7 +4748,7 @@ function Settings:RefreshBrokerTab()
 			listItem.nameText:SetPoint("LEFT", checkbox, "RIGHT", 10, 0)
 		end
 		
-		listItem:SetArrowState(canMoveUp, canMoveDown)
+		table.insert(listItems, listItem)
 		table.insert(allFrames, listItem)
 	end
 	

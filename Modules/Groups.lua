@@ -227,6 +227,84 @@ function Groups:RunSmartMigration()
 	DB:Set("wowUIDMigrationDone_v2", true)
 end
 
+-- Snapshot update: Explicitly set count/arrow colors to group color to disable implicit inheritance
+function Groups:RunColorSnapshotMigration()
+	local DB = BFL:GetModule("DB")
+	if not DB then return end
+	
+	if DB:Get("colorSnapshotMigrationDone") then return end
+	
+	-- We iterate through valid groups in DB
+	local modificationMade = false
+	
+	-- Snapshot Custom Groups
+	local customGroups = DB:GetCustomGroups()
+	if customGroups then
+		for groupId, groupInfo in pairs(customGroups) do
+			-- Check if specific colors are missing in DB
+			local groupCountColors = DB:Get("groupCountColors") or {}
+			local groupArrowColors = DB:Get("groupArrowColors") or {}
+			
+			-- If countColor is missing, snapshot current Group Color (or default Gold)
+			if not groupCountColors[groupId] then
+				-- Get current group color
+				local groupColors = DB:Get("groupColors") or {}
+				local currentColor = groupColors[groupId] or {r=1.0, g=0.82, b=0.0}
+				
+				-- Save snapshot
+				groupCountColors[groupId] = {r=currentColor.r, g=currentColor.g, b=currentColor.b}
+				DB:Set("groupCountColors", groupCountColors)
+				modificationMade = true
+			end
+			
+			-- If arrowColor is missing
+			if not groupArrowColors[groupId] then
+				local groupColors = DB:Get("groupColors") or {}
+				local currentColor = groupColors[groupId] or {r=1.0, g=0.82, b=0.0}
+				
+				groupArrowColors[groupId] = {r=currentColor.r, g=currentColor.g, b=currentColor.b}
+				DB:Set("groupArrowColors", groupArrowColors)
+				modificationMade = true
+			end
+		end
+	end
+	
+	-- Also handle Built-in Groups (Favorites, etc) if they have custom colors set
+	-- (Actually built-in groups usually don't have custom colors unless overridden, which is handled via groupColors)
+	local builtinIds = {"favorites", "ingame", "nogroup"}
+	for _, groupId in ipairs(builtinIds) do
+		local groupCountColors = DB:Get("groupCountColors") or {}
+		local groupArrowColors = DB:Get("groupArrowColors") or {}
+		
+		if not groupCountColors[groupId] then
+			local groupColors = DB:Get("groupColors") or {}
+			-- Default for favorites/ingame is Gold, nogroup is Gray
+			local defaultColor = (groupId == "nogroup") and {r=0.5, g=0.5, b=0.5} or {r=1.0, g=0.82, b=0.0}
+			local currentColor = groupColors[groupId] or defaultColor
+			
+			groupCountColors[groupId] = {r=currentColor.r, g=currentColor.g, b=currentColor.b}
+			DB:Set("groupCountColors", groupCountColors)
+			modificationMade = true
+		end
+		
+		if not groupArrowColors[groupId] then
+			local groupColors = DB:Get("groupColors") or {}
+			local defaultColor = (groupId == "nogroup") and {r=0.5, g=0.5, b=0.5} or {r=1.0, g=0.82, b=0.0}
+			local currentColor = groupColors[groupId] or defaultColor
+			
+			groupArrowColors[groupId] = {r=currentColor.r, g=currentColor.g, b=currentColor.b}
+			DB:Set("groupArrowColors", groupArrowColors)
+			modificationMade = true
+		end
+	end
+	
+	if modificationMade then
+		BFL:DebugPrint("Color Snapshot Migration applied.")
+	end
+	
+	DB:Set("colorSnapshotMigrationDone", true)
+end
+
 function Groups:Initialize()
 	-- Localize built-in group names
 	if BFL.L then
@@ -258,24 +336,37 @@ function Groups:Initialize()
 	end
 	
 	-- Migrate old bnetAccountID-based friend assignments to battleTag-based
-	self:MigrateFriendAssignments()
+	-- Using pcall to prevent migration errors from blocking initialization
+	local status, err = pcall(function() self:MigrateFriendAssignments() end)
+	if not status then 
+		BFL:DebugPrint("Error in MigrateFriendAssignments: " .. tostring(err)) 
+	end
 	
 	-- Run smart migration for WoW friends (v2)
-	self:RunSmartMigration()
+	status, err = pcall(function() self:RunSmartMigration() end)
+	if not status then 
+		BFL:DebugPrint("Error in RunSmartMigration: " .. tostring(err)) 
+	end
+	
+	-- Run color snapshot migration (v3) - Disable implicit inheritance
+	status, err = pcall(function() self:RunColorSnapshotMigration() end)
+	if not status then 
+		BFL:DebugPrint("Error in RunColorSnapshotMigration: " .. tostring(err)) 
+	end
 	
 	local customGroups = DB:GetCustomGroups()
-	if not customGroups then return end
-	
-	for groupId, groupInfo in pairs(customGroups) do
-		self.groups[groupId] = {
-			id = groupId,
-			name = groupInfo.name,
-			collapsed = groupInfo.collapsed or false,
-			builtin = false,
-			order = groupInfo.order or 50,
-			color = {r = 1.0, g = 0.82, b = 0.0}, -- Default gold
-			icon = "Interface\\FriendsFrame\\UI-Toast-ChatInviteIcon"
-		}
+	if customGroups then
+		for groupId, groupInfo in pairs(customGroups) do
+			self.groups[groupId] = {
+				id = groupId,
+				name = groupInfo.name,
+				collapsed = groupInfo.collapsed or false,
+				builtin = false,
+				order = groupInfo.order or 50,
+				color = {r = 1.0, g = 0.82, b = 0.0}, -- Default gold
+				icon = "Interface\\FriendsFrame\\UI-Toast-ChatInviteIcon"
+			}
+		end
 	end
 	
 	-- Load collapsed states
@@ -392,19 +483,30 @@ function Groups:ValidateGroupName(groupName, currentGroupId)
 		return false, BFL.L.ERROR_GROUP_NAME_EMPTY or "Group name cannot be empty"
 	end
 	
-	-- Generate unique ID from name (same logic as Create)
-	local potentialId = "custom_" .. groupName:gsub("%s+", "_"):lower()
-	local existingGroup = self.groups[potentialId]
+	local lowerName = groupName:lower()
 	
-	if existingGroup then
-		-- If we are renaming and the collision is with ourselves, it's fine
-		if currentGroupId and existingGroup.id == currentGroupId then
-			return true
+	-- Check for name collision across ALL groups
+	for id, group in pairs(self.groups) do
+		-- If renaming, ignore self
+		if id ~= currentGroupId then
+			if group.name and group.name:lower() == lowerName then
+				return false, BFL.L.ERROR_GROUP_EXISTS or "Group already exists"
+			end
 		end
+	end
+	
+	-- For creation (no currentGroupId), we also need to check if the generated ID is available
+	-- because Create() uses deterministic IDs based on name.
+	if not currentGroupId then
+		-- Generate unique ID from name (same logic as Create)
+		local potentialId = "custom_" .. groupName:gsub("%s+", "_"):lower()
+		local existingGroup = self.groups[potentialId]
 		
-		-- Also check if name matches exactly another group (just to be safe against ID collisions)
-		-- although ID collision implies name collision in our scheme usually
-		return false, BFL.L.ERROR_GROUP_EXISTS or "Group already exists"
+		if existingGroup then
+			-- ID collision! Even if names are different (e.g. existing group was renamed away from this name)
+			-- we can't create a new group with this name because the ID slot is taken.
+			return false, BFL.L.ERROR_GROUP_EXISTS or "Group already exists"
+		end
 	end
 	
 	return true
@@ -426,8 +528,10 @@ function Groups:Create(groupName)
 	
 	-- Find next order value (place custom groups between Favorites and No Group)
 	local maxOrder = 1
-	for _, groupData in pairs(self.groups) do
-		if not groupData.builtin or groupData.id == "favorites" then
+	for id, groupData in pairs(self.groups) do
+		-- Count all groups EXCEPT "nogroup" so we append after the last "content" group
+		-- This fixes the bug where "ingame" group was ignored in the calculation
+		if id ~= "nogroup" then
 			maxOrder = math.max(maxOrder, groupData.order or 1)
 		end
 	end
@@ -450,6 +554,20 @@ function Groups:Create(groupName)
 		collapsed = false,
 		order = maxOrder + 1
 	})
+	
+	-- Initialize color snapshot (Default Gold)
+	local defaultColor = {r = 1.0, g = 0.82, b = 0.0}
+	
+	local groupCountColors = DB:Get("groupCountColors") or {}
+	groupCountColors[groupId] = {r=defaultColor.r, g=defaultColor.g, b=defaultColor.b}
+	DB:Set("groupCountColors", groupCountColors)
+	
+	local groupArrowColors = DB:Get("groupArrowColors") or {}
+	groupArrowColors[groupId] = {r=defaultColor.r, g=defaultColor.g, b=defaultColor.b}
+	DB:Set("groupArrowColors", groupArrowColors)
+	
+	self.groups[groupId].countColor = {r=defaultColor.r, g=defaultColor.g, b=defaultColor.b}
+	self.groups[groupId].arrowColor = {r=defaultColor.r, g=defaultColor.g, b=defaultColor.b}
 	
 	-- Refresh Settings UI if open
 	local Settings = BFL:GetModule("Settings")
@@ -492,6 +610,20 @@ function Groups:CreateWithOrder(groupName, orderValue)
 		collapsed = false,
 		order = orderValue
 	})
+
+	-- Initialize color snapshot (Default Gold)
+	local defaultColor = {r = 1.0, g = 0.82, b = 0.0}
+	
+	local groupCountColors = DB:Get("groupCountColors") or {}
+	groupCountColors[groupId] = {r=defaultColor.r, g=defaultColor.g, b=defaultColor.b}
+	DB:Set("groupCountColors", groupCountColors)
+	
+	local groupArrowColors = DB:Get("groupArrowColors") or {}
+	groupArrowColors[groupId] = {r=defaultColor.r, g=defaultColor.g, b=defaultColor.b}
+	DB:Set("groupArrowColors", groupArrowColors)
+	
+	self.groups[groupId].countColor = {r=defaultColor.r, g=defaultColor.g, b=defaultColor.b}
+	self.groups[groupId].arrowColor = {r=defaultColor.r, g=defaultColor.g, b=defaultColor.b}
 	
 	-- Refresh Settings UI if open
 	local Settings = BFL:GetModule("Settings")

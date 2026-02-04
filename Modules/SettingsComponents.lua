@@ -428,13 +428,14 @@ function Components:CreateColorPicker(parent, labelText, initialColor, callback)
 	colorSwatch:SetPoint("BOTTOMRIGHT", colorButton, "BOTTOMRIGHT", -3, 3)
 	
 	-- Highlight
-	colorButton:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
+	-- Removed by user request to prevent color distortion
+	-- colorButton:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
 	
 	-- Tooltip
 	colorButton:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText(L.SETTINGS_FONT_COLOR or "Font Color", 1, 1, 1)
-		GameTooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 0.8, 0.8, 0.8, true)
+		GameTooltip:SetText(L.SETTINGS_FONT_COLOR or "Font Color", 1, 0.82, 0)
+		GameTooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 1, 1, 1, true)
 		GameTooltip:Show()
 	end)
 	colorButton:SetScript("OnLeave", function()
@@ -522,13 +523,14 @@ function Components:CreateSliderWithColorPicker(parent, labelText, min, max, ini
 	colorSwatch:SetPoint("BOTTOMRIGHT", colorButton, "BOTTOMRIGHT", -3, 3)
 	
 	-- Highlight
-	colorButton:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
+	-- Removed by user request to prevent color distortion
+	-- colorButton:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
 	
 	-- Tooltip
 	colorButton:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText(L.SETTINGS_FONT_COLOR or "Font Color", 1, 1, 1)
-		GameTooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 0.8, 0.8, 0.8, true)
+		GameTooltip:SetText(L.SETTINGS_FONT_COLOR or "Font Color", 1, 0.82, 0)
+		GameTooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 1, 1, 1, true)
 		GameTooltip:Show()
 	end)
 	colorButton:SetScript("OnLeave", function()
@@ -784,24 +786,110 @@ function Components:AnchorChain(frames, startY)
 	end
 end
 
+-- Shared Ghost Frame
+local DragGhost = nil
+local function GetDragGhost()
+	if not DragGhost then
+		DragGhost = CreateFrame("Frame", nil, UIParent)
+		DragGhost:SetFrameStrata("TOOLTIP")
+		DragGhost.bg = DragGhost:CreateTexture(nil, "BACKGROUND")
+		DragGhost.bg:SetAllPoints()
+		DragGhost.bg:SetColorTexture(0.15, 0.15, 0.15, 0.9)
+		
+		-- Color Strip
+		DragGhost.stripe = DragGhost:CreateTexture(nil, "ARTWORK")
+		DragGhost.stripe:SetPoint("TOPLEFT")
+		DragGhost.stripe:SetPoint("BOTTOMLEFT")
+		DragGhost.stripe:SetWidth(6)
+		
+		DragGhost.text = DragGhost:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
+		DragGhost.text:SetPoint("CENTER", 3, 0) -- Slight offset for stripe
+	end
+	return DragGhost
+end
+
 -- ========================================
--- LIST ITEM (With Up/Down arrows for reordering)
+-- LIST ITEM (With Drag Handle for reordering)
 -- ========================================
-function Components:CreateListItem(parent, itemText, orderIndex, onMoveUp, onMoveDown, onRename, onColor, onDelete, onCountColor, onArrowColor, initialColors)
-	local holder = CreateFrame("Frame", nil, parent)
+function Components:CreateListItem(parent, itemText, orderIndex, onDragStart, onDragStop, onRename, onColor, onDelete, onCountColor, onArrowColor, initialColors)
+	-- Use a Button for better click/drag handling
+	local holder = CreateFrame("Button", nil, parent)
 	holder:SetHeight(40)
 	-- Use negative padding to maximize width further
 	holder:SetPoint("LEFT", -2, 0)
-	holder:SetPoint("RIGHT", 15, 0)
+	holder:SetPoint("RIGHT", 5, 0)
+	
+	-- Enable Drag
+	holder:RegisterForDrag("LeftButton")
+	
+	-- Drag Scripts
+	if onDragStart and onDragStop then
+		holder:SetScript("OnDragStart", function(self)
+			-- Init Ghost
+			local ghost = GetDragGhost()
+			ghost.text:SetText(itemText)
+			
+			-- Calculate width based on text length + padding
+			local width = ghost.text:GetStringWidth() + 50
+			ghost:SetSize(width, self:GetHeight())
+			
+			-- Apply Color to Stripe
+			if initialColors and initialColors.fallback then
+				ghost.stripe:SetColorTexture(initialColors.fallback.r, initialColors.fallback.g, initialColors.fallback.b)
+			else
+				ghost.stripe:SetColorTexture(1, 0.82, 0) -- Default Gold
+			end
+			
+			ghost:Show()
+			local cursorX, cursorY = GetCursorPosition()
+			local scale = UIParent:GetEffectiveScale()
+			ghost:SetPoint("CENTER", UIParent, "BOTTOMLEFT", cursorX / scale, cursorY / scale)
+			
+			-- Dim original
+			self:SetAlpha(0.0)
+			
+			-- Start moving ghost
+			ghost:SetScript("OnUpdate", function(g)
+				local cX, cY = GetCursorPosition()
+				local s = UIParent:GetEffectiveScale()
+				
+				-- Ensure ghost stays within reasonable bounds or just follows cursor
+				g:SetPoint("CENTER", UIParent, "BOTTOMLEFT", cX / s, cY / s)
+			end)
+			
+			-- Call external handler (logic)
+			onDragStart(self)
+		end)
+		
+		holder:SetScript("OnDragStop", function(self)
+			-- Hide Ghost
+			local ghost = GetDragGhost()
+			ghost:Hide()
+			ghost:SetScript("OnUpdate", nil)
+			ghost:ClearAllPoints()
+			
+			-- Restore original
+			self:SetAlpha(1.0)
+			
+			-- Call external handler (logic)
+			onDragStop(self)
+		end)
+	end
 	
 	-- Background
 	holder.bg = holder:CreateTexture(nil, "BACKGROUND")
 	holder.bg:SetAllPoints()
 	holder.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
 	
+	-- Drag Handle (:::)
+	holder.dragHandle = holder:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
+	holder.dragHandle:SetPoint("LEFT", 5, 0)
+	holder.dragHandle:SetText(":::")
+	holder.dragHandle:SetTextColor(0.5, 0.5, 0.5)
+	
 	-- Order number
 	holder.orderText = holder:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
-	holder.orderText:SetPoint("LEFT", 10, 0)
+	holder.orderText:SetPoint("LEFT", holder.dragHandle, "RIGHT", 5, 0)
 	holder.orderText:SetText(orderIndex)
 	holder.orderText:SetTextColor(0.7, 0.7, 0.7)
 	
@@ -899,7 +987,8 @@ function Components:CreateListItem(parent, itemText, orderIndex, onMoveUp, onMov
 			holder.arrowColorSwatch:SetColorTexture(0.5, 0.5, 0.5, 0.5) -- Grey for "Inherited/None"
 		end
 		
-		holder.arrowColorButton:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
+		-- Removed highlight to prevent color distortion
+		-- holder.arrowColorButton:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
 		holder.arrowColorButton:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 		holder.arrowColorButton:SetScript("OnClick", function(self, button)
 			if button == "RightButton" then
@@ -911,22 +1000,45 @@ function Components:CreateListItem(parent, itemText, orderIndex, onMoveUp, onMov
 		end)
 		holder.arrowColorButton:SetScript("OnEnter", function(self)
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText(L.SETTINGS_GROUP_ARROW_COLOR or "Arrow Color", 1, 1, 1)
-			GameTooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 0.8, 0.8, 0.8, true)
+			GameTooltip:SetText(L.SETTINGS_GROUP_ARROW_COLOR or "Arrow Color", 1, 0.82, 0)
+			GameTooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 1, 1, 1, true)
 			GameTooltip:AddLine(L.TOOLTIP_RIGHT_CLICK_INHERIT or "Right-click to inherit from Group", 0.6, 0.6, 0.6)
 			GameTooltip:Show()
 		end)
 		holder.arrowColorButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
 		
 		-- Small Icon overlay to indicate function
-		local icon = holder.arrowColorButton:CreateTexture(nil, "OVERLAY")
+		-- Multiple shadows in 8 directions to simulate a full OUTLINE effect
+		
+		-- Helper to create a shadow texture
+		local function CreateShadow(x, y)
+			local shadow = holder.arrowColorButton:CreateTexture(nil, "OVERLAY")
+			shadow:SetSize(12, 12)
+			shadow:SetPoint("CENTER", x, y)
+			shadow:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\arrow-down")
+			shadow:SetDesaturated(true) -- Ensure no color bleed from original texture
+			shadow:SetVertexColor(0, 0, 0, 1)
+			return shadow
+		end
+
+		-- Create shadows in all 8 directions + directly behind for thickness
+		CreateShadow(1, 0)
+		CreateShadow(-1, 0)
+		CreateShadow(0, 1)
+		CreateShadow(0, -1)
+		CreateShadow(1, 1)
+		CreateShadow(1, -1)
+		CreateShadow(-1, 1)
+		CreateShadow(-1, -1)
+
+		local icon = holder.arrowColorButton:CreateTexture(nil, "OVERLAY", nil, 7) -- Draw on top of all shadows (subLevel > 0)
 		icon:SetSize(12, 12)
 		icon:SetPoint("CENTER")
 		
-		-- Use flat icon for clean black look (no baked-in shadows/3D effects)
+		-- Use flat icon for clean white look
 		icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\arrow-down")
-		
-		icon:SetVertexColor(0, 0, 0)
+		icon:SetDesaturated(true) -- Remove original color (e.g. yellow) to allow pure white
+		icon:SetVertexColor(1, 1, 1)
 	end
 	
 	-- Count Color Button (New)
@@ -951,7 +1063,8 @@ function Components:CreateListItem(parent, itemText, orderIndex, onMoveUp, onMov
 			holder.countColorSwatch:SetColorTexture(0.5, 0.5, 0.5, 0.5)
 		end
 		
-		holder.countColorButton:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
+		-- Removed highlight to prevent color distortion
+		-- holder.countColorButton:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
 		holder.countColorButton:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 		holder.countColorButton:SetScript("OnClick", function(self, button)
 			if button == "RightButton" then
@@ -963,8 +1076,8 @@ function Components:CreateListItem(parent, itemText, orderIndex, onMoveUp, onMov
 		end)
 		holder.countColorButton:SetScript("OnEnter", function(self)
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText(L.SETTINGS_GROUP_COUNT_COLOR or "Count Color", 1, 1, 1)
-			GameTooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 0.8, 0.8, 0.8, true)
+			GameTooltip:SetText(L.SETTINGS_GROUP_COUNT_COLOR or "Count Color", 1, 0.82, 0)
+			GameTooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 1, 1, 1, true)
 			GameTooltip:AddLine(L.TOOLTIP_RIGHT_CLICK_INHERIT or "Right-click to inherit from Group", 0.6, 0.6, 0.6)
 			GameTooltip:Show()
 		end)
@@ -974,8 +1087,11 @@ function Components:CreateListItem(parent, itemText, orderIndex, onMoveUp, onMov
 		local text = holder.countColorButton:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 		text:SetPoint("CENTER")
 		text:SetText("123")
-		text:SetTextColor(0, 0, 0)
-		text:SetShadowOffset(0, 0)
+		
+		-- Use White text with Outline for universal readability on any color background
+		local font, size, flags = text:GetFont()
+		text:SetFont(font, size, "OUTLINE")
+		text:SetTextColor(1, 1, 1)
 	end
 	
 	-- Color button (Main Group Color)
@@ -993,14 +1109,15 @@ function Components:CreateListItem(parent, itemText, orderIndex, onMoveUp, onMov
 	holder.colorSwatch:SetPoint("BOTTOMRIGHT", holder.colorButton, "BOTTOMRIGHT", -3, 3)
 	holder.colorSwatch:SetColorTexture(1, 0.82, 0)
 	
-	holder.colorButton:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
+	-- Removed highlight to prevent color distortion
+	-- holder.colorButton:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
 	holder.colorButton:SetScript("OnClick", function()
 		if onColor then onColor(holder.colorSwatch) end
 	end)
 	holder.colorButton:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText(L.SETTINGS_GROUP_COLOR or "Group Color", 1, 1, 1)
-		GameTooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 0.8, 0.8, 0.8, true)
+		GameTooltip:SetText(L.SETTINGS_GROUP_COLOR or "Group Color", 1, 0.82, 0)
+		GameTooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 1, 1, 1, true)
 		GameTooltip:Show()
 	end)
 	holder.colorButton:SetScript("OnLeave", function()
@@ -1011,65 +1128,11 @@ function Components:CreateListItem(parent, itemText, orderIndex, onMoveUp, onMov
 	local nameIcon = holder.colorButton:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	nameIcon:SetPoint("CENTER")
 	nameIcon:SetText("Abc")
-	nameIcon:SetTextColor(0, 0, 0)
-	nameIcon:SetShadowOffset(0, 0)
 	
-	-- Down Arrow button
-	holder.downButton = CreateFrame("Button", nil, holder, "UIPanelButtonTemplate")
-	holder.downButton:SetSize(28, 28)
-	holder.downButton:SetPoint("RIGHT", rightOffset, 0)
-	rightOffset = rightOffset - 30
-	
-	-- Icon texture
-	local downIcon = holder.downButton:CreateTexture(nil, "ARTWORK")
-	downIcon:SetSize(18, 18)
-	downIcon:SetPoint("CENTER")
-	downIcon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\arrow-down")
-	downIcon:SetVertexColor(1, 0.82, 0)
-	holder.downButton.icon = downIcon
-	
-	holder.downButton:SetScript("OnClick", function()
-		if onMoveDown then onMoveDown() end
-	end)
-	holder.downButton:SetScript("OnEnter", function(self)
-		self.icon:SetVertexColor(1, 1, 1)
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText(L.TOOLTIP_MOVE_DOWN or "Move Down", 1, 1, 1)
-		GameTooltip:AddLine(L.TOOLTIP_MOVE_DOWN_DESC or "Move this group down in the list", 0.8, 0.8, 0.8, true)
-		GameTooltip:Show()
-	end)
-	holder.downButton:SetScript("OnLeave", function(self)
-		self.icon:SetVertexColor(1, 0.82, 0)
-		GameTooltip:Hide()
-	end)
-	
-	-- Up Arrow button
-	holder.upButton = CreateFrame("Button", nil, holder, "UIPanelButtonTemplate")
-	holder.upButton:SetSize(28, 28)
-	holder.upButton:SetPoint("RIGHT", rightOffset, 0)
-	
-	-- Icon texture
-	local upIcon = holder.upButton:CreateTexture(nil, "ARTWORK")
-	upIcon:SetSize(18, 18)
-	upIcon:SetPoint("CENTER")
-	upIcon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\arrow-up")
-	upIcon:SetVertexColor(1, 0.82, 0)
-	holder.upButton.icon = upIcon
-	
-	holder.upButton:SetScript("OnClick", function()
-		if onMoveUp then onMoveUp() end
-	end)
-	holder.upButton:SetScript("OnEnter", function(self)
-		self.icon:SetVertexColor(1, 1, 1)
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText(L.TOOLTIP_MOVE_UP or "Move Up", 1, 1, 1)
-		GameTooltip:AddLine(L.TOOLTIP_MOVE_UP_DESC or "Move this group up in the list", 0.8, 0.8, 0.8, true)
-		GameTooltip:Show()
-	end)
-	holder.upButton:SetScript("OnLeave", function(self)
-		self.icon:SetVertexColor(1, 0.82, 0)
-		GameTooltip:Hide()
-	end)
+	-- Use White text with Outline for universal readability on any color background
+	local font, size, flags = nameIcon:GetFont()
+	nameIcon:SetFont(font, size, "OUTLINE")
+	nameIcon:SetTextColor(1, 1, 1)
 	
 	-- Store order index
 	holder.orderIndex = orderIndex
@@ -1078,12 +1141,6 @@ function Components:CreateListItem(parent, itemText, orderIndex, onMoveUp, onMov
 	function holder:SetOrderIndex(newIndex)
 		holder.orderIndex = newIndex
 		holder.orderText:SetText(newIndex)
-	end
-	
-	-- Function to enable/disable arrow buttons
-	function holder:SetArrowState(canMoveUp, canMoveDown)
-		holder.upButton:SetEnabled(canMoveUp)
-		holder.downButton:SetEnabled(canMoveDown)
 	end
 	
 	return holder

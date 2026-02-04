@@ -175,6 +175,12 @@ function DB:Initialize()
 			end
 		end
 	end
+
+	-- MIGRATION: Fix Aliased Color Tables (Phase 21)
+	-- Ensure color tables are not the same table reference (fixes inheritance bug)
+	if BetterFriendlistDB.groupCountColors and BetterFriendlistDB.groupArrowColors and BetterFriendlistDB.groupCountColors == BetterFriendlistDB.groupArrowColors then
+		BetterFriendlistDB.groupArrowColors = self:InternalDeepCopy(BetterFriendlistDB.groupCountColors)
+	end
 	
 	-- Debug: Check ElvUI Skin setting
 	if BetterFriendlistDB.enableElvUISkin then

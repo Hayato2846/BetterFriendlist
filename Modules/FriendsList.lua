@@ -291,6 +291,9 @@ local function BuildDisplayList(self)
 		if groupFriends then
 			-- Check if we should skip empty groups
 			local shouldSkip = false
+			-- Fix Phase 22: Only hide empty results if a filter is active (Search or Filter Mode != All)
+			-- Otherwise, show empty groups so users can populate them (prevents "disappearing groups" issue)
+			local hasActiveFilter = (self.filterMode and self.filterMode ~= "all") or (self.searchText and self.searchText ~= "")
 			
 			if hideEmptyGroups then
 				-- Count online friends only (for display purpose)
@@ -302,7 +305,8 @@ local function BuildDisplayList(self)
 				end
 				shouldSkip = (onlineCount == 0)
 			elseif #groupFriends == 0 then
-				shouldSkip = true
+				-- Only skip if filtering is active (e.g. "Online" or Search)
+				shouldSkip = hasActiveFilter
 			end
 			
 			if not shouldSkip then
@@ -664,7 +668,7 @@ end
 -- Classic button pool configuration
 local CLASSIC_BUTTON_HEIGHT = 34
 local CLASSIC_COMPACT_BUTTON_HEIGHT = 24
-local CLASSIC_MAX_BUTTONS = 20  -- Max visible buttons
+local CLASSIC_MAX_BUTTONS = 50  -- Max visible buttons (Increased for safety)
 
 -- Initialize Classic FauxScrollFrame with button pool
 function FriendsList:InitializeClassicScrollFrame(scrollFrame) -- Store reference to scrollFrame for Classic mode
@@ -735,7 +739,7 @@ function FriendsList:InitializeClassicScrollFrame(scrollFrame) -- Store referenc
 	
 	-- Also create group header buttons
 	self.classicHeaderPool = {}
-	for i = 1, 10 do  -- Max 10 group headers
+	for i = 1, numButtons do  -- Dynamic pool size matching friend buttons (Fix for >10 groups)
 		local header = CreateFrame("Button", "BetterFriendsGroupHeader" .. i, scrollFrame.ContentFrame, "BetterFriendsGroupHeaderTemplate")
 		header:SetPoint("LEFT", scrollFrame.ContentFrame, "LEFT", 2, 0)  -- 2px left padding
 		header:SetPoint("RIGHT", scrollFrame.ContentFrame, "RIGHT", 3, 0)  -- Match friend buttons
@@ -757,7 +761,7 @@ function FriendsList:InitializeClassicScrollFrame(scrollFrame) -- Store referenc
 	
 	-- Create invite buttons (Phase 6 Fix)
 	self.classicInviteButtonPool = {}
-	for i = 1, 10 do -- Max 10 invites
+	for i = 1, numButtons do -- Dynamic pool size (Fix for >10 invites)
 		local button = CreateFrame("Button", "BetterFriendsInviteButton" .. i, scrollFrame.ContentFrame, "BFL_FriendInviteButtonTemplate")
 		button:SetPoint("LEFT", scrollFrame.ContentFrame, "LEFT", 2, 0)
 		button:SetPoint("RIGHT", scrollFrame.ContentFrame, "RIGHT", 3, 0)
@@ -3016,9 +3020,9 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) local groupId 
 			colorCode = string.format("|cff%02x%02x%02x", r * 255, g * 255, b * 255)
 		end
 		
-		-- Default to group color
-		countR, countG, countB = r, g, b
-		arrowR, arrowG, arrowB = r, g, b
+		-- Default to White (No Inheritance)
+		countR, countG, countB = 1, 1, 1
+		arrowR, arrowG, arrowB = 1, 1, 1
 		
 		-- Override if specific colors are set
 		if group and group.countColor then
@@ -3119,6 +3123,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) local groupId 
 		local targetArrow = collapsed and button.RightArrow or button.DownArrow
 		if targetArrow then
 			targetArrow:Show()
+			targetArrow:SetDesaturated(true)
 			targetArrow:SetVertexColor(arrowR, arrowG, arrowB)
 			targetArrow:ClearAllPoints()
 			

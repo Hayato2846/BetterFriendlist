@@ -8,12 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 ## [DRAFT]
+### Changed
+- **Group Ordering** - Replaced Up/Down buttons with Drag & Drop system in Settings -> Groups.
+- **Broker Ordering** - Replaced Up/Down buttons with Drag & Drop system in Settings -> Data Broker.
+- **Color Settings** - Removed the mouseover highlight effect from color pickers in settings to prevent color distortion.
+
 ### Fixed
+- **Settings Groups** - Adjusted the layout of group list items in settings to prevent right-side clipping.
+- **Color Picker** - Fixed an issue where the Color Picker in settings would persist the previous color or restart with black instead of the current group color.
 - **API Modernization** - Replace deprecated `BNSetAFK` and `BNSetDND` APIs with `C_BattleNet.SetAFK` and `C_BattleNet.SetDND` for Retail 12.0.1+.
 - **Recent Allies & Recruit A Friend** - Fixed scrollbar positioning and length to match the Friends List standard.
 - **Search Box Visibility** - Fixed an issue where the search box would disappear when switching to "Recent Allies" or "Recruit A Friend" tabs in Normal Mode. Now it remains visible unless Simple Mode is enabled.
 - **Send Message Button** - Fixed the "Send Message" button not being disabled when selecting an offline WoW friend.
 - **Localization** - Fixed a missing localization key in the 'Rename Group' dialog within settings across all languages.
+- **Group Color Settings** - Improved text readability on color preview buttons by using white text with an outline.
 
 ## [2.2.9]       - 2026-02-03
 ### Fixed
