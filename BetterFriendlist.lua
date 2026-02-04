@@ -1173,9 +1173,28 @@ frame:SetScript("OnEvent", function(self, event, ...) if event == "ADDON_LOADED"
 
 		local groupsButton = rootDescription:CreateButton(L.MENU_GROUPS)
 		
+		-- Enable scrolling for the groups submenu (User requested scrolling instead of dialog)
+		if groupsButton.SetScrollMode then
+			groupsButton:SetScrollMode(300) -- 300px limit before scrolling
+		end
+		
 		-- Add "Create Group" option at the top
 		groupsButton:CreateButton(L.MENU_CREATE_GROUP, function() StaticPopup_Show("BETTER_FRIENDLIST_CREATE_GROUP_AND_ADD_FRIEND", nil, nil, friendUID)
 		end)
+
+		-- Add "Remove from All Groups" button immediately after Create Group (User request)
+		if next(friendCurrentGroups) then
+			-- Add "Remove from All Groups" button
+			local Groups = GetGroups()
+			groupsButton:CreateButton(L.MENU_REMOVE_ALL_GROUPS, function() if Groups then
+					for currentGroupId in pairs(friendCurrentGroups) do
+						Groups:RemoveFriendFromGroup(friendUID, currentGroupId)
+					end
+					-- Force full display refresh - group membership affects display structure
+					BFL:ForceRefreshFriendsList()
+				end
+			end)
+		end
 		
 		-- Get fresh groups list directly from module (bypass stale local cache)
 		local Groups = GetGroups()
@@ -1202,46 +1221,32 @@ frame:SetScript("OnEvent", function(self, event, ...) if event == "ADDON_LOADED"
 			end
 			table.sort(sortedGroups, function(a, b) return a.data.order < b.data.order end)
 			
-		-- Add checkbox for each custom group in sorted order
-		for _, group in ipairs(sortedGroups) do
-			-- Capture group.id in local variable for closure
-			local groupId = group.id
-			
-			groupsButton:CreateCheckbox(
-				group.data.name,
-				function() -- Read state dynamically from DB each time checkbox is rendered
-					if BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friendUID] then
-						for _, gid in ipairs(BetterFriendlistDB.friendGroups[friendUID]) do
-							if gid == groupId then
-								return true
+			-- Add checkbox for each custom group in sorted order
+			for _, group in ipairs(sortedGroups) do
+				-- Capture group.id in local variable for closure
+				local groupId = group.id
+				
+				groupsButton:CreateCheckbox(
+					group.data.name,
+					function() -- Read state dynamically from DB each time checkbox is rendered
+						if BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friendUID] then
+							for _, gid in ipairs(BetterFriendlistDB.friendGroups[friendUID]) do
+								if gid == groupId then
+									return true
+								end
 							end
 						end
-					end
-					return false
-				end,
-				function() local Groups = GetGroups()
-					if Groups then
-						Groups:ToggleFriendInGroup(friendUID, groupId)
-						-- Force full display refresh - group membership affects display structure
-						BFL:ForceRefreshFriendsList()
-					end
-				end
-			)
-		end			-- Add "Remove from All Groups" if friend is in custom groups
-			if next(friendCurrentGroups) then
-				groupsButton:CreateDivider()
-				
-				-- Add "Remove from All Groups" button
-				local Groups = GetGroups()
-				groupsButton:CreateButton(L.MENU_REMOVE_ALL_GROUPS, function() if Groups then
-						for currentGroupId in pairs(friendCurrentGroups) do
-							Groups:RemoveFriendFromGroup(friendUID, currentGroupId)
+						return false
+					end,
+					function() local Groups = GetGroups()
+						if Groups then
+							Groups:ToggleFriendInGroup(friendUID, groupId)
+							-- Force full display refresh - group membership affects display structure
+							BFL:ForceRefreshFriendsList()
 						end
-						-- Force full display refresh - group membership affects display structure
-						BFL:ForceRefreshFriendsList()
 					end
-				end)
-			end
+				)
+			end			-- End of group checkboxes
 		end
 	end
 		

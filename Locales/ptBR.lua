@@ -98,7 +98,7 @@ local L = BFL_LOCALE
 	L.SETTINGS_HEADER_COUNT_FORMAT_DESC = "Escolha como mostrar contadores de amigos"
 	L.SETTINGS_HEADER_COUNT_VISIBLE = "Filtrado / Total (Padrão)"
 	L.SETTINGS_HEADER_COUNT_ONLINE = "Online / Total"
-	L.SETTINGS_HEADER_COUNT_BOTH = "Filtrado (Online) / Total"
+	L.SETTINGS_HEADER_COUNT_BOTH = "Filtrado / Online / Total"
 	L.SETTINGS_SHOW_FACTION_ICONS = "Mostrar Ícones Facção"
 	L.SETTINGS_SHOW_REALM_NAME = "Mostrar Nome Reino"
 	L.SETTINGS_GRAY_OTHER_FACTION = "Atenuar Outra Facção"
@@ -189,6 +189,8 @@ local L = BFL_LOCALE
 	L.MENU_SET_BROADCAST = "Definir Transmissão"
 	L.MENU_IGNORE_LIST = "Lista Ignorados"
 	L.MENU_BETTERFRIENDLIST_TITLE = "BetterFriendList"
+	L.MENU_MORE_GROUPS = "Mais grupos..."
+	L.GROUPS_DIALOG_TITLE = "Grupos para %s"
 	L.MENU_COPY_CHARACTER_NAME = "Copiar nome do personagem"
 	L.COPY_CHARACTER_NAME_POPUP_TITLE = "Copiar nome do personagem"
 	

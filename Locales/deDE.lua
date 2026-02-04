@@ -98,7 +98,7 @@ local L = BFL_LOCALE
 	L.SETTINGS_HEADER_COUNT_FORMAT_DESC = "Anzeige der Freundeszahlen in Gruppenköpfen"
 	L.SETTINGS_HEADER_COUNT_VISIBLE = "Gefiltert / Gesamt (Standard)"
 	L.SETTINGS_HEADER_COUNT_ONLINE = "Online / Gesamt"
-	L.SETTINGS_HEADER_COUNT_BOTH = "Gefiltert (Online) / Gesamt"
+	L.SETTINGS_HEADER_COUNT_BOTH = "Gefiltert / Online / Gesamt"
 	L.SETTINGS_SHOW_FACTION_ICONS = "Fraktions-Symbole anzeigen"
 	L.SETTINGS_SHOW_REALM_NAME = "Realm-Namen anzeigen"
 	L.SETTINGS_GRAY_OTHER_FACTION = "Andere Fraktion ausgrauen"
@@ -189,6 +189,8 @@ local L = BFL_LOCALE
 	L.MENU_IGNORE_LIST = "Ignorierliste verwalten"
 	L.MENU_COPY_CHARACTER_NAME = "Charakternamen kopieren"
 	L.MENU_BETTERFRIENDLIST_TITLE = "BetterFriendList"
+	L.MENU_MORE_GROUPS = "Mehr Gruppen..."
+	L.GROUPS_DIALOG_TITLE = "Gruppen für %s"
 	L.COPY_CHARACTER_NAME_POPUP_TITLE = "Charakternamen kopieren"
 	
 	-- ========================================

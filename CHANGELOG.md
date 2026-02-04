@@ -12,8 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Group Ordering** - Replaced Up/Down buttons with Drag & Drop system in Settings -> Groups.
 - **Broker Ordering** - Replaced Up/Down buttons with Drag & Drop system in Settings -> Data Broker.
 - **Color Settings** - Removed the mouseover highlight effect from color pickers in settings to prevent color distortion.
+- **Font Settings** - Removed Font Outline and Font Shadow options from all font settings to simplify the interface.
+- **Settings Alignment** - Improved alignment of Sliders in settings using the component system to better match other elements.
 
 ### Fixed
+- **Sorting Logic** - Prevented Primary and Secondary sorters from being set to the same value to avoid logical conflicts. The Secondary sorter automatically resets to "None" if it matches the Primary sorter.
 - **Settings Groups** - Adjusted the layout of group list items in settings to prevent right-side clipping.
 - **Color Picker** - Fixed an issue where the Color Picker in settings would persist the previous color or restart with black instead of the current group color.
 - **API Modernization** - Replace deprecated `BNSetAFK` and `BNSetDND` APIs with `C_BattleNet.SetAFK` and `C_BattleNet.SetDND` for Retail 12.0.1+.

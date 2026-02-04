@@ -1205,6 +1205,16 @@ function FriendsList:Initialize() -- Initialize sort modes and filter from datab
 	local db = DB and DB:Get() or {}
 	self.sortMode = db.primarySort or "status"
 	self.secondarySort = db.secondarySort or "name"
+	
+	-- Compatibility: Prevent invalid state where Primary == Secondary
+	if self.sortMode == self.secondarySort then
+		self.secondarySort = "none"
+		if DB then DB:Set("secondarySort", "none") end 
+		if BFL.FrameInitializer and BFL.FrameInitializer.SetSecondarySortMode_UI then
+			BFL.FrameInitializer:SetSecondarySortMode_UI("none") -- Update UI if needed, though this runs early
+		end
+	end
+	
 	-- CRITICAL: Load filterMode from DB to ensure consistency
 	self.filterMode = db.quickFilter or "all"
 	
@@ -2308,6 +2318,12 @@ function FriendsList:SetSortMode(mode) local newMode = mode or "status"
 	end
 	self.sortMode = newMode
 	
+	-- Compatibility: If new Primary matches Secondary, reset Secondary to 'none'
+	-- This prevents parallel sorting on the same criteria
+	if self.secondarySort == newMode then
+		self:SetSecondarySortMode("none")
+	end
+	
 	-- Save to database
 	local DB = BFL:GetModule("DB")
 	if DB then
@@ -2323,6 +2339,12 @@ end
 function FriendsList:SetSecondarySortMode(mode) if self.secondarySort == mode then
 		return
 	end
+	
+	-- Prevent parallel sorting: Cannot set Secondary to same as Primary
+	if mode == self.sortMode and mode ~= "none" then
+		return
+	end
+	
 	self.secondarySort = mode
 	
 	-- Save to database
@@ -3045,8 +3067,8 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) local groupId 
 		-- Show "Online / Total" (e.g. "3/10")
 		countText = string.format("%d/%d", elementData.onlineCount or 0, elementData.totalCount or 0)
 	elseif format == "both" then
-		-- Show "Filtered (Online) / Total" (e.g. "1 (3)/10")
-		countText = string.format("%d (%d)/%d", count, elementData.onlineCount or 0, elementData.totalCount or 0)
+		-- Show "Filtered / Online / Total" (e.g. "1/3/10")
+		countText = string.format("%d / %d / %d", count, elementData.onlineCount or 0, elementData.totalCount or 0)
 	else -- "visible" (Default)
 		-- Show "Filtered / Total" (e.g. "3/10" or just "3" if same)
 		countText = count
@@ -3879,6 +3901,16 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 	button.friendIndex = friend.index
 	button.friendData = friend
 	button.groupId = groupId
+	
+	-- Sync selection highlight state to correct data
+	if button.selectionHighlight then
+		if self.selectedFriend == friend then
+			button.selectionHighlight:Show()
+			self.selectedButton = button
+		else
+			button.selectionHighlight:Hide()
+		end
+	end
 	
 	-- [Phase 5 Optimized] Static setup moved to InitFriendButton (friendInfo removed, using friendData)
 	

@@ -449,6 +449,11 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 					FriendsList:SetSortMode(sortMode)
 					FriendsList:RenderDisplay()
 					UIDropDownMenu_SetText(primaryDropdown, string.format("|T%s:14:14:-2:-2|t", icon))
+					
+					-- Update secondary dropdown text (in case it was reset to none)
+					local currentSecondary = FriendsList.secondarySort or "none"
+					local secondaryIcon = SORT_ICONS[currentSecondary] or SORT_ICONS.name
+					UIDropDownMenu_SetText(secondaryDropdown, string.format("|T%s:14:14:-2:-2|t", secondaryIcon))
 				end
 				-- Check against DB/Module state
 				local DB = BFL:GetModule("DB")
@@ -484,11 +489,17 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 			UIDropDownMenu_SetWidth(secondaryDropdown, 70)
 		end
 		UIDropDownMenu_Initialize(secondaryDropdown, function(self, level)
-			local info = UIDropDownMenu_CreateInfo()
 			
 			local function AddSecondaryOption(sortMode, label, icon)
+				-- Prevent selecting same sort as Primary (except None)
+				if sortMode ~= "none" and sortMode == FriendsList.sortMode then
+					return
+				end
+
+				local info = UIDropDownMenu_CreateInfo()
 				info.text = string.format("|T%s:14:14:0:0|t %s", icon, label)
 				info.value = sortMode
+				
 				info.func = function()
 					FriendsList:SetSecondarySortMode(sortMode)
 					FriendsList:RenderDisplay()
@@ -566,8 +577,8 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 		return
 	end
 	
-	-- Initialize Primary Sort Dropdown
 	local primaryDropdown = header.PrimarySortDropdown
+	local secondaryDropdown = header.SecondarySortDropdown
 	
 	local function IsPrimarySelected(sortMode)
 		-- Always read from DB when checking selection
@@ -580,6 +591,11 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 	local function SetPrimarySelected(sortMode)
 		FriendsList:SetSortMode(sortMode)
 		FriendsList:RenderDisplay()
+		
+		-- Force update secondary dropdown to reflect potential reset to "none"
+		if secondaryDropdown and secondaryDropdown.GenerateMenu then
+			secondaryDropdown:GenerateMenu()
+		end
 	end
 	
 	local function CreatePrimaryRadio(rootDescription, text, sortMode)
@@ -621,7 +637,6 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 	primaryDropdown:SetScript("OnLeave", GameTooltip_Hide)
 	
 	-- Initialize Secondary Sort Dropdown
-	local secondaryDropdown = header.SecondarySortDropdown
 	
 	local function IsSecondarySelected(sortMode)
 		-- Always read from DB when checking selection
@@ -637,6 +652,10 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 	end
 	
 	local function CreateSecondaryRadio(rootDescription, text, sortMode)
+		-- Prevent selecting same sort as Primary (except None)
+		if sortMode ~= "none" and sortMode == FriendsList.sortMode then
+			return
+		end
 		rootDescription:CreateRadio(text, IsSecondarySelected, SetSecondarySelected, sortMode)
 	end
 	

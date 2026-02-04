@@ -98,7 +98,7 @@ local L = BFL_LOCALE
 	L.SETTINGS_HEADER_COUNT_FORMAT_DESC = "Elige cómo se muestran los recuentos de amigos en las cabeceras"
 	L.SETTINGS_HEADER_COUNT_VISIBLE = "Filtrados / Total (Por defecto)"
 	L.SETTINGS_HEADER_COUNT_ONLINE = "Conectados / Total"
-	L.SETTINGS_HEADER_COUNT_BOTH = "Filtrados (Conectados) / Total"
+	L.SETTINGS_HEADER_COUNT_BOTH = "Filtrados / Conectados / Total"
 	L.SETTINGS_SHOW_FACTION_ICONS = "Mostrar Iconos de Facción"
 	L.SETTINGS_SHOW_REALM_NAME = "Mostrar Nombre del Reino"
 	L.SETTINGS_GRAY_OTHER_FACTION = "Atenuar Otra Facción"
@@ -190,6 +190,8 @@ L.BUTTON_EXPORT = "Exportar"
 	L.MENU_IGNORE_LIST = "Gestionar Lista de Ignorados"
 	L.MENU_COPY_CHARACTER_NAME = "Copiar nombre del personaje"
 	L.MENU_BETTERFRIENDLIST_TITLE = "BetterFriendList"
+	L.MENU_MORE_GROUPS = "Más grupos..."
+	L.GROUPS_DIALOG_TITLE = "Grupos para %s"
 	L.COPY_CHARACTER_NAME_POPUP_TITLE = "Copiar nombre del personaje"
 	
 	-- ========================================

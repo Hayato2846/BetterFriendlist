@@ -90,7 +90,7 @@ local L = BFL_LOCALE_ENUS
 	L.SETTINGS_HEADER_COUNT_FORMAT_DESC = "Choose how friend counts are displayed in group headers"
 	L.SETTINGS_HEADER_COUNT_VISIBLE = "Filtered / Total (Default)"
 	L.SETTINGS_HEADER_COUNT_ONLINE = "Online / Total"
-	L.SETTINGS_HEADER_COUNT_BOTH = "Filtered (Online) / Total"
+	L.SETTINGS_HEADER_COUNT_BOTH = "Filtered / Online / Total"
 
 	-- Group Header Alignment
 	L.SETTINGS_GROUP_HEADER_ALIGN = "Group Header Alignment"
@@ -194,6 +194,8 @@ L.BUTTON_EXPORT = "Export"
 	L.MENU_IGNORE_LIST = "Manage Ignore List"
 	L.MENU_COPY_CHARACTER_NAME = "Copy Character Name"
 	L.MENU_BETTERFRIENDLIST_TITLE = "BetterFriendList"
+	L.MENU_MORE_GROUPS = "More Groups..."
+	L.GROUPS_DIALOG_TITLE = "Groups for %s"
 	L.COPY_CHARACTER_NAME_POPUP_TITLE = "Copy Character Name"
 	
 	-- ========================================

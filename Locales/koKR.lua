@@ -98,7 +98,7 @@ local L = BFL_LOCALE
 	L.SETTINGS_HEADER_COUNT_FORMAT_DESC = "그룹 헤더에 친구 수를 표시하는 방법을 선택하세요"
 	L.SETTINGS_HEADER_COUNT_VISIBLE = "필터링됨 / 전체 (기본값)"
 	L.SETTINGS_HEADER_COUNT_ONLINE = "온라인 / 전체"
-	L.SETTINGS_HEADER_COUNT_BOTH = "필터링됨 (온라인) / 전체"
+	L.SETTINGS_HEADER_COUNT_BOTH = "필터링됨 / 온라인 / 전체"
 	L.SETTINGS_SHOW_FACTION_ICONS = "진영 아이콘 표시"
 	L.SETTINGS_SHOW_REALM_NAME = "서버 이름 표시"
 	L.SETTINGS_GRAY_OTHER_FACTION = "다른 진영 흐리게"
@@ -189,6 +189,8 @@ local L = BFL_LOCALE
 	L.MENU_SET_BROADCAST = "방송 메시지 설정"
 	L.MENU_IGNORE_LIST = "차단 목록 관리"
 	L.MENU_BETTERFRIENDLIST_TITLE = "BetterFriendList"
+	L.MENU_MORE_GROUPS = "More Groups..."
+	L.GROUPS_DIALOG_TITLE = "Groups for %s"
 	L.MENU_COPY_CHARACTER_NAME = "캐릭터 이름 복사"
 	L.COPY_CHARACTER_NAME_POPUP_TITLE = "캐릭터 이름 복사"
 	

@@ -98,7 +98,7 @@ local L = BFL_LOCALE
 	L.SETTINGS_HEADER_COUNT_FORMAT_DESC = "Scegli come mostrare i contatori amici"
 	L.SETTINGS_HEADER_COUNT_VISIBLE = "Filtrati / Totale (Default)"
 	L.SETTINGS_HEADER_COUNT_ONLINE = "Online / Totale"
-	L.SETTINGS_HEADER_COUNT_BOTH = "Filtrati (Online) / Totale"
+	L.SETTINGS_HEADER_COUNT_BOTH = "Filtrati / Online / Totale"
 	L.SETTINGS_SHOW_FACTION_ICONS = "Mostra Icone Fazione"
 	L.SETTINGS_SHOW_REALM_NAME = "Mostra Nome Reame"
 	L.SETTINGS_GRAY_OTHER_FACTION = "Grigio Altra Fazione"
@@ -189,6 +189,8 @@ local L = BFL_LOCALE
 	L.MENU_SET_BROADCAST = "Imposta Messaggio Diffusione"
 	L.MENU_IGNORE_LIST = "Gestisci Ignorati"
 	L.MENU_BETTERFRIENDLIST_TITLE = "BetterFriendList"
+	L.MENU_MORE_GROUPS = "Altri gruppi..."
+	L.GROUPS_DIALOG_TITLE = "Gruppi per %s"
 	L.MENU_COPY_CHARACTER_NAME = "Copia nome personaggio"
 	L.COPY_CHARACTER_NAME_POPUP_TITLE = "Copia nome personaggio"
 	

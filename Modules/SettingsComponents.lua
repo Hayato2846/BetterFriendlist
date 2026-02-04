@@ -144,7 +144,7 @@ function Components:CreateSlider(parent, labelText, min, max, initialValue, form
 	holder:SetScript("OnSizeChanged", function(self, width, height)
 		-- Sliders now use FIXED_CONTROL_WIDTH to align with Dropdowns
 		holder.Slider:ClearAllPoints()
-		holder.Slider:SetPoint("RIGHT", self, "RIGHT", -20, 0)
+		holder.Slider:SetPoint("RIGHT", self, "RIGHT", 0, 0)
 		holder.Slider:SetWidth(FIXED_CONTROL_WIDTH)
 		
 		-- Label takes remaining space
@@ -907,11 +907,27 @@ function Components:CreateListItem(parent, itemText, orderIndex, onDragStart, on
 		holder.deleteButton:SetSize(28, 28)
 		holder.deleteButton:SetPoint("RIGHT", rightOffset, 0)
 		
+		local texturePath = "Interface\\AddOns\\BetterFriendlist\\Icons\\trash-2"
+		
+		-- Create 8 shadows for outline effect to match Group Arrow style
+		for x = -1, 1 do
+			for y = -1, 1 do
+				if not (x == 0 and y == 0) then
+					local shadow = holder.deleteButton:CreateTexture(nil, "ARTWORK")
+					shadow:SetSize(18, 18)
+					shadow:SetPoint("CENTER", x, y)
+					shadow:SetTexture(texturePath)
+					shadow:SetDesaturated(true)
+					shadow:SetVertexColor(0, 0, 0, 1)
+				end
+			end
+		end
+		
 		-- Icon texture
-		local deleteIcon = holder.deleteButton:CreateTexture(nil, "ARTWORK")
+		local deleteIcon = holder.deleteButton:CreateTexture(nil, "OVERLAY")
 		deleteIcon:SetSize(18, 18)
 		deleteIcon:SetPoint("CENTER")
-		deleteIcon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\trash-2")
+		deleteIcon:SetTexture(texturePath)
 		deleteIcon:SetVertexColor(1, 0.82, 0)
 		holder.deleteButton.icon = deleteIcon
 		
@@ -941,11 +957,27 @@ function Components:CreateListItem(parent, itemText, orderIndex, onDragStart, on
 		holder.renameButton:SetPoint("RIGHT", rightOffset, 0)
 		rightOffset = rightOffset - 35 -- Extra gap
 		
+		local texturePath = "Interface\\AddOns\\BetterFriendlist\\Icons\\edit"
+		
+		-- Create 8 shadows for outline effect to match Group Arrow style
+		for x = -1, 1 do
+			for y = -1, 1 do
+				if not (x == 0 and y == 0) then
+					local shadow = holder.renameButton:CreateTexture(nil, "ARTWORK")
+					shadow:SetSize(18, 18)
+					shadow:SetPoint("CENTER", x, y)
+					shadow:SetTexture(texturePath)
+					shadow:SetDesaturated(true)
+					shadow:SetVertexColor(0, 0, 0, 1)
+				end
+			end
+		end
+		
 		-- Icon texture
-		local renameIcon = holder.renameButton:CreateTexture(nil, "ARTWORK")
+		local renameIcon = holder.renameButton:CreateTexture(nil, "OVERLAY")
 		renameIcon:SetSize(18, 18)
 		renameIcon:SetPoint("CENTER")
-		renameIcon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\edit")
+		renameIcon:SetTexture(texturePath)
 		renameIcon:SetVertexColor(1, 0.82, 0)
 		holder.renameButton.icon = renameIcon
 		

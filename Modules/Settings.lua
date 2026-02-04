@@ -3182,11 +3182,6 @@ function Settings:RefreshFontsTab()
 	local fontList = LSM:List("font")
 	local fontOptions = { labels = fontList, values = fontList }
 	
-	local outlineOptions = {
-		labels = {L.SETTINGS_FONT_OUTLINE_NONE, L.SETTINGS_FONT_OUTLINE_NORMAL, L.SETTINGS_FONT_OUTLINE_THICK, L.SETTINGS_FONT_OUTLINE_MONOCHROME},
-		values = {"NONE", "OUTLINE", "THICKOUTLINE", "MONOCHROME"}
-	}
-
 	-- -------------------------------------------------------------------------
 	-- Friend Name Settings
 	-- -------------------------------------------------------------------------
@@ -3250,49 +3245,7 @@ function Settings:RefreshFontsTab()
 	)
 	table.insert(allFrames, nameColorPicker)
 
-	-- Name Font Outline
-	local currentNameOutline = DB:Get("fontOutlineFriendName", "NONE")
-	local nameOutlineDropdown = Components:CreateDropdown(
-		tab, 
-		L.SETTINGS_FONT_OUTLINE, 
-		outlineOptions, 
-		function(val) return val == (DB:Get("fontOutlineFriendName", "NONE")) end,
-		function(val) 
-			DB:Set("fontOutlineFriendName", val)
-			C_Timer.After(0.01, function()
-				BFL:ForceRefreshFriendsList()
-			end)
-		end
-	)
-	-- Shift 10px right to prevent clipping
-	if nameOutlineDropdown.DropDown then
-		local point, relativeTo, relativePoint, xOfs, yOfs = nameOutlineDropdown.DropDown:GetPoint(1)
-		if point then
-			nameOutlineDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
-		end
-	end
-	table.insert(allFrames, nameOutlineDropdown)
 
-	-- Name Font Shadow (Temporarily Disabled)
-	local currentNameShadow = DB:Get("fontShadowFriendName", false)
-	local nameShadowCheckbox = Components:CreateCheckbox(
-		tab,
-		L.SETTINGS_FONT_SHADOW,
-		currentNameShadow,
-		function(checked)
-			-- Disabled: No op
-		end
-	)
-	
-	-- Force disable UI
-	if nameShadowCheckbox.checkBox then
-		nameShadowCheckbox.checkBox:Disable()
-		nameShadowCheckbox.checkBox:SetEnabled(false)
-	end
-	
-	-- Set tooltip
-	nameShadowCheckbox:SetTooltip(L.SETTINGS_FONT_SHADOW, "|cffff0000Feature temporarily disabled (coming later)|r")
-	table.insert(allFrames, nameShadowCheckbox)
 
 	-- -------------------------------------------------------------------------
 	-- Friend Info Settings
@@ -3360,49 +3313,7 @@ function Settings:RefreshFontsTab()
 	)
 	table.insert(allFrames, infoColorPicker)
 
-	-- Info Font Outline
-	local currentInfoOutline = DB:Get("fontOutlineFriendInfo", "NONE")
-	local infoOutlineDropdown = Components:CreateDropdown(
-		tab, 
-		L.SETTINGS_FONT_OUTLINE, 
-		outlineOptions, 
-		function(val) return val == (DB:Get("fontOutlineFriendInfo", "NONE")) end,
-		function(val) 
-			DB:Set("fontOutlineFriendInfo", val)
-			C_Timer.After(0.01, function()
-				BFL:ForceRefreshFriendsList()
-			end)
-		end
-	)
-	-- Shift 10px right to prevent clipping (matching other dropdowns)
-	if infoOutlineDropdown.DropDown then
-		local point, relativeTo, relativePoint, xOfs, yOfs = infoOutlineDropdown.DropDown:GetPoint(1)
-		if point then
-			infoOutlineDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
-		end
-	end
-	table.insert(allFrames, infoOutlineDropdown)
 
-	-- Info Font Shadow (Temporarily Disabled)
-	local currentInfoShadow = DB:Get("fontShadowFriendInfo", false)
-	local infoShadowCheckbox = Components:CreateCheckbox(
-		tab,
-		L.SETTINGS_FONT_SHADOW,
-		currentInfoShadow,
-		function(checked)
-			-- Disabled: No op
-		end
-	)
-	
-	-- Force disable UI
-	if infoShadowCheckbox.checkBox then
-		infoShadowCheckbox.checkBox:Disable()
-		infoShadowCheckbox.checkBox:SetEnabled(false)
-	end
-	
-	-- Set tooltip using standard component method
-	infoShadowCheckbox:SetTooltip(L.SETTINGS_FONT_SHADOW, "|cffff0000Feature temporarily disabled (coming later)|r")
-	table.insert(allFrames, infoShadowCheckbox)
 
 	-- -------------------------------------------------------------------------
 	-- Tabs Text Settings
@@ -3456,42 +3367,7 @@ function Settings:RefreshFontsTab()
 	)
 	table.insert(allFrames, tabSizeSlider)
 
-	-- Tabs Font Outline
-	local currentTabOutline = DB:Get("fontOutlineTabText", "NONE")
-	local tabOutlineDropdown = Components:CreateDropdown(
-		tab, 
-		L.SETTINGS_FONT_OUTLINE, 
-		outlineOptions, 
-		function(val) return val == currentTabOutline end,
-		function(val) 
-			DB:Set("fontOutlineTabText", val)
-			C_Timer.After(0.01, function()
-				BFL:ApplyTabFonts() -- Immediate Apply
-				BFL:ForceRefreshFriendsList()
-			end)
-		end
-	)
-	if tabOutlineDropdown.DropDown then
-		local point, relativeTo, relativePoint, xOfs, yOfs = tabOutlineDropdown.DropDown:GetPoint(1)
-		if point then
-			tabOutlineDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
-		end
-	end
-	table.insert(allFrames, tabOutlineDropdown)
 
-	-- Tabs Font Shadow (Disabled)
-	local tabShadowCheckbox = Components:CreateCheckbox(
-		tab,
-		L.SETTINGS_FONT_SHADOW,
-		DB:Get("fontShadowTabText", false),
-		function(checked) end
-	)
-	if tabShadowCheckbox.checkBox then
-		tabShadowCheckbox.checkBox:Disable()
-		tabShadowCheckbox.checkBox:SetEnabled(false)
-	end
-	tabShadowCheckbox:SetTooltip(L.SETTINGS_FONT_SHADOW, "|cffff0000Feature temporarily disabled (coming later)|r")
-	table.insert(allFrames, tabShadowCheckbox)
 
 	-- -------------------------------------------------------------------------
 	-- Raid Name Settings
@@ -3552,45 +3428,7 @@ function Settings:RefreshFontsTab()
 	)
 	table.insert(allFrames, raidSizeSlider)
 
-	-- Raid Font Outline
-	local currentRaidOutline = DB:Get("fontOutlineRaidName", "NONE")
-	local raidOutlineDropdown = Components:CreateDropdown(
-		tab, 
-		L.SETTINGS_FONT_OUTLINE, 
-		outlineOptions, 
-		function(val) return val == currentRaidOutline end,
-		function(val) 
-			DB:Set("fontOutlineRaidName", val)
-			C_Timer.After(0.01, function()
-				local RaidFrame = BFL:GetModule("RaidFrame")
-				if RaidFrame and RaidFrame.UpdateAllMemberButtons then
-					RaidFrame:UpdateAllMemberButtons()
-				end
-				BFL:ForceRefreshFriendsList()
-			end)
-		end
-	)
-	if raidOutlineDropdown.DropDown then
-		local point, relativeTo, relativePoint, xOfs, yOfs = raidOutlineDropdown.DropDown:GetPoint(1)
-		if point then
-			raidOutlineDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
-		end
-	end
-	table.insert(allFrames, raidOutlineDropdown)
 
-	-- Raid Font Shadow (Disabled)
-	local raidShadowCheckbox = Components:CreateCheckbox(
-		tab,
-		L.SETTINGS_FONT_SHADOW,
-		DB:Get("fontShadowRaidName", false),
-		function(checked) end
-	)
-	if raidShadowCheckbox.checkBox then
-		raidShadowCheckbox.checkBox:Disable()
-		raidShadowCheckbox.checkBox:SetEnabled(false)
-	end
-	raidShadowCheckbox:SetTooltip(L.SETTINGS_FONT_SHADOW, "|cffff0000Feature temporarily disabled (coming later)|r")
-	table.insert(allFrames, raidShadowCheckbox)
 	
 	-- Anchor all frames vertically
 	Components:AnchorChain(allFrames, -5)
@@ -3625,11 +3463,6 @@ function Settings:RefreshGroupsTab()
 	local fontList = LSM:List("font")
 	local fontOptions = { labels = fontList, values = fontList }
 	
-	local outlineOptions = {
-		labels = {L.SETTINGS_FONT_OUTLINE_NONE, L.SETTINGS_FONT_OUTLINE_NORMAL, L.SETTINGS_FONT_OUTLINE_THICK, L.SETTINGS_FONT_OUTLINE_MONOCHROME},
-		values = {"NONE", "OUTLINE", "THICKOUTLINE", "MONOCHROME"}
-	}
-
 	-- ===========================================
 	-- MOVED SETTINGS (From General)
 	-- ===========================================
@@ -3774,48 +3607,7 @@ function Settings:RefreshGroupsTab()
 	)
 	table.insert(allFrames, GroupSizeSlider)
 	
-	-- Group Font Outline
-	local currentGroupOutline = DB:Get("fontOutlineGroupHeader", "NONE")
-	local GroupOutlineDropdown = Components:CreateDropdown(
-		tab, 
-		L.SETTINGS_FONT_OUTLINE, 
-		outlineOptions, 
-		function(val) return val == currentGroupOutline end,
-		function(val) 
-			DB:Set("fontOutlineGroupHeader", val)
-			C_Timer.After(0.01, function()
-				BFL:ForceRefreshFriendsList()
-			end)
-		end
-	)
-	if GroupOutlineDropdown.DropDown then
-		local point, relativeTo, relativePoint, xOfs, yOfs = GroupOutlineDropdown.DropDown:GetPoint(1)
-		if point then
-			GroupOutlineDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
-		end
-	end
-	table.insert(allFrames, GroupOutlineDropdown)
-	
-	-- Group Font Shadow (Temporarily Disabled)
-	local currentGroupShadow = DB:Get("fontShadowGroupHeader", false)
-	local groupShadowCheckbox = Components:CreateCheckbox(
-		tab,
-		L.SETTINGS_FONT_SHADOW or "Font Shadow",
-		currentGroupShadow,
-		function(checked)
-			-- Disabled: No op
-		end
-	)
-	
-	-- Force disable UI
-	if groupShadowCheckbox.checkBox then
-		groupShadowCheckbox.checkBox:Disable()
-		groupShadowCheckbox.checkBox:SetEnabled(false)
-	end
-	
-	-- Set tooltip
-	groupShadowCheckbox:SetTooltip(L.SETTINGS_FONT_SHADOW, "|cffff0000Feature temporarily disabled (coming later)|r")
-	table.insert(allFrames, groupShadowCheckbox)
+
 	
 	-- Spacer
 	table.insert(allFrames, Components:CreateSpacer(tab))
