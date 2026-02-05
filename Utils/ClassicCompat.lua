@@ -678,6 +678,111 @@ function Compat.SetMyBNetStatus(status)
 end
 
 ------------------------------------------------------------
+-- Friend/Group Management Compatibility
+------------------------------------------------------------
+-- APIs for adding/removing friends and inviting to group
+
+-- Add a WoW friend
+function Compat.AddFriend(name, notes)
+    if C_FriendList and C_FriendList.AddFriend then
+        C_FriendList.AddFriend(name, notes or "")
+    elseif AddFriend then
+        AddFriend(name)
+        if notes and notes ~= "" and SetFriendNotes then
+             -- Note setting might be async in old API, but we try
+             SetFriendNotes(name, notes)
+        end
+    end
+end
+
+-- Remove a WoW friend
+function Compat.RemoveFriend(nameOrID)
+    if C_FriendList and C_FriendList.RemoveFriend then
+        C_FriendList.RemoveFriend(nameOrID)
+    elseif RemoveFriend then
+        RemoveFriend(nameOrID)
+    end
+end
+
+-- Remove friend by index (Classic/Retail variance)
+function Compat.RemoveFriendByIndex(index)
+    if C_FriendList and C_FriendList.RemoveFriendByIndex then
+        C_FriendList.RemoveFriendByIndex(index)
+    elseif RemoveFriend then
+        -- Classic: Need to get name first
+        local name = GetFriendInfo(index)
+        if name then
+            RemoveFriend(name)
+        end
+    end
+end
+
+-- Set friend notes
+function Compat.SetFriendNotes(name, notes)
+    if C_FriendList and C_FriendList.SetFriendNotes then
+        C_FriendList.SetFriendNotes(name, notes)
+    elseif SetFriendNotes then
+        SetFriendNotes(name, notes)
+    end
+end
+
+-- Invite a unit to party
+function Compat.InviteUnit(name)
+    if C_PartyInfo and C_PartyInfo.InviteUnit then
+        C_PartyInfo.InviteUnit(name)
+    elseif InviteUnit then
+        InviteUnit(name)
+    end
+end
+
+-- Request invite from unit (Retail only usually)
+function Compat.RequestInviteFromUnit(target)
+    if C_PartyInfo and C_PartyInfo.RequestInviteFromUnit then
+        C_PartyInfo.RequestInviteFromUnit(target)
+        return true
+    else
+        -- Feature not available in Classic
+        -- We could whisper them, but that's intrusive.
+        -- Just return false.
+        BFL:DebugPrint("RequestInviteFromUnit not available in this version")
+        return false
+    end
+end
+
+-- Invite Battle.net friend
+function Compat.BNInviteFriend(gameAccountID)
+    if BNInviteFriend then
+        BNInviteFriend(gameAccountID)
+    else
+        BFL:DebugPrint("BNInviteFriend not available")
+    end
+end
+
+------------------------------------------------------------
+-- Level / Expansion Compatibility
+------------------------------------------------------------
+
+-- Get absolute max level for the current expansion context
+function Compat.GetMaxLevel()
+    -- Retail / Modern API
+    if GetMaxLevelForPlayerExpansion then
+        return GetMaxLevelForPlayerExpansion()
+    end
+    
+    -- Fallbacks based on game version flags (defined in Core.lua)
+    if BFL.IsTWW then return 80 end
+    if BFL.IsRetail then return 70 end -- Dragonflight fallback
+    if BFL.IsMoPClassic then return 90 end
+    if BFL.IsCataClassic then return 85 end
+    if BFL.IsWrathClassic then return 80 end
+    if BFL.IsTBCClassic then return 70 end
+    if BFL.IsClassicEra then return 60 end
+    
+    -- Last resort default (Vanilla)
+    return 60
+end
+
+------------------------------------------------------------
 -- Global Aliases for Convenience
 ------------------------------------------------------------
 -- These aliases allow direct access via BFL.FunctionName instead of BFL.Compat.FunctionName
@@ -697,3 +802,13 @@ BFL.ShowColorPicker = Compat.ShowColorPicker
 -- BNet Status
 BFL.GetMyBNetStatus = Compat.GetMyBNetStatus
 BFL.SetMyBNetStatus = Compat.SetMyBNetStatus
+
+-- Friend/Group Operations
+BFL.AddFriend = Compat.AddFriend
+BFL.RemoveFriend = Compat.RemoveFriend
+BFL.RemoveFriendByIndex = Compat.RemoveFriendByIndex
+BFL.SetFriendNotes = Compat.SetFriendNotes
+BFL.InviteUnit = Compat.InviteUnit
+BFL.RequestInviteFromUnit = Compat.RequestInviteFromUnit
+BFL.BNInviteFriend = Compat.BNInviteFriend
+BFL.GetMaxLevel = Compat.GetMaxLevel

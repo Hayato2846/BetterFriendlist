@@ -734,6 +734,53 @@ function FriendsList:InitializeClassicScrollFrame(scrollFrame) -- Store referenc
 		button:SetHeight(CLASSIC_BUTTON_HEIGHT)
 		button.classicIndex = i
 		button:Hide()
+
+		-- Create selection highlight (Fix for Classic missing selection state)
+		if not button.selectionHighlight then
+			local selectionHighlight = button:CreateTexture(nil, "BACKGROUND")
+			selectionHighlight:SetTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
+			selectionHighlight:SetBlendMode("ADD")
+			selectionHighlight:SetAllPoints()
+			selectionHighlight:SetVertexColor(0.510, 0.773, 1.0, 0.5)
+			selectionHighlight:Hide()
+			button.selectionHighlight = selectionHighlight
+		end
+		
+		-- Create drag overlay (Fix for Classic missing drag visual)
+		if not button.dragOverlay then
+			local dragOverlay = button:CreateTexture(nil, "OVERLAY")
+			dragOverlay:SetAllPoints()
+			dragOverlay:SetColorTexture(1.0, 0.843, 0.0, 0.5) -- Gold with 50% alpha
+			dragOverlay:SetBlendMode("ADD")
+			dragOverlay:Hide()
+			button.dragOverlay = dragOverlay
+		end
+
+		-- Create favorite icon (Fix for Classic)
+		if not button.favoriteIcon then
+			button.favoriteIcon = button:CreateTexture(nil, "OVERLAY")
+			button.favoriteIcon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\star")
+			button.favoriteIcon:Hide()
+		end
+		
+		-- Enable drag handlers
+		button:RegisterForDrag("LeftButton")
+		button:SetScript("OnDragStart", Button_OnDragStart)
+		button:SetScript("OnDragStop", Button_OnDragStop)
+
+		-- FIX: Responsive Layout (Phase 28) - Classic Implementation
+		-- Ensure text width updates when button width changes (e.g. resizing frame)
+		if not button.resizeHooked then
+			button:SetScript("OnSizeChanged", function(self, width, height)
+				local padding = self.textRightPadding or 80 -- Default fallback
+				local nameWidth = width - 44 - padding
+				if nameWidth < 10 then nameWidth = 10 end
+				if self.Name then self.Name:SetWidth(nameWidth) end
+				if self.Info then self.Info:SetWidth(nameWidth) end
+			end)
+			button.resizeHooked = true
+		end
+
 		self.classicButtonPool[i] = button
 	end
 	
@@ -2774,13 +2821,13 @@ function FriendsList:InviteGroupToParty(groupId) local DB = GetDB()
 					if friend.gameAccountInfo and friend.gameAccountInfo.clientProgram == BNET_CLIENT_WOW then
 						local gameAccountID = friend.gameAccountInfo.gameAccountID
 						if gameAccountID then
-							BNInviteFriend(gameAccountID)
+							BFL.BNInviteFriend(gameAccountID)
 							inviteCount = inviteCount + 1
 						end
 					end
 				elseif friend.type == "wow" then
 					-- WoW friend - invite by name
-					C_PartyInfo.InviteUnit(friend.name)
+					BFL.InviteUnit(friend.name)
 					inviteCount = inviteCount + 1
 				end
 			end
@@ -3711,7 +3758,7 @@ function FriendsList:GetFormattedButtonText(friend)
 		if isCompactMode then
 			if not usedExternalFormatter then
 				local hideMaxLevel = self.settingsCache and self.settingsCache.hideMaxLevel or DB:Get("hideMaxLevel", false)
-				local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or MAX_PLAYER_LEVEL or 60
+				local maxLevel = BFL.GetMaxLevel and BFL.GetMaxLevel() or 60
 				
 				if friend.connected then
 					local infoText = ""
@@ -3749,7 +3796,7 @@ function FriendsList:GetFormattedButtonText(friend)
 		else
 			-- Normal Mode Line 2
 			local hideMaxLevel = self.settingsCache and self.settingsCache.hideMaxLevel or DB:Get("hideMaxLevel", false)
-			local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or MAX_PLAYER_LEVEL or 60
+			local maxLevel = BFL.GetMaxLevel and BFL.GetMaxLevel() or 60
 			
 			if friend.connected then
 				if friend.level and friend.areaName then
@@ -3830,7 +3877,7 @@ function FriendsList:GetFormattedButtonText(friend)
 		if isCompactMode then
 			if not usedExternalFormatter then
 				local hideMaxLevel = self.settingsCache and self.settingsCache.hideMaxLevel or DB:Get("hideMaxLevel", false)
-				local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or MAX_PLAYER_LEVEL or 60
+				local maxLevel = BFL.GetMaxLevel and BFL.GetMaxLevel() or 60
 				
 				if friend.connected then
 					local infoText = ""
@@ -3858,7 +3905,7 @@ function FriendsList:GetFormattedButtonText(friend)
 		else
 			-- Normal Mode Line 2
 			local hideMaxLevel = self.settingsCache and self.settingsCache.hideMaxLevel or DB:Get("hideMaxLevel", false)
-			local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or MAX_PLAYER_LEVEL or 60
+			local maxLevel = BFL.GetMaxLevel and BFL.GetMaxLevel() or 60
 			
 			if friend.connected then
 				if friend.level and friend.area then

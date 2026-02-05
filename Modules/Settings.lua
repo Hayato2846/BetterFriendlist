@@ -4711,7 +4711,7 @@ function Settings:RefreshGlobalSyncTab()
 								BetterFriendlistDB.GlobalFriends[faction][friendUID].restoring = true -- Flag for GlobalSync to restore note
 								
 								-- Add back to friend list
-								C_FriendList.AddFriend(friendUID)
+								BFL.AddFriend(friendUID)
 								BFL:DebugPrint("Restored " .. name .. " to friend list.")
 								
 								self:RefreshGlobalSyncTab()
@@ -4748,7 +4748,7 @@ function Settings:RefreshGlobalSyncTab()
 											end
 											
 											if match then
-												C_FriendList.RemoveFriend(info.name) -- Use the name from the API
+												BFL.RemoveFriend(info.name) -- Use the name from the API
 												BFL:DebugPrint("Removed " .. info.name .. " from friend list.")
 												removed = true
 												break
@@ -4758,7 +4758,7 @@ function Settings:RefreshGlobalSyncTab()
 									
 									if not removed then
 										-- Fallback: Try to remove by UID directly if not found in loop (e.g. offline/cache issue)
-										C_FriendList.RemoveFriend(friendUID)
+										BFL.RemoveFriend(friendUID)
 									end
 								end
 								

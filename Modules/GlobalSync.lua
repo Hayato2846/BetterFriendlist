@@ -99,40 +99,57 @@ function GlobalSync:HookDeletionAPIs()
     if self.hooksInstalled then return end
     self.hooksInstalled = true
     
-    -- Hook C_FriendList.RemoveFriend (Secure Hook is fine as we just need to know it happened)
-    -- This handles /removefriend command and some UI actions
-    hooksecurefunc(C_FriendList, "RemoveFriend", function(name)
-        self:OnFriendRemoved(name)
-    end)
-    
-    -- Hook C_FriendList.RemoveFriendByIndex (Must replace to get name before removal)
-    -- This handles the right-click menu removal
-    local originalRemoveByIndex = C_FriendList.RemoveFriendByIndex
-    C_FriendList.RemoveFriendByIndex = function(index)
-        -- Get info before removal
-        local info = C_FriendList.GetFriendInfoByIndex(index)
-        local nameToRemove = info and info.name
-        
-        -- Call original function
-        local result = originalRemoveByIndex(index)
-        
-        -- Process removal if successful
-        if nameToRemove then
-            self:OnFriendRemoved(nameToRemove)
-        end
-        
-        return result
+    -- Hook RemoveFriend (Checks both Modern C_FriendList and Legacy Global)
+    if C_FriendList and C_FriendList.RemoveFriend then
+        hooksecurefunc(C_FriendList, "RemoveFriend", function(name)
+            self:OnFriendRemoved(name)
+        end)
+    elseif RemoveFriend then
+        hooksecurefunc("RemoveFriend", function(name)
+            self:OnFriendRemoved(name)
+        end)
     end
     
-    -- Hook C_FriendList.AddFriend to clear deleted flag if re-added
-    hooksecurefunc(C_FriendList, "AddFriend", function(name)
-        self:OnFriendAdded(name)
-    end)
+    -- Hook RemoveFriendByIndex
+    if C_FriendList and C_FriendList.RemoveFriendByIndex then
+        local originalRemoveByIndex = C_FriendList.RemoveFriendByIndex
+        C_FriendList.RemoveFriendByIndex = function(index)
+            local info = C_FriendList.GetFriendInfoByIndex(index)
+            local nameToRemove = info and info.name
+            
+            local result = originalRemoveByIndex(index)
+            
+            if nameToRemove then
+                self:OnFriendRemoved(nameToRemove)
+            end
+            
+            return result
+        end
+    -- Note: Hooking global RemoveFriend covers Index removal in Classic if it accepts index, 
+    -- but usually Classic RemoveFriend takes a name. 
+    end
     
-    -- Hook C_FriendList.SetFriendNotes to update DB immediately
-    hooksecurefunc(C_FriendList, "SetFriendNotes", function(name, notes)
-        self:OnFriendNoteUpdated(name, notes)
-    end)
+    -- Hook AddFriend
+    if C_FriendList and C_FriendList.AddFriend then
+        hooksecurefunc(C_FriendList, "AddFriend", function(name)
+            self:OnFriendAdded(name)
+        end)
+    elseif AddFriend then
+        hooksecurefunc("AddFriend", function(name)
+            self:OnFriendAdded(name)
+        end)
+    end
+    
+    -- Hook SetFriendNotes
+    if C_FriendList and C_FriendList.SetFriendNotes then
+        hooksecurefunc(C_FriendList, "SetFriendNotes", function(name, notes)
+            self:OnFriendNoteUpdated(name, notes)
+        end)
+    elseif SetFriendNotes then
+        hooksecurefunc("SetFriendNotes", function(name, notes)
+            self:OnFriendNoteUpdated(name, notes)
+        end)
+    end
     
     -- BFL:DebugPrint("GlobalSync: Deletion APIs hooked.")
 end
@@ -284,7 +301,7 @@ function GlobalSync:ExportFriends(faction, realm)
             
             if isRestoring then
                 if dbNote and dbNote ~= "" then
-                    C_FriendList.SetFriendNotes(info.name, dbNote)
+                    BFL.SetFriendNotes(info.name, dbNote)
                     noteToSave = dbNote
                     -- BFL:DebugPrint("GlobalSync: Restored note for " .. info.name)
                 end
@@ -292,7 +309,7 @@ function GlobalSync:ExportFriends(faction, realm)
             elseif dbNote and dbNote ~= "" then
                 -- DB has a note. Check if we need to enforce it.
                 if noteToSave ~= dbNote then
-                    C_FriendList.SetFriendNotes(info.name, dbNote)
+                    BFL.SetFriendNotes(info.name, dbNote)
                     noteToSave = dbNote
                     -- BFL:DebugPrint("GlobalSync: Enforced DB note for " .. info.name)
                 end
@@ -408,7 +425,7 @@ function GlobalSync:SyncDeletions(faction, currentRealm)
         -- BFL:DebugPrint("GlobalSync: Found " .. #friendsToRemove .. " friends marked for deletion.")
         for _, name in ipairs(friendsToRemove) do
             -- BFL:DebugPrint("GlobalSync: Removing " .. name .. " (Synced Deletion)")
-            C_FriendList.RemoveFriend(name)
+            BFL.RemoveFriend(name)
         end
     end
 end
@@ -437,7 +454,7 @@ function GlobalSync:ProcessAddQueue(queue)
             
             local name = queue[index]
             -- BFL:DebugPrint("GlobalSync: Adding friend " .. name)
-            C_FriendList.AddFriend(name)
+            BFL.AddFriend(name)
             
             index = index + 1
         end

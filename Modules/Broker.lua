@@ -235,7 +235,7 @@ local function SmartInviteOrJoin(friendType, data)
 		
 		if isLeader then
 			-- We can invite: Use BNInviteFriend
-			BNInviteFriend(data.gameAccountID)
+			BFL.BNInviteFriend(data.gameAccountID)
 			-- BFL:DebugPrint(string.format("Broker: Invited BNet friend %s", data.accountName or "Unknown"))
 		else
 			-- We need to request to join their group
@@ -245,7 +245,7 @@ local function SmartInviteOrJoin(friendType, data)
 				if data.realmName and data.realmName ~= "" and data.realmName ~= GetRealmName() then
 					targetName = targetName .. "-" .. data.realmName
 				end
-				C_PartyInfo.RequestInviteFromUnit(targetName)
+				BFL.RequestInviteFromUnit(targetName)
 				-- BFL:DebugPrint(string.format("Broker: Requested invite from %s", targetName))
 			else
 				-- BFL:DebugPrint("Broker: Cannot request invite - no character name")
@@ -262,11 +262,11 @@ local function SmartInviteOrJoin(friendType, data)
 		
 		if isLeader then
 			-- We can invite
-			C_PartyInfo.InviteUnit(targetName)
+			BFL.InviteUnit(targetName)
 			-- BFL:DebugPrint(string.format("Broker: Invited WoW friend %s", targetName))
 		else
 			-- We need to request to join their group
-			C_PartyInfo.RequestInviteFromUnit(targetName)
+			BFL.RequestInviteFromUnit(targetName)
 			-- BFL:DebugPrint(string.format("Broker: Requested invite from %s", targetName))
 		end
 	end
@@ -837,7 +837,9 @@ local function GetColoredLevelText(level)
 	if not level or level == 0 then return "" end
 	
 	local hideMaxLevel = BetterFriendlistDB and BetterFriendlistDB.hideMaxLevel
-	local maxLevel = GetMaxLevelForPlayerExpansion()
+	-- Compatibility Fix: Use BFL.GetMaxLevel() instead of global GetMaxLevelForPlayerExpansion()
+	-- This ensures support for Classic and versions where the global API is missing
+	local maxLevel = BFL.GetMaxLevel and BFL.GetMaxLevel() or 60
 	
 	if hideMaxLevel and level == maxLevel then
 		return ""

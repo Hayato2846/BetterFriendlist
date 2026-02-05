@@ -101,6 +101,14 @@
 									<Anchor point="BOTTOMRIGHT" />
 								</Anchors>
 							</Frame>
+
+							<!-- Streamer Tab Content -->
+							<Frame parentKey="StreamerTab" hidden="true">
+								<Anchors>
+									<Anchor point="TOPLEFT" />
+									<Anchor point="BOTTOMRIGHT" />
+								</Anchors>
+							</Frame>
 						</Frames>
 					</Frame>
 				</ScrollChild>

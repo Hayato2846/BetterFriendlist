@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Settings Alignment** - Improved alignment of Sliders in settings using the component system to better match other elements.
 
 ### Fixed
+- **Streamer Mode (Classic)** - Fixed positioning of the Streamer Mode button in Classic versions to align correctly with the Close button.
 - **Sorting Logic** - Prevented Primary and Secondary sorters from being set to the same value to avoid logical conflicts. The Secondary sorter automatically resets to "None" if it matches the Primary sorter.
 - **Settings Groups** - Adjusted the layout of group list items in settings to prevent right-side clipping.
 - **Color Picker** - Fixed an issue where the Color Picker in settings would persist the previous color or restart with black instead of the current group color.
