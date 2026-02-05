@@ -908,6 +908,7 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita solapamientos con otras ventanas (P
 	L.CORE_HELP_CMD_DATABASE = "  |cffffffff/bfl database|r - Ver BD"
 	L.CORE_HELP_CMD_ACTIVITY = "  |cffffffff/bfl activity|r - Ver actividad"
 	L.CORE_HELP_CMD_STATS = "  |cffffffff/bfl stats|r - Ver estadísticas"
+	L.CORE_HELP_CMD_RESET = "  |cffffffff/bfl reset|r - Restablecer posición de ventana"
 	L.CORE_HELP_CMD_TESTGROUP = "  |cffffffff/bfl testgrouprules|r - Probar reglas grupo"
 	L.CORE_HELP_QJ_COMMANDS = "|cffffcc00Quick Join:|r"
 	L.CORE_HELP_QJ_MOCK = "  |cffffffff/bfl qj mock|r - Crear datos prueba"

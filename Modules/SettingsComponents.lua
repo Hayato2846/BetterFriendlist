@@ -464,13 +464,23 @@ function Components:CreateColorPicker(parent, labelText, initialColor, callback)
 			r = r, g = g, b = b, opacity = a, hasOpacity = true,
 			swatchFunc = function()
 				local nr, ng, nb = ColorPickerFrame:GetColorRGB()
-				local na = ColorPickerFrame:GetOpacity()
+				local na = 1
+				if ColorPickerFrame.GetColorAlpha then
+					na = ColorPickerFrame:GetColorAlpha()
+				elseif ColorPickerFrame.GetOpacity then
+					na = ColorPickerFrame:GetOpacity()
+				end
 				holder:SetColor(nr, ng, nb, na)
 				if callback then callback(nr, ng, nb, na) end
 			end,
 			opacityFunc = function()
 				local nr, ng, nb = ColorPickerFrame:GetColorRGB()
-				local na = ColorPickerFrame:GetOpacity()
+				local na = 1
+				if ColorPickerFrame.GetColorAlpha then
+					na = ColorPickerFrame:GetColorAlpha()
+				elseif ColorPickerFrame.GetOpacity then
+					na = ColorPickerFrame:GetOpacity()
+				end
 				holder:SetColor(nr, ng, nb, na)
 				if callback then callback(nr, ng, nb, na) end
 			end,
@@ -1002,7 +1012,7 @@ function Components:CreateListItem(parent, itemText, orderIndex, onDragStart, on
 		holder.arrowColorButton = CreateFrame("Button", nil, holder)
 		holder.arrowColorButton:SetSize(28, 28)
 		holder.arrowColorButton:SetPoint("RIGHT", rightOffset, 0)
-		rightOffset = rightOffset - 30
+		rightOffset = rightOffset - 35
 		
 		holder.arrowColorBorder = holder.arrowColorButton:CreateTexture(nil, "BACKGROUND")
 		holder.arrowColorBorder:SetAllPoints(holder.arrowColorButton)

@@ -2063,6 +2063,13 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 
 	-- Release lock after update complete
 	isUpdatingFriendsList = false
+	
+	-- PERFY FIX (Phase 23): Handle pending updates that were blocked during execution
+	if hasPendingUpdate then
+		hasPendingUpdate = false
+		-- Re-run update immediately to show latest state
+		self:UpdateFriendsList(ignoreVisibility)
+	end
 end
 
 -- Clear pending update flag (used by ForceRefreshFriendsList to prevent race conditions)

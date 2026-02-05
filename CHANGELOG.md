@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 ## [DRAFT]
+### Added
+- **Command Help** - Added `/bfl reset` command to the help list to reset the window position.
+
 ### Changed
 - **Group Ordering** - Replaced Up/Down buttons with Drag & Drop system in Settings -> Groups.
 - **Broker Ordering** - Replaced Up/Down buttons with Drag & Drop system in Settings -> Data Broker.

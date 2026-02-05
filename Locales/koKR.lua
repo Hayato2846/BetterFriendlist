@@ -900,6 +900,7 @@ local L = BFL_LOCALE
 	L.CORE_HELP_CMD_TOGGLE = "  |cffffffff/bfl|r - Toggle"
 	L.CORE_HELP_CMD_SETTINGS = "  |cffffffff/bfl settings|r - Config"
 	L.CORE_HELP_CMD_HELP = "  |cffffffff/bfl help|r - Help"
+	L.CORE_HELP_CMD_RESET = "  |cffffffff/bfl reset|r - 창 위치 초기화"
 	L.CORE_HELP_CMD_CHANGELOG = "  |cffffffff/bfl changelog|r - Open changelog window"
 	L.CORE_HELP_DEBUG_COMMANDS = "|cffffcc00Debug:|r"
 	L.CORE_HELP_CMD_DEBUG = "  |cffffffff/bfl debug|r - Toggle debug"

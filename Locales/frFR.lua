@@ -904,6 +904,7 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Évite chevauchements avec autres fenêtr
 	L.CORE_HELP_CMD_SETTINGS = "  |cffffffff/bfl settings|r - Ouvrir config"
 	L.CORE_HELP_CMD_HELP = "  |cffffffff/bfl help|r - Aide"
 	L.CORE_HELP_CMD_CHANGELOG = "  |cffffffff/bfl changelog|r - Ouvrir le journal des changements"
+	L.CORE_HELP_CMD_RESET = "  |cffffffff/bfl reset|r - Réinit. position fenêtre"
 	L.CORE_HELP_DEBUG_COMMANDS = "|cffffcc00Debug :|r"
 	L.CORE_HELP_CMD_DEBUG = "  |cffffffff/bfl debug|r - Basculer debug"
 	L.CORE_HELP_CMD_DATABASE = "  |cffffffff/bfl database|r - Voir BD"

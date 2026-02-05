@@ -692,11 +692,6 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 				LSM.RegisterCallback("BetterFriendlist", "LibSharedMedia_SetGlobal", OnMediaUpdate)
 			end
 			
-			-- Initialize FrameSettings (Size/Position management)
-			if BFL.FrameSettings and BFL.FrameSettings.Initialize then
-				BFL.FrameSettings:Initialize()
-			end
-			
 			-- Version-aware success message
 			local versionSuffix = BFL.IsMidnight and " (Midnight)" 
 				or (BFL.IsClassicEra and " (Classic Era)")
@@ -987,6 +982,15 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		end
 		BFL:DebugPrint("|cff00ff00End of Test|r")
 
+	-- Reset Frame Position
+	elseif msg == "reset" then
+		local FrameSettings = BFL:GetModule("FrameSettings")
+		if FrameSettings then
+			FrameSettings:ResetDefaults()
+		else
+			print("|cffff0000BetterFriendlist:|r FrameSettings module not loaded.")
+		end
+
 	-- Help (or any other unrecognized command)
 	elseif msg == "changelog" or msg == "changes" then
 		local Changelog = BFL:GetModule("Changelog")
@@ -1004,6 +1008,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		print(BFL.L.CORE_HELP_CMD_SETTINGS)
 		print(BFL.L.CORE_HELP_CMD_HELP)
 		print(BFL.L.CORE_HELP_CMD_CHANGELOG)
+		print(BFL.L.CORE_HELP_CMD_RESET)
 		print("")
 		print(BFL.L.CORE_HELP_LINK)
 	end

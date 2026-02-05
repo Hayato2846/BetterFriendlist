@@ -586,6 +586,11 @@ function Settings:SelectCategory(categoryID)
 		
 		-- Adjust content height dynamically after tab is shown
 		self:AdjustContentHeight(categoryID)
+		
+		-- Reset scroll position to top (User Request: Fix scroll staying down when switching tabs)
+		if settingsFrame.ContentScrollFrame then
+			settingsFrame.ContentScrollFrame:SetVerticalScroll(0)
+		end
 	end
 end
 
@@ -2514,6 +2519,15 @@ function Settings:OnAccordionGroupsChanged(checked)
 	
 	DB:Set("accordionGroups", checked)
 	
+	-- Collapse all groups to ensure clean state (Requested by User)
+	local Groups = BFL:GetModule("Groups")
+	if Groups then
+		local allGroups = Groups:GetAll()
+		for groupId, _ in pairs(allGroups) do
+			Groups:SetCollapsed(groupId, true, true)
+		end
+	end
+	
 	-- Display-only change - re-render existing data
 	BFL:ForceRefreshFriendsList()
 end
@@ -4299,6 +4313,10 @@ function Settings:RefreshBrokerTab()
 		DB:Get("brokerEnabled", true),
 		function(val)
 			BetterFriendlistDB.brokerEnabled = val
+			
+			-- Refresh to update sub-options visibility
+			self:RefreshBrokerTab()
+
 			-- Show confirmation dialog for reload
 			local statusText = val and "|cff00ff00" .. (L.STATUS_ENABLED or "ENABLED") .. "|r" or "|cffff0000" .. (L.STATUS_DISABLED or "DISABLED") .. "|r"
 			StaticPopupDialogs["BFL_BROKER_RELOAD_CONFIRM"] = {
@@ -4318,6 +4336,7 @@ function Settings:RefreshBrokerTab()
 	enableBroker:SetTooltip(L.BROKER_SETTINGS_ENABLE or "Enable Data Broker", L.BROKER_SETTINGS_ENABLE_TOOLTIP or "Show BetterFriendlist in Data Broker display addons. Requires UI reload to take effect.")
 	table.insert(allFrames, enableBroker)
 	
+	if DB:Get("brokerEnabled", true) then
 	-- Show Icon
 	local showIcon = Components:CreateCheckbox(tab, L.BROKER_SETTINGS_SHOW_ICON or "Show Icon on Display Addon",
 		DB:Get("brokerShowIcon", true),
@@ -4543,6 +4562,7 @@ function Settings:RefreshBrokerTab()
 		table.insert(listItems, listItem)
 		table.insert(allFrames, listItem)
 	end
+	end
 	
 	-- Anchor all frames vertically
 	Components:AnchorChain(allFrames, -5)
@@ -4601,211 +4621,212 @@ function Settings:RefreshGlobalSyncTab()
 	enableSync:SetTooltip(L.SETTINGS_GLOBAL_SYNC_ENABLE or "Enable Global Sync", L.SETTINGS_GLOBAL_SYNC_ENABLE_TOOLTIP or "Automatically sync friends from other realms to this character.")
 	table.insert(allFrames, enableSync)
 	
-	-- Enable Deletion
-	local enableDeletion = Components:CreateCheckbox(tab, L.SETTINGS_GLOBAL_SYNC_DELETION or "Enable Deletion",
-		DB:Get("enableGlobalSyncDeletion", false),
-		function(val)
-			BetterFriendlistDB.enableGlobalSyncDeletion = val
-			if val then
-				BFL:DebugPrint("Global Sync Deletion |cff00ff00" .. (L.STATUS_ENABLED or "ENABLED") .. "|r")
-			else
-				BFL:DebugPrint("Global Sync Deletion |cffff0000" .. (L.STATUS_DISABLED or "DISABLED") .. "|r")
-			end
-		end)
-	enableDeletion:SetTooltip(L.SETTINGS_GLOBAL_SYNC_DELETION or "Enable Deletion", L.SETTINGS_GLOBAL_SYNC_DELETION_DESC or "Allow the sync process to remove friends from your list if they are removed from the database.")
-	table.insert(allFrames, enableDeletion)
+	if DB:Get("enableGlobalSync", false) then
+		-- Enable Deletion
+		local enableDeletion = Components:CreateCheckbox(tab, L.SETTINGS_GLOBAL_SYNC_DELETION or "Enable Deletion",
+			DB:Get("enableGlobalSyncDeletion", false),
+			function(val)
+				BetterFriendlistDB.enableGlobalSyncDeletion = val
+				if val then
+					BFL:DebugPrint("Global Sync Deletion |cff00ff00" .. (L.STATUS_ENABLED or "ENABLED") .. "|r")
+				else
+					BFL:DebugPrint("Global Sync Deletion |cffff0000" .. (L.STATUS_DISABLED or "DISABLED") .. "|r")
+				end
+			end)
+		enableDeletion:SetTooltip(L.SETTINGS_GLOBAL_SYNC_DELETION or "Enable Deletion", L.SETTINGS_GLOBAL_SYNC_DELETION_DESC or "Allow the sync process to remove friends from your list if they are removed from the database.")
+		table.insert(allFrames, enableDeletion)
 
-	-- Show Deleted Friends
-	local showDeleted = Components:CreateCheckbox(tab, L.SETTINGS_GLOBAL_SYNC_SHOW_DELETED or "Show Deleted Friends",
-		self.showDeletedFriends or false,
-		function(val)
-			self.showDeletedFriends = val
-			self:RefreshGlobalSyncTab()
-		end)
-	showDeleted:SetTooltip(L.SETTINGS_GLOBAL_SYNC_SHOW_DELETED_TITLE or "Show Deleted Friends", L.SETTINGS_GLOBAL_SYNC_SHOW_DELETED_TOOLTIP or "Show friends that have been deleted from the database but are kept for history.")
-	table.insert(allFrames, showDeleted)
-	
-	-- Spacer
-	table.insert(allFrames, Components:CreateSpacer(tab))
-	
-	-- Header: Synced Friends
-	local listHeader = Components:CreateHeader(tab, L.SETTINGS_GLOBAL_SYNC_HEADER or "Synced Friends Database")
-	table.insert(allFrames, listHeader)
-	
-	-- Populate Table
-	local count = 0
-	local rowHeight = 24
-	
-	if BetterFriendlistDB.GlobalFriends then
-		for faction, friends in pairs(BetterFriendlistDB.GlobalFriends) do
-			for key, value in pairs(friends) do
-				if value.guid or value.notes or value.lastSeen or value.deleted then
-					-- Check if we should show this friend
-					if not value.deleted or self.showDeletedFriends then
-						local friendUID = key
-						local data = value
-						count = count + 1
-						
-						local row = CreateFrame("Frame", nil, tab)
-						row:SetHeight(rowHeight)
-						row:SetPoint("LEFT", 5, 0) -- Maximized width (was 20)
-						row:SetPoint("RIGHT", -5, 0) -- Maximized width (was -20)
-						
-						-- Background (alternating)
-						if count % 2 == 0 then
-							local bg = row:CreateTexture(nil, "BACKGROUND")
-							bg:SetAllPoints()
-							bg:SetColorTexture(1, 1, 1, 0.05)
-						end
-						
-						-- Parse Name and Realm
-						local name, realm = string.match(friendUID, "^(.+)%-(.+)$")
-						if not name then 
-							name = friendUID 
-							realm = "Unknown"
-						end
-						
-						-- Name
-						local nameText = row:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
-						nameText:SetPoint("LEFT", 5, 0)
-						nameText:SetWidth(130) -- Optimized to prevent clipping (was 155)
-						nameText:SetJustifyH("LEFT")
-						nameText:SetWordWrap(false)
-						nameText:SetText(name)
-						
-						-- Realm
-						local realmText = row:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-						realmText:SetPoint("LEFT", nameText, "RIGHT", 5, 0)
-						realmText:SetWidth(120) -- Optimized to prevent clipping (was 135)
-						realmText:SetJustifyH("LEFT")
-						realmText:SetWordWrap(false)
-						realmText:SetText(realm)
-						
-						-- Faction Icon
-						local factionIcon = row:CreateTexture(nil, "ARTWORK")
-						factionIcon:SetSize(16, 16)
-						factionIcon:SetPoint("LEFT", realmText, "RIGHT", 5, 0)
-						if faction == "Alliance" then
-							factionIcon:SetTexture("Interface\\FriendsFrame\\PlusManz-Alliance")
-						elseif faction == "Horde" then
-							factionIcon:SetTexture("Interface\\FriendsFrame\\PlusManz-Horde")
-						end
+		-- Show Deleted Friends
+		local showDeleted = Components:CreateCheckbox(tab, L.SETTINGS_GLOBAL_SYNC_SHOW_DELETED or "Show Deleted Friends",
+			self.showDeletedFriends or false,
+			function(val)
+				self.showDeletedFriends = val
+				self:RefreshGlobalSyncTab()
+			end)
+		showDeleted:SetTooltip(L.SETTINGS_GLOBAL_SYNC_SHOW_DELETED_TITLE or "Show Deleted Friends", L.SETTINGS_GLOBAL_SYNC_SHOW_DELETED_TOOLTIP or "Show friends that have been deleted from the database but are kept for history.")
+		table.insert(allFrames, showDeleted)
+		
+		-- Spacer
+		table.insert(allFrames, Components:CreateSpacer(tab))
+		
+		-- Header: Synced Friends
+		local listHeader = Components:CreateHeader(tab, L.SETTINGS_GLOBAL_SYNC_HEADER or "Synced Friends Database")
+		table.insert(allFrames, listHeader)
+		
+		-- Populate Table
+		local count = 0
+		local rowHeight = 24
+		
+		if BetterFriendlistDB.GlobalFriends then
+			for faction, friends in pairs(BetterFriendlistDB.GlobalFriends) do
+				for key, value in pairs(friends) do
+					if value.guid or value.notes or value.lastSeen or value.deleted then
+						-- Check if we should show this friend
+						if not value.deleted or self.showDeletedFriends then
+							local friendUID = key
+							local data = value
+							count = count + 1
+							
+							local row = CreateFrame("Frame", nil, tab)
+							row:SetHeight(rowHeight)
+							row:SetPoint("LEFT", 5, 0) -- Maximized width (was 20)
+							row:SetPoint("RIGHT", -5, 0) -- Maximized width (was -20)
+							
+							-- Background (alternating)
+							if count % 2 == 0 then
+								local bg = row:CreateTexture(nil, "BACKGROUND")
+								bg:SetAllPoints()
+								bg:SetColorTexture(1, 1, 1, 0.05)
+							end
+							
+							-- Parse Name and Realm
+							local name, realm = string.match(friendUID, "^(.+)%-(.+)$")
+							if not name then 
+								name = friendUID 
+								realm = "Unknown"
+							end
+							
+							-- Name
+							local nameText = row:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
+							nameText:SetPoint("LEFT", 5, 0)
+							nameText:SetWidth(130) -- Optimized to prevent clipping (was 155)
+							nameText:SetJustifyH("LEFT")
+							nameText:SetWordWrap(false)
+							nameText:SetText(name)
+							
+							-- Realm
+							local realmText = row:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
+							realmText:SetPoint("LEFT", nameText, "RIGHT", 5, 0)
+							realmText:SetWidth(120) -- Optimized to prevent clipping (was 135)
+							realmText:SetJustifyH("LEFT")
+							realmText:SetWordWrap(false)
+							realmText:SetText(realm)
+							
+							-- Faction Icon
+							local factionIcon = row:CreateTexture(nil, "ARTWORK")
+							factionIcon:SetSize(16, 16)
+							factionIcon:SetPoint("LEFT", realmText, "RIGHT", 5, 0)
+							if faction == "Alliance" then
+								factionIcon:SetTexture("Interface\\FriendsFrame\\PlusManz-Alliance")
+							elseif faction == "Horde" then
+								factionIcon:SetTexture("Interface\\FriendsFrame\\PlusManz-Horde")
+							end
 
-						-- Visuals for deleted friends
-						if value.deleted then
-							nameText:SetTextColor(0.5, 0.5, 0.5)
-							realmText:SetTextColor(0.5, 0.5, 0.5)
-						end
-						
-						-- Action Button (Delete or Restore)
-						local actionBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-						actionBtn:SetSize(20, 20)
-						actionBtn:SetPoint("RIGHT", -5, 0)
-						
-						if value.deleted then
-							-- Restore Button
-							actionBtn:SetText("R")
-							actionBtn:SetScript("OnClick", function()
-								BetterFriendlistDB.GlobalFriends[faction][friendUID].deleted = nil
-								BetterFriendlistDB.GlobalFriends[faction][friendUID].deletedTime = nil
-								BetterFriendlistDB.GlobalFriends[faction][friendUID].restoring = true -- Flag for GlobalSync to restore note
-								
-								-- Add back to friend list
-								BFL.AddFriend(friendUID)
-								BFL:DebugPrint("Restored " .. name .. " to friend list.")
-								
-								self:RefreshGlobalSyncTab()
-							end)
-							actionBtn:SetScript("OnEnter", function(self)
-								GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-								GameTooltip:SetText(L.TOOLTIP_RESTORE_FRIEND or "Restore Friend")
-								GameTooltip:Show()
-							end)
-							actionBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-						else
-							-- Delete Button
-							actionBtn:SetText("X")
-							actionBtn:SetScript("OnClick", function()
-								-- Mark as deleted
-								BetterFriendlistDB.GlobalFriends[faction][friendUID].deleted = true
-								BetterFriendlistDB.GlobalFriends[faction][friendUID].deletedTime = time()
-								
-								-- Immediate deletion from friend list if enabled
-								if BetterFriendlistDB.enableGlobalSyncDeletion then
-									local removed = false
-									-- Check if friend exists in current list
-									for i = 1, (C_FriendList.GetNumFriends() or 0) do
-										local info = C_FriendList.GetFriendInfoByIndex(i)
-										if info then
-											-- Robust matching: Check GUID first, then Name-Realm, then Name
-											local match = false
-											if data.guid and info.guid and data.guid == info.guid then
-												match = true
-											elseif info.name == friendUID then
-												match = true
-											elseif info.name == name then
-												match = true
+							-- Visuals for deleted friends
+							if value.deleted then
+								nameText:SetTextColor(0.5, 0.5, 0.5)
+								realmText:SetTextColor(0.5, 0.5, 0.5)
+							end
+							
+							-- Action Button (Delete or Restore)
+							local actionBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+							actionBtn:SetSize(20, 20)
+							actionBtn:SetPoint("RIGHT", -5, 0)
+							
+							if value.deleted then
+								-- Restore Button
+								actionBtn:SetText("R")
+								actionBtn:SetScript("OnClick", function()
+									BetterFriendlistDB.GlobalFriends[faction][friendUID].deleted = nil
+									BetterFriendlistDB.GlobalFriends[faction][friendUID].deletedTime = nil
+									BetterFriendlistDB.GlobalFriends[faction][friendUID].restoring = true -- Flag for GlobalSync to restore note
+									
+									-- Add back to friend list
+									BFL.AddFriend(friendUID)
+									BFL:DebugPrint("Restored " .. name .. " to friend list.")
+									
+									self:RefreshGlobalSyncTab()
+								end)
+								actionBtn:SetScript("OnEnter", function(self)
+									GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+									GameTooltip:SetText(L.TOOLTIP_RESTORE_FRIEND or "Restore Friend")
+									GameTooltip:Show()
+								end)
+								actionBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+							else
+								-- Delete Button
+								actionBtn:SetText("X")
+								actionBtn:SetScript("OnClick", function()
+									-- Mark as deleted
+									BetterFriendlistDB.GlobalFriends[faction][friendUID].deleted = true
+									BetterFriendlistDB.GlobalFriends[faction][friendUID].deletedTime = time()
+									
+									-- Immediate deletion from friend list if enabled
+									if BetterFriendlistDB.enableGlobalSyncDeletion then
+										local removed = false
+										-- Check if friend exists in current list
+										for i = 1, (C_FriendList.GetNumFriends() or 0) do
+											local info = C_FriendList.GetFriendInfoByIndex(i)
+											if info then
+												-- Robust matching: Check GUID first, then Name-Realm, then Name
+												local match = false
+												if data.guid and info.guid and data.guid == info.guid then
+													match = true
+												elseif info.name == friendUID then
+													match = true
+												elseif info.name == name then
+													match = true
+												end
+												
+												if match then
+													BFL.RemoveFriend(info.name) -- Use the name from the API
+													BFL:DebugPrint("Removed " .. info.name .. " from friend list.")
+													removed = true
+													break
+												end
 											end
-											
-											if match then
-												BFL.RemoveFriend(info.name) -- Use the name from the API
-												BFL:DebugPrint("Removed " .. info.name .. " from friend list.")
-												removed = true
-												break
-											end
+										end
+										
+										if not removed then
+											-- Fallback: Try to remove by UID directly if not found in loop (e.g. offline/cache issue)
+											BFL.RemoveFriend(friendUID)
 										end
 									end
 									
-									if not removed then
-										-- Fallback: Try to remove by UID directly if not found in loop (e.g. offline/cache issue)
-										BFL.RemoveFriend(friendUID)
-									end
-								end
-								
-								self:RefreshGlobalSyncTab()
-							end)
-							actionBtn:SetScript("OnEnter", function(self)
-								GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-								GameTooltip:SetText(L.TOOLTIP_DELETE_FRIEND or "Delete Friend")
-								GameTooltip:Show()
-							end)
-							actionBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-						end
-						
-						-- Edit Button (Note)
-						local editBtn = CreateFrame("Button", nil, row)
-						editBtn:SetSize(16, 16)
-						editBtn:SetPoint("RIGHT", actionBtn, "LEFT", -5, 0)
-						editBtn:SetNormalTexture("Interface\\Buttons\\UI-GuildButton-PublicNote-Up")
-						editBtn:SetScript("OnClick", function()
-							StaticPopupDialogs["BFL_EDIT_GLOBAL_NOTE"] = {
-								text = string.format(L.POPUP_EDIT_NOTE_TITLE or "Edit Note for %s", name),
-								button1 = L.BUTTON_SAVE or "Save",
-								button2 = L.BUTTON_CANCEL or "Cancel",
-								hasEditBox = true,
-								OnShow = function(self)
-									self.EditBox:SetText(data.notes or "")
-								end,
-								OnAccept = function(self)
-									local text = self.EditBox:GetText()
-									-- Update DB
-									BetterFriendlistDB.GlobalFriends[faction][friendUID].notes = text
-									
-									-- Update In-Game Friend Note if friend exists locally
-									for i = 1, (C_FriendList.GetNumFriends() or 0) do
-										local info = C_FriendList.GetFriendInfoByIndex(i)
-										if info then
-											-- Robust matching
-											local match = false
-											if data.guid and info.guid and data.guid == info.guid then
-												match = true
-											elseif info.name == friendUID then
-												match = true
-											elseif info.name == name then
-												match = true
-											end
-											
-											if match then
+									self:RefreshGlobalSyncTab()
+								end)
+								actionBtn:SetScript("OnEnter", function(self)
+									GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+									GameTooltip:SetText(L.TOOLTIP_DELETE_FRIEND or "Delete Friend")
+									GameTooltip:Show()
+								end)
+								actionBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+							end
+							
+							-- Edit Button (Note)
+							local editBtn = CreateFrame("Button", nil, row)
+							editBtn:SetSize(16, 16)
+							editBtn:SetPoint("RIGHT", actionBtn, "LEFT", -5, 0)
+							editBtn:SetNormalTexture("Interface\\Buttons\\UI-GuildButton-PublicNote-Up")
+							editBtn:SetScript("OnClick", function()
+								StaticPopupDialogs["BFL_EDIT_GLOBAL_NOTE"] = {
+									text = string.format(L.POPUP_EDIT_NOTE_TITLE or "Edit Note for %s", name),
+									button1 = L.BUTTON_SAVE or "Save",
+									button2 = L.BUTTON_CANCEL or "Cancel",
+									hasEditBox = true,
+									OnShow = function(self)
+										self.EditBox:SetText(data.notes or "")
+									end,
+									OnAccept = function(self)
+										local text = self.EditBox:GetText()
+										-- Update DB
+										BetterFriendlistDB.GlobalFriends[faction][friendUID].notes = text
+										
+										-- Update In-Game Friend Note if friend exists locally
+										for i = 1, (C_FriendList.GetNumFriends() or 0) do
+											local info = C_FriendList.GetFriendInfoByIndex(i)
+											if info then
+												-- Robust matching
+												local match = false
+												if data.guid and info.guid and data.guid == info.guid then
+													match = true
+												elseif info.name == friendUID then
+													match = true
+												elseif info.name == name then
+													match = true
+												end
+												
+												if match then
 												C_FriendList.SetFriendNotes(info.name, text)
 												BFL:DebugPrint("Updated note for " .. info.name)
 												break
@@ -4836,6 +4857,7 @@ function Settings:RefreshGlobalSyncTab()
 				end
 			end
 		end
+	end
 	end
 	
 	-- Anchor all frames vertically

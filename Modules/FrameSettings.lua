@@ -62,6 +62,24 @@ function FrameSettings:ApplySettings()
     self:ApplyScale()
     self:ApplyPosition()
     self:ApplyLock()
+    self:ApplyClamping()
+end
+
+function FrameSettings:ApplyClamping()
+    local frame = BFL.MainFrame
+    if not frame then return end
+
+    -- "Respect UI Hierarchy" (useUIPanelSystem) logic:
+    -- If TRUE: Frame is managed by Blizzard's UIPanel system (anchored to left/center automatically)
+    -- If FALSE: Frame is free-floating and user-movable.
+    -- We want to CLAMP it to screen only when it is free-floating to prevent losing it.
+    local useUIPanel = self.db.useUIPanelSystem
+    
+    if not useUIPanel then
+        frame:SetClampedToScreen(true)
+    else
+        frame:SetClampedToScreen(false)
+    end
 end
 
 function FrameSettings:ApplyLock(locked)
