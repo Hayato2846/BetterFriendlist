@@ -353,6 +353,7 @@ local TAB_DEFINITIONS = {
 	{id = 1, name = L.SETTINGS_TAB_GENERAL, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\settings.blp", beta = false},
 	{id = 2, name = L.SETTINGS_TAB_FONTS, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\type.blp", beta = false},
 	{id = 3, name = L.SETTINGS_TAB_GROUPS, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\users.blp", beta = false},
+	{id = 8, name = L.SETTINGS_TAB_RAID, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\shield.blp", beta = false},
 	{id = 4, name = L.SETTINGS_TAB_ADVANCED, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\sliders.blp", beta = false},
 	
 	-- Data Broker & Global Sync (Stable)
@@ -560,6 +561,7 @@ function Settings:SelectCategory(categoryID)
 		if content.StreamerTab then content.StreamerTab:Hide() end
 		if content.BrokerTab then content.BrokerTab:Hide() end
 		if content.GlobalSyncTab then content.GlobalSyncTab:Hide() end
+		if content.RaidTab then content.RaidTab:Hide() end
 		
 		if categoryID == 1 and content.GeneralTab then
 			content.GeneralTab:Show()
@@ -582,6 +584,9 @@ function Settings:SelectCategory(categoryID)
 		elseif categoryID == 7 and content.StreamerTab then
 			content.StreamerTab:Show()
 			self:RefreshStreamerTab()
+		elseif categoryID == 8 and content.RaidTab then
+			content.RaidTab:Show()
+			self:RefreshRaidTab()
 		end
 		
 		-- Adjust content height dynamically after tab is shown
@@ -616,6 +621,8 @@ function Settings:AdjustContentHeight(tabID)
 		activeTab = content.GlobalSyncTab
 	elseif tabID == 7 then
 		activeTab = content.StreamerTab
+	elseif tabID == 8 then
+		activeTab = content.RaidTab
 	end
 	
 	if not activeTab then return end
@@ -4914,5 +4921,242 @@ function Settings:RefreshStreamerTab()
 	-- Store components for cleanup
 	tab.components = allFrames
 end
+
+-- Refresh Raid Tab
+function Settings:RefreshRaidTab()
+	if not settingsFrame or not Components then return end
+	
+	local content = settingsFrame.ContentScrollFrame.Content
+	if not content or not content.RaidTab then return end
+	
+	local tab = content.RaidTab
+	local DB = GetDB()
+	if not DB then return end
+	
+	-- Clear existing content
+	if tab.components then
+		for _, component in ipairs(tab.components) do
+			if component.Hide then component:Hide() end
+		end
+	end
+	tab.components = {}
+	
+	local allFrames = {}
+	
+	-- Header
+	local header = Components:CreateHeader(tab, L.SETTINGS_TAB_RAID or "Raid & Group")
+	table.insert(allFrames, header)
+	
+	-- Description
+	local desc = Components:CreateLabel(tab, L.SETTINGS_RAID_DESC or "Configure shortcuts for raid and group management actions on the Raid Frame.", true)
+	table.insert(allFrames, desc)
+
+	-- Spacer
+	table.insert(allFrames, Components:CreateSpacer(tab))
+
+	-- Shortcuts Configuration
+	local shortcuts = DB:Get("raidShortcuts") or {}
+	
+	-- Helper Options
+	local modifierOptions = {
+		labels = {L.SETTINGS_RAID_MODIFIER_NONE or "None", "Shift", "Ctrl", "Alt", "Shift+Ctrl", "Shift+Alt", "Ctrl+Alt"},
+		values = {"NONE", "SHIFT", "CTRL", "ALT", "SHIFT-CTRL", "SHIFT-ALT", "CTRL-ALT"}
+	}
+	
+	local buttonOptions = {
+		labels = {L.SETTINGS_RAID_MOUSE_LEFT or "Left Click", L.SETTINGS_RAID_MOUSE_RIGHT or "Right Click", L.SETTINGS_RAID_MOUSE_MIDDLE or "Middle Click", "Button 4", "Button 5"},
+		values = {"LeftButton", "RightButton", "Button3", "Button4", "Button5"}
+	}
+	
+	-- Helper function to create rows
+	local function CreateShortcutRow(actionName, actionKey)
+		local isEnabled = DB:Get("raidShortcutEnabled_" .. actionKey, true)
+
+		local currentMod = "NONE"
+		local currentBtn = "LeftButton"
+		if shortcuts[actionKey] then
+			currentMod = shortcuts[actionKey].modifier or "NONE"
+			currentBtn = shortcuts[actionKey].button or "LeftButton"
+		end
+		
+		-- Row container
+		local row = CreateFrame("Frame", nil, tab)
+		row:SetHeight(40)
+		row:SetPoint("LEFT", 0, 0)
+		row:SetPoint("RIGHT", 0, 0)
+		
+		-- Checkbox (Manual creation for Left-Alignment)
+		local template = "SettingsCheckboxTemplate"
+		if BFL.IsClassic then
+			template = "InterfaceOptionsCheckButtonTemplate"
+		end
+		
+		local checkbox = CreateFrame("CheckButton", nil, row, template)
+		checkbox:SetSize(26, 26)
+		checkbox:SetPoint("LEFT", 0, 0)
+		checkbox:SetChecked(isEnabled)
+		
+		-- Fix text regions in template
+		if checkbox.Text then checkbox.Text:SetText("") end
+		if checkbox.SetText then checkbox:SetText("") end
+		local regions = {checkbox:GetRegions()}
+		for _, region in ipairs(regions) do
+			if region:GetObjectType() == "FontString" then region:SetText("") end
+		end
+
+		checkbox:SetScript("OnClick", function(self)
+			local val = self:GetChecked()
+			DB:Set("raidShortcutEnabled_" .. actionKey, val)
+			
+			-- Immediately update secure attributes
+			local RaidFrame = BFL:GetModule("RaidFrame")
+			if RaidFrame and RaidFrame.UpdateSecureAttributes then
+				RaidFrame:UpdateSecureAttributes()
+			end
+			
+			-- Refresh tab to show/hide shortcut options
+			C_Timer.After(0.05, function() Settings:RefreshRaidTab() end)
+		end)
+
+		-- Label
+		local label = row:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
+		label:SetPoint("LEFT", checkbox, "RIGHT", 5, 0)
+		label:SetWidth(200) -- Increased width for German text
+		label:SetJustifyH("LEFT")
+		label:SetText(actionName)
+		label:SetWordWrap(false)
+
+		-- Validation Function
+		local function ValidateShortcut(mod, btn)
+			if (mod == "NONE" and btn == "LeftButton") or
+			   (mod == "NONE" and btn == "RightButton") or
+			   (mod == "CTRL" and btn == "LeftButton") then
+				
+				-- Exception: If configuring "Target", None+Left is actually valid/desired.
+				if actionKey == "target" and mod == "NONE" and btn == "LeftButton" then
+					return true
+				end
+				
+				print("|cffff0000BetterFriendlist:|r " .. (L.SETTINGS_RAID_ERROR_RESERVED or "This combination is reserved."))
+				return false
+			end
+			return true
+		end
+
+		-- Only show dropdowns if enabled
+		if isEnabled then
+			-- Modifier Dropdown
+			local modDropdown = Components:CreateDropdown(
+				row, 
+				"", 
+				modifierOptions, 
+				function(val) return val == currentMod end,
+				function(val)
+					-- Snapshot update
+					local s = DB:Get("raidShortcuts") or {}
+					if not s[actionKey] then s[actionKey] = {} end
+					
+					local currentBtnVal = s[actionKey].button or "LeftButton"
+					if not ValidateShortcut(val, currentBtnVal) then
+						Settings:RefreshRaidTab() -- Reset UI
+						return
+					end
+
+					s[actionKey].modifier = val
+					DB:Set("raidShortcuts", s)
+					
+					-- Refresh input immediately
+					local RaidFrame = BFL:GetModule("RaidFrame")
+					if RaidFrame and RaidFrame.UpdateSecureAttributes then
+						RaidFrame:UpdateSecureAttributes()
+					end
+				end
+			)
+			-- MANUAL LAYOUT FIX: Disable auto-layout to prevent 170px width enforcement
+			modDropdown:SetScript("OnSizeChanged", nil)
+			modDropdown:ClearAllPoints()
+			modDropdown:SetPoint("LEFT", label, "RIGHT", 5, 0)
+			modDropdown:SetWidth(135)
+			modDropdown:SetScale(0.85) 
+			modDropdown.Label:Hide()
+			
+			local ddMod = modDropdown.DropDown
+			ddMod:ClearAllPoints()
+			if BFL.IsClassic or not BFL.HasModernMenu then
+				UIDropDownMenu_SetWidth(ddMod, 110)
+				ddMod:SetPoint("TOPLEFT", modDropdown, "TOPLEFT", -15, -2)
+			else
+				ddMod:SetPoint("LEFT", modDropdown, "LEFT", 0, 0)
+				ddMod:SetWidth(135)
+			end
+			
+			-- Button Dropdown
+			local btnDropdown = Components:CreateDropdown(
+				row, 
+				"", 
+				buttonOptions, 
+				function(val) return val == currentBtn end,
+				function(val)
+					local s = DB:Get("raidShortcuts") or {}
+					if not s[actionKey] then s[actionKey] = {} end
+					
+					local currentModVal = s[actionKey].modifier or "NONE"
+					if not ValidateShortcut(currentModVal, val) then
+						Settings:RefreshRaidTab() -- Reset UI
+						return
+					end
+
+					s[actionKey].button = val
+					DB:Set("raidShortcuts", s)
+					
+					local RaidFrame = BFL:GetModule("RaidFrame")
+					if RaidFrame and RaidFrame.UpdateSecureAttributes then
+						RaidFrame:UpdateSecureAttributes()
+					end
+				end
+			)
+			-- MANUAL LAYOUT FIX: Disable auto-layout
+			btnDropdown:SetScript("OnSizeChanged", nil)
+			btnDropdown:ClearAllPoints()
+			btnDropdown:SetPoint("LEFT", modDropdown, "RIGHT", 5, 0)
+			btnDropdown:SetWidth(135)
+			btnDropdown:SetScale(0.85)
+			btnDropdown.Label:Hide()
+			
+			local ddBtn = btnDropdown.DropDown
+			ddBtn:ClearAllPoints()
+			if BFL.IsClassic or not BFL.HasModernMenu then
+				UIDropDownMenu_SetWidth(ddBtn, 110)
+				ddBtn:SetPoint("TOPLEFT", btnDropdown, "TOPLEFT", -15, -2)
+			else
+				ddBtn:SetPoint("LEFT", btnDropdown, "LEFT", 0, 0)
+				ddBtn:SetWidth(135)
+			end
+
+			-- If action is Target, maybe verify it defaults to None+Left?
+			-- It is configured in DB defaults.
+		end
+		
+		table.insert(allFrames, row)
+	end
+	
+	-- Create rows
+	CreateShortcutRow(L.SETTINGS_RAID_ACTION_MAIN_TANK or "Set Main Tank", "mainTank")
+	CreateShortcutRow(L.SETTINGS_RAID_ACTION_MAIN_ASSIST or "Set Main Assist", "mainAssist")
+	CreateShortcutRow(L.SETTINGS_RAID_ACTION_RAID_LEAD or "Set Raid Leader", "lead")
+	CreateShortcutRow(L.SETTINGS_RAID_ACTION_PROMOTE or "Promo/Demote Assistant", "promote")
+
+	-- Warning about reloading/combat
+	table.insert(allFrames, Components:CreateSpacer(tab))
+	local warning = Components:CreateLabel(tab, L.SETTINGS_RAID_WARNING or "Note: Shortcuts are secure actions and update immediately (when out of combat).", true)
+	warning:SetTextColor(0.7, 0.7, 0.7)
+	table.insert(allFrames, warning)
+	
+	-- Anchor
+	Components:AnchorChain(allFrames, -5)
+	
+	tab.components = allFrames
+end
+
 
 return Settings

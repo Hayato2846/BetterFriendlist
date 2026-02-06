@@ -85,6 +85,7 @@ local L = BFL_LOCALE_ENUS
 	L.SETTINGS_FONT_SIZE_NORMAL = "Normal (12px)"
 	L.SETTINGS_FONT_SIZE_LARGE = "Large (14px)"
 	L.SETTINGS_COLOR_CLASS_NAMES = "Color Class Names"
+	L.SETTINGS_COLOR_CLASS_NAMES_DESC = "Colors character names using their class color for easier identification"
 	L.SETTINGS_HIDE_EMPTY_GROUPS = "Hide Empty Groups"
 	L.SETTINGS_HEADER_COUNT_FORMAT = "Group Header Counts"
 	L.SETTINGS_HEADER_COUNT_FORMAT_DESC = "Choose how friend counts are displayed in group headers"
@@ -1090,6 +1091,34 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	L.SETTINGS_STREAMER_NAME_FORMAT_NOTE = "Force Note"
 	L.SETTINGS_STREAMER_USE_PURPLE_HEADER = "Use Purple Header Color"
 	L.SETTINGS_STREAMER_USE_PURPLE_HEADER_DESC = "Changes the background color of the Battle.net header frame to Twitch purple when Streamer Mode is active."
+
+	-- ========================================
+	-- RAID SHORTCUTS (Phase 26)
+	-- ========================================
+	L.SETTINGS_TAB_RAID = "Raid"
+	L.SETTINGS_RAID_SHORTCUTS_TITLE = "Raid Shortcuts"
+	L.SETTINGS_RAID_ACTION_MASS_MOVE = "Mass Move"
+	L.SETTINGS_RAID_ACTION_MAIN_TANK = "Set Main Tank"
+	L.SETTINGS_RAID_ACTION_MAIN_ASSIST = "Set Main Assist"
+	L.SETTINGS_RAID_ACTION_RAID_LEAD = "Set Raid Leader"
+	L.SETTINGS_RAID_ACTION_PROMOTE = "Promote Assistant"
+	L.SETTINGS_RAID_ACTION_DEMOTE = "Demote Assistant"
+	L.SETTINGS_RAID_ACTION_KICK = "Remove from Group"
+	L.SETTINGS_RAID_ACTION_INVITE = "Invite to Group"
+	L.SETTINGS_RAID_MODIFIER_NONE = "None"
+	L.SETTINGS_RAID_MODIFIER_SHIFT = "Shift"
+	L.SETTINGS_RAID_MODIFIER_CTRL = "Ctrl"
+	L.SETTINGS_RAID_MODIFIER_ALT = "Alt"
+	L.SETTINGS_RAID_MOUSE_LEFT = "Left Click"
+	L.SETTINGS_RAID_MOUSE_RIGHT = "Right Click"
+	L.SETTINGS_RAID_MOUSE_MIDDLE = "Middle Click"
+	L.SETTINGS_RAID_DESC = "Configure shortcuts for raid and group management actions on the Raid Frame."
+	L.SETTINGS_RAID_ENABLE_SHORTCUTS = "Enable Shortcuts"
+	L.SETTINGS_RAID_ENABLE_SHORTCUTS_DESC = "Enable or disable all custom mouse shortcuts on the Raid Frame."
+	L.SETTINGS_RAID_MODIFIER_LABEL = "Mod:"
+	L.SETTINGS_RAID_BUTTON_LABEL = "Btn:"
+	L.SETTINGS_RAID_WARNING = "Note: Shortcuts are secure actions and update immediately (when out of combat)."
+	L.SETTINGS_RAID_ERROR_RESERVED = "This combination is reserved."
 end
 
 -- Always load enUS immediately to ensure fallback strings exist

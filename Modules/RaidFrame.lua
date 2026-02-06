@@ -485,33 +485,7 @@ function RaidFrame:CreateSecureProxy()
     highlight:SetAllPoints(proxy)
     proxy:SetHighlightTexture(highlight)
     
-    -- Secure Attributes
-    -- Let Left Click events fall through to the underlying visual button
-    -- This restores native Drag & Drop and Selection logic
-    if proxy.SetPassThroughButtons then
-        proxy:SetPassThroughButtons("LeftButton")
-    else
-        -- BFL:DebugPrint("Error: SetPassThroughButtons not supported")
-    end
-    
-    -- =====================================================
-    -- SECURE ACTION CONFIGURATION
-    -- =====================================================
-    -- These use Blizzard's built-in secure action types from SecureTemplates.lua
-    -- They execute SetPartyAssignment() in a SECURE context!
-    
-    -- Shift+Right-Click: Toggle Main Tank (SECURE!)
-    proxy:SetAttribute("shift-type2", "maintank")
-    proxy:SetAttribute("shift-action2", "toggle")
-    
-    -- Ctrl+Right-Click: Toggle Main Assist (SECURE!)
-    proxy:SetAttribute("ctrl-type2", "mainassist")
-    proxy:SetAttribute("ctrl-action2", "toggle")
-    
-    -- Normal Right-Click: Open standard unit menu via togglemenu (SECURE!)
-    -- This uses Blizzard's built-in menu determination logic
-    proxy:SetAttribute("*type2", "togglemenu")
-    
+    -- Register clicks
     proxy:RegisterForClicks("AnyUp", "AnyDown")
     
     -- Script Handlers
@@ -523,6 +497,12 @@ function RaidFrame:CreateSecureProxy()
             self.unit = unit
             self.name = name
             self.id = tonumber(string.match(unit, "raid(%d+)"))
+            
+            -- Copy visual button properties for Drag/Drop compatibility
+            if self.visualButton then
+                self.groupIndex = self.visualButton.groupIndex
+                self.slotIndex = self.visualButton.slotIndex
+            end
             
             -- BFL:DebugPrint("Proxy OnEnter: name=" .. tostring(name) .. " unit=" .. tostring(unit))
         end
@@ -537,6 +517,22 @@ function RaidFrame:CreateSecureProxy()
         self:ClearAllPoints()
         self.visualButton = nil
         self.unit = nil
+        self.groupIndex = nil
+        self.slotIndex = nil
+    end)
+    
+    -- Drag Support (Forwarding)
+    proxy:RegisterForDrag("LeftButton")
+    proxy:SetScript("OnDragStart", function(self)
+        if self.visualButton and BetterRaidMemberButton_OnDragStart then
+            BetterRaidMemberButton_OnDragStart(self.visualButton)
+        end
+    end)
+    proxy:SetScript("OnDragStop", function(self)
+        if BetterRaidMemberButton_OnDragStop then
+            -- We pass visualButton because OnDragStop might rely on its object identity
+            BetterRaidMemberButton_OnDragStop(self.visualButton or self)
+        end
     end)
     
     -- Combat Protection
@@ -550,11 +546,183 @@ function RaidFrame:CreateSecureProxy()
         end
     end)
     
+    -- PostClick Handler for Custom Actions
+    proxy:SetScript("PostClick", function(self, button)
+        if InCombatLockdown() then return end
+        
+        -- Resolve modifier prefix
+        local prefix = ""
+        if IsShiftKeyDown() then prefix = "shift-" .. prefix end
+        if IsControlKeyDown() then prefix = "ctrl-" .. prefix end
+        if IsAltKeyDown() then prefix = "alt-" .. prefix end
+        
+        -- Map button string to suffix number or *
+        local btnSuffix = "1"
+        if button == "RightButton" then btnSuffix = "2"
+        elseif button == "MiddleButton" then btnSuffix = "3"
+        elseif button == "Button4" then btnSuffix = "4"
+        elseif button == "Button5" then btnSuffix = "5"
+        end
+        
+        -- Check generic action then specific action
+        local action = self:GetAttribute(prefix.."bfl-action"..btnSuffix) or self:GetAttribute("bfl-action"..btnSuffix) or self:GetAttribute("*bfl-action"..btnSuffix)
+        
+        if action then
+            RaidFrame:PerformCustomAction(action, self.unit)
+        elseif button == "LeftButton" then
+            -- Fallback Logic: Restore original behavior when click is trapped but not assigned
+            if IsControlKeyDown() then
+                -- Ctrl+LeftClick: Toggle Single Selection (Restore Logic)
+                local raidIndex = tonumber(string.match(self.unit, "raid(%d+)"))
+                if raidIndex and BetterRaidFrame_SelectedPlayers and self.name then
+                    -- Check if selected
+                    local selectedIndex = nil
+                    for i, data in ipairs(BetterRaidFrame_SelectedPlayers) do
+                        if data.raidIndex == raidIndex then
+                            selectedIndex = i
+                            break
+                        end
+                    end
+                    
+                    if selectedIndex then
+                        table.remove(BetterRaidFrame_SelectedPlayers, selectedIndex)
+                        RaidFrame:SetButtonSelectionHighlight(raidIndex, false)
+                    else
+                        local _, _, subgroup = GetRaidRosterInfo(raidIndex)
+                        table.insert(BetterRaidFrame_SelectedPlayers, {
+                            raidIndex = raidIndex,
+                            groupIndex = subgroup,
+                            unit = self.unit,
+                            name = self.name
+                        })
+                        RaidFrame:SetButtonSelectionHighlight(raidIndex, true)
+                    end
+                end
+            elseif not prefix:find("-") then
+                -- Normal LeftClick: Select for display + Clear multi-select
+                if BetterRaidFrame_SelectedPlayers then
+                    for _, data in ipairs(BetterRaidFrame_SelectedPlayers) do
+                         RaidFrame:SetButtonSelectionHighlight(data.raidIndex, false)
+                    end
+                    wipe(BetterRaidFrame_SelectedPlayers)
+                end
+                
+                if self.name then
+                    RaidFrame:SetSelectedMember(self.name)
+                    RaidFrame:RefreshMemberButtons() -- Update highlights
+                end
+            end
+        end
+    end)
+    
     self.SecureProxy = proxy
-    -- BFL:DebugPrint("[BFL] SecureProxy created with SECURE Main Tank/Assist support")
-    -- BFL:DebugPrint("  Shift+RClick = Toggle Main Tank (SECURE)")
-    -- BFL:DebugPrint("  Ctrl+RClick = Toggle Main Assist (SECURE)")
-    -- BFL:DebugPrint("  RClick = RAID Menu (insecure)")
+    
+    -- Initial setup
+    self:UpdateSecureAttributes()
+end
+
+--- Apply configured shortcuts to Secure Proxy
+function RaidFrame:UpdateSecureAttributes()
+    local proxy = self.SecureProxy
+    if not proxy then return end
+    if InCombatLockdown() then return end -- Cannot update in combat
+    
+    local DB = BFL and BFL:GetModule("DB")
+    local enabled = true -- Global toggle removed, always check individually
+    local shortcuts = DB and DB:Get("raidShortcuts") or {}
+    
+    -- ALWAYS clear attributes first to ensure clean state
+    for _, mod in ipairs({"", "shift-", "ctrl-", "alt-", "shift-ctrl-", "shift-alt-", "ctrl-alt-"}) do
+        for i = 1, 5 do
+            proxy:SetAttribute(mod.."type"..i, nil)
+            proxy:SetAttribute(mod.."action"..i, nil)
+            proxy:SetAttribute(mod.."bfl-action"..i, nil)
+        end
+    end
+    proxy:SetAttribute("*type1", nil)
+    proxy:SetAttribute("*type2", "togglemenu") -- Default Right Click Menu
+    proxy:SetAttribute("type2", "togglemenu") 
+    proxy:SetAttribute("*type3", nil)
+    
+    -- Track secure buttons to manage PassThrough
+    local secureButtons = {}
+    
+    -- Apply shortcuts
+    for actionKey, data in pairs(shortcuts) do
+        -- Check if this specific shortcut is enabled
+        if DB:Get("raidShortcutEnabled_" .. actionKey, true) then
+            local modifier = data.modifier
+            local button = data.button
+            
+            if button then
+                -- Map to prefix
+                local modPrefix = ""
+                if modifier == "SHIFT" then modPrefix = "shift-"
+                elseif modifier == "CTRL" then modPrefix = "ctrl-"
+                elseif modifier == "ALT" then modPrefix = "alt-"
+                elseif modifier == "SHIFT-CTRL" then modPrefix = "shift-ctrl-"
+                elseif modifier == "SHIFT-ALT" then modPrefix = "shift-alt-"
+                elseif modifier == "CTRL-ALT" then modPrefix = "ctrl-alt-"
+                end
+                
+                -- Map to suffix
+                local btnID = 1
+                if button == "RightButton" then btnID = 2
+                elseif button == "Button3" then btnID = 3
+                elseif button == "Button4" then btnID = 4
+                elseif button == "Button5" then btnID = 5
+                end
+                
+                -- Apply
+                if actionKey == "mainTank" then
+                    proxy:SetAttribute(modPrefix.."type"..btnID, "maintank")
+                    proxy:SetAttribute(modPrefix.."action"..btnID, "toggle")
+                    secureButtons[button] = true
+                elseif actionKey == "mainAssist" then
+                    proxy:SetAttribute(modPrefix.."type"..btnID, "mainassist")
+                    proxy:SetAttribute(modPrefix.."action"..btnID, "toggle")
+                    secureButtons[button] = true
+                elseif actionKey == "lead" then
+                    proxy:SetAttribute(modPrefix.."bfl-action"..btnID, "lead")
+                    proxy:SetAttribute(modPrefix.."type"..btnID, "macro") -- Prevent menu fallback
+                    proxy:SetAttribute(modPrefix.."macrotext"..btnID, "")
+                    secureButtons[button] = true
+                elseif actionKey == "promote" then
+                    proxy:SetAttribute(modPrefix.."bfl-action"..btnID, "promote")
+                    proxy:SetAttribute(modPrefix.."type"..btnID, "macro") -- Prevent menu fallback
+                    proxy:SetAttribute(modPrefix.."macrotext"..btnID, "")
+                    secureButtons[button] = true
+                end
+            end
+        end
+    end
+    
+    -- Manage PassThroughButtons
+    -- If LeftButton has bindings, we cannot PassThrough, so we rely on PostClick for default Select
+    local pass = {}
+    if not secureButtons["LeftButton"] then 
+        table.insert(pass, "LeftButton") 
+    end
+    
+    if proxy.SetPassThroughButtons then
+        proxy:SetPassThroughButtons(unpack(pass))
+    end
+end
+
+--- Execute custom non-secure actions
+function RaidFrame:PerformCustomAction(action, unit)
+    if not unit or not UnitExists(unit) then return end
+    local name = UnitName(unit)
+    
+    if action == "lead" then
+        PromoteToLeader(unit)
+    elseif action == "promote" then
+        if UnitIsGroupAssistant(unit) then
+             DemoteAssistant(unit)
+        else
+             PromoteToAssistant(unit)
+        end
+    end
 end
 
 -- ========================================

@@ -17,6 +17,19 @@ local defaults = {
 	groupColors = {}, -- {groupId: {r, g, b}} - custom colors for group headers
 	groupCountColors = {}, -- {groupId: {r, g, b}} - custom colors for group counts (overrides global)
 	groupArrowColors = {}, -- {groupId: {r, g, b}} - custom colors for group arrows (overrides global)
+	-- Raid Shortcuts
+	raidShortcuts = {
+		mainTank = { modifier = "SHIFT", button = "RightButton" },
+		mainAssist = { modifier = "CTRL", button = "RightButton" },
+		lead = { modifier = "ALT", button = "LeftButton" },
+		promote = { modifier = "ALT", button = "RightButton" }
+	},
+    -- Individual Shortcut Toggles
+    raidShortcutEnabled_mainTank = true,
+    raidShortcutEnabled_mainAssist = true,
+    raidShortcutEnabled_lead = true,
+    raidShortcutEnabled_promote = true,
+
 	friendActivity = {}, -- {friendUID: {lastWhisper, lastGroup, lastTrade}} - tracks friend interaction timestamps
 	nicknames = {}, -- {friendUID: "Nickname"} - custom nicknames for friends
 	-- Visual Settings
@@ -158,6 +171,15 @@ function DB:Initialize()
 				BetterFriendlistDB[key] = self:InternalDeepCopy(value)
 			else
 				BetterFriendlistDB[key] = value
+			end
+		end
+	end
+	
+	-- MIGRATION: Merge defaults for raidShortcuts (Fix for missing keys in existing DB)
+	if BetterFriendlistDB.raidShortcuts then
+		for key, val in pairs(defaults.raidShortcuts) do
+			if not BetterFriendlistDB.raidShortcuts[key] then
+				BetterFriendlistDB.raidShortcuts[key] = self:InternalDeepCopy(val)
 			end
 		end
 	end

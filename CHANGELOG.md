@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [DRAFT]
 ### Added
+- **Raid Shortcuts** - Added granular control for Raid Shortcuts. You can now enable/disable each shortcut (Main Tank, Main Assist, Target, etc.) individually in Settings -> Raid.
 - **Export/Import** - Updated the Export/Import system to include ALL settings (future-proof) and use Base64 encoding. (Settings -> Advanced -> Export/Import).
 - **Export/Import** - Added legacy support for importing older versions of settings strings.
 - **Command Help** - Added `/bfl reset` command to the help list to reset the window position.
