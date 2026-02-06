@@ -3,7 +3,6 @@
 [![WoW Version](https://img.shields.io/badge/Retail-11.x_%7C_12.x-blue)](https://worldofwarcraft.com)
 [![Classic Version](https://img.shields.io/badge/Classic-Era_%7C_TBC_%7C_Wrath_%7C_Cata_%7C_MoP-orange)](https://worldofwarcraft.com)
 [![Discord](https://img.shields.io/badge/Discord-Join_Us-7289da?logo=discord&logoColor=white)](https://discord.gg/dpaV8vh3w3)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support_me-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/hayato2846)
 
 **A modern, feature-rich replacement for WoW's default Friends frame.**
