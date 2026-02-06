@@ -245,6 +245,10 @@ local function PopulateGroupMemberDetails(info)
 			if member.guid then
 				local name, color, relationship, playerLink = BetterFriendlist_GetRelationshipInfo(member.guid, nil, member.clubId)
 				
+				-- Store details for context menu
+				member.name = name
+				member.playerLink = playerLink
+				
 				-- Check if this member is the leader
 				local isLeader = (info.leaderGUID and member.guid == info.leaderGUID)
 				
@@ -3100,7 +3104,11 @@ function QuickJoin:OpenContextMenu(guid, anchorFrame)
 		return
 	end
 	
-	-- Get first member (leader) for context
+	-- Sort members to ensure the most relevant one is first (Friend/Leader)
+	-- This mirrors Blizzard's behavior of showing the context menu for the primary friend
+	BetterFriendlist_SortGroupMembers(groupInfo.members)
+
+	-- Get first member (leader/friend) for context
 	if not groupInfo.members[1] then return end
 	local leaderInfo = groupInfo.members[1]
 	if not leaderInfo then return end

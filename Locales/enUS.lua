@@ -219,6 +219,8 @@ L.BUTTON_EXPORT = "Export"
 	-- ========================================
 	L.MSG_INVITE_COUNT = "Invited %d friend(s) to party."
 	L.MSG_NO_FRIENDS_AVAILABLE = "No online friends available to invite."
+	L.MSG_INVITE_CONVERT_RAID = "Converting party to raid..."
+	L.MSG_INVITE_RAID_FULL = "Raid is full (%d/40). Stopped inviting."
 	L.MSG_GROUP_DELETED = "Group '%s' deleted"
 	L.MSG_IGNORE_LIST_EMPTY = "Your ignore list is empty."
 	L.MSG_IGNORE_LIST_COUNT = "Ignore List (%d players):"
@@ -661,6 +663,8 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	-- ========================================
 	-- SETTINGS (Additional)
 	-- ========================================
+	L.SETTINGS_SHOW_WELCOME_MESSAGE = "Show Welcome Message"
+	L.SETTINGS_SHOW_WELCOME_MESSAGE_DESC = "Show the addon loaded message in chat when logging in."
 	L.SETTINGS_TAB_DATABROKER = "Data Broker"
 	L.MSG_GROUP_RENAMED = "Group renamed to '%s'"
 	L.ERROR_RENAME_FAILED = "Failed to rename group"
@@ -1032,6 +1036,11 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 
 	-- RaidFrame.lua
 	L.RAID_GROUP_NAME = "Group %d"
+	L.RAID_CONVERT_TO_PARTY = "Convert to Party"
+	L.RAID_CONVERT_TO_RAID = "Convert to Raid"
+	L.RAID_MUST_BE_LEADER = "You must be the leader to do that"
+	L.RAID_CONVERT_TOO_MANY = "Group has too many players for a party"
+	L.RAID_ERR_NOT_IN_GROUP = "You are not in a group"
 
 	-- PerformanceMonitor.lua
 	L.PERF_FPS_60 = "  ✓ <16.6ms = 60 FPS"

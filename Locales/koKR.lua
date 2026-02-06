@@ -215,6 +215,8 @@ local L = BFL_LOCALE
 	-- ========================================
 	L.MSG_INVITE_COUNT = "%d명의 친구를 그룹에 초대했습니다."
 	L.MSG_NO_FRIENDS_AVAILABLE = "초대할 수 있는 온라인 친구가 없습니다."
+	L.MSG_INVITE_CONVERT_RAID = "Converting party to raid..."
+	L.MSG_INVITE_RAID_FULL = "Raid is full (%d/40). Stopped inviting."
 	L.MSG_GROUP_DELETED = "'%s' 그룹이 삭제되었습니다"
 	L.MSG_IGNORE_LIST_EMPTY = "차단 목록이 비어 있습니다."
 	L.MSG_IGNORE_LIST_COUNT = "차단 목록 (%d명):"
@@ -1025,6 +1027,11 @@ local L = BFL_LOCALE
 
 	-- RaidFrame.lua
 	L.RAID_GROUP_NAME = "Group %d"
+	L.RAID_CONVERT_TO_PARTY = "Convert to Party"
+	L.RAID_CONVERT_TO_RAID = "Convert to Raid"
+	L.RAID_MUST_BE_LEADER = "You must be the leader"
+	L.RAID_CONVERT_TOO_MANY = "Too many players for Party"
+	L.RAID_ERR_NOT_IN_GROUP = "Not in a group"
 
 	-- PerformanceMonitor.lua
 	L.PERF_FPS_60 = "  ✓ <16.6ms = 60 FPS"
@@ -1060,4 +1067,7 @@ local L = BFL_LOCALE
 	L.SETTINGS_ENABLE_FAVORITE_ICON_DESC = "즐겨찾기 친구 버튼에 별 아이콘을 표시합니다."
 	L.SETTINGS_SHOW_FACTION_BG = "진영 배경 표시"
 	L.SETTINGS_SHOW_FACTION_BG_DESC = "친구 버튼의 배경으로 진영 색상을 표시합니다."
+	L.SETTINGS_SHOW_WELCOME_MESSAGE = "환영 메시지 표시"
+	L.SETTINGS_SHOW_WELCOME_MESSAGE_DESC = "로그인 시 채팅창에 'BetterFriendlist 로드됨' 메시지를 표시합니다."
+
 end)

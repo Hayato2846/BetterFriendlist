@@ -170,6 +170,8 @@ local L = BFL_LOCALE
 	
 	L.MSG_INVITE_COUNT = "已邀請 %d 位好友到隊伍。"
 	L.MSG_NO_FRIENDS_AVAILABLE = "沒有上線好友可邀請。"
+	L.MSG_INVITE_CONVERT_RAID = "Converting party to raid..."
+	L.MSG_INVITE_RAID_FULL = "Raid is full (%d/40). Stopped inviting."
 	L.MSG_GROUP_DELETED = "分組 '%s' 已刪除"
 	L.MSG_IGNORE_LIST_EMPTY = "您的封鎖名單為空。"
 	L.MSG_IGNORE_LIST_COUNT = "封鎖名單（%d 位玩家）："
@@ -931,6 +933,11 @@ local L = BFL_LOCALE
 
 	-- RaidFrame.lua
 	L.RAID_GROUP_NAME = "Group %d"
+	L.RAID_CONVERT_TO_PARTY = "Convert to Party"
+	L.RAID_CONVERT_TO_RAID = "Convert to Raid"
+	L.RAID_MUST_BE_LEADER = "You must be the leader to convert the group."
+	L.RAID_CONVERT_TOO_MANY = "Cannot convert to party: Too many members."
+	L.RAID_ERR_NOT_IN_GROUP = "You are not in a group."
 
 	-- PerformanceMonitor.lua
 	L.PERF_FPS_60 = "  ✓ <16.6毫秒 = 60 FPS"
@@ -1084,4 +1091,7 @@ local L = BFL_LOCALE
 	L.SETTINGS_ENABLE_FAVORITE_ICON_DESC = "在好友按鈕上顯示星星圖示以標記最愛。"
 	L.SETTINGS_SHOW_FACTION_BG = "顯示陣營背景"
 	L.SETTINGS_SHOW_FACTION_BG_DESC = "將陣營顏色顯示為好友按鈕的背景。"
+	L.SETTINGS_SHOW_WELCOME_MESSAGE = "顯示歡迎訊息"
+	L.SETTINGS_SHOW_WELCOME_MESSAGE_DESC = "登入時在聊天視窗顯示'BetterFriendlist 已載入'訊息。"
+
 end)

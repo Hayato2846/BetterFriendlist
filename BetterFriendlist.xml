@@ -2434,14 +2434,14 @@
 					<Frame parentKey="GroupsInset" inherits="InsetFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT" relativeKey="$parent.ControlPanel" relativePoint="BOTTOMLEFT" x="-4" y="5"/>
-							<Anchor point="BOTTOMRIGHT" x="-8" y="0"/>
+							<Anchor point="BOTTOMRIGHT" x="-2" y="21"/>
 						</Anchors>
 						<Frames>
 							<!-- GroupsContainer lives inside the inset so only the raid groups receive the dark background -->
 							<Frame parentKey="GroupsContainer">
 								<Anchors>
 									<Anchor point="TOPLEFT" x="10" y="-2"/>
-									<Anchor point="BOTTOMRIGHT" x="-10" y="10"/>
+									<Anchor point="BOTTOMRIGHT" x="-10" y="2"/>
 								</Anchors>
 								<Frames>
 									<!-- Row 1: Group 1 and 2 -->
@@ -2495,6 +2495,35 @@
 							</Frame>
 						</Frames>
 			</Frame>
+			
+			<!-- Convert Group/Raid Button -->
+			<Button parentKey="ConvertToRaidButton" inherits="UIPanelButtonTemplate" text="CONVERT_TO_RAID">
+				<NormalFont style="BetterFriendlistFontNormal"/>
+				<HighlightFont style="BetterFriendlistFontHighlight"/>
+				<DisabledFont style="BetterFriendlistFontDisable"/>
+				<Size x="150" y="21"/>
+				<Anchors>
+					<Anchor point="BOTTOMRIGHT" relativeKey="$parent" x="-2" y="-1"/>
+				</Anchors>
+				<Scripts>
+					<OnLoad>
+						self:SetMotionScriptsWhileDisabled(true);
+					</OnLoad>
+					<OnClick>
+						BetterRaidFrame_ConvertToRaidButton_OnClick(self);
+					</OnClick>
+					<OnEnter>
+						if self.tooltip then
+							GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+							GameTooltip:SetText(self.tooltip, 1, 0.1, 0.1, 1, true);
+							GameTooltip:Show();
+						end
+					</OnEnter>
+					<OnLeave>
+						GameTooltip:Hide();
+					</OnLeave>
+				</Scripts>
+			</Button>
 		</Frames>
 		<Layers>
 			<Layer level="ARTWORK">

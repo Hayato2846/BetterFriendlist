@@ -306,7 +306,7 @@ function GlobalSync:ExportFriends(faction, realm)
                     -- BFL:DebugPrint("GlobalSync: Restored note for " .. info.name)
                 end
                 BetterFriendlistDB.GlobalFriends[faction][friendUID].restoring = nil
-            elseif dbNote and dbNote ~= "" then
+            elseif dbNote then
                 -- DB has a note. Check if we need to enforce it.
                 if noteToSave ~= dbNote then
                     BFL.SetFriendNotes(info.name, dbNote)

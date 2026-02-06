@@ -50,6 +50,7 @@ Locales\zhTW.lua
 
 # Utilities
 Utils\ClassUtils.lua
+Utils\Encoding.lua
 Utils\FontManager.lua
 Utils\ColorManager.lua
 Utils\AnimationHelpers.lua

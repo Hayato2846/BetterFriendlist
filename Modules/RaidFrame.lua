@@ -102,7 +102,7 @@ function RaidFrame:UpdateGroupLayout()
     
     -- GroupsContainer padding (from XML)
     local containerPaddingX = 20  -- 10px left + 10px right
-    local containerPaddingY = 12  -- 2px top + 10px bottom
+    local containerPaddingY = 4   -- 2px top + 2px bottom
     
     local availableWidth = insetWidth - containerPaddingX
     local availableHeight = insetHeight - containerPaddingY
@@ -471,7 +471,7 @@ function RaidFrame:CreateSecureProxy()
     
     -- Create the proxy frame
     -- CRITICAL: Parent must be UIParent to avoid tainting the addon frame
-    local proxy = CreateFrame("Button", "BFL_RaidFrame_SecureProxy", UIParent, "SecureUnitButtonTemplate")
+    local proxy = CreateFrame("Button", "BFL_RaidFrame_SecureProxy", UIParent, "InsecureActionButtonTemplate")
     
     -- Visual properties
     proxy:SetFrameStrata("DIALOG") -- High strata to sit above everything
@@ -600,6 +600,7 @@ function RaidFrame:Initialize()
     -- Initial update of control panel (this will set label too)
     self:UpdateControlPanel()
     self:UpdateGroupLayout() -- Ensure layout matches Mock (responsive sizing)
+    self:UpdateConvertButton() -- Initial update of convert button
     
     -- Hook OnShow to re-render if data changed while hidden
     if BetterFriendsFrame then
@@ -615,6 +616,94 @@ function RaidFrame:Initialize()
     
     -- BFL:DebugPrint("[BFL] RaidFrame initialized")
 end
+
+-- ========================================
+-- CONVERT BUTTON LOGIC
+-- ========================================
+
+--- Update the Convert to Raid/Party button state
+function RaidFrame:UpdateConvertButton()
+    local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
+    if not frame or not frame.ConvertToRaidButton then
+        return
+    end
+    
+    local button = frame.ConvertToRaidButton
+    local canControl = self:CanControlRaid() or (not IsInGroup()) -- Can create if solo
+    local inRaid = IsInRaid()
+    local inGroup = IsInGroup()
+    local numMembers = GetNumGroupMembers()
+    
+    -- Update Text
+    if inRaid then
+        button:SetText(L.RAID_CONVERT_TO_PARTY or "Convert to Party")
+    else
+        button:SetText(L.RAID_CONVERT_TO_RAID or "Convert to Raid")
+    end
+    
+    -- Update Enabled State
+    if inRaid then
+        -- Can only convert to party if <= 5 members and is leader
+        if canControl and numMembers <= 5 then
+            button:Enable()
+            button.tooltip = nil
+        else
+            button:Disable()
+            if not canControl then
+                button.tooltip = L.RAID_MUST_BE_LEADER or "You must be the leader to do that"
+            else
+                button.tooltip = L.RAID_CONVERT_TOO_MANY or "Group creates too many players for a party"
+            end
+        end
+    elseif inGroup then
+        -- Can convert to raid if leader
+        if canControl then
+            button:Enable()
+            button.tooltip = nil
+        else
+            button:Disable()
+            button.tooltip = L.RAID_MUST_BE_LEADER or "You must be the leader to do that"
+        end
+    else
+        -- Solo - can convert to raid (creates raid of 1) - wait, standard UI allows this?
+        -- Yes, "Convert to Raid" is usually available to start a raid group.
+        -- Actually, standard UI shows "Convert to Raid" only when in a party.
+        -- But let's check standard behavior. Usually needs to be in a group.
+        -- If solo, button should probably be disabled or act as "Form Group" (but that's different).
+        
+        -- Disable if solo
+        button:Disable()
+        button.tooltip = L.RAID_ERR_NOT_IN_GROUP or "You are not in a group"
+    end
+end
+
+--- Handle Convert Button Click
+function RaidFrame:ConvertToRaidOrParty()
+    if IsInRaid() then
+        -- Try to convert to Party
+        if not self:ConvertToParty() then
+             -- Error handling usually in ConvertToParty return or standard UI error
+        end
+    else
+        -- Try to convert to Raid
+        if not self:ConvertToRaid() then
+            -- Error handling
+        end
+    end
+    
+    -- Force immediate update
+    self:UpdateConvertButton()
+end
+
+-- Global Click Handler
+function BetterRaidFrame_ConvertToRaidButton_OnClick(self)
+    -- Use BFL.RaidFrame reference
+    local RaidFrame = BFL:GetModule("RaidFrame")
+    if RaidFrame then
+        RaidFrame:ConvertToRaidOrParty()
+    end
+end
+
 
 function RaidFrame:RegisterEvents()
     -- Raid roster events
@@ -1805,6 +1894,7 @@ function RaidFrame:OnRaidRosterUpdate(...)
         -- Note: UpdateGroupLayout calls UpdateAllMemberButtons internally
         self:UpdateControlPanel()
         self:UpdateGroupLayout()
+        self:UpdateConvertButton()
         
         -- Central Update Logic (Restored)
         if BetterRaidFrame_Update then
@@ -1828,6 +1918,7 @@ function RaidFrame:OnGroupLeft(...)
     self:UpdateAllMemberButtons()
     self:UpdateControlPanel()
     self:UpdateGroupLayout()
+    self:UpdateConvertButton()
     
     if BetterRaidFrame_Update then
         BetterRaidFrame_Update()

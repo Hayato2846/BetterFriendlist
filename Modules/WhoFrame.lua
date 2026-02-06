@@ -54,7 +54,7 @@ function WhoFrame:Initialize()
 				-- Only trigger update if we are on the Who tab (tab 3 usually, but let's check visibility)
 				if BetterFriendsFrame.WhoFrame and BetterFriendsFrame.WhoFrame:IsShown() then
 					if _G.BetterWhoFrame_Update then
-						_G.BetterWhoFrame_Update()
+						_G.BetterWhoFrame_Update(true)
 					end
 					needsRenderOnShow = false
 				end
@@ -65,8 +65,10 @@ end
 
 -- Handle WHO_LIST_UPDATE event
 function WhoFrame:OnWhoListUpdate(...)
-	-- Update will be triggered by the UI if WHO frame is visible
-	-- This callback ensures the module is aware of the event
+	-- CRITICAL: When WHO list updates, we MUST force a rebuild
+	-- The data in C_FriendList has changed, so our cached DataProvider is invalid
+	-- regardless of whether the count matches the previous count.
+	self:Update(true)
 end
 
 -- ========================================
@@ -555,6 +557,7 @@ function WhoFrame:InitButton(button, elementData)
 	local index = elementData.index
 	local info = elementData.info
 	button.index = index
+	button.info = info
 	
 	-- PERFORMANCE: Cache class color lookup
 	local classTextColor = info.filename and RAID_CLASS_COLORS[info.filename] or HIGHLIGHT_FONT_COLOR
@@ -855,10 +858,14 @@ function WhoFrame:SortByColumn(sortType, preserveDirection)
 		BetterFriendsFrame.WhoFrame.sortAscending = true
 	end
 	
-	-- Toggle sort direction if clicking same column (unless preserveDirection is true)
+	-- Toggle sort direction or switch column
 	if not preserveDirection and BetterFriendsFrame.WhoFrame.currentSort == sortType then
 		BetterFriendsFrame.WhoFrame.sortAscending = not BetterFriendsFrame.WhoFrame.sortAscending
 	elseif not preserveDirection then
+		-- Save previous sort state for stable sorting
+		BetterFriendsFrame.WhoFrame.prevSort = BetterFriendsFrame.WhoFrame.currentSort
+		BetterFriendsFrame.WhoFrame.prevSortAscending = BetterFriendsFrame.WhoFrame.sortAscending
+		
 		BetterFriendsFrame.WhoFrame.currentSort = sortType
 		BetterFriendsFrame.WhoFrame.sortAscending = true
 	end
@@ -883,36 +890,58 @@ function WhoFrame:SortByColumn(sortType, preserveDirection)
 		end
 	end
 	
-	-- Sort the data based on sort type
+	-- Value extractor helper
+	local function GetSortValue(entry, type)
+		if type == "name" then
+			return entry.info.fullName or ""
+		elseif type == "level" then
+			return entry.info.level or 0
+		elseif type == "class" then
+			return entry.info.classStr or ""
+		elseif type == "zone" then
+			return entry.info.area or ""
+		elseif type == "guild" then
+			return entry.info.guild or ""
+		elseif type == "race" then
+			return entry.info.raceStr or ""
+		end
+		return ""
+	end
+	
+	local currentSort = BetterFriendsFrame.WhoFrame.currentSort
+	local currentAsc = BetterFriendsFrame.WhoFrame.sortAscending
+	local prevSort = BetterFriendsFrame.WhoFrame.prevSort
+	local prevAsc = BetterFriendsFrame.WhoFrame.prevSortAscending
+	
+	-- Sort the data with detailed fallback logic
 	table.sort(whoData, function(a, b)
-		local aVal, bVal
+		-- 1. Primary Sort
+		local aVal = GetSortValue(a, currentSort)
+		local bVal = GetSortValue(b, currentSort)
 		
-		if sortType == "name" then
-			aVal = a.info.fullName or ""
-			bVal = b.info.fullName or ""
-		elseif sortType == "level" then
-			aVal = a.info.level or 0
-			bVal = b.info.level or 0
-		elseif sortType == "class" then
-			aVal = a.info.classStr or ""
-			bVal = b.info.classStr or ""
-		elseif sortType == "zone" then
-			aVal = a.info.area or ""
-			bVal = b.info.area or ""
-		elseif sortType == "guild" then
-			aVal = a.info.guild or ""
-			bVal = b.info.guild or ""
-		elseif sortType == "race" then
-			aVal = a.info.raceStr or ""
-			bVal = b.info.raceStr or ""
+		if aVal ~= bVal then
+			if currentAsc then return aVal < bVal else return aVal > bVal end
 		end
 		
-		-- Apply sort direction
-		if BetterFriendsFrame.WhoFrame.sortAscending then
-			return aVal < bVal
-		else
-			return aVal > bVal
+		-- 2. Secondary Sort (Previous Column)
+		if prevSort and prevSort ~= currentSort then
+			local aPrev = GetSortValue(a, prevSort)
+			local bPrev = GetSortValue(b, prevSort)
+			
+			if aPrev ~= bPrev then
+				if prevAsc then return aPrev < bPrev else return aPrev > bPrev end
+			end
 		end
+		
+		-- 3. Tertiary Sort (Name) - Deterministic fallback
+		-- If we aren't already sorting by name (primary or secondary), use Name to break ties
+		if currentSort ~= "name" and prevSort ~= "name" then
+			local aName = GetSortValue(a, "name")
+			local bName = GetSortValue(b, "name")
+			return aName < bName
+		end
+		
+		return false
 	end)
 	
 	-- Rebuild DataProvider with sorted data
@@ -927,6 +956,18 @@ function WhoFrame:SortByColumn(sortType, preserveDirection)
 				fontObject = fontObj
 			})
 		end
+	elseif self.classicWhoFrame or (BFL.IsClassic or not BFL.HasModernScrollBox) then
+		-- Classic Mode Support
+		self.classicWhoDataList = {}
+		local fontObj = "BetterFriendlistFontNormalSmall"
+		for i, entry in ipairs(whoData) do
+			table.insert(self.classicWhoDataList, {
+				index = entry.index,
+				info = entry.info,
+				fontObject = fontObj
+			})
+		end
+		self:RenderClassicWhoButtons()
 	end
 end
 
@@ -953,30 +994,32 @@ function WhoFrame:OnButtonClick(button, mouseButton)
 		self:SetSelectedButton(button)
 	elseif mouseButton == "RightButton" then
 		-- Open context menu for WHO player
-		if button.index then
-			local info = C_FriendList.GetWhoInfo(button.index)
+		-- Fix for data mismatch: Use stored info if available to ensure correct context menu
+		local info = button.info
+		
+		-- Fallback for legacy/error cases: Fetch by index
+		if not info and button.index then
+			info = C_FriendList.GetWhoInfo(button.index)
+			-- Must manually sanitize if fetching fresh
 			if info then
-				-- Strip trailing dash from fullName (WoW API bug)
-				if info.fullName then
-					info.fullName = info.fullName:gsub("%-$", "")
-				end
-				-- Also clean name field if present
-				if info.name then
-					info.name = info.name:gsub("%-$", "")
-				end
-				-- Use MenuSystem module if available
-				local MenuSystem = BFL and BFL:GetModule("MenuSystem")
-				if MenuSystem and MenuSystem.OpenWhoPlayerMenu then
-					MenuSystem:OpenWhoPlayerMenu(button, info)
-				else
-					-- Fallback: Use basic UnitPopup (with Classic compatibility)
-					local contextData = {
-						name = info.fullName,
-						server = info.fullGuildName,
-						guid = info.guid,
-					}
-					BFL.OpenContextMenu(button, "FRIEND", contextData, info.fullName)
-				end
+				if info.fullName then info.fullName = info.fullName:gsub("%-$", "") end
+				if info.name then info.name = info.name:gsub("%-$", "") end
+			end
+		end
+
+		if info then
+			-- Use MenuSystem module if available
+			local MenuSystem = BFL and BFL:GetModule("MenuSystem")
+			if MenuSystem and MenuSystem.OpenWhoPlayerMenu then
+				MenuSystem:OpenWhoPlayerMenu(button, info)
+			else
+				-- Fallback: Use basic UnitPopup (with Classic compatibility)
+				local contextData = {
+					name = info.fullName,
+					server = info.fullGuildName,
+					guid = info.guid,
+				}
+				BFL.OpenContextMenu(button, "FRIEND", contextData, info.fullName)
 			end
 		end
 	end

@@ -211,6 +211,8 @@ L.TOOLTIP_DELETE_DESC = "Удалить эту группу и исключит�
 -- ========================================
 L.MSG_INVITE_COUNT = "%d друг(ов) приглашено в группу."
 L.MSG_NO_FRIENDS_AVAILABLE = "Нет друзей в сети для приглашения."
+L.MSG_INVITE_CONVERT_RAID = "Converting party to raid..."
+L.MSG_INVITE_RAID_FULL = "Raid is full (%d/40). Stopped inviting."
 L.MSG_GROUP_DELETED = "Группа '%s' удалена"
 L.MSG_IGNORE_LIST_EMPTY = "Ваш список игнорирования пуст."
 L.MSG_IGNORE_LIST_COUNT = "Список Игнорирования (%d игроков):"
@@ -1031,6 +1033,11 @@ L.FRIEND_MAX_LEVEL = "Max Lvl"
 
 -- RaidFrame.lua
 L.RAID_GROUP_NAME = "Group %d"
+L.RAID_CONVERT_TO_PARTY = "Convert to Party"
+L.RAID_CONVERT_TO_RAID = "Convert to Raid"
+L.RAID_MUST_BE_LEADER = "You must be the leader to convert the group."
+L.RAID_CONVERT_TOO_MANY = "Cannot convert to party: Too many members."
+L.RAID_ERR_NOT_IN_GROUP = "You are not in a group."
 
 -- PerformanceMonitor.lua
 L.PERF_FPS_60 = "  ✓ <16.6мс = 60 FPS"
@@ -1066,4 +1073,7 @@ L.COMPAT_GAME_VERSION = "|cffffcc00Ver:|r"
 	L.SETTINGS_ENABLE_FAVORITE_ICON_DESC = "Показывает значок звезды на кнопке друга для избранных."
 	L.SETTINGS_SHOW_FACTION_BG = "Показать фон фракции"
 	L.SETTINGS_SHOW_FACTION_BG_DESC = "Показывает цвет фракции в качестве фона для кнопки друга."
+	L.SETTINGS_SHOW_WELCOME_MESSAGE = "Показывать приветствие"
+	L.SETTINGS_SHOW_WELCOME_MESSAGE_DESC = "Показывать сообщение 'BetterFriendlist загружен' в чате при входе."
+
 end)

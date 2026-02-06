@@ -215,6 +215,8 @@ local L = BFL_LOCALE
 	-- ========================================
 	L.MSG_INVITE_COUNT = "%d amico/i invitato/i."
 	L.MSG_NO_FRIENDS_AVAILABLE = "Nessun amico online da invitare."
+	L.MSG_INVITE_CONVERT_RAID = "Converting party to raid..."
+	L.MSG_INVITE_RAID_FULL = "Raid is full (%d/40). Stopped inviting."
 	L.MSG_GROUP_DELETED = "Gruppo '%s' eliminato"
 	L.MSG_IGNORE_LIST_EMPTY = "Lista ignorati vuota."
 	L.MSG_IGNORE_LIST_COUNT = "Lista Ignorati (%d giocatori):"
@@ -669,6 +671,8 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita sovrapposizioni. Richiede reload."
 	-- ========================================
 	-- SETTINGS (Additional)
 	-- ========================================
+	L.SETTINGS_SHOW_WELCOME_MESSAGE = "Mostra messaggio di benvenuto"
+	L.SETTINGS_SHOW_WELCOME_MESSAGE_DESC = "Mostra il messaggio di caricamento dell'addon nella chat al momento del login."
 	L.SETTINGS_TAB_DATABROKER = "Data Broker"
 	L.MSG_GROUP_RENAMED = "Gruppo rinominato '%s'"
 	L.ERROR_RENAME_FAILED = "Rinomina fallita"
@@ -1027,6 +1031,11 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita sovrapposizioni. Richiede reload."
 
 	-- RaidFrame.lua
 	L.RAID_GROUP_NAME = "Gruppo %d"
+	L.RAID_CONVERT_TO_PARTY = "Convert to Party"
+	L.RAID_CONVERT_TO_RAID = "Convert to Raid"
+	L.RAID_MUST_BE_LEADER = "You must be the leader to do that"
+	L.RAID_CONVERT_TOO_MANY = "Group has too many players for a party"
+	L.RAID_ERR_NOT_IN_GROUP = "You are not in a group"
 
 	-- PerformanceMonitor.lua
 	L.PERF_FPS_60 = "  ✓ <16.6ms = 60 FPS"

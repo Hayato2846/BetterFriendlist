@@ -9,9 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [DRAFT]
 ### Added
+- **Export/Import** - Updated the Export/Import system to include ALL settings (future-proof) and use Base64 encoding. (Settings -> Advanced -> Export/Import).
+- **Export/Import** - Added legacy support for importing older versions of settings strings.
 - **Command Help** - Added `/bfl reset` command to the help list to reset the window position.
+- **Localization** - Added localization strings for the new "Convert to Party/Raid" button in all supported languages.
 
 ### Changed
+- **Changelog** - Improved the "NEW" indicator on the changelog menu button to use a cleaner, native-style tag with less padding (Retail).
 - **Group Ordering** - Replaced Up/Down buttons with Drag & Drop system in Settings -> Groups.
 - **Broker Ordering** - Replaced Up/Down buttons with Drag & Drop system in Settings -> Data Broker.
 - **Color Settings** - Removed the mouseover highlight effect from color pickers in settings to prevent color distortion.
@@ -19,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Settings Alignment** - Improved alignment of Sliders in settings using the component system to better match other elements.
 
 ### Fixed
+- **Raid Frame UI** - Fixed the positioning of the "Convert to Party/Raid" button so it is always visible at the bottom of the frame (was previously positioned off-screen).
+- **Copy Character Name** - Fixed an issue where the realm name was missing when copying names from "Who List" and "Recent Allies".
 - **Streamer Mode (Classic)** - Fixed positioning of the Streamer Mode button in Classic versions to align correctly with the Close button.
 - **Sorting Logic** - Prevented Primary and Secondary sorters from being set to the same value to avoid logical conflicts. The Secondary sorter automatically resets to "None" if it matches the Primary sorter.
 - **Settings Groups** - Adjusted the layout of group list items in settings to prevent right-side clipping.
@@ -29,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Send Message Button** - Fixed the "Send Message" button not being disabled when selecting an offline WoW friend.
 - **Localization** - Fixed a missing localization key in the 'Rename Group' dialog within settings across all languages.
 - **Group Color Settings** - Improved text readability on color preview buttons by using white text with an outline.
+- **Who List Context Menu** - Fixed an issue where right-clicking a player in the Who list could open the context menu for a different player (data mismatch).
+- **Who List Sorting** - Improved sorting logic to be deterministic and support multi-level sorting (e.g. Sort by Class, then by Level = Grouped by Class within Level).
 
 ## [2.2.9]       - 2026-02-03
 ### Fixed

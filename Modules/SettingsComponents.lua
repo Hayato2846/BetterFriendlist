@@ -796,28 +796,6 @@ function Components:AnchorChain(frames, startY)
 	end
 end
 
--- Shared Ghost Frame
-local DragGhost = nil
-local function GetDragGhost()
-	if not DragGhost then
-		DragGhost = CreateFrame("Frame", nil, UIParent)
-		DragGhost:SetFrameStrata("TOOLTIP")
-		DragGhost.bg = DragGhost:CreateTexture(nil, "BACKGROUND")
-		DragGhost.bg:SetAllPoints()
-		DragGhost.bg:SetColorTexture(0.15, 0.15, 0.15, 0.9)
-		
-		-- Color Strip
-		DragGhost.stripe = DragGhost:CreateTexture(nil, "ARTWORK")
-		DragGhost.stripe:SetPoint("TOPLEFT")
-		DragGhost.stripe:SetPoint("BOTTOMLEFT")
-		DragGhost.stripe:SetWidth(6)
-		
-		DragGhost.text = DragGhost:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
-		DragGhost.text:SetPoint("CENTER", 3, 0) -- Slight offset for stripe
-	end
-	return DragGhost
-end
-
 -- ========================================
 -- LIST ITEM (With Drag Handle for reordering)
 -- ========================================
@@ -836,12 +814,15 @@ function Components:CreateListItem(parent, itemText, orderIndex, onDragStart, on
 	if onDragStart and onDragStop then
 		holder:SetScript("OnDragStart", function(self)
 			-- Init Ghost
-			local ghost = GetDragGhost()
+			local ghost = BFL:GetDragGhost()
 			ghost.text:SetText(itemText)
 			
 			-- Calculate width based on text length + padding
 			local width = ghost.text:GetStringWidth() + 50
 			ghost:SetSize(width, self:GetHeight())
+			
+			-- Reset Text Color to Gold (Precludes residue from other drags like RaidFrames)
+			ghost.text:SetTextColor(1, 0.82, 0)
 			
 			-- Apply Color to Stripe
 			if initialColors and initialColors.fallback then
@@ -873,7 +854,7 @@ function Components:CreateListItem(parent, itemText, orderIndex, onDragStart, on
 		
 		holder:SetScript("OnDragStop", function(self)
 			-- Hide Ghost
-			local ghost = GetDragGhost()
+			local ghost = BFL:GetDragGhost()
 			ghost:Hide()
 			ghost:SetScript("OnUpdate", nil)
 			ghost:ClearAllPoints()

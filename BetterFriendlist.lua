@@ -854,7 +854,7 @@ frame:SetScript("OnEvent", function(self, event, ...) if event == "ADDON_LOADED"
 	
 	-- Fix for "Copy Character Name" protected action error
 	-- Replaces the protected Blizzard button with a safe BFL version in generic menus
-	local function BFL_ReplaceCopyNameButton(owner, rootDescription, contextData)
+	local function BFL_ReplaceCopyNameButton(owner, rootDescription, contextData, menuTypeWrapper)
 		if not rootDescription or not rootDescription.EnumerateElementDescriptions then return end
 
 		local targetText = COPY_CHARACTER_NAME -- Blizzard global string
@@ -913,8 +913,28 @@ frame:SetScript("OnEvent", function(self, event, ...) if event == "ADDON_LOADED"
 					end
 					
 					-- 4. Fallback to contextData.name (Generic)
-					if (not copyNameText or copyNameText == "") and contextData.name then
-						copyNameText = contextData.name
+					if (not copyNameText or copyNameText == "") then
+						if contextData.name then
+							copyNameText = contextData.name
+							-- Append server/realm if available and not already part of the name
+							-- Generic check for contexts that might have server info (Recent Allies, Who, etc)
+							if not string.find(copyNameText, "-") then
+								if contextData.server and contextData.server ~= "" then
+									copyNameText = copyNameText .. "-" .. contextData.server
+								elseif contextData.realm and contextData.realm ~= "" then
+									copyNameText = copyNameText .. "-" .. contextData.realm
+								end
+							end
+						end
+						
+						-- Special handling for Who List (needs wrapper identification to use whoIndex)
+						if menuTypeWrapper == "WHO" and (contextData.index or contextData.whoIndex) then
+							local index = contextData.whoIndex or contextData.index
+							local info = C_FriendList.GetWhoInfo(index)
+							if info and info.fullName then
+								copyNameText = info.fullName
+							end
+						end
 					end
 
 					StaticPopupDialogs["BETTERFRIENDLIST_COPY_URL"] = {
@@ -926,6 +946,11 @@ frame:SetScript("OnEvent", function(self, event, ...) if event == "ADDON_LOADED"
 							self.EditBox:SetText(copyNameText or "")
 							self.EditBox:SetFocus()
 							self.EditBox:HighlightText()
+							self.EditBox:SetScript("OnKeyUp", function(editBox, key)
+								if IsControlKeyDown() and key == "C" then
+									editBox:GetParent():Hide()
+								end
+							end)
 						end,
 						EditBoxOnEnterPressed = function(self)
 							self:GetParent():Hide()
@@ -1118,6 +1143,11 @@ frame:SetScript("OnEvent", function(self, event, ...) if event == "ADDON_LOADED"
 								self.EditBox:SetText(copyNameText)
 								self.EditBox:SetFocus()
 								self.EditBox:HighlightText()
+								self.EditBox:SetScript("OnKeyUp", function(editBox, key)
+									if IsControlKeyDown() and key == "C" then
+										editBox:GetParent():Hide()
+									end
+								end)
 							end,
 							EditBoxOnEnterPressed = function(self)
 								self:GetParent():Hide()
@@ -1154,6 +1184,11 @@ frame:SetScript("OnEvent", function(self, event, ...) if event == "ADDON_LOADED"
 							self.EditBox:SetText(copyNameText)
 							self.EditBox:SetFocus()
 							self.EditBox:HighlightText()
+							self.EditBox:SetScript("OnKeyUp", function(editBox, key)
+								if IsControlKeyDown() and key == "C" then
+									editBox:GetParent():Hide()
+								end
+							end)
 						end,
 						EditBoxOnEnterPressed = function(self)
 							self:GetParent():Hide()
@@ -1258,9 +1293,11 @@ frame:SetScript("OnEvent", function(self, event, ...) if event == "ADDON_LOADED"
 			Menu.ModifyMenu("MENU_UNIT_FRIEND", BFL_ReplaceCopyNameButton)
 			Menu.ModifyMenu("MENU_UNIT_FRIEND_OFFLINE", BFL_ReplaceCopyNameButton)
 			Menu.ModifyMenu("MENU_UNIT_RAF_RECRUIT", BFL_ReplaceCopyNameButton)
-			Menu.ModifyMenu("MENU_UNIT_RECENT_ALLY", BFL_ReplaceCopyNameButton)
-			Menu.ModifyMenu("MENU_UNIT_RECENT_ALLY_OFFLINE", BFL_ReplaceCopyNameButton)
-			Menu.ModifyMenu("MENU_UNIT_WHO", BFL_ReplaceCopyNameButton)
+			
+			-- Pass context wrapper for Recent Allies and Who list to handle Realm Name retrieval
+			Menu.ModifyMenu("MENU_UNIT_RECENT_ALLY", function(owner, root, context) BFL_ReplaceCopyNameButton(owner, root, context, "RECENT") end)
+			Menu.ModifyMenu("MENU_UNIT_RECENT_ALLY_OFFLINE", function(owner, root, context) BFL_ReplaceCopyNameButton(owner, root, context, "RECENT") end)
+			Menu.ModifyMenu("MENU_UNIT_WHO", function(owner, root, context) BFL_ReplaceCopyNameButton(owner, root, context, "WHO") end)
 
 			Menu.ModifyMenu("MENU_UNIT_BN_FRIEND", AddGroupsToFriendMenu)
 			Menu.ModifyMenu("MENU_UNIT_BN_FRIEND_OFFLINE", AddGroupsToFriendMenu)
@@ -2397,7 +2434,22 @@ function BetterFriendsFrame_ShowContactsMenu(button) local generator = function(
 		local simpleMode = DB and DB:Get("simpleMode", false) or false
 		local isElvUIActive = BFL.IsClassic and _G.ElvUI and BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin ~= false
 		if simpleMode or isElvUIActive then
-			rootDescription:CreateButton(L.MENU_CHANGELOG or "Changelog", function()
+			local changelogText = L.MENU_CHANGELOG or "Changelog"
+			local Changelog = BFL:GetModule("Changelog")
+			if Changelog and Changelog:IsNewVersion() then
+				local atlas, size
+				if BFL.IsClassic then
+					atlas = "communities-icon-invitemail"
+					size = ":48:64"
+					changelogText = string.format("|A:%s%s|a %s", atlas, size, changelogText)
+				else
+					-- Retail: Use "NewCharacter-Alliance" (56x29) positioned after text
+					-- Height: 29, Width: 56
+					changelogText = string.format("%s|A:NewCharacter-Alliance:29:56|a", changelogText)
+				end
+			end
+
+			rootDescription:CreateButton(changelogText, function()
 				local Changelog = BFL:GetModule("Changelog")
 				if Changelog then Changelog:Show() end
 			end);

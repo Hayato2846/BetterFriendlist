@@ -40,7 +40,7 @@ end
 function HouseListProxy:CreateGlobalProxy()
     if self.secureProxy then return self.secureProxy end
     
-    local proxy = CreateFrame("Button", "BFL_HouseList_SecureProxy", UIParent, "SecureActionButtonTemplate")
+    local proxy = CreateFrame("Button", "BFL_HouseList_SecureProxy", UIParent, "InsecureActionButtonTemplate")
     
     proxy:SetFrameStrata("DIALOG")
     proxy:SetFrameLevel(9999)

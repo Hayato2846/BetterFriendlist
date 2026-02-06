@@ -1693,6 +1693,11 @@ local function ShowCopyDialog(url, title)
             self.EditBox:SetText(url)
             self.EditBox:SetFocus()
             self.EditBox:HighlightText()
+            self.EditBox:SetScript("OnKeyUp", function(editBox, key)
+                if IsControlKeyDown() and key == "C" then
+                    editBox:GetParent():Hide()
+                end
+            end)
         end,
         EditBoxOnEnterPressed = function(self)
             self:GetParent():Hide()
@@ -1710,6 +1715,13 @@ end
 
 function Changelog:ShowDiscordPopup()
     ShowCopyDialog("https://discord.gg/dpaV8vh3w3", L.CHANGELOG_POPUP_DISCORD)
+end
+
+function Changelog:IsNewVersion()
+    local DB = BFL:GetModule("DB")
+    local lastVersion = DB:Get("lastChangelogVersion", "0.0.0")
+    local currentVersion = BFL.VERSION
+    return lastVersion ~= currentVersion
 end
 
 function Changelog:Initialize()

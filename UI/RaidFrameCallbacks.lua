@@ -552,6 +552,16 @@ function BetterRaidMemberButton_OnClick(self, button)
 	end
 end
 
+function BetterRaidMemberButton_OnDragUpdate(self)
+	local ghost = BFL:GetDragGhost()
+	if ghost and ghost:IsShown() then
+		local x, y = GetCursorPosition()
+		local scale = UIParent:GetEffectiveScale()
+		ghost:ClearAllPoints()
+		ghost:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", (x / scale) + 10, (y / scale) - 10)
+	end
+end
+
 function BetterRaidMemberButton_OnDragStart(self)
 	if not self.unit or not self.name then
 		return
@@ -564,6 +574,77 @@ function BetterRaidMemberButton_OnDragStart(self)
 	if not isLeader and not isAssistant then
 		return
 	end
+	
+	-- Start ghost
+	local ghost = BFL:GetDragGhost()
+	if ghost then
+		local raidIndex = tonumber(string.match(self.unit, "raid(%d+)"))
+		local isMultiDrag = raidIndex and IsPlayerSelected(raidIndex) and #BetterRaidFrame_SelectedPlayers > 1
+		
+		if isMultiDrag then
+			-- Multi-selection mode: Show list of names
+			local names = {}
+			for _, data in ipairs(BetterRaidFrame_SelectedPlayers) do
+				local nameStr = data.name or "Unknown"
+				-- Use UnitClass if valid unit, otherwise try to guess or white
+				local _, cls = UnitClass(data.unit)
+				if cls and RAID_CLASS_COLORS[cls] then
+					local c = RAID_CLASS_COLORS[cls]
+					nameStr = string.format("|c%s%s|r", c.colorStr, nameStr)
+				end
+				table.insert(names, nameStr)
+			end
+			
+			ghost.text:SetText(table.concat(names, "\n"))
+			ghost.text:SetTextColor(1, 0.82, 0) -- Reset base color to Gold
+			
+			if ghost.stripe then
+				ghost.stripe:SetColorTexture(1, 0.82, 0, 1.0) -- Gold for group drag
+			end
+			
+			-- Dynamic size
+			local width = ghost.text:GetStringWidth() + 30
+			local height = ghost.text:GetStringHeight() + 10
+			ghost:SetSize(width, math.max(24, height))
+		else
+			-- Single mode: Standard class colored text
+			ghost.text:SetText(self.name)
+			
+			local r, g, b = 1, 1, 1
+			local classFileName = nil
+			
+			if self.memberData and self.memberData.classFileName then
+				classFileName = self.memberData.classFileName
+			elseif self.unit then
+				local _, cls = UnitClass(self.unit)
+				classFileName = cls
+			end
+			
+			if classFileName then
+				local classColor = RAID_CLASS_COLORS[classFileName]
+				if classColor then
+					r, g, b = classColor.r, classColor.g, classColor.b
+				end
+			end
+			
+			ghost.text:SetTextColor(r, g, b)
+			if ghost.stripe then
+				ghost.stripe:SetColorTexture(r, g, b, 1.0)
+			end
+			
+			-- Set size based on text width (Fix for invisible ghost)
+			local width = ghost.text:GetStringWidth() + 30
+			ghost:SetSize(width, 24)
+		end
+		
+		ghost:Show()
+		local x, y = GetCursorPosition()
+		local scale = UIParent:GetEffectiveScale()
+		ghost:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", (x / scale) + 10, (y / scale) - 10)
+	end
+	
+	-- Enable update script
+	self:SetScript("OnUpdate", BetterRaidMemberButton_OnDragUpdate)
 	
 	-- Phase 8.2: Clear selections if dragging non-selected player
 	local raidIndex = tonumber(string.match(self.unit, "raid(%d+)"))
@@ -597,6 +678,16 @@ function BetterRaidMemberButton_OnDragStart(self)
 end
 
 function BetterRaidMemberButton_OnDragStop(self)
+	-- Stop updates
+	self:SetScript("OnUpdate", nil)
+	
+	-- Hide ghost
+	local ghost = BFL:GetDragGhost()
+	if ghost then
+		ghost:Hide()
+		ghost:ClearAllPoints()
+	end
+	
 	if not BetterRaidFrame_DraggedUnit then
 		return
 	end

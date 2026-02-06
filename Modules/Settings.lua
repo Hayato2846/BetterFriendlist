@@ -1651,135 +1651,23 @@ function Settings:ExportSettings()
 		return nil, L.ERROR_DB_NOT_AVAILABLE
 	end
 	
-	-- Collect data to export
-	local exportData = {
-		version = 2, -- Export format version (v2 includes all settings)
-		-- Structure
-		customGroups = {},
-		friendGroups = {},
-		groupOrder = {},
-		groupStates = {},
-		groupColors = {},
-		-- General Settings
-		compactMode = BetterFriendlistDB.compactMode,
-		enableElvUISkin = BetterFriendlistDB.enableElvUISkin,
-		fontSize = BetterFriendlistDB.fontSize,
-		windowScale = BetterFriendlistDB.windowScale,
-		hideMaxLevel = BetterFriendlistDB.hideMaxLevel,
-		accordionGroups = BetterFriendlistDB.accordionGroups,
-		showFavoritesGroup = BetterFriendlistDB.showFavoritesGroup,
-		colorClassNames = BetterFriendlistDB.colorClassNames,
-		hideEmptyGroups = BetterFriendlistDB.hideEmptyGroups,
-		headerCountFormat = BetterFriendlistDB.headerCountFormat,
-		groupHeaderAlign = BetterFriendlistDB.groupHeaderAlign,
-		showGroupArrow = BetterFriendlistDB.showGroupArrow,
-		groupArrowAlign = BetterFriendlistDB.groupArrowAlign,
-		showFactionIcons = BetterFriendlistDB.showFactionIcons,
-		showRealmName = BetterFriendlistDB.showRealmName,
-		grayOtherFaction = BetterFriendlistDB.grayOtherFaction,
-		showMobileAsAFK = BetterFriendlistDB.showMobileAsAFK,
-		treatMobileAsOffline = BetterFriendlistDB.treatMobileAsOffline,
-		nameDisplayFormat = BetterFriendlistDB.nameDisplayFormat,
-		enableInGameGroup = BetterFriendlistDB.enableInGameGroup,
-		inGameGroupMode = BetterFriendlistDB.inGameGroupMode,
-		-- Font Settings
-		fontFriendName = BetterFriendlistDB.fontFriendName,
-		fontSizeFriendName = BetterFriendlistDB.fontSizeFriendName,
-		fontOutlineFriendName = BetterFriendlistDB.fontOutlineFriendName,
-		fontShadowFriendName = BetterFriendlistDB.fontShadowFriendName,
-		fontColorFriendName = BetterFriendlistDB.fontColorFriendName,
-		fontFriendInfo = BetterFriendlistDB.fontFriendInfo,
-		fontSizeFriendInfo = BetterFriendlistDB.fontSizeFriendInfo,
-		fontOutlineFriendInfo = BetterFriendlistDB.fontOutlineFriendInfo,
-		fontShadowFriendInfo = BetterFriendlistDB.fontShadowFriendInfo,
-		fontColorFriendInfo = BetterFriendlistDB.fontColorFriendInfo,
-		fontGroupHeader = BetterFriendlistDB.fontGroupHeader,
-		fontSizeGroupHeader = BetterFriendlistDB.fontSizeGroupHeader,
-		fontOutlineGroupHeader = BetterFriendlistDB.fontOutlineGroupHeader,
-		fontShadowGroupHeader = BetterFriendlistDB.fontShadowGroupHeader,
-		colorGroupCount = BetterFriendlistDB.colorGroupCount,
-		colorGroupArrow = BetterFriendlistDB.colorGroupArrow,
-		-- Sort & Filter
-		primarySort = BetterFriendlistDB.primarySort,
-		secondarySort = BetterFriendlistDB.secondarySort,
-		-- Broker
-		brokerEnabled = BetterFriendlistDB.brokerEnabled,
-		brokerShowIcon = BetterFriendlistDB.brokerShowIcon,
-		brokerShowLabel = BetterFriendlistDB.brokerShowLabel,
-		brokerShowTotal = BetterFriendlistDB.brokerShowTotal,
-		brokerShowGroups = BetterFriendlistDB.brokerShowGroups,
-		brokerTooltipMode = BetterFriendlistDB.brokerTooltipMode,
-		brokerClickAction = BetterFriendlistDB.brokerClickAction,
-		-- Sync
-		enableGlobalSync = BetterFriendlistDB.enableGlobalSync,
-		enableGlobalSyncDeletion = BetterFriendlistDB.enableGlobalSyncDeletion,
-		-- Other
-		nicknames = BetterFriendlistDB.nicknames,
-		enableBetaFeatures = BetterFriendlistDB.enableBetaFeatures,
-	}
+	-- Deep copy the DB to ensure we capture EVERYTHING
+	-- This fulfills the requirement to export future settings automatically
+	local DB = GetDB()
+	local exportData = DB:InternalDeepCopy(BetterFriendlistDB)
 	
-	-- Export custom groups with all properties
-	if BetterFriendlistDB.customGroups then
-		for groupId, groupInfo in pairs(BetterFriendlistDB.customGroups) do
-			exportData.customGroups[groupId] = {
-				name = groupInfo.name,
-				collapsed = groupInfo.collapsed,
-				order = groupInfo.order,
-				color = groupInfo.color and {
-					r = groupInfo.color.r,
-					g = groupInfo.color.g,
-					b = groupInfo.color.b
-				} or nil
-			}
-		end
-	end
+	-- Tag with export version 3 (Base64 + Full DB)
+	exportData.exportVersion = 3
 	
-	-- Export friend-to-group assignments
-	if BetterFriendlistDB.friendGroups then
-		for friendUID, groups in pairs(BetterFriendlistDB.friendGroups) do
-			exportData.friendGroups[friendUID] = {}
-			for _, groupId in ipairs(groups) do
-				table.insert(exportData.friendGroups[friendUID], groupId)
-			end
-		end
-	end
-	
-	-- Export group order
-	if BetterFriendlistDB.groupOrder then
-		for _, groupId in ipairs(BetterFriendlistDB.groupOrder) do
-			table.insert(exportData.groupOrder, groupId)
-		end
-	end
-	
-	-- Export group states (collapsed)
-	if BetterFriendlistDB.groupStates then
-		for groupId, collapsed in pairs(BetterFriendlistDB.groupStates) do
-			exportData.groupStates[groupId] = collapsed
-		end
-	end
-	
-	-- Export group colors (user-customized colors)
-	if BetterFriendlistDB.groupColors then
-		exportData.groupColors = {}
-		for groupId, color in pairs(BetterFriendlistDB.groupColors) do
-			if color and color.r and color.g and color.b then
-				exportData.groupColors[groupId] = {
-					r = color.r,
-					g = color.g,
-					b = color.b
-				}
-			end
-		end
-	end
-	
-	-- Serialize to string using LibSerialize or manual encoding
+	-- Serialize to string using manual encoding
 	local serialized = self:SerializeTable(exportData)
 	
 	if not serialized then
 		return nil, L.ERROR_EXPORT_SERIALIZE
 	end
 	
-	-- Encode to base64-like format for easy copy/paste
+	-- Encode to Base64 (using BFL3: prefix)
+	-- Used C_EncodingUtil.EncodeBase64 if available as requested
 	local encoded = self:EncodeString(serialized)
 	
 	return encoded, nil
@@ -1791,8 +1679,8 @@ function Settings:ImportSettings(importString)
 		return false, L.ERROR_IMPORT_EMPTY
 	end
 	
-	-- Decode from base64-like format
-	local decoded = self:DecodeString(importString)
+	-- Decode
+	local decoded, version = self:DecodeString(importString)
 	if not decoded then
 		return false, L.ERROR_IMPORT_DECODE
 	end
@@ -1803,16 +1691,6 @@ function Settings:ImportSettings(importString)
 		return false, L.ERROR_IMPORT_DESERIALIZE
 	end
 	
-	-- Validate version
-	if not importData.version or (importData.version ~= 1 and importData.version ~= 2) then
-		return false, L.ERROR_EXPORT_VERSION
-	end
-	
-	-- Validate structure
-	if not importData.customGroups or not importData.friendGroups then
-		return false, L.ERROR_EXPORT_STRUCTURE
-	end
-	
 	-- IMPORT DATA
 	local DB = GetDB()
 	local Groups = GetGroups()
@@ -1821,91 +1699,117 @@ function Settings:ImportSettings(importString)
 		return false, L.ERROR_MODULES_NOT_LOADED
 	end
 	
-	-- Clear existing data (Common to v1 and v2)
-	BetterFriendlistDB.customGroups = {}
-	BetterFriendlistDB.friendGroups = {}
-	BetterFriendlistDB.groupOrder = {}
-	BetterFriendlistDB.groupStates = {}
-	
-	-- Import custom groups
-	if importData.customGroups then
-		for groupId, groupInfo in pairs(importData.customGroups) do
-			BetterFriendlistDB.customGroups[groupId] = {
-				name = groupInfo.name,
-				collapsed = groupInfo.collapsed or false,
-				order = groupInfo.order or 2,
-				color = groupInfo.color or {r = 1.0, g = 0.82, b = 0.0}
-			}
-		end
-	end
-	
-	-- Import friend assignments
-	if importData.friendGroups then
-		for friendUID, groups in pairs(importData.friendGroups) do
-			BetterFriendlistDB.friendGroups[friendUID] = {}
-			for _, groupId in ipairs(groups) do
-				table.insert(BetterFriendlistDB.friendGroups[friendUID], groupId)
+	-- Handle V3 (Everything)
+	if importData.exportVersion and importData.exportVersion >= 3 then
+		BFL:DebugPrint("|cff00ff00BetterFriendlist:|r Importing V3 (Full) backup...")
+		
+		-- Import ALL keys from the export
+		for key, value in pairs(importData) do
+			-- Skip metadata
+			if key ~= "exportVersion" and key ~= "version" then
+				BetterFriendlistDB[key] = value
 			end
 		end
-	end
-	
-	-- Import group order
-	if importData.groupOrder then
-		for _, groupId in ipairs(importData.groupOrder) do
-			table.insert(BetterFriendlistDB.groupOrder, groupId)
+		
+		-- Explicitly handle version to prevent mismatches
+		-- We keep the current addon version in DB, not the one from export, 
+		-- to trigger migration logic if needed on next reload
+		BetterFriendlistDB.version = BFL.VERSION
+	else
+		-- Legacy V1/V2 Import Logic
+		BFL:DebugPrint("|cff00ff00BetterFriendlist:|r Importing V1/V2 (Legacy) backup...")
+		
+		-- Validate structure (Relaxed for V1/V2 as they might miss some keys but must have core ones)
+		if not importData.customGroups or not importData.friendGroups then
+			return false, L.ERROR_EXPORT_STRUCTURE
 		end
-	end
-	
-	-- Import group states
-	if importData.groupStates then
-		for groupId, collapsed in pairs(importData.groupStates) do
-			BetterFriendlistDB.groupStates[groupId] = collapsed
-		end
-	end
-	
-	-- Import group colors (user-customized colors)
-	if importData.groupColors then
-		BetterFriendlistDB.groupColors = {}
-		for groupId, color in pairs(importData.groupColors) do
-			if color and color.r and color.g and color.b then
-				BetterFriendlistDB.groupColors[groupId] = {
-					r = color.r,
-					g = color.g,
-					b = color.b
+		
+		-- Clear existing data (Common to v1 and v2)
+		BetterFriendlistDB.customGroups = {}
+		BetterFriendlistDB.friendGroups = {}
+		BetterFriendlistDB.groupOrder = {}
+		BetterFriendlistDB.groupStates = {}
+		
+		-- Import custom groups
+		if importData.customGroups then
+			for groupId, groupInfo in pairs(importData.customGroups) do
+				BetterFriendlistDB.customGroups[groupId] = {
+					name = groupInfo.name,
+					collapsed = groupInfo.collapsed or false,
+					order = groupInfo.order or 2,
+					color = groupInfo.color or {r = 1.0, g = 0.82, b = 0.0}
 				}
 			end
 		end
-	end
+		
+		-- Import friend assignments
+		if importData.friendGroups then
+			for friendUID, groups in pairs(importData.friendGroups) do
+				BetterFriendlistDB.friendGroups[friendUID] = {}
+				for _, groupId in ipairs(groups) do
+					table.insert(BetterFriendlistDB.friendGroups[friendUID], groupId)
+				end
+			end
+		end
+		
+		-- Import group order
+		if importData.groupOrder then
+			for _, groupId in ipairs(importData.groupOrder) do
+				table.insert(BetterFriendlistDB.groupOrder, groupId)
+			end
+		end
+		
+		-- Import group states
+		if importData.groupStates then
+			for groupId, collapsed in pairs(importData.groupStates) do
+				BetterFriendlistDB.groupStates[groupId] = collapsed
+			end
+		end
+		
+		-- Import group colors (user-customized colors)
+		if importData.groupColors then
+			BetterFriendlistDB.groupColors = {}
+			for groupId, color in pairs(importData.groupColors) do
+				if color and color.r and color.g and color.b then
+					BetterFriendlistDB.groupColors[groupId] = {
+						r = color.r,
+						g = color.g,
+						b = color.b
+					}
+				end
+			end
+		end
 
-	-- Version 2: Import all other settings
-	if importData.version >= 2 then
-		local keysToImport = {
-			-- General
-			"compactMode", "enableElvUISkin", "fontSize", "windowScale", 
-			"hideMaxLevel", "accordionGroups", "showFavoritesGroup", "colorClassNames",
-			"hideEmptyGroups", "headerCountFormat", "groupHeaderAlign", "showGroupArrow",
-			"groupArrowAlign", "showFactionIcons", "showRealmName", "grayOtherFaction",
-			"showMobileAsAFK", "treatMobileAsOffline", "nameDisplayFormat", 
-			"enableInGameGroup", "inGameGroupMode",
-			-- Fonts
-			"fontFriendName", "fontSizeFriendName", "fontOutlineFriendName", "fontShadowFriendName",
-			"fontColorFriendName", "fontFriendInfo", "fontSizeFriendInfo", "fontOutlineFriendInfo",
-			"fontShadowFriendInfo", "fontColorFriendInfo", "fontGroupHeader", "fontSizeGroupHeader",
-			"fontOutlineGroupHeader", "fontShadowGroupHeader", "colorGroupCount", "colorGroupArrow",
-			-- Sort & Filter
-			"primarySort", "secondarySort",
-			-- Broker
-			"brokerEnabled", "brokerShowIcon", "brokerShowLabel", 
-			"brokerShowTotal", "brokerShowGroups", "brokerTooltipMode", "brokerClickAction",
-			-- Sync
-			"enableGlobalSync", "enableGlobalSyncDeletion",
-			-- Other
-			"nicknames", "enableBetaFeatures"
-		}
+		-- Version 2: Import all other settings
+		if importData.version and importData.version >= 2 then
+			local keysToImport = {
+				-- General
+				"compactMode", "enableElvUISkin", "fontSize", "windowScale", 
+				"hideMaxLevel", "accordionGroups", "showFavoritesGroup", "colorClassNames",
+				"hideEmptyGroups", "headerCountFormat", "groupHeaderAlign", "showGroupArrow",
+				"groupArrowAlign", "showFactionIcons", "showRealmName", "grayOtherFaction",
+				"showMobileAsAFK", "treatMobileAsOffline", "nameDisplayFormat", 
+				"enableInGameGroup", "inGameGroupMode",
+				-- Fonts
+				"fontFriendName", "fontSizeFriendName", "fontOutlineFriendName", "fontShadowFriendName",
+				"fontColorFriendName", "fontFriendInfo", "fontSizeFriendInfo", "fontOutlineFriendInfo",
+				"fontShadowFriendInfo", "fontColorFriendInfo", "fontGroupHeader", "fontSizeGroupHeader",
+				"fontOutlineGroupHeader", "fontShadowGroupHeader", "colorGroupCount", "colorGroupArrow",
+				-- Sort & Filter
+				"primarySort", "secondarySort",
+				-- Broker
+				"brokerEnabled", "brokerShowIcon", "brokerShowLabel", 
+				"brokerShowTotal", "brokerShowGroups", "brokerTooltipMode", "brokerClickAction",
+				-- Sync
+				"enableGlobalSync", "enableGlobalSyncDeletion",
+				-- Other
+				"nicknames", "enableBetaFeatures"
+			}
 
-		for _, key in ipairs(keysToImport) do
-			if importData[key] ~= nil then
-				BetterFriendlistDB[key] = importData[key]
+			for _, key in ipairs(keysToImport) do
+				if importData[key] ~= nil then
+					BetterFriendlistDB[key] = importData[key]
+				end
 			end
 		end
 	end
@@ -1969,37 +1873,56 @@ function Settings:DeserializeTable(str)
 	return result
 end
 
--- Encode string to base64-like format (simple compression-safe encoding)
+-- Encode string to base64 or hex format
 function Settings:EncodeString(str)
-	-- Simple encoding: convert to hex representation
+	-- V3: Use Base64 (C_EncodingUtil or fallback)
+	-- This is much more efficient than hex string
+	-- and fulfills the requirement to use C_EncodingUtil
+	local encoded = BFL:Base64Encode(str)
+	if encoded then
+		return "BFL3:" .. encoded
+	end
+	
+	-- Fallback to Hex (Legacy V1/V2 style) if Base64 fails
 	local hexParts = {}
 	for i = 1, #str do
 		table.insert(hexParts, string.format("%02x", string.byte(str, i)))
 	end
-	return "BFL1:" .. table.concat(hexParts) -- BFL1: prefix for version identification
+	return "BFL1:" .. table.concat(hexParts) 
 end
 
--- Decode base64-like format back to string
+-- Decode format back to string
 function Settings:DecodeString(encoded)
-	-- Check prefix
-	if not encoded or not string.match(encoded, "^BFL1:") then
-		return nil
+	if not encoded then return nil end
+	
+	-- V3: Base64
+	if string.match(encoded, "^BFL3:") then
+		local b64 = string.sub(encoded, 6)
+		local decoded = BFL:Base64Decode(b64)
+		return decoded, 3
 	end
 	
-	-- Remove prefix
-	local hex = string.sub(encoded, 6)
-	
-	-- Convert hex back to string
-	local chars = {}
-	for i = 1, #hex, 2 do
-		local byte = tonumber(string.sub(hex, i, i+1), 16)
-		if not byte then
-			return nil
+	-- V1/V2: Hex
+	if string.match(encoded, "^BFL1:") then
+		local hex = string.sub(encoded, 6)
+		local chars = {}
+		for i = 1, #hex, 2 do
+			local byte = tonumber(string.sub(hex, i, i+1), 16)
+			if not byte then
+				return nil
+			end
+			table.insert(chars, string.char(byte))
 		end
-		table.insert(chars, string.char(byte))
+		return table.concat(chars), 1
 	end
 	
-	return table.concat(chars)
+	-- Try raw base64 (if user copied without prefix?)
+	local tryB64 = BFL:Base64Decode(encoded)
+	if tryB64 then
+		return tryB64, 3
+	end
+	
+	return nil
 end
 
 -- Show export dialog with scrollable text
@@ -2017,10 +1940,10 @@ function Settings:ShowExportDialog()
 	end
 	
 	-- Set text and show
+	self.exportFrame:Show()
 	self.exportFrame.scrollFrame.editBox:SetText(exportString)
 	self.exportFrame.scrollFrame.editBox:HighlightText()
 	self.exportFrame.scrollFrame.editBox:SetFocus()
-	self.exportFrame:Show()
 	
 	BFL:DebugPrint("Export complete! Copy the text from the dialog.")
 end
@@ -2033,9 +1956,9 @@ function Settings:ShowImportDialog()
 	end
 	
 	-- Clear and show
+	self.importFrame:Show()
 	self.importFrame.scrollFrame.editBox:SetText("")
 	self.importFrame.scrollFrame.editBox:SetFocus()
-	self.importFrame:Show()
 end
 
 -- Refresh statistics display
@@ -2276,6 +2199,11 @@ function Settings:CreateExportFrame()
 	editBox:SetAutoFocus(false)
 	editBox:SetScript("OnEscapePressed", function(self)
 		frame:Hide()
+	end)
+	editBox:SetScript("OnKeyUp", function(self, key)
+		if IsControlKeyDown() and key == "C" then
+			frame:Hide()
+		end
 	end)
 	scrollFrame:SetScrollChild(editBox)
 	scrollFrame.editBox = editBox
@@ -2864,6 +2792,19 @@ function Settings:RefreshGeneralTab()
 		elvData -- Right (nil if no ElvUI)
 	)
 	table.insert(allFrames, row6)
+
+	-- Row 7: Welcome Message
+	local row7 = Components:CreateDoubleCheckbox(tab,
+		{ -- Left
+			label = L.SETTINGS_SHOW_WELCOME_MESSAGE,
+			initialValue = DB:Get("showWelcomeMessage", true),
+			callback = function(val) DB:Set("showWelcomeMessage", val) end,
+			tooltipTitle = L.SETTINGS_SHOW_WELCOME_MESSAGE,
+			tooltipDesc = L.SETTINGS_SHOW_WELCOME_MESSAGE_DESC or "Shows the 'BetterFriendlist loaded...' message in chat when you log in or reload."
+		},
+		nil -- Right slot empty
+	)
+	table.insert(allFrames, row7)
 
 	-- Spacer before next section
 	table.insert(allFrames, Components:CreateSpacer(tab))

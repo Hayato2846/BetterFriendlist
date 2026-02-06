@@ -2785,9 +2785,9 @@ end
 function FriendsList:InviteGroupToParty(groupId) local DB = GetDB()
 	if not DB then return end
 	
-	local inviteCount = 0
+	local inviteCandidates = {}
 	
-	-- Collect all friends in this group
+	-- 1. Collect all candidates
 	for _, friend in ipairs(self.friendsList) do
 		if friend.connected then
 			local friendUID = GetFriendUID(friend)
@@ -2821,24 +2821,69 @@ function FriendsList:InviteGroupToParty(groupId) local DB = GetDB()
 				isInGroup = not hasGroup
 			end
 			
-			-- Invite if in this group
+			-- Add to candidates if found
 			if isInGroup then
+				-- Validate invitable status (BNet WoW or WoW friend)
+				local isValid = false
 				if friend.type == "bnet" then
-					-- Battle.net friend - invite via BNet
-					if friend.gameAccountInfo and friend.gameAccountInfo.clientProgram == BNET_CLIENT_WOW then
-						local gameAccountID = friend.gameAccountInfo.gameAccountID
-						if gameAccountID then
-							BFL.BNInviteFriend(gameAccountID)
-							inviteCount = inviteCount + 1
-						end
+					if friend.gameAccountInfo and friend.gameAccountInfo.clientProgram == BNET_CLIENT_WOW and friend.gameAccountInfo.gameAccountID then
+						isValid = true
 					end
 				elseif friend.type == "wow" then
-					-- WoW friend - invite by name
-					BFL.InviteUnit(friend.name)
-					inviteCount = inviteCount + 1
+					isValid = true
+				end
+				
+				if isValid then
+					table.insert(inviteCandidates, friend)
 				end
 			end
 		end
+	end
+	
+	if #inviteCandidates == 0 then
+		print(BFL.L.MSG_NO_FRIENDS_AVAILABLE)
+		return
+	end
+
+	-- 2. Check Group Status & Raid Conversion
+	local numGroupMembers = GetNumGroupMembers()
+	if numGroupMembers == 0 then numGroupMembers = 1 end -- Self count is 1 if solo
+	
+	local totalSize = numGroupMembers + #inviteCandidates
+	
+	if not IsInRaid() and totalSize > 5 then
+		-- Need to convert to raid
+		print(BFL.L.MSG_INVITE_CONVERT_RAID)
+		if BFL.ConvertToRaid then
+			BFL.ConvertToRaid()
+		end
+	end
+	
+	-- 3. Check Raid Cap (40)
+	local raidCap = 40
+	local inviteLimit = #inviteCandidates
+	
+	if totalSize > raidCap then
+		print(string.format(BFL.L.MSG_INVITE_RAID_FULL, raidCap))
+		inviteLimit = raidCap - numGroupMembers
+		if inviteLimit < 0 then inviteLimit = 0 end
+	end
+	
+	-- 4. Execute Invites
+	local inviteCount = 0
+	for i = 1, inviteLimit do
+		local friend = inviteCandidates[i]
+		if friend.type == "bnet" then
+			BFL.BNInviteFriend(friend.gameAccountInfo.gameAccountID)
+			inviteCount = inviteCount + 1
+		elseif friend.type == "wow" then
+			BFL.InviteUnit(friend.name)
+			inviteCount = inviteCount + 1
+		end
+	end
+	
+	if inviteCount > 0 then
+		print(string.format(BFL.L.MSG_INVITE_COUNT, inviteCount))
 	end
 end
 
@@ -3435,6 +3480,12 @@ Button_OnDragUpdate = function(self)
 	cursorX = cursorX / scale
 	cursorY = cursorY / scale
 	
+	-- Move Ghost
+	local ghost = BFL:GetDragGhost()
+	if ghost and ghost:IsShown() then
+		ghost:SetPoint("CENTER", UIParent, "BOTTOMLEFT", cursorX, cursorY)
+	end
+	
 	-- Get all visible group header buttons from ScrollBox
 	local Groups = GetGroups()
 	local friendGroups = Groups and Groups:GetAll() or {}
@@ -3498,6 +3549,43 @@ Button_OnDragStart = function(self)
 		-- Store friend name for header text updates
 		BetterFriendsList_DraggedFriend = self.friendData.name or self.friendData.accountName or self.friendData.battleTag or "Unknown"
 		
+		-- Init Ghost with Visuals
+		local ghost = BFL:GetDragGhost()
+		if ghost then
+			-- Format text nicely (including class color if available)
+			local text = BetterFriendsList_DraggedFriend
+			local colorR, colorG, colorB = 1, 0.82, 0 -- Default Gold
+			
+			-- Reset base text color to Gold to prevent tinting issues from previous drags
+			ghost.text:SetTextColor(1, 0.82, 0)
+			
+			if self.friendData.className then
+				local classFile = GetClassFileFromClassName(self.friendData.className)
+				if not classFile and self.friendData.type == "bnet" then
+					-- For BNet, we might need to look it up differently if classFile isn't direct
+					classFile = GetClassFileForFriend(self.friendData)
+				end
+				
+				local classColor = classFile and RAID_CLASS_COLORS[classFile]
+				if classColor then
+					text = "|c" .. (classColor.colorStr or "ffffffff") .. text .. "|r"
+					colorR, colorG, colorB = classColor.r, classColor.g, classColor.b
+				end
+			end
+			
+			ghost.text:SetText(text)
+			ghost.stripe:SetColorTexture(colorR, colorG, colorB)
+			
+			-- Calculate width based on text length + padding
+			local width = ghost.text:GetStringWidth() + 30
+			ghost:SetSize(width, 24)
+			
+			ghost:Show()
+			local cursorX, cursorY = GetCursorPosition()
+			local scale = UIParent:GetEffectiveScale()
+			ghost:SetPoint("CENTER", UIParent, "BOTTOMLEFT", cursorX / scale, cursorY / scale)
+		end
+		
 		-- Show drag overlay
 		self.dragOverlay:Show()
 		self:SetAlpha(0.5)
@@ -3514,6 +3602,13 @@ end
 Button_OnDragStop = function(self)
 	-- Disable OnUpdate
 	self:SetScript("OnUpdate", nil)
+	
+	-- Hide Ghost
+	local ghost = BFL:GetDragGhost()
+	if ghost then
+		ghost:Hide()
+		ghost:ClearAllPoints()
+	end
 	
 	-- Hide drag overlay
 	if self.dragOverlay then

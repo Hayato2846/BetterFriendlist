@@ -700,7 +700,16 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 				or (BFL.IsWrathClassic and " (Wrath Classic)")
 				or (BFL.IsTBCClassic and " (TBC Classic)")
 				or " (TWW)"
-			print(string.format(BFL.L.CORE_LOADED, BFL.VERSION, versionSuffix))
+			
+			-- Check if welcome message is enabled (default: true)
+			local showWelcome = true
+			if BetterFriendlistDB and BetterFriendlistDB.showWelcomeMessage ~= nil then
+				showWelcome = BetterFriendlistDB.showWelcomeMessage
+			end
+			
+			if showWelcome then
+				print(string.format(BFL.L.CORE_LOADED, BFL.VERSION, versionSuffix))
+			end
 			
 			-- ============================================================================
 			-- Hook ToggleFriendsFrame to open BetterFriendlist instead
@@ -868,6 +877,31 @@ end)
 _G.BetterFriendlist = BFL
 
 --------------------------------------------------------------------------
+-- Shared Helper: GetDragGhost
+--------------------------------------------------------------------------
+-- Reusable ghost frame for drag operations (friend list, raid frame, settings)
+local DragGhost = nil
+function BFL:GetDragGhost()
+	if not DragGhost then
+		DragGhost = CreateFrame("Frame", nil, UIParent)
+		DragGhost:SetFrameStrata("TOOLTIP")
+		DragGhost.bg = DragGhost:CreateTexture(nil, "BACKGROUND")
+		DragGhost.bg:SetAllPoints()
+		DragGhost.bg:SetColorTexture(0.15, 0.15, 0.15, 0.9)
+		
+		-- Color Strip
+		DragGhost.stripe = DragGhost:CreateTexture(nil, "ARTWORK")
+		DragGhost.stripe:SetPoint("TOPLEFT")
+		DragGhost.stripe:SetPoint("BOTTOMLEFT")
+		DragGhost.stripe:SetWidth(6)
+		
+		DragGhost.text = DragGhost:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
+		DragGhost.text:SetPoint("CENTER", 3, 0) -- Slight offset for stripe
+	end
+	return DragGhost
+end
+
+--------------------------------------------------------------------------
 -- Slash Commands
 --------------------------------------------------------------------------
 
@@ -989,6 +1023,20 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 			FrameSettings:ResetDefaults()
 		else
 			print("|cffff0000BetterFriendlist:|r FrameSettings module not loaded.")
+		end
+
+	-- Reset Changelog Version
+	elseif msg == "reset_changelog" then
+		local DB = BFL:GetModule("DB")
+		if DB then
+			DB:Set("lastChangelogVersion", "0.0.0")
+			print("|cff00ff00BetterFriendlist:|r " .. (BFL.L.CHANGELOG_RESET_SUCCESS or "Changelog version reset successfully."))
+
+			-- Update indicator immediately if module is loaded
+			local Changelog = BFL:GetModule("Changelog")
+			if Changelog then
+				Changelog:CheckVersion()
+			end
 		end
 
 	-- Help (or any other unrecognized command)
