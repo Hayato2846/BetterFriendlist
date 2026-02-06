@@ -3001,7 +3001,7 @@ function Settings:RefreshGeneralTab()
 			tab, 
 			L.SETTINGS_INGAME_MODE_LABEL or "   Mode:", 
 			modeOptions, 
-			function(val) return val == currentMode end,
+			function(val) return val == DB:Get("inGameGroupMode", "same_game") end,
 			function(val) self:OnInGameGroupModeChanged(val) end
 		)
 		modeDropdown:SetTooltip(L.SETTINGS_INGAME_MODE_TOOLTIP or "In-Game Group Mode", L.SETTINGS_INGAME_MODE_TOOLTIP_DESC or "Choose which friends to include in the In-Game group:\n\n|cffffffffWoW Only:|r Friends playing the same WoW version (Retail/Classic)\n|cffffffffAny Game:|r Friends playing any Battle.net game")
@@ -3638,16 +3638,9 @@ function Settings:RefreshGroupsTab()
 			
 			-- Only update background highlights in OnUpdate to be efficient
 			btn:SetScript("OnUpdate", function(self)
-				local cursorX, cursorY = GetCursorPosition()
-				local scale = UIParent:GetEffectiveScale()
-				cursorX = cursorX / scale
-				cursorY = cursorY / scale
-				
 				for _, otherItem in ipairs(listItems) do
 					if otherItem ~= self and otherItem:IsVisible() then
-						local left, bottom, width, height = otherItem:GetRect()
-						if left and cursorX >= left and cursorX <= left + width and
-						   cursorY >= bottom and cursorY <= bottom + height then
+						if MouseIsOver(otherItem) then
 							otherItem.bg:SetColorTexture(0.3, 0.3, 0.3, 0.7)
 						else
 							otherItem.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
@@ -3661,17 +3654,11 @@ function Settings:RefreshGroupsTab()
 			btn:SetScript("OnUpdate", nil)
 			
 			local targetIndex = nil
-			local cursorX, cursorY = GetCursorPosition()
-			local scale = UIParent:GetEffectiveScale()
-			cursorX = cursorX / scale
-			cursorY = cursorY / scale
 			
 			for _, otherItem in ipairs(listItems) do
 				otherItem.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5) -- Reset
 				if otherItem ~= btn and otherItem:IsVisible() then
-					local left, bottom, width, height = otherItem:GetRect()
-					if left and cursorX >= left and cursorX <= left + width and
-					   cursorY >= bottom and cursorY <= bottom + height then
+					if MouseIsOver(otherItem) then
 						targetIndex = otherItem.orderIndex
 					end
 				end
@@ -4415,16 +4402,9 @@ function Settings:RefreshBrokerTab()
 	for i, col in ipairs(orderedColumns) do
 		local onDragStart = function(btn)
 			btn:SetScript("OnUpdate", function(self)
-				local cursorX, cursorY = GetCursorPosition()
-				local scale = UIParent:GetEffectiveScale()
-				cursorX = cursorX / scale
-				cursorY = cursorY / scale
-				
 				for _, otherItem in ipairs(listItems) do
 					if otherItem ~= self and otherItem:IsVisible() then
-						local left, bottom, width, height = otherItem:GetRect()
-						if left and cursorX >= left and cursorX <= left + width and
-						   cursorY >= bottom and cursorY <= bottom + height then
+						if MouseIsOver(otherItem) then
 							otherItem.bg:SetColorTexture(0.3, 0.3, 0.3, 0.7)
 						else
 							otherItem.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
@@ -4438,34 +4418,30 @@ function Settings:RefreshBrokerTab()
 			btn:SetScript("OnUpdate", nil)
 			
 			local targetIndex = nil
-			local cursorX, cursorY = GetCursorPosition()
-			local scale = UIParent:GetEffectiveScale()
-			cursorX = cursorX / scale
-			cursorY = cursorY / scale
-			
+			-- Reset all backgrounds
 			for _, otherItem in ipairs(listItems) do
-				otherItem.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5) -- Reset
+				otherItem.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
 				if otherItem ~= btn and otherItem:IsVisible() then
-					local left, bottom, width, height = otherItem:GetRect()
-					if left and cursorX >= left and cursorX <= left + width and
-					   cursorY >= bottom and cursorY <= bottom + height then
+					if MouseIsOver(otherItem) then
 						targetIndex = otherItem.orderIndex
 					end
 				end
 			end
 			
-			if targetIndex and targetIndex ~= btn.orderIndex then
-				-- Move
-				local itemToMove = table.remove(orderedColumns, btn.orderIndex)
-				table.insert(orderedColumns, targetIndex, itemToMove)
-				
-				-- Save
-				local newOrder = {}
-				for _, c in ipairs(orderedColumns) do
-					table.insert(newOrder, c.key)
+			if targetIndex then
+				if targetIndex ~= btn.orderIndex then
+					-- Move
+					local itemToMove = table.remove(orderedColumns, btn.orderIndex)
+					table.insert(orderedColumns, targetIndex, itemToMove)
+					
+					-- Save
+					local newOrder = {}
+					for _, c in ipairs(orderedColumns) do
+						table.insert(newOrder, c.key)
+					end
+					DB:Set("brokerColumnOrder", newOrder)
+					self:RefreshBrokerTab()
 				end
-				DB:Set("brokerColumnOrder", newOrder)
-				self:RefreshBrokerTab()
 			end
 		end
 
@@ -5003,15 +4979,18 @@ function Settings:RefreshRaidTab()
 		for _, region in ipairs(regions) do
 			if region:GetObjectType() == "FontString" then region:SetText("") end
 		end
+		
+		-- Disable highlighting when hovering (no tooltip)
+		checkbox:SetScript("OnEnter", function() end)
 
 		checkbox:SetScript("OnClick", function(self)
 			local val = self:GetChecked()
 			DB:Set("raidShortcutEnabled_" .. actionKey, val)
 			
-			-- Immediately update secure attributes
+			-- Live refresh: Update all raid buttons
 			local RaidFrame = BFL:GetModule("RaidFrame")
-			if RaidFrame and RaidFrame.UpdateSecureAttributes then
-				RaidFrame:UpdateSecureAttributes()
+			if RaidFrame then
+				RaidFrame:UpdateAllMemberButtons()
 			end
 			
 			-- Refresh tab to show/hide shortcut options
@@ -5027,16 +5006,43 @@ function Settings:RefreshRaidTab()
 		label:SetWordWrap(false)
 
 		-- Validation Function
-		local function ValidateShortcut(mod, btn)
-			if (mod == "NONE" and btn == "LeftButton") or
-			   (mod == "NONE" and btn == "RightButton") or
-			   (mod == "CTRL" and btn == "LeftButton") then
-				
-				-- Exception: If configuring "Target", None+Left is actually valid/desired.
-				if actionKey == "target" and mod == "NONE" and btn == "LeftButton" then
-					return true
+		local function IsReservedCombination(mod, btn)
+			-- Reserved: LeftClick (Drag&Drop), RightClick (Menu), Ctrl+LeftClick (Multi-Select)
+			if mod == "NONE" and btn == "LeftButton" then return true end
+			if mod == "NONE" and btn == "RightButton" then return true end
+			if mod == "CTRL" and btn == "LeftButton" then return true end
+			return false
+		end
+		
+		-- Get valid modifiers for a button
+		local function GetValidModifiersForButton(btn)
+			local validLabels = {}
+			local validValues = {}
+			for i = 1, #modifierOptions.values do
+				if not IsReservedCombination(modifierOptions.values[i], btn) then
+					table.insert(validLabels, modifierOptions.labels[i])
+					table.insert(validValues, modifierOptions.values[i])
 				end
-				
+			end
+			return {labels = validLabels, values = validValues}
+		end
+		
+		-- Get valid buttons for a modifier
+		local function GetValidButtonsForModifier(mod)
+			local validLabels = {}
+			local validValues = {}
+			for i = 1, #buttonOptions.values do
+				if not IsReservedCombination(mod, buttonOptions.values[i]) then
+					table.insert(validLabels, buttonOptions.labels[i])
+					table.insert(validValues, buttonOptions.values[i])
+				end
+			end
+			return {labels = validLabels, values = validValues}
+		end
+
+		-- Validation Function (legacy, now replaced by filtering)
+		local function ValidateShortcut(mod, btn)
+			if IsReservedCombination(mod, btn) then
 				print("|cffff0000BetterFriendlist:|r " .. (L.SETTINGS_RAID_ERROR_RESERVED or "This combination is reserved."))
 				return false
 			end
@@ -5045,12 +5051,25 @@ function Settings:RefreshRaidTab()
 
 		-- Only show dropdowns if enabled
 		if isEnabled then
-			-- Modifier Dropdown
+			-- Get current shortcuts
+			local s = DB:Get("raidShortcuts") or {}
+			
+			-- Modifier Dropdown (dynamically filtered)
+			local currentBtn = s[actionKey] and s[actionKey].button or "LeftButton"
+			local validModifiers = GetValidModifiersForButton(currentBtn)
+			
 			local modDropdown = Components:CreateDropdown(
 				row, 
 				"", 
-				modifierOptions, 
-				function(val) return val == currentMod end,
+				validModifiers, -- Use filtered list
+				function(val) 
+					local s = DB:Get("raidShortcuts") or {}
+					local m = "NONE"
+					if s[actionKey] then
+						m = s[actionKey].modifier or "NONE"
+					end
+					return val == m
+				end,
 				function(val)
 					-- Snapshot update
 					local s = DB:Get("raidShortcuts") or {}
@@ -5065,11 +5084,14 @@ function Settings:RefreshRaidTab()
 					s[actionKey].modifier = val
 					DB:Set("raidShortcuts", s)
 					
-					-- Refresh input immediately
+					-- Live refresh: Update all raid buttons
 					local RaidFrame = BFL:GetModule("RaidFrame")
-					if RaidFrame and RaidFrame.UpdateSecureAttributes then
-						RaidFrame:UpdateSecureAttributes()
+					if RaidFrame then
+						RaidFrame:UpdateAllMemberButtons()
 					end
+					
+					-- Refresh button dropdown (modifier changed, button options may change)
+					C_Timer.After(0.05, function() Settings:RefreshRaidTab() end)
 				end
 			)
 			-- MANUAL LAYOUT FIX: Disable auto-layout to prevent 170px width enforcement
@@ -5090,12 +5112,22 @@ function Settings:RefreshRaidTab()
 				ddMod:SetWidth(135)
 			end
 			
-			-- Button Dropdown
+			-- Button Dropdown (dynamically filtered)
+			local currentMod = s[actionKey] and s[actionKey].modifier or "NONE"
+			local validButtons = GetValidButtonsForModifier(currentMod)
+			
 			local btnDropdown = Components:CreateDropdown(
 				row, 
 				"", 
-				buttonOptions, 
-				function(val) return val == currentBtn end,
+				validButtons, -- Use filtered list
+				function(val) 
+					local s = DB:Get("raidShortcuts") or {}
+					local b = "LeftButton"
+					if s[actionKey] then
+						b = s[actionKey].button or "LeftButton"
+					end
+					return val == b
+				end,
 				function(val)
 					local s = DB:Get("raidShortcuts") or {}
 					if not s[actionKey] then s[actionKey] = {} end
@@ -5109,10 +5141,14 @@ function Settings:RefreshRaidTab()
 					s[actionKey].button = val
 					DB:Set("raidShortcuts", s)
 					
+					-- Live refresh: Update all raid buttons
 					local RaidFrame = BFL:GetModule("RaidFrame")
-					if RaidFrame and RaidFrame.UpdateSecureAttributes then
-						RaidFrame:UpdateSecureAttributes()
+					if RaidFrame then
+						RaidFrame:UpdateAllMemberButtons()
 					end
+					
+					-- Refresh modifier dropdown (button changed, modifier options may change)
+					C_Timer.After(0.05, function() Settings:RefreshRaidTab() end)
 				end
 			)
 			-- MANUAL LAYOUT FIX: Disable auto-layout

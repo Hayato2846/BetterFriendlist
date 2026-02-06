@@ -693,11 +693,16 @@ function ShowBetterFriendsFrame(tabIndex) -- Clear search box
 		BetterFriendsFrame:Show()
 	end
 	
-	-- Switch to requested tab if specified
-	if tabIndex and tabIndex >= 1 and tabIndex <= 4 then
-		-- BFL:DebugPrint("[BFL] ShowBetterFriendsFrame: Switching to tab " .. tabIndex)
-		PanelTemplates_SetTab(BetterFriendsFrame, tabIndex)
-		BetterFriendsFrame_ShowBottomTab(tabIndex)
+	-- Switch to requested tab if specified, otherwise default to current or 1
+	local targetTab = tabIndex
+	if not targetTab then
+		targetTab = PanelTemplates_GetSelectedTab(BetterFriendsFrame) or 1
+	end
+	
+	if targetTab >= 1 and targetTab <= 4 then
+		-- BFL:DebugPrint("[BFL] ShowBetterFriendsFrame: Switching to tab " .. targetTab)
+		PanelTemplates_SetTab(BetterFriendsFrame, targetTab)
+		BetterFriendsFrame_ShowBottomTab(targetTab)
 	end
 end
 
@@ -2806,9 +2811,6 @@ end
 function BetterFriendsFrame_ShowBottomTab(tabIndex) local frame = BetterFriendsFrame
 	if not frame then return end
 	
-	-- Apply custom tab fonts from DB settings
-	BFL:ApplyTabFonts()
-	
 	-- CRITICAL: Update the Frame's selected tab index so PanelTemplates_GetSelectedTab returns correct value
 	-- This fixes 'isFriendsTab' checks in other modules (like FriendsList:UpdateSearchBoxState)
 	PanelTemplates_SetTab(frame, tabIndex)
@@ -2975,6 +2977,9 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex) local frame = BetterFriendsF
 	if FriendsList and FriendsList.UpdateSearchBoxState then
 		FriendsList:UpdateSearchBoxState()
 	end
+	
+	-- Apply custom tab fonts from DB settings (Applied LAST to respect selection state for sizing)
+	BFL:ApplyTabFonts()
 end
 
 -- ========================================

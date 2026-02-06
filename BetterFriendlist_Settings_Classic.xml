@@ -109,6 +109,14 @@
 									<Anchor point="BOTTOMRIGHT" />
 								</Anchors>
 							</Frame>
+
+							<!-- Raid Tab Content (NEW) -->
+							<Frame parentKey="RaidTab" hidden="true">
+								<Anchors>
+									<Anchor point="TOPLEFT" />
+									<Anchor point="BOTTOMRIGHT" />
+								</Anchors>
+							</Frame>
 						</Frames>
 					</Frame>
 				</ScrollChild>

@@ -630,7 +630,7 @@ function BFL:ForceRefreshFriendsList()
 	-- Refresh RaidFrame if loaded and visible
 	local RaidFrame = self:GetModule("RaidFrame")
 	if RaidFrame and BetterFriendsFrame and BetterFriendsFrame.RaidFrame and BetterFriendsFrame.RaidFrame:IsShown() then
-		RaidFrame:UpdateAllMemberButtons()
+		RaidFrame:UpdateGroupLayout()
 	end
 	
 	-- Refresh QuickFilter Dropdown (if it exists)
@@ -885,6 +885,7 @@ function BFL:GetDragGhost()
 	if not DragGhost then
 		DragGhost = CreateFrame("Frame", nil, UIParent)
 		DragGhost:SetFrameStrata("TOOLTIP")
+		DragGhost:EnableMouse(false) -- Ensure ghost doesn't block mouse events
 		DragGhost.bg = DragGhost:CreateTexture(nil, "BACKGROUND")
 		DragGhost.bg:SetAllPoints()
 		DragGhost.bg:SetColorTexture(0.15, 0.15, 0.15, 0.9)

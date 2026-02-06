@@ -727,8 +727,8 @@
 	
 	<!-- Raid Member Button Template - Individual member display with rich UI elements -->
 	<!-- IMPORTANT: NOT using SecureUnitButtonTemplate to avoid making parent frame PROTECTED -->
-	<!-- (SecureUnitButtonTemplate would propagate protection to BetterFriendsFrame, preventing :Show() in combat) -->
-	<Button name="BetterRaidMemberButtonTemplate" virtual="true">
+	<!-- InsecureActionButtonTemplate: Allows secure attributes without parent frame tainting -->
+	<Button name="BetterRaidMemberButtonTemplate" inherits="InsecureActionButtonTemplate" virtual="true">
 		<Size x="180" y="20"/>
 		<Layers>
 			<Layer level="BACKGROUND">
@@ -842,9 +842,9 @@
 			<OnLeave>
 				BetterRaidMemberButton_OnLeave(self);
 			</OnLeave>
-			<OnClick>
-				BetterRaidMemberButton_OnClick(self, button);
-			</OnClick>
+			<PostClick>
+				BetterRaidMemberButton_PostClick(self, button);
+			</PostClick>
 			<OnDragStart>
 				if not InCombatLockdown() then
 					BetterRaidMemberButton_OnDragStart(self);

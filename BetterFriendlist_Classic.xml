@@ -1619,7 +1619,6 @@
 				</Anchors>
 				<Scripts>
 					<OnClick>
-						PanelTemplates_Tab_OnClick(self, BetterFriendsFrame)
 						BetterFriendsFrame_ShowBottomTab(1)
 						PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
 					</OnClick>
@@ -1631,8 +1630,8 @@
 				</Anchors>
 				<Scripts>
 					<OnClick>
-						PanelTemplates_Tab_OnClick(self, BetterFriendsFrame)
 						BetterFriendsFrame_ShowBottomTab(2)
+						PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
 					</OnClick>
 				</Scripts>
 			</Button>
@@ -1666,8 +1665,10 @@
 				end
 				
 				-- Classic: Only 3 bottom tabs (no QuickJoin)
-				PanelTemplates_SetNumTabs(self, 3)
-				PanelTemplates_SetTab(self, 1)
+				-- We do NOT use PanelTemplates_SetNumTabs(self, 3) because we don't want
+				-- PanelTemplates_UpdateTabs(self) to mess with our explicitly managed bottom tabs
+				-- or confuse them with Top Tabs.
+				self.selectedTab = 1
 			</OnLoad>
 			<OnShow>
 				if BetterFriendsFrame_UpdateQuickJoinTab then

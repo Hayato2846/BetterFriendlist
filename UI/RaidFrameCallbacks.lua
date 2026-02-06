@@ -440,8 +440,9 @@ end
 -- ========================================
 
 function BetterRaidMemberButton_OnLoad(self)
-	-- Register for updates
-	self:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+	-- CRITICAL: Register for ALL clicks to allow Secure Attributes with modifiers
+	-- "AnyUp" enables processing of Shift+Click, Alt+Click, etc. via attributes
+	self:RegisterForClicks("AnyUp")
 	self:RegisterForDrag("LeftButton")
 	
 	-- Expand hit rect to cover the 2px gap between buttons
@@ -452,73 +453,23 @@ function BetterRaidMemberButton_OnLoad(self)
 end
 
 function BetterRaidMemberButton_OnEnter(self)
-	-- BFL:DebugPrint("XML OnEnter called for " .. (self:GetName() or "unnamed") .. ", unit=" .. tostring(self.unit))
-	
-	-- Always show highlight (even for empty slots)
+	-- Always show highlight
 	if self.Highlight then
 		self.Highlight:Show()
 	end
 	
-	-- Phase 8.3: If dragging, show highlight but skip proxy and tooltip
+	-- If dragging, skip tooltip (but keep highlight)
 	if BetterRaidFrame_DraggedUnit then
 		return
 	end
 	
-	if not self.unit then
-		return
-	end
-	
-	-- Phase 8.3: Secure Proxy Logic
-	-- If out of combat, show the secure proxy on top of this button
-	-- ONLY if the button has a valid unit assigned
-	local RaidFrame = BFL:GetModule("RaidFrame")
-	if RaidFrame and RaidFrame.SecureProxy and not InCombatLockdown() and self.unit then
-		local proxy = RaidFrame.SecureProxy
-		
-		-- Link proxy to this visual button
-		proxy.visualButton = self
-		
-        -- Position proxy to cover this button exactly
-        proxy:ClearAllPoints()
-        proxy:SetPoint("TOPLEFT", self, "TOPLEFT", 0, 0)
-        proxy:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", 0, 0)
-        
-        -- Set secure unit attribute
-        proxy:SetAttribute("unit", self.unit)
-        -- CRITICAL: Set Lua field 'unit' as well, because UnitFrame_UpdateTooltip checks self.unit
-        proxy.unit = self.unit
-        
-        -- Show proxy (it will now intercept mouse events)
-        proxy:Show()
-        
-        -- BFL:DebugPrint("Proxy summoned via XML OnEnter for " .. tostring(self.unit))
-
-        -- Manually trigger OnEnter on the proxy immediately
-        -- (Because the mouse is already over it, but it just appeared)
-        local onEnter = proxy:GetScript("OnEnter")
-        if onEnter then
-            onEnter(proxy)
-        end
-        return
-    else
-        -- if not RaidFrame then BFL:DebugPrint("OnEnter: RaidFrame module missing") end
-        -- if RaidFrame and not RaidFrame.SecureProxy then BFL:DebugPrint("OnEnter: SecureProxy missing") end
-    end
-	
-	-- Fallback: Standard Insecure Tooltip (In Combat)
-	UnitFrame_UpdateTooltip(self)
-	
-	-- Highlight
-	if self.Highlight then
-		self.Highlight:Show()
+	-- Show tooltip if unit exists
+	if self.unit then
+		UnitFrame_UpdateTooltip(self)
 	end
 end
 
 function BetterRaidMemberButton_OnLeave(self)
-	-- Note: When SecureProxy is active, this OnLeave fires immediately 
-	-- because the proxy covers the button.
-    -- We allow the visual highlight to hide, because the Proxy now has its own highlight.
-	
 	GameTooltip:Hide()
 	
 	if self.Highlight then
@@ -526,30 +477,48 @@ function BetterRaidMemberButton_OnLeave(self)
 	end
 end
 
-function BetterRaidMemberButton_OnClick(self, button)
-	-- BFL:DebugPrint("XML OnClick called for " .. (self:GetName() or "unnamed") .. ", button=" .. tostring(button) .. ", unit=" .. tostring(self.unit))
+function BetterRaidMemberButton_PostClick(self, button)
+	-- PostClick wird NACH Attribute-Verarbeitung aufgerufen
+	-- Hier ist sicher, dass Secure Attributes bereits verarbeitet wurden
+	
 	if not self.unit or not self.name then
 		return
 	end
 	
+	-- Detect modifier combination
+	local modifier = nil
+	if IsShiftKeyDown() and IsControlKeyDown() then
+		modifier = "SHIFT-CTRL"
+	elseif IsShiftKeyDown() and IsAltKeyDown() then
+		modifier = "SHIFT-ALT"
+	elseif IsControlKeyDown() and IsAltKeyDown() then
+		modifier = "CTRL-ALT"
+	elseif IsShiftKeyDown() then
+		modifier = "SHIFT"
+	elseif IsControlKeyDown() then
+		modifier = "CTRL"
+	elseif IsAltKeyDown() then
+		modifier = "ALT"
+	end
+	
+	-- Try to handle as shortcut (Promote/Lead only, MainTank/MainAssist via attributes)
+	if modifier then
+		local RaidFrame = GetRaidFrame()
+		if RaidFrame and RaidFrame:HandleShortcutClick(self, button, modifier) then
+			return -- Shortcut handled
+		end
+	end
+	
 	if button == "LeftButton" then
-		-- Ctrl+Left-click: Toggle multi-selection (Phase 8.2)
+		-- Ctrl+Left-click: Toggle multi-selection
 		if IsControlKeyDown() then
 			TogglePlayerSelection(self)
 		else
 			-- Normal left-click: Clear all selections
 			ClearAllSelections()
 		end
-	elseif button == "RightButton" then
-		-- Right-click: Show standard raid context menu
-		local contextData = {
-			unit = self.unit,
-			name = self.name,
-			isBFL = true, -- Signal to MenuSystem to add custom buttons
-		}
-		-- Use compatibility wrapper for Classic support
-		BFL.OpenContextMenu(self, "RAID", contextData, self.name)
 	end
+	-- RightButton togglemenu und MainTank/MainAssist werden durch Secure Attributes verarbeitet
 end
 
 function BetterRaidMemberButton_OnDragUpdate(self)
@@ -564,6 +533,11 @@ end
 
 function BetterRaidMemberButton_OnDragStart(self)
 	if not self.unit or not self.name then
+		return
+	end
+	
+	-- CRITICAL: Block drag if ANY modifier is pressed (shortcuts have priority)
+	if IsModifierKeyDown() then
 		return
 	end
 	

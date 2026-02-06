@@ -141,6 +141,26 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 		-- Set initial selected text with smaller icon and left offset
 		UIDropDownMenu_SetText(dropdown, string.format("|T%s.tga:14:14:-2:-2|t", bnStatus))
 		
+		-- Restore text on show (Fix for "..." when switching tabs)
+		-- We use C_Timer.After to ensure this runs AFTER any default layout logic that might clear our text
+		dropdown:SetScript("OnShow", function(self)
+			C_Timer.After(0.01, function()
+				local bnetAFK, bnetDND = BFL.GetMyBNetStatus()
+				-- Update closure variable so tooltip is also correct
+				if bnetAFK then
+					bnStatus = FRIENDS_TEXTURE_AFK
+				elseif bnetDND then
+					bnStatus = FRIENDS_TEXTURE_DND
+				else
+					bnStatus = FRIENDS_TEXTURE_ONLINE
+				end
+				
+				UIDropDownMenu_SetText(self, string.format("|T%s.tga:14:14:-2:-2|t", bnStatus))
+				-- Increase width slightly to ensure icon fits without truncating to "..."
+				UIDropDownMenu_SetWidth(self, 40) 
+			end)
+		end)
+		
 		-- Setup tooltip for Classic
 		-- Hook button as it consumes mouse events
 		local button = _G[dropdown:GetName() .. "Button"]
