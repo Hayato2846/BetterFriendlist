@@ -64,20 +64,6 @@ local INVITE_RESTRICTION_NO_GAME_ACCOUNTS = 12
 -- Helper Functions
 -- ========================================
 
--- PERFY FIX: Safe settings cache getter with auto-refresh and defaults
--- This ensures cache is always up-to-date and provides fallback values
-local function GetCachedSetting(self, key, default)
-	-- Auto-refresh cache if version changed (lazy loading)
-	self:UpdateSettingsCache()
-	
-	-- Return cached value or default
-	local value = self.settingsCache and self.settingsCache[key]
-	if value ~= nil then
-		return value
-	end
-	return default
-end
-
 -- Get height of a display list item based on its type
 -- CRITICAL: These heights MUST match XML template heights and ButtonPool SetHeight() calls
 -- Otherwise buttons will drift out of position!
@@ -113,9 +99,6 @@ end
 -- This allows for diffing before committing to ScrollBox
 local function BuildDisplayList(self) 
 	local displayList = {}
-	
-	-- PERFY FIX: Auto-refresh settings cache at entry point
-	self:UpdateSettingsCache()
 	
 	-- Optimization: SyncGroups removed (Called by UpdateFriendsList before Render)
 	-- self:SyncGroups()
@@ -3167,9 +3150,6 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) local groupId 
 	local count = elementData.count
 	local collapsed = elementData.collapsed
 	
-	-- PERFY FIX: Auto-refresh settings cache at entry point
-	self:UpdateSettingsCache()
-	
 	local Groups = GetGroups()
 
 	-- Store group data on button
@@ -3942,9 +3922,6 @@ end
 -- Helper: Get formatted text for friend button (Cached)
 -- This moves expensive string concatenation out of the render loop
 function FriendsList:GetFormattedButtonText(friend)
-	-- PERFY FIX: Auto-refresh settings cache at entry point
-	self:UpdateSettingsCache()
-	
 	local DB = GetDB()
 
 	-- [STREAMER MODE LOGIC INTEGRATED]
@@ -4279,9 +4256,6 @@ end
 -- Update friend button (called by ScrollBox factory for each visible friend)
 function FriendsList:UpdateFriendButton(button, elementData) local friend = elementData.friend
 	local groupId = elementData.groupId
-	
-	-- PERFY FIX: Auto-refresh settings cache at entry point
-	self:UpdateSettingsCache()
 	
 	-- Store friend data on button for tooltip and context menu
 	button.friendIndex = friend.index
