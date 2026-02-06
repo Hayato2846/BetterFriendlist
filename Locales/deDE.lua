@@ -4,9 +4,9 @@
 local ADDON_NAME, BFL = ...
 BFL:RegisterLocale("deDE", function()
 local L = BFL_LOCALE
-	L.SETTINGS_SIMPLE_MODE = "Simple Mode"
-	L.SETTINGS_SIMPLE_MODE_DESC = "Deaktiviert das Porträt, blendet Such/Sortieroptionen aus, verbreitert das Fenster und verschiebt Tabs für ein kompaktes Layout."
-	L.MENU_CHANGELOG = "Changelog"
+	L.SETTINGS_SIMPLE_MODE = "Einfacher Modus"
+	L.SETTINGS_SIMPLE_MODE_DESC = "Deaktiviert das Spielerportrait, versteckt Such-/Sortieroptionen, verbreitert das Fenster und verschiebt Tabs für ein kompakteres Layout."
+	L.MENU_CHANGELOG = "Änderungsprotokoll"
 	-- ========================================
 	-- DIALOGS & POPUPS
 	-- ========================================
@@ -67,7 +67,7 @@ local L = BFL_LOCALE
 	-- SETTINGS PANEL
 	-- ========================================
 	L.SETTINGS_TAB_GENERAL = "Allgemein"
-	L.SETTINGS_TAB_FONTS = "Fonts"
+	L.SETTINGS_TAB_FONTS = "Schriftarten"
 	L.SETTINGS_TAB_GROUPS = "Gruppen"
 	L.SETTINGS_TAB_APPEARANCE = "Aussehen"
 	L.SETTINGS_TAB_ADVANCED = "Erweitert"
@@ -78,15 +78,18 @@ local L = BFL_LOCALE
 	L.SETTINGS_LOCK_WINDOW_DESC = "Sperrt das Fenster, um versehentliches Verschieben zu verhindern."
 	L.SETTINGS_FONT_SIZE = "Schriftgröße"
 	L.SETTINGS_FONT_COLOR = "Schriftfarbe"
+	L.SETTINGS_FONT_FACE = "Schriftart"
+	L.SETTINGS_FONT_SIZE_NUM = "Schriftgröße"
 
 	-- Group Header Settings (Phase 21)
 	L.SETTINGS_GROUP_HEADER_SETTINGS = "Gruppenkopf-Einstellungen"
 	L.SETTINGS_GROUP_FONT_HEADER = "Gruppenkopf-Schriftart"
 	L.SETTINGS_GROUP_COLOR_HEADER = "Gruppenkopf-Farben"
+	L.SETTINGS_GROUP_ORDER_HEADER = "Gruppenreihenfolge"
 	L.SETTINGS_INHERIT_GROUP_COUNT_COLOR = "Farbe von Gruppe erben"
 	L.SETTINGS_INHERIT_GROUP_ARROW_COLOR = "Farbe von Gruppe erben"
-	L.TOOLTIP_RIGHT_CLICK_INHERIT = "Rechtsklick um von Gruppe zu erben"
-	L.SETTINGS_INHERIT_TOOLTIP = "(Geerbt von Gruppe)"
+	L.TOOLTIP_RIGHT_CLICK_INHERIT = "Rechtsklick, um von Gruppe zu erben"
+	L.SETTINGS_INHERIT_TOOLTIP = "(Von Gruppe geerbt)"
 	L.SETTINGS_COLOR_GROUP_COUNT = "Gruppenzähler-Farbe"
 	L.SETTINGS_COLOR_GROUP_ARROW = "Pfeilfarbe"
 	L.SETTINGS_FONT_SIZE_SMALL = "Klein (Kompakt, 10px)"
@@ -99,6 +102,18 @@ local L = BFL_LOCALE
 	L.SETTINGS_HEADER_COUNT_VISIBLE = "Gefiltert / Gesamt (Standard)"
 	L.SETTINGS_HEADER_COUNT_ONLINE = "Online / Gesamt"
 	L.SETTINGS_HEADER_COUNT_BOTH = "Gefiltert / Online / Gesamt"
+
+	-- Group Header Alignment
+	L.SETTINGS_GROUP_HEADER_ALIGN = "Gruppenkopf-Ausrichtung"
+	L.SETTINGS_GROUP_HEADER_ALIGN_DESC = "Ausrichtung des Gruppennamens festlegen"
+	L.SETTINGS_ALIGN_LEFT = "Links"
+	L.SETTINGS_ALIGN_CENTER = "Mitte"
+	L.SETTINGS_ALIGN_RIGHT = "Rechts"
+	-- New Arrow Settings
+	L.SETTINGS_SHOW_GROUP_ARROW = "Einklapp-Pfeil anzeigen"
+	L.SETTINGS_SHOW_GROUP_ARROW_DESC = "Pfeil-Symbol zum Einklappen von Gruppen anzeigen oder ausblenden"
+	L.SETTINGS_GROUP_ARROW_ALIGN = "Pfeil-Ausrichtung"
+	L.SETTINGS_GROUP_ARROW_ALIGN_DESC = "Ausrichtung des Einklapp-/Ausklapp-Pfeils festlegen"
 	L.SETTINGS_SHOW_FACTION_ICONS = "Fraktions-Symbole anzeigen"
 	L.SETTINGS_SHOW_REALM_NAME = "Realm-Namen anzeigen"
 	L.SETTINGS_GRAY_OTHER_FACTION = "Andere Fraktion ausgrauen"
@@ -282,6 +297,11 @@ local L = BFL_LOCALE
 	-- ========================================
 	-- EDIT MODE FRAME SIZE (PHASE 5)
 	-- ========================================
+	L.SETTINGS_FRAME_DIMENSIONS_HEADER = "Fensterabmessungen"
+	L.SETTINGS_FRAME_SCALE = "Skalierung:"
+	L.SETTINGS_FRAME_WIDTH_DESC = "Fensterbreite anpassen"
+	L.SETTINGS_FRAME_HEIGHT_DESC = "Fensterhöhe anpassen"
+	L.SETTINGS_FRAME_SCALE_DESC = "Fensterskalierung anpassen"
 	L.SETTINGS_FRAME_SIZE_HEADER = "Standard-Fenstergröße (Bearbeitungsmodus)"
 	L.SETTINGS_FRAME_SIZE_INFO = "Legen Sie Ihre bevorzugte Standardgröße für neue Bearbeitungsmodus-Layouts fest."
 	L.SETTINGS_FRAME_WIDTH = "Breite:"
@@ -434,7 +454,7 @@ local L = BFL_LOCALE
 	L.FILTER_WOW = "Nur WoW"
 	L.GROUP_INGAME = "Im Spiel"
 	L.IGNORE_LIST_UNIGNORE = "Ignorieren aufheben"
-L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
+	L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Globale Ignorierliste"
 	L.MENU_SET_NICKNAME_FMT = "Spitznamen für %s festlegen"
 	L.MIGRATION_DEBUG_BNET = "Migrations-Check - Altes Battle.net Format:"
 	L.MIGRATION_DEBUG_TOTAL = "Migrations-Check - Gesamte Freundes-Zuordnungen:"
@@ -603,6 +623,7 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	-- Tooltips Advanced
 	L.TOOLTIP_LAST_CONTACT = "Letzter Kontakt:"
 	L.TOOLTIP_AGO = " her"
+	L.TOOLTIP_AGO_PREFIX = ""
 	L.TOOLTIP_LAST_ONLINE = "Zuletzt online: %s"
 	L.TOOLTIP_RESTORE_FRIEND = "Freund wiederherstellen"
 	L.TOOLTIP_DELETE_FRIEND = "Freund löschen"
@@ -995,14 +1016,14 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	L.COMPAT_GAME_VERSION = "|cffffcc00Spiel-Version:|r"
 
 	-- Font Outline/Shadow Settings
-	L.SETTINGS_FONT_OUTLINE = "Font Outline"
-	L.SETTINGS_FONT_SHADOW = "Font Shadow"
-	L.SETTINGS_FONT_OUTLINE_NONE = "None"
-	L.SETTINGS_FONT_OUTLINE_NORMAL = "Outline"
-	L.SETTINGS_FONT_OUTLINE_THICK = "Thick Outline"
-	L.SETTINGS_FONT_OUTLINE_MONOCHROME = "Monochrome"
-	L.SETTINGS_GROUP_COUNT_COLOR = "Zählerfarbe"
-	L.SETTINGS_GROUP_ARROW_COLOR = "Pfeilfarbe"
+	L.SETTINGS_FONT_OUTLINE = "Schriftumrandung"
+	L.SETTINGS_FONT_SHADOW = "Schrift-Schatten"
+	L.SETTINGS_FONT_OUTLINE_NONE = "Keine"
+	L.SETTINGS_FONT_OUTLINE_NORMAL = "Kontur"
+	L.SETTINGS_FONT_OUTLINE_THICK = "Dicke Kontur"
+	L.SETTINGS_FONT_OUTLINE_MONOCHROME = "Monochrom"
+	L.SETTINGS_GROUP_COUNT_COLOR = "Zähler-Farbe"
+	L.SETTINGS_GROUP_ARROW_COLOR = "Pfeil-Farbe"
 	L.TOOLTIP_EDIT_NOTE = "Notiz bearbeiten"
 	L.MENU_SHOW_SEARCH = "Suche anzeigen"
 	L.MENU_QUICK_FILTER = "Schnellfilter"
@@ -1012,6 +1033,27 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	L.SETTINGS_ENABLE_FAVORITE_ICON_DESC = "Zeigt ein Stern-Symbol auf dem Freundes-Button für Favoriten an."
 	L.SETTINGS_SHOW_FACTION_BG = "Fraktions-Hintergrund anzeigen"
 	L.SETTINGS_SHOW_FACTION_BG_DESC = "Zeigt die Fraktionsfarbe als Hintergrund für Freundes-Buttons an."
+
+	-- ========================================
+	-- STREAMER MODE (Phase 24)
+	-- ========================================
+	L.STREAMER_MODE_TITLE = "Streamer-Modus"
+	L.STREAMER_MODE_DESC = "Optionen zum Schutz der Privatsphäre beim Streamen oder Aufnehmen."
+	L.SETTINGS_ENABLE_STREAMER_MODE = "Streamer-Modus-Button anzeigen"
+	L.STREAMER_MODE_ENABLE_DESC = "Zeigt einen Button im Hauptfenster zum Umschalten des Streamer-Modus."
+	L.STREAMER_MODE_HIDDEN_NAME = "Verstecktes Namensformat"
+	L.STREAMER_MODE_HEADER_TEXT = "Benutzerdefinierter Kopftext"
+	L.STREAMER_MODE_HEADER_TEXT_DESC = "Text, der im Battle.net-Kopf angezeigt wird, wenn Streamer-Modus aktiv ist (z.B., 'Stream-Modus')."
+	L.STREAMER_MODE_BUTTON_TOOLTIP = "Streamer-Modus umschalten"
+	L.STREAMER_MODE_BUTTON_DESC = "Klicken zum Ein-/Ausschalten des Datenschutzmodus."
+	L.SETTINGS_PRIVACY_OPTIONS = "Datenschutz-Optionen"
+	L.SETTINGS_STREAMER_NAME_FORMAT = "Namensformatierung"
+	L.SETTINGS_STREAMER_NAME_FORMAT_DESC = "Wähle, wie Namen im Streamer-Modus angezeigt werden."
+	L.SETTINGS_STREAMER_NAME_FORMAT_BATTLENET = "BattleTag erzwingen"
+	L.SETTINGS_STREAMER_NAME_FORMAT_NICKNAME = "Spitznamen erzwingen"
+	L.SETTINGS_STREAMER_NAME_FORMAT_NOTE = "Notiz erzwingen"
+	L.SETTINGS_STREAMER_USE_PURPLE_HEADER = "Lila Kopffarbe verwenden"
+	L.SETTINGS_STREAMER_USE_PURPLE_HEADER_DESC = "Ändert die Hintergrundfarbe des Battle.net-Kopfes zu Twitch-Lila, wenn Streamer-Modus aktiv ist."
 
 	-- ========================================
 	-- RAID SHORTCUTS (Phase 26)
@@ -1040,4 +1082,5 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	L.SETTINGS_RAID_MODIFIER_LABEL = "Mod:"
 	L.SETTINGS_RAID_BUTTON_LABEL = "Btn:"
 	L.SETTINGS_RAID_WARNING = "Hinweis: Kürzel sind sichere Aktionen (außerhalb des Kampfes)."
+	L.SETTINGS_RAID_ERROR_RESERVED = "Diese Kombination ist reserviert."
 end)

@@ -992,6 +992,17 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 	
 
 
+	-- Switch Locale (Debug)
+	elseif msg:match("^locale%s+") then
+		local newLocale = msg:match("^locale%s+(%S+)")
+		if newLocale then
+			if BFL.SetLocale then
+				BFL:SetLocale(newLocale)
+			else
+				print("|cffff0000BFL:|r SetLocale function not found!")
+			end
+		end
+
 	-- Test Translations (Encoding Check)
 	elseif msg == "testlocales" or msg == "testencoding" or msg == "testenc" then
 		BFL:DebugPrint("|cff00ff00BetterFriendlist:|r " .. (BFL.L.CORE_HELP_TEST_LOCALES or "Testing Localization Encoding..."))
