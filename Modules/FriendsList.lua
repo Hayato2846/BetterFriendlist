@@ -64,6 +64,20 @@ local INVITE_RESTRICTION_NO_GAME_ACCOUNTS = 12
 -- Helper Functions
 -- ========================================
 
+-- PERFY FIX: Safe settings cache getter with auto-refresh and defaults
+-- This ensures cache is always up-to-date and provides fallback values
+local function GetCachedSetting(self, key, default)
+	-- Auto-refresh cache if version changed (lazy loading)
+	self:UpdateSettingsCache()
+	
+	-- Return cached value or default
+	local value = self.settingsCache and self.settingsCache[key]
+	if value ~= nil then
+		return value
+	end
+	return default
+end
+
 -- Get height of a display list item based on its type
 -- CRITICAL: These heights MUST match XML template heights and ButtonPool SetHeight() calls
 -- Otherwise buttons will drift out of position!
@@ -99,6 +113,9 @@ end
 -- This allows for diffing before committing to ScrollBox
 local function BuildDisplayList(self) 
 	local displayList = {}
+	
+	-- PERFY FIX: Auto-refresh settings cache at entry point
+	self:UpdateSettingsCache()
 	
 	-- Optimization: SyncGroups removed (Called by UpdateFriendsList before Render)
 	-- self:SyncGroups()
@@ -189,9 +206,10 @@ local function BuildDisplayList(self)
 		return displayList -- Return empty list if DB missing
 	end
 	
-	-- PERFY OPTIMIZATION: Cache settings outside loop
-	local enableInGameGroup = self.settingsCache and self.settingsCache.enableInGameGroup or DB:Get("enableInGameGroup", false)
-	local inGameGroupMode = self.settingsCache and self.settingsCache.inGameGroupMode or DB:Get("inGameGroupMode", "same_game")
+	-- PERFY OPTIMIZATION: Direct cache access (no DB:Get fallback)
+	-- Cache is auto-refreshed at entry point, safe to use directly
+	local enableInGameGroup = self.settingsCache and self.settingsCache.enableInGameGroup or false
+	local inGameGroupMode = self.settingsCache and self.settingsCache.inGameGroupMode or "same_game"
 	local BNET_CLIENT_WOW = BNET_CLIENT_WOW or "WoW"
 	
 	-- Group friends
@@ -285,7 +303,8 @@ local function BuildDisplayList(self)
 	end
 	table.sort(orderedGroups, function(a, b) return (a.order or 999) < (b.order or 999) end)
 	
-	local hideEmptyGroups = self.settingsCache and self.settingsCache.hideEmptyGroups or DB:Get("hideEmptyGroups", false)
+	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
+	local hideEmptyGroups = self.settingsCache and self.settingsCache.hideEmptyGroups or false
 	
 	for _, groupData in ipairs(orderedGroups) do
 		local groupFriends = groupedFriends[groupData.id]
@@ -442,9 +461,10 @@ end
 
 -- Create extent calculator for dynamic button heights
 -- Returns a function that calculates height based on elementData.buttonType
-local function CreateExtentCalculator(self) local DB = GetDB()
-	
-	return function(dataIndex, elementData) local isCompactMode = self.settingsCache and self.settingsCache.compactMode or (DB and DB:Get("compactMode", false))
+local function CreateExtentCalculator(self) 
+	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback (no DB dependency in closure)
+	return function(dataIndex, elementData) 
+		local isCompactMode = self.settingsCache and self.settingsCache.compactMode or false
 		
 		if elementData.buttonType == BUTTON_TYPE_GROUP_HEADER then
 			return 22
@@ -473,9 +493,9 @@ function FriendsList:UpdateSearchBoxState()
 	local frame = BetterFriendsFrame
 	if not frame or not frame.ScrollFrame then return end
 	
-	local DB = GetDB()
-	local simpleMode = DB and DB:Get("simpleMode", false)
-	local showSearch = DB and DB:Get("simpleModeShowSearch", true)
+	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
+	local simpleMode = self.settingsCache and self.settingsCache.simpleMode or false
+	local showSearch = self.settingsCache and self.settingsCache.simpleModeShowSearch or true
 	local searchBox = frame.FriendsTabHeader and frame.FriendsTabHeader.SearchBox
 	local scrollFrame = frame.ScrollFrame
 	
@@ -844,9 +864,9 @@ function FriendsList:RenderClassicButtons() if not self.classicScrollFrame or no
 	local offset = FauxScrollFrame_GetOffset(self.classicScrollFrame.FauxScrollFrame) or 0
 	local numButtons = #self.classicButtonPool
 	
+	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
 	-- Get compact mode setting
-	local DB = GetDB()
-	local isCompactMode = self.settingsCache and self.settingsCache.compactMode or (DB and DB:Get("compactMode", false))
+	local isCompactMode = self.settingsCache and self.settingsCache.compactMode or false
 	
 	-- Calculate total content height for accurate scrolling with variable item heights
 	local totalHeight = 0
@@ -1049,10 +1069,11 @@ end
 -- Get display name based on format setting
 -- @param forSorting (boolean) If true, use BattleTag instead of AccountName for BNet friends (prevents sorting issues with protected strings)
 function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Name Caching (Persistent)
+	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
 	-- [STREAMER MODE START]
 	if BFL.StreamerMode and BFL.StreamerMode:IsActive() then
 		local DB = GetDB()
-		local mode = DB and DB:Get("streamerModeNameFormat", "battletag") or "battletag"
+		local mode = self.settingsCache and self.settingsCache.streamerModeNameFormat or "battletag"
 		
 		-- Default Safe Name (ShortTag or CharName)
 		local safeName = friend.name -- Valid for WoW friends (Character Name)
@@ -1083,11 +1104,11 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 
 	if not self.displayNameCache then self.displayNameCache = {} end
 
-	local DB = GetDB()
-	local format = self.settingsCache and self.settingsCache.nameDisplayFormat or (DB and DB:Get("nameDisplayFormat", "%name%") or "%name%")
+	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
+	local format = self.settingsCache and self.settingsCache.nameDisplayFormat or "%name%"
 	local uid = friend.uid or GetFriendUID(friend)
 	local note = (friend.note or friend.notes or "")
-	local showRealmName = self.settingsCache and self.settingsCache.showRealmName or (DB and DB:Get("showRealmName", false))
+	local showRealmName = self.settingsCache and self.settingsCache.showRealmName or false
 	local nicknameVersion = BFL.NicknameCacheVersion or 0 -- Phase 6: Version Check
 
 	-- Inputs for validation
@@ -1403,18 +1424,39 @@ function FriendsList:UpdateFontCache()
 	self.fontCache.infoR, self.fontCache.infoG, self.fontCache.infoB, self.fontCache.infoA = GetColor("fontColorFriendInfo")
 end
 
+-- Invalidate settings cache (called by DB:Set to ensure immediate UI response)
+function FriendsList:InvalidateSettingsCache()
+	self.settingsCacheVersion = nil
+end
+
 -- Update cached settings to avoid DB lookups in render loop
+-- PERFY FIX: Version-based lazy loading - only rebuild if settings changed
 function FriendsList:UpdateSettingsCache()
 	local DB = GetDB()
 	if not DB then return end
 	
+	-- Check if cache is already up-to-date
+	local currentVersion = BFL.SettingsVersion or 1
+	if self.settingsCacheVersion == currentVersion then
+		return -- Cache still valid
+	end
+	
+	-- Rebuild cache with new settings
+	self.settingsCacheVersion = currentVersion
 	self.settingsCache = self.settingsCache or {}
+	
+	-- Core Display Settings
 	self.settingsCache.nameDisplayFormat = DB:Get("nameDisplayFormat", "%name%")
 	self.settingsCache.showRealmName = DB:Get("showRealmName", false)
+	self.settingsCache.compactMode = DB:Get("compactMode", false)
+	
+	-- Group Settings
 	self.settingsCache.enableInGameGroup = DB:Get("enableInGameGroup", false)
 	self.settingsCache.inGameGroupMode = DB:Get("inGameGroupMode", "same_game")
 	self.settingsCache.hideEmptyGroups = DB:Get("hideEmptyGroups", false)
-	self.settingsCache.compactMode = DB:Get("compactMode", false)
+	self.settingsCache.accordionGroups = DB:Get("accordionGroups", false)
+	
+	-- Visual Settings
 	self.settingsCache.grayOtherFaction = DB:Get("grayOtherFaction", false)
 	self.settingsCache.showFactionIcons = DB:Get("showFactionIcons", false)
 	self.settingsCache.colorClassNames = DB:Get("colorClassNames", true)
@@ -1425,6 +1467,19 @@ function FriendsList:UpdateSettingsCache()
 	self.settingsCache.enableFavoriteIcon = DB:Get("enableFavoriteIcon", false)
 	self.settingsCache.showFactionBg = DB:Get("showFactionBg", false)
 	self.settingsCache.fontColorFriendInfo = DB:Get("fontColorFriendInfo") or {r=0.5, g=0.5, b=0.5, a=1}
+	
+	-- Group Header Settings (Hot Path in UpdateGroupHeaderButton)
+	self.settingsCache.headerCountFormat = DB:Get("headerCountFormat", "visible")
+	self.settingsCache.groupHeaderAlign = DB:Get("groupHeaderAlign", "LEFT")
+	self.settingsCache.showGroupArrow = DB:Get("showGroupArrow", true)
+	self.settingsCache.groupArrowAlign = DB:Get("groupArrowAlign", "LEFT")
+	
+	-- Simple Mode Settings
+	self.settingsCache.simpleMode = DB:Get("simpleMode", false)
+	self.settingsCache.simpleModeShowSearch = DB:Get("simpleModeShowSearch", true)
+	
+	-- Streamer Mode Settings
+	self.settingsCache.streamerModeNameFormat = DB:Get("streamerModeNameFormat", "battletag")
 	
 	-- Cache player faction for background rendering (Optimized Phase 4.1)
 	self.playerFaction = UnitFactionGroup("player")
@@ -2662,10 +2717,10 @@ end
 function FriendsList:ToggleGroup(groupId) local Groups = GetGroups()
 	if not Groups then return end
 	
+	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
 	-- Handle Accordion Mode
 	-- Note: We do this before the main toggle to clear others
-	local DB = GetDB()
-	local accordionMode = DB and DB:Get("accordionGroups", false)
+	local accordionMode = self.settingsCache and self.settingsCache.accordionGroups or false
 	local needsFullRefresh = false
 	
 	if accordionMode then
@@ -3112,6 +3167,9 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) local groupId 
 	local count = elementData.count
 	local collapsed = elementData.collapsed
 	
+	-- PERFY FIX: Auto-refresh settings cache at entry point
+	self:UpdateSettingsCache()
+	
 	local Groups = GetGroups()
 
 	-- Store group data on button
@@ -3161,8 +3219,9 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) local groupId 
 	-- Count Color Code
 	local countColorCode = string.format("|cff%02x%02x%02x", countR*255, countG*255, countB*255)
 	
+	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
 	-- Set header text with color
-	local format = DB and DB:Get("headerCountFormat", "visible") or "visible"
+	local format = self.settingsCache and self.settingsCache.headerCountFormat or "visible"
 	local countText = ""
 	
 	if format == "online" then
@@ -3182,8 +3241,9 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) local groupId 
 	-- Apply Name and Count colors separately
 	button:SetFormattedText("%s%s|r %s(%s)|r", colorCode, name, countColorCode, countText)
 	
+	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
 	-- Apply Text Alignment and Font Settings (Feature Request)
-	local align = DB and DB:Get("groupHeaderAlign", "LEFT") or "LEFT"
+	local align = self.settingsCache and self.settingsCache.groupHeaderAlign or "LEFT"
 	
 	if button:GetFontString() then
 		local fs = button:GetFontString()
@@ -3235,9 +3295,10 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) local groupId 
 		end
 	end
 
+	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
 	-- Show/hide and align collapse arrows (Feature Request)
-	local showArrow = DB and DB:Get("showGroupArrow", true)
-	local arrowAlign = DB and DB:Get("groupArrowAlign", "LEFT") or "LEFT"
+	local showArrow = self.settingsCache and self.settingsCache.showGroupArrow or true
+	local arrowAlign = self.settingsCache and self.settingsCache.groupArrowAlign or "LEFT"
 
 	-- Reset visibility first
 	if button.DownArrow then button.DownArrow:Hide() end
@@ -3881,6 +3942,9 @@ end
 -- Helper: Get formatted text for friend button (Cached)
 -- This moves expensive string concatenation out of the render loop
 function FriendsList:GetFormattedButtonText(friend)
+	-- PERFY FIX: Auto-refresh settings cache at entry point
+	self:UpdateSettingsCache()
+	
 	local DB = GetDB()
 
 	-- [STREAMER MODE LOGIC INTEGRATED]
@@ -3888,7 +3952,8 @@ function FriendsList:GetFormattedButtonText(friend)
 	-- AND show friend info (Character Name, Zone, etc.) which is desired by the user.
 	-- GetDisplayName (called below) handles the primary name masking.
 
-	local isCompactMode = self.settingsCache and self.settingsCache.compactMode or DB:Get("compactMode", false)
+	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
+	local isCompactMode = self.settingsCache and self.settingsCache.compactMode or false
 	local currentSettingsVersion = BFL.SettingsVersion or 1
 	
 	-- Check cache (Fastest Path)
@@ -3959,11 +4024,11 @@ function FriendsList:GetFormattedButtonText(friend)
 	end
 	
 	if friend.type == "bnet" then
-		-- Battle.net Friend
+		-- Battle.net Friend (PERFY OPTIMIZATION: Direct cache access with defensive fallback)
 		local playerFactionGroup = UnitFactionGroup("player")
-		local grayOtherFaction = self.settingsCache and self.settingsCache.grayOtherFaction or DB:Get("grayOtherFaction", false)
-		local showFactionIcons = self.settingsCache and self.settingsCache.showFactionIcons or DB:Get("showFactionIcons", false)
-		local showRealmName = self.settingsCache and self.settingsCache.showRealmName or DB:Get("showRealmName", false)
+		local grayOtherFaction = self.settingsCache and self.settingsCache.grayOtherFaction or false
+		local showFactionIcons = self.settingsCache and self.settingsCache.showFactionIcons or false
+		local showRealmName = self.settingsCache and self.settingsCache.showRealmName or false
 		
 		if friend.connected then
 			if not usedExternalFormatter then
@@ -3997,7 +4062,8 @@ function FriendsList:GetFormattedButtonText(friend)
 						end
 					end
 					
-					local useClassColor = self.settingsCache and self.settingsCache.colorClassNames or DB:Get("colorClassNames", true)
+					-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
+					local useClassColor = self.settingsCache and self.settingsCache.colorClassNames or true
 					
 					if useClassColor and not shouldGray and friend.className then
 						local classFile = GetClassFileForFriend(friend)
@@ -4214,6 +4280,9 @@ end
 function FriendsList:UpdateFriendButton(button, elementData) local friend = elementData.friend
 	local groupId = elementData.groupId
 	
+	-- PERFY FIX: Auto-refresh settings cache at entry point
+	self:UpdateSettingsCache()
+	
 	-- Store friend data on button for tooltip and context menu
 	button.friendIndex = friend.index
 	button.friendData = friend
@@ -4231,12 +4300,9 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 	
 	-- [Phase 5 Optimized] Static setup moved to InitFriendButton (friendInfo removed, using friendData)
 	
-	-- Get settings
-	local DB = GetDB()
-	local isCompactMode = self.settingsCache and self.settingsCache.compactMode
-	if isCompactMode == nil then isCompactMode = (DB and DB:Get("compactMode", false)) end
-	local showGameIcon = self.settingsCache and self.settingsCache.showGameIcon
-	if showGameIcon == nil then showGameIcon = (DB and DB:Get("showGameIcon", true)) end
+	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback (auto-refreshed at entry)
+	local isCompactMode = self.settingsCache and self.settingsCache.compactMode or false
+	local showGameIcon = self.settingsCache and self.settingsCache.showGameIcon or true
 	
 	-- Hide arrows if they exist
 	if button.RightArrow then button.RightArrow:Hide() end
@@ -4414,8 +4480,8 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 		end
 		
 		-- Set status icon (BSAp shows as AFK if setting enabled)
-		-- Optimized Phase 4: State Check
-		local showMobileAsAFK = self.settingsCache and self.settingsCache.showMobileAsAFK or DB:Get("showMobileAsAFK", false)
+		-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
+		local showMobileAsAFK = self.settingsCache and self.settingsCache.showMobileAsAFK or false
 		local statusTexture
 		
 		if friend.connected then
@@ -4684,11 +4750,9 @@ function FriendsList:UpdateInviteHeaderButton(button, data) button.Text:SetForma
 	-- Store data on button for callbacks (important for OnMouseUp refresh)
 	button.elementData = data
 	
-	-- Get Database for settings
-	local DB = GetDB and GetDB() or BFL.Settings
-	
+	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
 	-- APPLY TEXT ALIGNMENT (Feature Request)
-	local align = DB and DB:Get("groupHeaderAlign", "LEFT") or "LEFT"
+	local align = self.settingsCache and self.settingsCache.groupHeaderAlign or "LEFT"
 	if button.Text then
 		button.Text:ClearAllPoints()
 		if align == "CENTER" then
@@ -4703,9 +4767,10 @@ function FriendsList:UpdateInviteHeaderButton(button, data) button.Text:SetForma
 		end
 	end
 
+	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
 	-- ARROW ALIGNMENT & VISIBILITY
-	local showArrow = DB and DB:Get("showGroupArrow", true)
-	local arrowAlign = DB and DB:Get("groupArrowAlign", "LEFT") or "LEFT"
+	local showArrow = self.settingsCache and self.settingsCache.showGroupArrow or true
+	local arrowAlign = self.settingsCache and self.settingsCache.groupArrowAlign or "LEFT"
 
 	-- Reset visibility
 	if button.DownArrow then button.DownArrow:Hide() end

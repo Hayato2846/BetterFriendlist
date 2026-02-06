@@ -405,6 +405,13 @@ function DB:Set(key, value)
 		BFL.SettingsVersion = BFL.SettingsVersion + 1
 	end
 	BetterFriendlistDB[key] = value
+	
+	-- PERFY FIX: Immediately update FriendsList settings cache to prevent stale data
+	-- This ensures UI responds instantly to setting changes without delay/flicker
+	local FriendsList = BFL and BFL:GetModule("FriendsList")
+	if FriendsList and FriendsList.InvalidateSettingsCache then
+		FriendsList:InvalidateSettingsCache()
+	end
 end
 
 -- Get group state (collapsed/expanded)
