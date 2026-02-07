@@ -7,6 +7,78 @@ BFL.HelpFrame = HelpFrame
 
 local helpFrame = nil
 
+local function GetFormattedShortcut(action)
+	local db = BetterFriendlistDB
+	local shortcuts = db and db.raidShortcuts or {}
+	local setting = shortcuts[action]
+	local L = BFL.L
+	
+	if not setting then return "Unknown" end
+	
+	local mod = setting.modifier or "NONE"
+	local btn = setting.button or "LeftButton"
+	
+	local modText = ""
+	
+	if mod == "NONE" then
+		modText = ""
+	else
+		-- Handle composite modifiers like "CTRL-ALT" by splitting and translating parts
+		local parts = {}
+		-- Check for hyphenated modifiers
+		if string.find(mod, "-") then
+			for part in string.gmatch(mod, "[^-]+") do
+				local localized = L["SETTINGS_RAID_MODIFIER_" .. part] or part
+				table.insert(parts, localized)
+			end
+			modText = table.concat(parts, " + ")
+		else
+			-- Single modifier
+			modText = L["SETTINGS_RAID_MODIFIER_" .. mod] or mod
+		end
+	end
+
+	local btnText = ""
+	
+	if btn == "LeftButton" then btnText = L.SETTINGS_RAID_MOUSE_LEFT or "Left Click"
+	elseif btn == "RightButton" then btnText = L.SETTINGS_RAID_MOUSE_RIGHT or "Right Click"
+	elseif btn == "MiddleButton" then btnText = L.SETTINGS_RAID_MOUSE_MIDDLE or "Middle Click"
+	else btnText = btn end
+	
+	if modText == "" then
+		return btnText
+	else
+		return modText .. " + " .. btnText
+	end
+end
+
+function HelpFrame:UpdateText(frame)
+	if not frame or not frame.textElements then return end
+	local L = BFL.L or {}
+	
+	-- Update dynamic sections
+	if frame.textElements.section2Text then
+		frame.textElements.section2Text:SetText(string.format(L.RAID_HELP_MAINTANK_TEXT, GetFormattedShortcut("mainTank")))
+	end
+	
+	if frame.textElements.section3Text then
+		frame.textElements.section3Text:SetText(string.format(L.RAID_HELP_MAINASSIST_TEXT, GetFormattedShortcut("mainAssist")))
+	end
+	
+	if frame.textElements.sectionLeadText then
+		frame.textElements.sectionLeadText:SetText(string.format(L.RAID_HELP_LEAD_TEXT, GetFormattedShortcut("lead")))
+	end
+	
+	if frame.textElements.sectionPromoteText then
+		frame.textElements.sectionPromoteText:SetText(string.format(L.RAID_HELP_PROMOTE_TEXT, GetFormattedShortcut("promote")))
+	end
+	
+	-- Re-calculate layout if needed (height might change with text length)
+	if frame.LayoutContent then
+		frame:LayoutContent()
+	end
+end
+
 function HelpFrame:CreateFrame()
 	if helpFrame then
 		return helpFrame
@@ -73,6 +145,9 @@ function HelpFrame:CreateFrame()
 	content:SetSize(330, 1) -- Height will be adjusted
 	scrollFrame:SetScrollChild(content)
 	
+	-- Logic to store updateable text elements
+	frame.textElements = {}
+	
 	local L = BFL.L or {}
 	
 	-- Title
@@ -111,7 +186,8 @@ function HelpFrame:CreateFrame()
 	section2Text:SetPoint("TOPRIGHT", section2Title, "BOTTOMRIGHT", -5, -5)
 	section2Text:SetJustifyH("LEFT")
 	section2Text:SetJustifyV("TOP")
-	section2Text:SetText(L.RAID_HELP_MAINTANK_TEXT)
+	section2Text:SetText(string.format(L.RAID_HELP_MAINTANK_TEXT, GetFormattedShortcut("mainTank")))
+	frame.textElements.section2Text = section2Text
 	
 	-- Section 3: Main Assist
 	local section3Title = content:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
@@ -126,12 +202,45 @@ function HelpFrame:CreateFrame()
 	section3Text:SetPoint("TOPRIGHT", section3Title, "BOTTOMRIGHT", -5, -5)
 	section3Text:SetJustifyH("LEFT")
 	section3Text:SetJustifyV("TOP")
-	section3Text:SetText(L.RAID_HELP_MAINASSIST_TEXT)
+	section3Text:SetText(string.format(L.RAID_HELP_MAINASSIST_TEXT, GetFormattedShortcut("mainAssist")))
+	frame.textElements.section3Text = section3Text
 	
-	-- Section 4: Drag & Drop
+	-- Section 4: Raid Leader
+	local sectionLeadTitle = content:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
+	sectionLeadTitle:SetPoint("TOPLEFT", section3Text, "BOTTOMLEFT", -5, -15)
+	sectionLeadTitle:SetPoint("TOPRIGHT", section3Text, "BOTTOMRIGHT", 5, -15)
+	sectionLeadTitle:SetJustifyH("LEFT")
+	sectionLeadTitle:SetText(L.RAID_HELP_LEAD_TITLE)
+	sectionLeadTitle:SetTextColor(1.0, 0.82, 0)
+	
+	local sectionLeadText = content:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
+	sectionLeadText:SetPoint("TOPLEFT", sectionLeadTitle, "BOTTOMLEFT", 5, -5)
+	sectionLeadText:SetPoint("TOPRIGHT", sectionLeadTitle, "BOTTOMRIGHT", -5, -5)
+	sectionLeadText:SetJustifyH("LEFT")
+	sectionLeadText:SetJustifyV("TOP")
+	sectionLeadText:SetText(string.format(L.RAID_HELP_LEAD_TEXT, GetFormattedShortcut("lead")))
+	frame.textElements.sectionLeadText = sectionLeadText
+	
+	-- Section 5: Promote Assistant
+	local sectionPromoteTitle = content:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
+	sectionPromoteTitle:SetPoint("TOPLEFT", sectionLeadText, "BOTTOMLEFT", -5, -15)
+	sectionPromoteTitle:SetPoint("TOPRIGHT", sectionLeadText, "BOTTOMRIGHT", 5, -15)
+	sectionPromoteTitle:SetJustifyH("LEFT")
+	sectionPromoteTitle:SetText(L.RAID_HELP_PROMOTE_TITLE)
+	sectionPromoteTitle:SetTextColor(1.0, 0.82, 0)
+	
+	local sectionPromoteText = content:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
+	sectionPromoteText:SetPoint("TOPLEFT", sectionPromoteTitle, "BOTTOMLEFT", 5, -5)
+	sectionPromoteText:SetPoint("TOPRIGHT", sectionPromoteTitle, "BOTTOMRIGHT", -5, -5)
+	sectionPromoteText:SetJustifyH("LEFT")
+	sectionPromoteText:SetJustifyV("TOP")
+	sectionPromoteText:SetText(string.format(L.RAID_HELP_PROMOTE_TEXT, GetFormattedShortcut("promote")))
+	frame.textElements.sectionPromoteText = sectionPromoteText
+
+	-- Section 6: Drag & Drop
 	local section4Title = content:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
-	section4Title:SetPoint("TOPLEFT", section3Text, "BOTTOMLEFT", -5, -15)
-	section4Title:SetPoint("TOPRIGHT", section3Text, "BOTTOMRIGHT", 5, -15)
+	section4Title:SetPoint("TOPLEFT", sectionPromoteText, "BOTTOMLEFT", -5, -15)
+	section4Title:SetPoint("TOPRIGHT", sectionPromoteText, "BOTTOMRIGHT", 5, -15)
 	section4Title:SetJustifyH("LEFT")
 	section4Title:SetText(L.RAID_HELP_DRAGDROP_TITLE)
 	section4Title:SetTextColor(1.0, 0.82, 0)
@@ -159,24 +268,29 @@ function HelpFrame:CreateFrame()
 	section5Text:SetText(L.RAID_HELP_COMBAT_TEXT)
 	
 	-- Calculate actual content height dynamically
-	local totalHeight = 10 -- Starting offset
 	local sections = {
 		title,
 		section1Title, section1Text,
 		section2Title, section2Text,
 		section3Title, section3Text,
+		sectionLeadTitle, sectionLeadText,
+		sectionPromoteTitle, sectionPromoteText,
 		section4Title, section4Text,
 		section5Title, section5Text
 	}
 	
-	for _, fs in ipairs(sections) do
-		totalHeight = totalHeight + fs:GetStringHeight() + 5
+	frame.LayoutContent = function()
+		local total = 10
+		for _, fs in ipairs(sections) do
+			total = total + fs:GetStringHeight() + 5
+		end
+		content:SetHeight(total + 20)
 	end
-	
-	content:SetHeight(totalHeight + 20) -- Add bottom padding
+	frame:LayoutContent() -- Initial layout
 	
 	-- Sound effects
 	frame:SetScript("OnShow", function()
+		HelpFrame:UpdateText(frame) -- Update text on show
 		PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
 	end)
 	
