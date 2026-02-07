@@ -757,6 +757,40 @@ end
 -- LibQTip Tooltip (NEW)
 -- ========================================
 
+-- Replace token case-insensitively in format string
+local function ReplaceTokenCaseInsensitive(str, token, value)
+	-- Create pattern that matches token case-insensitively
+	local pattern = "%%"
+	for i = 1, #token do
+		local c = token:sub(i, i)
+		if c:match("%a") then
+			pattern = pattern .. "[" .. c:upper() .. c:lower() .. "]"
+		else
+			pattern = pattern .. c
+		end
+	end
+	pattern = pattern .. "%%"
+	
+	-- Escape value for replacement
+	local safeValue = value:gsub("%%", "%%%%")
+	return str:gsub(pattern, safeValue)
+end
+
+-- Check if token exists case-insensitively
+local function HasTokenCaseInsensitive(str, token)
+	local pattern = "%%"
+	for i = 1, #token do
+		local c = token:sub(i, i)
+		if c:match("%a") then
+			pattern = pattern .. "[" .. c:upper() .. c:lower() .. "]"
+		else
+			pattern = pattern .. c
+		end
+	end
+	pattern = pattern .. "%%"
+	return str:find(pattern) ~= nil
+end
+
 -- Helper: Get display name (respects nameDisplayFormat and tokens)
 local function GetFriendDisplayName(friend)
 	local DB = GetDB()
@@ -798,24 +832,24 @@ local function GetFriendDisplayName(friend)
 		end
 	end
 	
-	-- 2. Replace Tokens
-	-- Use function replacement to avoid issues with % characters in names
+	-- 2. Replace Tokens (case-insensitive)
 	local result = format
 
 	-- Smart Fallback Logic:
 	-- If %nickname% is used but empty, and %name% is NOT in the format, use name as nickname
-	if nickname == "" and result:find("%%nickname%%") and not result:find("%%name%%") then
+	if nickname == "" and HasTokenCaseInsensitive(result, "nickname") and not HasTokenCaseInsensitive(result, "name") then
 		nickname = name
 	end
 	-- Same for %battletag% (e.g. for WoW friends)
-	if battletag == "" and result:find("%%battletag%%") and not result:find("%%name%%") then
+	if battletag == "" and HasTokenCaseInsensitive(result, "battletag") and not HasTokenCaseInsensitive(result, "name") then
 		battletag = name
 	end
 
-	result = result:gsub("%%name%%", function() return name end)
-	result = result:gsub("%%note%%", function() return note end)
-	result = result:gsub("%%nickname%%", function() return nickname end)
-	result = result:gsub("%%battletag%%", function() return battletag end)
+	-- Replace tokens case-insensitively
+	result = ReplaceTokenCaseInsensitive(result, "name", name)
+	result = ReplaceTokenCaseInsensitive(result, "note", note)
+	result = ReplaceTokenCaseInsensitive(result, "nickname", nickname)
+	result = ReplaceTokenCaseInsensitive(result, "battletag", battletag)
 	
 	-- 3. Cleanup
 	-- Remove empty parentheses/brackets (e.g. "Name ()" -> "Name")

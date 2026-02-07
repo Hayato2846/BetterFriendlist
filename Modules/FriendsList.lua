@@ -1181,6 +1181,40 @@ local function GetFriendUID(friend) if not friend then return nil end
 	end
 end
 
+-- Replace token case-insensitively in format string
+local function ReplaceTokenCaseInsensitive(str, token, value)
+	-- Create pattern that matches token case-insensitively
+	local pattern = "%%"
+	for i = 1, #token do
+		local c = token:sub(i, i)
+		if c:match("%a") then
+			pattern = pattern .. "[" .. c:upper() .. c:lower() .. "]"
+		else
+			pattern = pattern .. c
+		end
+	end
+	pattern = pattern .. "%%"
+	
+	-- Escape value for replacement
+	local safeValue = value:gsub("%%", "%%%%")
+	return str:gsub(pattern, safeValue)
+end
+
+-- Check if token exists case-insensitively
+local function HasTokenCaseInsensitive(str, token)
+	local pattern = "%%"
+	for i = 1, #token do
+		local c = token:sub(i, i)
+		if c:match("%a") then
+			pattern = pattern .. "[" .. c:upper() .. c:lower() .. "]"
+		else
+			pattern = pattern .. c
+		end
+	end
+	pattern = pattern .. "%%"
+	return str:find(pattern) ~= nil
+end
+
 -- Get display name based on format setting
 -- @param forSorting (boolean) If true, use BattleTag instead of AccountName for BNet friends (prevents sorting issues with protected strings)
 function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Name Caching (Persistent)
@@ -1300,37 +1334,22 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		end
 	end
 
-	-- 2. Replace Tokens
-	-- Use string replacement without closures for performance (Phase 9.2 Optimization)
+	-- 2. Replace Tokens (case-insensitive)
 	local result = format
 
 	-- Smart Fallback Logic:
-	if nickname == "" and result:find("%%nickname%%") and not result:find("%%name%%") then
+	if nickname == "" and HasTokenCaseInsensitive(result, "nickname") and not HasTokenCaseInsensitive(result, "name") then
 		nickname = name
 	end
-	if battletag == "" and result:find("%%battletag%%") and not result:find("%%name%%") then
+	if battletag == "" and HasTokenCaseInsensitive(result, "battletag") and not HasTokenCaseInsensitive(result, "name") then
 		battletag = name
 	end
 
-	if result:find("%%name%%") then
-		local safeName = name:gsub("%%", "%%%%")
-		result = result:gsub("%%name%%", safeName)
-	end
-	
-	if result:find("%%note%%") then
-		local safeNote = note:gsub("%%", "%%%%")
-		result = result:gsub("%%note%%", safeNote)
-	end
-	
-	if result:find("%%nickname%%") then
-		local safeNickname = nickname:gsub("%%", "%%%%")
-		result = result:gsub("%%nickname%%", safeNickname)
-	end
-	
-	if result:find("%%battletag%%") then
-		local safeBattletag = battletag:gsub("%%", "%%%%")
-		result = result:gsub("%%battletag%%", safeBattletag)
-	end
+	-- Replace tokens case-insensitively
+	result = ReplaceTokenCaseInsensitive(result, "name", name)
+	result = ReplaceTokenCaseInsensitive(result, "note", note)
+	result = ReplaceTokenCaseInsensitive(result, "nickname", nickname)
+	result = ReplaceTokenCaseInsensitive(result, "battletag", battletag)
 	
 	-- 3. Cleanup
 	result = result:gsub("%(%)", "")
