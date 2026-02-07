@@ -30,6 +30,111 @@ local friendGroups = {}
 local isUpdatingFriendsList = false
 local hasPendingUpdate = false
 
+-- ========================================
+-- PERFY OPTIMIZATION (Phase 2A): Named Event Callbacks
+-- Pre-define event handlers to eliminate closure allocation overhead
+-- These are called 1000s of times per session, closures are expensive!
+-- ========================================
+
+local function EventCallback_FriendListUpdate(...)
+	BFL.FriendsList:OnFriendListUpdate(...)
+end
+
+local function EventCallback_BNetFriendListSizeChanged(...)
+	BFL.FriendsList:OnFriendListUpdate(...)
+end
+
+local function EventCallback_BNetAccountOnline(...)
+	BFL.FriendsList:OnFriendListUpdate(...)
+end
+
+local function EventCallback_BNetAccountOffline(...)
+	BFL.FriendsList:OnFriendListUpdate(...)
+end
+
+local function EventCallback_BNetFriendInfoChanged(...)
+	BFL.FriendsList:OnFriendListUpdate(...)
+end
+
+local function EventCallback_BNetConnected(...)
+	BFL.FriendsList:OnFriendListUpdate(...)
+end
+
+local function EventCallback_BNetDisconnected(...)
+	BFL.FriendsList:OnFriendListUpdate(...)
+end
+
+-- GROUP_ROSTER_UPDATE affects invite button availability - refresh friendlist
+local function EventCallback_GroupRosterUpdate(...)
+	BFL.FriendsList:OnFriendListUpdate(...)
+end
+
+local function EventCallback_BNetInviteListInitialized()
+	BFL.FriendsList:OnFriendListUpdate(true) -- Force immediate update
+end
+
+local function EventCallback_BNetInviteAdded()
+	-- Play sound immediately (Phase 1)
+	PlaySound(SOUNDKIT.UI_BNET_TOAST)
+	
+	local collapsed = GetCVarBool("friendInvitesCollapsed")
+	if collapsed then
+		BFL.FriendsList:FlashInviteHeader()
+	end
+	BFL.FriendsList:OnFriendListUpdate(true) -- Force immediate update (Phase 2)
+end
+
+local function EventCallback_BNetInviteRemoved()
+	BFL.FriendsList:OnFriendListUpdate(true) -- Force immediate update (Phase 2)
+end
+
+local function HookScript_OnFrameShow()
+	local self = BFL.FriendsList
+	-- CRITICAL FIX: Update layout immediately when shown
+	-- This ensures SearchBox appears instantly in Simple Mode,
+	-- instead of waiting for the threaded UpdateFriendsList -> RenderDisplay cycle
+	self:UpdateScrollBoxExtent()
+	
+	if needsRenderOnShow then
+		-- BFL:DebugPrint("|cff00ffffFriendsList:|r Frame shown, dirty flag set - triggering refresh")
+		self:UpdateFriendsList()
+	end
+end
+
+local function HookScript_OnScrollFrameShow()
+	local self = BFL.FriendsList
+	-- Force layout here too, as switching tabs shows ScrollFrame
+	self:UpdateScrollBoxExtent()
+end
+
+-- Bound method for UpdateSearchBoxWidth timer
+local function Timer_UpdateSearchBoxWidth()
+	if BFL.FriendsList and BFL.FriendsList.UpdateSearchBoxWidth then
+		BFL.FriendsList:UpdateSearchBoxWidth()
+	end
+	-- Also ensure extent is correct if frame wasn't ready
+	if BFL.FriendsList and BFL.FriendsList.UpdateScrollBoxExtent then
+		BFL.FriendsList:UpdateScrollBoxExtent()
+	end
+end
+
+-- Bound method for UpdateFriendsList throttle timer
+local function Timer_UpdateFriendsList()
+	if BFL.FriendsList then
+		BFL.FriendsList.updateTimer = nil
+		BFL.FriendsList:UpdateFriendsList()
+	end
+end
+
+-- PERFY OPTIMIZATION (Phase 2A): Pre-defined SetScript Handlers
+local function FriendButton_OnSizeChanged(self, width, height)
+	local padding = self.textRightPadding or 80
+	local nameWidth = width - 44 - padding
+	if nameWidth < 10 then nameWidth = 10 end
+	if self.Name then self.Name:SetWidth(nameWidth) end
+	if self.Info then self.Info:SetWidth(nameWidth) end
+end
+
 -- Performance Caches (Phase 9.7)
 local uidCache = {} -- Interned strings for UIDs (bnet_Tag123)
 local displayFormatBlueprint = nil -- Parsed structure for fast string building
@@ -98,6 +203,33 @@ end
 -- Build Display List (Optimization: Returns simplified table instead of DataProvider)
 -- This allows for diffing before committing to ScrollBox
 local function BuildDisplayList(self) 
+	-- PERFY OPTIMIZATION (Phase 2B): Input Version Tracking
+	-- Skip expensive rebuild if inputs unchanged (600+ friends = 600+ operations!)
+	local currentInputs = {
+		friendsListVersion = BFL.FriendsListVersion or 0,
+		filterMode = self.filterMode or "all",
+		searchText = self.searchText or "",
+		numInvites = (BNGetNumFriendInvites and BNGetNumFriendInvites()) or 0,
+		invitesCollapsed = GetCVarBool("friendInvitesCollapsed") and 1 or 0
+	}
+	
+	-- Check if inputs changed
+	if self.lastBuildInputs then
+		local changed = false
+		for key, value in pairs(currentInputs) do
+			if self.lastBuildInputs[key] ~= value then
+				changed = true
+				break
+			end
+		end
+		
+		if not changed and self.cachedDisplayList then
+			-- BFL:DebugPrint("|cff00ff00BuildDisplayList:|r Cache HIT (inputs unchanged)")
+			return self.cachedDisplayList -- INSTANT return, no rebuild!
+		end
+	end
+	
+	-- BFL:DebugPrint("|cffff8800BuildDisplayList:|r Cache MISS (rebuilding)")
 	local displayList = {}
 	
 	-- Optimization: SyncGroups removed (Called by UpdateFriendsList before Render)
@@ -340,6 +472,10 @@ local function BuildDisplayList(self)
 		end
 	end
 	
+	-- PERFY OPTIMIZATION (Phase 2B): Cache built display list
+	self.lastBuildInputs = currentInputs
+	self.cachedDisplayList = displayList
+	
 	return displayList
 end
 
@@ -400,16 +536,11 @@ local function CreateElementFactory(friendsList) -- Capture friendsList referenc
 			button:SetScript("OnDragStart", Button_OnDragStart)
 			button:SetScript("OnDragStop", Button_OnDragStop)
 
+			-- PERFY OPTIMIZATION (Phase 2A): Use pre-defined handler
 			-- FIX: Responsive Layout (Phase 28)
 			-- Ensure text width updates when button width changes (e.g. resizing frame)
 			if not button.resizeHooked then
-				button:SetScript("OnSizeChanged", function(self, width, height)
-					local padding = self.textRightPadding or 80 -- Default fallback
-					local nameWidth = width - 44 - padding
-					if nameWidth < 10 then nameWidth = 10 end
-					if self.Name then self.Name:SetWidth(nameWidth) end
-					if self.Info then self.Info:SetWidth(nameWidth) end
-				end)
+				button:SetScript("OnSizeChanged", FriendButton_OnSizeChanged)
 				button.resizeHooked = true
 			end
 
@@ -1290,79 +1421,36 @@ function FriendsList:Initialize() -- Initialize sort modes and filter from datab
 	-- BFL.BetterFriendlist_OnEvent -> ADDON_LOADED usually works, but this guarantees it.
 	self:UpdateFriendsList(true)
 	
+	-- PERFY OPTIMIZATION (Phase 2A): Use named function for timer
 	-- Initialize responsive SearchBox width
-	C_Timer.After(0.1, function() if BFL.FriendsList and BFL.FriendsList.UpdateSearchBoxWidth then
-			BFL.FriendsList:UpdateSearchBoxWidth()
-		end
-		-- Also ensure extent is correct if frame wasn't ready
-		if self.UpdateScrollBoxExtent then
-			self:UpdateScrollBoxExtent()
-		end
-	end)
+	C_Timer.After(0.1, Timer_UpdateSearchBoxWidth)
 	
+	-- PERFY OPTIMIZATION (Phase 2A): Use pre-defined named event callbacks
 	-- Register event callbacks for friend list updates
-	BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function(...) self:OnFriendListUpdate(...)
-	end, 10)
-	
-	BFL:RegisterEventCallback("BN_FRIEND_LIST_SIZE_CHANGED", function(...) self:OnFriendListUpdate(...)
-	end, 10)
-	
-	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_ONLINE", function(...) self:OnFriendListUpdate(...)
-	end, 10)
-	
-	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_OFFLINE", function(...) self:OnFriendListUpdate(...)
-	end, 10)
-	
-	BFL:RegisterEventCallback("BN_FRIEND_INFO_CHANGED", function(...) self:OnFriendListUpdate(...)
-	end, 10)
+	BFL:RegisterEventCallback("FRIENDLIST_UPDATE", EventCallback_FriendListUpdate, 10)
+	BFL:RegisterEventCallback("BN_FRIEND_LIST_SIZE_CHANGED", EventCallback_BNetFriendListSizeChanged, 10)
+	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_ONLINE", EventCallback_BNetAccountOnline, 10)
+	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_OFFLINE", EventCallback_BNetAccountOffline, 10)
+	BFL:RegisterEventCallback("BN_FRIEND_INFO_CHANGED", EventCallback_BNetFriendInfoChanged, 10)
 	
 	-- Additional events from Blizzard's FriendsFrame
-	BFL:RegisterEventCallback("BN_CONNECTED", function(...) self:OnFriendListUpdate(...)
-	end, 10)
-	
-	BFL:RegisterEventCallback("BN_DISCONNECTED", function(...) self:OnFriendListUpdate(...)
-	end, 10)
-	
-	BFL:RegisterEventCallback("GROUP_ROSTER_UPDATE", function(...) self:OnFriendListUpdate(...)
-	end, 10)
+	BFL:RegisterEventCallback("BN_CONNECTED", EventCallback_BNetConnected, 10)
+	BFL:RegisterEventCallback("BN_DISCONNECTED", EventCallback_BNetDisconnected, 10)
+	BFL:RegisterEventCallback("GROUP_ROSTER_UPDATE", EventCallback_GroupRosterUpdate, 10)
 	
 	-- Register friend invite events
-	BFL:RegisterEventCallback("BN_FRIEND_INVITE_LIST_INITIALIZED", function() self:OnFriendListUpdate(true) -- Force immediate update
-	end, 10)
+	BFL:RegisterEventCallback("BN_FRIEND_INVITE_LIST_INITIALIZED", EventCallback_BNetInviteListInitialized, 10)
+	BFL:RegisterEventCallback("BN_FRIEND_INVITE_ADDED", EventCallback_BNetInviteAdded, 10)
+	BFL:RegisterEventCallback("BN_FRIEND_INVITE_REMOVED", EventCallback_BNetInviteRemoved, 10)
 	
-	BFL:RegisterEventCallback("BN_FRIEND_INVITE_ADDED", function() -- Play sound immediately (Phase 1)
-		PlaySound(SOUNDKIT.UI_BNET_TOAST)
-		
-		local collapsed = GetCVarBool("friendInvitesCollapsed")
-		if collapsed then
-			self:FlashInviteHeader()
-		end
-		self:OnFriendListUpdate(true) -- Force immediate update (Phase 2)
-	end, 10)
-	
-	BFL:RegisterEventCallback("BN_FRIEND_INVITE_REMOVED", function() self:OnFriendListUpdate(true) -- Force immediate update (Phase 2)
-	end, 10)
-	
+	-- PERFY OPTIMIZATION (Phase 2A): Use named functions for HookScript
 	-- Hook OnShow to re-render if data changed while hidden
 	if BetterFriendsFrame then
-		BetterFriendsFrame:HookScript("OnShow", function() 
-			-- CRITICAL FIX: Update layout immediately when shown
-			-- This ensures SearchBox appears instantly in Simple Mode,
-			-- instead of waiting for the threaded UpdateFriendsList -> RenderDisplay cycle
-			self:UpdateScrollBoxExtent()
-			
-			if needsRenderOnShow then
-				-- BFL:DebugPrint("|cff00ffffFriendsList:|r Frame shown, dirty flag set - triggering refresh")
-				self:UpdateFriendsList()
-			end
-		end)
+		BetterFriendsFrame:HookScript("OnShow", HookScript_OnFrameShow)
 		
 		-- Also hook ScrollFrame OnShow for tab switching
 		if BetterFriendsFrame.ScrollFrame then
-			BetterFriendsFrame.ScrollFrame:HookScript("OnShow", function() 
-				-- Force layout here too, as switching tabs shows ScrollFrame
-				self:UpdateScrollBoxExtent()
-			end)
+			BetterFriendsFrame.ScrollFrame:HookScript("OnShow", HookScript_OnScrollFrameShow)
 		end
 	end
 	
@@ -1497,11 +1585,10 @@ function FriendsList:OnFriendListUpdate(forceImmediate) -- Event Coalescing (Mic
 		return
 	end
 	
+	-- PERFY OPTIMIZATION (Phase 2A): Use bound method instead of closure
 	-- Schedule update with a small delay (0.1s) to batch multiple events
 	-- This significantly reduces CPU usage during login or mass status changes
-	self.updateTimer = C_Timer.After(0.1, function() self.updateTimer = nil
-		self:UpdateFriendsList()
-	end)
+	self.updateTimer = C_Timer.After(0.1, Timer_UpdateFriendsList)
 end
 
 -- Sync groups from Groups module
@@ -2006,12 +2093,13 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 		-- Status Priority (Always used)
 		friend._sort_status = CalculateStatusPriority(friend)
 		
-		-- PHASE 9.6: Cache Display Name
-		-- Calculate main display name once per update
-		friend.displayName = self:GetDisplayName(friend, false) or "Unknown"
+		-- PERFY FIX: Calculate display name once to avoid duplicate GetDisplayName calls
+		local displayName = self:GetDisplayName(friend, false) or "Unknown"
+		friend.displayName = displayName
 		
-		-- Name (Always used as fallback) - calculate lowercase once
-		local nameForSort = self:GetDisplayName(friend, true) or ""
+		-- Reuse for sorting (forSorting=true uses BattleTag short form for BNet)
+		local nameForSort = (friend.type == "bnet" and friend.battleTag)
+			and friend.battleTag:match("([^#]+)") or displayName
 		friend._sort_name = nameForSort:lower()
 		friend._sort_level = friend.level or 0
 		
@@ -2095,6 +2183,10 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 	self:ApplyFilters()
 	self:ApplySort()
 	
+	-- PERFY OPTIMIZATION (Phase 2B): Increment version AFTER data collection to prevent premature cache invalidation
+	-- This ensures BuildDisplayList cache is only invalidated when data actually changed
+	BFL.FriendsListVersion = (BFL.FriendsListVersion or 0) + 1
+	
 	-- CRITICAL FIX: Render the display after building list
 	-- Without this, UI never updates after friend offline/online events
 	self:RenderDisplay(ignoreVisibility)
@@ -2116,6 +2208,7 @@ end
 -- Clear pending update flag (used by ForceRefreshFriendsList to prevent race conditions)
 function FriendsList:ClearPendingUpdate() hasPendingUpdate = false
 end
+
 
 -- Apply search and filter to friends list
 function FriendsList:ApplyFilters() -- Filter is applied in RenderDisplay / BuildDataProvider
@@ -2692,6 +2785,10 @@ function FriendsList:OptimizedGroupToggle(groupId, expanding) -- Only possible o
 			self:UpdateGroupHeaderButton(frame, elementData)
 		end
 	end)
+	
+	-- PERFY OPTIMIZATION (Phase 2B): Invalidate BuildDisplayList cache
+	-- OptimizedGroupToggle bypasses BuildDisplayList, so cache is now stale
+	self.lastBuildInputs = nil
 	
 	return true
 end
@@ -4623,7 +4720,7 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 	end
 
 	-- Favorites Icon (Feature: Display Favorites)
-	-- PERFY OPTIMIZATION: Dirty Checking for Layout
+	-- CRITICAL: GetStringWidth/Height are EXPENSIVE WoW API calls - only call when state changes!
 	local isFavorite = friend.isFavorite
 	local showFavIcon = isFavorite and self.settingsCache.enableFavoriteIcon
 
@@ -4642,7 +4739,7 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 			-- Position Update Logic (Hoisted for reuse)
 			local function UpdateFavoriteIconPosition()
 				if not button or not button.Name or not button.favoriteIcon then return end
-				
+
 				-- Expensive layout operations only run when needed
 				local currentHeight = button.Name:GetStringHeight()
 				-- Fallback if GetStringHeight returns 0
@@ -4650,22 +4747,22 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 					local _, size = button.Name:GetFont()
 					currentHeight = size or 12
 				end
-				
+
 				local iconSize = currentHeight * 0.70
 				button.favoriteIcon:SetSize(iconSize, iconSize)
-				
+
 				-- Re-measure width (crucial for delayed updates)
 				local currentWidth = button.Name:GetStringWidth() or 0
-				
+
 				button.favoriteIcon:ClearAllPoints()
 				-- Offset relative to text start + text width
 				button.favoriteIcon:SetPoint("LEFT", button.Name, "LEFT", currentWidth + 1, currentHeight * 0.3)
 				button.favoriteIcon:Show()
 			end
-			
+
 			-- Apply immediately
 			UpdateFavoriteIconPosition()
-			
+
 			-- CRITICAL FIX: Re-apply on next frame if font changed or on reload.
 			-- After /reload or SetFont, GetStringWidth() often returns 0 or incorrect values.
 			local targetFriend = friend

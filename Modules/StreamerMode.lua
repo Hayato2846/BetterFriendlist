@@ -32,6 +32,16 @@ function StreamerMode:Toggle()
         QuickJoin:Update(true)
     end
     
+    -- Refresh tooltip if mouse is currently hovering over the button
+    if self.toggleButton and GameTooltip:GetOwner() == self.toggleButton then
+        GameTooltip:SetOwner(self.toggleButton, "ANCHOR_RIGHT")
+        GameTooltip:SetText(L.STREAMER_MODE_TITLE or "Streamer Mode", 1, 1, 1)
+        local status = BetterFriendlistDB.streamerModeActive and (L.STATUS_ENABLED or "Enabled") or (L.STATUS_DISABLED or "Disabled")
+        GameTooltip:AddLine(L.STREAMER_MODE_BUTTON_DESC or "Click to toggle privacy mode.", 0.7, 0.7, 0.7, true)
+        GameTooltip:AddLine(status, 1, 1, 1)
+        GameTooltip:Show()
+    end
+    
     -- Print status
     if BetterFriendlistDB.streamerModeActive then
         BFL:DebugPrint(L.STREAMER_MODE_TITLE .. ": " .. (L.STATUS_ENABLED or "Enabled"))
