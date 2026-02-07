@@ -873,7 +873,7 @@ function Groups:GetFriendUID(friend)
 	if not friend then return nil end
 	if friend.type == "bnet" then
 		-- Use battleTag as persistent identifier (bnetAccountID is temporary per session)
-		if friend.battleTag then
+		if friend.battleTag and friend.battleTag ~= "" then
 			return "bnet_" .. friend.battleTag
 		else
 			-- Fallback to bnetAccountID only if battleTag is unavailable (should never happen)

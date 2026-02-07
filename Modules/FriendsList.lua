@@ -1160,7 +1160,8 @@ end
 local function GetFriendUID(friend) if not friend then return nil end
 	if friend.type == "bnet" then
 		-- Use battleTag as persistent identifier (bnetAccountID is temporary per session)
-		if friend.battleTag then
+		-- CRITICAL: Check for non-empty string, not just truthy value
+		if friend.battleTag and friend.battleTag ~= "" then
 			-- Phase 9.7: UID Interning to reduce string garbage
 			local tag = friend.battleTag
 			local cached = uidCache[tag]
@@ -1204,6 +1205,7 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		
 		if mode == "nickname" then
 			local uid = friend.uid or GetFriendUID(friend)
+			local DB = GetDB()
 			local nickname = DB and DB:GetNickname(uid) or ""
 			if nickname ~= "" then result = nickname end
 		elseif mode == "note" then
@@ -1249,6 +1251,7 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 
 	-- 1. Prepare Data (Only on Cache Miss)
 	-- Fetch nickname now if we haven't already (lazy load)
+	local DB = GetDB()
 	local nickname = DB and DB:GetNickname(uid) or ""
 	
 	local name = "Unknown"
@@ -1881,7 +1884,8 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 				friend.battleTag = accountInfo.battleTag
 				
 				-- PHASE 9.6: Cache UID for ActivityTracker (Hot Path)
-				if friend.battleTag then
+				-- CRITICAL: Check for non-empty string, not just truthy value
+				if friend.battleTag and friend.battleTag ~= "" then
 					friend.uid = "bnet_" .. friend.battleTag
 				else
 					friend.uid = "bnet_" .. (accountInfo.bnetAccountID or "unknown")

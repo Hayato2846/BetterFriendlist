@@ -514,14 +514,15 @@ end
 function GetFriendUID(friend) if not friend then return nil end
 	if friend.type == "bnet" then
 		-- Use battleTag as persistent identifier (bnetAccountID is temporary per session)
-		if friend.battleTag then
+		-- CRITICAL: Check for non-empty string, not just truthy value
+		if friend.battleTag and friend.battleTag ~= "" then
 			return "bnet_" .. friend.battleTag
 		elseif friend.bnetAccountID then
 			-- Fallback: Try to look up battleTag from bnetAccountID
 			local numBNet = BNGetNumFriends()
 			for i = 1, numBNet do
 				local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
-				if accountInfo and accountInfo.bnetAccountID == friend.bnetAccountID and accountInfo.battleTag then
+				if accountInfo and accountInfo.bnetAccountID == friend.bnetAccountID and accountInfo.battleTag and accountInfo.battleTag ~= "" then
 					return "bnet_" .. accountInfo.battleTag
 				end
 			end
@@ -1019,7 +1020,7 @@ frame:SetScript("OnEvent", function(self, event, ...) if event == "ADDON_LOADED"
 				for _, friend in ipairs(FriendsList.friendsList) do
 					if friend.type == "bnet" and friend.bnetAccountID == contextData.bnetIDAccount then
 						friendUID = FriendsList:GetFriendUID(friend)
-						-- BFL:DebugPrint("Resolved BNet UID via FriendsList:", friendUID)
+						BFL:DebugPrint("|cff00ff00[MENU UID]|r Resolved BNet UID via FriendsList: " .. tostring(friendUID))
 						break
 					end
 				end
@@ -1028,7 +1029,7 @@ frame:SetScript("OnEvent", function(self, event, ...) if event == "ADDON_LOADED"
 				for _, friend in ipairs(FriendsList.friendsList) do
 					if friend.type == "wow" and friend.index == contextData.index then
 						friendUID = FriendsList:GetFriendUID(friend)
-						-- BFL:DebugPrint("Resolved WoW UID via FriendsList:", friendUID)
+						BFL:DebugPrint("|cff00ff00[MENU UID]|r Resolved WoW UID via FriendsList: " .. tostring(friendUID))
 						break
 					end
 				end
@@ -1038,25 +1039,28 @@ frame:SetScript("OnEvent", function(self, event, ...) if event == "ADDON_LOADED"
 		-- Fallback if not resolved via module
 		if not friendUID then
 			if contextData.bnetIDAccount then
-				-- For BNet friends, we need to look up the battleTag
-				local numBNet = BNGetNumFriends()
-				for i = 1, numBNet do
-					local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
-					if accountInfo and accountInfo.bnetAccountID == contextData.bnetIDAccount then
-						if accountInfo.battleTag then
-							friendUID = "bnet_" .. accountInfo.battleTag
-						else
-							-- BFL:DebugPrint("|cffff0000BetterFriendlist Warning:|r BNet friend without battleTag, using bnetAccountID")
-							friendUID = "bnet_" .. tostring(contextData.bnetIDAccount)
+				-- PRIORITY 1: Use battleTag from contextData if available (ensures consistency)
+				if contextData.battleTag and contextData.battleTag ~= "" then
+					friendUID = "bnet_" .. contextData.battleTag
+				else
+					-- PRIORITY 2: Look up the battleTag from friends list
+					local numBNet = BNGetNumFriends()
+					for i = 1, numBNet do
+						local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
+						if accountInfo and accountInfo.bnetAccountID == contextData.bnetIDAccount then
+							if accountInfo.battleTag and accountInfo.battleTag ~= "" then
+								friendUID = "bnet_" .. accountInfo.battleTag
+							else
+								friendUID = "bnet_" .. tostring(contextData.bnetIDAccount)
+							end
+							break
 						end
-						break
 					end
-				end
-				
-				-- If not found in friends list (shouldn't happen), fallback to bnetAccountID
-				if not friendUID then
-					-- BFL:DebugPrint("|cffff0000BetterFriendlist Warning:|r Could not find BNet friend, using bnetAccountID")
-					friendUID = "bnet_" .. tostring(contextData.bnetIDAccount)
+					
+					-- If not found in friends list (shouldn't happen), fallback to bnetAccountID
+					if not friendUID then
+						friendUID = "bnet_" .. tostring(contextData.bnetIDAccount)
+					end
 				end
 			elseif contextData.name then
 				-- Normalize name to ensure it matches the format used in FriendsList module (Name-Realm)
@@ -1082,7 +1086,8 @@ frame:SetScript("OnEvent", function(self, event, ...) if event == "ADDON_LOADED"
 		rootDescription:CreateTitle(L.MENU_TITLE)
 
 		-- Add "Set Nickname" button
-		rootDescription:CreateButton(L.MENU_SET_NICKNAME, function() local DB = BFL:GetModule("DB")
+		rootDescription:CreateButton(L.MENU_SET_NICKNAME, function() 
+			local DB = BFL:GetModule("DB")
 			local currentNickname = DB and DB:GetNickname(friendUID)
 			
 			-- Use contextData.name for display, fallback to battleTag if available
@@ -2149,7 +2154,7 @@ function BetterFriendsList_Button_OnEnter(button) if not button.friendData then 
 		local friendUID = nil
 		
 		-- Determine friend UID based on friend type (matching FriendsList structure)
-		if friend.type == "bnet" and friend.battleTag then
+		if friend.type == "bnet" and friend.battleTag and friend.battleTag ~= "" then
 			-- Battle.net friend - use battleTag
 			friendUID = "bnet_" .. friend.battleTag
 		elseif friend.type == "wow" and friend.name then
@@ -2303,7 +2308,7 @@ function BetterFriendsList_ShowDropdown(name, connected, lineID, chatType, chatF
 			chatFrame = chatFrame,
 			bnetIDAccount = nil,
 			guid = guid,
-			uid = name, -- For Nickname (WoW friends use name as UID)
+			uid = BFL:NormalizeWoWFriendName(name) and ("wow_" .. BFL:NormalizeWoWFriendName(name)) or nil, -- For Nickname (consistent with FriendsList UID)
 			index = actualIndex, -- Required for some addons (e.g. RaiderIO)
 			friendsIndex = actualIndex, -- Alternative name used by Blizzard
 		}
@@ -2339,7 +2344,7 @@ function BetterFriendsList_ShowBNDropdown(name, connected, lineID, chatType, cha
 			chatFrame = chatFrame,
 			bnetIDAccount = bnetIDAccount,
 			battleTag = battleTag,
-			uid = bnetIDAccount, -- For Nickname (BNet friends use bnetIDAccount as UID)
+			uid = (battleTag and battleTag ~= "") and ("bnet_" .. battleTag) or ("bnet_" .. tostring(bnetIDAccount)), -- For Nickname (consistent with FriendsList UID)
 			index = actualIndex, -- Required for some addons
 			friendsIndex = actualIndex, -- Alternative name
 		}

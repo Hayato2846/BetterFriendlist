@@ -85,7 +85,7 @@ local function GetFriendUIDFromName(name)
 					local charBaseName = gameInfo.characterName:match("^([^-]+)") or gameInfo.characterName
 					if charBaseName == baseName then
 						-- Use battleTag as persistent identifier
-						if accountInfo.battleTag then
+						if accountInfo.battleTag and accountInfo.battleTag ~= "" then
 							if IsSecret(accountInfo.battleTag) then return nil end -- 12.0.0 Safety
 							return "bnet_" .. accountInfo.battleTag
 						end

@@ -1315,7 +1315,8 @@ local function CreateLibQTipTooltip(anchorFrame)
 				end
 				
 				-- Create friend object
-				local friendUID = accountInfo.battleTag and ("bnet_" .. accountInfo.battleTag) or ("bnet_" .. tostring(accountInfo.bnetAccountID))
+				-- CRITICAL: Check for non-empty battleTag
+				local friendUID = (accountInfo.battleTag and accountInfo.battleTag ~= "") and ("bnet_" .. accountInfo.battleTag) or ("bnet_" .. tostring(accountInfo.bnetAccountID))
 				
 				local friend = {
 					id = friendUID,

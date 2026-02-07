@@ -300,7 +300,7 @@ function DB:GetLibKey(friendUID)
 		-- WoW: Strip "wow_" prefix for Lib (Name-Realm)
 		return friendUID:gsub("^wow_", "")
 	elseif friendUID:match("^bnet_%d+") then
-		-- BNet ID: Resolve to BattleTag for Lib
+		-- BNet ID: Try to resolve to BattleTag for Lib
 		local bnetID = tonumber(friendUID:match("^bnet_(%d+)"))
 		if bnetID then
 			local accountInfo = C_BattleNet.GetAccountInfoByID(bnetID)
@@ -308,8 +308,11 @@ function DB:GetLibKey(friendUID)
 				return accountInfo.battleTag
 			end
 		end
+		-- CRITICAL: If resolution fails, return nil (not the ID!)
+		-- This prevents storing nicknames under inconsistent keys
+		return nil
 	elseif friendUID:match("^bnet_") then
-		-- BNet Tag (legacy/fallback): Strip "bnet_"
+		-- BNet Tag: Strip "bnet_" prefix
 		return friendUID:gsub("^bnet_", "")
 	elseif friendUID:match("#") then
 		-- Already a BattleTag
@@ -536,14 +539,13 @@ function DB:GetNickname(friendUID)
 	if CustomNamesLib and libKey then
 		local customName = CustomNamesLib.Get(libKey)
 		if customName and customName ~= libKey then
-			-- BFL:DebugPrint("DB:GetNickname (Lib) found for " .. tostring(libKey) .. ": " .. tostring(customName))
 			return customName
 		end
 	end
 
 	-- 2. Fallback to Internal DB
 	-- For WoW friends, we use the original UID (wow_Name-Realm) as key
-	-- For BNet friends, we use the BattleTag (libKey) as key, because we can't map back to ID easily in Sync
+	-- For BNet friends, we prefer BattleTag (libKey) but fallback to friendUID for legacy support
 	
 	local dbKey = friendUID
 	if friendUID:match("^bnet_") and libKey then
@@ -552,9 +554,12 @@ function DB:GetNickname(friendUID)
 
 	local nickname = BetterFriendlistDB.nicknames and BetterFriendlistDB.nicknames[dbKey]
 	
-	if nickname then
-		-- BFL:DebugPrint("DB:GetNickname (Internal) found for " .. tostring(dbKey) .. ": " .. tostring(nickname))
+	-- FALLBACK: If not found with primary key and this is a BNet friend, try friendUID
+	-- (for backwards compatibility with nicknames stored under "bnet_12345" format)
+	if not nickname and friendUID:match("^bnet_") and dbKey ~= friendUID then
+		nickname = BetterFriendlistDB.nicknames and BetterFriendlistDB.nicknames[friendUID]
 	end
+	
 	return nickname
 end
 
@@ -563,7 +568,6 @@ function DB:SetNickname(friendUID, nickname)
 	if not friendUID then return end
 	
 	local libKey = self:GetLibKey(friendUID)
-	-- BFL:DebugPrint("DB:SetNickname called for " .. tostring(friendUID) .. " -> LibKey: " .. tostring(libKey) .. " Value: " .. tostring(nickname))
 	
 	-- 1. Update CustomNames Lib
 	if CustomNamesLib and libKey then
@@ -579,6 +583,14 @@ function DB:SetNickname(friendUID, nickname)
 	local dbKey = friendUID
 	if friendUID:match("^bnet_") and libKey then
 		dbKey = libKey
+	end
+	
+	-- CLEANUP: If this is a BNet friend and we're using libKey as dbKey,
+	-- remove any legacy entry under friendUID to avoid duplicates
+	if friendUID:match("^bnet_") and libKey and dbKey ~= friendUID then
+		if BetterFriendlistDB.nicknames and BetterFriendlistDB.nicknames[friendUID] then
+			BetterFriendlistDB.nicknames[friendUID] = nil
+		end
 	end
 	
 	self:SetNicknameInternalDB(dbKey, nickname)
