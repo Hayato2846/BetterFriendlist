@@ -32,7 +32,7 @@ class BugChecker:
             if re.search(pattern, line) and 'FIX' not in line.upper():
                 self.errors.append(
                     f"[OR-TRUE BUG] {filepath.name}:{i}\n"
-                    f"  → {line.strip()}\n"
+                    f"  -> {line.strip()}\n"
                     f"  Fix: Use 'if X == nil then X = true end' pattern"
                 )
     
@@ -48,7 +48,7 @@ class BugChecker:
                         if api in line:
                             self.warnings.append(
                                 f"[CLASSIC-GUARD] {filepath.name}:{i}\n"
-                                f"  → {api} used without Classic guard"
+                                f"  -> {api} used without Classic guard"
                             )
                             break
     
@@ -61,8 +61,8 @@ class BugChecker:
                 if not re.search(r'(self\.\w+|local\s+\w+)\s*=\s*C_Timer', line):
                     self.warnings.append(
                         f"[TIMER-CLEANUP] {filepath.name}:{i}\n"
-                        f"  → Timer created without reference storage\n"
-                        f"  → {line.strip()}"
+                        f"  -> Timer created without reference storage\n"
+                        f"  -> {line.strip()}"
                     )
     
     def check_locale_completeness(self):
