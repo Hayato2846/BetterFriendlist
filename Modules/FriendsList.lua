@@ -265,6 +265,284 @@ local function CalculateCompactRowHeight(self, nameSize, nameText, nameWidth)
 	return math.max(MIN_ROW_HEIGHT, math.min(MAX_ROW_HEIGHT, math.floor(calculatedHeight)))
 end
 
+local function FormatColorCode(r, g, b, a)
+	local alpha = a
+	if alpha == nil then
+		alpha = 1
+	end
+	return string.format(
+		"|c%02x%02x%02x%02x",
+		math.floor(alpha * 255),
+		math.floor((r or 1) * 255),
+		math.floor((g or 1) * 255),
+		math.floor((b or 1) * 255)
+	)
+end
+
+local GROUP_HEADER_TEXT_GAP = 4
+
+local EnsureGroupHeaderFont
+
+local function EnsureGroupHeaderCountText(button)
+	if button.CountText then
+		return button.CountText
+	end
+
+	local countText = button:CreateFontString(nil, "OVERLAY")
+	countText:SetJustifyH("LEFT")
+	local baseFont = button.GetFontString and button:GetFontString()
+	local baseFontObj = baseFont and baseFont:GetFontObject()
+	if baseFontObj then
+		countText:SetFontObject(baseFontObj)
+	elseif _G.GameFontNormal then
+		countText:SetFontObject(_G.GameFontNormal)
+	end
+	countText:SetFont("Fonts\\FRIZQT__.TTF", 12, "")
+	EnsureGroupHeaderFont(countText)
+	button.CountText = countText
+	return countText
+end
+
+EnsureGroupHeaderFont = function(fs)
+	if not fs then
+		return
+	end
+	if fs:GetFontObject() then
+		return
+	end
+	if fs:GetFont() then
+		return
+	end
+
+	local fallback = _G.GameFontNormal
+	if fallback then
+		fs:SetFontObject(fallback)
+		return
+	end
+
+	if fallback and fallback.GetFont then
+		local fontPath, fontSize, fontFlags = fallback:GetFont()
+		if fontPath then
+			fs:SetFont(fontPath, fontSize or 12, fontFlags)
+			return
+		end
+	end
+
+	fs:SetFont("Fonts\\FRIZQT__.TTF", 12, "")
+end
+
+local function SyncGroupHeaderFont(fs, countFs)
+	if not (fs and countFs) then
+		return
+	end
+
+	local fontObj = fs:GetFontObject()
+	if fontObj then
+		countFs:SetFontObject(fontObj)
+		return
+	end
+
+	local fontPath, fontSize, fontFlags = fs:GetFont()
+	if fontPath then
+		countFs:SetFont(fontPath, fontSize, fontFlags)
+	end
+end
+
+local function IsFontReady(fs)
+	if not fs then
+		return false
+	end
+	return (fs.GetFontObject and fs:GetFontObject()) or (fs.GetFont and fs:GetFont())
+end
+
+-- General-purpose font guard: ensures a FontString has a font before SetText
+-- Prevents "FontString:SetText(): Font not set" errors and ScrollBox taint
+local function EnsureFontSet(fs)
+	if not fs then
+		return
+	end
+	-- Fast path: font is already set
+	if fs.GetFont and fs:GetFont() then
+		return
+	end
+	-- Try FontObject fallback
+	if fs.GetFontObject and fs:GetFontObject() then
+		local obj = fs:GetFontObject()
+		if obj and obj.GetFont and obj:GetFont() then
+			return
+		end
+	end
+	-- Font is NOT set: apply hardcoded fallback
+	local fallback = _G.GameFontNormal
+	if fallback then
+		fs:SetFontObject(fallback)
+		if fs:GetFont() then
+			return
+		end
+	end
+	fs:SetFont("Fonts\\FRIZQT__.TTF", 12, "")
+end
+
+local function SafeSetText(fs, text)
+	EnsureGroupHeaderFont(fs)
+	if not IsFontReady(fs) then
+		fs:SetFont("Fonts\\FRIZQT__.TTF", 12, "")
+	end
+	if IsFontReady(fs) then
+		local ok = pcall(fs.SetText, fs, text or "")
+		return ok
+	end
+	return false
+end
+
+local function EnsureHeaderFontFromButton(button, fs, countFs)
+	if not (button and button.GetNormalFontObject and fs) then
+		return false
+	end
+	local fontObj = button:GetNormalFontObject()
+	if not fontObj then
+		return false
+	end
+	fs:SetFontObject(fontObj)
+	if countFs then
+		countFs:SetFontObject(fontObj)
+	end
+	return true
+end
+
+local function ApplyGroupHeaderText(button, nameText, countText, nameColor, countColor, align)
+	local fs = button:GetFontString()
+	if not fs then
+		return
+	end
+
+	local countFs = EnsureGroupHeaderCountText(button)
+	fs:Show()
+	countFs:Show()
+
+	EnsureHeaderFontFromButton(button, fs, countFs)
+	if not IsFontReady(fs) or not IsFontReady(countFs) then
+		if not button._deferredHeaderUpdate then
+			button._deferredHeaderUpdate = true
+			C_Timer.After(0, function()
+				button._deferredHeaderUpdate = false
+				ApplyGroupHeaderText(button, nameText, countText, nameColor, countColor, align)
+			end)
+		end
+		return
+	end
+
+	EnsureGroupHeaderFont(fs)
+	EnsureGroupHeaderFont(countFs)
+	SyncGroupHeaderFont(fs, countFs)
+
+	local okName = SafeSetText(fs, nameText or "")
+	local okCount = true
+	if countText and countText ~= "" then
+		okCount = SafeSetText(countFs, "(" .. countText .. ")")
+	else
+		okCount = SafeSetText(countFs, "")
+	end
+	if not okName or not okCount then
+		if not button._deferredHeaderUpdate then
+			button._deferredHeaderUpdate = true
+			C_Timer.After(0, function()
+				button._deferredHeaderUpdate = false
+				ApplyGroupHeaderText(button, nameText, countText, nameColor, countColor, align)
+			end)
+		end
+		return
+	end
+
+	if nameColor then
+		fs:SetTextColor(nameColor.r, nameColor.g, nameColor.b, nameColor.a or 1)
+	end
+	if countColor then
+		countFs:SetTextColor(countColor.r, countColor.g, countColor.b, countColor.a or 1)
+	end
+
+	local shadowX, shadowY = fs:GetShadowOffset()
+	local shadowR, shadowG, shadowB, shadowA = fs:GetShadowColor()
+	countFs:SetShadowOffset(shadowX, shadowY)
+	countFs:SetShadowColor(shadowR, shadowG, shadowB, shadowA)
+
+	fs:ClearAllPoints()
+	countFs:ClearAllPoints()
+
+	if align == "RIGHT" then
+		countFs:SetPoint("RIGHT", button, "RIGHT", -22, 0)
+		fs:SetPoint("RIGHT", countFs, "LEFT", -GROUP_HEADER_TEXT_GAP, 0)
+		fs:SetJustifyH("RIGHT")
+		countFs:SetJustifyH("RIGHT")
+	elseif align == "CENTER" then
+		local nameWidth = fs:GetStringWidth() or 0
+		local countWidth = countFs:GetStringWidth() or 0
+		local totalWidth = nameWidth + GROUP_HEADER_TEXT_GAP + countWidth
+		if totalWidth <= 0 then
+			fs:SetPoint("LEFT", button, "LEFT", 22, 0)
+			countFs:SetPoint("LEFT", fs, "RIGHT", GROUP_HEADER_TEXT_GAP, 0)
+		else
+			fs:SetPoint("LEFT", button, "CENTER", -totalWidth / 2, 0)
+			countFs:SetPoint("LEFT", fs, "RIGHT", GROUP_HEADER_TEXT_GAP, 0)
+		end
+		fs:SetJustifyH("LEFT")
+		countFs:SetJustifyH("LEFT")
+	else
+		fs:SetPoint("LEFT", button, "LEFT", 22, 0)
+		countFs:SetPoint("LEFT", fs, "RIGHT", GROUP_HEADER_TEXT_GAP, 0)
+		fs:SetJustifyH("LEFT")
+		countFs:SetJustifyH("LEFT")
+	end
+end
+
+local function ApplyGroupHeaderSingleText(button, text, align)
+	local fs = button:GetFontString()
+	if not fs then
+		return
+	end
+
+	EnsureHeaderFontFromButton(button, fs)
+	if not IsFontReady(fs) then
+		if not button._deferredHeaderUpdate then
+			button._deferredHeaderUpdate = true
+			C_Timer.After(0, function()
+				button._deferredHeaderUpdate = false
+				ApplyGroupHeaderSingleText(button, text, align)
+			end)
+		end
+		return
+	end
+
+	EnsureGroupHeaderFont(fs)
+	fs:Show()
+	if not SafeSetText(fs, text or "") then
+		if not button._deferredHeaderUpdate then
+			button._deferredHeaderUpdate = true
+			C_Timer.After(0, function()
+				button._deferredHeaderUpdate = false
+				ApplyGroupHeaderSingleText(button, text, align)
+			end)
+		end
+		return
+	end
+
+	if button.CountText then
+		button.CountText:Hide()
+	end
+
+	fs:ClearAllPoints()
+	if align == "CENTER" then
+		fs:SetPoint("CENTER", button, "CENTER", 0, 0)
+		fs:SetJustifyH("CENTER")
+	elseif align == "RIGHT" then
+		fs:SetPoint("RIGHT", button, "RIGHT", -22, 0)
+		fs:SetJustifyH("RIGHT")
+	else
+		fs:SetPoint("LEFT", button, "LEFT", 22, 0)
+		fs:SetJustifyH("LEFT")
+	end
+end
+
 -- Get height of a display list item based on its type
 -- CRITICAL: These heights MUST match XML template heights and ButtonPool SetHeight() calls
 -- Otherwise buttons will drift out of position!
@@ -297,6 +575,7 @@ local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self)
 			local line1BaseText = friend and friend._cache_text_line1_base or line1Text or ""
 			local line1SuffixText = friend and friend._cache_text_line1_suffix or ""
 			local showFavIcon = friend
+				and (friend.type == "bnet")
 				and friend.isFavorite
 				and self.settingsCache
 				and self.settingsCache.enableFavoriteIcon
@@ -3987,12 +4266,12 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 	end
 
 	-- Get group color (Default name color)
-	local r, g, b = 1, 1, 1 -- Default white
-	local colorCode = "|cffffffff"
+	local r, g, b, a = 1, 1, 1, 1 -- Default white
+	local colorCode = FormatColorCode(1, 1, 1, 1)
 
 	-- Count and Arrow Colors (Default to Group Color)
-	local countR, countG, countB = 1, 1, 1
-	local arrowR, arrowG, arrowB = 1, 1, 1
+	local countR, countG, countB, countA = 1, 1, 1, 1
+	local arrowR, arrowG, arrowB, arrowA = 1, 1, 1, 1
 
 	if Groups then
 		local group = Groups:Get(groupId)
@@ -4000,7 +4279,8 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 			r = group.color.r or group.color[1] or 1
 			g = group.color.g or group.color[2] or 1
 			b = group.color.b or group.color[3] or 1
-			colorCode = string.format("|cff%02x%02x%02x", r * 255, g * 255, b * 255)
+			a = group.color.a or group.color[4] or 1
+			colorCode = FormatColorCode(r, g, b, a)
 		end
 
 		-- Default to White (No Inheritance)
@@ -4010,15 +4290,17 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 		-- Override if specific colors are set
 		if group and group.countColor then
 			countR, countG, countB = group.countColor.r, group.countColor.g, group.countColor.b
+			countA = group.countColor.a or 1
 		end
 		if group and group.arrowColor then
 			arrowR, arrowG, arrowB = group.arrowColor.r, group.arrowColor.g, group.arrowColor.b
+			arrowA = group.arrowColor.a or 1
 		end
 	end
 
 	local DB = GetDB()
 	-- Count Color Code
-	local countColorCode = string.format("|cff%02x%02x%02x", countR * 255, countG * 255, countB * 255)
+	local countColorCode = FormatColorCode(countR, countG, countB, countA)
 
 	-- PERFY OPTIMIZATION: Direct cache access
 	-- Set header text with color
@@ -4039,36 +4321,22 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 		end
 	end
 
-	-- Apply Name and Count colors separately
-	button:SetFormattedText("%s%s|r %s(%s)|r", colorCode, name, countColorCode, countText)
-
 	-- PERFY OPTIMIZATION: Direct cache access
 	-- Apply Text Alignment and Font Settings (Feature Request)
 	local align = self.settingsCache.groupHeaderAlign or "LEFT"
 
-	if button:GetFontString() then
-		local fs = button:GetFontString()
-		fs:ClearAllPoints()
-
-		-- Alignment
-		if align == "CENTER" then
-			fs:SetPoint("CENTER", button, "CENTER", 0, 0)
-			fs:SetJustifyH("CENTER")
-		elseif align == "RIGHT" then
-			-- Classic XML uses x=22 for LEFT, so we use x=-22 for RIGHT symmetry (minus arrow space)
-			fs:SetPoint("RIGHT", button, "RIGHT", -22, 0)
-			fs:SetJustifyH("RIGHT")
-		else -- "LEFT" (Default)
-			fs:SetPoint("LEFT", button, "LEFT", 22, 0)
-			fs:SetJustifyH("LEFT")
-		end
-
+	local fs = button:GetFontString()
+	if fs then
 		-- Font Settings
+		local appliedFont = false
+		local fontSize = 12
+		local fontOutline = ""
+		local fontShadow = false
 		if DB then
 			local fontName = DB:Get("fontGroupHeader", "Friz Quadrata TT")
-			local fontSize = DB:Get("fontSizeGroupHeader", 12)
-			local fontOutline = DB:Get("fontOutlineGroupHeader", "NONE")
-			local fontShadow = DB:Get("fontShadowGroupHeader", false)
+			fontSize = DB:Get("fontSizeGroupHeader", 12)
+			fontOutline = DB:Get("fontOutlineGroupHeader", "NONE")
+			fontShadow = DB:Get("fontShadowGroupHeader", false)
 
 			local fontPath = LSM:Fetch("font", fontName)
 			-- Use FontManager to apply font with Alphabet support
@@ -4081,9 +4349,11 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 					button:SetHighlightFontObject(familyObj)
 					-- Also set current fs immediately to ensure visual update
 					fs:SetFontObject(familyObj)
+					appliedFont = true
 				end
 			elseif fontPath then
 				fs:SetFont(fontPath, fontSize, fontOutline)
+				appliedFont = true
 
 				if fontShadow then
 					fs:SetShadowColor(0, 0, 0, 1)
@@ -4094,6 +4364,30 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 				end
 			end
 		end
+
+		if not appliedFont then
+			local outline = fontOutline
+			if outline == "NONE" then
+				outline = ""
+			end
+			fs:SetFont("Fonts\\FRIZQT__.TTF", fontSize, outline)
+			if fontShadow then
+				fs:SetShadowColor(0, 0, 0, 1)
+				fs:SetShadowOffset(1, -1)
+			else
+				fs:SetShadowColor(0, 0, 0, 0)
+				fs:SetShadowOffset(0, 0)
+			end
+		end
+
+		ApplyGroupHeaderText(
+			button,
+			name,
+			countText,
+			{ r = r, g = g, b = b, a = a },
+			{ r = countR, g = countG, b = countB, a = countA },
+			align
+		)
 	end
 
 	-- PERFY OPTIMIZATION: Direct cache access
@@ -4117,7 +4411,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 		if targetArrow then
 			targetArrow:Show()
 			targetArrow:SetDesaturated(true)
-			targetArrow:SetVertexColor(arrowR, arrowG, arrowB)
+			targetArrow:SetVertexColor(arrowR, arrowG, arrowB, arrowA)
 			targetArrow:ClearAllPoints()
 
 			-- Restore normal textures first (resetting any overrides)
@@ -4160,8 +4454,12 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 				if align == "CENTER" then
 					-- If text is also centered, offset arrow to the left of text
 					local textWidth = 0
-					if button:GetFontString() then
-						textWidth = button:GetFontString():GetStringWidth() or 0
+					local headerFs = button:GetFontString()
+					if headerFs then
+						textWidth = headerFs:GetStringWidth() or 0
+					end
+					if button.CountText and button.CountText:IsShown() then
+						textWidth = textWidth + GROUP_HEADER_TEXT_GAP + (button.CountText:GetStringWidth() or 0)
 					end
 					local offset = (textWidth / 2) + 12
 					x = -offset
@@ -4210,8 +4508,12 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 
 	-- Apply font scaling
 	local FontManager = GetFontManager()
-	if FontManager and button:GetFontString() then
-		FontManager:ApplyFontSize(button:GetFontString())
+	local headerFs = button:GetFontString()
+	if FontManager and headerFs then
+		EnsureGroupHeaderFont(headerFs)
+		if IsFontReady(headerFs) then
+			pcall(FontManager.ApplyFontSize, FontManager, headerFs)
+		end
 	end
 
 	-- Tooltips for group headers
@@ -4456,7 +4758,12 @@ Button_OnDragUpdate = function(self)
 						frame.dropHighlight:Show()
 						local headerText =
 							string.format(BFL.L.HEADER_ADD_FRIEND, BetterFriendsList_DraggedFriend, groupData.name)
-						frame:SetText(headerText)
+						local align = (
+							FriendsList
+							and FriendsList.settingsCache
+							and FriendsList.settingsCache.groupHeaderAlign
+						) or "LEFT"
+						ApplyGroupHeaderSingleText(frame, headerText, align)
 					else
 						-- Hide highlight and restore original text
 						frame.dropHighlight:Hide()
@@ -4485,16 +4792,17 @@ Button_OnDragUpdate = function(self)
 							end
 						end
 
-						-- Restore color logic
-						local colorCode = "|cffffffff"
-						if groupData.color then
-							local r = groupData.color.r or groupData.color[1] or 1
-							local g = groupData.color.g or groupData.color[2] or 1
-							local b = groupData.color.b or groupData.color[3] or 1
-							colorCode = string.format("|cff%02x%02x%02x", r * 255, g * 255, b * 255)
+						if FriendsList and FriendsList.UpdateGroupHeaderButton and frame.elementData then
+							FriendsList:UpdateGroupHeaderButton(frame, frame.elementData)
+						else
+							local headerText = string.format("%s (%d)", groupData.name, memberCount)
+							local align = (
+								FriendsList
+								and FriendsList.settingsCache
+								and FriendsList.settingsCache.groupHeaderAlign
+							) or "LEFT"
+							ApplyGroupHeaderSingleText(frame, headerText, align)
 						end
-						local headerText = string.format("%s%s (%d)|r", colorCode, groupData.name, memberCount)
-						frame:SetText(headerText)
 					end
 				end
 			end
@@ -4674,15 +4982,17 @@ Button_OnDragStop = function(self)
 						end
 					end
 
-					local colorCode = "|cffffffff"
-					if groupData.color then
-						local r = groupData.color.r or groupData.color[1] or 1
-						local g = groupData.color.g or groupData.color[2] or 1
-						local b = groupData.color.b or groupData.color[3] or 1
-						colorCode = string.format("|cff%02x%02x%02x", r * 255, g * 255, b * 255)
+					if FriendsList and FriendsList.UpdateGroupHeaderButton and elementData then
+						FriendsList:UpdateGroupHeaderButton(frame, elementData)
+					else
+						local headerText = string.format("%s (%d)", groupData.name, memberCount)
+						local align = (
+							FriendsList
+							and FriendsList.settingsCache
+							and FriendsList.settingsCache.groupHeaderAlign
+						) or "LEFT"
+						ApplyGroupHeaderSingleText(frame, headerText, align)
 					end
-					local headerText = string.format("%s%s (%d)|r", colorCode, groupData.name, memberCount)
-					frame:SetText(headerText)
 				end
 			end
 		end
@@ -4990,8 +5300,7 @@ function FriendsList:GetFormattedButtonText(friend)
 
 					if infoText ~= "" then
 						local infoColor = self.settingsCache.fontColorFriendInfo or { r = 0.5, g = 0.5, b = 0.5, a = 1 }
-						local infoHex =
-							string.format("|cff%02x%02x%02x", infoColor.r * 255, infoColor.g * 255, infoColor.b * 255)
+						local infoHex = FormatColorCode(infoColor.r, infoColor.g, infoColor.b, infoColor.a)
 						line1SuffixText = infoHex .. infoText .. "|r"
 						line1Text = line1Text .. line1SuffixText
 					end
@@ -4999,8 +5308,7 @@ function FriendsList:GetFormattedButtonText(friend)
 					line1BaseText = line1Text
 					if friend.lastOnlineTime then
 						local infoColor = self.settingsCache.fontColorFriendInfo or { r = 0.5, g = 0.5, b = 0.5, a = 1 }
-						local infoHex =
-							string.format("|cff%02x%02x%02x", infoColor.r * 255, infoColor.g * 255, infoColor.b * 255)
+						local infoHex = FormatColorCode(infoColor.r, infoColor.g, infoColor.b, infoColor.a)
 						line1SuffixText = " " .. infoHex .. "- " .. GetLastOnlineText(friend) .. "|r"
 						line1Text = line1Text .. line1SuffixText
 					end
@@ -5116,7 +5424,9 @@ function FriendsList:GetFormattedButtonText(friend)
 					end
 
 					if infoText ~= "" then
-						line1SuffixText = "|cff7f7f7f" .. infoText .. "|r"
+						local infoColor = self.settingsCache.fontColorFriendInfo or { r = 0.5, g = 0.5, b = 0.5, a = 1 }
+						local infoHex = FormatColorCode(infoColor.r, infoColor.g, infoColor.b, infoColor.a)
+						line1SuffixText = infoHex .. infoText .. "|r"
 						line1Text = line1Text .. line1SuffixText
 					end
 				end
@@ -5252,6 +5562,12 @@ function FriendsList:UpdateFriendButton(button, elementData)
 
 		-- Invalidate favorite icon cache to force repositioning
 		button.lastIsFavorite = nil
+		-- CRITICAL: Also hide the icon immediately to prevent stale display on recycled buttons
+		-- Without this, setting lastIsFavorite=nil when the new friend also has showFavIcon=nil
+		-- causes nil~=nil -> false, skipping the hide logic entirely
+		if button.favoriteIcon then
+			button.favoriteIcon:Hide()
+		end
 
 		-- All icons scale proportionally to row height (no artificial min/max limits)
 		-- Status icon: 16px at 34px row height = 47%
@@ -5609,7 +5925,8 @@ function FriendsList:UpdateFriendButton(button, elementData)
 
 	-- Favorites Icon (Feature: Display Favorites)
 	-- CRITICAL: GetStringWidth/Height are EXPENSIVE WoW API calls - only call when state changes!
-	local isFavorite = friend.isFavorite
+	-- Guard: Only BNet friends can have favorites (WoW friends never have isFavorite)
+	local isFavorite = (friend.type == "bnet") and friend.isFavorite
 	local showFavIcon = isFavorite and self.settingsCache.enableFavoriteIcon
 
 	-- Optimized Phase 4: State Check for Text
@@ -5623,6 +5940,7 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		displayLine1 = line1BaseText .. spacer .. line1SuffixText
 	end
 	if button.lastLine1Text ~= displayLine1 then
+		EnsureFontSet(button.Name)
 		button.Name:SetText(displayLine1)
 		button.lastLine1Text = displayLine1
 		textChanged = true
@@ -5709,6 +6027,7 @@ function FriendsList:UpdateFriendButton(button, elementData)
 					if button.favoriteMeasure.SetMaxLines then
 						button.favoriteMeasure:SetMaxLines(isCompactMode and 2 or 1)
 					end
+					EnsureFontSet(button.favoriteMeasure)
 					button.favoriteMeasure:SetText(baseText)
 					local baseWidth = button.favoriteMeasure:GetStringWidth() or 0
 					if baseWidth > 0 then
@@ -5745,6 +6064,7 @@ function FriendsList:UpdateFriendButton(button, elementData)
 
 	if not isCompactMode then
 		if button.lastLine2Text ~= line2Text then
+			EnsureFontSet(button.Info)
 			button.Info:SetText(line2Text)
 			button.lastLine2Text = line2Text
 		end
@@ -5778,6 +6098,7 @@ end
 -- ========================================
 
 function FriendsList:UpdateInviteHeaderButton(button, data)
+	EnsureFontSet(button.Text)
 	button.Text:SetFormattedText(L.INVITE_HEADER, data.count)
 	local collapsed = GetCVarBool("friendInvitesCollapsed")
 
@@ -5949,9 +6270,11 @@ function FriendsList:UpdateInviteButton(button, data)
 	local isCompact = height < 25
 
 	-- Set name with cyan color (BNet style)
+	EnsureFontSet(button.Name)
 	button.Name:SetText((FRIENDS_BNET_NAME_COLOR_CODE or "|cff82c5ff") .. accountName .. "|r")
 
 	-- Set Info text ALWAYS
+	EnsureFontSet(button.Info)
 	button.Info:SetText(L.INVITE_TAP_TEXT)
 
 	-- Adjust positioning based on compact mode

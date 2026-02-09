@@ -12,8 +12,8 @@ local builtinGroups = {
 		collapsed = false,
 		builtin = true,
 		order = 1,
-		color = {r = 1.0, g = 0.82, b = 0.0}, -- Gold
-		icon = "Interface\\FriendsFrame\\Battlenet-Battleneticon"
+		color = { r = 1.0, g = 0.82, b = 0.0 }, -- Gold
+		icon = "Interface\\FriendsFrame\\Battlenet-Battleneticon",
 	},
 	ingame = {
 		id = "ingame",
@@ -21,8 +21,8 @@ local builtinGroups = {
 		collapsed = false,
 		builtin = true,
 		order = 2,
-		color = {r = 1.0, g = 0.82, b = 0.0}, -- Gold
-		icon = "Interface\\Icons\\Inv_misc_groupneedmore"
+		color = { r = 1.0, g = 0.82, b = 0.0 }, -- Gold
+		icon = "Interface\\Icons\\Inv_misc_groupneedmore",
 	},
 	nogroup = {
 		id = "nogroup",
@@ -30,9 +30,9 @@ local builtinGroups = {
 		collapsed = false,
 		builtin = true,
 		order = 999,
-		color = {r = 0.5, g = 0.5, b = 0.5}, -- Gray
-		icon = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon"
-	}
+		color = { r = 0.5, g = 0.5, b = 0.5 }, -- Gray
+		icon = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon",
+	},
 }
 
 -- All groups (built-in + custom)
@@ -41,45 +41,49 @@ Groups.groups = {}
 -- Migrate old bnetAccountID-based UIDs to battleTag-based UIDs
 function Groups:MigrateFriendAssignments()
 	local DB = BFL:GetModule("DB")
-	if not DB then return end
+	if not DB then
+		return
+	end
 	local friendGroups = DB:GetFriendGroups() -- Get ALL friendGroups
-	if not friendGroups then return end
-	
+	if not friendGroups then
+		return
+	end
+
 	-- Check if Battle.net migration has already been done
 	local bnetMigrationDone = DB:Get("bnetUIDMigrationDone_v2") -- Changed flag name to force re-run
 	local wowMigrationDone = DB:Get("wowUIDMigrationDone_v1") -- New migration for WoW friends
-	
+
 	if bnetMigrationDone and wowMigrationDone then
 		return -- Already migrated
 	end
-	
+
 	-- Count old-style UIDs
 	local oldBnetUIDs = {}
 	local wowUIDsToMigrate = {}
 	local totalMappings = 0
-	
+
 	for uid, groups in pairs(friendGroups) do
 		-- Skip numeric array indices (corrupted data)
 		if type(uid) == "string" then
 			totalMappings = totalMappings + 1
-			
+
 			-- Battle.net: Old format "bnet_12345" where 12345 is numeric
 			if not bnetMigrationDone and uid:match("^bnet_%d+$") then
 				table.insert(oldBnetUIDs, uid)
 			end
-			
+
 			-- WoW: Old format "wow_Name" without realm
 			if not wowMigrationDone and uid:match("^wow_[^%-]+$") then
 				-- Extract character name (without "wow_" prefix)
 				local charName = uid:sub(5)
 				-- Only migrate if name doesn't look like it already has realm (no "-")
 				if not charName:find("-") then
-					table.insert(wowUIDsToMigrate, {oldUID = uid, charName = charName, groups = groups})
+					table.insert(wowUIDsToMigrate, { oldUID = uid, charName = charName, groups = groups })
 				end
 			end
 		end
 	end
-	
+
 	-- Debug output
 	-- Use BFL:DebugPrint to avoid spamming the user on every reload
 	BFL:DebugPrint(BFL.L.MIGRATION_DEBUG_TOTAL .. " " .. totalMappings)
@@ -89,7 +93,7 @@ function Groups:MigrateFriendAssignments()
 	if not wowMigrationDone then
 		BFL:DebugPrint(BFL.L.MIGRATION_DEBUG_WOW .. " " .. #wowUIDsToMigrate)
 	end
-	
+
 	-- Migrate Battle.net UIDs
 	if not bnetMigrationDone then
 		if #oldBnetUIDs > 0 then
@@ -97,7 +101,7 @@ function Groups:MigrateFriendAssignments()
 			for _, uid in ipairs(oldBnetUIDs) do
 				DB:SetFriendGroups(uid, nil) -- Remove assignment
 			end
-			
+
 			-- Inform user about the migration
 			print("|cff00ff00BetterFriendlist:|r " .. BFL.L.MIGRATION_BNET_UPDATED)
 			print("|cffff8800Note:|r " .. BFL.L.MIGRATION_BNET_REASSIGN)
@@ -106,28 +110,28 @@ function Groups:MigrateFriendAssignments()
 		-- Fix: Always set done flag even if 0 items found
 		DB:Set("bnetUIDMigrationDone_v2", true)
 	end
-	
+
 	-- Migrate WoW UIDs (add realm)
 	if not wowMigrationDone then
 		local markWoWDone = false
-		
+
 		if #wowUIDsToMigrate > 0 then
 			local playerRealm = GetNormalizedRealmName()
 			local migrated = 0
-			
+
 			if playerRealm and playerRealm ~= "" then
 				for _, entry in ipairs(wowUIDsToMigrate) do
 					local newUID = "wow_" .. entry.charName .. "-" .. playerRealm
-					
+
 					-- Copy groups to new UID
 					DB:SetFriendGroups(newUID, entry.groups)
-					
+
 					-- Remove old UID
 					DB:SetFriendGroups(entry.oldUID, nil)
-					
+
 					migrated = migrated + 1
 				end
-				
+
 				print("|cff00ff00BetterFriendlist:|r " .. string.format(BFL.L.MIGRATION_WOW_RESULT, migrated))
 				print("|cffaaaaaa" .. BFL.L.MIGRATION_WOW_FORMAT .. "|r")
 				markWoWDone = true
@@ -139,7 +143,7 @@ function Groups:MigrateFriendAssignments()
 			-- Nothing to migrate, mark as done
 			markWoWDone = true
 		end
-		
+
 		if markWoWDone then
 			DB:Set("wowUIDMigrationDone_v1", true)
 		end
@@ -149,11 +153,15 @@ end
 -- Smart migration for WoW friends (v2) - Fixes missing realm in UIDs
 function Groups:RunSmartMigration()
 	local DB = BFL:GetModule("DB")
-	if not DB then return end
-	
+	if not DB then
+		return
+	end
+
 	-- Check if already done
-	if DB:Get("wowUIDMigrationDone_v2") then return end
-	
+	if DB:Get("wowUIDMigrationDone_v2") then
+		return
+	end
+
 	-- We need friend list data to be loaded
 	local numFriends = C_FriendList.GetNumFriends() or 0
 	if not numFriends or numFriends == 0 then
@@ -167,13 +175,15 @@ function Groups:RunSmartMigration()
 		end
 		return
 	end
-	
+
 	-- Perform migration
 	local friendGroups = DB:GetFriendGroups()
-	if not friendGroups then return end
-	
+	if not friendGroups then
+		return
+	end
+
 	local changesMade = false
-	
+
 	-- Build a lookup of Name -> {FullNames...} from current friend list
 	local nameLookup = {}
 	for i = 1, numFriends do
@@ -191,25 +201,28 @@ function Groups:RunSmartMigration()
 			end
 		end
 	end
-	
+
 	-- Check for old UIDs in database
 	for uid, groups in pairs(friendGroups) do
 		-- Look for "wow_Name" where Name has no hyphen
 		if type(uid) == "string" and uid:match("^wow_[^%-]+$") then
 			local shortName = uid:sub(5) -- Remove "wow_" prefix
-			
+
 			-- Check if we have EXACTLY ONE match in the friend list
 			local matches = nameLookup[shortName]
 			if matches and #matches == 1 then
 				local correctFullName = matches[1] -- e.g. "Copium-Mal'Ganis"
 				local newUID = "wow_" .. correctFullName
-				
+
 				-- Only migrate if the new UID is actually different (it should be, since old had no hyphen)
 				if newUID ~= uid then
 					-- Check if target already has groups (safety check)
 					local existing = DB:GetFriendGroups(newUID)
 					if not existing or #existing == 0 then
-						print("|cff00ff00BetterFriendlist:|r " .. string.format(BFL.L.MIGRATION_SMART_MIGRATING, shortName, correctFullName))
+						print(
+							"|cff00ff00BetterFriendlist:|r "
+								.. string.format(BFL.L.MIGRATION_SMART_MIGRATING, shortName, correctFullName)
+						)
 						DB:SetFriendGroups(newUID, groups)
 						DB:SetFriendGroups(uid, nil)
 						changesMade = true
@@ -218,11 +231,11 @@ function Groups:RunSmartMigration()
 			end
 		end
 	end
-	
+
 	if changesMade then
 		BFL:ForceRefreshFriendsList()
 	end
-	
+
 	-- Mark as done
 	DB:Set("wowUIDMigrationDone_v2", true)
 end
@@ -230,13 +243,17 @@ end
 -- Snapshot update: Explicitly set count/arrow colors to group color to disable implicit inheritance
 function Groups:RunColorSnapshotMigration()
 	local DB = BFL:GetModule("DB")
-	if not DB then return end
-	
-	if DB:Get("colorSnapshotMigrationDone") then return end
-	
+	if not DB then
+		return
+	end
+
+	if DB:Get("colorSnapshotMigrationDone") then
+		return
+	end
+
 	-- We iterate through valid groups in DB
 	local modificationMade = false
-	
+
 	-- Snapshot Custom Groups
 	local customGroups = DB:GetCustomGroups()
 	if customGroups then
@@ -244,64 +261,72 @@ function Groups:RunColorSnapshotMigration()
 			-- Check if specific colors are missing in DB
 			local groupCountColors = DB:Get("groupCountColors") or {}
 			local groupArrowColors = DB:Get("groupArrowColors") or {}
-			
+
 			-- If countColor is missing, snapshot current Group Color (or default Gold)
 			if not groupCountColors[groupId] then
 				-- Get current group color
 				local groupColors = DB:Get("groupColors") or {}
-				local currentColor = groupColors[groupId] or {r=1.0, g=0.82, b=0.0}
-				
+				local currentColor = groupColors[groupId] or { r = 1.0, g = 0.82, b = 0.0, a = 1 }
+				local currentAlpha = currentColor.a or 1
+
 				-- Save snapshot
-				groupCountColors[groupId] = {r=currentColor.r, g=currentColor.g, b=currentColor.b}
+				groupCountColors[groupId] =
+					{ r = currentColor.r, g = currentColor.g, b = currentColor.b, a = currentAlpha }
 				DB:Set("groupCountColors", groupCountColors)
 				modificationMade = true
 			end
-			
+
 			-- If arrowColor is missing
 			if not groupArrowColors[groupId] then
 				local groupColors = DB:Get("groupColors") or {}
-				local currentColor = groupColors[groupId] or {r=1.0, g=0.82, b=0.0}
-				
-				groupArrowColors[groupId] = {r=currentColor.r, g=currentColor.g, b=currentColor.b}
+				local currentColor = groupColors[groupId] or { r = 1.0, g = 0.82, b = 0.0, a = 1 }
+				local currentAlpha = currentColor.a or 1
+
+				groupArrowColors[groupId] =
+					{ r = currentColor.r, g = currentColor.g, b = currentColor.b, a = currentAlpha }
 				DB:Set("groupArrowColors", groupArrowColors)
 				modificationMade = true
 			end
 		end
 	end
-	
+
 	-- Also handle Built-in Groups (Favorites, etc) if they have custom colors set
 	-- (Actually built-in groups usually don't have custom colors unless overridden, which is handled via groupColors)
-	local builtinIds = {"favorites", "ingame", "nogroup"}
+	local builtinIds = { "favorites", "ingame", "nogroup" }
 	for _, groupId in ipairs(builtinIds) do
 		local groupCountColors = DB:Get("groupCountColors") or {}
 		local groupArrowColors = DB:Get("groupArrowColors") or {}
-		
+
 		if not groupCountColors[groupId] then
 			local groupColors = DB:Get("groupColors") or {}
 			-- Default for favorites/ingame is Gold, nogroup is Gray
-			local defaultColor = (groupId == "nogroup") and {r=0.5, g=0.5, b=0.5} or {r=1.0, g=0.82, b=0.0}
+			local defaultColor = (groupId == "nogroup") and { r = 0.5, g = 0.5, b = 0.5, a = 1 }
+				or { r = 1.0, g = 0.82, b = 0.0, a = 1 }
 			local currentColor = groupColors[groupId] or defaultColor
-			
-			groupCountColors[groupId] = {r=currentColor.r, g=currentColor.g, b=currentColor.b}
+
+			groupCountColors[groupId] = { r = currentColor.r, g = currentColor.g, b = currentColor.b, a = currentColor.a
+				or 1 }
 			DB:Set("groupCountColors", groupCountColors)
 			modificationMade = true
 		end
-		
+
 		if not groupArrowColors[groupId] then
 			local groupColors = DB:Get("groupColors") or {}
-			local defaultColor = (groupId == "nogroup") and {r=0.5, g=0.5, b=0.5} or {r=1.0, g=0.82, b=0.0}
+			local defaultColor = (groupId == "nogroup") and { r = 0.5, g = 0.5, b = 0.5, a = 1 }
+				or { r = 1.0, g = 0.82, b = 0.0, a = 1 }
 			local currentColor = groupColors[groupId] or defaultColor
-			
-			groupArrowColors[groupId] = {r=currentColor.r, g=currentColor.g, b=currentColor.b}
+
+			groupArrowColors[groupId] = { r = currentColor.r, g = currentColor.g, b = currentColor.b, a = currentColor.a
+				or 1 }
 			DB:Set("groupArrowColors", groupArrowColors)
 			modificationMade = true
 		end
 	end
-	
+
 	if modificationMade then
 		BFL:DebugPrint("Color Snapshot Migration applied.")
 	end
-	
+
 	DB:Set("colorSnapshotMigrationDone", true)
 end
 
@@ -317,14 +342,14 @@ function Groups:Initialize()
 	for id, data in pairs(builtinGroups) do
 		self.groups[id] = CopyTable(data)
 	end
-	
+
 	-- Load custom groups from database
 	local DB = BFL:GetModule("DB")
 	if not DB or not BetterFriendlistDB then
 		-- DB not ready yet, skip initialization
 		return
 	end
-	
+
 	-- Load built-in group overrides
 	local overrides = DB:Get("builtinGroupOverrides", {})
 	for groupId, overrideData in pairs(overrides) do
@@ -334,26 +359,32 @@ function Groups:Initialize()
 			end
 		end
 	end
-	
+
 	-- Migrate old bnetAccountID-based friend assignments to battleTag-based
 	-- Using pcall to prevent migration errors from blocking initialization
-	local status, err = pcall(function() self:MigrateFriendAssignments() end)
-	if not status then 
-		BFL:DebugPrint("Error in MigrateFriendAssignments: " .. tostring(err)) 
+	local status, err = pcall(function()
+		self:MigrateFriendAssignments()
+	end)
+	if not status then
+		BFL:DebugPrint("Error in MigrateFriendAssignments: " .. tostring(err))
 	end
-	
+
 	-- Run smart migration for WoW friends (v2)
-	status, err = pcall(function() self:RunSmartMigration() end)
-	if not status then 
-		BFL:DebugPrint("Error in RunSmartMigration: " .. tostring(err)) 
+	status, err = pcall(function()
+		self:RunSmartMigration()
+	end)
+	if not status then
+		BFL:DebugPrint("Error in RunSmartMigration: " .. tostring(err))
 	end
-	
+
 	-- Run color snapshot migration (v3) - Disable implicit inheritance
-	status, err = pcall(function() self:RunColorSnapshotMigration() end)
-	if not status then 
-		BFL:DebugPrint("Error in RunColorSnapshotMigration: " .. tostring(err)) 
+	status, err = pcall(function()
+		self:RunColorSnapshotMigration()
+	end)
+	if not status then
+		BFL:DebugPrint("Error in RunColorSnapshotMigration: " .. tostring(err))
 	end
-	
+
 	local customGroups = DB:GetCustomGroups()
 	if customGroups then
 		for groupId, groupInfo in pairs(customGroups) do
@@ -363,12 +394,12 @@ function Groups:Initialize()
 				collapsed = groupInfo.collapsed or false,
 				builtin = false,
 				order = groupInfo.order or 50,
-				color = {r = 1.0, g = 0.82, b = 0.0}, -- Default gold
-				icon = "Interface\\FriendsFrame\\UI-Toast-ChatInviteIcon"
+				color = { r = 1.0, g = 0.82, b = 0.0 }, -- Default gold
+				icon = "Interface\\FriendsFrame\\UI-Toast-ChatInviteIcon",
 			}
 		end
 	end
-	
+
 	-- Load collapsed states
 	for groupId, groupData in pairs(self.groups) do
 		local collapsed = DB:GetGroupState(groupId)
@@ -376,37 +407,37 @@ function Groups:Initialize()
 			groupData.collapsed = collapsed
 		end
 	end
-	
+
 	-- Apply custom group colors from settings
 	local groupColors = DB:Get("groupColors")
 	if groupColors and type(groupColors) == "table" then
 		for groupId, color in pairs(groupColors) do
 			if self.groups[groupId] and color.r and color.g and color.b then
-				self.groups[groupId].color = {r = color.r, g = color.g, b = color.b}
+				self.groups[groupId].color = { r = color.r, g = color.g, b = color.b, a = color.a or 1 }
 			end
 		end
 	end
-	
+
 	-- Apply custom group count colors
 	local groupCountColors = DB:Get("groupCountColors")
 	if groupCountColors and type(groupCountColors) == "table" then
 		for groupId, color in pairs(groupCountColors) do
 			if self.groups[groupId] and color.r and color.g and color.b then
-				self.groups[groupId].countColor = {r = color.r, g = color.g, b = color.b}
+				self.groups[groupId].countColor = { r = color.r, g = color.g, b = color.b, a = color.a or 1 }
 			end
 		end
 	end
-	
+
 	-- Apply custom group arrow colors
 	local groupArrowColors = DB:Get("groupArrowColors")
 	if groupArrowColors and type(groupArrowColors) == "table" then
 		for groupId, color in pairs(groupArrowColors) do
 			if self.groups[groupId] and color.r and color.g and color.b then
-				self.groups[groupId].arrowColor = {r = color.r, g = color.g, b = color.b}
+				self.groups[groupId].arrowColor = { r = color.r, g = color.g, b = color.b, a = color.a or 1 }
 			end
 		end
 	end
-	
+
 	-- Apply saved group order from settings
 	local savedOrder = DB:Get("groupOrder")
 	if savedOrder and type(savedOrder) == "table" and #savedOrder > 0 then
@@ -426,11 +457,11 @@ function Groups:Initialize()
 				end
 			end
 			if not found then
-				groupData.order = 1000 + (#savedOrder)
+				groupData.order = 1000 + #savedOrder
 			end
 		end
 	end
-	
+
 	-- DEFENSIVE: Clean up ghost group entries in friendGroups
 	-- If a group was deleted but friendGroups still references it, remove the stale entries
 	-- This prevents friends from being "invisible" due to orphaned group assignments
@@ -470,25 +501,29 @@ function Groups:GetAll()
 		-- DB not yet initialized, return all groups including favorites
 		return self.groups
 	end
-	
+
 	local showFavorites = DB:Get("showFavoritesGroup", true)
 	local enableInGame = DB:Get("enableInGameGroup", false)
-	
+
 	-- Filter out hidden built-in groups
 	if not showFavorites or not enableInGame then
 		local filtered = {}
 		for id, group in pairs(self.groups) do
 			local keep = true
-			if id == "favorites" and not showFavorites then keep = false end
-			if id == "ingame" and not enableInGame then keep = false end
-			
+			if id == "favorites" and not showFavorites then
+				keep = false
+			end
+			if id == "ingame" and not enableInGame then
+				keep = false
+			end
+
 			if keep then
 				filtered[id] = group
 			end
 		end
 		return filtered
 	end
-	
+
 	return self.groups
 end
 
@@ -512,9 +547,9 @@ function Groups:ValidateGroupName(groupName, currentGroupId)
 	if not groupName or groupName:gsub("%s+", "") == "" then
 		return false, BFL.L.ERROR_GROUP_NAME_EMPTY or "Group name cannot be empty"
 	end
-	
+
 	local lowerName = groupName:lower()
-	
+
 	-- Check for name collision across ALL groups
 	for id, group in pairs(self.groups) do
 		-- If renaming, ignore self
@@ -524,21 +559,21 @@ function Groups:ValidateGroupName(groupName, currentGroupId)
 			end
 		end
 	end
-	
+
 	-- For creation (no currentGroupId), we also need to check if the generated ID is available
 	-- because Create() uses deterministic IDs based on name.
 	if not currentGroupId then
 		-- Generate unique ID from name (same logic as Create)
 		local potentialId = "custom_" .. groupName:gsub("%s+", "_"):lower()
 		local existingGroup = self.groups[potentialId]
-		
+
 		if existingGroup then
 			-- ID collision! Even if names are different (e.g. existing group was renamed away from this name)
 			-- we can't create a new group with this name because the ID slot is taken.
 			return false, BFL.L.ERROR_GROUP_EXISTS or "Group already exists"
 		end
 	end
-	
+
 	return true
 end
 
@@ -547,15 +582,15 @@ function Groups:Create(groupName)
 	if not groupName or groupName == "" then
 		return false, BFL.L.ERROR_GROUP_NAME_EMPTY
 	end
-	
+
 	-- Generate unique ID from name
 	local groupId = "custom_" .. groupName:gsub("%s+", "_"):lower()
-	
+
 	-- Check if group already exists
 	if self.groups[groupId] then
 		return false, BFL.L.ERROR_GROUP_EXISTS
 	end
-	
+
 	-- Find next order value (place custom groups between Favorites and No Group)
 	local maxOrder = 1
 	for id, groupData in pairs(self.groups) do
@@ -565,7 +600,7 @@ function Groups:Create(groupName)
 			maxOrder = math.max(maxOrder, groupData.order or 1)
 		end
 	end
-	
+
 	-- Create group
 	self.groups[groupId] = {
 		id = groupId,
@@ -573,38 +608,38 @@ function Groups:Create(groupName)
 		collapsed = false,
 		builtin = false,
 		order = maxOrder + 1,
-		color = {r = 1.0, g = 0.82, b = 0.0}, -- Default gold for all groups
-		icon = "Interface\\FriendsFrame\\UI-Toast-ChatInviteIcon"
+		color = { r = 1.0, g = 0.82, b = 0.0 }, -- Default gold for all groups
+		icon = "Interface\\FriendsFrame\\UI-Toast-ChatInviteIcon",
 	}
-	
+
 	-- Save to database
 	local DB = BFL:GetModule("DB")
 	DB:SaveCustomGroup(groupId, {
 		name = groupName,
 		collapsed = false,
-		order = maxOrder + 1
+		order = maxOrder + 1,
 	})
-	
+
 	-- Initialize color snapshot (Default Gold)
-	local defaultColor = {r = 1.0, g = 0.82, b = 0.0}
-	
+	local defaultColor = { r = 1.0, g = 0.82, b = 0.0, a = 1 }
+
 	local groupCountColors = DB:Get("groupCountColors") or {}
-	groupCountColors[groupId] = {r=defaultColor.r, g=defaultColor.g, b=defaultColor.b}
+	groupCountColors[groupId] = { r = defaultColor.r, g = defaultColor.g, b = defaultColor.b, a = defaultColor.a }
 	DB:Set("groupCountColors", groupCountColors)
-	
+
 	local groupArrowColors = DB:Get("groupArrowColors") or {}
-	groupArrowColors[groupId] = {r=defaultColor.r, g=defaultColor.g, b=defaultColor.b}
+	groupArrowColors[groupId] = { r = defaultColor.r, g = defaultColor.g, b = defaultColor.b, a = defaultColor.a }
 	DB:Set("groupArrowColors", groupArrowColors)
-	
-	self.groups[groupId].countColor = {r=defaultColor.r, g=defaultColor.g, b=defaultColor.b}
-	self.groups[groupId].arrowColor = {r=defaultColor.r, g=defaultColor.g, b=defaultColor.b}
-	
+
+	self.groups[groupId].countColor = { r = defaultColor.r, g = defaultColor.g, b = defaultColor.b, a = defaultColor.a }
+	self.groups[groupId].arrowColor = { r = defaultColor.r, g = defaultColor.g, b = defaultColor.b, a = defaultColor.a }
+
 	-- Refresh Settings UI if open
 	local Settings = BFL:GetModule("Settings")
 	if Settings and BetterFriendlistSettingsFrame and BetterFriendlistSettingsFrame:IsShown() then
 		Settings:RefreshGroupList()
 	end
-	
+
 	return true, groupId
 end
 
@@ -613,15 +648,15 @@ function Groups:CreateWithOrder(groupName, orderValue)
 	if not groupName or groupName == "" then
 		return false, BFL.L.ERROR_GROUP_NAME_EMPTY
 	end
-	
+
 	-- Generate unique ID from name
 	local groupId = "custom_" .. groupName:gsub("%s+", "_"):lower()
-	
+
 	-- Check if group already exists
 	if self.groups[groupId] then
 		return false, BFL.L.ERROR_GROUP_EXISTS
 	end
-	
+
 	-- Create group with specified order
 	self.groups[groupId] = {
 		id = groupId,
@@ -629,38 +664,38 @@ function Groups:CreateWithOrder(groupName, orderValue)
 		collapsed = false,
 		builtin = false,
 		order = orderValue,
-		color = {r = 1.0, g = 0.82, b = 0.0}, -- Default gold for all groups
-		icon = "Interface\\FriendsFrame\\UI-Toast-ChatInviteIcon"
+		color = { r = 1.0, g = 0.82, b = 0.0 }, -- Default gold for all groups
+		icon = "Interface\\FriendsFrame\\UI-Toast-ChatInviteIcon",
 	}
-	
+
 	-- Save to database
 	local DB = BFL:GetModule("DB")
 	DB:SaveCustomGroup(groupId, {
 		name = groupName,
 		collapsed = false,
-		order = orderValue
+		order = orderValue,
 	})
 
 	-- Initialize color snapshot (Default Gold)
-	local defaultColor = {r = 1.0, g = 0.82, b = 0.0}
-	
+	local defaultColor = { r = 1.0, g = 0.82, b = 0.0, a = 1 }
+
 	local groupCountColors = DB:Get("groupCountColors") or {}
-	groupCountColors[groupId] = {r=defaultColor.r, g=defaultColor.g, b=defaultColor.b}
+	groupCountColors[groupId] = { r = defaultColor.r, g = defaultColor.g, b = defaultColor.b, a = defaultColor.a }
 	DB:Set("groupCountColors", groupCountColors)
-	
+
 	local groupArrowColors = DB:Get("groupArrowColors") or {}
-	groupArrowColors[groupId] = {r=defaultColor.r, g=defaultColor.g, b=defaultColor.b}
+	groupArrowColors[groupId] = { r = defaultColor.r, g = defaultColor.g, b = defaultColor.b, a = defaultColor.a }
 	DB:Set("groupArrowColors", groupArrowColors)
-	
-	self.groups[groupId].countColor = {r=defaultColor.r, g=defaultColor.g, b=defaultColor.b}
-	self.groups[groupId].arrowColor = {r=defaultColor.r, g=defaultColor.g, b=defaultColor.b}
-	
+
+	self.groups[groupId].countColor = { r = defaultColor.r, g = defaultColor.g, b = defaultColor.b, a = defaultColor.a }
+	self.groups[groupId].arrowColor = { r = defaultColor.r, g = defaultColor.g, b = defaultColor.b, a = defaultColor.a }
+
 	-- Refresh Settings UI if open
 	local Settings = BFL:GetModule("Settings")
 	if Settings and BetterFriendlistSettingsFrame and BetterFriendlistSettingsFrame:IsShown() then
 		Settings:RefreshGroupList()
 	end
-	
+
 	return true, groupId
 end
 
@@ -669,23 +704,23 @@ function Groups:Rename(groupId, newName)
 	if not groupId or not newName or newName == "" then
 		return false, BFL.L.ERROR_INVALID_GROUP_NAME
 	end
-	
+
 	-- Verify name validity using our centralized validator
 	local isValid, errorMsg = self:ValidateGroupName(newName, groupId)
 	if not isValid then
 		return false, errorMsg
 	end
-	
+
 	local group = self.groups[groupId]
 	if not group then
 		return false, BFL.L.ERROR_GROUP_NOT_EXIST
 	end
-	
+
 	-- Update in memory
 	group.name = newName
-	
+
 	local DB = BFL:GetModule("DB")
-	
+
 	if group.builtin then
 		-- Save override for built-in group
 		local overrides = DB:Get("builtinGroupOverrides", {})
@@ -700,13 +735,13 @@ function Groups:Rename(groupId, newName)
 			DB:SaveCustomGroup(groupId, groupInfo)
 		end
 	end
-	
+
 	-- Refresh Settings UI if open
 	local Settings = BFL:GetModule("Settings")
 	if Settings and BetterFriendlistSettingsFrame and BetterFriendlistSettingsFrame:IsShown() then
 		Settings:RefreshGroupList()
 	end
-	
+
 	return true
 end
 
@@ -715,31 +750,31 @@ function Groups:SetColor(groupId, r, g, b, a)
 	if not groupId or not r or not g or not b then
 		return false, BFL.L.ERROR_INVALID_PARAMS
 	end
-	
+
 	local group = self.groups[groupId]
 	if not group then
 		return false, BFL.L.ERROR_GROUP_NOT_EXIST
 	end
-	
+
 	-- Fix #34: Default alpha to 1 if not provided
 	local alpha = a or 1
-	
+
 	-- Update in memory
-	group.color = {r = r, g = g, b = b, a = alpha}
-	
+	group.color = { r = r, g = g, b = b, a = alpha }
+
 	local DB = BFL:GetModule("DB")
-	
+
 	-- Save to database (same structure for built-in and custom)
 	local groupColors = DB:Get("groupColors", {})
-	groupColors[groupId] = {r = r, g = g, b = b, a = alpha}
+	groupColors[groupId] = { r = r, g = g, b = b, a = alpha }
 	DB:Set("groupColors", groupColors)
-	
+
 	-- Refresh Settings UI if open
 	local Settings = BFL:GetModule("Settings")
 	if Settings and BetterFriendlistSettingsFrame and BetterFriendlistSettingsFrame:IsShown() then
 		Settings:RefreshGroupList()
 	end
-	
+
 	return true
 end
 
@@ -748,37 +783,37 @@ function Groups:Delete(groupId)
 	if not groupId then
 		return false, BFL.L.ERROR_INVALID_GROUP_ID
 	end
-	
+
 	local group = self.groups[groupId]
 	if not group then
 		return false, BFL.L.ERROR_GROUP_NOT_EXIST
 	end
-	
+
 	if group.builtin then
 		return false, BFL.L.ERROR_CANNOT_DELETE_BUILTIN
 	end
-	
+
 	-- Remove from memory
 	self.groups[groupId] = nil
-	
+
 	-- Remove from database
 	local DB = BFL:GetModule("DB")
 	DB:DeleteCustomGroup(groupId)
-	
+
 	-- Refresh Settings UI if open
 	local Settings = BFL:GetModule("Settings")
 	if Settings and BetterFriendlistSettingsFrame and BetterFriendlistSettingsFrame:IsShown() then
 		Settings:RefreshGroupList()
 	end
-	
+
 	-- Remove all friend assignments to this group
 	for _, friendUID in ipairs(DB:GetAllFriendUIDs()) do
 		DB:RemoveFriendFromGroup(friendUID, groupId)
 	end
-	
+
 	-- Force refresh friends list so removed friends appear in "No Group" immediately
 	BFL:ForceRefreshFriendsList()
-	
+
 	return true
 end
 
@@ -788,18 +823,18 @@ function Groups:Toggle(groupId, suppressUpdate)
 	if not group then
 		return false
 	end
-	
+
 	group.collapsed = not group.collapsed
-	
+
 	-- Save to database
 	local DB = BFL:GetModule("DB")
 	DB:SetGroupState(groupId, group.collapsed)
-	
+
 	-- Force refresh of the friends list to update UI immediately
 	if not suppressUpdate then
 		BFL:ForceRefreshFriendsList()
 	end
-	
+
 	return true
 end
 
@@ -809,18 +844,18 @@ function Groups:SetCollapsed(groupId, collapsed, suppressUpdate)
 	if not group then
 		return false
 	end
-	
+
 	group.collapsed = collapsed
-	
+
 	-- Save to database
 	local DB = BFL:GetModule("DB")
 	DB:SetGroupState(groupId, group.collapsed)
-	
+
 	-- Force refresh of the friends list to update UI immediately
 	if not suppressUpdate then
 		BFL:ForceRefreshFriendsList()
 	end
-	
+
 	return true
 end
 
@@ -835,14 +870,14 @@ function Groups:ToggleFriendInGroup(friendUID, groupId)
 	if not friendUID or not groupId then
 		return false
 	end
-	
+
 	-- Don't allow adding to builtin groups (except they're managed automatically)
 	if self.groups[groupId] and self.groups[groupId].builtin then
 		return false
 	end
-	
+
 	local DB = BFL:GetModule("DB")
-	
+
 	if DB:IsFriendInGroup(friendUID, groupId) then
 		-- Remove from group
 		return DB:RemoveFriendFromGroup(friendUID, groupId)
@@ -868,7 +903,7 @@ end
 function Groups:GetMemberCount(groupId, friendsList)
 	local count = 0
 	local DB = BFL:GetModule("DB")
-	
+
 	for _, friend in ipairs(friendsList or {}) do
 		local friendUID = self:GetFriendUID(friend)
 		if friendUID then
@@ -900,13 +935,15 @@ function Groups:GetMemberCount(groupId, friendsList)
 			end
 		end
 	end
-	
+
 	return count
 end
 
 -- Helper function to get friend unique ID
 function Groups:GetFriendUID(friend)
-	if not friend then return nil end
+	if not friend then
+		return nil
+	end
 	if friend.type == "bnet" then
 		-- Use battleTag as persistent identifier (bnetAccountID is temporary per session)
 		if friend.battleTag and friend.battleTag ~= "" then
@@ -930,26 +967,26 @@ end
 function Groups:GetSortedGroupIds(includeNoGroup)
 	local allGroups = self:GetAll()
 	local sortedIds = {}
-	
+
 	for groupId, groupData in pairs(allGroups) do
 		if includeNoGroup or groupId ~= "nogroup" then
 			table.insert(sortedIds, {
 				id = groupId,
-				order = groupData.order or 999
+				order = groupData.order or 999,
 			})
 		end
 	end
-	
+
 	-- Sort by order value
 	table.sort(sortedIds, function(a, b)
 		return a.order < b.order
 	end)
-	
+
 	-- Extract just the IDs in sorted order
 	local result = {}
 	for _, entry in ipairs(sortedIds) do
 		table.insert(result, entry.id)
 	end
-	
+
 	return result
 end
