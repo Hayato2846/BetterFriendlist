@@ -148,6 +148,13 @@ function BetterQuickJoinFrame_Update(self)
 		return 
 	end
 	
+	-- Avoid duplicate UI rebuilds for the same data tick
+	if self._bflQuickJoinLastUpdate and self._bflQuickJoinLastUpdate == QuickJoin.lastUpdate then
+		QuickJoin:UpdateJoinButtonState()
+		return
+	end
+	self._bflQuickJoinLastUpdate = QuickJoin.lastUpdate
+	
 	-- Get QuickJoin entries (these are QuickJoinEntry objects with ApplyToFrame and CalculateHeight methods)
 	local entries = QuickJoin:GetEntries()
 	
@@ -158,9 +165,24 @@ function BetterQuickJoinFrame_Update(self)
 		self.ContentInset.NoGroupsText:SetShown(not entries or #entries == 0)
 	end
 	
-	-- Update ScrollBox - always create a data provider, even if empty
-	local dataProvider = CreateDataProvider(entries or {})
-	self.ScrollBox:SetDataProvider(dataProvider, ScrollBoxConstants.RetainScrollPosition)
+	-- Update ScrollBox - reuse data provider to reduce allocations
+	local dataProvider = self._bflQuickJoinDataProvider
+	if not dataProvider then
+		dataProvider = CreateDataProvider()
+		self._bflQuickJoinDataProvider = dataProvider
+	end
+
+	if dataProvider.Flush and dataProvider.Insert then
+		dataProvider:Flush()
+		for _, entry in ipairs(entries or {}) do
+			dataProvider:Insert(entry)
+		end
+		self.ScrollBox:SetDataProvider(dataProvider, ScrollBoxConstants.RetainScrollPosition)
+	else
+		dataProvider = CreateDataProvider(entries or {})
+		self.ScrollBox:SetDataProvider(dataProvider, ScrollBoxConstants.RetainScrollPosition)
+		self._bflQuickJoinDataProvider = dataProvider
+	end
 	
 	-- Update Join button state (handles "already in group" and "combat" edge cases)
 	QuickJoin:UpdateJoinButtonState()

@@ -2908,12 +2908,21 @@ end
 
 -- Helper: Get friends in a specific group (optimized for single group access)
 function FriendsList:GetFriendsForGroup(targetGroupId) local groupFriends = {}
+	local grouped = self.groupedFriends or self.cachedGroupedFriends
+	if grouped and grouped[targetGroupId] then
+		return grouped[targetGroupId]
+	end
+
 	local DB = GetDB()
 	if not DB then return groupFriends end
+	local enableInGameGroup = DB:Get("enableInGameGroup", false)
+	local inGameGroupMode = DB:Get("inGameGroupMode", "same_game")
+	local friendGroups = (BetterFriendlistDB and BetterFriendlistDB.friendGroups) or {}
 	
 	-- Get visible groups to check if favorites/ingame are actually enabled
 	local Groups = GetGroups()
 	local visibleGroups = Groups and Groups:GetAll() or {}
+	local favoritesVisible = visibleGroups["favorites"] == true
 	
 	for _, friend in ipairs(self.friendsList) do
 		-- Apply filters first
@@ -2924,14 +2933,14 @@ function FriendsList:GetFriendsForGroup(targetGroupId) local groupFriends = {}
 			local isInAnyGroup = false
 			
 			-- Check Favorites (only if Favorites group is visible/enabled)
-			if isFavorite and visibleGroups["favorites"] then
+			if isFavorite and favoritesVisible then
 				if targetGroupId == "favorites" then isInTargetGroup = true end
 				isInAnyGroup = true
 			end
 			
 			-- Check In-Game Group
-			if GetDB():Get("enableInGameGroup", false) then
-				local mode = GetDB():Get("inGameGroupMode", "same_game")
+			if enableInGameGroup then
+				local mode = inGameGroupMode
 				local isInGame = false
 				
 				if mode == "any_game" then
@@ -2960,7 +2969,7 @@ function FriendsList:GetFriendsForGroup(targetGroupId) local groupFriends = {}
 			end
 			
 			-- Check Custom Groups (only count groups that actually exist)
-			local customGroups = (BetterFriendlistDB and BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friendUID]) or {}
+			local customGroups = friendGroups[friendUID] or {}
 			for _, groupId in ipairs(customGroups) do
 				if type(groupId) == "string" and visibleGroups[groupId] then
 					if groupId == targetGroupId then isInTargetGroup = true end
