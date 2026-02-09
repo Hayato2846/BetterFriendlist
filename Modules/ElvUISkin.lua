@@ -58,15 +58,15 @@ function ElvUISkin:RegisterSkin()
 	-- Explicit check for false (nil means enabled by default if we wanted, but DB init sets it to false)
 	local isEnabled = BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin
 	if isEnabled == false then
-		BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Skin disabled in settings (DB.enableElvUISkin = false)")
+		-- BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Skin disabled in settings (DB.enableElvUISkin = false)")
 		return
 	end
 
-	BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Registering skin...")
+	-- BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Registering skin...")
 	local E, L, V, P, G = unpack(_G.ElvUI)
 	local RealS = E:GetModule('Skins')
 	if not RealS then 
-		BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Skins module not found!")
+		-- BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Skins module not found!")
 		return 
 	end
 
@@ -104,16 +104,16 @@ function ElvUISkin:RegisterSkin()
 	-- This ensures our skin runs when ElvUI skins are applied
 	-- Try both typical addon names to be safe
 	S:AddCallbackForAddon("BetterFriendlist", "BetterFriendlist", function()
-		BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Callback triggered")
-		xpcall(function() self:SkinFrames(E, S) end, function(err) BFL:DebugPrint("|cffff0000BetterFriendlist ElvUI Skin Error:|r " .. tostring(err)) end)
+		-- BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Callback triggered")
+		xpcall(function() self:SkinFrames(E, S) end, function(err) -- BFL:DebugPrint("|cffff0000BetterFriendlist ElvUI Skin Error:|r " .. tostring(err)) end)
 	end)
 	
 	-- Force run if ElvUI is already initialized (Classic fix)
 	if E.initialized then
-		BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Direct call triggered (E.initialized=true)")
-		xpcall(function() self:SkinFrames(E, S) end, function(err) BFL:DebugPrint("|cffff0000BetterFriendlist ElvUI Skin Error:|r " .. tostring(err)) end)
+		-- BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Direct call triggered (E.initialized=true)")
+		xpcall(function() self:SkinFrames(E, S) end, function(err) -- BFL:DebugPrint("|cffff0000BetterFriendlist ElvUI Skin Error:|r " .. tostring(err)) end)
 	else
-		BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Direct call skipped (E.initialized=false)")
+		-- BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Direct call skipped (E.initialized=false)")
 	end
 end
 
@@ -147,11 +147,11 @@ function ElvUISkin:SkinFrames(E, S)
 		self.TabHookInstalled = true
 	end
 
-	BFL:DebugPrint("ElvUISkin: SkinFrames started")
+	-- BFL:DebugPrint("ElvUISkin: SkinFrames started")
 	local frame = _G.BetterFriendsFrame
 
 	-- Skin Main Frame
-	BFL:DebugPrint("ElvUISkin: Skinning Main Frame")
+	-- BFL:DebugPrint("ElvUISkin: Skinning Main Frame")
 	if frame.PortraitContainer or frame.portrait then
 		-- Use pcall to safeguard against ElvUI PixelPerfect errors (nil comparisons) 
 		-- in case the frame isn't fully dimensioned yet
@@ -160,7 +160,7 @@ function ElvUISkin:SkinFrames(E, S)
 
 	-- Skin Portrait Button (Changelog)
 	if frame.PortraitButton then
-		BFL:DebugPrint("ElvUISkin: Skinning PortraitButton")
+		-- BFL:DebugPrint("ElvUISkin: Skinning PortraitButton")
 		local button = frame.PortraitButton
 		
 		-- Classic: Hide portrait when ElvUI active and NOT in Simple Mode

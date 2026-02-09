@@ -64,13 +64,13 @@ local function DetectOptionalFeatures()
 
 	-- Print version info (only if debug enabled)
 	local versionName = BFL.IsMidnight and "Midnight (12.x)" or "The War Within (11.x)"
-	BFL:DebugPrint(string.format("|cff00ff00BetterFriendlist:|r TOC %d (%s)", tocVersion, versionName))
+	-- BFL:DebugPrint(string.format("|cff00ff00BetterFriendlist:|r TOC %d (%s)", tocVersion, versionName))
 
 	if BFL.UseClassID then
-		BFL:DebugPrint("|cff00ff00BetterFriendlist:|r Using classID optimization (11.2.7+)")
+		-- BFL:DebugPrint("|cff00ff00BetterFriendlist:|r Using classID optimization (11.2.7+)")
 	end
 	if BFL.HasSecretValues then
-		BFL:DebugPrint("|cff00ff00BetterFriendlist:|r Secret Values API detected (12.0.0+)")
+		-- BFL:DebugPrint("|cff00ff00BetterFriendlist:|r Secret Values API detected (12.0.0+)")
 	end
 end
 
@@ -1068,11 +1068,10 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 
 	-- Test Translations (Encoding Check)
 	elseif msg == "testlocales" or msg == "testencoding" or msg == "testenc" then
-		BFL:DebugPrint(
-			"|cff00ff00BetterFriendlist:|r " .. (BFL.L.CORE_HELP_TEST_LOCALES or "Testing Localization Encoding...")
-		)
-		BFL:DebugPrint("Locale: " .. GetLocale())
-
+		-- BFL:DebugPrint(
+		--     "|cff00ff00BetterFriendlist:|r " .. (BFL.L.CORE_HELP_TEST_LOCALES or "Testing Localization Encoding...")
+		-- )
+		-- BFL:DebugPrint("Locale: " .. GetLocale())
 		-- List of strings with special characters to test
 		local testKeys = {
 			"DIALOG_DELETE_GROUP_TEXT", -- é, ê, û
@@ -1085,14 +1084,14 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 
 		for _, key in ipairs(testKeys) do
 			if BFL.L[key] then
-				BFL:DebugPrint(string.format("|cffffcc00%s:|r %s", key, BFL.L[key]))
+				-- BFL:DebugPrint(string.format("|cffffcc00%s:|r %s", key, BFL.L[key]))
 			else
-				BFL:DebugPrint(string.format("|cffff0000Missing:|r %s", key))
+				-- BFL:DebugPrint(string.format("|cffff0000Missing:|r %s", key))
 			end
 		end
-		BFL:DebugPrint("|cff00ff00End of Test|r")
+		-- BFL:DebugPrint("|cff00ff00End of Test|r")
 
-	-- Reset Frame Position
+		-- Reset Frame Position
 	elseif msg == "reset" then
 		local FrameSettings = BFL:GetModule("FrameSettings")
 		if FrameSettings then

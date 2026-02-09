@@ -31,31 +31,31 @@ function IgnoreList:OnLoad(frame)
 	-- Set up frame visuals matching Blizzard's InitializeFrameVisuals
 	ButtonFrameTemplate_HidePortrait(frame)
 	frame:SetTitle(IGNORE_LIST)
-	
+
 	if frame.TopTileStreaks then
 		frame.TopTileStreaks:Hide()
 	end
-	
+
 	-- Position Inset (matching Blizzard's exact positioning)
 	if frame.Inset then
 		frame.Inset:ClearAllPoints()
 		frame.Inset:SetPoint("TOPLEFT", frame, "TOPLEFT", 11, -28)
 		frame.Inset:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -6, 36)
 	end
-	
+
 	-- Position ScrollBox inside Inset (matching Blizzard's exact positioning)
 	if frame.ScrollBox and frame.Inset then
 		frame.ScrollBox:ClearAllPoints()
 		frame.ScrollBox:SetPoint("TOPLEFT", frame.Inset, 5, -5)
 		frame.ScrollBox:SetPoint("BOTTOMRIGHT", frame.Inset, -22, 2)
 	end
-	
+
 	-- Localization Fix for Unignore Button
 	if frame.UnignorePlayerButton then
 		-- Use global string or fallback
 		frame.UnignorePlayerButton:SetText(UNIGNORE or BFL.L.IGNORE_LIST_UNIGNORE)
 	end
-	
+
 	-- Global Ignore List Integration
 	if frame.GlobalIgnoreListButton then
 		-- Safe check for addon loaded
@@ -72,14 +72,14 @@ function IgnoreList:OnLoad(frame)
 			frame.GlobalIgnoreListButton:Hide()
 		end
 	end
-	
+
 	-- Classic: Use FauxScrollFrame approach
 	if BFL.IsClassic or not BFL.HasModernScrollBox then
 		-- BFL:DebugPrint("|cff00ffffIgnoreList:|r Using Classic FauxScrollFrame mode")
 		self:InitializeClassicIgnoreList(frame)
 		return
 	end
-	
+
 	-- Retail: Initialize ScrollBox with element factory (exact Blizzard implementation)
 	-- BFL:DebugPrint("|cff00ffffIgnoreList:|r Using Retail ScrollBox mode")
 	local scrollBoxView = CreateScrollBoxListLinearView()
@@ -92,7 +92,7 @@ function IgnoreList:OnLoad(frame)
 			end)
 		end
 	end)
-	
+
 	ScrollUtil.InitScrollBoxListWithScrollBar(frame.ScrollBox, frame.ScrollBar, scrollBoxView)
 end
 
@@ -101,13 +101,14 @@ function IgnoreList:InitializeClassicIgnoreList(frame)
 	self.classicIgnoreFrame = frame
 	self.classicIgnoreButtonPool = {}
 	self.classicIgnoreDataList = {}
-	
+
 	local BUTTON_HEIGHT = 16
 	local NUM_BUTTONS = 15
-	
+
 	-- Create buttons for Classic mode
 	for i = 1, NUM_BUTTONS do
-		local button = CreateFrame("Button", "BetterIgnoreListButton" .. i, frame.Inset or frame, "BetterIgnoreListButtonTemplate")
+		local button =
+			CreateFrame("Button", "BetterIgnoreListButton" .. i, frame.Inset or frame, "BetterIgnoreListButtonTemplate")
 		button:SetPoint("TOPLEFT", frame.Inset or frame, "TOPLEFT", 5, -((i - 1) * BUTTON_HEIGHT) - 5)
 		button:SetPoint("RIGHT", frame.Inset or frame, "RIGHT", -27, 0)
 		button:SetHeight(BUTTON_HEIGHT)
@@ -115,7 +116,7 @@ function IgnoreList:InitializeClassicIgnoreList(frame)
 		button:Hide()
 		self.classicIgnoreButtonPool[i] = button
 	end
-	
+
 	-- Create scroll bar
 	local parent = frame.Inset or frame
 	if not parent.ClassicScrollBar then
@@ -124,44 +125,46 @@ function IgnoreList:InitializeClassicIgnoreList(frame)
 			_G["BetterIgnoreScrollBar"]:Hide()
 			_G["BetterIgnoreScrollBar"] = nil
 		end
-		
+
 		-- Use Standard UIPanelScrollBarTemplate
 		local scrollBar = CreateFrame("Slider", "BetterIgnoreListScrollBar", parent, "UIPanelScrollBarTemplate")
 		scrollBar:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -4, -16)
 		scrollBar:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -4, 16)
 		-- Adjust width slightly if needed, template usually handles it
-		
+
 		scrollBar:SetScript("OnValueChanged", function(self, value)
 			IgnoreList:RenderClassicIgnoreButtons()
 		end)
-		
+
 		-- Set value AFTER scripts are registered (Classic requirement)
 		scrollBar:SetValue(0)
-		
+
 		parent.ClassicScrollBar = scrollBar
 	end
 end
 
 -- Render Classic Ignore buttons
 function IgnoreList:RenderClassicIgnoreButtons()
-	if not self.classicIgnoreButtonPool then return end
-	
+	if not self.classicIgnoreButtonPool then
+		return
+	end
+
 	local dataList = self.classicIgnoreDataList or {}
 	local numItems = #dataList
 	local numButtons = #self.classicIgnoreButtonPool
 	local offset = 0
-	
+
 	local parent = self.classicIgnoreFrame.Inset or self.classicIgnoreFrame
 	if parent.ClassicScrollBar then
 		offset = math.floor(parent.ClassicScrollBar:GetValue() or 0)
 	end
-	
+
 	-- Update scroll bar range
 	if parent.ClassicScrollBar then
 		local maxValue = math.max(0, numItems - numButtons)
 		parent.ClassicScrollBar:SetMinMaxValues(0, maxValue)
 	end
-	
+
 	-- Render buttons
 	for i, button in ipairs(self.classicIgnoreButtonPool) do
 		local dataIndex = offset + i
@@ -228,7 +231,7 @@ function IgnoreList:Update()
 	if not BetterFriendsFrame or not BetterFriendsFrame.IgnoreListWindow then
 		return
 	end
-	
+
 	-- Global Ignore List Integration Check
 	local ignoreFrame = BetterFriendsFrame.IgnoreListWindow
 	if ignoreFrame.GlobalIgnoreListButton then
@@ -238,36 +241,36 @@ function IgnoreList:Update()
 		elseif IsAddOnLoaded then
 			loaded = IsAddOnLoaded("GlobalIgnoreList")
 		end
-		
+
 		ignoreFrame.GlobalIgnoreListButton:SetShown(loaded)
 	end
-	
+
 	-- Build data list for both modes
 	local dataList = {}
 
 	local numIgnores = C_FriendList.GetNumIgnores()
-	
+
 	if numIgnores and numIgnores > 0 then
 		-- Only show header if there are actually ignored players
 		if not BFL.IsClassic and BFL.HasModernScrollBox then
-			table.insert(dataList, {header="BetterFriendsFrameIgnoredHeaderTemplate"})
+			table.insert(dataList, { header = "BetterFriendsFrameIgnoredHeaderTemplate" })
 		end
 
 		for index = 1, numIgnores do
-			table.insert(dataList, {squelchType=SQUELCH_TYPE_IGNORE, index=index})
+			table.insert(dataList, { squelchType = SQUELCH_TYPE_IGNORE, index = index })
 		end
 	end
 
 	local numBlocks = BNGetNumBlocked()
 	if numBlocks and numBlocks > 0 then
 		if not BFL.IsClassic and BFL.HasModernScrollBox then
-			table.insert(dataList, {header="BetterFriendsFrameBlockedInviteHeaderTemplate"})
+			table.insert(dataList, { header = "BetterFriendsFrameBlockedInviteHeaderTemplate" })
 		end
 		for index = 1, numBlocks do
-			table.insert(dataList, {squelchType=SQUELCH_TYPE_BLOCK_INVITE, index=index})
+			table.insert(dataList, { squelchType = SQUELCH_TYPE_BLOCK_INVITE, index = index })
 		end
 	end
-	
+
 	-- Classic mode: Use simple list and render
 	if BFL.IsClassic or not BFL.HasModernScrollBox then
 		self.classicIgnoreDataList = dataList
@@ -278,7 +281,10 @@ function IgnoreList:Update()
 		for _, data in ipairs(dataList) do
 			dataProvider:Insert(data)
 		end
-		BetterFriendsFrame.IgnoreListWindow.ScrollBox:SetDataProvider(dataProvider, ScrollBoxConstants.RetainScrollPosition)
+		BetterFriendsFrame.IgnoreListWindow.ScrollBox:SetDataProvider(
+			dataProvider,
+			ScrollBoxConstants.RetainScrollPosition
+		)
 	end
 
 	local selectedSquelchType, selectedSquelchIndex = self:GetSelected()
@@ -311,7 +317,7 @@ function IgnoreList:SelectSquelched(squelchType, index)
 
 	local function UpdateButtonSelection(type, index, selected)
 		local button = nil
-		
+
 		-- Classic mode: Manual iteration through button pool
 		if BFL.IsClassic or not BFL.HasModernScrollBox then
 			if self.classicIgnoreButtonPool then
@@ -328,7 +334,7 @@ function IgnoreList:SelectSquelched(squelchType, index)
 				return elementData.squelchType == type and elementData.index == index
 			end)
 		end
-		
+
 		if button then
 			self:SetButtonSelected(button, selected)
 		end
@@ -353,8 +359,10 @@ end
 -- Toggle Ignore List Window visibility (FriendsIgnoreListMixin:ToggleFrame)
 function IgnoreList:Toggle()
 	local frame = BetterFriendsFrame
-	if not frame or not frame.IgnoreListWindow then return end
-	
+	if not frame or not frame.IgnoreListWindow then
+		return
+	end
+
 	frame.IgnoreListWindow:SetShown(not frame.IgnoreListWindow:IsShown())
 	PlaySound(SOUNDKIT.IG_CHAT_EMOTE_BUTTON)
 end
@@ -398,7 +406,7 @@ function BetterIgnoreList_ToggleGIL()
 	elseif IsAddOnLoaded then
 		loaded = IsAddOnLoaded("GlobalIgnoreList")
 	end
-	
+
 	if loaded then
 		if SlashCmdList and SlashCmdList["GIGNORE"] then
 			-- This creates the frame AND shows it
@@ -406,7 +414,7 @@ function BetterIgnoreList_ToggleGIL()
 			PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
 		else
 			if BFL then
-				BFL:DebugPrint("BetterIgnoreList_ToggleGIL: GlobalIgnoreList loaded but SlashCmdList['GIGNORE'] is missing.")
+				-- BFL:DebugPrint("BetterIgnoreList_ToggleGIL: GlobalIgnoreList loaded but SlashCmdList['GIGNORE'] is missing.")
 			end
 		end
 	end

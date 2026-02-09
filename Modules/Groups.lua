@@ -304,8 +304,8 @@ function Groups:RunColorSnapshotMigration()
 				or { r = 1.0, g = 0.82, b = 0.0, a = 1 }
 			local currentColor = groupColors[groupId] or defaultColor
 
-			groupCountColors[groupId] = { r = currentColor.r, g = currentColor.g, b = currentColor.b, a = currentColor.a
-				or 1 }
+			groupCountColors[groupId] =
+				{ r = currentColor.r, g = currentColor.g, b = currentColor.b, a = currentColor.a or 1 }
 			DB:Set("groupCountColors", groupCountColors)
 			modificationMade = true
 		end
@@ -316,8 +316,8 @@ function Groups:RunColorSnapshotMigration()
 				or { r = 1.0, g = 0.82, b = 0.0, a = 1 }
 			local currentColor = groupColors[groupId] or defaultColor
 
-			groupArrowColors[groupId] = { r = currentColor.r, g = currentColor.g, b = currentColor.b, a = currentColor.a
-				or 1 }
+			groupArrowColors[groupId] =
+				{ r = currentColor.r, g = currentColor.g, b = currentColor.b, a = currentColor.a or 1 }
 			DB:Set("groupArrowColors", groupArrowColors)
 			modificationMade = true
 		end
@@ -488,7 +488,7 @@ function Groups:Initialize()
 			end
 		end
 		if cleanedCount > 0 then
-			BFL:DebugPrint("|cffff8800[Groups]|r Cleaned " .. cleanedCount .. " ghost group entries from friendGroups")
+			-- BFL:DebugPrint("|cffff8800[Groups]|r Cleaned " .. cleanedCount .. " ghost group entries from friendGroups")
 		end
 	end
 end
