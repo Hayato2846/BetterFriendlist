@@ -42,6 +42,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Show Faction Icons** - Fixed the setting so faction icons display correctly when enabled.
 - **Show Collapse Arrow** - Fixed the setting so collapse/expand arrows show when enabled.
 - **Raid Right-Click MT/MA** - Fixed raid context menu options for Main Tank/Main Assist not working.
+- **ElvUI Skin (Parse Error)** - Fixed a Lua error in ElvUI skinning caused by malformed `xpcall` error handlers that swallowed closing brackets.
+- **ElvUI Skin (Context Menus)** - Removed redundant context menu skinning code since ElvUI already handles this globally.
+- **ElvUI Skin (Missing Hooks)** - Added ElvUI skinning for Checkbox+Dropdown rows (e.g. Favorite Icon), Input fields (e.g. Streamer Mode custom text), and Button rows that were previously unskinned.
+- **Favorite Icon Cache** - Fixed favorite star icons incorrectly appearing on offline WoW friends due to a ScrollBox button recycling issue.
+- **Font Not Set Taint** - Fixed "FontString:SetText(): Font not set" errors that could cause Lua taint and break ESC/Chat during combat.
 
 ## [2.3.0]       - 2026-02-07
 ### Special Thanks

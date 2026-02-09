@@ -9,13 +9,17 @@ local ElvUISkin = BFL:RegisterModule("ElvUISkin", {})
 
 -- Helper to handle scrollbars across Retail and Classic
 local function SkinScrollBar(S, scrollBar)
-	if not scrollBar then return end
-	
+	if not scrollBar then
+		return
+	end
+
 	-- Validation: Ensure scrollBar is an object
-	if not scrollBar.IsObjectType then return end
+	if not scrollBar.IsObjectType then
+		return
+	end
 
 	local isClassic = BFL and BFL.IsClassic
-	
+
 	if isClassic then
 		-- Classic Override: Always use HandleScrollBar
 		-- HandleTrimScrollBar does not exist or shouldn't be used in Classic environments
@@ -52,8 +56,10 @@ function ElvUISkin:Initialize()
 end
 
 function ElvUISkin:RegisterSkin()
-	if not _G.ElvUI then return end
-	
+	if not _G.ElvUI then
+		return
+	end
+
 	-- Check if skin is enabled in BFL settings (Point 1)
 	-- Explicit check for false (nil means enabled by default if we wanted, but DB init sets it to false)
 	local isEnabled = BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin
@@ -64,10 +70,10 @@ function ElvUISkin:RegisterSkin()
 
 	-- BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Registering skin...")
 	local E, L, V, P, G = unpack(_G.ElvUI)
-	local RealS = E:GetModule('Skins')
-	if not RealS then 
+	local RealS = E:GetModule("Skins")
+	if not RealS then
 		-- BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Skins module not found!")
-		return 
+		return
 	end
 
 	-- Create Safety Proxy to prevent nil value crashes in ElvUI Skins module
@@ -77,15 +83,18 @@ function ElvUISkin:RegisterSkin()
 			if type(val) == "function" then
 				return function(_, arg1, ...)
 					-- Protect Handlers from nil arguments
-					if arg1 == nil and (
-						k == "HandleButton" or 
-						k == "HandleCheckBox" or 
-						k == "HandleEditBox" or 
-						k == "HandleTab" or 
-						k == "HandleScrollBar" or 
-						k == "HandleDropDownBox" or
-						k == "HandlePortraitFrame" 
-					) then
+					if
+						arg1 == nil
+						and (
+							k == "HandleButton"
+							or k == "HandleCheckBox"
+							or k == "HandleEditBox"
+							or k == "HandleTab"
+							or k == "HandleScrollBar"
+							or k == "HandleDropDownBox"
+							or k == "HandlePortraitFrame"
+						)
+					then
 						-- Silently ignore nil calls to prevent crashes
 						return
 					end
@@ -97,7 +106,7 @@ function ElvUISkin:RegisterSkin()
 		end,
 		__newindex = function(t, k, v)
 			RealS[k] = v
-		end
+		end,
 	})
 
 	-- Register callback for skinning
@@ -105,29 +114,41 @@ function ElvUISkin:RegisterSkin()
 	-- Try both typical addon names to be safe
 	S:AddCallbackForAddon("BetterFriendlist", "BetterFriendlist", function()
 		-- BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Callback triggered")
-		xpcall(function() self:SkinFrames(E, S) end, function(err) -- BFL:DebugPrint("|cffff0000BetterFriendlist ElvUI Skin Error:|r " .. tostring(err)) end)
+		xpcall(function()
+			self:SkinFrames(E, S)
+		end, function(err)
+			-- BFL:DebugPrint("|cffff0000BetterFriendlist ElvUI Skin Error:|r " .. tostring(err))
+		end)
 	end)
-	
+
 	-- Force run if ElvUI is already initialized (Classic fix)
 	if E.initialized then
 		-- BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Direct call triggered (E.initialized=true)")
-		xpcall(function() self:SkinFrames(E, S) end, function(err) -- BFL:DebugPrint("|cffff0000BetterFriendlist ElvUI Skin Error:|r " .. tostring(err)) end)
+		xpcall(function()
+			self:SkinFrames(E, S)
+		end, function(err)
+			-- BFL:DebugPrint("|cffff0000BetterFriendlist ElvUI Skin Error:|r " .. tostring(err))
+		end)
 	else
 		-- BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Direct call skipped (E.initialized=false)")
 	end
 end
 
 function ElvUISkin:SkinFrames(E, S)
-	if not _G.BetterFriendsFrame then return end
+	if not _G.BetterFriendsFrame then
+		return
+	end
 
 	-- Ensure Tab Text is centered (Hook for updates)
 	if not self.TabHookInstalled then
 		local function FixTabCenter(tab)
 			if tab and tab:GetName() then
 				local name = tab:GetName()
-				if string.find(name, "BetterFriendsFrameTab") or 
-				   string.find(name, "BetterFriendlistSettingsFrameTab") or 
-				   string.find(name, "BetterFriendsFrameBottomTab") then
+				if
+					string.find(name, "BetterFriendsFrameTab")
+					or string.find(name, "BetterFriendlistSettingsFrameTab")
+					or string.find(name, "BetterFriendsFrameBottomTab")
+				then
 					local text = tab.Text or (tab.GetFontString and tab:GetFontString())
 					if text then
 						text:ClearAllPoints()
@@ -143,7 +164,7 @@ function ElvUISkin:SkinFrames(E, S)
 		if _G.PanelTemplates_DeselectTab then
 			hooksecurefunc("PanelTemplates_DeselectTab", FixTabCenter)
 		end
-		
+
 		self.TabHookInstalled = true
 	end
 
@@ -153,16 +174,18 @@ function ElvUISkin:SkinFrames(E, S)
 	-- Skin Main Frame
 	-- BFL:DebugPrint("ElvUISkin: Skinning Main Frame")
 	if frame.PortraitContainer or frame.portrait then
-		-- Use pcall to safeguard against ElvUI PixelPerfect errors (nil comparisons) 
+		-- Use pcall to safeguard against ElvUI PixelPerfect errors (nil comparisons)
 		-- in case the frame isn't fully dimensioned yet
-		pcall(function() S:HandlePortraitFrame(frame) end)
+		pcall(function()
+			S:HandlePortraitFrame(frame)
+		end)
 	end
 
 	-- Skin Portrait Button (Changelog)
 	if frame.PortraitButton then
 		-- BFL:DebugPrint("ElvUISkin: Skinning PortraitButton")
 		local button = frame.PortraitButton
-		
+
 		-- Classic: Hide portrait when ElvUI active and NOT in Simple Mode
 		-- (Changelog will be accessible via Contacts Menu instead)
 		local shouldSkinPortrait = true
@@ -174,24 +197,24 @@ function ElvUISkin:SkinFrames(E, S)
 				shouldSkinPortrait = false
 			end
 		end
-		
+
 		if shouldSkinPortrait then
 			-- Reset position and size to fit ElvUI style
 			button:ClearAllPoints()
 			button:SetPoint("TOPLEFT", frame, "TOPLEFT", 4, -4)
 			button:SetSize(42, 42) -- Standard ElvUI icon size (square)
 			button:SetFrameLevel(frame:GetFrameLevel() + 5)
-		
+
 			-- Create Backdrop
 			button:CreateBackdrop("Transparent")
-			
+
 			-- Handle Icon
 			if BFL.IsClassic then
 				-- Classic: Hide the old circular icon and create a new square one
 				if button.Icon then
 					button.Icon:Hide()
 				end
-				
+
 				-- Create new square icon without mask
 				if not button.ElvUIIcon then
 					button.ElvUIIcon = button:CreateTexture(nil, "ARTWORK")
@@ -201,7 +224,7 @@ function ElvUISkin:SkinFrames(E, S)
 				button.ElvUIIcon:SetInside(button.backdrop)
 				button.ElvUIIcon:SetTexCoord(unpack(E.TexCoords)) -- Square crop
 				button.ElvUIIcon:Show()
-				
+
 				-- Reference for consistency
 				button.Icon = button.ElvUIIcon
 			elseif not button.Icon then
@@ -212,13 +235,15 @@ function ElvUISkin:SkinFrames(E, S)
 				button.Icon:SetTexCoord(unpack(E.TexCoords))
 				button.Icon:Show()
 			end
-			
+
 			-- Hide original icon and mask (if different from button.Icon)
-			if frame.PortraitIcon and frame.PortraitIcon ~= button.Icon then 
-				frame.PortraitIcon:Hide() 
+			if frame.PortraitIcon and frame.PortraitIcon ~= button.Icon then
+				frame.PortraitIcon:Hide()
 			end
-			if frame.PortraitMask then frame.PortraitMask:Hide() end
-			
+			if frame.PortraitMask then
+				frame.PortraitMask:Hide()
+			end
+
 			-- Handle Glow (New Version Indicator)
 			if button.Glow then
 				button.Glow:SetParent(button)
@@ -226,10 +251,10 @@ function ElvUISkin:SkinFrames(E, S)
 				button.Glow:SetInside(button.backdrop)
 				button.Glow:SetDrawLayer("OVERLAY")
 				-- Use a cleaner glow texture for ElvUI
-				button.Glow:SetTexture(E.Media.Textures.Highlight) 
+				button.Glow:SetTexture(E.Media.Textures.Highlight)
 				button.Glow:SetVertexColor(1, 0.82, 0, 0.5)
 			end
-			
+
 			-- Add Hover Effect
 			button:HookScript("OnEnter", function(self)
 				if self.backdrop then
@@ -239,7 +264,7 @@ function ElvUISkin:SkinFrames(E, S)
 					end
 				end
 			end)
-			
+
 			button:HookScript("OnLeave", function(self)
 				if self.backdrop then
 					local color = E.media.bordercolor
@@ -254,10 +279,10 @@ function ElvUISkin:SkinFrames(E, S)
 	-- Skin Tabs (Top)
 	BFL:DebugPrint("ElvUISkin: Skinning Top Tabs")
 	for i = 1, 4 do
-		local tab = _G["BetterFriendsFrameTab"..i]
+		local tab = _G["BetterFriendsFrameTab" .. i]
 		if tab then
 			S:HandleTab(tab)
-			
+
 			-- Adjust text position
 			local text = tab.Text or (tab.GetFontString and tab:GetFontString())
 			if text then
@@ -275,11 +300,11 @@ function ElvUISkin:SkinFrames(E, S)
 	-- Skin Tabs (Bottom)
 	BFL:DebugPrint("ElvUISkin: Skinning Bottom Tabs")
 	for i = 1, 4 do
-		local tab = _G["BetterFriendsFrameBottomTab"..i]
+		local tab = _G["BetterFriendsFrameBottomTab" .. i]
 		if tab then
 			S:HandleTab(tab)
 			tab:SetHeight(28) -- Fixed height
-			
+
 			-- Re-anchor tabs to be left-aligned with no spacing
 			tab:ClearAllPoints()
 			if i == 1 then
@@ -287,7 +312,7 @@ function ElvUISkin:SkinFrames(E, S)
 				tab:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", -2, 1)
 			else
 				-- Subsequent tabs anchor to the right of the previous one
-				local prevTab = _G["BetterFriendsFrameBottomTab"..(i-1)]
+				local prevTab = _G["BetterFriendsFrameBottomTab" .. (i - 1)]
 				tab:SetPoint("LEFT", prevTab, "RIGHT", -5, 0)
 			end
 		end
@@ -299,7 +324,7 @@ function ElvUISkin:SkinFrames(E, S)
 		frame.Inset:StripTextures()
 		frame.Inset:CreateBackdrop("Transparent")
 	end
-	
+
 	if frame.ListInset then
 		frame.ListInset:StripTextures()
 		frame.ListInset:CreateBackdrop("Transparent")
@@ -325,31 +350,31 @@ function ElvUISkin:SkinFrames(E, S)
 	BFL:DebugPrint("ElvUISkin: Skinning IgnoreList")
 	if frame.IgnoreListWindow then
 		S:HandlePortraitFrame(frame.IgnoreListWindow)
-		
+
 		if frame.IgnoreListWindow.Inset then
 			frame.IgnoreListWindow.Inset:StripTextures()
 			frame.IgnoreListWindow.Inset:CreateBackdrop("Transparent")
 		end
-		
+
 		if frame.IgnoreListWindow.ScrollBar then
 			SkinScrollBar(S, frame.IgnoreListWindow.ScrollBar)
 		end
-		
+
 		if frame.IgnoreListWindow.UnignorePlayerButton then
 			S:HandleButton(frame.IgnoreListWindow.UnignorePlayerButton)
 		end
-		
+
 		-- Skin Global Ignore List Button (if active)
 		if frame.IgnoreListWindow.GlobalIgnoreListButton then
 			-- Fix: Check if GlobalIgnoreListButton is actually a button (it might be a frame in some cases)
 			if frame.IgnoreListWindow.GlobalIgnoreListButton:IsObjectType("Button") then
 				S:HandleButton(frame.IgnoreListWindow.GlobalIgnoreListButton)
-				
+
 				-- Preserve the Icon (HandleButton calls StripTextures which hides ARTWORK)
 				if frame.IgnoreListWindow.GlobalIgnoreListButton.Icon then
 					-- Move to OVERLAY to ensure it sits on top of the new backdrop
 					frame.IgnoreListWindow.GlobalIgnoreListButton.Icon:SetDrawLayer("OVERLAY")
-					
+
 					-- Ensure it is visible
 					frame.IgnoreListWindow.GlobalIgnoreListButton.Icon:SetAlpha(1)
 					frame.IgnoreListWindow.GlobalIgnoreListButton.Icon:Show()
@@ -361,7 +386,7 @@ function ElvUISkin:SkinFrames(E, S)
 	-- Skin ScrollBars
 	BFL:DebugPrint("ElvUISkin: Skinning ScrollBars")
 	-- Friends List ScrollBar - Point 7
-	
+
 	-- Check for Retail Minimal, Standard, or Classic ScrollBar (often on ScrollFrame)
 	local scrollBar = frame.MinimalScrollBar or frame.ScrollBar
 	if not scrollBar and frame.ScrollFrame then
@@ -369,7 +394,7 @@ function ElvUISkin:SkinFrames(E, S)
 		if frame.ScrollFrame.ScrollBar then
 			scrollBar = frame.ScrollFrame.ScrollBar
 		elseif frame.ScrollFrame:GetName() then
-			scrollBar = _G[frame.ScrollFrame:GetName().."ScrollBar"]
+			scrollBar = _G[frame.ScrollFrame:GetName() .. "ScrollBar"]
 		end
 	end
 
@@ -413,7 +438,7 @@ function ElvUISkin:SkinFrames(E, S)
 	if frame.WhoFrame and frame.WhoFrame.ScrollBar then
 		SkinScrollBar(S, frame.WhoFrame.ScrollBar)
 	end
-	
+
 	-- Raid Frame ScrollBar
 	if frame.RaidFrame and frame.RaidFrame.ScrollBar then
 		SkinScrollBar(S, frame.RaidFrame.ScrollBar)
@@ -422,14 +447,20 @@ function ElvUISkin:SkinFrames(E, S)
 	-- Skin Buttons
 	BFL:DebugPrint("ElvUISkin: Skinning Buttons")
 	-- Add Friend / Send Who / etc
-	if frame.AddFriendButton then S:HandleButton(frame.AddFriendButton) end
-	if frame.SendMessageButton then S:HandleButton(frame.SendMessageButton) end
-	if frame.RecruitmentButton then S:HandleButton(frame.RecruitmentButton) end
-	
+	if frame.AddFriendButton then
+		S:HandleButton(frame.AddFriendButton)
+	end
+	if frame.SendMessageButton then
+		S:HandleButton(frame.SendMessageButton)
+	end
+	if frame.RecruitmentButton then
+		S:HandleButton(frame.RecruitmentButton)
+	end
+
 	-- Skin HelpButton
-	if frame.HelpButton then 
+	if frame.HelpButton then
 		-- Do not skin the framework of the HelpButton, only color the icon
-		-- S:HandleButton(frame.HelpButton) 
+		-- S:HandleButton(frame.HelpButton)
 		if frame.HelpButton.Icon then
 			frame.HelpButton.Icon:SetVertexColor(1, 1, 1)
 		end
@@ -443,35 +474,41 @@ function ElvUISkin:SkinFrames(E, S)
 		if frame.FriendsTabHeader.BattlenetFrame.SettingsButton then
 			pcall(S.HandleButton, S, frame.FriendsTabHeader.BattlenetFrame.SettingsButton)
 		end
-		
+
 		-- Classic: Reposition buttons 15px to the right (already anchored to bnet, which moved)
 		-- No additional changes needed as they inherit bnet's new position
 	end
 
 	if frame.WhoFrame then
-		if frame.WhoFrame.WhoButton then pcall(S.HandleButton, S, frame.WhoFrame.WhoButton) end
-		if frame.WhoFrame.AddFriendButton then pcall(S.HandleButton, S, frame.WhoFrame.AddFriendButton) end
-		if frame.WhoFrame.GroupInviteButton then pcall(S.HandleButton, S, frame.WhoFrame.GroupInviteButton) end
-		
+		if frame.WhoFrame.WhoButton then
+			pcall(S.HandleButton, S, frame.WhoFrame.WhoButton)
+		end
+		if frame.WhoFrame.AddFriendButton then
+			pcall(S.HandleButton, S, frame.WhoFrame.AddFriendButton)
+		end
+		if frame.WhoFrame.GroupInviteButton then
+			pcall(S.HandleButton, S, frame.WhoFrame.GroupInviteButton)
+		end
+
 		-- EditBox
-		if frame.WhoFrame.EditBox then 
+		if frame.WhoFrame.EditBox then
 			S:HandleEditBox(frame.WhoFrame.EditBox)
-			if frame.WhoFrame.EditBox.Backdrop then 
+			if frame.WhoFrame.EditBox.Backdrop then
 				frame.WhoFrame.EditBox.Backdrop:StripTextures()
 				frame.WhoFrame.EditBox.Backdrop:CreateBackdrop("Transparent")
 			end
 		end
-		
+
 		-- Dropdown
 		if frame.WhoFrame.ColumnDropdown then
 			S:HandleDropDownBox(frame.WhoFrame.ColumnDropdown)
-			
+
 			-- Classic: Expand clickable button area
 			if BFL.IsClassic then
 				local dropdown = frame.WhoFrame.ColumnDropdown
 				local name = dropdown:GetName()
 				if name then
-					local button = _G[name.."Button"]
+					local button = _G[name .. "Button"]
 					if button then
 						-- Get dropdown width to match button size
 						local width = dropdown:GetWidth()
@@ -492,13 +529,13 @@ function ElvUISkin:SkinFrames(E, S)
 		-- Battlenet Frame & Broadcast Frame
 		if frame.FriendsTabHeader.BattlenetFrame then
 			local bnet = frame.FriendsTabHeader.BattlenetFrame
-			
+
 			-- Skin Main Frame
 			bnet:StripTextures()
 			bnet:CreateBackdrop("Transparent")
 			bnet.backdrop:SetPoint("TOPLEFT", 0, 0)
 			bnet.backdrop:SetPoint("BOTTOMRIGHT", 0, 0)
-			
+
 			-- Classic: Reduce width to make room for StatusDropdown
 			if BFL.IsClassic then
 				bnet:SetWidth(180)
@@ -506,16 +543,16 @@ function ElvUISkin:SkinFrames(E, S)
 				bnet:ClearAllPoints()
 				bnet:SetPoint("TOPRIGHT", frame.FriendsTabHeader, "TOPRIGHT", -62, -27)
 			end
-			
+
 			if bnet.Tag then
 				bnet.Tag:SetParent(bnet.backdrop)
 			end
-			
+
 			-- Set initial border color to default (not blue)
 			if E.media and E.media.bordercolor then
 				bnet.backdrop:SetBackdropBorderColor(unpack(E.media.bordercolor))
 			end
-			
+
 			-- Add Hover Effect (like ElvUI)
 			bnet:EnableMouse(true)
 			bnet:SetScript("OnEnter", function(self)
@@ -526,7 +563,7 @@ function ElvUISkin:SkinFrames(E, S)
 					end
 				end
 			end)
-			
+
 			bnet:SetScript("OnLeave", function(self)
 				if self.backdrop then
 					local c = E.media.bordercolor
@@ -535,16 +572,22 @@ function ElvUISkin:SkinFrames(E, S)
 					end
 				end
 			end)
-			
+
 			if bnet.BroadcastFrame then
 				bnet.BroadcastFrame:StripTextures()
 				bnet.BroadcastFrame:CreateBackdrop("Transparent")
-				
-				if bnet.BroadcastFrame.UpdateButton then S:HandleButton(bnet.BroadcastFrame.UpdateButton) end
-				if bnet.BroadcastFrame.CancelButton then S:HandleButton(bnet.BroadcastFrame.CancelButton) end
-				if bnet.BroadcastFrame.EditBox then S:HandleEditBox(bnet.BroadcastFrame.EditBox) end
+
+				if bnet.BroadcastFrame.UpdateButton then
+					S:HandleButton(bnet.BroadcastFrame.UpdateButton)
+				end
+				if bnet.BroadcastFrame.CancelButton then
+					S:HandleButton(bnet.BroadcastFrame.CancelButton)
+				end
+				if bnet.BroadcastFrame.EditBox then
+					S:HandleEditBox(bnet.BroadcastFrame.EditBox)
+				end
 			end
-			
+
 			if bnet.UnavailableInfoFrame then
 				bnet.UnavailableInfoFrame:StripTextures()
 				bnet.UnavailableInfoFrame:CreateBackdrop("Transparent")
@@ -554,24 +597,32 @@ function ElvUISkin:SkinFrames(E, S)
 		-- SearchBox
 		if frame.FriendsTabHeader.SearchBox then
 			S:HandleEditBox(frame.FriendsTabHeader.SearchBox)
-			
+
 			-- Classic: Position below dropdowns
 			if BFL.IsClassic then
 				frame.FriendsTabHeader.SearchBox:ClearAllPoints()
-				frame.FriendsTabHeader.SearchBox:SetPoint("TOP", frame.FriendsTabHeader.BattlenetFrame, "BOTTOM", 0, -35)
+				frame.FriendsTabHeader.SearchBox:SetPoint(
+					"TOP",
+					frame.FriendsTabHeader.BattlenetFrame,
+					"BOTTOM",
+					0,
+					-35
+				)
 				frame.FriendsTabHeader.SearchBox:SetPoint("LEFT", frame.Inset, "LEFT", 10, 0)
 				frame.FriendsTabHeader.SearchBox:SetPoint("RIGHT", frame.Inset, "RIGHT", -10, 0)
 			end
 		end
-		
+
 		-- Dropdowns - Point 3: Fix width & Layout (Classic adjustments)
 		-- Common function to skin and size dropdowns
 		local function SkinAndSizeDropdown(dropdown, width, height)
-			if not dropdown then return end
+			if not dropdown then
+				return
+			end
 			if S.HandleDropDownBox then
 				S:HandleDropDownBox(dropdown, width)
 			end
-			
+
 			-- Classic uses UIDropDownMenu, Retail uses modern dropdown
 			if BFL.IsClassic and UIDropDownMenu_SetWidth then
 				UIDropDownMenu_SetWidth(dropdown, width)
@@ -579,32 +630,32 @@ function ElvUISkin:SkinFrames(E, S)
 				dropdown:SetWidth(width)
 			end
 			dropdown:SetHeight(height)
-			
+
 			-- Also force the button to match height if needed
 			local name = dropdown:GetName()
 			if name then
-				local button = _G[name.."Button"]
+				local button = _G[name .. "Button"]
 				if button then
 					button:SetHeight(height)
 				end
 			end
 		end
 
-		if frame.FriendsTabHeader.StatusDropdown then 
+		if frame.FriendsTabHeader.StatusDropdown then
 			if BFL.IsClassic then
 				-- Classic: Keep visual width at 38px but expand clickable area
 				local dropdown = frame.FriendsTabHeader.StatusDropdown
-				
+
 				if S.HandleDropDownBox then
 					S:HandleDropDownBox(dropdown, 38)
 				end
-				
+
 				UIDropDownMenu_SetWidth(dropdown, 38)
-				
+
 				-- Expand the clickable button area
 				local name = dropdown:GetName()
 				if name then
-					local button = _G[name.."Button"]
+					local button = _G[name .. "Button"]
 					if button then
 						-- Make button fill the entire dropdown width
 						button:SetSize(38, 24)
@@ -612,7 +663,7 @@ function ElvUISkin:SkinFrames(E, S)
 						button:SetPoint("CENTER", dropdown, "CENTER", 0, 0)
 					end
 				end
-				
+
 				-- Reposition: 1px gap left of BattlenetFrame
 				dropdown:ClearAllPoints()
 				dropdown:SetPoint("RIGHT", frame.FriendsTabHeader.BattlenetFrame, "LEFT", -1, 0)
@@ -620,22 +671,22 @@ function ElvUISkin:SkinFrames(E, S)
 				SkinAndSizeDropdown(frame.FriendsTabHeader.StatusDropdown, 70, 22)
 			end
 		end
-		
-		if frame.FriendsTabHeader.QuickFilterDropdown then 
+
+		if frame.FriendsTabHeader.QuickFilterDropdown then
 			if BFL.IsClassic then
 				-- Classic: Keep visual width at 38px but expand clickable area
 				local dropdown = frame.FriendsTabHeader.QuickFilterDropdown
-				
+
 				if S.HandleDropDownBox then
 					S:HandleDropDownBox(dropdown, 38)
 				end
-				
+
 				UIDropDownMenu_SetWidth(dropdown, 38)
-				
+
 				-- Expand the clickable button area
 				local name = dropdown:GetName()
 				if name then
-					local button = _G[name.."Button"]
+					local button = _G[name .. "Button"]
 					if button then
 						-- Make button fill the entire dropdown width
 						button:SetSize(38, 24)
@@ -643,7 +694,7 @@ function ElvUISkin:SkinFrames(E, S)
 						button:SetPoint("CENTER", dropdown, "CENTER", 0, 0)
 					end
 				end
-				
+
 				-- Position centered in frame (3 dropdowns: 38+3+38+3+38 = 120px total width)
 				-- Center at x=0 relative to frame center
 				dropdown:ClearAllPoints()
@@ -653,22 +704,22 @@ function ElvUISkin:SkinFrames(E, S)
 				SkinAndSizeDropdown(frame.FriendsTabHeader.QuickFilterDropdown, 50, 30)
 			end
 		end
-		
-		if frame.FriendsTabHeader.PrimarySortDropdown then 
+
+		if frame.FriendsTabHeader.PrimarySortDropdown then
 			if BFL.IsClassic then
 				-- Classic: Keep visual width at 38px but expand clickable area
 				local dropdown = frame.FriendsTabHeader.PrimarySortDropdown
-				
+
 				if S.HandleDropDownBox then
 					S:HandleDropDownBox(dropdown, 38)
 				end
-				
+
 				UIDropDownMenu_SetWidth(dropdown, 38)
-				
+
 				-- Expand the clickable button area
 				local name = dropdown:GetName()
 				if name then
-					local button = _G[name.."Button"]
+					local button = _G[name .. "Button"]
 					if button then
 						-- Make button fill the entire dropdown width
 						button:SetSize(38, 24)
@@ -676,35 +727,41 @@ function ElvUISkin:SkinFrames(E, S)
 						button:SetPoint("CENTER", dropdown, "CENTER", 0, 0)
 					end
 				end
-				
+
 				-- Anchor to QuickFilter with small gap
 				dropdown:ClearAllPoints()
 				dropdown:SetPoint("LEFT", frame.FriendsTabHeader.QuickFilterDropdown, "RIGHT", 3, 0)
 			else
 				-- Retail: Keep existing size
 				SkinAndSizeDropdown(frame.FriendsTabHeader.PrimarySortDropdown, 50, 30)
-				
+
 				-- Anchor to QuickFilter with positive spacing (ElvUI removes the transparent padding)
 				frame.FriendsTabHeader.PrimarySortDropdown:ClearAllPoints()
-				frame.FriendsTabHeader.PrimarySortDropdown:SetPoint("LEFT", frame.FriendsTabHeader.QuickFilterDropdown, "RIGHT", 5, 0)
+				frame.FriendsTabHeader.PrimarySortDropdown:SetPoint(
+					"LEFT",
+					frame.FriendsTabHeader.QuickFilterDropdown,
+					"RIGHT",
+					5,
+					0
+				)
 			end
 		end
-		
-		if frame.FriendsTabHeader.SecondarySortDropdown then 
+
+		if frame.FriendsTabHeader.SecondarySortDropdown then
 			if BFL.IsClassic then
 				-- Classic: Keep visual width at 38px but expand clickable area
 				local dropdown = frame.FriendsTabHeader.SecondarySortDropdown
-				
+
 				if S.HandleDropDownBox then
 					S:HandleDropDownBox(dropdown, 38)
 				end
-				
+
 				UIDropDownMenu_SetWidth(dropdown, 38)
-				
+
 				-- Expand the clickable button area
 				local name = dropdown:GetName()
 				if name then
-					local button = _G[name.."Button"]
+					local button = _G[name .. "Button"]
 					if button then
 						-- Make button fill the entire dropdown width
 						button:SetSize(38, 24)
@@ -712,17 +769,23 @@ function ElvUISkin:SkinFrames(E, S)
 						button:SetPoint("CENTER", dropdown, "CENTER", 0, 0)
 					end
 				end
-				
+
 				-- Anchor to PrimarySort with small gap
 				dropdown:ClearAllPoints()
 				dropdown:SetPoint("LEFT", frame.FriendsTabHeader.PrimarySortDropdown, "RIGHT", 3, 0)
 			else
 				-- Retail: Keep existing size
 				SkinAndSizeDropdown(frame.FriendsTabHeader.SecondarySortDropdown, 50, 30)
-				
+
 				-- Anchor to PrimarySort
 				frame.FriendsTabHeader.SecondarySortDropdown:ClearAllPoints()
-				frame.FriendsTabHeader.SecondarySortDropdown:SetPoint("LEFT", frame.FriendsTabHeader.PrimarySortDropdown, "RIGHT", 5, 0)
+				frame.FriendsTabHeader.SecondarySortDropdown:SetPoint(
+					"LEFT",
+					frame.FriendsTabHeader.PrimarySortDropdown,
+					"RIGHT",
+					5,
+					0
+				)
 			end
 		end
 	end
@@ -730,54 +793,54 @@ function ElvUISkin:SkinFrames(E, S)
 	-- Skin Headers (Who Frame)
 	BFL:DebugPrint("ElvUISkin: Skinning WhoFrame Headers")
 	if frame.WhoFrame then
-		local headers = {frame.WhoFrame.NameHeader, frame.WhoFrame.LevelHeader, frame.WhoFrame.ClassHeader}
+		local headers = { frame.WhoFrame.NameHeader, frame.WhoFrame.LevelHeader, frame.WhoFrame.ClassHeader }
 		for _, header in ipairs(headers) do
 			if header then
 				S:HandleButton(header)
 				header:SetHeight(22) -- Fixed height for headers
 			end
 		end
-		
+
 		-- Fix NameHeader alignment
 		if frame.WhoFrame.NameHeader and frame.WhoFrame.ListInset then
 			frame.WhoFrame.NameHeader:ClearAllPoints()
 			frame.WhoFrame.NameHeader:SetPoint("BOTTOMLEFT", frame.WhoFrame.ListInset, "TOPLEFT", 0, 1)
 		end
-		
+
 		-- Fix Dropdown height and alignment
 		if frame.WhoFrame.ColumnDropdown then
 			frame.WhoFrame.ColumnDropdown:SetHeight(26) -- Match header height
-			
+
 			-- Re-anchor to NameHeader
 			frame.WhoFrame.ColumnDropdown:ClearAllPoints()
 			frame.WhoFrame.ColumnDropdown:SetPoint("LEFT", frame.WhoFrame.NameHeader, "RIGHT", -1, 0)
 		end
-		
+
 		-- Re-anchor LevelHeader
 		if frame.WhoFrame.LevelHeader and frame.WhoFrame.ColumnDropdown then
 			frame.WhoFrame.LevelHeader:ClearAllPoints()
 			frame.WhoFrame.LevelHeader:SetPoint("LEFT", frame.WhoFrame.ColumnDropdown, "RIGHT", -1, 0)
 		end
-		
+
 		-- Re-anchor ClassHeader
 		if frame.WhoFrame.ClassHeader and frame.WhoFrame.LevelHeader then
 			frame.WhoFrame.ClassHeader:ClearAllPoints()
 			frame.WhoFrame.ClassHeader:SetPoint("LEFT", frame.WhoFrame.LevelHeader, "RIGHT", -1, 0)
 		end
 	end
-	
+
 	-- Skin QuickJoin
 	BFL:DebugPrint("ElvUISkin: Skinning QuickJoin")
 	if frame.QuickJoinFrame then
 		if frame.QuickJoinFrame.ContentInset then
-			 frame.QuickJoinFrame.ContentInset:StripTextures()
-			 frame.QuickJoinFrame.ContentInset:CreateBackdrop("Transparent")
-			 
-			 if frame.QuickJoinFrame.ContentInset.ScrollBar then
-				 SkinScrollBar(S, frame.QuickJoinFrame.ContentInset.ScrollBar)
-			 end
+			frame.QuickJoinFrame.ContentInset:StripTextures()
+			frame.QuickJoinFrame.ContentInset:CreateBackdrop("Transparent")
+
+			if frame.QuickJoinFrame.ContentInset.ScrollBar then
+				SkinScrollBar(S, frame.QuickJoinFrame.ContentInset.ScrollBar)
+			end
 		end
-		
+
 		-- Point 4: Join Queue Button (Check both possible paths)
 		if frame.QuickJoinFrame.JoinQueueButton then
 			S:HandleButton(frame.QuickJoinFrame.JoinQueueButton)
@@ -785,31 +848,33 @@ function ElvUISkin:SkinFrames(E, S)
 			S:HandleButton(frame.QuickJoinFrame.ContentInset.JoinQueueButton)
 		end
 	end
-	
+
 	-- Skin Raid Frame
 	BFL:DebugPrint("ElvUISkin: Skinning RaidFrame")
 	if frame.RaidFrame then
-		 -- Fix: Use GroupsInset instead of ListInset
-		 if frame.RaidFrame.GroupsInset then
-			 frame.RaidFrame.GroupsInset:StripTextures()
-			 frame.RaidFrame.GroupsInset:CreateBackdrop("Transparent")
-		 elseif frame.RaidFrame.ListInset then
-			 -- Fallback if ListInset exists
-			 frame.RaidFrame.ListInset:StripTextures()
-			 frame.RaidFrame.ListInset:CreateBackdrop("Transparent")
-		 end
-		 
-		 if frame.RaidFrame.ConvertToRaidButton then S:HandleButton(frame.RaidFrame.ConvertToRaidButton) end
-		 
-		 -- Point 8: Raid Info Button
-		 if frame.RaidFrame.ControlPanel and frame.RaidFrame.ControlPanel.RaidInfoButton then 
-			S:HandleButton(frame.RaidFrame.ControlPanel.RaidInfoButton) 
-		 end
-		 
-		 -- Skin EveryoneAssistCheckbox
-		 if frame.RaidFrame.ControlPanel and frame.RaidFrame.ControlPanel.EveryoneAssistCheckbox then
+		-- Fix: Use GroupsInset instead of ListInset
+		if frame.RaidFrame.GroupsInset then
+			frame.RaidFrame.GroupsInset:StripTextures()
+			frame.RaidFrame.GroupsInset:CreateBackdrop("Transparent")
+		elseif frame.RaidFrame.ListInset then
+			-- Fallback if ListInset exists
+			frame.RaidFrame.ListInset:StripTextures()
+			frame.RaidFrame.ListInset:CreateBackdrop("Transparent")
+		end
+
+		if frame.RaidFrame.ConvertToRaidButton then
+			S:HandleButton(frame.RaidFrame.ConvertToRaidButton)
+		end
+
+		-- Point 8: Raid Info Button
+		if frame.RaidFrame.ControlPanel and frame.RaidFrame.ControlPanel.RaidInfoButton then
+			S:HandleButton(frame.RaidFrame.ControlPanel.RaidInfoButton)
+		end
+
+		-- Skin EveryoneAssistCheckbox
+		if frame.RaidFrame.ControlPanel and frame.RaidFrame.ControlPanel.EveryoneAssistCheckbox then
 			S:HandleCheckBox(frame.RaidFrame.ControlPanel.EveryoneAssistCheckbox)
-		 end
+		end
 	end
 
 	-- Hook Friends List (ScrollBox Items)
@@ -818,24 +883,31 @@ function ElvUISkin:SkinFrames(E, S)
 
 	-- Skin Settings Frame
 	BFL:DebugPrint("ElvUISkin: Skinning Settings")
-	xpcall(function() self:SkinSettings(E, S) end, function(err) BFL:DebugPrint("ElvUISkin: Error skinning Settings: " .. tostring(err)) end)
-	
-	
+	xpcall(function()
+		self:SkinSettings(E, S)
+	end, function(err)
+		BFL:DebugPrint("ElvUISkin: Error skinning Settings: " .. tostring(err))
+	end)
+
 	-- Skin Broker
 	BFL:DebugPrint("ElvUISkin: Skinning Broker")
 	self:SkinBroker(E, S)
-	
-	-- Skin Context Menus
-	BFL:DebugPrint("ElvUISkin: Skinning ContextMenus")
-	xpcall(function() self:SkinContextMenus(E, S) end, function(err) BFL:DebugPrint("|cffff0000BetterFriendlist ElvUI Menu Error:|r " .. tostring(err)) end)
 
 	-- Skin Changelog
 	BFL:DebugPrint("ElvUISkin: Skinning Changelog")
-	xpcall(function() self:SkinChangelog(E, S) end, function(err) BFL:DebugPrint("ElvUISkin: Error skinning Changelog: " .. tostring(err)) end)
-	
+	xpcall(function()
+		self:SkinChangelog(E, S)
+	end, function(err)
+		BFL:DebugPrint("ElvUISkin: Error skinning Changelog: " .. tostring(err))
+	end)
+
 	-- Skin HelpFrame
 	BFL:DebugPrint("ElvUISkin: Skinning HelpFrame")
-	xpcall(function() self:SkinHelpFrame(E, S) end, function(err) BFL:DebugPrint("ElvUISkin: Error skinning HelpFrame: " .. tostring(err)) end)
+	xpcall(function()
+		self:SkinHelpFrame(E, S)
+	end, function(err)
+		BFL:DebugPrint("ElvUISkin: Error skinning HelpFrame: " .. tostring(err))
+	end)
 
 	-- Apply FontFix after Skinning to ensure correct font sizes
 	local FontFix = BFL:GetModule("FontFix")
@@ -849,8 +921,10 @@ end
 
 function ElvUISkin:HookFriendsList(E, S)
 	local FriendsList = BFL:GetModule("FriendsList")
-	if not FriendsList then return end
-	
+	if not FriendsList then
+		return
+	end
+
 	-- Explicitly skin Classic ScrollBar if it exists now (Backup for initialization order)
 	if BFL.IsClassic then
 		local classicSB = _G["BetterFriendsClassicScrollFrameScrollBar"]
@@ -865,11 +939,13 @@ function ElvUISkin:HookFriendsList(E, S)
 		if not button.isSkinned then
 			S:HandleButton(button)
 			-- Strip the custom background texture if it exists
-			if button.BG then button.BG:SetTexture(nil) end
+			if button.BG then
+				button.BG:SetTexture(nil)
+			end
 			button.isSkinned = true
 		end
 	end)
-	
+
 	-- Hook Friend Button
 	hooksecurefunc(FriendsList, "UpdateFriendButton", function(_, button, elementData)
 		if not button.isSkinned then
@@ -888,7 +964,7 @@ function ElvUISkin:HookFriendsList(E, S)
 			button.isSkinned = true
 		end
 	end)
-	
+
 	-- Hook Invite Header
 	hooksecurefunc(FriendsList, "UpdateInviteHeaderButton", function(_, button, elementData)
 		if not button.isSkinned then
@@ -896,12 +972,16 @@ function ElvUISkin:HookFriendsList(E, S)
 			button.isSkinned = true
 		end
 	end)
-	
+
 	-- Hook Invite Button
 	hooksecurefunc(FriendsList, "UpdateInviteButton", function(_, button, elementData)
 		if not button.isSkinned then
-			if button.AcceptButton then S:HandleButton(button.AcceptButton) end
-			if button.DeclineButton then S:HandleButton(button.DeclineButton) end
+			if button.AcceptButton then
+				S:HandleButton(button.AcceptButton)
+			end
+			if button.DeclineButton then
+				S:HandleButton(button.DeclineButton)
+			end
 			button.isSkinned = true
 		end
 	end)
@@ -912,10 +992,15 @@ function ElvUISkin:HookFriendsList(E, S)
 			if BFL.IsClassic then
 				local DB = BFL:GetModule("DB")
 				local simpleMode = DB and DB:Get("simpleMode", false)
-				
+
 				if not simpleMode then
 					local frame = _G.BetterFriendsFrame
-					if frame and frame.FriendsTabHeader and frame.FriendsTabHeader.SearchBox and frame.FriendsTabHeader.BattlenetFrame then
+					if
+						frame
+						and frame.FriendsTabHeader
+						and frame.FriendsTabHeader.SearchBox
+						and frame.FriendsTabHeader.BattlenetFrame
+					then
 						local searchBox = frame.FriendsTabHeader.SearchBox
 						searchBox:ClearAllPoints()
 						searchBox:SetPoint("TOP", frame.FriendsTabHeader.BattlenetFrame, "BOTTOM", 0, -35)
@@ -930,69 +1015,88 @@ end
 
 function ElvUISkin:SkinRecruitAFriend(E, S, frame)
 	local raf = frame.RecruitAFriendFrame
-	if not raf then return end
+	if not raf then
+		return
+	end
 
 	-- Skin Main Elements
-	if raf.Border then raf.Border:StripTextures() end
-	if raf.Background then raf.Background:Hide() end
-	
+	if raf.Border then
+		raf.Border:StripTextures()
+	end
+	if raf.Background then
+		raf.Background:Hide()
+	end
+
 	-- Skin Reward Claiming
 	if raf.RewardClaiming then
 		-- ElvUI Style: Handle Background
-		if raf.RewardClaiming.Background then raf.RewardClaiming.Background:SetAlpha(0) end
-		
+		if raf.RewardClaiming.Background then
+			raf.RewardClaiming.Background:SetAlpha(0)
+		end
+
 		-- Hide Parchment Elements
 		local parchmentElements = {
-			"Bracket_TopLeft", "Bracket_TopRight", "Bracket_BottomLeft", "Bracket_BottomRight", 
-			"Watermark"
+			"Bracket_TopLeft",
+			"Bracket_TopRight",
+			"Bracket_BottomLeft",
+			"Bracket_BottomRight",
+			"Watermark",
 		}
 		for _, name in ipairs(parchmentElements) do
-			if raf.RewardClaiming[name] then raf.RewardClaiming[name]:Hide() end
+			if raf.RewardClaiming[name] then
+				raf.RewardClaiming[name]:Hide()
+			end
 		end
-		
+
 		-- Create Backdrop
 		raf.RewardClaiming:CreateBackdrop("Transparent")
-		
+
 		-- Skin Claim/View Button
 		if raf.RewardClaiming.ClaimOrViewRewardButton then
 			S:HandleButton(raf.RewardClaiming.ClaimOrViewRewardButton)
 		end
-		
+
 		if raf.RewardClaiming.Inset then
 			raf.RewardClaiming.Inset:StripTextures()
 			raf.RewardClaiming.Inset:CreateBackdrop("Transparent")
 		end
-		
+
 		-- Next Reward Icon
 		if raf.RewardClaiming.NextRewardButton then
 			local button = raf.RewardClaiming.NextRewardButton
 			-- CRITICAL: Do NOT strip textures, it removes the Icon!
 			button:CreateBackdrop("Transparent")
-			
+
 			if button.Icon then
 				button.Icon:SetTexCoord(unpack(E.TexCoords))
 				button.Icon:SetParent(button.backdrop)
 				button.Icon:SetInside()
 				button.Icon:SetDrawLayer("ARTWORK")
 			end
-			
-			if button.IconBorder then button.IconBorder:SetAlpha(0) end
-			if button.IconOverlay then button.IconOverlay:SetAlpha(0) end
-			if button.CircleMask then button.CircleMask:Hide() end
+
+			if button.IconBorder then
+				button.IconBorder:SetAlpha(0)
+			end
+			if button.IconOverlay then
+				button.IconOverlay:SetAlpha(0)
+			end
+			if button.CircleMask then
+				button.CircleMask:Hide()
+			end
 		end
 	end
-	
+
 	-- Skin Recruit List
 	if raf.RecruitList then
 		if raf.RecruitList.ScrollFrameInset then
 			raf.RecruitList.ScrollFrameInset:StripTextures()
 			raf.RecruitList.ScrollFrameInset:CreateBackdrop("Transparent")
 		end
-		
+
 		if raf.RecruitList.ScrollBar then
 			SkinScrollBar(S, raf.RecruitList.ScrollBar)
 		end
-		
+
 		-- Header
 		if raf.RecruitList.Header then
 			if raf.RecruitList.Header.Background then
@@ -1002,27 +1106,41 @@ function ElvUISkin:SkinRecruitAFriend(E, S, frame)
 			raf.RecruitList.Header:CreateBackdrop("Transparent")
 		end
 	end
-	
+
 	-- Skin Splash Frame
 	if raf.SplashFrame then
 		raf.SplashFrame:StripTextures()
 		raf.SplashFrame:CreateBackdrop("Transparent")
-		
-		if raf.SplashFrame.Background then raf.SplashFrame.Background:Hide() end
-		if raf.SplashFrame.PictureFrame then raf.SplashFrame.PictureFrame:Hide() end
-		if raf.SplashFrame.Watermark then raf.SplashFrame.Watermark:Hide() end
-		if raf.SplashFrame.Bracket_TopLeft then raf.SplashFrame.Bracket_TopLeft:Hide() end
-		if raf.SplashFrame.Bracket_TopRight then raf.SplashFrame.Bracket_TopRight:Hide() end
-		if raf.SplashFrame.Bracket_BottomLeft then raf.SplashFrame.Bracket_BottomLeft:Hide() end
-		if raf.SplashFrame.Bracket_BottomRight then raf.SplashFrame.Bracket_BottomRight:Hide() end
-		
+
+		if raf.SplashFrame.Background then
+			raf.SplashFrame.Background:Hide()
+		end
+		if raf.SplashFrame.PictureFrame then
+			raf.SplashFrame.PictureFrame:Hide()
+		end
+		if raf.SplashFrame.Watermark then
+			raf.SplashFrame.Watermark:Hide()
+		end
+		if raf.SplashFrame.Bracket_TopLeft then
+			raf.SplashFrame.Bracket_TopLeft:Hide()
+		end
+		if raf.SplashFrame.Bracket_TopRight then
+			raf.SplashFrame.Bracket_TopRight:Hide()
+		end
+		if raf.SplashFrame.Bracket_BottomLeft then
+			raf.SplashFrame.Bracket_BottomLeft:Hide()
+		end
+		if raf.SplashFrame.Bracket_BottomRight then
+			raf.SplashFrame.Bracket_BottomRight:Hide()
+		end
+
 		if raf.SplashFrame.Picture then
 			raf.SplashFrame.Picture:SetInside() -- Make picture fill the frame or adjust as needed
 			-- ElvUI does this, but maybe we want to keep it centered?
 			-- Let's stick to ElvUI logic:
 			-- SplashFrame.Picture:SetInside()
 		end
-		
+
 		if raf.SplashFrame.OKButton then
 			S:HandleButton(raf.SplashFrame.OKButton)
 		end
@@ -1031,20 +1149,22 @@ end
 
 function ElvUISkin:SkinSettings(E, S)
 	local frame = _G.BetterFriendlistSettingsFrame
-	if not frame then return end
-	
+	if not frame then
+		return
+	end
+
 	S:HandlePortraitFrame(frame)
-	
+
 	-- Skin Tabs (Top) - Point 4: Adjust height
 	for i = 1, 10 do
-		local tab = _G["BetterFriendlistSettingsFrameTab"..i]
+		local tab = _G["BetterFriendlistSettingsFrameTab" .. i]
 		if tab then
 			-- Fixed: Removed IsShown() check to ensure all tabs (including Beta/Global Sync)
-			-- are skinned even if hidden during initial load. 
+			-- are skinned even if hidden during initial load.
 			-- Tabs should exist if XML defines them.
 			S:HandleTab(tab)
 			tab:SetHeight(28) -- Fixed height
-			
+
 			local text = tab.Text or (tab.GetFontString and tab:GetFontString())
 			if text then
 				text:ClearAllPoints()
@@ -1052,13 +1172,13 @@ function ElvUISkin:SkinSettings(E, S)
 			end
 		end
 	end
-	
+
 	-- Skin Main Inset
 	if frame.MainInset then
 		frame.MainInset:StripTextures()
 		frame.MainInset:CreateBackdrop("Transparent")
 	end
-	
+
 	-- Skin ScrollBar
 	if frame.ContentScrollFrame and frame.ContentScrollFrame.ScrollBar then
 		S:HandleScrollBar(frame.ContentScrollFrame.ScrollBar)
@@ -1068,14 +1188,16 @@ function ElvUISkin:SkinSettings(E, S)
 	local Settings = BFL:GetModule("Settings")
 	if Settings then
 		local function SkinEditBoxesInTab(tab)
-			if not tab or not tab.components then return end
+			if not tab or not tab.components then
+				return
+			end
 			for _, comp in ipairs(tab.components) do
 				-- Check if it's an EditBox (or container with EditBox)
 				if comp:IsObjectType("EditBox") then
 					S:HandleEditBox(comp)
 				elseif comp:IsObjectType("Frame") then
 					-- Check children for EditBox (like nameFormatContainer)
-					for _, child in ipairs({comp:GetChildren()}) do
+					for _, child in ipairs({ comp:GetChildren() }) do
 						if child:IsObjectType("EditBox") then
 							S:HandleEditBox(child)
 						end
@@ -1096,22 +1218,22 @@ function ElvUISkin:SkinSettings(E, S)
 				end
 
 				-- Skin Buttons
-				local children = {frame.CategoryList:GetChildren()}
+				local children = { frame.CategoryList:GetChildren() }
 				for _, child in ipairs(children) do
 					if child:IsObjectType("Button") and not child.isSkinned then
 						S:HandleButton(child)
 						-- Remove default highlight/selected textures as ElvUI adds its own
-						child:SetHighlightTexture("") 
-						
+						child:SetHighlightTexture("")
+
 						-- Adjust text position if needed
 						if child.text then
 							child.text:ClearAllPoints()
 							child.text:SetPoint("LEFT", child, "LEFT", 30, 0)
 						end
-						
+
 						-- Hook OnClick or similar if necessary to update selected state visual
 						-- But our SelectCategory logic handles text color, which is fine.
-						
+
 						child.isSkinned = true
 					end
 				end
@@ -1130,10 +1252,10 @@ function ElvUISkin:SkinSettings(E, S)
 			local content = frame.ContentScrollFrame.Content
 			if content and content.GlobalSyncTab then
 				local tab = content.GlobalSyncTab
-				
+
 				-- Skin Layout Headers (if they weren't caught by CreateHeader hook)
 				-- We can iterate children to find unskinned buttons or headers
-				local children = {tab:GetChildren()}
+				local children = { tab:GetChildren() }
 				for _, child in ipairs(children) do
 					-- Case 1: Direct Button (unlikely in Global Sync, but possible)
 					if child:IsObjectType("Button") and not child.isSkinned then
@@ -1143,11 +1265,11 @@ function ElvUISkin:SkinSettings(E, S)
 							S:HandleButton(child)
 							child.isSkinned = true
 						end
-					
+
 					-- Case 2: Row Frame containing Button
 					elseif child:IsObjectType("Frame") then
 						-- Check children of the row for the action button
-						local rowChildren = {child:GetChildren()}
+						local rowChildren = { child:GetChildren() }
 						for _, btn in ipairs(rowChildren) do
 							-- Skin Buttons (except Edit Note button which has a specific texture)
 							if btn:IsObjectType("Button") and not btn.isSkinned then
@@ -1156,8 +1278,12 @@ function ElvUISkin:SkinSettings(E, S)
 									-- Check for Edit Note Icon
 									local icon = btn:GetNormalTexture()
 									local iconPath = icon and icon:GetTexture()
-									local isEditNote = iconPath and (type(iconPath) == "string" and string.find(iconPath, "UI%-GuildButton%-PublicNote"))
-									
+									local isEditNote = iconPath
+										and (
+											type(iconPath) == "string"
+											and string.find(iconPath, "UI%-GuildButton%-PublicNote")
+										)
+
 									if not isEditNote then
 										S:HandleButton(btn)
 										btn.isSkinned = true
@@ -1170,11 +1296,11 @@ function ElvUISkin:SkinSettings(E, S)
 			end
 		end)
 	end
-	
+
 	-- Hook Components to skin dynamic elements
 	if BFL.SettingsComponents then
 		local C = BFL.SettingsComponents
-		
+
 		-- Checkbox
 		if not C.IsSkinned then
 			local oldCreateCheckbox = C.CreateCheckbox
@@ -1185,18 +1311,22 @@ function ElvUISkin:SkinSettings(E, S)
 				end
 				return holder
 			end
-			
+
 			-- Double Checkbox
 			local oldCreateDoubleCheckbox = C.CreateDoubleCheckbox
 			C.CreateDoubleCheckbox = function(...)
 				local holder = oldCreateDoubleCheckbox(...)
 				if holder then
-					if holder.LeftCheckbox then S:HandleCheckBox(holder.LeftCheckbox) end
-					if holder.RightCheckbox then S:HandleCheckBox(holder.RightCheckbox) end
+					if holder.LeftCheckbox then
+						S:HandleCheckBox(holder.LeftCheckbox)
+					end
+					if holder.RightCheckbox then
+						S:HandleCheckBox(holder.RightCheckbox)
+					end
 				end
 				return holder
 			end
-			
+
 			-- Slider
 			local oldCreateSlider = C.CreateSlider
 			C.CreateSlider = function(...)
@@ -1209,7 +1339,7 @@ function ElvUISkin:SkinSettings(E, S)
 						slider.backdrop:SetPoint("TOPLEFT", 0, -5)
 						slider.backdrop:SetPoint("BOTTOMRIGHT", 0, 5)
 					end
-					
+
 					local thumb = slider:GetThumbTexture()
 					if thumb then
 						thumb:SetAlpha(0)
@@ -1222,19 +1352,19 @@ function ElvUISkin:SkinSettings(E, S)
 							slider.BFLThumb = t
 						end
 					end
-					
-					if slider.Back then 
-						S:HandleNextPrevButton(slider.Back, "left") 
+
+					if slider.Back then
+						S:HandleNextPrevButton(slider.Back, "left")
 						slider.Back:SetSize(16, 16)
 					end
-					if slider.Forward then 
-						S:HandleNextPrevButton(slider.Forward, "right") 
+					if slider.Forward then
+						S:HandleNextPrevButton(slider.Forward, "right")
 						slider.Forward:SetSize(16, 16)
 					end
 				end
 				return holder
 			end
-			
+
 			-- SliderWithColorPicker
 			local oldCreateSliderColor = C.CreateSliderWithColorPicker
 			C.CreateSliderWithColorPicker = function(...)
@@ -1242,22 +1372,22 @@ function ElvUISkin:SkinSettings(E, S)
 				if holder and holder.Slider then
 					-- Aggressive Skinning for MinimalSliderWithSteppersTemplate
 					local slider = holder.Slider
-					
+
 					-- 1. Strip all textures (removes default Blizzard borders/track art)
 					slider:StripTextures()
-					
+
 					-- 2. Create proper ElvUI Backdrop (The Track)
 					slider:CreateBackdrop("Transparent")
 					if slider.backdrop then
 						slider.backdrop:SetPoint("TOPLEFT", 0, -5) -- Adjust height of track
 						slider.backdrop:SetPoint("BOTTOMRIGHT", 0, 5)
 					end
-					
+
 					-- 3. Handle Thumb
 					local thumb = slider:GetThumbTexture()
 					if thumb then
 						thumb:SetAlpha(0) -- Hide default geometry
-						
+
 						if not slider.BFLThumb then
 							local t = slider:CreateTexture(nil, "OVERLAY")
 							t:SetTexture(E.Media.Textures.Melli or 130751)
@@ -1269,18 +1399,18 @@ function ElvUISkin:SkinSettings(E, S)
 					end
 
 					-- 4. Skin Stepper Buttons
-					if slider.Back then 
-						S:HandleNextPrevButton(slider.Back, "left") 
+					if slider.Back then
+						S:HandleNextPrevButton(slider.Back, "left")
 						slider.Back:SetSize(16, 16) -- Force size
 					end
-					if slider.Forward then 
-						S:HandleNextPrevButton(slider.Forward, "right") 
+					if slider.Forward then
+						S:HandleNextPrevButton(slider.Forward, "right")
 						slider.Forward:SetSize(16, 16)
 					end
 				end
 				return holder
 			end
-			
+
 			-- Dropdown
 			local oldCreateDropdown = C.CreateDropdown
 			C.CreateDropdown = function(...)
@@ -1290,7 +1420,7 @@ function ElvUISkin:SkinSettings(E, S)
 				end
 				return holder
 			end
-			
+
 			-- Button
 			local oldCreateButton = C.CreateButton
 			C.CreateButton = function(...)
@@ -1300,18 +1430,28 @@ function ElvUISkin:SkinSettings(E, S)
 				end
 				return button
 			end
-			
+
 			-- List Item (Group Management)
 			local oldCreateListItem = C.CreateListItem
 			C.CreateListItem = function(...)
 				local holder = oldCreateListItem(...)
 				if holder then
-					if holder.deleteButton then S:HandleButton(holder.deleteButton) end
-					if holder.colorButton then S:HandleButton(holder.colorButton) end
-					if holder.renameButton then S:HandleButton(holder.renameButton) end
-					if holder.downButton then S:HandleButton(holder.downButton) end
-					if holder.upButton then S:HandleButton(holder.upButton) end
-					
+					if holder.deleteButton then
+						S:HandleButton(holder.deleteButton)
+					end
+					if holder.colorButton then
+						S:HandleButton(holder.colorButton)
+					end
+					if holder.renameButton then
+						S:HandleButton(holder.renameButton)
+					end
+					if holder.downButton then
+						S:HandleButton(holder.downButton)
+					end
+					if holder.upButton then
+						S:HandleButton(holder.upButton)
+					end
+
 					-- Skin the background if possible, or strip it
 					if holder.bg then
 						holder.bg:SetColorTexture(0, 0, 0, 0) -- Hide default bg
@@ -1320,13 +1460,51 @@ function ElvUISkin:SkinSettings(E, S)
 				end
 				return holder
 			end
-			
+
+			-- CheckboxDropdown (Favorite Icon row etc.)
+			local oldCreateCheckboxDropdown = C.CreateCheckboxDropdown
+			C.CreateCheckboxDropdown = function(...)
+				local holder = oldCreateCheckboxDropdown(...)
+				if holder then
+					if holder.LeftCheckbox then
+						S:HandleCheckBox(holder.LeftCheckbox)
+					end
+					if holder.RightDropdown then
+						S:HandleDropDownBox(holder.RightDropdown)
+					end
+				end
+				return holder
+			end
+
+			-- Input (Streamer Mode text field etc.)
+			local oldCreateInput = C.CreateInput
+			C.CreateInput = function(...)
+				local holder = oldCreateInput(...)
+				if holder and holder.Input then
+					S:HandleEditBox(holder.Input)
+				end
+				return holder
+			end
+
+			-- ButtonRow (Reset buttons etc.)
+			local oldCreateButtonRow = C.CreateButtonRow
+			C.CreateButtonRow = function(...)
+				local holder = oldCreateButtonRow(...)
+				if holder then
+					if holder.LeftButton then
+						S:HandleButton(holder.LeftButton)
+					end
+					if holder.RightButton then
+						S:HandleButton(holder.RightButton)
+					end
+				end
+				return holder
+			end
+
 			C.IsSkinned = true
 		end
 	end
 end
-
-
 
 function ElvUISkin:SkinBroker(E, S)
 	-- Hook LibQTip to skin tooltips
@@ -1348,243 +1526,52 @@ function ElvUISkin:SkinBroker(E, S)
 	end
 end
 
-function ElvUISkin:SkinContextMenus(E, S)
-	-- Hook MenuUtil to skin context menus
-	if not MenuUtil then return end
-	
-	-- Helper to skin a single frame in the menu
-	local function SkinMenuFrame(frame)
-		if not frame then return end
-		
-		-- Recursive search for CheckButtons and Checkbox-like Buttons
-		local function FindAndSkin(obj, depth)
-			if not obj then return end
-			depth = depth or 0
-			if depth > 15 then return end -- Prevent infinite recursion
-			
-			local objType = obj:GetObjectType()
-			
-			-- 1. Standard CheckButton
-			if objType == "CheckButton" then
-				if not obj.isSkinnedByBFL then
-					S:HandleCheckBox(obj)
-					obj.isSkinnedByBFL = true
-				end
-				
-			-- 2. Button acting as Checkbox (MenuUtil)
-			elseif objType == "Button" then
-				local regions = {obj:GetRegions()}
-				local checkboxRegion = nil
-				local checkmarkRegion = nil
-				
-				-- Pass 1: Find the checkbox background (130940 or similar)
-				for _, region in ipairs(regions) do
-					if region:IsObjectType("Texture") then
-						local tex = region:GetTexture()
-						local atlas = region:GetAtlas()
-						
-						-- Check for standard checkbox background textures
-						-- 130940: UI-CheckBox-Up
-						-- 130941: UI-CheckBox-Down
-						-- 130942: UI-CheckBox-Disabled
-						if tex == 130940 or tex == 130941 or tex == 130942 or 
-						   (atlas and (string.find(string.lower(atlas), "checkbox-off") or string.find(string.lower(atlas), "checkbox-up"))) then
-							checkboxRegion = region
-							break
-						end
-					end
-				end
-				
-				-- CRITICAL FIX: Only skin if the checkbox region is actually SHOWN.
-				-- This prevents skinning arrow buttons or other buttons that have hidden checkbox textures.
-				if checkboxRegion and checkboxRegion:IsShown() then
-					if not obj.isSkinnedByBFL then
-						-- Create Backdrop
-						local bd = CreateFrame("Frame", nil, obj)
-						bd:SetFrameLevel(obj:GetFrameLevel())
-						bd:SetSize(14, 14)
-						bd:SetPoint("CENTER", checkboxRegion, "CENTER", 0, 0)
-						bd:CreateBackdrop("Transparent")
-						obj.BFLCheckboxBackdrop = bd
-						
-						-- Create Checkmark
-						local check = bd:CreateTexture(nil, "OVERLAY")
-						local checkTex = E.Media and E.Media.Textures and E.Media.Textures.Melli or 130751
-						check:SetTexture(checkTex)
-						check:SetSize(14, 14)
-						check:SetPoint("CENTER")
-						check:SetVertexColor(1, 0.82, 0) -- ElvUI Yellow
-						check:Hide()
-						obj.BFLCheckmark = check
-						
-						-- Hide original background
-						checkboxRegion:SetAlpha(0)
-						
-						-- Pass 2: Find potential checkmark region (separate region)
-						for _, region in ipairs(regions) do
-							if region ~= checkboxRegion and region:IsObjectType("Texture") then
-								local tex = region:GetTexture()
-								local atlas = region:GetAtlas()
-								
-								-- Check for checkmark texture/atlas
-								-- 130751: UI-CheckBox-Check
-								if tex == 130751 or (atlas and (string.find(string.lower(atlas), "checkmark") or string.find(string.lower(atlas), "checkbox-on"))) then
-									checkmarkRegion = region
-									break
-								end
-							end
-						end
-						
-						if checkmarkRegion then
-							-- Case A: Separate Checkmark Region
-							checkmarkRegion:SetAlpha(0)
-							
-							local function UpdateCheck()
-								if not obj.BFLCheckmark then return end
-								if checkmarkRegion:IsShown() then
-									obj.BFLCheckmark:Show()
-								else
-									obj.BFLCheckmark:Hide()
-								end
-							end
-							
-							hooksecurefunc(checkmarkRegion, "Show", UpdateCheck)
-							hooksecurefunc(checkmarkRegion, "Hide", UpdateCheck)
-							hooksecurefunc(checkmarkRegion, "SetShown", UpdateCheck)
-							UpdateCheck()
-						else
-							-- Case B: Texture Swap on Background Region (or checkmark not found yet)
-							-- We hook the background region to see if it turns into a checkmark
-							local function UpdateTexture(self)
-								if not obj.BFLCheckmark then return end
-								
-								local tex = self:GetTexture()
-								local atlas = self:GetAtlas()
-								
-								local isChecked = false
-								if tex == 130751 then isChecked = true end
-								if atlas and (string.find(string.lower(atlas), "checkbox-on") or string.find(string.lower(atlas), "checkmark")) then isChecked = true end
-								
-								if isChecked then
-									obj.BFLCheckmark:Show()
-								else
-									obj.BFLCheckmark:Hide()
-								end
-							end
-							
-							hooksecurefunc(checkboxRegion, "SetTexture", UpdateTexture)
-							hooksecurefunc(checkboxRegion, "SetAtlas", UpdateTexture)
-							-- Initial check
-							UpdateTexture(checkboxRegion)
-						end
-						
-						obj.isSkinnedByBFL = true
-					end
-				end
-			end
-			
-			-- Recursively check children
-			local children = {obj:GetChildren()}
-			for _, child in ipairs(children) do
-				FindAndSkin(child, depth + 1)
-			end
-			
-			-- Special handling for ScrollBox to ensure we go deeper
-			if obj.GetScrollTarget then
-				FindAndSkin(obj:GetScrollTarget(), depth + 1)
-			end
-		end
-		
-		FindAndSkin(frame)
-	end
-	
-	-- Hook Menu Manager to catch ALL menus (including submenus)
-	local function HookMenuManager()
-		if BFL.MenuManagerHooked then return end
-		
-		if Menu and Menu.GetManager then
-			local manager = Menu.GetManager()
-			if manager and manager.OpenMenu then
-				hooksecurefunc(manager, "OpenMenu", function(self, menu)
-					-- Wait a frame for the menu to be created and populated
-					C_Timer.After(0.05, function()
-						-- Get the currently open menu (which should be the one we just opened)
-						local openMenu = manager:GetOpenMenu()
-						if openMenu then
-							-- Skin the menu frame if not already skinned
-							if not openMenu.isSkinnedByBFL then
-								openMenu:StripTextures()
-								openMenu:CreateBackdrop("Transparent")
-								openMenu.isSkinnedByBFL = true
-								
-								-- Hook ScrollBox to skin new frames as they appear
-								if openMenu.ScrollBox then
-									if openMenu.ScrollBox.RegisterCallback then
-										pcall(function()
-											openMenu.ScrollBox:RegisterCallback("OnAcquiredFrame", function(o, frame, elementData, isNew)
-												SkinMenuFrame(frame)
-											end, self)
-										end)
-									end
-								end
-							end
-							
-							-- Always scan the menu for items (initial population)
-							SkinMenuFrame(openMenu)
-						end
-					end)
-				end)
-				BFL.MenuManagerHooked = true
-				-- BFL:DebugPrint("BFL: Hooked Menu Manager for SubMenus")
-			end
-		end
-	end
-
-	-- Try to hook immediately
-	HookMenuManager()
-	
-	-- Also hook CreateContextMenu as a backup/trigger
-	hooksecurefunc(MenuUtil, "CreateContextMenu", function(owner, generator)
-		HookMenuManager() -- Retry hooking if it wasn't ready
-	end)
-end
-
 function ElvUISkin:SkinChangelog(E, S)
 	local Changelog = BFL:GetModule("Changelog")
-	if not Changelog then return end
+	if not Changelog then
+		return
+	end
 
 	local function Skin()
 		local frame = _G.BetterFriendlistChangelogFrame
-		if not frame or frame.isSkinned then return end
-		
+		if not frame or frame.isSkinned then
+			return
+		end
+
 		BFL:DebugPrint("ElvUISkin: Applying Skin to Changelog Window")
 		S:HandlePortraitFrame(frame)
-		
+
 		-- Skin Main Inset
 		if frame.MainInset then
 			frame.MainInset:StripTextures()
 			frame.MainInset:CreateBackdrop("Transparent")
 		end
-		
+
 		-- Skin Buttons
-		if frame.DiscordButton then S:HandleButton(frame.DiscordButton) end
-		if frame.GitHubButton then S:HandleButton(frame.GitHubButton) end
-		if frame.KoFiButton then S:HandleButton(frame.KoFiButton) end
-		
+		if frame.DiscordButton then
+			S:HandleButton(frame.DiscordButton)
+		end
+		if frame.GitHubButton then
+			S:HandleButton(frame.GitHubButton)
+		end
+		if frame.KoFiButton then
+			S:HandleButton(frame.KoFiButton)
+		end
+
 		-- Skin ScrollBar
 		if frame.ScrollBar then
 			-- Retail
 			SkinScrollBar(S, frame.ScrollBar)
 		elseif frame.ScrollFrame then
 			-- Classic or Fallback
-			local children = {frame.ScrollFrame:GetChildren()}
+			local children = { frame.ScrollFrame:GetChildren() }
 			for _, child in ipairs(children) do
 				if child:IsObjectType("Slider") then
 					S:HandleScrollBar(child)
 				end
 			end
 		end
-		
+
 		frame.isSkinned = true
 	end
 
@@ -1594,21 +1581,25 @@ end
 
 function ElvUISkin:SkinHelpFrame(E, S)
 	local HelpFrame = BFL.HelpFrame or BFL:GetModule("HelpFrame")
-	if not HelpFrame then return end
+	if not HelpFrame then
+		return
+	end
 
 	local function Skin()
 		local frame = _G.BetterFriendlistHelpFrame
-		if not frame or frame.isSkinned then return end
-		
+		if not frame or frame.isSkinned then
+			return
+		end
+
 		BFL:DebugPrint("ElvUISkin: Skinning HelpFrame")
 		S:HandlePortraitFrame(frame)
-		
+
 		-- Skin Inset if it exists (ButtonFrameTemplate feature)
 		if frame.Inset then
 			frame.Inset:StripTextures()
 			frame.Inset:CreateBackdrop("Transparent")
 		end
-		
+
 		-- Skin ScrollBar
 		if frame.ScrollBar then
 			SkinScrollBar(S, frame.ScrollBar)
@@ -1617,7 +1608,7 @@ function ElvUISkin:SkinHelpFrame(E, S)
 			if frame.ScrollFrame.ScrollBar then
 				SkinScrollBar(S, frame.ScrollFrame.ScrollBar)
 			elseif frame.ScrollFrame:GetName() then
-				local scrollBar = _G[frame.ScrollFrame:GetName().."ScrollBar"]
+				local scrollBar = _G[frame.ScrollFrame:GetName() .. "ScrollBar"]
 				if scrollBar then
 					SkinScrollBar(S, scrollBar)
 				end
@@ -1631,7 +1622,9 @@ function ElvUISkin:SkinHelpFrame(E, S)
 	hooksecurefunc(HelpFrame, "CreateFrame", Skin)
 	-- Hook toggle as well just in case CreateFrame returns early but we missed skinning
 	hooksecurefunc(HelpFrame, "Toggle", Skin)
-	
+
 	-- Try to skin immediately if it exists
-	if _G.BetterFriendlistHelpFrame then Skin() end
+	if _G.BetterFriendlistHelpFrame then
+		Skin()
+	end
 end
