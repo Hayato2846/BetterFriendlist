@@ -8,8 +8,7 @@ local Changelog = BFL:RegisterModule("Changelog", {})
 local changelogFrame = nil
 
 -- Changelog content
-local CHANGELOG_TEXT = [[
-# Changelog
+local CHANGELOG_TEXT = [[# Changelog
 
 All notable changes to BetterFriendlist will be documented in this file.
 
@@ -17,6 +16,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+
+## [DRAFT]
+### Added
+- **Context Menu Integration** - Added BFL options (Set Nickname, Groups, etc.) to friend right-click menus even when not opened from BFL (e.g. from chat links), provided the player is a recognized friend.
+- **Favorite Icon Style** - Added a setting to choose between BFL and Blizzard favorite icons (with icon previews).
+
+### Changed
+- **Tab Font Size** - Reduced maximum tab font size from 24 to 18 to prevent tab overlap issues.
+- **Font Dropdown UX** - Font dropdowns now use single-check checkbox menus so the current selection stays visible without reopening.
+- **Settings Layout** - Moved "Show Welcome Message" above Favorite Icon controls.
+- **Favorite Icon Spacing** - Adjusted favorite icon sizing/padding in compact mode to keep names aligned.
+
+### Fixed
+- **Context Menu** - Prevented BetterFriendlist options from appearing in context menus of non-friend players. Added comprehensive restriction protection (combat and secure execution) to avoid "Action Forbidden" errors during checks.
+- **UI Taint / Action Forbidden** - Fixed critical errors ("Action Forbidden") that could break the ESC key or Chat functionality during combat. Removed a conflict with Blizzard's window management system.
+- **Localization** - Fixed capitalization in context menu headers ("BetterFriendList" -> "BetterFriendlist") for consistency.
+- **Group Rename Display** - Fixed an issue where renaming groups (including built-in groups like "Favorites" or "No Group") would not visually update until a full UI reload.
+- **Built-in Group Renames** - Fixed inconsistent behavior when renaming built-in groups like "In-Game" so changes are reflected correctly.
+- **Settings Frame Viewport** - Fixed an issue where the Settings frame could be dragged outside the visible screen area. Frame is now clamped to screen boundaries.
+- **Invite Group (Party Check)** - Fixed "Invite All to Party" to skip friends who are already in your party/raid or playing a different WoW version (e.g., Classic friends when you're on Retail).
+- **Invite Group (Empty Groups)** - Fixed "Invite All to Party" context menu option to only appear when the group has invitable friends (online, same WoW version, not in party). The button shows the invitable count.
+- **Story Mode Raid Tab** - Fixed the Raid tab to be properly disabled when in Story Mode instances (like Blizzard's FriendsFrame). Uses official `DifficultyUtil.InStoryRaid()` API. Disabled tab shows tooltip explaining why.
+- **Dynamic Row Height** - Fixed friend list rows to dynamically adjust height based on font size settings, preventing text overlap at larger font sizes.
+- **Group Color Picker Alpha** - Added alpha (transparency) support to all group color pickers (main color, count color, arrow color) allowing semi-transparent group colors.
+- **Show Faction Icons** - Fixed the setting so faction icons display correctly when enabled.
+- **Show Collapse Arrow** - Fixed the setting so collapse/expand arrows show when enabled.
+- **Raid Right-Click MT/MA** - Fixed raid context menu options for Main Tank/Main Assist not working.
 
 ## [2.3.0]       - 2026-02-07
 ### Special Thanks
@@ -155,12 +181,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Font Support** - Reverted the friend name font to `GameFontNormal`. This restores support for the 4 standard fonts (including Asian/Cyrillic characters).
 - **ElvUI Interaction** - **Note:** ElvUI Font Size settings now apply to the Friend Name again.
 - **Workaround** - This is a temporary workaround. Proper independent font settings will be added in the next version.
-
-## [2.2.1]       - 2026-01-18
-### Fixed
-- **Slash Commands** - Cleanup of slash commands.
-- **Performance** - Fixed performance issues. (Reported by Drakblackz)
-- **Menu System** - Fixed issue where menus would not close properly, likely due to mouse cursor changes. (Reported by Atom)
 
 ---
 
