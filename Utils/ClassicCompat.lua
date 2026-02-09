@@ -108,6 +108,10 @@ end
 -- Classic: UnitPopup_ShowMenu(dropdown, which, unit, name, userData)
 
 function Compat.OpenUnitPopupMenu(menuType, contextData)
+    -- Force global flag to true so BFL menu modifiers know this is our menu
+    local wasOurMenu = _G.BetterFriendlist_IsOurMenu
+    _G.BetterFriendlist_IsOurMenu = true
+
     -- Streamer Mode Interception for Context Menu Header (Added 2026-02-01)
     if BFL.StreamerMode and BFL.StreamerMode:IsActive() and contextData then
         local FriendsList = BFL:GetModule("FriendsList")
@@ -183,6 +187,8 @@ function Compat.OpenUnitPopupMenu(menuType, contextData)
             UnitPopup_ShowMenu(dropdown, menuType, unit, name, contextData)
         end
     end
+
+    _G.BetterFriendlist_IsOurMenu = wasOurMenu
 end
 
 ------------------------------------------------------------

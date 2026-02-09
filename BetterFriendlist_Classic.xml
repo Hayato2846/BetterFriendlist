@@ -15,6 +15,13 @@
 		<Color color="NORMAL_FONT_COLOR"/>
 	</Font>
 	
+	<!-- Tab Normal (10pt) -->
+	<Font name="BetterFriendlistTabFontNormal" font="Fonts\FRIZQT__.TTF" virtual="true">
+		<FontHeight><AbsValue val="10"/></FontHeight>
+		<Shadow><Offset><AbsDimension x="1" y="-1"/></Offset><Color r="0" g="0" b="0"/></Shadow>
+		<Color color="NORMAL_FONT_COLOR"/>
+	</Font>
+	
 	<!-- Highlight (12pt) -->
 	<Font name="BetterFriendlistFontHighlight" font="Fonts\FRIZQT__.TTF" virtual="true">
 		<FontHeight><AbsValue val="12"/></FontHeight>
@@ -41,6 +48,20 @@
 		<FontHeight><AbsValue val="10"/></FontHeight>
 		<Shadow><Offset><AbsDimension x="1" y="-1"/></Offset><Color r="0" g="0" b="0"/></Shadow>
 		<Color color="HIGHLIGHT_FONT_COLOR"/>
+	</Font>
+	
+	<!-- Tab Highlight (10pt) -->
+	<Font name="BetterFriendlistTabFontHighlight" font="Fonts\FRIZQT__.TTF" virtual="true">
+		<FontHeight><AbsValue val="10"/></FontHeight>
+		<Shadow><Offset><AbsDimension x="1" y="-1"/></Offset><Color r="0" g="0" b="0"/></Shadow>
+		<Color color="HIGHLIGHT_FONT_COLOR"/>
+	</Font>
+	
+	<!-- Tab Disable (10pt) -->
+	<Font name="BetterFriendlistTabFontDisable" font="Fonts\FRIZQT__.TTF" virtual="true">
+		<FontHeight><AbsValue val="10"/></FontHeight>
+		<Shadow><Offset><AbsDimension x="1" y="-1"/></Offset><Color r="0" g="0" b="0"/></Shadow>
+		<Color r="0.5" g="0.5" b="0.5"/>
 	</Font>
 	
 	<!-- Disable (12pt) -->
@@ -139,7 +160,7 @@
 					</Anchors>
 				</Texture>
 				<!-- Friend Name (Line 1: BattleNet Name (CharacterName)) -->
-				<FontString parentKey="Name" inherits="BetterFriendlistFriendsFontNormal" justifyH="LEFT" maxLines="1" nonSpaceWrap="false">
+				<FontString parentKey="Name" inherits="BetterFriendlistFriendsFontNormal" justifyH="LEFT">
 					<Size x="280" y="0" />
 					<Anchors>
 						<Anchor point="TOPLEFT" x="24" y="-6" />
@@ -1306,10 +1327,17 @@
 				<Scripts>
 					<OnClick>
 						local FriendsList = BFL and BFL:GetModule("FriendsList")
-						if not FriendsList or not FriendsList.selectedFriend then
+						if not FriendsList then
 							return
 						end
-						local friend = FriendsList.selectedFriend
+
+						local friend = FriendsList.ResolveSelectedFriend and FriendsList:ResolveSelectedFriend() or FriendsList.selectedFriend
+						if not friend then
+							return
+						end
+
+						if BFL:IsActionRestricted() then return end
+
 						if friend.type == "bnet" then
 							ChatFrame_SendBNetTell(friend.accountName or friend.battleTag)
 						elseif friend.type == "wow" and friend.name then

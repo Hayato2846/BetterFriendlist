@@ -257,13 +257,17 @@ function ElvUISkin:SkinFrames(E, S)
 		local tab = _G["BetterFriendsFrameTab"..i]
 		if tab then
 			S:HandleTab(tab)
-			tab:SetHeight(25) -- Fixed height
 			
 			-- Adjust text position
 			local text = tab.Text or (tab.GetFontString and tab:GetFontString())
 			if text then
 				text:ClearAllPoints()
 				text:SetPoint("CENTER", tab, "CENTER", 0, 0) -- Text centered
+				local textHeight = text:GetStringHeight() or 0
+				local tabHeight = math.max(32, textHeight + 20)
+				tab:SetHeight(tabHeight)
+			else
+				tab:SetHeight(25)
 			end
 		end
 	end

@@ -795,6 +795,7 @@ function Settings:DoReset()
 	DB:Set("windowScale", 1.0)  -- NEW: Feature Request
 	DB:Set("hideMaxLevel", false)
 	DB:Set("accordionGroups", false)
+	DB:Set("favoriteIconStyle", "bfl")
 	
 	self:LoadSettings()
 	
@@ -932,21 +933,22 @@ function Settings:ShowGroupCountColorPicker(groupId, groupName, colorSwatch, isR
 	local DB = GetDB()
 	if not DB then return end
 	
-	-- Handle Reset (Right Click) - Snapshot Group Color
+	-- Handle Reset (Right Click) - Snapshot Group Color (Fix #34: includes alpha)
 	if isReset then
 		local Groups = GetGroups()
 		local group = Groups and Groups:Get(groupId)
-		local r, g, b = 1, 1, 1
+		local r, g, b, a = 1, 1, 1, 1
 		if group and group.color then
 			r, g, b = group.color.r, group.color.g, group.color.b
+			a = group.color.a or 1
 		end
 
 		local groupCountColors = DB:Get("groupCountColors") or {}
-		groupCountColors[groupId] = {r = r, g = g, b = b}
+		groupCountColors[groupId] = {r = r, g = g, b = b, a = a}
 		DB:Set("groupCountColors", groupCountColors)
 		
 		if group then
-			group.countColor = {r = r, g = g, b = b}
+			group.countColor = {r = r, g = g, b = b, a = a}
 		end
 		
 		BFL:ForceRefreshFriendsList()
@@ -975,43 +977,57 @@ function Settings:ShowGroupCountColorPicker(groupId, groupName, colorSwatch, isR
 	ColorPickerFrame.opacityFunc = nil
 	ColorPickerFrame.cancelFunc = nil
 	
+	-- Fix #34: Get existing alpha value for count color
+	local a = 1.0
+	if Groups then
+		local group = Groups:Get(groupId)
+		if group and group.countColor and group.countColor.a then
+			a = group.countColor.a
+		elseif group and group.color and group.color.a then
+			a = group.color.a  -- Inherit from group color
+		end
+	end
+	
 	local info = {}
 	info.r = r
 	info.g = g
 	info.b = b
-	info.opacity = 1.0
-	info.hasOpacity = false
+	info.opacity = a
+	info.hasOpacity = true  -- Fix #34: Enable alpha slider
 	info.swatchFunc = function()
 		local newR, newG, newB = ColorPickerFrame:GetColorRGB()
+		local newA = ColorPickerFrame:GetColorAlpha() or 1
 		
-		colorSwatch:SetColorTexture(newR, newG, newB)
+		colorSwatch:SetColorTexture(newR, newG, newB, newA)
 		
 		local groupCountColors = DB:Get("groupCountColors") or {}
-		groupCountColors[groupId] = {r = newR, g = newG, b = newB}
+		groupCountColors[groupId] = {r = newR, g = newG, b = newB, a = newA}
 		DB:Set("groupCountColors", groupCountColors)
 		
 		local Groups = GetGroups()
 		if Groups then
 			local group = Groups:Get(groupId)
 			if group then
-				group.countColor = {r = newR, g = newG, b = newB}
+				group.countColor = {r = newR, g = newG, b = newB, a = newA}
 			end
 		end
 		
 		BFL:ForceRefreshFriendsList()
 	end
+	info.opacityFunc = info.swatchFunc  -- Fix #34: Update on alpha slider change
 	info.cancelFunc = function(previousValues)
-		colorSwatch:SetColorTexture(previousValues.r, previousValues.g, previousValues.b)
+		local prevA = previousValues.a or 1
+		colorSwatch:SetColorTexture(previousValues.r, previousValues.g, previousValues.b, prevA)
 		
 		local groupCountColors = DB:Get("groupCountColors") or {}
-		groupCountColors[groupId] = {r = previousValues.r, g = previousValues.g, b = previousValues.b}
+		groupCountColors[groupId] = {r = previousValues.r, g = previousValues.g, b = previousValues.b, a = prevA}
 		DB:Set("groupCountColors", groupCountColors)
 		
 		local Groups = GetGroups()
 		if Groups then
 			local group = Groups:Get(groupId)
 			if group then
-				group.countColor = {r = previousValues.r, g = previousValues.g, b = previousValues.b}
+				group.countColor = {r = previousValues.r, g = previousValues.g, b = previousValues.b, a = prevA}
 			end
 		end
 		
@@ -1040,21 +1056,22 @@ function Settings:ShowGroupArrowColorPicker(groupId, groupName, colorSwatch, isR
 	local DB = GetDB()
 	if not DB then return end
 	
-	-- Handle Reset (Right Click) - Snapshot Group Color
+	-- Handle Reset (Right Click) - Snapshot Group Color (Fix #34: includes alpha)
 	if isReset then
 		local Groups = GetGroups()
 		local group = Groups and Groups:Get(groupId)
-		local r, g, b = 1, 1, 1
+		local r, g, b, a = 1, 1, 1, 1
 		if group and group.color then
 			r, g, b = group.color.r, group.color.g, group.color.b
+			a = group.color.a or 1
 		end
 
 		local groupArrowColors = DB:Get("groupArrowColors") or {}
-		groupArrowColors[groupId] = {r = r, g = g, b = b}
+		groupArrowColors[groupId] = {r = r, g = g, b = b, a = a}
 		DB:Set("groupArrowColors", groupArrowColors)
 		
 		if group then
-			group.arrowColor = {r = r, g = g, b = b}
+			group.arrowColor = {r = r, g = g, b = b, a = a}
 		end
 		
 		BFL:ForceRefreshFriendsList()
@@ -1082,43 +1099,57 @@ function Settings:ShowGroupArrowColorPicker(groupId, groupName, colorSwatch, isR
 	ColorPickerFrame.opacityFunc = nil
 	ColorPickerFrame.cancelFunc = nil
 	
+	-- Fix #34: Get existing alpha value for arrow color
+	local a = 1.0
+	if Groups then
+		local group = Groups:Get(groupId)
+		if group and group.arrowColor and group.arrowColor.a then
+			a = group.arrowColor.a
+		elseif group and group.color and group.color.a then
+			a = group.color.a  -- Inherit from group color
+		end
+	end
+	
 	local info = {}
 	info.r = r
 	info.g = g
 	info.b = b
-	info.opacity = 1.0
-	info.hasOpacity = false
+	info.opacity = a
+	info.hasOpacity = true  -- Fix #34: Enable alpha slider
 	info.swatchFunc = function()
 		local newR, newG, newB = ColorPickerFrame:GetColorRGB()
+		local newA = ColorPickerFrame:GetColorAlpha() or 1
 		
-		colorSwatch:SetColorTexture(newR, newG, newB)
+		colorSwatch:SetColorTexture(newR, newG, newB, newA)
 		
 		local groupArrowColors = DB:Get("groupArrowColors") or {}
-		groupArrowColors[groupId] = {r = newR, g = newG, b = newB}
+		groupArrowColors[groupId] = {r = newR, g = newG, b = newB, a = newA}
 		DB:Set("groupArrowColors", groupArrowColors)
 		
 		local Groups = GetGroups()
 		if Groups then
 			local group = Groups:Get(groupId)
 			if group then
-				group.arrowColor = {r = newR, g = newG, b = newB}
+				group.arrowColor = {r = newR, g = newG, b = newB, a = newA}
 			end
 		end
 		
 		BFL:ForceRefreshFriendsList()
 	end
+	info.opacityFunc = info.swatchFunc  -- Fix #34: Update on alpha slider change
 	info.cancelFunc = function(previousValues)
-		colorSwatch:SetColorTexture(previousValues.r, previousValues.g, previousValues.b)
+		local prevA = previousValues.a or 1
+		colorSwatch:SetColorTexture(previousValues.r, previousValues.g, previousValues.b, prevA)
 		
 		local groupArrowColors = DB:Get("groupArrowColors") or {}
-		groupArrowColors[groupId] = {r = previousValues.r, g = previousValues.g, b = previousValues.b}
+		groupArrowColors[groupId] = {r = previousValues.r, g = previousValues.g, b = previousValues.b, a = prevA}
 		DB:Set("groupArrowColors", groupArrowColors)
 		
 		local Groups = GetGroups()
 		if Groups then
 			local group = Groups:Get(groupId)
 			if group then
-				group.arrowColor = {r = previousValues.r, g = previousValues.g, b = previousValues.b}
+				group.arrowColor = {r = previousValues.r, g = previousValues.g, b = previousValues.b, a = prevA}
 			end
 		end
 		
@@ -1164,26 +1195,36 @@ function Settings:ShowColorPicker(groupId, groupName, colorSwatch)
 	ColorPickerFrame.opacityFunc = nil
 	ColorPickerFrame.cancelFunc = nil
 	
+	-- Fix #34: Get existing alpha value
+	local a = 1.0
+	if Groups then
+		local group = Groups:Get(groupId)
+		if group and group.color and group.color.a then
+			a = group.color.a
+		end
+	end
+	
 	local info = {}
 	info.r = r
 	info.g = g
 	info.b = b
-	info.opacity = 1.0
-	info.hasOpacity = false
+	info.opacity = a
+	info.hasOpacity = true  -- Fix #34: Enable alpha slider
 	info.swatchFunc = function()
 		local newR, newG, newB = ColorPickerFrame:GetColorRGB()
+		local newA = ColorPickerFrame:GetColorAlpha() or 1
 		
-		colorSwatch:SetColorTexture(newR, newG, newB)
+		colorSwatch:SetColorTexture(newR, newG, newB, newA)
 		
 		local groupColors = DB:Get("groupColors") or {}
-		groupColors[groupId] = {r = newR, g = newG, b = newB}
+		groupColors[groupId] = {r = newR, g = newG, b = newB, a = newA}
 		DB:Set("groupColors", groupColors)
 		
 		local Groups = GetGroups()
 		if Groups then
 			local group = Groups:Get(groupId)
 			if group then
-				group.color = {r = newR, g = newG, b = newB}
+				group.color = {r = newR, g = newG, b = newB, a = newA}
 			end
 		end
 		
@@ -1193,18 +1234,20 @@ function Settings:ShowColorPicker(groupId, groupName, colorSwatch)
 		-- Refresh Settings UI to update inherited swatches
 		if self.RefreshGroupsTab then self:RefreshGroupsTab() end
 	end
+	info.opacityFunc = info.swatchFunc  -- Fix #34: Update on alpha slider change
 	info.cancelFunc = function(previousValues)
-		colorSwatch:SetColorTexture(previousValues.r, previousValues.g, previousValues.b)
+		local prevA = previousValues.a or 1
+		colorSwatch:SetColorTexture(previousValues.r, previousValues.g, previousValues.b, prevA)
 		
 		local groupColors = DB:Get("groupColors") or {}
-		groupColors[groupId] = {r = previousValues.r, g = previousValues.g, b = previousValues.b}
+		groupColors[groupId] = {r = previousValues.r, g = previousValues.g, b = previousValues.b, a = prevA}
 		DB:Set("groupColors", groupColors)
 		
 		local Groups = GetGroups()
 		if Groups then
 			local group = Groups:Get(groupId)
 			if group then
-				group.color = {r = previousValues.r, g = previousValues.g, b = previousValues.b}
+				group.color = {r = previousValues.r, g = previousValues.g, b = previousValues.b, a = prevA}
 			end
 		end
 		
@@ -1823,6 +1866,18 @@ function Settings:ImportSettings(importString)
 	
 	-- Reload Groups module (this will apply imported colors)
 	Groups:Initialize()
+
+	-- Invalidate caches after direct DB writes
+	if BFL.SettingsVersion then
+		BFL.SettingsVersion = BFL.SettingsVersion + 1
+	end
+	local FriendsList = BFL:GetModule("FriendsList")
+	if FriendsList then
+		if FriendsList.InvalidateSettingsCache then
+			FriendsList:InvalidateSettingsCache()
+		end
+		FriendsList.lastBuildInputs = nil
+	end
 	
 	-- Force full display refresh - import affects groups and display structure
 	BFL:ForceRefreshFriendsList()
@@ -1866,12 +1921,26 @@ function Settings:DeserializeTable(str)
 		return nil
 	end
 	
-	-- Use loadstring (safe because we control the format)
+	-- Security: Validate that the string only contains safe table-literal characters
+	-- Allowed: braces, brackets, quotes, commas, equals, alphanumerics, whitespace, dots, minus, underscores
+	-- This prevents arbitrary Lua code execution from user-provided import strings
+	if string.find(str, "[^%w%s{}%[%]\"',=%.%-_]") then
+		BFL:DebugPrint("DeserializeTable: Rejected input - contains unsafe characters")
+		return nil
+	end
+	
+	-- Additional safety: reject strings containing function calls or known dangerous patterns
+	if string.find(str, "%w+%s*%(") then
+		BFL:DebugPrint("DeserializeTable: Rejected input - contains function call pattern")
+		return nil
+	end
+	
 	local func, err = loadstring("return " .. str)
 	if not func then
 		return nil
 	end
 	
+	-- Execute in protected call to catch runtime errors
 	local success, result = pcall(func)
 	if not success then
 		return nil
@@ -2679,7 +2748,7 @@ function Settings:RefreshGeneralTab()
 		},
 		{ -- Right
 			label = L.SETTINGS_SHOW_FACTION_ICONS,
-			initialValue = DB:Get("showFactionIcons", true),
+			initialValue = DB:Get("showFactionIcons", false),
 			callback = function(val) self:OnShowFactionIconsChanged(val) end,
 			tooltipTitle = L.SETTINGS_SHOW_FACTION_ICONS,
 			tooltipDesc = L.SETTINGS_SHOW_FACTION_ICONS_DESC or "Display Alliance/Horde icons next to character names"
@@ -2744,14 +2813,14 @@ function Settings:RefreshGeneralTab()
 	)
 	table.insert(allFrames, row4)
 
-	-- Row 5: Favorites & Hide Empty
+	-- Row 5: Welcome Message & Hide Empty
 	local row5 = Components:CreateDoubleCheckbox(tab,
 		{ -- Left
-			label = L.SETTINGS_ENABLE_FAVORITE_ICON,
-			initialValue = DB:Get("enableFavoriteIcon", true),
-			callback = function(val) DB:Set("enableFavoriteIcon", val); BFL:ForceRefreshFriendsList() end,
-			tooltipTitle = L.SETTINGS_ENABLE_FAVORITE_ICON,
-			tooltipDesc = L.SETTINGS_ENABLE_FAVORITE_ICON_DESC or "Display a star icon on the friend button for favorites."
+			label = L.SETTINGS_SHOW_WELCOME_MESSAGE,
+			initialValue = DB:Get("showWelcomeMessage", true),
+			callback = function(val) DB:Set("showWelcomeMessage", val) end,
+			tooltipTitle = L.SETTINGS_SHOW_WELCOME_MESSAGE,
+			tooltipDesc = L.SETTINGS_SHOW_WELCOME_MESSAGE_DESC or "Shows the 'BetterFriendlist loaded...' message in chat when you log in or reload."
 		},
 		{ -- Right
 			label = L.SETTINGS_HIDE_EMPTY_GROUPS,
@@ -2763,7 +2832,55 @@ function Settings:RefreshGeneralTab()
 	)
 	table.insert(allFrames, row5)
 
-	-- Row 6: Blizzard Option (Single or with ElvUI)
+	-- Row 6: Favorite Icon + Favorite Icon Dropdown (conditional)
+	local favoriteIconEnabled = DB:Get("enableFavoriteIcon", true)
+	local blizzardIconTag = "|A:friendslist-favorite:20:20|a"
+	if not (C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo("friendslist-favorite")) then
+		blizzardIconTag = "|TInterface\\AddOns\\BetterFriendlist\\Icons\\star:20:20|t"
+	end
+
+	local favoriteEntries = {
+		labels = {
+			"|TInterface\\AddOns\\BetterFriendlist\\Icons\\star:17:17|t " .. (L.SETTINGS_FAVORITE_ICON_OPTION_BFL or "BFL Icon"),
+			blizzardIconTag .. " " .. (L.SETTINGS_FAVORITE_ICON_OPTION_BLIZZARD or "Blizzard Icon")
+		},
+		values = {"bfl", "blizzard"}
+	}
+
+	local favoriteDropdownData = nil
+	if favoriteIconEnabled then
+		favoriteDropdownData = {
+			label = L.SETTINGS_FAVORITE_ICON_STYLE or "Favorite Icon",
+			entries = favoriteEntries,
+			isSelectedCallback = function(value)
+				return DB:Get("favoriteIconStyle", "bfl") == value
+			end,
+			onSelectionCallback = function(value)
+				DB:Set("favoriteIconStyle", value)
+				BFL:ForceRefreshFriendsList()
+			end,
+			tooltipTitle = L.SETTINGS_FAVORITE_ICON_STYLE or "Favorite Icon",
+			tooltipDesc = L.SETTINGS_FAVORITE_ICON_STYLE_DESC or "Choose which icon is used for favorites."
+		}
+	end
+
+	local row6 = Components:CreateCheckboxDropdown(tab,
+		{
+			label = L.SETTINGS_ENABLE_FAVORITE_ICON,
+			initialValue = favoriteIconEnabled,
+			callback = function(val)
+				DB:Set("enableFavoriteIcon", val)
+				BFL:ForceRefreshFriendsList()
+				self:RefreshGeneralTab()
+			end,
+			tooltipTitle = L.SETTINGS_ENABLE_FAVORITE_ICON,
+			tooltipDesc = L.SETTINGS_ENABLE_FAVORITE_ICON_DESC or "Display a star icon on the friend button for favorites."
+		},
+		favoriteDropdownData
+	)
+	table.insert(allFrames, row6)
+
+	-- Row 7: Blizzard Option (Single or with ElvUI)
 	local elvData = nil
 	if _G.ElvUI then
 		elvData = {
@@ -2788,7 +2905,7 @@ function Settings:RefreshGeneralTab()
 		}
 	end
 	
-	local row6 = Components:CreateDoubleCheckbox(tab,
+	local row7 = Components:CreateDoubleCheckbox(tab,
 		{ -- Left
 			label = L.SETTINGS_SHOW_BLIZZARD,
 			initialValue = DB:Get("showBlizzardOption", false),
@@ -2797,19 +2914,6 @@ function Settings:RefreshGeneralTab()
 			tooltipDesc = L.SETTINGS_SHOW_BLIZZARD_DESC or "Shows the original Blizzard Friends button in the social menu"
 		},
 		elvData -- Right (nil if no ElvUI)
-	)
-	table.insert(allFrames, row6)
-
-	-- Row 7: Welcome Message
-	local row7 = Components:CreateDoubleCheckbox(tab,
-		{ -- Left
-			label = L.SETTINGS_SHOW_WELCOME_MESSAGE,
-			initialValue = DB:Get("showWelcomeMessage", true),
-			callback = function(val) DB:Set("showWelcomeMessage", val) end,
-			tooltipTitle = L.SETTINGS_SHOW_WELCOME_MESSAGE,
-			tooltipDesc = L.SETTINGS_SHOW_WELCOME_MESSAGE_DESC or "Shows the 'BetterFriendlist loaded...' message in chat when you log in or reload."
-		},
-		nil -- Right slot empty
 	)
 	table.insert(allFrames, row7)
 
@@ -2970,23 +3074,39 @@ function Settings:RefreshGeneralTab()
 	local groupHeader = Components:CreateHeader(tab, L.SETTINGS_GROUP_MANAGEMENT or "Group Management")
 	table.insert(allFrames, groupHeader)
 
-    -- Group Management Row (Favorites / In-Game)
-    local groupRow = Components:CreateDoubleCheckbox(tab,
-        {
-            label = L.SETTINGS_SHOW_FAVORITES,
-            initialValue = DB:Get("showFavoritesGroup", true),
-            callback = function(val) self:OnShowFavoritesGroupChanged(val) end,
-            tooltipTitle = L.SETTINGS_SHOW_FAVORITES,
-            tooltipDesc = L.SETTINGS_SHOW_FAVORITES_DESC or "Toggle visibility of the Favorites group in your friends list"
-        },
-        {
-            label = L.SETTINGS_SHOW_INGAME_GROUP or "Show 'In-Game' Group",
-            initialValue = DB:Get("enableInGameGroup", false),
-            callback = function(val) self:OnEnableInGameGroupChanged(val) end,
-            tooltipTitle = L.SETTINGS_SHOW_INGAME_GROUP or "Show 'In-Game' Group",
-            tooltipDesc = L.SETTINGS_SHOW_INGAME_GROUP_DESC or "Automatically groups friends playing games into a separate group"
-        }
-    )
+	-- Group Management Row (Favorites / In-Game)
+	local Groups = GetGroups()
+	local showGroupFmt = L.SETTINGS_SHOW_GROUP_FMT or "Show %s Group"
+	local showGroupDescFmt = L.SETTINGS_SHOW_GROUP_DESC_FMT or "Toggle visibility of the %s group in your friends list"
+	local function BuildBuiltinDisplayName(groupId, fallbackName)
+		local groupName = (Groups and Groups:Get(groupId) and Groups:Get(groupId).name) or fallbackName
+		local defaultName = fallbackName
+		if groupName and defaultName and groupName ~= defaultName then
+			return string.format("%s (%s)", groupName, defaultName)
+		end
+		return groupName or defaultName
+	end
+	local favoritesDisplayName = BuildBuiltinDisplayName("favorites", L.GROUP_FAVORITES or "Favorites")
+	local inGameDisplayName = BuildBuiltinDisplayName("ingame", L.GROUP_INGAME or "In-Game")
+	local favoritesLabel = string.format(showGroupFmt, favoritesDisplayName)
+	local inGameLabel = string.format(showGroupFmt, inGameDisplayName)
+
+	local groupRow = Components:CreateDoubleCheckbox(tab,
+		{
+			label = favoritesLabel,
+			initialValue = DB:Get("showFavoritesGroup", true),
+			callback = function(val) self:OnShowFavoritesGroupChanged(val) end,
+			tooltipTitle = favoritesLabel,
+			tooltipDesc = string.format(showGroupDescFmt, favoritesDisplayName)
+		},
+		{
+			label = inGameLabel,
+			initialValue = DB:Get("enableInGameGroup", false),
+			callback = function(val) self:OnEnableInGameGroupChanged(val) end,
+			tooltipTitle = inGameLabel,
+			tooltipDesc = string.format(showGroupDescFmt, inGameDisplayName)
+		}
+	)
     table.insert(allFrames, groupRow)
 
 	-- NEW: In-Game Group Mode (Sub-option) - Keep as dedicated row since it's a dropdown
@@ -3142,7 +3262,11 @@ function Settings:RefreshFontsTab()
 	-- Font Library
 	local LSM = LibStub("LibSharedMedia-3.0")
 	local fontList = LSM:List("font")
-	local fontOptions = { labels = fontList, values = fontList }
+	local fontPaths = {}
+	for i, fontName in ipairs(fontList) do
+		fontPaths[i] = LSM:Fetch("font", fontName)
+	end
+	local fontOptions = { labels = fontList, values = fontList, fontPaths = fontPaths, useCheckboxes = true }
 	
 	-- -------------------------------------------------------------------------
 	-- Friend Name Settings
@@ -3154,17 +3278,25 @@ function Settings:RefreshFontsTab()
 	local currentNameFont = DB:Get("fontFriendName", "Friz Quadrata TT")
 	local currentNameSize = DB:Get("fontSizeFriendName", 12)
 	local currentNameColor = DB:Get("fontColorFriendName", {r=1, g=1, b=1, a=1})
-	local nameFontDropdown = Components:CreateDropdown(
+	local nameFontDropdown
+	nameFontDropdown = Components:CreateDropdown(
 		tab, 
 		"Font:",  -- Use generic label as per request to move code
 		fontOptions, 
 		function(val) return val == currentNameFont end,
 		function(val) 
 			DB:Set("fontFriendName", val)
+			currentNameFont = val
+			if nameFontDropdown.DropDown then
+				if nameFontDropdown.DropDown.SetText then
+					nameFontDropdown.DropDown:SetText(val)
+				elseif UIDropDownMenu_SetText then
+					UIDropDownMenu_SetText(nameFontDropdown.DropDown, val)
+				end
+			end
 			-- Defer update to next frame to ensure resource availability
 			C_Timer.After(0.01, function()
 				BFL:ForceRefreshFriendsList()
-				self:RefreshFontsTab(tab) -- Refresh to update dropdown label
 			end)
 		end
 	)
@@ -3186,6 +3318,11 @@ function Settings:RefreshFontsTab()
 		function(val) return tostring(val) end, -- Label formatter
 		function(val)
 			DB:Set("fontSizeFriendName", val)
+			-- Fix #35/#40: Invalidate settings cache to update dynamic row heights
+			local FriendsList = BFL:GetModule("FriendsList")
+			if FriendsList then
+				FriendsList:InvalidateSettingsCache()
+			end
 			C_Timer.After(0.01, function()
 				BFL:ForceRefreshFriendsList()
 			end)
@@ -3220,17 +3357,25 @@ function Settings:RefreshFontsTab()
 	local currentInfoFont = DB:Get("fontFriendInfo", "Friz Quadrata TT")
 	local currentInfoSize = DB:Get("fontSizeFriendInfo", 12)
 	local currentInfoColor = DB:Get("fontColorFriendInfo", {r=0.82, g=0.82, b=0.82, a=1})
-	local infoFontDropdown = Components:CreateDropdown(
+	local infoFontDropdown
+	infoFontDropdown = Components:CreateDropdown(
 		tab, 
 		"Font:",  -- Changed from "Font Face:" (User Request)
 		fontOptions, 
 		function(val) return val == currentInfoFont end,
 		function(val) 
 			DB:Set("fontFriendInfo", val)
+			currentInfoFont = val
+			if infoFontDropdown.DropDown then
+				if infoFontDropdown.DropDown.SetText then
+					infoFontDropdown.DropDown:SetText(val)
+				elseif UIDropDownMenu_SetText then
+					UIDropDownMenu_SetText(infoFontDropdown.DropDown, val)
+				end
+			end
 			-- Defer update to next frame
 			C_Timer.After(0.01, function()
 				BFL:ForceRefreshFriendsList()
-				self:RefreshFontsTab(tab) -- Refresh to update dropdown label
 			end)
 		end
 	)
@@ -3252,6 +3397,11 @@ function Settings:RefreshFontsTab()
 		function(val) return tostring(val) end, -- Label formatter
 		function(val)
 			DB:Set("fontSizeFriendInfo", val)
+			-- Fix #35/#40: Invalidate settings cache to update dynamic row heights
+			local FriendsList = BFL:GetModule("FriendsList")
+			if FriendsList then
+				FriendsList:InvalidateSettingsCache()
+			end
 			-- Defer update to next frame
 			C_Timer.After(0.01, function()
 				BFL:ForceRefreshFriendsList()
@@ -3290,17 +3440,25 @@ function Settings:RefreshFontsTab()
 	-- Tabs Font Face
 	local currentTabFont = DB:Get("fontTabText", "Friz Quadrata TT")
 	local currentTabSize = DB:Get("fontSizeTabText", defaultTabSize)
-	local tabFontDropdown = Components:CreateDropdown(
+	local tabFontDropdown
+	tabFontDropdown = Components:CreateDropdown(
 		tab, 
 		"Font:", 
 		fontOptions, 
 		function(val) return val == currentTabFont end,
 		function(val) 
 			DB:Set("fontTabText", val)
+			currentTabFont = val
+			if tabFontDropdown.DropDown then
+				if tabFontDropdown.DropDown.SetText then
+					tabFontDropdown.DropDown:SetText(val)
+				elseif UIDropDownMenu_SetText then
+					UIDropDownMenu_SetText(tabFontDropdown.DropDown, val)
+				end
+			end
 			C_Timer.After(0.01, function()
 				BFL:ApplyTabFonts() -- Immediate Apply
 				BFL:ForceRefreshFriendsList()
-				self:RefreshFontsTab(tab)
 			end)
 		end
 	)
@@ -3316,7 +3474,7 @@ function Settings:RefreshFontsTab()
 	local tabSizeSlider = Components:CreateSlider(
 		tab,
 		L.SETTINGS_FONT_SIZE_NUM or "Font Size:",
-		8, 24,
+		8, 24, -- Fix #40: Proportional tab scaling handles overflow
 		currentTabSize,
 		function(val) return tostring(val) end,
 		function(val)
@@ -3345,20 +3503,28 @@ function Settings:RefreshFontsTab()
 	-- Raid Font Face
 	local currentRaidFont = DB:Get("fontRaidName", "Friz Quadrata TT")
 	local currentRaidSize = DB:Get("fontSizeRaidName", defaultRaidSize)
-	local raidFontDropdown = Components:CreateDropdown(
+	local raidFontDropdown
+	raidFontDropdown = Components:CreateDropdown(
 		tab, 
 		"Font:", 
 		fontOptions, 
 		function(val) return val == currentRaidFont end,
 		function(val) 
 			DB:Set("fontRaidName", val)
+			currentRaidFont = val
+			if raidFontDropdown.DropDown then
+				if raidFontDropdown.DropDown.SetText then
+					raidFontDropdown.DropDown:SetText(val)
+				elseif UIDropDownMenu_SetText then
+					UIDropDownMenu_SetText(raidFontDropdown.DropDown, val)
+				end
+			end
 			C_Timer.After(0.01, function()
 				local RaidFrame = BFL:GetModule("RaidFrame")
 				if RaidFrame and RaidFrame.UpdateAllMemberButtons then
 					RaidFrame:UpdateAllMemberButtons()
 				end
 				BFL:ForceRefreshFriendsList()
-				self:RefreshFontsTab(tab)
 			end)
 		end
 	)
@@ -3423,7 +3589,11 @@ function Settings:RefreshGroupsTab()
 	-- Common Font Options
 	local LSM = LibStub("LibSharedMedia-3.0")
 	local fontList = LSM:List("font")
-	local fontOptions = { labels = fontList, values = fontList }
+	local fontPaths = {}
+	for i, fontName in ipairs(fontList) do
+		fontPaths[i] = LSM:Fetch("font", fontName)
+	end
+	local fontOptions = { labels = fontList, values = fontList, fontPaths = fontPaths, useCheckboxes = true }
 	
 	-- ===========================================
 	-- MOVED SETTINGS (From General)
@@ -3514,7 +3684,13 @@ function Settings:RefreshGroupsTab()
 		DB:Get("showGroupArrow", true),
 		function(val) 
 			DB:Set("showGroupArrow", val)
+			-- Force full rebuild of display list to ensure arrows update
+			local FriendsList = BFL:GetModule("FriendsList")
+			if FriendsList then
+				FriendsList:InvalidateSettingsCache()
+			end
 			BFL:ForceRefreshFriendsList()
+			self:RefreshGroupsTab()
 		end
 	)
 	table.insert(allFrames, showArrowCheckbox)
@@ -3530,17 +3706,25 @@ function Settings:RefreshGroupsTab()
 	
 	-- Group Font Dropdown
 	local currentGroupFont = DB:Get("fontGroupHeader", "Friz Quadrata TT")
-	local groupFontDropdown = Components:CreateDropdown(
+	local groupFontDropdown
+	groupFontDropdown = Components:CreateDropdown(
 		tab, 
 		"Font:", 
 		fontOptions, 
 		function(val) return val == currentGroupFont end,
 		function(val) 
 			DB:Set("fontGroupHeader", val)
+			currentGroupFont = val
+			if groupFontDropdown.DropDown then
+				if groupFontDropdown.DropDown.SetText then
+					groupFontDropdown.DropDown:SetText(val)
+				elseif UIDropDownMenu_SetText then
+					UIDropDownMenu_SetText(groupFontDropdown.DropDown, val)
+				end
+			end
 			-- Defer update
 			C_Timer.After(0.01, function()
 				BFL:ForceRefreshFriendsList()
-				self:RefreshGroupsTab()
 			end)
 		end
 	)
@@ -3582,6 +3766,19 @@ function Settings:RefreshGroupsTab()
 	local Groups = BFL:GetModule("Groups")
 	if not Groups then return end
 	
+	local function GetBuiltinDefaultName(groupId)
+		if groupId == "favorites" then
+			return L.GROUP_FAVORITES or "Favorites"
+		end
+		if groupId == "ingame" then
+			return L.GROUP_INGAME or "In-Game"
+		end
+		if groupId == "nogroup" then
+			return L.GROUP_NO_GROUP or "No Group"
+		end
+		return nil
+	end
+	
 	local allGroups = Groups:GetAll()
 	local groupOrder = DB:Get("groupOrder") or {}
 	local orderedGroups = {}
@@ -3609,12 +3806,14 @@ function Settings:RefreshGroupsTab()
 		end
 	else
 		-- Default order: favorites, custom groups (sorted), nogroup
-		table.insert(orderedGroups, {id = "favorites", name = "Favorites", order = 1, builtin = true})
+		if allGroups["favorites"] then
+			table.insert(orderedGroups, {id = "favorites", name = allGroups["favorites"].name, order = 1, builtin = true})
+		end
 		
 		local customGroups = {}
 		for groupId, group in pairs(allGroups) do
 			if groupId ~= "favorites" and groupId ~= "nogroup" then
-				table.insert(customGroups, {id = groupId, name = group.name, builtin = false})
+				table.insert(customGroups, {id = groupId, name = group.name, builtin = group.builtin == true})
 			end
 		end
 		table.sort(customGroups, function(a, b) return a.name < b.name end)
@@ -3624,7 +3823,7 @@ function Settings:RefreshGroupsTab()
 		end
 		
 		if allGroups["nogroup"] then
-			table.insert(orderedGroups, {id = "nogroup", name = "No Group", order = #orderedGroups + 1, builtin = true})
+			table.insert(orderedGroups, {id = "nogroup", name = allGroups["nogroup"].name, order = #orderedGroups + 1, builtin = true})
 		end
 	end
 	
@@ -3633,6 +3832,13 @@ function Settings:RefreshGroupsTab()
 	
 	for i, groupData in ipairs(orderedGroups) do
 		local isBuiltin = groupData.builtin
+		local displayName = groupData.name
+		if isBuiltin then
+			local defaultName = GetBuiltinDefaultName(groupData.id)
+			if defaultName and groupData.name and groupData.name ~= defaultName then
+				displayName = string.format("%s (%s)", groupData.name, defaultName)
+			end
+		end
 		
 		local onDragStart = function(btn)
 			
@@ -3685,7 +3891,7 @@ function Settings:RefreshGroupsTab()
 		
 		local listItem = Components:CreateListItem(
 			tab,
-			groupData.name,
+			displayName,
 			i,
 			onDragStart,
 			onDragStop,
@@ -5098,18 +5304,18 @@ function Settings:RefreshRaidTab()
 			modDropdown:SetScript("OnSizeChanged", nil)
 			modDropdown:ClearAllPoints()
 			modDropdown:SetPoint("LEFT", label, "RIGHT", 5, 0)
-			modDropdown:SetWidth(135)
-			modDropdown:SetScale(0.85) 
+			modDropdown:SetWidth(115)
+			modDropdown:SetScale(1)
 			modDropdown.Label:Hide()
 			
 			local ddMod = modDropdown.DropDown
 			ddMod:ClearAllPoints()
 			if BFL.IsClassic or not BFL.HasModernMenu then
-				UIDropDownMenu_SetWidth(ddMod, 110)
+				UIDropDownMenu_SetWidth(ddMod, 95)
 				ddMod:SetPoint("TOPLEFT", modDropdown, "TOPLEFT", -15, -2)
 			else
 				ddMod:SetPoint("LEFT", modDropdown, "LEFT", 0, 0)
-				ddMod:SetWidth(135)
+				ddMod:SetWidth(115)
 			end
 			
 			-- Button Dropdown (dynamically filtered)
@@ -5155,18 +5361,18 @@ function Settings:RefreshRaidTab()
 			btnDropdown:SetScript("OnSizeChanged", nil)
 			btnDropdown:ClearAllPoints()
 			btnDropdown:SetPoint("LEFT", modDropdown, "RIGHT", 5, 0)
-			btnDropdown:SetWidth(135)
-			btnDropdown:SetScale(0.85)
+			btnDropdown:SetWidth(115)
+			btnDropdown:SetScale(1)
 			btnDropdown.Label:Hide()
 			
 			local ddBtn = btnDropdown.DropDown
 			ddBtn:ClearAllPoints()
 			if BFL.IsClassic or not BFL.HasModernMenu then
-				UIDropDownMenu_SetWidth(ddBtn, 110)
+				UIDropDownMenu_SetWidth(ddBtn, 95)
 				ddBtn:SetPoint("TOPLEFT", btnDropdown, "TOPLEFT", -15, -2)
 			else
 				ddBtn:SetPoint("LEFT", btnDropdown, "LEFT", 0, 0)
-				ddBtn:SetWidth(135)
+				ddBtn:SetWidth(115)
 			end
 
 			-- If action is Target, maybe verify it defaults to None+Left?

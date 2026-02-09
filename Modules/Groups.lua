@@ -430,6 +430,36 @@ function Groups:Initialize()
 			end
 		end
 	end
+	
+	-- DEFENSIVE: Clean up ghost group entries in friendGroups
+	-- If a group was deleted but friendGroups still references it, remove the stale entries
+	-- This prevents friends from being "invisible" due to orphaned group assignments
+	if BetterFriendlistDB.friendGroups then
+		local cleanedCount = 0
+		for uid, groups in pairs(BetterFriendlistDB.friendGroups) do
+			if type(groups) == "table" then
+				for i = #groups, 1, -1 do
+					local gid = groups[i]
+					-- A valid group must exist in self.groups (builtins + loaded customs)
+					if type(gid) ~= "string" or not self.groups[gid] then
+						table.remove(groups, i)
+						cleanedCount = cleanedCount + 1
+					end
+				end
+				-- Clean up empty friend entries
+				if #groups == 0 then
+					BetterFriendlistDB.friendGroups[uid] = nil
+				end
+			else
+				-- Invalid entry (not a table), remove it
+				BetterFriendlistDB.friendGroups[uid] = nil
+				cleanedCount = cleanedCount + 1
+			end
+		end
+		if cleanedCount > 0 then
+			BFL:DebugPrint("|cffff8800[Groups]|r Cleaned " .. cleanedCount .. " ghost group entries from friendGroups")
+		end
+	end
 end
 
 -- Get all groups
@@ -680,8 +710,8 @@ function Groups:Rename(groupId, newName)
 	return true
 end
 
--- Set group color
-function Groups:SetColor(groupId, r, g, b)
+-- Set group color (Fix #34: Added alpha support)
+function Groups:SetColor(groupId, r, g, b, a)
 	if not groupId or not r or not g or not b then
 		return false, BFL.L.ERROR_INVALID_PARAMS
 	end
@@ -691,14 +721,17 @@ function Groups:SetColor(groupId, r, g, b)
 		return false, BFL.L.ERROR_GROUP_NOT_EXIST
 	end
 	
+	-- Fix #34: Default alpha to 1 if not provided
+	local alpha = a or 1
+	
 	-- Update in memory
-	group.color = {r = r, g = g, b = b}
+	group.color = {r = r, g = g, b = b, a = alpha}
 	
 	local DB = BFL:GetModule("DB")
 	
 	-- Save to database (same structure for built-in and custom)
 	local groupColors = DB:Get("groupColors", {})
-	groupColors[groupId] = {r = r, g = g, b = b}
+	groupColors[groupId] = {r = r, g = g, b = b, a = alpha}
 	DB:Set("groupColors", groupColors)
 	
 	-- Refresh Settings UI if open
@@ -742,6 +775,9 @@ function Groups:Delete(groupId)
 	for _, friendUID in ipairs(DB:GetAllFriendUIDs()) do
 		DB:RemoveFriendFromGroup(friendUID, groupId)
 	end
+	
+	-- Force refresh friends list so removed friends appear in "No Group" immediately
+	BFL:ForceRefreshFriendsList()
 	
 	return true
 end

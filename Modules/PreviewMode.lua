@@ -23,6 +23,36 @@ local PreviewMode = BFL:RegisterModule("PreviewMode", {})
 -- Preview mode state
 PreviewMode.enabled = false
 
+local function CopyArray(source)
+	if not source then
+		return nil
+	end
+	local copy = {}
+	for i, value in ipairs(source) do
+		copy[i] = value
+	end
+	return copy
+end
+
+local function CopyFriendGroups(source)
+	if not source then
+		return nil
+	end
+	local copy = {}
+	for uid, groups in pairs(source) do
+		if type(groups) == "table" then
+			local groupsCopy = {}
+			for i, value in ipairs(groups) do
+				groupsCopy[i] = value
+			end
+			copy[uid] = groupsCopy
+		else
+			copy[uid] = groups
+		end
+	end
+	return copy
+end
+
 -- Mock player names for realistic screenshots (famous/lore characters + typical names)
 local MOCK_NAMES = {
 	-- Alliance Lore Characters
@@ -608,6 +638,10 @@ function PreviewMode:Disable()
 		end
 		self.originalFriendGroups = nil
 	end
+
+	if BetterFriendlistDB then
+		BetterFriendlistDB.previewBackup = nil
+	end
 	
 	-- Disable existing mock systems (this also restores original functions)
 	self:DisableRaidMock()
@@ -791,6 +825,8 @@ end
 	This injects mock data into the friends display
 ]]
 function PreviewMode:ApplyMockFriends()
+	self:PersistOriginalState()
+
 	local FriendsList = BFL:GetModule("FriendsList")
 	if not FriendsList then return end
 	
@@ -892,6 +928,54 @@ function PreviewMode:ApplyMockFriends()
 		
 		-- BFL:DebugPrint("|cff00ffffPreviewMode:|r Injected " .. injectedCount .. " friend group assignments into BetterFriendlistDB.friendGroups")
 	end
+
+	-- Invalidate caches after direct DB modifications
+	if BFL.SettingsVersion then
+		BFL.SettingsVersion = BFL.SettingsVersion + 1
+	end
+	local FriendsList = BFL:GetModule("FriendsList")
+	if FriendsList then
+		if FriendsList.InvalidateSettingsCache then
+			FriendsList:InvalidateSettingsCache()
+		end
+		FriendsList.lastBuildInputs = nil
+	end
+end
+
+function PreviewMode:PersistOriginalState()
+	if not BetterFriendlistDB then
+		return
+	end
+	if not BetterFriendlistDB.previewBackup then
+		BetterFriendlistDB.previewBackup = {
+			groupOrder = CopyArray(BetterFriendlistDB.groupOrder),
+			friendGroups = CopyFriendGroups(BetterFriendlistDB.friendGroups),
+		}
+	end
+end
+
+function PreviewMode:RestorePersistedState()
+	if not BetterFriendlistDB then
+		return
+	end
+	local backup = BetterFriendlistDB.previewBackup
+	if not backup then
+		return
+	end
+
+	if backup.groupOrder == nil then
+		BetterFriendlistDB.groupOrder = nil
+	else
+		BetterFriendlistDB.groupOrder = CopyArray(backup.groupOrder)
+	end
+
+	if backup.friendGroups == nil then
+		BetterFriendlistDB.friendGroups = nil
+	else
+		BetterFriendlistDB.friendGroups = CopyFriendGroups(backup.friendGroups)
+	end
+
+	BetterFriendlistDB.previewBackup = nil
 end
 
 -- ============================================
@@ -1115,6 +1199,8 @@ end
 -- ============================================
 
 function PreviewMode:Initialize()
+	self:RestorePersistedState()
+
 	-- Module is ready
 	-- BFL:DebugPrint("|cff00ffffBFL:PreviewMode:|r Initialized")
 end

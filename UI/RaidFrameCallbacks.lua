@@ -17,6 +17,27 @@ local L = BFL.L
 local UI = BFL.UI.CONSTANTS
 
 -- ========================================
+-- STORY MODE DETECTION (Fix #43)
+-- ========================================
+-- Uses Blizzard's official DifficultyUtil.InStoryRaid() API
+-- See Interface/AddOns/Blizzard_FrameXMLUtil/DifficultyUtil.lua
+-- DifficultyUtil.ID.RaidStory = 220 is the official Story Raid difficulty ID
+
+-- Check if player is in a Story Mode instance (not a real raid)
+-- This is a fallback check for RaidFrame content display
+-- Primary check is in BetterFriendlist.lua where the tab is disabled
+local function IsInStoryModeRaid()
+	-- Guard for Classic (no DifficultyUtil) and missing API
+	if BFL.IsClassic then return false end
+	if DifficultyUtil and DifficultyUtil.InStoryRaid then
+		return DifficultyUtil.InStoryRaid()
+	end
+	-- Fallback: Manual check for Story Raid difficulty ID (220)
+	local _, _, difficultyID = GetInstanceInfo()
+	return difficultyID == 220
+end
+
+-- ========================================
 -- MULTI-SELECT STATE (Phase 8.2)
 -- ========================================
 
@@ -206,7 +227,11 @@ function BetterRaidFrame_Update()
 	local frame = BetterFriendsFrame.RaidFrame
 	if not frame or not frame:IsShown() then return end
 	
-	local isInRaid = IsInRaid()
+	-- Fix #43: Exclude Story Mode raids (player is technically "in raid" but solo)
+	-- Fix: Also exclude "solo raids" (IsInRaid but only 1 member) - e.g. after leaving Story Mode
+	local numMembers = GetNumGroupMembers()
+	local isSoloRaid = IsInRaid() and numMembers <= 1
+	local isInRaid = IsInRaid() and not IsInStoryModeRaid() and not isSoloRaid
 	local controlPanel = frame.ControlPanel
 	
 	-- Show/hide UI elements based on group type (Raid vs Party)
@@ -287,8 +312,11 @@ function BetterRaidFrame_UpdateCombatOverlay(inCombat)
 	local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
 	if not frame then return end
 	
-	-- Only show combat overlay when in raid
-	local isInRaid = IsInRaid()
+	-- Fix #43: Only show combat overlay when in real raid (not Story Mode)
+	-- Fix: Also exclude "solo raids" (IsInRaid but only 1 member)
+	local numMembers = GetNumGroupMembers()
+	local isSoloRaid = IsInRaid() and numMembers <= 1
+	local isInRaid = IsInRaid() and not IsInStoryModeRaid() and not isSoloRaid
 	
 	-- BFL:DebugPrint("[BFL] UpdateCombatOverlay called: inCombat=" .. tostring(inCombat) .. ", isInRaid=" .. tostring(isInRaid))
 	
@@ -517,8 +545,25 @@ function BetterRaidMemberButton_PostClick(self, button)
 			-- Normal left-click: Clear all selections
 			ClearAllSelections()
 		end
+	elseif button == "RightButton" then
+		-- RightButton: Show unit context menu manually
+		-- (InsecureActionButtonTemplate doesn't support togglemenu secure attribute)
+		if not IsModifierKeyDown() and self.unit then
+			if UnitExists(self.unit) then
+				-- Use Blizzard's unit popup menu system
+				if ToggleDropDownMenu then
+					-- Classic: Use dropdown-based unit menu
+					FriendsDropDown.unit = self.unit
+					FriendsDropDown.id = self.name
+					FriendsDropDown.initialize = RaidFrameDropDown_Initialize
+					ToggleDropDownMenu(1, nil, FriendsDropDown, "cursor", 0, 0)
+				elseif UnitPopup_ShowMenu then
+					-- Retail: Use modern unit popup
+					UnitPopup_ShowMenu(self, "RAID_PLAYER", self.unit, self.name)
+				end
+			end
+		end
 	end
-	-- RightButton togglemenu und MainTank/MainAssist werden durch Secure Attributes verarbeitet
 end
 
 function BetterRaidMemberButton_OnDragUpdate(self)

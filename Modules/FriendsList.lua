@@ -1,4 +1,4 @@
--- Friends List Core Logic Module
+﻿-- Friends List Core Logic Module
 
 local ADDON_NAME, BFL = ...
 local FriendsList = BFL:RegisterModule("FriendsList", {})
@@ -145,6 +145,7 @@ local needsRenderOnShow = true -- Default to true to force initial render
 
 -- Selected friend for "Send Message" button (matching Blizzard's FriendsFrame)
 FriendsList.selectedFriend = nil
+FriendsList.selectedFriendUID = nil
 FriendsList.selectedButton = nil  -- Reference to the selected button for highlight management
 
 -- Invite restriction constants (matching Blizzard's)
@@ -169,10 +170,87 @@ local INVITE_RESTRICTION_NO_GAME_ACCOUNTS = 12
 -- Helper Functions
 -- ========================================
 
+-- Fix #35/#40: Calculate dynamic friend row height based on font size
+-- Base height is designed for 12px fonts, scales proportionally for larger sizes
+local BASE_FONT_SIZE = 12
+local BASE_ROW_HEIGHT = 34
+local BASE_COMPACT_ROW_HEIGHT = 24
+local MIN_ROW_HEIGHT = 24  -- Minimum height even for tiny fonts
+local MAX_ROW_HEIGHT = 60  -- Maximum to prevent overly large rows
+
+-- Fix #35: Calculate row height based on combined font heights
+local function CalculateFriendRowHeight(isCompactMode, nameSize, infoSize)
+	local nameFontSize = nameSize or BASE_FONT_SIZE
+	local infoFontSize = infoSize or BASE_FONT_SIZE
+	
+	-- Calculate line height for each font (font size + 2px breathing room)
+	local nameLineHeight = nameFontSize + 2
+	local infoLineHeight = infoFontSize + 2
+	
+	local calculatedHeight
+	if isCompactMode then
+		-- Compact: name can wrap to 2 lines (maxLines=2), info hidden
+		-- 2 * nameLineHeight + padding (4px top + 4px bottom)
+		calculatedHeight = (nameLineHeight * 2) + 8
+	else
+		-- Normal: name + info stacked (each 1 line max), add padding (4px top + 2px gap + 4px bottom)
+		calculatedHeight = nameLineHeight + infoLineHeight + 10
+	end
+	
+	-- Clamp to reasonable bounds
+	return math.max(MIN_ROW_HEIGHT, math.min(MAX_ROW_HEIGHT, math.floor(calculatedHeight)))
+end
+
+local function CalculateCompactRowHeight(self, nameSize, nameText, nameWidth)
+	local nameFontSize = nameSize or BASE_FONT_SIZE
+	local nameLineHeight = nameFontSize + 2
+	local fallbackHeight = (nameLineHeight * 2) + 8
+
+	if not nameText or nameText == "" or not nameWidth or nameWidth <= 0 then
+		return math.max(MIN_ROW_HEIGHT, math.min(MAX_ROW_HEIGHT, math.floor(fallbackHeight)))
+	end
+
+	if self and not self.nameMeasure then
+		local parent = BetterFriendsFrame or UIParent
+		if parent then
+			self.nameMeasure = parent:CreateFontString(nil, "ARTWORK")
+			self.nameMeasure:Hide()
+			self.nameMeasure:SetJustifyH("LEFT")
+			self.nameMeasure:SetWordWrap(true)
+		end
+	end
+
+	if not (self and self.nameMeasure) then
+		return math.max(MIN_ROW_HEIGHT, math.min(MAX_ROW_HEIGHT, math.floor(fallbackHeight)))
+	end
+
+	local measure = self.nameMeasure
+	if self.fontCache and self.fontCache.namePath then
+		local outline = self.fontCache.nameOutline
+		if outline == "NONE" then outline = "" end
+		measure:SetFont(self.fontCache.namePath, nameFontSize, outline)
+	else
+		local _, _, flags = measure:GetFont()
+		measure:SetFont("Fonts\\FRIZQT__.TTF", nameFontSize, flags)
+	end
+
+	measure:SetWidth(nameWidth)
+	if measure.SetMaxLines then measure:SetMaxLines(2) end
+	measure:SetText(nameText)
+
+	local measuredHeight = measure:GetStringHeight() or 0
+	if measuredHeight <= 0 then
+		return math.max(MIN_ROW_HEIGHT, math.min(MAX_ROW_HEIGHT, math.floor(fallbackHeight)))
+	end
+
+	local calculatedHeight = measuredHeight + 8
+	return math.max(MIN_ROW_HEIGHT, math.min(MAX_ROW_HEIGHT, math.floor(calculatedHeight)))
+end
+
 -- Get height of a display list item based on its type
 -- CRITICAL: These heights MUST match XML template heights and ButtonPool SetHeight() calls
 -- Otherwise buttons will drift out of position!
-local function GetItemHeight(item, isCompactMode) if not item then return 0 end
+local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self) if not item then return 0 end
 	
 	-- Support both .type (Retail) and .buttonType (Classic)
 	local itemType = item.type or item.buttonType
@@ -188,7 +266,53 @@ local function GetItemHeight(item, isCompactMode) if not item then return 0 end
 	elseif itemType == BUTTON_TYPE_SEARCH then
 		return 30
 	elseif itemType == BUTTON_TYPE_FRIEND then
-		return isCompactMode and 24 or 34  -- Friend button (BetterFriendsListButtonTemplate y="34", compactMode=24)
+		-- Fix #35/#40: Use dynamic height for friend rows
+		if isCompactMode and self then
+			local friend = item.friend
+			local line1Text = friend and friend._cache_text_line1
+			if friend and not line1Text and self.GetFormattedButtonText then
+				line1Text = self:GetFormattedButtonText(friend)
+			end
+			local line1BaseText = friend and friend._cache_text_line1_base or line1Text or ""
+			local line1SuffixText = friend and friend._cache_text_line1_suffix or ""
+			local showFavIcon = friend and friend.isFavorite and self.settingsCache and self.settingsCache.enableFavoriteIcon
+
+			local displayLine1 = line1Text or ""
+			if line1SuffixText ~= "" and showFavIcon then
+				local spacer = "  "
+				if (self.settingsCache and self.settingsCache.favoriteIconStyle) == "blizzard" then
+					spacer = "     "
+				end
+				displayLine1 = line1BaseText .. spacer .. line1SuffixText
+			end
+
+			local buttonWidth = self:GetButtonWidth()
+			local padding = 25
+			local showGameIcon = self.settingsCache and self.settingsCache.showGameIcon
+			if showGameIcon == nil then showGameIcon = true end
+			local hasGameIcon = false
+			if showGameIcon and friend and friend.connected then
+				if friend.type == "bnet" and friend.gameAccountInfo and friend.gameAccountInfo.clientProgram then
+					hasGameIcon = true
+				end
+			end
+			if hasGameIcon then
+				padding = 80
+			elseif friend and friend.type == "bnet" and friend.connected then
+				padding = 45
+			end
+
+			if showFavIcon and (self.settingsCache and self.settingsCache.favoriteIconStyle) == "blizzard" then
+				padding = padding + 8
+			end
+
+			local nameWidth = buttonWidth - 44 - padding
+			if nameWidth < 10 then nameWidth = 10 end
+
+			return CalculateCompactRowHeight(self, nameSize, displayLine1, nameWidth)
+		end
+
+		return CalculateFriendRowHeight(isCompactMode, nameSize, infoSize)
 	else
 		return 34  -- Default fallback
 	end
@@ -207,6 +331,7 @@ local function BuildDisplayList(self)
 	-- Skip expensive rebuild if inputs unchanged (600+ friends = 600+ operations!)
 	local currentInputs = {
 		friendsListVersion = BFL.FriendsListVersion or 0,
+		settingsVersion = BFL.SettingsVersion or 0, -- Fix: Track settings/groups changes
 		filterMode = self.filterMode or "all",
 		searchText = self.searchText or "",
 		numInvites = (BNGetNumFriendInvites and BNGetNumFriendInvites()) or 0,
@@ -225,6 +350,7 @@ local function BuildDisplayList(self)
 		
 		if not changed and self.cachedDisplayList then
 			-- BFL:DebugPrint("|cff00ff00BuildDisplayList:|r Cache HIT (inputs unchanged)")
+			self.groupedFriends = self.cachedGroupedFriends or self.groupedFriends or {}
 			return self.cachedDisplayList -- INSTANT return, no rebuild!
 		end
 	end
@@ -323,8 +449,8 @@ local function BuildDisplayList(self)
 	
 	-- PERFY OPTIMIZATION: Direct cache access (no DB:Get fallback)
 	-- Cache is auto-refreshed at entry point, safe to use directly
-	local enableInGameGroup = self.settingsCache and self.settingsCache.enableInGameGroup or false
-	local inGameGroupMode = self.settingsCache and self.settingsCache.inGameGroupMode or "same_game"
+	local enableInGameGroup = self.settingsCache.enableInGameGroup or false
+	local inGameGroupMode = self.settingsCache.inGameGroupMode or "same_game"
 	local BNET_CLIENT_WOW = BNET_CLIENT_WOW or "WoW"
 	
 	-- Group friends
@@ -337,9 +463,16 @@ local function BuildDisplayList(self)
 		local friendGroupIds = {}
 		local isInAnyGroup = false
 		
+		-- FIX: Only mark as "in group" if the Favorites group is actually Enabled/Visible
+		-- If Favorites group is hidden (showFavoritesGroup=false), BNet favorites should fall through to 'nogroup'
+		-- unless they are in another custom group.
+		-- CRITICAL: Must check friendGroups (from Groups:GetAll(), respects visibility settings)
+		-- NOT groupedFriends (which always pre-initializes favorites={} and is always truthy)
 		if isFavorite then
-			table.insert(friendGroupIds, "favorites")
-			isInAnyGroup = true
+			if friendGroups["favorites"] then
+				table.insert(friendGroupIds, "favorites")
+				isInAnyGroup = true
+			end
 		end
 		
 		-- Feature: In-Game Group (Dynamic)
@@ -416,10 +549,30 @@ local function BuildDisplayList(self)
 			table.insert(orderedGroups, groupData)
 		end
 	end
+
+	-- ROBUSTNESS FIX: Ensure nogroup is always present in orderedGroups
+	-- If Groups module returns a list without nogroup (e.g. glitch or filter), friends in 'nogroup' would be invisible.
+	local hasNoGroup = false
+	for _, g in ipairs(orderedGroups) do
+		if g.id == "nogroup" then hasNoGroup = true; break end
+	end
+	
+	if not hasNoGroup then
+		-- Fallback 'No Group' definition
+		table.insert(orderedGroups, {
+			id = "nogroup",
+			name = (BFL.L and BFL.L.GROUP_NO_GROUP) or "No Group",
+			builtin = true,
+			order = 999,
+			collapsed = (BetterFriendlistDB and BetterFriendlistDB.groupStates and BetterFriendlistDB.groupStates["nogroup"]) or false,
+			color = {r=0.5, g=0.5, b=0.5}
+		})
+	end
+
 	table.sort(orderedGroups, function(a, b) return (a.order or 999) < (b.order or 999) end)
 	
-	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
-	local hideEmptyGroups = self.settingsCache and self.settingsCache.hideEmptyGroups or false
+	-- PERFY OPTIMIZATION: Direct cache access
+	local hideEmptyGroups = self.settingsCache.hideEmptyGroups or false
 	
 	for _, groupData in ipairs(orderedGroups) do
 		local groupFriends = groupedFriends[groupData.id]
@@ -475,6 +628,8 @@ local function BuildDisplayList(self)
 	-- PERFY OPTIMIZATION (Phase 2B): Cache built display list
 	self.lastBuildInputs = currentInputs
 	self.cachedDisplayList = displayList
+	self.groupedFriends = groupedFriends
+	self.cachedGroupedFriends = groupedFriends
 	
 	return displayList
 end
@@ -576,9 +731,12 @@ end
 -- Create extent calculator for dynamic button heights
 -- Returns a function that calculates height based on elementData.buttonType
 local function CreateExtentCalculator(self) 
-	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback (no DB dependency in closure)
+	-- PERFY OPTIMIZATION: Direct cache access (no DB dependency in closure)
 	return function(dataIndex, elementData) 
-		local isCompactMode = self.settingsCache and self.settingsCache.compactMode or false
+		local isCompactMode = self.settingsCache.compactMode or false
+		-- Fix #35/#40: Get font sizes from settings cache for dynamic row height
+		local nameSize = self.settingsCache.fontSizeFriendName or 12
+		local infoSize = self.settingsCache.fontSizeFriendInfo or 10
 		
 		if elementData.buttonType == BUTTON_TYPE_GROUP_HEADER then
 			return 22
@@ -591,7 +749,8 @@ local function CreateExtentCalculator(self)
 		elseif elementData.buttonType == BUTTON_TYPE_SEARCH then
 			return 30
 		elseif elementData.buttonType == BUTTON_TYPE_FRIEND then
-			return isCompactMode and 24 or 34
+			-- Fix #35/#40: Use dynamic height based on font size
+			return GetItemHeight(elementData, isCompactMode, nameSize, infoSize, self)
 		else
 			return 34
 		end
@@ -607,9 +766,10 @@ function FriendsList:UpdateSearchBoxState()
 	local frame = BetterFriendsFrame
 	if not frame or not frame.ScrollFrame then return end
 	
-	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
-	local simpleMode = self.settingsCache and self.settingsCache.simpleMode or false
-	local showSearch = self.settingsCache and self.settingsCache.simpleModeShowSearch or true
+	-- PERFY OPTIMIZATION: Direct cache access
+	local simpleMode = self.settingsCache.simpleMode or false
+	local showSearch = self.settingsCache.simpleModeShowSearch
+	if showSearch == nil then showSearch = true end
 	local searchBox = frame.FriendsTabHeader and frame.FriendsTabHeader.SearchBox
 	local scrollFrame = frame.ScrollFrame
 	
@@ -978,14 +1138,16 @@ function FriendsList:RenderClassicButtons() if not self.classicScrollFrame or no
 	local offset = FauxScrollFrame_GetOffset(self.classicScrollFrame.FauxScrollFrame) or 0
 	local numButtons = #self.classicButtonPool
 	
-	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
+	-- PERFY OPTIMIZATION: Direct cache access
 	-- Get compact mode setting
-	local isCompactMode = self.settingsCache and self.settingsCache.compactMode or false
+	local isCompactMode = self.settingsCache.compactMode or false
+	local nameSize = self.fontCache and self.fontCache.nameSize or BASE_FONT_SIZE
+	local infoSize = self.fontCache and self.fontCache.infoSize or BASE_FONT_SIZE
 	
 	-- Calculate total content height for accurate scrolling with variable item heights
 	local totalHeight = 0
 	for _, elementData in ipairs(displayList) do
-		totalHeight = totalHeight + GetItemHeight(elementData, isCompactMode)
+		totalHeight = totalHeight + GetItemHeight(elementData, isCompactMode, nameSize, infoSize)
 	end
 	
 	-- FIX: Do NOT set ContentFrame height to totalHeight for FauxScrollFrame.
@@ -1058,8 +1220,8 @@ function FriendsList:RenderClassicButtons() if not self.classicScrollFrame or no
 				button:SetPoint("TOPLEFT", self.classicScrollFrame.ContentFrame, "TOPLEFT", 2, -yOffset)  -- 2px left padding
 				button:SetPoint("RIGHT", self.classicScrollFrame.ContentFrame, "RIGHT", -2, 0)
 				
-				-- Get height for this item type
-				local itemHeight = GetItemHeight(elementData, isCompactMode)
+				-- Get height for this item type (using font sizes for dynamic friend row height)
+				local itemHeight = GetItemHeight(elementData, isCompactMode, nameSize, infoSize, self)
 				button:SetHeight(itemHeight)
 				
 				-- Update button based on type
@@ -1181,6 +1343,84 @@ local function GetFriendUID(friend) if not friend then return nil end
 	end
 end
 
+-- Resolve current BNet friend index by stable identifiers (index is not persistent)
+function FriendsList:ResolveBNetFriendIndex(bnetAccountID, battleTag)
+	local numBNet = BNGetNumFriends and select(1, BNGetNumFriends()) or 0
+	if numBNet == 0 then
+		return nil
+	end
+
+	local Compat = BFL and BFL.Compat
+	local getInfo = Compat and Compat.GetBNetFriendInfo or (C_BattleNet and C_BattleNet.GetFriendAccountInfo)
+	if not getInfo then
+		return nil
+	end
+
+	for i = 1, numBNet do
+		local accountInfo = getInfo(i)
+		if accountInfo then
+			if bnetAccountID and accountInfo.bnetAccountID == bnetAccountID then
+				return i
+			end
+			if (not bnetAccountID) and battleTag and accountInfo.battleTag == battleTag then
+				return i
+			end
+		end
+	end
+
+	return nil
+end
+
+-- Resolve current WoW friend index by name (index is not persistent)
+function FriendsList:ResolveWoWFriendIndex(name)
+	if not name then
+		return nil
+	end
+
+	local numFriends = C_FriendList and C_FriendList.GetNumFriends and C_FriendList.GetNumFriends() or 0
+	if numFriends == 0 then
+		return nil
+	end
+
+	local targetName = BFL:NormalizeWoWFriendName(name)
+	if not targetName then
+		return nil
+	end
+
+	for i = 1, numFriends do
+		local info = C_FriendList.GetFriendInfoByIndex(i)
+		if info and info.name then
+			local normalizedInfo = BFL:NormalizeWoWFriendName(info.name)
+			if normalizedInfo == targetName then
+				return i
+			end
+		end
+	end
+
+	return nil
+end
+
+-- Resolve current friend data by stable UID
+function FriendsList:ResolveFriendByUID(uid)
+	if not uid or not self.friendsList then
+		return nil
+	end
+
+	for _, friend in ipairs(self.friendsList) do
+		local friendUID = friend.uid or GetFriendUID(friend)
+		if friendUID == uid then
+			return friend
+		end
+	end
+
+	return nil
+end
+
+-- Resolve the currently selected friend from UID (safe across list refreshes)
+function FriendsList:ResolveSelectedFriend()
+	return self:ResolveFriendByUID(self.selectedFriendUID)
+end
+
 -- Replace token case-insensitively in format string
 local function ReplaceTokenCaseInsensitive(str, token, value)
 	-- Create pattern that matches token case-insensitively
@@ -1218,11 +1458,11 @@ end
 -- Get display name based on format setting
 -- @param forSorting (boolean) If true, use BattleTag instead of AccountName for BNet friends (prevents sorting issues with protected strings)
 function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Name Caching (Persistent)
-	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
+	-- PERFY OPTIMIZATION: Direct cache access
 	-- [STREAMER MODE START]
 	if BFL.StreamerMode and BFL.StreamerMode:IsActive() then
 		local DB = GetDB()
-		local mode = self.settingsCache and self.settingsCache.streamerModeNameFormat or "battletag"
+		local mode = self.settingsCache.streamerModeNameFormat or "battletag"
 		
 		-- Default Safe Name (ShortTag or CharName)
 		local safeName = friend.name -- Valid for WoW friends (Character Name)
@@ -1254,11 +1494,11 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 
 	if not self.displayNameCache then self.displayNameCache = {} end
 
-	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
-	local format = self.settingsCache and self.settingsCache.nameDisplayFormat or "%name%"
+	-- PERFY OPTIMIZATION: Direct cache access
+	local format = self.settingsCache.nameDisplayFormat or "%name%"
 	local uid = friend.uid or GetFriendUID(friend)
 	local note = (friend.note or friend.notes or "")
-	local showRealmName = self.settingsCache and self.settingsCache.showRealmName or false
+	local showRealmName = self.settingsCache.showRealmName or false
 	local nicknameVersion = BFL.NicknameCacheVersion or 0 -- Phase 6: Version Check
 
 	-- Inputs for validation
@@ -1381,10 +1621,10 @@ function FriendsList:UpdateSendMessageButton()
     local frame = BetterFriendsFrame
     if not frame or not frame.SendMessageButton then return end
     
-    local button = frame.SendMessageButton
-    local friend = self.selectedFriend
+	local button = frame.SendMessageButton
+	local friend = self:ResolveSelectedFriend()
     
-    if not friend then
+	if not friend then
         button:Disable()
         return
     end
@@ -1487,6 +1727,10 @@ function FriendsList:UpdateFontCache()
 	
 	local DB = GetDB()
 	if not DB then return end
+	
+	-- Fix #35/#40: Track if font sizes changed to force layout rebuild
+	local oldNameSize = self.fontCache.nameSize
+	local oldInfoSize = self.fontCache.infoSize
 
 	-- Function to safely get color table
 	local function GetColor(key)
@@ -1503,7 +1747,7 @@ function FriendsList:UpdateFontCache()
 	-- Name Font
 	local nameFontName = DB:Get("fontFriendName", "Friz Quadrata TT")
 	self.fontCache.namePath = LSM:Fetch("font", nameFontName)
-	self.fontCache.nameSize = DB:Get("fontSizeFriendName", 13)
+	self.fontCache.nameSize = DB:Get("fontSizeFriendName", 12)
 	self.fontCache.nameOutline = DB:Get("fontOutlineFriendName", "NONE")
 	self.fontCache.nameShadow = DB:Get("fontShadowFriendName", false)
 	self.fontCache.nameR, self.fontCache.nameG, self.fontCache.nameB, self.fontCache.nameA = GetColor("fontColorFriendName")
@@ -1515,6 +1759,11 @@ function FriendsList:UpdateFontCache()
 	self.fontCache.infoOutline = DB:Get("fontOutlineFriendInfo", "NONE")
 	self.fontCache.infoShadow = DB:Get("fontShadowFriendInfo", false)
 	self.fontCache.infoR, self.fontCache.infoG, self.fontCache.infoB, self.fontCache.infoA = GetColor("fontColorFriendInfo")
+	
+	-- Fix #35/#40: Force layout rebuild if font sizes changed (affects row heights)
+	if oldNameSize ~= self.fontCache.nameSize or oldInfoSize ~= self.fontCache.infoSize then
+		self.forceLayoutRebuild = true
+	end
 end
 
 -- Invalidate settings cache (called by DB:Set to ensure immediate UI response)
@@ -1557,9 +1806,14 @@ function FriendsList:UpdateSettingsCache()
 	self.settingsCache.showGameIcon = DB:Get("showGameIcon", true)
 	self.settingsCache.showMobileAsAFK = DB:Get("showMobileAsAFK", false)
 	self.settingsCache.treatMobileAsOffline = DB:Get("treatMobileAsOffline", false)
-	self.settingsCache.enableFavoriteIcon = DB:Get("enableFavoriteIcon", false)
+	self.settingsCache.enableFavoriteIcon = DB:Get("enableFavoriteIcon", true)
+	self.settingsCache.favoriteIconStyle = DB:Get("favoriteIconStyle", "bfl")
 	self.settingsCache.showFactionBg = DB:Get("showFactionBg", false)
 	self.settingsCache.fontColorFriendInfo = DB:Get("fontColorFriendInfo") or {r=0.5, g=0.5, b=0.5, a=1}
+	
+	-- Fix #35/#40: Font Size Settings for Dynamic Row Height
+	self.settingsCache.fontSizeFriendName = DB:Get("fontSizeFriendName", 12)
+	self.settingsCache.fontSizeFriendInfo = DB:Get("fontSizeFriendInfo", 10)
 	
 	-- Group Header Settings (Hot Path in UpdateGroupHeaderButton)
 	self.settingsCache.headerCountFormat = DB:Get("headerCountFormat", "visible")
@@ -1962,7 +2216,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 					elseif gameInfo.clientProgram == "BSAp" then
 						friend.gameName = BFL.L.STATUS_MOBILE
 						-- Feature: Treat Mobile as Offline (Phase Feature Request)
-						local treatMobileAsOffline = GetDB():Get("treatMobileAsOffline", false)
+						local treatMobileAsOffline = self.settingsCache.treatMobileAsOffline
 						if treatMobileAsOffline then
 							friend.connected = false  -- Treat as offline for sorting/display
 							friend.isMobileButTreatedOffline = true  -- Flag for special display
@@ -2195,9 +2449,9 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 				activityTime = ActivityTracker:GetLastActivity(uid) or 0
 			end
 		end
-		-- Fallback to API lastOnline if no tracked activity
-		if activityTime == 0 and friend.lastOnline then
-			activityTime = friend.lastOnline
+		-- Fallback to API lastOnlineTime if no tracked activity
+		if activityTime == 0 and friend.lastOnlineTime then
+			activityTime = friend.lastOnlineTime
 		end
 		friend._sort_activity = activityTime
 	end
@@ -2472,8 +2726,12 @@ function FriendsList:PassesFilters(friend) -- Search text filter
 			if friend.isAFK or friend.isDND then
 				return false
 			end
+		elseif friend.type == "wow" then
+			-- WoW friends have afk/dnd status fields (set during data collection)
+			if friend.afk or friend.dnd then
+				return false
+			end
 		end
-		-- WoW friends don't have AFK/DND status, always show
 		
 	elseif self.filterMode == "retail" then
 		-- Show only Retail/Mainline WoW friends
@@ -2654,6 +2912,10 @@ function FriendsList:GetFriendsForGroup(targetGroupId) local groupFriends = {}
 	local DB = GetDB()
 	if not DB then return groupFriends end
 	
+	-- Get visible groups to check if favorites/ingame are actually enabled
+	local Groups = GetGroups()
+	local visibleGroups = Groups and Groups:GetAll() or {}
+	
 	for _, friend in ipairs(self.friendsList) do
 		-- Apply filters first
 		if self:PassesFilters(friend) then
@@ -2662,8 +2924,8 @@ function FriendsList:GetFriendsForGroup(targetGroupId) local groupFriends = {}
 			local isInTargetGroup = false
 			local isInAnyGroup = false
 			
-			-- Check Favorites
-			if isFavorite then
+			-- Check Favorites (only if Favorites group is visible/enabled)
+			if isFavorite and visibleGroups["favorites"] then
 				if targetGroupId == "favorites" then isInTargetGroup = true end
 				isInAnyGroup = true
 			end
@@ -2698,10 +2960,10 @@ function FriendsList:GetFriendsForGroup(targetGroupId) local groupFriends = {}
 				end
 			end
 			
-			-- Check Custom Groups
+			-- Check Custom Groups (only count groups that actually exist)
 			local customGroups = (BetterFriendlistDB and BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friendUID]) or {}
 			for _, groupId in ipairs(customGroups) do
-				if type(groupId) == "string" then
+				if type(groupId) == "string" and visibleGroups[groupId] then
 					if groupId == targetGroupId then isInTargetGroup = true end
 					isInAnyGroup = true
 				end
@@ -2820,10 +3082,10 @@ end
 function FriendsList:ToggleGroup(groupId) local Groups = GetGroups()
 	if not Groups then return end
 	
-	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
+	-- PERFY OPTIMIZATION: Direct cache access
 	-- Handle Accordion Mode
 	-- Note: We do this before the main toggle to clear others
-	local accordionMode = self.settingsCache and self.settingsCache.accordionGroups or false
+	local accordionMode = self.settingsCache.accordionGroups or false
 	local needsFullRefresh = false
 	
 	if accordionMode then
@@ -2901,27 +3163,37 @@ function FriendsList:OpenColorPicker(groupId) local Groups = GetGroups()
 	local group = Groups:Get(groupId)
 	if not group then return end
 	
-	local r, g, b = 1, 1, 1
+	local r, g, b, a = 1, 1, 1, 1
 	if group.color then
 		r = group.color.r or 1
 		g = group.color.g or 1
 		b = group.color.b or 1
+		a = group.color.a or 1  -- Fix #34: Alpha support
 	end
 	
 	local info = {
 		swatchFunc = function() local newR, newG, newB = ColorPickerFrame:GetColorRGB()
-			Groups:SetColor(groupId, newR, newG, newB)
+			local newA = ColorPickerFrame:GetColorAlpha() or 1  -- Fix #34
+			Groups:SetColor(groupId, newR, newG, newB, newA)
+			BFL:ForceRefreshFriendsList()
+		end,
+		opacityFunc = function()  -- Fix #34: Update on alpha slider change
+			local newR, newG, newB = ColorPickerFrame:GetColorRGB()
+			local newA = ColorPickerFrame:GetColorAlpha() or 1
+			Groups:SetColor(groupId, newR, newG, newB, newA)
 			BFL:ForceRefreshFriendsList()
 		end,
 		cancelFunc = function(previousValues) if previousValues then
-				Groups:SetColor(groupId, previousValues.r, previousValues.g, previousValues.b)
+				local prevA = previousValues.a or 1  -- Fix #34
+				Groups:SetColor(groupId, previousValues.r, previousValues.g, previousValues.b, prevA)
 				BFL:ForceRefreshFriendsList()
 			end
 		end,
 		r = r,
 		g = g,
 		b = b,
-		hasOpacity = false,
+		opacity = a,  -- Fix #34
+		hasOpacity = true,  -- Fix #34: Enable alpha slider
 	}
 	
 	ColorPickerFrame:SetupColorPickerAndShow(info)
@@ -2942,9 +3214,104 @@ function FriendsList:DeleteGroup(groupId) local Groups = GetGroups()
 	return success, err
 end
 
+-- Fix #33: Helper to count invitable friends in a group (same WoW version, not in party)
+function FriendsList:GetInvitableCount(groupId) 
+	local DB = GetDB()
+	if not DB then return 0 end
+	
+	-- Helper to check if already in party/raid
+	local function IsAlreadyInGroup(characterName)
+		if not characterName then return false end
+		local numMembers = GetNumGroupMembers()
+		if numMembers == 0 then return false end
+		for i = 1, numMembers do
+			local unit = IsInRaid() and ("raid" .. i) or ("party" .. i)
+			local name = UnitName(unit)
+			if name and (name == characterName or characterName:find(name)) then
+				return true
+			end
+		end
+		return false
+	end
+	
+	local count = 0
+	
+	for _, friend in ipairs(self.friendsList) do
+		if friend.connected then
+			local friendUID = GetFriendUID(friend)
+			local isInGroup = false
+			
+			-- Check group membership (same logic as InviteGroupToParty)
+			if groupId == "favorites" and friend.type == "bnet" and friend.isFavorite then
+				isInGroup = true
+			elseif groupId ~= "favorites" and groupId ~= "nogroup" then
+				if BetterFriendlistDB and BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friendUID] then
+					local groups = BetterFriendlistDB.friendGroups[friendUID]
+					for _, gid in ipairs(groups) do
+						if gid == groupId then
+							isInGroup = true
+							break
+						end
+					end
+				end
+			elseif groupId == "nogroup" then
+				local hasGroup = false
+				if friend.type == "bnet" and friend.isFavorite then
+					hasGroup = true
+				elseif BetterFriendlistDB and BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friendUID] then
+					local groups = BetterFriendlistDB.friendGroups[friendUID]
+					if #groups > 0 then hasGroup = true end
+				end
+				isInGroup = not hasGroup
+			end
+			
+			if isInGroup then
+				-- Validate: Must be WoW, same version, not already in party
+				local isValid = false
+				local characterName = nil
+				
+				if friend.type == "bnet" then
+					if friend.gameAccountInfo and friend.gameAccountInfo.clientProgram == BNET_CLIENT_WOW and friend.gameAccountInfo.gameAccountID then
+						local friendProjectID = friend.gameAccountInfo.wowProjectID
+						if friendProjectID and WOW_PROJECT_ID and friendProjectID == WOW_PROJECT_ID then
+							isValid = true
+							characterName = friend.gameAccountInfo.characterName
+						end
+					end
+				elseif friend.type == "wow" then
+					isValid = true
+					characterName = friend.name
+				end
+				
+				if isValid and not IsAlreadyInGroup(characterName) then
+					count = count + 1
+				end
+			end
+		end
+	end
+	
+	return count
+end
+
 -- Invite all online friends in a group to party
 function FriendsList:InviteGroupToParty(groupId) local DB = GetDB()
 	if not DB then return end
+	
+	-- Fix #33: Helper to check if a character name is already in our party/raid
+	local function IsAlreadyInGroup(characterName)
+		if not characterName then return false end
+		local numMembers = GetNumGroupMembers()
+		if numMembers == 0 then return false end
+		
+		for i = 1, numMembers do
+			local unit = IsInRaid() and ("raid" .. i) or ("party" .. i)
+			local name = UnitName(unit)
+			if name and (name == characterName or characterName:find(name)) then
+				return true
+			end
+		end
+		return false
+	end
 	
 	local inviteCandidates = {}
 	
@@ -2986,12 +3353,26 @@ function FriendsList:InviteGroupToParty(groupId) local DB = GetDB()
 			if isInGroup then
 				-- Validate invitable status (BNet WoW or WoW friend)
 				local isValid = false
+				local characterName = nil
+				
 				if friend.type == "bnet" then
 					if friend.gameAccountInfo and friend.gameAccountInfo.clientProgram == BNET_CLIENT_WOW and friend.gameAccountInfo.gameAccountID then
-						isValid = true
+						-- Fix #33: Also check WoW project ID (Retail vs Classic)
+						local friendProjectID = friend.gameAccountInfo.wowProjectID
+						if friendProjectID and WOW_PROJECT_ID and friendProjectID == WOW_PROJECT_ID then
+							isValid = true
+							characterName = friend.gameAccountInfo.characterName
+						end
 					end
 				elseif friend.type == "wow" then
+					-- WoW friends are always on same project
 					isValid = true
+					characterName = friend.name
+				end
+				
+				-- Fix #33: Skip friends already in our party/raid
+				if isValid and IsAlreadyInGroup(characterName) then
+					isValid = false
 				end
 				
 				if isValid then
@@ -3128,9 +3509,13 @@ local function CompareElementData(a, b)
 	if a.buttonType ~= b.buttonType then return false end
 	
 	if a.buttonType == BUTTON_TYPE_FRIEND then
-		-- Structure is maintained if it's the same friend object reference
-		-- Friend objects are recycled but stable for the sorted list index order
-		return a.friend == b.friend
+		-- FIX (Fehlerklasse 4): Use UID comparison instead of reference comparison
+		-- Object Pooling recycles friend tables, so reference equality is unreliable
+		-- (same table can hold different friend data after wipe+refill)
+		if a.friend and b.friend then
+			return a.friend.uid == b.friend.uid and a.groupId == b.groupId
+		end
+		return false
 	elseif a.buttonType == BUTTON_TYPE_GROUP_HEADER then
 		-- For headers, we check ID and if collapsed state matches
 		-- Counts might change, but that's a property update, not a structure update
@@ -3202,6 +3587,12 @@ function FriendsList:RenderDisplay(ignoreVisibility)
 			end
 		end
 		
+		-- Fix #35/#40: Force full rebuild if font sizes changed (affects row heights)
+		if self.forceLayoutRebuild then
+			structureChanged = true
+			self.forceLayoutRebuild = false
+		end
+		
 		if not structureChanged then
 			-- SMART UPDATE: Structure is identical, so we just update properties
 			-- This avoids a full ScrollBox layout/rebuild!
@@ -3216,7 +3607,7 @@ function FriendsList:RenderDisplay(ignoreVisibility)
 					oldData.count = newData.count
 					oldData.totalCount = newData.totalCount
 					oldData.onlineCount = newData.onlineCount
-					-- name matches (checked by ID)
+					oldData.name = newData.name -- Fix #31/#32/#37: Copy renamed group name
 				elseif newData.buttonType == BUTTON_TYPE_FRIEND then
 					-- friend reference is same, so data inside friend object is already new
 					-- Nothing to copy unless we add friend-specific overrides in elementData
@@ -3319,9 +3710,9 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) local groupId 
 	-- Count Color Code
 	local countColorCode = string.format("|cff%02x%02x%02x", countR*255, countG*255, countB*255)
 	
-	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
+	-- PERFY OPTIMIZATION: Direct cache access
 	-- Set header text with color
-	local format = self.settingsCache and self.settingsCache.headerCountFormat or "visible"
+	local format = self.settingsCache.headerCountFormat or "visible"
 	local countText = ""
 	
 	if format == "online" then
@@ -3341,9 +3732,9 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) local groupId 
 	-- Apply Name and Count colors separately
 	button:SetFormattedText("%s%s|r %s(%s)|r", colorCode, name, countColorCode, countText)
 	
-	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
+	-- PERFY OPTIMIZATION: Direct cache access
 	-- Apply Text Alignment and Font Settings (Feature Request)
-	local align = self.settingsCache and self.settingsCache.groupHeaderAlign or "LEFT"
+	local align = self.settingsCache.groupHeaderAlign or "LEFT"
 	
 	if button:GetFontString() then
 		local fs = button:GetFontString()
@@ -3395,10 +3786,11 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) local groupId 
 		end
 	end
 
-	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
+	-- PERFY OPTIMIZATION: Direct cache access
 	-- Show/hide and align collapse arrows (Feature Request)
-	local showArrow = self.settingsCache and self.settingsCache.showGroupArrow or true
-	local arrowAlign = self.settingsCache and self.settingsCache.groupArrowAlign or "LEFT"
+	local showArrow = self.settingsCache.showGroupArrow
+	if showArrow == nil then showArrow = true end
+	local arrowAlign = self.settingsCache.groupArrowAlign or "LEFT"
 
 	-- Reset visibility first
 	if button.DownArrow then button.DownArrow:Hide() end
@@ -3552,10 +3944,14 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) local groupId 
 						rootDescription:CreateButton(BFL.L.MENU_DELETE_GROUP, function() StaticPopup_Show("BETTER_FRIENDLIST_DELETE_GROUP", nil, nil, self.groupId)
 						end)
 						
-						rootDescription:CreateDivider()
-						
-						rootDescription:CreateButton(BFL.L.MENU_INVITE_GROUP, function() FriendsList:InviteGroupToParty(self.groupId)
-						end)
+						-- Fix #30/#33: Only show Invite button if there are invitable friends (same WoW version, not in party)
+						local invitableCount = FriendsList:GetInvitableCount(self.groupId)
+						if invitableCount > 0 then
+							rootDescription:CreateDivider()
+							
+							rootDescription:CreateButton(BFL.L.MENU_INVITE_GROUP .. " (" .. invitableCount .. ")", function() FriendsList:InviteGroupToParty(self.groupId)
+							end)
+						end
 						
 						rootDescription:CreateDivider()
 						
@@ -3595,8 +3991,12 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData) local groupId 
 						rootDescription:CreateButton(BFL.L.MENU_CHANGE_COLOR, function() FriendsList:OpenColorPicker(self.groupId)
 						end)
 						
-						rootDescription:CreateButton(BFL.L.MENU_INVITE_GROUP, function() FriendsList:InviteGroupToParty(self.groupId)
-						end)
+						-- Fix #30/#33: Only show Invite button if there are invitable friends (same WoW version, not in party)
+						local invitableCount = FriendsList:GetInvitableCount(self.groupId)
+						if invitableCount > 0 then
+							rootDescription:CreateButton(BFL.L.MENU_INVITE_GROUP .. " (" .. invitableCount .. ")", function() FriendsList:InviteGroupToParty(self.groupId)
+							end)
+						end
 						
 						rootDescription:CreateDivider()
 						
@@ -4049,8 +4449,8 @@ function FriendsList:GetFormattedButtonText(friend)
 	-- AND show friend info (Character Name, Zone, etc.) which is desired by the user.
 	-- GetDisplayName (called below) handles the primary name masking.
 
-	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
-	local isCompactMode = self.settingsCache and self.settingsCache.compactMode or false
+	-- PERFY OPTIMIZATION: Direct cache access
+	local isCompactMode = self.settingsCache.compactMode or false
 	local currentSettingsVersion = BFL.SettingsVersion or 1
 	
 	-- Check cache (Fastest Path)
@@ -4062,6 +4462,8 @@ function FriendsList:GetFormattedButtonText(friend)
 	
 	-- Cache Miss - Calculate text (Slow Path - Happens once per friend/setting change)
 	local line1Text = ""
+	local line1BaseText = ""
+	local line1SuffixText = ""
 	local line2Text = ""
 	
 	local displayName = friend.displayName or self:GetDisplayName(friend)
@@ -4121,11 +4523,11 @@ function FriendsList:GetFormattedButtonText(friend)
 	end
 	
 	if friend.type == "bnet" then
-		-- Battle.net Friend (PERFY OPTIMIZATION: Direct cache access with defensive fallback)
+		-- Battle.net Friend (PERFY OPTIMIZATION: Direct cache access)
 		local playerFactionGroup = UnitFactionGroup("player")
-		local grayOtherFaction = self.settingsCache and self.settingsCache.grayOtherFaction or false
-		local showFactionIcons = self.settingsCache and self.settingsCache.showFactionIcons or false
-		local showRealmName = self.settingsCache and self.settingsCache.showRealmName or false
+		local grayOtherFaction = self.settingsCache.grayOtherFaction or false
+		local showFactionIcons = self.settingsCache.showFactionIcons or false
+		local showRealmName = self.settingsCache.showRealmName or false
 		
 		if friend.connected then
 			if not usedExternalFormatter then
@@ -4159,8 +4561,9 @@ function FriendsList:GetFormattedButtonText(friend)
 						end
 					end
 					
-					-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
-					local useClassColor = self.settingsCache and self.settingsCache.colorClassNames or true
+					-- PERFY OPTIMIZATION: Direct cache access
+					local useClassColor = self.settingsCache.colorClassNames
+					if useClassColor == nil then useClassColor = true end
 					
 					if useClassColor and not shouldGray and friend.className then
 						local classFile = GetClassFileForFriend(friend)
@@ -4190,7 +4593,8 @@ function FriendsList:GetFormattedButtonText(friend)
 		-- Compact Mode Append
 		if isCompactMode then
 			if not usedExternalFormatter then
-				local hideMaxLevel = self.settingsCache and self.settingsCache.hideMaxLevel or DB:Get("hideMaxLevel", false)
+				line1BaseText = line1Text
+				local hideMaxLevel = self.settingsCache.hideMaxLevel
 				local maxLevel = BFL.GetMaxLevel and BFL.GetMaxLevel() or 60
 				
 				if friend.connected then
@@ -4214,21 +4618,24 @@ function FriendsList:GetFormattedButtonText(friend)
 					end
 					
 					if infoText ~= "" then
-						local infoColor = self.settingsCache and self.settingsCache.fontColorFriendInfo or (DB:Get("fontColorFriendInfo") or {r=0.5, g=0.5, b=0.5, a=1})
+						local infoColor = self.settingsCache.fontColorFriendInfo or {r=0.5, g=0.5, b=0.5, a=1}
 						local infoHex = string.format("|cff%02x%02x%02x", infoColor.r*255, infoColor.g*255, infoColor.b*255)
-						line1Text = line1Text .. infoHex .. infoText .. "|r"
+						line1SuffixText = infoHex .. infoText .. "|r"
+						line1Text = line1Text .. line1SuffixText
 					end
 				else
+					line1BaseText = line1Text
 					if friend.lastOnlineTime then
-						local infoColor = self.settingsCache and self.settingsCache.fontColorFriendInfo or (DB:Get("fontColorFriendInfo") or {r=0.5, g=0.5, b=0.5, a=1})
+						local infoColor = self.settingsCache.fontColorFriendInfo or {r=0.5, g=0.5, b=0.5, a=1}
 						local infoHex = string.format("|cff%02x%02x%02x", infoColor.r*255, infoColor.g*255, infoColor.b*255)
-						line1Text = line1Text .. " " .. infoHex .. "- " .. GetLastOnlineText(friend) .. "|r"
+						line1SuffixText = " " .. infoHex .. "- " .. GetLastOnlineText(friend) .. "|r"
+						line1Text = line1Text .. line1SuffixText
 					end
 				end
 			end
 		else
 			-- Normal Mode Line 2
-			local hideMaxLevel = self.settingsCache and self.settingsCache.hideMaxLevel or DB:Get("hideMaxLevel", false)
+			local hideMaxLevel = self.settingsCache.hideMaxLevel
 			local maxLevel = BFL.GetMaxLevel and BFL.GetMaxLevel() or 60
 			
 			if friend.connected then
@@ -4263,9 +4670,9 @@ function FriendsList:GetFormattedButtonText(friend)
 	else
 		-- WoW Friend
 		local playerFactionGroup = UnitFactionGroup("player")
-		local grayOtherFaction = self.settingsCache and self.settingsCache.grayOtherFaction or DB:Get("grayOtherFaction", false)
-		local showFactionIcons = self.settingsCache and self.settingsCache.showFactionIcons or DB:Get("showFactionIcons", false)
-		local showRealmName = self.settingsCache and self.settingsCache.showRealmName or DB:Get("showRealmName", false)
+		local grayOtherFaction = self.settingsCache.grayOtherFaction
+		local showFactionIcons = self.settingsCache.showFactionIcons
+		local showRealmName = self.settingsCache.showRealmName
 		
 		if friend.connected then
 			if not usedExternalFormatter then
@@ -4282,7 +4689,8 @@ function FriendsList:GetFormattedButtonText(friend)
 					end
 				end
 				
-				local useClassColor = self.settingsCache and self.settingsCache.colorClassNames or DB:Get("colorClassNames", true)
+				local useClassColor = self.settingsCache.colorClassNames
+				if useClassColor == nil then useClassColor = true end
 				
 				if useClassColor and not shouldGray then
 					local classFile = GetClassFileFromClassName(friend.className)
@@ -4309,7 +4717,8 @@ function FriendsList:GetFormattedButtonText(friend)
 		-- Compact Mode Append
 		if isCompactMode then
 			if not usedExternalFormatter then
-				local hideMaxLevel = self.settingsCache and self.settingsCache.hideMaxLevel or DB:Get("hideMaxLevel", false)
+				line1BaseText = line1Text
+				local hideMaxLevel = self.settingsCache.hideMaxLevel
 				local maxLevel = BFL.GetMaxLevel and BFL.GetMaxLevel() or 60
 				
 				if friend.connected then
@@ -4331,13 +4740,14 @@ function FriendsList:GetFormattedButtonText(friend)
 					end
 					
 					if infoText ~= "" then
-						line1Text = line1Text .. "|cff7f7f7f" .. infoText .. "|r"
+						line1SuffixText = "|cff7f7f7f" .. infoText .. "|r"
+						line1Text = line1Text .. line1SuffixText
 					end
 				end
 			end
 		else
 			-- Normal Mode Line 2
-			local hideMaxLevel = self.settingsCache and self.settingsCache.hideMaxLevel or DB:Get("hideMaxLevel", false)
+			local hideMaxLevel = self.settingsCache.hideMaxLevel
 			local maxLevel = BFL.GetMaxLevel and BFL.GetMaxLevel() or 60
 			
 			if friend.connected then
@@ -4363,11 +4773,17 @@ function FriendsList:GetFormattedButtonText(friend)
 			end
 		end
 	end
+
+	if line1BaseText == "" then
+		line1BaseText = line1Text
+	end
 	
 	-- Store in cache
 	friend._cache_text_version = currentSettingsVersion
 	friend._cache_text_compact = isCompactMode
 	friend._cache_text_line1 = line1Text
+	friend._cache_text_line1_base = line1BaseText
+	friend._cache_text_line1_suffix = line1SuffixText
 	friend._cache_text_line2 = line2Text
 	
 	return line1Text, line2Text
@@ -4394,9 +4810,10 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 	
 	-- [Phase 5 Optimized] Static setup moved to InitFriendButton (friendInfo removed, using friendData)
 	
-	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback (auto-refreshed at entry)
-	local isCompactMode = self.settingsCache and self.settingsCache.compactMode or false
-	local showGameIcon = self.settingsCache and self.settingsCache.showGameIcon or true
+	-- PERFY OPTIMIZATION: Direct cache access (auto-refreshed at entry)
+	local isCompactMode = self.settingsCache.compactMode or false
+	local showGameIcon = self.settingsCache.showGameIcon
+	if showGameIcon == nil then showGameIcon = true end
 	
 	-- Hide arrows if they exist
 	if button.RightArrow then button.RightArrow:Hide() end
@@ -4407,10 +4824,18 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 		button.dragOverlay:Hide()
 	end
 	
+	-- Calculate dynamic row height for icon positioning (needed for layout updates)
+	local nameSize = self.fontCache and self.fontCache.nameSize or BASE_FONT_SIZE
+	local infoSize = self.fontCache and self.fontCache.infoSize or BASE_FONT_SIZE
+	local rowHeight = button:GetHeight() or CalculateFriendRowHeight(isCompactMode, nameSize, infoSize)
+	
 	-- OPTIMIZATION: Layout Caching (Phase 9.9)
-	-- Only update layout if CompactMode state changed for this button
-	if button.lastCompactMode ~= isCompactMode then
+	-- Update layout if CompactMode changed OR font version changed OR row height changed
+	local layoutChanged = button.lastCompactMode ~= isCompactMode or button.lastLayoutFontVersion ~= self.fontCacheVersion or button.lastRowHeight ~= rowHeight
+	if layoutChanged then
 		button.lastCompactMode = isCompactMode
+		button.lastLayoutFontVersion = self.fontCacheVersion
+		button.lastRowHeight = rowHeight
 
 		-- Reset name position based on compact mode
 		if isCompactMode then
@@ -4422,54 +4847,48 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 		-- Show/hide friend elements based on compact mode
 		if isCompactMode then
 			button.Info:Hide()  -- Hide second line in compact mode
+			-- Compact mode: allow name to wrap to 2 lines since info is hidden
+			if button.Name.SetMaxLines then button.Name:SetMaxLines(2) end
+			if button.Info.SetMaxLines then button.Info:SetMaxLines(2) end
 		else
 			button.Info:Show()
+			-- Normal mode: no wrapping, truncate with ellipsis
+			if button.Name.SetMaxLines then button.Name:SetMaxLines(1) end
+			if button.Info.SetMaxLines then button.Info:SetMaxLines(1) end
 		end
 		
-		-- Adjust icon positions and sizes for compact mode
-		if isCompactMode then
-			-- Status icon: move up to align with single-line text
-			button.status:ClearAllPoints()
-			button.status:SetPoint("TOPLEFT", 4, -4)  -- Higher position (was -9)
+		-- Invalidate favorite icon cache to force repositioning
+		button.lastIsFavorite = nil
+		
+		-- All icons scale proportionally to row height (no artificial min/max limits)
+		-- Status icon: 16px at 34px row height = 47%
+		local statusSize = math.floor(rowHeight * 0.47)
+		local statusYOffset = -math.floor((rowHeight - statusSize) / 2)
+		button.status:SetSize(statusSize, statusSize)
+		button.status:ClearAllPoints()
+		button.status:SetPoint("TOPLEFT", 4, statusYOffset)
+		
+		-- Game icon: 28px at 34px row height = 82%
+		local gameIconSize = math.floor(rowHeight * 0.82)
+		local gameIconYOffset = -math.floor((rowHeight - gameIconSize) / 2)
+		button.gameIcon:SetSize(gameIconSize, gameIconSize)
+		button.gameIcon:ClearAllPoints()
+		button.gameIcon:SetPoint("TOPRIGHT", -30, gameIconYOffset)
+		
+		-- TravelPass button: 32px height at 34px row height = 94%, aspect ratio 3:4
+		if button.travelPassButton then
+			local tpHeight = math.floor(rowHeight * 0.94)
+			local tpWidth = math.floor(tpHeight * 0.75)
+			local tpYOffset = -math.floor((rowHeight - tpHeight) / 2)
+			button.travelPassButton:SetSize(tpWidth, tpHeight)
+			button.travelPassButton:ClearAllPoints()
+			button.travelPassButton:SetPoint("TOPRIGHT", 0, tpYOffset)
 			
-			-- Game icon: reduce size for compact mode
-			button.gameIcon:SetSize(20, 20)  -- Smaller (was 28x28)
-			button.gameIcon:ClearAllPoints()
-			button.gameIcon:SetPoint("TOPRIGHT", -30, -2)  -- Moved 8px right total
-			
-			-- TravelPass button: reduce size for compact mode
-			if button.travelPassButton then
-				button.travelPassButton:SetSize(18, 24)  -- Smaller (was 24x32)
-				button.travelPassButton:ClearAllPoints()
-				button.travelPassButton:SetPoint("TOPRIGHT", 0, 0)  -- Moved 8px right total
-				
-				-- Scale textures
-				button.travelPassButton.NormalTexture:SetSize(18, 24)
-				button.travelPassButton.PushedTexture:SetSize(18, 24)
-				button.travelPassButton.DisabledTexture:SetSize(18, 24)
-				button.travelPassButton.HighlightTexture:SetSize(18, 24)
-			end
-		else
-			-- Normal mode: restore original positions and sizes
-			button.status:ClearAllPoints()
-			button.status:SetPoint("TOPLEFT", 4, -9)  -- Original position
-			
-			button.gameIcon:SetSize(28, 28)  -- Original size
-			button.gameIcon:ClearAllPoints()
-			button.gameIcon:SetPoint("TOPRIGHT", -30, -3)  -- Moved 8px right total
-			
-			-- TravelPass button: restore original size
-			if button.travelPassButton then
-				button.travelPassButton:SetSize(24, 32)  -- Original size
-				button.travelPassButton:ClearAllPoints()
-				button.travelPassButton:SetPoint("TOPRIGHT", 0, -1)  -- Moved 8px right total
-				
-				-- Restore texture sizes
-				button.travelPassButton.NormalTexture:SetSize(24, 32)
-				button.travelPassButton.PushedTexture:SetSize(24, 32)
-				button.travelPassButton.DisabledTexture:SetSize(24, 32)
-				button.travelPassButton.HighlightTexture:SetSize(24, 32)
-			end
+			-- Scale textures
+			button.travelPassButton.NormalTexture:SetSize(tpWidth, tpHeight)
+			button.travelPassButton.PushedTexture:SetSize(tpWidth, tpHeight)
+			button.travelPassButton.DisabledTexture:SetSize(tpWidth, tpHeight)
+			button.travelPassButton.HighlightTexture:SetSize(tpWidth, tpHeight)
 		end
 	end
 
@@ -4574,8 +4993,8 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 		end
 		
 		-- Set status icon (BSAp shows as AFK if setting enabled)
-		-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
-		local showMobileAsAFK = self.settingsCache and self.settingsCache.showMobileAsAFK or false
+		-- PERFY OPTIMIZATION: Direct cache access
+		local showMobileAsAFK = self.settingsCache.showMobileAsAFK or false
 		local statusTexture
 		
 		if friend.connected then
@@ -4603,24 +5022,35 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 		-- Set game icon using Blizzard's modern API
 		if friend.gameAccountInfo and friend.gameAccountInfo.clientProgram and friend.connected then
 			local clientProgram = friend.gameAccountInfo.clientProgram
-			
-			-- Use Blizzard's modern texture API (11.0+) for ALL client programs including Battle.net App
-			-- Optimized Phase 4: Avoid C-Call if unnecessary (though SetTitleIconTexture is fast, avoiding it is faster)
-			if button.lastClientProgram ~= clientProgram then
-				C_Texture.SetTitleIconTexture(button.gameIcon, clientProgram, Enum.TitleIconVersion.Medium)
-				button.lastClientProgram = clientProgram
+
+			local canSetTitleIcon = false
+			if C_Texture and C_Texture.SetTitleIconTexture then
+				if Enum and Enum.TitleIconVersion then
+					canSetTitleIcon = true
+				end
 			end
-			
-			-- Fade icon for WoW friends on different project versions
-			local fadeIcon = (clientProgram == BNET_CLIENT_WOW) and (friend.gameAccountInfo.wowProjectID ~= WOW_PROJECT_ID)
-			local targetAlpha = fadeIcon and 0.6 or 1
-			
-			if button.lastGameIconAlpha ~= targetAlpha then
-				button.gameIcon:SetAlpha(targetAlpha)
-				button.lastGameIconAlpha = targetAlpha
+			if canSetTitleIcon then
+				-- Use Blizzard's modern texture API (11.0+) for ALL client programs including Battle.net App
+				-- Optimized Phase 4: Avoid C-Call if unnecessary (though SetTitleIconTexture is fast, avoiding it is faster)
+				if button.lastClientProgram ~= clientProgram then
+					C_Texture.SetTitleIconTexture(button.gameIcon, clientProgram, Enum.TitleIconVersion.Medium)
+					button.lastClientProgram = clientProgram
+				end
+				
+				-- Fade icon for WoW friends on different project versions
+				local fadeIcon = (clientProgram == BNET_CLIENT_WOW) and (friend.gameAccountInfo.wowProjectID ~= WOW_PROJECT_ID)
+				local targetAlpha = fadeIcon and 0.6 or 1
+				
+				if button.lastGameIconAlpha ~= targetAlpha then
+					button.gameIcon:SetAlpha(targetAlpha)
+					button.lastGameIconAlpha = targetAlpha
+				end
+				
+				button.gameIcon:Show()
+			else
+				button.gameIcon:Hide()
+				button.lastClientProgram = nil
 			end
-			
-			button.gameIcon:Show()
 		else
 			button.gameIcon:Hide()
 			button.lastClientProgram = nil -- Reset state
@@ -4733,19 +5163,29 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 	
 	-- OPTIMIZED: Use cached text generation (Phase 21)
 	local line1Text, line2Text = self:GetFormattedButtonText(friend)
-	
-	-- Optimized Phase 4: State Check for Text
-	local textChanged = false
-	if button.lastLine1Text ~= line1Text then
-		button.Name:SetText(line1Text)
-		button.lastLine1Text = line1Text
-		textChanged = true
-	end
+	local line1BaseText = friend._cache_text_line1_base or line1Text
+	local line1SuffixText = friend._cache_text_line1_suffix or ""
 
 	-- Favorites Icon (Feature: Display Favorites)
 	-- CRITICAL: GetStringWidth/Height are EXPENSIVE WoW API calls - only call when state changes!
 	local isFavorite = friend.isFavorite
 	local showFavIcon = isFavorite and self.settingsCache.enableFavoriteIcon
+	
+	-- Optimized Phase 4: State Check for Text
+	local textChanged = false
+	local displayLine1 = line1Text
+	if isCompactMode and line1SuffixText ~= "" and showFavIcon then
+		local spacer = "  "
+		if (self.settingsCache and self.settingsCache.favoriteIconStyle) == "blizzard" then
+			spacer = "     "
+		end
+		displayLine1 = line1BaseText .. spacer .. line1SuffixText
+	end
+	if button.lastLine1Text ~= displayLine1 then
+		button.Name:SetText(displayLine1)
+		button.lastLine1Text = displayLine1
+		textChanged = true
+	end
 
 	-- We check if favorite state changed OR if the text changed (which means width changed)
 	-- Also check if font changed, as that affects text width
@@ -4759,27 +5199,78 @@ function FriendsList:UpdateFriendButton(button, elementData) local friend = elem
 				button.favoriteIcon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\star")
 			end
 
+			local iconStyle = self.settingsCache and self.settingsCache.favoriteIconStyle or "bfl"
+			if button.lastFavoriteIconStyle ~= iconStyle then
+				if iconStyle == "blizzard" then
+					local applied = false
+					if C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo("friendslist-favorite") and button.favoriteIcon.SetAtlas then
+						button.favoriteIcon:SetAtlas("friendslist-favorite", true)
+						applied = true
+					elseif button.favoriteIcon.SetAtlas then
+						button.favoriteIcon:SetAtlas("friendslist-favorite", true)
+						applied = true
+					end
+					if not applied then
+						button.favoriteIcon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\star")
+					end
+				else
+					button.favoriteIcon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\star")
+				end
+				button.lastFavoriteIconStyle = iconStyle
+			end
+
 			-- Position Update Logic (Hoisted for reuse)
 			local function UpdateFavoriteIconPosition()
 				if not button or not button.Name or not button.favoriteIcon then return end
 
-				-- Expensive layout operations only run when needed
-				local currentHeight = button.Name:GetStringHeight()
-				-- Fallback if GetStringHeight returns 0
-				if not currentHeight or currentHeight == 0 then
-					local _, size = button.Name:GetFont()
-					currentHeight = size or 12
+				local _, fontSize = button.Name:GetFont()
+				local nameHeight = fontSize or 12
+				local iconScale = 0.70
+				if (self.settingsCache and self.settingsCache.favoriteIconStyle) == "blizzard" then
+					iconScale = 1.2
 				end
-
-				local iconSize = currentHeight * 0.70
+				local iconSize = math.floor(nameHeight * iconScale)
 				button.favoriteIcon:SetSize(iconSize, iconSize)
+				local iconYOffset = 0
+				local iconPadding = 2
+				if (self.settingsCache and self.settingsCache.favoriteIconStyle) == "blizzard" then
+					iconPadding = 3
+				end
 
 				-- Re-measure width (crucial for delayed updates)
 				local currentWidth = button.Name:GetStringWidth() or 0
+				local baseText = (line1BaseText ~= "" and line1BaseText) or line1Text
+				local nameWidth = button.Name:GetWidth() or 0
+				if baseText ~= "" and nameWidth > 0 then
+					if not button.favoriteMeasure then
+						button.favoriteMeasure = button:CreateFontString(nil, "ARTWORK")
+						button.favoriteMeasure:Hide()
+						button.favoriteMeasure:SetJustifyH("LEFT")
+						button.favoriteMeasure:SetWordWrap(true)
+					end
+
+					if button.favoriteMeasureFontVersion ~= button.lastFontVersion then
+						local fontPath, fontSize, fontFlags = button.Name:GetFont()
+						if fontPath then
+							button.favoriteMeasure:SetFont(fontPath, fontSize, fontFlags)
+							button.favoriteMeasureFontVersion = button.lastFontVersion
+						end
+					end
+
+					button.favoriteMeasure:SetWidth(nameWidth)
+					if button.favoriteMeasure.SetMaxLines then
+						button.favoriteMeasure:SetMaxLines(isCompactMode and 2 or 1)
+					end
+					button.favoriteMeasure:SetText(baseText)
+					local baseWidth = button.favoriteMeasure:GetStringWidth() or 0
+					if baseWidth > 0 then
+						currentWidth = baseWidth
+					end
+				end
 
 				button.favoriteIcon:ClearAllPoints()
 				-- Offset relative to text start + text width
-				button.favoriteIcon:SetPoint("LEFT", button.Name, "LEFT", currentWidth + 1, currentHeight * 0.3)
+				button.favoriteIcon:SetPoint("TOPLEFT", button.Name, "TOPLEFT", currentWidth + iconPadding, iconYOffset)
 				button.favoriteIcon:Show()
 			end
 
@@ -4844,9 +5335,9 @@ function FriendsList:UpdateInviteHeaderButton(button, data) button.Text:SetForma
 	-- Store data on button for callbacks (important for OnMouseUp refresh)
 	button.elementData = data
 	
-	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
+	-- PERFY OPTIMIZATION: Direct cache access
 	-- APPLY TEXT ALIGNMENT (Feature Request)
-	local align = self.settingsCache and self.settingsCache.groupHeaderAlign or "LEFT"
+	local align = self.settingsCache.groupHeaderAlign or "LEFT"
 	if button.Text then
 		button.Text:ClearAllPoints()
 		if align == "CENTER" then
@@ -4861,10 +5352,11 @@ function FriendsList:UpdateInviteHeaderButton(button, data) button.Text:SetForma
 		end
 	end
 
-	-- PERFY OPTIMIZATION: Direct cache access with defensive fallback
+	-- PERFY OPTIMIZATION: Direct cache access
 	-- ARROW ALIGNMENT & VISIBILITY
-	local showArrow = self.settingsCache and self.settingsCache.showGroupArrow or true
-	local arrowAlign = self.settingsCache and self.settingsCache.groupArrowAlign or "LEFT"
+	local showArrow = self.settingsCache.showGroupArrow
+	if showArrow == nil then showArrow = true end
+	local arrowAlign = self.settingsCache.groupArrowAlign or "LEFT"
 
 	-- Reset visibility
 	if button.DownArrow then button.DownArrow:Hide() end

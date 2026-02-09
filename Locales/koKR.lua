@@ -111,6 +111,8 @@ local L = BFL_LOCALE
 	L.SETTINGS_HIDE_MAX_LEVEL = "최대 레벨 숨기기"
 	L.SETTINGS_ACCORDION_GROUPS = "아코디언 그룹 (한 번에 하나만 열림)"
 	L.SETTINGS_SHOW_FAVORITES = "즐겨찾기 그룹 표시"
+	L.SETTINGS_SHOW_GROUP_FMT = "%s 그룹 표시"
+	L.SETTINGS_SHOW_GROUP_DESC_FMT = "친구 목록에서 %s 그룹 표시 여부"
 	L.SETTINGS_GROUP_COLOR = "그룹 색상"
 	L.SETTINGS_RENAME_GROUP = "그룹 이름 변경"
 	L.SETTINGS_DELETE_GROUP = "그룹 삭제"
@@ -718,7 +720,7 @@ local L = BFL_LOCALE
 	L.TRAVEL_PASS_NO_GAME_ACCOUNTS = "No game account"
 
 	-- MENUS (Additional)
-	L.MENU_TITLE = "BetterFriendList"
+	L.MENU_TITLE = "BetterFriendlist"
 	L.MENU_SHOW_BLIZZARD = "Show Blizzard List"
 	L.MENU_COMBAT_LOCKED = "Combat Locked"
 	L.MENU_SET_NICKNAME = "별명 설정"
@@ -945,6 +947,14 @@ local L = BFL_LOCALE
 	L.CORE_HELP_PERF_MEM = "  |cffffffff/bfl perf memory|r - Memory"
 	L.CORE_HELP_TEST_COMMANDS = "|cffffcc00Test:|r"
 	L.CORE_HELP_TEST_ACTIVITY = "  |cffffffff/bfl test|r - Test"
+	L.TESTSUITE_PERFY_HELP = "  |cffffffff/bfl test perfy [seconds]|r - Run Perfy stress test"
+	L.TESTSUITE_PERFY_STARTING = "Starting Perfy stress test for %d seconds"
+	L.TESTSUITE_PERFY_ALREADY_RUNNING = "Perfy stress test already running"
+	L.TESTSUITE_PERFY_MISSING_ADDON = "Perfy addon not loaded (!!!Perfy)"
+	L.TESTSUITE_PERFY_MISSING_SLASH = "Perfy slash command not available"
+	L.TESTSUITE_PERFY_ACTION_FAILED = "Perfy stress action failed: %s"
+	L.TESTSUITE_PERFY_DONE = "Perfy stress test finished"
+	L.TESTSUITE_PERFY_ABORTED = "Perfy stress test stopped: %s"
 	L.CORE_HELP_LINK = "|cff20ff20Help:|r |cff00ccffhttps://github.com/Hayato2846/BetterFriendlist|r"
 	L.CORE_LOADED = "|cff00ff00BetterFriendlist v%s%s|r. 로드됨. Discord: /bfl discord"
 	L.MOCK_INVITE_ACCEPTED = "Accepted %s"
@@ -1062,6 +1072,10 @@ local L = BFL_LOCALE
 	-- Favorites & Faction Settings
 	L.SETTINGS_ENABLE_FAVORITE_ICON = "즐겨찾기 아이콘 사용"
 	L.SETTINGS_ENABLE_FAVORITE_ICON_DESC = "즐겨찾기 친구 버튼에 별 아이콘을 표시합니다."
+	L.SETTINGS_FAVORITE_ICON_STYLE = "즐겨찾기 아이콘"
+	L.SETTINGS_FAVORITE_ICON_STYLE_DESC = "즐겨찾기에 사용할 아이콘을 선택합니다."
+	L.SETTINGS_FAVORITE_ICON_OPTION_BFL = "BFL 아이콘"
+	L.SETTINGS_FAVORITE_ICON_OPTION_BLIZZARD = "블리자드 아이콘"
 	L.SETTINGS_SHOW_FACTION_BG = "진영 배경 표시"
 	L.SETTINGS_SHOW_FACTION_BG_DESC = "친구 버튼의 배경으로 진영 색상을 표시합니다."
 

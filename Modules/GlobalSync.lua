@@ -23,6 +23,27 @@ local function GetFaction()
     return faction
 end
 
+-- Helper: Determine whether a FriendUID should be added (self-check)
+function GlobalSync:ShouldAddFriend(friendUID, currentRealm, currentPlayerName)
+    if not friendUID or friendUID == "" then
+        return false
+    end
+
+    currentRealm = currentRealm or GetRealmName()
+    currentPlayerName = currentPlayerName or UnitName("player")
+    if not currentRealm or not currentPlayerName then
+        return false
+    end
+
+    local name, realm = string.match(friendUID, "^(.+)%-(.+)$")
+    if not name or not realm then
+        return false
+    end
+
+    local isSelf = (name == currentPlayerName) and (string.gsub(realm, "%s+", "") == currentRealm)
+    return not isSelf
+end
+
 function GlobalSync:Initialize()
     -- Initialize DB structure if missing
     if not BetterFriendlistDB.GlobalFriends then
@@ -369,10 +390,7 @@ function GlobalSync:ImportFriends(faction, currentRealm)
                 local name, realm = string.match(friendUID, "^(.+)%-(.+)$")
                 
                 if name and realm then
-                    -- Fix #25: Prevent adding self
-                    local isSelf = (name == currentPlayerName) and (string.gsub(realm, "%s+", "") == currentRealm)
-
-                    if not isSelf then
+                    if self:ShouldAddFriend(friendUID, currentRealm, currentPlayerName) then
                         local nameToAdd = friendUID -- Default to full Name-Realm
                         
                         -- If on same realm, we can try adding just the name, but Name-Realm is safer
@@ -437,9 +455,15 @@ function GlobalSync:ProcessAddQueue(queue)
     local index = 1
     local max = #queue
     
-    C_Timer.NewTicker(0.5, function(timer)
+    if self.addQueueTicker then
+        self.addQueueTicker:Cancel()
+        self.addQueueTicker = nil
+    end
+
+    self.addQueueTicker = C_Timer.NewTicker(0.5, function(timer)
         if not BetterFriendlistDB.enableGlobalSync then
             timer:Cancel()
+            self.addQueueTicker = nil
             self.processingQueue = false
             return
         end
@@ -447,6 +471,7 @@ function GlobalSync:ProcessAddQueue(queue)
         for i = 1, BATCH_SIZE do
             if index > max then
                 timer:Cancel()
+                self.addQueueTicker = nil
                 self.processingQueue = false
                 -- BFL:DebugPrint("GlobalSync: Finished syncing friends.")
                 return

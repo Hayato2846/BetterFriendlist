@@ -187,6 +187,8 @@ end
 -- Helper: Add friend name to active chat editbox (Shift+Click)
 -- Must be defined before OnFriendLineClick which uses it
 local function AddNameToEditBox(name, realm)
+	-- Safety: Avoid touching chat frame in combat to prevent taint
+	if BFL:IsActionRestricted() then return false end
 	if not name then return false end
 
 	-- Add realm suffix if different from player's realm
@@ -304,12 +306,15 @@ local function OpenFriendContextMenu(data)
 		
 		if bnetAccountID then
 			-- Pass extra data for menu title and context
+			local FriendsList = BFL and BFL:GetModule("FriendsList")
+			local resolvedIndex = FriendsList and FriendsList.ResolveBNetFriendIndex and
+				FriendsList:ResolveBNetFriendIndex(bnetAccountID, data.battleTag) or data.index
 			local extraData = {
 				name = data.accountName or data.characterName or "",
 				battleTag = data.battleTag,
 				connected = true, -- Broker only shows online friends
 				accountInfo = data.accountInfo,
-				index = data.index,
+				index = resolvedIndex,
 			}
 			MenuSystem:OpenFriendMenu(contextMenuAnchor, "BN", bnetAccountID, extraData)
 			-- BFL:DebugPrint(string.format("Broker: Opening BNet context menu for %s", data.accountName or "Unknown"))
@@ -319,16 +324,9 @@ local function OpenFriendContextMenu(data)
 		
 	elseif data.type == "wow" then
 		-- For WoW friends, we need to find the friend index
-		local numFriends = C_FriendList.GetNumFriends() or 0
-		local friendIndex = nil
-		
-		for i = 1, numFriends do
-			local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
-			if friendInfo and friendInfo.name == data.fullName then
-				friendIndex = i
-				break
-			end
-		end
+		local FriendsList = BFL and BFL:GetModule("FriendsList")
+		local friendIndex = FriendsList and FriendsList.ResolveWoWFriendIndex and
+			FriendsList:ResolveWoWFriendIndex(data.fullName) or nil
 		
 		if friendIndex then
 			-- Pass extra data for menu title and context
@@ -348,6 +346,12 @@ end
 -- Main click handler for friend lines in LibQTip tooltip
 local function OnFriendLineClick(cell, data, mouseButton)
 	if not data then return end
+	
+	-- Safety: Avoid interactions in combat to prevent taint (especially chat frame)
+	if BFL:IsActionRestricted() then 
+		-- BFL:DebugPrint("Broker: Click ignored in combat")
+		return 
+	end
 	
 	-- LibQTip doesn't pass mouseButton - we need to get it ourselves!
 	local actualButton = mouseButton or GetMouseButtonClicked()
@@ -1209,6 +1213,10 @@ local function CreateLibQTipTooltip(anchorFrame)
 
 	-- Acquire tooltip
 	local tt = LQT:Acquire(tooltipKey, numColumns, unpack(alignArgs))
+	if not tt then
+		BFL:DebugPrint("Broker: LQT:Acquire returned nil")
+		return nil
+	end
 
 	-- Hook OnHide to clean up layout changes when tooltip is released/hidden
 	-- Always re-hook because LibQTip might clear scripts on Release

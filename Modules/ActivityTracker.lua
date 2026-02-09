@@ -337,9 +337,12 @@ function ActivityTracker:OnGroupRosterUpdate()
 	-- Get current group members
 	local currentRoster = {}
 	local numGroupMembers = GetNumGroupMembers()
+	-- In raids, use "raid" unit prefix to access all members (up to 40)
+	-- In parties, use "party" prefix (up to 4, excluding player)
+	local unitPrefix = IsInRaid() and "raid" or "party"
 	
 	for i = 1, numGroupMembers do
-		local name, realm = UnitName("party" .. i)
+		local name, realm = UnitName(unitPrefix .. i)
 		if name and not IsSecret(name) then -- 12.0.0 Safety
 			-- Construct full name (Name-Realm or just Name for same realm)
 			local fullName = name

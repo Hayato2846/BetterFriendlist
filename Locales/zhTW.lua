@@ -87,6 +87,8 @@ local L = BFL_LOCALE
 	L.SETTINGS_HIDE_MAX_LEVEL = "隱藏最高等級"
 	L.SETTINGS_ACCORDION_GROUPS = "手風琴分組（一次打開一個）"
 	L.SETTINGS_SHOW_FAVORITES = "顯示收藏分組"
+	L.SETTINGS_SHOW_GROUP_FMT = "顯示%s分組"
+	L.SETTINGS_SHOW_GROUP_DESC_FMT = "切換好友列表中%s分組的顯示"
 	L.SETTINGS_GROUP_COLOR = "分組顏色"
 	L.SETTINGS_RENAME_GROUP = "重新命名分組"
 	L.SETTINGS_DELETE_GROUP = "刪除分組"
@@ -625,7 +627,7 @@ local L = BFL_LOCALE
 	L.TRAVEL_PASS_NO_GAME_ACCOUNTS = "No game account"
 
 	-- MENUS (Additional)
-	L.MENU_TITLE = "BetterFriendList"
+	L.MENU_TITLE = "BetterFriendlist"
 	L.MENU_SHOW_BLIZZARD = "Show Blizzard List"
 	L.MENU_COMBAT_LOCKED = "Combat Locked"
 	L.MENU_SET_NICKNAME = "設定暱稱"
@@ -851,6 +853,14 @@ local L = BFL_LOCALE
 	L.CORE_HELP_PERF_MEM = "  |cffffffff/bfl perf memory|r - Memory"
 	L.CORE_HELP_TEST_COMMANDS = "|cffffcc00Test:|r"
 	L.CORE_HELP_TEST_ACTIVITY = "  |cffffffff/bfl test|r - Test"
+	L.TESTSUITE_PERFY_HELP = "  |cffffffff/bfl test perfy [seconds]|r - Run Perfy stress test"
+	L.TESTSUITE_PERFY_STARTING = "Starting Perfy stress test for %d seconds"
+	L.TESTSUITE_PERFY_ALREADY_RUNNING = "Perfy stress test already running"
+	L.TESTSUITE_PERFY_MISSING_ADDON = "Perfy addon not loaded (!!!Perfy)"
+	L.TESTSUITE_PERFY_MISSING_SLASH = "Perfy slash command not available"
+	L.TESTSUITE_PERFY_ACTION_FAILED = "Perfy stress action failed: %s"
+	L.TESTSUITE_PERFY_DONE = "Perfy stress test finished"
+	L.TESTSUITE_PERFY_ABORTED = "Perfy stress test stopped: %s"
 	L.CORE_HELP_LINK = "|cff20ff20Help:|r |cff00ccffhttps://github.com/Hayato2846/BetterFriendlist|r"
 	L.CORE_LOADED = "|cff00ff00BetterFriendlist v%s%s|r. 已載入. Discord: /bfl discord"
 	L.MOCK_INVITE_ACCEPTED = "Accepted %s"
@@ -1086,6 +1096,10 @@ local L = BFL_LOCALE
 	-- Favorites & Faction Settings
 	L.SETTINGS_ENABLE_FAVORITE_ICON = "啟用最愛圖示"
 	L.SETTINGS_ENABLE_FAVORITE_ICON_DESC = "在好友按鈕上顯示星星圖示以標記最愛。"
+	L.SETTINGS_FAVORITE_ICON_STYLE = "最愛圖示"
+	L.SETTINGS_FAVORITE_ICON_STYLE_DESC = "選擇最愛使用的圖示。"
+	L.SETTINGS_FAVORITE_ICON_OPTION_BFL = "BFL 圖示"
+	L.SETTINGS_FAVORITE_ICON_OPTION_BLIZZARD = "暴雪圖示"
 	L.SETTINGS_SHOW_FACTION_BG = "顯示陣營背景"
 	L.SETTINGS_SHOW_FACTION_BG_DESC = "將陣營顏色顯示為好友按鈕的背景。"
 

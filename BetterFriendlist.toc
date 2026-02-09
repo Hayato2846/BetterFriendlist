@@ -89,6 +89,17 @@ Modules\GuildDetails.lua [AllowLoadGameType vanilla, tbc, wrath, cata, mists]
 BetterFriendlist_QuickJoin.xml [AllowLoadGameType mainline]
 Modules\QuickJoin.lua [AllowLoadGameType mainline]
 Modules\PreviewMode.lua
+
+# Test Framework
+TestData\TestConstants.lua
+TestData\CharacterNames.lua
+TestData\MockDataProvider.lua
+TestData\ScenarioManager.lua
+TestData\EventSimulator.lua
+TestData\StateValidator.lua
+TestData\PerformanceBenchmark.lua
+TestData\RegressionTests.lua
+Modules\TestSuite.lua
 Modules\ElvUISkin.lua
 Modules\AddOnSkins.lua [AllowLoadGameType mainline]
 Modules\Compat_GlobalIgnoreList.lua

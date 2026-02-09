@@ -151,6 +151,9 @@
 				self.PortraitContainer:Hide()
 			end
 			
+			-- Fix #39: Clamp frame to screen to prevent it going outside viewport
+			self:SetClampedToScreen(true)
+			
 			-- Set title
 			self.TitleContainer.TitleText:SetText("BetterFriendlist Settings")
 			
@@ -168,12 +171,6 @@
 				BetterFriendlistSettings_OnLoad()
 			end
 		</OnLoad>
-		<OnDragStart>
-			self:StartMoving()
-		</OnDragStart>
-		<OnDragStop>
-			self:StopMovingOrSizing()
-		</OnDragStop>
 	</Scripts>
 </Frame>
 </Ui>

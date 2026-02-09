@@ -68,6 +68,9 @@ local defaults = {
 	colorGroupArrow = nil, -- Default: nil (Inherit from Group Color)
 
 	colorClassNames = true, -- Color character names by class (default: ON)
+	showGameIcon = true, -- Show game icon next to friend name (default: ON)
+	simpleMode = false, -- Use simple/compact mode (default: OFF)
+	simpleModeShowSearch = true, -- Show search bar in simple mode (default: ON)
 	hideEmptyGroups = false, -- Hide groups with no online friends (default: OFF)
 	headerCountFormat = "visible", -- Group header count format: "visible", "online", "both" (default: visible)
 	groupHeaderAlign = "LEFT", -- Alignment of group header text: "LEFT", "CENTER", "RIGHT" (default: LEFT)
@@ -88,6 +91,7 @@ local defaults = {
 	accordionGroups = false, -- Only allow one group to be open at a time (default: OFF)
 	showFavoritesGroup = true, -- Show the Favorites group (default: ON)
 	enableFavoriteIcon = true, -- Show the Favorite icon on the friend button (default: ON)
+	favoriteIconStyle = "bfl", -- Favorite icon style: "bfl" or "blizzard"
 	showFactionBg = false, -- Show faction color as background (default: OFF)
 	-- Sort Settings
 	primarySort = "status", -- Primary sort method: status, name, level, zone (default: status)
@@ -98,6 +102,7 @@ local defaults = {
 	streamerModeActive = false, -- Enable Streamer Mode (default: OFF)
 	showStreamerModeButton = true, -- Show Streamer Mode button (default: ON)
 	streamerModeHeaderText = "Streamer Mode", -- Text to replace BattleTag with
+	streamerModeNameFormat = "battletag", -- Name format in streamer mode: "battletag", "character", "custom" (default: battletag)
 	-- Debug Settings
 	debugPrintEnabled = false, -- Toggle debug prints with /bfl debug print
 	-- Beta Features
@@ -480,6 +485,17 @@ function DB:AddFriendToGroup(friendUID, groupId)
 	end
 	
 	table.insert(BetterFriendlistDB.friendGroups[friendUID], groupId)
+	
+	-- Optimization: Increment version counter
+	if BFL.SettingsVersion then
+		BFL.SettingsVersion = BFL.SettingsVersion + 1
+	end
+	-- Invalidate caches
+	local FriendsList = BFL:GetModule("FriendsList")
+	if FriendsList and FriendsList.InvalidateSettingsCache then
+		FriendsList:InvalidateSettingsCache()
+	end
+	
 	return true
 end
 
@@ -496,6 +512,16 @@ function DB:RemoveFriendFromGroup(friendUID, groupId)
 			-- Clean up if no groups left
 			if #BetterFriendlistDB.friendGroups[friendUID] == 0 then
 				BetterFriendlistDB.friendGroups[friendUID] = nil
+			end
+			
+			-- Optimization: Increment version counter
+			if BFL.SettingsVersion then
+				BFL.SettingsVersion = BFL.SettingsVersion + 1
+			end
+			-- Invalidate caches
+			local FriendsList = BFL:GetModule("FriendsList")
+			if FriendsList and FriendsList.InvalidateSettingsCache then
+				FriendsList:InvalidateSettingsCache()
 			end
 			
 			return true

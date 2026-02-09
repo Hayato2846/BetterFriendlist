@@ -149,6 +149,9 @@
 					self.PortraitContainer:Hide()
 				end
 				
+				-- Fix #39: Clamp frame to screen to prevent it going outside viewport
+				self:SetClampedToScreen(true)
+				
 				-- Set title
 				if self.TitleContainer and self.TitleContainer.TitleText then
 					self.TitleContainer.TitleText:SetText("BetterFriendlist Settings")

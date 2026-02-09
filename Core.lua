@@ -15,39 +15,39 @@ _G.BFL = BFL
 --------------------------------------------------------------------------
 -- Version Detection (Retail & Classic)
 --------------------------------------------------------------------------
-local tocVersion = select(4, GetBuildInfo())  -- Returns TOC version (e.g., 110205)
+local tocVersion = select(4, GetBuildInfo()) -- Returns TOC version (e.g., 110205)
 BFL.TOCVersion = tocVersion
 
 -- Classic Versions (check first - more specific)
-BFL.IsClassicEra = (tocVersion < 20000)                         -- Classic Era (1.x)
-BFL.IsTBCClassic = (tocVersion >= 20000 and tocVersion < 30000)   -- TBC Classic (2.x) - legacy
+BFL.IsClassicEra = (tocVersion < 20000) -- Classic Era (1.x)
+BFL.IsTBCClassic = (tocVersion >= 20000 and tocVersion < 30000) -- TBC Classic (2.x) - legacy
 BFL.IsWrathClassic = (tocVersion >= 30000 and tocVersion < 40000) -- Wrath Classic (3.x) - legacy
 BFL.IsCataClassic = (tocVersion >= 40000 and tocVersion < 50000) -- Cata Classic (4.x) - legacy
 BFL.IsMoPClassic = (tocVersion >= 50000 and tocVersion < 60000) -- MoP Classic (5.x)
 BFL.IsClassic = BFL.IsClassicEra or BFL.IsMoPClassic or BFL.IsCataClassic or BFL.IsWrathClassic or BFL.IsTBCClassic
 
 -- Retail Expansions
-BFL.IsRetail = (tocVersion >= 100000)                           -- Dragonflight+ (10.x+)
-BFL.IsTWW = (tocVersion >= 110200 and tocVersion < 120000)      -- The War Within (11.x)
-BFL.IsMidnight = (tocVersion >= 120000)                         -- Midnight (12.x+)
+BFL.IsRetail = (tocVersion >= 100000) -- Dragonflight+ (10.x+)
+BFL.IsTWW = (tocVersion >= 110200 and tocVersion < 120000) -- The War Within (11.x)
+BFL.IsMidnight = (tocVersion >= 120000) -- Midnight (12.x+)
 
 -- Feature Flags (detect what APIs are available)
-BFL.HasModernScrollBox = BFL.IsRetail                           -- ScrollBox API (Retail 10.0+)
-BFL.HasModernMenu = BFL.IsRetail                                -- MenuUtil, Menu.ModifyMenu (Retail 11.0+)
-BFL.HasRecentAllies = BFL.IsTWW or BFL.IsMidnight               -- C_RecentAllies (TWW 11.0.7+)
-BFL.HasEditMode = BFL.IsRetail                                  -- Edit Mode API (Retail 10.0+)
-BFL.HasModernDropdown = BFL.IsRetail                            -- WowStyle1DropdownTemplate (Retail 10.0+)
-BFL.HasModernColorPicker = BFL.IsRetail                         -- ColorPickerFrame:SetupColorPickerAndShow (Retail 10.1+)
+BFL.HasModernScrollBox = BFL.IsRetail -- ScrollBox API (Retail 10.0+)
+BFL.HasModernMenu = BFL.IsRetail -- MenuUtil, Menu.ModifyMenu (Retail 11.0+)
+BFL.HasRecentAllies = BFL.IsTWW or BFL.IsMidnight -- C_RecentAllies (TWW 11.0.7+)
+BFL.HasEditMode = BFL.IsRetail -- Edit Mode API (Retail 10.0+)
+BFL.HasModernDropdown = BFL.IsRetail -- WowStyle1DropdownTemplate (Retail 10.0+)
+BFL.HasModernColorPicker = BFL.IsRetail -- ColorPickerFrame:SetupColorPickerAndShow (Retail 10.1+)
 
 -- Feature Detection (detect available APIs for optional features)
-BFL.UseClassID = false              -- 11.2.7+ classID optimization
-BFL.HasSecretValues = false         -- 12.0.0+ Secret Values API
-BFL.UseNativeCallbacks = false      -- 12.0.0+ Frame:RegisterEventCallback
+BFL.UseClassID = false -- 11.2.7+ classID optimization
+BFL.HasSecretValues = false -- 12.0.0+ Secret Values API
+BFL.UseNativeCallbacks = false -- 12.0.0+ Frame:RegisterEventCallback
 
 -- Mock Friend Invites System (for testing)
 BFL.MockFriendInvites = {
 	enabled = false,
-	invites = {}
+	invites = {},
 }
 
 -- Detect optional features based on API availability
@@ -56,16 +56,16 @@ local function DetectOptionalFeatures()
 	if GetClassInfoByID then
 		BFL.UseClassID = true
 	end
-	
+
 	-- 12.0.0+ Secret Values API
 	if issecretvalue then
 		BFL.HasSecretValues = true
 	end
-	
+
 	-- Print version info (only if debug enabled)
 	local versionName = BFL.IsMidnight and "Midnight (12.x)" or "The War Within (11.x)"
 	BFL:DebugPrint(string.format("|cff00ff00BetterFriendlist:|r TOC %d (%s)", tocVersion, versionName))
-	
+
 	if BFL.UseClassID then
 		BFL:DebugPrint("|cff00ff00BetterFriendlist:|r Using classID optimization (11.2.7+)")
 	end
@@ -104,18 +104,31 @@ function BFL:ToggleDebugPrint()
 		print("|cffff0000BetterFriendlist:|r Database not initialized yet. Try again after login.")
 		return
 	end
-	
+
 	-- Toggle in DB
 	BetterFriendlistDB.debugPrintEnabled = not BetterFriendlistDB.debugPrintEnabled
-	
+
 	-- Update cached flag immediately
 	self.debugPrintEnabled = BetterFriendlistDB.debugPrintEnabled
-	
+
 	if self.debugPrintEnabled then
 		print("|cff00ff00BetterFriendlist:|r " .. BFL.L.DEBUG_ENABLED)
 	else
 		print("|cff00ff00BetterFriendlist:|r " .. BFL.L.DEBUG_DISABLED)
 	end
+end
+
+-- Check if current execution path is restricted (Combat or secure execution)
+function BFL:IsActionRestricted()
+	if InCombatLockdown() then
+		return true
+	end
+	if C_RestrictedActions and C_RestrictedActions.IsAddOnRestrictionActive then
+		if C_RestrictedActions.IsAddOnRestrictionActive() then
+			return true
+		end
+	end
+	return false
 end
 
 -- Update Portrait Visibility based on Simple Mode setting
@@ -124,14 +137,14 @@ function BFL:UpdatePortraitVisibility(reason)
 
 	-- Need to use raw DB access here or get module
 	local DB = self:GetModule("DB")
-	if not DB then 
-		return 
+	if not DB then
+		return
 	end
-	
+
 	local simpleMode = DB:Get("simpleMode", false)
 	local shouldShow = not simpleMode
 	local shouldShowPortrait = shouldShow
-	
+
 	-- Classic: Hide portrait when ElvUI is active and Simple Mode is disabled
 	-- (Changelog will be accessible via Contacts Menu instead to save space)
 	if BFL.IsClassic and not simpleMode then
@@ -142,61 +155,80 @@ function BFL:UpdatePortraitVisibility(reason)
 	end
 
 	local frame = BetterFriendsFrame
-	
+
 	if frame then
 		-- Standard Hiding (The Nice Way)
 		-- We print what we find here to see if the frames actually exist
-		if frame.PortraitContainer then frame.PortraitContainer:SetShown(shouldShowPortrait) end
-		if frame.portrait then frame.portrait:SetShown(shouldShowPortrait) end
-		if frame.PortraitButton then frame.PortraitButton:SetShown(shouldShowPortrait) end
-		if frame.PortraitIcon then frame.PortraitIcon:SetShown(shouldShowPortrait) end
-		if frame.PortraitMask then frame.PortraitMask:SetShown(shouldShowPortrait) end
-		if frame.SetPortraitShown then frame:SetPortraitShown(shouldShowPortrait) end
-		
+		if frame.PortraitContainer then
+			frame.PortraitContainer:SetShown(shouldShowPortrait)
+		end
+		if frame.portrait then
+			frame.portrait:SetShown(shouldShowPortrait)
+		end
+		if frame.PortraitButton then
+			frame.PortraitButton:SetShown(shouldShowPortrait)
+		end
+		if frame.PortraitIcon then
+			frame.PortraitIcon:SetShown(shouldShowPortrait)
+		end
+		if frame.PortraitMask then
+			frame.PortraitMask:SetShown(shouldShowPortrait)
+		end
+		if frame.SetPortraitShown then
+			frame:SetPortraitShown(shouldShowPortrait)
+		end
+
 		-- Also hide Global Portrait (Usually the Icon)
 		local globalPortraitName = frame:GetName() .. "Portrait"
 		local globalPortrait = _G[globalPortraitName]
-		if globalPortrait then 
-			globalPortrait:SetShown(shouldShowPortrait) 
+		if globalPortrait then
+			globalPortrait:SetShown(shouldShowPortrait)
 		end
 
 		-- DEEP SEARCH (The "Find that Ring" Way)
 		-- We scan the frame regions AND immediate children's regions
-		
+
 		local function ProcessRegions(objectToScan, depthName)
-			if not objectToScan then return end
-			
+			if not objectToScan then
+				return
+			end
+
 			local objectName = (objectToScan.GetName and objectToScan:GetName()) or "Anonymous"
 
-			local subRegions = {objectToScan:GetRegions()}
+			local subRegions = { objectToScan:GetRegions() }
 			for i, region in ipairs(subRegions) do
 				if region:IsObjectType("Texture") then
 					local regionName = region:GetName()
 					local texture = region:GetTexture()
 					local atlas = region:GetAtlas()
-					
+
 					-- Strategy 1: SWAP the structural corner (The "Hole" for the portrait)
-					
+
 					local isTargetCorner = false
 					local matchReason = "None"
-					
+
 					-- Check Retail Atlas
-					if atlas and (atlas == "UI-Frame-PortraitMetal-CornerTopLeft" or atlas == "UI-Frame-Metal-CornerTopLeft") then
+					if
+						atlas
+						and (atlas == "UI-Frame-PortraitMetal-CornerTopLeft" or atlas == "UI-Frame-Metal-CornerTopLeft")
+					then
 						isTargetCorner = true
 						matchReason = "Atlas=" .. atlas
 					end
-					
+
 					-- Check Classic Texture Path
 					if BFL.IsClassic and type(texture) == "string" then
 						local texLower = texture:lower()
-						if (texLower:find("friendsframe") and texLower:find("topleft")) or 
-						   (texLower:find("ui%-friendsframe%-topleft")) or
-						   (texLower:find("helpframe") and texLower:find("topleft")) then -- Added helpframe check to re-detect our own fix
+						if
+							(texLower:find("friendsframe") and texLower:find("topleft"))
+							or (texLower:find("ui%-friendsframe%-topleft"))
+							or (texLower:find("helpframe") and texLower:find("topleft"))
+						then -- Added helpframe check to re-detect our own fix
 							isTargetCorner = true
 							matchReason = "TexturePath=" .. texture
 						end
 					end
-					
+
 					-- Check Explicit Name (Fix for Shared Texture IDs in Classic)
 					if regionName and regionName:find("TopLeftCorner") then
 						isTargetCorner = true
@@ -205,17 +237,17 @@ function BFL:UpdatePortraitVisibility(reason)
 
 					if isTargetCorner then
 						local parentFrame = objectToScan
-						
+
 						if shouldShowPortrait then
 							-- Restore original portrait corner (Open with hole)
 							region:Show() -- Ensure visible
 							region:SetAlpha(1)
 							region:SetVertexColor(1, 1, 1, 1)
-							
+
 							if parentFrame.SimpleCornerPatch then
 								parentFrame.SimpleCornerPatch:Hide()
 							end
-							
+
 							if BFL.IsClassic then
 								region:SetTexture(374156) -- Original Classic FileID for FriendFrame TopLeft
 								region:SetTexCoord(0, 1, 0, 1)
@@ -224,8 +256,8 @@ function BFL:UpdatePortraitVisibility(reason)
 							end
 						else
 							-- Swap to standard square corner (Closed hole)
-							
-							region:Show() 
+
+							region:Show()
 							region:SetAlpha(1)
 							region:SetVertexColor(1, 1, 1, 1)
 
@@ -235,7 +267,7 @@ function BFL:UpdatePortraitVisibility(reason)
 							else
 								region:SetAtlas("UI-Frame-Metal-CornerTopLeft", true)
 							end
-							
+
 							if parentFrame.SimpleCornerPatch then
 								parentFrame.SimpleCornerPatch:Hide()
 							end
@@ -245,7 +277,7 @@ function BFL:UpdatePortraitVisibility(reason)
 					-- Strategy 2: HIDE the overlay ring (The shiny gold/blue circle)
 					local isRingOverlay = false
 					local ringMatchReason = "None"
-					
+
 					-- Safety: If it's the corner, it CANNOT be the ring
 					if not isTargetCorner then
 						-- Check Explicit Name (Primary Fix)
@@ -253,25 +285,29 @@ function BFL:UpdatePortraitVisibility(reason)
 							isRingOverlay = true
 							ringMatchReason = "RegionName=" .. regionName
 						end
-						
+
 						-- Check Atlas (Ring Overlays only)
-						if atlas and (
-							atlas == "UI-Frame-Portrait" or 
-							atlas == "UI-Frame-Portrait-Blue" or 
-							atlas == "player-portrait-frame"
-						) then
+						if
+							atlas
+							and (
+								atlas == "UI-Frame-Portrait"
+								or atlas == "UI-Frame-Portrait-Blue"
+								or atlas == "player-portrait-frame"
+							)
+						then
 							isRingOverlay = true
 							ringMatchReason = "Atlas=" .. atlas
 						end
-						
+
 						-- Check Texture Path (Legacy/Classic rings)
 						if texture and type(texture) == "string" then
 							local texLower = texture:lower()
-							if (texLower:find("portrait") and not texLower:find("metal")) then
-								if texLower:find("ui%-frame%-portrait") or        -- Standard
-								   texLower:find("ui%-friendsframe%-portrait") or -- Classic FriendsFrame
-								   texLower:find("portraitring") or               -- Rare variation
-								   texLower:find("player%-portrait")              -- Player frame style
+							if texLower:find("portrait") and not texLower:find("metal") then
+								if
+									texLower:find("ui%-frame%-portrait") -- Standard
+									or texLower:find("ui%-friendsframe%-portrait") -- Classic FriendsFrame
+									or texLower:find("portraitring") -- Rare variation
+									or texLower:find("player%-portrait") -- Player frame style
 								then
 									isRingOverlay = true
 									ringMatchReason = "TexturePath=" .. texture
@@ -280,14 +316,11 @@ function BFL:UpdatePortraitVisibility(reason)
 						end
 
 						-- Check Texture IDs
-						if texture and type(texture) == "number" and (
-							texture == 136453 or 
-							texture == 609653 
-						) then
+						if texture and type(texture) == "number" and (texture == 136453 or texture == 609653) then
 							isRingOverlay = true
 							ringMatchReason = "FileID=" .. texture
 						end
-						
+
 						if isRingOverlay then
 							region:SetShown(shouldShowPortrait)
 							region:SetAlpha(shouldShowPortrait and 1 or 0)
@@ -300,7 +333,7 @@ function BFL:UpdatePortraitVisibility(reason)
 		-- Scan Frame and Children
 		ProcessRegions(frame, "MainFrame")
 		if frame.GetChildren then
-			local children = {frame:GetChildren()}
+			local children = { frame:GetChildren() }
 			for _, child in ipairs(children) do
 				local childName = child.GetName and child:GetName()
 				-- Skip Settings Frame
@@ -312,12 +345,12 @@ function BFL:UpdatePortraitVisibility(reason)
 
 		-- Title Adjustment (Layout Fix)
 		if frame.TitleContainer then
-			local xOffset = shouldShowPortrait and 58 or 5 
+			local xOffset = shouldShowPortrait and 58 or 5
 			frame.TitleContainer:ClearAllPoints()
 			frame.TitleContainer:SetPoint("TOPLEFT", frame, "TOPLEFT", xOffset, -1)
 			frame.TitleContainer:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -24, -1)
 		end
-		
+
 		-- BNet Frame Width Adjustment (Simple Mode Optimization)
 		if frame.FriendsTabHeader and frame.FriendsTabHeader.BattlenetFrame then
 			local bnetFrame = frame.FriendsTabHeader.BattlenetFrame
@@ -326,7 +359,7 @@ function BFL:UpdatePortraitVisibility(reason)
 			if BFL.IsClassic then
 				baseWidth = baseWidth - 40
 			end
-			
+
 			local extraWidth = shouldShowPortrait and 0 or 45
 
 			-- Further reduce width by 10px for Classic Simple Mode (User Request: Add 20px back from previous -30)
@@ -334,9 +367,9 @@ function BFL:UpdatePortraitVisibility(reason)
 			if BFL.IsClassic and not shouldShowPortrait then
 				extraWidth = extraWidth + 10
 			end
-			
+
 			local totalWidth = baseWidth + extraWidth
-			
+
 			-- Check if ElvUI is active - if yes, don't override the width set by ElvUI skin
 			local isElvUIActive = _G.ElvUI and BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin ~= false
 			if not (BFL.IsClassic and isElvUIActive) then
@@ -364,13 +397,15 @@ function BFL:UpdatePortraitVisibility(reason)
 				-- header.SearchBox, -- Managed by FriendsList module to prevent conflicts
 				header.QuickFilterDropdown,
 				header.PrimarySortDropdown,
-				header.SecondarySortDropdown
+				header.SecondarySortDropdown,
 			}
-			
+
 			for i, elem in ipairs(elementsToHide) do
-				if elem then elem:SetShown(shouldShow) end
+				if elem then
+					elem:SetShown(shouldShow)
+				end
 			end
-			
+
 			-- Move Tabs Upwards to fill the gap
 			if header.Tab1 then
 				header.Tab1:ClearAllPoints()
@@ -382,7 +417,7 @@ function BFL:UpdatePortraitVisibility(reason)
 				else
 					yOffset = -60
 				end
-				
+
 				header.Tab1:SetPoint("TOPLEFT", header, "TOPLEFT", 18, yOffset)
 			end
 
@@ -394,12 +429,12 @@ function BFL:UpdatePortraitVisibility(reason)
 					header.PrimarySortDropdown:ClearAllPoints()
 					header.PrimarySortDropdown:SetPoint("TOP", header, "TOP", 0, -60)
 				end
-				
+
 				if header.QuickFilterDropdown and header.PrimarySortDropdown then
 					header.QuickFilterDropdown:ClearAllPoints()
 					header.QuickFilterDropdown:SetPoint("TOPRIGHT", header.PrimarySortDropdown, "TOPLEFT", 10, 0)
 				end
-				
+
 				if header.SearchBox then
 					-- Managed by FriendsList:UpdateSearchBoxState (Phase 22)
 					-- Do not override here to avoid race conditions/jumping
@@ -445,7 +480,9 @@ end
 
 -- Count table entries (for non-sequential tables)
 function BFL:TableCount(tbl)
-	if not tbl then return 0 end
+	if not tbl then
+		return 0
+	end
 	local count = 0
 	for _ in pairs(tbl) do
 		count = count + 1
@@ -469,18 +506,18 @@ local eventFrame = CreateFrame("Frame")
 -- @param priority: Optional priority (lower = called first), default 50
 function BFL:RegisterEventCallback(event, callback, priority)
 	priority = priority or 50
-	
+
 	if not self.EventCallbacks[event] then
 		self.EventCallbacks[event] = {}
 		-- Auto-register WoW event with the event frame
 		eventFrame:RegisterEvent(event)
 	end
-	
+
 	table.insert(self.EventCallbacks[event], {
 		callback = callback,
-		priority = priority
+		priority = priority,
 	})
-	
+
 	-- Sort by priority
 	table.sort(self.EventCallbacks[event], function(a, b)
 		return a.priority < b.priority
@@ -494,7 +531,7 @@ function BFL:FireEventCallbacks(event, ...)
 	if not self.EventCallbacks[event] then
 		return
 	end
-	
+
 	-- Special handling for FRIENDLIST_UPDATE to prevent "script ran too long" errors
 	-- This event can fire multiple times rapidly and trigger heavy processing in multiple modules
 	if event == "FRIENDLIST_UPDATE" then
@@ -502,25 +539,34 @@ function BFL:FireEventCallbacks(event, ...)
 		if self.pendingUpdateTicker then
 			self.pendingUpdateTicker:Cancel()
 		end
-		
+
 		-- Schedule new update (0.2s delay to coalesce rapid updates)
 		self.pendingUpdateTicker = C_Timer.NewTimer(0.2, function()
 			self.pendingUpdateTicker = nil
-			
+
+			-- Cancel any previously running callback ticker to prevent double execution
+			if self.callbackTicker then
+				self.callbackTicker:Cancel()
+				self.callbackTicker = nil
+			end
+
 			-- Run callbacks staggered to prevent frame freeze
 			local callbacks = self.EventCallbacks[event]
-			if not callbacks then return end
-			
+			if not callbacks then
+				return
+			end
+
 			local index = 1
 			local numCallbacks = #callbacks
-			
+
 			-- Process one callback every 0.05s
-			C_Timer.NewTicker(0.05, function(timer)
+			self.callbackTicker = C_Timer.NewTicker(0.05, function(timer)
 				if index > numCallbacks then
 					timer:Cancel()
+					self.callbackTicker = nil
 					return
 				end
-				
+
 				local entry = callbacks[index]
 				if entry and entry.callback then
 					-- Use pcall to prevent one error from stopping the chain
@@ -534,7 +580,7 @@ function BFL:FireEventCallbacks(event, ...)
 		end)
 		return
 	end
-	
+
 	for _, entry in ipairs(self.EventCallbacks[event]) do
 		entry.callback(...)
 	end
@@ -549,12 +595,12 @@ function BFL:NormalizeWoWFriendName(name, playerRealm)
 	if not name or name == "" then
 		return nil
 	end
-	
+
 	-- If name already contains realm separator, it's already normalized
 	if string.find(name, "-") then
 		return name
 	end
-	
+
 	-- Name has no realm - append current player's realm
 	-- Using GetNormalizedRealmName() which returns the connected realm name
 	-- Optimization: Allow passing playerRealm to avoid repeated API calls in loops
@@ -562,7 +608,7 @@ function BFL:NormalizeWoWFriendName(name, playerRealm)
 	if realm and realm ~= "" then
 		return name .. "-" .. realm
 	end
-	
+
 	-- Fallback: return name as-is if we can't determine realm
 	return name
 end
@@ -576,14 +622,14 @@ function BFL:GetWoWFriendDisplayName(fullName)
 	if not fullName or fullName == "" then
 		return fullName
 	end
-	
+
 	-- Split name and realm
 	local name, realm = strsplit("-", fullName, 2)
 	if not realm then
 		-- No realm separator found, return as-is
 		return fullName
 	end
-	
+
 	-- Check if realm matches player's realm
 	local playerRealm = GetNormalizedRealmName()
 	if realm == playerRealm then
@@ -609,12 +655,12 @@ function BFL:ForceRefreshFriendsList()
 
 		-- Clear pending update flag to prevent overwriting our forced refresh
 		FriendsList:ClearPendingUpdate()
-		
+
 		-- Force immediate data update from WoW API
 		-- This ensures we have the latest friend data before rendering
 		FriendsList:UpdateFriendsList()
 	end
-	
+
 	-- Refresh WhoFrame font cache if loaded
 	local WhoFrame = self:GetModule("WhoFrame")
 	if WhoFrame then
@@ -626,17 +672,22 @@ function BFL:ForceRefreshFriendsList()
 			end
 		end
 	end
-	
+
 	-- Refresh RaidFrame if loaded and visible
 	local RaidFrame = self:GetModule("RaidFrame")
 	if RaidFrame and BetterFriendsFrame and BetterFriendsFrame.RaidFrame and BetterFriendsFrame.RaidFrame:IsShown() then
 		RaidFrame:UpdateGroupLayout()
 	end
-	
+
 	-- Refresh QuickFilter Dropdown (if it exists)
 	-- This ensures the dropdown icon updates when filter changes externally (e.g. via Broker)
 	local QuickFilters = self:GetModule("QuickFilters")
-	if QuickFilters and BetterFriendsFrame and BetterFriendsFrame.FriendsTabHeader and BetterFriendsFrame.FriendsTabHeader.QuickFilterDropdown then
+	if
+		QuickFilters
+		and BetterFriendsFrame
+		and BetterFriendsFrame.FriendsTabHeader
+		and BetterFriendsFrame.FriendsTabHeader.QuickFilterDropdown
+	then
 		QuickFilters:RefreshDropdown(BetterFriendsFrame.FriendsTabHeader.QuickFilterDropdown)
 	end
 end
@@ -652,24 +703,30 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 		if addonName == ADDON_NAME then
 			-- Get version dynamically from TOC file
 			BFL.VERSION = C_AddOns.GetAddOnMetadata("BetterFriendlist", "Version") or "Unknown"
-			
+
 			-- Link Localization
 			BFL.L = _G["BFL_L"]
-			
+
 			-- Initialize database
 			local DB = BFL:GetModule("DB")
 			if DB then
 				DB:Initialize()
 			end
-			
+
 			-- Load debug flag from DB
 			if BetterFriendlistDB then
 				BFL.debugPrintEnabled = BetterFriendlistDB.debugPrintEnabled or false
 			end
-			
+
+			-- Restore real data if preview mode was active during /reload
+			local PreviewMode = BFL:GetModule("PreviewMode")
+			if PreviewMode and PreviewMode.RestorePersistedState then
+				PreviewMode:RestorePersistedState()
+			end
+
 			-- Detect optional features (version-specific APIs)
 			DetectOptionalFeatures()
-			
+
 			-- Initialize all modules
 			for name, module in pairs(BFL.Modules) do
 				if name ~= "DB" and module.Initialize then
@@ -691,26 +748,26 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 				LSM.RegisterCallback("BetterFriendlist", "LibSharedMedia_Registered", OnMediaUpdate)
 				LSM.RegisterCallback("BetterFriendlist", "LibSharedMedia_SetGlobal", OnMediaUpdate)
 			end
-			
+
 			-- Version-aware success message
-			local versionSuffix = BFL.IsMidnight and " (Midnight)" 
+			local versionSuffix = BFL.IsMidnight and " (Midnight)"
 				or (BFL.IsClassicEra and " (Classic Era)")
 				or (BFL.IsMoPClassic and " (MoP Classic)")
 				or (BFL.IsCataClassic and " (Cata Classic)")
 				or (BFL.IsWrathClassic and " (Wrath Classic)")
 				or (BFL.IsTBCClassic and " (TBC Classic)")
 				or " (TWW)"
-			
+
 			-- Check if welcome message is enabled (default: true)
 			local showWelcome = true
 			if BetterFriendlistDB and BetterFriendlistDB.showWelcomeMessage ~= nil then
 				showWelcome = BetterFriendlistDB.showWelcomeMessage
 			end
-			
+
 			if showWelcome then
 				print(string.format(BFL.L.CORE_LOADED, BFL.VERSION, versionSuffix))
 			end
-			
+
 			-- ============================================================================
 			-- Hook ToggleFriendsFrame to open BetterFriendlist instead
 			-- ============================================================================
@@ -723,10 +780,10 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 			-- This works with ElvUI because even if they cached ToggleFriendsFrame,
 			-- the OnShow hook will catch the FriendsFrame being opened.
 			-- ============================================================================
-			
+
 			-- Flag to bypass hook when user explicitly wants Blizzard's frame
 			BFL.AllowBlizzardFriendsFrame = false
-			
+
 			-- ============================================================================
 			-- CRITICAL: Remove FriendsFrame from UIPanel system
 			-- ============================================================================
@@ -741,11 +798,11 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 				UIPanelWindows["FriendsFrame"] = nil
 				-- BFL:DebugPrint("|cff00ff00[BFL]|r FriendsFrame removed from UIPanel system (combat-safe)")
 			end
-			
+
 			-- Store original function for "Show Blizzard's Friendlist" option
 			if _G.ToggleFriendsFrame then
 				BFL.OriginalToggleFriendsFrame = _G.ToggleFriendsFrame
-				
+
 				-- Replace global with our version (taint-safe, not a protected function)
 				_G.ToggleFriendsFrame = function(tabIndex)
 					-- Allow original if explicitly requested
@@ -753,9 +810,9 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 						-- BFL:DebugPrint("[BFL] ToggleFriendsFrame: Allowing Blizzard (explicit)")
 						return BFL.OriginalToggleFriendsFrame(tabIndex)
 					end
-					
+
 					-- BFL:DebugPrint("[BFL] ToggleFriendsFrame: Opening BetterFriendlist, tabIndex: " .. tostring(tabIndex))
-					
+
 					-- Toggle our frame with the requested tab (combat-safe, our frame is not protected)
 					if _G.ToggleBetterFriendsFrame then
 						_G.ToggleBetterFriendsFrame(tabIndex)
@@ -763,7 +820,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 				end
 				-- BFL:DebugPrint("|cff00ff00[BFL]|r ToggleFriendsFrame global replaced")
 			end
-			
+
 			-- Helper function to show Blizzard's FriendsFrame (bypasses our hook)
 			-- This is used by "Show Blizzard's Friendlist" menu option
 			BFL.ShowBlizzardFriendsFrame = function()
@@ -783,7 +840,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 					BFL.AllowBlizzardFriendsFrame = false
 				end)
 			end
-			
+
 			-- Hook ShowFriends for additional coverage (taint-safe)
 			if _G.ShowFriends then
 				BFL.OriginalShowFriends = _G.ShowFriends
@@ -799,7 +856,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 					end
 				end
 			end
-			
+
 			-- ============================================================================
 			-- CRITICAL: Hook FriendsFrame:OnShow for ElvUI compatibility
 			-- ============================================================================
@@ -815,15 +872,15 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 						-- BFL:DebugPrint("[BFL] FriendsFrame:OnShow - Allowing (explicit)")
 						return
 					end
-					
+
 					-- Detect which tab was requested by reading Blizzard's selected tab
 					-- FRIEND_TAB_FRIENDS=1, FRIEND_TAB_WHO=2, FRIEND_TAB_RAID=3, FRIEND_TAB_QUICK_JOIN=4
 					local requestedTab = PanelTemplates_GetSelectedTab(FriendsFrame) or 1
 					-- BFL:DebugPrint("[BFL] FriendsFrame:OnShow - Intercepting, requested tab: " .. tostring(requestedTab))
-					
+
 					-- Hide Blizzard's frame immediately (combat-safe since not a UIPanel anymore)
 					FriendsFrame:Hide()
-					
+
 					-- Open our frame with the requested tab
 					if BetterFriendsFrame then
 						if _G.ToggleBetterFriendsFrame then
@@ -846,7 +903,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 			BFL.UseNativeCallbacks = true
 			-- BFL:DebugPrint("|cff00ff00[BFL]|r Using native Frame:RegisterEventCallback (12.0.0+)")
 		end
-		
+
 		-- Late initialization for modules that need PLAYER_LOGIN
 		for name, module in pairs(BFL.Modules) do
 			if module.OnPlayerLogin then
@@ -854,10 +911,10 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 			end
 		end
 	end
-	
+
 	-- Fire event callbacks for all events
 	BFL:FireEventCallbacks(event, ...)
-	
+
 	-- Update Portrait Visibility on Login
 	if event == "PLAYER_LOGIN" then
 		-- Hook OnShow to ensure portrait visibility persists despite template resets
@@ -867,7 +924,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 				BFL:UpdatePortraitVisibility("OnShow")
 			end)
 		end
-		
+
 		-- Initial update
 		BFL:UpdatePortraitVisibility("PLAYER_LOGIN")
 	end
@@ -889,13 +946,13 @@ function BFL:GetDragGhost()
 		DragGhost.bg = DragGhost:CreateTexture(nil, "BACKGROUND")
 		DragGhost.bg:SetAllPoints()
 		DragGhost.bg:SetColorTexture(0.15, 0.15, 0.15, 0.9)
-		
+
 		-- Color Strip
 		DragGhost.stripe = DragGhost:CreateTexture(nil, "ARTWORK")
 		DragGhost.stripe:SetPoint("TOPLEFT")
 		DragGhost.stripe:SetPoint("BOTTOMLEFT")
 		DragGhost.stripe:SetWidth(6)
-		
+
 		DragGhost.text = DragGhost:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
 		DragGhost.text:SetPoint("CENTER", 3, 0) -- Slight offset for stripe
 	end
@@ -910,7 +967,7 @@ end
 SLASH_BETTERFRIENDLIST1 = "/bfl"
 SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 	msg = msg:lower():trim()
-	
+
 	-- Toggle frame (no parameters)
 	if msg == "" then
 		if _G.ToggleBetterFriendsFrame then
@@ -920,7 +977,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		end
 		return
 	end
-	
+
 	-- Debug print toggle
 	if msg == "debug" then
 		BFL:ToggleDebugPrint()
@@ -931,11 +988,11 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		if Changelog then
 			Changelog:ShowDiscordPopup()
 		else
-			print("|cffff0000BetterFriendlist:|r " .. (BFL.L.CORE_CHANGELOG_NOT_LOADED or "Changelog module not loaded"))
+			print(
+				"|cffff0000BetterFriendlist:|r " .. (BFL.L.CORE_CHANGELOG_NOT_LOADED or "Changelog module not loaded")
+			)
 		end
 
-
-	
 	-- Legacy commands (from old BetterFriendlist.lua slash handler)
 	elseif msg == "show" then
 		if BFL.DB then
@@ -958,9 +1015,6 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 			end
 		end
 
-	
-
-	
 	-- Settings
 	elseif msg == "settings" or msg == "config" or msg == "options" then
 		local Settings = BFL:GetModule("Settings")
@@ -976,9 +1030,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		else
 			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_SETTINGS_NOT_LOADED)
 		end
-	
 
-	
 	-- ==========================================
 	-- Preview Mode Commands (for screenshots)
 	-- ==========================================
@@ -990,8 +1042,18 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		else
 			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_PREVIEW_MODE_NOT_LOADED)
 		end
-	
 
+	-- ==========================================
+	-- Test Suite Commands (for QA/Development)
+	-- ==========================================
+	elseif msg:match("^test") then
+		local TestSuite = BFL:GetModule("TestSuite")
+		if TestSuite then
+			local fullArgs = msg:match("^test%s*(.*)") or ""
+			TestSuite:HandleCommand(fullArgs)
+		else
+			print("|cffff0000BetterFriendlist:|r TestSuite module not loaded")
+		end
 
 	-- Switch Locale (Debug)
 	elseif msg:match("^locale%s+") then
@@ -1006,9 +1068,11 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 
 	-- Test Translations (Encoding Check)
 	elseif msg == "testlocales" or msg == "testencoding" or msg == "testenc" then
-		BFL:DebugPrint("|cff00ff00BetterFriendlist:|r " .. (BFL.L.CORE_HELP_TEST_LOCALES or "Testing Localization Encoding..."))
+		BFL:DebugPrint(
+			"|cff00ff00BetterFriendlist:|r " .. (BFL.L.CORE_HELP_TEST_LOCALES or "Testing Localization Encoding...")
+		)
 		BFL:DebugPrint("Locale: " .. GetLocale())
-		
+
 		-- List of strings with special characters to test
 		local testKeys = {
 			"DIALOG_DELETE_GROUP_TEXT", -- é, ê, û
@@ -1016,9 +1080,9 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 			"SETTINGS_BETA_FEATURES_ENABLED", -- é, È
 			"DIALOG_MIGRATE_TEXT", -- é, è
 			"FILTER_SEARCH_ONLINE", -- varies by locale
-			"STATUS_AFK" -- varies
+			"STATUS_AFK", -- varies
 		}
-		
+
 		for _, key in ipairs(testKeys) do
 			if BFL.L[key] then
 				BFL:DebugPrint(string.format("|cffffcc00%s:|r %s", key, BFL.L[key]))
@@ -1042,7 +1106,10 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		local DB = BFL:GetModule("DB")
 		if DB then
 			DB:Set("lastChangelogVersion", "0.0.0")
-			print("|cff00ff00BetterFriendlist:|r " .. (BFL.L.CHANGELOG_RESET_SUCCESS or "Changelog version reset successfully."))
+			print(
+				"|cff00ff00BetterFriendlist:|r "
+					.. (BFL.L.CHANGELOG_RESET_SUCCESS or "Changelog version reset successfully.")
+			)
 
 			-- Update indicator immediately if module is loaded
 			local Changelog = BFL:GetModule("Changelog")
@@ -1060,6 +1127,362 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_CHANGELOG_NOT_LOADED)
 		end
 
+	-- ==========================================
+	-- Debug Trace Command: /bfl trace <name>
+	-- Traces a friend through the entire data pipeline to find where they get lost
+	-- ==========================================
+	elseif msg:match("^trace%s+") then
+		local searchName = msg:match("^trace%s+(.+)")
+		if not searchName or searchName == "" then
+			print("|cffff0000BFL Trace:|r Usage: /bfl trace <name or battletag>")
+			return
+		end
+
+		searchName = searchName:lower()
+		local P = function(text)
+			print("|cff00ccff[BFL Trace]|r " .. text)
+		end
+
+		P("=== TRACING: '" .. searchName .. "' ===")
+
+		-- STEP 1: Check WoW API directly
+		P("")
+		P("|cffffcc00STEP 1: WoW API Data|r")
+		local foundInAPI = false
+		local matchedFriend = nil
+		local matchedUID = nil
+
+		-- Check BNet friends
+		if BNGetNumFriends then
+			local numBNet = BNGetNumFriends()
+			P("  BNet friends total: " .. tostring(numBNet))
+			for i = 1, numBNet do
+				local info = C_BattleNet.GetFriendAccountInfo(i)
+				if info then
+					local nameMatch = (info.accountName and info.accountName:lower():find(searchName, 1, true))
+						or (info.battleTag and info.battleTag:lower():find(searchName, 1, true))
+						or (
+							info.gameAccountInfo
+							and info.gameAccountInfo.characterName
+							and info.gameAccountInfo.characterName:lower():find(searchName, 1, true)
+						)
+					if nameMatch then
+						foundInAPI = true
+						local uid = info.battleTag and ("bnet_" .. info.battleTag)
+							or ("bnet_" .. tostring(info.bnetAccountID))
+						matchedUID = uid
+						P(
+							"  |cff00ff00FOUND|r BNet["
+								.. i
+								.. "]: "
+								.. tostring(info.accountName)
+								.. " | Tag: "
+								.. tostring(info.battleTag)
+								.. " | Online: "
+								.. tostring(info.gameAccountInfo and info.gameAccountInfo.isOnline)
+								.. " | Fav: "
+								.. tostring(info.isFavorite)
+						)
+						P("    UID: " .. uid)
+						P("    bnetAccountID: " .. tostring(info.bnetAccountID) .. " (session-only!)")
+						if info.gameAccountInfo then
+							P(
+								"    Game: "
+									.. tostring(info.gameAccountInfo.clientProgram)
+									.. " | Char: "
+									.. tostring(info.gameAccountInfo.characterName)
+									.. " | Realm: "
+									.. tostring(info.gameAccountInfo.realmName)
+							)
+						end
+					end
+				end
+			end
+		end
+
+		-- Check WoW friends
+		local numWoW = C_FriendList.GetNumFriends() or 0
+		P("  WoW friends total: " .. tostring(numWoW))
+		for i = 1, numWoW do
+			local info = C_FriendList.GetFriendInfoByIndex(i)
+			if info and info.name and info.name:lower():find(searchName, 1, true) then
+				foundInAPI = true
+				local normalized = BFL:NormalizeWoWFriendName(info.name)
+				local uid = normalized and ("wow_" .. normalized) or nil
+				matchedUID = uid
+				P(
+					"  |cff00ff00FOUND|r WoW["
+						.. i
+						.. "]: "
+						.. tostring(info.name)
+						.. " | Online: "
+						.. tostring(info.connected)
+						.. " | UID: "
+						.. tostring(uid)
+				)
+			end
+		end
+
+		if not foundInAPI then
+			P("  |cffff0000NOT FOUND in WoW API!|r This friend may not exist or the name doesn't match.")
+		end
+
+		-- STEP 2: Check FriendsList module data
+		P("")
+		P("|cffffcc00STEP 2: FriendsList Module (self.friendsList)|r")
+		local FriendsList = BFL:GetModule("FriendsList")
+		local foundInModule = false
+		if FriendsList and FriendsList.friendsList then
+			P("  friendsList count: " .. #FriendsList.friendsList)
+			for idx, friend in ipairs(FriendsList.friendsList) do
+				local nameMatch = false
+				if friend.type == "bnet" then
+					nameMatch = (friend.accountName and friend.accountName:lower():find(searchName, 1, true))
+						or (friend.battleTag and friend.battleTag:lower():find(searchName, 1, true))
+						or (friend.characterName and friend.characterName:lower():find(searchName, 1, true))
+				else
+					nameMatch = (friend.name and friend.name:lower():find(searchName, 1, true))
+				end
+				if nameMatch then
+					foundInModule = true
+					matchedUID = friend.uid
+					P(
+						"  |cff00ff00FOUND|r ["
+							.. idx
+							.. "] type="
+							.. tostring(friend.type)
+							.. " | uid="
+							.. tostring(friend.uid)
+							.. " | connected="
+							.. tostring(friend.connected)
+							.. " | displayName="
+							.. tostring(friend.displayName)
+					)
+				end
+			end
+			if not foundInModule then
+				P("  |cffff0000NOT FOUND in friendsList!|r Friend exists in API but not in module data.")
+			end
+		else
+			P("  |cffff0000FriendsList module not loaded or friendsList is nil!|r")
+		end
+
+		-- STEP 3: Check Database group membership
+		P("")
+		P("|cffffcc00STEP 3: Database (BetterFriendlistDB.friendGroups)|r")
+		if matchedUID then
+			if BetterFriendlistDB and BetterFriendlistDB.friendGroups then
+				local entry = BetterFriendlistDB.friendGroups[matchedUID]
+				if entry then
+					P("  |cffff8800friendGroups[" .. matchedUID .. "] = {" .. table.concat(entry, ", ") .. "}|r")
+					-- Check if these groups actually exist
+					local Groups = BFL:GetModule("Groups")
+					if Groups then
+						local allGroups = Groups:GetAll()
+						for _, gid in ipairs(entry) do
+							local exists = allGroups[gid] ~= nil
+							if exists then
+								P(
+									"    Group '"
+										.. gid
+										.. "': |cff00ff00EXISTS|r ("
+										.. tostring(allGroups[gid].name)
+										.. ")"
+								)
+							else
+								P("    Group '" .. gid .. "': |cffff0000GHOST GROUP - DOES NOT EXIST!|r")
+								P("    |cffff0000^^^ THIS IS THE BUG! Friend is assigned to a deleted group!|r")
+							end
+						end
+					end
+				else
+					P("  |cff00ff00friendGroups[" .. matchedUID .. "] = nil|r (correctly in 'No Group')")
+				end
+			else
+				P("  |cffff0000BetterFriendlistDB.friendGroups is nil!|r")
+			end
+		else
+			P("  Cannot check - no UID resolved.")
+			-- Dump ALL friendGroups entries that contain the search name
+			if BetterFriendlistDB and BetterFriendlistDB.friendGroups then
+				P("  Searching all friendGroups keys for partial match...")
+				for uid, groups in pairs(BetterFriendlistDB.friendGroups) do
+					if uid:lower():find(searchName, 1, true) then
+						P("  |cffff8800FOUND KEY: " .. uid .. " = {" .. table.concat(groups, ", ") .. "}|r")
+					end
+				end
+			end
+		end
+
+		-- STEP 4: Check filter state
+		P("")
+		P("|cffffcc00STEP 4: Current Filter State|r")
+		if FriendsList then
+			P("  filterMode: " .. tostring(FriendsList.filterMode))
+			P("  searchText: '" .. tostring(FriendsList.searchText) .. "'")
+			P("  quickFilter (DB): " .. tostring(BetterFriendlistDB and BetterFriendlistDB.quickFilter))
+
+			-- Test PassesFilters on the matched friend
+			if foundInModule then
+				for _, friend in ipairs(FriendsList.friendsList) do
+					local nameMatch = false
+					if friend.type == "bnet" then
+						nameMatch = (friend.accountName and friend.accountName:lower():find(searchName, 1, true))
+							or (friend.battleTag and friend.battleTag:lower():find(searchName, 1, true))
+					else
+						nameMatch = (friend.name and friend.name:lower():find(searchName, 1, true))
+					end
+					if nameMatch then
+						local passes = FriendsList:PassesFilters(friend)
+						P("  PassesFilters: " .. tostring(passes))
+						if not passes then
+							P("  |cffff0000^^^ FILTERED OUT! This is why the friend is hidden!|r")
+							if FriendsList.filterMode == "online" and not friend.connected then
+								P("  |cffff8800Reason: Filter is 'online' but friend is OFFLINE|r")
+							end
+						end
+						break
+					end
+				end
+			end
+		end
+
+		-- STEP 5: Check BuildDisplayList output
+		P("")
+		P("|cffffcc00STEP 5: Display List (BuildDisplayList)|r")
+		if FriendsList and FriendsList.cachedDisplayList then
+			local foundInDisplay = false
+			local totalFriendEntries = 0
+			for _, entry in ipairs(FriendsList.cachedDisplayList) do
+				if entry.buttonType == 1 then -- BUTTON_TYPE_FRIEND
+					totalFriendEntries = totalFriendEntries + 1
+					if entry.friend and entry.friend.uid == matchedUID then
+						foundInDisplay = true
+						P("  |cff00ff00FOUND in display list!|r Group: " .. tostring(entry.groupId))
+					end
+				end
+			end
+			P("  Total friend entries in display list: " .. totalFriendEntries)
+			if not foundInDisplay then
+				P("  |cffff0000NOT in display list!|r")
+			end
+		else
+			P("  |cffff8800No cached display list available.|r")
+		end
+
+		-- STEP 6: Check ScrollBox DataProvider
+		P("")
+		P("|cffffcc00STEP 6: ScrollBox DataProvider|r")
+		if FriendsList and FriendsList.scrollBox then
+			local provider = FriendsList.scrollBox:GetDataProvider()
+			if provider then
+				local foundInProvider = false
+				local providerCount = 0
+				for _, data in provider:Enumerate() do
+					if data.buttonType == 1 and data.friend then
+						providerCount = providerCount + 1
+						if data.friend.uid == matchedUID then
+							foundInProvider = true
+							P("  |cff00ff00FOUND in DataProvider!|r Group: " .. tostring(data.groupId))
+						end
+					end
+				end
+				P("  Total friend entries in DataProvider: " .. providerCount)
+				if not foundInProvider then
+					P("  |cffff0000NOT in DataProvider!|r")
+				end
+			else
+				P("  |cffff8800No DataProvider set!|r")
+			end
+		else
+			P("  |cffff8800ScrollBox not available.|r")
+		end
+
+		-- STEP 7: Check for ghost groups in entire DB
+		P("")
+		P("|cffffcc00STEP 7: Ghost Group Scan (all friends)|r")
+		if BetterFriendlistDB and BetterFriendlistDB.friendGroups then
+			local Groups = BFL:GetModule("Groups")
+			-- Use Groups.groups (ALL groups including hidden builtins) not GetAll() (which filters)
+			local allGroups = Groups and Groups.groups or {}
+			local ghostCount = 0
+			for uid, groups in pairs(BetterFriendlistDB.friendGroups) do
+				if type(groups) == "table" then
+					for _, gid in ipairs(groups) do
+						if not allGroups[gid] then
+							ghostCount = ghostCount + 1
+							P(
+								"  |cffff0000GHOST:|r "
+									.. uid
+									.. " → group '"
+									.. tostring(gid)
+									.. "' (does not exist!)"
+							)
+						end
+					end
+				end
+			end
+			if ghostCount == 0 then
+				P("  |cff00ff00No ghost groups found.|r")
+			else
+				P("  |cffff0000Total ghost entries: " .. ghostCount .. "|r")
+				P("  |cffff8800Run /bfl fixghosts to clean up ghost group entries.|r")
+			end
+		end
+
+		P("")
+		P("=== TRACE COMPLETE ===")
+
+	-- ==========================================
+	-- Fix Ghost Groups Command: /bfl fixghosts
+	-- Removes friendGroups entries pointing to non-existent groups
+	-- ==========================================
+	elseif msg == "fixghosts" then
+		local P = function(text)
+			print("|cff00ccff[BFL Fix]|r " .. text)
+		end
+		local Groups = BFL:GetModule("Groups")
+		-- Use Groups.groups (ALL groups including hidden builtins) not GetAll() (which filters)
+		local allGroups = Groups and Groups.groups or {}
+
+		if not BetterFriendlistDB or not BetterFriendlistDB.friendGroups then
+			P("|cffff0000No friendGroups data found.|r")
+			return
+		end
+
+		local fixedCount = 0
+		local removedFriends = 0
+
+		for uid, groups in pairs(BetterFriendlistDB.friendGroups) do
+			if type(groups) == "table" then
+				for i = #groups, 1, -1 do
+					if not allGroups[groups[i]] then
+						P("Removed ghost group '" .. tostring(groups[i]) .. "' from " .. uid)
+						table.remove(groups, i)
+						fixedCount = fixedCount + 1
+					end
+				end
+				-- Clean up empty entries
+				if #groups == 0 then
+					BetterFriendlistDB.friendGroups[uid] = nil
+					removedFriends = removedFriends + 1
+				end
+			end
+		end
+
+		if fixedCount > 0 then
+			P(
+				"|cff00ff00Fixed "
+					.. fixedCount
+					.. " ghost entries, cleaned "
+					.. removedFriends
+					.. " empty friend entries.|r"
+			)
+			P("Refreshing friends list...")
+			BFL:ForceRefreshFriendsList()
+		else
+			P("|cff00ff00No ghost groups found. Database is clean.|r")
+		end
 	else
 		print(string.format(BFL.L.CORE_HELP_TITLE, BFL.VERSION))
 		print("")

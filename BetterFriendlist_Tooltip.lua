@@ -179,6 +179,8 @@ function BetterFriendsList_Button_OnEnter(self)
 
 	local friendData = self.friendData
 	local tooltip = FriendsTooltip
+	local FriendsList = BFL and BFL:GetModule("FriendsList")
+	local resolvedIndex = nil
 	
 	-- Create a fake button object that mimics Blizzard's FriendsListButton
 	-- This allows RaiderIO and other addons to detect the friend info
@@ -198,16 +200,20 @@ function BetterFriendsList_Button_OnEnter(self)
 			fakeButton.id = friendData.index
 		else
 			-- Battle.net friend
-			-- Optimization: Trust the index from friendData (Phase 21)
-			-- This avoids the O(N) linear search through all friends on every mouseover
+			-- Resolve the current index since BNet indices are not persistent
+			resolvedIndex = FriendsList and FriendsList.ResolveBNetFriendIndex and
+				FriendsList:ResolveBNetFriendIndex(friendData.bnetAccountID, friendData.battleTag) or friendData.index
 			fakeButton.buttonType = FRIENDS_BUTTON_TYPE_BNET
-			fakeButton.id = friendData.index
+			fakeButton.id = resolvedIndex
 		end
 	else
 		-- WoW friend
-		if friendData.index and friendData.index > 0 then
+		-- Resolve the current index since WoW indices are not persistent
+		resolvedIndex = FriendsList and FriendsList.ResolveWoWFriendIndex and
+			FriendsList:ResolveWoWFriendIndex(friendData.name) or friendData.index
+		if resolvedIndex and resolvedIndex > 0 then
 			fakeButton.buttonType = FRIENDS_BUTTON_TYPE_WOW
-			fakeButton.id = friendData.index
+			fakeButton.id = resolvedIndex
 		end
 	end
 	
@@ -489,8 +495,13 @@ function BetterFriendsList_Button_OnEnter(self)
 				local className = gameAccountInfo.className or UNKNOWN
 				local gameText = gameAccountInfo.richPresence or ""
 				text = ""
+				local hasTitleIconTexture = false
+				if C_Texture and C_Texture.GetTitleIconTexture and C_Texture.IsTitleIconTextureReady then
+					hasTitleIconTexture = true
+				end
 				
-				if C_Texture.IsTitleIconTextureReady(gameAccountInfo.clientProgram, Enum.TitleIconVersion.Small) then
+				if Enum and Enum.TitleIconVersion and hasTitleIconTexture and
+					C_Texture.IsTitleIconTextureReady(gameAccountInfo.clientProgram, Enum.TitleIconVersion.Small) then
 					C_Texture.GetTitleIconTexture(gameAccountInfo.clientProgram, Enum.TitleIconVersion.Small, function(success, texture)
 						if success then
 							text = BNet_GetClientEmbeddedTexture(texture, 32, 32, 0).." "

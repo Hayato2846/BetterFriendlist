@@ -250,7 +250,12 @@ function PerformanceMonitor:EnableAutoMonitoring()
 	end
 	
 	-- Memory sampling timer
-	C_Timer.NewTicker(5, function()
+	if self.memorySampleTicker then
+		self.memorySampleTicker:Cancel()
+		self.memorySampleTicker = nil
+	end
+
+	self.memorySampleTicker = C_Timer.NewTicker(5, function()
 		PerformanceMonitor:SampleMemory()
 	end)
 	

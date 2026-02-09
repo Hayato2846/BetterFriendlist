@@ -30,3 +30,4 @@ docs/
 
 *.html
 *.py
+!Utils/pre-commit-check.py

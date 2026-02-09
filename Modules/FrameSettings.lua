@@ -123,6 +123,11 @@ function FrameSettings:ApplySize(bgWidth, bgHeight)
     end
 
     frame:SetSize(width, height)
+    if bgWidth and BFL.ApplyTabFonts then
+        C_Timer.After(0, function()
+            BFL:ApplyTabFonts()
+        end)
+    end
     -- BFL:DebugPrint("FrameSettings: Applied size " .. width .. "x" .. height)
 end
 

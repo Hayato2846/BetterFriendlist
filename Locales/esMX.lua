@@ -111,6 +111,8 @@ local L = BFL_LOCALE
 	L.SETTINGS_HIDE_MAX_LEVEL = "Ocultar Nivel Máximo"
 	L.SETTINGS_ACCORDION_GROUPS = "Grupos en Acordeón (uno abierto a la vez)"
 	L.SETTINGS_SHOW_FAVORITES = "Mostrar Grupo Favoritos"
+	L.SETTINGS_SHOW_GROUP_FMT = "Mostrar grupo %s"
+	L.SETTINGS_SHOW_GROUP_DESC_FMT = "Alternar visibilidad del grupo %s en tu lista de amigos"
 	L.SETTINGS_GROUP_COLOR = "Color del Grupo"
 	L.SETTINGS_RENAME_GROUP = "Renombrar Grupo"
 	L.SETTINGS_DELETE_GROUP = "Borrar Grupo"
@@ -725,7 +727,7 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita solapamientos con otras ventanas (P
 	L.TRAVEL_PASS_NO_GAME_ACCOUNTS = "No hay cuentas de juego disponibles"
 
 	-- MENUS (Additional)
-	L.MENU_TITLE = "BetterFriendList"
+	L.MENU_TITLE = "BetterFriendlist"
 	L.MENU_SHOW_BLIZZARD = "Mostrar Lista Amigos Blizzard"
 	L.MENU_COMBAT_LOCKED = "No se puede alternar en combate"
 	L.MENU_SET_NICKNAME = "Establecer Apodo"
@@ -951,6 +953,14 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita solapamientos con otras ventanas (P
 	L.CORE_HELP_PERF_MEM = "  |cffffffff/bfl perf memory|r - Memoria"
 	L.CORE_HELP_TEST_COMMANDS = "|cffffcc00Tests:|r"
 	L.CORE_HELP_TEST_ACTIVITY = "  |cffffffff/bfl test|r - Tests Actividad"
+	L.TESTSUITE_PERFY_HELP = "  |cffffffff/bfl test perfy [seconds]|r - Run Perfy stress test"
+	L.TESTSUITE_PERFY_STARTING = "Starting Perfy stress test for %d seconds"
+	L.TESTSUITE_PERFY_ALREADY_RUNNING = "Perfy stress test already running"
+	L.TESTSUITE_PERFY_MISSING_ADDON = "Perfy addon not loaded (!!!Perfy)"
+	L.TESTSUITE_PERFY_MISSING_SLASH = "Perfy slash command not available"
+	L.TESTSUITE_PERFY_ACTION_FAILED = "Perfy stress action failed: %s"
+	L.TESTSUITE_PERFY_DONE = "Perfy stress test finished"
+	L.TESTSUITE_PERFY_ABORTED = "Perfy stress test stopped: %s"
 	L.CORE_HELP_LINK = "|cff20ff20Ayuda:|r |cff00ccffhttps://github.com/Hayato2846/BetterFriendlist|r"
 	L.CORE_LOADED = "|cff00ff00BetterFriendlist v%s%s|r. Cargado. Discord: /bfl discord"
 	L.MOCK_INVITE_ACCEPTED = "Aceptada inv. prueba %s"
@@ -1073,6 +1083,10 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita solapamientos con otras ventanas (P
 	-- Favorites & Faction Settings
 	L.SETTINGS_ENABLE_FAVORITE_ICON = "Habilitar Icono Favorito"
 	L.SETTINGS_ENABLE_FAVORITE_ICON_DESC = "Muestra un icono de estrella en el botón del amigo para favoritos."
+	L.SETTINGS_FAVORITE_ICON_STYLE = "Icono de favorito"
+	L.SETTINGS_FAVORITE_ICON_STYLE_DESC = "Elige qué icono se usa para favoritos."
+	L.SETTINGS_FAVORITE_ICON_OPTION_BFL = "Icono BFL"
+	L.SETTINGS_FAVORITE_ICON_OPTION_BLIZZARD = "Icono Blizzard"
 	L.SETTINGS_SHOW_FACTION_BG = "Mostrar Fondo de Facción"
 	L.SETTINGS_SHOW_FACTION_BG_DESC = "Muestra el color de la facción como fondo para el botón del amigo."
 

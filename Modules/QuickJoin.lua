@@ -696,7 +696,12 @@ function QuickJoin:Initialize()
 	self:Update()
 	
 	-- Start periodic cache cleanup (every 5 minutes)
-	C_Timer.NewTicker(300, function()
+	if self.cleanupTicker then
+		self.cleanupTicker:Cancel()
+		self.cleanupTicker = nil
+	end
+
+	self.cleanupTicker = C_Timer.NewTicker(300, function()
 		self:CleanupCache()
 	end)
 	
