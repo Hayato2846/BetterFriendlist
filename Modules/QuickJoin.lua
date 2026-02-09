@@ -45,12 +45,42 @@ QuickJoin.config = nil            -- Social Queue Config (from C_SocialQueue.Get
 QuickJoin.mockGroups = {}         -- Mock groups for testing (added to real groups)
 QuickJoin.selectedGUID = nil      -- Currently selected group GUID
 QuickJoin.selectedButtons = {}    -- Track button selection states
+QuickJoin.relationshipCache = {}  -- Short-lived cache for relationship lookups
 
 
 
 -- Dirty flag: Set when data changes while frame is hidden
 local needsRenderOnShow = false
 local updateTimer = nil
+local RELATIONSHIP_CACHE_TTL = 0.5
+
+local function GetRelationshipCacheKey(guid, missingNameFallback, clubId)
+	return tostring(guid) .. "|" .. tostring(clubId or "") .. "|" .. tostring(missingNameFallback or "")
+end
+
+local function TryGetCachedRelationship(guid, missingNameFallback, clubId)
+	if not guid then
+		return nil
+	end
+	local entry = QuickJoin.relationshipCache[GetRelationshipCacheKey(guid, missingNameFallback, clubId)]
+	if entry and entry.expires and entry.expires > GetTime() then
+		return entry
+	end
+	return nil
+end
+
+local function CacheAndReturnRelationship(guid, missingNameFallback, clubId, name, color, relationship, playerLink)
+	if guid then
+		QuickJoin.relationshipCache[GetRelationshipCacheKey(guid, missingNameFallback, clubId)] = {
+			name = name,
+			color = color,
+			relationship = relationship,
+			playerLink = playerLink,
+			expires = GetTime() + RELATIONSHIP_CACHE_TTL,
+		}
+	end
+	return name, color, relationship, playerLink
+end
 
 --[[
 	Helper: GetFriendInfoByGUID
@@ -80,6 +110,10 @@ end
 	- Returns green color for mock members to distinguish them from real players
 ]]
 function BetterFriendlist_GetRelationshipInfo(guid, missingNameFallback, clubId)
+	local cached = TryGetCachedRelationship(guid, missingNameFallback, clubId)
+	if cached then
+		return cached.name, cached.color, cached.relationship, cached.playerLink
+	end
 	-- 1. Check if this is a mock group member first (BetterFriendlist-specific)
 	if QuickJoin and QuickJoin.mockGroups then
 		for groupGUID, mockGroup in pairs(QuickJoin.mockGroups) do
@@ -88,7 +122,7 @@ function BetterFriendlist_GetRelationshipInfo(guid, missingNameFallback, clubId)
 					if member.guid == guid then
 						local name = member.name or member.memberName or "MockPlayer"
 						local mockColor = "|cff00ff00"  -- Green for mock members
-						return name, mockColor, "mock", nil
+						return CacheAndReturnRelationship(guid, missingNameFallback, clubId, name, mockColor, "mock", nil)
 					end
 				end
 			end
@@ -112,13 +146,13 @@ function BetterFriendlist_GetRelationshipInfo(guid, missingNameFallback, clubId)
 				}
 				local safeName = FL:GetDisplayName(friendObj)
 				-- Return masked name, default color, type, and NO LINK (to prevent leaking real ID in link)
-				return safeName, FRIENDS_BNET_NAME_COLOR_CODE, "bnfriend", nil
+				return CacheAndReturnRelationship(guid, missingNameFallback, clubId, safeName, FRIENDS_BNET_NAME_COLOR_CODE, "bnfriend", nil)
 			end
 		end
 
 		local accountName = accountInfo.accountName
 		local playerLink = GetBNPlayerLink(accountName, accountName, accountInfo.bnetAccountID, 0, 0, 0)
-		return accountName, FRIENDS_BNET_NAME_COLOR_CODE, "bnfriend", playerLink
+		return CacheAndReturnRelationship(guid, missingNameFallback, clubId, accountName, FRIENDS_BNET_NAME_COLOR_CODE, "bnfriend", playerLink)
 	end
 	
 	-- 3. CRITICAL FIX: GetPlayerInfoByGUID fallback (like Blizzard's SocialQueueUtil_GetRelationshipInfo)
@@ -138,7 +172,7 @@ function BetterFriendlist_GetRelationshipInfo(guid, missingNameFallback, clubId)
 				uid = guid
 			}
 			local safeName = FL:GetDisplayName(friendObj)
-			return safeName, FRIENDS_WOW_NAME_COLOR_CODE, "wowfriend", nil
+			return CacheAndReturnRelationship(guid, missingNameFallback, clubId, safeName, FRIENDS_WOW_NAME_COLOR_CODE, "wowfriend", nil)
 		end
 	end
 
@@ -160,22 +194,22 @@ function BetterFriendlist_GetRelationshipInfo(guid, missingNameFallback, clubId)
 	
 	-- 4. Check WoW friend (with already determined name)
 	if C_FriendList.IsFriend(guid) then
-		return name, FRIENDS_WOW_NAME_COLOR_CODE, "wowfriend", playerLink
+		return CacheAndReturnRelationship(guid, missingNameFallback, clubId, name, FRIENDS_WOW_NAME_COLOR_CODE, "wowfriend", playerLink)
 	end
 	
 	-- 5. Check guild member (with already determined name)
 	if IsGuildMember(guid) then
-		return name, RGBTableToColorCode(ChatTypeInfo.GUILD), "guild", playerLink
+		return CacheAndReturnRelationship(guid, missingNameFallback, clubId, name, RGBTableToColorCode(ChatTypeInfo.GUILD), "guild", playerLink)
 	end
 	
 	-- 6. Check club/community (with already determined name) - FIX: Don't use GetMemberInfoForSelf!
 	local clubInfo = clubId and C_Club.GetClubInfo(clubId) or nil
 	if clubInfo then
-		return name, FRIENDS_WOW_NAME_COLOR_CODE, "club", playerLink
+		return CacheAndReturnRelationship(guid, missingNameFallback, clubId, name, FRIENDS_WOW_NAME_COLOR_CODE, "club", playerLink)
 	end
 	
 	-- 7. Final fallback (name is already set by GetPlayerInfoByGUID)
-	return name, FRIENDS_WOW_NAME_COLOR_CODE, nil, playerLink
+	return CacheAndReturnRelationship(guid, missingNameFallback, clubId, name, FRIENDS_WOW_NAME_COLOR_CODE, nil, playerLink)
 end
 
 --[[
@@ -192,10 +226,22 @@ local relationshipPriorityOrdering = {
 
 local function BetterFriendlist_SortGroupMembers(members)
 	if not members then return members end
+	local memberInfo = {}
+	local function GetMemberInfo(member)
+		local guid = member and member.guid
+		if guid and memberInfo[guid] then
+			return memberInfo[guid].name, memberInfo[guid].relationship
+		end
+		local name, _, relationship = BetterFriendlist_GetRelationshipInfo(guid, nil, member and member.clubId)
+		if guid then
+			memberInfo[guid] = { name = name or "", relationship = relationship }
+		end
+		return name or "", relationship
+	end
 	
 	table.sort(members, function(lhs, rhs)
-		local lhsName, _, lhsRelationship = BetterFriendlist_GetRelationshipInfo(lhs.guid, nil, lhs.clubId)
-		local rhsName, _, rhsRelationship = BetterFriendlist_GetRelationshipInfo(rhs.guid, nil, rhs.clubId)
+		local lhsName, lhsRelationship = GetMemberInfo(lhs)
+		local rhsName, rhsRelationship = GetMemberInfo(rhs)
 		
 		-- Sort by relationship priority first (lower = higher priority)
 		if lhsRelationship ~= rhsRelationship then
@@ -993,6 +1039,9 @@ function QuickJoin:Update(forceUpdate)
 	
 	self.lastUpdate = GetTime()
 	self.updateQueued = false
+	if self.relationshipCache then
+		wipe(self.relationshipCache)
+	end
 	
 	-- Get all available groups from Social Queue API
 	local groups = C_SocialQueue.GetAllGroups(false, false) or {}
