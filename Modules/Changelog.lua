@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Context Menu Integration** - Added BFL options (Set Nickname, Groups, etc.) to friend right-click menus even when not opened from BFL (e.g. from chat links), provided the player is a recognized friend.
 - **Favorite Icon Style** - Added a setting to choose between BFL and Blizzard favorite icons (with icon previews).
+- **Perfy Stress Tracking** - The perfy stress command now resets/enables AddonProfiler while a run is active.
 
 ### Changed
 - **Tab Font Size** - Reduced maximum tab font size from 24 to 18 to prevent tab overlap issues.
@@ -31,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Context Menu** - Prevented BetterFriendlist options from appearing in context menus of non-friend players. Added comprehensive restriction protection (combat and secure execution) to avoid "Action Forbidden" errors during checks.
 - **UI Taint / Action Forbidden** - Fixed critical errors ("Action Forbidden") that could break the ESC key or Chat functionality during combat. Removed a conflict with Blizzard's window management system.
+- **Perfy WHO Mocking** - The perfy stress test now uses mock WHO data instead of protected WHO requests.
 - **Localization** - Fixed capitalization in context menu headers ("BetterFriendList" -> "BetterFriendlist") for consistency.
 - **Group Rename Display** - Fixed an issue where renaming groups (including built-in groups like "Favorites" or "No Group") would not visually update until a full UI reload.
 - **Built-in Group Renames** - Fixed inconsistent behavior when renaming built-in groups like "In-Game" so changes are reflected correctly.
