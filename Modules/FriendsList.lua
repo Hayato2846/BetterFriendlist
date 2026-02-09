@@ -2491,26 +2491,132 @@ end
 function FriendsList:ApplyFilters() -- Filter is applied in RenderDisplay / BuildDataProvider
 end
 
+local compareByMode = {
+	status = function(a, b)
+		if a._sort_isOnline ~= b._sort_isOnline then
+			return a._sort_isOnline
+		end
+		local aP = a._sort_status or 3
+		local bP = b._sort_status or 3
+		if aP ~= bP then
+			return aP < bP
+		end
+		return nil
+	end,
+	name = function(a, b)
+		local aName = a._sort_name or ""
+		local bName = b._sort_name or ""
+		if aName ~= bName then
+			return aName < bName
+		end
+		return nil
+	end,
+	level = function(a, b)
+		local aLevel = a._sort_level or 0
+		local bLevel = b._sort_level or 0
+		if aLevel ~= bLevel then
+			return aLevel > bLevel
+		end
+		return nil
+	end,
+	zone = function(a, b)
+		if a._sort_hasZone ~= b._sort_hasZone then
+			return a._sort_hasZone
+		end
+		if a._sort_hasZone then
+			if a._sort_zoneName ~= b._sort_zoneName then
+				return a._sort_zoneName < b._sort_zoneName
+			end
+			return nil
+		end
+		if a._sort_isOnline ~= b._sort_isOnline then
+			return a._sort_isOnline
+		end
+		return nil
+	end,
+	activity = function(a, b)
+		local aTime = a._sort_activity or 0
+		local bTime = b._sort_activity or 0
+		if aTime ~= bTime then
+			return aTime > bTime
+		end
+		return nil
+	end,
+	game = function(a, b)
+		local aP = a._sort_game or 999
+		local bP = b._sort_game or 999
+		if aP ~= bP then
+			return aP < bP
+		end
+		return nil
+	end,
+	faction = function(a, b)
+		local aP = a._sort_faction or 3
+		local bP = b._sort_faction or 3
+		if aP ~= bP then
+			return aP < bP
+		end
+		return nil
+	end,
+	guild = function(a, b)
+		local aP = a._sort_guildPriority or 3
+		local bP = b._sort_guildPriority or 3
+		if aP ~= bP then
+			return aP < bP
+		end
+		if aP == 1 then
+			if a._sort_guildName ~= b._sort_guildName then
+				return a._sort_guildName < b._sort_guildName
+			end
+		end
+		return nil
+	end,
+	class = function(a, b)
+		local aP = a._sort_classPriority or 10
+		local bP = b._sort_classPriority or 10
+		if aP ~= bP then
+			return aP < bP
+		end
+		if a._sort_className ~= b._sort_className then
+			return a._sort_className < b._sort_className
+		end
+		return nil
+	end,
+	realm = function(a, b)
+		local aP = a._sort_realmPriority or 2
+		local bP = b._sort_realmPriority or 2
+		if aP ~= bP then
+			return aP < bP
+		end
+		if a._sort_realmName ~= b._sort_realmName then
+			return a._sort_realmName < b._sort_realmName
+		end
+		return nil
+	end,
+}
+
 -- Optimized comparator to avoid closure allocation
 local function SortComparator(a, b)
 	local self = FriendsList
-	local primarySort = self.currentPrimarySort
-	local secondarySort = self.currentSecondarySort
+	local primaryComparator = self.currentPrimaryComparator
+	local secondaryComparator = self.currentSecondaryComparator
+	local nameComparator = self.currentNameComparator
 	
-	-- Apply primary sort first
-	local primaryResult = self:CompareFriends(a, b, primarySort)
-	if primaryResult ~= nil then
-		return primaryResult
+	if primaryComparator then
+		local primaryResult = primaryComparator(a, b)
+		if primaryResult ~= nil then
+			return primaryResult
+		end
 	end
 	
 	-- Primary sort is equal (Same Group): Prioritize Favorites
 	if a.isFavorite ~= b.isFavorite then
-		return a.isFavorite -- true (Favorite) comes before false (Non-Favorite)
+		return a.isFavorite
 	end
 	
 	-- If primary sort is equal, use secondary sort
-	if secondarySort and secondarySort ~= "none" and secondarySort ~= primarySort then
-		local secondaryResult = self:CompareFriends(a, b, secondarySort)
+	if secondaryComparator and secondaryComparator ~= primaryComparator then
+		local secondaryResult = secondaryComparator(a, b)
 		if secondaryResult ~= nil then
 			return secondaryResult
 		end
@@ -2519,19 +2625,20 @@ local function SortComparator(a, b)
 	-- FALLBACK FOR OFFLINE FRIENDS: Sort by Last Online Time
 	local aOffline = not a._sort_isOnline
 	local bOffline = not b._sort_isOnline
-
 	if aOffline and bOffline then
 		local aTime = a.lastOnlineTime or 0
 		local bTime = b.lastOnlineTime or 0
 		if aTime ~= bTime then
-			return aTime > bTime -- Recent first
+			return aTime > bTime
 		end
 	end
 	
 	-- Fallback: sort by name
-	local fallbackResult = self:CompareFriends(a, b, "name")
-	if fallbackResult ~= nil then
-		return fallbackResult
+	if nameComparator then
+		local fallbackResult = nameComparator(a, b)
+		if fallbackResult ~= nil then
+			return fallbackResult
+		end
 	end
 	
 	-- Ultimate fallback: stable sort by ID/Index
@@ -2542,6 +2649,9 @@ end
 function FriendsList:ApplySort() -- Store sort modes for the static comparator
 	self.currentPrimarySort = self.sortMode
 	self.currentSecondarySort = self.secondarySort or "name"
+	self.currentPrimaryComparator = compareByMode[self.currentPrimarySort]
+	self.currentSecondaryComparator = compareByMode[self.currentSecondarySort]
+	self.currentNameComparator = compareByMode.name
 	
 	-- Use static comparator to avoid closure allocation (Phase 9.4 Optimization)
 	table.sort(self.friendsList, SortComparator)
@@ -2550,121 +2660,10 @@ end
 -- Compare two friends by a specific sort mode (returns true, false, or nil if equal)
 -- Compare two friends by a specific sort mode (Optimized)
 function FriendsList:CompareFriends(a, b, sortMode)
-	-- Use pre-calculated sort keys (FAST)
-	
-	if sortMode == "status" then
-		-- 1. Sort by online status (Online > Offline)
-		if a._sort_isOnline ~= b._sort_isOnline then
-			return a._sort_isOnline
-		end
-		
-		-- 2. Sort by Status Priority (Online > DND > AFK > Offline)
-		local aP = a._sort_status or 3
-		local bP = b._sort_status or 3
-		if aP ~= bP then
-			return aP < bP
-		end
-		return nil
-		
-	elseif sortMode == "name" then
-		local aName = a._sort_name or ""
-		local bName = b._sort_name or ""
-		if aName ~= bName then
-			return aName < bName
-		end
-		return nil
-		
-	elseif sortMode == "level" then
-		local aLevel = a._sort_level or 0
-		local bLevel = b._sort_level or 0
-		if aLevel ~= bLevel then
-			return aLevel > bLevel -- Descending
-		end
-		return nil
-		
-	elseif sortMode == "zone" then
-		-- Priority 1: Online WITH zone
-		if a._sort_hasZone ~= b._sort_hasZone then
-			return a._sort_hasZone -- true > false
-		end
-		
-		-- Both have zones: sort alphabetically
-		if a._sort_hasZone then
-			if a._sort_zoneName ~= b._sort_zoneName then
-				return a._sort_zoneName < b._sort_zoneName
-			end
-			return nil
-		end
-		
-		-- Priority 2: Online without zone vs Offline
-		if a._sort_isOnline ~= b._sort_isOnline then
-			return a._sort_isOnline
-		end
-		return nil
-		
-	elseif sortMode == "activity" then
-		local aTime = a._sort_activity or 0
-		local bTime = b._sort_activity or 0
-		if aTime ~= bTime then
-			return aTime > bTime -- Recent first
-		end
-		return nil
-		
-	elseif sortMode == "game" then
-		local aP = a._sort_game or 999
-		local bP = b._sort_game or 999
-		if aP ~= bP then
-			return aP < bP -- Lower is better
-		end
-		return nil
-		
-	elseif sortMode == "faction" then
-		local aP = a._sort_faction or 3
-		local bP = b._sort_faction or 3
-		if aP ~= bP then
-			return aP < bP
-		end
-		return nil
-		
-	elseif sortMode == "guild" then
-		local aP = a._sort_guildPriority or 3
-		local bP = b._sort_guildPriority or 3
-		if aP ~= bP then
-			return aP < bP
-		end
-		
-		if aP == 1 then -- Both "Other Guild"
-			if a._sort_guildName ~= b._sort_guildName then
-				return a._sort_guildName < b._sort_guildName
-			end
-		end
-		return nil
-		
-	elseif sortMode == "class" then
-		local aP = a._sort_classPriority or 10
-		local bP = b._sort_classPriority or 10
-		if aP ~= bP then
-			return aP < bP
-		end
-		
-		if a._sort_className ~= b._sort_className then
-			return a._sort_className < b._sort_className
-		end
-		return nil
-		
-	elseif sortMode == "realm" then
-		local aP = a._sort_realmPriority or 2
-		local bP = b._sort_realmPriority or 2
-		if aP ~= bP then
-			return aP < bP
-		end
-		
-		if a._sort_realmName ~= b._sort_realmName then
-			return a._sort_realmName < b._sort_realmName
-		end
-		return nil
+	local comparator = compareByMode[sortMode]
+	if comparator then
+		return comparator(a, b)
 	end
-	
 	return nil
 end
 
