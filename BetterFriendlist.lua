@@ -217,6 +217,21 @@ function BFL:ApplyTabFonts()
 		_G.BetterFriendsFrameTab3,
 	}
 
+	local function GetTabSignature(tab)
+		if not tab then
+			return "0"
+		end
+		local text = ""
+		if tab.GetText then
+			text = tab:GetText() or ""
+		end
+		local isShown = "0"
+		if tab.IsShown and tab:IsShown() then
+			isShown = "1"
+		end
+		return text .. "|" .. isShown
+	end
+
 	-- Mark all tabs as protected from auto-resize
 	for _, tab in ipairs(bottomTabs) do
 		if tab then
@@ -238,6 +253,28 @@ function BFL:ApplyTabFonts()
 		local mainFrameSize = db.mainFrameSize and db.mainFrameSize.Default
 		frameWidth = (mainFrameSize and mainFrameSize.width) or db.defaultFrameWidth or 415
 	end
+
+	local selectedTopTabId = frame and frame.FriendsTabHeader and PanelTemplates_GetSelectedTab(frame.FriendsTabHeader)
+		or 0
+	local signature = table.concat({
+		tostring(frameWidth),
+		fontPath or "",
+		tostring(fontSize),
+		outlineValue,
+		tostring(selectedTopTabId),
+		GetTabSignature(bottomTabs[1]),
+		GetTabSignature(bottomTabs[2]),
+		GetTabSignature(bottomTabs[3]),
+		GetTabSignature(bottomTabs[4]),
+		GetTabSignature(topTabs[1]),
+		GetTabSignature(topTabs[2]),
+		GetTabSignature(topTabs[3]),
+	}, "||")
+	if self._tabFontCache and self._tabFontCache.signature == signature then
+		return
+	end
+	self._tabFontCache = self._tabFontCache or {}
+	self._tabFontCache.signature = signature
 
 	local tabOverlap = 15 -- Tabs overlap by 15px in XML anchoring
 
@@ -701,7 +738,6 @@ function BFL:ApplyTabFonts()
 		local grow = fontSize - defaultFontSize
 		topExtraHeight = math.max(0, math.floor(grow * 1.2 + 0.5))
 	end
-	local selectedTopTab = frame.FriendsTabHeader and PanelTemplates_GetSelectedTab(frame.FriendsTabHeader) or nil
 	ProcessTabGroup(
 		topTabs,
 		20,
@@ -713,7 +749,7 @@ function BFL:ApplyTabFonts()
 		-1,
 		0.8,
 		-5,
-		selectedTopTab,
+		selectedTopTabId,
 		-5,
 		-8
 	)

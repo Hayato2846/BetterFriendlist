@@ -357,30 +357,27 @@ end
 local function BuildDisplayList(self)
 	-- PERFY OPTIMIZATION (Phase 2B): Input Version Tracking
 	-- Skip expensive rebuild if inputs unchanged (600+ friends = 600+ operations!)
-	local currentInputs = {
-		friendsListVersion = BFL.FriendsListVersion or 0,
-		settingsVersion = BFL.SettingsVersion or 0, -- Fix: Track settings/groups changes
-		filterMode = self.filterMode or "all",
-		searchText = self.searchText or "",
-		numInvites = (BNGetNumFriendInvites and BNGetNumFriendInvites()) or 0,
-		invitesCollapsed = GetCVarBool("friendInvitesCollapsed") and 1 or 0,
-	}
+	local numInvitesForSignature
+	if BFL.MockFriendInvites and BFL.MockFriendInvites.enabled then
+		numInvitesForSignature = #BFL.MockFriendInvites.invites
+	else
+		numInvitesForSignature = (BNGetNumFriendInvites and BNGetNumFriendInvites()) or 0
+	end
 
-	-- Check if inputs changed
-	if self.lastBuildInputs then
-		local changed = false
-		for key, value in pairs(currentInputs) do
-			if self.lastBuildInputs[key] ~= value then
-				changed = true
-				break
-			end
-		end
+	local invitesCollapsed = GetCVarBool("friendInvitesCollapsed") and 1 or 0
+	local currentSignature = table.concat({
+		BFL.FriendsListVersion or 0,
+		BFL.SettingsVersion or 0, -- Fix: Track settings/groups changes
+		self.filterMode or "all",
+		self.searchText or "",
+		numInvitesForSignature,
+		invitesCollapsed,
+	}, "|")
 
-		if not changed and self.cachedDisplayList then
-			-- BFL:DebugPrint("|cff00ff00BuildDisplayList:|r Cache HIT (inputs unchanged)")
-			self.groupedFriends = self.cachedGroupedFriends or self.groupedFriends or {}
-			return self.cachedDisplayList -- INSTANT return, no rebuild!
-		end
+	if self.lastBuildSignature == currentSignature and self.cachedDisplayList then
+		-- BFL:DebugPrint("|cff00ff00BuildDisplayList:|r Cache HIT (inputs unchanged)")
+		self.groupedFriends = self.cachedGroupedFriends or self.groupedFriends or {}
+		return self.cachedDisplayList -- INSTANT return, no rebuild!
 	end
 
 	-- BFL:DebugPrint("|cffff8800BuildDisplayList:|r Cache MISS (rebuilding)")
@@ -413,12 +410,7 @@ local function BuildDisplayList(self)
 	-- end
 
 	-- Add friend invites at top (real or mock)
-	local numInvites
-	if BFL.MockFriendInvites and BFL.MockFriendInvites.enabled then
-		numInvites = #BFL.MockFriendInvites.invites
-	else
-		numInvites = BNGetNumFriendInvites and BNGetNumFriendInvites() or 0
-	end
+	local numInvites = numInvitesForSignature
 
 	if numInvites and numInvites > 0 then
 		table.insert(displayList, {
@@ -678,7 +670,7 @@ local function BuildDisplayList(self)
 	end
 
 	-- PERFY OPTIMIZATION (Phase 2B): Cache built display list
-	self.lastBuildInputs = currentInputs
+	self.lastBuildSignature = currentSignature
 	self.cachedDisplayList = displayList
 	self.groupedFriends = groupedFriends
 	self.cachedGroupedFriends = groupedFriends
@@ -2782,15 +2774,14 @@ local compareByMode = {
 	end,
 }
 
+local currentPrimaryComparator = nil
+local currentSecondaryComparator = nil
+local currentNameComparator = nil
+
 -- Optimized comparator to avoid closure allocation
 local function SortComparator(a, b)
-	local self = FriendsList
-	local primaryComparator = self.currentPrimaryComparator
-	local secondaryComparator = self.currentSecondaryComparator
-	local nameComparator = self.currentNameComparator
-
-	if primaryComparator then
-		local primaryResult = primaryComparator(a, b)
+	if currentPrimaryComparator then
+		local primaryResult = currentPrimaryComparator(a, b)
 		if primaryResult ~= nil then
 			return primaryResult
 		end
@@ -2802,8 +2793,8 @@ local function SortComparator(a, b)
 	end
 
 	-- If primary sort is equal, use secondary sort
-	if secondaryComparator and secondaryComparator ~= primaryComparator then
-		local secondaryResult = secondaryComparator(a, b)
+	if currentSecondaryComparator and currentSecondaryComparator ~= currentPrimaryComparator then
+		local secondaryResult = currentSecondaryComparator(a, b)
 		if secondaryResult ~= nil then
 			return secondaryResult
 		end
@@ -2821,8 +2812,8 @@ local function SortComparator(a, b)
 	end
 
 	-- Fallback: sort by name
-	if nameComparator then
-		local fallbackResult = nameComparator(a, b)
+	if currentNameComparator then
+		local fallbackResult = currentNameComparator(a, b)
 		if fallbackResult ~= nil then
 			return fallbackResult
 		end
@@ -2839,6 +2830,9 @@ function FriendsList:ApplySort() -- Store sort modes for the static comparator
 	self.currentPrimaryComparator = compareByMode[self.currentPrimarySort]
 	self.currentSecondaryComparator = compareByMode[self.currentSecondarySort]
 	self.currentNameComparator = compareByMode.name
+	currentPrimaryComparator = self.currentPrimaryComparator
+	currentSecondaryComparator = self.currentSecondaryComparator
+	currentNameComparator = self.currentNameComparator
 
 	-- Use static comparator to avoid closure allocation (Phase 9.4 Optimization)
 	table.sort(self.friendsList, SortComparator)
@@ -3312,7 +3306,7 @@ function FriendsList:OptimizedGroupToggle(groupId, expanding) -- Only possible o
 
 	-- PERFY OPTIMIZATION (Phase 2B): Invalidate BuildDisplayList cache
 	-- OptimizedGroupToggle bypasses BuildDisplayList, so cache is now stale
-	self.lastBuildInputs = nil
+	self.lastBuildSignature = nil
 
 	return true
 end
@@ -6153,99 +6147,9 @@ function FriendsList:UpdateSearchBoxWidth()
 	end
 
 	local frameWidth = frame:GetWidth()
-
-	-- ========================================
-	-- DETAILED DEBUG: Measure all elements
-	-- ========================================
-	local debugInfo = {}
-
-	-- Measure SearchBox
-	if header.SearchBox then
-		local sbLeft = header.SearchBox:GetLeft() or 0
-		local sbRight = header.SearchBox:GetRight() or 0
-		local sbWidth = header.SearchBox:GetWidth() or 0
-		debugInfo.searchBox = { left = sbLeft, right = sbRight, width = sbWidth }
+	if not frameWidth or frameWidth <= 0 then
+		return
 	end
-
-	-- Measure QuickFilter
-	if header.QuickFilter then
-		local qfLeft = header.QuickFilter:GetLeft() or 0
-		local qfRight = header.QuickFilter:GetRight() or 0
-		local qfWidth = header.QuickFilter:GetWidth() or 0
-		debugInfo.quickFilter = { left = qfLeft, right = qfRight, width = qfWidth }
-	end
-
-	-- Measure PrimarySortDropdown
-	if header.PrimarySortDropdown then
-		local psLeft = header.PrimarySortDropdown:GetLeft() or 0
-		local psRight = header.PrimarySortDropdown:GetRight() or 0
-		local psWidth = header.PrimarySortDropdown:GetWidth() or 0
-		debugInfo.primarySort = { left = psLeft, right = psRight, width = psWidth }
-	end
-
-	-- Measure SecondarySortDropdown
-	if header.SecondarySortDropdown then
-		local ssLeft = header.SecondarySortDropdown:GetLeft() or 0
-		local ssRight = header.SecondarySortDropdown:GetRight() or 0
-		local ssWidth = header.SecondarySortDropdown:GetWidth() or 0
-		debugInfo.secondarySort = { left = ssLeft, right = ssRight, width = ssWidth }
-	end
-
-	-- Measure BattlenetFrame (contains BattleTag)
-	if header.BattlenetFrame then
-		local bnLeft = header.BattlenetFrame:GetLeft() or 0
-		local bnRight = header.BattlenetFrame:GetRight() or 0
-		local bnWidth = header.BattlenetFrame:GetWidth() or 0
-		debugInfo.battlenet = { left = bnLeft, right = bnRight, width = bnWidth }
-
-		-- Measure Tag (BattleTag text inside BattlenetFrame)
-		if header.BattlenetFrame.Tag then
-			local tagWidth = header.BattlenetFrame.Tag:GetStringWidth() or 0
-			debugInfo.battlenetTag = { stringWidth = tagWidth }
-		end
-	end
-
-	-- Measure StatusDropdown
-	if header.StatusDropdown then
-		local sdLeft = header.StatusDropdown:GetLeft() or 0
-		local sdRight = header.StatusDropdown:GetRight() or 0
-		local sdWidth = header.StatusDropdown:GetWidth() or 0
-		debugInfo.statusDropdown = { left = sdLeft, right = sdRight, width = sdWidth }
-	end
-
-	-- Measure frame bounds
-	local frameLeft = frame:GetLeft() or 0
-	local frameRight = frame:GetRight() or 0
-	debugInfo.frame = { left = frameLeft, right = frameRight, width = frameWidth }
-
-	-- ========================================
-	-- CLIPPING DETECTION
-	-- ========================================
-	local clipping = {}
-	local rightmostElement = 0
-
-	-- Check each element if it extends beyond frame bounds
-	for elementName, data in pairs(debugInfo) do
-		if elementName ~= "frame" and elementName ~= "battlenetTag" and data.right then
-			if data.right > frameRight then
-				table.insert(clipping, {
-					name = elementName,
-					overflow = data.right - frameRight,
-				})
-			end
-			if data.right > rightmostElement then
-				rightmostElement = data.right
-			end
-		end
-	end
-
-	-- Calculate actual space used and available
-	local usedWidth = rightmostElement - frameLeft
-	local wastedSpace = frameRight - rightmostElement
-
-	-- ========================================
-	-- CALCULATE OPTIMAL SEARCHBOX WIDTH (RESPONSIVE)
-	-- ========================================
 
 	-- Classic Mode: Fixed width to fit dropdowns
 	if BFL.IsClassic then
@@ -6269,8 +6173,14 @@ function FriendsList:UpdateSearchBoxWidth()
 		availableWidth = minSearchBoxWidth
 	end
 
+	local lastWidth = header.SearchBox.BFL_LastWidth
+	if lastWidth and math.abs(lastWidth - availableWidth) < 0.5 then
+		return
+	end
+
 	-- Apply new width
 	header.SearchBox:SetWidth(availableWidth)
+	header.SearchBox.BFL_LastWidth = availableWidth
 
 	-- BFL:DebugPrint(string.format("|cff00ffffFriendsList:|r SearchBox width updated: %.1fpx (frame width: %.1fpx)",
 	-- 	availableWidth, frameWidth))
