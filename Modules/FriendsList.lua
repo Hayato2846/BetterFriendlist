@@ -2630,12 +2630,31 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 		-- Skip this render and wait for the next FRIENDLIST_UPDATE with complete data.
 		if not self.bnetDataReady then
 			if numBNetTotal == 0 then
-				-- No BNet friends at all - data is "ready" (nothing to wait for)
-				self.bnetDataReady = true
+				-- After login/reload, BNGetNumFriends() may temporarily return 0
+				-- even when the user has BNet friends (server data still loading).
+				-- Don't trust zero immediately - schedule a fallback timer.
+				-- If still 0 after 1s, user truly has no BNet friends.
+				if not self.bnetZeroFallbackTimer then
+					self.bnetZeroFallbackTimer = C_Timer.NewTimer(1.0, function()
+						self.bnetZeroFallbackTimer = nil
+						if not self.bnetDataReady then
+							self.bnetDataReady = true
+							self:UpdateFriendsList()
+						end
+					end)
+				end
+				-- Defer render until BNet data actually loads or fallback fires
+				isUpdatingFriendsList = false
+				return
 			else
 				local firstInfo = C_BattleNet.GetFriendAccountInfo(1)
 				if firstInfo and firstInfo.battleTag and firstInfo.battleTag ~= "" then
 					self.bnetDataReady = true
+					-- Cancel zero fallback timer if it was pending from a previous call
+					if self.bnetZeroFallbackTimer then
+						self.bnetZeroFallbackTimer:Cancel()
+						self.bnetZeroFallbackTimer = nil
+					end
 				else
 					-- Data not ready yet - defer render
 					needsRenderOnShow = true

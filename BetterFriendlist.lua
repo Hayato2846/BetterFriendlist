@@ -1388,9 +1388,6 @@ function ShowBetterFriendsFrame(tabIndex) -- Clear search box
 		searchText = ""
 	end
 
-	-- Force immediate refresh to ensure mock invites are shown
-	BFL:ForceRefreshFriendsList()
-
 	-- Use UI Panel system if enabled (for auto-repositioning)
 	-- Note: ShowUIPanel is protected in combat (since 8.2.0), fallback to Show()
 	if BetterFriendlistDB and BetterFriendlistDB.useUIPanelSystem and not InCombatLockdown() then
@@ -1404,6 +1401,12 @@ function ShowBetterFriendsFrame(tabIndex) -- Clear search box
 		ConfigureUIPanelAttributes(false)
 		BetterFriendsFrame:Show()
 	end
+
+	-- Force immediate refresh AFTER Show() so the frame is visible
+	-- and UpdateFriendsList() won't bail due to the visibility check.
+	-- Note: OnShow also calls UpdateFriendsList when needsRenderOnShow is set,
+	-- but ForceRefresh additionally updates font caches and clears pending updates.
+	BFL:ForceRefreshFriendsList()
 
 	-- Switch to requested tab if specified, otherwise default to current or 1
 	local targetTab = tabIndex
