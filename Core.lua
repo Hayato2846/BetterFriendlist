@@ -1,6 +1,6 @@
 -- Core.lua
 -- Main initialization file for BetterFriendlist addon
--- Version 2.3.1 - February 2026
+-- Version 2.3.2 - February 2026
 -- Complete replacement for WoW Friends frame with modular architecture
 
 -- Create addon namespace
@@ -123,9 +123,11 @@ function BFL:IsActionRestricted()
 	if InCombatLockdown() then
 		return true
 	end
-	if C_RestrictedActions and C_RestrictedActions.IsAddOnRestrictionActive then
-		if C_RestrictedActions.IsAddOnRestrictionActive() then
-			return true
+	if C_RestrictedActions and C_RestrictedActions.IsAddOnRestrictionActive and Enum.AddOnRestrictionType then
+		for _, restrictionType in pairs(Enum.AddOnRestrictionType) do
+			if C_RestrictedActions.IsAddOnRestrictionActive(restrictionType) then
+				return true
+			end
 		end
 	end
 	return false

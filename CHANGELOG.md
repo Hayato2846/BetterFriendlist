@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.3.2]       - 2026-02-10
+### Fixed
+- **Midnight API Fix** - Fixed `C_RestrictedActions.IsAddOnRestrictionActive` error caused by missing required `Enum.AddOnRestrictionType` argument (API changed in 12.0.0).
+
 ## [2.3.1]       - 2026-02-10
 ### Special Thanks
 - Huge shoutout to **R41z0r** again for another round of testing my addon <3
@@ -170,12 +174,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Startup Stability** - Fixed an issue where BetterFriendlist would remain open if other addons forcibly entered and exited Edit Mode during startup.
 - **Combat Protection** - Added combat protection for UI Panel attributes.
 - **Activity Tracker** - Added secret value protection in ActivityTracker for Midnight.
-
-## [2.2.2]       - 2026-01-18
-### Fixed
-- **Font Support** - Reverted the friend name font to `GameFontNormal`. This restores support for the 4 standard fonts (including Asian/Cyrillic characters).
-- **ElvUI Interaction** - **Note:** ElvUI Font Size settings now apply to the Friend Name again.
-- **Workaround** - This is a temporary workaround. Proper independent font settings will be added in the next version.
 
 ---
 
