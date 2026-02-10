@@ -754,6 +754,15 @@ function Compat.ConvertToRaid()
 	end
 end
 
+-- Convert raid to party
+function Compat.ConvertToParty()
+	if C_PartyInfo and C_PartyInfo.ConvertToParty then
+		C_PartyInfo.ConvertToParty()
+	elseif ConvertToParty then
+		ConvertToParty()
+	end
+end
+
 -- Request invite from unit (Retail only usually)
 function Compat.RequestInviteFromUnit(target)
 	if C_PartyInfo and C_PartyInfo.RequestInviteFromUnit then
@@ -843,6 +852,7 @@ BFL.RemoveFriendByIndex = Compat.RemoveFriendByIndex
 BFL.SetFriendNotes = Compat.SetFriendNotes
 BFL.InviteUnit = Compat.InviteUnit
 BFL.ConvertToRaid = Compat.ConvertToRaid
+BFL.ConvertToParty = Compat.ConvertToParty
 BFL.RequestInviteFromUnit = Compat.RequestInviteFromUnit
 BFL.BNInviteFriend = Compat.BNInviteFriend
 BFL.GetMaxLevel = Compat.GetMaxLevel

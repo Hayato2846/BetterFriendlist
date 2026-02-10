@@ -1,6 +1,6 @@
 -- Core.lua
 -- Main initialization file for BetterFriendlist addon
--- Version 2.3.0 - February 2026
+-- Version 2.3.1 - February 2026
 -- Complete replacement for WoW Friends frame with modular architecture
 
 -- Create addon namespace
@@ -535,6 +535,38 @@ function BFL:FireEventCallbacks(event, ...)
 	-- Special handling for FRIENDLIST_UPDATE to prevent "script ran too long" errors
 	-- This event can fire multiple times rapidly and trigger heavy processing in multiple modules
 	if event == "FRIENDLIST_UPDATE" then
+		-- Fast path: Until BNet data is fully loaded (battleTags available),
+		-- bypass debounce for instant population on login/reload.
+		-- Once data is ready, switch to debounced mode for burst protection.
+		local FriendsList = self:GetModule("FriendsList")
+		local bnetReady = FriendsList and FriendsList.bnetDataReady
+
+		if not bnetReady then
+			-- Immediate execution for initial data population (login/reload)
+			-- Cancel any pending debounce timer from a previous rapid fire
+			if self.pendingUpdateTicker then
+				self.pendingUpdateTicker:Cancel()
+				self.pendingUpdateTicker = nil
+			end
+			if self.callbackTicker then
+				self.callbackTicker:Cancel()
+				self.callbackTicker = nil
+			end
+
+			local callbacks = self.EventCallbacks[event]
+			if callbacks then
+				for _, entry in ipairs(callbacks) do
+					if entry and entry.callback then
+						local success, err = pcall(entry.callback)
+						if not success then
+							BFL:DebugPrint("|cffff0000BFL Error in FRIENDLIST_UPDATE callback:|r " .. tostring(err))
+						end
+					end
+				end
+			end
+			return
+		end
+
 		-- Debounce: Cancel pending update
 		if self.pendingUpdateTicker then
 			self.pendingUpdateTicker:Cancel()
@@ -550,33 +582,18 @@ function BFL:FireEventCallbacks(event, ...)
 				self.callbackTicker = nil
 			end
 
-			-- Run callbacks staggered to prevent frame freeze
+			-- Run all callbacks immediately (staggering is unnecessary with only a few callbacks)
 			local callbacks = self.EventCallbacks[event]
-			if not callbacks then
-				return
-			end
-
-			local index = 1
-			local numCallbacks = #callbacks
-
-			-- Process one callback every 0.05s
-			self.callbackTicker = C_Timer.NewTicker(0.05, function(timer)
-				if index > numCallbacks then
-					timer:Cancel()
-					self.callbackTicker = nil
-					return
-				end
-
-				local entry = callbacks[index]
-				if entry and entry.callback then
-					-- Use pcall to prevent one error from stopping the chain
-					local success, err = pcall(entry.callback)
-					if not success then
-						BFL:DebugPrint("|cffff0000BFL Error in FRIENDLIST_UPDATE callback:|r " .. tostring(err))
+			if callbacks then
+				for _, entry in ipairs(callbacks) do
+					if entry and entry.callback then
+						local success, err = pcall(entry.callback)
+						if not success then
+							BFL:DebugPrint("|cffff0000BFL Error in FRIENDLIST_UPDATE callback:|r " .. tostring(err))
+						end
 					end
 				end
-				index = index + 1
-			end)
+			end
 		end)
 		return
 	end

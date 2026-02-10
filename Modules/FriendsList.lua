@@ -1292,6 +1292,38 @@ local CLASSIC_MAX_BUTTONS = 50 -- Max visible buttons (Increased for safety)
 
 -- Initialize Classic FauxScrollFrame with button pool
 function FriendsList:InitializeClassicScrollFrame(scrollFrame) -- Store reference to scrollFrame for Classic mode
+	-- Safety: Destroy orphaned buttons from previous initialization to prevent duplicate rendering
+	if self.classicButtonPool then
+		for _, button in ipairs(self.classicButtonPool) do
+			button:Hide()
+			button:SetParent(nil)
+		end
+	end
+	if self.classicHeaderPool then
+		for _, header in ipairs(self.classicHeaderPool) do
+			header:Hide()
+			header:SetParent(nil)
+		end
+	end
+	if self.classicInviteHeaderPool then
+		for _, b in ipairs(self.classicInviteHeaderPool) do
+			b:Hide()
+			b:SetParent(nil)
+		end
+	end
+	if self.classicInviteButtonPool then
+		for _, b in ipairs(self.classicInviteButtonPool) do
+			b:Hide()
+			b:SetParent(nil)
+		end
+	end
+	if self.classicDividerPool then
+		for _, b in ipairs(self.classicDividerPool) do
+			b:Hide()
+			b:SetParent(nil)
+		end
+	end
+
 	self.classicScrollFrame = scrollFrame
 	self.classicButtonPool = {}
 	self.classicDisplayList = {}
@@ -2048,6 +2080,13 @@ end
 
 -- Initialize the module
 function FriendsList:Initialize() -- Initialize sort modes and filter from database
+	-- Guard against double initialization (Core.lua and BetterFriendlist.lua both call Initialize)
+	-- Double init in Classic creates orphaned button frames that cause duplicate rendering
+	if self.initialized then
+		return
+	end
+	self.initialized = true
+
 	local DB = BFL:GetModule("DB")
 	local db = DB and DB:Get() or {}
 	self.sortMode = db.primarySort or "status"
@@ -2079,11 +2118,11 @@ function FriendsList:Initialize() -- Initialize sort modes and filter from datab
 	-- Force Initial Layout (Fix for delayed SearchBox in Simple Mode)
 	self:UpdateScrollBoxExtent()
 
-	-- CRITICAL FIX (Phase 22): Immediate Data Population
-	-- Instead of waiting for the first event throttler, we force an update immediately
-	-- to populate the list instantly on Reload/Login.
-	-- BFL.BetterFriendlist_OnEvent -> ADDON_LOADED usually works, but this guarantees it.
-	self:UpdateFriendsList(true)
+	-- NOTE: We do NOT call UpdateFriendsList(true) here anymore.
+	-- At ADDON_LOADED time, BNet data is often incomplete (missing battleTags),
+	-- causing friends to appear under "No Group" until FRIENDLIST_UPDATE fires
+	-- with complete data. The needsRenderOnShow flag (default: true) ensures
+	-- the list renders correctly when the frame is first opened.
 
 	-- PERFY OPTIMIZATION (Phase 2A): Use named function for timer
 	-- Initialize responsive SearchBox width
@@ -2252,7 +2291,8 @@ function FriendsList:OnFriendListUpdate(forceImmediate) -- Event Coalescing (Mic
 	-- This handles "event bursts" (e.g. 50 friends coming online at once) by updating only once.
 
 	-- Phase 2: Allow bypassing throttle for critical UI interactions (Invites)
-	if forceImmediate then
+	-- Also bypass until BNet data is fully ready (battleTags loaded) for instant population
+	if forceImmediate or not self.bnetDataReady then
 		if self.updateTimer then
 			self.updateTimer:Cancel()
 			self.updateTimer = nil
@@ -2584,6 +2624,27 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 	if bnetFriends and BNGetNumFriends then
 		local numBNetTotal, numBNetOnline = BNGetNumFriends()
 
+		-- BNet data completeness check: After login/reload, the first API responses
+		-- may lack battleTags (returns nil/empty). Without battleTags, friend UIDs
+		-- won't match DB group assignments, causing all friends to show under "No Group".
+		-- Skip this render and wait for the next FRIENDLIST_UPDATE with complete data.
+		if not self.bnetDataReady then
+			if numBNetTotal == 0 then
+				-- No BNet friends at all - data is "ready" (nothing to wait for)
+				self.bnetDataReady = true
+			else
+				local firstInfo = C_BattleNet.GetFriendAccountInfo(1)
+				if firstInfo and firstInfo.battleTag and firstInfo.battleTag ~= "" then
+					self.bnetDataReady = true
+				else
+					-- Data not ready yet - defer render
+					needsRenderOnShow = true
+					isUpdatingFriendsList = false
+					return
+				end
+			end
+		end
+
 		for i = 1, numBNetTotal do
 			local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
 			if accountInfo then
@@ -2754,6 +2815,11 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 				end
 			end
 		end
+	end
+
+	-- Classic fallback: If BNet APIs don't exist, mark data as ready immediately
+	if not self.bnetDataReady then
+		self.bnetDataReady = true
 	end
 
 	-- Get WoW friends
@@ -5820,21 +5886,22 @@ function FriendsList:UpdateFriendButton(button, elementData)
 				end
 
 				-- Set atlas based on faction for cross-faction invites
-				if not BFL.IsClassic and friend.inviteAtlas then
-					if button.lastInviteAtlas ~= friend.inviteAtlas then
-						button.lastInviteAtlas = friend.inviteAtlas
+				if not BFL.IsClassic then
+					local targetAtlas = friend.inviteAtlas or "default"
+					if button.lastInviteAtlas ~= targetAtlas then
+						button.lastInviteAtlas = targetAtlas
 
-						if friend.inviteAtlas == "horde" then
+						if targetAtlas == "horde" then
 							button.travelPassButton.NormalTexture:SetAtlas("friendslist-invitebutton-horde-normal")
 							button.travelPassButton.PushedTexture:SetAtlas("friendslist-invitebutton-horde-pressed")
 							button.travelPassButton.DisabledTexture:SetAtlas("friendslist-invitebutton-horde-disabled")
-						elseif friend.inviteAtlas == "alliance" then
+						elseif targetAtlas == "alliance" then
 							button.travelPassButton.NormalTexture:SetAtlas("friendslist-invitebutton-alliance-normal")
 							button.travelPassButton.PushedTexture:SetAtlas("friendslist-invitebutton-alliance-pressed")
 							button.travelPassButton.DisabledTexture:SetAtlas(
 								"friendslist-invitebutton-alliance-disabled"
 							)
-						else -- default
+						else -- default (also covers BNet-only friends with no inviteAtlas)
 							button.travelPassButton.NormalTexture:SetAtlas("friendslist-invitebutton-default-normal")
 							button.travelPassButton.PushedTexture:SetAtlas("friendslist-invitebutton-default-pressed")
 							button.travelPassButton.DisabledTexture:SetAtlas(

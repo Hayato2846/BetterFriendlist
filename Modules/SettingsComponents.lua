@@ -1780,6 +1780,10 @@ function Components:CreateCheckboxDropdown(parent, checkboxData, dropdownData)
 
 		if rightLabel and dropdown then
 			local dropdownWidth = FIXED_CONTROL_WIDTH
+			-- Classic: UIDropDownMenu adds ~30px internal padding, so use smaller width
+			if BFL.IsClassic then
+				dropdownWidth = 120
+			end
 
 			dropdown:ClearAllPoints()
 			if BFL.IsClassic or not BFL.HasModernMenu then

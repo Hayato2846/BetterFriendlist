@@ -140,9 +140,14 @@ local BFL_PROTECTED_TABS = {}
 
 -- Hook PanelTemplates_TabResize to prevent auto-resize on our tabs
 -- This MUST run before any tab operations to intercept all resize attempts
+-- Classic is excluded: tabs use default CharacterFrameTabButtonTemplate sizing
 if PanelTemplates_TabResize then
 	local OriginalTabResize = PanelTemplates_TabResize
 	PanelTemplates_TabResize = function(tab, padding, absoluteSize, minWidth, maxWidth, ...)
+		-- Classic: Let default tab sizing through (ApplyTabFonts is Retail-only)
+		if BFL.IsClassic then
+			return OriginalTabResize(tab, padding, absoluteSize, minWidth, maxWidth, ...)
+		end
 		-- Check by reference (for cached tabs)
 		if BFL_PROTECTED_TABS[tab] then
 			return
@@ -162,6 +167,58 @@ function BFL:ApplyTabFonts()
 	if not db then
 		return
 	end
+
+	-- Classic: Simple font application - just set font and let tabs auto-size
+	if BFL.IsClassic then
+		local defaultFontName, defaultFontSize = _G.GameFontNormalSmall:GetFont()
+		local fontName = db.fontTabText or defaultFontName
+		local fontSize = db.fontSizeTabText or defaultFontSize
+		if fontSize > 19 then
+			fontSize = 19
+		end -- Classic max: prevent tabs from overflowing
+		local fontOutline = db.fontOutlineTabText or "NORMAL"
+
+		local outlineValue = ""
+		if fontOutline == "THINOUTLINE" then
+			outlineValue = "OUTLINE"
+		elseif fontOutline == "THICKOUTLINE" then
+			outlineValue = "THICKOUTLINE"
+		elseif fontOutline == "MONOCHROME" then
+			outlineValue = "MONOCHROME"
+		end
+
+		local fontPath = fontName
+		local SharedMedia = LibStub and LibStub("LibSharedMedia-3.0", true)
+		if SharedMedia and not fontName:find("\\") then
+			fontPath = SharedMedia:Fetch("font", fontName) or fontName
+		end
+
+		local padding = 20
+		local allTabs = {
+			_G.BetterFriendsFrameBottomTab1,
+			_G.BetterFriendsFrameBottomTab2,
+			_G.BetterFriendsFrameBottomTab3,
+			_G.BetterFriendsFrameBottomTab4,
+			_G.BetterFriendsFrameTab1,
+		}
+
+		for _, tab in ipairs(allTabs) do
+			if tab then
+				local fs = tab.Text or (tab.GetFontString and tab:GetFontString())
+				if fs then
+					fs:SetFont(fontPath, fontSize, outlineValue)
+					fs:SetShadowOffset(0, 0)
+					-- Measure text and size tab accordingly
+					fs:SetWidth(0)
+					fs:SetWordWrap(false)
+					local textWidth = fs:GetStringWidth() or 50
+					PanelTemplates_TabResize(tab, padding, nil, nil, nil)
+				end
+			end
+		end
+		return
+	end
+
 	local frame = BetterFriendsFrame
 
 	-- Determine default font props from game standard
@@ -626,7 +683,7 @@ function BFL:ApplyTabFonts()
 			{ tab = _G.BetterFriendsFrameBottomTab1, min = 80, weight = 0.6 }, -- Contacts
 			{ tab = _G.BetterFriendsFrameBottomTab2, min = 60, weight = 0.6 }, -- Who
 			{ tab = _G.BetterFriendsFrameBottomTab3, min = 60, weight = 0.6 }, -- Raid
-			{ tab = _G.BetterFriendsFrameBottomTab4, min = 120, weight = 2.0 }, -- Quick Join (Retail)
+			{ tab = _G.BetterFriendsFrameBottomTab4, min = 120, weight = 2.0 }, -- Quick Join
 		}
 
 		local active = {}
@@ -1465,11 +1522,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end
 			end
 
-			-- Initialize FriendsList module (sets up ScrollBox)
-			local FriendsList = BFL:GetModule("FriendsList")
-			if FriendsList and FriendsList.Initialize then
-				FriendsList:Initialize()
-			end
+			-- FriendsList:Initialize() is called by Core.lua's module initialization loop.
+			-- Do NOT call it again here — double init creates orphaned Classic button frames
+			-- that cause duplicate rendering (buttons from 1st init remain visible alongside 2nd init's buttons).
 
 			-- Initialize saved variables (fallback if modules not used)
 			BetterFriendlistDB = BetterFriendlistDB or {}
@@ -1674,10 +1729,84 @@ frame:SetScript("OnEvent", function(self, event, ...)
 						-- break -- Don't break, in case of duplicates
 					end
 				end
-				-- Re-add "Create if missing" logic?
-				-- No, if Blizzard hides the button (e.g. unknown generic unit), we probably shouldn't force it unless we know we have data.
-				-- But for BNet friends, we now support BattleTag/RealName fallback, so maybe we COULD add it if missing?
-				-- For now, sticking to "Replace Existing" to fix the crash.
+
+				-- If not found (e.g. Classic doesn't have a native Copy Character Name button), add our own
+				if not foundAndReplaced and rootDescription.CreateButton then
+					local buttonText = (L and L.MENU_COPY_CHARACTER_NAME) or "Copy Character Name"
+					rootDescription:CreateButton(buttonText, function()
+						local copyNameText = nil
+
+						if contextData.bnetIDAccount then
+							local accountInfo = C_BattleNet.GetAccountInfoByID(contextData.bnetIDAccount)
+							if accountInfo then
+								if accountInfo.gameAccountInfo and accountInfo.gameAccountInfo.characterName then
+									local charName = accountInfo.gameAccountInfo.characterName
+									local realmName = accountInfo.gameAccountInfo.realmName
+									if realmName and realmName ~= "" then
+										copyNameText = charName .. "-" .. realmName
+									else
+										copyNameText = charName
+									end
+								end
+								if (not copyNameText or copyNameText == "") and accountInfo.battleTag then
+									copyNameText = accountInfo.battleTag
+								end
+								if (not copyNameText or copyNameText == "") and accountInfo.accountName then
+									copyNameText = accountInfo.accountName
+								end
+							end
+						end
+
+						if not copyNameText or copyNameText == "" then
+							if contextData.name then
+								copyNameText = contextData.name
+								if not string.find(copyNameText, "-") then
+									if contextData.server and contextData.server ~= "" then
+										copyNameText = copyNameText .. "-" .. contextData.server
+									elseif contextData.realm and contextData.realm ~= "" then
+										copyNameText = copyNameText .. "-" .. contextData.realm
+									end
+								end
+							end
+
+							if menuTypeWrapper == "WHO" and (contextData.index or contextData.whoIndex) then
+								local index = contextData.whoIndex or contextData.index
+								local info = C_FriendList.GetWhoInfo(index)
+								if info and info.fullName then
+									copyNameText = info.fullName
+								end
+							end
+						end
+
+						StaticPopupDialogs["BETTERFRIENDLIST_COPY_URL"] = {
+							text = L.COPY_CHARACTER_NAME_POPUP_TITLE,
+							button1 = CLOSE,
+							hasEditBox = true,
+							editBoxWidth = 350,
+							OnShow = function(popup)
+								popup.EditBox:SetText(copyNameText or "")
+								popup.EditBox:SetFocus()
+								popup.EditBox:HighlightText()
+								popup.EditBox:SetScript("OnKeyUp", function(editBox, key)
+									if IsControlKeyDown() and key == "C" then
+										editBox:GetParent():Hide()
+									end
+								end)
+							end,
+							EditBoxOnEnterPressed = function(editBox)
+								editBox:GetParent():Hide()
+							end,
+							EditBoxOnEscapePressed = function(editBox)
+								editBox:GetParent():Hide()
+							end,
+							timeout = 0,
+							whileDead = true,
+							hideOnEscape = true,
+							preferredIndex = 3,
+						}
+						StaticPopup_Show("BETTERFRIENDLIST_COPY_URL")
+					end)
+				end
 			end
 
 			local function AddGroupsToFriendMenu(owner, rootDescription, contextData) -- Check and reset flag in one atomic operation
@@ -2118,8 +2247,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		or event == "BN_FRIEND_ACCOUNT_OFFLINE"
 		or event == "BN_FRIEND_INFO_CHANGED"
 	then
-		-- Fire callbacks for modules
-		BFL:FireEventCallbacks(event, ...)
+		-- NOTE: BFL:FireEventCallbacks(event) is NOT called here because Core.lua's
+		-- eventFrame already fires callbacks for all registered events (including these).
+		-- Calling it again would execute each callback twice per event.
 
 		-- CRITICAL (Phase 14d): Always update friend list data, even if UI is hidden
 		-- This ensures data stays synchronized with WoW API

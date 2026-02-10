@@ -17,18 +17,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [DRAFT]
+## [2.3.1]       - 2026-02-10
+### Special Thanks
+- Huge shoutout to **R41z0r** again for another round of testing my addon <3
 ### Added
 - **Context Menu Integration** - Added BFL options (Set Nickname, Groups, etc.) to friend right-click menus even when not opened from BFL (e.g. from chat links), provided the player is a recognized friend.
-- **Favorite Icon Style** - Added a setting to choose between BFL and Blizzard favorite icons (with icon previews).
+- **Favorite Icon Style** - Added a setting to choose between BFL and Blizzard favorite icons (with icon previews) in Retail.
 
 ### Changed
-- **Font Dropdown UX** - Font dropdowns now use single-check checkbox menus so the current selection stays visible without reopening.
+- **Font Dropdown UX** - Font dropdowns now use single-check checkbox menus so the current selection stays visible without reopening. Font dropdowns now preview the font.
 - **Settings Layout** - Moved "Show Welcome Message" above Favorite Icon controls.
 - **Favorite Icon Spacing** - Adjusted favorite icon sizing/padding in compact mode to keep names aligned.
 
 ### Fixed
-- **Context Menu** - Prevented BetterFriendlist options from appearing in context menus of non-friend players. Added comprehensive restriction protection (combat and secure execution) to avoid "Action Forbidden" errors during checks.
 - **UI Taint / Action Forbidden** - Fixed critical errors ("Action Forbidden") that could break the ESC key or Chat functionality during combat. Removed a conflict with Blizzard's window management system.
 - **Localization** - Fixed capitalization in context menu headers ("BetterFriendList" -> "BetterFriendlist") for consistency.
 - **Group Rename Display** - Fixed an issue where renaming groups (including built-in groups like "Favorites" or "No Group") would not visually update until a full UI reload.
@@ -42,11 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Show Faction Icons** - Fixed the setting so faction icons display correctly when enabled.
 - **Show Collapse Arrow** - Fixed the setting so collapse/expand arrows show when enabled.
 - **Raid Right-Click MT/MA** - Fixed raid context menu options for Main Tank/Main Assist not working.
-- **ElvUI Skin (Parse Error)** - Fixed a Lua error in ElvUI skinning caused by malformed `xpcall` error handlers that swallowed closing brackets.
 - **ElvUI Skin (Context Menus)** - Removed redundant context menu skinning code since ElvUI already handles this globally.
 - **ElvUI Skin (Missing Hooks)** - Added ElvUI skinning for Checkbox+Dropdown rows (e.g. Favorite Icon), Input fields (e.g. Streamer Mode custom text), and Button rows that were previously unskinned.
 - **Favorite Icon Cache** - Fixed favorite star icons incorrectly appearing on offline WoW friends due to a ScrollBox button recycling issue.
-- **Font Not Set Taint** - Fixed "FontString:SetText(): Font not set" errors that could cause Lua taint and break ESC/Chat during combat.
+- **Tabs Resizing** - Improved Tabs resizing when using big font sizes.
 
 ## [2.3.0]       - 2026-02-07
 ### Special Thanks

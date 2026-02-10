@@ -3100,7 +3100,7 @@ function Settings:RefreshGeneralTab()
 	}
 
 	local favoriteDropdownData = nil
-	if favoriteIconEnabled then
+	if favoriteIconEnabled and not BFL.IsClassic then
 		favoriteDropdownData = {
 			label = L.SETTINGS_FAVORITE_ICON_STYLE or "Favorite Icon",
 			entries = favoriteEntries,
