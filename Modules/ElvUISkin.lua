@@ -889,10 +889,6 @@ function ElvUISkin:SkinFrames(E, S)
 		BFL:DebugPrint("ElvUISkin: Error skinning Settings: " .. tostring(err))
 	end)
 
-	-- Skin Broker
-	BFL:DebugPrint("ElvUISkin: Skinning Broker")
-	self:SkinBroker(E, S)
-
 	-- Skin Changelog
 	BFL:DebugPrint("ElvUISkin: Skinning Changelog")
 	xpcall(function()
@@ -1503,26 +1499,6 @@ function ElvUISkin:SkinSettings(E, S)
 
 			C.IsSkinned = true
 		end
-	end
-end
-
-function ElvUISkin:SkinBroker(E, S)
-	-- Hook LibQTip to skin tooltips
-	local LQT = LibStub("LibQTip-1.0", true)
-	if LQT and not LQT.IsSkinnedByBFL then
-		local oldAcquire = LQT.Acquire
-		LQT.Acquire = function(self, key, ...)
-			local tooltip = oldAcquire(self, key, ...)
-			if key == "BetterFriendlistBrokerTT" or key == "BetterFriendlistBrokerDetailTT" then
-				if not tooltip.isSkinned then
-					tooltip:StripTextures()
-					tooltip:CreateBackdrop("Transparent")
-					tooltip.isSkinned = true
-				end
-			end
-			return tooltip
-		end
-		LQT.IsSkinnedByBFL = true
 	end
 end
 

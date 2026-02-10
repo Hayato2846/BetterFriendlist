@@ -8,7 +8,7 @@
 ## X-WoWI-ID: 26984
 ## X-Wago-ID: rNkPLl6a 
 ## SavedVariables: BetterFriendlistDB
-## OptionalDeps: LibStub, CallbackHandler-1.0, LibDataBroker-1.1, LibQTip-1.0, CustomNames, FriendListColors
+## OptionalDeps: LibStub, CallbackHandler-1.0, LibDataBroker-1.1, LibQTip-2.0, CustomNames, FriendListColors
 ## Bindings: Bindings.xml
 
 ## Category: User Interface
@@ -27,7 +27,7 @@
 Libs\LibStub\LibStub.lua
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
 Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
-Libs\LibQTip-1.0\lib.xml
+Libs\LibQTip-2.0\LibQTip-2.0.xml
 Libs\LibSharedMedia-3.0\lib.xml
 
 # Core

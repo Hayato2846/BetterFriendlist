@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+### Fixed
+- **Top Tab State Not Reset on Reopen** - Fixed a bug where closing the friends list while on the Recent Allies or RAF tab and reopening it would show the Friends tab as selected but display the content of the previously viewed tab. The top tab (FriendsTabHeader) state is now properly reset when reopening.
+
 ## [2.3.2]       - 2026-02-10
 ### Fixed
 - **Midnight API Fix** - Fixed `C_RestrictedActions.IsAddOnRestrictionActive` error caused by missing required `Enum.AddOnRestrictionType` argument (API changed in 12.0.0).
@@ -165,26 +169,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Mojibake Fix** - Fixed an issue where localized text (German, French, etc.) could display incorrect characters. (Core.lua)
 - **QuickJoin** - Fixed quick join tooltips.
 - **Edit Mode** - Fixed visibility issues when entering Edit Mode.
-
-## [2.2.3]       - 2026-01-25
-### Added
-- **Typography Settings** - Added detailed font customization for Friend Names, Friend Info, and Group Headers. (Shadow settings coming soon).
-- **Ignore List Enhancements** - Added support for "Global Ignore List" addon in our improved Ignore List frame, including a quick-toggle button.
-- **Settings Overhaul** - Started restructuring the Settings panel for better organization. More improvements to come!
-- **Group Visuals** - Added color customization for Group Collapse Arrows and Group Member Counts.
-- **Classic Visuals** - Improved the visual design of collapse and expand arrows for group headers in Classic versions.
-
-### Fixed
-- **Edit Mode Stability** - Fixed an issue where opening Edit Mode immediately on startup (by other addons) would show BFL in an invalid state if no friend data was present.
-- **Classic Localization** - Fixed missing localization keys for the Ignore List in Classic versions.
-- **Visual Consistency** - Fixed the default friend name color to perfectly match Blizzard's standard UI color.
-- **Quick Join Tooltips** - Fixed the "Request to Join" tooltip on travel pass buttons to show the correct group information.
-- **Migration Notifications** - Fixed a bug where the "Migration Successful" message would appear after every UI reload.
-- **Performance** - Implemented the second iteration of performance fixes for smoother scrolling and updates.
-- **Housing System** - Fixed an issue preventing players from visiting friends' houses.
-- **Startup Stability** - Fixed an issue where BetterFriendlist would remain open if other addons forcibly entered and exited Edit Mode during startup.
-- **Combat Protection** - Added combat protection for UI Panel attributes.
-- **Activity Tracker** - Added secret value protection in ActivityTracker for Midnight.
 
 ---
 

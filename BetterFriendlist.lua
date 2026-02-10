@@ -1422,6 +1422,13 @@ function ShowBetterFriendsFrame(tabIndex) -- Clear search box
 		targetTab = 1
 	end
 
+	-- Reset top tab (FriendsTabHeader) to Friends when reopening
+	-- Fix: Without this, reopening after viewing Recent Allies/RAF would show
+	-- stale content because FriendsTabHeader.selectedTab was not reset
+	if not BFL.IsClassic then
+		BetterFriendsFrame_ShowTab(1)
+	end
+
 	if targetTab >= 1 and targetTab <= 4 then
 		-- BFL:DebugPrint("[BFL] ShowBetterFriendsFrame: Switching to tab " .. targetTab)
 		PanelTemplates_SetTab(BetterFriendsFrame, targetTab)
@@ -2439,6 +2446,12 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 	local frame = BetterFriendsFrame
 	if not frame then
 		return
+	end
+
+	-- Update FriendsTabHeader.selectedTab to match displayed content
+	-- Without this, PanelTemplates_GetSelectedTab returns stale values after reopen
+	if frame.FriendsTabHeader then
+		PanelTemplates_SetTab(frame.FriendsTabHeader, tabIndex)
 	end
 
 	-- SEARCHBOX VISIBILITY IS NOW MANAGED ENTIRELY BY FriendsList:UpdateScrollBoxExtent()
