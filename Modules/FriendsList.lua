@@ -6067,7 +6067,10 @@ function FriendsList:UpdateFriendButton(button, elementData)
 				local iconYOffset = 0
 				local iconPadding = 2
 				if (self.settingsCache and self.settingsCache.favoriteIconStyle) == "blizzard" then
-					iconPadding = 3
+					-- Adjust X/Y offset to align Blizzard icon with BFL icon position
+					local bflIconSize = math.floor(nameHeight * 0.70)
+					iconYOffset = math.floor((iconSize - bflIconSize) / 2)
+					iconPadding = 2 - math.floor((iconSize - bflIconSize) / 2)
 				end
 
 				-- Re-measure width (crucial for delayed updates)
