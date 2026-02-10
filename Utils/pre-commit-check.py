@@ -10,6 +10,7 @@ Also trims changelog files to keep only the 10 most recent versions.
 
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -198,16 +199,37 @@ class ChangelogCleaner:
     def run(self) -> list[str]:
         """Run cleanup on all changelog files. Returns list of messages."""
         messages = []
+        staged_files = []
 
         changed_md, msg_md = self.trim_changelog_md()
         messages.append(f"{'[CLEANED]' if changed_md else '[OK]'} {msg_md}")
+        if changed_md:
+            staged_files.append(str(CHANGELOG_MD))
 
         synced_lua, msg_sync = self.sync_changelog_lua_from_md()
         messages.append(f"{'[SYNCED]' if synced_lua else '[OK]'} {msg_sync}")
+        if synced_lua:
+            staged_files.append(str(CHANGELOG_LUA))
 
         changed_lua, msg_lua = self.trim_changelog_lua()
         messages.append(f"{'[CLEANED]' if changed_lua else '[OK]'} {msg_lua}")
-        
+        if changed_lua:
+            staged_files.append(str(CHANGELOG_LUA))
+
+        # Auto-stage any files modified by the cleaner (fixes pre-commit hook ordering)
+        if staged_files:
+            unique_files = list(dict.fromkeys(staged_files))
+            try:
+                subprocess.run(
+                    ['git', 'add'] + unique_files,
+                    cwd=str(ADDON_ROOT),
+                    check=True,
+                    capture_output=True,
+                )
+                messages.append(f"[STAGED] Auto-staged {len(unique_files)} modified file(s)")
+            except (subprocess.CalledProcessError, FileNotFoundError) as e:
+                messages.append(f"[WARN] Could not auto-stage files: {e}")
+
         return messages
 
 
