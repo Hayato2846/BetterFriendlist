@@ -1074,9 +1074,17 @@ function QuickJoin:OnScrollBoxInitialize(button, elementData)
 		local healers = info.numHealers or 0
 		local dps = info.numDPS or 0
 
-		-- Format: "14 (1/2/11)" - Compact format to save space
-		-- Using a group icon texture would be nice, but text is clearer for now
-		button.MemberCount:SetText(string.format("|cffffd100%d|r |cffffffff(%d/%d/%d)|r", count, tanks, healers, dps))
+		-- Format: "14 (1/2/11)" - Only show roles if known and not secret
+		if info._hasSecretValues then
+			-- Secret: We likely don't have accurate counts. Hide misleading (0/0/0)
+			button.MemberCount:SetText("")
+		elseif tanks == 0 and healers == 0 and dps == 0 then
+			-- No role data available: Just show count
+			button.MemberCount:SetText(string.format("|cffffd100%d|r", count))
+		else
+			-- Full data available
+			button.MemberCount:SetText(string.format("|cffffd100%d|r |cffffffff(%d/%d/%d)|r", count, tanks, healers, dps))
+		end
 	end
 
 	-- 6. Update Role Icons
@@ -1426,35 +1434,43 @@ function QuickJoin:GetGroupInfo(groupGUID)
 
 					-- Activity name & Icon
 					local activityID
-					if hasSecretValues then
-						-- When secret: searchResultInfo fields are secret and cannot be iterated,
-						-- indexed, or compared. Use queueData.activityID (non-secret, from
-						-- C_SocialQueue) for activity resolution instead.
+					
+					-- 1. Try queueData (Always Safe, works for Secret and Normal)
+					-- queueData comes from C_SocialQueue.GetGroupQueues which is allowed in restricted environments
+					if queueData.activityID then
 						activityID = queueData.activityID
-					else
-						activityID = searchResultInfo.activityID or queueData.activityID
+					end
 
-						-- CRITICAL FIX: Handle activityIDs table (plural) which Blizzard uses now
-						if searchResultInfo.activityIDs then
-							-- BFL:DebugPrint("  activityIDs table found:")
-							for k, v in pairs(searchResultInfo.activityIDs) do
-								-- BFL:DebugPrint(string.format("    [%s] = %s", tostring(k), tostring(v)))
-							end
+					-- 2. Try searchResultInfo (Riskier if secret, but necessary for primary LFG data)
+					if not activityID and searchResultInfo then
+						-- If secret, we cannot access fields of searchResultInfo userdata directly without care
+						-- But we already handled 'hasSecretValues' check earlier for unsafe fields.
+						-- activityID field access is generally safe unless it triggers a comparison metamethod.
+						
+						if searchResultInfo.activityID and type(searchResultInfo.activityID) == "number" then
+							activityID = searchResultInfo.activityID
+						end
 
-							if not activityID then
-								-- Try to grab the first ID (usually it's an array)
-								if searchResultInfo.activityIDs[1] then
-									activityID = searchResultInfo.activityIDs[1]
-								else
-									-- Fallback for non-array tables (key-value or set)
-									local k, v = next(searchResultInfo.activityIDs)
-									if v and type(v) == "number" then
-										activityID = v
-									elseif k and type(k) == "number" then
-										activityID = k
+						-- CRITICAL FIX: Handle activityIDs table (plural) which Blizzard uses now (11.0+)
+						if not activityID and searchResultInfo.activityIDs then
+							-- BFL:DebugPrint("  activityIDs table found")
+							
+							-- Try first index directly (Safe for array tables)
+							if searchResultInfo.activityIDs[1] and type(searchResultInfo.activityIDs[1]) == "number" then
+								activityID = searchResultInfo.activityIDs[1]
+							
+							elseif not hasSecretValues then
+								-- Only iterate pairs if NOT secret (pairs() on userdata might be restricted/empty)
+								for k, v in pairs(searchResultInfo.activityIDs) do
+									if type(v) == "number" then 
+										activityID = v 
+										break 
+									end
+									if type(k) == "number" then 
+										activityID = k 
+										break 
 									end
 								end
-								-- BFL:DebugPrint("  Resolved ActivityID from activityIDs table:", activityID)
 							end
 						end
 					end
@@ -1641,8 +1657,10 @@ function QuickJoin:GetGroupInfo(groupGUID)
 						end
 					else
 						-- BFL:DebugPrint("  No ActivityID found in SearchResult or QueueData")
-						info.groupTitle = info.activityName
-						-- BFL:DebugPrint("  Fixed GroupTitle using ActivityName:", info.groupTitle)
+						if info.activityName and info.activityName ~= "" then
+							info.groupTitle = info.activityName
+							-- BFL:DebugPrint("  Fixed GroupTitle using ActivityName:", info.groupTitle)
+						end
 					end
 
 					-- Playstyle für Tooltip

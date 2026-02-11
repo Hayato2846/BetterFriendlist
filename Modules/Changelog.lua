@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 ## [DRAFT]
+
+## [2.3.4]       - 2026-02-12
+### Fixed
+- **QuickJoin Visual Regression** - Fixed an issue where the "Secret Passthrough" mode (introduced in v2.3.3) caused the QuickJoin frame to display empty titles and "(0/0/0)" role counts in restricted environments (e.g., M+). Now correctly prioritizes `queueData.activityID` (safe) over `searchResultInfo` (restricted) to resolve activity icons and titles, and attempts to use the new `activityIDs` table (Patch 11.0.2+) if available.
+- **Empty Group Titles** - Fixed fallback logic to ensure the Leader's Name is displayed as the Group Title if the Activity Name cannot be resolved, preventing blank rows.
+- **Role Count Display** - The role count text "(0/0/0)" is now hidden when role data is unavailable or secret, reducing UI clutter.
+
+## [2.3.3]       - 2026-02-11
 ### Added
 - **Note Cleanup Wizard** - Added a new wizard (Settings -> Advanced) to clean up FriendGroups-style note suffixes (#Group1#Group2) from friend notes. Features a searchable table showing Account Name, BattleTag, Original Note and Cleaned Note with inline editing. Supports both BNet and WoW friends. Includes automatic backup before applying changes. Per-row status icons (pending/success/error) with traffic-light colored backgrounds provide real-time visual feedback during the cleanup process. Respects Streamer Mode by masking Real IDs in the Account Name column and search filter.
 - **Note Backup Viewer & Restore** - Added a backup viewer (Settings -> Advanced) to inspect all backed-up friend notes side-by-side with current notes. Changed notes are highlighted. The restore process uses sequential per-row status icons (pending/success/error) with traffic-light colored backgrounds, matching the Cleanup Wizard's visual feedback. Includes a Backup button to create new backups directly from the viewer.
@@ -27,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Data Broker Tooltip Library** - Migrated the Data Broker tooltip from LibQTip-1.0 to LibQTip-2.0.
 
 ### Fixed
+- **QuickJoin Secret Values** - Fixed a crash (`attempt to perform boolean test on field 'autoAccept'`) caused by Patch 12.0.0 (Midnight) where certain group finder fields (autoAccept) became secret and caused security violations when used in boolean checks.
 - **Non-WoW Game Info Text** - Fixed friend info text for non-WoW games (Overwatch, Diablo, Hearthstone, etc.) showing raw client program codes (e.g., "Pro", "D4", "WTCG") instead of the rich presence text (e.g., "Competitive: In Game", "Greater Rift", "Ranked: In Game") like Blizzard's default UI does.
 - **Empty Account Name for BattleTag-Only Friends** - Fixed BNet friends with empty `accountName` (kString) showing a blank display name instead of falling back to the short BattleTag. Now follows Blizzard's `BNet_GetBNetAccountName` pattern: if accountName is nil, empty, or "???", the short BattleTag (before #) is used as fallback.
 - **Top Tab State Not Reset on Reopen** - Fixed a bug where closing the friends list while on the Recent Allies or RAF tab and reopening it would show the Friends tab as selected but display the content of the previously viewed tab. The top tab (FriendsTabHeader) state is now properly reset when reopening.
@@ -34,10 +43,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Performance
 - **QuickJoin Module Optimizations** - Reduced memory allocations and CPU usage in the QuickJoin/Social Queue module. Key changes: reuse relationship cache entry tables instead of creating new ones on every lookup (13.61% of total allocations), replaced closure-based sort comparator with static module-level functions eliminating per-sort closure allocation (8.66% + 4.10% of allocations), added fast-path for relationship cache key generation avoiding unnecessary string concatenation when clubId/fallback are nil (5.14% CPU), batch DataProvider insert via InsertTable instead of per-entry Insert calls (16.95% CPU), and cached QuickJoin module reference to avoid repeated lookups.
-
-## [2.3.3]       - 2026-02-11
-### Fixed
-- **QuickJoin Secret Values** - Fixed a crash (`attempt to perform boolean test on field 'autoAccept'`) caused by Patch 12.0.0 (Midnight) where certain group finder fields (autoAccept) became secret and caused security violations when used in boolean checks.
 
 ## [2.3.2]       - 2026-02-10
 ### Fixed
@@ -176,11 +181,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Performance** - Third iteration of performance added. If anything feels odd don't hesitate to contact
 - **RAF** - Fixed an issue blocking the usage of copy link button in RAF Frame
 - **Global Sync** - Fixed an error occuring while having own characters in sync added
-
-## [2.2.5]       - 2026-01-25
-### Fixed
-- **Combat Blocking Fix** - Fixed a critical issue where the Friends List window could not be opened during combat, even when UI Panel settings were disabled. This resolves the "ADDON_ACTION_BLOCKED" error caused by unnecessary secure templates.
-- **Localization** - Fixed encoding issues in English localization (enUS) where bullets and arrows were displayed as corrupted characters.
 
 ---
 
