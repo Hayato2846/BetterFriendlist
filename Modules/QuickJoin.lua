@@ -56,7 +56,12 @@ local updateTimer = nil
 local RELATIONSHIP_CACHE_TTL = 0.5
 
 local function GetRelationshipCacheKey(guid, missingNameFallback, clubId)
-	return string.format("%s|%s|%s", tostring(guid), tostring(clubId or ""), tostring(missingNameFallback or ""))
+	-- Fast path: most calls have no clubId/fallback (avoids all concat/tostring)
+	if not clubId and not missingNameFallback then
+		return guid
+	end
+	-- Slow path: build composite key only when needed
+	return guid .. "|" .. (clubId and tostring(clubId) or "") .. "|" .. (missingNameFallback and tostring(missingNameFallback) or "")
 end
 
 local function TryGetCachedRelationship(guid, missingNameFallback, clubId)

@@ -184,7 +184,11 @@ function BetterQuickJoinFrame_Update(self)
 		self._bflQuickJoinDataProvider = dataProvider
 	end
 
-	if dataProvider.Flush and dataProvider.Insert then
+	if dataProvider.Flush and dataProvider.InsertTable then
+		dataProvider:Flush()
+		dataProvider:InsertTable(entries or {})
+		self.ScrollBox:SetDataProvider(dataProvider, ScrollBoxConstants.RetainScrollPosition)
+	elseif dataProvider.Flush and dataProvider.Insert then
 		dataProvider:Flush()
 		for _, entry in ipairs(entries or {}) do
 			dataProvider:Insert(entry)
