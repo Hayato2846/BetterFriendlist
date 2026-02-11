@@ -71,8 +71,8 @@ BFL:RegisterLocale("ptBR", function()
 	L.RAID_MSG_MOVE_SUCCESS = "%s movido para o Grupo %d"
 	L.RAID_ERROR_MOVE_FAILED = "Movimento falhou: %s"
 	L.DIALOG_MIGRATE_TEXT =
-		"Migrar grupos do FriendGroups para BetterFriendlist?\n\nIsso irá:\n• Criar grupos das notas BNet\n• Atribuir amigos aos grupos\n• Opcionalmente limpar notas\n\n|cffff0000Aviso: Irreversível!|r"
-	L.DIALOG_MIGRATE_BTN1 = "Migrar e Limpar Notas"
+		"Migrar grupos do FriendGroups para BetterFriendlist?\n\nIsso irá:\n• Criar grupos das notas BNet\n• Atribuir amigos aos grupos\n• Opcionalmente abrir o Assistente de Limpeza para revisar e limpar notas\n\n|cffff0000Aviso: Irreversível!|r"
+	L.DIALOG_MIGRATE_BTN1 = "Migrar e Revisar Notas"
 	L.DIALOG_MIGRATE_BTN2 = "Apenas Migrar"
 	L.DIALOG_MIGRATE_BTN3 = "Cancelar"
 

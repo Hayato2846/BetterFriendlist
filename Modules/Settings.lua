@@ -1549,32 +1549,25 @@ function Settings:MigrateFriendGroups(cleanupNotes, force)
 	local groupOrderArray = { "favorites" }
 
 	for _, groupName in ipairs(sortedGroupNames) do
-		local success, groupId = Groups:CreateWithOrder(groupName, currentOrder)
-		if success and groupId then
-			groupNameMap[groupName] = groupId
+		-- First: Check if a group with this name already exists (handles renamed groups too)
+		local existingGroupId = Groups:GetGroupIdByName(groupName)
+		if existingGroupId then
+			groupNameMap[groupName] = existingGroupId
 			migratedGroups[groupName] = true
-			table.insert(groupOrderArray, groupId)
-			BFL:DebugPrint("|cff00ff00BetterFriendlist:|r   ✓ Created:", groupName, "(order:", currentOrder, ")")
+			table.insert(groupOrderArray, existingGroupId)
+			BFL:DebugPrint("|cffffff00BetterFriendlist:|r   [!] Existing:", groupName, "(using existing group)")
 			currentOrder = currentOrder + 1
 		else
-			-- Group already exists - get its ID by name
-			if groupId == "Group already exists" then
-				local existingGroupId = Groups:GetGroupIdByName(groupName)
-				if existingGroupId then
-					groupNameMap[groupName] = existingGroupId
-					migratedGroups[groupName] = true
-					table.insert(groupOrderArray, existingGroupId)
-					BFL:DebugPrint("|cffffff00BetterFriendlist:|r   [!] Existing:", groupName, "(using existing group)")
-					currentOrder = currentOrder + 1
-				else
-					BFL:DebugPrint(
-						"|cffff0000BetterFriendlist:|r   ✗ FAILED:",
-						groupName,
-						"- Group exists but ID not found"
-					)
-				end
+			-- Group doesn't exist by name - create it
+			local success, groupId = Groups:CreateWithOrder(groupName, currentOrder)
+			if success and groupId then
+				groupNameMap[groupName] = groupId
+				migratedGroups[groupName] = true
+				table.insert(groupOrderArray, groupId)
+				BFL:DebugPrint("|cff00ff00BetterFriendlist:|r   Created:", groupName, "(order:", currentOrder, ")")
+				currentOrder = currentOrder + 1
 			else
-				BFL:DebugPrint("|cffff0000BetterFriendlist:|r   ✗ FAILED:", groupName, "-", tostring(groupId))
+				BFL:DebugPrint("|cffff0000BetterFriendlist:|r   FAILED:", groupName, "-", tostring(groupId))
 			end
 		end
 	end
@@ -1681,7 +1674,8 @@ function Settings:ShowMigrationDialog()
 		button2 = L.DIALOG_MIGRATE_BTN2,
 		button3 = L.DIALOG_MIGRATE_BTN3,
 		OnAccept = function()
-			Settings:MigrateFriendGroups(true, true)
+			Settings:MigrateFriendGroups(false, true)
+			BFL.NoteCleanupWizard:Show()
 		end,
 		OnCancel = function()
 			Settings:MigrateFriendGroups(false, true)

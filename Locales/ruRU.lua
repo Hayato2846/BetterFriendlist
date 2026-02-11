@@ -75,8 +75,8 @@ BFL:RegisterLocale("ruRU", function()
 	L.RAID_MSG_MOVE_SUCCESS = "%s перемещен в Группу %d"
 	L.RAID_ERROR_MOVE_FAILED = "Перемещение не удалось: %s"
 	L.DIALOG_MIGRATE_TEXT =
-		"Перенести группы друзей из FriendGroups в BetterFriendlist?\n\nЭто сделает:\n Создание всех групп из заметок BNet\n Назначение друзей в их группы\n Опционально очистка заметок\n\n|cffff0000Внимание: Это действие нельзя отменить!|r"
-	L.DIALOG_MIGRATE_BTN1 = "Перенести и Очистить Заметки"
+		"Перенести группы друзей из FriendGroups в BetterFriendlist?\n\nЭто сделает:\n Создание всех групп из заметок BNet\n Назначение друзей в их группы\n Опционально открыть Мастер Очистки для проверки и очистки заметок\n\n|cffff0000Внимание: Это действие нельзя отменить!|r"
+	L.DIALOG_MIGRATE_BTN1 = "Перенести и Проверить Заметки"
 	L.DIALOG_MIGRATE_BTN2 = "Только Перенести"
 	L.DIALOG_MIGRATE_BTN3 = "Отмена"
 
@@ -1214,7 +1214,7 @@ BFL:RegisterLocale("ruRU", function()
 		"Показать или скрыть значок стрелки для сворачивания групп"
 	L.SETTINGS_GROUP_ARROW_ALIGN = "Выравнивание Стрелки Сворачивания"
 	L.SETTINGS_GROUP_ARROW_ALIGN_DESC =
-		"Установить выравнивание значка стрелки сворачивания/разворачива������������ия"
+		"Установить выравнивание значка стрелки сворачивания/разворачива��������������ия"
 	L.SETTINGS_FONT_FACE = "Шрифт"
 	L.SETTINGS_COLOR_GROUP_COUNT = "Цвет Счётчика Группы"
 	L.SETTINGS_COLOR_GROUP_ARROW = "Цвет Стрелки Сворачивания"

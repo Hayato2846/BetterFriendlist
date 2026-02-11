@@ -296,8 +296,10 @@ local function EnsureGroupHeaderCountText(button)
 		countText:SetFontObject(baseFontObj)
 	elseif _G.GameFontNormal then
 		countText:SetFontObject(_G.GameFontNormal)
+	else
+		-- Only hardcode fallback if no FontObject is available at all
+		countText:SetFont("Fonts\\FRIZQT__.TTF", 12, "")
 	end
-	countText:SetFont("Fonts\\FRIZQT__.TTF", 12, "")
 	EnsureGroupHeaderFont(countText)
 	button.CountText = countText
 	return countText
@@ -339,6 +341,12 @@ local function SyncGroupHeaderFont(fs, countFs)
 	local fontObj = fs:GetFontObject()
 	if fontObj then
 		countFs:SetFontObject(fontObj)
+		-- Also apply SetFont to clear any per-instance font override
+		-- that may persist from EnsureGroupHeaderCountText or previous renders
+		local fontPath, fontSize, fontFlags = fs:GetFont()
+		if fontPath then
+			countFs:SetFont(fontPath, fontSize, fontFlags or "")
+		end
 		return
 	end
 

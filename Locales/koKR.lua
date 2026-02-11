@@ -73,8 +73,8 @@ BFL:RegisterLocale("koKR", function()
 	L.RAID_MSG_MOVE_SUCCESS = "%s moved to Group %d"
 	L.RAID_ERROR_MOVE_FAILED = "Move failed: %s"
 	L.DIALOG_MIGRATE_TEXT =
-		"FriendGroups에서 BetterFriendlist로 친구 그룹을 마이그레이션하시겠습니까?\n\n다음을 수행합니다:\n• BNet 메모에서 모든 그룹 생성\n• 친구를 그룹에 할당\n• 선택적으로 메모 정리\n\n|cffff0000경고: 이 작업은 취소할 수 없습니다!|r"
-	L.DIALOG_MIGRATE_BTN1 = "마이그레이션 및 메모 정리"
+		"FriendGroups에서 BetterFriendlist로 친구 그룹을 마이그레이션하시겠습니까?\n\n다음을 수행합니다:\n• BNet 메모에서 모든 그룹 생성\n• 친구를 그룹에 할당\n• 선택적으로 메모 정리 마법사를 열어 메모를 검토 및 정리\n\n|cffff0000경고: 이 작업은 취소할 수 없습니다!|r"
+	L.DIALOG_MIGRATE_BTN1 = "마이그레이션 및 메모 검토"
 	L.DIALOG_MIGRATE_BTN2 = "마이그레이션만"
 	L.DIALOG_MIGRATE_BTN3 = "취소"
 

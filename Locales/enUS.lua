@@ -72,8 +72,8 @@ local function LoadEnUS()
 	L.RAID_MSG_MOVE_SUCCESS = "%s moved to Group %d"
 	L.RAID_ERROR_MOVE_FAILED = "Move failed: %s"
 	L.DIALOG_MIGRATE_TEXT =
-		"Migrate friend groups from FriendGroups to BetterFriendlist?\n\nThis will:\n• Create all groups from BNet notes\n• Assign friends to their groups\n• Optionally clean up notes\n\n|cffff0000Warning: This cannot be undone!|r"
-	L.DIALOG_MIGRATE_BTN1 = "Migrate & Clean Notes"
+		"Migrate friend groups from FriendGroups to BetterFriendlist?\n\nThis will:\n• Create all groups from BNet notes\n• Assign friends to their groups\n• Optionally open the Note Cleanup Wizard to review and clean notes\n\n|cffff0000Warning: This cannot be undone!|r"
+	L.DIALOG_MIGRATE_BTN1 = "Migrate & Review Notes"
 	L.DIALOG_MIGRATE_BTN2 = "Migrate Only"
 	L.DIALOG_MIGRATE_BTN3 = "Cancel"
 

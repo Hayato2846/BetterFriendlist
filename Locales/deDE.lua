@@ -68,8 +68,8 @@ BFL:RegisterLocale("deDE", function()
 	L.RAID_MSG_MOVE_SUCCESS = "%s -> Gruppe %d"
 	L.RAID_ERROR_MOVE_FAILED = "Verschieben fehlgeschlagen: %s"
 	L.DIALOG_MIGRATE_TEXT =
-		"FriendGroups zu BetterFriendlist migrieren?\n\nDas passiert:\n• Gruppen aus BNet-Notizen erstellen\n• Freunde zuweisen\n• Optional: Notizen aufräumen\n\n|cffff0000Warnung: Nicht rückgängig machbar!|r"
-	L.DIALOG_MIGRATE_BTN1 = "Migrieren & Notizen aufräumen"
+		"FriendGroups zu BetterFriendlist migrieren?\n\nDas passiert:\n• Gruppen aus BNet-Notizen erstellen\n• Freunde zuweisen\n• Optional: Notizen im Bereinigungs-Assistenten prüfen und aufräumen\n\n|cffff0000Warnung: Nicht rückgängig machbar!|r"
+	L.DIALOG_MIGRATE_BTN1 = "Migrieren & Notizen prüfen"
 	L.DIALOG_MIGRATE_BTN2 = "Nur Migrieren"
 	L.DIALOG_MIGRATE_BTN3 = "Abbrechen"
 

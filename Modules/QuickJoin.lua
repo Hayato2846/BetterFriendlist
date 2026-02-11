@@ -39,6 +39,7 @@ local TOAST_DURATION = 8.0 -- Toast button display duration
 QuickJoin.initialized = false
 QuickJoin.availableGroups = {} -- List of available group GUIDs
 QuickJoin.groupCache = {} -- Cached group information
+QuickJoin.activityInfoCache = {} -- Persistent cache: lfgListID -> {activityName, activityIcon, isEJIcon}
 QuickJoin.lastUpdate = 0 -- Timestamp of last update
 QuickJoin.updateQueued = false -- Pending update flag
 QuickJoin.config = nil -- Social Queue Config (from C_SocialQueue.GetConfig)
@@ -1069,21 +1070,30 @@ function QuickJoin:OnScrollBoxInitialize(button, elementData)
 
 	-- 5. Set Member Count (New Frame)
 	if button.MemberCount then
-		local count = info.numMembers or 1
 		local tanks = info.numTanks or 0
 		local healers = info.numHealers or 0
 		local dps = info.numDPS or 0
 
-		-- Format: "14 (1/2/11)" - Only show roles if known and not secret
-		if info._hasSecretValues then
-			-- Secret: We likely don't have accurate counts. Hide misleading (0/0/0)
-			button.MemberCount:SetText("")
-		elseif tanks == 0 and healers == 0 and dps == 0 then
+		-- numMembers may be a secret value (not a number) in restricted mode.
+		-- In that case, compute it from role counts if available.
+		local count
+		if type(info.numMembers) == "number" then
+			count = info.numMembers
+		elseif tanks + healers + dps > 0 then
+			count = tanks + healers + dps
+		else
+			count = 1
+		end
+
+		-- Format: "14 (1/2/11)" - Show roles when available
+		if tanks == 0 and healers == 0 and dps == 0 then
 			-- No role data available: Just show count
 			button.MemberCount:SetText(string.format("|cffffd100%d|r", count))
 		else
-			-- Full data available
-			button.MemberCount:SetText(string.format("|cffffd100%d|r |cffffffff(%d/%d/%d)|r", count, tanks, healers, dps))
+			-- Role data available (from API or cached from non-secret state)
+			button.MemberCount:SetText(
+				string.format("|cffffd100%d|r |cffffffff(%d/%d/%d)|r", count, tanks, healers, dps)
+			)
 		end
 	end
 
@@ -1312,6 +1322,12 @@ function QuickJoin:GetGroupInfo(groupGUID)
 		return cached.info
 	end
 
+	-- Keep a reference to the old (possibly expired) cache entry.
+	-- If we transition from non-secret to secret, we can reuse resolved
+	-- data (activityName, activityIcon, role counts) from the old entry
+	-- instead of losing them.
+	local previousInfo = cached and cached.info or nil
+
 	-- Get fresh info from API
 	local canJoin, numQueues, needTank, needHealer, needDamage, isSoloQueueParty, questSessionActive, leaderGUID =
 		C_SocialQueue.GetGroupInfo(groupGUID)
@@ -1414,27 +1430,39 @@ function QuickJoin:GetGroupInfo(groupGUID)
 					end
 
 					-- Get role distribution using C_LFGList.GetSearchResultMemberCounts
-					-- Skip when secret: this API may also return secret values during lockdown
-					if not hasSecretValues then
-						local memberCounts = C_LFGList.GetSearchResultMemberCounts(queueData.lfgListID)
-						if memberCounts then
-							info.numTanks = memberCounts.TANK or 0
-							info.numHealers = memberCounts.HEALER or 0
-							info.numDPS = memberCounts.DAMAGER or 0
-						else
-							info.numTanks = 0
-							info.numHealers = 0
-							info.numDPS = 0
+					-- Try even during secret mode (pcall) - the API might still work.
+					-- If it fails, fall back to previously cached non-secret data.
+					local gotRoleCounts = false
+					local ok, memberCounts = pcall(C_LFGList.GetSearchResultMemberCounts, queueData.lfgListID)
+					if ok and memberCounts then
+						local t = memberCounts.TANK
+						local h = memberCounts.HEALER
+						local d = memberCounts.DAMAGER
+						-- Verify we got real numbers (not secret userdata)
+						if type(t) == "number" and type(h) == "number" and type(d) == "number" then
+							info.numTanks = t
+							info.numHealers = h
+							info.numDPS = d
+							gotRoleCounts = true
 						end
-					else
-						info.numTanks = 0
+					end
+
+					-- Fallback: Reuse role counts from a previous non-secret cache
+					if not gotRoleCounts and previousInfo and not previousInfo._hasSecretValues then
+						info.numTanks = previousInfo.numTanks or 0
+						info.numHealers = previousInfo.numHealers or 0
+						info.numDPS = previousInfo.numDPS or 0
+						gotRoleCounts = true
+					end
+
+					if not gotRoleCounts then
 						info.numHealers = 0
 						info.numDPS = 0
 					end
 
 					-- Activity name & Icon
 					local activityID
-					
+
 					-- 1. Try queueData (Always Safe, works for Secret and Normal)
 					-- queueData comes from C_SocialQueue.GetGroupQueues which is allowed in restricted environments
 					if queueData.activityID then
@@ -1446,31 +1474,35 @@ function QuickJoin:GetGroupInfo(groupGUID)
 						-- If secret, we cannot access fields of searchResultInfo userdata directly without care
 						-- But we already handled 'hasSecretValues' check earlier for unsafe fields.
 						-- activityID field access is generally safe unless it triggers a comparison metamethod.
-						
+
 						if searchResultInfo.activityID and type(searchResultInfo.activityID) == "number" then
 							activityID = searchResultInfo.activityID
 						end
 
 						-- CRITICAL FIX: Handle activityIDs table (plural) which Blizzard uses now (11.0+)
+						-- In secret mode, activityIDs is a secret userdata that throws errors when
+						-- indexed. We use pcall to safely attempt extraction - if it works, great.
+						-- If not, the previousInfo cache fallback will handle it.
 						if not activityID and searchResultInfo.activityIDs then
-							-- BFL:DebugPrint("  activityIDs table found")
-							
-							-- Try first index directly (Safe for array tables)
-							if searchResultInfo.activityIDs[1] and type(searchResultInfo.activityIDs[1]) == "number" then
-								activityID = searchResultInfo.activityIDs[1]
-							
-							elseif not hasSecretValues then
-								-- Only iterate pairs if NOT secret (pairs() on userdata might be restricted/empty)
+							local ok, result = pcall(function()
+								-- Try array index first
+								if searchResultInfo.activityIDs[1] then
+									return searchResultInfo.activityIDs[1]
+								end
+								-- Try pairs iteration as fallback
 								for k, v in pairs(searchResultInfo.activityIDs) do
-									if type(v) == "number" then 
-										activityID = v 
-										break 
+									if type(v) == "number" then
+										return v
 									end
-									if type(k) == "number" then 
-										activityID = k 
-										break 
+									if type(k) == "number" then
+										return k
 									end
 								end
+								return nil
+							end)
+
+							if ok and result and type(result) == "number" then
+								activityID = result
 							end
 						end
 					end
@@ -1482,6 +1514,12 @@ function QuickJoin:GetGroupInfo(groupGUID)
 						if activityInfo then
 							-- BFL:DebugPrint("  ActivityInfo Found:", activityInfo.fullName)
 							info.activityName = activityInfo.fullName
+
+							-- Persist activity resolution so it survives secret mode transitions
+							-- (the groupCache TTL causes previousInfo to be lost after repeated secret fetches)
+							self.activityInfoCache[queueData.lfgListID] = self.activityInfoCache[queueData.lfgListID]
+								or {}
+							self.activityInfoCache[queueData.lfgListID].activityName = activityInfo.fullName
 
 							if activityInfo.groupFinderActivityGroupID then
 								local _, groupIcon =
@@ -1651,6 +1689,12 @@ function QuickJoin:GetGroupInfo(groupGUID)
 										-- BFL:DebugPrint("          ✅ Heuristic: Assumed Dungeon (5 players): 525134")
 									end
 								end
+
+								-- Update persistent activity cache with resolved icon
+								if self.activityInfoCache[queueData.lfgListID] then
+									self.activityInfoCache[queueData.lfgListID].activityIcon = info.activityIcon
+									self.activityInfoCache[queueData.lfgListID].isEJIcon = info.isEJIcon
+								end
 							end
 						else
 							-- BFL:DebugPrint("  ActivityInfo is NIL for ID:", activityID)
@@ -1734,6 +1778,54 @@ function QuickJoin:GetGroupInfo(groupGUID)
 	-- FIX: Icon Overrides for known broken icons (Green Squares)
 	if info.activityName then
 		-- Add other overrides here if needed
+	end
+
+	-- Secret mode fallback: If we're in secret mode, reuse resolved activity data
+	-- from previous cache or persistent activity cache. IMPORTANT: Secret kStrings
+	-- (groupTitle, numMembers, leaderName) must NOT be compared with == / ~=.
+	-- activityName and activityIcon are always normal Lua values (resolved from
+	-- C_LFGList.GetActivityInfoTable) so they're safe to compare.
+	if info._hasSecretValues and (info.activityName == nil or info.activityName == "") then
+		-- Fallback 1: previousInfo (works regardless of whether it was also secret,
+		-- because activityName is a normal Lua string, not a secret value)
+		if previousInfo and previousInfo.activityName and previousInfo.activityName ~= "" then
+			info.activityName = previousInfo.activityName
+		end
+
+		-- Fallback 2: Persistent activity cache (survives repeated secret refreshes)
+		if info.activityName == nil or info.activityName == "" then
+			local lfgListID = info.queues
+				and info.queues[1]
+				and info.queues[1].queueData
+				and info.queues[1].queueData.lfgListID
+			if lfgListID and self.activityInfoCache[lfgListID] then
+				local cached = self.activityInfoCache[lfgListID]
+				if cached.activityName and cached.activityName ~= "" then
+					info.activityName = cached.activityName
+				end
+			end
+		end
+	end
+
+	if info._hasSecretValues and (info.activityIcon == nil or info.activityIcon == 0) then
+		if previousInfo and previousInfo.activityIcon then
+			info.activityIcon = previousInfo.activityIcon
+			info.isEJIcon = previousInfo.isEJIcon
+		end
+
+		if info.activityIcon == nil or info.activityIcon == 0 then
+			local lfgListID = info.queues
+				and info.queues[1]
+				and info.queues[1].queueData
+				and info.queues[1].queueData.lfgListID
+			if lfgListID and self.activityInfoCache[lfgListID] then
+				local cached = self.activityInfoCache[lfgListID]
+				if cached.activityIcon then
+					info.activityIcon = cached.activityIcon
+					info.isEJIcon = cached.isEJIcon
+				end
+			end
+		end
 	end
 
 	-- Cache the info

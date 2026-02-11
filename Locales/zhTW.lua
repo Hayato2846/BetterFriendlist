@@ -47,8 +47,8 @@ BFL:RegisterLocale("zhTW", function()
 	L.RAID_HELP_COMBAT_TITLE = "戰鬥鎖定"
 	L.RAID_HELP_COMBAT_TEXT = "戰鬥中無法移動玩家。\n這是暴雪的限制以防止錯誤。"
 	L.DIALOG_MIGRATE_TEXT =
-		"從 FriendGroups 遷移好友分組到 BetterFriendlist？\n\n這將：\n• 從戰網備註建立所有分組\n• 將好友指派到其分組\n• 可選擇清理備註\n\n|cffff0000警告：此操作無法復原！|r"
-	L.DIALOG_MIGRATE_BTN1 = "遷移並清理備註"
+		"從 FriendGroups 遷移好友分組到 BetterFriendlist？\n\n這將：\n• 從戰網備註建立所有分組\n• 將好友指派到其分組\n• 可選擇開啟備註清理精靈來審查並清理備註\n\n|cffff0000警告：此操作無法復原！|r"
+	L.DIALOG_MIGRATE_BTN1 = "遷移並審查備註"
 	L.DIALOG_MIGRATE_BTN2 = "僅遷移"
 	L.DIALOG_MIGRATE_BTN3 = "取消"
 

@@ -390,12 +390,20 @@ function BetterRaidFrame_EveryoneAssistCheckbox_OnEvent(self)
 		return
 	end
 
+	local label = self:GetParent() and self:GetParent().EveryoneAssistLabel
+
 	if IsInRaid() and UnitIsGroupLeader("player") then
 		self:Enable()
 		self:SetChecked(IsEveryoneAssistant())
+		if label then
+			label:SetFontObject("BetterFriendlistFontNormal")
+		end
 	else
 		self:Disable()
 		self:SetChecked(false)
+		if label then
+			label:SetFontObject("BetterFriendlistFontDisable")
+		end
 	end
 end
 

@@ -64,8 +64,8 @@ BFL:RegisterLocale("zhCN", function()
 	L.RAID_MSG_MOVE_SUCCESS = "%s 已移动到队伍 %d"
 	L.RAID_ERROR_MOVE_FAILED = "移动失败：%s"
 	L.DIALOG_MIGRATE_TEXT =
-		"从FriendGroups迁移好友分组到BetterFriendlist？\n\n这将会：\n• 从BNet备注创建所有分组\n• 将好友分配到对应分组\n• 可选清理备注\n\n|cffff0000警告：此操作无法撤销！|r"
-	L.DIALOG_MIGRATE_BTN1 = "迁移并清理备注"
+		"从FriendGroups迁移好友分组到BetterFriendlist？\n\n这将会：\n• 从BNet备注创建所有分组\n• 将好友分配到对应分组\n• 可选打开备注清理向导来审查并清理备注\n\n|cffff0000警告：此操作无法撤销！|r"
+	L.DIALOG_MIGRATE_BTN1 = "迁移并审查备注"
 	L.DIALOG_MIGRATE_BTN2 = "仅迁移"
 	L.DIALOG_MIGRATE_BTN3 = "取消"
 
