@@ -1646,12 +1646,12 @@ function QuickJoin:GetGroupInfo(groupGUID)
 					end
 
 					-- Playstyle für Tooltip
-					if searchResultInfo.playstyle then
+					if not hasSecretValues and searchResultInfo.playstyle then
 						info.playstyle = searchResultInfo.playstyle
 					end
 
 					-- Auto-Accept (Blizzard's isAutoAccept for auto-join groups)
-					if searchResultInfo.autoAccept then
+					if not hasSecretValues and searchResultInfo.autoAccept then
 						info.isAutoAccept = true
 					end
 				else

@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Performance
 - **QuickJoin Module Optimizations** - Reduced memory allocations and CPU usage in the QuickJoin/Social Queue module. Key changes: reuse relationship cache entry tables instead of creating new ones on every lookup (13.61% of total allocations), replaced closure-based sort comparator with static module-level functions eliminating per-sort closure allocation (8.66% + 4.10% of allocations), added fast-path for relationship cache key generation avoiding unnecessary string concatenation when clubId/fallback are nil (5.14% CPU), batch DataProvider insert via InsertTable instead of per-entry Insert calls (16.95% CPU), and cached QuickJoin module reference to avoid repeated lookups.
 
+## [2.3.3]       - 2026-02-11
+### Fixed
+- **QuickJoin Secret Values** - Fixed a crash (`attempt to perform boolean test on field 'autoAccept'`) caused by Patch 12.0.0 (Midnight) where certain group finder fields (autoAccept) became secret and caused security violations when used in boolean checks.
+
 ## [2.3.2]       - 2026-02-10
 ### Fixed
 - **Midnight API Fix** - Fixed `C_RestrictedActions.IsAddOnRestrictionActive` error caused by missing required `Enum.AddOnRestrictionType` argument (API changed in 12.0.0).
@@ -167,12 +171,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Combat Blocking Fix** - Fixed a critical issue where the Friends List window could not be opened during combat, even when UI Panel settings were disabled. This resolves the "ADDON_ACTION_BLOCKED" error caused by unnecessary secure templates.
 - **Localization** - Fixed encoding issues in English localization (enUS) where bullets and arrows were displayed as corrupted characters.
-
-## [2.2.4]       - 2026-01-25
-### Fixed
-- **Mojibake Fix** - Fixed an issue where localized text (German, French, etc.) could display incorrect characters. (Core.lua)
-- **QuickJoin** - Fixed quick join tooltips.
-- **Edit Mode** - Fixed visibility issues when entering Edit Mode.
 
 ---
 
