@@ -3,9 +3,10 @@
 
 local ADDON_NAME, BFL = ...
 BFL:RegisterLocale("zhTW", function()
-local L = BFL_LOCALE
+	local L = BFL_LOCALE
 	L.SETTINGS_SIMPLE_MODE = "Simple Mode"
-	L.SETTINGS_SIMPLE_MODE_DESC = "禁用玩家肖像，隱藏搜尋/排序選項，拉寬框架並移動標籤頁以獲得緊渊的版面。"
+	L.SETTINGS_SIMPLE_MODE_DESC =
+		"禁用玩家肖像，隱藏搜尋/排序選項，拉寬框架並移動標籤頁以獲得緊渊的版面。"
 	L.MENU_CHANGELOG = "Changelog"
 	L.DIALOG_CREATE_GROUP_TEXT = "輸入新分組的名稱："
 	L.DIALOG_CREATE_GROUP_BTN1 = "創建"
@@ -14,7 +15,8 @@ local L = BFL_LOCALE
 	L.DIALOG_RENAME_GROUP_BTN1 = "重新命名"
 	L.DIALOG_RENAME_GROUP_BTN2 = "取消"
 	L.DIALOG_RENAME_GROUP_SETTINGS = "重新命名群組 '%s'："
-	L.DIALOG_DELETE_GROUP_TEXT = "確定要刪除此分組嗎？\n\n|cffff0000這將移除該分組中的所有好友。|r"
+	L.DIALOG_DELETE_GROUP_TEXT =
+		"確定要刪除此分組嗎？\n\n|cffff0000這將移除該分組中的所有好友。|r"
 	L.DIALOG_DELETE_GROUP_BTN1 = "刪除"
 	L.DIALOG_DELETE_GROUP_BTN2 = "取消"
 	L.DIALOG_DELETE_GROUP_SETTINGS = "刪除分組 '%s'？\n\n所有好友將從此分組中移除。"
@@ -29,7 +31,8 @@ local L = BFL_LOCALE
 	L.RAID_HELP_TITLE = "團隊幫助"
 	L.RAID_HELP_TEXT = "點擊查看團隊清單使用幫助。"
 	L.RAID_HELP_MULTISELECT_TITLE = "多選"
-	L.RAID_HELP_MULTISELECT_TEXT = "按住 Ctrl 鍵並左鍵點擊選擇多個玩家。\n選擇後，將它們拖放到任何小隊中以一次性移動所有玩家。"
+	L.RAID_HELP_MULTISELECT_TEXT =
+		"按住 Ctrl 鍵並左鍵點擊選擇多個玩家。\n選擇後，將它們拖放到任何小隊中以一次性移動所有玩家。"
 	L.RAID_HELP_MAINTANK_TITLE = "主坦克"
 	L.RAID_HELP_MAINTANK_TEXT = "%s 將其設置為主坦克。\n其名字旁邊將顯示坦克圖示。"
 	L.RAID_HELP_MAINASSIST_TITLE = "主助理"
@@ -39,14 +42,16 @@ local L = BFL_LOCALE
 	L.RAID_HELP_PROMOTE_TITLE = "提升助理"
 	L.RAID_HELP_PROMOTE_TEXT = "%s 提升為助理。\n助理可以邀請、移動和移除成員。"
 	L.RAID_HELP_DRAGDROP_TITLE = "拖放"
-	L.RAID_HELP_DRAGDROP_TEXT = "拖動任何玩家即可在小隊之間移動。\n你也可以同時拖動多個選中的玩家。\n空位可用於交換位置。"
+	L.RAID_HELP_DRAGDROP_TEXT =
+		"拖動任何玩家即可在小隊之間移動。\n你也可以同時拖動多個選中的玩家。\n空位可用於交換位置。"
 	L.RAID_HELP_COMBAT_TITLE = "戰鬥鎖定"
 	L.RAID_HELP_COMBAT_TEXT = "戰鬥中無法移動玩家。\n這是暴雪的限制以防止錯誤。"
-	L.DIALOG_MIGRATE_TEXT = "從 FriendGroups 遷移好友分組到 BetterFriendlist？\n\n這將：\n• 從戰網備註建立所有分組\n• 將好友指派到其分組\n• 可選擇清理備註\n\n|cffff0000警告：此操作無法復原！|r"
+	L.DIALOG_MIGRATE_TEXT =
+		"從 FriendGroups 遷移好友分組到 BetterFriendlist？\n\n這將：\n• 從戰網備註建立所有分組\n• 將好友指派到其分組\n• 可選擇清理備註\n\n|cffff0000警告：此操作無法復原！|r"
 	L.DIALOG_MIGRATE_BTN1 = "遷移並清理備註"
 	L.DIALOG_MIGRATE_BTN2 = "僅遷移"
 	L.DIALOG_MIGRATE_BTN3 = "取消"
-	
+
 	L.SETTINGS_TAB_FONTS = "字型"
 	L.SETTINGS_TAB_GENERAL = "一般"
 	L.SETTINGS_TAB_GROUPS = "分組"
@@ -97,7 +102,8 @@ local L = BFL_LOCALE
 	L.SETTINGS_EXPORT_INFO = "複製下方的文字並儲存。您可以在其他角色或帳號上匯入。"
 	L.SETTINGS_EXPORT_BTN = "全選"
 	L.SETTINGS_IMPORT_TITLE = "匯入設定"
-	L.SETTINGS_IMPORT_INFO = "將匯出字串貼到下方並點擊匯入。\n\n|cffff0000警告：這將取代所有分組和指派！|r"
+	L.SETTINGS_IMPORT_INFO =
+		"將匯出字串貼到下方並點擊匯入。\n\n|cffff0000警告：這將取代所有分組和指派！|r"
 	L.SETTINGS_IMPORT_BTN = "匯入"
 	L.SETTINGS_IMPORT_CANCEL = "取消"
 	L.SETTINGS_RESET_DEFAULT = "重置為預設值"
@@ -115,7 +121,7 @@ local L = BFL_LOCALE
 	L.STATS_TOTAL_FRIENDS = "總好友數：%d"
 	L.STATS_ONLINE_OFFLINE = "|cff00ff00上線：%d|r  |  |cff808080離線：%d|r"
 	L.STATS_BNET_WOW = "|cff0070dd戰網：%d|r  |  |cffffd700魔獸世界：%d|r"
-	
+
 	L.INVITE_HEADER = "好友請求（%d）"
 	L.INVITE_BUTTON_ACCEPT = "接受"
 	L.INVITE_BUTTON_DECLINE = "拒絕"
@@ -123,7 +129,7 @@ local L = BFL_LOCALE
 	L.INVITE_MENU_DECLINE = "拒絕"
 	L.INVITE_MENU_REPORT = "檢舉玩家"
 	L.INVITE_MENU_BLOCK = "封鎖邀請"
-	
+
 	L.FILTER_ALL_FRIENDS = "所有好友"
 	L.FILTER_ONLINE_ONLY = "僅上線"
 	L.FILTER_OFFLINE_ONLY = "僅離線"
@@ -143,7 +149,7 @@ local L = BFL_LOCALE
 	L.SORT_CLASS = "職業"
 	L.SORT_REALM = "伺服器"
 	L.SORT_CHANGED = "排序已變更為：%s"
-	
+
 	L.MENU_GROUPS = "分組"
 	L.MENU_CREATE_GROUP = "建立分組"
 	L.MENU_REMOVE_ALL_GROUPS = "從所有分組移除"
@@ -160,7 +166,7 @@ local L = BFL_LOCALE
 	L.GROUPS_DIALOG_TITLE = "Groups for %s"
 	L.MENU_COPY_CHARACTER_NAME = "複製角色名稱"
 	L.COPY_CHARACTER_NAME_POPUP_TITLE = "複製角色名稱"
-	
+
 	L.TOOLTIP_DROP_TO_ADD = "釋放以新增到分組"
 	L.TOOLTIP_HOLD_SHIFT = "按住 Shift 以保留在其他分組中"
 	L.TOOLTIP_DRAG_HERE = "將好友拖到此處新增"
@@ -173,7 +179,7 @@ local L = BFL_LOCALE
 	L.TOOLTIP_GROUP_COLOR_DESC = "點擊以更改此分組的顏色"
 	L.TOOLTIP_DELETE_GROUP = "刪除分組"
 	L.TOOLTIP_DELETE_DESC = "刪除此分組並取消所有好友的指派"
-	
+
 	L.MSG_INVITE_COUNT = "已邀請 %d 位好友到隊伍。"
 	L.MSG_NO_FRIENDS_AVAILABLE = "沒有上線好友可邀請。"
 	L.MSG_GROUP_DELETED = "分組 '%s' 已刪除"
@@ -186,7 +192,7 @@ local L = BFL_LOCALE
 	L.MSG_EXPORT_FAILED = "匯出失敗：%s"
 	L.MSG_IMPORT_SUCCESS = "匯入成功！所有分組和指派已恢復。"
 	L.MSG_IMPORT_FAILED = "匯入失敗：%s"
-	
+
 	L.ERROR_DB_NOT_AVAILABLE = "資料庫不可用！"
 	L.ERROR_SETTINGS_NOT_INIT = "框架未初始化！"
 	L.ERROR_MODULES_NOT_LOADED = "模組不可用！"
@@ -203,7 +209,7 @@ local L = BFL_LOCALE
 	L.ERROR_CANNOT_RENAME_BUILTIN = "無法重新命名內建分組"
 	L.ERROR_INVALID_GROUP_ID = "無效的分組 ID"
 	L.ERROR_CANNOT_DELETE_BUILTIN = "無法刪除內建分組"
-	
+
 	L.TAB_FRIENDS = "好友"
 	L.GROUP_FAVORITES = "收藏"
 	L.GROUP_NO_GROUP = "無分組"
@@ -214,7 +220,7 @@ local L = BFL_LOCALE
 	L.BUTTON_SEND_MESSAGE = "傳送訊息"
 	L.EMPTY_TEXT = "空"
 	L.LEVEL_FORMAT = "%d 級"
-	
+
 	-- ========================================
 	-- BETA FEATURES (Advanced Tab)
 	-- ========================================
@@ -222,19 +228,18 @@ local L = BFL_LOCALE
 	L.SETTINGS_BETA_FEATURES_DESC = "啟用實驗性功能"
 	L.SETTINGS_BETA_FEATURES_ENABLE = "啟用測試功能"
 	L.SETTINGS_BETA_FEATURES_TOOLTIP = "啟用實驗性功能（通知等）"
-	L.SETTINGS_BETA_FEATURES_WARNING = "警告：測試功能可能包含錯誤、效能問題或不完整的功能。使用風險自負。"
+	L.SETTINGS_BETA_FEATURES_WARNING =
+		"警告：測試功能可能包含錯誤、效能問題或不完整的功能。使用風險自負。"
 	L.SETTINGS_BETA_FEATURES_LIST = "目前可用的測試功能："
 	L.SETTINGS_BETA_FEATURES_ENABLED = "測試功能 |cff00ff00已啟用|r"
 	L.SETTINGS_BETA_FEATURES_DISABLED = "測試功能 |cffff0000已停用|r"
 	L.SETTINGS_BETA_TABS_VISIBLE = "測試標籤頁現在在設定中可見"
 	L.SETTINGS_BETA_TABS_HIDDEN = "測試標籤頁現在已隱藏"
-	
 
-	
 	-- ========================================
 	-- NOTIFICATION MESSAGES
 	-- ========================================
-	
+
 	-- ========================================
 	-- EDIT MODE FRAME SIZE (PHASE 5)
 	-- ========================================
@@ -245,7 +250,7 @@ local L = BFL_LOCALE
 	L.SETTINGS_FRAME_RESET_SIZE = "重設為 415x570"
 	L.SETTINGS_FRAME_APPLY_NOW = "套用到目前配置"
 	L.SETTINGS_FRAME_RESET_ALL = "重設所有配置"
-	
+
 	-- ========================================
 	-- DATA BROKER
 	-- ========================================
@@ -284,22 +289,22 @@ local L = BFL_LOCALE
 	L.BROKER_COLUMN_ZONE_DESC = "顯示當前區域"
 	L.BROKER_COLUMN_REALM_DESC = "顯示伺服器名稱"
 	L.BROKER_COLUMN_NOTES_DESC = "顯示好友備註"
-	
+
 	-- ========================================
 	-- FEATURE REQUESTS (CurseForge User Feedback)
 	-- ========================================
 	-- Feature 1: 將手機用戶視為離線
 	L.SETTINGS_TREAT_MOBILE_OFFLINE = "將手機用戶視為離線"
 	L.SETTINGS_TREAT_MOBILE_OFFLINE_DESC = "將使用手機應用的好友顯示在離線群組中"
-	
+
 	-- Feature 3: 顯示備註作為名稱
 	L.SETTINGS_SHOW_NOTES_AS_NAME = "顯示備註作為好友名稱"
 	L.SETTINGS_SHOW_NOTES_AS_NAME_DESC = "當有備註時，顯示好友備註作為他們的名稱"
-	
+
 	-- Feature 4: 視窗縮放
 	L.SETTINGS_WINDOW_SCALE = "視窗縮放"
 	L.SETTINGS_WINDOW_SCALE_DESC = "縮放整個視窗（50%% - 200%%）"
-	
+
 	-- ========================================
 	-- CLASSIC COMPATIBILITY
 	-- ========================================
@@ -312,7 +317,8 @@ local L = BFL_LOCALE
 	L.SETTINGS_HIDE_GUILD_TAB = "隱藏公會標籤"
 	L.SETTINGS_HIDE_GUILD_TAB_DESC = "從好友列表中隱藏公會標籤"
 	L.SETTINGS_USE_UI_PANEL_SYSTEM = "遵守UI層級"
-	L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "防止BetterFriendlist在其他UI視窗(角色、法術書等)上方開啟。需要/reload。"
+	L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC =
+		"防止BetterFriendlist在其他UI視窗(角色、法術書等)上方開啟。需要/reload。"
 	-- ========================================
 	-- GLOBAL FRIEND SYNC
 	-- ========================================
@@ -320,9 +326,10 @@ local L = BFL_LOCALE
 	L.SETTINGS_GLOBAL_SYNC_DESC = "在所有角色間同步設定"
 	L.SETTINGS_GLOBAL_SYNC_FEATURE = "全域好友同步"
 	L.SETTINGS_GLOBAL_SYNC_DELETION = "啟用刪除"
-	L.SETTINGS_GLOBAL_SYNC_DELETION_DESC = "允許同步過程從您的列表中移除已從資料庫中刪除的好友。"
+	L.SETTINGS_GLOBAL_SYNC_DELETION_DESC =
+		"允許同步過程從您的列表中移除已從資料庫中刪除的好友。"
 	L.SETTINGS_GLOBAL_SYNC_HEADER = "同步好友資料庫"
-	
+
 	-- Raid Frame
 	L.RAID_INFO_UNAVAILABLE = "團隊資訊不可用"
 	L.RAID_NOT_IN_RAID = "不在團隊中"
@@ -342,7 +349,7 @@ local L = BFL_LOCALE
 	L.RAID_MSG_GROUP_UPDATE = "收到團隊小隊更新"
 	L.RAID_MSG_SYNC_ERROR = "同步錯誤：%s"
 
--- ========================================
+	-- ========================================
 	-- AUDITED MISSING STRINGS
 	-- ========================================
 	-- Core
@@ -421,7 +428,7 @@ local L = BFL_LOCALE
 	L.EDITMODE_PREVIEW_MESSAGE = "Preview Position"
 	L.EDITMODE_FRAME_WIDTH = "Width"
 	L.EDITMODE_FRAME_HEIGHT = "Height"
-	
+
 	-- Dialogs (Notifications Trigger)
 	L.DIALOG_RESET_LAYOUTS_TEXT = "Reset layouts?\n\nIrreversible!"
 	L.DIALOG_RESET_LAYOUTS_BTN1 = "Reset"
@@ -449,7 +456,7 @@ local L = BFL_LOCALE
 	L.FILTER_BNET = "BNet"
 	L.FILTER_RETAIL = "Retail"
 	L.TOOLTIP_QUICK_FILTER = "Filter: %s"
-	
+
 	-- Settings (Broker)
 	L.BROKER_SETTINGS_RELOAD_TEXT = "Reload required.\n\nReload?"
 	L.BROKER_SETTINGS_RELOAD_BTN = "Reload"
@@ -469,9 +476,9 @@ local L = BFL_LOCALE
 	L.BROKER_SETTINGS_SHOW_BNET_ICON = "BNet Icon"
 	L.BROKER_SETTINGS_SHOW_BNET_ICON_TITLE = "顯示 BNet 圖示"
 	L.BROKER_SETTINGS_SHOW_BNET_ICON_TOOLTIP = "BNet Friends Icon"
-    L.STATUS_ENABLED = "|cff00ff00Enabled|r"
-    L.STATUS_DISABLED = "|cffff0000已停用|r"
-    L.BROKER_WOW_FRIENDS = "WoW好友"
+	L.STATUS_ENABLED = "|cff00ff00Enabled|r"
+	L.STATUS_DISABLED = "|cffff0000已停用|r"
+	L.BROKER_WOW_FRIENDS = "WoW好友"
 
 	-- Settings (Global Sync)
 	L.SETTINGS_TAB_GLOBAL_SYNC = "Global Sync"
@@ -575,7 +582,7 @@ local L = BFL_LOCALE
 	L.RAF_CHAT_MORE_REWARDS = "    ... and %d others"
 	L.RAF_CHAT_USE_UI = "|cff00ff00Use UI for details.|r"
 	L.RAF_GAME_TIME_MESSAGE = "|cff00ff00RAF:|r Game time available."
-	
+
 	-- ========================================
 	-- SETTINGS (Additional)
 	-- ========================================
@@ -589,7 +596,7 @@ local L = BFL_LOCALE
 	L.ERROR_IMPORT_DESERIALIZE = "Deserialize Error"
 	L.ERROR_EXPORT_VERSION = "Version Not Supported"
 	L.ERROR_EXPORT_STRUCTURE = "Invalid Structure"
-	
+
 	-- Statistics
 	L.STATS_NO_HEALTH_DATA = "No health data"
 	L.STATS_NO_CLASS_DATA = "No class data"
@@ -608,7 +615,8 @@ local L = BFL_LOCALE
 	L.STATS_MOBILE_DESKTOP = "PC: %d (%d%%)\nMobile: %d (%d%%)"
 	L.STATS_NOTES_FAVORITES = "Notes: %d (%d%%)\nFavorites: %d (%d%%)"
 	L.STATS_MAX_LEVEL = "Max: %d\n70-79: %d\n60-69: %d\n<60: %d\nAvg: %.1f"
-	L.STATS_HEALTH_FMT = "|cff00ff00Active: %d (%d%%)|r\n|cffffd700Med: %d (%d%%)|r\n|cffffaa00Old: %d (%d%%)|r\n|cffff6600Stale: %d (%d%%)|r\n|cffff0000Inactive: %d (%d%%)|r"
+	L.STATS_HEALTH_FMT =
+		"|cff00ff00Active: %d (%d%%)|r\n|cffffd700Med: %d (%d%%)|r\n|cffffaa00Old: %d (%d%%)|r\n|cffff6600Stale: %d (%d%%)|r\n|cffff0000Inactive: %d (%d%%)|r"
 	L.STATS_CLASS_FMT = "%d. %s: %d (%d%%)"
 	L.STATS_FACTION_DISTRIBUTION = "|cff0080ff聯盟: %d|r\n|cffff0000部落: %d|r"
 	L.STATS_REALM_FMT = "\n%d. %s: %d"
@@ -654,11 +662,13 @@ local L = BFL_LOCALE
 	-- ========================================
 	-- Name Formatting
 	L.SETTINGS_NAME_FORMAT_HEADER = "Name Format"
-	L.SETTINGS_NAME_FORMAT_DESC = "Customize:\n|cffFFD100%name%|r -Name\n|cffFFD100%note%|r -Note\n|cffFFD100%nickname%|r -Nickname\n|cffFFD100%battletag%|r -Tag"
+	L.SETTINGS_NAME_FORMAT_DESC =
+		"Customize:\n|cffFFD100%name%|r -Name\n|cffFFD100%note%|r -Note\n|cffFFD100%nickname%|r -Nickname\n|cffFFD100%battletag%|r -Tag"
 	L.SETTINGS_NAME_FORMAT_LABEL = "格式:"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP = "Name Format"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP_DESC = "Enter format."
-	L.SETTINGS_NAME_FORMAT_DISABLED_FRIENDLISTCOLORS = "由於插件 'FriendListColors' 正在管理名字顏色/格式，此設定已停用。"
+	L.SETTINGS_NAME_FORMAT_DISABLED_FRIENDLISTCOLORS =
+		"由於插件 'FriendListColors' 正在管理名字顏色/格式，此設定已停用。"
 
 	-- In-Game Group
 	L.SETTINGS_SHOW_INGAME_GROUP = "'In Game' Group"
@@ -703,7 +713,7 @@ local L = BFL_LOCALE
 	-- Notifications (Detailed)
 
 	-- Quiet Hours & Filters
-	
+
 	-- Notification Toggles
 
 	-- Missing Descriptions
@@ -740,7 +750,8 @@ local L = BFL_LOCALE
 	L.CORE_STATISTICS_MODULE_NOT_LOADED = "Stats not loaded"
 	L.CORE_STATISTICS_HEADER = "|cff00ff00=== Statistics ===|r"
 	L.CORE_STATS_OVERVIEW = "|cffffcc00Summary:|r"
-	L.CORE_STATS_TOTAL_ONLINE_OFFLINE = "  Tot: |cffffffff%d|r  On: |cff00ff00%d|r (%.0f%%)  Off: |cffaaaaaa%d|r (%.0f%%)"
+	L.CORE_STATS_TOTAL_ONLINE_OFFLINE =
+		"  Tot: |cffffffff%d|r  On: |cff00ff00%d|r (%.0f%%)  Off: |cffaaaaaa%d|r (%.0f%%)"
 	L.CORE_STATS_BNET_WOW = "  BNet: |cff0099ff%d|r  |  WoW: |cffffd700%d|r"
 	L.CORE_STATS_FRIENDSHIP_HEALTH = "|cffffcc00Health:|r"
 	L.CORE_STATS_HEALTH_ACTIVE = "  Active: |cff00ff00%d|r  Med: |cffffd700%d|r"
@@ -748,7 +759,8 @@ local L = BFL_LOCALE
 	L.CORE_STATS_NO_HEALTH_DATA = "  No Data"
 	L.CORE_STATS_CLASS_DISTRIBUTION = "|cffffcc00Classes:|r"
 	L.CORE_STATS_LEVEL_DISTRIBUTION = "|cffffcc00Levels:|r"
-	L.CORE_STATS_LEVEL_BREAKDOWN = "  Max: |cffffffff%d|r  70+: |cffffffff%d|r  60+: |cffffffff%d|r  <60: |cffffffff%d|r"
+	L.CORE_STATS_LEVEL_BREAKDOWN =
+		"  Max: |cffffffff%d|r  70+: |cffffffff%d|r  60+: |cffffffff%d|r  <60: |cffffffff%d|r"
 	L.CORE_STATS_AVG_LEVEL = "  Avg: |cffffffff%.1f|r"
 	L.CORE_STATS_REALM_CLUSTERS = "|cffffcc00Realms:|r"
 	L.CORE_STATS_REALM_BREAKDOWN = "  Same: |cffffffff%d|r  |  Other: |cffffffff%d|r"
@@ -921,12 +933,12 @@ local L = BFL_LOCALE
 	L.QJ_MOCK_ICONS_HELP = "  |cffffcc00/bfl qj mock icons|r - Icons"
 	L.HELP_HEADER_CONFIGURATION = "|cffffcc00Config:|r"
 	L.QJ_CMD_CONFIG_HELP = "  |cffffcc00/bfl qj config|r - Config"
-	
+
 	-- BetterFriendlist.lua
 	L.CMD_RESET_FILTER_SUCCESS = "Reset Guild UI warning."
 	L.CMD_RESET_HEADER = "Reset:"
 	L.CMD_RESET_HELP_WARNING = "Reset Guild warning"
-	
+
 	-- Changelog.lua
 	L.CHANGELOG_DISCORD = "   Discord"
 	L.CHANGELOG_GITHUB = "   GitHub問題"
@@ -962,7 +974,7 @@ local L = BFL_LOCALE
 	L.BROKER_ACTION_FRIENDS = "好友列表"
 	L.BROKER_ACTION_NONE = "無"
 	L.BROKER_ACTION_OPEN_BNET = "開啟戰網應用程式"
-	
+
 	-- Broker Columns
 	L.BROKER_COLUMN_CHARACTER = "角色"
 	L.BROKER_COLUMN_CHARACTER_DESC = "顯示角色名稱和職業圖示"
@@ -972,12 +984,12 @@ local L = BFL_LOCALE
 	L.BROKER_COLUMN_GAME_DESC = "顯示好友正在玩的遊戲或應用程式"
 	L.BROKER_COLUMN_LEVEL = "等級"
 	L.BROKER_COLUMN_LEVEL_DESC = "顯示角色的等級"
-	
+
 	-- Broker Headers
 	L.BROKER_FILTER_LABEL = "篩選器："
 	L.BROKER_HEADER_BNET = "戰網好友"
 	L.BROKER_HEADER_WOW = "魔獸世界好友"
-	
+
 	-- Broker Hints
 	L.BROKER_HINT_ALT_CLICK = "Alt+點擊："
 	L.BROKER_HINT_CLICK_WHISPER = "點擊好友："
@@ -995,11 +1007,11 @@ local L = BFL_LOCALE
 	L.BROKER_HINT_SHIFT_CLICK = "Shift+點擊："
 	L.BROKER_HINT_TOGGLE = " 切換 BetterFriendlist"
 	L.BROKER_HINT_WHISPER = " 密語 • "
-	
+
 	-- Broker Status
 	L.BROKER_NO_FRIENDS_ONLINE = "沒有好友在線"
 	L.BROKER_NO_WOW_ONLINE = "  沒有魔獸世界好友在線"
-	
+
 	-- Broker Settings
 	L.BROKER_SETTINGS_COLUMNS_HEADER = "提示訊息欄位"
 	L.BROKER_SETTINGS_HEADER_COLUMNS = "提示訊息欄位"
@@ -1008,28 +1020,31 @@ local L = BFL_LOCALE
 	L.BROKER_SETTINGS_HEADER_INSTRUCTIONS = "使用說明"
 	L.BROKER_SETTINGS_HEADER_INTEGRATION = "Data Broker 整合"
 	L.BROKER_SETTINGS_HEADER_INTERACTION = "互動"
-	L.BROKER_SETTINGS_INFO = "BetterFriendlist 整合了 Data Broker 顯示插件，如 Bazooka、ChocolateBar 和 TitanPanel。啟用此功能可在你的顯示插件中看到好友數量和快速存取。"
-	L.BROKER_SETTINGS_INSTRUCTIONS = "• 安裝 Data Broker 顯示插件（例如 TitanPanel、Bazooka）\n• 在上方啟用 Data Broker（需要重新載入）\n• BetterFriendlist 按鈕將出現在顯示插件中\n• 滑鼠懸停：提示訊息\n• 左鍵點擊：開啟\n• 右鍵點擊：設定\n• 中鍵點擊：切換篩選器"
+	L.BROKER_SETTINGS_INFO =
+		"BetterFriendlist 整合了 Data Broker 顯示插件，如 Bazooka、ChocolateBar 和 TitanPanel。啟用此功能可在你的顯示插件中看到好友數量和快速存取。"
+	L.BROKER_SETTINGS_INSTRUCTIONS =
+		"• 安裝 Data Broker 顯示插件（例如 TitanPanel、Bazooka）\n• 在上方啟用 Data Broker（需要重新載入）\n• BetterFriendlist 按鈕將出現在顯示插件中\n• 滑鼠懸停：提示訊息\n• 左鍵點擊：開啟\n• 右鍵點擊：設定\n• 中鍵點擊：切換篩選器"
 	L.BROKER_SETTINGS_LEFT_CLICK = "左鍵點擊動作"
 	L.BROKER_SETTINGS_RIGHT_CLICK = "右鍵點擊動作"
 	L.BROKER_SETTINGS_SHOW_GROUPS = "分別顯示魔獸世界和戰網好友數量"
 	L.BROKER_SETTINGS_SHOW_LABEL = "顯示「好友：」標籤"
 	L.BROKER_SORT_LABEL = "排序："
 	L.BROKER_TOTAL_ONLINE = "總計：%d 在線 / %d 好友"
-	
+
 	-- ========================================
 	-- MISSING KEYS - BATCH 2 (EXPORT & RAID)
 	-- ========================================
 	-- Export/Import
 	L.BUTTON_EXPORT = "匯出"
-	
+
 	-- Classic Guild UI Warning
-	L.CLASSIC_GUILD_UI_WARNING_TEXT = "BetterFriendlist 已停用經典公會介面設定，因為只有暴雪的現代公會介面與 BetterFriendlist 相容。\n\n公會分頁現在會開啟暴雪的現代公會介面。"
+	L.CLASSIC_GUILD_UI_WARNING_TEXT =
+		"BetterFriendlist 已停用經典公會介面設定，因為只有暴雪的現代公會介面與 BetterFriendlist 相容。\n\n公會分頁現在會開啟暴雪的現代公會介面。"
 	L.CLASSIC_GUILD_UI_WARNING_TITLE = "經典公會介面已停用"
-	
+
 	-- Group In Game
 	L.GROUP_INGAME = "遊戲中"
-	
+
 	-- Last Online Time Formats
 	L.LASTONLINE_DAYS = "%d 天"
 	L.LASTONLINE_HOURS = "%d 時"
@@ -1037,10 +1052,10 @@ local L = BFL_LOCALE
 	L.LASTONLINE_MONTHS = "%d 月"
 	L.LASTONLINE_SECS = "< 1 分"
 	L.LASTONLINE_YEARS = "%d 年"
-	
+
 	-- RAF (Recruit A Friend)
 	L.RAF_RECRUITMENT = "招募好友"
-	
+
 	-- Raid Errors & Messages
 	L.RAID_ERROR_BULK_MOVE_FAILED = "移動%d名玩家失敗"
 	L.RAID_ERROR_LOAD_RAID_INFO = "錯誤：無法載入團隊資訊視窗。"
@@ -1052,16 +1067,16 @@ local L = BFL_LOCALE
 	L.RAID_MSG_MOVE_SUCCESS = "%s 已移動到小隊 %d"
 	L.RAID_MSG_SWAP_SUCCESS = "%s <-> %s 已交換"
 	L.RAID_NOT_IN_RAID_DETAILS = "您目前不在團隊中。"
-	
+
 	-- ========================================
 	-- MISSING KEYS - BATCH 3 (SETTINGS)
 	-- ========================================
 	-- Settings Descriptions
 	L.SETTINGS_ADVANCED_DESC = "進階選項和工具。"
 	L.SETTINGS_COLOR_CLASS_NAMES_DESC = "用職業顏色顯示好友名字"
-	
+
 	-- Settings Notifications
-	
+
 	-- ========================================
 	-- MISSING KEYS - BATCH 4 (SORT & STATUS)
 	-- ========================================
@@ -1071,11 +1086,11 @@ local L = BFL_LOCALE
 	L.SORT_SECONDARY_LABEL = "Secondary Sort"
 	L.SORT_PRIMARY_DESC = "選擇如何對好友清單進行排序。"
 	L.SORT_SECONDARY_DESC = "當主要值相等時按此排序。"
-	
+
 	-- Status
 	L.STATUS_IN_APP = "在應用程式中"
 	L.STATUS_MOBILE = "行動版"
-	
+
 	-- Unknown Error
 	L.UNKNOWN_ERROR = "未知錯誤"
 	L.UNKNOWN_GAME = "未知遊戲"
@@ -1112,7 +1127,8 @@ local L = BFL_LOCALE
 	L.STREAMER_MODE_ENABLE_DESC = "在主框中顯示一個切換主播模式的按鈕。"
 	L.STREAMER_MODE_HIDDEN_NAME = "隱藏名稱格式"
 	L.STREAMER_MODE_HEADER_TEXT = "自訂標項文字"
-	L.STREAMER_MODE_HEADER_TEXT_DESC = "主播模式活躍時在 Battle.net 標項中顯示的文字（例如，'主播模式'）。"
+	L.STREAMER_MODE_HEADER_TEXT_DESC =
+		"主播模式活躍時在 Battle.net 標項中顯示的文字（例如，'主播模式'）。"
 	L.STREAMER_MODE_BUTTON_TOOLTIP = "切換主播模式"
 	L.STREAMER_MODE_BUTTON_DESC = "點擊以啟用/停用隱私模式。"
 	L.SETTINGS_PRIVACY_OPTIONS = "隱私選項"
@@ -1122,7 +1138,8 @@ local L = BFL_LOCALE
 	L.SETTINGS_STREAMER_NAME_FORMAT_NICKNAME = "強制使用昵稱"
 	L.SETTINGS_STREAMER_NAME_FORMAT_NOTE = "強制使用備註"
 	L.SETTINGS_STREAMER_USE_PURPLE_HEADER = "使用紫色標項颜色"
-	L.SETTINGS_STREAMER_USE_PURPLE_HEADER_DESC = "主播模式活躍時將 Battle.net 標項背景改为 Twitch 紫色。"
+	L.SETTINGS_STREAMER_USE_PURPLE_HEADER_DESC =
+		"主播模式活躍時將 Battle.net 標項背景改为 Twitch 紫色。"
 
 	-- ========================================
 	-- RAID SHORTCUTS (Phase 26)
@@ -1199,6 +1216,26 @@ local L = BFL_LOCALE
 	L.SETTINGS_FONT_SIZE_NUM = "字型大小"
 
 	-- ========================================
+	-- NOTE SYNC (Group to Note Sync)
+	-- ========================================
+	L.SETTINGS_SYNC_GROUPS_NOTE_HEADER = "群組備註同步"
+	L.SETTINGS_SYNC_GROUPS_NOTE = "將群組同步到好友備註"
+	L.SETTINGS_SYNC_GROUPS_NOTE_DESC =
+		"以FriendGroups格式(備註#群組1#群組2)將群組資訊寫入好友備註。可在帳號間或與FriendGroups使用者共享群組。"
+	L.DIALOG_SYNC_GROUPS_CONFIRM_TEXT =
+		"啟用群組備註同步？\n\n|cffff8800警告：|r 戰網備註限制為127個字元，魔獸世界好友備註限制為48個字元。超出字元限制的群組將在備註中跳過，但仍儲存在資料庫中。\n\n現有備註將被更新。是否繼續？"
+	L.DIALOG_SYNC_GROUPS_CONFIRM_BTN1 = "啟用"
+	L.DIALOG_SYNC_GROUPS_CONFIRM_BTN2 = "取消"
+	L.DIALOG_SYNC_GROUPS_DISABLE_TEXT =
+		"群組備註同步已停用。\n\n是否開啟備註清理精靈，從好友備註中移除群組後綴？"
+	L.DIALOG_SYNC_GROUPS_DISABLE_BTN1 = "開啟清理精靈"
+	L.DIALOG_SYNC_GROUPS_DISABLE_BTN2 = "保留備註"
+	L.MSG_SYNC_GROUPS_STARTED = "正在將群組同步到好友備註..."
+	L.MSG_SYNC_GROUPS_COMPLETE = "群組備註同步完成。已更新：%d，已跳過（限制）：%d"
+	L.MSG_SYNC_GROUPS_PROGRESS = "同步備註中：%d / %d"
+	L.MSG_SYNC_GROUPS_NOTE_LIMIT = "%s 的備註已達上限 - 部分群組已跳過"
+
+	-- ========================================
 	-- MESSAGES (Phase 22 - Asian/Cyrillic)
 	-- ========================================
 	L.MSG_INVITE_CONVERT_RAID = "正在將隊伍轉換為團隊..."
@@ -1221,4 +1258,48 @@ local L = BFL_LOCALE
 	L.RAID_ERR_NOT_IN_GROUP = "你不在團伋中"
 	L.MOCK_INVITE_ACCEPTED = "接受來自 %s 的模擬邀請"
 	L.MOCK_INVITE_DECLINED = "拒絕來自 %s 的模擬邀請"
+
+	-- ========================================
+	-- NOTE CLEANUP WIZARD
+	-- ========================================
+	L.WIZARD_TITLE = "備註清理精靈"
+	L.WIZARD_DESC =
+		"從好友備註中移除 FriendGroups 資料（#群組1#群組2）。在套用之前檢查清理後的備註。"
+	L.WIZARD_BTN = "備註清理"
+	L.WIZARD_BTN_TOOLTIP = "開啟精靈以清理好友備註中的 FriendGroups 資料"
+	L.WIZARD_HEADER = "備註清理"
+	L.WIZARD_HEADER_DESC =
+		"從好友備註中移除 FriendGroups 後綴。先備份您的備註，然後檢查並套用變更。"
+	L.WIZARD_COL_ACCOUNT = "帳號名稱"
+	L.WIZARD_COL_BATTLETAG = "戰網暱稱"
+	L.WIZARD_COL_NOTE = "目前備註"
+	L.WIZARD_COL_CLEANED = "清理後備註"
+	L.WIZARD_SEARCH_PLACEHOLDER = "搜尋..."
+	L.WIZARD_BACKUP_BTN = "備份備註"
+	L.WIZARD_BACKUP_DONE = "已備份！"
+	L.WIZARD_BACKUP_TOOLTIP = "將所有目前好友備註儲存到資料庫作為備份。"
+	L.WIZARD_BACKUP_SUCCESS = "已備份 %d 位好友的備註。"
+	L.WIZARD_APPLY_BTN = "套用清理"
+	L.WIZARD_APPLY_TOOLTIP = "將清理後的備註寫回。僅更新與原始備註不同的備註。"
+	L.WIZARD_APPLY_CONFIRM =
+		"將清理後的備註套用到所有好友？\n\n|cffff8800目前備註將被覆蓋。請確保您已先建立備份！|r"
+	L.WIZARD_APPLY_SUCCESS = "成功更新 %d 筆備註。"
+	L.WIZARD_APPLY_PROGRESS_FMT = "進度: %d/%d | %d 成功 | %d 失敗"
+	L.WIZARD_STATUS_FMT = "顯示 %d / %d 位好友 | %d 包含群組資料 | %d 待變更"
+
+	-- Note Cleanup Wizard: Backup Viewer
+	L.WIZARD_VIEW_BACKUP_BTN = "查看備份"
+	L.WIZARD_VIEW_BACKUP_TOOLTIP =
+		"開啟備份檢視器，查看所有已備份的備註並與目前備註進行對比。"
+	L.WIZARD_BACKUP_VIEWER_TITLE = "備註備份檢視器"
+	L.WIZARD_BACKUP_VIEWER_DESC =
+		"查看已備份的好友備註並與目前備註進行比較。如有需要，可以還原原始備註。"
+	L.WIZARD_COL_BACKED_UP = "已備份備註"
+	L.WIZARD_COL_CURRENT = "目前備註"
+	L.WIZARD_RESTORE_BTN = "還原備份"
+	L.WIZARD_RESTORE_TOOLTIP = "從備份還原原始備註。僅更新與備份不同的備註。"
+	L.WIZARD_RESTORE_CONFIRM = "從備份還原所有備註？\n\n|cffff8800目前備註將被備份版本覆蓋。|r"
+	L.WIZARD_RESTORE_SUCCESS = "已成功還原 %d 條備註。"
+	L.WIZARD_NO_BACKUP = "未找到備註備份。請先使用備註清理精靈建立備份。"
+	L.WIZARD_BACKUP_STATUS_FMT = "顯示 %d/%d 筆記錄 | %d 筆自備份後已變更 | 備份時間: %s"
 end)

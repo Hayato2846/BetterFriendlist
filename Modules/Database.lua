@@ -22,13 +22,13 @@ local defaults = {
 		mainTank = { modifier = "SHIFT", button = "RightButton" },
 		mainAssist = { modifier = "CTRL", button = "RightButton" },
 		lead = { modifier = "ALT", button = "LeftButton" },
-		promote = { modifier = "ALT", button = "RightButton" }
+		promote = { modifier = "ALT", button = "RightButton" },
 	},
-    -- Individual Shortcut Toggles
-    raidShortcutEnabled_mainTank = true,
-    raidShortcutEnabled_mainAssist = true,
-    raidShortcutEnabled_lead = true,
-    raidShortcutEnabled_promote = true,
+	-- Individual Shortcut Toggles
+	raidShortcutEnabled_mainTank = true,
+	raidShortcutEnabled_mainAssist = true,
+	raidShortcutEnabled_lead = true,
+	raidShortcutEnabled_promote = true,
 
 	friendActivity = {}, -- {friendUID: {lastWhisper, lastGroup, lastTrade}} - tracks friend interaction timestamps
 	nicknames = {}, -- {friendUID: "Nickname"} - custom nicknames for friends
@@ -41,24 +41,24 @@ local defaults = {
 	fontSizeFriendName = 12,
 	fontOutlineFriendName = "NONE",
 	fontShadowFriendName = false,
-	fontColorFriendName = {r = 0.510, g = 0.773, b = 1.0, a = 1}, -- Blizzard BNet Blue {r=0.51, g=0.773, b=1.0}
+	fontColorFriendName = { r = 0.510, g = 0.773, b = 1.0, a = 1 }, -- Blizzard BNet Blue {r=0.51, g=0.773, b=1.0}
 	fontFriendInfo = "Friz Quadrata TT",
 	fontSizeFriendInfo = 10,
 	fontOutlineFriendInfo = "NONE",
 	fontShadowFriendInfo = false,
-	fontColorFriendInfo = {r = 0.510, g = 0.510, b = 0.510, a = 1}, -- Blizzard Gray {r=0.51, g=0.51, b=0.51}
+	fontColorFriendInfo = { r = 0.510, g = 0.510, b = 0.510, a = 1 }, -- Blizzard Gray {r=0.51, g=0.51, b=0.51}
 	-- Tab Font Customization
 	fontTabText = "Friz Quadrata TT",
 	fontSizeTabText = 12,
 	fontOutlineTabText = "NONE",
 	fontShadowTabText = false,
-	fontColorTabText = {r = 1.0, g = 0.82, b = 0.0, a = 1}, -- Normal/Highlight yellow {r=1.0, g=0.82, b=0}
+	fontColorTabText = { r = 1.0, g = 0.82, b = 0.0, a = 1 }, -- Normal/Highlight yellow {r=1.0, g=0.82, b=0}
 	-- Raid Name Font Customization
 	fontRaidName = "Friz Quadrata TT",
 	fontSizeRaidName = 12,
 	fontOutlineRaidName = "NONE",
 	fontShadowRaidName = false,
-	fontColorRaidName = {r = 1.0, g = 0.82, b = 0.0, a = 1}, -- Class color override usually applies, but default valid
+	fontColorRaidName = { r = 1.0, g = 0.82, b = 0.0, a = 1 }, -- Class color override usually applies, but default valid
 	-- Group Header Font Customization
 	fontGroupHeader = "Friz Quadrata TT",
 	fontSizeGroupHeader = 12,
@@ -110,7 +110,7 @@ local defaults = {
 	-- Global Sync Settings
 	enableGlobalSync = false, -- Enable Global Friend Sync (default: OFF)
 	enableGlobalSyncDeletion = false, -- Enable deletion of friends during sync (default: OFF)
-	
+
 	-- Main Frame Edit Mode (Phase EditMode)
 	mainFrameSize = {}, -- {[layoutName] = {width, height}} - Main frame size per layout
 	mainFramePosition = {}, -- {[layoutName] = {point, x, y}} - Main frame position per layout
@@ -118,7 +118,7 @@ local defaults = {
 	lockWindow = false, -- Lock the frame to prevent movement
 	defaultFrameWidth = 415, -- User-customizable default width (350-800)
 	defaultFrameHeight = 570, -- User-customizable default height (400-1200)
-	
+
 	-- Data Broker Settings
 	brokerEnabled = false, -- Enable Data Broker integration (default: OFF)
 	brokerShowIcon = true, -- Show icon on display addons (default: ON)
@@ -132,16 +132,19 @@ local defaults = {
 	hideGuildTab = false, -- Hide the Guild tab completely (Classic only, default: OFF)
 	-- UI Panel System
 	useUIPanelSystem = false, -- Use ShowUIPanel/HideUIPanel for automatic repositioning (default: OFF)
+	-- Note Sync
+	syncGroupsToNote = false, -- Sync group assignments to friend notes (default: OFF)
+
 	-- Migration tracking
 	friendGroupsMigrated = false, -- Track if FriendGroups migration has been completed
 	lastChangelogVersion = "0.0.0", -- Last version the user saw the changelog for
-	version = BFL.Version
+	version = BFL.Version,
 }
 
 function DB:InternalDeepCopy(orig)
 	local orig_type = type(orig)
 	local copy
-	if orig_type == 'table' then
+	if orig_type == "table" then
 		copy = {}
 		for orig_key, orig_value in next, orig, nil do
 			copy[self:InternalDeepCopy(orig_key)] = self:InternalDeepCopy(orig_value)
@@ -158,7 +161,7 @@ function DB:Initialize()
 	if not BFL.SettingsVersion then
 		BFL.SettingsVersion = 1
 	end
-	
+
 	-- Initialize Nickname Cache Version (Phase 6 Optimization)
 	if not BFL.NicknameCacheVersion then
 		BFL.NicknameCacheVersion = 1
@@ -168,7 +171,7 @@ function DB:Initialize()
 	if not BetterFriendlistDB then
 		BetterFriendlistDB = {}
 	end
-	
+
 	-- Apply defaults
 	for key, value in pairs(defaults) do
 		if BetterFriendlistDB[key] == nil then
@@ -179,7 +182,7 @@ function DB:Initialize()
 			end
 		end
 	end
-	
+
 	-- MIGRATION: Merge defaults for raidShortcuts (Fix for missing keys in existing DB)
 	if BetterFriendlistDB.raidShortcuts then
 		for key, val in pairs(defaults.raidShortcuts) do
@@ -188,10 +191,10 @@ function DB:Initialize()
 			end
 		end
 	end
-	
+
 	-- MIGRATION: Fix Color Tables initialized as empty tables (Bug fix Phase 20)
 	-- Check if color settings are empty tables and reset to defaults
-	local colorKeys = {"fontColorFriendName", "fontColorFriendInfo"}
+	local colorKeys = { "fontColorFriendName", "fontColorFriendInfo" }
 	for _, key in ipairs(colorKeys) do
 		local dbVal = BetterFriendlistDB[key]
 		if type(dbVal) == "table" and (dbVal.r == nil or dbVal.g == nil or dbVal.b == nil) then
@@ -205,68 +208,76 @@ function DB:Initialize()
 
 	-- MIGRATION: Fix Aliased Color Tables (Phase 21)
 	-- Ensure color tables are not the same table reference (fixes inheritance bug)
-	if BetterFriendlistDB.groupCountColors and BetterFriendlistDB.groupArrowColors and BetterFriendlistDB.groupCountColors == BetterFriendlistDB.groupArrowColors then
+	if
+		BetterFriendlistDB.groupCountColors
+		and BetterFriendlistDB.groupArrowColors
+		and BetterFriendlistDB.groupCountColors == BetterFriendlistDB.groupArrowColors
+	then
 		BetterFriendlistDB.groupArrowColors = self:InternalDeepCopy(BetterFriendlistDB.groupCountColors)
 	end
-	
+
 	-- Debug: Check ElvUI Skin setting
 	if BetterFriendlistDB.enableElvUISkin then
 		-- BFL:DebugPrint("Database: ElvUI Skin is ENABLED")
 	else
 		-- BFL:DebugPrint("Database: ElvUI Skin is DISABLED")
 	end
-	
+
 	-- MIGRATION: Name Display Format (Phase 15)
 	-- Convert old boolean flags to new format string
-	if BetterFriendlistDB.showNotesAsName ~= nil or BetterFriendlistDB.showNicknameAsName ~= nil or BetterFriendlistDB.showNicknameInName ~= nil then
+	if
+		BetterFriendlistDB.showNotesAsName ~= nil
+		or BetterFriendlistDB.showNicknameAsName ~= nil
+		or BetterFriendlistDB.showNicknameInName ~= nil
+	then
 		local showNotes = BetterFriendlistDB.showNotesAsName
 		local showNick = BetterFriendlistDB.showNicknameAsName
 		local showNickInName = BetterFriendlistDB.showNicknameInName
-		
+
 		local format = "%name%"
-		
+
 		if showNick then
 			format = "%nickname%"
 		elseif showNotes then
 			format = "%note%"
 		end
-		
+
 		if showNickInName then
 			-- If base format is already nickname, don't append nickname again
 			if format ~= "%nickname%" then
 				format = format .. " (%nickname%)"
 			end
 		end
-		
+
 		BetterFriendlistDB.nameDisplayFormat = format
-		
+
 		-- Remove old keys
 		BetterFriendlistDB.showNotesAsName = nil
 		BetterFriendlistDB.showNicknameAsName = nil
 		BetterFriendlistDB.showNicknameInName = nil
-		
+
 		-- BFL:DebugPrint("|cff00ff00BFL:Database:|r Migrated name display settings to: " .. format)
 	end
-	
+
 	-- Migration: Ensure defaultFrameWidth meets new minimum (380px)
 	if BetterFriendlistDB.defaultFrameWidth and BetterFriendlistDB.defaultFrameWidth < 380 then
 		BetterFriendlistDB.defaultFrameWidth = 380
 		-- BFL:DebugPrint("|cff00ff00BFL:Database:|r Migrated defaultFrameWidth to 380 (old minimum was 350)")
 	end
-	
+
 	-- Version migration if needed
 	if BetterFriendlistDB.version ~= BFL.VERSION then
 		self:MigrateData(BetterFriendlistDB.version, BFL.VERSION)
 		BetterFriendlistDB.version = BFL.VERSION
 	end
-	
+
 	-- Initialize CustomNames Sync if available
 	CustomNamesLib = LibStub("CustomNames", true)
 	local lib = CustomNamesLib
-	
+
 	if lib then
 		-- BFL:DebugPrint("Database: CustomNames Library DETECTED and Sync enabled.")
-		
+
 		-- Push existing BFL nicknames to Library (One-way sync on load)
 		if BetterFriendlistDB.nicknames then
 			for uid, nickname in pairs(BetterFriendlistDB.nicknames) do
@@ -299,8 +310,10 @@ function DB:Initialize()
 end
 
 function DB:GetLibKey(friendUID)
-	if not friendUID then return nil end
-	
+	if not friendUID then
+		return nil
+	end
+
 	if friendUID:match("^wow_") then
 		-- WoW: Strip "wow_" prefix for Lib (Name-Realm)
 		return friendUID:gsub("^wow_", "")
@@ -323,24 +336,26 @@ function DB:GetLibKey(friendUID)
 		-- Already a BattleTag
 		return friendUID
 	end
-	
+
 	-- Fallback: Assume it's a WoW name without prefix (shouldn't happen with BFL UIDs but safe to return)
 	return friendUID
 end
 
 -- Internal setter for DB only (used by Sync and SetNickname)
 function DB:SetNicknameInternalDB(key, nickname)
-	if not key then return end
+	if not key then
+		return
+	end
 	if not BetterFriendlistDB.nicknames then
 		BetterFriendlistDB.nicknames = {}
 	end
-	
+
 	if nickname and nickname ~= "" then
 		BetterFriendlistDB.nicknames[key] = nickname
 	else
 		BetterFriendlistDB.nicknames[key] = nil
 	end
-	
+
 	-- Invalidate Nickname Cache on change (Phase 6)
 	if BFL.NicknameCacheVersion then
 		BFL.NicknameCacheVersion = BFL.NicknameCacheVersion + 1
@@ -349,19 +364,21 @@ end
 
 -- Callback handler for CustomNames Sync
 function DB:SetNicknameInternal(name, nickname)
-	if not name then return end
+	if not name then
+		return
+	end
 	-- BFL:DebugPrint("DB:SetNicknameInternal (Sync) for " .. tostring(name) .. " to " .. tostring(nickname))
 
 	-- Convert Lib Name back to DB Key
 	local dbKey = name
-	if not name:match("#") then 
+	if not name:match("#") then
 		-- It's a WoW Name (Name-Realm) -> Prepend "wow_" for BFL DB
 		dbKey = "wow_" .. name
 	else
 		-- It's a BattleTag -> Use as is (matches our BNet storage strategy)
 		dbKey = name
 	end
-	
+
 	self:SetNicknameInternalDB(dbKey, nickname)
 
 	-- Force UI Refresh to show new nickname immediately
@@ -384,12 +401,12 @@ function DB:ResetFontColors()
 	if defaults.fontColorFriendInfo then
 		BetterFriendlistDB.fontColorFriendInfo = self:InternalDeepCopy(defaults.fontColorFriendInfo)
 	end
-	
+
 	-- Force full display refresh
 	if BFL and BFL.ForceRefreshFriendsList then
 		BFL:ForceRefreshFriendsList()
 	end
-	
+
 	-- BFL:DebugPrint("Database: Font colors reset to defaults.")
 	print("|cff00ff00BetterFriendlist:|r Font colors reset to Blizzard defaults.")
 end
@@ -399,7 +416,7 @@ function DB:Get(key, default)
 	if key == nil then
 		return BetterFriendlistDB
 	end
-	
+
 	if BetterFriendlistDB[key] ~= nil then
 		return BetterFriendlistDB[key]
 	end
@@ -413,12 +430,20 @@ function DB:Set(key, value)
 		BFL.SettingsVersion = BFL.SettingsVersion + 1
 	end
 	BetterFriendlistDB[key] = value
-	
+
 	-- PERFY FIX: Immediately update FriendsList settings cache to prevent stale data
 	-- This ensures UI responds instantly to setting changes without delay/flicker
 	local FriendsList = BFL and BFL:GetModule("FriendsList")
 	if FriendsList and FriendsList.InvalidateSettingsCache then
 		FriendsList:InvalidateSettingsCache()
+	end
+
+	-- NoteSync: Re-sync all friend notes when group order changes
+	if key == "groupOrder" then
+		local NoteSync = BFL:GetModule("NoteSync")
+		if NoteSync then
+			NoteSync:OnGroupOrderChanged()
+		end
 	end
 end
 
@@ -469,6 +494,12 @@ function DB:SetFriendGroups(friendUID, groups)
 	else
 		BetterFriendlistDB.friendGroups[friendUID] = groups
 	end
+
+	-- NoteSync: Sync group change to friend note
+	local NoteSync = BFL:GetModule("NoteSync")
+	if NoteSync then
+		NoteSync:OnGroupChanged(friendUID)
+	end
 end
 
 -- Add friend to group
@@ -476,16 +507,16 @@ function DB:AddFriendToGroup(friendUID, groupId)
 	if not BetterFriendlistDB.friendGroups[friendUID] then
 		BetterFriendlistDB.friendGroups[friendUID] = {}
 	end
-	
+
 	-- Check if already in group
 	for _, gid in ipairs(BetterFriendlistDB.friendGroups[friendUID]) do
 		if gid == groupId then
 			return false -- Already in group
 		end
 	end
-	
+
 	table.insert(BetterFriendlistDB.friendGroups[friendUID], groupId)
-	
+
 	-- Optimization: Increment version counter
 	if BFL.SettingsVersion then
 		BFL.SettingsVersion = BFL.SettingsVersion + 1
@@ -495,7 +526,13 @@ function DB:AddFriendToGroup(friendUID, groupId)
 	if FriendsList and FriendsList.InvalidateSettingsCache then
 		FriendsList:InvalidateSettingsCache()
 	end
-	
+
+	-- NoteSync: Sync group change to friend note
+	local NoteSync = BFL:GetModule("NoteSync")
+	if NoteSync then
+		NoteSync:OnGroupChanged(friendUID)
+	end
+
 	return true
 end
 
@@ -504,16 +541,16 @@ function DB:RemoveFriendFromGroup(friendUID, groupId)
 	if not BetterFriendlistDB.friendGroups[friendUID] then
 		return false
 	end
-	
+
 	for i = #BetterFriendlistDB.friendGroups[friendUID], 1, -1 do
 		if BetterFriendlistDB.friendGroups[friendUID][i] == groupId then
 			table.remove(BetterFriendlistDB.friendGroups[friendUID], i)
-			
+
 			-- Clean up if no groups left
 			if #BetterFriendlistDB.friendGroups[friendUID] == 0 then
 				BetterFriendlistDB.friendGroups[friendUID] = nil
 			end
-			
+
 			-- Optimization: Increment version counter
 			if BFL.SettingsVersion then
 				BFL.SettingsVersion = BFL.SettingsVersion + 1
@@ -523,11 +560,17 @@ function DB:RemoveFriendFromGroup(friendUID, groupId)
 			if FriendsList and FriendsList.InvalidateSettingsCache then
 				FriendsList:InvalidateSettingsCache()
 			end
-			
+
+			-- NoteSync: Sync group change to friend note
+			local NoteSync = BFL:GetModule("NoteSync")
+			if NoteSync then
+				NoteSync:OnGroupChanged(friendUID)
+			end
+
 			return true
 		end
 	end
-	
+
 	return false
 end
 
@@ -536,13 +579,13 @@ function DB:IsFriendInGroup(friendUID, groupId)
 	if not BetterFriendlistDB.friendGroups[friendUID] then
 		return false
 	end
-	
+
 	for _, gid in ipairs(BetterFriendlistDB.friendGroups[friendUID]) do
 		if gid == groupId then
 			return true
 		end
 	end
-	
+
 	return false
 end
 
@@ -557,10 +600,12 @@ end
 
 -- Get nickname
 function DB:GetNickname(friendUID)
-	if not friendUID then return nil end
-	
+	if not friendUID then
+		return nil
+	end
+
 	local libKey = self:GetLibKey(friendUID)
-	
+
 	-- 1. Try CustomNames Lib (Optimized Cache)
 	if CustomNamesLib and libKey then
 		local customName = CustomNamesLib.Get(libKey)
@@ -572,29 +617,31 @@ function DB:GetNickname(friendUID)
 	-- 2. Fallback to Internal DB
 	-- For WoW friends, we use the original UID (wow_Name-Realm) as key
 	-- For BNet friends, we prefer BattleTag (libKey) but fallback to friendUID for legacy support
-	
+
 	local dbKey = friendUID
 	if friendUID:match("^bnet_") and libKey then
 		dbKey = libKey -- Use BattleTag for BNet storage
 	end
 
 	local nickname = BetterFriendlistDB.nicknames and BetterFriendlistDB.nicknames[dbKey]
-	
+
 	-- FALLBACK: If not found with primary key and this is a BNet friend, try friendUID
 	-- (for backwards compatibility with nicknames stored under "bnet_12345" format)
 	if not nickname and friendUID:match("^bnet_") and dbKey ~= friendUID then
 		nickname = BetterFriendlistDB.nicknames and BetterFriendlistDB.nicknames[friendUID]
 	end
-	
+
 	return nickname
 end
 
 -- Set nickname
 function DB:SetNickname(friendUID, nickname)
-	if not friendUID then return end
-	
+	if not friendUID then
+		return
+	end
+
 	local libKey = self:GetLibKey(friendUID)
-	
+
 	-- 1. Update CustomNames Lib
 	if CustomNamesLib and libKey then
 		if nickname and nickname ~= "" then
@@ -603,14 +650,14 @@ function DB:SetNickname(friendUID, nickname)
 			CustomNamesLib.Set(libKey, nil)
 		end
 	end
-	
+
 	-- 2. Update Internal DB
 	-- Determine DB Key (same logic as GetNickname)
 	local dbKey = friendUID
 	if friendUID:match("^bnet_") and libKey then
 		dbKey = libKey
 	end
-	
+
 	-- CLEANUP: If this is a BNet friend and we're using libKey as dbKey,
 	-- remove any legacy entry under friendUID to avoid duplicates
 	if friendUID:match("^bnet_") and libKey and dbKey ~= friendUID then
@@ -618,6 +665,6 @@ function DB:SetNickname(friendUID, nickname)
 			BetterFriendlistDB.nicknames[friendUID] = nil
 		end
 	end
-	
+
 	self:SetNicknameInternalDB(dbKey, nickname)
 end

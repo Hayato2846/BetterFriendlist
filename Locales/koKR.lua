@@ -3,9 +3,10 @@
 
 local ADDON_NAME, BFL = ...
 BFL:RegisterLocale("koKR", function()
-local L = BFL_LOCALE
+	local L = BFL_LOCALE
 	L.SETTINGS_SIMPLE_MODE = "Simple Mode"
-	L.SETTINGS_SIMPLE_MODE_DESC = "플레이어 초상화를 비활성화하고 검색/정렬 옵션을 숨기며 프레임을 넓히고 탭을 이동하여 컴팩트 레이아웃을 만듭니다."
+	L.SETTINGS_SIMPLE_MODE_DESC =
+		"플레이어 초상화를 비활성화하고 검색/정렬 옵션을 숨기며 프레임을 넓히고 탭을 이동하여 컴팩트 레이아웃을 만듭니다."
 	L.MENU_CHANGELOG = "Changelog"
 	-- ========================================
 	-- DIALOGS & POPUPS
@@ -17,34 +18,43 @@ local L = BFL_LOCALE
 	L.DIALOG_RENAME_GROUP_BTN1 = "이름 변경"
 	L.DIALOG_RENAME_GROUP_BTN2 = "취소"
 	L.DIALOG_RENAME_GROUP_SETTINGS = "그룹 '%s' 이름 변경:"
-	L.DIALOG_DELETE_GROUP_TEXT = "이 그룹을 삭제하시겠습니까?\n\n|cffff0000이 그룹의 모든 친구가 제거됩니다.|r"
+	L.DIALOG_DELETE_GROUP_TEXT =
+		"이 그룹을 삭제하시겠습니까?\n\n|cffff0000이 그룹의 모든 친구가 제거됩니다.|r"
 	L.DIALOG_DELETE_GROUP_BTN1 = "삭제"
 	L.DIALOG_DELETE_GROUP_BTN2 = "취소"
-	L.DIALOG_DELETE_GROUP_SETTINGS = "'%s' 그룹을 삭제하시겠습니까?\n\n모든 친구가 이 그룹에서 제거됩니다."
+	L.DIALOG_DELETE_GROUP_SETTINGS =
+		"'%s' 그룹을 삭제하시겠습니까?\n\n모든 친구가 이 그룹에서 제거됩니다."
 	L.DIALOG_RESET_SETTINGS_TEXT = "모든 설정을 기본값으로 재설정하시겠습니까?"
 	L.DIALOG_RESET_BTN1 = "재설정"
 	L.DIALOG_RESET_BTN2 = "취소"
-	L.DIALOG_UI_PANEL_RELOAD_TEXT = "UI 계층 구조 설정 변경은 UI 재로드가 필요합니다.\n\n지금 재로드하시겠습니까?"
+	L.DIALOG_UI_PANEL_RELOAD_TEXT =
+		"UI 계층 구조 설정 변경은 UI 재로드가 필요합니다.\n\n지금 재로드하시겠습니까?"
 	L.DIALOG_UI_PANEL_RELOAD_BTN1 = "재로드"
 	L.DIALOG_UI_PANEL_RELOAD_BTN2 = "취소"
-	L.MSG_RELOAD_REQUIRED = "Classic에서 이 변경 사항을 올바르게 적용하려면 UI를 다시 불러와야 합니다."
+	L.MSG_RELOAD_REQUIRED =
+		"Classic에서 이 변경 사항을 올바르게 적용하려면 UI를 다시 불러와야 합니다."
 	L.MSG_RELOAD_NOW = "지금 UI를 다시 불러오시겠습니까?"
 	L.RAID_HELP_TITLE = "공격대 도움말"
 	L.RAID_HELP_TEXT = "공격대 명단 사용법에 대한 도움말을 보려면 클릭하세요."
 	L.RAID_HELP_MULTISELECT_TITLE = "다중 선택"
-	L.RAID_HELP_MULTISELECT_TEXT = "Ctrl을 누른 채 왼쪽 클릭으로 여러 플레이어를 선택하세요.\n선택한 후 어떤 그룹으로든 끌어다 놓으면 모두 한번에 이동합니다."
+	L.RAID_HELP_MULTISELECT_TEXT =
+		"Ctrl을 누른 채 왼쪽 클릭으로 여러 플레이어를 선택하세요.\n선택한 후 어떤 그룹으로든 끌어다 놓으면 모두 한번에 이동합니다."
 	L.RAID_HELP_MAINTANK_TITLE = "주 방어 탱커"
-	L.RAID_HELP_MAINTANK_TEXT = "%s - 플레이어를 주 방어 탱커로 설정합니다.\n이름 옆에 탱커 아이콘이 나타납니다."
+	L.RAID_HELP_MAINTANK_TEXT =
+		"%s - 플레이어를 주 방어 탱커로 설정합니다.\n이름 옆에 탱커 아이콘이 나타납니다."
 	L.RAID_HELP_MAINASSIST_TITLE = "주 지원"
-	L.RAID_HELP_MAINASSIST_TEXT = "%s - 플레이어를 주 지원으로 설정합니다.\n이름 옆에 지원 아이콘이 나타납니다."
+	L.RAID_HELP_MAINASSIST_TEXT =
+		"%s - 플레이어를 주 지원으로 설정합니다.\n이름 옆에 지원 아이콘이 나타납니다."
 	L.RAID_HELP_LEAD_TITLE = "공격대장"
 	L.RAID_HELP_LEAD_TEXT = "%s - 플레이어를 공격대장으로 승급."
 	L.RAID_HELP_PROMOTE_TITLE = "부공격대장"
 	L.RAID_HELP_PROMOTE_TEXT = "%s - 플레이어를 부공격대장 승급/강등."
 	L.RAID_HELP_DRAGDROP_TITLE = "끌어다 놓기"
-	L.RAID_HELP_DRAGDROP_TEXT = "플레이어를 끌어 그룹 간에 이동하세요.\n선택한 여러 플레이어를 한번에 끌어다 놓을 수도 있습니다.\n빈 슬롯을 사용하여 위치를 교환할 수 있습니다."
+	L.RAID_HELP_DRAGDROP_TEXT =
+		"플레이어를 끌어 그룹 간에 이동하세요.\n선택한 여러 플레이어를 한번에 끌어다 놓을 수도 있습니다.\n빈 슬롯을 사용하여 위치를 교환할 수 있습니다."
 	L.RAID_HELP_COMBAT_TITLE = "전투 잠금"
-	L.RAID_HELP_COMBAT_TEXT = "전투 중에는 플레이어를 이동할 수 없습니다.\n이는 오류를 방지하기 위한 Blizzard의 제한 사항입니다."
+	L.RAID_HELP_COMBAT_TEXT =
+		"전투 중에는 플레이어를 이동할 수 없습니다.\n이는 오류를 방지하기 위한 Blizzard의 제한 사항입니다."
 	L.RAID_INFO_UNAVAILABLE = "Raid information unavailable"
 	L.RAID_NOT_IN_RAID = "Not in a raid"
 	L.RAID_NOT_IN_RAID_DETAILS = "현재 공격대 그룹에 속해 있지 않습니다."
@@ -62,11 +72,12 @@ local L = BFL_LOCALE
 	L.RAID_ERROR_SWAP_FAILED = "Swap failed: %s"
 	L.RAID_MSG_MOVE_SUCCESS = "%s moved to Group %d"
 	L.RAID_ERROR_MOVE_FAILED = "Move failed: %s"
-	L.DIALOG_MIGRATE_TEXT = "FriendGroups에서 BetterFriendlist로 친구 그룹을 마이그레이션하시겠습니까?\n\n다음을 수행합니다:\n• BNet 메모에서 모든 그룹 생성\n• 친구를 그룹에 할당\n• 선택적으로 메모 정리\n\n|cffff0000경고: 이 작업은 취소할 수 없습니다!|r"
+	L.DIALOG_MIGRATE_TEXT =
+		"FriendGroups에서 BetterFriendlist로 친구 그룹을 마이그레이션하시겠습니까?\n\n다음을 수행합니다:\n• BNet 메모에서 모든 그룹 생성\n• 친구를 그룹에 할당\n• 선택적으로 메모 정리\n\n|cffff0000경고: 이 작업은 취소할 수 없습니다!|r"
 	L.DIALOG_MIGRATE_BTN1 = "마이그레이션 및 메모 정리"
 	L.DIALOG_MIGRATE_BTN2 = "마이그레이션만"
 	L.DIALOG_MIGRATE_BTN3 = "취소"
-	
+
 	-- ========================================
 	-- SETTINGS PANEL
 	-- ========================================
@@ -118,11 +129,13 @@ local L = BFL_LOCALE
 	L.SETTINGS_DELETE_GROUP = "그룹 삭제"
 	L.SETTINGS_DELETE_GROUP_DESC = "이 그룹을 삭제하고 모든 친구 할당 해제"
 	L.SETTINGS_EXPORT_TITLE = "설정 내보내기"
-	L.SETTINGS_EXPORT_INFO = "아래 텍스트를 복사하여 저장하세요. 다른 캐릭터나 계정으로 가져올 수 있습니다."
+	L.SETTINGS_EXPORT_INFO =
+		"아래 텍스트를 복사하여 저장하세요. 다른 캐릭터나 계정으로 가져올 수 있습니다."
 	L.SETTINGS_EXPORT_BTN = "모두 선택"
 	L.BUTTON_EXPORT = "내보내기"
 	L.SETTINGS_IMPORT_TITLE = "설정 가져오기"
-	L.SETTINGS_IMPORT_INFO = "내보내기 문자열을 아래에 붙여넣고 가져오기를 클릭하세요.\n\n|cffff0000경고: 모든 그룹과 할당이 대체됩니다!|r"
+	L.SETTINGS_IMPORT_INFO =
+		"내보내기 문자열을 아래에 붙여넣고 가져오기를 클릭하세요.\n\n|cffff0000경고: 모든 그룹과 할당이 대체됩니다!|r"
 	L.SETTINGS_IMPORT_BTN = "가져오기"
 	L.SETTINGS_IMPORT_CANCEL = "취소"
 	L.SETTINGS_RESET_DEFAULT = "기본값으로 재설정"
@@ -140,7 +153,7 @@ local L = BFL_LOCALE
 	L.STATS_TOTAL_FRIENDS = "총 친구: %d"
 	L.STATS_ONLINE_OFFLINE = "|cff00ff00온라인: %d|r  |  |cff808080오프라인: %d|r"
 	L.STATS_BNET_WOW = "|cff0070ddBattle.net: %d|r  |  |cffffd700WoW: %d|r"
-	
+
 	-- ========================================
 	-- FRIEND REQUESTS
 	-- ========================================
@@ -151,7 +164,7 @@ local L = BFL_LOCALE
 	L.INVITE_MENU_DECLINE = "거절"
 	L.INVITE_MENU_REPORT = "플레이어 신고"
 	L.INVITE_MENU_BLOCK = "초대 차단"
-	
+
 	-- ========================================
 	-- FILTERS & SORTING
 	-- ========================================
@@ -179,7 +192,7 @@ local L = BFL_LOCALE
 	L.SORT_SECONDARY_LABEL = "Secondary Sort"
 	L.SORT_PRIMARY_DESC = "친구 목록을 어떻게 정렬할지 선택하세요."
 	L.SORT_SECONDARY_DESC = "기본 값이 같을 때 이 기준으로 정렬합니다."
-	
+
 	-- ========================================
 	-- MENUS & CONTEXT MENUS
 	-- ========================================
@@ -199,7 +212,7 @@ local L = BFL_LOCALE
 	L.GROUPS_DIALOG_TITLE = "Groups for %s"
 	L.MENU_COPY_CHARACTER_NAME = "캐릭터 이름 복사"
 	L.COPY_CHARACTER_NAME_POPUP_TITLE = "캐릭터 이름 복사"
-	
+
 	-- ========================================
 	-- TOOLTIPS
 	-- ========================================
@@ -215,7 +228,7 @@ local L = BFL_LOCALE
 	L.TOOLTIP_GROUP_COLOR_DESC = "클릭하여 이 그룹의 색상 변경"
 	L.TOOLTIP_DELETE_GROUP = "그룹 삭제"
 	L.TOOLTIP_DELETE_DESC = "이 그룹을 삭제하고 모든 친구 할당 해제"
-	
+
 	-- ========================================
 	-- STATUS MESSAGES
 	-- ========================================
@@ -224,14 +237,15 @@ local L = BFL_LOCALE
 	L.MSG_GROUP_DELETED = "'%s' 그룹이 삭제되었습니다"
 	L.MSG_IGNORE_LIST_EMPTY = "차단 목록이 비어 있습니다."
 	L.MSG_IGNORE_LIST_COUNT = "차단 목록 (%d명):"
-	L.MSG_MIGRATION_ALREADY_DONE = "마이그레이션이 이미 완료되었습니다. 다시 실행하려면 '/bfl migrate force'를 사용하세요."
+	L.MSG_MIGRATION_ALREADY_DONE =
+		"마이그레이션이 이미 완료되었습니다. 다시 실행하려면 '/bfl migrate force'를 사용하세요."
 	L.MSG_MIGRATION_STARTING = "FriendGroups에서 마이그레이션 시작 중..."
 	L.MSG_GROUP_ORDER_SAVED = "그룹 순서가 저장되었습니다!"
 	L.MSG_SETTINGS_RESET = "설정이 기본값으로 재설정되었습니다!"
 	L.MSG_EXPORT_FAILED = "내보내기 실패: %s"
 	L.MSG_IMPORT_SUCCESS = "가져오기 성공! 모든 그룹과 할당이 복원되었습니다."
 	L.MSG_IMPORT_FAILED = "가져오기 실패: %s"
-	
+
 	-- ========================================
 	-- ERRORS & WARNINGS
 	-- ========================================
@@ -251,7 +265,7 @@ local L = BFL_LOCALE
 	L.ERROR_CANNOT_RENAME_BUILTIN = "기본 그룹의 이름을 변경할 수 없습니다"
 	L.ERROR_INVALID_GROUP_ID = "잘못된 그룹 ID"
 	L.ERROR_CANNOT_DELETE_BUILTIN = "기본 그룹을 삭제할 수 없습니다"
-	
+
 	-- ========================================
 	-- MISC UI ELEMENTS
 	-- ========================================
@@ -268,7 +282,7 @@ local L = BFL_LOCALE
 	L.BUTTON_SEND_MESSAGE = "메시지 보내기"
 	L.EMPTY_TEXT = "비어 있음"
 	L.LEVEL_FORMAT = "레벨 %d"
-	
+
 	-- ========================================
 	-- BETA FEATURES (Advanced Tab)
 	-- ========================================
@@ -276,42 +290,43 @@ local L = BFL_LOCALE
 	L.SETTINGS_BETA_FEATURES_DESC = "실험적 기능 활성화"
 	L.SETTINGS_BETA_FEATURES_ENABLE = "베타 기능 활성화"
 	L.SETTINGS_BETA_FEATURES_TOOLTIP = "실험적 기능 활성화 (알림 등)"
-	L.SETTINGS_BETA_FEATURES_WARNING = "경고: 베타 기능에는 버그, 성능 문제 또는 불완전한 기능이 포함될 수 있습니다. 본인의 책임하에 사용하십시오."
+	L.SETTINGS_BETA_FEATURES_WARNING =
+		"경고: 베타 기능에는 버그, 성능 문제 또는 불완전한 기능이 포함될 수 있습니다. 본인의 책임하에 사용하십시오."
 	L.SETTINGS_BETA_FEATURES_LIST = "현재 사용 가능한 베타 기능:"
 	L.SETTINGS_BETA_FEATURES_ENABLED = "베타 기능 |cff00ff00활성화됨|r"
 	L.SETTINGS_BETA_FEATURES_DISABLED = "베타 기능 |cffff0000비활성화됨|r"
 	L.SETTINGS_BETA_TABS_VISIBLE = "베타 탭이 설정에 표시됩니다"
 	L.SETTINGS_BETA_TABS_HIDDEN = "베타 탭이 숨겨졌습니다"
-	
+
 	-- Global Friend Sync
 	L.SETTINGS_GLOBAL_SYNC_ENABLE = "전역 친구 동기화 활성화"
 	L.SETTINGS_GLOBAL_SYNC_DESC = "모든 캐릭터 간 설정 동기화"
 	L.SETTINGS_GLOBAL_SYNC_FEATURE = "전역 친구 동기화"
 	L.SETTINGS_GLOBAL_SYNC_DELETION = "Enable Deletion"
-	L.SETTINGS_GLOBAL_SYNC_DELETION_DESC = "Allow the sync process to remove friends from your list if they are removed from the database."
+	L.SETTINGS_GLOBAL_SYNC_DELETION_DESC =
+		"Allow the sync process to remove friends from your list if they are removed from the database."
 	L.SETTINGS_GLOBAL_SYNC_HEADER = "Synced Friends Database"
-	
+
 	-- ========================================
 	-- NOTIFICATIONS TAB
 	-- ========================================
 
-	
-	
 	-- ========================================
 	-- NOTIFICATION MESSAGES
 	-- ========================================
-	
+
 	-- ========================================
 	-- EDIT MODE FRAME SIZE (PHASE 5)
 	-- ========================================
 	L.SETTINGS_FRAME_SIZE_HEADER = "기본 프레임 크기 (편집 모드)"
-	L.SETTINGS_FRAME_SIZE_INFO = "새로운 편집 모드 레이아웃을 위한 선호 기본 크기를 설정하세요."
+	L.SETTINGS_FRAME_SIZE_INFO =
+		"새로운 편집 모드 레이아웃을 위한 선호 기본 크기를 설정하세요."
 	L.SETTINGS_FRAME_WIDTH = "너비:"
 	L.SETTINGS_FRAME_HEIGHT = "높이:"
 	L.SETTINGS_FRAME_RESET_SIZE = "415x570으로 재설정"
 	L.SETTINGS_FRAME_APPLY_NOW = "현재 레이아웃에 적용"
 	L.SETTINGS_FRAME_RESET_ALL = "모든 레이아웃 재설정"
-	
+
 	-- ========================================
 	-- DATA BROKER (STABLE FEATURE)
 	-- ========================================
@@ -330,9 +345,10 @@ local L = BFL_LOCALE
 	L.BROKER_ACTION_SETTINGS = "설정 열기"
 	L.BROKER_ACTION_OPEN_BNET = "Open BNet App"
 	L.BROKER_ACTION_NONE = "None"
-	L.BROKER_SETTINGS_INFO = "BetterFriendlist는 Bazooka, ChocolateBar, TitanPanel과 같은 데이터 브로커 표시 애드온과 통합됩니다. 이 기능을 활성화하여 표시 애드온에서 친구 수와 빠른 액세스를 표시하세요."
+	L.BROKER_SETTINGS_INFO =
+		"BetterFriendlist는 Bazooka, ChocolateBar, TitanPanel과 같은 데이터 브로커 표시 애드온과 통합됩니다. 이 기능을 활성화하여 표시 애드온에서 친구 수와 빠른 액세스를 표시하세요."
 	L.BROKER_FILTER_CHANGED = "필터 변경: %s"
-	
+
 	-- Broker Tooltip Strings
 	L.BROKER_HEADER_WOW = "WoW 친구"
 	L.BROKER_HEADER_BNET = "Battle.Net 친구"
@@ -357,22 +373,22 @@ local L = BFL_LOCALE
 	L.BROKER_HINT_SETTINGS = " 설정 • "
 	L.BROKER_HINT_MIDDLE_CLICK = "가운데 클릭:"
 	L.BROKER_HINT_CYCLE_FILTER = " 필터 순환"
-	
+
 	-- ========================================
 	-- FEATURE REQUESTS (CurseForge User Feedback)
 	-- ========================================
 	-- Feature 1: 모바일 사용자를 오프라인으로 표시
 	L.SETTINGS_TREAT_MOBILE_OFFLINE = "모바일 사용자를 오프라인으로 표시"
 	L.SETTINGS_TREAT_MOBILE_OFFLINE_DESC = "모바일 앱을 사용하는 친구를 오프라인 그룹에 표시"
-	
+
 	-- Feature 3: 메모를 이름으로 표시
 	L.SETTINGS_SHOW_NOTES_AS_NAME = "메모를 친구 이름으로 표시"
 	L.SETTINGS_SHOW_NOTES_AS_NAME_DESC = "사용 가능한 경우 친구 메모를 이름으로 표시"
-	
+
 	-- Feature 4: 창 크기 조절
 	L.SETTINGS_WINDOW_SCALE = "창 크기 조절"
 	L.SETTINGS_WINDOW_SCALE_DESC = "전체 창 크기 조절 (50%% - 200%%)"
-	
+
 	-- Data Broker Settings
 	L.BROKER_SETTINGS_SHOW_LABEL = "레이블 표시"
 	L.BROKER_SETTINGS_SHOW_TOTAL = "총 수 표시"
@@ -382,7 +398,8 @@ local L = BFL_LOCALE
 	L.BROKER_SETTINGS_HEADER_INTERACTION = "상호작용"
 	L.BROKER_SETTINGS_HEADER_INSTRUCTIONS = "사용 방법"
 	L.BROKER_SETTINGS_HEADER_COMPATIBILITY = "테스트된 표시 애드온"
-	L.BROKER_SETTINGS_INSTRUCTIONS = "• 데이터 브로커 표시 애드온 설치(Bazooka, ChocolateBar 또는 TitanPanel)\n• 위의 데이터 브로커 활성화(UI 다시 로드 안내됨)\n• BetterFriendlist 버튼이 표시 애드온에 나타남\n• 호버로 도구 설명 표시, 좌클릭으로 열기, 우클릭으로 설정, 가운데 클릭으로 필터 순환"
+	L.BROKER_SETTINGS_INSTRUCTIONS =
+		"• 데이터 브로커 표시 애드온 설치(Bazooka, ChocolateBar 또는 TitanPanel)\n• 위의 데이터 브로커 활성화(UI 다시 로드 안내됨)\n• BetterFriendlist 버튼이 표시 애드온에 나타남\n• 호버로 도구 설명 표시, 좌클릭으로 열기, 우클릭으로 설정, 가운데 클릭으로 필터 순환"
 	L.BROKER_SETTINGS_HEADER_COLUMNS = "도구 설명 열"
 	L.BROKER_SETTINGS_COLUMNS_HEADER = "도구 설명 열"
 	L.BROKER_COLUMN_NAME = "Name"
@@ -393,7 +410,7 @@ local L = BFL_LOCALE
 	L.BROKER_COLUMN_REALM = "서버"
 	L.BROKER_COLUMN_FACTION = "진영"
 	L.BROKER_COLUMN_NOTES = "메모"
-	
+
 	-- Broker Column Tooltips
 	L.BROKER_COLUMN_NAME_DESC = "친구 이름 표시 (RealID 또는 캐릭터명)"
 	L.BROKER_COLUMN_LEVEL_DESC = "캐릭터 레벨 표시"
@@ -403,7 +420,7 @@ local L = BFL_LOCALE
 	L.BROKER_COLUMN_REALM_DESC = "캐릭터의 서버 표시"
 	L.BROKER_COLUMN_FACTION_DESC = "진영 아이콘 표시 (얼라이언스/호드)"
 	L.BROKER_COLUMN_NOTES_DESC = "친구 메모 표시"
-	
+
 	-- ========================================
 	-- CLASSIC COMPATIBILITY
 	-- ========================================
@@ -416,7 +433,8 @@ local L = BFL_LOCALE
 	L.SETTINGS_HIDE_GUILD_TAB = "길드 탭 숨기기"
 	L.SETTINGS_HIDE_GUILD_TAB_DESC = "친구 목록에서 길드 탭을 숨깁니다"
 	L.SETTINGS_USE_UI_PANEL_SYSTEM = "UI 계층 구조 준수"
-	L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "BetterFriendlist가 다른 UI 창(캐릭터, 주문서 등) 위에 열리지 않도록 합니다. /reload 필요."
+	L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC =
+		"BetterFriendlist가 다른 UI 창(캐릭터, 주문서 등) 위에 열리지 않도록 합니다. /reload 필요."
 
 	-- ========================================
 	-- LAST ONLINE TIME FORMATS
@@ -432,7 +450,8 @@ local L = BFL_LOCALE
 	-- GUILD UI WARNING
 	-- ========================================
 	L.CLASSIC_GUILD_UI_WARNING_TITLE = "클래식 길드 UI 비활성화됨"
-	L.CLASSIC_GUILD_UI_WARNING_TEXT = "BetterFriendlist는 Blizzard의 최신 길드 UI만 BetterFriendlist와 호환되므로 클래식 길드 UI 설정을 비활성화했습니다.\n\n길드 탭은 이제 Blizzard의 최신 길드 UI를 엽니다."
+	L.CLASSIC_GUILD_UI_WARNING_TEXT =
+		"BetterFriendlist는 Blizzard의 최신 길드 UI만 BetterFriendlist와 호환되므로 클래식 길드 UI 설정을 비활성화했습니다.\n\n길드 탭은 이제 Blizzard의 최신 길드 UI를 엽니다."
 
 	-- ========================================
 	-- AUDITED MISSING STRINGS
@@ -513,7 +532,7 @@ local L = BFL_LOCALE
 	L.EDITMODE_PREVIEW_MESSAGE = "Preview Position"
 	L.EDITMODE_FRAME_WIDTH = "Width"
 	L.EDITMODE_FRAME_HEIGHT = "Height"
-	
+
 	-- Dialogs (Notifications Trigger)
 	L.DIALOG_RESET_LAYOUTS_TEXT = "Reset layouts?\n\nIrreversible!"
 	L.DIALOG_RESET_LAYOUTS_BTN1 = "Reset"
@@ -542,7 +561,7 @@ local L = BFL_LOCALE
 	L.FILTER_HIDE_AFK = "No AFK"
 	L.FILTER_RETAIL = "Retail"
 	L.TOOLTIP_QUICK_FILTER = "Filter: %s"
-	
+
 	-- Settings (Broker)
 	L.BROKER_SETTINGS_RELOAD_TEXT = "Reload required.\n\nReload?"
 	L.BROKER_SETTINGS_RELOAD_BTN = "Reload"
@@ -562,9 +581,9 @@ local L = BFL_LOCALE
 	L.BROKER_SETTINGS_SHOW_BNET_ICON = "BNet Icon"
 	L.BROKER_SETTINGS_SHOW_BNET_ICON_TITLE = "BNet 아이콘 표시"
 	L.BROKER_SETTINGS_SHOW_BNET_ICON_TOOLTIP = "BNet Friends Icon"
-    L.STATUS_ENABLED = "|cff00ff00Enabled|r"
-    L.STATUS_DISABLED = "|cffff0000비활성화됨|r"
-    L.BROKER_WOW_FRIENDS = "WoW 친구:"
+	L.STATUS_ENABLED = "|cff00ff00Enabled|r"
+	L.STATUS_DISABLED = "|cffff0000비활성화됨|r"
+	L.BROKER_WOW_FRIENDS = "WoW 친구:"
 
 	-- Settings (Global Sync)
 	L.SETTINGS_TAB_GLOBAL_SYNC = "Global Sync"
@@ -668,7 +687,7 @@ local L = BFL_LOCALE
 	L.RAF_CHAT_MORE_REWARDS = "    ... and %d others"
 	L.RAF_CHAT_USE_UI = "|cff00ff00Use UI for details.|r"
 	L.RAF_GAME_TIME_MESSAGE = "|cff00ff00RAF:|r Game time available."
-	
+
 	-- ========================================
 	-- SETTINGS (Additional)
 	-- ========================================
@@ -682,7 +701,7 @@ local L = BFL_LOCALE
 	L.ERROR_IMPORT_DESERIALIZE = "Deserialize Error"
 	L.ERROR_EXPORT_VERSION = "Version Not Supported"
 	L.ERROR_EXPORT_STRUCTURE = "Invalid Structure"
-	
+
 	-- Statistics
 	L.STATS_NO_HEALTH_DATA = "No health data"
 	L.STATS_NO_CLASS_DATA = "No class data"
@@ -701,7 +720,8 @@ local L = BFL_LOCALE
 	L.STATS_MOBILE_DESKTOP = "PC: %d (%d%%)\nMobile: %d (%d%%)"
 	L.STATS_NOTES_FAVORITES = "Notes: %d (%d%%)\nFavorites: %d (%d%%)"
 	L.STATS_MAX_LEVEL = "Max: %d\n70-79: %d\n60-69: %d\n<60: %d\nAvg: %.1f"
-	L.STATS_HEALTH_FMT = "|cff00ff00Active: %d (%d%%)|r\n|cffffd700Med: %d (%d%%)|r\n|cffffaa00Old: %d (%d%%)|r\n|cffff6600Stale: %d (%d%%)|r\n|cffff0000Inactive: %d (%d%%)|r"
+	L.STATS_HEALTH_FMT =
+		"|cff00ff00Active: %d (%d%%)|r\n|cffffd700Med: %d (%d%%)|r\n|cffffaa00Old: %d (%d%%)|r\n|cffff6600Stale: %d (%d%%)|r\n|cffff0000Inactive: %d (%d%%)|r"
 	L.STATS_CLASS_FMT = "%d. %s: %d (%d%%)"
 	L.STATS_FACTION_DISTRIBUTION = "|cff0080ff얼라이언스: %d|r\n|cffff0000호드: %d|r"
 	L.STATS_REALM_FMT = "\n%d. %s: %d"
@@ -747,11 +767,13 @@ local L = BFL_LOCALE
 	-- ========================================
 	-- Name Formatting
 	L.SETTINGS_NAME_FORMAT_HEADER = "Name Format"
-	L.SETTINGS_NAME_FORMAT_DESC = "Customize:\n|cffFFD100%name%|r -Name\n|cffFFD100%note%|r -Note\n|cffFFD100%nickname%|r -Nickname\n|cffFFD100%battletag%|r -Tag"
+	L.SETTINGS_NAME_FORMAT_DESC =
+		"Customize:\n|cffFFD100%name%|r -Name\n|cffFFD100%note%|r -Note\n|cffFFD100%nickname%|r -Nickname\n|cffFFD100%battletag%|r -Tag"
 	L.SETTINGS_NAME_FORMAT_LABEL = "형식:"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP = "Name Format"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP_DESC = "Enter format."
-	L.SETTINGS_NAME_FORMAT_DISABLED_FRIENDLISTCOLORS = "이 설정은 'FriendListColors' 애드온이 이름 색상/형식을 관리하고 있어서 비활성화되었습니다."
+	L.SETTINGS_NAME_FORMAT_DISABLED_FRIENDLISTCOLORS =
+		"이 설정은 'FriendListColors' 애드온이 이름 색상/형식을 관리하고 있어서 비활성화되었습니다."
 
 	-- In-Game Group
 	L.SETTINGS_SHOW_INGAME_GROUP = "'In Game' Group"
@@ -797,7 +819,7 @@ local L = BFL_LOCALE
 	-- Notifications (Detailed)
 
 	-- Quiet Hours & Filters
-	
+
 	-- Notification Toggles
 
 	-- Missing Descriptions
@@ -834,7 +856,8 @@ local L = BFL_LOCALE
 	L.CORE_STATISTICS_MODULE_NOT_LOADED = "Stats not loaded"
 	L.CORE_STATISTICS_HEADER = "|cff00ff00=== Statistics ===|r"
 	L.CORE_STATS_OVERVIEW = "|cffffcc00Summary:|r"
-	L.CORE_STATS_TOTAL_ONLINE_OFFLINE = "  Tot: |cffffffff%d|r  On: |cff00ff00%d|r (%.0f%%)  Off: |cffaaaaaa%d|r (%.0f%%)"
+	L.CORE_STATS_TOTAL_ONLINE_OFFLINE =
+		"  Tot: |cffffffff%d|r  On: |cff00ff00%d|r (%.0f%%)  Off: |cffaaaaaa%d|r (%.0f%%)"
 	L.CORE_STATS_BNET_WOW = "  BNet: |cff0099ff%d|r  |  WoW: |cffffd700%d|r"
 	L.CORE_STATS_FRIENDSHIP_HEALTH = "|cffffcc00Health:|r"
 	L.CORE_STATS_HEALTH_ACTIVE = "  Active: |cff00ff00%d|r  Med: |cffffd700%d|r"
@@ -842,7 +865,8 @@ local L = BFL_LOCALE
 	L.CORE_STATS_NO_HEALTH_DATA = "  No Data"
 	L.CORE_STATS_CLASS_DISTRIBUTION = "|cffffcc00Classes:|r"
 	L.CORE_STATS_LEVEL_DISTRIBUTION = "|cffffcc00Levels:|r"
-	L.CORE_STATS_LEVEL_BREAKDOWN = "  Max: |cffffffff%d|r  70+: |cffffffff%d|r  60+: |cffffffff%d|r  <60: |cffffffff%d|r"
+	L.CORE_STATS_LEVEL_BREAKDOWN =
+		"  Max: |cffffffff%d|r  70+: |cffffffff%d|r  60+: |cffffffff%d|r  <60: |cffffffff%d|r"
 	L.CORE_STATS_AVG_LEVEL = "  Avg: |cffffffff%.1f|r"
 	L.CORE_STATS_REALM_CLUSTERS = "|cffffcc00Realms:|r"
 	L.CORE_STATS_REALM_BREAKDOWN = "  Same: |cffffffff%d|r  |  Other: |cffffffff%d|r"
@@ -1015,12 +1039,12 @@ local L = BFL_LOCALE
 	L.QJ_MOCK_ICONS_HELP = "  |cffffcc00/bfl qj mock icons|r - Icons"
 	L.HELP_HEADER_CONFIGURATION = "|cffffcc00Config:|r"
 	L.QJ_CMD_CONFIG_HELP = "  |cffffcc00/bfl qj config|r - Config"
-	
+
 	-- BetterFriendlist.lua
 	L.CMD_RESET_FILTER_SUCCESS = "Reset Guild UI warning."
 	L.CMD_RESET_HEADER = "Reset:"
 	L.CMD_RESET_HELP_WARNING = "Reset Guild warning"
-	
+
 	-- Changelog.lua
 	L.CHANGELOG_DISCORD = "   Discord"
 	L.CHANGELOG_GITHUB = "   GitHub 이슈"
@@ -1055,7 +1079,6 @@ local L = BFL_LOCALE
 	L.RAF_RECRUITMENT = "친구 초대"
 	L.SETTINGS_COLOR_CLASS_NAMES_DESC = "직업 이름을 직업 색상으로 표시"
 
-
 	-- Font Outline/Shadow Settings
 	L.SETTINGS_FONT_OUTLINE = "글꼴 윤곽"
 	L.SETTINGS_FONT_SHADOW = "글꼴 그림자"
@@ -1088,7 +1111,8 @@ local L = BFL_LOCALE
 	L.STREAMER_MODE_ENABLE_DESC = "메인 프레임에 스트리머 모드를 토글하는 버튼을 표시합니다."
 	L.STREAMER_MODE_HIDDEN_NAME = "숨겨진 이름 형식"
 	L.STREAMER_MODE_HEADER_TEXT = "사용자 정의 헤더 텍스트"
-	L.STREAMER_MODE_HEADER_TEXT_DESC = "스트리머 모드가 활성화되었을 때 Battle.net 헤더에 표시할 텍스트(예: 'Stream Mode')."
+	L.STREAMER_MODE_HEADER_TEXT_DESC =
+		"스트리머 모드가 활성화되었을 때 Battle.net 헤더에 표시할 텍스트(예: 'Stream Mode')."
 	L.STREAMER_MODE_BUTTON_TOOLTIP = "스트리머 모드 토글"
 	L.STREAMER_MODE_BUTTON_DESC = "클릭하여 개인정보 보호 모드를 활성화/비활성화합니다."
 	L.SETTINGS_PRIVACY_OPTIONS = "개인정보 보호 옵션"
@@ -1098,14 +1122,16 @@ local L = BFL_LOCALE
 	L.SETTINGS_STREAMER_NAME_FORMAT_NICKNAME = "별명 강제"
 	L.SETTINGS_STREAMER_NAME_FORMAT_NOTE = "메모 강제"
 	L.SETTINGS_STREAMER_USE_PURPLE_HEADER = "보라색 헤더 색상 사용"
-	L.SETTINGS_STREAMER_USE_PURPLE_HEADER_DESC = "스트리머 모드가 활성화되었을 때 Battle.net 헤더 배경을 트위치 보라색으로 변경합니다."
+	L.SETTINGS_STREAMER_USE_PURPLE_HEADER_DESC =
+		"스트리머 모드가 활성화되었을 때 Battle.net 헤더 배경을 트위치 보라색으로 변경합니다."
 
 	-- ========================================
 	-- RAID SHORTCUTS (Phase 26)
 	-- ========================================
 	L.SETTINGS_TAB_RAID = "공격대"
 	L.SETTINGS_RAID_ENABLE_SHORTCUTS = "단축키 활성화"
-	L.SETTINGS_RAID_ENABLE_SHORTCUTS_DESC = "공격대 프레임의 모든 사용자 정의 마우스 단축키를 활성화하거나 비활성화합니다."
+	L.SETTINGS_RAID_ENABLE_SHORTCUTS_DESC =
+		"공격대 프레임의 모든 사용자 정의 마우스 단축키를 활성화하거나 비활성화합니다."
 	L.SETTINGS_RAID_SHORTCUTS_TITLE = "공격대 단축키"
 	L.SETTINGS_RAID_ACTION_MASS_MOVE = "일괄 이동"
 	L.SETTINGS_RAID_ACTION_TARGET = "대상 설정"
@@ -1175,6 +1201,26 @@ local L = BFL_LOCALE
 	L.SETTINGS_FONT_SIZE_NUM = "글꼴 크기"
 
 	-- ========================================
+	-- NOTE SYNC (Group to Note Sync)
+	-- ========================================
+	L.SETTINGS_SYNC_GROUPS_NOTE_HEADER = "그룹 메모 동기화"
+	L.SETTINGS_SYNC_GROUPS_NOTE = "그룹을 친구 메모에 동기화"
+	L.SETTINGS_SYNC_GROUPS_NOTE_DESC =
+		"FriendGroups 형식(메모#그룹1#그룹2)으로 그룹 할당을 친구 메모에 작성합니다. 계정 간 또는 FriendGroups 사용자와 그룹을 공유할 수 있습니다."
+	L.DIALOG_SYNC_GROUPS_CONFIRM_TEXT =
+		"그룹 메모 동기화를 활성화하시겠습니까?\n\n|cffff8800경고:|r 배틀넷 메모는 127자, WoW 친구 메모는 48자로 제한됩니다. 글자 수 제한을 초과하는 그룹은 메모에서 생략되지만 데이터베이스에는 유지됩니다.\n\n기존 메모가 업데이트됩니다. 계속하시겠습니까?"
+	L.DIALOG_SYNC_GROUPS_CONFIRM_BTN1 = "활성화"
+	L.DIALOG_SYNC_GROUPS_CONFIRM_BTN2 = "취소"
+	L.DIALOG_SYNC_GROUPS_DISABLE_TEXT =
+		"그룹 메모 동기화가 비활성화되었습니다.\n\n메모 정리 마법사를 열어 친구 메모에서 그룹 접미사를 제거하시겠습니까?"
+	L.DIALOG_SYNC_GROUPS_DISABLE_BTN1 = "정리 마법사 열기"
+	L.DIALOG_SYNC_GROUPS_DISABLE_BTN2 = "메모 유지"
+	L.MSG_SYNC_GROUPS_STARTED = "그룹을 친구 메모에 동기화 중..."
+	L.MSG_SYNC_GROUPS_COMPLETE = "그룹 메모 동기화 완료. 업데이트: %d, 건너뜀(제한): %d"
+	L.MSG_SYNC_GROUPS_PROGRESS = "메모 동기화 중: %d / %d"
+	L.MSG_SYNC_GROUPS_NOTE_LIMIT = "%s의 메모 제한 도달 - 일부 그룹 건너뜀"
+
+	-- ========================================
 	-- MESSAGES (Phase 22 - Asian/Cyrillic)
 	-- ========================================
 	L.MSG_INVITE_CONVERT_RAID = "파티를 공격대로 전환 중..."
@@ -1184,7 +1230,8 @@ local L = BFL_LOCALE
 	-- SETTINGS (Phase 22 - Asian/Cyrillic)
 	-- ========================================
 	L.SETTINGS_SHOW_WELCOME_MESSAGE = "환영 메시지 표시"
-	L.SETTINGS_SHOW_WELCOME_MESSAGE_DESC = "로그인할 때 애드온 로드된 메시지를 채팅에 표시합니다."
+	L.SETTINGS_SHOW_WELCOME_MESSAGE_DESC =
+		"로그인할 때 애드온 로드된 메시지를 채팅에 표시합니다."
 
 	-- ========================================
 	-- RAID CONVERSION / MOCK (Phase 21+)
@@ -1197,4 +1244,52 @@ local L = BFL_LOCALE
 	L.RAID_ERR_NOT_IN_GROUP = "당신은 그룹에 속해 있지 않습니다"
 	L.MOCK_INVITE_ACCEPTED = "%s의 모의 초대를 수락했습니다"
 	L.MOCK_INVITE_DECLINED = "%s의 모의 초대를 거절했습니다"
+
+	-- ========================================
+	-- NOTE CLEANUP WIZARD
+	-- ========================================
+	L.WIZARD_TITLE = "메모 정리 마법사"
+	L.WIZARD_DESC =
+		"친구 메모에서 FriendGroups 데이터(#그룹1#그룹2)를 제거합니다. 적용하기 전에 정리된 메모를 확인하세요."
+	L.WIZARD_BTN = "메모 정리"
+	L.WIZARD_BTN_TOOLTIP = "친구 메모에서 FriendGroups 데이터를 정리하는 마법사 열기"
+	L.WIZARD_HEADER = "메모 정리"
+	L.WIZARD_HEADER_DESC =
+		"친구 메모에서 FriendGroups 접미사를 제거합니다. 먼저 백업한 다음 변경 사항을 검토하고 적용하세요."
+	L.WIZARD_COL_ACCOUNT = "계정 이름"
+	L.WIZARD_COL_BATTLETAG = "배틀태그"
+	L.WIZARD_COL_NOTE = "현재 메모"
+	L.WIZARD_COL_CLEANED = "정리된 메모"
+	L.WIZARD_SEARCH_PLACEHOLDER = "검색..."
+	L.WIZARD_BACKUP_BTN = "메모 백업"
+	L.WIZARD_BACKUP_DONE = "백업 완료!"
+	L.WIZARD_BACKUP_TOOLTIP = "모든 현재 친구 메모를 데이터베이스에 백업으로 저장합니다."
+	L.WIZARD_BACKUP_SUCCESS = "%d명의 친구 메모를 백업했습니다."
+	L.WIZARD_APPLY_BTN = "정리 적용"
+	L.WIZARD_APPLY_TOOLTIP =
+		"정리된 메모를 다시 기록합니다. 원본과 다른 메모만 업데이트됩니다."
+	L.WIZARD_APPLY_CONFIRM =
+		"모든 친구에게 정리된 메모를 적용하시겠습니까?\n\n|cffff8800현재 메모가 덮어쓰기됩니다. 먼저 백업을 만들었는지 확인하세요!|r"
+	L.WIZARD_APPLY_SUCCESS = "%d개의 메모가 성공적으로 업데이트되었습니다."
+	L.WIZARD_APPLY_PROGRESS_FMT = "진행: %d/%d | %d 성공 | %d 실패"
+	L.WIZARD_STATUS_FMT = "%d / %d 친구 표시 중 | %d 그룹 데이터 포함 | %d 변경 대기 중"
+
+	-- Note Cleanup Wizard: Backup Viewer
+	L.WIZARD_VIEW_BACKUP_BTN = "백업 보기"
+	L.WIZARD_VIEW_BACKUP_TOOLTIP =
+		"백업 뷰어를 열어 저장된 모든 메모를 현재 메모와 비교합니다."
+	L.WIZARD_BACKUP_VIEWER_TITLE = "메모 백업 뷰어"
+	L.WIZARD_BACKUP_VIEWER_DESC =
+		"백업된 친구 메모를 현재 메모와 비교하여 확인합니다. 필요한 경우 원래 메모를 복원할 수 있습니다."
+	L.WIZARD_COL_BACKED_UP = "백업된 메모"
+	L.WIZARD_COL_CURRENT = "현재 메모"
+	L.WIZARD_RESTORE_BTN = "백업 복원"
+	L.WIZARD_RESTORE_TOOLTIP =
+		"백업에서 원래 메모를 복원합니다. 백업과 다른 메모만 업데이트됩니다."
+	L.WIZARD_RESTORE_CONFIRM =
+		"백업에서 모든 메모를 복원하시겠습니까?\n\n|cffff8800현재 메모가 백업된 버전으로 덮어씌워집니다.|r"
+	L.WIZARD_RESTORE_SUCCESS = "%d개의 메모가 성공적으로 복원되었습니다."
+	L.WIZARD_NO_BACKUP =
+		"메모 백업을 찾을 수 없습니다. 먼저 메모 정리 마법사를 사용하여 백업을 만드세요."
+	L.WIZARD_BACKUP_STATUS_FMT = "%d/%d개 표시 | 백업 이후 %d개 변경 | 백업: %s"
 end)

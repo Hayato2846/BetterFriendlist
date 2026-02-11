@@ -3,9 +3,10 @@
 
 local ADDON_NAME, BFL = ...
 BFL:RegisterLocale("itIT", function()
-local L = BFL_LOCALE
+	local L = BFL_LOCALE
 	L.SETTINGS_SIMPLE_MODE = "Simple Mode"
-	L.SETTINGS_SIMPLE_MODE_DESC = "Disabilita il ritratto del giocatore, nasconde le opzioni di ricerca/ordinamento, allarga il frame e sposta le schede per un layout compatto."
+	L.SETTINGS_SIMPLE_MODE_DESC =
+		"Disabilita il ritratto del giocatore, nasconde le opzioni di ricerca/ordinamento, allarga il frame e sposta le schede per un layout compatto."
 	L.MENU_CHANGELOG = "Registro Modifiche"
 	-- ========================================
 	-- DIALOGS & POPUPS
@@ -17,7 +18,8 @@ local L = BFL_LOCALE
 	L.DIALOG_RENAME_GROUP_BTN1 = "Rinomina"
 	L.DIALOG_RENAME_GROUP_BTN2 = "Annulla"
 	L.DIALOG_RENAME_GROUP_SETTINGS = "Rinomina gruppo '%s':"
-	L.DIALOG_DELETE_GROUP_TEXT = "Sei sicuro di voler eliminare questo gruppo?\n\n|cffff0000Questo rimuoverà tutti gli amici da questo gruppo.|r"
+	L.DIALOG_DELETE_GROUP_TEXT =
+		"Sei sicuro di voler eliminare questo gruppo?\n\n|cffff0000Questo rimuoverà tutti gli amici da questo gruppo.|r"
 	L.DIALOG_DELETE_GROUP_BTN1 = "Elimina"
 	L.DIALOG_DELETE_GROUP_BTN2 = "Annulla"
 	L.DIALOG_DELETE_GROUP_SETTINGS = "Eliminare gruppo '%s'?\n\nTutti gli amici verranno rimossi da questo gruppo."
@@ -32,19 +34,24 @@ local L = BFL_LOCALE
 	L.RAID_HELP_TITLE = "Aiuto Elenco Incursione"
 	L.RAID_HELP_TEXT = "Clicca per aiuto sull'uso dell'elenco incursione."
 	L.RAID_HELP_MULTISELECT_TITLE = "Selezione Multipla"
-	L.RAID_HELP_MULTISELECT_TEXT = "Tieni premuto Ctrl e clicca col sinistro per selezionare più giocatori.\nUna volta selezionati, trascinali in qualsiasi gruppo per spostarli insieme."
+	L.RAID_HELP_MULTISELECT_TEXT =
+		"Tieni premuto Ctrl e clicca col sinistro per selezionare più giocatori.\nUna volta selezionati, trascinali in qualsiasi gruppo per spostarli insieme."
 	L.RAID_HELP_MAINTANK_TITLE = "Difensore Principale"
-	L.RAID_HELP_MAINTANK_TEXT = "%s su un giocatore per impostarlo come Difensore Principale.\nUn'icona scudo apparirà accanto al nome."
+	L.RAID_HELP_MAINTANK_TEXT =
+		"%s su un giocatore per impostarlo come Difensore Principale.\nUn'icona scudo apparirà accanto al nome."
 	L.RAID_HELP_MAINASSIST_TITLE = "Assistente Principale"
-	L.RAID_HELP_MAINASSIST_TEXT = "%s su un giocatore per impostarlo come Assistente Principale.\nUn'icona spada apparirà accanto al nome."
+	L.RAID_HELP_MAINASSIST_TEXT =
+		"%s su un giocatore per impostarlo come Assistente Principale.\nUn'icona spada apparirà accanto al nome."
 	L.RAID_HELP_LEAD_TITLE = "Capo Incursione"
 	L.RAID_HELP_LEAD_TEXT = "%s su un giocatore per promuoverlo a Capo Incursione."
 	L.RAID_HELP_PROMOTE_TITLE = "Assistente"
 	L.RAID_HELP_PROMOTE_TEXT = "%s su un giocatore per promuovere/degradare come Assistente."
 	L.RAID_HELP_DRAGDROP_TITLE = "Trascina e Rilascia"
-	L.RAID_HELP_DRAGDROP_TEXT = "Trascina qualsiasi giocatore per spostarlo tra i gruppi.\nPuoi anche trascinare più giocatori selezionati.\nGli slot vuoti possono essere usati per scambiare posizioni."
+	L.RAID_HELP_DRAGDROP_TEXT =
+		"Trascina qualsiasi giocatore per spostarlo tra i gruppi.\nPuoi anche trascinare più giocatori selezionati.\nGli slot vuoti possono essere usati per scambiare posizioni."
 	L.RAID_HELP_COMBAT_TITLE = "Blocco in Combattimento"
-	L.RAID_HELP_COMBAT_TEXT = "I giocatori non possono essere spostati durante il combattimento.\nQuesta è una restrizione Blizzard."
+	L.RAID_HELP_COMBAT_TEXT =
+		"I giocatori non possono essere spostati durante il combattimento.\nQuesta è una restrizione Blizzard."
 	L.RAID_INFO_UNAVAILABLE = "Info non disponibile"
 	L.RAID_NOT_IN_RAID = "Non in incursione"
 	L.RAID_NOT_IN_RAID_DETAILS = "Non sei attualmente in un gruppo di incursione."
@@ -62,11 +69,12 @@ local L = BFL_LOCALE
 	L.RAID_ERROR_SWAP_FAILED = "Scambio fallito: %s"
 	L.RAID_MSG_MOVE_SUCCESS = "%s spostato nel Gruppo %d"
 	L.RAID_ERROR_MOVE_FAILED = "Spostamento fallito: %s"
-	L.DIALOG_MIGRATE_TEXT = "Migrare gruppi da FriendGroups a BetterFriendlist?\n\nQuesto:\n• Creerà gruppi dalle note BNet\n• Assegnerà amici ai gruppi\n• Opzionalmente pulirà le note\n\n|cffff0000Attenzione: Non si può annullare!|r"
+	L.DIALOG_MIGRATE_TEXT =
+		"Migrare gruppi da FriendGroups a BetterFriendlist?\n\nQuesto:\n• Creerà gruppi dalle note BNet\n• Assegnerà amici ai gruppi\n• Opzionalmente pulirà le note\n\n|cffff0000Attenzione: Non si può annullare!|r"
 	L.DIALOG_MIGRATE_BTN1 = "Migra e Pulisci Note"
 	L.DIALOG_MIGRATE_BTN2 = "Solo Migra"
 	L.DIALOG_MIGRATE_BTN3 = "Annulla"
-	
+
 	-- ========================================
 	-- SETTINGS PANEL
 	-- ========================================
@@ -122,7 +130,8 @@ local L = BFL_LOCALE
 	L.SETTINGS_EXPORT_BTN = "Seleziona Tutto"
 	L.BUTTON_EXPORT = "Esporta"
 	L.SETTINGS_IMPORT_TITLE = "Importa Configurazione"
-	L.SETTINGS_IMPORT_INFO = "Incolla la stringa di esportazione e clicca Importa.\n\n|cffff0000Attenzione: Sovrascriverà TUTTI i gruppi!|r"
+	L.SETTINGS_IMPORT_INFO =
+		"Incolla la stringa di esportazione e clicca Importa.\n\n|cffff0000Attenzione: Sovrascriverà TUTTI i gruppi!|r"
 	L.SETTINGS_IMPORT_BTN = "Importa"
 	L.SETTINGS_IMPORT_CANCEL = "Annulla"
 	L.SETTINGS_RESET_DEFAULT = "Ripristina Default"
@@ -140,7 +149,7 @@ local L = BFL_LOCALE
 	L.STATS_TOTAL_FRIENDS = "Totale Amici: %d"
 	L.STATS_ONLINE_OFFLINE = "|cff00ff00Online: %d (%d%%)|r  |  |cff808080Offline: %d (%d%%)|r"
 	L.STATS_BNET_WOW = "|cff0070ddBattle.net: %d|r  |  |cffffd700WoW: %d|r"
-	
+
 	-- ========================================
 	-- FRIEND REQUESTS
 	-- ========================================
@@ -151,7 +160,7 @@ local L = BFL_LOCALE
 	L.INVITE_MENU_DECLINE = "Rifiuta"
 	L.INVITE_MENU_REPORT = "Segnala Giocatore"
 	L.INVITE_MENU_BLOCK = "Blocca Inviti"
-	
+
 	-- ========================================
 	-- FILTERS & SORTING
 	-- ========================================
@@ -179,7 +188,7 @@ local L = BFL_LOCALE
 	L.SORT_SECONDARY_LABEL = "Secondary Sort"
 	L.SORT_PRIMARY_DESC = "Scegli come ordinare la lista amici."
 	L.SORT_SECONDARY_DESC = "Ordina per questo quando i valori primari sono uguali."
-	
+
 	-- ========================================
 	-- MENUS & CONTEXT MENUS
 	-- ========================================
@@ -199,7 +208,7 @@ local L = BFL_LOCALE
 	L.GROUPS_DIALOG_TITLE = "Gruppi per %s"
 	L.MENU_COPY_CHARACTER_NAME = "Copia nome personaggio"
 	L.COPY_CHARACTER_NAME_POPUP_TITLE = "Copia nome personaggio"
-	
+
 	-- ========================================
 	-- TOOLTIPS
 	-- ========================================
@@ -215,7 +224,7 @@ local L = BFL_LOCALE
 	L.TOOLTIP_GROUP_COLOR_DESC = "Clicca per cambiare colore"
 	L.TOOLTIP_DELETE_GROUP = "Elimina Gruppo"
 	L.TOOLTIP_DELETE_DESC = "Elimina gruppo e amici"
-	
+
 	-- ========================================
 	-- STATUS MESSAGES
 	-- ========================================
@@ -233,7 +242,7 @@ local L = BFL_LOCALE
 	L.MSG_EXPORT_FAILED = "Export fallito: %s"
 	L.MSG_IMPORT_SUCCESS = "Import riuscito!"
 	L.MSG_IMPORT_FAILED = "Import fallito: %s"
-	
+
 	-- ========================================
 	-- ERRORS & WARNINGS
 	-- ========================================
@@ -253,7 +262,7 @@ local L = BFL_LOCALE
 	L.ERROR_CANNOT_RENAME_BUILTIN = "Impossibile rinominare gruppi base"
 	L.ERROR_INVALID_GROUP_ID = "ID gruppo invalido"
 	L.ERROR_CANNOT_DELETE_BUILTIN = "Impossibile eliminare gruppi base"
-	
+
 	-- ========================================
 	-- MISC UI ELEMENTS
 	-- ========================================
@@ -270,7 +279,7 @@ local L = BFL_LOCALE
 	L.BUTTON_SEND_MESSAGE = "Invia Messaggio"
 	L.EMPTY_TEXT = "Vuoto"
 	L.LEVEL_FORMAT = "Liv %d"
-	
+
 	-- ========================================
 	-- BETA FEATURES (Advanced Tab)
 	-- ========================================
@@ -284,7 +293,7 @@ local L = BFL_LOCALE
 	L.SETTINGS_BETA_FEATURES_DISABLED = "Funzioni Beta |cffff0000DISABILITATE|r"
 	L.SETTINGS_BETA_TABS_VISIBLE = "Schede Beta visibili"
 	L.SETTINGS_BETA_TABS_HIDDEN = "Schede Beta nascoste"
-	
+
 	-- Global Friend Sync
 	L.SETTINGS_GLOBAL_SYNC_ENABLE = "Abilita Sincronizzazione Globale"
 	L.SETTINGS_GLOBAL_SYNC_DESC = "Sincronizza lista amici su tutti i personaggi."
@@ -292,17 +301,15 @@ local L = BFL_LOCALE
 	L.SETTINGS_GLOBAL_SYNC_DELETION = "Abilita Eliminazione"
 	L.SETTINGS_GLOBAL_SYNC_DELETION_DESC = "Consenti eliminazione amici dalla sincronizzazione."
 	L.SETTINGS_GLOBAL_SYNC_HEADER = "Database Amici Sincronizzato"
-	
+
 	-- ========================================
 	-- NOTIFICATIONS TAB
 	-- ========================================
-	
-	
-	
+
 	-- ========================================
 	-- NOTIFICATION MESSAGES
 	-- ========================================
-	
+
 	-- ========================================
 	-- EDIT MODE FRAME SIZE (PHASE 5)
 	-- ========================================
@@ -313,7 +320,7 @@ local L = BFL_LOCALE
 	L.SETTINGS_FRAME_RESET_SIZE = "Reset a 415x570"
 	L.SETTINGS_FRAME_APPLY_NOW = "Applica ora"
 	L.SETTINGS_FRAME_RESET_ALL = "Reset tutto"
-	
+
 	-- ========================================
 	-- DATA BROKER (STABLE FEATURE)
 	-- ========================================
@@ -334,7 +341,7 @@ local L = BFL_LOCALE
 	L.BROKER_ACTION_NONE = "Niente"
 	L.BROKER_SETTINGS_INFO = "Integrazione con Bazooka, TitanPanel, etc."
 	L.BROKER_FILTER_CHANGED = "Filtro cambiato: %s"
-	
+
 	-- Broker Tooltip Strings
 	L.BROKER_HEADER_WOW = "Amici WoW"
 	L.BROKER_HEADER_BNET = "Amici Battle.Net"
@@ -359,22 +366,22 @@ local L = BFL_LOCALE
 	L.BROKER_HINT_SETTINGS = " Impostazioni • "
 	L.BROKER_HINT_MIDDLE_CLICK = "Clic Centro:"
 	L.BROKER_HINT_CYCLE_FILTER = " Cambia Filtro"
-	
+
 	-- ========================================
 	-- FEATURE REQUESTS (CurseForge User Feedback)
 	-- ========================================
 	-- Feature 1: Treat Mobile as Offline
 	L.SETTINGS_TREAT_MOBILE_OFFLINE = "Tratta Mobile come Offline"
 	L.SETTINGS_TREAT_MOBILE_OFFLINE_DESC = "Mostra amici mobile in gruppo Offline"
-	
+
 	-- Feature 3: Show Notes as Name
 	L.SETTINGS_SHOW_NOTES_AS_NAME = "Mostra Note come Nome"
 	L.SETTINGS_SHOW_NOTES_AS_NAME_DESC = "Usa note amico come nome"
-	
+
 	-- Feature 4: Window Scale
 	L.SETTINGS_WINDOW_SCALE = "Scala Finestra"
 	L.SETTINGS_WINDOW_SCALE_DESC = "Scala interfaccia (50%% - 200%%)"
-	
+
 	-- Data Broker Settings
 	L.BROKER_SETTINGS_SHOW_LABEL = "Mostra Etichetta"
 	L.BROKER_SETTINGS_SHOW_TOTAL = "Mostra Totale"
@@ -395,7 +402,7 @@ local L = BFL_LOCALE
 	L.BROKER_COLUMN_REALM = "Reame"
 	L.BROKER_COLUMN_FACTION = "Fazione"
 	L.BROKER_COLUMN_NOTES = "Note"
-	
+
 	-- Broker Column Tooltips
 	L.BROKER_COLUMN_NAME_DESC = "Mostra nome"
 	L.BROKER_COLUMN_LEVEL_DESC = "Mostra livello"
@@ -405,7 +412,7 @@ local L = BFL_LOCALE
 	L.BROKER_COLUMN_REALM_DESC = "Mostra reame"
 	L.BROKER_COLUMN_FACTION_DESC = "Mostra fazione"
 	L.BROKER_COLUMN_NOTES_DESC = "Mostra note"
-	
+
 	-- ========================================
 	-- CLASSIC COMPATIBILITY
 	-- ========================================
@@ -416,9 +423,9 @@ local L = BFL_LOCALE
 	L.SETTINGS_CLOSE_ON_GUILD_TAB = "Chiudi su Gilda"
 	L.SETTINGS_CLOSE_ON_GUILD_TAB_DESC = "Chiudi lista amici quando apri gilda"
 	L.SETTINGS_HIDE_GUILD_TAB = "Nascondi Tab Gilda"
-L.SETTINGS_HIDE_GUILD_TAB_DESC = "Nascondi tab gilda dalla lista amici"
-L.SETTINGS_USE_UI_PANEL_SYSTEM = "Usa Sistema Pannelli UI"
-L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita sovrapposizioni. Richiede reload."
+	L.SETTINGS_HIDE_GUILD_TAB_DESC = "Nascondi tab gilda dalla lista amici"
+	L.SETTINGS_USE_UI_PANEL_SYSTEM = "Usa Sistema Pannelli UI"
+	L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita sovrapposizioni. Richiede reload."
 
 	-- ========================================
 	-- LAST ONLINE TIME FORMATS
@@ -434,7 +441,8 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita sovrapposizioni. Richiede reload."
 	-- GUILD UI WARNING
 	-- ========================================
 	L.CLASSIC_GUILD_UI_WARNING_TITLE = "UI Gilda Classica Disabilitata"
-	L.CLASSIC_GUILD_UI_WARNING_TEXT = "BetterFriendlist ha disabilitato l'UI Gilda Classica.\n\nIl tab Gilda aprirà l'interfaccia moderna."
+	L.CLASSIC_GUILD_UI_WARNING_TEXT =
+		"BetterFriendlist ha disabilitato l'UI Gilda Classica.\n\nIl tab Gilda aprirà l'interfaccia moderna."
 
 	-- ========================================
 	-- AUDITED MISSING STRINGS
@@ -515,7 +523,7 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita sovrapposizioni. Richiede reload."
 	L.EDITMODE_PREVIEW_MESSAGE = "Anteprima posizionamento"
 	L.EDITMODE_FRAME_WIDTH = "Larghezza"
 	L.EDITMODE_FRAME_HEIGHT = "Altezza"
-	
+
 	-- Dialogs (Notifications Trigger)
 	L.DIALOG_RESET_LAYOUTS_TEXT = "Reset layout?\n\nIrreversibile!"
 	L.DIALOG_RESET_LAYOUTS_BTN1 = "Reset"
@@ -545,7 +553,7 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita sovrapposizioni. Richiede reload."
 	L.FILTER_HIDE_AFK = "No AFK"
 	L.FILTER_RETAIL = "Retail"
 	L.TOOLTIP_QUICK_FILTER = "Filtro: %s"
-	
+
 	-- Settings (Broker)
 	L.BROKER_SETTINGS_RELOAD_TEXT = "Ricarica richiesta.\n\nRicaricare?"
 	L.BROKER_SETTINGS_RELOAD_BTN = "Ricarica"
@@ -565,11 +573,11 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita sovrapposizioni. Richiede reload."
 	L.BROKER_SETTINGS_SHOW_BNET_ICON = "Icona BNet"
 	L.BROKER_SETTINGS_SHOW_BNET_ICON_TITLE = "Mostra Icona BNet"
 	L.BROKER_SETTINGS_SHOW_BNET_ICON_TOOLTIP = "Icona per amici BNet"
-    L.BROKER_SETTINGS_CLICK_ACTION = "Azione Clic"
-    L.BROKER_SETTINGS_TOOLTIP_MODE = "Mode Tooltip"
-    L.STATUS_ENABLED = "|cff00ff00Abilitato|r"
-    L.STATUS_DISABLED = "|cffff0000Disabilitato|r"
-    L.BROKER_WOW_FRIENDS = "Amici WoW:"
+	L.BROKER_SETTINGS_CLICK_ACTION = "Azione Clic"
+	L.BROKER_SETTINGS_TOOLTIP_MODE = "Mode Tooltip"
+	L.STATUS_ENABLED = "|cff00ff00Abilitato|r"
+	L.STATUS_DISABLED = "|cffff0000Disabilitato|r"
+	L.BROKER_WOW_FRIENDS = "Amici WoW:"
 
 	-- Settings (Global Sync)
 	L.SETTINGS_TAB_GLOBAL_SYNC = "Sync Globale"
@@ -673,12 +681,13 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita sovrapposizioni. Richiede reload."
 	L.RAF_CHAT_MORE_REWARDS = "    ... e %d altri"
 	L.RAF_CHAT_USE_UI = "|cff00ff00Usa UI per dettagli.|r"
 	L.RAF_GAME_TIME_MESSAGE = "|cff00ff00RAF:|r Tempo gioco disponibile."
-	
+
 	-- ========================================
 	-- SETTINGS (Additional)
 	-- ========================================
 	L.SETTINGS_SHOW_WELCOME_MESSAGE = "Mostra messaggio di benvenuto"
-	L.SETTINGS_SHOW_WELCOME_MESSAGE_DESC = "Mostra il messaggio di caricamento dell'addon nella chat al momento del login."
+	L.SETTINGS_SHOW_WELCOME_MESSAGE_DESC =
+		"Mostra il messaggio di caricamento dell'addon nella chat al momento del login."
 	L.SETTINGS_TAB_DATABROKER = "Data Broker"
 	L.MSG_GROUP_RENAMED = "Gruppo rinominato '%s'"
 	L.ERROR_RENAME_FAILED = "Rinomina fallita"
@@ -689,7 +698,7 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita sovrapposizioni. Richiede reload."
 	L.ERROR_IMPORT_DESERIALIZE = "Err. deserializzazione"
 	L.ERROR_EXPORT_VERSION = "Versione non supportata"
 	L.ERROR_EXPORT_STRUCTURE = "Struttura invalida"
-	
+
 	-- Statistics
 	L.STATS_NO_HEALTH_DATA = "No dati salute"
 	L.STATS_NO_CLASS_DATA = "No dati classe"
@@ -708,7 +717,8 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita sovrapposizioni. Richiede reload."
 	L.STATS_MOBILE_DESKTOP = "PC: %d (%d%%)\nMobile: %d (%d%%)"
 	L.STATS_NOTES_FAVORITES = "Note: %d (%d%%)\nPreferiti: %d (%d%%)"
 	L.STATS_MAX_LEVEL = "Max: %d\n70-79: %d\n60-69: %d\n<60: %d\nMedia: %.1f"
-	L.STATS_HEALTH_FMT = "|cff00ff00Attivo: %d (%d%%)|r\n|cffffd700Medio: %d (%d%%)|r\n|cffffaa00Stantio: %d (%d%%)|r\n|cffff6600Stagnante: %d (%d%%)|r\n|cffff0000Inattivo: %d (%d%%)|r"
+	L.STATS_HEALTH_FMT =
+		"|cff00ff00Attivo: %d (%d%%)|r\n|cffffd700Medio: %d (%d%%)|r\n|cffffaa00Stantio: %d (%d%%)|r\n|cffff6600Stagnante: %d (%d%%)|r\n|cffff0000Inattivo: %d (%d%%)|r"
 	L.STATS_CLASS_FMT = "%d. %s: %d (%d%%)"
 	L.STATS_FACTION_DISTRIBUTION = "|cff0080ffAlliance: %d|r\n|cffff0000Horde: %d|r"
 	L.STATS_REALM_FMT = "\n%d. %s: %d"
@@ -754,11 +764,13 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita sovrapposizioni. Richiede reload."
 	-- ========================================
 	-- Name Formatting
 	L.SETTINGS_NAME_FORMAT_HEADER = "Formato Nome"
-	L.SETTINGS_NAME_FORMAT_DESC = "Personalizza:\n|cffFFD100%name%|r - Nome\n|cffFFD100%note%|r - Nota\n|cffFFD100%nickname%|r - Soprannome\n|cffFFD100%battletag%|r - Tag"
+	L.SETTINGS_NAME_FORMAT_DESC =
+		"Personalizza:\n|cffFFD100%name%|r - Nome\n|cffFFD100%note%|r - Nota\n|cffFFD100%nickname%|r - Soprannome\n|cffFFD100%battletag%|r - Tag"
 	L.SETTINGS_NAME_FORMAT_LABEL = "Formato:"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP = "Formato Nome"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP_DESC = "Inserisci formato."
-	L.SETTINGS_NAME_FORMAT_DISABLED_FRIENDLISTCOLORS = "Questa impostazione è disabilitata perché l'addon 'FriendListColors' gestisce i colori/formati dei nomi."
+	L.SETTINGS_NAME_FORMAT_DISABLED_FRIENDLISTCOLORS =
+		"Questa impostazione è disabilitata perché l'addon 'FriendListColors' gestisce i colori/formati dei nomi."
 
 	-- In-Game Group
 	L.SETTINGS_SHOW_INGAME_GROUP = "Gruppo 'In Gioco'"
@@ -803,7 +815,7 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita sovrapposizioni. Richiede reload."
 	-- Notifications (Detailed)
 
 	-- Quiet Hours & Filters
-	
+
 	-- Notification Toggles
 
 	-- Missing Descriptions
@@ -840,7 +852,8 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita sovrapposizioni. Richiede reload."
 	L.CORE_STATISTICS_MODULE_NOT_LOADED = "Stats non caricate"
 	L.CORE_STATISTICS_HEADER = "|cff00ff00=== Statistiche ===|r"
 	L.CORE_STATS_OVERVIEW = "|cffffcc00Sommario:|r"
-	L.CORE_STATS_TOTAL_ONLINE_OFFLINE = "  Tot: |cffffffff%d|r  On: |cff00ff00%d|r (%.0f%%)  Off: |cffaaaaaa%d|r (%.0f%%)"
+	L.CORE_STATS_TOTAL_ONLINE_OFFLINE =
+		"  Tot: |cffffffff%d|r  On: |cff00ff00%d|r (%.0f%%)  Off: |cffaaaaaa%d|r (%.0f%%)"
 	L.CORE_STATS_BNET_WOW = "  BNet: |cff0099ff%d|r  |  WoW: |cffffd700%d|r"
 	L.CORE_STATS_FRIENDSHIP_HEALTH = "|cffffcc00Salute:|r"
 	L.CORE_STATS_HEALTH_ACTIVE = "  Attivo: |cff00ff00%d|r  Medio: |cffffd700%d|r"
@@ -848,7 +861,8 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita sovrapposizioni. Richiede reload."
 	L.CORE_STATS_NO_HEALTH_DATA = "  No dati"
 	L.CORE_STATS_CLASS_DISTRIBUTION = "|cffffcc00Classi:|r"
 	L.CORE_STATS_LEVEL_DISTRIBUTION = "|cffffcc00Livelli:|r"
-	L.CORE_STATS_LEVEL_BREAKDOWN = "  Max: |cffffffff%d|r  70+: |cffffffff%d|r  60+: |cffffffff%d|r  <60: |cffffffff%d|r"
+	L.CORE_STATS_LEVEL_BREAKDOWN =
+		"  Max: |cffffffff%d|r  70+: |cffffffff%d|r  60+: |cffffffff%d|r  <60: |cffffffff%d|r"
 	L.CORE_STATS_AVG_LEVEL = "  Media: |cffffffff%.1f|r"
 	L.CORE_STATS_REALM_CLUSTERS = "|cffffcc00Reami:|r"
 	L.CORE_STATS_REALM_BREAKDOWN = "  Stesso: |cffffffff%d|r  |  Altro: |cffffffff%d|r"
@@ -1021,12 +1035,12 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita sovrapposizioni. Richiede reload."
 	L.QJ_MOCK_ICONS_HELP = "  |cffffcc00/bfl qj mock icons|r - Icone"
 	L.HELP_HEADER_CONFIGURATION = "|cffffcc00Config:|r"
 	L.QJ_CMD_CONFIG_HELP = "  |cffffcc00/bfl qj config|r - Config"
-	
+
 	-- BetterFriendlist.lua
 	L.CMD_RESET_FILTER_SUCCESS = "Reset Guild UI warning."
 	L.CMD_RESET_HEADER = "Reset:"
 	L.CMD_RESET_HELP_WARNING = "Reset Guild warning"
-	
+
 	-- Changelog.lua
 	L.CHANGELOG_DISCORD = "   Discord"
 	L.CHANGELOG_GITHUB = "   GitHub Issues"
@@ -1066,7 +1080,6 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita sovrapposizioni. Richiede reload."
 	L.RAF_RECRUITMENT = "Invita un Amico"
 	L.SETTINGS_COLOR_CLASS_NAMES_DESC = "Colora i nomi degli amici nel colore della loro classe"
 
-
 	-- Font Outline/Shadow Settings
 	L.SETTINGS_FONT_OUTLINE = "Font Outline"
 	L.SETTINGS_FONT_SHADOW = "Font Shadow"
@@ -1095,7 +1108,8 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita sovrapposizioni. Richiede reload."
 	-- ========================================
 	L.SETTINGS_TAB_RAID = "Raid"
 	L.SETTINGS_RAID_ENABLE_SHORTCUTS = "Enable Shortcuts"
-	L.SETTINGS_RAID_ENABLE_SHORTCUTS_DESC = "Abilita o disabilita tutti i tasti scorciatoia personalizzati del mouse sul Frame Incursione."
+	L.SETTINGS_RAID_ENABLE_SHORTCUTS_DESC =
+		"Abilita o disabilita tutti i tasti scorciatoia personalizzati del mouse sul Frame Incursione."
 	L.SETTINGS_RAID_SHORTCUTS_TITLE = "Raid Shortcuts"
 	L.SETTINGS_RAID_ACTION_MASS_MOVE = "Mass Move"
 	L.SETTINGS_RAID_ACTION_MAIN_TANK = "Set Main Tank"
@@ -1120,10 +1134,12 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita sovrapposizioni. Richiede reload."
 	L.STREAMER_MODE_TITLE = "Modalità Streamer"
 	L.STREAMER_MODE_DESC = "Opzioni di privacy per lo streaming o la registrazione."
 	L.SETTINGS_ENABLE_STREAMER_MODE = "Mostra Pulsante Modalità Streamer"
-	L.STREAMER_MODE_ENABLE_DESC = "Mostra un pulsante nel frame principale per attivare/disattivare la Modalità Streamer."
+	L.STREAMER_MODE_ENABLE_DESC =
+		"Mostra un pulsante nel frame principale per attivare/disattivare la Modalità Streamer."
 	L.STREAMER_MODE_HIDDEN_NAME = "Formato Nome Nascosto"
 	L.STREAMER_MODE_HEADER_TEXT = "Testo Intestazione Personalizzato"
-	L.STREAMER_MODE_HEADER_TEXT_DESC = "Testo da visualizzare nell'intestazione Battle.net quando la Modalità Streamer è attiva (p. es., 'Modalità Stream')."
+	L.STREAMER_MODE_HEADER_TEXT_DESC =
+		"Testo da visualizzare nell'intestazione Battle.net quando la Modalità Streamer è attiva (p. es., 'Modalità Stream')."
 	L.STREAMER_MODE_BUTTON_TOOLTIP = "Attiva/Disattiva Modalità Streamer"
 	L.STREAMER_MODE_BUTTON_DESC = "Clicca per abilitare/disabilitare la modalità privacy."
 	L.SETTINGS_PRIVACY_OPTIONS = "Opzioni di Privacy"
@@ -1133,7 +1149,8 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita sovrapposizioni. Richiede reload."
 	L.SETTINGS_STREAMER_NAME_FORMAT_NICKNAME = "Forza Soprannome"
 	L.SETTINGS_STREAMER_NAME_FORMAT_NOTE = "Forza Nota"
 	L.SETTINGS_STREAMER_USE_PURPLE_HEADER = "Usa Colore Intestazione Viola"
-	L.SETTINGS_STREAMER_USE_PURPLE_HEADER_DESC = "Cambia lo sfondo dell'intestazione Battle.net al viola Twitch quando la Modalità Streamer è attiva."
+	L.SETTINGS_STREAMER_USE_PURPLE_HEADER_DESC =
+		"Cambia lo sfondo dell'intestazione Battle.net al viola Twitch quando la Modalità Streamer è attiva."
 
 	-- ========================================
 	-- RAID SHORTCUTS (Phase 26) - PARTIAL
@@ -1188,5 +1205,70 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita sovrapposizioni. Richiede reload."
 	L.SETTINGS_FONT_TABS_TITLE = "Testo Schede"
 	L.SETTINGS_FONT_RAID_TITLE = "Testo Nome Raid"
 	L.SETTINGS_FONT_SIZE_NUM = "Dimensione Font"
-end)
 
+	-- ========================================
+	-- NOTE SYNC (Group to Note Sync)
+	-- ========================================
+	L.SETTINGS_SYNC_GROUPS_NOTE_HEADER = "Sincronizzazione note gruppo"
+	L.SETTINGS_SYNC_GROUPS_NOTE = "Sincronizza gruppi nelle note amico"
+	L.SETTINGS_SYNC_GROUPS_NOTE_DESC =
+		"Scrive le assegnazioni dei gruppi nelle note degli amici nel formato FriendGroups (Nota#Gruppo1#Gruppo2). Permette di condividere i gruppi tra account o con gli utenti di FriendGroups."
+	L.DIALOG_SYNC_GROUPS_CONFIRM_TEXT =
+		"Attivare la sincronizzazione delle note di gruppo?\n\n|cffff8800Attenzione:|r Le note BattleNet sono limitate a 127 caratteri, le note amici WoW a 48 caratteri. I gruppi che superano il limite verranno saltati nella nota ma rimarranno nel database.\n\nLe note esistenti verranno aggiornate. Continuare?"
+	L.DIALOG_SYNC_GROUPS_CONFIRM_BTN1 = "Attiva"
+	L.DIALOG_SYNC_GROUPS_CONFIRM_BTN2 = "Annulla"
+	L.DIALOG_SYNC_GROUPS_DISABLE_TEXT =
+		"La sincronizzazione delle note di gruppo e stata disattivata.\n\nVuoi aprire la Procedura Guidata di Pulizia delle Note per rimuovere i suffissi di gruppo dalle note dei tuoi amici?"
+	L.DIALOG_SYNC_GROUPS_DISABLE_BTN1 = "Apri Procedura Guidata"
+	L.DIALOG_SYNC_GROUPS_DISABLE_BTN2 = "Mantieni Note"
+	L.MSG_SYNC_GROUPS_STARTED = "Sincronizzazione gruppi nelle note amici..."
+	L.MSG_SYNC_GROUPS_COMPLETE = "Sincronizzazione completata. Aggiornati: %d, Saltati (limite): %d"
+	L.MSG_SYNC_GROUPS_PROGRESS = "Sincronizzazione note: %d / %d"
+	L.MSG_SYNC_GROUPS_NOTE_LIMIT = "Limite nota raggiunto per %s - alcuni gruppi saltati"
+
+	-- ========================================
+	-- NOTE CLEANUP WIZARD
+	-- ========================================
+	L.WIZARD_TITLE = "Procedura Pulizia Note"
+	L.WIZARD_DESC =
+		"Rimuovi i dati di FriendGroups (#Gruppo1#Gruppo2) dalle note degli amici. Controlla le note pulite prima di applicare."
+	L.WIZARD_BTN = "Pulizia Note"
+	L.WIZARD_BTN_TOOLTIP = "Apri la procedura per pulire i dati di FriendGroups dalle note degli amici"
+	L.WIZARD_HEADER = "Pulizia Note"
+	L.WIZARD_HEADER_DESC =
+		"Rimuovi i suffissi di FriendGroups dalle note degli amici. Esegui un backup prima, poi controlla e applica le modifiche."
+	L.WIZARD_COL_ACCOUNT = "Nome Account"
+	L.WIZARD_COL_BATTLETAG = "BattleTag"
+	L.WIZARD_COL_NOTE = "Nota Attuale"
+	L.WIZARD_COL_CLEANED = "Nota Pulita"
+	L.WIZARD_SEARCH_PLACEHOLDER = "Cerca..."
+	L.WIZARD_BACKUP_BTN = "Backup Note"
+	L.WIZARD_BACKUP_DONE = "Backup completato!"
+	L.WIZARD_BACKUP_TOOLTIP = "Salva tutte le note degli amici attuali nel database come backup."
+	L.WIZARD_BACKUP_SUCCESS = "Backup completato per %d amici."
+	L.WIZARD_APPLY_BTN = "Applica Pulizia"
+	L.WIZARD_APPLY_TOOLTIP = "Riscrivi le note pulite. Solo le note diverse dall'originale verranno aggiornate."
+	L.WIZARD_APPLY_CONFIRM =
+		"Applicare le note pulite a tutti gli amici?\n\n|cffff8800Le note attuali verranno sovrascritte. Assicurati di aver creato un backup prima!|r"
+	L.WIZARD_APPLY_SUCCESS = "%d note aggiornate con successo."
+	L.WIZARD_APPLY_PROGRESS_FMT = "Progresso: %d/%d | %d riusciti | %d falliti"
+	L.WIZARD_STATUS_FMT = "Visualizzando %d di %d amici | %d con dati di gruppo | %d modifiche in sospeso"
+
+	-- Note Cleanup Wizard: Backup Viewer
+	L.WIZARD_VIEW_BACKUP_BTN = "Visualizza backup"
+	L.WIZARD_VIEW_BACKUP_TOOLTIP =
+		"Apri il visualizzatore di backup per vedere tutte le note salvate e confrontarle con quelle attuali."
+	L.WIZARD_BACKUP_VIEWER_TITLE = "Visualizzatore backup note"
+	L.WIZARD_BACKUP_VIEWER_DESC =
+		"Visualizza le note degli amici salvate e confrontale con le note attuali. Puoi ripristinare le note originali se necessario."
+	L.WIZARD_COL_BACKED_UP = "Nota salvata"
+	L.WIZARD_COL_CURRENT = "Nota attuale"
+	L.WIZARD_RESTORE_BTN = "Ripristina backup"
+	L.WIZARD_RESTORE_TOOLTIP =
+		"Ripristina le note originali dal backup. Verranno aggiornate solo le note diverse dal backup."
+	L.WIZARD_RESTORE_CONFIRM =
+		"Ripristinare tutte le note dal backup?\n\n|cffff8800Questo sovrascrivera le note attuali con le versioni salvate.|r"
+	L.WIZARD_RESTORE_SUCCESS = "%d note ripristinate con successo."
+	L.WIZARD_NO_BACKUP = "Nessun backup trovato. Usa prima la Procedura guidata di pulizia note per crearne uno."
+	L.WIZARD_BACKUP_STATUS_FMT = "Mostrando %d di %d voci | %d modificate dal backup | Backup: %s"
+end)

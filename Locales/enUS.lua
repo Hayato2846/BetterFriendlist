@@ -5,10 +5,11 @@
 local ADDON_NAME, BFL = ...
 
 local function LoadEnUS()
--- Load into enUS fallback table (used by all locales)
-local L = BFL_LOCALE_ENUS
+	-- Load into enUS fallback table (used by all locales)
+	local L = BFL_LOCALE_ENUS
 	L.SETTINGS_SIMPLE_MODE = "Simple Mode"
-	L.SETTINGS_SIMPLE_MODE_DESC = "Disables the player portrait, hides search/sort options, widens the frame, and shifts tabs for a compact layout."
+	L.SETTINGS_SIMPLE_MODE_DESC =
+		"Disables the player portrait, hides search/sort options, widens the frame, and shifts tabs for a compact layout."
 	L.MENU_CHANGELOG = "Changelog"
 	-- ========================================
 	-- DIALOGS & POPUPS
@@ -20,7 +21,8 @@ local L = BFL_LOCALE_ENUS
 	L.DIALOG_RENAME_GROUP_BTN1 = "Rename"
 	L.DIALOG_RENAME_GROUP_BTN2 = "Cancel"
 	L.DIALOG_RENAME_GROUP_SETTINGS = "Rename group '%s':"
-	L.DIALOG_DELETE_GROUP_TEXT = "Are you sure you want to delete this group?\n\n|cffff0000This will remove all friends from this group.|r"
+	L.DIALOG_DELETE_GROUP_TEXT =
+		"Are you sure you want to delete this group?\n\n|cffff0000This will remove all friends from this group.|r"
 	L.DIALOG_DELETE_GROUP_BTN1 = "Delete"
 	L.DIALOG_DELETE_GROUP_BTN2 = "Cancel"
 	L.DIALOG_DELETE_GROUP_SETTINGS = "Delete group '%s'?\n\nAll friends will be unassigned from this group."
@@ -35,19 +37,23 @@ local L = BFL_LOCALE_ENUS
 	L.RAID_HELP_TITLE = "Raid Roster Help"
 	L.RAID_HELP_TEXT = "Click for help on using the raid roster."
 	L.RAID_HELP_MULTISELECT_TITLE = "Multi-Selection"
-	L.RAID_HELP_MULTISELECT_TEXT = "Hold Ctrl and left-click to select multiple players.\nOnce selected, drag and drop them into any group to move them all at once."
+	L.RAID_HELP_MULTISELECT_TEXT =
+		"Hold Ctrl and left-click to select multiple players.\nOnce selected, drag and drop them into any group to move them all at once."
 	L.RAID_HELP_MAINTANK_TITLE = "Main Tank"
 	L.RAID_HELP_MAINTANK_TEXT = "%s on a player to set them as Main Tank.\nA tank icon will appear next to their name."
 	L.RAID_HELP_MAINASSIST_TITLE = "Main Assist"
-	L.RAID_HELP_MAINASSIST_TEXT = "%s on a player to set them as Main Assist.\nAn assist icon will appear next to their name."
+	L.RAID_HELP_MAINASSIST_TEXT =
+		"%s on a player to set them as Main Assist.\nAn assist icon will appear next to their name."
 	L.RAID_HELP_LEAD_TITLE = "Raid Leader"
 	L.RAID_HELP_LEAD_TEXT = "%s on a player to promote them to Raid Leader."
 	L.RAID_HELP_PROMOTE_TITLE = "Promote Assistant"
 	L.RAID_HELP_PROMOTE_TEXT = "%s on a player to promote/demote them as Assistant."
 	L.RAID_HELP_DRAGDROP_TITLE = "Drag & Drop"
-	L.RAID_HELP_DRAGDROP_TEXT = "Drag any player to move them between groups.\nYou can also drag multiple selected players at once.\nEmpty slots can be used to swap positions."
+	L.RAID_HELP_DRAGDROP_TEXT =
+		"Drag any player to move them between groups.\nYou can also drag multiple selected players at once.\nEmpty slots can be used to swap positions."
 	L.RAID_HELP_COMBAT_TITLE = "Combat Lock"
-	L.RAID_HELP_COMBAT_TEXT = "Players cannot be moved during combat.\nThis is a Blizzard restriction to prevent errors."
+	L.RAID_HELP_COMBAT_TEXT =
+		"Players cannot be moved during combat.\nThis is a Blizzard restriction to prevent errors."
 	L.RAID_INFO_UNAVAILABLE = "No info available"
 	L.RAID_NOT_IN_RAID = "Not in Raid"
 	L.RAID_NOT_IN_RAID_DETAILS = "You are not currently in a raid group."
@@ -65,11 +71,12 @@ local L = BFL_LOCALE_ENUS
 	L.RAID_ERROR_SWAP_FAILED = "Swap failed: %s"
 	L.RAID_MSG_MOVE_SUCCESS = "%s moved to Group %d"
 	L.RAID_ERROR_MOVE_FAILED = "Move failed: %s"
-	L.DIALOG_MIGRATE_TEXT = "Migrate friend groups from FriendGroups to BetterFriendlist?\n\nThis will:\n• Create all groups from BNet notes\n• Assign friends to their groups\n• Optionally clean up notes\n\n|cffff0000Warning: This cannot be undone!|r"
+	L.DIALOG_MIGRATE_TEXT =
+		"Migrate friend groups from FriendGroups to BetterFriendlist?\n\nThis will:\n• Create all groups from BNet notes\n• Assign friends to their groups\n• Optionally clean up notes\n\n|cffff0000Warning: This cannot be undone!|r"
 	L.DIALOG_MIGRATE_BTN1 = "Migrate & Clean Notes"
 	L.DIALOG_MIGRATE_BTN2 = "Migrate Only"
 	L.DIALOG_MIGRATE_BTN3 = "Cancel"
-	
+
 	-- ========================================
 	-- SETTINGS PANEL
 	-- ========================================
@@ -125,9 +132,10 @@ local L = BFL_LOCALE_ENUS
 	L.SETTINGS_EXPORT_TITLE = "Export Settings"
 	L.SETTINGS_EXPORT_INFO = "Copy the text below and save it. You can import it on another character or account."
 	L.SETTINGS_EXPORT_BTN = "Select All"
-L.BUTTON_EXPORT = "Export"
+	L.BUTTON_EXPORT = "Export"
 	L.SETTINGS_IMPORT_TITLE = "Import Settings"
-	L.SETTINGS_IMPORT_INFO = "Paste your export string below and click Import.\n\n|cffff0000Warning: This will replace ALL your groups and assignments!|r"
+	L.SETTINGS_IMPORT_INFO =
+		"Paste your export string below and click Import.\n\n|cffff0000Warning: This will replace ALL your groups and assignments!|r"
 	L.SETTINGS_IMPORT_BTN = "Import"
 	L.SETTINGS_IMPORT_CANCEL = "Cancel"
 	L.SETTINGS_RESET_DEFAULT = "Reset to Defaults"
@@ -145,7 +153,7 @@ L.BUTTON_EXPORT = "Export"
 	L.STATS_TOTAL_FRIENDS = "Total Friends: %d"
 	L.STATS_ONLINE_OFFLINE = "|cff00ff00Online: %d (%d%%)|r  |  |cff808080Offline: %d (%d%%)|r"
 	L.STATS_BNET_WOW = "|cff0070ddBattle.net: %d|r  |  |cffffd700WoW: %d|r"
-	
+
 	-- ========================================
 	-- FRIEND REQUESTS
 	-- ========================================
@@ -156,7 +164,7 @@ L.BUTTON_EXPORT = "Export"
 	L.INVITE_MENU_DECLINE = "Decline"
 	L.INVITE_MENU_REPORT = "Report Player"
 	L.INVITE_MENU_BLOCK = "Block Invites"
-	
+
 	-- ========================================
 	-- FILTERS & SORTING
 	-- ========================================
@@ -184,7 +192,7 @@ L.BUTTON_EXPORT = "Export"
 	L.SORT_SECONDARY_LABEL = "Secondary Sort"
 	L.SORT_PRIMARY_DESC = "Choose how the friendlist is sorted."
 	L.SORT_SECONDARY_DESC = "Sort by this when primary values are equal."
-	
+
 	-- ========================================
 	-- MENUS & CONTEXT MENUS
 	-- ========================================
@@ -204,7 +212,7 @@ L.BUTTON_EXPORT = "Export"
 	L.MENU_MORE_GROUPS = "More Groups..."
 	L.GROUPS_DIALOG_TITLE = "Groups for %s"
 	L.COPY_CHARACTER_NAME_POPUP_TITLE = "Copy Character Name"
-	
+
 	-- ========================================
 	-- TOOLTIPS
 	-- ========================================
@@ -220,7 +228,7 @@ L.BUTTON_EXPORT = "Export"
 	L.TOOLTIP_GROUP_COLOR_DESC = "Click to change the color of this group"
 	L.TOOLTIP_DELETE_GROUP = "Delete Group"
 	L.TOOLTIP_DELETE_DESC = "Remove this group and unassign all friends"
-	
+
 	-- ========================================
 	-- STATUS MESSAGES
 	-- ========================================
@@ -238,7 +246,7 @@ L.BUTTON_EXPORT = "Export"
 	L.MSG_EXPORT_FAILED = "Export failed: %s"
 	L.MSG_IMPORT_SUCCESS = "Import successful! All groups and assignments have been restored."
 	L.MSG_IMPORT_FAILED = "Import failed: %s"
-	
+
 	-- ========================================
 	-- ERRORS & WARNINGS
 	-- ========================================
@@ -258,7 +266,7 @@ L.BUTTON_EXPORT = "Export"
 	L.ERROR_CANNOT_RENAME_BUILTIN = "Cannot rename built-in groups"
 	L.ERROR_INVALID_GROUP_ID = "Invalid group ID"
 	L.ERROR_CANNOT_DELETE_BUILTIN = "Cannot delete built-in groups"
-	
+
 	-- ========================================
 	-- MISC UI ELEMENTS
 	-- ========================================
@@ -275,34 +283,37 @@ L.BUTTON_EXPORT = "Export"
 	L.BUTTON_SEND_MESSAGE = "Send Message"
 	L.EMPTY_TEXT = "Empty"
 	L.LEVEL_FORMAT = "Lvl %d"
-	
+
 	-- ========================================
 	-- BETA FEATURES (Advanced Tab)
 	-- ========================================
 	L.SETTINGS_BETA_FEATURES_TITLE = "Beta Features"
-	L.SETTINGS_BETA_FEATURES_DESC = "Enable experimental features that are still in development. These features may change or be removed in future versions."
+	L.SETTINGS_BETA_FEATURES_DESC =
+		"Enable experimental features that are still in development. These features may change or be removed in future versions."
 	L.SETTINGS_BETA_FEATURES_ENABLE = "Enable Beta Features"
 	L.SETTINGS_BETA_FEATURES_TOOLTIP = "Enables experimental features."
-	L.SETTINGS_BETA_FEATURES_WARNING = "Warning: Beta features may contain bugs, performance issues, or incomplete functionality. Use at your own risk."
+	L.SETTINGS_BETA_FEATURES_WARNING =
+		"Warning: Beta features may contain bugs, performance issues, or incomplete functionality. Use at your own risk."
 	L.SETTINGS_BETA_FEATURES_LIST = "Currently available Beta Features:"
 	L.SETTINGS_BETA_FEATURES_ENABLED = "Beta Features |cff00ff00ENABLED|r"
 	L.SETTINGS_BETA_FEATURES_DISABLED = "Beta Features |cffff0000DISABLED|r"
 	L.SETTINGS_BETA_TABS_VISIBLE = "Beta tabs are now visible in Settings"
 	L.SETTINGS_BETA_TABS_HIDDEN = "Beta tabs are now hidden"
-	
+
 	-- Global Friend Sync
 	L.SETTINGS_GLOBAL_SYNC_ENABLE = "Enable Global Friend Sync"
 	L.SETTINGS_GLOBAL_SYNC_DESC = "Synchronize your WoW friendlist across all characters on this account."
 	L.SETTINGS_GLOBAL_SYNC_FEATURE = "Global Friend Sync"
 	L.SETTINGS_GLOBAL_SYNC_DELETION = "Enable Deletion"
-	L.SETTINGS_GLOBAL_SYNC_DELETION_DESC = "Allow the sync process to remove friends from your list if they are removed from the database."
+	L.SETTINGS_GLOBAL_SYNC_DELETION_DESC =
+		"Allow the sync process to remove friends from your list if they are removed from the database."
 	L.SETTINGS_GLOBAL_SYNC_HEADER = "Synced Friends Database"
-	
+
 	-- ========================================
 	-- EDIT MODE FRAME SIZE (PHASE 5)
 	-- ========================================
 	L.SETTINGS_FRAME_SIZE_HEADER = "Default Frame Size (Edit Mode)"
-	
+
 	-- ========================================
 	-- FRAME SETTINGS (Restored)
 	-- ========================================
@@ -320,7 +331,7 @@ L.BUTTON_EXPORT = "Export"
 	L.SETTINGS_FRAME_RESET_SIZE = "Reset to 415x570"
 	L.SETTINGS_FRAME_APPLY_NOW = "Apply to Current Layout"
 	L.SETTINGS_FRAME_RESET_ALL = "Reset All Layouts to Default"
-	
+
 	-- ========================================
 	-- DATA BROKER (STABLE FEATURE)
 	-- ========================================
@@ -339,9 +350,10 @@ L.BUTTON_EXPORT = "Export"
 	L.BROKER_ACTION_SETTINGS = "Open Settings"
 	L.BROKER_ACTION_OPEN_BNET = "Open Battle.net App"
 	L.BROKER_ACTION_NONE = "Do Nothing"
-	L.BROKER_SETTINGS_INFO = "BetterFriendlist integrates with Data Broker display addons like Bazooka, ChocolateBar, and TitanPanel. Enable this feature to show friend counts and quick access in your display addon."
+	L.BROKER_SETTINGS_INFO =
+		"BetterFriendlist integrates with Data Broker display addons like Bazooka, ChocolateBar, and TitanPanel. Enable this feature to show friend counts and quick access in your display addon."
 	L.BROKER_FILTER_CHANGED = "Filter changed to: %s"
-	
+
 	-- Broker Tooltip Strings
 	L.BROKER_HEADER_WOW = "WoW Friends"
 	L.BROKER_HEADER_BNET = "Battle.Net Friends"
@@ -366,22 +378,22 @@ L.BUTTON_EXPORT = "Export"
 	L.BROKER_HINT_SETTINGS = " Settings • "
 	L.BROKER_HINT_MIDDLE_CLICK = "Middle Click:"
 	L.BROKER_HINT_CYCLE_FILTER = " Cycle Filter"
-	
+
 	-- ========================================
 	-- FEATURE REQUESTS (CurseForge User Feedback)
 	-- ========================================
 	-- Feature 1: Treat Mobile as Offline
 	L.SETTINGS_TREAT_MOBILE_OFFLINE = "Treat Mobile users as Offline"
 	L.SETTINGS_TREAT_MOBILE_OFFLINE_DESC = "Display friends using the Mobile App in the Offline group"
-	
+
 	-- Feature 3: Show Notes as Name
 	L.SETTINGS_SHOW_NOTES_AS_NAME = "Show Notes as Friend Name"
 	L.SETTINGS_SHOW_NOTES_AS_NAME_DESC = "Display friend notes as their name when available"
-	
+
 	-- Feature 4: Window Scale
 	L.SETTINGS_WINDOW_SCALE = "Window Scale"
 	L.SETTINGS_WINDOW_SCALE_DESC = "Scale the entire window (50%% - 200%%)"
-	
+
 	-- Data Broker Settings
 	L.BROKER_SETTINGS_SHOW_LABEL = "Show Label 'Friends:'"
 	L.BROKER_SETTINGS_SHOW_TOTAL = "Show Total Count"
@@ -391,7 +403,8 @@ L.BUTTON_EXPORT = "Export"
 	L.BROKER_SETTINGS_HEADER_INTERACTION = "Interaction"
 	L.BROKER_SETTINGS_HEADER_INSTRUCTIONS = "How to Use"
 	L.BROKER_SETTINGS_HEADER_COMPATIBILITY = "Tested Display Addons"
-	L.BROKER_SETTINGS_INSTRUCTIONS = "• Install a Data Broker display addon (Bazooka, ChocolateBar, or TitanPanel)\n• Enable Data Broker above (UI reload will be prompted)\n• The BetterFriendlist button will appear in your display addon\n• Hover for tooltip, left-click to open, right-click for settings, middle-click to cycle filters"
+	L.BROKER_SETTINGS_INSTRUCTIONS =
+		"• Install a Data Broker display addon (Bazooka, ChocolateBar, or TitanPanel)\n• Enable Data Broker above (UI reload will be prompted)\n• The BetterFriendlist button will appear in your display addon\n• Hover for tooltip, left-click to open, right-click for settings, middle-click to cycle filters"
 	L.BROKER_SETTINGS_HEADER_COLUMNS = "Tooltip Columns"
 	L.BROKER_SETTINGS_COLUMNS_HEADER = "Tooltip Columns"
 	L.BROKER_COLUMN_NAME = "Name"
@@ -402,7 +415,7 @@ L.BUTTON_EXPORT = "Export"
 	L.BROKER_COLUMN_REALM = "Realm"
 	L.BROKER_COLUMN_FACTION = "Faction"
 	L.BROKER_COLUMN_NOTES = "Notes"
-	
+
 	-- Broker Column Tooltips
 	L.BROKER_COLUMN_NAME_DESC = "Display the friend's name (RealID or Character Name)"
 	L.BROKER_COLUMN_LEVEL_DESC = "Display the character's level"
@@ -412,7 +425,7 @@ L.BUTTON_EXPORT = "Export"
 	L.BROKER_COLUMN_REALM_DESC = "Display the realm the character is on"
 	L.BROKER_COLUMN_FACTION_DESC = "Display the faction icon (Alliance/Horde)"
 	L.BROKER_COLUMN_NOTES_DESC = "Display friend notes"
-	
+
 	-- ========================================
 	-- CLASSIC COMPATIBILITY
 	-- ========================================
@@ -423,9 +436,10 @@ L.BUTTON_EXPORT = "Export"
 	L.SETTINGS_CLOSE_ON_GUILD_TAB = "Close BetterFriendlist when opening Guild"
 	L.SETTINGS_CLOSE_ON_GUILD_TAB_DESC = "Automatically close BetterFriendlist when you click the Guild tab"
 	L.SETTINGS_HIDE_GUILD_TAB = "Hide Guild Tab"
-L.SETTINGS_HIDE_GUILD_TAB_DESC = "Hide the Guild tab from the friendlist"
-L.SETTINGS_USE_UI_PANEL_SYSTEM = "Respect UI Hierarchy"
-L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Prevent BetterFriendlist from opening over other UI windows (Character, Spellbook, etc.). Requires /reload."
+	L.SETTINGS_HIDE_GUILD_TAB_DESC = "Hide the Guild tab from the friendlist"
+	L.SETTINGS_USE_UI_PANEL_SYSTEM = "Respect UI Hierarchy"
+	L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC =
+		"Prevent BetterFriendlist from opening over other UI windows (Character, Spellbook, etc.). Requires /reload."
 
 	-- ========================================
 	-- LAST ONLINE TIME FORMATS
@@ -441,7 +455,8 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Prevent BetterFriendlist from opening ove
 	-- GUILD UI WARNING
 	-- ========================================
 	L.CLASSIC_GUILD_UI_WARNING_TITLE = "Classic Guild UI Disabled"
-	L.CLASSIC_GUILD_UI_WARNING_TEXT = "BetterFriendlist has disabled the Classic Guild UI setting as only Blizzard's modern Guild UI is compatible with BetterFriendlist.\n\nThe Guild tab now opens Blizzard's modern Guild UI."
+	L.CLASSIC_GUILD_UI_WARNING_TEXT =
+		"BetterFriendlist has disabled the Classic Guild UI setting as only Blizzard's modern Guild UI is compatible with BetterFriendlist.\n\nThe Guild tab now opens Blizzard's modern Guild UI."
 
 	-- ========================================
 	-- AUDITED MISSING STRINGS
@@ -516,9 +531,10 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Prevent BetterFriendlist from opening ove
 	-- Edit Mode
 	L.EDITMODE_FRAME_WIDTH = "Frame Width"
 	L.EDITMODE_FRAME_HEIGHT = "Frame Height"
-	
+
 	-- Dialogs (Reset Layouts)
-	L.DIALOG_RESET_LAYOUTS_TEXT = "Reset all saved frame sizes and positions for all Edit Mode layouts?\n\nThis cannot be undone!"
+	L.DIALOG_RESET_LAYOUTS_TEXT =
+		"Reset all saved frame sizes and positions for all Edit Mode layouts?\n\nThis cannot be undone!"
 	L.DIALOG_RESET_LAYOUTS_BTN1 = "Reset All"
 	L.MSG_LAYOUTS_RESET = "All layouts reset. Use /editmode to reposition."
 
@@ -537,7 +553,7 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Prevent BetterFriendlist from opening ove
 	L.FILTER_HIDE_AFK = "Hide AFK/DND"
 	L.FILTER_RETAIL = "Retail Only"
 	L.TOOLTIP_QUICK_FILTER = "Quick Filter: %s"
-	
+
 	-- Settings (Broker)
 	L.BROKER_SETTINGS_RELOAD_TEXT = "Changing this setting requires a UI reload.\n\nReload now?"
 	L.BROKER_SETTINGS_RELOAD_BTN = "Reload Now"
@@ -557,11 +573,11 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Prevent BetterFriendlist from opening ove
 	L.BROKER_SETTINGS_SHOW_BNET_ICON = "Show BNet Icon"
 	L.BROKER_SETTINGS_SHOW_BNET_ICON_TITLE = "Show BNet Icon"
 	L.BROKER_SETTINGS_SHOW_BNET_ICON_TOOLTIP = "Show the Battle.net icon next to BNet friends"
-    L.BROKER_SETTINGS_CLICK_ACTION = "Click Action"
-    L.BROKER_SETTINGS_TOOLTIP_MODE = "Tooltip Mode"
-    L.STATUS_ENABLED = "|cff00ff00Enabled|r"
-    L.STATUS_DISABLED = "|cffff0000Disabled|r"
-    L.BROKER_WOW_FRIENDS = "WoW Friends:"
+	L.BROKER_SETTINGS_CLICK_ACTION = "Click Action"
+	L.BROKER_SETTINGS_TOOLTIP_MODE = "Tooltip Mode"
+	L.STATUS_ENABLED = "|cff00ff00Enabled|r"
+	L.STATUS_DISABLED = "|cffff0000Disabled|r"
+	L.BROKER_WOW_FRIENDS = "WoW Friends:"
 
 	-- Settings (Global Sync)
 	L.SETTINGS_TAB_GLOBAL_SYNC = "Global Sync"
@@ -608,7 +624,7 @@ L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Prevent BetterFriendlist from opening ove
 
 	-- Ignore List
 	L.IGNORE_LIST_UNIGNORE = "Unignore Player"
-L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
+	L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 
 	-- ========================================
 	-- RECENT ALLIES (Retail 11.0.7+)
@@ -682,7 +698,7 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	L.ERROR_IMPORT_DESERIALIZE = "Failed to deserialize data (corrupted string)"
 	L.ERROR_EXPORT_VERSION = "Unsupported export version"
 	L.ERROR_EXPORT_STRUCTURE = "Invalid export data structure"
-	
+
 	-- Statistics
 	L.STATS_NO_HEALTH_DATA = "No health data available"
 	L.STATS_NO_CLASS_DATA = "No class data available"
@@ -701,7 +717,8 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	L.STATS_MOBILE_DESKTOP = "Desktop: %d (%d%%)\nMobile: %d (%d%%)"
 	L.STATS_NOTES_FAVORITES = "With Notes: %d (%d%%)\nFavorites: %d (%d%%)"
 	L.STATS_MAX_LEVEL = "Max (80): %d\n70-79: %d\n60-69: %d\n<60: %d\nAverage: %.1f"
-	L.STATS_HEALTH_FMT = "|cff00ff00Active: %d (%d%%)|r\n|cffffd700Regular: %d (%d%%)|r\n|cffffaa00Drifting: %d (%d%%)|r\n|cffff6600Stale: %d (%d%%)|r\n|cffff0000Dormant: %d (%d%%)|r"
+	L.STATS_HEALTH_FMT =
+		"|cff00ff00Active: %d (%d%%)|r\n|cffffd700Regular: %d (%d%%)|r\n|cffffaa00Drifting: %d (%d%%)|r\n|cffff6600Stale: %d (%d%%)|r\n|cffff0000Dormant: %d (%d%%)|r"
 	L.STATS_CLASS_FMT = "%d. %s: %d (%d%%)"
 	L.STATS_FACTION_DISTRIBUTION = "|cff0080ffAlliance: %d|r\n|cffff0000Horde: %d|r"
 	L.STATS_REALM_FMT = "\n%d. %s: %d"
@@ -747,11 +764,13 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	-- ========================================
 	-- Name Formatting
 	L.SETTINGS_NAME_FORMAT_HEADER = "Name Formatting"
-	L.SETTINGS_NAME_FORMAT_DESC = "Customize how friend names are displayed using tokens:\n|cffFFD100%name%|r - Account Name (RealID/BattleTag)\n|cffFFD100%note%|r - Note (BNet or WoW)\n|cffFFD100%nickname%|r - Custom Nickname\n|cffFFD100%battletag%|r - Short BattleTag (no #1234)"
+	L.SETTINGS_NAME_FORMAT_DESC =
+		"Customize how friend names are displayed using tokens:\n|cffFFD100%name%|r - Account Name (RealID/BattleTag)\n|cffFFD100%note%|r - Note (BNet or WoW)\n|cffFFD100%nickname%|r - Custom Nickname\n|cffFFD100%battletag%|r - Short BattleTag (no #1234)"
 	L.SETTINGS_NAME_FORMAT_LABEL = "Format:"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP = "Name Display Format"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP_DESC = "Enter a format string using tokens."
-	L.SETTINGS_NAME_FORMAT_DISABLED_FRIENDLISTCOLORS = "This setting is disabled because the addon 'FriendListColors' is managing name colors/formats."
+	L.SETTINGS_NAME_FORMAT_DISABLED_FRIENDLISTCOLORS =
+		"This setting is disabled because the addon 'FriendListColors' is managing name colors/formats."
 
 	-- In-Game Group
 	L.SETTINGS_SHOW_INGAME_GROUP = "Show 'In-Game' Group"
@@ -760,7 +779,8 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	L.SETTINGS_INGAME_MODE_ANY = "Any Game"
 	L.SETTINGS_INGAME_MODE_LABEL = "   Mode:"
 	L.SETTINGS_INGAME_MODE_TOOLTIP = "In-Game Group Mode"
-	L.SETTINGS_INGAME_MODE_TOOLTIP_DESC = "Choose which friends to include in the In-Game group:\n\n|cffffffffWoW Only:|r Friends playing the same WoW version (Retail/Classic)\n|cffffffffAny Game:|r Friends playing any Battle.net game"
+	L.SETTINGS_INGAME_MODE_TOOLTIP_DESC =
+		"Choose which friends to include in the In-Game group:\n\n|cffffffffWoW Only:|r Friends playing the same WoW version (Retail/Classic)\n|cffffffffAny Game:|r Friends playing any Battle.net game"
 
 	-- Headers & Titles
 	L.SETTINGS_DISPLAY_OPTIONS = "Display Options"
@@ -769,11 +789,13 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	L.SETTINGS_FONT_SETTINGS = "Font Settings"
 	L.SETTINGS_GROUP_ORDER = "Group Order"
 	L.SETTINGS_MIGRATION_HEADER = "FriendGroups Migration"
-	L.SETTINGS_MIGRATION_DESC = "Migrate groups and friend assignments from FriendGroups addon. This will parse group information from BattleNet notes and create corresponding groups in BetterFriendlist."
+	L.SETTINGS_MIGRATION_DESC =
+		"Migrate groups and friend assignments from FriendGroups addon. This will parse group information from BattleNet notes and create corresponding groups in BetterFriendlist."
 	L.SETTINGS_MIGRATE_BTN = "Migrate from FriendGroups"
 	L.SETTINGS_MIGRATE_TOOLTIP = "Import groups from the FriendGroups addon"
 	L.SETTINGS_EXPORT_HEADER = "Export / Import Settings"
-	L.SETTINGS_EXPORT_DESC = "Export your groups and friend assignments to share between characters or accounts. Perfect for players with multiple accounts who share Battle.net friends."
+	L.SETTINGS_EXPORT_DESC =
+		"Export your groups and friend assignments to share between characters or accounts. Perfect for players with multiple accounts who share Battle.net friends."
 	L.SETTINGS_EXPORT_WARNING = "|cffff0000Warning: Importing will replace ALL your groups and assignments!|r"
 	L.SETTINGS_EXPORT_TOOLTIP = "Export your groups and friend assignments"
 	L.SETTINGS_IMPORT_TOOLTIP = "Import groups and friend assignments"
@@ -801,7 +823,7 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	L.SETTINGS_FONT_FACE = "Font Face"
 	L.SETTINGS_FONT_SIZE_NUM = "Font Size"
 	L.SETTINGS_FONT_COLOR = "Font Color"
-	
+
 	-- Group Header Settings (Phase 21)
 	L.SETTINGS_GROUP_HEADER_SETTINGS = "Group Header Settings"
 	L.SETTINGS_GROUP_FONT_HEADER = "Group Header Font"
@@ -827,7 +849,8 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 
 	-- ElvUI & UI Panel
 	L.SETTINGS_ENABLE_ELVUI_SKIN = "Enable ElvUI Skin"
-	L.SETTINGS_ENABLE_ELVUI_SKIN_DESC = "Enables the ElvUI skin for BetterFriendlist. Requires ElvUI to be installed and enabled."
+	L.SETTINGS_ENABLE_ELVUI_SKIN_DESC =
+		"Enables the ElvUI skin for BetterFriendlist. Requires ElvUI to be installed and enabled."
 	L.DIALOG_ELVUI_RELOAD_TEXT = "Changing ElvUI Skin settings requires a UI Reload.\nReload now?"
 	L.DIALOG_ELVUI_RELOAD_BTN1 = "Yes"
 	L.DIALOG_ELVUI_RELOAD_BTN2 = "No"
@@ -847,15 +870,18 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	L.CORE_STATISTICS_MODULE_NOT_LOADED = "Statistics module not loaded"
 	L.CORE_STATISTICS_HEADER = "|cff00ff00=== BetterFriendlist Enhanced Statistics ===|r"
 	L.CORE_STATS_OVERVIEW = "|cffffcc00Overview:|r"
-	L.CORE_STATS_TOTAL_ONLINE_OFFLINE = "  Total: |cffffffff%d|r  Online: |cff00ff00%d|r (%.0f%%)  Offline: |cffaaaaaa%d|r (%.0f%%)"
+	L.CORE_STATS_TOTAL_ONLINE_OFFLINE =
+		"  Total: |cffffffff%d|r  Online: |cff00ff00%d|r (%.0f%%)  Offline: |cffaaaaaa%d|r (%.0f%%)"
 	L.CORE_STATS_BNET_WOW = "  Battle.net Friends: |cff0099ff%d|r  |  WoW Friends: |cffffd700%d|r"
 	L.CORE_STATS_FRIENDSHIP_HEALTH = "|cffffcc00Friendship Health:|r"
-	L.CORE_STATS_HEALTH_ACTIVE = "  Active: |cff00ff00%d|r (%.0f%%)  Regular: |cffffd700%d|r (%.0f%%)  Drifting: |cffffaa00%d|r (%.0f%%)"
+	L.CORE_STATS_HEALTH_ACTIVE =
+		"  Active: |cff00ff00%d|r (%.0f%%)  Regular: |cffffd700%d|r (%.0f%%)  Drifting: |cffffaa00%d|r (%.0f%%)"
 	L.CORE_STATS_HEALTH_STALE = "  Stale: |cffff6600%d|r (%.0f%%)  Dormant: |cffff0000%d|r (%.0f%%)"
 	L.CORE_STATS_NO_HEALTH_DATA = "  No health data available"
 	L.CORE_STATS_CLASS_DISTRIBUTION = "|cffffcc00Class Distribution (Top 5):|r"
 	L.CORE_STATS_LEVEL_DISTRIBUTION = "|cffffcc00Level Distribution:|r"
-	L.CORE_STATS_LEVEL_BREAKDOWN = "  Max (80): |cffffffff%d|r  70-79: |cffffffff%d|r  60-69: |cffffffff%d|r  <60: |cffffffff%d|r"
+	L.CORE_STATS_LEVEL_BREAKDOWN =
+		"  Max (80): |cffffffff%d|r  70-79: |cffffffff%d|r  60-69: |cffffffff%d|r  <60: |cffffffff%d|r"
 	L.CORE_STATS_AVG_LEVEL = "  Average Level: |cffffffff%.1f|r"
 	L.CORE_STATS_REALM_CLUSTERS = "|cffffcc00Realm Clusters:|r"
 	L.CORE_STATS_REALM_BREAKDOWN = "  Same Realm: |cffffffff%d|r (%.0f%%)  |  Other Realms: |cffffffff%d|r (%.0f%%)"
@@ -1027,12 +1053,12 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	L.QJ_MOCK_ICONS_HELP = "  |cffffcc00/bfl qj mock icons|r - Test all fallback icons"
 	L.HELP_HEADER_CONFIGURATION = "|cffffcc00Configuration:|r"
 	L.QJ_CMD_CONFIG_HELP = "  |cffffcc00/bfl qj config|r - Show/set mock configuration"
-	
+
 	-- BetterFriendlist.lua
 	L.CMD_RESET_FILTER_SUCCESS = "Classic Guild UI warning flag reset. The popup will show on next login/reload."
 	L.CMD_RESET_HEADER = "Reset Commands:"
 	L.CMD_RESET_HELP_WARNING = "Reset Classic Guild UI warning popup"
-	
+
 	-- Changelog.lua
 	L.CHANGELOG_DISCORD = "   Discord"
 	L.CHANGELOG_GITHUB = "   GitHub Issues"
@@ -1098,7 +1124,8 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	L.STREAMER_MODE_ENABLE_DESC = "Shows a button in the main window to toggle Streamer Mode."
 	L.STREAMER_MODE_HIDDEN_NAME = "Hidden Name Format"
 	L.STREAMER_MODE_HEADER_TEXT = "Custom Header Text"
-	L.STREAMER_MODE_HEADER_TEXT_DESC = "Text to display in the Battle.net header when Streamer Mode is active (e.g., 'Stream Mode')."
+	L.STREAMER_MODE_HEADER_TEXT_DESC =
+		"Text to display in the Battle.net header when Streamer Mode is active (e.g., 'Stream Mode')."
 	L.STREAMER_MODE_BUTTON_TOOLTIP = "Toggle Streamer Mode"
 	L.STREAMER_MODE_BUTTON_DESC = "Click to toggle privacy mode on/off."
 	L.SETTINGS_PRIVACY_OPTIONS = "Privacy Options"
@@ -1108,7 +1135,8 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	L.SETTINGS_STREAMER_NAME_FORMAT_NICKNAME = "Force Nickname"
 	L.SETTINGS_STREAMER_NAME_FORMAT_NOTE = "Force Note"
 	L.SETTINGS_STREAMER_USE_PURPLE_HEADER = "Use Purple Header Color"
-	L.SETTINGS_STREAMER_USE_PURPLE_HEADER_DESC = "Changes the background color of the Battle.net header frame to Twitch purple when Streamer Mode is active."
+	L.SETTINGS_STREAMER_USE_PURPLE_HEADER_DESC =
+		"Changes the background color of the Battle.net header frame to Twitch purple when Streamer Mode is active."
 
 	-- ========================================
 	-- RAID SHORTCUTS (Phase 26)
@@ -1137,6 +1165,73 @@ L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
 	L.SETTINGS_RAID_BUTTON_LABEL = "Btn:"
 	L.SETTINGS_RAID_WARNING = "Note: Shortcuts are secure actions and update immediately (when out of combat)."
 	L.SETTINGS_RAID_ERROR_RESERVED = "This combination is reserved."
+
+	-- ========================================
+	-- NOTE SYNC (Group to Note Sync)
+	-- ========================================
+	L.SETTINGS_SYNC_GROUPS_NOTE_HEADER = "Group Note Sync"
+	L.SETTINGS_SYNC_GROUPS_NOTE = "Sync Groups to Friend Note"
+	L.SETTINGS_SYNC_GROUPS_NOTE_DESC =
+		"Write group assignments into friend notes using the FriendGroups format (Note#Group1#Group2). This allows sharing groups across accounts or with FriendGroups users."
+	L.DIALOG_SYNC_GROUPS_CONFIRM_TEXT =
+		"Enable Group Note Sync?\n\n|cffff8800Warning:|r BattleNet notes are limited to 127 characters, WoW friend notes to 48 characters. Groups that exceed the character limit will be skipped in the note but remain stored in the database.\n\nExisting notes will be updated. Continue?"
+	L.DIALOG_SYNC_GROUPS_CONFIRM_BTN1 = "Enable"
+	L.DIALOG_SYNC_GROUPS_CONFIRM_BTN2 = "Cancel"
+	L.DIALOG_SYNC_GROUPS_DISABLE_TEXT =
+		"Group Note Sync has been disabled.\n\nWould you like to open the Note Cleanup Wizard to remove the group suffixes from your friend notes?"
+	L.DIALOG_SYNC_GROUPS_DISABLE_BTN1 = "Open Cleanup Wizard"
+	L.DIALOG_SYNC_GROUPS_DISABLE_BTN2 = "Keep Notes"
+	L.MSG_SYNC_GROUPS_STARTED = "Syncing groups to friend notes..."
+	L.MSG_SYNC_GROUPS_COMPLETE = "Group note sync complete. Updated: %d, Skipped (limit): %d"
+	L.MSG_SYNC_GROUPS_PROGRESS = "Syncing notes: %d / %d"
+	L.MSG_SYNC_GROUPS_NOTE_LIMIT = "Note limit reached for %s - some groups skipped"
+
+	-- ========================================
+	-- NOTE CLEANUP WIZARD
+	-- ========================================
+	L.WIZARD_TITLE = "Note Cleanup Wizard"
+	L.WIZARD_DESC =
+		"Remove FriendGroups data (#Group1#Group2) from friend notes. Review the cleaned notes before applying."
+	L.WIZARD_BTN = "Note Cleanup Wizard"
+	L.WIZARD_BTN_TOOLTIP = "Open the wizard to clean up FriendGroups data from friend notes"
+	L.WIZARD_HEADER = "Note Cleanup"
+	L.WIZARD_HEADER_DESC =
+		"Remove FriendGroups suffixes from friend notes. Back up your notes first, then review and apply changes."
+	L.WIZARD_COL_ACCOUNT = "Account Name"
+	L.WIZARD_COL_BATTLETAG = "BattleTag"
+	L.WIZARD_COL_NOTE = "Current Note"
+	L.WIZARD_COL_CLEANED = "Cleaned Note"
+	L.WIZARD_SEARCH_PLACEHOLDER = "Search..."
+	L.WIZARD_BACKUP_BTN = "Backup Notes"
+	L.WIZARD_BACKUP_DONE = "Backed up!"
+	L.WIZARD_BACKUP_TOOLTIP = "Save all current friend notes to the database as a backup before making changes."
+	L.WIZARD_BACKUP_SUCCESS = "Backed up notes for %d friends."
+	L.WIZARD_APPLY_BTN = "Apply Cleanup"
+	L.WIZARD_APPLY_TOOLTIP =
+		"Write the cleaned notes back to your friends. Only notes that differ from the original will be updated."
+	L.WIZARD_APPLY_CONFIRM =
+		"Apply cleaned notes to all friends?\n\n|cffff8800This will overwrite the current notes. Make sure you have created a backup first!|r"
+	L.WIZARD_APPLY_SUCCESS = "%d notes updated successfully."
+	L.WIZARD_APPLY_PROGRESS_FMT = "Progress: %d/%d | %d successful | %d failed"
+	L.WIZARD_STATUS_FMT = "Showing %d of %d friends | %d with group data | %d pending changes"
+
+	-- Note Cleanup Wizard: Backup Viewer
+	L.WIZARD_VIEW_BACKUP_BTN = "View Backup"
+	L.WIZARD_VIEW_BACKUP_TOOLTIP =
+		"Open the backup viewer to see all backed-up notes and compare them with the current notes."
+	L.WIZARD_BACKUP_VIEWER_TITLE = "Note Backup Viewer"
+	L.WIZARD_BACKUP_VIEWER_DESC =
+		"View your backed-up friend notes and compare them with the current notes. You can restore the original notes if needed."
+	L.WIZARD_COL_BACKED_UP = "Backed-Up Note"
+	L.WIZARD_COL_CURRENT = "Current Note"
+	L.WIZARD_RESTORE_BTN = "Restore Backup"
+	L.WIZARD_RESTORE_TOOLTIP =
+		"Restore the original notes from the backup. Only notes that differ from the backup will be updated."
+	L.WIZARD_RESTORE_CONFIRM =
+		"Restore all notes from the backup?\n\n|cffff8800This will overwrite the current notes with the backed-up versions.|r"
+	L.WIZARD_RESTORE_SUCCESS = "%d notes restored successfully."
+	L.WIZARD_NO_BACKUP = "No note backup found. Use the Note Cleanup Wizard to create a backup first."
+	L.WIZARD_BACKUP_STATUS_FMT = "Showing %d of %d entries | %d changed since backup | Backup: %s"
 end
 
 -- Always load enUS immediately to ensure fallback strings exist

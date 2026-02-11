@@ -81,6 +81,8 @@ Modules\QuickFilters.lua
 Modules\Broker.lua
 Modules\SettingsComponents.lua
 Modules\Settings.lua
+Modules\NoteSync.lua
+Modules\NoteCleanupWizard.lua
 Modules\GlobalSync.lua
 Modules\Dialogs.lua
 Modules\RAF.lua [AllowLoadGameType mainline]

@@ -1967,8 +1967,23 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 				name = rawAccountName or "Unknown"
 			end
 		else
-			-- DISPLAY MODE: Use accountName
-			name = rawAccountName or "Unknown"
+			-- DISPLAY MODE: Follow Blizzard's BNet_GetBNetAccountName pattern
+			-- accountName is a kString. If nil/empty, fall back to short BattleTag.
+			if rawAccountName then
+				name = rawAccountName
+			else
+				-- Fallback: use short BattleTag (before #) like Blizzard does
+				if rawBattleTag and rawBattleTag ~= "" then
+					local hashIndex = string.find(rawBattleTag, "#")
+					if hashIndex then
+						name = string.sub(rawBattleTag, 1, hashIndex - 1)
+					else
+						name = rawBattleTag
+					end
+				else
+					name = "Unknown"
+				end
+			end
 		end
 	else
 		-- WoW: Name is Character Name
@@ -2672,7 +2687,14 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 				friend.type = "bnet"
 				friend.index = i
 				friend.bnetAccountID = accountInfo.bnetAccountID
-				friend.accountName = (accountInfo.accountName ~= "???") and accountInfo.accountName or nil
+				-- Follow Blizzard's BNet_GetBNetAccountName pattern:
+				-- accountName is a kString (|Kq..|k). Store nil if empty or "???" so display fallback triggers.
+				local accName = accountInfo.accountName
+				if accName == nil or accName == "" or accName == "???" then
+					friend.accountName = nil
+				else
+					friend.accountName = accName
+				end
 				friend.battleTag = accountInfo.battleTag
 
 				-- PHASE 9.6: Cache UID for ActivityTracker (Hot Path)
@@ -2694,7 +2716,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 				-- If they're playing WoW, get game info (EXACT COPY OF OLD LOGIC)
 				if accountInfo.gameAccountInfo and accountInfo.gameAccountInfo.isOnline then
 					local gameInfo = accountInfo.gameAccountInfo
-					if gameInfo.clientProgram == "WoW" or gameInfo.clientProgram == "WTCG" then
+					if gameInfo.clientProgram == "WoW" then
 						-- DEBUG: Log raw data for analysis
 						if BFL.DebugPrint then
 							-- BFL:DebugPrint(string.format("BNet Friend: %s (Prog: %s, Proj: %s, Class: %s, Area: %s, Rich: %s)",
@@ -2742,7 +2764,14 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 					elseif gameInfo.clientProgram == "App" then
 						friend.gameName = BFL.L.STATUS_IN_APP
 					else
-						friend.gameName = gameInfo.clientProgram or BFL.L.UNKNOWN_GAME
+						-- Non-WoW games (Overwatch, Diablo, Hearthstone, etc.): Use richPresence
+						-- for info text, matching Blizzard's behavior (e.g., "Competitive: In Game")
+						local richPresence = gameInfo.richPresence
+						if richPresence and richPresence ~= "" then
+							friend.gameName = richPresence
+						else
+							friend.gameName = gameInfo.clientProgram or BFL.L.UNKNOWN_GAME
+						end
 					end
 				end
 

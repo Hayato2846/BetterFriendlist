@@ -480,6 +480,13 @@ function BFL:GetModule(name)
 	return self.Modules[name]
 end
 
+-- 12.0.0+ Secret Values compatibility
+-- Check if a value is a "secret" (cannot be inspected, compared, or iterated by tainted code)
+-- Returns false on Classic and pre-12.0 clients where issecretvalue does not exist
+function BFL:IsSecret(value)
+	return issecretvalue ~= nil and issecretvalue(value)
+end
+
 -- Count table entries (for non-sequential tables)
 function BFL:TableCount(tbl)
 	if not tbl then

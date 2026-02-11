@@ -427,7 +427,7 @@ function QuickJoinEntry:New(guid, groupInfo)
 			-- CRITICAL: C_SocialQueue.GetGroupMembers() only returns 'guid' and 'clubId'!
 			-- Fields like 'name', 'memberName' do NOT exist - must resolve name from GUID
 			local name
-			if i == 1 and groupInfo.leaderName and groupInfo.leaderName ~= "" then
+			if i == 1 and groupInfo.leaderName and (groupInfo._hasSecretValues or groupInfo.leaderName ~= "") then
 				-- Use pre-resolved leaderName for first member if available
 				name = groupInfo.leaderName
 			elseif member.guid then
@@ -528,6 +528,10 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 	local comment = nil
 	local needTank, needHealer, needDamage = false, false, false
 
+	-- 12.0.0+: Track whether secret values are present (combat lockdown).
+	-- Secret values can be stored/concatenated/displayed but NOT compared/iterated.
+	local hasSecrets = self.groupInfo and self.groupInfo._hasSecretValues
+
 	-- Get group title from first queue (this is searchResultInfo.name - "Wo ist Hayato")
 	if self.displayedQueues and #self.displayedQueues > 0 and self.displayedQueues[1] then
 		local firstQueue = self.displayedQueues[1]
@@ -566,14 +570,24 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 		if firstQueue.queueData and firstQueue.queueData.queueType == "lfglist" and firstQueue.queueData.lfgListID then
 			-- CRITICAL: Fetch FRESH searchResultInfo to get CHARACTER name (not cached BNet name)
 			local searchResultInfo = C_LFGList.GetSearchResultInfo(firstQueue.queueData.lfgListID)
-			if searchResultInfo and searchResultInfo.leaderName then
-				leaderName = searchResultInfo.leaderName -- This is CHARACTER name like "Tsveta-ChamberofAspects"
+			if searchResultInfo then
+				-- 12.0.0+: Update secret detection for this tooltip render.
+				-- Values may have become secret since GetGroupInfo() was called.
+				if BFL:IsSecret(searchResultInfo.searchResultID) then
+					hasSecrets = true
+				end
+				-- Secret strings can be stored and passed to SetText/string.format safely
+				if searchResultInfo.leaderName then
+					leaderName = searchResultInfo.leaderName
+				end
 			end
 		end
 	end
 
 	-- Fallback to groupInfo.leaderName (may be BNet account name for non-lfglist queues, which is correct)
-	if not leaderName or leaderName == "" then
+	-- 12.0.0+: When hasSecrets, leaderName may be a secret string (truthy).
+	-- Skip the == "" comparison to avoid crash on secret values.
+	if not leaderName or (not hasSecrets and leaderName == "") then
 		if self.groupInfo and self.groupInfo.leaderName then
 			leaderName = self.groupInfo.leaderName
 		elseif self.displayedMembers and #self.displayedMembers > 0 and self.displayedMembers[1] then
@@ -610,21 +624,24 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 	-- Fix: GameTooltip:SetText arguments are (text, r, g, b, alpha, wrap)
 	-- We must explicitly provide alpha (1) before the wrap boolean (true)
 	-- Only show if not empty
-	if groupTitle ~= "" then
-		tooltip:SetText(groupTitle, 1, 1, 1, 1, true)
+	-- 12.0.0+: groupTitle may be secret - skip ~= "" comparison, pass directly to SetText
+	if hasSecrets or (groupTitle and groupTitle ~= "") then
+		tooltip:SetText(groupTitle or " ", 1, 1, 1, 1, true)
 	else
 		tooltip:SetText(" ", 1, 1, 1, 1, true) -- Fallback: single space to avoid empty tooltip
 	end
 
 	-- Line 2: Activity Name (GOLD - HIGHLIGHT_FONT_COLOR: 1.0, 0.82, 0) - Only if different from group title and not empty
-	if activityName and activityName ~= "" and activityName ~= groupTitle then
+	-- 12.0.0+: groupTitle may be secret - skip ~= groupTitle dedup comparison when secret
+	if activityName and activityName ~= "" and (hasSecrets or activityName ~= groupTitle) then
 		tooltip:AddLine(activityName, 1.0, 0.82, 0)
 	end
 
 	-- Line 3: Playstyle (GREEN - 0.1, 1.0, 0.1) - Displayed directly under activity name
 	-- Playstyle values: 1 = Standard, 2 = Hardcore (from C_LFGList constants)
+	-- 12.0.0+: playstyle may be secret - skip == comparison when secret
 	local playstyle = self.groupInfo and self.groupInfo.playstyle
-	if playstyle then
+	if playstyle and not hasSecrets then
 		local playstyleName = nil
 		if playstyle == 1 then
 			playstyleName = "Standard" -- LFG_LIST_PLAYSTYLE_STANDARD
@@ -638,7 +655,7 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 
 	-- Comment (GRAY - 0.6, 0.6, 0.6) - Blizzard uses LFG_LIST_COMMENT_FONT_COLOR
 	-- Format: "|cff44ccff[Comment]|r Comment text" (blue bracket, then gray text)
-	if comment and comment ~= "" then
+	if comment and (hasSecrets or comment ~= "") then
 		tooltip:AddLine(string.format("[%s] %s", "Comment", comment), 0.6, 0.6, 0.6, true)
 	end
 
@@ -652,8 +669,9 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 	local playerFaction = UnitFactionGroup("player")
 
 	-- Add faction indicator if different from player's faction
+	-- 12.0.0+: leaderFaction may be secret - skip == comparison when secret
 	local leaderNameWithFaction = leaderName
-	if leaderFaction then
+	if leaderFaction and not hasSecrets then
 		local factionName = nil
 		if leaderFaction == 0 then
 			factionName = FACTION_HORDE
@@ -665,9 +683,8 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 		if
 			factionName
 			and (
-				(playerFaction == "Horde" and leaderFaction == 1) or (
-					playerFaction == "Alliance" and leaderFaction == 0
-				)
+				(playerFaction == "Horde" and leaderFaction == 1)
+				or (playerFaction == "Alliance" and leaderFaction == 0)
 			)
 		then
 			leaderNameWithFaction = leaderName .. " (" .. factionName .. ")"
@@ -676,7 +693,8 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 
 	-- Use color code format like MemberCount: gold "Leader:" + white name
 	-- Only show if leader name is not empty
-	if leaderName ~= "" then
+	-- 12.0.0+: leaderName may be secret - use truthiness check instead of ~= ""
+	if (hasSecrets and leaderName) or (not hasSecrets and leaderName ~= "") then
 		local leaderText =
 			string.format("|cffffd100%s|r |cffffffff%s|r", L.LEADER_LABEL or "Leader:", leaderNameWithFaction)
 		tooltip:AddLine(leaderText)
@@ -1006,16 +1024,19 @@ function QuickJoin:OnScrollBoxInitialize(button, elementData)
 		local leaderName = info.leaderName or ""
 		local leaderColor = info.leaderColor or "|cffffffff"
 		local details = ""
+		local hasDetails = false
 
 		-- Only show leader if name is not empty
-		if leaderName ~= "" then
+		-- 12.0.0+: leaderName may be secret - use truthiness check when secret
+		if (info._hasSecretValues and leaderName) or (not info._hasSecretValues and leaderName ~= "") then
 			details = L.LEADER_LABEL .. " " .. leaderColor .. leaderName .. "|r"
+			hasDetails = true
 		end
 
 		-- Add other friends if present (already colored in GetGroupInfo)
 		if info.otherFriends and #info.otherFriends > 0 then
 			local friendsList = table.concat(info.otherFriends, ", ")
-			if details ~= "" then
+			if hasDetails then
 				details = details .. " (+ " .. friendsList .. ")"
 			else
 				details = "+ " .. friendsList
@@ -1319,11 +1340,23 @@ function QuickJoin:GetGroupInfo(groupGUID)
 				-- NOT the activity name! (QuickJoin.lua doesn't even use activities)
 				local searchResultInfo = C_LFGList.GetSearchResultInfo(queueData.lfgListID)
 
+				-- 12.0.0+: C_LFGList.GetSearchResultInfo returns secret field values during
+				-- combat lockdown (SecretInChatMessagingLockdown). Secret values can be
+				-- stored, concatenated, and passed to SetText/string.format, but CANNOT be
+				-- compared, iterated (pairs/next), indexed, or used in arithmetic.
+				-- We detect this and use a passthrough path that preserves display data.
+				local hasSecretValues = searchResultInfo and BFL:IsSecret(searchResultInfo.searchResultID)
+
 				if searchResultInfo then
-					-- BFL:DebugPrint("  SearchResult Found for ID:", queueData.lfgListID)
-					-- Detailed SearchResult Dump
-					for k, v in pairs(searchResultInfo) do
-						-- BFL:DebugPrint(string.format("    searchResultInfo.%s = %s", tostring(k), tostring(v)))
+					if hasSecretValues then
+						info._hasSecretValues = true
+					end
+
+					-- Detailed SearchResult Dump (skip when secret - pairs() crashes on secret values)
+					if not hasSecretValues then
+						for k, v in pairs(searchResultInfo) do
+							-- BFL:DebugPrint(string.format("    searchResultInfo.%s = %s", tostring(k), tostring(v)))
+						end
 					end
 
 					-- Protected strings are safe to use directly
@@ -1352,11 +1385,18 @@ function QuickJoin:GetGroupInfo(groupGUID)
 					end
 
 					-- Get role distribution using C_LFGList.GetSearchResultMemberCounts
-					local memberCounts = C_LFGList.GetSearchResultMemberCounts(queueData.lfgListID)
-					if memberCounts then
-						info.numTanks = memberCounts.TANK or 0
-						info.numHealers = memberCounts.HEALER or 0
-						info.numDPS = memberCounts.DAMAGER or 0
+					-- Skip when secret: this API may also return secret values during lockdown
+					if not hasSecretValues then
+						local memberCounts = C_LFGList.GetSearchResultMemberCounts(queueData.lfgListID)
+						if memberCounts then
+							info.numTanks = memberCounts.TANK or 0
+							info.numHealers = memberCounts.HEALER or 0
+							info.numDPS = memberCounts.DAMAGER or 0
+						else
+							info.numTanks = 0
+							info.numHealers = 0
+							info.numDPS = 0
+						end
 					else
 						info.numTanks = 0
 						info.numHealers = 0
@@ -1364,29 +1404,37 @@ function QuickJoin:GetGroupInfo(groupGUID)
 					end
 
 					-- Activity name & Icon
-					local activityID = searchResultInfo.activityID or queueData.activityID
+					local activityID
+					if hasSecretValues then
+						-- When secret: searchResultInfo fields are secret and cannot be iterated,
+						-- indexed, or compared. Use queueData.activityID (non-secret, from
+						-- C_SocialQueue) for activity resolution instead.
+						activityID = queueData.activityID
+					else
+						activityID = searchResultInfo.activityID or queueData.activityID
 
-					-- CRITICAL FIX: Handle activityIDs table (plural) which Blizzard uses now
-					if searchResultInfo.activityIDs then
-						-- BFL:DebugPrint("  activityIDs table found:")
-						for k, v in pairs(searchResultInfo.activityIDs) do
-							-- BFL:DebugPrint(string.format("    [%s] = %s", tostring(k), tostring(v)))
-						end
-
-						if not activityID then
-							-- Try to grab the first ID (usually it's an array)
-							if searchResultInfo.activityIDs[1] then
-								activityID = searchResultInfo.activityIDs[1]
-							else
-								-- Fallback for non-array tables (key-value or set)
-								local k, v = next(searchResultInfo.activityIDs)
-								if v and type(v) == "number" then
-									activityID = v
-								elseif k and type(k) == "number" then
-									activityID = k
-								end
+						-- CRITICAL FIX: Handle activityIDs table (plural) which Blizzard uses now
+						if searchResultInfo.activityIDs then
+							-- BFL:DebugPrint("  activityIDs table found:")
+							for k, v in pairs(searchResultInfo.activityIDs) do
+								-- BFL:DebugPrint(string.format("    [%s] = %s", tostring(k), tostring(v)))
 							end
-							-- BFL:DebugPrint("  Resolved ActivityID from activityIDs table:", activityID)
+
+							if not activityID then
+								-- Try to grab the first ID (usually it's an array)
+								if searchResultInfo.activityIDs[1] then
+									activityID = searchResultInfo.activityIDs[1]
+								else
+									-- Fallback for non-array tables (key-value or set)
+									local k, v = next(searchResultInfo.activityIDs)
+									if v and type(v) == "number" then
+										activityID = v
+									elseif k and type(k) == "number" then
+										activityID = k
+									end
+								end
+								-- BFL:DebugPrint("  Resolved ActivityID from activityIDs table:", activityID)
+							end
 						end
 					end
 

@@ -4444,6 +4444,197 @@ function Settings:RefreshAdvancedTab()
 	table.insert(allFrames, Components:CreateSpacer(tab))
 
 	-- ===========================================
+	-- Group Note Sync Section
+	-- ===========================================
+	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_SYNC_GROUPS_NOTE_HEADER or "Group Note Sync"))
+
+	-- Description
+	table.insert(
+		allFrames,
+		Components:CreateLabel(
+			tab,
+			L.SETTINGS_SYNC_GROUPS_NOTE_DESC
+				or "Write group assignments into friend notes using the FriendGroups format (Note#Group1#Group2).",
+			true
+		)
+	)
+
+	-- Sync Groups to Note Toggle
+	local syncNoteToggle = Components:CreateCheckbox(
+		tab,
+		L.SETTINGS_SYNC_GROUPS_NOTE or "Sync Groups to Friend Note",
+		BetterFriendlistDB.syncGroupsToNote or false,
+		function(checked)
+			if checked then
+				-- Show confirmation dialog before enabling
+				StaticPopupDialogs["BETTERFRIENDLIST_SYNC_GROUPS_CONFIRM"] = {
+					text = L.DIALOG_SYNC_GROUPS_CONFIRM_TEXT,
+					button1 = L.DIALOG_SYNC_GROUPS_CONFIRM_BTN1 or "Enable",
+					button2 = L.DIALOG_SYNC_GROUPS_CONFIRM_BTN2 or "Cancel",
+					OnAccept = function()
+						BetterFriendlistDB.syncGroupsToNote = true
+						-- Increment settings version to invalidate caches
+						if BFL.SettingsVersion then
+							BFL.SettingsVersion = BFL.SettingsVersion + 1
+						end
+						-- Show progress label
+						if tab.syncProgressLabel then
+							tab.syncProgressLabel:SetText(
+								string.format(L.MSG_SYNC_GROUPS_PROGRESS or "Syncing notes: %d / %d", 0, 0)
+							)
+							tab.syncProgressLabel:SetTextColor(1, 0.82, 0)
+							tab.syncProgressLabel:Show()
+						end
+						-- Trigger full sync of all friend notes with progress callback
+						local NoteSync = BFL:GetModule("NoteSync")
+						if NoteSync then
+							NoteSync:SyncAllFriends(function(updated, skipped)
+								-- Completion: show final state in green then fade out
+								if tab.syncProgressLabel then
+									local completeMsg = string.format(
+										L.MSG_SYNC_GROUPS_COMPLETE
+											or "Group note sync complete. Updated: %d, Skipped (limit): %d",
+										updated,
+										skipped
+									)
+									tab.syncProgressLabel:SetText(completeMsg)
+									tab.syncProgressLabel:SetTextColor(0, 1, 0)
+									C_Timer.After(5, function()
+										if tab.syncProgressLabel then
+											tab.syncProgressLabel:Hide()
+										end
+									end)
+								end
+							end, function(processed, total)
+								-- Progress update each batch
+								if tab.syncProgressLabel then
+									tab.syncProgressLabel:SetText(
+										string.format(
+											L.MSG_SYNC_GROUPS_PROGRESS or "Syncing notes: %d / %d",
+											processed,
+											total
+										)
+									)
+								end
+							end)
+						end
+					end,
+					OnCancel = function()
+						-- Revert checkbox state
+						BetterFriendlistDB.syncGroupsToNote = false
+						-- Refresh the Advanced tab to reset the checkbox visual
+						Settings:RefreshAdvancedTab()
+					end,
+					timeout = 0,
+					whileDead = true,
+					hideOnEscape = true,
+					preferredIndex = 3,
+				}
+				StaticPopup_Show("BETTERFRIENDLIST_SYNC_GROUPS_CONFIRM")
+			else
+				BetterFriendlistDB.syncGroupsToNote = false
+				-- Increment settings version to invalidate caches
+				if BFL.SettingsVersion then
+					BFL.SettingsVersion = BFL.SettingsVersion + 1
+				end
+				-- Ask user if they want to clean up notes
+				StaticPopupDialogs["BETTERFRIENDLIST_SYNC_GROUPS_DISABLE"] = {
+					text = L.DIALOG_SYNC_GROUPS_DISABLE_TEXT
+						or "Group Note Sync has been disabled.\n\nWould you like to open the Note Cleanup Wizard to remove the group suffixes from your friend notes?",
+					button1 = L.DIALOG_SYNC_GROUPS_DISABLE_BTN1 or "Open Cleanup Wizard",
+					button2 = L.DIALOG_SYNC_GROUPS_DISABLE_BTN2 or "Keep Notes",
+					OnAccept = function()
+						local NoteCleanupWizard = BFL.NoteCleanupWizard
+						if NoteCleanupWizard then
+							NoteCleanupWizard:Show()
+						end
+					end,
+					timeout = 0,
+					whileDead = true,
+					hideOnEscape = true,
+					preferredIndex = 3,
+				}
+				StaticPopup_Show("BETTERFRIENDLIST_SYNC_GROUPS_DISABLE")
+			end
+		end
+	)
+	syncNoteToggle:SetTooltip(
+		L.SETTINGS_SYNC_GROUPS_NOTE or "Sync Groups to Friend Note",
+		L.SETTINGS_SYNC_GROUPS_NOTE_DESC or "Write group assignments into friend notes using the FriendGroups format."
+	)
+	table.insert(allFrames, syncNoteToggle)
+
+	-- Sync progress label (hidden by default, shown during sync)
+	local syncProgressLabel = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
+	syncProgressLabel:SetJustifyH("LEFT")
+	syncProgressLabel:SetText("")
+	syncProgressLabel:Hide()
+	-- Store on tab so it persists across calls
+	tab.syncProgressLabel = syncProgressLabel
+	-- Wrap in a frame container so AnchorChain can position it
+	local syncProgressFrame = CreateFrame("Frame", nil, tab)
+	syncProgressFrame:SetHeight(18)
+	syncProgressFrame:SetWidth(400)
+	syncProgressLabel:SetPoint("LEFT", syncProgressFrame, "LEFT", 4, 0)
+	syncProgressFrame.label = syncProgressLabel
+	table.insert(allFrames, syncProgressFrame)
+
+	-- Spacer
+	table.insert(allFrames, Components:CreateSpacer(tab))
+
+	-- ===========================================
+	-- Note Cleanup Section
+	-- ===========================================
+	table.insert(allFrames, Components:CreateHeader(tab, L.WIZARD_HEADER or "Note Cleanup"))
+
+	-- Note Cleanup description
+	table.insert(
+		allFrames,
+		Components:CreateLabel(
+			tab,
+			L.WIZARD_HEADER_DESC
+				or "Remove FriendGroups suffixes from friend notes. Back up your notes first, then review and apply changes.",
+			true
+		)
+	)
+
+	-- Note Cleanup Wizard button
+	local cleanupButton = Components:CreateButton(tab, L.WIZARD_BTN or "Note Cleanup Wizard", function()
+		local NoteCleanupWizard = BFL.NoteCleanupWizard
+		if NoteCleanupWizard then
+			NoteCleanupWizard:Show()
+		end
+	end, L.WIZARD_BTN_TOOLTIP or "Open the wizard to clean up FriendGroups data from friend notes")
+	cleanupButton:SetSize(200, 24)
+
+	-- View Backup button
+	local viewBackupButton = Components:CreateButton(tab, L.WIZARD_VIEW_BACKUP_BTN or "View Backup", function()
+		local NoteCleanupWizard = BFL.NoteCleanupWizard
+		if NoteCleanupWizard then
+			NoteCleanupWizard:ShowBackupViewer()
+		end
+	end, L.WIZARD_VIEW_BACKUP_TOOLTIP or "Open the backup viewer to see all backed-up notes")
+	viewBackupButton:SetSize(200, 24)
+
+	local cleanupBtnRow = CreateFrame("Frame", nil, tab)
+	cleanupBtnRow:SetHeight(30)
+	cleanupBtnRow:SetPoint("LEFT", 20, 0)
+	cleanupBtnRow:SetPoint("RIGHT", -20, 0)
+
+	cleanupButton:SetParent(cleanupBtnRow)
+	cleanupButton:ClearAllPoints()
+	cleanupButton:SetPoint("CENTER", cleanupBtnRow, "CENTER", -110, 0)
+
+	viewBackupButton:SetParent(cleanupBtnRow)
+	viewBackupButton:ClearAllPoints()
+	viewBackupButton:SetPoint("CENTER", cleanupBtnRow, "CENTER", 110, 0)
+
+	table.insert(allFrames, cleanupBtnRow)
+
+	-- Spacer
+	table.insert(allFrames, Components:CreateSpacer(tab))
+
+	-- ===========================================
 	-- Beta Features Section
 	-- ===========================================
 	table.insert(allFrames, Components:CreateHeader(tab, "|cffff8800" .. L.SETTINGS_BETA_FEATURES_TITLE .. "|r"))
