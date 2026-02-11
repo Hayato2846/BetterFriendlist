@@ -14,6 +14,16 @@ local L = BFL.L
 -- Import UI constants
 local UI = BFL.UI.CONSTANTS
 
+-- Cached module reference (avoids repeated BFL:GetModule lookups in hot paths)
+local QuickJoinModule
+
+local function GetQuickJoinModule()
+	if not QuickJoinModule then
+		QuickJoinModule = BFL and BFL:GetModule("QuickJoin")
+	end
+	return QuickJoinModule
+end
+
 -- ========================================
 -- QUICK JOIN FRAME CALLBACKS
 -- ========================================
@@ -44,7 +54,7 @@ function BetterQuickJoinFrame_OnLoad(self)
 	-- Classic mode: Skip ScrollBox initialization (handled by QuickJoin module)
 	if BFL.IsClassic or not BFL.HasModernScrollBox then
 		-- BFL:DebugPrint("|cff00ffffQuickJoinCallbacks:|r Classic mode - skipping ScrollBox init")
-		self.QuickJoin = BFL and BFL:GetModule("QuickJoin")
+		self.QuickJoin = GetQuickJoinModule()
 		self.selectedGUID = nil
 		return
 	end
@@ -70,7 +80,7 @@ function BetterQuickJoinFrame_OnLoad(self)
 			button.guid = elementData.guid
 
 			-- Register button for selection tracking
-			local QuickJoin = BFL and BFL:GetModule("QuickJoin")
+			local QuickJoin = GetQuickJoinModule()
 			if QuickJoin then
 				QuickJoin.selectedButtons[elementData.guid] = button
 			end
@@ -114,13 +124,12 @@ function BetterQuickJoinFrame_OnLoad(self)
 	end
 
 	-- Store reference to QuickJoin module
-	self.QuickJoin = BFL and BFL:GetModule("QuickJoin")
+	self.QuickJoin = GetQuickJoinModule()
 	self.selectedGUID = nil
 end
 
 function BetterQuickJoinFrame_OnShow(self)
-	-- Get QuickJoin module directly from BFL (more reliable)
-	local QuickJoin = BFL and BFL:GetModule("QuickJoin")
+	local QuickJoin = GetQuickJoinModule()
 	if QuickJoin then
 		-- Register update callback
 		QuickJoin:SetUpdateCallback(function()
@@ -135,8 +144,7 @@ function BetterQuickJoinFrame_OnShow(self)
 end
 
 function BetterQuickJoinFrame_OnHide(self)
-	-- Cleanup
-	local QuickJoin = BFL and BFL:GetModule("QuickJoin")
+	local QuickJoin = GetQuickJoinModule()
 	if QuickJoin then
 		QuickJoin:SetUpdateCallback(nil)
 	end
@@ -147,8 +155,7 @@ function BetterQuickJoinFrame_Update(self)
 		return
 	end
 
-	-- Get QuickJoin module directly from BFL (more reliable than storing reference)
-	local QuickJoin = BFL and BFL:GetModule("QuickJoin")
+	local QuickJoin = GetQuickJoinModule()
 	if not QuickJoin then
 		return
 	end
@@ -203,7 +210,7 @@ function BetterQuickJoinGroupButton_OnEnter(self)
 	end
 
 	-- Update entry's groupInfo reference to get latest data (for dynamic updates like member count changes)
-	local QuickJoin = BFL and BFL:GetModule("QuickJoin")
+	local QuickJoin = GetQuickJoinModule()
 	if QuickJoin then
 		local latestGroupInfo = QuickJoin:GetGroupInfo(self.guid)
 		if latestGroupInfo then
@@ -234,14 +241,14 @@ function BetterQuickJoinGroupButton_OnLeave(self)
 	end
 
 	-- Restore selection highlight if this button is selected
-	local QuickJoin = BFL and BFL:GetModule("QuickJoin")
+	local QuickJoin = GetQuickJoinModule()
 	if QuickJoin and self.guid == QuickJoin.selectedGUID and self.Selected then
 		self.Selected:Show()
 	end
 end
 
 function BetterQuickJoinGroupButton_OnClick(self, button)
-	local QuickJoin = BFL and BFL:GetModule("QuickJoin")
+	local QuickJoin = GetQuickJoinModule()
 	if not QuickJoin then
 		return
 	end
@@ -265,7 +272,7 @@ end
 
 -- Join Queue Button Handler
 function BetterQuickJoinFrame_JoinQueueButton_OnClick(self)
-	local QuickJoin = BFL and BFL:GetModule("QuickJoin")
+	local QuickJoin = GetQuickJoinModule()
 	if QuickJoin then
 		QuickJoin:JoinQueue()
 	end
@@ -328,7 +335,7 @@ function BetterQuickJoinGroupButton_OnJoinClick(button)
 	local frame = BetterQuickJoinRoleSelectionFrame
 	if not frame or not frame.guid then return end
 	
-	local QuickJoin = BFL and BFL:GetModule("QuickJoin")
+	local QuickJoin = GetQuickJoinModule()
 	if not QuickJoin then return end
 	
 	-- Get selected roles

@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Top Tab State Not Reset on Reopen** - Fixed a bug where closing the friends list while on the Recent Allies or RAF tab and reopening it would show the Friends tab as selected but display the content of the previously viewed tab. The top tab (FriendsTabHeader) state is now properly reset when reopening.
 - **QuickJoin Crash During Combat (Issue #44)** - Fixed a crash caused by Patch 12.0.0 Secret Values when `C_LFGList.GetSearchResultInfo()` returns secret field values during combat lockdown (e.g., M+ keys). Implemented a Secret-Passthrough mode that stores and displays secret values directly (group title, leader name, member count, activity name/icon) instead of discarding them. Forbidden operations (comparisons, iteration) are safely skipped.
 
+### Performance
+- **QuickJoin Module Optimizations** - Reduced memory allocations and CPU usage in the QuickJoin/Social Queue module. Key changes: reuse relationship cache entry tables instead of creating new ones on every lookup (13.61% of total allocations), replaced closure-based sort comparator with static module-level functions eliminating per-sort closure allocation (8.66% + 4.10% of allocations), optimized cache key generation using string.format (3.78% CPU), and cached QuickJoin module reference to avoid repeated lookups.
+
 ## [2.3.2]       - 2026-02-10
 ### Fixed
 - **Midnight API Fix** - Fixed `C_RestrictedActions.IsAddOnRestrictionActive` error caused by missing required `Enum.AddOnRestrictionType` argument (API changed in 12.0.0).

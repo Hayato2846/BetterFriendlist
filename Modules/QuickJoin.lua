@@ -56,7 +56,7 @@ local updateTimer = nil
 local RELATIONSHIP_CACHE_TTL = 0.5
 
 local function GetRelationshipCacheKey(guid, missingNameFallback, clubId)
-	return tostring(guid) .. "|" .. tostring(clubId or "") .. "|" .. tostring(missingNameFallback or "")
+	return string.format("%s|%s|%s", tostring(guid), tostring(clubId or ""), tostring(missingNameFallback or ""))
 end
 
 local function TryGetCachedRelationship(guid, missingNameFallback, clubId)
@@ -72,13 +72,18 @@ end
 
 local function CacheAndReturnRelationship(guid, missingNameFallback, clubId, name, color, relationship, playerLink)
 	if guid then
-		QuickJoin.relationshipCache[GetRelationshipCacheKey(guid, missingNameFallback, clubId)] = {
-			name = name,
-			color = color,
-			relationship = relationship,
-			playerLink = playerLink,
-			expires = GetTime() + RELATIONSHIP_CACHE_TTL,
-		}
+		local cacheKey = GetRelationshipCacheKey(guid, missingNameFallback, clubId)
+		local entry = QuickJoin.relationshipCache[cacheKey]
+		if not entry then
+			entry = {}
+			QuickJoin.relationshipCache[cacheKey] = entry
+		end
+		-- Overwrite ALL fields to prevent stale data
+		entry.name = name
+		entry.color = color
+		entry.relationship = relationship
+		entry.playerLink = playerLink
+		entry.expires = GetTime() + RELATIONSHIP_CACHE_TTL
 	end
 	return name, color, relationship, playerLink
 end
@@ -278,38 +283,44 @@ local relationshipPriorityOrdering = {
 	["club"] = 4,
 }
 
+-- Static sort state (avoids closure allocation per sort call)
+local sortMemberInfoCache = {}
+
+local function GetSortMemberInfo(member)
+	local guid = member and member.guid
+	if guid and sortMemberInfoCache[guid] then
+		return sortMemberInfoCache[guid][1], sortMemberInfoCache[guid][2]
+	end
+	local name, _, relationship = BetterFriendlist_GetRelationshipInfo(guid, nil, member and member.clubId)
+	if guid then
+		-- Use array-style table for compactness (1=name, 2=relationship)
+		sortMemberInfoCache[guid] = { name or "", relationship }
+	end
+	return name or "", relationship
+end
+
+local function MemberSortComparator(lhs, rhs)
+	local lhsName, lhsRelationship = GetSortMemberInfo(lhs)
+	local rhsName, rhsRelationship = GetSortMemberInfo(rhs)
+
+	-- Sort by relationship priority first (lower = higher priority)
+	if lhsRelationship ~= rhsRelationship then
+		local lhsPriority = lhsRelationship and relationshipPriorityOrdering[lhsRelationship] or 10
+		local rhsPriority = rhsRelationship and relationshipPriorityOrdering[rhsRelationship] or 10
+		return lhsPriority < rhsPriority
+	end
+
+	-- Same relationship type: sort alphabetically by name
+	return strcmputf8i(lhsName or "", rhsName or "") < 0
+end
+
 local function BetterFriendlist_SortGroupMembers(members)
 	if not members then
 		return members
 	end
-	local memberInfo = {}
-	local function GetMemberInfo(member)
-		local guid = member and member.guid
-		if guid and memberInfo[guid] then
-			return memberInfo[guid].name, memberInfo[guid].relationship
-		end
-		local name, _, relationship = BetterFriendlist_GetRelationshipInfo(guid, nil, member and member.clubId)
-		if guid then
-			memberInfo[guid] = { name = name or "", relationship = relationship }
-		end
-		return name or "", relationship
-	end
-
-	table.sort(members, function(lhs, rhs)
-		local lhsName, lhsRelationship = GetMemberInfo(lhs)
-		local rhsName, rhsRelationship = GetMemberInfo(rhs)
-
-		-- Sort by relationship priority first (lower = higher priority)
-		if lhsRelationship ~= rhsRelationship then
-			local lhsPriority = lhsRelationship and relationshipPriorityOrdering[lhsRelationship] or 10
-			local rhsPriority = rhsRelationship and relationshipPriorityOrdering[rhsRelationship] or 10
-			return lhsPriority < rhsPriority
-		end
-
-		-- Same relationship type: sort alphabetically by name
-		return strcmputf8i(lhsName or "", rhsName or "") < 0
-	end)
-
+	-- Wipe cache completely before each sort to prevent stale data
+	wipe(sortMemberInfoCache)
+	table.sort(members, MemberSortComparator)
 	return members
 end
 
@@ -410,13 +421,14 @@ function QuickJoinEntry:New(guid, groupInfo)
 
 	-- Extract member data - use actual member info from groupInfo
 	-- CRITICAL: Sort members by relationship priority first! (like Blizzard's SocialQueueUtil_SortGroupMembers)
+	-- Copy members to avoid modifying the cached original array
 	local sortedMembers = groupInfo.members
 	if sortedMembers and #sortedMembers > 0 then
-		-- Make a copy to avoid modifying original
-		sortedMembers = {}
+		local copy = {}
 		for i, member in ipairs(groupInfo.members) do
-			sortedMembers[i] = member
+			copy[i] = member
 		end
+		sortedMembers = copy
 		-- Sort by relationship priority: BNet > WoW Friend > Guild > Club > Unknown
 		BetterFriendlist_SortGroupMembers(sortedMembers)
 	end
