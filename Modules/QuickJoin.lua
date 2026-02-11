@@ -61,7 +61,11 @@ local function GetRelationshipCacheKey(guid, missingNameFallback, clubId)
 		return guid
 	end
 	-- Slow path: build composite key only when needed
-	return guid .. "|" .. (clubId and tostring(clubId) or "") .. "|" .. (missingNameFallback and tostring(missingNameFallback) or "")
+	return guid
+		.. "|"
+		.. (clubId and tostring(clubId) or "")
+		.. "|"
+		.. (missingNameFallback and tostring(missingNameFallback) or "")
 end
 
 local function TryGetCachedRelationship(guid, missingNameFallback, clubId)
