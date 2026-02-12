@@ -17,11 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [DRAFT]
+## [2.3.4]       - 2026-02-12
 ### Fixed
 - **Streamer Mode Real ID Leaks** - Fixed several places where Real IDs could still be visible despite Streamer Mode being active:
   - Friend tooltip in Classic showed Real ID instead of BattleTag.
-  - Data Broker tooltip showed Real ID for friends not currently in a WoW game.
+  - Data Broker tooltip showed Real ID for friends not currently playing WoW.
   - Recruit-A-Friend tab showed Real IDs without respecting Streamer Mode.
   - FriendListColors addon integration received unmasked Real IDs.
   - Copy Name popup could fall back to Real ID.
