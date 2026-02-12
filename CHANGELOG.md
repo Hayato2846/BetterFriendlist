@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+### Fixed
+- **Streamer Mode Real ID Leaks** - Fixed several places where Real IDs could still be visible despite Streamer Mode being active:
+  - Friend tooltip in Classic showed Real ID instead of BattleTag.
+  - Data Broker tooltip showed Real ID for friends not currently in a WoW game.
+  - Recruit-A-Friend tab showed Real IDs without respecting Streamer Mode.
+  - FriendListColors addon integration received unmasked Real IDs.
+  - Copy Name popup could fall back to Real ID.
+  - Drag ghost text could show Real ID when dragging a friend.
+
 ## [2.3.3]       - 2026-02-11
 ### Added
 - **Note Cleanup Wizard** - Added a new wizard (Settings -> Advanced) to clean up FriendGroups-style note suffixes (#Group1#Group2) from friend notes. Features a searchable table showing Account Name, BattleTag, Original Note and Cleaned Note with inline editing. Supports both BNet and WoW friends. Includes automatic backup before applying changes. Per-row status icons (pending/success/error) with traffic-light colored backgrounds provide real-time visual feedback during the cleanup process. Respects Streamer Mode by masking Real IDs in the Account Name column and search filter.

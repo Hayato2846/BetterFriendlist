@@ -1636,6 +1636,14 @@ local function CreateLibQTipTooltip(anchorFrame)
 		local function RenderFriendRow(friend, indentation)
 			local nameText = friend.characterName ~= "" and friend.characterName or friend.accountName
 
+			-- [STREAMER MODE CHECK] Replace Real ID with safe name
+			if BFL.StreamerMode and BFL.StreamerMode:IsActive() and friend.type == "bnet" then
+				local FL = BFL:GetModule("FriendsList")
+				if FL then
+					nameText = FL:GetDisplayName(friend)
+				end
+			end
+
 			if friend.timerunningSeasonID and TimerunningUtil and TimerunningUtil.AddSmallIcon then
 				nameText = TimerunningUtil.AddSmallIcon(nameText)
 			end

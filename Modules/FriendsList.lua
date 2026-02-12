@@ -4967,10 +4967,14 @@ end
 Button_OnDragStart = function(self)
 	if self.friendData then
 		-- Store friend name for header text updates
-		BetterFriendsList_DraggedFriend = self.friendData.name
-			or self.friendData.accountName
-			or self.friendData.battleTag
-			or "Unknown"
+		-- [STREAMER MODE CHECK] Never expose Real ID in drag ghost text
+		local dragName
+		if BFL.StreamerMode and BFL.StreamerMode:IsActive() and self.friendData.type == "bnet" then
+			dragName = FriendsList:GetDisplayName(self.friendData)
+		else
+			dragName = self.friendData.name or self.friendData.accountName or self.friendData.battleTag or "Unknown"
+		end
+		BetterFriendsList_DraggedFriend = dragName
 		-- Store UID for validation (Fix for Phantom DragStop events during list refresh)
 		BetterFriendsList_DraggedUID = FriendsList:GetFriendUID(self.friendData)
 
@@ -5290,7 +5294,15 @@ function FriendsList:GetFormattedButtonText(friend)
 		flcData.notes = friend.note or friend.notes
 
 		if friend.type == "bnet" then
-			flcData.accountName = friend.accountName
+			-- [STREAMER MODE CHECK] Mask accountName for external addon
+			if BFL.StreamerMode and BFL.StreamerMode:IsActive() then
+				local safeName = displayName or self:GetDisplayName(friend)
+				flcData.accountName = safeName
+				flcData.name = friend.characterName or safeName
+			else
+				flcData.accountName = friend.accountName
+				flcData.name = friend.characterName or friend.accountName
+			end
 			flcData.battleTag = friend.battleTag
 			flcData.characterName = friend.characterName
 			flcData.level = friend.level
@@ -5299,8 +5311,6 @@ function FriendsList:GetFormattedButtonText(friend)
 			flcData.factionName = friend.factionName
 			flcData.timerunningSeasonID = friend.timerunningSeasonID
 			flcData.gameAccountInfo = friend.gameAccountInfo
-			-- Support for default FLC behavior
-			flcData.name = friend.characterName or friend.accountName
 		else
 			flcData.name = friend.name
 			flcData.level = friend.level

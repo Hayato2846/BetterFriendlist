@@ -1666,8 +1666,14 @@ frame:SetScript("OnEvent", function(self, event, ...)
 									end
 
 									-- 3. Try Real Name (Account Name) if nothing else
+									-- [STREAMER MODE CHECK] Never expose Real ID in Streamer Mode
 									if (not copyNameText or copyNameText == "") and accountInfo.accountName then
-										copyNameText = accountInfo.accountName
+										if BFL.StreamerMode and BFL.StreamerMode:IsActive() then
+											-- Use BattleTag fallback or "Unknown" instead of Real ID
+											copyNameText = accountInfo.battleTag or "Unknown"
+										else
+											copyNameText = accountInfo.accountName
+										end
 									end
 								end
 							end
