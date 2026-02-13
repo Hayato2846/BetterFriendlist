@@ -1107,6 +1107,10 @@ function FriendsList:UpdateSearchBoxState()
 		return
 	end
 
+	-- CRITICAL: Refresh cache before reading simpleMode to prevent stale state
+	-- when called from OnSimpleModeChanged before ForceRefreshFriendsList has run
+	self:UpdateSettingsCache()
+
 	-- PERFY OPTIMIZATION: Direct cache access
 	local simpleMode = self.settingsCache.simpleMode or false
 	local showSearch = self.settingsCache.simpleModeShowSearch
@@ -1116,15 +1120,21 @@ function FriendsList:UpdateSearchBoxState()
 	local searchBox = frame.FriendsTabHeader and frame.FriendsTabHeader.SearchBox
 	local scrollFrame = frame.ScrollFrame
 
-	-- Check if we are on the Friends tab
-	-- We use the global PanelTemplates logic since BetterFriendsFrame inherits it
-	local isFriendsTab = (PanelTemplates_GetSelectedTab(frame) or 1) == 1
+	-- Check if we are on the Contacts bottom tab (which hosts Friends, Recent Allies, RAF)
+	local isContactsTab = (PanelTemplates_GetSelectedTab(frame) or 1) == 1
 
-	-- Relaxed check: If the scroll frame is shown, we are definitely on the friends tab
+	-- Relaxed check: If the scroll frame is shown, we are definitely on the contacts tab
 	-- This fixes Scenario 3 where toggling simpleMode hides variable elements
 	if scrollFrame and scrollFrame:IsShown() then
-		isFriendsTab = true
+		isContactsTab = true
 	end
+
+	-- Check which top tab is active (1=Friends, 2=Recent Allies, 3=RAF)
+	local activeTopTab = 1
+	if frame.FriendsTabHeader then
+		activeTopTab = PanelTemplates_GetSelectedTab(frame.FriendsTabHeader) or 1
+	end
+	local isFriendsTopTab = (activeTopTab == 1)
 
 	if simpleMode then
 		if showSearch and searchBox then
@@ -1146,18 +1156,20 @@ function FriendsList:UpdateSearchBoxState()
 			searchBox:SetHeight(22)
 			searchBox:SetFrameLevel(frame:GetFrameLevel() + 20)
 
-			-- Ensure it's shown ONLY if we are on the Friends tab or ScrollFrame is visible
-			if isFriendsTab or (scrollFrame and scrollFrame:IsShown()) then
+			-- Show SearchBox on any Contacts sub-tab (Friends, Recent Allies, RAF)
+			if isContactsTab then
 				searchBox:Show()
 			else
 				searchBox:Hide()
 			end
 
-			-- Push ScrollFrame down
-			-- Adjusted (Phase 30): Maximum tightness (-25 -> -22)
-			scrollFrame:ClearAllPoints()
-			scrollFrame:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 4, -22)
-			scrollFrame:SetPoint("BOTTOMRIGHT", frame.Inset, "BOTTOMRIGHT", -22, 2)
+			-- Push ScrollFrame down only on Friends top tab (scrollFrame is Friends-specific)
+			if isFriendsTopTab then
+				-- Adjusted (Phase 30): Maximum tightness (-25 -> -22)
+				scrollFrame:ClearAllPoints()
+				scrollFrame:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 4, -22)
+				scrollFrame:SetPoint("BOTTOMRIGHT", frame.Inset, "BOTTOMRIGHT", -22, 2)
+			end
 		elseif searchBox then
 			-- Persistent SearchBox Mode (Simple Mode - HIDE)
 			searchBox:Hide()
@@ -1172,6 +1184,15 @@ function FriendsList:UpdateSearchBoxState()
 		if searchBox and frame.FriendsTabHeader then
 			searchBox:SetParent(frame.FriendsTabHeader)
 			searchBox:ClearAllPoints()
+
+			-- Reset FrameLevel (Simple Mode elevates it by +20 for overlay)
+			searchBox:SetFrameLevel(frame.FriendsTabHeader:GetFrameLevel() + 2)
+
+			-- Invalidate width cache: Simple Mode sets SetWidth(0), but BFL_LastWidth
+			-- retains the previous Normal Mode value. Without clearing this,
+			-- UpdateSearchBoxWidth() skips the SetWidth call (cache hit) and the
+			-- SearchBox stays at width 0.
+			searchBox.BFL_LastWidth = nil
 
 			if BFL.IsClassic then
 				-- Classic Normal Mode: Restore XML Defaults
@@ -1196,13 +1217,30 @@ function FriendsList:UpdateSearchBoxState()
 
 			searchBox:SetHeight(28)
 
+			-- Re-anchor dropdowns to SearchBox after reparenting
+			-- XML anchors ($parent.SearchBox) may be invalidated when SearchBox
+			-- was reparented to BetterFriendsFrame during Simple Mode
+			local header = frame.FriendsTabHeader
+			if header.QuickFilterDropdown then
+				header.QuickFilterDropdown:ClearAllPoints()
+				header.QuickFilterDropdown:SetPoint("LEFT", searchBox, "RIGHT", 5, 0)
+			end
+			if header.PrimarySortDropdown and header.QuickFilterDropdown then
+				header.PrimarySortDropdown:ClearAllPoints()
+				header.PrimarySortDropdown:SetPoint("LEFT", header.QuickFilterDropdown, "RIGHT", 5, 0)
+			end
+			if header.SecondarySortDropdown and header.PrimarySortDropdown then
+				header.SecondarySortDropdown:ClearAllPoints()
+				header.SecondarySortDropdown:SetPoint("LEFT", header.PrimarySortDropdown, "RIGHT", 5, 0)
+			end
+
 			-- CRITICAL FIX: Ensure SearchBox is visible in Normal Mode
 			if not searchBox:IsShown() then
 				searchBox:Show()
 			end
 
 			-- ALSO Ensure TabHeader is visible if on Friends Tab
-			if isFriendsTab and not frame.FriendsTabHeader:IsShown() then
+			if isContactsTab and not frame.FriendsTabHeader:IsShown() then
 				frame.FriendsTabHeader:Show()
 			end
 		end
@@ -3631,10 +3669,10 @@ end
 -- Check if friend passes current filters
 function FriendsList:PassesFilters(friend) -- Search text filter
 	if self.searchText and self.searchText ~= "" then
-		local searchLower = self.searchText:lower()
+		local searchNormalized = BFL:StripAccents(self.searchText)
 		local found = false
 
-		-- Helper function to check if a field contains the search text
+		-- Helper function to check if a field contains the search text (accent-insensitive)
 		local function contains(text)
 			if text and text ~= "" and text ~= "???" then
 				-- Fix #50: Skip kStrings (|K...|k) - these are Blizzard privacy-protected
@@ -3643,7 +3681,7 @@ function FriendsList:PassesFilters(friend) -- Search text filter
 				if text:sub(1, 2) == "|K" then
 					return false
 				end
-				return text:lower():find(searchLower, 1, true) ~= nil
+				return BFL:StripAccents(text):find(searchNormalized, 1, true) ~= nil
 			end
 			return false
 		end

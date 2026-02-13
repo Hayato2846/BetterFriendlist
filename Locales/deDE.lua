@@ -491,6 +491,8 @@ BFL:RegisterLocale("deDE", function()
 	L.RAID_ERR_NOT_IN_GROUP = "Du bist in keiner Gruppe"
 	L.RECRUIT_A_FRIEND = "Werbt einen Freund"
 	L.SEARCH_FRIENDS_INSTRUCTION = "Freunde suchen..."
+	L.SEARCH_RECENT_ALLIES_INSTRUCTION = "Letzte Verb\195\188ndete suchen..."
+	L.SEARCH_RAF_INSTRUCTION = "Geworbene Freunde suchen..."
 	L.SETTINGS_SHOW_WELCOME_MESSAGE = "Willkommensnachricht anzeigen"
 	L.SETTINGS_SHOW_WELCOME_MESSAGE_DESC = "Zeigt die Addon-Geladen-Nachricht im Chat an, wenn du dich einloggst."
 	L.SETTINGS_TAB_DATABROKER = "Data Broker"

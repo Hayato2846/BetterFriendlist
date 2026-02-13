@@ -31,6 +31,9 @@ local maxRecruitLinkUses = 0
 local daysInCycle = 0
 local latestRAFVersion = 0
 
+-- Current search text for filtering
+RAF.searchText = ""
+
 --------------------------------------------------------------------------
 -- RAF Frame Initialization and Event Handling
 --------------------------------------------------------------------------
@@ -360,6 +363,30 @@ function RAF:UpdateRecruitList(frame, recruits)
 	-- Process and sort recruits
 	local needDivider = ProcessAndSortRecruits(recruits)
 
+	-- Apply search filter if active
+	if self.searchText and self.searchText ~= "" then
+		local searchNormalized = BFL:StripAccents(self.searchText)
+		local filtered = {}
+		for _, recruit in ipairs(recruits) do
+			if self:MatchesSearch(recruit, searchNormalized) then
+				filtered[#filtered + 1] = recruit
+			end
+		end
+		recruits = filtered
+		numRecruits = #recruits
+
+		-- Recalculate divider need after filtering
+		local haveOnline, haveOffline = false, false
+		for _, r in ipairs(recruits) do
+			if r.isOnline then
+				haveOnline = true
+			else
+				haveOffline = true
+			end
+		end
+		needDivider = haveOnline and haveOffline
+	end
+
 	-- Build data list with divider
 	local dataList = {}
 	for index = 1, numRecruits do
@@ -549,6 +576,42 @@ function RAF:ShowSplashScreen(frame)
 		return
 	end
 	frame.SplashFrame:Show()
+end
+
+--------------------------------------------------------------------------
+-- Search Functionality
+--------------------------------------------------------------------------
+
+-- Check if a recruit matches the search text (accent-insensitive)
+function RAF:MatchesSearch(recruit, searchNormalized)
+	-- Helper: check if field contains the search (accent-insensitive)
+	local function contains(text)
+		if text and text ~= "" then
+			return BFL:StripAccents(text):find(searchNormalized, 1, true) ~= nil
+		end
+		return false
+	end
+
+	-- Search in name, battleTag, and character name
+	return contains(recruit.nameText)
+		or contains(recruit.plainName)
+		or contains(recruit.battleTag)
+		or contains(recruit.characterName)
+end
+
+-- Set search text and refresh the list
+function RAF:SetSearchText(text)
+	local newText = text or ""
+	if self.searchText == newText then
+		return
+	end
+	self.searchText = newText
+
+	-- Refresh the list with the new search filter
+	local frame = BetterFriendsFrame and BetterFriendsFrame.RecruitAFriendFrame
+	if frame and frame:IsShown() and frame.rafInfo and frame.rafInfo.recruits then
+		self:UpdateRecruitList(frame, frame.rafInfo.recruits)
+	end
 end
 
 --------------------------------------------------------------------------

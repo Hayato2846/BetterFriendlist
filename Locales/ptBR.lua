@@ -747,6 +747,8 @@ BFL:RegisterLocale("ptBR", function()
 	-- ========================================
 	L.SETTINGS_TITLE = "Config BetterFriendlist"
 	L.SEARCH_FRIENDS_INSTRUCTION = "Buscar..."
+	L.SEARCH_RECENT_ALLIES_INSTRUCTION = "Buscar aliados recentes..."
+	L.SEARCH_RAF_INSTRUCTION = "Buscar amigos recrutados..."
 	L.RAF_NEXT_REWARD_HELP = "Info RAF"
 	L.WHO_LEVEL_FORMAT = "Nível %d"
 	L.CONTACTS_RECENT_ALLIES_TAB_NAME = "Aliados Recentes"

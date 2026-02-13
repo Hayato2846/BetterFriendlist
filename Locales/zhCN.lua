@@ -748,6 +748,8 @@ BFL:RegisterLocale("zhCN", function()
 	-- ========================================
 	L.SETTINGS_TITLE = "BetterFriendlist设置"
 	L.SEARCH_FRIENDS_INSTRUCTION = "Search..."
+	L.SEARCH_RECENT_ALLIES_INSTRUCTION = "Search recent allies..."
+	L.SEARCH_RAF_INSTRUCTION = "Search recruited friends..."
 	L.RAF_NEXT_REWARD_HELP = "RAF Info"
 	L.WHO_LEVEL_FORMAT = "Level %d"
 	L.CONTACTS_RECENT_ALLIES_TAB_NAME = "最近队友"

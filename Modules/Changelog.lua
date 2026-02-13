@@ -29,7 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **RAF Frame Layout** - Fixed the Recruit-A-Friend tab showing excessive nested borders and recruit list entries appearing centered instead of filling the available width.
 - **RAF Activity Tooltips** - Fixed RAF activity tooltips not matching Blizzard's tooltip style by using the correct tooltip frame for quest reward display.
 - **RAF Reward Icon** - Fixed the next reward icon always appearing fully saturated. It now properly shows as desaturated when the reward is not yet affordable, matching Blizzard's behavior.
-- **Friend Search on Wrong Tabs** - Fixed the friend search box being visible on the Recent Allies and Recruit-A-Friend tabs where it had no effect.
+- **Search on All Tabs** - The search box now works on the Recent Allies and Recruit-A-Friend tabs in addition to the Friends tab. Each tab shows a fitting placeholder text and switching tabs clears the current search.
+- **Accent-Insensitive Search** - Searching for "Hayato" now also finds friends named "Hâyato", "Hàyató", etc. Accented characters are treated as their base letter during search.
 - **Friend Search with Real Names** - Friend search now properly skips privacy-protected Real Names (a Blizzard limitation) instead of silently failing. Nicknames are now also included in search results.
 - **Who Frame Level Alignment** - Fixed the Level column in the Who search results not aligning with its column header.
 - **Blizzard Raid Frame Interaction** - Fixed empty raid member slots retaining stale unit references, which could cause unexpected interactions with Blizzard's default raid frame.

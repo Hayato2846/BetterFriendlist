@@ -2790,6 +2790,13 @@ function Settings:OnSimpleModeChanged(checked)
 
 	DB:Set("simpleMode", checked)
 
+	-- Reset top tab to Friends when deactivating Simple Mode
+	-- Without this, a stale activeTopTab (e.g. Recent Allies) causes ShowBottomTab
+	-- to skip showing ScrollFrame, which breaks hook-driven layout updates
+	if not checked and not BFL.IsClassic and BetterFriendsFrame_ShowTab then
+		BetterFriendsFrame_ShowTab(1)
+	end
+
 	-- Update Main Frame Layout (Show/Hide Tabs) FIRST
 	-- This ensures the Frame is on Tab 1 (Friends) and contexts like ScrollFrame visibility are established
 	-- BEFORE we try to calculate SearchBox visibility/parenting.

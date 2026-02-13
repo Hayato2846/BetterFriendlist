@@ -1230,6 +1230,7 @@ end
 BFL.searchDebounceTimer = BFL.searchDebounceTimer or nil
 
 -- Handle search box text changes (called from XML)
+-- Routes search to the correct module based on active top tab
 function BetterFriendsFrame_OnSearchTextChanged(editBox)
 	local text = editBox:GetText()
 	-- Convert to lowercase, handle empty string as well
@@ -1245,18 +1246,34 @@ function BetterFriendsFrame_OnSearchTextChanged(editBox)
 		searchText = newSearchText
 		BFL.searchDebounceTimer = nil
 
-		-- Update FriendsList module with new search text
-		local FriendsList = GetFriendsList()
-		if FriendsList then
-			FriendsList:SetSearchText(searchText)
-			-- BFL:ForceRefreshFriendsList is called by SetSearchText, which handles the update
-			-- Logic: SetSearchText -> BFL:ForceRefreshFriendsList -> FriendsList:UpdateFriendsList
+		-- Determine which top tab is active
+		local frame = BetterFriendsFrame
+		local activeTopTab = 1
+		if frame and frame.FriendsTabHeader then
+			activeTopTab = PanelTemplates_GetSelectedTab(frame.FriendsTabHeader) or 1
 		end
 
-		-- Update immediately - filtering happens in UpdateFriendsList
-		if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
-			-- Ensure display is updated
-			RequestUpdate(true)
+		if activeTopTab == 1 then
+			-- Tab 1: Friends
+			local FriendsList = GetFriendsList()
+			if FriendsList then
+				FriendsList:SetSearchText(searchText)
+			end
+			if frame and frame:IsShown() then
+				RequestUpdate(true)
+			end
+		elseif activeTopTab == 2 then
+			-- Tab 2: Recent Allies
+			local RecentAllies = BFL:GetModule("RecentAllies")
+			if RecentAllies then
+				RecentAllies:SetSearchText(searchText)
+			end
+		elseif activeTopTab == 3 then
+			-- Tab 3: Recruit A Friend
+			local RAF = BFL:GetModule("RAF")
+			if RAF then
+				RAF:SetSearchText(searchText)
+			end
 		end
 	end)
 	BFL.searchDebounceTimer = newTimer
@@ -2394,20 +2411,48 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 		PanelTemplates_SetTab(frame.FriendsTabHeader, tabIndex)
 	end
 
-	-- SEARCHBOX VISIBILITY IS NOW MANAGED ENTIRELY BY FriendsList:UpdateScrollBoxExtent()
-	-- We force a layout update immediately if switching to Tab 1 to ensure SearchBox appears instantly
+	-- Clear search and update placeholder when switching tabs
+	local searchBox = frame.FriendsTabHeader and frame.FriendsTabHeader.SearchBox
+	if searchBox then
+		-- Clear the search text on tab switch
+		searchBox:SetText("")
+		searchText = ""
+
+		-- Clear search state in all modules
+		local FriendsList = BFL:GetModule("FriendsList")
+		if FriendsList then
+			FriendsList:SetSearchText("")
+		end
+		local RecentAllies = BFL:GetModule("RecentAllies")
+		if RecentAllies and RecentAllies.SetSearchText then
+			RecentAllies:SetSearchText("")
+		end
+		local RAF = BFL:GetModule("RAF")
+		if RAF and RAF.SetSearchText then
+			RAF:SetSearchText("")
+		end
+
+		-- Update placeholder text based on active tab
+		local L = BFL.L
+		if searchBox.Instructions then
+			if tabIndex == 1 then
+				searchBox.Instructions:SetText(L.SEARCH_FRIENDS_INSTRUCTION)
+			elseif tabIndex == 2 then
+				searchBox.Instructions:SetText(L.SEARCH_RECENT_ALLIES_INSTRUCTION)
+			elseif tabIndex == 3 then
+				searchBox.Instructions:SetText(L.SEARCH_RAF_INSTRUCTION)
+			end
+		end
+
+		-- Show SearchBox on all top tabs (Friends, Recent Allies, RAF)
+		searchBox:Show()
+	end
+
+	-- Force layout update for Tab 1 to position SearchBox correctly
 	if tabIndex == 1 then
 		local FriendsList = BFL:GetModule("FriendsList")
 		if FriendsList and FriendsList.UpdateScrollBoxExtent then
 			FriendsList:UpdateScrollBoxExtent()
-		end
-	else
-		-- If switching away from Tab 1 (Friends)
-		-- Fix #51: Always hide search box on non-Friends tabs (Recent Allies, RAF)
-		-- The search only works on the Friends tab, showing it elsewhere is misleading
-		local searchBox = frame.FriendsTabHeader and frame.FriendsTabHeader.SearchBox
-		if searchBox then
-			searchBox:Hide()
 		end
 	end
 
@@ -2538,6 +2583,30 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 				ShowChildFrame(frame.RaidFrame)
 			end
 		end
+	end
+
+	-- Simple Mode: Adjust content frame offsets to make room for SearchBox
+	-- In Simple Mode, the SearchBox is reparented to the main frame at the top of Inset
+	-- Content frames for tabs 2/3 need to be pushed down to avoid overlap
+	local FriendsList = BFL:GetModule("FriendsList")
+	local isSimpleMode = FriendsList and FriendsList.settingsCache and FriendsList.settingsCache.simpleMode
+	local showSearchInSimple = FriendsList
+		and FriendsList.settingsCache
+		and FriendsList.settingsCache.simpleModeShowSearch
+	if showSearchInSimple == nil then
+		showSearchInSimple = true
+	end
+	local searchOffset = (isSimpleMode and showSearchInSimple) and -22 or -4
+
+	if frame.RecentAlliesFrame then
+		frame.RecentAlliesFrame:ClearAllPoints()
+		frame.RecentAlliesFrame:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 3, searchOffset)
+		frame.RecentAlliesFrame:SetPoint("BOTTOMRIGHT", frame.Inset, "BOTTOMRIGHT", -3, 2)
+	end
+	if frame.RecruitAFriendFrame then
+		frame.RecruitAFriendFrame:ClearAllPoints()
+		frame.RecruitAFriendFrame:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 0, searchOffset)
+		frame.RecruitAFriendFrame:SetPoint("BOTTOMRIGHT", frame.Inset, "BOTTOMRIGHT", 0, 0)
 	end
 end
 
@@ -3979,6 +4048,22 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex)
 	local FriendsList = BFL:GetModule("FriendsList")
 	if FriendsList and FriendsList.UpdateSearchBoxState then
 		FriendsList:UpdateSearchBoxState()
+	end
+
+	-- Update SearchBox placeholder text for the active top tab
+	if tabIndex == 1 and frame.FriendsTabHeader then
+		local searchBox = frame.FriendsTabHeader.SearchBox
+		if searchBox and searchBox.Instructions then
+			local activeTopTab = PanelTemplates_GetSelectedTab(frame.FriendsTabHeader) or 1
+			local L = BFL.L
+			if activeTopTab == 1 then
+				searchBox.Instructions:SetText(L.SEARCH_FRIENDS_INSTRUCTION)
+			elseif activeTopTab == 2 then
+				searchBox.Instructions:SetText(L.SEARCH_RECENT_ALLIES_INSTRUCTION)
+			elseif activeTopTab == 3 then
+				searchBox.Instructions:SetText(L.SEARCH_RAF_INSTRUCTION)
+			end
+		end
 	end
 
 	-- Apply custom tab fonts from DB settings (Applied LAST to respect selection state for sizing)

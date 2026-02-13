@@ -747,6 +747,8 @@ local function LoadEnUS()
 	-- ========================================
 	L.SETTINGS_TITLE = "BetterFriendlist Settings"
 	L.SEARCH_FRIENDS_INSTRUCTION = "Search friends..."
+	L.SEARCH_RECENT_ALLIES_INSTRUCTION = "Search recent allies..."
+	L.SEARCH_RAF_INSTRUCTION = "Search recruited friends..."
 	L.RAF_NEXT_REWARD_HELP = "Information about RAF rewards"
 	L.WHO_LEVEL_FORMAT = "Level %d"
 	L.CONTACTS_RECENT_ALLIES_TAB_NAME = "Recent Allies"
