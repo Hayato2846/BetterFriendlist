@@ -331,6 +331,10 @@ function Groups:RunColorSnapshotMigration()
 end
 
 function Groups:Initialize()
+	-- Reset groups table to prevent stale data from persisting across re-initializations
+	-- (e.g., after settings import where custom groups may have changed)
+	wipe(self.groups)
+
 	-- Localize built-in group names
 	if BFL.L then
 		builtinGroups.favorites.name = BFL.L.GROUP_FAVORITES
