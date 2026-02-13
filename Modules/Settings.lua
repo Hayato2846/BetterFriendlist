@@ -2082,15 +2082,20 @@ function Settings:DeserializeTable(str)
 	end
 
 	-- Security: Validate that the string only contains safe table-literal characters
-	-- Allowed: braces, brackets, quotes, commas, equals, alphanumerics, whitespace, dots, minus, underscores
+	-- Allowed: braces, brackets, quotes, commas, equals, alphanumerics, whitespace, dots, minus, underscores,
+	-- backslash (for %q escape sequences like \n, \\, \000), parentheses (may appear in user-defined names),
+	-- plus, colon, semicolon, hash, at-sign (may appear in BattleTags, realm names, etc.)
 	-- This prevents arbitrary Lua code execution from user-provided import strings
-	if string.find(str, "[^%w%s{}%[%]\"',=%.%-_]") then
+	if string.find(str, "[^%w%s{}%[%]\"',=%.%-_\\%(%)%+:;#@]") then
 		BFL:DebugPrint("DeserializeTable: Rejected input - contains unsafe characters")
 		return nil
 	end
 
-	-- Additional safety: reject strings containing function calls or known dangerous patterns
-	if string.find(str, "%w+%s*%(") then
+	-- Additional safety: reject strings that look like dangerous Lua patterns
+	-- Check for function calls OUTSIDE of quoted strings by stripping quoted content first
+	local stripped = string.gsub(str, '"[^"]*"', '""') -- Remove double-quoted strings
+	stripped = string.gsub(stripped, "'[^']*'", "''") -- Remove single-quoted strings
+	if string.find(stripped, "%w+%s*%(") then
 		BFL:DebugPrint("DeserializeTable: Rejected input - contains function call pattern")
 		return nil
 	end
@@ -3171,108 +3176,181 @@ function Settings:RefreshGeneralTab()
 	-- Spacer before next section
 	table.insert(allFrames, Components:CreateSpacer(tab))
 
-	-- Header: Name Formatting (Phase 15)
+	-- ========================================
+	-- Header: Name Formatting (Phase 22 - Preset System)
+	-- ========================================
 	local nameFormatHeader = Components:CreateHeader(tab, L.SETTINGS_NAME_FORMAT_HEADER or "Name Formatting")
 	table.insert(allFrames, nameFormatHeader)
 
-	-- Name Format Description
-	local nameFormatDesc = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-	nameFormatDesc:SetWidth(450) -- Increased width to match grid
-	nameFormatDesc:SetPoint("LEFT", 20, 0) -- Align with components
-	nameFormatDesc:SetJustifyH("LEFT")
-	nameFormatDesc:SetWordWrap(true)
-
-	-- MODIFIED: Show warning text if FriendListColors is active, otherwise show instructions
-	if _G.FriendListColorsAPI then
-		nameFormatDesc:SetText(
+	-- FriendListColors warning (if active)
+	local friendListColorsActive = _G.FriendListColorsAPI ~= nil
+	if friendListColorsActive then
+		local flcWarning = Components:CreateLabel(
+			tab,
 			"|cffFF3333"
-				.. (L.SETTINGS_NAME_FORMAT_DISABLED_FRIENDLISTCOLORS or "This setting is disabled because the addon 'FriendListColors' is managing name colors/formats.")
-				.. "|r"
+				.. (L.SETTINGS_NAME_FORMAT_DISABLED_FRIENDLISTCOLORS or "Name formatting is disabled because 'FriendListColors' is managing name colors/formats.")
+				.. "|r",
+			true
 		)
-	else
-		nameFormatDesc:SetTextColor(1, 1, 1)
-		nameFormatDesc:SetText(
-			L.SETTINGS_NAME_FORMAT_DESC
-				or "Customize how friend names are displayed using tokens:\n|cffFFD100%name%|r - Account Name (RealID/BattleTag)\n|cffFFD100%note%|r - Note (BNet or WoW)\n|cffFFD100%nickname%|r - Custom Nickname\n|cffFFD100%battletag%|r - Short BattleTag (no #1234)"
-		)
+		table.insert(allFrames, flcWarning)
 	end
-	table.insert(allFrames, nameFormatDesc)
 
-	-- Name Format EditBox Container
-	local nameFormatContainer = CreateFrame("Frame", nil, tab)
-	nameFormatContainer:SetSize(450, 30)
-	nameFormatContainer:SetPoint("LEFT", 20, 0) -- Align with components
+	-- Name Format Preset Dropdown
+	local namePresetEntries = {
+		labels = {
+			L.NAME_PRESET_DEFAULT or "Name (Character)",
+			L.NAME_PRESET_BATTLETAG or "BattleTag (Character)",
+			L.NAME_PRESET_NICKNAME or "Nickname (Character)",
+			L.NAME_PRESET_CHARACTER or "Character Only",
+			L.NAME_PRESET_NAME_ONLY or "Name Only",
+			L.NAME_PRESET_CUSTOM or "Custom...",
+		},
+		values = {
+			"default",
+			"battletag",
+			"nickname",
+			"character",
+			"name_only",
+			"custom",
+		},
+	}
 
-	local nameFormatLabel = nameFormatContainer:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
-	nameFormatLabel:SetText(L.SETTINGS_NAME_FORMAT_LABEL or "Format:")
-	nameFormatLabel:SetPoint("LEFT", 0, 0)
-	nameFormatLabel:SetWidth(100) -- LABEL_WIDTH 100
-	nameFormatLabel:SetJustifyH("LEFT")
+	local nameCustomInput -- forward declare for visibility toggling
 
-	local nameFormatBox = CreateFrame("EditBox", nil, nameFormatContainer, "InputBoxTemplate")
-	nameFormatBox:SetSize(200, 25) -- FIELD_WIDTH 200
-	nameFormatBox:SetPoint("LEFT", nameFormatContainer, "LEFT", 110, 0) -- CONTROL_OFFSET 110
-
-	nameFormatBox:SetFontObject("BetterFriendlistFontHighlight")
-	nameFormatBox:SetAutoFocus(false)
-	nameFormatBox:SetText(DB:Get("nameDisplayFormat", "%name%"))
-	nameFormatBox:SetScript("OnEnterPressed", function(self)
-		self:ClearFocus()
-	end)
-	nameFormatBox:SetScript("OnEscapePressed", function(self)
-		self:ClearFocus()
-	end)
-	nameFormatBox:SetScript("OnEditFocusLost", function(self)
-		local text = self:GetText()
-		if text and text ~= "" then
-			DB:Set("nameDisplayFormat", text)
+	local namePresetDropdown = Components:CreateDropdown(
+		tab,
+		L.SETTINGS_NAME_FORMAT_LABEL or "Preset:",
+		namePresetEntries,
+		function(val)
+			return DB:Get("nameFormatPreset", "default") == val
+		end,
+		function(val)
+			DB:Set("nameFormatPreset", val)
 			BFL:ForceRefreshFriendsList()
+			-- Show/hide custom input
+			if nameCustomInput then
+				if val == "custom" then
+					nameCustomInput:Show()
+				else
+					nameCustomInput:Hide()
+				end
+			end
 		end
-	end)
-
-	-- Add tooltip to EditBox
-	nameFormatBox:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-
-		if _G.FriendListColorsAPI then
-			GameTooltip:SetText(L.SETTINGS_NAME_FORMAT_TOOLTIP or "Name Display Format", 0.5, 0.5, 0.5)
-			GameTooltip:AddLine(
-				L.SETTINGS_NAME_FORMAT_DISABLED_FRIENDLISTCOLORS
-					or "This setting is disabled because the addon 'FriendListColors' is managing name colors/formats.",
-				1,
-				0.2,
-				0.2,
-				true
-			)
-		else
-			GameTooltip:SetText(L.SETTINGS_NAME_FORMAT_TOOLTIP or "Name Display Format", 1, 1, 1)
-			GameTooltip:AddLine(
-				L.SETTINGS_NAME_FORMAT_TOOLTIP_DESC or "Enter a format string using tokens.",
-				0.8,
-				0.8,
-				0.8,
-				true
-			)
-			GameTooltip:AddLine("Example: %name% (%nickname%)", 0.8, 0.8, 0.8, true)
+	)
+	if friendListColorsActive and namePresetDropdown then
+		-- Disable dropdown when FriendListColors is active
+		if namePresetDropdown.Label then
+			namePresetDropdown.Label:SetTextColor(0.5, 0.5, 0.5)
 		end
-
-		GameTooltip:Show()
-	end)
-	nameFormatBox:SetScript("OnLeave", function(self)
-		GameTooltip:Hide()
-	end)
-
-	-- Disable Name Formatting if FriendListColors is active
-	if _G.FriendListColorsAPI then
-		nameFormatBox:Disable()
-		nameFormatBox:SetTextColor(0.5, 0.5, 0.5)
-		if nameFormatLabel then
-			nameFormatLabel:SetTextColor(0.5, 0.5, 0.5)
-		end
-		-- Description text is handled above (shown in red)
 	end
+	table.insert(allFrames, namePresetDropdown)
 
-	table.insert(allFrames, nameFormatContainer)
+	-- Custom Name Format Input (shown only when preset == "custom")
+	nameCustomInput = Components:CreateInput(
+		tab,
+		L.SETTINGS_NAME_FORMAT_CUSTOM_LABEL or "Custom Format:",
+		DB:Get("nameFormatCustom", "%name%"),
+		function(text)
+			if text and text ~= "" then
+				DB:Set("nameFormatCustom", text)
+				BFL:ForceRefreshFriendsList()
+			end
+		end
+	)
+	if nameCustomInput.SetTooltip then
+		nameCustomInput:SetTooltip(
+			L.SETTINGS_NAME_FORMAT_TOOLTIP or "Custom Name Format",
+			L.SETTINGS_NAME_FORMAT_DESC
+				or "Use tokens to customize the display:\n|cffFFD100%name%|r - Account Name\n|cffFFD100%battletag%|r - BattleTag\n|cffFFD100%nickname%|r - Nickname\n|cffFFD100%note%|r - Note\n|cffFFD100%character%|r - Character Name\n|cffFFD100%realm%|r - Realm Name\n|cffFFD100%level%|r - Level\n|cffFFD100%zone%|r - Zone\n|cffFFD100%class%|r - Class\n|cffFFD100%game%|r - Game"
+		)
+	end
+	-- Initially show/hide based on current preset
+	if DB:Get("nameFormatPreset", "default") ~= "custom" then
+		nameCustomInput:Hide()
+	end
+	if friendListColorsActive then
+		if nameCustomInput.Label then
+			nameCustomInput.Label:SetTextColor(0.5, 0.5, 0.5)
+		end
+		if nameCustomInput.Input then
+			nameCustomInput.Input:Disable()
+			nameCustomInput.Input:SetTextColor(0.5, 0.5, 0.5)
+		end
+	end
+	table.insert(allFrames, nameCustomInput)
+
+	-- Spacer before Info Formatting
+	table.insert(allFrames, Components:CreateSpacer(tab))
+
+	-- ========================================
+	-- Header: Friend Info Formatting (Phase 22)
+	-- ========================================
+	local infoFormatHeader = Components:CreateHeader(tab, L.SETTINGS_INFO_FORMAT_HEADER or "Friend Info Formatting")
+	table.insert(allFrames, infoFormatHeader)
+
+	-- Info Format Preset Dropdown
+	local infoPresetEntries = {
+		labels = {
+			L.INFO_PRESET_DEFAULT or "Default (Level, Zone)",
+			L.INFO_PRESET_ZONE or "Zone Only",
+			L.INFO_PRESET_LEVEL or "Level Only",
+			L.INFO_PRESET_CLASS_ZONE or "Class, Zone",
+			L.INFO_PRESET_LEVEL_CLASS_ZONE or "Level Class, Zone",
+			L.INFO_PRESET_GAME or "Game Name",
+			L.INFO_PRESET_DISABLED or "Disabled (Hide Info)",
+			L.INFO_PRESET_CUSTOM or "Custom...",
+		},
+		values = { "default", "zone", "level", "class_zone", "level_class_zone", "game", "disabled", "custom" },
+	}
+
+	local infoCustomInput -- forward declare
+
+	local infoPresetDropdown = Components:CreateDropdown(
+		tab,
+		L.SETTINGS_INFO_FORMAT_LABEL or "Preset:",
+		infoPresetEntries,
+		function(val)
+			return DB:Get("infoFormatPreset", "default") == val
+		end,
+		function(val)
+			DB:Set("infoFormatPreset", val)
+			BFL:ForceRefreshFriendsList()
+			-- Show/hide custom input
+			if infoCustomInput then
+				if val == "custom" then
+					infoCustomInput:Show()
+				else
+					infoCustomInput:Hide()
+				end
+			end
+		end
+	)
+	table.insert(allFrames, infoPresetDropdown)
+
+	-- Custom Info Format Input (shown only when preset == "custom")
+	infoCustomInput = Components:CreateInput(
+		tab,
+		L.SETTINGS_INFO_FORMAT_CUSTOM_LABEL or "Custom Format:",
+		DB:Get("infoFormatCustom", "%level%, %zone%"),
+		function(text)
+			if text and text ~= "" then
+				DB:Set("infoFormatCustom", text)
+				BFL:ForceRefreshFriendsList()
+			end
+		end
+	)
+	if infoCustomInput.SetTooltip then
+		infoCustomInput:SetTooltip(
+			L.SETTINGS_INFO_FORMAT_TOOLTIP or "Custom Info Format",
+			L.SETTINGS_INFO_FORMAT_DESC
+				or "Use tokens to customize the info line:\n|cffFFD100%level%|r - Character Level\n|cffFFD100%zone%|r - Current Zone\n|cffFFD100%class%|r - Class Name\n|cffFFD100%game%|r - Game Name\n|cffFFD100%realm%|r - Realm Name\n|cffFFD100%status%|r - AFK/DND/Online\n|cffFFD100%lastonline%|r - Last Online\n|cffFFD100%name%|r - Account Name\n|cffFFD100%battletag%|r - BattleTag\n|cffFFD100%nickname%|r - Nickname\n|cffFFD100%note%|r - Note\n|cffFFD100%character%|r - Character Name"
+		)
+	end
+	-- Initially show/hide based on current preset
+	if DB:Get("infoFormatPreset", "default") ~= "custom" then
+		infoCustomInput:Hide()
+	end
+	table.insert(allFrames, infoCustomInput)
 
 	-- Spacer before next section
 	table.insert(allFrames, Components:CreateSpacer(tab))

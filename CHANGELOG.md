@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+### Added
+- **Name Formatting Presets** - Replaced the free-text name format input with a dropdown menu offering preset options (Name (Character), BattleTag (Character), Nickname (Character), Character Only, Name Only). A "Custom..." option is still available for advanced users who want to use wildcards. All wildcards (%name%, %character%, %level%, %zone%, %class%, %game%, %note%, %nickname%, %battletag%, %realm%) are available in both name and info formats.
+- **Friend Info Formatting** - Added a new setting to customize the second line of friend entries (the info line showing level, zone, etc.). Choose from presets like Default, Zone Only, Level Only, Class/Zone, Game Name, or create a custom format using wildcards. Selecting "Disabled" hides the info line entirely and reduces button height to save space.
+
+### Changed
+- Character names are now rendered entirely through the formatting system instead of being appended separately, giving full control over their placement and formatting.
+
+### Fixed
+- **RAF Frame Layout** - Fixed the Recruit-A-Friend tab showing excessive nested borders and recruit list entries appearing centered instead of filling the available width.
+- **RAF Activity Tooltips** - Fixed RAF activity tooltips not matching Blizzard's tooltip style by using the correct tooltip frame for quest reward display.
+- **RAF Reward Icon** - Fixed the next reward icon always appearing fully saturated. It now properly shows as desaturated when the reward is not yet affordable, matching Blizzard's behavior.
+- **Friend Search on Wrong Tabs** - Fixed the friend search box being visible on the Recent Allies and Recruit-A-Friend tabs where it had no effect.
+- **Friend Search with Real Names** - Friend search now properly skips privacy-protected Real Names (a Blizzard limitation) instead of silently failing. Nicknames are now also included in search results.
+- **Who Frame Level Alignment** - Fixed the Level column in the Who search results not aligning with its column header.
+- **Blizzard Raid Frame Interaction** - Fixed empty raid member slots retaining stale unit references, which could cause unexpected interactions with Blizzard's default raid frame.
+- **Raid Info First-Click Ghost Buttons** - Fixed Blizzard's raid member buttons briefly appearing when clicking the Raid Info button for the first time after a /reload.
+
 ## [2.3.4]       - 2026-02-12
 ### Fixed
 - **Streamer Mode Real ID Leaks** - Fixed several places where Real IDs could still be visible despite Streamer Mode being active:

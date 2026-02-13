@@ -766,14 +766,37 @@ BFL:RegisterLocale("zhCN", function()
 	-- Name Formatting
 	L.SETTINGS_NAME_FORMAT_HEADER = "Name Format"
 	L.SETTINGS_NAME_FORMAT_DESC =
-		"Customize:\n|cffFFD100%name%|r -Name\n|cffFFD100%note%|r -Note\n|cffFFD100%nickname%|r -Nickname\n|cffFFD100%battletag%|r -Tag"
-	L.SETTINGS_NAME_FORMAT_LABEL = "格式:"
+		"使用标记自定义显示:\n|cffFFD100%name%|r - 账户名\n|cffFFD100%battletag%|r - 战网昵称\n|cffFFD100%nickname%|r - 备注名\n|cffFFD100%note%|r - 备注\n|cffFFD100%character%|r - 角色名\n|cffFFD100%realm%|r - 服务器名\n|cffFFD100%level%|r - 等级\n|cffFFD100%zone%|r - 区域\n|cffFFD100%class%|r - 职业\n|cffFFD100%game%|r - 游戏"
+	L.SETTINGS_NAME_FORMAT_LABEL = "预设:"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP = "Name Format"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP_DESC = "Enter format."
 	L.SETTINGS_NAME_FORMAT_DISABLED_FRIENDLISTCOLORS =
 		"由于插件 'FriendListColors' 正在管理名字颜色/格式，此设置已禁用。"
 
-	-- In-Game Group
+	-- Name Format Preset Labels (Phase 22)
+	L.NAME_PRESET_DEFAULT = "名称 (角色)"
+	L.NAME_PRESET_BATTLETAG = "战网昵称 (角色)"
+	L.NAME_PRESET_NICKNAME = "备注名 (角色)"
+	L.NAME_PRESET_NAME_ONLY = "仅名称"
+	L.NAME_PRESET_CHARACTER = "仅角色"
+	L.NAME_PRESET_CUSTOM = "自定义..."
+	L.SETTINGS_NAME_FORMAT_CUSTOM_LABEL = "自定义格式:"
+
+	-- Info Format Section (Phase 22)
+	L.SETTINGS_INFO_FORMAT_HEADER = "好友信息格式"
+	L.SETTINGS_INFO_FORMAT_LABEL = "预设:"
+	L.SETTINGS_INFO_FORMAT_CUSTOM_LABEL = "自定义格式:"
+	L.SETTINGS_INFO_FORMAT_TOOLTIP = "Custom Info Format"
+	L.SETTINGS_INFO_FORMAT_DESC =
+		"使用标记自定义信息行:\n|cffFFD100%level%|r - 角色等级\n|cffFFD100%zone%|r - 当前区域\n|cffFFD100%class%|r - 职业名称\n|cffFFD100%game%|r - 游戏名称\n|cffFFD100%realm%|r - 服务器名称\n|cffFFD100%status%|r - AFK/DND/在线\n|cffFFD100%lastonline%|r - 上次在线\n|cffFFD100%name%|r - 账户名\n|cffFFD100%battletag%|r - 战网昵称\n|cffFFD100%nickname%|r - 备注名\n|cffFFD100%note%|r - 备注\n|cffFFD100%character%|r - 角色名"
+	L.INFO_PRESET_DEFAULT = "Default (Level, Zone)"
+	L.INFO_PRESET_ZONE = "Zone Only"
+	L.INFO_PRESET_LEVEL = "Level Only"
+	L.INFO_PRESET_CLASS_ZONE = "Class, Zone"
+	L.INFO_PRESET_LEVEL_CLASS_ZONE = "Level Class, Zone"
+	L.INFO_PRESET_GAME = "Game Name"
+	L.INFO_PRESET_DISABLED = "Disabled (Hide Info)"
+	L.INFO_PRESET_CUSTOM = "Custom..."
 	L.SETTINGS_SHOW_INGAME_GROUP = "'In Game' Group"
 	L.SETTINGS_SHOW_INGAME_GROUP_DESC = "Group in-game friends"
 	L.SETTINGS_INGAME_MODE_WOW = "WoW Only"

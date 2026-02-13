@@ -768,12 +768,37 @@ BFL:RegisterLocale("koKR", function()
 	-- Name Formatting
 	L.SETTINGS_NAME_FORMAT_HEADER = "Name Format"
 	L.SETTINGS_NAME_FORMAT_DESC =
-		"Customize:\n|cffFFD100%name%|r -Name\n|cffFFD100%note%|r -Note\n|cffFFD100%nickname%|r -Nickname\n|cffFFD100%battletag%|r -Tag"
-	L.SETTINGS_NAME_FORMAT_LABEL = "형식:"
+		"토큰을 사용하여 표시를 사용자 정의하세요:\n|cffFFD100%name%|r - 계정 이름\n|cffFFD100%battletag%|r - 배틀태그\n|cffFFD100%nickname%|r - 별명\n|cffFFD100%note%|r - 메모\n|cffFFD100%character%|r - 캐릭터 이름\n|cffFFD100%realm%|r - 서버 이름\n|cffFFD100%level%|r - 레벨\n|cffFFD100%zone%|r - 지역\n|cffFFD100%class%|r - 직업\n|cffFFD100%game%|r - 게임"
+	L.SETTINGS_NAME_FORMAT_LABEL = "프리셋:"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP = "Name Format"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP_DESC = "Enter format."
 	L.SETTINGS_NAME_FORMAT_DISABLED_FRIENDLISTCOLORS =
 		"이 설정은 'FriendListColors' 애드온이 이름 색상/형식을 관리하고 있어서 비활성화되었습니다."
+
+	-- Name Format Preset Labels (Phase 22)
+	L.NAME_PRESET_DEFAULT = "이름 (캐릭터)"
+	L.NAME_PRESET_BATTLETAG = "배틀태그 (캐릭터)"
+	L.NAME_PRESET_NICKNAME = "별명 (캐릭터)"
+	L.NAME_PRESET_NAME_ONLY = "이름만"
+	L.NAME_PRESET_CHARACTER = "캐릭터만"
+	L.NAME_PRESET_CUSTOM = "사용자 정의..."
+	L.SETTINGS_NAME_FORMAT_CUSTOM_LABEL = "사용자 정의 형식:"
+
+	-- Info Format Section (Phase 22)
+	L.SETTINGS_INFO_FORMAT_HEADER = "친구 정보 형식"
+	L.SETTINGS_INFO_FORMAT_LABEL = "프리셋:"
+	L.SETTINGS_INFO_FORMAT_CUSTOM_LABEL = "사용자 정의 형식:"
+	L.SETTINGS_INFO_FORMAT_TOOLTIP = "Custom Info Format"
+	L.SETTINGS_INFO_FORMAT_DESC =
+		"토큰을 사용하여 정보 줄을 사용자 정의하세요:\n|cffFFD100%level%|r - 캐릭터 레벨\n|cffFFD100%zone%|r - 현재 지역\n|cffFFD100%class%|r - 직업 이름\n|cffFFD100%game%|r - 게임 이름\n|cffFFD100%realm%|r - 서버 이름\n|cffFFD100%status%|r - AFK/DND/온라인\n|cffFFD100%lastonline%|r - 마지막 접속\n|cffFFD100%name%|r - 계정 이름\n|cffFFD100%battletag%|r - 배틀태그\n|cffFFD100%nickname%|r - 별명\n|cffFFD100%note%|r - 메모\n|cffFFD100%character%|r - 캐릭터 이름"
+	L.INFO_PRESET_DEFAULT = "Default (Level, Zone)"
+	L.INFO_PRESET_ZONE = "Zone Only"
+	L.INFO_PRESET_LEVEL = "Level Only"
+	L.INFO_PRESET_CLASS_ZONE = "Class, Zone"
+	L.INFO_PRESET_LEVEL_CLASS_ZONE = "Level Class, Zone"
+	L.INFO_PRESET_GAME = "Game Name"
+	L.INFO_PRESET_DISABLED = "Disabled (Hide Info)"
+	L.INFO_PRESET_CUSTOM = "Custom..."
 
 	-- In-Game Group
 	L.SETTINGS_SHOW_INGAME_GROUP = "'In Game' Group"

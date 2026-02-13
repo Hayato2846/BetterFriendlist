@@ -765,12 +765,37 @@ BFL:RegisterLocale("itIT", function()
 	-- Name Formatting
 	L.SETTINGS_NAME_FORMAT_HEADER = "Formato Nome"
 	L.SETTINGS_NAME_FORMAT_DESC =
-		"Personalizza:\n|cffFFD100%name%|r - Nome\n|cffFFD100%note%|r - Nota\n|cffFFD100%nickname%|r - Soprannome\n|cffFFD100%battletag%|r - Tag"
-	L.SETTINGS_NAME_FORMAT_LABEL = "Formato:"
+		"Usa i token per personalizzare la visualizzazione:\n|cffFFD100%name%|r - Nome account\n|cffFFD100%battletag%|r - BattleTag\n|cffFFD100%nickname%|r - Soprannome\n|cffFFD100%note%|r - Nota\n|cffFFD100%character%|r - Nome personaggio\n|cffFFD100%realm%|r - Nome reame\n|cffFFD100%level%|r - Livello\n|cffFFD100%zone%|r - Zona\n|cffFFD100%class%|r - Classe\n|cffFFD100%game%|r - Gioco"
+	L.SETTINGS_NAME_FORMAT_LABEL = "Modello:"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP = "Formato Nome"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP_DESC = "Inserisci formato."
 	L.SETTINGS_NAME_FORMAT_DISABLED_FRIENDLISTCOLORS =
 		"Questa impostazione è disabilitata perché l'addon 'FriendListColors' gestisce i colori/formati dei nomi."
+
+	-- Name Format Preset Labels (Phase 22)
+	L.NAME_PRESET_DEFAULT = "Nome (Personaggio)"
+	L.NAME_PRESET_BATTLETAG = "BattleTag (Personaggio)"
+	L.NAME_PRESET_NICKNAME = "Soprannome (Personaggio)"
+	L.NAME_PRESET_NAME_ONLY = "Solo Nome"
+	L.NAME_PRESET_CHARACTER = "Solo Personaggio"
+	L.NAME_PRESET_CUSTOM = "Personalizzato..."
+	L.SETTINGS_NAME_FORMAT_CUSTOM_LABEL = "Formato personalizzato:"
+
+	-- Info Format Section (Phase 22)
+	L.SETTINGS_INFO_FORMAT_HEADER = "Formattazione info amici"
+	L.SETTINGS_INFO_FORMAT_LABEL = "Modello:"
+	L.SETTINGS_INFO_FORMAT_CUSTOM_LABEL = "Formato personalizzato:"
+	L.SETTINGS_INFO_FORMAT_TOOLTIP = "Formato Info Personalizzato"
+	L.SETTINGS_INFO_FORMAT_DESC =
+		"Usa i token per personalizzare la riga info:\n|cffFFD100%level%|r - Livello personaggio\n|cffFFD100%zone%|r - Zona attuale\n|cffFFD100%class%|r - Nome classe\n|cffFFD100%game%|r - Nome gioco\n|cffFFD100%realm%|r - Nome reame\n|cffFFD100%status%|r - AFK/DND/Online\n|cffFFD100%lastonline%|r - Ultimo accesso\n|cffFFD100%name%|r - Nome account\n|cffFFD100%battletag%|r - BattleTag\n|cffFFD100%nickname%|r - Soprannome\n|cffFFD100%note%|r - Nota\n|cffFFD100%character%|r - Nome personaggio"
+	L.INFO_PRESET_DEFAULT = "Predefinito (Livello, Zona)"
+	L.INFO_PRESET_ZONE = "Solo Zona"
+	L.INFO_PRESET_LEVEL = "Solo Livello"
+	L.INFO_PRESET_CLASS_ZONE = "Classe, Zona"
+	L.INFO_PRESET_LEVEL_CLASS_ZONE = "Livello Classe, Zona"
+	L.INFO_PRESET_GAME = "Nome del gioco"
+	L.INFO_PRESET_DISABLED = "Disattivato (Nascondi info)"
+	L.INFO_PRESET_CUSTOM = "Personalizzato..."
 
 	-- In-Game Group
 	L.SETTINGS_SHOW_INGAME_GROUP = "Gruppo 'In Gioco'"

@@ -1455,7 +1455,8 @@ function RaidFrame:UpdateMemberButtons()
 	-- Cache everyone-is-assistant flag for this update cycle
 	self.everyoneIsAssistant = IsEveryoneAssistant()
 
-	-- First, hide all buttons
+	-- First, hide all buttons and clear secure attributes
+	local canSetAttributes = not InCombatLockdown()
 	for groupIndex = 1, 8 do
 		if self.memberButtons[groupIndex] then
 			for slotIndex = 1, 5 do
@@ -1463,6 +1464,11 @@ function RaidFrame:UpdateMemberButtons()
 				if button then
 					button:Hide()
 					button.memberData = nil
+					-- Fix #53: Clear secure attributes to prevent stale unit references
+					if canSetAttributes then
+						button:SetAttribute("unit", nil)
+						button:SetAttribute("type2", nil)
+					end
 				end
 			end
 		end
@@ -1752,6 +1758,14 @@ function RaidFrame:UpdateMemberButton(button, memberData)
 		button.unit = nil
 		button.name = nil
 		button.raidSlot = nil
+
+		-- Fix #53: Clear secure attributes to prevent interaction with Blizzard raid frame
+		-- Stale "unit" attributes on empty buttons cause the game's secure action system
+		-- to route actions through these buttons, interfering with Blizzard's raid frame
+		if not InCombatLockdown() then
+			button:SetAttribute("unit", nil)
+			button:SetAttribute("type2", nil)
+		end
 
 		-- Clear visuals
 		if button.Name then

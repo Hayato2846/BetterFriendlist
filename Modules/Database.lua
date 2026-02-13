@@ -81,7 +81,11 @@ local defaults = {
 	grayOtherFaction = false, -- Gray out friends from other faction (default: OFF)
 	showMobileAsAFK = false, -- Show mobile friends with AFK status icon (default: OFF)
 	treatMobileAsOffline = false, -- Treat mobile friends as offline (display in Offline group) (default: OFF)
-	nameDisplayFormat = "%name%", -- Display format: %name%, %note%, %nickname% (default: %name%)
+	nameDisplayFormat = "%name%", -- LEGACY: Migrated to nameFormatPreset/nameFormatCustom
+	nameFormatPreset = "default", -- Preset: "default", "battletag", "nickname", "name_nickname", "name_note", "name_battletag", "custom"
+	nameFormatCustom = "%name%", -- Custom format string (used when nameFormatPreset == "custom")
+	infoFormatPreset = "default", -- Preset: "default", "zone", "level", "class_zone", "level_class_zone", "game", "disabled", "custom"
+	infoFormatCustom = "%level%, %zone%", -- Custom info format string (used when infoFormatPreset == "custom")
 	enableInGameGroup = false, -- Enable dynamic "In-Game" group (default: OFF)
 	inGameGroupMode = "same_game", -- "same_game" (WoW matching project) or "any_game" (Any BNet game)
 	windowScale = 1.0, -- Window scale factor: 0.5 = 50%, 1.0 = 100%, 2.0 = 200% (default: 100%)
@@ -156,6 +160,58 @@ function DB:InternalDeepCopy(orig)
 	return copy
 end
 
+-- ========================================
+-- Name/Info Format Preset System (Phase 22)
+-- ========================================
+local NAME_PRESET_FORMATS = {
+	["default"] = "%name% (%character%)",
+	["battletag"] = "%battletag% (%character%)",
+	["nickname"] = "%nickname% (%character%)",
+	["character"] = "%character%",
+	["name_only"] = "%name%",
+}
+
+local INFO_PRESET_FORMATS = {
+	-- "default" is handled specially (hardcoded level/zone logic in FriendsList)
+	["zone"] = "%zone%",
+	["level"] = "%level%",
+	["class_zone"] = "%class%, %zone%",
+	["level_class_zone"] = "%level% %class%, %zone%",
+	["game"] = "%game%",
+	-- "disabled" = no info line
+	-- "custom" = user-defined
+}
+
+-- Resolve the name format preset to a format string
+function DB:GetNameFormatString()
+	local preset = self:Get("nameFormatPreset", "default")
+	if preset == "custom" then
+		return self:Get("nameFormatCustom", "%name%")
+	end
+	return NAME_PRESET_FORMATS[preset] or "%name%"
+end
+
+-- Resolve the info format preset to a format string (or nil for "default"/"disabled")
+-- Returns: formatString, isDisabled, isDefault
+function DB:GetInfoFormatString()
+	local preset = self:Get("infoFormatPreset", "default")
+	if preset == "disabled" then
+		return nil, true, false
+	end
+	if preset == "default" then
+		return nil, false, true
+	end
+	if preset == "custom" then
+		return self:Get("infoFormatCustom", "%level%, %zone%"), false, false
+	end
+	return INFO_PRESET_FORMATS[preset] or nil, false, (INFO_PRESET_FORMATS[preset] == nil)
+end
+
+-- Check if info line is disabled
+function DB:IsInfoDisabled()
+	return self:Get("infoFormatPreset", "default") == "disabled"
+end
+
 function DB:Initialize()
 	-- Initialize Settings Version Counter (Optimization)
 	if not BFL.SettingsVersion then
@@ -170,6 +226,53 @@ function DB:Initialize()
 	-- Initialize SavedVariables
 	if not BetterFriendlistDB then
 		BetterFriendlistDB = {}
+	end
+
+	-- MIGRATION (BEFORE defaults): Migrate nameDisplayFormat to preset system (Phase 22)
+	-- Uses a flag to ensure this runs exactly once, even if nameFormatPreset was already
+	-- incorrectly set to "default" by the defaults loop in a prior session.
+	if BetterFriendlistDB.nameDisplayFormat and not BetterFriendlistDB.nameFormatMigrated then
+		local oldFormat = BetterFriendlistDB.nameDisplayFormat
+		local oldLower = oldFormat:lower()
+
+		-- Map known format strings to presets (case-insensitive)
+		local presetMap = {
+			["%name%"] = "default",
+			["%battletag%"] = "battletag",
+			["%nickname%"] = "nickname",
+			["%name% (%character%)"] = "default",
+			["%character%"] = "character",
+		}
+
+		local matchedPreset = presetMap[oldLower]
+		if matchedPreset then
+			BetterFriendlistDB.nameFormatPreset = matchedPreset
+			BetterFriendlistDB.nameFormatCustom = oldFormat
+		else
+			-- Non-standard format -> Custom preset preserving user's input
+			BetterFriendlistDB.nameFormatPreset = "custom"
+			BetterFriendlistDB.nameFormatCustom = oldFormat
+		end
+		BetterFriendlistDB.nameFormatMigrated = true
+		-- BFL:DebugPrint("|cff00ff00BFL:Database:|r Migrated nameDisplayFormat to preset: " .. BetterFriendlistDB.nameFormatPreset)
+	end
+
+	-- MIGRATION (Phase 22b): Redesign presets - migrate removed preset keys to "custom" or "default"
+	if not BetterFriendlistDB.nameFormatMigrated2 then
+		local currentPreset = BetterFriendlistDB.nameFormatPreset
+		if currentPreset == "name_nickname" then
+			BetterFriendlistDB.nameFormatPreset = "custom"
+			BetterFriendlistDB.nameFormatCustom = "%name% (%nickname%)"
+		elseif currentPreset == "name_note" then
+			BetterFriendlistDB.nameFormatPreset = "custom"
+			BetterFriendlistDB.nameFormatCustom = "%name% (%note%)"
+		elseif currentPreset == "name_battletag" then
+			BetterFriendlistDB.nameFormatPreset = "custom"
+			BetterFriendlistDB.nameFormatCustom = "%name% (%battletag%)"
+		elseif currentPreset == "name_character" then
+			BetterFriendlistDB.nameFormatPreset = "default"
+		end
+		BetterFriendlistDB.nameFormatMigrated2 = true
 	end
 
 	-- Apply defaults
@@ -223,8 +326,8 @@ function DB:Initialize()
 		-- BFL:DebugPrint("Database: ElvUI Skin is DISABLED")
 	end
 
-	-- MIGRATION: Name Display Format (Phase 15)
-	-- Convert old boolean flags to new format string
+	-- MIGRATION: Name Display Format (Phase 15 -> Phase 22 Preset System)
+	-- Step 1: Convert ancient boolean flags to nameDisplayFormat string (legacy path)
 	if
 		BetterFriendlistDB.showNotesAsName ~= nil
 		or BetterFriendlistDB.showNicknameAsName ~= nil
@@ -243,7 +346,6 @@ function DB:Initialize()
 		end
 
 		if showNickInName then
-			-- If base format is already nickname, don't append nickname again
 			if format ~= "%nickname%" then
 				format = format .. " (%nickname%)"
 			end
@@ -255,9 +357,9 @@ function DB:Initialize()
 		BetterFriendlistDB.showNotesAsName = nil
 		BetterFriendlistDB.showNicknameAsName = nil
 		BetterFriendlistDB.showNicknameInName = nil
-
-		-- BFL:DebugPrint("|cff00ff00BFL:Database:|r Migrated name display settings to: " .. format)
 	end
+
+	-- Step 2: nameDisplayFormat migration moved to pre-defaults block above
 
 	-- Migration: Ensure defaultFrameWidth meets new minimum (380px)
 	if BetterFriendlistDB.defaultFrameWidth and BetterFriendlistDB.defaultFrameWidth < 380 then

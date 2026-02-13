@@ -794,13 +794,36 @@ BFL:RegisterLocale("ruRU", function()
 	-- Name Formatting
 	L.SETTINGS_NAME_FORMAT_HEADER = "Name Format"
 	L.SETTINGS_NAME_FORMAT_DESC =
-		"Customize:\n|cffFFD100%name%|r -Name\n|cffFFD100%note%|r -Note\n|cffFFD100%nickname%|r -Nickname\n|cffFFD100%battletag%|r -Tag"
-	L.SETTINGS_NAME_FORMAT_LABEL = "Формат:"
+		"Используйте токены для настройки отображения:\n|cffFFD100%name%|r - Имя аккаунта\n|cffFFD100%battletag%|r - BattleTag\n|cffFFD100%nickname%|r - Прозвище\n|cffFFD100%note%|r - Заметка\n|cffFFD100%character%|r - Имя персонажа\n|cffFFD100%realm%|r - Название сервера\n|cffFFD100%level%|r - Уровень\n|cffFFD100%zone%|r - Зона\n|cffFFD100%class%|r - Класс\n|cffFFD100%game%|r - Игра"
+	L.SETTINGS_NAME_FORMAT_LABEL = "Шаблон:"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP = "Name Format"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP_DESC = "Enter format."
 	L.SETTINGS_NAME_FORMAT_DISABLED_FRIENDLISTCOLORS =
 		"This setting is disabled because the addon 'FriendListColors' is managing name colors/formats."
-	-- In-Game Group
+	-- Name Format Preset Labels (Phase 22)
+	L.NAME_PRESET_DEFAULT = "Имя (Персонаж)"
+	L.NAME_PRESET_BATTLETAG = "BattleTag (Персонаж)"
+	L.NAME_PRESET_NICKNAME = "Прозвище (Персонаж)"
+	L.NAME_PRESET_NAME_ONLY = "Только имя"
+	L.NAME_PRESET_CHARACTER = "Только персонаж"
+	L.NAME_PRESET_CUSTOM = "Свой формат..."
+	L.SETTINGS_NAME_FORMAT_CUSTOM_LABEL = "Свой формат:"
+
+	-- Info Format Section (Phase 22)
+	L.SETTINGS_INFO_FORMAT_HEADER = "Format information about friends"
+	L.SETTINGS_INFO_FORMAT_LABEL = "Шаблон:"
+	L.SETTINGS_INFO_FORMAT_CUSTOM_LABEL = "Свой формат:"
+	L.SETTINGS_INFO_FORMAT_TOOLTIP = "Custom Info Format"
+	L.SETTINGS_INFO_FORMAT_DESC =
+		"Используйте токены для настройки информационной строки:\n|cffFFD100%level%|r - Уровень персонажа\n|cffFFD100%zone%|r - Текущая зона\n|cffFFD100%class%|r - Название класса\n|cffFFD100%game%|r - Название игры\n|cffFFD100%realm%|r - Название сервера\n|cffFFD100%status%|r - AFK/DND/Онлайн\n|cffFFD100%lastonline%|r - Был в сети\n|cffFFD100%name%|r - Имя аккаунта\n|cffFFD100%battletag%|r - BattleTag\n|cffFFD100%nickname%|r - Прозвище\n|cffFFD100%note%|r - Заметка\n|cffFFD100%character%|r - Имя персонажа"
+	L.INFO_PRESET_DEFAULT = "Default (Level, Zone)"
+	L.INFO_PRESET_ZONE = "Zone Only"
+	L.INFO_PRESET_LEVEL = "Level Only"
+	L.INFO_PRESET_CLASS_ZONE = "Class, Zone"
+	L.INFO_PRESET_LEVEL_CLASS_ZONE = "Level Class, Zone"
+	L.INFO_PRESET_GAME = "Game Name"
+	L.INFO_PRESET_DISABLED = "Disabled (Hide Info)"
+	L.INFO_PRESET_CUSTOM = "Custom..."
 	L.SETTINGS_SHOW_INGAME_GROUP = "'In Game' Group"
 	L.SETTINGS_SHOW_INGAME_GROUP_DESC = "Group in-game friends"
 	L.SETTINGS_INGAME_MODE_WOW = "WoW Only"
@@ -1188,8 +1211,8 @@ BFL:RegisterLocale("ruRU", function()
 	L.SETTINGS_RAID_MODIFIER_LABEL = "Мод:"
 	L.SETTINGS_RAID_BUTTON_LABEL = "Кнп:"
 	L.SETTINGS_RAID_WARNING =
-		"Примечание: Сочетания клавиш - это защищенные действия (только вне боя)."
-	L.SETTINGS_RAID_ERROR_RESERVED = "Это сочетание зарезервировано."
+		"Примечание: Сочетания клавиш - это защищенные действ��я (только вне боя)."
+	L.SETTINGS_RAID_ERROR_RESERVED = "Это сочетание зарезервиро��ано."
 
 	-- ========================================
 	-- FRAME DIMENSIONS (Phase 21) - RESTORED

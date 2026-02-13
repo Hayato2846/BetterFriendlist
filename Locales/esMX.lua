@@ -773,12 +773,37 @@ BFL:RegisterLocale("esMX", function()
 	-- Name Formatting
 	L.SETTINGS_NAME_FORMAT_HEADER = "Formato de Nombre"
 	L.SETTINGS_NAME_FORMAT_DESC =
-		"Personaliza cómo se muestran los nombres:\n|cffFFD100%name%|r - Nombre Cuenta (RealID/BattleTag)\n|cffFFD100%note%|r - Nota\n|cffFFD100%nickname%|r - Apodo\n|cffFFD100%battletag%|r - BattleTag Corto"
-	L.SETTINGS_NAME_FORMAT_LABEL = "Formato:"
+		"Usa tokens para personalizar la visualizacion:\n|cffFFD100%name%|r - Nombre de cuenta\n|cffFFD100%battletag%|r - BattleTag\n|cffFFD100%nickname%|r - Apodo\n|cffFFD100%note%|r - Nota\n|cffFFD100%character%|r - Nombre del personaje\n|cffFFD100%realm%|r - Nombre del reino\n|cffFFD100%level%|r - Nivel\n|cffFFD100%zone%|r - Zona\n|cffFFD100%class%|r - Clase\n|cffFFD100%game%|r - Juego"
+	L.SETTINGS_NAME_FORMAT_LABEL = "Plantilla:"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP = "Formato de Nombre"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP_DESC = "Introduce una cadena de formato usando tokens."
 	L.SETTINGS_NAME_FORMAT_DISABLED_FRIENDLISTCOLORS =
 		"Esta configuración está deshabilitada porque el addon 'FriendListColors' está gestionando colores/formatos de nombres."
+
+	-- Name Format Preset Labels (Phase 22)
+	L.NAME_PRESET_DEFAULT = "Nombre (Personaje)"
+	L.NAME_PRESET_BATTLETAG = "BattleTag (Personaje)"
+	L.NAME_PRESET_NICKNAME = "Apodo (Personaje)"
+	L.NAME_PRESET_NAME_ONLY = "Solo Nombre"
+	L.NAME_PRESET_CHARACTER = "Solo Personaje"
+	L.NAME_PRESET_CUSTOM = "Personalizado..."
+	L.SETTINGS_NAME_FORMAT_CUSTOM_LABEL = "Formato personalizado:"
+
+	-- Info Format Section (Phase 22)
+	L.SETTINGS_INFO_FORMAT_HEADER = "Formato de info de amigos"
+	L.SETTINGS_INFO_FORMAT_LABEL = "Plantilla:"
+	L.SETTINGS_INFO_FORMAT_CUSTOM_LABEL = "Formato personalizado:"
+	L.SETTINGS_INFO_FORMAT_TOOLTIP = "Formato de Info Personalizado"
+	L.SETTINGS_INFO_FORMAT_DESC =
+		"Usa tokens para personalizar la linea de info:\n|cffFFD100%level%|r - Nivel del personaje\n|cffFFD100%zone%|r - Zona actual\n|cffFFD100%class%|r - Nombre de clase\n|cffFFD100%game%|r - Nombre del juego\n|cffFFD100%realm%|r - Nombre del reino\n|cffFFD100%status%|r - AFK/DND/Online\n|cffFFD100%lastonline%|r - Ultimo en linea\n|cffFFD100%name%|r - Nombre de cuenta\n|cffFFD100%battletag%|r - BattleTag\n|cffFFD100%nickname%|r - Apodo\n|cffFFD100%note%|r - Nota\n|cffFFD100%character%|r - Nombre del personaje"
+	L.INFO_PRESET_DEFAULT = "Predeterminado (Nivel, Zona)"
+	L.INFO_PRESET_ZONE = "Solo Zona"
+	L.INFO_PRESET_LEVEL = "Solo Nivel"
+	L.INFO_PRESET_CLASS_ZONE = "Clase, Zona"
+	L.INFO_PRESET_LEVEL_CLASS_ZONE = "Nivel Clase, Zona"
+	L.INFO_PRESET_GAME = "Nombre del juego"
+	L.INFO_PRESET_DISABLED = "Desactivado (Ocultar info)"
+	L.INFO_PRESET_CUSTOM = "Personalizado..."
 
 	-- In-Game Group
 	L.SETTINGS_SHOW_INGAME_GROUP = "Mostrar Grupo 'En Juego'"

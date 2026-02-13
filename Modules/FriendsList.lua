@@ -193,7 +193,7 @@ local MIN_ROW_HEIGHT = 24 -- Minimum height even for tiny fonts
 local MAX_ROW_HEIGHT = 60 -- Maximum to prevent overly large rows
 
 -- Fix #35: Calculate row height based on combined font heights
-local function CalculateFriendRowHeight(isCompactMode, nameSize, infoSize)
+local function CalculateFriendRowHeight(isCompactMode, nameSize, infoSize, infoDisabled)
 	local nameFontSize = nameSize or BASE_FONT_SIZE
 	local infoFontSize = infoSize or BASE_FONT_SIZE
 
@@ -203,9 +203,13 @@ local function CalculateFriendRowHeight(isCompactMode, nameSize, infoSize)
 
 	local calculatedHeight
 	if isCompactMode then
-		-- Compact: name can wrap to 2 lines (maxLines=2), info hidden
+		-- Compact Mode: name can wrap to 2 lines (maxLines=2), info hidden
 		-- 2 * nameLineHeight + padding (4px top + 4px bottom)
 		calculatedHeight = (nameLineHeight * 2) + 8
+	elseif infoDisabled then
+		-- Info Disabled: single name line only, no info line
+		-- nameLineHeight + padding (4px top + 4px bottom)
+		calculatedHeight = nameLineHeight + 8
 	else
 		-- Normal: name + info stacked (each 1 line max), add padding (4px top + 2px gap + 4px bottom)
 		calculatedHeight = nameLineHeight + infoLineHeight + 10
@@ -554,7 +558,7 @@ end
 -- Get height of a display list item based on its type
 -- CRITICAL: These heights MUST match XML template heights and ButtonPool SetHeight() calls
 -- Otherwise buttons will drift out of position!
-local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self)
+local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self, infoDisabled)
 	if not item then
 		return 0
 	end
@@ -627,7 +631,7 @@ local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self)
 			return CalculateCompactRowHeight(self, nameSize, displayLine1, nameWidth)
 		end
 
-		return CalculateFriendRowHeight(isCompactMode, nameSize, infoSize)
+		return CalculateFriendRowHeight(isCompactMode, nameSize, infoSize, infoDisabled)
 	else
 		return 34 -- Default fallback
 	end
@@ -1078,7 +1082,14 @@ local function CreateExtentCalculator(self)
 			return 30
 		elseif elementData.buttonType == BUTTON_TYPE_FRIEND then
 			-- Fix #35/#40: Use dynamic height based on font size
-			return GetItemHeight(elementData, isCompactMode, nameSize, infoSize, self)
+			return GetItemHeight(
+				elementData,
+				isCompactMode,
+				nameSize,
+				infoSize,
+				self,
+				self.settingsCache and self.settingsCache.infoDisabled
+			)
 		else
 			return 34
 		end
@@ -1541,7 +1552,15 @@ function FriendsList:RenderClassicButtons()
 	-- Calculate total content height for accurate scrolling with variable item heights
 	local totalHeight = 0
 	for _, elementData in ipairs(displayList) do
-		totalHeight = totalHeight + GetItemHeight(elementData, isCompactMode, nameSize, infoSize)
+		totalHeight = totalHeight
+			+ GetItemHeight(
+				elementData,
+				isCompactMode,
+				nameSize,
+				infoSize,
+				nil,
+				self.settingsCache and self.settingsCache.infoDisabled
+			)
 	end
 
 	-- FIX: Do NOT set ContentFrame height to totalHeight for FauxScrollFrame.
@@ -1631,7 +1650,14 @@ function FriendsList:RenderClassicButtons()
 				button:SetPoint("RIGHT", self.classicScrollFrame.ContentFrame, "RIGHT", -2, 0)
 
 				-- Get height for this item type (using font sizes for dynamic friend row height)
-				local itemHeight = GetItemHeight(elementData, isCompactMode, nameSize, infoSize, self)
+				local itemHeight = GetItemHeight(
+					elementData,
+					isCompactMode,
+					nameSize,
+					infoSize,
+					self,
+					self.settingsCache and self.settingsCache.infoDisabled
+				)
 				button:SetHeight(itemHeight)
 
 				-- Update button based on type
@@ -1873,58 +1899,247 @@ local function HasTokenCaseInsensitive(str, token)
 	return str:find(pattern) ~= nil
 end
 
+-- ========================================
+-- Info Line Formatting (Phase 22)
+-- ========================================
+
+-- Helper: Get colored level text (used by info format system)
+local function GetColoredLevelText(level)
+	if not level or level == 0 then
+		return ""
+	end
+
+	local color = GetQuestDifficultyColor and GetQuestDifficultyColor(level)
+	if color then
+		return string.format("|cff%02x%02x%02x%d|r", color.r * 255, color.g * 255, color.b * 255, level)
+	end
+	return tostring(level)
+end
+
+-- Format the info line (line 2) using the info format system
+-- Returns formatted string, or nil if info is disabled
+function FriendsList:FormatInfoLine(friend)
+	local infoPreset = self.settingsCache.infoFormatPreset or "default"
+
+	-- Disabled: No info line at all
+	if infoPreset == "disabled" then
+		return nil
+	end
+
+	local hideMaxLevel = self.settingsCache.hideMaxLevel
+	local maxLevel = BFL.GetMaxLevel and BFL.GetMaxLevel() or 60
+
+	-- Determine raw data values
+	local isBNet = (friend.type == "bnet")
+	local level = friend.level
+	local zone = isBNet and friend.areaName or friend.area or ""
+	local className = friend.className or ""
+	local gameName = friend.gameName or ""
+	local realmName = friend.realmName or ""
+	local note = friend.note or friend.notes or ""
+	local statusText = ""
+
+	-- Status text (AFK/DND)
+	if friend.isAFK or friend.afk then
+		statusText = CHAT_FLAG_AFK or "AFK"
+	elseif friend.isDND or friend.dnd then
+		statusText = CHAT_FLAG_DND or "DND"
+	elseif friend.connected then
+		statusText = L.ONLINE_STATUS or "Online"
+	else
+		statusText = L.OFFLINE_STATUS or "Offline"
+	end
+
+	-- Last online text
+	local lastOnlineText = ""
+	if not friend.connected and friend.lastOnlineTime then
+		lastOnlineText = GetLastOnlineText(friend) or ""
+	end
+
+	-- Level text (respects hideMaxLevel and colorLevelByDifficulty)
+	local levelText = ""
+	if level and level > 0 then
+		if hideMaxLevel and level == maxLevel then
+			levelText = ""
+		else
+			local colorByDifficulty = self.settingsCache.colorLevelByDifficulty
+			if colorByDifficulty == nil then
+				colorByDifficulty = true
+			end
+			if colorByDifficulty and friend.connected then
+				levelText = GetColoredLevelText(level) or tostring(level)
+			else
+				levelText = tostring(level)
+			end
+		end
+	end
+
+	-- "default" preset: Use the original hardcoded logic
+	if infoPreset == "default" then
+		if friend.connected then
+			if isBNet then
+				-- BNet friend
+				if level and zone and zone ~= "" then
+					if hideMaxLevel and level == maxLevel then
+						return zone
+					else
+						return string.format(L.LEVEL_FORMAT, level) .. ", " .. zone
+					end
+				elseif level then
+					if hideMaxLevel and level == maxLevel then
+						return L.FRIEND_MAX_LEVEL or ""
+					else
+						return string.format(L.LEVEL_FORMAT, level)
+					end
+				elseif zone and zone ~= "" then
+					return zone
+				elseif gameName and gameName ~= "" then
+					return gameName
+				else
+					return L.ONLINE_STATUS or "Online"
+				end
+			else
+				-- WoW friend
+				if level and zone and zone ~= "" then
+					if hideMaxLevel and level == maxLevel then
+						return zone
+					else
+						return string.format(L.LEVEL_FORMAT, level) .. ", " .. zone
+					end
+				elseif level then
+					if hideMaxLevel and level == maxLevel then
+						return L.FRIEND_MAX_LEVEL or ""
+					else
+						return string.format(L.LEVEL_FORMAT, level)
+					end
+				elseif zone and zone ~= "" then
+					return zone
+				else
+					return L.ONLINE_STATUS or "Online"
+				end
+			end
+		else
+			-- Offline
+			if isBNet then
+				if friend.lastOnlineTime then
+					return GetLastOnlineText(friend) or L.OFFLINE_STATUS or "Offline"
+				else
+					return L.OFFLINE_STATUS or "Offline"
+				end
+			else
+				return L.OFFLINE_STATUS or "Offline"
+			end
+		end
+	end
+
+	-- Custom or preset format: Replace tokens
+	local formatString
+	if infoPreset == "custom" then
+		formatString = self.settingsCache.infoFormatString or "%level%, %zone%"
+	else
+		local DB = GetDB()
+		formatString = DB and DB:GetInfoFormatString() or "%level%, %zone%"
+	end
+
+	-- For offline friends with custom format, show last online or offline status
+	if not friend.connected then
+		if HasTokenCaseInsensitive(formatString, "lastonline") and lastOnlineText ~= "" then
+			local result = ReplaceTokenCaseInsensitive(formatString, "lastonline", lastOnlineText)
+			-- Clear other tokens that don't apply to offline friends
+			result = ReplaceTokenCaseInsensitive(result, "level", "")
+			result = ReplaceTokenCaseInsensitive(result, "zone", "")
+			result = ReplaceTokenCaseInsensitive(result, "class", "")
+			result = ReplaceTokenCaseInsensitive(result, "game", "")
+			result = ReplaceTokenCaseInsensitive(result, "realm", "")
+			result = ReplaceTokenCaseInsensitive(result, "note", note)
+			result = ReplaceTokenCaseInsensitive(result, "status", statusText)
+			-- Phase 22b: Unified tokens - name tokens in info format
+			result = ReplaceTokenCaseInsensitive(
+				result,
+				"name",
+				isBNet and (friend.accountName or "Unknown") or (friend.name or "Unknown")
+			)
+			result = ReplaceTokenCaseInsensitive(
+				result,
+				"battletag",
+				friend.battleTag and (friend.battleTag:match("([^#]+)") or friend.battleTag) or ""
+			)
+			local DB = GetDB()
+			local uid = friend.uid or GetFriendUID(friend)
+			result = ReplaceTokenCaseInsensitive(result, "nickname", DB and DB:GetNickname(uid) or "")
+			result = ReplaceTokenCaseInsensitive(result, "character", friend.characterName or "")
+			-- Cleanup empty delimiters
+			result = result:gsub("%(%)", "")
+			result = result:gsub("%[%]", "")
+			result = result:gsub(",%s*,", ",")
+			result = result:gsub("^%s*,%s*", "")
+			result = result:gsub("%s*,%s*$", "")
+			result = result:match("^%s*(.-)%s*$")
+			if result == "" then
+				return lastOnlineText ~= "" and lastOnlineText or (L.OFFLINE_STATUS or "Offline")
+			end
+			return result
+		else
+			return lastOnlineText ~= "" and lastOnlineText or (L.OFFLINE_STATUS or "Offline")
+		end
+	end
+
+	-- Replace tokens for online friends
+	local result = formatString
+	result = ReplaceTokenCaseInsensitive(result, "level", levelText)
+	result = ReplaceTokenCaseInsensitive(result, "zone", zone)
+	result = ReplaceTokenCaseInsensitive(result, "class", className)
+	result = ReplaceTokenCaseInsensitive(result, "game", gameName)
+	result = ReplaceTokenCaseInsensitive(result, "realm", realmName)
+	result = ReplaceTokenCaseInsensitive(result, "note", note)
+	result = ReplaceTokenCaseInsensitive(result, "status", statusText)
+	result = ReplaceTokenCaseInsensitive(result, "lastonline", "")
+	-- Phase 22b: Unified tokens - name tokens in info format
+	local nameValue = isBNet and (friend.accountName or "Unknown") or (friend.name or "Unknown")
+	result = ReplaceTokenCaseInsensitive(result, "name", nameValue)
+	local battletag = friend.battleTag and (friend.battleTag:match("([^#]+)") or friend.battleTag) or ""
+	result = ReplaceTokenCaseInsensitive(result, "battletag", battletag)
+	local DB = GetDB()
+	local uid = friend.uid or GetFriendUID(friend)
+	result = ReplaceTokenCaseInsensitive(result, "nickname", DB and DB:GetNickname(uid) or "")
+	result = ReplaceTokenCaseInsensitive(result, "character", friend.characterName or friend.name or "")
+
+	-- Cleanup empty delimiters and extra commas/spaces
+	result = result:gsub("%(%)", "")
+	result = result:gsub("%[%]", "")
+	result = result:gsub(",%s*,", ",")
+	result = result:gsub("^%s*,%s*", "")
+	result = result:gsub("%s*,%s*$", "")
+	result = result:match("^%s*(.-)%s*$")
+
+	if result == "" then
+		return L.ONLINE_STATUS or "Online"
+	end
+
+	return result
+end
+
 -- Get display name based on format setting
 -- @param forSorting (boolean) If true, use BattleTag instead of AccountName for BNet friends (prevents sorting issues with protected strings)
 function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Name Caching (Persistent)
 	-- PERFY OPTIMIZATION: Direct cache access
-	-- [STREAMER MODE START]
-	if BFL.StreamerMode and BFL.StreamerMode:IsActive() then
-		local DB = GetDB()
-		local mode = self.settingsCache.streamerModeNameFormat or "battletag"
-
-		-- Default Safe Name (ShortTag or CharName)
-		local safeName = friend.name -- Valid for WoW friends (Character Name)
-
-		if friend.battleTag then
-			safeName = friend.battleTag:match("([^#]+)") or friend.battleTag
-		elseif friend.type == "bnet" then
-			-- Fallback for BNet friends if BattleTag is missing (Safety Net)
-			-- CRITICAL: Never use friend.accountName (Real ID) in Streamer Mode
-			safeName = "Unknown"
-		end
-
-		local result = safeName or "Unknown"
-
-		if mode == "nickname" then
-			local uid = friend.uid or GetFriendUID(friend)
-			local DB = GetDB()
-			local nickname = DB and DB:GetNickname(uid) or ""
-			if nickname ~= "" then
-				result = nickname
-			end
-		elseif mode == "note" then
-			local note = (friend.note or friend.notes or "")
-			if note ~= "" then
-				result = note
-			end
-		end
-
-		if forSorting then
-			return result
-		end
-		return result
-	end
-	-- [STREAMER MODE END]
+	-- [STREAMER MODE] Determine if active (used below to override %name%)
+	local isStreamerMode = BFL.StreamerMode and BFL.StreamerMode:IsActive()
 
 	if not self.displayNameCache then
 		self.displayNameCache = {}
 	end
 
-	-- PERFY OPTIMIZATION: Direct cache access
-	local format = self.settingsCache.nameDisplayFormat or "%name%"
+	-- PERFY OPTIMIZATION: Direct cache access (Phase 22: Use preset system)
+	local format = self.settingsCache.nameFormatString or "%name%"
 	local uid = friend.uid or GetFriendUID(friend)
 	local note = (friend.note or friend.notes or "")
 	local showRealmName = self.settingsCache.showRealmName or false
+	local colorClassNames = self.settingsCache.colorClassNames
+	if colorClassNames == nil then
+		colorClassNames = true
+	end
+	local showFactionIcons = self.settingsCache.showFactionIcons or false
 	local nicknameVersion = BFL.NicknameCacheVersion or 0 -- Phase 6: Version Check
 
 	-- Inputs for validation
@@ -1944,11 +2159,15 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		cacheEntry
 		and cacheEntry.format == format
 		and cacheEntry.showRealmName == showRealmName
+		and cacheEntry.colorClassNames == colorClassNames
+		and cacheEntry.showFactionIcons == showFactionIcons
+		and cacheEntry.isStreamerMode == isStreamerMode
 		and cacheEntry.note == note
 		and cacheEntry.rawName == rawName
 		and cacheEntry.rawAccountName == rawAccountName
 		and cacheEntry.rawBattleTag == rawBattleTag
 		and cacheEntry.nicknameVersion == nicknameVersion
+		and cacheEntry.characterName == friend.characterName
 	then -- Phase 6: Check version instead of value
 		return cacheEntry.result
 	end
@@ -1960,6 +2179,14 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 
 	local name = "Unknown"
 	local battletag = rawBattleTag or ""
+
+	-- Process battletag to be short version (before #)
+	if battletag ~= "" then
+		local hashIndex = string.find(battletag, "#")
+		if hashIndex then
+			battletag = string.sub(battletag, 1, hashIndex - 1)
+		end
+	end
 
 	if friend.type == "bnet" then
 		if forSorting then
@@ -1973,6 +2200,28 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 				end
 			else
 				name = rawAccountName or "Unknown"
+			end
+		elseif isStreamerMode then
+			-- [STREAMER MODE] %name% must NEVER resolve to Real ID (accountName)
+			-- Use safe alternatives based on streamer mode name format setting
+			local streamerNameMode = self.settingsCache.streamerModeNameFormat or "battletag"
+			if streamerNameMode == "nickname" then
+				local nick = DB and DB:GetNickname(uid) or ""
+				if nick ~= "" then
+					name = nick
+				else
+					-- Fallback to BattleTag if no nickname set
+					name = battletag ~= "" and battletag or "Unknown"
+				end
+			elseif streamerNameMode == "note" then
+				if note ~= "" then
+					name = note
+				else
+					name = battletag ~= "" and battletag or "Unknown"
+				end
+			else
+				-- Default: BattleTag (short, already processed above)
+				name = battletag ~= "" and battletag or "Unknown"
 			end
 		else
 			-- DISPLAY MODE: Follow Blizzard's BNet_GetBNetAccountName pattern
@@ -2011,14 +2260,6 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		end
 	end
 
-	-- Process battletag to be short version as requested
-	if battletag ~= "" then
-		local hashIndex = string.find(battletag, "#")
-		if hashIndex then
-			battletag = string.sub(battletag, 1, hashIndex - 1)
-		end
-	end
-
 	-- 2. Replace Tokens (case-insensitive)
 	local result = format
 
@@ -2044,9 +2285,129 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 	result = ReplaceTokenCaseInsensitive(result, "nickname", nickname)
 	result = ReplaceTokenCaseInsensitive(result, "battletag", battletag)
 
+	-- Phase 22b: Unified token system - all tokens available in name format
+	local character = friend.characterName or ""
+	local realm = friend.realmName or ""
+
+	-- Apply class coloring, faction icon, timerunning, and realm to %character% token
+	if character ~= "" and HasTokenCaseInsensitive(result, "character") and not forSorting then
+		local decoratedChar = character
+
+		-- Timerunning icon
+		if friend.timerunningSeasonID and TimerunningUtil and TimerunningUtil.AddSmallIcon then
+			decoratedChar = TimerunningUtil.AddSmallIcon(decoratedChar)
+		end
+
+		-- Faction icon
+		local showFactionIcons = self.settingsCache.showFactionIcons
+		if showFactionIcons and friend.factionName then
+			if friend.factionName == "Horde" then
+				decoratedChar = "|TInterface\\FriendsFrame\\PlusManz-Horde:12:12:0:0|t" .. decoratedChar
+			elseif friend.factionName == "Alliance" then
+				decoratedChar = "|TInterface\\FriendsFrame\\PlusManz-Alliance:12:12:0:0|t" .. decoratedChar
+			end
+		end
+
+		-- Realm name
+		if showRealmName and friend.realmName and friend.realmName ~= "" then
+			local playerRealm = GetRealmName()
+			if friend.realmName ~= playerRealm then
+				decoratedChar = decoratedChar .. " - " .. friend.realmName
+			end
+		end
+
+		-- Class coloring
+		local useClassColor = self.settingsCache.colorClassNames
+		if useClassColor == nil then
+			useClassColor = true
+		end
+		local colorStr = nil
+		if useClassColor and friend.className then
+			local classFile = GetClassFileForFriend(friend)
+			local classColor = classFile and RAID_CLASS_COLORS[classFile]
+			if classColor then
+				colorStr = classColor.colorStr or "ffffffff"
+			end
+		end
+
+		-- Check if %character% is wrapped in parentheses: (%character%) → include parens in class coloring
+		local wrappedPattern = "%(%%[Cc][Hh][Aa][Rr][Aa][Cc][Tt][Ee][Rr]%%%)"
+		local wrapStart, wrapEnd = result:find(wrappedPattern)
+		if wrapStart then
+			-- Replace (%character%) with class-colored (CharName) - parens inside color
+			local wrappedReplacement
+			if colorStr then
+				wrappedReplacement = "|c" .. colorStr .. "(" .. decoratedChar .. ")|r"
+			else
+				wrappedReplacement = "(" .. decoratedChar .. ")"
+			end
+			-- Use find+sub instead of gsub to avoid replacement string interpretation issues
+			result = result:sub(1, wrapStart - 1) .. wrappedReplacement .. result:sub(wrapEnd + 1)
+			-- Also replace any remaining standalone %character% tokens (unlikely but safe)
+			if HasTokenCaseInsensitive(result, "character") then
+				local standaloneReplacement = colorStr and ("|c" .. colorStr .. decoratedChar .. "|r") or decoratedChar
+				result = ReplaceTokenCaseInsensitive(result, "character", standaloneReplacement)
+			end
+		else
+			-- Standard replacement: class color without parens
+			local replacement = colorStr and ("|c" .. colorStr .. decoratedChar .. "|r") or decoratedChar
+			result = ReplaceTokenCaseInsensitive(result, "character", replacement)
+		end
+	else
+		-- Empty character or forSorting: remove wrapping parens for empty character, then replace
+		if character == "" then
+			local wrappedPattern = "%(%%[Cc][Hh][Aa][Rr][Aa][Cc][Tt][Ee][Rr]%%%)"
+			result = result:gsub(wrappedPattern, "")
+		end
+		result = ReplaceTokenCaseInsensitive(result, "character", character)
+	end
+	result = ReplaceTokenCaseInsensitive(result, "realm", realm)
+
+	-- Info tokens available in name format (Phase 22b: Unified tokens)
+	if not forSorting then
+		local level = friend.level or 0
+		local levelText = ""
+		if level > 0 then
+			local colorLevelByDifficulty = self.settingsCache.colorLevelByDifficulty
+			if colorLevelByDifficulty == nil then
+				colorLevelByDifficulty = true
+			end
+			if colorLevelByDifficulty then
+				levelText = GetColoredLevelText(level)
+			else
+				levelText = tostring(level)
+			end
+		end
+		local zone = friend.areaName or friend.area or ""
+		local className = friend.className or ""
+		local gameName = ""
+		if friend.gameAccountInfo and friend.gameAccountInfo.richPresence then
+			gameName = friend.gameAccountInfo.richPresence
+		elseif friend.clientProgram then
+			gameName = friend.clientProgram
+		end
+
+		result = ReplaceTokenCaseInsensitive(result, "level", levelText)
+		result = ReplaceTokenCaseInsensitive(result, "zone", zone)
+		result = ReplaceTokenCaseInsensitive(result, "class", className)
+		result = ReplaceTokenCaseInsensitive(result, "game", gameName)
+		result = ReplaceTokenCaseInsensitive(result, "status", "")
+		result = ReplaceTokenCaseInsensitive(result, "lastonline", "")
+	else
+		result = ReplaceTokenCaseInsensitive(result, "level", "")
+		result = ReplaceTokenCaseInsensitive(result, "zone", "")
+		result = ReplaceTokenCaseInsensitive(result, "class", "")
+		result = ReplaceTokenCaseInsensitive(result, "game", "")
+		result = ReplaceTokenCaseInsensitive(result, "status", "")
+		result = ReplaceTokenCaseInsensitive(result, "lastonline", "")
+	end
+
 	-- 3. Cleanup
 	result = result:gsub("%(%)", "")
 	result = result:gsub("%[%]", "")
+	result = result:gsub(",%s*,", ",")
+	result = result:gsub("^%s*,%s*", "")
+	result = result:gsub("%s*,%s*$", "")
 	result = result:match("^%s*(.-)%s*$")
 
 	-- 4. Fallback
@@ -2059,11 +2420,15 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		result = result,
 		format = format,
 		showRealmName = showRealmName,
+		colorClassNames = colorClassNames,
+		showFactionIcons = showFactionIcons,
+		isStreamerMode = isStreamerMode,
 		note = note,
 		nicknameVersion = nicknameVersion, -- Phase 6: Store version
 		rawName = rawName,
 		rawBattleTag = rawBattleTag,
 		rawAccountName = rawAccountName,
+		characterName = friend.characterName, -- Phase 22b: Cache invalidation for character changes
 	}
 
 	return result
@@ -2263,10 +2628,23 @@ function FriendsList:UpdateSettingsCache()
 	self.settingsCacheVersion = currentVersion
 	self.settingsCache = self.settingsCache or {}
 
-	-- Core Display Settings
-	self.settingsCache.nameDisplayFormat = DB:Get("nameDisplayFormat", "%name%")
+	-- Track layout-affecting settings for forceLayoutRebuild
+	local oldInfoDisabled = self.settingsCache.infoDisabled
+	local oldCompactMode = self.settingsCache.compactMode
+
+	-- Core Display Settings (Phase 22: Preset system)
+	self.settingsCache.nameDisplayFormat = DB:Get("nameDisplayFormat", "%name%") -- Legacy compat
+	self.settingsCache.nameFormatString = DB:GetNameFormatString()
+	self.settingsCache.infoFormatPreset = DB:Get("infoFormatPreset", "default")
+	self.settingsCache.infoFormatString = DB:GetInfoFormatString()
+	self.settingsCache.infoDisabled = DB:IsInfoDisabled()
 	self.settingsCache.showRealmName = DB:Get("showRealmName", false)
 	self.settingsCache.compactMode = DB:Get("compactMode", false)
+
+	-- Force layout rebuild if row height-affecting settings changed
+	if oldInfoDisabled ~= self.settingsCache.infoDisabled or oldCompactMode ~= self.settingsCache.compactMode then
+		self.forceLayoutRebuild = true
+	end
 
 	-- Group Settings
 	self.settingsCache.enableInGameGroup = DB:Get("enableInGameGroup", false)
@@ -2279,6 +2657,7 @@ function FriendsList:UpdateSettingsCache()
 	self.settingsCache.showFactionIcons = DB:Get("showFactionIcons", false)
 	self.settingsCache.colorClassNames = DB:Get("colorClassNames", true)
 	self.settingsCache.hideMaxLevel = DB:Get("hideMaxLevel", false)
+	self.settingsCache.colorLevelByDifficulty = DB:Get("colorLevelByDifficulty", true)
 	self.settingsCache.showGameIcon = DB:Get("showGameIcon", true)
 	self.settingsCache.showMobileAsAFK = DB:Get("showMobileAsAFK", false)
 	self.settingsCache.treatMobileAsOffline = DB:Get("treatMobileAsOffline", false)
@@ -3258,6 +3637,12 @@ function FriendsList:PassesFilters(friend) -- Search text filter
 		-- Helper function to check if a field contains the search text
 		local function contains(text)
 			if text and text ~= "" and text ~= "???" then
+				-- Fix #50: Skip kStrings (|K...|k) - these are Blizzard privacy-protected
+				-- strings (Real Names) that cannot be searched programmatically.
+				-- Calling lower() on them mangles the escape code |K -> |k.
+				if text:sub(1, 2) == "|K" then
+					return false
+				end
 				return text:lower():find(searchLower, 1, true) ~= nil
 			end
 			return false
@@ -3265,12 +3650,18 @@ function FriendsList:PassesFilters(friend) -- Search text filter
 
 		-- Search in multiple fields depending on friend type
 		if friend.type == "bnet" then
-			-- BNet friends: search in accountName, battleTag, characterName, realmName, note
+			-- BNet friends: search in accountName, battleTag, characterName, realmName, note, nickname
+			-- Note: accountName is a kString (Real Name) and will be skipped by contains()
+			-- This is a Blizzard privacy limitation - Real Names cannot be searched
+			local DB = GetDB()
+			local uid = friend.uid or GetFriendUID(friend)
+			local nickname = DB and DB:GetNickname(uid) or nil
 			found = contains(friend.accountName)
 				or contains(friend.battleTag)
 				or contains(friend.characterName)
 				or contains(friend.realmName)
 				or contains(friend.note)
+				or contains(nickname)
 		else
 			-- WoW friends: search in name, note
 			found = contains(friend.name) or contains(friend.note)
@@ -5330,8 +5721,6 @@ function FriendsList:GetFormattedButtonText(friend)
 		-- Battle.net Friend (PERFY OPTIMIZATION: Direct cache access)
 		local playerFactionGroup = UnitFactionGroup("player")
 		local grayOtherFaction = self.settingsCache.grayOtherFaction or false
-		local showFactionIcons = self.settingsCache.showFactionIcons or false
-		local showRealmName = self.settingsCache.showRealmName or false
 
 		if friend.connected then
 			if not usedExternalFormatter then
@@ -5341,59 +5730,11 @@ function FriendsList:GetFormattedButtonText(friend)
 				local shouldGray = grayOtherFaction and isOppositeFaction
 
 				if shouldGray then
-					line1Text = "|cff808080" .. displayName .. "|r"
+					-- Strip inner color codes so gray applies uniformly (Phase 22b)
+					local stripped = displayName:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+					line1Text = "|cff808080" .. stripped .. "|r"
 				else
 					line1Text = displayName
-				end
-
-				if friend.characterName then
-					local characterName = friend.characterName
-					if friend.timerunningSeasonID and TimerunningUtil and TimerunningUtil.AddSmallIcon then
-						characterName = TimerunningUtil.AddSmallIcon(characterName)
-					end
-
-					if showFactionIcons and friend.factionName then
-						if friend.factionName == "Horde" then
-							characterName = "|TInterface\\FriendsFrame\\PlusManz-Horde:12:12:0:0|t" .. characterName
-						elseif friend.factionName == "Alliance" then
-							characterName = "|TInterface\\FriendsFrame\\PlusManz-Alliance:12:12:0:0|t" .. characterName
-						end
-					end
-
-					if showRealmName and friend.realmName and friend.realmName ~= "" then
-						local playerRealm = GetRealmName()
-						if friend.realmName ~= playerRealm then
-							characterName = characterName .. " - " .. friend.realmName
-						end
-					end
-
-					-- PERFY OPTIMIZATION: Direct cache access
-					local useClassColor = self.settingsCache.colorClassNames
-					if useClassColor == nil then
-						useClassColor = true
-					end
-
-					if useClassColor and not shouldGray and friend.className then
-						local classFile = GetClassFileForFriend(friend)
-						local classColor = classFile and RAID_CLASS_COLORS[classFile]
-
-						if classColor then
-							line1Text = line1Text
-								.. " |c"
-								.. (classColor.colorStr or "ffffffff")
-								.. "("
-								.. characterName
-								.. ")|r"
-						else
-							line1Text = line1Text .. " (" .. characterName .. ")"
-						end
-					else
-						if shouldGray then
-							line1Text = line1Text .. " (|cff808080" .. characterName .. "|r)"
-						else
-							line1Text = line1Text .. " (" .. characterName .. ")"
-						end
-					end
 				end
 			end
 		else
@@ -5403,81 +5744,27 @@ function FriendsList:GetFormattedButtonText(friend)
 			end
 		end
 
-		-- Compact Mode Append
-		if isCompactMode then
+		-- Compact Mode Append (BNet)
+		local infoDisabled = self.settingsCache.infoDisabled or false
+		if isCompactMode or infoDisabled then
 			if not usedExternalFormatter then
 				line1BaseText = line1Text
-				local hideMaxLevel = self.settingsCache.hideMaxLevel
-				local maxLevel = BFL.GetMaxLevel and BFL.GetMaxLevel() or 60
-
-				if friend.connected then
-					local infoText = ""
-					if friend.level and friend.areaName then
-						if hideMaxLevel and friend.level == maxLevel then
-							infoText = " - " .. friend.areaName
-						else
-							infoText = " - " .. string.format(L.LEVEL_FORMAT, friend.level) .. ", " .. friend.areaName
-						end
-					elseif friend.level then
-						if hideMaxLevel and friend.level == maxLevel then
-							infoText = " - " .. L.FRIEND_MAX_LEVEL
-						else
-							infoText = " - " .. string.format(L.LEVEL_FORMAT, friend.level)
-						end
-					elseif friend.areaName then
-						infoText = " - " .. friend.areaName
-					elseif friend.gameName then
-						infoText = " - " .. friend.gameName
+				-- Phase 22: Use FormatInfoLine for compact suffix
+				local infoLine = not infoDisabled and self:FormatInfoLine(friend)
+				if infoLine and infoLine ~= "" then
+					local infoColor = self.settingsCache.fontColorFriendInfo or { r = 0.5, g = 0.5, b = 0.5, a = 1 }
+					local infoHex = FormatColorCode(infoColor.r, infoColor.g, infoColor.b, infoColor.a)
+					if friend.connected then
+						line1SuffixText = infoHex .. " - " .. infoLine .. "|r"
+					else
+						line1SuffixText = " " .. infoHex .. "- " .. infoLine .. "|r"
 					end
-
-					if infoText ~= "" then
-						local infoColor = self.settingsCache.fontColorFriendInfo or { r = 0.5, g = 0.5, b = 0.5, a = 1 }
-						local infoHex = FormatColorCode(infoColor.r, infoColor.g, infoColor.b, infoColor.a)
-						line1SuffixText = infoHex .. infoText .. "|r"
-						line1Text = line1Text .. line1SuffixText
-					end
-				else
-					line1BaseText = line1Text
-					if friend.lastOnlineTime then
-						local infoColor = self.settingsCache.fontColorFriendInfo or { r = 0.5, g = 0.5, b = 0.5, a = 1 }
-						local infoHex = FormatColorCode(infoColor.r, infoColor.g, infoColor.b, infoColor.a)
-						line1SuffixText = " " .. infoHex .. "- " .. GetLastOnlineText(friend) .. "|r"
-						line1Text = line1Text .. line1SuffixText
-					end
+					line1Text = line1Text .. line1SuffixText
 				end
 			end
 		else
-			-- Normal Mode Line 2
-			local hideMaxLevel = self.settingsCache.hideMaxLevel
-			local maxLevel = BFL.GetMaxLevel and BFL.GetMaxLevel() or 60
-
-			if friend.connected then
-				if friend.level and friend.areaName then
-					if hideMaxLevel and friend.level == maxLevel then
-						line2Text = friend.areaName
-					else
-						line2Text = string.format(L.LEVEL_FORMAT, friend.level) .. ", " .. friend.areaName
-					end
-				elseif friend.level then
-					if hideMaxLevel and friend.level == maxLevel then
-						line2Text = L.FRIEND_MAX_LEVEL
-					else
-						line2Text = string.format(L.LEVEL_FORMAT, friend.level)
-					end
-				elseif friend.areaName then
-					line2Text = friend.areaName
-				elseif friend.gameName then
-					line2Text = friend.gameName
-				else
-					line2Text = L.ONLINE_STATUS
-				end
-			else
-				if friend.lastOnlineTime then
-					line2Text = GetLastOnlineText(friend)
-				else
-					line2Text = L.OFFLINE_STATUS
-				end
-			end
+			-- Normal Mode Line 2 (Phase 22: Use FormatInfoLine)
+			line2Text = self:FormatInfoLine(friend) or ""
 		end
 	else
 		-- WoW Friend
@@ -5530,65 +5817,23 @@ function FriendsList:GetFormattedButtonText(friend)
 			end
 		end
 
-		-- Compact Mode Append
-		if isCompactMode then
+		-- Compact Mode Append (WoW)
+		local infoDisabledWow = self.settingsCache.infoDisabled or false
+		if isCompactMode or infoDisabledWow then
 			if not usedExternalFormatter then
 				line1BaseText = line1Text
-				local hideMaxLevel = self.settingsCache.hideMaxLevel
-				local maxLevel = BFL.GetMaxLevel and BFL.GetMaxLevel() or 60
-
-				if friend.connected then
-					local infoText = ""
-					if friend.level and friend.area then
-						if hideMaxLevel and friend.level == maxLevel then
-							infoText = " - " .. friend.area
-						else
-							infoText = " - " .. string.format(L.LEVEL_FORMAT, friend.level) .. ", " .. friend.area
-						end
-					elseif friend.level then
-						if hideMaxLevel and friend.level == maxLevel then
-							infoText = " - " .. L.FRIEND_MAX_LEVEL
-						else
-							infoText = " - " .. string.format(L.LEVEL_FORMAT, friend.level)
-						end
-					elseif friend.area then
-						infoText = " - " .. friend.area
-					end
-
-					if infoText ~= "" then
-						local infoColor = self.settingsCache.fontColorFriendInfo or { r = 0.5, g = 0.5, b = 0.5, a = 1 }
-						local infoHex = FormatColorCode(infoColor.r, infoColor.g, infoColor.b, infoColor.a)
-						line1SuffixText = infoHex .. infoText .. "|r"
-						line1Text = line1Text .. line1SuffixText
-					end
+				-- Phase 22: Use FormatInfoLine for compact suffix
+				local infoLine = not infoDisabledWow and self:FormatInfoLine(friend)
+				if infoLine and infoLine ~= "" and friend.connected then
+					local infoColor = self.settingsCache.fontColorFriendInfo or { r = 0.5, g = 0.5, b = 0.5, a = 1 }
+					local infoHex = FormatColorCode(infoColor.r, infoColor.g, infoColor.b, infoColor.a)
+					line1SuffixText = infoHex .. " - " .. infoLine .. "|r"
+					line1Text = line1Text .. line1SuffixText
 				end
 			end
 		else
-			-- Normal Mode Line 2
-			local hideMaxLevel = self.settingsCache.hideMaxLevel
-			local maxLevel = BFL.GetMaxLevel and BFL.GetMaxLevel() or 60
-
-			if friend.connected then
-				if friend.level and friend.area then
-					if hideMaxLevel and friend.level == maxLevel then
-						line2Text = friend.area
-					else
-						line2Text = string.format(L.LEVEL_FORMAT, friend.level) .. ", " .. friend.area
-					end
-				elseif friend.level then
-					if hideMaxLevel and friend.level == maxLevel then
-						line2Text = L.FRIEND_MAX_LEVEL
-					else
-						line2Text = string.format(L.LEVEL_FORMAT, friend.level)
-					end
-				elseif friend.area then
-					line2Text = friend.area
-				else
-					line2Text = L.ONLINE_STATUS
-				end
-			else
-				line2Text = L.OFFLINE_STATUS
-			end
+			-- Normal Mode Line 2 (Phase 22: Use FormatInfoLine)
+			line2Text = self:FormatInfoLine(friend) or ""
 		end
 	end
 
@@ -5652,34 +5897,44 @@ function FriendsList:UpdateFriendButton(button, elementData)
 	-- Calculate dynamic row height for icon positioning (needed for layout updates)
 	local nameSize = self.fontCache and self.fontCache.nameSize or BASE_FONT_SIZE
 	local infoSize = self.fontCache and self.fontCache.infoSize or BASE_FONT_SIZE
-	local rowHeight = button:GetHeight() or CalculateFriendRowHeight(isCompactMode, nameSize, infoSize)
+	local rowHeight = button:GetHeight()
+		or CalculateFriendRowHeight(isCompactMode, nameSize, infoSize, self.settingsCache.infoDisabled)
 
 	-- OPTIMIZATION: Layout Caching (Phase 9.9)
 	-- Update layout if CompactMode changed OR font version changed OR row height changed
+	local infoDisabled = self.settingsCache.infoDisabled or false
 	local layoutChanged = button.lastCompactMode ~= isCompactMode
 		or button.lastLayoutFontVersion ~= self.fontCacheVersion
 		or button.lastRowHeight ~= rowHeight
+		or button.lastInfoDisabled ~= infoDisabled
 	if layoutChanged then
 		button.lastCompactMode = isCompactMode
 		button.lastLayoutFontVersion = self.fontCacheVersion
 		button.lastRowHeight = rowHeight
+		button.lastInfoDisabled = infoDisabled
 
-		-- Reset name position based on compact mode
-		if isCompactMode then
+		-- Reset name position based on compact mode and info disabled state
+		if isCompactMode or infoDisabled then
 			button.Name:SetPoint("LEFT", 44, 0) -- Centered vertically for single line
 		else
 			button.Name:SetPoint("LEFT", 44, 7) -- Upper position for two lines
 		end
 
-		-- Show/hide friend elements based on compact mode
+		-- Show/hide friend elements based on compact mode and info disabled state
 		if isCompactMode then
 			button.Info:Hide() -- Hide second line in compact mode
-			-- Compact mode: allow name to wrap to 2 lines since info is hidden
+			-- Allow name to wrap to 2 lines since info is hidden
 			if button.Name.SetMaxLines then
 				button.Name:SetMaxLines(2)
 			end
 			if button.Info.SetMaxLines then
 				button.Info:SetMaxLines(2)
+			end
+		elseif infoDisabled then
+			button.Info:Hide() -- Hide second line when info is disabled
+			-- Single line only (row height is slim, no space for wrapping)
+			if button.Name.SetMaxLines then
+				button.Name:SetMaxLines(1)
 			end
 		else
 			button.Info:Show()

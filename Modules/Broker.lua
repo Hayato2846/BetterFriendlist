@@ -797,57 +797,53 @@ end
 
 -- Helper: Get display name (respects nameDisplayFormat and tokens)
 local function GetFriendDisplayName(friend)
-	-- [STREAMER MODE] Hide Real ID, use safe name instead
-	if BFL.StreamerMode and BFL.StreamerMode:IsActive() then
-		local mode = BetterFriendlistDB and BetterFriendlistDB.streamerModeNameFormat or "battletag"
-
-		-- Default safe name: BattleTag (short) or Character Name
-		local safeName = friend.name -- Valid for WoW friends (Character Name)
-		if friend.battleTag then
-			safeName = friend.battleTag:match("([^#]+)") or friend.battleTag
-		elseif friend.type == "bnet" then
-			-- CRITICAL: Never use friend.accountName (Real ID) in Streamer Mode
-			safeName = "Unknown"
-		end
-
-		local result = safeName or "Unknown"
-
-		if mode == "nickname" then
-			local DB = GetDB()
-			local nickname = DB and DB:GetNickname(friend.id) or ""
-			if nickname ~= "" then
-				result = nickname
-			end
-		elseif mode == "note" then
-			local note = friend.note or ""
-			if note ~= "" then
-				result = note
-			end
-		end
-
-		return result
-	end
-	-- [STREAMER MODE END]
+	local isStreamerMode = BFL.StreamerMode and BFL.StreamerMode:IsActive()
 
 	local DB = GetDB()
-	local format = DB and DB:Get("nameDisplayFormat", "%name%") or "%name%"
+	local format = DB and DB:GetNameFormatString() or "%name%"
 
 	-- 1. Prepare Data
 	local name = "Unknown"
 	local battletag = friend.battleTag or ""
 	local note = friend.note or ""
 	local nickname = DB and DB:GetNickname(friend.id) or ""
+	local characterName = ""
+	local realmName = ""
 
 	if friend.type == "bnet" then
-		name = friend.accountName or "Unknown"
+		if isStreamerMode then
+			-- [STREAMER MODE] %name% must NEVER resolve to Real ID (accountName)
+			local streamerNameMode = BetterFriendlistDB and BetterFriendlistDB.streamerModeNameFormat or "battletag"
+			-- Get short BattleTag (before #)
+			local shortTag = ""
+			if battletag ~= "" then
+				shortTag = battletag:match("([^#]+)") or battletag
+			end
+			if streamerNameMode == "nickname" and nickname ~= "" then
+				name = nickname
+			elseif streamerNameMode == "note" and note ~= "" then
+				name = note
+			else
+				name = shortTag ~= "" and shortTag or "Unknown"
+			end
+		else
+			name = friend.accountName or "Unknown"
+		end
+		-- Character name from game info
+		characterName = friend.characterName or friend.toonName or ""
+		realmName = friend.realmName or ""
 	else
 		local fullName = friend.fullName or friend.name or "Unknown"
 		local showRealmName = DB and DB:Get("showRealmName", false)
 
+		-- Extract character and realm from fullName
+		local n, r = strsplit("-", fullName)
+		characterName = n or fullName
+		realmName = r or ""
+
 		if showRealmName then
 			name = fullName
 		else
-			local n, r = strsplit("-", fullName)
 			local playerRealm = GetNormalizedRealmName()
 
 			if r and r ~= playerRealm then
@@ -884,11 +880,25 @@ local function GetFriendDisplayName(friend)
 	then
 		battletag = name
 	end
-
 	result = ReplaceTokenCaseInsensitive(result, "name", name)
 	result = ReplaceTokenCaseInsensitive(result, "note", note)
 	result = ReplaceTokenCaseInsensitive(result, "nickname", nickname)
 	result = ReplaceTokenCaseInsensitive(result, "battletag", battletag)
+	result = ReplaceTokenCaseInsensitive(result, "character", characterName)
+	result = ReplaceTokenCaseInsensitive(result, "realm", realmName)
+	-- Phase 22b: Unified tokens - info tokens in name format
+	result = ReplaceTokenCaseInsensitive(result, "level", friend.level and tostring(friend.level) or "")
+	result = ReplaceTokenCaseInsensitive(result, "zone", friend.areaName or friend.area or "")
+	result = ReplaceTokenCaseInsensitive(result, "class", friend.className or "")
+	local gameName = ""
+	if friend.gameAccountInfo and friend.gameAccountInfo.richPresence then
+		gameName = friend.gameAccountInfo.richPresence
+	elseif friend.clientProgram then
+		gameName = friend.clientProgram
+	end
+	result = ReplaceTokenCaseInsensitive(result, "game", gameName)
+	result = ReplaceTokenCaseInsensitive(result, "status", "")
+	result = ReplaceTokenCaseInsensitive(result, "lastonline", "")
 
 	-- 3. Cleanup
 	result = result:gsub("%(%)", "")

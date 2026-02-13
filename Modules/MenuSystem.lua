@@ -64,19 +64,23 @@ end
 -- For BNet: friendID = bnetIDAccount, extraData = {name, battleTag, connected}
 -- For WoW: friendID = friendIndex, extraData = {name, connected}
 function MenuSystem:OpenFriendMenu(button, friendType, friendID, extraData)
-	if not button or not friendType then return end
-	
+	if not button or not friendType then
+		return
+	end
+
 	extraData = extraData or {}
 	local menuType
 	local contextData
-	
+
 	if friendType == "BN" then
 		-- Determine if online or offline
 		local connected = extraData.connected
-		if connected == nil then connected = true end -- Default to online
-		
+		if connected == nil then
+			connected = true
+		end -- Default to online
+
 		menuType = connected and "BN_FRIEND" or "BN_FRIEND_OFFLINE"
-		
+
 		-- BNet friends need full contextData like BetterFriendsList_ShowBNDropdown
 		contextData = {
 			name = extraData.name or "",
@@ -88,17 +92,19 @@ function MenuSystem:OpenFriendMenu(button, friendType, friendID, extraData)
 	else
 		-- WoW friends
 		local connected = extraData.connected
-		if connected == nil then connected = true end
-		
+		if connected == nil then
+			connected = true
+		end
+
 		menuType = connected and "FRIEND" or "FRIEND_OFFLINE"
-		
+
 		-- Get name from extraData or look up by index
 		local name = extraData.name
 		if not name and type(friendID) == "number" then
 			local friendInfo = C_FriendList.GetFriendInfoByIndex(friendID)
 			name = friendInfo and friendInfo.name or ""
 		end
-		
+
 		contextData = {
 			name = name or "",
 			friendsList = (type(friendID) == "number") and friendID or true, -- RIO Fix
@@ -107,22 +113,21 @@ function MenuSystem:OpenFriendMenu(button, friendType, friendID, extraData)
 			friendsIndex = (type(friendID) == "number") and friendID or nil,
 		}
 	end
-	
+
 	-- Set flag to indicate this menu is opened from BetterFriendlist
 	_G.BetterFriendlist_IsOurMenu = true
-	-- BFL:DebugPrint("|cff00ff00BFL MenuSystem: Flag set to TRUE, opening menu type:", menuType)
-	
+
 	-- Use compatibility wrapper for Classic support
+	-- Flag is cleared by AddGroupsToFriendMenu callback (fires during menu construction)
 	BFL.OpenContextMenu(button, menuType, contextData, contextData.name)
-	
-	-- Clear flag immediately after opening
-	_G.BetterFriendlist_IsOurMenu = false
 end
 
 -- Open context menu for a group
 function MenuSystem:OpenGroupMenu(button, groupData)
-	if not button or not groupData then return end
-	
+	if not button or not groupData then
+		return
+	end
+
 	-- For now, groups don't have special context menus
 	-- This can be extended later with group management options
 end
@@ -144,43 +149,43 @@ function MenuSystem:OpenWhoPlayerMenu(button, whoInfo)
 	if not button or not whoInfo then
 		return
 	end
-	
+
 	-- Set flag to indicate this is a WHO player menu
 	self:SetWhoPlayerMenuFlag(true)
-	
+
 	-- Strip trailing dash from name (WoW API bug)
 	local cleanName = whoInfo.fullName
 	if cleanName then
 		cleanName = cleanName:gsub("%-$", "")
 	end
-	
+
 	-- IMPORTANT: Also clean the regular name field
 	local cleanShortName = whoInfo.name
 	if cleanShortName then
 		cleanShortName = cleanShortName:gsub("%-$", "")
 	end
-	
+
 	-- Extract server from fullName (e.g., "Name-Server" -> "Server")
 	-- DO NOT use fullGuildName as server - that's the guild name!
 	local serverName = nil
 	if cleanName and cleanName:find("-") then
-		-- Split "Charactername-Servername" 
+		-- Split "Charactername-Servername"
 		local _, _, name, server = cleanName:find("^(.-)%-(.+)$")
 		if server then
-			cleanName = name  -- Use just the character name
+			cleanName = name -- Use just the character name
 			serverName = server
 		end
 	end
-	
+
 	local contextData = {
 		name = cleanName or cleanShortName,
-		server = serverName,  -- Only set if cross-realm, otherwise nil
+		server = serverName, -- Only set if cross-realm, otherwise nil
 		guid = whoInfo.guid,
 	}
-	
+
 	-- Use FRIEND menu as base (compatibility wrapper for Classic)
 	BFL.OpenContextMenu(button, "FRIEND", contextData, contextData.name)
-	
+
 	-- Clear flag immediately after opening
 	self:SetWhoPlayerMenuFlag(false)
 end

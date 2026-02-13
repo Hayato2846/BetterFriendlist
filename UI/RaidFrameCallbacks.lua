@@ -430,6 +430,13 @@ function BetterRaidFrame_RaidInfoButton_OnClick(self)
 	-- Load Blizzard's Raid UI (contains RaidInfoFrame)
 	if not C_AddOns.IsAddOnLoaded("Blizzard_RaidUI") then
 		C_AddOns.LoadAddOn("Blizzard_RaidUI")
+		-- Loading Blizzard_RaidUI creates Blizzard's RaidFrame with RaidGroup1-8
+		-- child frames. If the player is in a raid, RaidGroupFrame_Update() shows
+		-- these group buttons, causing them to leak through on the Blizzard side.
+		-- Hide Blizzard's RaidFrame to prevent this (BFL uses BetterFriendsFrame.RaidFrame).
+		if RaidFrame then
+			RaidFrame:Hide()
+		end
 	end
 
 	-- Check if RaidInfoFrame exists

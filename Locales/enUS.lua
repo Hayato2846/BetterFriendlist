@@ -765,12 +765,37 @@ local function LoadEnUS()
 	-- Name Formatting
 	L.SETTINGS_NAME_FORMAT_HEADER = "Name Formatting"
 	L.SETTINGS_NAME_FORMAT_DESC =
-		"Customize how friend names are displayed using tokens:\n|cffFFD100%name%|r - Account Name (RealID/BattleTag)\n|cffFFD100%note%|r - Note (BNet or WoW)\n|cffFFD100%nickname%|r - Custom Nickname\n|cffFFD100%battletag%|r - Short BattleTag (no #1234)"
-	L.SETTINGS_NAME_FORMAT_LABEL = "Format:"
+		"Use tokens to customize the display:\n|cffFFD100%name%|r - Account Name\n|cffFFD100%battletag%|r - BattleTag\n|cffFFD100%nickname%|r - Nickname\n|cffFFD100%note%|r - Note\n|cffFFD100%character%|r - Character Name\n|cffFFD100%realm%|r - Realm Name\n|cffFFD100%level%|r - Level\n|cffFFD100%zone%|r - Zone\n|cffFFD100%class%|r - Class\n|cffFFD100%game%|r - Game"
+	L.SETTINGS_NAME_FORMAT_LABEL = "Preset:"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP = "Name Display Format"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP_DESC = "Enter a format string using tokens."
 	L.SETTINGS_NAME_FORMAT_DISABLED_FRIENDLISTCOLORS =
 		"This setting is disabled because the addon 'FriendListColors' is managing name colors/formats."
+
+	-- Name Format Preset Labels (Phase 22)
+	L.NAME_PRESET_DEFAULT = "Name (Character)"
+	L.NAME_PRESET_BATTLETAG = "BattleTag (Character)"
+	L.NAME_PRESET_NICKNAME = "Nickname (Character)"
+	L.NAME_PRESET_NAME_ONLY = "Name Only"
+	L.NAME_PRESET_CHARACTER = "Character Only"
+	L.NAME_PRESET_CUSTOM = "Custom..."
+	L.SETTINGS_NAME_FORMAT_CUSTOM_LABEL = "Custom Format:"
+
+	-- Info Format Section (Phase 22)
+	L.SETTINGS_INFO_FORMAT_HEADER = "Friend Info Formatting"
+	L.SETTINGS_INFO_FORMAT_LABEL = "Preset:"
+	L.SETTINGS_INFO_FORMAT_CUSTOM_LABEL = "Custom Format:"
+	L.SETTINGS_INFO_FORMAT_TOOLTIP = "Custom Info Format"
+	L.SETTINGS_INFO_FORMAT_DESC =
+		"Use tokens to customize the info line:\n|cffFFD100%level%|r - Character Level\n|cffFFD100%zone%|r - Current Zone\n|cffFFD100%class%|r - Class Name\n|cffFFD100%game%|r - Game Name\n|cffFFD100%realm%|r - Realm Name\n|cffFFD100%status%|r - AFK/DND/Online\n|cffFFD100%lastonline%|r - Last Online\n|cffFFD100%name%|r - Account Name\n|cffFFD100%battletag%|r - BattleTag\n|cffFFD100%nickname%|r - Nickname\n|cffFFD100%note%|r - Note\n|cffFFD100%character%|r - Character Name"
+	L.INFO_PRESET_DEFAULT = "Default (Level, Zone)"
+	L.INFO_PRESET_ZONE = "Zone Only"
+	L.INFO_PRESET_LEVEL = "Level Only"
+	L.INFO_PRESET_CLASS_ZONE = "Class, Zone"
+	L.INFO_PRESET_LEVEL_CLASS_ZONE = "Level Class, Zone"
+	L.INFO_PRESET_GAME = "Game Name"
+	L.INFO_PRESET_DISABLED = "Disabled (Hide Info)"
+	L.INFO_PRESET_CUSTOM = "Custom..."
 
 	-- In-Game Group
 	L.SETTINGS_SHOW_INGAME_GROUP = "Show 'In-Game' Group"
