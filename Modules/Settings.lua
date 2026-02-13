@@ -1876,6 +1876,11 @@ function Settings:ImportSettings(importString)
 	if importData.exportVersion and importData.exportVersion >= 3 then
 		BFL:DebugPrint("|cff00ff00BetterFriendlist:|r Importing V3 (Full) backup...")
 
+		-- Wipe the entire DB first, then apply import data.
+		-- This ensures keys that existed in the live DB but NOT in the export
+		-- (e.g., newly created groups, settings added after the export) are removed.
+		wipe(BetterFriendlistDB)
+
 		-- Import ALL keys from the export
 		for key, value in pairs(importData) do
 			-- Skip metadata
@@ -2081,28 +2086,29 @@ function Settings:DeserializeTable(str)
 		return nil
 	end
 
-	-- Security: Validate that the string only contains safe table-literal characters
-	-- Allowed: braces, brackets, quotes, commas, equals, alphanumerics, whitespace, dots, minus, underscores
-	-- This prevents arbitrary Lua code execution from user-provided import strings
-	if string.find(str, "[^%w%s{}%[%]\"',=%.%-_]") then
-		BFL:DebugPrint("DeserializeTable: Rejected input - contains unsafe characters")
-		return nil
-	end
-
-	-- Additional safety: reject strings containing function calls or known dangerous patterns
-	if string.find(str, "%w+%s*%(") then
-		BFL:DebugPrint("DeserializeTable: Rejected input - contains function call pattern")
-		return nil
-	end
-
+	-- Security: Use setfenv to sandbox the loaded code instead of fragile character whitelisting.
+	-- setfenv(func, {}) removes access to ALL globals (os, print, loadstring, etc.),
+	-- making code injection harmless. Table literals only need Lua keywords (true/false/nil)
+	-- which work without any environment.
 	local func, err = loadstring("return " .. str)
 	if not func then
+		BFL:DebugPrint("DeserializeTable: loadstring failed:", err)
 		return nil
 	end
+
+	-- Sandbox: empty environment prevents access to any global functions or variables
+	setfenv(func, {})
 
 	-- Execute in protected call to catch runtime errors
 	local success, result = pcall(func)
 	if not success then
+		BFL:DebugPrint("DeserializeTable: pcall failed:", tostring(result))
+		return nil
+	end
+
+	-- Validate result is a table (not a string, number, or other type from crafted input)
+	if type(result) ~= "table" then
+		BFL:DebugPrint("DeserializeTable: Result is not a table:", type(result))
 		return nil
 	end
 

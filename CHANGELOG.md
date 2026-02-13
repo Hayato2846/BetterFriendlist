@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.3.5]       - 2026-02-13
+### Fixed
+- **Settings Import Failing** - Fixed settings import always failing with "corrupted string" error, making it impossible to restore exported backups.
+- **Settings Import Not Fully Replacing Data** - Fixed settings import not removing groups or settings that were created after the export. Importing a backup now fully restores the exact state from the export.
+
 ## [2.3.4]       - 2026-02-12
 ### Fixed
 - **Streamer Mode Real ID Leaks** - Fixed several places where Real IDs could still be visible despite Streamer Mode being active:
