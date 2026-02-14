@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+### Removed
+- **Activity Tracker** - Removed the Activity Tracker feature (last whisper/group/trade timestamps) to fix a critical error caused by addon taint in the chat system on WoW 12.0+. The "Recent Activity" sort option has also been removed.
+
 ## [2.3.5]       - 2026-02-13
 ### Fixed
 - **Settings Import Failing** - Fixed settings import always failing with "corrupted string" error, making it impossible to restore exported backups.
@@ -174,22 +178,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.2.7]       - 2026-01-31
 ### Fixed
 - **Library** - Fixed potential issues with LibQTip library integration.
-
-## [2.2.6]       - 2026-01-31
-### Added
-- **Copy Character Name** - Added a new option to the context menu to copy character names (Name-Realm) for better inviting/messaging
-- **Simple Mode** - Added Simple Mode in Settings -> General. Simple Mode hides specific elements (Search, Filter, Sort, BFL Avatar) and moves corresponding functions in the menu button
-- **ElvUI Skin Tabs** - Improved alignment of tab text and overall layout of all tabs of BFL in ElvUI Skin
-
-### Fixed
-- **Friend Groups Migration** - Fixed an issue with FriendGroups Migration for WoW friends. Added more debug logs to better help with issues.
-- **ElvUI Skin Retail** - Fixed an error with ElvUI Retail Skinning
-- **ElvUI Skin Classic** - Fixed and enabled ElvUI Classic Skin
-- **QuickJoin Informations** - Fixed an issue with shown QuickJoin informations lacking details of queued content type
-- **Broker Integration** - Fixed an issue that disabled the Broker BFL Plugin
-- **Performance** - Third iteration of performance added. If anything feels odd don't hesitate to contact
-- **RAF** - Fixed an issue blocking the usage of copy link button in RAF Frame
-- **Global Sync** - Fixed an error occuring while having own characters in sync added
 
 ---
 

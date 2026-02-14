@@ -19,9 +19,6 @@ end
 local function GetGroups()
 	return BFL:GetModule("Groups")
 end
-local function GetActivityTracker()
-	return BFL:GetModule("ActivityTracker")
-end
 local function GetStatistics()
 	return BFL:GetModule("Statistics")
 end
@@ -576,7 +573,6 @@ local function CreateAdvancedTooltip(gameTooltip)
 	gameTooltip:AddLine(" ")
 
 	local Groups = GetGroups()
-	local ActivityTracker = GetActivityTracker()
 
 	local friends = {}
 
@@ -667,20 +663,9 @@ local function CreateAdvancedTooltip(gameTooltip)
 
 					local classColor = RAID_CLASS_COLORS[className] or { r = 1, g = 1, b = 1 }
 
-					local activityText = ""
-					if ActivityTracker then
-						local activities = ActivityTracker:GetAllActivities(friend.id)
-						if activities and activities.lastWhisper then
-							local timeStr = FormatTimeSince(activities.lastWhisper)
-							if timeStr then
-								activityText = string.format(L("BROKER_WHISPER_AGO"), timeStr)
-							end
-						end
-					end
-
 					gameTooltip:AddDoubleLine(
 						string.format("  %s (%s)", name, level),
-						zone .. activityText,
+						zone,
 						classColor.r,
 						classColor.g,
 						classColor.b,
@@ -1004,7 +989,6 @@ local function RenderFixedFooter(footerFrame)
 		faction = L("SORT_FACTION"),
 		guild = L("SORT_GUILD"),
 		class = L("SORT_CLASS"),
-		activity = L("SORT_ACTIVITY"),
 		realm = L("SORT_REALM"),
 	}
 	local sortIcons = {
@@ -1016,7 +1000,6 @@ local function RenderFixedFooter(footerFrame)
 		faction = "Interface\\AddOns\\BetterFriendlist\\Icons\\faction",
 		guild = "Interface\\AddOns\\BetterFriendlist\\Icons\\guild",
 		class = "Interface\\AddOns\\BetterFriendlist\\Icons\\class",
-		activity = "Interface\\AddOns\\BetterFriendlist\\Icons\\activity",
 		realm = "Interface\\AddOns\\BetterFriendlist\\Icons\\realm",
 	}
 

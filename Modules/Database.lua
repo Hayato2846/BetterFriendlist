@@ -30,7 +30,6 @@ local defaults = {
 	raidShortcutEnabled_lead = true,
 	raidShortcutEnabled_promote = true,
 
-	friendActivity = {}, -- {friendUID: {lastWhisper, lastGroup, lastTrade}} - tracks friend interaction timestamps
 	nicknames = {}, -- {friendUID: "Nickname"} - custom nicknames for friends
 	-- Visual Settings
 	compactMode = false, -- Use compact button layout
@@ -262,8 +261,17 @@ function DB:Initialize()
 	-- Migration: Ensure defaultFrameWidth meets new minimum (380px)
 	if BetterFriendlistDB.defaultFrameWidth and BetterFriendlistDB.defaultFrameWidth < 380 then
 		BetterFriendlistDB.defaultFrameWidth = 380
-		-- BFL:DebugPrint("|cff00ff00BFL:Database:|r Migrated defaultFrameWidth to 380 (old minimum was 350)")
 	end
+
+	-- Migration: Remove deprecated "activity" sort mode (ActivityTracker removed)
+	if BetterFriendlistDB.primarySort == "activity" then
+		BetterFriendlistDB.primarySort = "status"
+	end
+	if BetterFriendlistDB.secondarySort == "activity" then
+		BetterFriendlistDB.secondarySort = "name"
+	end
+	-- Clean up orphaned friendActivity data
+	BetterFriendlistDB.friendActivity = nil
 
 	-- Version migration if needed
 	if BetterFriendlistDB.version ~= BFL.VERSION then

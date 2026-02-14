@@ -176,7 +176,6 @@ BFL:RegisterLocale("itIT", function()
 	L.SORT_NAME = "Nome (A-Z)"
 	L.SORT_LEVEL = "Livello"
 	L.SORT_ZONE = "Zona"
-	L.SORT_ACTIVITY = "Attività Recente"
 	L.SORT_GAME = "Gioco"
 	L.SORT_FACTION = "Fazione"
 	L.SORT_GUILD = "Gilda"
@@ -509,8 +508,6 @@ BFL:RegisterLocale("itIT", function()
 	L.DIALOG_CREATE_GROUP_TITLE = "Crea gruppo"
 
 	-- Tooltips
-	L.TOOLTIP_LAST_CONTACT = "Ultimo contatto:"
-	L.TOOLTIP_AGO = " fa"
 	L.TOOLTIP_LAST_ONLINE = "Ultimo online: %s"
 
 	-- Notifications
@@ -597,7 +594,6 @@ BFL:RegisterLocale("itIT", function()
 	L.BROKER_CURRENT_FILTER = "Filtro:"
 	L.BROKER_HINT_CYCLE_FILTER_FULL = "Clic Centro: Cicla Filtro"
 	L.BROKER_AND_MORE = "  ... e %d altri"
-	L.BROKER_WHISPER_AGO = " (sussurro %s fa)"
 	L.BROKER_TOTAL_LABEL = "Totale:"
 	L.BROKER_ONLINE_FRIENDS_COUNT = "%d online / %d amici"
 	L.MENU_CHANGE_COLOR = "Cambia Colore"
@@ -892,7 +888,6 @@ BFL:RegisterLocale("itIT", function()
 	L.CORE_QUICKJOIN_NOT_LOADED = "QJ non carc."
 	L.CORE_RAIDFRAME_NOT_LOADED = "RaidFrame non carc."
 	L.CORE_PREVIEW_MODE_NOT_LOADED = "Preview non carc."
-	L.CORE_ACTIVITY_TEST_NOT_LOADED = "ActivityTest non carc."
 	L.CORE_CLASSIC_COMPAT_HEADER = "|cff00ff00=== Compat ===|r"
 	L.CORE_CLIENT_VERSION = "|cffffcc00Ver Client:|r"
 	L.CORE_DETECTED_FLAVOR = "|cffffcc00Tipo:|r"
@@ -966,7 +961,6 @@ BFL:RegisterLocale("itIT", function()
 	L.CORE_HELP_PERF_RESET = "  |cffffffff/bfl perf reset|r - Reset"
 	L.CORE_HELP_PERF_MEM = "  |cffffffff/bfl perf memory|r - Memoria"
 	L.CORE_HELP_TEST_COMMANDS = "|cffffcc00Test:|r"
-	L.CORE_HELP_TEST_ACTIVITY = "  |cffffffff/bfl test|r - Test"
 	L.TESTSUITE_PERFY_HELP = "  |cffffffff/bfl test perfy [seconds]|r - Run Perfy stress test"
 	L.TESTSUITE_PERFY_STARTING = "Starting Perfy stress test for %d seconds"
 	L.TESTSUITE_PERFY_ALREADY_RUNNING = "Perfy stress test already running"
@@ -1194,7 +1188,6 @@ BFL:RegisterLocale("itIT", function()
 	L.SETTINGS_INHERIT_TOOLTIP = "(Ereditato dal Gruppo)"
 
 	-- Misc
-	L.TOOLTIP_AGO_PREFIX = ""
 	L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Elenco Ignorati Globale"
 
 	-- ========================================
