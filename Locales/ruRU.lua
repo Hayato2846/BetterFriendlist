@@ -187,7 +187,6 @@ BFL:RegisterLocale("ruRU", function()
 	L.SORT_NAME = "Имя (А-Я)"
 	L.SORT_LEVEL = "Уровень"
 	L.SORT_ZONE = "Зона"
-	L.SORT_ACTIVITY = "Недавняя Активность"
 	L.SORT_GAME = "Игра"
 	L.SORT_FACTION = "Фракция"
 	L.SORT_GUILD = "Гильдия"
@@ -544,8 +543,6 @@ BFL:RegisterLocale("ruRU", function()
 	L.DIALOG_CREATE_GROUP_TITLE = "Create Group"
 
 	-- Tooltips
-	L.TOOLTIP_LAST_CONTACT = "Last Contact:"
-	L.TOOLTIP_AGO = " назад"
 	L.TOOLTIP_LAST_ONLINE = "Последний раз в сети: %s"
 
 	-- Notifications
@@ -629,7 +626,6 @@ BFL:RegisterLocale("ruRU", function()
 	L.BROKER_CURRENT_FILTER = "Filter:"
 	L.BROKER_HINT_CYCLE_FILTER_FULL = "Средняя кнопка: Переключить фильтр"
 	L.BROKER_AND_MORE = "  ... and %d others"
-	L.BROKER_WHISPER_AGO = " (шепот %s назад)"
 	L.BROKER_TOTAL_LABEL = "Всего:"
 	L.BROKER_ONLINE_FRIENDS_COUNT = "%d online / %d friends"
 	L.MENU_CHANGE_COLOR = "Изменить цвет"
@@ -946,7 +942,6 @@ BFL:RegisterLocale("ruRU", function()
 	L.CORE_QUICKJOIN_NOT_LOADED = "QJ not loaded"
 	L.CORE_RAIDFRAME_NOT_LOADED = "RaidFrame not loaded"
 	L.CORE_PREVIEW_MODE_NOT_LOADED = "Preview not loaded"
-	L.CORE_ACTIVITY_TEST_NOT_LOADED = "ActivityTest not loaded"
 	L.CORE_CLASSIC_COMPAT_HEADER = "|cff00ff00=== Compat ===|r"
 	L.CORE_CLIENT_VERSION = "|cffffcc00Ver Client:|r"
 	L.CORE_DETECTED_FLAVOR = "|cffffcc00Flavor:|r"
@@ -1020,7 +1015,6 @@ BFL:RegisterLocale("ruRU", function()
 	L.CORE_HELP_PERF_RESET = "  |cffffffff/bfl perf reset|r - Reset"
 	L.CORE_HELP_PERF_MEM = "  |cffffffff/bfl perf memory|r - Memory"
 	L.CORE_HELP_TEST_COMMANDS = "|cffffcc00Test:|r"
-	L.CORE_HELP_TEST_ACTIVITY = "  |cffffffff/bfl test|r - Test"
 	L.TESTSUITE_PERFY_HELP = "  |cffffffff/bfl test perfy [seconds]|r - Run Perfy stress test"
 	L.TESTSUITE_PERFY_STARTING = "Starting Perfy stress test for %d seconds"
 	L.TESTSUITE_PERFY_ALREADY_RUNNING = "Perfy stress test already running"
@@ -1242,7 +1236,7 @@ BFL:RegisterLocale("ruRU", function()
 		"Установить выравнивание значка стрелки сворачивания/разворачива��������������ия"
 	L.SETTINGS_FONT_FACE = "Шрифт"
 	L.SETTINGS_COLOR_GROUP_COUNT = "Цвет Счётчика Группы"
-	L.SETTINGS_COLOR_GROUP_ARROW = "Цвет Стрелки Сворачивания"
+	L.SETTINGS_COLOR_GROUP_ARROW = "Цвет Стрелки Сворачивани��"
 	L.SETTINGS_INHERIT_GROUP_COUNT_COLOR = "Унаследовать Цвет из Группы"
 	L.SETTINGS_INHERIT_GROUP_ARROW_COLOR = "Унаследовать Цвет из Группы"
 	L.SETTINGS_GROUP_HEADER_SETTINGS = "Параметры Заголовка Группы"
@@ -1252,7 +1246,6 @@ BFL:RegisterLocale("ruRU", function()
 	L.SETTINGS_INHERIT_TOOLTIP = "(Унаследовано из Группы)"
 
 	-- Misc
-	L.TOOLTIP_AGO_PREFIX = ""
 	L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Глобальный Список Игнора"
 
 	-- ========================================

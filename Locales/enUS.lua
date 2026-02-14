@@ -180,7 +180,6 @@ local function LoadEnUS()
 	L.SORT_NAME = "Name (A-Z)"
 	L.SORT_LEVEL = "Level"
 	L.SORT_ZONE = "Zone"
-	L.SORT_ACTIVITY = "Recent Activity"
 	L.SORT_GAME = "Game"
 	L.SORT_FACTION = "Faction"
 	L.SORT_GUILD = "Guild"
@@ -523,9 +522,6 @@ local function LoadEnUS()
 	L.DIALOG_CREATE_GROUP_TITLE = "Create group"
 
 	-- Tooltips
-	L.TOOLTIP_LAST_CONTACT = "Last contact:"
-	L.TOOLTIP_AGO = " ago"
-	L.TOOLTIP_AGO_PREFIX = ""
 	L.TOOLTIP_LAST_ONLINE = "Last Online: %s"
 
 	-- Edit Mode
@@ -597,7 +593,6 @@ local function LoadEnUS()
 	L.BROKER_CURRENT_FILTER = "Current Filter:"
 	L.BROKER_HINT_CYCLE_FILTER_FULL = "Middle Click: Cycle Filter"
 	L.BROKER_AND_MORE = "  ... and %d more"
-	L.BROKER_WHISPER_AGO = " (whisper %s ago)"
 	L.BROKER_TOTAL_LABEL = "Total:"
 	L.BROKER_ONLINE_FRIENDS_COUNT = "%d online / %d friends"
 	L.MENU_CHANGE_COLOR = "Change Color"
@@ -938,7 +933,6 @@ local function LoadEnUS()
 	L.CORE_QUICKJOIN_NOT_LOADED = "QuickJoin module not loaded"
 	L.CORE_RAIDFRAME_NOT_LOADED = "RaidFrame module not loaded"
 	L.CORE_PREVIEW_MODE_NOT_LOADED = "PreviewMode module not loaded"
-	L.CORE_ACTIVITY_TEST_NOT_LOADED = "ActivityTracker Tests not loaded"
 	L.CORE_CLASSIC_COMPAT_HEADER = "|cff00ff00=== BetterFriendlist Classic Compatibility ===|r"
 	L.CORE_CLIENT_VERSION = "|cffffcc00Client Version:|r"
 	L.CORE_DETECTED_FLAVOR = "|cffffcc00Detected Flavor:|r"
@@ -1011,7 +1005,6 @@ local function LoadEnUS()
 	L.CORE_HELP_PERF_RESET = "  |cffffffff/bfl perf reset|r - Reset statistics"
 	L.CORE_HELP_PERF_MEM = "  |cffffffff/bfl perf memory|r - Show memory usage"
 	L.CORE_HELP_TEST_COMMANDS = "|cffffcc00Test Commands:|r"
-	L.CORE_HELP_TEST_ACTIVITY = "  |cffffffff/bfl test|r - Run ActivityTracker tests"
 	L.TESTSUITE_PERFY_HELP = "  |cffffffff/bfl test perfy [seconds]|r - Run Perfy stress test"
 	L.TESTSUITE_PERFY_STARTING = "Starting Perfy stress test for %d seconds"
 	L.TESTSUITE_PERFY_ALREADY_RUNNING = "Perfy stress test already running"

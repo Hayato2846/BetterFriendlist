@@ -177,7 +177,6 @@ BFL:RegisterLocale("ptBR", function()
 	L.SORT_NAME = "Nome (A-Z)"
 	L.SORT_LEVEL = "Nível"
 	L.SORT_ZONE = "Zona"
-	L.SORT_ACTIVITY = "Atividade Recente"
 	L.SORT_GAME = "Jogo"
 	L.SORT_FACTION = "Facção"
 	L.SORT_GUILD = "Guilda"
@@ -510,8 +509,6 @@ BFL:RegisterLocale("ptBR", function()
 	L.DIALOG_CREATE_GROUP_TITLE = "Criar grupo"
 
 	-- Tooltips
-	L.TOOLTIP_LAST_CONTACT = "Último contato:"
-	L.TOOLTIP_AGO = " atrás"
 	L.TOOLTIP_LAST_ONLINE = "Último online: %s"
 
 	-- Notifications
@@ -598,7 +595,6 @@ BFL:RegisterLocale("ptBR", function()
 	L.BROKER_CURRENT_FILTER = "Filtro:"
 	L.BROKER_HINT_CYCLE_FILTER_FULL = "Clique Meio: Ciclar Filtro"
 	L.BROKER_AND_MORE = "  ... e %d outros"
-	L.BROKER_WHISPER_AGO = " (sussurro %s atrás)"
 	L.BROKER_TOTAL_LABEL = "Total:"
 	L.BROKER_ONLINE_FRIENDS_COUNT = "%d online / %d amigos"
 	L.MENU_CHANGE_COLOR = "Mudar Cor"
@@ -919,7 +915,6 @@ BFL:RegisterLocale("ptBR", function()
 	L.CORE_QUICKJOIN_NOT_LOADED = "QJ não carreg."
 	L.CORE_RAIDFRAME_NOT_LOADED = "RaidFrame não carreg."
 	L.CORE_PREVIEW_MODE_NOT_LOADED = "Preview não carreg."
-	L.CORE_ACTIVITY_TEST_NOT_LOADED = "ActivityTest não carreg."
 	L.CORE_CLASSIC_COMPAT_HEADER = "|cff00ff00=== Compat ===|r"
 	L.CORE_CLIENT_VERSION = "|cffffcc00Ver Client:|r"
 	L.CORE_DETECTED_FLAVOR = "|cffffcc00Tipo:|r"
@@ -993,7 +988,6 @@ BFL:RegisterLocale("ptBR", function()
 	L.CORE_HELP_PERF_RESET = "  |cffffffff/bfl perf reset|r - Reset"
 	L.CORE_HELP_PERF_MEM = "  |cffffffff/bfl perf memory|r - Memória"
 	L.CORE_HELP_TEST_COMMANDS = "|cffffcc00Teste:|r"
-	L.CORE_HELP_TEST_ACTIVITY = "  |cffffffff/bfl test|r - Teste"
 	L.TESTSUITE_PERFY_HELP = "  |cffffffff/bfl test perfy [seconds]|r - Run Perfy stress test"
 	L.TESTSUITE_PERFY_STARTING = "Starting Perfy stress test for %d seconds"
 	L.TESTSUITE_PERFY_ALREADY_RUNNING = "Perfy stress test already running"
@@ -1220,7 +1214,6 @@ BFL:RegisterLocale("ptBR", function()
 	L.SETTINGS_INHERIT_TOOLTIP = "(Herdado do Grupo)"
 
 	-- Misc
-	L.TOOLTIP_AGO_PREFIX = ""
 	L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Lista Global de Ignorados"
 
 	-- ========================================

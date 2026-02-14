@@ -68,7 +68,6 @@ Modules\HouseListProxy.lua [AllowLoadGameType mainline]
 Modules\Database.lua
 Modules\Changelog.lua
 Modules\HelpFrame.lua
-Modules\ActivityTracker.lua
 Modules\Statistics.lua
 Modules\FrameSettings.lua
 Modules\Groups.lua

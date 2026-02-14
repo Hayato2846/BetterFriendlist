@@ -179,7 +179,6 @@ BFL:RegisterLocale("esES", function()
 	L.SORT_NAME = "Nombre (A-Z)"
 	L.SORT_LEVEL = "Nivel"
 	L.SORT_ZONE = "Zona"
-	L.SORT_ACTIVITY = "Actividad Reciente"
 	L.SORT_GAME = "Juego"
 	L.SORT_FACTION = "Facción"
 	L.SORT_GUILD = "Hermandad"
@@ -518,8 +517,6 @@ BFL:RegisterLocale("esES", function()
 	L.DIALOG_CREATE_GROUP_TITLE = "Crear grupo"
 
 	-- Tooltips
-	L.TOOLTIP_LAST_CONTACT = "Último contacto:"
-	L.TOOLTIP_AGO = " hace"
 	L.TOOLTIP_LAST_ONLINE = "Última vez: %s"
 
 	-- Notifications
@@ -607,7 +604,6 @@ BFL:RegisterLocale("esES", function()
 	L.BROKER_CURRENT_FILTER = "Filtro Actual:"
 	L.BROKER_HINT_CYCLE_FILTER_FULL = "Clic Central: Ciclar Filtro"
 	L.BROKER_AND_MORE = "  ... y %d más"
-	L.BROKER_WHISPER_AGO = " (susurro hace %s)"
 	L.BROKER_TOTAL_LABEL = "Total:"
 	L.BROKER_ONLINE_FRIENDS_COUNT = "%d online / %d amigos"
 	L.MENU_CHANGE_COLOR = "Cambiar Color"
@@ -929,7 +925,6 @@ BFL:RegisterLocale("esES", function()
 	L.CORE_QUICKJOIN_NOT_LOADED = "QuickJoin no cargado"
 	L.CORE_RAIDFRAME_NOT_LOADED = "RaidFrame no cargado"
 	L.CORE_PREVIEW_MODE_NOT_LOADED = "PreviewMode no cargado"
-	L.CORE_ACTIVITY_TEST_NOT_LOADED = "ActivityTests no cargado"
 	L.CORE_CLASSIC_COMPAT_HEADER = "|cff00ff00=== Compat. Classic ===|r"
 	L.CORE_CLIENT_VERSION = "|cffffcc00Versión Cliente:|r"
 	L.CORE_DETECTED_FLAVOR = "|cffffcc00Sabor Detectado:|r"
@@ -1003,7 +998,6 @@ BFL:RegisterLocale("esES", function()
 	L.CORE_HELP_PERF_RESET = "  |cffffffff/bfl perf reset|r - Reset"
 	L.CORE_HELP_PERF_MEM = "  |cffffffff/bfl perf memory|r - Memoria"
 	L.CORE_HELP_TEST_COMMANDS = "|cffffcc00Tests:|r"
-	L.CORE_HELP_TEST_ACTIVITY = "  |cffffffff/bfl test|r - Tests Actividad"
 	L.TESTSUITE_PERFY_HELP = "  |cffffffff/bfl test perfy [seconds]|r - Run Perfy stress test"
 	L.TESTSUITE_PERFY_STARTING = "Starting Perfy stress test for %d seconds"
 	L.TESTSUITE_PERFY_ALREADY_RUNNING = "Perfy stress test already running"
@@ -1230,7 +1224,6 @@ BFL:RegisterLocale("esES", function()
 	L.SETTINGS_INHERIT_TOOLTIP = "(Heredado del Grupo)"
 
 	-- Misc
-	L.TOOLTIP_AGO_PREFIX = ""
 	L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Lista Global de Ignorados"
 
 	-- ========================================

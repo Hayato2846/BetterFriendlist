@@ -3122,7 +3122,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 				end
 				friend.battleTag = accountInfo.battleTag
 
-				-- PHASE 9.6: Cache UID for ActivityTracker (Hot Path)
+				-- PHASE 9.6: Cache UID (Hot Path)
 				-- CRITICAL: Check for non-empty string, not just truthy value
 				if friend.battleTag and friend.battleTag ~= "" then
 					friend.uid = "bnet_" .. friend.battleTag
@@ -3348,9 +3348,6 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 	-- This prevents recalculation during the N*log(N) sort process (1000s of calls)
 	-- We always calculate ALL keys because primary/secondary sort can switch instantly
 
-	-- PERFY OPTIMIZATION: Cache ActivityTracker module reference
-	local ActivityTracker = BFL and BFL:GetModule("ActivityTracker")
-
 	-- OPTIMIZATION (Phase 9.8): Selective Sort Key Calculation
 	-- Only calculate expensive keys if they are actually used for sorting
 	local primarySort = self.sortMode or "status"
@@ -3436,21 +3433,8 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 			friend._sort_zoneName = nil
 		end
 
-		-- Activity (Hybrid Activity + Last Online)
-		local activityTime = 0
-		-- Use cached ActivityTracker
-		if ActivityTracker then
-			-- PHASE 9.6: Use Cached UID
-			local uid = friend.uid
-			if uid then
-				activityTime = ActivityTracker:GetLastActivity(uid) or 0
-			end
-		end
-		-- Fallback to API lastOnlineTime if no tracked activity
-		if activityTime == 0 and friend.lastOnlineTime then
-			activityTime = friend.lastOnlineTime
-		end
-		friend._sort_activity = activityTime
+		-- Activity sort key (uses last online time from API)
+		friend._sort_activity = friend.lastOnlineTime or 0
 	end
 
 	-- Apply filters and sort
@@ -3863,7 +3847,6 @@ function FriendsList:PopulateSortMenu(rootDescription, sortType)
 		name = "Interface\\AddOns\\BetterFriendlist\\Icons\\name",
 		level = "Interface\\AddOns\\BetterFriendlist\\Icons\\level",
 		zone = "Interface\\AddOns\\BetterFriendlist\\Icons\\zone",
-		activity = "Interface\\AddOns\\BetterFriendlist\\Icons\\activity",
 		game = "Interface\\AddOns\\BetterFriendlist\\Icons\\game",
 		faction = "Interface\\AddOns\\BetterFriendlist\\Icons\\faction",
 		guild = "Interface\\AddOns\\BetterFriendlist\\Icons\\guild",
@@ -3917,7 +3900,6 @@ function FriendsList:PopulateSortMenu(rootDescription, sortType)
 		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.name, L.SORT_NAME), "name")
 		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.level, L.SORT_LEVEL), "level")
 		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.zone, L.SORT_ZONE), "zone")
-		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.activity, L.SORT_ACTIVITY), "activity")
 		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.game, L.SORT_GAME), "game")
 		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.faction, L.SORT_FACTION), "faction")
 		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.guild, L.SORT_GUILD), "guild")

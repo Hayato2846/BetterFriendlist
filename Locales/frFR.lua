@@ -178,7 +178,6 @@ BFL:RegisterLocale("frFR", function()
 	L.SORT_NAME = "Nom (A-Z)"
 	L.SORT_LEVEL = "Niveau"
 	L.SORT_ZONE = "Zone"
-	L.SORT_ACTIVITY = "Activité Récente"
 	L.SORT_GAME = "Jeu"
 	L.SORT_FACTION = "Faction"
 	L.SORT_GUILD = "Guilde"
@@ -515,9 +514,6 @@ BFL:RegisterLocale("frFR", function()
 	L.DIALOG_CREATE_GROUP_TITLE = "Créer groupe"
 
 	-- Tooltips
-	L.TOOLTIP_LAST_CONTACT = "Dernier contact :"
-	L.TOOLTIP_AGO = ""
-	L.TOOLTIP_AGO_PREFIX = "il y a "
 	L.TOOLTIP_LAST_ONLINE = "Dernière fois : %s"
 
 	-- Notifications
@@ -604,7 +600,6 @@ BFL:RegisterLocale("frFR", function()
 	L.BROKER_CURRENT_FILTER = "Filtre Actuel :"
 	L.BROKER_HINT_CYCLE_FILTER_FULL = "Clic Milieu : Changer Filtre"
 	L.BROKER_AND_MORE = "  ... et %d plus"
-	L.BROKER_WHISPER_AGO = " (chuchotement il y a %s)"
 	L.BROKER_TOTAL_LABEL = "Total :"
 	L.BROKER_ONLINE_FRIENDS_COUNT = "%d en ligne / %d amis"
 	L.MENU_CHANGE_COLOR = "Changer Couleur"
@@ -926,7 +921,6 @@ BFL:RegisterLocale("frFR", function()
 	L.CORE_QUICKJOIN_NOT_LOADED = "QuickJoin non chargé"
 	L.CORE_RAIDFRAME_NOT_LOADED = "RaidFrame non chargé"
 	L.CORE_PREVIEW_MODE_NOT_LOADED = "PreviewMode non chargé"
-	L.CORE_ACTIVITY_TEST_NOT_LOADED = "ActivityTests non chargé"
 	L.CORE_CLASSIC_COMPAT_HEADER = "|cff00ff00=== Compat. Classic ===|r"
 	L.CORE_CLIENT_VERSION = "|cffffcc00Version Client :|r"
 	L.CORE_DETECTED_FLAVOR = "|cffffcc00Type Détecté :|r"
@@ -1000,7 +994,6 @@ BFL:RegisterLocale("frFR", function()
 	L.CORE_HELP_PERF_RESET = "  |cffffffff/bfl perf reset|r - Reset"
 	L.CORE_HELP_PERF_MEM = "  |cffffffff/bfl perf memory|r - Mémoire"
 	L.CORE_HELP_TEST_COMMANDS = "|cffffcc00Tests :|r"
-	L.CORE_HELP_TEST_ACTIVITY = "  |cffffffff/bfl test|r - Tests Activité"
 	L.TESTSUITE_PERFY_HELP = "  |cffffffff/bfl test perfy [seconds]|r - Run Perfy stress test"
 	L.TESTSUITE_PERFY_STARTING = "Starting Perfy stress test for %d seconds"
 	L.TESTSUITE_PERFY_ALREADY_RUNNING = "Perfy stress test already running"
@@ -1227,7 +1220,6 @@ BFL:RegisterLocale("frFR", function()
 	L.SETTINGS_INHERIT_TOOLTIP = "(Hérité du Groupe)"
 
 	-- Misc
-	L.TOOLTIP_AGO_PREFIX = ""
 	L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Liste Globale Ignorée"
 
 	-- ========================================

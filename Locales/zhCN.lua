@@ -170,7 +170,6 @@ BFL:RegisterLocale("zhCN", function()
 	L.SORT_NAME = "姓名 (A-Z)"
 	L.SORT_LEVEL = "等级"
 	L.SORT_ZONE = "区域"
-	L.SORT_ACTIVITY = "最近活动"
 	L.SORT_GAME = "游戏"
 	L.SORT_FACTION = "阵营"
 	L.SORT_GUILD = "公会"
@@ -516,8 +515,6 @@ BFL:RegisterLocale("zhCN", function()
 	L.DIALOG_CREATE_GROUP_TITLE = "Create Group"
 
 	-- Tooltips
-	L.TOOLTIP_LAST_CONTACT = "Last Contact:"
-	L.TOOLTIP_AGO = " 前"
 	L.TOOLTIP_LAST_ONLINE = "最后上线: %s"
 
 	-- Notifications
@@ -601,7 +598,6 @@ BFL:RegisterLocale("zhCN", function()
 	L.BROKER_CURRENT_FILTER = "Filter:"
 	L.BROKER_HINT_CYCLE_FILTER_FULL = "中键点击: 切换过滤器"
 	L.BROKER_AND_MORE = "  ... and %d others"
-	L.BROKER_WHISPER_AGO = " (%s前密语)"
 	L.BROKER_TOTAL_LABEL = "总计:"
 	L.BROKER_ONLINE_FRIENDS_COUNT = "%d online / %d friends"
 	L.MENU_CHANGE_COLOR = "更改颜色"
@@ -919,7 +915,6 @@ BFL:RegisterLocale("zhCN", function()
 	L.CORE_QUICKJOIN_NOT_LOADED = "QJ not loaded"
 	L.CORE_RAIDFRAME_NOT_LOADED = "RaidFrame not loaded"
 	L.CORE_PREVIEW_MODE_NOT_LOADED = "Preview not loaded"
-	L.CORE_ACTIVITY_TEST_NOT_LOADED = "ActivityTest not loaded"
 	L.CORE_CLASSIC_COMPAT_HEADER = "|cff00ff00=== Compat ===|r"
 	L.CORE_CLIENT_VERSION = "|cffffcc00Ver Client:|r"
 	L.CORE_DETECTED_FLAVOR = "|cffffcc00Flavor:|r"
@@ -993,7 +988,6 @@ BFL:RegisterLocale("zhCN", function()
 	L.CORE_HELP_PERF_RESET = "  |cffffffff/bfl perf reset|r - Reset"
 	L.CORE_HELP_PERF_MEM = "  |cffffffff/bfl perf memory|r - Memory"
 	L.CORE_HELP_TEST_COMMANDS = "|cffffcc00Test:|r"
-	L.CORE_HELP_TEST_ACTIVITY = "  |cffffffff/bfl test|r - Test"
 	L.TESTSUITE_PERFY_HELP = "  |cffffffff/bfl test perfy [seconds]|r - Run Perfy stress test"
 	L.TESTSUITE_PERFY_STARTING = "Starting Perfy stress test for %d seconds"
 	L.TESTSUITE_PERFY_ALREADY_RUNNING = "Perfy stress test already running"
@@ -1210,7 +1204,6 @@ BFL:RegisterLocale("zhCN", function()
 	L.SETTINGS_INHERIT_TOOLTIP = "（从群组继承）"
 
 	-- Misc
-	L.TOOLTIP_AGO_PREFIX = ""
 	L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "全局忽略列表"
 
 	-- ========================================

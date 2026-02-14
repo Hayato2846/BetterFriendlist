@@ -280,7 +280,6 @@ local SORT_ICONS = {
 	name = "Interface\\AddOns\\BetterFriendlist\\Icons\\name", -- Feather: type/text icon
 	level = "Interface\\AddOns\\BetterFriendlist\\Icons\\level", -- Feather: bar-chart icon
 	zone = "Interface\\AddOns\\BetterFriendlist\\Icons\\zone", -- Feather: map-pin icon
-	activity = "Interface\\AddOns\\BetterFriendlist\\Icons\\activity", -- Feather: activity pulse
 	game = "Interface\\AddOns\\BetterFriendlist\\Icons\\game", -- Feather: target/game icon
 	faction = "Interface\\AddOns\\BetterFriendlist\\Icons\\faction", -- Feather: shield icon
 	guild = "Interface\\AddOns\\BetterFriendlist\\Icons\\guild", -- Feather: users/group icon
@@ -556,7 +555,6 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 			AddSecondaryOption("name", L.SORT_NAME, SORT_ICONS.name)
 			AddSecondaryOption("level", L.SORT_LEVEL, SORT_ICONS.level)
 			AddSecondaryOption("zone", L.SORT_ZONE, SORT_ICONS.zone)
-			AddSecondaryOption("activity", L.SORT_ACTIVITY, SORT_ICONS.activity)
 			AddSecondaryOption("game", L.SORT_GAME, SORT_ICONS.game)
 			AddSecondaryOption("faction", L.SORT_FACTION, SORT_ICONS.faction)
 			AddSecondaryOption("guild", L.SORT_GUILD, SORT_ICONS.guild)
@@ -708,7 +706,6 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.name, L.SORT_NAME), "name")
 		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.level, L.SORT_LEVEL), "level")
 		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.zone, L.SORT_ZONE), "zone")
-		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.activity, L.SORT_ACTIVITY), "activity")
 
 		-- PHASE 9B+9C: Add 5 new sort options
 		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.game, L.SORT_GAME), "game")

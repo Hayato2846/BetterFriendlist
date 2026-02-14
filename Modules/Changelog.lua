@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Blizzard Raid Frame Interaction** - Fixed empty raid member slots retaining stale unit references, which could cause unexpected interactions with Blizzard's default raid frame.
 - **Raid Info First-Click Ghost Buttons** - Fixed Blizzard's raid member buttons briefly appearing when clicking the Raid Info button for the first time after a /reload.
 
+### Removed
+- **Activity Tracker** - Removed the Activity Tracker feature (last whisper/group/trade timestamps) to fix a critical error caused by addon taint in the chat system on WoW 12.0+. The "Recent Activity" sort option has also been removed.
+
 ## [2.3.5]       - 2026-02-13
 ### Fixed
 - **Settings Import Failing** - Fixed settings import always failing with "corrupted string" error, making it impossible to restore exported backups.

@@ -188,7 +188,6 @@ BFL:RegisterLocale("deDE", function()
 	L.SORT_NAME = "Name (A-Z)"
 	L.SORT_LEVEL = "Stufe"
 	L.SORT_ZONE = "Zone"
-	L.SORT_ACTIVITY = "Letzte Aktivität"
 	L.SORT_GAME = "Spiel"
 	L.SORT_FACTION = "Fraktion"
 	L.SORT_GUILD = "Gilde"
@@ -642,9 +641,6 @@ BFL:RegisterLocale("deDE", function()
 	L.DIALOG_CREATE_GROUP_TITLE = "Gruppe erstellen"
 
 	-- Tooltips Advanced
-	L.TOOLTIP_LAST_CONTACT = "Letzter Kontakt:"
-	L.TOOLTIP_AGO = " her"
-	L.TOOLTIP_AGO_PREFIX = ""
 	L.TOOLTIP_LAST_ONLINE = "Zuletzt online: %s"
 	L.TOOLTIP_RESTORE_FRIEND = "Freund wiederherstellen"
 	L.TOOLTIP_DELETE_FRIEND = "Freund löschen"
@@ -677,7 +673,6 @@ BFL:RegisterLocale("deDE", function()
 	L.BROKER_CURRENT_FILTER = "Aktueller Filter:"
 	L.BROKER_HINT_CYCLE_FILTER_FULL = "Mittelklick: Filter durchschalten"
 	L.BROKER_AND_MORE = "  ... und %d weitere"
-	L.BROKER_WHISPER_AGO = " (geflüstert vor %s)"
 	L.BROKER_TOTAL_LABEL = "Gesamt:"
 	L.BROKER_ONLINE_FRIENDS_COUNT = "%d online / %d Freunde"
 
@@ -922,7 +917,6 @@ BFL:RegisterLocale("deDE", function()
 	L.CORE_QUICKJOIN_NOT_LOADED = "QuickJoin Modul nicht geladen"
 	L.CORE_RAIDFRAME_NOT_LOADED = "RaidFrame Modul nicht geladen"
 	L.CORE_PREVIEW_MODE_NOT_LOADED = "PreviewMode Modul nicht geladen"
-	L.CORE_ACTIVITY_TEST_NOT_LOADED = "ActivityTracker Tests nicht geladen"
 	L.CORE_CLASSIC_COMPAT_HEADER = "|cff00ff00=== BetterFriendlist Classic Kompatibilität ===|r"
 	L.CORE_CLIENT_VERSION = "|cffffcc00Client-Version:|r"
 	L.CORE_DETECTED_FLAVOR = "|cffffcc00Erkannte Variante:|r"
@@ -996,7 +990,6 @@ BFL:RegisterLocale("deDE", function()
 	L.CORE_HELP_PERF_RESET = "  |cffffffff/bfl perf reset|r - Statistiken zurücksetzen"
 	L.CORE_HELP_PERF_MEM = "  |cffffffff/bfl perf memory|r - Speichernutzung anzeigen"
 	L.CORE_HELP_TEST_COMMANDS = "|cffffcc00Test-Befehle:|r"
-	L.CORE_HELP_TEST_ACTIVITY = "  |cffffffff/bfl test|r - ActivityTracker Tests ausführen"
 	L.TESTSUITE_PERFY_HELP = "  |cffffffff/bfl test perfy [seconds]|r - Run Perfy stress test"
 	L.TESTSUITE_PERFY_STARTING = "Starting Perfy stress test for %d seconds"
 	L.TESTSUITE_PERFY_ALREADY_RUNNING = "Perfy stress test already running"
