@@ -1170,6 +1170,18 @@ function FriendsList:UpdateSearchBoxState()
 				scrollFrame:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 4, -22)
 				scrollFrame:SetPoint("BOTTOMRIGHT", frame.Inset, "BOTTOMRIGHT", -22, 2)
 			end
+
+			-- Push content frames for tabs 2/3 down to make room for SearchBox
+			if frame.RecentAlliesFrame then
+				frame.RecentAlliesFrame:ClearAllPoints()
+				frame.RecentAlliesFrame:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 3, -22)
+				frame.RecentAlliesFrame:SetPoint("BOTTOMRIGHT", frame.Inset, "BOTTOMRIGHT", -3, 2)
+			end
+			if frame.RecruitAFriendFrame then
+				frame.RecruitAFriendFrame:ClearAllPoints()
+				frame.RecruitAFriendFrame:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 0, -22)
+				frame.RecruitAFriendFrame:SetPoint("BOTTOMRIGHT", frame.Inset, "BOTTOMRIGHT", 0, 0)
+			end
 		elseif searchBox then
 			-- Persistent SearchBox Mode (Simple Mode - HIDE)
 			searchBox:Hide()
@@ -1178,6 +1190,18 @@ function FriendsList:UpdateSearchBoxState()
 			scrollFrame:ClearAllPoints()
 			scrollFrame:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 4, -4)
 			scrollFrame:SetPoint("BOTTOMRIGHT", frame.Inset, "BOTTOMRIGHT", -22, 2)
+
+			-- Reset content frames for tabs 2/3 (no SearchBox = no offset)
+			if frame.RecentAlliesFrame then
+				frame.RecentAlliesFrame:ClearAllPoints()
+				frame.RecentAlliesFrame:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 3, -4)
+				frame.RecentAlliesFrame:SetPoint("BOTTOMRIGHT", frame.Inset, "BOTTOMRIGHT", -3, 2)
+			end
+			if frame.RecruitAFriendFrame then
+				frame.RecruitAFriendFrame:ClearAllPoints()
+				frame.RecruitAFriendFrame:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 0, -4)
+				frame.RecruitAFriendFrame:SetPoint("BOTTOMRIGHT", frame.Inset, "BOTTOMRIGHT", 0, 0)
+			end
 		end
 	else
 		-- Normal Mode

@@ -812,10 +812,14 @@ function BFL:ApplyTabFonts()
 	)
 
 	-- Reposition first top tab to align with Inset
+	-- Simple Mode uses -60 (no SearchBox row in header), Normal Mode uses -95
 	local topTab1 = _G.BetterFriendsFrameTab1
 	if topTab1 and BetterFriendsFrame then
+		local db = BetterFriendlistDB
+		local isSimple = db and db.simpleMode
+		local topTabY = isSimple and -60 or -95
 		topTab1:ClearAllPoints()
-		topTab1:SetPoint("TOPLEFT", BetterFriendsFrame, "TOPLEFT", topStartX, -95)
+		topTab1:SetPoint("TOPLEFT", BetterFriendsFrame, "TOPLEFT", topStartX, topTabY)
 	end
 end
 
@@ -2444,13 +2448,18 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 			end
 		end
 
-		-- Show SearchBox on all top tabs (Friends, Recent Allies, RAF)
-		searchBox:Show()
+		-- SearchBox visibility is managed by UpdateSearchBoxState (respects Simple Mode)
+		-- Do NOT unconditionally Show() here - it would override Simple Mode's hidden state
 	end
 
-	-- Force layout update for Tab 1 to position SearchBox correctly
+	-- Force SearchBox state update (handles Simple Mode visibility + positioning)
+	local FriendsList = BFL:GetModule("FriendsList")
+	if FriendsList and FriendsList.UpdateSearchBoxState then
+		FriendsList:UpdateSearchBoxState()
+	end
+
+	-- Force layout update for Tab 1 to position ScrollFrame correctly
 	if tabIndex == 1 then
-		local FriendsList = BFL:GetModule("FriendsList")
 		if FriendsList and FriendsList.UpdateScrollBoxExtent then
 			FriendsList:UpdateScrollBoxExtent()
 		end
