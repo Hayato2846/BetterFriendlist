@@ -490,6 +490,8 @@ BFL:RegisterLocale("deDE", function()
 	L.RAID_ERR_NOT_IN_GROUP = "Du bist in keiner Gruppe"
 	L.RECRUIT_A_FRIEND = "Werbt einen Freund"
 	L.SEARCH_FRIENDS_INSTRUCTION = "Freunde suchen..."
+	L.SEARCH_RECENT_ALLIES_INSTRUCTION = "Letzte Verb\195\188ndete suchen..."
+	L.SEARCH_RAF_INSTRUCTION = "Geworbene Freunde suchen..."
 	L.SETTINGS_SHOW_WELCOME_MESSAGE = "Willkommensnachricht anzeigen"
 	L.SETTINGS_SHOW_WELCOME_MESSAGE_DESC = "Zeigt die Addon-Geladen-Nachricht im Chat an, wenn du dich einloggst."
 	L.SETTINGS_TAB_DATABROKER = "Data Broker"
@@ -553,9 +555,9 @@ BFL:RegisterLocale("deDE", function()
 	L.SETTINGS_MIGRATION_DESC = "Migriert Gruppen und Zuweisungen vom FriendGroups Addon (basierend auf BNet-Notizen)."
 	L.SETTINGS_MIGRATION_HEADER = "FriendGroups Migration"
 	L.SETTINGS_NAME_FORMAT_DESC =
-		"Namensanzeige anpassen:\n|cffFFD100%name%|r - Name (RealID/BattleTag)\n|cffFFD100%note%|r - Notiz\n|cffFFD100%nickname%|r - Spitzname\n|cffFFD100%battletag%|r - Kurzer BattleTag"
+		"Verwende Platzhalter, um die Anzeige anzupassen:\n|cffFFD100%name%|r - Accountname\n|cffFFD100%battletag%|r - BattleTag\n|cffFFD100%nickname%|r - Spitzname\n|cffFFD100%note%|r - Notiz\n|cffFFD100%character%|r - Charaktername\n|cffFFD100%realm%|r - Realmname\n|cffFFD100%level%|r - Stufe\n|cffFFD100%zone%|r - Gebiet\n|cffFFD100%class%|r - Klasse\n|cffFFD100%game%|r - Spiel"
 	L.SETTINGS_NAME_FORMAT_HEADER = "Namensformatierung"
-	L.SETTINGS_NAME_FORMAT_LABEL = "Format:"
+	L.SETTINGS_NAME_FORMAT_LABEL = "Vorlage:"
 	L.SETTINGS_SHOW_BLIZZARD_DESC = "Zeigt den Blizzard Freunde-Button an"
 	L.SETTINGS_SHOW_FACTION_ICONS_DESC = "Zeigt Fraktions-Icons neben Namen"
 	L.SETTINGS_SHOW_FAVORITES_DESC = "Zeigt die Favoriten-Gruppe an"
@@ -820,6 +822,31 @@ BFL:RegisterLocale("deDE", function()
 	L.SETTINGS_NAME_FORMAT_TOOLTIP_DESC = "Gib einen Format-String mit Tokens ein."
 	L.SETTINGS_NAME_FORMAT_DISABLED_FRIENDLISTCOLORS =
 		"This setting is disabled because the addon 'FriendListColors' is managing name colors/formats."
+
+	-- Name Format Preset Labels (Phase 22)
+	L.NAME_PRESET_DEFAULT = "Name (Charakter)"
+	L.NAME_PRESET_BATTLETAG = "BattleTag (Charakter)"
+	L.NAME_PRESET_NICKNAME = "Spitzname (Charakter)"
+	L.NAME_PRESET_NAME_ONLY = "Nur Name"
+	L.NAME_PRESET_CHARACTER = "Nur Charakter"
+	L.NAME_PRESET_CUSTOM = "Benutzerdefiniert..."
+	L.SETTINGS_NAME_FORMAT_CUSTOM_LABEL = "Eigenes Format:"
+
+	-- Info Format Section (Phase 22)
+	L.SETTINGS_INFO_FORMAT_HEADER = "Freunde-Info Formatierung"
+	L.SETTINGS_INFO_FORMAT_LABEL = "Vorlage:"
+	L.SETTINGS_INFO_FORMAT_CUSTOM_LABEL = "Eigenes Format:"
+	L.SETTINGS_INFO_FORMAT_TOOLTIP = "Eigenes Info-Format"
+	L.SETTINGS_INFO_FORMAT_DESC =
+		"Verwende Platzhalter, um die Infoleiste anzupassen:\n|cffFFD100%level%|r - Charakterstufe\n|cffFFD100%zone%|r - Aktuelles Gebiet\n|cffFFD100%class%|r - Klassenname\n|cffFFD100%game%|r - Spielname\n|cffFFD100%realm%|r - Realmname\n|cffFFD100%status%|r - AFK/DND/Online\n|cffFFD100%lastonline%|r - Zuletzt Online\n|cffFFD100%name%|r - Accountname\n|cffFFD100%battletag%|r - BattleTag\n|cffFFD100%nickname%|r - Spitzname\n|cffFFD100%note%|r - Notiz\n|cffFFD100%character%|r - Charaktername"
+	L.INFO_PRESET_DEFAULT = "Standard (Level, Zone)"
+	L.INFO_PRESET_ZONE = "Nur Zone"
+	L.INFO_PRESET_LEVEL = "Nur Level"
+	L.INFO_PRESET_CLASS_ZONE = "Klasse, Zone"
+	L.INFO_PRESET_LEVEL_CLASS_ZONE = "Level Klasse, Zone"
+	L.INFO_PRESET_GAME = "Spielname"
+	L.INFO_PRESET_DISABLED = "Deaktiviert (Info ausblenden)"
+	L.INFO_PRESET_CUSTOM = "Benutzerdefiniert..."
 	L.SETTINGS_INGAME_MODE_WOW = "Nur WoW (Gleiche Ära)"
 	L.SETTINGS_INGAME_MODE_ANY = "Jedes Spiel"
 	L.SETTINGS_INGAME_MODE_LABEL = "   Modus:"

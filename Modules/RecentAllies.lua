@@ -22,6 +22,9 @@ local RecentAlliesListEvents = {
 	"RECENT_ALLIES_CACHE_UPDATE",
 }
 
+-- Current search text for filtering
+RecentAllies.searchText = ""
+
 -- ========================================
 -- Public API
 -- ========================================
@@ -46,19 +49,25 @@ function RecentAllies:OnLoad(frame)
 		notAvailableText:SetText(BFL.L.RECENT_ALLIES_NOT_AVAILABLE)
 		notAvailableText:SetTextColor(0.5, 0.5, 0.5)
 		frame.UnavailableText = notAvailableText
-		
+
 		-- Hide ScrollBox elements if they exist
-		if frame.ScrollBox then frame.ScrollBox:Hide() end
-		if frame.ScrollBar then frame.ScrollBar:Hide() end
-		if frame.LoadingSpinner then frame.LoadingSpinner:Hide() end
+		if frame.ScrollBox then
+			frame.ScrollBox:Hide()
+		end
+		if frame.ScrollBar then
+			frame.ScrollBar:Hide()
+		end
+		if frame.LoadingSpinner then
+			frame.LoadingSpinner:Hide()
+		end
 		return
 	end
-	
+
 	-- Initialize ScrollBox with element factory
 	local elementSpacing = 1
 	local topPadding, bottomPadding, leftPadding, rightPadding = 0, 0, 0, 0
 	local view = CreateScrollBoxListLinearView(topPadding, bottomPadding, leftPadding, rightPadding, elementSpacing)
-	
+
 	view:SetElementFactory(function(factory, elementData)
 		if elementData.isDivider then
 			factory("BetterRecentAlliesDividerTemplate")
@@ -86,17 +95,17 @@ function RecentAllies:OnLoad(frame)
 			end)
 		end
 	end)
-	
+
 	ScrollUtil.InitScrollBoxListWithScrollBar(frame.ScrollBox, frame.ScrollBar, view)
 end
 
 -- Show Recent Allies Frame (RecentAlliesListMixin:OnShow)
 function RecentAllies:OnShow(frame)
 	FrameUtil.RegisterFrameForEvents(frame, RecentAlliesListEvents)
-	
+
 	-- Show spinner initially, will hide when data is ready
 	self:SetLoadingSpinnerShown(frame, true)
-	
+
 	-- Refresh will check if data is ready and hide spinner if it is
 	self:Refresh(frame, ScrollBoxConstants.DiscardScrollPosition)
 end
@@ -127,21 +136,21 @@ function RecentAllies:Refresh(frame, retainScrollPosition)
 		frame.UnavailableText:Show()
 		return
 	end
-	
+
 	-- Hide unavailable message if it exists
 	if frame.UnavailableText then
 		frame.UnavailableText:Hide()
 	end
-	
+
 	-- Check if data is ready
 	local dataReady = C_RecentAllies.IsRecentAllyDataReady()
 	self:SetLoadingSpinnerShown(frame, not dataReady)
-	
+
 	if not dataReady then
 		-- Data will load automatically, and we'll get RECENT_ALLIES_CACHE_UPDATE event
 		return
 	end
-	
+
 	local dataProvider = self:BuildDataProvider()
 	frame.ScrollBox:SetDataProvider(dataProvider, retainScrollPosition)
 end
@@ -150,18 +159,74 @@ end
 function RecentAllies:BuildDataProvider()
 	-- Get recent allies (presorted by pin state, online status, most recent interaction, alphabetically)
 	local recentAllies = C_RecentAllies.GetRecentAllies()
+
+	-- Apply search filter if active
+	if self.searchText and self.searchText ~= "" then
+		local searchNormalized = BFL:StripAccents(self.searchText)
+		local filtered = {}
+		for _, ally in ipairs(recentAllies) do
+			if self:MatchesSearch(ally, searchNormalized) then
+				filtered[#filtered + 1] = ally
+			end
+		end
+		recentAllies = filtered
+	end
+
 	local dataProvider = CreateDataProvider(recentAllies)
-	
+
 	-- Insert divider between pinned and unpinned allies
 	local firstUnpinnedIndex = dataProvider:FindIndexByPredicate(function(elementData)
 		return not elementData.stateData.pinExpirationDate
 	end)
-	
+
 	if firstUnpinnedIndex and firstUnpinnedIndex > 1 then
 		dataProvider:InsertAtIndex({ isDivider = true }, firstUnpinnedIndex)
 	end
-	
+
 	return dataProvider
+end
+
+-- Check if a recent ally matches the search text (accent-insensitive)
+function RecentAllies:MatchesSearch(ally, searchNormalized)
+	local characterData = ally.characterData
+	local stateData = ally.stateData
+	local interactionData = ally.interactionData
+
+	-- Helper: check if field contains the search (accent-insensitive)
+	local function contains(text)
+		if text and text ~= "" then
+			return BFL:StripAccents(text):find(searchNormalized, 1, true) ~= nil
+		end
+		return false
+	end
+
+	-- Search across all relevant fields
+	return contains(characterData.name)
+		or contains(characterData.fullName)
+		or contains(stateData.currentLocation)
+		or contains(interactionData and interactionData.note)
+		or (
+			interactionData
+			and interactionData.interactions
+			and #interactionData.interactions > 0
+			and interactionData.interactions[1]
+			and contains(interactionData.interactions[1].description)
+		)
+end
+
+-- Set search text and refresh the list
+function RecentAllies:SetSearchText(text)
+	local newText = text or ""
+	if self.searchText == newText then
+		return
+	end
+	self.searchText = newText
+
+	-- Refresh the list with the new search filter
+	local frame = BetterFriendsFrame and BetterFriendsFrame.RecentAlliesFrame
+	if frame and frame:IsShown() then
+		self:Refresh(frame, ScrollBoxConstants.DiscardScrollPosition)
+	end
 end
 
 -- Set loading spinner visibility (RecentAlliesListMixin:SetLoadingSpinnerShown)
@@ -174,11 +239,11 @@ end
 -- Initialize a recent ally entry button (RecentAlliesEntryMixin:Initialize)
 function RecentAllies:InitializeEntry(button, elementData)
 	button.elementData = elementData
-	
+
 	local characterData = elementData.characterData
 	local stateData = elementData.stateData
 	local interactionData = elementData.interactionData
-	
+
 	-- Set online status icon
 	local statusIcon = "Interface\\FriendsFrame\\StatusIcon-Offline"
 	if stateData.isOnline then
@@ -191,12 +256,12 @@ function RecentAllies:InitializeEntry(button, elementData)
 		end
 	end
 	button.OnlineStatusIcon:SetTexture(statusIcon)
-	
+
 	-- Update background color based on online status
 	button.NormalTexture:Show()
 	local backgroundColor = stateData.isOnline and FRIENDS_WOW_BACKGROUND_COLOR or FRIENDS_OFFLINE_BACKGROUND_COLOR
 	button.NormalTexture:SetColorTexture(backgroundColor:GetRGBA())
-	
+
 	-- Set name in class color (Line 1, Part 1)
 	local classInfo = C_CreatureInfo.GetClassInfo(characterData.classID)
 	local nameColor
@@ -207,12 +272,12 @@ function RecentAllies:InitializeEntry(button, elementData)
 	end
 	button.CharacterData.Name:SetText(nameColor:WrapTextInColorCode(characterData.name))
 	button.CharacterData.Name:SetWidth(math.min(button.CharacterData.Name:GetUnboundedStringWidth(), 150))
-	
+
 	-- Set level (Line 1, Part 2)
 	local levelColor = stateData.isOnline and NORMAL_FONT_COLOR or FRIENDS_GRAY_COLOR
 	button.CharacterData.Level:SetText(levelColor:WrapTextInColorCode(characterData.level))
 	button.CharacterData.Level:SetWidth(button.CharacterData.Level:GetUnboundedStringWidth())
-	
+
 	-- Class (Line 1, Part 3)
 	if classInfo then
 		local classColor = stateData.isOnline and GetClassColorObj(classInfo.classFile) or FRIENDS_GRAY_COLOR
@@ -220,7 +285,7 @@ function RecentAllies:InitializeEntry(button, elementData)
 	else
 		button.CharacterData.Class:SetText("")
 	end
-	
+
 	-- Update divider colors
 	if button.CharacterData.Dividers then
 		for _, divider in ipairs(button.CharacterData.Dividers) do
@@ -231,18 +296,20 @@ function RecentAllies:InitializeEntry(button, elementData)
 			end
 		end
 	end
-	
+
 	-- Set most recent interaction (Line 2)
-	local mostRecentInteraction = interactionData.interactions and #interactionData.interactions > 0 and interactionData.interactions[1]
+	local mostRecentInteraction = interactionData.interactions
+		and #interactionData.interactions > 0
+		and interactionData.interactions[1]
 	if mostRecentInteraction then
 		button.CharacterData.MostRecentInteraction:SetText(mostRecentInteraction.description or "")
 	else
 		button.CharacterData.MostRecentInteraction:SetText("")
 	end
-	
+
 	-- Set location (Line 3)
 	button.CharacterData.Location:SetText(stateData.currentLocation or "")
-	
+
 	-- Update state icons
 	button.StateIconContainer.PinDisplay:SetShown(stateData.pinExpirationDate ~= nil)
 	if stateData.pinExpirationDate then
@@ -252,19 +319,19 @@ function RecentAllies:InitializeEntry(button, elementData)
 		local atlas = isNearingExpiration and "friendslist-recentallies-pin" or "friendslist-recentallies-pin-yellow"
 		button.StateIconContainer.PinDisplay.Icon:SetAtlas(atlas, true)
 	end
-	
+
 	button.StateIconContainer.FriendRequestPendingDisplay:SetShown(stateData.hasFriendRequestPending or false)
-	
+
 	-- Enable/disable party button based on online status
 	button.PartyButton:SetEnabled(stateData.isOnline)
-	
+
 	-- Setup party button click handler
 	button.PartyButton:SetScript("OnClick", function()
 		if characterData and characterData.fullName then
 			C_PartyInfo.InviteUnit(characterData.fullName)
 		end
 	end)
-	
+
 	-- Setup party button tooltip
 	button.PartyButton:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -274,11 +341,11 @@ function RecentAllies:InitializeEntry(button, elementData)
 		end
 		GameTooltip:Show()
 	end)
-	
+
 	button.PartyButton:SetScript("OnLeave", function()
 		GameTooltip:Hide()
 	end)
-	
+
 	-- Setup pin display tooltip
 	if button.StateIconContainer.PinDisplay then
 		button.StateIconContainer.PinDisplay:SetScript("OnEnter", function(self)
@@ -290,7 +357,7 @@ function RecentAllies:InitializeEntry(button, elementData)
 				GameTooltip:Show()
 			end
 		end)
-		
+
 		button.StateIconContainer.PinDisplay:SetScript("OnLeave", function()
 			GameTooltip:Hide()
 		end)
@@ -300,8 +367,10 @@ end
 -- Open context menu for recent ally
 function RecentAllies:OpenMenu(button)
 	local elementData = button.elementData
-	if not elementData then return end
-	
+	if not elementData then
+		return
+	end
+
 	local recentAllyData = elementData
 	local contextData = {
 		recentAllyData = recentAllyData,
@@ -310,15 +379,15 @@ function RecentAllies:OpenMenu(button)
 		guid = recentAllyData.characterData.guid,
 		isOffline = not recentAllyData.stateData.isOnline,
 	}
-	
+
 	-- Use appropriate menu based on online status
 	local bestMenu = recentAllyData.stateData.isOnline and "RECENT_ALLY" or "RECENT_ALLY_OFFLINE"
-	
+
 	-- Fallback to FRIEND menu if RECENT_ALLY not available
 	if not UnitPopupMenus[bestMenu] then
 		bestMenu = recentAllyData.stateData.isOnline and "FRIEND" or "FRIEND_OFFLINE"
 	end
-	
+
 	-- Use compatibility wrapper for Classic support
 	BFL.OpenContextMenu(button, bestMenu, contextData, contextData.name)
 end
@@ -326,43 +395,48 @@ end
 -- Build tooltip for recent ally (RecentAlliesEntryMixin:BuildRecentAllyTooltip)
 function RecentAllies:BuildTooltip(button, tooltip)
 	local elementData = button.elementData
-	if not elementData then return end
-	
+	if not elementData then
+		return
+	end
+
 	local characterData = elementData.characterData
 	local stateData = elementData.stateData
 	local interactionData = elementData.interactionData
-	
+
 	-- Character name
 	GameTooltip_AddNormalLine(tooltip, characterData.fullName)
-	
+
 	-- Race and level
 	local raceInfo = C_CreatureInfo.GetRaceInfo(characterData.raceID)
 	if raceInfo then
-		GameTooltip_AddHighlightLine(tooltip, BFL.L.RECENT_ALLIES_LEVEL_RACE:format(characterData.level, raceInfo.raceName))
+		GameTooltip_AddHighlightLine(
+			tooltip,
+			BFL.L.RECENT_ALLIES_LEVEL_RACE:format(characterData.level, raceInfo.raceName)
+		)
 	end
-	
+
 	-- Class
 	local classInfo = C_CreatureInfo.GetClassInfo(characterData.classID)
 	if classInfo then
 		GameTooltip_AddHighlightLine(tooltip, classInfo.className)
 	end
-	
+
 	-- Faction
 	local factionInfo = C_CreatureInfo.GetFactionInfo(characterData.raceID)
 	if factionInfo then
 		GameTooltip_AddHighlightLine(tooltip, factionInfo.name)
 	end
-	
+
 	-- Current location
 	if stateData.currentLocation then
 		GameTooltip_AddHighlightLine(tooltip, stateData.currentLocation)
 	end
-	
+
 	-- Note
 	if interactionData.note and interactionData.note ~= "" then
 		GameTooltip_AddNormalLine(tooltip, BFL.L.RECENT_ALLIES_NOTE:format(interactionData.note))
 	end
-	
+
 	-- Most recent interaction
 	if interactionData.interactions and #interactionData.interactions > 0 and interactionData.interactions[1] then
 		GameTooltip_AddBlankLineToTooltip(tooltip)

@@ -427,12 +427,7 @@ function BetterRaidFrame_RaidInfoButton_OnClick(self)
 		return
 	end
 
-	-- Load Blizzard's Raid UI (contains RaidInfoFrame)
-	if not C_AddOns.IsAddOnLoaded("Blizzard_RaidUI") then
-		C_AddOns.LoadAddOn("Blizzard_RaidUI")
-	end
-
-	-- Check if RaidInfoFrame exists
+	-- Check if RaidInfoFrame exists (provided by Blizzard_RaidUI, loaded automatically)
 	if not RaidInfoFrame then
 		UIErrorsFrame:AddMessage(L.RAID_ERROR_LOAD_RAID_INFO, 1.0, 0.1, 0.1, 1.0)
 		return
@@ -444,7 +439,9 @@ function BetterRaidFrame_RaidInfoButton_OnClick(self)
 		RaidInfoFrame:Hide()
 		RaidInfoFrame:SetParent(UIParent)
 		RaidInfoFrame:ClearAllPoints()
-		RaidInfoFrame:SetPoint("TOPLEFT", RaidFrame, "TOPRIGHT", 0, -20)
+		if RaidFrame then
+			RaidInfoFrame:SetPoint("TOPLEFT", RaidFrame, "TOPRIGHT", 0, -20)
+		end
 		return
 	end
 
@@ -473,7 +470,9 @@ function BetterRaidFrame_RaidInfoButton_OnClick(self)
 			if RaidInfoFrame._originalParent then
 				RaidInfoFrame:SetParent(RaidInfoFrame._originalParent)
 				RaidInfoFrame:ClearAllPoints()
-				RaidInfoFrame:SetPoint("TOPLEFT", RaidFrame, "TOPRIGHT", 0, -20)
+				if RaidFrame then
+					RaidInfoFrame:SetPoint("TOPLEFT", RaidFrame, "TOPRIGHT", 0, -20)
+				end
 			end
 		end)
 		RaidInfoFrame.CloseButton._hooked = true

@@ -812,10 +812,14 @@ function BFL:ApplyTabFonts()
 	)
 
 	-- Reposition first top tab to align with Inset
+	-- Simple Mode uses -60 (no SearchBox row in header), Normal Mode uses -95
 	local topTab1 = _G.BetterFriendsFrameTab1
 	if topTab1 and BetterFriendsFrame then
+		local db = BetterFriendlistDB
+		local isSimple = db and db.simpleMode
+		local topTabY = isSimple and -60 or -95
 		topTab1:ClearAllPoints()
-		topTab1:SetPoint("TOPLEFT", BetterFriendsFrame, "TOPLEFT", topStartX, -95)
+		topTab1:SetPoint("TOPLEFT", BetterFriendsFrame, "TOPLEFT", topStartX, topTabY)
 	end
 end
 
@@ -1230,6 +1234,7 @@ end
 BFL.searchDebounceTimer = BFL.searchDebounceTimer or nil
 
 -- Handle search box text changes (called from XML)
+-- Routes search to the correct module based on active top tab
 function BetterFriendsFrame_OnSearchTextChanged(editBox)
 	local text = editBox:GetText()
 	-- Convert to lowercase, handle empty string as well
@@ -1245,18 +1250,34 @@ function BetterFriendsFrame_OnSearchTextChanged(editBox)
 		searchText = newSearchText
 		BFL.searchDebounceTimer = nil
 
-		-- Update FriendsList module with new search text
-		local FriendsList = GetFriendsList()
-		if FriendsList then
-			FriendsList:SetSearchText(searchText)
-			-- BFL:ForceRefreshFriendsList is called by SetSearchText, which handles the update
-			-- Logic: SetSearchText -> BFL:ForceRefreshFriendsList -> FriendsList:UpdateFriendsList
+		-- Determine which top tab is active
+		local frame = BetterFriendsFrame
+		local activeTopTab = 1
+		if frame and frame.FriendsTabHeader then
+			activeTopTab = PanelTemplates_GetSelectedTab(frame.FriendsTabHeader) or 1
 		end
 
-		-- Update immediately - filtering happens in UpdateFriendsList
-		if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
-			-- Ensure display is updated
-			RequestUpdate(true)
+		if activeTopTab == 1 then
+			-- Tab 1: Friends
+			local FriendsList = GetFriendsList()
+			if FriendsList then
+				FriendsList:SetSearchText(searchText)
+			end
+			if frame and frame:IsShown() then
+				RequestUpdate(true)
+			end
+		elseif activeTopTab == 2 then
+			-- Tab 2: Recent Allies
+			local RecentAllies = BFL:GetModule("RecentAllies")
+			if RecentAllies then
+				RecentAllies:SetSearchText(searchText)
+			end
+		elseif activeTopTab == 3 then
+			-- Tab 3: Recruit A Friend
+			local RAF = BFL:GetModule("RAF")
+			if RAF then
+				RAF:SetSearchText(searchText)
+			end
 		end
 	end)
 	BFL.searchDebounceTimer = newTimer
@@ -1598,6 +1619,96 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 			-- Fix for "Copy Character Name" protected action error
 			-- Replaces the protected Blizzard button with a safe BFL version in generic menus
+			-- Helper: Build the copy-name click handler (shared between replace and fallback)
+			local function BFL_BuildCopyNameHandler(contextData, menuTypeWrapper)
+				return function()
+					-- Resolve Name Lazy (at click time) for maximum accuracy
+					local copyNameText = nil
+
+					if contextData.bnetIDAccount then
+						local accountInfo = C_BattleNet.GetAccountInfoByID(contextData.bnetIDAccount)
+						if accountInfo then
+							-- 1. Try Character Name (if in-game)
+							if accountInfo.gameAccountInfo and accountInfo.gameAccountInfo.characterName then
+								local charName = accountInfo.gameAccountInfo.characterName
+								local realmName = accountInfo.gameAccountInfo.realmName
+								if realmName and realmName ~= "" then
+									copyNameText = charName .. "-" .. realmName
+								else
+									copyNameText = charName
+								end
+							end
+
+							-- 2. Try BattleTag (if Valid and Character Name failed, or as backup)
+							if (not copyNameText or copyNameText == "") and accountInfo.battleTag then
+								copyNameText = accountInfo.battleTag
+							end
+
+							-- 3. Try Real Name (Account Name) if nothing else
+							-- [STREAMER MODE CHECK] Never expose Real ID in Streamer Mode
+							if (not copyNameText or copyNameText == "") and accountInfo.accountName then
+								if BFL.StreamerMode and BFL.StreamerMode:IsActive() then
+									copyNameText = accountInfo.battleTag or "Unknown"
+								else
+									copyNameText = accountInfo.accountName
+								end
+							end
+						end
+					end
+
+					-- 4. Fallback to contextData.name (Generic)
+					if not copyNameText or copyNameText == "" then
+						if contextData.name then
+							copyNameText = contextData.name
+							if not string.find(copyNameText, "-") then
+								if contextData.server and contextData.server ~= "" then
+									copyNameText = copyNameText .. "-" .. contextData.server
+								elseif contextData.realm and contextData.realm ~= "" then
+									copyNameText = copyNameText .. "-" .. contextData.realm
+								end
+							end
+						end
+
+						-- Special handling for Who List
+						if menuTypeWrapper == "WHO" and (contextData.index or contextData.whoIndex) then
+							local index = contextData.whoIndex or contextData.index
+							local info = C_FriendList.GetWhoInfo(index)
+							if info and info.fullName then
+								copyNameText = info.fullName
+							end
+						end
+					end
+
+					StaticPopupDialogs["BETTERFRIENDLIST_COPY_URL"] = {
+						text = L.COPY_CHARACTER_NAME_POPUP_TITLE,
+						button1 = CLOSE,
+						hasEditBox = true,
+						editBoxWidth = 350,
+						OnShow = function(self)
+							self.EditBox:SetText(copyNameText or "")
+							self.EditBox:SetFocus()
+							self.EditBox:HighlightText()
+							self.EditBox:SetScript("OnKeyUp", function(editBox, key)
+								if IsControlKeyDown() and key == "C" then
+									editBox:GetParent():Hide()
+								end
+							end)
+						end,
+						EditBoxOnEnterPressed = function(self)
+							self:GetParent():Hide()
+						end,
+						EditBoxOnEscapePressed = function(self)
+							self:GetParent():Hide()
+						end,
+						timeout = 0,
+						whileDead = true,
+						hideOnEscape = true,
+						preferredIndex = 3,
+					}
+					StaticPopup_Show("BETTERFRIENDLIST_COPY_URL")
+				end
+			end
+
 			local function BFL_ReplaceCopyNameButton(owner, rootDescription, contextData, menuTypeWrapper)
 				-- Only run if this is our menu
 				if not _G.BetterFriendlist_IsOurMenu then
@@ -1611,217 +1722,61 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				local targetText = COPY_CHARACTER_NAME -- Blizzard global string
 				local foundAndReplaced = false
 
-				-- Loop through all elements in the menu
-				for _, elementDescription in rootDescription:EnumerateElementDescriptions() do
-					-- Check text (handle function or string)
-					local text = elementDescription.text
-					if type(text) == "function" then
-						local success, result = pcall(text)
-						if success then
-							text = result
-						end
-					end
-
-					-- Check for match: Text match OR Data match
-					local isMatch = false
-
-					-- Match by global string (localized) or fallback english
-					if
-						text
-						and (
-							text == targetText
-							or text == "Copy Character Name"
-							or (L and text == L.MENU_COPY_CHARACTER_NAME)
-						)
-					then
-						isMatch = true
-					-- Match by internal data key (Blizzard usually uses this for UnitPopup)
-					elseif elementDescription.data == "COPY_CHARACTER_NAME" then
-						isMatch = true
-					end
-
-					if isMatch then
-						-- Hijack the click handler
-						elementDescription:SetResponder(function()
-							-- Resolve Name Lazy (at click time) for maximum accuracy
-							local copyNameText = nil
-
-							if contextData.bnetIDAccount then
-								local accountInfo = C_BattleNet.GetAccountInfoByID(contextData.bnetIDAccount)
-								if accountInfo then
-									-- 1. Try Character Name (if in-game)
-									if accountInfo.gameAccountInfo and accountInfo.gameAccountInfo.characterName then
-										local charName = accountInfo.gameAccountInfo.characterName
-										local realmName = accountInfo.gameAccountInfo.realmName
-										if realmName and realmName ~= "" then
-											copyNameText = charName .. "-" .. realmName
-										else
-											copyNameText = charName
-										end
-									end
-
-									-- 2. Try BattleTag (if Valid and Character Name failed, or as backup)
-									if (not copyNameText or copyNameText == "") and accountInfo.battleTag then
-										copyNameText = accountInfo.battleTag
-									end
-
-									-- 3. Try Real Name (Account Name) if nothing else
-									-- [STREAMER MODE CHECK] Never expose Real ID in Streamer Mode
-									if (not copyNameText or copyNameText == "") and accountInfo.accountName then
-										if BFL.StreamerMode and BFL.StreamerMode:IsActive() then
-											-- Use BattleTag fallback or "Unknown" instead of Real ID
-											copyNameText = accountInfo.battleTag or "Unknown"
-										else
-											copyNameText = accountInfo.accountName
-										end
-									end
-								end
-							end
-
-							-- 4. Fallback to contextData.name (Generic)
-							if not copyNameText or copyNameText == "" then
-								if contextData.name then
-									copyNameText = contextData.name
-									-- Append server/realm if available and not already part of the name
-									-- Generic check for contexts that might have server info (Recent Allies, Who, etc)
-									if not string.find(copyNameText, "-") then
-										if contextData.server and contextData.server ~= "" then
-											copyNameText = copyNameText .. "-" .. contextData.server
-										elseif contextData.realm and contextData.realm ~= "" then
-											copyNameText = copyNameText .. "-" .. contextData.realm
-										end
-									end
-								end
-
-								-- Special handling for Who List (needs wrapper identification to use whoIndex)
-								if menuTypeWrapper == "WHO" and (contextData.index or contextData.whoIndex) then
-									local index = contextData.whoIndex or contextData.index
-									local info = C_FriendList.GetWhoInfo(index)
-									if info and info.fullName then
-										copyNameText = info.fullName
-									end
-								end
-							end
-
-							StaticPopupDialogs["BETTERFRIENDLIST_COPY_URL"] = {
-								text = L.COPY_CHARACTER_NAME_POPUP_TITLE,
-								button1 = CLOSE,
-								hasEditBox = true,
-								editBoxWidth = 350,
-								OnShow = function(self)
-									self.EditBox:SetText(copyNameText or "")
-									self.EditBox:SetFocus()
-									self.EditBox:HighlightText()
-									self.EditBox:SetScript("OnKeyUp", function(editBox, key)
-										if IsControlKeyDown() and key == "C" then
-											editBox:GetParent():Hide()
-										end
-									end)
-								end,
-								EditBoxOnEnterPressed = function(self)
-									self:GetParent():Hide()
-								end,
-								EditBoxOnEscapePressed = function(self)
-									self:GetParent():Hide()
-								end,
-								timeout = 0,
-								whileDead = true,
-								hideOnEscape = true,
-								preferredIndex = 3,
-							}
-							StaticPopup_Show("BETTERFRIENDLIST_COPY_URL")
-						end)
-
-						-- Update text to our localized version if available
-						if L and L.MENU_COPY_CHARACTER_NAME then
-							if elementDescription.SetText then
-								elementDescription:SetText(L.MENU_COPY_CHARACTER_NAME)
-							else
-								elementDescription.text = L.MENU_COPY_CHARACTER_NAME
+				-- Wrap in pcall: if Blizzard's button is restricted/protected, SetResponder
+				-- can throw a taint error which would kill the entire function and prevent
+				-- the fallback from running.
+				pcall(function()
+					for _, elementDescription in rootDescription:EnumerateElementDescriptions() do
+						-- Check text (handle function or string)
+						local text = elementDescription.text
+						if type(text) == "function" then
+							local success, result = pcall(text)
+							if success then
+								text = result
 							end
 						end
 
-						foundAndReplaced = true
-						-- break -- Don't break, in case of duplicates
-					end
-				end
+						-- Check for match: Text match OR Data match
+						local isMatch = false
 
-				-- If not found (e.g. Classic doesn't have a native Copy Character Name button), add our own
+						-- Match by global string (localized) or fallback english
+						if
+							text
+							and (
+								text == targetText
+								or text == "Copy Character Name"
+								or (L and text == L.MENU_COPY_CHARACTER_NAME)
+							)
+						then
+							isMatch = true
+						-- Match by internal data key (Blizzard usually uses this for UnitPopup)
+						elseif elementDescription.data == "COPY_CHARACTER_NAME" then
+							isMatch = true
+						end
+
+						if isMatch then
+							-- Hijack the click handler (may throw taint for restricted buttons)
+							elementDescription:SetResponder(BFL_BuildCopyNameHandler(contextData, menuTypeWrapper))
+
+							-- Update text to our localized version if available
+							if L and L.MENU_COPY_CHARACTER_NAME then
+								if elementDescription.SetText then
+									elementDescription:SetText(L.MENU_COPY_CHARACTER_NAME)
+								else
+									elementDescription.text = L.MENU_COPY_CHARACTER_NAME
+								end
+							end
+
+							foundAndReplaced = true
+							-- Don't break, in case of duplicates
+						end
+					end
+				end)
+
+				-- If not found or replacement failed (protected button), add our own safe button
 				if not foundAndReplaced and rootDescription.CreateButton then
 					local buttonText = (L and L.MENU_COPY_CHARACTER_NAME) or "Copy Character Name"
-					rootDescription:CreateButton(buttonText, function()
-						local copyNameText = nil
-
-						if contextData.bnetIDAccount then
-							local accountInfo = C_BattleNet.GetAccountInfoByID(contextData.bnetIDAccount)
-							if accountInfo then
-								if accountInfo.gameAccountInfo and accountInfo.gameAccountInfo.characterName then
-									local charName = accountInfo.gameAccountInfo.characterName
-									local realmName = accountInfo.gameAccountInfo.realmName
-									if realmName and realmName ~= "" then
-										copyNameText = charName .. "-" .. realmName
-									else
-										copyNameText = charName
-									end
-								end
-								if (not copyNameText or copyNameText == "") and accountInfo.battleTag then
-									copyNameText = accountInfo.battleTag
-								end
-								if (not copyNameText or copyNameText == "") and accountInfo.accountName then
-									copyNameText = accountInfo.accountName
-								end
-							end
-						end
-
-						if not copyNameText or copyNameText == "" then
-							if contextData.name then
-								copyNameText = contextData.name
-								if not string.find(copyNameText, "-") then
-									if contextData.server and contextData.server ~= "" then
-										copyNameText = copyNameText .. "-" .. contextData.server
-									elseif contextData.realm and contextData.realm ~= "" then
-										copyNameText = copyNameText .. "-" .. contextData.realm
-									end
-								end
-							end
-
-							if menuTypeWrapper == "WHO" and (contextData.index or contextData.whoIndex) then
-								local index = contextData.whoIndex or contextData.index
-								local info = C_FriendList.GetWhoInfo(index)
-								if info and info.fullName then
-									copyNameText = info.fullName
-								end
-							end
-						end
-
-						StaticPopupDialogs["BETTERFRIENDLIST_COPY_URL"] = {
-							text = L.COPY_CHARACTER_NAME_POPUP_TITLE,
-							button1 = CLOSE,
-							hasEditBox = true,
-							editBoxWidth = 350,
-							OnShow = function(popup)
-								popup.EditBox:SetText(copyNameText or "")
-								popup.EditBox:SetFocus()
-								popup.EditBox:HighlightText()
-								popup.EditBox:SetScript("OnKeyUp", function(editBox, key)
-									if IsControlKeyDown() and key == "C" then
-										editBox:GetParent():Hide()
-									end
-								end)
-							end,
-							EditBoxOnEnterPressed = function(editBox)
-								editBox:GetParent():Hide()
-							end,
-							EditBoxOnEscapePressed = function(editBox)
-								editBox:GetParent():Hide()
-							end,
-							timeout = 0,
-							whileDead = true,
-							hideOnEscape = true,
-							preferredIndex = 3,
-						}
-						StaticPopup_Show("BETTERFRIENDLIST_COPY_URL")
-					end)
+					rootDescription:CreateButton(buttonText, BFL_BuildCopyNameHandler(contextData, menuTypeWrapper))
 				end
 			end
 
@@ -2460,30 +2415,53 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 		PanelTemplates_SetTab(frame.FriendsTabHeader, tabIndex)
 	end
 
-	-- SEARCHBOX VISIBILITY IS NOW MANAGED ENTIRELY BY FriendsList:UpdateScrollBoxExtent()
-	-- We force a layout update immediately if switching to Tab 1 to ensure SearchBox appears instantly
-	if tabIndex == 1 then
+	-- Clear search and update placeholder when switching tabs
+	local searchBox = frame.FriendsTabHeader and frame.FriendsTabHeader.SearchBox
+	if searchBox then
+		-- Clear the search text on tab switch
+		searchBox:SetText("")
+		searchText = ""
+
+		-- Clear search state in all modules
 		local FriendsList = BFL:GetModule("FriendsList")
+		if FriendsList then
+			FriendsList:SetSearchText("")
+		end
+		local RecentAllies = BFL:GetModule("RecentAllies")
+		if RecentAllies and RecentAllies.SetSearchText then
+			RecentAllies:SetSearchText("")
+		end
+		local RAF = BFL:GetModule("RAF")
+		if RAF and RAF.SetSearchText then
+			RAF:SetSearchText("")
+		end
+
+		-- Update placeholder text based on active tab
+		local L = BFL.L
+		if searchBox.Instructions then
+			if tabIndex == 1 then
+				searchBox.Instructions:SetText(L.SEARCH_FRIENDS_INSTRUCTION)
+			elseif tabIndex == 2 then
+				searchBox.Instructions:SetText(L.SEARCH_RECENT_ALLIES_INSTRUCTION)
+			elseif tabIndex == 3 then
+				searchBox.Instructions:SetText(L.SEARCH_RAF_INSTRUCTION)
+			end
+		end
+
+		-- SearchBox visibility is managed by UpdateSearchBoxState (respects Simple Mode)
+		-- Do NOT unconditionally Show() here - it would override Simple Mode's hidden state
+	end
+
+	-- Force SearchBox state update (handles Simple Mode visibility + positioning)
+	local FriendsList = BFL:GetModule("FriendsList")
+	if FriendsList and FriendsList.UpdateSearchBoxState then
+		FriendsList:UpdateSearchBoxState()
+	end
+
+	-- Force layout update for Tab 1 to position ScrollFrame correctly
+	if tabIndex == 1 then
 		if FriendsList and FriendsList.UpdateScrollBoxExtent then
 			FriendsList:UpdateScrollBoxExtent()
-		end
-	else
-		-- If switching away from Tab 1
-		local searchBox = frame.FriendsTabHeader and frame.FriendsTabHeader.SearchBox
-
-		-- Fix: Only hide if in Simple Mode (where it is inside the list view)
-		-- In Normal Mode, searchBox is in the header and should remain visible for sub-tabs
-		local DB = BFL:GetModule("DB")
-		local simpleMode = DB and DB:Get("simpleMode", false)
-
-		if simpleMode then
-			if searchBox then
-				searchBox:Hide()
-			end
-		else
-			if searchBox then
-				searchBox:Show()
-			end
 		end
 	end
 
@@ -2614,6 +2592,30 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 				ShowChildFrame(frame.RaidFrame)
 			end
 		end
+	end
+
+	-- Simple Mode: Adjust content frame offsets to make room for SearchBox
+	-- In Simple Mode, the SearchBox is reparented to the main frame at the top of Inset
+	-- Content frames for tabs 2/3 need to be pushed down to avoid overlap
+	local FriendsList = BFL:GetModule("FriendsList")
+	local isSimpleMode = FriendsList and FriendsList.settingsCache and FriendsList.settingsCache.simpleMode
+	local showSearchInSimple = FriendsList
+		and FriendsList.settingsCache
+		and FriendsList.settingsCache.simpleModeShowSearch
+	if showSearchInSimple == nil then
+		showSearchInSimple = true
+	end
+	local searchOffset = (isSimpleMode and showSearchInSimple) and -22 or -4
+
+	if frame.RecentAlliesFrame then
+		frame.RecentAlliesFrame:ClearAllPoints()
+		frame.RecentAlliesFrame:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 3, searchOffset)
+		frame.RecentAlliesFrame:SetPoint("BOTTOMRIGHT", frame.Inset, "BOTTOMRIGHT", -3, 2)
+	end
+	if frame.RecruitAFriendFrame then
+		frame.RecruitAFriendFrame:ClearAllPoints()
+		frame.RecruitAFriendFrame:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 0, searchOffset)
+		frame.RecruitAFriendFrame:SetPoint("BOTTOMRIGHT", frame.Inset, "BOTTOMRIGHT", 0, 0)
 	end
 end
 
@@ -4005,6 +4007,22 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex)
 	local FriendsList = BFL:GetModule("FriendsList")
 	if FriendsList and FriendsList.UpdateSearchBoxState then
 		FriendsList:UpdateSearchBoxState()
+	end
+
+	-- Update SearchBox placeholder text for the active top tab
+	if tabIndex == 1 and frame.FriendsTabHeader then
+		local searchBox = frame.FriendsTabHeader.SearchBox
+		if searchBox and searchBox.Instructions then
+			local activeTopTab = PanelTemplates_GetSelectedTab(frame.FriendsTabHeader) or 1
+			local L = BFL.L
+			if activeTopTab == 1 then
+				searchBox.Instructions:SetText(L.SEARCH_FRIENDS_INSTRUCTION)
+			elseif activeTopTab == 2 then
+				searchBox.Instructions:SetText(L.SEARCH_RECENT_ALLIES_INSTRUCTION)
+			elseif activeTopTab == 3 then
+				searchBox.Instructions:SetText(L.SEARCH_RAF_INSTRUCTION)
+			end
+		end
 	end
 
 	-- Apply custom tab fonts from DB settings (Applied LAST to respect selection state for sizing)

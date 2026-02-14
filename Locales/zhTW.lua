@@ -641,6 +641,8 @@ BFL:RegisterLocale("zhTW", function()
 	-- ========================================
 	L.SETTINGS_TITLE = "BetterFriendlist設定"
 	L.SEARCH_FRIENDS_INSTRUCTION = "Search..."
+	L.SEARCH_RECENT_ALLIES_INSTRUCTION = "Search recent allies..."
+	L.SEARCH_RAF_INSTRUCTION = "Search recruited friends..."
 	L.RAF_NEXT_REWARD_HELP = "RAF Info"
 	L.WHO_LEVEL_FORMAT = "Level %d"
 	L.CONTACTS_RECENT_ALLIES_TAB_NAME = "最近隊友"
@@ -659,14 +661,37 @@ BFL:RegisterLocale("zhTW", function()
 	-- Name Formatting
 	L.SETTINGS_NAME_FORMAT_HEADER = "Name Format"
 	L.SETTINGS_NAME_FORMAT_DESC =
-		"Customize:\n|cffFFD100%name%|r -Name\n|cffFFD100%note%|r -Note\n|cffFFD100%nickname%|r -Nickname\n|cffFFD100%battletag%|r -Tag"
-	L.SETTINGS_NAME_FORMAT_LABEL = "格式:"
+		"使用標記自訂顯示:\n|cffFFD100%name%|r - 帳號名稱\n|cffFFD100%battletag%|r - 戰網暱稱\n|cffFFD100%nickname%|r - 暱稱\n|cffFFD100%note%|r - 備註\n|cffFFD100%character%|r - 角色名稱\n|cffFFD100%realm%|r - 伺服器名稱\n|cffFFD100%level%|r - 等級\n|cffFFD100%zone%|r - 區域\n|cffFFD100%class%|r - 職業\n|cffFFD100%game%|r - 遊戲"
+	L.SETTINGS_NAME_FORMAT_LABEL = "預設:"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP = "Name Format"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP_DESC = "Enter format."
 	L.SETTINGS_NAME_FORMAT_DISABLED_FRIENDLISTCOLORS =
 		"由於插件 'FriendListColors' 正在管理名字顏色/格式，此設定已停用。"
 
-	-- In-Game Group
+	-- Name Format Preset Labels (Phase 22)
+	L.NAME_PRESET_DEFAULT = "名稱 (角色)"
+	L.NAME_PRESET_BATTLETAG = "戰網暱稱 (角色)"
+	L.NAME_PRESET_NICKNAME = "暱稱 (角色)"
+	L.NAME_PRESET_NAME_ONLY = "僅名稱"
+	L.NAME_PRESET_CHARACTER = "僅角色"
+	L.NAME_PRESET_CUSTOM = "自訂..."
+	L.SETTINGS_NAME_FORMAT_CUSTOM_LABEL = "自訂格式:"
+
+	-- Info Format Section (Phase 22)
+	L.SETTINGS_INFO_FORMAT_HEADER = "好友訊息格式"
+	L.SETTINGS_INFO_FORMAT_LABEL = "預設:"
+	L.SETTINGS_INFO_FORMAT_CUSTOM_LABEL = "自訂格式:"
+	L.SETTINGS_INFO_FORMAT_TOOLTIP = "Custom Info Format"
+	L.SETTINGS_INFO_FORMAT_DESC =
+		"Customize:\n|cffFFD100%level%|r - Level\n|cffFFD100%zone%|r - Zone\n|cffFFD100%class%|r - Class\n|cffFFD100%game%|r - Game Name\n|cffFFD100%realm%|r - Realm\n|cffFFD100%status%|r - AFK/DND/Online\n|cffFFD100%lastonline%|r - Last Online"
+	L.INFO_PRESET_DEFAULT = "Default (Level, Zone)"
+	L.INFO_PRESET_ZONE = "Zone Only"
+	L.INFO_PRESET_LEVEL = "Level Only"
+	L.INFO_PRESET_CLASS_ZONE = "Class, Zone"
+	L.INFO_PRESET_LEVEL_CLASS_ZONE = "Level Class, Zone"
+	L.INFO_PRESET_GAME = "Game Name"
+	L.INFO_PRESET_DISABLED = "Disabled (Hide Info)"
+	L.INFO_PRESET_CUSTOM = "Custom..."
 	L.SETTINGS_SHOW_INGAME_GROUP = "'In Game' Group"
 	L.SETTINGS_SHOW_INGAME_GROUP_DESC = "Group in-game friends"
 	L.SETTINGS_INGAME_MODE_WOW = "WoW Only"

@@ -2006,14 +2006,6 @@
 									</Layer>
 								</Layers>
 							</Frame>
-							<!-- Scroll Frame Inset -->
-							<Frame parentKey="ScrollFrameInset" inherits="InsetFrameTemplate"
-								frameStrata="MEDIUM">
-								<Anchors>
-									<Anchor point="TOPLEFT" y="-20" />
-									<Anchor point="BOTTOMRIGHT" />
-								</Anchors>
-							</Frame>
 							<!-- ScrollBox for Recruit List -->
 							<Frame parentKey="ScrollBox" inherits="WowScrollBoxList">
 								<Size y="188" />
@@ -2702,7 +2694,7 @@
 				<DisabledFont style="BetterFriendlistFontDisable" />
 				<Size x="134" y="21" />
 				<Anchors>
-					<Anchor point="BOTTOMLEFT" x="4" y="4" />
+					<Anchor point="BOTTOMLEFT" x="12" y="4"/>
 				</Anchors>
 				<Scripts>
 					<OnClick>

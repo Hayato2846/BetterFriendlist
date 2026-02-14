@@ -31,6 +31,9 @@ local maxRecruitLinkUses = 0
 local daysInCycle = 0
 local latestRAFVersion = 0
 
+-- Current search text for filtering
+RAF.searchText = ""
+
 --------------------------------------------------------------------------
 -- RAF Frame Initialization and Event Handling
 --------------------------------------------------------------------------
@@ -360,6 +363,30 @@ function RAF:UpdateRecruitList(frame, recruits)
 	-- Process and sort recruits
 	local needDivider = ProcessAndSortRecruits(recruits)
 
+	-- Apply search filter if active
+	if self.searchText and self.searchText ~= "" then
+		local searchNormalized = BFL:StripAccents(self.searchText)
+		local filtered = {}
+		for _, recruit in ipairs(recruits) do
+			if self:MatchesSearch(recruit, searchNormalized) then
+				filtered[#filtered + 1] = recruit
+			end
+		end
+		recruits = filtered
+		numRecruits = #recruits
+
+		-- Recalculate divider need after filtering
+		local haveOnline, haveOffline = false, false
+		for _, r in ipairs(recruits) do
+			if r.isOnline then
+				haveOnline = true
+			else
+				haveOffline = true
+			end
+		end
+		needDivider = haveOnline and haveOffline
+	end
+
 	-- Build data list with divider
 	local dataList = {}
 	for index = 1, numRecruits do
@@ -448,10 +475,14 @@ function RAF:UpdateNextReward(frame, nextReward)
 
 		rewardPanel.NextRewardButton.Icon:SetTexture(nextReward.iconID)
 
-		-- Fix: Never desaturate the icon (matches Blizzard UI behavior)
-		rewardPanel.NextRewardButton.Icon:SetDesaturated(false)
+		-- Fix #48: Match Blizzard's three-condition desaturation logic
+		-- Desaturate only when reward is not claimed, not claimable, and not affordable
+		local shouldDesaturate = not nextReward.claimed
+			and not nextReward.canClaim
+			and not (nextReward.canAfford or false)
+		rewardPanel.NextRewardButton.Icon:SetDesaturated(shouldDesaturate)
 
-		if not nextReward.canClaim then
+		if shouldDesaturate then
 			rewardPanel.NextRewardButton.IconOverlay:Show()
 		else
 			rewardPanel.NextRewardButton.IconOverlay:Hide()
@@ -545,6 +576,42 @@ function RAF:ShowSplashScreen(frame)
 		return
 	end
 	frame.SplashFrame:Show()
+end
+
+--------------------------------------------------------------------------
+-- Search Functionality
+--------------------------------------------------------------------------
+
+-- Check if a recruit matches the search text (accent-insensitive)
+function RAF:MatchesSearch(recruit, searchNormalized)
+	-- Helper: check if field contains the search (accent-insensitive)
+	local function contains(text)
+		if text and text ~= "" then
+			return BFL:StripAccents(text):find(searchNormalized, 1, true) ~= nil
+		end
+		return false
+	end
+
+	-- Search in name, battleTag, and character name
+	return contains(recruit.nameText)
+		or contains(recruit.plainName)
+		or contains(recruit.battleTag)
+		or contains(recruit.characterName)
+end
+
+-- Set search text and refresh the list
+function RAF:SetSearchText(text)
+	local newText = text or ""
+	if self.searchText == newText then
+		return
+	end
+	self.searchText = newText
+
+	-- Refresh the list with the new search filter
+	local frame = BetterFriendsFrame and BetterFriendsFrame.RecruitAFriendFrame
+	if frame and frame:IsShown() and frame.rafInfo and frame.rafInfo.recruits then
+		self:UpdateRecruitList(frame, frame.rafInfo.recruits)
+	end
 end
 
 --------------------------------------------------------------------------
@@ -774,7 +841,10 @@ function RAF:RecruitActivityButton_OnEnter(button)
 		parent:EnableDrawLayer("HIGHLIGHT")
 	end
 
-	GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+	-- Fix #47: Use EmbeddedItemTooltip to match Blizzard's RAF tooltip behavior
+	-- Blizzard uses EmbeddedItemTooltip for quest reward display in RAF
+	local tooltip = EmbeddedItemTooltip or GameTooltip
+	tooltip:SetOwner(button, "ANCHOR_RIGHT")
 
 	local wrap = true
 	local questName = button.activityInfo.rewardQuestID
@@ -782,9 +852,9 @@ function RAF:RecruitActivityButton_OnEnter(button)
 		and C_QuestLog.GetTitleForQuestID(button.activityInfo.rewardQuestID)
 
 	if questName then
-		GameTooltip_SetTitle(GameTooltip, questName, nil, wrap)
-		GameTooltip:SetMinimumWidth(300)
-		GameTooltip_AddNormalLine(GameTooltip, L.RAF_ACTIVITY_DESCRIPTION:format(button.recruitInfo.nameText), true)
+		GameTooltip_SetTitle(tooltip, questName, nil, wrap)
+		tooltip:SetMinimumWidth(300)
+		GameTooltip_AddNormalLine(tooltip, L.RAF_ACTIVITY_DESCRIPTION:format(button.recruitInfo.nameText), true)
 
 		if C_RecruitAFriend.GetRecruitActivityRequirementsText then
 			local reqTextLines = C_RecruitAFriend.GetRecruitActivityRequirementsText(
@@ -794,38 +864,38 @@ function RAF:RecruitActivityButton_OnEnter(button)
 			if reqTextLines then
 				for i = 1, #reqTextLines do
 					if reqTextLines[i] then
-						GameTooltip_AddColoredLine(GameTooltip, reqTextLines[i], HIGHLIGHT_FONT_COLOR, wrap)
+						GameTooltip_AddColoredLine(tooltip, reqTextLines[i], HIGHLIGHT_FONT_COLOR, wrap)
 					end
 				end
 			end
 		end
 
-		GameTooltip_AddBlankLineToTooltip(GameTooltip)
+		GameTooltip_AddBlankLineToTooltip(tooltip)
 
 		if button.activityInfo.state == Enum.RafRecruitActivityState.Incomplete then
-			GameTooltip_AddNormalLine(GameTooltip, L.RAF_REWARDS_LABEL, wrap)
+			GameTooltip_AddNormalLine(tooltip, L.RAF_REWARDS_LABEL, wrap)
 		else
-			GameTooltip_AddNormalLine(GameTooltip, L.RAF_YOU_EARNED_LABEL, wrap)
+			GameTooltip_AddNormalLine(tooltip, L.RAF_YOU_EARNED_LABEL, wrap)
 		end
 
 		if GameTooltip_AddQuestRewardsToTooltip then
 			GameTooltip_AddQuestRewardsToTooltip(
-				GameTooltip,
+				tooltip,
 				button.activityInfo.rewardQuestID,
 				TOOLTIP_QUEST_REWARDS_STYLE_NONE
 			)
 		end
 
 		if button.activityInfo.state == Enum.RafRecruitActivityState.Complete then
-			GameTooltip_AddBlankLineToTooltip(GameTooltip)
-			GameTooltip_AddInstructionLine(GameTooltip, L.RAF_CLICK_TO_CLAIM, wrap)
+			GameTooltip_AddBlankLineToTooltip(tooltip)
+			GameTooltip_AddInstructionLine(tooltip, L.RAF_CLICK_TO_CLAIM, wrap)
 		end
 	else
-		GameTooltip_SetTitle(GameTooltip, L.RAF_LOADING, RED_FONT_COLOR)
+		GameTooltip_SetTitle(tooltip, L.RAF_LOADING, RED_FONT_COLOR)
 	end
 
 	self:RecruitActivityButton_UpdateIcon(button)
-	GameTooltip:Show()
+	tooltip:Show()
 end
 
 function RAF:RecruitActivityButton_OnLeave(button)
@@ -835,6 +905,10 @@ function RAF:RecruitActivityButton_OnLeave(button)
 		parent:DisableDrawLayer("HIGHLIGHT")
 	end
 
+	-- Fix #47: Hide EmbeddedItemTooltip (matching OnEnter change)
+	if EmbeddedItemTooltip then
+		EmbeddedItemTooltip:Hide()
+	end
 	GameTooltip_Hide()
 	RAF:RecruitActivityButton_UpdateIcon(button)
 end

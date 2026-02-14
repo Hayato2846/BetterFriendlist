@@ -743,6 +743,8 @@ BFL:RegisterLocale("ptBR", function()
 	-- ========================================
 	L.SETTINGS_TITLE = "Config BetterFriendlist"
 	L.SEARCH_FRIENDS_INSTRUCTION = "Buscar..."
+	L.SEARCH_RECENT_ALLIES_INSTRUCTION = "Buscar aliados recentes..."
+	L.SEARCH_RAF_INSTRUCTION = "Buscar amigos recrutados..."
 	L.RAF_NEXT_REWARD_HELP = "Info RAF"
 	L.WHO_LEVEL_FORMAT = "Nível %d"
 	L.CONTACTS_RECENT_ALLIES_TAB_NAME = "Aliados Recentes"
@@ -761,12 +763,37 @@ BFL:RegisterLocale("ptBR", function()
 	-- Name Formatting
 	L.SETTINGS_NAME_FORMAT_HEADER = "Formato Nome"
 	L.SETTINGS_NAME_FORMAT_DESC =
-		"Personalize:\n|cffFFD100%name%|r - Nome\n|cffFFD100%note%|r - Nota\n|cffFFD100%nickname%|r - Apelido\n|cffFFD100%battletag%|r - Tag"
-	L.SETTINGS_NAME_FORMAT_LABEL = "Formato:"
+		"Use tokens para personalizar a exibicao:\n|cffFFD100%name%|r - Nome da conta\n|cffFFD100%battletag%|r - BattleTag\n|cffFFD100%nickname%|r - Apelido\n|cffFFD100%note%|r - Nota\n|cffFFD100%character%|r - Nome do personagem\n|cffFFD100%realm%|r - Nome do reino\n|cffFFD100%level%|r - Nivel\n|cffFFD100%zone%|r - Zona\n|cffFFD100%class%|r - Classe\n|cffFFD100%game%|r - Jogo"
+	L.SETTINGS_NAME_FORMAT_LABEL = "Modelo:"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP = "Formato Nome"
 	L.SETTINGS_NAME_FORMAT_TOOLTIP_DESC = "Insira formato."
 	L.SETTINGS_NAME_FORMAT_DISABLED_FRIENDLISTCOLORS =
 		"Esta configuração está desabilitada porque o addon 'FriendListColors' está gerenciando cores/formatos de nomes."
+
+	-- Name Format Preset Labels (Phase 22)
+	L.NAME_PRESET_DEFAULT = "Nome (Personagem)"
+	L.NAME_PRESET_BATTLETAG = "BattleTag (Personagem)"
+	L.NAME_PRESET_NICKNAME = "Apelido (Personagem)"
+	L.NAME_PRESET_NAME_ONLY = "Somente Nome"
+	L.NAME_PRESET_CHARACTER = "Somente Personagem"
+	L.NAME_PRESET_CUSTOM = "Personalizado..."
+	L.SETTINGS_NAME_FORMAT_CUSTOM_LABEL = "Formato personalizado:"
+
+	-- Info Format Section (Phase 22)
+	L.SETTINGS_INFO_FORMAT_HEADER = "Formatacao de info de amigos"
+	L.SETTINGS_INFO_FORMAT_LABEL = "Modelo:"
+	L.SETTINGS_INFO_FORMAT_CUSTOM_LABEL = "Formato personalizado:"
+	L.SETTINGS_INFO_FORMAT_TOOLTIP = "Formato de Info Personalizado"
+	L.SETTINGS_INFO_FORMAT_DESC =
+		"Use tokens para personalizar a linha de info:\n|cffFFD100%level%|r - Nivel do personagem\n|cffFFD100%zone%|r - Zona atual\n|cffFFD100%class%|r - Nome da classe\n|cffFFD100%game%|r - Nome do jogo\n|cffFFD100%realm%|r - Nome do reino\n|cffFFD100%status%|r - AFK/DND/Online\n|cffFFD100%lastonline%|r - Ultimo acesso\n|cffFFD100%name%|r - Nome da conta\n|cffFFD100%battletag%|r - BattleTag\n|cffFFD100%nickname%|r - Apelido\n|cffFFD100%note%|r - Nota\n|cffFFD100%character%|r - Nome do personagem"
+	L.INFO_PRESET_DEFAULT = "Padrao (Nivel, Zona)"
+	L.INFO_PRESET_ZONE = "Somente Zona"
+	L.INFO_PRESET_LEVEL = "Somente Nivel"
+	L.INFO_PRESET_CLASS_ZONE = "Classe, Zona"
+	L.INFO_PRESET_LEVEL_CLASS_ZONE = "Nivel Classe, Zona"
+	L.INFO_PRESET_GAME = "Nome do jogo"
+	L.INFO_PRESET_DISABLED = "Desativado (Ocultar info)"
+	L.INFO_PRESET_CUSTOM = "Personalizado..."
 
 	-- In-Game Group
 	L.SETTINGS_SHOW_INGAME_GROUP = "Grupo 'No Jogo'"
