@@ -227,10 +227,10 @@ function DB:Initialize()
 		BetterFriendlistDB = {}
 	end
 
-	-- MIGRATION (BEFORE defaults): Migrate nameDisplayFormat to preset system (Phase 22)
-	-- Uses a flag to ensure this runs exactly once, even if nameFormatPreset was already
-	-- incorrectly set to "default" by the defaults loop in a prior session.
-	if BetterFriendlistDB.nameDisplayFormat and not BetterFriendlistDB.nameFormatMigrated then
+	-- MIGRATION (BEFORE defaults): Migrate nameDisplayFormat to preset system
+	-- Runs whenever nameFormatPreset is missing but old nameDisplayFormat exists.
+	-- NOT a one-time flag - if the user somehow loses nameFormatPreset, it re-derives from the old value.
+	if not BetterFriendlistDB.nameFormatPreset and BetterFriendlistDB.nameDisplayFormat then
 		local oldFormat = BetterFriendlistDB.nameDisplayFormat
 		local oldLower = oldFormat:lower()
 
@@ -249,29 +249,25 @@ function DB:Initialize()
 			BetterFriendlistDB.nameFormatCustom = oldFormat
 		else
 			-- Non-standard format -> Custom preset preserving user's input
+			-- Append " (%character%)" because pre-2.3.6 the character name was always appended automatically
 			BetterFriendlistDB.nameFormatPreset = "custom"
-			BetterFriendlistDB.nameFormatCustom = oldFormat
+			BetterFriendlistDB.nameFormatCustom = oldFormat .. " (%character%)"
 		end
-		BetterFriendlistDB.nameFormatMigrated = true
-		-- BFL:DebugPrint("|cff00ff00BFL:Database:|r Migrated nameDisplayFormat to preset: " .. BetterFriendlistDB.nameFormatPreset)
 	end
 
-	-- MIGRATION (Phase 22b): Redesign presets - migrate removed preset keys to "custom" or "default"
-	if not BetterFriendlistDB.nameFormatMigrated2 then
-		local currentPreset = BetterFriendlistDB.nameFormatPreset
-		if currentPreset == "name_nickname" then
-			BetterFriendlistDB.nameFormatPreset = "custom"
-			BetterFriendlistDB.nameFormatCustom = "%name% (%nickname%)"
-		elseif currentPreset == "name_note" then
-			BetterFriendlistDB.nameFormatPreset = "custom"
-			BetterFriendlistDB.nameFormatCustom = "%name% (%note%)"
-		elseif currentPreset == "name_battletag" then
-			BetterFriendlistDB.nameFormatPreset = "custom"
-			BetterFriendlistDB.nameFormatCustom = "%name% (%battletag%)"
-		elseif currentPreset == "name_character" then
-			BetterFriendlistDB.nameFormatPreset = "default"
-		end
-		BetterFriendlistDB.nameFormatMigrated2 = true
+	-- MIGRATION: Fix removed preset keys from earlier versions -> map to "custom" or "default"
+	local currentPreset = BetterFriendlistDB.nameFormatPreset
+	if currentPreset == "name_nickname" then
+		BetterFriendlistDB.nameFormatPreset = "custom"
+		BetterFriendlistDB.nameFormatCustom = "%name% (%nickname%)"
+	elseif currentPreset == "name_note" then
+		BetterFriendlistDB.nameFormatPreset = "custom"
+		BetterFriendlistDB.nameFormatCustom = "%name% (%note%)"
+	elseif currentPreset == "name_battletag" then
+		BetterFriendlistDB.nameFormatPreset = "custom"
+		BetterFriendlistDB.nameFormatCustom = "%name% (%battletag%)"
+	elseif currentPreset == "name_character" then
+		BetterFriendlistDB.nameFormatPreset = "default"
 	end
 
 	-- Apply defaults

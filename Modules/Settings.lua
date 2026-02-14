@@ -3263,7 +3263,8 @@ function Settings:RefreshGeneralTab()
 				DB:Set("nameFormatCustom", text)
 				BFL:ForceRefreshFriendsList()
 			end
-		end
+		end,
+		350
 	)
 	if nameCustomInput.SetTooltip then
 		nameCustomInput:SetTooltip(
@@ -3345,7 +3346,8 @@ function Settings:RefreshGeneralTab()
 				DB:Set("infoFormatCustom", text)
 				BFL:ForceRefreshFriendsList()
 			end
-		end
+		end,
+		350
 	)
 	if infoCustomInput.SetTooltip then
 		infoCustomInput:SetTooltip(

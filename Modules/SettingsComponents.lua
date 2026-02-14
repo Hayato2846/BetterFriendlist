@@ -1815,7 +1815,7 @@ end
 -- ========================================
 -- INPUT BOX (Label Left, EditBox Right - Grid Aligned)
 -- ========================================
-function Components:CreateInput(parent, labelText, initialValue, callback)
+function Components:CreateInput(parent, labelText, initialValue, callback, inputWidth)
 	local holder = CreateFrame("Frame", nil, parent)
 	holder:SetHeight(COMPONENT_HEIGHT + 6) -- Input boxes need a bit more height
 	holder:SetPoint("LEFT", PADDING_LEFT, 0)
@@ -1833,10 +1833,13 @@ function Components:CreateInput(parent, labelText, initialValue, callback)
 	inputBox:SetAutoFocus(false)
 	inputBox:SetFontObject("BetterFriendlistFontHighlight")
 
+	-- Store custom width for use in resize handler
+	local customInputWidth = inputWidth
+
 	-- Dynamic Resizing Handler
 	holder:SetScript("OnSizeChanged", function(self, width, height)
-		-- Use fixed width for alignment consistency
-		local inputWidth = FIXED_CONTROL_WIDTH
+		-- Use custom width if provided, otherwise standard alignment width
+		local inputWidth = customInputWidth or FIXED_CONTROL_WIDTH
 
 		inputBox:ClearAllPoints()
 		inputBox:SetPoint("RIGHT", self, "RIGHT", 0, 0)

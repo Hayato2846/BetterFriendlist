@@ -849,13 +849,15 @@
 				<Texture parentKey="DividerTexture"
 					file="Interface\FriendsFrame\UI-FriendsFrame-OnlineDivider" setAllPoints="true"
 					hidden="true" />
-				<FontString parentKey="Name" inherits="BetterFriendlistFriendsFontNormal">
+				<FontString parentKey="Name" inherits="BetterFriendlistFriendsFontNormal"
+					justifyH="LEFT">
 					<Size x="190" y="12" />
 					<Anchors>
 						<Anchor point="TOPLEFT" x="5" y="-4" />
 					</Anchors>
 				</FontString>
-				<FontString parentKey="InfoText" inherits="BetterFriendlistFriendsFontSmall">
+				<FontString parentKey="InfoText" inherits="BetterFriendlistFriendsFontSmall"
+					justifyH="LEFT">
 					<Size x="190" y="10" />
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeKey="$parent.Name"
@@ -893,7 +895,7 @@
 				BetterRecruitListButton_OnClick(self, button)
 			</OnClick>
 		</Scripts>
-		<HighlightTexture file="Interface\FriendsFrame\UI-FriendsFrame-HighlightBar" alphaMode="ADD"
+		<HighlightTexture file="Interface\QuestFrame\UI-QuestTitleHighlight" alphaMode="ADD"
 			setAllPoints="true" />
 	</Button>
 
@@ -1813,52 +1815,46 @@
 								</Texture>
 							</Layer>
 							<Layer level="ARTWORK">
-								<FontString parentKey="EarnInfo" inherits="FriendsFont_Small"
+								<FontString parentKey="EarnInfo" inherits="FriendsFont_Normal"
 									justifyH="LEFT">
 									<Size x="230" y="12" />
 									<Anchors>
 										<Anchor point="TOPLEFT" relativeKey="$parent.Background"
-											x="84" y="-34" />
+											x="90" y="-33" />
 									</Anchors>
 								</FontString>
 							</Layer>
 						</Layers>
 						<Frames>
 							<!-- Month Count Display -->
-							<Frame parentKey="MonthCount">
-								<Size x="260" y="18" />
+							<Frame parentKey="MonthCount"
+									inherits="TruncatedTooltipFontStringWrapperTemplate">
 								<Anchors>
-									<Anchor point="TOPLEFT" relativeKey="$parent.Background" x="84"
-										y="-12" />
+									<Anchor point="TOPLEFT" relativeKey="$parent.Background" x="90"
+										y="-15" />
 								</Anchors>
 								<Layers>
 									<Layer level="OVERLAY">
 										<FontString parentKey="Text"
 											inherits="BetterFriendlistFontLarge" justifyH="LEFT">
-											<Anchors>
-												<Anchor point="TOPLEFT" />
-												<Anchor point="BOTTOMRIGHT" />
-											</Anchors>
+											<Size x="230" y="14" />
 											<Color color="NORMAL_FONT_COLOR" />
 										</FontString>
 									</Layer>
 								</Layers>
 							</Frame>
 							<!-- Next Reward Name Display -->
-							<Frame parentKey="NextRewardName">
-								<Size x="260" y="14" />
+							<Frame parentKey="NextRewardName"
+									inherits="TruncatedTooltipFontStringWrapperTemplate">
 								<Anchors>
-									<Anchor point="TOPLEFT" relativeKey="$parent.Background" x="84"
-										y="-50" />
+									<Anchor point="TOPLEFT" relativeKey="$parent.Background" x="90"
+										y="-48" />
 								</Anchors>
 								<Layers>
 									<Layer level="OVERLAY">
 										<FontString parentKey="Text" inherits="FriendsFont_Normal"
 											justifyH="LEFT">
-											<Anchors>
-												<Anchor point="TOPLEFT" />
-												<Anchor point="BOTTOMRIGHT" />
-											</Anchors>
+											<Size x="230" y="12" />
 										</FontString>
 									</Layer>
 								</Layers>
@@ -1888,8 +1884,8 @@
 								registerForClicks="LeftButtonUp, RightButtonUp">
 								<Size x="49" y="49" />
 								<Anchors>
-									<Anchor point="LEFT" relativeKey="$parent.Background" x="16"
-										y="0" />
+									<Anchor point="CENTER" relativeKey="$parent.Background"
+										relativePoint="LEFT" x="46" />
 								</Anchors>
 								<Layers>
 									<Layer level="ARTWORK">

@@ -21,7 +21,7 @@ local RAF = BFL:RegisterModule("RAF", {})
 BFL.HasRAF = BFL.IsRetail and C_RecruitAFriend ~= nil
 
 -- Local constants for RAF display
-local RECRUIT_HEIGHT = 45
+local RECRUIT_HEIGHT = 34
 local DIVIDER_HEIGHT = 16
 
 -- RAF state variables (module-level)
@@ -30,6 +30,45 @@ local maxRecruitMonths = 0
 local maxRecruitLinkUses = 0
 local daysInCycle = 0
 local latestRAFVersion = 0
+
+--------------------------------------------------------------------------
+-- RAFUtil-compatible helpers (uses Blizzard RAFUtil when available)
+--------------------------------------------------------------------------
+
+-- Texture kit mapping: RAF version -> texture kit string
+-- Matches Blizzard's RAFUtil.GetTextureKitForRAFVersion
+local function GetTextureKitForRAFVersion(rafVersion)
+	if RAFUtil and RAFUtil.GetTextureKitForRAFVersion then
+		return RAFUtil.GetTextureKitForRAFVersion(rafVersion)
+	end
+	-- Fallback: replicate Blizzard's mapping
+	if Enum and Enum.RecruitAFriendRewardsVersion then
+		if rafVersion == Enum.RecruitAFriendRewardsVersion.VersionTwo then
+			return "V2"
+		elseif rafVersion == Enum.RecruitAFriendRewardsVersion.VersionThree then
+			return "V3"
+		end
+	end
+	return nil
+end
+
+-- Color mapping: RAF version -> online background color
+-- Matches Blizzard's RAFUtil.GetColorForRAFVersion
+local function GetColorForRAFVersion(rafVersion)
+	if RAFUtil and RAFUtil.GetColorForRAFVersion then
+		return RAFUtil.GetColorForRAFVersion(rafVersion)
+	end
+	-- Fallback: use known color constants
+	if Enum and Enum.RecruitAFriendRewardsVersion then
+		if rafVersion == Enum.RecruitAFriendRewardsVersion.VersionTwo and RAF_VERSION_TWO_COLOR then
+			return RAF_VERSION_TWO_COLOR
+		elseif rafVersion == Enum.RecruitAFriendRewardsVersion.VersionThree and RAF_VERSION_THREE_COLOR then
+			return RAF_VERSION_THREE_COLOR
+		end
+	end
+	-- Ultimate fallback blue tint
+	return CreateColor(0.2, 0.4, 0.8, 0.3)
+end
 
 -- Current search text for filtering
 RAF.searchText = ""
@@ -68,9 +107,9 @@ function RAF:OnLoad(frame)
 	frame:RegisterEvent("RAF_INFO_UPDATED")
 	frame:RegisterEvent("BN_FRIEND_INFO_CHANGED")
 
-	-- Set up no recruits text
+	-- Set up no recruits text (use Blizzard global)
 	if frame.RecruitList and frame.RecruitList.NoRecruitsDesc then
-		frame.RecruitList.NoRecruitsDesc:SetText(L.RAF_NO_RECRUITS_DESC)
+		frame.RecruitList.NoRecruitsDesc:SetText(RAF_NO_RECRUITS_DESC or L.RAF_NO_RECRUITS_DESC)
 	end
 
 	-- Set up ScrollBox (Retail) or FauxScrollFrame (Classic)
@@ -240,11 +279,22 @@ local function SortRecruits(a, b)
 	end
 end
 
+-- Pre-sort recruits that share a bnetAccountID by wowAccountGUID (consistent order)
+-- Matches Blizzard's SortRecruitsByWoWAccount
+local function SortRecruitsByWoWAccount(a, b)
+	if a.bnetAccountID == b.bnetAccountID then
+		return a.wowAccountGUID < b.wowAccountGUID
+	end
+end
+
 -- Process and sort recruits with divider logic
 local function ProcessAndSortRecruits(recruits)
 	local seenAccounts = {}
 	local haveOnlineFriends = false
 	local haveOfflineFriends = false
+
+	-- First, sort recruits that share a bnetAccountID by wowAccountGUID
+	table.sort(recruits, SortRecruitsByWoWAccount)
 
 	-- Get account info for all recruits
 	for _, recruitInfo in ipairs(recruits) do
@@ -255,7 +305,6 @@ local function ProcessAndSortRecruits(recruits)
 				recruitInfo.isOnline = accountInfo.gameAccountInfo.isOnline
 				recruitInfo.characterName = accountInfo.gameAccountInfo.characterName
 
-				-- Get name and status
 				-- [STREAMER MODE CHECK] Use safe name instead of Real ID
 				if BFL.StreamerMode and BFL.StreamerMode:IsActive() then
 					local FL = BFL:GetModule("FriendsList")
@@ -274,20 +323,21 @@ local function ProcessAndSortRecruits(recruits)
 						recruitInfo.nameText = recruitInfo.battleTag or "Unknown"
 						recruitInfo.nameColor = FRIENDS_BNET_NAME_COLOR
 					end
-				elseif FriendsFrame_GetBNetAccountNameAndStatus then
-					recruitInfo.nameText, recruitInfo.nameColor = FriendsFrame_GetBNetAccountNameAndStatus(accountInfo)
-				else
-					recruitInfo.nameText = recruitInfo.battleTag or "Unknown"
-					recruitInfo.nameColor = FRIENDS_GRAY_COLOR
-				end
-
-				-- [STREAMER MODE CHECK] Use safe name for plainName too
-				if BFL.StreamerMode and BFL.StreamerMode:IsActive() then
 					recruitInfo.plainName = recruitInfo.nameText
-				elseif BNet_GetBNetAccountName then
-					recruitInfo.plainName = BNet_GetBNetAccountName(accountInfo)
 				else
-					recruitInfo.plainName = recruitInfo.nameText
+					-- Use Blizzard functions directly (matches Blizzard RAF behavior)
+					if FriendsFrame_GetBNetAccountNameAndStatus then
+						recruitInfo.nameText, recruitInfo.nameColor =
+							FriendsFrame_GetBNetAccountNameAndStatus(accountInfo)
+					else
+						recruitInfo.nameText = recruitInfo.battleTag or "Unknown"
+						recruitInfo.nameColor = FRIENDS_GRAY_COLOR
+					end
+					if BNet_GetBNetAccountName then
+						recruitInfo.plainName = BNet_GetBNetAccountName(accountInfo)
+					else
+						recruitInfo.plainName = recruitInfo.nameText
+					end
 				end
 			else
 				-- No presence info yet
@@ -299,10 +349,10 @@ local function ProcessAndSortRecruits(recruits)
 				recruitInfo.nameColor = FRIENDS_GRAY_COLOR
 			end
 
-			-- Handle pending recruits
-			if recruitInfo.nameText == "" and L.RAF_PENDING_RECRUIT then
-				recruitInfo.nameText = L.RAF_PENDING_RECRUIT
-				recruitInfo.plainName = L.RAF_PENDING_RECRUIT
+			-- Handle pending recruits (use Blizzard global)
+			if recruitInfo.nameText == "" then
+				recruitInfo.nameText = RAF_PENDING_RECRUIT or "Pending Recruit"
+				recruitInfo.plainName = recruitInfo.nameText
 			end
 
 			recruitInfo.accountInfo = accountInfo
@@ -324,13 +374,11 @@ local function ProcessAndSortRecruits(recruits)
 		end
 	end
 
-	-- Append recruit index for multiple accounts
+	-- Append recruit index for multiple accounts (use Blizzard global)
 	for _, recruitInfo in ipairs(recruits) do
 		if seenAccounts[recruitInfo.bnetAccountID] > 1 and not recruitInfo.characterName then
-			if L.RAF_RECRUIT_NAME_MULTIPLE then
-				recruitInfo.nameText =
-					L.RAF_RECRUIT_NAME_MULTIPLE:format(recruitInfo.nameText, recruitInfo.recruitIndex)
-			end
+			local fmtStr = RAF_RECRUIT_NAME_MULTIPLE or "%s (%d)"
+			recruitInfo.nameText = fmtStr:format(recruitInfo.nameText, recruitInfo.recruitIndex)
 		end
 	end
 
@@ -352,12 +400,10 @@ function RAF:UpdateRecruitList(frame, recruits)
 		frame.RecruitList.NoRecruitsDesc:SetShown(numRecruits == 0)
 	end
 
-	-- Update header count
+	-- Update header count (use Blizzard global RAF_RECRUITED_FRIENDS_COUNT)
 	if frame.RecruitList.Header and frame.RecruitList.Header.Count then
-		frame.RecruitList.Header.Count:SetText(
-			L.RAF_RECRUITED_FRIENDS_COUNT and L.RAF_RECRUITED_FRIENDS_COUNT:format(numRecruits, maxRecruits)
-				or string.format("%d/%d", numRecruits, maxRecruits)
-		)
+		local fmtStr = RAF_RECRUITED_FRIENDS_COUNT or "%d/%d"
+		frame.RecruitList.Header.Count:SetText(fmtStr:format(numRecruits, maxRecruits))
 	end
 
 	-- Process and sort recruits
@@ -439,20 +485,18 @@ function RAF:UpdateNextReward(frame, nextReward)
 		return
 	end
 
-	-- Set earn info text
+	-- Set earn info text (using Blizzard globals)
 	if rewardPanel.EarnInfo then
 		local earnText = ""
 		if nextReward.canClaim then
-			earnText = L.RAF_YOU_HAVE_EARNED
+			earnText = RAF_YOU_HAVE_EARNED or L.RAF_YOU_HAVE_EARNED or ""
 		elseif nextReward.monthCost and nextReward.monthCost > 1 then
-			earnText = L.RAF_NEXT_REWARD_AFTER:format(
-				nextReward.monthCost - nextReward.availableInMonths,
-				nextReward.monthCost
-			)
+			local fmtStr = RAF_NEXT_REWARD_AFTER or L.RAF_NEXT_REWARD_AFTER or "%d/%d"
+			earnText = fmtStr:format(nextReward.monthCost - nextReward.availableInMonths, nextReward.monthCost)
 		elseif nextReward.monthsRequired == 0 then
-			earnText = L.RAF_FIRST_REWARD
+			earnText = RAF_FIRST_REWARD or L.RAF_FIRST_REWARD or ""
 		else
-			earnText = L.RAF_NEXT_REWARD
+			earnText = RAF_NEXT_REWARD or L.RAF_NEXT_REWARD or ""
 		end
 		rewardPanel.EarnInfo:SetText(earnText)
 		rewardPanel.EarnInfo:Show()
@@ -475,50 +519,80 @@ function RAF:UpdateNextReward(frame, nextReward)
 
 		rewardPanel.NextRewardButton.Icon:SetTexture(nextReward.iconID)
 
-		-- Fix #48: Match Blizzard's three-condition desaturation logic
-		-- Desaturate only when reward is not claimed, not claimable, and not affordable
+		-- Match Blizzard's three-condition desaturation logic
 		local shouldDesaturate = not nextReward.claimed
 			and not nextReward.canClaim
 			and not (nextReward.canAfford or false)
 		rewardPanel.NextRewardButton.Icon:SetDesaturated(shouldDesaturate)
-
-		if shouldDesaturate then
-			rewardPanel.NextRewardButton.IconOverlay:Show()
-		else
-			rewardPanel.NextRewardButton.IconOverlay:Hide()
-		end
+		rewardPanel.NextRewardButton.IconOverlay:SetShown(shouldDesaturate)
 		rewardPanel.NextRewardButton:Show()
 	end
 
-	-- Set reward name
+	-- Set reward name (matching Blizzard's SetNextRewardName logic with repeatableClaimCount)
 	if rewardPanel.NextRewardName and rewardPanel.NextRewardName.Text then
 		local rewardName = ""
+		local repeatCount = nextReward.repeatableClaimCount or 1
+
 		if nextReward.petInfo and nextReward.petInfo.speciesName then
 			rewardName = nextReward.petInfo.speciesName
 		elseif nextReward.mountInfo and nextReward.mountInfo.mountID then
 			rewardName = C_MountJournal.GetMountInfoByID
 					and C_MountJournal.GetMountInfoByID(nextReward.mountInfo.mountID)
-				or L.RAF_REWARD_MOUNT
+				or "Mount"
 		elseif nextReward.titleInfo and nextReward.titleInfo.titleMaskID then
-			local titleName = TitleUtil.GetNameFromTitleMaskID
-					and TitleUtil.GetNameFromTitleMaskID(nextReward.titleInfo.titleMaskID)
-				or L.RAF_REWARD_TITLE_DEFAULT
-			rewardName = L.RAF_REWARD_TITLE_FMT:format(titleName)
+			local titleName = TitleUtil
+				and TitleUtil.GetNameFromTitleMaskID
+				and TitleUtil.GetNameFromTitleMaskID(nextReward.titleInfo.titleMaskID)
+			if titleName then
+				local fmtStr = RAF_REWARD_TITLE or L.RAF_REWARD_TITLE_FMT or "Title: %s"
+				rewardName = fmtStr:format(titleName)
+			end
+		elseif nextReward.appearanceInfo or nextReward.appearanceSetInfo or nextReward.illusionInfo then
+			-- Appearance-based rewards: try to get name from item
+			if nextReward.itemID and nextReward.itemID > 0 then
+				local item = Item:CreateFromItemID(nextReward.itemID)
+				if item then
+					item:ContinueOnItemLoad(function()
+						local itemName = item:GetItemName()
+						if itemName and rewardPanel.NextRewardName and rewardPanel.NextRewardName.Text then
+							self:SetNextRewardNameText(rewardPanel, itemName, repeatCount, nextReward.rewardType)
+						end
+					end)
+				end
+			end
 		else
-			rewardName = L.RAF_REWARD_GAMETIME
+			-- Game time (use Blizzard global RAF_BENEFIT4)
+			rewardName = RAF_BENEFIT4 or L.RAF_REWARD_GAMETIME or "Game Time"
 		end
 
-		rewardPanel.NextRewardName.Text:SetText(rewardName)
-
-		-- Set color using the same method as Blizzard
-		if nextReward.rewardType == Enum.RafRewardType.GameTime then
-			rewardPanel.NextRewardName.Text:SetTextColor(HEIRLOOM_BLUE_COLOR:GetRGBA())
-		else
-			rewardPanel.NextRewardName.Text:SetTextColor(EPIC_PURPLE_COLOR:GetRGBA())
-		end
-
-		rewardPanel.NextRewardName:Show()
+		self:SetNextRewardNameText(rewardPanel, rewardName, repeatCount, nextReward.rewardType)
 	end
+end
+
+-- Helper: Set the reward name text with count and color (matches Blizzard's SetNextRewardName)
+function RAF:SetNextRewardNameText(rewardPanel, rewardName, count, rewardType)
+	if not rewardPanel or not rewardPanel.NextRewardName or not rewardPanel.NextRewardName.Text then
+		return
+	end
+	if not rewardName or rewardName == "" then
+		return
+	end
+
+	-- Show count for repeatable rewards (matches Blizzard)
+	if count and count > 1 and RAF_REWARD_NAME_MULTIPLE then
+		rewardPanel.NextRewardName.Text:SetText(RAF_REWARD_NAME_MULTIPLE:format(rewardName, count))
+	else
+		rewardPanel.NextRewardName.Text:SetText(rewardName)
+	end
+
+	-- Set color using the same method as Blizzard
+	if rewardType == Enum.RafRewardType.GameTime then
+		rewardPanel.NextRewardName.Text:SetTextColor(HEIRLOOM_BLUE_COLOR:GetRGBA())
+	else
+		rewardPanel.NextRewardName.Text:SetTextColor(EPIC_PURPLE_COLOR:GetRGBA())
+	end
+
+	rewardPanel.NextRewardName:Show()
 end
 
 function RAF:UpdateRAFInfo(frame, rafInfo)
@@ -538,14 +612,23 @@ function RAF:UpdateRAFInfo(frame, rafInfo)
 		self:UpdateRecruitList(frame, rafInfo.recruits)
 	end
 
-	-- Update month count
+	-- Update month count (matches Blizzard's conditional logic)
 	if frame.RewardClaiming and frame.RewardClaiming.MonthCount and frame.RewardClaiming.MonthCount.Text then
 		local latestVersionInfo = rafInfo.versions and #rafInfo.versions > 0 and rafInfo.versions[1]
 		if latestVersionInfo then
-			local monthCount = latestVersionInfo.monthCount and latestVersionInfo.monthCount.lifetimeMonths or 0
-			-- Format: "X Months Subscribed by Friends"
-			local monthText = string.format(L.RAF_MONTH_COUNT, monthCount)
-			frame.RewardClaiming.MonthCount.Text:SetText(monthText)
+			local numRecruits = latestVersionInfo.numRecruits or 0
+			local lifetimeMonths = latestVersionInfo.monthCount and latestVersionInfo.monthCount.lifetimeMonths or 0
+
+			-- Blizzard: if no recruits and no months, show "first month" text; otherwise show earned months
+			if numRecruits == 0 and lifetimeMonths == 0 then
+				local firstMonthText = RAF_FIRST_MONTH or L.RAF_FIRST_MONTH or ""
+				frame.RewardClaiming.MonthCount.Text:SetText(firstMonthText)
+			else
+				local monthsEarned = RAF_MONTHS_EARNED or L.RAF_MONTH_COUNT
+				if monthsEarned then
+					frame.RewardClaiming.MonthCount.Text:SetText(monthsEarned:format(lifetimeMonths))
+				end
+			end
 			frame.RewardClaiming.MonthCount:Show()
 		end
 	end
@@ -563,10 +646,10 @@ function RAF:UpdateRAFInfo(frame, rafInfo)
 
 		if haveUnclaimedReward then
 			frame.RewardClaiming.ClaimOrViewRewardButton:SetEnabled(true)
-			frame.RewardClaiming.ClaimOrViewRewardButton:SetText(L.RAF_CLAIM_REWARD)
+			frame.RewardClaiming.ClaimOrViewRewardButton:SetText(CLAIM_REWARD or L.RAF_CLAIM_REWARD)
 		else
 			frame.RewardClaiming.ClaimOrViewRewardButton:SetEnabled(true)
-			frame.RewardClaiming.ClaimOrViewRewardButton:SetText(L.RAF_VIEW_ALL_REWARDS)
+			frame.RewardClaiming.ClaimOrViewRewardButton:SetText(RAF_VIEW_ALL_REWARDS or L.RAF_VIEW_ALL_REWARDS)
 		end
 	end
 end
@@ -643,27 +726,36 @@ function RAF:RecruitListButton_SetupDivider(button)
 	button:Show()
 end
 
+-- Texture kit region mapping for recruit button icons (matches Blizzard)
+local recruitListButtonTextureKitRegions = {
+	Icon = "recruitafriend_friendslist_%s_icon",
+}
+
 function RAF:RecruitListButton_SetupRecruit(button, recruitInfo)
 	button.DividerTexture:Hide()
 	button.Background:Show()
 	button.Name:Show()
 	button.InfoText:Show()
 
-	-- Always show Icon, but set different atlas based on RAF version
+	-- Set icon via SetupTextureKitOnRegions (matches Blizzard exactly)
 	local versionRecruited = recruitInfo.versionRecruited or 0
-
-	-- Show legacy icon for older RAF versions, or current icon for current version
-	if versionRecruited > 0 and versionRecruited < latestRAFVersion then
-		-- Legacy RAF version - show legacy icon
-		button.Icon:SetAtlas("recruitafriend_friendslist_v2_icon", true)
-		button.Icon:Show()
-	elseif versionRecruited == latestRAFVersion then
-		-- Current RAF version - show current icon
-		button.Icon:SetAtlas("recruitafriend_friendslist_v3_icon", true)
-		button.Icon:Show()
+	if SetupTextureKitOnRegions then
+		SetupTextureKitOnRegions(
+			GetTextureKitForRAFVersion(versionRecruited),
+			button,
+			recruitListButtonTextureKitRegions,
+			TextureKitConstants.SetVisibility,
+			TextureKitConstants.UseAtlasSize
+		)
 	else
-		-- No valid version - hide icon
-		button.Icon:Hide()
+		-- Fallback for environments without SetupTextureKitOnRegions
+		local kit = GetTextureKitForRAFVersion(versionRecruited)
+		if kit then
+			button.Icon:SetAtlas(("recruitafriend_friendslist_%s_icon"):format(kit), true)
+			button.Icon:Show()
+		else
+			button.Icon:Hide()
+		end
 	end
 
 	button:SetHeight(RECRUIT_HEIGHT)
@@ -676,19 +768,24 @@ function RAF:RecruitListButton_SetupRecruit(button, recruitInfo)
 		button.Name:SetTextColor(recruitInfo.nameColor:GetRGB())
 	end
 
-	-- Set background color based on online status
+	-- Set background color based on online status (matches Blizzard: uses RAF version color)
 	if recruitInfo.isOnline then
-		button.Background:SetColorTexture(0.2, 0.4, 0.8, 0.3) -- Blue tint for online
+		local versionColor = GetColorForRAFVersion(versionRecruited)
+		if versionColor then
+			button.Background:SetColorTexture(versionColor:GetRGBA())
+		else
+			button.Background:SetColorTexture(0.2, 0.4, 0.8, 0.3)
+		end
 
-		-- Set info text based on subscription status
+		-- Set info text based on subscription status (using Blizzard globals)
 		if recruitInfo.subStatus == Enum.RafRecruitSubStatus.Active then
-			button.InfoText:SetText(L.RAF_ACTIVE_RECRUIT)
+			button.InfoText:SetText(RAF_ACTIVE_RECRUIT or L.RAF_ACTIVE_RECRUIT)
 			button.InfoText:SetTextColor(GREEN_FONT_COLOR:GetRGB())
 		elseif recruitInfo.subStatus == Enum.RafRecruitSubStatus.Trial then
-			button.InfoText:SetText(L.RAF_TRIAL_RECRUIT)
+			button.InfoText:SetText(RAF_TRIAL_RECRUIT or L.RAF_TRIAL_RECRUIT)
 			button.InfoText:SetTextColor(NORMAL_FONT_COLOR:GetRGB())
 		else
-			button.InfoText:SetText(L.RAF_INACTIVE_RECRUIT)
+			button.InfoText:SetText(RAF_INACTIVE_RECRUIT or L.RAF_INACTIVE_RECRUIT)
 			button.InfoText:SetTextColor(GRAY_FONT_COLOR:GetRGB())
 		end
 	else
@@ -696,9 +793,9 @@ function RAF:RecruitListButton_SetupRecruit(button, recruitInfo)
 		button.InfoText:SetTextColor(GRAY_FONT_COLOR:GetRGB())
 
 		if recruitInfo.subStatus == Enum.RafRecruitSubStatus.Inactive then
-			button.InfoText:SetText(L.RAF_INACTIVE_RECRUIT)
+			button.InfoText:SetText(RAF_INACTIVE_RECRUIT or L.RAF_INACTIVE_RECRUIT)
 		else
-			-- Show last online time
+			-- Show last online time (matches Blizzard)
 			if recruitInfo.accountInfo and FriendsFrame_GetLastOnlineText then
 				button.InfoText:SetText(FriendsFrame_GetLastOnlineText(recruitInfo.accountInfo))
 			else
@@ -732,20 +829,25 @@ function RAF:RecruitListButton_OnEnter(button)
 		GameTooltip_SetTitle(GameTooltip, recruitInfo.nameText, recruitInfo.nameColor)
 	end
 
+	-- Use Blizzard globals (matches Blizzard exactly)
 	local wrap = true
-	if maxRecruitMonths > 0 then
-		GameTooltip_AddNormalLine(GameTooltip, L.RAF_TOOLTIP_DESC:format(maxRecruitMonths), wrap)
+	local tooltipDesc = RAF_RECRUIT_TOOLTIP_DESC or L.RAF_TOOLTIP_DESC
+	if maxRecruitMonths > 0 and tooltipDesc then
+		GameTooltip_AddNormalLine(GameTooltip, tooltipDesc:format(maxRecruitMonths), wrap)
 		GameTooltip_AddBlankLineToTooltip(GameTooltip)
 	end
 
 	if recruitInfo.monthsRemaining then
 		local usedMonths = math.max(maxRecruitMonths - recruitInfo.monthsRemaining, 0)
-		GameTooltip_AddColoredLine(
-			GameTooltip,
-			L.RAF_TOOLTIP_MONTH_COUNT:format(usedMonths, maxRecruitMonths),
-			HIGHLIGHT_FONT_COLOR,
-			wrap
-		)
+		local monthCountFmt = RAF_RECRUIT_TOOLTIP_MONTH_COUNT or L.RAF_TOOLTIP_MONTH_COUNT
+		if monthCountFmt then
+			GameTooltip_AddColoredLine(
+				GameTooltip,
+				monthCountFmt:format(usedMonths, maxRecruitMonths),
+				HIGHLIGHT_FONT_COLOR,
+				wrap
+			)
+		end
 	end
 
 	GameTooltip:Show()
@@ -841,21 +943,40 @@ function RAF:RecruitActivityButton_OnEnter(button)
 		parent:EnableDrawLayer("HIGHLIGHT")
 	end
 
-	-- Fix #47: Use EmbeddedItemTooltip to match Blizzard's RAF tooltip behavior
-	-- Blizzard uses EmbeddedItemTooltip for quest reward display in RAF
+	-- Use EmbeddedItemTooltip to match Blizzard's RAF tooltip behavior
 	local tooltip = EmbeddedItemTooltip or GameTooltip
 	tooltip:SetOwner(button, "ANCHOR_RIGHT")
 
 	local wrap = true
-	local questName = button.activityInfo.rewardQuestID
-		and C_QuestLog.GetTitleForQuestID
-		and C_QuestLog.GetTitleForQuestID(button.activityInfo.rewardQuestID)
 
-	if questName then
-		GameTooltip_SetTitle(tooltip, questName, nil, wrap)
+	-- Update quest name (cache it like Blizzard does)
+	if not button.questName and button.activityInfo.rewardQuestID then
+		button.questName = C_QuestLog.GetTitleForQuestID
+			and C_QuestLog.GetTitleForQuestID(button.activityInfo.rewardQuestID)
+	end
+
+	self:RecruitActivityButton_UpdateIcon(button)
+
+	if not button.questName then
+		-- Data not loaded yet - show loading state (matches Blizzard)
+		GameTooltip_SetTitle(tooltip, RETRIEVING_DATA or L.RAF_LOADING, RED_FONT_COLOR)
+		if GameTooltip_SetTooltipWaitingForData then
+			GameTooltip_SetTooltipWaitingForData(tooltip, true)
+		end
+		button.UpdateTooltip = function()
+			RAF:RecruitActivityButton_OnEnter(button)
+		end
+	else
+		GameTooltip_SetTitle(tooltip, button.questName, nil, wrap)
 		tooltip:SetMinimumWidth(300)
-		GameTooltip_AddNormalLine(tooltip, L.RAF_ACTIVITY_DESCRIPTION:format(button.recruitInfo.nameText), true)
 
+		-- Activity description (Blizzard global)
+		local activityDesc = RAF_RECRUIT_ACTIVITY_DESCRIPTION or L.RAF_ACTIVITY_DESCRIPTION
+		if activityDesc then
+			GameTooltip_AddNormalLine(tooltip, activityDesc:format(button.recruitInfo.nameText), true)
+		end
+
+		-- Requirements text
 		if C_RecruitAFriend.GetRecruitActivityRequirementsText then
 			local reqTextLines = C_RecruitAFriend.GetRecruitActivityRequirementsText(
 				button.activityInfo.activityID,
@@ -872,10 +993,11 @@ function RAF:RecruitActivityButton_OnEnter(button)
 
 		GameTooltip_AddBlankLineToTooltip(tooltip)
 
+		-- Rewards label (Blizzard globals)
 		if button.activityInfo.state == Enum.RafRecruitActivityState.Incomplete then
-			GameTooltip_AddNormalLine(tooltip, L.RAF_REWARDS_LABEL, wrap)
+			GameTooltip_AddNormalLine(tooltip, QUEST_REWARDS or L.RAF_REWARDS_LABEL, wrap)
 		else
-			GameTooltip_AddNormalLine(tooltip, L.RAF_YOU_EARNED_LABEL, wrap)
+			GameTooltip_AddNormalLine(tooltip, YOU_EARNED_LABEL or L.RAF_YOU_EARNED_LABEL, wrap)
 		end
 
 		if GameTooltip_AddQuestRewardsToTooltip then
@@ -888,13 +1010,15 @@ function RAF:RecruitActivityButton_OnEnter(button)
 
 		if button.activityInfo.state == Enum.RafRecruitActivityState.Complete then
 			GameTooltip_AddBlankLineToTooltip(tooltip)
-			GameTooltip_AddInstructionLine(tooltip, L.RAF_CLICK_TO_CLAIM, wrap)
+			GameTooltip_AddInstructionLine(tooltip, CLICK_CHEST_TO_CLAIM_REWARD or L.RAF_CLICK_TO_CLAIM, wrap)
 		end
-	else
-		GameTooltip_SetTitle(tooltip, L.RAF_LOADING, RED_FONT_COLOR)
+
+		if GameTooltip_SetTooltipWaitingForData then
+			GameTooltip_SetTooltipWaitingForData(tooltip, false)
+		end
+		button.UpdateTooltip = nil
 	end
 
-	self:RecruitActivityButton_UpdateIcon(button)
 	tooltip:Show()
 end
 
@@ -905,7 +1029,10 @@ function RAF:RecruitActivityButton_OnLeave(button)
 		parent:DisableDrawLayer("HIGHLIGHT")
 	end
 
-	-- Fix #47: Hide EmbeddedItemTooltip (matching OnEnter change)
+	-- Clear UpdateTooltip callback (matches Blizzard)
+	button.UpdateTooltip = nil
+
+	-- Hide EmbeddedItemTooltip (matching OnEnter change)
 	if EmbeddedItemTooltip then
 		EmbeddedItemTooltip:Hide()
 	end
@@ -1018,8 +1145,7 @@ function RAF:ClaimOrViewRewardButton_OnClick(button)
 				RecruitAFriendFrame.rafInfo = frame.rafInfo
 				RecruitAFriendFrame.rafEnabled = true
 
-				-- ALWAYS set selected RAF version to the latest when opening rewards
-				-- This ensures we start with the correct version every time
+				-- Set selected RAF version to the latest when opening rewards
 				if frame.rafInfo.versions and #frame.rafInfo.versions > 0 and frame.rafInfo.versions[1] then
 					local latestVersion = frame.rafInfo.versions[1].rafVersion
 					RecruitAFriendFrame.selectedRAFVersion = latestVersion
@@ -1030,80 +1156,77 @@ function RAF:ClaimOrViewRewardButton_OnClick(button)
 					RecruitAFriendFrame.rafSystemInfo = frame.RecruitAFriendFrame.rafSystemInfo
 				end
 
-				-- CRITICAL: Override/Initialize the TriggerEvent system
-				-- Even if it exists, we need to ensure it works with our setup
-				local originalTriggerEvent = RecruitAFriendFrame.TriggerEvent
+				-- Initialize helper methods exactly ONCE (guard with flag)
+				if not RecruitAFriendFrame._bflInitialized then
+					-- TriggerEvent: dispatch to native CallbackRegistryMixin or handle manually
+					local nativeTriggerEvent = RecruitAFriendFrame.TriggerEvent
+					RecruitAFriendFrame.callbacks = RecruitAFriendFrame.callbacks or {}
 
-				RecruitAFriendFrame.callbacks = RecruitAFriendFrame.callbacks or {}
-
-				RecruitAFriendFrame.TriggerEvent = function(self, event, ...)
-					-- Handle NewRewardTabSelected event
-					if event == "NewRewardTabSelected" then
-						local newRAFVersion = ...
-						self.selectedRAFVersion = newRAFVersion
-
-						-- Refresh the rewards display
-						if RecruitAFriendRewardsFrame and RecruitAFriendRewardsFrame.Refresh then
-							RecruitAFriendRewardsFrame:Refresh()
+					RecruitAFriendFrame.TriggerEvent = function(self, event, ...)
+						if event == "NewRewardTabSelected" then
+							local newRAFVersion = ...
+							self.selectedRAFVersion = newRAFVersion
+							if RecruitAFriendRewardsFrame and RecruitAFriendRewardsFrame.Refresh then
+								RecruitAFriendRewardsFrame:Refresh()
+							end
+						elseif event == "RewardsListOpened" then
+							if
+								self.rafInfo
+								and self.rafInfo.versions
+								and #self.rafInfo.versions > 0
+								and self.rafInfo.versions[1]
+							then
+								self.selectedRAFVersion = self.rafInfo.versions[1].rafVersion
+							end
 						end
-					elseif event == "RewardsListOpened" then
-						-- Set to latest version when opening
-						if
-							self.rafInfo
-							and self.rafInfo.versions
-							and #self.rafInfo.versions > 0
-							and self.rafInfo.versions[1]
-						then
-							self.selectedRAFVersion = self.rafInfo.versions[1].rafVersion
+
+						-- Forward to native CallbackRegistryMixin if available
+						if nativeTriggerEvent and nativeTriggerEvent ~= self.TriggerEvent then
+							nativeTriggerEvent(self, event, ...)
 						end
 					end
 
-					-- Call original if it was a real function (not our mock)
-					if originalTriggerEvent and originalTriggerEvent ~= self.TriggerEvent then
-						originalTriggerEvent(self, event, ...)
+					RecruitAFriendFrame.GetSelectedRAFVersion = function(self)
+						return self.selectedRAFVersion
 					end
-				end
 
-				-- Add helper methods that RecruitAFriendFrame needs (always set these)
-				RecruitAFriendFrame.GetSelectedRAFVersion = function(self)
-					return self.selectedRAFVersion
-				end
+					RecruitAFriendFrame.GetSelectedRAFVersionInfo = function(self)
+						if not self.rafInfo or not self.rafInfo.versions then
+							return nil
+						end
+						for _, versionInfo in ipairs(self.rafInfo.versions) do
+							if versionInfo.rafVersion == self.selectedRAFVersion then
+								return versionInfo
+							end
+						end
+						return self.rafInfo.versions[1]
+					end
 
-				RecruitAFriendFrame.GetSelectedRAFVersionInfo = function(self)
-					if not self.rafInfo or not self.rafInfo.versions then
+					RecruitAFriendFrame.GetLatestRAFVersion = function(self)
+						if self.rafInfo and self.rafInfo.versions and #self.rafInfo.versions > 0 then
+							return self.rafInfo.versions[1].rafVersion
+						end
 						return nil
 					end
-					for _, versionInfo in ipairs(self.rafInfo.versions) do
-						if versionInfo.rafVersion == self.selectedRAFVersion then
-							return versionInfo
+
+					RecruitAFriendFrame.IsLegacyRAFVersion = function(self, rafVersion)
+						local latest = self:GetLatestRAFVersion()
+						return rafVersion ~= latest
+					end
+
+					RecruitAFriendFrame.GetRAFVersionInfo = function(self, rafVersion)
+						if not self.rafInfo or not self.rafInfo.versions then
+							return nil
 						end
-					end
-					return self.rafInfo.versions[1] -- Fallback to first version
-				end
-
-				RecruitAFriendFrame.GetLatestRAFVersion = function(self)
-					if self.rafInfo and self.rafInfo.versions and #self.rafInfo.versions > 0 then
-						return self.rafInfo.versions[1].rafVersion
-					end
-					return nil
-				end
-
-				RecruitAFriendFrame.IsLegacyRAFVersion = function(self, rafVersion)
-					-- All versions except the latest are considered legacy
-					local latestVersion = self:GetLatestRAFVersion()
-					return rafVersion ~= latestVersion
-				end
-
-				RecruitAFriendFrame.GetRAFVersionInfo = function(self, rafVersion)
-					if not self.rafInfo or not self.rafInfo.versions then
+						for _, versionInfo in ipairs(self.rafInfo.versions) do
+							if versionInfo.rafVersion == rafVersion then
+								return versionInfo
+							end
+						end
 						return nil
 					end
-					for _, versionInfo in ipairs(self.rafInfo.versions) do
-						if versionInfo.rafVersion == rafVersion then
-							return versionInfo
-						end
-					end
-					return nil
+
+					RecruitAFriendFrame._bflInitialized = true
 				end
 			end
 
@@ -1194,14 +1317,22 @@ function RAF:DisplayRewardsInChat(rafInfo)
 end
 
 function RAF:RecruitmentButton_OnClick(button)
-	-- Ensure RecruitAFriendRecruitmentFrame is loaded
+	-- Ensure Blizzard's RAF addon is loaded
 	if not RecruitAFriendRecruitmentFrame then
 		LoadAddOn("Blizzard_RecruitAFriend")
 	end
 
 	if not RecruitAFriendRecruitmentFrame then
-		-- BFL:DebugPrint("Error: Could not load RecruitAFriendRecruitmentFrame")
 		return
+	end
+
+	-- Ensure Blizzard's RecruitAFriendFrame has data so the recruitment frame works
+	if RecruitAFriendFrame then
+		local frame = BetterFriendsFrame and BetterFriendsFrame.RecruitAFriendFrame
+		if frame and frame.rafInfo then
+			RecruitAFriendFrame.rafInfo = frame.rafInfo
+			RecruitAFriendFrame.rafEnabled = true
+		end
 	end
 
 	-- Toggle recruitment frame (exact Blizzard logic)
