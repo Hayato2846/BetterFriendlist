@@ -85,6 +85,22 @@ end
 -- CHECKBOX (Label Left, Checkbox Right - Aligned Right)
 -- ========================================
 function Components:CreateCheckbox(parent, labelText, initialValue, callback)
+	-- Allow table-based signature for convenience: {label, initialValue, callback, tooltipTitle, tooltipDesc, disabled}
+	local opts
+	if type(labelText) == "table" then
+		opts = labelText
+		labelText = opts.label
+		initialValue = opts.initialValue
+		callback = opts.callback
+	end
+
+	if labelText == nil then
+		labelText = ""
+	end
+
+	if callback == nil then
+		callback = function() end
+	end
 	local holder = CreateFrame("Frame", nil, parent)
 	holder:SetHeight(COMPONENT_HEIGHT)
 	holder:SetPoint("LEFT", PADDING_LEFT, 0)
@@ -146,6 +162,16 @@ function Components:CreateCheckbox(parent, labelText, initialValue, callback)
 		checkBox:SetScript("OnLeave", function()
 			GameTooltip:Hide()
 		end)
+	end
+
+	-- Apply tooltip immediately if provided via table signature
+	if opts and opts.tooltipTitle then
+		holder:SetTooltip(opts.tooltipTitle, opts.tooltipDesc)
+	end
+
+	-- Respect disabled flag from table signature
+	if opts and opts.disabled then
+		checkBox:Disable()
 	end
 
 	function holder:SetValue(value)

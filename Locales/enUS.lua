@@ -209,6 +209,8 @@ local function LoadEnUS()
 	L.MENU_COPY_CHARACTER_NAME = "Copy Character Name"
 	L.MENU_BETTERFRIENDLIST_TITLE = "BetterFriendList"
 	L.MENU_MORE_GROUPS = "More Groups..."
+	L.MENU_SWITCH_GAME_ACCOUNT = "Switch Game Account"
+	L.MENU_DEFAULT_FOCUS = "Default (Blizzard)"
 	L.GROUPS_DIALOG_TITLE = "Groups for %s"
 	L.COPY_CHARACTER_NAME_POPUP_TITLE = "Copy Character Name"
 
@@ -731,6 +733,8 @@ local function LoadEnUS()
 	L.TRAVEL_PASS_NO_INFO = "Not enough information available"
 	L.TRAVEL_PASS_DIFFERENT_REGION = "Friend is in a different region"
 	L.TRAVEL_PASS_NO_GAME_ACCOUNTS = "No game accounts available"
+	L.TRAVEL_PASS_DIFFERENT_FACTION = "Friend is in the opposite faction"
+	L.TRAVEL_PASS_QUEST_SESSION = "Cannot invite during a Quest Session"
 
 	-- MENUS (Additional)
 	L.MENU_TITLE = "BetterFriendlist"
@@ -1126,6 +1130,10 @@ local function LoadEnUS()
 	L.MENU_SHOW_SEARCH = "Show Search"
 	L.MENU_QUICK_FILTER = "Quick Filter"
 
+	-- Multi-Game-Account
+	L.MENU_INVITE_CHARACTER = "Invite Character..."
+	L.INVITE_ACCOUNT_PICKER_TITLE = "Invite Character"
+
 	-- Favorites & Faction Settings
 	L.SETTINGS_ENABLE_FAVORITE_ICON = "Enable Favorite Icon"
 	L.SETTINGS_ENABLE_FAVORITE_ICON_DESC = "Display a star icon on the friend button for favorites."
@@ -1135,6 +1143,17 @@ local function LoadEnUS()
 	L.SETTINGS_FAVORITE_ICON_OPTION_BLIZZARD = "Blizzard Icon"
 	L.SETTINGS_SHOW_FACTION_BG = "Show Faction Background"
 	L.SETTINGS_SHOW_FACTION_BG_DESC = "Show faction color as background for friend buttons."
+
+	-- Multi-Game-Account Settings
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_BADGE = "Show Multi-Account Badge"
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_BADGE_DESC = "Display a badge on friends with multiple game accounts online."
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO = "Show Multi-Account Info"
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO_DESC =
+		"Add a dedicated line with icons for other online characters when a friend is logged into multiple accounts."
+	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS = "Tooltip: Max Game Accounts"
+	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS_DESC = "Maximum number of additional game accounts shown in the tooltip."
+	L.INFO_MULTI_ACCOUNT_PREFIX = "x%d Accounts"
+	L.INFO_MULTI_ACCOUNT_REMAINDER = " (+%d)"
 
 	-- ========================================
 	-- STREAMER MODE (Phase 24)

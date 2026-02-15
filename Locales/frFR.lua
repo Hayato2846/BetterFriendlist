@@ -206,6 +206,8 @@ BFL:RegisterLocale("frFR", function()
 	L.MENU_IGNORE_LIST = "Gérer Liste Ignorés"
 	L.MENU_BETTERFRIENDLIST_TITLE = "BetterFriendList"
 	L.MENU_MORE_GROUPS = "Plus de groupes..."
+	L.MENU_SWITCH_GAME_ACCOUNT = "Changer de compte de jeu"
+	L.MENU_DEFAULT_FOCUS = "Par défaut (Blizzard)"
 	L.GROUPS_DIALOG_TITLE = "Groupes pour %s"
 	L.MENU_COPY_CHARACTER_NAME = "Copier le nom du personnage"
 	L.COPY_CHARACTER_NAME_POPUP_TITLE = "Copier le nom du personnage"
@@ -737,6 +739,8 @@ BFL:RegisterLocale("frFR", function()
 	L.TRAVEL_PASS_NO_INFO = "Info insuffisante"
 	L.TRAVEL_PASS_DIFFERENT_REGION = "Région différente"
 	L.TRAVEL_PASS_NO_GAME_ACCOUNTS = "Pas de comptes jeu"
+	L.TRAVEL_PASS_DIFFERENT_FACTION = "Ami dans la faction opposée"
+	L.TRAVEL_PASS_QUEST_SESSION = "Invitation impossible pendant une session de quêtes"
 
 	-- MENUS (Additional)
 	L.MENU_TITLE = "BetterFriendlist"
@@ -1120,6 +1124,10 @@ BFL:RegisterLocale("frFR", function()
 	L.MENU_SHOW_SEARCH = "Afficher la recherche"
 	L.MENU_QUICK_FILTER = "Filtre rapide"
 
+	-- Multi-Game-Account
+	L.MENU_INVITE_CHARACTER = "Inviter le personnage..."
+	L.INVITE_ACCOUNT_PICKER_TITLE = "Inviter le personnage"
+
 	-- Favorites & Faction Settings
 	L.SETTINGS_ENABLE_FAVORITE_ICON = "Activer l'Icône Favori"
 	L.SETTINGS_ENABLE_FAVORITE_ICON_DESC = "Affiche une icône étoile sur le bouton ami pour les favoris."
@@ -1129,6 +1137,18 @@ BFL:RegisterLocale("frFR", function()
 	L.SETTINGS_FAVORITE_ICON_OPTION_BLIZZARD = "Icône Blizzard"
 	L.SETTINGS_SHOW_FACTION_BG = "Afficher Fond de Faction"
 	L.SETTINGS_SHOW_FACTION_BG_DESC = "Affiche la couleur de la faction comme fond pour le bouton ami."
+
+	-- Multi-Game-Account Settings
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_BADGE = "Afficher le badge multi-comptes"
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_BADGE_DESC = "Affiche un badge sur les amis ayant plusieurs comptes de jeu en ligne."
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO = "Afficher l'info multi-comptes"
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO_DESC =
+		"Ajoute une courte liste des personnages en ligne quand un ami utilise plusieurs comptes."
+	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS = "Infobulle : Comptes de jeu max."
+	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS_DESC =
+		"Nombre maximum de comptes de jeu supplémentaires affichés dans l'infobulle."
+	L.INFO_MULTI_ACCOUNT_PREFIX = "x%d Accounts"
+	L.INFO_MULTI_ACCOUNT_REMAINDER = " (+%d)"
 
 	-- ========================================
 	-- RAID SHORTCUTS (Phase 26)

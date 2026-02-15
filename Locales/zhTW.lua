@@ -162,6 +162,8 @@ BFL:RegisterLocale("zhTW", function()
 	L.MENU_IGNORE_LIST = "管理封鎖名單"
 	L.MENU_BETTERFRIENDLIST_TITLE = "BetterFriendList"
 	L.MENU_MORE_GROUPS = "More Groups..."
+	L.MENU_SWITCH_GAME_ACCOUNT = "切換遊戲帳號"
+	L.MENU_DEFAULT_FOCUS = "預設（Blizzard）"
 	L.GROUPS_DIALOG_TITLE = "Groups for %s"
 	L.MENU_COPY_CHARACTER_NAME = "複製角色名稱"
 	L.COPY_CHARACTER_NAME_POPUP_TITLE = "複製角色名稱"
@@ -629,6 +631,8 @@ BFL:RegisterLocale("zhTW", function()
 	L.TRAVEL_PASS_NO_INFO = "Info unavailable"
 	L.TRAVEL_PASS_DIFFERENT_REGION = "Different Region"
 	L.TRAVEL_PASS_NO_GAME_ACCOUNTS = "No game account"
+	L.TRAVEL_PASS_DIFFERENT_FACTION = "Opposite faction"
+	L.TRAVEL_PASS_QUEST_SESSION = "Cannot invite during a quest session"
 
 	-- MENUS (Additional)
 	L.MENU_TITLE = "BetterFriendlist"
@@ -1127,6 +1131,10 @@ BFL:RegisterLocale("zhTW", function()
 	L.MENU_SHOW_SEARCH = "顯示搜尋"
 	L.MENU_QUICK_FILTER = "快速過濾"
 
+	-- Multi-Game-Account
+	L.MENU_INVITE_CHARACTER = "邀請角色..."
+	L.INVITE_ACCOUNT_PICKER_TITLE = "邀請角色"
+
 	-- Favorites & Faction Settings
 	L.SETTINGS_ENABLE_FAVORITE_ICON = "啟用最愛圖示"
 	L.SETTINGS_ENABLE_FAVORITE_ICON_DESC = "在好友按鈕上顯示星星圖示以標記最愛。"
@@ -1136,6 +1144,17 @@ BFL:RegisterLocale("zhTW", function()
 	L.SETTINGS_FAVORITE_ICON_OPTION_BLIZZARD = "暴雪圖示"
 	L.SETTINGS_SHOW_FACTION_BG = "顯示陣營背景"
 	L.SETTINGS_SHOW_FACTION_BG_DESC = "將陣營顏色顯示為好友按鈕的背景。"
+
+	-- Multi-Game-Account Settings
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_BADGE = "顯示多帳號徽章"
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_BADGE_DESC = "為同時線上多個遊戲帳號的好友顯示徽章。"
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO = "顯示多帳號資訊"
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO_DESC =
+		"當好友同時登入多個帳號時，附加一份線上角色的簡短列表。"
+	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS = "提示框：最大遊戲帳號數"
+	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS_DESC = "提示框中顯示的額外遊戲帳號最大數量。"
+	L.INFO_MULTI_ACCOUNT_PREFIX = "x%d Accounts"
+	L.INFO_MULTI_ACCOUNT_REMAINDER = " (+%d)"
 
 	-- ========================================
 	-- STREAMER MODE (Phase 24)

@@ -153,7 +153,8 @@ BFL:RegisterLocale("ruRU", function()
 	L.SETTINGS_NOTES_CLEANED = "Заметки очищены!"
 	L.SETTINGS_NOTES_PRESERVED =
 		"Заметки сохранены (вы можете очистить их вручную)"
-	L.SETTINGS_EXPORT_SUCCESS = "Экспорт успешно завершён! Скопируйте текст из диалога"
+	L.SETTINGS_EXPORT_SUCCESS =
+		"Экспорт успешно завершён! Скопируйте текст из диалога"
 	L.SETTINGS_IMPORT_SUCCESS =
 		"Импорт успешно завершён! Все группы и назначения восстановлены"
 	L.SETTINGS_IMPORT_FAILED = "Импорт не удался!\n\n"
@@ -215,6 +216,8 @@ BFL:RegisterLocale("ruRU", function()
 	L.MENU_IGNORE_LIST = "Управление списком игнорирования"
 	L.MENU_BETTERFRIENDLIST_TITLE = "BetterFriendList"
 	L.MENU_MORE_GROUPS = "Больше групп..."
+	L.MENU_SWITCH_GAME_ACCOUNT = "Сменить игровой аккаунт"
+	L.MENU_DEFAULT_FOCUS = "По умолчанию (Blizzard)"
 	L.GROUPS_DIALOG_TITLE = "Группы для %s"
 	L.MENU_COPY_CHARACTER_NAME = "Копировать имя персонажа"
 	L.COPY_CHARACTER_NAME_POPUP_TITLE = "Копировать имя персонажа"
@@ -352,7 +355,8 @@ BFL:RegisterLocale("ruRU", function()
 	L.BROKER_SETTINGS_SHOW_BNET = "Показать кол-во Battle.net"
 	L.BROKER_SETTINGS_SHOW_WOW = "Показать кол-во WoW"
 	L.BROKER_SETTINGS_TEXT_FORMAT = "Формат текста"
-	L.BROKER_SETTINGS_TEXT_FORMAT_DESC = "Выбрать способ отображения текста в брокере"
+	L.BROKER_SETTINGS_TEXT_FORMAT_DESC =
+		"Выбрать способ отображения текста в брокере"
 	L.BROKER_SETTINGS_TOOLTIP_MODE = "Уровень детализации в тултипе"
 	L.BROKER_SETTINGS_CLICK_ACTION = "Действие левой кнопки"
 	L.BROKER_FILTER_CHANGED = "Фильтр изменён на: %s"
@@ -413,7 +417,8 @@ BFL:RegisterLocale("ruRU", function()
 	L.BROKER_SETTINGS_HEADER_INTERACTION = "Взаимодействие"
 	L.BROKER_SETTINGS_HEADER_INSTRUCTIONS = "Как использовать"
 	L.BROKER_SETTINGS_HEADER_COMPATIBILITY = "Протестированные аддоны отображения"
-	L.BROKER_SETTINGS_INSTRUCTIONS = " Установить аддон брокера данных\n Включить указанный аддон брокера данных"
+	L.BROKER_SETTINGS_INSTRUCTIONS =
+		" Установить аддон брокера данных\n Включить указанный аддон брокера данных"
 	L.BROKER_SETTINGS_HEADER_COLUMNS = "Колонки подсказки"
 	L.BROKER_SETTINGS_COLUMNS_HEADER = "Колонки подсказки"
 	L.BROKER_COLUMN_LEVEL = "Уровень"
@@ -557,7 +562,8 @@ BFL:RegisterLocale("ruRU", function()
 	L.EDITMODE_FRAME_HEIGHT = "Высота"
 
 	-- Dialogs (Notifications Trigger)
-	L.DIALOG_RESET_LAYOUTS_TEXT = "Сбросить расположение?\n\nЭто действие нельзя отменить!"
+	L.DIALOG_RESET_LAYOUTS_TEXT =
+		"Сбросить расположение?\n\nЭто действие нельзя отменить!"
 	L.DIALOG_RESET_LAYOUTS_BTN1 = "Сбросить"
 	L.MSG_LAYOUTS_RESET = "Расположение сброшено"
 	L.DIALOG_TRIGGER_TITLE = "Создать триггер"
@@ -586,7 +592,8 @@ BFL:RegisterLocale("ruRU", function()
 	L.TOOLTIP_QUICK_FILTER = "Фильтр: %s"
 
 	-- Settings (Broker)
-	L.BROKER_SETTINGS_RELOAD_TEXT = "Требуется перезагрузка интерфейса.\n\nПерезагрузить?"
+	L.BROKER_SETTINGS_RELOAD_TEXT =
+		"Требуется перезагрузка интерфейса.\n\nПерезагрузить?"
 	L.BROKER_SETTINGS_RELOAD_BTN = "Перезагрузка"
 	L.BROKER_SETTINGS_RELOAD_CANCEL = "Отмена"
 	L.BROKER_SETTINGS_ENABLE_TOOLTIP = "Включить брокер данных"
@@ -656,7 +663,8 @@ BFL:RegisterLocale("ruRU", function()
 	-- ========================================
 	-- RECENT ALLIES (Retail 11.0.7+)
 	-- ========================================
-	L.RECENT_ALLIES_SYSTEM_UNAVAILABLE = "Информация о недавних союзниках недоступна"
+	L.RECENT_ALLIES_SYSTEM_UNAVAILABLE =
+		"Информация о недавних союзниках недоступна"
 	L.RECENT_ALLIES_INVITE = "Пригласить"
 	L.RECENT_ALLIES_PLAYER_OFFLINE = "Игрок не в сети"
 	L.RECENT_ALLIES_PIN_EXPIRES = "Закрепление истекает через %s"
@@ -760,6 +768,8 @@ BFL:RegisterLocale("ruRU", function()
 	L.TRAVEL_PASS_NO_INFO = "Информация недоступна"
 	L.TRAVEL_PASS_DIFFERENT_REGION = "Другой регион"
 	L.TRAVEL_PASS_NO_GAME_ACCOUNTS = "Нет игрового аккаунта"
+	L.TRAVEL_PASS_DIFFERENT_FACTION = "Противоположная фракция"
+	L.TRAVEL_PASS_QUEST_SESSION = "Нельзя пригласить во время квестовой сессии"
 
 	-- MENUS (Additional)
 	L.MENU_TITLE = "BetterFriendlist"
@@ -877,13 +887,15 @@ BFL:RegisterLocale("ruRU", function()
 	L.SETTINGS_HIDE_MAX_LEVEL_DESC = "Скрывать максимальный лвл"
 	L.SETTINGS_SHOW_BLIZZARD_DESC = "Показывать кнопку Blizzard"
 	L.SETTINGS_SHOW_FAVORITES_DESC = "Показывать Избранное"
-	L.SETTINGS_ACCORDION_GROUPS_DESC = "Открытие одной группы сворачивает остальные"
+	L.SETTINGS_ACCORDION_GROUPS_DESC =
+		"Открытие одной группы сворачивает остальные"
 	L.SETTINGS_COMPACT_MODE_DESC = "Уменьшает список"
 
 	-- ElvUI & UI Panel
 	L.SETTINGS_ENABLE_ELVUI_SKIN = "Включить скин ElvUI"
 	L.SETTINGS_ENABLE_ELVUI_SKIN_DESC = "Требуется ElvUI"
-	L.DIALOG_ELVUI_RELOAD_TEXT = "Требуется перезагрузка интерфейса.\nПерезагрузить?"
+	L.DIALOG_ELVUI_RELOAD_TEXT =
+		"Требуется перезагрузка интерфейса.\nПерезагрузить?"
 	L.DIALOG_ELVUI_RELOAD_BTN1 = "Да"
 	L.DIALOG_ELVUI_RELOAD_BTN2 = "Нет"
 
@@ -1015,7 +1027,8 @@ BFL:RegisterLocale("ruRU", function()
 	L.CORE_HELP_PERF_RESET = "  |cffffffff/bfl perf reset|r - Сбросить"
 	L.CORE_HELP_PERF_MEM = "  |cffffffff/bfl perf memory|r - Память"
 	L.CORE_HELP_TEST_COMMANDS = "|cffffcc00Test:|r"
-	L.TESTSUITE_PERFY_HELP = "  |cffffffff/bfl test perfy [seconds]|r - Запуск стресс-тест производительности"
+	L.TESTSUITE_PERFY_HELP =
+		"  |cffffffff/bfl test perfy [seconds]|r - Запуск стресс-тест производительности"
 	L.TESTSUITE_PERFY_STARTING = "Запуск стресс-теста Perfy на %d секунд"
 	L.TESTSUITE_PERFY_ALREADY_RUNNING = "Стресс-тест Perfy уже запущен"
 	L.TESTSUITE_PERFY_MISSING_ADDON = "Аддон Perfy недоступен (!!!Perfy)"
@@ -1136,6 +1149,10 @@ BFL:RegisterLocale("ruRU", function()
 	L.MENU_SHOW_SEARCH = "Показать поиск"
 	L.MENU_QUICK_FILTER = "Быстрый фильтр"
 
+	-- Multi-Game-Account
+	L.MENU_INVITE_CHARACTER = "Пригласить персонажа..."
+	L.INVITE_ACCOUNT_PICKER_TITLE = "Пригласить персонажа"
+
 	-- Favorites & Faction Settings
 	L.SETTINGS_ENABLE_FAVORITE_ICON = "Включить значок избранного"
 	L.SETTINGS_ENABLE_FAVORITE_ICON_DESC =
@@ -1148,6 +1165,19 @@ BFL:RegisterLocale("ruRU", function()
 	L.SETTINGS_SHOW_FACTION_BG = "Показать фон фракции"
 	L.SETTINGS_SHOW_FACTION_BG_DESC =
 		"Показывать цвет фракции в качестве фона для кнопки друга"
+
+	-- Multi-Game-Account Settings
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_BADGE = "Значок мульти-аккаунта"
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_BADGE_DESC =
+		"Показывать значок у друзей с несколькими игровыми аккаунтами онлайн."
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO = "Показывать инфо мульти-аккаунта"
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO_DESC =
+		"Добавляет краткий список онлайн-персонажей, если у друга активно несколько аккаунтов."
+	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS = "Подсказка: Макс. игровых аккаунтов"
+	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS_DESC =
+		"Максимальное количество дополнительных игровых аккаунтов в подсказке."
+	L.INFO_MULTI_ACCOUNT_PREFIX = "x%d Accounts"
+	L.INFO_MULTI_ACCOUNT_REMAINDER = " (+%d)"
 
 	-- ========================================
 	-- STREAMER MODE (Phase 24)

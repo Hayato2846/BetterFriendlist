@@ -208,6 +208,8 @@ BFL:RegisterLocale("koKR", function()
 	L.MENU_IGNORE_LIST = "차단 목록 관리"
 	L.MENU_BETTERFRIENDLIST_TITLE = "BetterFriendList"
 	L.MENU_MORE_GROUPS = "More Groups..."
+	L.MENU_SWITCH_GAME_ACCOUNT = "게임 계정 전환"
+	L.MENU_DEFAULT_FOCUS = "기본값 (Blizzard)"
 	L.GROUPS_DIALOG_TITLE = "Groups for %s"
 	L.MENU_COPY_CHARACTER_NAME = "캐릭터 이름 복사"
 	L.COPY_CHARACTER_NAME_POPUP_TITLE = "캐릭터 이름 복사"
@@ -734,6 +736,8 @@ BFL:RegisterLocale("koKR", function()
 	L.TRAVEL_PASS_NO_INFO = "Info unavailable"
 	L.TRAVEL_PASS_DIFFERENT_REGION = "Different Region"
 	L.TRAVEL_PASS_NO_GAME_ACCOUNTS = "No game account"
+	L.TRAVEL_PASS_DIFFERENT_FACTION = "Opposite faction"
+	L.TRAVEL_PASS_QUEST_SESSION = "Cannot invite during a quest session"
 
 	-- MENUS (Additional)
 	L.MENU_TITLE = "BetterFriendlist"
@@ -1113,6 +1117,10 @@ BFL:RegisterLocale("koKR", function()
 	L.MENU_SHOW_SEARCH = "검색 표시"
 	L.MENU_QUICK_FILTER = "빠른 필터"
 
+	-- Multi-Game-Account
+	L.MENU_INVITE_CHARACTER = "캐릭터 초대..."
+	L.INVITE_ACCOUNT_PICKER_TITLE = "캐릭터 초대"
+
 	-- Favorites & Faction Settings
 	L.SETTINGS_ENABLE_FAVORITE_ICON = "즐겨찾기 아이콘 사용"
 	L.SETTINGS_ENABLE_FAVORITE_ICON_DESC = "즐겨찾기 친구 버튼에 별 아이콘을 표시합니다."
@@ -1122,6 +1130,18 @@ BFL:RegisterLocale("koKR", function()
 	L.SETTINGS_FAVORITE_ICON_OPTION_BLIZZARD = "블리자드 아이콘"
 	L.SETTINGS_SHOW_FACTION_BG = "진영 배경 표시"
 	L.SETTINGS_SHOW_FACTION_BG_DESC = "친구 버튼의 배경으로 진영 색상을 표시합니다."
+
+	-- Multi-Game-Account Settings
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_BADGE = "멀티 계정 배지 표시"
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_BADGE_DESC =
+		"여러 게임 계정이 온라인인 친구에게 배지를 표시합니다."
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO = "멀티 계정 정보 표시"
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO_DESC =
+		"친구가 여러 계정에 접속 중일 때 온라인 캐릭터 목록을 짧게 추가합니다."
+	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS = "툴팁: 최대 게임 계정 수"
+	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS_DESC = "툴팁에 표시되는 추가 게임 계정의 최대 수입니다."
+	L.INFO_MULTI_ACCOUNT_PREFIX = "x%d Accounts"
+	L.INFO_MULTI_ACCOUNT_REMAINDER = " (+%d)"
 
 	-- ========================================
 	-- STREAMER MODE (Phase 24)
@@ -1308,7 +1328,7 @@ BFL:RegisterLocale("koKR", function()
 	L.WIZARD_RESTORE_TOOLTIP =
 		"백업에서 원래 메모를 복원합니다. 백업과 다른 메모만 업데이트됩니다."
 	L.WIZARD_RESTORE_CONFIRM =
-		"백업에서 모든 메모를 복원하시겠습니까?\n\n|cffff8800현재 메모가 백업된 버전으로 덮어씌워집니다.|r"
+		"백업에서 모든 메모를 복원��시겠습니까?\n\n|cffff8800현재 메모가 백업된 버전으로 ��어씌����니다.|r"
 	L.WIZARD_RESTORE_SUCCESS = "%d개의 메모가 성공적으로 복원되었습니다."
 	L.WIZARD_NO_BACKUP =
 		"메모 백업을 찾을 수 없습니다. 먼저 메모 정리 마법사를 사용하여 백업을 만드세요."

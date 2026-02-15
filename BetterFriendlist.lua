@@ -1710,17 +1710,83 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			end
 
 			local function BFL_ReplaceCopyNameButton(owner, rootDescription, contextData, menuTypeWrapper)
-				-- Only run if this is our menu
-				if not _G.BetterFriendlist_IsOurMenu then
-					return
-				end
-
+				-- NOTE: Do NOT check _G.BetterFriendlist_IsOurMenu here!
+				-- Menu.ModifyMenu callbacks do not run in registration order,
+				-- so AddGroupsToFriendMenu may clear the flag before we get called.
+				-- We are already filtered to specific MENU_UNIT_* tags by registration.
 				if not rootDescription or not rootDescription.EnumerateElementDescriptions then
 					return
 				end
 
+				-- Check if this BNet friend has multiple WoW game accounts (submenu mode)
+				-- Only WoW accounts have a character name to copy
+				local multiAccountEntries
+				if contextData and contextData.bnetIDAccount then
+					local FriendsListModule = GetFriendsList()
+					if FriendsListModule and FriendsListModule.friendsList then
+						for _, f in ipairs(FriendsListModule.friendsList) do
+							if f.type == "bnet" and f.bnetAccountID == contextData.bnetIDAccount then
+								if f.gameAccounts and #f.gameAccounts > 1 then
+									local wowAccounts = {}
+									for _, ga in ipairs(f.gameAccounts) do
+										if ga.clientProgram == (BNET_CLIENT_WOW or "WoW") then
+											local entry = FriendsListModule:BuildAccountDisplay(ga)
+											if entry then
+												wowAccounts[#wowAccounts + 1] = entry
+											end
+										end
+									end
+									if #wowAccounts > 1 then
+										multiAccountEntries = wowAccounts
+										-- Sort alphabetically by character name
+										table.sort(multiAccountEntries, function(a, b)
+											local aName = (a.raw and a.raw.characterName) or a.text or ""
+											local bName = (b.raw and b.raw.characterName) or b.text or ""
+											return tostring(aName):lower() < tostring(bName):lower()
+										end)
+									end
+								end
+								break
+							end
+						end
+					end
+				end
+
 				local targetText = COPY_CHARACTER_NAME -- Blizzard global string
 				local foundAndReplaced = false
+
+				-- Helper: Build a copy handler for a specific name string
+				local function BuildCopyHandler(copyNameText)
+					return function()
+						StaticPopupDialogs["BETTERFRIENDLIST_COPY_URL"] = {
+							text = L.COPY_CHARACTER_NAME_POPUP_TITLE,
+							button1 = CLOSE,
+							hasEditBox = true,
+							editBoxWidth = 350,
+							OnShow = function(self)
+								self.EditBox:SetText(copyNameText or "")
+								self.EditBox:SetFocus()
+								self.EditBox:HighlightText()
+								self.EditBox:SetScript("OnKeyUp", function(editBox, key)
+									if IsControlKeyDown() and key == "C" then
+										editBox:GetParent():Hide()
+									end
+								end)
+							end,
+							EditBoxOnEnterPressed = function(self)
+								self:GetParent():Hide()
+							end,
+							EditBoxOnEscapePressed = function(self)
+								self:GetParent():Hide()
+							end,
+							timeout = 0,
+							whileDead = true,
+							hideOnEscape = true,
+							preferredIndex = 3,
+						}
+						StaticPopup_Show("BETTERFRIENDLIST_COPY_URL")
+					end
+				end
 
 				-- Wrap in pcall: if Blizzard's button is restricted/protected, SetResponder
 				-- can throw a taint error which would kill the entire function and prevent
@@ -1755,20 +1821,50 @@ frame:SetScript("OnEvent", function(self, event, ...)
 						end
 
 						if isMatch then
-							-- Hijack the click handler (may throw taint for restricted buttons)
-							elementDescription:SetResponder(BFL_BuildCopyNameHandler(contextData, menuTypeWrapper))
+							if multiAccountEntries and #multiAccountEntries > 1 then
+								-- Multi-account: Convert to submenu
+								elementDescription:SetResponder(function()
+									return MenuResponse and MenuResponse.Open or false
+								end)
 
-							-- Update text to our localized version if available
-							if L and L.MENU_COPY_CHARACTER_NAME then
-								if elementDescription.SetText then
-									elementDescription:SetText(L.MENU_COPY_CHARACTER_NAME)
-								else
-									elementDescription.text = L.MENU_COPY_CHARACTER_NAME
+								-- Update text to our localized version
+								if L and L.MENU_COPY_CHARACTER_NAME then
+									if elementDescription.SetText then
+										elementDescription:SetText(L.MENU_COPY_CHARACTER_NAME)
+									else
+										elementDescription.text = L.MENU_COPY_CHARACTER_NAME
+									end
+								end
+
+								-- Add character entries as submenu children
+								for _, entry in ipairs(multiAccountEntries) do
+									local displayText = entry.text or "Unknown"
+									local charName = entry.raw and entry.raw.characterName or "Unknown"
+									local realmName = entry.raw and entry.raw.realmName or ""
+									local copyText
+									if realmName ~= "" then
+										copyText = charName .. "-" .. realmName
+									else
+										copyText = charName
+									end
+									elementDescription:CreateButton(displayText, BuildCopyHandler(copyText))
+								end
+							else
+								-- Single account or non-BNet: Hijack the click handler directly
+								elementDescription:SetResponder(BFL_BuildCopyNameHandler(contextData, menuTypeWrapper))
+
+								-- Update text to our localized version if available
+								if L and L.MENU_COPY_CHARACTER_NAME then
+									if elementDescription.SetText then
+										elementDescription:SetText(L.MENU_COPY_CHARACTER_NAME)
+									else
+										elementDescription.text = L.MENU_COPY_CHARACTER_NAME
+									end
 								end
 							end
 
 							foundAndReplaced = true
-							-- Don't break, in case of duplicates
+							break
 						end
 					end
 				end)
@@ -1776,7 +1872,259 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				-- If not found or replacement failed (protected button), add our own safe button
 				if not foundAndReplaced and rootDescription.CreateButton then
 					local buttonText = (L and L.MENU_COPY_CHARACTER_NAME) or "Copy Character Name"
-					rootDescription:CreateButton(buttonText, BFL_BuildCopyNameHandler(contextData, menuTypeWrapper))
+					if multiAccountEntries and #multiAccountEntries > 1 then
+						-- Add as submenu with all character entries
+						local submenu = rootDescription:CreateButton(buttonText, function()
+							return MenuResponse and MenuResponse.Open or false
+						end)
+						if submenu and submenu.CreateButton then
+							for _, entry in ipairs(multiAccountEntries) do
+								local displayText = entry.text or "Unknown"
+								local charName = entry.raw and entry.raw.characterName or "Unknown"
+								local realmName = entry.raw and entry.raw.realmName or ""
+								local copyText
+								if realmName ~= "" then
+									copyText = charName .. "-" .. realmName
+								else
+									copyText = charName
+								end
+								submenu:CreateButton(displayText, BuildCopyHandler(copyText))
+							end
+						end
+					else
+						rootDescription:CreateButton(buttonText, BFL_BuildCopyNameHandler(contextData, menuTypeWrapper))
+					end
+				end
+			end
+
+			-- Multi-Game-Account: Replace Blizzard's single invite button with a character picker submenu
+			-- Only for BNet friend menus where the friend has multiple invitable WoW accounts
+			local function BFL_ReplaceInviteButton(owner, rootDescription, contextData)
+				-- NOTE: Do NOT check _G.BetterFriendlist_IsOurMenu here!
+				-- Menu.ModifyMenu callbacks do not run in registration order,
+				-- so AddGroupsToFriendMenu may clear the flag before we get called.
+				-- We are already filtered to MENU_UNIT_BN_FRIEND by registration.
+				if not rootDescription or not rootDescription.EnumerateElementDescriptions then
+					BFL:DebugPrint("ReplaceInvite: No rootDescription or EnumerateElementDescriptions")
+					return
+				end
+				if not contextData or not contextData.bnetIDAccount then
+					BFL:DebugPrint("ReplaceInvite: No contextData or bnetIDAccount")
+					return
+				end
+
+				-- Find friend data from FriendsList module
+				local FriendsList = GetFriendsList()
+				if not FriendsList or not FriendsList.friendsList then
+					BFL:DebugPrint("ReplaceInvite: No FriendsList module")
+					return
+				end
+
+				local friendData
+				for _, f in ipairs(FriendsList.friendsList) do
+					if f.type == "bnet" and f.bnetAccountID == contextData.bnetIDAccount then
+						friendData = f
+						break
+					end
+				end
+
+				-- Only enhance for friends with multiple invitable accounts
+				if not friendData then
+					BFL:DebugPrint("ReplaceInvite: Friend not found for bnetID=" .. tostring(contextData.bnetIDAccount))
+					return
+				end
+				if not friendData.invitableAccounts then
+					BFL:DebugPrint(
+						"ReplaceInvite: No invitableAccounts for friend (numGameAccounts="
+							.. tostring(friendData.numGameAccounts)
+							.. ")"
+					)
+					return
+				end
+				if #friendData.invitableAccounts <= 1 then
+					BFL:DebugPrint(
+						"ReplaceInvite: Only " .. #friendData.invitableAccounts .. " invitable account(s), skipping"
+					)
+					return
+				end
+
+				BFL:DebugPrint(
+					"ReplaceInvite: Friend has "
+						.. #friendData.invitableAccounts
+						.. " invitable accounts, searching menu elements..."
+				)
+
+				-- Text/data keys used by Blizzard's invite buttons
+				local inviteTexts = {}
+				if PARTY_INVITE then
+					inviteTexts[PARTY_INVITE] = true
+					BFL:DebugPrint("ReplaceInvite: PARTY_INVITE = '" .. tostring(PARTY_INVITE) .. "'")
+				end
+				if SUGGEST_INVITE then
+					inviteTexts[SUGGEST_INVITE] = true
+				end
+				if REQUEST_INVITE then
+					inviteTexts[REQUEST_INVITE] = true
+				end
+
+				local inviteDataKeys = {
+					["BN_INVITE"] = true,
+					["BN_SUGGEST_INVITE"] = true,
+					["BN_REQUEST_INVITE"] = true,
+				}
+
+				local friendUID = FriendsList:GetFriendUID(friendData)
+				local lastInvited = friendUID and FriendsList:GetLastInvitedAccountID(friendUID) or nil
+
+				local entries = {}
+				for _, ga in ipairs(friendData.invitableAccounts) do
+					local entry = FriendsList:BuildAccountDisplay(ga)
+					if entry then
+						entry.isPreferred = lastInvited and entry.gameAccountID == lastInvited or false
+						entries[#entries + 1] = entry
+					end
+				end
+
+				local function GetRestrictionText(restriction)
+					if not restriction or restriction == INVITE_RESTRICTION_NONE then
+						return nil
+					end
+
+					if restriction == INVITE_RESTRICTION_CLIENT then
+						return ERR_TRAVEL_PASS_NOT_WOW or (L and L.TRAVEL_PASS_NOT_WOW) or "Not playing WoW"
+					elseif restriction == INVITE_RESTRICTION_WOW_PROJECT_CLASSIC then
+						return ERR_TRAVEL_PASS_WRONG_PROJECT_CLASSIC_OVERRIDE
+							or (L and L.TRAVEL_PASS_WOW_CLASSIC)
+							or "Different WoW version (Classic)"
+					elseif restriction == INVITE_RESTRICTION_WOW_PROJECT_MAINLINE then
+						return ERR_TRAVEL_PASS_WRONG_PROJECT_MAINLINE_OVERRIDE
+							or (L and L.TRAVEL_PASS_WOW_MAINLINE)
+							or "Different WoW version (Retail)"
+					elseif restriction == INVITE_RESTRICTION_WOW_PROJECT_ID then
+						return ERR_TRAVEL_PASS_WRONG_PROJECT
+							or (L and L.TRAVEL_PASS_DIFFERENT_VERSION)
+							or "Different WoW version"
+					elseif restriction == INVITE_RESTRICTION_INFO then
+						return ERR_TRAVEL_PASS_NO_INFO or (L and L.TRAVEL_PASS_NO_INFO) or "No realm info"
+					elseif restriction == INVITE_RESTRICTION_REGION then
+						return ERR_TRAVEL_PASS_DIFFERENT_REGION
+							or (L and L.TRAVEL_PASS_DIFFERENT_REGION)
+							or "Different region"
+					elseif restriction == INVITE_RESTRICTION_NO_GAME_ACCOUNTS then
+						return (L and L.TRAVEL_PASS_NO_GAME_ACCOUNTS) or "No game accounts"
+					elseif restriction == INVITE_RESTRICTION_FACTION then
+						return (L and L.TRAVEL_PASS_DIFFERENT_FACTION) or "Different faction"
+					elseif restriction == INVITE_RESTRICTION_QUEST_SESSION then
+						return (L and L.TRAVEL_PASS_QUEST_SESSION) or "Quest Session"
+					end
+
+					return nil
+				end
+
+				local function FormatEntryText(entry)
+					local label = entry.text or "Unknown"
+					if entry.isPreferred then
+						label = "* " .. label
+					end
+
+					if not entry.isInvitable then
+						local reason = GetRestrictionText(entry.restriction)
+						if reason and reason ~= "" then
+							label = label .. " (" .. reason .. ")"
+						else
+							label = label .. " (Not invitable)"
+						end
+					end
+					return label
+				end
+
+				table.sort(entries, function(a, b)
+					if a.isPreferred ~= b.isPreferred then
+						return a.isPreferred
+					end
+
+					local aName = (a.raw and a.raw.characterName) or a.text or ""
+					local bName = (b.raw and b.raw.characterName) or b.text or ""
+					return tostring(aName):lower() < tostring(bName):lower()
+				end)
+
+				local found = false
+				local ok, err = pcall(function()
+					local elementCount = 0
+					for _, elementDescription in rootDescription:EnumerateElementDescriptions() do
+						elementCount = elementCount + 1
+						local text = elementDescription.text
+						local rawTextType = type(text)
+						if type(text) == "function" then
+							local fOk, fResult = pcall(text)
+							if fOk then
+								text = fResult
+							end
+						end
+
+						-- Debug: log every element's text and data
+						local dataVal = elementDescription.data
+						BFL:DebugPrint(
+							"  Element #"
+								.. elementCount
+								.. ": text="
+								.. tostring(text)
+								.. " (raw type="
+								.. rawTextType
+								.. "), data="
+								.. tostring(dataVal)
+						)
+
+						local isInvite = false
+						if text and inviteTexts[text] then
+							isInvite = true
+							BFL:DebugPrint("  -> MATCHED via text!")
+						elseif dataVal and inviteDataKeys[tostring(dataVal)] then
+							isInvite = true
+							BFL:DebugPrint("  -> MATCHED via data key!")
+						end
+
+						if isInvite then
+							found = true
+							-- Convert from single-click button to submenu parent
+							-- Suppress original handler: return MenuResponse.Open to keep submenu visible
+							elementDescription:SetResponder(function()
+								return MenuResponse and MenuResponse.Open or false
+							end)
+
+							-- Add character entries as submenu children
+							for _, entry in ipairs(entries) do
+								local displayText = FormatEntryText(entry)
+								local gameAccountID = entry.gameAccountID
+								local playerGuid = entry.playerGuid
+								elementDescription:CreateButton(displayText, function()
+									if not entry.isInvitable then
+										return
+									end
+
+									if FriendsFrame_InviteOrRequestToJoin and playerGuid and gameAccountID then
+										FriendsFrame_InviteOrRequestToJoin(playerGuid, gameAccountID)
+									elseif gameAccountID then
+										BNInviteFriend(gameAccountID)
+									end
+
+									if friendUID and gameAccountID then
+										FriendsList:SetLastInvitedAccountID(friendUID, gameAccountID)
+									end
+								end)
+							end
+							BFL:DebugPrint(
+								"ReplaceInvite: Successfully converted invite button to submenu with "
+									.. #friendData.invitableAccounts
+									.. " entries"
+							)
+							break -- Only one invite button should be visible at a time
+						end
+					end
+					BFL:DebugPrint("ReplaceInvite: Scanned " .. elementCount .. " elements, found=" .. tostring(found))
+				end)
+				if not ok then
+					BFL:DebugPrint("ReplaceInvite: pcall ERROR: " .. tostring(err))
 				end
 			end
 
@@ -1984,6 +2332,87 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					})
 				end)
 
+				-- "Switch Game Account" submenu for BNet friends with multiple game accounts
+				if contextData.bnetIDAccount then
+					local FriendsList = GetFriendsList()
+					local friendData
+					if FriendsList and FriendsList.friendsList then
+						for _, f in ipairs(FriendsList.friendsList) do
+							if f.type == "bnet" and f.bnetAccountID == contextData.bnetIDAccount then
+								friendData = f
+								break
+							end
+						end
+					end
+
+					if friendData and friendData.gameAccounts and #friendData.gameAccounts > 1 then
+						local switchButton =
+							rootDescription:CreateButton((L and L.MENU_SWITCH_GAME_ACCOUNT) or "Switch Game Account")
+
+						-- Header: Friend display name (respects name formatting & Streamer Mode)
+						if FriendsList and FriendsList.GetDisplayName then
+							switchButton:CreateTitle(FriendsList:GetDisplayName(friendData))
+						end
+
+						local currentPrefID = FriendsList and FriendsList:GetPreferredGameAccountID(friendUID)
+
+						local function IsSelected(gaID)
+							if gaID == "default" then
+								return currentPrefID == nil
+							end
+							return currentPrefID == gaID
+						end
+
+						local function SetSelected(gaID)
+							if not FriendsList then
+								return
+							end
+							if gaID == "default" then
+								FriendsList:ClearPreferredGameAccount(friendUID)
+							else
+								FriendsList:SetPreferredGameAccount(friendUID, gaID)
+							end
+						end
+
+						-- "Default (Server Focus)" option
+						local defaultText = (L and L.MENU_DEFAULT_FOCUS) or "Default (Server)"
+						switchButton:CreateRadio(defaultText, IsSelected, SetSelected, "default")
+
+						switchButton:CreateDivider()
+
+						-- List all game accounts
+						for _, ga in ipairs(friendData.gameAccounts) do
+							if
+								ga.clientProgram ~= "App"
+								and ga.clientProgram ~= "CLNT"
+								and ga.clientProgram ~= "BSAp"
+							then
+								local isWoW = ga.clientProgram == (BNET_CLIENT_WOW or "WoW")
+								local label
+								if isWoW then
+									local display = FriendsList
+										and FriendsList.BuildAccountDisplay
+										and FriendsList:BuildAccountDisplay(ga)
+									label = display and (display.coloredName or display.text)
+										or ga.characterName
+										or "Unknown"
+									if ga.areaName and ga.areaName ~= "" then
+										label = label .. " - " .. ga.areaName
+									end
+								else
+									-- Non-WoW: just richPresence, no character name
+									label = ga.richPresence or ga.clientProgram or "Unknown"
+								end
+
+								-- Prepend game icon
+								label = BFL:GetClientEmbeddedIcon(ga.clientProgram, 16) .. label
+
+								switchButton:CreateRadio(label, IsSelected, SetSelected, ga.gameAccountID)
+							end
+						end
+					end
+				end
+
 				local groupsButton = rootDescription:CreateButton(L.MENU_GROUPS)
 
 				-- Enable scrolling for the groups submenu (User requested scrolling instead of dialog)
@@ -2125,6 +2554,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				-- Add "Add Friend" to Recent Allies
 				Menu.ModifyMenu("MENU_UNIT_RECENT_ALLY", AddRecentAllyOptions)
 				Menu.ModifyMenu("MENU_UNIT_RECENT_ALLY_OFFLINE", AddRecentAllyOptions)
+
+				-- Multi-Game-Account: Replace invite button with character picker for BNet friends
+				Menu.ModifyMenu("MENU_UNIT_BN_FRIEND", BFL_ReplaceInviteButton)
 
 				Menu.ModifyMenu("MENU_UNIT_BN_FRIEND", AddGroupsToFriendMenu)
 				Menu.ModifyMenu("MENU_UNIT_BN_FRIEND_OFFLINE", AddGroupsToFriendMenu)
@@ -2708,6 +3140,168 @@ local function CanInviteByGameMode(gameAccountInfo)
 	end
 end
 
+-- Multi-Game-Account Invite Picker
+-- Shows a menu to select which game account to invite when a friend has multiple WoW accounts online
+local function GetInviteRestrictionText(restriction)
+	local L = BFL.L or {}
+
+	if not restriction or restriction == INVITE_RESTRICTION_NONE then
+		return nil
+	end
+	if restriction == INVITE_RESTRICTION_CLIENT then
+		return ERR_TRAVEL_PASS_NOT_WOW or L.TRAVEL_PASS_NOT_WOW or "Not playing WoW"
+	elseif restriction == INVITE_RESTRICTION_WOW_PROJECT_CLASSIC then
+		return ERR_TRAVEL_PASS_WRONG_PROJECT_CLASSIC_OVERRIDE
+			or L.TRAVEL_PASS_WOW_CLASSIC
+			or "Different WoW version (Classic)"
+	elseif restriction == INVITE_RESTRICTION_WOW_PROJECT_MAINLINE then
+		return ERR_TRAVEL_PASS_WRONG_PROJECT_MAINLINE_OVERRIDE
+			or L.TRAVEL_PASS_WOW_MAINLINE
+			or "Different WoW version (Retail)"
+	elseif restriction == INVITE_RESTRICTION_WOW_PROJECT_ID then
+		return ERR_TRAVEL_PASS_WRONG_PROJECT or L.TRAVEL_PASS_DIFFERENT_VERSION or "Different WoW version"
+	elseif restriction == INVITE_RESTRICTION_INFO then
+		return ERR_TRAVEL_PASS_NO_INFO or L.TRAVEL_PASS_NO_INFO or "No realm info"
+	elseif restriction == INVITE_RESTRICTION_REGION then
+		return ERR_TRAVEL_PASS_DIFFERENT_REGION or L.TRAVEL_PASS_DIFFERENT_REGION or "Different region"
+	elseif restriction == INVITE_RESTRICTION_NO_GAME_ACCOUNTS then
+		return L.TRAVEL_PASS_NO_GAME_ACCOUNTS or "No game accounts"
+	elseif restriction == INVITE_RESTRICTION_FACTION then
+		return L.TRAVEL_PASS_DIFFERENT_FACTION or "Different faction"
+	elseif restriction == INVITE_RESTRICTION_QUEST_SESSION then
+		return L.TRAVEL_PASS_QUEST_SESSION or "Quest Session"
+	end
+	return nil
+end
+
+BFL.GetInviteRestrictionText = GetInviteRestrictionText
+
+local function ShowMultiAccountInvitePicker(invitableAccounts, anchorButton)
+	if not invitableAccounts or #invitableAccounts == 0 then
+		return
+	end
+
+	local L = BFL.L or {}
+	local FriendsList = GetFriendsList()
+	local friendUID = nil
+	if anchorButton and anchorButton.friendData and FriendsList and FriendsList.GetFriendUID then
+		friendUID = FriendsList:GetFriendUID(anchorButton.friendData)
+	end
+
+	local lastInvited = nil
+	if FriendsList and friendUID then
+		lastInvited = FriendsList:GetLastInvitedAccountID(friendUID)
+	end
+
+	local entries = {}
+	if FriendsList and FriendsList.BuildAccountDisplay then
+		for _, ga in ipairs(invitableAccounts) do
+			local entry = FriendsList:BuildAccountDisplay(ga)
+			if entry then
+				entry.isPreferred = lastInvited and entry.gameAccountID == lastInvited or false
+				entries[#entries + 1] = entry
+			end
+		end
+	else
+		for _, ga in ipairs(invitableAccounts) do
+			entries[#entries + 1] = {
+				text = ga.characterName or "Unknown",
+				gameAccountID = ga.gameAccountID,
+			}
+		end
+	end
+
+	local function FormatEntryText(entry)
+		local label = entry.text or "Unknown"
+		if entry.isPreferred then
+			label = "* " .. label
+		end
+		if not entry.isInvitable then
+			local reason = GetInviteRestrictionText(entry.restriction)
+			if reason and reason ~= "" then
+				label = label .. " (" .. reason .. ")"
+			else
+				label = label .. " (Not invitable)"
+			end
+		end
+		return label
+	end
+
+	table.sort(entries, function(a, b)
+		if a.isPreferred ~= b.isPreferred then
+			return a.isPreferred
+		end
+		return tostring(a.text or ""):lower() < tostring(b.text or ""):lower()
+	end)
+
+	-- Retail: Use MenuUtil if available
+	if MenuUtil and MenuUtil.CreateContextMenu then
+		MenuUtil.CreateContextMenu(anchorButton, function(ownerRegion, rootDescription)
+			rootDescription:CreateTitle(L.INVITE_ACCOUNT_PICKER_TITLE or "Invite Character")
+			for _, entry in ipairs(entries) do
+				local text = FormatEntryText(entry)
+				local gameAccountID = entry.gameAccountID
+				rootDescription:CreateButton(text, function()
+					if not entry.isInvitable then
+						return
+					end
+					if gameAccountID then
+						BNInviteFriend(gameAccountID)
+					end
+
+					if FriendsList and friendUID and gameAccountID then
+						FriendsList:SetLastInvitedAccountID(friendUID, gameAccountID)
+					end
+				end)
+			end
+		end)
+		return
+	end
+
+	-- Classic: Use UIDropDownMenu
+	if UIDropDownMenu_Initialize and ToggleDropDownMenu then
+		if not BFL.InvitePickerDropdown then
+			BFL.InvitePickerDropdown =
+				CreateFrame("Frame", "BFL_InvitePickerDropdown", UIParent, "UIDropDownMenuTemplate")
+		end
+
+		local accounts = invitableAccounts -- closure capture
+		UIDropDownMenu_Initialize(BFL.InvitePickerDropdown, function(self, level)
+			-- Title
+			local titleInfo = UIDropDownMenu_CreateInfo()
+			titleInfo.text = L.INVITE_ACCOUNT_PICKER_TITLE or "Invite Character"
+			titleInfo.isTitle = true
+			titleInfo.notCheckable = true
+			UIDropDownMenu_AddButton(titleInfo, level)
+
+			for _, entry in ipairs(entries) do
+				local info = UIDropDownMenu_CreateInfo()
+				info.text = FormatEntryText(entry)
+				info.notCheckable = true
+				local gameAccountID = entry.gameAccountID
+				info.disabled = entry.isInvitable == false
+				info.func = function()
+					if not entry.isInvitable then
+						return
+					end
+					if gameAccountID then
+						BNInviteFriend(gameAccountID)
+					end
+
+					if FriendsList and friendUID and gameAccountID then
+						FriendsList:SetLastInvitedAccountID(friendUID, gameAccountID)
+					end
+				end
+				UIDropDownMenu_AddButton(info, level)
+			end
+		end, "MENU")
+
+		ToggleDropDownMenu(1, nil, BFL.InvitePickerDropdown, anchorButton, 0, 0)
+	end
+end
+
+BFL.ShowMultiAccountInvitePicker = ShowMultiAccountInvitePicker
+
 -- TravelPass Button Handlers
 function BetterFriendsList_TravelPassButton_OnClick(self)
 	local friendData = self.friendData
@@ -2796,36 +3390,39 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 		return
 	end
 
-	-- CLASSIC FALLBACK (Legacy Logic)
-	-- Check if friend has multiple game accounts
-	local numGameAccounts = C_BattleNet.GetFriendNumGameAccounts(actualIndex)
+	-- CLASSIC FALLBACK (Enhanced with Multi-Game-Account Invite Picker)
+	-- Use pre-calculated invitable accounts from the data layer
+	if friendData.invitableAccounts and #friendData.invitableAccounts > 0 then
+		if #friendData.invitableAccounts == 1 then
+			-- Single invitable account: invite directly
+			BNInviteFriend(friendData.invitableAccounts[1].gameAccountID)
+		else
+			-- Multiple invitable accounts: show picker
+			ShowMultiAccountInvitePicker(friendData.invitableAccounts, self)
+		end
+		return
+	end
 
-	if numGameAccounts > 1 then
-		-- Multiple game accounts - need to show dropdown
-		-- For now, just invite the first valid WoW account
-		local playerFactionGroup = UnitFactionGroup("player")
-		for i = 1, numGameAccounts do
-			local gameAccountInfo = C_BattleNet.GetFriendGameAccountInfo(actualIndex, i)
-			if
-				gameAccountInfo
-				and gameAccountInfo.clientProgram == BNET_CLIENT_WOW
-				and gameAccountInfo.isOnline
-				and gameAccountInfo.realmID
-				and gameAccountInfo.realmID ~= 0
-			then
-				-- Found a valid WoW account - send invite
-				if gameAccountInfo.playerGuid then
-					BNInviteFriend(gameAccountInfo.gameAccountID)
-					return
-				end
-			end
-		end
-	else
-		-- Single game account - invite directly
-		local gameAccountInfo = C_BattleNet.GetFriendGameAccountInfo(actualIndex, 1)
-		if gameAccountInfo and gameAccountInfo.gameAccountID then
+	-- Final fallback: iterate game accounts (handles stale pre-calc data)
+	local numGameAccounts = C_BattleNet.GetFriendNumGameAccounts(actualIndex)
+	for i = 1, numGameAccounts do
+		local gameAccountInfo = C_BattleNet.GetFriendGameAccountInfo(actualIndex, i)
+		if
+			gameAccountInfo
+			and gameAccountInfo.clientProgram == BNET_CLIENT_WOW
+			and gameAccountInfo.isOnline
+			and gameAccountInfo.realmID
+			and gameAccountInfo.realmID ~= 0
+		then
 			BNInviteFriend(gameAccountInfo.gameAccountID)
+			return
 		end
+	end
+
+	-- Single game account fallback
+	local gameAccountInfo = C_BattleNet.GetFriendGameAccountInfo(actualIndex, 1)
+	if gameAccountInfo and gameAccountInfo.gameAccountID then
+		BNInviteFriend(gameAccountInfo.gameAccountID)
 	end
 end
 
