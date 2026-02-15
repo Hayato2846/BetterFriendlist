@@ -3789,6 +3789,14 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 						restriction = INVITE_RESTRICTION_NO_GAME_ACCOUNTS
 					end
 
+					-- Fix: If at least one account is invitable, the friend-level restriction
+					-- must be NONE regardless of worse restrictions from other accounts
+					-- (e.g. non-WoW App accounts or cross-faction accounts during quest sessions).
+					-- The max-tracking can incorrectly override NONE (0) with a higher value.
+					if restriction ~= INVITE_RESTRICTION_NONE and invitableAccounts and #invitableAccounts > 0 then
+						restriction = INVITE_RESTRICTION_NONE
+					end
+
 					if restriction == INVITE_RESTRICTION_NONE then
 						friend.canInvite = true
 
@@ -6949,6 +6957,12 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		)
 	local iconBaseRowHeight =
 		CalculateFriendRowHeight(isCompactMode, nameSize, infoSize, self.settingsCache.infoDisabled, false)
+
+	-- Compact mode: actual row height may be smaller than the 2-line fallback used by
+	-- CalculateFriendRowHeight. Clamp icon base so icons never exceed the real row.
+	if iconBaseRowHeight > rowHeight then
+		iconBaseRowHeight = rowHeight
+	end
 
 	-- OPTIMIZATION: Layout Caching (Phase 9.9)
 	-- Update layout if CompactMode changed OR font version changed OR row height changed

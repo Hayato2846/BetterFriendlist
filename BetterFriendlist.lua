@@ -3246,7 +3246,12 @@ local function ShowMultiAccountInvitePicker(invitableAccounts, anchorButton)
 						return
 					end
 					if gameAccountID then
-						BNInviteFriend(gameAccountID)
+						-- Use Blizzard's wrapper for proper Invite vs Request-To-Join handling
+						if FriendsFrame_InviteOrRequestToJoin and entry.playerGuid then
+							FriendsFrame_InviteOrRequestToJoin(entry.playerGuid, gameAccountID)
+						else
+							BNInviteFriend(gameAccountID)
+						end
 					end
 
 					if FriendsList and friendUID and gameAccountID then
@@ -3285,7 +3290,12 @@ local function ShowMultiAccountInvitePicker(invitableAccounts, anchorButton)
 						return
 					end
 					if gameAccountID then
-						BNInviteFriend(gameAccountID)
+						-- Use Blizzard's wrapper for proper Invite vs Request-To-Join handling
+						if FriendsFrame_InviteOrRequestToJoin and entry.playerGuid then
+							FriendsFrame_InviteOrRequestToJoin(entry.playerGuid, gameAccountID)
+						else
+							BNInviteFriend(gameAccountID)
+						end
 					end
 
 					if FriendsList and friendUID and gameAccountID then
@@ -3394,8 +3404,19 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 	-- Use pre-calculated invitable accounts from the data layer
 	if friendData.invitableAccounts and #friendData.invitableAccounts > 0 then
 		if #friendData.invitableAccounts == 1 then
-			-- Single invitable account: invite directly
-			BNInviteFriend(friendData.invitableAccounts[1].gameAccountID)
+			-- Single invitable account: use Request-To-Join when appropriate
+			local singleAccount = friendData.invitableAccounts[1]
+			local singleGuid = singleAccount.playerGuid
+			if singleGuid and GetDisplayedInviteType then
+				local inviteType = GetDisplayedInviteType(singleGuid)
+				if inviteType == "REQUEST_INVITE" or inviteType == "REQUEST_INVITE_CROSS_FACTION" then
+					BNRequestInviteFriend(singleAccount.gameAccountID)
+				else
+					BNInviteFriend(singleAccount.gameAccountID)
+				end
+			else
+				BNInviteFriend(singleAccount.gameAccountID)
+			end
 		else
 			-- Multiple invitable accounts: show picker
 			ShowMultiAccountInvitePicker(friendData.invitableAccounts, self)

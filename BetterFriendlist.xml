@@ -608,6 +608,7 @@
 				<Anchor point="TOPLEFT" x="0" y="-1" />
 				<Anchor point="BOTTOMRIGHT" x="0" y="1" />
 			</Anchors>
+			<Color color="HIGHLIGHT_LIGHT_BLUE" />
 		</HighlightTexture>
 		<Scripts>
 			<OnClick>
@@ -620,13 +621,6 @@
 				BetterFriendsList_Button_OnLeave(self);
 			</OnLeave>
 		</Scripts>
-		<HighlightTexture file="Interface\QuestFrame\UI-QuestLogTitleHighlight" alphaMode="ADD"
-			parentKey="highlight">
-			<Anchors>
-				<Anchor point="TOPLEFT" x="0" y="-1" />
-				<Anchor point="BOTTOMRIGHT" x="0" y="1" />
-			</Anchors>
-		</HighlightTexture>
 	</Button>
 	<!-- Group Header Button Template -->
 	<Button name="BetterFriendsGroupHeaderTemplate" virtual="true" enableMouse="true">
