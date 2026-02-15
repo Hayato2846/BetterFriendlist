@@ -385,7 +385,8 @@ function BetterFriendsList_Button_OnEnter(self)
 	local gameAccountIndex = 1
 	local playerRealmName = GetRealmName()
 	local playerFactionGroup = UnitFactionGroup("player")
-	local FRIENDS_TOOLTIP_MAX_GAME_ACCOUNTS = 5
+	local DB = BFL:GetModule("DB")
+	local FRIENDS_TOOLTIP_MAX_GAME_ACCOUNTS = DB and DB:Get("tooltipMaxGameAccounts", 5) or 5
 
 	if numGameAccounts > 1 then
 		local headerSet = false

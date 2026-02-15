@@ -21,6 +21,10 @@ local function GetFontManager()
 	return BFL.FontManager
 end
 
+local function GetFriendsListModule()
+	return BFL:GetModule("FriendsList")
+end
+
 -- ========================================
 -- Constants
 -- ========================================
@@ -30,6 +34,10 @@ local BUTTON_TYPE_INVITE_HEADER = 3
 local BUTTON_TYPE_INVITE = 4
 local BUTTON_TYPE_DIVIDER = 5
 local BUTTON_TYPE_SEARCH = 6
+local MAX_MULTI_ACCOUNT_ROW_ENTRIES = 2 -- Info Line Formatting (Phase 22)
+
+-- Forward declarations for helpers referenced before their definitions
+local ShouldShowMultiAccountRow
 
 -- Reference to Groups (Upvalue shared by all functions)
 local friendGroups = {}
@@ -147,6 +155,9 @@ local function FriendButton_OnSizeChanged(self, width, height)
 	if self.Info then
 		self.Info:SetWidth(nameWidth)
 	end
+	if self.multiAccountRow then
+		self.multiAccountRow:SetWidth(nameWidth)
+	end
 end
 
 -- Performance Caches (Phase 9.7)
@@ -190,10 +201,10 @@ local BASE_FONT_SIZE = 12
 local BASE_ROW_HEIGHT = 34
 local BASE_COMPACT_ROW_HEIGHT = 24
 local MIN_ROW_HEIGHT = 24 -- Minimum height even for tiny fonts
-local MAX_ROW_HEIGHT = 60 -- Maximum to prevent overly large rows
+local MAX_ROW_HEIGHT = 72 -- Maximum to prevent overly large rows (allows extra detail rows)
 
 -- Fix #35: Calculate row height based on combined font heights
-local function CalculateFriendRowHeight(isCompactMode, nameSize, infoSize, infoDisabled)
+local function CalculateFriendRowHeight(isCompactMode, nameSize, infoSize, infoDisabled, hasMultiAccountRow)
 	local nameFontSize = nameSize or BASE_FONT_SIZE
 	local infoFontSize = infoSize or BASE_FONT_SIZE
 
@@ -213,6 +224,10 @@ local function CalculateFriendRowHeight(isCompactMode, nameSize, infoSize, infoD
 	else
 		-- Normal: name + info stacked (each 1 line max), add padding (4px top + 2px gap + 4px bottom)
 		calculatedHeight = nameLineHeight + infoLineHeight + 10
+		if hasMultiAccountRow then
+			-- Extra multi-account row sits below the info line; reuse info line height with a small gap
+			calculatedHeight = calculatedHeight + infoLineHeight + 2
+		end
 	end
 
 	-- Clamp to reasonable bounds
@@ -631,7 +646,8 @@ local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self, info
 			return CalculateCompactRowHeight(self, nameSize, displayLine1, nameWidth)
 		end
 
-		return CalculateFriendRowHeight(isCompactMode, nameSize, infoSize, infoDisabled)
+		local hasMultiAccountRow = self and ShouldShowMultiAccountRow(self, item.friend)
+		return CalculateFriendRowHeight(isCompactMode, nameSize, infoSize, infoDisabled, hasMultiAccountRow)
 	else
 		return 34 -- Default fallback
 	end
@@ -953,6 +969,7 @@ local function BuildDisplayList(self)
 							buttonType = BUTTON_TYPE_FRIEND,
 							friend = friend,
 							groupId = groupData.id,
+							_hasMultiAccountRow = ShouldShowMultiAccountRow(self, friend),
 						})
 					end
 				end
@@ -1019,6 +1036,98 @@ local function CreateElementFactory(friendsList) -- Capture friendsList referenc
 				button.favoriteIcon = button:CreateTexture(nil, "OVERLAY")
 				button.favoriteIcon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\star")
 				button.favoriteIcon:Hide()
+			end
+
+			-- Create multi-game-account badge (Phase: Multi-Game-Account Support)
+			if not button.gameAccountBadge then
+				local badge = CreateFrame("Frame", nil, button)
+				badge:SetSize(16, 16)
+				badge:Hide()
+				button.gameAccountBadge = badge
+
+				local badgeBg = badge:CreateTexture(nil, "OVERLAY", nil, 1)
+				badgeBg:SetAllPoints(badge)
+				badgeBg:SetColorTexture(0.1, 0.1, 0.1, 0.9)
+				local badgeMask = badge:CreateMaskTexture(nil, "OVERLAY")
+				badgeMask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask")
+				badgeMask:SetAllPoints(badge)
+				badgeBg:AddMaskTexture(badgeMask)
+				badge.gameAccountBadgeBg = badgeBg
+				button.gameAccountBadgeBg = badgeBg
+
+				local badgeText = badge:CreateFontString(nil, "OVERLAY", nil, 2)
+				badgeText:SetFont(STANDARD_TEXT_FONT, 10, "OUTLINE")
+				badgeText:SetPoint("CENTER", badge, "CENTER", 0, 0)
+				badgeText:SetTextColor(1, 0.82, 0, 1) -- Gold
+				badgeText:SetJustifyH("CENTER")
+				badge.gameAccountBadgeText = badgeText
+				button.gameAccountBadgeText = badgeText
+			end
+
+			-- Mini stack of class dots for first few game accounts
+			if not button.gameAccountDotsFrame then
+				local dotsFrame = CreateFrame("Frame", nil, button)
+				dotsFrame:SetSize(32, 12)
+				dotsFrame:Hide()
+				button.gameAccountDotsFrame = dotsFrame
+				button.gameAccountDots = {}
+
+				for i = 1, 3 do
+					local dot = dotsFrame:CreateTexture(nil, "OVERLAY", nil, 3 + i)
+					dot:SetColorTexture(1, 1, 1, 1)
+					dot:Hide()
+					button.gameAccountDots[i] = dot
+				end
+			end
+
+			-- Dedicated multi-account row (icons + names)
+			if not button.multiAccountRow then
+				local row = CreateFrame("Frame", nil, button)
+				row:SetHeight(14)
+				row:Hide()
+				row.entries = {}
+
+				for i = 1, MAX_MULTI_ACCOUNT_ROW_ENTRIES do
+					local entry = CreateFrame("Frame", nil, row)
+					entry:SetHeight(14)
+					entry.icon = entry:CreateTexture(nil, "ARTWORK")
+					entry.icon:SetSize(12, 12)
+					entry.icon:SetPoint("LEFT", entry, "LEFT", 0, 0)
+					entry.text = entry:CreateFontString(nil, "ARTWORK", "BetterFriendlistFriendsFontSmall")
+					entry.text:SetJustifyH("LEFT")
+					entry.text:SetWordWrap(false)
+					entry.text:SetPoint("LEFT", entry.icon, "RIGHT", 4, 0)
+					row.entries[i] = entry
+				end
+
+				row.remainderText = row:CreateFontString(nil, "ARTWORK", "BetterFriendlistFriendsFontSmall")
+				row.remainderText:SetJustifyH("LEFT")
+
+				button.multiAccountRow = row
+			end
+
+			-- Clickable overlay on game icon for switching preferred game account
+			if not button.gameIconOverlay then
+				local overlay = CreateFrame("Button", nil, button)
+				overlay:SetSize(28, 28)
+				overlay:Hide()
+				overlay:SetScript("OnClick", function(self)
+					local FL = BFL:GetModule("FriendsList")
+					if FL and self.friendData then
+						FL:ShowGameAccountPicker(self, self.friendData)
+					end
+				end)
+				overlay:SetScript("OnEnter", function(self)
+					if self.friendData and self.friendData.gameAccounts and #self.friendData.gameAccounts > 1 then
+						GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+						GameTooltip:SetText((L and L.MENU_SWITCH_GAME_ACCOUNT) or "Switch Game Account", 1, 1, 1)
+						GameTooltip:Show()
+					end
+				end)
+				overlay:SetScript("OnLeave", function()
+					GameTooltip:Hide()
+				end)
+				button.gameIconOverlay = overlay
 			end
 
 			-- Enable drag
@@ -1766,6 +1875,99 @@ local function GetClassFileForFriend(friend)
 	return BFL.ClassUtils:GetClassFileForFriend(friend)
 end
 
+local function GetAccountClassFile(account)
+	if not account then
+		return nil
+	end
+
+	if account.classID and account.classID > 0 and C_CreatureInfo and C_CreatureInfo.GetClassInfo then
+		local info = C_CreatureInfo.GetClassInfo(account.classID)
+		if info and info.classFile then
+			return info.classFile
+		end
+	end
+
+	if account.className and BFL.ClassUtils then
+		return BFL.ClassUtils:GetClassFileFromClassName(account.className)
+	end
+
+	return nil
+end
+
+-- Build display data for a single game account (shared by menus/tooltips)
+function FriendsList:BuildAccountDisplay(gameAccountInfo)
+	if not gameAccountInfo then
+		return {
+			text = "Unknown",
+			isInvitable = false,
+		}
+	end
+
+	local charName = gameAccountInfo.characterName or "Unknown"
+	local realmName = gameAccountInfo.realmName or ""
+
+	-- Resolve class file via classID (11.2.7+) or localized class name
+	local classFile
+	if gameAccountInfo.classID and gameAccountInfo.classID > 0 then
+		if C_CreatureInfo and C_CreatureInfo.GetClassInfo then
+			local info = C_CreatureInfo.GetClassInfo(gameAccountInfo.classID)
+			if info and info.classFile then
+				classFile = info.classFile
+			end
+		end
+	end
+
+	if not classFile and gameAccountInfo.className and BFL.ClassUtils then
+		classFile = GetClassFileFromClassName(gameAccountInfo.className)
+	end
+
+	local coloredName = charName
+	if classFile and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFile] then
+		coloredName = RAID_CLASS_COLORS[classFile]:WrapTextInColorCode(charName)
+	end
+
+	local text
+	if realmName ~= "" then
+		text = coloredName .. " - " .. realmName
+	else
+		text = coloredName
+	end
+
+	local restriction = gameAccountInfo.bflRestriction or gameAccountInfo.inviteRestriction
+	local restrictionNone = INVITE_RESTRICTION_NONE
+	local isInvitable
+
+	if gameAccountInfo.bflIsInvitable ~= nil then
+		isInvitable = gameAccountInfo.bflIsInvitable
+	elseif restrictionNone then
+		isInvitable = restriction == restrictionNone
+	else
+		isInvitable = restriction == nil
+	end
+
+	return {
+		text = text,
+		coloredName = coloredName,
+		realmName = realmName,
+		classFile = classFile,
+		isInvitable = isInvitable and true or false,
+		restriction = restriction,
+		gameAccountID = gameAccountInfo.gameAccountID,
+		playerGuid = gameAccountInfo.playerGuid,
+		factionName = gameAccountInfo.factionName,
+		projectID = gameAccountInfo.wowProjectID,
+		gameMode = gameAccountInfo.classID,
+		raw = gameAccountInfo,
+	}
+end
+
+local function GetInviteRestrictionTextSafe(restriction)
+	if BFL and BFL.GetInviteRestrictionText then
+		return BFL.GetInviteRestrictionText(restriction)
+	end
+	return nil
+end
+
 -- ========================================
 -- Module State
 -- ========================================
@@ -1964,6 +2166,60 @@ end
 -- ========================================
 -- Info Line Formatting (Phase 22)
 -- ========================================
+local function CollectAdditionalGameAccounts(friend)
+	if not friend then
+		return nil
+	end
+
+	local accounts = friend.gameAccounts
+	if not accounts or #accounts == 0 then
+		return nil
+	end
+
+	local primaryGameAccountID = friend.gameAccountInfo and friend.gameAccountInfo.gameAccountID
+	local primaryPlayerGuid = friend.gameAccountInfo and friend.gameAccountInfo.playerGuid
+
+	local additional = {}
+	for _, ga in ipairs(accounts) do
+		local gaId = ga.gameAccountID
+		local gaGuid = ga.playerGuid
+		local isPrimary = (gaId and primaryGameAccountID and gaId == primaryGameAccountID)
+			or (gaGuid and primaryPlayerGuid and gaGuid == primaryPlayerGuid)
+			or ga == friend.gameAccountInfo
+
+		if not isPrimary then
+			additional[#additional + 1] = ga
+		end
+	end
+
+	return additional
+end
+
+function ShouldShowMultiAccountRow(self, friend)
+	if not self or not self.settingsCache then
+		return false
+	end
+
+	if self.settingsCache.compactMode or self.settingsCache.infoDisabled then
+		return false
+	end
+
+	if not self.settingsCache.showMultiAccountInfo then
+		return false
+	end
+
+	if not friend or friend.type ~= "bnet" or not friend.connected then
+		return false
+	end
+
+	local accounts = friend.gameAccounts
+	local totalAccounts = friend.numGameAccounts or (accounts and #accounts) or 0
+	if not accounts or #accounts == 0 then
+		return false
+	end
+
+	return totalAccounts > 1
+end
 
 -- Helper: Get colored level text (used by info format system)
 local function GetColoredLevelText(level)
@@ -1978,10 +2234,139 @@ local function GetColoredLevelText(level)
 	return tostring(level)
 end
 
+-- Build a short summary of online game accounts for the info line (BNet only)
+local function BuildMultiAccountInfoLine(self, friend)
+	if not self or not friend or friend.type ~= "bnet" then
+		return nil
+	end
+
+	if not self.settingsCache or not self.settingsCache.showMultiAccountInfo then
+		return nil
+	end
+
+	if not friend.connected then
+		return nil
+	end
+
+	local accounts = friend.gameAccounts
+	local totalAccounts = friend.numGameAccounts or (accounts and #accounts) or 0
+	if not accounts or #accounts == 0 or totalAccounts <= 1 then
+		return nil
+	end
+
+	local additionalAccounts = CollectAdditionalGameAccounts(friend)
+	local additionalCount = totalAccounts - 1 -- exclude focus account from total
+	if additionalCount <= 0 or not additionalAccounts or #additionalAccounts == 0 then
+		return nil
+	end
+
+	local names = {}
+	local maxNames = 2
+	for _, ga in ipairs(additionalAccounts) do
+		local display = self.BuildAccountDisplay and self:BuildAccountDisplay(ga)
+		local nameText = display and (display.coloredName or display.text)
+		if not nameText or nameText == "" then
+			nameText = ga.characterName or ga.richPresence or ga.gameAccountName or ga.name
+		end
+		if nameText and nameText ~= "" then
+			names[#names + 1] = nameText
+		end
+		if #names >= maxNames then
+			break
+		end
+	end
+
+	local infoText = "+" .. tostring(additionalCount)
+	if #names > 0 then
+		infoText = infoText .. " (" .. table.concat(names, ", ") .. ")"
+	end
+
+	local extraCount = additionalCount - #names
+	if extraCount > 0 then
+		local remainderFmt = (L and L.INFO_MULTI_ACCOUNT_REMAINDER) or " (+%d)"
+		infoText = infoText .. string.format(remainderFmt, extraCount)
+	end
+
+	return infoText
+end
+
+local function BuildMultiAccountRowData(self, friend)
+	if not ShouldShowMultiAccountRow(self, friend) then
+		return nil
+	end
+
+	local accounts = CollectAdditionalGameAccounts(friend)
+	local totalAccounts = friend.numGameAccounts or (friend.gameAccounts and #friend.gameAccounts) or 0
+	local additionalCount = totalAccounts - 1
+	if not accounts or #accounts == 0 or additionalCount <= 0 then
+		return nil
+	end
+
+	local entries = {}
+	for _, ga in ipairs(accounts) do
+		local isWoW = ga.clientProgram == (BNET_CLIENT_WOW or "WoW")
+		local nameText
+		local display
+		if isWoW then
+			display = self.BuildAccountDisplay and self:BuildAccountDisplay(ga)
+			nameText = display and (display.coloredName or display.text)
+			if not nameText or nameText == "" then
+				nameText = ga.characterName or "Unknown"
+			end
+		else
+			-- Non-WoW: no character name, just richPresence
+			nameText = ga.richPresence or ""
+		end
+		if nameText and nameText ~= "" then
+			entries[#entries + 1] = {
+				name = nameText,
+				clientProgram = ga.clientProgram,
+				classFile = display and display.classFile,
+				level = ga.characterLevel,
+				zone = ga.areaName or "",
+				className = ga.className or "",
+				raceName = ga.raceName or "",
+				richPresence = ga.richPresence or "",
+				wowProjectID = ga.wowProjectID,
+				realmName = ga.realmName or "",
+				gameAccountID = ga.gameAccountID,
+			}
+		end
+		if #entries >= MAX_MULTI_ACCOUNT_ROW_ENTRIES then
+			break
+		end
+	end
+
+	local remainder = additionalCount - #entries
+	if remainder < 0 then
+		remainder = 0
+	end
+
+	return {
+		entries = entries,
+		remainder = remainder,
+	}
+end
+
 -- Format the info line (line 2) using the info format system
 -- Returns formatted string, or nil if info is disabled
 function FriendsList:FormatInfoLine(friend)
 	local infoPreset = self.settingsCache.infoFormatPreset or "default"
+
+	local function AppendMultiAccountInfo(baseText)
+		-- Skip info-line summary when the dedicated multi-account row is shown
+		if ShouldShowMultiAccountRow(self, friend) then
+			return baseText
+		end
+		local extra = BuildMultiAccountInfoLine(self, friend)
+		if extra and extra ~= "" then
+			if baseText and baseText ~= "" then
+				return baseText .. " | " .. extra
+			end
+			return extra
+		end
+		return baseText
+	end
 
 	-- Disabled: No info line at all
 	if infoPreset == "disabled" then
@@ -2043,22 +2428,22 @@ function FriendsList:FormatInfoLine(friend)
 				-- BNet friend
 				if level and zone and zone ~= "" then
 					if hideMaxLevel and level == maxLevel then
-						return zone
+						return AppendMultiAccountInfo(zone)
 					else
-						return string.format(L.LEVEL_FORMAT, level) .. ", " .. zone
+						return AppendMultiAccountInfo(string.format(L.LEVEL_FORMAT, level) .. ", " .. zone)
 					end
 				elseif level then
 					if hideMaxLevel and level == maxLevel then
-						return L.FRIEND_MAX_LEVEL or ""
+						return AppendMultiAccountInfo(L.FRIEND_MAX_LEVEL or "")
 					else
-						return string.format(L.LEVEL_FORMAT, level)
+						return AppendMultiAccountInfo(string.format(L.LEVEL_FORMAT, level))
 					end
 				elseif zone and zone ~= "" then
-					return zone
+					return AppendMultiAccountInfo(zone)
 				elseif gameName and gameName ~= "" then
-					return gameName
+					return AppendMultiAccountInfo(gameName)
 				else
-					return L.ONLINE_STATUS or "Online"
+					return AppendMultiAccountInfo(L.ONLINE_STATUS or "Online")
 				end
 			else
 				-- WoW friend
@@ -2130,6 +2515,9 @@ function FriendsList:FormatInfoLine(friend)
 			local uid = friend.uid or GetFriendUID(friend)
 			result = ReplaceTokenCaseInsensitive(result, "nickname", DB and DB:GetNickname(uid) or "")
 			result = ReplaceTokenCaseInsensitive(result, "character", friend.characterName or "")
+			-- Multi-Game-Account tokens (empty for offline)
+			result = ReplaceTokenCaseInsensitive(result, "accounts", "")
+			result = ReplaceTokenCaseInsensitive(result, "games", "")
 			-- Cleanup empty delimiters
 			result = result:gsub("%(%)", "")
 			result = result:gsub("%[%]", "")
@@ -2165,6 +2553,39 @@ function FriendsList:FormatInfoLine(friend)
 	local uid = friend.uid or GetFriendUID(friend)
 	result = ReplaceTokenCaseInsensitive(result, "nickname", DB and DB:GetNickname(uid) or "")
 	result = ReplaceTokenCaseInsensitive(result, "character", friend.characterName or friend.name or "")
+
+	-- Multi-Game-Account tokens
+	local accountCount = friend.numGameAccounts or (isBNet and 1 or 1)
+	result = ReplaceTokenCaseInsensitive(result, "accounts", tostring(accountCount))
+
+	local gamesText = ""
+	if friend.gameAccounts and #friend.gameAccounts > 0 then
+		local seen = {}
+		local gameList = {}
+		for _, ga in ipairs(friend.gameAccounts) do
+			local gn = ga.richPresence or ga.clientProgram or ""
+			if gn ~= "" and not seen[gn] then
+				seen[gn] = true
+				gameList[#gameList + 1] = gn
+			end
+		end
+		gamesText = table.concat(gameList, ", ")
+	elseif gameName ~= "" then
+		gamesText = gameName
+	end
+	result = ReplaceTokenCaseInsensitive(result, "games", gamesText)
+
+	-- Append multi-account summary only when no dedicated row is shown
+	if not ShouldShowMultiAccountRow(self, friend) then
+		local multiAccountInfo = BuildMultiAccountInfoLine(self, friend)
+		if multiAccountInfo and multiAccountInfo ~= "" then
+			if result ~= "" then
+				result = result .. " | " .. multiAccountInfo
+			else
+				result = multiAccountInfo
+			end
+		end
+	end
 
 	-- Cleanup empty delimiters and extra commas/spaces
 	result = result:gsub("%(%)", "")
@@ -2729,6 +3150,8 @@ function FriendsList:UpdateSettingsCache()
 	self.settingsCache.enableFavoriteIcon = DB:Get("enableFavoriteIcon", true)
 	self.settingsCache.favoriteIconStyle = DB:Get("favoriteIconStyle", "bfl")
 	self.settingsCache.showFactionBg = DB:Get("showFactionBg", false)
+	self.settingsCache.showMultiAccountBadge = DB:Get("showMultiAccountBadge", true)
+	self.settingsCache.showMultiAccountInfo = DB:Get("showMultiAccountInfo", true)
 	self.settingsCache.fontColorFriendInfo = DB:Get("fontColorFriendInfo") or { r = 0.5, g = 0.5, b = 0.5, a = 1 }
 
 	-- Fix #35/#40: Font Size Settings for Dynamic Row Height
@@ -3229,6 +3652,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 
 				-- PHASE 4 OPTIMIZATION: Pre-calculate Invite Status
 				-- Moves O(N^2) complexity from Render Loop to Data Update
+				-- Multi-Game-Account Support: Also stores all game accounts for richer display
 				friend.canInvite = false
 				friend.inviteAtlas = nil
 
@@ -3236,48 +3660,112 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 					local restriction = nil
 					local numGameAccounts = C_BattleNet.GetFriendNumGameAccounts(i)
 
+					-- Multi-Game-Account: Store count and collect all game account data
+					friend.numGameAccounts = numGameAccounts
+
+					local gameAccounts
+					local invitableAccounts
+					if numGameAccounts > 1 then
+						gameAccounts = {}
+						invitableAccounts = {}
+					end
+
+					local playerFactionGroup = UnitFactionGroup("player")
+
 					for k = 1, numGameAccounts do
 						local gameAccountInfo = C_BattleNet.GetFriendGameAccountInfo(i, k)
 						if gameAccountInfo then
+							-- Multi-Game-Account: Store account info (filter out App/CLNT/BSAp)
+							if
+								gameAccounts
+								and gameAccountInfo.clientProgram ~= BNET_CLIENT_APP
+								and gameAccountInfo.clientProgram ~= "CLNT"
+								and gameAccountInfo.clientProgram ~= "BSAp"
+							then
+								gameAccounts[#gameAccounts + 1] = gameAccountInfo
+							end
+
+							-- Invite restriction check (original logic)
 							if gameAccountInfo.clientProgram == BNET_CLIENT_WOW then
+								local accountRestriction = nil
 								if gameAccountInfo.wowProjectID and WOW_PROJECT_ID then
 									if
 										gameAccountInfo.wowProjectID == WOW_PROJECT_CLASSIC
 										and WOW_PROJECT_ID ~= WOW_PROJECT_CLASSIC
 									then
-										if not restriction then
-											restriction = INVITE_RESTRICTION_WOW_PROJECT_CLASSIC
-										end
+										accountRestriction = INVITE_RESTRICTION_WOW_PROJECT_CLASSIC
 									elseif
 										gameAccountInfo.wowProjectID == WOW_PROJECT_MAINLINE
 										and WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE
 									then
-										if not restriction then
-											restriction = INVITE_RESTRICTION_WOW_PROJECT_MAINLINE
-										end
+										accountRestriction = INVITE_RESTRICTION_WOW_PROJECT_MAINLINE
 									elseif gameAccountInfo.wowProjectID ~= WOW_PROJECT_ID then
-										if not restriction then
-											restriction = INVITE_RESTRICTION_WOW_PROJECT_ID
-										end
+										accountRestriction = INVITE_RESTRICTION_WOW_PROJECT_ID
 									elseif gameAccountInfo.realmID == 0 then
-										if not restriction then
-											restriction = INVITE_RESTRICTION_INFO
-										end
+										accountRestriction = INVITE_RESTRICTION_INFO
 									elseif not gameAccountInfo.isInCurrentRegion then
-										restriction = INVITE_RESTRICTION_REGION
+										accountRestriction = INVITE_RESTRICTION_REGION
 									else
-										restriction = INVITE_RESTRICTION_NONE
-										break
+										-- Check faction restriction
+										if gameAccountInfo.factionName ~= playerFactionGroup then
+											if C_QuestSession and C_QuestSession.Exists() then
+												accountRestriction = INVITE_RESTRICTION_QUEST_SESSION
+											elseif
+												C_PartyInfo
+												and C_PartyInfo.CanFormCrossFactionParties
+												and not C_PartyInfo.CanFormCrossFactionParties()
+											then
+												accountRestriction = INVITE_RESTRICTION_FACTION
+											end
+										end
+										-- Check game mode restriction (Retail only)
+										if not accountRestriction and not BFL.IsClassic then
+											if CanInviteByGameMode and not CanInviteByGameMode(gameAccountInfo) then
+												accountRestriction = INVITE_RESTRICTION_GAME_MODE
+											end
+										end
+										-- If no sub-restriction found, this account is invitable
+										if not accountRestriction then
+											accountRestriction = INVITE_RESTRICTION_NONE
+											if invitableAccounts then
+												invitableAccounts[#invitableAccounts + 1] = gameAccountInfo
+											end
+										end
 									end
 								elseif gameAccountInfo.realmID == 0 then
-									if not restriction then
-										restriction = INVITE_RESTRICTION_INFO
-									end
+									accountRestriction = INVITE_RESTRICTION_INFO
 								elseif not gameAccountInfo.isInCurrentRegion then
-									restriction = INVITE_RESTRICTION_REGION
+									accountRestriction = INVITE_RESTRICTION_REGION
 								elseif gameAccountInfo.realmID and gameAccountInfo.realmID ~= 0 then
-									restriction = INVITE_RESTRICTION_NONE
-									break
+									accountRestriction = INVITE_RESTRICTION_NONE
+									if invitableAccounts then
+										invitableAccounts[#invitableAccounts + 1] = gameAccountInfo
+									end
+								end
+
+								-- Track best restriction across all accounts
+								-- Store per-account restriction metadata for downstream display logic
+								local restrictionValue = accountRestriction
+								if not restrictionValue and INVITE_RESTRICTION_NO_GAME_ACCOUNTS then
+									restrictionValue = INVITE_RESTRICTION_NO_GAME_ACCOUNTS
+								end
+
+								gameAccountInfo.bflRestriction = restrictionValue
+								local restrictionNone = INVITE_RESTRICTION_NONE
+								if restrictionNone then
+									gameAccountInfo.bflIsInvitable = accountRestriction == restrictionNone
+								else
+									gameAccountInfo.bflIsInvitable = accountRestriction == nil
+								end
+
+								if accountRestriction then
+									if not restriction or accountRestriction > (restriction or 0) then
+										restriction = accountRestriction
+									end
+									if accountRestriction == INVITE_RESTRICTION_NONE and not invitableAccounts then
+										-- Single-account shortcut: break early
+										break
+									end
 								end
 							else
 								if not restriction then
@@ -3285,6 +3773,16 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 								end
 							end
 						end
+					end
+
+					-- Store multi-account data on friend object
+					friend.gameAccounts = gameAccounts
+					friend.invitableAccounts = invitableAccounts
+					friend.numInvitableAccounts = invitableAccounts and #invitableAccounts or 0
+
+					-- Update numGameAccounts to filtered count (excludes App/CLNT/BSAp)
+					if gameAccounts then
+						friend.numGameAccounts = #gameAccounts
 					end
 
 					if not restriction then
@@ -3296,19 +3794,106 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 
 						-- Calculate Cross-Faction Atlas
 						if not BFL.IsClassic then
-							local playerFactionGroup = UnitFactionGroup("player")
 							local isCrossFaction = accountInfo.gameAccountInfo
 								and accountInfo.gameAccountInfo.factionName
 								and accountInfo.gameAccountInfo.factionName ~= playerFactionGroup
 
 							if isCrossFaction then
 								if accountInfo.gameAccountInfo.factionName == "Horde" then
-									friend.inviteAtlas = "horde" -- Marker for 'friendslist-invitebutton-horde-xxx'
+									friend.inviteAtlas = "horde"
 								elseif accountInfo.gameAccountInfo.factionName == "Alliance" then
-									friend.inviteAtlas = "alliance" -- Marker for 'friendslist-invitebutton-alliance-xxx'
+									friend.inviteAtlas = "alliance"
 								end
 							else
-								friend.inviteAtlas = "default" -- Marker for default
+								friend.inviteAtlas = "default"
+							end
+						end
+					end
+				else
+					friend.numGameAccounts = 0
+				end
+
+				-- Preferred Game Account Override:
+				-- If the user has selected a preferred account for this friend,
+				-- swap out the focused gameAccountInfo and re-derive character fields.
+				if friend.connected and friend.gameAccounts and #friend.gameAccounts > 1 then
+					local prefID = self:GetPreferredGameAccountID(friend.uid)
+					if prefID then
+						local prefAccount
+						for _, ga in ipairs(friend.gameAccounts) do
+							if ga.gameAccountID == prefID then
+								prefAccount = ga
+								break
+							end
+						end
+						if prefAccount then
+							-- Store original focused account for reference
+							friend.originalGameAccountInfo = friend.gameAccountInfo
+							friend.gameAccountInfo = prefAccount
+							friend.hasPreferredAccountOverride = true
+
+							-- Re-derive character fields from preferred account
+							if prefAccount.clientProgram == "WoW" then
+								friend.characterName = prefAccount.characterName
+								friend.className = prefAccount.className
+								friend.classID = prefAccount.classID
+								friend.areaName = prefAccount.areaName
+								friend.level = prefAccount.characterLevel
+								friend.realmName = prefAccount.realmName
+								friend.factionName = prefAccount.factionName
+								friend.timerunningSeasonID = prefAccount.timerunningSeasonID
+								friend.gameName = nil
+								-- Classic richPresence fallback
+								if (not friend.areaName or friend.areaName == "") and prefAccount.richPresence then
+									local richZone, richRealm = strsplit("-", prefAccount.richPresence)
+									if richZone then
+										friend.areaName = strtrim(richZone)
+									end
+									if richRealm and (not friend.realmName or friend.realmName == "") then
+										friend.realmName = strtrim(richRealm)
+									end
+								end
+							elseif prefAccount.clientProgram == "BSAp" then
+								friend.characterName = nil
+								friend.className = nil
+								friend.classID = nil
+								friend.areaName = nil
+								friend.level = nil
+								friend.realmName = nil
+								friend.gameName = BFL.L.STATUS_MOBILE
+							else
+								friend.characterName = nil
+								friend.className = nil
+								friend.classID = nil
+								friend.areaName = nil
+								friend.level = nil
+								friend.realmName = nil
+								local rp = prefAccount.richPresence
+								friend.gameName = (rp and rp ~= "") and rp
+									or (prefAccount.clientProgram or BFL.L.UNKNOWN_GAME)
+							end
+
+							-- Recalculate cross-faction atlas for preferred account
+							if not BFL.IsClassic and friend.canInvite then
+								local prefFactionGroup = UnitFactionGroup("player")
+								local isCrossFaction = prefAccount.factionName
+									and prefAccount.factionName ~= prefFactionGroup
+								if isCrossFaction then
+									if prefAccount.factionName == "Horde" then
+										friend.inviteAtlas = "horde"
+									elseif prefAccount.factionName == "Alliance" then
+										friend.inviteAtlas = "alliance"
+									end
+								else
+									friend.inviteAtlas = "default"
+								end
+							end
+						else
+							-- Preferred account no longer online/available, clear it silently
+							-- (Do NOT call ClearPreferredGameAccount here as it triggers ForceRefresh recursion)
+							local DB = BFL:GetModule("DB")
+							if DB then
+								DB:ClearPreferredGameAccount(friend.uid)
 							end
 						end
 					end
@@ -3400,6 +3985,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 			or displayName
 		friend._sort_name = nameForSort:lower()
 		friend._sort_level = friend.level or 0
+		friend._sort_accountCount = friend.numGameAccounts or 0
 
 		-- Game Priority (For game sort)
 		if needGame then
@@ -3785,6 +4371,178 @@ function FriendsList:GetFriendUID(friend)
 	return GetFriendUID(friend)
 end
 
+function FriendsList:GetLastInvitedAccountID(friendUID)
+	local DB = BFL:GetModule("DB")
+	if not DB then
+		return nil
+	end
+
+	return DB:GetLastInvitedAccount(friendUID)
+end
+
+function FriendsList:SetLastInvitedAccountID(friendUID, gameAccountID)
+	local DB = BFL:GetModule("DB")
+	if not DB then
+		return
+	end
+
+	DB:SetLastInvitedAccount(friendUID, gameAccountID)
+end
+
+-- Preferred Game Account: user-selected account override for display
+function FriendsList:GetPreferredGameAccountID(friendUID)
+	local DB = BFL:GetModule("DB")
+	if not DB then
+		return nil
+	end
+	return DB:GetPreferredGameAccount(friendUID)
+end
+
+function FriendsList:SetPreferredGameAccount(friendUID, gameAccountID)
+	local DB = BFL:GetModule("DB")
+	if not DB then
+		return
+	end
+	DB:SetPreferredGameAccount(friendUID, gameAccountID)
+	BFL:ForceRefreshFriendsList()
+end
+
+function FriendsList:ClearPreferredGameAccount(friendUID)
+	local DB = BFL:GetModule("DB")
+	if not DB then
+		return
+	end
+	DB:ClearPreferredGameAccount(friendUID)
+	BFL:ForceRefreshFriendsList()
+end
+
+-- Show account picker dropdown on the game icon for switching preferred game account
+function FriendsList:ShowGameAccountPicker(anchorFrame, friend)
+	if not friend or not friend.gameAccounts or #friend.gameAccounts <= 1 then
+		return
+	end
+
+	local friendUID = friend.uid or GetFriendUID(friend)
+	if not friendUID then
+		return
+	end
+
+	local currentPrefID = self:GetPreferredGameAccountID(friendUID)
+
+	-- Retail: Use MenuUtil
+	if MenuUtil and MenuUtil.CreateContextMenu then
+		MenuUtil.CreateContextMenu(anchorFrame, function(ownerRegion, rootDescription)
+			-- Header: Friend display name (respects name formatting & Streamer Mode)
+			rootDescription:CreateTitle(self:GetDisplayName(friend))
+
+			local function IsSelected(gaID)
+				if gaID == "default" then
+					return currentPrefID == nil
+				end
+				return currentPrefID == gaID
+			end
+
+			local function SetSelected(gaID)
+				if gaID == "default" then
+					self:ClearPreferredGameAccount(friendUID)
+				else
+					self:SetPreferredGameAccount(friendUID, gaID)
+				end
+			end
+
+			-- "Default (Server)" option
+			local defaultText = (L and L.MENU_DEFAULT_FOCUS) or "Default (Server)"
+			rootDescription:CreateRadio(defaultText, IsSelected, SetSelected, "default")
+
+			rootDescription:CreateDivider()
+
+			-- List all game accounts (excluding App/CLNT/BSAp)
+			for _, ga in ipairs(friend.gameAccounts) do
+				if ga.clientProgram ~= "App" and ga.clientProgram ~= "CLNT" and ga.clientProgram ~= "BSAp" then
+					local isWoW = ga.clientProgram == (BNET_CLIENT_WOW or "WoW")
+					local label
+					if isWoW then
+						local display = self:BuildAccountDisplay(ga)
+						label = display and (display.coloredName or display.text) or ga.characterName or "Unknown"
+						if ga.areaName and ga.areaName ~= "" then
+							label = label .. " - " .. ga.areaName
+						end
+					else
+						-- Non-WoW: just richPresence, no character name
+						label = ga.richPresence or ga.clientProgram or "Unknown"
+					end
+
+					-- Prepend game icon
+					label = BFL:GetClientEmbeddedIcon(ga.clientProgram, 16) .. label
+
+					rootDescription:CreateRadio(label, IsSelected, SetSelected, ga.gameAccountID)
+				end
+			end
+		end)
+		return
+	end
+
+	-- Classic: Use UIDropDownMenu
+	if UIDropDownMenu_Initialize and ToggleDropDownMenu then
+		if not BFL.GameAccountPickerDropdown then
+			BFL.GameAccountPickerDropdown =
+				CreateFrame("Frame", "BFL_GameAccountPickerDropdown", UIParent, "UIDropDownMenuTemplate")
+		end
+
+		UIDropDownMenu_Initialize(BFL.GameAccountPickerDropdown, function(self, level)
+			-- Header: Friend display name (respects name formatting & Streamer Mode)
+			local titleInfo = UIDropDownMenu_CreateInfo()
+			titleInfo.text = FriendsList:GetDisplayName(friend)
+			titleInfo.isTitle = true
+			titleInfo.notCheckable = true
+			UIDropDownMenu_AddButton(titleInfo, level)
+
+			-- Default option
+			local defaultInfo = UIDropDownMenu_CreateInfo()
+			defaultInfo.text = (L and L.MENU_DEFAULT_FOCUS) or "Default (Server)"
+			defaultInfo.checked = (currentPrefID == nil)
+			defaultInfo.func = function()
+				FriendsList:ClearPreferredGameAccount(friendUID)
+				CloseDropDownMenus()
+			end
+			UIDropDownMenu_AddButton(defaultInfo, level)
+
+			-- Game accounts
+			for _, ga in ipairs(friend.gameAccounts) do
+				if ga.clientProgram ~= "App" and ga.clientProgram ~= "CLNT" and ga.clientProgram ~= "BSAp" then
+					local isWoW = ga.clientProgram == (BNET_CLIENT_WOW or "WoW")
+					local label
+					if isWoW then
+						local display = FriendsList:BuildAccountDisplay(ga)
+						label = display and (display.coloredName or display.text) or ga.characterName or "Unknown"
+						if ga.areaName and ga.areaName ~= "" then
+							label = label .. " - " .. ga.areaName
+						end
+					else
+						-- Non-WoW: just richPresence, no character name
+						label = ga.richPresence or ga.clientProgram or "Unknown"
+					end
+
+					-- Prepend game icon
+					label = BFL:GetClientEmbeddedIcon(ga.clientProgram, 16) .. label
+
+					local info = UIDropDownMenu_CreateInfo()
+					info.text = label
+					info.checked = (currentPrefID ~= nil and ga.gameAccountID == currentPrefID)
+					local gaID = ga.gameAccountID
+					info.func = function()
+						FriendsList:SetPreferredGameAccount(friendUID, gaID)
+						CloseDropDownMenus()
+					end
+					UIDropDownMenu_AddButton(info, level)
+				end
+			end
+		end, "MENU")
+
+		ToggleDropDownMenu(1, nil, BFL.GameAccountPickerDropdown, anchorFrame, 0, 0)
+	end
+end
+
 -- Set search text
 function FriendsList:SetSearchText(text)
 	local newText = text or ""
@@ -4131,6 +4889,7 @@ function FriendsList:OptimizedGroupToggle(groupId, expanding) -- Only possible o
 					buttonType = BUTTON_TYPE_FRIEND,
 					friend = friend,
 					groupId = groupId,
+					_hasMultiAccountRow = ShouldShowMultiAccountRow(self, friend),
 				}, insertIndex)
 				insertIndex = insertIndex + 1
 			end
@@ -4743,6 +5502,24 @@ function FriendsList:RenderDisplay(ignoreVisibility)
 			self.forceLayoutRebuild = false
 		end
 
+		-- Force full rebuild if any friend's multi-account row status changed
+		-- (height changes require ScrollBox layout recalculation)
+		if not structureChanged and currentProvider then
+			local index = 1
+			for _, oldData in currentProvider:Enumerate() do
+				local newData = newDisplayList[index]
+				if oldData.buttonType == BUTTON_TYPE_FRIEND and oldData.friend then
+					local oldHasRow = oldData._hasMultiAccountRow or false
+					local newHasRow = ShouldShowMultiAccountRow(self, newData.friend)
+					if oldHasRow ~= newHasRow then
+						structureChanged = true
+						break
+					end
+				end
+				index = index + 1
+			end
+		end
+
 		if not structureChanged then
 			-- SMART UPDATE: Structure is identical, so we just update properties
 			-- This avoids a full ScrollBox layout/rebuild!
@@ -4760,7 +5537,8 @@ function FriendsList:RenderDisplay(ignoreVisibility)
 					oldData.name = newData.name -- Fix #31/#32/#37: Copy renamed group name
 				elseif newData.buttonType == BUTTON_TYPE_FRIEND then
 					-- friend reference is same, so data inside friend object is already new
-					-- Nothing to copy unless we add friend-specific overrides in elementData
+					-- Copy multi-account row status for height change tracking
+					oldData._hasMultiAccountRow = newData._hasMultiAccountRow
 				end
 
 				index = index + 1
@@ -5902,6 +6680,218 @@ function FriendsList:GetFormattedButtonText(friend)
 	return line1Text, line2Text
 end
 
+local function ApplyClientIcon(texture, clientProgram, iconSize)
+	if not texture then
+		return
+	end
+
+	texture:SetTexCoord(0, 1, 0, 1)
+
+	local applied = false
+
+	-- Use C_Texture.SetTitleIconTexture (same API the primary game icon uses)
+	if
+		not applied
+		and clientProgram
+		and C_Texture
+		and C_Texture.SetTitleIconTexture
+		and Enum
+		and Enum.TitleIconVersion
+	then
+		local ok = pcall(C_Texture.SetTitleIconTexture, texture, clientProgram, Enum.TitleIconVersion.Small)
+		if ok then
+			applied = true
+		end
+	end
+
+	-- Classic fallback: BNet_GetClientTexture returns a file path
+	if not applied and clientProgram and BNet_GetClientTexture then
+		local texturePath = BNet_GetClientTexture(clientProgram)
+		if texturePath then
+			texture:SetTexture(texturePath)
+			applied = true
+		end
+	end
+
+	if not applied then
+		texture:SetTexture("Interface\\FriendsFrame\\Battlenet-Battleneticon")
+	end
+
+	if iconSize then
+		texture:SetSize(iconSize, iconSize)
+	end
+end
+
+-- Returns an embedded texture string (|T...|t) for a game client icon, for use in text/menu labels
+function BFL:GetClientEmbeddedIcon(clientProgram, size)
+	if not clientProgram then
+		return ""
+	end
+	size = size or 16
+
+	-- Retail: Use C_Texture API for proper high-res icon
+	if
+		C_Texture
+		and C_Texture.GetTitleIconTexture
+		and C_Texture.IsTitleIconTextureReady
+		and Enum
+		and Enum.TitleIconVersion
+		and C_Texture.IsTitleIconTextureReady(clientProgram, Enum.TitleIconVersion.Small)
+	then
+		local iconStr = ""
+		C_Texture.GetTitleIconTexture(clientProgram, Enum.TitleIconVersion.Small, function(success, texture)
+			if success and BNet_GetClientEmbeddedTexture then
+				iconStr = BNet_GetClientEmbeddedTexture(texture, size, size, 0) .. " "
+			end
+		end)
+		if iconStr ~= "" then
+			return iconStr
+		end
+	end
+
+	-- Classic fallback: BNet_GetClientTexture
+	if BNet_GetClientTexture then
+		local texturePath = BNet_GetClientTexture(clientProgram)
+		if texturePath then
+			if BNet_GetClientEmbeddedTexture then
+				return BNet_GetClientEmbeddedTexture(texturePath, size, size, 0) .. " "
+			else
+				return "|T" .. texturePath .. ":" .. size .. ":" .. size .. ":0:0|t "
+			end
+		end
+	end
+
+	return ""
+end
+
+function FriendsList:UpdateMultiAccountRow(button, friend, availableWidth)
+	local row = button and button.multiAccountRow
+	if not row then
+		return
+	end
+
+	local data = BuildMultiAccountRowData(self, friend)
+	if not data or not data.entries or #data.entries == 0 then
+		row:Hide()
+		if button then
+			button.lastHasMultiAccountRow = false
+		end
+		return
+	end
+
+	button.lastHasMultiAccountRow = true
+	local infoFontPath = self.fontCache and self.fontCache.infoPath
+	local infoFontSize = self.fontCache and self.fontCache.infoSize or BASE_FONT_SIZE
+	local infoFontOutline = self.fontCache and self.fontCache.infoOutline or "NONE"
+	if infoFontOutline == "NONE" then
+		infoFontOutline = ""
+	end
+	local infoShadow = self.fontCache and self.fontCache.infoShadow
+	local infoR = (self.fontCache and self.fontCache.infoR) or 0.5
+	local infoG = (self.fontCache and self.fontCache.infoG) or 0.5
+	local infoB = (self.fontCache and self.fontCache.infoB) or 0.5
+	local infoA = (self.fontCache and self.fontCache.infoA) or 1
+
+	local rowWidth = availableWidth or row:GetWidth() or (button and button.Name and button.Name:GetWidth()) or 0
+	if not rowWidth or rowWidth <= 0 then
+		rowWidth = (self.GetButtonWidth and self:GetButtonWidth()) or 200
+	end
+	rowWidth = math.max(rowWidth, 120) -- Ensure usable width for text/icon layout
+	local iconSize = math.max(12, math.floor(infoFontSize * 1.2))
+	local rowHeight = math.max(iconSize, infoFontSize + 2)
+	row:SetHeight(rowHeight)
+	row:SetWidth(rowWidth)
+
+	row:ClearAllPoints()
+	row:SetPoint("TOPLEFT", button.Info, "BOTTOMLEFT", 0, -2)
+	row:SetPoint("TOPRIGHT", button.Info, "BOTTOMRIGHT", 0, -2)
+
+	for _, entry in ipairs(row.entries) do
+		entry:Hide()
+	end
+	if row.remainderText then
+		row.remainderText:Hide()
+	end
+
+	local cursorX = 0
+	for idx, entryData in ipairs(data.entries or {}) do
+		local entryFrame = row.entries[idx]
+		if not entryFrame then
+			break
+		end
+
+		entryFrame:ClearAllPoints()
+		entryFrame:SetPoint("LEFT", row, "LEFT", cursorX, 0)
+		entryFrame:SetSize(rowWidth - cursorX, rowHeight)
+
+		ApplyClientIcon(entryFrame.icon, entryData.clientProgram, iconSize)
+		entryFrame.icon:SetSize(iconSize, iconSize)
+		entryFrame.icon:Show()
+
+		if infoFontPath then
+			entryFrame.text:SetFont(infoFontPath, infoFontSize, infoFontOutline)
+		end
+		if infoShadow then
+			entryFrame.text:SetShadowOffset(1, -1)
+		else
+			entryFrame.text:SetShadowOffset(0, 0)
+		end
+		entryFrame.text:SetTextColor(infoR, infoG, infoB, infoA)
+		entryFrame.text:SetWidth(math.max(0, rowWidth - cursorX - iconSize - 4))
+
+		-- Build display text: name + info (level, zone or richPresence)
+		local displayText = entryData.name or ""
+		local isWoW = entryData.clientProgram == (BNET_CLIENT_WOW or "WoW")
+		if isWoW then
+			local infoParts = {}
+			local level = entryData.level
+			local zone = entryData.zone
+			local hideMaxLevel = self.settingsCache.hideMaxLevel
+			local maxLevel = BFL.GetMaxLevel and BFL.GetMaxLevel() or 80
+			if level and level > 0 then
+				if not (hideMaxLevel and level == maxLevel) then
+					infoParts[#infoParts + 1] = string.format((L and L.LEVEL_FORMAT) or "Lvl %d", level)
+				end
+			end
+			if zone and zone ~= "" then
+				infoParts[#infoParts + 1] = zone
+			end
+			if #infoParts > 0 then
+				displayText = displayText .. " - " .. table.concat(infoParts, ", ")
+			end
+		else
+			-- Non-WoW game: name IS the richPresence already (set in BuildMultiAccountRowData)
+			-- No additional info to append
+		end
+
+		entryFrame.text:SetText(displayText)
+
+		local textWidth = entryFrame.text:GetStringWidth() or 0
+		cursorX = cursorX + iconSize + textWidth + 8
+
+		entryFrame:Show()
+	end
+
+	if data.remainder and data.remainder > 0 and row.remainderText then
+		if infoFontPath then
+			row.remainderText:SetFont(infoFontPath, infoFontSize, infoFontOutline)
+		end
+		if infoShadow then
+			row.remainderText:SetShadowOffset(1, -1)
+		else
+			row.remainderText:SetShadowOffset(0, 0)
+		end
+		row.remainderText:SetTextColor(infoR, infoG, infoB, infoA)
+		row.remainderText:ClearAllPoints()
+		row.remainderText:SetPoint("LEFT", row, "LEFT", cursorX, 0)
+		row.remainderText:SetWidth(math.max(0, rowWidth - cursorX))
+		row.remainderText:SetText(string.format((L and L.INFO_MULTI_ACCOUNT_REMAINDER) or " (+%d)", data.remainder))
+		row.remainderText:Show()
+	end
+
+	row:Show()
+end
+
 -- Update friend button (called by ScrollBox factory for each visible friend)
 function FriendsList:UpdateFriendButton(button, elementData)
 	local friend = elementData.friend
@@ -5931,6 +6921,8 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		showGameIcon = true
 	end
 
+	local hasMultiAccountRow = ShouldShowMultiAccountRow(self, friend)
+
 	-- Hide arrows if they exist
 	if button.RightArrow then
 		button.RightArrow:Hide()
@@ -5948,7 +6940,15 @@ function FriendsList:UpdateFriendButton(button, elementData)
 	local nameSize = self.fontCache and self.fontCache.nameSize or BASE_FONT_SIZE
 	local infoSize = self.fontCache and self.fontCache.infoSize or BASE_FONT_SIZE
 	local rowHeight = button:GetHeight()
-		or CalculateFriendRowHeight(isCompactMode, nameSize, infoSize, self.settingsCache.infoDisabled)
+		or CalculateFriendRowHeight(
+			isCompactMode,
+			nameSize,
+			infoSize,
+			self.settingsCache.infoDisabled,
+			hasMultiAccountRow
+		)
+	local iconBaseRowHeight =
+		CalculateFriendRowHeight(isCompactMode, nameSize, infoSize, self.settingsCache.infoDisabled, false)
 
 	-- OPTIMIZATION: Layout Caching (Phase 9.9)
 	-- Update layout if CompactMode changed OR font version changed OR row height changed
@@ -5957,11 +6957,13 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		or button.lastLayoutFontVersion ~= self.fontCacheVersion
 		or button.lastRowHeight ~= rowHeight
 		or button.lastInfoDisabled ~= infoDisabled
+		or button.lastHasMultiAccountRow ~= hasMultiAccountRow
 	if layoutChanged then
 		button.lastCompactMode = isCompactMode
 		button.lastLayoutFontVersion = self.fontCacheVersion
 		button.lastRowHeight = rowHeight
 		button.lastInfoDisabled = infoDisabled
+		button.lastHasMultiAccountRow = hasMultiAccountRow
 
 		-- Reset name position based on compact mode and info disabled state
 		if isCompactMode or infoDisabled then
@@ -6008,14 +7010,14 @@ function FriendsList:UpdateFriendButton(button, elementData)
 
 		-- All icons scale proportionally to row height (no artificial min/max limits)
 		-- Status icon: 16px at 34px row height = 47%
-		local statusSize = math.floor(rowHeight * 0.47)
+		local statusSize = math.floor(iconBaseRowHeight * 0.47)
 		local statusYOffset = -math.floor((rowHeight - statusSize) / 2)
 		button.status:SetSize(statusSize, statusSize)
 		button.status:ClearAllPoints()
 		button.status:SetPoint("TOPLEFT", 4, statusYOffset)
 
 		-- Game icon: 28px at 34px row height = 82%
-		local gameIconSize = math.floor(rowHeight * 0.82)
+		local gameIconSize = math.floor(iconBaseRowHeight * 0.82)
 		local gameIconYOffset = -math.floor((rowHeight - gameIconSize) / 2)
 		button.gameIcon:SetSize(gameIconSize, gameIconSize)
 		button.gameIcon:ClearAllPoints()
@@ -6023,7 +7025,7 @@ function FriendsList:UpdateFriendButton(button, elementData)
 
 		-- TravelPass button: 32px height at 34px row height = 94%, aspect ratio 3:4
 		if button.travelPassButton then
-			local tpHeight = math.floor(rowHeight * 0.94)
+			local tpHeight = math.floor(iconBaseRowHeight * 0.94)
 			local tpWidth = math.floor(tpHeight * 0.75)
 			local tpYOffset = -math.floor((rowHeight - tpHeight) / 2)
 			button.travelPassButton:SetSize(tpWidth, tpHeight)
@@ -6241,6 +7243,77 @@ function FriendsList:UpdateFriendButton(button, elementData)
 			button.lastClientProgram = nil -- Reset state
 		end
 
+		-- Game icon overlay: clickable for BNet friends with multiple game accounts
+		if button.gameIconOverlay then
+			local showOverlay = friend.type == "bnet"
+				and friend.connected
+				and friend.gameAccounts
+				and #friend.gameAccounts > 1
+				and button.gameIcon:IsShown()
+			if showOverlay then
+				button.gameIconOverlay.friendData = friend
+				button.gameIconOverlay:ClearAllPoints()
+				button.gameIconOverlay:SetAllPoints(button.gameIcon)
+				button.gameIconOverlay:SetFrameLevel(button:GetFrameLevel() + 10)
+				button.gameIconOverlay:Show()
+			else
+				button.gameIconOverlay.friendData = nil
+				button.gameIconOverlay:Hide()
+			end
+		end
+
+		-- Multi-Game-Account Badge: Show count when friend has multiple game accounts online
+		if button.gameAccountBadge then
+			local showBadge = self.settingsCache.showMultiAccountBadge
+				and friend.connected
+				and friend.numGameAccounts
+				and friend.numGameAccounts > 1
+			if showBadge then
+				local countStr = tostring(friend.numGameAccounts)
+				if button.lastBadgeCount ~= countStr then
+					button.gameAccountBadgeText:SetText(countStr)
+					button.lastBadgeCount = countStr
+				end
+
+				local iconSize = button.gameIcon and button.gameIcon:GetWidth() or 28
+				local badgeSize = math.max(14, math.floor(iconSize * 0.54))
+				button.gameAccountBadge:SetSize(badgeSize, badgeSize)
+				if button.gameAccountBadgeText and button.gameAccountBadgeText.SetFont then
+					local fontHeight = math.max(10, math.floor(badgeSize * 0.55))
+					button.gameAccountBadgeText:SetFont(STANDARD_TEXT_FONT, fontHeight, "OUTLINE")
+				end
+
+				button.gameAccountBadge:ClearAllPoints()
+				button.gameAccountBadge:SetPoint("BOTTOMRIGHT", button.gameIcon, "BOTTOMRIGHT", 4, -4)
+				button.gameAccountBadge:Show()
+				button.gameAccountBadgeBg:Show()
+				button.gameAccountBadgeText:Show()
+
+				if button.gameAccountDotsFrame and button.gameAccountDots then
+					button.gameAccountDotsFrame:Hide()
+					for i = 1, 3 do
+						if button.gameAccountDots[i] then
+							button.gameAccountDots[i]:Hide()
+						end
+					end
+				end
+			else
+				button.gameAccountBadge:Hide()
+				button.gameAccountBadgeBg:Hide()
+				button.gameAccountBadgeText:Hide()
+				button.lastBadgeCount = nil
+
+				if button.gameAccountDotsFrame and button.gameAccountDots then
+					button.gameAccountDotsFrame:Hide()
+					for i = 1, 3 do
+						if button.gameAccountDots[i] then
+							button.gameAccountDots[i]:Hide()
+						end
+					end
+				end
+			end
+		end
+
 		-- Handle TravelPass button for Battle.net friends
 		-- Optimized Phase 4: Use Pre-Calculated Data (O(1) complexity)
 		if button.travelPassButton then
@@ -6347,6 +7420,22 @@ function FriendsList:UpdateFriendButton(button, elementData)
 
 		button.gameIcon:Hide()
 		button.lastClientProgram = nil -- Reset state
+
+		-- Hide badge for WoW friends (only BNet friends have multi-account)
+		if button.gameAccountBadge then
+			button.gameAccountBadge:Hide()
+			button.gameAccountBadgeBg:Hide()
+			button.gameAccountBadgeText:Hide()
+			button.lastBadgeCount = nil
+			if button.gameAccountDotsFrame and button.gameAccountDots then
+				button.gameAccountDotsFrame:Hide()
+				for i = 1, 3 do
+					if button.gameAccountDots[i] then
+						button.gameAccountDots[i]:Hide()
+					end
+				end
+			end
+		end
 
 		-- Hide TravelPass button for WoW friends (they don't have it)
 		if button.travelPassButton then
@@ -6528,6 +7617,13 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		if button:GetScript("OnSizeChanged") then
 			button:GetScript("OnSizeChanged")(button, button:GetWidth(), button:GetHeight())
 		end
+	end
+
+	local nameWidth = (button.Name and button.Name:GetWidth()) or (self:GetButtonWidth() - 44 - padding)
+	if nameWidth and nameWidth > 0 then
+		self:UpdateMultiAccountRow(button, friend, nameWidth)
+	else
+		self:UpdateMultiAccountRow(button, friend)
 	end
 
 	-- Ensure button is visible

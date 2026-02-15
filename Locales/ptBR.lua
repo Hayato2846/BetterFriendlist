@@ -205,6 +205,8 @@ BFL:RegisterLocale("ptBR", function()
 	L.MENU_IGNORE_LIST = "Lista Ignorados"
 	L.MENU_BETTERFRIENDLIST_TITLE = "BetterFriendList"
 	L.MENU_MORE_GROUPS = "Mais grupos..."
+	L.MENU_SWITCH_GAME_ACCOUNT = "Trocar conta de jogo"
+	L.MENU_DEFAULT_FOCUS = "Padrão (Blizzard)"
 	L.GROUPS_DIALOG_TITLE = "Grupos para %s"
 	L.MENU_COPY_CHARACTER_NAME = "Copiar nome do personagem"
 	L.COPY_CHARACTER_NAME_POPUP_TITLE = "Copiar nome do personagem"
@@ -731,6 +733,8 @@ BFL:RegisterLocale("ptBR", function()
 	L.TRAVEL_PASS_NO_INFO = "Info insuficiente"
 	L.TRAVEL_PASS_DIFFERENT_REGION = "Região diferente"
 	L.TRAVEL_PASS_NO_GAME_ACCOUNTS = "Sem conta jogo"
+	L.TRAVEL_PASS_DIFFERENT_FACTION = "O amigo está na facção oposta"
+	L.TRAVEL_PASS_QUEST_SESSION = "Não é possível convidar durante uma sessão de missão"
 
 	-- MENUS (Additional)
 	L.MENU_TITLE = "BetterFriendlist"
@@ -1114,6 +1118,10 @@ BFL:RegisterLocale("ptBR", function()
 	L.MENU_SHOW_SEARCH = "Mostrar busca"
 	L.MENU_QUICK_FILTER = "Filtro rápido"
 
+	-- Multi-Game-Account
+	L.MENU_INVITE_CHARACTER = "Convidar personagem..."
+	L.INVITE_ACCOUNT_PICKER_TITLE = "Convidar personagem"
+
 	-- Favorites & Faction Settings
 	L.SETTINGS_ENABLE_FAVORITE_ICON = "Habilitar Ícone de Favorito"
 	L.SETTINGS_ENABLE_FAVORITE_ICON_DESC = "Mostra um ícone de estrela no botão do amigo para favoritos."
@@ -1123,6 +1131,17 @@ BFL:RegisterLocale("ptBR", function()
 	L.SETTINGS_FAVORITE_ICON_OPTION_BLIZZARD = "Ícone Blizzard"
 	L.SETTINGS_SHOW_FACTION_BG = "Mostrar Fundo da Facção"
 	L.SETTINGS_SHOW_FACTION_BG_DESC = "Mostra a cor da facção como fundo para o botão do amigo."
+
+	-- Multi-Game-Account Settings
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_BADGE = "Mostrar emblema multi-conta"
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_BADGE_DESC = "Exibe um emblema em amigos com várias contas de jogo online."
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO = "Mostrar info multi-conta"
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO_DESC =
+		"Adiciona uma lista curta de personagens online quando um amigo tem várias contas ativas."
+	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS = "Tooltip: Máx. contas de jogo"
+	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS_DESC = "Número máximo de contas de jogo adicionais mostradas no tooltip."
+	L.INFO_MULTI_ACCOUNT_PREFIX = "x%d Accounts"
+	L.INFO_MULTI_ACCOUNT_REMAINDER = " (+%d)"
 
 	-- ========================================
 	-- RAID SHORTCUTS (Phase 26)

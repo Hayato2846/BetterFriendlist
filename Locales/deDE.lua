@@ -217,6 +217,8 @@ BFL:RegisterLocale("deDE", function()
 	L.MENU_COPY_CHARACTER_NAME = "Charakternamen kopieren"
 	L.MENU_BETTERFRIENDLIST_TITLE = "BetterFriendList"
 	L.MENU_MORE_GROUPS = "Mehr Gruppen..."
+	L.MENU_SWITCH_GAME_ACCOUNT = "Spielkonto wechseln"
+	L.MENU_DEFAULT_FOCUS = "Standard (Blizzard)"
 	L.GROUPS_DIALOG_TITLE = "Gruppen für %s"
 	L.COPY_CHARACTER_NAME_POPUP_TITLE = "Charakternamen kopieren"
 
@@ -761,6 +763,8 @@ BFL:RegisterLocale("deDE", function()
 	L.TRAVEL_PASS_NO_INFO = "Nicht genügend Informationen verfügbar"
 	L.TRAVEL_PASS_DIFFERENT_REGION = "Freund ist in einer anderen Region"
 	L.TRAVEL_PASS_NO_GAME_ACCOUNTS = "Keine Spiel-Accounts verfügbar"
+	L.TRAVEL_PASS_DIFFERENT_FACTION = "Dieser Freund ist in der anderen Fraktion"
+	L.TRAVEL_PASS_QUEST_SESSION = "Einladung während einer Quest-Sitzung nicht möglich"
 
 	-- Recent Allies
 	L.RECENT_ALLIES_SYSTEM_UNAVAILABLE = "Letzte Mitspieler System ist nicht verfügbar."
@@ -1086,6 +1090,10 @@ BFL:RegisterLocale("deDE", function()
 	L.MENU_SHOW_SEARCH = "Suche anzeigen"
 	L.MENU_QUICK_FILTER = "Schnellfilter"
 
+	-- Multi-Game-Account
+	L.MENU_INVITE_CHARACTER = "Charakter einladen..."
+	L.INVITE_ACCOUNT_PICKER_TITLE = "Charakter einladen"
+
 	-- Favorites & Faction Settings
 	L.SETTINGS_ENABLE_FAVORITE_ICON = "Favoriten-Icon aktivieren"
 	L.SETTINGS_ENABLE_FAVORITE_ICON_DESC = "Zeigt ein Stern-Symbol auf dem Freundes-Button für Favoriten an."
@@ -1095,6 +1103,18 @@ BFL:RegisterLocale("deDE", function()
 	L.SETTINGS_FAVORITE_ICON_OPTION_BLIZZARD = "Blizzard-Icon"
 	L.SETTINGS_SHOW_FACTION_BG = "Fraktions-Hintergrund anzeigen"
 	L.SETTINGS_SHOW_FACTION_BG_DESC = "Zeigt die Fraktionsfarbe als Hintergrund für Freundes-Buttons an."
+
+	-- Multi-Game-Account Settings
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_BADGE = "Multi-Account-Badge anzeigen"
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_BADGE_DESC =
+		"Zeigt ein Badge bei Freunden mit mehreren gleichzeitig online Spielkonten an."
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO = "Multi-Account-Info anzeigen"
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO_DESC =
+		"Fügt bei mehreren aktiven Konten eine kurze Liste der online Charaktere hinzu."
+	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS = "Tooltip: Max. Spielkonten"
+	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS_DESC = "Maximale Anzahl zusätzlicher Spielkonten, die im Tooltip angezeigt werden."
+	L.INFO_MULTI_ACCOUNT_PREFIX = "x%d Accounts"
+	L.INFO_MULTI_ACCOUNT_REMAINDER = " (+%d)"
 
 	-- ========================================
 	-- STREAMER MODE (Phase 24)

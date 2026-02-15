@@ -215,6 +215,8 @@ BFL:RegisterLocale("ruRU", function()
 	L.MENU_IGNORE_LIST = "Управление Списком Игнорирования"
 	L.MENU_BETTERFRIENDLIST_TITLE = "BetterFriendList"
 	L.MENU_MORE_GROUPS = "Больше групп..."
+	L.MENU_SWITCH_GAME_ACCOUNT = "Сменить игровой аккаунт"
+	L.MENU_DEFAULT_FOCUS = "По умолчанию (Blizzard)"
 	L.GROUPS_DIALOG_TITLE = "Группы для %s"
 	L.MENU_COPY_CHARACTER_NAME = "Копировать имя персонажа"
 	L.COPY_CHARACTER_NAME_POPUP_TITLE = "Копировать имя персонажа"
@@ -760,6 +762,8 @@ BFL:RegisterLocale("ruRU", function()
 	L.TRAVEL_PASS_NO_INFO = "Info unavailable"
 	L.TRAVEL_PASS_DIFFERENT_REGION = "Different Region"
 	L.TRAVEL_PASS_NO_GAME_ACCOUNTS = "No game account"
+	L.TRAVEL_PASS_DIFFERENT_FACTION = "Opposite faction"
+	L.TRAVEL_PASS_QUEST_SESSION = "Cannot invite during a quest session"
 
 	-- MENUS (Additional)
 	L.MENU_TITLE = "BetterFriendlist"
@@ -1136,6 +1140,10 @@ BFL:RegisterLocale("ruRU", function()
 	L.MENU_SHOW_SEARCH = "Показать поиск"
 	L.MENU_QUICK_FILTER = "Быстрый фильтр"
 
+	-- Multi-Game-Account
+	L.MENU_INVITE_CHARACTER = "Пригласить персонажа..."
+	L.INVITE_ACCOUNT_PICKER_TITLE = "Пригласить персонажа"
+
 	-- Favorites & Faction Settings
 	L.SETTINGS_ENABLE_FAVORITE_ICON = "Включить значок избранного"
 	L.SETTINGS_ENABLE_FAVORITE_ICON_DESC =
@@ -1148,6 +1156,19 @@ BFL:RegisterLocale("ruRU", function()
 	L.SETTINGS_SHOW_FACTION_BG = "Показать фон фракции"
 	L.SETTINGS_SHOW_FACTION_BG_DESC =
 		"Показывает цвет фракции в качестве фона для кнопки друга."
+
+	-- Multi-Game-Account Settings
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_BADGE = "Значок мульти-аккаунта"
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_BADGE_DESC =
+		"Показывать значок у друзей с несколькими игровыми аккаунтами онлайн."
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO = "Показывать инфо мульти-аккаунта"
+	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO_DESC =
+		"Добавляет краткий список онлайн-персонажей, если у друга активно несколько аккаунтов."
+	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS = "Подсказка: Макс. игровых аккаунтов"
+	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS_DESC =
+		"Максимальное количество дополнительных игровых аккаунтов в подсказке."
+	L.INFO_MULTI_ACCOUNT_PREFIX = "x%d Accounts"
+	L.INFO_MULTI_ACCOUNT_REMAINDER = " (+%d)"
 
 	-- ========================================
 	-- STREAMER MODE (Phase 24)
@@ -1176,7 +1197,7 @@ BFL:RegisterLocale("ruRU", function()
 	L.SETTINGS_STREAMER_NAME_FORMAT_NOTE = "Принудительное использование заметки"
 	L.SETTINGS_STREAMER_USE_PURPLE_HEADER = "Использовать фиолетовый цвет заголовка"
 	L.SETTINGS_STREAMER_USE_PURPLE_HEADER_DESC =
-		"Измените фон заголовка Battle.net на фиолетовый Twitch при активном режиме потоковой трансляции."
+		"Измените фон заголовка Battle.net на фиолетовый Twitch при активном режиме потоковой ����рансляции."
 
 	-- ========================================
 	-- RAID SHORTCUTS (Phase 26)

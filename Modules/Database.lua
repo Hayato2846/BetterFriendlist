@@ -31,6 +31,8 @@ local defaults = {
 	raidShortcutEnabled_promote = true,
 
 	nicknames = {}, -- {friendUID: "Nickname"} - custom nicknames for friends
+	lastInvitedAccounts = {}, -- {friendUID: gameAccountID} - remembers last invited game account per friend
+	preferredGameAccounts = {}, -- {friendUID: gameAccountID} - user-selected preferred game account per friend
 	-- Visual Settings
 	compactMode = false, -- Use compact button layout
 	enableElvUISkin = false, -- Enable ElvUI Skin (default: OFF)
@@ -96,6 +98,9 @@ local defaults = {
 	enableFavoriteIcon = true, -- Show the Favorite icon on the friend button (default: ON)
 	favoriteIconStyle = "bfl", -- Favorite icon style: "bfl" or "blizzard"
 	showFactionBg = false, -- Show faction color as background (default: OFF)
+	showMultiAccountBadge = true, -- Show badge on friends with multiple game accounts online (default: ON)
+	showMultiAccountInfo = true, -- Append multi-account details to the info line (default: ON)
+	tooltipMaxGameAccounts = 5, -- Max game accounts to show in tooltip (default: 5)
 	-- Sort Settings
 	primarySort = "status", -- Primary sort method: status, name, level, zone (default: status)
 	secondarySort = "name", -- Secondary sort method: none, name, level, zone (default: name)
@@ -550,6 +555,71 @@ function DB:Set(key, value)
 		if NoteSync then
 			NoteSync:OnGroupOrderChanged()
 		end
+	end
+end
+
+function DB:GetLastInvitedAccount(friendUID)
+	if not friendUID then
+		return nil
+	end
+
+	local map = BetterFriendlistDB.lastInvitedAccounts
+	if not map then
+		return nil
+	end
+
+	return map[friendUID]
+end
+
+function DB:SetLastInvitedAccount(friendUID, gameAccountID)
+	if not friendUID or not gameAccountID then
+		return
+	end
+
+	if not BetterFriendlistDB.lastInvitedAccounts then
+		BetterFriendlistDB.lastInvitedAccounts = {}
+	end
+
+	BetterFriendlistDB.lastInvitedAccounts[friendUID] = gameAccountID
+end
+
+-- Preferred Game Account: user-selected account override for multi-account BNet friends
+function DB:GetPreferredGameAccount(friendUID)
+	if not friendUID then
+		return nil
+	end
+	local map = BetterFriendlistDB.preferredGameAccounts
+	if not map then
+		return nil
+	end
+	return map[friendUID]
+end
+
+function DB:SetPreferredGameAccount(friendUID, gameAccountID)
+	if not friendUID then
+		return
+	end
+	if not BetterFriendlistDB.preferredGameAccounts then
+		BetterFriendlistDB.preferredGameAccounts = {}
+	end
+	BetterFriendlistDB.preferredGameAccounts[friendUID] = gameAccountID
+	-- Bump settings version so display refreshes
+	if BFL.SettingsVersion then
+		BFL.SettingsVersion = BFL.SettingsVersion + 1
+	end
+end
+
+function DB:ClearPreferredGameAccount(friendUID)
+	if not friendUID then
+		return
+	end
+	local map = BetterFriendlistDB.preferredGameAccounts
+	if not map then
+		return
+	end
+	map[friendUID] = nil
+	if BFL.SettingsVersion then
+		BFL.SettingsVersion = BFL.SettingsVersion + 1
 	end
 end
 
