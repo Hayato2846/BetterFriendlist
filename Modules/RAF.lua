@@ -1064,7 +1064,11 @@ function RAF:NextRewardButton_OnClick(button, mouseButton)
 	elseif IsModifiedClick("CHATLINK") and nextReward and nextReward.itemID then
 		local name, link = C_Item.GetItemInfo(nextReward.itemID)
 		if not ChatEdit_InsertLink(link) then
-			ChatFrame_OpenChat(link)
+			if ChatFrameUtil and ChatFrameUtil.OpenChat then
+				ChatFrameUtil.OpenChat(link)
+			else
+				ChatFrame_OpenChat(link)
+			end
 		end
 	end
 end
@@ -1117,7 +1121,7 @@ function RAF:ClaimOrViewRewardButton_OnClick(button)
 					latestVersionInfo.rafVersion
 				)
 			else
-				DEFAULT_CHAT_FRAME:AddMessage(L.RAF_GAME_TIME_MESSAGE, 1, 1, 0)
+				print("|cffFFFF00" .. L.RAF_GAME_TIME_MESSAGE .. "|r")
 			end
 		elseif C_RecruitAFriend.ClaimNextReward then
 			if C_RecruitAFriend.ClaimNextReward() then
@@ -1265,22 +1269,17 @@ function RAF:DisplayRewardsInChat(rafInfo)
 		return
 	end
 
-	DEFAULT_CHAT_FRAME:AddMessage(L.RAF_CHAT_HEADER, 1, 1, 0)
+	print("|cffFFFF00" .. L.RAF_CHAT_HEADER .. "|r")
 
 	for versionIndex, versionInfo in ipairs(rafInfo.versions) do
 		local versionName = versionIndex == 1 and L.RAF_CHAT_CURRENT_VERSION
 			or L.RAF_CHAT_LEGACY_VERSION:format(versionInfo.rafVersion)
-		DEFAULT_CHAT_FRAME:AddMessage("|cff00ccff" .. versionName .. ":|r", 0.8, 0.8, 1)
-		DEFAULT_CHAT_FRAME:AddMessage(
-			L.RAF_CHAT_MONTHS_EARNED:format(versionInfo.monthCount and versionInfo.monthCount.lifetimeMonths or 0),
-			1,
-			1,
-			1
-		)
-		DEFAULT_CHAT_FRAME:AddMessage(L.RAF_CHAT_RECRUITS_COUNT:format(versionInfo.numRecruits or 0), 1, 1, 1)
+		print("|cff00ccff" .. versionName .. ":|r")
+		print(L.RAF_CHAT_MONTHS_EARNED:format(versionInfo.monthCount and versionInfo.monthCount.lifetimeMonths or 0))
+		print(L.RAF_CHAT_RECRUITS_COUNT:format(versionInfo.numRecruits or 0))
 
 		if versionInfo.rewards and #versionInfo.rewards > 0 then
-			DEFAULT_CHAT_FRAME:AddMessage(L.RAF_CHAT_AVAILABLE_REWARDS, 1, 1, 1)
+			print(L.RAF_CHAT_AVAILABLE_REWARDS)
 			for i, reward in ipairs(versionInfo.rewards) do
 				if i <= 5 then -- Show first 5 rewards
 					local status = reward.claimed and L.RAF_CHAT_REWARD_CLAIMED
@@ -1299,21 +1298,18 @@ function RAF:DisplayRewardsInChat(rafInfo)
 								and TitleUtil.GetNameFromTitleMaskID(reward.titleInfo.titleMaskID)
 							or L.RAF_REWARD_TITLE_DEFAULT
 					end
-					DEFAULT_CHAT_FRAME:AddMessage(
-						L.RAF_CHAT_REWARD_FMT:format(rewardName, status, reward.monthsRequired),
-						0.9,
-						0.9,
-						0.9
+					print(
+						"|cffe6e6e6" .. L.RAF_CHAT_REWARD_FMT:format(rewardName, status, reward.monthsRequired) .. "|r"
 					)
 				end
 			end
 			if #versionInfo.rewards > 5 then
-				DEFAULT_CHAT_FRAME:AddMessage(L.RAF_CHAT_MORE_REWARDS:format(#versionInfo.rewards - 5), 0.7, 0.7, 0.7)
+				print("|cffb3b3b3" .. L.RAF_CHAT_MORE_REWARDS:format(#versionInfo.rewards - 5) .. "|r")
 			end
 		end
 	end
 
-	DEFAULT_CHAT_FRAME:AddMessage(L.RAF_CHAT_USE_UI, 1, 1, 0)
+	print("|cffFFFF00" .. L.RAF_CHAT_USE_UI .. "|r")
 end
 
 function RAF:RecruitmentButton_OnClick(button)

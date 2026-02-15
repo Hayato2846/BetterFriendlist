@@ -368,7 +368,11 @@ local function OnFriendLineClick(cell, data, mouseButton)
 				local bnetLink = "BNplayer:" .. (data.accountName or "Friend") .. ":" .. data.bnetAccountID
 				SetItemRef(bnetLink, bnetLink, "LeftButton")
 			elseif data.accountName and data.accountName ~= "" then
-				ChatFrame_SendSmartTell(data.accountName)
+				if ChatFrameUtil and ChatFrameUtil.SendBNetTell then
+					ChatFrameUtil.SendBNetTell(data.accountName)
+				else
+					ChatFrame_SendBNetTell(data.accountName)
+				end
 			end
 		end
 	-- WoW friend click handlers
@@ -384,7 +388,11 @@ local function OnFriendLineClick(cell, data, mouseButton)
 		else
 			if data.fullName then
 				local whisperName = data.fullName:gsub(" ", "")
-				ChatFrame_SendTell(whisperName)
+				if ChatFrameUtil and ChatFrameUtil.SendTell then
+					ChatFrameUtil.SendTell(whisperName)
+				else
+					ChatFrame_SendTell(whisperName)
+				end
 			end
 		end
 	end

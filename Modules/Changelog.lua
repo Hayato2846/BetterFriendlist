@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Copy Character Name Not Showing** - Fixed "Copy Character Name" sometimes not appearing in the friend right-click menu. The option now also supports multiple characters across different game accounts via a submenu.
 - **White Hover Highlight on Friends** - Fixed the mouse-over highlight on friend entries appearing white instead of the standard light blue used by Blizzard's default Friends list. Also removed a duplicate highlight definition in the Retail button template.
 - **Compact Mode Icon Sizing** - Fixed game icons and invite buttons appearing oversized in Compact Mode when a friend's name fits on a single line. Icons now scale to match the actual row height.
+- **Chat System Taint (MONSTER_YELL crash)** - Hopefully fixed a rare crash ("attempt to perform string conversion on a secret string value") that could occur when NPCs yelled in-game. The error was caused by internal chat output methods tainting Blizzard's chat history system on WoW 12.0+. This could not be reliably reproduced, so please report if you still encounter it.
 
 ## [2.3.7]       - 2026-02-15
 ### Added
