@@ -15,6 +15,25 @@ function StreamerMode:Initialize()
 	end
 
 	self:UpdateState()
+
+	-- Defensively re-apply header text after any FRIENDLIST_UPDATE.
+	-- Blizzard's own BNet handlers reset the header to the real BattleTag
+	-- whenever friend data changes (e.g. Note Cleanup Wizard batch operations).
+	BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function()
+		if not StreamerMode:IsActive() then
+			return
+		end
+		if
+			BetterFriendsFrame
+			and BetterFriendsFrame.FriendsTabHeader
+			and BetterFriendsFrame.FriendsTabHeader.BattlenetFrame
+		then
+			local header = BetterFriendsFrame.FriendsTabHeader.BattlenetFrame.Tag
+			if header and header:GetText() ~= BetterFriendlistDB.streamerModeHeaderText then
+				header:SetText(BetterFriendlistDB.streamerModeHeaderText)
+			end
+		end
+	end, 100) -- UI priority: runs after data handlers
 end
 
 function StreamerMode:Toggle()
@@ -112,16 +131,23 @@ function StreamerMode:UpdateState()
 			local battlenetFrame = BetterFriendsFrame.FriendsTabHeader.BattlenetFrame
 			local header = battlenetFrame.Tag
 
-			if header and self.originalHeaderText then
-				-- Try to restore original text, but BNet frame might update itself
-				-- Force a check of BNet info to get the real tag back
+			if header then
+				-- Always restore from BNGetInfo as primary source
+				local restored = false
 				if BNGetInfo then
 					local _, battleTag = BNGetInfo()
 					if battleTag then
 						header:SetText(battleTag)
-					elseif self.originalHeaderText ~= BetterFriendlistDB.streamerModeHeaderText then
-						header:SetText(self.originalHeaderText)
+						restored = true
 					end
+				end
+				-- Fallback to stored original text if BNGetInfo unavailable
+				if
+					not restored
+					and self.originalHeaderText
+					and self.originalHeaderText ~= BetterFriendlistDB.streamerModeHeaderText
+				then
+					header:SetText(self.originalHeaderText)
 				end
 			end
 		end

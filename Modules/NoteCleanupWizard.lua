@@ -249,6 +249,10 @@ function NoteCleanupWizard:ApplyCleanedNotes()
 			isApplying = false
 			NoteCleanupWizard:RefreshRows()
 			BFL:DebugPrint("|cff00ff00BetterFriendlist:|r " .. string.format(L.WIZARD_APPLY_SUCCESS, successCount))
+			-- Re-apply Streamer Mode header (Blizzard resets it on each BNSetFriendNote)
+			if BFL.StreamerMode then
+				BFL.StreamerMode:UpdateState()
+			end
 			return
 		end
 
@@ -902,6 +906,10 @@ function NoteCleanupWizard:RestoreBackup()
 			isRestoring = false
 			NoteCleanupWizard:RefreshBackupRows()
 			BFL:DebugPrint("|cff00ff00BetterFriendlist:|r " .. string.format(L.WIZARD_RESTORE_SUCCESS, successCount))
+			-- Re-apply Streamer Mode header (Blizzard resets it on each BNSetFriendNote)
+			if BFL.StreamerMode then
+				BFL.StreamerMode:UpdateState()
+			end
 			-- Refresh main wizard if open
 			C_Timer.After(0.3, function()
 				if wizardFrame and wizardFrame:IsShown() then

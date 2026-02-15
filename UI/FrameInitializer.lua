@@ -552,6 +552,7 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 			end
 
 			AddSecondaryOption("none", L.SORT_NONE, SORT_ICONS.none)
+			AddSecondaryOption("status", L.SORT_STATUS, SORT_ICONS.status)
 			AddSecondaryOption("name", L.SORT_NAME, SORT_ICONS.name)
 			AddSecondaryOption("level", L.SORT_LEVEL, SORT_ICONS.level)
 			AddSecondaryOption("zone", L.SORT_ZONE, SORT_ICONS.zone)
@@ -703,6 +704,7 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 
 		-- Create secondary sort options with icons (using helper function)
 		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.none, L.SORT_NONE), "none")
+		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.status, L.SORT_STATUS), "status")
 		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.name, L.SORT_NAME), "name")
 		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.level, L.SORT_LEVEL), "level")
 		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.zone, L.SORT_ZONE), "zone")

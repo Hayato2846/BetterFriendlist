@@ -2042,6 +2042,12 @@ function Settings:ImportSettings(importString)
 		FriendsList.lastBuildInputs = nil
 	end
 
+	-- Sync Streamer Mode visual state (button icon, header text) with imported DB
+	local StreamerMode = BFL:GetModule("StreamerMode")
+	if StreamerMode then
+		StreamerMode:UpdateState()
+	end
+
 	-- Force full display refresh - import affects groups and display structure
 	BFL:ForceRefreshFriendsList()
 

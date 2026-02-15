@@ -3404,11 +3404,11 @@ function BetterFriendsFrame_ShowContactsMenu(button)
 			local FriendsList = BFL:GetModule("FriendsList")
 			if FriendsList and FriendsList.PopulateSortMenu then
 				-- Primary Sort
-				local primarySort = sortSubmenu:CreateButton("Primary")
+				local primarySort = sortSubmenu:CreateButton(L.SORT_PRIMARY_LABEL or "Primary")
 				FriendsList:PopulateSortMenu(primarySort, "primary")
 
 				-- Secondary Sort
-				local secondarySort = sortSubmenu:CreateButton("Secondary")
+				local secondarySort = sortSubmenu:CreateButton(L.SORT_SECONDARY_LABEL or "Secondary")
 				FriendsList:PopulateSortMenu(secondarySort, "secondary")
 			end
 

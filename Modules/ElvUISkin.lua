@@ -918,6 +918,38 @@ function ElvUISkin:SkinFrames(E, S)
 		BFL:DebugPrint("ElvUISkin: Error skinning HelpFrame: " .. tostring(err))
 	end)
 
+	-- Skin Export Frame
+	BFL:DebugPrint("ElvUISkin: Skinning ExportFrame")
+	xpcall(function()
+		self:SkinExportFrame(E, S)
+	end, function(err)
+		BFL:DebugPrint("ElvUISkin: Error skinning ExportFrame: " .. tostring(err))
+	end)
+
+	-- Skin Import Frame
+	BFL:DebugPrint("ElvUISkin: Skinning ImportFrame")
+	xpcall(function()
+		self:SkinImportFrame(E, S)
+	end, function(err)
+		BFL:DebugPrint("ElvUISkin: Error skinning ImportFrame: " .. tostring(err))
+	end)
+
+	-- Skin Note Cleanup Wizard
+	BFL:DebugPrint("ElvUISkin: Skinning NoteCleanupWizard")
+	xpcall(function()
+		self:SkinNoteCleanupWizard(E, S)
+	end, function(err)
+		BFL:DebugPrint("ElvUISkin: Error skinning NoteCleanupWizard: " .. tostring(err))
+	end)
+
+	-- Skin Backup Viewer
+	BFL:DebugPrint("ElvUISkin: Skinning BackupViewer")
+	xpcall(function()
+		self:SkinBackupViewer(E, S)
+	end, function(err)
+		BFL:DebugPrint("ElvUISkin: Error skinning BackupViewer: " .. tostring(err))
+	end)
+
 	-- Apply FontFix after Skinning to ensure correct font sizes
 	local FontFix = BFL:GetModule("FontFix")
 	if FontFix then
@@ -1614,6 +1646,270 @@ function ElvUISkin:SkinHelpFrame(E, S)
 
 	-- Try to skin immediately if it exists
 	if _G.BetterFriendlistHelpFrame then
+		Skin()
+	end
+end
+
+-- Helper: Skin all UIPanelButtonTemplate / GameMenuButtonTemplate buttons in a frame
+local function SkinChildButtons(S, parent)
+	for _, child in ipairs({ parent:GetChildren() }) do
+		if child:IsObjectType("Button") and not child.isSkinned then
+			-- Skip close buttons (handled by HandlePortraitFrame)
+			local name = child:GetName()
+			if not name or not string.find(name, "CloseButton") then
+				S:HandleButton(child)
+				child.isSkinned = true
+			end
+		end
+	end
+end
+
+-- Helper: Skin ScrollBar from UIPanelScrollFrameTemplate (legacy Slider-based)
+-- UIPanelScrollFrameTemplate creates a classic Slider scrollbar, NOT a modern ScrollBar.
+-- We must use S:HandleScrollBar() (for Slider), NOT SkinScrollBar/HandleTrimScrollBar.
+local function SkinUIPanelScrollBar(S, scrollFrame)
+	if not scrollFrame then
+		return
+	end
+	-- Try direct ScrollBar child (some frames store it)
+	if scrollFrame.ScrollBar then
+		if scrollFrame.ScrollBar:IsObjectType("Slider") then
+			pcall(S.HandleScrollBar, S, scrollFrame.ScrollBar)
+		else
+			pcall(SkinScrollBar, S, scrollFrame.ScrollBar)
+		end
+		return
+	end
+	-- Try named ScrollBar (UIPanelScrollFrameTemplate convention: $parentScrollBar)
+	local name = scrollFrame:GetName()
+	if name then
+		local scrollBar = _G[name .. "ScrollBar"]
+		if scrollBar then
+			pcall(S.HandleScrollBar, S, scrollBar)
+			return
+		end
+	end
+	-- Fallback: find Slider child among all children
+	for _, child in ipairs({ scrollFrame:GetChildren() }) do
+		if child:IsObjectType("Slider") then
+			pcall(S.HandleScrollBar, S, child)
+			return
+		end
+	end
+end
+
+function ElvUISkin:SkinExportFrame(E, S)
+	local Settings = BFL:GetModule("Settings")
+	if not Settings then
+		return
+	end
+
+	local function Skin()
+		local frame = _G.BetterFriendlistExportFrame
+		if not frame or frame.isSkinned then
+			return
+		end
+
+		BFL:DebugPrint("ElvUISkin: Applying Skin to Export Frame")
+
+		-- BasicFrameTemplateWithInset
+		frame:StripTextures()
+		frame:CreateBackdrop("Transparent")
+
+		-- Close Button
+		if frame.CloseButton then
+			S:HandleCloseButton(frame.CloseButton)
+		end
+
+		-- Inset
+		if frame.InsetFrame then
+			frame.InsetFrame:StripTextures()
+		end
+
+		-- ScrollFrame & ScrollBar
+		if frame.scrollFrame then
+			SkinUIPanelScrollBar(S, frame.scrollFrame)
+		end
+
+		-- Skin all buttons (Copy All)
+		SkinChildButtons(S, frame)
+
+		frame.isSkinned = true
+	end
+
+	-- Hook creation
+	hooksecurefunc(Settings, "CreateExportFrame", Skin)
+
+	-- Try to skin immediately if it exists
+	if _G.BetterFriendlistExportFrame then
+		Skin()
+	end
+end
+
+function ElvUISkin:SkinImportFrame(E, S)
+	local Settings = BFL:GetModule("Settings")
+	if not Settings then
+		return
+	end
+
+	local function Skin()
+		local frame = _G.BetterFriendlistImportFrame
+		if not frame or frame.isSkinned then
+			return
+		end
+
+		BFL:DebugPrint("ElvUISkin: Applying Skin to Import Frame")
+
+		-- BasicFrameTemplateWithInset
+		frame:StripTextures()
+		frame:CreateBackdrop("Transparent")
+
+		-- Close Button
+		if frame.CloseButton then
+			S:HandleCloseButton(frame.CloseButton)
+		end
+
+		-- Inset
+		if frame.InsetFrame then
+			frame.InsetFrame:StripTextures()
+		end
+
+		-- ScrollFrame & ScrollBar
+		if frame.scrollFrame then
+			SkinUIPanelScrollBar(S, frame.scrollFrame)
+		end
+
+		-- Skin all buttons (Import, Cancel)
+		SkinChildButtons(S, frame)
+
+		frame.isSkinned = true
+	end
+
+	-- Hook creation
+	hooksecurefunc(Settings, "CreateImportFrame", Skin)
+
+	-- Try to skin immediately if it exists
+	if _G.BetterFriendlistImportFrame then
+		Skin()
+	end
+end
+
+function ElvUISkin:SkinNoteCleanupWizard(E, S)
+	local NoteCleanupWizard = BFL.NoteCleanupWizard
+	if not NoteCleanupWizard then
+		return
+	end
+
+	local function Skin()
+		local frame = _G.BetterFriendlistNoteCleanupWizard
+		if not frame or frame.isSkinned then
+			return
+		end
+
+		BFL:DebugPrint("ElvUISkin: Applying Skin to Note Cleanup Wizard")
+
+		-- ButtonFrameTemplate
+		S:HandlePortraitFrame(frame)
+
+		-- Inset
+		if frame.Inset then
+			frame.Inset:StripTextures()
+			frame.Inset:CreateBackdrop("Transparent")
+		end
+
+		-- ScrollFrame & ScrollBar
+		if frame.scrollFrame then
+			SkinUIPanelScrollBar(S, frame.scrollFrame)
+		end
+
+		-- Skin buttons and search boxes in all child frames (topBar children)
+		for _, child in ipairs({ frame:GetChildren() }) do
+			-- Skin buttons inside sub-frames (topBar)
+			if child:IsObjectType("Frame") and not child:IsObjectType("Button") then
+				for _, subChild in ipairs({ child:GetChildren() }) do
+					if subChild:IsObjectType("Button") and not subChild.isSkinned then
+						S:HandleButton(subChild)
+						subChild.isSkinned = true
+					end
+					if subChild:IsObjectType("EditBox") and not subChild.isSkinned then
+						S:HandleEditBox(subChild)
+						subChild.isSkinned = true
+					end
+				end
+			end
+		end
+
+		frame.isSkinned = true
+	end
+
+	-- Hook creation
+	hooksecurefunc(NoteCleanupWizard, "CreateWizardFrame", Skin)
+
+	-- Also hook Show in case frame was already created
+	hooksecurefunc(NoteCleanupWizard, "Show", Skin)
+
+	-- Try to skin immediately if it exists
+	if _G.BetterFriendlistNoteCleanupWizard then
+		Skin()
+	end
+end
+
+function ElvUISkin:SkinBackupViewer(E, S)
+	local NoteCleanupWizard = BFL.NoteCleanupWizard
+	if not NoteCleanupWizard then
+		return
+	end
+
+	local function Skin()
+		local frame = _G.BetterFriendlistNoteBackupViewer
+		if not frame or frame.isSkinned then
+			return
+		end
+
+		BFL:DebugPrint("ElvUISkin: Applying Skin to Backup Viewer")
+
+		-- ButtonFrameTemplate
+		S:HandlePortraitFrame(frame)
+
+		-- Inset
+		if frame.Inset then
+			frame.Inset:StripTextures()
+			frame.Inset:CreateBackdrop("Transparent")
+		end
+
+		-- ScrollFrame & ScrollBar
+		if frame.scrollFrame then
+			SkinUIPanelScrollBar(S, frame.scrollFrame)
+		end
+
+		-- Skin buttons and search boxes in all child frames (topBar children)
+		for _, child in ipairs({ frame:GetChildren() }) do
+			-- Skin buttons inside sub-frames (topBar)
+			if child:IsObjectType("Frame") and not child:IsObjectType("Button") then
+				for _, subChild in ipairs({ child:GetChildren() }) do
+					if subChild:IsObjectType("Button") and not subChild.isSkinned then
+						S:HandleButton(subChild)
+						subChild.isSkinned = true
+					end
+					if subChild:IsObjectType("EditBox") and not subChild.isSkinned then
+						S:HandleEditBox(subChild)
+						subChild.isSkinned = true
+					end
+				end
+			end
+		end
+
+		frame.isSkinned = true
+	end
+
+	-- Hook creation
+	hooksecurefunc(NoteCleanupWizard, "CreateBackupViewerFrame", Skin)
+
+	-- Also hook ShowBackupViewer in case frame was already created
+	hooksecurefunc(NoteCleanupWizard, "ShowBackupViewer", Skin)
+
+	-- Try to skin immediately if it exists
+	if _G.BetterFriendlistNoteBackupViewer then
 		Skin()
 	end
 end

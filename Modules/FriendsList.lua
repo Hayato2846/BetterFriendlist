@@ -2187,6 +2187,7 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 	-- PERFY OPTIMIZATION: Direct cache access
 	-- [STREAMER MODE] Determine if active (used below to override %name%)
 	local isStreamerMode = BFL.StreamerMode and BFL.StreamerMode:IsActive()
+	local streamerNameFormat = isStreamerMode and (self.settingsCache.streamerModeNameFormat or "battletag") or nil
 
 	if not self.displayNameCache then
 		self.displayNameCache = {}
@@ -2224,6 +2225,7 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		and cacheEntry.colorClassNames == colorClassNames
 		and cacheEntry.showFactionIcons == showFactionIcons
 		and cacheEntry.isStreamerMode == isStreamerMode
+		and cacheEntry.streamerNameFormat == streamerNameFormat
 		and cacheEntry.note == note
 		and cacheEntry.rawName == rawName
 		and cacheEntry.rawAccountName == rawAccountName
@@ -2485,6 +2487,7 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		colorClassNames = colorClassNames,
 		showFactionIcons = showFactionIcons,
 		isStreamerMode = isStreamerMode,
+		streamerNameFormat = streamerNameFormat,
 		note = note,
 		nicknameVersion = nicknameVersion, -- Phase 6: Store version
 		rawName = rawName,
@@ -3893,7 +3896,6 @@ function FriendsList:PopulateSortMenu(rootDescription, sortType)
 		end
 
 		local function CreatePrimaryRadio(root, text, mode)
-			-- Use Native Radio implementation
 			root:CreateRadio(text, IsPrimarySelected, SetPrimarySelected, mode)
 		end
 
@@ -3916,11 +3918,15 @@ function FriendsList:PopulateSortMenu(rootDescription, sortType)
 		end
 
 		local function CreateSecondaryRadio(root, text, mode)
-			-- Use Native Radio implementation
+			-- Prevent selecting same sort as Primary (except None)
+			if mode ~= "none" and mode == self.sortMode then
+				return
+			end
 			root:CreateRadio(text, IsSecondarySelected, SetSecondarySelected, mode)
 		end
 
 		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.none, L.SORT_NONE), "none")
+		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.status, L.SORT_STATUS), "status")
 		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.name, L.SORT_NAME), "name")
 		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.level, L.SORT_LEVEL), "level")
 		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.zone, L.SORT_ZONE), "zone")

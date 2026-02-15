@@ -2,7 +2,7 @@
 ## Title: BetterFriendlist
 ## Notes: Complete replacement for WoW Friends frame - Custom groups, Raid management, Quick Join, and more!
 ## Author: Hayato2846
-## Version: 2.3.6
+## Version: 2.3.7
 ## IconTexture: Interface\AddOns\BetterFriendlist\Textures\PortraitIcon.blp
 ## X-Curse-Project-ID: 1381771
 ## X-WoWI-ID: 26984
