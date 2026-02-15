@@ -1215,6 +1215,7 @@ BFL:RegisterLocale("ptBR", function()
 
 	-- Misc
 	L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Lista Global de Ignorados"
+	L.IGNORE_LIST_ENHANCEQOL_IGNORE = "Lista de Ignorados do EnhanceQoL"
 
 	-- ========================================
 	-- FONT SETTINGS (Phase 22)

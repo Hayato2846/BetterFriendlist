@@ -1216,6 +1216,7 @@ BFL:RegisterLocale("itIT", function()
 
 	-- Misc
 	L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Elenco Ignorati Globale"
+	L.IGNORE_LIST_ENHANCEQOL_IGNORE = "Elenco Ignorati EnhanceQoL"
 
 	-- ========================================
 	-- FONT SETTINGS (Phase 22)

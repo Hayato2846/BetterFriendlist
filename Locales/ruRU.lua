@@ -1247,6 +1247,7 @@ BFL:RegisterLocale("ruRU", function()
 
 	-- Misc
 	L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Глобальный Список Игнора"
+	L.IGNORE_LIST_ENHANCEQOL_IGNORE = "Список Игнора EnhanceQoL"
 
 	-- ========================================
 	-- FONT SETTINGS (Phase 22)

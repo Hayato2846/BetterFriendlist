@@ -472,6 +472,7 @@ BFL:RegisterLocale("deDE", function()
 	L.GROUP_INGAME = "Im Spiel"
 	L.IGNORE_LIST_UNIGNORE = "Ignorieren aufheben"
 	L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Globale Ignorierliste"
+	L.IGNORE_LIST_ENHANCEQOL_IGNORE = "EnhanceQoL Ignorierliste"
 	L.MENU_SET_NICKNAME_FMT = "Spitznamen für %s festlegen"
 	L.MIGRATION_DEBUG_BNET = "Migrations-Check - Altes Battle.net Format:"
 	L.MIGRATION_DEBUG_TOTAL = "Migrations-Check - Gesamte Freundes-Zuordnungen:"

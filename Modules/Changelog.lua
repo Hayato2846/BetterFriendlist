@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+### Added
+- **EnhanceQoL Ignore List Support** - When EnhanceQoL's Ignore List feature is active and set to open with the Friends frame, BetterFriendlist now automatically shows and positions it alongside its own window, just like Global Ignore List. A toggle button also appears in the Ignore List panel.
+
 ## [2.3.6]       - 2026-02-14
 ### Added
 - **Name Formatting Presets** - Replaced the free-text name format input with a dropdown menu offering preset options (Name (Character), BattleTag (Character), Nickname (Character), Character Only, Name Only). A "Custom..." option is still available for advanced users who want to use wildcards. All wildcards (%name%, %character%, %level%, %zone%, %class%, %game%, %note%, %nickname%, %battletag%, %realm%) are available in both name and info formats. 
@@ -193,10 +197,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Broker Tooltip** - Resolved an issue where the tooltip would not display correctly with display addons like ChocolateBar.
 - **ElvUI Skin** - Fixed a Lua error ("index field 'BFLCheckmark'") that could occur when other addons (like ToyBoxEnhanced) create menus that BetterFriendlist tries to skin.
 - **Groups Cache** - Fixed an issue with groups caching sometimes not updating properly when changing groups of a friend.
-
-## [2.2.7]       - 2026-01-31
-### Fixed
-- **Library** - Fixed potential issues with LibQTip library integration.
 
 ---
 

@@ -73,6 +73,13 @@ function IgnoreList:OnLoad(frame)
 		end
 	end
 
+	-- EnhanceQoL Ignore List Integration
+	if frame.EnhanceQoLIgnoreButton then
+		local eqol = _G["EnhanceQoL"]
+		local eqolActive = eqol and eqol.db and eqol.db.enableIgnore
+		frame.EnhanceQoLIgnoreButton:SetShown(eqolActive and true or false)
+	end
+
 	-- Classic: Use FauxScrollFrame approach
 	if BFL.IsClassic or not BFL.HasModernScrollBox then
 		-- BFL:DebugPrint("|cff00ffffIgnoreList:|r Using Classic FauxScrollFrame mode")
@@ -243,6 +250,13 @@ function IgnoreList:Update()
 		end
 
 		ignoreFrame.GlobalIgnoreListButton:SetShown(loaded)
+	end
+
+	-- EnhanceQoL Ignore List Integration Check
+	if ignoreFrame.EnhanceQoLIgnoreButton then
+		local eqol = _G["EnhanceQoL"]
+		local eqolActive = eqol and eqol.db and eqol.db.enableIgnore
+		ignoreFrame.EnhanceQoLIgnoreButton:SetShown(eqolActive and true or false)
 	end
 
 	-- Build data list for both modes
@@ -416,6 +430,18 @@ function BetterIgnoreList_ToggleGIL()
 			if BFL then
 				-- BFL:DebugPrint("BetterIgnoreList_ToggleGIL: GlobalIgnoreList loaded but SlashCmdList['GIGNORE'] is missing.")
 			end
+		end
+	end
+end
+
+function BetterIgnoreList_ToggleEQOL()
+	local eqolFrame = _G["EQOLIgnoreFrame"]
+	if eqolFrame then
+		eqolFrame:SetShown(not eqolFrame:IsShown())
+		if eqolFrame:IsShown() then
+			PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+		else
+			PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_OFF)
 		end
 	end
 end

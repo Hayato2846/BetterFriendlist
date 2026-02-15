@@ -8,7 +8,7 @@
 ## X-WoWI-ID: 26984
 ## X-Wago-ID: rNkPLl6a 
 ## SavedVariables: BetterFriendlistDB
-## OptionalDeps: LibStub, CallbackHandler-1.0, LibDataBroker-1.1, LibQTip-2.0, CustomNames, FriendListColors
+## OptionalDeps: LibStub, CallbackHandler-1.0, LibDataBroker-1.1, LibQTip-2.0, CustomNames, FriendListColors, EnhanceQoL
 ## Bindings: Bindings.xml
 
 ## Category: User Interface
@@ -104,6 +104,7 @@ Modules\TestSuite.lua
 Modules\ElvUISkin.lua
 Modules\AddOnSkins.lua [AllowLoadGameType mainline]
 Modules\Compat_GlobalIgnoreList.lua
+Modules\Compat_EnhanceQoL.lua
 Modules\FontFix.lua
 
 # UI Callbacks

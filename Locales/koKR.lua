@@ -1210,6 +1210,7 @@ BFL:RegisterLocale("koKR", function()
 
 	-- Misc
 	L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "전역 무시 목록"
+	L.IGNORE_LIST_ENHANCEQOL_IGNORE = "EnhanceQoL 무시 목록"
 
 	-- ========================================
 	-- FONT SETTINGS (Phase 22)

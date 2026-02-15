@@ -381,6 +381,19 @@ function ElvUISkin:SkinFrames(E, S)
 				end
 			end
 		end
+
+		-- Skin EnhanceQoL Ignore List Button (if active)
+		if frame.IgnoreListWindow.EnhanceQoLIgnoreButton then
+			if frame.IgnoreListWindow.EnhanceQoLIgnoreButton:IsObjectType("Button") then
+				S:HandleButton(frame.IgnoreListWindow.EnhanceQoLIgnoreButton)
+
+				if frame.IgnoreListWindow.EnhanceQoLIgnoreButton.Icon then
+					frame.IgnoreListWindow.EnhanceQoLIgnoreButton.Icon:SetDrawLayer("OVERLAY")
+					frame.IgnoreListWindow.EnhanceQoLIgnoreButton.Icon:SetAlpha(1)
+					frame.IgnoreListWindow.EnhanceQoLIgnoreButton.Icon:Show()
+				end
+			end
+		end
 	end
 
 	-- Skin ScrollBars

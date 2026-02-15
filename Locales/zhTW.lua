@@ -1223,6 +1223,7 @@ BFL:RegisterLocale("zhTW", function()
 
 	-- Misc
 	L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "全域忽略清單"
+	L.IGNORE_LIST_ENHANCEQOL_IGNORE = "EnhanceQoL 忽略清單"
 
 	-- ========================================
 	-- FONT SETTINGS (Phase 22)

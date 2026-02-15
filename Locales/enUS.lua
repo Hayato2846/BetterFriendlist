@@ -620,6 +620,7 @@ local function LoadEnUS()
 	-- Ignore List
 	L.IGNORE_LIST_UNIGNORE = "Unignore Player"
 	L.IGNORE_LIST_GLOBAL_IGNORE_LIST = "Global Ignore List"
+	L.IGNORE_LIST_ENHANCEQOL_IGNORE = "EnhanceQoL Ignore List"
 
 	-- ========================================
 	-- RECENT ALLIES (Retail 11.0.7+)
