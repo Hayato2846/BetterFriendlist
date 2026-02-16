@@ -135,31 +135,19 @@ local function ApplyFontSize(fontString)
 end
 
 -- Apply Font Settings to Tabs (Called when settings change or frame shown)
--- Mark our tabs to prevent auto-resize by PanelTemplates_TabResize
-local BFL_PROTECTED_TABS = {}
-
--- Hook PanelTemplates_TabResize to prevent auto-resize on our tabs
--- This MUST run before any tab operations to intercept all resize attempts
--- Classic is excluded: tabs use default CharacterFrameTabButtonTemplate sizing
-if PanelTemplates_TabResize then
-	local OriginalTabResize = PanelTemplates_TabResize
-	PanelTemplates_TabResize = function(tab, padding, absoluteSize, minWidth, maxWidth, ...)
-		-- Classic: Let default tab sizing through (ApplyTabFonts is Retail-only)
-		if BFL.IsClassic then
-			return OriginalTabResize(tab, padding, absoluteSize, minWidth, maxWidth, ...)
+-- Secure post-hook: re-apply enforced width on BFL tabs AFTER Blizzard resizes them.
+-- CRITICAL: We must NOT override PanelTemplates_TabResize globally, as that taints the
+-- function. Chat tabs also use PanelTemplates_TabResize, and a tainted resize propagates
+-- into the chat system, causing "secret string conversion" crashes on WoW 12.0+.
+-- hooksecurefunc runs AFTER the original without tainting it.
+if not BFL.IsClassic and PanelTemplates_TabResize then
+	hooksecurefunc("PanelTemplates_TabResize", function(tab)
+		if tab and tab.BFL_EnforcedWidth then
+			tab.BFL_ResizeLock = true
+			tab:SetWidth(tab.BFL_EnforcedWidth)
+			tab.BFL_ResizeLock = false
 		end
-		-- Check by reference (for cached tabs)
-		if BFL_PROTECTED_TABS[tab] then
-			return
-		end
-		-- Check by name pattern (for tabs not yet cached, e.g. during initial SetText)
-		local tabName = tab and tab:GetName()
-		if tabName and (tabName:find("^BetterFriendsFrame") or tabName:find("^BetterFriendlist")) then
-			return
-		end
-		-- Otherwise, call the original function
-		return OriginalTabResize(tab, padding, absoluteSize, minWidth, maxWidth, ...)
-	end
+	end)
 end
 
 function BFL:ApplyTabFonts()
@@ -287,18 +275,6 @@ function BFL:ApplyTabFonts()
 			isShown = "1"
 		end
 		return text .. "|" .. isShown
-	end
-
-	-- Mark all tabs as protected from auto-resize
-	for _, tab in ipairs(bottomTabs) do
-		if tab then
-			BFL_PROTECTED_TABS[tab] = true
-		end
-	end
-	for _, tab in ipairs(topTabs) do
-		if tab then
-			BFL_PROTECTED_TABS[tab] = true
-		end
 	end
 
 	-- Get frame dimensions (respect user width setting when available)
