@@ -1350,21 +1350,42 @@ function FriendsList:UpdateSearchBoxState()
 
 			searchBox:SetHeight(28)
 
-			-- Re-anchor dropdowns to SearchBox after reparenting
+			-- Re-anchor dropdowns after reparenting
 			-- XML anchors ($parent.SearchBox) may be invalidated when SearchBox
 			-- was reparented to BetterFriendsFrame during Simple Mode
 			local header = frame.FriendsTabHeader
-			if header.QuickFilterDropdown then
-				header.QuickFilterDropdown:ClearAllPoints()
-				header.QuickFilterDropdown:SetPoint("LEFT", searchBox, "RIGHT", 5, 0)
-			end
-			if header.PrimarySortDropdown and header.QuickFilterDropdown then
-				header.PrimarySortDropdown:ClearAllPoints()
-				header.PrimarySortDropdown:SetPoint("LEFT", header.QuickFilterDropdown, "RIGHT", 5, 0)
-			end
-			if header.SecondarySortDropdown and header.PrimarySortDropdown then
-				header.SecondarySortDropdown:ClearAllPoints()
-				header.SecondarySortDropdown:SetPoint("LEFT", header.PrimarySortDropdown, "RIGHT", 5, 0)
+			if BFL.IsClassic then
+				-- Classic: UIDropDownMenuTemplate frames are ~180px wide.
+				-- Place all 3 dropdowns in a separate row ABOVE the SearchBox
+				-- (instead of Retail-style to the right, which overflows the frame).
+				-- UIDropDownMenuTemplate has ~16px built-in left margin, ~8px top margin.
+				if header.QuickFilterDropdown then
+					header.QuickFilterDropdown:ClearAllPoints()
+					header.QuickFilterDropdown:SetPoint("TOPLEFT", searchBox, "TOPLEFT", -16, 32)
+				end
+				if header.PrimarySortDropdown and header.QuickFilterDropdown then
+					header.PrimarySortDropdown:ClearAllPoints()
+					header.PrimarySortDropdown:SetPoint("LEFT", header.QuickFilterDropdown, "RIGHT", -10, 0)
+				end
+				if header.SecondarySortDropdown and header.PrimarySortDropdown then
+					header.SecondarySortDropdown:ClearAllPoints()
+					header.SecondarySortDropdown:SetPoint("LEFT", header.PrimarySortDropdown, "RIGHT", -15, 0)
+				end
+			else
+				-- Retail: WowStyle1DropdownTemplate buttons are small (51px),
+				-- so place them to the right of the SearchBox on the same row
+				if header.QuickFilterDropdown then
+					header.QuickFilterDropdown:ClearAllPoints()
+					header.QuickFilterDropdown:SetPoint("LEFT", searchBox, "RIGHT", 5, 0)
+				end
+				if header.PrimarySortDropdown and header.QuickFilterDropdown then
+					header.PrimarySortDropdown:ClearAllPoints()
+					header.PrimarySortDropdown:SetPoint("LEFT", header.QuickFilterDropdown, "RIGHT", 5, 0)
+				end
+				if header.SecondarySortDropdown and header.PrimarySortDropdown then
+					header.SecondarySortDropdown:ClearAllPoints()
+					header.SecondarySortDropdown:SetPoint("LEFT", header.PrimarySortDropdown, "RIGHT", 5, 0)
+				end
 			end
 
 			-- CRITICAL FIX: Ensure SearchBox is visible in Normal Mode

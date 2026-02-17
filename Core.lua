@@ -424,24 +424,9 @@ function BFL:UpdatePortraitVisibility(reason)
 			end
 
 			-- Classic Layout Adjustments
-			-- Skip if ElvUI is active - ElvUI Skin handles positioning
-			local isElvUIActive = _G.ElvUI and BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin ~= false
-			if BFL.IsClassic and shouldShow and not isElvUIActive then
-				if header.PrimarySortDropdown then
-					header.PrimarySortDropdown:ClearAllPoints()
-					header.PrimarySortDropdown:SetPoint("TOP", header, "TOP", 0, -60)
-				end
-
-				if header.QuickFilterDropdown and header.PrimarySortDropdown then
-					header.QuickFilterDropdown:ClearAllPoints()
-					header.QuickFilterDropdown:SetPoint("TOPRIGHT", header.PrimarySortDropdown, "TOPLEFT", 10, 0)
-				end
-
-				if header.SearchBox then
-					-- Managed by FriendsList:UpdateSearchBoxState (Phase 22)
-					-- Do not override here to avoid race conditions/jumping
-				end
-			end
+			-- Dropdown positioning for Classic Normal Mode is handled by
+			-- FriendsList:UpdateSearchBoxState() (above SearchBox, not beside it)
+			-- No override needed here.
 		end
 	end
 end
