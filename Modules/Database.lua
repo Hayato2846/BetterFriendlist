@@ -143,6 +143,16 @@ local defaults = {
 	-- Note Sync
 	syncGroupsToNote = false, -- Sync group assignments to friend notes (default: OFF)
 
+	-- WHO Frame Settings
+	whoClassColorNames = true, -- Color WHO result names by class color (default: ON)
+	whoShowClassIcons = true, -- Show class icon in WHO result rows (default: ON)
+	whoLevelColors = true, -- Color level text by difficulty (default: ON)
+	whoZebraStripes = true, -- Alternating row backgrounds in WHO (default: ON)
+	whoSearchHistoryEnabled = true, -- Enable WHO search history (default: ON)
+	whoSearchHistoryMax = 8, -- Maximum search history entries (default: 8)
+	whoDoubleClickAction = "whisper", -- Double-click action: whisper, invite, inspect (default: whisper)
+	whoSearchHistory = {}, -- Stored search history entries
+
 	-- Migration tracking
 	friendGroupsMigrated = false, -- Track if FriendGroups migration has been completed
 	lastChangelogVersion = "0.0.0", -- Last version the user saw the changelog for

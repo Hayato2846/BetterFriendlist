@@ -225,10 +225,14 @@ end
 -- @param options: Table with { labels = {...}, values = {...} }
 -- @param getter: Function(value) -> boolean (is this value selected?)
 -- @param setter: Function(value) called when selection changes
-function Compat.InitializeDropdown(dropdown, options, getter, setter)
+-- @param scrollHeight: Optional max pixel height before the dropdown scrolls (Retail only)
+function Compat.InitializeDropdown(dropdown, options, getter, setter, scrollHeight)
 	if BFL.HasModernDropdown and dropdown.SetupMenu then
 		-- Retail: Modern API
 		dropdown:SetupMenu(function(dropdown, rootDescription)
+			if scrollHeight then
+				rootDescription:SetScrollMode(scrollHeight)
+			end
 			for i, label in ipairs(options.labels) do
 				local value = options.values[i]
 				rootDescription:CreateRadio(label, getter, setter, value)
@@ -260,6 +264,18 @@ function Compat.InitializeDropdown(dropdown, options, getter, setter)
 				break
 			end
 		end
+	end
+end
+
+-- Refresh a dropdown's displayed text after programmatic value change
+-- @param dropdown: The dropdown frame
+-- @param text: The text to display
+function Compat.RefreshDropdown(dropdown, text)
+	if BFL.HasModernDropdown and dropdown.Update then
+		dropdown:Update()
+	else
+		UIDropDownMenu_SetText(dropdown, text)
+		UIDropDownMenu_SetSelectedValue(dropdown, "")
 	end
 end
 
@@ -837,6 +853,7 @@ end
 -- Dropdown Creation
 BFL.CreateDropdown = Compat.CreateDropdown
 BFL.InitializeDropdown = Compat.InitializeDropdown
+BFL.RefreshDropdown = Compat.RefreshDropdown
 
 -- ColorPicker
 BFL.ShowColorPicker = Compat.ShowColorPicker

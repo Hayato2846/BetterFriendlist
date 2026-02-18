@@ -1170,6 +1170,51 @@ BFL:RegisterLocale("deDE", function()
 	L.SETTINGS_RAID_ERROR_RESERVED = "Diese Kombination ist reserviert."
 
 	-- ========================================
+	-- WHO FRAME SETTINGS
+	-- ========================================
+	L.SETTINGS_TAB_WHO = "Wer"
+	L.WHO_SETTINGS_DESC = "Konfiguriere Aussehen und Verhalten der Wer-Suchergebnisse."
+	L.WHO_SETTINGS_VISUAL_HEADER = "Darstellung"
+	L.WHO_SETTINGS_CLASS_ICONS = "Klassensymbole anzeigen"
+	L.WHO_SETTINGS_CLASS_ICONS_DESC = "Zeigt Klassensymbole neben Spielernamen an."
+	L.WHO_SETTINGS_CLASS_COLORS = "Klassengefaerbte Namen"
+	L.WHO_SETTINGS_CLASS_COLORS_DESC = "Faerbt Spielernamen nach ihrer Klasse."
+	L.WHO_SETTINGS_LEVEL_COLORS = "Stufenschwierigkeit"
+	L.WHO_SETTINGS_LEVEL_COLORS_DESC = "Faerbt Stufen nach Schwierigkeit relativ zu deiner Stufe."
+	L.WHO_SETTINGS_ZEBRA = "Alternierende Zeilenhintergruende"
+	L.WHO_SETTINGS_ZEBRA_DESC = "Zeigt dezente abwechselnde Zeilenhintergruende fuer bessere Lesbarkeit."
+	L.WHO_SETTINGS_BEHAVIOR_HEADER = "Verhalten"
+	L.WHO_SETTINGS_DOUBLE_CLICK = "Doppelklick-Aktion"
+	L.WHO_DOUBLE_CLICK_WHISPER = "Fluestern"
+	L.WHO_DOUBLE_CLICK_INVITE = "Gruppe einladen"
+	L.WHO_RESULTS_SHOWING = "%d von %d Spielern angezeigt"
+	L.WHO_NO_RESULTS = "Keine Spieler gefunden"
+	L.WHO_TOOLTIP_HINT_CLICK = "Klicken zum Auswaehlen"
+	L.WHO_TOOLTIP_HINT_DBLCLICK = "Doppelklick zum Fluestern"
+	L.WHO_TOOLTIP_HINT_DBLCLICK_INVITE = "Doppelklick zum Einladen"
+	L.WHO_TOOLTIP_HINT_CTRL = "Strg+Klick fuer Spaltensuche"
+	L.WHO_TOOLTIP_HINT_RIGHTCLICK = "Rechtsklick fuer Optionen"
+
+	-- ========================================
+	-- WHO SEARCH BUILDER
+	-- ========================================
+	L.WHO_BUILDER_TITLE = "Suchbaukasten"
+	L.WHO_BUILDER_NAME = "Name"
+	L.WHO_BUILDER_GUILD = "Gilde"
+	L.WHO_BUILDER_ZONE = "Zone"
+	L.WHO_BUILDER_CLASS = "Klasse"
+	L.WHO_BUILDER_RACE = "Volk"
+	L.WHO_BUILDER_LEVEL = "Stufe"
+	L.WHO_BUILDER_LEVEL_TO = "bis"
+	L.WHO_BUILDER_ALL_CLASSES = "Alle Klassen"
+	L.WHO_BUILDER_ALL_RACES = "Alle Voelker"
+	L.WHO_BUILDER_PREVIEW = "Vorschau:"
+	L.WHO_BUILDER_PREVIEW_EMPTY = "Felder ausfuellen, um eine Suche zu erstellen"
+	L.WHO_BUILDER_SEARCH = "Suchen"
+	L.WHO_BUILDER_RESET = "Zuruecksetzen"
+	L.WHO_BUILDER_TOOLTIP = "Suchbaukasten oeffnen"
+
+	-- ========================================
 	-- NOTE SYNC (Group to Note Sync)
 	-- ========================================
 	L.SETTINGS_SYNC_GROUPS_NOTE_HEADER = "Gruppen-Notiz-Sync"

@@ -119,7 +119,13 @@
 						<Anchor point="BOTTOMRIGHT" />
 					</Anchors>
 				</Frame>
-			</Frames>
+					<!-- Who Tab Content -->
+					<Frame parentKey="WhoTab" hidden="true">
+						<Anchors>
+							<Anchor point="TOPLEFT" />
+							<Anchor point="BOTTOMRIGHT" />
+						</Anchors>
+					</Frame>			</Frames>
 		</Frame>
 	</ScrollChild>
 </ScrollFrame><!-- Bottom Buttons - at bottom of MainInset -->

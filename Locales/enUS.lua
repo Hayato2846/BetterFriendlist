@@ -1207,6 +1207,51 @@ local function LoadEnUS()
 	L.SETTINGS_RAID_ERROR_RESERVED = "This combination is reserved."
 
 	-- ========================================
+	-- WHO FRAME SETTINGS
+	-- ========================================
+	L.SETTINGS_TAB_WHO = "Who"
+	L.WHO_SETTINGS_DESC = "Configure the appearance and behavior of the Who search results."
+	L.WHO_SETTINGS_VISUAL_HEADER = "Visual"
+	L.WHO_SETTINGS_CLASS_ICONS = "Show Class Icons"
+	L.WHO_SETTINGS_CLASS_ICONS_DESC = "Display class icons next to player names."
+	L.WHO_SETTINGS_CLASS_COLORS = "Class-Colored Names"
+	L.WHO_SETTINGS_CLASS_COLORS_DESC = "Color player names by their class."
+	L.WHO_SETTINGS_LEVEL_COLORS = "Level Difficulty Colors"
+	L.WHO_SETTINGS_LEVEL_COLORS_DESC = "Color levels by difficulty relative to your level."
+	L.WHO_SETTINGS_ZEBRA = "Alternating Row Background"
+	L.WHO_SETTINGS_ZEBRA_DESC = "Show subtle alternating row backgrounds for readability."
+	L.WHO_SETTINGS_BEHAVIOR_HEADER = "Behavior"
+	L.WHO_SETTINGS_DOUBLE_CLICK = "Double-Click Action"
+	L.WHO_DOUBLE_CLICK_WHISPER = "Whisper"
+	L.WHO_DOUBLE_CLICK_INVITE = "Invite to Group"
+	L.WHO_RESULTS_SHOWING = "%d of %d players shown"
+	L.WHO_NO_RESULTS = "No players found"
+	L.WHO_TOOLTIP_HINT_CLICK = "Click to select"
+	L.WHO_TOOLTIP_HINT_DBLCLICK = "Double-click to whisper"
+	L.WHO_TOOLTIP_HINT_DBLCLICK_INVITE = "Double-click to invite"
+	L.WHO_TOOLTIP_HINT_CTRL = "Ctrl+Click to search column value"
+	L.WHO_TOOLTIP_HINT_RIGHTCLICK = "Right-click for options"
+
+	-- ========================================
+	-- WHO SEARCH BUILDER
+	-- ========================================
+	L.WHO_BUILDER_TITLE = "Search Builder"
+	L.WHO_BUILDER_NAME = "Name"
+	L.WHO_BUILDER_GUILD = "Guild"
+	L.WHO_BUILDER_ZONE = "Zone"
+	L.WHO_BUILDER_CLASS = "Class"
+	L.WHO_BUILDER_RACE = "Race"
+	L.WHO_BUILDER_LEVEL = "Level"
+	L.WHO_BUILDER_LEVEL_TO = "to"
+	L.WHO_BUILDER_ALL_CLASSES = "All Classes"
+	L.WHO_BUILDER_ALL_RACES = "All Races"
+	L.WHO_BUILDER_PREVIEW = "Preview:"
+	L.WHO_BUILDER_PREVIEW_EMPTY = "Fill in fields to build a search"
+	L.WHO_BUILDER_SEARCH = "Search"
+	L.WHO_BUILDER_RESET = "Reset"
+	L.WHO_BUILDER_TOOLTIP = "Open Search Builder"
+
+	-- ========================================
 	-- NOTE SYNC (Group to Note Sync)
 	-- ========================================
 	L.SETTINGS_SYNC_GROUPS_NOTE_HEADER = "Group Note Sync"

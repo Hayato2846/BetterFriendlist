@@ -1191,6 +1191,51 @@ BFL:RegisterLocale("zhCN", function()
 	L.SETTINGS_RAID_ERROR_RESERVED = "此组合已保留。"
 
 	-- ========================================
+	-- WHO FRAME SETTINGS
+	-- ========================================
+	L.SETTINGS_TAB_WHO = "查找"
+	L.WHO_SETTINGS_DESC = "配置查找搜索结果的外观和行为。"
+	L.WHO_SETTINGS_VISUAL_HEADER = "外观"
+	L.WHO_SETTINGS_CLASS_ICONS = "显示职业图标"
+	L.WHO_SETTINGS_CLASS_ICONS_DESC = "在玩家名称旁边显示职业图标。"
+	L.WHO_SETTINGS_CLASS_COLORS = "职业颜色名称"
+	L.WHO_SETTINGS_CLASS_COLORS_DESC = "按职业着色玩家名称。"
+	L.WHO_SETTINGS_LEVEL_COLORS = "等级难度颜色"
+	L.WHO_SETTINGS_LEVEL_COLORS_DESC = "根据与你等级的相对难度着色等级。"
+	L.WHO_SETTINGS_ZEBRA = "交替行背景"
+	L.WHO_SETTINGS_ZEBRA_DESC = "显示微妙的交替行背景以提高可读性。"
+	L.WHO_SETTINGS_BEHAVIOR_HEADER = "行为"
+	L.WHO_SETTINGS_DOUBLE_CLICK = "双击操作"
+	L.WHO_DOUBLE_CLICK_WHISPER = "密语"
+	L.WHO_DOUBLE_CLICK_INVITE = "邀请加入队伍"
+	L.WHO_RESULTS_SHOWING = "显示 %d / %d 位玩家"
+	L.WHO_NO_RESULTS = "未找到玩家"
+	L.WHO_TOOLTIP_HINT_CLICK = "点击选择"
+	L.WHO_TOOLTIP_HINT_DBLCLICK = "双击密语"
+	L.WHO_TOOLTIP_HINT_DBLCLICK_INVITE = "双击邀请"
+	L.WHO_TOOLTIP_HINT_CTRL = "Ctrl+点击搜索列值"
+	L.WHO_TOOLTIP_HINT_RIGHTCLICK = "右键查看选项"
+
+	-- ========================================
+	-- WHO SEARCH BUILDER
+	-- ========================================
+	L.WHO_BUILDER_TITLE = "搜索构建器"
+	L.WHO_BUILDER_NAME = "名字"
+	L.WHO_BUILDER_GUILD = "公会"
+	L.WHO_BUILDER_ZONE = "区域"
+	L.WHO_BUILDER_CLASS = "职业"
+	L.WHO_BUILDER_RACE = "种族"
+	L.WHO_BUILDER_LEVEL = "等级"
+	L.WHO_BUILDER_LEVEL_TO = "至"
+	L.WHO_BUILDER_ALL_CLASSES = "所有职业"
+	L.WHO_BUILDER_ALL_RACES = "所有种族"
+	L.WHO_BUILDER_PREVIEW = "预览:"
+	L.WHO_BUILDER_PREVIEW_EMPTY = "填写字段以构建搜索"
+	L.WHO_BUILDER_SEARCH = "搜索"
+	L.WHO_BUILDER_RESET = "重置"
+	L.WHO_BUILDER_TOOLTIP = "打开搜索构建器"
+
+	-- ========================================
 	-- FRAME DIMENSIONS (Phase 21) - RESTORED
 	-- ========================================
 	L.SETTINGS_FRAME_DIMENSIONS_HEADER = "窗口尺寸"

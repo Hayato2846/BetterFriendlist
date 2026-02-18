@@ -1202,6 +1202,51 @@ BFL:RegisterLocale("itIT", function()
 	L.SETTINGS_RAID_ERROR_RESERVED = "Questa combinazione è riservata."
 
 	-- ========================================
+	-- WHO FRAME SETTINGS
+	-- ========================================
+	L.SETTINGS_TAB_WHO = "Chi"
+	L.WHO_SETTINGS_DESC = "Configura l'aspetto e il comportamento dei risultati di ricerca Chi."
+	L.WHO_SETTINGS_VISUAL_HEADER = "Aspetto"
+	L.WHO_SETTINGS_CLASS_ICONS = "Mostra icone classe"
+	L.WHO_SETTINGS_CLASS_ICONS_DESC = "Visualizza le icone classe accanto ai nomi dei giocatori."
+	L.WHO_SETTINGS_CLASS_COLORS = "Nomi colorati per classe"
+	L.WHO_SETTINGS_CLASS_COLORS_DESC = "Colora i nomi dei giocatori in base alla loro classe."
+	L.WHO_SETTINGS_LEVEL_COLORS = "Colori difficoltà livello"
+	L.WHO_SETTINGS_LEVEL_COLORS_DESC = "Colora i livelli in base alla difficoltà relativa al tuo livello."
+	L.WHO_SETTINGS_ZEBRA = "Sfondo righe alternate"
+	L.WHO_SETTINGS_ZEBRA_DESC = "Mostra sfondi di righe alternate per migliorare la leggibilità."
+	L.WHO_SETTINGS_BEHAVIOR_HEADER = "Comportamento"
+	L.WHO_SETTINGS_DOUBLE_CLICK = "Azione doppio clic"
+	L.WHO_DOUBLE_CLICK_WHISPER = "Sussurra"
+	L.WHO_DOUBLE_CLICK_INVITE = "Invita nel gruppo"
+	L.WHO_RESULTS_SHOWING = "%d di %d giocatori mostrati"
+	L.WHO_NO_RESULTS = "Nessun giocatore trovato"
+	L.WHO_TOOLTIP_HINT_CLICK = "Clic per selezionare"
+	L.WHO_TOOLTIP_HINT_DBLCLICK = "Doppio clic per sussurrare"
+	L.WHO_TOOLTIP_HINT_DBLCLICK_INVITE = "Doppio clic per invitare"
+	L.WHO_TOOLTIP_HINT_CTRL = "Ctrl+Clic per cercare il valore della colonna"
+	L.WHO_TOOLTIP_HINT_RIGHTCLICK = "Clic destro per opzioni"
+
+	-- ========================================
+	-- WHO SEARCH BUILDER
+	-- ========================================
+	L.WHO_BUILDER_TITLE = "Costruttore di ricerca"
+	L.WHO_BUILDER_NAME = "Nome"
+	L.WHO_BUILDER_GUILD = "Gilda"
+	L.WHO_BUILDER_ZONE = "Zona"
+	L.WHO_BUILDER_CLASS = "Classe"
+	L.WHO_BUILDER_RACE = "Razza"
+	L.WHO_BUILDER_LEVEL = "Livello"
+	L.WHO_BUILDER_LEVEL_TO = "a"
+	L.WHO_BUILDER_ALL_CLASSES = "Tutte le classi"
+	L.WHO_BUILDER_ALL_RACES = "Tutte le razze"
+	L.WHO_BUILDER_PREVIEW = "Anteprima:"
+	L.WHO_BUILDER_PREVIEW_EMPTY = "Compila i campi per costruire una ricerca"
+	L.WHO_BUILDER_SEARCH = "Cerca"
+	L.WHO_BUILDER_RESET = "Reimposta"
+	L.WHO_BUILDER_TOOLTIP = "Apri il costruttore di ricerca"
+
+	-- ========================================
 	-- FRAME DIMENSIONS (Phase 21) - RESTORED
 	-- ========================================
 	L.SETTINGS_FRAME_DIMENSIONS_HEADER = "Dimensioni del Riquadro"

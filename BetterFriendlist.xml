@@ -682,14 +682,31 @@
 	<!-- Who List Button Template -->
 	<Button name="BetterWhoListButtonTemplate" virtual="true"
 		registerForClicks="LeftButtonUp, RightButtonUp">
-		<Size x="298" y="16" />
+		<Size x="298" y="22" />
 		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="background">
+					<Anchors>
+						<Anchor point="TOPLEFT" />
+						<Anchor point="BOTTOMRIGHT" />
+					</Anchors>
+					<Color r="0" g="0" b="0" a="0" />
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture parentKey="classIcon" hidden="true">
+					<Size x="14" y="14" />
+					<Anchors>
+						<Anchor point="LEFT" x="4" y="0" />
+					</Anchors>
+				</Texture>
+			</Layer>
 			<Layer level="BORDER">
 				<FontString parentKey="Name" inherits="BetterFriendlistFontNormalSmall" maxLines="1"
 					justifyH="LEFT">
 					<Size x="106" />
 					<Anchors>
-						<Anchor point="LEFT" x="6" />
+						<Anchor point="LEFT" x="22" />
 					</Anchors>
 				</FontString>
 				<FontString parentKey="Variable" inherits="BetterFriendlistFontNormalSmall"
@@ -725,43 +742,21 @@
 				BetterWhoListButton_OnClick(self, button)
 			</OnClick>
 			<OnEnter>
-				-- PERFORMANCE: Lazy tooltip generation - only check truncation on hover
-				if self.tooltipInfo then
-				local showTooltip = false
-				local lines = {}
-
-				-- Check if any text is truncated
-				if self.Name:IsTruncated() then
-				table.insert(lines, self.tooltipInfo.fullName)
-				showTooltip = true
-				end
-				if self.Level:IsTruncated() then
-				table.insert(lines, format(WHO_LIST_LEVEL_TOOLTIP or "Level %d",
-				self.tooltipInfo.level))
-				showTooltip = true
-				end
-				if self.Variable:IsTruncated() then
-				table.insert(lines, self.tooltipInfo.variableText)
-				showTooltip = true
-				end
-
-				-- Show tooltip only if something is truncated
-				if showTooltip then
-				GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-				GameTooltip:SetText(lines[1] or "")
-				for i = 2, #lines do
-				GameTooltip:AddLine(lines[i], 1, 1, 1)
-				end
-				GameTooltip:Show()
-				end
-				end
+				BetterWhoListButton_OnEnter(self)
 			</OnEnter>
 			<OnLeave>
-				GameTooltip:Hide()
+				BetterWhoListButton_OnLeave(self)
 			</OnLeave>
+			<OnDoubleClick>
+				BetterWhoListButton_OnDoubleClick(self, button)
+			</OnDoubleClick>
 		</Scripts>
-		<HighlightTexture file="Interface\QuestFrame\UI-QuestTitleHighlight" setAllPoints="true"
-			alphaMode="ADD" />
+		<HighlightTexture file="Interface\QuestFrame\UI-QuestTitleHighlight" alphaMode="ADD">
+			<Anchors>
+				<Anchor point="TOPLEFT" x="0" y="-1" />
+				<Anchor point="BOTTOMRIGHT" x="0" y="1" />
+			</Anchors>
+		</HighlightTexture>
 	</Button>
 	<!-- Ignore List Button Template (11.2.5) -->
 	<Button name="BetterIgnoreListButtonTemplate" virtual="true">

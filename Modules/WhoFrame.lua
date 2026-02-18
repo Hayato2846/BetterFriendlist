@@ -20,6 +20,18 @@ local WhoFrame = BFL:RegisterModule("WhoFrame", {})
 
 -- WHO constants
 local MAX_WHOS_FROM_SERVER = 50
+local BUTTON_HEIGHT = 22 -- Increased from 16 for class icons + readability
+local CLASS_ICON_SIZE = 14
+local CLASS_ICON_OFFSET = 4
+local NAME_OFFSET_WITH_ICON = 22 -- 4 (icon offset) + 14 (icon) + 4 (gap)
+local NAME_OFFSET_WITHOUT_ICON = 6
+
+-- Class icon texture coordinates (from WoW global CLASS_ICON_TCOORDS)
+local CLASS_ICON_TEXTURE = "Interface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES"
+
+-- Zebra stripe colors
+local ZEBRA_EVEN_COLOR = { r = 0.1, g = 0.1, b = 0.1, a = 0.3 }
+local ZEBRA_ODD_COLOR = { r = 0, g = 0, b = 0, a = 0 }
 
 -- WHO sort values
 local whoSortValue = 1 -- 1=Zone, 2=Guild, 3=Race
@@ -37,6 +49,11 @@ local cachedExtent = nil
 -- Dirty flag: Set when data changes while frame is hidden
 local needsRenderOnShow = false
 
+-- Double-click tracking
+local lastClickTime = 0
+local lastClickButton = nil
+local DOUBLE_CLICK_THRESHOLD = 0.4
+
 -- ========================================
 -- Module Lifecycle
 -- ========================================
@@ -51,7 +68,6 @@ function WhoFrame:Initialize()
 	if BetterFriendsFrame then
 		BetterFriendsFrame:HookScript("OnShow", function()
 			if needsRenderOnShow then
-				-- Only trigger update if we are on the Who tab (tab 3 usually, but let's check visibility)
 				if BetterFriendsFrame.WhoFrame and BetterFriendsFrame.WhoFrame:IsShown() then
 					if _G.BetterWhoFrame_Update then
 						_G.BetterWhoFrame_Update(true)
@@ -61,6 +77,15 @@ function WhoFrame:Initialize()
 			end
 		end)
 	end
+end
+
+-- Get a WHO setting from the database with fallback
+function WhoFrame:GetSetting(key, default)
+	local DB = BFL:GetModule("DB")
+	if DB then
+		return DB:Get(key, default)
+	end
+	return default
 end
 
 -- Handle WHO_LIST_UPDATE event
@@ -87,10 +112,11 @@ function WhoFrame:UpdateResponsiveLayout()
 	-- Calculate available width for column headers
 	-- XML positions: NameHeader starts at x=4 (TOPLEFT from ListInset)
 	-- Reserve space for:
-	--   - Left: NameHeader padding (4px)
-	--   - Right: Scrollbar (20px) + right padding (7px) = 27px
-	local headerLeftPadding = 4
-	local scrollbarAndPadding = 27 -- 20px scrollbar + 7px padding
+	--   - Left: NameHeader padding (adjusted for class icons)
+	--   - Right: Scrollbar (20px) + overlap (7px) + visual gap (7px) = 34px
+	local showClassIcons = self:GetSetting("whoShowClassIcons", true)
+	local headerLeftPadding = showClassIcons and NAME_OFFSET_WITH_ICON or NAME_OFFSET_WITHOUT_ICON
+	local scrollbarAndPadding = 34 -- 20px scrollbar + 7px overlap + 7px visual gap
 	local availableWidth = frameWidth - headerLeftPadding - scrollbarAndPadding
 
 	-- CRITICAL: Headers overlap by -2px each (3 overlaps = 6px gained back)
@@ -104,17 +130,18 @@ function WhoFrame:UpdateResponsiveLayout()
 	local effectiveWidth = availableWidth + totalOverlapGain
 
 	-- Distribute widths proportionally:
-	-- Name: 32%, Column Dropdown: 29%, Level: 15%, Class: 24%
-	local nameWidth = math.floor(effectiveWidth * 0.32)
-	local columnWidth = math.floor(effectiveWidth * 0.29)
-	local levelWidth = math.floor(effectiveWidth * 0.15)
+	-- Name: 34%, Column Dropdown: 26%, Level: 10%, Class: 30%
+	-- Level only needs ~30px for 2-3 digits; freed space goes to Name and Class
+	local nameWidth = math.floor(effectiveWidth * 0.34)
+	local columnWidth = math.floor(effectiveWidth * 0.26)
+	local levelWidth = math.floor(effectiveWidth * 0.10)
 	local classWidth = effectiveWidth - nameWidth - columnWidth - levelWidth -- Remaining space
 
 	-- Apply minimum widths
 	nameWidth = math.max(nameWidth, 80)
 	columnWidth = math.max(columnWidth, 70)
-	levelWidth = math.max(levelWidth, 40)
-	classWidth = math.max(classWidth, 60)
+	levelWidth = math.max(levelWidth, 28)
+	classWidth = math.max(classWidth, 70)
 
 	-- CRITICAL: Store calculated widths for button layout
 	-- These will be used in InitButton() to position row content dynamically
@@ -188,57 +215,38 @@ function WhoFrame:UpdateResponsiveLayout()
 						-- This ensures proper layout even before first Who results load
 						if self.columnWidths then
 							local widths = self.columnWidths
-							local headerLeftPadding = 4 -- Match NameHeader XML position
+							local nameStart = NAME_OFFSET_WITHOUT_ICON -- No data = no icon
 							local headerGap = -2 -- Match XML header overlap
 
-							-- Scale widths to fit button width (same logic as InitButton)
-							local buttonWidth = button:GetWidth()
-							local rightPadding = 2 -- Prevent text clipping
-							local totalHeaderWidth = widths.name
-								+ widths.variable
-								+ widths.level
-								+ widths.class
-								- (3 * math.abs(headerGap))
-							local buttonContentWidth = buttonWidth - headerLeftPadding - rightPadding
-							local scaleFactor = buttonContentWidth / totalHeaderWidth
-
-							local scaledName = math.floor(widths.name * scaleFactor)
-							local scaledVariable = math.floor(widths.variable * scaleFactor)
-							local scaledLevel = math.floor(widths.level * scaleFactor)
-							local scaledClass = buttonContentWidth
-								- scaledName
-								- scaledVariable
-								- scaledLevel
-								+ (3 * math.abs(headerGap))
-
-							-- Apply scaled widths
-							local nameStart = headerLeftPadding
-							button.Name:SetWidth(scaledName)
+							-- Direct header-aligned positioning (same as InitButton)
 							button.Name:SetJustifyH("LEFT")
 							button.Name:ClearAllPoints()
 							button.Name:SetPoint("LEFT", button, "LEFT", nameStart, 0)
-							button.Name:SetPoint("RIGHT", button, "LEFT", nameStart + scaledName, 0)
+							button.Name:SetPoint("RIGHT", button, "LEFT", widths.name, 0)
 
-							local variableStart = nameStart + scaledName + headerGap
-							button.Variable:SetWidth(scaledVariable)
+							local variableStart = widths.name + headerGap + 8
 							button.Variable:SetJustifyH("LEFT")
 							button.Variable:ClearAllPoints()
 							button.Variable:SetPoint("LEFT", button, "LEFT", variableStart, 0)
-							button.Variable:SetPoint("RIGHT", button, "LEFT", variableStart + scaledVariable, 0)
+							button.Variable:SetPoint(
+								"RIGHT",
+								button,
+								"LEFT",
+								widths.name + headerGap + widths.variable,
+								0
+							)
 
-							local levelStart = variableStart + scaledVariable + headerGap
-							button.Level:SetWidth(scaledLevel)
+							local levelStart = widths.name + headerGap + widths.variable + headerGap
 							button.Level:SetJustifyH("CENTER")
 							button.Level:ClearAllPoints()
 							button.Level:SetPoint("LEFT", button, "LEFT", levelStart, 0)
-							button.Level:SetPoint("RIGHT", button, "LEFT", levelStart + scaledLevel, 0)
+							button.Level:SetPoint("RIGHT", button, "LEFT", levelStart + widths.level, 0)
 
-							local classStart = levelStart + scaledLevel + headerGap
-							button.Class:SetWidth(scaledClass)
-							button.Class:SetJustifyH("CENTER")
+							local classStart = levelStart + widths.level + headerGap
+							button.Class:SetJustifyH("LEFT")
 							button.Class:ClearAllPoints()
 							button.Class:SetPoint("LEFT", button, "LEFT", classStart, 0)
-							button.Class:SetPoint("RIGHT", button, "LEFT", classStart + scaledClass, 0)
+							button.Class:SetPoint("RIGHT", button, "LEFT", classStart + widths.class, 0)
 						end
 					end
 				end
@@ -255,13 +263,11 @@ end
 function WhoFrame:OnLoad(frame)
 	-- Classic: Use FauxScrollFrame approach
 	if BFL.IsClassic or not BFL.HasModernScrollBox then
-		-- BFL:DebugPrint("|cff00ffffWhoFrame:|r Using Classic FauxScrollFrame mode")
 		self:InitializeClassicWhoFrame(frame)
 		return
 	end
 
 	-- Retail: Initialize ScrollBox with DataProvider
-	-- BFL:DebugPrint("|cff00ffffWhoFrame:|r Using Retail ScrollBox mode")
 	local view = CreateScrollBoxListLinearView()
 	view:SetElementInitializer("BetterWhoListButtonTemplate", function(button, elementData)
 		self:InitButton(button, elementData)
@@ -269,37 +275,18 @@ function WhoFrame:OnLoad(frame)
 
 	-- PERFORMANCE: Cache font height calculation (all buttons use same font)
 	view:SetElementExtentCalculator(function(dataIndex, elementData)
-		-- Cache font height to avoid repeated GetFontInfo calls
-		if not cachedFontHeight then
-			local fontObj = elementData.fontObject or "BetterFriendlistFontNormalSmall"
-
-			-- Fix: Resolve font object if it's passed as a string name
-			if type(fontObj) == "string" then
-				fontObj = _G[fontObj] or GameFontNormalSmall -- Fallback if not found
-			end
-
-			local fontHeight = 10 -- Fallback default
-			if fontObj and fontObj.GetFont then
-				local _, height = fontObj:GetFont()
-				if height then
-					fontHeight = height
-				end
-			end
-
-			-- Apply multiplier from FontManager
-			if FontManager then
-				local multiplier = FontManager:GetFontSizeMultiplier()
-				fontHeight = math.floor(fontHeight * multiplier + 0.5)
-			end
-
-			cachedFontHeight = fontHeight
-			local padding = 4 -- Slightly more padding for readability
-			cachedExtent = cachedFontHeight + padding
+		if not cachedExtent then
+			cachedExtent = BUTTON_HEIGHT
 		end
 		return cachedExtent
 	end)
 
 	ScrollUtil.InitScrollBoxListWithScrollBar(frame.ScrollBox, frame.ScrollBar, view)
+
+	-- Anchor ScrollBox flush inside ListInset for a clean, crisp layout
+	frame.ScrollBox:ClearAllPoints()
+	frame.ScrollBox:SetPoint("TOPLEFT", frame.ListInset, "TOPLEFT", 4, -4)
+	frame.ScrollBox:SetPoint("BOTTOMRIGHT", frame.ListInset.Totals, "TOPRIGHT", -4, 2)
 
 	-- Create DataProvider
 	whoDataProvider = CreateDataProvider()
@@ -308,6 +295,12 @@ function WhoFrame:OnLoad(frame)
 	-- Initialize selected who
 	frame.selectedWho = nil
 	frame.selectedName = ""
+
+	-- Create empty state message
+	self:CreateEmptyState(frame)
+
+	-- Create search builder
+	self:CreateSearchBuilder(frame)
 
 	-- Apply initial responsive layout
 	C_Timer.After(0.1, function()
@@ -329,11 +322,9 @@ function WhoFrame:InitializeClassicWhoFrame(frame)
 	self.classicWhoButtonPool = {}
 	self.classicWhoDataList = {}
 
-	local BUTTON_HEIGHT = 16
-	local NUM_BUTTONS = 22
+	local NUM_BUTTONS = 18 -- Adjusted for taller rows (22px)
 
 	-- Create buttons for Classic mode
-	-- Anchor to ScrollBox to respect Inset boundaries
 	local parentFrame = frame.ScrollBox or frame
 	for i = 1, NUM_BUTTONS do
 		local button = CreateFrame("Button", "BetterWhoListButton" .. i, parentFrame, "BetterWhoListButtonTemplate")
@@ -453,6 +444,12 @@ function WhoFrame:InitializeClassicWhoFrame(frame)
 	frame.selectedWho = nil
 	frame.selectedName = ""
 
+	-- Create empty state message
+	self:CreateEmptyState(frame)
+
+	-- Create search builder
+	self:CreateSearchBuilder(frame)
+
 	-- Click outside to clear focus
 	frame:SetScript("OnMouseDown", function()
 		if frame.EditBox then
@@ -526,7 +523,7 @@ function WhoFrame:RenderClassicWhoButtons()
 	if scrollBox then
 		local height = scrollBox:GetHeight()
 		if height and height > 0 then
-			visibleButtons = math.floor(height / 16) -- 16 is BUTTON_HEIGHT
+			visibleButtons = math.floor(height / BUTTON_HEIGHT)
 		end
 	end
 
@@ -570,87 +567,134 @@ end
 function WhoFrame:InitButton(button, elementData)
 	local index = elementData.index
 	local info = elementData.info
+	local dataIndex = elementData.dataIndex or index
 	button.index = index
 	button.info = info
+	button.elementData = elementData
+
+	-- Get settings
+	local showClassIcons = self:GetSetting("whoShowClassIcons", true)
+	local classColorNames = self:GetSetting("whoClassColorNames", true)
+	local levelColors = self:GetSetting("whoLevelColors", true)
+	local zebraStripes = self:GetSetting("whoZebraStripes", true)
 
 	-- PERFORMANCE: Cache class color lookup
 	local classTextColor = info.filename and RAID_CLASS_COLORS[info.filename] or HIGHLIGHT_FONT_COLOR
 
+	-- Class Icon
+	if button.classIcon then
+		if showClassIcons and info.filename and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[info.filename] then
+			local coords = CLASS_ICON_TCOORDS[info.filename]
+			button.classIcon:SetTexture(CLASS_ICON_TEXTURE)
+			button.classIcon:SetTexCoord(coords[1], coords[2], coords[3], coords[4])
+			button.classIcon:Show()
+		else
+			button.classIcon:Hide()
+		end
+	end
+
+	-- Zebra stripe background
+	if button.background and zebraStripes then
+		if dataIndex % 2 == 0 then
+			button.background:SetColorTexture(
+				ZEBRA_EVEN_COLOR.r,
+				ZEBRA_EVEN_COLOR.g,
+				ZEBRA_EVEN_COLOR.b,
+				ZEBRA_EVEN_COLOR.a
+			)
+		else
+			button.background:SetColorTexture(
+				ZEBRA_ODD_COLOR.r,
+				ZEBRA_ODD_COLOR.g,
+				ZEBRA_ODD_COLOR.b,
+				ZEBRA_ODD_COLOR.a
+			)
+		end
+	elseif button.background then
+		button.background:SetColorTexture(0, 0, 0, 0)
+	end
+
+	-- Selection highlight (create once per button)
+	if not button.selectionHighlight then
+		local sel = button:CreateTexture(nil, "BACKGROUND", nil, 1)
+		sel:SetTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
+		sel:SetBlendMode("ADD")
+		sel:SetVertexColor(0.510, 0.773, 1.0, 0.5)
+		sel:SetPoint("TOPLEFT", 0, -1)
+		sel:SetPoint("BOTTOMRIGHT", 0, 1)
+		sel:Hide()
+		button.selectionHighlight = sel
+	end
+
 	-- Process Timerunning icon for name display
 	local name = info.fullName
 	if info.timerunningSeasonID then
-		-- Always regenerate name with icon (don't cache old names)
 		if TimerunningUtil and TimerunningUtil.AddTinyIcon then
 			name = TimerunningUtil.AddTinyIcon(name)
 		end
 	end
 
-	-- RESPONSIVE LAYOUT: Apply calculated column widths to button elements
-	-- This ensures row content aligns perfectly with column headers
-	-- All text elements are CENTER-justified to match header button alignment
+	-- RESPONSIVE LAYOUT: Position row elements to align directly with column headers
+	-- With ScrollBox x=0 fix, button LEFT = NameHeader LEFT, so header widths map directly
 	if self.columnWidths then
 		local widths = self.columnWidths
+		local nameStart = showClassIcons and NAME_OFFSET_WITH_ICON or NAME_OFFSET_WITHOUT_ICON
+		local headerGap = -2 -- Match XML header overlap (-2px between each header)
 
-		-- Match XML header positions EXACTLY:
-		-- NameHeader: x=4 from ListInset TOPLEFT
-		-- ScrollBox TOPLEFT is now at NameHeader BOTTOMLEFT (x=0, no offset)
-		-- So buttons start at the same X as NameHeader
-		local headerLeftPadding = 4 -- Match UpdateResponsiveLayout for header alignment
-		local headerGap = -2 -- Headers overlap by 2px in XML
-
-		-- CRITICAL: Buttons are narrower than headers due to ScrollBox layout
-		-- We need to scale down the column widths proportionally to fit button width
-		local buttonWidth = button:GetWidth()
-		local rightPadding = 2 -- Small padding to prevent text clipping at button edge
-		local totalHeaderWidth = widths.name + widths.variable + widths.level + widths.class - (3 * math.abs(headerGap))
-		local buttonContentWidth = buttonWidth - headerLeftPadding - rightPadding -- Available width in button
-		local scaleFactor = buttonContentWidth / totalHeaderWidth
-
-		-- Scale all widths proportionally
-		local scaledName = math.floor(widths.name * scaleFactor)
-		local scaledVariable = math.floor(widths.variable * scaleFactor)
-		local scaledLevel = math.floor(widths.level * scaleFactor)
-		local scaledClass = buttonContentWidth - scaledName - scaledVariable - scaledLevel + (3 * math.abs(headerGap))
-
-		-- Name column: Starts at x=4 (matching NameHeader XML position)
-		local nameStart = headerLeftPadding
-		button.Name:SetWidth(scaledName)
+		-- Name column: aligned with NameHeader, text offset for class icon
 		button.Name:SetJustifyH("LEFT")
 		button.Name:ClearAllPoints()
 		button.Name:SetPoint("LEFT", button, "LEFT", nameStart, 0)
-		button.Name:SetPoint("RIGHT", button, "LEFT", nameStart + scaledName, 0)
+		button.Name:SetPoint("RIGHT", button, "LEFT", widths.name, 0)
 
-		-- Variable column: Positioned with -2px overlap (matching XML)
-		local variableStart = nameStart + scaledName + headerGap
-		button.Variable:SetWidth(scaledVariable)
+		-- Variable column: aligned with ColumnDropdown text (offset for dropdown padding)
+		local dropdownTextPad = 8 -- Match WhoFrameColumnDropdownMixin Text LEFT offset
+		local variableStart = widths.name + headerGap + dropdownTextPad
 		button.Variable:SetJustifyH("LEFT")
 		button.Variable:ClearAllPoints()
 		button.Variable:SetPoint("LEFT", button, "LEFT", variableStart, 0)
-		button.Variable:SetPoint("RIGHT", button, "LEFT", variableStart + scaledVariable, 0)
+		button.Variable:SetPoint("RIGHT", button, "LEFT", widths.name + headerGap + widths.variable, 0)
 
-		-- Level column: Positioned with -2px overlap (matching XML)
-		local levelStart = variableStart + scaledVariable + headerGap
-		button.Level:SetWidth(scaledLevel)
+		-- Level column: aligned with LevelHeader
+		local levelStart = widths.name + headerGap + widths.variable + headerGap
 		button.Level:SetJustifyH("CENTER")
 		button.Level:ClearAllPoints()
 		button.Level:SetPoint("LEFT", button, "LEFT", levelStart, 0)
-		button.Level:SetPoint("RIGHT", button, "LEFT", levelStart + scaledLevel, 0)
+		button.Level:SetPoint("RIGHT", button, "LEFT", levelStart + widths.level, 0)
 
-		-- Class column: Positioned with -2px overlap (matching XML)
-		local classStart = levelStart + scaledLevel + headerGap
-		button.Class:SetWidth(scaledClass)
-		button.Class:SetJustifyH("CENTER")
+		-- Class column: aligned with ClassHeader
+		local classStart = levelStart + widths.level + headerGap
+		button.Class:SetJustifyH("LEFT")
 		button.Class:ClearAllPoints()
 		button.Class:SetPoint("LEFT", button, "LEFT", classStart, 0)
-		button.Class:SetPoint("RIGHT", button, "LEFT", classStart + scaledClass, 0)
+		button.Class:SetPoint("RIGHT", button, "LEFT", classStart + widths.class, 0)
 	end
 
 	-- Set button text
 	button.Name:SetText(name)
 	button.Level:SetText(info.level)
 	button.Class:SetText(info.classStr or "")
+
+	-- Class-colored name
+	if classColorNames and classTextColor then
+		button.Name:SetTextColor(classTextColor.r, classTextColor.g, classTextColor.b)
+	else
+		button.Name:SetTextColor(NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b)
+	end
+
+	-- Class-colored class column
 	if classTextColor then
 		button.Class:SetTextColor(classTextColor.r, classTextColor.g, classTextColor.b)
+	end
+
+	-- Level difficulty coloring
+	if levelColors and info.level then
+		local diffColor = GetQuestDifficultyColor(info.level)
+		if diffColor then
+			button.Level:SetTextColor(diffColor.r, diffColor.g, diffColor.b)
+		end
+	else
+		button.Level:SetTextColor(HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b)
 	end
 
 	-- Apply font scaling
@@ -672,11 +716,15 @@ function WhoFrame:InitButton(button, elementData)
 	end
 	button.Variable:SetText(variableText or "")
 
-	-- PERFORMANCE: Defer tooltip checks until OnEnter instead of every update
-	-- Store raw data for tooltip generation on hover
+	-- Store full data for tooltip and interactions
 	button.tooltipInfo = {
 		fullName = info.fullName,
 		level = info.level,
+		classStr = info.classStr,
+		raceStr = info.raceStr,
+		area = info.area,
+		guild = info.fullGuildName or info.guild,
+		filename = info.filename,
 		variableText = variableText,
 	}
 
@@ -730,7 +778,6 @@ function WhoFrame:Update(forceRebuild)
 	end
 
 	-- Visibility Optimization:
-	-- If the frame (or the Who tab) is hidden, don't rebuild the list.
 	if not BetterFriendsFrame:IsShown() or not BetterFriendsFrame.WhoFrame:IsShown() then
 		needsRenderOnShow = true
 		return
@@ -738,15 +785,15 @@ function WhoFrame:Update(forceRebuild)
 
 	local numWhos, totalCount = C_FriendList.GetNumWhoResults()
 
-	-- Update totals text
-	local displayedText = ""
-	if totalCount > MAX_WHOS_FROM_SERVER then
-		displayedText = format(WHO_FRAME_SHOWN_TEMPLATE or "Showing %d", MAX_WHOS_FROM_SERVER)
-	end
-
-	local totalsText = format(WHO_FRAME_TOTAL_TEMPLATE or "Total: %d", totalCount)
-	if displayedText ~= "" then
-		totalsText = totalsText .. "  " .. displayedText
+	-- Update totals text with improved format
+	local L = BFL.L
+	local totalsText
+	if totalCount == 0 then
+		totalsText = ""
+	elseif totalCount > MAX_WHOS_FROM_SERVER then
+		totalsText = format(L and L.WHO_RESULTS_SHOWING or "%d of %d players", MAX_WHOS_FROM_SERVER, totalCount)
+	else
+		totalsText = format(WHO_FRAME_TOTAL_TEMPLATE or "Total: %d", totalCount)
 	end
 
 	-- Classic: Totals is a Frame with a Text FontString child
@@ -754,13 +801,14 @@ function WhoFrame:Update(forceRebuild)
 	local totalsElement = BetterFriendsFrame.WhoFrame.ListInset.Totals
 	if totalsElement then
 		if totalsElement.Text then
-			-- Classic XML structure: Frame.Text
 			totalsElement.Text:SetText(totalsText)
 		elseif totalsElement.SetText then
-			-- Retail XML structure: FontString directly
 			totalsElement:SetText(totalsText)
 		end
 	end
+
+	-- Empty state message
+	self:UpdateEmptyState(numWhos)
 
 	-- PERFORMANCE: Cache fontObject reference instead of string lookup
 	local fontObj = "BetterFriendlistFontNormalSmall"
@@ -771,7 +819,6 @@ function WhoFrame:Update(forceRebuild)
 		for i = 1, numWhos do
 			local info = C_FriendList.GetWhoInfo(i)
 			if info then
-				-- Strip trailing dash from names (WoW API bug)
 				if info.fullName then
 					info.fullName = info.fullName:gsub("%-$", "")
 				end
@@ -780,6 +827,7 @@ function WhoFrame:Update(forceRebuild)
 				end
 				table.insert(self.classicWhoDataList, {
 					index = i,
+					dataIndex = i,
 					info = info,
 					fontObject = fontObj,
 				})
@@ -789,18 +837,14 @@ function WhoFrame:Update(forceRebuild)
 		return
 	end
 
-	-- Retail mode: PERFORMANCE: Only rebuild if count changed OR if forced (e.g., dropdown change)
+	-- Retail mode: PERFORMANCE: Only rebuild if count changed OR if forced
 	local currentSize = whoDataProvider:GetSize()
 	if not forceRebuild and currentSize == numWhos and currentSize > 0 then
-		-- Data count unchanged, ScrollBox will automatically refresh from DataProvider
-		-- No need to Flush and rebuild - just return
 		return
 	end
 
 	-- If a sort is active, delegate to SortByColumn instead of building unsorted
 	if BetterFriendsFrame.WhoFrame.currentSort then
-		-- Re-apply current sort - it will rebuild the DataProvider sorted
-		-- Use preserveDirection=true to avoid toggling
 		self:SortByColumn(BetterFriendsFrame.WhoFrame.currentSort, true)
 		return
 	end
@@ -811,16 +855,15 @@ function WhoFrame:Update(forceRebuild)
 	for i = 1, numWhos do
 		local info = C_FriendList.GetWhoInfo(i)
 		if info then
-			-- Strip trailing dash from names (WoW API bug)
 			if info.fullName then
 				info.fullName = info.fullName:gsub("%-$", "")
 			end
 			if info.name then
 				info.name = info.name:gsub("%-$", "")
 			end
-			-- Add fontObject reference (not string) for extent calculator
 			whoDataProvider:Insert({
 				index = i,
+				dataIndex = i,
 				info = info,
 				fontObject = fontObj,
 			})
@@ -856,8 +899,14 @@ end
 function WhoFrame:SetButtonSelected(button, selected)
 	if selected then
 		button:LockHighlight()
+		if button.selectionHighlight then
+			button.selectionHighlight:Show()
+		end
 	else
 		button:UnlockHighlight()
+		if button.selectionHighlight then
+			button.selectionHighlight:Hide()
+		end
 	end
 end
 
@@ -971,6 +1020,7 @@ function WhoFrame:SortByColumn(sortType, preserveDirection)
 		for i, entry in ipairs(whoData) do
 			whoDataProvider:Insert({
 				index = i,
+				dataIndex = i,
 				info = entry.info,
 				fontObject = fontObj,
 			})
@@ -982,6 +1032,7 @@ function WhoFrame:SortByColumn(sortType, preserveDirection)
 		for i, entry in ipairs(whoData) do
 			table.insert(self.classicWhoDataList, {
 				index = entry.index,
+				dataIndex = i,
 				info = entry.info,
 				fontObject = fontObj,
 			})
@@ -1009,6 +1060,12 @@ end
 -- Handle button click
 function WhoFrame:OnButtonClick(button, mouseButton)
 	if mouseButton == "LeftButton" then
+		-- Ctrl+Click: Interactive column search
+		if IsControlKeyDown() and button.info then
+			self:HandleCtrlClick(button)
+			return
+		end
+
 		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
 		self:SetSelectedButton(button)
 	elseif mouseButton == "RightButton" then
@@ -1049,8 +1106,216 @@ function WhoFrame:OnButtonClick(button, mouseButton)
 end
 
 -- ========================================
--- Module Export
 -- ========================================
+-- Empty State
+-- ========================================
+
+-- Create empty state message for when no results are found
+function WhoFrame:CreateEmptyState(frame)
+	local parent = frame.ScrollBox or frame
+	local emptyText = parent:CreateFontString(nil, "OVERLAY", "GameFontDisableLarge")
+	emptyText:SetPoint("CENTER", parent, "CENTER", 0, 20)
+	emptyText:SetText(BFL.L and BFL.L.WHO_NO_RESULTS or "No players found")
+	emptyText:SetTextColor(0.5, 0.5, 0.5)
+	emptyText:Hide()
+	self.emptyStateText = emptyText
+end
+
+-- Show/hide empty state based on result count
+function WhoFrame:UpdateEmptyState(numWhos)
+	if not self.emptyStateText then
+		return
+	end
+	if numWhos == 0 then
+		self.emptyStateText:Show()
+	else
+		self.emptyStateText:Hide()
+	end
+end
+
+-- ========================================
+-- Ctrl+Click Interactive Search
+-- ========================================
+
+-- Handle Ctrl+Click on a WHO result to search by zone/guild/class
+function WhoFrame:HandleCtrlClick(button)
+	if not button or not button.info then
+		return
+	end
+
+	local info = button.info
+	local searchText
+
+	-- Determine what to search based on current variable column
+	if whoSortValue == 2 and info.fullGuildName and info.fullGuildName ~= "" then
+		-- Guild column active: search by guild
+		searchText = 'g-"' .. info.fullGuildName .. '"'
+	elseif whoSortValue == 3 and info.raceStr and info.raceStr ~= "" then
+		-- Race column active: search by race
+		searchText = 'r-"' .. info.raceStr .. '"'
+	elseif info.area and info.area ~= "" then
+		-- Default (zone): search by zone
+		searchText = 'z-"' .. info.area .. '"'
+	else
+		return
+	end
+
+	-- Set search text in edit box and send query
+	local editBox = BetterFriendsFrame and BetterFriendsFrame.WhoFrame and BetterFriendsFrame.WhoFrame.EditBox
+	if editBox then
+		editBox:SetText(searchText)
+		editBox:ClearFocus()
+	end
+
+	self:SendWhoRequest(searchText)
+end
+
+-- ========================================
+-- Rich Tooltip (OnEnter/OnLeave)
+-- ========================================
+
+-- Show rich tooltip for WHO result button
+function _G.BetterWhoListButton_OnEnter(self)
+	if not self.tooltipInfo then
+		return
+	end
+
+	local info = self.tooltipInfo
+	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+
+	-- Name as header (class-colored if available)
+	local classColor = info.filename and RAID_CLASS_COLORS[info.filename]
+	if classColor then
+		GameTooltip:AddLine(info.fullName or "", classColor.r, classColor.g, classColor.b)
+	else
+		GameTooltip:AddLine(info.fullName or "", 1, 0.82, 0)
+	end
+
+	-- Level, Race, Class line
+	local levelRaceClass = ""
+	if info.level then
+		local diffColor = GetQuestDifficultyColor(info.level)
+		local levelStr = format(
+			"|cff%02x%02x%02x%s %d|r",
+			(diffColor.r or 1) * 255,
+			(diffColor.g or 1) * 255,
+			(diffColor.b or 1) * 255,
+			LEVEL or "Level",
+			info.level
+		)
+
+		if info.raceStr then
+			levelRaceClass = levelStr .. " " .. info.raceStr
+		else
+			levelRaceClass = levelStr
+		end
+
+		if info.classStr then
+			if classColor then
+				levelRaceClass = levelRaceClass
+					.. " |cff"
+					.. format("%02x%02x%02x", classColor.r * 255, classColor.g * 255, classColor.b * 255)
+					.. info.classStr
+					.. "|r"
+			else
+				levelRaceClass = levelRaceClass .. " " .. info.classStr
+			end
+		end
+	end
+	if levelRaceClass ~= "" then
+		GameTooltip:AddLine(levelRaceClass, 1, 1, 1)
+	end
+
+	-- Guild
+	if info.guild and info.guild ~= "" then
+		GameTooltip:AddLine("<" .. info.guild .. ">", 0.25, 1, 0.25)
+	end
+
+	-- Zone
+	if info.area and info.area ~= "" then
+		GameTooltip:AddLine(info.area, 1, 1, 1)
+	end
+
+	-- Hints
+	GameTooltip:AddLine(" ")
+	local L = BFL.L
+	GameTooltip:AddLine(L and L.WHO_TOOLTIP_HINT_CLICK or "Click to select", 0.5, 0.5, 0.5)
+	local DB = BFL:GetModule("DB")
+	local dblClickAction = DB and DB:Get("whoDoubleClickAction", "whisper") or "whisper"
+	local dblClickHint
+	if dblClickAction == "invite" then
+		dblClickHint = L and L.WHO_TOOLTIP_HINT_DBLCLICK_INVITE or "Double-click to invite"
+	else
+		dblClickHint = L and L.WHO_TOOLTIP_HINT_DBLCLICK or "Double-click to whisper"
+	end
+	GameTooltip:AddLine(dblClickHint, 0.5, 0.5, 0.5)
+	GameTooltip:AddLine(L and L.WHO_TOOLTIP_HINT_CTRL or "Ctrl+Click to search column value", 0.5, 0.5, 0.5)
+	GameTooltip:AddLine(L and L.WHO_TOOLTIP_HINT_RIGHTCLICK or "Right-click for options", 0.5, 0.5, 0.5)
+
+	GameTooltip:Show()
+
+	-- Highlight row
+	if self.background then
+		self.background:SetColorTexture(0.15, 0.15, 0.3, 0.4)
+	end
+end
+
+-- Hide tooltip when leaving WHO result button
+function _G.BetterWhoListButton_OnLeave(self)
+	GameTooltip:Hide()
+
+	-- Restore zebra stripe
+	if self.background and self.elementData then
+		local WhoFrameModule = BFL:GetModule("WhoFrame")
+		local zebraStripes = WhoFrameModule:GetSetting("whoZebraStripes", true)
+		local dataIndex = self.elementData.dataIndex or self.elementData.index or 1
+
+		if zebraStripes then
+			if dataIndex % 2 == 0 then
+				self.background:SetColorTexture(
+					ZEBRA_EVEN_COLOR.r,
+					ZEBRA_EVEN_COLOR.g,
+					ZEBRA_EVEN_COLOR.b,
+					ZEBRA_EVEN_COLOR.a
+				)
+			else
+				self.background:SetColorTexture(
+					ZEBRA_ODD_COLOR.r,
+					ZEBRA_ODD_COLOR.g,
+					ZEBRA_ODD_COLOR.b,
+					ZEBRA_ODD_COLOR.a
+				)
+			end
+		else
+			self.background:SetColorTexture(0, 0, 0, 0)
+		end
+	end
+end
+
+-- ========================================
+-- Double-Click Handler
+-- ========================================
+
+-- Handle double-click on WHO result button
+function _G.BetterWhoListButton_OnDoubleClick(self, mouseButton)
+	if mouseButton ~= "LeftButton" then
+		return
+	end
+
+	if not self.info or not self.info.fullName then
+		return
+	end
+
+	local WhoFrameModule = BFL:GetModule("WhoFrame")
+	local action = WhoFrameModule:GetSetting("whoDoubleClickAction", "whisper")
+
+	local name = self.info.fullName
+	if action == "invite" then
+		BFL.InviteUnit(name)
+	else
+		ChatFrame_SendTell(name)
+	end
+end
 
 -- ========================================
 -- WHO FRAME UI MIXINS
@@ -1225,6 +1490,515 @@ end
 -- Export mixins globally for XML access
 _G.WhoFrameEditBoxMixin = WhoFrameEditBoxMixin
 _G.WhoFrameColumnDropdownMixin = WhoFrameColumnDropdownMixin
+
+-- ========================================
+-- WHO SEARCH BUILDER
+-- ========================================
+
+-- Race lists for dropdown, split by faction (English internal names used in WHO queries)
+local WHO_RACES_ALLIANCE = {
+	"Human",
+	"Dwarf",
+	"Night Elf",
+	"Gnome",
+	"Draenei",
+	"Worgen",
+	"Void Elf",
+	"Lightforged Draenei",
+	"Dark Iron Dwarf",
+	"Kul Tiran",
+	"Mechagnome",
+}
+
+local WHO_RACES_HORDE = {
+	"Orc",
+	"Undead",
+	"Tauren",
+	"Troll",
+	"Blood Elf",
+	"Goblin",
+	"Nightborne",
+	"Highmountain Tauren",
+	"Mag'har Orc",
+	"Zandalari Troll",
+	"Vulpera",
+}
+
+local WHO_RACES_NEUTRAL = {
+	"Pandaren",
+	"Dracthyr",
+	"Earthen",
+}
+
+-- Create the Search Builder UI (trigger button + flyout panel)
+function WhoFrame:CreateSearchBuilder(whoFrame)
+	local L = BFL.L or {}
+	local editBox = whoFrame.EditBox
+	if not editBox then
+		return
+	end
+
+	-- DO NOT modify EditBox anchors. Place the toggle button inside the EditBox,
+	-- overlaying the right-side padding area (left of the clear "X" button).
+	local toggleBtn = CreateFrame("Button", nil, editBox)
+	toggleBtn:SetSize(16, 16)
+	toggleBtn:SetPoint("RIGHT", editBox, "RIGHT", -20, 0) -- left of the clear button
+	toggleBtn:SetFrameLevel(editBox:GetFrameLevel() + 5)
+
+	local icon = toggleBtn:CreateTexture(nil, "ARTWORK")
+	icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\sliders")
+	icon:SetSize(14, 14)
+	icon:SetPoint("CENTER")
+	icon:SetVertexColor(0.7, 0.7, 0.7)
+	toggleBtn.icon = icon
+
+	toggleBtn:SetScript("OnEnter", function(self)
+		self.icon:SetVertexColor(1, 1, 1)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:AddLine(L.WHO_BUILDER_TOOLTIP or "Open Search Builder")
+		GameTooltip:Show()
+	end)
+	toggleBtn:SetScript("OnLeave", function(self)
+		if not WhoFrame.builderFlyout or not WhoFrame.builderFlyout:IsShown() then
+			self.icon:SetVertexColor(0.7, 0.7, 0.7)
+		end
+		GameTooltip:Hide()
+	end)
+
+	-- Create the flyout panel (match ListInset width)
+	local flyout = CreateFrame("Frame", nil, whoFrame, "BackdropTemplate")
+	flyout:SetPoint("BOTTOMLEFT", whoFrame.ListInset, "BOTTOMLEFT", 0, 60)
+	flyout:SetPoint("BOTTOMRIGHT", whoFrame.ListInset, "BOTTOMRIGHT", 0, 60)
+	flyout:SetHeight(235)
+	flyout:SetFrameLevel(editBox:GetFrameLevel() + 10)
+	flyout:SetBackdrop({
+		bgFile = "Interface\\BUTTONS\\WHITE8X8",
+		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+		tile = true,
+		tileSize = 16,
+		edgeSize = 16,
+		insets = { left = 4, right = 4, top = 4, bottom = 4 },
+	})
+	flyout:SetBackdropColor(0.08, 0.08, 0.08, 1)
+	flyout:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+	flyout:Hide()
+	flyout:EnableMouse(true) -- Block clicks from passing through
+
+	-- ESC to close
+	flyout:EnableKeyboard(true)
+	flyout:SetPropagateKeyboardInput(true)
+	flyout:SetScript("OnKeyDown", function(self, key)
+		if key == "ESCAPE" then
+			self:SetPropagateKeyboardInput(false)
+			WhoFrame:ToggleSearchBuilder(false)
+		else
+			self:SetPropagateKeyboardInput(true)
+		end
+	end)
+
+	-- Title bar
+	local title = flyout:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	title:SetPoint("TOPLEFT", flyout, "TOPLEFT", 10, -8)
+	title:SetText(L.WHO_BUILDER_TITLE or "Search Builder")
+
+	-- Close button
+	local closeBtn = CreateFrame("Button", nil, flyout, "UIPanelCloseButton")
+	closeBtn:SetSize(20, 20)
+	closeBtn:SetPoint("TOPRIGHT", flyout, "TOPRIGHT", -4, -4)
+	closeBtn:SetScript("OnClick", function()
+		WhoFrame:ToggleSearchBuilder(false)
+	end)
+
+	-- Build content
+	self.builder = {}
+	local yOffset = -28
+	local labelWidth = 55
+	local rowHeight = 24
+	local padding = 10
+
+	-- Helper: Create a labeled row with an EditBox
+	local function CreateInputRow(parent, labelText, yPos)
+		local label = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+		label:SetPoint("TOPLEFT", parent, "TOPLEFT", padding, yPos)
+		label:SetWidth(labelWidth)
+		label:SetJustifyH("LEFT")
+		label:SetText(labelText)
+
+		local input = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
+		input:SetPoint("LEFT", label, "RIGHT", 6, 0)
+		input:SetPoint("RIGHT", parent, "RIGHT", -padding, 0)
+		input:SetHeight(20)
+		input:SetAutoFocus(false)
+		input:SetFontObject("GameFontHighlight")
+		input:SetScript("OnTextChanged", function()
+			WhoFrame:UpdateBuilderPreview()
+		end)
+		input:SetScript("OnEnterPressed", function(self)
+			self:ClearFocus()
+			WhoFrame:ExecuteBuilderSearch()
+		end)
+		input:SetScript("OnEscapePressed", function(self)
+			self:ClearFocus()
+			WhoFrame:ToggleSearchBuilder(false)
+		end)
+		-- Tab navigation handled by WoW default EditBox behavior
+		return input
+	end
+
+	-- Row 1: Name
+	self.builder.nameInput = CreateInputRow(flyout, (L.WHO_BUILDER_NAME or "Name") .. ":", yOffset)
+	yOffset = yOffset - rowHeight
+
+	-- Row 2: Guild
+	self.builder.guildInput = CreateInputRow(flyout, (L.WHO_BUILDER_GUILD or "Guild") .. ":", yOffset)
+	yOffset = yOffset - rowHeight
+
+	-- Row 3: Zone
+	self.builder.zoneInput = CreateInputRow(flyout, (L.WHO_BUILDER_ZONE or "Zone") .. ":", yOffset)
+	yOffset = yOffset - rowHeight
+
+	-- Row 4: Class dropdown
+	local classLabel = flyout:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	classLabel:SetPoint("TOPLEFT", flyout, "TOPLEFT", padding, yOffset)
+	classLabel:SetWidth(labelWidth)
+	classLabel:SetJustifyH("LEFT")
+	classLabel:SetText((L.WHO_BUILDER_CLASS or "Class") .. ":")
+
+	self.builder.selectedClass = "" -- "" = All
+	local classDropdown = BFL.CreateDropdown(flyout, nil, 140)
+	if BFL.HasModernDropdown then
+		classDropdown:SetPoint("LEFT", classLabel, "RIGHT", 0, 0)
+	else
+		classDropdown:SetPoint("LEFT", classLabel, "RIGHT", -14, -2)
+	end
+
+	-- Build class options
+	local classLabels = { L.WHO_BUILDER_ALL_CLASSES or "All Classes" }
+	local classValues = { "" }
+	if CLASS_SORT_ORDER then
+		for _, classToken in ipairs(CLASS_SORT_ORDER) do
+			local localName = LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[classToken]
+			if localName then
+				table.insert(classLabels, localName)
+				table.insert(classValues, localName)
+			end
+		end
+	end
+
+	BFL.InitializeDropdown(classDropdown, {
+		labels = classLabels,
+		values = classValues,
+	}, function(value)
+		return self.builder.selectedClass == value
+	end, function(value)
+		self.builder.selectedClass = value
+		self:UpdateBuilderPreview()
+	end, 300)
+	self.builder.classDropdown = classDropdown
+	yOffset = yOffset - (rowHeight + 2)
+
+	-- Row 5: Race dropdown
+	local raceLabel = flyout:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	raceLabel:SetPoint("TOPLEFT", flyout, "TOPLEFT", padding, yOffset)
+	raceLabel:SetWidth(labelWidth)
+	raceLabel:SetJustifyH("LEFT")
+	raceLabel:SetText((L.WHO_BUILDER_RACE or "Race") .. ":")
+
+	self.builder.selectedRace = "" -- "" = All
+	local raceDropdown = BFL.CreateDropdown(flyout, nil, 140)
+	if BFL.HasModernDropdown then
+		raceDropdown:SetPoint("LEFT", raceLabel, "RIGHT", 0, 0)
+	else
+		raceDropdown:SetPoint("LEFT", raceLabel, "RIGHT", -14, -2)
+	end
+
+	-- Build race options filtered by player faction
+	local raceLabels = { L.WHO_BUILDER_ALL_RACES or "All Races" }
+	local raceValues = { "" }
+	local faction = UnitFactionGroup("player")
+	local factionRaces = (faction == "Alliance") and WHO_RACES_ALLIANCE or WHO_RACES_HORDE
+	for _, raceName in ipairs(factionRaces) do
+		table.insert(raceLabels, raceName)
+		table.insert(raceValues, raceName)
+	end
+	for _, raceName in ipairs(WHO_RACES_NEUTRAL) do
+		table.insert(raceLabels, raceName)
+		table.insert(raceValues, raceName)
+	end
+
+	BFL.InitializeDropdown(raceDropdown, {
+		labels = raceLabels,
+		values = raceValues,
+	}, function(value)
+		return self.builder.selectedRace == value
+	end, function(value)
+		self.builder.selectedRace = value
+		self:UpdateBuilderPreview()
+	end, 300)
+	self.builder.raceDropdown = raceDropdown
+	yOffset = yOffset - (rowHeight + 2)
+
+	-- Row 6: Level range
+	local levelLabel = flyout:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	levelLabel:SetPoint("TOPLEFT", flyout, "TOPLEFT", padding, yOffset)
+	levelLabel:SetWidth(labelWidth)
+	levelLabel:SetJustifyH("LEFT")
+	levelLabel:SetText((L.WHO_BUILDER_LEVEL or "Level") .. ":")
+
+	local levelMin = CreateFrame("EditBox", nil, flyout, "InputBoxTemplate")
+	levelMin:SetPoint("LEFT", levelLabel, "RIGHT", 6, 0)
+	levelMin:SetSize(40, 18)
+	levelMin:SetAutoFocus(false)
+	levelMin:SetFontObject("GameFontHighlight")
+	levelMin:SetNumeric(true)
+	levelMin:SetMaxLetters(3)
+	levelMin:SetScript("OnTextChanged", function()
+		WhoFrame:UpdateBuilderPreview()
+	end)
+	levelMin:SetScript("OnEnterPressed", function(self)
+		self:ClearFocus()
+		WhoFrame:ExecuteBuilderSearch()
+	end)
+	levelMin:SetScript("OnEscapePressed", function(self)
+		self:ClearFocus()
+		WhoFrame:ToggleSearchBuilder(false)
+	end)
+	self.builder.levelMin = levelMin
+
+	local levelMax = CreateFrame("EditBox", nil, flyout, "InputBoxTemplate")
+	levelMax:SetPoint("LEFT", levelMin, "RIGHT", 50, 0)
+
+	local toLabel = flyout:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	toLabel:SetPoint("LEFT", levelMin, "RIGHT", 0, 0)
+	toLabel:SetPoint("RIGHT", levelMax, "LEFT", 0, 0)
+	toLabel:SetJustifyH("CENTER")
+	toLabel:SetText(L.WHO_BUILDER_LEVEL_TO or "to")
+	levelMax:SetSize(40, 18)
+	levelMax:SetAutoFocus(false)
+	levelMax:SetFontObject("GameFontHighlight")
+	levelMax:SetNumeric(true)
+	levelMax:SetMaxLetters(3)
+	levelMax:SetScript("OnTextChanged", function()
+		WhoFrame:UpdateBuilderPreview()
+	end)
+	levelMax:SetScript("OnEnterPressed", function(self)
+		self:ClearFocus()
+		WhoFrame:ExecuteBuilderSearch()
+	end)
+	levelMax:SetScript("OnEscapePressed", function(self)
+		self:ClearFocus()
+		WhoFrame:ToggleSearchBuilder(false)
+	end)
+	self.builder.levelMax = levelMax
+	yOffset = yOffset - rowHeight
+
+	-- Separator line
+	local sep = flyout:CreateTexture(nil, "ARTWORK")
+	sep:SetColorTexture(0.4, 0.4, 0.4, 0.5)
+	sep:SetHeight(1)
+	sep:SetPoint("TOPLEFT", flyout, "TOPLEFT", padding, yOffset - 2)
+	sep:SetPoint("TOPRIGHT", flyout, "TOPRIGHT", -padding, yOffset - 2)
+	yOffset = yOffset - 6
+
+	-- Buttons row (anchored flush to bottom)
+	local searchBtn = CreateFrame("Button", nil, flyout, "UIPanelButtonTemplate")
+	searchBtn:SetSize(80, 22)
+	searchBtn:SetPoint("BOTTOMRIGHT", flyout, "BOTTOM", -2, 6)
+	searchBtn:SetText(L.WHO_BUILDER_SEARCH or "Search")
+	searchBtn:SetScript("OnClick", function()
+		WhoFrame:ExecuteBuilderSearch()
+	end)
+
+	local resetBtn = CreateFrame("Button", nil, flyout, "UIPanelButtonTemplate")
+	resetBtn:SetSize(80, 22)
+	resetBtn:SetPoint("BOTTOMLEFT", flyout, "BOTTOM", 2, 6)
+	resetBtn:SetText(L.WHO_BUILDER_RESET or "Reset")
+	resetBtn:SetScript("OnClick", function()
+		WhoFrame:ResetBuilder()
+	end)
+
+	-- Preview row (between separator and buttons, using TOPLEFT for proper multi-line alignment)
+	local previewLabel = flyout:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	previewLabel:SetPoint("TOPLEFT", sep, "BOTTOMLEFT", 0, -4)
+	previewLabel:SetText(L.WHO_BUILDER_PREVIEW or "Preview:")
+	previewLabel:SetTextColor(0.6, 0.6, 0.6)
+	previewLabel:SetJustifyV("TOP")
+
+	local previewText = flyout:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	previewText:SetPoint("TOPLEFT", previewLabel, "TOPRIGHT", 4, 0)
+	previewText:SetPoint("RIGHT", flyout, "RIGHT", -6, 0)
+	previewText:SetJustifyH("LEFT")
+	previewText:SetJustifyV("TOP")
+	previewText:SetTextColor(1, 0.82, 0)
+	previewText:SetWordWrap(true)
+	previewText:SetText(L.WHO_BUILDER_PREVIEW_EMPTY or "Fill in fields to build a search")
+	self.builder.previewText = previewText
+
+	-- Store references
+	self.builderFlyout = flyout
+	self.builderToggle = toggleBtn
+
+	-- Toggle button click
+	toggleBtn:SetScript("OnClick", function()
+		WhoFrame:ToggleSearchBuilder(not flyout:IsShown())
+	end)
+end
+
+-- Toggle the Search Builder flyout open/closed
+function WhoFrame:ToggleSearchBuilder(show)
+	if not self.builderFlyout then
+		return
+	end
+
+	if show then
+		self.builderFlyout:Show()
+		self.builderToggle.icon:SetVertexColor(1, 0.82, 0) -- Gold tint when active
+		self:UpdateBuilderPreview()
+	else
+		self.builderFlyout:Hide()
+		self.builderToggle.icon:SetVertexColor(0.7, 0.7, 0.7) -- Dim when inactive
+		-- Clear focus from all builder inputs
+		if self.builder then
+			if self.builder.nameInput then
+				self.builder.nameInput:ClearFocus()
+			end
+			if self.builder.guildInput then
+				self.builder.guildInput:ClearFocus()
+			end
+			if self.builder.zoneInput then
+				self.builder.zoneInput:ClearFocus()
+			end
+			if self.builder.levelMin then
+				self.builder.levelMin:ClearFocus()
+			end
+			if self.builder.levelMax then
+				self.builder.levelMax:ClearFocus()
+			end
+		end
+	end
+end
+
+-- Compose the WHO query string from builder fields
+function WhoFrame:ComposeBuilderQuery()
+	if not self.builder then
+		return ""
+	end
+
+	local parts = {}
+
+	local name = self.builder.nameInput and self.builder.nameInput:GetText() or ""
+	if name ~= "" then
+		table.insert(parts, 'n-"' .. name .. '"')
+	end
+
+	local guild = self.builder.guildInput and self.builder.guildInput:GetText() or ""
+	if guild ~= "" then
+		table.insert(parts, 'g-"' .. guild .. '"')
+	end
+
+	local zone = self.builder.zoneInput and self.builder.zoneInput:GetText() or ""
+	if zone ~= "" then
+		table.insert(parts, 'z-"' .. zone .. '"')
+	end
+
+	local class = self.builder.selectedClass or ""
+	if class ~= "" then
+		table.insert(parts, 'c-"' .. class .. '"')
+	end
+
+	local race = self.builder.selectedRace or ""
+	if race ~= "" then
+		table.insert(parts, 'r-"' .. race .. '"')
+	end
+
+	local minLvl = self.builder.levelMin and self.builder.levelMin:GetText() or ""
+	local maxLvl = self.builder.levelMax and self.builder.levelMax:GetText() or ""
+	if minLvl ~= "" and maxLvl ~= "" then
+		table.insert(parts, minLvl .. "-" .. maxLvl)
+	elseif minLvl ~= "" then
+		table.insert(parts, minLvl .. "-" .. minLvl)
+	elseif maxLvl ~= "" then
+		table.insert(parts, "1-" .. maxLvl)
+	end
+
+	return table.concat(parts, " ")
+end
+
+-- Update the live preview text
+function WhoFrame:UpdateBuilderPreview()
+	if not self.builder or not self.builder.previewText then
+		return
+	end
+
+	local query = self:ComposeBuilderQuery()
+	local L = BFL.L or {}
+
+	if query == "" then
+		self.builder.previewText:SetText(L.WHO_BUILDER_PREVIEW_EMPTY or "Fill in fields to build a search")
+		self.builder.previewText:SetTextColor(0.5, 0.5, 0.5)
+	else
+		self.builder.previewText:SetText(query)
+		self.builder.previewText:SetTextColor(1, 0.82, 0)
+	end
+end
+
+-- Execute the builder search
+function WhoFrame:ExecuteBuilderSearch()
+	local query = self:ComposeBuilderQuery()
+	if query == "" then
+		return
+	end
+
+	-- Set in EditBox for visibility
+	local editBox = BetterFriendsFrame and BetterFriendsFrame.WhoFrame and BetterFriendsFrame.WhoFrame.EditBox
+	if editBox then
+		editBox:SetText(query)
+		editBox:ClearFocus()
+	end
+
+	-- Close the flyout
+	self:ToggleSearchBuilder(false)
+
+	-- Send the WHO request
+	self:SendWhoRequest(query)
+end
+
+-- Reset all builder fields
+function WhoFrame:ResetBuilder()
+	if not self.builder then
+		return
+	end
+
+	if self.builder.nameInput then
+		self.builder.nameInput:SetText("")
+	end
+	if self.builder.guildInput then
+		self.builder.guildInput:SetText("")
+	end
+	if self.builder.zoneInput then
+		self.builder.zoneInput:SetText("")
+	end
+	if self.builder.levelMin then
+		self.builder.levelMin:SetText("")
+	end
+	if self.builder.levelMax then
+		self.builder.levelMax:SetText("")
+	end
+
+	self.builder.selectedClass = ""
+	self.builder.selectedRace = ""
+
+	-- Visually refresh dropdowns
+	local L = BFL.L or {}
+	if self.builder.classDropdown then
+		BFL.Compat.RefreshDropdown(self.builder.classDropdown, L.WHO_BUILDER_ALL_CLASSES or "All Classes")
+	end
+	if self.builder.raceDropdown then
+		BFL.Compat.RefreshDropdown(self.builder.raceDropdown, L.WHO_BUILDER_ALL_RACES or "All Races")
+	end
+
+	self:UpdateBuilderPreview()
+end
 
 -- ========================================
 -- Global Wrapper Functions for XML Access

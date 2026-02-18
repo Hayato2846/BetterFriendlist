@@ -391,6 +391,12 @@ local TAB_DEFINITIONS = {
 		beta = false,
 	},
 	{
+		id = 9,
+		name = L.SETTINGS_TAB_WHO or "Who",
+		icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\search.blp",
+		beta = false,
+	},
+	{
 		id = 4,
 		name = L.SETTINGS_TAB_ADVANCED,
 		icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\sliders.blp",
@@ -648,6 +654,9 @@ function Settings:SelectCategory(categoryID)
 		if content.RaidTab then
 			content.RaidTab:Hide()
 		end
+		if content.WhoTab then
+			content.WhoTab:Hide()
+		end
 
 		if categoryID == 1 and content.GeneralTab then
 			content.GeneralTab:Show()
@@ -673,6 +682,9 @@ function Settings:SelectCategory(categoryID)
 		elseif categoryID == 8 and content.RaidTab then
 			content.RaidTab:Show()
 			self:RefreshRaidTab()
+		elseif categoryID == 9 and content.WhoTab then
+			content.WhoTab:Show()
+			self:RefreshWhoTab()
 		end
 
 		-- Adjust content height dynamically after tab is shown
@@ -713,6 +725,8 @@ function Settings:AdjustContentHeight(tabID)
 		activeTab = content.StreamerTab
 	elseif tabID == 8 then
 		activeTab = content.RaidTab
+	elseif tabID == 9 then
+		activeTab = content.WhoTab
 	end
 
 	if not activeTab then
@@ -6244,6 +6258,161 @@ function Settings:RefreshRaidTab()
 	)
 	warning:SetTextColor(0.7, 0.7, 0.7)
 	table.insert(allFrames, warning)
+
+	-- Anchor
+	Components:AnchorChain(allFrames, -5)
+
+	tab.components = allFrames
+end
+
+-- ========================================
+-- WHO Tab
+-- ========================================
+function Settings:RefreshWhoTab()
+	if not settingsFrame or not Components then
+		return
+	end
+
+	local content = settingsFrame.ContentScrollFrame.Content
+	if not content or not content.WhoTab then
+		return
+	end
+
+	local tab = content.WhoTab
+	local DB = GetDB()
+	if not DB then
+		return
+	end
+
+	-- Clear existing content
+	if tab.components then
+		for _, component in ipairs(tab.components) do
+			if component.Hide then
+				component:Hide()
+			end
+		end
+	end
+	tab.components = {}
+
+	local allFrames = {}
+	local L = BFL.L
+
+	-- Header
+	local header = Components:CreateHeader(tab, L.SETTINGS_TAB_WHO or "Who")
+	table.insert(allFrames, header)
+
+	-- Description
+	local desc = Components:CreateLabel(
+		tab,
+		L.WHO_SETTINGS_DESC or "Configure the appearance and behavior of the Who search results.",
+		true
+	)
+	table.insert(allFrames, desc)
+
+	table.insert(allFrames, Components:CreateSpacer(tab))
+
+	-- Visual Options
+	local visualHeader = Components:CreateHeader(tab, L.WHO_SETTINGS_VISUAL_HEADER or "Visual")
+	table.insert(allFrames, visualHeader)
+
+	-- Show Class Icons
+	local classIconsCb = Components:CreateCheckbox(
+		tab,
+		L.WHO_SETTINGS_CLASS_ICONS or "Show Class Icons",
+		DB:Get("whoShowClassIcons", true),
+		function(val)
+			DB:Set("whoShowClassIcons", val)
+			local WhoFrameModule = BFL:GetModule("WhoFrame")
+			if WhoFrameModule then
+				WhoFrameModule:UpdateResponsiveLayout()
+				WhoFrameModule:Update(true)
+			end
+		end
+	)
+	classIconsCb:SetTooltip(
+		L.WHO_SETTINGS_CLASS_ICONS or "Show Class Icons",
+		L.WHO_SETTINGS_CLASS_ICONS_DESC or "Display class icons next to player names."
+	)
+	table.insert(allFrames, classIconsCb)
+
+	-- Class-Colored Names
+	local classColorsCb = Components:CreateCheckbox(
+		tab,
+		L.WHO_SETTINGS_CLASS_COLORS or "Class-Colored Names",
+		DB:Get("whoClassColorNames", true),
+		function(val)
+			DB:Set("whoClassColorNames", val)
+			local WhoFrameModule = BFL:GetModule("WhoFrame")
+			if WhoFrameModule then
+				WhoFrameModule:Update(true)
+			end
+		end
+	)
+	classColorsCb:SetTooltip(
+		L.WHO_SETTINGS_CLASS_COLORS or "Class-Colored Names",
+		L.WHO_SETTINGS_CLASS_COLORS_DESC or "Color player names by their class."
+	)
+	table.insert(allFrames, classColorsCb)
+
+	-- Level Difficulty Colors
+	local levelColorsCb = Components:CreateCheckbox(
+		tab,
+		L.WHO_SETTINGS_LEVEL_COLORS or "Level Difficulty Colors",
+		DB:Get("whoLevelColors", true),
+		function(val)
+			DB:Set("whoLevelColors", val)
+			local WhoFrameModule = BFL:GetModule("WhoFrame")
+			if WhoFrameModule then
+				WhoFrameModule:Update(true)
+			end
+		end
+	)
+	levelColorsCb:SetTooltip(
+		L.WHO_SETTINGS_LEVEL_COLORS or "Level Difficulty Colors",
+		L.WHO_SETTINGS_LEVEL_COLORS_DESC or "Color levels by difficulty relative to your level."
+	)
+	table.insert(allFrames, levelColorsCb)
+
+	-- Zebra Stripes
+	local zebraCb = Components:CreateCheckbox(
+		tab,
+		L.WHO_SETTINGS_ZEBRA or "Alternating Row Background",
+		DB:Get("whoZebraStripes", true),
+		function(val)
+			DB:Set("whoZebraStripes", val)
+			local WhoFrameModule = BFL:GetModule("WhoFrame")
+			if WhoFrameModule then
+				WhoFrameModule:Update(true)
+			end
+		end
+	)
+	zebraCb:SetTooltip(
+		L.WHO_SETTINGS_ZEBRA or "Alternating Row Background",
+		L.WHO_SETTINGS_ZEBRA_DESC or "Show subtle alternating row backgrounds for readability."
+	)
+	table.insert(allFrames, zebraCb)
+
+	table.insert(allFrames, Components:CreateSpacer(tab))
+
+	-- Behavior Options
+	local behaviorHeader = Components:CreateHeader(tab, L.WHO_SETTINGS_BEHAVIOR_HEADER or "Behavior")
+	table.insert(allFrames, behaviorHeader)
+
+	-- Double-Click Action
+	table.insert(
+		allFrames,
+		Components:CreateDropdown(tab, L.WHO_SETTINGS_DOUBLE_CLICK or "Double-Click Action", {
+			labels = {
+				L.WHO_DOUBLE_CLICK_WHISPER or "Whisper",
+				L.WHO_DOUBLE_CLICK_INVITE or "Invite to Group",
+			},
+			values = { "whisper", "invite" },
+		}, function(val)
+			return val == DB:Get("whoDoubleClickAction", "whisper")
+		end, function(val)
+			DB:Set("whoDoubleClickAction", val)
+		end)
+	)
 
 	-- Anchor
 	Components:AnchorChain(allFrames, -5)

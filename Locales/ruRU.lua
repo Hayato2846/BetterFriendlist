@@ -1241,6 +1241,55 @@ BFL:RegisterLocale("ruRU", function()
 	L.SETTINGS_RAID_ERROR_RESERVED = "Это сочетание зарезервировано"
 
 	-- ========================================
+	-- WHO FRAME SETTINGS
+	-- ========================================
+	L.SETTINGS_TAB_WHO = "Кто"
+	L.WHO_SETTINGS_DESC =
+		"Настройте внешний вид и поведение результатов поиска Кто."
+	L.WHO_SETTINGS_VISUAL_HEADER = "Внешний вид"
+	L.WHO_SETTINGS_CLASS_ICONS = "Показывать иконки классов"
+	L.WHO_SETTINGS_CLASS_ICONS_DESC =
+		"Отображать иконки классов рядом с именами игроков."
+	L.WHO_SETTINGS_CLASS_COLORS = "Цветные имена по классу"
+	L.WHO_SETTINGS_CLASS_COLORS_DESC = "Окрашивать имена игроков в цвет их класса."
+	L.WHO_SETTINGS_LEVEL_COLORS = "Цвета сложности уровня"
+	L.WHO_SETTINGS_LEVEL_COLORS_DESC =
+		"Окрашивать уровни по сложности относительно вашего уровня."
+	L.WHO_SETTINGS_ZEBRA = "Чередующиеся фоны строк"
+	L.WHO_SETTINGS_ZEBRA_DESC =
+		"Показывать чередующиеся фоны строк для удобства чтения."
+	L.WHO_SETTINGS_BEHAVIOR_HEADER = "Поведение"
+	L.WHO_SETTINGS_DOUBLE_CLICK = "Действие двойного щелчка"
+	L.WHO_DOUBLE_CLICK_WHISPER = "Шепот"
+	L.WHO_DOUBLE_CLICK_INVITE = "Пригласить в группу"
+	L.WHO_RESULTS_SHOWING = "Показано %d из %d игроков"
+	L.WHO_NO_RESULTS = "Игроки не найдены"
+	L.WHO_TOOLTIP_HINT_CLICK = "Нажмите для выбора"
+	L.WHO_TOOLTIP_HINT_DBLCLICK = "Двойной щелчок для шепота"
+	L.WHO_TOOLTIP_HINT_DBLCLICK_INVITE = "Двойной щелчок для приглашения"
+	L.WHO_TOOLTIP_HINT_CTRL = "Ctrl+клик для поиска по значению столбца"
+	L.WHO_TOOLTIP_HINT_RIGHTCLICK = "Правый клик для опций"
+
+	-- ========================================
+	-- WHO SEARCH BUILDER
+	-- ========================================
+	L.WHO_BUILDER_TITLE = "Конструктор поиска"
+	L.WHO_BUILDER_NAME = "Имя"
+	L.WHO_BUILDER_GUILD = "Гильдия"
+	L.WHO_BUILDER_ZONE = "Зона"
+	L.WHO_BUILDER_CLASS = "Класс"
+	L.WHO_BUILDER_RACE = "Раса"
+	L.WHO_BUILDER_LEVEL = "Уровень"
+	L.WHO_BUILDER_LEVEL_TO = "до"
+	L.WHO_BUILDER_ALL_CLASSES = "Все классы"
+	L.WHO_BUILDER_ALL_RACES = "Все расы"
+	L.WHO_BUILDER_PREVIEW = "Предпросмотр:"
+	L.WHO_BUILDER_PREVIEW_EMPTY = "Заполните поля для составления запроса"
+	L.WHO_BUILDER_SEARCH = "Поиск"
+	L.WHO_BUILDER_RESET = "Сброс"
+	L.WHO_BUILDER_TOOLTIP = "Открыть конструктор поиска"
+
+	-- ========================================
 	-- FRAME DIMENSIONS (Phase 21) - RESTORED
 	-- ========================================
 	L.SETTINGS_FRAME_DIMENSIONS_HEADER = "Размеры окна"

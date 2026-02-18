@@ -1197,6 +1197,51 @@ BFL:RegisterLocale("koKR", function()
 	L.SETTINGS_RAID_ERROR_RESERVED = "이 조합은 예약된 것입니다."
 
 	-- ========================================
+	-- WHO FRAME SETTINGS
+	-- ========================================
+	L.SETTINGS_TAB_WHO = "누구"
+	L.WHO_SETTINGS_DESC = "누구 검색 결과의 모양과 동작을 설정합니다."
+	L.WHO_SETTINGS_VISUAL_HEADER = "시각"
+	L.WHO_SETTINGS_CLASS_ICONS = "직업 아이콘 표시"
+	L.WHO_SETTINGS_CLASS_ICONS_DESC = "플레이어 이름 옆에 직업 아이콘을 표시합니다."
+	L.WHO_SETTINGS_CLASS_COLORS = "직업 색상 이름"
+	L.WHO_SETTINGS_CLASS_COLORS_DESC = "플레이어 이름을 직업별로 색상을 지정합니다."
+	L.WHO_SETTINGS_LEVEL_COLORS = "레벨 난이도 색상"
+	L.WHO_SETTINGS_LEVEL_COLORS_DESC = "내 레벨 대비 난이도에 따라 레벨에 색상을 지정합니다."
+	L.WHO_SETTINGS_ZEBRA = "교대 행 배경"
+	L.WHO_SETTINGS_ZEBRA_DESC = "가독성을 위해 번갈아 행 배경을 표시합니다."
+	L.WHO_SETTINGS_BEHAVIOR_HEADER = "동작"
+	L.WHO_SETTINGS_DOUBLE_CLICK = "더블클릭 동작"
+	L.WHO_DOUBLE_CLICK_WHISPER = "귀솏말"
+	L.WHO_DOUBLE_CLICK_INVITE = "그룹 초대"
+	L.WHO_RESULTS_SHOWING = "%d명 중 %d명 표시"
+	L.WHO_NO_RESULTS = "플레이어를 찾을 수 없습니다"
+	L.WHO_TOOLTIP_HINT_CLICK = "클릭하여 선택"
+	L.WHO_TOOLTIP_HINT_DBLCLICK = "더블클릭으로 귀속말"
+	L.WHO_TOOLTIP_HINT_DBLCLICK_INVITE = "더블클릭으로 초대"
+	L.WHO_TOOLTIP_HINT_CTRL = "Ctrl+클릭으로 열 값 검색"
+	L.WHO_TOOLTIP_HINT_RIGHTCLICK = "우클릭으로 옵션"
+
+	-- ========================================
+	-- WHO SEARCH BUILDER
+	-- ========================================
+	L.WHO_BUILDER_TITLE = "검색 빌더"
+	L.WHO_BUILDER_NAME = "이름"
+	L.WHO_BUILDER_GUILD = "길드"
+	L.WHO_BUILDER_ZONE = "지역"
+	L.WHO_BUILDER_CLASS = "직업"
+	L.WHO_BUILDER_RACE = "종족"
+	L.WHO_BUILDER_LEVEL = "레벨"
+	L.WHO_BUILDER_LEVEL_TO = "~"
+	L.WHO_BUILDER_ALL_CLASSES = "모든 직업"
+	L.WHO_BUILDER_ALL_RACES = "모든 종족"
+	L.WHO_BUILDER_PREVIEW = "미리보기:"
+	L.WHO_BUILDER_PREVIEW_EMPTY = "검색을 구성하려면 필드를 입력하세요"
+	L.WHO_BUILDER_SEARCH = "검색"
+	L.WHO_BUILDER_RESET = "초기화"
+	L.WHO_BUILDER_TOOLTIP = "검색 빌더 열기"
+
+	-- ========================================
 	-- FRAME DIMENSIONS (Phase 21) - RESTORED
 	-- ========================================
 	L.SETTINGS_FRAME_DIMENSIONS_HEADER = "프레임 크기"
