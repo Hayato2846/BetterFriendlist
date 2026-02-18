@@ -145,6 +145,20 @@ if not BFL.IsClassic and PanelTemplates_TabResize then
 		if tab and tab.BFL_EnforcedWidth then
 			tab.BFL_ResizeLock = true
 			tab:SetWidth(tab.BFL_EnforcedWidth)
+			-- Restore text fontstring width and font that Blizzard's TabResize overwrites.
+			-- PanelTemplates_TabResize sets tab.Text:SetWidth(textWidth) at the end,
+			-- which constrains text based on Blizzard's own width calculation.
+			-- We must re-apply BFL's text area width and custom font.
+			local fs = tab.Text or (tab.GetFontString and tab:GetFontString())
+			if fs then
+				if tab.BFL_TextWidth then
+					fs:SetWidth(tab.BFL_TextWidth)
+				end
+				if tab.BFL_FontPath then
+					fs:SetFont(tab.BFL_FontPath, tab.BFL_FontSize, tab.BFL_FontOutline)
+					fs:SetShadowOffset(0, 0)
+				end
+			end
 			tab.BFL_ResizeLock = false
 		end
 	end)
@@ -353,7 +367,8 @@ function BFL:ApplyTabFonts()
 		baseTextOffset,
 		selectedTabId,
 		selectedOffset,
-		unselectedOffset
+		unselectedOffset,
+		fixedHeight
 	)
 		-- Collect all tabs
 		local tabList = {}
@@ -399,9 +414,14 @@ function BFL:ApplyTabFonts()
 		local biasScale = textBiasScale or 0.5
 		local baseTextHeight = defaultFontSize or 12
 		local baseOffset = baseTextOffset or 0
+		-- Use Blizzard's standard TAB_SIDES_PADDING (20) for text area width,
+		-- independent of the tab width padding. This prevents text truncation
+		-- when padding > 20 (e.g. bottom tabs use 30 for wider tab backgrounds).
+		local textPadding = 20
 		local function ApplyTabWrap(info, width)
-			local textAreaWidth = math.max(20, width - padding)
+			local textAreaWidth = math.max(20, width - textPadding)
 			info.fs:SetWidth(textAreaWidth)
+			info.tab.BFL_TextWidth = textAreaWidth
 			info.fs:SetWordWrap(false)
 			local singleLineWidth = info.fs:GetStringWidth() or 0
 			local needsWrap = singleLineWidth > textAreaWidth
@@ -412,8 +432,8 @@ function BFL:ApplyTabFonts()
 				info.fs:SetWordWrap(false)
 			end
 			local textHeight = info.fs:GetStringHeight() or fontSize
-			local tabHeight = math.max(32, textHeight + 20 + heightPad)
-			local grow = math.max(0, textHeight - baseTextHeight)
+			local tabHeight = fixedHeight or math.max(32, textHeight + 20 + heightPad)
+			local grow = fixedHeight and 0 or math.max(0, textHeight - baseTextHeight)
 			local tabId = info.tab.GetID and info.tab:GetID() or nil
 			local isSelected = selectedTabId and tabId and tabId == selectedTabId
 			local offsetBase = baseOffset
@@ -450,7 +470,7 @@ function BFL:ApplyTabFonts()
 			end
 			finalWidth = math.max(40, finalWidth)
 
-			local textAreaWidth = math.max(20, finalWidth - padding)
+			local textAreaWidth = math.max(20, finalWidth - textPadding)
 
 			-- DEBUG
 			local tabName = info.tab:GetName() or "unknown"
@@ -465,8 +485,15 @@ function BFL:ApplyTabFonts()
 				)
 			)
 
-			-- Store enforced width
+			-- Store enforced width and text area width for hooksecurefunc restoration.
+			-- textAreaWidth now uses Blizzard's standard 20px padding, so storing
+			-- it for all tabs (top and bottom) keeps sizing consistent across
+			-- live font changes and frame reopening.
 			info.tab.BFL_EnforcedWidth = finalWidth
+			info.tab.BFL_TextWidth = textAreaWidth
+			info.tab.BFL_FontPath = fontPath
+			info.tab.BFL_FontSize = fontSize
+			info.tab.BFL_FontOutline = outlineValue
 
 			-- Apply width
 			info.tab:SetWidth(finalWidth)
@@ -571,8 +598,8 @@ function BFL:ApplyTabFonts()
 
 			-- Calculate height for text
 			local textHeight = info.fs:GetStringHeight() or fontSize
-			local tabHeight = math.max(32, textHeight + 20 + heightPad)
-			local grow = math.max(0, textHeight - baseTextHeight)
+			local tabHeight = fixedHeight or math.max(32, textHeight + 20 + heightPad)
+			local grow = fixedHeight and 0 or math.max(0, textHeight - baseTextHeight)
 			local tabId = info.tab.GetID and info.tab:GetID() or nil
 			local isSelected = selectedTabId and tabId and tabId == selectedTabId
 			local offsetBase = baseOffset
@@ -766,26 +793,9 @@ function BFL:ApplyTabFonts()
 	end
 
 	-- Process top tabs (start aligned to Inset left edge, clamp at Inset right edge)
-	local topExtraHeight = 0
-	if fontSize and defaultFontSize and fontSize > defaultFontSize then
-		local grow = fontSize - defaultFontSize
-		topExtraHeight = math.max(0, math.floor(grow * 1.2 + 0.5))
-	end
-	ProcessTabGroup(
-		topTabs,
-		20,
-		topStartX,
-		topMaxRightEdge,
-		nil,
-		nil,
-		topExtraHeight,
-		-1,
-		0.8,
-		-5,
-		selectedTopTabId,
-		-5,
-		-8
-	)
+	-- NOTE: topExtraHeight is intentionally 0. The Inset is anchored to Tab1's BOTTOMLEFT,
+	-- so increasing tab height would push the entire content area down.
+	ProcessTabGroup(topTabs, 20, topStartX, topMaxRightEdge, nil, nil, 0, -1, 0.8, -5, selectedTopTabId, -5, -8, 32)
 
 	-- Reposition first top tab to align with Inset
 	-- Simple Mode uses -60 (no SearchBox row in header), Normal Mode uses -95
