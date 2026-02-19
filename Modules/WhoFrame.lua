@@ -139,7 +139,12 @@ function WhoFrame:UpdateResponsiveLayout()
 
 	-- Apply minimum widths
 	nameWidth = math.max(nameWidth, 80)
-	columnWidth = math.max(columnWidth, 70)
+	local isClassicElvUISkinActive = BFL.IsClassic
+		and _G.ElvUI
+		and BetterFriendlistDB
+		and BetterFriendlistDB.enableElvUISkin ~= false
+	local minColumnWidth = isClassicElvUISkinActive and 110 or 70
+	columnWidth = math.max(columnWidth, minColumnWidth)
 	levelWidth = math.max(levelWidth, 28)
 	classWidth = math.max(classWidth, 70)
 
@@ -176,6 +181,26 @@ function WhoFrame:UpdateResponsiveLayout()
 		whoFrame.ClassHeader:SetWidth(classWidth)
 		if whoFrame.ClassHeader.Middle then
 			whoFrame.ClassHeader.Middle:SetWidth(classWidth - 9)
+		end
+	end
+
+	-- Classic: Reposition headers dynamically (XML uses fixed positions, won't adapt to responsive widths)
+	if BFL.IsClassic then
+		local headerOverlapX = -2
+		if whoFrame.ColumnDropdown and whoFrame.NameHeader then
+			whoFrame.ColumnDropdown:ClearAllPoints()
+			whoFrame.ColumnDropdown:SetPoint("TOPLEFT", whoFrame.NameHeader, "TOPRIGHT", headerOverlapX - 14, 2)
+		end
+		-- Anchor Level and Class relative to NameHeader using accumulated widths
+		-- (UIDropDownMenu frame edges are unreliable due to internal padding)
+		local levelX = nameWidth + columnWidth + headerOverlapX
+		if whoFrame.LevelHeader and whoFrame.NameHeader then
+			whoFrame.LevelHeader:ClearAllPoints()
+			whoFrame.LevelHeader:SetPoint("TOPLEFT", whoFrame.NameHeader, "TOPLEFT", levelX, 0)
+		end
+		if whoFrame.ClassHeader and whoFrame.LevelHeader then
+			whoFrame.ClassHeader:ClearAllPoints()
+			whoFrame.ClassHeader:SetPoint("LEFT", whoFrame.LevelHeader, "RIGHT", headerOverlapX, 0)
 		end
 	end
 
@@ -469,6 +494,25 @@ function WhoFrame:InitializeClassicDropdown(dropdown)
 		return
 	end
 
+	local isClassicElvUISkinActive = BFL.IsClassic
+		and _G.ElvUI
+		and BetterFriendlistDB
+		and BetterFriendlistDB.enableElvUISkin ~= false
+
+	local function NormalizeClassicColumnDropdown()
+		dropdown:SetHeight(24)
+		local name = dropdown:GetName()
+		if name then
+			local button = _G[name .. "Button"]
+			if button then
+				button:ClearAllPoints()
+				button:SetAllPoints(dropdown)
+				button:SetHitRectInsets(0, 0, 0, 0)
+				button:SetHeight(24)
+			end
+		end
+	end
+
 	UIDropDownMenu_Initialize(dropdown, function(self, level, menuList)
 		local info = UIDropDownMenu_CreateInfo()
 
@@ -503,8 +547,29 @@ function WhoFrame:InitializeClassicDropdown(dropdown)
 		UIDropDownMenu_AddButton(info)
 	end)
 
-	UIDropDownMenu_SetWidth(dropdown, 80)
+	UIDropDownMenu_SetWidth(dropdown, isClassicElvUISkinActive and 110 or 80)
 	UIDropDownMenu_SetSelectedValue(dropdown, 1)
+	if not isClassicElvUISkinActive then
+		return
+	end
+
+	NormalizeClassicColumnDropdown()
+
+	if not dropdown.BFL_ClassicNormalizeHookInstalled then
+		dropdown.BFL_ClassicNormalizeHookInstalled = true
+		dropdown:HookScript("OnShow", function()
+			C_Timer.After(0, NormalizeClassicColumnDropdown)
+		end)
+		local name = dropdown:GetName()
+		if name then
+			local button = _G[name .. "Button"]
+			if button and button.HookScript then
+				button:HookScript("OnClick", function()
+					C_Timer.After(0, NormalizeClassicColumnDropdown)
+				end)
+			end
+		end
+	end
 end
 
 -- Render Classic WHO buttons
@@ -1503,11 +1568,6 @@ local WHO_RACES_ALLIANCE = {
 	"Gnome",
 	"Draenei",
 	"Worgen",
-	"Void Elf",
-	"Lightforged Draenei",
-	"Dark Iron Dwarf",
-	"Kul Tiran",
-	"Mechagnome",
 }
 
 local WHO_RACES_HORDE = {
@@ -1517,6 +1577,22 @@ local WHO_RACES_HORDE = {
 	"Troll",
 	"Blood Elf",
 	"Goblin",
+}
+
+local WHO_RACES_NEUTRAL = {
+	"Pandaren",
+}
+
+-- Allied races (Retail only)
+local WHO_RACES_ALLIANCE_RETAIL = {
+	"Void Elf",
+	"Lightforged Draenei",
+	"Dark Iron Dwarf",
+	"Kul Tiran",
+	"Mechagnome",
+}
+
+local WHO_RACES_HORDE_RETAIL = {
 	"Nightborne",
 	"Highmountain Tauren",
 	"Mag'har Orc",
@@ -1524,8 +1600,7 @@ local WHO_RACES_HORDE = {
 	"Vulpera",
 }
 
-local WHO_RACES_NEUTRAL = {
-	"Pandaren",
+local WHO_RACES_NEUTRAL_RETAIL = {
 	"Dracthyr",
 	"Earthen",
 }
@@ -1721,9 +1796,23 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 		table.insert(raceLabels, raceName)
 		table.insert(raceValues, raceName)
 	end
+	-- Add allied races on Retail only
+	if not BFL.IsClassic then
+		local retailFactionRaces = (faction == "Alliance") and WHO_RACES_ALLIANCE_RETAIL or WHO_RACES_HORDE_RETAIL
+		for _, raceName in ipairs(retailFactionRaces) do
+			table.insert(raceLabels, raceName)
+			table.insert(raceValues, raceName)
+		end
+	end
 	for _, raceName in ipairs(WHO_RACES_NEUTRAL) do
 		table.insert(raceLabels, raceName)
 		table.insert(raceValues, raceName)
+	end
+	if not BFL.IsClassic then
+		for _, raceName in ipairs(WHO_RACES_NEUTRAL_RETAIL) do
+			table.insert(raceLabels, raceName)
+			table.insert(raceValues, raceName)
+		end
 	end
 
 	BFL.InitializeDropdown(raceDropdown, {

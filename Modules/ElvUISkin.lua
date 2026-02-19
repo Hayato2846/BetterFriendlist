@@ -37,6 +37,77 @@ local function SkinScrollBar(S, scrollBar)
 	end
 end
 
+-- Normalize Classic UIDropDownMenu hitbox/geometry after ElvUI skinning.
+-- Without this, the clickable region can drift outside the visual box.
+local function FixClassicDropdownHitbox(dropdown, width, height)
+	if not (BFL and BFL.IsClassic and dropdown) then
+		return
+	end
+
+	if width then
+		dropdown.BFL_ClassicDropdownWidth = width
+	end
+	if height then
+		dropdown.BFL_ClassicDropdownHeight = height
+	end
+
+	local targetWidth = dropdown.BFL_ClassicDropdownWidth
+	local targetHeight = dropdown.BFL_ClassicDropdownHeight
+
+	if targetWidth and UIDropDownMenu_SetWidth then
+		UIDropDownMenu_SetWidth(dropdown, targetWidth)
+	end
+	if targetHeight then
+		dropdown:SetHeight(targetHeight)
+	end
+
+	local ddName = dropdown.GetName and dropdown:GetName()
+	if not ddName then
+		return
+	end
+
+	local button = _G[ddName .. "Button"]
+	local text = _G[ddName .. "Text"]
+	if button then
+		button:ClearAllPoints()
+		button:SetAllPoints(dropdown)
+		button:SetHitRectInsets(0, 0, 0, 0)
+		if targetHeight then
+			button:SetHeight(targetHeight)
+		end
+	end
+
+	if text and button then
+		text:ClearAllPoints()
+		text:SetPoint("LEFT", dropdown, "LEFT", 8, 0)
+		text:SetPoint("RIGHT", button, "RIGHT", -20, 0)
+		text:SetJustifyH("LEFT")
+		text:SetWordWrap(false)
+	end
+
+	if not dropdown.BFL_ClassicDropdownHookInstalled then
+		dropdown.BFL_ClassicDropdownHookInstalled = true
+		if dropdown.HookScript then
+			dropdown:HookScript("OnShow", function(self)
+				C_Timer.After(0, function()
+					if self and self.GetName then
+						FixClassicDropdownHitbox(self)
+					end
+				end)
+			end)
+		end
+		if button and button.HookScript then
+			button:HookScript("OnClick", function()
+				C_Timer.After(0, function()
+					if dropdown and dropdown.GetName then
+						FixClassicDropdownHitbox(dropdown)
+					end
+				end)
+			end)
+		end
+	end
+end
+
 function ElvUISkin:Initialize()
 	-- Check if ElvUI is loaded immediately
 	if _G.ElvUI then
@@ -299,21 +370,51 @@ function ElvUISkin:SkinFrames(E, S)
 
 	-- Skin Tabs (Bottom)
 	BFL:DebugPrint("ElvUISkin: Skinning Bottom Tabs")
-	for i = 1, 4 do
-		local tab = _G["BetterFriendsFrameBottomTab" .. i]
-		if tab then
-			S:HandleTab(tab)
-			tab:SetHeight(28) -- Fixed height
+	if BFL.IsClassic then
+		-- Classic: skin all existing bottom tabs (Friends/Who/Guild/Raid) and compact spacing.
+		local frameWidth = frame:GetWidth()
+		if frameWidth <= 0 then
+			frameWidth = 338
+		end
 
-			-- Re-anchor tabs to be left-aligned with no spacing
-			tab:ClearAllPoints()
-			if i == 1 then
-				-- First tab anchors to the bottom left of the main frame
-				tab:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", -2, 1)
-			else
-				-- Subsequent tabs anchor to the right of the previous one
-				local prevTab = _G["BetterFriendsFrameBottomTab" .. (i - 1)]
-				tab:SetPoint("LEFT", prevTab, "RIGHT", -5, 0)
+		local tabs = {}
+		for i = 1, 4 do
+			local tab = _G["BetterFriendsFrameBottomTab" .. i]
+			if tab then
+				table.insert(tabs, tab)
+			end
+		end
+
+		local numTabs = #tabs
+		if numTabs > 0 then
+			local spacing = -4
+			local tabWidth = math.floor((frameWidth - (spacing * (numTabs - 1))) / numTabs)
+			for i, tab in ipairs(tabs) do
+				S:HandleTab(tab)
+				tab:SetHeight(28)
+				tab:SetWidth(tabWidth)
+				tab:ClearAllPoints()
+				if i == 1 then
+					tab:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", 0, 1)
+				else
+					local prevTab = tabs[i - 1]
+					tab:SetPoint("LEFT", prevTab, "RIGHT", spacing, 0)
+				end
+			end
+		end
+	else
+		for i = 1, 4 do
+			local tab = _G["BetterFriendsFrameBottomTab" .. i]
+			if tab then
+				S:HandleTab(tab)
+				tab:SetHeight(28)
+				tab:ClearAllPoints()
+				if i == 1 then
+					tab:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", -2, 1)
+				else
+					local prevTab = _G["BetterFriendsFrameBottomTab" .. (i - 1)]
+					tab:SetPoint("LEFT", prevTab, "RIGHT", -5, 0)
+				end
 			end
 		end
 	end
@@ -516,21 +617,27 @@ function ElvUISkin:SkinFrames(E, S)
 		if frame.WhoFrame.ColumnDropdown then
 			S:HandleDropDownBox(frame.WhoFrame.ColumnDropdown)
 
-			-- Classic: Expand clickable button area
+			-- Classic: Fix text clipping into arrow and restore selected value
 			if BFL.IsClassic then
 				local dropdown = frame.WhoFrame.ColumnDropdown
-				local name = dropdown:GetName()
-				if name then
-					local button = _G[name .. "Button"]
-					if button then
-						-- Get dropdown width to match button size
-						local width = dropdown:GetWidth()
-						if width > 0 then
-							button:SetSize(width, 24)
-							button:ClearAllPoints()
-							button:SetPoint("CENTER", dropdown, "CENTER", 0, 0)
-						end
+				local ddName = dropdown:GetName()
+				if ddName then
+					local ddText = _G[ddName .. "Text"]
+					local ddButton = _G[ddName .. "Button"]
+					if ddText and ddButton then
+						ddText:ClearAllPoints()
+						ddText:SetPoint("LEFT", dropdown, "LEFT", 5, 2)
+						ddText:SetPoint("RIGHT", ddButton, "LEFT", -2, 0)
+						ddText:SetJustifyH("LEFT")
+						ddText:SetWordWrap(false)
 					end
+				end
+				-- Restore selected value text after skinning
+				local WhoFrameModule = BFL:GetModule("WhoFrame")
+				if WhoFrameModule and WhoFrameModule.GetSortValue then
+					local sortValue = WhoFrameModule:GetSortValue() or 1
+					local selectionTexts = { ZONE, GUILD, RACE }
+					UIDropDownMenu_SetText(dropdown, selectionTexts[sortValue] or ZONE)
 				end
 			end
 		end
@@ -663,19 +770,7 @@ function ElvUISkin:SkinFrames(E, S)
 					S:HandleDropDownBox(dropdown, 38)
 				end
 
-				UIDropDownMenu_SetWidth(dropdown, 38)
-
-				-- Expand the clickable button area
-				local name = dropdown:GetName()
-				if name then
-					local button = _G[name .. "Button"]
-					if button then
-						-- Make button fill the entire dropdown width
-						button:SetSize(38, 24)
-						button:ClearAllPoints()
-						button:SetPoint("CENTER", dropdown, "CENTER", 0, 0)
-					end
-				end
+				FixClassicDropdownHitbox(dropdown, 38, 24)
 
 				-- Reposition: 1px gap left of BattlenetFrame
 				dropdown:ClearAllPoints()
@@ -687,31 +782,17 @@ function ElvUISkin:SkinFrames(E, S)
 
 		if frame.FriendsTabHeader.QuickFilterDropdown then
 			if BFL.IsClassic then
-				-- Classic: Keep visual width at 38px but expand clickable area
+				-- Classic: Re-anchor with clearer spacing to avoid visual clipping with sort dropdowns.
 				local dropdown = frame.FriendsTabHeader.QuickFilterDropdown
-
 				if S.HandleDropDownBox then
-					S:HandleDropDownBox(dropdown, 38)
+					S:HandleDropDownBox(dropdown)
 				end
-
-				UIDropDownMenu_SetWidth(dropdown, 38)
-
-				-- Expand the clickable button area
-				local name = dropdown:GetName()
-				if name then
-					local button = _G[name .. "Button"]
-					if button then
-						-- Make button fill the entire dropdown width
-						button:SetSize(38, 24)
-						button:ClearAllPoints()
-						button:SetPoint("CENTER", dropdown, "CENTER", 0, 0)
-					end
+				FixClassicDropdownHitbox(dropdown, 70, 24)
+				-- Restore position (matches FriendsList.lua Classic layout)
+				if frame.FriendsTabHeader.SearchBox then
+					dropdown:ClearAllPoints()
+					dropdown:SetPoint("TOPLEFT", frame.FriendsTabHeader.SearchBox, "TOPLEFT", -16, 32)
 				end
-
-				-- Position centered in frame (3 dropdowns: 38+3+38+3+38 = 120px total width)
-				-- Center at x=0 relative to frame center
-				dropdown:ClearAllPoints()
-				dropdown:SetPoint("BOTTOMLEFT", frame.FriendsTabHeader.BattlenetFrame, "BOTTOM", -150, -35)
 			else
 				-- Retail: Use smaller width (50) to fit in one row
 				SkinAndSizeDropdown(frame.FriendsTabHeader.QuickFilterDropdown, 50, 30)
@@ -720,30 +801,17 @@ function ElvUISkin:SkinFrames(E, S)
 
 		if frame.FriendsTabHeader.PrimarySortDropdown then
 			if BFL.IsClassic then
-				-- Classic: Keep visual width at 38px but expand clickable area
+				-- Classic: add spacing so controls don't overlap after skinning.
 				local dropdown = frame.FriendsTabHeader.PrimarySortDropdown
-
 				if S.HandleDropDownBox then
-					S:HandleDropDownBox(dropdown, 38)
+					S:HandleDropDownBox(dropdown)
 				end
-
-				UIDropDownMenu_SetWidth(dropdown, 38)
-
-				-- Expand the clickable button area
-				local name = dropdown:GetName()
-				if name then
-					local button = _G[name .. "Button"]
-					if button then
-						-- Make button fill the entire dropdown width
-						button:SetSize(38, 24)
-						button:ClearAllPoints()
-						button:SetPoint("CENTER", dropdown, "CENTER", 0, 0)
-					end
+				FixClassicDropdownHitbox(dropdown, 70, 24)
+				-- Anchor to QuickFilter with positive spacing.
+				if frame.FriendsTabHeader.QuickFilterDropdown then
+					dropdown:ClearAllPoints()
+					dropdown:SetPoint("LEFT", frame.FriendsTabHeader.QuickFilterDropdown, "RIGHT", 6, 0)
 				end
-
-				-- Anchor to QuickFilter with small gap
-				dropdown:ClearAllPoints()
-				dropdown:SetPoint("LEFT", frame.FriendsTabHeader.QuickFilterDropdown, "RIGHT", 3, 0)
 			else
 				-- Retail: Keep existing size
 				SkinAndSizeDropdown(frame.FriendsTabHeader.PrimarySortDropdown, 50, 30)
@@ -762,30 +830,17 @@ function ElvUISkin:SkinFrames(E, S)
 
 		if frame.FriendsTabHeader.SecondarySortDropdown then
 			if BFL.IsClassic then
-				-- Classic: Keep visual width at 38px but expand clickable area
+				-- Classic: add spacing so controls don't overlap after skinning.
 				local dropdown = frame.FriendsTabHeader.SecondarySortDropdown
-
 				if S.HandleDropDownBox then
-					S:HandleDropDownBox(dropdown, 38)
+					S:HandleDropDownBox(dropdown)
 				end
-
-				UIDropDownMenu_SetWidth(dropdown, 38)
-
-				-- Expand the clickable button area
-				local name = dropdown:GetName()
-				if name then
-					local button = _G[name .. "Button"]
-					if button then
-						-- Make button fill the entire dropdown width
-						button:SetSize(38, 24)
-						button:ClearAllPoints()
-						button:SetPoint("CENTER", dropdown, "CENTER", 0, 0)
-					end
+				FixClassicDropdownHitbox(dropdown, 70, 24)
+				-- Anchor to PrimarySort with positive spacing.
+				if frame.FriendsTabHeader.PrimarySortDropdown then
+					dropdown:ClearAllPoints()
+					dropdown:SetPoint("LEFT", frame.FriendsTabHeader.PrimarySortDropdown, "RIGHT", 6, 0)
 				end
-
-				-- Anchor to PrimarySort with small gap
-				dropdown:ClearAllPoints()
-				dropdown:SetPoint("LEFT", frame.FriendsTabHeader.PrimarySortDropdown, "RIGHT", 3, 0)
 			else
 				-- Retail: Keep existing size
 				SkinAndSizeDropdown(frame.FriendsTabHeader.SecondarySortDropdown, 50, 30)
@@ -822,7 +877,11 @@ function ElvUISkin:SkinFrames(E, S)
 
 		-- Fix Dropdown height and alignment
 		if frame.WhoFrame.ColumnDropdown then
-			frame.WhoFrame.ColumnDropdown:SetHeight(26) -- Match header height
+			if BFL.IsClassic then
+				FixClassicDropdownHitbox(frame.WhoFrame.ColumnDropdown, 110, 24)
+			else
+				frame.WhoFrame.ColumnDropdown:SetHeight(26) -- Match header height
+			end
 
 			-- Re-anchor to NameHeader
 			frame.WhoFrame.ColumnDropdown:ClearAllPoints()
@@ -949,6 +1008,28 @@ function ElvUISkin:SkinFrames(E, S)
 	end, function(err)
 		BFL:DebugPrint("ElvUISkin: Error skinning BackupViewer: " .. tostring(err))
 	end)
+
+	-- Skin Search Builder (WHO frame)
+	BFL:DebugPrint("ElvUISkin: Skinning SearchBuilder")
+	xpcall(function()
+		self:SkinSearchBuilder(E, S)
+	end, function(err)
+		BFL:DebugPrint("ElvUISkin: Error skinning SearchBuilder: " .. tostring(err))
+	end)
+
+	if not self.SearchBuilderHookInstalled then
+		local WhoFrameModule = BFL:GetModule("WhoFrame")
+		if WhoFrameModule and WhoFrameModule.ToggleSearchBuilder then
+			hooksecurefunc(WhoFrameModule, "ToggleSearchBuilder", function()
+				xpcall(function()
+					self:SkinSearchBuilder(E, S)
+				end, function(err)
+					BFL:DebugPrint("ElvUISkin: Error skinning SearchBuilder hook: " .. tostring(err))
+				end)
+			end)
+			self.SearchBuilderHookInstalled = true
+		end
+	end
 
 	-- Apply FontFix after Skinning to ensure correct font sizes
 	local FontFix = BFL:GetModule("FontFix")
@@ -1911,5 +1992,66 @@ function ElvUISkin:SkinBackupViewer(E, S)
 	-- Try to skin immediately if it exists
 	if _G.BetterFriendlistNoteBackupViewer then
 		Skin()
+	end
+end
+
+function ElvUISkin:SkinSearchBuilder(E, S)
+	local WhoFrameModule = BFL:GetModule("WhoFrame")
+	if not WhoFrameModule then
+		return
+	end
+
+	local flyout = WhoFrameModule.builderFlyout
+	if not flyout then
+		return
+	end
+
+	-- Apply ElvUI backdrop
+	flyout:StripTextures()
+	flyout:CreateBackdrop("Transparent")
+
+	-- Skin builder inputs and dropdowns
+	local builder = WhoFrameModule.builder
+	if builder then
+		if builder.nameInput then
+			S:HandleEditBox(builder.nameInput)
+		end
+		if builder.guildInput then
+			S:HandleEditBox(builder.guildInput)
+		end
+		if builder.zoneInput then
+			S:HandleEditBox(builder.zoneInput)
+		end
+		if builder.levelMin then
+			S:HandleEditBox(builder.levelMin)
+		end
+		if builder.levelMax then
+			S:HandleEditBox(builder.levelMax)
+		end
+		if builder.classDropdown then
+			pcall(S.HandleDropDownBox, S, builder.classDropdown)
+			if BFL.IsClassic then
+				FixClassicDropdownHitbox(builder.classDropdown, 140, 24)
+			end
+		end
+		if builder.raceDropdown then
+			pcall(S.HandleDropDownBox, S, builder.raceDropdown)
+			if BFL.IsClassic then
+				FixClassicDropdownHitbox(builder.raceDropdown, 140, 24)
+			end
+		end
+	end
+
+	-- Skin child buttons (close, search, reset)
+	for _, child in ipairs({ flyout:GetChildren() }) do
+		if child:IsObjectType("Button") and not child.isSkinned then
+			local w = child:GetWidth()
+			if w <= 24 then
+				pcall(S.HandleCloseButton, S, child)
+			else
+				S:HandleButton(child)
+			end
+			child.isSkinned = true
+		end
 	end
 end

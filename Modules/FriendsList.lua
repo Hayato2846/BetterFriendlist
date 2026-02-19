@@ -1355,6 +1355,12 @@ function FriendsList:UpdateSearchBoxState()
 			-- was reparented to BetterFriendsFrame during Simple Mode
 			local header = frame.FriendsTabHeader
 			if BFL.IsClassic then
+				local isClassicElvUISkinActive = _G.ElvUI
+					and BetterFriendlistDB
+					and BetterFriendlistDB.enableElvUISkin ~= false
+				local classicSortSpacing = isClassicElvUISkinActive and 8 or -10
+				local classicSecondarySpacing = isClassicElvUISkinActive and 8 or -15
+
 				-- Classic: UIDropDownMenuTemplate frames are ~180px wide.
 				-- Place all 3 dropdowns in a separate row ABOVE the SearchBox
 				-- (instead of Retail-style to the right, which overflows the frame).
@@ -1362,14 +1368,29 @@ function FriendsList:UpdateSearchBoxState()
 				if header.QuickFilterDropdown then
 					header.QuickFilterDropdown:ClearAllPoints()
 					header.QuickFilterDropdown:SetPoint("TOPLEFT", searchBox, "TOPLEFT", -16, 32)
+					header.QuickFilterDropdown:SetHeight(24)
 				end
 				if header.PrimarySortDropdown and header.QuickFilterDropdown then
 					header.PrimarySortDropdown:ClearAllPoints()
-					header.PrimarySortDropdown:SetPoint("LEFT", header.QuickFilterDropdown, "RIGHT", -10, 0)
+					header.PrimarySortDropdown:SetPoint(
+						"LEFT",
+						header.QuickFilterDropdown,
+						"RIGHT",
+						classicSortSpacing,
+						0
+					)
+					header.PrimarySortDropdown:SetHeight(24)
 				end
 				if header.SecondarySortDropdown and header.PrimarySortDropdown then
 					header.SecondarySortDropdown:ClearAllPoints()
-					header.SecondarySortDropdown:SetPoint("LEFT", header.PrimarySortDropdown, "RIGHT", -15, 0)
+					header.SecondarySortDropdown:SetPoint(
+						"LEFT",
+						header.PrimarySortDropdown,
+						"RIGHT",
+						classicSecondarySpacing,
+						0
+					)
+					header.SecondarySortDropdown:SetHeight(24)
 				end
 			else
 				-- Retail: WowStyle1DropdownTemplate buttons are small (51px),

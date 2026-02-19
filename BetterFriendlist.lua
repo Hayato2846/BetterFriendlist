@@ -218,6 +218,44 @@ function BFL:ApplyTabFonts()
 				end
 			end
 		end
+
+		local isClassicElvUISkinActive = _G.ElvUI and BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin ~= false
+		if isClassicElvUISkinActive and BetterFriendsFrame then
+			local frameWidth = BetterFriendsFrame:GetWidth()
+			if not frameWidth or frameWidth <= 0 then
+				frameWidth = 338
+			end
+
+			local tabs = {}
+			for i = 1, 4 do
+				local tab = _G["BetterFriendsFrameBottomTab" .. i]
+				if tab and tab:IsShown() then
+					table.insert(tabs, tab)
+				end
+			end
+
+			local count = #tabs
+			if count > 0 then
+				-- Compact layout for Classic+ElvUI: no visual gaps between bottom tabs.
+				local leftPadding = 5
+				local rightPadding = 5
+				local spacing = 0
+				local available = frameWidth - leftPadding - rightPadding - ((count - 1) * spacing)
+				local tabWidth = math.max(40, math.floor(available / count))
+				-- Pull tabs closer to the frame so they don't look detached.
+				local y = -26
+
+				for i, tab in ipairs(tabs) do
+					tab:SetWidth(tabWidth)
+					tab:ClearAllPoints()
+					if i == 1 then
+						tab:SetPoint("BOTTOMLEFT", BetterFriendsFrame, "BOTTOMLEFT", leftPadding, y)
+					else
+						tab:SetPoint("LEFT", tabs[i - 1], "RIGHT", spacing, 0)
+					end
+				end
+			end
+		end
 		return
 	end
 
