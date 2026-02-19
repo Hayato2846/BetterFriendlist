@@ -117,6 +117,14 @@
 									<Anchor point="BOTTOMRIGHT" />
 								</Anchors>
 							</Frame>
+
+							<!-- Who Tab Content -->
+							<Frame parentKey="WhoTab" hidden="true">
+								<Anchors>
+									<Anchor point="TOPLEFT" />
+									<Anchor point="BOTTOMRIGHT" />
+								</Anchors>
+							</Frame>
 						</Frames>
 					</Frame>
 				</ScrollChild>
