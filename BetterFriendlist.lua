@@ -833,7 +833,28 @@ function BFL:ApplyTabFonts()
 	-- Process top tabs (start aligned to Inset left edge, clamp at Inset right edge)
 	-- NOTE: topExtraHeight is intentionally 0. The Inset is anchored to Tab1's BOTTOMLEFT,
 	-- so increasing tab height would push the entire content area down.
-	ProcessTabGroup(topTabs, 20, topStartX, topMaxRightEdge, nil, nil, 0, -1, 0.8, -5, selectedTopTabId, -5, -8, 32)
+	-- ElvUI's FixTabCenter hook centers top-tab text at (0,0) on every Select/Deselect.
+	-- Use matching 0 offsets so ProcessTabGroup and FixTabCenter produce identical results.
+	local isElvUISkinActive = _G.ElvUI and BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin ~= false
+	local topBaseOffset = isElvUISkinActive and 0 or -5
+	local topSelectedOffset = isElvUISkinActive and 0 or -5
+	local topUnselectedOffset = isElvUISkinActive and 0 or -8
+	ProcessTabGroup(
+		topTabs,
+		20,
+		topStartX,
+		topMaxRightEdge,
+		nil,
+		nil,
+		0,
+		-1,
+		0.8,
+		topBaseOffset,
+		selectedTopTabId,
+		topSelectedOffset,
+		topUnselectedOffset,
+		32
+	)
 
 	-- Reposition first top tab to align with Inset
 	-- Simple Mode uses -60 (no SearchBox row in header), Normal Mode uses -95
