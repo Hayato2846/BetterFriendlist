@@ -2572,6 +2572,45 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 			-- Register for BattleNet friend menus (online and offline)
 			if Menu and Menu.ModifyMenu then
+				-- Streamer Mode: Rename context menu title to safe display name
+				-- (contextData.name stays as accountName for whisper functionality)
+				local function BFL_StreamerModeRenameTitle(owner, rootDescription, contextData)
+					if not BFL.StreamerMode or not BFL.StreamerMode:IsActive() then
+						return
+					end
+					if not contextData or not rootDescription then
+						return
+					end
+					local safeName = contextData.bfl_streamerDisplayName
+					if not safeName or safeName == "" then
+						return
+					end
+					-- Find the title element (first element matching the original name) and rename it
+					pcall(function()
+						for _, elementDescription in rootDescription:EnumerateElementDescriptions() do
+							local text = elementDescription.text
+							if type(text) == "function" then
+								local success, result = pcall(text)
+								if success then
+									text = result
+								end
+							end
+							if text == contextData.name then
+								if elementDescription.SetText then
+									elementDescription:SetText(safeName)
+								else
+									elementDescription.text = safeName
+								end
+								break
+							end
+						end
+					end)
+				end
+				Menu.ModifyMenu("MENU_UNIT_BN_FRIEND", BFL_StreamerModeRenameTitle)
+				Menu.ModifyMenu("MENU_UNIT_BN_FRIEND_OFFLINE", BFL_StreamerModeRenameTitle)
+				Menu.ModifyMenu("MENU_UNIT_FRIEND", BFL_StreamerModeRenameTitle)
+				Menu.ModifyMenu("MENU_UNIT_FRIEND_OFFLINE", BFL_StreamerModeRenameTitle)
+
 				-- Fix "Copy Character Name" button (Must be registered BEFORE AddGroupsToFriendMenu)
 				Menu.ModifyMenu("MENU_UNIT_BN_FRIEND", BFL_ReplaceCopyNameButton)
 				Menu.ModifyMenu("MENU_UNIT_BN_FRIEND_OFFLINE", BFL_ReplaceCopyNameButton)

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.4.0]
+
+### Fixed
+- **Streamer Mode Whisper Broken** - Fixed whispering via the right-click context menu not working when Streamer Mode was active. The whisper target was incorrectly set to the formatted display name (including character name and color codes) instead of the account name.
+
 ## [2.3.9]       - 2026-02-19
 ### Added
 - **Who Frame Visual Overhaul** - The Who search results now feature class icons, class-colored names, level difficulty coloring, alternating row backgrounds, and taller rows for improved readability. Hovering a result shows a detailed tooltip with name, level, race, class, guild, and zone. Double-clicking a player whispers them (configurable to invite instead). Ctrl+Click searches by the value in the current variable column (zone, guild, or race).
@@ -139,59 +144,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Favorite Icon Cache** - Fixed favorite star icons incorrectly appearing on offline WoW friends due to a ScrollBox button recycling issue.
 - **Assist All** - Fixed Assist All not showing assistant crown for raid players.
 - **Tabs Resizing** - Improved Tabs resizing when using big font sizes.
-
-## [2.3.0]       - 2026-02-07
-### Special Thanks
-- Huge shoutout to **R41z0r** for testing the shit out of my addon. He's awesome and so is his addon EQOL <3
-
-### Added
-- **Raid Tab** - Added Convert To Raid / Convert To Party button to raid tab.
-- **Login Message Setting** - Added new setting to enable/disable BFL's login message.
-- **Raid Shortcuts** - Added two new Raid Shortcuts for setting Raid Leader and Assistant
-- **Raid Settings** - Added new Raid Tab in Settings. You can enable/disable and change the actual shortcut used for the four actions BFL supports.
-- **Raid Help Frame** - Added descriptions for both new shortcuts. The text reflects what you have setup in Raid Settings.
-- **Copy Dialogs** - Added auto-close function when Ctrl+C is pressed.
-- **Translations** - Added new translations, fixed some awkward translations.
-- **Groups Scrollbar** - Added Scrollbar for right-click menu for friends -> groups so that a massive list of created groups doesn't grow out of the screen.
-- **Frame Clamped** - Added ClampedToScreen protection so that the friendlist window can't move out of screen.
-- **Position Reset Command** - For any edge-case scenarios the command `/bfl reset` was added. It resets frame position, width, height and scale.
-
-### Changed
-- **Changelog** - Improved the "NEW" indicator on the changelog menu button to use a cleaner, native-style tag with less padding (Retail).
-- **RAF Visibility** - Added RAF visibility check.
-- **Copy Character Name** - Replaced all 'Copy Character Name' right-click menu options with BFL-native options. Please be aware that copying natively to clipboard is protected and a copy dialog variant is the only way to achieve it for addons.
-- **Create/Rename Group** - Dialog for creating/renaming a group now checks if the given name is already used.
-- **Groups Setting Fixes** - Added outline to groups color elements in settings, removed highlight hover effect, fixed inherit functions, standardized padding between elements, fixed missing translation key for renaming groups
-- **Font Settings** - Removed options Font Outline and Font Shadow for now. Will be added again in a later update.
-- **Group Header Counts** - Changed possible values to Filtered / Total, Online / Total, Filtered / Online / Total
-- **Sorter** - Selected primary sorter can't be used as secondary sorter anymore, e.g. sorting by Name & Name doesn't make sense.
-- **Empty Groups** - Changed default behaviour of empty groups so these will be shown when 'Hide Empty Groups' setting is disabled.
-- **Simple Mode** - Removed empty spaces around the SearchBar.
-- **Settings Visibility** - Data Broker and Global Sync options are now hidden when the features aren't enabled.
-- **Send Message Button** - Send Message Button is disabled when you select a offline WoW friend.
-- **Group Order Drag and Drop** - Changed group ordering in settings to use drag and drop instead of up and down buttons.
-- **Data Broker Column Drag and Drop** - Changed data broker column ordering in settings to use drag and drop instead of up and down buttons.
-- **Drag and Drop Ghosting** - Added a ghosting effect when you use drag so that you know what/who you're dragging!
-
-### Fixed
-- **Tab Width Calculation** - Fixed dynamic tab width calculation when toggling Streamer Mode.
-- **Layouting** - Fixed and standardized layout of UI elements.
-- **RAF Label** - Removed redundant friend label.
-- **Changelog** - Fixed date alignment.
-- **SearchBar Visibility** - Fixed SearchBar visibility in Normal Mode when swapping tabs.
-- **Recent Allies Information** - Changed display of Recent Allies information to a approach closer to Blizzard's view of Recent Allies.
-- **Recent Allies Rendering** - Fixed flickering of some Recent Allies elements.
-- **Recent Allies Positioning** - Changed element positioning to better align character information and pipes.
-- **Beta Fixes** - Added some new API Calls so that deprecated API isn't used anymore in WoW Midnight Beta, e.g. BNSetAFK().
-- **Ignore List Label** - Fixed visibility of ignored label showing when you no entries in ignore list.
-- **Groups Setting Layout** - Fixed Groups Setting layout cropping UI elements.
-- **Streamer Mode Tooltip** - Fixed Streamer Mode tooltip enabled/disable state not updating properly after toggling the mode by pressing the button.
-- **ColorPicker** - Fixed some lua errors and added proper color reset.
-- **Global Sync** - Fixed a bug not saving note changes in Global Sync tab for friends.
-- **Who List** - Fixed selection in who list, fixed sorting, fixed caching.
-- **Performance** - Fourth iteration of performance fixes added. If anything feels odd don't hesitate to contact.
-- **Streamer Mode (Classic)** - Fixed Streamer Mode in Classic not showing settings and button.
-- **Friend Width Calculation (Classic)** - Fixed friend font string width calculation not properly updating in classic after changing the width of the friendlist.
 
 ---
 

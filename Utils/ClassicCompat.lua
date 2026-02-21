@@ -163,7 +163,12 @@ function Compat.OpenUnitPopupMenu(menuType, contextData)
 				-- Get the safe masked name (Nickname or Note or BattleTag)
 				local safeName = FriendsList:GetDisplayName(friend)
 				if safeName and safeName ~= "" then
-					contextData.name = safeName
+					-- IMPORTANT: Do NOT overwrite contextData.name!
+					-- Blizzard's Whisper action uses contextData.name as the target
+					-- for ChatFrame_SendBNetTell. Overwriting it with the display name
+					-- (which may contain color codes, character names, etc.) breaks whisper.
+					-- Store safe name in separate field for display-only use.
+					contextData.bfl_streamerDisplayName = safeName
 				end
 			end
 		end
@@ -179,12 +184,13 @@ function Compat.OpenUnitPopupMenu(menuType, contextData)
 			dropdown = CreateFrame("Frame", "BFLUnitPopupDropdown", UIParent, "UIDropDownMenuTemplate")
 		end
 
-		local name = contextData.name or ""
+		-- Classic: Use safe display name for title, keep contextData.name for whisper
+		local displayName = contextData.bfl_streamerDisplayName or contextData.name or ""
 		local unit = contextData.unit
 
 		-- UnitPopup_ShowMenu(dropdownMenu, which, unit, name, userData)
 		if UnitPopup_ShowMenu then
-			UnitPopup_ShowMenu(dropdown, menuType, unit, name, contextData)
+			UnitPopup_ShowMenu(dropdown, menuType, unit, displayName, contextData)
 		end
 	end
 
