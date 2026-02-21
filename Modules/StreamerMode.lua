@@ -90,7 +90,12 @@ function StreamerMode:UpdateState()
 		if BetterFriendlistDB.streamerModeActive then
 			BetterFriendlistDB.streamerModeActive = false
 			-- Restore original header if it was changed
-			if self.originalHeaderText and BetterFriendsFrame and BetterFriendsFrame.FriendsTabHeader and BetterFriendsFrame.FriendsTabHeader.BattlenetFrame then
+			if
+				self.originalHeaderText
+				and BetterFriendsFrame
+				and BetterFriendsFrame.FriendsTabHeader
+				and BetterFriendsFrame.FriendsTabHeader.BattlenetFrame
+			then
 				local header = BetterFriendsFrame.FriendsTabHeader.BattlenetFrame.Tag
 				if header then
 					header:SetText(self.originalHeaderText)
