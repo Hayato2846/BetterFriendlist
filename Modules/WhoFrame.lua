@@ -812,6 +812,9 @@ function WhoFrame:SendWhoRequest(text)
 		text = 'z-"' .. GetRealZoneText() .. '" ' .. minLevel .. "-" .. maxLevel
 	end
 
+	-- Clear selection from previous search results
+	self:SetSelectedButton(nil)
+
 	-- CRITICAL: Ensure FriendsFrame is unregistered from WHO_LIST_UPDATE
 	if FriendsFrame then
 		FriendsFrame:UnregisterEvent("WHO_LIST_UPDATE")

@@ -86,6 +86,22 @@ function StreamerMode:UpdateState()
 
 	-- Check Visibility Setting
 	if not BetterFriendlistDB.showStreamerModeButton then
+		-- Auto-disable Streamer Mode if button is hidden
+		if BetterFriendlistDB.streamerModeActive then
+			BetterFriendlistDB.streamerModeActive = false
+			-- Restore original header if it was changed
+			if self.originalHeaderText and BetterFriendsFrame and BetterFriendsFrame.FriendsTabHeader and BetterFriendsFrame.FriendsTabHeader.BattlenetFrame then
+				local header = BetterFriendsFrame.FriendsTabHeader.BattlenetFrame.Tag
+				if header then
+					header:SetText(self.originalHeaderText)
+				end
+			end
+			-- Update friends list to remove privacy filtering
+			local FriendsList = BFL:GetModule("FriendsList")
+			if FriendsList and FriendsList.Update then
+				FriendsList:Update()
+			end
+		end
 		self.toggleButton:Hide()
 		return
 	else
