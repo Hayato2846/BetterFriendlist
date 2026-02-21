@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [DRAFT]
 
+### Added
+- **Who Search Builder: Smart Race/Class Filtering** - The Who Search Builder now prevents impossible race-class combinations (e.g., Dracthyr Death Knight, Human Demon Hunter). When you select a class, only compatible races appear in the race dropdown and vice versa. Each WoW version (Retail, MoP Classic, Cata Classic, Classic Era) has its own accurate compatibility table based on Warcraft Wiki data.
+
 ### Fixed
 - **Visit House Protected Function Error** - Fixed an occasional error when clicking "Visit House" on a friend's housing entry. The addon now validates housing data before attempting to visit, and properly handles combat restrictions by queueing the visit until combat ends.
 

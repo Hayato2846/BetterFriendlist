@@ -1605,6 +1605,450 @@ local WHO_RACES_NEUTRAL_RETAIL = {
 	"Earthen",
 }
 
+-- ========================================
+-- CLASS-RACE COMPATIBILITY TABLES
+-- ========================================
+-- Source: https://warcraft.wiki.gg/wiki/Class (Race-Class table)
+-- Last updated: 2026-02-21 for Midnight 12.0+ / The War Within 11.0+
+
+-- Retail (The War Within 11.0+ / Midnight 12.0+)
+local CLASS_RACE_COMPATIBILITY_RETAIL = {
+	["Warrior"] = {
+		"Human",
+		"Dwarf",
+		"Night Elf",
+		"Gnome",
+		"Draenei",
+		"Worgen",
+		"Pandaren",
+		"Orc",
+		"Undead",
+		"Tauren",
+		"Troll",
+		"Blood Elf",
+		"Goblin",
+		"Void Elf",
+		"Lightforged Draenei",
+		"Dark Iron Dwarf",
+		"Kul Tiran",
+		"Mechagnome",
+		"Nightborne",
+		"Highmountain Tauren",
+		"Mag'har Orc",
+		"Zandalari Troll",
+		"Vulpera",
+		"Dracthyr",
+		"Earthen",
+	},
+	["Paladin"] = {
+		"Human",
+		"Dwarf",
+		"Draenei",
+		"Blood Elf",
+		"Tauren",
+		"Lightforged Draenei",
+		"Dark Iron Dwarf",
+		"Zandalari Troll",
+		"Earthen",
+	},
+	["Hunter"] = {
+		"Human",
+		"Dwarf",
+		"Night Elf",
+		"Gnome",
+		"Draenei",
+		"Worgen",
+		"Pandaren",
+		"Orc",
+		"Undead",
+		"Tauren",
+		"Troll",
+		"Blood Elf",
+		"Goblin",
+		"Void Elf",
+		"Lightforged Draenei",
+		"Dark Iron Dwarf",
+		"Kul Tiran",
+		"Mechagnome",
+		"Nightborne",
+		"Highmountain Tauren",
+		"Mag'har Orc",
+		"Zandalari Troll",
+		"Vulpera",
+		"Earthen",
+	},
+	["Rogue"] = {
+		"Human",
+		"Dwarf",
+		"Night Elf",
+		"Gnome",
+		"Worgen",
+		"Pandaren",
+		"Orc",
+		"Undead",
+		"Troll",
+		"Blood Elf",
+		"Goblin",
+		"Void Elf",
+		"Dark Iron Dwarf",
+		"Kul Tiran",
+		"Mechagnome",
+		"Nightborne",
+		"Mag'har Orc",
+		"Zandalari Troll",
+		"Vulpera",
+		"Earthen",
+	},
+	["Priest"] = {
+		"Human",
+		"Dwarf",
+		"Night Elf",
+		"Gnome",
+		"Draenei",
+		"Worgen",
+		"Pandaren",
+		"Undead",
+		"Troll",
+		"Blood Elf",
+		"Goblin",
+		"Void Elf",
+		"Lightforged Draenei",
+		"Dark Iron Dwarf",
+		"Kul Tiran",
+		"Mechagnome",
+		"Nightborne",
+		"Mag'har Orc",
+		"Zandalari Troll",
+		"Vulpera",
+		"Earthen",
+	},
+	["Death Knight"] = {
+		"Human",
+		"Dwarf",
+		"Night Elf",
+		"Gnome",
+		"Draenei",
+		"Worgen",
+		"Pandaren",
+		"Orc",
+		"Undead",
+		"Tauren",
+		"Troll",
+		"Blood Elf",
+		"Goblin",
+		"Void Elf",
+		"Lightforged Draenei",
+		"Dark Iron Dwarf",
+		"Kul Tiran",
+		"Mechagnome",
+		"Nightborne",
+		"Highmountain Tauren",
+		"Mag'har Orc",
+		"Zandalari Troll",
+		"Vulpera",
+		"Earthen",
+	},
+	["Shaman"] = {
+		"Dwarf",
+		"Draenei",
+		"Pandaren",
+		"Orc",
+		"Tauren",
+		"Troll",
+		"Goblin",
+		"Dark Iron Dwarf",
+		"Kul Tiran",
+		"Highmountain Tauren",
+		"Mag'har Orc",
+		"Zandalari Troll",
+		"Vulpera",
+		"Earthen",
+	},
+	["Mage"] = {
+		"Human",
+		"Dwarf",
+		"Night Elf",
+		"Gnome",
+		"Draenei",
+		"Worgen",
+		"Pandaren",
+		"Undead",
+		"Troll",
+		"Blood Elf",
+		"Goblin",
+		"Void Elf",
+		"Lightforged Draenei",
+		"Dark Iron Dwarf",
+		"Kul Tiran",
+		"Mechagnome",
+		"Nightborne",
+		"Mag'har Orc",
+		"Zandalari Troll",
+		"Vulpera",
+		"Earthen",
+	},
+	["Warlock"] = {
+		"Human",
+		"Dwarf",
+		"Gnome",
+		"Worgen",
+		"Orc",
+		"Undead",
+		"Troll",
+		"Blood Elf",
+		"Goblin",
+		"Void Elf",
+		"Dark Iron Dwarf",
+		"Mechagnome",
+		"Nightborne",
+		"Mag'har Orc",
+		"Zandalari Troll",
+		"Vulpera",
+	},
+	["Monk"] = {
+		"Human",
+		"Dwarf",
+		"Night Elf",
+		"Gnome",
+		"Draenei",
+		"Pandaren",
+		"Orc",
+		"Undead",
+		"Tauren",
+		"Troll",
+		"Blood Elf",
+		"Goblin",
+		"Void Elf",
+		"Lightforged Draenei",
+		"Dark Iron Dwarf",
+		"Kul Tiran",
+		"Mechagnome",
+		"Nightborne",
+		"Highmountain Tauren",
+		"Mag'har Orc",
+		"Zandalari Troll",
+		"Vulpera",
+		"Earthen",
+	},
+	["Druid"] = {
+		"Night Elf",
+		"Worgen",
+		"Pandaren",
+		"Tauren",
+		"Troll",
+		"Kul Tiran",
+		"Highmountain Tauren",
+		"Zandalari Troll",
+		"Earthen",
+	},
+	["Demon Hunter"] = {
+		"Night Elf",
+		"Blood Elf",
+		"Void Elf", -- Added in Midnight
+	},
+	["Evoker"] = {
+		"Dracthyr",
+	},
+}
+
+-- Mists of Pandaria Classic 5.x (Monk added, Pandaren added, many new combos)
+local CLASS_RACE_COMPATIBILITY_MOP = {
+	["Warrior"] = {
+		"Human", "Dwarf", "Night Elf", "Gnome", "Draenei", "Worgen",
+		"Orc", "Undead", "Tauren", "Troll", "Blood Elf", "Goblin",
+		"Pandaren",
+	},
+	["Paladin"] = {
+		"Human", "Dwarf", "Draenei",
+		"Blood Elf", "Tauren", -- Tauren added in Cata 4.0
+	},
+	["Hunter"] = {
+		"Human", "Dwarf", "Night Elf", "Draenei", "Worgen",
+		"Orc", "Undead", "Tauren", "Troll", "Blood Elf", "Goblin",
+		"Pandaren",
+	},
+	["Rogue"] = {
+		"Human", "Dwarf", "Night Elf", "Gnome", "Worgen",
+		"Orc", "Undead", "Troll", "Blood Elf", "Goblin",
+		"Pandaren",
+	},
+	["Priest"] = {
+		"Human", "Dwarf", "Night Elf", "Draenei", "Worgen",
+		"Undead", "Troll", "Blood Elf", "Goblin",
+		"Pandaren",
+	},
+	["Death Knight"] = { -- Added in WotLK 3.0, all races except Pandaren initially
+		"Human", "Dwarf", "Night Elf", "Gnome", "Draenei", "Worgen",
+		"Orc", "Undead", "Tauren", "Troll", "Blood Elf", "Goblin",
+		"Pandaren", -- Added in MoP
+	},
+	["Shaman"] = {
+		"Dwarf", "Draenei", -- Dwarf added in Cata 4.0
+		"Orc", "Tauren", "Troll", "Goblin",
+		"Pandaren",
+	},
+	["Mage"] = {
+		"Human", "Gnome", "Draenei", "Worgen",
+		"Undead", "Troll", "Blood Elf", "Goblin",
+		"Pandaren",
+	},
+	["Warlock"] = {
+		"Human", "Gnome", "Worgen",
+		"Orc", "Undead", "Blood Elf", "Goblin",
+	},
+	["Monk"] = { -- NEW in MoP 5.0
+		"Human", "Dwarf", "Night Elf", "Gnome", "Draenei",
+		"Orc", "Undead", "Tauren", "Troll", "Blood Elf",
+		"Pandaren",
+	},
+	["Druid"] = {
+		"Night Elf", "Worgen",
+		"Tauren", "Troll", -- Troll added in Cata 4.0
+	},
+}
+
+-- Cataclysm Classic 4.x (Goblin/Worgen added, many new combos)
+local CLASS_RACE_COMPATIBILITY_CATA = {
+	["Warrior"] = {
+		"Human", "Dwarf", "Night Elf", "Gnome", "Draenei", "Worgen",
+		"Orc", "Undead", "Tauren", "Troll", "Blood Elf", "Goblin",
+	},
+	["Paladin"] = {
+		"Human", "Dwarf", "Draenei",
+		"Blood Elf", "Tauren", -- NEW in Cata 4.0
+	},
+	["Hunter"] = {
+		"Human", "Dwarf", "Night Elf", "Draenei", "Worgen",
+		"Orc", "Undead", "Tauren", "Troll", "Blood Elf", "Goblin",
+	},
+	["Rogue"] = {
+		"Human", "Dwarf", "Night Elf", "Gnome", "Worgen",
+		"Orc", "Undead", "Troll", "Blood Elf", "Goblin",
+	},
+	["Priest"] = {
+		"Human", "Dwarf", "Night Elf", "Draenei", "Worgen",
+		"Undead", "Troll", "Blood Elf", "Goblin",
+	},
+	["Death Knight"] = { -- All races (added in WotLK)
+		"Human", "Dwarf", "Night Elf", "Gnome", "Draenei", "Worgen",
+		"Orc", "Undead", "Tauren", "Troll", "Blood Elf", "Goblin",
+	},
+	["Shaman"] = {
+		"Dwarf", "Draenei", -- Dwarf NEW in Cata 4.0
+		"Orc", "Tauren", "Troll", "Goblin",
+	},
+	["Mage"] = {
+		"Human", "Gnome", "Draenei", "Worgen",
+		"Undead", "Troll", "Blood Elf", "Goblin",
+	},
+	["Warlock"] = {
+		"Human", "Gnome", "Worgen",
+		"Orc", "Undead", "Blood Elf", "Goblin",
+	},
+	["Druid"] = {
+		"Night Elf", "Worgen",
+		"Tauren", "Troll", -- Troll NEW in Cata 4.0
+	},
+}
+
+-- Classic Era (Vanilla 1.12 / Anniversary) - Original 8 classes only
+local CLASS_RACE_COMPATIBILITY_CLASSIC = {
+	["Warrior"] = {
+		"Human", "Dwarf", "Night Elf", "Gnome",
+		"Orc", "Undead", "Tauren", "Troll",
+	},
+	["Paladin"] = {
+		"Human", "Dwarf", -- Alliance only originally
+	},
+	["Hunter"] = {
+		"Dwarf", "Night Elf",
+		"Orc", "Tauren", "Troll",
+	},
+	["Rogue"] = {
+		"Human", "Dwarf", "Night Elf", "Gnome",
+		"Orc", "Undead", "Troll",
+	},
+	["Priest"] = {
+		"Human", "Dwarf", "Night Elf",
+		"Undead", "Troll",
+	},
+	["Shaman"] = {
+		"Orc", "Tauren", "Troll", -- Horde only originally
+	},
+	["Mage"] = {
+		"Human", "Gnome",
+		"Undead", "Troll",
+	},
+	["Warlock"] = {
+		"Human", "Gnome",
+		"Orc", "Undead",
+	},
+	["Druid"] = {
+		"Night Elf",
+		"Tauren",
+	},
+}
+
+-- Select the appropriate compatibility table based on WoW version
+local CLASS_RACE_COMPATIBILITY
+if BFL.IsClassicEra then
+	CLASS_RACE_COMPATIBILITY = CLASS_RACE_COMPATIBILITY_CLASSIC
+elseif BFL.IsCataClassic then
+	CLASS_RACE_COMPATIBILITY = CLASS_RACE_COMPATIBILITY_CATA
+elseif BFL.IsMoPClassic then
+	CLASS_RACE_COMPATIBILITY = CLASS_RACE_COMPATIBILITY_MOP
+else
+	-- Retail (including Wrath/TBC classic if they exist)
+	CLASS_RACE_COMPATIBILITY = CLASS_RACE_COMPATIBILITY_RETAIL
+end
+
+-- Helper: Check if a race-class combination is valid
+local function IsRaceClassCompatible(raceName, className)
+	if not raceName or raceName == "" or not className or className == "" then
+		return true -- No selection = all valid
+	end
+
+	local compatibleRaces = CLASS_RACE_COMPATIBILITY[className]
+	if not compatibleRaces then
+		return true -- Unknown class = allow all
+	end
+
+	for _, race in ipairs(compatibleRaces) do
+		if race == raceName then
+			return true
+		end
+	end
+
+	return false
+end
+
+-- Helper: Get races compatible with a class
+local function GetCompatibleRacesForClass(className)
+	if not className or className == "" then
+		return nil -- All races
+	end
+	return CLASS_RACE_COMPATIBILITY[className]
+end
+
+-- Helper: Get classes compatible with a race
+local function GetCompatibleClassesForRace(raceName)
+	if not raceName or raceName == "" then
+		return nil -- All classes
+	end
+
+	local compatibleClasses = {}
+	for className, races in pairs(CLASS_RACE_COMPATIBILITY) do
+		for _, race in ipairs(races) do
+			if race == raceName then
+				table.insert(compatibleClasses, className)
+				break
+			end
+		end
+	end
+
+	return compatibleClasses
+end
+
 -- Create the Search Builder UI (trigger button + flyout panel)
 function WhoFrame:CreateSearchBuilder(whoFrame)
 	local L = BFL.L or {}
@@ -1740,36 +2184,49 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	classLabel:SetText((L.WHO_BUILDER_CLASS or "Class") .. ":")
 
 	self.builder.selectedClass = "" -- "" = All
+	self.builder.selectedRace = "" -- "" = All (pre-declare for cross-reference)
+
 	local classDropdown = BFL.CreateDropdown(flyout, nil, 140)
 	if BFL.HasModernDropdown then
 		classDropdown:SetPoint("LEFT", classLabel, "RIGHT", 0, 0)
 	else
 		classDropdown:SetPoint("LEFT", classLabel, "RIGHT", -14, -2)
 	end
+	self.builder.classDropdown = classDropdown
 
-	-- Build class options
-	local classLabels = { L.WHO_BUILDER_ALL_CLASSES or "All Classes" }
-	local classValues = { "" }
-	if CLASS_SORT_ORDER then
-		for _, classToken in ipairs(CLASS_SORT_ORDER) do
-			local localName = LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[classToken]
-			if localName then
-				table.insert(classLabels, localName)
-				table.insert(classValues, localName)
+	-- Function to build/rebuild class dropdown with optional race filter
+	local function RebuildClassDropdown()
+		local classLabels = { L.WHO_BUILDER_ALL_CLASSES or "All Classes" }
+		local classValues = { "" }
+
+		local compatibleClasses = GetCompatibleClassesForRace(self.builder.selectedRace)
+
+		if CLASS_SORT_ORDER then
+			for _, classToken in ipairs(CLASS_SORT_ORDER) do
+				local localName = LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[classToken]
+				if localName then
+					-- Only add if compatible with selected race (or no race selected)
+					if not compatibleClasses or tContains(compatibleClasses, localName) then
+						table.insert(classLabels, localName)
+						table.insert(classValues, localName)
+					end
+				end
 			end
 		end
+
+		BFL.InitializeDropdown(classDropdown, {
+			labels = classLabels,
+			values = classValues,
+		}, function(value)
+			return self.builder.selectedClass == value
+		end, function(value)
+			self.builder.selectedClass = value
+			RebuildRaceDropdown()
+			self:UpdateBuilderPreview()
+		end, 300)
 	end
 
-	BFL.InitializeDropdown(classDropdown, {
-		labels = classLabels,
-		values = classValues,
-	}, function(value)
-		return self.builder.selectedClass == value
-	end, function(value)
-		self.builder.selectedClass = value
-		self:UpdateBuilderPreview()
-	end, 300)
-	self.builder.classDropdown = classDropdown
+	self.builder.RebuildClassDropdown = RebuildClassDropdown
 	yOffset = yOffset - (rowHeight + 2)
 
 	-- Row 5: Race dropdown
@@ -1779,52 +2236,72 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	raceLabel:SetJustifyH("LEFT")
 	raceLabel:SetText((L.WHO_BUILDER_RACE or "Race") .. ":")
 
-	self.builder.selectedRace = "" -- "" = All
 	local raceDropdown = BFL.CreateDropdown(flyout, nil, 140)
 	if BFL.HasModernDropdown then
 		raceDropdown:SetPoint("LEFT", raceLabel, "RIGHT", 0, 0)
 	else
 		raceDropdown:SetPoint("LEFT", raceLabel, "RIGHT", -14, -2)
 	end
-
-	-- Build race options filtered by player faction
-	local raceLabels = { L.WHO_BUILDER_ALL_RACES or "All Races" }
-	local raceValues = { "" }
-	local faction = UnitFactionGroup("player")
-	local factionRaces = (faction == "Alliance") and WHO_RACES_ALLIANCE or WHO_RACES_HORDE
-	for _, raceName in ipairs(factionRaces) do
-		table.insert(raceLabels, raceName)
-		table.insert(raceValues, raceName)
-	end
-	-- Add allied races on Retail only
-	if not BFL.IsClassic then
-		local retailFactionRaces = (faction == "Alliance") and WHO_RACES_ALLIANCE_RETAIL or WHO_RACES_HORDE_RETAIL
-		for _, raceName in ipairs(retailFactionRaces) do
-			table.insert(raceLabels, raceName)
-			table.insert(raceValues, raceName)
-		end
-	end
-	for _, raceName in ipairs(WHO_RACES_NEUTRAL) do
-		table.insert(raceLabels, raceName)
-		table.insert(raceValues, raceName)
-	end
-	if not BFL.IsClassic then
-		for _, raceName in ipairs(WHO_RACES_NEUTRAL_RETAIL) do
-			table.insert(raceLabels, raceName)
-			table.insert(raceValues, raceName)
-		end
-	end
-
-	BFL.InitializeDropdown(raceDropdown, {
-		labels = raceLabels,
-		values = raceValues,
-	}, function(value)
-		return self.builder.selectedRace == value
-	end, function(value)
-		self.builder.selectedRace = value
-		self:UpdateBuilderPreview()
-	end, 300)
 	self.builder.raceDropdown = raceDropdown
+
+	-- Function to build/rebuild race dropdown with optional class filter
+	local function RebuildRaceDropdown()
+		local raceLabels = { L.WHO_BUILDER_ALL_RACES or "All Races" }
+		local raceValues = { "" }
+
+		local compatibleRaces = GetCompatibleRacesForClass(self.builder.selectedClass)
+		local faction = UnitFactionGroup("player")
+
+		-- Helper: Add race if compatible with selected class
+		local function AddRaceIfCompatible(raceName)
+			if not compatibleRaces or tContains(compatibleRaces, raceName) then
+				table.insert(raceLabels, raceName)
+				table.insert(raceValues, raceName)
+			end
+		end
+
+		-- Faction-specific races
+		local factionRaces = (faction == "Alliance") and WHO_RACES_ALLIANCE or WHO_RACES_HORDE
+		for _, raceName in ipairs(factionRaces) do
+			AddRaceIfCompatible(raceName)
+		end
+
+		-- Allied races (Retail only)
+		if not BFL.IsClassic then
+			local retailFactionRaces = (faction == "Alliance") and WHO_RACES_ALLIANCE_RETAIL or WHO_RACES_HORDE_RETAIL
+			for _, raceName in ipairs(retailFactionRaces) do
+				AddRaceIfCompatible(raceName)
+			end
+		end
+
+		-- Neutral races
+		for _, raceName in ipairs(WHO_RACES_NEUTRAL) do
+			AddRaceIfCompatible(raceName)
+		end
+
+		if not BFL.IsClassic then
+			for _, raceName in ipairs(WHO_RACES_NEUTRAL_RETAIL) do
+				AddRaceIfCompatible(raceName)
+			end
+		end
+
+		BFL.InitializeDropdown(raceDropdown, {
+			labels = raceLabels,
+			values = raceValues,
+		}, function(value)
+			return self.builder.selectedRace == value
+		end, function(value)
+			self.builder.selectedRace = value
+			RebuildClassDropdown()
+			self:UpdateBuilderPreview()
+		end, 300)
+	end
+
+	self.builder.RebuildRaceDropdown = RebuildRaceDropdown
+
+	-- Initial build
+	RebuildClassDropdown()
+	RebuildRaceDropdown()
 	yOffset = yOffset - (rowHeight + 2)
 
 	-- Row 6: Level range
@@ -2077,13 +2554,12 @@ function WhoFrame:ResetBuilder()
 	self.builder.selectedClass = ""
 	self.builder.selectedRace = ""
 
-	-- Visually refresh dropdowns
-	local L = BFL.L or {}
-	if self.builder.classDropdown then
-		BFL.Compat.RefreshDropdown(self.builder.classDropdown, L.WHO_BUILDER_ALL_CLASSES or "All Classes")
+	-- Rebuild dropdowns to show full lists (no filtering)
+	if self.builder.RebuildClassDropdown then
+		self.builder.RebuildClassDropdown()
 	end
-	if self.builder.raceDropdown then
-		BFL.Compat.RefreshDropdown(self.builder.raceDropdown, L.WHO_BUILDER_ALL_RACES or "All Races")
+	if self.builder.RebuildRaceDropdown then
+		self.builder.RebuildRaceDropdown()
 	end
 
 	self:UpdateBuilderPreview()
