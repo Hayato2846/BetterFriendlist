@@ -2499,7 +2499,20 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	levelMin:SetFontObject("GameFontHighlight")
 	levelMin:SetNumeric(true)
 	levelMin:SetMaxLetters(3)
-	levelMin:SetScript("OnTextChanged", function()
+	levelMin:SetScript("OnTextChanged", function(self)
+		-- Cap level to max player level
+		local text = self:GetText()
+		if text ~= "" then
+			local value = tonumber(text)
+			if value then
+				local maxLevel = BFL.GetMaxLevel()
+				if value > maxLevel then
+					self:SetText(tostring(maxLevel))
+				elseif value < 1 then
+					self:SetText("1")
+				end
+			end
+		end
 		WhoFrame:UpdateBuilderPreview()
 	end)
 	levelMin:SetScript("OnEnterPressed", function(self)
@@ -2525,7 +2538,20 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	levelMax:SetFontObject("GameFontHighlight")
 	levelMax:SetNumeric(true)
 	levelMax:SetMaxLetters(3)
-	levelMax:SetScript("OnTextChanged", function()
+	levelMax:SetScript("OnTextChanged", function(self)
+		-- Cap level to max player level
+		local text = self:GetText()
+		if text ~= "" then
+			local value = tonumber(text)
+			if value then
+				local maxLevel = BFL.GetMaxLevel()
+				if value > maxLevel then
+					self:SetText(tostring(maxLevel))
+				elseif value < 1 then
+					self:SetText("1")
+				end
+			end
+		end
 		WhoFrame:UpdateBuilderPreview()
 	end)
 	levelMax:SetScript("OnEnterPressed", function(self)

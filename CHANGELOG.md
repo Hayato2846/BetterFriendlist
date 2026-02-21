@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Visit House Protected Function Error** - Fixed an occasional error when clicking "Visit House" on a friend's housing entry. The addon now validates housing data before attempting to visit, and properly handles combat restrictions by queueing the visit until combat ends.
 - **Who Search Builder: Unsorted Dropdowns** - Fixed race and class dropdowns in the Who Search Builder not being sorted alphabetically, making it difficult to find specific options quickly.
+- **Who Search Builder: Level Range Validation** - Fixed level input fields allowing values beyond the maximum player level. Both minimum and maximum level fields now automatically cap entered values to the current expansion's max level and prevent values below 1.
 
 ## [2.4.0]       - 2026-02-21
 
