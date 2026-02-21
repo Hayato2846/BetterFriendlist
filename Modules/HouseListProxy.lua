@@ -29,6 +29,16 @@ function HouseListProxy:Initialize()
 		end
 	end)
 
+	-- Register for combat start to hide proxy
+	BFL:RegisterEventCallback("PLAYER_REGEN_DISABLED", function()
+		self:HideProxy()
+	end)
+
+	-- Register for combat end to process pending actions
+	BFL:RegisterEventCallback("PLAYER_REGEN_ENABLED", function()
+		self:ProcessPendingShow()
+	end)
+
 	-- Check if already loaded
 	if C_AddOns and C_AddOns.IsAddOnLoaded(TARGET_ADDON) then
 		self:SetupScrollBoxCallback()
@@ -140,8 +150,52 @@ end
 -- Interaction Logic
 -- ========================================
 
+function HouseListProxy:HideProxy()
+	if self.secureProxy and self.secureProxy:IsShown() then
+		self.secureProxy:Hide()
+		self.secureProxy:ClearAllPoints()
+		self.secureProxy.visualButton = nil
+	end
+	-- Clear any pending show
+	self.pendingShow = nil
+end
+
+function HouseListProxy:ProcessPendingShow()
+	if not self.pendingShow then
+		return
+	end
+
+	local pending = self.pendingShow
+	self.pendingShow = nil
+
+	-- Only execute if button still exists, is visible, and mouse is still over it
+	if pending.button and pending.button:IsVisible() and pending.button:IsMouseOver() then
+		self:ShowProxy(pending.button, pending.houseInfo)
+	end
+end
+
 function HouseListProxy:ShowProxy(button, houseInfo)
-	if InCombatLockdown() or not houseInfo then
+	-- Validate required house data first
+	if not houseInfo then
+		return
+	end
+
+	-- Validate required house data fields exist and are valid
+	if not houseInfo.neighborhoodGUID or not houseInfo.houseGUID or not houseInfo.plotID then
+		return
+	end
+
+	-- Validate GUIDs are non-empty strings
+	if houseInfo.neighborhoodGUID == "" or houseInfo.houseGUID == "" then
+		return
+	end
+
+	-- If in combat or restricted, queue the action for later
+	if BFL:IsActionRestricted() then
+		self.pendingShow = {
+			button = button,
+			houseInfo = houseInfo,
+		}
 		return
 	end
 
