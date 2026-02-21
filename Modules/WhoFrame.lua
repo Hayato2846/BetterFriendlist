@@ -1854,134 +1854,294 @@ local CLASS_RACE_COMPATIBILITY_RETAIL = {
 -- Mists of Pandaria Classic 5.x (Monk added, Pandaren added, many new combos)
 local CLASS_RACE_COMPATIBILITY_MOP = {
 	["Warrior"] = {
-		"Human", "Dwarf", "Night Elf", "Gnome", "Draenei", "Worgen",
-		"Orc", "Undead", "Tauren", "Troll", "Blood Elf", "Goblin",
+		"Human",
+		"Dwarf",
+		"Night Elf",
+		"Gnome",
+		"Draenei",
+		"Worgen",
+		"Orc",
+		"Undead",
+		"Tauren",
+		"Troll",
+		"Blood Elf",
+		"Goblin",
 		"Pandaren",
 	},
 	["Paladin"] = {
-		"Human", "Dwarf", "Draenei",
-		"Blood Elf", "Tauren", -- Tauren added in Cata 4.0
+		"Human",
+		"Dwarf",
+		"Draenei",
+		"Blood Elf",
+		"Tauren", -- Tauren added in Cata 4.0
 	},
 	["Hunter"] = {
-		"Human", "Dwarf", "Night Elf", "Draenei", "Worgen",
-		"Orc", "Undead", "Tauren", "Troll", "Blood Elf", "Goblin",
+		"Human",
+		"Dwarf",
+		"Night Elf",
+		"Draenei",
+		"Worgen",
+		"Orc",
+		"Undead",
+		"Tauren",
+		"Troll",
+		"Blood Elf",
+		"Goblin",
 		"Pandaren",
 	},
 	["Rogue"] = {
-		"Human", "Dwarf", "Night Elf", "Gnome", "Worgen",
-		"Orc", "Undead", "Troll", "Blood Elf", "Goblin",
+		"Human",
+		"Dwarf",
+		"Night Elf",
+		"Gnome",
+		"Worgen",
+		"Orc",
+		"Undead",
+		"Troll",
+		"Blood Elf",
+		"Goblin",
 		"Pandaren",
 	},
 	["Priest"] = {
-		"Human", "Dwarf", "Night Elf", "Draenei", "Worgen",
-		"Undead", "Troll", "Blood Elf", "Goblin",
+		"Human",
+		"Dwarf",
+		"Night Elf",
+		"Draenei",
+		"Worgen",
+		"Undead",
+		"Troll",
+		"Blood Elf",
+		"Goblin",
 		"Pandaren",
 	},
 	["Death Knight"] = { -- Added in WotLK 3.0, all races except Pandaren initially
-		"Human", "Dwarf", "Night Elf", "Gnome", "Draenei", "Worgen",
-		"Orc", "Undead", "Tauren", "Troll", "Blood Elf", "Goblin",
+		"Human",
+		"Dwarf",
+		"Night Elf",
+		"Gnome",
+		"Draenei",
+		"Worgen",
+		"Orc",
+		"Undead",
+		"Tauren",
+		"Troll",
+		"Blood Elf",
+		"Goblin",
 		"Pandaren", -- Added in MoP
 	},
 	["Shaman"] = {
-		"Dwarf", "Draenei", -- Dwarf added in Cata 4.0
-		"Orc", "Tauren", "Troll", "Goblin",
+		"Dwarf",
+		"Draenei", -- Dwarf added in Cata 4.0
+		"Orc",
+		"Tauren",
+		"Troll",
+		"Goblin",
 		"Pandaren",
 	},
 	["Mage"] = {
-		"Human", "Gnome", "Draenei", "Worgen",
-		"Undead", "Troll", "Blood Elf", "Goblin",
+		"Human",
+		"Gnome",
+		"Draenei",
+		"Worgen",
+		"Undead",
+		"Troll",
+		"Blood Elf",
+		"Goblin",
 		"Pandaren",
 	},
 	["Warlock"] = {
-		"Human", "Gnome", "Worgen",
-		"Orc", "Undead", "Blood Elf", "Goblin",
+		"Human",
+		"Gnome",
+		"Worgen",
+		"Orc",
+		"Undead",
+		"Blood Elf",
+		"Goblin",
 	},
 	["Monk"] = { -- NEW in MoP 5.0
-		"Human", "Dwarf", "Night Elf", "Gnome", "Draenei",
-		"Orc", "Undead", "Tauren", "Troll", "Blood Elf",
+		"Human",
+		"Dwarf",
+		"Night Elf",
+		"Gnome",
+		"Draenei",
+		"Orc",
+		"Undead",
+		"Tauren",
+		"Troll",
+		"Blood Elf",
 		"Pandaren",
 	},
 	["Druid"] = {
-		"Night Elf", "Worgen",
-		"Tauren", "Troll", -- Troll added in Cata 4.0
+		"Night Elf",
+		"Worgen",
+		"Tauren",
+		"Troll", -- Troll added in Cata 4.0
 	},
 }
 
 -- Cataclysm Classic 4.x (Goblin/Worgen added, many new combos)
 local CLASS_RACE_COMPATIBILITY_CATA = {
 	["Warrior"] = {
-		"Human", "Dwarf", "Night Elf", "Gnome", "Draenei", "Worgen",
-		"Orc", "Undead", "Tauren", "Troll", "Blood Elf", "Goblin",
+		"Human",
+		"Dwarf",
+		"Night Elf",
+		"Gnome",
+		"Draenei",
+		"Worgen",
+		"Orc",
+		"Undead",
+		"Tauren",
+		"Troll",
+		"Blood Elf",
+		"Goblin",
 	},
 	["Paladin"] = {
-		"Human", "Dwarf", "Draenei",
-		"Blood Elf", "Tauren", -- NEW in Cata 4.0
+		"Human",
+		"Dwarf",
+		"Draenei",
+		"Blood Elf",
+		"Tauren", -- NEW in Cata 4.0
 	},
 	["Hunter"] = {
-		"Human", "Dwarf", "Night Elf", "Draenei", "Worgen",
-		"Orc", "Undead", "Tauren", "Troll", "Blood Elf", "Goblin",
+		"Human",
+		"Dwarf",
+		"Night Elf",
+		"Draenei",
+		"Worgen",
+		"Orc",
+		"Undead",
+		"Tauren",
+		"Troll",
+		"Blood Elf",
+		"Goblin",
 	},
 	["Rogue"] = {
-		"Human", "Dwarf", "Night Elf", "Gnome", "Worgen",
-		"Orc", "Undead", "Troll", "Blood Elf", "Goblin",
+		"Human",
+		"Dwarf",
+		"Night Elf",
+		"Gnome",
+		"Worgen",
+		"Orc",
+		"Undead",
+		"Troll",
+		"Blood Elf",
+		"Goblin",
 	},
 	["Priest"] = {
-		"Human", "Dwarf", "Night Elf", "Draenei", "Worgen",
-		"Undead", "Troll", "Blood Elf", "Goblin",
+		"Human",
+		"Dwarf",
+		"Night Elf",
+		"Draenei",
+		"Worgen",
+		"Undead",
+		"Troll",
+		"Blood Elf",
+		"Goblin",
 	},
 	["Death Knight"] = { -- All races (added in WotLK)
-		"Human", "Dwarf", "Night Elf", "Gnome", "Draenei", "Worgen",
-		"Orc", "Undead", "Tauren", "Troll", "Blood Elf", "Goblin",
+		"Human",
+		"Dwarf",
+		"Night Elf",
+		"Gnome",
+		"Draenei",
+		"Worgen",
+		"Orc",
+		"Undead",
+		"Tauren",
+		"Troll",
+		"Blood Elf",
+		"Goblin",
 	},
 	["Shaman"] = {
-		"Dwarf", "Draenei", -- Dwarf NEW in Cata 4.0
-		"Orc", "Tauren", "Troll", "Goblin",
+		"Dwarf",
+		"Draenei", -- Dwarf NEW in Cata 4.0
+		"Orc",
+		"Tauren",
+		"Troll",
+		"Goblin",
 	},
 	["Mage"] = {
-		"Human", "Gnome", "Draenei", "Worgen",
-		"Undead", "Troll", "Blood Elf", "Goblin",
+		"Human",
+		"Gnome",
+		"Draenei",
+		"Worgen",
+		"Undead",
+		"Troll",
+		"Blood Elf",
+		"Goblin",
 	},
 	["Warlock"] = {
-		"Human", "Gnome", "Worgen",
-		"Orc", "Undead", "Blood Elf", "Goblin",
+		"Human",
+		"Gnome",
+		"Worgen",
+		"Orc",
+		"Undead",
+		"Blood Elf",
+		"Goblin",
 	},
 	["Druid"] = {
-		"Night Elf", "Worgen",
-		"Tauren", "Troll", -- Troll NEW in Cata 4.0
+		"Night Elf",
+		"Worgen",
+		"Tauren",
+		"Troll", -- Troll NEW in Cata 4.0
 	},
 }
 
 -- Classic Era (Vanilla 1.12 / Anniversary) - Original 8 classes only
 local CLASS_RACE_COMPATIBILITY_CLASSIC = {
 	["Warrior"] = {
-		"Human", "Dwarf", "Night Elf", "Gnome",
-		"Orc", "Undead", "Tauren", "Troll",
+		"Human",
+		"Dwarf",
+		"Night Elf",
+		"Gnome",
+		"Orc",
+		"Undead",
+		"Tauren",
+		"Troll",
 	},
 	["Paladin"] = {
-		"Human", "Dwarf", -- Alliance only originally
+		"Human",
+		"Dwarf", -- Alliance only originally
 	},
 	["Hunter"] = {
-		"Dwarf", "Night Elf",
-		"Orc", "Tauren", "Troll",
+		"Dwarf",
+		"Night Elf",
+		"Orc",
+		"Tauren",
+		"Troll",
 	},
 	["Rogue"] = {
-		"Human", "Dwarf", "Night Elf", "Gnome",
-		"Orc", "Undead", "Troll",
+		"Human",
+		"Dwarf",
+		"Night Elf",
+		"Gnome",
+		"Orc",
+		"Undead",
+		"Troll",
 	},
 	["Priest"] = {
-		"Human", "Dwarf", "Night Elf",
-		"Undead", "Troll",
+		"Human",
+		"Dwarf",
+		"Night Elf",
+		"Undead",
+		"Troll",
 	},
 	["Shaman"] = {
-		"Orc", "Tauren", "Troll", -- Horde only originally
+		"Orc",
+		"Tauren",
+		"Troll", -- Horde only originally
 	},
 	["Mage"] = {
-		"Human", "Gnome",
-		"Undead", "Troll",
+		"Human",
+		"Gnome",
+		"Undead",
+		"Troll",
 	},
 	["Warlock"] = {
-		"Human", "Gnome",
-		"Orc", "Undead",
+		"Human",
+		"Gnome",
+		"Orc",
+		"Undead",
 	},
 	["Druid"] = {
 		"Night Elf",
@@ -2201,17 +2361,27 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 
 		local compatibleClasses = GetCompatibleClassesForRace(self.builder.selectedRace)
 
+		-- Collect classes first (excluding "All Classes")
+		local tempClasses = {}
 		if CLASS_SORT_ORDER then
 			for _, classToken in ipairs(CLASS_SORT_ORDER) do
 				local localName = LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[classToken]
 				if localName then
 					-- Only add if compatible with selected race (or no race selected)
 					if not compatibleClasses or tContains(compatibleClasses, localName) then
-						table.insert(classLabels, localName)
-						table.insert(classValues, localName)
+						table.insert(tempClasses, localName)
 					end
 				end
 			end
+		end
+
+		-- Sort alphabetically
+		table.sort(tempClasses)
+
+		-- Add sorted classes to dropdown lists
+		for _, className in ipairs(tempClasses) do
+			table.insert(classLabels, className)
+			table.insert(classValues, className)
 		end
 
 		BFL.InitializeDropdown(classDropdown, {
@@ -2252,11 +2422,13 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 		local compatibleRaces = GetCompatibleRacesForClass(self.builder.selectedClass)
 		local faction = UnitFactionGroup("player")
 
+		-- Collect races first (excluding "All Races")
+		local tempRaces = {}
+
 		-- Helper: Add race if compatible with selected class
 		local function AddRaceIfCompatible(raceName)
 			if not compatibleRaces or tContains(compatibleRaces, raceName) then
-				table.insert(raceLabels, raceName)
-				table.insert(raceValues, raceName)
+				table.insert(tempRaces, raceName)
 			end
 		end
 
@@ -2283,6 +2455,15 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 			for _, raceName in ipairs(WHO_RACES_NEUTRAL_RETAIL) do
 				AddRaceIfCompatible(raceName)
 			end
+		end
+
+		-- Sort alphabetically
+		table.sort(tempRaces)
+
+		-- Add sorted races to dropdown lists
+		for _, raceName in ipairs(tempRaces) do
+			table.insert(raceLabels, raceName)
+			table.insert(raceValues, raceName)
 		end
 
 		BFL.InitializeDropdown(raceDropdown, {
