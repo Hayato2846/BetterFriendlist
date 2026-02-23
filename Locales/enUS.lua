@@ -1231,6 +1231,8 @@ local function LoadEnUS()
 	L.WHO_TOOLTIP_HINT_DBLCLICK_INVITE = "Double-click to invite"
 	L.WHO_TOOLTIP_HINT_CTRL_FORMAT = "Ctrl+Click to search %s"
 	L.WHO_TOOLTIP_HINT_RIGHTCLICK = "Right-click for options"
+	L.WHO_SEARCH_PENDING = "Searching..."
+	L.WHO_SEARCH_TIMEOUT = "No response. Try again."
 
 	-- ========================================
 	-- WHO SEARCH BUILDER

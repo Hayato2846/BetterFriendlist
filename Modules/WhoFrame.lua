@@ -54,6 +54,10 @@ local lastClickTime = 0
 local lastClickButton = nil
 local DOUBLE_CLICK_THRESHOLD = 0.4
 
+-- WHO throttle constants
+local WHO_COOLDOWN = 5 -- seconds between WHO queries
+local WHO_TIMEOUT = 8 -- seconds to wait for WHO_LIST_UPDATE before showing timeout
+
 -- ========================================
 -- Module Lifecycle
 -- ========================================
@@ -90,6 +94,13 @@ end
 
 -- Handle WHO_LIST_UPDATE event
 function WhoFrame:OnWhoListUpdate(...)
+	-- Clear pending state - results arrived successfully
+	self.whoPending = false
+	if self.whoTimeoutTimer then
+		self.whoTimeoutTimer:Cancel()
+		self.whoTimeoutTimer = nil
+	end
+
 	-- CRITICAL: When WHO list updates, we MUST force a rebuild
 	-- The data in C_FriendList has changed, so our cached DataProvider is invalid
 	-- regardless of whether the count matches the previous count.
@@ -798,9 +809,22 @@ function WhoFrame:InitButton(button, elementData)
 	self:SetButtonSelected(button, selected)
 end
 
+-- Check if WHO search is currently on cooldown
+function WhoFrame:IsOnCooldown()
+	return self.lastWhoSendTime and (GetTime() - self.lastWhoSendTime < WHO_COOLDOWN)
+end
+
 -- Send Who request
 function WhoFrame:SendWhoRequest(text)
-	-- if BFL then BFL:DebugPrint("WhoFrame:SendWhoRequest called with text: " .. tostring(text)) end
+	-- Throttle: Prevent queries faster than the server allows
+	local now = GetTime()
+	if self.lastWhoSendTime and (now - self.lastWhoSendTime < WHO_COOLDOWN) then
+		-- Still in cooldown - update buttons to show remaining time
+		self:UpdateRefreshButtonCooldown()
+		self:UpdateBuilderSearchButtonCooldown()
+		return
+	end
+
 	if not text or text == "" then
 		-- Use default Who command if no text provided
 		local level = UnitLevel("player")
@@ -811,6 +835,29 @@ function WhoFrame:SendWhoRequest(text)
 		local maxLevel = math.min(level + 3, GetMaxPlayerLevel())
 		text = 'z-"' .. GetRealZoneText() .. '" ' .. minLevel .. "-" .. maxLevel
 	end
+
+	-- Record send time and set pending state
+	self.lastWhoSendTime = now
+	self.whoPending = true
+
+	-- Start button cooldown feedback
+	self:StartRefreshButtonCooldown()
+	self:StartBuilderSearchButtonCooldown()
+
+	-- Start timeout timer (server may silently drop the request)
+	if self.whoTimeoutTimer then
+		self.whoTimeoutTimer:Cancel()
+	end
+	self.whoTimeoutTimer = C_Timer.NewTimer(WHO_TIMEOUT, function()
+		self.whoTimeoutTimer = nil
+		if self.whoPending then
+			self.whoPending = false
+			self:ShowThrottleHint()
+		end
+	end)
+
+	-- Show pending state in totals area
+	self:ShowPendingState()
 
 	-- Clear selection from previous search results
 	self:SetSelectedButton(nil)
@@ -829,6 +876,182 @@ function WhoFrame:SendWhoRequest(text)
 	C_FriendList.SetWhoToUi(true)
 
 	C_FriendList.SendWho(text)
+end
+
+-- Show "Searching..." in the totals area while waiting for results
+-- Also clears old result rows so they don't remain visible underneath
+function WhoFrame:ShowPendingState()
+	local totalsElement = BetterFriendsFrame
+		and BetterFriendsFrame.WhoFrame
+		and BetterFriendsFrame.WhoFrame.ListInset
+		and BetterFriendsFrame.WhoFrame.ListInset.Totals
+	if not totalsElement then
+		return
+	end
+
+	local L = BFL.L
+	local pendingText = L and L.WHO_SEARCH_PENDING or "Searching..."
+	if totalsElement.Text then
+		totalsElement.Text:SetText(pendingText)
+	elseif totalsElement.SetText then
+		totalsElement:SetText(pendingText)
+	end
+
+	-- Clear old result rows so they don't show below "Searching..."
+	if whoDataProvider then
+		whoDataProvider:Flush()
+	end
+	if self.classicWhoDataList then
+		wipe(self.classicWhoDataList)
+		self:RenderClassicWhoButtons()
+	end
+
+	-- Hide the empty state text (we have "Searching..." instead)
+	if self.emptyStateText then
+		self.emptyStateText:Hide()
+	end
+end
+
+-- Show a brief hint that the search may have been throttled
+function WhoFrame:ShowThrottleHint()
+	local totalsElement = BetterFriendsFrame
+		and BetterFriendsFrame.WhoFrame
+		and BetterFriendsFrame.WhoFrame.ListInset
+		and BetterFriendsFrame.WhoFrame.ListInset.Totals
+	if not totalsElement then
+		return
+	end
+
+	local L = BFL.L
+	local timeoutText = L and L.WHO_SEARCH_TIMEOUT or "No response. Try again."
+	if totalsElement.Text then
+		totalsElement.Text:SetText(timeoutText)
+	elseif totalsElement.SetText then
+		totalsElement:SetText(timeoutText)
+	end
+
+	-- Show empty state since results were cleared during pending
+	self:UpdateEmptyState(0)
+end
+
+-- Start the Refresh button cooldown with countdown text
+function WhoFrame:StartRefreshButtonCooldown()
+	local whoButton = BetterFriendsFrame and BetterFriendsFrame.WhoFrame and BetterFriendsFrame.WhoFrame.WhoButton
+	if not whoButton then
+		return
+	end
+
+	whoButton:Disable()
+
+	-- Cancel any existing ticker
+	if self.buttonCooldownTicker then
+		self.buttonCooldownTicker:Cancel()
+		self.buttonCooldownTicker = nil
+	end
+
+	-- Update button text with countdown
+	local L = BFL.L
+	local refreshLabel = REFRESH or "Refresh"
+	local remaining = WHO_COOLDOWN
+	whoButton:SetText(format("%s (%ds)", refreshLabel, remaining))
+
+	self.buttonCooldownTicker = C_Timer.NewTicker(1, function()
+		remaining = remaining - 1
+		if remaining <= 0 then
+			self:StopRefreshButtonCooldown()
+		else
+			whoButton:SetText(format("%s (%ds)", refreshLabel, remaining))
+		end
+	end, WHO_COOLDOWN)
+end
+
+-- Re-enable the Refresh button and restore its label
+function WhoFrame:StopRefreshButtonCooldown()
+	if self.buttonCooldownTicker then
+		self.buttonCooldownTicker:Cancel()
+		self.buttonCooldownTicker = nil
+	end
+
+	local whoButton = BetterFriendsFrame and BetterFriendsFrame.WhoFrame and BetterFriendsFrame.WhoFrame.WhoButton
+	if not whoButton then
+		return
+	end
+
+	whoButton:SetText(REFRESH or "Refresh")
+	whoButton:Enable()
+end
+
+-- Update button when a throttled request is attempted (visual shake / feedback)
+function WhoFrame:UpdateRefreshButtonCooldown()
+	local whoButton = BetterFriendsFrame and BetterFriendsFrame.WhoFrame and BetterFriendsFrame.WhoFrame.WhoButton
+	if not whoButton then
+		return
+	end
+
+	-- Button should already be disabled with countdown text from StartRefreshButtonCooldown
+	-- If somehow it's enabled, re-start the cooldown display
+	if whoButton:IsEnabled() then
+		self:StartRefreshButtonCooldown()
+	end
+end
+
+-- Start the builder Search button cooldown with countdown text
+function WhoFrame:StartBuilderSearchButtonCooldown()
+	local searchBtn = self.builder and self.builder.searchBtn
+	if not searchBtn then
+		return
+	end
+
+	searchBtn:Disable()
+
+	-- Cancel any existing ticker
+	if self.builderCooldownTicker then
+		self.builderCooldownTicker:Cancel()
+		self.builderCooldownTicker = nil
+	end
+
+	local L = BFL.L
+	local searchLabel = L and L.WHO_BUILDER_SEARCH or "Search"
+	local remaining = WHO_COOLDOWN
+	searchBtn:SetText(format("%s (%ds)", searchLabel, remaining))
+
+	self.builderCooldownTicker = C_Timer.NewTicker(1, function()
+		remaining = remaining - 1
+		if remaining <= 0 then
+			self:StopBuilderSearchButtonCooldown()
+		else
+			searchBtn:SetText(format("%s (%ds)", searchLabel, remaining))
+		end
+	end, WHO_COOLDOWN)
+end
+
+-- Re-enable the builder Search button and restore its label
+function WhoFrame:StopBuilderSearchButtonCooldown()
+	if self.builderCooldownTicker then
+		self.builderCooldownTicker:Cancel()
+		self.builderCooldownTicker = nil
+	end
+
+	local searchBtn = self.builder and self.builder.searchBtn
+	if not searchBtn then
+		return
+	end
+
+	local L = BFL.L
+	searchBtn:SetText(L and L.WHO_BUILDER_SEARCH or "Search")
+	searchBtn:Enable()
+end
+
+-- Update builder Search button when a throttled request is attempted
+function WhoFrame:UpdateBuilderSearchButtonCooldown()
+	local searchBtn = self.builder and self.builder.searchBtn
+	if not searchBtn then
+		return
+	end
+
+	if searchBtn:IsEnabled() then
+		self:StartBuilderSearchButtonCooldown()
+	end
 end
 
 -- Update Who list display
@@ -2732,6 +2955,7 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	searchBtn:SetScript("OnClick", function()
 		WhoFrame:ExecuteBuilderSearch()
 	end)
+	self.builder.searchBtn = searchBtn
 
 	local resetBtn = CreateFrame("Button", nil, flyout, "UIPanelButtonTemplate")
 	resetBtn:SetSize(80, 22)
@@ -2868,6 +3092,12 @@ end
 
 -- Execute the builder search
 function WhoFrame:ExecuteBuilderSearch()
+	-- Don't close the builder or search during cooldown
+	if self:IsOnCooldown() then
+		self:UpdateBuilderSearchButtonCooldown()
+		return
+	end
+
 	local query = self:ComposeBuilderQuery()
 	if query == "" then
 		return

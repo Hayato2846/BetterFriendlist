@@ -1221,6 +1221,8 @@ BFL:RegisterLocale("koKR", function()
 	L.WHO_TOOLTIP_HINT_DBLCLICK_INVITE = "더블클릭으로 초대"
 	L.WHO_TOOLTIP_HINT_CTRL_FORMAT = "Ctrl+클릭: %s 검색"
 	L.WHO_TOOLTIP_HINT_RIGHTCLICK = "우클릭으로 옵션"
+	L.WHO_SEARCH_PENDING = "검색 중..."
+	L.WHO_SEARCH_TIMEOUT = "응답 없음. 다시 시도하세요."
 
 	-- ========================================
 	-- WHO SEARCH BUILDER

@@ -1235,6 +1235,8 @@ BFL:RegisterLocale("esMX", function()
 	L.WHO_TOOLTIP_HINT_DBLCLICK_INVITE = "Doble clic para invitar"
 	L.WHO_TOOLTIP_HINT_CTRL_FORMAT = "Ctrl+Clic para buscar %s"
 	L.WHO_TOOLTIP_HINT_RIGHTCLICK = "Clic derecho para opciones"
+	L.WHO_SEARCH_PENDING = "Buscando..."
+	L.WHO_SEARCH_TIMEOUT = "Sin respuesta. Intenta de nuevo."
 
 	-- ========================================
 	-- WHO SEARCH BUILDER

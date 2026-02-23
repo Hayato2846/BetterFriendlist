@@ -1233,6 +1233,8 @@ BFL:RegisterLocale("zhTW", function()
 	L.WHO_TOOLTIP_HINT_DBLCLICK_INVITE = "雙擊邀請"
 	L.WHO_TOOLTIP_HINT_CTRL_FORMAT = "Ctrl+點擊搜尋%s"
 	L.WHO_TOOLTIP_HINT_RIGHTCLICK = "右鍵查看選項"
+	L.WHO_SEARCH_PENDING = "搜尋中..."
+	L.WHO_SEARCH_TIMEOUT = "無回應，請重試。"
 
 	-- ========================================
 	-- WHO SEARCH BUILDER

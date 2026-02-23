@@ -1215,6 +1215,8 @@ BFL:RegisterLocale("zhCN", function()
 	L.WHO_TOOLTIP_HINT_DBLCLICK_INVITE = "双击邀请"
 	L.WHO_TOOLTIP_HINT_CTRL_FORMAT = "Ctrl+点击搜索%s"
 	L.WHO_TOOLTIP_HINT_RIGHTCLICK = "右键查看选项"
+	L.WHO_SEARCH_PENDING = "搜索中..."
+	L.WHO_SEARCH_TIMEOUT = "无响应，请重试。"
 
 	-- ========================================
 	-- WHO SEARCH BUILDER

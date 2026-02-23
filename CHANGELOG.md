@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Who Search Builder: Smart Race/Class Filtering** - The Who Search Builder now prevents impossible race-class combinations (e.g., Dracthyr Death Knight, Human Demon Hunter). When you select a class, only compatible races appear in the race dropdown and vice versa. Each WoW version (Retail, MoP Classic, Cata Classic, Classic Era) has its own accurate compatibility table based on Warcraft Wiki data.
+- **Who Search: Throttle Protection** - The Refresh button now shows a 5-second cooldown countdown after each search, preventing queries from being silently dropped by the server. A "Searching..." indicator appears while waiting for results, and a timeout message is shown if no results are received.
 
 ### Changed
 - **Who Search Builder: Name Field Character Limit** - The name field in the Who Search Builder is now limited to 12 characters, matching the maximum length of WoW character names.
