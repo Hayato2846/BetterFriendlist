@@ -37,6 +37,16 @@ function HouseListProxy:Initialize()
 	-- Register for combat end to process pending actions
 	BFL:RegisterEventCallback("PLAYER_REGEN_ENABLED", function()
 		self:ProcessPendingShow()
+		-- If proxy creation was deferred due to combat, create it now
+		if self.deferredProxyCreation then
+			self.deferredProxyCreation = false
+			self:CreateGlobalProxy()
+			-- If callback setup was deferred, complete it now
+			if self.deferredCallbackSetup then
+				self.deferredCallbackSetup = false
+				self:SetupScrollBoxCallback()
+			end
+		end
 	end)
 
 	-- Check if already loaded
@@ -52,6 +62,13 @@ end
 function HouseListProxy:CreateGlobalProxy()
 	if self.secureProxy then
 		return self.secureProxy
+	end
+
+	-- CRITICAL: Secure frames cannot be created during combat
+	-- Defer creation until combat ends
+	if BFL:IsActionRestricted() then
+		self.deferredProxyCreation = true
+		return nil
 	end
 
 	local proxy = CreateFrame("Button", "BFL_HouseList_SecureProxy", UIParent, "InsecureActionButtonTemplate")
@@ -111,7 +128,14 @@ function HouseListProxy:SetupScrollBoxCallback()
 		return
 	end
 
+	-- Try to create proxy (will defer if in combat)
 	self:CreateGlobalProxy()
+
+	-- If proxy creation was deferred, defer callback setup too
+	if self.deferredProxyCreation then
+		self.deferredCallbackSetup = true
+		return
+	end
 
 	-- The "Clean" way: Register for the OnInitializedFrame event
 	-- This tells us when a frame is created or reused
@@ -199,7 +223,11 @@ function HouseListProxy:ShowProxy(button, houseInfo)
 		return
 	end
 
+	-- If proxy doesn't exist yet (e.g., deferred creation), can't show it
 	local proxy = self.secureProxy
+	if not proxy then
+		return
+	end
 
 	if proxy:IsShown() and proxy.visualButton == button then
 		return
