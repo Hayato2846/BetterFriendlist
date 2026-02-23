@@ -24,6 +24,15 @@ local builtinGroups = {
 		color = { r = 1.0, g = 0.82, b = 0.0 }, -- Gold
 		icon = "Interface\\Icons\\Inv_misc_groupneedmore",
 	},
+	recentlyadded = {
+		id = "recentlyadded",
+		name = "Recently Added",
+		collapsed = false,
+		builtin = true,
+		order = 3,
+		color = { r = 1.0, g = 0.82, b = 0.0 }, -- Gold (default)
+		icon = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon",
+	},
 	nogroup = {
 		id = "nogroup",
 		name = "No Group",
@@ -292,7 +301,7 @@ function Groups:RunColorSnapshotMigration()
 
 	-- Also handle Built-in Groups (Favorites, etc) if they have custom colors set
 	-- (Actually built-in groups usually don't have custom colors unless overridden, which is handled via groupColors)
-	local builtinIds = { "favorites", "ingame", "nogroup" }
+	local builtinIds = { "favorites", "ingame", "recentlyadded", "nogroup" }
 	for _, groupId in ipairs(builtinIds) do
 		local groupCountColors = DB:Get("groupCountColors") or {}
 		local groupArrowColors = DB:Get("groupArrowColors") or {}
@@ -339,6 +348,7 @@ function Groups:Initialize()
 	if BFL.L then
 		builtinGroups.favorites.name = BFL.L.GROUP_FAVORITES
 		builtinGroups.ingame.name = BFL.L.GROUP_INGAME
+		builtinGroups.recentlyadded.name = BFL.L.GROUP_RECENTLY_ADDED or "Recently Added"
 		builtinGroups.nogroup.name = BFL.L.GROUP_NO_GROUP
 	end
 
@@ -442,6 +452,18 @@ function Groups:Initialize()
 		end
 	end
 
+	-- Ensure all groups have countColor/arrowColor (fallback to group color)
+	for groupId, groupData in pairs(self.groups) do
+		if not groupData.countColor and groupData.color then
+			groupData.countColor =
+				{ r = groupData.color.r, g = groupData.color.g, b = groupData.color.b, a = groupData.color.a or 1 }
+		end
+		if not groupData.arrowColor and groupData.color then
+			groupData.arrowColor =
+				{ r = groupData.color.r, g = groupData.color.g, b = groupData.color.b, a = groupData.color.a or 1 }
+		end
+	end
+
 	-- Apply saved group order from settings
 	local savedOrder = DB:Get("groupOrder")
 	if savedOrder and type(savedOrder) == "table" and #savedOrder > 0 then
@@ -508,9 +530,10 @@ function Groups:GetAll()
 
 	local showFavorites = DB:Get("showFavoritesGroup", true)
 	local enableInGame = DB:Get("enableInGameGroup", false)
+	local enableRecentlyAdded = DB:Get("enableRecentlyAddedGroup", false)
 
 	-- Filter out hidden built-in groups
-	if not showFavorites or not enableInGame then
+	if not showFavorites or not enableInGame or not enableRecentlyAdded then
 		local filtered = {}
 		for id, group in pairs(self.groups) do
 			local keep = true
@@ -518,6 +541,9 @@ function Groups:GetAll()
 				keep = false
 			end
 			if id == "ingame" and not enableInGame then
+				keep = false
+			end
+			if id == "recentlyadded" and not enableRecentlyAdded then
 				keep = false
 			end
 

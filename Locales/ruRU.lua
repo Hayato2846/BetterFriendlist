@@ -206,6 +206,9 @@ BFL:RegisterLocale("ruRU", function()
 	L.MENU_GROUPS = "Группы"
 	L.MENU_CREATE_GROUP = "Создать группу"
 	L.MENU_REMOVE_ALL_GROUPS = "Удалить из всех групп"
+	L.MENU_REMOVE_RECENTLY_ADDED = "Убрать из Недавно добавленных"
+	L.MENU_CLEAR_ALL_RECENTLY_ADDED = "Очистить всех недавно добавленных"
+	L.MENU_ADD_ALL_TO_GROUP = "Добавить всех в группу"
 	L.MENU_RENAME_GROUP = "Переименовать группу"
 	L.MENU_DELETE_GROUP = "Удалить группу"
 	L.MENU_INVITE_GROUP = "Пригласить всех в группу"
@@ -284,6 +287,7 @@ BFL:RegisterLocale("ruRU", function()
 	L.GROUP_FAVORITES = "Избранные"
 	L.GROUP_INGAME = "В игре"
 	L.GROUP_NO_GROUP = "Без группы"
+	L.GROUP_RECENTLY_ADDED = "Недавно добавленные"
 	L.ONLINE_STATUS = "В сети"
 	L.OFFLINE_STATUS = "Не в сети"
 	L.STATUS_MOBILE = "Мобильный"
@@ -839,6 +843,17 @@ BFL:RegisterLocale("ruRU", function()
 	L.SETTINGS_INGAME_MODE_LABEL = "   Режим:"
 	L.SETTINGS_INGAME_MODE_TOOLTIP = "Режим"
 	L.SETTINGS_INGAME_MODE_TOOLTIP_DESC = "Выбрать друзей"
+	L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT = "   Единица времени:"
+	L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT_DESC =
+		"Выберите единицу времени, определяющую как долго друзья остаются в группе Недавно добавленные."
+	L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE = "   Значение длительности:"
+	L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE_DESC =
+		"Сколько дней/часов/минут друзья остаются в группе Недавно добавленные перед удалением."
+	L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT_TOOLTIP = "Единица времени"
+	L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE_TOOLTIP = "Значение длительности"
+	L.SETTINGS_DURATION_DAYS = "Дни"
+	L.SETTINGS_DURATION_HOURS = "Часы"
+	L.SETTINGS_DURATION_MINUTES = "Минуты"
 
 	-- Headers & Titles
 	L.SETTINGS_DISPLAY_OPTIONS = "Параметры отображения"

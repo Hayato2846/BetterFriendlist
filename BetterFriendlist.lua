@@ -2485,6 +2485,15 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					end)
 				end
 
+				-- Add "Remove from Recently Added" button if friend is in the Recently Added group
+				local RecentlyAddedModule = BFL:GetModule("RecentlyAdded")
+				if RecentlyAddedModule and RecentlyAddedModule:IsFriendRecentlyAdded(friendUID) then
+					groupsButton:CreateButton(L.MENU_REMOVE_RECENTLY_ADDED or "Remove from Recently Added", function()
+						RecentlyAddedModule:RemoveFriend(friendUID)
+						BFL:ForceRefreshFriendsList()
+					end)
+				end
+
 				-- Get fresh groups list directly from module (bypass stale local cache)
 				local Groups = GetGroups()
 				local friendGroups = Groups and Groups:GetAll() or {}

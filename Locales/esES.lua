@@ -197,6 +197,9 @@ BFL:RegisterLocale("esES", function()
 	L.MENU_GROUPS = "Grupos"
 	L.MENU_CREATE_GROUP = "Crear Grupo"
 	L.MENU_REMOVE_ALL_GROUPS = "Eliminar de Todos los Grupos"
+	L.MENU_REMOVE_RECENTLY_ADDED = "Quitar de Añadidos recientemente"
+	L.MENU_CLEAR_ALL_RECENTLY_ADDED = "Limpiar todos los añadidos recientemente"
+	L.MENU_ADD_ALL_TO_GROUP = "Añadir todos al grupo"
 	L.MENU_RENAME_GROUP = "Renombrar Grupo"
 	L.MENU_DELETE_GROUP = "Borrar Grupo"
 	L.MENU_INVITE_GROUP = "Invitar Todos a Grupo"
@@ -274,6 +277,7 @@ BFL:RegisterLocale("esES", function()
 	L.GROUP_FAVORITES = "Favoritos"
 	L.GROUP_INGAME = "En Juego"
 	L.GROUP_NO_GROUP = "Sin Grupo"
+	L.GROUP_RECENTLY_ADDED = "Añadidos recientemente"
 	L.ONLINE_STATUS = "Conectado"
 	L.OFFLINE_STATUS = "Desconectado"
 	L.STATUS_MOBILE = "Móvil"
@@ -817,6 +821,17 @@ BFL:RegisterLocale("esES", function()
 	L.SETTINGS_INGAME_MODE_TOOLTIP = "Modo Grupo En Juego"
 	L.SETTINGS_INGAME_MODE_TOOLTIP_DESC =
 		"Elige qué amigos incluir:\n\n|cffffffffSolo WoW:|r Muestra versión (Retail/Classic)\n|cffffffffCualquier Juego:|r Cualquier juego Battle.net"
+	L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT = "   Unidad de tiempo:"
+	L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT_DESC =
+		"Elige la unidad de tiempo para determinar cuánto tiempo permanecen los amigos en el grupo Añadidos recientemente."
+	L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE = "   Valor de duración:"
+	L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE_DESC =
+		"Cuántos días/horas/minutos permanecen los amigos en el grupo Añadidos recientemente antes de ser eliminados."
+	L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT_TOOLTIP = "Unidad de tiempo"
+	L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE_TOOLTIP = "Valor de duración"
+	L.SETTINGS_DURATION_DAYS = "Días"
+	L.SETTINGS_DURATION_HOURS = "Horas"
+	L.SETTINGS_DURATION_MINUTES = "Minutos"
 
 	-- Headers & Titles
 	L.SETTINGS_DISPLAY_OPTIONS = "Opciones Visualización"

@@ -198,6 +198,9 @@ BFL:RegisterLocale("koKR", function()
 	L.MENU_GROUPS = "그룹"
 	L.MENU_CREATE_GROUP = "그룹 생성"
 	L.MENU_REMOVE_ALL_GROUPS = "모든 그룹에서 제거"
+	L.MENU_REMOVE_RECENTLY_ADDED = "최근 추가됨에서 제거"
+	L.MENU_CLEAR_ALL_RECENTLY_ADDED = "최근 추가된 항목 모두 지우기"
+	L.MENU_ADD_ALL_TO_GROUP = "모두 그룹에 추가"
 	L.MENU_RENAME_GROUP = "그룹 이름 변경"
 	L.MENU_DELETE_GROUP = "그룹 삭제"
 	L.MENU_INVITE_GROUP = "모두 그룹에 초대"
@@ -274,6 +277,7 @@ BFL:RegisterLocale("koKR", function()
 	L.GROUP_FAVORITES = "즐겨찾기"
 	L.GROUP_INGAME = "In Game"
 	L.GROUP_NO_GROUP = "그룹 없음"
+	L.GROUP_RECENTLY_ADDED = "최근 추가됨"
 	L.ONLINE_STATUS = "온라인"
 	L.OFFLINE_STATUS = "오프라인"
 	L.STATUS_MOBILE = "모바일"
@@ -810,6 +814,17 @@ BFL:RegisterLocale("koKR", function()
 	L.SETTINGS_INGAME_MODE_LABEL = "   모드:"
 	L.SETTINGS_INGAME_MODE_TOOLTIP = "Mode"
 	L.SETTINGS_INGAME_MODE_TOOLTIP_DESC = "Choose friends."
+	L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT = "   기간 단위:"
+	L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT_DESC =
+		"최근 추가됨 그룹에 친구가 유지되는 시간 단위를 선택하세요."
+	L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE = "   기간 값:"
+	L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE_DESC =
+		"최근 추가됨 그룹에서 제거되기 전까지 친구가 유지되는 일/시간/분 수."
+	L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT_TOOLTIP = "기간 단위"
+	L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE_TOOLTIP = "기간 값"
+	L.SETTINGS_DURATION_DAYS = "일"
+	L.SETTINGS_DURATION_HOURS = "시간"
+	L.SETTINGS_DURATION_MINUTES = "분"
 
 	-- Headers & Titles
 	L.SETTINGS_DISPLAY_OPTIONS = "Display Options"

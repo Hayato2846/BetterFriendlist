@@ -143,6 +143,13 @@ local defaults = {
 	-- Note Sync
 	syncGroupsToNote = false, -- Sync group assignments to friend notes (default: OFF)
 
+	-- Recently Added Group
+	enableRecentlyAddedGroup = false, -- Enable "Recently Added" builtin group (default: OFF)
+	recentlyAddedDurationUnit = "days", -- Duration unit: "days", "hours", "minutes" (default: days)
+	recentlyAddedDurationValue = 7, -- Duration value (default: 7)
+	recentlyAddedTimestamps = {}, -- {friendUID: unixTimestamp} - when each friend was first seen
+	knownFriendUIDs = {}, -- {friendUID: true} - snapshot of all known friends for diffing
+
 	-- WHO Frame Settings
 	whoClassColorNames = true, -- Color WHO result names by class color (default: ON)
 	whoShowClassIcons = true, -- Show class icon in WHO result rows (default: ON)

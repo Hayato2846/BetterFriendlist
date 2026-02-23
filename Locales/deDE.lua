@@ -206,6 +206,9 @@ BFL:RegisterLocale("deDE", function()
 	L.MENU_GROUPS = "Gruppen"
 	L.MENU_CREATE_GROUP = "Gruppe erstellen"
 	L.MENU_REMOVE_ALL_GROUPS = "Aus allen Gruppen entfernen"
+	L.MENU_REMOVE_RECENTLY_ADDED = "Aus Kürzlich hinzugefügt entfernen"
+	L.MENU_CLEAR_ALL_RECENTLY_ADDED = "Alle kürzlich Hinzugefügten leeren"
+	L.MENU_ADD_ALL_TO_GROUP = "Alle zur Gruppe hinzufügen"
 	L.MENU_RENAME_GROUP = "Gruppe umbenennen"
 	L.MENU_DELETE_GROUP = "Gruppe löschen"
 	L.MENU_INVITE_GROUP = "Alle in Gruppe einladen"
@@ -283,6 +286,7 @@ BFL:RegisterLocale("deDE", function()
 	L.TAB_FRIENDS = "Freunde"
 	L.GROUP_FAVORITES = "Favoriten"
 	L.GROUP_NO_GROUP = "Keine Gruppe"
+	L.GROUP_RECENTLY_ADDED = "Kürzlich hinzugefügt"
 	L.ONLINE_STATUS = "Online"
 	L.OFFLINE_STATUS = "Offline"
 	L.STATUS_MOBILE = "Mobil"
@@ -858,6 +862,17 @@ BFL:RegisterLocale("deDE", function()
 	L.SETTINGS_INGAME_MODE_TOOLTIP = "Im-Spiel Gruppenmodus"
 	L.SETTINGS_INGAME_MODE_TOOLTIP_DESC =
 		"Wähle welche Freunde in der Im-Spiel Gruppe erscheinen:\n\n|cffffffffNur WoW:|r Freunde die die gleiche WoW Version spielen (Retail/Classic)\n|cffffffffJedes Spiel:|r Freunde die irgendein Battle.net Spiel spielen"
+	L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT = "   Zeiteinheit:"
+	L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT_DESC =
+		"Wähle die Zeiteinheit, wie lange Freunde in der Gruppe Kürzlich hinzugefügt bleiben."
+	L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE = "   Zeitwert:"
+	L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE_DESC =
+		"Wie viele Tage/Stunden/Minuten Freunde in der Gruppe Kürzlich hinzugefügt bleiben, bevor sie entfernt werden."
+	L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT_TOOLTIP = "Zeiteinheit"
+	L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE_TOOLTIP = "Zeitwert"
+	L.SETTINGS_DURATION_DAYS = "Tage"
+	L.SETTINGS_DURATION_HOURS = "Stunden"
+	L.SETTINGS_DURATION_MINUTES = "Minuten"
 
 	-- ElvUI
 	L.SETTINGS_ENABLE_ELVUI_SKIN = "ElvUI Skin aktivieren"

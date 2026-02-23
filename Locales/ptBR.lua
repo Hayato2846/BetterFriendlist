@@ -195,6 +195,9 @@ BFL:RegisterLocale("ptBR", function()
 	L.MENU_GROUPS = "Grupos"
 	L.MENU_CREATE_GROUP = "Criar Grupo"
 	L.MENU_REMOVE_ALL_GROUPS = "Remover de Todos"
+	L.MENU_REMOVE_RECENTLY_ADDED = "Remover de Adicionados recentemente"
+	L.MENU_CLEAR_ALL_RECENTLY_ADDED = "Limpar todos os adicionados recentemente"
+	L.MENU_ADD_ALL_TO_GROUP = "Adicionar todos ao grupo"
 	L.MENU_RENAME_GROUP = "Renomear Grupo"
 	L.MENU_DELETE_GROUP = "Excluir Grupo"
 	L.MENU_INVITE_GROUP = "Convidar Grupo"
@@ -272,6 +275,7 @@ BFL:RegisterLocale("ptBR", function()
 	L.GROUP_FAVORITES = "Favoritos"
 	L.GROUP_INGAME = "No Jogo"
 	L.GROUP_NO_GROUP = "Sem Grupo"
+	L.GROUP_RECENTLY_ADDED = "Adicionados recentemente"
 	L.ONLINE_STATUS = "Online"
 	L.OFFLINE_STATUS = "Offline"
 	L.STATUS_MOBILE = "Móvel"
@@ -807,6 +811,17 @@ BFL:RegisterLocale("ptBR", function()
 	L.SETTINGS_INGAME_MODE_LABEL = "   Modo:"
 	L.SETTINGS_INGAME_MODE_TOOLTIP = "Modo"
 	L.SETTINGS_INGAME_MODE_TOOLTIP_DESC = "Escolha amigos."
+	L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT = "   Unidade de duração:"
+	L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT_DESC =
+		"Escolha a unidade de tempo para quanto tempo os amigos permanecem no grupo Adicionados recentemente."
+	L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE = "   Valor da duração:"
+	L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE_DESC =
+		"Quantos dias/horas/minutos os amigos permanecem no grupo Adicionados recentemente antes de serem removidos."
+	L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT_TOOLTIP = "Unidade de duração"
+	L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE_TOOLTIP = "Valor da duração"
+	L.SETTINGS_DURATION_DAYS = "Dias"
+	L.SETTINGS_DURATION_HOURS = "Horas"
+	L.SETTINGS_DURATION_MINUTES = "Minutos"
 
 	-- Headers & Titles
 	L.SETTINGS_DISPLAY_OPTIONS = "Opções Exibição"

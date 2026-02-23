@@ -2969,6 +2969,60 @@ function Settings:OnInGameGroupModeChanged(value)
 	BFL:ForceRefreshFriendsList()
 end
 
+-- Enable Recently Added Group toggle
+function Settings:OnEnableRecentlyAddedGroupChanged(checked)
+	local DB = GetDB()
+	if not DB then
+		return
+	end
+
+	DB:Set("enableRecentlyAddedGroup", checked)
+
+	-- Notify the module about the state change
+	local RecentlyAddedModule = BFL:GetModule("RecentlyAdded")
+	if RecentlyAddedModule and checked then
+		RecentlyAddedModule:OnFeatureEnabled()
+	end
+
+	-- Affects group structure - needs full refresh
+	BFL:ForceRefreshFriendsList()
+
+	-- Refresh settings to show/hide sub-options
+	self:RefreshGeneralTab()
+end
+
+-- Recently Added Duration Unit changed
+function Settings:OnRecentlyAddedDurationUnitChanged(value)
+	local DB = GetDB()
+	if not DB then
+		return
+	end
+
+	DB:Set("recentlyAddedDurationUnit", value)
+
+	-- Duration change affects membership - needs full refresh
+	BFL:ForceRefreshFriendsList()
+end
+
+-- Recently Added Duration Value changed
+function Settings:OnRecentlyAddedDurationValueChanged(value)
+	local DB = GetDB()
+	if not DB then
+		return
+	end
+
+	local num = tonumber(value)
+	if not num or num < 1 then
+		num = 1
+	end
+	num = math.floor(num)
+
+	DB:Set("recentlyAddedDurationValue", num)
+
+	-- Duration change affects membership - needs full refresh
+	BFL:ForceRefreshFriendsList()
+end
+
 --------------------------------------------------------------------------
 -- NEW: TAB REFRESH FUNCTIONS
 --------------------------------------------------------------------------
@@ -3567,6 +3621,75 @@ function Settings:RefreshGeneralTab()
 				or "Choose which friends to include in the In-Game group:\n\n|cffffffffWoW Only:|r Friends playing the same WoW version (Retail/Classic)\n|cffffffffAny Game:|r Friends playing any Battle.net game"
 		)
 		table.insert(allFrames, modeDropdown)
+	end
+
+	-- Recently Added Group checkbox
+	local recentlyAddedDisplayName =
+		BuildBuiltinDisplayName("recentlyadded", L.GROUP_RECENTLY_ADDED or "Recently Added")
+	local recentlyAddedLabel = string.format(showGroupFmt, recentlyAddedDisplayName)
+	local recentlyAddedCheckbox = Components:CreateCheckbox(tab, {
+		label = recentlyAddedLabel,
+		initialValue = DB:Get("enableRecentlyAddedGroup", false),
+		callback = function(val)
+			self:OnEnableRecentlyAddedGroupChanged(val)
+		end,
+		tooltipTitle = recentlyAddedLabel,
+		tooltipDesc = string.format(showGroupDescFmt, recentlyAddedDisplayName),
+	})
+	table.insert(allFrames, recentlyAddedCheckbox)
+
+	-- Recently Added sub-options (only shown when enabled)
+	if DB:Get("enableRecentlyAddedGroup", false) then
+		-- Duration Unit dropdown
+		local unitOptions = {
+			labels = {
+				L.SETTINGS_DURATION_DAYS or "Days",
+				L.SETTINGS_DURATION_HOURS or "Hours",
+				L.SETTINGS_DURATION_MINUTES or "Minutes",
+			},
+			values = { "days", "hours", "minutes" },
+		}
+		local durationDropdown = Components:CreateDropdown(
+			tab,
+			L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT or "   Duration Unit:",
+			unitOptions,
+			function(val)
+				return val == DB:Get("recentlyAddedDurationUnit", "days")
+			end,
+			function(val)
+				self:OnRecentlyAddedDurationUnitChanged(val)
+			end
+		)
+		durationDropdown:SetTooltip(
+			L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT_TOOLTIP or "Duration Unit",
+			L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT_DESC
+				or "Choose the time unit for how long friends stay in the Recently Added group."
+		)
+		table.insert(allFrames, durationDropdown)
+
+		-- Duration Value input
+		local durationInput = Components:CreateInput(
+			tab,
+			L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE or "   Duration Value:",
+			tostring(DB:Get("recentlyAddedDurationValue", 7)),
+			function(val, editBox)
+				local num = tonumber(val)
+				if not num or num < 1 then
+					num = 1
+				end
+				num = math.floor(num)
+				if editBox then
+					editBox:SetText(tostring(num))
+				end
+				self:OnRecentlyAddedDurationValueChanged(num)
+			end
+		)
+		durationInput:SetTooltip(
+			L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE_TOOLTIP or "Duration Value",
+			L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE_DESC
+				or "How many days/hours/minutes friends stay in the Recently Added group before being removed."
+		)
+		table.insert(allFrames, durationInput)
 	end
 
 	-- Spacer before next section
@@ -4240,6 +4363,9 @@ function Settings:RefreshGroupsTab()
 		end
 		if groupId == "ingame" then
 			return L.GROUP_INGAME or "In-Game"
+		end
+		if groupId == "recentlyadded" then
+			return L.GROUP_RECENTLY_ADDED or "Recently Added"
 		end
 		if groupId == "nogroup" then
 			return L.GROUP_NO_GROUP or "No Group"

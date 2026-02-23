@@ -752,16 +752,24 @@ local function BuildDisplayList(self)
 		favorites = 0,
 		nogroup = 0,
 		ingame = 0,
+		recentlyadded = 0,
 	}
 	local onlineGroupCounts = {
 		favorites = 0,
 		nogroup = 0,
 		ingame = 0,
+		recentlyadded = 0,
 	}
 
 	-- Initialize custom group tables
 	for groupId, groupData in pairs(friendGroups) do
-		if not groupData.builtin or groupId == "favorites" or groupId == "nogroup" or groupId == "ingame" then
+		if
+			not groupData.builtin
+			or groupId == "favorites"
+			or groupId == "nogroup"
+			or groupId == "ingame"
+			or groupId == "recentlyadded"
+		then
 			groupedFriends[groupId] = groupedFriends[groupId] or {}
 			totalGroupCounts[groupId] = 0
 			onlineGroupCounts[groupId] = 0
@@ -778,6 +786,7 @@ local function BuildDisplayList(self)
 	-- Cache is auto-refreshed at entry point, safe to use directly
 	local enableInGameGroup = self.settingsCache.enableInGameGroup or false
 	local inGameGroupMode = self.settingsCache.inGameGroupMode or "same_game"
+	local enableRecentlyAddedGroup = self.settingsCache.enableRecentlyAddedGroup or false
 	local BNET_CLIENT_WOW = BNET_CLIENT_WOW or "WoW"
 
 	-- Group friends
@@ -847,6 +856,16 @@ local function BuildDisplayList(self)
 
 			if isInGame then
 				table.insert(friendGroupIds, "ingame")
+				isInAnyGroup = true
+			end
+		end
+
+		-- Feature: Recently Added Group (Dynamic)
+		-- Only if enabled in settings
+		if enableRecentlyAddedGroup and groupedFriends["recentlyadded"] then
+			local RecentlyAddedModule = BFL:GetModule("RecentlyAdded")
+			if RecentlyAddedModule and RecentlyAddedModule:IsFriendRecentlyAdded(friendUID) then
+				table.insert(friendGroupIds, "recentlyadded")
 				isInAnyGroup = true
 			end
 		end
@@ -3177,6 +3196,7 @@ function FriendsList:UpdateSettingsCache()
 	-- Group Settings
 	self.settingsCache.enableInGameGroup = DB:Get("enableInGameGroup", false)
 	self.settingsCache.inGameGroupMode = DB:Get("inGameGroupMode", "same_game")
+	self.settingsCache.enableRecentlyAddedGroup = DB:Get("enableRecentlyAddedGroup", false)
 	self.settingsCache.hideEmptyGroups = DB:Get("hideEmptyGroups", false)
 	self.settingsCache.accordionGroups = DB:Get("accordionGroups", false)
 
@@ -6035,6 +6055,55 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 									FriendsList:InviteGroupToParty(self.groupId)
 								end
 							)
+						end
+
+						-- Recently Added group: Bulk actions
+						if self.groupId == "recentlyadded" then
+							local RecentlyAddedModule = BFL:GetModule("RecentlyAdded")
+							if RecentlyAddedModule then
+								local recentUIDs = RecentlyAddedModule:GetAllRecentFriendUIDs()
+								if #recentUIDs > 0 then
+									-- "Add All to Group" submenu
+									local customGroups = {}
+									local allGroups = Groups:GetAll()
+									for gid, gData in pairs(allGroups) do
+										if not gData.builtin then
+											table.insert(customGroups, { id = gid, data = gData })
+										end
+									end
+									if #customGroups > 0 then
+										table.sort(customGroups, function(a, b)
+											return (a.data.order or 0) < (b.data.order or 0)
+										end)
+										local addAllButton = rootDescription:CreateButton(
+											BFL.L.MENU_ADD_ALL_TO_GROUP or "Add All to Group"
+										)
+										for _, cg in ipairs(customGroups) do
+											local targetGroupId = cg.id
+											addAllButton:CreateButton(cg.data.name, function()
+												local DB = BFL:GetModule("DB")
+												if DB then
+													for _, uid in ipairs(recentUIDs) do
+														if not DB:IsFriendInGroup(uid, targetGroupId) then
+															DB:AddFriendToGroup(uid, targetGroupId)
+														end
+													end
+												end
+												BFL:ForceRefreshFriendsList()
+											end)
+										end
+									end
+
+									-- "Clear All" button
+									rootDescription:CreateButton(
+										BFL.L.MENU_CLEAR_ALL_RECENTLY_ADDED or "Clear All",
+										function()
+											RecentlyAddedModule:ClearAll()
+											BFL:ForceRefreshFriendsList()
+										end
+									)
+								end
+							end
 						end
 
 						rootDescription:CreateDivider()

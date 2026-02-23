@@ -198,6 +198,9 @@ local function LoadEnUS()
 	L.MENU_GROUPS = "Groups"
 	L.MENU_CREATE_GROUP = "Create Group"
 	L.MENU_REMOVE_ALL_GROUPS = "Remove from All Groups"
+	L.MENU_REMOVE_RECENTLY_ADDED = "Remove from Recently Added"
+	L.MENU_CLEAR_ALL_RECENTLY_ADDED = "Clear All Recently Added"
+	L.MENU_ADD_ALL_TO_GROUP = "Add All to Group"
 	L.MENU_RENAME_GROUP = "Rename Group"
 	L.MENU_DELETE_GROUP = "Delete Group"
 	L.MENU_INVITE_GROUP = "Invite All to Party"
@@ -275,6 +278,7 @@ local function LoadEnUS()
 	L.GROUP_FAVORITES = "Favorites"
 	L.GROUP_INGAME = "In-Game"
 	L.GROUP_NO_GROUP = "No Group"
+	L.GROUP_RECENTLY_ADDED = "Recently Added"
 	L.ONLINE_STATUS = "Online"
 	L.OFFLINE_STATUS = "Offline"
 	L.STATUS_MOBILE = "Mobile"
@@ -808,6 +812,17 @@ local function LoadEnUS()
 	L.SETTINGS_INGAME_MODE_TOOLTIP = "In-Game Group Mode"
 	L.SETTINGS_INGAME_MODE_TOOLTIP_DESC =
 		"Choose which friends to include in the In-Game group:\n\n|cffffffffWoW Only:|r Friends playing the same WoW version (Retail/Classic)\n|cffffffffAny Game:|r Friends playing any Battle.net game"
+	L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT = "   Duration Unit:"
+	L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT_DESC =
+		"Choose the time unit for how long friends stay in the Recently Added group."
+	L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE = "   Duration Value:"
+	L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE_DESC =
+		"How many days/hours/minutes friends stay in the Recently Added group before being removed."
+	L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT_TOOLTIP = "Duration Unit"
+	L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE_TOOLTIP = "Duration Value"
+	L.SETTINGS_DURATION_DAYS = "Days"
+	L.SETTINGS_DURATION_HOURS = "Hours"
+	L.SETTINGS_DURATION_MINUTES = "Minutes"
 
 	-- Headers & Titles
 	L.SETTINGS_DISPLAY_OPTIONS = "Display Options"

@@ -71,6 +71,7 @@ Modules\HelpFrame.lua
 Modules\Statistics.lua
 Modules\FrameSettings.lua
 Modules\Groups.lua
+Modules\RecentlyAdded.lua
 Modules\FriendsList.lua
 Modules\WhoFrame.lua
 Modules\IgnoreList.lua
