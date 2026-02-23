@@ -2039,30 +2039,74 @@ function ElvUISkin:SkinSearchBuilder(E, S)
 		if builder.classDropdown then
 			pcall(S.HandleDropDownBox, S, builder.classDropdown)
 			if BFL.IsClassic then
-				FixClassicDropdownHitbox(builder.classDropdown, isDocked and 135 or 140, 24)
-				local p, rel, rp, x, y = builder.classDropdown:GetPoint(1)
+				FixClassicDropdownHitbox(builder.classDropdown, isDocked and 105 or 115, 24)
+				if not builder.classDropdown.BFL_OrigXOfs then
+					local p, rel, rp, x, y = builder.classDropdown:GetPoint(1)
+					builder.classDropdown.BFL_OrigXOfs = x or 0
+					builder.classDropdown.BFL_OrigYOfs = y or 0
+				end
+				local p, rel, rp = builder.classDropdown:GetPoint(1)
 				if p then
-					builder.classDropdown:SetPoint(p, rel, rp, (x or 0) + 2, y or 0)
+					builder.classDropdown:SetPoint(
+						p,
+						rel,
+						rp,
+						builder.classDropdown.BFL_OrigXOfs + 10,
+						builder.classDropdown.BFL_OrigYOfs
+					)
 				end
 			elseif BFL.HasModernDropdown then
-				local p, rel, rp, x, y = builder.classDropdown:GetPoint(1)
+				if not builder.classDropdown.BFL_OrigXOfs then
+					local p, rel, rp, x, y = builder.classDropdown:GetPoint(1)
+					builder.classDropdown.BFL_OrigXOfs = x or 0
+					builder.classDropdown.BFL_OrigYOfs = y or 0
+				end
+				local p, rel, rp = builder.classDropdown:GetPoint(1)
 				if p then
-					builder.classDropdown:SetPoint(p, rel, rp, (x or 0) + 1, y or 0)
+					builder.classDropdown:SetPoint(
+						p,
+						rel,
+						rp,
+						builder.classDropdown.BFL_OrigXOfs + 1,
+						builder.classDropdown.BFL_OrigYOfs
+					)
 				end
 			end
 		end
 		if builder.raceDropdown then
 			pcall(S.HandleDropDownBox, S, builder.raceDropdown)
 			if BFL.IsClassic then
-				FixClassicDropdownHitbox(builder.raceDropdown, isDocked and 135 or 140, 24)
-				local p, rel, rp, x, y = builder.raceDropdown:GetPoint(1)
+				FixClassicDropdownHitbox(builder.raceDropdown, isDocked and 105 or 115, 24)
+				if not builder.raceDropdown.BFL_OrigXOfs then
+					local p, rel, rp, x, y = builder.raceDropdown:GetPoint(1)
+					builder.raceDropdown.BFL_OrigXOfs = x or 0
+					builder.raceDropdown.BFL_OrigYOfs = y or 0
+				end
+				local p, rel, rp = builder.raceDropdown:GetPoint(1)
 				if p then
-					builder.raceDropdown:SetPoint(p, rel, rp, (x or 0) + 2, y or 0)
+					builder.raceDropdown:SetPoint(
+						p,
+						rel,
+						rp,
+						builder.raceDropdown.BFL_OrigXOfs + 10,
+						builder.raceDropdown.BFL_OrigYOfs
+					)
 				end
 			elseif BFL.HasModernDropdown then
-				local p, rel, rp, x, y = builder.raceDropdown:GetPoint(1)
+				if not builder.raceDropdown.BFL_OrigXOfs then
+					local p, rel, rp, x, y = builder.raceDropdown:GetPoint(1)
+					builder.raceDropdown.BFL_OrigXOfs = x or 0
+					builder.raceDropdown.BFL_OrigYOfs = y or 0
+				end
+				local p, rel, rp = builder.raceDropdown:GetPoint(1)
 				if p then
-					builder.raceDropdown:SetPoint(p, rel, rp, (x or 0) + 1, y or 0)
+					builder.raceDropdown:SetPoint(
+						p,
+						rel,
+						rp,
+						builder.raceDropdown.BFL_OrigXOfs + 1,
+						builder.raceDropdown.BFL_OrigYOfs
+					)
 				end
 			end
 		end

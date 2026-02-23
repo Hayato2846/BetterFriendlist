@@ -3117,25 +3117,27 @@ function WhoFrame:GetOrCreateDockedContainer()
 	end
 
 	local L = BFL.L or {}
-	local container =
-		CreateFrame("Frame", "BetterFriendlistSearchBuilderFrame", BetterFriendsFrame, "ButtonFrameTemplate")
+	local template = BFL.IsClassic and "BasicFrameTemplateWithInset" or "ButtonFrameTemplate"
+	local container = CreateFrame("Frame", "BetterFriendlistSearchBuilderFrame", BetterFriendsFrame, template)
 	container:SetSize(240, 240)
 	container:EnableMouse(true)
 	container:SetMovable(false)
 	container:Hide()
 
-	-- Setup ButtonFrameTemplate
-	if container.portrait then
-		container.portrait:Hide()
-	end
-	if container.PortraitContainer then
-		container.PortraitContainer:Hide()
-	end
-	if ButtonFrameTemplate_HidePortrait then
-		ButtonFrameTemplate_HidePortrait(container)
-	end
-	if ButtonFrameTemplate_HideAttic then
-		ButtonFrameTemplate_HideAttic(container)
+	if not BFL.IsClassic then
+		-- Retail: hide portrait from ButtonFrameTemplate
+		if container.portrait then
+			container.portrait:Hide()
+		end
+		if container.PortraitContainer then
+			container.PortraitContainer:Hide()
+		end
+		if ButtonFrameTemplate_HidePortrait then
+			ButtonFrameTemplate_HidePortrait(container)
+		end
+		if ButtonFrameTemplate_HideAttic then
+			ButtonFrameTemplate_HideAttic(container)
+		end
 	end
 
 	-- Set title
@@ -3148,6 +3150,9 @@ function WhoFrame:GetOrCreateDockedContainer()
 	-- Hide default Inset (we use the flyout content directly)
 	if container.Inset then
 		container.Inset:Hide()
+	end
+	if container.InsetRight then
+		container.InsetRight:Hide()
 	end
 
 	-- Override close button to toggle builder
