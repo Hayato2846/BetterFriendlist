@@ -1606,6 +1606,7 @@ local WHO_RACES_HORDE_RETAIL = {
 local WHO_RACES_NEUTRAL_RETAIL = {
 	"Dracthyr",
 	"Earthen",
+	"Haranir",
 }
 
 -- ========================================
@@ -1642,6 +1643,7 @@ local CLASS_RACE_COMPATIBILITY_RETAIL = {
 		"Vulpera",
 		"Dracthyr",
 		"Earthen",
+		"Haranir",
 	},
 	["Paladin"] = {
 		"Human",
@@ -1678,31 +1680,11 @@ local CLASS_RACE_COMPATIBILITY_RETAIL = {
 		"Mag'har Orc",
 		"Zandalari Troll",
 		"Vulpera",
+		"Dracthyr",
 		"Earthen",
+		"Haranir",
 	},
 	["Rogue"] = {
-		"Human",
-		"Dwarf",
-		"Night Elf",
-		"Gnome",
-		"Worgen",
-		"Pandaren",
-		"Orc",
-		"Undead",
-		"Troll",
-		"Blood Elf",
-		"Goblin",
-		"Void Elf",
-		"Dark Iron Dwarf",
-		"Kul Tiran",
-		"Mechagnome",
-		"Nightborne",
-		"Mag'har Orc",
-		"Zandalari Troll",
-		"Vulpera",
-		"Earthen",
-	},
-	["Priest"] = {
 		"Human",
 		"Dwarf",
 		"Night Elf",
@@ -1710,7 +1692,9 @@ local CLASS_RACE_COMPATIBILITY_RETAIL = {
 		"Draenei",
 		"Worgen",
 		"Pandaren",
+		"Orc",
 		"Undead",
+		"Tauren",
 		"Troll",
 		"Blood Elf",
 		"Goblin",
@@ -1720,10 +1704,41 @@ local CLASS_RACE_COMPATIBILITY_RETAIL = {
 		"Kul Tiran",
 		"Mechagnome",
 		"Nightborne",
+		"Highmountain Tauren",
 		"Mag'har Orc",
 		"Zandalari Troll",
 		"Vulpera",
+		"Dracthyr",
 		"Earthen",
+		"Haranir",
+	},
+	["Priest"] = {
+		"Human",
+		"Dwarf",
+		"Night Elf",
+		"Gnome",
+		"Draenei",
+		"Worgen",
+		"Pandaren",
+		"Orc",
+		"Undead",
+		"Tauren",
+		"Troll",
+		"Blood Elf",
+		"Goblin",
+		"Void Elf",
+		"Lightforged Draenei",
+		"Dark Iron Dwarf",
+		"Kul Tiran",
+		"Mechagnome",
+		"Nightborne",
+		"Highmountain Tauren",
+		"Mag'har Orc",
+		"Zandalari Troll",
+		"Vulpera",
+		"Dracthyr",
+		"Earthen",
+		"Haranir",
 	},
 	["Death Knight"] = {
 		"Human",
@@ -1749,7 +1764,6 @@ local CLASS_RACE_COMPATIBILITY_RETAIL = {
 		"Mag'har Orc",
 		"Zandalari Troll",
 		"Vulpera",
-		"Earthen",
 	},
 	["Shaman"] = {
 		"Dwarf",
@@ -1766,6 +1780,7 @@ local CLASS_RACE_COMPATIBILITY_RETAIL = {
 		"Zandalari Troll",
 		"Vulpera",
 		"Earthen",
+		"Haranir",
 	},
 	["Mage"] = {
 		"Human",
@@ -1775,7 +1790,9 @@ local CLASS_RACE_COMPATIBILITY_RETAIL = {
 		"Draenei",
 		"Worgen",
 		"Pandaren",
+		"Orc",
 		"Undead",
+		"Tauren",
 		"Troll",
 		"Blood Elf",
 		"Goblin",
@@ -1785,28 +1802,41 @@ local CLASS_RACE_COMPATIBILITY_RETAIL = {
 		"Kul Tiran",
 		"Mechagnome",
 		"Nightborne",
+		"Highmountain Tauren",
 		"Mag'har Orc",
 		"Zandalari Troll",
 		"Vulpera",
+		"Dracthyr",
 		"Earthen",
+		"Haranir",
 	},
 	["Warlock"] = {
 		"Human",
 		"Dwarf",
+		"Night Elf",
 		"Gnome",
+		"Draenei",
 		"Worgen",
+		"Pandaren",
 		"Orc",
 		"Undead",
+		"Tauren",
 		"Troll",
 		"Blood Elf",
 		"Goblin",
 		"Void Elf",
+		"Lightforged Draenei",
 		"Dark Iron Dwarf",
+		"Kul Tiran",
 		"Mechagnome",
 		"Nightborne",
+		"Highmountain Tauren",
 		"Mag'har Orc",
 		"Zandalari Troll",
 		"Vulpera",
+		"Dracthyr",
+		"Earthen",
+		"Haranir",
 	},
 	["Monk"] = {
 		"Human",
@@ -1814,6 +1844,7 @@ local CLASS_RACE_COMPATIBILITY_RETAIL = {
 		"Night Elf",
 		"Gnome",
 		"Draenei",
+		"Worgen",
 		"Pandaren",
 		"Orc",
 		"Undead",
@@ -1832,17 +1863,17 @@ local CLASS_RACE_COMPATIBILITY_RETAIL = {
 		"Zandalari Troll",
 		"Vulpera",
 		"Earthen",
+		"Haranir",
 	},
 	["Druid"] = {
 		"Night Elf",
 		"Worgen",
-		"Pandaren",
 		"Tauren",
 		"Troll",
 		"Kul Tiran",
 		"Highmountain Tauren",
 		"Zandalari Troll",
-		"Earthen",
+		"Haranir",
 	},
 	["Demon Hunter"] = {
 		"Night Elf",
@@ -1909,15 +1940,17 @@ local CLASS_RACE_COMPATIBILITY_MOP = {
 		"Human",
 		"Dwarf",
 		"Night Elf",
+		"Gnome", -- NEW in Cata 4.0
 		"Draenei",
 		"Worgen",
 		"Undead",
+		"Tauren", -- NEW in Cata 4.0
 		"Troll",
 		"Blood Elf",
 		"Goblin",
 		"Pandaren",
 	},
-	["Death Knight"] = { -- Added in WotLK 3.0, all races except Pandaren initially
+	["Death Knight"] = { -- Added in WotLK 3.0, Pandaren DK added in Shadowlands 9.0
 		"Human",
 		"Dwarf",
 		"Night Elf",
@@ -1930,7 +1963,6 @@ local CLASS_RACE_COMPATIBILITY_MOP = {
 		"Troll",
 		"Blood Elf",
 		"Goblin",
-		"Pandaren", -- Added in MoP
 	},
 	["Shaman"] = {
 		"Dwarf",
@@ -1943,9 +1975,12 @@ local CLASS_RACE_COMPATIBILITY_MOP = {
 	},
 	["Mage"] = {
 		"Human",
+		"Dwarf", -- NEW in Cata 4.0
+		"Night Elf", -- NEW in Cata 4.0
 		"Gnome",
 		"Draenei",
 		"Worgen",
+		"Orc", -- NEW in Cata 4.0
 		"Undead",
 		"Troll",
 		"Blood Elf",
@@ -1954,10 +1989,12 @@ local CLASS_RACE_COMPATIBILITY_MOP = {
 	},
 	["Warlock"] = {
 		"Human",
+		"Dwarf", -- NEW in Cata 4.0
 		"Gnome",
 		"Worgen",
 		"Orc",
 		"Undead",
+		"Troll", -- NEW in Cata 4.0
 		"Blood Elf",
 		"Goblin",
 	},
@@ -2034,9 +2071,11 @@ local CLASS_RACE_COMPATIBILITY_CATA = {
 		"Human",
 		"Dwarf",
 		"Night Elf",
+		"Gnome", -- NEW in Cata 4.0
 		"Draenei",
 		"Worgen",
 		"Undead",
+		"Tauren", -- NEW in Cata 4.0
 		"Troll",
 		"Blood Elf",
 		"Goblin",
@@ -2065,9 +2104,12 @@ local CLASS_RACE_COMPATIBILITY_CATA = {
 	},
 	["Mage"] = {
 		"Human",
+		"Dwarf", -- NEW in Cata 4.0
+		"Night Elf", -- NEW in Cata 4.0
 		"Gnome",
 		"Draenei",
 		"Worgen",
+		"Orc", -- NEW in Cata 4.0
 		"Undead",
 		"Troll",
 		"Blood Elf",
@@ -2075,10 +2117,12 @@ local CLASS_RACE_COMPATIBILITY_CATA = {
 	},
 	["Warlock"] = {
 		"Human",
+		"Dwarf", -- NEW in Cata 4.0
 		"Gnome",
 		"Worgen",
 		"Orc",
 		"Undead",
+		"Troll", -- NEW in Cata 4.0
 		"Blood Elf",
 		"Goblin",
 	},
@@ -2357,6 +2401,9 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	end
 	self.builder.classDropdown = classDropdown
 
+	-- Forward declaration (RebuildRaceDropdown is defined after RebuildClassDropdown)
+	local RebuildRaceDropdown
+
 	-- Function to build/rebuild class dropdown with optional race filter
 	local function RebuildClassDropdown()
 		local classLabels = { L.WHO_BUILDER_ALL_CLASSES or "All Classes" }
@@ -2418,7 +2465,7 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	self.builder.raceDropdown = raceDropdown
 
 	-- Function to build/rebuild race dropdown with optional class filter
-	local function RebuildRaceDropdown()
+	RebuildRaceDropdown = function()
 		local raceLabels = { L.WHO_BUILDER_ALL_RACES or "All Races" }
 		local raceValues = { "" }
 
