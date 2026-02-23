@@ -2371,8 +2371,9 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 		return input
 	end
 
-	-- Row 1: Name
+	-- Row 1: Name (max 12 chars = WoW character name limit)
 	self.builder.nameInput = CreateInputRow(flyout, (L.WHO_BUILDER_NAME or "Name") .. ":", yOffset)
+	self.builder.nameInput:SetMaxLetters(12)
 	yOffset = yOffset - rowHeight
 
 	-- Row 2: Guild
