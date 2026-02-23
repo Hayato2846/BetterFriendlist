@@ -416,6 +416,61 @@ function BetterRaidFrame_EveryoneAssistCheckbox_OnClick(self)
 	end
 end
 
+local function RestoreRaidInfoFrameLayering()
+	if not RaidInfoFrame then
+		return
+	end
+
+	local targetParent = RaidInfoFrame._originalParent or UIParent
+
+	if RaidInfoFrame._originalFrameStrata then
+		RaidInfoFrame:SetFrameStrata(RaidInfoFrame._originalFrameStrata)
+	elseif targetParent and targetParent.GetFrameStrata then
+		RaidInfoFrame:SetFrameStrata(targetParent:GetFrameStrata())
+	end
+
+	if RaidInfoFrame._originalFrameLevel then
+		RaidInfoFrame:SetFrameLevel(RaidInfoFrame._originalFrameLevel)
+	elseif targetParent and targetParent.GetFrameLevel then
+		RaidInfoFrame:SetFrameLevel((targetParent:GetFrameLevel() or 0) + 1)
+	end
+end
+
+local function GetHigherFrameStrata(baseStrata)
+	local strataOrder = {
+		"BACKGROUND",
+		"LOW",
+		"MEDIUM",
+		"HIGH",
+		"DIALOG",
+		"FULLSCREEN",
+		"FULLSCREEN_DIALOG",
+		"TOOLTIP",
+	}
+
+	for i, strataName in ipairs(strataOrder) do
+		if strataName == baseStrata then
+			return strataOrder[math.min(i + 1, #strataOrder)]
+		end
+	end
+
+	-- Fallback for unknown/empty strata values.
+	return "DIALOG"
+end
+
+local function ApplyDockedRaidInfoFrameLayering()
+	if not RaidInfoFrame or not BetterFriendsFrame then
+		return
+	end
+
+	-- Keep RaidInfoFrame above the entire BetterFriendsFrame hierarchy so movable
+	-- RaidInfo windows from other addons never end up under BFL borders.
+	local higherStrata = GetHigherFrameStrata(BetterFriendsFrame:GetFrameStrata())
+	RaidInfoFrame:SetFrameStrata(higherStrata)
+	RaidInfoFrame:SetFrameLevel((BetterFriendsFrame:GetFrameLevel() or 0) + 100)
+	RaidInfoFrame:Raise()
+end
+
 -- Raid Info Button
 function BetterRaidFrame_RaidInfoButton_OnClick(self)
 	-- Get number of saved instances to check if we have any
@@ -437,7 +492,8 @@ function BetterRaidFrame_RaidInfoButton_OnClick(self)
 	if RaidInfoFrame:IsShown() and RaidInfoFrame:GetParent() == BetterFriendsFrame then
 		-- Close and restore to default parent
 		RaidInfoFrame:Hide()
-		RaidInfoFrame:SetParent(UIParent)
+		RaidInfoFrame:SetParent(RaidInfoFrame._originalParent or UIParent)
+		RestoreRaidInfoFrameLayering()
 		RaidInfoFrame:ClearAllPoints()
 		if RaidFrame then
 			RaidInfoFrame:SetPoint("TOPLEFT", RaidFrame, "TOPRIGHT", 0, -20)
@@ -450,9 +506,16 @@ function BetterRaidFrame_RaidInfoButton_OnClick(self)
 	if not RaidInfoFrame._originalParent then
 		RaidInfoFrame._originalParent = RaidInfoFrame:GetParent()
 	end
+	if not RaidInfoFrame._originalFrameStrata then
+		RaidInfoFrame._originalFrameStrata = RaidInfoFrame:GetFrameStrata()
+	end
+	if not RaidInfoFrame._originalFrameLevel then
+		RaidInfoFrame._originalFrameLevel = RaidInfoFrame:GetFrameLevel()
+	end
 
 	-- Reparent to BetterFriendsFrame
 	RaidInfoFrame:SetParent(BetterFriendsFrame)
+	ApplyDockedRaidInfoFrameLayering()
 	RaidInfoFrame:ClearAllPoints()
 
 	-- Position next to BetterFriendsFrame (top-aligned)
@@ -469,6 +532,7 @@ function BetterRaidFrame_RaidInfoButton_OnClick(self)
 			-- Restore original parent
 			if RaidInfoFrame._originalParent then
 				RaidInfoFrame:SetParent(RaidInfoFrame._originalParent)
+				RestoreRaidInfoFrameLayering()
 				RaidInfoFrame:ClearAllPoints()
 				if RaidFrame then
 					RaidInfoFrame:SetPoint("TOPLEFT", RaidFrame, "TOPRIGHT", 0, -20)

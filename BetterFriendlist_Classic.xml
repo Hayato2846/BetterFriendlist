@@ -501,8 +501,8 @@
 			<Layer level="BACKGROUND">
 				<Texture parentKey="Background" file="Interface\RaidFrame\Raid-Bar-Hp-Bg">
 					<Anchors>
-						<Anchor point="TOPLEFT" x="-3" y="0"/>
-						<Anchor point="BOTTOMRIGHT" x="3" y="0"/>
+						<Anchor point="TOPLEFT" x="0" y="0"/>
+						<Anchor point="BOTTOMRIGHT" x="0" y="0"/>
 					</Anchors>
 					<TexCoords left="0" right="1" top="0" bottom="0.53125"/>
 				</Texture>
