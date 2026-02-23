@@ -74,6 +74,33 @@ function StreamerMode:IsActive()
 	return BetterFriendlistDB and BetterFriendlistDB.streamerModeActive
 end
 
+function StreamerMode:UpdateAdjacentButtonAnchors()
+	-- Re-anchor HelpButton when StreamerModeButton is hidden/shown
+	if not BetterFriendsFrame then
+		return
+	end
+
+	local helpButton = BetterFriendsFrame.HelpButton
+	if helpButton then
+		helpButton:ClearAllPoints()
+		if BetterFriendlistDB.showStreamerModeButton == false then
+			-- StreamerModeButton hidden: anchor HelpButton directly to CloseButton
+			if BFL.IsClassic then
+				helpButton:SetPoint("RIGHT", BetterFriendsFrame.CloseButton, "LEFT", -4, 0)
+			else
+				helpButton:SetPoint("TOPRIGHT", BetterFriendsFrame.CloseButton, "TOPLEFT", 1, 1)
+			end
+		else
+			-- StreamerModeButton visible: anchor to StreamerModeButton (default)
+			if BFL.IsClassic then
+				helpButton:SetPoint("RIGHT", self.toggleButton, "LEFT", -1, 0)
+			else
+				helpButton:SetPoint("TOPRIGHT", self.toggleButton, "TOPLEFT", 0, 0)
+			end
+		end
+	end
+end
+
 function StreamerMode:UpdateState()
 	if not self.toggleButton then
 		-- Try to find it again (if loaded late)
@@ -108,10 +135,13 @@ function StreamerMode:UpdateState()
 			end
 		end
 		self.toggleButton:Hide()
+		self:UpdateAdjacentButtonAnchors()
 		return
 	else
 		self.toggleButton:Show()
 	end
+
+	self:UpdateAdjacentButtonAnchors()
 
 	if self:IsActive() then
 		-- Privacy ON -> Twitch Purple (Active)

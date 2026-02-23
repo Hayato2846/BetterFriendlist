@@ -32,8 +32,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Streamer Mode Still Active When Button Hidden** - Fixed Streamer Mode remaining active when the "Show Streamer Mode Button" option was disabled. The addon now automatically deactivates Streamer Mode when the button is hidden, restoring the original header text and removing privacy filtering.
 - **Who Search: Stale Player Selection** - Fixed being able to invite or interact with players from previous Who search results after starting a new search. Player selection is now automatically cleared when a new Who search is executed.
 - **Who Search Builder: Incomplete Race/Class Data** - Fixed race-class compatibility tables across all WoW versions. In Retail, Dracthyr was missing most of its classes, many races were missing Warlock and other Dragonflight additions, Haranir was not included, and Earthen was incorrectly listed as Death Knight and Druid. In Cata Classic and MoP Classic, Priest was missing Gnome and Tauren, Mage was missing Dwarf, Night Elf, and Orc, and Warlock was missing Dwarf and Troll (all combinations that were added in Cataclysm 4.0). In MoP Classic, Pandaren was incorrectly listed as a Death Knight option (Pandaren DK was not available until Shadowlands).
-- **Raid Tab: Button Gap When Streamer Mode Button Hidden** - The Raid Info button and Help button now shift to the right when the Streamer Mode button is hidden via settings, removing the visual gap in the top-right corner.
-- **Raid Tab: Content Area Misaligned With Quick Join** - Fixed the Raid tab's content area starting at a different vertical position than the Quick Join tab, causing a visual inconsistency when switching between tabs.
 
 ## [2.4.0]       - 2026-02-21
 
