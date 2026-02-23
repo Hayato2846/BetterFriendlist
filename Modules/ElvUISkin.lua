@@ -2035,10 +2035,15 @@ function ElvUISkin:SkinSearchBuilder(E, S)
 		if builder.levelMax then
 			S:HandleEditBox(builder.levelMax)
 		end
+		local isDocked = WhoFrameModule.builderDocked
 		if builder.classDropdown then
 			pcall(S.HandleDropDownBox, S, builder.classDropdown)
 			if BFL.IsClassic then
-				FixClassicDropdownHitbox(builder.classDropdown, 140, 24)
+				FixClassicDropdownHitbox(builder.classDropdown, isDocked and 135 or 140, 24)
+				local p, rel, rp, x, y = builder.classDropdown:GetPoint(1)
+				if p then
+					builder.classDropdown:SetPoint(p, rel, rp, (x or 0) + 2, y or 0)
+				end
 			elseif BFL.HasModernDropdown then
 				local p, rel, rp, x, y = builder.classDropdown:GetPoint(1)
 				if p then
@@ -2049,7 +2054,11 @@ function ElvUISkin:SkinSearchBuilder(E, S)
 		if builder.raceDropdown then
 			pcall(S.HandleDropDownBox, S, builder.raceDropdown)
 			if BFL.IsClassic then
-				FixClassicDropdownHitbox(builder.raceDropdown, 140, 24)
+				FixClassicDropdownHitbox(builder.raceDropdown, isDocked and 135 or 140, 24)
+				local p, rel, rp, x, y = builder.raceDropdown:GetPoint(1)
+				if p then
+					builder.raceDropdown:SetPoint(p, rel, rp, (x or 0) + 2, y or 0)
+				end
 			elseif BFL.HasModernDropdown then
 				local p, rel, rp, x, y = builder.raceDropdown:GetPoint(1)
 				if p then
