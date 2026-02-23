@@ -1261,6 +1261,8 @@ BFL:RegisterLocale("ptBR", function()
 	L.WHO_BUILDER_SEARCH = "Buscar"
 	L.WHO_BUILDER_RESET = "Redefinir"
 	L.WHO_BUILDER_TOOLTIP = "Abrir construtor de busca"
+	L.WHO_BUILDER_DOCK_TOOLTIP = "Ancorar construtor de busca"
+	L.WHO_BUILDER_UNDOCK_TOOLTIP = "Desancorar construtor de busca"
 
 	-- ========================================
 	-- FRAME DIMENSIONS (Phase 21) - RESTORED

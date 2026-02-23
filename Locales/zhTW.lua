@@ -1268,6 +1268,8 @@ BFL:RegisterLocale("zhTW", function()
 	L.WHO_BUILDER_SEARCH = "搜尋"
 	L.WHO_BUILDER_RESET = "重置"
 	L.WHO_BUILDER_TOOLTIP = "開啟搜尋建構器"
+	L.WHO_BUILDER_DOCK_TOOLTIP = "停靠搜尋建構器"
+	L.WHO_BUILDER_UNDOCK_TOOLTIP = "取消停靠搜尋建構器"
 
 	-- ========================================
 	-- FRAME DIMENSIONS (Phase 21) - RESTORED

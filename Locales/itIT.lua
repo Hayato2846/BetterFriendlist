@@ -1262,6 +1262,8 @@ BFL:RegisterLocale("itIT", function()
 	L.WHO_BUILDER_SEARCH = "Cerca"
 	L.WHO_BUILDER_RESET = "Reimposta"
 	L.WHO_BUILDER_TOOLTIP = "Apri il costruttore di ricerca"
+	L.WHO_BUILDER_DOCK_TOOLTIP = "Ancora il costruttore di ricerca"
+	L.WHO_BUILDER_UNDOCK_TOOLTIP = "Sgancia il costruttore di ricerca"
 
 	-- ========================================
 	-- FRAME DIMENSIONS (Phase 21) - RESTORED

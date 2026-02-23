@@ -1267,6 +1267,8 @@ local function LoadEnUS()
 	L.WHO_BUILDER_SEARCH = "Search"
 	L.WHO_BUILDER_RESET = "Reset"
 	L.WHO_BUILDER_TOOLTIP = "Open Search Builder"
+	L.WHO_BUILDER_DOCK_TOOLTIP = "Dock Search Builder"
+	L.WHO_BUILDER_UNDOCK_TOOLTIP = "Undock Search Builder"
 
 	-- ========================================
 	-- NOTE SYNC (Group to Note Sync)

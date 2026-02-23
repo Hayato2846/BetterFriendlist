@@ -1250,6 +1250,8 @@ BFL:RegisterLocale("zhCN", function()
 	L.WHO_BUILDER_SEARCH = "搜索"
 	L.WHO_BUILDER_RESET = "重置"
 	L.WHO_BUILDER_TOOLTIP = "打开搜索构建器"
+	L.WHO_BUILDER_DOCK_TOOLTIP = "停靠搜索构建器"
+	L.WHO_BUILDER_UNDOCK_TOOLTIP = "取消停靠搜索构建器"
 
 	-- ========================================
 	-- FRAME DIMENSIONS (Phase 21) - RESTORED

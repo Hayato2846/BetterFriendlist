@@ -1257,6 +1257,8 @@ BFL:RegisterLocale("koKR", function()
 	L.WHO_BUILDER_SEARCH = "검색"
 	L.WHO_BUILDER_RESET = "초기화"
 	L.WHO_BUILDER_TOOLTIP = "검색 빌더 열기"
+	L.WHO_BUILDER_DOCK_TOOLTIP = "검색 빌더 고정"
+	L.WHO_BUILDER_UNDOCK_TOOLTIP = "검색 빌더 분리"
 
 	-- ========================================
 	-- FRAME DIMENSIONS (Phase 21) - RESTORED
@@ -1334,7 +1336,7 @@ BFL:RegisterLocale("koKR", function()
 	-- ========================================
 	L.SETTINGS_SHOW_WELCOME_MESSAGE = "환영 메시지 표시"
 	L.SETTINGS_SHOW_WELCOME_MESSAGE_DESC =
-		"로그인할 때 애드온 로드된 메시지를 채팅에 표시합니다."
+		"로그인할 때 ���드온 로드된 메시지를 채팅에 표시합니다."
 
 	-- ========================================
 	-- RAID CONVERSION / MOCK (Phase 21+)

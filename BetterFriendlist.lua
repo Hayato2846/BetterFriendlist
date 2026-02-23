@@ -3029,6 +3029,12 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 		HideChildFrame(frame.RaidFrame)
 	end
 
+	-- Hide docked Search Builder when switching away from WHO tab
+	local WhoFrameModule = BFL:GetModule("WhoFrame")
+	if WhoFrameModule and WhoFrameModule.builderDocked and WhoFrameModule.builderDockedContainer then
+		WhoFrameModule.builderDockedContainer:Hide()
+	end
+
 	if tabIndex == 1 then
 		-- Show Friends list
 		ShowChildFrame(frame.ScrollFrame)
@@ -3048,6 +3054,16 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 		elseif BFL.IsClassic and frame.WhoFrame then
 			ShowChildFrame(frame.WhoFrame)
 			BetterWhoFrame_Update()
+			-- Restore docked Search Builder if it was open
+			if
+				WhoFrameModule
+				and WhoFrameModule.builderDocked
+				and WhoFrameModule.builderDockedContainer
+				and WhoFrameModule.builderFlyout
+				and WhoFrameModule.builderFlyout:IsShown()
+			then
+				WhoFrameModule.builderDockedContainer:Show()
+			end
 		end
 	elseif tabIndex == 3 then
 		-- Retail: Recruit A Friend
@@ -4595,6 +4611,12 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex)
 	HideChildFrame(frame.RecruitAFriendFrame)
 	HideChildFrame(frame.QuickJoinFrame)
 
+	-- Hide docked Search Builder when switching away from WHO tab
+	local WhoFrameModule = BFL:GetModule("WhoFrame")
+	if WhoFrameModule and WhoFrameModule.builderDocked and WhoFrameModule.builderDockedContainer then
+		WhoFrameModule.builderDockedContainer:Hide()
+	end
+
 	-- Hide all friend list buttons explicitly
 	-- REMOVED: ScrollBox handles button visibility automatically
 	-- if tabIndex ~= 1 then
@@ -4686,6 +4708,16 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex)
 		-- Tab 2: Who frame
 		ShowChildFrame(frame.WhoFrame)
 		BetterWhoFrame_Update()
+		-- Restore docked Search Builder if it was open
+		if
+			WhoFrameModule
+			and WhoFrameModule.builderDocked
+			and WhoFrameModule.builderDockedContainer
+			and WhoFrameModule.builderFlyout
+			and WhoFrameModule.builderFlyout:IsShown()
+		then
+			WhoFrameModule.builderDockedContainer:Show()
+		end
 	elseif tabIndex == 3 then
 		if BFL.IsClassic then
 			-- Classic: Guild Tab (if visible) OR Raid (if Guild hidden)

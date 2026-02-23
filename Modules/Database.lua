@@ -159,6 +159,7 @@ local defaults = {
 	whoSearchHistoryMax = 8, -- Maximum search history entries (default: 8)
 	whoDoubleClickAction = "whisper", -- Double-click action: whisper, invite, inspect (default: whisper)
 	whoSearchHistory = {}, -- Stored search history entries
+	whoSearchBuilderDocked = false, -- Search Builder docked mode (default: OFF, flyout overlay)
 
 	-- Migration tracking
 	friendGroupsMigrated = false, -- Track if FriendGroups migration has been completed

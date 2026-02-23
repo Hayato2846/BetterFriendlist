@@ -81,6 +81,16 @@ function WhoFrame:Initialize()
 			end
 		end)
 	end
+
+	-- Restore docked state from DB (must be here, not in CreateSearchBuilder,
+	-- because SavedVariables are not yet available during XML OnLoad)
+	local DB = BFL:GetModule("DB")
+	if DB and self.builderFlyout then
+		local isDocked = DB:Get("whoSearchBuilderDocked", false)
+		if isDocked then
+			self:SetBuilderDocked(true)
+		end
+	end
 end
 
 -- Get a WHO setting from the database with fallback
@@ -2637,7 +2647,7 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	flyout:EnableKeyboard(true)
 	flyout:SetPropagateKeyboardInput(true)
 	flyout:SetScript("OnKeyDown", function(self, key)
-		if key == "ESCAPE" then
+		if key == "ESCAPE" and not WhoFrame.builderDocked then
 			self:SetPropagateKeyboardInput(false)
 			WhoFrame:ToggleSearchBuilder(false)
 		else
@@ -2657,6 +2667,10 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	closeBtn:SetScript("OnClick", function()
 		WhoFrame:ToggleSearchBuilder(false)
 	end)
+
+	-- Store title/close references for dock mode switching
+	self.builderTitle = title
+	self.builderCloseBtn = closeBtn
 
 	-- Build content
 	self.builder = {}
@@ -2688,7 +2702,9 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 		end)
 		input:SetScript("OnEscapePressed", function(self)
 			self:ClearFocus()
-			WhoFrame:ToggleSearchBuilder(false)
+			if not WhoFrame.builderDocked then
+				WhoFrame:ToggleSearchBuilder(false)
+			end
 		end)
 		-- Tab navigation handled by WoW default EditBox behavior
 		return input
@@ -2981,6 +2997,39 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	previewText:SetWordWrap(true)
 	previewText:SetText(L.WHO_BUILDER_PREVIEW_EMPTY or "Fill in fields to build a search")
 	self.builder.previewText = previewText
+	self.builder.previewLabel = previewLabel
+
+	-- Dock toggle button (next to close button in title bar)
+	local dockBtn = CreateFrame("Button", nil, flyout)
+	dockBtn:SetSize(16, 16)
+	dockBtn:SetPoint("RIGHT", closeBtn, "LEFT", -2, 0)
+	dockBtn:SetFrameLevel(flyout:GetFrameLevel() + 2)
+
+	local dockIcon = dockBtn:CreateTexture(nil, "ARTWORK")
+	dockIcon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\maximize-2")
+	dockIcon:SetSize(12, 12)
+	dockIcon:SetPoint("CENTER")
+	dockIcon:SetVertexColor(0.7, 0.7, 0.7)
+	dockBtn.icon = dockIcon
+
+	dockBtn:SetScript("OnEnter", function(self)
+		self.icon:SetVertexColor(1, 1, 1)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		if WhoFrame.builderDocked then
+			GameTooltip:AddLine(L.WHO_BUILDER_UNDOCK_TOOLTIP or "Undock Search Builder")
+		else
+			GameTooltip:AddLine(L.WHO_BUILDER_DOCK_TOOLTIP or "Dock Search Builder")
+		end
+		GameTooltip:Show()
+	end)
+	dockBtn:SetScript("OnLeave", function(self)
+		self.icon:SetVertexColor(0.7, 0.7, 0.7)
+		GameTooltip:Hide()
+	end)
+	dockBtn:SetScript("OnClick", function()
+		WhoFrame:SetBuilderDocked(not WhoFrame.builderDocked)
+	end)
+	self.builderDockBtn = dockBtn
 
 	-- Store references
 	self.builderFlyout = flyout
@@ -2990,6 +3039,189 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	toggleBtn:SetScript("OnClick", function()
 		WhoFrame:ToggleSearchBuilder(not flyout:IsShown())
 	end)
+
+	-- Store whoFrame reference for re-anchoring
+	self.builderWhoFrame = whoFrame
+end
+
+-- Create the ButtonFrameTemplate container for docked mode (lazy, one-time)
+function WhoFrame:GetOrCreateDockedContainer()
+	if self.builderDockedContainer then
+		return self.builderDockedContainer
+	end
+
+	local L = BFL.L or {}
+	local container =
+		CreateFrame("Frame", "BetterFriendlistSearchBuilderFrame", BetterFriendsFrame, "ButtonFrameTemplate")
+	container:SetSize(240, 240)
+	container:EnableMouse(true)
+	container:SetMovable(false)
+	container:Hide()
+
+	-- Setup ButtonFrameTemplate
+	if container.portrait then
+		container.portrait:Hide()
+	end
+	if container.PortraitContainer then
+		container.PortraitContainer:Hide()
+	end
+	if ButtonFrameTemplate_HidePortrait then
+		ButtonFrameTemplate_HidePortrait(container)
+	end
+	if ButtonFrameTemplate_HideAttic then
+		ButtonFrameTemplate_HideAttic(container)
+	end
+
+	-- Set title
+	if container.TitleText and container.TitleText.SetText then
+		container.TitleText:SetText(L.WHO_BUILDER_TITLE or "Search Builder")
+	elseif container.TitleContainer and container.TitleContainer.TitleText then
+		container.TitleContainer.TitleText:SetText(L.WHO_BUILDER_TITLE or "Search Builder")
+	end
+
+	-- Hide default Inset (we use the flyout content directly)
+	if container.Inset then
+		container.Inset:Hide()
+	end
+
+	-- Override close button to toggle builder
+	if container.CloseButton then
+		container.CloseButton:SetScript("OnClick", function()
+			WhoFrame:ToggleSearchBuilder(false)
+		end)
+	end
+
+	self.builderDockedContainer = container
+	return container
+end
+
+-- Set the Search Builder to docked or flyout mode
+function WhoFrame:SetBuilderDocked(docked)
+	local flyout = self.builderFlyout
+	local whoFrame = self.builderWhoFrame
+	if not flyout or not whoFrame then
+		return
+	end
+
+	local DB = BFL:GetModule("DB")
+	self.builderDocked = docked
+	DB:Set("whoSearchBuilderDocked", docked)
+
+	flyout:ClearAllPoints()
+
+	if docked then
+		-- Create (or get) the ButtonFrameTemplate container
+		local container = self:GetOrCreateDockedContainer()
+		container:ClearAllPoints()
+		container:SetPoint("BOTTOMLEFT", BetterFriendsFrame, "BOTTOMRIGHT", 2, 0)
+		container:SetFrameStrata("HIGH")
+
+		-- Reparent flyout into the container and fill it
+		flyout:SetParent(container)
+		flyout:ClearAllPoints()
+		flyout:SetPoint("TOPLEFT", container, "TOPLEFT", 4, -22)
+		flyout:SetPoint("BOTTOMRIGHT", container, "BOTTOMRIGHT", -4, 4)
+
+		-- Hide flyout's own backdrop, title bar, and close button (container provides these)
+		flyout:SetBackdrop(nil)
+		if self.builderTitle then
+			self.builderTitle:Hide()
+		end
+		if self.builderCloseBtn then
+			self.builderCloseBtn:Hide()
+		end
+
+		-- Move dock button to the container's title bar
+		if self.builderDockBtn then
+			self.builderDockBtn:SetParent(container)
+			self.builderDockBtn:ClearAllPoints()
+			if container.CloseButton then
+				self.builderDockBtn:SetPoint("RIGHT", container.CloseButton, "LEFT", -2, 0)
+				self.builderDockBtn:SetFrameStrata(container.CloseButton:GetFrameStrata())
+				self.builderDockBtn:SetFrameLevel(container.CloseButton:GetFrameLevel())
+			else
+				self.builderDockBtn:SetPoint("TOPRIGHT", container, "TOPRIGHT", -28, -4)
+				self.builderDockBtn:SetFrameLevel(container:GetFrameLevel() + 10)
+			end
+		end
+
+		-- Show the container if the builder flyout is currently visible
+		if flyout:IsShown() then
+			container:Show()
+		end
+
+		-- Hide preview (live EditBox replaces it)
+		if self.builder.previewLabel then
+			self.builder.previewLabel:Hide()
+		end
+		if self.builder.previewText then
+			self.builder.previewText:Hide()
+		end
+
+		-- Update dock button icon to "minimize" (undock)
+		if self.builderDockBtn then
+			self.builderDockBtn.icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\minimize-2")
+		end
+	else
+		-- Hide the docked container
+		if self.builderDockedContainer then
+			self.builderDockedContainer:Hide()
+		end
+
+		-- Undock: restore original flyout position inside WhoFrame
+		flyout:SetParent(whoFrame)
+		flyout:ClearAllPoints()
+		flyout:SetFrameStrata(whoFrame:GetFrameStrata())
+		local editBox = whoFrame.EditBox
+		if editBox then
+			flyout:SetFrameLevel(editBox:GetFrameLevel() + 10)
+		end
+		flyout:SetPoint("BOTTOMLEFT", whoFrame.ListInset, "BOTTOMLEFT", 0, 60)
+		flyout:SetPoint("BOTTOMRIGHT", whoFrame.ListInset, "BOTTOMRIGHT", 0, 60)
+		flyout:SetHeight(235)
+
+		-- Restore flyout's own backdrop, title bar, and close button
+		flyout:SetBackdrop({
+			bgFile = "Interface\\BUTTONS\\WHITE8X8",
+			edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+			tile = true,
+			tileSize = 16,
+			edgeSize = 16,
+			insets = { left = 4, right = 4, top = 4, bottom = 4 },
+		})
+		flyout:SetBackdropColor(0.08, 0.08, 0.08, 1)
+		flyout:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+		if self.builderTitle then
+			self.builderTitle:Show()
+		end
+		if self.builderCloseBtn then
+			self.builderCloseBtn:Show()
+		end
+
+		-- Move dock button back to flyout title bar
+		if self.builderDockBtn and self.builderCloseBtn then
+			self.builderDockBtn:SetParent(flyout)
+			self.builderDockBtn:ClearAllPoints()
+			self.builderDockBtn:SetPoint("RIGHT", self.builderCloseBtn, "LEFT", -2, 0)
+			self.builderDockBtn:SetFrameLevel(flyout:GetFrameLevel() + 2)
+		end
+
+		-- Show preview again
+		if self.builder.previewLabel then
+			self.builder.previewLabel:Show()
+		end
+		if self.builder.previewText then
+			self.builder.previewText:Show()
+		end
+
+		-- Update dock button icon to "maximize" (dock)
+		if self.builderDockBtn then
+			self.builderDockBtn.icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\maximize-2")
+		end
+	end
+
+	-- Sync current state
+	self:UpdateBuilderPreview()
 end
 
 -- Toggle the Search Builder flyout open/closed
@@ -2999,11 +3231,19 @@ function WhoFrame:ToggleSearchBuilder(show)
 	end
 
 	if show then
+		-- In docked mode, also show the container
+		if self.builderDocked and self.builderDockedContainer then
+			self.builderDockedContainer:Show()
+		end
 		self.builderFlyout:Show()
 		self.builderToggle.icon:SetVertexColor(1, 0.82, 0) -- Gold tint when active
 		self:UpdateBuilderPreview()
 	else
 		self.builderFlyout:Hide()
+		-- In docked mode, also hide the container
+		if self.builderDocked and self.builderDockedContainer then
+			self.builderDockedContainer:Hide()
+		end
 		self.builderToggle.icon:SetVertexColor(0.7, 0.7, 0.7) -- Dim when inactive
 		-- Clear focus from all builder inputs
 		if self.builder then
@@ -3072,14 +3312,28 @@ function WhoFrame:ComposeBuilderQuery()
 	return table.concat(parts, " ")
 end
 
--- Update the live preview text
+-- Update the live preview text (or live-update EditBox in docked mode)
 function WhoFrame:UpdateBuilderPreview()
-	if not self.builder or not self.builder.previewText then
+	if not self.builder then
 		return
 	end
 
 	local query = self:ComposeBuilderQuery()
 	local L = BFL.L or {}
+
+	-- In docked mode, write directly to the WHO EditBox
+	if self.builderDocked then
+		local editBox = BetterFriendsFrame and BetterFriendsFrame.WhoFrame and BetterFriendsFrame.WhoFrame.EditBox
+		if editBox then
+			editBox:SetText(query)
+		end
+		return
+	end
+
+	-- Flyout mode: update preview text
+	if not self.builder.previewText then
+		return
+	end
 
 	if query == "" then
 		self.builder.previewText:SetText(L.WHO_BUILDER_PREVIEW_EMPTY or "Fill in fields to build a search")
@@ -3110,8 +3364,10 @@ function WhoFrame:ExecuteBuilderSearch()
 		editBox:ClearFocus()
 	end
 
-	-- Close the flyout
-	self:ToggleSearchBuilder(false)
+	-- In docked mode, keep builder open; in flyout mode, close it
+	if not self.builderDocked then
+		self:ToggleSearchBuilder(false)
+	end
 
 	-- Send the WHO request
 	self:SendWhoRequest(query)
@@ -3148,6 +3404,14 @@ function WhoFrame:ResetBuilder()
 	end
 	if self.builder.RebuildRaceDropdown then
 		self.builder.RebuildRaceDropdown()
+	end
+
+	-- In docked mode, also clear the WHO EditBox
+	if self.builderDocked then
+		local editBox = BetterFriendsFrame and BetterFriendsFrame.WhoFrame and BetterFriendsFrame.WhoFrame.EditBox
+		if editBox then
+			editBox:SetText("")
+		end
 	end
 
 	self:UpdateBuilderPreview()

@@ -1268,6 +1268,8 @@ BFL:RegisterLocale("frFR", function()
 	L.WHO_BUILDER_SEARCH = "Rechercher"
 	L.WHO_BUILDER_RESET = "Reinitialiser"
 	L.WHO_BUILDER_TOOLTIP = "Ouvrir le constructeur de recherche"
+	L.WHO_BUILDER_DOCK_TOOLTIP = "Ancrer le constructeur de recherche"
+	L.WHO_BUILDER_UNDOCK_TOOLTIP = "Detacher le constructeur de recherche"
 
 	-- ========================================
 	-- FRAME DIMENSIONS (Phase 21) - RESTORED

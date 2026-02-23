@@ -1305,6 +1305,8 @@ BFL:RegisterLocale("ruRU", function()
 	L.WHO_BUILDER_SEARCH = "Поиск"
 	L.WHO_BUILDER_RESET = "Сброс"
 	L.WHO_BUILDER_TOOLTIP = "Открыть конструктор поиска"
+	L.WHO_BUILDER_DOCK_TOOLTIP = "Прикрепить конструктор поиска"
+	L.WHO_BUILDER_UNDOCK_TOOLTIP = "Открепить конструктор поиска"
 
 	-- ========================================
 	-- FRAME DIMENSIONS (Phase 21) - RESTORED

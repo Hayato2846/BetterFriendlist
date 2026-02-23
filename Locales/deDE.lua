@@ -1230,6 +1230,8 @@ BFL:RegisterLocale("deDE", function()
 	L.WHO_BUILDER_SEARCH = "Suchen"
 	L.WHO_BUILDER_RESET = "Zuruecksetzen"
 	L.WHO_BUILDER_TOOLTIP = "Suchbaukasten oeffnen"
+	L.WHO_BUILDER_DOCK_TOOLTIP = "Suchbaukasten andocken"
+	L.WHO_BUILDER_UNDOCK_TOOLTIP = "Suchbaukasten abdocken"
 
 	-- ========================================
 	-- NOTE SYNC (Group to Note Sync)
