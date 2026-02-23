@@ -1027,6 +1027,13 @@ function ElvUISkin:SkinFrames(E, S)
 					BFL:DebugPrint("ElvUISkin: Error skinning SearchBuilder hook: " .. tostring(err))
 				end)
 			end)
+			hooksecurefunc(WhoFrameModule, "SetBuilderDocked", function()
+				xpcall(function()
+					self:SkinSearchBuilder(E, S)
+				end, function(err)
+					BFL:DebugPrint("ElvUISkin: Error skinning SearchBuilder (dock) hook: " .. tostring(err))
+				end)
+			end)
 			self.SearchBuilderHookInstalled = true
 		end
 	end
@@ -2032,26 +2039,51 @@ function ElvUISkin:SkinSearchBuilder(E, S)
 			pcall(S.HandleDropDownBox, S, builder.classDropdown)
 			if BFL.IsClassic then
 				FixClassicDropdownHitbox(builder.classDropdown, 140, 24)
+			elseif BFL.HasModernDropdown then
+				local p, rel, rp, x, y = builder.classDropdown:GetPoint(1)
+				if p then
+					builder.classDropdown:SetPoint(p, rel, rp, (x or 0) + 1, y or 0)
+				end
 			end
 		end
 		if builder.raceDropdown then
 			pcall(S.HandleDropDownBox, S, builder.raceDropdown)
 			if BFL.IsClassic then
 				FixClassicDropdownHitbox(builder.raceDropdown, 140, 24)
+			elseif BFL.HasModernDropdown then
+				local p, rel, rp, x, y = builder.raceDropdown:GetPoint(1)
+				if p then
+					builder.raceDropdown:SetPoint(p, rel, rp, (x or 0) + 1, y or 0)
+				end
 			end
 		end
 	end
 
 	-- Skin child buttons (close, search, reset)
+	local dockBtn = WhoFrameModule.builderDockBtn
 	for _, child in ipairs({ flyout:GetChildren() }) do
 		if child:IsObjectType("Button") and not child.isSkinned then
-			local w = child:GetWidth()
-			if w <= 24 then
-				pcall(S.HandleCloseButton, S, child)
+			if child == dockBtn then
+				-- Dock button uses a custom icon texture, don't skin it
+				child.isSkinned = true
 			else
-				S:HandleButton(child)
+				local w = child:GetWidth()
+				if w <= 24 then
+					pcall(S.HandleCloseButton, S, child)
+				else
+					S:HandleButton(child)
+				end
+				child.isSkinned = true
 			end
-			child.isSkinned = true
 		end
+	end
+
+	-- Skin docked container if it exists
+	local container = WhoFrameModule.builderDockedContainer
+	if container and not container.isSkinned then
+		pcall(function()
+			S:HandlePortraitFrame(container)
+		end)
+		container.isSkinned = true
 	end
 end
