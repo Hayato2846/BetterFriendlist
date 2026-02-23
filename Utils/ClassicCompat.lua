@@ -251,11 +251,17 @@ function Compat.InitializeDropdown(dropdown, options, getter, setter, scrollHeig
 			for i, label in ipairs(options.labels) do
 				local info = UIDropDownMenu_CreateInfo()
 				info.text = label
-				info.value = options.values[i]
-				info.checked = getter(options.values[i])
-				info.func = function(self)
-					setter(self.value)
-					UIDropDownMenu_SetSelectedValue(dropdown, self.value)
+				local capturedValue = options.values[i]
+				local capturedLabel = label
+				info.value = capturedValue
+				info.checked = getter(capturedValue)
+				info.func = function()
+					-- Use closured values, NOT self.value/self:GetText()
+					-- (setter may call UIDropDownMenu_Initialize on another dropdown,
+					-- which overwrites DropDownList1 buttons, corrupting self)
+					setter(capturedValue)
+					UIDropDownMenu_SetSelectedValue(dropdown, capturedValue)
+					UIDropDownMenu_SetText(dropdown, capturedLabel)
 					CloseDropDownMenus()
 				end
 				UIDropDownMenu_AddButton(info, level)

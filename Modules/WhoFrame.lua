@@ -2642,17 +2642,42 @@ local function GetCompatibleClassesForRace(raceName)
 		return nil -- All classes
 	end
 
-	local compatibleClasses = {}
+	-- Collect English class names that support this race
+	local compatibleTokens = {}
 	for className, races in pairs(CLASS_RACE_COMPATIBILITY) do
 		for _, race in ipairs(races) do
 			if race == raceName then
-				table.insert(compatibleClasses, className)
+				-- Convert English name to token: "Death Knight" -> "DEATHKNIGHT"
+				local token = className:upper():gsub(" ", "")
+				compatibleTokens[token] = true
 				break
 			end
 		end
 	end
 
+	-- Convert tokens to localized class names for dropdown matching
+	local compatibleClasses = {}
+	if LOCALIZED_CLASS_NAMES_MALE then
+		for token, localName in pairs(LOCALIZED_CLASS_NAMES_MALE) do
+			if compatibleTokens[token] then
+				table.insert(compatibleClasses, localName)
+			end
+		end
+	end
+
 	return compatibleClasses
+end
+
+-- Helper: Check if a race exists in the current CLASS_RACE_COMPATIBILITY table
+local function IsRaceAvailableInFlavor(raceName)
+	for _, races in pairs(CLASS_RACE_COMPATIBILITY) do
+		for _, race in ipairs(races) do
+			if race == raceName then
+				return true
+			end
+		end
+	end
+	return false
 end
 
 -- Create the Search Builder UI (trigger button + flyout panel)
@@ -2881,8 +2906,11 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 		-- Collect races first (excluding "All Races")
 		local tempRaces = {}
 
-		-- Helper: Add race if compatible with selected class
+		-- Helper: Add race if compatible with selected class and available in current flavor
 		local function AddRaceIfCompatible(raceName)
+			if not IsRaceAvailableInFlavor(raceName) then
+				return
+			end
 			if not compatibleRaces or tContains(compatibleRaces, raceName) then
 				table.insert(tempRaces, raceName)
 			end
