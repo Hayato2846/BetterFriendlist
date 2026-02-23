@@ -1089,7 +1089,7 @@ BFL:RegisterLocale("zhTW", function()
 	L.RAID_MSG_BULK_MOVE_SUCCESS = "已移動 %d 名玩家到小隊 %d"
 	L.RAID_MSG_MOVE_SUCCESS = "%s 已移動到小隊 %d"
 	L.RAID_MSG_SWAP_SUCCESS = "%s <-> %s 已交換"
-	L.RAID_NOT_IN_RAID_DETAILS = "您目前不在團隊中。"
+	L.RAID_NOT_IN_RAID_DETAILS = "您目前不在團隊中"
 
 	-- ========================================
 	-- MISSING KEYS - BATCH 3 (SETTINGS)

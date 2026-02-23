@@ -54,7 +54,7 @@ BFL:RegisterLocale("itIT", function()
 		"I giocatori non possono essere spostati durante il combattimento.\nQuesta è una restrizione Blizzard."
 	L.RAID_INFO_UNAVAILABLE = "Info non disponibile"
 	L.RAID_NOT_IN_RAID = "Non in incursione"
-	L.RAID_NOT_IN_RAID_DETAILS = "Non sei attualmente in un gruppo di incursione."
+	L.RAID_NOT_IN_RAID_DETAILS = "Non sei attualmente in un gruppo di incursione"
 	L.RAID_CREATE_BUTTON = "Crea Incursione"
 	L.GROUP = "Gruppo"
 	L.ALL = "Tutti"

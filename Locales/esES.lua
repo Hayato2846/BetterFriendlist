@@ -55,7 +55,7 @@ BFL:RegisterLocale("esES", function()
 		"Los jugadores no se pueden mover durante el combate.\nEsta es una restricción de Blizzard para evitar errores."
 	L.RAID_INFO_UNAVAILABLE = "Info no disponible"
 	L.RAID_NOT_IN_RAID = "No estás en banda"
-	L.RAID_NOT_IN_RAID_DETAILS = "No estás actualmente en un grupo de banda."
+	L.RAID_NOT_IN_RAID_DETAILS = "No estás actualmente en un grupo de banda"
 	L.RAID_CREATE_BUTTON = "Crear Banda"
 	L.GROUP = "Grupo"
 	L.ALL = "Todos"

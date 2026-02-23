@@ -52,7 +52,7 @@ BFL:RegisterLocale("deDE", function()
 	L.RAID_HELP_COMBAT_TEXT = "Im Kampf ist kein Verschieben möglich.\n(Blizzard-Beschränkung)"
 	L.RAID_INFO_UNAVAILABLE = "Keine Info verfügbar"
 	L.RAID_NOT_IN_RAID = "Nicht im Schlachtzug"
-	L.RAID_NOT_IN_RAID_DETAILS = "Du bist in keiner Schlachtzugsgruppe."
+	L.RAID_NOT_IN_RAID_DETAILS = "Du bist in keiner Schlachtzugsgruppe"
 	L.RAID_CREATE_BUTTON = "Schlachtzug erstellen"
 	L.GROUP = "Gruppe"
 	L.ALL = "Alle"

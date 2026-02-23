@@ -55,7 +55,7 @@ BFL:RegisterLocale("frFR", function()
 		"Les joueurs ne peuvent pas être déplacés pendant le combat.\nC'est une restriction de Blizzard pour éviter les erreurs."
 	L.RAID_INFO_UNAVAILABLE = "Info non disponible"
 	L.RAID_NOT_IN_RAID = "Pas en raid"
-	L.RAID_NOT_IN_RAID_DETAILS = "Vous n'êtes pas actuellement dans un groupe de raid."
+	L.RAID_NOT_IN_RAID_DETAILS = "Vous n'êtes pas actuellement dans un groupe de raid"
 	L.RAID_CREATE_BUTTON = "Créer un Raid"
 	L.GROUP = "Groupe"
 	L.ALL = "Tous"

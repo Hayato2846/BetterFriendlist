@@ -48,7 +48,7 @@ BFL:RegisterLocale("zhCN", function()
 	L.RAID_HELP_COMBAT_TEXT = "战斗中无法移动玩家。\n这是暴雪的限制以防止错误。"
 	L.RAID_INFO_UNAVAILABLE = "团队信息不可用"
 	L.RAID_NOT_IN_RAID = "不在团队中"
-	L.RAID_NOT_IN_RAID_DETAILS = "您当前不在团队中。"
+	L.RAID_NOT_IN_RAID_DETAILS = "您当前不在团队中"
 	L.RAID_CREATE_BUTTON = "创建团队"
 	L.GROUP = "队伍"
 	L.ALL = "全部"

@@ -57,7 +57,7 @@ BFL:RegisterLocale("koKR", function()
 		"전투 중에는 플레이어를 이동할 수 없습니다.\n이는 오류를 방지하기 위한 Blizzard의 제한 사항입니다."
 	L.RAID_INFO_UNAVAILABLE = "Raid information unavailable"
 	L.RAID_NOT_IN_RAID = "Not in a raid"
-	L.RAID_NOT_IN_RAID_DETAILS = "현재 공격대 그룹에 속해 있지 않습니다."
+	L.RAID_NOT_IN_RAID_DETAILS = "현재 공격대 그룹에 속해 있지 않습니다"
 	L.RAID_CREATE_BUTTON = "Create Raid"
 	L.GROUP = "그룹"
 	L.ALL = "All"

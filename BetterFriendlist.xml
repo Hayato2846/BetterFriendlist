@@ -2972,8 +2972,7 @@
 					the shaded area -->
 					<Frame parentKey="GroupsInset" inherits="InsetFrameTemplate">
 						<Anchors>
-							<Anchor point="TOPLEFT" relativeKey="$parent.ControlPanel"
-								relativePoint="BOTTOMLEFT" x="-4" y="5" />
+							<Anchor point="TOPLEFT" relativeKey="$parent.ControlPanel" relativePoint="BOTTOMLEFT" x="-4" y="10" />
 							<Anchor point="BOTTOMRIGHT" x="-2" y="21" />
 						</Anchors>
 						<Frames>
@@ -3078,13 +3077,13 @@
 					<Layer level="ARTWORK">
 						<!-- "Not in Raid" placeholder text (shown when in party, not raid) -->
 						<FontString parentKey="NotInRaid" inherits="BetterFriendlistFontLarge"
-							text="Raid roster is only available when in a raid group." hidden="true"
+							text="Raid roster is only available when in a raid group" hidden="true"
 							wordwrap="true" justifyH="CENTER" justifyV="MIDDLE">
 							<Anchors>
-								<Anchor point="LEFT" relativeKey="$parent.Inset" x="20" y="0" />
-								<Anchor point="RIGHT" relativeKey="$parent.Inset" x="-20" y="0" />
+								<Anchor point="CENTER" relativeKey="$parent.GroupsInset" x="0"
+									y="0" />
 							</Anchors>
-							<Color r="0.6" g="0.6" b="0.6" />
+							<Color r="0.5" g="0.5" b="0.5" />
 						</FontString>
 					</Layer>
 				</Layers>

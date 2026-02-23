@@ -1563,12 +1563,11 @@
 				</Frames>
 				<Layers>
 					<Layer level="ARTWORK">
-						<FontString parentKey="NotInRaid" inherits="BetterFriendlistFontNormalMed3" text="Raid roster is only available when in a raid group." hidden="true" wordwrap="true" justifyH="CENTER" justifyV="MIDDLE">
+						<FontString parentKey="NotInRaid" inherits="BetterFriendlistFontNormalMed3" text="Raid roster is only available when in a raid group" hidden="true" wordwrap="true" justifyH="CENTER" justifyV="MIDDLE">
 							<Anchors>
-								<Anchor point="LEFT" relativeKey="$parent.Inset" x="20" y="0"/>
-								<Anchor point="RIGHT" relativeKey="$parent.Inset" x="-20" y="0"/>
+								<Anchor point="CENTER" relativeKey="$parent.GroupsInset" x="0" y="0"/>
 							</Anchors>
-							<Color r="0.6" g="0.6" b="0.6"/>
+							<Color r="0.5" g="0.5" b="0.5"/>
 						</FontString>
 					</Layer>
 				</Layers>

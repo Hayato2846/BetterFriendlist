@@ -56,7 +56,7 @@ local function LoadEnUS()
 		"Players cannot be moved during combat.\nThis is a Blizzard restriction to prevent errors."
 	L.RAID_INFO_UNAVAILABLE = "No info available"
 	L.RAID_NOT_IN_RAID = "Not in Raid"
-	L.RAID_NOT_IN_RAID_DETAILS = "You are not currently in a raid group."
+	L.RAID_NOT_IN_RAID_DETAILS = "You are not currently in a raid group"
 	L.RAID_CREATE_BUTTON = "Create Raid"
 	L.GROUP = "Group"
 	L.ALL = "All"
