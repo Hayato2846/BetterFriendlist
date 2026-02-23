@@ -1361,6 +1361,12 @@ end
 -- Handle button click
 function WhoFrame:OnButtonClick(button, mouseButton)
 	if mouseButton == "LeftButton" then
+		-- Alt+Click: Add value to Search Builder
+		if IsAltKeyDown() and button.info then
+			self:HandleAltClick(button)
+			return
+		end
+
 		-- Ctrl+Click: Interactive column search
 		if IsControlKeyDown() and button.info then
 			self:HandleCtrlClick(button)
@@ -1472,6 +1478,64 @@ function WhoFrame:GetHoveredColumn(button)
 	else
 		return "class"
 	end
+end
+
+-- Handle Alt+Click on a WHO result to populate the Search Builder field
+function WhoFrame:HandleAltClick(button)
+	if not button or not button.info then
+		return
+	end
+
+	local info = button.info
+	local column = self:GetHoveredColumn(button)
+
+	-- Ensure builder exists
+	if not self.builder then
+		return
+	end
+
+	-- Auto-open the Search Builder if not visible
+	if not self.builderFlyout or not self.builderFlyout:IsShown() then
+		self:ToggleSearchBuilder(true)
+	end
+
+	if column == "name" then
+		if info.fullName and info.fullName ~= "" then
+			local name = info.fullName:match("^([^%-]+)") or info.fullName
+			self.builder.nameInput:SetText(name)
+		end
+	elseif column == "variable" then
+		if whoSortValue == 2 and info.fullGuildName and info.fullGuildName ~= "" then
+			self.builder.guildInput:SetText(info.fullGuildName)
+		elseif whoSortValue == 3 and info.raceStr and info.raceStr ~= "" then
+			self.builder.selectedRace = info.raceStr
+			self.builder.RebuildRaceDropdown()
+			self.builder.RebuildClassDropdown()
+		else
+			if info.area and info.area ~= "" then
+				self.builder.zoneInput:SetText(info.area)
+			end
+		end
+	elseif column == "level" then
+		if info.level then
+			local levelStr = tostring(info.level)
+			self.builder.levelMin:SetText(levelStr)
+			self.builder.levelMax:SetText(levelStr)
+		end
+	elseif column == "class" then
+		if info.classStr and info.classStr ~= "" then
+			self.builder.selectedClass = info.classStr
+			self.builder.RebuildClassDropdown()
+			self.builder.RebuildRaceDropdown()
+		end
+	else
+		-- Fallback: use zone
+		if info.area and info.area ~= "" then
+			self.builder.zoneInput:SetText(info.area)
+		end
+	end
+
+	self:UpdateBuilderPreview()
 end
 
 -- Handle Ctrl+Click on a WHO result to search by the hovered column
@@ -1631,6 +1695,8 @@ function _G.BetterWhoListButton_OnEnter(self)
 	if columnLabel then
 		local ctrlFormat = L and L.WHO_TOOLTIP_HINT_CTRL_FORMAT or "Ctrl+Click to search %s"
 		GameTooltip:AddLine(format(ctrlFormat, columnLabel), 0.5, 0.5, 0.5)
+		local altFormat = L and L.WHO_TOOLTIP_HINT_ALT_FORMAT or "Alt+Click to add %s to Search Builder"
+		GameTooltip:AddLine(format(altFormat, columnLabel), 0.5, 0.5, 0.5)
 	else
 		GameTooltip:AddLine(L and L.WHO_TOOLTIP_HINT_CTRL_FORMAT or "Ctrl+Click to search", 0.5, 0.5, 0.5)
 	end

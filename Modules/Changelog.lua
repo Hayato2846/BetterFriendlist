@@ -24,12 +24,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Who Search: Throttle Protection** - The Refresh button now shows a 5-second cooldown countdown after each search, preventing queries from being silently dropped by the server. A "Searching..." indicator appears while waiting for results, and a timeout message is shown if no results are received.
 - **Recently Added Group** - New optional builtin group that automatically tracks newly added friends. Friends appear in the group for a configurable duration (default: 7 days) and can be bulk-added to custom groups or cleared individually. Enable it in Settings under General -> Group Management.
 - **Who Search Builder: Docked Mode** - The Who Search Builder can now be docked as a standalone panel next to the main window. Click the new dock button in the builder's title bar to switch between overlay and docked mode. In docked mode, the search box updates live as you type, the builder stays open after searching, and ESC no longer closes it. Your preference is saved across sessions.
+- **Who Results: Alt+Click to Search Builder** - Alt+Click on a Who result now adds the hovered column's value (Name, Zone, Guild, Race, Level, or Class) directly into the Search Builder fields. The Search Builder opens automatically if it is not already visible.
 
 ### Changed
 - **Who Search Builder: Name Field Character Limit** - The name field in the Who Search Builder is now limited to 12 characters, matching the maximum length of WoW character names.
 - **Who Results: Smarter Ctrl+Click Search** - Ctrl+Click on a Who result now searches based on the column you are hovering over (Name, Zone/Guild/Race, Level, or Class) instead of always using the dropdown column. The tooltip also shows which column will be searched.
 
 ### Fixed
+- **Raid Info Overlap Layering** - Fixed visual overlap where parts of BetterFriendlist could render on top of the Blizzard Raid Information window when both frames were open side by side.
 - **Raid Inset Misaligned** - Fixed the inset (dark grey background) position of raid tab to properly align with quick join in BFL's normal mode.
 - **Raid and Quick Join Placeholder Text Misaligned** - Fixed the "Not in Raid" and "No groups available" placeholder texts appearing at different vertical positions. Both are now consistently centered within their respective content areas.
 - **Visit House Not Working After Combat** - Fixed the "Visit House" button becoming permanently broken after opening the house list for the first time during combat.

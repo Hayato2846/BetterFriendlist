@@ -1208,6 +1208,7 @@ BFL:RegisterLocale("deDE", function()
 	L.WHO_TOOLTIP_HINT_DBLCLICK = "Doppelklick zum Fluestern"
 	L.WHO_TOOLTIP_HINT_DBLCLICK_INVITE = "Doppelklick zum Einladen"
 	L.WHO_TOOLTIP_HINT_CTRL_FORMAT = "Strg+Klick: %s suchen"
+	L.WHO_TOOLTIP_HINT_ALT_FORMAT = "Alt+Klick: %s in Suchbaukasten eintragen"
 	L.WHO_TOOLTIP_HINT_RIGHTCLICK = "Rechtsklick fuer Optionen"
 	L.WHO_SEARCH_PENDING = "Suche..."
 	L.WHO_SEARCH_TIMEOUT = "Keine Antwort. Erneut versuchen."

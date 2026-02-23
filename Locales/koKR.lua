@@ -1235,6 +1235,7 @@ BFL:RegisterLocale("koKR", function()
 	L.WHO_TOOLTIP_HINT_DBLCLICK = "더블클릭으로 귀속말"
 	L.WHO_TOOLTIP_HINT_DBLCLICK_INVITE = "더블클릭으로 초대"
 	L.WHO_TOOLTIP_HINT_CTRL_FORMAT = "Ctrl+클릭: %s 검색"
+	L.WHO_TOOLTIP_HINT_ALT_FORMAT = "Alt+클릭: %s 검색 빌더에 추가"
 	L.WHO_TOOLTIP_HINT_RIGHTCLICK = "우클릭으로 옵션"
 	L.WHO_SEARCH_PENDING = "검색 중..."
 	L.WHO_SEARCH_TIMEOUT = "응답 없음. 다시 시도하세요."
@@ -1334,7 +1335,7 @@ BFL:RegisterLocale("koKR", function()
 	-- ========================================
 	-- SETTINGS (Phase 22 - Asian/Cyrillic)
 	-- ========================================
-	L.SETTINGS_SHOW_WELCOME_MESSAGE = "환영 메시지 표시"
+	L.SETTINGS_SHOW_WELCOME_MESSAGE = "환영 메��지 표시"
 	L.SETTINGS_SHOW_WELCOME_MESSAGE_DESC =
 		"로그인할 때 ���드온 로드된 메시지를 채팅에 표시합니다."
 

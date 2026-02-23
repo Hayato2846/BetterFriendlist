@@ -1283,6 +1283,7 @@ BFL:RegisterLocale("ruRU", function()
 	L.WHO_TOOLTIP_HINT_DBLCLICK = "Двойной щелчок для шепота"
 	L.WHO_TOOLTIP_HINT_DBLCLICK_INVITE = "Двойной щелчок для приглашения"
 	L.WHO_TOOLTIP_HINT_CTRL_FORMAT = "Ctrl+клик: поиск %s"
+	L.WHO_TOOLTIP_HINT_ALT_FORMAT = "Alt+клик: добавить %s в конструктор поиска"
 	L.WHO_TOOLTIP_HINT_RIGHTCLICK = "Правый клик для опций"
 	L.WHO_SEARCH_PENDING = "Поиск..."
 	L.WHO_SEARCH_TIMEOUT = "Нет ответа. Попробуйте снова."
