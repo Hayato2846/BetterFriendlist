@@ -1267,7 +1267,7 @@ BFL:RegisterLocale("ruRU", function()
 	L.WHO_TOOLTIP_HINT_CLICK = "Нажмите для выбора"
 	L.WHO_TOOLTIP_HINT_DBLCLICK = "Двойной щелчок для шепота"
 	L.WHO_TOOLTIP_HINT_DBLCLICK_INVITE = "Двойной щелчок для приглашения"
-	L.WHO_TOOLTIP_HINT_CTRL = "Ctrl+клик для поиска по значению столбца"
+	L.WHO_TOOLTIP_HINT_CTRL_FORMAT = "Ctrl+клик: поиск %s"
 	L.WHO_TOOLTIP_HINT_RIGHTCLICK = "Правый клик для опций"
 
 	-- ========================================

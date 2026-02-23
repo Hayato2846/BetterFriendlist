@@ -1233,7 +1233,7 @@ BFL:RegisterLocale("esMX", function()
 	L.WHO_TOOLTIP_HINT_CLICK = "Clic para seleccionar"
 	L.WHO_TOOLTIP_HINT_DBLCLICK = "Doble clic para susurrar"
 	L.WHO_TOOLTIP_HINT_DBLCLICK_INVITE = "Doble clic para invitar"
-	L.WHO_TOOLTIP_HINT_CTRL = "Ctrl+Clic para buscar valor de columna"
+	L.WHO_TOOLTIP_HINT_CTRL_FORMAT = "Ctrl+Clic para buscar %s"
 	L.WHO_TOOLTIP_HINT_RIGHTCLICK = "Clic derecho para opciones"
 
 	-- ========================================

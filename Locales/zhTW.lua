@@ -1231,7 +1231,7 @@ BFL:RegisterLocale("zhTW", function()
 	L.WHO_TOOLTIP_HINT_CLICK = "點擊選擇"
 	L.WHO_TOOLTIP_HINT_DBLCLICK = "雙擊密語"
 	L.WHO_TOOLTIP_HINT_DBLCLICK_INVITE = "雙擊邀請"
-	L.WHO_TOOLTIP_HINT_CTRL = "Ctrl+點擊搜尋欄位值"
+	L.WHO_TOOLTIP_HINT_CTRL_FORMAT = "Ctrl+點擊搜尋%s"
 	L.WHO_TOOLTIP_HINT_RIGHTCLICK = "右鍵查看選項"
 
 	-- ========================================

@@ -1230,7 +1230,7 @@ BFL:RegisterLocale("frFR", function()
 	L.WHO_TOOLTIP_HINT_CLICK = "Cliquer pour sélectionner"
 	L.WHO_TOOLTIP_HINT_DBLCLICK = "Double-cliquer pour chuchoter"
 	L.WHO_TOOLTIP_HINT_DBLCLICK_INVITE = "Double-cliquer pour inviter"
-	L.WHO_TOOLTIP_HINT_CTRL = "Ctrl+Clic pour rechercher la valeur de colonne"
+	L.WHO_TOOLTIP_HINT_CTRL_FORMAT = "Ctrl+Clic pour rechercher %s"
 	L.WHO_TOOLTIP_HINT_RIGHTCLICK = "Clic droit pour les options"
 
 	-- ========================================

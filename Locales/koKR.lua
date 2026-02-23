@@ -1219,7 +1219,7 @@ BFL:RegisterLocale("koKR", function()
 	L.WHO_TOOLTIP_HINT_CLICK = "클릭하여 선택"
 	L.WHO_TOOLTIP_HINT_DBLCLICK = "더블클릭으로 귀속말"
 	L.WHO_TOOLTIP_HINT_DBLCLICK_INVITE = "더블클릭으로 초대"
-	L.WHO_TOOLTIP_HINT_CTRL = "Ctrl+클릭으로 열 값 검색"
+	L.WHO_TOOLTIP_HINT_CTRL_FORMAT = "Ctrl+클릭: %s 검색"
 	L.WHO_TOOLTIP_HINT_RIGHTCLICK = "우클릭으로 옵션"
 
 	-- ========================================

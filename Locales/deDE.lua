@@ -1192,7 +1192,7 @@ BFL:RegisterLocale("deDE", function()
 	L.WHO_TOOLTIP_HINT_CLICK = "Klicken zum Auswaehlen"
 	L.WHO_TOOLTIP_HINT_DBLCLICK = "Doppelklick zum Fluestern"
 	L.WHO_TOOLTIP_HINT_DBLCLICK_INVITE = "Doppelklick zum Einladen"
-	L.WHO_TOOLTIP_HINT_CTRL = "Strg+Klick fuer Spaltensuche"
+	L.WHO_TOOLTIP_HINT_CTRL_FORMAT = "Strg+Klick: %s suchen"
 	L.WHO_TOOLTIP_HINT_RIGHTCLICK = "Rechtsklick fuer Optionen"
 
 	-- ========================================

@@ -1205,7 +1205,43 @@ end
 -- Ctrl+Click Interactive Search
 -- ========================================
 
--- Handle Ctrl+Click on a WHO result to search by zone/guild/class
+-- Determine which column the cursor is hovering over based on X position
+-- Returns: "name", "variable", "level", "class", or nil
+function WhoFrame:GetHoveredColumn(button)
+	if not button or not self.columnWidths then
+		return nil
+	end
+
+	local cursorX = GetCursorPosition()
+	local scale = button:GetEffectiveScale()
+	cursorX = cursorX / scale
+
+	local buttonLeft = button:GetLeft()
+	if not buttonLeft then
+		return nil
+	end
+
+	local relativeX = cursorX - buttonLeft
+	local widths = self.columnWidths
+	local headerGap = -2
+
+	-- Column boundaries (accumulated from left)
+	local nameEnd = widths.name
+	local variableEnd = nameEnd + headerGap + widths.variable
+	local levelEnd = variableEnd + headerGap + widths.level
+
+	if relativeX <= nameEnd then
+		return "name"
+	elseif relativeX <= variableEnd then
+		return "variable"
+	elseif relativeX <= levelEnd then
+		return "level"
+	else
+		return "class"
+	end
+end
+
+-- Handle Ctrl+Click on a WHO result to search by the hovered column
 function WhoFrame:HandleCtrlClick(button)
 	if not button or not button.info then
 		return
@@ -1213,18 +1249,39 @@ function WhoFrame:HandleCtrlClick(button)
 
 	local info = button.info
 	local searchText
+	local column = self:GetHoveredColumn(button)
 
-	-- Determine what to search based on current variable column
-	if whoSortValue == 2 and info.fullGuildName and info.fullGuildName ~= "" then
-		-- Guild column active: search by guild
-		searchText = 'g-"' .. info.fullGuildName .. '"'
-	elseif whoSortValue == 3 and info.raceStr and info.raceStr ~= "" then
-		-- Race column active: search by race
-		searchText = 'r-"' .. info.raceStr .. '"'
-	elseif info.area and info.area ~= "" then
-		-- Default (zone): search by zone
-		searchText = 'z-"' .. info.area .. '"'
+	if column == "name" then
+		if info.fullName and info.fullName ~= "" then
+			-- Strip realm suffix for name search
+			local name = info.fullName:match("^([^%-]+)") or info.fullName
+			searchText = 'n-"' .. name .. '"'
+		end
+	elseif column == "variable" then
+		-- Variable column depends on dropdown selection (Zone/Guild/Race)
+		if whoSortValue == 2 and info.fullGuildName and info.fullGuildName ~= "" then
+			searchText = 'g-"' .. info.fullGuildName .. '"'
+		elseif whoSortValue == 3 and info.raceStr and info.raceStr ~= "" then
+			searchText = 'r-"' .. info.raceStr .. '"'
+		elseif info.area and info.area ~= "" then
+			searchText = 'z-"' .. info.area .. '"'
+		end
+	elseif column == "level" then
+		if info.level then
+			searchText = info.level .. "-" .. info.level
+		end
+	elseif column == "class" then
+		if info.classStr and info.classStr ~= "" then
+			searchText = 'c-"' .. info.classStr .. '"'
+		end
 	else
+		-- Fallback: search by zone (mirrors original behavior)
+		if info.area and info.area ~= "" then
+			searchText = 'z-"' .. info.area .. '"'
+		end
+	end
+
+	if not searchText then
 		return
 	end
 
@@ -1317,10 +1374,50 @@ function _G.BetterWhoListButton_OnEnter(self)
 		dblClickHint = L and L.WHO_TOOLTIP_HINT_DBLCLICK or "Double-click to whisper"
 	end
 	GameTooltip:AddLine(dblClickHint, 0.5, 0.5, 0.5)
-	GameTooltip:AddLine(L and L.WHO_TOOLTIP_HINT_CTRL or "Ctrl+Click to search column value", 0.5, 0.5, 0.5)
+
+	-- Dynamic Ctrl+Click hint based on hovered column
+	local WhoFrameModule = BFL:GetModule("WhoFrame")
+	local column = WhoFrameModule:GetHoveredColumn(self)
+	local columnLabel
+	if column == "name" then
+		columnLabel = L and L.WHO_BUILDER_NAME or "Name"
+	elseif column == "variable" then
+		if whoSortValue == 2 then
+			columnLabel = L and L.WHO_BUILDER_GUILD or "Guild"
+		elseif whoSortValue == 3 then
+			columnLabel = L and L.WHO_BUILDER_RACE or "Race"
+		else
+			columnLabel = L and L.WHO_BUILDER_ZONE or "Zone"
+		end
+	elseif column == "level" then
+		columnLabel = L and L.WHO_BUILDER_LEVEL or "Level"
+	elseif column == "class" then
+		columnLabel = L and L.WHO_BUILDER_CLASS or "Class"
+	end
+
+	if columnLabel then
+		local ctrlFormat = L and L.WHO_TOOLTIP_HINT_CTRL_FORMAT or "Ctrl+Click to search %s"
+		GameTooltip:AddLine(format(ctrlFormat, columnLabel), 0.5, 0.5, 0.5)
+	else
+		GameTooltip:AddLine(L and L.WHO_TOOLTIP_HINT_CTRL_FORMAT or "Ctrl+Click to search", 0.5, 0.5, 0.5)
+	end
+
 	GameTooltip:AddLine(L and L.WHO_TOOLTIP_HINT_RIGHTCLICK or "Right-click for options", 0.5, 0.5, 0.5)
 
 	GameTooltip:Show()
+
+	-- Track hovered column for dynamic tooltip refresh
+	self.lastHoveredColumn = column
+	if not self.columnTrackingActive then
+		self.columnTrackingActive = true
+		self:SetScript("OnUpdate", function(btn)
+			local WFM = BFL:GetModule("WhoFrame")
+			local col = WFM:GetHoveredColumn(btn)
+			if col ~= btn.lastHoveredColumn then
+				_G.BetterWhoListButton_OnEnter(btn)
+			end
+		end)
+	end
 
 	-- Highlight row
 	if self.background then
@@ -1331,6 +1428,9 @@ end
 -- Hide tooltip when leaving WHO result button
 function _G.BetterWhoListButton_OnLeave(self)
 	GameTooltip:Hide()
+	self.columnTrackingActive = nil
+	self.lastHoveredColumn = nil
+	self:SetScript("OnUpdate", nil)
 
 	-- Restore zebra stripe
 	if self.background and self.elementData then

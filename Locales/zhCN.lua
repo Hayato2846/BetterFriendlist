@@ -1213,7 +1213,7 @@ BFL:RegisterLocale("zhCN", function()
 	L.WHO_TOOLTIP_HINT_CLICK = "点击选择"
 	L.WHO_TOOLTIP_HINT_DBLCLICK = "双击密语"
 	L.WHO_TOOLTIP_HINT_DBLCLICK_INVITE = "双击邀请"
-	L.WHO_TOOLTIP_HINT_CTRL = "Ctrl+点击搜索列值"
+	L.WHO_TOOLTIP_HINT_CTRL_FORMAT = "Ctrl+点击搜索%s"
 	L.WHO_TOOLTIP_HINT_RIGHTCLICK = "右键查看选项"
 
 	-- ========================================

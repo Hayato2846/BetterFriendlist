@@ -1229,7 +1229,7 @@ local function LoadEnUS()
 	L.WHO_TOOLTIP_HINT_CLICK = "Click to select"
 	L.WHO_TOOLTIP_HINT_DBLCLICK = "Double-click to whisper"
 	L.WHO_TOOLTIP_HINT_DBLCLICK_INVITE = "Double-click to invite"
-	L.WHO_TOOLTIP_HINT_CTRL = "Ctrl+Click to search column value"
+	L.WHO_TOOLTIP_HINT_CTRL_FORMAT = "Ctrl+Click to search %s"
 	L.WHO_TOOLTIP_HINT_RIGHTCLICK = "Right-click for options"
 
 	-- ========================================
