@@ -1539,6 +1539,21 @@ function RaidFrame:UpdateMemberButtonVisuals(button, member)
 	if button.Name then
 		button.Name:SetText(member.name or "")
 
+		-- Apply cached raid font with FontFamily fallback for non-roman alphabets
+		if self.fontCache and self.fontCache.name then
+			local fc = self.fontCache.name
+			if BFL.FontManager and BFL.FontManager.ApplyFont then
+				BFL.FontManager:ApplyFont(button.Name, fc.path, fc.size, fc.outline, fc.shadow)
+			else
+				button.Name:SetFont(fc.path, fc.size, fc.outline)
+				if fc.shadow then
+					button.Name:SetShadowOffset(1, -1)
+				else
+					button.Name:SetShadowOffset(0, 0)
+				end
+			end
+		end
+
 		-- Apply class color
 		local classColor = RAID_CLASS_COLORS[member.classFileName]
 		if member.online then
@@ -1893,15 +1908,18 @@ function RaidFrame:UpdateMemberButton(button, memberData)
 		end
 		button.Name:SetText(displayName)
 
-		-- Apply cached raid font
+		-- Apply cached raid font with FontFamily fallback for non-roman alphabets
 		if self.fontCache and self.fontCache.name then
 			local fc = self.fontCache.name
-			button.Name:SetFont(fc.path, fc.size, fc.outline)
-
-			if fc.shadow then
-				button.Name:SetShadowOffset(1, -1)
+			if BFL.FontManager and BFL.FontManager.ApplyFont then
+				BFL.FontManager:ApplyFont(button.Name, fc.path, fc.size, fc.outline, fc.shadow)
 			else
-				button.Name:SetShadowOffset(0, 0)
+				button.Name:SetFont(fc.path, fc.size, fc.outline)
+				if fc.shadow then
+					button.Name:SetShadowOffset(1, -1)
+				else
+					button.Name:SetShadowOffset(0, 0)
+				end
 			end
 		elseif FontManager then
 			-- Fallback
@@ -2581,6 +2599,18 @@ local MOCK_PLAYER_NAMES = {
 	"Bloodfang",
 	"Steelclaw",
 	"VeryLongNamePleaseTruncateMeCorrectlyOrResizeMeIfYouCanDoThatWithoutBreakingLayout",
+	-- Korean
+	"달빛기사",
+	"불꽃마법사",
+	-- Simplified Chinese
+	"暴风城勇士",
+	"艾泽拉斯",
+	-- Traditional Chinese
+	"暴風城勇士",
+	"艾澤拉斯",
+	-- Russian
+	"Штормград",
+	"Паладин",
 }
 
 -- Class data with role assignments
@@ -2757,14 +2787,23 @@ local function GenerateRaidComposition(numMembers)
 		index = index + 1
 	end
 
+	-- Forced international names to guarantee non-roman alphabet coverage in previews
+	local forcedDPSNames = {
+		[1] = "VeryLongNamePleaseTruncateMeCorrectlyOrResizeMeIfYouCanDoThatWithoutBreakingLayout",
+		[2] = "달빛기사", -- Korean
+		[3] = "暴风城勇士", -- Simplified Chinese
+		[4] = "暴風城勇士", -- Traditional Chinese
+		[5] = "Штормград", -- Russian
+	}
+
 	-- Create DPS (Groups 3-8)
 	local currentGroup = 3
 	local membersInGroup = 0
 	for i = 1, numDPS do
 		local name
-		if i == 1 then
-			-- Force one long name for testing truncation/resizing
-			name = "VeryLongNamePleaseTruncateMeCorrectlyOrResizeMeIfYouCanDoThatWithoutBreakingLayout"
+		if forcedDPSNames[i] then
+			-- Force specific names for testing truncation and non-roman alphabets
+			name = forcedDPSNames[i]
 			usedNames[name] = true
 		else
 			name = getUniqueName()
