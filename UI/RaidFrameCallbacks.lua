@@ -254,21 +254,21 @@ function BetterRaidFrame_Update()
 
 	-- Show/hide UI elements based on group type (Raid vs Party)
 	if controlPanel then
-		-- Hide raid-specific controls when not in raid
+		-- Control panel elements are always visible (checkbox disabled when not in raid/not leader)
 		if controlPanel.EveryoneAssistCheckbox then
-			controlPanel.EveryoneAssistCheckbox:SetShown(isInRaid)
+			controlPanel.EveryoneAssistCheckbox:Show()
 		end
 		if controlPanel.EveryoneAssistLabel then
-			controlPanel.EveryoneAssistLabel:SetShown(isInRaid)
+			controlPanel.EveryoneAssistLabel:Show()
 		end
 		if controlPanel.MemberCount then
-			controlPanel.MemberCount:SetShown(isInRaid)
+			controlPanel.MemberCount:Show()
 		end
 		if controlPanel.CombatIcon then
 			controlPanel.CombatIcon:SetShown(isInRaid and InCombatLockdown())
 		end
 		if controlPanel.RoleSummary then
-			controlPanel.RoleSummary:SetShown(isInRaid)
+			controlPanel.RoleSummary:Show()
 		end
 		-- Raid Info Button always visible
 	end
@@ -283,11 +283,11 @@ function BetterRaidFrame_Update()
 		frame.NotInRaid:SetShown(not isInRaid)
 	end
 
+	-- Always update control panel buttons (enable/disable based on state)
+	BetterRaidFrame_UpdateControlPanelButtons()
+
 	-- Only update member buttons if in raid
 	if isInRaid then
-		-- Update control panel buttons
-		BetterRaidFrame_UpdateControlPanelButtons()
-
 		-- Update member buttons via module
 		RaidFrame:UpdateAllMemberButtons()
 	end
@@ -307,10 +307,31 @@ function BetterRaidFrame_UpdateControlPanelButtons()
 	local isLeader = UnitIsGroupLeader("player")
 	local isAssistant = UnitIsGroupAssistant("player")
 	local canControl = isLeader or isAssistant
+	local inRaid = IsInRaid()
 
-	-- Ready Check: Only Leader or Assistant
+	-- Everyone is Assistant checkbox: Only Raid Leader can toggle
+	-- Must be in a real raid AND be leader (Blizzard only checks leader because
+	-- their UI is only visible in raid; we always show the checkbox, so we need both)
+	local canAssist = inRaid and isLeader
+	if controlPanel.EveryoneAssistCheckbox then
+		controlPanel.EveryoneAssistCheckbox:SetChecked(IsEveryoneAssistant())
+		if canAssist then
+			controlPanel.EveryoneAssistCheckbox:Enable()
+		else
+			controlPanel.EveryoneAssistCheckbox:Disable()
+		end
+	end
+	if controlPanel.EveryoneAssistLabel then
+		if canAssist then
+			controlPanel.EveryoneAssistLabel:SetFontObject("BetterFriendlistFontNormal")
+		else
+			controlPanel.EveryoneAssistLabel:SetFontObject("BetterFriendlistFontDisable")
+		end
+	end
+
+	-- Ready Check: Only Leader or Assistant, and only in a group
 	if controlPanel.ReadyCheckButton then
-		if canControl then
+		if IsInGroup() and canControl then
 			controlPanel.ReadyCheckButton:Enable()
 		else
 			controlPanel.ReadyCheckButton:Disable()
@@ -319,7 +340,7 @@ function BetterRaidFrame_UpdateControlPanelButtons()
 
 	-- Convert to Raid: Only if in Party (not Raid) and is Leader
 	if controlPanel.ConvertToRaidButton then
-		if not IsInRaid() and IsInGroup() and isLeader then
+		if not inRaid and IsInGroup() and isLeader then
 			controlPanel.ConvertToRaidButton:Enable()
 		else
 			controlPanel.ConvertToRaidButton:Disable()
@@ -376,6 +397,9 @@ function BetterRaidFrame_EveryoneAssistCheckbox_OnLoad(self)
 	self:RegisterEvent("GROUP_ROSTER_UPDATE")
 	self:RegisterEvent("PARTY_LEADER_CHANGED")
 
+	-- Enable OnEnter/OnLeave even when disabled (required for tooltip on disabled checkbox)
+	self:SetMotionScriptsWhileDisabled(true)
+
 	-- Label will be set by RaidFrame:Initialize() after frame is ready
 	-- Don't try to set it here - BetterFriendsFrame.RaidFrame doesn't exist yet
 
@@ -390,21 +414,8 @@ function BetterRaidFrame_EveryoneAssistCheckbox_OnEvent(self)
 		return
 	end
 
-	local label = self:GetParent() and self:GetParent().EveryoneAssistLabel
-
-	if IsInRaid() and UnitIsGroupLeader("player") then
-		self:Enable()
-		self:SetChecked(IsEveryoneAssistant())
-		if label then
-			label:SetFontObject("BetterFriendlistFontNormal")
-		end
-	else
-		self:Disable()
-		self:SetChecked(false)
-		if label then
-			label:SetFontObject("BetterFriendlistFontDisable")
-		end
-	end
+	-- Delegate to centralized update (handles checkbox + label state)
+	BetterRaidFrame_UpdateControlPanelButtons()
 end
 
 function BetterRaidFrame_EveryoneAssistCheckbox_OnClick(self)
@@ -413,6 +424,22 @@ function BetterRaidFrame_EveryoneAssistCheckbox_OnClick(self)
 		-- Set cooldown to prevent OnEvent from resetting state before server confirms
 		self.clickCooldown = GetTime()
 		SetEveryoneIsAssistant(checked)
+	end
+end
+
+function BetterRaidFrame_EveryoneAssistCheckbox_OnEnter(self)
+	-- Replicate Blizzard's RaidFrame.xml pattern: always show description, add error when disabled
+	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+	GameTooltip:SetText(ALL_ASSIST_DESCRIPTION, nil, nil, nil, nil, true)
+	if not self:IsEnabled() then
+		GameTooltip:AddLine(ALL_ASSIST_NOT_LEADER_ERROR, RED_FONT_COLOR.r, RED_FONT_COLOR.g, RED_FONT_COLOR.b, true)
+	end
+	GameTooltip:Show()
+end
+
+function BetterRaidFrame_EveryoneAssistCheckbox_OnLeave(self)
+	if GameTooltip:GetOwner() == self then
+		GameTooltip:Hide()
 	end
 end
 

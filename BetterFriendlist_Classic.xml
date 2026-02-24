@@ -1416,6 +1416,12 @@
 									<OnClick>
 										BetterRaidFrame_EveryoneAssistCheckbox_OnClick(self);
 									</OnClick>
+									<OnEnter>
+										BetterRaidFrame_EveryoneAssistCheckbox_OnEnter(self);
+									</OnEnter>
+									<OnLeave>
+										BetterRaidFrame_EveryoneAssistCheckbox_OnLeave(self);
+									</OnLeave>
 								</Scripts>
 							</CheckButton>
 						</Frames>

@@ -403,12 +403,7 @@ function RaidFrame:UpdateControlPanelLayout()
 		leftSectionEnd = checkboxStartX + checkboxWidth + checkboxLabelGap -- Recalculate boundary
 		availableCenter = rightSectionStart - leftSectionEnd
 	elseif controlPanel.EveryoneAssistLabel then
-		-- Only show if in Raid (User Request: Fix visibility)
-		if IsInRaid() then
-			controlPanel.EveryoneAssistLabel:Show()
-		else
-			controlPanel.EveryoneAssistLabel:Hide()
-		end
+		controlPanel.EveryoneAssistLabel:Show()
 	end
 
 	-- BFL:DebugPrint(string.format("  Layout boundaries:"))
