@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Preserve Groups** - Excludes any combination of groups 1-8 from being modified during sort or split operations.
   - **Auto-resume after combat** - Automatically continues an interrupted sort or split after leaving combat.
   - Shows live progress during sort and split operations (e.g., "Sorting... (5/12)").
+- **Quick Filter: In A Game** - New Quick Filter option that shows only friends who are currently playing any game (WoW, Overwatch, Diablo, etc.), hiding offline, app-only, and mobile-only friends.
 
 ### Fixed
 - **Assist All Checkbox** - Fixed the "Assist All" checkbox and its label not disabling when the player isn't raid leader. Also fixed the state not updating when converting between Raid and Party or when raid lead is given or taken. The checkbox tooltip now matches Blizzard's default behavior.

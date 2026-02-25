@@ -601,6 +601,7 @@ BFL:RegisterLocale("esMX", function()
 	L.FILTER_BNET = "Solo Battle.net"
 	L.FILTER_HIDE_AFK = "Ocultar AFK/ND"
 	L.FILTER_RETAIL = "Solo Retail"
+	L.FILTER_INGAME = "En un juego"
 	L.TOOLTIP_QUICK_FILTER = "Filtro Rápido: %s"
 
 	-- Settings (Broker)

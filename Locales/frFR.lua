@@ -598,6 +598,7 @@ BFL:RegisterLocale("frFR", function()
 	L.FILTER_BNET = "BNet"
 	L.FILTER_HIDE_AFK = "Masquer AFK"
 	L.FILTER_RETAIL = "Retail"
+	L.FILTER_INGAME = "En jeu"
 	L.TOOLTIP_QUICK_FILTER = "Filtre Rapide : %s"
 
 	-- Settings (Broker)

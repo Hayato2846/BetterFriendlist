@@ -101,7 +101,7 @@ local pendingUpdate = false
 local currentSortMode = "status" -- Default: status, name, level, zone
 
 -- Quick filter state (session-only, not persistent)
-local filterMode = "all" -- Options: "all", "online", "wow", "bnet", "offline"
+local filterMode = "all" -- Options: "all", "online", "wow", "bnet", "offline", "ingame"
 
 -- Load filter mode from database
 local function LoadFilterMode()

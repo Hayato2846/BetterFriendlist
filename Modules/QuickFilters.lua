@@ -24,13 +24,14 @@ end
 
 -- Filter icons (Feather Icons for custom filters)
 local FILTER_ICONS = {
-	all = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-all",         -- All Friends (users icon)
-	online = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-online",     -- Online Only (user-check icon)
-	offline = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-offline",   -- Offline Only (user-x icon)
-	wow = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-wow",           -- WoW Only (shield icon)
-	bnet = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-bnet",         -- Battle.net Only (share-2 icon)
-	hideafk = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-hide-afk",  -- Hide AFK (eye-off icon)
-	retail = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-retail"     -- Retail Only (trending-up icon)
+	all = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-all", -- All Friends (users icon)
+	online = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-online", -- Online Only (user-check icon)
+	offline = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-offline", -- Offline Only (user-x icon)
+	wow = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-wow", -- WoW Only (shield icon)
+	bnet = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-bnet", -- Battle.net Only (share-2 icon)
+	hideafk = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-hide-afk", -- Hide AFK (eye-off icon)
+	retail = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-retail", -- Retail Only (trending-up icon)
+	ingame = "Interface\\AddOns\\BetterFriendlist\\Icons\\game", -- In A Game (game icon)
 }
 
 -- Current filter mode
@@ -50,12 +51,14 @@ end
 
 -- Initialize Quick Filter Dropdown
 function QuickFilters:InitDropdown(dropdown)
-	if not dropdown then return end
-	
+	if not dropdown then
+		return
+	end
+
 	-- Classic mode: Use UIDropDownMenu
 	if BFL.IsClassic or not BFL.HasModernDropdown then
 		-- BFL:DebugPrint("|cff00ffffQuickFilters:|r Classic mode - using UIDropDownMenu for Quick Filter dropdown")
-		
+
 		-- Only set width if ElvUI is not active (ElvUI Skin handles sizing)
 		local isElvUIActive = _G.ElvUI and BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin ~= false
 		if not isElvUIActive then
@@ -63,7 +66,7 @@ function QuickFilters:InitDropdown(dropdown)
 		end
 		UIDropDownMenu_Initialize(dropdown, function(self, level)
 			local info = UIDropDownMenu_CreateInfo()
-			
+
 			local function AddFilterOption(mode, label, icon)
 				info.text = string.format("|T%s:14:14:0:0|t %s", icon, label)
 				info.value = mode
@@ -76,7 +79,7 @@ function QuickFilters:InitDropdown(dropdown)
 				info.checked = (currentFilter == mode)
 				UIDropDownMenu_AddButton(info)
 			end
-			
+
 			AddFilterOption("all", L.FILTER_ALL, FILTER_ICONS.all)
 			AddFilterOption("online", L.FILTER_ONLINE, FILTER_ICONS.online)
 			AddFilterOption("offline", L.FILTER_OFFLINE, FILTER_ICONS.offline)
@@ -84,23 +87,24 @@ function QuickFilters:InitDropdown(dropdown)
 			AddFilterOption("bnet", L.FILTER_BNET, FILTER_ICONS.bnet)
 			AddFilterOption("hideafk", L.FILTER_HIDE_AFK, FILTER_ICONS.hideafk)
 			AddFilterOption("retail", L.FILTER_RETAIL, FILTER_ICONS.retail)
+			AddFilterOption("ingame", L.FILTER_INGAME, FILTER_ICONS.ingame)
 		end)
-		
+
 		-- Set initial selected text (read from DB, not local variable)
 		local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
 		local currentIcon = FILTER_ICONS[currentFilter] or FILTER_ICONS.all
 		UIDropDownMenu_SetText(dropdown, string.format("|T%s:14:14:-2:-2|t", currentIcon))
-		
+
 		-- Setup tooltip for Classic
 		-- We need to hook the button inside the dropdown frame because it consumes mouse events
 		local dropdownName = dropdown:GetName()
 		local buttonName = dropdownName and (dropdownName .. "Button")
 		local button = buttonName and _G[buttonName]
-		
+
 		if button then
 			button:HookScript("OnEnter", function()
 				local filterText = QuickFilters:GetFilterText()
-				
+
 				GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
 				GameTooltip:SetText(string.format(L.TOOLTIP_QUICK_FILTER or "Quick Filter: %s", filterText))
 				GameTooltip:Show()
@@ -109,24 +113,24 @@ function QuickFilters:InitDropdown(dropdown)
 		else
 			dropdown:SetScript("OnEnter", function()
 				local filterText = QuickFilters:GetFilterText()
-				
+
 				GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
 				GameTooltip:SetText(string.format(L.TOOLTIP_QUICK_FILTER or "Quick Filter: %s", filterText))
 				GameTooltip:Show()
 			end)
 			dropdown:SetScript("OnLeave", GameTooltip_Hide)
 		end
-		
+
 		return
 	end
-	
+
 	-- Helper function to check if a filter mode is selected
 	-- IMPORTANT: Read from DB to stay in sync with external changes (e.g., Broker middle click)
 	local function IsSelected(mode)
 		local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
 		return currentFilter == mode
 	end
-	
+
 	-- Helper function to set the filter mode
 	local function SetSelected(mode)
 		-- CRITICAL: Read from DB to prevent race conditions
@@ -136,59 +140,62 @@ function QuickFilters:InitDropdown(dropdown)
 			self:SetFilter(mode)
 		end
 	end
-	
+
 	-- Helper function to create radio button with icon
 	local function CreateRadio(rootDescription, text, mode)
 		rootDescription:CreateRadio(text, IsSelected, SetSelected, mode)
 	end
-	
+
 	-- Set dropdown width (same as StatusDropdown)
 	dropdown:SetWidth(51)
-	
+
 	-- Setup the dropdown menu
 	dropdown:SetupMenu(function(dropdown, rootDescription)
 		rootDescription:SetTag("MENU_FRIENDS_QUICKFILTER")
-		
+
 		-- Format for icon + text in menu (with vertical offset +2)
 		local optionText = "\124T%s:16:16:0:0\124t %s"
-		
+
 		-- Create filter options with icons
 		local allText = string.format(optionText, FILTER_ICONS.all, L.FILTER_ALL)
 		CreateRadio(rootDescription, allText, "all")
-		
+
 		local onlineText = string.format(optionText, FILTER_ICONS.online, L.FILTER_ONLINE)
 		CreateRadio(rootDescription, onlineText, "online")
-		
+
 		local offlineText = string.format(optionText, FILTER_ICONS.offline, L.FILTER_OFFLINE)
 		CreateRadio(rootDescription, offlineText, "offline")
-		
+
 		local wowText = string.format(optionText, FILTER_ICONS.wow, L.FILTER_WOW)
 		CreateRadio(rootDescription, wowText, "wow")
-		
+
 		local bnetText = string.format(optionText, FILTER_ICONS.bnet, L.FILTER_BNET)
 		CreateRadio(rootDescription, bnetText, "bnet")
-		
+
 		local hideafkText = string.format(optionText, FILTER_ICONS.hideafk, L.FILTER_HIDE_AFK)
 		CreateRadio(rootDescription, hideafkText, "hideafk")
-		
+
 		local retailText = string.format(optionText, FILTER_ICONS.retail, L.FILTER_RETAIL)
 		CreateRadio(rootDescription, retailText, "retail")
+
+		local ingameText = string.format(optionText, FILTER_ICONS.ingame, L.FILTER_INGAME)
+		CreateRadio(rootDescription, ingameText, "ingame")
 	end)
-	
+
 	-- SetSelectionTranslator: Shows only the icon (centered)
 	dropdown:SetSelectionTranslator(function(selection)
 		return string.format("\124T%s:16:16:0:0\124t", FILTER_ICONS[selection.data])
 	end)
-	
+
 	-- Setup tooltip
 	dropdown:SetScript("OnEnter", function()
 		local filterText = self:GetFilterText()
-		
+
 		GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
 		GameTooltip:SetText(string.format(L.TOOLTIP_QUICK_FILTER or "Quick Filter: %s", filterText))
 		GameTooltip:Show()
 	end)
-	
+
 	dropdown:SetScript("OnLeave", GameTooltip_Hide)
 end
 
@@ -198,16 +205,16 @@ function QuickFilters:SetFilter(mode)
 	if BetterFriendlistDB then
 		BetterFriendlistDB.quickFilter = mode
 	end
-	
+
 	-- Update local cache AFTER DB write
 	filterMode = mode
-	
+
 	-- Update FriendsList module with new filter (use mode parameter, not cached variable)
 	local FriendsList = GetFriendsList()
 	if FriendsList then
 		FriendsList:SetFilterMode(mode)
 	end
-	
+
 	-- Return true to indicate filter changed (caller should refresh display)
 	return true
 end
@@ -225,7 +232,7 @@ end
 function QuickFilters:GetFilterText()
 	-- ALWAYS read from DB to ensure correct text after external changes (e.g., Broker)
 	local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or filterMode
-	
+
 	local filterTexts = {
 		all = L.FILTER_ALL,
 		online = L.FILTER_ONLINE,
@@ -234,6 +241,7 @@ function QuickFilters:GetFilterText()
 		bnet = L.FILTER_BNET,
 		hideafk = L.FILTER_HIDE_AFK,
 		retail = L.FILTER_RETAIL,
+		ingame = L.FILTER_INGAME,
 	}
 	return filterTexts[currentFilter] or L.FILTER_ALL
 end
@@ -246,16 +254,18 @@ end
 -- Refresh the dropdown display (icon) based on current filter
 -- Called when filter changes externally (e.g. via Broker)
 function QuickFilters:RefreshDropdown(dropdown)
-	if not dropdown then return end
-	
+	if not dropdown then
+		return
+	end
+
 	-- Get current filter from DB
 	local currentFilter = self:GetFilter()
 	local icon = FILTER_ICONS[currentFilter]
-	
+
 	if icon then
 		-- Manually update the text to match the translator format
 		-- This forces the dropdown button to show the correct icon
-		
+
 		if BFL.IsClassic or not BFL.HasModernDropdown then
 			-- Classic: Use 14x14 icon with -2:-2 offset to match InitDropdown
 			local text = string.format("\124T%s:14:14:-2:-2\124t", icon)
@@ -272,19 +282,19 @@ end
 function QuickFilters:PopulateMenu(rootDescription)
 	local L = BFL.L
 	local FILTER_ICONS = self:GetIcons()
-	
+
 	-- Format for icon + text in menu
 	local optionText = "\124T%s:16:16:0:0\124t %s"
-	
+
 	local function IsSelected(mode)
 		local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
 		return currentFilter == mode
 	end
-	
+
 	local function SetSelected(mode)
 		self:SetFilter(mode)
 	end
-	
+
 	local function CreateRadio(root, text, mode)
 		root:CreateRadio(text, IsSelected, SetSelected, mode)
 	end
@@ -292,22 +302,25 @@ function QuickFilters:PopulateMenu(rootDescription)
 	-- Create filter options with icons
 	local allText = string.format(optionText, FILTER_ICONS.all, L.FILTER_ALL)
 	CreateRadio(rootDescription, allText, "all")
-	
+
 	local onlineText = string.format(optionText, FILTER_ICONS.online, L.FILTER_ONLINE)
 	CreateRadio(rootDescription, onlineText, "online")
-	
+
 	local offlineText = string.format(optionText, FILTER_ICONS.offline, L.FILTER_OFFLINE)
 	CreateRadio(rootDescription, offlineText, "offline")
-	
+
 	local wowText = string.format(optionText, FILTER_ICONS.wow, L.FILTER_WOW)
 	CreateRadio(rootDescription, wowText, "wow")
-	
+
 	local bnetText = string.format(optionText, FILTER_ICONS.bnet, L.FILTER_BNET)
 	CreateRadio(rootDescription, bnetText, "bnet")
-	
+
 	local hideafkText = string.format(optionText, FILTER_ICONS.hideafk, L.FILTER_HIDE_AFK)
 	CreateRadio(rootDescription, hideafkText, "hideafk")
-	
+
 	local retailText = string.format(optionText, FILTER_ICONS.retail, L.FILTER_RETAIL)
 	CreateRadio(rootDescription, retailText, "retail")
+
+	local ingameText = string.format(optionText, FILTER_ICONS.ingame, L.FILTER_INGAME)
+	CreateRadio(rootDescription, ingameText, "ingame")
 end

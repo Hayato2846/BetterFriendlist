@@ -4122,7 +4122,7 @@ function TestSuite:RunPerfyStress(durationSeconds)
 		originalTab = (BetterFriendsFrame and PanelTemplates_GetSelectedTab(BetterFriendsFrame)) or 1,
 		groupStates = {},
 		groupIds = {},
-		filterModes = { "all", "online", "offline", "wow", "bnet", "hideafk" },
+		filterModes = { "all", "online", "offline", "wow", "bnet", "hideafk", "ingame" },
 		sortModes = { "status", "name", "level", "zone" },
 	}
 

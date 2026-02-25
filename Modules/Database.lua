@@ -110,7 +110,7 @@ local defaults = {
 	primarySort = "status", -- Primary sort method: status, name, level, zone (default: status)
 	secondarySort = "name", -- Secondary sort method: none, name, level, zone (default: name)
 	-- Filter Settings
-	quickFilter = "all", -- Quick filter mode: all, online, offline, wow, bnet (default: all)
+	quickFilter = "all", -- Quick filter mode: all, online, offline, wow, bnet, hideafk, retail, ingame (default: all)
 	-- Streamer Mode
 	streamerModeActive = false, -- Enable Streamer Mode (default: OFF)
 	showStreamerModeButton = true, -- Show Streamer Mode button (default: ON)

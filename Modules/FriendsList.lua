@@ -4431,6 +4431,22 @@ function FriendsList:PassesFilters(friend) -- Search text filter
 			end
 		end
 		-- WoW friends are assumed to be on same version as player
+	elseif self.filterMode == "ingame" then
+		-- Show only friends currently playing any game (not just on App/Mobile)
+		if friend.type == "bnet" then
+			if not friend.connected or not friend.gameAccountInfo then
+				return false
+			end
+			local client = friend.gameAccountInfo.clientProgram
+			if not client or client == "" or client == "App" or client == "BSAp" then
+				return false
+			end
+		elseif friend.type == "wow" then
+			-- WoW friends are always in a game, but must be online
+			if not friend.connected then
+				return false
+			end
+		end
 	end
 
 	return true

@@ -598,6 +598,7 @@ BFL:RegisterLocale("zhCN", function()
 	L.FILTER_BNET = "BNet"
 	L.FILTER_HIDE_AFK = "No AFK"
 	L.FILTER_RETAIL = "Retail"
+	L.FILTER_INGAME = "游戏中"
 	L.TOOLTIP_QUICK_FILTER = "Filter: %s"
 
 	-- Settings (Broker)

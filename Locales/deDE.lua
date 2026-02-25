@@ -511,6 +511,7 @@ BFL:RegisterLocale("deDE", function()
 	L.FILTER_OFFLINE = "Nur Offline"
 	L.FILTER_ONLINE = "Nur Online"
 	L.FILTER_RETAIL = "Nur Retail"
+	L.FILTER_INGAME = "Im Spiel"
 	L.FILTER_WOW = "Nur WoW"
 	L.GROUP_INGAME = "Im Spiel"
 	L.IGNORE_LIST_UNIGNORE = "Ignorieren aufheben"

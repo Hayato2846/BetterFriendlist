@@ -37,7 +37,7 @@ local lastUpdateTime = 0
 local THROTTLE_INTERVAL = 0.1 -- Update max 10 times per second (crisp but not spammy)
 
 -- Quick filter cycle order (offline removed - tooltip only shows online friends)
-local FILTER_CYCLE = { "all", "online", "wow", "bnet" }
+local FILTER_CYCLE = { "all", "online", "wow", "bnet", "ingame" }
 
 -- LibQTip tooltip reference
 local tooltip = nil

@@ -634,6 +634,7 @@ BFL:RegisterLocale("ruRU", function()
 	L.FILTER_BNET = "BNet"
 	L.FILTER_HIDE_AFK = "Не AFK"
 	L.FILTER_RETAIL = "Основная версия"
+	L.FILTER_INGAME = "В игре"
 	L.TOOLTIP_QUICK_FILTER = "Фильтр: %s"
 
 	-- Settings (Broker)

@@ -495,6 +495,7 @@ BFL:RegisterLocale("zhTW", function()
 	L.FILTER_WOW = "WoW"
 	L.FILTER_BNET = "BNet"
 	L.FILTER_RETAIL = "Retail"
+	L.FILTER_INGAME = "遊戲中"
 	L.TOOLTIP_QUICK_FILTER = "Filter: %s"
 
 	-- Settings (Broker)
