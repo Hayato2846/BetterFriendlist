@@ -29,6 +29,11 @@ local defaults = {
 	raidShortcutEnabled_mainAssist = true,
 	raidShortcutEnabled_lead = true,
 	raidShortcutEnabled_promote = true,
+	-- Raid Tools Settings
+	raidToolsSortMode = "tmrh", -- Sort mode: "tmrh" (Tanks>Melee>Ranged>Healers) or "thmr" (Tanks>Healers>Melee>Ranged)
+	raidToolsPreserveGroups = {}, -- Table of preserved group numbers: {[1]=true, [3]=true} = groups 1 and 3 are preserved
+	raidToolsResumeAfterCombat = true, -- Auto-resume sorting after leaving combat
+	raidToolsBalanceDps = false, -- Balance DPS across groups during split
 
 	nicknames = {}, -- {friendUID: "Nickname"} - custom nicknames for friends
 	lastInvitedAccounts = {}, -- {friendUID: gameAccountID} - remembers last invited game account per friend
@@ -393,6 +398,23 @@ function DB:Initialize()
 	end
 	-- Clean up orphaned friendActivity data
 	BetterFriendlistDB.friendActivity = nil
+
+	-- Migration: raidToolsSortMode "meter" -> raidToolsBalanceDps
+	if BetterFriendlistDB.raidToolsSortMode == "meter" then
+		BetterFriendlistDB.raidToolsSortMode = "tmrh"
+		BetterFriendlistDB.raidToolsBalanceDps = true
+	end
+
+	-- Migration: raidToolsGroupOffset (number) -> raidToolsPreserveGroups (table)
+	if BetterFriendlistDB.raidToolsGroupOffset ~= nil then
+		local offset = BetterFriendlistDB.raidToolsGroupOffset
+		local preserved = {}
+		for i = 1, offset do
+			preserved[i] = true
+		end
+		BetterFriendlistDB.raidToolsPreserveGroups = preserved
+		BetterFriendlistDB.raidToolsGroupOffset = nil
+	end
 
 	-- Version migration if needed
 	if BetterFriendlistDB.version ~= BFL.VERSION then

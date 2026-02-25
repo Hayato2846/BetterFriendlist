@@ -231,6 +231,12 @@ end
 function BetterRaidFrame_OnHide(self)
 	-- Clear multi-selections on hide (Phase 8.2)
 	ClearAllSelections()
+
+	-- Close Raid Tools frame
+	local RaidTools = BFL:GetModule("RaidTools")
+	if RaidTools then
+		RaidTools:Hide()
+	end
 end
 
 -- Update: Render raid member list and control panel
@@ -344,6 +350,27 @@ function BetterRaidFrame_UpdateControlPanelButtons()
 			controlPanel.ConvertToRaidButton:Enable()
 		else
 			controlPanel.ConvertToRaidButton:Disable()
+		end
+	end
+
+	-- Raid Tools: Only enabled when in raid and can control
+	if frame.RaidToolsButton then
+		if inRaid and canControl then
+			frame.RaidToolsButton:Enable()
+			frame.RaidToolsButton.tooltip = nil
+		else
+			frame.RaidToolsButton:Disable()
+			if not inRaid then
+				frame.RaidToolsButton.tooltip = nil
+			else
+				frame.RaidToolsButton.tooltip = L.RAID_TOOLS_STATUS_ERROR_NOT_LEADER
+					or "Requires raid leader or assistant"
+			end
+			-- Auto-hide Tools frame when button becomes disabled
+			local RaidTools = BFL:GetModule("RaidTools")
+			if RaidTools then
+				RaidTools:Hide()
+			end
 		end
 	end
 end

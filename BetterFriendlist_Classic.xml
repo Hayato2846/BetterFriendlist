@@ -1566,6 +1566,35 @@
 					</OnLeave>
 				</Scripts>
 			</Button>
+
+			<!-- Raid Tools Button (bottom left, mirrors ConvertToRaidButton) -->
+			<Button parentKey="RaidToolsButton" inherits="UIPanelButtonTemplate" text="Tools">
+				<NormalFont style="BetterFriendlistFontNormal"/>
+				<HighlightFont style="BetterFriendlistFontHighlight"/>
+				<DisabledFont style="BetterFriendlistFontDisable"/>
+				<Size x="150" y="21"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeKey="$parent.GroupsInset" relativePoint="BOTTOMLEFT" x="-2" y="-1"/>
+				</Anchors>
+				<Scripts>
+					<OnLoad>
+						self:SetMotionScriptsWhileDisabled(true);
+					</OnLoad>
+					<OnClick>
+						BetterRaidFrame_RaidToolsButton_OnClick(self);
+					</OnClick>
+					<OnEnter>
+						if self.tooltip then
+							GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+							GameTooltip:SetText(self.tooltip, 1, 0.1, 0.1, 1, true);
+							GameTooltip:Show();
+						end
+					</OnEnter>
+					<OnLeave>
+						GameTooltip:Hide();
+					</OnLeave>
+				</Scripts>
+			</Button>
 				</Frames>
 				<Layers>
 					<Layer level="ARTWORK">

@@ -279,6 +279,58 @@ function Compat.InitializeDropdown(dropdown, options, getter, setter, scrollHeig
 	end
 end
 
+-- Initialize dropdown with multi-select checkboxes
+-- @param dropdown: The dropdown frame
+-- @param options: Table with { labels = {...}, values = {...} }
+-- @param getter: Function(value) -> boolean (is this value currently selected?)
+-- @param setter: Function(value, checked) called when a checkbox is toggled
+-- @param textFunc: Function() -> string (returns the display text for the dropdown)
+function Compat.InitializeMultiSelectDropdown(dropdown, options, getter, setter, textFunc)
+	if BFL.HasModernDropdown and dropdown.SetupMenu then
+		-- Retail: Modern API with checkboxes
+		dropdown:SetupMenu(function(dropdown, rootDescription)
+			for i, label in ipairs(options.labels) do
+				local value = options.values[i]
+				rootDescription:CreateCheckbox(label, function()
+					return getter(value)
+				end, function()
+					setter(value, not getter(value))
+				end)
+			end
+		end)
+		-- Use SetDefaultText as fallback, and SetSelectionText for dynamic updates
+		dropdown:SetDefaultText(textFunc())
+		dropdown:SetSelectionText(function()
+			return textFunc()
+		end)
+	else
+		-- Classic: UIDropDownMenu with checkboxes
+		UIDropDownMenu_Initialize(dropdown, function(self, level, menuList)
+			level = level or 1
+			for i, label in ipairs(options.labels) do
+				local info = UIDropDownMenu_CreateInfo()
+				info.text = label
+				local capturedValue = options.values[i]
+				info.value = capturedValue
+				info.isNotRadio = true
+				info.keepShownOnClick = true
+				info.checked = function()
+					return getter(capturedValue)
+				end
+				info.func = function(self)
+					local newChecked = not getter(capturedValue)
+					setter(capturedValue, newChecked)
+					UIDropDownMenu_SetText(dropdown, textFunc())
+				end
+				UIDropDownMenu_AddButton(info, level)
+			end
+		end)
+
+		-- Set initial text
+		UIDropDownMenu_SetText(dropdown, textFunc())
+	end
+end
+
 -- Refresh a dropdown's displayed text after programmatic value change
 -- @param dropdown: The dropdown frame
 -- @param text: The text to display
@@ -865,6 +917,7 @@ end
 -- Dropdown Creation
 BFL.CreateDropdown = Compat.CreateDropdown
 BFL.InitializeDropdown = Compat.InitializeDropdown
+BFL.InitializeMultiSelectDropdown = Compat.InitializeMultiSelectDropdown
 BFL.RefreshDropdown = Compat.RefreshDropdown
 
 -- ColorPicker

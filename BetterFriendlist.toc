@@ -87,6 +87,7 @@ Modules\GlobalSync.lua
 Modules\Dialogs.lua
 Modules\RAF.lua [AllowLoadGameType mainline]
 Modules\RaidFrame.lua
+Modules\RaidTools.lua
 Modules\GuildDetails.lua [AllowLoadGameType vanilla, tbc, wrath, cata, mists]
 BetterFriendlist_QuickJoin.xml [AllowLoadGameType mainline]
 Modules\QuickJoin.lua [AllowLoadGameType mainline]
