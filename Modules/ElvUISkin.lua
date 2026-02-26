@@ -947,6 +947,11 @@ function ElvUISkin:SkinFrames(E, S)
 		if frame.RaidFrame.ControlPanel and frame.RaidFrame.ControlPanel.EveryoneAssistCheckbox then
 			S:HandleCheckBox(frame.RaidFrame.ControlPanel.EveryoneAssistCheckbox)
 		end
+
+		-- Skin RaidToolsButton
+		if frame.RaidFrame.RaidToolsButton then
+			S:HandleButton(frame.RaidFrame.RaidToolsButton)
+		end
 	end
 
 	-- Hook Friends List (ScrollBox Items)
@@ -1035,6 +1040,21 @@ function ElvUISkin:SkinFrames(E, S)
 				end)
 			end)
 			self.SearchBuilderHookInstalled = true
+		end
+	end
+
+	-- Hook RaidTools (lazy frame creation)
+	if not self.RaidToolsHookInstalled then
+		local RaidToolsModule = BFL:GetModule("RaidTools")
+		if RaidToolsModule and RaidToolsModule.CreateFrame then
+			hooksecurefunc(RaidToolsModule, "CreateFrame", function()
+				xpcall(function()
+					self:SkinRaidTools(E, S)
+				end, function(err)
+					BFL:DebugPrint("ElvUISkin: Error skinning RaidTools: " .. tostring(err))
+				end)
+			end)
+			self.RaidToolsHookInstalled = true
 		end
 	end
 
@@ -2138,5 +2158,110 @@ function ElvUISkin:SkinSearchBuilder(E, S)
 			S:HandlePortraitFrame(container)
 		end)
 		container.isSkinned = true
+	end
+end
+
+-- ============================================================================
+-- RaidTools Skinning
+-- ============================================================================
+
+function ElvUISkin:SkinRaidTools(E, S)
+	local frame = _G.BetterFriendlistRaidToolsFrame
+	if not frame then
+		return
+	end
+
+	-- Frame backdrop
+	pcall(S.HandlePortraitFrame, S, frame)
+
+	-- Close button
+	if frame.CloseButton then
+		pcall(S.HandleCloseButton, S, frame.CloseButton)
+	end
+
+	-- Dropdowns
+	local sortDropdown = _G["BFLRaidToolsSortMode"]
+	if sortDropdown then
+		pcall(S.HandleDropDownBox, S, sortDropdown)
+		if BFL.IsClassic then
+			FixClassicDropdownHitbox(sortDropdown, 189, 24)
+			if not sortDropdown.BFL_OrigXOfs then
+				local p, rel, rp, x, y = sortDropdown:GetPoint(1)
+				sortDropdown.BFL_OrigXOfs = x or 0
+				sortDropdown.BFL_OrigYOfs = y or 0
+			end
+			local p, rel, rp = sortDropdown:GetPoint(1)
+			if p then
+				sortDropdown:SetPoint(p, rel, rp, sortDropdown.BFL_OrigXOfs + 16, sortDropdown.BFL_OrigYOfs)
+			end
+		end
+		if BFL.IsRetail then
+			sortDropdown:SetWidth(240)
+		end
+	end
+
+	local preserveDropdown = _G["BFLRaidToolsPreserveGroups"]
+	if preserveDropdown then
+		pcall(S.HandleDropDownBox, S, preserveDropdown)
+		if BFL.IsClassic then
+			FixClassicDropdownHitbox(preserveDropdown, 189, 24)
+			if not preserveDropdown.BFL_OrigXOfs then
+				local p, rel, rp, x, y = preserveDropdown:GetPoint(1)
+				preserveDropdown.BFL_OrigXOfs = x or 0
+				preserveDropdown.BFL_OrigYOfs = y or 0
+			end
+			local p, rel, rp = preserveDropdown:GetPoint(1)
+			if p then
+				preserveDropdown:SetPoint(p, rel, rp, preserveDropdown.BFL_OrigXOfs + 16, preserveDropdown.BFL_OrigYOfs)
+			end
+		end
+		if BFL.IsRetail then
+			preserveDropdown:SetWidth(240)
+		end
+	end
+
+	-- Checkboxes
+	local balanceDps = _G["BFLRaidToolsBalanceDps"]
+	if balanceDps then
+		S:HandleCheckBox(balanceDps)
+		if BFL.IsRetail then
+			local p, rel, rp, x, y = balanceDps:GetPoint(1)
+			if p then
+				balanceDps:SetPoint(p, rel, rp, x - 3, y)
+			end
+		end
+	end
+
+	local resumeCheck = _G["BFLRaidToolsResumeCheck"]
+	if resumeCheck then
+		S:HandleCheckBox(resumeCheck)
+		if BFL.IsRetail then
+			local p, rel, rp, x, y = resumeCheck:GetPoint(1)
+			if p then
+				resumeCheck:SetPoint(p, rel, rp, x - 3, y)
+			end
+		end
+	end
+
+	-- Buttons
+	if frame.sortButton then
+		S:HandleButton(frame.sortButton)
+	end
+	if frame.splitButton then
+		S:HandleButton(frame.splitButton)
+	end
+	if frame.splitOddsButton then
+		S:HandleButton(frame.splitOddsButton)
+	end
+	if frame.promoteButton then
+		S:HandleButton(frame.promoteButton)
+	end
+
+	-- RETAIL FINETUNING: Additional Retail-specific tweaks for RaidTools here
+	if BFL.IsRetail then
+	end
+
+	-- CLASSIC FINETUNING: Additional Classic-specific tweaks for RaidTools here
+	if BFL.IsClassic then
 	end
 end

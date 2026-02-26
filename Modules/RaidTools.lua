@@ -1686,6 +1686,11 @@ function RaidTools:UpdateButtonStates()
 	if toolsFrame.balanceDpsCheck then
 		local hasMeter = self:HasMeterAddon()
 		toolsFrame.balanceDpsCheck:SetEnabled(hasMeter)
+		-- Update label font to match enabled/disabled state
+		local balanceText = toolsFrame.balanceDpsCheck.Text or _G["BFLRaidToolsBalanceDpsText"]
+		if balanceText then
+			balanceText:SetFontObject(hasMeter and "BetterFriendlistFontNormal" or "BetterFriendlistFontDisable")
+		end
 		if not hasMeter then
 			local DB = BFL:GetModule("DB")
 			if DB:Get("raidToolsBalanceDps", false) then
