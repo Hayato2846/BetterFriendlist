@@ -4948,7 +4948,7 @@ function Settings:RefreshAdvancedTab()
 				local betaTabIds = GetBetaTabIds()
 				for _, betaTabId in ipairs(betaTabIds) do
 					if currentTab == betaTabId then
-						self:ShowTab(1)
+						self:SelectCategory(1)
 						break
 					end
 				end

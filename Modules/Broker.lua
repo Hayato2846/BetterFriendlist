@@ -2097,7 +2097,7 @@ function Broker:OnClick(clickedFrame, button)
 				Settings:Hide()
 			else
 				Settings:Show()
-				Settings:ShowTab(4) -- Data Broker tab
+				Settings:SelectCategory(5) -- Data Broker tab
 			end
 		end
 	elseif action == "bnet" then
