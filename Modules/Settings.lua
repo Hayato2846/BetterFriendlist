@@ -3102,8 +3102,8 @@ function Settings:RefreshGeneralTab()
 	})
 	table.insert(allFrames, row2)
 
-	-- Row 2b: Multi-Account Badge & Tooltip Max Accounts
-	local row2b = Components:CreateCheckboxDropdown(tab, { -- Left: Checkbox
+	-- Row 2b: Multi-Account Badge
+	local row2b = Components:CreateCheckbox(tab, {
 		label = L.SETTINGS_SHOW_MULTI_ACCOUNT_BADGE,
 		initialValue = DB:Get("showMultiAccountBadge", true),
 		callback = function(val)
@@ -3113,21 +3113,6 @@ function Settings:RefreshGeneralTab()
 		tooltipTitle = L.SETTINGS_SHOW_MULTI_ACCOUNT_BADGE,
 		tooltipDesc = L.SETTINGS_SHOW_MULTI_ACCOUNT_BADGE_DESC
 			or "Display a badge on friends with multiple game accounts online.",
-	}, { -- Right: Dropdown
-		label = L.SETTINGS_TOOLTIP_MAX_ACCOUNTS or "Tooltip: Max Game Accounts",
-		entries = {
-			labels = { "1", "2", "3", "5", "10" },
-			values = { 1, 2, 3, 5, 10 },
-		},
-		isSelectedCallback = function(val)
-			return DB:Get("tooltipMaxGameAccounts", 5) == val
-		end,
-		onSelectionCallback = function(val)
-			DB:Set("tooltipMaxGameAccounts", val)
-		end,
-		tooltipTitle = L.SETTINGS_TOOLTIP_MAX_ACCOUNTS,
-		tooltipDesc = L.SETTINGS_TOOLTIP_MAX_ACCOUNTS_DESC
-			or "Maximum number of additional game accounts shown in the tooltip.",
 	})
 	table.insert(allFrames, row2b)
 

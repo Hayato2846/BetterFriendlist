@@ -1191,8 +1191,6 @@ BFL:RegisterLocale("koKR", function()
 	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO = "멀티 계정 정보 표시"
 	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO_DESC =
 		"친구가 여러 계정에 접속 중일 때 온라인 캐릭터 목록을 짧게 추가합니다."
-	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS = "툴팁: 최대 게임 계정 수"
-	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS_DESC = "툴팁에 표시되는 추가 게임 계정의 최대 수입니다."
 	L.INFO_MULTI_ACCOUNT_PREFIX = "x%d Accounts"
 	L.INFO_MULTI_ACCOUNT_REMAINDER = " (+%d)"
 
@@ -1341,7 +1339,7 @@ BFL:RegisterLocale("koKR", function()
 	L.SETTINGS_FRIEND_NAME_SETTINGS = "친구 이름 설정"
 	L.SETTINGS_FRIEND_INFO_SETTINGS = "친구 정보 설정"
 	L.SETTINGS_FONT_TABS_TITLE = "탭 텍스트"
-	L.SETTINGS_FONT_RAID_TITLE = "공��대 이름 텍스트"
+	L.SETTINGS_FONT_RAID_TITLE = "공��대 이�� 텍스트"
 	L.SETTINGS_FONT_SIZE_NUM = "글꼴 크기"
 
 	-- ========================================

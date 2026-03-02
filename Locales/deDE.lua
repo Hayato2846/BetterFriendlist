@@ -1164,8 +1164,6 @@ BFL:RegisterLocale("deDE", function()
 	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO = "Multi-Account-Info anzeigen"
 	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO_DESC =
 		"Fügt bei mehreren aktiven Konten eine kurze Liste der online Charaktere hinzu."
-	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS = "Tooltip: Max. Spielkonten"
-	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS_DESC = "Maximale Anzahl zusätzlicher Spielkonten, die im Tooltip angezeigt werden."
 	L.INFO_MULTI_ACCOUNT_PREFIX = "x%d Accounts"
 	L.INFO_MULTI_ACCOUNT_REMAINDER = " (+%d)"
 

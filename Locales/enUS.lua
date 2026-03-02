@@ -1203,8 +1203,6 @@ local function LoadEnUS()
 	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO = "Show Multi-Account Info"
 	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO_DESC =
 		"Add a dedicated line with icons for other online characters when a friend is logged into multiple accounts."
-	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS = "Tooltip: Max Game Accounts"
-	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS_DESC = "Maximum number of additional game accounts shown in the tooltip."
 	L.INFO_MULTI_ACCOUNT_PREFIX = "x%d Accounts"
 	L.INFO_MULTI_ACCOUNT_REMAINDER = " (+%d)"
 

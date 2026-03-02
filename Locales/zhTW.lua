@@ -1203,8 +1203,6 @@ BFL:RegisterLocale("zhTW", function()
 	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO = "顯示多帳號資訊"
 	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO_DESC =
 		"當好友同時登入多個帳號時，附加一份線上角色的簡短列表。"
-	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS = "提示框：最大遊戲帳號數"
-	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS_DESC = "提示框中顯示的額外遊戲帳號最大數量。"
 	L.INFO_MULTI_ACCOUNT_PREFIX = "x%d Accounts"
 	L.INFO_MULTI_ACCOUNT_REMAINDER = " (+%d)"
 
@@ -1417,7 +1415,7 @@ BFL:RegisterLocale("zhTW", function()
 	L.WIZARD_SEARCH_PLACEHOLDER = "搜尋..."
 	L.WIZARD_BACKUP_BTN = "備份備��"
 	L.WIZARD_BACKUP_DONE = "已備份！"
-	L.WIZARD_BACKUP_TOOLTIP = "將所有目前好友備註儲存到資料庫作為備份。"
+	L.WIZARD_BACKUP_TOOLTIP = "將所有目前好友備註��存到資料庫作為備份。"
 	L.WIZARD_BACKUP_SUCCESS = "已備份 %d 位好友的���註。"
 	L.WIZARD_APPLY_BTN = "套用清理"
 	L.WIZARD_APPLY_TOOLTIP = "將清理後的備註寫回。僅更新與原始備註不同的備註。"

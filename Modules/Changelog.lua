@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [DRAFT]
 
+### Changed
+- **Friend Tooltip** - Completely rebuilt the friend tooltip to use Blizzard's native tooltip system instead of manually replicating it. This eliminates potential UI taint issues and ensures the tooltip always matches Blizzard's latest format.
+- **Tooltip: Max Game Accounts setting removed** - The tooltip now always uses Blizzard's default of 5 game accounts, matching the standard behavior.
+
 ### Fixed
 - **Data Broker Right-Click** - Fixed an error when right-clicking the BetterFriendlist icon in Data Broker displays like ChocolateBar to open settings.
 - **Beta Features Toggle** - Fixed an error when disabling Beta Features while viewing a Beta settings tab.

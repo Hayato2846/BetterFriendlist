@@ -1185,8 +1185,6 @@ BFL:RegisterLocale("zhCN", function()
 	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO = "显示多账号信息"
 	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO_DESC =
 		"当好友同时登录多个账号时，附加一份在线角色的简短列表。"
-	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS = "提示框：最大游戏账号数"
-	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS_DESC = "提示框中显示的额外游戏账号最大数量。"
 	L.INFO_MULTI_ACCOUNT_PREFIX = "x%d Accounts"
 	L.INFO_MULTI_ACCOUNT_REMAINDER = " (+%d)"
 

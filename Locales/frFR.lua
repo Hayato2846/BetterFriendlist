@@ -1197,9 +1197,6 @@ BFL:RegisterLocale("frFR", function()
 	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO = "Afficher l'info multi-comptes"
 	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO_DESC =
 		"Ajoute une courte liste des personnages en ligne quand un ami utilise plusieurs comptes."
-	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS = "Infobulle : Comptes de jeu max."
-	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS_DESC =
-		"Nombre maximum de comptes de jeu supplémentaires affichés dans l'infobulle."
 	L.INFO_MULTI_ACCOUNT_PREFIX = "x%d Accounts"
 	L.INFO_MULTI_ACCOUNT_REMAINDER = " (+%d)"
 
@@ -1314,7 +1311,7 @@ BFL:RegisterLocale("frFR", function()
 	-- FRAME DIMENSIONS (Phase 21) - RESTORED
 	-- ========================================
 	L.SETTINGS_FRAME_DIMENSIONS_HEADER = "Dimensions de la Fenêtre"
-	L.SETTINGS_FRAME_SCALE = "Échelle:"
+	L.SETTINGS_FRAME_SCALE = "��chelle:"
 	L.SETTINGS_FRAME_WIDTH = "Largeur:"
 	L.SETTINGS_FRAME_HEIGHT = "Hauteur:"
 	L.SETTINGS_FRAME_WIDTH_DESC = "Ajuste la largeur de la fenêtre"

@@ -105,7 +105,6 @@ local defaults = {
 	showFactionBg = false, -- Show faction color as background (default: OFF)
 	showMultiAccountBadge = true, -- Show badge on friends with multiple game accounts online (default: ON)
 	showMultiAccountInfo = true, -- Append multi-account details to the info line (default: ON)
-	tooltipMaxGameAccounts = 5, -- Max game accounts to show in tooltip (default: 5)
 	-- Sort Settings
 	primarySort = "status", -- Primary sort method: status, name, level, zone (default: status)
 	secondarySort = "name", -- Secondary sort method: none, name, level, zone (default: name)

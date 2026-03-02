@@ -1230,9 +1230,6 @@ BFL:RegisterLocale("ruRU", function()
 	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO = "Показывать инфо мульти-аккаунта"
 	L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO_DESC =
 		"Добавляет краткий список онлайн-персонажей, если у друга активно несколько аккаунтов."
-	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS = "Подсказка: Макс. игровых аккаунтов"
-	L.SETTINGS_TOOLTIP_MAX_ACCOUNTS_DESC =
-		"Максимальное количество дополнительных игровых аккаунтов в подсказке."
 	L.INFO_MULTI_ACCOUNT_PREFIX = "x%d Accounts"
 	L.INFO_MULTI_ACCOUNT_REMAINDER = " (+%d)"
 
