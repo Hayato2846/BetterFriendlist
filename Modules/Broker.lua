@@ -2091,6 +2091,10 @@ function Broker:OnClick(clickedFrame, button)
 			ToggleFriendsFrame(1)
 		end
 	elseif action == "settings" then
+		-- Ensure the friendlist is open first (never close it)
+		if BetterFriendsFrame and not BetterFriendsFrame:IsShown() then
+			ShowUIPanel(BetterFriendsFrame)
+		end
 		local Settings = BFL:GetModule("Settings")
 		if Settings then
 			if BetterFriendlistSettingsFrame and BetterFriendlistSettingsFrame:IsShown() then
@@ -2185,6 +2189,13 @@ function Broker:Initialize()
 		dataObjectDef.OnEnter = function(anchorFrame)
 			tooltip = CreateLibQTipTooltip(anchorFrame)
 		end
+
+		-- OnLeave signals to broker displays (ChocolateBar, Bazooka, etc.) that we
+		-- manage our own tooltip lifecycle. Without this, they apply a fallback hide
+		-- timeout (typically 5 seconds). The actual hide logic is handled by
+		-- SetupTooltipAutoHide's OnUpdate polling (0.25s after mouse leaves both
+		-- the tooltip and the anchor frame).
+		dataObjectDef.OnLeave = function() end
 	else
 		dataObjectDef.OnTooltipShow = function(gameTooltip)
 			if gameTooltip and gameTooltip.AddLine then

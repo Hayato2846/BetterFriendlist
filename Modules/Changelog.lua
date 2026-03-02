@@ -17,15 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [DRAFT]
+## [2.4.3]       - 2026-03-02
 
 ### Changed
-- **Friend Tooltip** - Completely rebuilt the friend tooltip to use Blizzard's native tooltip system instead of manually replicating it. This eliminates potential UI taint issues and ensures the tooltip always matches Blizzard's latest format.
-- **Tooltip: Max Game Accounts setting removed** - The tooltip now always uses Blizzard's default of 5 game accounts, matching the standard behavior.
+- **Data Broker Right-Click** - Also opens the friend list if it was closed.
+- **Friend Tooltip** - Now uses Blizzard's native tooltip instead of a custom replica.
+- **Tooltip: Max Game Accounts** - Setting removed. Always shows up to 5 accounts (Blizzard default).
 
 ### Fixed
-- **Data Broker Right-Click** - Fixed an error when right-clicking the BetterFriendlist icon in Data Broker displays like ChocolateBar to open settings.
-- **Beta Features Toggle** - Fixed an error when disabling Beta Features while viewing a Beta settings tab.
+- **Data Broker Tooltip** - No longer stays open for ~5 seconds after moving the mouse away (ChocolateBar, Bazooka, etc.).
+- **Data Broker Right-Click** - Fixed an error when right-clicking the icon to open settings.
+- **Beta Features Toggle** - Fixed an error when disabling Beta Features while on a Beta settings tab.
 
 ---
 
@@ -141,16 +143,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Settings Import Failing** - Fixed settings import always failing with "corrupted string" error, making it impossible to restore exported backups.
 - **Settings Import Not Fully Replacing Data** - Fixed settings import not removing groups or settings that were created after the export. Importing a backup now fully restores the exact state from the export.
-
-## [2.3.4]       - 2026-02-12
-### Fixed
-- **Streamer Mode Real ID Leaks** - Fixed several places where Real IDs could still be visible despite Streamer Mode being active:
-  - Friend tooltip in Classic showed Real ID instead of BattleTag.
-  - Data Broker tooltip showed Real ID for friends not currently playing WoW.
-  - Recruit-A-Friend tab showed Real IDs without respecting Streamer Mode.
-  - FriendListColors addon integration received unmasked Real IDs.
-  - Copy Name popup could fall back to Real ID.
-  - Drag ghost text could show Real ID when dragging a friend.
 
 ---
 
