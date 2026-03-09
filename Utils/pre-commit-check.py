@@ -310,8 +310,8 @@ class BugChecker:
     
     def run_all_checks(self):
         for lua_file in LUA_FILES:
-            if 'Libs' in str(lua_file):
-                continue  # Skip library files
+            if 'Libs' in str(lua_file) or 'WoW UI Source' in str(lua_file):
+                continue  # Skip library and reference files
             
             content = lua_file.read_text(encoding='utf-8', errors='ignore')
             self.check_or_true_pattern(lua_file, content)

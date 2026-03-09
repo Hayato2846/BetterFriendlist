@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [DRAFT]
 
 ### Fixed
+- **Global Sync** - Fixed "Player not found." spam caused by using an incorrect realm name format when adding friends. Same-realm and connected-realm friends are now synced correctly.
+- **Global Sync** - Friends on connected realms are no longer incorrectly detected as missing, which previously caused repeated failed add attempts.
+- **Global Sync** - System messages like "Player not found." and "Friends list is full." are now suppressed during automatic sync.
+- **Global Sync** - The sync no longer retries failed add attempts every cycle. Each friend is only attempted once per session.
+- **Global Sync** - The sync now respects the 100 friend limit and stops adding when the list is full.
 - **Raid Shortcuts** - Fixed raid shortcuts (Assist, Raid Lead, Main Tank, Main Assist, and the right-click context menu) not working on Classic. Also fixed these shortcuts silently failing on Retail when "Cast on Key Down" was enabled in the game settings.
 
 ---

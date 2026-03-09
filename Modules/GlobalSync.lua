@@ -12,478 +12,598 @@ local syncTimer = nil
 local pendingAdds = {}
 local processingQueue = false
 
--- Helper: Get Normalized Realm Name
-local function GetRealmName()
-    return GetNormalizedRealmName()
+-- Helper: Get Normalized Realm Name (for DB keys and internal matching)
+local function GetNormalizedRealm()
+	return GetNormalizedRealmName()
+end
+
+-- Helper: Get Display Realm Name (for AddFriend API - preserves spaces/hyphens)
+local function GetDisplayRealmName()
+	return _G.GetRealmName()
 end
 
 -- Helper: Get Faction
 local function GetFaction()
-    local faction = UnitFactionGroup("player")
-    return faction
+	local faction = UnitFactionGroup("player")
+	return faction
 end
 
 -- Helper: Determine whether a FriendUID should be added (self-check)
 function GlobalSync:ShouldAddFriend(friendUID, currentRealm, currentPlayerName)
-    if not friendUID or friendUID == "" then
-        return false
-    end
+	if not friendUID or friendUID == "" then
+		return false
+	end
 
-    currentRealm = currentRealm or GetRealmName()
-    currentPlayerName = currentPlayerName or UnitName("player")
-    if not currentRealm or not currentPlayerName then
-        return false
-    end
+	currentRealm = currentRealm or GetNormalizedRealm()
+	currentPlayerName = currentPlayerName or UnitName("player")
+	if not currentRealm or not currentPlayerName then
+		return false
+	end
 
-    local name, realm = string.match(friendUID, "^(.+)%-(.+)$")
-    if not name or not realm then
-        return false
-    end
+	local name, realm = string.match(friendUID, "^(.+)%-(.+)$")
+	if not name or not realm then
+		return false
+	end
 
-    local isSelf = (name == currentPlayerName) and (string.gsub(realm, "%s+", "") == currentRealm)
-    return not isSelf
+	local isSelf = (name == currentPlayerName) and (string.gsub(realm, "%s+", "") == currentRealm)
+	return not isSelf
 end
 
 function GlobalSync:Initialize()
-    -- Initialize DB structure if missing
-    if not BetterFriendlistDB.GlobalFriends then
-        BetterFriendlistDB.GlobalFriends = {
-            Alliance = {},
-            Horde = {}
-        }
-    end
+	-- Initialize DB structure if missing
+	if not BetterFriendlistDB.GlobalFriends then
+		BetterFriendlistDB.GlobalFriends = {
+			Alliance = {},
+			Horde = {},
+		}
+	end
 
-    -- Perform Migration to Flat Structure
-    self:MigrateGlobalFriends()
+	-- Perform Migration to Flat Structure
+	self:MigrateGlobalFriends()
 
-    -- Hook Deletion APIs
-    self:HookDeletionAPIs()
+	-- Hook Deletion APIs
+	self:HookDeletionAPIs()
 
-    self:RegisterEvents()
-    
-    -- Request friend list update from server to ensure we have data
-    if C_FriendList.ShowFriends then
-        C_FriendList.ShowFriends()
-    end
+	self:RegisterEvents()
 
-    -- BFL:DebugPrint("GlobalSync Module Initialized")
+	-- Initialize session tracking for attempted adds
+	self.attemptedAdds = {}
+
+	-- Ensure current realm display name is in the reverse lookup
+	local normalizedRealm = GetNormalizedRealm()
+	if BFL.RealmDisplayNames and normalizedRealm then
+		BFL.RealmDisplayNames[normalizedRealm] = GetDisplayRealmName()
+	end
+
+	-- Request friend list update from server to ensure we have data
+	if C_FriendList.ShowFriends then
+		C_FriendList.ShowFriends()
+	end
+
+	-- BFL:DebugPrint("GlobalSync Module Initialized")
 end
 
 function GlobalSync:MigrateGlobalFriends()
-    if BetterFriendlistDB.globalFriendsMigrated then return end
-    
-    -- BFL:DebugPrint("GlobalSync: Starting migration to flat structure...")
-    
-    local newStructure = {
-        Alliance = {},
-        Horde = {}
-    }
-    
-    local count = 0
-    
-    -- Iterate old structure: [Faction][StorageKey][Name]
-    for faction, storageKeys in pairs(BetterFriendlistDB.GlobalFriends) do
-        if newStructure[faction] then
-            for storageKey, friends in pairs(storageKeys) do
-                -- Extract Realm from StorageKey (Format: "Realm - CharacterName" or legacy "Realm")
-                local realm = string.match(storageKey, "^(.+) %- .+$") or storageKey
-                
-                for name, data in pairs(friends) do
-                    -- Construct FriendUID: Name-Realm
-                    local friendUID
-                    if string.find(name, "-") then
-                        friendUID = name -- Already has realm
-                    else
-                        friendUID = name .. "-" .. realm
-                    end
-                    
-                    -- Store in new structure (overwrite duplicates, last one wins)
-                    newStructure[faction][friendUID] = {
-                        notes = data.notes,
-                        guid = data.guid,
-                        lastSeen = data.lastSeen or time() -- Preserve or add timestamp
-                    }
-                    count = count + 1
-                end
-            end
-        end
-    end
-    
-    -- Replace old DB with new structure
-    BetterFriendlistDB.GlobalFriends = newStructure
-    BetterFriendlistDB.globalFriendsMigrated = true
-    
-    -- BFL:DebugPrint("GlobalSync: Migration complete. Migrated " .. count .. " friends.")
+	if BetterFriendlistDB.globalFriendsMigrated then
+		return
+	end
+
+	-- BFL:DebugPrint("GlobalSync: Starting migration to flat structure...")
+
+	local newStructure = {
+		Alliance = {},
+		Horde = {},
+	}
+
+	local count = 0
+
+	-- Iterate old structure: [Faction][StorageKey][Name]
+	for faction, storageKeys in pairs(BetterFriendlistDB.GlobalFriends) do
+		if newStructure[faction] then
+			for storageKey, friends in pairs(storageKeys) do
+				-- Extract Realm from StorageKey (Format: "Realm - CharacterName" or legacy "Realm")
+				local realm = string.match(storageKey, "^(.+) %- .+$") or storageKey
+
+				for name, data in pairs(friends) do
+					-- Construct FriendUID: Name-Realm
+					local friendUID
+					if string.find(name, "-") then
+						friendUID = name -- Already has realm
+					else
+						friendUID = name .. "-" .. realm
+					end
+
+					-- Store in new structure (overwrite duplicates, last one wins)
+					newStructure[faction][friendUID] = {
+						notes = data.notes,
+						guid = data.guid,
+						lastSeen = data.lastSeen or time(), -- Preserve or add timestamp
+					}
+					count = count + 1
+				end
+			end
+		end
+	end
+
+	-- Replace old DB with new structure
+	BetterFriendlistDB.GlobalFriends = newStructure
+	BetterFriendlistDB.globalFriendsMigrated = true
+
+	-- BFL:DebugPrint("GlobalSync: Migration complete. Migrated " .. count .. " friends.")
 end
 
 function GlobalSync:HookDeletionAPIs()
-    if self.hooksInstalled then return end
-    self.hooksInstalled = true
-    
-    -- Hook RemoveFriend (Checks both Modern C_FriendList and Legacy Global)
-    if C_FriendList and C_FriendList.RemoveFriend then
-        hooksecurefunc(C_FriendList, "RemoveFriend", function(name)
-            self:OnFriendRemoved(name)
-        end)
-    elseif RemoveFriend then
-        hooksecurefunc("RemoveFriend", function(name)
-            self:OnFriendRemoved(name)
-        end)
-    end
-    
-    -- Hook RemoveFriendByIndex
-    if C_FriendList and C_FriendList.RemoveFriendByIndex then
-        local originalRemoveByIndex = C_FriendList.RemoveFriendByIndex
-        C_FriendList.RemoveFriendByIndex = function(index)
-            local info = C_FriendList.GetFriendInfoByIndex(index)
-            local nameToRemove = info and info.name
-            
-            local result = originalRemoveByIndex(index)
-            
-            if nameToRemove then
-                self:OnFriendRemoved(nameToRemove)
-            end
-            
-            return result
-        end
-    -- Note: Hooking global RemoveFriend covers Index removal in Classic if it accepts index, 
-    -- but usually Classic RemoveFriend takes a name. 
-    end
-    
-    -- Hook AddFriend
-    if C_FriendList and C_FriendList.AddFriend then
-        hooksecurefunc(C_FriendList, "AddFriend", function(name)
-            self:OnFriendAdded(name)
-        end)
-    elseif AddFriend then
-        hooksecurefunc("AddFriend", function(name)
-            self:OnFriendAdded(name)
-        end)
-    end
-    
-    -- Hook SetFriendNotes
-    if C_FriendList and C_FriendList.SetFriendNotes then
-        hooksecurefunc(C_FriendList, "SetFriendNotes", function(name, notes)
-            self:OnFriendNoteUpdated(name, notes)
-        end)
-    elseif SetFriendNotes then
-        hooksecurefunc("SetFriendNotes", function(name, notes)
-            self:OnFriendNoteUpdated(name, notes)
-        end)
-    end
-    
-    -- BFL:DebugPrint("GlobalSync: Deletion APIs hooked.")
+	if self.hooksInstalled then
+		return
+	end
+	self.hooksInstalled = true
+
+	-- Hook RemoveFriend (Checks both Modern C_FriendList and Legacy Global)
+	if C_FriendList and C_FriendList.RemoveFriend then
+		hooksecurefunc(C_FriendList, "RemoveFriend", function(name)
+			self:OnFriendRemoved(name)
+		end)
+	elseif RemoveFriend then
+		hooksecurefunc("RemoveFriend", function(name)
+			self:OnFriendRemoved(name)
+		end)
+	end
+
+	-- Hook RemoveFriendByIndex
+	if C_FriendList and C_FriendList.RemoveFriendByIndex then
+		local originalRemoveByIndex = C_FriendList.RemoveFriendByIndex
+		C_FriendList.RemoveFriendByIndex = function(index)
+			local info = C_FriendList.GetFriendInfoByIndex(index)
+			local nameToRemove = info and info.name
+
+			local result = originalRemoveByIndex(index)
+
+			if nameToRemove then
+				self:OnFriendRemoved(nameToRemove)
+			end
+
+			return result
+		end
+		-- Note: Hooking global RemoveFriend covers Index removal in Classic if it accepts index,
+		-- but usually Classic RemoveFriend takes a name.
+	end
+
+	-- Hook AddFriend
+	if C_FriendList and C_FriendList.AddFriend then
+		hooksecurefunc(C_FriendList, "AddFriend", function(name)
+			self:OnFriendAdded(name)
+		end)
+	elseif AddFriend then
+		hooksecurefunc("AddFriend", function(name)
+			self:OnFriendAdded(name)
+		end)
+	end
+
+	-- Hook SetFriendNotes
+	if C_FriendList and C_FriendList.SetFriendNotes then
+		hooksecurefunc(C_FriendList, "SetFriendNotes", function(name, notes)
+			self:OnFriendNoteUpdated(name, notes)
+		end)
+	elseif SetFriendNotes then
+		hooksecurefunc("SetFriendNotes", function(name, notes)
+			self:OnFriendNoteUpdated(name, notes)
+		end)
+	end
+
+	-- BFL:DebugPrint("GlobalSync: Deletion APIs hooked.")
 end
 
 function GlobalSync:OnFriendNoteUpdated(name, notes)
-    if not name then return end
-    
-    local faction = GetFaction()
-    local realm = GetRealmName()
-    
-    if not faction or not realm then return end
-    
-    -- Construct FriendUID
-    local friendUID
-    if string.find(name, "-") then
-        friendUID = name
-    else
-        friendUID = name .. "-" .. realm
-    end
-    
-    -- Update DB if entry exists
-    if BetterFriendlistDB.GlobalFriends[faction] and BetterFriendlistDB.GlobalFriends[faction][friendUID] then
-        BetterFriendlistDB.GlobalFriends[faction][friendUID].notes = notes
-        -- BFL:DebugPrint("GlobalSync: Updated DB note for " .. friendUID .. " (Hooked SetFriendNotes).")
-    end
+	if not name then
+		return
+	end
+
+	local faction = GetFaction()
+	local realm = GetNormalizedRealm()
+
+	if not faction or not realm then
+		return
+	end
+
+	-- Construct FriendUID
+	local friendUID
+	if string.find(name, "-") then
+		friendUID = name
+	else
+		friendUID = name .. "-" .. realm
+	end
+
+	-- Update DB if entry exists
+	if BetterFriendlistDB.GlobalFriends[faction] and BetterFriendlistDB.GlobalFriends[faction][friendUID] then
+		BetterFriendlistDB.GlobalFriends[faction][friendUID].notes = notes
+		-- BFL:DebugPrint("GlobalSync: Updated DB note for " .. friendUID .. " (Hooked SetFriendNotes).")
+	end
 end
 
 function GlobalSync:OnFriendAdded(name)
-    if not name then return end
-    
-    local faction = GetFaction()
-    local realm = GetRealmName()
-    
-    if not faction or not realm then return end
-    
-    -- Construct FriendUID
-    local friendUID
-    if string.find(name, "-") then
-        friendUID = name
-    else
-        friendUID = name .. "-" .. realm
-    end
-    
-    -- If marked as deleted in DB, clear the flag
-    if BetterFriendlistDB.GlobalFriends[faction] and BetterFriendlistDB.GlobalFriends[faction][friendUID] then
-        if BetterFriendlistDB.GlobalFriends[faction][friendUID].deleted then
-            BetterFriendlistDB.GlobalFriends[faction][friendUID].deleted = nil
-            -- BFL:DebugPrint("GlobalSync: Cleared deleted flag for " .. friendUID .. " (Re-added manually).")
-        end
-    end
+	if not name then
+		return
+	end
+
+	local faction = GetFaction()
+	local realm = GetNormalizedRealm()
+
+	if not faction or not realm then
+		return
+	end
+
+	-- Construct FriendUID
+	local friendUID
+	if string.find(name, "-") then
+		friendUID = name
+	else
+		friendUID = name .. "-" .. realm
+	end
+
+	-- If marked as deleted in DB, clear the flag
+	if BetterFriendlistDB.GlobalFriends[faction] and BetterFriendlistDB.GlobalFriends[faction][friendUID] then
+		if BetterFriendlistDB.GlobalFriends[faction][friendUID].deleted then
+			BetterFriendlistDB.GlobalFriends[faction][friendUID].deleted = nil
+			-- BFL:DebugPrint("GlobalSync: Cleared deleted flag for " .. friendUID .. " (Re-added manually).")
+		end
+	end
 end
 
 function GlobalSync:OnFriendRemoved(name)
-    if not BetterFriendlistDB.enableGlobalSyncDeletion then return end
-    if not name then return end
-    
-    local faction = GetFaction()
-    local realm = GetRealmName()
-    
-    if not faction or not realm then return end
-    
-    -- Construct FriendUID to find in DB
-    local friendUID
-    if string.find(name, "-") then
-        friendUID = name
-    else
-        friendUID = name .. "-" .. realm
-    end
-    
-    -- Check if exists in DB
-    if BetterFriendlistDB.GlobalFriends[faction] and BetterFriendlistDB.GlobalFriends[faction][friendUID] then
-        -- Mark as deleted instead of removing
-        BetterFriendlistDB.GlobalFriends[faction][friendUID].deleted = true
-        BetterFriendlistDB.GlobalFriends[faction][friendUID].deletedTime = time()
-        -- BFL:DebugPrint("GlobalSync: Marked " .. friendUID .. " as DELETED in Global DB.")
-        
-        -- Refresh Settings UI if open
-        local Settings = BFL:GetModule("Settings")
-        if Settings and Settings.RefreshGlobalSyncTab then
-            Settings:RefreshGlobalSyncTab()
-        end
-    end
+	if not BetterFriendlistDB.enableGlobalSyncDeletion then
+		return
+	end
+	if not name then
+		return
+	end
+
+	local faction = GetFaction()
+	local realm = GetNormalizedRealm()
+
+	if not faction or not realm then
+		return
+	end
+
+	-- Construct FriendUID to find in DB
+	local friendUID
+	if string.find(name, "-") then
+		friendUID = name
+	else
+		friendUID = name .. "-" .. realm
+	end
+
+	-- Check if exists in DB
+	if BetterFriendlistDB.GlobalFriends[faction] and BetterFriendlistDB.GlobalFriends[faction][friendUID] then
+		-- Mark as deleted instead of removing
+		BetterFriendlistDB.GlobalFriends[faction][friendUID].deleted = true
+		BetterFriendlistDB.GlobalFriends[faction][friendUID].deletedTime = time()
+		-- BFL:DebugPrint("GlobalSync: Marked " .. friendUID .. " as DELETED in Global DB.")
+
+		-- Refresh Settings UI if open
+		local Settings = BFL:GetModule("Settings")
+		if Settings and Settings.RefreshGlobalSyncTab then
+			Settings:RefreshGlobalSyncTab()
+		end
+	end
 end
 
 function GlobalSync:RegisterEvents()
-    BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function()
-        self:OnFriendListUpdate()
-    end)
+	BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function()
+		self:OnFriendListUpdate()
+	end)
 end
 
 function GlobalSync:OnFriendListUpdate()
-    -- Throttle updates
-    if self.updateTimer then return end
-    self.updateTimer = C_Timer.NewTimer(2, function()
-        self:PerformSync()
-        self.updateTimer = nil
-    end)
+	-- Throttle updates
+	if self.updateTimer then
+		return
+	end
+	self.updateTimer = C_Timer.NewTimer(2, function()
+		self:PerformSync()
+		self.updateTimer = nil
+	end)
 end
 
 function GlobalSync:PerformSync()
-    local faction = GetFaction()
-    local realm = GetRealmName()
-    
-    if not faction or not realm then return end
-    
-    -- 1. Export current friends to DB
-    self:ExportFriends(faction, realm)
-    
-    -- 2. Import friends from connected realms
-    self:ImportFriends(faction, realm)
-    
-    -- 3. Sync Deletions (Remove friends marked as deleted)
-    self:SyncDeletions(faction, realm)
+	-- Skip if queue is being processed (re-entry guard)
+	if self.processingQueue then
+		return
+	end
+
+	local faction = GetFaction()
+	local realm = GetNormalizedRealm()
+
+	if not faction or not realm then
+		return
+	end
+
+	-- 1. Export current friends to DB
+	self:ExportFriends(faction, realm)
+
+	-- 2. Import friends from connected realms
+	self:ImportFriends(faction, realm)
+
+	-- 3. Sync Deletions (Remove friends marked as deleted)
+	self:SyncDeletions(faction, realm)
 end
 
 function GlobalSync:ExportFriends(faction, realm)
-    local numFriends = C_FriendList.GetNumFriends() or 0
+	local numFriends = C_FriendList.GetNumFriends() or 0
 
-    
-    -- Ensure faction table exists
-    if not BetterFriendlistDB.GlobalFriends[faction] then
-        BetterFriendlistDB.GlobalFriends[faction] = {}
-    end
-    
-    local count = 0
-    for i = 1, numFriends do
-        local info = C_FriendList.GetFriendInfoByIndex(i)
-        if info and info.name then
-            -- Construct FriendUID
-            local friendUID
-            if string.find(info.name, "-") then
-                friendUID = info.name
-            else
-                friendUID = info.name .. "-" .. realm
-            end
-            
-            -- Check if marked as deleted
-            local dbEntry = BetterFriendlistDB.GlobalFriends[faction][friendUID]
-            local isDeleted = dbEntry and dbEntry.deleted
-            local isRestoring = dbEntry and dbEntry.restoring
-            
-            local noteToSave = info.notes or ""
-            local dbNote = dbEntry and dbEntry.notes
-            
-            -- SYNC NOTE LOGIC:
-            -- 1. Restore: If restoring, force DB note.
-            -- 2. DB Priority: If DB has a note, it overrides local note (DB is source of truth).
-            -- 3. Local Priority: If DB has NO note, local note is saved to DB.
-            
-            if isRestoring then
-                if dbNote and dbNote ~= "" then
-                    BFL.SetFriendNotes(info.name, dbNote)
-                    noteToSave = dbNote
-                    -- BFL:DebugPrint("GlobalSync: Restored note for " .. info.name)
-                end
-                BetterFriendlistDB.GlobalFriends[faction][friendUID].restoring = nil
-            elseif dbNote then
-                -- DB has a note. Check if we need to enforce it.
-                if noteToSave ~= dbNote then
-                    BFL.SetFriendNotes(info.name, dbNote)
-                    noteToSave = dbNote
-                    -- BFL:DebugPrint("GlobalSync: Enforced DB note for " .. info.name)
-                end
-            end
-            
-            -- Only update if NOT marked as deleted (unless we want to force un-delete, but AddFriend hook handles that)
-            if not isDeleted then
-                -- Update DB entry
-                BetterFriendlistDB.GlobalFriends[faction][friendUID] = {
-                    notes = noteToSave,
-                    guid = info.guid,
-                    lastSeen = time()
-                }
-                count = count + 1
-            end
-        end
-    end
-    
-    -- BFL:DebugPrint("GlobalSync: Exported " .. count .. " friends to flat DB.")
+	-- Ensure faction table exists
+	if not BetterFriendlistDB.GlobalFriends[faction] then
+		BetterFriendlistDB.GlobalFriends[faction] = {}
+	end
+
+	local count = 0
+	for i = 1, numFriends do
+		local info = C_FriendList.GetFriendInfoByIndex(i)
+		if info and info.name then
+			-- Construct FriendUID
+			local friendUID
+			if string.find(info.name, "-") then
+				friendUID = info.name
+			else
+				friendUID = info.name .. "-" .. realm
+			end
+
+			-- Check if marked as deleted
+			local dbEntry = BetterFriendlistDB.GlobalFriends[faction][friendUID]
+			local isDeleted = dbEntry and dbEntry.deleted
+			local isRestoring = dbEntry and dbEntry.restoring
+
+			local noteToSave = info.notes or ""
+			local dbNote = dbEntry and dbEntry.notes
+
+			-- SYNC NOTE LOGIC:
+			-- 1. Restore: If restoring, force DB note.
+			-- 2. DB Priority: If DB has a note, it overrides local note (DB is source of truth).
+			-- 3. Local Priority: If DB has NO note, local note is saved to DB.
+
+			if isRestoring then
+				if dbNote and dbNote ~= "" then
+					BFL.SetFriendNotes(info.name, dbNote)
+					noteToSave = dbNote
+					-- BFL:DebugPrint("GlobalSync: Restored note for " .. info.name)
+				end
+				BetterFriendlistDB.GlobalFriends[faction][friendUID].restoring = nil
+			elseif dbNote then
+				-- DB has a note. Check if we need to enforce it.
+				if noteToSave ~= dbNote then
+					BFL.SetFriendNotes(info.name, dbNote)
+					noteToSave = dbNote
+					-- BFL:DebugPrint("GlobalSync: Enforced DB note for " .. info.name)
+				end
+			end
+
+			-- Only update if NOT marked as deleted (unless we want to force un-delete, but AddFriend hook handles that)
+			if not isDeleted then
+				-- Update DB entry
+				BetterFriendlistDB.GlobalFriends[faction][friendUID] = {
+					notes = noteToSave,
+					guid = info.guid,
+					lastSeen = time(),
+				}
+				count = count + 1
+			end
+		end
+	end
+
+	-- BFL:DebugPrint("GlobalSync: Exported " .. count .. " friends to flat DB.")
 end
 
 function GlobalSync:ImportFriends(faction, currentRealm)
-    -- Check if sync is enabled in settings (default false)
-    if not BetterFriendlistDB.enableGlobalSync then return end
+	-- Check if sync is enabled in settings (default false)
+	if not BetterFriendlistDB.enableGlobalSync then
+		return
+	end
 
-    -- Ensure faction table exists
-    if not BetterFriendlistDB.GlobalFriends[faction] then return end
+	-- Ensure faction table exists
+	if not BetterFriendlistDB.GlobalFriends[faction] then
+		return
+	end
 
-    local friendsToAdd = {}
-    local currentFriendList = {}
-    
-    -- Cache current friends for quick lookup
-    local numFriends = C_FriendList.GetNumFriends() or 0
-    for i = 1, numFriends do
-        local info = C_FriendList.GetFriendInfoByIndex(i)
-        if info and info.name then
-            -- Store as Name-Realm for comparison
-            local uid
-            if string.find(info.name, "-") then
-                uid = info.name
-            else
-                uid = info.name .. "-" .. currentRealm
-            end
-            currentFriendList[uid] = true
-        end
-    end
+	-- Check friend list cap (max 100 WoW friends)
+	local numFriends = C_FriendList.GetNumFriends() or 0
+	if numFriends >= 100 then
+		return
+	end
 
-    local currentPlayerName = UnitName("player")
+	local friendsToAdd = {}
+	local currentFriendList = {}
+	local currentFriendNames = {} -- Name-only lookup for connected realm matching
 
-    -- Iterate FLAT structure: [Faction][FriendUID]
-    for friendUID, data in pairs(BetterFriendlistDB.GlobalFriends[faction]) do
-        -- Skip if marked as deleted
-        if not data.deleted then
-            -- Check if we already have this friend
-            if not currentFriendList[friendUID] then
-                -- Parse UID to get Name and Realm
-                local name, realm = string.match(friendUID, "^(.+)%-(.+)$")
-                
-                if name and realm then
-                    if self:ShouldAddFriend(friendUID, currentRealm, currentPlayerName) then
-                        local nameToAdd = friendUID -- Default to full Name-Realm
-                        
-                        -- If on same realm, we can try adding just the name, but Name-Realm is safer
-                        -- Blizzard API handles Name-Realm correctly even for same realm
-                        
-                        table.insert(friendsToAdd, nameToAdd)
-                    end
-                end
-            end
-        end
-    end
+	-- Build connected realm set for current realm (normalized names)
+	local connectedRealms = {}
+	local connectedList = BFL.GetConnectedRealms and BFL:GetConnectedRealms(currentRealm)
+	if connectedList then
+		for _, connRealm in ipairs(connectedList) do
+			connectedRealms[connRealm] = true
+		end
+	end
+	connectedRealms[currentRealm] = true -- Include self
 
-    -- Process queue
-    if #friendsToAdd > 0 then
-        -- BFL:DebugPrint("GlobalSync: Found " .. #friendsToAdd .. " missing friends.")
-        self:ProcessAddQueue(friendsToAdd)
-    end
+	-- Cache current friends for quick lookup
+	for i = 1, numFriends do
+		local info = C_FriendList.GetFriendInfoByIndex(i)
+		if info and info.name then
+			local uid
+			if string.find(info.name, "-") then
+				uid = info.name
+			else
+				uid = info.name .. "-" .. currentRealm
+			end
+			currentFriendList[uid] = true
+
+			-- Store name-only for connected realm matching
+			local nameOnly = string.match(info.name, "^(.+)%-") or info.name
+			currentFriendNames[nameOnly] = true
+		end
+	end
+
+	local currentPlayerName = UnitName("player")
+
+	-- Iterate FLAT structure: [Faction][FriendUID]
+	for friendUID, data in pairs(BetterFriendlistDB.GlobalFriends[faction]) do
+		-- Skip if marked as deleted or already attempted this session
+		if not data.deleted and not self.attemptedAdds[friendUID] then
+			-- Check if we already have this friend (exact UID match)
+			if not currentFriendList[friendUID] then
+				-- Parse UID to get Name and Realm
+				local name, realm = string.match(friendUID, "^(.+)%-(.+)$")
+
+				if name and realm then
+					-- Check connected realm: friend may already exist under different realm suffix
+					if connectedRealms[realm] and currentFriendNames[name] then
+						-- Already have this friend on a connected realm, skip
+					elseif self:ShouldAddFriend(friendUID, currentRealm, currentPlayerName) then
+						self.attemptedAdds[friendUID] = true
+
+						local nameToAdd
+						if realm == currentRealm or connectedRealms[realm] then
+							-- Same realm or connected realm: just the name (no suffix needed)
+							nameToAdd = name
+						else
+							-- Cross realm: resolve display realm name for AddFriend
+							local displayRealm = BFL.RealmDisplayNames and BFL.RealmDisplayNames[realm] or realm
+							nameToAdd = name .. "-" .. displayRealm
+						end
+
+						table.insert(friendsToAdd, nameToAdd)
+					end
+				end
+			end
+		end
+	end
+
+	-- Process queue
+	if #friendsToAdd > 0 then
+		-- BFL:DebugPrint("GlobalSync: Found " .. #friendsToAdd .. " missing friends.")
+		self:ProcessAddQueue(friendsToAdd)
+	end
 end
 
 function GlobalSync:SyncDeletions(faction, currentRealm)
-    -- Check if deletion sync is enabled
-    if not BetterFriendlistDB.enableGlobalSyncDeletion then return end
-    if not BetterFriendlistDB.GlobalFriends[faction] then return end
-    
-    local friendsToRemove = {}
-    
-    -- Iterate current friends
-    local numFriends = C_FriendList.GetNumFriends() or 0
-    for i = 1, numFriends do
-        local info = C_FriendList.GetFriendInfoByIndex(i)
-        if info and info.name then
-            -- Construct UID
-            local friendUID
-            if string.find(info.name, "-") then
-                friendUID = info.name
-            else
-                friendUID = info.name .. "-" .. currentRealm
-            end
-            
-            -- Check if marked as deleted in DB
-            local dbEntry = BetterFriendlistDB.GlobalFriends[faction][friendUID]
-            if dbEntry and dbEntry.deleted then
-                table.insert(friendsToRemove, info.name)
-            end
-        end
-    end
-    
-    -- Process removals
-    if #friendsToRemove > 0 then
-        -- BFL:DebugPrint("GlobalSync: Found " .. #friendsToRemove .. " friends marked for deletion.")
-        for _, name in ipairs(friendsToRemove) do
-            -- BFL:DebugPrint("GlobalSync: Removing " .. name .. " (Synced Deletion)")
-            BFL.RemoveFriend(name)
-        end
-    end
+	-- Check if deletion sync is enabled
+	if not BetterFriendlistDB.enableGlobalSyncDeletion then
+		return
+	end
+	if not BetterFriendlistDB.GlobalFriends[faction] then
+		return
+	end
+
+	local friendsToRemove = {}
+
+	-- Iterate current friends
+	local numFriends = C_FriendList.GetNumFriends() or 0
+	for i = 1, numFriends do
+		local info = C_FriendList.GetFriendInfoByIndex(i)
+		if info and info.name then
+			-- Construct UID
+			local friendUID
+			if string.find(info.name, "-") then
+				friendUID = info.name
+			else
+				friendUID = info.name .. "-" .. currentRealm
+			end
+
+			-- Check if marked as deleted in DB
+			local dbEntry = BetterFriendlistDB.GlobalFriends[faction][friendUID]
+			if dbEntry and dbEntry.deleted then
+				table.insert(friendsToRemove, info.name)
+			end
+		end
+	end
+
+	-- Process removals
+	if #friendsToRemove > 0 then
+		-- BFL:DebugPrint("GlobalSync: Found " .. #friendsToRemove .. " friends marked for deletion.")
+		for _, name in ipairs(friendsToRemove) do
+			-- BFL:DebugPrint("GlobalSync: Removing " .. name .. " (Synced Deletion)")
+			BFL.RemoveFriend(name)
+		end
+	end
 end
 
 function GlobalSync:ProcessAddQueue(queue)
-    if self.processingQueue then return end
-    self.processingQueue = true
-    
-    local index = 1
-    local max = #queue
-    
-    if self.addQueueTicker then
-        self.addQueueTicker:Cancel()
-        self.addQueueTicker = nil
-    end
+	if self.processingQueue then
+		return
+	end
+	self.processingQueue = true
 
-    self.addQueueTicker = C_Timer.NewTicker(0.5, function(timer)
-        if not BetterFriendlistDB.enableGlobalSync then
-            timer:Cancel()
-            self.addQueueTicker = nil
-            self.processingQueue = false
-            return
-        end
+	-- Suppress system messages during queue processing
+	self:InstallMessageFilter()
 
-        for i = 1, BATCH_SIZE do
-            if index > max then
-                timer:Cancel()
-                self.addQueueTicker = nil
-                self.processingQueue = false
-                -- BFL:DebugPrint("GlobalSync: Finished syncing friends.")
-                return
-            end
-            
-            local name = queue[index]
-            -- BFL:DebugPrint("GlobalSync: Adding friend " .. name)
-            BFL.AddFriend(name)
-            
-            index = index + 1
-        end
-    end)
+	local index = 1
+	local max = #queue
+
+	if self.addQueueTicker then
+		self.addQueueTicker:Cancel()
+		self.addQueueTicker = nil
+	end
+
+	self.addQueueTicker = C_Timer.NewTicker(0.5, function(timer)
+		if not BetterFriendlistDB.enableGlobalSync then
+			timer:Cancel()
+			self.addQueueTicker = nil
+			self.processingQueue = false
+			self:RemoveMessageFilter()
+			return
+		end
+
+		for i = 1, BATCH_SIZE do
+			if index > max then
+				timer:Cancel()
+				self.addQueueTicker = nil
+				self.processingQueue = false
+				self:RemoveMessageFilter()
+				-- BFL:DebugPrint("GlobalSync: Finished syncing friends.")
+				return
+			end
+
+			local name = queue[index]
+			-- BFL:DebugPrint("GlobalSync: Adding friend " .. name)
+			BFL.AddFriend(name)
+
+			index = index + 1
+		end
+	end)
+end
+
+-- Static filter to suppress friend-add system messages during queue processing
+function GlobalSync.SystemMessageFilter(chatFrame, event, msg, ...)
+	if not msg then
+		return false
+	end
+	if msg == ERR_FRIEND_NOT_FOUND then
+		return true
+	end
+	if msg == ERR_FRIEND_LIST_FULL then
+		return true
+	end
+	if ERR_FRIEND_ALREADY_S then
+		local pattern = string.gsub(ERR_FRIEND_ALREADY_S, "%%s", ".+")
+		if string.match(msg, "^" .. pattern .. "$") then
+			return true
+		end
+	end
+	return false
+end
+
+function GlobalSync:InstallMessageFilter()
+	if self.messageFilterInstalled then
+		return
+	end
+	self.messageFilterInstalled = true
+	ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", GlobalSync.SystemMessageFilter)
+end
+
+function GlobalSync:RemoveMessageFilter()
+	if not self.messageFilterInstalled then
+		return
+	end
+	self.messageFilterInstalled = false
+	ChatFrame_RemoveMessageEventFilter("CHAT_MSG_SYSTEM", GlobalSync.SystemMessageFilter)
 end
 
 -- Register module
