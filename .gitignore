@@ -5,6 +5,7 @@
 .ai-context
 memory-bank
 /old_version
+/WoW UI Source
 *.log
 *.zip
 *.ps1

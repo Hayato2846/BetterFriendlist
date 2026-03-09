@@ -632,6 +632,11 @@ function BetterRaidMemberButton_OnLoad(self)
 	self:RegisterForClicks("AnyUp")
 	self:RegisterForDrag("LeftButton")
 
+	-- Override CVar "ActionButtonUseKeyDown" for our buttons.
+	-- Without this, SecureActionButton_OnClick skips "AnyUp" clicks when the CVar is enabled,
+	-- blocking togglemenu, maintank, and mainassist secure actions. (GitHub #74)
+	self:SetAttribute("useOnKeyDown", false)
+
 	-- Expand hit rect to cover the 2px gap between buttons
 	-- Negative values expand the hit area BEYOND the button's visual bounds
 	-- Top: +1px, Right: 0px, Bottom: +1px, Left: 0px
@@ -705,8 +710,9 @@ function BetterRaidMemberButton_PostClick(self, button)
 			ClearAllSelections()
 		end
 	elseif button == "RightButton" then
-		-- RightButton: Show unit context menu manually
-		-- (InsecureActionButtonTemplate doesn't support togglemenu secure attribute)
+		-- RightButton: Context menu is handled by the "togglemenu" secure attribute
+		-- (set in UpdateSecureAttributesForButton). This PostClick fallback only runs
+		-- if the secure action didn't fire (e.g., missing unit attribute).
 		if not IsModifierKeyDown() and self.unit then
 			if UnitExists(self.unit) then
 				-- Use Blizzard's unit popup menu system
