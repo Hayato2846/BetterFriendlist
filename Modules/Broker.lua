@@ -2093,7 +2093,11 @@ function Broker:OnClick(clickedFrame, button)
 	elseif action == "settings" then
 		-- Ensure the friendlist is open first (never close it)
 		if BetterFriendsFrame and not BetterFriendsFrame:IsShown() then
-			ShowUIPanel(BetterFriendsFrame)
+			if _G.ShowBetterFriendsFrame then
+				_G.ShowBetterFriendsFrame()
+			else
+				BetterFriendsFrame:Show()
+			end
 		end
 		local Settings = BFL:GetModule("Settings")
 		if Settings then

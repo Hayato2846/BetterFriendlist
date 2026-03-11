@@ -2867,61 +2867,8 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				BetterFriendsFrame_UpdateQuickFilterButtons()
 			end
 		end)
-
-		-- Setup automatic keybind override (like BetterBags)
-		-- BFL:DebugPrint("[BFL] Setting up keybind override system...")
-		BFL.bindingFrame = BFL.bindingFrame or CreateFrame("Frame")
-		BFL.bindingFrame:RegisterEvent("PLAYER_LOGIN")
-		BFL.bindingFrame:RegisterEvent("UPDATE_BINDINGS")
-		BFL.bindingFrame:SetScript(
-			"OnEvent",
-			function(self, event, ...) -- BFL:DebugPrint("[BFL] Event received: " .. event)
-				BFL_CheckKeyBindings()
-			end
-		)
-
-		-- Trigger initial check after a short delay
-		C_Timer.After(1, function() -- BFL:DebugPrint("[BFL] Running initial keybind check...")
-			BFL_CheckKeyBindings()
-		end)
 	end
 end)
-
--- Automatic Keybind Override System (like BetterBags)
--- Intercepts the default O-key and redirects it to our frame
-function BFL_CheckKeyBindings() -- BFL:DebugPrint("[BFL] CheckKeyBindings called")
-	if InCombatLockdown() then
-		-- BFL:DebugPrint("[BFL] In combat, delaying keybind check")
-		BFL.bindingFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
-		return
-	end
-	BFL.bindingFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
-	ClearOverrideBindings(BFL.bindingFrame)
-
-	local bindings = {
-		"TOGGLESOCIAL", -- O-key (default social/friends keybind)
-		"TOGGLEFRIENDSTAB", -- Alternative binding (if exists)
-		"TOGGLEFRIENDSFRAME", -- Possible alternative name
-	}
-
-	-- BFL:DebugPrint("[BFL] Checking " .. #bindings .. " binding names...")
-
-	for _, binding in pairs(bindings) do
-		local key, otherkey = GetBindingKey(binding)
-		-- BFL:DebugPrint("[BFL] Binding '" .. binding .. "': key1=" .. tostring(key) .. ", key2=" .. tostring(otherkey))
-
-		if key ~= nil then
-			SetOverrideBinding(BFL.bindingFrame, true, key, "BETTERFRIENDLIST_TOGGLE")
-			-- BFL:DebugPrint("[BFL] Override set: " .. key .. " -> BETTERFRIENDLIST_TOGGLE")
-		end
-		if otherkey ~= nil then
-			SetOverrideBinding(BFL.bindingFrame, true, otherkey, "BETTERFRIENDLIST_TOGGLE")
-			-- BFL:DebugPrint("[BFL] Override set: " .. otherkey .. " -> BETTERFRIENDLIST_TOGGLE")
-		end
-	end
-
-	-- BFL:DebugPrint("[BFL] Keybind override complete")
-end
 
 -- Slash Commands are now in Core.lua
 -- This avoids loading order conflicts

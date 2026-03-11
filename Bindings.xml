@@ -1,5 +1,2 @@
 <Bindings>
-	<Binding name="BETTERFRIENDLIST_TOGGLE" category="ADDONS" header="BETTERFRIENDLIST">
-		ToggleBetterFriendsFrame();
-	</Binding>
 </Bindings>

@@ -9,7 +9,6 @@
 ## X-Wago-ID: rNkPLl6a 
 ## SavedVariables: BetterFriendlistDB
 ## OptionalDeps: LibStub, CallbackHandler-1.0, LibDataBroker-1.1, LibQTip-2.0, CustomNames, FriendListColors, EnhanceQoL
-## Bindings: Bindings.xml
 
 ## Category: User Interface
 ## Category-deDE: Benutzerinterface
