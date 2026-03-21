@@ -17,10 +17,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [DRAFT]
+## [2.5.0-beta]       - 2026-03-21
+
+### Changed
+- **Library Isolation** - BetterFriendlist no longer loads shared global libraries (LibStub, CallbackHandler, LibQTip, LibDataBroker, LibSharedMedia). This prevents the addon from being falsely blamed for taint errors caused by other addons that share the same libraries. Font and media features now gracefully fall back to defaults if no media library is available.
+
+### Improved
+- **Font Dropdowns** - Font selection dropdowns in Settings now use lazy loading, so fonts are only loaded as they scroll into view instead of all at once. This eliminates a brief freeze when opening a font dropdown for the first time.
 
 ### Fixed
+- **Taint Errors** - Eliminated thousands of "Action was blocked" taint errors that could occur when opening the friend list during or shortly after combat. Tooltips and the friend list window now use addon-owned frames that cannot interfere with Blizzard's protected UI.
 - **Frame Position** - Fixed the friend list window sometimes resetting to the center of the screen instead of restoring the saved position. This could happen when opening it via the Data Broker, after a game crash, or when other UI addons moved the window.
+- **Midnight Compatibility** - Fixed a crash in the chat system that could occur on WoW 12.0 (Midnight) when a system message arrived while the Global Sync was adding friends. Also hardened all internal display code against the new privacy-protected account names.
+- **Standalone Installation** - Fixed a crash on startup when BetterFriendlist was the only addon installed and no shared library provider was available.
+- **Classic: Send Message** - Fixed clicking the "Send Message" button on Classic crashing with an error instead of opening a whisper to the selected friend.
 
 ### Removed
 - **Keybind Override** - Removed a redundant keybinding entry from the Key Bindings UI. The O-key (Social) redirect was already handled internally and the extra entry served no purpose.
@@ -436,7 +446,7 @@ function Changelog:SetupClassicPortraitButton()
 	end)
 
 	button:SetScript("OnLeave", function(self)
-		GameTooltip:Hide()
+		BFL_Tooltip:Hide()
 	end)
 
 	-- No need to manual sync visibility if it's a child, but let's be safe if it gets parented elsewhere in future
@@ -521,20 +531,20 @@ function Changelog:ToggleChangelog()
 end
 
 function Changelog:OnPortraitEnter(button)
-	GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
-	GameTooltip:SetText("BetterFriendlist " .. (BFL.VERSION or ""), 1, 0.82, 0)
+	BFL_Tooltip:SetOwner(button, "ANCHOR_RIGHT")
+	BFL_Tooltip:SetText("BetterFriendlist " .. (BFL.VERSION or ""), 1, 0.82, 0)
 
 	local DB = BFL:GetModule("DB")
 	local lastVersion = DB:Get("lastChangelogVersion", "0.0.0")
 
 	if lastVersion ~= BFL.VERSION then
-		GameTooltip:AddLine(L.CHANGELOG_TOOLTIP_UPDATE, 0, 1, 0)
-		GameTooltip:AddLine(L.CHANGELOG_TOOLTIP_CLICK, 1, 1, 1)
+		BFL_Tooltip:AddLine(L.CHANGELOG_TOOLTIP_UPDATE, 0, 1, 0)
+		BFL_Tooltip:AddLine(L.CHANGELOG_TOOLTIP_CLICK, 1, 1, 1)
 	else
-		GameTooltip:AddLine(L.CHANGELOG_TOOLTIP_CLICK, 1, 1, 1)
+		BFL_Tooltip:AddLine(L.CHANGELOG_TOOLTIP_CLICK, 1, 1, 1)
 	end
 
-	GameTooltip:Show()
+	BFL_Tooltip:Show()
 end
 
 function Changelog:Show()

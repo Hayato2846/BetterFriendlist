@@ -10,7 +10,7 @@ local FontManager = BFL.FontManager
 -- ========================================
 -- Dependencies
 -- ========================================
-local LSM = LibStub("LibSharedMedia-3.0")
+local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
 local GetDB = function()
 	return BFL:GetModule("DB")
 end

@@ -594,6 +594,11 @@ function GlobalSync:InstallMessageFilter()
 	if self.messageFilterInstalled then
 		return
 	end
+	-- 12.0.0+: Do not install message filter to avoid tainting the CHAT_MSG_SYSTEM
+	-- execution path, which crashes on secret values in ChatFrameOverrides.lua
+	if BFL.HasSecretValues then
+		return
+	end
 	self.messageFilterInstalled = true
 	ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", GlobalSync.SystemMessageFilter)
 end

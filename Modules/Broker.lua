@@ -30,7 +30,7 @@ end
 -- Local Variables
 -- ========================================
 local LDB = LibStub and LibStub:GetLibrary("LibDataBroker-1.1", true)
-local LQT = LibStub and LibStub:GetLibrary("LibQTip-2.0", true)
+local LQT = BFL.QTip
 local dataObject = nil
 local updateThrottle = 0
 local lastUpdateTime = 0
@@ -313,7 +313,7 @@ local function OpenFriendContextMenu(data)
 					and FriendsList:ResolveBNetFriendIndex(bnetAccountID, data.battleTag)
 				or data.index
 			local extraData = {
-				name = data.accountName or data.characterName or "",
+				name = BFL:GetSafeAccountName(data.accountName, data.battleTag) or data.characterName or "",
 				battleTag = data.battleTag,
 				connected = true,
 				accountInfo = data.accountInfo,
@@ -365,13 +365,15 @@ local function OnFriendLineClick(cell, data, mouseButton)
 			OpenFriendContextMenu(data)
 		else
 			if data.bnetAccountID then
-				local bnetLink = "BNplayer:" .. (data.accountName or "Friend") .. ":" .. data.bnetAccountID
+				local safeName = BFL:GetSafeAccountName(data.accountName, data.battleTag)
+				local bnetLink = "BNplayer:" .. safeName .. ":" .. data.bnetAccountID
 				SetItemRef(bnetLink, bnetLink, "LeftButton")
 			elseif data.accountName and data.accountName ~= "" then
+				local safeName = BFL:GetSafeAccountName(data.accountName, data.battleTag)
 				if ChatFrameUtil and ChatFrameUtil.SendBNetTell then
-					ChatFrameUtil.SendBNetTell(data.accountName)
-				else
-					ChatFrame_SendBNetTell(data.accountName)
+					ChatFrameUtil.SendBNetTell(safeName)
+				elseif ChatFrame_SendBNetTell then
+					ChatFrame_SendBNetTell(safeName)
 				end
 			end
 		end
@@ -1635,7 +1637,8 @@ local function CreateLibQTipTooltip(anchorFrame)
 
 		-- Helper to render a friend row
 		local function RenderFriendRow(friend, indentation)
-			local nameText = friend.characterName ~= "" and friend.characterName or friend.accountName
+			local nameText = friend.characterName ~= "" and friend.characterName
+				or BFL:GetSafeAccountName(friend.accountName, friend.battleTag)
 
 			-- [STREAMER MODE CHECK] Replace Real ID with safe name
 			if BFL.StreamerMode and BFL.StreamerMode:IsActive() and friend.type == "bnet" then
@@ -1919,7 +1922,7 @@ local function CreateDetailTooltip(cell, data)
 	-- Header with character/account name
 	local headerRow = tt2:AddHeadingRow()
 	local displayName = data.characterName and data.characterName ~= "" and data.characterName
-		or data.accountName
+		or BFL:GetSafeAccountName(data.accountName, data.battleTag)
 		or "Unknown"
 
 	-- [STREAMER MODE] Use safe name for detail tooltip header

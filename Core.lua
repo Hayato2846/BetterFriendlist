@@ -472,6 +472,25 @@ function BFL:IsSecret(value)
 	return issecretvalue ~= nil and issecretvalue(value)
 end
 
+-- Get a safe (non-secret) account name for string operations.
+-- Returns battleTag if accountName is a kString secret, otherwise accountName.
+-- Falls back to battleTag or "Unknown" if accountName is nil.
+function BFL:GetSafeAccountName(accountName, battleTag)
+	if accountName and not self:IsSecret(accountName) then
+		return accountName
+	end
+	return battleTag or "Unknown"
+end
+
+-- Safe tostring() that handles kString secret values.
+-- Returns "<kString>" if value is secret, otherwise tostring(value).
+function BFL:SafeToString(value)
+	if self:IsSecret(value) then
+		return "<kString>"
+	end
+	return tostring(value)
+end
+
 -- Count table entries (for non-sequential tables)
 function BFL:TableCount(tbl)
 	if not tbl then
@@ -971,7 +990,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 
 			-- Best Practice: Register LibSharedMedia callbacks (modern approach)
 			-- Ensures fonts update immediately if a new font is registered (e.g. by another addon)
-			local LSM = LibStub("LibSharedMedia-3.0", true)
+			local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
 			if LSM then
 				local function OnMediaUpdate(event, mediaType, key)
 					if mediaType == LSM.MediaType.FONT then
@@ -1113,21 +1132,28 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 					local requestedTab = PanelTemplates_GetSelectedTab(FriendsFrame) or 1
 					-- BFL:DebugPrint("[BFL] FriendsFrame:OnShow - Intercepting, requested tab: " .. tostring(requestedTab))
 
-					-- Hide Blizzard's frame immediately (combat-safe since not a UIPanel anymore)
-					FriendsFrame:Hide()
+					-- Hide immediately via alpha to prevent visual flash, then defer
+					-- the actual Hide()+Open to a new execution frame to break taint chain
+					FriendsFrame:SetAlpha(0)
 
-					-- Open our frame with the requested tab
-					if BetterFriendsFrame then
-						if _G.ToggleBetterFriendsFrame then
-							-- If already shown, just switch tab; otherwise open with tab
-							if BetterFriendsFrame:IsShown() then
-								PanelTemplates_SetTab(BetterFriendsFrame, requestedTab)
-								BetterFriendsFrame_ShowBottomTab(requestedTab)
-							else
-								_G.ShowBetterFriendsFrame(requestedTab)
+					C_Timer.After(0, function()
+						-- Hide Blizzard's frame (combat-safe since not a UIPanel anymore)
+						FriendsFrame:Hide()
+						FriendsFrame:SetAlpha(1)
+
+						-- Open our frame with the requested tab
+						if BetterFriendsFrame then
+							if _G.ToggleBetterFriendsFrame then
+								-- If already shown, just switch tab; otherwise open with tab
+								if BetterFriendsFrame:IsShown() then
+									PanelTemplates_SetTab(BetterFriendsFrame, requestedTab)
+									BetterFriendsFrame_ShowBottomTab(requestedTab)
+								else
+									_G.ShowBetterFriendsFrame(requestedTab)
+								end
 							end
 						end
-					end
+					end)
 				end)
 				-- BFL:DebugPrint("|cff00ff00[BFL]|r FriendsFrame:OnShow hooked for ElvUI compatibility")
 			end
@@ -1393,7 +1419,11 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 			for i = 1, numBNet do
 				local info = C_BattleNet.GetFriendAccountInfo(i)
 				if info then
-					local nameMatch = (info.accountName and info.accountName:lower():find(searchName, 1, true))
+					local nameMatch = (
+						info.accountName
+						and not BFL:IsSecret(info.accountName)
+						and info.accountName:lower():find(searchName, 1, true)
+					)
 						or (info.battleTag and info.battleTag:lower():find(searchName, 1, true))
 						or (
 							info.gameAccountInfo
@@ -1409,7 +1439,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 							"  |cff00ff00FOUND|r BNet["
 								.. i
 								.. "]: "
-								.. tostring(info.accountName)
+								.. BFL:SafeToString(info.accountName)
 								.. " | Tag: "
 								.. tostring(info.battleTag)
 								.. " | Online: "

@@ -561,7 +561,7 @@ function RaidFrame:CreateSecureProxy_DISABLED_OLD()
 			return
 		end -- Do not hide while dragging!
 
-		GameTooltip:Hide()
+		BFL_Tooltip:Hide()
 		self:Hide()
 		self:ClearAllPoints()
 		self.visualButton = nil

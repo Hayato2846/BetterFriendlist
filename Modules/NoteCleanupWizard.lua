@@ -273,7 +273,10 @@ function NoteCleanupWizard:ApplyCleanedNotes()
 			data.status = "error"
 			errorCount = errorCount + 1
 			BFL:DebugPrint(
-				"|cffff0000BetterFriendlist:|r Error: " .. (data.accountName or "?") .. " - " .. tostring(err)
+				"|cffff0000BetterFriendlist:|r Error: "
+					.. BFL:SafeToString(data.accountName or "?")
+					.. " - "
+					.. tostring(err)
 			)
 		end
 
@@ -635,13 +638,13 @@ function NoteCleanupWizard:CreateWizardFrame()
 	end)
 
 	backupBtn:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText(L.WIZARD_BACKUP_BTN, 1, 1, 1)
-		GameTooltip:AddLine(L.WIZARD_BACKUP_TOOLTIP, 1, 1, 1, true)
-		GameTooltip:Show()
+		BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+		BFL_Tooltip:SetText(L.WIZARD_BACKUP_BTN, 1, 1, 1)
+		BFL_Tooltip:AddLine(L.WIZARD_BACKUP_TOOLTIP, 1, 1, 1, true)
+		BFL_Tooltip:Show()
 	end)
 	backupBtn:SetScript("OnLeave", function()
-		GameTooltip:Hide()
+		BFL_Tooltip:Hide()
 	end)
 
 	-- View Backup button
@@ -658,13 +661,13 @@ function NoteCleanupWizard:CreateWizardFrame()
 	end)
 
 	viewBackupBtn:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText(L.WIZARD_VIEW_BACKUP_BTN, 1, 1, 1)
-		GameTooltip:AddLine(L.WIZARD_VIEW_BACKUP_TOOLTIP, 1, 1, 1, true)
-		GameTooltip:Show()
+		BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+		BFL_Tooltip:SetText(L.WIZARD_VIEW_BACKUP_BTN, 1, 1, 1)
+		BFL_Tooltip:AddLine(L.WIZARD_VIEW_BACKUP_TOOLTIP, 1, 1, 1, true)
+		BFL_Tooltip:Show()
 	end)
 	viewBackupBtn:SetScript("OnLeave", function()
-		GameTooltip:Hide()
+		BFL_Tooltip:Hide()
 	end)
 
 	-- Apply button
@@ -694,13 +697,13 @@ function NoteCleanupWizard:CreateWizardFrame()
 	end)
 
 	applyBtn:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText(L.WIZARD_APPLY_BTN, 1, 1, 1)
-		GameTooltip:AddLine(L.WIZARD_APPLY_TOOLTIP, 1, 1, 1, true)
-		GameTooltip:Show()
+		BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+		BFL_Tooltip:SetText(L.WIZARD_APPLY_BTN, 1, 1, 1)
+		BFL_Tooltip:AddLine(L.WIZARD_APPLY_TOOLTIP, 1, 1, 1, true)
+		BFL_Tooltip:Show()
 	end)
 	applyBtn:SetScript("OnLeave", function()
-		GameTooltip:Hide()
+		BFL_Tooltip:Hide()
 	end)
 
 	-- ========================================
@@ -829,7 +832,9 @@ function NoteCleanupWizard:GetBackupData()
 
 	-- Sort alphabetically by account name
 	table.sort(data, function(a, b)
-		return a.accountName:lower() < b.accountName:lower()
+		local nameA = BFL:GetSafeAccountName(a.accountName, a.battleTag)
+		local nameB = BFL:GetSafeAccountName(b.accountName, b.battleTag)
+		return nameA:lower() < nameB:lower()
 	end)
 
 	return data
@@ -945,7 +950,10 @@ function NoteCleanupWizard:RestoreBackup()
 			data.status = "error"
 			errorCount = errorCount + 1
 			BFL:DebugPrint(
-				"|cffff0000BetterFriendlist:|r Error: " .. (data.accountName or "?") .. " - " .. tostring(err)
+				"|cffff0000BetterFriendlist:|r Error: "
+					.. BFL:SafeToString(data.accountName or "?")
+					.. " - "
+					.. tostring(err)
 			)
 		end
 
@@ -1301,13 +1309,13 @@ function NoteCleanupWizard:CreateBackupViewerFrame()
 	end)
 
 	backupBtn:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText(L.WIZARD_BACKUP_BTN, 1, 1, 1)
-		GameTooltip:AddLine(L.WIZARD_BACKUP_TOOLTIP, 1, 1, 1, true)
-		GameTooltip:Show()
+		BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+		BFL_Tooltip:SetText(L.WIZARD_BACKUP_BTN, 1, 1, 1)
+		BFL_Tooltip:AddLine(L.WIZARD_BACKUP_TOOLTIP, 1, 1, 1, true)
+		BFL_Tooltip:Show()
 	end)
 	backupBtn:SetScript("OnLeave", function()
-		GameTooltip:Hide()
+		BFL_Tooltip:Hide()
 	end)
 
 	-- Restore button
@@ -1336,13 +1344,13 @@ function NoteCleanupWizard:CreateBackupViewerFrame()
 	end)
 
 	restoreBtn:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText(L.WIZARD_RESTORE_BTN, 1, 1, 1)
-		GameTooltip:AddLine(L.WIZARD_RESTORE_TOOLTIP, 1, 1, 1, true)
-		GameTooltip:Show()
+		BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+		BFL_Tooltip:SetText(L.WIZARD_RESTORE_BTN, 1, 1, 1)
+		BFL_Tooltip:AddLine(L.WIZARD_RESTORE_TOOLTIP, 1, 1, 1, true)
+		BFL_Tooltip:Show()
 	end)
 	restoreBtn:SetScript("OnLeave", function()
-		GameTooltip:Hide()
+		BFL_Tooltip:Hide()
 	end)
 
 	-- ========================================

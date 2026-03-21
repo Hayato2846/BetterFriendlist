@@ -2,13 +2,13 @@
 ## Title: BetterFriendlist
 ## Notes: Complete replacement for WoW Friends frame - Custom groups, Raid management, Quick Join, and more!
 ## Author: Hayato2846
-## Version: 2.4.4
+## Version: 2.5.0-beta
 ## IconTexture: Interface\AddOns\BetterFriendlist\Textures\PortraitIcon.blp
 ## X-Curse-Project-ID: 1381771
 ## X-WoWI-ID: 26984
 ## X-Wago-ID: rNkPLl6a 
 ## SavedVariables: BetterFriendlistDB
-## OptionalDeps: LibStub, CallbackHandler-1.0, LibDataBroker-1.1, LibQTip-2.0, CustomNames, FriendListColors, EnhanceQoL
+## OptionalDeps: LibStub, LibDataBroker-1.1, LibSharedMedia-3.0, CustomNames, FriendListColors, EnhanceQoL
 
 ## Category: User Interface
 ## Category-deDE: Benutzerinterface
@@ -22,16 +22,14 @@
 ## Category-zhCN: 用户界面
 ## Category-zhTW: 使用者介面
 
-# Libraries
-Libs\LibStub\LibStub.lua
-Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
-Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
-Libs\LibQTip-2.0\LibQTip-2.0.xml
-Libs\LibSharedMedia-3.0\lib.xml
-
 # Core
 Core.lua
+
+# Private Library Forks (taint-isolated)
+Libs\BFL_CallbackHandler.lua
+Libs\BFL_QTip\BFL_QTip.xml
 Utils\ClassicCompat.lua
+Utils\BFL_Tooltip.lua
 
 # Localization
 Locales\Locales.lua

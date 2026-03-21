@@ -456,17 +456,17 @@ end
 
 function BetterRaidFrame_EveryoneAssistCheckbox_OnEnter(self)
 	-- Replicate Blizzard's RaidFrame.xml pattern: always show description, add error when disabled
-	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-	GameTooltip:SetText(ALL_ASSIST_DESCRIPTION, nil, nil, nil, nil, true)
+	BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+	BFL_Tooltip:SetText(ALL_ASSIST_DESCRIPTION, nil, nil, nil, nil, true)
 	if not self:IsEnabled() then
-		GameTooltip:AddLine(ALL_ASSIST_NOT_LEADER_ERROR, RED_FONT_COLOR.r, RED_FONT_COLOR.g, RED_FONT_COLOR.b, true)
+		BFL_Tooltip:AddLine(ALL_ASSIST_NOT_LEADER_ERROR, RED_FONT_COLOR.r, RED_FONT_COLOR.g, RED_FONT_COLOR.b, true)
 	end
-	GameTooltip:Show()
+	BFL_Tooltip:Show()
 end
 
 function BetterRaidFrame_EveryoneAssistCheckbox_OnLeave(self)
-	if GameTooltip:GetOwner() == self then
-		GameTooltip:Hide()
+	if BFL_Tooltip:GetOwner() == self then
+		BFL_Tooltip:Hide()
 	end
 end
 
@@ -662,7 +662,7 @@ function BetterRaidMemberButton_OnEnter(self)
 end
 
 function BetterRaidMemberButton_OnLeave(self)
-	GameTooltip:Hide()
+	BFL_Tooltip:Hide()
 
 	if self.Highlight then
 		self.Highlight:Hide()

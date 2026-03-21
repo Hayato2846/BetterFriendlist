@@ -105,20 +105,20 @@ function QuickFilters:InitDropdown(dropdown)
 			button:HookScript("OnEnter", function()
 				local filterText = QuickFilters:GetFilterText()
 
-				GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
-				GameTooltip:SetText(string.format(L.TOOLTIP_QUICK_FILTER or "Quick Filter: %s", filterText))
-				GameTooltip:Show()
+				BFL_Tooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
+				BFL_Tooltip:SetText(string.format(L.TOOLTIP_QUICK_FILTER or "Quick Filter: %s", filterText))
+				BFL_Tooltip:Show()
 			end)
-			button:HookScript("OnLeave", GameTooltip_Hide)
+			button:HookScript("OnLeave", BFL_Tooltip_Hide)
 		else
 			dropdown:SetScript("OnEnter", function()
 				local filterText = QuickFilters:GetFilterText()
 
-				GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
-				GameTooltip:SetText(string.format(L.TOOLTIP_QUICK_FILTER or "Quick Filter: %s", filterText))
-				GameTooltip:Show()
+				BFL_Tooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
+				BFL_Tooltip:SetText(string.format(L.TOOLTIP_QUICK_FILTER or "Quick Filter: %s", filterText))
+				BFL_Tooltip:Show()
 			end)
-			dropdown:SetScript("OnLeave", GameTooltip_Hide)
+			dropdown:SetScript("OnLeave", BFL_Tooltip_Hide)
 		end
 
 		return
@@ -191,12 +191,12 @@ function QuickFilters:InitDropdown(dropdown)
 	dropdown:SetScript("OnEnter", function()
 		local filterText = self:GetFilterText()
 
-		GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
-		GameTooltip:SetText(string.format(L.TOOLTIP_QUICK_FILTER or "Quick Filter: %s", filterText))
-		GameTooltip:Show()
+		BFL_Tooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
+		BFL_Tooltip:SetText(string.format(L.TOOLTIP_QUICK_FILTER or "Quick Filter: %s", filterText))
+		BFL_Tooltip:Show()
 	end)
 
-	dropdown:SetScript("OnLeave", GameTooltip_Hide)
+	dropdown:SetScript("OnLeave", BFL_Tooltip_Hide)
 end
 
 -- Set the quick filter mode

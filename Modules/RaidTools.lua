@@ -1716,16 +1716,16 @@ local function CreateToolButton(parent, text, yOffset, onClick, tooltipText)
 
 	if tooltipText then
 		button:SetScript("OnEnter", function(self)
-			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+			BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
 			if not self:IsEnabled() and self.disabledTooltip then
-				GameTooltip:SetText(self.disabledTooltip, 1, 0.2, 0.2, 1, true)
+				BFL_Tooltip:SetText(self.disabledTooltip, 1, 0.2, 0.2, 1, true)
 			else
-				GameTooltip:SetText(tooltipText, 1, 1, 1, 1, true)
+				BFL_Tooltip:SetText(tooltipText, 1, 1, 1, 1, true)
 			end
-			GameTooltip:Show()
+			BFL_Tooltip:Show()
 		end)
 		button:SetScript("OnLeave", function()
-			GameTooltip:Hide()
+			BFL_Tooltip:Hide()
 		end)
 	end
 

@@ -103,14 +103,14 @@ local function CreateGroupButton(parent, groupId, groupName, orderIndex)
 		end)
 
 		button.editButton:SetScript("OnEnter", function(self)
-			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText(L.TOOLTIP_RENAME_GROUP, 1, 1, 1)
-			GameTooltip:AddLine(L.TOOLTIP_RENAME_DESC, 0.8, 0.8, 0.8, true)
-			GameTooltip:Show()
+			BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+			BFL_Tooltip:SetText(L.TOOLTIP_RENAME_GROUP, 1, 1, 1)
+			BFL_Tooltip:AddLine(L.TOOLTIP_RENAME_DESC, 0.8, 0.8, 0.8, true)
+			BFL_Tooltip:Show()
 		end)
 
 		button.editButton:SetScript("OnLeave", function(self)
-			GameTooltip:Hide()
+			BFL_Tooltip:Hide()
 		end)
 	end
 
@@ -151,14 +151,14 @@ local function CreateGroupButton(parent, groupId, groupName, orderIndex)
 	end)
 
 	button.colorButton:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText(L.TOOLTIP_GROUP_COLOR, 1, 0.82, 0)
-		GameTooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC, 0.8, 0.8, 0.8, true)
-		GameTooltip:Show()
+		BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+		BFL_Tooltip:SetText(L.TOOLTIP_GROUP_COLOR, 1, 0.82, 0)
+		BFL_Tooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC, 0.8, 0.8, 0.8, true)
+		BFL_Tooltip:Show()
 	end)
 
 	button.colorButton:SetScript("OnLeave", function(self)
-		GameTooltip:Hide()
+		BFL_Tooltip:Hide()
 	end)
 
 	-- Delete Button (only for custom groups)
@@ -190,14 +190,14 @@ local function CreateGroupButton(parent, groupId, groupName, orderIndex)
 		end)
 
 		button.deleteButton:SetScript("OnEnter", function(self)
-			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText(L.TOOLTIP_DELETE_GROUP, 1, 0.2, 0.2)
-			GameTooltip:AddLine(L.TOOLTIP_DELETE_DESC, 0.8, 0.8, 0.8, true)
-			GameTooltip:Show()
+			BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+			BFL_Tooltip:SetText(L.TOOLTIP_DELETE_GROUP, 1, 0.2, 0.2)
+			BFL_Tooltip:AddLine(L.TOOLTIP_DELETE_DESC, 0.8, 0.8, 0.8, true)
+			BFL_Tooltip:Show()
 		end)
 
 		button.deleteButton:SetScript("OnLeave", function(self)
-			GameTooltip:Hide()
+			BFL_Tooltip:Hide()
 		end)
 	end
 
@@ -3822,18 +3822,16 @@ function Settings:RefreshFontsTab()
 	local allFrames = {}
 
 	-- Font Library
-	local LSM = LibStub("LibSharedMedia-3.0")
-	local fontList = LSM:List("font")
+	local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
+	local fontList = LSM and LSM:List("font") or { "Friz Quadrata TT" }
 	local fontPaths = {}
 	for i, fontName in ipairs(fontList) do
-		fontPaths[i] = LSM:Fetch("font", fontName)
+		fontPaths[i] = LSM and LSM:Fetch("font", fontName) or "Fonts\\FRIZQT__.TTF"
 	end
 	local fontOptions = { labels = fontList, values = fontList, fontPaths = fontPaths, useCheckboxes = true }
 
 	-- -------------------------------------------------------------------------
 	-- Friend Name Settings
-	-- -------------------------------------------------------------------------
-	local nameFontHeader = Components:CreateHeader(tab, L.SETTINGS_FRIEND_NAME_SETTINGS or "Friend Name Settings")
 	table.insert(allFrames, nameFontHeader)
 
 	-- Name Font Face
@@ -4157,11 +4155,11 @@ function Settings:RefreshGroupsTab()
 	local allFrames = {}
 
 	-- Common Font Options
-	local LSM = LibStub("LibSharedMedia-3.0")
-	local fontList = LSM:List("font")
+	local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
+	local fontList = LSM and LSM:List("font") or { "Friz Quadrata TT" }
 	local fontPaths = {}
 	for i, fontName in ipairs(fontList) do
-		fontPaths[i] = LSM:Fetch("font", fontName)
+		fontPaths[i] = LSM and LSM:Fetch("font", fontName) or "Fonts\\FRIZQT__.TTF"
 	end
 	local fontOptions = { labels = fontList, values = fontList, fontPaths = fontPaths, useCheckboxes = true }
 
@@ -4534,28 +4532,28 @@ function Settings:RefreshGroupsTab()
 		-- Update tooltips properties for new component structure
 		if listItem.renameButton then
 			listItem.renameButton:SetScript("OnEnter", function(self)
-				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-				GameTooltip:SetText(L.SETTINGS_RENAME_GROUP, 1, 1, 1)
-				GameTooltip:AddLine(L.TOOLTIP_RENAME_DESC, 1, 1, 1, true)
-				GameTooltip:Show()
+				BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+				BFL_Tooltip:SetText(L.SETTINGS_RENAME_GROUP, 1, 1, 1)
+				BFL_Tooltip:AddLine(L.TOOLTIP_RENAME_DESC, 1, 1, 1, true)
+				BFL_Tooltip:Show()
 			end)
 		end
 
 		if listItem.colorButton then
 			listItem.colorButton:SetScript("OnEnter", function(self)
-				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-				GameTooltip:SetText(L.SETTINGS_GROUP_COLOR, 1, 0.82, 0)
-				GameTooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC, 1, 1, 1, true)
-				GameTooltip:Show()
+				BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+				BFL_Tooltip:SetText(L.SETTINGS_GROUP_COLOR, 1, 0.82, 0)
+				BFL_Tooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC, 1, 1, 1, true)
+				BFL_Tooltip:Show()
 			end)
 		end
 
 		if listItem.deleteButton then
 			listItem.deleteButton:SetScript("OnEnter", function(self)
-				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-				GameTooltip:SetText(L.SETTINGS_DELETE_GROUP, 1, 1, 1)
-				GameTooltip:AddLine(L.TOOLTIP_DELETE_DESC, 1, 1, 1, true)
-				GameTooltip:Show()
+				BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+				BFL_Tooltip:SetText(L.SETTINGS_DELETE_GROUP, 1, 1, 1)
+				BFL_Tooltip:AddLine(L.TOOLTIP_DELETE_DESC, 1, 1, 1, true)
+				BFL_Tooltip:Show()
 			end)
 		end
 
@@ -5775,12 +5773,12 @@ function Settings:RefreshGlobalSyncTab()
 									self:RefreshGlobalSyncTab()
 								end)
 								actionBtn:SetScript("OnEnter", function(self)
-									GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-									GameTooltip:SetText(L.TOOLTIP_RESTORE_FRIEND or "Restore Friend")
-									GameTooltip:Show()
+									BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+									BFL_Tooltip:SetText(L.TOOLTIP_RESTORE_FRIEND or "Restore Friend")
+									BFL_Tooltip:Show()
 								end)
 								actionBtn:SetScript("OnLeave", function()
-									GameTooltip:Hide()
+									BFL_Tooltip:Hide()
 								end)
 							else
 								-- Delete Button
@@ -5825,12 +5823,12 @@ function Settings:RefreshGlobalSyncTab()
 									self:RefreshGlobalSyncTab()
 								end)
 								actionBtn:SetScript("OnEnter", function(self)
-									GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-									GameTooltip:SetText(L.TOOLTIP_DELETE_FRIEND or "Delete Friend")
-									GameTooltip:Show()
+									BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+									BFL_Tooltip:SetText(L.TOOLTIP_DELETE_FRIEND or "Delete Friend")
+									BFL_Tooltip:Show()
 								end)
 								actionBtn:SetScript("OnLeave", function()
-									GameTooltip:Hide()
+									BFL_Tooltip:Hide()
 								end)
 							end
 
@@ -5889,12 +5887,12 @@ function Settings:RefreshGlobalSyncTab()
 							end)
 
 							editBtn:SetScript("OnEnter", function(self)
-								GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-								GameTooltip:SetText(L.TOOLTIP_EDIT_NOTE or "Edit Note")
-								GameTooltip:Show()
+								BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+								BFL_Tooltip:SetText(L.TOOLTIP_EDIT_NOTE or "Edit Note")
+								BFL_Tooltip:Show()
 							end)
 							editBtn:SetScript("OnLeave", function()
-								GameTooltip:Hide()
+								BFL_Tooltip:Hide()
 							end)
 
 							table.insert(allFrames, row)

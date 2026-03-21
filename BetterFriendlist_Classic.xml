@@ -214,7 +214,7 @@
 						BetterFriendsList_TravelPassButton_OnEnter(self);
 					</OnEnter>
 					<OnLeave>
-						GameTooltip:Hide();
+						BFL_Tooltip:Hide();
 					</OnLeave>
 				</Scripts>
 			</Button>
@@ -465,25 +465,25 @@
 		<Scripts>
 			<OnEnter>
 				if self.instanceData then
-					GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-					GameTooltip:SetText(self.instanceData.name, 1, 1, 1);
-					GameTooltip:AddLine(self.instanceData.difficultyName, 0.7, 0.7, 0.7);
+					BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT");
+					BFL_Tooltip:SetText(self.instanceData.name, 1, 1, 1);
+					BFL_Tooltip:AddLine(self.instanceData.difficultyName, 0.7, 0.7, 0.7);
 					if self.instanceData.encounterProgress and self.instanceData.numEncounters then
-						GameTooltip:AddLine(string.format("Progress: %d/%d", self.instanceData.encounterProgress, self.instanceData.numEncounters), 0.5, 1, 0.5);
+						BFL_Tooltip:AddLine(string.format("Progress: %d/%d", self.instanceData.encounterProgress, self.instanceData.numEncounters), 0.5, 1, 0.5);
 					end
 					local timeLeft = SecondsToTime(self.instanceData.reset, true, nil, 3);
 					if self.instanceData.extended then
-						GameTooltip:AddLine("Extended - " .. timeLeft, 1, 0.5, 0);
+						BFL_Tooltip:AddLine("Extended - " .. timeLeft, 1, 0.5, 0);
 					elseif self.instanceData.locked then
-						GameTooltip:AddLine("Resets in: " .. timeLeft, 1, 1, 0);
+						BFL_Tooltip:AddLine("Resets in: " .. timeLeft, 1, 1, 0);
 					else
-						GameTooltip:AddLine("Expired", 0.5, 0.5, 0.5);
+						BFL_Tooltip:AddLine("Expired", 0.5, 0.5, 0.5);
 					end
-					GameTooltip:Show();
+					BFL_Tooltip:Show();
 				end
 			</OnEnter>
 			<OnLeave>
-				GameTooltip:Hide();
+				BFL_Tooltip:Hide();
 			</OnLeave>
 		</Scripts>
 		<HighlightTexture setAllPoints="true" alphaMode="ADD">
@@ -718,12 +718,12 @@
 								</Layers>
 								<Scripts>
 									<OnEnter>
-										GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-										GameTooltip_SetTitle(GameTooltip, CONTACTS_MENU_NAME or "Menu");
-										GameTooltip:Show();
+										BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT");
+										GameTooltip_SetTitle(BFL_Tooltip, CONTACTS_MENU_NAME or "Menu");
+										BFL_Tooltip:Show();
 									</OnEnter>
 									<OnLeave>
-										GameTooltip:Hide();
+										BFL_Tooltip:Hide();
 									</OnLeave>
 									<OnClick>
 										BetterFriendsFrame_ShowContactsMenu(self);
@@ -749,12 +749,12 @@
 								</Layers>
 								<Scripts>
 									<OnEnter>
-										GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-										GameTooltip:SetText(BFL and BFL.L and BFL.L.SETTINGS_TITLE or "Settings");
-										GameTooltip:Show();
+										BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT");
+										BFL_Tooltip:SetText(BFL and BFL.L and BFL.L.SETTINGS_TITLE or "Settings");
+										BFL_Tooltip:Show();
 									</OnEnter>
 									<OnLeave>
-										GameTooltip:Hide();
+										BFL_Tooltip:Hide();
 									</OnLeave>
 									<OnClick>
 										if BFL then BFL:OpenConfig() end
@@ -1021,12 +1021,12 @@
 								BetterIgnoreList_ToggleGIL();
 							</OnClick>
 							<OnEnter>
-								GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-								GameTooltip:SetText(BFL and BFL.L and BFL.L.IGNORE_LIST_GLOBAL_IGNORE_LIST or "Global Ignore List", 1, 1, 1);
-								GameTooltip:Show();
+								BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT");
+								BFL_Tooltip:SetText(BFL and BFL.L and BFL.L.IGNORE_LIST_GLOBAL_IGNORE_LIST or "Global Ignore List", 1, 1, 1);
+								BFL_Tooltip:Show();
 							</OnEnter>
 							<OnLeave>
-								GameTooltip:Hide();
+								BFL_Tooltip:Hide();
 							</OnLeave>
 						</Scripts>
 					</Button>
@@ -1050,12 +1050,12 @@
 								BetterIgnoreList_ToggleEQOL();
 							</OnClick>
 							<OnEnter>
-								GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-								GameTooltip:SetText(BFL and BFL.L and BFL.L.IGNORE_LIST_ENHANCEQOL_IGNORE or "EnhanceQoL Ignore List", 1, 1, 1);
-								GameTooltip:Show();
+								BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT");
+								BFL_Tooltip:SetText(BFL and BFL.L and BFL.L.IGNORE_LIST_ENHANCEQOL_IGNORE or "EnhanceQoL Ignore List", 1, 1, 1);
+								BFL_Tooltip:Show();
 							</OnEnter>
 							<OnLeave>
-								GameTooltip:Hide();
+								BFL_Tooltip:Hide();
 							</OnLeave>
 						</Scripts>
 					</Button>
@@ -1369,7 +1369,12 @@
 						if BFL:IsActionRestricted() then return end
 
 						if friend.type == "bnet" then
-							ChatFrame_SendBNetTell(friend.accountName or friend.battleTag)
+							local tellName = BFL:GetSafeAccountName(friend.accountName, friend.battleTag) or friend.battleTag
+							if ChatFrameUtil and ChatFrameUtil.SendBNetTell then
+								ChatFrameUtil.SendBNetTell(tellName)
+							elseif ChatFrame_SendBNetTell then
+								ChatFrame_SendBNetTell(tellName)
+							end
 						elseif friend.type == "wow" and friend.name then
 							ChatFrame_SendTell(friend.name)
 						end
@@ -1466,15 +1471,15 @@
 										self.Icon:SetTexCoord(0, 1, 0, 1);
 									</OnLoad>
 									<OnEnter>
-										GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-										GameTooltip:SetText("In Combat", 1.0, 0.82, 0, 1.0);
-										GameTooltip:AddLine("Players cannot be moved between groups during combat.", 1.0, 1.0, 1.0, true);
-										GameTooltip:AddLine(" ", 1.0, 1.0, 1.0);
-										GameTooltip:AddLine("This restriction is enforced by Blizzard to prevent errors.", 0.8, 0.8, 0.8, true);
-										GameTooltip:Show();
+										BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT");
+										BFL_Tooltip:SetText("In Combat", 1.0, 0.82, 0, 1.0);
+										BFL_Tooltip:AddLine("Players cannot be moved between groups during combat.", 1.0, 1.0, 1.0, true);
+										BFL_Tooltip:AddLine(" ", 1.0, 1.0, 1.0);
+										BFL_Tooltip:AddLine("This restriction is enforced by Blizzard to prevent errors.", 0.8, 0.8, 0.8, true);
+										BFL_Tooltip:Show();
 									</OnEnter>
 									<OnLeave>
-										GameTooltip:Hide();
+										BFL_Tooltip:Hide();
 									</OnLeave>
 								</Scripts>
 							</Button>
@@ -1556,13 +1561,13 @@
 					</OnClick>
 					<OnEnter>
 						if self.tooltip then
-							GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-							GameTooltip:SetText(self.tooltip, 1, 0.1, 0.1, 1, true);
-							GameTooltip:Show();
+							BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT");
+							BFL_Tooltip:SetText(self.tooltip, 1, 0.1, 0.1, 1, true);
+							BFL_Tooltip:Show();
 						end
 					</OnEnter>
 					<OnLeave>
-						GameTooltip:Hide();
+						BFL_Tooltip:Hide();
 					</OnLeave>
 				</Scripts>
 			</Button>
@@ -1585,13 +1590,13 @@
 					</OnClick>
 					<OnEnter>
 						if self.tooltip then
-							GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-							GameTooltip:SetText(self.tooltip, 1, 0.1, 0.1, 1, true);
-							GameTooltip:Show();
+							BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT");
+							BFL_Tooltip:SetText(self.tooltip, 1, 0.1, 0.1, 1, true);
+							BFL_Tooltip:Show();
 						end
 					</OnEnter>
 					<OnLeave>
-						GameTooltip:Hide();
+						BFL_Tooltip:Hide();
 					</OnLeave>
 				</Scripts>
 			</Button>
@@ -1659,15 +1664,15 @@
 						end
 					</OnClick>
 					<OnEnter>
-						GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-						GameTooltip:SetText(BFL.L.STREAMER_MODE_TITLE or "Streamer Mode", 1, 1, 1);
+						BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT");
+						BFL_Tooltip:SetText(BFL.L.STREAMER_MODE_TITLE or "Streamer Mode", 1, 1, 1);
 						local status = (BetterFriendlistDB and BetterFriendlistDB.streamerModeActive) and (BFL.L.STATUS_ENABLED or "Enabled") or (BFL.L.STATUS_DISABLED or "Disabled")
-						GameTooltip:AddLine(BFL.L.STREAMER_MODE_BUTTON_DESC or "Click to toggle privacy mode.", 0.7, 0.7, 0.7, true);
-						GameTooltip:AddLine(status, 1, 1, 1);
-						GameTooltip:Show();
+						BFL_Tooltip:AddLine(BFL.L.STREAMER_MODE_BUTTON_DESC or "Click to toggle privacy mode.", 0.7, 0.7, 0.7, true);
+						BFL_Tooltip:AddLine(status, 1, 1, 1);
+						BFL_Tooltip:Show();
 					</OnEnter>
 					<OnLeave>
-						GameTooltip:Hide();
+						BFL_Tooltip:Hide();
 					</OnLeave>
 				</Scripts>
 			</Button>
@@ -1693,13 +1698,13 @@
 						BetterFriendsFrame_HelpButton_OnClick(self);
 					</OnClick>
 					<OnEnter>
-						GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-						GameTooltip:SetText(BFL.L.RAID_HELP_TITLE or "Raid Roster Help", 1, 1, 1);
-						GameTooltip:AddLine(BFL.L.RAID_HELP_TEXT or "Click for help on using the raid roster.", 0.7, 0.7, 0.7, true);
-						GameTooltip:Show();
+						BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT");
+						BFL_Tooltip:SetText(BFL.L.RAID_HELP_TITLE or "Raid Roster Help", 1, 1, 1);
+						BFL_Tooltip:AddLine(BFL.L.RAID_HELP_TEXT or "Click for help on using the raid roster.", 0.7, 0.7, 0.7, true);
+						BFL_Tooltip:Show();
 					</OnEnter>
 					<OnLeave>
-						GameTooltip:Hide();
+						BFL_Tooltip:Hide();
 					</OnLeave>
 				</Scripts>
 			</Button>

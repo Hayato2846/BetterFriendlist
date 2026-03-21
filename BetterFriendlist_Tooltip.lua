@@ -95,15 +95,15 @@ function BetterFriendsList_Button_OnEnter(self)
 
 	-- Mock/Preview mode: simple GameTooltip (Blizzard's API can't resolve mock indices)
 	if friendData._isMock then
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
 		local displayName
 		if FriendsList then
 			displayName = FriendsList:GetDisplayName(friendData)
 		end
 		displayName = displayName or friendData.name or friendData.characterName or "Unknown"
-		GameTooltip:SetText(displayName, 1, 1, 1)
+		BFL_Tooltip:SetText(displayName, 1, 1, 1)
 		if friendData.characterName and friendData.level and friendData.className then
-			GameTooltip:AddLine(
+			BFL_Tooltip:AddLine(
 				string.format(FRIENDS_LEVEL_TEMPLATE or "Level %d %s", friendData.level, friendData.className),
 				HIGHLIGHT_FONT_COLOR.r,
 				HIGHLIGHT_FONT_COLOR.g,
@@ -111,7 +111,7 @@ function BetterFriendsList_Button_OnEnter(self)
 			)
 		end
 		if friendData.area or friendData.areaName then
-			GameTooltip:AddLine(
+			BFL_Tooltip:AddLine(
 				friendData.area or friendData.areaName,
 				HIGHLIGHT_FONT_COLOR.r,
 				HIGHLIGHT_FONT_COLOR.g,
@@ -119,10 +119,10 @@ function BetterFriendsList_Button_OnEnter(self)
 			)
 		end
 		if friendData.note and friendData.note ~= "" then
-			GameTooltip:AddLine(" ")
-			GameTooltip:AddLine(friendData.note, 1, 0.82, 0, true)
+			BFL_Tooltip:AddLine(" ")
+			BFL_Tooltip:AddLine(friendData.note, 1, 0.82, 0, true)
 		end
-		GameTooltip:Show()
+		BFL_Tooltip:Show()
 		return
 	end
 
@@ -158,9 +158,6 @@ function BetterFriendsList_Button_OnEnter(self)
 		tooltip:SetParent(UIParent)
 		tooltip:ClearAllPoints()
 		tooltip:SetPoint("TOPLEFT", self, "TOPRIGHT", 36, 0)
-		tooltip:SetFrameStrata("TOOLTIP")
-		tooltip:SetFrameLevel(100)
-		tooltip:Raise()
 
 		ApplyStreamerModeOverride(friendData)
 	end
@@ -168,7 +165,7 @@ end
 
 -- Button OnLeave handler
 function BetterFriendsList_Button_OnLeave(self)
-	GameTooltip:Hide()
+	BFL_Tooltip:Hide()
 	local tooltip = FriendsTooltip
 	tooltip.button = nil
 	tooltip:Hide()

@@ -616,13 +616,13 @@ function BFL:ApplyTabFonts()
 						if not self.BFL_ShowTooltip then
 							return
 						end
-						GameTooltip:SetOwner(self, "ANCHOR_TOP")
-						GameTooltip:SetText(self:GetText() or "", 1, 1, 1, 1, true)
-						GameTooltip:Show()
+						BFL_Tooltip:SetOwner(self, "ANCHOR_TOP")
+						BFL_Tooltip:SetText(self:GetText() or "", 1, 1, 1, 1, true)
+						BFL_Tooltip:Show()
 					end)
 
 					info.tab:SetScript("OnLeave", function(self)
-						GameTooltip:Hide()
+						BFL_Tooltip:Hide()
 						if originalOnLeave then
 							originalOnLeave(self)
 						end
@@ -1432,14 +1432,14 @@ function BetterFriendsFrame_UpdateRaidTabState()
 		PanelTemplates_SetDisabledTabState(raidTab)
 		-- Add tooltip explaining why tab is disabled
 		raidTab:SetScript("OnEnter", function(self)
-			GameTooltip:SetOwner(self, "ANCHOR_RIGHT", 0, 0)
+			BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT", 0, 0)
 			-- Use Blizzard's global string (available in Retail)
 			local reason = DIFFICULTY_LOCKED_REASON_STORY_RAID or "Unavailable in Story Raid"
-			GameTooltip:SetText(RED_FONT_COLOR:WrapTextInColorCode(reason))
-			GameTooltip:Show()
+			BFL_Tooltip:SetText(RED_FONT_COLOR:WrapTextInColorCode(reason))
+			BFL_Tooltip:Show()
 		end)
 		raidTab:SetScript("OnLeave", function(self)
-			GameTooltip:Hide()
+			BFL_Tooltip:Hide()
 		end)
 	end
 
@@ -1695,7 +1695,8 @@ frame:SetScript("OnEvent", function(self, event, ...)
 								if BFL.StreamerMode and BFL.StreamerMode:IsActive() then
 									copyNameText = accountInfo.battleTag or "Unknown"
 								else
-									copyNameText = accountInfo.accountName
+									copyNameText =
+										BFL:GetSafeAccountName(accountInfo.accountName, accountInfo.battleTag)
 								end
 							end
 						end
@@ -3529,7 +3530,7 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 		return
 	end
 
-	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+	BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
 
 	-- Get the actual Battle.net friend index
 	local numBNet = BNGetNumFriends()
@@ -3544,8 +3545,8 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 	end
 
 	if not actualIndex then
-		GameTooltip:SetText("Error", RED_FONT_COLOR.r, RED_FONT_COLOR.g, RED_FONT_COLOR.b)
-		GameTooltip:Show()
+		BFL_Tooltip:SetText("Error", RED_FONT_COLOR.r, RED_FONT_COLOR.g, RED_FONT_COLOR.b)
+		BFL_Tooltip:Show()
 		return
 	end
 
@@ -3559,7 +3560,7 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 		local restriction = FriendsFrame_GetInviteRestriction(actualIndex)
 
 		if inviteType and inviteTypeToButtonText[inviteType] then
-			GameTooltip:SetText(
+			BFL_Tooltip:SetText(
 				inviteTypeToButtonText[inviteType],
 				HIGHLIGHT_FONT_COLOR.r,
 				HIGHLIGHT_FONT_COLOR.g,
@@ -3570,7 +3571,7 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 				local factionLabel = FACTION_LABELS_FROM_STRING[factionName]
 					or (factionName == "Horde" and FACTION_HORDE or FACTION_ALLIANCE)
 				if CROSS_FACTION_INVITE_TOOLTIP then
-					GameTooltip:AddLine(CROSS_FACTION_INVITE_TOOLTIP:format(factionLabel), nil, nil, nil, true)
+					BFL_Tooltip:AddLine(CROSS_FACTION_INVITE_TOOLTIP:format(factionLabel), nil, nil, nil, true)
 				end
 			end
 
@@ -3586,28 +3587,22 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 						for i = 1, #members do
 							if members[i].guid ~= guid then
 								if numDisplayed == 0 then
-									GameTooltip:AddLine(SOCIAL_QUEUE_ALSO_IN_GROUP)
+									BFL_Tooltip:AddLine(SOCIAL_QUEUE_ALSO_IN_GROUP)
 								elseif numDisplayed >= 7 then
-									GameTooltip:AddLine(
-										SOCIAL_QUEUE_AND_MORE,
-										GRAY_FONT_COLOR.r,
-										GRAY_FONT_COLOR.g,
-										GRAY_FONT_COLOR.b,
-										1
-									)
+									BFL_Tooltip:AddLine(GRAY_FONT_COLOR.r, GRAY_FONT_COLOR.g, GRAY_FONT_COLOR.b, 1)
 									break
 								end
 
 								local name, color =
 									SocialQueueUtil_GetRelationshipInfo(members[i].guid, nil, members[i].clubId)
-								GameTooltip:AddLine(color .. name .. FONT_COLOR_CODE_CLOSE)
+								BFL_Tooltip:AddLine(color .. name .. FONT_COLOR_CODE_CLOSE)
 								numDisplayed = numDisplayed + 1
 							end
 						end
 					end
 				end
 			else
-				GameTooltip:AddLine(
+				BFL_Tooltip:AddLine(
 					FriendsFrame_GetInviteRestrictionText(restriction),
 					RED_FONT_COLOR.r,
 					RED_FONT_COLOR.g,
@@ -3616,7 +3611,7 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 				)
 			end
 
-			GameTooltip:Show()
+			BFL_Tooltip:Show()
 			return
 		end
 	end
@@ -3709,13 +3704,13 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 		tooltipText = TRAVEL_PASS_INVITE_CROSS_FACTION or "Invite to Group"
 	end
 
-	GameTooltip:SetText(tooltipText, HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b)
+	BFL_Tooltip:SetText(tooltipText, HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b)
 
 	-- Add cross-faction line
 	if isCrossFaction and factionName then
 		local factionLabel = factionName == "Horde" and (FACTION_HORDE or "Horde") or (FACTION_ALLIANCE or "Alliance")
 		if CROSS_FACTION_INVITE_TOOLTIP then
-			GameTooltip:AddLine(CROSS_FACTION_INVITE_TOOLTIP:format(factionLabel), nil, nil, nil, true)
+			BFL_Tooltip:AddLine(CROSS_FACTION_INVITE_TOOLTIP:format(factionLabel), nil, nil, nil, true)
 		end
 	end
 
@@ -3739,11 +3734,11 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 		end
 
 		if restrictionText ~= "" then
-			GameTooltip:AddLine(restrictionText, RED_FONT_COLOR.r, RED_FONT_COLOR.g, RED_FONT_COLOR.b, true)
+			BFL_Tooltip:AddLine(restrictionText, RED_FONT_COLOR.r, RED_FONT_COLOR.g, RED_FONT_COLOR.b, true)
 		end
 	end
 
-	GameTooltip:Show()
+	BFL_Tooltip:Show()
 end
 
 -- Button OnClick Handler (matching Blizzard's FriendsFrame_SelectFriend behavior)
@@ -4088,13 +4083,13 @@ function BetterFriendsFrame_ShowContactsMenu(button)
 				-- Add tooltip using OnEnter/OnLeave (SetTooltip doesn't exist)
 				menuButton:AddInitializer(function(btn, description, menuInstance)
 					btn:SetScript("OnEnter", function(self)
-						GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-						GameTooltip:SetText(L.MENU_SHOW_BLIZZARD, 1, 1, 1)
-						GameTooltip:AddLine(L.MENU_COMBAT_LOCKED, 1, 0.2, 0.2, true)
-						GameTooltip:Show()
+						BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+						BFL_Tooltip:SetText(L.MENU_SHOW_BLIZZARD, 1, 1, 1)
+						BFL_Tooltip:AddLine(L.MENU_COMBAT_LOCKED, 1, 0.2, 0.2, true)
+						BFL_Tooltip:Show()
 					end)
 					btn:SetScript("OnLeave", function()
-						GameTooltip:Hide()
+						BFL_Tooltip:Hide()
 					end)
 				end)
 			else
@@ -4692,14 +4687,14 @@ end
 function BetterRecentAlliesEntry_OnEnter(self)
 	local RecentAllies = BFL and BFL:GetModule("RecentAllies")
 	if RecentAllies and RecentAllies.BuildTooltip then
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		RecentAllies:BuildTooltip(self, GameTooltip)
-		GameTooltip:Show()
+		BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+		RecentAllies:BuildTooltip(self, BFL_Tooltip)
+		BFL_Tooltip:Show()
 	end
 end
 
 function BetterRecentAlliesEntry_OnLeave(self)
-	GameTooltip:Hide()
+	BFL_Tooltip:Hide()
 end
 
 -- ========================================

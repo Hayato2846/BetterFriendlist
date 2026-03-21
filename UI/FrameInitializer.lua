@@ -179,11 +179,11 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 					statusText = FRIENDS_LIST_BUSY
 				end
 
-				GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", UI_CONSTANTS.TOOLTIP_ANCHOR_Y, 0)
-				GameTooltip:SetText(string.format(FRIENDS_LIST_STATUS_TOOLTIP, statusText))
-				GameTooltip:Show()
+				BFL_Tooltip:SetOwner(dropdown, "ANCHOR_RIGHT", UI_CONSTANTS.TOOLTIP_ANCHOR_Y, 0)
+				BFL_Tooltip:SetText(string.format(FRIENDS_LIST_STATUS_TOOLTIP, statusText))
+				BFL_Tooltip:Show()
 			end)
-			button:HookScript("OnLeave", GameTooltip_Hide)
+			button:HookScript("OnLeave", BFL_Tooltip_Hide)
 		else
 			dropdown:SetScript("OnEnter", function()
 				local statusText
@@ -195,11 +195,11 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 					statusText = FRIENDS_LIST_BUSY
 				end
 
-				GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", UI_CONSTANTS.TOOLTIP_ANCHOR_Y, 0)
-				GameTooltip:SetText(string.format(FRIENDS_LIST_STATUS_TOOLTIP, statusText))
-				GameTooltip:Show()
+				BFL_Tooltip:SetOwner(dropdown, "ANCHOR_RIGHT", UI_CONSTANTS.TOOLTIP_ANCHOR_Y, 0)
+				BFL_Tooltip:SetText(string.format(FRIENDS_LIST_STATUS_TOOLTIP, statusText))
+				BFL_Tooltip:Show()
 			end)
-			dropdown:SetScript("OnLeave", GameTooltip_Hide)
+			dropdown:SetScript("OnLeave", BFL_Tooltip_Hide)
 		end
 
 		return
@@ -263,11 +263,11 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 			statusText = FRIENDS_LIST_BUSY
 		end
 
-		GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", UI_CONSTANTS.TOOLTIP_ANCHOR_Y, 0)
-		GameTooltip:SetText(string.format(FRIENDS_LIST_STATUS_TOOLTIP, statusText))
-		GameTooltip:Show()
+		BFL_Tooltip:SetOwner(dropdown, "ANCHOR_RIGHT", UI_CONSTANTS.TOOLTIP_ANCHOR_Y, 0)
+		BFL_Tooltip:SetText(string.format(FRIENDS_LIST_STATUS_TOOLTIP, statusText))
+		BFL_Tooltip:Show()
 	end)
-	dropdown:SetScript("OnLeave", GameTooltip_Hide)
+	dropdown:SetScript("OnLeave", BFL_Tooltip_Hide)
 end
 
 --------------------------------------------------------------------------
@@ -374,19 +374,19 @@ function FrameInitializer:InitializeSortDropdown(frame)
 		if button then
 			button:HookScript("OnEnter", function()
 				local sortName = SORT_NAMES[currentSortMode] or "Status"
-				GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", UI_CONSTANTS.TOOLTIP_ANCHOR_Y, 0)
-				GameTooltip:SetText("Sort: " .. sortName)
-				GameTooltip:Show()
+				BFL_Tooltip:SetOwner(dropdown, "ANCHOR_RIGHT", UI_CONSTANTS.TOOLTIP_ANCHOR_Y, 0)
+				BFL_Tooltip:SetText("Sort: " .. sortName)
+				BFL_Tooltip:Show()
 			end)
-			button:HookScript("OnLeave", GameTooltip_Hide)
+			button:HookScript("OnLeave", BFL_Tooltip_Hide)
 		else
 			dropdown:SetScript("OnEnter", function()
 				local sortName = SORT_NAMES[currentSortMode] or "Status"
-				GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", UI_CONSTANTS.TOOLTIP_ANCHOR_Y, 0)
-				GameTooltip:SetText("Sort: " .. sortName)
-				GameTooltip:Show()
+				BFL_Tooltip:SetOwner(dropdown, "ANCHOR_RIGHT", UI_CONSTANTS.TOOLTIP_ANCHOR_Y, 0)
+				BFL_Tooltip:SetText("Sort: " .. sortName)
+				BFL_Tooltip:Show()
 			end)
-			dropdown:SetScript("OnLeave", GameTooltip_Hide)
+			dropdown:SetScript("OnLeave", BFL_Tooltip_Hide)
 		end
 
 		return
@@ -444,11 +444,11 @@ function FrameInitializer:InitializeSortDropdown(frame)
 	-- Set up tooltip
 	dropdown:SetScript("OnEnter", function()
 		local sortName = SORT_NAMES[currentSortMode] or "Status"
-		GameTooltip:SetOwner(dropdown, "ANCHOR_RIGHT", UI_CONSTANTS.TOOLTIP_ANCHOR_Y, 0)
-		GameTooltip:SetText("Sort: " .. sortName)
-		GameTooltip:Show()
+		BFL_Tooltip:SetOwner(dropdown, "ANCHOR_RIGHT", UI_CONSTANTS.TOOLTIP_ANCHOR_Y, 0)
+		BFL_Tooltip:SetText("Sort: " .. sortName)
+		BFL_Tooltip:Show()
 	end)
-	dropdown:SetScript("OnLeave", GameTooltip_Hide)
+	dropdown:SetScript("OnLeave", BFL_Tooltip_Hide)
 end
 
 -- Initialize primary and secondary sort dropdowns
@@ -574,21 +574,21 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 		if primaryButton then
 			primaryButton:HookScript("OnEnter", function()
 				local sortName = SORT_NAMES[FriendsList.sortMode] or "Status"
-				GameTooltip:SetOwner(primaryDropdown, "ANCHOR_RIGHT")
-				GameTooltip:SetText(L.SORT_PRIMARY_LABEL .. ": " .. sortName)
-				GameTooltip:AddLine(L.SORT_PRIMARY_DESC, 1, 1, 1, true)
-				GameTooltip:Show()
+				BFL_Tooltip:SetOwner(primaryDropdown, "ANCHOR_RIGHT")
+				BFL_Tooltip:SetText(L.SORT_PRIMARY_LABEL .. ": " .. sortName)
+				BFL_Tooltip:AddLine(L.SORT_PRIMARY_DESC, 1, 1, 1, true)
+				BFL_Tooltip:Show()
 			end)
-			primaryButton:HookScript("OnLeave", GameTooltip_Hide)
+			primaryButton:HookScript("OnLeave", BFL_Tooltip_Hide)
 		else
 			primaryDropdown:SetScript("OnEnter", function()
 				local sortName = SORT_NAMES[FriendsList.sortMode] or "Status"
-				GameTooltip:SetOwner(primaryDropdown, "ANCHOR_RIGHT")
-				GameTooltip:SetText(L.SORT_PRIMARY_LABEL .. ": " .. sortName)
-				GameTooltip:AddLine(L.SORT_PRIMARY_DESC, 1, 1, 1, true)
-				GameTooltip:Show()
+				BFL_Tooltip:SetOwner(primaryDropdown, "ANCHOR_RIGHT")
+				BFL_Tooltip:SetText(L.SORT_PRIMARY_LABEL .. ": " .. sortName)
+				BFL_Tooltip:AddLine(L.SORT_PRIMARY_DESC, 1, 1, 1, true)
+				BFL_Tooltip:Show()
 			end)
-			primaryDropdown:SetScript("OnLeave", GameTooltip_Hide)
+			primaryDropdown:SetScript("OnLeave", BFL_Tooltip_Hide)
 		end
 
 		local secondaryButton = _G[secondaryDropdown:GetName() .. "Button"]
@@ -596,22 +596,22 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 			secondaryButton:HookScript("OnEnter", function()
 				local sortName = FriendsList.secondarySort == "none" and "None"
 					or (SORT_NAMES[FriendsList.secondarySort] or "Name")
-				GameTooltip:SetOwner(secondaryDropdown, "ANCHOR_RIGHT")
-				GameTooltip:SetText(L.SORT_SECONDARY_LABEL .. ": " .. sortName)
-				GameTooltip:AddLine(L.SORT_SECONDARY_DESC, 1, 1, 1, true)
-				GameTooltip:Show()
+				BFL_Tooltip:SetOwner(secondaryDropdown, "ANCHOR_RIGHT")
+				BFL_Tooltip:SetText(L.SORT_SECONDARY_LABEL .. ": " .. sortName)
+				BFL_Tooltip:AddLine(L.SORT_SECONDARY_DESC, 1, 1, 1, true)
+				BFL_Tooltip:Show()
 			end)
-			secondaryButton:HookScript("OnLeave", GameTooltip_Hide)
+			secondaryButton:HookScript("OnLeave", BFL_Tooltip_Hide)
 		else
 			secondaryDropdown:SetScript("OnEnter", function()
 				local sortName = FriendsList.secondarySort == "none" and "None"
 					or (SORT_NAMES[FriendsList.secondarySort] or "Name")
-				GameTooltip:SetOwner(secondaryDropdown, "ANCHOR_RIGHT")
-				GameTooltip:SetText(L.SORT_SECONDARY_LABEL .. ": " .. sortName)
-				GameTooltip:AddLine(L.SORT_SECONDARY_DESC, 1, 1, 1, true)
-				GameTooltip:Show()
+				BFL_Tooltip:SetOwner(secondaryDropdown, "ANCHOR_RIGHT")
+				BFL_Tooltip:SetText(L.SORT_SECONDARY_LABEL .. ": " .. sortName)
+				BFL_Tooltip:AddLine(L.SORT_SECONDARY_DESC, 1, 1, 1, true)
+				BFL_Tooltip:Show()
 			end)
-			secondaryDropdown:SetScript("OnLeave", GameTooltip_Hide)
+			secondaryDropdown:SetScript("OnLeave", BFL_Tooltip_Hide)
 		end
 
 		return
@@ -669,12 +669,12 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 
 	primaryDropdown:SetScript("OnEnter", function()
 		local sortName = SORT_NAMES[FriendsList.sortMode] or "Status"
-		GameTooltip:SetOwner(primaryDropdown, "ANCHOR_RIGHT")
-		GameTooltip:SetText(L.SORT_PRIMARY_LABEL .. ": " .. sortName)
-		GameTooltip:AddLine(L.SORT_PRIMARY_DESC, 1, 1, 1, true)
-		GameTooltip:Show()
+		BFL_Tooltip:SetOwner(primaryDropdown, "ANCHOR_RIGHT")
+		BFL_Tooltip:SetText(L.SORT_PRIMARY_LABEL .. ": " .. sortName)
+		BFL_Tooltip:AddLine(L.SORT_PRIMARY_DESC, 1, 1, 1, true)
+		BFL_Tooltip:Show()
 	end)
-	primaryDropdown:SetScript("OnLeave", GameTooltip_Hide)
+	primaryDropdown:SetScript("OnLeave", BFL_Tooltip_Hide)
 
 	-- Initialize Secondary Sort Dropdown
 
@@ -729,12 +729,12 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 	secondaryDropdown:SetScript("OnEnter", function()
 		local sortName = FriendsList.secondarySort == "none" and "None"
 			or (SORT_NAMES[FriendsList.secondarySort] or "Name")
-		GameTooltip:SetOwner(secondaryDropdown, "ANCHOR_RIGHT")
-		GameTooltip:SetText(L.SORT_SECONDARY_LABEL .. ": " .. sortName)
-		GameTooltip:AddLine(L.SORT_SECONDARY_DESC, 1, 1, 1, true)
-		GameTooltip:Show()
+		BFL_Tooltip:SetOwner(secondaryDropdown, "ANCHOR_RIGHT")
+		BFL_Tooltip:SetText(L.SORT_SECONDARY_LABEL .. ": " .. sortName)
+		BFL_Tooltip:AddLine(L.SORT_SECONDARY_DESC, 1, 1, 1, true)
+		BFL_Tooltip:Show()
 	end)
-	secondaryDropdown:SetScript("OnLeave", GameTooltip_Hide)
+	secondaryDropdown:SetScript("OnLeave", BFL_Tooltip_Hide)
 end
 
 -- Get current sort mode (for external access)

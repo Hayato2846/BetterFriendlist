@@ -422,7 +422,7 @@ function DB:Initialize()
 	end
 
 	-- Initialize CustomNames Sync if available
-	CustomNamesLib = LibStub("CustomNames", true)
+	CustomNamesLib = LibStub and LibStub("CustomNames", true)
 	local lib = CustomNamesLib
 
 	if lib then

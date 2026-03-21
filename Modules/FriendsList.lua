@@ -3,7 +3,7 @@
 local ADDON_NAME, BFL = ...
 local FriendsList = BFL:RegisterModule("FriendsList", {})
 local L = BFL.L -- Localization table
-local LSM = LibStub("LibSharedMedia-3.0")
+local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
 
 -- ========================================
 -- Module Dependencies
@@ -1138,13 +1138,13 @@ local function CreateElementFactory(friendsList) -- Capture friendsList referenc
 				end)
 				overlay:SetScript("OnEnter", function(self)
 					if self.friendData and self.friendData.gameAccounts and #self.friendData.gameAccounts > 1 then
-						GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-						GameTooltip:SetText((L and L.MENU_SWITCH_GAME_ACCOUNT) or "Switch Game Account", 1, 1, 1)
-						GameTooltip:Show()
+						BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+						BFL_Tooltip:SetText((L and L.MENU_SWITCH_GAME_ACCOUNT) or "Switch Game Account", 1, 1, 1)
+						BFL_Tooltip:Show()
 					end
 				end)
 				overlay:SetScript("OnLeave", function()
-					GameTooltip:Hide()
+					BFL_Tooltip:Hide()
 				end)
 				button.gameIconOverlay = overlay
 			end
@@ -2606,7 +2606,8 @@ function FriendsList:FormatInfoLine(friend)
 	result = ReplaceTokenCaseInsensitive(result, "status", statusText)
 	result = ReplaceTokenCaseInsensitive(result, "lastonline", "")
 	-- Phase 22b: Unified tokens - name tokens in info format
-	local nameValue = isBNet and (friend.accountName or "Unknown") or (friend.name or "Unknown")
+	local nameValue = isBNet and (BFL:GetSafeAccountName(friend.accountName, friend.battleTag) or "Unknown")
+		or (friend.name or "Unknown")
 	result = ReplaceTokenCaseInsensitive(result, "name", nameValue)
 	local battletag = friend.battleTag and (friend.battleTag:match("([^#]+)") or friend.battleTag) or ""
 	result = ReplaceTokenCaseInsensitive(result, "battletag", battletag)
@@ -3130,7 +3131,7 @@ function FriendsList:UpdateFontCache()
 
 	-- Name Font
 	local nameFontName = DB:Get("fontFriendName", "Friz Quadrata TT")
-	self.fontCache.namePath = LSM:Fetch("font", nameFontName)
+	self.fontCache.namePath = (LSM and LSM:Fetch("font", nameFontName)) or "Fonts\\FRIZQT__.TTF"
 	self.fontCache.nameSize = DB:Get("fontSizeFriendName", 12)
 	self.fontCache.nameOutline = DB:Get("fontOutlineFriendName", "NONE")
 	self.fontCache.nameShadow = DB:Get("fontShadowFriendName", false)
@@ -3139,7 +3140,7 @@ function FriendsList:UpdateFontCache()
 
 	-- Info Font
 	local infoFontName = DB:Get("fontFriendInfo", "Friz Quadrata TT")
-	self.fontCache.infoPath = LSM:Fetch("font", infoFontName)
+	self.fontCache.infoPath = (LSM and LSM:Fetch("font", infoFontName)) or "Fonts\\FRIZQT__.TTF"
 	self.fontCache.infoSize = DB:Get("fontSizeFriendInfo", 10)
 	self.fontCache.infoOutline = DB:Get("fontOutlineFriendInfo", "NONE")
 	self.fontCache.infoShadow = DB:Get("fontShadowFriendInfo", false)
@@ -5765,7 +5766,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 			fontOutline = DB:Get("fontOutlineGroupHeader", "NONE")
 			fontShadow = DB:Get("fontShadowGroupHeader", false)
 
-			local fontPath = LSM:Fetch("font", fontName)
+			local fontPath = LSM and LSM:Fetch("font", fontName) or "Fonts\\FRIZQT__.TTF"
 			-- Use FontManager to apply font with Alphabet support
 			if fontPath and BFL.FontManager and BFL.FontManager.GetOrCreateFontFamily then
 				-- For Group Headers (Buttons), we must set the Normal/Highlight FontObject
@@ -5952,28 +5953,28 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 
 		if isDragging and self.groupId and friendGroups[self.groupId] and not friendGroups[self.groupId].builtin then
 			-- Show drop target tooltip
-			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText(L.TOOLTIP_DROP_TO_ADD, 1, 1, 1)
-			GameTooltip:AddLine(L.TOOLTIP_HOLD_SHIFT, 0.7, 0.7, 0.7, true)
-			GameTooltip:Show()
+			BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+			BFL_Tooltip:SetText(L.TOOLTIP_DROP_TO_ADD, 1, 1, 1)
+			BFL_Tooltip:AddLine(L.TOOLTIP_HOLD_SHIFT, 0.7, 0.7, 0.7, true)
+			BFL_Tooltip:Show()
 		else
 			-- Show group info tooltip
 			if self.groupId and friendGroups[self.groupId] then
 				local groupData = friendGroups[self.groupId]
 
-				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-				GameTooltip:SetText(groupData.name, 1, 1, 1)
-				GameTooltip:AddLine(BFL.L.HINT_RIGHT_CLICK_OPTIONS, 0.7, 0.7, 0.7, true)
+				BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+				BFL_Tooltip:SetText(groupData.name, 1, 1, 1)
+				BFL_Tooltip:AddLine(BFL.L.HINT_RIGHT_CLICK_OPTIONS, 0.7, 0.7, 0.7, true)
 				if not groupData.builtin then
-					GameTooltip:AddLine(L.TOOLTIP_DRAG_HERE, 0.5, 0.8, 1.0, true)
+					BFL_Tooltip:AddLine(L.TOOLTIP_DRAG_HERE, 0.5, 0.8, 1.0, true)
 				end
-				GameTooltip:Show()
+				BFL_Tooltip:Show()
 			end
 		end
 	end)
 
 	button:SetScript("OnLeave", function(self)
-		GameTooltip:Hide()
+		BFL_Tooltip:Hide()
 	end)
 
 	-- Add right-click menu functionality
@@ -6326,7 +6327,9 @@ Button_OnDragStart = function(self)
 		if BFL.StreamerMode and BFL.StreamerMode:IsActive() and self.friendData.type == "bnet" then
 			dragName = FriendsList:GetDisplayName(self.friendData)
 		else
-			dragName = self.friendData.name or self.friendData.accountName or self.friendData.battleTag or "Unknown"
+			dragName = self.friendData.name
+				or BFL:GetSafeAccountName(self.friendData.accountName, self.friendData.battleTag)
+				or "Unknown"
 		end
 		BetterFriendsList_DraggedFriend = dragName
 		-- Store UID for validation (Fix for Phantom DragStop events during list refresh)
@@ -6374,7 +6377,7 @@ Button_OnDragStart = function(self)
 		self:SetAlpha(0.5)
 
 		-- Hide tooltip
-		GameTooltip:Hide()
+		BFL_Tooltip:Hide()
 
 		-- Enable OnUpdate
 		self.hasPrintedBrokerFetch = nil -- Reset debug flag for new drag session
@@ -6654,8 +6657,9 @@ function FriendsList:GetFormattedButtonText(friend)
 				flcData.accountName = safeName
 				flcData.name = friend.characterName or safeName
 			else
-				flcData.accountName = friend.accountName
-				flcData.name = friend.characterName or friend.accountName
+				local safeAccountName = BFL:GetSafeAccountName(friend.accountName, friend.battleTag)
+				flcData.accountName = safeAccountName
+				flcData.name = friend.characterName or safeAccountName
 			end
 			flcData.battleTag = friend.battleTag
 			flcData.characterName = friend.characterName
@@ -7949,7 +7953,7 @@ function FriendsList:UpdateInviteButton(button, data)
 
 	-- Set name with cyan color (BNet style)
 	EnsureFontSet(button.Name)
-	button.Name:SetText((FRIENDS_BNET_NAME_COLOR_CODE or "|cff82c5ff") .. accountName .. "|r")
+	button.Name:SetText((FRIENDS_BNET_NAME_COLOR_CODE or "|cff82c5ff") .. BFL:GetSafeAccountName(accountName) .. "|r")
 
 	-- Set Info text ALWAYS
 	EnsureFontSet(button.Info)
@@ -8000,7 +8004,7 @@ function FriendsList:UpdateInviteButton(button, data)
 							table.remove(BFL.MockFriendInvites.invites, i)
 							BFL:DebugPrint(
 								"|cff00ff00BetterFriendlist:|r "
-									.. string.format(BFL.L.MOCK_INVITE_ACCEPTED, invite.accountName)
+									.. string.format(BFL.L.MOCK_INVITE_ACCEPTED, BFL:SafeToString(invite.accountName))
 							)
 							break
 						end
@@ -8049,7 +8053,10 @@ function FriendsList:UpdateInviteButton(button, data)
 								table.remove(BFL.MockFriendInvites.invites, i)
 								BFL:DebugPrint(
 									"|cffff0000BetterFriendlist:|r "
-										.. string.format(BFL.L.MOCK_INVITE_DECLINED, invite.accountName)
+										.. string.format(
+											BFL.L.MOCK_INVITE_DECLINED,
+											BFL:SafeToString(invite.accountName)
+										)
 								)
 								break
 							end

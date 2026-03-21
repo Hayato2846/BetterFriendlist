@@ -152,15 +152,15 @@ function Components:CreateCheckbox(parent, labelText, initialValue, callback)
 
 	holder.SetTooltip = function(_, title, desc)
 		checkBox:SetScript("OnEnter", function(self)
-			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText(title, 1, 1, 1)
+			BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+			BFL_Tooltip:SetText(title, 1, 1, 1)
 			if desc then
-				GameTooltip:AddLine(desc, 0.8, 0.8, 0.8, true)
+				BFL_Tooltip:AddLine(desc, 0.8, 0.8, 0.8, true)
 			end
-			GameTooltip:Show()
+			BFL_Tooltip:Show()
 		end)
 		checkBox:SetScript("OnLeave", function()
-			GameTooltip:Hide()
+			BFL_Tooltip:Hide()
 		end)
 	end
 
@@ -449,17 +449,14 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 						end, entryValues[i])
 					end
 
-					local fontPath = entryFontPaths and entryFontPaths[i]
-					local fontObject = fontPath and GetDropdownFontObject(fontPath, 2) or defaultFontObject
+					-- Lazy font loading: defer CreateFont() to AddInitializer (only runs for visible items)
 					do
-						local entryFontObject = fontObject
+						local entryFontPath = entryFontPaths and entryFontPaths[i]
 						item:AddInitializer(function(button)
 							if button.fontString then
-								if entryFontObject then
-									button.fontString:SetFontObject(entryFontObject)
-								else
-									button.fontString:SetFontObject(defaultFontObject)
-								end
+								local entryFontObject = entryFontPath and GetDropdownFontObject(entryFontPath, 2)
+									or defaultFontObject
+								button.fontString:SetFontObject(entryFontObject or defaultFontObject)
 							end
 						end)
 					end
@@ -518,15 +515,15 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 
 	holder.SetTooltip = function(_, title, desc)
 		dropdown:SetScript("OnEnter", function(self)
-			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText(title, 1, 1, 1)
+			BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+			BFL_Tooltip:SetText(title, 1, 1, 1)
 			if desc then
-				GameTooltip:AddLine(desc, 0.8, 0.8, 0.8, true)
+				BFL_Tooltip:AddLine(desc, 0.8, 0.8, 0.8, true)
 			end
-			GameTooltip:Show()
+			BFL_Tooltip:Show()
 		end)
 		dropdown:SetScript("OnLeave", function()
-			GameTooltip:Hide()
+			BFL_Tooltip:Hide()
 		end)
 	end
 
@@ -582,13 +579,13 @@ function Components:CreateColorPicker(parent, labelText, initialColor, callback)
 
 	-- Tooltip
 	colorButton:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText(L.SETTINGS_FONT_COLOR or "Font Color", 1, 0.82, 0)
-		GameTooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 1, 1, 1, true)
-		GameTooltip:Show()
+		BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+		BFL_Tooltip:SetText(L.SETTINGS_FONT_COLOR or "Font Color", 1, 0.82, 0)
+		BFL_Tooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 1, 1, 1, true)
+		BFL_Tooltip:Show()
 	end)
 	colorButton:SetScript("OnLeave", function()
-		GameTooltip:Hide()
+		BFL_Tooltip:Hide()
 	end)
 
 	if initialColor then
@@ -713,13 +710,13 @@ function Components:CreateSliderWithColorPicker(
 
 	-- Tooltip
 	colorButton:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText(L.SETTINGS_FONT_COLOR or "Font Color", 1, 0.82, 0)
-		GameTooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 1, 1, 1, true)
-		GameTooltip:Show()
+		BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+		BFL_Tooltip:SetText(L.SETTINGS_FONT_COLOR or "Font Color", 1, 0.82, 0)
+		BFL_Tooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 1, 1, 1, true)
+		BFL_Tooltip:Show()
 	end)
 	colorButton:SetScript("OnLeave", function()
-		GameTooltip:Hide()
+		BFL_Tooltip:Hide()
 	end)
 
 	-- Color Logic
@@ -1152,14 +1149,14 @@ function Components:CreateListItem(
 		end)
 		holder.deleteButton:SetScript("OnEnter", function(self)
 			self.icon:SetVertexColor(1, 1, 1)
-			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText(L.SETTINGS_DELETE_GROUP or "Delete Group", 1, 0.1, 0.1)
-			GameTooltip:AddLine(L.SETTINGS_DELETE_GROUP_DESC or "Delete this custom group", 0.8, 0.8, 0.8, true)
-			GameTooltip:Show()
+			BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+			BFL_Tooltip:SetText(L.SETTINGS_DELETE_GROUP or "Delete Group", 1, 0.1, 0.1)
+			BFL_Tooltip:AddLine(L.SETTINGS_DELETE_GROUP_DESC or "Delete this custom group", 0.8, 0.8, 0.8, true)
+			BFL_Tooltip:Show()
 		end)
 		holder.deleteButton:SetScript("OnLeave", function(self)
 			self.icon:SetVertexColor(1, 0.82, 0)
-			GameTooltip:Hide()
+			BFL_Tooltip:Hide()
 		end)
 	end
 
@@ -1204,14 +1201,14 @@ function Components:CreateListItem(
 		end)
 		holder.renameButton:SetScript("OnEnter", function(self)
 			self.icon:SetVertexColor(1, 1, 1)
-			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText(L.SETTINGS_RENAME_GROUP or "Rename", 1, 1, 1)
-			GameTooltip:AddLine(L.TOOLTIP_RENAME_DESC or "Rename this group", 0.8, 0.8, 0.8, true)
-			GameTooltip:Show()
+			BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+			BFL_Tooltip:SetText(L.SETTINGS_RENAME_GROUP or "Rename", 1, 1, 1)
+			BFL_Tooltip:AddLine(L.TOOLTIP_RENAME_DESC or "Rename this group", 0.8, 0.8, 0.8, true)
+			BFL_Tooltip:Show()
 		end)
 		holder.renameButton:SetScript("OnLeave", function(self)
 			self.icon:SetVertexColor(1, 0.82, 0)
-			GameTooltip:Hide()
+			BFL_Tooltip:Hide()
 		end)
 	end
 
@@ -1265,14 +1262,14 @@ function Components:CreateListItem(
 			end
 		end)
 		holder.arrowColorButton:SetScript("OnEnter", function(self)
-			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText(L.SETTINGS_GROUP_ARROW_COLOR or "Arrow Color", 1, 0.82, 0)
-			GameTooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 1, 1, 1, true)
-			GameTooltip:AddLine(L.TOOLTIP_RIGHT_CLICK_INHERIT or "Right-click to inherit from Group", 0.6, 0.6, 0.6)
-			GameTooltip:Show()
+			BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+			BFL_Tooltip:SetText(L.SETTINGS_GROUP_ARROW_COLOR or "Arrow Color", 1, 0.82, 0)
+			BFL_Tooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 1, 1, 1, true)
+			BFL_Tooltip:AddLine(L.TOOLTIP_RIGHT_CLICK_INHERIT or "Right-click to inherit from Group", 0.6, 0.6, 0.6)
+			BFL_Tooltip:Show()
 		end)
 		holder.arrowColorButton:SetScript("OnLeave", function()
-			GameTooltip:Hide()
+			BFL_Tooltip:Hide()
 		end)
 
 		-- Small Icon overlay to indicate function
@@ -1359,14 +1356,14 @@ function Components:CreateListItem(
 			end
 		end)
 		holder.countColorButton:SetScript("OnEnter", function(self)
-			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText(L.SETTINGS_GROUP_COUNT_COLOR or "Count Color", 1, 0.82, 0)
-			GameTooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 1, 1, 1, true)
-			GameTooltip:AddLine(L.TOOLTIP_RIGHT_CLICK_INHERIT or "Right-click to inherit from Group", 0.6, 0.6, 0.6)
-			GameTooltip:Show()
+			BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+			BFL_Tooltip:SetText(L.SETTINGS_GROUP_COUNT_COLOR or "Count Color", 1, 0.82, 0)
+			BFL_Tooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 1, 1, 1, true)
+			BFL_Tooltip:AddLine(L.TOOLTIP_RIGHT_CLICK_INHERIT or "Right-click to inherit from Group", 0.6, 0.6, 0.6)
+			BFL_Tooltip:Show()
 		end)
 		holder.countColorButton:SetScript("OnLeave", function()
-			GameTooltip:Hide()
+			BFL_Tooltip:Hide()
 		end)
 
 		-- Text overlay "123"
@@ -1403,13 +1400,13 @@ function Components:CreateListItem(
 		end
 	end)
 	holder.colorButton:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText(L.SETTINGS_GROUP_COLOR or "Group Color", 1, 0.82, 0)
-		GameTooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 1, 1, 1, true)
-		GameTooltip:Show()
+		BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+		BFL_Tooltip:SetText(L.SETTINGS_GROUP_COLOR or "Group Color", 1, 0.82, 0)
+		BFL_Tooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 1, 1, 1, true)
+		BFL_Tooltip:Show()
 	end)
 	holder.colorButton:SetScript("OnLeave", function()
-		GameTooltip:Hide()
+		BFL_Tooltip:Hide()
 	end)
 
 	-- Text overlay "Abc" (Group Name)
@@ -1453,12 +1450,12 @@ function Components:CreateButton(parent, text, onClick, tooltip)
 
 	if tooltip then
 		button:SetScript("OnEnter", function(self)
-			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText(tooltip, nil, nil, nil, nil, true)
-			GameTooltip:Show()
+			BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+			BFL_Tooltip:SetText(tooltip, nil, nil, nil, nil, true)
+			BFL_Tooltip:Show()
 		end)
 		button:SetScript("OnLeave", function(self)
-			GameTooltip:Hide()
+			BFL_Tooltip:Hide()
 		end)
 	end
 
@@ -1509,16 +1506,16 @@ function Components:CreateDoubleCheckbox(parent, leftData, rightData)
 		end)
 		leftCheck:SetScript("OnEnter", function(self)
 			if leftData.tooltipTitle then
-				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-				GameTooltip:SetText(leftData.tooltipTitle, 1, 1, 1)
+				BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+				BFL_Tooltip:SetText(leftData.tooltipTitle, 1, 1, 1)
 				if leftData.tooltipDesc then
-					GameTooltip:AddLine(leftData.tooltipDesc, 0.8, 0.8, 0.8, true)
+					BFL_Tooltip:AddLine(leftData.tooltipDesc, 0.8, 0.8, 0.8, true)
 				end
-				GameTooltip:Show()
+				BFL_Tooltip:Show()
 			end
 		end)
 		leftCheck:SetScript("OnLeave", function()
-			GameTooltip:Hide()
+			BFL_Tooltip:Hide()
 		end)
 	end
 
@@ -1552,16 +1549,16 @@ function Components:CreateDoubleCheckbox(parent, leftData, rightData)
 		end)
 		rightCheck:SetScript("OnEnter", function(self)
 			if rightData.tooltipTitle then
-				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-				GameTooltip:SetText(rightData.tooltipTitle, 1, 1, 1)
+				BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+				BFL_Tooltip:SetText(rightData.tooltipTitle, 1, 1, 1)
 				if rightData.tooltipDesc then
-					GameTooltip:AddLine(rightData.tooltipDesc, 0.8, 0.8, 0.8, true)
+					BFL_Tooltip:AddLine(rightData.tooltipDesc, 0.8, 0.8, 0.8, true)
 				end
-				GameTooltip:Show()
+				BFL_Tooltip:Show()
 			end
 		end)
 		rightCheck:SetScript("OnLeave", function()
-			GameTooltip:Hide()
+			BFL_Tooltip:Hide()
 		end)
 	end
 
@@ -1650,16 +1647,16 @@ function Components:CreateCheckboxDropdown(parent, checkboxData, dropdownData)
 		end)
 		leftCheck:SetScript("OnEnter", function(self)
 			if checkboxData.tooltipTitle then
-				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-				GameTooltip:SetText(checkboxData.tooltipTitle, 1, 1, 1)
+				BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+				BFL_Tooltip:SetText(checkboxData.tooltipTitle, 1, 1, 1)
 				if checkboxData.tooltipDesc then
-					GameTooltip:AddLine(checkboxData.tooltipDesc, 0.8, 0.8, 0.8, true)
+					BFL_Tooltip:AddLine(checkboxData.tooltipDesc, 0.8, 0.8, 0.8, true)
 				end
-				GameTooltip:Show()
+				BFL_Tooltip:Show()
 			end
 		end)
 		leftCheck:SetScript("OnLeave", function()
-			GameTooltip:Hide()
+			BFL_Tooltip:Hide()
 		end)
 	end
 
@@ -1744,18 +1741,17 @@ function Components:CreateCheckboxDropdown(parent, checkboxData, dropdownData)
 							)
 						end
 
-						local fontPath = entryFontPaths and entryFontPaths[i]
-						local fontObject = fontPath and GetDropdownFontObject(fontPath, 2) or defaultFontObject
-						local entryFontObject = fontObject
-						item:AddInitializer(function(button)
-							if button.fontString then
-								if entryFontObject then
-									button.fontString:SetFontObject(entryFontObject)
-								else
-									button.fontString:SetFontObject(defaultFontObject)
+						-- Lazy font loading: defer CreateFont() to AddInitializer (only runs for visible items)
+						do
+							local entryFontPath = entryFontPaths and entryFontPaths[i]
+							item:AddInitializer(function(button)
+								if button.fontString then
+									local entryFontObject = entryFontPath and GetDropdownFontObject(entryFontPath, 2)
+										or defaultFontObject
+									button.fontString:SetFontObject(entryFontObject or defaultFontObject)
 								end
-							end
-						end)
+							end)
+						end
 					end
 				end)
 
@@ -1780,16 +1776,16 @@ function Components:CreateCheckboxDropdown(parent, checkboxData, dropdownData)
 
 		dropdown:SetScript("OnEnter", function(self)
 			if dropdownData.tooltipTitle then
-				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-				GameTooltip:SetText(dropdownData.tooltipTitle, 1, 1, 1)
+				BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+				BFL_Tooltip:SetText(dropdownData.tooltipTitle, 1, 1, 1)
 				if dropdownData.tooltipDesc then
-					GameTooltip:AddLine(dropdownData.tooltipDesc, 0.8, 0.8, 0.8, true)
+					BFL_Tooltip:AddLine(dropdownData.tooltipDesc, 0.8, 0.8, 0.8, true)
 				end
-				GameTooltip:Show()
+				BFL_Tooltip:Show()
 			end
 		end)
 		dropdown:SetScript("OnLeave", function()
-			GameTooltip:Hide()
+			BFL_Tooltip:Hide()
 		end)
 	end
 
@@ -1906,15 +1902,15 @@ function Components:CreateInput(parent, labelText, initialValue, callback, input
 
 	holder.SetTooltip = function(_, title, desc)
 		inputBox:SetScript("OnEnter", function(self)
-			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			GameTooltip:SetText(title, 1, 1, 1)
+			BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+			BFL_Tooltip:SetText(title, 1, 1, 1)
 			if desc then
-				GameTooltip:AddLine(desc, 0.8, 0.8, 0.8, true)
+				BFL_Tooltip:AddLine(desc, 0.8, 0.8, 0.8, true)
 			end
-			GameTooltip:Show()
+			BFL_Tooltip:Show()
 		end)
 		inputBox:SetScript("OnLeave", function()
-			GameTooltip:Hide()
+			BFL_Tooltip:Hide()
 		end)
 	end
 

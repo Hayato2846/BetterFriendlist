@@ -223,9 +223,9 @@ function BetterQuickJoinGroupButton_OnEnter(self)
 	end
 
 	-- Show tooltip using entry's ApplyToTooltip method
-	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-	self.entry:ApplyToTooltip(GameTooltip)
-	GameTooltip:Show()
+	BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+	self.entry:ApplyToTooltip(BFL_Tooltip)
+	BFL_Tooltip:Show()
 
 	-- Hide selection highlight and show hover highlight (blue)
 	if self.Selected then
@@ -237,7 +237,7 @@ function BetterQuickJoinGroupButton_OnEnter(self)
 end
 
 function BetterQuickJoinGroupButton_OnLeave(self)
-	GameTooltip:Hide()
+	BFL_Tooltip:Hide()
 
 	-- Hide hover highlight and restore selection if needed
 	if self.HoverHighlight then

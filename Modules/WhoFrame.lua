@@ -1603,14 +1603,14 @@ function _G.BetterWhoListButton_OnEnter(self)
 	end
 
 	local info = self.tooltipInfo
-	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+	BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
 
 	-- Name as header (class-colored if available)
 	local classColor = info.filename and RAID_CLASS_COLORS[info.filename]
 	if classColor then
-		GameTooltip:AddLine(info.fullName or "", classColor.r, classColor.g, classColor.b)
+		BFL_Tooltip:AddLine(info.fullName or "", classColor.r, classColor.g, classColor.b)
 	else
-		GameTooltip:AddLine(info.fullName or "", 1, 0.82, 0)
+		BFL_Tooltip:AddLine(info.fullName or "", 1, 0.82, 0)
 	end
 
 	-- Level, Race, Class line
@@ -1645,23 +1645,23 @@ function _G.BetterWhoListButton_OnEnter(self)
 		end
 	end
 	if levelRaceClass ~= "" then
-		GameTooltip:AddLine(levelRaceClass, 1, 1, 1)
+		BFL_Tooltip:AddLine(levelRaceClass, 1, 1, 1)
 	end
 
 	-- Guild
 	if info.guild and info.guild ~= "" then
-		GameTooltip:AddLine("<" .. info.guild .. ">", 0.25, 1, 0.25)
+		BFL_Tooltip:AddLine("<" .. info.guild .. ">", 0.25, 1, 0.25)
 	end
 
 	-- Zone
 	if info.area and info.area ~= "" then
-		GameTooltip:AddLine(info.area, 1, 1, 1)
+		BFL_Tooltip:AddLine(info.area, 1, 1, 1)
 	end
 
 	-- Hints
-	GameTooltip:AddLine(" ")
+	BFL_Tooltip:AddLine(" ")
 	local L = BFL.L
-	GameTooltip:AddLine(L and L.WHO_TOOLTIP_HINT_CLICK or "Click to select", 0.5, 0.5, 0.5)
+	BFL_Tooltip:AddLine(L and L.WHO_TOOLTIP_HINT_CLICK or "Click to select", 0.5, 0.5, 0.5)
 	local DB = BFL:GetModule("DB")
 	local dblClickAction = DB and DB:Get("whoDoubleClickAction", "whisper") or "whisper"
 	local dblClickHint
@@ -1670,7 +1670,7 @@ function _G.BetterWhoListButton_OnEnter(self)
 	else
 		dblClickHint = L and L.WHO_TOOLTIP_HINT_DBLCLICK or "Double-click to whisper"
 	end
-	GameTooltip:AddLine(dblClickHint, 0.5, 0.5, 0.5)
+	BFL_Tooltip:AddLine(dblClickHint, 0.5, 0.5, 0.5)
 
 	-- Dynamic Ctrl+Click hint based on hovered column
 	local WhoFrameModule = BFL:GetModule("WhoFrame")
@@ -1694,16 +1694,16 @@ function _G.BetterWhoListButton_OnEnter(self)
 
 	if columnLabel then
 		local ctrlFormat = L and L.WHO_TOOLTIP_HINT_CTRL_FORMAT or "Ctrl+Click to search %s"
-		GameTooltip:AddLine(format(ctrlFormat, columnLabel), 0.5, 0.5, 0.5)
+		BFL_Tooltip:AddLine(format(ctrlFormat, columnLabel), 0.5, 0.5, 0.5)
 		local altFormat = L and L.WHO_TOOLTIP_HINT_ALT_FORMAT or "Alt+Click to add %s to Search Builder"
-		GameTooltip:AddLine(format(altFormat, columnLabel), 0.5, 0.5, 0.5)
+		BFL_Tooltip:AddLine(format(altFormat, columnLabel), 0.5, 0.5, 0.5)
 	else
-		GameTooltip:AddLine(L and L.WHO_TOOLTIP_HINT_CTRL_FORMAT or "Ctrl+Click to search", 0.5, 0.5, 0.5)
+		BFL_Tooltip:AddLine(L and L.WHO_TOOLTIP_HINT_CTRL_FORMAT or "Ctrl+Click to search", 0.5, 0.5, 0.5)
 	end
 
-	GameTooltip:AddLine(L and L.WHO_TOOLTIP_HINT_RIGHTCLICK or "Right-click for options", 0.5, 0.5, 0.5)
+	BFL_Tooltip:AddLine(L and L.WHO_TOOLTIP_HINT_RIGHTCLICK or "Right-click for options", 0.5, 0.5, 0.5)
 
-	GameTooltip:Show()
+	BFL_Tooltip:Show()
 
 	-- Track hovered column for dynamic tooltip refresh
 	self.lastHoveredColumn = column
@@ -1726,7 +1726,7 @@ end
 
 -- Hide tooltip when leaving WHO result button
 function _G.BetterWhoListButton_OnLeave(self)
-	GameTooltip:Hide()
+	BFL_Tooltip:Hide()
 	self.columnTrackingActive = nil
 	self.lastHoveredColumn = nil
 	self:SetScript("OnUpdate", nil)
@@ -1873,14 +1873,14 @@ end
 
 function WhoFrameEditBoxMixin:OnEnter()
 	if self.Instructions:IsShown() and self.Instructions:IsTruncated() then
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:AddLine(WHO_LIST_SEARCH_INSTRUCTIONS or "Enter player name or search criteria", 1, 1, 1, true)
-		GameTooltip:Show()
+		BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+		BFL_Tooltip:AddLine(WHO_LIST_SEARCH_INSTRUCTIONS or "Enter player name or search criteria", 1, 1, 1, true)
+		BFL_Tooltip:Show()
 	end
 end
 
 function WhoFrameEditBoxMixin:OnLeave()
-	GameTooltip:Hide()
+	BFL_Tooltip:Hide()
 end
 
 -- WHO Column Dropdown Mixin (Variable Column: Zone/Guild/Race)
@@ -2704,15 +2704,15 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 
 	toggleBtn:SetScript("OnEnter", function(self)
 		self.icon:SetVertexColor(1, 1, 1)
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:AddLine(L.WHO_BUILDER_TOOLTIP or "Open Search Builder")
-		GameTooltip:Show()
+		BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+		BFL_Tooltip:AddLine(L.WHO_BUILDER_TOOLTIP or "Open Search Builder")
+		BFL_Tooltip:Show()
 	end)
 	toggleBtn:SetScript("OnLeave", function(self)
 		if not WhoFrame.builderFlyout or not WhoFrame.builderFlyout:IsShown() then
 			self.icon:SetVertexColor(0.7, 0.7, 0.7)
 		end
-		GameTooltip:Hide()
+		BFL_Tooltip:Hide()
 	end)
 
 	-- Create the flyout panel (match ListInset width)
@@ -3108,17 +3108,17 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 
 	dockBtn:SetScript("OnEnter", function(self)
 		self.icon:SetVertexColor(1, 1, 1)
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
 		if WhoFrame.builderDocked then
-			GameTooltip:AddLine(L.WHO_BUILDER_UNDOCK_TOOLTIP or "Undock Search Builder")
+			BFL_Tooltip:AddLine(L.WHO_BUILDER_UNDOCK_TOOLTIP or "Undock Search Builder")
 		else
-			GameTooltip:AddLine(L.WHO_BUILDER_DOCK_TOOLTIP or "Dock Search Builder")
+			BFL_Tooltip:AddLine(L.WHO_BUILDER_DOCK_TOOLTIP or "Dock Search Builder")
 		end
-		GameTooltip:Show()
+		BFL_Tooltip:Show()
 	end)
 	dockBtn:SetScript("OnLeave", function(self)
 		self.icon:SetVertexColor(0.7, 0.7, 0.7)
-		GameTooltip:Hide()
+		BFL_Tooltip:Hide()
 	end)
 	dockBtn:SetScript("OnClick", function()
 		WhoFrame:SetBuilderDocked(not WhoFrame.builderDocked)

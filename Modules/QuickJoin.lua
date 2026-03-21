@@ -171,7 +171,7 @@ function BetterFriendlist_GetRelationshipInfo(guid, missingNameFallback, clubId)
 			end
 		end
 
-		local accountName = accountInfo.accountName
+		local accountName = BFL:GetSafeAccountName(accountInfo.accountName, accountInfo.battleTag)
 		local playerLink = GetBNPlayerLink(accountName, accountName, accountInfo.bnetAccountID, 0, 0, 0)
 		return CacheAndReturnRelationship(
 			guid,
@@ -1155,12 +1155,12 @@ function QuickJoin:OnScrollBoxInitialize(button, elementData)
 
 	-- 9. Tooltip
 	button:SetScript("OnEnter", function()
-		GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
-		entry:ApplyToTooltip(GameTooltip)
-		GameTooltip:Show()
+		BFL_Tooltip:SetOwner(button, "ANCHOR_RIGHT")
+		entry:ApplyToTooltip(BFL_Tooltip)
+		BFL_Tooltip:Show()
 	end)
 	button:SetScript("OnLeave", function()
-		GameTooltip:Hide()
+		BFL_Tooltip:Hide()
 	end)
 end
 

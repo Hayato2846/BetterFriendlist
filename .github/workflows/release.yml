@@ -24,7 +24,7 @@ jobs:
           GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Send Discord Notification
-        if: success()
+        if: success() && !contains(github.ref_name, '-')
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           VERSION: ${{ github.ref_name }}
@@ -77,8 +77,15 @@ jobs:
           except Exception as e:
               print(f"Error reading CHANGELOG.md: {e}")
 
+          # Strip Markdown horizontal rules (---) that Discord renders as plain text
+          if changelog_body:
+              changelog_body = '\n'.join(
+                  line for line in changelog_body.split('\n')
+                  if line.strip() != '---'
+              )
+
           # Use changelog body if found, otherwise fallback to release body
-          body = changelog_body if changelog_body else "New version released!"
+          body = changelog_body.strip() if changelog_body else "New version released!"
 
           # Define Project Links
           links = (

@@ -823,18 +823,18 @@ function RAF:RecruitListButton_OnEnter(button)
 	end
 
 	local recruitInfo = button.recruitInfo
-	GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+	BFL_Tooltip:SetOwner(button, "ANCHOR_RIGHT")
 
 	if recruitInfo.nameText and recruitInfo.nameColor then
-		GameTooltip_SetTitle(GameTooltip, recruitInfo.nameText, recruitInfo.nameColor)
+		GameTooltip_SetTitle(BFL_Tooltip, recruitInfo.nameText, recruitInfo.nameColor)
 	end
 
 	-- Use Blizzard globals (matches Blizzard exactly)
 	local wrap = true
 	local tooltipDesc = RAF_RECRUIT_TOOLTIP_DESC or L.RAF_TOOLTIP_DESC
 	if maxRecruitMonths > 0 and tooltipDesc then
-		GameTooltip_AddNormalLine(GameTooltip, tooltipDesc:format(maxRecruitMonths), wrap)
-		GameTooltip_AddBlankLineToTooltip(GameTooltip)
+		GameTooltip_AddNormalLine(BFL_Tooltip, tooltipDesc:format(maxRecruitMonths), wrap)
+		GameTooltip_AddBlankLineToTooltip(BFL_Tooltip)
 	end
 
 	if recruitInfo.monthsRemaining then
@@ -842,7 +842,7 @@ function RAF:RecruitListButton_OnEnter(button)
 		local monthCountFmt = RAF_RECRUIT_TOOLTIP_MONTH_COUNT or L.RAF_TOOLTIP_MONTH_COUNT
 		if monthCountFmt then
 			GameTooltip_AddColoredLine(
-				GameTooltip,
+				BFL_Tooltip,
 				monthCountFmt:format(usedMonths, maxRecruitMonths),
 				HIGHLIGHT_FONT_COLOR,
 				wrap
@@ -850,7 +850,7 @@ function RAF:RecruitListButton_OnEnter(button)
 		end
 	end
 
-	GameTooltip:Show()
+	BFL_Tooltip:Show()
 end
 
 function RAF:RecruitListButton_OnClick(button, mouseButton)
@@ -1086,8 +1086,8 @@ function RAF:NextRewardButton_OnEnter(button)
 		return
 	end
 
-	GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
-	GameTooltip:SetItemByID(nextReward.itemID)
+	BFL_Tooltip:SetOwner(button, "ANCHOR_RIGHT")
+	BFL_Tooltip:SetItemByID(nextReward.itemID)
 
 	if IsModifiedClick("DRESSUP") then
 		ShowInspectCursor()

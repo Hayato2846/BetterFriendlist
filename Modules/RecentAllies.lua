@@ -334,32 +334,32 @@ function RecentAllies:InitializeEntry(button, elementData)
 
 	-- Setup party button tooltip
 	button.PartyButton:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip_AddHighlightLine(GameTooltip, BFL.L.RECENT_ALLIES_INVITE)
+		BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip_AddHighlightLine(BFL_Tooltip, BFL.L.RECENT_ALLIES_INVITE)
 		if not self:IsEnabled() then
-			GameTooltip_AddErrorLine(GameTooltip, BFL.L.RECENT_ALLIES_PLAYER_OFFLINE)
+			GameTooltip_AddErrorLine(BFL_Tooltip, BFL.L.RECENT_ALLIES_PLAYER_OFFLINE)
 		end
-		GameTooltip:Show()
+		BFL_Tooltip:Show()
 	end)
 
 	button.PartyButton:SetScript("OnLeave", function()
-		GameTooltip:Hide()
+		BFL_Tooltip:Hide()
 	end)
 
 	-- Setup pin display tooltip
 	if button.StateIconContainer.PinDisplay then
 		button.StateIconContainer.PinDisplay:SetScript("OnEnter", function(self)
 			if stateData.pinExpirationDate then
-				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+				BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
 				local timeUntilExpiration = math.max(stateData.pinExpirationDate - GetServerTime(), 1)
 				local timeText = RecentAlliesUtil.GetFormattedTime(timeUntilExpiration)
-				GameTooltip_AddHighlightLine(GameTooltip, BFL.L.RECENT_ALLIES_PIN_EXPIRES:format(timeText))
-				GameTooltip:Show()
+				GameTooltip_AddHighlightLine(BFL_Tooltip, BFL.L.RECENT_ALLIES_PIN_EXPIRES:format(timeText))
+				BFL_Tooltip:Show()
 			end
 		end)
 
 		button.StateIconContainer.PinDisplay:SetScript("OnLeave", function()
-			GameTooltip:Hide()
+			BFL_Tooltip:Hide()
 		end)
 	end
 end
