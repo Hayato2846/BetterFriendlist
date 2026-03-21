@@ -3826,7 +3826,7 @@ function Settings:RefreshFontsTab()
 	local fontList = LSM and LSM:List("font") or { "Friz Quadrata TT" }
 	local fontPaths = {}
 	for i, fontName in ipairs(fontList) do
-		fontPaths[i] = LSM and LSM:Fetch("font", fontName) or "Fonts\\FRIZQT__.TTF"
+		fontPaths[i] = BFL.FontManager:ResolveFontPath(fontName)
 	end
 	local fontOptions = { labels = fontList, values = fontList, fontPaths = fontPaths, useCheckboxes = true }
 
@@ -4159,7 +4159,7 @@ function Settings:RefreshGroupsTab()
 	local fontList = LSM and LSM:List("font") or { "Friz Quadrata TT" }
 	local fontPaths = {}
 	for i, fontName in ipairs(fontList) do
-		fontPaths[i] = LSM and LSM:Fetch("font", fontName) or "Fonts\\FRIZQT__.TTF"
+		fontPaths[i] = BFL.FontManager:ResolveFontPath(fontName)
 	end
 	local fontOptions = { labels = fontList, values = fontList, fontPaths = fontPaths, useCheckboxes = true }
 

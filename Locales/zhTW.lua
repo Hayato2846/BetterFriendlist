@@ -1096,7 +1096,7 @@ BFL:RegisterLocale("zhTW", function()
 	L.BROKER_SETTINGS_HEADER_INTEGRATION = "Data Broker 整合"
 	L.BROKER_SETTINGS_HEADER_INTERACTION = "互動"
 	L.BROKER_SETTINGS_INFO =
-		"BetterFriendlist 整合了 Data Broker 顯示插件，如 Bazooka、ChocolateBar 和 TitanPanel。啟用此功能可在你的顯示插件中看到好友數量和快速存取。"
+		"BetterFriendlist 整合了 Data Broker 顯示插件，如 Bazooka、Arcana 和 TitanPanel。啟用此功能可在你的顯示插件中看到好友數量和快速存取。"
 	L.BROKER_SETTINGS_INSTRUCTIONS =
 		"• 安裝 Data Broker 顯示插件（例如 TitanPanel、Bazooka）\n• 在上方啟用 Data Broker（需要重新載入）\n• BetterFriendlist 按鈕將出現在顯示插件中\n• 滑鼠懸停：提示訊息\n• 左鍵點擊：開啟\n• 右鍵點擊：設定\n• 中鍵點擊：切換篩選器"
 	L.BROKER_SETTINGS_LEFT_CLICK = "左鍵點擊動作"
@@ -1415,7 +1415,7 @@ BFL:RegisterLocale("zhTW", function()
 	L.WIZARD_SEARCH_PLACEHOLDER = "搜尋..."
 	L.WIZARD_BACKUP_BTN = "備份備��"
 	L.WIZARD_BACKUP_DONE = "已備份！"
-	L.WIZARD_BACKUP_TOOLTIP = "將所有目前好友備註��存到資料庫作為備份。"
+	L.WIZARD_BACKUP_TOOLTIP = "將所有目前好友備註����到資料庫作為備份。"
 	L.WIZARD_BACKUP_SUCCESS = "已備份 %d 位好友的���註。"
 	L.WIZARD_APPLY_BTN = "套用清理"
 	L.WIZARD_APPLY_TOOLTIP = "將清理後的備註寫回。僅更新與原始備註不同的備註。"

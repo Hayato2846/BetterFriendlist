@@ -377,7 +377,7 @@ BFL:RegisterLocale("deDE", function()
 	L.BROKER_ACTION_FRIENDS = "Freundesliste öffnen"
 	L.BROKER_ACTION_SETTINGS = "Einstellungen öffnen"
 	L.BROKER_SETTINGS_INFO =
-		"BetterFriendlist integriert sich in Data Broker Anzeige-Addons wie Bazooka, ChocolateBar und TitanPanel. Aktiviere diese Funktion, um Freundeszahlen und Schnellzugriff in deinem Anzeige-Addon zu sehen."
+		"BetterFriendlist integriert sich in Data Broker Anzeige-Addons wie Bazooka, Arcana und TitanPanel. Aktiviere diese Funktion, um Freundeszahlen und Schnellzugriff in deinem Anzeige-Addon zu sehen."
 	L.BROKER_FILTER_CHANGED = "Filter geändert auf: %s"
 
 	-- Broker Tooltip Strings

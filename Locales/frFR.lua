@@ -386,7 +386,7 @@ BFL:RegisterLocale("frFR", function()
 	L.BROKER_ACTION_SETTINGS = "Ouvrir Paramètres"
 	L.BROKER_ACTION_OPEN_BNET = "Ouvrir App Battle.net"
 	L.BROKER_ACTION_NONE = "Rien"
-	L.BROKER_SETTINGS_INFO = "S'intègre avec Bazooka, ChocolateBar, TitanPanel."
+	L.BROKER_SETTINGS_INFO = "S'intègre avec Bazooka, Arcana, TitanPanel."
 	L.BROKER_FILTER_CHANGED = "Filtre changé : %s"
 
 	-- Broker Tooltip Strings

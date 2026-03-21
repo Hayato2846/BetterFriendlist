@@ -431,7 +431,7 @@ BFL:RegisterLocale("ruRU", function()
 	L.BROKER_ACTION_OPEN_BNET = "Открыть приложение BNet"
 	L.BROKER_ACTION_NONE = "Ничего"
 	L.BROKER_SETTINGS_INFO =
-		"BetterFriendlist интегрируется с брокерами данных, такими как Bazooka, ChocolateBar and Titan Panel"
+		"BetterFriendlist интегрируется с брокерами данных, такими как Bazooka, Arcana and Titan Panel"
 	L.BROKER_HEADER_WOW = "Друзья WoW"
 	L.BROKER_HEADER_BNET = "Друзья Battle.Net"
 	L.BROKER_NO_WOW_ONLINE = "  Нет друзей WoW в сети"

@@ -388,7 +388,7 @@ BFL:RegisterLocale("esMX", function()
 	L.BROKER_ACTION_OPEN_BNET = "Abrir App Battle.net"
 	L.BROKER_ACTION_NONE = "Nada"
 	L.BROKER_SETTINGS_INFO =
-		"BetterFriendlist se integra con addons como Bazooka, ChocolateBar o TitanPanel. Habilítalo para ver recuentos y acceso rápido."
+		"BetterFriendlist se integra con addons como Bazooka, Arcana o TitanPanel. Habilítalo para ver recuentos y acceso rápido."
 	L.BROKER_FILTER_CHANGED = "Filtro cambiado a: %s"
 
 	-- Broker Tooltip Strings
@@ -441,7 +441,7 @@ BFL:RegisterLocale("esMX", function()
 	L.BROKER_SETTINGS_HEADER_INSTRUCTIONS = "Cómo Usar"
 	L.BROKER_SETTINGS_HEADER_COMPATIBILITY = "Addons Probados"
 	L.BROKER_SETTINGS_INSTRUCTIONS =
-		"• Instala un addon de visualización (Bazooka, ChocolateBar o TitanPanel)\n• Habilita Data Broker arriba (requiere recarga)\n• El botón aparecerá en tu addon de visualización\n• Pasa el ratón para ver detalles, clic para abrir"
+		"• Instala un addon de visualización (Bazooka, Arcana o TitanPanel)\n• Habilita Data Broker arriba (requiere recarga)\n• El botón aparecerá en tu addon de visualización\n• Pasa el ratón para ver detalles, clic para abrir"
 	L.BROKER_SETTINGS_HEADER_COLUMNS = "Columnas del Tooltip"
 	L.BROKER_SETTINGS_COLUMNS_HEADER = "Columnas del Tooltip"
 	L.BROKER_COLUMN_NAME = "Nombre"

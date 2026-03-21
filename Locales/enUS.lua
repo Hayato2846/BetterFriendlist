@@ -393,7 +393,7 @@ local function LoadEnUS()
 	L.BROKER_ACTION_OPEN_BNET = "Open Battle.net App"
 	L.BROKER_ACTION_NONE = "Do Nothing"
 	L.BROKER_SETTINGS_INFO =
-		"BetterFriendlist integrates with Data Broker display addons like Bazooka, ChocolateBar, and TitanPanel. Enable this feature to show friend counts and quick access in your display addon."
+		"BetterFriendlist integrates with Data Broker display addons like Bazooka, Arcana, and TitanPanel. Enable this feature to show friend counts and quick access in your display addon."
 	L.BROKER_FILTER_CHANGED = "Filter changed to: %s"
 
 	-- Broker Tooltip Strings
@@ -446,7 +446,7 @@ local function LoadEnUS()
 	L.BROKER_SETTINGS_HEADER_INSTRUCTIONS = "How to Use"
 	L.BROKER_SETTINGS_HEADER_COMPATIBILITY = "Tested Display Addons"
 	L.BROKER_SETTINGS_INSTRUCTIONS =
-		"• Install a Data Broker display addon (Bazooka, ChocolateBar, or TitanPanel)\n• Enable Data Broker above (UI reload will be prompted)\n• The BetterFriendlist button will appear in your display addon\n• Hover for tooltip, left-click to open, right-click for settings, middle-click to cycle filters"
+		"• Install a Data Broker display addon (Bazooka, Arcana, or TitanPanel)\n• Enable Data Broker above (UI reload will be prompted)\n• The BetterFriendlist button will appear in your display addon\n• Hover for tooltip, left-click to open, right-click for settings, middle-click to cycle filters"
 	L.BROKER_SETTINGS_HEADER_COLUMNS = "Tooltip Columns"
 	L.BROKER_SETTINGS_COLUMNS_HEADER = "Tooltip Columns"
 	L.BROKER_COLUMN_NAME = "Name"

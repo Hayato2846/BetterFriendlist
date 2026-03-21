@@ -16,6 +16,33 @@ local GetDB = function()
 end
 
 -- ========================================
+-- Font Path Resolution
+-- ========================================
+
+-- Resolve a font name (e.g. "Friz Quadrata TT") to a file path.
+-- Uses LibSharedMedia if available; falls back to STANDARD_TEXT_FONT
+-- which is locale-aware (e.g. 2002.TTF on Korean, FRIZQT___CYR.TTF on Russian).
+function FontManager:ResolveFontPath(fontName)
+	if not fontName then
+		return STANDARD_TEXT_FONT
+	end
+	-- Already a file path
+	if fontName:find("\\") or fontName:find("/") then
+		return fontName
+	end
+	-- Try LibSharedMedia (may be provided by another addon)
+	local media = LibStub and LibStub("LibSharedMedia-3.0", true)
+	if media then
+		local path = media:Fetch("font", fontName)
+		if path then
+			return path
+		end
+	end
+	-- Unresolvable name: use locale-appropriate default
+	return STANDARD_TEXT_FONT
+end
+
+-- ========================================
 -- Advanced Font Family System
 -- ========================================
 
@@ -78,9 +105,21 @@ function FontManager:GetOrCreateFontFamily(fontPath, size, flags, shadow)
 		memberDef.height = size
 		memberDef.flags = flags
 
-		if alphabet == CURRENT_ALPHABET then
-			-- Active locale: Use user's chosen font
+		if alphabet == CURRENT_ALPHABET and CURRENT_ALPHABET == "roman" then
+			-- Roman locale: Use user's chosen font directly
 			memberDef.file = fontPath
+		elseif alphabet == CURRENT_ALPHABET then
+			-- Non-roman locale: Prefer the system default for this alphabet
+			-- because the user's chosen font (e.g. FRIZQT__.TTF) is unlikely
+			-- to contain glyphs for Korean, Chinese, or Cyrillic.
+			local defaultFile = nil
+			if baseFont and baseFont.GetFontObjectForAlphabet then
+				local defaultObj = baseFont:GetFontObjectForAlphabet(alphabet)
+				if defaultObj then
+					defaultFile, _, _ = defaultObj:GetFont()
+				end
+			end
+			memberDef.file = defaultFile or fontPath
 		else
 			-- Secondary alphabet: Try to use system fallback
 			local defaultFile = nil

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+
+### Fixed
+- **Non-Roman Alphabets** - Fixed Korean, Chinese, and Russian text not displaying correctly when no font library addon (e.g. SharedMedia) was installed. All text now uses the correct locale-appropriate font as a fallback.
+- **Whisper in Instances and Combat** - Fixed clicking to whisper not working while inside instances, Delves, Mythic+, PvP matches, or during combat. This affected both the Data Broker tooltip and the "Send Message" button in the friend list.
+
+### Changed
+- **Arcana** - Updated all references from ChocolateBar to Arcana to reflect the addon's new name.
+
+---
+
 ## [2.5.0-beta]       - 2026-03-21
 
 ### Changed
@@ -43,7 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tooltip: Max Game Accounts** - Setting removed. Always shows up to 5 accounts (Blizzard default).
 
 ### Fixed
-- **Data Broker Tooltip** - No longer stays open for ~5 seconds after moving the mouse away (ChocolateBar, Bazooka, etc.).
+- **Data Broker Tooltip** - No longer stays open for ~5 seconds after moving the mouse away (Arcana, Bazooka, etc.).
 - **Data Broker Right-Click** - Fixed an error when right-clicking the icon to open settings.
 - **Beta Features Toggle** - Fixed an error when disabling Beta Features while on a Beta settings tab.
 
@@ -133,29 +144,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Custom Header Text Shown With Streamer Mode Off** - Fixed the custom header text (e.g. "Streamer Mode") remaining visible after disabling Streamer Mode in certain conditions, such as when the addon loaded with Streamer Mode already active.
 - **ElvUI Skin (Advanced Settings Dialogs)** - Added ElvUI skinning for the Export, Import, Note Cleanup Wizard, and Backup Viewer windows (Settings -> Advanced). Buttons, scrollbars, and frames are now properly styled to match the ElvUI theme.
 - **Missing "Status" Secondary Sort Option** - Fixed the "Status" sort option not appearing as a secondary sort choice. The sort logic already supported it but the option was missing from the dropdown and context menus.
-
-## [2.3.6]       - 2026-02-14
-### Added
-- **Name Formatting Presets** - Replaced the free-text name format input with a dropdown menu offering preset options (Name (Character), BattleTag (Character), Nickname (Character), Character Only, Name Only). A "Custom..." option is still available for advanced users who want to use wildcards. All wildcards (%name%, %character%, %level%, %zone%, %class%, %game%, %note%, %nickname%, %battletag%, %realm%) are available in both name and info formats. 
-- **Friend Info Formatting** - Added a new setting to customize the second line of friend entries (the info line showing level, zone, etc.). Choose from presets like Default, Zone Only, Level Only, Class/Zone, Game Name, or create a custom format using wildcards. Selecting "Disabled" hides the info line entirely and reduces button height to save space.
-
-### Changed
-- Character names are now rendered entirely through the formatting system instead of being appended separately, giving full control over their placement and formatting.
-
-### Fixed
-- **RAF Overhaul** - Reworked the Recruit-A-Friend tab to closely match Blizzard's official implementation. Recruit list entries are now left-aligned, use version-specific icons and colors, and show the correct status text. Tooltips, reward descriptions, and month counts now display the same text as Blizzard's default UI. Repeatable rewards (e.g. Game Time) now correctly show their claim count. The reward panel now reliably opens to the active RAF season instead of occasionally pulling from an inactive one.
-- **RAF Activity Tooltips** - Fixed RAF activity tooltips not matching Blizzard's tooltip style. Now uses the correct tooltip frame for quest reward display and properly shows a loading indicator while quest data is retrieved.
-- **RAF Reward Icon** - Fixed the next reward icon always appearing fully saturated. It now properly shows as desaturated when the reward is not yet affordable, matching Blizzard's behavior.
-- **RAF Recruitment Link** - Fixed the Recruit-A-Friend recruitment link popup not displaying properly when opened from the BetterFriendlist RAF tab.
-- **Search on All Tabs** - The search box now works on the Recent Allies and Recruit-A-Friend tabs in addition to the Friends tab. Each tab shows a fitting placeholder text and switching tabs clears the current search.
-- **Accent-Insensitive Search** - Searching for "Hayato" now also finds friends named "Hâyato", "Hàyató", etc. Accented characters are treated as their base letter during search.
-- **Friend Search with Real Names** - Friend search now properly skips privacy-protected Real Names (a Blizzard limitation) instead of silently failing. Nicknames are now also included in search results.
-- **Who Frame Level Alignment** - Fixed the Level column in the Who search results not aligning with its column header.
-- **Blizzard Raid Frame Interaction** - Fixed empty raid member slots retaining stale unit references, which could cause unexpected interactions with Blizzard's default raid frame.
-- **Raid Info First-Click Ghost Buttons** - Fixed Blizzard's raid member buttons briefly appearing when clicking the Raid Info button for the first time after a /reload.
-
-### Removed
-- **Activity Tracker** - Removed the Activity Tracker feature (last whisper/group/trade timestamps) to fix a critical error caused by addon taint in the chat system on WoW 12.0+. The "Recent Activity" sort option has also been removed.
 
 ---
 

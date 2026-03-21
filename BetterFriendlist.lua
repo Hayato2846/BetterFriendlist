@@ -189,11 +189,7 @@ function BFL:ApplyTabFonts()
 			outlineValue = "MONOCHROME"
 		end
 
-		local fontPath = fontName
-		local SharedMedia = LibStub and LibStub("LibSharedMedia-3.0", true)
-		if SharedMedia and not fontName:find("\\") then
-			fontPath = SharedMedia:Fetch("font", fontName) or fontName
-		end
+		local fontPath = BFL.FontManager:ResolveFontPath(fontName)
 
 		local padding = 20
 		local allTabs = {
@@ -279,14 +275,8 @@ function BFL:ApplyTabFonts()
 		outlineValue = "MONOCHROME"
 	end
 
-	-- Resolve font path using LSM if available
-	local fontPath = fontName
-	local SharedMedia = LibStub and LibStub("LibSharedMedia-3.0", true)
-	if SharedMedia then
-		if not fontName:find("\\") then
-			fontPath = SharedMedia:Fetch("font", fontName) or fontName
-		end
-	end
+	-- Resolve font path using FontManager (locale-aware fallback)
+	local fontPath = BFL.FontManager:ResolveFontPath(fontName)
 
 	-- Update tab-only font objects (do not touch shared small fonts)
 	if _G.BetterFriendlistTabFontNormal then

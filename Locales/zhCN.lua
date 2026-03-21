@@ -402,7 +402,7 @@ BFL:RegisterLocale("zhCN", function()
 	L.BROKER_ACTION_OPEN_BNET = "Open BNet App"
 	L.BROKER_ACTION_NONE = "None"
 	L.BROKER_SETTINGS_INFO =
-		"BetterFriendlist integrates with Data Broker display addons like Bazooka, ChocolateBar, and TitanPanel."
+		"BetterFriendlist integrates with Data Broker display addons like Bazooka, Arcana, and TitanPanel."
 	L.BROKER_HEADER_WOW = "WoW好友"
 	L.BROKER_HEADER_BNET = "Battle.Net好友"
 	L.BROKER_NO_WOW_ONLINE = "  没有在线WoW好友"

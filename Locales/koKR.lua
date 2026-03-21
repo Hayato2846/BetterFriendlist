@@ -388,7 +388,7 @@ BFL:RegisterLocale("koKR", function()
 	L.BROKER_ACTION_OPEN_BNET = "Open BNet App"
 	L.BROKER_ACTION_NONE = "None"
 	L.BROKER_SETTINGS_INFO =
-		"BetterFriendlist는 Bazooka, ChocolateBar, TitanPanel과 같은 데이터 브로커 표시 애드온과 통합됩니다. 이 기능을 활성화하여 표시 애드온에서 친구 수와 빠른 액세스를 표시하세요."
+		"BetterFriendlist는 Bazooka, Arcana, TitanPanel과 같은 데이터 브로커 표시 애드온과 통합됩니다. 이 기능을 활성화하여 표시 애드온에서 친구 수와 빠른 액세스를 표시하세요."
 	L.BROKER_FILTER_CHANGED = "필터 변경: %s"
 
 	-- Broker Tooltip Strings
@@ -441,7 +441,7 @@ BFL:RegisterLocale("koKR", function()
 	L.BROKER_SETTINGS_HEADER_INSTRUCTIONS = "사용 방법"
 	L.BROKER_SETTINGS_HEADER_COMPATIBILITY = "테스트된 표시 애드온"
 	L.BROKER_SETTINGS_INSTRUCTIONS =
-		"• 데이터 브로커 표시 애드온 설치(Bazooka, ChocolateBar 또는 TitanPanel)\n• 위의 데이터 브로커 활성화(UI 다시 로드 안내됨)\n• BetterFriendlist 버튼이 표시 애드온에 나타남\n• 호버로 도구 설명 표시, 좌클릭으로 열기, 우클릭으로 설정, 가운데 클릭으로 필터 순환"
+		"• 데이터 브로커 표시 애드온 설치(Bazooka, Arcana 또는 TitanPanel)\n• 위의 데이터 브로커 활성화(UI 다시 로드 안내됨)\n• BetterFriendlist 버튼이 표시 애드온에 나타남\n• 호버로 도구 설명 표시, 좌클릭으로 열기, 우클릭으로 설정, 가운데 클릭으로 필터 순환"
 	L.BROKER_SETTINGS_HEADER_COLUMNS = "도구 설명 열"
 	L.BROKER_SETTINGS_COLUMNS_HEADER = "도구 설명 열"
 	L.BROKER_COLUMN_NAME = "Name"
@@ -1339,7 +1339,7 @@ BFL:RegisterLocale("koKR", function()
 	L.SETTINGS_FRIEND_NAME_SETTINGS = "친구 이름 설정"
 	L.SETTINGS_FRIEND_INFO_SETTINGS = "친구 정보 설정"
 	L.SETTINGS_FONT_TABS_TITLE = "탭 텍스트"
-	L.SETTINGS_FONT_RAID_TITLE = "공��대 이�� 텍스트"
+	L.SETTINGS_FONT_RAID_TITLE = "공��대 이�� 텍스���"
 	L.SETTINGS_FONT_SIZE_NUM = "글꼴 크기"
 
 	-- ========================================

@@ -1366,8 +1366,6 @@
 							return
 						end
 
-						if BFL:IsActionRestricted() then return end
-
 						if friend.type == "bnet" then
 							local tellName = BFL:GetSafeAccountName(friend.accountName, friend.battleTag) or friend.battleTag
 							if ChatFrameUtil and ChatFrameUtil.SendBNetTell then

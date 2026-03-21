@@ -1311,15 +1311,8 @@ function RaidFrame:CacheFontSettings()
 		outlineValue = "MONOCHROME"
 	end
 
-	-- Resolve path
-	local SharedMedia = LibStub and LibStub("LibSharedMedia-3.0", true)
-	local fontPath = fontName
-	if SharedMedia then
-		-- Only fetch if it looks like a name, not a path
-		if not fontName:find("\\") then
-			fontPath = SharedMedia:Fetch("font", fontName) or fontName
-		end
-	end
+	-- Resolve path (locale-aware fallback)
+	local fontPath = BFL.FontManager:ResolveFontPath(fontName)
 
 	self.fontCache = {
 		name = { path = fontPath, size = fontSize, outline = outlineValue, shadow = fontShadow },

@@ -1,6 +1,6 @@
 -- Modules/Broker.lua
 -- Data Broker Integration Module (LibQTip-2.0)
--- Exposes BetterFriendlist via LibDataBroker-1.1 for display addons (Bazooka, ChocolateBar, TitanPanel)
+-- Exposes BetterFriendlist via LibDataBroker-1.1 for display addons (Bazooka, Arcana, TitanPanel)
 
 local ADDON_NAME, BFL = ...
 
@@ -199,10 +199,6 @@ end
 -- Helper: Add friend name to active chat editbox (Shift+Click)
 -- Must be defined before OnFriendLineClick which uses it
 local function AddNameToEditBox(name, realm)
-	-- Safety: Avoid touching chat frame in combat to prevent taint
-	if BFL:IsActionRestricted() then
-		return false
-	end
 	if not name then
 		return false
 	end
@@ -342,11 +338,6 @@ end
 -- Main click handler for friend lines in LibQTip tooltip
 local function OnFriendLineClick(cell, data, mouseButton)
 	if not data then
-		return
-	end
-
-	-- Safety: Avoid interactions in combat to prevent taint (especially chat frame)
-	if BFL:IsActionRestricted() then
 		return
 	end
 
@@ -2197,7 +2188,7 @@ function Broker:Initialize()
 			tooltip = CreateLibQTipTooltip(anchorFrame)
 		end
 
-		-- OnLeave signals to broker displays (ChocolateBar, Bazooka, etc.) that we
+		-- OnLeave signals to broker displays (Arcana, Bazooka, etc.) that we
 		-- manage our own tooltip lifecycle. Without this, they apply a fallback hide
 		-- timeout (typically 5 seconds). The actual hide logic is handled by
 		-- SetupTooltipAutoHide's OnUpdate polling (0.25s after mouse leaves both

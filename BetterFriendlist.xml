@@ -2645,8 +2645,6 @@
 						return
 						end
 
-						if BFL:IsActionRestricted() then return end
-
 						if friend.type == "bnet" then
 						-- 12.0.0+ kString Safety: Use battleTag when accountName is a secret value
 						local tellName = friend.accountName

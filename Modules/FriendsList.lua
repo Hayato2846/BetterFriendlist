@@ -266,7 +266,7 @@ local function CalculateCompactRowHeight(self, nameSize, nameText, nameWidth)
 		measure:SetFont(self.fontCache.namePath, nameFontSize, outline)
 	else
 		local _, _, flags = measure:GetFont()
-		measure:SetFont("Fonts\\FRIZQT__.TTF", nameFontSize, flags)
+		measure:SetFont(STANDARD_TEXT_FONT, nameFontSize, flags)
 	end
 
 	measure:SetWidth(nameWidth)
@@ -317,7 +317,7 @@ local function EnsureGroupHeaderCountText(button)
 		countText:SetFontObject(_G.GameFontNormal)
 	else
 		-- Only hardcode fallback if no FontObject is available at all
-		countText:SetFont("Fonts\\FRIZQT__.TTF", 12, "")
+		countText:SetFont(STANDARD_TEXT_FONT, 12, "")
 	end
 	EnsureGroupHeaderFont(countText)
 	button.CountText = countText
@@ -349,7 +349,7 @@ EnsureGroupHeaderFont = function(fs)
 		end
 	end
 
-	fs:SetFont("Fonts\\FRIZQT__.TTF", 12, "")
+	fs:SetFont(STANDARD_TEXT_FONT, 12, "")
 end
 
 local function SyncGroupHeaderFont(fs, countFs)
@@ -407,13 +407,13 @@ local function EnsureFontSet(fs)
 			return
 		end
 	end
-	fs:SetFont("Fonts\\FRIZQT__.TTF", 12, "")
+	fs:SetFont(STANDARD_TEXT_FONT, 12, "")
 end
 
 local function SafeSetText(fs, text)
 	EnsureGroupHeaderFont(fs)
 	if not IsFontReady(fs) then
-		fs:SetFont("Fonts\\FRIZQT__.TTF", 12, "")
+		fs:SetFont(STANDARD_TEXT_FONT, 12, "")
 	end
 	if IsFontReady(fs) then
 		local ok = pcall(fs.SetText, fs, text or "")
@@ -3131,7 +3131,7 @@ function FriendsList:UpdateFontCache()
 
 	-- Name Font
 	local nameFontName = DB:Get("fontFriendName", "Friz Quadrata TT")
-	self.fontCache.namePath = (LSM and LSM:Fetch("font", nameFontName)) or "Fonts\\FRIZQT__.TTF"
+	self.fontCache.namePath = BFL.FontManager:ResolveFontPath(nameFontName)
 	self.fontCache.nameSize = DB:Get("fontSizeFriendName", 12)
 	self.fontCache.nameOutline = DB:Get("fontOutlineFriendName", "NONE")
 	self.fontCache.nameShadow = DB:Get("fontShadowFriendName", false)
@@ -3140,7 +3140,7 @@ function FriendsList:UpdateFontCache()
 
 	-- Info Font
 	local infoFontName = DB:Get("fontFriendInfo", "Friz Quadrata TT")
-	self.fontCache.infoPath = (LSM and LSM:Fetch("font", infoFontName)) or "Fonts\\FRIZQT__.TTF"
+	self.fontCache.infoPath = BFL.FontManager:ResolveFontPath(infoFontName)
 	self.fontCache.infoSize = DB:Get("fontSizeFriendInfo", 10)
 	self.fontCache.infoOutline = DB:Get("fontOutlineFriendInfo", "NONE")
 	self.fontCache.infoShadow = DB:Get("fontShadowFriendInfo", false)
@@ -5766,7 +5766,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 			fontOutline = DB:Get("fontOutlineGroupHeader", "NONE")
 			fontShadow = DB:Get("fontShadowGroupHeader", false)
 
-			local fontPath = LSM and LSM:Fetch("font", fontName) or "Fonts\\FRIZQT__.TTF"
+			local fontPath = BFL.FontManager:ResolveFontPath(fontName)
 			-- Use FontManager to apply font with Alphabet support
 			if fontPath and BFL.FontManager and BFL.FontManager.GetOrCreateFontFamily then
 				-- For Group Headers (Buttons), we must set the Normal/Highlight FontObject
@@ -5798,7 +5798,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 			if outline == "NONE" then
 				outline = ""
 			end
-			fs:SetFont("Fonts\\FRIZQT__.TTF", fontSize, outline)
+			fs:SetFont(STANDARD_TEXT_FONT, fontSize, outline)
 			if fontShadow then
 				fs:SetShadowColor(0, 0, 0, 1)
 				fs:SetShadowOffset(1, -1)

@@ -62,7 +62,7 @@ A rebuilt WHO list with a cleaner layout and more functionality than the default
 ### Customization
 
 *   **ElvUI Skin** - Native ElvUI skinning when ElvUI is detected.
-*   **Data Broker** - LDB data object for use with TitanPanel, Bazooka, ChocolateBar, and similar addons. Shows online friend count and a rich tooltip listing all friends with status, game, and character info.
+*   **Data Broker** - LDB data object for use with TitanPanel, Bazooka, Arcana, and similar addons. Shows online friend count and a rich tooltip listing all friends with status, game, and character info.
 
 ## Language Support
 
