@@ -950,28 +950,43 @@ local function GetFriendDisplayName(friend)
 		end
 	end
 
-	if characterName ~= "" and classColorStr then
+	-- Decorate character name (faction icon, timerunning) before token replacement
+	local decoratedChar = characterName
+	if decoratedChar ~= "" then
+		if friend.timerunningSeasonID and TimerunningUtil and TimerunningUtil.AddSmallIcon then
+			decoratedChar = TimerunningUtil.AddSmallIcon(decoratedChar)
+		end
+		if BetterFriendlistDB and BetterFriendlistDB.showFactionIcons then
+			if friend.factionName == "Horde" then
+				decoratedChar = "|TInterface\\FriendsFrame\\PlusManz-Horde:12:12:0:0|t" .. decoratedChar
+			elseif friend.factionName == "Alliance" then
+				decoratedChar = "|TInterface\\FriendsFrame\\PlusManz-Alliance:12:12:0:0|t" .. decoratedChar
+			end
+		end
+	end
+
+	if decoratedChar ~= "" and classColorStr then
 		-- Handle wrapped pattern: (%character%) -> class-colored (CharName)
 		local wrappedPattern = "%(%%[Cc][Hh][Aa][Rr][Aa][Cc][Tt][Ee][Rr]%%%)"
 		local wrapStart, wrapEnd = result:find(wrappedPattern)
 		if wrapStart then
-			local wrappedReplacement = "|c" .. classColorStr .. "(" .. characterName .. ")|r"
+			local wrappedReplacement = "|c" .. classColorStr .. "(" .. decoratedChar .. ")|r"
 			result = result:sub(1, wrapStart - 1) .. wrappedReplacement .. result:sub(wrapEnd + 1)
 			if HasTokenCaseInsensitive(result, "character") then
-				local standaloneReplacement = "|c" .. classColorStr .. characterName .. "|r"
+				local standaloneReplacement = "|c" .. classColorStr .. decoratedChar .. "|r"
 				result = ReplaceTokenCaseInsensitive(result, "character", standaloneReplacement)
 			end
 		else
-			local replacement = "|c" .. classColorStr .. characterName .. "|r"
+			local replacement = "|c" .. classColorStr .. decoratedChar .. "|r"
 			result = ReplaceTokenCaseInsensitive(result, "character", replacement)
 		end
 	else
 		-- No class coloring or empty character name
-		if characterName == "" then
+		if decoratedChar == "" then
 			local wrappedPattern = "%(%%[Cc][Hh][Aa][Rr][Aa][Cc][Tt][Ee][Rr]%%%)"
 			result = result:gsub(wrappedPattern, "")
 		end
-		result = ReplaceTokenCaseInsensitive(result, "character", characterName)
+		result = ReplaceTokenCaseInsensitive(result, "character", decoratedChar)
 	end
 
 	result = ReplaceTokenCaseInsensitive(result, "realm", realmName)
@@ -1789,21 +1804,6 @@ local function CreateLibQTipTooltip(anchorFrame)
 
 		-- Helper to render a friend row
 		local function RenderFriendRow(friend, indentation)
-			local nameText = friend.characterName ~= "" and friend.characterName
-				or BFL:GetSafeAccountName(friend.accountName, friend.battleTag)
-
-			-- [STREAMER MODE CHECK] Replace Real ID with safe name
-			if BFL.StreamerMode and BFL.StreamerMode:IsActive() and friend.type == "bnet" then
-				local FL = BFL:GetModule("FriendsList")
-				if FL then
-					nameText = FL:GetDisplayName(friend)
-				end
-			end
-
-			if friend.timerunningSeasonID and TimerunningUtil and TimerunningUtil.AddSmallIcon then
-				nameText = TimerunningUtil.AddSmallIcon(nameText)
-			end
-
 			local statusIcon = GetStatusIcon(friend.isAFK, friend.isDND, friend.isMobile)
 			local clientInfo = GetClientInfo(friend.client)
 
@@ -1852,7 +1852,10 @@ local function CreateLibQTipTooltip(anchorFrame)
 					val = GetColoredLevelText(friend.level)
 				elseif col.key == "Character" then
 					if friend.characterName and friend.characterName ~= "" then
-						local displayCharName = nameText
+						local displayCharName = friend.characterName
+						if friend.timerunningSeasonID and TimerunningUtil and TimerunningUtil.AddSmallIcon then
+							displayCharName = TimerunningUtil.AddSmallIcon(displayCharName)
+						end
 						if factionIcon ~= "" then
 							displayCharName = factionIcon .. " " .. displayCharName
 						end
