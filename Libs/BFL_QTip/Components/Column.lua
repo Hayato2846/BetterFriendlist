@@ -1,5 +1,7 @@
 --------------------------------------------------------------------------------
 ---- BFL_QTip Column (forked from LibQTip-2.0)
+---- Original: Copyright (c) 2023, James D. Callahan III - BSD 3-Clause License
+---- See QTip.lua for full license text.
 --------------------------------------------------------------------------------
 
 local ADDON_NAME, BFL = ...
