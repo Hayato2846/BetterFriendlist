@@ -574,6 +574,7 @@ local function CreateAdvancedTooltip(gameTooltip)
 	gameTooltip:AddLine(" ")
 
 	local Groups = GetGroups()
+	local DB = GetDB()
 
 	local friends = {}
 
@@ -582,14 +583,22 @@ local function CreateAdvancedTooltip(gameTooltip)
 		for i = 1, numBNetOnline do
 			local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
 			if accountInfo and accountInfo.gameAccountInfo and accountInfo.gameAccountInfo.isOnline then
+				local friendUID = (accountInfo.battleTag and accountInfo.battleTag ~= "")
+						and ("bnet_" .. accountInfo.battleTag)
+					or ("bnet_" .. tostring(accountInfo.bnetAccountID))
+				local gameInfo = accountInfo.gameAccountInfo
 				table.insert(friends, {
-					id = "bnet" .. accountInfo.bnetAccountID,
+					id = friendUID,
 					type = "bnet",
+					isFavorite = accountInfo.isFavorite,
+					client = gameInfo.clientProgram or "App",
+					wowProjectID = gameInfo.wowProjectID,
+					connected = true,
 					info = {
 						name = accountInfo.accountName or "Unknown",
-						level = accountInfo.gameAccountInfo.characterLevel or "??",
-						className = accountInfo.gameAccountInfo.className or "UNKNOWN",
-						area = accountInfo.gameAccountInfo.areaName or "Unknown",
+						level = gameInfo.characterLevel or "??",
+						className = gameInfo.className or "UNKNOWN",
+						area = gameInfo.areaName or "Unknown",
 					},
 				})
 			end
@@ -600,9 +609,14 @@ local function CreateAdvancedTooltip(gameTooltip)
 	for i = 1, numWoWFriends do
 		local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
 		if friendInfo and friendInfo.connected then
+			local fullName = friendInfo.name or ""
+			local normalizedName = BFL:NormalizeWoWFriendName(fullName)
+			local friendUID = normalizedName and ("wow_" .. normalizedName) or ("wow_" .. fullName)
 			table.insert(friends, {
-				id = "wow" .. (friendInfo.name or ""),
+				id = friendUID,
 				type = "wow",
+				client = "WoW",
+				connected = true,
 				info = {
 					name = friendInfo.name or "Unknown",
 					level = friendInfo.level or "??",
@@ -615,18 +629,70 @@ local function CreateAdvancedTooltip(gameTooltip)
 
 	local groupsData = Groups and Groups:GetAll() or {}
 
+	-- Read dynamic group settings
+	local enableInGameGroup = DB and DB:Get("enableInGameGroup", false) or false
+	local inGameGroupMode = DB and DB:Get("inGameGroupMode", "same_game") or "same_game"
+	local enableRecentlyAdded = DB and DB:Get("enableRecentlyAddedGroup", false) or false
+	local BNET_CLIENT_WOW_LOCAL = BNET_CLIENT_WOW or "WoW"
+
 	local groupedFriends = {}
 	local ungrouped = {}
 
 	for _, friend in ipairs(friends) do
 		if friend and friend.info then
-			local friendGroups = BetterFriendlistDB
+			local customGroups = BetterFriendlistDB
 					and BetterFriendlistDB.friendGroups
 					and BetterFriendlistDB.friendGroups[friend.id]
 				or {}
 			local assigned = false
 
-			for _, groupId in ipairs(friendGroups) do
+			-- Favorites (BNet only)
+			if friend.type == "bnet" and friend.isFavorite and groupsData["favorites"] then
+				groupedFriends["favorites"] = groupedFriends["favorites"] or {}
+				table.insert(groupedFriends["favorites"], friend)
+				assigned = true
+			end
+
+			-- In-Game group (dynamic)
+			if enableInGameGroup and groupsData["ingame"] then
+				local isInGame = false
+				if inGameGroupMode == "any_game" then
+					if friend.type == "wow" and friend.connected then
+						isInGame = true
+					elseif friend.type == "bnet" and friend.connected then
+						local client = friend.client
+						if client and client ~= "" and client ~= "App" and client ~= "BSAp" then
+							isInGame = true
+						end
+					end
+				else
+					if friend.type == "wow" and friend.connected then
+						isInGame = true
+					elseif friend.type == "bnet" and friend.connected and friend.client == BNET_CLIENT_WOW_LOCAL then
+						if friend.wowProjectID == WOW_PROJECT_ID then
+							isInGame = true
+						end
+					end
+				end
+				if isInGame then
+					groupedFriends["ingame"] = groupedFriends["ingame"] or {}
+					table.insert(groupedFriends["ingame"], friend)
+					assigned = true
+				end
+			end
+
+			-- Recently Added group (dynamic)
+			if enableRecentlyAdded and groupsData["recentlyadded"] then
+				local RecentlyAddedModule = BFL:GetModule("RecentlyAdded")
+				if RecentlyAddedModule and RecentlyAddedModule:IsFriendRecentlyAdded(friend.id) then
+					groupedFriends["recentlyadded"] = groupedFriends["recentlyadded"] or {}
+					table.insert(groupedFriends["recentlyadded"], friend)
+					assigned = true
+				end
+			end
+
+			-- Custom groups
+			for _, groupId in ipairs(customGroups) do
 				if groupsData[groupId] then
 					groupedFriends[groupId] = groupedFriends[groupId] or {}
 					table.insert(groupedFriends[groupId], friend)
@@ -870,7 +936,44 @@ local function GetFriendDisplayName(friend)
 	result = ReplaceTokenCaseInsensitive(result, "note", note)
 	result = ReplaceTokenCaseInsensitive(result, "nickname", nickname)
 	result = ReplaceTokenCaseInsensitive(result, "battletag", battletag)
-	result = ReplaceTokenCaseInsensitive(result, "character", characterName)
+
+	-- Class coloring for %character% token (parity with FriendsList:GetDisplayName)
+	local colorClassNames = BetterFriendlistDB and BetterFriendlistDB.colorClassNames
+	if colorClassNames == nil then
+		colorClassNames = true
+	end
+	local classColorStr = nil
+	if colorClassNames and characterName ~= "" then
+		local classColor = GetClassColorForFriend(friend)
+		if classColor then
+			classColorStr = string.format("ff%02x%02x%02x", classColor.r * 255, classColor.g * 255, classColor.b * 255)
+		end
+	end
+
+	if characterName ~= "" and classColorStr then
+		-- Handle wrapped pattern: (%character%) -> class-colored (CharName)
+		local wrappedPattern = "%(%%[Cc][Hh][Aa][Rr][Aa][Cc][Tt][Ee][Rr]%%%)"
+		local wrapStart, wrapEnd = result:find(wrappedPattern)
+		if wrapStart then
+			local wrappedReplacement = "|c" .. classColorStr .. "(" .. characterName .. ")|r"
+			result = result:sub(1, wrapStart - 1) .. wrappedReplacement .. result:sub(wrapEnd + 1)
+			if HasTokenCaseInsensitive(result, "character") then
+				local standaloneReplacement = "|c" .. classColorStr .. characterName .. "|r"
+				result = ReplaceTokenCaseInsensitive(result, "character", standaloneReplacement)
+			end
+		else
+			local replacement = "|c" .. classColorStr .. characterName .. "|r"
+			result = ReplaceTokenCaseInsensitive(result, "character", replacement)
+		end
+	else
+		-- No class coloring or empty character name
+		if characterName == "" then
+			local wrappedPattern = "%(%%[Cc][Hh][Aa][Rr][Aa][Cc][Tt][Ee][Rr]%%%)"
+			result = result:gsub(wrappedPattern, "")
+		end
+		result = ReplaceTokenCaseInsensitive(result, "character", characterName)
+	end
+
 	result = ReplaceTokenCaseInsensitive(result, "realm", realmName)
 	-- Phase 22b: Unified tokens - info tokens in name format
 	result = ReplaceTokenCaseInsensitive(result, "level", friend.level and tostring(friend.level) or "")
@@ -1362,15 +1465,23 @@ local function CreateLibQTipTooltip(anchorFrame)
 			groupedFriends["nogroup"] = {}
 		end
 
+		-- Read dynamic group settings
+		local DB = GetDB()
+		local enableInGameGroup = DB and DB:Get("enableInGameGroup", false) or false
+		local inGameGroupMode = DB and DB:Get("inGameGroupMode", "same_game") or "same_game"
+		local enableRecentlyAdded = DB and DB:Get("enableRecentlyAddedGroup", false) or false
+		local BNET_CLIENT_WOW = BNET_CLIENT_WOW or "WoW"
+
 		-- Helper to process a friend (add to groups and counts)
 		local function ProcessFriend(friend)
-			local friendGroups = BetterFriendlistDB
+			local customGroups = BetterFriendlistDB
 					and BetterFriendlistDB.friendGroups
 					and BetterFriendlistDB.friendGroups[friend.id]
 				or {}
 			local assigned = false
 			local isOnline = friend.connected
 
+			-- Favorites group (BNet only)
 			if friend.type == "bnet" and friend.isFavorite then
 				if groupsData["favorites"] then
 					groupCounts["favorites"].total = groupCounts["favorites"].total + 1
@@ -1382,7 +1493,55 @@ local function CreateLibQTipTooltip(anchorFrame)
 				end
 			end
 
-			for _, groupId in ipairs(friendGroups) do
+			-- In-Game group (dynamic, parity with FriendsList)
+			if enableInGameGroup and groupsData["ingame"] then
+				local isInGame = false
+
+				if inGameGroupMode == "any_game" then
+					if friend.type == "wow" and friend.connected then
+						isInGame = true
+					elseif friend.type == "bnet" and friend.connected then
+						local client = friend.client
+						if client and client ~= "" and client ~= "App" and client ~= "BSAp" then
+							isInGame = true
+						end
+					end
+				else
+					-- Same Game (Default): WoW friends OR BNet friends in SAME WoW version
+					if friend.type == "wow" and friend.connected then
+						isInGame = true
+					elseif friend.type == "bnet" and friend.connected and friend.client == BNET_CLIENT_WOW then
+						if friend.wowProjectID == WOW_PROJECT_ID then
+							isInGame = true
+						end
+					end
+				end
+
+				if isInGame then
+					groupCounts["ingame"].total = groupCounts["ingame"].total + 1
+					if isOnline then
+						groupCounts["ingame"].online = groupCounts["ingame"].online + 1
+						table.insert(groupedFriends["ingame"], friend)
+					end
+					assigned = true
+				end
+			end
+
+			-- Recently Added group (dynamic, parity with FriendsList)
+			if enableRecentlyAdded and groupsData["recentlyadded"] then
+				local RecentlyAddedModule = BFL:GetModule("RecentlyAdded")
+				if RecentlyAddedModule and RecentlyAddedModule:IsFriendRecentlyAdded(friend.id) then
+					groupCounts["recentlyadded"].total = groupCounts["recentlyadded"].total + 1
+					if isOnline then
+						groupCounts["recentlyadded"].online = groupCounts["recentlyadded"].online + 1
+						table.insert(groupedFriends["recentlyadded"], friend)
+					end
+					assigned = true
+				end
+			end
+
+			-- Custom groups
+			for _, groupId in ipairs(customGroups) do
 				if groupsData[groupId] then
 					groupCounts[groupId].total = groupCounts[groupId].total + 1
 					if isOnline then
@@ -1393,6 +1552,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 				end
 			end
 
+			-- Fallback: No Group
 			if not assigned then
 				if groupCounts["nogroup"] then
 					groupCounts["nogroup"].total = groupCounts["nogroup"].total + 1
@@ -1438,6 +1598,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 						realmName = gameInfo.realmName or "",
 						factionName = gameInfo.factionName or "",
 						guildName = gameInfo.guildName or "",
+						wowProjectID = gameInfo.wowProjectID,
 						timerunningSeasonID = gameInfo.timerunningSeasonID,
 						isAFK = accountInfo.isAFK or (gameInfo.isAFK or gameInfo.isGameAFK),
 						isDND = accountInfo.isDND or (gameInfo.isDND or gameInfo.isGameBusy),
