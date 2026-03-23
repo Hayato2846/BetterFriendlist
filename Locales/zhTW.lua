@@ -1359,7 +1359,7 @@ BFL:RegisterLocale("zhTW", function()
 	L.SETTINGS_SYNC_GROUPS_NOTE_HEADER = "群組備註同步"
 	L.SETTINGS_SYNC_GROUPS_NOTE = "將群組同步到好友備註"
 	L.SETTINGS_SYNC_GROUPS_NOTE_DESC =
-		"以FriendGroups格式(備註#群組1#群組2)將群組資訊寫入好友備註。可在帳號間或與FriendGroups使用者共享群組。"
+		"以FriendGroups格式(備註#群組1#群組2)在BetterFriendlist群組和好友備註之間進行雙向同步。\n\n啟用後：\n- 群組自動寫入好友備註\n- 備註中發現的群組會被匯入BetterFriendlist（如需要會自動建立新群組）\n- 雙向變更會被持續偵測和同步\n\n可在帳號間或與FriendGroups使用者共享群組。"
 	L.DIALOG_SYNC_GROUPS_CONFIRM_TEXT =
 		"啟用群組備註同步？\n\n|cffff8800警告：|r 戰網備註限制為127個字元，魔獸世界好友備註限制為48個字元。超出字元限制的群組將在備註中跳過，但仍儲存在資料庫中。\n\n現有備註將被更新。是否繼續？"
 	L.DIALOG_SYNC_GROUPS_CONFIRM_BTN1 = "啟用"
@@ -1372,6 +1372,7 @@ BFL:RegisterLocale("zhTW", function()
 	L.MSG_SYNC_GROUPS_COMPLETE = "群組備註同步完成。已更新：%d，已跳過（限制）：%d"
 	L.MSG_SYNC_GROUPS_PROGRESS = "同步備註中：%d / %d"
 	L.MSG_SYNC_GROUPS_NOTE_LIMIT = "%s 的備註已達上限 - 部分群組已跳過"
+	L.MSG_SYNC_GROUPS_IMPORTED = "已從現有備註中匯入 %d 個群組和 %d 個分配。"
 
 	-- ========================================
 	-- MESSAGES (Phase 22 - Asian/Cyrillic)
@@ -1408,7 +1409,7 @@ BFL:RegisterLocale("zhTW", function()
 	L.WIZARD_HEADER = "備註清理"
 	L.WIZARD_HEADER_DESC =
 		"從好友備註中移除 FriendGroups 後綴。先備份您的備註，然後檢查並套用變更。"
-	L.WIZARD_COL_ACCOUNT = "帳號名稱"
+	L.WIZARD_COL_ACCOUNT = "帳���名稱"
 	L.WIZARD_COL_BATTLETAG = "戰網暱稱"
 	L.WIZARD_COL_NOTE = "目前備註"
 	L.WIZARD_COL_CLEANED = "清理後備註"

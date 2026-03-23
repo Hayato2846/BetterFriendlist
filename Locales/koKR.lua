@@ -1339,7 +1339,7 @@ BFL:RegisterLocale("koKR", function()
 	L.SETTINGS_FRIEND_NAME_SETTINGS = "친구 이름 설정"
 	L.SETTINGS_FRIEND_INFO_SETTINGS = "친구 정보 설정"
 	L.SETTINGS_FONT_TABS_TITLE = "탭 텍스트"
-	L.SETTINGS_FONT_RAID_TITLE = "공��대 이�� 텍스���"
+	L.SETTINGS_FONT_RAID_TITLE = "공��대 이�� 텍스�������"
 	L.SETTINGS_FONT_SIZE_NUM = "글꼴 크기"
 
 	-- ========================================
@@ -1348,7 +1348,7 @@ BFL:RegisterLocale("koKR", function()
 	L.SETTINGS_SYNC_GROUPS_NOTE_HEADER = "그룹 메모 동기화"
 	L.SETTINGS_SYNC_GROUPS_NOTE = "그룹을 친구 메모에 동기화"
 	L.SETTINGS_SYNC_GROUPS_NOTE_DESC =
-		"FriendGroups 형식(메모#그룹1#그룹2)으로 그룹 할당을 친구 메모에 작성합니다. 계정 간 또는 FriendGroups 사용자와 그룹을 공유할 수 있습니다."
+		"BetterFriendlist 그룹과 친구 메모 간의 양방향 동기화를 FriendGroups 형식(메모#그룹1#그룹2)으로 수행합니다.\n\n활성화 시:\n- 그룹이 자동으로 친구 메모에 기록됩니다\n- 메모에서 발견된 그룹이 BetterFriendlist로 가져옵니다 (필요시 새 그룹 생성)\n- 양방향 변경 사항이 감지되어 지속적으로 동기화됩니다\n\n계정 간 또는 FriendGroups 사용자와 그룹을 공유할 수 있습니다."
 	L.DIALOG_SYNC_GROUPS_CONFIRM_TEXT =
 		"그룹 메모 동기화를 활성화하시겠습니까?\n\n|cffff8800경고:|r 배틀넷 메모는 127자, WoW 친구 메모는 48자로 제한됩니다. 글자 수 제한을 초과하는 그룹은 메모에서 생략되지만 데이터베이스에는 유지됩니다.\n\n기존 메모가 업데이��됩니다. 계속하시겠습니까?"
 	L.DIALOG_SYNC_GROUPS_CONFIRM_BTN1 = "활성화"
@@ -1361,6 +1361,7 @@ BFL:RegisterLocale("koKR", function()
 	L.MSG_SYNC_GROUPS_COMPLETE = "그룹 메모 동기화 완료. 업데이트: %d, 건너뜀(제한): %d"
 	L.MSG_SYNC_GROUPS_PROGRESS = "메모 동기화 중: %d / %d"
 	L.MSG_SYNC_GROUPS_NOTE_LIMIT = "%s의 메모 제한 도달 - 일부 그룹 건너뜀"
+	L.MSG_SYNC_GROUPS_IMPORTED = "기존 메모에서 %d개 그룹 및 %d개 할당을 가져왔습니다."
 
 	-- ========================================
 	-- MESSAGES (Phase 22 - Asian/Cyrillic)

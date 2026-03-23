@@ -1313,7 +1313,7 @@ local function LoadEnUS()
 	L.SETTINGS_SYNC_GROUPS_NOTE_HEADER = "Group Note Sync"
 	L.SETTINGS_SYNC_GROUPS_NOTE = "Sync Groups to Friend Note"
 	L.SETTINGS_SYNC_GROUPS_NOTE_DESC =
-		"Write group assignments into friend notes using the FriendGroups format (Note#Group1#Group2). This allows sharing groups across accounts or with FriendGroups users."
+		"Bidirectional sync between BetterFriendlist groups and friend notes using the FriendGroups format (Note#Group1#Group2).\n\nWhen enabled:\n- Groups are written into friend notes automatically\n- Groups found in notes are imported into BetterFriendlist (new groups are created if needed)\n- Changes in either direction are detected and synced continuously\n\nThis allows sharing groups across accounts or with FriendGroups users."
 	L.DIALOG_SYNC_GROUPS_CONFIRM_TEXT =
 		"Enable Group Note Sync?\n\n|cffff8800Warning:|r BattleNet notes are limited to 127 characters, WoW friend notes to 48 characters. Groups that exceed the character limit will be skipped in the note but remain stored in the database.\n\nExisting notes will be updated. Continue?"
 	L.DIALOG_SYNC_GROUPS_CONFIRM_BTN1 = "Enable"
@@ -1326,6 +1326,7 @@ local function LoadEnUS()
 	L.MSG_SYNC_GROUPS_COMPLETE = "Group note sync complete. Updated: %d, Skipped (limit): %d"
 	L.MSG_SYNC_GROUPS_PROGRESS = "Syncing notes: %d / %d"
 	L.MSG_SYNC_GROUPS_NOTE_LIMIT = "Note limit reached for %s - some groups skipped"
+	L.MSG_SYNC_GROUPS_IMPORTED = "Imported %d group(s) and %d assignment(s) from existing notes."
 
 	-- ========================================
 	-- NOTE CLEANUP WIZARD

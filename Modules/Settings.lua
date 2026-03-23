@@ -4731,46 +4731,35 @@ function Settings:RefreshAdvancedTab()
 						if BFL.SettingsVersion then
 							BFL.SettingsVersion = BFL.SettingsVersion + 1
 						end
-						-- Show progress label
-						if tab.syncProgressLabel then
-							tab.syncProgressLabel:SetText(
-								string.format(L.MSG_SYNC_GROUPS_PROGRESS or "Syncing notes: %d / %d", 0, 0)
-							)
-							tab.syncProgressLabel:SetTextColor(1, 0.82, 0)
-							tab.syncProgressLabel:Show()
-						end
-						-- Trigger full sync of all friend notes with progress callback
+						-- Import existing group tags from notes before writing
+						-- (prevents data loss for users coming from FriendGroups)
 						local NoteSync = BFL:GetModule("NoteSync")
 						if NoteSync then
-							NoteSync:SyncAllFriends(function(updated, skipped)
-								-- Completion: show final state in green then fade out
-								if tab.syncProgressLabel then
-									local completeMsg = string.format(
-										L.MSG_SYNC_GROUPS_COMPLETE
-											or "Group note sync complete. Updated: %d, Skipped (limit): %d",
-										updated,
-										skipped
-									)
-									tab.syncProgressLabel:SetText(completeMsg)
-									tab.syncProgressLabel:SetTextColor(0, 1, 0)
-									C_Timer.After(5, function()
-										if tab.syncProgressLabel then
-											tab.syncProgressLabel:Hide()
-										end
-									end)
+							local importedGroups, importedAssignments = NoteSync:ImportGroupsFromNotes()
+							if importedGroups > 0 then
+								local importMsg = string.format(
+									L.MSG_SYNC_GROUPS_IMPORTED
+										or "Imported %d group(s) and %d assignment(s) from existing notes.",
+									importedGroups,
+									importedAssignments
+								)
+								print("|cff00ff00BetterFriendlist:|r " .. importMsg)
+								-- Reload groups from DB and force re-render
+								local Groups = BFL:GetModule("Groups")
+								if Groups and Groups.Initialize then
+									Groups:Initialize()
 								end
-							end, function(processed, total)
-								-- Progress update each batch
-								if tab.syncProgressLabel then
-									tab.syncProgressLabel:SetText(
-										string.format(
-											L.MSG_SYNC_GROUPS_PROGRESS or "Syncing notes: %d / %d",
-											processed,
-											total
-										)
-									)
+								BFL:ForceRefreshFriendsList()
+								-- Refresh group list in Settings UI if open
+								if BetterFriendlistSettingsFrame and BetterFriendlistSettingsFrame:IsShown() then
+									Settings:RefreshGroupList()
 								end
-							end)
+							end
+						end
+						-- Trigger full sync of all friend notes
+						local NoteSync = BFL:GetModule("NoteSync")
+						if NoteSync then
+							NoteSync:SyncAllFriends()
 						end
 					end,
 					OnCancel = function()
@@ -4817,21 +4806,6 @@ function Settings:RefreshAdvancedTab()
 		L.SETTINGS_SYNC_GROUPS_NOTE_DESC or "Write group assignments into friend notes using the FriendGroups format."
 	)
 	table.insert(allFrames, syncNoteToggle)
-
-	-- Sync progress label (hidden by default, shown during sync)
-	local syncProgressLabel = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-	syncProgressLabel:SetJustifyH("LEFT")
-	syncProgressLabel:SetText("")
-	syncProgressLabel:Hide()
-	-- Store on tab so it persists across calls
-	tab.syncProgressLabel = syncProgressLabel
-	-- Wrap in a frame container so AnchorChain can position it
-	local syncProgressFrame = CreateFrame("Frame", nil, tab)
-	syncProgressFrame:SetHeight(18)
-	syncProgressFrame:SetWidth(400)
-	syncProgressLabel:SetPoint("LEFT", syncProgressFrame, "LEFT", 4, 0)
-	syncProgressFrame.label = syncProgressLabel
-	table.insert(allFrames, syncProgressFrame)
 
 	-- Spacer
 	table.insert(allFrames, Components:CreateSpacer(tab))

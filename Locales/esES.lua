@@ -1362,7 +1362,7 @@ BFL:RegisterLocale("esES", function()
 	L.SETTINGS_SYNC_GROUPS_NOTE_HEADER = "Sincronizar Notas de Grupo"
 	L.SETTINGS_SYNC_GROUPS_NOTE = "Sincronizar grupos en notas de amigo"
 	L.SETTINGS_SYNC_GROUPS_NOTE_DESC =
-		"Escribe las asignaciones de grupo en las notas de amigos usando el formato FriendGroups (Nota#Grupo1#Grupo2). Permite compartir grupos entre cuentas o con usuarios de FriendGroups."
+		"Sincronizacion bidireccional entre los grupos de BetterFriendlist y las notas de amigos en formato FriendGroups (Nota#Grupo1#Grupo2).\n\nCuando esta activado:\n- Los grupos se escriben automaticamente en las notas de amigos\n- Los grupos encontrados en las notas se importan a BetterFriendlist (se crean nuevos grupos si es necesario)\n- Los cambios en ambas direcciones se detectan y sincronizan continuamente\n\nPermite compartir grupos entre cuentas o con usuarios de FriendGroups."
 	L.DIALOG_SYNC_GROUPS_CONFIRM_TEXT =
 		"Activar sincronizacion de notas de grupo?\n\n|cffff8800Advertencia:|r Las notas de BattleNet estan limitadas a 127 caracteres, las notas de amigos WoW a 48 caracteres. Los grupos que excedan el limite se omitiran en la nota pero permaneceran en la base de datos.\n\nLas notas existentes se actualizaran. Continuar?"
 	L.DIALOG_SYNC_GROUPS_CONFIRM_BTN1 = "Activar"
@@ -1375,6 +1375,7 @@ BFL:RegisterLocale("esES", function()
 	L.MSG_SYNC_GROUPS_COMPLETE = "Sincronizacion completada. Actualizados: %d, Omitidos (limite): %d"
 	L.MSG_SYNC_GROUPS_PROGRESS = "Sincronizando notas: %d / %d"
 	L.MSG_SYNC_GROUPS_NOTE_LIMIT = "Limite de nota alcanzado para %s - algunos grupos omitidos"
+	L.MSG_SYNC_GROUPS_IMPORTED = "Se importaron %d grupo(s) y %d asignacion(es) de las notas existentes."
 
 	-- ========================================
 	-- NOTE CLEANUP WIZARD

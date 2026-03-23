@@ -1341,7 +1341,7 @@ BFL:RegisterLocale("zhCN", function()
 	L.SETTINGS_SYNC_GROUPS_NOTE_HEADER = "分组备注同步"
 	L.SETTINGS_SYNC_GROUPS_NOTE = "将分组同步到好友备注"
 	L.SETTINGS_SYNC_GROUPS_NOTE_DESC =
-		"以FriendGroups格式(备注#分组1#分组2)将分组信息写入好友备注。可在账号间或与FriendGroups用户共享分组。"
+		"以FriendGroups格式(备注#分组1#分组2)在BetterFriendlist分组和好友备注之间进行双向同步。\n\n启用后：\n- 分组自动写入好友备注\n- 备注中发现的分组会被导入BetterFriendlist（如需要会自动创建新分组）\n- 双向变更会被持续检测和同步\n\n可在账号间或与FriendGroups用户共享分组。"
 	L.DIALOG_SYNC_GROUPS_CONFIRM_TEXT =
 		"启用分组备注同步？\n\n|cffff8800警告：|r 战网备注限制为127个字符，魔兽世界好友备注限制为48个字符。超出字符限制的分组将在备注中跳过，但仍保存在数据库中。\n\n现有备注将被更新。是否继续？"
 	L.DIALOG_SYNC_GROUPS_CONFIRM_BTN1 = "启用"
@@ -1354,6 +1354,7 @@ BFL:RegisterLocale("zhCN", function()
 	L.MSG_SYNC_GROUPS_COMPLETE = "分组备注同步完成。已更新：%d，已跳过（限制）：%d"
 	L.MSG_SYNC_GROUPS_PROGRESS = "同步备注中：%d / %d"
 	L.MSG_SYNC_GROUPS_NOTE_LIMIT = "%s 的备注已达上限 - 部分分组已跳过"
+	L.MSG_SYNC_GROUPS_IMPORTED = "已从现有备注中导入 %d 个分组和 %d 个分配。"
 
 	-- ========================================
 	-- MESSAGES (Phase 22 - Asian/Cyrillic)
@@ -1402,7 +1403,7 @@ BFL:RegisterLocale("zhCN", function()
 	L.WIZARD_APPLY_BTN = "应用清理"
 	L.WIZARD_APPLY_TOOLTIP = "将清理后的备注写回。仅更新与原始备注不同的备注。"
 	L.WIZARD_APPLY_CONFIRM =
-		"将清理后��备注应用到所有好友？\n\n|cffff8800当前备注将被覆盖。��确保您已先创建备份！|r"
+		"将清理后��备注应用到所有好友？\n\n|cffff8800���前备注将被覆盖。��确保您已先创建备份！|r"
 	L.WIZARD_APPLY_SUCCESS = "成功更新 %d 条备注。"
 	L.WIZARD_APPLY_PROGRESS_FMT = "进度: %d/%d | %d ��功 | %d 失败"
 	L.WIZARD_STATUS_FMT = "显示 %d / %d 位好友 | %d 包含分组数据 | %d 待更改"

@@ -13,6 +13,7 @@ local VERIFY_DEBOUNCE = 5 -- Seconds to wait after last event before verifying n
 
 -- State
 NoteSync.isSyncing = false
+NoteSync.isImporting = false
 NoteSync.syncTimer = nil
 NoteSync.verifyTimer = nil
 NoteSync.isWriting = false -- Guard to prevent verification re-triggering itself
@@ -71,7 +72,7 @@ function NoteSync:ScheduleVerification()
 		return
 	end
 
-	if self.isSyncing then
+	if self.isSyncing or self.isImporting then
 		return
 	end
 
@@ -87,8 +88,9 @@ function NoteSync:ScheduleVerification()
 end
 
 -- ============================================================
--- VERIFY: Single-pass check of all friend notes against DB state
--- Only writes notes that are actually out of sync (missing/wrong groups)
+-- VERIFY: Bidirectional sync of friend notes <-> DB state
+-- Phase 1 (read): Import new group tags from notes into DB
+-- Phase 2 (write): Write DB groups to notes that are out of sync
 -- ============================================================
 function NoteSync:VerifyAllNotes()
 	if self.isSyncing or self.isWriting then
@@ -100,10 +102,13 @@ function NoteSync:VerifyAllNotes()
 		return
 	end
 
-	local allFriendGroups = DB:GetFriendGroups() -- no arg = all
+	local Groups = BFL:GetModule("Groups")
+	if not Groups then
+		return
+	end
 
-	-- Build lookup tables for O(1) friend access (avoid O(n*m) iteration)
-	local bnetLookup = {} -- battleTag -> { accountInfo, index }
+	-- Build lookup tables for O(1) friend access
+	local bnetLookup = {} -- battleTag -> accountInfo
 	local numBNetFriends = BNGetNumFriends()
 	for i = 1, numBNetFriends do
 		local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
@@ -124,9 +129,150 @@ function NoteSync:VerifyAllNotes()
 		end
 	end
 
+	-- ---- Phase 1: Read notes -> DB (import unknown groups + assignments) ----
+	local newGroupNames = {} -- set of group names that don't exist in DB yet
+	local noteAssignments = {} -- uid -> { groupName1, groupName2, ... }
+
+	-- Scan BNet notes
+	for battleTag, accountInfo in pairs(bnetLookup) do
+		local noteText = accountInfo.note or ""
+		if noteText:find("#") then
+			local _, groupNames = ParseNoteGroups(noteText)
+			if #groupNames > 0 then
+				local uid = "bnet_" .. battleTag
+				noteAssignments[uid] = groupNames
+				for _, gn in ipairs(groupNames) do
+					if not Groups:GetGroupIdByName(gn) then
+						newGroupNames[gn] = true
+					end
+				end
+			end
+		end
+	end
+
+	-- Scan WoW notes
+	for normalizedName, info in pairs(wowLookup) do
+		local noteText = info.notes or ""
+		if noteText:find("#") then
+			local _, groupNames = ParseNoteGroups(noteText)
+			if #groupNames > 0 then
+				local uid = "wow_" .. normalizedName
+				noteAssignments[uid] = groupNames
+				for _, gn in ipairs(groupNames) do
+					if not Groups:GetGroupIdByName(gn) then
+						newGroupNames[gn] = true
+					end
+				end
+			end
+		end
+	end
+
+	-- Create new groups and assign friends if we found unknown group names
+	local importedGroups = 0
+	local importedAssignments = 0
+
+	-- Collect group names to sort deterministically
+	local sortedNewNames = {}
+	for gn in pairs(newGroupNames) do
+		table.insert(sortedNewNames, gn)
+	end
+
+	if #sortedNewNames > 0 then
+		table.sort(sortedNewNames)
+
+		-- Determine insertion point and order value
+		local savedOrder = DB:Get("groupOrder")
+		local groupOrderArray = {}
+		local groupOrderSet = {}
+		if savedOrder and type(savedOrder) == "table" and #savedOrder > 0 then
+			for _, gid in ipairs(savedOrder) do
+				if not groupOrderSet[gid] then
+					table.insert(groupOrderArray, gid)
+					groupOrderSet[gid] = true
+				end
+			end
+		else
+			groupOrderArray = { "favorites" }
+			groupOrderSet["favorites"] = true
+		end
+
+		local insertIdx = #groupOrderArray + 1
+		for i, gid in ipairs(groupOrderArray) do
+			if gid == "nogroup" then
+				insertIdx = i
+				break
+			end
+		end
+
+		local maxOrder = 1
+		local allGroups = Groups:GetAll()
+		for gid, gData in pairs(allGroups) do
+			if gid ~= "nogroup" then
+				maxOrder = math.max(maxOrder, gData.order or 1)
+			end
+		end
+		local currentOrder = maxOrder + 1
+
+		self.isImporting = true
+
+		for _, groupName in ipairs(sortedNewNames) do
+			local success, groupId = Groups:CreateWithOrder(groupName, currentOrder)
+			if success and groupId then
+				importedGroups = importedGroups + 1
+				if not groupOrderSet[groupId] then
+					table.insert(groupOrderArray, insertIdx, groupId)
+					groupOrderSet[groupId] = true
+					insertIdx = insertIdx + 1
+				end
+				currentOrder = currentOrder + 1
+			end
+		end
+
+		if not groupOrderSet["nogroup"] then
+			table.insert(groupOrderArray, "nogroup")
+		end
+
+		if importedGroups > 0 then
+			DB:Set("groupOrder", groupOrderArray)
+		end
+
+		self.isImporting = false
+	end
+
+	-- Assign friends from notes to groups they aren't in yet
+	self.isImporting = true
+	for uid, groupNames in pairs(noteAssignments) do
+		for _, groupName in ipairs(groupNames) do
+			local groupId = Groups:GetGroupIdByName(groupName)
+			if groupId then
+				local success = DB:AddFriendToGroup(uid, groupId)
+				if success then
+					importedAssignments = importedAssignments + 1
+				end
+			end
+		end
+	end
+	self.isImporting = false
+
+	if importedGroups > 0 or importedAssignments > 0 then
+		BFL:DebugPrint(
+			string.format(
+				"NoteSync: Verify imported %d group(s), %d assignment(s) from notes.",
+				importedGroups,
+				importedAssignments
+			)
+		)
+		-- Reload groups and refresh UI
+		if Groups.Initialize then
+			Groups:Initialize()
+		end
+		BFL:ForceRefreshFriendsList()
+	end
+
+	-- ---- Phase 2: Write DB -> notes (fix out-of-sync notes) ----
+	local allFriendGroups = DB:GetFriendGroups() -- re-read after imports
 	local fixedCount = 0
 
-	-- Set writing guard to prevent re-triggering from our own note writes
 	self.isWriting = true
 
 	for uid in pairs(allFriendGroups) do
@@ -258,6 +404,11 @@ function NoteSync:OnGroupOrderChanged()
 
 	-- Guard: Only sync if setting is enabled
 	if not DB:Get("syncGroupsToNote") then
+		return
+	end
+
+	-- Guard: Skip during bulk import (the OnAccept caller handles SyncAllFriends after import)
+	if self.isImporting then
 		return
 	end
 
@@ -426,6 +577,12 @@ function NoteSync:SyncAllFriends(callback, progressCallback)
 	local totalFriends = #friendUIDs
 	if totalFriends == 0 then
 		BFL:DebugPrint("NoteSync: No friends to sync.")
+		local completeMsg = string.format(
+			L.MSG_SYNC_GROUPS_COMPLETE or "Group note sync complete. Updated: %d, Skipped (limit): %d",
+			0,
+			0
+		)
+		print("|cff00ff00BetterFriendlist:|r " .. completeMsg)
 		if callback then
 			callback(0, 0)
 		end
@@ -517,13 +674,189 @@ function NoteSync:OnGroupChanged(friendUID)
 		return
 	end
 
-	-- Avoid syncing during full sync
-	if self.isSyncing then
+	-- Avoid syncing during full sync or import
+	if self.isSyncing or self.isImporting then
 		return
 	end
 
 	-- Sync the specific friend
 	self:SyncSingleFriend(friendUID)
+end
+
+-- ============================================================
+-- IMPORT: Read existing group tags from friend notes and create
+-- groups + assignments in DB before the first write-sync.
+-- Prevents data loss for users coming from FriendGroups who
+-- haven't run the migration wizard.
+-- Returns: importedGroups (number), importedAssignments (number)
+-- ============================================================
+function NoteSync:ImportGroupsFromNotes()
+	local DB = BFL:GetModule("DB")
+	local Groups = BFL:GetModule("Groups")
+	if not DB or not Groups then
+		return 0, 0
+	end
+
+	-- Phase 1: Scan all friend notes for #-tags
+	local allGroupNames = {} -- set of unique group names found
+	local friendAssignments = {} -- friendUID -> { groups = {name1, name2, ...} }
+
+	-- Scan BNet friends
+	local numBNetFriends = BNGetNumFriends()
+	for i = 1, numBNetFriends do
+		local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
+		if accountInfo and accountInfo.battleTag then
+			local noteText = accountInfo.note or ""
+			if noteText:find("#") then
+				local _, groupNames = ParseNoteGroups(noteText)
+				if #groupNames > 0 then
+					local uid = "bnet_" .. accountInfo.battleTag
+					friendAssignments[uid] = groupNames
+					for _, gn in ipairs(groupNames) do
+						allGroupNames[gn] = true
+					end
+				end
+			end
+		end
+	end
+
+	-- Scan WoW friends
+	local numWoWFriends = C_FriendList.GetNumFriends() or 0
+	for i = 1, numWoWFriends do
+		local info = C_FriendList.GetFriendInfoByIndex(i)
+		if info and info.name then
+			local noteText = info.notes or ""
+			if noteText:find("#") then
+				local _, groupNames = ParseNoteGroups(noteText)
+				if #groupNames > 0 then
+					local name = BFL:NormalizeWoWFriendName(info.name)
+					if name then
+						local uid = "wow_" .. name
+						friendAssignments[uid] = groupNames
+						for _, gn in ipairs(groupNames) do
+							allGroupNames[gn] = true
+						end
+					end
+				end
+			end
+		end
+	end
+
+	-- Nothing to import?
+	local nameCount = 0
+	for _ in pairs(allGroupNames) do
+		nameCount = nameCount + 1
+	end
+	if nameCount == 0 then
+		BFL:DebugPrint("NoteSync: Import - no group tags found in notes.")
+		return 0, 0
+	end
+
+	-- Phase 2: Create missing groups, build name -> groupId map
+	local groupNameMap = {}
+	local createdGroups = 0
+
+	-- Get existing group order to append new groups
+	local savedOrder = DB:Get("groupOrder")
+	local groupOrderArray
+	local groupOrderSet = {} -- for dedup checks
+	if savedOrder and type(savedOrder) == "table" and #savedOrder > 0 then
+		-- Copy existing order
+		groupOrderArray = {}
+		for _, gid in ipairs(savedOrder) do
+			if not groupOrderSet[gid] then
+				table.insert(groupOrderArray, gid)
+				groupOrderSet[gid] = true
+			end
+		end
+	else
+		groupOrderArray = { "favorites" }
+		groupOrderSet["favorites"] = true
+	end
+
+	-- Find the insertion point: before "nogroup" (last element in most setups)
+	local insertIdx = #groupOrderArray + 1
+	for i, gid in ipairs(groupOrderArray) do
+		if gid == "nogroup" then
+			insertIdx = i
+			break
+		end
+	end
+
+	-- Determine next order value from existing groups
+	local maxOrder = 1
+	local allGroups = Groups:GetAll()
+	for gid, gData in pairs(allGroups) do
+		if gid ~= "nogroup" then
+			maxOrder = math.max(maxOrder, gData.order or 1)
+		end
+	end
+	local currentOrder = maxOrder + 1
+
+	-- Sort group names alphabetically for deterministic order
+	local sortedNames = {}
+	for gn in pairs(allGroupNames) do
+		table.insert(sortedNames, gn)
+	end
+	table.sort(sortedNames)
+
+	for _, groupName in ipairs(sortedNames) do
+		local existingId = Groups:GetGroupIdByName(groupName)
+		if existingId then
+			groupNameMap[groupName] = existingId
+		else
+			local success, groupId = Groups:CreateWithOrder(groupName, currentOrder)
+			if success and groupId then
+				groupNameMap[groupName] = groupId
+				createdGroups = createdGroups + 1
+				-- Insert into order array before "nogroup" (skip if already present as ghost)
+				if not groupOrderSet[groupId] then
+					table.insert(groupOrderArray, insertIdx, groupId)
+					groupOrderSet[groupId] = true
+					insertIdx = insertIdx + 1
+				end
+				currentOrder = currentOrder + 1
+			end
+		end
+	end
+
+	-- Ensure "nogroup" is in the order array
+	if not groupOrderSet["nogroup"] then
+		table.insert(groupOrderArray, "nogroup")
+	end
+
+	-- Save updated group order if we created new groups
+	if createdGroups > 0 then
+		DB:Set("groupOrder", groupOrderArray)
+	end
+
+	-- Phase 3: Assign friends to groups (skip duplicates)
+	-- Suppress OnGroupChanged during bulk assignment to prevent
+	-- intermediate note writes (SyncAllFriends handles it after)
+	self.isImporting = true
+	local assignmentCount = 0
+	for uid, groupNames in pairs(friendAssignments) do
+		for _, groupName in ipairs(groupNames) do
+			local groupId = groupNameMap[groupName]
+			if groupId then
+				local success = DB:AddFriendToGroup(uid, groupId)
+				if success then
+					assignmentCount = assignmentCount + 1
+				end
+			end
+		end
+	end
+	self.isImporting = false
+
+	BFL:DebugPrint(
+		string.format(
+			"NoteSync: Import complete - %d group(s) created, %d assignment(s) added.",
+			createdGroups,
+			assignmentCount
+		)
+	)
+
+	return createdGroups, assignmentCount
 end
 
 -- ============================================================
