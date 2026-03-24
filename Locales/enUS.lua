@@ -1374,6 +1374,9 @@ local function LoadEnUS()
 	L.WIZARD_RESTORE_SUCCESS = "%d notes restored successfully."
 	L.WIZARD_NO_BACKUP = "No note backup found. Use the Note Cleanup Wizard to create a backup first."
 	L.WIZARD_BACKUP_STATUS_FMT = "Showing %d of %d entries | %d changed since backup | Backup: %s"
+
+	-- Housing
+	L.HOUSING_COMBAT_RESTRICTED = "Not available in combat."
 end
 
 -- Always load enUS immediately to ensure fallback strings exist

@@ -1413,4 +1413,7 @@ BFL:RegisterLocale("ptBR", function()
 	L.WIZARD_NO_BACKUP =
 		"Nenhum backup de notas encontrado. Use o Assistente de limpeza de notas primeiro para criar um."
 	L.WIZARD_BACKUP_STATUS_FMT = "Exibindo %d de %d entradas | %d alteradas desde o backup | Backup: %s"
+
+	-- Housing
+	L.HOUSING_COMBAT_RESTRICTED = "Indisponivel em combate."
 end)

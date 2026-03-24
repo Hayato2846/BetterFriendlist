@@ -1424,4 +1424,7 @@ BFL:RegisterLocale("esES", function()
 	L.WIZARD_NO_BACKUP =
 		"No se encontro copia de seguridad. Usa primero el Asistente de limpieza de notas para crear una."
 	L.WIZARD_BACKUP_STATUS_FMT = "Mostrando %d de %d entradas | %d cambiadas desde la copia | Copia: %s"
+
+	-- Housing
+	L.HOUSING_COMBAT_RESTRICTED = "No disponible en combate."
 end)

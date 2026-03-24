@@ -1338,4 +1338,7 @@ BFL:RegisterLocale("deDE", function()
 	L.WIZARD_NO_BACKUP =
 		"Kein Notiz-Backup gefunden. Verwende zuerst den Notiz-Bereinigungs-Assistenten, um ein Backup zu erstellen."
 	L.WIZARD_BACKUP_STATUS_FMT = "Zeige %d von %d Eintraegen | %d seit Backup geaendert | Backup: %s"
+
+	-- Housing
+	L.HOUSING_COMBAT_RESTRICTED = "Im Kampf gesperrt."
 end)

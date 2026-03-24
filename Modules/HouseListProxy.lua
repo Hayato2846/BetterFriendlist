@@ -29,13 +29,15 @@ function HouseListProxy:Initialize()
 		end
 	end)
 
-	-- Register for combat start to hide proxy
+	-- Register for combat start to hide proxy and show overlays on all buttons
 	BFL:RegisterEventCallback("PLAYER_REGEN_DISABLED", function()
 		self:HideProxy()
+		self:ShowAllCombatOverlays()
 	end)
 
-	-- Register for combat end to process pending actions
+	-- Register for combat end to hide overlays and process pending actions
 	BFL:RegisterEventCallback("PLAYER_REGEN_ENABLED", function()
+		self:HideAllCombatOverlays()
 		self:ProcessPendingShow()
 		-- If proxy creation was deferred due to combat, create it now
 		if self.deferredProxyCreation then
@@ -167,7 +169,98 @@ function HouseListProxy:SetupButtonInteraction(rowFrame)
 		end
 	end)
 
+	-- Show combat overlay whenever the button becomes visible during combat
+	button:HookScript("OnShow", function(btn)
+		if BFL:IsActionRestricted() and btn.bflCombatOverlay then
+			btn.bflCombatOverlay:Show()
+		end
+	end)
+
+	-- Create combat overlay for this button
+	self:CreateButtonCombatOverlay(button)
+
+	-- Track the button
+	if not self.hookedButtons then
+		self.hookedButtons = {}
+	end
+	self.hookedButtons[button] = true
+
+	-- If currently in combat, show overlay immediately
+	if BFL:IsActionRestricted() and button.bflCombatOverlay then
+		button.bflCombatOverlay:Show()
+	end
+
 	button.bflHooked = true
+end
+
+-- ========================================
+-- Combat Overlay (per-button)
+-- ========================================
+
+function HouseListProxy:CreateButtonCombatOverlay(button)
+	if button.bflCombatOverlay then
+		return button.bflCombatOverlay
+	end
+
+	-- Use UIPanelButtonTemplate so the overlay has the same rounded shape as the VisitHouseButton
+	local overlay = CreateFrame("Button", nil, button, "UIPanelButtonTemplate")
+	overlay:SetAllPoints(button)
+	overlay:SetFrameLevel(button:GetFrameLevel() + 5)
+	overlay:SetMotionScriptsWhileDisabled(true)
+	overlay:Disable()
+	overlay:Hide()
+
+	-- Tint the disabled texture darker for a clear visual distinction
+	local disabledTex = overlay:GetDisabledTexture()
+	if disabledTex then
+		disabledTex:SetVertexColor(0.4, 0.4, 0.4, 1.0)
+	end
+
+	-- Show localized combat text on the button
+	overlay:SetDisabledFontObject(GameFontDisable)
+	local L = BFL.L
+	if L and L.HOUSING_COMBAT_RESTRICTED then
+		overlay:SetText(L.HOUSING_COMBAT_RESTRICTED)
+	end
+
+	-- Tooltip on hover explaining the restriction
+	overlay:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		local L = BFL.L
+		if L and L.HOUSING_COMBAT_RESTRICTED then
+			GameTooltip:SetText(L.HOUSING_COMBAT_RESTRICTED, 1.0, 0.1, 0.1, 1.0, true)
+		end
+		GameTooltip:Show()
+	end)
+
+	overlay:SetScript("OnLeave", function(self)
+		GameTooltip:Hide()
+	end)
+
+	button.bflCombatOverlay = overlay
+	return overlay
+end
+
+function HouseListProxy:ShowAllCombatOverlays()
+	if not self.hookedButtons then
+		return
+	end
+	for button in pairs(self.hookedButtons) do
+		if button:IsVisible() and button.bflCombatOverlay then
+			button.bflCombatOverlay:Show()
+		end
+	end
+end
+
+function HouseListProxy:HideAllCombatOverlays()
+	if not self.hookedButtons then
+		return
+	end
+	for button in pairs(self.hookedButtons) do
+		if button.bflCombatOverlay then
+			button.bflCombatOverlay:Hide()
+		end
+	end
 end
 
 -- ========================================
@@ -214,7 +307,7 @@ function HouseListProxy:ShowProxy(button, houseInfo)
 		return
 	end
 
-	-- If in combat or restricted, queue the action for later
+	-- If in combat or restricted, queue the action for later (overlay is already visible)
 	if BFL:IsActionRestricted() then
 		self.pendingShow = {
 			button = button,

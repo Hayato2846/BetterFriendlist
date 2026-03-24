@@ -1339,7 +1339,7 @@ BFL:RegisterLocale("koKR", function()
 	L.SETTINGS_FRIEND_NAME_SETTINGS = "친구 이름 설정"
 	L.SETTINGS_FRIEND_INFO_SETTINGS = "친구 정보 설정"
 	L.SETTINGS_FONT_TABS_TITLE = "탭 텍스트"
-	L.SETTINGS_FONT_RAID_TITLE = "공��대 이�� 텍스�������"
+	L.SETTINGS_FONT_RAID_TITLE = "공��대 이�� 텍스�����������"
 	L.SETTINGS_FONT_SIZE_NUM = "글꼴 크기"
 
 	-- ========================================
@@ -1435,4 +1435,7 @@ BFL:RegisterLocale("koKR", function()
 	L.WIZARD_NO_BACKUP =
 		"메모 백업을 찾을 수 없습니다. 먼저 메모 정리 마법사를 사용하여 백업을 만드세요."
 	L.WIZARD_BACKUP_STATUS_FMT = "%d/%d개 표시 | 백업 이후 %d개 변경 | 백업: %s"
+
+	-- Housing
+	L.HOUSING_COMBAT_RESTRICTED = "전투 중 사용 불가."
 end)

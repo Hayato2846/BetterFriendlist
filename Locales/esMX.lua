@@ -1423,4 +1423,7 @@ BFL:RegisterLocale("esMX", function()
 	L.WIZARD_NO_BACKUP =
 		"No se encontro respaldo de notas. Usa primero el Asistente de limpieza de notas para crear uno."
 	L.WIZARD_BACKUP_STATUS_FMT = "Mostrando %d de %d entradas | %d cambiadas desde el respaldo | Respaldo: %s"
+
+	-- Housing
+	L.HOUSING_COMBAT_RESTRICTED = "No disponible en combate."
 end)

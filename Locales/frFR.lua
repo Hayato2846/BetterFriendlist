@@ -1420,4 +1420,7 @@ BFL:RegisterLocale("frFR", function()
 	L.WIZARD_NO_BACKUP =
 		"Aucune sauvegarde trouvee. Utilisez d'abord l'Assistant de nettoyage des notes pour en creer une."
 	L.WIZARD_BACKUP_STATUS_FMT = "Affichage de %d sur %d entrees | %d modifiees depuis la sauvegarde | Sauvegarde : %s"
+
+	-- Housing
+	L.HOUSING_COMBAT_RESTRICTED = "Indisponible en combat."
 end)

@@ -1423,4 +1423,7 @@ BFL:RegisterLocale("zhCN", function()
 	L.WIZARD_RESTORE_SUCCESS = "已成功恢复 %d 条备注。"
 	L.WIZARD_NO_BACKUP = "未找到备注备份。请先使用备注清理向导创建备份。"
 	L.WIZARD_BACKUP_STATUS_FMT = "显示 %d/%d 条记录 | %d 条自备份后已更改 | 备份时间: %s"
+
+	-- Housing
+	L.HOUSING_COMBAT_RESTRICTED = "战斗中不可用。"
 end)

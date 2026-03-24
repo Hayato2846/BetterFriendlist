@@ -1413,4 +1413,7 @@ BFL:RegisterLocale("itIT", function()
 	L.WIZARD_RESTORE_SUCCESS = "%d note ripristinate con successo."
 	L.WIZARD_NO_BACKUP = "Nessun backup trovato. Usa prima la Procedura guidata di pulizia note per crearne uno."
 	L.WIZARD_BACKUP_STATUS_FMT = "Mostrando %d di %d voci | %d modificate dal backup | Backup: %s"
+
+	-- Housing
+	L.HOUSING_COMBAT_RESTRICTED = "Bloccato in combattimento."
 end)

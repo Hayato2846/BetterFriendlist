@@ -1,5 +1,4 @@
 ﻿-- A friends list replacement for World of Warcraft with Battle.net support
--- Version 0.13
 -- UI GLUE LAYER - XML Callbacks and thin wrappers for modular backend
 -- Main business logic is in Modules/ folder
 
@@ -2648,6 +2647,48 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				-- Register for WoW friend menus (online and offline)
 				Menu.ModifyMenu("MENU_UNIT_FRIEND", AddGroupsToFriendMenu)
 				Menu.ModifyMenu("MENU_UNIT_FRIEND_OFFLINE", AddGroupsToFriendMenu)
+
+				-- Housing: Intercept "View Houses" menu entry during combat (Retail 12.0+ only)
+				-- ShowUIPanel() is protected since 8.2.0, so the house list cannot be opened in combat.
+				-- Without interception, BFL's ModifyMenu hooks taint the execution context, causing
+				-- a cryptic "Interface action failed because of an AddOn" error. We replace it with
+				-- a clear localized message instead.
+				if BFL.IsRetail and UNIT_VIEW_HOUSES then
+					local function BFL_InterceptViewHousesInCombat(owner, rootDescription, contextData)
+						if not BFL:IsActionRestricted() then
+							return
+						end
+						if not rootDescription then
+							return
+						end
+						pcall(function()
+							for _, elementDescription in rootDescription:EnumerateElementDescriptions() do
+								local text = elementDescription.text
+								if type(text) == "function" then
+									local success, result = pcall(text)
+									if success then
+										text = result
+									end
+								end
+								if text == UNIT_VIEW_HOUSES then
+									elementDescription:SetResponder(function()
+										local L = BFL.L
+										if L and L.HOUSING_COMBAT_RESTRICTED then
+											UIErrorsFrame:AddMessage(L.HOUSING_COMBAT_RESTRICTED, 1.0, 0.1, 0.1, 1.0)
+										end
+										return MenuResponse and MenuResponse.Close
+									end)
+									break
+								end
+							end
+						end)
+					end
+					Menu.ModifyMenu("MENU_UNIT_BN_FRIEND", BFL_InterceptViewHousesInCombat)
+					Menu.ModifyMenu("MENU_UNIT_BN_FRIEND_OFFLINE", BFL_InterceptViewHousesInCombat)
+					Menu.ModifyMenu("MENU_UNIT_PARTY", BFL_InterceptViewHousesInCombat)
+					Menu.ModifyMenu("MENU_UNIT_RAID_PLAYER", BFL_InterceptViewHousesInCombat)
+					Menu.ModifyMenu("MENU_UNIT_COMMUNITIES_GUILD_MEMBER", BFL_InterceptViewHousesInCombat)
+				end
 			end
 
 			-- DEPRECATED: Old Menu.ModifyMenu code removed (was using wrong tags without MENU_UNIT_ prefix)

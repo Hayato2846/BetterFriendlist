@@ -1409,7 +1409,7 @@ BFL:RegisterLocale("zhTW", function()
 	L.WIZARD_HEADER = "備註清理"
 	L.WIZARD_HEADER_DESC =
 		"從好友備註中移除 FriendGroups 後綴。先備份您的備註，然後檢查並套用變更。"
-	L.WIZARD_COL_ACCOUNT = "帳���名稱"
+	L.WIZARD_COL_ACCOUNT = "帳�������名稱"
 	L.WIZARD_COL_BATTLETAG = "戰網暱稱"
 	L.WIZARD_COL_NOTE = "目前備註"
 	L.WIZARD_COL_CLEANED = "清理後備註"
@@ -1441,4 +1441,7 @@ BFL:RegisterLocale("zhTW", function()
 	L.WIZARD_RESTORE_SUCCESS = "已成功還原 %d 條備註。"
 	L.WIZARD_NO_BACKUP = "未找到備註備份。請先使用備註清理精靈建立備份。"
 	L.WIZARD_BACKUP_STATUS_FMT = "顯示 %d/%d 筆記錄 | %d 筆自備份後已變更 | 備份時間: %s"
+
+	-- Housing
+	L.HOUSING_COMBAT_RESTRICTED = "戰鬥中無法使用。"
 end)
