@@ -1374,13 +1374,6 @@ function QuickJoin:GetGroupInfo(groupGUID)
 				-- BFL:DebugPrint("  QueueType:", queueData.queueType)
 				-- BFL:DebugPrint("  LFGList ID:", queueData.lfgListID)
 
-				-- Detailed QueueData Dump
-				if queueData then
-					for k, v in pairs(queueData) do
-						-- BFL:DebugPrint(string.format("  queueData.%s = %s", tostring(k), tostring(v)))
-					end
-				end
-
 				-- For LFG List: Blizzard displays searchResultInfo.name (the custom group title)
 				-- NOT the activity name! (QuickJoin.lua doesn't even use activities)
 				local searchResultInfo = C_LFGList.GetSearchResultInfo(queueData.lfgListID)
@@ -1480,10 +1473,10 @@ function QuickJoin:GetGroupInfo(groupGUID)
 						end
 
 						-- CRITICAL FIX: Handle activityIDs table (plural) which Blizzard uses now (11.0+)
-						-- In secret mode, activityIDs is a secret userdata that throws errors when
-						-- indexed. We use pcall to safely attempt extraction - if it works, great.
-						-- If not, the previousInfo cache fallback will handle it.
-						if not activityID and searchResultInfo.activityIDs then
+						-- In secret mode, activityIDs is a secret value that throws errors when
+						-- indexed or iterated. Skip entirely when secret - the previousInfo cache
+						-- and activityInfoCache fallbacks will provide the activity data.
+						if not activityID and not hasSecretValues and searchResultInfo.activityIDs then
 							local ok, result = pcall(function()
 								-- Try array index first
 								if searchResultInfo.activityIDs[1] then

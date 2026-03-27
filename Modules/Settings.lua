@@ -1796,7 +1796,7 @@ function Settings:DebugDatabase()
 						and accountInfo.gameAccountInfo.isOnline
 						and "|cff00ff00ONLINE|r"
 					or "|cffaaaaaaOFFLINE|r"
-				local name = accountInfo.accountName ~= "???" and accountInfo.accountName or accountInfo.battleTag
+				local name = BFL:GetSafeAccountName(accountInfo.accountName, accountInfo.battleTag)
 				-- BFL:DebugPrint(string.format("|cff00ffffBetterFriendlist Debug:|r   [%d] %s - %s", i, name, status))
 			end
 		end
@@ -3310,6 +3310,7 @@ function Settings:RefreshGeneralTab()
 		labels = {
 			L.NAME_PRESET_DEFAULT or "Name (Character)",
 			L.NAME_PRESET_BATTLETAG or "BattleTag (Character)",
+			L.NAME_PRESET_BATTLETAG_ONLY or "BattleTag Only",
 			L.NAME_PRESET_NICKNAME or "Nickname (Character)",
 			L.NAME_PRESET_CHARACTER or "Character Only",
 			L.NAME_PRESET_NAME_ONLY or "Name Only",
@@ -3318,6 +3319,7 @@ function Settings:RefreshGeneralTab()
 		values = {
 			"default",
 			"battletag",
+			"battletag_only",
 			"nickname",
 			"character",
 			"name_only",

@@ -192,6 +192,7 @@ end
 local NAME_PRESET_FORMATS = {
 	["default"] = "%name% (%character%)",
 	["battletag"] = "%battletag% (%character%)",
+	["battletag_only"] = "%battletag%",
 	["nickname"] = "%nickname% (%character%)",
 	["character"] = "%character%",
 	["name_only"] = "%name%",

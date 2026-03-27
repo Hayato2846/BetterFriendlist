@@ -822,6 +822,7 @@ BFL:RegisterLocale("koKR", function()
 	-- Name Format Preset Labels (Phase 22)
 	L.NAME_PRESET_DEFAULT = "이름 (캐릭터)"
 	L.NAME_PRESET_BATTLETAG = "배틀태그 (캐릭터)"
+	L.NAME_PRESET_BATTLETAG_ONLY = "배틀태그만"
 	L.NAME_PRESET_NICKNAME = "별명 (캐릭터)"
 	L.NAME_PRESET_NAME_ONLY = "이름만"
 	L.NAME_PRESET_CHARACTER = "캐릭터만"

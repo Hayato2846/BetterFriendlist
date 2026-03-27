@@ -873,6 +873,7 @@ BFL:RegisterLocale("deDE", function()
 	-- Name Format Preset Labels (Phase 22)
 	L.NAME_PRESET_DEFAULT = "Name (Charakter)"
 	L.NAME_PRESET_BATTLETAG = "BattleTag (Charakter)"
+	L.NAME_PRESET_BATTLETAG_ONLY = "Nur BattleTag"
 	L.NAME_PRESET_NICKNAME = "Spitzname (Charakter)"
 	L.NAME_PRESET_NAME_ONLY = "Nur Name"
 	L.NAME_PRESET_CHARACTER = "Nur Charakter"

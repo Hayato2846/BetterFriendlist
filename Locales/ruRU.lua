@@ -857,6 +857,7 @@ BFL:RegisterLocale("ruRU", function()
 	-- Name Format Preset Labels (Phase 22)
 	L.NAME_PRESET_DEFAULT = "Имя (Персонаж)"
 	L.NAME_PRESET_BATTLETAG = "BattleTag (Персонаж)"
+	L.NAME_PRESET_BATTLETAG_ONLY = "Только BattleTag"
 	L.NAME_PRESET_NICKNAME = "Псевдоним (Персонаж)"
 	L.NAME_PRESET_NAME_ONLY = "Только имя"
 	L.NAME_PRESET_CHARACTER = "Только персонаж"

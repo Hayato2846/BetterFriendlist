@@ -828,6 +828,7 @@ BFL:RegisterLocale("esES", function()
 	-- Name Format Preset Labels (Phase 22)
 	L.NAME_PRESET_DEFAULT = "Nombre (Personaje)"
 	L.NAME_PRESET_BATTLETAG = "BattleTag (Personaje)"
+	L.NAME_PRESET_BATTLETAG_ONLY = "Solo BattleTag"
 	L.NAME_PRESET_NICKNAME = "Apodo (Personaje)"
 	L.NAME_PRESET_NAME_ONLY = "Solo Nombre"
 	L.NAME_PRESET_CHARACTER = "Solo Personaje"

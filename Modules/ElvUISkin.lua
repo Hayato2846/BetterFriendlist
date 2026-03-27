@@ -229,11 +229,31 @@ function ElvUISkin:SkinFrames(E, S)
 			end
 		end
 
-		if _G.PanelTemplates_SelectTab then
-			hooksecurefunc("PanelTemplates_SelectTab", FixTabCenter)
-		end
-		if _G.PanelTemplates_DeselectTab then
-			hooksecurefunc("PanelTemplates_DeselectTab", FixTabCenter)
+		-- On 12.0.0+ (HasSecretValues), global PanelTemplates hooks taint the
+		-- execution context, causing "secret string conversion" errors in the
+		-- chat system. Use per-tab OnShow hooks instead of global hooks.
+		if BFL.HasSecretValues then
+			local function HookBFLTab(tab)
+				if tab and not tab.BFL_ElvCenterHooked then
+					tab:HookScript("OnShow", function(self)
+						FixTabCenter(self)
+					end)
+					tab.BFL_ElvCenterHooked = true
+				end
+			end
+			for i = 1, 4 do
+				HookBFLTab(_G["BetterFriendsFrameBottomTab" .. i])
+			end
+			HookBFLTab(_G["BetterFriendsFrameTab1"])
+			HookBFLTab(_G["BetterFriendlistSettingsFrameTab1"])
+			HookBFLTab(_G["BetterFriendlistSettingsFrameTab2"])
+		else
+			if _G.PanelTemplates_SelectTab then
+				hooksecurefunc("PanelTemplates_SelectTab", FixTabCenter)
+			end
+			if _G.PanelTemplates_DeselectTab then
+				hooksecurefunc("PanelTemplates_DeselectTab", FixTabCenter)
+			end
 		end
 
 		self.TabHookInstalled = true

@@ -717,6 +717,7 @@ BFL:RegisterLocale("zhTW", function()
 	-- Name Format Preset Labels (Phase 22)
 	L.NAME_PRESET_DEFAULT = "名稱 (角色)"
 	L.NAME_PRESET_BATTLETAG = "戰網暱稱 (角色)"
+	L.NAME_PRESET_BATTLETAG_ONLY = "僅戰網暱稱"
 	L.NAME_PRESET_NICKNAME = "暱稱 (角色)"
 	L.NAME_PRESET_NAME_ONLY = "僅名稱"
 	L.NAME_PRESET_CHARACTER = "僅角色"
@@ -1408,7 +1409,7 @@ BFL:RegisterLocale("zhTW", function()
 	L.WIZARD_BTN_TOOLTIP = "開啟精靈以清理好友備註中的 FriendGroups 資料"
 	L.WIZARD_HEADER = "備註清理"
 	L.WIZARD_HEADER_DESC =
-		"從好友備註中移除 FriendGroups 後綴。先備份您的備註，然後檢查並套用變更。"
+		"從好友備註中移除 FriendGroups 後綴。先備份您的備註，然後檢��並套用變更。"
 	L.WIZARD_COL_ACCOUNT = "帳�������名稱"
 	L.WIZARD_COL_BATTLETAG = "戰網暱稱"
 	L.WIZARD_COL_NOTE = "目前備註"

@@ -819,6 +819,7 @@ local function LoadEnUS()
 	-- Name Format Preset Labels (Phase 22)
 	L.NAME_PRESET_DEFAULT = "Name (Character)"
 	L.NAME_PRESET_BATTLETAG = "BattleTag (Character)"
+	L.NAME_PRESET_BATTLETAG_ONLY = "BattleTag Only"
 	L.NAME_PRESET_NICKNAME = "Nickname (Character)"
 	L.NAME_PRESET_NAME_ONLY = "Name Only"
 	L.NAME_PRESET_CHARACTER = "Character Only"

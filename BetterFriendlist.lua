@@ -133,33 +133,41 @@ local function ApplyFontSize(fontString)
 	FontManager:ApplyFontSize(fontString)
 end
 
--- Apply Font Settings to Tabs (Called when settings change or frame shown)
--- Secure post-hook: re-apply enforced width on BFL tabs AFTER Blizzard resizes them.
--- CRITICAL: We must NOT override PanelTemplates_TabResize globally, as that taints the
--- function. Chat tabs also use PanelTemplates_TabResize, and a tainted resize propagates
--- into the chat system, causing "secret string conversion" crashes on WoW 12.0+.
--- hooksecurefunc runs AFTER the original without tainting it.
-if not BFL.IsClassic and PanelTemplates_TabResize then
-	hooksecurefunc("PanelTemplates_TabResize", function(tab)
-		if tab and tab.BFL_EnforcedWidth then
-			tab.BFL_ResizeLock = true
-			tab:SetWidth(tab.BFL_EnforcedWidth)
-			-- Restore text fontstring width and font that Blizzard's TabResize overwrites.
-			-- PanelTemplates_TabResize sets tab.Text:SetWidth(textWidth) at the end,
-			-- which constrains text based on Blizzard's own width calculation.
-			-- We must re-apply BFL's text area width and custom font.
-			local fs = tab.Text or (tab.GetFontString and tab:GetFontString())
-			if fs then
-				if tab.BFL_TextWidth then
-					fs:SetWidth(tab.BFL_TextWidth)
-				end
-				if tab.BFL_FontPath then
-					fs:SetFont(tab.BFL_FontPath, tab.BFL_FontSize, tab.BFL_FontOutline)
-					fs:SetShadowOffset(0, 0)
-				end
-			end
-			tab.BFL_ResizeLock = false
+-- Re-apply enforced width and font on a BFL tab AFTER Blizzard's PanelTemplates_TabResize
+-- overwrites them. Call this directly after any PanelTemplates_TabResize on BFL tabs.
+local function BFL_EnforceTabWidth(tab)
+	if not tab or not tab.BFL_EnforcedWidth then
+		return
+	end
+	tab.BFL_ResizeLock = true
+	tab:SetWidth(tab.BFL_EnforcedWidth)
+	-- Restore text fontstring width and font that Blizzard's TabResize overwrites.
+	-- PanelTemplates_TabResize sets tab.Text:SetWidth(textWidth) at the end,
+	-- which constrains text based on Blizzard's own width calculation.
+	-- We must re-apply BFL's text area width and custom font.
+	local fs = tab.Text or (tab.GetFontString and tab:GetFontString())
+	if fs then
+		if tab.BFL_TextWidth then
+			fs:SetWidth(tab.BFL_TextWidth)
 		end
+		if tab.BFL_FontPath then
+			fs:SetFont(tab.BFL_FontPath, tab.BFL_FontSize, tab.BFL_FontOutline)
+			fs:SetShadowOffset(0, 0)
+		end
+	end
+	tab.BFL_ResizeLock = false
+end
+
+-- Install global hook ONLY on pre-12.0 Retail where secret values don't exist.
+-- On 12.0.0+ (HasSecretValues), chat frame tabs also call PanelTemplates_TabResize,
+-- and the hooksecurefunc callback taints the execution context. When Blizzard's
+-- ChatHistory_GetToken then calls strlower() on a secret arg12/arg13, the taint
+-- causes "attempt to perform string conversion on a secret string value".
+-- Per-tab OnSizeChanged hooks (installed later in DistributeTabWidths) provide
+-- equivalent width enforcement without the global taint vector.
+if not BFL.IsClassic and PanelTemplates_TabResize and not BFL.HasSecretValues then
+	hooksecurefunc("PanelTemplates_TabResize", function(tab)
+		BFL_EnforceTabWidth(tab)
 	end)
 end
 
@@ -579,6 +587,12 @@ function BFL:ApplyTabFonts()
 						self.BFL_ResizeLock = true
 						self:SetWidth(self.BFL_EnforcedWidth)
 						self.BFL_ResizeLock = false
+					end
+					-- On 12.0.0+ the global PanelTemplates_TabResize hook is disabled
+					-- to avoid tainting the chat execution path. Restore text width
+					-- and font here instead when an external resize is detected.
+					if BFL.HasSecretValues and self.BFL_EnforcedWidth then
+						BFL_EnforceTabWidth(self)
 					end
 				end)
 				info.tab.BFL_SizeHooked = true
@@ -3822,7 +3836,7 @@ function BetterFriendsList_Button_OnClick(button, mouseButton)
 						and FriendsListModule:ResolveBNetFriendIndex(friendData.bnetAccountID, friendData.battleTag)
 					or friendData.index
 				BetterFriendsList_ShowBNDropdown(
-					accountInfo.accountName,
+					BFL:GetSafeAccountName(accountInfo.accountName, accountInfo.battleTag),
 					accountInfo.gameAccountInfo.isOnline,
 					nil, -- lineID
 					nil, -- chatType

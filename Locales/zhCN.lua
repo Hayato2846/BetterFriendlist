@@ -820,6 +820,7 @@ BFL:RegisterLocale("zhCN", function()
 	-- Name Format Preset Labels (Phase 22)
 	L.NAME_PRESET_DEFAULT = "名称 (角色)"
 	L.NAME_PRESET_BATTLETAG = "战网昵称 (角色)"
+	L.NAME_PRESET_BATTLETAG_ONLY = "仅战网昵称"
 	L.NAME_PRESET_NICKNAME = "备注名 (角色)"
 	L.NAME_PRESET_NAME_ONLY = "仅名称"
 	L.NAME_PRESET_CHARACTER = "仅角色"

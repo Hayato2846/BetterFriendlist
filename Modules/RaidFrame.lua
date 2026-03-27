@@ -923,6 +923,9 @@ end
 
 --- Execute custom non-secure actions
 function RaidFrame:PerformCustomAction(action, unit)
+	if BFL:IsActionRestricted() then
+		return
+	end
 	if not unit or not UnitExists(unit) then
 		return
 	end
@@ -2183,6 +2186,9 @@ end
 
 --- Convert to raid
 function RaidFrame:ConvertToRaid()
+	if BFL:IsActionRestricted() then
+		return false
+	end
 	if not IsInGroup() then
 		return false
 	end
@@ -2197,6 +2203,9 @@ end
 
 --- Convert to party
 function RaidFrame:ConvertToParty()
+	if BFL:IsActionRestricted() then
+		return false
+	end
 	if not IsInRaid() then
 		return false
 	end
@@ -2211,6 +2220,9 @@ end
 
 --- Initiate ready check
 function RaidFrame:DoReadyCheck()
+	if BFL:IsActionRestricted() then
+		return false
+	end
 	if not self:CanControlRaid() then
 		return false
 	end
@@ -2241,6 +2253,9 @@ end
 
 --- Toggle everyone is assistant
 function RaidFrame:SetEveryoneIsAssistant(enabled)
+	if BFL:IsActionRestricted() then
+		return false
+	end
 	if not self:IsRaidLeader() then
 		return false
 	end

@@ -3627,8 +3627,9 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 				friend.bnetAccountID = accountInfo.bnetAccountID
 				-- Follow Blizzard's BNet_GetBNetAccountName pattern:
 				-- accountName is a kString (|Kq..|k). Store nil if empty or "???" so display fallback triggers.
+				-- On 12.0.0+, accountName could theoretically be a secret value. Guard comparisons.
 				local accName = accountInfo.accountName
-				if accName == nil or accName == "" or accName == "???" then
+				if accName == nil or BFL:IsSecret(accName) or accName == "" or accName == "???" then
 					friend.accountName = nil
 				else
 					friend.accountName = accName
@@ -5370,6 +5371,10 @@ function FriendsList:InviteGroupToParty(groupId)
 
 	if not IsInRaid() and totalSize > 5 then
 		-- Need to convert to raid
+		if BFL:IsActionRestricted() then
+			UIErrorsFrame:AddMessage(ERR_AFFECTING_COMBAT, 1.0, 0.1, 0.1, 1.0)
+			return
+		end
 		print(BFL.L.MSG_INVITE_CONVERT_RAID)
 		if BFL.ConvertToRaid then
 			BFL.ConvertToRaid()

@@ -314,11 +314,13 @@ function BetterRaidFrame_UpdateControlPanelButtons()
 	local isAssistant = UnitIsGroupAssistant("player")
 	local canControl = isLeader or isAssistant
 	local inRaid = IsInRaid()
+	local inCombat = BFL:IsActionRestricted()
 
 	-- Everyone is Assistant checkbox: Only Raid Leader can toggle
 	-- Must be in a real raid AND be leader (Blizzard only checks leader because
 	-- their UI is only visible in raid; we always show the checkbox, so we need both)
-	local canAssist = inRaid and isLeader
+	-- 12.0.1: SetEveryoneIsAssistant is combat-restricted
+	local canAssist = inRaid and isLeader and not inCombat
 	if controlPanel.EveryoneAssistCheckbox then
 		controlPanel.EveryoneAssistCheckbox:SetChecked(IsEveryoneAssistant())
 		if canAssist then
@@ -336,8 +338,9 @@ function BetterRaidFrame_UpdateControlPanelButtons()
 	end
 
 	-- Ready Check: Only Leader or Assistant, and only in a group
+	-- 12.0.1: DoReadyCheck is combat-restricted
 	if controlPanel.ReadyCheckButton then
-		if IsInGroup() and canControl then
+		if IsInGroup() and canControl and not inCombat then
 			controlPanel.ReadyCheckButton:Enable()
 		else
 			controlPanel.ReadyCheckButton:Disable()
@@ -345,8 +348,9 @@ function BetterRaidFrame_UpdateControlPanelButtons()
 	end
 
 	-- Convert to Raid: Only if in Party (not Raid) and is Leader
+	-- 12.0.1: ConvertToRaid is combat-restricted
 	if controlPanel.ConvertToRaidButton then
-		if not inRaid and IsInGroup() and isLeader then
+		if not inRaid and IsInGroup() and isLeader and not inCombat then
 			controlPanel.ConvertToRaidButton:Enable()
 		else
 			controlPanel.ConvertToRaidButton:Disable()
@@ -406,12 +410,19 @@ function BetterRaidFrame_UpdateCombatOverlay(inCombat)
 			-- BFL:DebugPrint("[BFL] Member button overlays updated")
 		end
 	end
+
+	-- 12.0.1: Update control panel buttons for combat state
+	BetterRaidFrame_UpdateControlPanelButtons()
 end -- ========================================
 -- CONTROL PANEL BUTTONS
 -- ========================================
 
 -- Ready Check Button
 function BetterRaidFrame_DoReadyCheck()
+	if BFL:IsActionRestricted() then
+		UIErrorsFrame:AddMessage(ERR_AFFECTING_COMBAT, 1.0, 0.1, 0.1, 1.0)
+		return
+	end
 	if UnitIsGroupLeader("player") or UnitIsGroupAssistant("player") then
 		DoReadyCheck()
 	else
@@ -446,6 +457,11 @@ function BetterRaidFrame_EveryoneAssistCheckbox_OnEvent(self)
 end
 
 function BetterRaidFrame_EveryoneAssistCheckbox_OnClick(self)
+	if BFL:IsActionRestricted() then
+		self:SetChecked(not self:GetChecked())
+		UIErrorsFrame:AddMessage(ERR_AFFECTING_COMBAT, 1.0, 0.1, 0.1, 1.0)
+		return
+	end
 	if UnitIsGroupLeader("player") then
 		local checked = self:GetChecked()
 		-- Set cooldown to prevent OnEvent from resetting state before server confirms
