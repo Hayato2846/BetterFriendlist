@@ -303,8 +303,14 @@ local function GetSortMemberInfo(member)
 	end
 	local name, _, relationship = BetterFriendlist_GetRelationshipInfo(guid, nil, member and member.clubId)
 	if guid then
-		-- Use array-style table for compactness (1=name, 2=relationship)
-		sortMemberInfoCache[guid] = { name or "", relationship }
+		-- PERF: Reuse existing cache entry table if present (avoids allocation on re-population)
+		local existing = sortMemberInfoCache[guid]
+		if existing then
+			existing[1] = name or ""
+			existing[2] = relationship
+		else
+			sortMemberInfoCache[guid] = { name or "", relationship }
+		end
 	end
 	return name or "", relationship
 end
@@ -413,17 +419,71 @@ end
 local QuickJoinEntry = {}
 QuickJoinEntry.__index = QuickJoinEntry
 
-function QuickJoinEntry:New(guid, groupInfo)
-	local entry = setmetatable({}, QuickJoinEntry)
-	entry.guid = guid
-	entry.groupInfo = groupInfo or {}
-	entry.fontObject = BetterFriendlistFontNormalSmall
+-- PERF: Object pool to avoid per-update table allocations
+-- Entries are recycled via wipe() instead of creating new tables each frame
+local entryPool = {}
+local entryPoolSize = 0
 
-	-- Parse display data
+local function AcquireEntry()
+	if entryPoolSize > 0 then
+		local entry = entryPool[entryPoolSize]
+		entryPool[entryPoolSize] = nil
+		entryPoolSize = entryPoolSize - 1
+		return entry
+	end
+	-- Pool empty: create new entry with pre-allocated sub-tables
+	local entry = setmetatable({}, QuickJoinEntry)
 	entry.displayedMembers = {}
 	entry.displayedQueues = {}
 	entry.zombieMemberIndices = {}
 	entry.zombieQueueIndices = {}
+	return entry
+end
+
+local function ReleaseEntries(entries)
+	if not entries then
+		return
+	end
+	for i = 1, #entries do
+		local entry = entries[i]
+		if entry then
+			-- Keep sub-tables intact for reuse in next AcquireEntry().
+			-- :New() will overwrite fields and nil-out surplus indices.
+			-- Clear non-reusable references to avoid stale data leaks
+			entry.guid = nil
+			entry.groupInfo = nil
+			entry.hasRelationshipWithLeader = nil
+			entryPoolSize = entryPoolSize + 1
+			entryPool[entryPoolSize] = entry
+		end
+		entries[i] = nil
+	end
+end
+
+-- PERF helper: Reuse or create a sub-table at array index
+local function ReuseOrCreateSubTable(array, index)
+	local t = array[index]
+	if t then
+		wipe(t)
+		return t
+	end
+	t = {}
+	array[index] = t
+	return t
+end
+
+-- PERF helper: Nil-out surplus entries beyond newCount
+local function TruncateArray(array, newCount)
+	for i = newCount + 1, #array do
+		array[i] = nil
+	end
+end
+
+function QuickJoinEntry:New(guid, groupInfo)
+	local entry = AcquireEntry()
+	entry.guid = guid
+	entry.groupInfo = groupInfo or {}
+	entry.fontObject = BetterFriendlistFontNormalSmall
 
 	-- Track relationship with leader (Blizzard's hasRelationshipWithLeader)
 	-- Used for auto-accept logic in tooltips
@@ -443,6 +503,7 @@ function QuickJoinEntry:New(guid, groupInfo)
 		BetterFriendlist_SortGroupMembers(sortedMembers)
 	end
 
+	local memberCount = 0
 	if sortedMembers and #sortedMembers > 0 then
 		for i, member in ipairs(sortedMembers) do
 			-- Get name using BetterFriendlist_GetRelationshipInfo (like Blizzard)
@@ -460,22 +521,25 @@ function QuickJoinEntry:New(guid, groupInfo)
 				name = ""
 			end
 
-			entry.displayedMembers[i] = {
-				guid = member.guid or guid,
-				name = name,
-				clubId = member.clubId,
-			}
+			-- PERF: Reuse existing sub-table from previous pool cycle
+			local memberEntry = ReuseOrCreateSubTable(entry.displayedMembers, i)
+			memberEntry.guid = member.guid or guid
+			memberEntry.name = name
+			memberEntry.clubId = member.clubId
+			memberCount = i
 		end
 	else
 		-- Fallback: Use leader name if no members array
-		entry.displayedMembers[1] = {
-			guid = guid,
-			name = groupInfo.leaderName or groupInfo._mockLeaderName or "",
-			clubId = nil,
-		}
+		local memberEntry = ReuseOrCreateSubTable(entry.displayedMembers, 1)
+		memberEntry.guid = guid
+		memberEntry.name = groupInfo.leaderName or groupInfo._mockLeaderName or ""
+		memberEntry.clubId = nil
+		memberCount = 1
 	end
+	TruncateArray(entry.displayedMembers, memberCount)
 
 	-- Extract queue data - Store GROUP TITLE (not activity name!)
+	local queueCount = 0
 	if groupInfo.queues and #groupInfo.queues > 0 then
 		for i, queue in ipairs(groupInfo.queues) do
 			-- Use groupTitle from groupInfo (the custom group name, e.g., "Wo ist Hayato")
@@ -486,43 +550,58 @@ function QuickJoinEntry:New(guid, groupInfo)
 			local lfgListID = queue.queueData and queue.queueData.lfgListID
 			local queueType = queue.queueData and queue.queueData.queueType or queue.queueType or "lfg"
 
-			entry.displayedQueues[i] = {
-				queueData = {
-					name = groupTitle, -- Internal storage
-					queueType = queueType,
-					lfgListID = lfgListID, -- IMPORTANT: Store lfgListID for tooltip leaderName lookup!
-				},
-				-- CRITICAL: Blizzard caches the queue name (QuickJoin.lua:386-393)
-				-- This is what gets displayed in the button!
-				cachedQueueName = groupTitle,
-				-- Extract role needs from groupInfo (returned by GetGroupInfo)
-				-- These are used in the tooltip to show Available Roles
-				needTank = groupInfo.needTank or false,
-				needHealer = groupInfo.needHealer or false,
-				needDamage = groupInfo.needDamage or false,
-				-- Auto-accept flag from groupInfo (for tooltip display)
-				isAutoAccept = groupInfo.isAutoAccept or false,
-				isZombie = false, -- Queue is active unless proven otherwise
-			}
+			-- PERF: Reuse existing sub-table from previous pool cycle
+			local queueEntry = ReuseOrCreateSubTable(entry.displayedQueues, i)
+			local queueData = queueEntry.queueData
+			if not queueData then
+				queueData = {}
+				queueEntry.queueData = queueData
+			end
+			queueData.name = groupTitle
+			queueData.queueType = queueType
+			queueData.lfgListID = lfgListID
+
+			-- CRITICAL: Blizzard caches the queue name (QuickJoin.lua:386-393)
+			-- This is what gets displayed in the button!
+			queueEntry.cachedQueueName = groupTitle
+			-- Extract role needs from groupInfo (returned by GetGroupInfo)
+			-- These are used in the tooltip to show Available Roles
+			queueEntry.needTank = groupInfo.needTank or false
+			queueEntry.needHealer = groupInfo.needHealer or false
+			queueEntry.needDamage = groupInfo.needDamage or false
+			-- Auto-accept flag from groupInfo (for tooltip display)
+			queueEntry.isAutoAccept = groupInfo.isAutoAccept or false
+			queueEntry.isZombie = false -- Queue is active unless proven otherwise
+			queueCount = i
 		end
 	else
 		-- Fallback: Create one queue entry with group title
 		local groupTitle = groupInfo.groupTitle or groupInfo._mockActivityName or ""
-		entry.displayedQueues[1] = {
-			queueData = {
-				name = groupTitle,
-				queueType = "lfg",
-			},
-			cachedQueueName = groupTitle, -- CRITICAL: Cache the name!
-			-- Use role needs from groupInfo for fallback too
-			needTank = groupInfo.needTank or false,
-			needHealer = groupInfo.needHealer or false,
-			needDamage = groupInfo.needDamage or false,
-			-- Auto-accept flag from groupInfo (for tooltip display)
-			isAutoAccept = groupInfo.isAutoAccept or false,
-			isZombie = false,
-		}
+		local queueEntry = ReuseOrCreateSubTable(entry.displayedQueues, 1)
+		local queueData = queueEntry.queueData
+		if not queueData then
+			queueData = {}
+			queueEntry.queueData = queueData
+		end
+		queueData.name = groupTitle
+		queueData.queueType = "lfg"
+		queueData.lfgListID = nil
+
+		queueEntry.cachedQueueName = groupTitle
+		-- Use role needs from groupInfo for fallback too
+		queueEntry.needTank = groupInfo.needTank or false
+		queueEntry.needHealer = groupInfo.needHealer or false
+		queueEntry.needDamage = groupInfo.needDamage or false
+		-- Auto-accept flag from groupInfo (for tooltip display)
+		queueEntry.isAutoAccept = groupInfo.isAutoAccept or false
+		queueEntry.isZombie = false
+		queueCount = 1
 	end
+	TruncateArray(entry.displayedQueues, queueCount)
+
+	-- Clear zombie indices from previous pool cycle
+	wipe(entry.zombieMemberIndices)
+	wipe(entry.zombieQueueIndices)
 
 	return entry
 end
@@ -1199,9 +1278,9 @@ function QuickJoin:Update(forceUpdate)
 
 	self.lastUpdate = GetTime()
 	self.updateQueued = false
-	if self.relationshipCache then
-		wipe(self.relationshipCache)
-	end
+	-- PERF: Do NOT wipe relationshipCache here. TTL-based invalidation (RELATIONSHIP_CACHE_TTL)
+	-- handles expiration. Wiping forces CacheAndReturnRelationship to re-allocate new tables
+	-- for every member on every update, even when data hasn't changed.
 	self.entriesCache = nil
 	self.entriesCacheVersion = nil
 
@@ -1256,6 +1335,8 @@ function QuickJoin:Update(forceUpdate)
 
 	-- Update ScrollBox DataProvider
 	if self.dataProvider then
+		-- PERF: Release old entries back to pool before creating new ones
+		ReleaseEntries(self._lastEntries)
 		local entries = {}
 		for _, guid in ipairs(self.availableGroups) do
 			local groupInfo = self:GetGroupInfo(guid)
@@ -1264,6 +1345,7 @@ function QuickJoin:Update(forceUpdate)
 				table.insert(entries, entry)
 			end
 		end
+		self._lastEntries = entries
 
 		-- Classic mode: Use simple list and render
 		if BFL.IsClassic or not BFL.HasModernScrollBox then
@@ -2122,6 +2204,9 @@ function QuickJoin:GetEntries()
 	if self.entriesCache and self.entriesCacheVersion == self.lastUpdate then
 		return self.entriesCache
 	end
+
+	-- PERF: Release old cached entries back to pool
+	ReleaseEntries(self.entriesCache)
 
 	local entries = {}
 	local groups = self.availableGroups or {}

@@ -790,7 +790,12 @@ local function BuildDisplayList(self)
 	local BNET_CLIENT_WOW = BNET_CLIENT_WOW or "WoW"
 
 	-- Group friends
+	-- PERF: Reuse tables across loop iterations to avoid per-friend allocations
+	local friendGroupIds = {}
+	local assignedGroups = {}
 	for _, friend in ipairs(self.friendsList) do
+		wipe(friendGroupIds)
+		wipe(assignedGroups)
 		local friendUID = GetFriendUID(friend)
 		local isFavorite = (friend.type == "bnet" and friend.isFavorite)
 		local customGroups = (
@@ -800,7 +805,6 @@ local function BuildDisplayList(self)
 		) or {}
 
 		-- Determine groups for this friend
-		local friendGroupIds = {}
 		local isInAnyGroup = false
 
 		-- FIX: Only mark as "in group" if the Favorites group is actually Enabled/Visible
@@ -870,7 +874,7 @@ local function BuildDisplayList(self)
 			end
 		end
 
-		local assignedGroups = {} -- Deduplication set
+		-- assignedGroups already wiped at loop start (PERF: reused table)
 
 		for _, groupId in ipairs(customGroups) do
 			if type(groupId) == "string" and groupedFriends[groupId] and not assignedGroups[groupId] then
