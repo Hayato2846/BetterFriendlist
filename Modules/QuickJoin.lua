@@ -369,7 +369,10 @@ local function PopulateGroupMemberDetails(info)
 		info.numMembers = #info.members
 	end
 
-	info.otherFriends = {} -- Store names of other friends in the group
+	-- PERF: Reuse existing otherFriends table if present (mock groups), lazy-create otherwise
+	if info.otherFriends then
+		wipe(info.otherFriends)
+	end
 
 	if info.members and #info.members > 0 then
 		for i, member in ipairs(info.members) do
@@ -400,8 +403,11 @@ local function PopulateGroupMemberDetails(info)
 					-- Check if this member is a friend (BNet or WoW) or Mock
 					if relationship == "bnfriend" or relationship == "wowfriend" or relationship == "mock" then
 						if name and name ~= "" then
-							-- Store colored name
+							-- Store colored name (lazy-create otherFriends table on first use)
 							local coloredName = (color or "|cffffffff") .. name .. "|r"
+							if not info.otherFriends then
+								info.otherFriends = {}
+							end
 							table.insert(info.otherFriends, coloredName)
 						end
 					end
@@ -433,8 +439,9 @@ local function AcquireEntry()
 	end
 	-- Pool empty: create new entry with pre-allocated sub-tables
 	local entry = setmetatable({}, QuickJoinEntry)
-	entry.displayedMembers = {}
-	entry.displayedQueues = {}
+	-- PERF: Pre-allocate common sub-table slots to reduce ReuseOrCreateSubTable allocations
+	entry.displayedMembers = { {}, {}, {}, {}, {} }
+	entry.displayedQueues = { {}, {}, {} }
 	entry.zombieMemberIndices = {}
 	entry.zombieQueueIndices = {}
 	return entry

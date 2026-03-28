@@ -684,7 +684,7 @@ local function BuildDisplayList(self)
 	if self.lastBuildSignature == currentSignature and self.cachedDisplayList then
 		-- BFL:DebugPrint("|cff00ff00BuildDisplayList:|r Cache HIT (inputs unchanged)")
 		self.groupedFriends = self.cachedGroupedFriends or self.groupedFriends or {}
-		return self.cachedDisplayList -- INSTANT return, no rebuild!
+		return self.cachedDisplayList, true -- cacheHit flag
 	end
 
 	-- BFL:DebugPrint("|cffff8800BuildDisplayList:|r Cache MISS (rebuilding)")
@@ -4961,7 +4961,12 @@ function FriendsList:GetFriendsForGroup(targetGroupId)
 	return groupFriends
 end
 
+-- PERF: Pre-allocated tables for OptimizedGroupToggle (avoid per-call allocation)
+local _ogtItems = {}
+local _ogtNewItems = {}
+
 -- Attempt optimized group toggle without full list rebuild
+-- PERF (Round 3): Batch rebuild instead of per-item InsertAtIndex (O(N^2) → O(N))
 function FriendsList:OptimizedGroupToggle(groupId, expanding) -- Only possible on Retail (ScrollBox)
 	if not self.scrollBox then
 		return false
@@ -4972,104 +4977,80 @@ function FriendsList:OptimizedGroupToggle(groupId, expanding) -- Only possible o
 		return false
 	end
 
-	local headerData = nil
-	local friendsToRemove = {}
-	local foundHeader = false
+	-- Collect all current items into a flat table
+	local items = _ogtItems
+	wipe(items)
+	local headerIndex = nil
 
-	-- Scan provider to find header and children
 	for _, data in dataProvider:Enumerate() do
-		if not foundHeader then
-			if data.buttonType == BUTTON_TYPE_GROUP_HEADER and data.groupId == groupId then
-				headerData = data
-				foundHeader = true
-
-				-- If expanding, we just need the header, so we can stop scanning
-				if expanding then
-					break
-				end
-			end
-		else
-			-- We are in the group (Collapsing logic)
-			if data.buttonType == BUTTON_TYPE_FRIEND and data.groupId == groupId then
-				table.insert(friendsToRemove, data) -- Collect data to remove
-			else
-				-- Hit something else (another header or filtered out), stop
-				break
-			end
+		items[#items + 1] = data
+		if not headerIndex and data.buttonType == BUTTON_TYPE_GROUP_HEADER and data.groupId == groupId then
+			headerIndex = #items
 		end
 	end
 
-	if not headerData then
+	if not headerIndex then
 		return false
 	end
 
 	-- Update header state
-	headerData.collapsed = not expanding
+	items[headerIndex].collapsed = not expanding
 
-	if not expanding then
-		-- COLLAPSING: Remove friends
-		-- Depending on DataProvider implementation, Remove(data) is usually available
-		if dataProvider.Remove then
-			for _, data in ipairs(friendsToRemove) do
-				dataProvider:Remove(data)
-			end
-		else
-			-- Fallback if Remove(data) missing (unlikely on Retail)
-			return false
-		end
-	else
-		-- EXPANDING: Insert friends
+	-- Build new item list in O(N)
+	local newItems = _ogtNewItems
+	wipe(newItems)
+
+	if expanding then
 		local friends = self:GetFriendsForGroup(groupId)
 
-		-- PERFY OPTIMIZATION: Fall back to full rebuild for large groups
-		-- InsertAtIndex with many items is O(N^2) due to DataProvider shifting
-		if #friends > 30 then
-			return false
+		-- Copy items up to and including header
+		for i = 1, headerIndex do
+			newItems[#newItems + 1] = items[i]
 		end
 
-		-- Find insertion index
-		local insertIndex = nil
-		if dataProvider.FindIndex then
-			insertIndex = dataProvider:FindIndex(headerData)
+		-- Insert new friends after header
+		for _, friend in ipairs(friends) do
+			newItems[#newItems + 1] = {
+				buttonType = BUTTON_TYPE_FRIEND,
+				friend = friend,
+				groupId = groupId,
+				_hasMultiAccountRow = ShouldShowMultiAccountRow(self, friend),
+			}
 		end
 
-		-- Fallback scan if needed
-		if not insertIndex then
-			local idx = 0
-			for _, data in dataProvider:Enumerate() do
-				idx = idx + 1
-				if data == headerData then
-					insertIndex = idx
-					break
+		-- Copy remaining items after header
+		for i = headerIndex + 1, #items do
+			newItems[#newItems + 1] = items[i]
+		end
+	else
+		-- COLLAPSING: Copy all items, skipping friends of this group after header
+		local skipping = false
+		for i = 1, #items do
+			if i == headerIndex then
+				newItems[#newItems + 1] = items[i]
+				skipping = true
+			elseif skipping then
+				local data = items[i]
+				if data.buttonType == BUTTON_TYPE_FRIEND and data.groupId == groupId then
+					-- skip (collapsing)
+				else
+					skipping = false
+					newItems[#newItems + 1] = data
 				end
+			else
+				newItems[#newItems + 1] = items[i]
 			end
-		end
-
-		if insertIndex then
-			insertIndex = insertIndex + 1 -- Start inserting AFTER header
-			for _, friend in ipairs(friends) do
-				dataProvider:InsertAtIndex({
-					buttonType = BUTTON_TYPE_FRIEND,
-					friend = friend,
-					groupId = groupId,
-					_hasMultiAccountRow = ShouldShowMultiAccountRow(self, friend),
-				}, insertIndex)
-				insertIndex = insertIndex + 1
-			end
-		else
-			return false -- Should not happen header was found earlier
 		end
 	end
 
-	-- Manually update header visual to reflect new state
-	self.scrollBox:ForEachFrame(function(frame, elementData)
-		if elementData == headerData then
-			self:UpdateGroupHeaderButton(frame, elementData)
-		end
-	end)
+	-- PERF: Rebuild DataProvider in one shot (avoids O(N^2) InsertAtIndex)
+	local newProvider = CreateDataProvider()
+	for i = 1, #newItems do
+		newProvider:Insert(newItems[i])
+	end
+	self.scrollBox:SetDataProvider(newProvider, true) -- retainScrollPosition
 
-	-- PERFY OPTIMIZATION (Phase 2B): Invalidate BuildDisplayList cache
-	-- OptimizedGroupToggle bypasses BuildDisplayList, so cache is now stale
+	-- Invalidate BuildDisplayList cache (OptimizedGroupToggle bypasses it)
 	self.lastBuildSignature = nil
 
 	return true
@@ -5626,7 +5607,7 @@ function FriendsList:RenderDisplay(ignoreVisibility)
 	needsRenderOnShow = false
 
 	-- Build Display List (Returns simple table now)
-	local newDisplayList = BuildDisplayList(self)
+	local newDisplayList, cacheHit = BuildDisplayList(self)
 
 	-- Classic: Use FauxScrollFrame rendering
 	if BFL.IsClassic or not BFL.HasModernScrollBox then
@@ -5642,8 +5623,10 @@ function FriendsList:RenderDisplay(ignoreVisibility)
 		local currentProvider = self.scrollBox:GetDataProvider()
 		local structureChanged = true
 
-		-- Check if structure has changed
-		if currentProvider then
+		-- PERF: Skip diffing when BuildDisplayList returned cached data
+		if cacheHit and currentProvider and not self.forceLayoutRebuild then
+			structureChanged = false
+		elseif currentProvider then
 			local currentSize = (currentProvider.GetSize and currentProvider:GetSize())
 				or (currentProvider.Count and currentProvider:Count())
 				or 0
@@ -5671,7 +5654,8 @@ function FriendsList:RenderDisplay(ignoreVisibility)
 
 		-- Force full rebuild if any friend's multi-account row status changed
 		-- (height changes require ScrollBox layout recalculation)
-		if not structureChanged and currentProvider then
+		-- PERF: Skip on BuildDisplayList cache hit (structure unchanged)
+		if not structureChanged and not cacheHit and currentProvider then
 			local index = 1
 			for _, oldData in currentProvider:Enumerate() do
 				local newData = newDisplayList[index]

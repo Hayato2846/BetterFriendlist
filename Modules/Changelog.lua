@@ -21,8 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improved
 - **Quick Join: Reduced Memory Usage** - The Quick Join tab now reuses internal data structures instead of recreating them on every update, significantly reducing memory allocations and garbage collection pressure.
+- **Quick Join: Fewer Short-Lived Allocations** - Internal member and queue data structures are now pre-allocated, reducing the number of tables created during Quick Join updates.
 - **Friends List: Reduced Memory Usage** - Optimized how friend group assignments are tracked internally, avoiding unnecessary short-lived allocations when processing large friend lists.
 - **Friends List: Faster Sorting** - Sorting your friends list is now significantly faster, especially with large lists. Sort values are pre-computed so comparisons resolve in a single step instead of multiple lookups.
+- **Friends List: Faster Group Toggle** - Expanding and collapsing friend groups is now dramatically faster, especially with many groups. The operation was changed from per-item updates to a single batch rebuild.
+- **Friends List: Faster Refresh** - When the friends list data has not changed, the display now skips unnecessary structural comparisons, resulting in faster refresh cycles.
 - **Raid Frame: Faster Layout Updates** - The raid grid layout now caches its dimensions and skips redundant recalculations when the frame size hasn't changed, reducing CPU usage when switching tabs or updating the roster.
 - **Raid Frame: Reduced Allocations** - Internal sort operations and button updates now reuse existing data structures instead of creating new ones each cycle.
 - **WHO Frame: Faster Layout Updates** - Column width calculations are now cached, preventing redundant layout recalculations when nothing has changed.
