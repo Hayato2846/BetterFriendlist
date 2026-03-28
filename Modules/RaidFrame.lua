@@ -21,6 +21,32 @@ local SORT_MODE_NAME = 2 -- Alphabetically
 local SORT_MODE_CLASS = 3 -- By class
 local SORT_MODE_RANK = 4 -- By raid rank (leader, assist, member)
 
+-- PERFY OPTIMIZATION: Static sort comparators (avoid anonymous closure creation per sort)
+local function RaidSortByGroupThenName(a, b)
+	if a.subgroup ~= b.subgroup then
+		return a.subgroup < b.subgroup
+	end
+	return a.name < b.name
+end
+
+local function RaidSortByName(a, b)
+	return a.name < b.name
+end
+
+local function RaidSortByClassThenName(a, b)
+	if a.classFileName ~= b.classFileName then
+		return a.classFileName < b.classFileName
+	end
+	return a.name < b.name
+end
+
+local function RaidSortByRankThenName(a, b)
+	if a.rank ~= b.rank then
+		return a.rank > b.rank
+	end
+	return a.name < b.name
+end
+
 -- Tab modes
 local TAB_MODE_ROSTER = 1 -- Raid roster view
 local TAB_MODE_INFO = 2 -- Saved instances info
@@ -140,6 +166,18 @@ function RaidFrame:UpdateGroupLayout()
 
 	local insetWidth = inset:GetWidth()
 	local insetHeight = inset:GetHeight()
+
+	-- PERFY OPTIMIZATION: Skip recalculation if inset dimensions haven't changed
+	local roundedWidth = math.floor(insetWidth + 0.5)
+	local roundedHeight = math.floor(insetHeight + 0.5)
+	if self._lastLayoutWidth == roundedWidth and self._lastLayoutHeight == roundedHeight then
+		-- Dimensions unchanged: skip grid recalculation but still refresh member buttons
+		-- (roster data may have changed even if frame size didn't)
+		self:UpdateAllMemberButtons()
+		return
+	end
+	self._lastLayoutWidth = roundedWidth
+	self._lastLayoutHeight = roundedHeight
 
 	-- GroupsContainer padding (from XML)
 	local containerPaddingX = 20 -- 10px left + 10px right
@@ -1256,34 +1294,13 @@ end
 --- Sort display list
 function RaidFrame:SortDisplayList()
 	if self.sortMode == SORT_MODE_GROUP then
-		-- Sort by group then name
-		table.sort(self.displayList, function(a, b)
-			if a.subgroup ~= b.subgroup then
-				return a.subgroup < b.subgroup
-			end
-			return a.name < b.name
-		end)
+		table.sort(self.displayList, RaidSortByGroupThenName)
 	elseif self.sortMode == SORT_MODE_NAME then
-		-- Sort alphabetically
-		table.sort(self.displayList, function(a, b)
-			return a.name < b.name
-		end)
+		table.sort(self.displayList, RaidSortByName)
 	elseif self.sortMode == SORT_MODE_CLASS then
-		-- Sort by class then name
-		table.sort(self.displayList, function(a, b)
-			if a.classFileName ~= b.classFileName then
-				return a.classFileName < b.classFileName
-			end
-			return a.name < b.name
-		end)
+		table.sort(self.displayList, RaidSortByClassThenName)
 	elseif self.sortMode == SORT_MODE_RANK then
-		-- Sort by rank (leader > assist > member) then name
-		table.sort(self.displayList, function(a, b)
-			if a.rank ~= b.rank then
-				return a.rank > b.rank -- Higher rank first
-			end
-			return a.name < b.name
-		end)
+		table.sort(self.displayList, RaidSortByRankThenName)
 	end
 end
 
@@ -1293,6 +1310,12 @@ end
 
 --- Cache font settings from DB to avoid repetitive lookups
 function RaidFrame:CacheFontSettings()
+	-- PERFY OPTIMIZATION: Skip if settings haven't changed
+	if self.fontCacheVersion == BFL.SettingsVersion then
+		return
+	end
+	self.fontCacheVersion = BFL.SettingsVersion
+
 	local db = BetterFriendlistDB or {}
 
 	-- Determine default font props
@@ -1344,9 +1367,15 @@ function RaidFrame:UpdateAllMemberButtons()
 	end
 
 	-- Organize members by subgroup
-	local membersByGroup = {}
+	if not self._membersByGroup then
+		self._membersByGroup = {}
+		for i = 1, 8 do
+			self._membersByGroup[i] = {}
+		end
+	end
+	local membersByGroup = self._membersByGroup
 	for i = 1, 8 do
-		membersByGroup[i] = {}
+		wipe(membersByGroup[i])
 	end
 
 	for _, member in ipairs(self.raidMembers) do

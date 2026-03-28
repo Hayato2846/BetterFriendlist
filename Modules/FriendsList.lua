@@ -3534,6 +3534,41 @@ local function CalculateRealmPriority(friend)
 	end
 end
 
+-- PERFY OPTIMIZATION: Numeric key extractors for pre-computation (called O(N) in BuildDisplayList)
+-- Maps each sort mode to a function returning a numeric value where lower = higher priority
+local sortNumericKey = {
+	status = function(f)
+		return f._sort_isOnline and (f._sort_status or 3) or (1000 + (f._sort_status or 3))
+	end,
+	name = function()
+		return 0
+	end,
+	level = function(f)
+		return -(f._sort_level or 0)
+	end,
+	zone = function(f)
+		return f._sort_hasZone and 0 or (f._sort_isOnline and 1 or 2)
+	end,
+	activity = function(f)
+		return -(f._sort_activity or 0)
+	end,
+	game = function(f)
+		return f._sort_game or 999
+	end,
+	faction = function(f)
+		return f._sort_faction or 3
+	end,
+	guild = function(f)
+		return f._sort_guildPriority or 3
+	end,
+	class = function(f)
+		return f._sort_classPriority or 10
+	end,
+	realm = function(f)
+		return f._sort_realmPriority or 2
+	end,
+}
+
 -- Update the friends list from WoW API
 function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimization:
 	-- If the frame is hidden, we don't need to fetch data or rebuild the list.
@@ -4048,6 +4083,10 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 	local needRealm = (primarySort == "realm" or secondarySort == "realm")
 	local needZone = (primarySort == "zone" or secondarySort == "zone")
 
+	-- PERFY OPTIMIZATION: Pre-resolve numeric key extractors for inline SortComparator
+	local primaryKeyFn = sortNumericKey[primarySort] or sortNumericKey.status
+	local secondaryKeyFn = sortNumericKey[secondarySort] or sortNumericKey.name
+
 	for _, friend in ipairs(self.friendsList) do
 		-- Status Priority (Always used)
 		friend._sort_status = CalculateStatusPriority(friend)
@@ -4124,6 +4163,11 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 
 		-- Activity sort key (uses last online time from API)
 		friend._sort_activity = friend.lastOnlineTime or 0
+
+		-- PERFY OPTIMIZATION: Pre-compute numeric sort keys for inline SortComparator
+		-- Eliminates 2 function calls per comparison during N*log(N) sort
+		friend._sort_primaryNumeric = primaryKeyFn(friend)
+		friend._sort_secondaryNumeric = secondaryKeyFn(friend)
 	end
 
 	-- Apply filters and sort
@@ -4265,36 +4309,60 @@ local compareByMode = {
 	end,
 }
 
-local currentPrimaryComparator = nil
-local currentSecondaryComparator = nil
-local currentNameComparator = nil
+-- String tiebreaker fields for sort modes with string components (nil = pure numeric)
+local sortStringField = {
+	name = "_sort_name",
+	zone = "_sort_zoneName",
+	guild = "_sort_guildName",
+	class = "_sort_className",
+	realm = "_sort_realmName",
+}
 
--- Optimized comparator to avoid closure allocation
+local currentPrimaryStringField = nil
+local currentSecondaryStringField = nil
+
+-- PERFY OPTIMIZATION: Inline sort comparator using pre-computed numeric keys
+-- Eliminates 2+ indirect function calls per comparison (N*log(N) savings)
 local function SortComparator(a, b)
-	if currentPrimaryComparator then
-		local primaryResult = currentPrimaryComparator(a, b)
-		if primaryResult ~= nil then
-			return primaryResult
+	-- Primary numeric comparison (pre-computed on friend object)
+	local aPrim = a._sort_primaryNumeric
+	local bPrim = b._sort_primaryNumeric
+	if aPrim ~= bPrim then
+		return aPrim < bPrim
+	end
+
+	-- Primary string tiebreaker (for name/zone/guild/class/realm)
+	if currentPrimaryStringField then
+		local aStr = a[currentPrimaryStringField]
+		local bStr = b[currentPrimaryStringField]
+		if aStr ~= bStr then
+			return aStr < bStr
 		end
 	end
 
-	-- Primary sort is equal (Same Group): Prioritize Favorites
+	-- Favorites (within same primary bucket)
 	if a.isFavorite ~= b.isFavorite then
 		return a.isFavorite
 	end
 
-	-- If primary sort is equal, use secondary sort
-	if currentSecondaryComparator and currentSecondaryComparator ~= currentPrimaryComparator then
-		local secondaryResult = currentSecondaryComparator(a, b)
-		if secondaryResult ~= nil then
-			return secondaryResult
+	-- Secondary numeric comparison
+	local aSec = a._sort_secondaryNumeric
+	local bSec = b._sort_secondaryNumeric
+	if aSec ~= bSec then
+		return aSec < bSec
+	end
+
+	-- Secondary string tiebreaker
+	if currentSecondaryStringField then
+		local aStr = a[currentSecondaryStringField]
+		local bStr = b[currentSecondaryStringField]
+		if aStr ~= bStr then
+			return aStr < bStr
 		end
 	end
 
-	-- FALLBACK FOR OFFLINE FRIENDS: Sort by Last Online Time
-	local aOffline = not a._sort_isOnline
-	local bOffline = not b._sort_isOnline
-	if aOffline and bOffline then
+	-- Offline friends: sort by last online time (more recent first)
+	if not a._sort_isOnline and not b._sort_isOnline then
 		local aTime = a.lastOnlineTime or 0
 		local bTime = b.lastOnlineTime or 0
 		if aTime ~= bTime then
@@ -4302,30 +4370,27 @@ local function SortComparator(a, b)
 		end
 	end
 
-	-- Fallback: sort by name
-	if currentNameComparator then
-		local fallbackResult = currentNameComparator(a, b)
-		if fallbackResult ~= nil then
-			return fallbackResult
-		end
+	-- Name fallback
+	local aName = a._sort_name or ""
+	local bName = b._sort_name or ""
+	if aName ~= bName then
+		return aName < bName
 	end
 
-	-- Ultimate fallback: stable sort by ID/Index
+	-- Stable sort: index fallback
 	return (a.index or 0) < (b.index or 0)
 end
 
 -- Apply sort order to friends list (with primary and secondary sort)
-function FriendsList:ApplySort() -- Store sort modes for the static comparator
-	self.currentPrimarySort = self.sortMode
-	self.currentSecondarySort = self.secondarySort or "name"
-	self.currentPrimaryComparator = compareByMode[self.currentPrimarySort]
-	self.currentSecondaryComparator = compareByMode[self.currentSecondarySort]
-	self.currentNameComparator = compareByMode.name
-	currentPrimaryComparator = self.currentPrimaryComparator
-	currentSecondaryComparator = self.currentSecondaryComparator
-	currentNameComparator = self.currentNameComparator
+function FriendsList:ApplySort()
+	local primarySort = self.sortMode or "status"
+	local secondarySort = self.secondarySort or "name"
 
-	-- Use static comparator to avoid closure allocation (Phase 9.4 Optimization)
+	-- Set string tiebreaker fields for the inline comparator
+	currentPrimaryStringField = sortStringField[primarySort]
+	currentSecondaryStringField = sortStringField[secondarySort]
+
+	-- Use inline comparator with pre-computed numeric keys (Phase 9.4+ Optimization)
 	table.sort(self.friendsList, SortComparator)
 end
 
@@ -4955,6 +5020,12 @@ function FriendsList:OptimizedGroupToggle(groupId, expanding) -- Only possible o
 	else
 		-- EXPANDING: Insert friends
 		local friends = self:GetFriendsForGroup(groupId)
+
+		-- PERFY OPTIMIZATION: Fall back to full rebuild for large groups
+		-- InsertAtIndex with many items is O(N^2) due to DataProvider shifting
+		if #friends > 30 then
+			return false
+		end
 
 		-- Find insertion index
 		local insertIndex = nil

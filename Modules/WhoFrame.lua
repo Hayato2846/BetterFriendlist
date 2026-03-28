@@ -130,6 +130,14 @@ function WhoFrame:UpdateResponsiveLayout()
 	local whoFrame = frame.WhoFrame
 	local frameWidth = frame:GetWidth()
 
+	-- PERFY OPTIMIZATION: Skip if frame width and settings haven't changed
+	local roundedWidth = math.floor(frameWidth + 0.5)
+	if self._lastLayoutWidth == roundedWidth and self._lastLayoutSettingsVersion == BFL.SettingsVersion then
+		return
+	end
+	self._lastLayoutWidth = roundedWidth
+	self._lastLayoutSettingsVersion = BFL.SettingsVersion
+
 	-- Calculate available width for column headers
 	-- XML positions: NameHeader starts at x=4 (TOPLEFT from ListInset)
 	-- Reserve space for:
@@ -1269,16 +1277,26 @@ function WhoFrame:SortByColumn(sortType, preserveDirection)
 		return ""
 	end
 
+	-- PERFY OPTIMIZATION: Pre-extract sort values to avoid repeated GetSortValue calls in comparator
 	local currentSort = BetterFriendsFrame.WhoFrame.currentSort
-	local currentAsc = BetterFriendsFrame.WhoFrame.sortAscending
 	local prevSort = BetterFriendsFrame.WhoFrame.prevSort
+
+	for _, entry in ipairs(whoData) do
+		entry._sortPrimary = GetSortValue(entry, currentSort)
+		entry._sortSecondary = (prevSort and prevSort ~= currentSort) and GetSortValue(entry, prevSort) or nil
+		entry._sortName = (currentSort ~= "name" and prevSort ~= "name") and GetSortValue(entry, "name") or nil
+	end
+
+	local currentAsc = BetterFriendsFrame.WhoFrame.sortAscending
 	local prevAsc = BetterFriendsFrame.WhoFrame.prevSortAscending
+	local hasPrevSort = prevSort and prevSort ~= currentSort
+	local hasNameFallback = currentSort ~= "name" and prevSort ~= "name"
 
 	-- Sort the data with detailed fallback logic
 	table.sort(whoData, function(a, b)
-		-- 1. Primary Sort
-		local aVal = GetSortValue(a, currentSort)
-		local bVal = GetSortValue(b, currentSort)
+		-- 1. Primary Sort (pre-extracted)
+		local aVal = a._sortPrimary
+		local bVal = b._sortPrimary
 
 		if aVal ~= bVal then
 			if currentAsc then
@@ -1288,10 +1306,10 @@ function WhoFrame:SortByColumn(sortType, preserveDirection)
 			end
 		end
 
-		-- 2. Secondary Sort (Previous Column)
-		if prevSort and prevSort ~= currentSort then
-			local aPrev = GetSortValue(a, prevSort)
-			local bPrev = GetSortValue(b, prevSort)
+		-- 2. Secondary Sort (pre-extracted)
+		if hasPrevSort then
+			local aPrev = a._sortSecondary
+			local bPrev = b._sortSecondary
 
 			if aPrev ~= bPrev then
 				if prevAsc then
@@ -1303,11 +1321,8 @@ function WhoFrame:SortByColumn(sortType, preserveDirection)
 		end
 
 		-- 3. Tertiary Sort (Name) - Deterministic fallback
-		-- If we aren't already sorting by name (primary or secondary), use Name to break ties
-		if currentSort ~= "name" and prevSort ~= "name" then
-			local aName = GetSortValue(a, "name")
-			local bName = GetSortValue(b, "name")
-			return aName < bName
+		if hasNameFallback then
+			return a._sortName < b._sortName
 		end
 
 		return false
