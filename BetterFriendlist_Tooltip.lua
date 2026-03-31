@@ -15,7 +15,12 @@ if not BFL.IsClassic then
 
 	proxyButton.OnEnter = function(self)
 		if FriendsListButtonMixin and FriendsListButtonMixin.OnEnter then
-			FriendsListButtonMixin.OnEnter(self)
+			-- Use securecallfunction on 12.0.0+ (see main OnEnter for rationale)
+			if BFL.HasSecretValues and securecallfunction then
+				securecallfunction(FriendsListButtonMixin.OnEnter, self)
+			else
+				FriendsListButtonMixin.OnEnter(self)
+			end
 
 			-- Re-anchor tooltip to the actual visible button (Blizzard anchored to proxyButton)
 			if self.anchorButton then
@@ -94,6 +99,8 @@ function BetterFriendsList_Button_OnEnter(self)
 	end
 
 	-- Mock/Preview mode: simple GameTooltip (Blizzard's API can't resolve mock indices)
+	-- NOTE: Preview Mode is internal-only (developer screenshots/testing), NOT user-facing.
+	-- Do not document Preview Mode features in CHANGELOG.md.
 	if friendData._isMock then
 		BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
 		local displayName
@@ -122,6 +129,29 @@ function BetterFriendsList_Button_OnEnter(self)
 			BFL_Tooltip:AddLine(" ")
 			BFL_Tooltip:AddLine(friendData.note, 1, 0.82, 0, true)
 		end
+
+		-- RaiderIO integration: query public API for M+ score in Preview Mode
+		if _G.RaiderIO and _G.RaiderIO.GetProfile and friendData.characterName then
+			local realm = friendData.realmName
+			if (not realm or realm == "") and GetNormalizedRealmName then
+				realm = GetNormalizedRealmName()
+			end
+			if realm and realm ~= "" then
+				local profile = _G.RaiderIO.GetProfile(friendData.characterName, realm)
+				if profile and profile.mythicKeystoneProfile and profile.mythicKeystoneProfile.currentScore then
+					local score = profile.mythicKeystoneProfile.currentScore
+					if score > 0 then
+						local r, g, b = 1, 1, 1
+						if _G.RaiderIO.GetScoreColor then
+							r, g, b = _G.RaiderIO.GetScoreColor(score)
+						end
+						BFL_Tooltip:AddLine(" ")
+						BFL_Tooltip:AddDoubleLine("Raider.IO M+ Score", tostring(score), 0.8, 0.8, 0.8, r, g, b)
+					end
+				end
+			end
+		end
+
 		BFL_Tooltip:Show()
 		return
 	end
@@ -151,11 +181,28 @@ function BetterFriendsList_Button_OnEnter(self)
 		proxyButton.friendData = friendData
 		proxyButton.anchorButton = self
 
-		-- Blizzard's mixin populates FriendsTooltip, sets tooltip.button = proxyButton
-		FriendsListButtonMixin.OnEnter(proxyButton)
-
-		-- Reparent and reposition tooltip to our actual visible button
+		-- Reparent FriendsTooltip to UIParent BEFORE Blizzard populates it.
+		-- FriendsTooltip is a child of FriendsFrame in the XML, but BFL keeps
+		-- FriendsFrame hidden. Without reparenting first, FriendsTooltip:Show()
+		-- has a hidden parent, so external addons (ArchonTooltip, RaiderIO) that
+		-- anchor GameTooltip to FriendsTooltip cannot position it correctly.
 		tooltip:SetParent(UIParent)
+
+		-- On 12.0.0+, call Blizzard's code via securecallfunction to run in an
+		-- untainted execution context. BNet_GetBNetAccountName does comparisons
+		-- on accountInfo.accountName which can be a secret value (kString) in
+		-- Midnight. In tainted execution, this comparison throws a Lua error and
+		-- prevents FriendsTooltip:Show() from firing, breaking external addon
+		-- hooks (ArchonTooltip, RaiderIO). securecallfunction avoids this by
+		-- running the code in a secure (untainted) context.
+		if BFL.HasSecretValues and securecallfunction then
+			securecallfunction(FriendsListButtonMixin.OnEnter, proxyButton)
+		else
+			FriendsListButtonMixin.OnEnter(proxyButton)
+		end
+
+		-- Reposition tooltip to our actual visible button
+		-- (Blizzard anchored to proxyButton which has no visible position)
 		tooltip:ClearAllPoints()
 		tooltip:SetPoint("TOPLEFT", self, "TOPRIGHT", 36, 0)
 

@@ -491,6 +491,57 @@ function BFL:SafeToString(value)
 	return tostring(value)
 end
 
+-- Secure wrappers for Blizzard chat APIs.
+-- When BFL (tainted addon code) calls chat APIs directly, the taint propagates
+-- into Blizzard's chat frame code, permanently tainting globals like LAST_ACTIVE_CHAT_EDIT_BOX.
+-- On 12.0.0+ this causes "attempt to perform arithmetic on a secret number value" errors
+-- when FCF_OpenTemporaryWindow later reads the tainted global during UpdateHeader.
+-- Fix: On 12.0.0+, use securecallfunction() to call Blizzard APIs in a new secure
+-- execution context that does not inherit the caller's taint.
+
+function BFL:SecureSendBNetTell(name)
+	if not name then return end
+	local func = ChatFrameUtil and ChatFrameUtil.SendBNetTell or ChatFrame_SendBNetTell
+	if not func then return end
+	if BFL.HasSecretValues and securecallfunction then
+		securecallfunction(func, name)
+	else
+		func(name)
+	end
+end
+
+function BFL:SecureSendTell(name)
+	if not name then return end
+	local func = ChatFrameUtil and ChatFrameUtil.SendTell or ChatFrame_SendTell
+	if not func then return end
+	if BFL.HasSecretValues and securecallfunction then
+		securecallfunction(func, name)
+	else
+		func(name)
+	end
+end
+
+function BFL:SecureOpenChat(msg)
+	if not msg then return end
+	local func = ChatFrameUtil and ChatFrameUtil.OpenChat or ChatFrame_OpenChat
+	if not func then return end
+	if BFL.HasSecretValues and securecallfunction then
+		securecallfunction(func, msg)
+	else
+		func(msg)
+	end
+end
+
+-- Secure SetItemRef for 12.0.0+ taint prevention.
+function BFL:SecureSetItemRef(link, text, button)
+	if not link then return end
+	if BFL.HasSecretValues and securecallfunction then
+		securecallfunction(SetItemRef, link, text, button)
+	else
+		SetItemRef(link, text, button)
+	end
+end
+
 -- Count table entries (for non-sequential tables)
 function BFL:TableCount(tbl)
 	if not tbl then
@@ -1044,8 +1095,11 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 			-- By removing FriendsFrame from UIPanelWindows, we can use Hide() in combat
 			-- without taint issues. ShowUIPanel/HideUIPanel are protected in combat,
 			-- but direct Show()/Hide() calls work fine for non-UIPanel frames.
+			-- On 12.0.0+ (Midnight), we keep UIPanelWindows intact because we no longer
+			-- replace ToggleFriendsFrame (to avoid tainting global closures). Blizzard's
+			-- ToggleFriendsFrame uses ShowUIPanel which requires the UIPanel entry.
 			-- ============================================================================
-			if UIPanelWindows and UIPanelWindows["FriendsFrame"] then
+			if not BFL.HasSecretValues and UIPanelWindows and UIPanelWindows["FriendsFrame"] then
 				-- Store original settings in case user wants Blizzard's frame
 				BFL.OriginalFriendsFrameUIPanelSettings = UIPanelWindows["FriendsFrame"]
 				-- Remove from UIPanel system
@@ -1057,22 +1111,43 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 			if _G.ToggleFriendsFrame then
 				BFL.OriginalToggleFriendsFrame = _G.ToggleFriendsFrame
 
-				-- Replace global with our version (taint-safe, not a protected function)
-				_G.ToggleFriendsFrame = function(tabIndex)
-					-- Allow original if explicitly requested
-					if BFL.AllowBlizzardFriendsFrame then
-						-- BFL:DebugPrint("[BFL] ToggleFriendsFrame: Allowing Blizzard (explicit)")
-						return BFL.OriginalToggleFriendsFrame(tabIndex)
-					end
+				-- On 12.0.0+ (Midnight), do NOT replace this global with a tainted addon closure.
+				-- Writing a tainted closure to _G.ToggleFriendsFrame causes BFL's taint to propagate
+				-- through Blizzard's initialization chain into chat frame globals (ACTIVE_CHAT_EDIT_BOX),
+				-- leading to "attempt to perform arithmetic on a secret number value" errors when
+				-- FCF_OpenTemporaryWindow creates whisper popout windows.
+				-- The FriendsFrame:HookScript("OnShow") below handles the redirect instead.
+				if not BFL.HasSecretValues then
+					-- Pre-12.0: Replace the global directly (no secret value concerns)
+					_G.ToggleFriendsFrame = function(tabIndex)
+						-- Allow original if explicitly requested
+						if BFL.AllowBlizzardFriendsFrame then
+							-- BFL:DebugPrint("[BFL] ToggleFriendsFrame: Allowing Blizzard (explicit)")
+							return BFL.OriginalToggleFriendsFrame(tabIndex)
+						end
 
-					-- BFL:DebugPrint("[BFL] ToggleFriendsFrame: Opening BetterFriendlist, tabIndex: " .. tostring(tabIndex))
+						-- BFL:DebugPrint("[BFL] ToggleFriendsFrame: Opening BetterFriendlist, tabIndex: " .. tostring(tabIndex))
 
-					-- Toggle our frame with the requested tab (combat-safe, our frame is not protected)
-					if _G.ToggleBetterFriendsFrame then
-						_G.ToggleBetterFriendsFrame(tabIndex)
+						-- Toggle our frame with the requested tab (combat-safe, our frame is not protected)
+						if _G.ToggleBetterFriendsFrame then
+							_G.ToggleBetterFriendsFrame(tabIndex)
+						end
 					end
+					-- BFL:DebugPrint("|cff00ff00[BFL]|r ToggleFriendsFrame global replaced")
+				else
+					-- 12.0.0+ (Midnight): Do NOT replace the global - writing a tainted closure
+					-- to _G.ToggleFriendsFrame permanently taints Blizzard's chat frame globals
+					-- (ACTIVE_CHAT_EDIT_BOX), causing "secret number value" errors.
+					-- We use hooksecurefunc (runs AFTER original, doesn't taint the original)
+					-- combined with FriendsFrame:HookScript("OnShow") for the redirect.
+					hooksecurefunc("ToggleFriendsFrame", function(tabIndex)
+						if BFL.AllowBlizzardFriendsFrame then return end
+						-- After Blizzard's toggle: if FriendsFrame was closed and BFL is open, close BFL
+						if not FriendsFrame:IsShown() and BetterFriendsFrame and BetterFriendsFrame:IsShown() then
+							BetterFriendsFrame:Hide()
+						end
+					end)
 				end
-				-- BFL:DebugPrint("|cff00ff00[BFL]|r ToggleFriendsFrame global replaced")
 			end
 
 			-- Helper function to show Blizzard's FriendsFrame (bypasses our hook)
@@ -1098,14 +1173,29 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 			-- Hook ShowFriends for additional coverage (taint-safe)
 			if _G.ShowFriends then
 				BFL.OriginalShowFriends = _G.ShowFriends
-				_G.ShowFriends = function()
-					if BFL.AllowBlizzardFriendsFrame then
-						return BFL.OriginalShowFriends()
-					end
-					-- BFL:DebugPrint("[BFL] ShowFriends: Redirecting to BetterFriendlist")
-					if BetterFriendsFrame and not BetterFriendsFrame:IsShown() then
-						if _G.ToggleBetterFriendsFrame then
-							_G.ToggleBetterFriendsFrame()
+				-- On 12.0.0+, use hooksecurefunc to avoid tainting the global.
+				-- hooksecurefunc runs AFTER the original in a separate context,
+				-- so the original's secure execution is preserved.
+				if BFL.HasSecretValues then
+					hooksecurefunc("ShowFriends", function()
+						if BFL.AllowBlizzardFriendsFrame then return end
+						-- BFL:DebugPrint("[BFL] ShowFriends hook: Redirecting to BetterFriendlist")
+						if BetterFriendsFrame and not BetterFriendsFrame:IsShown() then
+							if _G.ToggleBetterFriendsFrame then
+								_G.ToggleBetterFriendsFrame()
+							end
+						end
+					end)
+				else
+					_G.ShowFriends = function()
+						if BFL.AllowBlizzardFriendsFrame then
+							return BFL.OriginalShowFriends()
+						end
+						-- BFL:DebugPrint("[BFL] ShowFriends: Redirecting to BetterFriendlist")
+						if BetterFriendsFrame and not BetterFriendsFrame:IsShown() then
+							if _G.ToggleBetterFriendsFrame then
+								_G.ToggleBetterFriendsFrame()
+							end
 						end
 					end
 				end
@@ -1127,6 +1217,11 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 						return
 					end
 
+					-- Skip redirect during silent trigger (lets external addons register their hooks)
+					if BFL._suppressFriendsFrameRedirect then
+						return
+					end
+
 					-- Detect which tab was requested by reading Blizzard's selected tab
 					-- FRIEND_TAB_FRIENDS=1, FRIEND_TAB_WHO=2, FRIEND_TAB_RAID=3, FRIEND_TAB_QUICK_JOIN=4
 					local requestedTab = PanelTemplates_GetSelectedTab(FriendsFrame) or 1
@@ -1137,20 +1232,28 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 					FriendsFrame:SetAlpha(0)
 
 					C_Timer.After(0, function()
-						-- Hide Blizzard's frame (combat-safe since not a UIPanel anymore)
-						FriendsFrame:Hide()
+						-- Hide Blizzard's frame
+						if BFL.HasSecretValues and HideUIPanel then
+							-- On 12.0.0+: FriendsFrame is still a UIPanel, use HideUIPanel
+							HideUIPanel(FriendsFrame)
+						else
+							-- Pre-12.0: FriendsFrame was removed from UIPanel, use direct Hide
+							FriendsFrame:Hide()
+						end
 						FriendsFrame:SetAlpha(1)
+
+						-- Toggle behavior: if BFL is already visible, this is a "toggle close"
+						-- (On 12.0.0+ Blizzard's ToggleFriendsFrame opened FriendsFrame because
+						-- it wasn't shown, but the user intended to close BFL)
+						if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
+							BetterFriendsFrame:Hide()
+							return
+						end
 
 						-- Open our frame with the requested tab
 						if BetterFriendsFrame then
-							if _G.ToggleBetterFriendsFrame then
-								-- If already shown, just switch tab; otherwise open with tab
-								if BetterFriendsFrame:IsShown() then
-									PanelTemplates_SetTab(BetterFriendsFrame, requestedTab)
-									BetterFriendsFrame_ShowBottomTab(requestedTab)
-								else
-									_G.ShowBetterFriendsFrame(requestedTab)
-								end
+							if _G.ShowBetterFriendsFrame then
+								_G.ShowBetterFriendsFrame(requestedTab)
 							end
 						end
 					end)
@@ -1170,6 +1273,20 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 			if module.OnPlayerLogin then
 				module:OnPlayerLogin()
 			end
+		end
+
+		-- Trigger a silent FriendsFrame:Show() so addons that defer their hook
+		-- registration to FriendsFrame:OnShow (e.g. ArchonTooltip) get initialized.
+		-- The suppress flag prevents BFL from redirecting to BetterFriendsFrame.
+		if FriendsFrame then
+			BFL._suppressFriendsFrameRedirect = true
+			FriendsFrame:SetAlpha(0)
+			FriendsFrame:Show()
+			C_Timer.After(0, function()
+				FriendsFrame:Hide()
+				FriendsFrame:SetAlpha(1)
+				BFL._suppressFriendsFrameRedirect = nil
+			end)
 		end
 	end
 

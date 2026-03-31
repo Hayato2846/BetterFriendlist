@@ -1368,13 +1368,9 @@
 
 						if friend.type == "bnet" then
 							local tellName = BFL:GetSafeAccountName(friend.accountName, friend.battleTag) or friend.battleTag
-							if ChatFrameUtil and ChatFrameUtil.SendBNetTell then
-								ChatFrameUtil.SendBNetTell(tellName)
-							elseif ChatFrame_SendBNetTell then
-								ChatFrame_SendBNetTell(tellName)
-							end
+							BFL:SecureSendBNetTell(tellName)
 						elseif friend.type == "wow" and friend.name then
-							ChatFrame_SendTell(friend.name)
+							BFL:SecureSendTell(friend.name)
 						end
 					</OnClick>
 				</Scripts>

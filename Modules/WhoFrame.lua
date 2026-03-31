@@ -1795,7 +1795,7 @@ function _G.BetterWhoListButton_OnDoubleClick(self, mouseButton)
 	if action == "invite" then
 		BFL.InviteUnit(name)
 	else
-		ChatFrame_SendTell(name)
+		BFL:SecureSendTell(name)
 	end
 end
 

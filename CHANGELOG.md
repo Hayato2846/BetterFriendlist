@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+
+### Fixed
+- **Friends List: Zone Display** - Fixed localized zone names containing hyphens (e.g., French "Silvermoon City") being incorrectly split between zone and realm columns in Classic.
+
+### Improved
+- **Tooltip: External Addon Support** - Friend tooltips now work correctly with RaiderIO and ArchonTooltip (Warcraft Logs). Both addons can display their data (M+ scores, raid rankings) below the friend tooltip. Previously, ArchonTooltip could not detect BetterFriendlist's tooltip due to a loading order issue.
+- **Midnight: Chat Taint** - Further reduced potential chat-related taint errors on Midnight (12.0.0+) by adding additional isolation around whisper and chat actions.
+
+---
+
 ## [2.5.3-beta2]  - 2026-03-28
 
 ### Added
@@ -21,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Quick Join: Secret Values** - Fixed an error in the Quick Join tab that could occur repeatedly in the background when viewing listed groups during certain restricted game states.
 - **Chat Taint on Midnight** - Fixed hundreds of "secret string value" taint errors per session that could occur on Midnight (12.0.0+) whenever chat messages were received. The addon no longer hooks global tab resize functions that interfere with Blizzard's chat processing.
+- **Whisper Popout Taint on Midnight** - Fixed "secret number value" errors on Midnight (12.0.0+) that could occur when clicking the whisper button or receiving whispers in popout mode. The addon no longer replaces certain Blizzard global functions during loading and now defers whisper-related chat actions to avoid interfering with Blizzard's chat frame system.
 - **Raid Frame: Combat Restriction** - Ready Check, Convert to Raid, Everyone Assist, and Promote/Demote actions now correctly block during combat instead of showing the cryptic "Interface action failed because of an AddOn" error. The corresponding buttons are visually disabled while in combat.
 
 ## [2.5.2]       - 2026-03-24

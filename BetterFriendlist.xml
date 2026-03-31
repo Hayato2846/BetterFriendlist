@@ -2652,19 +2652,10 @@
 						tellName = friend.battleTag
 						end
 						if tellName then
-						-- Use modern API (ChatFrameUtil) if available
-						if ChatFrameUtil and ChatFrameUtil.SendBNetTell then
-						ChatFrameUtil.SendBNetTell(tellName)
-						elseif ChatFrame_SendBNetTell then
-						ChatFrame_SendBNetTell(tellName)
-						end
+						BFL:SecureSendBNetTell(tellName)
 						end
 						elseif friend.type == "wow" and friend.name then
-						if ChatFrameUtil and ChatFrameUtil.SendTell then
-						ChatFrameUtil.SendTell(friend.name)
-						elseif ChatFrame_SendTell then
-						ChatFrame_SendTell(friend.name)
-						end
+						BFL:SecureSendTell(friend.name)
 						end
 					</OnClick>
 				</Scripts>

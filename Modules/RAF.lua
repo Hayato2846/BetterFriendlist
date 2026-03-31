@@ -1064,11 +1064,7 @@ function RAF:NextRewardButton_OnClick(button, mouseButton)
 	elseif IsModifiedClick("CHATLINK") and nextReward and nextReward.itemID then
 		local name, link = C_Item.GetItemInfo(nextReward.itemID)
 		if not ChatEdit_InsertLink(link) then
-			if ChatFrameUtil and ChatFrameUtil.OpenChat then
-				ChatFrameUtil.OpenChat(link)
-			else
-				ChatFrame_OpenChat(link)
-			end
+			BFL:SecureOpenChat(link)
 		end
 	end
 end

@@ -358,14 +358,10 @@ local function OnFriendLineClick(cell, data, mouseButton)
 			if data.bnetAccountID then
 				local safeName = BFL:GetSafeAccountName(data.accountName, data.battleTag)
 				local bnetLink = "BNplayer:" .. safeName .. ":" .. data.bnetAccountID
-				SetItemRef(bnetLink, bnetLink, "LeftButton")
+				BFL:SecureSetItemRef(bnetLink, bnetLink, "LeftButton")
 			elseif data.accountName and data.accountName ~= "" then
 				local safeName = BFL:GetSafeAccountName(data.accountName, data.battleTag)
-				if ChatFrameUtil and ChatFrameUtil.SendBNetTell then
-					ChatFrameUtil.SendBNetTell(safeName)
-				elseif ChatFrame_SendBNetTell then
-					ChatFrame_SendBNetTell(safeName)
-				end
+				BFL:SecureSendBNetTell(safeName)
 			end
 		end
 	-- WoW friend click handlers
@@ -381,11 +377,7 @@ local function OnFriendLineClick(cell, data, mouseButton)
 		else
 			if data.fullName then
 				local whisperName = data.fullName:gsub(" ", "")
-				if ChatFrameUtil and ChatFrameUtil.SendTell then
-					ChatFrameUtil.SendTell(whisperName)
-				else
-					ChatFrame_SendTell(whisperName)
-				end
+				BFL:SecureSendTell(whisperName)
 			end
 		end
 	end
@@ -1609,7 +1601,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 						className = gameInfo.className or "UNKNOWN",
 						classID = gameInfo.classID,
 						client = client,
-						area = gameInfo.areaName or gameInfo.richPresence or "",
+						area = gameInfo.areaName or "",
 						realmName = gameInfo.realmName or "",
 						factionName = gameInfo.factionName or "",
 						guildName = gameInfo.guildName or "",
@@ -1627,6 +1619,19 @@ local function CreateLibQTipTooltip(anchorFrame)
 						accountInfo = accountInfo,
 						index = i,
 					}
+
+					-- Classic fallback: Parse richPresence if area is missing (format: "Zone - Realm")
+					if (friend.area == "") and gameInfo.richPresence then
+						local sep = string.find(gameInfo.richPresence, " - ", 1, true)
+						if sep then
+							friend.area = strtrim(string.sub(gameInfo.richPresence, 1, sep - 1))
+							if friend.realmName == "" then
+								friend.realmName = strtrim(string.sub(gameInfo.richPresence, sep + 3))
+							end
+						else
+							friend.area = strtrim(gameInfo.richPresence)
+						end
+					end
 
 					ProcessFriend(friend)
 				end

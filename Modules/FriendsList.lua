@@ -3717,14 +3717,19 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 						friend.factionName = gameInfo.factionName
 						friend.timerunningSeasonID = gameInfo.timerunningSeasonID
 
-						-- Classic Fix: Parse richPresence if areaName is missing (e.g. "Zone - Realm")
+						-- Classic Fix: Parse richPresence if areaName is missing (format: "Zone - Realm")
+						-- Use " - " (space-dash-space) as separator to avoid splitting localized zone names
+						-- that contain hyphens (e.g. French "Lune-d'Argent" for Silvermoon City)
 						if (not friend.areaName or friend.areaName == "") and gameInfo.richPresence then
-							local richZone, richRealm = strsplit("-", gameInfo.richPresence)
-							if richZone then
-								friend.areaName = strtrim(richZone)
-							end
-							if richRealm and (not friend.realmName or friend.realmName == "") then
-								friend.realmName = strtrim(richRealm)
+							local sep = string.find(gameInfo.richPresence, " - ", 1, true)
+							if sep then
+								friend.areaName = strtrim(string.sub(gameInfo.richPresence, 1, sep - 1))
+								local richRealm = strtrim(string.sub(gameInfo.richPresence, sep + 3))
+								if richRealm ~= "" and (not friend.realmName or friend.realmName == "") then
+									friend.realmName = richRealm
+								end
+							else
+								friend.areaName = strtrim(gameInfo.richPresence)
 							end
 						end
 
@@ -3954,14 +3959,18 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 								friend.factionName = prefAccount.factionName
 								friend.timerunningSeasonID = prefAccount.timerunningSeasonID
 								friend.gameName = nil
-								-- Classic richPresence fallback
+								-- Classic richPresence fallback (format: "Zone - Realm")
+								-- Use " - " separator to preserve localized zone names with hyphens
 								if (not friend.areaName or friend.areaName == "") and prefAccount.richPresence then
-									local richZone, richRealm = strsplit("-", prefAccount.richPresence)
-									if richZone then
-										friend.areaName = strtrim(richZone)
-									end
-									if richRealm and (not friend.realmName or friend.realmName == "") then
-										friend.realmName = strtrim(richRealm)
+									local sep = string.find(prefAccount.richPresence, " - ", 1, true)
+									if sep then
+										friend.areaName = strtrim(string.sub(prefAccount.richPresence, 1, sep - 1))
+										local richRealm = strtrim(string.sub(prefAccount.richPresence, sep + 3))
+										if richRealm ~= "" and (not friend.realmName or friend.realmName == "") then
+											friend.realmName = richRealm
+										end
+									else
+										friend.areaName = strtrim(prefAccount.richPresence)
 									end
 								end
 							elseif prefAccount.clientProgram == "BSAp" then
