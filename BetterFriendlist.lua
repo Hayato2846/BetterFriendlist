@@ -1946,6 +1946,63 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end
 			end
 
+			-- Midnight 12.0.0+ Taint Fix: Replace Whisper button handler with securecallfunction wrapper
+			-- When BFL opens a context menu, the contextData table is addon-created (tainted).
+			-- Blizzard's UnitPopupWhisperButtonMixin:OnClick reads contextData.bnetIDAccount,
+			-- which taints the execution context, then calls ChatFrameUtil.SendBNetTell in tainted
+			-- context. This taints LAST_ACTIVE_CHAT_EDIT_BOX, causing arithmetic errors on secret
+			-- number values in UpdateHeader later (ChatFrameEditBox.lua:677).
+			-- Fix: Replace the Whisper responder so it calls through securecallfunction, which
+			-- creates a clean execution context for SendBNetTell/SendTell.
+			local function BFL_ReplaceWhisperButton(owner, rootDescription, contextData)
+				-- Only needed on Midnight 12.0.0+ where secret values exist
+				if not BFL.HasSecretValues then
+					return
+				end
+				if not rootDescription or not rootDescription.EnumerateElementDescriptions then
+					return
+				end
+				if not contextData then
+					return
+				end
+
+				pcall(function()
+					for _, elementDescription in rootDescription:EnumerateElementDescriptions() do
+						local text = elementDescription.text
+						if type(text) == "function" then
+							local success, result = pcall(text)
+							if success then
+								text = result
+							end
+						end
+						if text == WHISPER then
+							elementDescription:SetResponder(function()
+								local isBNetAccount = contextData.bnetIDAccount
+								if not isBNetAccount then
+									local playerLocation = contextData.playerLocation
+									if playerLocation and playerLocation.IsBattleNetGUID then
+										isBNetAccount = playerLocation:IsBattleNetGUID()
+									end
+								end
+								if isBNetAccount then
+									BFL:SecureSendBNetTell(contextData.name)
+								else
+									local fullName
+									if UnitPopupSharedUtil and UnitPopupSharedUtil.GetFullPlayerName then
+										fullName = UnitPopupSharedUtil.GetFullPlayerName(contextData)
+									else
+										fullName = contextData.name
+									end
+									BFL:SecureSendTell(fullName)
+								end
+								return MenuResponse.Close
+							end)
+							break
+						end
+					end
+				end)
+			end
+
 			-- Multi-Game-Account: Replace Blizzard's single invite button with a character picker submenu
 			-- Only for BNet friend menus where the friend has multiple invitable WoW accounts
 			local function BFL_ReplaceInviteButton(owner, rootDescription, contextData)
@@ -2623,6 +2680,12 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				Menu.ModifyMenu("MENU_UNIT_BN_FRIEND_OFFLINE", BFL_StreamerModeRenameTitle)
 				Menu.ModifyMenu("MENU_UNIT_FRIEND", BFL_StreamerModeRenameTitle)
 				Menu.ModifyMenu("MENU_UNIT_FRIEND_OFFLINE", BFL_StreamerModeRenameTitle)
+
+				-- Midnight 12.0.0+ Taint Fix: Replace Whisper button with securecallfunction wrapper
+				Menu.ModifyMenu("MENU_UNIT_BN_FRIEND", BFL_ReplaceWhisperButton)
+				Menu.ModifyMenu("MENU_UNIT_BN_FRIEND_OFFLINE", BFL_ReplaceWhisperButton)
+				Menu.ModifyMenu("MENU_UNIT_FRIEND", BFL_ReplaceWhisperButton)
+				Menu.ModifyMenu("MENU_UNIT_FRIEND_OFFLINE", BFL_ReplaceWhisperButton)
 
 				-- Fix "Copy Character Name" button (Must be registered BEFORE AddGroupsToFriendMenu)
 				Menu.ModifyMenu("MENU_UNIT_BN_FRIEND", BFL_ReplaceCopyNameButton)
