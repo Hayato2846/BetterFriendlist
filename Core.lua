@@ -1277,15 +1277,22 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 
 		-- Trigger a silent FriendsFrame:Show() so addons that defer their hook
 		-- registration to FriendsFrame:OnShow (e.g. ArchonTooltip) get initialized.
-		-- The suppress flag prevents BFL from redirecting to BetterFriendsFrame.
+		-- IMPORTANT: Deferred to next frame so ALL PLAYER_LOGIN handlers finish first.
+		-- ArchonTooltip deliberately hooks FriendsTooltip:Show AFTER RaiderIO (so RaiderIO
+		-- sets GameTooltip owner first, then ArchonTooltip appends). If we trigger
+		-- FriendsFrame:Show() synchronously during PLAYER_LOGIN, ArchonTooltip registers
+		-- before RaiderIO (which also initializes during PLAYER_LOGIN), reversing the
+		-- intended hook order and causing ArchonTooltip content to be wiped by RaiderIO.
 		if FriendsFrame then
-			BFL._suppressFriendsFrameRedirect = true
-			FriendsFrame:SetAlpha(0)
-			FriendsFrame:Show()
 			C_Timer.After(0, function()
-				FriendsFrame:Hide()
-				FriendsFrame:SetAlpha(1)
-				BFL._suppressFriendsFrameRedirect = nil
+				BFL._suppressFriendsFrameRedirect = true
+				FriendsFrame:SetAlpha(0)
+				FriendsFrame:Show()
+				C_Timer.After(0, function()
+					FriendsFrame:Hide()
+					FriendsFrame:SetAlpha(1)
+					BFL._suppressFriendsFrameRedirect = nil
+				end)
 			end)
 		end
 	end
