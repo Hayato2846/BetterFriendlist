@@ -359,7 +359,7 @@ local function OnFriendLineClick(cell, data, mouseButton)
 				local safeName = BFL:GetSafeAccountName(data.accountName, data.battleTag)
 				local bnetLink = "BNplayer:" .. safeName .. ":" .. data.bnetAccountID
 				BFL:SecureSetItemRef(bnetLink, bnetLink, "LeftButton")
-			elseif data.accountName and data.accountName ~= "" then
+			elseif not BFL:IsSecret(data.accountName) and data.accountName and data.accountName ~= "" then
 				local safeName = BFL:GetSafeAccountName(data.accountName, data.battleTag)
 				BFL:SecureSendBNetTell(safeName)
 			end
@@ -587,7 +587,7 @@ local function CreateAdvancedTooltip(gameTooltip)
 					wowProjectID = gameInfo.wowProjectID,
 					connected = true,
 					info = {
-						name = accountInfo.accountName or "Unknown",
+						name = BFL:GetSafeAccountName(accountInfo.accountName, accountInfo.battleTag),
 						level = gameInfo.characterLevel or "??",
 						className = gameInfo.className or "UNKNOWN",
 						area = gameInfo.areaName or "Unknown",
@@ -871,7 +871,7 @@ local function GetFriendDisplayName(friend)
 				name = shortTag ~= "" and shortTag or "Unknown"
 			end
 		else
-			name = friend.accountName or "Unknown"
+			name = BFL:GetSafeAccountName(friend.accountName, friend.battleTag)
 		end
 		-- Character name from game info
 		characterName = friend.characterName or friend.toonName or ""
@@ -1595,7 +1595,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 						bnetAccountID = accountInfo.bnetAccountID,
 						battleTag = accountInfo.battleTag,
 						type = "bnet",
-						accountName = accountInfo.accountName or "Unknown",
+						accountName = BFL:GetSafeAccountName(accountInfo.accountName, accountInfo.battleTag),
 						characterName = gameInfo.characterName or "",
 						level = gameInfo.characterLevel or 0,
 						className = gameInfo.className or "UNKNOWN",

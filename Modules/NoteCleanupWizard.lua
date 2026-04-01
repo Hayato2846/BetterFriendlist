@@ -118,7 +118,7 @@ function NoteCleanupWizard:ScanFriends()
 
 			table.insert(friendData, {
 				index = i,
-				accountName = accountInfo.accountName or "",
+				accountName = BFL:GetSafeAccountName(accountInfo.accountName, accountInfo.battleTag),
 				battleTag = accountInfo.battleTag or "",
 				bnetAccountID = accountInfo.bnetAccountID,
 				originalNote = noteText,
@@ -820,7 +820,7 @@ function NoteCleanupWizard:GetBackupData()
 
 		table.insert(data, {
 			key = key,
-			accountName = entry.accountName or "",
+			accountName = BFL:GetSafeAccountName(entry.accountName, entry.battleTag),
 			battleTag = entry.battleTag or "",
 			backedUpNote = entry.originalNote or "",
 			currentNote = currentNote,

@@ -2569,7 +2569,7 @@ function FriendsList:FormatInfoLine(friend)
 			result = ReplaceTokenCaseInsensitive(
 				result,
 				"name",
-				isBNet and (friend.accountName or "Unknown") or (friend.name or "Unknown")
+				isBNet and BFL:GetSafeAccountName(friend.accountName, friend.battleTag) or (friend.name or "Unknown")
 			)
 			result = ReplaceTokenCaseInsensitive(
 				result,
@@ -2707,6 +2707,7 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 	-- Check if cache is valid (inputs haven't changed)
 	if
 		cacheEntry
+		and not BFL:IsSecret(rawAccountName)
 		and cacheEntry.format == format
 		and cacheEntry.showRealmName == showRealmName
 		and cacheEntry.colorClassNames == colorClassNames
@@ -2750,7 +2751,7 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 					name = rawBattleTag
 				end
 			else
-				name = rawAccountName or "Unknown"
+				name = BFL:GetSafeAccountName(rawAccountName, rawBattleTag)
 			end
 		elseif isStreamerMode then
 			-- [STREAMER MODE] %name% must NEVER resolve to Real ID (accountName)

@@ -7,18 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [DRAFT]
-
-### Fixed
-- **Friends List: Zone Display** - Fixed localized zone names containing hyphens (e.g., French "Silvermoon City") being incorrectly split between zone and realm columns in Classic.
-
-### Improved
-- **Tooltip: External Addon Support** - Friend tooltips now work correctly with RaiderIO and ArchonTooltip (Warcraft Logs). Both addons can display their data (M+ scores, raid rankings) below the friend tooltip. Previously, ArchonTooltip could not detect BetterFriendlist's tooltip due to a loading order issue.
-- **Midnight: Chat Taint** - Further reduced potential chat-related taint errors on Midnight (12.0.0+) by adding additional isolation around whisper and chat actions.
-
----
-
-## [2.5.3-beta2]  - 2026-03-28
+## [2.5.3-beta3]  - 2026-04-01
 
 ### Added
 - **Name Format: BattleTag Only** - New name format preset that shows only the BattleTag without the character name in parentheses.
@@ -28,8 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Quick Join: Performance** - The Quick Join tab now reuses and pre-allocates internal data structures, significantly reducing memory allocations and garbage collection pressure during updates.
 - **Raid Frame: Performance** - Layout calculations and roster updates now cache their results and reuse data structures, reducing CPU and memory usage when switching tabs or updating members.
 - **WHO Frame: Performance** - Column layout and sort operations now cache their results, preventing redundant recalculations and repeated lookups.
+- **Tooltip: External Addon Support** - Friend tooltips now work correctly with RaiderIO and ArchonTooltip (Warcraft Logs). Both addons can display their data (M+ scores, raid rankings) below the friend tooltip. Previously, ArchonTooltip could not detect BetterFriendlist's tooltip due to a loading order issue.
+- **Midnight: Chat Taint** - Further reduced potential chat-related taint errors on Midnight (12.0.0+) by adding additional isolation around whisper and chat actions.
 
 ### Fixed
+- **Friends List: Zone Display** - Fixed localized zone names containing hyphens (e.g., French "Silvermoon City") being incorrectly split between zone and realm columns in Classic.
+- **Midnight: Secret Value Safety** - Fixed a structural flaw in the internal name safety function that could crash when encountering protected values on Midnight (12.0.0+). Also fixed potential crashes in the Broker tooltip click handler, display name cache, and debug commands. All friend name handling now consistently uses the safe display name path.
 - **Quick Join: Secret Values** - Fixed an error in the Quick Join tab that could occur repeatedly in the background when viewing listed groups during certain restricted game states.
 - **Chat Taint on Midnight** - Fixed hundreds of "secret string value" taint errors per session that could occur on Midnight (12.0.0+) whenever chat messages were received. The addon no longer hooks global tab resize functions that interfere with Blizzard's chat processing.
 - **Whisper Popout Taint on Midnight** - Fixed "secret number value" errors on Midnight (12.0.0+) that could occur when clicking the whisper button or receiving whispers in popout mode. The addon no longer replaces certain Blizzard global functions during loading and now defers whisper-related chat actions to avoid interfering with Blizzard's chat frame system.

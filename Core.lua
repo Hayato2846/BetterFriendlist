@@ -475,8 +475,13 @@ end
 -- Get a safe (non-secret) account name for string operations.
 -- Returns battleTag if accountName is a kString secret, otherwise accountName.
 -- Falls back to battleTag or "Unknown" if accountName is nil.
+-- NOTE: Must check issecretvalue() BEFORE any boolean test on accountName,
+-- because `if secret then` itself throws an error on 12.0.0+ secret values.
 function BFL:GetSafeAccountName(accountName, battleTag)
-	if accountName and not self:IsSecret(accountName) then
+	if self:IsSecret(accountName) then
+		return battleTag or "Unknown"
+	end
+	if accountName then
 		return accountName
 	end
 	return battleTag or "Unknown"
@@ -1625,7 +1630,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 			for idx, friend in ipairs(FriendsList.friendsList) do
 				local nameMatch = false
 				if friend.type == "bnet" then
-					nameMatch = (friend.accountName and friend.accountName:lower():find(searchName, 1, true))
+					nameMatch = (friend.accountName and not BFL:IsSecret(friend.accountName) and friend.accountName:lower():find(searchName, 1, true))
 						or (friend.battleTag and friend.battleTag:lower():find(searchName, 1, true))
 						or (friend.characterName and friend.characterName:lower():find(searchName, 1, true))
 				else
@@ -1715,7 +1720,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 				for _, friend in ipairs(FriendsList.friendsList) do
 					local nameMatch = false
 					if friend.type == "bnet" then
-						nameMatch = (friend.accountName and friend.accountName:lower():find(searchName, 1, true))
+						nameMatch = (friend.accountName and not BFL:IsSecret(friend.accountName) and friend.accountName:lower():find(searchName, 1, true))
 							or (friend.battleTag and friend.battleTag:lower():find(searchName, 1, true))
 					else
 						nameMatch = (friend.name and friend.name:lower():find(searchName, 1, true))
