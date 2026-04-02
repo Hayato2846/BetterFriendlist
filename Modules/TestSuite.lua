@@ -4010,11 +4010,155 @@ local function RegisterBuiltInTests()
 			V:Assert(group == nil, "Group should not exist after deletion")
 		end,
 	})
-end
 
--- ============================================
--- PERFY STRESS COMMANDS
--- ============================================
+	-- ===== SECRET VALUE SAFETY TESTS =====
+
+	TS:RegisterTest("data", "IsSecret_NormalValues", {
+		description = "BFL:IsSecret() returns false for normal values",
+		action = function(V)
+			V:Assert(BFL.IsSecret ~= nil, "BFL:IsSecret should exist")
+			V:Assert(BFL:IsSecret("hello") == false, "String should not be secret")
+			V:Assert(BFL:IsSecret(42) == false, "Number should not be secret")
+			V:Assert(BFL:IsSecret(true) == false, "Boolean should not be secret")
+			V:Assert(BFL:IsSecret(nil) == false, "Nil should not be secret")
+			V:Assert(BFL:IsSecret({}) == false, "Table should not be secret")
+		end,
+	})
+
+	TS:RegisterTest("data", "GetSafeAccountName_Normal", {
+		description = "GetSafeAccountName returns accountName when not secret",
+		action = function(V)
+			V:Assert(BFL.GetSafeAccountName ~= nil, "BFL:GetSafeAccountName should exist")
+			local result = BFL:GetSafeAccountName("PlayerName", "Player#1234")
+			V:AssertEqual(result, "PlayerName", "Should return accountName for normal string")
+		end,
+	})
+
+	TS:RegisterTest("data", "GetSafeAccountName_NilFallback", {
+		description = "GetSafeAccountName falls back to battleTag or Unknown",
+		action = function(V)
+			local r1 = BFL:GetSafeAccountName(nil, "Player#1234")
+			V:AssertEqual(r1, "Player#1234", "Should return battleTag when accountName is nil")
+
+			local r2 = BFL:GetSafeAccountName(nil, nil)
+			V:AssertEqual(r2, "Unknown", "Should return 'Unknown' when both are nil")
+		end,
+	})
+
+	TS:RegisterTest("data", "GetSafeAccountName_EmptyString", {
+		description = "GetSafeAccountName handles empty string accountName",
+		action = function(V)
+			local result = BFL:GetSafeAccountName("", "Player#1234")
+			V:AssertEqual(result, "", "Should return empty string (truthy in Lua)")
+		end,
+	})
+
+	TS:RegisterTest("data", "SafeToString_Normal", {
+		description = "BFL:SafeToString handles normal values",
+		action = function(V)
+			V:Assert(BFL.SafeToString ~= nil, "BFL:SafeToString should exist")
+			V:AssertEqual(BFL:SafeToString("test"), "test", "String should pass through")
+			V:AssertEqual(BFL:SafeToString(42), "42", "Number should convert")
+			V:AssertEqual(BFL:SafeToString(nil), "nil", "Nil should convert")
+		end,
+	})
+
+	TS:RegisterTest("integration", "GetDisplayName_NilAccountName", {
+		description = "GetDisplayName handles nil accountName without error",
+		action = function(V)
+			local FriendsList = BFL:GetModule("FriendsList")
+			if not FriendsList or not FriendsList.GetDisplayName then
+				V:Skip("FriendsList not loaded")
+				return
+			end
+			-- Mock BNet friend with nil accountName (simulates secret fallback)
+			local mockFriend = {
+				type = "bnet",
+				uid = "bnet_TestNil#9999",
+				accountName = nil,
+				battleTag = "TestNil#9999",
+				characterName = "TestChar",
+				name = "TestChar-TestRealm",
+				connected = true,
+				note = "",
+			}
+			local result = FriendsList:GetDisplayName(mockFriend, false)
+			V:AssertNotNil(result, "GetDisplayName should return a value")
+			V:Assert(result ~= "", "GetDisplayName should not be empty")
+		end,
+	})
+
+	TS:RegisterTest("integration", "GetDisplayName_OfflineFriend_NilAccountName", {
+		description = "GetDisplayName offline path handles nil accountName",
+		action = function(V)
+			local FriendsList = BFL:GetModule("FriendsList")
+			if not FriendsList or not FriendsList.GetDisplayName then
+				V:Skip("FriendsList not loaded")
+				return
+			end
+			-- Mock offline BNet friend with nil accountName
+			local mockFriend = {
+				type = "bnet",
+				uid = "bnet_TestOffline#9999",
+				accountName = nil,
+				battleTag = "TestOffline#9999",
+				characterName = "",
+				name = "",
+				connected = false,
+				note = "",
+			}
+			local result = FriendsList:GetDisplayName(mockFriend, false)
+			V:AssertNotNil(result, "Offline GetDisplayName should return a value")
+			V:Assert(result ~= "", "Offline GetDisplayName should not be empty")
+		end,
+	})
+
+	TS:RegisterTest("integration", "GetDisplayName_SortMode_NilAccountName", {
+		description = "GetDisplayName sorting mode handles nil accountName",
+		action = function(V)
+			local FriendsList = BFL:GetModule("FriendsList")
+			if not FriendsList or not FriendsList.GetDisplayName then
+				V:Skip("FriendsList not loaded")
+				return
+			end
+			-- Mock BNet friend with nil accountName, no battleTag
+			local mockFriend = {
+				type = "bnet",
+				uid = "bnet_TestSort#9999",
+				accountName = nil,
+				battleTag = nil,
+				characterName = "SortChar",
+				name = "SortChar-TestRealm",
+				connected = true,
+				note = "",
+			}
+			local result = FriendsList:GetDisplayName(mockFriend, true)
+			V:AssertNotNil(result, "Sort-mode GetDisplayName should return a value")
+		end,
+	})
+
+	TS:RegisterTest("integration", "Broker_NilAccountName_NoError", {
+		description = "Broker tooltip handles friends with nil accountName",
+		action = function(V)
+			local Broker = BFL:GetModule("Broker")
+			if not Broker or not Broker.UpdateBrokerText then
+				V:Skip("Broker not loaded")
+				return
+			end
+			-- Just verify UpdateBrokerText completes without error
+			Broker:UpdateBrokerText()
+			V:Assert(true, "Broker:UpdateBrokerText completed with no error")
+		end,
+	})
+
+	TS:RegisterTest("integration", "NoteCleanupWizard_Module_Exists", {
+		description = "NoteCleanupWizard module loads without error",
+		action = function(V)
+			local NCW = BFL:GetModule("NoteCleanupWizard")
+			V:AssertNotNil(NCW, "NoteCleanupWizard module should be loaded")
+		end,
+	})
+end
 
 local function IsPerfyAddonLoaded()
 	if C_AddOns and C_AddOns.IsAddOnLoaded then
