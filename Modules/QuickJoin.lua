@@ -400,11 +400,23 @@ local function PopulateGroupMemberDetails(info)
 						info.leaderColor = color -- Store color for leader
 					end
 				else
-					-- Check if this member is a friend (BNet or WoW) or Mock
-					if relationship == "bnfriend" or relationship == "wowfriend" or relationship == "mock" then
+					-- Check if this member is someone the player knows (friend, guild, community, or mock)
+					if relationship == "bnfriend" or relationship == "wowfriend" or relationship == "guild"
+						or relationship == "club" or relationship == "mock" then
 						if name and name ~= "" then
 							-- Store colored name (lazy-create otherFriends table on first use)
 							local coloredName = (color or "|cffffffff") .. name .. "|r"
+							-- Append community name for club members (subtle gray)
+							if relationship == "club" and member.clubId then
+								local clubInfo = C_Club.GetClubInfo(member.clubId)
+								if clubInfo and clubInfo.name then
+									local clubName = clubInfo.name
+									if #clubName > 25 then
+										clubName = strsub(clubName, 1, 23) .. ".."
+									end
+									coloredName = coloredName .. " |cff888888(" .. clubName .. ")|r"
+								end
+							end
 							if not info.otherFriends then
 								info.otherFriends = {}
 							end

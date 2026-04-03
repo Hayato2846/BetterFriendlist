@@ -473,6 +473,7 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 
 		-- Primary Sort Dropdown
 		local primaryDropdown = header.PrimarySortDropdown
+		local secondaryDropdown = header.SecondarySortDropdown
 		-- Only set width if ElvUI is not active (ElvUI Skin handles sizing)
 		local isElvUIActive = _G.ElvUI and BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin ~= false
 		if not isElvUIActive then
@@ -521,7 +522,6 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 		UIDropDownMenu_SetText(primaryDropdown, string.format("|T%s:14:14:-2:-2|t", primaryIcon))
 
 		-- Secondary Sort Dropdown
-		local secondaryDropdown = header.SecondarySortDropdown
 		-- Only set width if ElvUI is not active (ElvUI Skin handles sizing)
 		local isElvUIActiveSecondary = _G.ElvUI and BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin ~= false
 		if not isElvUIActiveSecondary then
