@@ -409,7 +409,10 @@ local function PopulateGroupMemberDetails(info)
 							-- Append community name for club members (subtle gray)
 							if relationship == "club" and member.clubId then
 								local clubInfo = C_Club.GetClubInfo(member.clubId)
-								if clubInfo and clubInfo.name then
+								-- 12.0.0+: clubInfo.name may be a secret value.
+								-- Secret strings forbid #, strsub, comparisons, AND concatenation (..).
+								-- Skip the entire block when the name is secret.
+								if clubInfo and type(clubInfo.name) == "string" and not BFL:IsSecret(clubInfo.name) then
 									local clubName = clubInfo.name
 									if #clubName > 25 then
 										clubName = strsub(clubName, 1, 23) .. ".."
@@ -1503,12 +1506,14 @@ function QuickJoin:GetGroupInfo(groupGUID)
 
 					-- IMPORTANT: Use numMembers from searchResultInfo, NOT from members array!
 					-- members array only contains visible members (usually just leader)
-					if searchResultInfo.numMembers then
+					-- 12.0.0+: truthiness test on secret values is forbidden; short-circuit
+					-- with hasSecretValues so the field is never evaluated when secret.
+					if hasSecretValues or searchResultInfo.numMembers then
 						info.numMembers = searchResultInfo.numMembers
 					end
 
 					-- IMPORTANT: Use leaderName and leaderFactionGroup from searchResultInfo!
-					if searchResultInfo.leaderName then
+					if hasSecretValues or searchResultInfo.leaderName then
 						-- Only overwrite if NOT a BNet friend (User Request: Prioritize BNet Name)
 						local isBNetFriend = false
 						if info.leaderGUID and C_BattleNet.GetAccountInfoByGUID(info.leaderGUID) then
@@ -1519,7 +1524,7 @@ function QuickJoin:GetGroupInfo(groupGUID)
 							info.leaderName = searchResultInfo.leaderName
 						end
 					end
-					if searchResultInfo.leaderFactionGroup then
+					if hasSecretValues or searchResultInfo.leaderFactionGroup then
 						info.leaderFactionGroup = searchResultInfo.leaderFactionGroup
 					end
 

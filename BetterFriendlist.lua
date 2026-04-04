@@ -165,7 +165,9 @@ end
 -- causes "attempt to perform string conversion on a secret string value".
 -- Per-tab OnSizeChanged hooks (installed later in DistributeTabWidths) provide
 -- equivalent width enforcement without the global taint vector.
-if not BFL.IsClassic and PanelTemplates_TabResize and not BFL.HasSecretValues then
+-- NOTE: Use `issecretvalue` (WoW C global) directly instead of BFL.HasSecretValues,
+-- because this code runs at file load time BEFORE ADDON_LOADED sets the flag.
+if not BFL.IsClassic and PanelTemplates_TabResize and not issecretvalue then
 	hooksecurefunc("PanelTemplates_TabResize", function(tab)
 		BFL_EnforceTabWidth(tab)
 	end)
