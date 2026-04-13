@@ -106,132 +106,19 @@ local GetClientInfo = setmetatable({
 	end,
 })
 
--- Status icon helper (AFK/DND) - smaller size for tooltip
-local function GetStatusIcon(isAFK, isDND, isMobile)
-	local showMobileAsAFK = BetterFriendlistDB and BetterFriendlistDB.showMobileAsAFK
-
-	if isAFK or (isMobile and showMobileAsAFK) then
-		return "|TInterface\\FriendsFrame\\StatusIcon-Away:12:12:0:0:32:32:5:27:5:27|t"
-	elseif isDND then
-		return "|TInterface\\FriendsFrame\\StatusIcon-DnD:12:12:0:0:32:32:5:27:5:27|t"
-	else
-		return "|TInterface\\FriendsFrame\\StatusIcon-Online:12:12:0:0:32:32:5:27:5:27|t"
-	end
-end
-
--- Convert localized className to classFile (e.g., "Krieger" -> "WARRIOR")
--- Logic moved to BFL.ClassUtils
-local function GetClassFileFromClassName(className)
-	return BFL.ClassUtils:GetClassFileFromClassName(className)
-end
-
--- Get classFile for friend data (prioritizes classID for 11.2.7+)
-local function GetClassFileForFriend(friend)
-	return BFL.ClassUtils:GetClassFileForFriend(friend)
-end
+-- Shared helpers from BrokerUtils (used by both Friends Broker and Guild Broker)
+local GetStatusIcon = BFL.BrokerUtils.GetStatusIcon
+local ClassColorText = BFL.BrokerUtils.ClassColorText
+local GetFactionIcon = BFL.BrokerUtils.GetFactionIcon
+local C = BFL.BrokerUtils.C
 
 -- Get class color for friend (returns color table or white fallback)
 local function GetClassColorForFriend(friend)
 	return BFL.ClassUtils:GetClassColorForFriend(friend)
 end
 
--- Color text using friend's class color (uses classID if available)
-local function ClassColorText(friend, text)
-	if not text then
-		return ""
-	end
-	local classColor = GetClassColorForFriend(friend)
-	return string.format("|cff%02x%02x%02x%s|r", classColor.r * 255, classColor.g * 255, classColor.b * 255, text)
-end
-
--- Faction icon helper
-local function GetFactionIcon(factionName)
-	if not factionName then
-		return ""
-	end
-
-	if factionName == "Alliance" then
-		return "|TInterface\\FriendsFrame\\PlusManz-Alliance:16:16|t"
-	elseif factionName == "Horde" then
-		return "|TInterface\\FriendsFrame\\PlusManz-Horde:16:16|t"
-	else
-		return "" -- Neutral or unknown
-	end
-end
-
--- Color wrapper helper
-local function C(color, text)
-	if not text then
-		return ""
-	end
-
-	local colors = {
-		dkyellow = "ffcc00",
-		ltyellow = "ffff99",
-		ltblue = "6699ff",
-		ltgray = "b0b0b0",
-		gray = "808080",
-		white = "ffffff",
-		green = "00ff00",
-		red = "ff0000",
-		gold = "ffd700",
-	}
-
-	-- Check if it's a class color (try direct match first, then convert from localized name)
-	local classColor = RAID_CLASS_COLORS[color]
-	if not classColor then
-		-- Try converting localized className to classFile
-		local classFile = GetClassFileFromClassName(color)
-		if classFile then
-			classColor = RAID_CLASS_COLORS[classFile]
-		end
-	end
-
-	if classColor then
-		return string.format("|cff%02x%02x%02x%s|r", classColor.r * 255, classColor.g * 255, classColor.b * 255, text)
-	end
-
-	-- Otherwise use predefined or custom hex
-	local hex = colors[color] or color
-	return "|cff" .. hex .. text .. "|r"
-end
-
 -- Helper: Add friend name to active chat editbox (Shift+Click)
--- Must be defined before OnFriendLineClick which uses it
-local function AddNameToEditBox(name, realm)
-	if not name then
-		return false
-	end
-
-	-- Add realm suffix if different from player's realm
-	local playerRealm = GetRealmName()
-	if realm and realm ~= "" and realm ~= playerRealm then
-		name = name .. "-" .. realm
-	end
-
-	-- Find active chat editbox and insert name
-	local editboxes = {
-		ChatEdit_GetActiveWindow(),
-		ChatEdit_GetLastActiveWindow(),
-	}
-
-	for _, editbox in ipairs(editboxes) do
-		if editbox and editbox:IsVisible() and editbox:HasFocus() then
-			editbox:Insert(name)
-			return true
-		end
-	end
-
-	-- Fallback: Insert into default chat frame's editbox
-	local defaultEditBox = ChatEdit_ChooseBoxForSend()
-	if defaultEditBox then
-		ChatEdit_ActivateChat(defaultEditBox)
-		defaultEditBox:Insert(name)
-		return true
-	end
-
-	return false
-end
+local AddNameToEditBox = BFL.BrokerUtils.AddNameToEditBox
 
 -- Helper: Smart invite - either invite to group or request to join their group
 local function SmartInviteOrJoin(friendType, data)
@@ -361,7 +248,7 @@ local function OnFriendLineClick(cell, data, mouseButton)
 				BFL:SecureSetItemRef(bnetLink, bnetLink, "LeftButton")
 			elseif not BFL:IsSecret(data.accountName) and data.accountName and data.accountName ~= "" then
 				local safeName = BFL:GetSafeAccountName(data.accountName, data.battleTag)
-				BFL:SecureSendBNetTell(safeName)
+				BFL:SecureSendBNetTell(safeName, data.bnetAccountID)
 			end
 		end
 	-- WoW friend click handlers
@@ -443,6 +330,101 @@ local function GetFriendCounts()
 	return wowOnline, wowTotal, bnetOnline, bnetTotal
 end
 
+-- Get filtered friend counts based on the active QuickFilter
+-- Returns wowFiltered, wowTotal, bnetFiltered, bnetTotal
+-- When filter is "all", returns same as GetFriendCounts()
+local function GetFilteredFriendCounts()
+	local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
+
+	-- Fast path: "all" and "online" return raw counts (same as before)
+	if currentFilter == "all" or currentFilter == "online" then
+		return GetFriendCounts()
+	end
+
+	local treatMobileAsOffline = BetterFriendlistDB and BetterFriendlistDB.treatMobileAsOffline
+	local BNET_CLIENT_WOW_LOCAL = BNET_CLIENT_WOW or "WoW"
+
+	local wowFiltered, wowTotal = 0, 0
+	local bnetFiltered, bnetTotal = 0, 0
+
+	-- WoW Friends
+	local numWoWFriends = C_FriendList.GetNumFriends() or 0
+	wowTotal = numWoWFriends
+	for i = 1, numWoWFriends do
+		local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
+		if friendInfo then
+			local connected = friendInfo.connected
+			local passes = false
+
+			if currentFilter == "offline" then
+				passes = not connected
+			elseif currentFilter == "wow" then
+				-- WoW friends always pass "wow" filter if online
+				passes = connected
+			elseif currentFilter == "bnet" then
+				-- WoW friends never pass "bnet" filter
+				passes = false
+			elseif currentFilter == "hideafk" then
+				passes = connected and not (friendInfo.afk or friendInfo.dnd)
+			elseif currentFilter == "retail" then
+				-- WoW friends assumed same version as player
+				passes = connected
+			elseif currentFilter == "ingame" then
+				passes = connected
+			end
+
+			if passes then
+				wowFiltered = wowFiltered + 1
+			end
+		end
+	end
+
+	-- BNet Friends
+	if BNConnected() then
+		local numBNetTotal, numBNetOnline = BNGetNumFriends()
+		bnetTotal = numBNetTotal or 0
+
+		for i = 1, bnetTotal do
+			local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
+			if accountInfo then
+				local gameInfo = accountInfo.gameAccountInfo or {}
+				local isOnline = gameInfo.isOnline or false
+				local client = gameInfo.clientProgram or "App"
+				local isMobile = (client == "BSAp")
+
+				if treatMobileAsOffline and isMobile then
+					isOnline = false
+				end
+
+				local passes = false
+
+				if currentFilter == "offline" then
+					passes = not isOnline
+				elseif currentFilter == "wow" then
+					passes = isOnline and (client == BNET_CLIENT_WOW_LOCAL)
+				elseif currentFilter == "bnet" then
+					passes = isOnline and (client ~= BNET_CLIENT_WOW_LOCAL)
+				elseif currentFilter == "hideafk" then
+					passes = isOnline and not (accountInfo.isAFK or accountInfo.isDND)
+				elseif currentFilter == "retail" then
+					passes = isOnline and (client == BNET_CLIENT_WOW_LOCAL)
+					if passes and gameInfo.wowProjectID and gameInfo.wowProjectID ~= WOW_PROJECT_MAINLINE then
+						passes = false
+					end
+				elseif currentFilter == "ingame" then
+					passes = isOnline and client ~= "" and client ~= "App" and client ~= "BSAp"
+				end
+
+				if passes then
+					bnetFiltered = bnetFiltered + 1
+				end
+			end
+		end
+	end
+
+	return wowFiltered, wowTotal, bnetFiltered, bnetTotal
+end
+
 -- ========================================
 -- Broker Text Update
 -- ========================================
@@ -464,7 +446,7 @@ function Broker:UpdateBrokerText()
 		return
 	end
 
-	local wowOnline, wowTotal, bnetOnline, bnetTotal = GetFriendCounts()
+	local wowOnline, wowTotal, bnetOnline, bnetTotal = GetFilteredFriendCounts()
 	local totalOnline = wowOnline + bnetOnline
 	local totalFriends = wowTotal + bnetTotal
 
@@ -520,7 +502,7 @@ local function CreateBasicTooltip(gameTooltip)
 	gameTooltip:AddLine(L("BROKER_TITLE"), 1, 0.82, 0, 1)
 	gameTooltip:AddLine(" ")
 
-	local wowOnline, wowTotal, bnetOnline, bnetTotal = GetFriendCounts()
+	local wowOnline, wowTotal, bnetOnline, bnetTotal = GetFilteredFriendCounts()
 
 	gameTooltip:AddDoubleLine(
 		L("BROKER_WOW_FRIENDS"),
@@ -554,10 +536,12 @@ local function CreateBasicTooltip(gameTooltip)
 	end
 	gameTooltip:AddDoubleLine(L("BROKER_CURRENT_FILTER"), currentFilter, 1, 1, 1, 1, 1, 0)
 
-	gameTooltip:AddLine(" ")
-	gameTooltip:AddLine(L("BROKER_TOOLTIP_FOOTER_LEFT"), 0.5, 0.9, 1, 1)
-	gameTooltip:AddLine(L("BROKER_TOOLTIP_FOOTER_RIGHT"), 0.5, 0.9, 1, 1)
-	gameTooltip:AddLine(L("BROKER_HINT_CYCLE_FILTER_FULL"), 0.5, 0.9, 1, 1)
+	if BetterFriendlistDB and BetterFriendlistDB.brokerShowHints ~= false then
+		gameTooltip:AddLine(" ")
+		gameTooltip:AddLine(L("BROKER_TOOLTIP_FOOTER_LEFT"), 0.5, 0.9, 1, 1)
+		gameTooltip:AddLine(L("BROKER_TOOLTIP_FOOTER_RIGHT"), 0.5, 0.9, 1, 1)
+		gameTooltip:AddLine(L("BROKER_HINT_CYCLE_FILTER_FULL"), 0.5, 0.9, 1, 1)
+	end
 end
 
 -- Advanced Tooltip with Groups and Activity
@@ -567,6 +551,13 @@ local function CreateAdvancedTooltip(gameTooltip)
 
 	local Groups = GetGroups()
 	local DB = GetDB()
+
+	-- Read fontColorFriendName as fallback color for names without class color
+	local fontColorName = BetterFriendlistDB and BetterFriendlistDB.fontColorFriendName
+	local fallbackNameColor = { r = 1, g = 1, b = 1 }
+	if fontColorName and fontColorName.r and fontColorName.g and fontColorName.b then
+		fallbackNameColor = fontColorName
+	end
 
 	local friends = {}
 
@@ -720,7 +711,7 @@ local function CreateAdvancedTooltip(gameTooltip)
 					local className = info.className or "UNKNOWN"
 					local zone = info.area or "Unknown"
 
-					local classColor = RAID_CLASS_COLORS[className] or { r = 1, g = 1, b = 1 }
+					local classColor = RAID_CLASS_COLORS[className] or fallbackNameColor
 
 					gameTooltip:AddDoubleLine(
 						string.format("  %s (%s)", name, level),
@@ -754,7 +745,7 @@ local function CreateAdvancedTooltip(gameTooltip)
 			local className = info.className or "UNKNOWN"
 			local zone = info.area or "Unknown"
 
-			local classColor = RAID_CLASS_COLORS[className] or { r = 1, g = 1, b = 1 }
+			local classColor = RAID_CLASS_COLORS[className] or fallbackNameColor
 
 			gameTooltip:AddDoubleLine(
 				string.format("  %s (%s)", name, level),
@@ -776,7 +767,7 @@ local function CreateAdvancedTooltip(gameTooltip)
 		gameTooltip:AddLine(" ")
 	end
 
-	local wowOnline, wowTotal, bnetOnline, bnetTotal = GetFriendCounts()
+	local wowOnline, wowTotal, bnetOnline, bnetTotal = GetFilteredFriendCounts()
 	gameTooltip:AddDoubleLine(
 		L("BROKER_TOTAL_LABEL"),
 		string.format(L("BROKER_ONLINE_FRIENDS_COUNT"), wowOnline + bnetOnline, wowTotal + bnetTotal),
@@ -797,10 +788,12 @@ local function CreateAdvancedTooltip(gameTooltip)
 	end
 	gameTooltip:AddDoubleLine(L("BROKER_FILTER_LABEL"), currentFilter, 1, 1, 1, 1, 1, 0)
 
-	gameTooltip:AddLine(" ")
-	gameTooltip:AddLine(L("BROKER_TOOLTIP_FOOTER_LEFT"), 0.5, 0.9, 1, 1)
-	gameTooltip:AddLine(L("BROKER_TOOLTIP_FOOTER_RIGHT"), 0.5, 0.9, 1, 1)
-	gameTooltip:AddLine(L("BROKER_HINT_CYCLE_FILTER_FULL"), 0.5, 0.9, 1, 1)
+	if BetterFriendlistDB and BetterFriendlistDB.brokerShowHints ~= false then
+		gameTooltip:AddLine(" ")
+		gameTooltip:AddLine(L("BROKER_TOOLTIP_FOOTER_LEFT"), 0.5, 0.9, 1, 1)
+		gameTooltip:AddLine(L("BROKER_TOOLTIP_FOOTER_RIGHT"), 0.5, 0.9, 1, 1)
+		gameTooltip:AddLine(L("BROKER_HINT_CYCLE_FILTER_FULL"), 0.5, 0.9, 1, 1)
+	end
 end
 
 -- ========================================
@@ -1029,8 +1022,14 @@ end
 -- ========================================
 -- Fixed Footer Implementation
 -- ========================================
-local FOOTER_HEIGHT = 160 -- Height for the fixed footer area
+local FOOTER_HEIGHT = 160 -- Height for the fixed footer area (with hints)
+local FOOTER_HEIGHT_NO_HINTS = 65 -- Height for the fixed footer area (without hints)
 local MAX_TOOLTIP_HEIGHT = 690 -- Maximum height for the tooltip before scrolling
+
+local function GetFooterHeight()
+	local showHints = BetterFriendlistDB and BetterFriendlistDB.brokerShowHints ~= false
+	return showHints and FOOTER_HEIGHT or FOOTER_HEIGHT_NO_HINTS
+end
 
 local function RenderFixedFooter(footerFrame)
 	-- Clear previous content
@@ -1069,8 +1068,8 @@ local function RenderFixedFooter(footerFrame)
 	sep1:SetPoint("TOPRIGHT", footerFrame, "TOPRIGHT", -10, yOffset)
 	yOffset = yOffset - 5
 
-	-- Total Online
-	local wowOnline, wowTotal, bnetOnline, bnetTotal = GetFriendCounts()
+	-- Total Online (uses filtered counts to match LDB text)
+	local wowOnline, wowTotal, bnetOnline, bnetTotal = GetFilteredFriendCounts()
 	local totalText = string.format(L("BROKER_TOTAL_ONLINE"), wowOnline + bnetOnline, wowTotal + bnetTotal)
 	local totalLine = AddLine(totalText, "GameTooltipText", 1, 1, 1)
 	totalLine:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
@@ -1143,159 +1142,78 @@ local function RenderFixedFooter(footerFrame)
 	sortLine:SetPoint("RIGHT", footerFrame, "RIGHT", -10, yOffset)
 	yOffset = yOffset - 18
 
-	-- Separator
-	local sep2 = AddSeparator()
-	sep2:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
-	sep2:SetPoint("TOPRIGHT", footerFrame, "TOPRIGHT", -10, yOffset)
-	yOffset = yOffset - 5
+	-- Hints (conditionally shown based on brokerShowHints setting)
+	local showHints = BetterFriendlistDB and BetterFriendlistDB.brokerShowHints ~= false
+	if showHints then
+		-- Separator
+		local sep2 = AddSeparator()
+		sep2:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
+		sep2:SetPoint("TOPRIGHT", footerFrame, "TOPRIGHT", -10, yOffset)
+		yOffset = yOffset - 5
 
-	-- Hints 1
-	local hint1 = AddLine(C("ltgray", L("BROKER_HINT_FRIEND_ACTIONS")), "GameTooltipTextSmall")
-	hint1:SetPoint("TOP", footerFrame, "TOP", 0, yOffset)
-	yOffset = yOffset - 14
+		-- Hints 1
+		local hint1 = AddLine(C("ltgray", L("BROKER_HINT_FRIEND_ACTIONS")), "GameTooltipTextSmall")
+		hint1:SetPoint("TOP", footerFrame, "TOP", 0, yOffset)
+		yOffset = yOffset - 14
 
-	local hint2 = AddLine(
-		C("ltblue", L("BROKER_HINT_CLICK_WHISPER"))
-			.. L("BROKER_HINT_WHISPER")
-			.. C("ltblue", L("BROKER_HINT_RIGHT_CLICK_MENU"))
-			.. L("BROKER_HINT_CONTEXT_MENU"),
-		"GameTooltipTextSmall"
-	)
-	hint2:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
-	hint2:SetPoint("RIGHT", footerFrame, "RIGHT", -10, yOffset)
-	yOffset = yOffset - 14
+		local hint2 = AddLine(
+			C("ltblue", L("BROKER_HINT_CLICK_WHISPER"))
+				.. L("BROKER_HINT_WHISPER")
+				.. C("ltblue", L("BROKER_HINT_RIGHT_CLICK_MENU"))
+				.. L("BROKER_HINT_CONTEXT_MENU"),
+			"GameTooltipTextSmall"
+		)
+		hint2:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
+		hint2:SetPoint("RIGHT", footerFrame, "RIGHT", -10, yOffset)
+		yOffset = yOffset - 14
 
-	local hint3 = AddLine(
-		C("ltblue", L("BROKER_HINT_ALT_CLICK"))
-			.. L("BROKER_HINT_INVITE")
-			.. C("ltblue", L("BROKER_HINT_SHIFT_CLICK"))
-			.. L("BROKER_HINT_COPY"),
-		"GameTooltipTextSmall"
-	)
-	hint3:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
-	hint3:SetPoint("RIGHT", footerFrame, "RIGHT", -10, yOffset)
-	yOffset = yOffset - 14
+		local hint3 = AddLine(
+			C("ltblue", L("BROKER_HINT_ALT_CLICK"))
+				.. L("BROKER_HINT_INVITE")
+				.. C("ltblue", L("BROKER_HINT_SHIFT_CLICK"))
+				.. L("BROKER_HINT_COPY"),
+			"GameTooltipTextSmall"
+		)
+		hint3:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
+		hint3:SetPoint("RIGHT", footerFrame, "RIGHT", -10, yOffset)
+		yOffset = yOffset - 14
 
-	-- Separator
-	local sep3 = AddSeparator()
-	sep3:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
-	sep3:SetPoint("TOPRIGHT", footerFrame, "TOPRIGHT", -10, yOffset)
-	yOffset = yOffset - 5
+		-- Separator
+		local sep3 = AddSeparator()
+		sep3:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
+		sep3:SetPoint("TOPRIGHT", footerFrame, "TOPRIGHT", -10, yOffset)
+		yOffset = yOffset - 5
 
-	-- Hints 2
-	local hint4 = AddLine(C("ltgray", L("BROKER_HINT_ICON_ACTIONS")), "GameTooltipTextSmall")
-	hint4:SetPoint("TOP", footerFrame, "TOP", 0, yOffset)
-	yOffset = yOffset - 14
+		-- Hints 2
+		local hint4 = AddLine(C("ltgray", L("BROKER_HINT_ICON_ACTIONS")), "GameTooltipTextSmall")
+		hint4:SetPoint("TOP", footerFrame, "TOP", 0, yOffset)
+		yOffset = yOffset - 14
 
-	local hint5 = AddLine(C("ltblue", L("BROKER_HINT_LEFT_CLICK")) .. L("BROKER_HINT_TOGGLE"), "GameTooltipTextSmall")
-	hint5:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
-	hint5:SetPoint("RIGHT", footerFrame, "RIGHT", -10, yOffset)
-	yOffset = yOffset - 14
+		local hint5 =
+			AddLine(C("ltblue", L("BROKER_HINT_LEFT_CLICK")) .. L("BROKER_HINT_TOGGLE"), "GameTooltipTextSmall")
+		hint5:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
+		hint5:SetPoint("RIGHT", footerFrame, "RIGHT", -10, yOffset)
+		yOffset = yOffset - 14
 
-	local hint6 = AddLine(
-		C("ltblue", L("BROKER_HINT_RIGHT_CLICK"))
-			.. L("BROKER_HINT_SETTINGS")
-			.. C("ltblue", L("BROKER_HINT_MIDDLE_CLICK"))
-			.. L("BROKER_HINT_CYCLE_FILTER"),
-		"GameTooltipTextSmall"
-	)
-	hint6:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
-	hint6:SetPoint("RIGHT", footerFrame, "RIGHT", -10, yOffset)
-	yOffset = yOffset - 14
+		local hint6 = AddLine(
+			C("ltblue", L("BROKER_HINT_RIGHT_CLICK"))
+				.. L("BROKER_HINT_SETTINGS")
+				.. C("ltblue", L("BROKER_HINT_MIDDLE_CLICK"))
+				.. L("BROKER_HINT_CYCLE_FILTER"),
+			"GameTooltipTextSmall"
+		)
+		hint6:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
+		hint6:SetPoint("RIGHT", footerFrame, "RIGHT", -10, yOffset)
+		yOffset = yOffset - 14
+	end
 end
 
 -- Helper: Check if any context menu is open
-local function IsMenuOpen()
-	if UIDROPDOWNMENU_OPEN_MENU and UIDROPDOWNMENU_OPEN_MENU:IsShown() then
-		return true
-	end
-	if _G.Lib_UIDROPDOWNMENU_OPEN_MENU and _G.Lib_UIDROPDOWNMENU_OPEN_MENU:IsShown() then
-		return true
-	end
+local IsMenuOpen = BFL.BrokerUtils.IsMenuOpen
 
-	if Menu and Menu.GetManager then
-		local manager = Menu.GetManager()
-		if manager and manager.GetOpenMenu then
-			local openMenu = manager:GetOpenMenu()
-			if openMenu and openMenu.IsShown and openMenu:IsShown() then
-				return true
-			end
-		end
-	end
-
-	return false
-end
-
--- Helper: Custom AutoHide that respects open menus
+-- Wrapper: SetupTooltipAutoHide with module-specific upvalues (detailTooltip, LQT)
 local function SetupTooltipAutoHide(tt, anchorFrame)
-	tt:SetAutoHideDelay(nil) -- Disable LibQTip's built-in auto-hide
-
-	if not tt.bflTimer then
-		tt.bflTimer = CreateFrame("Frame", nil, tt)
-	end
-
-	local timer = tt.bflTimer
-	timer.hideTimer = 0
-	timer.checkTimer = 0
-	timer.menuOpenTimer = 0 -- Failsafe timer
-
-	timer:SetScript("OnUpdate", function(self, elapsed)
-		self.checkTimer = self.checkTimer + elapsed
-		if self.checkTimer < 0.1 then
-			return
-		end
-
-		local checkInterval = self.checkTimer
-		self.checkTimer = 0
-
-		local isOver = (tt.IsMouseOver and tt:IsMouseOver())
-
-		if not isOver and anchorFrame and anchorFrame.IsMouseOver and anchorFrame:IsMouseOver() then
-			isOver = true
-		end
-
-		if
-			not isOver
-			and detailTooltip
-			and detailTooltip.IsShown
-			and detailTooltip:IsShown()
-			and detailTooltip.IsMouseOver
-			and detailTooltip:IsMouseOver()
-		then
-			isOver = true
-		end
-
-		if isOver then
-			self.hideTimer = 0
-			self.menuOpenTimer = 0
-		else
-			if IsMenuOpen() then
-				self.hideTimer = 0
-
-				self.menuOpenTimer = (self.menuOpenTimer or 0) + checkInterval
-				if self.menuOpenTimer > 2.0 then
-					if LQT then
-						pcall(function()
-							LQT:ReleaseTooltip(tt)
-						end)
-					end
-					self:SetScript("OnUpdate", nil)
-				end
-			else
-				self.hideTimer = self.hideTimer + checkInterval
-				self.menuOpenTimer = 0
-
-				if self.hideTimer >= 0.25 then
-					if LQT then
-						pcall(function()
-							LQT:ReleaseTooltip(tt)
-						end)
-					end
-					self:SetScript("OnUpdate", nil)
-				end
-			end
-		end
-	end)
+	BFL.BrokerUtils.SetupTooltipAutoHide(tt, anchorFrame, LQT, function() return detailTooltip end)
 end
 
 local function TooltipCleanup(tt)
@@ -1335,6 +1253,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 
 	-- Define available columns and their default visibility
 	local columns = {
+		{ key = "Nickname", label = L("BROKER_COLUMN_NICKNAME"), align = "LEFT", default = false },
 		{ key = "Name", label = L("BROKER_COLUMN_NAME"), align = "LEFT", default = true },
 		{ key = "Level", label = L("BROKER_COLUMN_LEVEL"), align = "CENTER", default = true },
 		{ key = "Character", label = L("BROKER_COLUMN_CHARACTER"), align = "LEFT", default = true },
@@ -1409,13 +1328,34 @@ local function CreateLibQTipTooltip(anchorFrame)
 		SetupTooltipAutoHide(tt, anchorFrame)
 		tt:SetFrameStrata("HIGH")
 
+		-- ElvUI Skin: Toggle backdrop based on current setting
+		if _G.ElvUI then
+			local wantSkin = BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin
+			if wantSkin and not tt.bflElvUISkinned then
+				local ok, E = pcall(function()
+					return select(1, unpack(_G.ElvUI))
+				end)
+				if ok and E and E.initialized and tt.CreateBackdrop then
+					tt:CreateBackdrop("Transparent")
+					tt.bflElvUISkinned = true
+				end
+			end
+			if tt.backdrop then
+				if wantSkin then
+					tt.backdrop:Show()
+				else
+					tt.backdrop:Hide()
+				end
+			end
+		end
+
 		-- Setup Fixed Footer Frame
 		if not tt.footerFrame then
 			tt.footerFrame = CreateFrame("Frame", nil, tt)
 			tt.footerFrame:SetPoint("BOTTOMLEFT", tt, "BOTTOMLEFT", 0, 0)
 			tt.footerFrame:SetPoint("BOTTOMRIGHT", tt, "BOTTOMRIGHT", 0, 0)
-			tt.footerFrame:SetHeight(FOOTER_HEIGHT)
 		end
+		tt.footerFrame:SetHeight(GetFooterHeight())
 		tt.footerFrame:Show()
 
 		-- Adjust ScrollFrame to respect footer (PascalCase in v2)
@@ -1832,25 +1772,43 @@ local function CreateLibQTipTooltip(anchorFrame)
 				and friend.factionName ~= ""
 			local shouldGray = grayOtherFaction and isOppositeFaction
 
-			local nameColor = "|cffffffff"
+			-- Read fontColorFriendName from settings as fallback color
+			local fontColorName = BetterFriendlistDB and BetterFriendlistDB.fontColorFriendName
+			local defaultNameColor = "|cffffffff"
+			if fontColorName and fontColorName.r and fontColorName.g and fontColorName.b then
+				defaultNameColor = string.format(
+					"|cff%02x%02x%02x",
+					fontColorName.r * 255,
+					fontColorName.g * 255,
+					fontColorName.b * 255
+				)
+			end
+
+			local nameColor = defaultNameColor
 			if shouldGray then
 				nameColor = "|cff808080"
 			elseif friend.type == "bnet" then
-				nameColor = FRIENDS_BNET_NAME_COLOR_CODE or "|cff82c5ff"
+				nameColor = defaultNameColor
 			elseif friend.type == "wow" then
 				if colorClassNames then
 					local classColor = GetClassColorForFriend(friend)
 					nameColor =
 						string.format("|cff%02x%02x%02x", classColor.r * 255, classColor.g * 255, classColor.b * 255)
 				else
-					nameColor = "|cffffffff"
+					nameColor = defaultNameColor
 				end
 			end
 
 			local cellValues = {}
 			for _, col in ipairs(activeColumns) do
 				local val = ""
-				if col.key == "Name" then
+				if col.key == "Nickname" then
+					local DB = GetDB()
+					local nick = DB and DB:GetNickname(friend.id) or ""
+					if nick ~= "" then
+						val = defaultNameColor .. nick .. "|r"
+					end
+				elseif col.key == "Name" then
 					local prefix = indentation .. statusIcon .. " "
 					val = prefix .. nameColor .. GetFriendDisplayName(friend) .. "|r"
 				elseif col.key == "Level" then
@@ -2006,12 +1964,13 @@ local function CreateLibQTipTooltip(anchorFrame)
 			emptyCell:SetText(C("gray", L("BROKER_NO_FRIENDS_ONLINE")))
 		end
 
-		local maxContentHeight = MAX_TOOLTIP_HEIGHT - FOOTER_HEIGHT
+		local footerHeight = GetFooterHeight()
+		local maxContentHeight = MAX_TOOLTIP_HEIGHT - footerHeight
 		tt:SetMaxHeight(maxContentHeight)
 		tt:UpdateLayout()
 
 		-- Add space for footer to the calculated height
-		tt:SetHeight(tt:GetHeight() + FOOTER_HEIGHT)
+		tt:SetHeight(tt:GetHeight() + footerHeight)
 
 		-- Fix Slider Anchor (must stop at footer) - PascalCase in v2
 		if tt.Slider and tt.Slider:IsShown() then
@@ -2078,6 +2037,27 @@ local function CreateDetailTooltip(cell, data)
 	tt2:SetAutoHideDelay(0.25, tooltip)
 	tt2:SetFrameStrata("HIGH")
 	tt2:UpdateLayout()
+
+	-- ElvUI Skin: Toggle backdrop based on current setting
+	if _G.ElvUI then
+		local wantSkin = BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin
+		if wantSkin and not tt2.bflElvUISkinned then
+			local ok, E = pcall(function()
+				return select(1, unpack(_G.ElvUI))
+			end)
+			if ok and E and E.initialized and tt2.CreateBackdrop then
+				tt2:CreateBackdrop("Transparent")
+				tt2.bflElvUISkinned = true
+			end
+		end
+		if tt2.backdrop then
+			if wantSkin then
+				tt2.backdrop:Show()
+			else
+				tt2.backdrop:Hide()
+			end
+		end
+	end
 
 	-- Header with character/account name
 	local headerRow = tt2:AddHeadingRow()

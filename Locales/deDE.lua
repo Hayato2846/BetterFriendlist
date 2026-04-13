@@ -373,6 +373,9 @@ BFL:RegisterLocale("deDE", function()
 	L.BROKER_SETTINGS_SHOW_ICON = "Icon anzeigen"
 	L.BROKER_SETTINGS_TOOLTIP_MODE = "Tooltip-Detailstufe"
 	L.BROKER_SETTINGS_CLICK_ACTION = "Linksklick-Aktion"
+	L.BROKER_SETTINGS_SHOW_HINTS = "Tooltip-Hinweise anzeigen"
+	L.BROKER_SETTINGS_SHOW_HINTS_TITLE = "Tooltip-Hinweise anzeigen"
+	L.BROKER_SETTINGS_SHOW_HINTS_TOOLTIP = "Zeigt klickbare Aktionshinweise am unteren Rand des Broker-Tooltips an"
 	L.BROKER_ACTION_TOGGLE = "BetterFriendlist umschalten"
 	L.BROKER_ACTION_FRIENDS = "Freundesliste öffnen"
 	L.BROKER_ACTION_SETTINGS = "Einstellungen öffnen"
@@ -426,6 +429,7 @@ BFL:RegisterLocale("deDE", function()
 	L.BROKER_COLUMN_REALM = "Realm"
 	L.BROKER_COLUMN_FACTION = "Fraktion"
 	L.BROKER_COLUMN_NOTES = "Notizen"
+	L.BROKER_COLUMN_NICKNAME = "Spitzname"
 
 	-- Broker Column Tooltips
 	L.BROKER_COLUMN_NAME_DESC = "Zeigt den Namen des Freundes (RealID oder Charaktername)"
@@ -436,6 +440,111 @@ BFL:RegisterLocale("deDE", function()
 	L.BROKER_COLUMN_REALM_DESC = "Zeigt den Realm des Charakters"
 	L.BROKER_COLUMN_FACTION_DESC = "Zeigt das Fraktionssymbol (Allianz/Horde)"
 	L.BROKER_COLUMN_NOTES_DESC = "Zeigt Freundesnotizen an"
+	L.BROKER_COLUMN_NICKNAME_DESC = "Zeigt den Spitznamen des Freundes"
+
+	-- ========================================
+	-- GUILD BROKER
+	-- ========================================
+	-- Core
+	L.GUILD_BROKER_TITLE = "BetterFriendlist - Gilde"
+	L.GUILD_BROKER_TOOLTIP_HEADER = "Gildenmitglieder"
+	L.GUILD_BROKER_NO_GUILD = "Keine Gilde"
+	L.GUILD_BROKER_ONLINE_COUNT = "%d online"
+	L.GUILD_BROKER_TOTAL_COUNT = "%d / %d Mitglieder"
+	L.GUILD_BROKER_NO_MEMBERS_ONLINE = "Keine Gildenmitglieder online"
+	L.GUILD_BROKER_FILTER_LABEL = "Filter: "
+	L.GUILD_BROKER_SORT_LABEL = "Sortierung: "
+
+	-- Columns
+	L.GUILD_BROKER_COL_NAME = "Name"
+	L.GUILD_BROKER_COL_LEVEL = "Stufe"
+	L.GUILD_BROKER_COL_CLASS = "Klasse"
+	L.GUILD_BROKER_COL_RANK = "Rang"
+	L.GUILD_BROKER_COL_ZONE = "Zone"
+	L.GUILD_BROKER_COL_NOTE = "Notiz"
+	L.GUILD_BROKER_COL_OFFICER_NOTE = "Offiziersnotiz"
+	L.GUILD_BROKER_COL_LAST_ONLINE = "Zuletzt online"
+
+	-- Column Tooltips
+	L.GUILD_BROKER_COL_NAME_DESC = "Zeigt den Charakternamen des Mitglieds"
+	L.GUILD_BROKER_COL_LEVEL_DESC = "Zeigt die Stufe des Mitglieds"
+	L.GUILD_BROKER_COL_CLASS_DESC = "Zeigt die Klasse des Mitglieds"
+	L.GUILD_BROKER_COL_RANK_DESC = "Zeigt den Gildenrang des Mitglieds"
+	L.GUILD_BROKER_COL_ZONE_DESC = "Zeigt die aktuelle Zone des Mitglieds"
+	L.GUILD_BROKER_COL_NOTE_DESC = "Zeigt die Notiz des Mitglieds"
+	L.GUILD_BROKER_COL_OFFICER_NOTE_DESC = "Zeigt die Offiziersnotiz des Mitglieds"
+	L.GUILD_BROKER_COL_LAST_ONLINE_DESC = "Zeigt wann das Mitglied zuletzt online war"
+
+	-- Settings
+	L.GUILD_BROKER_SETTINGS_HEADER = "Gilden-Plugin"
+	L.GUILD_BROKER_SETTINGS_ENABLE = "Gilden-Broker aktivieren"
+	L.GUILD_BROKER_SETTINGS_ENABLE_DESC = "Zeigt Gildenmitgliederdaten in Deinem Data Broker Anzeigeaddon"
+	L.GUILD_BROKER_SETTINGS_SHOW_ICON = "Symbol anzeigen"
+	L.GUILD_BROKER_SETTINGS_SHOW_LABEL = "Beschriftung anzeigen"
+	L.GUILD_BROKER_SETTINGS_SHOW_TOTAL = "Gesamtzahl anzeigen"
+	L.GUILD_BROKER_SETTINGS_SHOW_HINTS = "Hinweise anzeigen"
+	L.GUILD_BROKER_SETTINGS_CLICK_ACTION = "Linksklick-Aktion"
+	L.GUILD_BROKER_SETTINGS_GROUP_MODE = "Gruppierung"
+	L.GUILD_BROKER_SETTINGS_FILTER = "Standard-Filter"
+	L.GUILD_BROKER_SETTINGS_MAX_ROWS = "Maximale Zeilen"
+	L.GUILD_BROKER_SETTINGS_MAX_ROWS_DESC = "Tooltip-Zeilen für große Gilden begrenzen (25-200)"
+	L.GUILD_BROKER_SETTINGS_COLUMNS = "Tooltip-Spalten"
+
+	-- Click Actions
+	L.GUILD_BROKER_ACTION_GUILD_FRAME = "Gildenfenster öffnen"
+	L.GUILD_BROKER_ACTION_SETTINGS = "Einstellungen öffnen"
+
+	-- Group Modes
+	L.GUILD_BROKER_GROUP_NONE = "Keine Gruppierung"
+	L.GUILD_BROKER_GROUP_BY_RANK = "Nach Rang gruppieren"
+	L.GUILD_BROKER_GROUP_BY_CLASS = "Nach Klasse gruppieren"
+
+	-- Filters
+	L.GUILD_BROKER_FILTER_ALL = "Alle Mitglieder"
+	L.GUILD_BROKER_FILTER_ONLINE = "Nur Online"
+
+	-- Hints
+	L.GUILD_BROKER_HINT_MEMBER_ACTIONS = "--- Mitglieder-Aktionen ---"
+	L.GUILD_BROKER_HINT_CLICK_WHISPER = "Mitglied anklicken:"
+	L.GUILD_BROKER_HINT_WHISPER = " Flüstern"
+	L.GUILD_BROKER_HINT_RIGHT_CLICK_MENU = "Rechtsklick:"
+	L.GUILD_BROKER_HINT_CONTEXT_MENU = " Kontextmenü"
+	L.GUILD_BROKER_HINT_ALT_CLICK = "Alt+Klick:"
+	L.GUILD_BROKER_HINT_INVITE = " Einladen"
+	L.GUILD_BROKER_HINT_SHIFT_CLICK = "Shift+Klick:"
+	L.GUILD_BROKER_HINT_COPY = " In Chat kopieren"
+	L.GUILD_BROKER_HINT_ICON_ACTIONS = "--- Broker-Symbol-Aktionen ---"
+	L.GUILD_BROKER_HINT_LEFT_CLICK = "Linksklick:"
+	L.GUILD_BROKER_HINT_TOGGLE = " Tooltip umschalten"
+	L.GUILD_BROKER_HINT_RIGHT_CLICK = "Rechtsklick:"
+	L.GUILD_BROKER_HINT_SETTINGS = " Einstellungen"
+	L.GUILD_BROKER_HINT_MIDDLE_CLICK = "Mittelklick:"
+	L.GUILD_BROKER_HINT_CYCLE_FILTER = " Filter wechseln"
+
+	-- Context Menu
+	L.GUILD_BROKER_MENU_WHISPER = "Flüstern"
+	L.GUILD_BROKER_MENU_INVITE = "In Gruppe einladen"
+	L.GUILD_BROKER_MENU_WHO = "Wer"
+	L.GUILD_BROKER_MENU_COPY_NAME = "Name kopieren"
+	L.GUILD_BROKER_MENU_EDIT_NOTE = "Notiz bearbeiten"
+	L.GUILD_BROKER_MENU_EDIT_OFFICER_NOTE = "Offiziersnotiz bearbeiten"
+	L.GUILD_BROKER_MENU_PROMOTE = "Befördern"
+	L.GUILD_BROKER_MENU_DEMOTE = "Degradieren"
+	L.GUILD_BROKER_MENU_REMOVE = "Aus der Gilde entfernen"
+
+	-- Rank Management
+	L.GUILD_BROKER_PROMOTE_CONFIRM = "%s zu %s befördern?"
+	L.GUILD_BROKER_DEMOTE_CONFIRM = "%s zu %s degradieren?"
+	L.GUILD_BROKER_REMOVE_CONFIRM = "%s aus der Gilde entfernen?"
+	L.GUILD_BROKER_ACTION_RESTRICTED = "Diese Aktion ist im Kampf nicht verfügbar."
+	L.GUILD_BROKER_NO_PERMISSION = "Du hast keine Berechtigung dafür."
+
+	-- Last Online Formats
+	L.GUILD_BROKER_LAST_ONLINE_YEARS = "%dy"
+	L.GUILD_BROKER_LAST_ONLINE_MONTHS = "%dmo"
+	L.GUILD_BROKER_LAST_ONLINE_DAYS = "%dd"
+	L.GUILD_BROKER_LAST_ONLINE_HOURS = "%dh"
+	L.GUILD_BROKER_LAST_ONLINE_NOW = "Online"
 
 	-- ========================================
 	-- FEATURE REQUESTS (CurseForge User Feedback)
@@ -464,6 +573,8 @@ BFL:RegisterLocale("deDE", function()
 	L.SETTINGS_CLOSE_ON_GUILD_TAB_DESC = "BetterFriendlist automatisch schließen, wenn du auf den Gilden-Tab klickst"
 	L.SETTINGS_HIDE_GUILD_TAB = "Gilden-Tab ausblenden"
 	L.SETTINGS_HIDE_GUILD_TAB_DESC = "Versteckt den Gilden-Tab aus der Freundesliste"
+	L.SETTINGS_ENABLE_GUILD_TAB = "Gilden-Tab aktivieren"
+	L.SETTINGS_ENABLE_GUILD_TAB_DESC = "Zeigt einen Gilden-Tab in BetterFriendlist mit einer vollstaendigen Gildenansicht"
 	L.SETTINGS_USE_UI_PANEL_SYSTEM = "UI-Hierarchie respektieren"
 	L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC =
 		"Verhindert, dass sich BetterFriendlist über andere UI-Fenster öffnet (Charakter, Zauberbuch, etc.). Erfordert /reload."
@@ -1342,4 +1453,25 @@ BFL:RegisterLocale("deDE", function()
 
 	-- Housing
 	L.HOUSING_COMBAT_RESTRICTED = "Im Kampf gesperrt."
+
+	-- Taint-Free Whisper
+	L.SETTINGS_TAINT_FREE_WHISPER = "Taint-freies Fluestern"
+	L.SETTINGS_TAINT_FREE_WHISPER_DESC =
+		"Verwendet eine integrierte Nachrichtenleiste am unteren Rand der Freundesliste zum Fluestern, anstatt den Standard-Chat zu oeffnen. Dadurch wird verhindert, dass BetterFriendlist das Chat-System beeinflusst, was bei anderen Addons oder Blizzard-Code zu Lua-Fehlern fuehren kann. Aktiviere diese Option, wenn du Chat-bezogene Fehler erhaeltst, die BetterFriendlist erwaehnen. Die Leiste schliesst sich nach dem Senden. Druecke Shift+Enter, um sie mit dem gleichen Fluesterziel erneut zu oeffnen. Klicke das X, um das Ziel zu vergessen."
+	L.SETTINGS_TAINT_FREE_WHISPER_TOOLTIP =
+		"Verhindert Chat-Taint-Fehler, die durch das Oeffnen der Blizzard-Fluesterfunktion durch BetterFriendlist verursacht werden. Verwendet stattdessen eine integrierte Nachrichtenleiste."
+	L.TAINT_FREE_WHISPER_TITLE = "Fluestern an %s"
+	L.TAINT_FREE_WHISPER_SEND = "Senden"
+	L.TAINT_FREE_WHISPER_CANCEL = "Abbrechen"
+
+	-- GUILD TAB
+	-- ========================================
+	L.GUILD_TAB_TITLE = "Gilde"
+	L.GUILD_NOT_IN_GUILD = "Du bist in keiner Gilde."
+	L.GUILD_NO_RESULTS = "Keine Mitglieder gefunden."
+	L.GUILD_RESULTS_SHOWN = "angezeigt"
+	L.GUILD_TOOLTIP_HINT = "Rechtsklick fuer Optionen"
+	L.GUILD_OPEN_MANAGEMENT = "Gildenverwaltung"
+	L.GUILD_HEADER_MOTD = "MOTD:"
+	L.GUILD_REFRESH_THROTTLED = "Aktualisierung auf Abklingzeit (10s)"
 end)

@@ -504,8 +504,239 @@ end
 -- Fix: On 12.0.0+, use securecallfunction() to call Blizzard APIs in a new secure
 -- execution context that does not inherit the caller's taint.
 
-function BFL:SecureSendBNetTell(name)
+-- Taint-Free Whisper: Inline EditBox integrated into the BFL frame bottom bar.
+-- When enabled via Settings > Advanced, this bypasses ChatFrameUtil.SendBNetTell/SendTell entirely.
+-- Instead of opening Blizzard's chat, an inline input bar appears at the bottom of the BFL frame,
+-- replacing the Add Friend / Send Message buttons temporarily.
+do
+	local whisperBar
+	local stickyWhisper -- persists across bar hide/show for "sticky target" behavior
+
+	local function EnsureWhisperBar()
+		if whisperBar then return whisperBar end
+
+		-- Defer creation until BetterFriendsFrame exists
+		local parent = _G.BetterFriendsFrame
+		if not parent then return nil end
+
+		local bar = CreateFrame("Frame", nil, parent)
+		bar:SetHeight(25)
+		bar:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", 6, 3)
+		bar:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -6, 3)
+		bar:SetFrameLevel(parent:GetFrameLevel() + 10)
+
+		-- "To: Name" label
+		local toLabel = bar:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
+		toLabel:SetPoint("LEFT", bar, "LEFT", 6, 0)
+		toLabel:SetJustifyH("LEFT")
+		toLabel:SetTextColor(0.6, 0.6, 0.6)
+		bar.ToLabel = toLabel
+
+		-- EditBox
+		local editBox = CreateFrame("EditBox", nil, bar, "InputBoxTemplate")
+		editBox:SetHeight(20)
+		editBox:SetPoint("LEFT", toLabel, "RIGHT", 4, 0)
+		editBox:SetPoint("RIGHT", bar, "RIGHT", -60, 0)
+		editBox:SetAutoFocus(false)
+		editBox:SetMaxLetters(255)
+		editBox:SetFontObject("BetterFriendlistFontNormal")
+		bar.EditBox = editBox
+
+		-- Send button (small, icon-style arrow)
+		local sendBtn = CreateFrame("Button", nil, bar)
+		sendBtn:SetSize(22, 22)
+		sendBtn:SetPoint("LEFT", editBox, "RIGHT", 2, 0)
+		sendBtn:SetNormalTexture("Interface\\Buttons\\UI-SpellbookIcon-NextPage-Up")
+		sendBtn:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
+		sendBtn:SetPushedTexture("Interface\\Buttons\\UI-SpellbookIcon-NextPage-Down")
+		bar.SendButton = sendBtn
+
+		-- Close/cancel button
+		local closeBtn = CreateFrame("Button", nil, bar)
+		closeBtn:SetSize(22, 22)
+		closeBtn:SetPoint("LEFT", sendBtn, "RIGHT", 0, 0)
+		closeBtn:SetNormalTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Up")
+		closeBtn:SetHighlightTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Highlight")
+		closeBtn:SetPushedTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Down")
+		bar.CloseButton = closeBtn
+
+		local function SoftCloseBar()
+			bar:Hide()
+			-- Restore bottom buttons (sticky state preserved for Shift+Enter)
+			if parent.AddFriendButton then parent.AddFriendButton:Show() end
+			if parent.SendMessageButton then parent.SendMessageButton:Show() end
+		end
+
+		local function HardCloseBar()
+			bar:Hide()
+			-- Restore bottom buttons
+			if parent.AddFriendButton then parent.AddFriendButton:Show() end
+			if parent.SendMessageButton then parent.SendMessageButton:Show() end
+			editBox:SetText("")
+			editBox:ClearFocus()
+			-- Hard close: clear sticky state (user explicitly closed via X button)
+			stickyWhisper = nil
+			bar.bnetIDAccount = nil
+			bar.whisperTarget = nil
+			bar.isBNet = nil
+		end
+
+		local function DoSend()
+			local text = editBox:GetText()
+			if not text or text == "" then
+				-- Empty message: soft close (target preserved for Shift+Enter)
+				SoftCloseBar()
+				return
+			end
+			if bar.isBNet and bar.bnetIDAccount then
+				BNSendWhisper(bar.bnetIDAccount, text)
+			elseif not bar.isBNet and bar.whisperTarget then
+				SendChatMessage(text, "WHISPER", nil, bar.whisperTarget)
+			end
+			-- Close bar after sending (sticky state preserved for Shift+Enter reopen)
+			SoftCloseBar()
+		end
+
+		editBox:SetScript("OnEnterPressed", DoSend)
+		editBox:SetScript("OnEscapePressed", SoftCloseBar)
+		sendBtn:SetScript("OnClick", DoSend)
+		closeBtn:SetScript("OnClick", HardCloseBar)
+		bar:SetScript("OnHide", function()
+			-- Soft close: preserve sticky state (tab switch, frame hide)
+			editBox:SetText("")
+			editBox:ClearFocus()
+		end)
+
+		-- Tooltip for send button
+		sendBtn:SetScript("OnEnter", function(self)
+			GameTooltip:SetOwner(self, "ANCHOR_TOP")
+			GameTooltip:SetText(BFL.L and BFL.L.TAINT_FREE_WHISPER_SEND or "Send")
+			GameTooltip:Show()
+		end)
+		sendBtn:SetScript("OnLeave", GameTooltip_Hide)
+
+		-- Tooltip for close button
+		closeBtn:SetScript("OnEnter", function(self)
+			GameTooltip:SetOwner(self, "ANCHOR_TOP")
+			GameTooltip:SetText(BFL.L and BFL.L.TAINT_FREE_WHISPER_CANCEL or "Cancel")
+			GameTooltip:Show()
+		end)
+		closeBtn:SetScript("OnLeave", GameTooltip_Hide)
+
+		bar:Hide()
+		whisperBar = bar
+
+		-- Shift+Enter on BetterFriendsFrame reopens whisper bar from sticky state
+		if not parent.bflKeyboardHooked then
+			parent:EnableKeyboard(true)
+			parent:HookScript("OnKeyDown", function(self, key)
+				if key == "ENTER" and IsShiftKeyDown() and stickyWhisper
+					and BetterFriendlistDB and BetterFriendlistDB.taintFreeWhisper
+					and not (whisperBar and whisperBar:IsShown()) then
+					self:SetPropagateKeyboardInput(false)
+					BFL:RestoreTaintFreeWhisper()
+				else
+					self:SetPropagateKeyboardInput(true)
+				end
+			end)
+			parent.bflKeyboardHooked = true
+		end
+
+		return bar
+	end
+
+	function BFL:OpenTaintFreeWhisper(displayName, whisperTarget, bnetIDAccount, isBNet)
+		local bar = EnsureWhisperBar()
+		if not bar then
+			-- Fallback: BFL frame not ready, use standard path
+			if isBNet then
+				local func = ChatFrameUtil and ChatFrameUtil.SendBNetTell or ChatFrame_SendBNetTell
+				if func then
+					if BFL.HasSecretValues and securecallfunction then
+						securecallfunction(func, displayName)
+					else
+						func(displayName)
+					end
+				end
+			else
+				local func = ChatFrameUtil and ChatFrameUtil.SendTell or ChatFrame_SendTell
+				if func then
+					if BFL.HasSecretValues and securecallfunction then
+						securecallfunction(func, whisperTarget or displayName)
+					else
+						func(whisperTarget or displayName)
+					end
+				end
+			end
+			return
+		end
+
+		local L = BFL.L
+
+		-- Set whisper target info
+		bar.bnetIDAccount = bnetIDAccount
+		bar.whisperTarget = whisperTarget
+		bar.isBNet = isBNet
+
+		-- Save sticky state so bar can be restored after tab switch / frame hide
+		stickyWhisper = {
+			displayName = displayName,
+			whisperTarget = whisperTarget,
+			bnetIDAccount = bnetIDAccount,
+			isBNet = isBNet,
+		}
+
+		-- Set label
+		local titlePattern = L and L.TAINT_FREE_WHISPER_TITLE or "Whisper to %s"
+		bar.ToLabel:SetText(string.format(titlePattern, displayName or "???") .. ":")
+
+		-- Hide bottom buttons, show inline bar
+		local parent = _G.BetterFriendsFrame
+		if parent then
+			if parent.AddFriendButton then parent.AddFriendButton:Hide() end
+			if parent.SendMessageButton then parent.SendMessageButton:Hide() end
+		end
+
+		bar:Show()
+		bar.EditBox:SetFocus()
+	end
+
+	-- Close the whisper bar externally (e.g., when switching tabs)
+	-- Soft close: hide bar but preserve sticky state (tab switch, frame hide)
+	function BFL:CloseTaintFreeWhisper()
+		if whisperBar and whisperBar:IsShown() then
+			whisperBar:Hide()
+			local parent = _G.BetterFriendsFrame
+			if parent then
+				if parent.AddFriendButton then parent.AddFriendButton:Show() end
+				if parent.SendMessageButton then parent.SendMessageButton:Show() end
+			end
+		end
+	end
+
+	-- Restore whisper bar from sticky state (e.g., after returning to Friends tab)
+	function BFL:RestoreTaintFreeWhisper()
+		if not stickyWhisper then return end
+		if not BetterFriendlistDB or not BetterFriendlistDB.taintFreeWhisper then
+			stickyWhisper = nil
+			return
+		end
+		BFL:OpenTaintFreeWhisper(
+			stickyWhisper.displayName,
+			stickyWhisper.whisperTarget,
+			stickyWhisper.bnetIDAccount,
+			stickyWhisper.isBNet
+		)
+	end
+end
+
+function BFL:SecureSendBNetTell(name, bnetIDAccount)
 	if not name then return end
+	-- Taint-Free Whisper: Use custom EditBox popup instead of Blizzard chat
+	if BetterFriendlistDB and BetterFriendlistDB.taintFreeWhisper and bnetIDAccount then
+		BFL:OpenTaintFreeWhisper(name, nil, bnetIDAccount, true)
+		return
+	end
 	local func = ChatFrameUtil and ChatFrameUtil.SendBNetTell or ChatFrame_SendBNetTell
 	if not func then return end
 	if BFL.HasSecretValues and securecallfunction then
@@ -517,6 +748,11 @@ end
 
 function BFL:SecureSendTell(name)
 	if not name then return end
+	-- Taint-Free Whisper: Use custom EditBox popup instead of Blizzard chat
+	if BetterFriendlistDB and BetterFriendlistDB.taintFreeWhisper then
+		BFL:OpenTaintFreeWhisper(name, name, nil, false)
+		return
+	end
 	local func = ChatFrameUtil and ChatFrameUtil.SendTell or ChatFrame_SendTell
 	if not func then return end
 	if BFL.HasSecretValues and securecallfunction then
@@ -1231,6 +1467,11 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 					-- FRIEND_TAB_FRIENDS=1, FRIEND_TAB_WHO=2, FRIEND_TAB_RAID=3, FRIEND_TAB_QUICK_JOIN=4
 					local requestedTab = PanelTemplates_GetSelectedTab(FriendsFrame) or 1
 					-- BFL:DebugPrint("[BFL] FriendsFrame:OnShow - Intercepting, requested tab: " .. tostring(requestedTab))
+
+					-- Fix #81: Reset Blizzard's selected tab to Friends after reading it.
+					-- Without this, the stale value persists and subsequent opens via keybind
+					-- (which route through FriendsFrame:OnShow) would reopen on the wrong tab.
+					PanelTemplates_SetTab(FriendsFrame, 1)
 
 					-- Hide immediately via alpha to prevent visual flash, then defer
 					-- the actual Hide()+Open to a new execution frame to break taint chain

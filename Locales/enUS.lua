@@ -457,6 +457,7 @@ local function LoadEnUS()
 	L.BROKER_COLUMN_REALM = "Realm"
 	L.BROKER_COLUMN_FACTION = "Faction"
 	L.BROKER_COLUMN_NOTES = "Notes"
+	L.BROKER_COLUMN_NICKNAME = "Nickname"
 
 	-- Broker Column Tooltips
 	L.BROKER_COLUMN_NAME_DESC = "Display the friend's name (RealID or Character Name)"
@@ -467,6 +468,111 @@ local function LoadEnUS()
 	L.BROKER_COLUMN_REALM_DESC = "Display the realm the character is on"
 	L.BROKER_COLUMN_FACTION_DESC = "Display the faction icon (Alliance/Horde)"
 	L.BROKER_COLUMN_NOTES_DESC = "Display friend notes"
+	L.BROKER_COLUMN_NICKNAME_DESC = "Display the friend's nickname"
+
+	-- ========================================
+	-- GUILD BROKER
+	-- ========================================
+	-- Core
+	L.GUILD_BROKER_TITLE = "BetterFriendlist - Guild"
+	L.GUILD_BROKER_TOOLTIP_HEADER = "Guild Members"
+	L.GUILD_BROKER_NO_GUILD = "No Guild"
+	L.GUILD_BROKER_ONLINE_COUNT = "%d online"
+	L.GUILD_BROKER_TOTAL_COUNT = "%d / %d members"
+	L.GUILD_BROKER_NO_MEMBERS_ONLINE = "No guild members online"
+	L.GUILD_BROKER_FILTER_LABEL = "Filter: "
+	L.GUILD_BROKER_SORT_LABEL = "Sort: "
+
+	-- Columns
+	L.GUILD_BROKER_COL_NAME = "Name"
+	L.GUILD_BROKER_COL_LEVEL = "Level"
+	L.GUILD_BROKER_COL_CLASS = "Class"
+	L.GUILD_BROKER_COL_RANK = "Rank"
+	L.GUILD_BROKER_COL_ZONE = "Zone"
+	L.GUILD_BROKER_COL_NOTE = "Note"
+	L.GUILD_BROKER_COL_OFFICER_NOTE = "Officer Note"
+	L.GUILD_BROKER_COL_LAST_ONLINE = "Last Online"
+
+	-- Column Tooltips
+	L.GUILD_BROKER_COL_NAME_DESC = "Display the member's character name"
+	L.GUILD_BROKER_COL_LEVEL_DESC = "Display the member's level"
+	L.GUILD_BROKER_COL_CLASS_DESC = "Display the member's class"
+	L.GUILD_BROKER_COL_RANK_DESC = "Display the member's guild rank"
+	L.GUILD_BROKER_COL_ZONE_DESC = "Display the member's current zone"
+	L.GUILD_BROKER_COL_NOTE_DESC = "Display the member's public note"
+	L.GUILD_BROKER_COL_OFFICER_NOTE_DESC = "Display the member's officer note"
+	L.GUILD_BROKER_COL_LAST_ONLINE_DESC = "Display when the member was last online"
+
+	-- Settings
+	L.GUILD_BROKER_SETTINGS_HEADER = "Guild Plugin"
+	L.GUILD_BROKER_SETTINGS_ENABLE = "Enable Guild Broker"
+	L.GUILD_BROKER_SETTINGS_ENABLE_DESC = "Show guild member data in your Data Broker display addon"
+	L.GUILD_BROKER_SETTINGS_SHOW_ICON = "Show Icon"
+	L.GUILD_BROKER_SETTINGS_SHOW_LABEL = "Show Label"
+	L.GUILD_BROKER_SETTINGS_SHOW_TOTAL = "Show Total Count"
+	L.GUILD_BROKER_SETTINGS_SHOW_HINTS = "Show Hints"
+	L.GUILD_BROKER_SETTINGS_CLICK_ACTION = "Left Click Action"
+	L.GUILD_BROKER_SETTINGS_GROUP_MODE = "Group Mode"
+	L.GUILD_BROKER_SETTINGS_FILTER = "Default Filter"
+	L.GUILD_BROKER_SETTINGS_MAX_ROWS = "Maximum Rows"
+	L.GUILD_BROKER_SETTINGS_MAX_ROWS_DESC = "Limit tooltip rows for large guilds (25-200)"
+	L.GUILD_BROKER_SETTINGS_COLUMNS = "Tooltip Columns"
+
+	-- Click Actions
+	L.GUILD_BROKER_ACTION_GUILD_FRAME = "Open Guild Frame"
+	L.GUILD_BROKER_ACTION_SETTINGS = "Open Settings"
+
+	-- Group Modes
+	L.GUILD_BROKER_GROUP_NONE = "No Grouping"
+	L.GUILD_BROKER_GROUP_BY_RANK = "Group by Rank"
+	L.GUILD_BROKER_GROUP_BY_CLASS = "Group by Class"
+
+	-- Filters
+	L.GUILD_BROKER_FILTER_ALL = "All Members"
+	L.GUILD_BROKER_FILTER_ONLINE = "Online Only"
+
+	-- Hints
+	L.GUILD_BROKER_HINT_MEMBER_ACTIONS = "--- Member Line Actions ---"
+	L.GUILD_BROKER_HINT_CLICK_WHISPER = "Click Member:"
+	L.GUILD_BROKER_HINT_WHISPER = " Whisper"
+	L.GUILD_BROKER_HINT_RIGHT_CLICK_MENU = "Right-Click:"
+	L.GUILD_BROKER_HINT_CONTEXT_MENU = " Context Menu"
+	L.GUILD_BROKER_HINT_ALT_CLICK = "Alt+Click:"
+	L.GUILD_BROKER_HINT_INVITE = " Invite"
+	L.GUILD_BROKER_HINT_SHIFT_CLICK = "Shift+Click:"
+	L.GUILD_BROKER_HINT_COPY = " Copy to Chat"
+	L.GUILD_BROKER_HINT_ICON_ACTIONS = "--- Broker Icon Actions ---"
+	L.GUILD_BROKER_HINT_LEFT_CLICK = "Left Click:"
+	L.GUILD_BROKER_HINT_TOGGLE = " Toggle Tooltip"
+	L.GUILD_BROKER_HINT_RIGHT_CLICK = "Right Click:"
+	L.GUILD_BROKER_HINT_SETTINGS = " Settings"
+	L.GUILD_BROKER_HINT_MIDDLE_CLICK = "Middle Click:"
+	L.GUILD_BROKER_HINT_CYCLE_FILTER = " Cycle Filter"
+
+	-- Context Menu
+	L.GUILD_BROKER_MENU_WHISPER = "Whisper"
+	L.GUILD_BROKER_MENU_INVITE = "Invite to Group"
+	L.GUILD_BROKER_MENU_WHO = "Who"
+	L.GUILD_BROKER_MENU_COPY_NAME = "Copy Name"
+	L.GUILD_BROKER_MENU_EDIT_NOTE = "Edit Note"
+	L.GUILD_BROKER_MENU_EDIT_OFFICER_NOTE = "Edit Officer Note"
+	L.GUILD_BROKER_MENU_PROMOTE = "Promote"
+	L.GUILD_BROKER_MENU_DEMOTE = "Demote"
+	L.GUILD_BROKER_MENU_REMOVE = "Remove from Guild"
+
+	-- Rank Management
+	L.GUILD_BROKER_PROMOTE_CONFIRM = "Promote %s to %s?"
+	L.GUILD_BROKER_DEMOTE_CONFIRM = "Demote %s to %s?"
+	L.GUILD_BROKER_REMOVE_CONFIRM = "Remove %s from the guild?"
+	L.GUILD_BROKER_ACTION_RESTRICTED = "This action is not available during combat."
+	L.GUILD_BROKER_NO_PERMISSION = "You do not have permission to do this."
+
+	-- Last Online Formats
+	L.GUILD_BROKER_LAST_ONLINE_YEARS = "%dy"
+	L.GUILD_BROKER_LAST_ONLINE_MONTHS = "%dmo"
+	L.GUILD_BROKER_LAST_ONLINE_DAYS = "%dd"
+	L.GUILD_BROKER_LAST_ONLINE_HOURS = "%dh"
+	L.GUILD_BROKER_LAST_ONLINE_NOW = "Online"
 
 	-- ========================================
 	-- CLASSIC COMPATIBILITY
@@ -479,6 +585,8 @@ local function LoadEnUS()
 	L.SETTINGS_CLOSE_ON_GUILD_TAB_DESC = "Automatically close BetterFriendlist when you click the Guild tab"
 	L.SETTINGS_HIDE_GUILD_TAB = "Hide Guild Tab"
 	L.SETTINGS_HIDE_GUILD_TAB_DESC = "Hide the Guild tab from the friendlist"
+	L.SETTINGS_ENABLE_GUILD_TAB = "Enable Guild Tab"
+	L.SETTINGS_ENABLE_GUILD_TAB_DESC = "Show a Guild tab in BetterFriendlist with a full guild roster view"
 	L.SETTINGS_USE_UI_PANEL_SYSTEM = "Respect UI Hierarchy"
 	L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC =
 		"Prevent BetterFriendlist from opening over other UI windows (Character, Spellbook, etc.). Requires /reload."
@@ -615,6 +723,9 @@ local function LoadEnUS()
 	L.BROKER_SETTINGS_SHOW_BNET_ICON_TOOLTIP = "Show the Battle.net icon next to BNet friends"
 	L.BROKER_SETTINGS_CLICK_ACTION = "Click Action"
 	L.BROKER_SETTINGS_TOOLTIP_MODE = "Tooltip Mode"
+	L.BROKER_SETTINGS_SHOW_HINTS = "Show Tooltip Hints"
+	L.BROKER_SETTINGS_SHOW_HINTS_TITLE = "Show Tooltip Hints"
+	L.BROKER_SETTINGS_SHOW_HINTS_TOOLTIP = "Display clickable action hints at the bottom of the broker tooltip"
 	L.STATUS_ENABLED = "|cff00ff00Enabled|r"
 	L.STATUS_DISABLED = "|cffff0000Disabled|r"
 	L.BROKER_WOW_FRIENDS = "WoW Friends:"
@@ -1378,6 +1489,27 @@ local function LoadEnUS()
 
 	-- Housing
 	L.HOUSING_COMBAT_RESTRICTED = "Not available in combat."
+
+	-- Taint-Free Whisper
+	L.SETTINGS_TAINT_FREE_WHISPER = "Taint-Free Whisper"
+	L.SETTINGS_TAINT_FREE_WHISPER_DESC =
+		"Uses an inline message bar at the bottom of the friend list for whispering friends instead of opening the default chat. This prevents BetterFriendlist from interfering with the chat system, which can cause Lua errors when other addons or Blizzard code processes messages. Enable this if you experience chat-related errors mentioning BetterFriendlist. The bar closes after sending a message. Press Shift+Enter to reopen it with the same whisper target. Click the X button to close and forget the target."
+	L.SETTINGS_TAINT_FREE_WHISPER_TOOLTIP =
+		"Prevents chat taint errors caused by BetterFriendlist opening the Blizzard whisper box. Uses an inline message bar instead."
+	L.TAINT_FREE_WHISPER_TITLE = "Whisper to %s"
+	L.TAINT_FREE_WHISPER_SEND = "Send"
+	L.TAINT_FREE_WHISPER_CANCEL = "Cancel"
+
+	-- GUILD TAB
+	-- ========================================
+	L.GUILD_TAB_TITLE = "Guild"
+	L.GUILD_NOT_IN_GUILD = "You are not in a guild."
+	L.GUILD_NO_RESULTS = "No members found."
+	L.GUILD_RESULTS_SHOWN = "shown"
+	L.GUILD_TOOLTIP_HINT = "Right-click for options"
+	L.GUILD_OPEN_MANAGEMENT = "Guild Management"
+	L.GUILD_HEADER_MOTD = "MOTD:"
+	L.GUILD_REFRESH_THROTTLED = "Roster refresh on cooldown (10s)"
 end
 
 -- Always load enUS immediately to ensure fallback strings exist

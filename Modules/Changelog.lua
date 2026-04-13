@@ -17,6 +17,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+
+### Added
+- **Guild Tab** - New dedicated Guild tab with a full guild roster view directly inside BetterFriendlist. Features searchable member list, column sorting (name, rank, level, zone), online/offline/all filter buttons, guild name, member count, and Message of the Day display. Includes buttons to open Blizzard's guild management and to refresh the roster. Disabled by default; enable in Settings > General > Behavior. Works on all WoW versions.
+- **Advanced: Taint-Free Whisper** - New optional setting under Advanced that uses an inline message bar at the bottom of the friend list for whispering friends instead of opening the default Blizzard chat. This prevents BetterFriendlist from interfering with the chat system, which can cause Lua errors when other addons or Blizzard code processes messages. After sending, the bar closes automatically. Press Shift+Enter to reopen it with the same whisper target for follow-up messages. Disabled by default.
+- **Broker: Filtered Friend Count** - The broker text and tooltip now reflect the active Quick Filter (e.g., "WoW only" or "Online only") instead of always showing the total online count.
+- **Broker: Name Colors** - Friend names in the broker tooltip now use the font color configured in Settings > Fonts, matching the main friend list appearance.
+- **Broker: Show Tooltip Hints** - New toggle in Settings > Broker to hide the clickable action hints at the bottom of the broker tooltip for a cleaner look.
+- **Broker: Nickname Column** - New optional "Nickname" column for the broker tooltip. Enable it in Settings > Broker > Tooltip Columns. Shows the assigned nickname for each friend, colored with the configured name font color.
+- **Broker: ElvUI Tooltip Skin** - When the ElvUI skin is enabled, the broker tooltip now uses the ElvUI backdrop style for a consistent look.
+- **Broker: Guild Plugin** - New Data Broker plugin that displays guild members in a rich tooltip, similar to the existing friends broker. Shows name, level, class, rank, zone, notes, officer notes, and last online time with 8 toggleable columns. Supports grouping by rank or class with collapsible headers, online/all filter cycling, rank management (promote, demote, remove), and full click interactions (whisper, invite, context menu). Works on all WoW versions. Disabled by default, enable in Settings > Broker > Guild Plugin.
+
+### Fixed
+- **Tab Navigation** - Fixed the window getting stuck on the Who or Quick Join tab after using /who or clicking a group join link. Closing and reopening the window now correctly returns to the Friends tab.
+
 ## [2.5.5]        - 2026-04-05
 
 ### Fixed
@@ -123,29 +138,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Raid Tab Controls Always Visible** - The "Assist All" checkbox, role counts, and member count on the Raid tab are now always visible, even when not in a raid group.
-
-## [2.4.1]       - 2026-02-23
-
-### Added
-- **Who Search Builder: Smart Race/Class Filtering** - The Who Search Builder now prevents impossible race-class combinations (e.g., Dracthyr Death Knight, Human Demon Hunter). When you select a class, only compatible races appear in the race dropdown and vice versa.
-- **Who Search: Throttle Protection** - The Refresh button now shows a 5-second cooldown countdown after each search, preventing queries from being silently dropped by the server. A "Searching..." indicator appears while waiting for results, and a timeout message is shown if no results are received.
-- **Recently Added Group** - New optional builtin group that automatically tracks newly added friends. Friends appear in the group for a configurable duration (default: 7 days) and can be bulk-added to custom groups or cleared individually. Enable it in Settings under General -> Group Management.
-- **Who Search Builder: Docked Mode** - The Who Search Builder can now be docked as a standalone panel next to the main window. Click the new dock button in the builder's title bar to switch between overlay and docked mode. In docked mode, the search box updates live as you type, the builder stays open after searching, and ESC no longer closes it. Your preference is saved across sessions.
-- **Who Results: Alt+Click to Search Builder** - Alt+Click on a Who result now adds the hovered column's value (Name, Zone, Guild, Race, Level, or Class) directly into the Search Builder fields. The Search Builder opens automatically if it is not already visible.
-
-### Changed
-- **Who Search Builder: Name Field Character Limit** - The name field in the Who Search Builder is now limited to 12 characters, matching the maximum length of WoW character names.
-- **Who Results: Smarter Ctrl+Click Search** - Ctrl+Click on a Who result now searches based on the column you are hovering over (Name, Zone/Guild/Race, Level, or Class) instead of always using the dropdown column. The tooltip also shows which column will be searched.
-
-### Fixed
-- **Raid Info Overlap Layering** - Fixed visual overlap where parts of BetterFriendlist could render on top of the Blizzard Raid Information window when both frames were on top of each other.
-- **Raid Inset Misaligned** - Fixed the inset (dark grey background) position of raid tab to properly align with quick join in BFL's normal mode.
-- **Raid and Quick Join Placeholder Text Misaligned** - Fixed the "Not in Raid" and "No groups available" placeholder texts appearing at different vertical positions. Both are now consistently centered within their respective content areas.
-- **Visit House Not Working After Combat** - Fixed the "Visit House" button becoming permanently broken after opening the house list for the first time during combat.
-- **Who Search Builder: Unsorted Dropdowns** - Fixed race and class dropdowns in the Who Search Builder not being sorted alphabetically, making it difficult to find specific options quickly.
-- **Who Search Builder: Level Range Validation** - Fixed level input fields allowing values beyond the maximum player level. Both minimum and maximum level fields now automatically cap entered values to the current expansion's max level and prevent values below 1.
-- **Streamer Mode Still Active When Button Hidden** - Fixed Streamer Mode remaining active when the "Show Streamer Mode Button" option was disabled. The addon now automatically deactivates Streamer Mode when the button is hidden, restoring the original header text and removing privacy filtering.
-- **Who Search: Stale Player Selection** - Fixed being able to invite or interact with players from previous Who search results after starting a new search. Player selection is now automatically cleared when a new Who search is executed.
 
 ---
 

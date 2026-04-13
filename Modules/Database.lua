@@ -139,13 +139,42 @@ local defaults = {
 	brokerShowGroups = false, -- Split counts by WoW/BNet (default: OFF, shows combined)
 	brokerTooltipMode = "advanced", -- Tooltip detail level: "basic" or "advanced" (default: advanced)
 	brokerClickAction = "toggle", -- Left click action: "toggle", "friends", "settings" (default: toggle)
-	-- Classic Guild Tab Settings
+	brokerShowHints = true, -- Show hint text in LDB tooltip footer (default: ON)
+	-- Guild Data Broker Settings
+	guildBrokerEnabled = false, -- Enable Guild Data Broker plugin (default: OFF)
+	guildBrokerShowIcon = true, -- Show guild icon on display addons (default: ON)
+	guildBrokerShowLabel = true, -- Show label text (default: ON)
+	guildBrokerShowTotal = true, -- Show total member count (default: ON)
+	guildBrokerTooltipMode = "advanced", -- Tooltip detail level: "basic" or "advanced" (default: advanced)
+	guildBrokerClickAction = "guild_frame", -- Left click action: "guild_frame", "settings" (default: guild_frame)
+	guildBrokerShowHints = true, -- Show hint text in tooltip footer (default: ON)
+	guildBrokerGroupMode = "none", -- Group mode: "none", "by_rank", "by_class" (default: none)
+	guildBrokerFilter = "online", -- Default filter: "all", "online" (default: online)
+	guildBrokerMaxRows = 100, -- Max rows in tooltip (performance cap, default: 100)
+	guildBrokerShowColName = true, -- Column: Name (default: ON)
+	guildBrokerShowColLevel = true, -- Column: Level (default: ON)
+	guildBrokerShowColClass = true, -- Column: Class (default: ON)
+	guildBrokerShowColRank = true, -- Column: Rank (default: ON)
+	guildBrokerShowColZone = true, -- Column: Zone (default: ON)
+	guildBrokerShowColNote = false, -- Column: Public Note (default: OFF)
+	guildBrokerShowColOfficerNote = false, -- Column: Officer Note (default: OFF, privacy-sensitive)
+	guildBrokerShowColLastOnline = true, -- Column: Last Online (default: ON)
+	guildBrokerColumnOrder = {}, -- Column order persistence
+	guildBrokerCollapsedGroups = {}, -- Collapsed rank/class groups
+	-- Guild Tab Settings
+	enableGuildTab = false, -- Enable the Guild tab in BetterFriendlist (default: OFF, opt-in)
+	guildTabFilterMode = "online", -- Default filter for Guild Tab (default: online)
+	guildTabSortMode = "rank", -- Default sort for Guild Tab (default: rank)
+	-- Classic Guild Tab Settings (legacy, kept for compat)
 	closeOnGuildTabClick = false, -- Close BetterFriendlist when opening Guild Frame (Classic only, default: OFF)
 	hideGuildTab = false, -- Hide the Guild tab completely (Classic only, default: OFF)
 	-- UI Panel System
 	useUIPanelSystem = false, -- Use ShowUIPanel/HideUIPanel for automatic repositioning (default: OFF)
 	-- Note Sync
 	syncGroupsToNote = false, -- Sync group assignments to friend notes (default: OFF)
+
+	-- Taint-Free Whisper
+	taintFreeWhisper = false, -- Use custom EditBox for whispers to avoid tainting Blizzard chat (default: OFF)
 
 	-- Recently Added Group
 	enableRecentlyAddedGroup = false, -- Enable "Recently Added" builtin group (default: OFF)

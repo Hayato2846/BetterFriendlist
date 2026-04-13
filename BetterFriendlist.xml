@@ -1286,6 +1286,12 @@
 			</Button>
 		</Frames>
 	</Frame>
+
+	<!-- Guild Member Button Template (Retail ScrollBox) -->
+	<Button name="BFL_GuildMemberButtonTemplate" virtual="true" registerForClicks="LeftButtonUp,RightButtonUp">
+		<Size x="300" y="22" />
+	</Button>
+
 	<!-- Main Friends Frame -->
 	<Frame name="BetterFriendsFrame" parent="UIParent" inherits="ButtonFrameTemplate"
 		toplevel="true"
@@ -1736,6 +1742,19 @@
 							<OnClick>
 								PanelTemplates_Tab_OnClick(self, self:GetParent())
 								BetterFriendsFrame_ShowTab(3)
+							</OnClick>
+						</Scripts>
+					</Button>
+					<Button name="BetterFriendsFrameTab4" parentKey="Tab4"
+						inherits="PanelTopTabButtonTemplate" text="GUILD" id="4" hidden="true">
+						<Anchors>
+							<Anchor point="LEFT" relativeTo="BetterFriendsFrameTab3"
+								relativePoint="RIGHT" x="-16" y="0" />
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								PanelTemplates_Tab_OnClick(self, self:GetParent())
+								BetterFriendsFrame_ShowTab(4)
 							</OnClick>
 						</Scripts>
 					</Button>
@@ -2652,7 +2671,7 @@
 						tellName = friend.battleTag
 						end
 						if tellName then
-						BFL:SecureSendBNetTell(tellName)
+						BFL:SecureSendBNetTell(tellName, friend.bnetIDAccount)
 						end
 						elseif friend.type == "wow" and friend.name then
 						BFL:SecureSendTell(friend.name)
@@ -3311,7 +3330,356 @@
 				</Scripts>
 			</Frame>
 
-			<!-- Bottom Tabs (Contacts, Who, Raid, Quick Join) - Matching Blizzard's FriendsFrame
+			<!-- ============================================================ -->
+			<!-- GUILD FRAME -->
+			<!-- ============================================================ -->
+			<Frame parentKey="GuildFrame" hidden="true" setAllPoints="true">
+				<Frames>
+					<!-- Search EditBox -->
+					<EditBox parentKey="SearchBox" inherits="SearchBoxTemplate" autoFocus="false"
+						bytes="128">
+						<KeyValues>
+							<KeyValue key="instructionText" value="SEARCH" type="global" />
+							<KeyValue key="instructionsFontObject"
+								value="BetterFriendlistFontDisableSmall" type="global" />
+						</KeyValues>
+						<Size y="20" />
+						<Anchors>
+							<Anchor point="BOTTOMLEFT" relativeKey="$parent.ListInset" x="35" y="40" />
+							<Anchor point="BOTTOMRIGHT" relativeKey="$parent.ListInset" x="-20"
+								y="40" />
+						</Anchors>
+						<Layers>
+							<Layer level="BACKGROUND">
+								<Texture parentKey="Backdrop"
+									atlas="glues-characterSelect-searchbar" useAtlasSize="false">
+									<Anchors>
+										<Anchor point="TOPLEFT" x="-5" />
+										<Anchor point="BOTTOMRIGHT" />
+									</Anchors>
+								</Texture>
+							</Layer>
+						</Layers>
+						<Scripts>
+							<OnTextChanged inherit="prepend">
+								BFL_GuildFrame_SearchChanged(self)
+							</OnTextChanged>
+						</Scripts>
+						<FontString inherits="BetterFriendlistFontHighlight" justifyH="LEFT" />
+					</EditBox>
+					<!-- List Inset -->
+					<Frame parentKey="ListInset" inherits="InsetFrameTemplate">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeKey="$parent.$parent.Inset" x="0" y="40" />
+							<Anchor point="BOTTOMRIGHT" relativeKey="$parent.$parent.Inset" x="0"
+								y="0" />
+						</Anchors>
+					</Frame>
+					<!-- Column Headers -->
+					<Button parentKey="NameHeader" text="NAME">
+						<Size x="116" y="35" />
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeKey="$parent.ListInset"
+								relativePoint="TOPLEFT" x="4" y="25" />
+						</Anchors>
+						<Layers>
+							<Layer level="BACKGROUND">
+								<Texture parentKey="Left"
+									file="Interface\FriendsFrame\WhoFrame-ColumnTabs">
+									<Size x="5" y="35" />
+									<Anchors>
+										<Anchor point="TOPLEFT" />
+									</Anchors>
+									<TexCoords left="0" right="0.078125" top="0" bottom="1.0" />
+								</Texture>
+								<Texture parentKey="Middle"
+									file="Interface\FriendsFrame\WhoFrame-ColumnTabs">
+									<Size x="106" y="35" />
+									<Anchors>
+										<Anchor point="LEFT" relativeKey="$parent.Left"
+											relativePoint="RIGHT" />
+									</Anchors>
+									<TexCoords left="0.078125" right="0.90625" top="0" bottom="1.0" />
+								</Texture>
+								<Texture parentKey="Right"
+									file="Interface\FriendsFrame\WhoFrame-ColumnTabs">
+									<Size x="4" y="35" />
+									<Anchors>
+										<Anchor point="LEFT" relativeKey="$parent.Middle"
+											relativePoint="RIGHT" />
+									</Anchors>
+									<TexCoords left="0.90625" right="1.0" top="0" bottom="1.0" />
+								</Texture>
+							</Layer>
+						</Layers>
+						<NormalFont style="BetterFriendlistFontHighlightSmall" />
+						<Scripts>
+							<OnClick>
+								BFL_GuildFrame_SortByName()
+							</OnClick>
+						</Scripts>
+					</Button>
+					<Button parentKey="RankHeader" text="RANK">
+						<Size x="80" y="35" />
+						<Anchors>
+							<Anchor point="LEFT" relativeKey="$parent.NameHeader"
+								relativePoint="RIGHT" x="-2" y="0" />
+						</Anchors>
+						<Layers>
+							<Layer level="BACKGROUND">
+								<Texture parentKey="Left"
+									file="Interface\FriendsFrame\WhoFrame-ColumnTabs">
+									<Size x="5" y="35" />
+									<Anchors>
+										<Anchor point="TOPLEFT" />
+									</Anchors>
+									<TexCoords left="0" right="0.078125" top="0" bottom="1.0" />
+								</Texture>
+								<Texture parentKey="Middle"
+									file="Interface\FriendsFrame\WhoFrame-ColumnTabs">
+									<Size x="70" y="35" />
+									<Anchors>
+										<Anchor point="LEFT" relativeKey="$parent.Left"
+											relativePoint="RIGHT" />
+									</Anchors>
+									<TexCoords left="0.078125" right="0.90625" top="0" bottom="1.0" />
+								</Texture>
+								<Texture parentKey="Right"
+									file="Interface\FriendsFrame\WhoFrame-ColumnTabs">
+									<Size x="4" y="35" />
+									<Anchors>
+										<Anchor point="LEFT" relativeKey="$parent.Middle"
+											relativePoint="RIGHT" />
+									</Anchors>
+									<TexCoords left="0.90625" right="1.0" top="0" bottom="1.0" />
+								</Texture>
+							</Layer>
+						</Layers>
+						<NormalFont style="BetterFriendlistFontHighlightSmall" />
+						<Scripts>
+							<OnClick>
+								BFL_GuildFrame_SortByRank()
+							</OnClick>
+						</Scripts>
+					</Button>
+					<Button parentKey="LevelHeader" text="LEVEL_ABBR">
+						<Size x="54" y="35" />
+						<Anchors>
+							<Anchor point="LEFT" relativeKey="$parent.RankHeader"
+								relativePoint="RIGHT" x="-2" y="0" />
+						</Anchors>
+						<Layers>
+							<Layer level="BACKGROUND">
+								<Texture parentKey="Left"
+									file="Interface\FriendsFrame\WhoFrame-ColumnTabs">
+									<Size x="5" y="35" />
+									<Anchors>
+										<Anchor point="TOPLEFT" />
+									</Anchors>
+									<TexCoords left="0" right="0.078125" top="0" bottom="1.0" />
+								</Texture>
+								<Texture parentKey="Middle"
+									file="Interface\FriendsFrame\WhoFrame-ColumnTabs">
+									<Size x="44" y="35" />
+									<Anchors>
+										<Anchor point="LEFT" relativeKey="$parent.Left"
+											relativePoint="RIGHT" />
+									</Anchors>
+									<TexCoords left="0.078125" right="0.90625" top="0" bottom="1.0" />
+								</Texture>
+								<Texture parentKey="Right"
+									file="Interface\FriendsFrame\WhoFrame-ColumnTabs">
+									<Size x="4" y="35" />
+									<Anchors>
+										<Anchor point="LEFT" relativeKey="$parent.Middle"
+											relativePoint="RIGHT" />
+									</Anchors>
+									<TexCoords left="0.90625" right="1.0" top="0" bottom="1.0" />
+								</Texture>
+							</Layer>
+						</Layers>
+						<NormalFont style="BetterFriendlistFontHighlightSmall" />
+						<Scripts>
+							<OnClick>
+								BFL_GuildFrame_SortByLevel()
+							</OnClick>
+						</Scripts>
+					</Button>
+					<Button parentKey="ZoneHeader" text="ZONE">
+						<Size x="90" y="35" />
+						<Anchors>
+							<Anchor point="LEFT" relativeKey="$parent.LevelHeader"
+								relativePoint="RIGHT" x="-2" y="0" />
+						</Anchors>
+						<Layers>
+							<Layer level="BACKGROUND">
+								<Texture parentKey="Left"
+									file="Interface\FriendsFrame\WhoFrame-ColumnTabs">
+									<Size x="5" y="35" />
+									<Anchors>
+										<Anchor point="TOPLEFT" />
+									</Anchors>
+									<TexCoords left="0" right="0.078125" top="0" bottom="1.0" />
+								</Texture>
+								<Texture parentKey="Middle"
+									file="Interface\FriendsFrame\WhoFrame-ColumnTabs">
+									<Size x="80" y="35" />
+									<Anchors>
+										<Anchor point="LEFT" relativeKey="$parent.Left"
+											relativePoint="RIGHT" />
+									</Anchors>
+									<TexCoords left="0.078125" right="0.90625" top="0" bottom="1.0" />
+								</Texture>
+								<Texture parentKey="Right"
+									file="Interface\FriendsFrame\WhoFrame-ColumnTabs">
+									<Size x="4" y="35" />
+									<Anchors>
+										<Anchor point="LEFT" relativeKey="$parent.Middle"
+											relativePoint="RIGHT" />
+									</Anchors>
+									<TexCoords left="0.90625" right="1.0" top="0" bottom="1.0" />
+								</Texture>
+							</Layer>
+						</Layers>
+						<NormalFont style="BetterFriendlistFontHighlightSmall" />
+						<Scripts>
+							<OnClick>
+								BFL_GuildFrame_SortByZone()
+							</OnClick>
+						</Scripts>
+					</Button>
+					<!-- Filter Buttons (above search) -->
+					<Button parentKey="FilterAll" text="ALL">
+						<NormalFont style="BetterFriendlistFontHighlightSmall" />
+						<Size x="30" y="16" />
+						<Anchors>
+							<Anchor point="BOTTOMRIGHT" relativeKey="$parent.SearchBox"
+								relativePoint="TOPRIGHT" x="0" y="2" />
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								BFL_GuildFrame_FilterAll()
+							</OnClick>
+						</Scripts>
+					</Button>
+					<Button parentKey="FilterOnline" text="FRIENDS_LIST_ONLINE">
+						<NormalFont style="BetterFriendlistFontHighlightSmall" />
+						<Size x="50" y="16" />
+						<Anchors>
+							<Anchor point="RIGHT" relativeKey="$parent.FilterAll"
+								relativePoint="LEFT" x="-4" y="0" />
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								BFL_GuildFrame_FilterOnline()
+							</OnClick>
+						</Scripts>
+					</Button>
+					<Button parentKey="FilterOffline">
+						<NormalFont style="BetterFriendlistFontHighlightSmall" />
+						<Size x="50" y="16" />
+						<Anchors>
+							<Anchor point="RIGHT" relativeKey="$parent.FilterOnline"
+								relativePoint="LEFT" x="-4" y="0" />
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								BFL_GuildFrame_FilterOffline()
+							</OnClick>
+						</Scripts>
+					</Button>
+					<!-- Bottom Buttons -->
+					<Button parentKey="OpenBlizzardGuildButton" inherits="UIPanelButtonTemplate">
+						<NormalFont style="BetterFriendlistFontNormal" />
+						<HighlightFont style="BetterFriendlistFontHighlight" />
+						<DisabledFont style="BetterFriendlistFontDisable" />
+						<Size x="130" y="21" />
+						<Anchors>
+							<Anchor point="BOTTOMLEFT" relativeKey="$parent.$parent" x="4" y="4" />
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								BFL_GuildFrame_OpenBlizzardGuild()
+							</OnClick>
+						</Scripts>
+					</Button>
+					<Button parentKey="RefreshButton" inherits="UIPanelButtonTemplate" text="REFRESH">
+						<NormalFont style="BetterFriendlistFontNormal" />
+						<HighlightFont style="BetterFriendlistFontHighlight" />
+						<DisabledFont style="BetterFriendlistFontDisable" />
+						<Size x="85" y="21" />
+						<Anchors>
+							<Anchor point="LEFT" relativeKey="$parent.OpenBlizzardGuildButton"
+								relativePoint="RIGHT" x="1" y="0" />
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								BFL_GuildFrame_RefreshRoster()
+							</OnClick>
+						</Scripts>
+					</Button>
+					<!-- ScrollBox (Retail) -->
+					<Frame parentKey="ScrollBox" inherits="WowScrollBoxList">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeKey="$parent.NameHeader"
+								relativePoint="BOTTOMLEFT" x="7" y="-2" />
+							<Anchor point="BOTTOMRIGHT" relativeKey="$parent.ListInset"
+								relativePoint="BOTTOMRIGHT" x="-25" y="4" />
+						</Anchors>
+					</Frame>
+					<!-- ScrollBar -->
+					<EventFrame parentKey="ScrollBar" inherits="MinimalScrollBar">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeKey="$parent.ScrollBox"
+								relativePoint="TOPRIGHT" x="0" y="0" />
+							<Anchor point="BOTTOMLEFT" relativeKey="$parent.ScrollBox"
+								relativePoint="BOTTOMRIGHT" x="0" y="0" />
+						</Anchors>
+					</EventFrame>
+				</Frames>
+				<Layers>
+					<Layer level="ARTWORK">
+						<FontString parentKey="GuildName"
+							inherits="BetterFriendlistFontHighlight" justifyH="LEFT">
+							<Anchors>
+								<Anchor point="TOPLEFT" relativeKey="$parent.ListInset"
+									relativePoint="TOPLEFT" x="6" y="56" />
+							</Anchors>
+						</FontString>
+						<FontString parentKey="MemberCount"
+							inherits="BetterFriendlistFontNormalSmall" justifyH="RIGHT">
+							<Anchors>
+								<Anchor point="TOPRIGHT" relativeKey="$parent.ListInset"
+									relativePoint="TOPRIGHT" x="-6" y="56" />
+							</Anchors>
+						</FontString>
+						<FontString parentKey="MOTDText"
+							inherits="BetterFriendlistFontNormalSmall" justifyH="LEFT"
+							maxLines="1" wordwrap="false">
+							<Anchors>
+								<Anchor point="TOPLEFT" relativeKey="$parent.GuildName"
+									relativePoint="BOTTOMLEFT" x="0" y="-2" />
+								<Anchor point="RIGHT" relativeKey="$parent.MemberCount"
+									relativePoint="RIGHT" x="0" y="0" />
+							</Anchors>
+							<Color r="0.6" g="0.6" b="0.6" />
+						</FontString>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnLoad>
+						BFL_GuildFrame_OnLoad(self)
+					</OnLoad>
+					<OnShow>
+						BFL_GuildFrame_OnShow(self)
+					</OnShow>
+					<OnHide>
+						BFL_GuildFrame_OnHide(self)
+					</OnHide>
+				</Scripts>
+			</Frame>
+
+			<!-- Bottom Tabs (Contacts, Who, Raid, Quick Join, Guild) - Matching Blizzard's FriendsFrame
 			bottom tabs -->
 			<Button name="BetterFriendsFrameBottomTab1" parentKey="BottomTab1"
 				inherits="PanelTabButtonTemplate" id="1" text="CONTACTS_TAB_TITLE">
@@ -3426,6 +3794,10 @@
 				BetterFriendsFrame_ShowTab(1)
 				end
 			</OnShow>
+			<OnHide>
+				-- Fix #81: Reset bottom tab to Friends so reopen doesn't get stuck on Who/Quick Join
+				self.selectedTab = 1
+			</OnHide>
 			<OnDragStart>
 				if self:IsMovable() then
 				self:StartMoving()

@@ -2025,6 +2025,7 @@ function Settings:ImportSettings(importString)
 				"brokerShowGroups",
 				"brokerTooltipMode",
 				"brokerClickAction",
+				"brokerShowHints",
 				-- Sync
 				"enableGlobalSync",
 				"enableGlobalSyncDeletion",
@@ -2906,6 +2907,76 @@ end
 end
 --]]
 
+-- Enable Guild Tab toggle (all versions)
+function Settings:OnEnableGuildTabChanged(checked)
+	local DB = GetDB()
+	if not DB then
+		return
+	end
+
+	DB:Set("enableGuildTab", checked)
+
+	if not BetterFriendsFrame then return end
+
+	if BFL.IsClassic then
+		-- Classic: Tab 3 = Guild, Tab 4 = Raid
+		if BetterFriendsFrame.BottomTab3 then
+			if checked then
+				BetterFriendsFrame.BottomTab3:Show()
+				local L = BFL.L
+				BetterFriendsFrame.BottomTab3:SetText(L and L.GUILD_TAB_TITLE or GUILD or "Guild")
+				BetterFriendsFrame.BottomTab3:SetScript("OnClick", function(self)
+					PanelTemplates_Tab_OnClick(self, BetterFriendsFrame)
+					BetterFriendsFrame_ShowBottomTab(3)
+					PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+				end)
+			else
+				BetterFriendsFrame.BottomTab3:Hide()
+				-- If currently on guild tab, switch to Friends
+				if (BetterFriendsFrame.selectedTab or 1) == 3 then
+					PanelTemplates_SetTab(BetterFriendsFrame, 1)
+					BetterFriendsFrame_ShowBottomTab(1)
+				end
+			end
+		end
+		-- Reposition Raid tab
+		if BetterFriendsFrame.BottomTab4 then
+			BetterFriendsFrame.BottomTab4:ClearAllPoints()
+			if checked then
+				BetterFriendsFrame.BottomTab4:SetPoint("LEFT", BetterFriendsFrame.BottomTab3, "RIGHT", -15, 0)
+			else
+				BetterFriendsFrame.BottomTab4:SetPoint("LEFT", BetterFriendsFrame.BottomTab2, "RIGHT", -15, 0)
+			end
+		end
+	else
+		-- Retail: Guild is Top Tab 4 in FriendsTabHeader
+		local header = BetterFriendsFrame.FriendsTabHeader
+		local tab4 = header and header.Tab4
+		if tab4 then
+			if checked then
+				tab4:Show()
+				PanelTemplates_SetNumTabs(header, 4)
+				PanelTemplates_UpdateTabs(header)
+			else
+				tab4:Hide()
+				PanelTemplates_SetNumTabs(header, 3)
+				PanelTemplates_UpdateTabs(header)
+				-- If currently on guild top tab, switch to Friends top tab
+				local activeTopTab = PanelTemplates_GetSelectedTab(header) or 1
+				if activeTopTab == 4 then
+					PanelTemplates_SetTab(header, 1)
+					BetterFriendsFrame_ShowTab(1)
+				end
+			end
+		end
+	end
+
+	-- Recalculate tab layout after visibility change
+	if BFL.ApplyTabFonts then
+		BFL:ApplyTabFonts()
+	end
+end
+
 -- Classic: Hide Guild Tab toggle
 function Settings:OnHideGuildTabChanged(checked)
 	local DB = GetDB()
@@ -2927,9 +2998,12 @@ function Settings:OnHideGuildTabChanged(checked)
 		else
 			BetterFriendsFrame.BottomTab3:Show()
 			-- Restore Guild tab text and click handler
-			BetterFriendsFrame.BottomTab3:SetText(GUILD or "Guild")
+			local L = BFL.L
+			BetterFriendsFrame.BottomTab3:SetText(L and L.GUILD_TAB_TITLE or GUILD or "Guild")
 			BetterFriendsFrame.BottomTab3:SetScript("OnClick", function(self)
-				BetterFriendsFrame_HandleGuildTabClick()
+				PanelTemplates_Tab_OnClick(self, BetterFriendsFrame)
+				BetterFriendsFrame_ShowBottomTab(3)
+				PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
 			end)
 			-- Reposition Raid tab (Tab 4) next to Guild tab (Tab 3)
 			if BetterFriendsFrame.BottomTab4 then
@@ -3516,29 +3590,18 @@ function Settings:RefreshGeneralTab()
 	})
 	table.insert(allFrames, behaviorRow2)
 
-	-- Behavior Settings Row 3 (Classic Only)
-	if BFL.IsClassic then
-		local behaviorRow3 = Components:CreateDoubleCheckbox(tab, {
-			label = L.SETTINGS_HIDE_GUILD_TAB or "Hide Guild Tab",
-			initialValue = DB:Get("hideGuildTab", false),
-			callback = function(val)
-				self:OnHideGuildTabChanged(val)
-			end,
-			tooltipTitle = L.SETTINGS_HIDE_GUILD_TAB or "Hide Guild Tab",
-			tooltipDesc = L.SETTINGS_HIDE_GUILD_TAB_DESC
-				or "Hide the Guild tab from the friends list (requires UI reload)",
-		}, {
-			label = L.SETTINGS_CLOSE_ON_GUILD_TAB or "Close BetterFriendlist when opening Guild",
-			initialValue = DB:Get("closeOnGuildTabClick", false),
-			callback = function(val)
-				self:OnCloseOnGuildTabClickChanged(val)
-			end,
-			tooltipTitle = L.SETTINGS_CLOSE_ON_GUILD_TAB or "Close on Guild Tab",
-			tooltipDesc = L.SETTINGS_CLOSE_ON_GUILD_TAB_DESC
-				or "Automatically close BetterFriendlist when you click the Guild tab",
-		})
-		table.insert(allFrames, behaviorRow3)
-	end
+	-- Behavior Settings Row 3 (Guild Tab) - Hidden until feature is complete
+	-- local guildTabCheckbox = Components:CreateCheckbox(tab, {
+	-- 	label = L.SETTINGS_ENABLE_GUILD_TAB or "Enable Guild Tab",
+	-- 	initialValue = DB:Get("enableGuildTab", false),
+	-- 	callback = function(val)
+	-- 		self:OnEnableGuildTabChanged(val)
+	-- 	end,
+	-- 	tooltipTitle = L.SETTINGS_ENABLE_GUILD_TAB or "Enable Guild Tab",
+	-- 	tooltipDesc = L.SETTINGS_ENABLE_GUILD_TAB_DESC
+	-- 		or "Show a Guild tab in BetterFriendlist with a full guild roster view",
+	-- })
+	-- table.insert(allFrames, guildTabCheckbox)
 
 	-- Spacer before next section
 	table.insert(allFrames, Components:CreateSpacer(tab))
@@ -4865,6 +4928,44 @@ function Settings:RefreshAdvancedTab()
 	table.insert(allFrames, Components:CreateSpacer(tab))
 
 	-- ===========================================
+	-- Taint-Free Whisper Section
+	-- ===========================================
+	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_TAINT_FREE_WHISPER or "Taint-Free Whisper"))
+
+	-- Description
+	table.insert(
+		allFrames,
+		Components:CreateLabel(
+			tab,
+			L.SETTINGS_TAINT_FREE_WHISPER_DESC
+				or "Uses a built-in message box for whispering friends instead of opening the default chat.",
+			true
+		)
+	)
+
+	-- Taint-Free Whisper Toggle
+	local taintFreeToggle = Components:CreateCheckbox(
+		tab,
+		L.SETTINGS_TAINT_FREE_WHISPER or "Taint-Free Whisper",
+		BetterFriendlistDB.taintFreeWhisper or false,
+		function(checked)
+			BetterFriendlistDB.taintFreeWhisper = checked
+			if BFL.SettingsVersion then
+				BFL.SettingsVersion = BFL.SettingsVersion + 1
+			end
+		end
+	)
+	taintFreeToggle:SetTooltip(
+		L.SETTINGS_TAINT_FREE_WHISPER or "Taint-Free Whisper",
+		L.SETTINGS_TAINT_FREE_WHISPER_TOOLTIP
+			or "Prevents chat taint errors caused by BetterFriendlist opening the Blizzard whisper box."
+	)
+	table.insert(allFrames, taintFreeToggle)
+
+	-- Spacer
+	table.insert(allFrames, Components:CreateSpacer(tab))
+
+	-- ===========================================
 	-- Beta Features Section
 	-- ===========================================
 	table.insert(allFrames, Components:CreateHeader(tab, "|cffff8800" .. L.SETTINGS_BETA_FEATURES_TITLE .. "|r"))
@@ -5399,12 +5500,32 @@ function Settings:RefreshBrokerTab()
 		-- Spacer
 		table.insert(allFrames, Components:CreateSpacer(tab))
 
+		-- Show Tooltip Hints
+		local showHints = Components:CreateCheckbox(
+			tab,
+			L.BROKER_SETTINGS_SHOW_HINTS or "Show Tooltip Hints",
+			DB:Get("brokerShowHints", true),
+			function(val)
+				BetterFriendlistDB.brokerShowHints = val
+			end
+		)
+		showHints:SetTooltip(
+			L.BROKER_SETTINGS_SHOW_HINTS_TITLE or "Show Tooltip Hints",
+			L.BROKER_SETTINGS_SHOW_HINTS_TOOLTIP
+				or "Display clickable action hints at the bottom of the broker tooltip"
+		)
+		table.insert(allFrames, showHints)
+
+		-- Spacer
+		table.insert(allFrames, Components:CreateSpacer(tab))
+
 		-- Header: Tooltip Columns
 		local columnsHeader = Components:CreateHeader(tab, L.BROKER_SETTINGS_COLUMNS_HEADER)
 		table.insert(allFrames, columnsHeader)
 
 		-- Column Reordering Logic
 		local availableColumns = {
+			{ key = "Nickname", label = L.BROKER_COLUMN_NICKNAME or "Nickname" },
 			{ key = "Name", label = L.BROKER_COLUMN_NAME },
 			{ key = "Level", label = L.BROKER_COLUMN_LEVEL },
 			{ key = "Character", label = L.BROKER_COLUMN_CHARACTER },
@@ -5538,6 +5659,226 @@ function Settings:RefreshBrokerTab()
 
 			table.insert(listItems, listItem)
 			table.insert(allFrames, listItem)
+		end
+	end
+
+	-- ===========================================
+	-- GUILD PLUGIN SUB-SECTION
+	-- ===========================================
+	table.insert(allFrames, Components:CreateSpacer(tab))
+	table.insert(allFrames, Components:CreateSpacer(tab))
+
+	local guildHeader = Components:CreateHeader(tab, L.GUILD_BROKER_SETTINGS_HEADER or "Guild Plugin")
+	table.insert(allFrames, guildHeader)
+
+	-- Enable Guild Broker
+	local enableGuildBroker = Components:CreateCheckbox(
+		tab,
+		L.GUILD_BROKER_SETTINGS_ENABLE or "Enable Guild Broker",
+		DB:Get("guildBrokerEnabled", false),
+		function(val)
+			BetterFriendlistDB.guildBrokerEnabled = val
+			self:RefreshBrokerTab()
+
+			local statusText = val and "|cff00ff00" .. (L.STATUS_ENABLED or "ENABLED") .. "|r"
+				or "|cffff0000" .. (L.STATUS_DISABLED or "DISABLED") .. "|r"
+			StaticPopupDialogs["BFL_GUILD_BROKER_RELOAD_CONFIRM"] = {
+				text = string.format(
+					L.BROKER_SETTINGS_RELOAD_TEXT
+						or "Data Broker has been %s.\n\nA UI reload is required for this change to take effect.\n\nReload now?",
+					statusText
+				),
+				button1 = L.BROKER_SETTINGS_RELOAD_BTN or "Reload Now",
+				button2 = L.BROKER_SETTINGS_RELOAD_CANCEL or "Later",
+				OnAccept = function()
+					ReloadUI()
+				end,
+				timeout = 0,
+				whileDead = true,
+				hideOnEscape = true,
+				preferredIndex = 3,
+			}
+			StaticPopup_Show("BFL_GUILD_BROKER_RELOAD_CONFIRM")
+		end
+	)
+	enableGuildBroker:SetTooltip(
+		L.GUILD_BROKER_SETTINGS_ENABLE or "Enable Guild Broker",
+		L.GUILD_BROKER_SETTINGS_ENABLE_DESC or "Show guild member data in your Data Broker display addon"
+	)
+	table.insert(allFrames, enableGuildBroker)
+
+	if DB:Get("guildBrokerEnabled", false) then
+		-- Show Icon
+		local guildShowIcon = Components:CreateCheckbox(
+			tab,
+			L.GUILD_BROKER_SETTINGS_SHOW_ICON or "Show Icon",
+			DB:Get("guildBrokerShowIcon", true),
+			function(val)
+				BetterFriendlistDB.guildBrokerShowIcon = val
+				local GBroker = BFL:GetModule("GuildBroker")
+				if GBroker and GBroker.UpdateBrokerText then
+					GBroker:UpdateBrokerText()
+				end
+			end
+		)
+		table.insert(allFrames, guildShowIcon)
+
+		-- Show Label
+		local guildShowLabel = Components:CreateCheckbox(
+			tab,
+			L.GUILD_BROKER_SETTINGS_SHOW_LABEL or "Show Label",
+			DB:Get("guildBrokerShowLabel", true),
+			function(val)
+				BetterFriendlistDB.guildBrokerShowLabel = val
+				local GBroker = BFL:GetModule("GuildBroker")
+				if GBroker and GBroker.UpdateBrokerText then
+					GBroker:UpdateBrokerText()
+				end
+			end
+		)
+		table.insert(allFrames, guildShowLabel)
+
+		-- Show Total Count
+		local guildShowTotal = Components:CreateCheckbox(
+			tab,
+			L.GUILD_BROKER_SETTINGS_SHOW_TOTAL or "Show Total Count",
+			DB:Get("guildBrokerShowTotal", true),
+			function(val)
+				BetterFriendlistDB.guildBrokerShowTotal = val
+				local GBroker = BFL:GetModule("GuildBroker")
+				if GBroker and GBroker.UpdateBrokerText then
+					GBroker:UpdateBrokerText()
+				end
+			end
+		)
+		table.insert(allFrames, guildShowTotal)
+
+		-- Show Hints
+		local guildShowHints = Components:CreateCheckbox(
+			tab,
+			L.GUILD_BROKER_SETTINGS_SHOW_HINTS or "Show Hints",
+			DB:Get("guildBrokerShowHints", true),
+			function(val)
+				BetterFriendlistDB.guildBrokerShowHints = val
+			end
+		)
+		table.insert(allFrames, guildShowHints)
+
+		table.insert(allFrames, Components:CreateSpacer(tab))
+
+		-- Left Click Action
+		local clickActionOptions = {
+			labels = {
+				L.GUILD_BROKER_ACTION_GUILD_FRAME or "Open Guild Frame",
+				L.GUILD_BROKER_ACTION_SETTINGS or "Open Settings",
+			},
+			values = { "guild_frame", "settings" },
+		}
+		local guildClickAction = Components:CreateDropdown(
+			tab,
+			L.GUILD_BROKER_SETTINGS_CLICK_ACTION or "Left Click Action",
+			clickActionOptions,
+			function(val)
+				return val == DB:Get("guildBrokerClickAction", "guild_frame")
+			end,
+			function(val)
+				BetterFriendlistDB.guildBrokerClickAction = val
+			end
+		)
+		table.insert(allFrames, guildClickAction)
+
+		-- Group Mode
+		local groupModeOptions = {
+			labels = {
+				L.GUILD_BROKER_GROUP_NONE or "No Grouping",
+				L.GUILD_BROKER_GROUP_BY_RANK or "Group by Rank",
+				L.GUILD_BROKER_GROUP_BY_CLASS or "Group by Class",
+			},
+			values = { "none", "by_rank", "by_class" },
+		}
+		local guildGroupMode = Components:CreateDropdown(
+			tab,
+			L.GUILD_BROKER_SETTINGS_GROUP_MODE or "Group Mode",
+			groupModeOptions,
+			function(val)
+				return val == DB:Get("guildBrokerGroupMode", "none")
+			end,
+			function(val)
+				BetterFriendlistDB.guildBrokerGroupMode = val
+			end
+		)
+		table.insert(allFrames, guildGroupMode)
+
+		-- Default Filter
+		local filterOptions = {
+			labels = {
+				L.GUILD_BROKER_FILTER_ONLINE or "Online Only",
+				L.GUILD_BROKER_FILTER_ALL or "All Members",
+			},
+			values = { "online", "all" },
+		}
+		local guildFilter = Components:CreateDropdown(
+			tab,
+			L.GUILD_BROKER_SETTINGS_FILTER or "Default Filter",
+			filterOptions,
+			function(val)
+				return val == DB:Get("guildBrokerFilter", "online")
+			end,
+			function(val)
+				BetterFriendlistDB.guildBrokerFilter = val
+			end
+		)
+		table.insert(allFrames, guildFilter)
+
+		-- Max Rows Slider
+		local guildMaxRows = Components:CreateSlider(
+			tab,
+			L.GUILD_BROKER_SETTINGS_MAX_ROWS or "Maximum Rows",
+			25, 200,
+			DB:Get("guildBrokerMaxRows", 100),
+			function(val)
+				return tostring(val)
+			end,
+			function(val)
+				BetterFriendlistDB.guildBrokerMaxRows = val
+			end
+		)
+		if guildMaxRows.SetTooltip then
+			guildMaxRows:SetTooltip(
+				L.GUILD_BROKER_SETTINGS_MAX_ROWS or "Maximum Rows",
+				L.GUILD_BROKER_SETTINGS_MAX_ROWS_DESC or "Limit tooltip rows for large guilds (25-200)"
+			)
+		end
+		table.insert(allFrames, guildMaxRows)
+
+		table.insert(allFrames, Components:CreateSpacer(tab))
+
+		-- Guild Tooltip Columns Header
+		local guildColumnsHeader = Components:CreateHeader(tab, L.GUILD_BROKER_SETTINGS_COLUMNS or "Tooltip Columns")
+		table.insert(allFrames, guildColumnsHeader)
+
+		-- Guild Column Toggles
+		local guildColumns = {
+			{ key = "Name",        label = L.GUILD_BROKER_COL_NAME or "Name",             setting = "guildBrokerShowColName" },
+			{ key = "Level",       label = L.GUILD_BROKER_COL_LEVEL or "Level",           setting = "guildBrokerShowColLevel" },
+			{ key = "Class",       label = L.GUILD_BROKER_COL_CLASS or "Class",           setting = "guildBrokerShowColClass" },
+			{ key = "Rank",        label = L.GUILD_BROKER_COL_RANK or "Rank",             setting = "guildBrokerShowColRank" },
+			{ key = "Zone",        label = L.GUILD_BROKER_COL_ZONE or "Zone",             setting = "guildBrokerShowColZone" },
+			{ key = "Note",        label = L.GUILD_BROKER_COL_NOTE or "Note",             setting = "guildBrokerShowColNote" },
+			{ key = "OfficerNote", label = L.GUILD_BROKER_COL_OFFICER_NOTE or "Officer Note", setting = "guildBrokerShowColOfficerNote" },
+			{ key = "LastOnline",  label = L.GUILD_BROKER_COL_LAST_ONLINE or "Last Online",   setting = "guildBrokerShowColLastOnline" },
+		}
+
+		for _, col in ipairs(guildColumns) do
+			local colToggle = Components:CreateCheckbox(
+				tab,
+				col.label,
+				DB:Get(col.setting, true),
+				function(val)
+					BetterFriendlistDB[col.setting] = val
+				end
+			)
+			table.insert(allFrames, colToggle)
 		end
 	end
 

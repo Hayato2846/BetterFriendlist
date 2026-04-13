@@ -1368,7 +1368,7 @@
 
 						if friend.type == "bnet" then
 							local tellName = BFL:GetSafeAccountName(friend.accountName, friend.battleTag) or friend.battleTag
-							BFL:SecureSendBNetTell(tellName)
+							BFL:SecureSendBNetTell(tellName, friend.bnetIDAccount)
 						elseif friend.type == "wow" and friend.name then
 							BFL:SecureSendTell(friend.name)
 						end
@@ -1703,7 +1703,192 @@
 				</Scripts>
 			</Button>
 			
-			<!-- Bottom Tabs (Friends, Who, Raid) - NO QuickJoin in Classic -->
+			<!-- ============================================================ -->
+			<!-- GUILD FRAME (Classic - FauxScrollFrame) -->
+			<!-- ============================================================ -->
+			<Frame parentKey="GuildFrame" hidden="true" setAllPoints="true">
+				<Frames>
+					<!-- List Inset -->
+					<Frame parentKey="ListInset" inherits="InsetFrameTemplate">
+						<Anchors>
+							<Anchor point="TOPLEFT" x="4" y="-83"/>
+							<Anchor point="BOTTOMRIGHT" x="-6" y="26"/>
+						</Anchors>
+					</Frame>
+					<!-- Search EditBox -->
+					<EditBox parentKey="SearchBox" inherits="SearchBoxTemplate" autoFocus="false" bytes="128">
+						<Size y="20"/>
+						<Anchors>
+							<Anchor point="BOTTOMLEFT" relativeKey="$parent.ListInset" x="10" y="5"/>
+							<Anchor point="BOTTOMRIGHT" relativeKey="$parent.ListInset" x="-10" y="5"/>
+						</Anchors>
+						<Scripts>
+							<OnTextChanged inherit="prepend">
+								BFL_GuildFrame_SearchChanged(self)
+							</OnTextChanged>
+							<OnEscapePressed>
+								self:ClearFocus()
+							</OnEscapePressed>
+						</Scripts>
+					</EditBox>
+					<!-- Column Headers -->
+					<Button parentKey="NameHeader" inherits="WhoFrameColumnHeaderTemplate" frameStrata="HIGH">
+						<Anchors>
+							<Anchor point="TOPLEFT" x="7" y="-60"/>
+						</Anchors>
+						<Scripts>
+							<OnLoad>
+								self:SetText(NAME)
+								self:SetWidth(100)
+							</OnLoad>
+							<OnClick>
+								BFL_GuildFrame_SortByName()
+							</OnClick>
+						</Scripts>
+					</Button>
+					<Button parentKey="RankHeader" inherits="WhoFrameColumnHeaderTemplate" frameStrata="HIGH">
+						<Anchors>
+							<Anchor point="TOPLEFT" x="108" y="-60"/>
+						</Anchors>
+						<Scripts>
+							<OnLoad>
+								self:SetText(RANK)
+								self:SetWidth(70)
+							</OnLoad>
+							<OnClick>
+								BFL_GuildFrame_SortByRank()
+							</OnClick>
+						</Scripts>
+					</Button>
+					<Button parentKey="LevelHeader" inherits="WhoFrameColumnHeaderTemplate" frameStrata="HIGH">
+						<Anchors>
+							<Anchor point="TOPLEFT" x="179" y="-60"/>
+						</Anchors>
+						<Scripts>
+							<OnLoad>
+								self:SetText(LEVEL_ABBR)
+								self:SetWidth(32)
+							</OnLoad>
+							<OnClick>
+								BFL_GuildFrame_SortByLevel()
+							</OnClick>
+						</Scripts>
+					</Button>
+					<Button parentKey="ZoneHeader" inherits="WhoFrameColumnHeaderTemplate" frameStrata="HIGH">
+						<Anchors>
+							<Anchor point="TOPLEFT" x="212" y="-60"/>
+						</Anchors>
+						<Scripts>
+							<OnLoad>
+								self:SetText(ZONE)
+								self:SetWidth(120)
+							</OnLoad>
+							<OnClick>
+								BFL_GuildFrame_SortByZone()
+							</OnClick>
+						</Scripts>
+					</Button>
+					<!-- Filter Buttons (top area) -->
+					<Button parentKey="FilterAll" text="ALL">
+						<Size x="30" y="16"/>
+						<Anchors>
+							<Anchor point="TOPRIGHT" x="-10" y="-40"/>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								BFL_GuildFrame_FilterAll()
+							</OnClick>
+						</Scripts>
+					</Button>
+					<Button parentKey="FilterOnline" text="FRIENDS_LIST_ONLINE">
+						<Size x="50" y="16"/>
+						<Anchors>
+							<Anchor point="RIGHT" relativeKey="$parent.FilterAll" relativePoint="LEFT" x="-4" y="0"/>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								BFL_GuildFrame_FilterOnline()
+							</OnClick>
+						</Scripts>
+					</Button>
+					<Button parentKey="FilterOffline">
+						<Size x="50" y="16"/>
+						<Anchors>
+							<Anchor point="RIGHT" relativeKey="$parent.FilterOnline" relativePoint="LEFT" x="-4" y="0"/>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								BFL_GuildFrame_FilterOffline()
+							</OnClick>
+						</Scripts>
+					</Button>
+					<!-- Bottom Buttons -->
+					<Button parentKey="OpenBlizzardGuildButton" inherits="UIPanelButtonTemplate">
+						<Size x="130" y="21"/>
+						<Anchors>
+							<Anchor point="BOTTOMLEFT" relativeKey="$parent.$parent" x="4" y="4"/>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								BFL_GuildFrame_OpenBlizzardGuild()
+							</OnClick>
+						</Scripts>
+					</Button>
+					<Button parentKey="RefreshButton" inherits="UIPanelButtonTemplate" text="REFRESH">
+						<Size x="85" y="21"/>
+						<Anchors>
+							<Anchor point="LEFT" relativeKey="$parent.OpenBlizzardGuildButton" relativePoint="RIGHT" x="1" y="0"/>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								BFL_GuildFrame_RefreshRoster()
+							</OnClick>
+						</Scripts>
+					</Button>
+					<!-- FauxScrollFrame container -->
+					<ScrollFrame name="BFL_GuildFauxScrollFrame" parentKey="FauxScroll" inherits="FauxScrollFrameTemplate">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeKey="$parent.ListInset" x="10" y="-2"/>
+							<Anchor point="BOTTOMRIGHT" relativeKey="$parent.ListInset" x="-22" y="18"/>
+						</Anchors>
+					</ScrollFrame>
+				</Frames>
+				<Layers>
+					<Layer level="ARTWORK">
+						<FontString parentKey="GuildName" inherits="BetterFriendlistFontHighlight" justifyH="LEFT">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="12" y="-8"/>
+							</Anchors>
+						</FontString>
+						<FontString parentKey="MemberCount" inherits="BetterFriendlistFontNormalSmall" justifyH="RIGHT">
+							<Anchors>
+								<Anchor point="TOPRIGHT" x="-12" y="-8"/>
+							</Anchors>
+						</FontString>
+						<FontString parentKey="MOTDText" inherits="BetterFriendlistFontNormalSmall" justifyH="LEFT"
+							maxLines="1" wordwrap="false">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="12" y="-24"/>
+								<Anchor point="RIGHT" x="-12" y="0"/>
+							</Anchors>
+							<Color r="0.6" g="0.6" b="0.6"/>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnLoad>
+						BFL_GuildFrame_OnLoad(self)
+					</OnLoad>
+					<OnShow>
+						BFL_GuildFrame_OnShow(self)
+					</OnShow>
+					<OnHide>
+						BFL_GuildFrame_OnHide(self)
+					</OnHide>
+				</Scripts>
+			</Frame>
+
+			<!-- Bottom Tabs (Friends, Who, Guild, Raid) -->
 			<Button name="BetterFriendsFrameBottomTab1" parentKey="BottomTab1" inherits="CharacterFrameTabButtonTemplate" id="1" text="FRIENDS" frameStrata="LOW">
 				<Anchors>
 					<Anchor point="BOTTOMLEFT" x="5" y="-28"/>
@@ -1726,18 +1911,19 @@
 					</OnClick>
 				</Scripts>
 			</Button>
-			<Button name="BetterFriendsFrameBottomTab3" parentKey="BottomTab3" inherits="CharacterFrameTabButtonTemplate" id="3" text="RAID" frameStrata="LOW">
+			<Button name="BetterFriendsFrameBottomTab3" parentKey="BottomTab3" inherits="CharacterFrameTabButtonTemplate" id="3" text="GUILD" frameStrata="LOW">
 				<Anchors>
 					<Anchor point="LEFT" relativeKey="$parent.BottomTab2" relativePoint="RIGHT" x="-15" y="0"/>
 				</Anchors>
 				<Scripts>
 					<OnClick>
-						-- Guild Tab: Open Blizzard Guild Frame, return to Friends tab, close BFL
-						BetterFriendsFrame_HandleGuildTabClick()
+						PanelTemplates_Tab_OnClick(self, BetterFriendsFrame)
+						BetterFriendsFrame_ShowBottomTab(3)
+						PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
 					</OnClick>
 				</Scripts>
 			</Button>
-			<!-- BottomTab4 (QuickJoin) is NOT created in Classic -->
+			<!-- BottomTab4 (Raid) is created in Lua -->
 		</Frames>
 		<Scripts>
 			<OnLoad>
@@ -1766,6 +1952,10 @@
 					BetterFriendsFrame_UpdateQuickJoinTab()
 				end
 			</OnShow>
+			<OnHide>
+				-- Fix #81: Reset bottom tab to Friends so reopen doesn't get stuck on Who/Quick Join
+				self.selectedTab = 1
+			</OnHide>
 			<OnDragStart>
 				self:StartMoving()
 			</OnDragStart>
