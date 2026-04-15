@@ -116,7 +116,7 @@ local function GetTooltipAnchor(frame)
 	local x, y = frame:GetCenter()
 
 	if not x or not y then
-		return "TOPLEFT", "BOTTOMLEFT"
+		return "TOPLEFT", frame, "BOTTOMLEFT"
 	end
 
 	local horizontalHalf = (x > UIParent:GetWidth() * 2 / 3) and "RIGHT"

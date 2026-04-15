@@ -905,6 +905,37 @@ function Compat.GetMaxLevel()
 end
 
 ------------------------------------------------------------
+-- Guild Roster Compatibility
+------------------------------------------------------------
+
+-- Request guild roster update (triggers GUILD_ROSTER_UPDATE)
+function Compat.GuildRoster()
+	if C_GuildInfo and C_GuildInfo.GuildRoster then
+		C_GuildInfo.GuildRoster()
+	elseif GuildRoster then
+		GuildRoster()
+	end
+end
+
+-- Get guild roster member info (unified return table across versions)
+-- Returns: { fullName, rankName, rankIndex, level, classDisplayName, zone,
+--            note, officerNote, online, isAFK, isDND, classFileName,
+--            achievementPoints, achievementRank, isMobile, isSoREligible,
+--            standingID, guid }
+function Compat.GetGuildRosterInfo(index)
+	return GetGuildRosterInfo(index)
+end
+
+-- Get guild roster last online time
+-- Returns: years, months, days, hours
+function Compat.GetGuildRosterLastOnline(index)
+	if GetGuildRosterLastOnline then
+		return GetGuildRosterLastOnline(index)
+	end
+	return 0, 0, 0, 0
+end
+
+------------------------------------------------------------
 -- Global Aliases for Convenience
 ------------------------------------------------------------
 -- These aliases allow direct access via BFL.FunctionName instead of BFL.Compat.FunctionName
@@ -938,3 +969,8 @@ BFL.ConvertToParty = Compat.ConvertToParty
 BFL.RequestInviteFromUnit = Compat.RequestInviteFromUnit
 BFL.BNInviteFriend = Compat.BNInviteFriend
 BFL.GetMaxLevel = Compat.GetMaxLevel
+
+-- Guild Operations
+BFL.GuildRoster = Compat.GuildRoster
+BFL.GetGuildRosterInfo = Compat.GetGuildRosterInfo
+BFL.GetGuildRosterLastOnline = Compat.GetGuildRosterLastOnline

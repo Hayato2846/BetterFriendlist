@@ -20,7 +20,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [DRAFT]
 
 ### Added
-- **Guild Tab** - New dedicated Guild tab with a full guild roster view directly inside BetterFriendlist. Features searchable member list, column sorting (name, rank, level, zone), online/offline/all filter buttons, guild name, member count, and Message of the Day display. Includes buttons to open Blizzard's guild management and to refresh the roster. Disabled by default; enable in Settings > General > Behavior. Works on all WoW versions.
 - **Advanced: Taint-Free Whisper** - New optional setting under Advanced that uses an inline message bar at the bottom of the friend list for whispering friends instead of opening the default Blizzard chat. This prevents BetterFriendlist from interfering with the chat system, which can cause Lua errors when other addons or Blizzard code processes messages. After sending, the bar closes automatically. Press Shift+Enter to reopen it with the same whisper target for follow-up messages. Disabled by default.
 - **Broker: Filtered Friend Count** - The broker text and tooltip now reflect the active Quick Filter (e.g., "WoW only" or "Online only") instead of always showing the total online count.
 - **Broker: Name Colors** - Friend names in the broker tooltip now use the font color configured in Settings > Fonts, matching the main friend list appearance.

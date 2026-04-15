@@ -470,7 +470,6 @@ BFL:RegisterLocale("ruRU", function()
 	L.GUILD_BROKER_SETTINGS_MAX_ROWS = "Максимум строк"
 	L.GUILD_BROKER_SETTINGS_MAX_ROWS_DESC = "Ограничить строки тултипа для больших гильдий (25-200)"
 	L.GUILD_BROKER_SETTINGS_COLUMNS = "Столбцы тултипа"
-	L.GUILD_BROKER_ACTION_TOGGLE = "Переключить тултип"
 	L.GUILD_BROKER_ACTION_GUILD_FRAME = "Открыть окно гильдии"
 	L.GUILD_BROKER_ACTION_SETTINGS = "Открыть настройки"
 	L.GUILD_BROKER_GROUP_NONE = "Без группировки"

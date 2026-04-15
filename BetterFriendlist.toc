@@ -47,6 +47,7 @@ Locales\zhTW.lua
 
 # Utilities
 Utils\ClassUtils.lua
+Utils\BrokerUtils.lua
 Utils\Encoding.lua
 Utils\FontManager.lua
 Utils\ColorManager.lua
@@ -76,6 +77,8 @@ Modules\RecentAllies.lua [AllowLoadGameType mainline]
 Modules\MenuSystem.lua
 Modules\QuickFilters.lua
 Modules\Broker.lua
+Modules\GuildBroker.lua
+Modules\GuildFrame.lua
 Modules\SettingsComponents.lua
 Modules\Settings.lua
 Modules\NoteSync.lua

@@ -765,8 +765,11 @@ function FrameInitializer:InitializeTabs(frame)
 		PanelTemplates_SetNumTabs(frame.FriendsTabHeader, 1)
 		PanelTemplates_SetTab(frame.FriendsTabHeader, 1)
 	else
-		-- Retail: Set up the tabs on the FriendsTabHeader (11.2.5: 3 tabs - Friends, Recent Allies, RAF. Sort tab removed.)
-		PanelTemplates_SetNumTabs(frame.FriendsTabHeader, 3)
+		-- Retail: Set up the tabs on the FriendsTabHeader
+		-- Base tabs: Friends, Recent Allies, RAF. Guild tab (Tab4) added conditionally.
+		local enableGuildTab = BetterFriendlistDB and BetterFriendlistDB.enableGuildTab
+		local numTopTabs = enableGuildTab and 4 or 3
+		PanelTemplates_SetNumTabs(frame.FriendsTabHeader, numTopTabs)
 		PanelTemplates_SetTab(frame.FriendsTabHeader, 1)
 		PanelTemplates_UpdateTabs(frame.FriendsTabHeader)
 	end

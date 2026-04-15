@@ -560,18 +560,60 @@ do
 		closeBtn:SetPushedTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Down")
 		bar.CloseButton = closeBtn
 
+		local hiddenByBar = {} -- tracks which elements we hid (to restore on close)
+
+		-- Collect all bottom-area elements across all tabs (built dynamically
+		-- because sub-frames like WhoFrame/RaidFrame may not exist at bar creation time)
+		local function GetBottomElements()
+			local elems = {
+				parent.AddFriendButton,
+				parent.SendMessageButton,
+				parent.RecruitmentButton,
+			}
+			-- WhoFrame bottom buttons:
+			if parent.WhoFrame then
+				elems[#elems + 1] = parent.WhoFrame.WhoButton
+				elems[#elems + 1] = parent.WhoFrame.AddFriendButton
+				elems[#elems + 1] = parent.WhoFrame.GroupInviteButton
+			end
+			-- RaidFrame bottom buttons:
+			if parent.RaidFrame then
+				elems[#elems + 1] = parent.RaidFrame.ConvertToRaidButton
+				elems[#elems + 1] = parent.RaidFrame.RaidToolsButton
+			end
+			-- QuickJoinFrame bottom button:
+			if parent.QuickJoinFrame and parent.QuickJoinFrame.ScrollFrame then
+				elems[#elems + 1] = parent.QuickJoinFrame.ScrollFrame.JoinQueueButton
+			end
+			return elems
+		end
+
+		local function HideBottomElements()
+			wipe(hiddenByBar)
+			for _, elem in ipairs(GetBottomElements()) do
+				if elem and elem:IsShown() then
+					hiddenByBar[elem] = true
+					elem:Hide()
+				end
+			end
+		end
+		bar.HideBottomElements = HideBottomElements
+
+		local function RestoreBottomElements()
+			for elem in pairs(hiddenByBar) do
+				elem:Show()
+			end
+			wipe(hiddenByBar)
+		end
+
 		local function SoftCloseBar()
+			RestoreBottomElements()
 			bar:Hide()
-			-- Restore bottom buttons (sticky state preserved for Shift+Enter)
-			if parent.AddFriendButton then parent.AddFriendButton:Show() end
-			if parent.SendMessageButton then parent.SendMessageButton:Show() end
 		end
 
 		local function HardCloseBar()
+			RestoreBottomElements()
 			bar:Hide()
-			-- Restore bottom buttons
-			if parent.AddFriendButton then parent.AddFriendButton:Show() end
-			if parent.SendMessageButton then parent.SendMessageButton:Show() end
 			editBox:SetText("")
 			editBox:ClearFocus()
 			-- Hard close: clear sticky state (user explicitly closed via X button)
@@ -605,6 +647,7 @@ do
 			-- Soft close: preserve sticky state (tab switch, frame hide)
 			editBox:SetText("")
 			editBox:ClearFocus()
+			wipe(hiddenByBar) -- clear tracking; tab switch handles its own elements
 		end)
 
 		-- Tooltip for send button
@@ -690,12 +733,18 @@ do
 		local titlePattern = L and L.TAINT_FREE_WHISPER_TITLE or "Whisper to %s"
 		bar.ToLabel:SetText(string.format(titlePattern, displayName or "???") .. ":")
 
-		-- Hide bottom buttons, show inline bar
+		-- Auto-open BFL frame if not yet visible (e.g., triggered from Broker tooltip)
 		local parent = _G.BetterFriendsFrame
-		if parent then
-			if parent.AddFriendButton then parent.AddFriendButton:Hide() end
-			if parent.SendMessageButton then parent.SendMessageButton:Hide() end
+		if parent and not parent:IsShown() then
+			if ShowBetterFriendsFrame then
+				ShowBetterFriendsFrame(1)
+			else
+				parent:Show()
+			end
 		end
+
+		-- Hide bottom elements, show inline bar
+		bar.HideBottomElements()
 
 		bar:Show()
 		bar.EditBox:SetFocus()
@@ -706,11 +755,8 @@ do
 	function BFL:CloseTaintFreeWhisper()
 		if whisperBar and whisperBar:IsShown() then
 			whisperBar:Hide()
-			local parent = _G.BetterFriendsFrame
-			if parent then
-				if parent.AddFriendButton then parent.AddFriendButton:Show() end
-				if parent.SendMessageButton then parent.SendMessageButton:Show() end
-			end
+			-- Note: Do NOT restore bottom elements here.
+			-- The tab switch code will show the correct elements for the new tab.
 		end
 	end
 

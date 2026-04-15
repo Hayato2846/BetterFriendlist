@@ -497,7 +497,6 @@ BFL:RegisterLocale("itIT", function()
 	L.GUILD_BROKER_SETTINGS_MAX_ROWS = "Righe massime"
 	L.GUILD_BROKER_SETTINGS_MAX_ROWS_DESC = "Limita le righe del tooltip per gilde grandi (25-200)"
 	L.GUILD_BROKER_SETTINGS_COLUMNS = "Colonne del tooltip"
-	L.GUILD_BROKER_ACTION_TOGGLE = "Alterna tooltip"
 	L.GUILD_BROKER_ACTION_GUILD_FRAME = "Apri finestra gilda"
 	L.GUILD_BROKER_ACTION_SETTINGS = "Apri impostazioni"
 	L.GUILD_BROKER_GROUP_NONE = "Nessun raggruppamento"

@@ -498,7 +498,6 @@ BFL:RegisterLocale("ptBR", function()
 	L.GUILD_BROKER_SETTINGS_MAX_ROWS = "Linhas máximas"
 	L.GUILD_BROKER_SETTINGS_MAX_ROWS_DESC = "Limitar linhas do tooltip para guildas grandes (25-200)"
 	L.GUILD_BROKER_SETTINGS_COLUMNS = "Colunas do tooltip"
-	L.GUILD_BROKER_ACTION_TOGGLE = "Alternar tooltip"
 	L.GUILD_BROKER_ACTION_GUILD_FRAME = "Abrir janela da guilda"
 	L.GUILD_BROKER_ACTION_SETTINGS = "Abrir configurações"
 	L.GUILD_BROKER_GROUP_NONE = "Sem agrupamento"

@@ -215,6 +215,12 @@ function QuickFilters:SetFilter(mode)
 		FriendsList:SetFilterMode(mode)
 	end
 
+	-- Update Broker text to reflect new filter counts
+	local Broker = BFL:GetModule("Broker")
+	if Broker and Broker.UpdateBrokerText then
+		Broker:UpdateBrokerText()
+	end
+
 	-- Return true to indicate filter changed (caller should refresh display)
 	return true
 end

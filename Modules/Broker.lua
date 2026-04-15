@@ -244,8 +244,7 @@ local function OnFriendLineClick(cell, data, mouseButton)
 		else
 			if data.bnetAccountID then
 				local safeName = BFL:GetSafeAccountName(data.accountName, data.battleTag)
-				local bnetLink = "BNplayer:" .. safeName .. ":" .. data.bnetAccountID
-				BFL:SecureSetItemRef(bnetLink, bnetLink, "LeftButton")
+				BFL:SecureSendBNetTell(safeName, data.bnetAccountID)
 			elseif not BFL:IsSecret(data.accountName) and data.accountName and data.accountName ~= "" then
 				local safeName = BFL:GetSafeAccountName(data.accountName, data.battleTag)
 				BFL:SecureSendBNetTell(safeName, data.bnetAccountID)
@@ -1032,11 +1031,17 @@ local function GetFooterHeight()
 end
 
 local function RenderFixedFooter(footerFrame)
-	-- Clear previous content
+	-- Clear previous content (both own .content and cross-module .lines)
 	if footerFrame.content then
 		for _, region in ipairs(footerFrame.content) do
 			region:Hide()
 		end
+	end
+	if footerFrame.lines then
+		for _, line in ipairs(footerFrame.lines) do
+			line:Hide()
+		end
+		footerFrame.lines = nil
 	end
 	footerFrame.content = {}
 
@@ -1216,10 +1221,21 @@ local function SetupTooltipAutoHide(tt, anchorFrame)
 	BFL.BrokerUtils.SetupTooltipAutoHide(tt, anchorFrame, LQT, function() return detailTooltip end)
 end
 
+-- ========================================
+-- ElvUI Tooltip Skin Helpers (delegate to BrokerUtils)
+-- ========================================
+local ApplyElvUISkin = BFL.BrokerUtils.ApplyElvUISkin
+local RemoveElvUISkin = BFL.BrokerUtils.RemoveElvUISkin
+
 local function TooltipCleanup(tt)
 	if not tt then
 		return
 	end
+
+	-- Remove ElvUI skin artifacts so released tooltips are clean
+	RemoveElvUISkin(tt)
+
+	BFL.BrokerUtils.ClearActiveBrokerTooltip()
 
 	-- Hide our custom footer
 	if tt.footerFrame then
@@ -1251,6 +1267,9 @@ local function CreateLibQTipTooltip(anchorFrame)
 		return nil
 	end
 
+	-- Dismiss any other BFL broker tooltip (prevents overlap when hovering between plugins)
+	BFL.BrokerUtils.DismissActiveBrokerTooltip()
+
 	-- Define available columns and their default visibility
 	local columns = {
 		{ key = "Nickname", label = L("BROKER_COLUMN_NICKNAME"), align = "LEFT", default = false },
@@ -1279,7 +1298,9 @@ local function CreateLibQTipTooltip(anchorFrame)
 
 			if colDef then
 				local settingKey = "brokerShowCol" .. colKey
-				if BetterFriendlistDB[settingKey] ~= false then
+				local visible = BetterFriendlistDB[settingKey]
+				if visible == nil then visible = colDef.default end
+				if visible ~= false then
 					table.insert(activeColumns, colDef)
 				end
 			end
@@ -1287,14 +1308,16 @@ local function CreateLibQTipTooltip(anchorFrame)
 	else
 		for _, col in ipairs(columns) do
 			local settingKey = "brokerShowCol" .. col.key
-			if BetterFriendlistDB[settingKey] ~= false then
+			local visible = BetterFriendlistDB[settingKey]
+			if visible == nil then visible = col.default end
+			if visible ~= false then
 				table.insert(activeColumns, col)
 			end
 		end
 	end
 
 	if #activeColumns == 0 then
-		table.insert(activeColumns, columns[1])
+		table.insert(activeColumns, columns[2]) -- Fallback: Name column
 	end
 
 	-- Build Acquire arguments
@@ -1328,26 +1351,8 @@ local function CreateLibQTipTooltip(anchorFrame)
 		SetupTooltipAutoHide(tt, anchorFrame)
 		tt:SetFrameStrata("HIGH")
 
-		-- ElvUI Skin: Toggle backdrop based on current setting
-		if _G.ElvUI then
-			local wantSkin = BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin
-			if wantSkin and not tt.bflElvUISkinned then
-				local ok, E = pcall(function()
-					return select(1, unpack(_G.ElvUI))
-				end)
-				if ok and E and E.initialized and tt.CreateBackdrop then
-					tt:CreateBackdrop("Transparent")
-					tt.bflElvUISkinned = true
-				end
-			end
-			if tt.backdrop then
-				if wantSkin then
-					tt.backdrop:Show()
-				else
-					tt.backdrop:Hide()
-				end
-			end
-		end
+		-- ElvUI Skin: Apply ElvUI template (hides NineSlice, applies ElvUI backdrop)
+		ApplyElvUISkin(tt)
 
 		-- Setup Fixed Footer Frame
 		if not tt.footerFrame then
@@ -1998,6 +2003,9 @@ local function CreateLibQTipTooltip(anchorFrame)
 		SetupTooltipAutoHide(tt, anchorFrame)
 	end
 
+	-- Register as active BFL broker tooltip
+	BFL.BrokerUtils.SetActiveBrokerTooltip(tt, LQT, function() return detailTooltip end)
+
 	return tt
 end
 
@@ -2005,6 +2013,19 @@ end
 function Broker:RefreshTooltip()
 	if LQT and tooltip and tooltip:IsShown() then
 		local anchor = tooltip.anchorFrame
+
+		-- Don't re-create if nobody is looking (prevents event-driven refreshes
+		-- from resetting the auto-hide timer after the user moved away)
+		local isOver = tooltip:IsMouseOver()
+		if not isOver and anchor and anchor.IsMouseOver then
+			isOver = anchor:IsMouseOver()
+		end
+		if not isOver then
+			LQT:ReleaseTooltip(tooltip)
+			tooltip = nil
+			return
+		end
+
 		LQT:ReleaseTooltip(tooltip)
 		tooltip = nil
 		if anchor then
@@ -2038,26 +2059,17 @@ local function CreateDetailTooltip(cell, data)
 	tt2:SetFrameStrata("HIGH")
 	tt2:UpdateLayout()
 
-	-- ElvUI Skin: Toggle backdrop based on current setting
-	if _G.ElvUI then
-		local wantSkin = BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin
-		if wantSkin and not tt2.bflElvUISkinned then
-			local ok, E = pcall(function()
-				return select(1, unpack(_G.ElvUI))
-			end)
-			if ok and E and E.initialized and tt2.CreateBackdrop then
-				tt2:CreateBackdrop("Transparent")
-				tt2.bflElvUISkinned = true
-			end
+	-- Hook OnHide to clean up ElvUI skin when detail tooltip is released/hidden
+	local oldOnHide2 = tt2:GetScript("OnHide")
+	tt2:SetScript("OnHide", function(self)
+		RemoveElvUISkin(self)
+		if oldOnHide2 then
+			pcall(oldOnHide2, self)
 		end
-		if tt2.backdrop then
-			if wantSkin then
-				tt2.backdrop:Show()
-			else
-				tt2.backdrop:Hide()
-			end
-		end
-	end
+	end)
+
+	-- ElvUI Skin: Apply ElvUI template (hides NineSlice, applies ElvUI backdrop)
+	ApplyElvUISkin(tt2)
 
 	-- Header with character/account name
 	local headerRow = tt2:AddHeadingRow()

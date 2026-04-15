@@ -505,7 +505,6 @@ BFL:RegisterLocale("esES", function()
 	L.GUILD_BROKER_SETTINGS_MAX_ROWS = "Filas máximas"
 	L.GUILD_BROKER_SETTINGS_MAX_ROWS_DESC = "Limitar filas del tooltip para hermandades grandes (25-200)"
 	L.GUILD_BROKER_SETTINGS_COLUMNS = "Columnas del tooltip"
-	L.GUILD_BROKER_ACTION_TOGGLE = "Alternar tooltip"
 	L.GUILD_BROKER_ACTION_GUILD_FRAME = "Abrir ventana de hermandad"
 	L.GUILD_BROKER_ACTION_SETTINGS = "Abrir ajustes"
 	L.GUILD_BROKER_GROUP_NONE = "Sin agrupación"

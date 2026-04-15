@@ -5525,14 +5525,14 @@ function Settings:RefreshBrokerTab()
 
 		-- Column Reordering Logic
 		local availableColumns = {
-			{ key = "Nickname", label = L.BROKER_COLUMN_NICKNAME or "Nickname" },
-			{ key = "Name", label = L.BROKER_COLUMN_NAME },
-			{ key = "Level", label = L.BROKER_COLUMN_LEVEL },
-			{ key = "Character", label = L.BROKER_COLUMN_CHARACTER },
-			{ key = "Game", label = L.BROKER_COLUMN_GAME },
-			{ key = "Zone", label = L.BROKER_COLUMN_ZONE },
-			{ key = "Realm", label = L.BROKER_COLUMN_REALM },
-			{ key = "Notes", label = L.BROKER_COLUMN_NOTES },
+			{ key = "Nickname", label = L.BROKER_COLUMN_NICKNAME or "Nickname", default = false },
+			{ key = "Name", label = L.BROKER_COLUMN_NAME, default = true },
+			{ key = "Level", label = L.BROKER_COLUMN_LEVEL, default = true },
+			{ key = "Character", label = L.BROKER_COLUMN_CHARACTER, default = true },
+			{ key = "Game", label = L.BROKER_COLUMN_GAME, default = true },
+			{ key = "Zone", label = L.BROKER_COLUMN_ZONE, default = true },
+			{ key = "Realm", label = L.BROKER_COLUMN_REALM, default = true },
+			{ key = "Notes", label = L.BROKER_COLUMN_NOTES, default = true },
 		}
 
 		local currentOrder = DB:Get("brokerColumnOrder")
@@ -5635,7 +5635,7 @@ function Settings:RefreshBrokerTab()
 			end
 
 			-- Add Checkbox to the list item (Classic-compatible template selection)
-			local isChecked = DB:Get("brokerShowCol" .. col.key, true)
+			local isChecked = DB:Get("brokerShowCol" .. col.key, col.default ~= false)
 			local checkboxTemplate = BFL.IsClassic and "InterfaceOptionsCheckButtonTemplate"
 				or "SettingsCheckboxTemplate"
 			local checkbox = CreateFrame("CheckButton", nil, listItem, checkboxTemplate)
