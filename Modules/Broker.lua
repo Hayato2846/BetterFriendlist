@@ -331,12 +331,18 @@ end
 
 -- Get filtered friend counts based on the active QuickFilter
 -- Returns wowFiltered, wowTotal, bnetFiltered, bnetTotal
--- When filter is "all", returns same as GetFriendCounts()
+-- The filtered count reflects the number of friends visible in the main window
 local function GetFilteredFriendCounts()
 	local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
 
-	-- Fast path: "all" and "online" return raw counts (same as before)
-	if currentFilter == "all" or currentFilter == "online" then
+	-- "all" filter shows all friends (online + offline), so filtered = total
+	if currentFilter == "all" then
+		local _, wowTotal, _, bnetTotal = GetFriendCounts()
+		return wowTotal, wowTotal, bnetTotal, bnetTotal
+	end
+
+	-- "online" filter shows only online friends
+	if currentFilter == "online" then
 		return GetFriendCounts()
 	end
 

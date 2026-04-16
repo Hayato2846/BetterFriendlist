@@ -151,6 +151,8 @@ local defaults = {
 	guildBrokerGroupMode = "none", -- Group mode: "none", "by_rank", "by_class" (default: none)
 	guildBrokerFilter = "online", -- Default filter: "all", "online" (default: online)
 	guildBrokerMaxRows = 100, -- Max rows in tooltip (performance cap, default: 100)
+	guildBrokerHideLevelAtMax = false, -- Hide level column for max-level characters (default: OFF)
+	guildBrokerShowColNickname = false, -- Column: Nickname (default: OFF)
 	guildBrokerShowColName = true, -- Column: Name (default: ON)
 	guildBrokerShowColLevel = true, -- Column: Level (default: ON)
 	guildBrokerShowColClass = true, -- Column: Class (default: ON)
@@ -161,6 +163,7 @@ local defaults = {
 	guildBrokerShowColLastOnline = true, -- Column: Last Online (default: ON)
 	guildBrokerColumnOrder = {}, -- Column order persistence
 	guildBrokerCollapsedGroups = {}, -- Collapsed rank/class groups
+	guildNicknames = {}, -- Guild member nicknames {"Name-Realm": "Nickname"}
 	-- Guild Tab Settings
 	enableGuildTab = false, -- Enable the Guild tab in BetterFriendlist (default: OFF, opt-in)
 	guildTabFilterMode = "online", -- Default filter for Guild Tab (default: online)
@@ -912,4 +915,27 @@ function DB:SetNickname(friendUID, nickname)
 	end
 
 	self:SetNicknameInternalDB(dbKey, nickname)
+end
+
+-- Get guild member nickname (keyed by "Name-Realm")
+function DB:GetGuildNickname(fullName)
+	if not fullName then
+		return nil
+	end
+	return BetterFriendlistDB.guildNicknames and BetterFriendlistDB.guildNicknames[fullName]
+end
+
+-- Set guild member nickname (keyed by "Name-Realm")
+function DB:SetGuildNickname(fullName, nickname)
+	if not fullName then
+		return
+	end
+	if not BetterFriendlistDB.guildNicknames then
+		BetterFriendlistDB.guildNicknames = {}
+	end
+	if nickname and nickname ~= "" then
+		BetterFriendlistDB.guildNicknames[fullName] = nickname
+	else
+		BetterFriendlistDB.guildNicknames[fullName] = nil
+	end
 end

@@ -462,6 +462,59 @@ function GuildBroker:OpenMemberContextMenu(data)
 				end)
 			end
 
+			-- Set/Edit Nickname
+			if data.fullName then
+				local DB = GetDB()
+				local currentNick = DB and DB:GetGuildNickname(data.fullName) or ""
+				local nickLabel = currentNick ~= ""
+					and L("GUILD_BROKER_MENU_EDIT_NICKNAME")
+					or L("GUILD_BROKER_MENU_SET_NICKNAME")
+				rootDescription:CreateButton(nickLabel, function()
+					StaticPopupDialogs["BFL_GUILD_SET_NICKNAME"] = {
+						text = string.format(L("GUILD_BROKER_NICKNAME_PROMPT"), data.name or data.fullName),
+						button1 = ACCEPT,
+						button2 = CANCEL,
+						button3 = currentNick ~= "" and (L("GUILD_BROKER_MENU_REMOVE_NICKNAME") or "Remove") or nil,
+						hasEditBox = true,
+						editBoxWidth = 250,
+						OnShow = function(self)
+							self.EditBox:SetText(currentNick)
+							self.EditBox:SetFocus()
+							self.EditBox:HighlightText()
+						end,
+						OnAccept = function(self)
+							local newNick = self.EditBox:GetText()
+							if newNick and newNick:trim() ~= "" then
+								DB:SetGuildNickname(data.fullName, newNick:trim())
+								GuildBroker:RefreshTooltip()
+							end
+						end,
+						OnAlt = function()
+							-- Button3: Remove nickname
+							DB:SetGuildNickname(data.fullName, nil)
+							GuildBroker:RefreshTooltip()
+						end,
+						EditBoxOnEnterPressed = function(self)
+							local parent = self:GetParent()
+							local newNick = parent.EditBox:GetText()
+							if newNick and newNick:trim() ~= "" then
+								DB:SetGuildNickname(data.fullName, newNick:trim())
+								GuildBroker:RefreshTooltip()
+							end
+							parent:Hide()
+						end,
+						EditBoxOnEscapePressed = function(self)
+							self:GetParent():Hide()
+						end,
+						timeout = 0,
+						whileDead = true,
+						hideOnEscape = true,
+						preferredIndex = 3,
+					}
+					StaticPopup_Show("BFL_GUILD_SET_NICKNAME")
+				end)
+			end
+
 			-- Edit Note
 			if CanEditPublicNote and CanEditPublicNote() then
 				rootDescription:CreateButton(L("GUILD_BROKER_MENU_EDIT_NOTE"), function()
@@ -1009,6 +1062,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 
 	-- Define columns
 	local columns = {
+		{ key = "Nickname",    label = L("GUILD_BROKER_COL_NICKNAME"),     align = "LEFT",   setting = "guildBrokerShowColNickname" },
 		{ key = "Name",        label = L("GUILD_BROKER_COL_NAME"),         align = "LEFT",   setting = "guildBrokerShowColName" },
 		{ key = "Level",       label = L("GUILD_BROKER_COL_LEVEL"),        align = "CENTER", setting = "guildBrokerShowColLevel" },
 		{ key = "Class",       label = L("GUILD_BROKER_COL_CLASS"),        align = "LEFT",   setting = "guildBrokerShowColClass" },
@@ -1198,9 +1252,22 @@ local function CreateLibQTipTooltip(anchorFrame)
 			indent = indent or ""
 			local cellValues = {}
 
+			local hideLevelAtMax = BetterFriendlistDB and BetterFriendlistDB.guildBrokerHideLevelAtMax
+			local maxLevel = BFL.GetMaxLevel and BFL.GetMaxLevel() or 80
+
 			for _, col in ipairs(activeColumns) do
 				local val = ""
-				if col.key == "Name" then
+				if col.key == "Nickname" then
+					local DB = GetDB()
+					local nick = DB and DB:GetGuildNickname(member.fullName) or ""
+					if nick ~= "" then
+						if member.online then
+							val = ClassColorTextByFile(member.classFile, nick)
+						else
+							val = C("gray", nick)
+						end
+					end
+				elseif col.key == "Name" then
 					local statusIcon = ""
 					if member.online then
 						statusIcon = GetStatusIcon(member.isAFK, member.isDND, member.isMobile) .. " "
@@ -1211,7 +1278,9 @@ local function CreateLibQTipTooltip(anchorFrame)
 					end
 					val = indent .. statusIcon .. nameText
 				elseif col.key == "Level" then
-					if member.online then
+					if hideLevelAtMax and member.level and member.level >= maxLevel then
+						val = ""
+					elseif member.online then
 						val = GetColoredLevelText(member.level)
 					else
 						val = C("gray", tostring(member.level or ""))

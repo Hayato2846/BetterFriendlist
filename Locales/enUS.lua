@@ -492,6 +492,7 @@ local function LoadEnUS()
 	L.GUILD_BROKER_COL_NOTE = "Note"
 	L.GUILD_BROKER_COL_OFFICER_NOTE = "Officer Note"
 	L.GUILD_BROKER_COL_LAST_ONLINE = "Last Online"
+	L.GUILD_BROKER_COL_NICKNAME = "Nickname"
 
 	-- Column Tooltips
 	L.GUILD_BROKER_COL_NAME_DESC = "Display the member's character name"
@@ -502,6 +503,7 @@ local function LoadEnUS()
 	L.GUILD_BROKER_COL_NOTE_DESC = "Display the member's public note"
 	L.GUILD_BROKER_COL_OFFICER_NOTE_DESC = "Display the member's officer note"
 	L.GUILD_BROKER_COL_LAST_ONLINE_DESC = "Display when the member was last online"
+	L.GUILD_BROKER_COL_NICKNAME_DESC = "Display the member's custom nickname"
 
 	-- Settings
 	L.GUILD_BROKER_SETTINGS_HEADER = "Guild Plugin"
@@ -517,6 +519,8 @@ local function LoadEnUS()
 	L.GUILD_BROKER_SETTINGS_MAX_ROWS = "Maximum Rows"
 	L.GUILD_BROKER_SETTINGS_MAX_ROWS_DESC = "Limit tooltip rows for large guilds (25-200)"
 	L.GUILD_BROKER_SETTINGS_COLUMNS = "Tooltip Columns"
+	L.GUILD_BROKER_SETTINGS_HIDE_LEVEL_AT_MAX = "Hide Level at Max"
+	L.GUILD_BROKER_SETTINGS_HIDE_LEVEL_AT_MAX_DESC = "Hide the level display for characters at maximum level"
 
 	-- Click Actions
 	L.GUILD_BROKER_ACTION_GUILD_FRAME = "Open Guild Frame"
@@ -554,6 +558,10 @@ local function LoadEnUS()
 	L.GUILD_BROKER_MENU_INVITE = "Invite to Group"
 	L.GUILD_BROKER_MENU_WHO = "Who"
 	L.GUILD_BROKER_MENU_COPY_NAME = "Copy Name"
+	L.GUILD_BROKER_MENU_SET_NICKNAME = "Set Nickname"
+	L.GUILD_BROKER_MENU_EDIT_NICKNAME = "Edit Nickname"
+	L.GUILD_BROKER_MENU_REMOVE_NICKNAME = "Remove"
+	L.GUILD_BROKER_NICKNAME_PROMPT = "Enter a nickname for %s:"
 	L.GUILD_BROKER_MENU_EDIT_NOTE = "Edit Note"
 	L.GUILD_BROKER_MENU_EDIT_OFFICER_NOTE = "Edit Officer Note"
 	L.GUILD_BROKER_MENU_PROMOTE = "Promote"

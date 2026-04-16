@@ -487,6 +487,9 @@ BFL:RegisterLocale("koKR", function()
 	L.GUILD_BROKER_COL_NOTE = "메모"
 	L.GUILD_BROKER_COL_OFFICER_NOTE = "관리자 메모"
 	L.GUILD_BROKER_COL_LAST_ONLINE = "마지막 접속"
+	L.GUILD_BROKER_COL_NICKNAME = "별명"
+
+	-- Column Tooltips
 	L.GUILD_BROKER_COL_NAME_DESC = "길드원의 캐릭터 이름 표시"
 	L.GUILD_BROKER_COL_LEVEL_DESC = "길드원의 레벨 표시"
 	L.GUILD_BROKER_COL_CLASS_DESC = "길드원의 직업 표시"
@@ -495,6 +498,9 @@ BFL:RegisterLocale("koKR", function()
 	L.GUILD_BROKER_COL_NOTE_DESC = "길드원의 공개 메모 표시"
 	L.GUILD_BROKER_COL_OFFICER_NOTE_DESC = "길드원의 관리자 메모 표시"
 	L.GUILD_BROKER_COL_LAST_ONLINE_DESC = "길드원의 마지막 접속 시간 표시"
+	L.GUILD_BROKER_COL_NICKNAME_DESC = "멤버의 사용자 지정 별명 표시"
+
+	-- Settings
 	L.GUILD_BROKER_SETTINGS_HEADER = "길드 플러그인"
 	L.GUILD_BROKER_SETTINGS_ENABLE = "길드 브로커 활성화"
 	L.GUILD_BROKER_SETTINGS_ENABLE_DESC = "Data Broker 디스플레이 애드온에 길드원 데이터 표시"
@@ -508,6 +514,9 @@ BFL:RegisterLocale("koKR", function()
 	L.GUILD_BROKER_SETTINGS_MAX_ROWS = "최대 행 수"
 	L.GUILD_BROKER_SETTINGS_MAX_ROWS_DESC = "대규모 길드를 위한 툴팁 행 제한 (25-200)"
 	L.GUILD_BROKER_SETTINGS_COLUMNS = "툴팁 열"
+	L.GUILD_BROKER_SETTINGS_HIDE_LEVEL_AT_MAX = "만렙 시 레벨 숨기기"
+	L.GUILD_BROKER_SETTINGS_HIDE_LEVEL_AT_MAX_DESC = "최대 레벨 캐릭터의 레벨 표시를 숨깁니다"
+
 	L.GUILD_BROKER_ACTION_GUILD_FRAME = "길드 창 열기"
 	L.GUILD_BROKER_ACTION_SETTINGS = "설정 열기"
 	L.GUILD_BROKER_GROUP_NONE = "그룹 없음"
@@ -535,6 +544,11 @@ BFL:RegisterLocale("koKR", function()
 	L.GUILD_BROKER_MENU_INVITE = "그룹 초대"
 	L.GUILD_BROKER_MENU_WHO = "누구"
 	L.GUILD_BROKER_MENU_COPY_NAME = "이름 복사"
+	L.GUILD_BROKER_MENU_SET_NICKNAME = "별명 설정"
+	L.GUILD_BROKER_MENU_EDIT_NICKNAME = "별명 편집"
+	L.GUILD_BROKER_MENU_REMOVE_NICKNAME = "삭제"
+	L.GUILD_BROKER_NICKNAME_PROMPT = "%s의 별명을 입력하세요:"
+
 	L.GUILD_BROKER_MENU_EDIT_NOTE = "메모 편집"
 	L.GUILD_BROKER_MENU_EDIT_OFFICER_NOTE = "관리자 메모 편집"
 	L.GUILD_BROKER_MENU_PROMOTE = "승급"

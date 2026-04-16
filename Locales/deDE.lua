@@ -464,6 +464,7 @@ BFL:RegisterLocale("deDE", function()
 	L.GUILD_BROKER_COL_NOTE = "Notiz"
 	L.GUILD_BROKER_COL_OFFICER_NOTE = "Offiziersnotiz"
 	L.GUILD_BROKER_COL_LAST_ONLINE = "Zuletzt online"
+	L.GUILD_BROKER_COL_NICKNAME = "Spitzname"
 
 	-- Column Tooltips
 	L.GUILD_BROKER_COL_NAME_DESC = "Zeigt den Charakternamen des Mitglieds"
@@ -474,6 +475,7 @@ BFL:RegisterLocale("deDE", function()
 	L.GUILD_BROKER_COL_NOTE_DESC = "Zeigt die Notiz des Mitglieds"
 	L.GUILD_BROKER_COL_OFFICER_NOTE_DESC = "Zeigt die Offiziersnotiz des Mitglieds"
 	L.GUILD_BROKER_COL_LAST_ONLINE_DESC = "Zeigt wann das Mitglied zuletzt online war"
+	L.GUILD_BROKER_COL_NICKNAME_DESC = "Zeigt den benutzerdefinierten Spitznamen des Mitglieds"
 
 	-- Settings
 	L.GUILD_BROKER_SETTINGS_HEADER = "Gilden-Plugin"
@@ -489,6 +491,8 @@ BFL:RegisterLocale("deDE", function()
 	L.GUILD_BROKER_SETTINGS_MAX_ROWS = "Maximale Zeilen"
 	L.GUILD_BROKER_SETTINGS_MAX_ROWS_DESC = "Tooltip-Zeilen für große Gilden begrenzen (25-200)"
 	L.GUILD_BROKER_SETTINGS_COLUMNS = "Tooltip-Spalten"
+	L.GUILD_BROKER_SETTINGS_HIDE_LEVEL_AT_MAX = "Stufe bei Max ausblenden"
+	L.GUILD_BROKER_SETTINGS_HIDE_LEVEL_AT_MAX_DESC = "Blendet die Stufenanzeige bei Charakteren auf Maximalstufe aus"
 
 	-- Click Actions
 	L.GUILD_BROKER_ACTION_GUILD_FRAME = "Gildenfenster öffnen"
@@ -526,6 +530,10 @@ BFL:RegisterLocale("deDE", function()
 	L.GUILD_BROKER_MENU_INVITE = "In Gruppe einladen"
 	L.GUILD_BROKER_MENU_WHO = "Wer"
 	L.GUILD_BROKER_MENU_COPY_NAME = "Name kopieren"
+	L.GUILD_BROKER_MENU_SET_NICKNAME = "Spitzname setzen"
+	L.GUILD_BROKER_MENU_EDIT_NICKNAME = "Spitzname bearbeiten"
+	L.GUILD_BROKER_MENU_REMOVE_NICKNAME = "Entfernen"
+	L.GUILD_BROKER_NICKNAME_PROMPT = "Spitzname für %s eingeben:"
 	L.GUILD_BROKER_MENU_EDIT_NOTE = "Notiz bearbeiten"
 	L.GUILD_BROKER_MENU_EDIT_OFFICER_NOTE = "Offiziersnotiz bearbeiten"
 	L.GUILD_BROKER_MENU_PROMOTE = "Befördern"

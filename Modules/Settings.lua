@@ -5853,32 +5853,157 @@ function Settings:RefreshBrokerTab()
 
 		table.insert(allFrames, Components:CreateSpacer(tab))
 
+		-- Hide Level at Max
+		local guildHideLevelAtMax = Components:CreateCheckbox(
+			tab,
+			L.GUILD_BROKER_SETTINGS_HIDE_LEVEL_AT_MAX or "Hide Level at Max",
+			DB:Get("guildBrokerHideLevelAtMax", false),
+			function(val)
+				BetterFriendlistDB.guildBrokerHideLevelAtMax = val
+			end
+		)
+		if guildHideLevelAtMax.SetTooltip then
+			guildHideLevelAtMax:SetTooltip(
+				L.GUILD_BROKER_SETTINGS_HIDE_LEVEL_AT_MAX or "Hide Level at Max",
+				L.GUILD_BROKER_SETTINGS_HIDE_LEVEL_AT_MAX_DESC or "Hide the level display for characters at maximum level"
+			)
+		end
+		table.insert(allFrames, guildHideLevelAtMax)
+
+		table.insert(allFrames, Components:CreateSpacer(tab))
+
 		-- Guild Tooltip Columns Header
 		local guildColumnsHeader = Components:CreateHeader(tab, L.GUILD_BROKER_SETTINGS_COLUMNS or "Tooltip Columns")
 		table.insert(allFrames, guildColumnsHeader)
 
-		-- Guild Column Toggles
-		local guildColumns = {
-			{ key = "Name",        label = L.GUILD_BROKER_COL_NAME or "Name",             setting = "guildBrokerShowColName" },
-			{ key = "Level",       label = L.GUILD_BROKER_COL_LEVEL or "Level",           setting = "guildBrokerShowColLevel" },
-			{ key = "Class",       label = L.GUILD_BROKER_COL_CLASS or "Class",           setting = "guildBrokerShowColClass" },
-			{ key = "Rank",        label = L.GUILD_BROKER_COL_RANK or "Rank",             setting = "guildBrokerShowColRank" },
-			{ key = "Zone",        label = L.GUILD_BROKER_COL_ZONE or "Zone",             setting = "guildBrokerShowColZone" },
-			{ key = "Note",        label = L.GUILD_BROKER_COL_NOTE or "Note",             setting = "guildBrokerShowColNote" },
-			{ key = "OfficerNote", label = L.GUILD_BROKER_COL_OFFICER_NOTE or "Officer Note", setting = "guildBrokerShowColOfficerNote" },
-			{ key = "LastOnline",  label = L.GUILD_BROKER_COL_LAST_ONLINE or "Last Online",   setting = "guildBrokerShowColLastOnline" },
+		-- Guild Column Reordering (same pattern as Friends Broker)
+		local guildAvailableColumns = {
+			{ key = "Nickname",    label = L.GUILD_BROKER_COL_NICKNAME or "Nickname",         default = false },
+			{ key = "Name",        label = L.GUILD_BROKER_COL_NAME or "Name",                 default = true },
+			{ key = "Level",       label = L.GUILD_BROKER_COL_LEVEL or "Level",               default = true },
+			{ key = "Class",       label = L.GUILD_BROKER_COL_CLASS or "Class",               default = true },
+			{ key = "Rank",        label = L.GUILD_BROKER_COL_RANK or "Rank",                 default = true },
+			{ key = "Zone",        label = L.GUILD_BROKER_COL_ZONE or "Zone",                 default = true },
+			{ key = "Note",        label = L.GUILD_BROKER_COL_NOTE or "Note",                 default = false },
+			{ key = "OfficerNote", label = L.GUILD_BROKER_COL_OFFICER_NOTE or "Officer Note", default = false },
+			{ key = "LastOnline",  label = L.GUILD_BROKER_COL_LAST_ONLINE or "Last Online",   default = true },
 		}
 
-		for _, col in ipairs(guildColumns) do
-			local colToggle = Components:CreateCheckbox(
+		local guildCurrentOrder = DB:Get("guildBrokerColumnOrder")
+		local guildOrderedColumns = {}
+
+		if guildCurrentOrder and #guildCurrentOrder > 0 then
+			for _, key in ipairs(guildCurrentOrder) do
+				for _, col in ipairs(guildAvailableColumns) do
+					if col.key == key then
+						table.insert(guildOrderedColumns, col)
+						break
+					end
+				end
+			end
+			-- Add missing columns (new columns added in updates)
+			for _, col in ipairs(guildAvailableColumns) do
+				local found = false
+				for _, ordered in ipairs(guildOrderedColumns) do
+					if ordered.key == col.key then
+						found = true
+						break
+					end
+				end
+				if not found then
+					table.insert(guildOrderedColumns, col)
+				end
+			end
+		else
+			guildOrderedColumns = guildAvailableColumns
+		end
+
+		-- Create reorderable list items
+		local guildListItems = {}
+
+		for i, col in ipairs(guildOrderedColumns) do
+			local onDragStart = function(btn)
+				btn:SetScript("OnUpdate", function(self)
+					for _, otherItem in ipairs(guildListItems) do
+						if otherItem ~= self and otherItem:IsVisible() then
+							if MouseIsOver(otherItem) then
+								otherItem.bg:SetColorTexture(0.3, 0.3, 0.3, 0.7)
+							else
+								otherItem.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
+							end
+						end
+					end
+				end)
+			end
+
+			local onDragStop = function(btn)
+				btn:SetScript("OnUpdate", nil)
+
+				local targetIndex = nil
+				for _, otherItem in ipairs(guildListItems) do
+					otherItem.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
+					if otherItem ~= btn and otherItem:IsVisible() then
+						if MouseIsOver(otherItem) then
+							targetIndex = otherItem.orderIndex
+						end
+					end
+				end
+
+				if targetIndex then
+					if targetIndex ~= btn.orderIndex then
+						local itemToMove = table.remove(guildOrderedColumns, btn.orderIndex)
+						table.insert(guildOrderedColumns, targetIndex, itemToMove)
+
+						local newOrder = {}
+						for _, c in ipairs(guildOrderedColumns) do
+							table.insert(newOrder, c.key)
+						end
+						DB:Set("guildBrokerColumnOrder", newOrder)
+						self:RefreshBrokerTab()
+					end
+				end
+			end
+
+			local listItem = Components:CreateListItem(
 				tab,
 				col.label,
-				DB:Get(col.setting, true),
-				function(val)
-					BetterFriendlistDB[col.setting] = val
-				end
+				i,
+				onDragStart,
+				onDragStop,
+				nil, nil, nil
 			)
-			table.insert(allFrames, colToggle)
+
+			if listItem.colorButton then
+				listItem.colorButton:Hide()
+			end
+			if listItem.orderText then
+				listItem.orderText:Hide()
+			end
+
+			-- Add visibility checkbox
+			local guildColSettingKey = "guildBrokerShowCol" .. col.key
+			local isChecked = DB:Get(guildColSettingKey, col.default ~= false)
+			local checkboxTemplate = BFL.IsClassic and "InterfaceOptionsCheckButtonTemplate"
+				or "SettingsCheckboxTemplate"
+			local checkbox = CreateFrame("CheckButton", nil, listItem, checkboxTemplate)
+			checkbox:SetPoint("LEFT", listItem, "LEFT", 4, 0)
+			checkbox:SetSize(20, 20)
+			checkbox:SetChecked(isChecked)
+			checkbox:SetScript("OnClick", function(self)
+				local checked = self:GetChecked()
+				DB:Set(guildColSettingKey, checked)
+			end)
+
+			checkbox:SetScript("OnEnter", function() end)
+			checkbox:SetScript("OnLeave", function() end)
+
+			if listItem.nameText then
+				listItem.nameText:ClearAllPoints()
+				listItem.nameText:SetPoint("LEFT", checkbox, "RIGHT", 10, 0)
+			end
+
+			table.insert(guildListItems, listItem)
+			table.insert(allFrames, listItem)
 		end
 	end
 

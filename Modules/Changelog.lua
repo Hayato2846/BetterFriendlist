@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+
+### Added
+- **Guild Broker: Nickname Column** - New optional "Nickname" column for the guild broker tooltip. Assign custom nicknames to guild members via right-click context menu. Enable in Settings > Broker > Guild Plugin.
+- **Guild Broker: Hide Level at Max** - New toggle to hide the level column for characters at maximum level, reducing visual clutter. Enable in Settings > Broker > Guild Plugin.
+- **Guild Broker: Column Ordering** - Guild broker tooltip columns can now be reordered via drag and drop in Settings, just like the friends broker.
+
+### Fixed
+- **Broker: Filtered Count** - The broker display now correctly shows the total number of friends when the "All" quick filter is active, matching the main window. Previously it always showed the online count regardless of the active filter.
+
 ## [2.5.6-beta1]  - 2026-04-15
 
 ### Added
@@ -117,26 +127,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Beta Features Toggle** - Fixed an error when disabling Beta Features while on a Beta settings tab.
 
 ---
-
-## [2.4.2]       - 2026-02-26
-
-### Added
-- **Raid Tools** - New "Tools" button on the Raid tab that opens a dedicated Raid Tools panel. Features include:
-  - **Sort by Role** - Arranges raid members by role with two sort modes: Tanks > Melee > Ranged > Healers, or Tanks > Healers > Melee > Ranged. Uses spec inspection to accurately distinguish melee and ranged DPS.
-  - **Split Raid** - Splits the raid into two balanced halves or into odd/even groups, distributing roles, classes, Battle Rez, and Bloodlust evenly across both sides.
-  - **Balance DPS** - Optional checkbox that uses damage meter data (Details! or Blizzard's built-in Damage Meter) to evenly distribute DPS output across both sides when splitting.
-  - **Promote Tanks** - Gives raid assistant to all players with the Tank role.
-  - **Preserve Groups** - Excludes any combination of groups 1-8 from being modified during sort or split operations.
-  - **Auto-resume after combat** - Automatically continues an interrupted sort or split after leaving combat.
-  - Shows live progress during sort and split operations (e.g., "Sorting... (5/12)").
-- **Quick Filter: In A Game** - New Quick Filter option that shows only friends who are currently playing any game (WoW, Overwatch, Diablo, etc.), hiding offline, app-only, and mobile-only friends.
-
-### Fixed
-- **Assist All Checkbox** - Fixed the "Assist All" checkbox and its label not disabling when the player isn't raid leader. Also fixed the state not updating when converting between Raid and Party or when raid lead is given or taken. The checkbox tooltip now matches Blizzard's default behavior.
-- **Raid Tab Non-Roman Character Names** - Fixed raid member names in non-roman alphabets (Korean, Chinese, Russian) not rendering correctly even when the selected font supports them. The font fallback system was not being applied in the Raid tab, unlike the Friends list where it already worked.
-
-### Changed
-- **Raid Tab Controls Always Visible** - The "Assist All" checkbox, role counts, and member count on the Raid tab are now always visible, even when not in a raid group.
 
 ---
 
