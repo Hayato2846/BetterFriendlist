@@ -477,6 +477,18 @@ function DB:Initialize()
 			end
 		end
 
+		-- Push existing guild nicknames to Library (One-way sync on load)
+		if BetterFriendlistDB.guildNicknames then
+			for fullName, nickname in pairs(BetterFriendlistDB.guildNicknames) do
+				if fullName and nickname then
+					local libName = lib.Get(fullName)
+					if libName == fullName then
+						lib.Set(fullName, nickname)
+					end
+				end
+			end
+		end
+
 		-- Register callbacks to keep internal DB in sync
 		lib.RegisterCallback(self, "Name_Added", function(_, name, customName)
 			self:SetNicknameInternal(name, customName)
@@ -563,6 +575,18 @@ function DB:SetNicknameInternal(name, nickname)
 	end
 
 	self:SetNicknameInternalDB(dbKey, nickname)
+
+	-- Also update guild nicknames if this is a WoW character name (Name-Realm)
+	if not name:match("#") and name:match("%-") then
+		if not BetterFriendlistDB.guildNicknames then
+			BetterFriendlistDB.guildNicknames = {}
+		end
+		if nickname and nickname ~= "" then
+			BetterFriendlistDB.guildNicknames[name] = nickname
+		else
+			BetterFriendlistDB.guildNicknames[name] = nil
+		end
+	end
 
 	-- Force UI Refresh to show new nickname immediately
 	if BFL and BFL.ForceRefreshFriendsList then
@@ -922,6 +946,16 @@ function DB:GetGuildNickname(fullName)
 	if not fullName then
 		return nil
 	end
+
+	-- 1. Try CustomNames Lib first
+	if CustomNamesLib then
+		local customName = CustomNamesLib.Get(fullName)
+		if customName and customName ~= fullName then
+			return customName
+		end
+	end
+
+	-- 2. Fallback to internal DB
 	return BetterFriendlistDB.guildNicknames and BetterFriendlistDB.guildNicknames[fullName]
 end
 
@@ -930,6 +964,17 @@ function DB:SetGuildNickname(fullName, nickname)
 	if not fullName then
 		return
 	end
+
+	-- 1. Update CustomNames Lib
+	if CustomNamesLib then
+		if nickname and nickname ~= "" then
+			CustomNamesLib.Set(fullName, nickname)
+		else
+			CustomNamesLib.Set(fullName, nil)
+		end
+	end
+
+	-- 2. Update internal DB
 	if not BetterFriendlistDB.guildNicknames then
 		BetterFriendlistDB.guildNicknames = {}
 	end

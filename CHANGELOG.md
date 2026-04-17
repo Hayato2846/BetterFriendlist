@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [DRAFT]
 
 ### Added
-- **Guild Broker: Nickname Column** - New optional "Nickname" column for the guild broker tooltip. Assign custom nicknames to guild members via right-click context menu. Enable in Settings > Broker > Guild Plugin.
+- **Guild Broker: Nickname Column** - New optional "Nickname" column for the guild broker tooltip. Assign custom nicknames to guild members via right-click context menu. Nicknames sync with the CustomNames library so other addons can see them too. Enable in Settings > Broker > Guild Plugin.
 - **Guild Broker: Hide Level at Max** - New toggle to hide the level column for characters at maximum level, reducing visual clutter. Enable in Settings > Broker > Guild Plugin.
 - **Guild Broker: Column Ordering** - Guild broker tooltip columns can now be reordered via drag and drop in Settings, just like the friends broker.
 
