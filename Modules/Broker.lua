@@ -1644,6 +1644,13 @@ local function CreateLibQTipTooltip(anchorFrame)
 						include = not (friend.isAFK or friend.isDND)
 					elseif currentFilter == "retail" then
 						include = (friend.client == "WoW" or friend.type == "wow")
+					elseif currentFilter == "ingame" then
+						if friend.type == "wow" then
+							include = friend.connected
+						elseif friend.type == "bnet" then
+							local client = friend.client
+							include = friend.connected and client ~= "" and client ~= "App" and client ~= "BSAp"
+						end
 					end
 
 					if include then
