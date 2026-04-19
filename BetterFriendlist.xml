@@ -1289,7 +1289,7 @@
 
 	<!-- Guild Member Button Template (Retail ScrollBox) -->
 	<Button name="BFL_GuildMemberButtonTemplate" virtual="true" registerForClicks="LeftButtonUp,RightButtonUp">
-		<Size x="300" y="22" />
+		<Size x="300" y="24" />
 	</Button>
 
 	<!-- Main Friends Frame -->
@@ -3345,8 +3345,8 @@
 						</KeyValues>
 						<Size y="20" />
 						<Anchors>
-							<Anchor point="BOTTOMLEFT" relativeKey="$parent.ListInset" x="35" y="40" />
-							<Anchor point="BOTTOMRIGHT" relativeKey="$parent.ListInset" x="-20"
+							<Anchor point="BOTTOMLEFT" relativeKey="$parent.ListInset" x="14" y="40" />
+							<Anchor point="BOTTOMRIGHT" relativeKey="$parent.ListInset" x="-10"
 								y="40" />
 						</Anchors>
 						<Layers>
@@ -3367,20 +3367,21 @@
 						</Scripts>
 						<FontString inherits="BetterFriendlistFontHighlight" justifyH="LEFT" />
 					</EditBox>
-					<!-- List Inset -->
+					<!-- List Inset (starts below header area; now includes column headers) -->
 					<Frame parentKey="ListInset" inherits="InsetFrameTemplate">
 						<Anchors>
-							<Anchor point="TOPLEFT" relativeKey="$parent.$parent.Inset" x="0" y="40" />
+							<Anchor point="TOPLEFT" relativeKey="$parent.HeaderDivider"
+								relativePoint="BOTTOMLEFT" x="-2" y="-8" />
 							<Anchor point="BOTTOMRIGHT" relativeKey="$parent.$parent.Inset" x="0"
 								y="0" />
 						</Anchors>
 					</Frame>
-					<!-- Column Headers -->
+					<!-- Column Headers (anchored inside ListInset top edge) -->
 					<Button parentKey="NameHeader" text="NAME">
 						<Size x="116" y="35" />
 						<Anchors>
 							<Anchor point="TOPLEFT" relativeKey="$parent.ListInset"
-								relativePoint="TOPLEFT" x="4" y="25" />
+								relativePoint="TOPLEFT" x="4" y="-2" />
 						</Anchors>
 						<Layers>
 							<Layer level="BACKGROUND">
@@ -3548,13 +3549,58 @@
 							</OnClick>
 						</Scripts>
 					</Button>
-					<!-- Filter Buttons (above search) -->
-					<Button parentKey="FilterAll" text="ALL">
+					<Button parentKey="ILvlHeader" text="iLvl">
+						<Size x="60" y="35" />
+						<Anchors>
+							<Anchor point="LEFT" relativeKey="$parent.ZoneHeader"
+								relativePoint="RIGHT" x="-2" y="0" />
+						</Anchors>
+						<Layers>
+							<Layer level="BACKGROUND">
+								<Texture parentKey="Left"
+									file="Interface\FriendsFrame\WhoFrame-ColumnTabs">
+									<Size x="5" y="35" />
+									<Anchors>
+										<Anchor point="TOPLEFT" />
+									</Anchors>
+									<TexCoords left="0" right="0.078125" top="0" bottom="1.0" />
+								</Texture>
+								<Texture parentKey="Middle"
+									file="Interface\FriendsFrame\WhoFrame-ColumnTabs">
+									<Size x="50" y="35" />
+									<Anchors>
+										<Anchor point="LEFT" relativeKey="$parent.Left"
+											relativePoint="RIGHT" />
+									</Anchors>
+									<TexCoords left="0.078125" right="0.90625" top="0" bottom="1.0" />
+								</Texture>
+								<Texture parentKey="Right"
+									file="Interface\FriendsFrame\WhoFrame-ColumnTabs">
+									<Size x="4" y="35" />
+									<Anchors>
+										<Anchor point="LEFT" relativeKey="$parent.Middle"
+											relativePoint="RIGHT" />
+									</Anchors>
+									<TexCoords left="0.90625" right="1.0" top="0" bottom="1.0" />
+								</Texture>
+							</Layer>
+						</Layers>
 						<NormalFont style="BetterFriendlistFontHighlightSmall" />
-						<Size x="30" y="16" />
+						<Scripts>
+							<OnClick>
+								BFL_GuildFrame_SortByILvl()
+							</OnClick>
+						</Scripts>
+					</Button>
+					<!-- Filter Buttons (Blizzard UIPanelButton style, above search) -->
+					<Button parentKey="FilterAll" inherits="UIPanelButtonTemplate" text="ALL">
+						<NormalFont style="BetterFriendlistFontNormalSmall" />
+						<HighlightFont style="BetterFriendlistFontHighlightSmall" />
+						<DisabledFont style="BetterFriendlistFontDisableSmall" />
+						<Size x="50" y="20" />
 						<Anchors>
 							<Anchor point="BOTTOMRIGHT" relativeKey="$parent.SearchBox"
-								relativePoint="TOPRIGHT" x="0" y="2" />
+								relativePoint="TOPRIGHT" x="0" y="4" />
 						</Anchors>
 						<Scripts>
 							<OnClick>
@@ -3562,12 +3608,15 @@
 							</OnClick>
 						</Scripts>
 					</Button>
-					<Button parentKey="FilterOnline" text="FRIENDS_LIST_ONLINE">
-						<NormalFont style="BetterFriendlistFontHighlightSmall" />
-						<Size x="50" y="16" />
+					<Button parentKey="FilterOnline" inherits="UIPanelButtonTemplate"
+						text="FRIENDS_LIST_ONLINE">
+						<NormalFont style="BetterFriendlistFontNormalSmall" />
+						<HighlightFont style="BetterFriendlistFontHighlightSmall" />
+						<DisabledFont style="BetterFriendlistFontDisableSmall" />
+						<Size x="60" y="20" />
 						<Anchors>
 							<Anchor point="RIGHT" relativeKey="$parent.FilterAll"
-								relativePoint="LEFT" x="-4" y="0" />
+								relativePoint="LEFT" x="-2" y="0" />
 						</Anchors>
 						<Scripts>
 							<OnClick>
@@ -3575,12 +3624,14 @@
 							</OnClick>
 						</Scripts>
 					</Button>
-					<Button parentKey="FilterOffline">
-						<NormalFont style="BetterFriendlistFontHighlightSmall" />
-						<Size x="50" y="16" />
+					<Button parentKey="FilterOffline" inherits="UIPanelButtonTemplate">
+						<NormalFont style="BetterFriendlistFontNormalSmall" />
+						<HighlightFont style="BetterFriendlistFontHighlightSmall" />
+						<DisabledFont style="BetterFriendlistFontDisableSmall" />
+						<Size x="60" y="20" />
 						<Anchors>
 							<Anchor point="RIGHT" relativeKey="$parent.FilterOnline"
-								relativePoint="LEFT" x="-4" y="0" />
+								relativePoint="LEFT" x="-2" y="0" />
 						</Anchors>
 						<Scripts>
 							<OnClick>
@@ -3618,6 +3669,21 @@
 							</OnClick>
 						</Scripts>
 					</Button>
+					<Button parentKey="InvitePlayerButton" inherits="UIPanelButtonTemplate">
+						<NormalFont style="BetterFriendlistFontNormal" />
+						<HighlightFont style="BetterFriendlistFontHighlight" />
+						<DisabledFont style="BetterFriendlistFontDisable" />
+						<Size x="100" y="21" />
+						<Anchors>
+							<Anchor point="LEFT" relativeKey="$parent.RefreshButton"
+								relativePoint="RIGHT" x="1" y="0" />
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								BFL_GuildFrame_ShowInviteDialog()
+							</OnClick>
+						</Scripts>
+					</Button>
 					<!-- ScrollBox (Retail) -->
 					<Frame parentKey="ScrollBox" inherits="WowScrollBoxList">
 						<Anchors>
@@ -3642,15 +3708,15 @@
 						<FontString parentKey="GuildName"
 							inherits="BetterFriendlistFontHighlight" justifyH="LEFT">
 							<Anchors>
-								<Anchor point="TOPLEFT" relativeKey="$parent.ListInset"
-									relativePoint="TOPLEFT" x="6" y="56" />
+								<Anchor point="TOPLEFT" relativeKey="$parent.$parent.Inset"
+									relativePoint="TOPLEFT" x="10" y="-10" />
 							</Anchors>
 						</FontString>
 						<FontString parentKey="MemberCount"
 							inherits="BetterFriendlistFontNormalSmall" justifyH="RIGHT">
 							<Anchors>
-								<Anchor point="TOPRIGHT" relativeKey="$parent.ListInset"
-									relativePoint="TOPRIGHT" x="-6" y="56" />
+								<Anchor point="TOPRIGHT" relativeKey="$parent.$parent.Inset"
+									relativePoint="TOPRIGHT" x="-10" y="-14" />
 							</Anchors>
 						</FontString>
 						<FontString parentKey="MOTDText"
@@ -3658,12 +3724,24 @@
 							maxLines="1" wordwrap="false">
 							<Anchors>
 								<Anchor point="TOPLEFT" relativeKey="$parent.GuildName"
-									relativePoint="BOTTOMLEFT" x="0" y="-2" />
+									relativePoint="BOTTOMLEFT" x="0" y="-4" />
 								<Anchor point="RIGHT" relativeKey="$parent.MemberCount"
 									relativePoint="RIGHT" x="0" y="0" />
 							</Anchors>
-							<Color r="0.6" g="0.6" b="0.6" />
+							<Color r="0.7" g="0.7" b="0.7" />
 						</FontString>
+					</Layer>
+					<Layer level="OVERLAY">
+						<Texture parentKey="HeaderDivider">
+							<Size x="1" y="1" />
+							<Anchors>
+								<Anchor point="TOPLEFT" relativeKey="$parent.MOTDText"
+									relativePoint="BOTTOMLEFT" x="-2" y="-6" />
+								<Anchor point="TOPRIGHT" relativeKey="$parent.MOTDText"
+									relativePoint="BOTTOMRIGHT" x="2" y="-6" />
+							</Anchors>
+							<Color r="0.4" g="0.4" b="0.4" a="0.6" />
+						</Texture>
 					</Layer>
 				</Layers>
 				<Scripts>

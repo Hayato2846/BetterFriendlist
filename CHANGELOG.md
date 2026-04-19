@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.5.6-beta3]  - 2026-04-19
+
+### Added
+- **Guild Broker: Class Icons** - New option to display class icons next to character names in the guild broker tooltip. Enable in Settings > Broker > Guild Plugin.
+- **Guild Broker: Sort Mode** - The guild broker tooltip can now be sorted by name, rank, level, class, zone, or nickname. Configure in Settings > Broker > Guild Plugin.
+- **Guild Broker: Exclude Yourself** - New option to hide your own character from the guild broker list and subtract from the online member count.
+- **Guild Broker: Custom Nickname Color** - Nickname colors in the guild broker tooltip can now be customized with a color picker. A checkbox lets you toggle between class colors and a custom color.
+- **Guild Broker: Column Colors** - New color pickers for Rank, Zone, Note, and Officer Note columns in the guild broker tooltip. Customize each column's text color individually in Settings > Broker > Guild Plugin.
+- **Guild Broker: Status Indicators** - AFK and DND status icons are now shown next to member names in the guild broker tooltip, matching the Blizzard guild interface style. Online members no longer show a green circle.
+
+### Fixed
+- **Broker: Online Count** - Fixed the broker display always showing the total number of friends instead of the actual online count.
+- **Guild Broker: Tooltip Error** - Fixed a Lua error that could occur when hovering over guild members in the broker tooltip, caused by a frame anchoring conflict.
+
+---
+
 ## [2.5.6-beta2]  - 2026-04-17
 
 ### Added
@@ -94,30 +110,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - **Keybind Override** - Removed a redundant keybinding entry from the Key Bindings UI. The O-key (Social) redirect was already handled internally and the extra entry served no purpose.
-
----
-
-## [2.4.4]       - 2026-03-09
-
-### Fixed
-- **Global Sync** - Fixed several issues that could cause "Player not found." spam and repeated failed sync attempts. The sync now works correctly across connected realms and respects the friend list limit.
-- **Raid Shortcuts** - Fixed raid shortcuts (Assist, Raid Lead, Main Tank, Main Assist, and the right-click context menu) not working on Classic. Also fixed these shortcuts silently failing on Retail when "Cast on Key Down" was enabled in the game settings.
-
----
-
-## [2.4.3]       - 2026-03-02
-
-### Changed
-- **Data Broker Right-Click** - Also opens the friend list if it was closed.
-- **Friend Tooltip** - Now uses Blizzard's native tooltip instead of a custom replica.
-- **Tooltip: Max Game Accounts** - Setting removed. Always shows up to 5 accounts (Blizzard default).
-
-### Fixed
-- **Data Broker Tooltip** - No longer stays open for ~5 seconds after moving the mouse away (Arcana, Bazooka, etc.).
-- **Data Broker Right-Click** - Fixed an error when right-clicking the icon to open settings.
-- **Beta Features Toggle** - Fixed an error when disabling Beta Features while on a Beta settings tab.
-
----
 
 ---
 

@@ -163,11 +163,21 @@ local defaults = {
 	guildBrokerShowColLastOnline = true, -- Column: Last Online (default: ON)
 	guildBrokerColumnOrder = {}, -- Column order persistence
 	guildBrokerCollapsedGroups = {}, -- Collapsed rank/class groups
+	guildBrokerSortMode = "name", -- Sort mode: "name", "rank", "level", "class", "zone", "nickname" (default: name)
+	guildBrokerExcludeSelf = false, -- Exclude the player from guild list and online count (default: OFF)
+	guildBrokerShowClassIcons = false, -- Show class icons in tooltip name column (default: OFF)
+	guildBrokerNicknameColor = nil, -- Custom nickname color {r, g, b} (nil = class color)
+	guildBrokerRankColor = nil, -- Custom rank column color {r, g, b} (nil = default white)
+	guildBrokerZoneColor = nil, -- Custom zone column color {r, g, b} (nil = default white)
+	guildBrokerNoteColor = nil, -- Custom note column color {r, g, b} (nil = default white)
+	guildBrokerOfficerNoteColor = nil, -- Custom officer note column color {r, g, b} (nil = default white)
 	guildNicknames = {}, -- Guild member nicknames {"Name-Realm": "Nickname"}
 	-- Guild Tab Settings
 	enableGuildTab = false, -- Enable the Guild tab in BetterFriendlist (default: OFF, opt-in)
 	guildTabFilterMode = "online", -- Default filter for Guild Tab (default: online)
 	guildTabSortMode = "rank", -- Default sort for Guild Tab (default: rank)
+	guildTabShowTabard = true, -- Show guild tabard in Guild tab header (default: ON)
+	guildTabShowILvlColumn = true, -- Show Item Level column (default: ON)
 	-- Classic Guild Tab Settings (legacy, kept for compat)
 	closeOnGuildTabClick = false, -- Close BetterFriendlist when opening Guild Frame (Classic only, default: OFF)
 	hideGuildTab = false, -- Hide the Guild tab completely (Classic only, default: OFF)

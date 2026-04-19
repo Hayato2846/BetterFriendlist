@@ -1788,9 +1788,23 @@
 							</OnClick>
 						</Scripts>
 					</Button>
-					<!-- Filter Buttons (top area) -->
-					<Button parentKey="FilterAll" text="ALL">
-						<Size x="30" y="16"/>
+					<Button parentKey="ILvlHeader" inherits="WhoFrameColumnHeaderTemplate" frameStrata="HIGH">
+						<Anchors>
+							<Anchor point="LEFT" relativeKey="$parent.ZoneHeader" relativePoint="RIGHT" x="-2" y="0"/>
+						</Anchors>
+						<Scripts>
+							<OnLoad>
+								self:SetText("iLvl")
+								self:SetWidth(60)
+							</OnLoad>
+							<OnClick>
+								BFL_GuildFrame_SortByILvl()
+							</OnClick>
+						</Scripts>
+					</Button>
+					<!-- Filter Buttons (Blizzard UIPanelButton style) -->
+					<Button parentKey="FilterAll" inherits="UIPanelButtonTemplate" text="ALL">
+						<Size x="50" y="20"/>
 						<Anchors>
 							<Anchor point="TOPRIGHT" x="-10" y="-40"/>
 						</Anchors>
@@ -1800,10 +1814,10 @@
 							</OnClick>
 						</Scripts>
 					</Button>
-					<Button parentKey="FilterOnline" text="FRIENDS_LIST_ONLINE">
-						<Size x="50" y="16"/>
+					<Button parentKey="FilterOnline" inherits="UIPanelButtonTemplate" text="FRIENDS_LIST_ONLINE">
+						<Size x="60" y="20"/>
 						<Anchors>
-							<Anchor point="RIGHT" relativeKey="$parent.FilterAll" relativePoint="LEFT" x="-4" y="0"/>
+							<Anchor point="RIGHT" relativeKey="$parent.FilterAll" relativePoint="LEFT" x="-2" y="0"/>
 						</Anchors>
 						<Scripts>
 							<OnClick>
@@ -1811,10 +1825,10 @@
 							</OnClick>
 						</Scripts>
 					</Button>
-					<Button parentKey="FilterOffline">
-						<Size x="50" y="16"/>
+					<Button parentKey="FilterOffline" inherits="UIPanelButtonTemplate">
+						<Size x="60" y="20"/>
 						<Anchors>
-							<Anchor point="RIGHT" relativeKey="$parent.FilterOnline" relativePoint="LEFT" x="-4" y="0"/>
+							<Anchor point="RIGHT" relativeKey="$parent.FilterOnline" relativePoint="LEFT" x="-2" y="0"/>
 						</Anchors>
 						<Scripts>
 							<OnClick>
@@ -1842,6 +1856,17 @@
 						<Scripts>
 							<OnClick>
 								BFL_GuildFrame_RefreshRoster()
+							</OnClick>
+						</Scripts>
+					</Button>
+					<Button parentKey="InvitePlayerButton" inherits="UIPanelButtonTemplate">
+						<Size x="100" y="21"/>
+						<Anchors>
+							<Anchor point="LEFT" relativeKey="$parent.RefreshButton" relativePoint="RIGHT" x="1" y="0"/>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								BFL_GuildFrame_ShowInviteDialog()
 							</OnClick>
 						</Scripts>
 					</Button>
@@ -1873,6 +1898,16 @@
 							</Anchors>
 							<Color r="0.6" g="0.6" b="0.6"/>
 						</FontString>
+					</Layer>
+					<Layer level="OVERLAY">
+						<Texture parentKey="HeaderDivider">
+							<Size x="1" y="1"/>
+							<Anchors>
+								<Anchor point="TOPLEFT" relativeKey="$parent.MOTDText" relativePoint="BOTTOMLEFT" x="-2" y="-4"/>
+								<Anchor point="TOPRIGHT" relativeKey="$parent.MOTDText" relativePoint="BOTTOMRIGHT" x="2" y="-4"/>
+							</Anchors>
+							<Color r="0.4" g="0.4" b="0.4" a="0.6"/>
+						</Texture>
 					</Layer>
 				</Layers>
 				<Scripts>

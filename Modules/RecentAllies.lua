@@ -320,7 +320,8 @@ function RecentAllies:InitializeEntry(button, elementData)
 		button.StateIconContainer.PinDisplay.Icon:SetAtlas(atlas, true)
 	end
 
-	button.StateIconContainer.FriendRequestPendingDisplay:SetShown(stateData.hasFriendRequestPending or false)
+	-- Field renamed in 12.0.5: hasFriendRequestPending -> friendRequestSentThisSession
+	button.StateIconContainer.FriendRequestPendingDisplay:SetShown(stateData.friendRequestSentThisSession or stateData.hasFriendRequestPending or false)
 
 	-- Enable/disable party button based on online status
 	button.PartyButton:SetEnabled(stateData.isOnline)

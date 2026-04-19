@@ -3590,18 +3590,54 @@ function Settings:RefreshGeneralTab()
 	})
 	table.insert(allFrames, behaviorRow2)
 
-	-- Behavior Settings Row 3 (Guild Tab) - Hidden until feature is complete
-	-- local guildTabCheckbox = Components:CreateCheckbox(tab, {
-	-- 	label = L.SETTINGS_ENABLE_GUILD_TAB or "Enable Guild Tab",
-	-- 	initialValue = DB:Get("enableGuildTab", false),
-	-- 	callback = function(val)
-	-- 		self:OnEnableGuildTabChanged(val)
-	-- 	end,
-	-- 	tooltipTitle = L.SETTINGS_ENABLE_GUILD_TAB or "Enable Guild Tab",
-	-- 	tooltipDesc = L.SETTINGS_ENABLE_GUILD_TAB_DESC
-	-- 		or "Show a Guild tab in BetterFriendlist with a full guild roster view",
-	-- })
-	-- table.insert(allFrames, guildTabCheckbox)
+	-- Behavior Settings Row 3 (Guild Tab) -- WIP: hidden from settings while
+	-- the Guild Tab is being reworked. Re-enable this block when ready.
+	--[[
+	local guildTabCheckbox = Components:CreateCheckbox(tab, {
+		label = L.SETTINGS_ENABLE_GUILD_TAB or "Enable Guild Tab",
+		initialValue = DB:Get("enableGuildTab", false),
+		callback = function(val)
+			self:OnEnableGuildTabChanged(val)
+		end,
+		tooltipTitle = L.SETTINGS_ENABLE_GUILD_TAB or "Enable Guild Tab",
+		tooltipDesc = L.SETTINGS_ENABLE_GUILD_TAB_DESC
+			or "Show a Guild tab in BetterFriendlist with a full guild roster view",
+	})
+	table.insert(allFrames, guildTabCheckbox)
+
+	local guildTabShowTabardCB = Components:CreateCheckbox(tab, {
+		label = L.SETTINGS_SHOW_GUILD_TABARD or "Show Guild Tabard",
+		initialValue = DB:Get("guildTabShowTabard", true) ~= false,
+		callback = function(val)
+			DB:Set("guildTabShowTabard", val and true or false)
+			local GuildFrame = BFL:GetModule("GuildFrame")
+			if GuildFrame and GuildFrame.UpdateTabard then
+				GuildFrame:UpdateTabard()
+			end
+		end,
+		tooltipTitle = L.SETTINGS_SHOW_GUILD_TABARD or "Show Guild Tabard",
+		tooltipDesc = L.SETTINGS_SHOW_GUILD_TABARD_DESC
+			or "Display the guild's tabard in the Guild tab header.",
+	})
+	table.insert(allFrames, guildTabShowTabardCB)
+
+	local guildTabShowILvlCB = Components:CreateCheckbox(tab, {
+		label = L.SETTINGS_SHOW_ILVL_COLUMN or "Show Item Level Column",
+		initialValue = DB:Get("guildTabShowILvlColumn", true) ~= false,
+		callback = function(val)
+			DB:Set("guildTabShowILvlColumn", val and true or false)
+			local GuildFrame = BFL:GetModule("GuildFrame")
+			if GuildFrame and GuildFrame.UpdateResponsiveLayout then
+				GuildFrame:UpdateResponsiveLayout()
+				GuildFrame:Refresh()
+			end
+		end,
+		tooltipTitle = L.SETTINGS_SHOW_ILVL_COLUMN or "Show Item Level Column",
+		tooltipDesc = L.SETTINGS_SHOW_ILVL_COLUMN_DESC
+			or "Show an item level column in the Guild tab list.",
+	})
+	table.insert(allFrames, guildTabShowILvlCB)
+	--]]
 
 	-- Spacer before next section
 	table.insert(allFrames, Components:CreateSpacer(tab))
@@ -5869,6 +5905,188 @@ function Settings:RefreshBrokerTab()
 			)
 		end
 		table.insert(allFrames, guildHideLevelAtMax)
+
+		-- Show Class Icons
+		local guildShowClassIcons = Components:CreateCheckbox(
+			tab,
+			L.GUILD_BROKER_SETTINGS_SHOW_CLASS_ICONS or "Show Class Icons",
+			DB:Get("guildBrokerShowClassIcons", false),
+			function(val)
+				BetterFriendlistDB.guildBrokerShowClassIcons = val
+			end
+		)
+		if guildShowClassIcons.SetTooltip then
+			guildShowClassIcons:SetTooltip(
+				L.GUILD_BROKER_SETTINGS_SHOW_CLASS_ICONS or "Show Class Icons",
+				L.GUILD_BROKER_SETTINGS_SHOW_CLASS_ICONS_DESC or "Display class icons next to character names in the tooltip"
+			)
+		end
+		table.insert(allFrames, guildShowClassIcons)
+
+		-- Exclude Self
+		local guildExcludeSelf = Components:CreateCheckbox(
+			tab,
+			L.GUILD_BROKER_SETTINGS_EXCLUDE_SELF or "Exclude Yourself",
+			DB:Get("guildBrokerExcludeSelf", false),
+			function(val)
+				BetterFriendlistDB.guildBrokerExcludeSelf = val
+				local GBroker = BFL:GetModule("GuildBroker")
+				if GBroker and GBroker.UpdateBrokerText then
+					GBroker:UpdateBrokerText()
+				end
+			end
+		)
+		if guildExcludeSelf.SetTooltip then
+			guildExcludeSelf:SetTooltip(
+				L.GUILD_BROKER_SETTINGS_EXCLUDE_SELF or "Exclude Yourself",
+				L.GUILD_BROKER_SETTINGS_EXCLUDE_SELF_DESC or "Hide your own character from the guild list and subtract from online count"
+			)
+		end
+		table.insert(allFrames, guildExcludeSelf)
+
+		table.insert(allFrames, Components:CreateSpacer(tab))
+
+		-- Sort Mode
+		local sortModeOptions = {
+			labels = {
+				L.GUILD_BROKER_SORT_NAME or "Name",
+				L.GUILD_BROKER_SORT_RANK or "Rank",
+				L.GUILD_BROKER_SORT_LEVEL or "Level",
+				L.GUILD_BROKER_SORT_CLASS or "Class",
+				L.GUILD_BROKER_SORT_ZONE or "Zone",
+				L.GUILD_BROKER_SORT_NICKNAME or "Nickname",
+			},
+			values = { "name", "rank", "level", "class", "zone", "nickname" },
+		}
+		local guildSortMode = Components:CreateDropdown(
+			tab,
+			L.GUILD_BROKER_SETTINGS_SORT_MODE or "Sort Mode",
+			sortModeOptions,
+			function(val)
+				return val == DB:Get("guildBrokerSortMode", "name")
+			end,
+			function(val)
+				BetterFriendlistDB.guildBrokerSortMode = val
+			end
+		)
+		table.insert(allFrames, guildSortMode)
+
+		-- Column Colors Header
+		local colColorsHeader = Components:CreateHeader(tab, L.GUILD_BROKER_SETTINGS_COLUMN_COLORS or "Column Colors")
+		table.insert(allFrames, colColorsHeader)
+
+		-- Nickname Color: Checkbox "Use Class Color" + conditional color picker
+		local nickUseClassColor = BetterFriendlistDB.guildBrokerNicknameColor == nil
+		local nickClassColorCheckbox = Components:CreateCheckbox(
+			tab,
+			L.GUILD_BROKER_NICKNAME_USE_CLASS_COLOR or "Nickname: Use Class Color",
+			nickUseClassColor,
+			function(checked)
+				if checked then
+					BetterFriendlistDB.guildBrokerNicknameColor = nil
+				else
+					-- Set a default custom color (white) when unchecking
+					local currentColor = { 1, 1, 1 }
+					BetterFriendlistDB.guildBrokerNicknameColor = currentColor
+				end
+				-- Toggle color picker visibility
+				if nickColorPicker then
+					if checked then
+						nickColorPicker:Hide()
+						nickColorPicker.isHidden = true
+					else
+						nickColorPicker:Show()
+						nickColorPicker.isHidden = false
+					end
+				end
+			end
+		)
+		table.insert(allFrames, nickClassColorCheckbox)
+
+		local currentNickColor = DB:Get("guildBrokerNicknameColor")
+		local nickColorPicker = Components:CreateColorPicker(
+			tab,
+			L.GUILD_BROKER_SETTINGS_NICKNAME_COLOR or "Nickname Color",
+			currentNickColor and { r = currentNickColor[1], g = currentNickColor[2], b = currentNickColor[3] } or
+			{ r = 1, g = 1, b = 1 },
+			function(r, g, b)
+				BetterFriendlistDB.guildBrokerNicknameColor = { r, g, b }
+			end
+		)
+		if nickUseClassColor then
+			nickColorPicker:Hide()
+			nickColorPicker.isHidden = true
+		end
+		table.insert(allFrames, nickColorPicker)
+
+		-- Rank Color
+		local currentRankColor = DB:Get("guildBrokerRankColor")
+		local rankColorPicker = Components:CreateColorPicker(
+			tab,
+			L.GUILD_BROKER_SETTINGS_RANK_COLOR or "Rank Color",
+			currentRankColor and { r = currentRankColor[1], g = currentRankColor[2], b = currentRankColor[3] } or
+			{ r = 1, g = 1, b = 1 },
+			function(r, g, b)
+				if math.abs(r - 1) < 0.01 and math.abs(g - 1) < 0.01 and math.abs(b - 1) < 0.01 then
+					BetterFriendlistDB.guildBrokerRankColor = nil
+				else
+					BetterFriendlistDB.guildBrokerRankColor = { r, g, b }
+				end
+			end
+		)
+		table.insert(allFrames, rankColorPicker)
+
+		-- Zone Color
+		local currentZoneColor = DB:Get("guildBrokerZoneColor")
+		local zoneColorPicker = Components:CreateColorPicker(
+			tab,
+			L.GUILD_BROKER_SETTINGS_ZONE_COLOR or "Zone Color",
+			currentZoneColor and { r = currentZoneColor[1], g = currentZoneColor[2], b = currentZoneColor[3] } or
+			{ r = 1, g = 1, b = 1 },
+			function(r, g, b)
+				if math.abs(r - 1) < 0.01 and math.abs(g - 1) < 0.01 and math.abs(b - 1) < 0.01 then
+					BetterFriendlistDB.guildBrokerZoneColor = nil
+				else
+					BetterFriendlistDB.guildBrokerZoneColor = { r, g, b }
+				end
+			end
+		)
+		table.insert(allFrames, zoneColorPicker)
+
+		-- Note Color
+		local currentNoteColor = DB:Get("guildBrokerNoteColor")
+		local noteColorPicker = Components:CreateColorPicker(
+			tab,
+			L.GUILD_BROKER_SETTINGS_NOTE_COLOR or "Note Color",
+			currentNoteColor and { r = currentNoteColor[1], g = currentNoteColor[2], b = currentNoteColor[3] } or
+			{ r = 1, g = 1, b = 1 },
+			function(r, g, b)
+				if math.abs(r - 1) < 0.01 and math.abs(g - 1) < 0.01 and math.abs(b - 1) < 0.01 then
+					BetterFriendlistDB.guildBrokerNoteColor = nil
+				else
+					BetterFriendlistDB.guildBrokerNoteColor = { r, g, b }
+				end
+			end
+		)
+		table.insert(allFrames, noteColorPicker)
+
+		-- Officer Note Color
+		local currentOfficerNoteColor = DB:Get("guildBrokerOfficerNoteColor")
+		local officerNoteColorPicker = Components:CreateColorPicker(
+			tab,
+			L.GUILD_BROKER_SETTINGS_OFFICER_NOTE_COLOR or "Officer Note Color",
+			currentOfficerNoteColor and
+			{ r = currentOfficerNoteColor[1], g = currentOfficerNoteColor[2], b = currentOfficerNoteColor[3] } or
+			{ r = 1, g = 1, b = 1 },
+			function(r, g, b)
+				if math.abs(r - 1) < 0.01 and math.abs(g - 1) < 0.01 and math.abs(b - 1) < 0.01 then
+					BetterFriendlistDB.guildBrokerOfficerNoteColor = nil
+				else
+					BetterFriendlistDB.guildBrokerOfficerNoteColor = { r, g, b }
+				end
+			end
+		)
+		table.insert(allFrames, officerNoteColorPicker)
 
 		table.insert(allFrames, Components:CreateSpacer(tab))
 

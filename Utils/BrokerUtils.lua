@@ -352,6 +352,25 @@ function BU.FormatLastOnline(years, months, days, hours)
 end
 
 -- ========================================
+-- Class Icon Helper (Inline Texture String)
+-- ========================================
+function BU.GetClassIcon(classFile, size)
+	if not classFile or classFile == "" then
+		return ""
+	end
+	size = size or 14
+	local coords = CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[classFile]
+	if not coords then
+		return ""
+	end
+	return string.format(
+		"|TInterface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES:%d:%d:0:0:256:256:%d:%d:%d:%d|t",
+		size, size,
+		coords[1] * 256, coords[2] * 256, coords[3] * 256, coords[4] * 256
+	)
+end
+
+-- ========================================
 -- Chat Name Insert Helper
 -- ========================================
 function BU.AddNameToEditBox(name, realm)

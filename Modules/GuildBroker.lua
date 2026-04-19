@@ -44,6 +44,7 @@ local MAX_TOOLTIP_HEIGHT = 600
 local C = BFL.BrokerUtils.C
 local GetStatusIcon = BFL.BrokerUtils.GetStatusIcon
 local ClassColorTextByFile = BFL.BrokerUtils.ClassColorTextByFile
+local GetClassIcon = BFL.BrokerUtils.GetClassIcon
 local FormatLastOnline = BFL.BrokerUtils.FormatLastOnline
 local IsMenuOpen = BFL.BrokerUtils.IsMenuOpen
 local AddNameToEditBox = BFL.BrokerUtils.AddNameToEditBox
@@ -220,21 +221,58 @@ local function CompareMembersByZone(a, b)
 	return CompareMembersByName(a, b)
 end
 
+local function CompareMembersByNickname(a, b)
+	if a.online ~= b.online then
+		return a.online
+	end
+	local DB = GetDB()
+	local nickA = DB and DB:GetGuildNickname(a.fullName) or ""
+	local nickB = DB and DB:GetGuildNickname(b.fullName) or ""
+	-- Members with nicknames come first
+	if (nickA ~= "") ~= (nickB ~= "") then
+		return nickA ~= ""
+	end
+	if nickA ~= "" and nickB ~= "" then
+		return nickA:lower() < nickB:lower()
+	end
+	return CompareMembersByName(a, b)
+end
+
+local SORT_COMPARATORS = {
+	name = CompareMembers,
+	rank = CompareMembersByRank,
+	level = CompareMembersByLevel,
+	class = CompareMembersByClass,
+	zone = CompareMembersByZone,
+	nickname = CompareMembersByNickname,
+}
+
 -- ========================================
 -- Filtering
 -- ========================================
 
-local function FilterMembers(members, filter)
-	if filter == "all" then
+local function FilterMembers(members, filter, excludeSelf)
+	local playerName = excludeSelf and UnitName("player") or nil
+	local playerRealm = excludeSelf and GetNormalizedRealmName() or nil
+	local playerFullName = playerName and playerRealm and (playerName .. "-" .. playerRealm) or nil
+
+	if filter == "all" and not excludeSelf then
 		return members
 	end
 
 	local filtered = {}
 	for _, member in ipairs(members) do
-		if filter == "online" then
-			if member.online then
-				table.insert(filtered, member)
+		local include = true
+		if excludeSelf and playerFullName and member.fullName == playerFullName then
+			include = false
+		end
+		if include and filter == "online" then
+			if not member.online then
+				include = false
 			end
+		end
+		if include then
+			table.insert(filtered, member)
 		end
 	end
 	return filtered
@@ -313,6 +351,13 @@ function GuildBroker:UpdateBrokerText()
 	end
 
 	local onlineCount, totalCount = self:GetGuildCounts()
+
+	-- Subtract self from counts if excluded
+	if BetterFriendlistDB.guildBrokerExcludeSelf then
+		totalCount = math.max(0, totalCount - 1)
+		onlineCount = math.max(0, onlineCount - 1)
+	end
+
 	local showLabel = BetterFriendlistDB.guildBrokerShowLabel ~= false
 	local showTotal = BetterFriendlistDB.guildBrokerShowTotal ~= false
 
@@ -865,6 +910,10 @@ local function RenderFixedFooter(footerFrame)
 
 	-- Total line
 	local onlineCount, totalCount = GuildBroker:GetGuildCounts()
+	if BetterFriendlistDB and BetterFriendlistDB.guildBrokerExcludeSelf then
+		totalCount = math.max(0, totalCount - 1)
+		onlineCount = math.max(0, onlineCount - 1)
+	end
 	local totalText = string.format(L("GUILD_BROKER_TOTAL_COUNT"), onlineCount, totalCount)
 	local totalLine = AddLine(L("GUILD_BROKER_TOOLTIP_HEADER") .. ": " .. C("green", totalText), "GameTooltipText")
 	totalLine:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
@@ -959,14 +1008,27 @@ local function CreateDetailTooltip(cell, data)
 		return
 	end
 
-	if detailTooltip then
+	-- Only release if the frame still IS the detail tooltip (not recycled by LibQTip)
+	if detailTooltip and detailTooltip.Key == detailTooltipKey then
 		LQT:ReleaseTooltip(detailTooltip)
-		detailTooltip = nil
+	end
+	detailTooltip = nil
+
+	-- Bail out if main tooltip is gone
+	if not tooltip or not tooltip:IsShown() then
+		return
 	end
 
 	local tt2 = LQT:AcquireTooltip(detailTooltipKey, 2, "LEFT", "RIGHT")
 	tt2:Clear()
-	tt2:SmartAnchorTo(cell)
+
+	-- Safety: if LibQTip recycled the main tooltip frame, don't anchor to self
+	if tooltip == tt2 then
+		LQT:ReleaseTooltip(tt2)
+		return
+	end
+
+	tt2:SmartAnchorTo(tooltip)
 	tt2:SetAutoHideDelay(0.25, tooltip)
 	tt2:SetFrameStrata("HIGH")
 	tt2:SetFrameLevel(tooltip:GetFrameLevel() + 10)
@@ -1234,12 +1296,15 @@ local function CreateLibQTipTooltip(anchorFrame)
 		-- Collect and process roster data
 		local members = GuildBroker:CollectGuildRoster()
 
-		-- Apply filter
+		-- Apply filter (with self-exclusion)
 		local currentFilter = BetterFriendlistDB and BetterFriendlistDB.guildBrokerFilter or "online"
-		members = FilterMembers(members, currentFilter)
+		local excludeSelf = BetterFriendlistDB and BetterFriendlistDB.guildBrokerExcludeSelf
+		members = FilterMembers(members, currentFilter, excludeSelf)
 
-		-- Apply sort (online first, then by name)
-		table.sort(members, CompareMembers)
+		-- Apply sort
+		local sortMode = BetterFriendlistDB and BetterFriendlistDB.guildBrokerSortMode or "name"
+		local comparator = SORT_COMPARATORS[sortMode] or CompareMembers
+		table.sort(members, comparator)
 
 		-- Apply grouping
 		local groupMode = BetterFriendlistDB and BetterFriendlistDB.guildBrokerGroupMode or "none"
@@ -1254,6 +1319,12 @@ local function CreateLibQTipTooltip(anchorFrame)
 
 			local hideLevelAtMax = BetterFriendlistDB and BetterFriendlistDB.guildBrokerHideLevelAtMax
 			local maxLevel = BFL.GetMaxLevel and BFL.GetMaxLevel() or 80
+			local showClassIcons = BetterFriendlistDB and BetterFriendlistDB.guildBrokerShowClassIcons
+			local customNickColor = BetterFriendlistDB and BetterFriendlistDB.guildBrokerNicknameColor
+			local customRankColor = BetterFriendlistDB and BetterFriendlistDB.guildBrokerRankColor
+			local customZoneColor = BetterFriendlistDB and BetterFriendlistDB.guildBrokerZoneColor
+			local customNoteColor = BetterFriendlistDB and BetterFriendlistDB.guildBrokerNoteColor
+			local customOfficerNoteColor = BetterFriendlistDB and BetterFriendlistDB.guildBrokerOfficerNoteColor
 
 			for _, col in ipairs(activeColumns) do
 				local val = ""
@@ -1262,21 +1333,33 @@ local function CreateLibQTipTooltip(anchorFrame)
 					local nick = DB and DB:GetGuildNickname(member.fullName) or ""
 					if nick ~= "" then
 						if member.online then
-							val = ClassColorTextByFile(member.classFile, nick)
+							if customNickColor then
+								local hex = string.format("%02x%02x%02x",
+									math.floor(customNickColor[1] * 255),
+									math.floor(customNickColor[2] * 255),
+									math.floor(customNickColor[3] * 255))
+								val = C(hex, nick)
+							else
+								val = ClassColorTextByFile(member.classFile, nick)
+							end
 						else
 							val = C("gray", nick)
 						end
 					end
 				elseif col.key == "Name" then
+					local classIcon = ""
+					if showClassIcons then
+						classIcon = GetClassIcon(member.classFile) .. " "
+					end
 					local statusIcon = ""
-					if member.online then
+					if member.online and (member.isAFK or member.isDND) then
 						statusIcon = GetStatusIcon(member.isAFK, member.isDND, member.isMobile) .. " "
 					end
 					local nameText = ClassColorTextByFile(member.classFile, member.name or "Unknown")
 					if not member.online then
 						nameText = C("gray", member.name or "Unknown")
 					end
-					val = indent .. statusIcon .. nameText
+					val = indent .. classIcon .. statusIcon .. nameText
 				elseif col.key == "Level" then
 					if hideLevelAtMax and member.level and member.level >= maxLevel then
 						val = ""
@@ -1292,13 +1375,51 @@ local function CreateLibQTipTooltip(anchorFrame)
 						val = C("gray", member.className or "")
 					end
 				elseif col.key == "Rank" then
-					val = member.online and (member.rank or "") or C("gray", member.rank or "")
+					local rankText = member.rank or ""
+					if not member.online then
+						val = C("gray", rankText)
+					elseif customRankColor and rankText ~= "" then
+						local hex = string.format("%02x%02x%02x",
+							math.floor(customRankColor[1] * 255),
+							math.floor(customRankColor[2] * 255),
+							math.floor(customRankColor[3] * 255))
+						val = C(hex, rankText)
+					else
+						val = rankText
+					end
 				elseif col.key == "Zone" then
-					val = member.online and (member.zone or "") or ""
+					local zoneText = member.online and (member.zone or "") or ""
+					if zoneText ~= "" and member.online and customZoneColor then
+						local hex = string.format("%02x%02x%02x",
+							math.floor(customZoneColor[1] * 255),
+							math.floor(customZoneColor[2] * 255),
+							math.floor(customZoneColor[3] * 255))
+						val = C(hex, zoneText)
+					else
+						val = zoneText
+					end
 				elseif col.key == "Note" then
-					val = member.note or ""
+					local noteText = member.note or ""
+					if noteText ~= "" and customNoteColor then
+						local hex = string.format("%02x%02x%02x",
+							math.floor(customNoteColor[1] * 255),
+							math.floor(customNoteColor[2] * 255),
+							math.floor(customNoteColor[3] * 255))
+						val = C(hex, noteText)
+					else
+						val = noteText
+					end
 				elseif col.key == "OfficerNote" then
-					val = member.officerNote or ""
+					local offNoteText = member.officerNote or ""
+					if offNoteText ~= "" and customOfficerNoteColor then
+						local hex = string.format("%02x%02x%02x",
+							math.floor(customOfficerNoteColor[1] * 255),
+							math.floor(customOfficerNoteColor[2] * 255),
+							math.floor(customOfficerNoteColor[3] * 255))
+						val = C(hex, offNoteText)
+					else
+						val = offNoteText
+					end
 				elseif col.key == "LastOnline" then
 					if member.online then
 						val = C("green", L("GUILD_BROKER_LAST_ONLINE_NOW"))
@@ -1358,6 +1479,17 @@ local function CreateLibQTipTooltip(anchorFrame)
 					if groupMode == "by_class" then
 						local sampleMember = groupMembers[1]
 						headerText = prefix .. ClassColorTextByFile(sampleMember.classFile, groupKey) .. " " .. C("gray", countText)
+					elseif groupMode == "by_rank" then
+						local rankColor = BetterFriendlistDB and BetterFriendlistDB.guildBrokerRankColor
+						if rankColor then
+							local hex = string.format("%02x%02x%02x",
+								math.floor(rankColor[1] * 255),
+								math.floor(rankColor[2] * 255),
+								math.floor(rankColor[3] * 255))
+							headerText = prefix .. C(hex, groupKey) .. " " .. C("gray", countText)
+						else
+							headerText = prefix .. C("gold", groupKey) .. " " .. C("gray", countText)
+						end
 					else
 						headerText = prefix .. C("gold", groupKey) .. " " .. C("gray", countText)
 					end

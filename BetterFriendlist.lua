@@ -354,6 +354,7 @@ function BFL:ApplyTabFonts()
 		GetTabSignature(topTabs[1]),
 		GetTabSignature(topTabs[2]),
 		GetTabSignature(topTabs[3]),
+		GetTabSignature(topTabs[4]),
 	}, "||")
 	if self._tabFontCache and self._tabFontCache.signature == signature then
 		return
@@ -2785,7 +2786,8 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			if BFL.IsClassic and BetterFriendsFrame then
 				-- Classic has 4 main tabs: Friends(1), Who(2), Guild(3), Raid(4)
 
-				local enableGuildTab = BetterFriendlistDB and BetterFriendlistDB.enableGuildTab
+				-- Guild Tab is currently a work in progress and hidden regardless of user setting.
+				local enableGuildTab = false -- WIP: was BetterFriendlistDB and BetterFriendlistDB.enableGuildTab
 
 				-- TAB 3: Guild tab (set locale text, hide if disabled)
 				if BetterFriendsFrame.BottomTab3 then
@@ -2849,7 +2851,8 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					end
 					PanelTemplates_TabResize(tab4, 0)
 
-					local enableGuildTab = BetterFriendlistDB and BetterFriendlistDB.enableGuildTab
+					-- Guild Tab is currently a work in progress and hidden regardless of user setting.
+					local enableGuildTab = false -- WIP: was BetterFriendlistDB and BetterFriendlistDB.enableGuildTab
 					if enableGuildTab then
 						tab4:Show()
 						PanelTemplates_SetNumTabs(BetterFriendsFrame.FriendsTabHeader, 4)
@@ -3234,6 +3237,8 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 		frame.RecruitAFriendFrame:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 0, searchOffset)
 		frame.RecruitAFriendFrame:SetPoint("BOTTOMRIGHT", frame.Inset, "BOTTOMRIGHT", 0, 0)
 	end
+	-- GuildFrame uses setAllPoints="true" (like WhoFrame) and positions its elements
+	-- relative to $parent.$parent.Inset in XML/OnLoad. No repositioning needed here.
 end
 
 -- Set sort method and update display

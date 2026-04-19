@@ -335,14 +335,8 @@ end
 local function GetFilteredFriendCounts()
 	local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
 
-	-- "all" filter shows all friends (online + offline), so filtered = total
-	if currentFilter == "all" then
-		local _, wowTotal, _, bnetTotal = GetFriendCounts()
-		return wowTotal, wowTotal, bnetTotal, bnetTotal
-	end
-
-	-- "online" filter shows only online friends
-	if currentFilter == "online" then
+	-- "all" and "online" filters both show online/total counts
+	if currentFilter == "all" or currentFilter == "online" then
 		return GetFriendCounts()
 	end
 
@@ -1079,7 +1073,7 @@ local function RenderFixedFooter(footerFrame)
 	sep1:SetPoint("TOPRIGHT", footerFrame, "TOPRIGHT", -10, yOffset)
 	yOffset = yOffset - 5
 
-	-- Total Online (uses filtered counts to match LDB text)
+	-- Total Online (filtered to match LDB text)
 	local wowOnline, wowTotal, bnetOnline, bnetTotal = GetFilteredFriendCounts()
 	local totalText = string.format(L("BROKER_TOTAL_ONLINE"), wowOnline + bnetOnline, wowTotal + bnetTotal)
 	local totalLine = AddLine(totalText, "GameTooltipText", 1, 1, 1)
