@@ -7,9 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [DRAFT]
+## [2.5.6-beta4]  - 2026-05-02
 
 ### Fixed
+- **Broker: Game Display** - Updated the friends broker game column to use the same Blizzard client icons and rich presence/mobile/app labels as the main BetterFriendlist window instead of the outdated static icon table.
+- **Broker: Friend Context Menu** - Restored right-click context menus for friends in the broker tooltip.
+- **Guild Broker: Member Detail Tooltip** - Fixed member detail tooltips lingering after the cursor leaves a guild member row.
+- **Broker Display Compatibility** - Improved tooltip cleanup compatibility with broker display addons such as Arcana and Bazooka by avoiding a no-op leave handler on BetterFriendlist broker plugins.
+- **Guild Broker: Professions Column** - Fixed the Professions setting not adding a separate tooltip column when an older saved guild broker column order was present.
+- **Guild Broker: Profession Icons** - Hid unhelpful default profession rank values so the professions column stays focused on the icons unless a meaningful rank is available.
 - **Broker: LDB Count Refresh** - Fixed the broker display getting stuck at 0 or stale online counts until a broker setting was toggled. Broker updates now listen for Battle.net/friend events even when Beta Features are disabled and refresh again after roster data settles.
 - **Broker: All Filter Count** - Fixed the broker display so the "All" quick filter counts all visible friends, matching the main window, while the "Online" filter still counts online friends only.
 - **Social Keybind** - Pressing the Social key now opens BetterFriendlist directly without also opening Blizzard's friend list in the background.

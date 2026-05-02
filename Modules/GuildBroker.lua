@@ -30,6 +30,13 @@ local tooltipKey = "BetterFriendlistGuildBrokerTT"
 local detailTooltip = nil
 local detailTooltipKey = "BetterFriendlistGuildBrokerDetailTT"
 
+local function ReleaseDetailTooltip()
+	if LQT and detailTooltip and detailTooltip.Key == detailTooltipKey then
+		LQT:ReleaseTooltip(detailTooltip)
+	end
+	detailTooltip = nil
+end
+
 -- Roster cache
 local rosterCache = nil
 local rosterCacheTime = 0
@@ -91,7 +98,7 @@ local function FormatProfessionEntry(professionID, professionName, professionRan
 
 	local icon = GetProfessionIcon(professionID)
 	local text = icon ~= "" and icon or (professionName or "")
-	if professionRank and professionRank > 0 then
+	if professionRank and professionRank > 1 then
 		text = string.format("%s %d", text, professionRank)
 	end
 
@@ -1104,11 +1111,7 @@ local function CreateDetailTooltip(cell, data)
 		return
 	end
 
-	-- Only release if the frame still IS the detail tooltip (not recycled by LibQTip)
-	if detailTooltip and detailTooltip.Key == detailTooltipKey then
-		LQT:ReleaseTooltip(detailTooltip)
-	end
-	detailTooltip = nil
+	ReleaseDetailTooltip()
 
 	-- Bail out if main tooltip is gone
 	if not tooltip or not tooltip:IsShown() then
@@ -1226,36 +1229,60 @@ local function CreateLibQTipTooltip(anchorFrame)
 
 	-- Define columns
 	local columns = {
-		{ key = "Nickname",    label = L("GUILD_BROKER_COL_NICKNAME"),     align = "LEFT",   setting = "guildBrokerShowColNickname" },
-		{ key = "Name",        label = L("GUILD_BROKER_COL_NAME"),         align = "LEFT",   setting = "guildBrokerShowColName" },
-		{ key = "Level",       label = L("GUILD_BROKER_COL_LEVEL"),        align = "CENTER", setting = "guildBrokerShowColLevel" },
-		{ key = "Class",       label = L("GUILD_BROKER_COL_CLASS"),        align = "LEFT",   setting = "guildBrokerShowColClass" },
-		{ key = "Professions", label = L("GUILD_BROKER_COL_PROFESSIONS"),  align = "LEFT",   setting = "guildBrokerShowColProfessions" },
-		{ key = "Rank",        label = L("GUILD_BROKER_COL_RANK"),         align = "LEFT",   setting = "guildBrokerShowColRank" },
-		{ key = "Zone",        label = L("GUILD_BROKER_COL_ZONE"),         align = "LEFT",   setting = "guildBrokerShowColZone" },
-		{ key = "Note",        label = L("GUILD_BROKER_COL_NOTE"),         align = "LEFT",   setting = "guildBrokerShowColNote" },
-		{ key = "OfficerNote", label = L("GUILD_BROKER_COL_OFFICER_NOTE"), align = "LEFT",   setting = "guildBrokerShowColOfficerNote" },
-		{ key = "LastOnline",  label = L("GUILD_BROKER_COL_LAST_ONLINE"),  align = "CENTER", setting = "guildBrokerShowColLastOnline" },
+		{ key = "Nickname",    label = L("GUILD_BROKER_COL_NICKNAME"),     align = "LEFT",   setting = "guildBrokerShowColNickname",    default = false },
+		{ key = "Name",        label = L("GUILD_BROKER_COL_NAME"),         align = "LEFT",   setting = "guildBrokerShowColName",        default = true },
+		{ key = "Level",       label = L("GUILD_BROKER_COL_LEVEL"),        align = "CENTER", setting = "guildBrokerShowColLevel",       default = true },
+		{ key = "Class",       label = L("GUILD_BROKER_COL_CLASS"),        align = "LEFT",   setting = "guildBrokerShowColClass",       default = true },
+		{ key = "Professions", label = L("GUILD_BROKER_COL_PROFESSIONS"),  align = "LEFT",   setting = "guildBrokerShowColProfessions", default = false },
+		{ key = "Rank",        label = L("GUILD_BROKER_COL_RANK"),         align = "LEFT",   setting = "guildBrokerShowColRank",        default = true },
+		{ key = "Zone",        label = L("GUILD_BROKER_COL_ZONE"),         align = "LEFT",   setting = "guildBrokerShowColZone",        default = true },
+		{ key = "Note",        label = L("GUILD_BROKER_COL_NOTE"),         align = "LEFT",   setting = "guildBrokerShowColNote",        default = false },
+		{ key = "OfficerNote", label = L("GUILD_BROKER_COL_OFFICER_NOTE"), align = "LEFT",   setting = "guildBrokerShowColOfficerNote", default = false },
+		{ key = "LastOnline",  label = L("GUILD_BROKER_COL_LAST_ONLINE"),  align = "CENTER", setting = "guildBrokerShowColLastOnline",  default = true },
 	}
 
 	-- Build active columns based on settings and column order
 	local columnOrder = BetterFriendlistDB and BetterFriendlistDB.guildBrokerColumnOrder
 	local activeColumns = {}
+	local orderedColumns = {}
+
+	local function IsColumnVisible(col)
+		local visible = BetterFriendlistDB and BetterFriendlistDB[col.setting]
+		if visible == nil then
+			visible = col.default
+		end
+		return visible ~= false
+	end
 
 	if columnOrder and #columnOrder > 0 then
 		for _, colKey in ipairs(columnOrder) do
 			for _, c in ipairs(columns) do
-				if c.key == colKey and BetterFriendlistDB[c.setting] ~= false then
-					table.insert(activeColumns, c)
+				if c.key == colKey then
+					table.insert(orderedColumns, c)
 					break
 				end
 			end
 		end
-	else
+
 		for _, col in ipairs(columns) do
-			if BetterFriendlistDB[col.setting] ~= false then
-				table.insert(activeColumns, col)
+			local found = false
+			for _, ordered in ipairs(orderedColumns) do
+				if ordered.key == col.key then
+					found = true
+					break
+				end
 			end
+			if not found then
+				table.insert(orderedColumns, col)
+			end
+		end
+	else
+		orderedColumns = columns
+	end
+
+	for _, col in ipairs(orderedColumns) do
+		if IsColumnVisible(col) then
+			table.insert(activeColumns, col)
 		end
 	end
 
@@ -1548,9 +1575,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 			end)
 			row:SetScript("OnLeave", function()
 				row:SetColor(0, 0, 0, 0)
-				if detailTooltip then
-					-- Let auto-hide handle it
-				end
+				ReleaseDetailTooltip()
 			end)
 
 			-- Click handler
@@ -1603,10 +1628,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 					-- Group header hover
 					groupRow:SetScript("OnEnter", function()
 						groupRow:SetColor(0.2, 0.2, 0.2, 0.5)
-						if detailTooltip then
-							LQT:ReleaseTooltip(detailTooltip)
-							detailTooltip = nil
-						end
+						ReleaseDetailTooltip()
 					end)
 					groupRow:SetScript("OnLeave", function()
 						groupRow:SetColor(0, 0, 0, 0)
@@ -1843,7 +1865,6 @@ function GuildBroker:Initialize()
 			BFL.GuildRoster()
 			tooltip = CreateLibQTipTooltip(anchorFrame)
 		end
-		dataObjectDef.OnLeave = function() end
 	else
 		dataObjectDef.OnTooltipShow = function(gameTooltip)
 			if gameTooltip and gameTooltip.AddLine then

@@ -51,62 +51,6 @@ local detailTooltip = nil
 -- Helper Functions
 -- ========================================
 
--- Game/Client Info Table with Icons
-local GetClientInfo = setmetatable({
-	-- Blizzard Games
-	ANBS = { icon = 4557783, short = "DI", long = "Diablo Immortal" },
-	App = { icon = 796351, short = "Desktop", long = "Desktop App" },
-	BSAp = { icon = 796351, short = "Mobile", long = "Mobile App" },
-	CLNT = { icon = 796351, short = "App", long = "Battle.net App" },
-	D3 = { icon = 536090, short = "D3", long = "Diablo III" },
-	Fen = { icon = 5207606, short = "D4", long = "Diablo IV" },
-	GRY = { icon = 4553312, short = "Arclight", long = "Warcraft Arclight Rumble" },
-	Hero = { icon = 1087463, short = "HotS", long = "Heroes of the Storm" },
-	OSI = { icon = 4034244, short = "D2R", long = "Diablo II Resurrected" },
-	Pro = { icon = 1313858, short = "OW", long = "Overwatch" },
-	Pro2 = { icon = 4734171, short = "OW2", long = "Overwatch 2" },
-	RTRO = { icon = 4034242, short = "Arcade", long = "Blizzard Arcade Collection" },
-	S1 = { icon = 1669008, short = "SC1", long = "Starcraft" },
-	S2 = { icon = 374211, short = "SC2", long = "Starcraft II" },
-	W3 = { icon = 3257659, short = "WC3", long = "Warcraft III Reforged" },
-	WoW = { icon = 374212, short = "WoW", long = "World of Warcraft" },
-	WTCG = { icon = 852633, short = "HS", long = "Hearthstone" },
-
-	-- Activision Games
-	WLBY = { icon = 4034243, short = "CB4", long = "Crash Bandicoot 4" },
-	DST2 = { icon = 1711629, short = "DST2", long = "Destiny 2" },
-	AUKS = { icon = 134400, short = "COD", long = "Call of Duty" },
-	VIPR = { icon = 2204215, short = "BO4", long = "Call of Duty: Black Ops 4" },
-	FORE = { icon = 4256535, short = "CoDV", long = "Call of Duty: Vanguard" },
-	LAZR = { icon = 3581732, short = "MW2", long = "Call of Duty: Modern Warfare 2" },
-	ODIN = { icon = 3257658, short = "MW", long = "Call of Duty: Modern Warfare" },
-	ZEUS = { icon = 3920823, short = "BOCW", long = "Call of Duty: Black Ops Cold War" },
-
-	-- Other
-	SCOR = { icon = 134400, short = "SOT", long = "Sea of Thieves" },
-}, {
-	__call = function(t, clientProgram)
-		local info = rawget(t, clientProgram)
-		if not info then
-			-- Unknown game - create fallback entry
-			info = { icon = 134400, short = clientProgram or "Unknown", long = clientProgram or "Unknown Game" }
-			rawset(t, clientProgram, info)
-		end
-
-		-- Lazy initialization of iconStr (smaller size for tooltip)
-		if not info.iconStr then
-			info.iconStr = string.format("|T%d:14:14:0:0|t", info.icon)
-		end
-
-		-- Set type (App vs Game)
-		if not info.type then
-			info.type = (info.icon == 796351) and "App" or "Game"
-		end
-
-		return info
-	end,
-})
-
 -- Shared helpers from BrokerUtils (used by both Friends Broker and Guild Broker)
 local GetStatusIcon = BFL.BrokerUtils.GetStatusIcon
 local ClassColorText = BFL.BrokerUtils.ClassColorText
@@ -199,6 +143,8 @@ end
 -- Create a hidden anchor frame for context menus
 local contextMenuAnchor = CreateFrame("Frame", "BFL_BrokerContextMenuAnchor", UIParent)
 contextMenuAnchor:SetSize(1, 1)
+contextMenuAnchor:EnableMouse(false)
+contextMenuAnchor:SetFrameStrata("TOOLTIP")
 contextMenuAnchor:Hide()
 
 local function OpenFriendContextMenu(data)
@@ -211,6 +157,7 @@ local function OpenFriendContextMenu(data)
 	local scale = UIParent:GetEffectiveScale()
 	contextMenuAnchor:ClearAllPoints()
 	contextMenuAnchor:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", x / scale, y / scale)
+	contextMenuAnchor:Show()
 
 	local MenuSystem = BFL:GetModule("MenuSystem")
 	if not MenuSystem then
@@ -221,7 +168,7 @@ local function OpenFriendContextMenu(data)
 		local bnetAccountID = data.bnetAccountID
 
 		if not bnetAccountID and data.id then
-			bnetAccountID = tonumber(data.id:match("^bnet(%d+)$"))
+			bnetAccountID = tonumber(data.id:match("^bnet_(%d+)$"))
 		end
 
 		if bnetAccountID then
@@ -264,7 +211,7 @@ local function OnFriendLineClick(cell, data, mouseButton)
 	end
 
 	-- LibQTip might not pass mouseButton - we need to get it ourselves!
-	local actualButton = mouseButton or GetMouseButtonClicked()
+	local actualButton = mouseButton or (cell and cell.bflLastMouseButton) or (GetMouseButtonClicked and GetMouseButtonClicked())
 
 	-- BattleNet friend click handlers
 	if data.type == "bnet" then
@@ -310,6 +257,145 @@ local function L(key)
 		return BFL.L[key]
 	end
 	return key
+end
+
+local function GetClientEmbeddedIcon(clientProgram, size)
+	if not clientProgram or clientProgram == "" then
+		return ""
+	end
+
+	if BFL.GetClientEmbeddedIcon then
+		local icon = BFL:GetClientEmbeddedIcon(clientProgram, size or 14)
+		if icon and icon ~= "" then
+			return icon
+		end
+	end
+
+	if BNet_GetClientTexture then
+		local texturePath = BNet_GetClientTexture(clientProgram)
+		if texturePath then
+			size = size or 14
+			if BNet_GetClientEmbeddedTexture then
+				return BNet_GetClientEmbeddedTexture(texturePath, size, size, 0) .. " "
+			end
+			return string.format("|T%s:%d:%d:0:0|t ", texturePath, size, size)
+		end
+	end
+
+	return ""
+end
+
+local function GetFriendGameName(friend)
+	if not friend then
+		return ""
+	end
+
+	if friend.gameName and friend.gameName ~= "" then
+		return friend.gameName
+	end
+
+	local gameInfo = friend.gameAccountInfo or (friend.accountInfo and friend.accountInfo.gameAccountInfo)
+	local client = friend.client or (gameInfo and gameInfo.clientProgram)
+
+	if friend.type == "wow" or client == (BNET_CLIENT_WOW or "WoW") then
+		return WORLD_OF_WARCRAFT or "World of Warcraft"
+	end
+
+	if client == "BSAp" then
+		return L("STATUS_MOBILE")
+	end
+
+	if client == "App" or client == "CLNT" then
+		return L("STATUS_IN_APP")
+	end
+
+	if gameInfo and gameInfo.richPresence and gameInfo.richPresence ~= "" then
+		return gameInfo.richPresence
+	end
+
+	return client or ""
+end
+
+local function GetFriendGameDisplay(friend, iconSize)
+	local gameName = GetFriendGameName(friend)
+	local gameInfo = friend and (friend.gameAccountInfo or (friend.accountInfo and friend.accountInfo.gameAccountInfo))
+	local client = friend and (friend.client or (gameInfo and gameInfo.clientProgram))
+	local icon = GetClientEmbeddedIcon(client, iconSize or 14)
+
+	if icon ~= "" and gameName ~= "" then
+		return icon .. gameName
+	end
+	return icon ~= "" and icon or gameName
+end
+
+local function ApplyGameAccountToFriend(friend, gameInfo)
+	if not friend or not gameInfo then
+		return
+	end
+
+	local client = gameInfo.clientProgram or "App"
+	friend.client = client
+	friend.isMobile = client == "BSAp"
+	friend.wowProjectID = gameInfo.wowProjectID
+	friend.timerunningSeasonID = gameInfo.timerunningSeasonID
+	friend.gameAccountID = gameInfo.gameAccountID
+	friend.gameAccountInfo = gameInfo
+
+	if client == (BNET_CLIENT_WOW or "WoW") then
+		friend.characterName = gameInfo.characterName or ""
+		friend.level = gameInfo.characterLevel or 0
+		friend.className = gameInfo.className or "UNKNOWN"
+		friend.classID = gameInfo.classID
+		friend.area = gameInfo.areaName or ""
+		friend.realmName = gameInfo.realmName or ""
+		friend.factionName = gameInfo.factionName or ""
+		friend.guildName = gameInfo.guildName or ""
+		friend.gameName = nil
+
+		if (friend.area == "") and gameInfo.richPresence then
+			local sep = string.find(gameInfo.richPresence, " - ", 1, true)
+			if sep then
+				friend.area = strtrim(string.sub(gameInfo.richPresence, 1, sep - 1))
+				if friend.realmName == "" then
+					friend.realmName = strtrim(string.sub(gameInfo.richPresence, sep + 3))
+				end
+			else
+				friend.area = strtrim(gameInfo.richPresence)
+			end
+		end
+	elseif client == "BSAp" then
+		friend.characterName = ""
+		friend.level = 0
+		friend.className = "UNKNOWN"
+		friend.classID = nil
+		friend.area = ""
+		friend.realmName = ""
+		friend.factionName = ""
+		friend.guildName = ""
+		friend.gameName = L("STATUS_MOBILE")
+	elseif client == "App" or client == "CLNT" then
+		friend.characterName = ""
+		friend.level = 0
+		friend.className = "UNKNOWN"
+		friend.classID = nil
+		friend.area = ""
+		friend.realmName = ""
+		friend.factionName = ""
+		friend.guildName = ""
+		friend.gameName = L("STATUS_IN_APP")
+	else
+		friend.characterName = ""
+		friend.level = 0
+		friend.className = "UNKNOWN"
+		friend.classID = nil
+		friend.area = ""
+		friend.realmName = ""
+		friend.factionName = ""
+		friend.guildName = ""
+		local richPresence = gameInfo.richPresence
+		friend.gameName = (richPresence and richPresence ~= "") and richPresence
+			or (gameInfo.clientProgram or L("UNKNOWN_GAME"))
+	end
 end
 
 -- Format time difference for activity tracker
@@ -1030,13 +1116,7 @@ local function GetFriendDisplayName(friend)
 	result = ReplaceTokenCaseInsensitive(result, "level", friend.level and tostring(friend.level) or "")
 	result = ReplaceTokenCaseInsensitive(result, "zone", friend.areaName or friend.area or "")
 	result = ReplaceTokenCaseInsensitive(result, "class", friend.className or "")
-	local gameName = ""
-	if friend.gameAccountInfo and friend.gameAccountInfo.richPresence then
-		gameName = friend.gameAccountInfo.richPresence
-	elseif friend.clientProgram then
-		gameName = friend.clientProgram
-	end
-	result = ReplaceTokenCaseInsensitive(result, "game", gameName)
+	result = ReplaceTokenCaseInsensitive(result, "game", GetFriendGameName(friend))
 	result = ReplaceTokenCaseInsensitive(result, "status", "")
 	result = ReplaceTokenCaseInsensitive(result, "lastonline", "")
 
@@ -1593,41 +1673,56 @@ local function CreateLibQTipTooltip(anchorFrame)
 						battleTag = accountInfo.battleTag,
 						type = "bnet",
 						accountName = BFL:GetSafeAccountName(accountInfo.accountName, accountInfo.battleTag),
-						characterName = gameInfo.characterName or "",
-						level = gameInfo.characterLevel or 0,
-						className = gameInfo.className or "UNKNOWN",
-						classID = gameInfo.classID,
-						client = client,
-						area = gameInfo.areaName or "",
-						realmName = gameInfo.realmName or "",
-						factionName = gameInfo.factionName or "",
-						guildName = gameInfo.guildName or "",
-						wowProjectID = gameInfo.wowProjectID,
-						timerunningSeasonID = gameInfo.timerunningSeasonID,
 						isAFK = accountInfo.isAFK or (gameInfo.isAFK or gameInfo.isGameAFK),
 						isDND = accountInfo.isDND or (gameInfo.isDND or gameInfo.isGameBusy),
-						isMobile = isMobile,
 						broadcast = accountInfo.customMessage or "",
 						broadcastTime = accountInfo.customMessageTime,
 						note = accountInfo.note or "",
-						gameAccountID = gameInfo.gameAccountID,
 						connected = isOnline,
 						isFavorite = accountInfo.isFavorite,
 						accountInfo = accountInfo,
 						index = i,
 					}
 
-					-- Classic fallback: Parse richPresence if area is missing (format: "Zone - Realm")
-					if (friend.area == "") and gameInfo.richPresence then
-						local sep = string.find(gameInfo.richPresence, " - ", 1, true)
-						if sep then
-							friend.area = strtrim(string.sub(gameInfo.richPresence, 1, sep - 1))
-							if friend.realmName == "" then
-								friend.realmName = strtrim(string.sub(gameInfo.richPresence, sep + 3))
+					ApplyGameAccountToFriend(friend, gameInfo)
+
+					if isOnline and C_BattleNet.GetFriendNumGameAccounts and C_BattleNet.GetFriendGameAccountInfo then
+						local numGameAccounts = C_BattleNet.GetFriendNumGameAccounts(i) or 0
+						if numGameAccounts > 1 then
+							local gameAccounts = {}
+							for accountIndex = 1, numGameAccounts do
+								local gameAccountInfo = C_BattleNet.GetFriendGameAccountInfo(i, accountIndex)
+								if
+									gameAccountInfo
+									and gameAccountInfo.clientProgram ~= "App"
+									and gameAccountInfo.clientProgram ~= "CLNT"
+									and gameAccountInfo.clientProgram ~= "BSAp"
+								then
+									gameAccounts[#gameAccounts + 1] = gameAccountInfo
+								end
+							end
+
+							friend.gameAccounts = gameAccounts
+							friend.numGameAccounts = #gameAccounts
+
+							local FriendsList = GetFriendsList()
+							local prefID = FriendsList
+								and FriendsList.GetPreferredGameAccountID
+								and FriendsList:GetPreferredGameAccountID(friendUID)
+							if prefID then
+								for _, account in ipairs(gameAccounts) do
+									if account.gameAccountID == prefID then
+										ApplyGameAccountToFriend(friend, account)
+										friend.hasPreferredAccountOverride = true
+										break
+									end
+								end
 							end
 						else
-							friend.area = strtrim(gameInfo.richPresence)
+							friend.numGameAccounts = numGameAccounts
 						end
+					else
+						friend.numGameAccounts = isOnline and 1 or 0
 					end
 
 					ProcessFriend(friend)
@@ -1814,7 +1909,6 @@ local function CreateLibQTipTooltip(anchorFrame)
 		-- Helper to render a friend row
 		local function RenderFriendRow(friend, indentation)
 			local statusIcon = GetStatusIcon(friend.isAFK, friend.isDND, friend.isMobile)
-			local clientInfo = GetClientInfo(friend.client)
 			local showClassIcons = BetterFriendlistDB and BetterFriendlistDB.brokerShowClassIcons
 			local classIcon = showClassIcons and GetClassIconForFriend(friend) or ""
 			if classIcon ~= "" then
@@ -1908,7 +2002,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 						val = ""
 					end
 				elseif col.key == "Game" then
-					val = clientInfo.iconStr .. " " .. clientInfo.short
+					val = GetFriendGameDisplay(friend, 14)
 				elseif col.key == "Zone" then
 					val = ApplyBrokerColumnColor(friend.area or "", "brokerZoneColor")
 				elseif col.key == "Realm" then
@@ -1930,8 +2024,12 @@ local function CreateLibQTipTooltip(anchorFrame)
 				row:SetColor(0, 0, 0, 0)
 			end)
 
+			row:SetScript("OnMouseDown", function(frame, button)
+				frame.bflLastMouseButton = button
+			end)
 			row:SetScript("OnMouseUp", function(frame, button)
-				OnFriendLineClick(nil, friend, button)
+				OnFriendLineClick(frame, friend, button)
+				frame.bflLastMouseButton = nil
 			end)
 
 			return row
@@ -2177,12 +2275,11 @@ local function CreateDetailTooltip(cell, data)
 
 	-- Game/Client info with icon
 	if data.client then
-		local clientInfo = GetClientInfo(data.client)
 		local gameRow = tt2:AddRow(C("ltblue", L("GAME_LABEL")), "", "")
 		local gameCell = gameRow:GetCell(2)
 		gameCell:SetColSpan(2)
 		gameCell:SetJustifyH("RIGHT")
-		gameCell:SetText(clientInfo.iconStr .. " " .. clientInfo.long)
+		gameCell:SetText(GetFriendGameDisplay(data, 14))
 	end
 
 	-- WoW-specific details
@@ -2417,13 +2514,6 @@ function Broker:Initialize()
 		dataObjectDef.OnEnter = function(anchorFrame)
 			tooltip = CreateLibQTipTooltip(anchorFrame)
 		end
-
-		-- OnLeave signals to broker displays (Arcana, Bazooka, etc.) that we
-		-- manage our own tooltip lifecycle. Without this, they apply a fallback hide
-		-- timeout (typically 5 seconds). The actual hide logic is handled by
-		-- SetupTooltipAutoHide's OnUpdate polling (0.25s after mouse leaves both
-		-- the tooltip and the anchor frame).
-		dataObjectDef.OnLeave = function() end
 	else
 		dataObjectDef.OnTooltipShow = function(gameTooltip)
 			if gameTooltip and gameTooltip.AddLine then

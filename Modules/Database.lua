@@ -156,6 +156,7 @@ local defaults = {
 	guildBrokerShowColName = true, -- Column: Name (default: ON)
 	guildBrokerShowColLevel = true, -- Column: Level (default: ON)
 	guildBrokerShowColClass = true, -- Column: Class (default: ON)
+	guildBrokerShowColProfessions = false, -- Column: Professions (default: OFF)
 	guildBrokerShowColRank = true, -- Column: Rank (default: ON)
 	guildBrokerShowColZone = true, -- Column: Zone (default: ON)
 	guildBrokerShowColNote = false, -- Column: Public Note (default: OFF)
