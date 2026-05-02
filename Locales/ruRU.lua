@@ -121,6 +121,11 @@ BFL:RegisterLocale("ruRU", function()
 	L.DIALOG_MIGRATE_BTN2 = "Только перенести"
 	L.DIALOG_MIGRATE_BTN3 = "Отмена"
 
+	L.KEYBIND_TOGGLE_BETTERFRIENDLIST = "Toggle BetterFriendlist"
+	L.DIALOG_SOCIAL_KEYBIND_RELOAD_TEXT =
+		"BetterFriendlist moved your Social key to its own keybinding.\n\nReload the UI now to activate the new binding path?"
+	L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN1 = "Reload"
+	L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN2 = "Cancel"
 	-- ========================================
 	-- SETTINGS PANEL
 	-- ========================================

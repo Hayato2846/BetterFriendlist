@@ -8,6 +8,11 @@ BFL:RegisterLocale("koKR", function()
 	L.SETTINGS_SIMPLE_MODE_DESC =
 		"플레이어 초상화를 비활성화하고 검색/정렬 옵션을 숨기며 프레임을 넓히고 탭을 이동하여 컴팩트 레이아웃을 만듭니다."
 	L.MENU_CHANGELOG = "Changelog"
+	L.KEYBIND_TOGGLE_BETTERFRIENDLIST = "Toggle BetterFriendlist"
+	L.DIALOG_SOCIAL_KEYBIND_RELOAD_TEXT =
+		"BetterFriendlist moved your Social key to its own keybinding.\n\nReload the UI now to activate the new binding path?"
+	L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN1 = "Reload"
+	L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN2 = "Cancel"
 	-- ========================================
 	-- DIALOGS & POPUPS
 	-- ========================================

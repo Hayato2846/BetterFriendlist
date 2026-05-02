@@ -70,6 +70,58 @@ local function GetColorForRAFVersion(rafVersion)
 	return CreateColor(0.2, 0.4, 0.8, 0.3)
 end
 
+local function IsSecret(value)
+	return BFL and BFL.IsSecret and BFL:IsSecret(value)
+end
+
+local function SafeString(value, fallback)
+	if IsSecret(value) then
+		return fallback
+	end
+	if value and value ~= "" then
+		return value
+	end
+	return fallback
+end
+
+local function SafeBool(value, fallback)
+	if IsSecret(value) then
+		return fallback or false
+	end
+	return not not value
+end
+
+local function SafeNumber(value, fallback)
+	if IsSecret(value) then
+		return fallback
+	end
+	if value ~= nil then
+		return value
+	end
+	return fallback
+end
+
+local function SafeBattleTagName(battleTag, fallback)
+	if IsSecret(battleTag) then
+		return fallback or "Unknown"
+	end
+	if BNet_GetTruncatedBattleTag and battleTag then
+		return BNet_GetTruncatedBattleTag(battleTag)
+	end
+	return battleTag or fallback or "Unknown"
+end
+
+local function GetSafeLastOnlineText(lastOnlineTime)
+	lastOnlineTime = SafeNumber(lastOnlineTime, 0) or 0
+	if lastOnlineTime == 0 or (HasTimePassed and HasTimePassed(lastOnlineTime, SECONDS_PER_YEAR)) then
+		return FRIENDS_LIST_OFFLINE or L.RAF_OFFLINE
+	end
+	if FriendsFrame_GetLastOnline and BNET_LAST_ONLINE_TIME then
+		return string.format(BNET_LAST_ONLINE_TIME, FriendsFrame_GetLastOnline(lastOnlineTime))
+	end
+	return L.RAF_OFFLINE
+end
+
 -- Current search text for filtering
 RAF.searchText = ""
 
@@ -300,10 +352,20 @@ local function ProcessAndSortRecruits(recruits)
 	for _, recruitInfo in ipairs(recruits) do
 		if C_BattleNet and C_BattleNet.GetAccountInfoByID then
 			local accountInfo = C_BattleNet.GetAccountInfoByID(recruitInfo.bnetAccountID, recruitInfo.wowAccountGUID)
+			local gameAccountInfo = accountInfo and accountInfo.gameAccountInfo
+			local isWowMobile = gameAccountInfo and SafeBool(gameAccountInfo.isWowMobile, false)
 
-			if accountInfo and accountInfo.gameAccountInfo and not accountInfo.gameAccountInfo.isWowMobile then
-				recruitInfo.isOnline = accountInfo.gameAccountInfo.isOnline
-				recruitInfo.characterName = accountInfo.gameAccountInfo.characterName
+			if accountInfo and gameAccountInfo and not isWowMobile then
+				local accountBattleTag = SafeString(accountInfo.battleTag, recruitInfo.battleTag)
+				local accountName = SafeString(accountInfo.accountName, nil)
+				local characterName = SafeString(gameAccountInfo.characterName, nil)
+				local clientProgram = SafeString(gameAccountInfo.clientProgram, nil)
+				local timerunningSeasonID = SafeNumber(gameAccountInfo.timerunningSeasonID, nil)
+
+				recruitInfo.isOnline = SafeBool(gameAccountInfo.isOnline, false)
+				recruitInfo.characterName = characterName
+				recruitInfo.lastOnlineText = GetSafeLastOnlineText(accountInfo.lastOnlineTime)
+				recruitInfo.contextGuid = SafeString(gameAccountInfo.playerGuid, nil)
 
 				-- [STREAMER MODE CHECK] Use safe name instead of Real ID
 				if BFL.StreamerMode and BFL.StreamerMode:IsActive() then
@@ -311,42 +373,51 @@ local function ProcessAndSortRecruits(recruits)
 					if FL then
 						local friendObj = {
 							type = "bnet",
-							accountName = accountInfo.accountName,
-							battleTag = accountInfo.battleTag or recruitInfo.battleTag,
-							note = accountInfo.note,
+							accountName = accountName,
+							battleTag = accountBattleTag,
+							note = SafeString(accountInfo.note, nil),
 							uid = tostring(recruitInfo.bnetAccountID),
 						}
 						local safeName = FL:GetDisplayName(friendObj)
 						recruitInfo.nameText = safeName
 						recruitInfo.nameColor = FRIENDS_BNET_NAME_COLOR
 					else
-						recruitInfo.nameText = recruitInfo.battleTag or "Unknown"
+						recruitInfo.nameText = accountBattleTag or "Unknown"
 						recruitInfo.nameColor = FRIENDS_BNET_NAME_COLOR
 					end
 					recruitInfo.plainName = recruitInfo.nameText
 				else
-					-- Use Blizzard functions directly (matches Blizzard RAF behavior)
-					if FriendsFrame_GetBNetAccountNameAndStatus then
-						recruitInfo.nameText, recruitInfo.nameColor =
-							FriendsFrame_GetBNetAccountNameAndStatus(accountInfo)
+					local nameText = BFL:GetSafeAccountName(accountName, accountBattleTag)
+					if characterName and characterName ~= "" and FriendsFrame_GetFormattedCharacterName then
+						local formattedCharacterName =
+							FriendsFrame_GetFormattedCharacterName(characterName, nil, clientProgram, timerunningSeasonID)
+						if formattedCharacterName and formattedCharacterName ~= "" then
+							nameText = nameText
+								.. " "
+								.. (FRIENDS_WOW_NAME_COLOR_CODE or "")
+								.. "("
+								.. formattedCharacterName
+								.. ")"
+								.. (FONT_COLOR_CODE_CLOSE or "")
+						end
+					end
+
+					recruitInfo.nameText = nameText
+					if recruitInfo.isOnline then
+						recruitInfo.nameColor = FRIENDS_BNET_NAME_COLOR
 					else
-						recruitInfo.nameText = recruitInfo.battleTag or "Unknown"
 						recruitInfo.nameColor = FRIENDS_GRAY_COLOR
 					end
-					if BNet_GetBNetAccountName then
-						recruitInfo.plainName = BNet_GetBNetAccountName(accountInfo)
-					else
-						recruitInfo.plainName = recruitInfo.nameText
-					end
+					recruitInfo.plainName = BFL:GetSafeAccountName(accountName, accountBattleTag)
 				end
 			else
 				-- No presence info yet
 				recruitInfo.isOnline = false
-				recruitInfo.nameText = BNet_GetTruncatedBattleTag and BNet_GetTruncatedBattleTag(recruitInfo.battleTag)
-					or recruitInfo.battleTag
-					or "Unknown"
+				recruitInfo.nameText = SafeBattleTagName(recruitInfo.battleTag)
 				recruitInfo.plainName = recruitInfo.nameText
 				recruitInfo.nameColor = FRIENDS_GRAY_COLOR
+				recruitInfo.lastOnlineText = L.RAF_OFFLINE
+				recruitInfo.contextGuid = nil
 			end
 
 			-- Handle pending recruits (use Blizzard global)
@@ -355,7 +426,7 @@ local function ProcessAndSortRecruits(recruits)
 				recruitInfo.plainName = recruitInfo.nameText
 			end
 
-			recruitInfo.accountInfo = accountInfo
+			recruitInfo.accountInfo = nil
 
 			-- Track seen accounts
 			if not seenAccounts[recruitInfo.bnetAccountID] then
@@ -795,12 +866,7 @@ function RAF:RecruitListButton_SetupRecruit(button, recruitInfo)
 		if recruitInfo.subStatus == Enum.RafRecruitSubStatus.Inactive then
 			button.InfoText:SetText(RAF_INACTIVE_RECRUIT or L.RAF_INACTIVE_RECRUIT)
 		else
-			-- Show last online time (matches Blizzard)
-			if recruitInfo.accountInfo and FriendsFrame_GetLastOnlineText then
-				button.InfoText:SetText(FriendsFrame_GetLastOnlineText(recruitInfo.accountInfo))
-			else
-				button.InfoText:SetText(L.RAF_OFFLINE)
-			end
+			button.InfoText:SetText(recruitInfo.lastOnlineText or L.RAF_OFFLINE)
 		end
 	end
 
@@ -861,11 +927,8 @@ function RAF:RecruitListButton_OnClick(button, mouseButton)
 			bnetIDAccount = recruitInfo.bnetAccountID,
 			wowAccountGUID = recruitInfo.wowAccountGUID,
 			isRafRecruit = true,
+			guid = recruitInfo.contextGuid,
 		}
-
-		if recruitInfo.accountInfo and recruitInfo.accountInfo.gameAccountInfo then
-			contextData.guid = recruitInfo.accountInfo.gameAccountInfo.playerGuid
-		end
 
 		-- Use compatibility wrapper for Classic support
 		BFL.OpenContextMenu(button, "RAF_RECRUIT", contextData, contextData.name)

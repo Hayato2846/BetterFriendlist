@@ -8,6 +8,11 @@ BFL:RegisterLocale("ptBR", function()
 	L.SETTINGS_SIMPLE_MODE_DESC =
 		"Desativa o retrato do jogador, oculta opções de pesquisa/ordenação, amplia o quadro e desloca as abas para um layout compacto."
 	L.MENU_CHANGELOG = "Histórico de Alterações"
+	L.KEYBIND_TOGGLE_BETTERFRIENDLIST = "Toggle BetterFriendlist"
+	L.DIALOG_SOCIAL_KEYBIND_RELOAD_TEXT =
+		"BetterFriendlist moved your Social key to its own keybinding.\n\nReload the UI now to activate the new binding path?"
+	L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN1 = "Reload"
+	L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN2 = "Cancel"
 	-- ========================================
 	-- DIALOGS & POPUPS
 	-- ========================================

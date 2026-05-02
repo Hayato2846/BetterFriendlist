@@ -3686,6 +3686,8 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 
 				friend.connected = accountInfo.gameAccountInfo and accountInfo.gameAccountInfo.isOnline or false
 				friend.note = accountInfo.note
+				friend.customMessage = accountInfo.customMessage
+				friend.customMessageTime = accountInfo.customMessageTime
 				friend.isFavorite = accountInfo.isFavorite
 				friend.gameAccountInfo = accountInfo.gameAccountInfo
 				friend.lastOnlineTime = accountInfo.lastOnlineTime
@@ -3771,6 +3773,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 
 					-- Multi-Game-Account: Store count and collect all game account data
 					friend.numGameAccounts = numGameAccounts
+					friend.totalGameAccounts = numGameAccounts
 
 					local gameAccounts
 					local invitableAccounts

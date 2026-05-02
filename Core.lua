@@ -41,8 +41,47 @@ BFL.HasModernColorPicker = BFL.IsRetail -- ColorPickerFrame:SetupColorPickerAndS
 
 -- Feature Detection (detect available APIs for optional features)
 BFL.UseClassID = false -- 11.2.7+ classID optimization
-BFL.HasSecretValues = false -- 12.0.0+ Secret Values API
+BFL.HasSecretValues = issecretvalue ~= nil -- 12.0.0+ Secret Values API
 BFL.UseNativeCallbacks = false -- 12.0.0+ Frame:RegisterEventCallback
+
+local SOCIAL_BINDING = "TOGGLESOCIAL"
+local BFL_SOCIAL_BINDING = "BETTERFRIENDLIST_TOGGLE"
+local SOCIAL_BINDING_MIGRATION_VERSION = "2.5.6-social-keybind-v1"
+local TAINT_TEST_CVARS = {
+	{ name = "scriptErrors", value = "1" },
+	{ name = "addonChatRestrictionsForced", value = "1" },
+	{ name = "secretAurasForced", value = "1" },
+	{ name = "secretCooldownsForced", value = "1" },
+	{ name = "secretSpellcastsForced", value = "1" },
+	{ name = "secretUnitComparisonForced", value = "1" },
+	{ name = "secretUnitIdentityForced", value = "1" },
+	{ name = "secretUnitPowerForced", value = "1" },
+	{ name = "secretUnitPowerMaxForced", value = "1" },
+	{ name = "secretChallengeModeRestrictionsForced", value = "1" },
+	{ name = "secretCombatRestrictionsForced", value = "1" },
+	{ name = "secretEncounterRestrictionsForced", value = "1" },
+	{ name = "secretMapRestrictionsForced", value = "1" },
+	{ name = "secretPvPMatchRestrictionsForced", value = "1" },
+	{ name = "taintLog", value = "5" },
+}
+local TAINT_TEST_RESTORE_CVARS = {
+	{ name = "taintLog", value = "0" },
+	{ name = "addonChatRestrictionsForced", value = "0" },
+	{ name = "secretAurasForced", value = "0" },
+	{ name = "secretCooldownsForced", value = "0" },
+	{ name = "secretSpellcastsForced", value = "0" },
+	{ name = "secretUnitComparisonForced", value = "0" },
+	{ name = "secretUnitIdentityForced", value = "0" },
+	{ name = "secretUnitPowerForced", value = "0" },
+	{ name = "secretUnitPowerMaxForced", value = "0" },
+	{ name = "secretChallengeModeRestrictionsForced", value = "0" },
+	{ name = "secretCombatRestrictionsForced", value = "0" },
+	{ name = "secretEncounterRestrictionsForced", value = "0" },
+	{ name = "secretMapRestrictionsForced", value = "0" },
+	{ name = "secretPvPMatchRestrictionsForced", value = "0" },
+}
+
+_G.BINDING_NAME_BETTERFRIENDLIST_TOGGLE = "Toggle BetterFriendlist"
 
 -- Mock Friend Invites System (for testing)
 BFL.MockFriendInvites = {
@@ -133,10 +172,252 @@ function BFL:IsActionRestricted()
 	return false
 end
 
+local function GetDiagnosticCVar(name)
+	local getCVar = (C_CVar and C_CVar.GetCVar) or GetCVar
+	if not getCVar then
+		return nil
+	end
+
+	local ok, result = pcall(getCVar, name)
+	if ok then
+		return result
+	end
+	return nil
+end
+
+local function SetDiagnosticCVar(name, value)
+	local getCVar = (C_CVar and C_CVar.GetCVar) or GetCVar
+	local setCVar = (C_CVar and C_CVar.SetCVar) or SetCVar
+	if not (getCVar and (setCVar or ConsoleExec)) then
+		return false, "CVar API unavailable"
+	end
+
+	local before
+	local getOk, getResult = pcall(getCVar, name)
+	if getOk then
+		before = getResult
+	end
+
+	if setCVar then
+		local ok, result = pcall(setCVar, name, value)
+		if ok and result ~= false then
+			local afterOk, after = pcall(getCVar, name)
+			return true, before, afterOk and after or nil, "SetCVar"
+		end
+	end
+
+	if ConsoleExec then
+		local ok, result = pcall(ConsoleExec, name .. " " .. value, false)
+		if ok and result then
+			local afterOk, after = pcall(getCVar, name)
+			return true, before, afterOk and after or nil, "ConsoleExec"
+		end
+	end
+
+	return false, "SetCVar/ConsoleExec rejected CVar"
+end
+
+function BFL:IsTaintTestStateEnabled()
+	for _, cvar in ipairs(TAINT_TEST_CVARS) do
+		if cvar.name ~= "scriptErrors" then
+			local value = GetDiagnosticCVar(cvar.name)
+			if value ~= nil and tostring(value) == tostring(cvar.value) then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+function BFL:EnableTaintTestState()
+	local applied = 0
+	local skipped = 0
+	local skippedNames = {}
+	local taintLogCVar
+	for _, cvar in ipairs(TAINT_TEST_CVARS) do
+		if cvar.name == "taintLog" then
+			taintLogCVar = cvar
+		else
+			local ok, err = SetDiagnosticCVar(cvar.name, cvar.value)
+			if ok then
+				applied = applied + 1
+			else
+				skipped = skipped + 1
+				skippedNames[#skippedNames + 1] = cvar.name .. " (" .. tostring(err) .. ")"
+			end
+		end
+	end
+
+	print(
+		"|cff00ff00BetterFriendlist:|r taint test state enabled ("
+			.. applied
+			.. " applied before taintLog, "
+			.. skipped
+			.. " skipped). /reload recommended."
+	)
+	if skipped > 0 then
+		print("|cffffff00BetterFriendlist:|r skipped: " .. table.concat(skippedNames, ", "))
+	end
+
+	if taintLogCVar then
+		local ok, err = SetDiagnosticCVar(taintLogCVar.name, taintLogCVar.value)
+		if ok then
+			applied = applied + 1
+		else
+			skipped = skipped + 1
+			print("|cffffff00BetterFriendlist:|r taintLog skipped: " .. tostring(err))
+		end
+	end
+end
+
+function BFL:DisableTaintTestState()
+	local applied = 0
+	local skipped = 0
+	local skippedNames = {}
+	for _, cvar in ipairs(TAINT_TEST_RESTORE_CVARS) do
+		local ok, err = SetDiagnosticCVar(cvar.name, cvar.value)
+		if ok then
+			applied = applied + 1
+		else
+			skipped = skipped + 1
+			skippedNames[#skippedNames + 1] = cvar.name .. " (" .. tostring(err) .. ")"
+		end
+	end
+
+	print(
+		"|cff00ff00BetterFriendlist:|r taint test state disabled ("
+			.. applied
+			.. " restored, "
+			.. skipped
+			.. " skipped). /reload recommended."
+	)
+	if skipped > 0 then
+		print("|cffffff00BetterFriendlist:|r skipped: " .. table.concat(skippedNames, ", "))
+	end
+end
+
+function BFL:ToggleTaintTestState()
+	if self:IsTaintTestStateEnabled() then
+		self:DisableTaintTestState()
+	else
+		self:EnableTaintTestState()
+	end
+end
+
+function BFL:UpdateBindingGlobals()
+	local L = self.L or _G.BFL_L
+	_G.BINDING_NAME_BETTERFRIENDLIST_TOGGLE = (L and L.KEYBIND_TOGGLE_BETTERFRIENDLIST) or "Toggle BetterFriendlist"
+end
+
+local function CollectBindingKeys(action)
+	local keys = { GetBindingKey(action) }
+	local result = {}
+	for _, key in ipairs(keys) do
+		if key and key ~= "" then
+			result[#result + 1] = key
+		end
+	end
+	return result
+end
+
+local function ContainsKey(keys, targetKey)
+	for _, key in ipairs(keys) do
+		if key == targetKey then
+			return true
+		end
+	end
+	return false
+end
+
+function BFL:ShowSocialKeybindReloadPrompt()
+	if not (StaticPopupDialogs and StaticPopup_Show) then
+		return
+	end
+
+	StaticPopupDialogs["BFL_SOCIAL_KEYBIND_RELOAD"] = StaticPopupDialogs["BFL_SOCIAL_KEYBIND_RELOAD"] or {
+		text = (self.L and self.L.DIALOG_SOCIAL_KEYBIND_RELOAD_TEXT)
+			or "BetterFriendlist moved your Social key to its own keybinding.\n\nReload the UI now to activate the new binding path?",
+		button1 = (self.L and self.L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN1) or RELOADUI or "Reload",
+		button2 = (self.L and self.L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN2) or CANCEL or "Cancel",
+		OnAccept = function()
+			ReloadUI()
+		end,
+		timeout = 0,
+		whileDead = true,
+		hideOnEscape = true,
+		preferredIndex = 3,
+	}
+
+	StaticPopup_Show("BFL_SOCIAL_KEYBIND_RELOAD")
+end
+
+function BFL:MigrateSocialKeybindToNativeBinding()
+	if not self.HasSecretValues then
+		return
+	end
+	if not BetterFriendlistDB then
+		return
+	end
+	if InCombatLockdown() then
+		self.pendingSocialKeybindMigration = true
+		return
+	end
+	if BetterFriendlistDB.socialKeybindMigrationVersion == SOCIAL_BINDING_MIGRATION_VERSION then
+		return
+	end
+	if not (GetBindingKey and SetBinding and SaveBindings and GetCurrentBindingSet) then
+		return
+	end
+
+	local socialKeys = CollectBindingKeys(SOCIAL_BINDING)
+	local bflKeys = CollectBindingKeys(BFL_SOCIAL_BINDING)
+	if #socialKeys == 0 then
+		BetterFriendlistDB.socialKeybindMigrated = true
+		BetterFriendlistDB.socialKeybindMigrationVersion = SOCIAL_BINDING_MIGRATION_VERSION
+		BetterFriendlistDB.socialKeybindMigratedKeys = {}
+		return
+	end
+
+	local migratedKeys = {}
+	for _, key in ipairs(socialKeys) do
+		if not ContainsKey(bflKeys, key) and SetBinding(key, BFL_SOCIAL_BINDING) then
+			migratedKeys[#migratedKeys + 1] = key
+			bflKeys[#bflKeys + 1] = key
+		end
+	end
+
+	local remainingSocialKeys = CollectBindingKeys(SOCIAL_BINDING)
+	if #remainingSocialKeys > 0 then
+		return
+	end
+
+	if #migratedKeys > 0 then
+		SaveBindings(GetCurrentBindingSet())
+	end
+
+	BetterFriendlistDB.socialKeybindMigrated = true
+	BetterFriendlistDB.socialKeybindMigrationVersion = SOCIAL_BINDING_MIGRATION_VERSION
+	BetterFriendlistDB.socialKeybindMigratedKeys = migratedKeys
+
+	if #migratedKeys > 0 and not BetterFriendlistDB.socialKeybindMigrationReloadPrompted then
+		BetterFriendlistDB.socialKeybindMigrationReloadPrompted = true
+		C_Timer.After(0, function()
+			BFL:ShowSocialKeybindReloadPrompt()
+		end)
+	end
+end
+
 -- Intercept Blizzard's Social keybind before ToggleFriendsFrame runs.
 -- This keeps the default FriendsFrame from opening in the background while
 -- preserving the user's actual keybinding configuration.
 function BFL:InstallSocialKeybindOverride()
+	if self.HasSecretValues then
+		if self.socialKeybindOwner then
+			ClearOverrideBindings(self.socialKeybindOwner)
+		end
+		self.pendingSocialKeybindOverride = nil
+		return
+	end
 	if self.installingSocialKeybindOverride then
 		return
 	end
@@ -166,7 +447,7 @@ function BFL:InstallSocialKeybindOverride()
 		end)
 	end
 
-	local keys = { GetBindingKey("TOGGLESOCIAL") }
+	local keys = { GetBindingKey(SOCIAL_BINDING) }
 	for _, key in ipairs(keys) do
 		SetOverrideBindingClick(self.socialKeybindOwner, false, key, "BetterFriendlistSocialKeybindButton")
 	end
@@ -1331,6 +1612,7 @@ eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 eventFrame:RegisterEvent("UPDATE_BINDINGS")
+eventFrame:RegisterEvent("BINDINGS_LOADED")
 
 -- Event handler
 eventFrame:SetScript("OnEvent", function(self, event, ...)
@@ -1342,6 +1624,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 
 			-- Link Localization
 			BFL.L = _G["BFL_L"]
+			BFL:UpdateBindingGlobals()
 
 			-- Initialize database
 			local DB = BFL:GetModule("DB")
@@ -1605,6 +1888,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 		end
 
 		BFL:InstallSocialKeybindOverride()
+		BFL:MigrateSocialKeybindToNativeBinding()
 
 		-- Late initialization for modules that need PLAYER_LOGIN
 		for name, module in pairs(BFL.Modules) do
@@ -1640,8 +1924,14 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 		if BFL.pendingSocialKeybindOverride then
 			BFL:InstallSocialKeybindOverride()
 		end
+		if BFL.pendingSocialKeybindMigration then
+			BFL.pendingSocialKeybindMigration = nil
+			BFL:MigrateSocialKeybindToNativeBinding()
+		end
 	elseif event == "UPDATE_BINDINGS" then
 		BFL:InstallSocialKeybindOverride()
+	elseif event == "BINDINGS_LOADED" then
+		BFL:MigrateSocialKeybindToNativeBinding()
 	end
 
 	-- Fire event callbacks for all events
@@ -1786,6 +2076,14 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		else
 			print("|cffff0000BetterFriendlist:|r TestSuite module not loaded")
 		end
+
+	-- Internal taint diagnostics. Intentionally omitted from public help.
+	elseif msg == "tainttest" or msg == "taintstate" then
+		BFL:ToggleTaintTestState()
+	elseif msg == "tainttest on" or msg == "taintstate on" then
+		BFL:EnableTaintTestState()
+	elseif msg == "tainttest off" or msg == "taintstate off" then
+		BFL:DisableTaintTestState()
 
 	-- Switch Locale (Debug)
 	elseif msg:match("^locale%s+") then

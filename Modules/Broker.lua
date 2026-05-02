@@ -452,15 +452,12 @@ end
 
 -- Get filtered friend counts based on the active QuickFilter
 -- Returns wowFiltered, wowTotal, bnetFiltered, bnetTotal
--- The filtered count reflects the number of friends visible in the main window
+-- The first value is the number to display as "online/current"; never report
+-- total friends as online just because the active filter is "All".
 local function GetFilteredFriendCounts()
 	local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
 
-	-- "All" reflects all visible friends in the main window, not just online friends.
-	if currentFilter == "all" then
-		local wowOnline, wowTotal, bnetOnline, bnetTotal = GetFriendCounts()
-		return wowTotal, wowTotal, bnetTotal, bnetTotal
-	elseif currentFilter == "online" then
+	if currentFilter == "all" or currentFilter == "online" then
 		return GetFriendCounts()
 	end
 
@@ -2402,7 +2399,11 @@ function Broker:OnClick(clickedFrame, button)
 	end
 
 	if action == "toggle" then
-		ToggleFriendsFrame(1)
+		if _G.ToggleBetterFriendsFrame then
+			_G.ToggleBetterFriendsFrame(1)
+		elseif BetterFriendsFrame then
+			BetterFriendsFrame:Show()
+		end
 	elseif action == "friends" then
 		if BFL.ShowBlizzardFriendsFrame then
 			BFL.ShowBlizzardFriendsFrame()
@@ -2430,7 +2431,11 @@ function Broker:OnClick(clickedFrame, button)
 			end
 		end
 	elseif action == "bnet" then
-		ToggleFriendsFrame(1)
+		if _G.ToggleBetterFriendsFrame then
+			_G.ToggleBetterFriendsFrame(1)
+		elseif BetterFriendsFrame then
+			BetterFriendsFrame:Show()
+		end
 	elseif action == "cycle_filter" then
 		local currentFilter = BetterFriendlistDB.quickFilter or "all"
 		local currentIndex = 1

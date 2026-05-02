@@ -210,6 +210,10 @@ local defaults = {
 
 	-- Migration tracking
 	friendGroupsMigrated = false, -- Track if FriendGroups migration has been completed
+	socialKeybindMigrated = false, -- Track if TOGGLESOCIAL was moved to BetterFriendlist's native binding on secret-value clients
+	socialKeybindMigrationVersion = nil, -- Last social keybind migration version
+	socialKeybindMigratedKeys = {}, -- Keys moved from TOGGLESOCIAL to BETTERFRIENDLIST_TOGGLE
+	socialKeybindMigrationReloadPrompted = false, -- Track one-time reload prompt after automatic binding migration
 	lastChangelogVersion = "0.0.0", -- Last version the user saw the changelog for
 	version = BFL.Version,
 }

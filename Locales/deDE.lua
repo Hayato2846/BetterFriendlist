@@ -8,6 +8,11 @@ BFL:RegisterLocale("deDE", function()
 	L.SETTINGS_SIMPLE_MODE_DESC =
 		"Deaktiviert das Spielerportrait, versteckt Such-/Sortieroptionen, verbreitert das Fenster und verschiebt Tabs für ein kompakteres Layout."
 	L.MENU_CHANGELOG = "Änderungsprotokoll"
+	L.KEYBIND_TOGGLE_BETTERFRIENDLIST = "BetterFriendlist umschalten"
+	L.DIALOG_SOCIAL_KEYBIND_RELOAD_TEXT =
+		"BetterFriendlist hat deine Social-Taste auf eine eigene Tastenbelegung verschoben.\n\nUI jetzt neu laden, um die neue Tastenbelegung zu aktivieren?"
+	L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN1 = "Neu laden"
+	L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN2 = "Abbrechen"
 	-- ========================================
 	-- DIALOGS & POPUPS
 	-- ========================================

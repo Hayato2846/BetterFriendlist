@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.5.6-beta5]  - 2026-05-02
+
+### Fixed
+- **Broker: Online Count Display** - Fixed the "All" quick filter showing total friends as the online count in Data Broker displays.
+- **Social Keybind Taint** - On secret-value clients, the Social key now migrates to a saved BetterFriendlist binding so BetterFriendlist opens directly without tainting Blizzard's Guild and Communities panels.
+- **RAF List Taint** - Reduced Recruit A Friend taint noise on secret-value clients by avoiding Blizzard account-name helpers and keeping raw Battle.net account payloads out of RAF list rows.
+- **Friend Tooltip Taint** - On secret-value clients, Battle.net friend hover tooltips now mirror Blizzard's native FriendsTooltip layout while using BetterFriendlist's sanitized friend data instead of Blizzard's raw Battle.net helper path.
+- **Friend Tooltips** - Battle.net character names in hover tooltips now use class colors when class-colored names are enabled.
+
 ## [2.5.6-beta4]  - 2026-05-02
 
 ### Fixed
@@ -27,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Guild Broker: Professions Column** - Fixed the Professions setting not adding a separate tooltip column when an older saved guild broker column order was present.
 - **Guild Broker: Profession Icons** - Hid unhelpful default profession rank values so the professions column stays focused on the icons unless a meaningful rank is available.
 - **Broker: LDB Count Refresh** - Fixed the broker display getting stuck at 0 or stale online counts until a broker setting was toggled. Broker updates now listen for Battle.net/friend events even when Beta Features are disabled and refresh again after roster data settles.
-- **Broker: All Filter Count** - Fixed the broker display so the "All" quick filter counts all visible friends, matching the main window, while the "Online" filter still counts online friends only.
+- **Broker: All Filter Count** - Improved broker count refresh behavior while the "All" quick filter is active.
 - **Social Keybind** - Pressing the Social key now opens BetterFriendlist directly without also opening Blizzard's friend list in the background.
 - **Combat Window Toggle** - Improved opening and closing BetterFriendlist during combat when Respect UI Hierarchy is enabled.
 - **Taint Hardening** - On secret-value clients, BFL now opens its own friend context menus instead of patching Blizzard UnitPopup menus; legacy UnitPopup customizations are limited to non-secret clients.
@@ -118,31 +127,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improved
 - **Group Note Sync** - The sync is now fully bidirectional. Existing group tags in friend notes (e.g. from FriendGroups) are automatically imported when enabling the feature. Manually adding a tag like `#MyGroup` to any friend note will create the group and assign the friend automatically.
-
-## [2.5.0]       - 2026-03-22
-
-### Changed
-- **Library Isolation** - BetterFriendlist no longer loads shared global libraries (LibStub, CallbackHandler, LibQTip, LibDataBroker, LibSharedMedia). This prevents the addon from being falsely blamed for taint errors caused by other addons that share the same libraries. Font and media features now gracefully fall back to defaults if no media library is available.
-- **Arcana** - Updated all references from ChocolateBar to Arcana to reflect the addon's new name.
-
-### Improved
-- **Font Dropdowns** - Font selection dropdowns in Settings now use lazy loading, so fonts are only loaded as they scroll into view instead of all at once. This eliminates a brief freeze when opening a font dropdown for the first time.
-
-### Fixed
-- **Taint Errors** - Eliminated thousands of "Action was blocked" taint errors that could occur when opening the friend list during or shortly after combat. Tooltips and the friend list window now use addon-owned frames that cannot interfere with Blizzard's protected UI.
-- **Frame Position** - Fixed the friend list window sometimes resetting to the center of the screen instead of restoring the saved position. This could happen when opening it via the Data Broker, after a game crash, or when other UI addons moved the window.
-- **Midnight Compatibility** - Fixed a crash in the chat system that could occur on WoW 12.0 (Midnight) when a system message arrived while the Global Sync was adding friends. Also hardened all internal display code against the new privacy-protected account names.
-- **Standalone Installation** - Fixed a crash on startup when BetterFriendlist was the only addon installed and no shared library provider was available.
-- **Classic: Send Message** - Fixed clicking the "Send Message" button on Classic crashing with an error instead of opening a whisper to the selected friend.
-- **Non-Roman Alphabets** - Fixed Korean, Chinese, and Russian text not displaying correctly when no font library addon (e.g. SharedMedia) was installed. All text now uses the correct locale-appropriate font as a fallback.
-- **Whisper in Instances and Combat** - Fixed clicking to whisper not working while inside instances, Delves, Mythic+, PvP matches, or during combat. This affected both the Data Broker tooltip and the "Send Message" button in the friend list.
-- **Data Broker: Built-in Groups** - Fixed the "In-Game", "Favorites", and "Recently Added" groups not appearing in the Data Broker tooltip. Only custom groups were shown previously.
-- **Data Broker: Class-Colored Character Names** - Fixed the %character% token in name format not being class-colored in the Data Broker tooltip. Character names now respect the class color setting, matching the main friend list behavior.
-- **Data Broker: Character Column** - Fixed the Character column in the Data Broker tooltip incorrectly showing the account name instead of only the character name.
-- **Data Broker: Faction Icons** - Faction icons now also appear in the Name column of the Data Broker tooltip, not just the Character column.
-
-### Removed
-- **Keybind Override** - Removed a redundant keybinding entry from the Key Bindings UI. The O-key (Social) redirect was already handled internally and the extra entry served no purpose.
 
 ---
 

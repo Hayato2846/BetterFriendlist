@@ -97,6 +97,10 @@ function BFL:SetLocale(newLocale)
 		-- Fallback if we switch to a locale with no file but it is valid? 
 		-- Should not happen with our setup.
 	end
+
+	if self.UpdateBindingGlobals then
+		self:UpdateBindingGlobals()
+	end
 	
 	print("|cff00ff00BFL:|r Leveled up! Switched locale to " .. targetKey)
 end

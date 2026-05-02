@@ -11,6 +11,11 @@ local function LoadEnUS()
 	L.SETTINGS_SIMPLE_MODE_DESC =
 		"Disables the player portrait, hides search/sort options, widens the frame, and shifts tabs for a compact layout."
 	L.MENU_CHANGELOG = "Changelog"
+	L.KEYBIND_TOGGLE_BETTERFRIENDLIST = "Toggle BetterFriendlist"
+	L.DIALOG_SOCIAL_KEYBIND_RELOAD_TEXT =
+		"BetterFriendlist moved your Social key to its own keybinding.\n\nReload the UI now to activate the new binding path?"
+	L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN1 = "Reload"
+	L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN2 = "Cancel"
 	-- ========================================
 	-- DIALOGS & POPUPS
 	-- ========================================

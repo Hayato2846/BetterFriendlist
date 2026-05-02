@@ -1,2 +1,5 @@
 <Bindings>
+	<Binding name="BETTERFRIENDLIST_TOGGLE" category="BetterFriendlist">
+		ToggleBetterFriendsFrame(1);
+	</Binding>
 </Bindings>
