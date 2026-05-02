@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+
+### Fixed
+- **Broker: LDB Count Refresh** - Fixed the broker display getting stuck at 0 or stale online counts until a broker setting was toggled. Broker updates now listen for Battle.net/friend events even when Beta Features are disabled and refresh again after roster data settles.
+- **Broker: All Filter Count** - Fixed the broker display so the "All" quick filter counts all visible friends, matching the main window, while the "Online" filter still counts online friends only.
+- **Social Keybind** - Pressing the Social key now opens BetterFriendlist directly without also opening Blizzard's friend list in the background.
+- **Combat Window Toggle** - Improved opening and closing BetterFriendlist during combat when Respect UI Hierarchy is enabled.
+- **Taint Hardening** - On secret-value clients, BFL now opens its own friend context menus instead of patching Blizzard UnitPopup menus; legacy UnitPopup customizations are limited to non-secret clients.
+- **Context Menus** - Expanded the secret-value fallback menus to cover Blizzard's Friend, Battle.net Friend, and Recent Ally actions, including notes, friends-of-friends, favorite toggle, RAF summon, invite/request invite, houses, ignore/block, remove, report, PvP AFK report, community message delete, recent ally pinning, and copy name. Target actions were intentionally omitted because `TargetUnit()` is protected for addon menu callbacks.
+- **Context Menus** - Added BetterFriendlist group/nickname controls to additional Blizzard UnitPopup menus when the clicked player is already a friend.
+- **Taint Hardening** - Disabled automatic hidden FriendsFrame initialization on secret-value clients and stopped replacing `C_FriendList.RemoveFriendByIndex` on those clients.
+- **Whisper Actions** - Quick Join whisper links now use the secure SetItemRef wrapper, and the Send Message button now accepts both BNet account ID field names.
+
+### Added
+- **Broker: Class Icons and Column Colors** - Friends broker tooltip now has an option to show class icons next to friend names plus color pickers for Nickname, Character, Zone, Realm, and Notes columns.
+- **Guild Broker: Profession Icons** - New optional Professions column shows guild members' primary profession icons and ranks when guild community data is available.
+
 ## [2.5.6-beta3]  - 2026-04-19
 
 ### Added

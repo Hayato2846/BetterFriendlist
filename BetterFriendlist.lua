@@ -1335,6 +1335,41 @@ function BetterFriendsFrame_OnSearchTextChanged(editBox)
 	BFL.searchDebounceTimer = newTimer
 end
 
+local function SuspendBetterFriendsFrameUIPanelForCombat()
+	if not (BetterFriendsFrame and UIPanelWindows) then
+		return
+	end
+
+	local settings = UIPanelWindows["BetterFriendsFrame"]
+	if settings then
+		BFL.SuspendedBetterFriendsFrameUIPanelSettings = settings
+		UIPanelWindows["BetterFriendsFrame"] = nil
+	end
+
+	BFL.pendingBetterFriendsFrameUIPanelRestore = true
+end
+
+function BFL:RestoreBetterFriendsFrameUIPanelAfterCombat()
+	if InCombatLockdown() then
+		return
+	end
+	if not (BetterFriendlistDB and BetterFriendlistDB.useUIPanelSystem and BetterFriendsFrame) then
+		self.pendingBetterFriendsFrameUIPanelRestore = nil
+		return
+	end
+
+	if UIPanelWindows and self.SuspendedBetterFriendsFrameUIPanelSettings and not UIPanelWindows["BetterFriendsFrame"] then
+		UIPanelWindows["BetterFriendsFrame"] = self.SuspendedBetterFriendsFrameUIPanelSettings
+	end
+
+	if _G.ConfigureUIPanelAttributes then
+		_G.ConfigureUIPanelAttributes(true)
+	end
+
+	self.SuspendedBetterFriendsFrameUIPanelSettings = nil
+	self.pendingBetterFriendsFrameUIPanelRestore = nil
+end
+
 -- Configure UI Panel Layout attributes for BetterFriendsFrame
 -- Made global for access from Settings module
 function ConfigureUIPanelAttributes(enable)
@@ -1349,7 +1384,8 @@ function ConfigureUIPanelAttributes(enable)
 
 	-- Optimization: Don't set attributes if they are already in the desired state
 	local isDefined = BetterFriendsFrame:GetAttribute("UIPanelLayout-defined")
-	if enable and isDefined then
+	local hasUIPanelEntry = UIPanelWindows and UIPanelWindows["BetterFriendsFrame"]
+	if enable and isDefined and hasUIPanelEntry then
 		return
 	elseif not enable and not isDefined then
 		return
@@ -1470,8 +1506,12 @@ function ShowBetterFriendsFrame(tabIndex) -- Clear search box
 		BFL:DebugPrint("ShowUIPanel called")
 	else
 		-- Direct :Show() - combat-safe fallback
-		-- Ensure attributes are disabled when not using UI Panel system
-		ConfigureUIPanelAttributes(false)
+		if BetterFriendlistDB and BetterFriendlistDB.useUIPanelSystem and InCombatLockdown() then
+			SuspendBetterFriendsFrameUIPanelForCombat()
+		else
+			-- Ensure attributes are disabled when not using UI Panel system
+			ConfigureUIPanelAttributes(false)
+		end
 		BetterFriendsFrame:Show()
 	end
 
@@ -1526,6 +1566,9 @@ function HideBetterFriendsFrame() -- Clear friend selection (like Blizzard's Fri
 		HideUIPanel(BetterFriendsFrame)
 	else
 		-- Direct :Hide() - combat-safe fallback
+		if BetterFriendlistDB and BetterFriendlistDB.useUIPanelSystem and InCombatLockdown() then
+			SuspendBetterFriendsFrameUIPanelForCombat()
+		end
 		BetterFriendsFrame:Hide()
 	end
 end
@@ -1667,6 +1710,18 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			-- For WoW 11.2: Use Menu.ModifyMenu with correct MENU_UNIT_* tags
 			-- According to https://warcraft.wiki.gg/wiki/Blizzard_Menu_implementation_guide
 			-- UnitPopup menus use "MENU_UNIT_<UNIT_TYPE>" format
+			local function BFL_IsOwnMenuContext(contextData)
+				return contextData and contextData.bflOrigin == ADDON_NAME
+			end
+			local function BFL_FirstSafeText(...)
+				for i = 1, select("#", ...) do
+					local value = select(i, ...)
+					if not BFL:IsSecret(value) and value and value ~= "" then
+						return value
+					end
+				end
+				return UNKNOWN or "Unknown"
+			end
 
 			-- Fix for "Copy Character Name" protected action error
 			-- Replaces the protected Blizzard button with a safe BFL version in generic menus
@@ -1710,12 +1765,12 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 					-- 4. Fallback to contextData.name (Generic)
 					if not copyNameText or copyNameText == "" then
-						if contextData.name then
+						if not BFL:IsSecret(contextData.name) and contextData.name then
 							copyNameText = contextData.name
 							if not string.find(copyNameText, "-") then
-								if contextData.server and contextData.server ~= "" then
+								if not BFL:IsSecret(contextData.server) and contextData.server and contextData.server ~= "" then
 									copyNameText = copyNameText .. "-" .. contextData.server
-								elseif contextData.realm and contextData.realm ~= "" then
+								elseif not BFL:IsSecret(contextData.realm) and contextData.realm and contextData.realm ~= "" then
 									copyNameText = copyNameText .. "-" .. contextData.realm
 								end
 							end
@@ -1762,10 +1817,11 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			end
 
 			local function BFL_ReplaceCopyNameButton(owner, rootDescription, contextData, menuTypeWrapper)
-				-- NOTE: Do NOT check _G.BetterFriendlist_IsOurMenu here!
-				-- Menu.ModifyMenu callbacks do not run in registration order,
-				-- so AddGroupsToFriendMenu may clear the flag before we get called.
-				-- We are already filtered to specific MENU_UNIT_* tags by registration.
+				-- Only mutate menus that BFL opened itself. Native Blizzard menus should not
+				-- inherit BFL responders just because our Menu.ModifyMenu callback exists.
+				if not BFL_IsOwnMenuContext(contextData) then
+					return
+				end
 				if not rootDescription or not rootDescription.EnumerateElementDescriptions then
 					return
 				end
@@ -1962,6 +2018,10 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				if not BFL.HasSecretValues then
 					return
 				end
+				-- This workaround is only for BFL-created UnitPopup contextData.
+				if not BFL_IsOwnMenuContext(contextData) then
+					return
+				end
 				if not rootDescription or not rootDescription.EnumerateElementDescriptions then
 					return
 				end
@@ -2009,10 +2069,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			-- Multi-Game-Account: Replace Blizzard's single invite button with a character picker submenu
 			-- Only for BNet friend menus where the friend has multiple invitable WoW accounts
 			local function BFL_ReplaceInviteButton(owner, rootDescription, contextData)
-				-- NOTE: Do NOT check _G.BetterFriendlist_IsOurMenu here!
-				-- Menu.ModifyMenu callbacks do not run in registration order,
-				-- so AddGroupsToFriendMenu may clear the flag before we get called.
-				-- We are already filtered to MENU_UNIT_BN_FRIEND by registration.
+				if not BFL_IsOwnMenuContext(contextData) then
+					return
+				end
 				if not rootDescription or not rootDescription.EnumerateElementDescriptions then
 					BFL:DebugPrint("ReplaceInvite: No rootDescription or EnumerateElementDescriptions")
 					return
@@ -2237,28 +2296,33 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end
 			end
 
-			local function AddGroupsToFriendMenu(owner, rootDescription, contextData) -- Check and reset flag in one atomic operation
-				-- local isOurMenu = _G.BetterFriendlist_IsOurMenu
-				-- _G.BetterFriendlist_IsOurMenu = false
-
-				-- if not isOurMenu then return end
-				local isOurMenu = _G.BetterFriendlist_IsOurMenu
-				if isOurMenu then
-					_G.BetterFriendlist_IsOurMenu = false
-				end
-
-				-- CRITICAL: Don't add group options for WHO players (non-friends)
-				if _G.BetterFriendlist_IsWhoPlayerMenu then
+			local function AddGroupsToFriendMenu(owner, rootDescription, contextData)
+				if not contextData then
 					return
 				end
 
-				-- contextData contains bnetIDAccount or name
-				if not contextData then
+				-- CRITICAL: Don't add group options for WHO players (non-friends)
+				if contextData.bflWhoPlayerMenu or _G.BetterFriendlist_IsWhoPlayerMenu then
 					return
 				end
 
 				-- DEBUG: Print contextData to see what we are working with
 				-- BFL:DebugPrint("Context Menu Data: Name="..tostring(contextData.name).." BNetID="..tostring(contextData.bnetIDAccount).." BattleTag="..tostring(contextData.battleTag).." Index="..tostring(contextData.index))
+
+				local bnetIDAccount = contextData.bnetIDAccount
+				if not bnetIDAccount and contextData.accountInfo then
+					bnetIDAccount = contextData.accountInfo.bnetAccountID
+				end
+
+				if BFL:IsSecret(bnetIDAccount) then
+					return
+				end
+				if not bnetIDAccount and BFL:IsSecret(contextData.name) then
+					return
+				end
+				if BFL:IsSecret(contextData.battleTag) then
+					return
+				end
 
 				-- Determine friendUID from contextData
 				local friendUID
@@ -2267,10 +2331,10 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				-- This ensures 100% consistency with the list display (which works correctly)
 				local FriendsList = GetFriendsList()
 				if FriendsList and FriendsList.friendsList then
-					if contextData.bnetIDAccount then
+					if bnetIDAccount then
 						-- Find BNet friend
 						for _, friend in ipairs(FriendsList.friendsList) do
-							if friend.type == "bnet" and friend.bnetAccountID == contextData.bnetIDAccount then
+							if friend.type == "bnet" and friend.bnetAccountID == bnetIDAccount then
 								friendUID = FriendsList:GetFriendUID(friend)
 								BFL:DebugPrint(
 									"|cff00ff00[MENU UID]|r Resolved BNet UID via FriendsList: " .. tostring(friendUID)
@@ -2307,9 +2371,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 				-- Fallback if not resolved via module
 				if not friendUID then
-					if contextData.bnetIDAccount then
+					if bnetIDAccount then
 						-- PRIORITY 1: Try direct lookup via API (Most reliable for Chat Links/Whispers)
-						local accountInfo = C_BattleNet.GetAccountInfoByID(contextData.bnetIDAccount)
+						local accountInfo = C_BattleNet.GetAccountInfoByID(bnetIDAccount)
 						if accountInfo and accountInfo.battleTag and accountInfo.isFriend then
 							friendUID = "bnet_" .. accountInfo.battleTag
 						end
@@ -2329,17 +2393,17 @@ frame:SetScript("OnEvent", function(self, event, ...)
 							local numBNet = BNGetNumFriends()
 							for i = 1, numBNet do
 								local bnInfo = C_BattleNet.GetFriendAccountInfo(i)
-								if bnInfo and bnInfo.bnetAccountID == contextData.bnetIDAccount then
+								if bnInfo and bnInfo.bnetAccountID == bnetIDAccount then
 									if bnInfo.battleTag and bnInfo.battleTag ~= "" then
 										friendUID = "bnet_" .. bnInfo.battleTag
 									else
-										friendUID = "bnet_" .. tostring(contextData.bnetIDAccount)
+										friendUID = "bnet_" .. tostring(bnetIDAccount)
 									end
 									break
 								end
 							end
 						end
-					elseif contextData.name then
+					elseif not BFL:IsSecret(contextData.name) and contextData.name then
 						-- Normalize context name (remove spaces from realm if present)
 						local cleanContextName = contextData.name
 						if string.find(cleanContextName, "-") then
@@ -2430,10 +2494,8 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					local currentNickname = DB and DB:GetNickname(friendUID)
 
 					-- Use contextData.name for display, fallback to battleTag if available
-					local displayName = contextData.name
-					if not displayName and contextData.battleTag then
-						displayName = contextData.battleTag
-					end
+					local displayName =
+						BFL_FirstSafeText(contextData.bfl_streamerDisplayName, contextData.name, contextData.battleTag)
 
 					StaticPopup_Show("BETTER_FRIENDLIST_SET_NICKNAME", displayName or "Friend", nil, {
 						uid = friendUID,
@@ -2442,12 +2504,12 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end)
 
 				-- "Switch Game Account" submenu for BNet friends with multiple game accounts
-				if contextData.bnetIDAccount then
+				if bnetIDAccount then
 					local FriendsList = GetFriendsList()
 					local friendData
 					if FriendsList and FriendsList.friendsList then
 						for _, f in ipairs(FriendsList.friendsList) do
-							if f.type == "bnet" and f.bnetAccountID == contextData.bnetIDAccount then
+							if f.type == "bnet" and f.bnetAccountID == bnetIDAccount then
 								friendData = f
 								break
 							end
@@ -2616,13 +2678,11 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			end
 
 			local function AddRecentAllyOptions(owner, rootDescription, contextData)
-				-- Check and reset flag in one atomic operation
-				local isOurMenu = _G.BetterFriendlist_IsOurMenu
-				if isOurMenu then
-					_G.BetterFriendlist_IsOurMenu = false
+				if not BFL_IsOwnMenuContext(contextData) then
+					return
 				end
 
-				if not contextData or not contextData.name then
+				if not contextData or BFL:IsSecret(contextData.name) or not contextData.name then
 					return
 				end
 
@@ -2643,11 +2703,703 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end
 			end
 
-			-- Register for BattleNet friend menus (online and offline)
+			local function BFL_GetContextFullName(contextData)
+				if not contextData or BFL:IsSecret(contextData.name) or not contextData.name then
+					return nil
+				end
+				if
+					not BFL:IsSecret(contextData.server)
+					and contextData.server
+					and contextData.server ~= ""
+					and not string.find(contextData.name, "-", 1, true)
+				then
+					return contextData.name .. "-" .. contextData.server
+				end
+				return contextData.name
+			end
+
+			local function BFL_HasFriendListContext(contextData)
+				return contextData and contextData.friendsList ~= nil
+			end
+
+			local function BFL_FindBNetFriendData(contextData)
+				if not contextData or not contextData.bnetIDAccount then
+					return nil, nil
+				end
+				local FriendsList = GetFriendsList()
+				if not FriendsList or not FriendsList.friendsList then
+					return nil, FriendsList
+				end
+				for _, friend in ipairs(FriendsList.friendsList) do
+					if friend.type == "bnet" and friend.bnetAccountID == contextData.bnetIDAccount then
+						return friend, FriendsList
+					end
+				end
+				return nil, FriendsList
+			end
+
+			local function BFL_AddInviteButton(rootDescription, contextData, isBNet, isOffline)
+				if isOffline or not rootDescription or not contextData then
+					return
+				end
+
+				if isBNet then
+					local friendData, FriendsList = BFL_FindBNetFriendData(contextData)
+					if friendData and friendData.invitableAccounts and #friendData.invitableAccounts > 0 then
+						local friendUID = FriendsList and FriendsList.GetFriendUID and FriendsList:GetFriendUID(friendData)
+						local lastInvited = friendUID and FriendsList.GetLastInvitedAccountID
+							and FriendsList:GetLastInvitedAccountID(friendUID)
+							or nil
+						local entries = {}
+
+						for _, ga in ipairs(friendData.invitableAccounts) do
+							local entry = FriendsList.BuildAccountDisplay and FriendsList:BuildAccountDisplay(ga)
+							if entry then
+								entry.isPreferred = lastInvited and entry.gameAccountID == lastInvited or false
+								entries[#entries + 1] = entry
+							end
+						end
+
+						local function InviteEntry(entry)
+							if not entry or entry.isInvitable == false then
+								return
+							end
+							if FriendsFrame_InviteOrRequestToJoin and entry.playerGuid and entry.gameAccountID then
+								FriendsFrame_InviteOrRequestToJoin(entry.playerGuid, entry.gameAccountID)
+							elseif entry.gameAccountID and BNInviteFriend then
+								BNInviteFriend(entry.gameAccountID)
+							end
+							if friendUID and entry.gameAccountID and FriendsList.SetLastInvitedAccountID then
+								FriendsList:SetLastInvitedAccountID(friendUID, entry.gameAccountID)
+							end
+						end
+
+						if #entries > 1 then
+							local inviteMenu = rootDescription:CreateButton(PARTY_INVITE or INVITE or "Invite")
+							for _, entry in ipairs(entries) do
+								local label = entry.text or entry.name or UNKNOWN or "Unknown"
+								inviteMenu:CreateButton(label, function()
+									InviteEntry(entry)
+								end)
+							end
+						elseif entries[1] then
+							rootDescription:CreateButton(PARTY_INVITE or INVITE or "Invite", function()
+								InviteEntry(entries[1])
+							end)
+						end
+					end
+					return
+				end
+
+				local fullName = BFL_GetContextFullName(contextData)
+				if fullName and BFL.InviteUnit then
+					local inviteType = contextData.guid and GetDisplayedInviteType and GetDisplayedInviteType(contextData.guid) or "INVITE"
+					local buttonText = PARTY_INVITE or INVITE or "Invite"
+					if inviteType == "SUGGEST_INVITE" or inviteType == "SUGGEST_INVITE_CROSS_FACTION" then
+						buttonText = SUGGEST_INVITE or buttonText
+					elseif inviteType == "REQUEST_INVITE" or inviteType == "REQUEST_INVITE_CROSS_FACTION" then
+						buttonText = REQUEST_INVITE or buttonText
+					elseif inviteType == "INVITE_CROSS_FACTION" and TRAVEL_PASS_INVITE_CROSS_FACTION then
+						buttonText = TRAVEL_PASS_INVITE_CROSS_FACTION
+					end
+
+					rootDescription:CreateButton(buttonText, function()
+						if inviteType == "REQUEST_INVITE" or inviteType == "REQUEST_INVITE_CROSS_FACTION" then
+							if BFL.RequestInviteFromUnit then
+								BFL.RequestInviteFromUnit(fullName)
+							elseif C_PartyInfo and C_PartyInfo.RequestInviteFromUnit then
+								C_PartyInfo.RequestInviteFromUnit(fullName)
+							end
+						elseif BFL.InviteUnit then
+							BFL.InviteUnit(fullName)
+						end
+					end)
+				end
+			end
+
+			local function BFL_GetBNetAccountInfo(contextData)
+				if not contextData or not contextData.bnetIDAccount then
+					return nil
+				end
+				if contextData.accountInfo then
+					return contextData.accountInfo
+				end
+				if C_BattleNet and C_BattleNet.GetAccountInfoByID then
+					local accountInfo = C_BattleNet.GetAccountInfoByID(contextData.bnetIDAccount)
+					contextData.accountInfo = accountInfo
+					return accountInfo
+				end
+				return nil
+			end
+
+			local function BFL_GetBNetGameAccountInfo(contextData)
+				local accountInfo = BFL_GetBNetAccountInfo(contextData)
+				return accountInfo and accountInfo.gameAccountInfo or nil
+			end
+
+			local function BFL_GetContextGUID(contextData, isBNet)
+				if not contextData then
+					return nil
+				end
+				if contextData.guid then
+					return contextData.guid
+				end
+				if isBNet then
+					local gameAccountInfo = BFL_GetBNetGameAccountInfo(contextData)
+					return gameAccountInfo and gameAccountInfo.playerGuid or nil
+				end
+				return nil
+			end
+
+			local function BFL_GetContextDisplayName(contextData, isBNet)
+				if isBNet then
+					local accountInfo = BFL_GetBNetAccountInfo(contextData)
+					if accountInfo then
+						return BFL_FirstSafeText(
+							contextData.bfl_streamerDisplayName,
+							accountInfo.accountName,
+							accountInfo.battleTag,
+							contextData.battleTag,
+							contextData.name
+						)
+					end
+				end
+				return BFL_FirstSafeText(contextData and contextData.bfl_streamerDisplayName, contextData and contextData.name)
+			end
+
+			local function BFL_GetContextPlayerLocation(contextData)
+				if not contextData or not UnitPopupSharedUtil or not UnitPopupSharedUtil.TryCreatePlayerLocation then
+					return nil
+				end
+				local ok, playerLocation = pcall(UnitPopupSharedUtil.TryCreatePlayerLocation, contextData)
+				if ok then
+					return playerLocation
+				end
+				return nil
+			end
+
+			local function BFL_IsValidReportLocation(playerLocation)
+				if not playerLocation then
+					return false
+				end
+				if UnitPopupSharedUtil and UnitPopupSharedUtil.IsValidPlayerLocation then
+					local ok, valid = pcall(UnitPopupSharedUtil.IsValidPlayerLocation, playerLocation)
+					return ok and valid
+				end
+				return playerLocation.IsValid and playerLocation:IsValid()
+			end
+
+			local function BFL_CanReportPlayer(playerLocation)
+				if not BFL_IsValidReportLocation(playerLocation) then
+					return false
+				end
+				if C_ReportSystem and C_ReportSystem.CanReportPlayer then
+					local ok, canReport = pcall(C_ReportSystem.CanReportPlayer, playerLocation)
+					return ok and canReport
+				end
+				return false
+			end
+
+			local function BFL_ShowReportFrame(contextData, reportType, isBNet)
+				if not (ReportInfo and ReportInfo.CreateReportInfoFromType and ReportFrame and ReportFrame.InitiateReport) then
+					return
+				end
+				local playerLocation = BFL_GetContextPlayerLocation(contextData)
+				if not BFL_CanReportPlayer(playerLocation) then
+					return
+				end
+				local reportInfo = ReportInfo:CreateReportInfoFromType(reportType)
+				local fullName = BFL_GetContextFullName(contextData) or BFL_GetContextDisplayName(contextData, isBNet)
+				ReportFrame:InitiateReport(reportInfo, fullName, playerLocation, isBNet and true or false)
+			end
+
+			local function BFL_AddPopoutChatButton(rootDescription, contextData)
+				local chatType = contextData and contextData.chatType
+				local chatTarget = contextData and contextData.chatTarget
+				if not ((chatType == "WHISPER" or chatType == "BN_WHISPER") and chatTarget) then
+					return
+				end
+				if FCFManager_GetNumDedicatedFrames and FCFManager_GetNumDedicatedFrames(chatType, chatTarget) ~= 0 then
+					return
+				end
+				if FCF_OpenTemporaryWindow then
+					rootDescription:CreateButton(MOVE_TO_WHISPER_WINDOW or "Move to Whisper Window", function()
+						FCF_OpenTemporaryWindow(chatType, chatTarget, contextData.chatFrame, true)
+					end)
+				end
+			end
+
+			local function BFL_AddSetNoteButton(rootDescription, contextData, isBNet)
+				if isBNet and contextData.bnetIDAccount then
+					rootDescription:CreateButton(SET_NOTE or "Set Note", function()
+						if not FriendsFrame and C_AddOns and C_AddOns.LoadAddOn then
+							pcall(C_AddOns.LoadAddOn, "Blizzard_FriendsFrame")
+						end
+						if FriendsFrame then
+							FriendsFrame.NotesID = contextData.bnetIDAccount
+							StaticPopup_Show("SET_BNFRIENDNOTE", BFL_GetContextDisplayName(contextData, true))
+							if PlaySound and SOUNDKIT and SOUNDKIT.IG_CHARACTER_INFO_CLOSE then
+								PlaySound(SOUNDKIT.IG_CHARACTER_INFO_CLOSE)
+							end
+						end
+					end)
+					return
+				end
+
+				local fullName = BFL_GetContextFullName(contextData)
+				if fullName and BFL_HasFriendListContext(contextData) then
+					rootDescription:CreateButton(SET_NOTE or "Set Note", function()
+						if not FriendsFrame and C_AddOns and C_AddOns.LoadAddOn then
+							pcall(C_AddOns.LoadAddOn, "Blizzard_FriendsFrame")
+						end
+						if FriendsFrame then
+							FriendsFrame.NotesID = fullName
+							StaticPopup_Show("SET_FRIENDNOTE", fullName)
+							if PlaySound and SOUNDKIT and SOUNDKIT.IG_CHARACTER_INFO_CLOSE then
+								PlaySound(SOUNDKIT.IG_CHARACTER_INFO_CLOSE)
+							end
+						end
+					end)
+				end
+			end
+
+			local function BFL_AddRecentAllyNativeButtons(rootDescription, contextData)
+				local recentAllyData = contextData and contextData.recentAllyData
+				if not recentAllyData or not recentAllyData.characterData then
+					return
+				end
+				local guid = recentAllyData.characterData.guid
+
+				if
+					guid
+					and C_RecentAllies
+					and C_RecentAllies.CanSetRecentAllyNote
+					and C_RecentAllies.CanSetRecentAllyNote(guid)
+				then
+					rootDescription:CreateButton(RECENT_ALLIES_MENU_BUTTON_LABEL_SET_NOTE or SET_NOTE or "Set Note", function()
+						StaticPopup_Show(
+							"SET_RECENT_ALLY_NOTE",
+							recentAllyData.characterData.name,
+							nil,
+							recentAllyData
+						)
+					end)
+				end
+
+				if guid and C_RecentAllies and C_RecentAllies.IsRecentAllyPinned and C_RecentAllies.SetRecentAllyPinned then
+					local pinned = C_RecentAllies.IsRecentAllyPinned(guid)
+					local label = pinned and (RECENT_ALLIES_MENU_BUTTON_LABEL_UNPIN or "Unpin")
+						or (RECENT_ALLIES_MENU_BUTTON_LABEL_PIN or "Pin")
+					rootDescription:CreateButton(label, function()
+						C_RecentAllies.SetRecentAllyPinned(guid, not C_RecentAllies.IsRecentAllyPinned(guid))
+					end)
+				end
+			end
+
+			local function BFL_AddViewBNetFriendsButton(rootDescription, contextData)
+				if contextData and contextData.bnetIDAccount and FriendsFriendsFrame_Show then
+					rootDescription:CreateButton(VIEW_FRIENDS_OF_FRIENDS or "View Friends", function()
+						FriendsFriendsFrame_Show(contextData.bnetIDAccount)
+					end)
+				end
+			end
+
+			local function BFL_AddRafSummonButton(rootDescription, contextData, isBNet, isOffline)
+				if isOffline or not (C_RecruitAFriend and C_RecruitAFriend.IsRecruitAFriendLinked) then
+					return
+				end
+				local guid = BFL_GetContextGUID(contextData, isBNet)
+				if not guid or not C_RecruitAFriend.IsRecruitAFriendLinked(guid) then
+					return
+				end
+
+				rootDescription:CreateButton(RAF_SUMMON or "Summon Friend", function()
+					local fullName = BFL_GetContextFullName(contextData) or BFL_GetContextDisplayName(contextData, isBNet)
+					C_RecruitAFriend.SummonFriend(guid, fullName)
+				end)
+			end
+
+			local function BFL_AddViewHousesButton(rootDescription, contextData, isBNet)
+				if not UNIT_VIEW_HOUSES then
+					return
+				end
+				if not (isBNet or (contextData and (contextData.unit or contextData.isGuildMember))) then
+					return
+				end
+				rootDescription:CreateButton(UNIT_VIEW_HOUSES, function()
+					if BFL:IsActionRestricted() then
+						return
+					end
+					if not HouseListFrame and C_AddOns and C_AddOns.LoadAddOn then
+						pcall(C_AddOns.LoadAddOn, "Blizzard_HouseList")
+					end
+					if HouseListFrame and HouseListFrame.InitWithContextData then
+						local playerName = BFL_GetContextFullName(contextData) or BFL_GetContextDisplayName(contextData, isBNet)
+						local guid = BFL_GetContextGUID(contextData, isBNet)
+						if ShowUIPanel then
+							ShowUIPanel(HouseListFrame)
+						end
+						HouseListFrame:InitWithContextData(
+							playerName,
+							guid,
+							isBNet and contextData.bnetIDAccount or nil,
+							contextData and contextData.isGuildMember
+						)
+					end
+				end)
+			end
+
+			local function BFL_AddFavoriteButton(rootDescription, contextData)
+				if not (contextData and contextData.bnetIDAccount and BNSetFriendFavoriteFlag) then
+					return
+				end
+				local accountInfo = BFL_GetBNetAccountInfo(contextData)
+				if not accountInfo then
+					return
+				end
+				local isFavorite = accountInfo.isFavorite
+				rootDescription:CreateButton(
+					isFavorite and (REMOVE_FAVORITE_STATUS or "Remove Favorite") or (ADD_FAVORITE_STATUS or "Add Favorite"),
+					function()
+						BNSetFriendFavoriteFlag(contextData.bnetIDAccount, not isFavorite)
+					end
+				)
+			end
+
+			local function BFL_ShowRemoveWoWFriendPrompt(fullName)
+				local prompt = fullName
+				if REMOVE_FRIEND_CONFIRMATION then
+					local ok, text = pcall(string.format, REMOVE_FRIEND_CONFIRMATION, fullName)
+					if ok then
+						prompt = text
+					end
+				elseif CONFIRM_REMOVE_WOW_FRIEND then
+					prompt = CONFIRM_REMOVE_WOW_FRIEND
+				end
+
+				StaticPopupDialogs["BFL_CONFIRM_REMOVE_WOW_FRIEND"] = {
+					text = "%s",
+					button1 = ACCEPT,
+					button2 = CANCEL,
+					OnAccept = function()
+						if C_FriendList and C_FriendList.RemoveFriend then
+							if not C_FriendList.RemoveFriend(fullName) and UIErrorsFrame then
+								UIErrorsFrame:AddExternalErrorMessage(ERR_FRIEND_NOT_FOUND)
+							end
+						elseif BFL.RemoveFriend then
+							BFL.RemoveFriend(fullName)
+						end
+					end,
+					timeout = 0,
+					whileDead = 1,
+					hideOnEscape = 1,
+					preferredIndex = 3,
+				}
+				StaticPopup_Show("BFL_CONFIRM_REMOVE_WOW_FRIEND", prompt)
+			end
+
+			local function BFL_AddRemoveFriendButton(rootDescription, contextData, isBNet)
+				if isBNet then
+					if not contextData.bnetIDAccount then
+						return
+					end
+					rootDescription:CreateButton(BNET_REMOVE_FRIEND or REMOVE_FRIEND or "Remove Friend", function()
+						local displayName = BFL_GetContextDisplayName(contextData, true)
+						local confirmation = REMOVE_FRIEND_CONFIRMATION or BATTLETAG_REMOVE_FRIEND_CONFIRMATION
+						local prompt = displayName
+						if confirmation then
+							local ok, text = pcall(string.format, confirmation, displayName)
+							if ok then
+								prompt = text
+							end
+						end
+						StaticPopup_Show("CONFIRM_REMOVE_BN_FRIEND", prompt, nil, contextData.bnetIDAccount)
+					end)
+					return
+				end
+
+				local fullName = BFL_GetContextFullName(contextData)
+				if fullName and BFL_HasFriendListContext(contextData) then
+					rootDescription:CreateButton(REMOVE_FRIEND or "Remove Friend", function()
+						BFL_ShowRemoveWoWFriendPrompt(fullName)
+					end)
+				end
+			end
+
+			local function BFL_AddIgnoreOrBlockButton(rootDescription, contextData, isBNet)
+				if isBNet then
+					if not contextData.bnetIDAccount or not BNSetBlocked then
+						return
+					end
+					rootDescription:CreateButton(BN_BLOCK_FRIEND or BLOCK_COMMUNICATION or IGNORE or "Block", function()
+						local displayName = BFL_GetContextDisplayName(contextData, true)
+						local prompt = displayName
+						if BLOCK_FRIEND_CONFIRMATION then
+							local ok, text = pcall(string.format, BLOCK_FRIEND_CONFIRMATION, displayName)
+							if ok then
+								prompt = text
+							end
+						end
+						StaticPopupDialogs["BFL_CONFIRM_BLOCK_BNET_FRIEND"] = {
+							text = "%s",
+							button1 = ACCEPT,
+							button2 = CANCEL,
+							OnAccept = function()
+								BNSetBlocked(contextData.bnetIDAccount, true)
+							end,
+							timeout = 0,
+							whileDead = 1,
+							hideOnEscape = 1,
+							preferredIndex = 3,
+						}
+						StaticPopup_Show("BFL_CONFIRM_BLOCK_BNET_FRIEND", prompt)
+					end)
+					return
+				end
+
+				local fullName = BFL_GetContextFullName(contextData)
+				if fullName and C_FriendList and C_FriendList.AddOrDelIgnore then
+					if fullName == UnitNameUnmodified("player") then
+						return
+					end
+					local label = C_FriendList.IsOnIgnoredList and C_FriendList.IsOnIgnoredList(fullName) and IGNORE_REMOVE
+						or IGNORE
+						or "Ignore"
+					rootDescription:CreateButton(label, function()
+						C_FriendList.AddOrDelIgnore(fullName)
+					end)
+				end
+			end
+
+			local function BFL_AddDeleteCommunityMessageButton(rootDescription, contextData)
+				if
+					not (
+						contextData
+						and contextData.communityClubID
+						and contextData.communityStreamID
+						and contextData.communityEpoch
+						and contextData.communityPosition
+						and C_Club
+						and C_Club.DestroyMessage
+					)
+				then
+					return
+				end
+
+				local canDestroy = true
+				if C_Club.GetMessageInfo and C_Club.GetClubPrivileges then
+					local messageId = { epoch = contextData.communityEpoch, position = contextData.communityPosition }
+					local messageInfo = C_Club.GetMessageInfo(
+						contextData.communityClubID,
+						contextData.communityStreamID,
+						messageId
+					)
+					local privileges = C_Club.GetClubPrivileges(contextData.communityClubID)
+					if not messageInfo or messageInfo.destroyed or not privileges then
+						canDestroy = false
+					elseif messageInfo.author and messageInfo.author.isSelf then
+						canDestroy = privileges.canDestroyOwnMessage
+					else
+						canDestroy = privileges.canDestroyOtherMessage
+					end
+				end
+				if not canDestroy then
+					return
+				end
+
+				rootDescription:CreateButton(COMMUNITY_MESSAGE_DROP_DOWN_DELETE or DELETE or "Delete", function()
+					C_Club.DestroyMessage(contextData.communityClubID, contextData.communityStreamID, {
+						epoch = contextData.communityEpoch,
+						position = contextData.communityPosition,
+					})
+				end)
+			end
+
+			local function BFL_AddReportButtons(rootDescription, contextData, isBNet, isRecentAlly)
+				local playerLocation = BFL_GetContextPlayerLocation(contextData)
+				if not BFL_CanReportPlayer(playerLocation) then
+					return
+				end
+				local isChatLocation = playerLocation
+					and ((playerLocation.IsChatLineID and playerLocation:IsChatLineID())
+						or (playerLocation.IsCommunityData and playerLocation:IsCommunityData()))
+
+				if isChatLocation and Enum and Enum.ReportType and Enum.ReportType.Chat then
+					rootDescription:CreateButton(REPORT_CHAT or "Report Chat", function()
+						BFL_ShowReportFrame(contextData, Enum.ReportType.Chat, isBNet)
+					end)
+				elseif Enum and Enum.ReportType then
+					local reportType = isRecentAlly and Enum.ReportType.RecentAlly or Enum.ReportType.Friend
+					if reportType then
+						rootDescription:CreateButton(REPORT_IN_WORLD_PLAYER or REPORT_PLAYER or "Report Player", function()
+							BFL_ShowReportFrame(contextData, reportType, isBNet)
+						end)
+					end
+				end
+			end
+
+			local function BFL_AddPvpReportAfkButton(rootDescription, contextData)
+				if not (Enum and Enum.ReportType and Enum.ReportType.PvP) then
+					return
+				end
+				local fullName = BFL_GetContextFullName(contextData)
+				if not fullName or fullName == UnitNameUnmodified("player") then
+					return
+				end
+				local canShow = false
+				if UnitInBattleground and UnitInBattleground(fullName) then
+					canShow = true
+				elseif IsInActiveWorldPVP and IsInActiveWorldPVP(fullName) then
+					canShow = true
+				end
+				if canShow then
+					rootDescription:CreateButton(PVP_REPORT_AFK or "Report AFK", function()
+						BFL_ShowReportFrame(contextData, Enum.ReportType.PvP, false)
+					end)
+				end
+			end
+
+			function BFL:OpenBetterFriendlistContextMenu(button, menuType, contextData, name)
+				if not (MenuUtil and MenuUtil.CreateContextMenu and contextData) then
+					return false
+				end
+
+				contextData.bflOrigin = ADDON_NAME
+				local owner = button
+				if not owner and GetMouseFoci then
+					local mouseFoci = GetMouseFoci()
+					owner = mouseFoci and mouseFoci[1]
+				end
+				if not owner and GetMouseFocus then
+					owner = GetMouseFocus()
+				end
+				owner = owner or UIParent
+
+				local isBNet = menuType == "BN_FRIEND" or menuType == "BN_FRIEND_OFFLINE" or contextData.bnetIDAccount
+				local isOffline = menuType == "BN_FRIEND_OFFLINE"
+					or menuType == "FRIEND_OFFLINE"
+					or menuType == "RECENT_ALLY_OFFLINE"
+					or contextData.isOffline
+				local isRecentAlly = menuType == "RECENT_ALLY" or menuType == "RECENT_ALLY_OFFLINE"
+				local isFriendMenu = menuType == "BN_FRIEND"
+					or menuType == "BN_FRIEND_OFFLINE"
+					or menuType == "FRIEND"
+					or menuType == "FRIEND_OFFLINE"
+				local menuTypeWrapper = contextData.bflWhoPlayerMenu and "WHO" or nil
+
+				MenuUtil.CreateContextMenu(owner, function(ownerRegion, rootDescription)
+					local title = BFL_FirstSafeText(contextData.bfl_streamerDisplayName, name, contextData.name)
+					rootDescription:CreateTitle(title)
+
+					BFL_AddPopoutChatButton(rootDescription, contextData)
+
+					if isFriendMenu then
+						BFL_AddSetNoteButton(rootDescription, contextData, isBNet)
+					end
+					if isRecentAlly then
+						BFL_AddRecentAllyNativeButtons(rootDescription, contextData)
+					end
+					if isBNet and isFriendMenu then
+						BFL_AddViewBNetFriendsButton(rootDescription, contextData)
+					end
+
+					rootDescription:CreateDivider()
+					rootDescription:CreateTitle(UNIT_FRAME_DROPDOWN_SUBSECTION_TITLE_INTERACT or "Interact")
+
+					BFL_AddRafSummonButton(rootDescription, contextData, isBNet, isOffline)
+
+					if (not isOffline) or isBNet then
+						rootDescription:CreateButton(WHISPER or "Whisper", function()
+							if isBNet then
+								BFL:SecureSendBNetTell(contextData.name, contextData.bnetIDAccount)
+							else
+								BFL:SecureSendTell(BFL_GetContextFullName(contextData))
+							end
+						end)
+					end
+
+					if not isOffline then
+						BFL_AddInviteButton(rootDescription, contextData, isBNet, isOffline)
+					end
+
+					BFL_AddViewHousesButton(rootDescription, contextData, isBNet)
+
+					rootDescription:CreateDivider()
+					rootDescription:CreateTitle(UNIT_FRAME_DROPDOWN_SUBSECTION_TITLE_OTHER or "Other")
+
+					BFL_AddDeleteCommunityMessageButton(rootDescription, contextData)
+					if isBNet and isFriendMenu then
+						BFL_AddFavoriteButton(rootDescription, contextData)
+					end
+					if isBNet then
+						if isFriendMenu then
+							BFL_AddIgnoreOrBlockButton(rootDescription, contextData, true)
+						end
+					else
+						BFL_AddIgnoreOrBlockButton(rootDescription, contextData, false)
+					end
+					if isFriendMenu then
+						BFL_AddRemoveFriendButton(rootDescription, contextData, isBNet)
+					end
+					BFL_AddReportButtons(rootDescription, contextData, isBNet, isRecentAlly)
+					if not isBNet then
+						BFL_AddPvpReportAfkButton(rootDescription, contextData)
+					end
+
+					rootDescription:CreateButton(
+						(L and L.MENU_COPY_CHARACTER_NAME) or COPY_CHARACTER_NAME or "Copy Character Name",
+						BFL_BuildCopyNameHandler(contextData, menuTypeWrapper)
+					)
+
+					if isRecentAlly then
+						AddRecentAllyOptions(ownerRegion, rootDescription, contextData)
+					end
+
+					if isFriendMenu then
+						AddGroupsToFriendMenu(ownerRegion, rootDescription, contextData)
+					end
+				end)
+
+				return true
+			end
+
 			if Menu and Menu.ModifyMenu then
+				local groupMenuTags = {
+					"MENU_UNIT_BN_FRIEND",
+					"MENU_UNIT_BN_FRIEND_OFFLINE",
+					"MENU_UNIT_FRIEND",
+					"MENU_UNIT_FRIEND_OFFLINE",
+					"MENU_UNIT_PARTY",
+					"MENU_UNIT_PLAYER",
+					"MENU_UNIT_RAID_PLAYER",
+					"MENU_UNIT_RAID",
+					"MENU_UNIT_GUILD",
+					"MENU_UNIT_GUILD_OFFLINE",
+					"MENU_UNIT_CHAT_ROSTER",
+					"MENU_UNIT_TARGET",
+					"MENU_UNIT_FOCUS",
+					"MENU_UNIT_COMMUNITIES_WOW_MEMBER",
+					"MENU_UNIT_COMMUNITIES_GUILD_MEMBER",
+					"MENU_UNIT_COMMUNITIES_MEMBER",
+					"MENU_UNIT_RECENT_ALLY",
+					"MENU_UNIT_RECENT_ALLY_OFFLINE",
+					"MENU_UNIT_WORLD_STATE_SCORE",
+					"MENU_UNIT_PVP_SCOREBOARD",
+				}
+
+				for _, tag in ipairs(groupMenuTags) do
+					Menu.ModifyMenu(tag, AddGroupsToFriendMenu)
+				end
+			end
+
+			-- Register for BattleNet friend menus (online and offline)
+			if Menu and Menu.ModifyMenu and not BFL.HasSecretValues then
 				-- Streamer Mode: Rename context menu title to safe display name
 				-- (contextData.name stays as accountName for whisper functionality)
 				local function BFL_StreamerModeRenameTitle(owner, rootDescription, contextData)
+					if not BFL_IsOwnMenuContext(contextData) then
+						return
+					end
 					if not BFL.StreamerMode or not BFL.StreamerMode:IsActive() then
 						return
 					end
@@ -2698,7 +3450,6 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				-- RAF: Clear flag manually as no other function follows
 				Menu.ModifyMenu("MENU_UNIT_RAF_RECRUIT", function(owner, root, context)
 					BFL_ReplaceCopyNameButton(owner, root, context)
-					_G.BetterFriendlist_IsOurMenu = false
 				end)
 
 				-- Pass context wrapper for Recent Allies and Who list to handle Realm Name retrieval
@@ -2711,7 +3462,6 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				-- WHO: Clear flag manually as no other function follows
 				Menu.ModifyMenu("MENU_UNIT_WHO", function(owner, root, context)
 					BFL_ReplaceCopyNameButton(owner, root, context, "WHO")
-					_G.BetterFriendlist_IsOurMenu = false
 				end)
 
 				-- Add "Add Friend" to Recent Allies
@@ -2721,13 +3471,6 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				-- Multi-Game-Account: Replace invite button with character picker for BNet friends
 				Menu.ModifyMenu("MENU_UNIT_BN_FRIEND", BFL_ReplaceInviteButton)
 
-				Menu.ModifyMenu("MENU_UNIT_BN_FRIEND", AddGroupsToFriendMenu)
-				Menu.ModifyMenu("MENU_UNIT_BN_FRIEND_OFFLINE", AddGroupsToFriendMenu)
-
-				-- Register for WoW friend menus (online and offline)
-				Menu.ModifyMenu("MENU_UNIT_FRIEND", AddGroupsToFriendMenu)
-				Menu.ModifyMenu("MENU_UNIT_FRIEND_OFFLINE", AddGroupsToFriendMenu)
-
 				-- Housing: Intercept "View Houses" menu entry during combat (Retail 12.0+ only)
 				-- ShowUIPanel() is protected since 8.2.0, so the house list cannot be opened in combat.
 				-- Without interception, BFL's ModifyMenu hooks taint the execution context, causing
@@ -2735,6 +3478,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				-- a clear localized message instead.
 				if BFL.IsRetail and UNIT_VIEW_HOUSES then
 					local function BFL_InterceptViewHousesInCombat(owner, rootDescription, contextData)
+						if not BFL_IsOwnMenuContext(contextData) then
+							return
+						end
 						if not BFL:IsActionRestricted() then
 							return
 						end
@@ -2921,6 +3667,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			if not menu or not menu:IsShown() then
 				table.remove(_G.BFL_ActiveContactsMenus, i)
 			end
+		end
+		if BFL.pendingBetterFriendsFrameUIPanelRestore and BFL.RestoreBetterFriendsFrameUIPanelAfterCombat then
+			BFL:RestoreBetterFriendsFrameUIPanelAfterCombat()
 		end
 	elseif event == "WHO_LIST_UPDATE" then
 		-- Fire callbacks for modules
@@ -4006,9 +4755,6 @@ function BetterFriendsList_ShowDropdown(
 			friendsIndex = actualIndex, -- Alternative name used by Blizzard
 		}
 
-		-- Set flag BEFORE opening menu (menu modifiers run during UnitPopup_OpenMenu)
-		_G.BetterFriendlist_IsOurMenu = true
-
 		-- Determine menu type based on online status
 		local menuType = connected and "FRIEND" or "FRIEND_OFFLINE"
 		-- Use compatibility wrapper for Classic support
@@ -4055,9 +4801,6 @@ function BetterFriendsList_ShowBNDropdown(
 			index = actualIndex, -- Required for some addons
 			friendsIndex = actualIndex, -- Alternative name
 		}
-
-		-- Set flag BEFORE opening menu (menu modifiers run during UnitPopup_OpenMenu)
-		_G.BetterFriendlist_IsOurMenu = true
 
 		-- Determine menu type based on online status
 		local menuType = connected and "BN_FRIEND" or "BN_FRIEND_OFFLINE"

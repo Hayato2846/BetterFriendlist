@@ -59,6 +59,96 @@ local function L(key)
 	return key
 end
 
+local function NormalizeRosterName(name)
+	if not name or name == "" then
+		return nil
+	end
+	if BFL.HasSecretValues and BFL:IsSecret(name) then
+		return nil
+	end
+
+	return (name:gsub("%s+", ""):lower())
+end
+
+local function GetProfessionIcon(professionID, size)
+	if not professionID or not C_TradeSkillUI or not C_TradeSkillUI.GetTradeSkillTexture then
+		return ""
+	end
+
+	local texture = C_TradeSkillUI.GetTradeSkillTexture(professionID)
+	if not texture then
+		return ""
+	end
+
+	size = size or 14
+	return string.format("|T%s:%d:%d:0:0|t", tostring(texture), size, size)
+end
+
+local function FormatProfessionEntry(professionID, professionName, professionRank)
+	if not professionID and (not professionName or professionName == "") then
+		return ""
+	end
+
+	local icon = GetProfessionIcon(professionID)
+	local text = icon ~= "" and icon or (professionName or "")
+	if professionRank and professionRank > 0 then
+		text = string.format("%s %d", text, professionRank)
+	end
+
+	return text
+end
+
+local function BuildGuildProfessionLookup()
+	local lookup = {}
+
+	if not C_Club or not C_Club.GetGuildClubId or not C_Club.GetClubMembers or not C_Club.GetMemberInfo then
+		return lookup
+	end
+
+	local clubId = C_Club.GetGuildClubId()
+	if not clubId then
+		return lookup
+	end
+
+	local memberIds = C_Club.GetClubMembers(clubId)
+	if not memberIds then
+		return lookup
+	end
+
+	for _, memberId in ipairs(memberIds) do
+		local memberInfo = C_Club.GetMemberInfo(clubId, memberId)
+		if memberInfo and memberInfo.name then
+			local professions = {}
+			local firstProfession = FormatProfessionEntry(
+				memberInfo.profession1ID,
+				memberInfo.profession1Name,
+				memberInfo.profession1Rank
+			)
+			local secondProfession = FormatProfessionEntry(
+				memberInfo.profession2ID,
+				memberInfo.profession2Name,
+				memberInfo.profession2Rank
+			)
+
+			if firstProfession ~= "" then
+				professions[#professions + 1] = firstProfession
+			end
+			if secondProfession ~= "" then
+				professions[#professions + 1] = secondProfession
+			end
+
+			if #professions > 0 then
+				local key = NormalizeRosterName(memberInfo.name)
+				if key then
+					lookup[key] = table.concat(professions, " ")
+				end
+			end
+		end
+	end
+
+	return lookup
+end
+
 -- ========================================
 -- Data Layer: Guild Roster Collection
 -- ========================================
@@ -85,6 +175,7 @@ function GuildBroker:CollectGuildRoster()
 
 	local maxRows = BetterFriendlistDB and BetterFriendlistDB.guildBrokerMaxRows or 100
 	local members = {}
+	local professionLookup = BuildGuildProfessionLookup()
 
 	for i = 1, numTotal do
 		local fullName, rank, rankIndex, level, className, zone, note, officerNote, online, status, classFile,
@@ -114,11 +205,16 @@ function GuildBroker:CollectGuildRoster()
 				end
 			end
 
+			local professionText = professionLookup[NormalizeRosterName(safeName)]
+				or professionLookup[NormalizeRosterName(name)]
+				or ""
+
 			table.insert(members, {
 				index = i,
 				fullName = safeName,
 				name = name or safeName,
 				realm = realm or "",
+				professions = professionText,
 				rank = rank or "",
 				rankIndex = rankIndex or 0,
 				level = level or 0,
@@ -1094,6 +1190,12 @@ local function CreateDetailTooltip(cell, data)
 	end
 
 	-- Note
+	if data.professions and data.professions ~= "" then
+		tt2:AddSeparator()
+		tt2:AddRow(C("ltblue", L("GUILD_BROKER_COL_PROFESSIONS")), data.professions)
+	end
+
+	-- Note
 	if data.note and data.note ~= "" then
 		tt2:AddSeparator()
 		local noteRow = tt2:AddRow(C("ltblue", L("GUILD_BROKER_COL_NOTE")), C("white", data.note))
@@ -1128,6 +1230,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 		{ key = "Name",        label = L("GUILD_BROKER_COL_NAME"),         align = "LEFT",   setting = "guildBrokerShowColName" },
 		{ key = "Level",       label = L("GUILD_BROKER_COL_LEVEL"),        align = "CENTER", setting = "guildBrokerShowColLevel" },
 		{ key = "Class",       label = L("GUILD_BROKER_COL_CLASS"),        align = "LEFT",   setting = "guildBrokerShowColClass" },
+		{ key = "Professions", label = L("GUILD_BROKER_COL_PROFESSIONS"),  align = "LEFT",   setting = "guildBrokerShowColProfessions" },
 		{ key = "Rank",        label = L("GUILD_BROKER_COL_RANK"),         align = "LEFT",   setting = "guildBrokerShowColRank" },
 		{ key = "Zone",        label = L("GUILD_BROKER_COL_ZONE"),         align = "LEFT",   setting = "guildBrokerShowColZone" },
 		{ key = "Note",        label = L("GUILD_BROKER_COL_NOTE"),         align = "LEFT",   setting = "guildBrokerShowColNote" },
@@ -1374,6 +1477,8 @@ local function CreateLibQTipTooltip(anchorFrame)
 					else
 						val = C("gray", member.className or "")
 					end
+				elseif col.key == "Professions" then
+					val = member.professions or ""
 				elseif col.key == "Rank" then
 					local rankText = member.rank or ""
 					if not member.online then

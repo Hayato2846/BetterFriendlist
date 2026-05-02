@@ -35,6 +35,7 @@ local dataObject = nil
 local updateThrottle = 0
 local lastUpdateTime = 0
 local THROTTLE_INTERVAL = 0.1 -- Update max 10 times per second (crisp but not spammy)
+local pendingDeferredUpdate = false
 
 -- Quick filter cycle order (offline removed - tooltip only shows online friends)
 local FILTER_CYCLE = { "all", "online", "wow", "bnet", "ingame" }
@@ -115,6 +116,40 @@ local C = BFL.BrokerUtils.C
 -- Get class color for friend (returns color table or white fallback)
 local function GetClassColorForFriend(friend)
 	return BFL.ClassUtils:GetClassColorForFriend(friend)
+end
+
+local function GetClassIconForFriend(friend)
+	local classFile = BFL.ClassUtils and BFL.ClassUtils:GetClassFileForFriend(friend)
+	return BFL.BrokerUtils.GetClassIcon(classFile)
+end
+
+local function GetBrokerColumnColor(settingKey)
+	local color = BetterFriendlistDB and BetterFriendlistDB[settingKey]
+	if not color then
+		return nil
+	end
+
+	local r = color.r or color[1]
+	local g = color.g or color[2]
+	local b = color.b or color[3]
+	if not r or not g or not b then
+		return nil
+	end
+
+	return string.format("|cff%02x%02x%02x", r * 255, g * 255, b * 255)
+end
+
+local function ApplyBrokerColumnColor(text, settingKey)
+	if not text or text == "" then
+		return text or ""
+	end
+
+	local color = GetBrokerColumnColor(settingKey)
+	if color then
+		return color .. text .. "|r"
+	end
+
+	return text
 end
 
 -- Helper: Add friend name to active chat editbox (Shift+Click)
@@ -335,8 +370,11 @@ end
 local function GetFilteredFriendCounts()
 	local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
 
-	-- "all" and "online" filters both show online/total counts
-	if currentFilter == "all" or currentFilter == "online" then
+	-- "All" reflects all visible friends in the main window, not just online friends.
+	if currentFilter == "all" then
+		local wowOnline, wowTotal, bnetOnline, bnetTotal = GetFriendCounts()
+		return wowTotal, wowTotal, bnetTotal, bnetTotal
+	elseif currentFilter == "online" then
 		return GetFriendCounts()
 	end
 
@@ -490,6 +528,20 @@ function Broker:UpdateBrokerText()
 	else
 		dataObject.icon = nil
 	end
+end
+
+function Broker:ScheduleBrokerTextUpdate()
+	self:UpdateBrokerText()
+
+	if pendingDeferredUpdate then
+		return
+	end
+
+	pendingDeferredUpdate = true
+	C_Timer.After(0.25, function()
+		pendingDeferredUpdate = false
+		Broker:UpdateBrokerText()
+	end)
 end
 
 -- ========================================
@@ -1763,6 +1815,11 @@ local function CreateLibQTipTooltip(anchorFrame)
 		local function RenderFriendRow(friend, indentation)
 			local statusIcon = GetStatusIcon(friend.isAFK, friend.isDND, friend.isMobile)
 			local clientInfo = GetClientInfo(friend.client)
+			local showClassIcons = BetterFriendlistDB and BetterFriendlistDB.brokerShowClassIcons
+			local classIcon = showClassIcons and GetClassIconForFriend(friend) or ""
+			if classIcon ~= "" then
+				classIcon = classIcon .. " "
+			end
 
 			local factionIcon = ""
 			if BetterFriendlistDB and BetterFriendlistDB.showFactionIcons then
@@ -1818,10 +1875,13 @@ local function CreateLibQTipTooltip(anchorFrame)
 					local DB = GetDB()
 					local nick = DB and DB:GetNickname(friend.id) or ""
 					if nick ~= "" then
-						val = defaultNameColor .. nick .. "|r"
+						val = ApplyBrokerColumnColor(nick, "brokerNicknameColor")
+						if val == nick then
+							val = defaultNameColor .. nick .. "|r"
+						end
 					end
 				elseif col.key == "Name" then
-					local prefix = indentation .. statusIcon .. " "
+					local prefix = indentation .. classIcon .. statusIcon .. " "
 					val = prefix .. nameColor .. GetFriendDisplayName(friend) .. "|r"
 				elseif col.key == "Level" then
 					val = GetColoredLevelText(friend.level)
@@ -1837,10 +1897,12 @@ local function CreateLibQTipTooltip(anchorFrame)
 
 						if shouldGray then
 							val = "|cff808080" .. displayCharName .. "|r"
+						elseif GetBrokerColumnColor("brokerCharacterColor") then
+							val = ApplyBrokerColumnColor(displayCharName, "brokerCharacterColor")
 						elseif colorClassNames then
 							val = ClassColorText(friend, displayCharName)
 						else
-							val = displayCharName
+							val = ApplyBrokerColumnColor(displayCharName, "brokerCharacterColor")
 						end
 					else
 						val = ""
@@ -1848,11 +1910,11 @@ local function CreateLibQTipTooltip(anchorFrame)
 				elseif col.key == "Game" then
 					val = clientInfo.iconStr .. " " .. clientInfo.short
 				elseif col.key == "Zone" then
-					val = friend.area or ""
+					val = ApplyBrokerColumnColor(friend.area or "", "brokerZoneColor")
 				elseif col.key == "Realm" then
-					val = friend.realmName or ""
+					val = ApplyBrokerColumnColor(friend.realmName or "", "brokerRealmColor")
 				elseif col.key == "Notes" then
-					val = friend.note or ""
+					val = ApplyBrokerColumnColor(friend.note or "", "brokerNotesColor")
 				end
 				table.insert(cellValues, val)
 			end
@@ -2383,11 +2445,6 @@ function Broker:Initialize()
 end
 
 function Broker:RegisterEvents()
-	-- BETA FEATURE CHECK: Only register events if Beta Features are enabled
-	if not BetterFriendlistDB or not BetterFriendlistDB.enableBetaFeatures then
-		return
-	end
-
 	if not BetterFriendlistDB.brokerEnabled then
 		return
 	end
@@ -2397,23 +2454,27 @@ function Broker:RegisterEvents()
 	end
 
 	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_ONLINE", function(...)
-		Broker:UpdateBrokerText()
+		Broker:ScheduleBrokerTextUpdate()
 	end)
 
 	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_OFFLINE", function(...)
-		Broker:UpdateBrokerText()
+		Broker:ScheduleBrokerTextUpdate()
+	end)
+
+	BFL:RegisterEventCallback("BN_FRIEND_INFO_CHANGED", function(...)
+		Broker:ScheduleBrokerTextUpdate()
 	end)
 
 	BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function(...)
-		Broker:UpdateBrokerText()
+		Broker:ScheduleBrokerTextUpdate()
 	end)
 
 	BFL:RegisterEventCallback("BN_CONNECTED", function(...)
-		Broker:UpdateBrokerText()
+		Broker:ScheduleBrokerTextUpdate()
 	end)
 
 	BFL:RegisterEventCallback("BN_DISCONNECTED", function(...)
-		Broker:UpdateBrokerText()
+		Broker:ScheduleBrokerTextUpdate()
 	end)
 end
 

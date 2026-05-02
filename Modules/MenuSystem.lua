@@ -114,11 +114,7 @@ function MenuSystem:OpenFriendMenu(button, friendType, friendID, extraData)
 		}
 	end
 
-	-- Set flag to indicate this menu is opened from BetterFriendlist
-	_G.BetterFriendlist_IsOurMenu = true
-
 	-- Use compatibility wrapper for Classic support
-	-- Flag is cleared by AddGroupsToFriendMenu callback (fires during menu construction)
 	BFL.OpenContextMenu(button, menuType, contextData, contextData.name)
 end
 
@@ -181,6 +177,7 @@ function MenuSystem:OpenWhoPlayerMenu(button, whoInfo)
 		name = cleanName or cleanShortName,
 		server = serverName, -- Only set if cross-realm, otherwise nil
 		guid = whoInfo.guid,
+		bflWhoPlayerMenu = true,
 	}
 
 	-- Use FRIEND menu as base (compatibility wrapper for Classic)

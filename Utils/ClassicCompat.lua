@@ -108,9 +108,11 @@ end
 -- Classic: UnitPopup_ShowMenu(dropdown, which, unit, name, userData)
 
 function Compat.OpenUnitPopupMenu(menuType, contextData)
-	-- Force global flag to true so BFL menu modifiers know this is our menu
-	local wasOurMenu = _G.BetterFriendlist_IsOurMenu
-	_G.BetterFriendlist_IsOurMenu = true
+	-- Mark BFL-created menu contexts directly. Global flags are fragile because
+	-- Menu.ModifyMenu callbacks may run in an order we do not control.
+	if contextData then
+		contextData.bflOrigin = ADDON_NAME
+	end
 
 	-- Streamer Mode Interception for Context Menu Header (Added 2026-02-01)
 	if BFL.StreamerMode and BFL.StreamerMode:IsActive() and contextData then
@@ -194,7 +196,6 @@ function Compat.OpenUnitPopupMenu(menuType, contextData)
 		end
 	end
 
-	_G.BetterFriendlist_IsOurMenu = wasOurMenu
 end
 
 ------------------------------------------------------------
@@ -942,6 +943,14 @@ end
 
 -- Context Menu (UnitPopup) - Used by many modules
 BFL.OpenContextMenu = function(button, menuType, contextData, name)
+	if contextData then
+		contextData.bflOrigin = ADDON_NAME
+	end
+	if BFL.HasSecretValues and BFL.OpenBetterFriendlistContextMenu then
+		if BFL:OpenBetterFriendlistContextMenu(button, menuType, contextData, name) then
+			return
+		end
+	end
 	Compat.OpenUnitPopupMenu(menuType, contextData)
 end
 

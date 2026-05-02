@@ -1418,8 +1418,9 @@ function WhoFrame:OnButtonClick(button, mouseButton)
 				-- Fallback: Use basic UnitPopup (with Classic compatibility)
 				local contextData = {
 					name = info.fullName,
-					server = info.fullGuildName,
+					server = nil,
 					guid = info.guid,
+					bflWhoPlayerMenu = true,
 				}
 				BFL.OpenContextMenu(button, "FRIEND", contextData, info.fullName)
 			end

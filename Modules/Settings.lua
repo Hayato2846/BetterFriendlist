@@ -5555,6 +5555,60 @@ function Settings:RefreshBrokerTab()
 		-- Spacer
 		table.insert(allFrames, Components:CreateSpacer(tab))
 
+		-- Show Class Icons
+		local brokerShowClassIcons = Components:CreateCheckbox(
+			tab,
+			L.BROKER_SETTINGS_SHOW_CLASS_ICONS or "Show Class Icons",
+			DB:Get("brokerShowClassIcons", false),
+			function(val)
+				BetterFriendlistDB.brokerShowClassIcons = val
+			end
+		)
+		if brokerShowClassIcons.SetTooltip then
+			brokerShowClassIcons:SetTooltip(
+				L.BROKER_SETTINGS_SHOW_CLASS_ICONS or "Show Class Icons",
+				L.BROKER_SETTINGS_SHOW_CLASS_ICONS_TOOLTIP or "Display class icons next to friend names in the broker tooltip"
+			)
+		end
+		table.insert(allFrames, brokerShowClassIcons)
+
+		-- Spacer
+		table.insert(allFrames, Components:CreateSpacer(tab))
+
+		-- Header: Column Colors
+		local brokerColumnColorsHeader = Components:CreateHeader(
+			tab,
+			L.BROKER_SETTINGS_COLUMN_COLORS or "Column Colors"
+		)
+		table.insert(allFrames, brokerColumnColorsHeader)
+
+		local function CreateBrokerColumnColor(label, settingKey)
+			local currentColor = DB:Get(settingKey)
+			local picker = Components:CreateColorPicker(
+				tab,
+				label,
+				currentColor and { r = currentColor[1] or currentColor.r, g = currentColor[2] or currentColor.g, b = currentColor[3] or currentColor.b } or
+				{ r = 1, g = 1, b = 1 },
+				function(r, g, b)
+					if math.abs(r - 1) < 0.01 and math.abs(g - 1) < 0.01 and math.abs(b - 1) < 0.01 then
+						BetterFriendlistDB[settingKey] = nil
+					else
+						BetterFriendlistDB[settingKey] = { r, g, b }
+					end
+				end
+			)
+			table.insert(allFrames, picker)
+		end
+
+		CreateBrokerColumnColor(L.BROKER_SETTINGS_NICKNAME_COLOR or "Nickname Color", "brokerNicknameColor")
+		CreateBrokerColumnColor(L.BROKER_SETTINGS_CHARACTER_COLOR or "Character Color", "brokerCharacterColor")
+		CreateBrokerColumnColor(L.BROKER_SETTINGS_ZONE_COLOR or "Zone Color", "brokerZoneColor")
+		CreateBrokerColumnColor(L.BROKER_SETTINGS_REALM_COLOR or "Realm Color", "brokerRealmColor")
+		CreateBrokerColumnColor(L.BROKER_SETTINGS_NOTES_COLOR or "Notes Color", "brokerNotesColor")
+
+		-- Spacer
+		table.insert(allFrames, Components:CreateSpacer(tab))
+
 		-- Header: Tooltip Columns
 		local columnsHeader = Components:CreateHeader(tab, L.BROKER_SETTINGS_COLUMNS_HEADER)
 		table.insert(allFrames, columnsHeader)
@@ -6100,6 +6154,7 @@ function Settings:RefreshBrokerTab()
 			{ key = "Name",        label = L.GUILD_BROKER_COL_NAME or "Name",                 default = true },
 			{ key = "Level",       label = L.GUILD_BROKER_COL_LEVEL or "Level",               default = true },
 			{ key = "Class",       label = L.GUILD_BROKER_COL_CLASS or "Class",               default = true },
+			{ key = "Professions", label = L.GUILD_BROKER_COL_PROFESSIONS or "Professions",   default = false },
 			{ key = "Rank",        label = L.GUILD_BROKER_COL_RANK or "Rank",                 default = true },
 			{ key = "Zone",        label = L.GUILD_BROKER_COL_ZONE or "Zone",                 default = true },
 			{ key = "Note",        label = L.GUILD_BROKER_COL_NOTE or "Note",                 default = false },

@@ -151,21 +151,27 @@ function GlobalSync:HookDeletionAPIs()
 
 	-- Hook RemoveFriendByIndex
 	if C_FriendList and C_FriendList.RemoveFriendByIndex then
-		local originalRemoveByIndex = C_FriendList.RemoveFriendByIndex
-		C_FriendList.RemoveFriendByIndex = function(index)
-			local info = C_FriendList.GetFriendInfoByIndex(index)
-			local nameToRemove = info and info.name
+		if not (BFL.HasSecretValues or issecretvalue) then
+			local originalRemoveByIndex = C_FriendList.RemoveFriendByIndex
+			C_FriendList.RemoveFriendByIndex = function(index)
+				local info = C_FriendList.GetFriendInfoByIndex(index)
+				local nameToRemove = info and info.name
 
-			local result = originalRemoveByIndex(index)
+				local result = originalRemoveByIndex(index)
 
-			if nameToRemove then
-				self:OnFriendRemoved(nameToRemove)
+				if nameToRemove then
+					self:OnFriendRemoved(nameToRemove)
+				end
+
+				return result
 			end
-
-			return result
+			-- Note: Hooking global RemoveFriend covers Index removal in Classic if it accepts index,
+			-- but usually Classic RemoveFriend takes a name.
+		else
+			-- 12.0.0+: Do not replace Blizzard API functions with addon closures.
+			-- The normal RemoveFriend hook and FRIENDLIST_UPDATE reconciliation cover
+			-- the supported path without tainting C_FriendList.RemoveFriendByIndex.
 		end
-		-- Note: Hooking global RemoveFriend covers Index removal in Classic if it accepts index,
-		-- but usually Classic RemoveFriend takes a name.
 	end
 
 	-- Hook AddFriend
@@ -531,9 +537,6 @@ function GlobalSync:ProcessAddQueue(queue)
 	end
 	self.processingQueue = true
 
-	-- Suppress system messages during queue processing
-	self:InstallMessageFilter()
-
 	local index = 1
 	local max = #queue
 
@@ -547,7 +550,6 @@ function GlobalSync:ProcessAddQueue(queue)
 			timer:Cancel()
 			self.addQueueTicker = nil
 			self.processingQueue = false
-			self:RemoveMessageFilter()
 			return
 		end
 
@@ -556,7 +558,6 @@ function GlobalSync:ProcessAddQueue(queue)
 				timer:Cancel()
 				self.addQueueTicker = nil
 				self.processingQueue = false
-				self:RemoveMessageFilter()
 				-- BFL:DebugPrint("GlobalSync: Finished syncing friends.")
 				return
 			end
@@ -568,47 +569,6 @@ function GlobalSync:ProcessAddQueue(queue)
 			index = index + 1
 		end
 	end)
-end
-
--- Static filter to suppress friend-add system messages during queue processing
-function GlobalSync.SystemMessageFilter(chatFrame, event, msg, ...)
-	if not msg then
-		return false
-	end
-	if msg == ERR_FRIEND_NOT_FOUND then
-		return true
-	end
-	if msg == ERR_FRIEND_LIST_FULL then
-		return true
-	end
-	if ERR_FRIEND_ALREADY_S then
-		local pattern = string.gsub(ERR_FRIEND_ALREADY_S, "%%s", ".+")
-		if string.match(msg, "^" .. pattern .. "$") then
-			return true
-		end
-	end
-	return false
-end
-
-function GlobalSync:InstallMessageFilter()
-	if self.messageFilterInstalled then
-		return
-	end
-	-- 12.0.0+: Do not install message filter to avoid tainting the CHAT_MSG_SYSTEM
-	-- execution path, which crashes on secret values in ChatFrameOverrides.lua
-	if BFL.HasSecretValues then
-		return
-	end
-	self.messageFilterInstalled = true
-	ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", GlobalSync.SystemMessageFilter)
-end
-
-function GlobalSync:RemoveMessageFilter()
-	if not self.messageFilterInstalled then
-		return
-	end
-	self.messageFilterInstalled = false
-	ChatFrame_RemoveMessageEventFilter("CHAT_MSG_SYSTEM", GlobalSync.SystemMessageFilter)
 end
 
 -- Register module

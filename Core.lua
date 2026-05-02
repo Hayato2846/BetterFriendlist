@@ -133,6 +133,48 @@ function BFL:IsActionRestricted()
 	return false
 end
 
+-- Intercept Blizzard's Social keybind before ToggleFriendsFrame runs.
+-- This keeps the default FriendsFrame from opening in the background while
+-- preserving the user's actual keybinding configuration.
+function BFL:InstallSocialKeybindOverride()
+	if self.installingSocialKeybindOverride then
+		return
+	end
+	if InCombatLockdown() then
+		self.pendingSocialKeybindOverride = true
+		return
+	end
+
+	self.installingSocialKeybindOverride = true
+
+	if self.socialKeybindOwner then
+		ClearOverrideBindings(self.socialKeybindOwner)
+	else
+		self.socialKeybindOwner = CreateFrame("Frame")
+	end
+
+	if not self.socialKeybindButton then
+		self.socialKeybindButton = CreateFrame("Button", "BetterFriendlistSocialKeybindButton", UIParent)
+		self.socialKeybindButton:SetSize(1, 1)
+		self.socialKeybindButton:SetPoint("TOPLEFT", UIParent, "TOPLEFT", -10, 10)
+		self.socialKeybindButton:EnableMouse(false)
+		self.socialKeybindButton:Show()
+		self.socialKeybindButton:SetScript("OnClick", function()
+			if _G.ToggleBetterFriendsFrame then
+				_G.ToggleBetterFriendsFrame(1)
+			end
+		end)
+	end
+
+	local keys = { GetBindingKey("TOGGLESOCIAL") }
+	for _, key in ipairs(keys) do
+		SetOverrideBindingClick(self.socialKeybindOwner, false, key, "BetterFriendlistSocialKeybindButton")
+	end
+
+	self.pendingSocialKeybindOverride = nil
+	self.installingSocialKeybindOverride = nil
+end
+
 -- Update Portrait Visibility based on Simple Mode setting
 function BFL:UpdatePortraitVisibility(reason)
 	reason = reason or "Unknown"
@@ -1287,6 +1329,8 @@ end
 -- Register initial events
 eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
+eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+eventFrame:RegisterEvent("UPDATE_BINDINGS")
 
 -- Event handler
 eventFrame:SetScript("OnEvent", function(self, event, ...)
@@ -1560,6 +1604,8 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 			-- BFL:DebugPrint("|cff00ff00[BFL]|r Using native Frame:RegisterEventCallback (12.0.0+)")
 		end
 
+		BFL:InstallSocialKeybindOverride()
+
 		-- Late initialization for modules that need PLAYER_LOGIN
 		for name, module in pairs(BFL.Modules) do
 			if module.OnPlayerLogin then
@@ -1575,7 +1621,10 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 		-- FriendsFrame:Show() synchronously during PLAYER_LOGIN, ArchonTooltip registers
 		-- before RaiderIO (which also initializes during PLAYER_LOGIN), reversing the
 		-- intended hook order and causing ArchonTooltip content to be wiped by RaiderIO.
-		if FriendsFrame then
+		-- On 12.0.0+ secret-value clients, avoid opening Blizzard's FriendsFrame
+		-- automatically from BFL tainted code. This keeps login-time tooltip
+		-- compatibility hooks from becoming a hidden social UI taint source.
+		if FriendsFrame and not BFL.HasSecretValues then
 			C_Timer.After(0, function()
 				BFL._suppressFriendsFrameRedirect = true
 				FriendsFrame:SetAlpha(0)
@@ -1587,6 +1636,12 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 				end)
 			end)
 		end
+	elseif event == "PLAYER_REGEN_ENABLED" then
+		if BFL.pendingSocialKeybindOverride then
+			BFL:InstallSocialKeybindOverride()
+		end
+	elseif event == "UPDATE_BINDINGS" then
+		BFL:InstallSocialKeybindOverride()
 	end
 
 	-- Fire event callbacks for all events

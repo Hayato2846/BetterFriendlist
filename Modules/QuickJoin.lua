@@ -3696,7 +3696,11 @@ function QuickJoin:OpenContextMenu(guid, anchorFrame)
 		rootDescription:CreateButton(WHISPER, function()
 			if leaderInfo.playerLink then
 				local link, text = LinkUtil.SplitLink(leaderInfo.playerLink)
-				SetItemRef(link, text, "LeftButton")
+				if BFL and BFL.SecureSetItemRef then
+					BFL:SecureSetItemRef(link, text, "LeftButton")
+				else
+					SetItemRef(link, text, "LeftButton")
+				end
 			end
 		end)
 	end)
