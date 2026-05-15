@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.5.7]        - 2026-05-16
+
+### Fixed
+- **Classic Loading** - Fixed a load error after the latest update.
+
+### Changed
+- **Client Compatibility** - Added TOC support for newer Retail and Classic client builds.
+
 ## [2.5.6]        - 2026-05-15
 
 ### Added

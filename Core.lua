@@ -310,6 +310,10 @@ function BFL:UpdateBindingGlobals()
 end
 
 local function CollectBindingKeys(action)
+	if not GetBindingKey then
+		return {}
+	end
+
 	local keys = { GetBindingKey(action) }
 	local result = {}
 	for _, key in ipairs(keys) do
@@ -334,6 +338,12 @@ local function IsBindingKeyAssignedToAction(key, action)
 		return false
 	end
 	return ContainsKey(CollectBindingKeys(action), key)
+end
+
+local function AddUniqueBindingKey(keys, key)
+	if key and key ~= "" and not ContainsKey(keys, key) then
+		keys[#keys + 1] = key
+	end
 end
 
 local function IsBetterFriendlistEnabledForCurrentCharacter()
@@ -369,8 +379,23 @@ function BFL:RestoreMigratedSocialKeybindsForAddonDisable()
 		return
 	end
 
+	local restoreKeys = {}
 	local migratedKeys = BetterFriendlistDB.socialKeybindMigratedKeys
-	if type(migratedKeys) ~= "table" or #migratedKeys == 0 then
+	if type(migratedKeys) == "table" then
+		for _, key in ipairs(migratedKeys) do
+			if IsBindingKeyAssignedToAction(key, BFL_SOCIAL_BINDING) then
+				AddUniqueBindingKey(restoreKeys, key)
+			end
+		end
+	end
+
+	if #restoreKeys == 0 then
+		for _, key in ipairs(CollectBindingKeys(BFL_SOCIAL_BINDING)) do
+			AddUniqueBindingKey(restoreKeys, key)
+		end
+	end
+
+	if #restoreKeys == 0 then
 		BetterFriendlistDB.socialKeybindMigrated = false
 		BetterFriendlistDB.socialKeybindMigrationVersion = nil
 		BetterFriendlistDB.socialKeybindMigratedKeys = {}
@@ -379,14 +404,12 @@ function BFL:RestoreMigratedSocialKeybindsForAddonDisable()
 
 	local restored = false
 	local failedKeys = {}
-	for _, key in ipairs(migratedKeys) do
-		if IsBindingKeyAssignedToAction(key, BFL_SOCIAL_BINDING) then
-			local ok, result = pcall(SetBinding, key, SOCIAL_BINDING)
-			if ok and result then
-				restored = true
-			else
-				failedKeys[#failedKeys + 1] = key
-			end
+	for _, key in ipairs(restoreKeys) do
+		local ok, result = pcall(SetBinding, key, SOCIAL_BINDING)
+		if ok and result then
+			restored = true
+		else
+			failedKeys[#failedKeys + 1] = key
 		end
 	end
 
@@ -418,27 +441,41 @@ function BFL:MigrateSocialKeybindToNativeBinding()
 		self.pendingSocialKeybindMigration = true
 		return
 	end
-	if BetterFriendlistDB.socialKeybindMigrationVersion == SOCIAL_BINDING_MIGRATION_VERSION then
-		return
-	end
 	if not (GetBindingKey and SetBinding and SaveBindings and GetCurrentBindingSet) then
 		return
 	end
 
 	local socialKeys = CollectBindingKeys(SOCIAL_BINDING)
 	local bflKeys = CollectBindingKeys(BFL_SOCIAL_BINDING)
+
+	if BetterFriendlistDB.socialKeybindMigrationVersion == SOCIAL_BINDING_MIGRATION_VERSION then
+		local migratedKeys = BetterFriendlistDB.socialKeybindMigratedKeys
+		if type(migratedKeys) == "table" and #migratedKeys > 0 then
+			return
+		end
+		if #socialKeys == 0 and #bflKeys > 0 then
+			BetterFriendlistDB.socialKeybindMigrated = true
+			BetterFriendlistDB.socialKeybindMigratedKeys = bflKeys
+		end
+		return
+	end
+
 	if #socialKeys == 0 then
+		local migratedKeys = {}
+		for _, key in ipairs(bflKeys) do
+			AddUniqueBindingKey(migratedKeys, key)
+		end
 		BetterFriendlistDB.socialKeybindMigrated = true
 		BetterFriendlistDB.socialKeybindMigrationVersion = SOCIAL_BINDING_MIGRATION_VERSION
-		BetterFriendlistDB.socialKeybindMigratedKeys = {}
+		BetterFriendlistDB.socialKeybindMigratedKeys = migratedKeys
 		return
 	end
 
 	local migratedKeys = {}
 	for _, key in ipairs(socialKeys) do
 		if not ContainsKey(bflKeys, key) and SetBinding(key, BFL_SOCIAL_BINDING) then
-			migratedKeys[#migratedKeys + 1] = key
-			bflKeys[#bflKeys + 1] = key
+			AddUniqueBindingKey(migratedKeys, key)
+			AddUniqueBindingKey(bflKeys, key)
 		end
 	end
 
@@ -496,9 +533,9 @@ function BFL:InstallSocialKeybindOverride()
 		end)
 	end
 
-	local keys = { GetBindingKey(SOCIAL_BINDING) }
+	local keys = CollectBindingKeys(SOCIAL_BINDING)
 	for _, key in ipairs(keys) do
-		SetOverrideBindingClick(self.socialKeybindOwner, false, key, "BetterFriendlistSocialKeybindButton")
+		SetOverrideBindingClick(self.socialKeybindOwner, true, key, "BetterFriendlistSocialKeybindButton")
 	end
 
 	self.pendingSocialKeybindOverride = nil
@@ -2181,7 +2218,7 @@ eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 eventFrame:RegisterEvent("UPDATE_BINDINGS")
-eventFrame:RegisterEvent("BINDINGS_LOADED")
+pcall(eventFrame.RegisterEvent, eventFrame, "BINDINGS_LOADED")
 pcall(eventFrame.RegisterEvent, eventFrame, "ADDONS_UNLOADING")
 
 -- Event handler

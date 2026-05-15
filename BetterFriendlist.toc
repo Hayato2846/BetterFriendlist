@@ -1,8 +1,8 @@
-## Interface: 120001, 120000, 110207, 50503, 50500, 40402, 38000, 30405, 20505, 20504, 11508
+## Interface: 120007, 120005, 120001, 120000, 110207, 50504, 50503, 50500, 40402, 38000, 30405, 20505, 20504, 11508
 ## Title: BetterFriendlist
 ## Notes: Complete replacement for WoW Friends frame - Custom groups, Raid management, Quick Join, and more!
 ## Author: Hayato2846
-## Version: 2.5.6
+## Version: 2.5.7
 ## IconTexture: Interface\AddOns\BetterFriendlist\Textures\PortraitIcon.blp
 ## X-Curse-Project-ID: 1381771
 ## X-WoWI-ID: 26984
