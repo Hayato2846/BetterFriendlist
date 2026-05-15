@@ -329,6 +329,35 @@ local function ContainsKey(keys, targetKey)
 	return false
 end
 
+local function IsBindingKeyAssignedToAction(key, action)
+	if not key then
+		return false
+	end
+	return ContainsKey(CollectBindingKeys(action), key)
+end
+
+local function IsBetterFriendlistEnabledForCurrentCharacter()
+	if not (C_AddOns and C_AddOns.GetAddOnEnableState and Enum and Enum.AddOnEnableState) then
+		return true
+	end
+
+	local character = UnitGUID and UnitGUID("player") or nil
+	local ok, state
+	if character then
+		ok, state = pcall(C_AddOns.GetAddOnEnableState, ADDON_NAME, character)
+	else
+		ok, state = pcall(C_AddOns.GetAddOnEnableState, ADDON_NAME)
+	end
+	if not ok then
+		return true
+	end
+	if type(state) ~= "number" then
+		return true
+	end
+
+	return state > Enum.AddOnEnableState.None
+end
+
 function BFL:ShowSocialKeybindReloadPrompt()
 	if not (StaticPopupDialogs and StaticPopup_Show) then
 		return
@@ -349,6 +378,55 @@ function BFL:ShowSocialKeybindReloadPrompt()
 	}
 
 	StaticPopup_Show("BFL_SOCIAL_KEYBIND_RELOAD")
+end
+
+function BFL:RestoreMigratedSocialKeybindsForAddonDisable()
+	if IsBetterFriendlistEnabledForCurrentCharacter() then
+		return
+	end
+	if not BetterFriendlistDB then
+		return
+	end
+	if not (GetBindingKey and SetBinding and SaveBindings and GetCurrentBindingSet) then
+		return
+	end
+
+	local migratedKeys = BetterFriendlistDB.socialKeybindMigratedKeys
+	if type(migratedKeys) ~= "table" or #migratedKeys == 0 then
+		BetterFriendlistDB.socialKeybindMigrated = false
+		BetterFriendlistDB.socialKeybindMigrationVersion = nil
+		BetterFriendlistDB.socialKeybindMigratedKeys = {}
+		return
+	end
+
+	local restored = false
+	local failedKeys = {}
+	for _, key in ipairs(migratedKeys) do
+		if IsBindingKeyAssignedToAction(key, BFL_SOCIAL_BINDING) then
+			local ok, result = pcall(SetBinding, key, SOCIAL_BINDING)
+			if ok and result then
+				restored = true
+			else
+				failedKeys[#failedKeys + 1] = key
+			end
+		end
+	end
+
+	if restored then
+		local ok = pcall(SaveBindings, GetCurrentBindingSet())
+		if not ok then
+			return
+		end
+	end
+
+	if #failedKeys > 0 then
+		BetterFriendlistDB.socialKeybindMigratedKeys = failedKeys
+		return
+	end
+
+	BetterFriendlistDB.socialKeybindMigrated = false
+	BetterFriendlistDB.socialKeybindMigrationVersion = nil
+	BetterFriendlistDB.socialKeybindMigratedKeys = {}
 end
 
 function BFL:MigrateSocialKeybindToNativeBinding()
@@ -398,13 +476,6 @@ function BFL:MigrateSocialKeybindToNativeBinding()
 	BetterFriendlistDB.socialKeybindMigrated = true
 	BetterFriendlistDB.socialKeybindMigrationVersion = SOCIAL_BINDING_MIGRATION_VERSION
 	BetterFriendlistDB.socialKeybindMigratedKeys = migratedKeys
-
-	if #migratedKeys > 0 and not BetterFriendlistDB.socialKeybindMigrationReloadPrompted then
-		BetterFriendlistDB.socialKeybindMigrationReloadPrompted = true
-		C_Timer.After(0, function()
-			BFL:ShowSocialKeybindReloadPrompt()
-		end)
-	end
 end
 
 -- Intercept Blizzard's Social keybind before ToggleFriendsFrame runs.
@@ -835,6 +906,65 @@ do
 	local whisperBar
 	local stickyWhisper -- persists across bar hide/show for "sticky target" behavior
 
+	local function GetSafeWhisperValue(value)
+		if BFL:IsSecret(value) then
+			return nil
+		end
+		if value and value ~= "" then
+			return value
+		end
+		return nil
+	end
+
+	local function GetSafeWhisperAccountID(value)
+		if BFL:IsSecret(value) then
+			return nil
+		end
+		if type(value) == "number" then
+			return value
+		end
+		if type(value) == "string" then
+			return tonumber(value)
+		end
+		return nil
+	end
+
+	local function CallChatAPI(func, ...)
+		if not func then
+			return nil
+		end
+		if BFL.HasSecretValues and securecallfunction then
+			return securecallfunction(func, ...)
+		end
+		return func(...)
+	end
+
+	local function SendTaintFreeWhisper(bar, text)
+		if bar.isBNet then
+			local bnetIDAccount = GetSafeWhisperAccountID(bar.bnetIDAccount)
+			if not bnetIDAccount then
+				return false
+			end
+			local func = C_BattleNet and C_BattleNet.SendWhisper or BNSendWhisper
+			if not func then
+				return false
+			end
+			local success = CallChatAPI(func, bnetIDAccount, text)
+			return success ~= false
+		end
+
+		local whisperTarget = GetSafeWhisperValue(bar.whisperTarget)
+		if not whisperTarget then
+			return false
+		end
+		local func = C_ChatInfo and C_ChatInfo.SendChatMessage or SendChatMessage
+		if not func then
+			return false
+		end
+		CallChatAPI(func, text, "WHISPER", nil, whisperTarget)
+		return true
+	end
+
 	local function EnsureWhisperBar()
 		if whisperBar then return whisperBar end
 
@@ -953,10 +1083,10 @@ do
 				SoftCloseBar()
 				return
 			end
-			if bar.isBNet and bar.bnetIDAccount then
-				BNSendWhisper(bar.bnetIDAccount, text)
-			elseif not bar.isBNet and bar.whisperTarget then
-				SendChatMessage(text, "WHISPER", nil, bar.whisperTarget)
+			if not SendTaintFreeWhisper(bar, text) then
+				BFL:DebugPrint("TaintFreeWhisper: Missing safe whisper target")
+				editBox:SetFocus()
+				return
 			end
 			-- Close bar after sending (sticky state preserved for Shift+Enter reopen)
 			SoftCloseBar()
@@ -1012,26 +1142,37 @@ do
 	end
 
 	function BFL:OpenTaintFreeWhisper(displayName, whisperTarget, bnetIDAccount, isBNet)
+		local safeDisplayName = GetSafeWhisperValue(displayName)
+		local safeWhisperTarget = GetSafeWhisperValue(whisperTarget)
+		local safeBNetID = GetSafeWhisperAccountID(bnetIDAccount)
+		local labelName = safeDisplayName or safeWhisperTarget or UNKNOWN or "Unknown"
+
+		if isBNet then
+			if not safeBNetID then
+				BFL:DebugPrint("TaintFreeWhisper: Missing safe BNet account ID")
+				return
+			end
+		else
+			safeWhisperTarget = safeWhisperTarget or safeDisplayName
+			if not safeWhisperTarget then
+				BFL:DebugPrint("TaintFreeWhisper: Missing safe character whisper target")
+				return
+			end
+			labelName = safeDisplayName or safeWhisperTarget
+		end
+
 		local bar = EnsureWhisperBar()
 		if not bar then
 			-- Fallback: BFL frame not ready, use standard path
 			if isBNet then
 				local func = ChatFrameUtil and ChatFrameUtil.SendBNetTell or ChatFrame_SendBNetTell
-				if func then
-					if BFL.HasSecretValues and securecallfunction then
-						securecallfunction(func, displayName)
-					else
-						func(displayName)
-					end
+				if func and safeDisplayName then
+					CallChatAPI(func, safeDisplayName)
 				end
 			else
 				local func = ChatFrameUtil and ChatFrameUtil.SendTell or ChatFrame_SendTell
-				if func then
-					if BFL.HasSecretValues and securecallfunction then
-						securecallfunction(func, whisperTarget or displayName)
-					else
-						func(whisperTarget or displayName)
-					end
+				if func and safeWhisperTarget then
+					CallChatAPI(func, safeWhisperTarget)
 				end
 			end
 			return
@@ -1040,21 +1181,21 @@ do
 		local L = BFL.L
 
 		-- Set whisper target info
-		bar.bnetIDAccount = bnetIDAccount
-		bar.whisperTarget = whisperTarget
-		bar.isBNet = isBNet
+		bar.bnetIDAccount = safeBNetID
+		bar.whisperTarget = safeWhisperTarget
+		bar.isBNet = isBNet and true or false
 
 		-- Save sticky state so bar can be restored after tab switch / frame hide
 		stickyWhisper = {
-			displayName = displayName,
-			whisperTarget = whisperTarget,
-			bnetIDAccount = bnetIDAccount,
-			isBNet = isBNet,
+			displayName = labelName,
+			whisperTarget = safeWhisperTarget,
+			bnetIDAccount = safeBNetID,
+			isBNet = isBNet and true or false,
 		}
 
 		-- Set label
 		local titlePattern = L and L.TAINT_FREE_WHISPER_TITLE or "Whisper to %s"
-		bar.ToLabel:SetText(string.format(titlePattern, displayName or "???") .. ":")
+		bar.ToLabel:SetText(string.format(titlePattern, labelName) .. ":")
 
 		-- Auto-open BFL frame if not yet visible (e.g., triggered from Broker tooltip)
 		local parent = _G.BetterFriendsFrame
@@ -1075,7 +1216,15 @@ do
 
 	-- Close the whisper bar externally (e.g., when switching tabs)
 	-- Soft close: hide bar but preserve sticky state (tab switch, frame hide)
-	function BFL:CloseTaintFreeWhisper()
+	function BFL:CloseTaintFreeWhisper(clearSticky)
+		if clearSticky then
+			stickyWhisper = nil
+			if whisperBar then
+				whisperBar.bnetIDAccount = nil
+				whisperBar.whisperTarget = nil
+				whisperBar.isBNet = nil
+			end
+		end
 		if whisperBar and whisperBar:IsShown() then
 			whisperBar:Hide()
 			-- Note: Do NOT restore bottom elements here.
@@ -1099,23 +1248,48 @@ do
 	end
 end
 
-function BFL:SecureSendBNetTell(name, bnetIDAccount)
-	if not name then return end
+function BFL:SecureSendBNetTell(name, bnetIDAccount, displayName)
+	local safeName = name
+	if BFL:IsSecret(safeName) then
+		safeName = nil
+	end
+	local safeDisplayName = displayName
+	if BFL:IsSecret(safeDisplayName) then
+		safeDisplayName = nil
+	end
+	safeDisplayName = safeDisplayName or safeName
+	local safeBNetID = bnetIDAccount
+	if BFL:IsSecret(safeBNetID) then
+		safeBNetID = nil
+	elseif type(safeBNetID) == "string" then
+		safeBNetID = tonumber(safeBNetID)
+	elseif type(safeBNetID) ~= "number" then
+		safeBNetID = nil
+	end
+
 	-- Taint-Free Whisper: Use custom EditBox popup instead of Blizzard chat
-	if BetterFriendlistDB and BetterFriendlistDB.taintFreeWhisper and bnetIDAccount then
-		BFL:OpenTaintFreeWhisper(name, nil, bnetIDAccount, true)
+	if BetterFriendlistDB and BetterFriendlistDB.taintFreeWhisper then
+		if safeBNetID then
+			BFL:OpenTaintFreeWhisper(safeDisplayName, nil, safeBNetID, true)
+		else
+			BFL:DebugPrint("SecureSendBNetTell: Missing safe BNet account ID")
+		end
 		return
 	end
+	if not safeName then return end
 	local func = ChatFrameUtil and ChatFrameUtil.SendBNetTell or ChatFrame_SendBNetTell
 	if not func then return end
 	if BFL.HasSecretValues and securecallfunction then
-		securecallfunction(func, name)
+		securecallfunction(func, safeName)
 	else
-		func(name)
+		func(safeName)
 	end
 end
 
 function BFL:SecureSendTell(name)
+	if BFL:IsSecret(name) then
+		return
+	end
 	if not name then return end
 	-- Taint-Free Whisper: Use custom EditBox popup instead of Blizzard chat
 	if BetterFriendlistDB and BetterFriendlistDB.taintFreeWhisper then
@@ -1613,6 +1787,7 @@ eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 eventFrame:RegisterEvent("UPDATE_BINDINGS")
 eventFrame:RegisterEvent("BINDINGS_LOADED")
+pcall(eventFrame.RegisterEvent, eventFrame, "ADDONS_UNLOADING")
 
 -- Event handler
 eventFrame:SetScript("OnEvent", function(self, event, ...)
@@ -1932,6 +2107,8 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 		BFL:InstallSocialKeybindOverride()
 	elseif event == "BINDINGS_LOADED" then
 		BFL:MigrateSocialKeybindToNativeBinding()
+	elseif event == "ADDONS_UNLOADING" then
+		BFL:RestoreMigratedSocialKeybindsForAddonDisable()
 	end
 
 	-- Fire event callbacks for all events

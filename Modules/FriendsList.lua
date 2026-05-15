@@ -4059,6 +4059,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 				friend.type = "wow"
 				friend.index = i
 				friend.name = normalizedName -- Always includes realm: "Name-Realm"
+				friend.guid = friendInfo.guid
 
 				-- PHASE 9.6: Cache UID
 				friend.uid = "wow_" .. normalizedName

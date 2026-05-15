@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+
+### Added
+- **Broker Tooltip Font Settings** - Added global font and font size settings for Friends and Guild broker tooltips.
+- **Friends Broker Columns** - Added an optional Status column and group name alignment setting for the Friends broker tooltip.
+- **Guild Broker Applicants** - Added an optional guild applicant count indicator for eligible guild leaders and officers.
+
+### Fixed
+- **Guild Broker Display** - The Guild Data Broker plugin is registered again on Retail secret-value clients instead of being fully suppressed.
+- **Friends Broker Class Icons** - Class icons now attach to the Character column instead of the Name column.
+- **Friends Broker Group Headers** - Collapse and expand markers now render as `+` and `-` without extra parentheses.
+- **Quick Join Sign Up** - Group Finder listings opened from Quick Join now use the native sign-up dialog instead of sending a direct join request.
+- **Retail Chat Taint** - Friend menu extensions now use secret-safe context handling on modern clients, reducing chat history taint errors.
+- **Guild and Communities Taint** - On secret-value clients, BetterFriendlist now avoids Guild/Communities roster hooks and native guild menu extensions while Blizzard's Guild panel opens.
+- **Social Keybind Cleanup** - Disabling BetterFriendlist now restores Social keys that were automatically migrated to BetterFriendlist's own keybinding.
+- **Social Keybind Migration** - Re-enabling BetterFriendlist now migrates the Social key silently without asking for a UI reload.
+
 ## [2.5.6-beta5]  - 2026-05-02
 
 ### Fixed
@@ -112,11 +129,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Housing: Combat Restriction** - The "View Houses" context menu entry now shows a clear error message during combat instead of the cryptic "Interface action failed because of an AddOn" error. Visit House buttons in the house list show a gray overlay with a tooltip when combat starts while the list is already open.
-
-## [2.5.1]       - 2026-03-23
-
-### Improved
-- **Group Note Sync** - The sync is now fully bidirectional. Existing group tags in friend notes (e.g. from FriendGroups) are automatically imported when enabling the feature. Manually adding a tag like `#MyGroup` to any friend note will create the group and assign the friend automatically.
 
 ---
 

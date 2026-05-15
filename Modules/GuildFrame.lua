@@ -60,6 +60,10 @@ local function GetDB()
 	return BFL:GetModule("DB")
 end
 
+local function ShouldSuppressGuildModuleForSecretValues()
+	return BFL.HasSecretValues
+end
+
 -- ========================================
 -- Module Lifecycle
 -- ========================================
@@ -77,6 +81,13 @@ function GuildFrame:Initialize()
 	self.selectedMember = nil
 	self.totalMembers = 0
 	self.onlineMembers = 0
+	self.suppressedForSecretValues = ShouldSuppressGuildModuleForSecretValues()
+
+	-- Retail 12.x Communities reads secret guild/member values while opening.
+	-- Keep BetterFriendlist out of that path entirely.
+	if self.suppressedForSecretValues then
+		return
+	end
 
 	-- Register events
 	BFL:RegisterEventCallback("GUILD_ROSTER_UPDATE", function(...)
@@ -106,6 +117,10 @@ function GuildFrame:Initialize()
 end
 
 function GuildFrame:OnPlayerLogin()
+	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+		return
+	end
+
 	-- Request initial guild roster data if in a guild
 	if IsInGuild() then
 		self:RequestRosterUpdate()
@@ -117,6 +132,10 @@ end
 -- ========================================
 
 function GuildFrame:OnGuildRosterUpdate(canRequestRosterUpdate)
+	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+		return
+	end
+
 	rosterDirty = true
 
 	-- Check if our frame is visible
@@ -129,6 +148,10 @@ function GuildFrame:OnGuildRosterUpdate(canRequestRosterUpdate)
 end
 
 function GuildFrame:OnPlayerGuildUpdate(unitTarget)
+	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+		return
+	end
+
 	rosterDirty = true
 
 	-- Update empty state visibility
@@ -148,6 +171,10 @@ end
 -- ========================================
 
 function GuildFrame:RequestRosterUpdate()
+	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+		return false
+	end
+
 	local now = GetTime()
 	if (now - lastRosterRequestTime) < ROSTER_REFRESH_THROTTLE then
 		return false -- Throttled
@@ -158,6 +185,13 @@ function GuildFrame:RequestRosterUpdate()
 end
 
 function GuildFrame:CollectRoster()
+	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+		self.guildMembers = {}
+		self.totalMembers = 0
+		self.onlineMembers = 0
+		return
+	end
+
 	if not IsInGuild() then
 		self.guildMembers = {}
 		self.totalMembers = 0
@@ -373,6 +407,12 @@ end
 -- ========================================
 
 function GuildFrame:BuildDisplayList()
+	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+		self.guildMembers = {}
+		self.displayList = {}
+		return self.displayList
+	end
+
 	if rosterDirty then
 		self:CollectRoster()
 	end
@@ -394,6 +434,12 @@ end
 -- ========================================
 
 function GuildFrame:Refresh()
+	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+		self.guildMembers = {}
+		self.displayList = {}
+		return
+	end
+
 	self:BuildDisplayList()
 
 	local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
@@ -496,6 +542,10 @@ end
 -- ========================================
 
 function GuildFrame:OnLoad(frame)
+	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+		return
+	end
+
 	-- NOTE: L (locale) is NOT available during OnLoad (set in Initialize).
 	-- Button/label text is set in OnShow instead.
 
@@ -797,6 +847,10 @@ end
 -- ========================================
 
 function GuildFrame:UpdateHeaderInfo()
+	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+		return
+	end
+
 	local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
 	if not guildFrame then return end
 
@@ -826,6 +880,10 @@ function GuildFrame:UpdateHeaderInfo()
 end
 
 function GuildFrame:UpdateMOTD()
+	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+		return
+	end
+
 	local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
 	if not guildFrame or not guildFrame.MOTDText then return end
 
@@ -855,6 +913,10 @@ end
 -- ========================================
 
 function GuildFrame:UpdateLayout()
+	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+		return
+	end
+
 	local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
 	local inset = BetterFriendsFrame and BetterFriendsFrame.Inset
 	if not guildFrame or not inset then return end
@@ -1063,6 +1125,10 @@ end
 -- ========================================
 
 function GuildFrame:ShowContextMenu(button, member)
+	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+		return
+	end
+
 	-- Basic context menu using existing MenuSystem
 	local MenuSystem = BFL:GetModule("MenuSystem")
 	if MenuSystem and MenuSystem.ShowGuildMemberMenu then
@@ -1075,6 +1141,10 @@ end
 -- ========================================
 
 function GuildFrame:OpenBlizzardGuildUI(memberIndex)
+	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+		return
+	end
+
 	if BFL.IsClassic then
 		local useClassicGuildUI = GetCVar("useClassicGuildUI")
 		if useClassicGuildUI == "1" then
@@ -1097,6 +1167,10 @@ end
 -- ========================================
 
 function GuildFrame:GetMemberByName(name)
+	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+		return nil
+	end
+
 	for _, member in ipairs(self.guildMembers) do
 		if member.fullName == name or member.name == name then
 			return member
@@ -1118,6 +1192,10 @@ end
 -- ========================================
 
 function GuildFrame:UpdateResponsiveLayout()
+	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+		return
+	end
+
 	local frame = BetterFriendsFrame
 	if not frame or not frame.GuildFrame then return end
 
@@ -1267,6 +1345,10 @@ function GuildFrame.StylePillButton(button, isActive)
 end
 
 function GuildFrame:SetupFilterPills()
+	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+		return
+	end
+
 	local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
 	if not guildFrame then return end
 
@@ -1289,6 +1371,10 @@ end
 -- ========================================
 
 function GuildFrame:SetupMOTDTooltip()
+	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+		return
+	end
+
 	local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
 	if not guildFrame or not guildFrame.MOTDText then return end
 	if guildFrame.MOTDText._bflTooltipHooked then return end
@@ -1311,6 +1397,10 @@ end
 -- ========================================
 
 function GuildFrame:UpdateTabard()
+	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+		return
+	end
+
 	local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
 	if not guildFrame then return end
 
@@ -1365,6 +1455,10 @@ local function CreatePanelDivider(parent, anchorTo, yOffset)
 end
 
 function GuildFrame:CreateMemberInfoPanel()
+	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+		return nil
+	end
+
 	if self._infoPanel then return self._infoPanel end
 
 	local panel = CreateFrame("Frame", "BFL_GuildMemberInfoPanel", UIParent,
@@ -1537,6 +1631,10 @@ end
 -- Populate/refresh the rank dropdown based on the given member and current
 -- player permissions. Uses SetGuildMemberRank (non-protected).
 function GuildFrame:_RefreshRankDropdown(member)
+	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+		return
+	end
+
 	local panel = self._infoPanel
 	if not panel or not panel.rankDropdown then return end
 
@@ -1578,6 +1676,10 @@ function GuildFrame:_RefreshRankDropdown(member)
 end
 
 function GuildFrame:ShowMemberInfoPanel(member)
+	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+		return
+	end
+
 	if not member then return end
 	local panel = self:CreateMemberInfoPanel()
 	panel._currentMember = member
@@ -1681,6 +1783,10 @@ function GuildFrame:HideMemberInfoPanel()
 end
 
 function GuildFrame:SaveMemberInfoPanel()
+	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+		return
+	end
+
 	local panel = self._infoPanel
 	if not panel or not panel._currentMember then return end
 	local member = panel._currentMember
@@ -1773,6 +1879,10 @@ local function EnsureInviteDialog()
 end
 
 function GuildFrame:ShowInviteDialog()
+	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+		return
+	end
+
 	if not CanGuildInvite or not CanGuildInvite() then
 		BFL:DebugPrint("No permission to invite to guild")
 		return
@@ -1799,6 +1909,10 @@ end
 function BFL_GuildFrame_OnShow(frame)
 	local GF = BFL:GetModule("GuildFrame")
 	if GF then
+		if GF.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+			return
+		end
+
 		-- Set locale text for buttons (L is not available during OnLoad, only after Initialize)
 		if frame.OpenBlizzardGuildButton and BFL.L then
 			frame.OpenBlizzardGuildButton:SetText(BFL.L.GUILD_OPEN_MANAGEMENT or "Guild Management")

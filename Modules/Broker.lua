@@ -1176,6 +1176,7 @@ local function RenderFixedFooter(footerFrame)
 
 	local function AddLine(text, font, r, g, b)
 		local fs = footerFrame:CreateFontString(nil, "OVERLAY", font or "GameTooltipTextSmall")
+		BFL.BrokerUtils.ApplyBrokerFontToFontString(fs, font == "GameTooltipText" and 0 or -2)
 		fs:SetText(text)
 		fs:SetJustifyH("LEFT")
 		fs:SetWordWrap(false)
@@ -1403,6 +1404,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 	local columns = {
 		{ key = "Nickname", label = L("BROKER_COLUMN_NICKNAME"), align = "LEFT", default = false },
 		{ key = "Name", label = L("BROKER_COLUMN_NAME"), align = "LEFT", default = true },
+		{ key = "Status", label = L("BROKER_COLUMN_STATUS"), align = "CENTER", default = false },
 		{ key = "Level", label = L("BROKER_COLUMN_LEVEL"), align = "CENTER", default = true },
 		{ key = "Character", label = L("BROKER_COLUMN_CHARACTER"), align = "LEFT", default = true },
 		{ key = "Game", label = L("BROKER_COLUMN_GAME"), align = "LEFT", default = true },
@@ -1414,39 +1416,59 @@ local function CreateLibQTipTooltip(anchorFrame)
 	-- Get user-defined column order from DB
 	local columnOrder = BetterFriendlistDB and BetterFriendlistDB.brokerColumnOrder
 	local activeColumns = {}
+	local orderedColumns = {}
+
+	local function IsColumnVisible(col)
+		local settingKey = "brokerShowCol" .. col.key
+		local visible = BetterFriendlistDB and BetterFriendlistDB[settingKey]
+		if visible == nil then
+			visible = col.default
+		end
+		return visible ~= false
+	end
 
 	if columnOrder and #columnOrder > 0 then
 		for _, colKey in ipairs(columnOrder) do
-			local colDef = nil
 			for _, c in ipairs(columns) do
 				if c.key == colKey then
-					colDef = c
+					table.insert(orderedColumns, c)
 					break
 				end
 			end
+		end
 
-			if colDef then
-				local settingKey = "brokerShowCol" .. colKey
-				local visible = BetterFriendlistDB[settingKey]
-				if visible == nil then visible = colDef.default end
-				if visible ~= false then
-					table.insert(activeColumns, colDef)
+		for _, col in ipairs(columns) do
+			local found = false
+			for _, ordered in ipairs(orderedColumns) do
+				if ordered.key == col.key then
+					found = true
+					break
 				end
+			end
+			if not found then
+				table.insert(orderedColumns, col)
 			end
 		end
 	else
-		for _, col in ipairs(columns) do
-			local settingKey = "brokerShowCol" .. col.key
-			local visible = BetterFriendlistDB[settingKey]
-			if visible == nil then visible = col.default end
-			if visible ~= false then
-				table.insert(activeColumns, col)
-			end
+		orderedColumns = columns
+	end
+
+	for _, col in ipairs(orderedColumns) do
+		if IsColumnVisible(col) then
+			table.insert(activeColumns, col)
 		end
 	end
 
 	if #activeColumns == 0 then
 		table.insert(activeColumns, columns[2]) -- Fallback: Name column
+	end
+
+	local hasStatusColumn = false
+	for _, col in ipairs(activeColumns) do
+		if col.key == "Status" then
+			hasStatusColumn = true
+			break
+		end
 	end
 
 	-- Build Acquire arguments
@@ -1972,8 +1994,10 @@ local function CreateLibQTipTooltip(anchorFrame)
 						end
 					end
 				elseif col.key == "Name" then
-					local prefix = indentation .. classIcon .. statusIcon .. " "
-					val = prefix .. nameColor .. GetFriendDisplayName(friend) .. "|r"
+					local statusPrefix = hasStatusColumn and "" or (statusIcon .. " ")
+					val = indentation .. statusPrefix .. nameColor .. GetFriendDisplayName(friend) .. "|r"
+				elseif col.key == "Status" then
+					val = statusIcon
 				elseif col.key == "Level" then
 					val = GetColoredLevelText(friend.level)
 				elseif col.key == "Character" then
@@ -1984,6 +2008,9 @@ local function CreateLibQTipTooltip(anchorFrame)
 						end
 						if factionIcon ~= "" then
 							displayCharName = factionIcon .. " " .. displayCharName
+						end
+						if classIcon ~= "" then
+							displayCharName = classIcon .. displayCharName
 						end
 
 						if shouldGray then
@@ -2062,12 +2089,16 @@ local function CreateLibQTipTooltip(anchorFrame)
 
 					local countText = string.format("%d/%d", counts.online, counts.total)
 					local collapsed = groupInfo.collapsed
-					local prefix = collapsed and "(+) " or "(-) "
+					local prefix = collapsed and "+ " or "- "
+					local headerAlign = BetterFriendlistDB and BetterFriendlistDB.brokerGroupHeaderAlign or "LEFT"
+					if headerAlign ~= "LEFT" and headerAlign ~= "CENTER" and headerAlign ~= "RIGHT" then
+						headerAlign = "LEFT"
+					end
 
 					local headerText = string.format("|c%s%s%s|r (%s)", colorCode, prefix, groupInfo.name, countText)
 					groupCell:SetColSpan(numColumns)
-					groupCell:SetJustifyH("LEFT")
-					groupCell:SetText("  " .. headerText)
+					groupCell:SetJustifyH(headerAlign)
+					groupCell:SetText(headerText)
 
 					groupRow:SetScript("OnEnter", function()
 						groupRow:SetColor(0.2, 0.2, 0.2, 0.5)
@@ -2132,6 +2163,8 @@ local function CreateLibQTipTooltip(anchorFrame)
 			emptyCell:SetJustifyH("CENTER")
 			emptyCell:SetText(C("gray", L("BROKER_NO_FRIENDS_ONLINE")))
 		end
+
+		BFL.BrokerUtils.ApplyBrokerFontToTooltip(tt)
 
 		local footerHeight = GetFooterHeight()
 		local maxContentHeight = MAX_TOOLTIP_HEIGHT - footerHeight
@@ -2362,6 +2395,8 @@ local function CreateDetailTooltip(cell, data)
 		end
 	end
 
+	BFL.BrokerUtils.ApplyBrokerFontToTooltip(tt2)
+	tt2:UpdateLayout()
 	tt2:Show()
 	detailTooltip = tt2
 end

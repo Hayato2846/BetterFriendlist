@@ -501,6 +501,21 @@ local function TruncateArray(array, newCount)
 	end
 end
 
+local function GetActiveLFGListInfo(queues)
+	if not queues then
+		return nil
+	end
+
+	for _, queueInfo in ipairs(queues) do
+		local queueData = queueInfo and queueInfo.queueData
+		if queueData and queueData.queueType == "lfglist" and queueData.lfgListID then
+			return queueInfo
+		end
+	end
+
+	return nil
+end
+
 function QuickJoinEntry:New(guid, groupInfo)
 	local entry = AcquireEntry()
 	entry.guid = guid
@@ -1440,6 +1455,9 @@ function QuickJoin:GetGroupInfo(groupGUID)
 		return nil
 	end
 
+	local members = C_SocialQueue.GetGroupMembers(groupGUID)
+	local queues = C_SocialQueue.GetGroupQueues(groupGUID)
+
 	local info = {
 		canJoin = canJoin,
 		numQueues = numQueues,
@@ -1449,8 +1467,9 @@ function QuickJoin:GetGroupInfo(groupGUID)
 		isSoloQueueParty = isSoloQueueParty,
 		questSessionActive = questSessionActive,
 		leaderGUID = leaderGUID,
-		members = C_SocialQueue.GetGroupMembers(groupGUID),
-		queues = C_SocialQueue.GetGroupQueues(groupGUID),
+		members = members,
+		queues = queues,
+		lfgListInfo = GetActiveLFGListInfo(queues),
 		requestedToJoin = C_SocialQueue.GetGroupForPlayer(groupGUID) ~= nil, -- Check if already requested
 		numMembers = 0, -- Will be calculated below
 		leaderName = "",
@@ -3642,10 +3661,12 @@ function QuickJoin:JoinQueue()
 	end
 
 	-- Check if LFG List group
-	if groupInfo.lfgListInfo then
+	local lfgListInfo = groupInfo.lfgListInfo
+	local lfgListID = lfgListInfo and lfgListInfo.queueData and lfgListInfo.queueData.lfgListID
+	if lfgListID then
 		-- Show LFG List application dialog (Blizzard's native dialog)
 		if LFGListApplicationDialog and LFGListApplicationDialog_Show then
-			LFGListApplicationDialog_Show(LFGListApplicationDialog, groupInfo.lfgListInfo.queueData.lfgListID)
+			LFGListApplicationDialog_Show(LFGListApplicationDialog, lfgListID)
 		else
 			UIErrorsFrame:AddMessage("LFG List dialog not available.", 1.0, 0.1, 0.1, 1.0)
 		end

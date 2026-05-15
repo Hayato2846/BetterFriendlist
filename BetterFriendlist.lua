@@ -1711,13 +1711,54 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			-- According to https://warcraft.wiki.gg/wiki/Blizzard_Menu_implementation_guide
 			-- UnitPopup menus use "MENU_UNIT_<UNIT_TYPE>" format
 			local function BFL_IsOwnMenuContext(contextData)
-				return contextData and contextData.bflOrigin == ADDON_NAME
+				if not contextData then
+					return false
+				end
+				local ok, origin = pcall(function()
+					return contextData.bflOrigin
+				end)
+				return ok and origin == ADDON_NAME
+			end
+			local function BFL_SafeContextValue(contextData, key)
+				if not contextData then
+					return nil
+				end
+				local ok, value = pcall(function()
+					return contextData[key]
+				end)
+				if not ok or BFL:IsSecret(value) then
+					return nil
+				end
+				return value
+			end
+			local function BFL_SafeFieldValue(tableValue, key)
+				if BFL:IsSecret(tableValue) or not tableValue then
+					return nil
+				end
+				local ok, value = pcall(function()
+					return tableValue[key]
+				end)
+				if not ok or BFL:IsSecret(value) then
+					return nil
+				end
+				return value
+			end
+			local function BFL_NumberOrNil(value)
+				if type(value) == "number" then
+					return value
+				end
+				if type(value) == "string" then
+					return tonumber(value)
+				end
+				return nil
 			end
 			local function BFL_FirstSafeText(...)
 				for i = 1, select("#", ...) do
 					local value = select(i, ...)
-					if not BFL:IsSecret(value) and value and value ~= "" then
-						return value
+					if not BFL:IsSecret(value) then
+						if value and value ~= "" then
+							return value
+						end
 					end
 				end
 				return UNKNOWN or "Unknown"
@@ -2005,17 +2046,11 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end
 			end
 
-			-- Midnight 12.0.0+ Taint Fix: Replace Whisper button handler with securecallfunction wrapper
-			-- When BFL opens a context menu, the contextData table is addon-created (tainted).
-			-- Blizzard's UnitPopupWhisperButtonMixin:OnClick reads contextData.bnetIDAccount,
-			-- which taints the execution context, then calls ChatFrameUtil.SendBNetTell in tainted
-			-- context. This taints LAST_ACTIVE_CHAT_EDIT_BOX, causing arithmetic errors on secret
-			-- number values in UpdateHeader later (ChatFrameEditBox.lua:677).
-			-- Fix: Replace the Whisper responder so it calls through securecallfunction, which
-			-- creates a clean execution context for SendBNetTell/SendTell.
+			-- Legacy BFL-owned UnitPopup wrapper for clients without secret values.
+			-- Secret-value builds use the BFL custom menu and Taint-Free Whisper paths instead
+			-- of replacing native Blizzard responders.
 			local function BFL_ReplaceWhisperButton(owner, rootDescription, contextData)
-				-- Only needed on Midnight 12.0.0+ where secret values exist
-				if not BFL.HasSecretValues then
+				if BFL.HasSecretValues then
 					return
 				end
 				-- This workaround is only for BFL-created UnitPopup contextData.
@@ -2297,44 +2332,85 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			end
 
 			local function AddGroupsToFriendMenu(owner, rootDescription, contextData)
-				if not contextData then
+				if not contextData or not rootDescription or not rootDescription.CreateButton then
 					return
 				end
 
-				-- CRITICAL: Don't add group options for WHO players (non-friends)
-				if contextData.bflWhoPlayerMenu or _G.BetterFriendlist_IsWhoPlayerMenu then
+				local isOwnMenu = BFL_IsOwnMenuContext(contextData)
+				local allowApiFallbacks = isOwnMenu or not BFL.HasSecretValues
+
+				-- Native Menu.ModifyMenu callbacks may receive secret-backed contextData on 12.x.
+				-- Read only shallow, pcall-protected values here; keep full fallback logic for BFL-owned menus.
+				if BFL_SafeContextValue(contextData, "bflWhoPlayerMenu") or _G.BetterFriendlist_IsWhoPlayerMenu then
 					return
 				end
 
-				-- DEBUG: Print contextData to see what we are working with
-				-- BFL:DebugPrint("Context Menu Data: Name="..tostring(contextData.name).." BNetID="..tostring(contextData.bnetIDAccount).." BattleTag="..tostring(contextData.battleTag).." Index="..tostring(contextData.index))
+				local bnetIDAccount = BFL_SafeContextValue(contextData, "bnetIDAccount")
+				local battleTag = BFL_SafeContextValue(contextData, "battleTag")
+				local contextName = BFL_SafeContextValue(contextData, "name")
+				local contextIndex = BFL_NumberOrNil(BFL_SafeContextValue(contextData, "index"))
+				local contextFriendsList = BFL_NumberOrNil(BFL_SafeContextValue(contextData, "friendsList"))
+				local contextGUID = BFL_SafeContextValue(contextData, "guid")
+				local contextUID = BFL_SafeContextValue(contextData, "uid")
+				local streamerDisplayName = BFL_SafeContextValue(contextData, "bfl_streamerDisplayName")
 
-				local bnetIDAccount = contextData.bnetIDAccount
-				if not bnetIDAccount and contextData.accountInfo then
-					bnetIDAccount = contextData.accountInfo.bnetAccountID
-				end
-
-				if BFL:IsSecret(bnetIDAccount) then
-					return
-				end
-				if not bnetIDAccount and BFL:IsSecret(contextData.name) then
-					return
-				end
-				if BFL:IsSecret(contextData.battleTag) then
-					return
+				if not bnetIDAccount then
+					local accountInfo = BFL_SafeContextValue(contextData, "accountInfo")
+					if accountInfo then
+						bnetIDAccount = BFL_NumberOrNil(BFL_SafeFieldValue(accountInfo, "bnetAccountID"))
+					end
 				end
 
-				-- Determine friendUID from contextData
+				if contextUID and BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[contextUID] then
+					contextUID = tostring(contextUID)
+				else
+					contextUID = nil
+				end
+
+				if
+					not bnetIDAccount
+					and not battleTag
+					and not contextName
+					and not contextIndex
+					and not contextFriendsList
+					and not contextGUID
+					and not contextUID
+				then
+					return
+				end
+
 				local friendUID
+				local friendData
 
-				-- PHASE 15 FIX: Try to resolve UID via FriendsList module first
-				-- This ensures 100% consistency with the list display (which works correctly)
+				-- Prefer BFL's already-cached FriendsList data. This is the only resolver used by
+				-- native secret-value menus.
 				local FriendsList = GetFriendsList()
 				if FriendsList and FriendsList.friendsList then
-					if bnetIDAccount then
-						-- Find BNet friend
+					if contextUID then
 						for _, friend in ipairs(FriendsList.friendsList) do
-							if friend.type == "bnet" and friend.bnetAccountID == bnetIDAccount then
+							local cachedUID = friend.uid or FriendsList:GetFriendUID(friend)
+							if cachedUID == contextUID then
+								friendData = friend
+								friendUID = cachedUID
+								break
+							end
+						end
+					end
+
+					if not friendUID and (bnetIDAccount or battleTag or contextGUID) then
+						for _, friend in ipairs(FriendsList.friendsList) do
+							local idMatch = bnetIDAccount and friend.type == "bnet" and friend.bnetAccountID == bnetIDAccount
+							local tagMatch = battleTag
+								and battleTag ~= ""
+								and friend.type == "bnet"
+								and friend.battleTag == battleTag
+							local friendGUID = friend.gameAccountInfo and friend.gameAccountInfo.playerGuid
+							local guidMatch = contextGUID
+								and friend.type == "bnet"
+								and not BFL:IsSecret(friendGUID)
+								and friendGUID == contextGUID
+							if idMatch or tagMatch or guidMatch then
+								friendData = friend
 								friendUID = FriendsList:GetFriendUID(friend)
 								BFL:DebugPrint(
 									"|cff00ff00[MENU UID]|r Resolved BNet UID via FriendsList: " .. tostring(friendUID)
@@ -2342,21 +2418,28 @@ frame:SetScript("OnEvent", function(self, event, ...)
 								break
 							end
 						end
-					elseif contextData.index or contextData.name then
-						-- Find WoW friend by resolved index or normalized name (indices are not persistent)
-						local resolvedIndex = FriendsList.ResolveWoWFriendIndex
-								and FriendsList:ResolveWoWFriendIndex(contextData.name)
-							or contextData.index
-						local normalizedContextName = contextData.name and BFL:NormalizeWoWFriendName(contextData.name)
+					end
+					if not friendUID and (contextIndex or contextFriendsList or contextName or contextGUID) then
+						local resolvedIndex = contextIndex or contextFriendsList
+						if contextName and FriendsList.ResolveWoWFriendIndex then
+							resolvedIndex = FriendsList:ResolveWoWFriendIndex(contextName) or resolvedIndex
+						end
+						local normalizedContextName = type(contextName) == "string" and contextName ~= ""
+								and BFL:NormalizeWoWFriendName(contextName)
 							or nil
 						for _, friend in ipairs(FriendsList.friendsList) do
 							if friend.type == "wow" then
 								local normalizedFriendName = friend.name and BFL:NormalizeWoWFriendName(friend.name)
 									or nil
 								local indexMatch = resolvedIndex and friend.index == resolvedIndex
+								local guidMatch = contextGUID
+									and friend.guid
+									and not BFL:IsSecret(friend.guid)
+									and friend.guid == contextGUID
 								local nameMatch = normalizedContextName
 									and normalizedFriendName == normalizedContextName
-								if indexMatch or nameMatch then
+								if indexMatch or guidMatch or nameMatch then
+									friendData = friend
 									friendUID = FriendsList:GetFriendUID(friend)
 									BFL:DebugPrint(
 										"|cff00ff00[MENU UID]|r Resolved WoW UID via FriendsList: "
@@ -2369,27 +2452,24 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					end
 				end
 
-				-- Fallback if not resolved via module
-				if not friendUID then
+				-- BFL-created menus may still use API fallbacks. Native secret-value menus must not.
+				if not friendUID and allowApiFallbacks then
 					if bnetIDAccount then
-						-- PRIORITY 1: Try direct lookup via API (Most reliable for Chat Links/Whispers)
-						local accountInfo = C_BattleNet.GetAccountInfoByID(bnetIDAccount)
+						local accountInfo
+						if C_BattleNet and C_BattleNet.GetAccountInfoByID then
+							accountInfo = C_BattleNet.GetAccountInfoByID(bnetIDAccount)
+						end
 						if accountInfo and accountInfo.battleTag and accountInfo.isFriend then
 							friendUID = "bnet_" .. accountInfo.battleTag
 						end
 
-						-- PRIORITY 2: Use battleTag from contextData if available (ensures consistency)
-						if not friendUID and contextData.battleTag and contextData.battleTag ~= "" then
-							if not accountInfo then
-								accountInfo = C_BattleNet.GetAccountInfoByID(contextData.bnetIDAccount)
-							end
+						if not friendUID and battleTag and battleTag ~= "" then
 							if accountInfo and accountInfo.isFriend then
-								friendUID = "bnet_" .. contextData.battleTag
+								friendUID = "bnet_" .. battleTag
 							end
 						end
 
-						-- PRIORITY 3: Look up the battleTag from friends list
-						if not friendUID then
+						if not friendUID and BNGetNumFriends and C_BattleNet and C_BattleNet.GetFriendAccountInfo then
 							local numBNet = BNGetNumFriends()
 							for i = 1, numBNet do
 								local bnInfo = C_BattleNet.GetFriendAccountInfo(i)
@@ -2403,69 +2483,59 @@ frame:SetScript("OnEvent", function(self, event, ...)
 								end
 							end
 						end
-					elseif not BFL:IsSecret(contextData.name) and contextData.name then
-						-- Normalize context name (remove spaces from realm if present)
-						local cleanContextName = contextData.name
+					elseif type(contextName) == "string" and contextName ~= "" then
+						local cleanContextName = contextName
 						if string.find(cleanContextName, "-") then
 							local cName, cRealm = strsplit("-", cleanContextName, 2)
 							if cRealm then
-								cleanContextName = cName .. "-" .. cRealm:gsub("%s+", "") -- Remove spaces
+								cleanContextName = cName .. "-" .. cRealm:gsub("%s+", "")
 							end
 						end
 
-						-- Check if this name belongs to a playing BNet friend (Reverse Lookup for Context Resolution)
-						local numBNet = BNGetNumFriends()
-						for i = 1, numBNet do
-							local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
-							if
-								accountInfo
-								and accountInfo.gameAccountInfo
-								and accountInfo.gameAccountInfo.characterName
-							then
-								local charName = accountInfo.gameAccountInfo.characterName
-								local realmName = accountInfo.gameAccountInfo.realmName
-								local fullName = charName
-								local normalizedFullName = charName
-
-								if realmName and realmName ~= "" then
-									fullName = charName .. "-" .. realmName
-									normalizedFullName = charName .. "-" .. realmName:gsub("%s+", "")
-								end
-
-								-- Match against contextData.name (Try both raw and normalized)
+						if BNGetNumFriends and C_BattleNet and C_BattleNet.GetFriendAccountInfo then
+							local numBNet = BNGetNumFriends()
+							for i = 1, numBNet do
+								local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
 								if
-									fullName == contextData.name
-									or normalizedFullName == contextData.name
-									or normalizedFullName == cleanContextName
-									or fullName == cleanContextName
-									or charName == contextData.name
+									accountInfo
+									and accountInfo.gameAccountInfo
+									and accountInfo.gameAccountInfo.characterName
 								then
-									if accountInfo.battleTag then
-										friendUID = "bnet_" .. accountInfo.battleTag
-										break
+									local charName = accountInfo.gameAccountInfo.characterName
+									local realmName = accountInfo.gameAccountInfo.realmName
+									local fullName = charName
+									local normalizedFullName = charName
+
+									if realmName and realmName ~= "" then
+										fullName = charName .. "-" .. realmName
+										normalizedFullName = charName .. "-" .. realmName:gsub("%s+", "")
+									end
+
+									if
+										fullName == contextName
+										or normalizedFullName == contextName
+										or normalizedFullName == cleanContextName
+										or fullName == cleanContextName
+										or charName == contextName
+									then
+										if accountInfo.battleTag then
+											friendUID = "bnet_" .. accountInfo.battleTag
+											break
+										end
 									end
 								end
 							end
 						end
 
 						if not friendUID then
-							-- Normalize name to ensure it matches the format used in FriendsList module (Name-Realm)
-							-- BFL:NormalizeWoWFriendName uses GetNormalizedRealmName (no spaces)
-							-- So we must ensure our input name has spaces stripped from realm too
-
-							local targetName = contextData.name
+							local targetName = contextName
 							if string.find(targetName, "-") then
 								local tName, tRealm = strsplit("-", targetName, 2)
 								targetName = tName .. "-" .. tRealm:gsub("%s+", "")
 							end
 
 							local normalized = BFL:NormalizeWoWFriendName(targetName)
-
-							-- FIX: Verify this person is actually a friend before creating a UID
-							-- Check for restricted content (Combat) to avoid taint/Action Forbidden errors
-							if
-								not BFL:IsActionRestricted() and C_FriendList.GetFriendInfo(normalized or targetName)
-							then
+							if not BFL:IsActionRestricted() and C_FriendList.GetFriendInfo(normalized or targetName) then
 								friendUID = "wow_" .. (normalized or targetName)
 							end
 						end
@@ -2476,7 +2546,6 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					return
 				end
 
-				-- Check if this friend is in any custom group
 				local friendCurrentGroups = {}
 				if BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friendUID] then
 					for _, gid in ipairs(BetterFriendlistDB.friendGroups[friendUID]) do
@@ -2484,30 +2553,25 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					end
 				end
 
-				-- Add divider and Header
 				rootDescription:CreateDivider()
 				rootDescription:CreateTitle(L.MENU_TITLE)
 
-				-- Add "Set Nickname" button
+				local menuDisplayName = BFL_FirstSafeText(streamerDisplayName, contextName, battleTag)
 				rootDescription:CreateButton(L.MENU_SET_NICKNAME, function()
 					local DB = BFL:GetModule("DB")
 					local currentNickname = DB and DB:GetNickname(friendUID)
 
-					-- Use contextData.name for display, fallback to battleTag if available
-					local displayName =
-						BFL_FirstSafeText(contextData.bfl_streamerDisplayName, contextData.name, contextData.battleTag)
-
-					StaticPopup_Show("BETTER_FRIENDLIST_SET_NICKNAME", displayName or "Friend", nil, {
+					StaticPopup_Show("BETTER_FRIENDLIST_SET_NICKNAME", menuDisplayName or "Friend", nil, {
 						uid = friendUID,
 						nickname = currentNickname,
 					})
 				end)
 
-				-- "Switch Game Account" submenu for BNet friends with multiple game accounts
-				if bnetIDAccount then
-					local FriendsList = GetFriendsList()
-					local friendData
-					if FriendsList and FriendsList.friendsList then
+				-- Keep richer game-account controls on BFL-owned menus only. Native Blizzard
+				-- Menu.ModifyMenu callbacks append BFL group/nickname entries without mutating
+				-- or expanding Blizzard-owned menu behavior.
+				if bnetIDAccount and isOwnMenu then
+					if not friendData and FriendsList and FriendsList.friendsList then
 						for _, f in ipairs(FriendsList.friendsList) do
 							if f.type == "bnet" and f.bnetAccountID == bnetIDAccount then
 								friendData = f
@@ -2520,7 +2584,6 @@ frame:SetScript("OnEvent", function(self, event, ...)
 						local switchButton =
 							rootDescription:CreateButton((L and L.MENU_SWITCH_GAME_ACCOUNT) or "Switch Game Account")
 
-						-- Header: Friend display name (respects name formatting & Streamer Mode)
 						if FriendsList and FriendsList.GetDisplayName then
 							switchButton:CreateTitle(FriendsList:GetDisplayName(friendData))
 						end
@@ -2545,13 +2608,11 @@ frame:SetScript("OnEvent", function(self, event, ...)
 							end
 						end
 
-						-- "Default (Server Focus)" option
 						local defaultText = (L and L.MENU_DEFAULT_FOCUS) or "Default (Server)"
 						switchButton:CreateRadio(defaultText, IsSelected, SetSelected, "default")
 
 						switchButton:CreateDivider()
 
-						-- List all game accounts
 						for _, ga in ipairs(friendData.gameAccounts) do
 							if
 								ga.clientProgram ~= "App"
@@ -2571,13 +2632,10 @@ frame:SetScript("OnEvent", function(self, event, ...)
 										label = label .. " - " .. ga.areaName
 									end
 								else
-									-- Non-WoW: just richPresence, no character name
 									label = ga.richPresence or ga.clientProgram or "Unknown"
 								end
 
-								-- Prepend game icon
 								label = BFL:GetClientEmbeddedIcon(ga.clientProgram, 16) .. label
-
 								switchButton:CreateRadio(label, IsSelected, SetSelected, ga.gameAccountID)
 							end
 						end
@@ -3373,26 +3431,32 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					"MENU_UNIT_PLAYER",
 					"MENU_UNIT_RAID_PLAYER",
 					"MENU_UNIT_RAID",
-					"MENU_UNIT_GUILD",
-					"MENU_UNIT_GUILD_OFFLINE",
 					"MENU_UNIT_CHAT_ROSTER",
 					"MENU_UNIT_TARGET",
 					"MENU_UNIT_FOCUS",
-					"MENU_UNIT_COMMUNITIES_WOW_MEMBER",
-					"MENU_UNIT_COMMUNITIES_GUILD_MEMBER",
-					"MENU_UNIT_COMMUNITIES_MEMBER",
 					"MENU_UNIT_RECENT_ALLY",
 					"MENU_UNIT_RECENT_ALLY_OFFLINE",
 					"MENU_UNIT_WORLD_STATE_SCORE",
 					"MENU_UNIT_PVP_SCOREBOARD",
 				}
 
+				if not BFL.HasSecretValues then
+					-- Guild/Communities menus feed Blizzard's Communities list, which
+					-- reads secret member fields while opening on 12.x.
+					groupMenuTags[#groupMenuTags + 1] = "MENU_UNIT_GUILD"
+					groupMenuTags[#groupMenuTags + 1] = "MENU_UNIT_GUILD_OFFLINE"
+					groupMenuTags[#groupMenuTags + 1] = "MENU_UNIT_COMMUNITIES_WOW_MEMBER"
+					groupMenuTags[#groupMenuTags + 1] = "MENU_UNIT_COMMUNITIES_GUILD_MEMBER"
+					groupMenuTags[#groupMenuTags + 1] = "MENU_UNIT_COMMUNITIES_MEMBER"
+				end
+
 				for _, tag in ipairs(groupMenuTags) do
 					Menu.ModifyMenu(tag, AddGroupsToFriendMenu)
 				end
 			end
 
-			-- Register for BattleNet friend menus (online and offline)
+			-- Pre-secret clients may still use safe BFL-owned native menu mutations.
+			-- On secret-value builds, keep native ModifyMenu to BFL's own appended group section only.
 			if Menu and Menu.ModifyMenu and not BFL.HasSecretValues then
 				-- Streamer Mode: Rename context menu title to safe display name
 				-- (contextData.name stays as accountName for whisper functionality)
@@ -3436,7 +3500,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				Menu.ModifyMenu("MENU_UNIT_FRIEND", BFL_StreamerModeRenameTitle)
 				Menu.ModifyMenu("MENU_UNIT_FRIEND_OFFLINE", BFL_StreamerModeRenameTitle)
 
-				-- Midnight 12.0.0+ Taint Fix: Replace Whisper button with securecallfunction wrapper
+				-- Legacy whisper responder replacement for BFL-owned pre-secret menus.
 				Menu.ModifyMenu("MENU_UNIT_BN_FRIEND", BFL_ReplaceWhisperButton)
 				Menu.ModifyMenu("MENU_UNIT_BN_FRIEND_OFFLINE", BFL_ReplaceWhisperButton)
 				Menu.ModifyMenu("MENU_UNIT_FRIEND", BFL_ReplaceWhisperButton)
@@ -3473,9 +3537,8 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 				-- Housing: Intercept "View Houses" menu entry during combat (Retail 12.0+ only)
 				-- ShowUIPanel() is protected since 8.2.0, so the house list cannot be opened in combat.
-				-- Without interception, BFL's ModifyMenu hooks taint the execution context, causing
-				-- a cryptic "Interface action failed because of an AddOn" error. We replace it with
-				-- a clear localized message instead.
+				-- On pre-secret clients this replaces the combat-blocked action with a clear
+				-- localized message for BFL-owned menus.
 				if BFL.IsRetail and UNIT_VIEW_HOUSES then
 					local function BFL_InterceptViewHousesInCombat(owner, rootDescription, contextData)
 						if not BFL_IsOwnMenuContext(contextData) then

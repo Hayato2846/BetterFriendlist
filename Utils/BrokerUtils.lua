@@ -106,6 +106,77 @@ function BU.ClassColorText(friend, text)
 end
 
 -- ========================================
+-- Broker Tooltip Font Helpers
+-- ========================================
+local function GetBrokerFontSize(sizeOffset)
+	local size = BetterFriendlistDB and tonumber(BetterFriendlistDB.brokerFontSize) or 12
+	size = size + (sizeOffset or 0)
+	return math.max(6, math.floor(size + 0.5))
+end
+
+function BU.GetBrokerFontObject(sizeOffset)
+	local fontName = BetterFriendlistDB and BetterFriendlistDB.brokerFont or "Friz Quadrata TT"
+	local fontSize = GetBrokerFontSize(sizeOffset)
+
+	if BFL.FontManager and BFL.FontManager.ResolveFontPath and BFL.FontManager.GetOrCreateFontFamily then
+		local fontPath = BFL.FontManager:ResolveFontPath(fontName)
+		if fontPath then
+			local fontObject = BFL.FontManager:GetOrCreateFontFamily(fontPath, fontSize, "NONE", false)
+			if fontObject then
+				return fontObject
+			end
+		end
+	end
+
+	return (sizeOffset and sizeOffset > 0) and "GameTooltipHeaderText" or "GameTooltipText"
+end
+
+function BU.ApplyBrokerFontToFontString(fontString, sizeOffset)
+	local valueType = type(fontString)
+	if (valueType == "table" or valueType == "userdata") and fontString.SetFontObject then
+		pcall(fontString.SetFontObject, fontString, BU.GetBrokerFontObject(sizeOffset))
+	end
+end
+
+function BU.ApplyBrokerFontToCell(cell, sizeOffset)
+	local valueType = type(cell)
+	if (valueType == "table" or valueType == "userdata") and cell.SetFontObject then
+		pcall(cell.SetFontObject, cell, BU.GetBrokerFontObject(sizeOffset))
+		if cell.OnContentChanged then
+			pcall(cell.OnContentChanged, cell)
+		end
+	end
+end
+
+function BU.ApplyBrokerFontToRow(row, sizeOffset)
+	if not row then
+		return
+	end
+
+	if row.Cells then
+		for _, cell in pairs(row.Cells) do
+			BU.ApplyBrokerFontToCell(cell, sizeOffset)
+		end
+	end
+
+	if row.ColSpanCells then
+		for _, cell in pairs(row.ColSpanCells) do
+			BU.ApplyBrokerFontToCell(cell, sizeOffset)
+		end
+	end
+end
+
+function BU.ApplyBrokerFontToTooltip(tt, sizeOffset)
+	if not tt or not tt.Rows then
+		return
+	end
+
+	for _, row in pairs(tt.Rows) do
+		BU.ApplyBrokerFontToRow(row, sizeOffset)
+	end
+end
+
+-- ========================================
 -- Menu Open Detection
 -- ========================================
 function BU.IsMenuOpen()

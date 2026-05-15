@@ -4986,6 +4986,9 @@ function Settings:RefreshAdvancedTab()
 		BetterFriendlistDB.taintFreeWhisper or false,
 		function(checked)
 			BetterFriendlistDB.taintFreeWhisper = checked
+			if not checked and BFL.CloseTaintFreeWhisper then
+				BFL:CloseTaintFreeWhisper(true)
+			end
 			if BFL.SettingsVersion then
 				BFL.SettingsVersion = BFL.SettingsVersion + 1
 			end
@@ -5359,6 +5362,27 @@ function Settings:RefreshBrokerTab()
 
 	local allFrames = {}
 
+	-- Shared Broker Font Library
+	local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
+	local fontList = LSM and LSM:List("font") or { "Friz Quadrata TT" }
+	local fontPaths = {}
+	for i, fontName in ipairs(fontList) do
+		fontPaths[i] = BFL.FontManager:ResolveFontPath(fontName)
+	end
+	local fontOptions = { labels = fontList, values = fontList, fontPaths = fontPaths, useCheckboxes = true }
+
+	local function RefreshBrokerTooltips()
+		local Broker = BFL:GetModule("Broker")
+		if Broker and Broker.RefreshTooltip then
+			Broker:RefreshTooltip()
+		end
+
+		local GBroker = BFL:GetModule("GuildBroker")
+		if GBroker and GBroker.RefreshTooltip then
+			GBroker:RefreshTooltip()
+		end
+	end
+
 	-- Header: Data Broker Integration
 	local header = Components:CreateHeader(tab, L.BROKER_SETTINGS_HEADER_INTEGRATION)
 	table.insert(allFrames, header)
@@ -5406,6 +5430,70 @@ function Settings:RefreshBrokerTab()
 			or "Show BetterFriendlist in Data Broker display addons. Requires UI reload to take effect."
 	)
 	table.insert(allFrames, enableBroker)
+
+	table.insert(allFrames, Components:CreateSpacer(tab))
+	table.insert(allFrames, Components:CreateHeader(tab, L.BROKER_SETTINGS_FONT_HEADER or "Broker Tooltip Font"))
+
+	local currentBrokerFont = DB:Get("brokerFont", "Friz Quadrata TT")
+	local brokerFontDropdown
+	brokerFontDropdown = Components:CreateDropdown(
+		tab,
+		L.BROKER_SETTINGS_FONT or "Font:",
+		fontOptions,
+		function(val)
+			return val == currentBrokerFont
+		end,
+		function(val)
+			DB:Set("brokerFont", val)
+			currentBrokerFont = val
+			if brokerFontDropdown.DropDown then
+				if brokerFontDropdown.DropDown.SetText then
+					brokerFontDropdown.DropDown:SetText(val)
+				elseif UIDropDownMenu_SetText then
+					UIDropDownMenu_SetText(brokerFontDropdown.DropDown, val)
+				end
+			end
+			RefreshBrokerTooltips()
+		end
+	)
+	if brokerFontDropdown.SetTooltip then
+		brokerFontDropdown:SetTooltip(
+			L.BROKER_SETTINGS_FONT or "Font:",
+			L.BROKER_SETTINGS_FONT_TOOLTIP or "Choose the font used in broker tooltips"
+		)
+	end
+	if brokerFontDropdown.DropDown then
+		local point, relativeTo, relativePoint, xOfs, yOfs = brokerFontDropdown.DropDown:GetPoint(1)
+		if point then
+			brokerFontDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
+		end
+	end
+	table.insert(allFrames, brokerFontDropdown)
+
+	local brokerFontSize = Components:CreateSlider(
+		tab,
+		L.BROKER_SETTINGS_FONT_SIZE or "Font Size:",
+		8,
+		24,
+		DB:Get("brokerFontSize", 12),
+		function(val)
+			return tostring(val)
+		end,
+		function(val)
+			DB:Set("brokerFontSize", val)
+			RefreshBrokerTooltips()
+		end
+	)
+	if brokerFontSize.SetStep then
+		brokerFontSize:SetStep(1)
+	end
+	if brokerFontSize.SetTooltip then
+		brokerFontSize:SetTooltip(
+			L.BROKER_SETTINGS_FONT_SIZE or "Font Size:",
+			L.BROKER_SETTINGS_FONT_SIZE_TOOLTIP or "Set the font size used in broker tooltips"
+		)
+	end
+	table.insert(allFrames, brokerFontSize)
 
 	if DB:Get("brokerEnabled", true) then
 		-- Show Icon
@@ -5572,6 +5660,40 @@ function Settings:RefreshBrokerTab()
 		end
 		table.insert(allFrames, brokerShowClassIcons)
 
+		local brokerGroupHeaderAlignOptions = {
+			labels = {
+				L.SETTINGS_ALIGN_LEFT or "Left",
+				L.SETTINGS_ALIGN_CENTER or "Center",
+				L.SETTINGS_ALIGN_RIGHT or "Right",
+			},
+			values = { "LEFT", "CENTER", "RIGHT" },
+		}
+		local currentGroupHeaderAlign = DB:Get("brokerGroupHeaderAlign", "LEFT")
+		local brokerGroupHeaderAlignDropdown = Components:CreateDropdown(
+			tab,
+			L.BROKER_SETTINGS_GROUP_HEADER_ALIGN or "Group Name Alignment",
+			brokerGroupHeaderAlignOptions,
+			function(val)
+				return val == currentGroupHeaderAlign
+			end,
+			function(val)
+				DB:Set("brokerGroupHeaderAlign", val)
+				currentGroupHeaderAlign = val
+				local Broker = BFL:GetModule("Broker")
+				if Broker and Broker.RefreshTooltip then
+					Broker:RefreshTooltip()
+				end
+			end
+		)
+		if brokerGroupHeaderAlignDropdown.SetTooltip then
+			brokerGroupHeaderAlignDropdown:SetTooltip(
+				L.BROKER_SETTINGS_GROUP_HEADER_ALIGN or "Group Name Alignment",
+				L.BROKER_SETTINGS_GROUP_HEADER_ALIGN_TOOLTIP
+					or "Set the alignment of group names in the friends broker tooltip"
+			)
+		end
+		table.insert(allFrames, brokerGroupHeaderAlignDropdown)
+
 		-- Spacer
 		table.insert(allFrames, Components:CreateSpacer(tab))
 
@@ -5617,6 +5739,7 @@ function Settings:RefreshBrokerTab()
 		local availableColumns = {
 			{ key = "Nickname", label = L.BROKER_COLUMN_NICKNAME or "Nickname", default = false },
 			{ key = "Name", label = L.BROKER_COLUMN_NAME, default = true },
+			{ key = "Status", label = L.BROKER_COLUMN_STATUS or "Status", default = false },
 			{ key = "Level", label = L.BROKER_COLUMN_LEVEL, default = true },
 			{ key = "Character", label = L.BROKER_COLUMN_CHARACTER, default = true },
 			{ key = "Game", label = L.BROKER_COLUMN_GAME, default = true },
@@ -5842,6 +5965,31 @@ function Settings:RefreshBrokerTab()
 			end
 		)
 		table.insert(allFrames, guildShowTotal)
+
+		-- Show Applicant Count
+		local guildShowApplicants = Components:CreateCheckbox(
+			tab,
+			L.GUILD_BROKER_SETTINGS_SHOW_APPLICANTS or "Show Applicant Count",
+			DB:Get("guildBrokerShowApplicants", true),
+			function(val)
+				DB:Set("guildBrokerShowApplicants", val)
+				local GBroker = BFL:GetModule("GuildBroker")
+				if GBroker and GBroker.RefreshApplicantCount then
+					GBroker:RefreshApplicantCount(false)
+				end
+				if GBroker and GBroker.UpdateBrokerText then
+					GBroker:UpdateBrokerText(true)
+				end
+			end
+		)
+		if guildShowApplicants.SetTooltip then
+			guildShowApplicants:SetTooltip(
+				L.GUILD_BROKER_SETTINGS_SHOW_APPLICANTS or "Show Applicant Count",
+				L.GUILD_BROKER_SETTINGS_SHOW_APPLICANTS_DESC
+					or "Show pending guild applicant count in the broker label when available"
+			)
+		end
+		table.insert(allFrames, guildShowApplicants)
 
 		-- Show Hints
 		local guildShowHints = Components:CreateCheckbox(

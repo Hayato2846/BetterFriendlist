@@ -1368,7 +1368,7 @@
 
 						if friend.type == "bnet" then
 							local tellName = BFL:GetSafeAccountName(friend.accountName, friend.battleTag) or friend.battleTag
-							BFL:SecureSendBNetTell(tellName, friend.bnetIDAccount)
+							BFL:SecureSendBNetTell(tellName, friend.bnetIDAccount or friend.bnetAccountID)
 						elseif friend.type == "wow" and friend.name then
 							BFL:SecureSendTell(friend.name)
 						end

@@ -140,6 +140,10 @@ local defaults = {
 	brokerTooltipMode = "advanced", -- Tooltip detail level: "basic" or "advanced" (default: advanced)
 	brokerClickAction = "toggle", -- Left click action: "toggle", "friends", "settings" (default: toggle)
 	brokerShowHints = true, -- Show hint text in LDB tooltip footer (default: ON)
+	brokerFont = "Friz Quadrata TT", -- Broker tooltip font face
+	brokerFontSize = 12, -- Broker tooltip font size
+	brokerShowColStatus = false, -- Column: Status icon (default: OFF)
+	brokerGroupHeaderAlign = "LEFT", -- Friends Broker group header alignment: LEFT/CENTER/RIGHT
 	-- Guild Data Broker Settings
 	guildBrokerEnabled = false, -- Enable Guild Data Broker plugin (default: OFF)
 	guildBrokerShowIcon = true, -- Show guild icon on display addons (default: ON)
@@ -148,6 +152,7 @@ local defaults = {
 	guildBrokerTooltipMode = "advanced", -- Tooltip detail level: "basic" or "advanced" (default: advanced)
 	guildBrokerClickAction = "guild_frame", -- Left click action: "guild_frame", "settings" (default: guild_frame)
 	guildBrokerShowHints = true, -- Show hint text in tooltip footer (default: ON)
+	guildBrokerShowApplicants = true, -- Show pending Guild Finder applicant count when available
 	guildBrokerGroupMode = "none", -- Group mode: "none", "by_rank", "by_class" (default: none)
 	guildBrokerFilter = "online", -- Default filter: "all", "online" (default: online)
 	guildBrokerMaxRows = 100, -- Max rows in tooltip (performance cap, default: 100)
@@ -213,7 +218,7 @@ local defaults = {
 	socialKeybindMigrated = false, -- Track if TOGGLESOCIAL was moved to BetterFriendlist's native binding on secret-value clients
 	socialKeybindMigrationVersion = nil, -- Last social keybind migration version
 	socialKeybindMigratedKeys = {}, -- Keys moved from TOGGLESOCIAL to BETTERFRIENDLIST_TOGGLE
-	socialKeybindMigrationReloadPrompted = false, -- Track one-time reload prompt after automatic binding migration
+	socialKeybindMigrationReloadPrompted = false, -- Legacy reload prompt flag kept for SavedVariables compatibility
 	lastChangelogVersion = "0.0.0", -- Last version the user saw the changelog for
 	version = BFL.Version,
 }

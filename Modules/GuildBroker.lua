@@ -55,6 +55,13 @@ local GetClassIcon = BFL.BrokerUtils.GetClassIcon
 local FormatLastOnline = BFL.BrokerUtils.FormatLastOnline
 local IsMenuOpen = BFL.BrokerUtils.IsMenuOpen
 local AddNameToEditBox = BFL.BrokerUtils.AddNameToEditBox
+local ApplyBrokerFontToFontString = BFL.BrokerUtils.ApplyBrokerFontToFontString
+local ApplyBrokerFontToTooltip = BFL.BrokerUtils.ApplyBrokerFontToTooltip
+
+-- Guild Finder applicant count cache
+local applicantCount = 0
+local lastApplicantRequestTime = 0
+local APPLICANT_REQUEST_INTERVAL = 20
 
 -- ========================================
 -- Localization Helper
@@ -66,11 +73,47 @@ local function L(key)
 	return key
 end
 
+local function ShouldAvoidSecretValueGuildActions()
+	return BFL.HasSecretValues
+end
+
+local function IsSecretValue(value)
+	return BFL.HasSecretValues and BFL.IsSecret and BFL:IsSecret(value)
+end
+
+local function SafeText(value, fallback)
+	if value == nil or IsSecretValue(value) then
+		return fallback or ""
+	end
+	return value
+end
+
+local function SafeIsInGuild()
+	if not IsInGuild then
+		return false
+	end
+
+	local ok, result = pcall(IsInGuild)
+	return ok and result or false
+end
+
+local function SafeGetGuildInfo()
+	if not GetGuildInfo then
+		return nil
+	end
+
+	local ok, guildName = pcall(GetGuildInfo, "player")
+	if ok and guildName and not IsSecretValue(guildName) then
+		return guildName
+	end
+	return nil
+end
+
 local function NormalizeRosterName(name)
 	if not name or name == "" then
 		return nil
 	end
-	if BFL.HasSecretValues and BFL:IsSecret(name) then
+	if IsSecretValue(name) then
 		return nil
 	end
 
@@ -108,23 +151,27 @@ end
 local function BuildGuildProfessionLookup()
 	local lookup = {}
 
+	if ShouldAvoidSecretValueGuildActions() then
+		return lookup
+	end
+
 	if not C_Club or not C_Club.GetGuildClubId or not C_Club.GetClubMembers or not C_Club.GetMemberInfo then
 		return lookup
 	end
 
-	local clubId = C_Club.GetGuildClubId()
-	if not clubId then
+	local okClubId, clubId = pcall(C_Club.GetGuildClubId)
+	if not okClubId or not clubId then
 		return lookup
 	end
 
-	local memberIds = C_Club.GetClubMembers(clubId)
-	if not memberIds then
+	local okMembers, memberIds = pcall(C_Club.GetClubMembers, clubId)
+	if not okMembers or not memberIds then
 		return lookup
 	end
 
 	for _, memberId in ipairs(memberIds) do
-		local memberInfo = C_Club.GetMemberInfo(clubId, memberId)
-		if memberInfo and memberInfo.name then
+		local okMemberInfo, memberInfo = pcall(C_Club.GetMemberInfo, clubId, memberId)
+		if okMemberInfo and memberInfo and memberInfo.name then
 			local professions = {}
 			local firstProfession = FormatProfessionEntry(
 				memberInfo.profession1ID,
@@ -162,7 +209,7 @@ end
 
 -- Collect and cache guild roster data
 function GuildBroker:CollectGuildRoster()
-	if not IsInGuild() then
+	if not SafeIsInGuild() then
 		rosterCache = nil
 		return {}
 	end
@@ -173,8 +220,19 @@ function GuildBroker:CollectGuildRoster()
 		return rosterCache
 	end
 
-	local numTotal, numOnline = GetNumGuildMembers()
-	if not numTotal or numTotal == 0 then
+	if not GetNumGuildMembers then
+		rosterCache = {}
+		rosterCacheTime = now
+		return rosterCache
+	end
+
+	local okCounts, numTotal = pcall(GetNumGuildMembers)
+	if not okCounts or not numTotal or numTotal == 0 then
+		rosterCache = {}
+		rosterCacheTime = now
+		return rosterCache
+	end
+	if not BFL.GetGuildRosterInfo then
 		rosterCache = {}
 		rosterCacheTime = now
 		return rosterCache
@@ -185,51 +243,55 @@ function GuildBroker:CollectGuildRoster()
 	local professionLookup = BuildGuildProfessionLookup()
 
 	for i = 1, numTotal do
-		local fullName, rank, rankIndex, level, className, zone, note, officerNote, online, status, classFile,
-			achievementPoints, achievementRank, isMobile, isSoREligible, standingID = BFL.GetGuildRosterInfo(i)
+		local okInfo, fullName, rank, rankIndex, level, className, zone, note, officerNote, online, status, classFile,
+			achievementPoints, achievementRank, isMobile, isSoREligible, standingID = pcall(BFL.GetGuildRosterInfo, i)
 
-		if fullName then
-			local name, realm = strsplit("-", fullName, 2)
+		if okInfo and fullName then
+			local safeFullName = SafeText(fullName, "Unknown")
+			local name, realm
+			if safeFullName == "Unknown" then
+				name = "Unknown"
+				realm = ""
+			else
+				name, realm = strsplit("-", safeFullName, 2)
+			end
 			local isAFK = (status == 1)
 			local isDND = (status == 2)
 
 			-- Last online time (only relevant for offline members)
 			local lastYears, lastMonths, lastDays, lastHours = 0, 0, 0, 0
-			if not online then
-				lastYears, lastMonths, lastDays, lastHours = BFL.GetGuildRosterLastOnline(i)
-			end
-
-			-- Secret value guards (12.0+)
-			local safeName = fullName
-			local safeZone = zone or ""
-			if BFL.HasSecretValues then
-				if BFL:IsSecret(fullName) then
-					safeName = "Unknown"
-					name = "Unknown"
-				end
-				if BFL:IsSecret(zone) then
-					safeZone = ""
+			if not online and BFL.GetGuildRosterLastOnline then
+				local okLastOnline, years, months, days, hours = pcall(BFL.GetGuildRosterLastOnline, i)
+				if okLastOnline then
+					lastYears, lastMonths, lastDays, lastHours = years, months, days, hours
 				end
 			end
 
-			local professionText = professionLookup[NormalizeRosterName(safeName)]
+			local safeZone = SafeText(zone, "")
+			local safeRank = SafeText(rank, "")
+			local safeClassName = SafeText(className, "")
+			local safeClassFile = SafeText(classFile, "")
+			local safeNote = SafeText(note, "")
+			local safeOfficerNote = SafeText(officerNote, "")
+
+			local professionText = professionLookup[NormalizeRosterName(safeFullName)]
 				or professionLookup[NormalizeRosterName(name)]
 				or ""
 
 			table.insert(members, {
 				index = i,
-				fullName = safeName,
-				name = name or safeName,
+				fullName = safeFullName,
+				name = name or safeFullName,
 				realm = realm or "",
 				professions = professionText,
-				rank = rank or "",
+				rank = safeRank,
 				rankIndex = rankIndex or 0,
 				level = level or 0,
-				classFile = classFile or "",
-				className = className or "",
+				classFile = safeClassFile,
+				className = safeClassName,
 				zone = safeZone,
-				note = note or "",
-				officerNote = officerNote or "",
+				note = safeNote,
+				officerNote = safeOfficerNote,
 				online = online or false,
 				isAFK = isAFK,
 				isDND = isDND,
@@ -259,10 +321,16 @@ end
 
 -- Get online/total counts
 function GuildBroker:GetGuildCounts()
-	if not IsInGuild() then
+	if not SafeIsInGuild() then
 		return 0, 0
 	end
-	local numTotal, numOnline = GetNumGuildMembers()
+	if not GetNumGuildMembers then
+		return 0, 0
+	end
+	local okCounts, numTotal, numOnline = pcall(GetNumGuildMembers)
+	if not okCounts then
+		return 0, 0
+	end
 	return numOnline or 0, numTotal or 0
 end
 
@@ -430,16 +498,110 @@ local function GroupMembers(members, mode)
 end
 
 -- ========================================
+-- Guild Finder Applicant Count
+-- ========================================
+
+local function HasGuildApplicantPermission()
+	if IsGuildLeader then
+		local okLeader, isLeader = pcall(IsGuildLeader)
+		if okLeader and isLeader then
+			return true
+		end
+	end
+
+	if C_GuildInfo and C_GuildInfo.IsGuildOfficer then
+		local okOfficer, isOfficer = pcall(C_GuildInfo.IsGuildOfficer)
+		if okOfficer and isOfficer then
+			return true
+		end
+	end
+
+	return false
+end
+
+local function GetGuildClubId()
+	if not C_Club or not C_Club.GetGuildClubId then
+		return nil
+	end
+
+	local ok, clubId = pcall(C_Club.GetGuildClubId)
+	if ok and clubId then
+		return clubId
+	end
+	return nil
+end
+
+function GuildBroker:CanShowApplicantCount()
+	return BetterFriendlistDB
+		and BetterFriendlistDB.guildBrokerShowApplicants ~= false
+		and C_Club
+		and C_Club.GetGuildClubId
+		and C_ClubFinder
+		and C_ClubFinder.RequestApplicantList
+		and C_ClubFinder.ReturnClubApplicantList
+		and Enum
+		and Enum.ClubFinderRequestType
+		and Enum.ClubFinderRequestType.Guild
+		and HasGuildApplicantPermission()
+end
+
+function GuildBroker:RefreshApplicantCount(requestServer)
+	applicantCount = 0
+
+	if not self:CanShowApplicantCount() then
+		return applicantCount
+	end
+
+	local clubId = GetGuildClubId()
+	if not clubId then
+		return applicantCount
+	end
+
+	if requestServer then
+		pcall(C_ClubFinder.RequestApplicantList, Enum.ClubFinderRequestType.Guild)
+	end
+
+	local okApplicants, applicants = pcall(C_ClubFinder.ReturnClubApplicantList, clubId)
+	if okApplicants and type(applicants) == "table" then
+		applicantCount = #applicants
+	end
+
+	return applicantCount
+end
+
+function GuildBroker:RequestApplicantCountUpdate()
+	if not self:CanShowApplicantCount() then
+		applicantCount = 0
+		return applicantCount
+	end
+
+	local now = GetTime()
+	local shouldRequest = lastApplicantRequestTime == 0 or (now - lastApplicantRequestTime) >= APPLICANT_REQUEST_INTERVAL
+	if shouldRequest then
+		lastApplicantRequestTime = now
+	end
+
+	return self:RefreshApplicantCount(shouldRequest)
+end
+
+local function GetApplicantIndicatorText()
+	if applicantCount and applicantCount > 0 then
+		return " " .. C("ff8800", "+" .. tostring(applicantCount))
+	end
+	return ""
+end
+
+-- ========================================
 -- Broker Text Update
 -- ========================================
 
-function GuildBroker:UpdateBrokerText()
+function GuildBroker:UpdateBrokerText(force)
 	if not dataObject then
 		return
 	end
 
 	local currentTime = GetTime()
-	if currentTime - lastUpdateTime < THROTTLE_INTERVAL then
+	if not force and currentTime - lastUpdateTime < THROTTLE_INTERVAL then
 		return
 	end
 	lastUpdateTime = currentTime
@@ -448,10 +610,12 @@ function GuildBroker:UpdateBrokerText()
 		return
 	end
 
-	if not IsInGuild() then
+	if not SafeIsInGuild() then
 		dataObject.text = L("GUILD_BROKER_NO_GUILD")
 		return
 	end
+
+	self:RequestApplicantCountUpdate()
 
 	local onlineCount, totalCount = self:GetGuildCounts()
 
@@ -470,9 +634,10 @@ function GuildBroker:UpdateBrokerText()
 	else
 		countText = tostring(onlineCount)
 	end
+	countText = countText .. GetApplicantIndicatorText()
 
 	if showLabel then
-		local guildName = GetGuildInfo("player") or L("GUILD_BROKER_NO_GUILD")
+		local guildName = SafeGetGuildInfo() or L("GUILD_BROKER_NO_GUILD")
 		dataObject.text = guildName .. ": " .. countText
 	else
 		dataObject.text = countText
@@ -517,15 +682,16 @@ local function OnMemberLineClick(cell, data, mouseButton)
 	end
 
 	local actualButton = mouseButton or GetMouseButtonClicked()
+	local hasUsableFullName = data.fullName and data.fullName ~= "Unknown"
 
 	if IsAltKeyDown() then
 		-- Invite to group
-		if data.fullName then
+		if hasUsableFullName then
 			BFL.InviteUnit(data.fullName)
 		end
 	elseif IsShiftKeyDown() then
 		-- Copy name to chat
-		if data.name then
+		if data.name and data.name ~= "Unknown" then
 			AddNameToEditBox(data.name, data.realm)
 		end
 	elseif actualButton == "RightButton" then
@@ -533,7 +699,7 @@ local function OnMemberLineClick(cell, data, mouseButton)
 		GuildBroker:OpenMemberContextMenu(data)
 	else
 		-- Whisper
-		if data.fullName then
+		if hasUsableFullName then
 			local whisperName = data.fullName:gsub(" ", "")
 			BFL:SecureSendTell(whisperName)
 		end
@@ -549,13 +715,16 @@ function GuildBroker:OpenMemberContextMenu(data)
 		return
 	end
 
+	local canUseGuildActions = not ShouldAvoidSecretValueGuildActions()
+	local hasUsableFullName = data.fullName and data.fullName ~= "Unknown"
+
 	-- Use MenuUtil (Retail) or fallback
 	if MenuUtil and MenuUtil.CreateContextMenu then
 		MenuUtil.CreateContextMenu(UIParent, function(owner, rootDescription)
 			rootDescription:CreateTitle(data.name or "Unknown")
 
 			-- Whisper (online only)
-			if data.online and data.fullName then
+			if data.online and hasUsableFullName then
 				rootDescription:CreateButton(L("GUILD_BROKER_MENU_WHISPER"), function()
 					local whisperName = data.fullName:gsub(" ", "")
 					BFL:SecureSendTell(whisperName)
@@ -563,21 +732,21 @@ function GuildBroker:OpenMemberContextMenu(data)
 			end
 
 			-- Invite (online only)
-			if data.online and data.fullName then
+			if data.online and hasUsableFullName then
 				rootDescription:CreateButton(L("GUILD_BROKER_MENU_INVITE"), function()
 					BFL.InviteUnit(data.fullName)
 				end)
 			end
 
 			-- Who
-			if data.fullName then
+			if hasUsableFullName then
 				rootDescription:CreateButton(L("GUILD_BROKER_MENU_WHO"), function()
 					C_FriendList.SendWho(data.fullName)
 				end)
 			end
 
 			-- Copy Name
-			if data.name then
+			if data.name and data.name ~= "Unknown" then
 				rootDescription:CreateButton(L("GUILD_BROKER_MENU_COPY_NAME"), function()
 					local copyText = data.fullName or data.name
 					StaticPopupDialogs["BETTERFRIENDLIST_COPY_URL"] = {
@@ -611,7 +780,7 @@ function GuildBroker:OpenMemberContextMenu(data)
 			end
 
 			-- Set/Edit Nickname
-			if data.fullName then
+			if hasUsableFullName then
 				local DB = GetDB()
 				local currentNick = DB and DB:GetGuildNickname(data.fullName) or ""
 				local nickLabel = currentNick ~= ""
@@ -664,7 +833,7 @@ function GuildBroker:OpenMemberContextMenu(data)
 			end
 
 			-- Edit Note
-			if CanEditPublicNote and CanEditPublicNote() then
+			if canUseGuildActions and CanEditPublicNote and CanEditPublicNote() then
 				rootDescription:CreateButton(L("GUILD_BROKER_MENU_EDIT_NOTE"), function()
 					SetGuildRosterSelection(data.index)
 					StaticPopup_Show("SET_GUILDPLAYERNOTE")
@@ -672,8 +841,12 @@ function GuildBroker:OpenMemberContextMenu(data)
 			end
 
 			-- Edit Officer Note
-			local canViewOfficer = C_GuildInfo and C_GuildInfo.CanViewOfficerNote and C_GuildInfo.CanViewOfficerNote()
-			local canEditOfficer = CanEditOfficerNote and CanEditOfficerNote()
+			local canViewOfficer = false
+			if canUseGuildActions and C_GuildInfo and C_GuildInfo.CanViewOfficerNote then
+				local okOfficerView, result = pcall(C_GuildInfo.CanViewOfficerNote)
+				canViewOfficer = okOfficerView and result or false
+			end
+			local canEditOfficer = canUseGuildActions and CanEditOfficerNote and CanEditOfficerNote()
 			if canViewOfficer and canEditOfficer then
 				rootDescription:CreateButton(L("GUILD_BROKER_MENU_EDIT_OFFICER_NOTE"), function()
 					SetGuildRosterSelection(data.index)
@@ -685,7 +858,7 @@ function GuildBroker:OpenMemberContextMenu(data)
 			local hasRankOptions = false
 
 			-- Promote
-			if CanGuildPromote and CanGuildPromote() and data.rankIndex and data.rankIndex > 1 then
+			if canUseGuildActions and CanGuildPromote and CanGuildPromote() and data.rankIndex and data.rankIndex > 1 then
 				if not hasRankOptions then
 					rootDescription:CreateDivider()
 					hasRankOptions = true
@@ -697,7 +870,7 @@ function GuildBroker:OpenMemberContextMenu(data)
 			end
 
 			-- Demote
-			if CanGuildDemote and CanGuildDemote() then
+			if canUseGuildActions and CanGuildDemote and CanGuildDemote() then
 				local numRanks = GuildControlGetNumRanks and GuildControlGetNumRanks() or 10
 				if data.rankIndex and data.rankIndex < (numRanks - 1) then
 					if not hasRankOptions then
@@ -712,7 +885,7 @@ function GuildBroker:OpenMemberContextMenu(data)
 			end
 
 			-- Remove
-			if CanGuildRemove and CanGuildRemove() then
+			if canUseGuildActions and CanGuildRemove and CanGuildRemove() then
 				if not hasRankOptions then
 					rootDescription:CreateDivider()
 				end
@@ -722,7 +895,7 @@ function GuildBroker:OpenMemberContextMenu(data)
 				end)
 			end
 		end)
-	elseif BFL.OpenContextMenu then
+	elseif BFL.OpenContextMenu and canUseGuildActions then
 		-- Classic fallback: Use WoW friend-style context menu for guild members
 		-- The guild roster index-based popup actions work via SetGuildRosterSelection
 		if data.index then
@@ -741,26 +914,30 @@ end
 
 -- Get member GUID via C_Club
 local function GetMemberGUID(memberData)
+	if ShouldAvoidSecretValueGuildActions() then
+		return nil, nil
+	end
+
 	if not C_Club or not C_Club.GetGuildClubId or not C_Club.GetMemberInfo then
 		return nil, nil
 	end
 
-	local clubId = C_Club.GetGuildClubId()
-	if not clubId then
+	local okClubId, clubId = pcall(C_Club.GetGuildClubId)
+	if not okClubId or not clubId then
 		return nil, nil
 	end
 
 	-- Find member by name in club roster
-	local members = C_Club.GetClubMembers(clubId)
-	if not members then
+	local okMembers, members = pcall(C_Club.GetClubMembers, clubId)
+	if not okMembers or not members then
 		return nil, nil
 	end
 
 	for _, memberId in ipairs(members) do
-		local memberInfo = C_Club.GetMemberInfo(clubId, memberId)
-		if memberInfo then
+		local okMemberInfo, memberInfo = pcall(C_Club.GetMemberInfo, clubId, memberId)
+		if okMemberInfo and memberInfo then
 			local infoName = memberInfo.name
-			if BFL.HasSecretValues and BFL:IsSecret(infoName) then
+			if IsSecretValue(infoName) then
 				-- Cannot compare secret names
 			elseif infoName and memberData.fullName then
 				-- C_Club names may or may not have realm suffix
@@ -775,6 +952,11 @@ local function GetMemberGUID(memberData)
 end
 
 function GuildBroker:PromoteMember(data)
+	if ShouldAvoidSecretValueGuildActions() then
+		BFL:DebugPrint(L("GUILD_BROKER_ACTION_RESTRICTED"))
+		return
+	end
+
 	if BFL:IsActionRestricted() then
 		BFL:DebugPrint(L("GUILD_BROKER_ACTION_RESTRICTED"))
 		return
@@ -823,6 +1005,11 @@ function GuildBroker:PromoteMember(data)
 end
 
 function GuildBroker:DemoteMember(data)
+	if ShouldAvoidSecretValueGuildActions() then
+		BFL:DebugPrint(L("GUILD_BROKER_ACTION_RESTRICTED"))
+		return
+	end
+
 	if BFL:IsActionRestricted() then
 		BFL:DebugPrint(L("GUILD_BROKER_ACTION_RESTRICTED"))
 		return
@@ -869,6 +1056,11 @@ function GuildBroker:DemoteMember(data)
 end
 
 function GuildBroker:RemoveMember(data)
+	if ShouldAvoidSecretValueGuildActions() then
+		BFL:DebugPrint(L("GUILD_BROKER_ACTION_RESTRICTED"))
+		return
+	end
+
 	if BFL:IsActionRestricted() then
 		BFL:DebugPrint(L("GUILD_BROKER_ACTION_RESTRICTED"))
 		return
@@ -988,6 +1180,7 @@ local function RenderFixedFooter(footerFrame)
 	local function AddLine(text, fontObject)
 		fontObject = fontObject or "GameTooltipText"
 		local fs = footerFrame:CreateFontString(nil, "OVERLAY", fontObject)
+		ApplyBrokerFontToFontString(fs, fontObject == "GameTooltipTextSmall" and -2 or 0)
 		table.insert(footerFrame.lines, fs)
 		fs:SetText(text)
 		fs:Show()
@@ -1205,11 +1398,16 @@ local function CreateDetailTooltip(cell, data)
 	end
 
 	-- Officer Note
-	local canViewOfficer = C_GuildInfo and C_GuildInfo.CanViewOfficerNote and C_GuildInfo.CanViewOfficerNote()
+	local canViewOfficer = false
+	if C_GuildInfo and C_GuildInfo.CanViewOfficerNote then
+		local okOfficerView, result = pcall(C_GuildInfo.CanViewOfficerNote)
+		canViewOfficer = okOfficerView and result or false
+	end
 	if canViewOfficer and data.officerNote and data.officerNote ~= "" then
 		local offNoteRow = tt2:AddRow(C("ltblue", L("GUILD_BROKER_COL_OFFICER_NOTE")), C("ltyellow", data.officerNote))
 	end
 
+	ApplyBrokerFontToTooltip(tt2)
 	tt2:UpdateLayout()
 	tt2:Show()
 	detailTooltip = tt2
@@ -1287,7 +1485,11 @@ local function CreateLibQTipTooltip(anchorFrame)
 	end
 
 	-- Officer Note visibility gated by permission
-	local canViewOfficer = C_GuildInfo and C_GuildInfo.CanViewOfficerNote and C_GuildInfo.CanViewOfficerNote()
+	local canViewOfficer = false
+	if C_GuildInfo and C_GuildInfo.CanViewOfficerNote then
+		local okOfficerView, result = pcall(C_GuildInfo.CanViewOfficerNote)
+		canViewOfficer = okOfficerView and result or false
+	end
 	if not canViewOfficer then
 		local filtered = {}
 		for _, col in ipairs(activeColumns) do
@@ -1333,7 +1535,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 		ApplyElvUISkin(tt)
 
 		-- No guild: show a simple, clean tooltip without footer/scroll infrastructure
-		if not IsInGuild() then
+		if not SafeIsInGuild() then
 			-- Hide leftover footer and reset scroll anchors from a previous in-guild tooltip (pooled frame reuse)
 			if tt.footerFrame then
 				tt.footerFrame:Hide()
@@ -1378,6 +1580,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 				)
 			end
 
+			ApplyBrokerFontToTooltip(tt)
 			tt:UpdateLayout()
 			tt:Show()
 			return
@@ -1411,7 +1614,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 		headerCell:SetFontObject(BetterFriendlistFontNormalLarge or "GameTooltipHeaderText")
 		headerCell:SetJustifyH("LEFT")
 
-		local guildName = GetGuildInfo("player") or L("GUILD_BROKER_NO_GUILD")
+		local guildName = SafeGetGuildInfo() or L("GUILD_BROKER_NO_GUILD")
 		headerCell:SetText(C("dkyellow", guildName))
 		tt:AddSeparator()
 
@@ -1672,6 +1875,8 @@ local function CreateLibQTipTooltip(anchorFrame)
 			emptyCell:SetText(C("gray", L("GUILD_BROKER_NO_MEMBERS_ONLINE")))
 		end
 
+		ApplyBrokerFontToTooltip(tt)
+
 		local footerHeight = GetFooterHeight()
 		local maxContentHeight = MAX_TOOLTIP_HEIGHT - footerHeight
 		tt:SetMaxHeight(maxContentHeight)
@@ -1744,12 +1949,12 @@ local function CreateBasicTooltip(gameTooltip)
 	gameTooltip:AddLine(L("GUILD_BROKER_TITLE"), 1, 0.82, 0, 1)
 	gameTooltip:AddLine(" ")
 
-	if not IsInGuild() then
+	if not SafeIsInGuild() then
 		gameTooltip:AddLine(L("GUILD_BROKER_NO_GUILD"), 0.7, 0.7, 0.7)
 		return
 	end
 
-	local guildName = GetGuildInfo("player") or ""
+	local guildName = SafeGetGuildInfo() or ""
 	gameTooltip:AddLine(guildName, 0, 1, 0)
 	gameTooltip:AddLine(" ")
 
@@ -1801,7 +2006,7 @@ function GuildBroker:OnClick(clickedFrame, button)
 			Settings:OpenSettingsTab("broker")
 		elseif BetterFriendsFrame and BetterFriendsFrame:IsShown() then
 			-- Toggle frame
-		else
+		elseif not ShouldAvoidSecretValueGuildActions() then
 			if ToggleGuildFrame then
 				ToggleGuildFrame()
 			elseif GuildFrame_Toggle then
@@ -1810,7 +2015,7 @@ function GuildBroker:OnClick(clickedFrame, button)
 		end
 	else
 		-- Left click: configurable action
-local action = BetterFriendlistDB and BetterFriendlistDB.guildBrokerClickAction or "guild_frame"
+		local action = BetterFriendlistDB and BetterFriendlistDB.guildBrokerClickAction or "guild_frame"
 
 		if action == "settings" then
 			local Settings = BFL:GetModule("Settings")
@@ -1818,6 +2023,14 @@ local action = BetterFriendlistDB and BetterFriendlistDB.guildBrokerClickAction 
 				Settings:OpenSettingsTab("broker")
 			end
 		else
+			if ShouldAvoidSecretValueGuildActions() then
+				local Settings = BFL:GetModule("Settings")
+				if Settings and Settings.OpenSettingsTab then
+					Settings:OpenSettingsTab("broker")
+				end
+				return
+			end
+
 			-- Default: open guild frame
 			if ToggleGuildFrame then
 				ToggleGuildFrame()
@@ -1862,7 +2075,10 @@ function GuildBroker:Initialize()
 	if LQT then
 		dataObjectDef.OnEnter = function(anchorFrame)
 			-- Request fresh roster data when tooltip opens
-			BFL.GuildRoster()
+			if BFL.GuildRoster then
+				pcall(BFL.GuildRoster)
+			end
+			GuildBroker:RequestApplicantCountUpdate()
 			tooltip = CreateLibQTipTooltip(anchorFrame)
 		end
 	else
@@ -1878,8 +2094,9 @@ function GuildBroker:Initialize()
 	if dataObject then
 		self:RegisterEvents()
 		-- Request initial roster (async: UpdateBrokerText will be called by GUILD_ROSTER_UPDATE)
-		if IsInGuild() then
-			BFL.GuildRoster()
+		self:UpdateBrokerText()
+		if SafeIsInGuild() and BFL.GuildRoster then
+			pcall(BFL.GuildRoster)
 		end
 	end
 end
@@ -1895,17 +2112,39 @@ function GuildBroker:RegisterEvents()
 
 	BFL:RegisterEventCallback("GUILD_ROSTER_UPDATE", function()
 		GuildBroker:InvalidateCache()
+		GuildBroker:RequestApplicantCountUpdate()
 		GuildBroker:UpdateBrokerText()
 		GuildBroker:RefreshTooltip()
 	end, 50)
 
 	BFL:RegisterEventCallback("PLAYER_GUILD_UPDATE", function()
 		GuildBroker:InvalidateCache()
+		lastApplicantRequestTime = 0
+		GuildBroker:RequestApplicantCountUpdate()
 		GuildBroker:UpdateBrokerText()
-		if IsInGuild() then
-			BFL.GuildRoster()
+		if SafeIsInGuild() and BFL.GuildRoster then
+			pcall(BFL.GuildRoster)
 		end
 	end, 50)
+
+	pcall(function()
+		BFL:RegisterEventCallback("CLUB_FINDER_APPLICATIONS_UPDATED", function(requestType)
+			if
+				Enum
+				and Enum.ClubFinderRequestType
+				and Enum.ClubFinderRequestType.Guild
+				and requestType
+				and requestType ~= Enum.ClubFinderRequestType.Guild
+			then
+				return
+			end
+
+			GuildBroker:RefreshApplicantCount(false)
+			lastUpdateTime = 0
+			GuildBroker:UpdateBrokerText()
+			GuildBroker:RefreshTooltip()
+		end, 50)
+	end)
 
 	if BFL.RegisterEventCallback then
 		-- GUILD_RANKS_UPDATE may not exist on all versions
