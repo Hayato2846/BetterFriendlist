@@ -2752,13 +2752,14 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 
 	-- ESC to close
 	flyout:EnableKeyboard(true)
-	flyout:SetPropagateKeyboardInput(true)
 	flyout:SetScript("OnKeyDown", function(self, key)
 		if key == "ESCAPE" and not WhoFrame.builderDocked then
-			self:SetPropagateKeyboardInput(false)
 			WhoFrame:ToggleSearchBuilder(false)
-		else
-			self:SetPropagateKeyboardInput(true)
+			return
+		end
+
+		if RegionUtil and RegionUtil.RunStandardKeybind then
+			RegionUtil.RunStandardKeybind(key)
 		end
 	end)
 

@@ -28,12 +28,9 @@ local THROTTLE_INTERVAL = 0.5 -- Guild data changes less frequently than friends
 local tooltip = nil
 local tooltipKey = "BetterFriendlistGuildBrokerTT"
 local detailTooltip = nil
-local detailTooltipKey = "BetterFriendlistGuildBrokerDetailTT"
 
 local function ReleaseDetailTooltip()
-	if LQT and detailTooltip and detailTooltip.Key == detailTooltipKey then
-		LQT:ReleaseTooltip(detailTooltip)
-	end
+	BFL.BrokerUtils.HideBrokerDetailTooltip(detailTooltip)
 	detailTooltip = nil
 end
 
@@ -1109,7 +1106,12 @@ local RemoveElvUISkin = BFL.BrokerUtils.RemoveElvUISkin
 -- ========================================
 
 local function TooltipCleanup(tt)
-	BFL.BrokerUtils.ClearActiveBrokerTooltip()
+	BFL.BrokerUtils.ClearActiveBrokerTooltip(tt)
+	ReleaseDetailTooltip()
+	if tooltip == tt then
+		tooltip = nil
+	end
+	BFL.BrokerUtils.ScheduleBrokerTooltipRelease(LQT, tt)
 
 	-- Remove ElvUI skin artifacts so released tooltips are clean
 	RemoveElvUISkin(tt)
@@ -1300,7 +1302,7 @@ end
 -- ========================================
 
 local function CreateDetailTooltip(cell, data)
-	if not LQT or not data then
+	if not data then
 		return
 	end
 
@@ -1311,54 +1313,26 @@ local function CreateDetailTooltip(cell, data)
 		return
 	end
 
-	local tt2 = LQT:AcquireTooltip(detailTooltipKey, 2, "LEFT", "RIGHT")
-	tt2:Clear()
-
-	-- Safety: if LibQTip recycled the main tooltip frame, don't anchor to self
-	if tooltip == tt2 then
-		LQT:ReleaseTooltip(tt2)
-		return
-	end
-
-	tt2:SmartAnchorTo(tooltip)
-	tt2:SetAutoHideDelay(0.25, tooltip)
-	tt2:SetFrameStrata("HIGH")
-	tt2:SetFrameLevel(tooltip:GetFrameLevel() + 10)
-
-	-- Hook OnHide to clean up ElvUI skin when detail tooltip is released/hidden
-	local oldOnHide2 = tt2:GetScript("OnHide")
-	tt2:SetScript("OnHide", function(self)
-		RemoveElvUISkin(self)
-		if oldOnHide2 then
-			pcall(oldOnHide2, self)
-		end
-	end)
-
-	-- ElvUI Skin: Apply ElvUI template (hides NineSlice, applies ElvUI backdrop)
-	ApplyElvUISkin(tt2)
+	local tt2 = BFL.BrokerUtils.GetOrCreateBrokerDetailTooltip("BetterFriendlistGuildBrokerDetailTooltip")
+	tt2:ClearLines()
+	BFL.BrokerUtils.AnchorBrokerDetailTooltip(tt2, cell, tooltip)
 
 	-- Header
-	local headerRow = tt2:AddHeadingRow()
-	local headerCell = headerRow:GetCell(1)
-	headerCell:SetColSpan(2)
-	headerCell:SetFontObject(BetterFriendlistFontNormalLarge or "GameTooltipHeaderText")
-	headerCell:SetJustifyH("LEFT")
-	headerCell:SetText(ClassColorTextByFile(data.classFile, data.name or "Unknown"))
-	tt2:AddSeparator()
+	tt2:SetText(ClassColorTextByFile(data.classFile, data.name or "Unknown"))
 
 	-- Rank
 	if data.rank and data.rank ~= "" then
-		local rankRow = tt2:AddRow(C("ltblue", L("GUILD_BROKER_COL_RANK")), data.rank)
+		tt2:AddDoubleLine(C("ltblue", L("GUILD_BROKER_COL_RANK")), data.rank)
 	end
 
 	-- Level
 	if data.level and data.level > 0 then
-		local levelRow = tt2:AddRow(C("ltblue", L("GUILD_BROKER_COL_LEVEL")), GetColoredLevelText(data.level))
+		tt2:AddDoubleLine(C("ltblue", L("GUILD_BROKER_COL_LEVEL")), GetColoredLevelText(data.level))
 	end
 
 	-- Class
 	if data.className and data.className ~= "" then
-		local classRow = tt2:AddRow(
+		tt2:AddDoubleLine(
 			C("ltblue", L("GUILD_BROKER_COL_CLASS")),
 			ClassColorTextByFile(data.classFile, data.className)
 		)
@@ -1366,35 +1340,36 @@ local function CreateDetailTooltip(cell, data)
 
 	-- Zone
 	if data.zone and data.zone ~= "" then
-		local zoneRow = tt2:AddRow(C("ltblue", L("GUILD_BROKER_COL_ZONE")), data.zone)
+		tt2:AddDoubleLine(C("ltblue", L("GUILD_BROKER_COL_ZONE")), data.zone)
 	end
 
 	-- Status
 	if data.online then
 		if data.isAFK then
-			local statusRow = tt2:AddRow(C("ltblue", "Status"), C("gold", AWAY or "Away"))
+			tt2:AddDoubleLine(C("ltblue", L("STATUS_LABEL")), C("gold", AWAY or "Away"))
 		elseif data.isDND then
-			local statusRow = tt2:AddRow(C("ltblue", "Status"), C("gold", DND or "DND"))
+			tt2:AddDoubleLine(C("ltblue", L("STATUS_LABEL")), C("gold", DND or "DND"))
 		end
 	else
 		local lastOnline = FormatLastOnline(
 			data.lastOnlineYears, data.lastOnlineMonths, data.lastOnlineDays, data.lastOnlineHours
 		)
 		if lastOnline and lastOnline ~= "" then
-			local lastRow = tt2:AddRow(C("ltblue", L("GUILD_BROKER_COL_LAST_ONLINE")), C("gray", lastOnline))
+			tt2:AddDoubleLine(C("ltblue", L("GUILD_BROKER_COL_LAST_ONLINE")), C("gray", lastOnline))
 		end
 	end
 
-	-- Note
+	-- Professions
 	if data.professions and data.professions ~= "" then
-		tt2:AddSeparator()
-		tt2:AddRow(C("ltblue", L("GUILD_BROKER_COL_PROFESSIONS")), data.professions)
+		tt2:AddLine(" ")
+		tt2:AddDoubleLine(C("ltblue", L("GUILD_BROKER_COL_PROFESSIONS")), data.professions)
 	end
 
 	-- Note
 	if data.note and data.note ~= "" then
-		tt2:AddSeparator()
-		local noteRow = tt2:AddRow(C("ltblue", L("GUILD_BROKER_COL_NOTE")), C("white", data.note))
+		tt2:AddLine(" ")
+		tt2:AddLine(C("ltblue", L("GUILD_BROKER_COL_NOTE")))
+		tt2:AddLine(data.note, 1, 1, 1, true)
 	end
 
 	-- Officer Note
@@ -1404,11 +1379,11 @@ local function CreateDetailTooltip(cell, data)
 		canViewOfficer = okOfficerView and result or false
 	end
 	if canViewOfficer and data.officerNote and data.officerNote ~= "" then
-		local offNoteRow = tt2:AddRow(C("ltblue", L("GUILD_BROKER_COL_OFFICER_NOTE")), C("ltyellow", data.officerNote))
+		tt2:AddLine(" ")
+		tt2:AddLine(C("ltblue", L("GUILD_BROKER_COL_OFFICER_NOTE")))
+		tt2:AddLine(C("ltyellow", data.officerNote), 1, 1, 1, true)
 	end
 
-	ApplyBrokerFontToTooltip(tt2)
-	tt2:UpdateLayout()
 	tt2:Show()
 	detailTooltip = tt2
 end

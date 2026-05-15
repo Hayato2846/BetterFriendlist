@@ -9,10 +9,6 @@ BFL:RegisterLocale("frFR", function()
 		"Désactive le portrait du joueur, masque les options de recherche/tri, élargit la fenêtre et déplace les onglets pour une interface compacte."
 	L.MENU_CHANGELOG = "Journal des modifications"
 	L.KEYBIND_TOGGLE_BETTERFRIENDLIST = "Toggle BetterFriendlist"
-	L.DIALOG_SOCIAL_KEYBIND_RELOAD_TEXT =
-		"BetterFriendlist moved your Social key to its own keybinding.\n\nReload the UI now to activate the new binding path?"
-	L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN1 = "Reload"
-	L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN2 = "Cancel"
 	-- ========================================
 	-- DIALOGS & POPUPS
 	-- ========================================
@@ -1012,6 +1008,14 @@ BFL:RegisterLocale("frFR", function()
 	-- Headers & Titles
 	L.SETTINGS_DISPLAY_OPTIONS = "Options Affichage"
 	L.SETTINGS_BEHAVIOR_HEADER = "Comportement"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER = "Chuchoter depuis la liste d'amis"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_DESC =
+		"Lance un chuchotement depuis la liste d'amis avec un clic gauche."
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE = "Clic de chuchotement"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE_DESC =
+		"Choisissez si un clic gauche simple ou un double-clic gauche lance le chuchotement."
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE_DOUBLE = "Double-clic"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE_SINGLE = "Clic simple"
 	L.SETTINGS_GROUP_MANAGEMENT = "Gestion Groupes"
 	L.SETTINGS_FONT_SETTINGS = "Réglages Police"
 	L.SETTINGS_GROUP_ORDER = "Ordre Groupes"
@@ -1569,7 +1573,7 @@ BFL:RegisterLocale("frFR", function()
 	-- Taint-Free Whisper
 	L.SETTINGS_TAINT_FREE_WHISPER = "Chuchotement sans Taint"
 	L.SETTINGS_TAINT_FREE_WHISPER_DESC =
-		"Utilise une barre de message integree en bas de la liste d'amis pour chuchoter au lieu d'ouvrir le chat par defaut. Cela empeche BetterFriendlist d'interferer avec le systeme de chat, ce qui peut provoquer des erreurs Lua. Activez cette option si vous rencontrez des erreurs de chat mentionnant BetterFriendlist. La barre se ferme apres l'envoi. Appuyez sur Shift+Entree pour la rouvrir avec le meme destinataire. Cliquez sur le X pour fermer et oublier le destinataire."
+		"Utilise une barre de message integree en bas de la liste d'amis pour chuchoter au lieu d'ouvrir le chat par defaut. Cela empeche BetterFriendlist d'interferer avec le systeme de chat, ce qui peut provoquer des erreurs Lua. Activez cette option si vous rencontrez des erreurs de chat mentionnant BetterFriendlist. La barre se ferme apres l'envoi. Ouvrez un autre chuchotement pour la reutiliser. Cliquez sur le X pour fermer et oublier le destinataire."
 	L.SETTINGS_TAINT_FREE_WHISPER_TOOLTIP =
 		"Empeche les erreurs de taint de chat causees par BetterFriendlist. Utilise une barre de message integree."
 	L.TAINT_FREE_WHISPER_TITLE = "Chuchoter a %s"

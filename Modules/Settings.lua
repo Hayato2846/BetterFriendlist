@@ -908,6 +908,8 @@ function Settings:DoReset()
 	DB:Set("hideMaxLevel", false)
 	DB:Set("accordionGroups", false)
 	DB:Set("favoriteIconStyle", "bfl")
+	DB:Set("friendListClickWhisperEnabled", false)
+	DB:Set("friendListClickWhisperMode", "double")
 
 	self:LoadSettings()
 
@@ -2802,6 +2804,31 @@ function Settings:OnUseUIPanelSystemChanged(checked)
 	StaticPopup_Show("BFL_CONFIRM_UI_PANEL_RELOAD")
 end
 
+-- Friend list whisper click toggle
+function Settings:OnFriendListClickWhisperEnabledChanged(checked)
+	local DB = GetDB()
+	if not DB then
+		return
+	end
+
+	DB:Set("friendListClickWhisperEnabled", checked and true or false)
+	self:RefreshGeneralTab()
+end
+
+-- Friend list whisper click mode
+function Settings:OnFriendListClickWhisperModeChanged(mode)
+	local DB = GetDB()
+	if not DB then
+		return
+	end
+
+	if mode ~= "single" and mode ~= "double" then
+		mode = "double"
+	end
+
+	DB:Set("friendListClickWhisperMode", mode)
+end
+
 -- Simple Mode Toggle
 function Settings:OnSimpleModeChanged(checked)
 	local DB = GetDB()
@@ -3589,6 +3616,42 @@ function Settings:RefreshGeneralTab()
 			or "Hides the player portrait and adds a changelog option to the contacts menu.",
 	})
 	table.insert(allFrames, behaviorRow2)
+
+	local whisperClickEnabled = DB:Get("friendListClickWhisperEnabled", false)
+	local whisperClickDropdown = nil
+	if whisperClickEnabled then
+		whisperClickDropdown = {
+			label = L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE or "Whisper Click",
+			entries = {
+				labels = {
+					L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE_DOUBLE or "Double-click",
+					L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE_SINGLE or "Single click",
+				},
+				values = { "double", "single" },
+			},
+			isSelectedCallback = function(val)
+				return DB:Get("friendListClickWhisperMode", "double") == val
+			end,
+			onSelectionCallback = function(val)
+				self:OnFriendListClickWhisperModeChanged(val)
+			end,
+			tooltipTitle = L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE or "Whisper Click",
+			tooltipDesc = L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE_DESC
+				or "Choose whether a single left-click or double left-click starts the whisper.",
+		}
+	end
+
+	local whisperClickRow = Components:CreateCheckboxDropdown(tab, {
+		label = L.SETTINGS_FRIENDLIST_CLICK_WHISPER or "Whisper from Friend List",
+		initialValue = whisperClickEnabled,
+		callback = function(val)
+			self:OnFriendListClickWhisperEnabledChanged(val)
+		end,
+		tooltipTitle = L.SETTINGS_FRIENDLIST_CLICK_WHISPER or "Whisper from Friend List",
+		tooltipDesc = L.SETTINGS_FRIENDLIST_CLICK_WHISPER_DESC
+			or "Start a whisper from the friend list with a left-click action.",
+	}, whisperClickDropdown)
+	table.insert(allFrames, whisperClickRow)
 
 	-- Behavior Settings Row 3 (Guild Tab) -- WIP: hidden from settings while
 	-- the Guild Tab is being reworked. Re-enable this block when ready.

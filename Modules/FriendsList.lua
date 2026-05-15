@@ -2194,6 +2194,66 @@ function FriendsList:ResolveSelectedFriend()
 	return self:ResolveFriendByUID(self.selectedFriendUID)
 end
 
+function FriendsList:WhisperFriend(friend)
+	if not friend then
+		return false
+	end
+
+	if friend.type == "bnet" then
+		local accountID = friend.bnetIDAccount or friend.bnetAccountID
+		local accountName = friend.accountName
+		local battleTag = friend.battleTag
+
+		if accountID and C_BattleNet and C_BattleNet.GetAccountInfoByID then
+			local accountInfo = C_BattleNet.GetAccountInfoByID(accountID)
+			if accountInfo then
+				accountID = accountInfo.bnetAccountID or accountID
+				accountName = accountInfo.accountName or accountName
+				battleTag = accountInfo.battleTag or battleTag
+			end
+		end
+
+		local tellName = nil
+		if BFL:IsSecret(accountName) then
+			tellName = battleTag
+		elseif accountName and accountName ~= "" and accountName ~= "???" then
+			tellName = accountName
+		else
+			tellName = battleTag
+		end
+		if BFL:IsSecret(tellName) then
+			tellName = nil
+		end
+
+		if tellName and tellName ~= "" then
+			BFL:SecureSendBNetTell(tellName, accountID)
+			return true
+		end
+	elseif friend.type == "wow" and friend.connected and friend.name then
+		BFL:SecureSendTell(friend.name)
+		return true
+	end
+
+	return false
+end
+
+function FriendsList:HandleFriendWhisperClick(friend, clickMode)
+	local DB = GetDB()
+	if not DB or not DB:Get("friendListClickWhisperEnabled", false) then
+		return false
+	end
+
+	local configuredMode = DB:Get("friendListClickWhisperMode", "double")
+	if configuredMode ~= "single" and configuredMode ~= "double" then
+		configuredMode = "double"
+	end
+	if configuredMode ~= clickMode then
+		return false
+	end
+
+	return self:WhisperFriend(friend)
+end
+
 -- Replace token case-insensitively in format string
 local function ReplaceTokenCaseInsensitive(str, token, value)
 	-- Create pattern that matches token case-insensitively

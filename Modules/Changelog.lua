@@ -17,95 +17,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [DRAFT]
+## [2.5.6]        - 2026-05-15
 
 ### Added
-- **Broker Tooltip Font Settings** - Added global font and font size settings for Friends and Guild broker tooltips.
-- **Friends Broker Columns** - Added an optional Status column and group name alignment setting for the Friends broker tooltip.
-- **Guild Broker Applicants** - Added an optional guild applicant count indicator for eligible guild leaders and officers.
+- **Advanced: Taint-Free Whisper** - Added an optional inline whisper bar under Advanced that lets you message friends without opening Blizzard chat.
+- **Friend List Whisper Click** - Added an optional Behavior setting to start whispers from friend rows with a double left-click or single left-click.
+- **Broker Tooltip Fonts** - Added global font and font size settings for Friends and Guild broker tooltips.
+- **Friends Broker: Filter-Aware Display** - Broker text and tooltip counts now follow the active quick filter, including Online, All, WoW only, and In A Game.
+- **Friends Broker: Columns** - Added optional Nickname and Status columns, class icons in the Character column, and configurable group name alignment.
+- **Broker Hover Details** - Friend and guild broker rows now show overlay detail tooltips on hover.
+- **Friends Broker: Styling** - Added per-column colors, main-list name color syncing, ElvUI tooltip styling, Blizzard client icons, rich presence/mobile/app labels, and a toggle for footer hints.
+- **Guild Broker Plugin** - Added an optional Data Broker plugin for guild rosters with online/all filtering, collapsible rank/class groups, configurable columns, member actions, rank management, and all-version support. Enable it in Settings > Broker > Guild Plugin.
+- **Guild Broker: Roster Options** - Added nickname, professions, class icon, applicant count, hide-max-level, and exclude-yourself options, with drag-and-drop column ordering.
+- **Guild Broker: Sorting and Status** - Added sort modes for name, rank, level, class, zone, and nickname plus AFK/DND status indicators.
+- **Guild Broker: Colors** - Added custom nickname colors and configurable Rank, Zone, Note, and Officer Note colors.
+- **Guild Broker: Compatibility** - Added support for Retail secret-value clients, migration-friendly saved column layouts, clean member tooltip cleanup, and streamlined profession rank display.
+
+### Improved
+- **Broker Refreshing** - Data Broker plugins now refresh reliably after Battle.net and friend roster updates, including when Beta Features are disabled.
+- **Broker Display Compatibility** - Improved tooltip cleanup for broker display addons such as Arcana and Bazooka.
+- **Secret-Value Context Menus** - Modern clients now use BetterFriendlist-owned friend menus for Friend, Battle.net Friend, and Recent Ally actions instead of patching protected Blizzard menus.
+- **Friend Tooltips** - Battle.net friend hover tooltips now use sanitized data on secret-value clients and class colors when class-colored names are enabled.
+- **Social Keybind** - The Social key now opens BetterFriendlist directly and migrates or restores cleanly without reload prompts or Guild/Communities taint.
+- **Quick Join** - Group Finder listings opened from Quick Join now use Blizzard's native sign-up dialog.
+- **Combat Window Toggle** - Opening and closing BetterFriendlist during combat is more reliable when Respect UI Hierarchy is enabled.
 
 ### Fixed
-- **Guild Broker Display** - The Guild Data Broker plugin is registered again on Retail secret-value clients instead of being fully suppressed.
-- **Friends Broker Class Icons** - Class icons now attach to the Character column instead of the Name column.
-- **Friends Broker Group Headers** - Collapse and expand markers now render as `+` and `-` without extra parentheses.
-- **Quick Join Sign Up** - Group Finder listings opened from Quick Join now use the native sign-up dialog instead of sending a direct join request.
-- **Retail Chat Taint** - Friend menu extensions now use secret-safe context handling on modern clients, reducing chat history taint errors.
+- **Blizzard Friends Frame Replacement** - Blizzard and addon calls that open the default Friends frame now route to BetterFriendlist more consistently, preventing both windows from opening or closing out of sync.
+- **Escape Key Handling** - Pressing Escape now closes BetterFriendlist more reliably, including when the frame is opened outside the normal UI panel path.
+- **Taint-Free Whisper Focus** - Closing the inline whisper bar with Escape no longer blocks normal keybinds while BetterFriendlist stays open.
+- **Broker Hover Details** - Friend and guild broker detail tooltips now stay above the main broker tooltip and no longer trigger QTip release errors while closing.
+- **Tab Navigation** - Fixed the window getting stuck on the Who or Quick Join tab after using /who or clicking a group join link.
+- **Broker Counts** - Fixed stale, zero, total-friend, and filtered-count display problems across Friends broker quick filters.
+- **Broker Group Headers** - Collapse and expand markers now render as `+` and `-` without extra parentheses.
+- **Retail Chat Taint** - Reduced chat history taint by using secret-safe friend menu extension handling on modern clients.
 - **Guild and Communities Taint** - On secret-value clients, BetterFriendlist now avoids Guild/Communities roster hooks and native guild menu extensions while Blizzard's Guild panel opens.
-- **Social Keybind Cleanup** - Disabling BetterFriendlist now restores Social keys that were automatically migrated to BetterFriendlist's own keybinding.
-- **Social Keybind Migration** - Re-enabling BetterFriendlist now migrates the Social key silently without asking for a UI reload.
-
-## [2.5.6-beta5]  - 2026-05-02
-
-### Fixed
-- **Broker: Online Count Display** - Fixed the "All" quick filter showing total friends as the online count in Data Broker displays.
-- **Social Keybind Taint** - On secret-value clients, the Social key now migrates to a saved BetterFriendlist binding so BetterFriendlist opens directly without tainting Blizzard's Guild and Communities panels.
-- **RAF List Taint** - Reduced Recruit A Friend taint noise on secret-value clients by avoiding Blizzard account-name helpers and keeping raw Battle.net account payloads out of RAF list rows.
-- **Friend Tooltip Taint** - On secret-value clients, Battle.net friend hover tooltips now mirror Blizzard's native FriendsTooltip layout while using BetterFriendlist's sanitized friend data instead of Blizzard's raw Battle.net helper path.
-- **Friend Tooltips** - Battle.net character names in hover tooltips now use class colors when class-colored names are enabled.
-
-## [2.5.6-beta4]  - 2026-05-02
-
-### Fixed
-- **Broker: Game Display** - Updated the friends broker game column to use the same Blizzard client icons and rich presence/mobile/app labels as the main BetterFriendlist window instead of the outdated static icon table.
-- **Broker: Friend Context Menu** - Restored right-click context menus for friends in the broker tooltip.
-- **Guild Broker: Member Detail Tooltip** - Fixed member detail tooltips lingering after the cursor leaves a guild member row.
-- **Broker Display Compatibility** - Improved tooltip cleanup compatibility with broker display addons such as Arcana and Bazooka by avoiding a no-op leave handler on BetterFriendlist broker plugins.
-- **Guild Broker: Professions Column** - Fixed the Professions setting not adding a separate tooltip column when an older saved guild broker column order was present.
-- **Guild Broker: Profession Icons** - Hid unhelpful default profession rank values so the professions column stays focused on the icons unless a meaningful rank is available.
-- **Broker: LDB Count Refresh** - Fixed the broker display getting stuck at 0 or stale online counts until a broker setting was toggled. Broker updates now listen for Battle.net/friend events even when Beta Features are disabled and refresh again after roster data settles.
-- **Broker: All Filter Count** - Improved broker count refresh behavior while the "All" quick filter is active.
-- **Social Keybind** - Pressing the Social key now opens BetterFriendlist directly without also opening Blizzard's friend list in the background.
-- **Combat Window Toggle** - Improved opening and closing BetterFriendlist during combat when Respect UI Hierarchy is enabled.
-- **Taint Hardening** - On secret-value clients, BFL now opens its own friend context menus instead of patching Blizzard UnitPopup menus; legacy UnitPopup customizations are limited to non-secret clients.
-- **Context Menus** - Expanded the secret-value fallback menus to cover Blizzard's Friend, Battle.net Friend, and Recent Ally actions, including notes, friends-of-friends, favorite toggle, RAF summon, invite/request invite, houses, ignore/block, remove, report, PvP AFK report, community message delete, recent ally pinning, and copy name. Target actions were intentionally omitted because `TargetUnit()` is protected for addon menu callbacks.
-- **Context Menus** - Added BetterFriendlist group/nickname controls to additional Blizzard UnitPopup menus when the clicked player is already a friend.
-- **Taint Hardening** - Disabled automatic hidden FriendsFrame initialization on secret-value clients and stopped replacing `C_FriendList.RemoveFriendByIndex` on those clients.
-- **Whisper Actions** - Quick Join whisper links now use the secure SetItemRef wrapper, and the Send Message button now accepts both BNet account ID field names.
-
-### Added
-- **Broker: Class Icons and Column Colors** - Friends broker tooltip now has an option to show class icons next to friend names plus color pickers for Nickname, Character, Zone, Realm, and Notes columns.
-- **Guild Broker: Profession Icons** - New optional Professions column shows guild members' primary profession icons and ranks when guild community data is available.
-
-## [2.5.6-beta3]  - 2026-04-19
-
-### Added
-- **Guild Broker: Class Icons** - New option to display class icons next to character names in the guild broker tooltip. Enable in Settings > Broker > Guild Plugin.
-- **Guild Broker: Sort Mode** - The guild broker tooltip can now be sorted by name, rank, level, class, zone, or nickname. Configure in Settings > Broker > Guild Plugin.
-- **Guild Broker: Exclude Yourself** - New option to hide your own character from the guild broker list and subtract from the online member count.
-- **Guild Broker: Custom Nickname Color** - Nickname colors in the guild broker tooltip can now be customized with a color picker. A checkbox lets you toggle between class colors and a custom color.
-- **Guild Broker: Column Colors** - New color pickers for Rank, Zone, Note, and Officer Note columns in the guild broker tooltip. Customize each column's text color individually in Settings > Broker > Guild Plugin.
-- **Guild Broker: Status Indicators** - AFK and DND status icons are now shown next to member names in the guild broker tooltip, matching the Blizzard guild interface style. Online members no longer show a green circle.
-
-### Fixed
-- **Broker: Online Count** - Fixed the broker display always showing the total number of friends instead of the actual online count.
-- **Guild Broker: Tooltip Error** - Fixed a Lua error that could occur when hovering over guild members in the broker tooltip, caused by a frame anchoring conflict.
-
----
-
-## [2.5.6-beta2]  - 2026-04-17
-
-### Added
-- **Guild Broker: Nickname Column** - New optional "Nickname" column for the guild broker tooltip. Assign custom nicknames to guild members via right-click context menu. Nicknames sync with the CustomNames library so other addons can see them too. Enable in Settings > Broker > Guild Plugin.
-- **Guild Broker: Hide Level at Max** - New toggle to hide the level column for characters at maximum level, reducing visual clutter. Enable in Settings > Broker > Guild Plugin.
-- **Guild Broker: Column Ordering** - Guild broker tooltip columns can now be reordered via drag and drop in Settings, just like the friends broker.
-
-### Fixed
-- **Broker: In A Game Filter** - Fixed the "In A Game" quick filter showing no friends in the broker tooltip even when friends were actively playing.
-- **Broker: Filtered Count** - The broker display now correctly shows the total number of friends when the "All" quick filter is active, matching the main window. Previously it always showed the online count regardless of the active filter.
-
-## [2.5.6-beta1]  - 2026-04-15
-
-### Added
-- **Advanced: Taint-Free Whisper** - New optional setting under Advanced that uses an inline message bar at the bottom of the friend list for whispering friends instead of opening the default Blizzard chat. This prevents BetterFriendlist from interfering with the chat system, which can cause Lua errors when other addons or Blizzard code processes messages. After sending, the bar closes automatically. Press Shift+Enter to reopen it with the same whisper target for follow-up messages. Disabled by default.
-- **Broker: Filtered Friend Count** - The broker text and tooltip now reflect the active Quick Filter (e.g., "WoW only" or "Online only") instead of always showing the total online count.
-- **Broker: Name Colors** - Friend names in the broker tooltip now use the font color configured in Settings > Fonts, matching the main friend list appearance.
-- **Broker: Show Tooltip Hints** - New toggle in Settings > Broker to hide the clickable action hints at the bottom of the broker tooltip for a cleaner look.
-- **Broker: Nickname Column** - New optional "Nickname" column for the broker tooltip. Enable it in Settings > Broker > Tooltip Columns. Shows the assigned nickname for each friend, colored with the configured name font color.
-- **Broker: ElvUI Tooltip Skin** - When the ElvUI skin is enabled, the broker tooltip now uses the ElvUI backdrop style for a consistent look.
-- **Broker: Guild Plugin** - New Data Broker plugin that displays guild members in a rich tooltip, similar to the existing friends broker. Shows name, level, class, rank, zone, notes, officer notes, and last online time with 8 toggleable columns. Supports grouping by rank or class with collapsible headers, online/all filter cycling, rank management (promote, demote, remove), and full click interactions (whisper, invite, context menu). Works on all WoW versions. Disabled by default, enable in Settings > Broker > Guild Plugin.
-
-### Fixed
-- **Tab Navigation** - Fixed the window getting stuck on the Who or Quick Join tab after using /who or clicking a group join link. Closing and reopening the window now correctly returns to the Friends tab.
+- **Recruit A Friend Taint** - Reduced RAF list taint noise on secret-value clients by keeping raw Battle.net account payloads out of RAF list rows.
+- **Quick Join Messages** - Whisper links and Send Message actions from Quick Join now open the correct Battle.net conversation more reliably.
 
 ## [2.5.5]        - 2026-04-05
 

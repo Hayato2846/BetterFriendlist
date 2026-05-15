@@ -9,10 +9,6 @@ BFL:RegisterLocale("koKR", function()
 		"플레이어 초상화를 비활성화하고 검색/정렬 옵션을 숨기며 프레임을 넓히고 탭을 이동하여 컴팩트 레이아웃을 만듭니다."
 	L.MENU_CHANGELOG = "Changelog"
 	L.KEYBIND_TOGGLE_BETTERFRIENDLIST = "Toggle BetterFriendlist"
-	L.DIALOG_SOCIAL_KEYBIND_RELOAD_TEXT =
-		"BetterFriendlist moved your Social key to its own keybinding.\n\nReload the UI now to activate the new binding path?"
-	L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN1 = "Reload"
-	L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN2 = "Cancel"
 	-- ========================================
 	-- DIALOGS & POPUPS
 	-- ========================================
@@ -1015,6 +1011,14 @@ BFL:RegisterLocale("koKR", function()
 	-- Headers & Titles
 	L.SETTINGS_DISPLAY_OPTIONS = "Display Options"
 	L.SETTINGS_BEHAVIOR_HEADER = "Behavior"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER = "친구 목록에서 귓속말"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_DESC =
+		"친구 목록에서 왼쪽 클릭 동작으로 바로 귓속말을 시작합니다."
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE = "귓속말 클릭"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE_DESC =
+		"왼쪽 한 번 클릭 또는 두 번 클릭 중 귓속말을 시작할 방식을 선택합니다."
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE_DOUBLE = "두 번 클릭"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE_SINGLE = "한 번 클릭"
 	L.SETTINGS_GROUP_MANAGEMENT = "Group Management"
 	L.SETTINGS_FONT_SETTINGS = "Font"
 	L.SETTINGS_GROUP_ORDER = "그룹 순서"
@@ -1590,7 +1594,7 @@ BFL:RegisterLocale("koKR", function()
 	-- Taint-Free Whisper
 	L.SETTINGS_TAINT_FREE_WHISPER = "테인트 없는 귀솏말"
 	L.SETTINGS_TAINT_FREE_WHISPER_DESC =
-		"기본 채팅을 여는 대신 친구 목록 하단에 내장된 메시지 바를 사용하여 귀속말을 보냅니다. BetterFriendlist가 채팅 시스템을 방해하여 Lua 오류를 발생시키는 것을 방지합니다. BetterFriendlist을 언급하는 채팅 오류가 발생하면 활성화하세요. 메시지 바는 전송 후 닫힙니다. Shift+Enter를 눌러 같은 대상으로 다시 열 수 있습니다. X를 클릭하면 대상을 잊고 닫습니다."
+		"기본 채팅을 여는 대신 친구 목록 하단에 내장된 메시지 바를 사용하여 귀속말을 보냅니다. BetterFriendlist가 채팅 시스템을 방해하여 Lua 오류를 발생시키는 것을 방지합니다. BetterFriendlist을 언급하는 채팅 오류가 발생하면 활성화하세요. 메시지 바는 전송 후 닫힙니다. 다시 사용하려면 새 귓속말을 여세요. X를 클릭하면 대상을 잊고 닫습니다."
 	L.SETTINGS_TAINT_FREE_WHISPER_TOOLTIP =
 		"BetterFriendlist로 인한 채팅 테인트 오류를 방지합니다. 내장 메시지 바를 사용합니다."
 	L.TAINT_FREE_WHISPER_TITLE = "%s에게 귀속말"

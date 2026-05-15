@@ -12,10 +12,6 @@ local function LoadEnUS()
 		"Disables the player portrait, hides search/sort options, widens the frame, and shifts tabs for a compact layout."
 	L.MENU_CHANGELOG = "Changelog"
 	L.KEYBIND_TOGGLE_BETTERFRIENDLIST = "Toggle BetterFriendlist"
-	L.DIALOG_SOCIAL_KEYBIND_RELOAD_TEXT =
-		"BetterFriendlist moved your Social key to its own keybinding.\n\nReload the UI now to activate the new binding path?"
-	L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN1 = "Reload"
-	L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN2 = "Cancel"
 	-- ========================================
 	-- DIALOGS & POPUPS
 	-- ========================================
@@ -1028,6 +1024,13 @@ local function LoadEnUS()
 	-- Headers & Titles
 	L.SETTINGS_DISPLAY_OPTIONS = "Display Options"
 	L.SETTINGS_BEHAVIOR_HEADER = "Behavior"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER = "Whisper from Friend List"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_DESC = "Start a whisper from the friend list with a left-click action."
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE = "Whisper Click"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE_DESC =
+		"Choose whether a single left-click or double left-click starts the whisper."
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE_DOUBLE = "Double-click"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE_SINGLE = "Single click"
 	L.SETTINGS_GROUP_MANAGEMENT = "Group Management"
 	L.SETTINGS_FONT_SETTINGS = "Font Settings"
 	L.SETTINGS_GROUP_ORDER = "Group Order"
@@ -1544,7 +1547,7 @@ local function LoadEnUS()
 	-- Taint-Free Whisper
 	L.SETTINGS_TAINT_FREE_WHISPER = "Taint-Free Whisper"
 	L.SETTINGS_TAINT_FREE_WHISPER_DESC =
-		"Uses an inline message bar at the bottom of the friend list for whispering friends instead of opening the default chat. This prevents BetterFriendlist from interfering with the chat system, which can cause Lua errors when other addons or Blizzard code processes messages. Enable this if you experience chat-related errors mentioning BetterFriendlist. The bar closes after sending a message. Press Shift+Enter to reopen it with the same whisper target. Click the X button to close and forget the target."
+		"Uses an inline message bar at the bottom of the friend list for whispering friends instead of opening the default chat. This prevents BetterFriendlist from interfering with the chat system, which can cause Lua errors when other addons or Blizzard code processes messages. Enable this if you experience chat-related errors mentioning BetterFriendlist. The bar closes after sending a message. Open another whisper to use it again. Click the X button to close and forget the target."
 	L.SETTINGS_TAINT_FREE_WHISPER_TOOLTIP =
 		"Prevents chat taint errors caused by BetterFriendlist opening the Blizzard whisper box. Uses an inline message bar instead."
 	L.TAINT_FREE_WHISPER_TITLE = "Whisper to %s"

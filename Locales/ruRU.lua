@@ -122,10 +122,6 @@ BFL:RegisterLocale("ruRU", function()
 	L.DIALOG_MIGRATE_BTN3 = "Отмена"
 
 	L.KEYBIND_TOGGLE_BETTERFRIENDLIST = "Toggle BetterFriendlist"
-	L.DIALOG_SOCIAL_KEYBIND_RELOAD_TEXT =
-		"BetterFriendlist moved your Social key to its own keybinding.\n\nReload the UI now to activate the new binding path?"
-	L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN1 = "Reload"
-	L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN2 = "Cancel"
 	-- ========================================
 	-- SETTINGS PANEL
 	-- ========================================
@@ -1040,6 +1036,14 @@ BFL:RegisterLocale("ruRU", function()
 	-- Headers & Titles
 	L.SETTINGS_DISPLAY_OPTIONS = "Параметры отображения"
 	L.SETTINGS_BEHAVIOR_HEADER = "Поведение"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER = "Шепот из списка друзей"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_DESC =
+		"Начинает шепот из списка друзей действием левой кнопки мыши."
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE = "Клик для шепота"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE_DESC =
+		"Выберите, будет ли шепот начинаться одиночным или двойным кликом левой кнопкой мыши."
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE_DOUBLE = "Двойной клик"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE_SINGLE = "Одиночный клик"
 	L.SETTINGS_GROUP_MANAGEMENT = "Управление группами"
 	L.SETTINGS_FONT_SETTINGS = "Шрифт"
 	L.SETTINGS_GROUP_ORDER = "Порядок групп"
@@ -1643,7 +1647,7 @@ BFL:RegisterLocale("ruRU", function()
 	-- Taint-Free Whisper
 	L.SETTINGS_TAINT_FREE_WHISPER = "Шепот без тейнта"
 	L.SETTINGS_TAINT_FREE_WHISPER_DESC =
-		"Использует встроенную панель сообщений в нижней части списка друзей для шепота вместо открытия стандартного чата. Это предотвращает влияние BetterFriendlist на систему чата, что может вызывать ошибки Lua. Включите, если вы получаете ошибки чата с упоминанием BetterFriendlist. Панель закрывается после отправки. Нажмите Shift+Enter, чтобы открыть её снова с тем же адресатом. Нажмите X, чтобы закрыть и забыть адресата."
+		"Использует встроенную панель сообщений в нижней части списка друзей для шепота вместо открытия стандартного чата. Это предотвращает влияние BetterFriendlist на систему чата, что может вызывать ошибки Lua. Включите, если вы получаете ошибки чата с упоминанием BetterFriendlist. Панель закрывается после отправки. Откройте новый шепот, чтобы использовать её снова. Нажмите X, чтобы закрыть и забыть адресата."
 	L.SETTINGS_TAINT_FREE_WHISPER_TOOLTIP =
 		"Предотвращает ошибки тейнта чата, вызванные BetterFriendlist. Использует встроенную панель сообщений."
 	L.TAINT_FREE_WHISPER_TITLE = "Шепнуть %s"

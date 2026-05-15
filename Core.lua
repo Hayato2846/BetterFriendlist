@@ -358,28 +358,6 @@ local function IsBetterFriendlistEnabledForCurrentCharacter()
 	return state > Enum.AddOnEnableState.None
 end
 
-function BFL:ShowSocialKeybindReloadPrompt()
-	if not (StaticPopupDialogs and StaticPopup_Show) then
-		return
-	end
-
-	StaticPopupDialogs["BFL_SOCIAL_KEYBIND_RELOAD"] = StaticPopupDialogs["BFL_SOCIAL_KEYBIND_RELOAD"] or {
-		text = (self.L and self.L.DIALOG_SOCIAL_KEYBIND_RELOAD_TEXT)
-			or "BetterFriendlist moved your Social key to its own keybinding.\n\nReload the UI now to activate the new binding path?",
-		button1 = (self.L and self.L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN1) or RELOADUI or "Reload",
-		button2 = (self.L and self.L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN2) or CANCEL or "Cancel",
-		OnAccept = function()
-			ReloadUI()
-		end,
-		timeout = 0,
-		whileDead = true,
-		hideOnEscape = true,
-		preferredIndex = 3,
-	}
-
-	StaticPopup_Show("BFL_SOCIAL_KEYBIND_RELOAD")
-end
-
 function BFL:RestoreMigratedSocialKeybindsForAddonDisable()
 	if IsBetterFriendlistEnabledForCurrentCharacter() then
 		return
@@ -525,6 +503,436 @@ function BFL:InstallSocialKeybindOverride()
 
 	self.pendingSocialKeybindOverride = nil
 	self.installingSocialKeybindOverride = nil
+end
+
+local function RunNextFrame(callback)
+	if C_Timer and C_Timer.After then
+		C_Timer.After(0, callback)
+	else
+		callback()
+	end
+end
+
+function BFL:AddUniqueUISpecialFrame(frameName)
+	if not (frameName and UISpecialFrames) then
+		return
+	end
+
+	for _, value in ipairs(UISpecialFrames) do
+		if value == frameName then
+			return
+		end
+	end
+
+	tinsert(UISpecialFrames, frameName)
+end
+
+function BFL:InstallBetterFriendsFrameEscapeHandler()
+	if self.betterFriendsFrameEscapeHandlerInstalled or not BetterFriendsFrame then
+		return
+	end
+
+	self.betterFriendsFrameEscapeHandlerInstalled = true
+	self:AddUniqueUISpecialFrame("BetterFriendsFrame")
+end
+
+local function NormalizeFriendsFrameTab(tabIndex)
+	local tab = tonumber(tabIndex) or 1
+
+	if FRIEND_TAB_FRIENDS and tab == FRIEND_TAB_FRIENDS then
+		return 1
+	end
+	if FRIEND_TAB_WHO and tab == FRIEND_TAB_WHO then
+		return 2
+	end
+	if FRIEND_TAB_RAID and tab == FRIEND_TAB_RAID then
+		return 3
+	end
+	if FRIEND_TAB_QUICK_JOIN and tab == FRIEND_TAB_QUICK_JOIN then
+		return 4
+	end
+
+	if tab >= 1 and tab <= 4 then
+		return tab
+	end
+
+	return 1
+end
+
+local function NormalizeFriendsSubPanel(panelIndex)
+	local tab = tonumber(panelIndex)
+	local blizzardHeader = _G.FriendsTabHeader
+
+	if blizzardHeader then
+		if blizzardHeader.friendsTabID and tab == blizzardHeader.friendsTabID then
+			return 1
+		end
+		if blizzardHeader.recentAlliesTabID and tab == blizzardHeader.recentAlliesTabID then
+			return 2
+		end
+		if blizzardHeader.recruitAFriendTabID and tab == blizzardHeader.recruitAFriendTabID then
+			return 3
+		end
+	end
+
+	if tab and tab >= 1 and tab <= 4 then
+		return tab
+	end
+
+	return 1
+end
+
+local function StoreOriginalFriendsFrameFunction(name)
+	local original = _G[name]
+	if not original then
+		return nil
+	end
+
+	local key = "Original" .. name
+	if not BFL[key] then
+		BFL[key] = original
+	end
+
+	return BFL[key]
+end
+
+function BFL:GetBetterFriendsFrameBottomTab()
+	if BetterFriendsFrame and PanelTemplates_GetSelectedTab then
+		return PanelTemplates_GetSelectedTab(BetterFriendsFrame) or 1
+	end
+
+	return 1
+end
+
+function BFL:GetBetterFriendsFrameTopTab()
+	if
+		BetterFriendsFrame
+		and BetterFriendsFrame.FriendsTabHeader
+		and PanelTemplates_GetSelectedTab
+	then
+		return PanelTemplates_GetSelectedTab(BetterFriendsFrame.FriendsTabHeader) or 1
+	end
+
+	return 1
+end
+
+function BFL:IsBetterFriendsRedirectTargetShown(tabIndex, topTabIndex)
+	if not (BetterFriendsFrame and BetterFriendsFrame:IsShown()) then
+		return false
+	end
+
+	local currentTab = self:GetBetterFriendsFrameBottomTab()
+	if currentTab ~= tabIndex then
+		return false
+	end
+
+	if tabIndex == 1 and topTabIndex then
+		return self:GetBetterFriendsFrameTopTab() == topTabIndex
+	end
+
+	return true
+end
+
+function BFL:HideBetterFriendsFrameForRedirect()
+	if not BetterFriendsFrame then
+		return
+	end
+
+	if BetterFriendsFrame.IgnoreListWindow then
+		BetterFriendsFrame.IgnoreListWindow:Hide()
+	end
+
+	if _G.HideBetterFriendsFrame then
+		_G.HideBetterFriendsFrame()
+	else
+		BetterFriendsFrame:Hide()
+	end
+end
+
+function BFL:ApplyBetterFriendsFrameTarget(tabIndex, topTabIndex)
+	if not BetterFriendsFrame then
+		return
+	end
+
+	if BetterFriendsFrame.IgnoreListWindow then
+		BetterFriendsFrame.IgnoreListWindow:Hide()
+	end
+
+	if _G.ShowBetterFriendsFrame then
+		_G.ShowBetterFriendsFrame(tabIndex)
+	else
+		BetterFriendsFrame:Show()
+	end
+
+	if
+		tabIndex == 1
+		and topTabIndex
+		and _G.BetterFriendsFrame_ShowTab
+		and not self.IsClassic
+	then
+		_G.BetterFriendsFrame_ShowTab(topTabIndex)
+	end
+end
+
+function BFL:ShowBetterFriendsFrameIgnoreList()
+	if not BetterFriendsFrame then
+		return
+	end
+
+	if _G.ShowBetterFriendsFrame then
+		_G.ShowBetterFriendsFrame(1)
+	else
+		BetterFriendsFrame:Show()
+	end
+
+	if _G.BetterFriendsFrame_ShowIgnoreList then
+		_G.BetterFriendsFrame_ShowIgnoreList()
+	end
+end
+
+function BFL:HandleFriendsFrameRedirect(action, tabIndex, topTabIndex)
+	if self.AllowBlizzardFriendsFrame then
+		return false
+	end
+
+	if FriendsFrame and FriendsFrame:IsShown() then
+		self:HideBlizzardFriendsFrameForRedirect()
+	end
+
+	if action == "ignore" then
+		if
+			BetterFriendsFrame
+			and BetterFriendsFrame:IsShown()
+			and BetterFriendsFrame.IgnoreListWindow
+			and BetterFriendsFrame.IgnoreListWindow:IsShown()
+		then
+			self:HideBetterFriendsFrameForRedirect()
+			return true
+		end
+
+		self:ShowBetterFriendsFrameIgnoreList()
+		return true
+	end
+
+	if action == "toggle-any" and BetterFriendsFrame and BetterFriendsFrame:IsShown() then
+		self:HideBetterFriendsFrameForRedirect()
+		return true
+	end
+
+	local targetTab = NormalizeFriendsFrameTab(tabIndex)
+	local targetTopTab = topTabIndex and NormalizeFriendsSubPanel(topTabIndex) or nil
+
+	if action == "toggle" and self:IsBetterFriendsRedirectTargetShown(targetTab, targetTopTab) then
+		self:HideBetterFriendsFrameForRedirect()
+		return true
+	end
+
+	self:ApplyBetterFriendsFrameTarget(targetTab, targetTopTab)
+	return true
+end
+
+function BFL:HideBlizzardFriendsFrameForRedirect()
+	if not FriendsFrame then
+		return true
+	end
+
+	if not FriendsFrame:IsShown() then
+		FriendsFrame:SetAlpha(1)
+		self.pendingBlizzardFriendsFrameHide = nil
+		return true
+	end
+
+	FriendsFrame:SetAlpha(0)
+
+	if FriendsFrame.IgnoreListWindow then
+		FriendsFrame.IgnoreListWindow:Hide()
+	end
+
+	FriendsFrame:Hide()
+
+	if FriendsFrame:IsShown() then
+		self.pendingBlizzardFriendsFrameHide = true
+		return false
+	end
+
+	if UpdateUIPanelPositions then
+		pcall(UpdateUIPanelPositions, FriendsFrame)
+	end
+
+	FriendsFrame:SetAlpha(1)
+	self.pendingBlizzardFriendsFrameHide = nil
+	return true
+end
+
+function BFL:ConsumeFriendsFrameRedirect(defaultAction, defaultTab, defaultTopTab)
+	local request = self.pendingFriendsFrameRedirect
+	self.pendingFriendsFrameRedirect = nil
+
+	if request then
+		return self:HandleFriendsFrameRedirect(request.action, request.tabIndex, request.topTabIndex)
+	end
+
+	return self:HandleFriendsFrameRedirect(defaultAction or "toggle", defaultTab or 1, defaultTopTab)
+end
+
+function BFL:QueueFriendsFrameRedirect(action, tabIndex, topTabIndex)
+	if self.AllowBlizzardFriendsFrame then
+		return
+	end
+
+	self.pendingFriendsFrameRedirect = {
+		action = action,
+		tabIndex = tabIndex,
+		topTabIndex = topTabIndex,
+	}
+
+	if self.friendsFrameRedirectTimerPending then
+		return
+	end
+
+	self.friendsFrameRedirectTimerPending = true
+	RunNextFrame(function()
+		BFL.friendsFrameRedirectTimerPending = nil
+
+		if not BFL.pendingFriendsFrameRedirect or BFL.friendsFrameRedirectOnShowPending then
+			return
+		end
+
+		if FriendsFrame and FriendsFrame:IsShown() then
+			BFL:HideBlizzardFriendsFrameForRedirect()
+		end
+
+		BFL:ConsumeFriendsFrameRedirect("show", 1)
+	end)
+end
+
+function BFL:InstallFriendsFrameRedirects()
+	if self.friendsFrameRedirectsInstalled then
+		return
+	end
+
+	if not (FriendsFrame and _G.ToggleFriendsFrame) then
+		self.pendingFriendsFrameRedirectInstall = true
+		return
+	end
+
+	self.friendsFrameRedirectsInstalled = true
+	self.pendingFriendsFrameRedirectInstall = nil
+	self.AllowBlizzardFriendsFrame = false
+
+	if not self.HasSecretValues and UIPanelWindows and UIPanelWindows["FriendsFrame"] then
+		self.OriginalFriendsFrameUIPanelSettings = UIPanelWindows["FriendsFrame"]
+		UIPanelWindows["FriendsFrame"] = nil
+	end
+
+	local function installRedirect(name, directHandler)
+		local original = StoreOriginalFriendsFrameFunction(name)
+		if not original then
+			return
+		end
+
+		_G[name] = function(...)
+			if BFL.AllowBlizzardFriendsFrame then
+				return original(...)
+			end
+			return directHandler(...)
+		end
+	end
+
+	local function directShow(tabIndex, topTabIndex)
+		return BFL:HandleFriendsFrameRedirect("show", tabIndex, topTabIndex)
+	end
+
+	local function directToggle(tabIndex, topTabIndex)
+		return BFL:HandleFriendsFrameRedirect("toggle", tabIndex, topTabIndex)
+	end
+
+	installRedirect("ToggleFriendsFrame", function(tabIndex)
+		if tabIndex == nil then
+			return BFL:HandleFriendsFrameRedirect("toggle-any", 1)
+		end
+		return directToggle(tabIndex)
+	end)
+	installRedirect("OpenFriendsFrame", directShow)
+	installRedirect("ShowFriends", function()
+		return directShow(1)
+	end)
+	installRedirect("ShowWhoPanel", function()
+		return directShow(2)
+	end)
+	installRedirect("ToggleFriendsSubPanel", function(panelIndex)
+		return directToggle(1, NormalizeFriendsSubPanel(panelIndex))
+	end)
+	installRedirect("ToggleFriendsPanel", function()
+		return directToggle(1, 1)
+	end)
+	installRedirect("ToggleRecentAlliesPanel", function()
+		return directToggle(1, 2)
+	end)
+	installRedirect("ToggleRafPanel", function()
+		return directToggle(1, 3)
+	end)
+	installRedirect("ToggleQuickJoinPanel", function()
+		return directToggle(4)
+	end)
+	installRedirect("ToggleIgnorePanel", function()
+		return BFL:HandleFriendsFrameRedirect("ignore")
+	end)
+
+	self.ShowBlizzardFriendsFrame = function()
+		BFL.AllowBlizzardFriendsFrame = true
+
+		if _G.HideBetterFriendsFrame and BetterFriendsFrame and BetterFriendsFrame:IsShown() then
+			_G.HideBetterFriendsFrame()
+		end
+
+		if BFL.OriginalFriendsFrameUIPanelSettings and UIPanelWindows then
+			UIPanelWindows["FriendsFrame"] = BFL.OriginalFriendsFrameUIPanelSettings
+		end
+
+		if BFL.OriginalOpenFriendsFrame then
+			BFL.OriginalOpenFriendsFrame(1)
+		elseif BFL.OriginalToggleFriendsFrame then
+			BFL.OriginalToggleFriendsFrame(1)
+		elseif FriendsFrame then
+			FriendsFrame:Show()
+		end
+
+		C_Timer.After(0.1, function()
+			BFL.AllowBlizzardFriendsFrame = false
+		end)
+	end
+
+	if FriendsFrame and FriendsFrame.HookScript then
+		FriendsFrame:HookScript("OnShow", function(frame)
+			if BFL.AllowBlizzardFriendsFrame or BFL._suppressFriendsFrameRedirect then
+				return
+			end
+
+			local requestedTab = NormalizeFriendsFrameTab(PanelTemplates_GetSelectedTab(FriendsFrame) or 1)
+			if PanelTemplates_SetTab then
+				PanelTemplates_SetTab(FriendsFrame, 1)
+			end
+
+			frame:SetAlpha(0)
+			if frame:IsShown() then
+				frame:Hide()
+			end
+			BFL.pendingBlizzardFriendsFrameHide = nil
+			BFL.friendsFrameRedirectOnShowPending = true
+
+			RunNextFrame(function()
+				BFL.friendsFrameRedirectOnShowPending = nil
+
+				if BFL.AllowBlizzardFriendsFrame or BFL._suppressFriendsFrameRedirect then
+					return
+				end
+
+				BFL:HideBlizzardFriendsFrameForRedirect()
+				BFL:ConsumeFriendsFrameRedirect("toggle", requestedTab)
+			end)
+		end)
+	end
 end
 
 -- Update Portrait Visibility based on Simple Mode setting
@@ -1061,14 +1469,15 @@ do
 
 		local function SoftCloseBar()
 			RestoreBottomElements()
+			editBox:ClearFocus()
 			bar:Hide()
 		end
 
 		local function HardCloseBar()
 			RestoreBottomElements()
+			editBox:ClearFocus()
 			bar:Hide()
 			editBox:SetText("")
-			editBox:ClearFocus()
 			-- Hard close: clear sticky state (user explicitly closed via X button)
 			stickyWhisper = nil
 			bar.bnetIDAccount = nil
@@ -1079,7 +1488,7 @@ do
 		local function DoSend()
 			local text = editBox:GetText()
 			if not text or text == "" then
-				-- Empty message: soft close (target preserved for Shift+Enter)
+				-- Empty message: soft close while preserving the current target.
 				SoftCloseBar()
 				return
 			end
@@ -1088,7 +1497,7 @@ do
 				editBox:SetFocus()
 				return
 			end
-			-- Close bar after sending (sticky state preserved for Shift+Enter reopen)
+			-- Close bar after sending while preserving the current target.
 			SoftCloseBar()
 		end
 
@@ -1122,21 +1531,7 @@ do
 		bar:Hide()
 		whisperBar = bar
 
-		-- Shift+Enter on BetterFriendsFrame reopens whisper bar from sticky state
-		if not parent.bflKeyboardHooked then
-			parent:EnableKeyboard(true)
-			parent:HookScript("OnKeyDown", function(self, key)
-				if key == "ENTER" and IsShiftKeyDown() and stickyWhisper
-					and BetterFriendlistDB and BetterFriendlistDB.taintFreeWhisper
-					and not (whisperBar and whisperBar:IsShown()) then
-					self:SetPropagateKeyboardInput(false)
-					BFL:RestoreTaintFreeWhisper()
-				else
-					self:SetPropagateKeyboardInput(true)
-				end
-			end)
-			parent.bflKeyboardHooked = true
-		end
+		parent:EnableKeyboard(false)
 
 		return bar
 	end
@@ -1862,198 +2257,10 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 				print(string.format(BFL.L.CORE_LOADED, BFL.VERSION, versionSuffix))
 			end
 
-			-- ============================================================================
-			-- Hook ToggleFriendsFrame to open BetterFriendlist instead
-			-- ============================================================================
-			-- Strategy: Multi-layer hooking for maximum compatibility
-			-- 1. Remove FriendsFrame from UIPanel system (allows Hide() in combat)
-			-- 2. Hook FriendsFrame:OnShow to intercept ALL ways of opening it
-			-- 3. Replace _G.ToggleFriendsFrame for direct calls
-			-- 4. Hook ShowFriends for additional coverage
-			--
-			-- This works with ElvUI because even if they cached ToggleFriendsFrame,
-			-- the OnShow hook will catch the FriendsFrame being opened.
-			-- ============================================================================
-
-			-- Flag to bypass hook when user explicitly wants Blizzard's frame
-			BFL.AllowBlizzardFriendsFrame = false
-
-			-- ============================================================================
-			-- CRITICAL: Remove FriendsFrame from UIPanel system
-			-- ============================================================================
-			-- By removing FriendsFrame from UIPanelWindows, we can use Hide() in combat
-			-- without taint issues. ShowUIPanel/HideUIPanel are protected in combat,
-			-- but direct Show()/Hide() calls work fine for non-UIPanel frames.
-			-- On 12.0.0+ (Midnight), we keep UIPanelWindows intact because we no longer
-			-- replace ToggleFriendsFrame (to avoid tainting global closures). Blizzard's
-			-- ToggleFriendsFrame uses ShowUIPanel which requires the UIPanel entry.
-			-- ============================================================================
-			if not BFL.HasSecretValues and UIPanelWindows and UIPanelWindows["FriendsFrame"] then
-				-- Store original settings in case user wants Blizzard's frame
-				BFL.OriginalFriendsFrameUIPanelSettings = UIPanelWindows["FriendsFrame"]
-				-- Remove from UIPanel system
-				UIPanelWindows["FriendsFrame"] = nil
-				-- BFL:DebugPrint("|cff00ff00[BFL]|r FriendsFrame removed from UIPanel system (combat-safe)")
-			end
-
-			-- Store original function for "Show Blizzard's Friendlist" option
-			if _G.ToggleFriendsFrame then
-				BFL.OriginalToggleFriendsFrame = _G.ToggleFriendsFrame
-
-				-- On 12.0.0+ (Midnight), do NOT replace this global with a tainted addon closure.
-				-- Writing a tainted closure to _G.ToggleFriendsFrame causes BFL's taint to propagate
-				-- through Blizzard's initialization chain into chat frame globals (ACTIVE_CHAT_EDIT_BOX),
-				-- leading to "attempt to perform arithmetic on a secret number value" errors when
-				-- FCF_OpenTemporaryWindow creates whisper popout windows.
-				-- The FriendsFrame:HookScript("OnShow") below handles the redirect instead.
-				if not BFL.HasSecretValues then
-					-- Pre-12.0: Replace the global directly (no secret value concerns)
-					_G.ToggleFriendsFrame = function(tabIndex)
-						-- Allow original if explicitly requested
-						if BFL.AllowBlizzardFriendsFrame then
-							-- BFL:DebugPrint("[BFL] ToggleFriendsFrame: Allowing Blizzard (explicit)")
-							return BFL.OriginalToggleFriendsFrame(tabIndex)
-						end
-
-						-- BFL:DebugPrint("[BFL] ToggleFriendsFrame: Opening BetterFriendlist, tabIndex: " .. tostring(tabIndex))
-
-						-- Toggle our frame with the requested tab (combat-safe, our frame is not protected)
-						if _G.ToggleBetterFriendsFrame then
-							_G.ToggleBetterFriendsFrame(tabIndex)
-						end
-					end
-					-- BFL:DebugPrint("|cff00ff00[BFL]|r ToggleFriendsFrame global replaced")
-				else
-					-- 12.0.0+ (Midnight): Do NOT replace the global - writing a tainted closure
-					-- to _G.ToggleFriendsFrame permanently taints Blizzard's chat frame globals
-					-- (ACTIVE_CHAT_EDIT_BOX), causing "secret number value" errors.
-					-- We use hooksecurefunc (runs AFTER original, doesn't taint the original)
-					-- combined with FriendsFrame:HookScript("OnShow") for the redirect.
-					hooksecurefunc("ToggleFriendsFrame", function(tabIndex)
-						if BFL.AllowBlizzardFriendsFrame then return end
-						-- After Blizzard's toggle: if FriendsFrame was closed and BFL is open, close BFL
-						if not FriendsFrame:IsShown() and BetterFriendsFrame and BetterFriendsFrame:IsShown() then
-							BetterFriendsFrame:Hide()
-						end
-					end)
-				end
-			end
-
-			-- Helper function to show Blizzard's FriendsFrame (bypasses our hook)
-			-- This is used by "Show Blizzard's Friendlist" menu option
-			BFL.ShowBlizzardFriendsFrame = function()
-				BFL.AllowBlizzardFriendsFrame = true
-				-- Temporarily restore UIPanel settings for proper positioning
-				if BFL.OriginalFriendsFrameUIPanelSettings then
-					UIPanelWindows["FriendsFrame"] = BFL.OriginalFriendsFrameUIPanelSettings
-				end
-				if BFL.OriginalToggleFriendsFrame then
-					BFL.OriginalToggleFriendsFrame()
-				elseif FriendsFrame then
-					-- Fallback: Direct Show (combat-safe now that it's not a UIPanel)
-					FriendsFrame:Show()
-				end
-				-- Reset flag and UIPanel settings after a brief delay
-				C_Timer.After(0.1, function()
-					BFL.AllowBlizzardFriendsFrame = false
-				end)
-			end
-
-			-- Hook ShowFriends for additional coverage (taint-safe)
-			if _G.ShowFriends then
-				BFL.OriginalShowFriends = _G.ShowFriends
-				-- On 12.0.0+, use hooksecurefunc to avoid tainting the global.
-				-- hooksecurefunc runs AFTER the original in a separate context,
-				-- so the original's secure execution is preserved.
-				if BFL.HasSecretValues then
-					hooksecurefunc("ShowFriends", function()
-						if BFL.AllowBlizzardFriendsFrame then return end
-						-- BFL:DebugPrint("[BFL] ShowFriends hook: Redirecting to BetterFriendlist")
-						if BetterFriendsFrame and not BetterFriendsFrame:IsShown() then
-							if _G.ToggleBetterFriendsFrame then
-								_G.ToggleBetterFriendsFrame()
-							end
-						end
-					end)
-				else
-					_G.ShowFriends = function()
-						if BFL.AllowBlizzardFriendsFrame then
-							return BFL.OriginalShowFriends()
-						end
-						-- BFL:DebugPrint("[BFL] ShowFriends: Redirecting to BetterFriendlist")
-						if BetterFriendsFrame and not BetterFriendsFrame:IsShown() then
-							if _G.ToggleBetterFriendsFrame then
-								_G.ToggleBetterFriendsFrame()
-							end
-						end
-					end
-				end
-			end
-
-			-- ============================================================================
-			-- CRITICAL: Hook FriendsFrame:OnShow for ElvUI compatibility
-			-- ============================================================================
-			-- ElvUI and other addons may cache ToggleFriendsFrame at load time.
-			-- By hooking OnShow, we intercept the frame REGARDLESS of how it was opened.
-			-- Since FriendsFrame is no longer a UIPanel, Hide() is combat-safe.
-			-- We detect which tab was requested by checking FriendsFrame's selected tab.
-			-- ============================================================================
-			if FriendsFrame then
-				FriendsFrame:HookScript("OnShow", function(self)
-					-- Skip if user explicitly wants Blizzard's frame
-					if BFL.AllowBlizzardFriendsFrame then
-						-- BFL:DebugPrint("[BFL] FriendsFrame:OnShow - Allowing (explicit)")
-						return
-					end
-
-					-- Skip redirect during silent trigger (lets external addons register their hooks)
-					if BFL._suppressFriendsFrameRedirect then
-						return
-					end
-
-					-- Detect which tab was requested by reading Blizzard's selected tab
-					-- FRIEND_TAB_FRIENDS=1, FRIEND_TAB_WHO=2, FRIEND_TAB_RAID=3, FRIEND_TAB_QUICK_JOIN=4
-					local requestedTab = PanelTemplates_GetSelectedTab(FriendsFrame) or 1
-					-- BFL:DebugPrint("[BFL] FriendsFrame:OnShow - Intercepting, requested tab: " .. tostring(requestedTab))
-
-					-- Fix #81: Reset Blizzard's selected tab to Friends after reading it.
-					-- Without this, the stale value persists and subsequent opens via keybind
-					-- (which route through FriendsFrame:OnShow) would reopen on the wrong tab.
-					PanelTemplates_SetTab(FriendsFrame, 1)
-
-					-- Hide immediately via alpha to prevent visual flash, then defer
-					-- the actual Hide()+Open to a new execution frame to break taint chain
-					FriendsFrame:SetAlpha(0)
-
-					C_Timer.After(0, function()
-						-- Hide Blizzard's frame
-						if BFL.HasSecretValues and HideUIPanel then
-							-- On 12.0.0+: FriendsFrame is still a UIPanel, use HideUIPanel
-							HideUIPanel(FriendsFrame)
-						else
-							-- Pre-12.0: FriendsFrame was removed from UIPanel, use direct Hide
-							FriendsFrame:Hide()
-						end
-						FriendsFrame:SetAlpha(1)
-
-						-- Toggle behavior: if BFL is already visible, this is a "toggle close"
-						-- (On 12.0.0+ Blizzard's ToggleFriendsFrame opened FriendsFrame because
-						-- it wasn't shown, but the user intended to close BFL)
-						if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
-							BetterFriendsFrame:Hide()
-							return
-						end
-
-						-- Open our frame with the requested tab
-						if BetterFriendsFrame then
-							if _G.ShowBetterFriendsFrame then
-								_G.ShowBetterFriendsFrame(requestedTab)
-							end
-						end
-					end)
-				end)
-				-- BFL:DebugPrint("|cff00ff00[BFL]|r FriendsFrame:OnShow hooked for ElvUI compatibility")
-			end
+			BFL:InstallFriendsFrameRedirects()
+			BFL:InstallBetterFriendsFrameEscapeHandler()
+		elseif addonName == "Blizzard_FriendsFrame" then
+			BFL:InstallFriendsFrameRedirects()
 		end
 	elseif event == "PLAYER_LOGIN" then
 		-- Check for native event callbacks (12.0.0+)
@@ -2064,6 +2271,8 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 
 		BFL:InstallSocialKeybindOverride()
 		BFL:MigrateSocialKeybindToNativeBinding()
+		BFL:InstallFriendsFrameRedirects()
+		BFL:InstallBetterFriendsFrameEscapeHandler()
 
 		-- Late initialization for modules that need PLAYER_LOGIN
 		for name, module in pairs(BFL.Modules) do
@@ -2096,6 +2305,9 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 			end)
 		end
 	elseif event == "PLAYER_REGEN_ENABLED" then
+		if BFL.pendingBlizzardFriendsFrameHide then
+			BFL:HideBlizzardFriendsFrameForRedirect()
+		end
 		if BFL.pendingSocialKeybindOverride then
 			BFL:InstallSocialKeybindOverride()
 		end

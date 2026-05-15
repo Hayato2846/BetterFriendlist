@@ -9,10 +9,6 @@ BFL:RegisterLocale("itIT", function()
 		"Disabilita il ritratto del giocatore, nasconde le opzioni di ricerca/ordinamento, allarga il frame e sposta le schede per un layout compatto."
 	L.MENU_CHANGELOG = "Registro Modifiche"
 	L.KEYBIND_TOGGLE_BETTERFRIENDLIST = "Toggle BetterFriendlist"
-	L.DIALOG_SOCIAL_KEYBIND_RELOAD_TEXT =
-		"BetterFriendlist moved your Social key to its own keybinding.\n\nReload the UI now to activate the new binding path?"
-	L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN1 = "Reload"
-	L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN2 = "Cancel"
 	-- ========================================
 	-- DIALOGS & POPUPS
 	-- ========================================
@@ -1006,6 +1002,14 @@ BFL:RegisterLocale("itIT", function()
 	-- Headers & Titles
 	L.SETTINGS_DISPLAY_OPTIONS = "Opzioni Visualizzazione"
 	L.SETTINGS_BEHAVIOR_HEADER = "Comportamento"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER = "Sussurro dalla lista amici"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_DESC =
+		"Avvia un sussurro dalla lista amici con un clic sinistro."
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE = "Clic per sussurrare"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE_DESC =
+		"Scegli se un clic sinistro singolo o doppio avvia il sussurro."
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE_DOUBLE = "Doppio clic"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE_SINGLE = "Clic singolo"
 	L.SETTINGS_GROUP_MANAGEMENT = "Gestione Gruppi"
 	L.SETTINGS_FONT_SETTINGS = "Font"
 	L.SETTINGS_GROUP_ORDER = "Ordine Gruppi"
@@ -1562,7 +1566,7 @@ BFL:RegisterLocale("itIT", function()
 	-- Taint-Free Whisper
 	L.SETTINGS_TAINT_FREE_WHISPER = "Sussurro senza Taint"
 	L.SETTINGS_TAINT_FREE_WHISPER_DESC =
-		"Usa una barra di input integrata nella parte inferiore della lista amici per sussurrare invece di aprire la chat predefinita. Questo impedisce a BetterFriendlist di interferire con il sistema di chat, che puo causare errori Lua. Attiva questa opzione se riscontri errori di chat che menzionano BetterFriendlist. La barra si chiude dopo l'invio. Premi Shift+Invio per riaprirla con lo stesso destinatario. Clicca la X per chiudere e dimenticare il destinatario."
+		"Usa una barra di input integrata nella parte inferiore della lista amici per sussurrare invece di aprire la chat predefinita. Questo impedisce a BetterFriendlist di interferire con il sistema di chat, che puo causare errori Lua. Attiva questa opzione se riscontri errori di chat che menzionano BetterFriendlist. La barra si chiude dopo l'invio. Apri un altro sussurro per usarla di nuovo. Clicca la X per chiudere e dimenticare il destinatario."
 	L.SETTINGS_TAINT_FREE_WHISPER_TOOLTIP =
 		"Previene gli errori di taint della chat causati da BetterFriendlist. Usa una barra di input integrata."
 	L.TAINT_FREE_WHISPER_TITLE = "Sussurra a %s"

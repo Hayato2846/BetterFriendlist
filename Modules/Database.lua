@@ -189,6 +189,8 @@ local defaults = {
 	hideGuildTab = false, -- Hide the Guild tab completely (Classic only, default: OFF)
 	-- UI Panel System
 	useUIPanelSystem = false, -- Use ShowUIPanel/HideUIPanel for automatic repositioning (default: OFF)
+	friendListClickWhisperEnabled = false, -- Allow friend row left-click actions to start whispers (default: OFF)
+	friendListClickWhisperMode = "double", -- Friend row whisper trigger: "double" or "single" (default: double)
 	-- Note Sync
 	syncGroupsToNote = false, -- Sync group assignments to friend notes (default: OFF)
 
@@ -218,7 +220,6 @@ local defaults = {
 	socialKeybindMigrated = false, -- Track if TOGGLESOCIAL was moved to BetterFriendlist's native binding on secret-value clients
 	socialKeybindMigrationVersion = nil, -- Last social keybind migration version
 	socialKeybindMigratedKeys = {}, -- Keys moved from TOGGLESOCIAL to BETTERFRIENDLIST_TOGGLE
-	socialKeybindMigrationReloadPrompted = false, -- Legacy reload prompt flag kept for SavedVariables compatibility
 	lastChangelogVersion = "0.0.0", -- Last version the user saw the changelog for
 	version = BFL.Version,
 }

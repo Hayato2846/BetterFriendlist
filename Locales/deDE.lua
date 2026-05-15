@@ -9,10 +9,6 @@ BFL:RegisterLocale("deDE", function()
 		"Deaktiviert das Spielerportrait, versteckt Such-/Sortieroptionen, verbreitert das Fenster und verschiebt Tabs für ein kompakteres Layout."
 	L.MENU_CHANGELOG = "Änderungsprotokoll"
 	L.KEYBIND_TOGGLE_BETTERFRIENDLIST = "BetterFriendlist umschalten"
-	L.DIALOG_SOCIAL_KEYBIND_RELOAD_TEXT =
-		"BetterFriendlist hat deine Social-Taste auf eine eigene Tastenbelegung verschoben.\n\nUI jetzt neu laden, um die neue Tastenbelegung zu aktivieren?"
-	L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN1 = "Neu laden"
-	L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN2 = "Abbrechen"
 	-- ========================================
 	-- DIALOGS & POPUPS
 	-- ========================================
@@ -735,6 +731,14 @@ BFL:RegisterLocale("deDE", function()
 	L.SETTINGS_ACCORDION_GROUPS_DESC = "Erlaubt nur eine ausgeklappte Gruppe gleichzeitig (Akkordeon-Effekt)"
 	L.SETTINGS_ADVANCED_DESC = "Erweiterte Optionen und Werkzeuge"
 	L.SETTINGS_BEHAVIOR_HEADER = "Verhalten"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER = "Flüstern aus Freundesliste"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_DESC =
+		"Startet per Linksklick-Aktion direkt ein Flüstern aus der Freundesliste."
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE = "Flüster-Klick"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE_DESC =
+		"Wähle, ob ein einfacher Linksklick oder ein Doppelklick das Flüstern startet."
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE_DOUBLE = "Doppelklick"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE_SINGLE = "Einzelklick"
 	L.SETTINGS_COLOR_CLASS_NAMES_DESC = "Färbt Freundesnamen in ihrer Klassenfarbe"
 	L.SETTINGS_COMPACT_MODE_DESC = "Verringert die Zeilenhöhe für eine kompaktere Liste"
 	L.SETTINGS_DISPLAY_OPTIONS = "Anzeigeoptionen"
@@ -1508,7 +1512,7 @@ BFL:RegisterLocale("deDE", function()
 	-- Taint-Free Whisper
 	L.SETTINGS_TAINT_FREE_WHISPER = "Taint-freies Fluestern"
 	L.SETTINGS_TAINT_FREE_WHISPER_DESC =
-		"Verwendet eine integrierte Nachrichtenleiste am unteren Rand der Freundesliste zum Fluestern, anstatt den Standard-Chat zu oeffnen. Dadurch wird verhindert, dass BetterFriendlist das Chat-System beeinflusst, was bei anderen Addons oder Blizzard-Code zu Lua-Fehlern fuehren kann. Aktiviere diese Option, wenn du Chat-bezogene Fehler erhaeltst, die BetterFriendlist erwaehnen. Die Leiste schliesst sich nach dem Senden. Druecke Shift+Enter, um sie mit dem gleichen Fluesterziel erneut zu oeffnen. Klicke das X, um das Ziel zu vergessen."
+		"Verwendet eine integrierte Nachrichtenleiste am unteren Rand der Freundesliste zum Fluestern, anstatt den Standard-Chat zu oeffnen. Dadurch wird verhindert, dass BetterFriendlist das Chat-System beeinflusst, was bei anderen Addons oder Blizzard-Code zu Lua-Fehlern fuehren kann. Aktiviere diese Option, wenn du Chat-bezogene Fehler erhaeltst, die BetterFriendlist erwaehnen. Die Leiste schliesst sich nach dem Senden. Starte erneut ein Fluesterfenster, um sie wieder zu verwenden. Klicke das X, um das Ziel zu vergessen."
 	L.SETTINGS_TAINT_FREE_WHISPER_TOOLTIP =
 		"Verhindert Chat-Taint-Fehler, die durch das Oeffnen der Blizzard-Fluesterfunktion durch BetterFriendlist verursacht werden. Verwendet stattdessen eine integrierte Nachrichtenleiste."
 	L.TAINT_FREE_WHISPER_TITLE = "Fluestern an %s"

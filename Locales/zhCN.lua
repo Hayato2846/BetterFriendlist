@@ -107,10 +107,6 @@ BFL:RegisterLocale("zhCN", function()
 	L.DIALOG_MIGRATE_BTN3 = "取消"
 
 	L.KEYBIND_TOGGLE_BETTERFRIENDLIST = "Toggle BetterFriendlist"
-	L.DIALOG_SOCIAL_KEYBIND_RELOAD_TEXT =
-		"BetterFriendlist moved your Social key to its own keybinding.\n\nReload the UI now to activate the new binding path?"
-	L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN1 = "Reload"
-	L.DIALOG_SOCIAL_KEYBIND_RELOAD_BTN2 = "Cancel"
 	-- ========================================
 	-- SETTINGS PANEL
 	-- ========================================
@@ -1002,6 +998,14 @@ BFL:RegisterLocale("zhCN", function()
 	-- Headers & Titles
 	L.SETTINGS_DISPLAY_OPTIONS = "Display Options"
 	L.SETTINGS_BEHAVIOR_HEADER = "Behavior"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER = "好友列表密语"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_DESC =
+		"通过左键点击好友列表条目直接开始密语。"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE = "密语点击"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE_DESC =
+		"选择单击左键或双击左键来开始密语。"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE_DOUBLE = "双击"
+	L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE_SINGLE = "单击"
 	L.SETTINGS_GROUP_MANAGEMENT = "Group Management"
 	L.SETTINGS_FONT_SETTINGS = "Font"
 	L.SETTINGS_GROUP_ORDER = "分组顺序"
@@ -1570,7 +1574,7 @@ BFL:RegisterLocale("zhCN", function()
 	-- Taint-Free Whisper
 	L.SETTINGS_TAINT_FREE_WHISPER = "无污染密语"
 	L.SETTINGS_TAINT_FREE_WHISPER_DESC =
-		"使用好友列表底部的内置消息栏发送密语，而不是打开默认聊天窗口。这可以防止 BetterFriendlist 干扰聊天系统导致 Lua 错误。如果您遇到提及 BetterFriendlist 的聊天错误，请启用此选项。消息栏在发送后关闭。按 Shift+Enter 重新打开并保留相同的密语目标。点击 X 关闭并清除目标。"
+		"使用好友列表底部的内置消息栏发送密语，而不是打开默认聊天窗口。这可以防止 BetterFriendlist 干扰聊天系统导致 Lua 错误。如果您遇到提及 BetterFriendlist 的聊天错误，请启用此选项。消息栏在发送后关闭。再次打开密语即可继续使用。点击 X 关闭并清除目标。"
 	L.SETTINGS_TAINT_FREE_WHISPER_TOOLTIP =
 		"防止 BetterFriendlist 导致的聊天污染错误。使用内置消息栏。"
 	L.TAINT_FREE_WHISPER_TITLE = "密语 %s"

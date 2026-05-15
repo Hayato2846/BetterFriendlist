@@ -1695,14 +1695,24 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			-- COMBAT FIX: ESC key via UISpecialFrames
 			-- Add our frame to UISpecialFrames so it closes on ESC
 			if BetterFriendsFrame then
-				tinsert(UISpecialFrames, "BetterFriendsFrame")
+				if BFL.AddUniqueUISpecialFrame then
+					BFL:AddUniqueUISpecialFrame("BetterFriendsFrame")
+				end
+				if BFL.InstallBetterFriendsFrameEscapeHandler then
+					BFL:InstallBetterFriendsFrameEscapeHandler()
+				end
 			else
 				-- If frame not created yet (though it should be loaded from XML), ensure it's added later
 				local f = CreateFrame("Frame")
 				f:RegisterEvent("PLAYER_LOGIN")
 				f:SetScript("OnEvent", function()
 					if BetterFriendsFrame then
-						tinsert(UISpecialFrames, "BetterFriendsFrame")
+						if BFL.AddUniqueUISpecialFrame then
+							BFL:AddUniqueUISpecialFrame("BetterFriendsFrame")
+						end
+						if BFL.InstallBetterFriendsFrameEscapeHandler then
+							BFL:InstallBetterFriendsFrameEscapeHandler()
+						end
 					end
 				end)
 			end
@@ -4719,6 +4729,10 @@ function BetterFriendsList_Button_OnClick(button, mouseButton)
 			if FriendsListModule.UpdateSendMessageButton then
 				FriendsListModule:UpdateSendMessageButton()
 			end
+
+			if FriendsListModule.HandleFriendWhisperClick then
+				FriendsListModule:HandleFriendWhisperClick(button.friendData, "single")
+			end
 		end
 	elseif mouseButton == "RightButton" then
 		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
@@ -4776,6 +4790,17 @@ function BetterFriendsList_Button_OnClick(button, mouseButton)
 				)
 			end
 		end
+	end
+end
+
+function BetterFriendsList_Button_OnDoubleClick(button, mouseButton)
+	if mouseButton ~= "LeftButton" or not button.friendData then
+		return
+	end
+
+	local FriendsListModule = GetFriendsList()
+	if FriendsListModule and FriendsListModule.HandleFriendWhisperClick then
+		FriendsListModule:HandleFriendWhisperClick(button.friendData, "double")
 	end
 end
 

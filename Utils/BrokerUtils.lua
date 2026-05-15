@@ -217,8 +217,10 @@ function BU.DismissActiveBrokerTooltip()
 
 	-- Release detail tooltip if present
 	local dt = entry.detailTooltipRef and entry.detailTooltipRef()
-	if dt and entry.LQT then
+	if dt and entry.LQT and dt.Key then
 		pcall(entry.LQT.ReleaseTooltip, entry.LQT, dt)
+	else
+		BU.HideBrokerDetailTooltip(dt)
 	end
 
 	-- Release main tooltip
@@ -231,8 +233,83 @@ function BU.SetActiveBrokerTooltip(tt, LQT, detailTooltipRef)
 	activeBrokerEntry = { tooltip = tt, LQT = LQT, detailTooltipRef = detailTooltipRef }
 end
 
-function BU.ClearActiveBrokerTooltip()
-	activeBrokerEntry = nil
+function BU.ClearActiveBrokerTooltip(tt)
+	if not activeBrokerEntry then
+		return
+	end
+
+	if not tt or activeBrokerEntry.tooltip == tt then
+		activeBrokerEntry = nil
+	end
+end
+
+function BU.ScheduleBrokerTooltipRelease(LQT, tt)
+	if not LQT or not tt or not tt.Key then
+		return
+	end
+
+	if not C_Timer or not C_Timer.After then
+		return
+	end
+
+	local releaseKey = tt.Key
+	if tt.bflReleaseScheduled == releaseKey then
+		return
+	end
+
+	tt.bflReleaseScheduled = releaseKey
+	C_Timer.After(0, function()
+		if tt.bflReleaseScheduled == releaseKey then
+			tt.bflReleaseScheduled = nil
+		end
+
+		if tt.Key == releaseKey and (not tt.IsShown or not tt:IsShown()) then
+			pcall(LQT.ReleaseTooltip, LQT, tt)
+		end
+	end)
+end
+
+function BU.GetOrCreateBrokerDetailTooltip(name)
+	local tt = _G[name]
+	if not tt then
+		tt = CreateFrame("GameTooltip", name, UIParent, "GameTooltipTemplate")
+	end
+	tt:SetClampedToScreen(true)
+	return tt
+end
+
+function BU.AnchorBrokerDetailTooltip(tt, owner, mainTooltip)
+	if not tt or not owner then
+		return
+	end
+
+	tt:SetOwner(owner, "ANCHOR_NONE")
+	tt:ClearAllPoints()
+	tt:SetFrameStrata("TOOLTIP")
+
+	if mainTooltip and mainTooltip.GetFrameLevel and tt.SetFrameLevel then
+		tt:SetFrameLevel((mainTooltip:GetFrameLevel() or 0) + 50)
+	end
+
+	local ownerCenter = owner.GetCenter and owner:GetCenter()
+	local screenWidth = UIParent and UIParent.GetWidth and UIParent:GetWidth()
+	if ownerCenter and screenWidth and ownerCenter > (screenWidth * 0.55) then
+		tt:SetPoint("TOPRIGHT", owner, "TOPLEFT", -8, 2)
+	else
+		tt:SetPoint("TOPLEFT", owner, "TOPRIGHT", 8, 2)
+	end
+end
+
+function BU.HideBrokerDetailTooltip(tt)
+	if not tt then
+		return
+	end
+	if tt.ClearLines then
+		tt:ClearLines()
+	end
+	if tt.Hide then
+		tt:Hide()
+	end
 end
 
 -- ========================================

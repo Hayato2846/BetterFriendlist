@@ -1351,6 +1351,9 @@ local function SetupTooltipAutoHide(tt, anchorFrame)
 	BFL.BrokerUtils.SetupTooltipAutoHide(tt, anchorFrame, LQT, function() return detailTooltip end)
 end
 
+local CreateDetailTooltip
+local ReleaseDetailTooltip
+
 -- ========================================
 -- ElvUI Tooltip Skin Helpers (delegate to BrokerUtils)
 -- ========================================
@@ -1362,10 +1365,16 @@ local function TooltipCleanup(tt)
 		return
 	end
 
+	ReleaseDetailTooltip()
+
 	-- Remove ElvUI skin artifacts so released tooltips are clean
 	RemoveElvUISkin(tt)
 
-	BFL.BrokerUtils.ClearActiveBrokerTooltip()
+	BFL.BrokerUtils.ClearActiveBrokerTooltip(tt)
+	if tooltip == tt then
+		tooltip = nil
+	end
+	BFL.BrokerUtils.ScheduleBrokerTooltipRelease(LQT, tt)
 
 	-- Hide our custom footer
 	if tt.footerFrame then
@@ -2043,9 +2052,15 @@ local function CreateLibQTipTooltip(anchorFrame)
 
 			row:SetScript("OnEnter", function()
 				row:SetColor(0.2, 0.4, 0.6, 0.3)
+				if CreateDetailTooltip then
+					CreateDetailTooltip(row, friend)
+				end
 			end)
 			row:SetScript("OnLeave", function()
 				row:SetColor(0, 0, 0, 0)
+				if ReleaseDetailTooltip then
+					ReleaseDetailTooltip()
+				end
 			end)
 
 			row:SetScript("OnMouseDown", function(frame, button)
@@ -2232,44 +2247,26 @@ function Broker:RefreshTooltip()
 end
 
 -- ========================================
--- LibQTip-2.0 Detail Tooltip (Two-Tier System)
+-- Broker Detail Tooltip
 -- ========================================
 
-local detailTooltipKey = "BetterFriendlistBrokerDetailTT"
-
 -- Create detail tooltip on friend line hover
-local function CreateDetailTooltip(cell, data)
-	if not LQT or not data then
+function CreateDetailTooltip(cell, data)
+	if not data then
 		return
 	end
 
-	-- Release previous detail tooltip if exists
-	if detailTooltip then
-		LQT:ReleaseTooltip(detailTooltip)
-		detailTooltip = nil
+	ReleaseDetailTooltip()
+
+	if not tooltip or not tooltip:IsShown() then
+		return
 	end
 
-	local tt2 = LQT:AcquireTooltip(detailTooltipKey, 3, "LEFT", "RIGHT", "RIGHT")
-	tt2:Clear()
-	tt2:SmartAnchorTo(cell)
-	tt2:SetAutoHideDelay(0.25, tooltip)
-	tt2:SetFrameStrata("HIGH")
-	tt2:UpdateLayout()
-
-	-- Hook OnHide to clean up ElvUI skin when detail tooltip is released/hidden
-	local oldOnHide2 = tt2:GetScript("OnHide")
-	tt2:SetScript("OnHide", function(self)
-		RemoveElvUISkin(self)
-		if oldOnHide2 then
-			pcall(oldOnHide2, self)
-		end
-	end)
-
-	-- ElvUI Skin: Apply ElvUI template (hides NineSlice, applies ElvUI backdrop)
-	ApplyElvUISkin(tt2)
+	local tt2 = BFL.BrokerUtils.GetOrCreateBrokerDetailTooltip("BetterFriendlistBrokerDetailTooltip")
+	tt2:ClearLines()
+	BFL.BrokerUtils.AnchorBrokerDetailTooltip(tt2, cell, tooltip)
 
 	-- Header with character/account name
-	local headerRow = tt2:AddHeadingRow()
 	local displayName = data.characterName and data.characterName ~= "" and data.characterName
 		or BFL:GetSafeAccountName(data.accountName, data.battleTag)
 		or "Unknown"
@@ -2285,128 +2282,73 @@ local function CreateDetailTooltip(cell, data)
 		end
 	end
 
-	local headerCell = headerRow:GetCell(1)
-	headerCell:SetColSpan(3)
-	headerCell:SetFontObject(BetterFriendlistFontNormalLarge)
-	headerCell:SetJustifyH("LEFT")
-	headerCell:SetText(C("dkyellow", displayName))
-	tt2:AddSeparator()
+	tt2:SetText(displayName, 1, 0.82, 0)
 
 	-- Status info
 	if data.isAFK or data.isDND then
 		local statusIcon = GetStatusIcon(data.isAFK, data.isDND)
 		local statusText = data.isAFK and L("STATUS_AWAY") or L("STATUS_DND_FULL")
-		local statusRow = tt2:AddRow(C("ltblue", L("STATUS_LABEL")), "", "")
-		local statusCell = statusRow:GetCell(2)
-		statusCell:SetColSpan(2)
-		statusCell:SetJustifyH("RIGHT")
-		statusCell:SetText(statusIcon .. " " .. C("gold", statusText))
+		tt2:AddDoubleLine(C("ltblue", L("STATUS_LABEL")), statusIcon .. " " .. C("gold", statusText))
 	end
 
 	-- Game/Client info with icon
 	if data.client then
-		local gameRow = tt2:AddRow(C("ltblue", L("GAME_LABEL")), "", "")
-		local gameCell = gameRow:GetCell(2)
-		gameCell:SetColSpan(2)
-		gameCell:SetJustifyH("RIGHT")
-		gameCell:SetText(GetFriendGameDisplay(data, 14))
+		tt2:AddDoubleLine(C("ltblue", L("GAME_LABEL")), GetFriendGameDisplay(data, 14))
 	end
 
 	-- WoW-specific details
 	if data.client == "WoW" then
 		-- Realm
 		if data.realmName and data.realmName ~= "" then
-			local realmRow = tt2:AddRow(C("ltblue", L("REALM_LABEL")), data.realmName, "")
-			local realmCell = realmRow:GetCell(2)
-			realmCell:SetColSpan(2)
-			realmCell:SetJustifyH("RIGHT")
-			realmCell:SetText(data.realmName)
+			tt2:AddDoubleLine(C("ltblue", L("REALM_LABEL")), data.realmName)
 		end
 
 		-- Class (with color)
 		if data.className and data.className ~= "UNKNOWN" then
-			local classRow = tt2:AddRow(C("ltblue", L("CLASS_LABEL")), "", "")
-			local classCell = classRow:GetCell(2)
-			classCell:SetColSpan(2)
-			classCell:SetJustifyH("RIGHT")
-			classCell:SetText(C(data.className, _G[data.className] or data.className))
+			tt2:AddDoubleLine(C("ltblue", L("CLASS_LABEL")), C(data.className, _G[data.className] or data.className))
 		end
 
 		-- Faction with icon
 		if data.factionName and data.factionName ~= "" then
 			local factionIcon = GetFactionIcon(data.factionName)
-			local factionRow = tt2:AddRow(C("ltblue", L("FACTION_LABEL")), "", "")
-			local factionCell = factionRow:GetCell(2)
-			factionCell:SetColSpan(2)
-			factionCell:SetJustifyH("RIGHT")
-			factionCell:SetText(factionIcon .. " " .. data.factionName)
+			tt2:AddDoubleLine(C("ltblue", L("FACTION_LABEL")), factionIcon .. " " .. data.factionName)
 		end
 	end
 
 	-- Zone/Area
 	if data.area and data.area ~= "" then
-		local zoneRow = tt2:AddRow(C("ltblue", L("ZONE_LABEL")), "", "")
-		local zoneCell = zoneRow:GetCell(2)
-		zoneCell:SetColSpan(2)
-		zoneCell:SetJustifyH("RIGHT")
-		zoneCell:SetText(data.area)
+		tt2:AddDoubleLine(C("ltblue", L("ZONE_LABEL")), data.area)
 	end
 
 	-- Notes
 	if data.note and data.note ~= "" then
-		tt2:AddSeparator()
-		local notesHeaderRow = tt2:AddRow()
-		local notesHeaderCell = notesHeaderRow:GetCell(1)
-		notesHeaderCell:SetColSpan(3)
-		notesHeaderCell:SetJustifyH("LEFT")
-		notesHeaderCell:SetText(C("ltblue", L("NOTE_LABEL")))
-		tt2:AddSeparator()
-		local notesRow = tt2:AddRow()
-		local notesCell = notesRow:GetCell(1)
-		notesCell:SetColSpan(3)
-		notesCell:SetJustifyH("LEFT")
-		notesCell:SetText(C("white", data.note))
+		tt2:AddLine(" ")
+		tt2:AddLine(C("ltblue", L("NOTE_LABEL")))
+		tt2:AddLine(data.note, 1, 1, 1, true)
 	end
 
 	-- Broadcast message (BNet only)
 	if data.type == "bnet" and data.broadcast and data.broadcast ~= "" then
-		tt2:AddSeparator()
-		local broadcastHeaderRow = tt2:AddRow()
-		local broadcastHeaderCell = broadcastHeaderRow:GetCell(1)
-		broadcastHeaderCell:SetColSpan(3)
-		broadcastHeaderCell:SetJustifyH("LEFT")
-		broadcastHeaderCell:SetText(C("ltblue", L("BROADCAST_LABEL")))
-		tt2:AddSeparator()
-		local broadcastRow = tt2:AddRow()
-		local broadcastCell = broadcastRow:GetCell(1)
-		broadcastCell:SetColSpan(3)
-		broadcastCell:SetJustifyH("LEFT")
-		broadcastCell:SetText(C("white", data.broadcast))
+		tt2:AddLine(" ")
+		tt2:AddLine(C("ltblue", L("BROADCAST_LABEL")))
+		tt2:AddLine(data.broadcast, 1, 1, 1, true)
 
 		-- Broadcast time
 		if data.broadcastTime then
 			local timeSince = time() - data.broadcastTime
 			local timeText = SecondsToTime(timeSince)
-			local timeRow = tt2:AddRow()
-			local timeCell = timeRow:GetCell(1)
-			timeCell:SetColSpan(3)
-			timeCell:SetJustifyH("RIGHT")
-			timeCell:SetText(C("ltgray", string.format(L("ACTIVE_SINCE_FMT"), timeText)))
+			tt2:AddLine(C("ltgray", string.format(L("ACTIVE_SINCE_FMT"), timeText)))
 		end
 	end
 
-	BFL.BrokerUtils.ApplyBrokerFontToTooltip(tt2)
-	tt2:UpdateLayout()
 	tt2:Show()
 	detailTooltip = tt2
 end
 
 -- Release detail tooltip on mouse leave
-local function ReleaseDetailTooltip()
-	if LQT and detailTooltip then
-		LQT:ReleaseTooltip(detailTooltip)
-		detailTooltip = nil
-	end
+function ReleaseDetailTooltip()
+	BFL.BrokerUtils.HideBrokerDetailTooltip(detailTooltip)
+	detailTooltip = nil
 end
 
 -- ========================================

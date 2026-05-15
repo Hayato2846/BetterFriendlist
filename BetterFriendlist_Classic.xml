@@ -230,6 +230,9 @@
 			<OnClick>
 				BetterFriendsList_Button_OnClick(self, button);
 			</OnClick>
+			<OnDoubleClick>
+				BetterFriendsList_Button_OnDoubleClick(self, button);
+			</OnDoubleClick>
 			<OnEnter>
 				BetterFriendsList_Button_OnEnter(self);
 			</OnEnter>
