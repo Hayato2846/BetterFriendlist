@@ -121,7 +121,14 @@ function BU.GetBrokerFontObject(sizeOffset)
 	if BFL.FontManager and BFL.FontManager.ResolveFontPath and BFL.FontManager.GetOrCreateFontFamily then
 		local fontPath = BFL.FontManager:ResolveFontPath(fontName)
 		if fontPath then
-			local fontObject = BFL.FontManager:GetOrCreateFontFamily(fontPath, fontSize, "NONE", false)
+			local useCustomNonLatinFont = BetterFriendlistDB and BetterFriendlistDB.brokerUseCustomFontForNonLatin == true
+			local fontObject = BFL.FontManager:GetOrCreateFontFamily(
+				fontPath,
+				fontSize,
+				"NONE",
+				false,
+				useCustomNonLatinFont
+			)
 			if fontObject then
 				return fontObject
 			end

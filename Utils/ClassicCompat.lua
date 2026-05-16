@@ -936,6 +936,111 @@ function Compat.GetGuildRosterLastOnline(index)
 	return 0, 0, 0, 0
 end
 
+local guildMOTDCache = ""
+local guildMOTDCacheValid = false
+local guildMOTDChatUtilHookInstalled = false
+local guildMOTDChatGlobalHookInstalled = false
+
+local function NormalizeGuildMOTD(motd)
+	if BFL.HasSecretValues and BFL.IsSecret and BFL:IsSecret(motd) then
+		return "", false
+	end
+	if motd == nil then
+		return "", false
+	end
+
+	return tostring(motd):gsub("|n", "\n"):gsub("\\n", "\n"), true
+end
+
+function BFL.CacheGuildMOTD(motd)
+	local normalized, canCache = NormalizeGuildMOTD(motd)
+	if not canCache then
+		return guildMOTDCache
+	end
+
+	guildMOTDCache = normalized
+	guildMOTDCacheValid = true
+	return guildMOTDCache
+end
+
+function BFL.ClearGuildMOTDCache()
+	guildMOTDCache = ""
+	guildMOTDCacheValid = false
+end
+
+function BFL.GetGuildMOTD()
+	if guildMOTDCacheValid then
+		return guildMOTDCache
+	end
+
+	if BFL.IsActionRestricted and BFL:IsActionRestricted() then
+		return ""
+	end
+	if IsInGuild then
+		local okInGuild, inGuild = pcall(IsInGuild)
+		if okInGuild and not inGuild then
+			return ""
+		end
+	end
+
+	local getter = C_GuildInfo and C_GuildInfo.GetMOTD or GetGuildRosterMOTD
+	if not getter then
+		return ""
+	end
+
+	local ok, motd
+	if BFL.HasSecretValues and securecallfunction then
+		ok, motd = pcall(securecallfunction, getter)
+	elseif BFL.HasSecretValues then
+		return ""
+	else
+		ok, motd = pcall(getter)
+	end
+	if not ok then
+		return ""
+	end
+	return BFL.CacheGuildMOTD(motd)
+end
+
+local function CacheGuildMOTDFromChatFrame(_, motd)
+	BFL.CacheGuildMOTD(motd)
+end
+
+local function InstallGuildMOTDChatHooks()
+	if not hooksecurefunc then
+		return
+	end
+
+	if not guildMOTDChatUtilHookInstalled and ChatFrameUtil and ChatFrameUtil.DisplayGMOTD then
+		local ok = pcall(hooksecurefunc, ChatFrameUtil, "DisplayGMOTD", CacheGuildMOTDFromChatFrame)
+		guildMOTDChatUtilHookInstalled = ok or guildMOTDChatUtilHookInstalled
+	end
+
+	if not guildMOTDChatGlobalHookInstalled and type(ChatFrame_DisplayGMOTD) == "function" then
+		local ok = pcall(hooksecurefunc, "ChatFrame_DisplayGMOTD", CacheGuildMOTDFromChatFrame)
+		guildMOTDChatGlobalHookInstalled = ok or guildMOTDChatGlobalHookInstalled
+	end
+end
+
+if BFL.RegisterEventCallback then
+	InstallGuildMOTDChatHooks()
+
+	BFL:RegisterEventCallback("GUILD_MOTD", function(motd)
+		BFL.CacheGuildMOTD(motd)
+	end, 5)
+
+	BFL:RegisterEventCallback("PLAYER_LOGIN", function()
+		InstallGuildMOTDChatHooks()
+	end, 5)
+
+	BFL:RegisterEventCallback("PLAYER_GUILD_UPDATE", function(unitTarget)
+		if unitTarget and unitTarget ~= "player" then
+			return
+		end
+		BFL.ClearGuildMOTDCache()
+	end, 5)
+end
+
 ------------------------------------------------------------
 -- Global Aliases for Convenience
 ------------------------------------------------------------

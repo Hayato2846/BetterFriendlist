@@ -47,39 +47,6 @@ BFL.UseNativeCallbacks = false -- 12.0.0+ Frame:RegisterEventCallback
 local SOCIAL_BINDING = "TOGGLESOCIAL"
 local BFL_SOCIAL_BINDING = "BETTERFRIENDLIST_TOGGLE"
 local SOCIAL_BINDING_MIGRATION_VERSION = "2.5.6-social-keybind-v1"
-local TAINT_TEST_CVARS = {
-	{ name = "scriptErrors", value = "1" },
-	{ name = "addonChatRestrictionsForced", value = "1" },
-	{ name = "secretAurasForced", value = "1" },
-	{ name = "secretCooldownsForced", value = "1" },
-	{ name = "secretSpellcastsForced", value = "1" },
-	{ name = "secretUnitComparisonForced", value = "1" },
-	{ name = "secretUnitIdentityForced", value = "1" },
-	{ name = "secretUnitPowerForced", value = "1" },
-	{ name = "secretUnitPowerMaxForced", value = "1" },
-	{ name = "secretChallengeModeRestrictionsForced", value = "1" },
-	{ name = "secretCombatRestrictionsForced", value = "1" },
-	{ name = "secretEncounterRestrictionsForced", value = "1" },
-	{ name = "secretMapRestrictionsForced", value = "1" },
-	{ name = "secretPvPMatchRestrictionsForced", value = "1" },
-	{ name = "taintLog", value = "5" },
-}
-local TAINT_TEST_RESTORE_CVARS = {
-	{ name = "taintLog", value = "0" },
-	{ name = "addonChatRestrictionsForced", value = "0" },
-	{ name = "secretAurasForced", value = "0" },
-	{ name = "secretCooldownsForced", value = "0" },
-	{ name = "secretSpellcastsForced", value = "0" },
-	{ name = "secretUnitComparisonForced", value = "0" },
-	{ name = "secretUnitIdentityForced", value = "0" },
-	{ name = "secretUnitPowerForced", value = "0" },
-	{ name = "secretUnitPowerMaxForced", value = "0" },
-	{ name = "secretChallengeModeRestrictionsForced", value = "0" },
-	{ name = "secretCombatRestrictionsForced", value = "0" },
-	{ name = "secretEncounterRestrictionsForced", value = "0" },
-	{ name = "secretMapRestrictionsForced", value = "0" },
-	{ name = "secretPvPMatchRestrictionsForced", value = "0" },
-}
 
 _G.BINDING_NAME_BETTERFRIENDLIST_TOGGLE = "Toggle BetterFriendlist"
 
@@ -170,138 +137,6 @@ function BFL:IsActionRestricted()
 		end
 	end
 	return false
-end
-
-local function GetDiagnosticCVar(name)
-	local getCVar = (C_CVar and C_CVar.GetCVar) or GetCVar
-	if not getCVar then
-		return nil
-	end
-
-	local ok, result = pcall(getCVar, name)
-	if ok then
-		return result
-	end
-	return nil
-end
-
-local function SetDiagnosticCVar(name, value)
-	local getCVar = (C_CVar and C_CVar.GetCVar) or GetCVar
-	local setCVar = (C_CVar and C_CVar.SetCVar) or SetCVar
-	if not (getCVar and (setCVar or ConsoleExec)) then
-		return false, "CVar API unavailable"
-	end
-
-	local before
-	local getOk, getResult = pcall(getCVar, name)
-	if getOk then
-		before = getResult
-	end
-
-	if setCVar then
-		local ok, result = pcall(setCVar, name, value)
-		if ok and result ~= false then
-			local afterOk, after = pcall(getCVar, name)
-			return true, before, afterOk and after or nil, "SetCVar"
-		end
-	end
-
-	if ConsoleExec then
-		local ok, result = pcall(ConsoleExec, name .. " " .. value, false)
-		if ok and result then
-			local afterOk, after = pcall(getCVar, name)
-			return true, before, afterOk and after or nil, "ConsoleExec"
-		end
-	end
-
-	return false, "SetCVar/ConsoleExec rejected CVar"
-end
-
-function BFL:IsTaintTestStateEnabled()
-	for _, cvar in ipairs(TAINT_TEST_CVARS) do
-		if cvar.name ~= "scriptErrors" then
-			local value = GetDiagnosticCVar(cvar.name)
-			if value ~= nil and tostring(value) == tostring(cvar.value) then
-				return true
-			end
-		end
-	end
-	return false
-end
-
-function BFL:EnableTaintTestState()
-	local applied = 0
-	local skipped = 0
-	local skippedNames = {}
-	local taintLogCVar
-	for _, cvar in ipairs(TAINT_TEST_CVARS) do
-		if cvar.name == "taintLog" then
-			taintLogCVar = cvar
-		else
-			local ok, err = SetDiagnosticCVar(cvar.name, cvar.value)
-			if ok then
-				applied = applied + 1
-			else
-				skipped = skipped + 1
-				skippedNames[#skippedNames + 1] = cvar.name .. " (" .. tostring(err) .. ")"
-			end
-		end
-	end
-
-	print(
-		"|cff00ff00BetterFriendlist:|r taint test state enabled ("
-			.. applied
-			.. " applied before taintLog, "
-			.. skipped
-			.. " skipped). /reload recommended."
-	)
-	if skipped > 0 then
-		print("|cffffff00BetterFriendlist:|r skipped: " .. table.concat(skippedNames, ", "))
-	end
-
-	if taintLogCVar then
-		local ok, err = SetDiagnosticCVar(taintLogCVar.name, taintLogCVar.value)
-		if ok then
-			applied = applied + 1
-		else
-			skipped = skipped + 1
-			print("|cffffff00BetterFriendlist:|r taintLog skipped: " .. tostring(err))
-		end
-	end
-end
-
-function BFL:DisableTaintTestState()
-	local applied = 0
-	local skipped = 0
-	local skippedNames = {}
-	for _, cvar in ipairs(TAINT_TEST_RESTORE_CVARS) do
-		local ok, err = SetDiagnosticCVar(cvar.name, cvar.value)
-		if ok then
-			applied = applied + 1
-		else
-			skipped = skipped + 1
-			skippedNames[#skippedNames + 1] = cvar.name .. " (" .. tostring(err) .. ")"
-		end
-	end
-
-	print(
-		"|cff00ff00BetterFriendlist:|r taint test state disabled ("
-			.. applied
-			.. " restored, "
-			.. skipped
-			.. " skipped). /reload recommended."
-	)
-	if skipped > 0 then
-		print("|cffffff00BetterFriendlist:|r skipped: " .. table.concat(skippedNames, ", "))
-	end
-end
-
-function BFL:ToggleTaintTestState()
-	if self:IsTaintTestStateEnabled() then
-		self:DisableTaintTestState()
-	else
-		self:EnableTaintTestState()
-	end
 end
 
 function BFL:UpdateBindingGlobals()
@@ -2502,14 +2337,6 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		else
 			print("|cffff0000BetterFriendlist:|r TestSuite module not loaded")
 		end
-
-	-- Internal taint diagnostics. Intentionally omitted from public help.
-	elseif msg == "tainttest" or msg == "taintstate" then
-		BFL:ToggleTaintTestState()
-	elseif msg == "tainttest on" or msg == "taintstate on" then
-		BFL:EnableTaintTestState()
-	elseif msg == "tainttest off" or msg == "taintstate off" then
-		BFL:DisableTaintTestState()
 
 	-- Switch Locale (Debug)
 	elseif msg:match("^locale%s+") then

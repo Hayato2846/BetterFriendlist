@@ -142,6 +142,7 @@ local defaults = {
 	brokerShowHints = true, -- Show hint text in LDB tooltip footer (default: ON)
 	brokerFont = "Friz Quadrata TT", -- Broker tooltip font face
 	brokerFontSize = 12, -- Broker tooltip font size
+	brokerUseCustomFontForNonLatin = false, -- Use selected broker tooltip font for non-latin alphabets (default: OFF)
 	brokerShowColStatus = false, -- Column: Status icon (default: OFF)
 	brokerGroupHeaderAlign = "LEFT", -- Friends Broker group header alignment: LEFT/CENTER/RIGHT
 	-- Guild Data Broker Settings

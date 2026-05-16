@@ -5558,6 +5558,33 @@ function Settings:RefreshBrokerTab()
 	end
 	table.insert(allFrames, brokerFontSize)
 
+	local brokerNonLatinFont = Components:CreateCheckbox(
+		tab,
+		L.BROKER_SETTINGS_FONT_NON_LATIN or "Enable Font for non-latin Alphabets",
+		DB:Get("brokerUseCustomFontForNonLatin", false),
+		function(val)
+			DB:Set("brokerUseCustomFontForNonLatin", val)
+			RefreshBrokerTooltips()
+		end
+	)
+	if brokerNonLatinFont.SetTooltip then
+		brokerNonLatinFont:SetTooltip(
+			L.BROKER_SETTINGS_FONT_NON_LATIN or "Enable Font for non-latin Alphabets",
+			L.BROKER_SETTINGS_FONT_NON_LATIN_TOOLTIP
+				or "Use the selected broker tooltip font for Korean, Chinese, and Russian text instead of WoW's default alphabet fallback."
+		)
+	end
+	table.insert(allFrames, brokerNonLatinFont)
+
+	local brokerNonLatinWarning = Components:CreateLabel(
+		tab,
+		L.BROKER_SETTINGS_FONT_NON_LATIN_WARNING
+			or "Fonts do not always support every alphabet. If text appears as boxes, choose another font or disable this option.",
+		true,
+		{ r = 1, g = 0.82, b = 0, a = 1 }
+	)
+	table.insert(allFrames, brokerNonLatinWarning)
+
 	if DB:Get("brokerEnabled", true) then
 		-- Show Icon
 		local showIcon = Components:CreateCheckbox(

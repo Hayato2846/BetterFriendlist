@@ -368,13 +368,41 @@ local function GenerateMockGroups()
 			color = { r = 0.4, g = 0.4, b = 1.0 }, -- Blueish
 			icon = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon",
 		},
+		-- Font preview groups for WoW's non-latin font families.
 		{
-			id = "group_japan",
-			name = "テストグループ (JP)",
+			id = "font_korean",
+			name = "테스트 그룹 (Korean)",
 			collapsed = false,
 			builtin = false,
 			order = 10,
-			color = { r = 1.0, g = 0.6, b = 0.8 }, -- Pink
+			color = { r = 0.35, g = 0.9, b = 0.7 },
+			icon = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon",
+		},
+		{
+			id = "font_simplified_chinese",
+			name = "测试组 (Simplified Chinese)",
+			collapsed = false,
+			builtin = false,
+			order = 11,
+			color = { r = 0.95, g = 0.35, b = 0.35 },
+			icon = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon",
+		},
+		{
+			id = "font_traditional_chinese",
+			name = "測試群組 (Traditional Chinese)",
+			collapsed = false,
+			builtin = false,
+			order = 12,
+			color = { r = 1.0, g = 0.65, b = 0.25 },
+			icon = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon",
+		},
+		{
+			id = "font_russian",
+			name = "Тестовая группа (Russian)",
+			collapsed = false,
+			builtin = false,
+			order = 13,
+			color = { r = 0.45, g = 0.55, b = 1.0 },
 			icon = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon",
 		},
 		{
@@ -490,6 +518,9 @@ PreviewMode.mockData = {
 	groups = {},
 	whoResults = {},
 	groupAssignments = {},
+	brokerFriends = {},
+	guildMembers = {},
+	guildName = "",
 }
 
 -- Mock BattleTag for privacy in screenshots
@@ -615,6 +646,7 @@ end
 function PreviewMode:Enable()
 	if self.enabled then
 		print("|cffff8800BetterFriendlist:|r Preview mode is already enabled!")
+		self:ApplyBrokerPreviewData()
 		return
 	end
 
@@ -628,6 +660,9 @@ function PreviewMode:Enable()
 
 	-- Generate mock groups
 	self:GenerateMockGroupsData()
+
+	-- Generate broker tooltip data
+	self:GenerateBrokerPreviewData()
 
 	-- Enable existing mock systems
 	self:EnableRaidMock()
@@ -643,8 +678,11 @@ function PreviewMode:Enable()
 
 	-- Force UI refresh
 	self:RefreshAllUI()
+	self:ApplyBrokerPreviewData()
 
 	print("|cff00ff00BetterFriendlist:|r Preview data created:")
+	print("  |cffffffff- " .. #self.mockData.brokerFriends .. " broker friend rows|r")
+	print("  |cffffffff- " .. #self.mockData.guildMembers .. " broker guild rows|r")
 	print("  |cffffffff• " .. #self.mockData.friends .. " mock friends|r")
 	print("  |cffffffff• " .. #self.mockData.groups .. " custom groups|r")
 	print("  |cffffffff• Raid frame with 25 players|r")
@@ -652,7 +690,7 @@ function PreviewMode:Enable()
 	print("  |cffffffff• 2 friend invite requests|r")
 	print("  |cffffffff• BattleTag hidden (" .. self.MOCK_BATTLETAG .. ")|r")
 	print("")
-	print("|cffffcc00Tip:|r Use |cffffffff/bfl preview off|r to disable preview mode")
+	print("|cffffcc00Tip:|r Use |cffffffff/bfl preview|r again to disable preview mode")
 end
 
 --[[
@@ -668,11 +706,17 @@ function PreviewMode:Disable()
 	print("|cff00ff00BetterFriendlist:|r |cffffd700Preview Mode DISABLED|r")
 
 	self.enabled = false
+	local previewGroupAssignments = self.mockData.groupAssignments
+
+	self:ClearBrokerPreviewData()
 
 	-- Clear mock data
 	self.mockData.friends = {}
 	self.mockData.groups = {}
 	self.mockData.groupAssignments = {}
+	self.mockData.brokerFriends = {}
+	self.mockData.guildMembers = {}
+	self.mockData.guildName = ""
 
 	-- Restore original UpdateFriendsList function
 	local FriendsList = BFL:GetModule("FriendsList")
@@ -705,6 +749,9 @@ function PreviewMode:Disable()
 	-- Restore original friendGroups in BetterFriendlistDB
 	if BetterFriendlistDB and BetterFriendlistDB.friendGroups then
 		-- Remove mock friend group assignments
+		for uid in pairs(previewGroupAssignments or {}) do
+			BetterFriendlistDB.friendGroups[uid] = nil
+		end
 		for uid in pairs(MOCK_GROUP_ASSIGNMENTS) do
 			BetterFriendlistDB.friendGroups[uid] = nil
 		end
@@ -759,7 +806,7 @@ function PreviewMode:GenerateMockFriends()
 	self.mockData.friends = {}
 	self.mockData.groupAssignments = {} -- Clean start for assignments
 
-	-- Generate International Friends for Font Testing (KR, SC, TC, RU, JP)
+	-- Generate International Friends for Font Testing (KR, SC, TC, RU)
 	local intFriends = {
 		{
 			name = "안녕하세요",
@@ -792,14 +839,6 @@ function PreviewMode:GenerateMockFriends()
 			group = "group_russia",
 			note = "Проверка шрифтов (Russian)",
 			zone = "Даларан (Dalaran)",
-		},
-		{
-			name = "こんにちは",
-			tag = "こんにちは#5555",
-			uid = "bnet_こんにちは#5555",
-			group = "group_japan",
-			note = "日本語テスト (Japanese)",
-			zone = "ドラゴンの島 (Dragon Isles)",
 		},
 		{
 			name = "VeryLongNamePleaseTruncateMeCorrectlyOrResizeMeIfYouCanDoThatWithoutBreakingLayout",
@@ -908,6 +947,237 @@ function PreviewMode:GenerateMockGroupsData()
 	for k, v in pairs(MOCK_WOW_GROUP_ASSIGNMENTS) do
 		self.mockData.groupAssignments[k] = v
 	end
+end
+
+function PreviewMode:GenerateBrokerPreviewData()
+	self.mockData.brokerFriends = {}
+	self.mockData.guildMembers = {}
+	self.mockData.guildName = "Font Preview - 한글 / 简体 / 繁體 / Русский"
+
+	-- WoW font families with non-latin alphabet support:
+	-- korean, simplifiedchinese, traditionalchinese, russian.
+	local fontSamples = {
+		{
+			alphabet = "Korean",
+			group = "font_korean",
+			accountName = "한글친구",
+			characterName = "한글수호자",
+			battleTagSuffix = "1111",
+			zone = "도르노갈",
+			rank = "레이드원",
+			note = "한국어 폰트 테스트",
+			className = "Monk",
+			classFile = "MONK",
+			classID = 10,
+			level = 80,
+			factionName = "Alliance",
+		},
+		{
+			alphabet = "Simplified Chinese",
+			group = "font_simplified_chinese",
+			accountName = "简体好友",
+			characterName = "简体法师",
+			battleTagSuffix = "2222",
+			zone = "奥格瑞玛",
+			rank = "测试成员",
+			note = "简体中文字体测试",
+			className = "Mage",
+			classFile = "MAGE",
+			classID = 8,
+			level = 79,
+			factionName = "Horde",
+		},
+		{
+			alphabet = "Traditional Chinese",
+			group = "font_traditional_chinese",
+			accountName = "繁體好友",
+			characterName = "繁體牧師",
+			battleTagSuffix = "3333",
+			zone = "暴風城",
+			rank = "測試成員",
+			note = "繁體中文字體測試",
+			className = "Priest",
+			classFile = "PRIEST",
+			classID = 5,
+			level = 78,
+			factionName = "Alliance",
+		},
+		{
+			alphabet = "Russian",
+			group = "font_russian",
+			accountName = "РусскийДруг",
+			characterName = "РусскийТанк",
+			battleTagSuffix = "4444",
+			zone = "Даларан",
+			rank = "Участник",
+			note = "Проверка шрифтов",
+			className = "Warrior",
+			classFile = "WARRIOR",
+			classID = 1,
+			level = 77,
+			factionName = "Horde",
+		},
+	}
+
+	for i, sample in ipairs(fontSamples) do
+		local battleTag = sample.accountName .. "#" .. sample.battleTagSuffix
+		local bnetId = "bnet_" .. battleTag
+		local wowId = "wow_" .. sample.characterName .. "-Blackrock"
+		local gameAccountID = 9000 + i
+
+		local gameInfo = {
+			isOnline = true,
+			gameAccountID = gameAccountID,
+			clientProgram = "WoW",
+			gameName = "World of Warcraft",
+			characterName = sample.characterName,
+			className = sample.className,
+			classID = sample.classID,
+			characterLevel = sample.level,
+			areaName = sample.zone,
+			realmName = "Blackrock",
+			factionName = sample.factionName,
+			guildName = self.mockData.guildName,
+			wowProjectID = WOW_PROJECT_ID or 1,
+		}
+
+		table.insert(self.mockData.brokerFriends, {
+			type = "bnet",
+			index = 300 + i,
+			id = bnetId,
+			bnetAccountID = 900000 + i,
+			accountName = sample.accountName,
+			battleTag = battleTag,
+			connected = true,
+			note = sample.note .. " (" .. sample.alphabet .. ")",
+			isFavorite = false,
+			client = "WoW",
+			isMobile = false,
+			gameAccountID = gameAccountID,
+			gameAccountInfo = gameInfo,
+			wowProjectID = WOW_PROJECT_ID or 1,
+			characterName = sample.characterName,
+			className = sample.className,
+			classID = sample.classID,
+			level = sample.level,
+			area = sample.zone,
+			realmName = "Blackrock",
+			factionName = sample.factionName,
+			guildName = self.mockData.guildName,
+			_isMock = true,
+		})
+		self.mockData.groupAssignments[bnetId] = { sample.group }
+
+		table.insert(self.mockData.brokerFriends, {
+			type = "wow",
+			index = 400 + i,
+			id = wowId,
+			accountName = sample.characterName,
+			characterName = sample.characterName,
+			fullName = sample.characterName .. "-Blackrock",
+			name = sample.characterName .. "-Blackrock",
+			connected = true,
+			client = "WoW",
+			note = sample.note,
+			level = sample.level,
+			className = sample.className,
+			classID = sample.classID,
+			area = sample.zone,
+			realmName = "Blackrock",
+			factionName = sample.factionName,
+			guildName = self.mockData.guildName,
+			_isMock = true,
+		})
+		self.mockData.groupAssignments[wowId] = { sample.group }
+
+		table.insert(self.mockData.guildMembers, {
+			index = i,
+			fullName = sample.characterName .. "-Blackrock",
+			name = sample.characterName,
+			realm = "Blackrock",
+			professions = "",
+			rank = sample.rank,
+			rankIndex = i,
+			level = sample.level,
+			classFile = sample.classFile,
+			className = sample.className,
+			zone = sample.zone,
+			note = sample.note,
+			officerNote = sample.note .. " (" .. sample.alphabet .. ")",
+			online = true,
+			isAFK = false,
+			isDND = false,
+			isMobile = false,
+			lastOnlineYears = 0,
+			lastOnlineMonths = 0,
+			lastOnlineDays = 0,
+			lastOnlineHours = 0,
+		})
+	end
+
+	table.insert(self.mockData.brokerFriends, {
+		type = "bnet",
+		index = 399,
+		id = "bnet_LatinControl#5555",
+		bnetAccountID = 900005,
+		accountName = "LatinControl",
+		battleTag = "LatinControl#5555",
+		connected = true,
+		note = "Latin baseline row for comparison",
+		isFavorite = false,
+		client = "WoW",
+		gameAccountID = 9005,
+		gameAccountInfo = {
+			isOnline = true,
+			gameAccountID = 9005,
+			clientProgram = "WoW",
+			gameName = "World of Warcraft",
+			characterName = "Latincontrol",
+			className = "Paladin",
+			classID = 2,
+			characterLevel = 80,
+			areaName = "Stormwind City",
+			realmName = "Blackrock",
+			factionName = "Alliance",
+			guildName = self.mockData.guildName,
+			wowProjectID = WOW_PROJECT_ID or 1,
+		},
+		wowProjectID = WOW_PROJECT_ID or 1,
+		characterName = "Latincontrol",
+		className = "Paladin",
+		classID = 2,
+		level = 80,
+		area = "Stormwind City",
+		realmName = "Blackrock",
+		factionName = "Alliance",
+		guildName = self.mockData.guildName,
+		_isMock = true,
+	})
+	self.mockData.groupAssignments["bnet_LatinControl#5555"] = { "raid_team" }
+
+	table.insert(self.mockData.guildMembers, {
+		index = 99,
+		fullName = "Latincontrol-Blackrock",
+		name = "Latincontrol",
+		realm = "Blackrock",
+		professions = "",
+		rank = "Officer",
+		rankIndex = 0,
+		level = 80,
+		classFile = "PALADIN",
+		className = "Paladin",
+		zone = "Stormwind City",
+		note = "Latin baseline row for comparison",
+		officerNote = "",
+		online = true,
+		isAFK = false,
+		isDND = false,
+		isMobile = false,
+		lastOnlineYears = 0,
+		lastOnlineMonths = 0,
+		lastOnlineDays = 0,
+		lastOnlineHours = 0,
+	})
 end
 
 -- ============================================
@@ -1255,6 +1525,67 @@ function PreviewMode:DisableInviteMock()
 end
 
 -- ============================================
+-- BROKER TOOLTIP PREVIEW DATA
+-- ============================================
+
+function PreviewMode:ApplyBrokerPreviewData()
+	if #self.mockData.brokerFriends == 0 or #self.mockData.guildMembers == 0 then
+		self:GenerateBrokerPreviewData()
+	end
+
+	local Broker = BFL:GetModule("Broker")
+	local GuildBroker = BFL:GetModule("GuildBroker")
+
+	if self.enabled and BetterFriendlistDB then
+		BetterFriendlistDB.friendGroups = BetterFriendlistDB.friendGroups or {}
+		for uid, groups in pairs(self.mockData.groupAssignments or {}) do
+			BetterFriendlistDB.friendGroups[uid] = groups
+		end
+	end
+
+	if Broker and Broker.SetPreviewData then
+		Broker:SetPreviewData({
+			friends = self.mockData.brokerFriends,
+		})
+		if Broker.RefreshTooltip then
+			Broker:RefreshTooltip()
+		end
+	end
+
+	if GuildBroker and GuildBroker.SetPreviewData then
+		GuildBroker:SetPreviewData({
+			guildName = self.mockData.guildName,
+			members = self.mockData.guildMembers,
+		})
+		if GuildBroker.RefreshTooltip then
+			GuildBroker:RefreshTooltip()
+		end
+	end
+end
+
+function PreviewMode:ClearBrokerPreviewData()
+	local Broker = BFL:GetModule("Broker")
+	if Broker then
+		if Broker.SetPreviewData then
+			Broker:SetPreviewData(nil)
+		end
+		if Broker.RefreshTooltip then
+			Broker:RefreshTooltip()
+		end
+	end
+
+	local GuildBroker = BFL:GetModule("GuildBroker")
+	if GuildBroker then
+		if GuildBroker.SetPreviewData then
+			GuildBroker:SetPreviewData(nil)
+		end
+		if GuildBroker.RefreshTooltip then
+			GuildBroker:RefreshTooltip()
+		end
+	end
+end
+
+-- ============================================
 -- UI REFRESH
 -- ============================================
 
@@ -1314,7 +1645,9 @@ end
 function PreviewMode:HandleCommand(args)
 	local cmd = args and args:lower() or ""
 
-	if cmd == "" or cmd == "on" or cmd == "enable" then
+	if cmd == "" then
+		self:Toggle()
+	elseif cmd == "on" or cmd == "enable" then
 		self:Enable()
 	elseif cmd == "off" or cmd == "disable" then
 		self:Disable()
@@ -1323,6 +1656,8 @@ function PreviewMode:HandleCommand(args)
 	elseif cmd == "status" then
 		if self.enabled then
 			print("|cff00ff00BetterFriendlist:|r Preview mode is |cff00ff00ENABLED|r")
+			print("  |cffffffff- " .. #self.mockData.brokerFriends .. " broker friend rows|r")
+			print("  |cffffffff- " .. #self.mockData.guildMembers .. " broker guild rows|r")
 			print("  |cffffffff• " .. #self.mockData.friends .. " mock friends|r")
 			print("  |cffffffff• " .. #self.mockData.groups .. " custom groups|r")
 		else
@@ -1331,13 +1666,13 @@ function PreviewMode:HandleCommand(args)
 	else
 		print("|cff00ff00BFL Preview Mode Commands:|r")
 		print("")
-		print("  |cffffcc00/bfl preview|r - Enable preview mode")
+		print("  |cffffcc00/bfl preview|r - Toggle preview mode")
 		print("  |cffffcc00/bfl preview off|r - Disable preview mode")
 		print("  |cffffcc00/bfl preview toggle|r - Toggle preview mode")
 		print("  |cffffcc00/bfl preview status|r - Show current status")
 		print("")
 		print("|cff888888Preview mode displays realistic mock data for screenshots.|r")
-		print("|cff888888It includes: Friends, Groups, Raid, QuickJoin, and Invites.|r")
+		print("|cff888888It includes: Friends, Groups, Broker Tooltips, Raid, QuickJoin, and Invites.|r")
 	end
 end
 

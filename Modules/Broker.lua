@@ -43,6 +43,7 @@ local FILTER_CYCLE = { "all", "online", "wow", "bnet", "ingame" }
 -- LibQTip tooltip reference
 local tooltip = nil
 local tooltipKey = "BetterFriendlistBrokerTT"
+local previewData = nil
 
 -- Detail Tooltip reference (Forward declared for helper access)
 local detailTooltip = nil
@@ -398,6 +399,87 @@ local function ApplyGameAccountToFriend(friend, gameInfo)
 	end
 end
 
+local function GetPreviewFriendGameInfo(friend)
+	return friend and (friend.gameAccountInfo or (friend.accountInfo and friend.accountInfo.gameAccountInfo))
+end
+
+local function GetPreviewFriendClient(friend)
+	local gameInfo = GetPreviewFriendGameInfo(friend)
+	return (friend and friend.client) or (gameInfo and gameInfo.clientProgram) or ""
+end
+
+local function IsPreviewFriendOnline(friend, treatMobileAsOffline)
+	if not friend then
+		return false
+	end
+
+	local client = GetPreviewFriendClient(friend)
+	if treatMobileAsOffline and client == "BSAp" then
+		return false
+	end
+
+	if friend.connected ~= nil then
+		return friend.connected and true or false
+	end
+
+	local gameInfo = GetPreviewFriendGameInfo(friend)
+	return gameInfo and gameInfo.isOnline or false
+end
+
+local function PreviewFriendPassesFilter(friend, currentFilter, isOnline)
+	local client = GetPreviewFriendClient(friend)
+	local wowClient = BNET_CLIENT_WOW or "WoW"
+
+	if currentFilter == "all" or currentFilter == "online" then
+		return isOnline
+	elseif currentFilter == "offline" then
+		return not isOnline
+	elseif currentFilter == "wow" then
+		return isOnline and (friend.type == "wow" or client == wowClient)
+	elseif currentFilter == "bnet" then
+		return isOnline and friend.type == "bnet" and client ~= wowClient
+	elseif currentFilter == "hideafk" then
+		return isOnline and not (friend.isAFK or friend.isDND)
+	elseif currentFilter == "retail" then
+		if not isOnline or not (friend.type == "wow" or client == wowClient) then
+			return false
+		end
+		return not friend.wowProjectID or friend.wowProjectID == (WOW_PROJECT_MAINLINE or WOW_PROJECT_ID)
+	elseif currentFilter == "ingame" then
+		if friend.type == "wow" then
+			return isOnline
+		end
+		return isOnline and client ~= "" and client ~= "App" and client ~= "BSAp"
+	end
+
+	return isOnline
+end
+
+local function GetPreviewFriendCounts(currentFilter)
+	local treatMobileAsOffline = BetterFriendlistDB and BetterFriendlistDB.treatMobileAsOffline
+	local wowFiltered, wowTotal = 0, 0
+	local bnetFiltered, bnetTotal = 0, 0
+
+	for _, friend in ipairs(previewData and previewData.friends or {}) do
+		local isOnline = IsPreviewFriendOnline(friend, treatMobileAsOffline)
+		local passes = PreviewFriendPassesFilter(friend, currentFilter or "all", isOnline)
+
+		if friend.type == "wow" then
+			wowTotal = wowTotal + 1
+			if passes then
+				wowFiltered = wowFiltered + 1
+			end
+		else
+			bnetTotal = bnetTotal + 1
+			if passes then
+				bnetFiltered = bnetFiltered + 1
+			end
+		end
+	end
+
+	return wowFiltered, wowTotal, bnetFiltered, bnetTotal
+end
+
 -- Format time difference for activity tracker
 local function FormatTimeSince(timestamp)
 	if not timestamp then
@@ -456,6 +538,10 @@ end
 -- total friends as online just because the active filter is "All".
 local function GetFilteredFriendCounts()
 	local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
+
+	if previewData and previewData.friends then
+		return GetPreviewFriendCounts("all")
+	end
 
 	if currentFilter == "all" or currentFilter == "online" then
 		return GetFriendCounts()
@@ -1591,7 +1677,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 					and BetterFriendlistDB.friendGroups[friend.id]
 				or {}
 			local assigned = false
-			local isOnline = friend.connected
+			local isOnline = IsPreviewFriendOnline(friend, treatMobileAsOffline)
 
 			-- Favorites group (BNet only)
 			if friend.type == "bnet" and friend.isFavorite then
@@ -1676,125 +1762,131 @@ local function CreateLibQTipTooltip(anchorFrame)
 			end
 		end
 
-		-- Collect BNet Friends (ALL)
-		if BNConnected() then
-			local numBNetTotal = BNGetNumFriends()
-			for i = 1, numBNetTotal do
-				local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
-				if accountInfo then
-					local gameInfo = accountInfo.gameAccountInfo or {}
-					local isOnline = gameInfo.isOnline or false
-					local client = gameInfo.clientProgram or "App"
+		if previewData and previewData.friends then
+			for _, friend in ipairs(previewData.friends) do
+				ProcessFriend(friend)
+			end
+		else
+			-- Collect BNet Friends (ALL)
+			if BNConnected() then
+				local numBNetTotal = BNGetNumFriends()
+				for i = 1, numBNetTotal do
+					local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
+					if accountInfo then
+						local gameInfo = accountInfo.gameAccountInfo or {}
+						local isOnline = gameInfo.isOnline or false
+						local client = gameInfo.clientProgram or "App"
 
-					local isMobile = (client == "BSAp")
-					if treatMobileAsOffline and isMobile then
-						isOnline = false
+						local isMobile = (client == "BSAp")
+						if treatMobileAsOffline and isMobile then
+							isOnline = false
+						end
+
+						local friendUID = (accountInfo.battleTag and accountInfo.battleTag ~= "")
+								and ("bnet_" .. accountInfo.battleTag)
+							or ("bnet_" .. tostring(accountInfo.bnetAccountID))
+
+						local friend = {
+							id = friendUID,
+							bnetAccountID = accountInfo.bnetAccountID,
+							battleTag = accountInfo.battleTag,
+							type = "bnet",
+							accountName = BFL:GetSafeAccountName(accountInfo.accountName, accountInfo.battleTag),
+							isAFK = accountInfo.isAFK or (gameInfo.isAFK or gameInfo.isGameAFK),
+							isDND = accountInfo.isDND or (gameInfo.isDND or gameInfo.isGameBusy),
+							broadcast = accountInfo.customMessage or "",
+							broadcastTime = accountInfo.customMessageTime,
+							note = accountInfo.note or "",
+							connected = isOnline,
+							isFavorite = accountInfo.isFavorite,
+							accountInfo = accountInfo,
+							index = i,
+						}
+
+						ApplyGameAccountToFriend(friend, gameInfo)
+
+						if isOnline and C_BattleNet.GetFriendNumGameAccounts and C_BattleNet.GetFriendGameAccountInfo then
+							local numGameAccounts = C_BattleNet.GetFriendNumGameAccounts(i) or 0
+							if numGameAccounts > 1 then
+								local gameAccounts = {}
+								for accountIndex = 1, numGameAccounts do
+									local gameAccountInfo = C_BattleNet.GetFriendGameAccountInfo(i, accountIndex)
+									if
+										gameAccountInfo
+										and gameAccountInfo.clientProgram ~= "App"
+										and gameAccountInfo.clientProgram ~= "CLNT"
+										and gameAccountInfo.clientProgram ~= "BSAp"
+									then
+										gameAccounts[#gameAccounts + 1] = gameAccountInfo
+									end
+								end
+
+								friend.gameAccounts = gameAccounts
+								friend.numGameAccounts = #gameAccounts
+
+								local FriendsList = GetFriendsList()
+								local prefID = FriendsList
+									and FriendsList.GetPreferredGameAccountID
+									and FriendsList:GetPreferredGameAccountID(friendUID)
+								if prefID then
+									for _, account in ipairs(gameAccounts) do
+										if account.gameAccountID == prefID then
+											ApplyGameAccountToFriend(friend, account)
+											friend.hasPreferredAccountOverride = true
+											break
+										end
+									end
+								end
+							else
+								friend.numGameAccounts = numGameAccounts
+							end
+						else
+							friend.numGameAccounts = isOnline and 1 or 0
+						end
+
+						ProcessFriend(friend)
 					end
+				end
+			end
 
-					local friendUID = (accountInfo.battleTag and accountInfo.battleTag ~= "")
-							and ("bnet_" .. accountInfo.battleTag)
-						or ("bnet_" .. tostring(accountInfo.bnetAccountID))
+			-- Collect WoW Friends (ALL)
+			local numWoWFriends = C_FriendList.GetNumFriends() or 0
+			for i = 1, numWoWFriends do
+				local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
+				if friendInfo then
+					local fullName = friendInfo.name or ""
+					local name, realm = strsplit("-", fullName, 2)
+					local normalizedName = BFL:NormalizeWoWFriendName(fullName)
+					local friendUID = normalizedName and ("wow_" .. normalizedName) or ("wow_" .. fullName)
 
 					local friend = {
 						id = friendUID,
-						bnetAccountID = accountInfo.bnetAccountID,
-						battleTag = accountInfo.battleTag,
-						type = "bnet",
-						accountName = BFL:GetSafeAccountName(accountInfo.accountName, accountInfo.battleTag),
-						isAFK = accountInfo.isAFK or (gameInfo.isAFK or gameInfo.isGameAFK),
-						isDND = accountInfo.isDND or (gameInfo.isDND or gameInfo.isGameBusy),
-						broadcast = accountInfo.customMessage or "",
-						broadcastTime = accountInfo.customMessageTime,
-						note = accountInfo.note or "",
-						connected = isOnline,
-						isFavorite = accountInfo.isFavorite,
-						accountInfo = accountInfo,
+						type = "wow",
+						accountName = name,
+						characterName = name,
+						fullName = fullName,
+						level = friendInfo.level or 0,
+						className = friendInfo.className or "UNKNOWN",
+						classID = friendInfo.classID,
+						client = "WoW",
+						area = friendInfo.area or "",
+						realmName = realm or GetRealmName(),
+						factionName = UnitFactionGroup("player"),
+						guildName = GetGuildInfo(fullName) or "",
+						isAFK = friendInfo.afk,
+						isDND = friendInfo.dnd,
+						note = friendInfo.notes or "",
+						connected = friendInfo.connected,
 						index = i,
 					}
-
-					ApplyGameAccountToFriend(friend, gameInfo)
-
-					if isOnline and C_BattleNet.GetFriendNumGameAccounts and C_BattleNet.GetFriendGameAccountInfo then
-						local numGameAccounts = C_BattleNet.GetFriendNumGameAccounts(i) or 0
-						if numGameAccounts > 1 then
-							local gameAccounts = {}
-							for accountIndex = 1, numGameAccounts do
-								local gameAccountInfo = C_BattleNet.GetFriendGameAccountInfo(i, accountIndex)
-								if
-									gameAccountInfo
-									and gameAccountInfo.clientProgram ~= "App"
-									and gameAccountInfo.clientProgram ~= "CLNT"
-									and gameAccountInfo.clientProgram ~= "BSAp"
-								then
-									gameAccounts[#gameAccounts + 1] = gameAccountInfo
-								end
-							end
-
-							friend.gameAccounts = gameAccounts
-							friend.numGameAccounts = #gameAccounts
-
-							local FriendsList = GetFriendsList()
-							local prefID = FriendsList
-								and FriendsList.GetPreferredGameAccountID
-								and FriendsList:GetPreferredGameAccountID(friendUID)
-							if prefID then
-								for _, account in ipairs(gameAccounts) do
-									if account.gameAccountID == prefID then
-										ApplyGameAccountToFriend(friend, account)
-										friend.hasPreferredAccountOverride = true
-										break
-									end
-								end
-							end
-						else
-							friend.numGameAccounts = numGameAccounts
-						end
-					else
-						friend.numGameAccounts = isOnline and 1 or 0
-					end
 
 					ProcessFriend(friend)
 				end
 			end
 		end
 
-		-- Collect WoW Friends (ALL)
-		local numWoWFriends = C_FriendList.GetNumFriends() or 0
-		for i = 1, numWoWFriends do
-			local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
-			if friendInfo then
-				local fullName = friendInfo.name or ""
-				local name, realm = strsplit("-", fullName, 2)
-				local normalizedName = BFL:NormalizeWoWFriendName(fullName)
-				local friendUID = normalizedName and ("wow_" .. normalizedName) or ("wow_" .. fullName)
-
-				local friend = {
-					id = friendUID,
-					type = "wow",
-					accountName = name,
-					characterName = name,
-					fullName = fullName,
-					level = friendInfo.level or 0,
-					className = friendInfo.className or "UNKNOWN",
-					classID = friendInfo.classID,
-					client = "WoW",
-					area = friendInfo.area or "",
-					realmName = realm or GetRealmName(),
-					factionName = UnitFactionGroup("player"),
-					guildName = GetGuildInfo(fullName) or "",
-					isAFK = friendInfo.afk,
-					isDND = friendInfo.dnd,
-					note = friendInfo.notes or "",
-					connected = friendInfo.connected,
-					index = i,
-				}
-
-				ProcessFriend(friend)
-			end
-		end
-
 		-- Apply current filter (to online friends only)
-		local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
+		local currentFilter = previewData and "all" or (BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all")
 		if currentFilter ~= "all" then
 			for groupId, groupFriends in pairs(groupedFriends) do
 				local filteredFriends = {}
@@ -2067,6 +2159,10 @@ local function CreateLibQTipTooltip(anchorFrame)
 				frame.bflLastMouseButton = button
 			end)
 			row:SetScript("OnMouseUp", function(frame, button)
+				if previewData then
+					frame.bflLastMouseButton = nil
+					return
+				end
 				OnFriendLineClick(frame, friend, button)
 				frame.bflLastMouseButton = nil
 			end)
@@ -2123,6 +2219,9 @@ local function CreateLibQTipTooltip(anchorFrame)
 					end)
 
 					groupRow:SetScript("OnMouseUp", function(frame, button)
+						if previewData then
+							return
+						end
 						local actualButton = button or (GetMouseButtonClicked and GetMouseButtonClicked())
 
 						if actualButton == "LeftButton" then
@@ -2219,6 +2318,10 @@ local function CreateLibQTipTooltip(anchorFrame)
 	BFL.BrokerUtils.SetActiveBrokerTooltip(tt, LQT, function() return detailTooltip end)
 
 	return tt
+end
+
+function Broker:SetPreviewData(data)
+	previewData = data
 end
 
 -- Refresh the tooltip (re-create it) to update content

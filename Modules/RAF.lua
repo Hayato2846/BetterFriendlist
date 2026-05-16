@@ -122,6 +122,60 @@ local function GetSafeLastOnlineText(lastOnlineTime)
 	return L.RAF_OFFLINE
 end
 
+local function CopyRecruitActivity(activityInfo)
+	if not activityInfo or IsSecret(activityInfo) then
+		return nil
+	end
+
+	return {
+		activityID = SafeNumber(activityInfo.activityID, 0) or 0,
+		rewardQuestID = SafeNumber(activityInfo.rewardQuestID, 0) or 0,
+		state = SafeNumber(activityInfo.state, 0) or 0,
+	}
+end
+
+local function CopyRecruitActivities(activities)
+	local displayActivities = {}
+	if not activities or IsSecret(activities) then
+		return displayActivities
+	end
+
+	for i = 1, #activities do
+		local activityInfo = CopyRecruitActivity(activities[i])
+		if activityInfo then
+			displayActivities[#displayActivities + 1] = activityInfo
+		end
+	end
+
+	return displayActivities
+end
+
+local function CreateRecruitDisplayRecord(recruitInfo)
+	if not recruitInfo or IsSecret(recruitInfo) then
+		return nil
+	end
+
+	local battleTag = SafeString(recruitInfo.battleTag, "") or ""
+	local nameText = SafeBattleTagName(battleTag)
+
+	return {
+		bnetAccountID = SafeNumber(recruitInfo.bnetAccountID, 0) or 0,
+		wowAccountGUID = SafeString(recruitInfo.wowAccountGUID, "") or "",
+		battleTag = battleTag,
+		monthsRemaining = SafeNumber(recruitInfo.monthsRemaining, 0) or 0,
+		subStatus = SafeNumber(recruitInfo.subStatus, 0) or 0,
+		acceptanceID = SafeNumber(recruitInfo.acceptanceID, 0) or 0,
+		versionRecruited = SafeNumber(recruitInfo.versionRecruited, 0) or 0,
+		activities = CopyRecruitActivities(recruitInfo.activities),
+		isOnline = false,
+		nameText = nameText,
+		plainName = nameText,
+		nameColor = FRIENDS_GRAY_COLOR,
+		lastOnlineText = L.RAF_OFFLINE,
+		contextGuid = nil,
+	}
+end
+
 -- Current search text for filtering
 RAF.searchText = ""
 
@@ -335,24 +389,40 @@ end
 -- Matches Blizzard's SortRecruitsByWoWAccount
 local function SortRecruitsByWoWAccount(a, b)
 	if a.bnetAccountID == b.bnetAccountID then
-		return a.wowAccountGUID < b.wowAccountGUID
+		return tostring(a.wowAccountGUID or "") < tostring(b.wowAccountGUID or "")
 	end
+
+	return (a.bnetAccountID or 0) < (b.bnetAccountID or 0)
 end
 
 -- Process and sort recruits with divider logic
 local function ProcessAndSortRecruits(recruits)
+	local displayRecruits = {}
 	local seenAccounts = {}
 	local haveOnlineFriends = false
 	local haveOfflineFriends = false
 
-	-- First, sort recruits that share a bnetAccountID by wowAccountGUID
-	table.sort(recruits, SortRecruitsByWoWAccount)
+	for _, recruitInfo in ipairs(recruits or {}) do
+		local displayRecruit = CreateRecruitDisplayRecord(recruitInfo)
+		if displayRecruit then
+			displayRecruits[#displayRecruits + 1] = displayRecruit
+		end
+	end
+
+	-- First, sort copied recruits that share a bnetAccountID by wowAccountGUID
+	table.sort(displayRecruits, SortRecruitsByWoWAccount)
 
 	-- Get account info for all recruits
-	for _, recruitInfo in ipairs(recruits) do
+	for _, recruitInfo in ipairs(displayRecruits) do
 		if C_BattleNet and C_BattleNet.GetAccountInfoByID then
 			local accountInfo = C_BattleNet.GetAccountInfoByID(recruitInfo.bnetAccountID, recruitInfo.wowAccountGUID)
-			local gameAccountInfo = accountInfo and accountInfo.gameAccountInfo
+			local gameAccountInfo
+			if accountInfo and not IsSecret(accountInfo) then
+				gameAccountInfo = accountInfo.gameAccountInfo
+				if IsSecret(gameAccountInfo) then
+					gameAccountInfo = nil
+				end
+			end
 			local isWowMobile = gameAccountInfo and SafeBool(gameAccountInfo.isWowMobile, false)
 
 			if accountInfo and gameAccountInfo and not isWowMobile then
@@ -419,34 +489,34 @@ local function ProcessAndSortRecruits(recruits)
 				recruitInfo.lastOnlineText = L.RAF_OFFLINE
 				recruitInfo.contextGuid = nil
 			end
+		end
 
-			-- Handle pending recruits (use Blizzard global)
-			if recruitInfo.nameText == "" then
-				recruitInfo.nameText = RAF_PENDING_RECRUIT or "Pending Recruit"
-				recruitInfo.plainName = recruitInfo.nameText
-			end
+		-- Handle pending recruits (use Blizzard global)
+		if recruitInfo.nameText == "" then
+			recruitInfo.nameText = RAF_PENDING_RECRUIT or "Pending Recruit"
+			recruitInfo.plainName = recruitInfo.nameText
+		end
 
-			recruitInfo.accountInfo = nil
+		recruitInfo.accountInfo = nil
 
-			-- Track seen accounts
-			if not seenAccounts[recruitInfo.bnetAccountID] then
-				seenAccounts[recruitInfo.bnetAccountID] = 1
-			else
-				seenAccounts[recruitInfo.bnetAccountID] = seenAccounts[recruitInfo.bnetAccountID] + 1
-			end
+		-- Track seen accounts
+		if not seenAccounts[recruitInfo.bnetAccountID] then
+			seenAccounts[recruitInfo.bnetAccountID] = 1
+		else
+			seenAccounts[recruitInfo.bnetAccountID] = seenAccounts[recruitInfo.bnetAccountID] + 1
+		end
 
-			recruitInfo.recruitIndex = seenAccounts[recruitInfo.bnetAccountID]
+		recruitInfo.recruitIndex = seenAccounts[recruitInfo.bnetAccountID]
 
-			if recruitInfo.isOnline then
-				haveOnlineFriends = true
-			else
-				haveOfflineFriends = true
-			end
+		if recruitInfo.isOnline then
+			haveOnlineFriends = true
+		else
+			haveOfflineFriends = true
 		end
 	end
 
 	-- Append recruit index for multiple accounts (use Blizzard global)
-	for _, recruitInfo in ipairs(recruits) do
+	for _, recruitInfo in ipairs(displayRecruits) do
 		if seenAccounts[recruitInfo.bnetAccountID] > 1 and not recruitInfo.characterName then
 			local fmtStr = RAF_RECRUIT_NAME_MULTIPLE or "%s (%d)"
 			recruitInfo.nameText = fmtStr:format(recruitInfo.nameText, recruitInfo.recruitIndex)
@@ -454,9 +524,9 @@ local function ProcessAndSortRecruits(recruits)
 	end
 
 	-- Sort by online status, version, and name
-	table.sort(recruits, SortRecruits)
+	table.sort(displayRecruits, SortRecruits)
 
-	return haveOnlineFriends and haveOfflineFriends
+	return displayRecruits, haveOnlineFriends and haveOfflineFriends
 end
 
 function RAF:UpdateRecruitList(frame, recruits)
@@ -464,7 +534,7 @@ function RAF:UpdateRecruitList(frame, recruits)
 		return
 	end
 
-	local numRecruits = #recruits
+	local numRecruits = recruits and #recruits or 0
 
 	-- Show/hide no recruits message
 	if frame.RecruitList.NoRecruitsDesc then
@@ -478,23 +548,22 @@ function RAF:UpdateRecruitList(frame, recruits)
 	end
 
 	-- Process and sort recruits
-	local needDivider = ProcessAndSortRecruits(recruits)
+	local displayRecruits, needDivider = ProcessAndSortRecruits(recruits)
 
 	-- Apply search filter if active
 	if self.searchText and self.searchText ~= "" then
 		local searchNormalized = BFL:StripAccents(self.searchText)
 		local filtered = {}
-		for _, recruit in ipairs(recruits) do
+		for _, recruit in ipairs(displayRecruits) do
 			if self:MatchesSearch(recruit, searchNormalized) then
 				filtered[#filtered + 1] = recruit
 			end
 		end
-		recruits = filtered
-		numRecruits = #recruits
+		displayRecruits = filtered
 
 		-- Recalculate divider need after filtering
 		local haveOnline, haveOffline = false, false
-		for _, r in ipairs(recruits) do
+		for _, r in ipairs(displayRecruits) do
 			if r.isOnline then
 				haveOnline = true
 			else
@@ -506,8 +575,8 @@ function RAF:UpdateRecruitList(frame, recruits)
 
 	-- Build data list with divider
 	local dataList = {}
-	for index = 1, numRecruits do
-		local recruit = recruits[index]
+	for index = 1, #displayRecruits do
+		local recruit = displayRecruits[index]
 		if needDivider and not recruit.isOnline then
 			table.insert(dataList, { isDivider = true })
 			needDivider = false
@@ -797,36 +866,23 @@ function RAF:RecruitListButton_SetupDivider(button)
 	button:Show()
 end
 
--- Texture kit region mapping for recruit button icons (matches Blizzard)
-local recruitListButtonTextureKitRegions = {
-	Icon = "recruitafriend_friendslist_%s_icon",
-}
-
 function RAF:RecruitListButton_SetupRecruit(button, recruitInfo)
 	button.DividerTexture:Hide()
 	button.Background:Show()
 	button.Name:Show()
 	button.InfoText:Show()
 
-	-- Set icon via SetupTextureKitOnRegions (matches Blizzard exactly)
 	local versionRecruited = recruitInfo.versionRecruited or 0
-	if SetupTextureKitOnRegions then
-		SetupTextureKitOnRegions(
-			GetTextureKitForRAFVersion(versionRecruited),
-			button,
-			recruitListButtonTextureKitRegions,
-			TextureKitConstants.SetVisibility,
-			TextureKitConstants.UseAtlasSize
-		)
-	else
-		-- Fallback for environments without SetupTextureKitOnRegions
-		local kit = GetTextureKitForRAFVersion(versionRecruited)
-		if kit then
-			button.Icon:SetAtlas(("recruitafriend_friendslist_%s_icon"):format(kit), true)
+	local kit = GetTextureKitForRAFVersion(versionRecruited)
+	if kit and button.Icon and button.Icon.SetAtlas then
+		local ok = pcall(button.Icon.SetAtlas, button.Icon, ("recruitafriend_friendslist_%s_icon"):format(kit), true)
+		if ok then
 			button.Icon:Show()
 		else
 			button.Icon:Hide()
 		end
+	elseif button.Icon then
+		button.Icon:Hide()
 	end
 
 	button:SetHeight(RECRUIT_HEIGHT)

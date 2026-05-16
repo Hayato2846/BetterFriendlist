@@ -27,6 +27,7 @@ local THROTTLE_INTERVAL = 0.5 -- Guild data changes less frequently than friends
 -- LibQTip tooltip references
 local tooltip = nil
 local tooltipKey = "BetterFriendlistGuildBrokerTT"
+local previewData = nil
 local detailTooltip = nil
 
 local function ReleaseDetailTooltip()
@@ -41,6 +42,7 @@ local ROSTER_CACHE_TTL = 2 -- seconds
 
 -- Maximum tooltip height
 local MAX_TOOLTIP_HEIGHT = 600
+local MOTD_MAX_WIDTH = 520
 
 -- ========================================
 -- Shared Helpers from BrokerUtils
@@ -86,6 +88,10 @@ local function SafeText(value, fallback)
 end
 
 local function SafeIsInGuild()
+	if previewData and previewData.guildName then
+		return true
+	end
+
 	if not IsInGuild then
 		return false
 	end
@@ -95,15 +101,38 @@ local function SafeIsInGuild()
 end
 
 local function SafeGetGuildInfo()
+	if previewData and previewData.guildName then
+		return previewData.guildName
+	end
+
 	if not GetGuildInfo then
 		return nil
 	end
 
 	local ok, guildName = pcall(GetGuildInfo, "player")
-	if ok and guildName and not IsSecretValue(guildName) then
+	if ok and not IsSecretValue(guildName) and guildName then
 		return guildName
 	end
 	return nil
+end
+
+local function SafeGetGuildMOTD()
+	if previewData then
+		local previewMOTD = previewData.motd
+		if not IsSecretValue(previewMOTD) and previewMOTD ~= nil then
+			return tostring(previewMOTD):gsub("|n", "\n"):gsub("\\n", "\n")
+		end
+	end
+
+	if not SafeIsInGuild() or not BFL.GetGuildMOTD then
+		return ""
+	end
+
+	local ok, motd = pcall(BFL.GetGuildMOTD)
+	if not ok or IsSecretValue(motd) or motd == nil then
+		return ""
+	end
+	return tostring(motd)
 end
 
 local function NormalizeRosterName(name)
@@ -206,6 +235,10 @@ end
 
 -- Collect and cache guild roster data
 function GuildBroker:CollectGuildRoster()
+	if previewData and previewData.members then
+		return previewData.members
+	end
+
 	if not SafeIsInGuild() then
 		rosterCache = nil
 		return {}
@@ -318,6 +351,17 @@ end
 
 -- Get online/total counts
 function GuildBroker:GetGuildCounts()
+	if previewData and previewData.members then
+		local total = #previewData.members
+		local online = 0
+		for _, member in ipairs(previewData.members) do
+			if member.online then
+				online = online + 1
+			end
+		end
+		return online, total
+	end
+
 	if not SafeIsInGuild() then
 		return 0, 0
 	end
@@ -1485,6 +1529,36 @@ local function CreateLibQTipTooltip(anchorFrame)
 		table.insert(alignArgs, col.align)
 	end
 
+	local function AddGuildMOTDRow(tt)
+		local motd = SafeGetGuildMOTD()
+		if motd == "" then
+			return false
+		end
+
+		local motdRow = tt:AddRow()
+		local motdCell = motdRow:GetCell(1)
+		motdCell:SetColSpan(numColumns)
+		motdCell:SetJustifyH("LEFT")
+		if motdCell.SetMaxWidth then
+			pcall(motdCell.SetMaxWidth, motdCell, MOTD_MAX_WIDTH)
+		end
+		if motdCell.FontString then
+			if motdCell.FontString.SetWordWrap then
+				pcall(motdCell.FontString.SetWordWrap, motdCell.FontString, true)
+			end
+			if motdCell.FontString.SetNonSpaceWrap then
+				pcall(motdCell.FontString.SetNonSpaceWrap, motdCell.FontString, true)
+			end
+		end
+
+		local motdLabel = L("GUILD_HEADER_MOTD")
+		if motdLabel == "GUILD_HEADER_MOTD" then
+			motdLabel = "MOTD:"
+		end
+		motdCell:SetText(C("ltyellow", motdLabel) .. " " .. C("white", motd))
+		return true
+	end
+
 	local tt = LQT:AcquireTooltip(tooltipKey, numColumns, unpack(alignArgs))
 	if not tt then
 		return nil
@@ -1591,6 +1665,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 
 		local guildName = SafeGetGuildInfo() or L("GUILD_BROKER_NO_GUILD")
 		headerCell:SetText(C("dkyellow", guildName))
+		AddGuildMOTDRow(tt)
 		tt:AddSeparator()
 
 		-- Column Headers
@@ -1605,7 +1680,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 		local members = GuildBroker:CollectGuildRoster()
 
 		-- Apply filter (with self-exclusion)
-		local currentFilter = BetterFriendlistDB and BetterFriendlistDB.guildBrokerFilter or "online"
+		local currentFilter = previewData and "all" or (BetterFriendlistDB and BetterFriendlistDB.guildBrokerFilter or "online")
 		local excludeSelf = BetterFriendlistDB and BetterFriendlistDB.guildBrokerExcludeSelf
 		members = FilterMembers(members, currentFilter, excludeSelf)
 
@@ -1758,6 +1833,9 @@ local function CreateLibQTipTooltip(anchorFrame)
 
 			-- Click handler
 			row:SetScript("OnMouseUp", function(frame, button)
+				if previewData then
+					return
+				end
 				OnMemberLineClick(nil, member, button)
 			end)
 
@@ -1814,6 +1892,9 @@ local function CreateLibQTipTooltip(anchorFrame)
 
 					-- Toggle collapse on click
 					groupRow:SetScript("OnMouseUp", function()
+						if previewData then
+							return
+						end
 						if not BetterFriendlistDB.guildBrokerCollapsedGroups then
 							BetterFriendlistDB.guildBrokerCollapsedGroups = {}
 						end
@@ -1891,6 +1972,11 @@ local function CreateLibQTipTooltip(anchorFrame)
 	return tt
 end
 
+function GuildBroker:SetPreviewData(data)
+	previewData = data
+	self:InvalidateCache()
+end
+
 -- Refresh the tooltip
 function GuildBroker:RefreshTooltip()
 	if LQT and tooltip and tooltip:IsShown() then
@@ -1931,6 +2017,15 @@ local function CreateBasicTooltip(gameTooltip)
 
 	local guildName = SafeGetGuildInfo() or ""
 	gameTooltip:AddLine(guildName, 0, 1, 0)
+
+	local motd = SafeGetGuildMOTD()
+	if motd ~= "" then
+		local motdLabel = L("GUILD_HEADER_MOTD")
+		if motdLabel == "GUILD_HEADER_MOTD" then
+			motdLabel = "MOTD:"
+		end
+		gameTooltip:AddLine(C("ltyellow", motdLabel) .. " " .. C("white", motd), 1, 1, 1, true)
+	end
 	gameTooltip:AddLine(" ")
 
 	local onlineCount, totalCount = GuildBroker:GetGuildCounts()
@@ -1951,6 +2046,70 @@ end
 -- ========================================
 -- DataObject OnClick Handler
 -- ========================================
+
+local function OpenGuildBrokerSettings()
+	local Settings = BFL:GetModule("Settings")
+	if not Settings then
+		return false
+	end
+
+	if Settings.OpenSettingsTab then
+		Settings:OpenSettingsTab("broker")
+		return true
+	end
+
+	if Settings.Show then
+		Settings:Show()
+		if Settings.SelectCategory then
+			Settings:SelectCategory(5)
+		end
+		return true
+	end
+
+	return false
+end
+
+local function SafeCallGuildFrameToggle(toggleFunc)
+	if not toggleFunc then
+		return false, "missing-toggle"
+	end
+
+	if BFL.HasSecretValues and securecallfunction then
+		local ok = pcall(securecallfunction, toggleFunc)
+		return ok, ok and "securecallfunction" or "securecallfunction-failed"
+	end
+
+	local ok = pcall(toggleFunc)
+	return ok, ok and "pcall" or "pcall-failed"
+end
+
+local function OpenBlizzardGuildFrame()
+	if InCombatLockdown and InCombatLockdown() then
+		return false, "combat"
+	end
+
+	if BFL.IsActionRestricted and BFL:IsActionRestricted() then
+		return false, "restricted"
+	end
+
+	local ok, method = SafeCallGuildFrameToggle(ToggleGuildFrame)
+	if ok then
+		return true, method
+	end
+
+	return SafeCallGuildFrameToggle(GuildFrame_Toggle)
+end
+
+local function RunConfiguredLeftClickAction()
+	local action = (BetterFriendlistDB and BetterFriendlistDB.guildBrokerClickAction) or "guild_frame"
+
+	if action == "settings" then
+		return OpenGuildBrokerSettings(), "settings"
+	end
+
+	local ok, method = OpenBlizzardGuildFrame()
+	return ok, "guild_frame", method
+end
 
 function GuildBroker:OnClick(clickedFrame, button)
 	if button == "MiddleButton" then
@@ -1976,43 +2135,10 @@ function GuildBroker:OnClick(clickedFrame, button)
 		self:UpdateBrokerText()
 	elseif button == "RightButton" then
 		-- Open settings
-		local Settings = BFL:GetModule("Settings")
-		if Settings and Settings.OpenSettingsTab then
-			Settings:OpenSettingsTab("broker")
-		elseif BetterFriendsFrame and BetterFriendsFrame:IsShown() then
-			-- Toggle frame
-		elseif not ShouldAvoidSecretValueGuildActions() then
-			if ToggleGuildFrame then
-				ToggleGuildFrame()
-			elseif GuildFrame_Toggle then
-				GuildFrame_Toggle()
-			end
-		end
+		OpenGuildBrokerSettings()
 	else
 		-- Left click: configurable action
-		local action = BetterFriendlistDB and BetterFriendlistDB.guildBrokerClickAction or "guild_frame"
-
-		if action == "settings" then
-			local Settings = BFL:GetModule("Settings")
-			if Settings and Settings.OpenSettingsTab then
-				Settings:OpenSettingsTab("broker")
-			end
-		else
-			if ShouldAvoidSecretValueGuildActions() then
-				local Settings = BFL:GetModule("Settings")
-				if Settings and Settings.OpenSettingsTab then
-					Settings:OpenSettingsTab("broker")
-				end
-				return
-			end
-
-			-- Default: open guild frame
-			if ToggleGuildFrame then
-				ToggleGuildFrame()
-			elseif GuildFrame_Toggle then
-				GuildFrame_Toggle()
-			end
-		end
+		RunConfiguredLeftClickAction()
 	end
 end
 
@@ -2092,7 +2218,20 @@ function GuildBroker:RegisterEvents()
 		GuildBroker:RefreshTooltip()
 	end, 50)
 
-	BFL:RegisterEventCallback("PLAYER_GUILD_UPDATE", function()
+	BFL:RegisterEventCallback("GUILD_MOTD", function(motd)
+		if BFL.CacheGuildMOTD then
+			BFL.CacheGuildMOTD(motd)
+		end
+		GuildBroker:RefreshTooltip()
+	end, 50)
+
+	BFL:RegisterEventCallback("PLAYER_GUILD_UPDATE", function(unitTarget)
+		if unitTarget and unitTarget ~= "player" then
+			return
+		end
+		if BFL.ClearGuildMOTDCache then
+			BFL.ClearGuildMOTDCache()
+		end
 		GuildBroker:InvalidateCache()
 		lastApplicantRequestTime = 0
 		GuildBroker:RequestApplicantCountUpdate()
@@ -2100,6 +2239,7 @@ function GuildBroker:RegisterEvents()
 		if SafeIsInGuild() and BFL.GuildRoster then
 			pcall(BFL.GuildRoster)
 		end
+		GuildBroker:RefreshTooltip()
 	end, 50)
 
 	pcall(function()

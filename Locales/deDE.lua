@@ -377,6 +377,11 @@ BFL:RegisterLocale("deDE", function()
 	L.BROKER_SETTINGS_FONT_TOOLTIP = "Waehle die Schrift fuer Broker-Tooltips"
 	L.BROKER_SETTINGS_FONT_SIZE = "Schriftgroesse:"
 	L.BROKER_SETTINGS_FONT_SIZE_TOOLTIP = "Legt die Schriftgroesse fuer Broker-Tooltips fest"
+	L.BROKER_SETTINGS_FONT_NON_LATIN = "Schrift fuer nicht-lateinische Alphabete aktivieren"
+	L.BROKER_SETTINGS_FONT_NON_LATIN_TOOLTIP =
+		"Verwendet die gewaehlte Broker-Tooltip-Schrift fuer koreanische, chinesische und russische Texte statt WoWs Standard-Alphabet-Fallback."
+	L.BROKER_SETTINGS_FONT_NON_LATIN_WARNING =
+		"Schriften unterstuetzen nicht immer jedes Alphabet. Wenn Text als Kaestchen erscheint, waehle eine andere Schrift oder deaktiviere diese Option."
 	L.BROKER_SETTINGS_GROUP_HEADER_ALIGN = "Gruppennamen-Ausrichtung"
 	L.BROKER_SETTINGS_GROUP_HEADER_ALIGN_TOOLTIP = "Legt die Ausrichtung der Gruppennamen im Freunde-Broker-Tooltip fest"
 	L.BROKER_SETTINGS_TOOLTIP_MODE = "Tooltip-Detailstufe"

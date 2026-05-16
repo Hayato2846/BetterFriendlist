@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.5.8]        - 2026-05-16
+
+### Added
+- **Broker Tooltip Fonts** - Added an optional setting for using selected broker tooltip fonts on non-latin alphabets, with a warning about unsupported glyphs.
+- **Guild Broker MOTD** - Added the guild message of the day to the Guild Broker tooltip with guarded cross-version handling.
+
+### Fixed
+- **Guild Broker Click Action** - Fixed the configured left-click action not opening the guild frame or broker settings.
+- **Recruit A Friend Taint** - Reduced RAF list taint by keeping addon display data separate from Blizzard recruit records.
+
 ## [2.5.7]        - 2026-05-16
 
 ### Fixed

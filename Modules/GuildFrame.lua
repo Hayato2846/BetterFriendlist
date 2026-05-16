@@ -888,10 +888,8 @@ function GuildFrame:UpdateMOTD()
 	if not guildFrame or not guildFrame.MOTDText then return end
 
 	local motd = ""
-	if IsInGuild() then
-		-- GetGuildRosterMOTD() is protected in combat (12.0+)
-		if BFL:IsActionRestricted() then return end
-		motd = GetGuildRosterMOTD() or ""
+	if IsInGuild() and BFL.GetGuildMOTD then
+		motd = BFL.GetGuildMOTD() or ""
 	end
 
 	-- Replace literal pipe-n (|n) and backslash-n with real newlines

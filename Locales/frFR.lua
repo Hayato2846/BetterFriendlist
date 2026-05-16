@@ -382,6 +382,11 @@ BFL:RegisterLocale("frFR", function()
 	L.BROKER_SETTINGS_FONT_TOOLTIP = "Choose the font used in broker tooltips"
 	L.BROKER_SETTINGS_FONT_SIZE = "Font Size:"
 	L.BROKER_SETTINGS_FONT_SIZE_TOOLTIP = "Set the font size used in broker tooltips"
+	L.BROKER_SETTINGS_FONT_NON_LATIN = "Enable Font for non-latin Alphabets"
+	L.BROKER_SETTINGS_FONT_NON_LATIN_TOOLTIP =
+		"Use the selected broker tooltip font for Korean, Chinese, and Russian text instead of WoW's default alphabet fallback."
+	L.BROKER_SETTINGS_FONT_NON_LATIN_WARNING =
+		"Fonts do not always support every alphabet. If text appears as boxes, choose another font or disable this option."
 	L.BROKER_SETTINGS_GROUP_HEADER_ALIGN = "Group Name Alignment"
 	L.BROKER_SETTINGS_GROUP_HEADER_ALIGN_TOOLTIP = "Set the alignment of group names in the friends broker tooltip"
 	L.BROKER_SETTINGS_SHOW_ICON = "Afficher Icône"

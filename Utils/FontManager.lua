@@ -73,7 +73,7 @@ local CURRENT_ALPHABET = GetLocaleAlphabet()
 local FAMILY_COUNTER = 0
 
 -- Generate and Cache FontFamily
-function FontManager:GetOrCreateFontFamily(fontPath, size, flags, shadow)
+function FontManager:GetOrCreateFontFamily(fontPath, size, flags, shadow, useFontForNonLatinAlphabets)
 	-- Normalize inputs
 	size = math.floor(size + 0.5) -- Round to integer
 	flags = flags or ""
@@ -82,9 +82,10 @@ function FontManager:GetOrCreateFontFamily(fontPath, size, flags, shadow)
 	end
 
 	local shadowKey = shadow and "SHADOW" or "NONE"
+	local alphabetKey = useFontForNonLatinAlphabets and "USER_NON_LATIN" or "SYSTEM_NON_LATIN"
 
 	-- Create Cache Key
-	local cacheKey = string.format("%s_%d_%s_%s", fontPath, size, flags, shadowKey)
+	local cacheKey = string.format("%s_%d_%s_%s_%s", fontPath, size, flags, shadowKey, alphabetKey)
 
 	if FONT_CACHE[cacheKey] then
 		return FONT_CACHE[cacheKey]
@@ -105,8 +106,9 @@ function FontManager:GetOrCreateFontFamily(fontPath, size, flags, shadow)
 		memberDef.height = size
 		memberDef.flags = flags
 
-		if alphabet == CURRENT_ALPHABET and CURRENT_ALPHABET == "roman" then
-			-- Roman locale: Use user's chosen font directly
+		if alphabet == "roman" or useFontForNonLatinAlphabets then
+			-- Roman text always uses the chosen font. Non-latin alphabets use it only
+			-- when explicitly enabled because many LSM fonts do not contain those glyphs.
 			memberDef.file = fontPath
 		elseif alphabet == CURRENT_ALPHABET then
 			-- Non-roman locale: Prefer the system default for this alphabet
