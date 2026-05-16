@@ -475,7 +475,7 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 		local primaryDropdown = header.PrimarySortDropdown
 		local secondaryDropdown = header.SecondarySortDropdown
 		-- Only set width if ElvUI is not active (ElvUI Skin handles sizing)
-		local isElvUIActive = _G.ElvUI and BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin ~= false
+		local isElvUIActive = BFL.IsThemeActive and BFL:IsThemeActive("elvui")
 		if not isElvUIActive then
 			UIDropDownMenu_SetWidth(primaryDropdown, 70)
 		end
@@ -523,7 +523,7 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 
 		-- Secondary Sort Dropdown
 		-- Only set width if ElvUI is not active (ElvUI Skin handles sizing)
-		local isElvUIActiveSecondary = _G.ElvUI and BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin ~= false
+		local isElvUIActiveSecondary = BFL.IsThemeActive and BFL:IsThemeActive("elvui")
 		if not isElvUIActiveSecondary then
 			UIDropDownMenu_SetWidth(secondaryDropdown, 70)
 		end

@@ -103,6 +103,9 @@ TestData\StateValidator.lua
 TestData\PerformanceBenchmark.lua
 TestData\RegressionTests.lua
 Modules\TestSuite.lua
+Modules\ThemeManager.lua
+Modules\SkinEngine.lua
+Modules\DarkTheme.lua
 Modules\ElvUISkin.lua
 Modules\AddOnSkins.lua [AllowLoadGameType mainline]
 Modules\Compat_GlobalIgnoreList.lua

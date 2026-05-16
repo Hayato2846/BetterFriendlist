@@ -2565,7 +2565,7 @@
 				<Scripts>
 					<OnShow>
 						-- If ElvUI Skin is enabled, we need to handle the icon color
-						if _G.ElvUI and BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin
+						if BFL and BFL.IsThemeActive and BFL:IsThemeActive("elvui")
 						then
 						-- The icon might be natively gold/colored, so we desaturate it to make it greyscale
 						-- Then we color it white so it appears bright white against dark ElvUI backgrounds

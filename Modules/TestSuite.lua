@@ -1678,6 +1678,7 @@ local function RegisterBuiltInTests()
 				V:Assert(tempDB.showFavoritesGroup == true, "showFavoritesGroup default should be true")
 				V:AssertEqual(tempDB.quickFilter, "all", "quickFilter default should be 'all'")
 				V:AssertEqual(tempDB.primarySort, "status", "primarySort default should be 'status'")
+				V:AssertEqual(tempDB.theme, "blizzard", "theme default should be 'blizzard'")
 				V:Assert(tempDB.groupOrder == nil, "groupOrder default should be nil")
 				V:Assert(type(tempDB.groupStates) == "table", "groupStates should be a table")
 				V:Assert(type(tempDB.groupColors) == "table", "groupColors should be a table")
@@ -1701,6 +1702,58 @@ local function RegisterBuiltInTests()
 				V:AssertNil(tempDB.showNotesAsName, "showNotesAsName should be removed")
 				V:AssertNil(tempDB.showNicknameAsName, "showNicknameAsName should be removed")
 				V:AssertNil(tempDB.showNicknameInName, "showNicknameInName should be removed")
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "Database_Migration_ThemeFromElvUISkin", {
+		description = "Legacy ElvUI skin setting should migrate to the theme setting",
+		action = function(V)
+			WithTemporaryDatabase({
+				enableElvUISkin = true,
+			}, function(tempDB)
+				V:AssertEqual(tempDB.theme, "elvui", "enableElvUISkin=true should migrate to theme='elvui'")
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "Theme_Helpers", {
+		description = "Theme helper API should resolve selected and effective themes",
+		action = function(V)
+			V:AssertNotNil(BFL.GetEffectiveTheme, "BFL:GetEffectiveTheme should exist")
+			V:AssertNotNil(BFL.IsThemeActive, "BFL:IsThemeActive should exist")
+			V:AssertNotNil(BFL.UsesFlatTheme, "BFL:UsesFlatTheme should exist")
+
+			WithTemporaryDatabase({
+				theme = "dark",
+			}, function()
+				V:AssertEqual(BFL:GetEffectiveTheme(), "dark", "Dark theme should resolve as dark")
+				V:Assert(BFL:IsThemeActive("dark"), "Dark theme should be active")
+				V:Assert(BFL:UsesFlatTheme(), "Dark theme should count as a flat theme")
+			end)
+
+			WithTemporaryDatabase({
+				theme = "blizzard",
+			}, function()
+				V:AssertEqual(BFL:GetEffectiveTheme(), "blizzard", "Blizzard theme should resolve as blizzard")
+				V:Assert(not BFL:UsesFlatTheme(), "Blizzard theme should not count as a flat theme")
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "Theme_ElvUIFallbackWithoutAddon", {
+		description = "Stored ElvUI theme should fall back to Blizzard when ElvUI is unavailable",
+		action = function(V)
+			if _G.ElvUI then
+				V:Skip("ElvUI is loaded")
+				return
+			end
+
+			WithTemporaryDatabase({
+				theme = "elvui",
+			}, function()
+				V:AssertEqual(BFL:GetEffectiveTheme(), "blizzard", "ElvUI theme should fall back to Blizzard")
+				V:Assert(not BFL:IsThemeActive("elvui"), "ElvUI theme should not be active without ElvUI")
 			end)
 		end,
 	})
@@ -3939,6 +3992,13 @@ local function RegisterBuiltInTests()
 				"ERROR_GROUP_EXISTS",
 				"ERROR_GROUP_NOT_EXIST",
 				"SETTINGS_GROUP_COLOR",
+				"SETTINGS_TAB_THEME",
+				"SETTINGS_THEME_HEADER",
+				"SETTINGS_THEME_DROPDOWN",
+				"SETTINGS_THEME_DROPDOWN_DESC",
+				"SETTINGS_THEME_BLIZZARD",
+				"SETTINGS_THEME_DARK",
+				"SETTINGS_THEME_ELVUI",
 				"TOOLTIP_GROUP_COLOR_DESC",
 				"CORE_HELP_TEST_COMMANDS",
 				"CORE_HELP_TEST_ACTIVITY",

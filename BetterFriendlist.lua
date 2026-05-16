@@ -224,7 +224,7 @@ function BFL:ApplyTabFonts()
 			end
 		end
 
-		local isClassicElvUISkinActive = _G.ElvUI and BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin ~= false
+		local isClassicElvUISkinActive = BFL.IsThemeActive and BFL:IsThemeActive("elvui")
 		if isClassicElvUISkinActive and BetterFriendsFrame then
 			local frameWidth = BetterFriendsFrame:GetWidth()
 			if not frameWidth or frameWidth <= 0 then
@@ -341,12 +341,16 @@ function BFL:ApplyTabFonts()
 
 	local selectedTopTabId = frame and frame.FriendsTabHeader and PanelTemplates_GetSelectedTab(frame.FriendsTabHeader)
 		or 0
+	local selectedBottomTabId = frame and PanelTemplates_GetSelectedTab(frame) or 0
+	local isFlatThemeActive = BFL.UsesFlatTheme and BFL:UsesFlatTheme()
 	local signature = table.concat({
 		tostring(frameWidth),
 		fontPath or "",
 		tostring(fontSize),
 		outlineValue,
+		tostring(isFlatThemeActive),
 		tostring(selectedTopTabId),
+		tostring(selectedBottomTabId),
 		GetTabSignature(bottomTabs[1]),
 		GetTabSignature(bottomTabs[2]),
 		GetTabSignature(bottomTabs[3]),
@@ -819,8 +823,10 @@ function BFL:ApplyTabFonts()
 	-- Process bottom tabs (start at x=5, must fit within frame bounds)
 	-- padding=30 gives more base width for short tabs like "Who", "Raid"
 	local bottomWidths = ComputeBottomTabWidths(bottomStartX, bottomMaxRightEdge)
+	local bottomTextMode = isFlatThemeActive and "center" or nil
+	local bottomTextBias = isFlatThemeActive and 0 or 1
 	local bottomTabHeight =
-		ProcessTabGroup(bottomTabs, 30, bottomStartX, bottomMaxRightEdge, bottomWidths, nil, nil, 1, 0.5)
+		ProcessTabGroup(bottomTabs, 30, bottomStartX, bottomMaxRightEdge, bottomWidths, bottomTextMode, nil, bottomTextBias, 0.5)
 
 	-- Adjust bottom tab Y position based on height (default y=-30 for 32px tabs)
 	local bottomTab1 = _G.BetterFriendsFrameBottomTab1
@@ -840,21 +846,24 @@ function BFL:ApplyTabFonts()
 	-- Process top tabs (start aligned to Inset left edge, clamp at Inset right edge)
 	-- NOTE: topExtraHeight is intentionally 0. The Inset is anchored to Tab1's BOTTOMLEFT,
 	-- so increasing tab height would push the entire content area down.
-	-- ElvUI's FixTabCenter hook centers top-tab text at (0,0) on every Select/Deselect.
-	-- Use matching 0 offsets so ProcessTabGroup and FixTabCenter produce identical results.
-	local isElvUISkinActive = _G.ElvUI and BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin ~= false
-	local topBaseOffset = isElvUISkinActive and 0 or -5
-	local topSelectedOffset = isElvUISkinActive and 0 or -5
-	local topUnselectedOffset = isElvUISkinActive and 0 or -8
+	-- Flat themes center tab text at (0,0) on every Select/Deselect.
+	-- Use matching 0 offsets so ProcessTabGroup and theme hooks produce identical results.
+	local isElvUISkinActive = BFL.IsThemeActive and BFL:IsThemeActive("elvui")
+	local shouldCenterTopTabs = isElvUISkinActive or isFlatThemeActive
+	local topTextMode = shouldCenterTopTabs and "center" or nil
+	local topTextBias = shouldCenterTopTabs and 0 or -1
+	local topBaseOffset = shouldCenterTopTabs and 0 or -5
+	local topSelectedOffset = shouldCenterTopTabs and 0 or -5
+	local topUnselectedOffset = shouldCenterTopTabs and 0 or -8
 	ProcessTabGroup(
 		topTabs,
 		20,
 		topStartX,
 		topMaxRightEdge,
 		nil,
-		nil,
+		topTextMode,
 		0,
-		-1,
+		topTextBias,
 		0.8,
 		topBaseOffset,
 		selectedTopTabId,
@@ -4983,8 +4992,8 @@ function BetterFriendsFrame_ShowContactsMenu(button)
 		local simpleMode = DB and DB:Get("simpleMode", false) or false
 		local isElvUIActive = BFL.IsClassic
 			and _G.ElvUI
-			and BetterFriendlistDB
-			and BetterFriendlistDB.enableElvUISkin ~= false
+			and BFL.IsThemeActive
+			and BFL:IsThemeActive("elvui")
 		if simpleMode or isElvUIActive then
 			local changelogText = L.MENU_CHANGELOG or "Changelog"
 			local Changelog = BFL:GetModule("Changelog")

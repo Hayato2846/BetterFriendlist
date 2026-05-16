@@ -131,11 +131,9 @@ function ElvUISkin:RegisterSkin()
 		return
 	end
 
-	-- Check if skin is enabled in BFL settings (Point 1)
-	-- Explicit check for false (nil means enabled by default if we wanted, but DB init sets it to false)
-	local isEnabled = BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin
-	if isEnabled == false then
-		-- BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Skin disabled in settings (DB.enableElvUISkin = false)")
+	local isEnabled = BFL.IsThemeActive and BFL:IsThemeActive("elvui")
+	if not isEnabled then
+		-- BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Skin disabled in theme settings")
 		return
 	end
 

@@ -40,7 +40,7 @@ local defaults = {
 	preferredGameAccounts = {}, -- {friendUID: gameAccountID} - user-selected preferred game account per friend
 	-- Visual Settings
 	compactMode = false, -- Use compact button layout
-	enableElvUISkin = false, -- Enable ElvUI Skin (default: OFF)
+	theme = "blizzard", -- UI theme: "blizzard", "dark", "elvui"
 	fontSize = "normal", -- "small", "normal", "large"
 	-- Font Customization (LibSharedMedia)
 	fontFriendName = "Friz Quadrata TT",
@@ -263,6 +263,12 @@ local INFO_PRESET_FORMATS = {
 	-- "custom" = user-defined
 }
 
+local VALID_THEMES = {
+	blizzard = true,
+	dark = true,
+	elvui = true,
+}
+
 -- Resolve the name format preset to a format string
 function DB:GetNameFormatString()
 	local preset = self:Get("nameFormatPreset", "default")
@@ -293,6 +299,20 @@ function DB:IsInfoDisabled()
 	return self:Get("infoFormatPreset", "default") == "disabled"
 end
 
+function DB:NormalizeThemeSetting()
+	if not BetterFriendlistDB then
+		return
+	end
+
+	if BetterFriendlistDB.theme == nil then
+		BetterFriendlistDB.theme = BetterFriendlistDB.enableElvUISkin == true and "elvui" or "blizzard"
+	end
+
+	if not VALID_THEMES[BetterFriendlistDB.theme] then
+		BetterFriendlistDB.theme = "blizzard"
+	end
+end
+
 function DB:Initialize()
 	-- Initialize Settings Version Counter (Optimization)
 	if not BFL.SettingsVersion then
@@ -308,6 +328,8 @@ function DB:Initialize()
 	if not BetterFriendlistDB then
 		BetterFriendlistDB = {}
 	end
+
+	self:NormalizeThemeSetting()
 
 	-- MIGRATION (BEFORE defaults): Migrate nameDisplayFormat to preset system
 	-- Runs whenever nameFormatPreset is missing but old nameDisplayFormat exists.
@@ -394,13 +416,6 @@ function DB:Initialize()
 		and BetterFriendlistDB.groupCountColors == BetterFriendlistDB.groupArrowColors
 	then
 		BetterFriendlistDB.groupArrowColors = self:InternalDeepCopy(BetterFriendlistDB.groupCountColors)
-	end
-
-	-- Debug: Check ElvUI Skin setting
-	if BetterFriendlistDB.enableElvUISkin then
-		-- BFL:DebugPrint("Database: ElvUI Skin is ENABLED")
-	else
-		-- BFL:DebugPrint("Database: ElvUI Skin is DISABLED")
 	end
 
 	-- MIGRATION: Name Display Format (Phase 15 -> Phase 22 Preset System)

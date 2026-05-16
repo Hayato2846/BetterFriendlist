@@ -279,6 +279,43 @@ end
 -- Classic dropdown counter
 local classicDropdownCounter = 0
 
+local function AttachDarkDropdownData(dropdown, entries, isSelectedCallback, onSelectionCallback, applySelectionFont)
+	if not dropdown or not entries or not entries.labels or not entries.values then
+		return
+	end
+
+	local entryLabels = entries.labels
+	local entryValues = entries.values
+	local entryFontPaths = entries.fontPaths
+	local defaultFontObject = GetDefaultDropdownFontObject(2)
+
+	dropdown.BFL_DarkDropdownData = {
+		labels = entryLabels,
+		values = entryValues,
+		useCheckboxes = entries.useCheckboxes,
+		isSelected = isSelectedCallback,
+		onSelect = onSelectionCallback,
+		applyFont = applySelectionFont,
+		getFontObject = function(index)
+			local fontPath = entryFontPaths and entryFontPaths[index]
+			return fontPath and GetDropdownFontObject(fontPath, 2) or defaultFontObject
+		end,
+		setText = function(value)
+			for i = 1, #entryValues do
+				if entryValues[i] == value then
+					local label = entryLabels[i]
+					if dropdown.SetText then
+						dropdown:SetText(label)
+					elseif UIDropDownMenu_SetText then
+						UIDropDownMenu_SetText(dropdown, label)
+					end
+					return
+				end
+			end
+		end,
+	}
+end
+
 local function CreateClassicDropdown(parent, entries, isSelectedCallback, onSelectionCallback)
 	classicDropdownCounter = classicDropdownCounter + 1
 	local dropdownName = "BFLSettingsDropdown" .. classicDropdownCounter
@@ -311,6 +348,7 @@ local function CreateClassicDropdown(parent, entries, isSelectedCallback, onSele
 
 	dropdown.isSelectedCallback = isSelectedCallback
 	dropdown.onSelectionCallback = onSelectionCallback
+	AttachDarkDropdownData(dropdown, entries, isSelectedCallback, onSelectionCallback, ApplySelectionFont)
 
 	UIDropDownMenu_Initialize(dropdown, function(self, level)
 		level = level or 1
@@ -359,7 +397,7 @@ local function CreateClassicDropdown(parent, entries, isSelectedCallback, onSele
 
 	-- Classic + ElvUI: Expand clickable button area
 	if BFL.IsClassic then
-		local isElvUIActive = _G.ElvUI and BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin ~= false
+		local isElvUIActive = BFL.IsThemeActive and BFL:IsThemeActive("elvui")
 		if isElvUIActive then
 			local button = _G[dropdownName .. "Button"]
 			if button then
@@ -425,6 +463,8 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 					end
 				end
 			end
+
+			AttachDarkDropdownData(dropdown, entries, isSelectedCallback, onSelectionCallback, ApplySelectionFont)
 
 			dropdown:SetupMenu(function(dropdown, rootDescription)
 				-- 300px height limit to ensure scrolling for long lists (e.g. Fonts)
@@ -1708,6 +1748,14 @@ function Components:CreateCheckboxDropdown(parent, checkboxData, dropdownData)
 						end
 					end
 				end
+
+				AttachDarkDropdownData(
+					dropdown,
+					dropdownData.entries,
+					dropdownData.isSelectedCallback,
+					dropdownData.onSelectionCallback,
+					ApplySelectionFont
+				)
 
 				dropdown:SetupMenu(function(_, rootDescription)
 					if rootDescription.SetScrollMode then

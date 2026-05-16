@@ -824,7 +824,7 @@ function BFL:UpdatePortraitVisibility(reason)
 	-- Classic: Hide portrait when ElvUI is active and Simple Mode is disabled
 	-- (Changelog will be accessible via Contacts Menu instead to save space)
 	if BFL.IsClassic and not simpleMode then
-		local isElvUIActive = _G.ElvUI and BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin ~= false
+		local isElvUIActive = BFL.IsThemeActive and BFL:IsThemeActive("elvui")
 		if isElvUIActive then
 			shouldShowPortrait = false
 		end
@@ -1047,7 +1047,7 @@ function BFL:UpdatePortraitVisibility(reason)
 			local totalWidth = baseWidth + extraWidth
 
 			-- Check if ElvUI is active - if yes, don't override the width set by ElvUI skin
-			local isElvUIActive = _G.ElvUI and BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin ~= false
+			local isElvUIActive = BFL.IsThemeActive and BFL:IsThemeActive("elvui")
 			if not (BFL.IsClassic and isElvUIActive) then
 				bnetFrame:SetWidth(totalWidth)
 			end

@@ -334,10 +334,18 @@ end
 --- Apply ElvUI skin to a LibQTip tooltip (mirrors ElvUI TT:SetStyle)
 function BU.ApplyElvUISkin(tt)
 	if not tt then return end
+	if BFL and BFL.IsThemeActive and BFL:IsThemeActive("dark") then
+		local Engine = BFL:GetModule("SkinEngine")
+		if Engine then
+			Engine:SkinTooltip(tt)
+		end
+		return
+	end
+
 	local E = BU.GetElvUIEngine()
 	if not E then return end
 
-	local wantSkin = BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin
+	local wantSkin = BFL and BFL.IsThemeActive and BFL:IsThemeActive("elvui")
 	if not wantSkin then return end
 
 	-- Hide default NineSlice backdrop (same as ElvUI TT:SetStyle)
@@ -353,7 +361,16 @@ end
 
 --- Remove ElvUI skin from a LibQTip tooltip (restore default appearance)
 function BU.RemoveElvUISkin(tt)
-	if not tt or not tt.bflElvUISkinned then return end
+	if not tt then return end
+
+	if tt.bflDarkSkinned and BFL then
+		local Engine = BFL:GetModule("SkinEngine")
+		if Engine then
+			Engine:RestoreFrame(tt)
+		end
+	end
+
+	if not tt.bflElvUISkinned then return end
 
 	-- Restore NineSlice visibility
 	if tt.NineSlice then

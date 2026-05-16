@@ -1642,5 +1642,12 @@ L.SETTINGS_SHOW_ILVL_COLUMN_DESC = "Show an item level column in the Guild tab l
 	L.GUILD_CONTEXT_SECTION_COMMUNICATION = "Communication"
 	L.GUILD_CONTEXT_SECTION_MANAGEMENT = "Management"
 	L.GUILD_CONTEXT_SECTION_ADDON = "BetterFriendlist"
+	L.SETTINGS_TAB_THEME = "Theme"
+	L.SETTINGS_THEME_HEADER = "Theme"
+	L.SETTINGS_THEME_DROPDOWN = "Theme"
+	L.SETTINGS_THEME_DROPDOWN_DESC = "Choose the visual style for BetterFriendlist. ElvUI requires a UI reload."
+	L.SETTINGS_THEME_BLIZZARD = "Blizzard"
+	L.SETTINGS_THEME_DARK = "Dark"
+	L.SETTINGS_THEME_ELVUI = "ElvUI"
 	L.GUILD_CONTEXT_SECTION_SYSTEM = "System"
 end)

@@ -60,7 +60,7 @@ function QuickFilters:InitDropdown(dropdown)
 		-- BFL:DebugPrint("|cff00ffffQuickFilters:|r Classic mode - using UIDropDownMenu for Quick Filter dropdown")
 
 		-- Only set width if ElvUI is not active (ElvUI Skin handles sizing)
-		local isElvUIActive = _G.ElvUI and BetterFriendlistDB and BetterFriendlistDB.enableElvUISkin ~= false
+		local isElvUIActive = BFL.IsThemeActive and BFL:IsThemeActive("elvui")
 		if not isElvUIActive then
 			UIDropDownMenu_SetWidth(dropdown, 70)
 		end

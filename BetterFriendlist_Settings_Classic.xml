@@ -52,6 +52,14 @@
 									<Anchor point="BOTTOMRIGHT" />
 								</Anchors>
 							</Frame>
+
+							<!-- Theme Tab Content -->
+							<Frame parentKey="ThemeTab" hidden="true">
+								<Anchors>
+									<Anchor point="TOPLEFT" />
+									<Anchor point="BOTTOMRIGHT" />
+								</Anchors>
+							</Frame>
 							
 							<!-- Fonts Tab Content -->
 							<Frame parentKey="FontsTab" hidden="true">

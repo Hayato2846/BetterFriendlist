@@ -373,6 +373,12 @@ local TAB_DEFINITIONS = {
 		beta = false,
 	},
 	{
+		id = 10,
+		name = L.SETTINGS_TAB_THEME or "Theme",
+		icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\sliders.blp",
+		beta = false,
+	},
+	{
 		id = 2,
 		name = L.SETTINGS_TAB_FONTS,
 		icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\type.blp",
@@ -633,6 +639,9 @@ function Settings:SelectCategory(categoryID)
 		if content.GeneralTab then
 			content.GeneralTab:Hide()
 		end
+		if content.ThemeTab then
+			content.ThemeTab:Hide()
+		end
 		if content.FontsTab then
 			content.FontsTab:Hide()
 		end
@@ -661,6 +670,9 @@ function Settings:SelectCategory(categoryID)
 		if categoryID == 1 and content.GeneralTab then
 			content.GeneralTab:Show()
 			self:RefreshGeneralTab()
+		elseif categoryID == 10 and content.ThemeTab then
+			content.ThemeTab:Show()
+			self:RefreshThemeTab()
 		elseif categoryID == 2 and content.FontsTab then
 			content.FontsTab:Show()
 			self:RefreshFontsTab()
@@ -711,6 +723,8 @@ function Settings:AdjustContentHeight(tabID)
 	local activeTab = nil
 	if tabID == 1 then
 		activeTab = content.GeneralTab
+	elseif tabID == 10 then
+		activeTab = content.ThemeTab
 	elseif tabID == 2 then
 		activeTab = content.FontsTab
 	elseif tabID == 3 then
@@ -890,6 +904,7 @@ function Settings:DoReset()
 		return
 	end
 
+	self:OnThemeChanged("blizzard")
 	DB:Set("showBlizzardOption", false)
 	DB:Set("compactMode", false)
 	-- DB:Set("fontSize", "normal") -- REMOVED
@@ -1979,6 +1994,7 @@ function Settings:ImportSettings(importString)
 			local keysToImport = {
 				-- General
 				"compactMode",
+				"theme",
 				"enableElvUISkin",
 				"fontSize",
 				"windowScale",
@@ -2042,6 +2058,13 @@ function Settings:ImportSettings(importString)
 				end
 			end
 		end
+	end
+
+	if importData.theme == nil and importData.enableElvUISkin ~= nil then
+		BetterFriendlistDB.theme = importData.enableElvUISkin == true and "elvui" or "blizzard"
+	end
+	if DB.NormalizeThemeSetting then
+		DB:NormalizeThemeSetting()
 	end
 
 	-- Reload Groups module (this will apply imported colors)
@@ -3128,6 +3151,108 @@ end
 -- NEW: TAB REFRESH FUNCTIONS
 --------------------------------------------------------------------------
 
+-- Theme setting callbacks
+function Settings:OnThemeChanged(theme)
+	local DB = GetDB()
+	if not DB then
+		return
+	end
+
+	if theme ~= "blizzard" and theme ~= "dark" and theme ~= "elvui" then
+		theme = "blizzard"
+	end
+	if theme == "elvui" and not _G.ElvUI then
+		theme = "blizzard"
+	end
+
+	local oldStoredTheme = DB:Get("theme", "blizzard")
+	local oldEffectiveTheme = BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() or oldStoredTheme
+	DB:Set("theme", theme)
+
+	local ThemeManager = BFL:GetModule("ThemeManager")
+	local touchesElvUI = oldEffectiveTheme == "elvui" or theme == "elvui"
+	if touchesElvUI then
+		if oldEffectiveTheme == "dark" then
+			local DarkTheme = BFL:GetModule("DarkTheme")
+			if DarkTheme and DarkTheme.Remove then
+				DarkTheme:Remove("settings-elvui")
+			end
+		end
+		if ThemeManager and ThemeManager.ShowReloadDialog then
+			ThemeManager:ShowReloadDialog()
+		end
+		return
+	end
+
+	if ThemeManager and ThemeManager.ApplyCurrentTheme then
+		ThemeManager:ApplyCurrentTheme("settings")
+	end
+end
+
+function Settings:RefreshThemeTab()
+	if not settingsFrame or not Components then
+		return
+	end
+
+	local content = settingsFrame.ContentScrollFrame.Content
+	if not content or not content.ThemeTab then
+		return
+	end
+
+	local tab = content.ThemeTab
+	local DB = GetDB()
+	if not DB then
+		return
+	end
+
+	if tab.components then
+		for _, component in ipairs(tab.components) do
+			if component.Hide then
+				component:Hide()
+			end
+		end
+	end
+	tab.components = {}
+
+	local allFrames = {}
+	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_THEME_HEADER or "Theme"))
+
+	local labels = {
+		L.SETTINGS_THEME_BLIZZARD or "Blizzard",
+		L.SETTINGS_THEME_DARK or "Dark",
+	}
+	local values = { "blizzard", "dark" }
+	if _G.ElvUI then
+		table.insert(labels, L.SETTINGS_THEME_ELVUI or "ElvUI")
+		table.insert(values, "elvui")
+	end
+
+	local themeDropdown = Components:CreateDropdown(
+		tab,
+		L.SETTINGS_THEME_DROPDOWN or "Theme",
+		{
+			labels = labels,
+			values = values,
+		},
+		function(value)
+			local selectedTheme = BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() or DB:Get("theme", "blizzard")
+			return selectedTheme == value
+		end,
+		function(value)
+			self:OnThemeChanged(value)
+		end
+	)
+	themeDropdown:SetTooltip(
+		L.SETTINGS_THEME_DROPDOWN or "Theme",
+		L.SETTINGS_THEME_DROPDOWN_DESC
+			or "Choose the visual style for BetterFriendlist. ElvUI requires a UI reload."
+	)
+	table.insert(allFrames, themeDropdown)
+
+	Components:AnchorChain(allFrames, -5)
+	tab.components = allFrames
+end
+
 -- Refresh General Tab with new component library
 function Settings:RefreshGeneralTab()
 	if not settingsFrame or not Components then
@@ -3339,49 +3464,16 @@ function Settings:RefreshGeneralTab()
 	}, favoriteDropdownData)
 	table.insert(allFrames, row6)
 
-	-- Row 7: Blizzard Option (Single or with ElvUI)
-	local elvData = nil
-	if _G.ElvUI then
-		elvData = {
-			label = L.SETTINGS_ENABLE_ELVUI_SKIN or "Enable ElvUI Skin",
-			initialValue = DB:Get("enableElvUISkin", false),
-			callback = function(val)
-				local boolVal = (val == true or val == 1)
-				DB:Set("enableElvUISkin", boolVal)
-				StaticPopupDialogs["BFL_ELVUI_RELOAD"] = {
-					text = L.DIALOG_ELVUI_RELOAD_TEXT
-						or "Changing ElvUI Skin settings requires a UI Reload.\nReload now?",
-					button1 = L.DIALOG_ELVUI_RELOAD_BTN1 or "Yes",
-					button2 = L.DIALOG_ELVUI_RELOAD_BTN2 or "No",
-					OnAccept = function()
-						ReloadUI()
-					end,
-					timeout = 0,
-					whileDead = true,
-					hideOnEscape = true,
-				}
-				StaticPopup_Show("BFL_ELVUI_RELOAD")
-			end,
-			tooltipTitle = L.SETTINGS_ENABLE_ELVUI_SKIN or "Enable ElvUI Skin",
-			tooltipDesc = L.SETTINGS_ENABLE_ELVUI_SKIN_DESC
-				or "Enables the ElvUI skin for BetterFriendlist. Requires ElvUI to be installed and enabled.",
-		}
-	end
-
-	local row7 = Components:CreateDoubleCheckbox(
-		tab,
-		{ -- Left
-			label = L.SETTINGS_SHOW_BLIZZARD,
-			initialValue = DB:Get("showBlizzardOption", false),
-			callback = function(val)
-				self:OnShowBlizzardOptionChanged(val)
-			end,
-			tooltipTitle = L.SETTINGS_SHOW_BLIZZARD,
-			tooltipDesc = L.SETTINGS_SHOW_BLIZZARD_DESC
-				or "Shows the original Blizzard Friends button in the social menu",
-		},
-		elvData -- Right (nil if no ElvUI)
-	)
+	-- Row 7: Blizzard Option
+	local row7 = Components:CreateCheckbox(tab, {
+		label = L.SETTINGS_SHOW_BLIZZARD,
+		initialValue = DB:Get("showBlizzardOption", false),
+		callback = function(val)
+			self:OnShowBlizzardOptionChanged(val)
+		end,
+		tooltipTitle = L.SETTINGS_SHOW_BLIZZARD,
+		tooltipDesc = L.SETTINGS_SHOW_BLIZZARD_DESC or "Shows the original Blizzard Friends button in the social menu",
+	})
 	table.insert(allFrames, row7)
 
 	-- Spacer before next section

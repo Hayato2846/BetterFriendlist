@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+
+### Added
+- **Theme Settings** - Added a Theme settings section with Blizzard, Dark, and ElvUI theme choices.
+- **Dark Theme** - Added a BFL-owned dark skinning engine covering BetterFriendlist windows, rows, dialogs, and broker tooltips.
+
+### Changed
+- **ElvUI Skin Setting** - Moved the ElvUI skin option from General to Theme and migrated existing profiles automatically.
+- **Dark Theme Visuals** - Refined the Dark theme with translucent black Aurora-style surfaces, clearer control hairlines, Material-like navigation states, and cleaner list dividers.
+
+### Fixed
+- **Dark Theme Coverage** - Improved Dark theme coverage for frame borders, tabs, scroll bars, dropdown menus, sliders, close buttons, and standard Blizzard button templates that could still show Blizzard styling.
+- **Dark Theme Controls** - Replaced text-based close and dropdown indicators with BFL icons, removed extra borders from header icon buttons, and preserved TravelPass invite textures.
+- **Dark Theme Tabs** - Centered tab labels, matched bottom-tab opacity to the main frame, and added accent borders for selected top and bottom tabs.
+- **Dark Theme Main List** - Widened and aligned the main scrollbar, lined up the footer buttons with the list edges, and made disabled buttons visually distinct without dimming selected tabs.
+- **Dark Theme Performance** - Reduced Friendlist rerender work and stopped row skinning from interfering with configured group header colors.
+- **Dark Theme Frame Chrome** - Prevented Blizzard ButtonFrame portrait/corner artwork from reappearing over the Dark theme after portrait visibility updates.
+- **Dark Theme Polish** - Aligned header and title icon buttons, changed borderless button hover to icon-only glow, and tightened the main scrollbar alignment and stepper state layout.
+
 ## [2.5.8]        - 2026-05-16
 
 ### Added

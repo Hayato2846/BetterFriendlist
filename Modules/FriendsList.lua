@@ -1378,9 +1378,7 @@ function FriendsList:UpdateSearchBoxState()
 			-- was reparented to BetterFriendsFrame during Simple Mode
 			local header = frame.FriendsTabHeader
 			if BFL.IsClassic then
-				local isClassicElvUISkinActive = _G.ElvUI
-					and BetterFriendlistDB
-					and BetterFriendlistDB.enableElvUISkin ~= false
+				local isClassicElvUISkinActive = BFL.IsThemeActive and BFL:IsThemeActive("elvui")
 				local classicSortSpacing = isClassicElvUISkinActive and 8 or -10
 				local classicSecondarySpacing = isClassicElvUISkinActive and 8 or -15
 

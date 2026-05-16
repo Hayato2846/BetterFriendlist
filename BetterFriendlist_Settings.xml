@@ -53,6 +53,14 @@
 								<Anchor point="BOTTOMRIGHT" />
 							</Anchors>
 						</Frame>
+
+						<!-- Theme Tab - Populated by Lua (SettingsComponents) -->
+						<Frame parentKey="ThemeTab" hidden="true">
+							<Anchors>
+								<Anchor point="TOPLEFT" />
+								<Anchor point="BOTTOMRIGHT" />
+							</Anchors>
+						</Frame>
 							
 						<!-- Fonts Tab - Populated by Lua (SettingsComponents) -->
 						<Frame parentKey="FontsTab" hidden="true">

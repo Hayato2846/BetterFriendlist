@@ -168,10 +168,7 @@ function WhoFrame:UpdateResponsiveLayout()
 
 	-- Apply minimum widths
 	nameWidth = math.max(nameWidth, 80)
-	local isClassicElvUISkinActive = BFL.IsClassic
-		and _G.ElvUI
-		and BetterFriendlistDB
-		and BetterFriendlistDB.enableElvUISkin ~= false
+	local isClassicElvUISkinActive = BFL.IsClassic and BFL.IsThemeActive and BFL:IsThemeActive("elvui")
 	local minColumnWidth = isClassicElvUISkinActive and 110 or 70
 	columnWidth = math.max(columnWidth, minColumnWidth)
 	levelWidth = math.max(levelWidth, 28)
@@ -523,10 +520,7 @@ function WhoFrame:InitializeClassicDropdown(dropdown)
 		return
 	end
 
-	local isClassicElvUISkinActive = BFL.IsClassic
-		and _G.ElvUI
-		and BetterFriendlistDB
-		and BetterFriendlistDB.enableElvUISkin ~= false
+	local isClassicElvUISkinActive = BFL.IsClassic and BFL.IsThemeActive and BFL:IsThemeActive("elvui")
 
 	local function NormalizeClassicColumnDropdown()
 		dropdown:SetHeight(24)
