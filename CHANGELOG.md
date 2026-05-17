@@ -18,7 +18,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dark Theme Visuals** - Refined the Dark theme with translucent black Aurora-style surfaces, clearer control hairlines, Material-like navigation states, and cleaner list dividers.
 
 ### Fixed
-- **ElvUI Top Tabs** - Centered the Friends, Recent Allies, and Recruit A Friend tab labels in the ElvUI skin.
 - **Dark Theme Coverage** - Improved Dark theme coverage for frame borders, tabs, scroll bars, dropdown menus, sliders, close buttons, and standard Blizzard button templates that could still show Blizzard styling.
 - **Dark Theme Controls** - Replaced text-based close and dropdown indicators with BFL icons, removed extra borders from header icon buttons, and preserved TravelPass invite textures.
 - **Dark Theme Tabs** - Centered tab labels, matched bottom-tab opacity to the main frame, and added accent borders for selected top and bottom tabs.
@@ -26,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dark Theme Performance** - Reduced Friendlist rerender work and stopped row skinning from interfering with configured group header colors.
 - **Dark Theme Frame Chrome** - Prevented Blizzard ButtonFrame portrait/corner artwork from reappearing over the Dark theme after portrait visibility updates.
 - **Dark Theme Polish** - Aligned header and title icon buttons, changed borderless button hover to icon-only glow, and tightened the main scrollbar alignment and stepper state layout.
+
+## [2.5.9]        - 2026-05-17
+
+### Fixed
+- **ElvUI Top Tabs** - Centered the Friends, Recent Allies, and Recruit A Friend tab labels in the ElvUI skin.
 
 ## [2.5.8]        - 2026-05-16
 
