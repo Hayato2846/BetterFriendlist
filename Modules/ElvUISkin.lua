@@ -108,6 +108,70 @@ local function FixClassicDropdownHitbox(dropdown, width, height)
 	end
 end
 
+local function IsBFLTab(tab)
+	local name = tab and tab.GetName and tab:GetName()
+	return name
+		and (
+			string.find(name, "BetterFriendsFrameTab", 1, true)
+			or string.find(name, "BetterFriendlistSettingsFrameTab", 1, true)
+			or string.find(name, "BetterFriendsFrameBottomTab", 1, true)
+		)
+end
+
+local function CenterBFLTabText(tab)
+	if not IsBFLTab(tab) then
+		return
+	end
+
+	local text = tab.Text or (tab.GetFontString and tab:GetFontString())
+	if not text then
+		return
+	end
+
+	text:ClearAllPoints()
+	text:SetPoint("CENTER", tab, "CENTER", 0, 0)
+	text:SetJustifyH("CENTER")
+	text:SetJustifyV("MIDDLE")
+end
+
+local function CenterNamedTabs(prefix, count)
+	for i = 1, count do
+		CenterBFLTabText(_G[prefix .. i])
+	end
+end
+
+local function CenterMainFrameTabs()
+	CenterNamedTabs("BetterFriendsFrameTab", 4)
+	CenterNamedTabs("BetterFriendsFrameBottomTab", 4)
+end
+
+local function DeferCenterBFLTab(tab)
+	if C_Timer and C_Timer.After then
+		C_Timer.After(0, function()
+			CenterBFLTabText(tab)
+		end)
+	else
+		CenterBFLTabText(tab)
+	end
+end
+
+local function HookBFLTabCenter(tab)
+	if not IsBFLTab(tab) or tab.BFL_ElvCenterHooked or not tab.HookScript then
+		return
+	end
+
+	tab:HookScript("OnShow", CenterBFLTabText)
+	tab:HookScript("OnSizeChanged", CenterBFLTabText)
+	tab:HookScript("OnClick", DeferCenterBFLTab)
+	tab.BFL_ElvCenterHooked = true
+end
+
+local function HookNamedTabs(prefix, count)
+	for i = 1, count do
+		HookBFLTabCenter(_G[prefix .. i])
+	end
+end
+
 function ElvUISkin:Initialize()
 	-- Check if ElvUI is loaded immediately
 	if _G.ElvUI then
@@ -210,47 +274,31 @@ function ElvUISkin:SkinFrames(E, S)
 
 	-- Ensure Tab Text is centered (Hook for updates)
 	if not self.TabHookInstalled then
-		local function FixTabCenter(tab)
-			if tab and tab:GetName() then
-				local name = tab:GetName()
-				if
-					string.find(name, "BetterFriendsFrameTab")
-					or string.find(name, "BetterFriendlistSettingsFrameTab")
-					or string.find(name, "BetterFriendsFrameBottomTab")
-				then
-					local text = tab.Text or (tab.GetFontString and tab:GetFontString())
-					if text then
-						text:ClearAllPoints()
-						text:SetPoint("CENTER", tab, "CENTER", 0, 0)
-					end
-				end
+		-- On 12.0.0+ (HasSecretValues), global PanelTemplates hooks taint the
+		-- execution context, causing "secret string conversion" errors in the
+		-- chat system. Use per-tab hooks and BFL-owned tab functions there.
+		HookNamedTabs("BetterFriendsFrameTab", 4)
+		HookNamedTabs("BetterFriendsFrameBottomTab", 4)
+		HookNamedTabs("BetterFriendlistSettingsFrameTab", 10)
+
+		if not BFL.HasSecretValues then
+			if _G.PanelTemplates_SelectTab then
+				hooksecurefunc("PanelTemplates_SelectTab", CenterBFLTabText)
+			end
+			if _G.PanelTemplates_DeselectTab then
+				hooksecurefunc("PanelTemplates_DeselectTab", CenterBFLTabText)
 			end
 		end
 
-		-- On 12.0.0+ (HasSecretValues), global PanelTemplates hooks taint the
-		-- execution context, causing "secret string conversion" errors in the
-		-- chat system. Use per-tab OnShow hooks instead of global hooks.
-		if BFL.HasSecretValues then
-			local function HookBFLTab(tab)
-				if tab and not tab.BFL_ElvCenterHooked then
-					tab:HookScript("OnShow", function(self)
-						FixTabCenter(self)
-					end)
-					tab.BFL_ElvCenterHooked = true
-				end
+		if hooksecurefunc then
+			if type(_G.BetterFriendsFrame_ShowTab) == "function" then
+				hooksecurefunc("BetterFriendsFrame_ShowTab", CenterMainFrameTabs)
 			end
-			for i = 1, 4 do
-				HookBFLTab(_G["BetterFriendsFrameBottomTab" .. i])
+			if type(_G.BetterFriendsFrame_ShowBottomTab) == "function" then
+				hooksecurefunc("BetterFriendsFrame_ShowBottomTab", CenterMainFrameTabs)
 			end
-			HookBFLTab(_G["BetterFriendsFrameTab1"])
-			HookBFLTab(_G["BetterFriendlistSettingsFrameTab1"])
-			HookBFLTab(_G["BetterFriendlistSettingsFrameTab2"])
-		else
-			if _G.PanelTemplates_SelectTab then
-				hooksecurefunc("PanelTemplates_SelectTab", FixTabCenter)
-			end
-			if _G.PanelTemplates_DeselectTab then
-				hooksecurefunc("PanelTemplates_DeselectTab", FixTabCenter)
+			if type(BFL.ApplyTabFonts) == "function" then
+				hooksecurefunc(BFL, "ApplyTabFonts", CenterMainFrameTabs)
 			end
 		end
 
@@ -371,12 +419,12 @@ function ElvUISkin:SkinFrames(E, S)
 		local tab = _G["BetterFriendsFrameTab" .. i]
 		if tab then
 			S:HandleTab(tab)
+			HookBFLTabCenter(tab)
 
 			-- Adjust text position
 			local text = tab.Text or (tab.GetFontString and tab:GetFontString())
 			if text then
-				text:ClearAllPoints()
-				text:SetPoint("CENTER", tab, "CENTER", 0, 0) -- Text centered
+				CenterBFLTabText(tab)
 				local textHeight = text:GetStringHeight() or 0
 				local tabHeight = math.max(32, textHeight + 20)
 				tab:SetHeight(tabHeight)
@@ -409,6 +457,7 @@ function ElvUISkin:SkinFrames(E, S)
 			local tabWidth = math.floor((frameWidth - (spacing * (numTabs - 1))) / numTabs)
 			for i, tab in ipairs(tabs) do
 				S:HandleTab(tab)
+				HookBFLTabCenter(tab)
 				tab:SetHeight(28)
 				tab:SetWidth(tabWidth)
 				tab:ClearAllPoints()
@@ -418,6 +467,7 @@ function ElvUISkin:SkinFrames(E, S)
 					local prevTab = tabs[i - 1]
 					tab:SetPoint("LEFT", prevTab, "RIGHT", spacing, 0)
 				end
+				CenterBFLTabText(tab)
 			end
 		end
 	else
@@ -425,6 +475,7 @@ function ElvUISkin:SkinFrames(E, S)
 			local tab = _G["BetterFriendsFrameBottomTab" .. i]
 			if tab then
 				S:HandleTab(tab)
+				HookBFLTabCenter(tab)
 				tab:SetHeight(28)
 				tab:ClearAllPoints()
 				if i == 1 then
@@ -433,6 +484,7 @@ function ElvUISkin:SkinFrames(E, S)
 					local prevTab = _G["BetterFriendsFrameBottomTab" .. (i - 1)]
 					tab:SetPoint("LEFT", prevTab, "RIGHT", -5, 0)
 				end
+				CenterBFLTabText(tab)
 			end
 		end
 	end
@@ -1331,12 +1383,8 @@ function ElvUISkin:SkinSettings(E, S)
 			-- Tabs should exist if XML defines them.
 			S:HandleTab(tab)
 			tab:SetHeight(28) -- Fixed height
-
-			local text = tab.Text or (tab.GetFontString and tab:GetFontString())
-			if text then
-				text:ClearAllPoints()
-				text:SetPoint("CENTER", tab, "CENTER", 0, 0)
-			end
+			HookBFLTabCenter(tab)
+			CenterBFLTabText(tab)
 		end
 	end
 
