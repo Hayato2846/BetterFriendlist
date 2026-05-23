@@ -101,6 +101,330 @@ local function SafeNumber(value, fallback)
 	return fallback
 end
 
+local function CallBlizzardFunction(func, ...)
+	if not func then
+		return nil
+	end
+	if securecallfunction then
+		return securecallfunction(func, ...)
+	end
+	return func(...)
+end
+
+local function CallBlizzardMethod(owner, method, ...)
+	if not owner or not method then
+		return nil
+	end
+	return CallBlizzardFunction(method, owner, ...)
+end
+
+local function LoadBlizzardRecruitAFriend()
+	if RecruitAFriendFrame and RecruitAFriendRewardsFrame and RecruitAFriendRecruitmentFrame then
+		return true
+	end
+
+	local loadAddOn = C_AddOns and C_AddOns.LoadAddOn or LoadAddOn
+	if loadAddOn then
+		pcall(CallBlizzardFunction, loadAddOn, "Blizzard_RecruitAFriend")
+	end
+
+	return RecruitAFriendFrame and RecruitAFriendRewardsFrame and RecruitAFriendRecruitmentFrame
+end
+
+local function ClickNativeRAFButton(button, fallbackMixin)
+	if not button then
+		return false
+	end
+
+	local onClick = button.OnClick or (fallbackMixin and fallbackMixin.OnClick)
+	if not onClick then
+		return false
+	end
+
+	CallBlizzardMethod(button, onClick)
+	return true
+end
+
+local nativeRewardsState = {
+	rafInfo = nil,
+	selectedRAFVersion = nil,
+}
+local nativeRewardTabHooks = setmetatable({}, { __mode = "k" })
+local SelectNativeRewardVersion
+
+local function GetNativeRewardVersionInfo(rafInfo, rafVersion)
+	if not rafInfo or not rafInfo.versions then
+		return nil
+	end
+
+	for _, versionInfo in ipairs(rafInfo.versions) do
+		if versionInfo.rafVersion == rafVersion then
+			return versionInfo
+		end
+	end
+
+	return nil
+end
+
+local function GetNativeLatestRewardVersion(rafInfo)
+	local latestVersionInfo = rafInfo and rafInfo.versions and rafInfo.versions[1]
+	return latestVersionInfo and latestVersionInfo.rafVersion
+end
+
+local function IsNativeLegacyRewardVersion(rafInfo, rafVersion)
+	return rafVersion ~= GetNativeLatestRewardVersion(rafInfo)
+end
+
+local function RefreshNativeRewardTabs()
+	local rewardsFrame = RecruitAFriendRewardsFrame
+	local rewardTabPool = rewardsFrame and rewardsFrame.rewardTabPool
+	local rafInfo = nativeRewardsState.rafInfo
+	if not rewardTabPool or not rafInfo then
+		return
+	end
+
+	for rewardTab in rewardTabPool:EnumerateActive() do
+		local selected = rewardTab.rafVersion == nativeRewardsState.selectedRAFVersion
+		rewardTab:SetChecked(selected)
+
+		if rewardTab.UnclaimedRewardsAnim then
+			local versionInfo = GetNativeRewardVersionInfo(rafInfo, rewardTab.rafVersion)
+			local canClaimNextReward = versionInfo and versionInfo.nextReward and versionInfo.nextReward.canClaim
+			rewardTab.UnclaimedRewardsAnim:SetPlaying(
+				not selected and IsNativeLegacyRewardVersion(rafInfo, rewardTab.rafVersion) and canClaimNextReward
+			)
+		end
+	end
+end
+
+local function UpdateNativeRewardsBackground(rewardsFrame, selectedRAFVersion)
+	if not rewardsFrame or not rewardsFrame.Background or not RAFUtil then
+		return
+	end
+
+	local useLegacyArt = RAFUtil.DoesRAFVersionUseLegacyArt
+		and RAFUtil.DoesRAFVersionUseLegacyArt(selectedRAFVersion)
+	local atlas = useLegacyArt and rewardsFrame.legacyBackgroundAtlas or rewardsFrame.backgroundAtlas
+	if atlas then
+		local useAtlasSize = TextureKitConstants and TextureKitConstants.UseAtlasSize
+		rewardsFrame.Background:SetAtlas(atlas, useAtlasSize)
+	end
+
+	if SetupTextureKitOnRegions and RAFUtil.GetTextureKitForRAFVersion then
+		local textureKitRegions = {
+			Watermark = "recruitafriend_%s_iwatermark_big",
+		}
+		local setVisibility = TextureKitConstants and TextureKitConstants.SetVisibility
+		local useAtlasSize = TextureKitConstants and TextureKitConstants.UseAtlasSize
+		SetupTextureKitOnRegions(
+			RAFUtil.GetTextureKitForRAFVersion(selectedRAFVersion),
+			rewardsFrame,
+			textureKitRegions,
+			setVisibility,
+			useAtlasSize
+		)
+	end
+end
+
+local function UpdateNativeRewardsList(rewardsFrame, rewards)
+	if not rewardsFrame or not rewardsFrame.rewardPool then
+		return
+	end
+
+	rewardsFrame.rewardPool:ReleaseAll()
+	if not rewards then
+		return
+	end
+
+	local lastRewardFrame
+	for index, rewardInfo in ipairs(rewards) do
+		if index > 13 then
+			return
+		end
+
+		local leftColumnStartIndex = 1
+		local rightColumnStartIndex = leftColumnStartIndex + (#rewards - 1) / 2
+		local finalRewardIndex = #rewards
+		local rewardFrame = rewardsFrame.rewardPool:Acquire()
+
+		if index == leftColumnStartIndex then
+			rewardFrame:SetPoint("TOPLEFT", rewardsFrame.Background, "TOPLEFT", 69, -98)
+		elseif index == rightColumnStartIndex then
+			rewardFrame:SetPoint("TOPLEFT", rewardsFrame.Background, "TOPLEFT", 209, -98)
+		elseif index == finalRewardIndex then
+			rewardFrame:SetPoint("BOTTOM", rewardsFrame.Background, "BOTTOM", 0, 44)
+		else
+			rewardFrame:SetPoint("TOPLEFT", lastRewardFrame, "BOTTOMLEFT", 0, -9)
+		end
+
+		local tooltipRightAligned = index >= rightColumnStartIndex and index < finalRewardIndex
+		if rewardFrame.Setup then
+			CallBlizzardMethod(rewardFrame, rewardFrame.Setup, rewardInfo, tooltipRightAligned)
+		end
+
+		lastRewardFrame = rewardFrame
+	end
+end
+
+local function RefreshNativeRewardsFrame()
+	local rewardsFrame = RecruitAFriendRewardsFrame
+	local rafInfo = nativeRewardsState.rafInfo
+	local selectedRAFVersion = nativeRewardsState.selectedRAFVersion
+	local selectedVersionInfo = GetNativeRewardVersionInfo(rafInfo, selectedRAFVersion)
+	if not rewardsFrame or not selectedVersionInfo then
+		return false
+	end
+
+	if SideDressUpFrame and CloseSideDressUpFrame then
+		CloseSideDressUpFrame(rewardsFrame)
+	end
+
+	UpdateNativeRewardsBackground(rewardsFrame, selectedRAFVersion)
+
+	if rewardsFrame.Description then
+		local description = IsNativeLegacyRewardVersion(rafInfo, selectedRAFVersion)
+			and RAF_LEGACY_REWARDS_DESC
+			or RAF_REWARDS_DESC
+		rewardsFrame.Description:SetText(description or "")
+	end
+
+	UpdateNativeRewardsList(rewardsFrame, selectedVersionInfo.rewards)
+
+	if rewardsFrame.ClaimLegacyRewardsButton and rewardsFrame.ClaimLegacyRewardsButton.Update then
+		CallBlizzardMethod(
+			rewardsFrame.ClaimLegacyRewardsButton,
+			rewardsFrame.ClaimLegacyRewardsButton.Update,
+			selectedVersionInfo,
+			rafInfo.claimInProgress
+		)
+	end
+
+	if rewardsFrame.Layout then
+		CallBlizzardMethod(rewardsFrame, rewardsFrame.Layout)
+	end
+
+	if SetUpSideDressUpFrame then
+		SetUpSideDressUpFrame(rewardsFrame, 500, 682, "TOPLEFT", "TOPRIGHT", -5, -2)
+	end
+
+	RefreshNativeRewardTabs()
+	return true
+end
+
+function SelectNativeRewardVersion(rafVersion)
+	if not nativeRewardsState.rafInfo or not GetNativeRewardVersionInfo(nativeRewardsState.rafInfo, rafVersion) then
+		return false
+	end
+
+	nativeRewardsState.selectedRAFVersion = rafVersion
+	return RefreshNativeRewardsFrame()
+end
+
+local function IsBetterFriendlistRewardsContext()
+	return BetterFriendsFrame
+		and BetterFriendsFrame:IsShown()
+		and BetterFriendsFrame.RecruitAFriendFrame
+		and BetterFriendsFrame.RecruitAFriendFrame:IsShown()
+end
+
+local function HookNativeRewardTabs()
+	local rewardsFrame = RecruitAFriendRewardsFrame
+	local rewardTabPool = rewardsFrame and rewardsFrame.rewardTabPool
+	if not rewardTabPool then
+		return false
+	end
+
+	for rewardTab in rewardTabPool:EnumerateActive() do
+		if not nativeRewardTabHooks[rewardTab] then
+			rewardTab:HookScript("OnClick", function(tab)
+				if RecruitAFriendRewardsFrame and RecruitAFriendRewardsFrame:IsShown() and IsBetterFriendlistRewardsContext() then
+					SelectNativeRewardVersion(tab.rafVersion)
+				end
+			end)
+			nativeRewardTabHooks[rewardTab] = true
+		end
+	end
+
+	return true
+end
+
+local function PrepareNativeRewardsFrame(resetToLatest)
+	if not LoadBlizzardRecruitAFriend() or not C_RecruitAFriend or not RecruitAFriendRewardsFrame then
+		return false
+	end
+
+	local rafInfo = C_RecruitAFriend.GetRAFInfo and C_RecruitAFriend.GetRAFInfo() or RecruitAFriendFrame and RecruitAFriendFrame.rafInfo
+	if not rafInfo or not rafInfo.versions or #rafInfo.versions == 0 then
+		return false
+	end
+
+	nativeRewardsState.rafInfo = rafInfo
+	if resetToLatest or not GetNativeRewardVersionInfo(rafInfo, nativeRewardsState.selectedRAFVersion) then
+		nativeRewardsState.selectedRAFVersion = GetNativeLatestRewardVersion(rafInfo)
+	end
+
+	local refreshed = RefreshNativeRewardsFrame()
+	HookNativeRewardTabs()
+	return refreshed
+end
+
+local function GetNextRewardDisplayName(nextReward, fallback)
+	if not nextReward or IsSecret(nextReward) then
+		return fallback
+	end
+
+	if nextReward.petInfo and not IsSecret(nextReward.petInfo) and nextReward.petInfo.speciesName then
+		return nextReward.petInfo.speciesName
+	end
+
+	if nextReward.mountInfo and not IsSecret(nextReward.mountInfo) and nextReward.mountInfo.mountID then
+		if C_MountJournal and C_MountJournal.GetMountInfoByID then
+			local mountName = C_MountJournal.GetMountInfoByID(nextReward.mountInfo.mountID)
+			if mountName then
+				return mountName
+			end
+		end
+	end
+
+	if nextReward.titleInfo and not IsSecret(nextReward.titleInfo) and nextReward.titleInfo.titleMaskID then
+		local titleName = TitleUtil
+			and TitleUtil.GetNameFromTitleMaskID
+			and TitleUtil.GetNameFromTitleMaskID(nextReward.titleInfo.titleMaskID)
+		if titleName then
+			local fmtStr = RAF_REWARD_TITLE or L.RAF_REWARD_TITLE_FMT or "Title: %s"
+			return fmtStr:format(titleName)
+		end
+	end
+
+	local itemID = SafeNumber(nextReward.itemID, 0) or 0
+	if itemID > 0 and C_Item and C_Item.GetItemInfo then
+		local itemName = C_Item.GetItemInfo(itemID)
+		if itemName then
+			return itemName
+		end
+	end
+
+	if Enum and Enum.RafRewardType and nextReward.rewardType == Enum.RafRewardType.GameTime then
+		return RAF_BENEFIT4 or L.RAF_REWARD_GAMETIME or fallback
+	end
+
+	return fallback
+end
+
+local function GetVisibleNextRewardName(frame)
+	local text = frame
+		and frame.RewardClaiming
+		and frame.RewardClaiming.NextRewardName
+		and frame.RewardClaiming.NextRewardName.Text
+	if text and text.GetText then
+		local rewardName = text:GetText()
+		if rewardName and rewardName ~= "" then
+			return rewardName
+		end
+	end
+	return nil
+end
+
 local function SafeBattleTagName(battleTag, fallback)
 	if IsSecret(battleTag) then
 		return fallback or "Unknown"
@@ -665,6 +989,12 @@ function RAF:UpdateNextReward(frame, nextReward)
 			and not (nextReward.canAfford or false)
 		rewardPanel.NextRewardButton.Icon:SetDesaturated(shouldDesaturate)
 		rewardPanel.NextRewardButton.IconOverlay:SetShown(shouldDesaturate)
+		if rewardPanel.NextRewardButton.IconBorder and rewardPanel.NextRewardButton.IconBorder.SetAtlas then
+			local borderAtlas = (not nextReward.claimed and not nextReward.canClaim)
+				and "RecruitAFriend_ClaimPane_SepiaRing"
+				or "RecruitAFriend_ClaimPane_GoldRing"
+			rewardPanel.NextRewardButton.IconBorder:SetAtlas(borderAtlas, true)
+		end
 		rewardPanel.NextRewardButton:Show()
 	end
 
@@ -1197,18 +1527,70 @@ function RAF:NextRewardButton_OnEnter(button)
 	local latestVersionInfo = frame.rafInfo.versions and #frame.rafInfo.versions > 0 and frame.rafInfo.versions[1]
 	local nextReward = latestVersionInfo and latestVersionInfo.nextReward
 
-	if not nextReward or not nextReward.itemID then
+	if not nextReward then
 		return
 	end
 
-	BFL_Tooltip:SetOwner(button, "ANCHOR_RIGHT")
-	BFL_Tooltip:SetItemByID(nextReward.itemID)
+	local tooltip = BFL_Tooltip or GameTooltip
+	local itemID = SafeNumber(nextReward.itemID, 0) or 0
+	local itemLink
+	if itemID > 0 and C_Item and C_Item.GetItemInfo then
+		_, itemLink = C_Item.GetItemInfo(itemID)
+	end
+
+	tooltip:SetOwner(button, "ANCHOR_RIGHT")
+	if itemLink and tooltip.SetHyperlink then
+		tooltip:SetHyperlink(itemLink)
+	else
+		if tooltip.ClearLines then
+			tooltip:ClearLines()
+		end
+		local rewardName = GetNextRewardDisplayName(nextReward, GetVisibleNextRewardName(frame))
+			or RAF_NEXT_REWARD
+			or L.RAF_NEXT_REWARD
+		GameTooltip_SetTitle(tooltip, rewardName, HIGHLIGHT_FONT_COLOR, true)
+		if itemID > 0 and RETRIEVING_DATA then
+			GameTooltip_AddNormalLine(tooltip, RETRIEVING_DATA, true)
+		end
+	end
+	tooltip:Show()
+
+	if itemID > 0 and Item and Item.CreateFromItemID then
+		if button.BFL_NextRewardTooltipItemID ~= itemID then
+			button.BFL_NextRewardTooltipItemID = itemID
+			button.BFL_NextRewardTooltipItem = Item:CreateFromItemID(itemID)
+		end
+		local item = button.BFL_NextRewardTooltipItem
+		if item and item.ContinueOnItemLoad then
+			item:ContinueOnItemLoad(function()
+				if button.IsMouseOver and button:IsMouseOver() then
+					RAF:NextRewardButton_OnEnter(button)
+				end
+			end)
+		end
+	end
+
+	button.UpdateTooltip = function()
+		RAF:NextRewardButton_OnEnter(button)
+	end
 
 	if IsModifiedClick("DRESSUP") then
 		ShowInspectCursor()
 	else
 		ResetCursor()
 	end
+end
+
+function RAF:NextRewardButton_OnLeave(button)
+	if button then
+		button.UpdateTooltip = nil
+	end
+	if BFL_Tooltip then
+		BFL_Tooltip:Hide()
+	elseif GameTooltip_Hide then
+		GameTooltip_Hide()
+	end
+	ResetCursor()
 end
 
 --------------------------------------------------------------------------
@@ -1252,121 +1634,16 @@ function RAF:ClaimOrViewRewardButton_OnClick(button)
 		end
 	else
 		-- Show all rewards list
-		if RecruitAFriendRewardsFrame then
-			-- Load Blizzard's RAF addon if not already loaded
-			if not RecruitAFriendFrame then
-				LoadAddOn("Blizzard_RecruitAFriend")
-			end
-
-			-- Ensure Blizzard's RecruitAFriendFrame has the data it needs
-			if RecruitAFriendFrame and frame.rafInfo then
-				-- Store RAF info in Blizzard's frame (critical for RewardsFrame to work!)
-				RecruitAFriendFrame.rafInfo = frame.rafInfo
-				RecruitAFriendFrame.rafEnabled = true
-
-				-- Set selected RAF version to the latest when opening rewards
-				if frame.rafInfo.versions and #frame.rafInfo.versions > 0 and frame.rafInfo.versions[1] then
-					local latestVersion = frame.rafInfo.versions[1].rafVersion
-					RecruitAFriendFrame.selectedRAFVersion = latestVersion
-				end
-
-				-- Store rafSystemInfo if we have it
-				if frame.RecruitAFriendFrame and frame.RecruitAFriendFrame.rafSystemInfo then
-					RecruitAFriendFrame.rafSystemInfo = frame.RecruitAFriendFrame.rafSystemInfo
-				end
-
-				-- Initialize helper methods exactly ONCE (guard with flag)
-				if not RecruitAFriendFrame._bflInitialized then
-					-- TriggerEvent: dispatch to native CallbackRegistryMixin or handle manually
-					local nativeTriggerEvent = RecruitAFriendFrame.TriggerEvent
-					RecruitAFriendFrame.callbacks = RecruitAFriendFrame.callbacks or {}
-
-					RecruitAFriendFrame.TriggerEvent = function(self, event, ...)
-						if event == "NewRewardTabSelected" then
-							local newRAFVersion = ...
-							self.selectedRAFVersion = newRAFVersion
-							if RecruitAFriendRewardsFrame and RecruitAFriendRewardsFrame.Refresh then
-								RecruitAFriendRewardsFrame:Refresh()
-							end
-						elseif event == "RewardsListOpened" then
-							if
-								self.rafInfo
-								and self.rafInfo.versions
-								and #self.rafInfo.versions > 0
-								and self.rafInfo.versions[1]
-							then
-								self.selectedRAFVersion = self.rafInfo.versions[1].rafVersion
-							end
-						end
-
-						-- Forward to native CallbackRegistryMixin if available
-						if nativeTriggerEvent and nativeTriggerEvent ~= self.TriggerEvent then
-							nativeTriggerEvent(self, event, ...)
-						end
-					end
-
-					RecruitAFriendFrame.GetSelectedRAFVersion = function(self)
-						return self.selectedRAFVersion
-					end
-
-					RecruitAFriendFrame.GetSelectedRAFVersionInfo = function(self)
-						if not self.rafInfo or not self.rafInfo.versions then
-							return nil
-						end
-						for _, versionInfo in ipairs(self.rafInfo.versions) do
-							if versionInfo.rafVersion == self.selectedRAFVersion then
-								return versionInfo
-							end
-						end
-						return self.rafInfo.versions[1]
-					end
-
-					RecruitAFriendFrame.GetLatestRAFVersion = function(self)
-						if self.rafInfo and self.rafInfo.versions and #self.rafInfo.versions > 0 then
-							return self.rafInfo.versions[1].rafVersion
-						end
-						return nil
-					end
-
-					RecruitAFriendFrame.IsLegacyRAFVersion = function(self, rafVersion)
-						local latest = self:GetLatestRAFVersion()
-						return rafVersion ~= latest
-					end
-
-					RecruitAFriendFrame.GetRAFVersionInfo = function(self, rafVersion)
-						if not self.rafInfo or not self.rafInfo.versions then
-							return nil
-						end
-						for _, versionInfo in ipairs(self.rafInfo.versions) do
-							if versionInfo.rafVersion == rafVersion then
-								return versionInfo
-							end
-						end
-						return nil
-					end
-
-					RecruitAFriendFrame._bflInitialized = true
-				end
-			end
-
-			-- Use Blizzard's rewards frame
+		local nativeHasRAFInfo = PrepareNativeRewardsFrame(not RecruitAFriendRewardsFrame or not RecruitAFriendRewardsFrame:IsShown())
+		if RecruitAFriendRewardsFrame and nativeHasRAFInfo then
 			if RecruitAFriendRewardsFrame:IsShown() then
-				RecruitAFriendRewardsFrame:Hide()
+				CallBlizzardMethod(RecruitAFriendRewardsFrame, RecruitAFriendRewardsFrame.Hide)
 			else
-				-- Set up tabs and refresh (Blizzard does this in UpdateRAFInfo)
-				if frame.rafInfo then
-					if RecruitAFriendRewardsFrame.SetUpTabs then
-						RecruitAFriendRewardsFrame:SetUpTabs(frame.rafInfo)
-					end
-
-					if RecruitAFriendRewardsFrame.Refresh then
-						RecruitAFriendRewardsFrame:Refresh()
-					end
+				CallBlizzardMethod(RecruitAFriendRewardsFrame, RecruitAFriendRewardsFrame.Show)
+				PrepareNativeRewardsFrame(true)
+				if RecruitAFriendRecruitmentFrame and StaticPopupSpecial_Hide then
+					CallBlizzardFunction(StaticPopupSpecial_Hide, RecruitAFriendRecruitmentFrame)
 				end
-
-				RecruitAFriendRewardsFrame:Show()
-				PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
-				StaticPopupSpecial_Hide(RecruitAFriendRecruitmentFrame)
 			end
 		else
 			-- Fallback: Display rewards info in chat
@@ -1428,35 +1705,26 @@ function RAF:DisplayRewardsInChat(rafInfo)
 end
 
 function RAF:RecruitmentButton_OnClick(button)
-	-- Ensure Blizzard's RAF addon is loaded
-	if not RecruitAFriendRecruitmentFrame then
-		LoadAddOn("Blizzard_RecruitAFriend")
-	end
-
-	if not RecruitAFriendRecruitmentFrame then
+	if not LoadBlizzardRecruitAFriend() then
 		return
 	end
 
-	-- Ensure Blizzard's RecruitAFriendFrame has data so the recruitment frame works
-	if RecruitAFriendFrame then
-		local frame = BetterFriendsFrame and BetterFriendsFrame.RecruitAFriendFrame
-		if frame and frame.rafInfo then
-			RecruitAFriendFrame.rafInfo = frame.rafInfo
-			RecruitAFriendFrame.rafEnabled = true
-		end
+	local nativeButton = RecruitAFriendFrame and RecruitAFriendFrame.RecruitmentButton
+	if ClickNativeRAFButton(nativeButton, RecruitAFriendRecruitmentButtonMixin) then
+		return
 	end
 
 	-- Toggle recruitment frame (exact Blizzard logic)
 	if RecruitAFriendRecruitmentFrame:IsShown() then
-		StaticPopupSpecial_Hide(RecruitAFriendRecruitmentFrame)
+		CallBlizzardFunction(StaticPopupSpecial_Hide, RecruitAFriendRecruitmentFrame)
 	else
-		C_RecruitAFriend.RequestUpdatedRecruitmentInfo()
+		CallBlizzardFunction(C_RecruitAFriend.RequestUpdatedRecruitmentInfo)
 
 		-- Hide rewards frame if shown
 		if RecruitAFriendRewardsFrame then
-			RecruitAFriendRewardsFrame:Hide()
+			CallBlizzardMethod(RecruitAFriendRewardsFrame, RecruitAFriendRewardsFrame.Hide)
 		end
 
-		StaticPopupSpecial_Show(RecruitAFriendRecruitmentFrame)
+		CallBlizzardFunction(StaticPopupSpecial_Show, RecruitAFriendRecruitmentFrame)
 	end
 end

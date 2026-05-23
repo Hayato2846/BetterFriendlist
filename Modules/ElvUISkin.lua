@@ -1421,6 +1421,34 @@ function ElvUISkin:SkinSettings(E, S)
 			end
 		end
 
+		local function SkinFilterSortEditor()
+			local editor = _G.BetterFriendlistFilterSortEditorFrame
+			if not editor then
+				return
+			end
+
+			if not editor.BFL_ElvFrameSkinned then
+				S:HandlePortraitFrame(editor)
+				if editor.Inset then
+					editor.Inset:StripTextures()
+					editor.Inset:CreateBackdrop("Transparent")
+				end
+				editor.BFL_ElvFrameSkinned = true
+			end
+
+			if editor.ScrollFrame then
+				if editor.ScrollFrame.ScrollBar then
+					SkinScrollBar(S, editor.ScrollFrame.ScrollBar)
+				else
+					for _, child in ipairs({ editor.ScrollFrame:GetChildren() }) do
+						if child:IsObjectType("Slider") then
+							S:HandleScrollBar(child)
+						end
+					end
+				end
+			end
+		end
+
 		-- Hook RefreshCategories to skin the new vertical buttons
 		hooksecurefunc(Settings, "RefreshCategories", function()
 			local frame = _G.BetterFriendlistSettingsFrame
@@ -1461,6 +1489,8 @@ function ElvUISkin:SkinSettings(E, S)
 				SkinEditBoxesInTab(content.GeneralTab)
 			end
 		end)
+		hooksecurefunc(Settings, "EnsureFilterSortEditorPanel", SkinFilterSortEditor)
+		hooksecurefunc(Settings, "RefreshFilterSortTab", SkinFilterSortEditor)
 
 		-- Hook Global Sync Tab (Point 5: Skin dynamic headers and buttons)
 		hooksecurefunc(Settings, "RefreshGlobalSyncTab", function()

@@ -45,30 +45,30 @@ local defaults = {
 	-- Font Customization (LibSharedMedia)
 	fontFriendName = "Friz Quadrata TT",
 	fontSizeFriendName = 12,
-	fontOutlineFriendName = "NONE",
+	fontOutlineFriendName = "SLUG",
 	fontShadowFriendName = false,
 	fontColorFriendName = { r = 0.510, g = 0.773, b = 1.0, a = 1 }, -- Blizzard BNet Blue {r=0.51, g=0.773, b=1.0}
 	fontFriendInfo = "Friz Quadrata TT",
 	fontSizeFriendInfo = 10,
-	fontOutlineFriendInfo = "NONE",
+	fontOutlineFriendInfo = "SLUG",
 	fontShadowFriendInfo = false,
 	fontColorFriendInfo = { r = 0.510, g = 0.510, b = 0.510, a = 1 }, -- Blizzard Gray {r=0.51, g=0.51, b=0.51}
 	-- Tab Font Customization
 	fontTabText = "Friz Quadrata TT",
 	fontSizeTabText = 12,
-	fontOutlineTabText = "NONE",
+	fontOutlineTabText = "SLUG",
 	fontShadowTabText = false,
 	fontColorTabText = { r = 1.0, g = 0.82, b = 0.0, a = 1 }, -- Normal/Highlight yellow {r=1.0, g=0.82, b=0}
 	-- Raid Name Font Customization
 	fontRaidName = "Friz Quadrata TT",
 	fontSizeRaidName = 12,
-	fontOutlineRaidName = "NONE",
+	fontOutlineRaidName = "SLUG",
 	fontShadowRaidName = false,
 	fontColorRaidName = { r = 1.0, g = 0.82, b = 0.0, a = 1 }, -- Class color override usually applies, but default valid
 	-- Group Header Font Customization
 	fontGroupHeader = "Friz Quadrata TT",
 	fontSizeGroupHeader = 12,
-	fontOutlineGroupHeader = "NONE",
+	fontOutlineGroupHeader = "SLUG",
 	fontShadowGroupHeader = false,
 	colorGroupCount = nil, -- Default: nil (Inherit from Group Color)
 	colorGroupArrow = nil, -- Default: nil (Inherit from Group Color)
@@ -109,7 +109,15 @@ local defaults = {
 	primarySort = "status", -- Primary sort method: status, name, level, zone (default: status)
 	secondarySort = "name", -- Secondary sort method: none, name, level, zone (default: name)
 	-- Filter Settings
-	quickFilter = "all", -- Quick filter mode: all, online, offline, wow, bnet, hideafk, retail, ingame (default: all)
+	quickFilter = "all", -- Quick filter mode: all, online, offline, wowonline, wow, bnet, hideafk, retail, ingame (default: all)
+	customQuickFilters = {}, -- User-created QuickFilter definitions (account-wide)
+	quickFilterVisibility = {}, -- {filterId: boolean}; nil means visible
+	quickFilterOrder = {}, -- Ordered list of built-in and custom QuickFilter IDs
+	nextCustomQuickFilterId = 1,
+	customSorters = {}, -- User-created sorter definitions (account-wide)
+	sorterVisibility = {}, -- {sorterId: boolean}; nil means visible
+	sorterOrder = {}, -- Ordered list of built-in and custom sorter IDs
+	nextCustomSorterId = 1,
 	-- Streamer Mode
 	streamerModeActive = false, -- Enable Streamer Mode (default: OFF)
 	showStreamerModeButton = true, -- Show Streamer Mode button (default: ON)
@@ -142,6 +150,7 @@ local defaults = {
 	brokerShowHints = true, -- Show hint text in LDB tooltip footer (default: ON)
 	brokerFont = "Friz Quadrata TT", -- Broker tooltip font face
 	brokerFontSize = 12, -- Broker tooltip font size
+	brokerFontFlags = "SLUG", -- Broker tooltip font rendering flags
 	brokerUseCustomFontForNonLatin = false, -- Use selected broker tooltip font for non-latin alphabets (default: OFF)
 	brokerShowColStatus = false, -- Column: Status icon (default: OFF)
 	brokerGroupHeaderAlign = "LEFT", -- Friends Broker group header alignment: LEFT/CENTER/RIGHT
@@ -311,6 +320,10 @@ function DB:NormalizeThemeSetting()
 	if not VALID_THEMES[BetterFriendlistDB.theme] then
 		BetterFriendlistDB.theme = "blizzard"
 	end
+
+	if BetterFriendlistDB.theme ~= "blizzard" and BetterFriendlistDB.enableBetaFeatures ~= true then
+		BetterFriendlistDB.theme = "blizzard"
+	end
 end
 
 function DB:Initialize()
@@ -330,6 +343,39 @@ function DB:Initialize()
 	end
 
 	self:NormalizeThemeSetting()
+
+	-- MIGRATION: Move the temporary global Slug toggle into per-font flag settings.
+	-- Also enables Slug by default for existing profiles while preserving any outline flags.
+	if not BetterFriendlistDB.fontFlagsMigratedToPerFont then
+		local fontFlagKeys = {
+			"fontOutlineFriendName",
+			"fontOutlineFriendInfo",
+			"fontOutlineTabText",
+			"fontOutlineRaidName",
+			"fontOutlineGroupHeader",
+			"brokerFontFlags",
+		}
+		local useSlug = BetterFriendlistDB.fontUseSlugRendering
+		if useSlug == nil then
+			useSlug = true
+		end
+
+		for _, key in ipairs(fontFlagKeys) do
+			local flags = BetterFriendlistDB[key]
+			if useSlug then
+				flags = BFL.FontManager and BFL.FontManager.AddFontFlag and BFL.FontManager:AddFontFlag(flags, "SLUG")
+					or "SLUG"
+			elseif BFL.FontManager and BFL.FontManager.RemoveFontFlag then
+				flags = BFL.FontManager:RemoveFontFlag(flags, "SLUG")
+			end
+			if flags ~= nil then
+				BetterFriendlistDB[key] = flags
+			end
+		end
+
+		BetterFriendlistDB.fontUseSlugRendering = nil
+		BetterFriendlistDB.fontFlagsMigratedToPerFont = true
+	end
 
 	-- MIGRATION (BEFORE defaults): Migrate nameDisplayFormat to preset system
 	-- Runs whenever nameFormatPreset is missing but old nameDisplayFormat exists.

@@ -12,6 +12,14 @@ local BACKDROP = {
 	insets = { left = 1, right = 1, top = 1, bottom = 1 },
 }
 
+local DARK_SCROLLBAR_WIDTH = 22
+
+local function ApplyDefaultSlugToFontString(fontString)
+	if BFL.FontManager and BFL.FontManager.ApplyDefaultSlugToFontString then
+		BFL.FontManager:ApplyDefaultSlugToFontString(fontString)
+	end
+end
+
 local COLORS = {
 	panel = { 0.000, 0.000, 0.000, 0.68 },
 	popup = { 0.000, 0.000, 0.000, 0.78 },
@@ -27,8 +35,11 @@ local COLORS = {
 	sliderTrack = { 0.000, 0.000, 0.000, 0.46 },
 	sliderThumb = { 1.0, 0.82, 0.0, 0.92 },
 	scrollThumb = { 0.42, 0.42, 0.44, 0.78 },
+	scrollThumbHover = { 0.62, 0.62, 0.64, 0.90 },
+	scrollThumbDown = { 1.0, 0.82, 0.0, 0.86 },
 	row = { 0.000, 0.000, 0.000, 0.00 },
 	rowHover = { 1.0, 0.82, 0.0, 0.10 },
+	rowDown = { 1.0, 0.82, 0.0, 0.14 },
 	border = { 0.34, 0.34, 0.36, 0.82 },
 	borderSoft = { 0.22, 0.22, 0.24, 0.58 },
 	borderMuted = { 0.13, 0.13, 0.14, 0.38 },
@@ -221,6 +232,56 @@ local function IsTravelPassButton(button)
 	return TextureMatches(normal, "friendslist%-invitebutton") or TextureMatches(normal, "travelpass%-invite")
 end
 
+local function IsRAFNativeRewardButton(button)
+	if not button or not IsObjectType(button, "Button") then
+		return false
+	end
+
+	local parent = button.GetParent and button:GetParent()
+	return parent and (parent.NextRewardInfoButton == button or parent.NextRewardButton == button)
+end
+
+local function IsRAFActivityButton(button)
+	if not button or not IsObjectType(button, "Button") then
+		return false
+	end
+
+	local parent = button.GetParent and button:GetParent()
+	local activities = parent and parent.Activities
+	if not activities then
+		return false
+	end
+
+	for i = 1, #activities do
+		if activities[i] == button then
+			return true
+		end
+	end
+
+	return false
+end
+
+local function IsRAFNativeTextureButton(button)
+	return IsRAFNativeRewardButton(button) or IsRAFActivityButton(button)
+end
+
+local function IsButtonChromeSuppressed(button)
+	if not button or not IsObjectType(button, "Button") then
+		return false
+	end
+
+	if button.BFL_DarkNoButtonChrome or button.BFL_DarkInvisibleOverlayButton then
+		return true
+	end
+
+	local parent = button.GetParent and button:GetParent()
+	return parent
+		and (
+			parent.gameIconOverlay == button
+			or (IsObjectType(parent, "EditBox") and (parent.clearButton == button or parent.ClearButton == button))
+		)
+end
+
 local function CopyColor(color)
 	if not color then
 		return nil
@@ -245,6 +306,28 @@ local function IsControlEnabled(frame)
 	end
 
 	return true
+end
+
+local function IsScrollBarFrame(frame)
+	if not frame or IsForbidden(frame) then
+		return false
+	end
+
+	local lowerName = LowerName(frame)
+	if lowerName:find("scrollbar") then
+		return true
+	end
+
+	if frame.Back and frame.Forward and frame.Track then
+		return true
+	end
+	if frame.ScrollUpButton or frame.ScrollDownButton then
+		return true
+	end
+
+	local parent = frame.GetParent and frame:GetParent()
+	return parent
+		and (parent.ScrollBar == frame or parent.ClassicScrollBar == frame or parent.MinimalScrollBar == frame)
 end
 
 local function SetButtonOverlayAlpha(button, alpha)
@@ -324,6 +407,15 @@ local function SetButtonHoverIcon(button, alpha, color)
 	end
 end
 
+local function SetBackdropColors(backdrop, bgColor, borderColor)
+	if not backdrop or not backdrop.SetBackdropColor then
+		return
+	end
+
+	backdrop:SetBackdropColor(UnpackColor(bgColor))
+	backdrop:SetBackdropBorderColor(UnpackColor(borderColor or COLORS.borderNone))
+end
+
 local function ConfigureBackdropLine(backdrop, key, point, color)
 	if not backdrop or not backdrop.CreateTexture then
 		return
@@ -385,7 +477,7 @@ local function ApplyBackdropLines(backdrop, variant)
 end
 
 function SkinEngine:IsActive()
-	return self.active == true and BFL:IsThemeActive("dark")
+	return self.active == true and BFL.IsThemeActive and BFL:IsThemeActive("dark")
 end
 
 function SkinEngine:Activate()
@@ -393,6 +485,10 @@ function SkinEngine:Activate()
 end
 
 function SkinEngine:Deactivate()
+	if self.active ~= true and not next(self.registry) then
+		return
+	end
+
 	self.active = false
 	self:RestoreAll()
 end
@@ -406,10 +502,17 @@ function SkinEngine:GetState(frame)
 		state = {
 			textureAlpha = {},
 			fontColors = {},
+			shown = {},
 			backdrops = {},
 			overlays = {},
 		}
 		frame.BFL_DarkSkin = state
+	else
+		state.textureAlpha = state.textureAlpha or {}
+		state.fontColors = state.fontColors or {}
+		state.shown = state.shown or {}
+		state.backdrops = state.backdrops or {}
+		state.overlays = state.overlays or {}
 	end
 	self.registry[frame] = true
 	return state
@@ -508,6 +611,32 @@ function SkinEngine:SetTextureAlpha(frame, texture, alpha)
 	texture:SetAlpha(alpha)
 end
 
+function SkinEngine:RememberShown(frame, object)
+	if not object or not object.IsShown then
+		return
+	end
+
+	local state = self:GetState(frame)
+	if state and state.shown[object] == nil then
+		state.shown[object] = object:IsShown() == true
+	end
+end
+
+function SkinEngine:SetObjectShown(frame, object, shown)
+	if not object then
+		return
+	end
+
+	self:RememberShown(frame, object)
+	if object.SetShown then
+		object:SetShown(shown == true)
+	elseif shown and object.Show then
+		object:Show()
+	elseif not shown and object.Hide then
+		object:Hide()
+	end
+end
+
 function SkinEngine:ClearTextureObject(owner, texture, alpha)
 	if not texture then
 		return
@@ -603,6 +732,9 @@ function SkinEngine:CreateBackdrop(frame, variant, insets)
 	elseif variant == "control" or variant == "button" or variant == "dropdown" or variant == "editbox" or variant == "nav" then
 		bg = COLORS.control
 		border = COLORS.controlBorder
+	elseif variant == "nativeButton" then
+		bg = COLORS.borderNone
+		border = COLORS.borderSoft
 	elseif variant == "icon" then
 		bg = COLORS.borderNone
 		border = COLORS.borderNone
@@ -838,6 +970,12 @@ function SkinEngine:ApplyButtonState(button, interactionState)
 	if not self:IsActive() or not button or IsForbidden(button) then
 		return
 	end
+	if IsButtonChromeSuppressed(button) then
+		if button.BFL_DarkBackdrop then
+			button.BFL_DarkBackdrop:Hide()
+		end
+		return
+	end
 
 	local selectedTab = button.BFL_DarkTabButton and self:IsTabSelected(button)
 	if button.BFL_DarkTabButton then
@@ -862,6 +1000,19 @@ function SkinEngine:ApplyButtonState(button, interactionState)
 		SetButtonIconBlendMode(button, enabled and interactionState == "hover" and "ADD" or "BLEND")
 		SetButtonHoverIcon(button, enabled and interactionState == "hover" and 0.85 or 0, iconColor)
 		SetButtonOverlayAlpha(button, enabled and 1 or 0.35)
+		return
+	end
+	if button.BFL_DarkTravelPassButton then
+		local border = COLORS.borderSoft
+		if not enabled then
+			border = COLORS.controlBorderDisabled
+		elseif interactionState == "down" then
+			border = COLORS.accent
+		elseif interactionState == "hover" then
+			border = COLORS.controlBorderHover
+		end
+
+		self:StyleBackdrop(button, COLORS.borderNone, border)
 		return
 	end
 	if button.BFL_DarkArrowButton then
@@ -902,7 +1053,11 @@ function SkinEngine:ApplyButtonState(button, interactionState)
 			self:SetFontColor(button, fs, UnpackColor(COLORS.disabledText))
 		end
 	end
-	SetButtonOverlayAlpha(button, enabled and 1 or 0.35)
+	local overlayAlpha = enabled and 1 or 0.35
+	if button.BFL_DarkScrollStepper then
+		overlayAlpha = enabled and 1 or 0.82
+	end
+	SetButtonOverlayAlpha(button, overlayAlpha)
 end
 
 function SkinEngine:InstallButtonHooks(button)
@@ -984,6 +1139,14 @@ function SkinEngine:SkinButton(button, opts)
 	if not self:IsActive() or not button or IsForbidden(button) then
 		return
 	end
+	if IsButtonChromeSuppressed(button) then
+		self:RestoreFrame(button)
+		return
+	end
+	if IsRAFNativeTextureButton(button) then
+		self:SkinNativeTextureButton(button)
+		return
+	end
 	if IsTravelPassButton(button) then
 		self:SkinTravelPassButton(button)
 		return
@@ -1051,10 +1214,10 @@ function SkinEngine:SkinIconButton(button, iconPath, opts)
 	self:StyleBackdrop(button, COLORS.borderNone, COLORS.borderNone)
 
 	if button.BFL_DarkCloseText then
-		button.BFL_DarkCloseText:Hide()
+		self:SetObjectShown(button, button.BFL_DarkCloseText, false)
 	end
 	if button.BFL_DarkArrowText then
-		button.BFL_DarkArrowText:Hide()
+		self:SetObjectShown(button, button.BFL_DarkArrowText, false)
 	end
 
 	local icon = opts.texture or button.BFL_DarkIcon
@@ -1128,14 +1291,73 @@ function SkinEngine:SkinIconButton(button, iconPath, opts)
 	self:ApplyButtonState(button)
 end
 
+function SkinEngine:SkinNativeTextureButton(button)
+	if not self:IsActive() or not button or IsForbidden(button) then
+		return
+	end
+
+	button.BFL_DarkNativeTextureButton = true
+	button.BFL_DarkBorderlessIconButton = nil
+	button.BFL_DarkTravelPassButton = nil
+
+	if button.BFL_DarkBackdrop then
+		button.BFL_DarkBackdrop:Hide()
+	end
+	if button.BFL_DarkDropdownIndicator then
+		button.BFL_DarkDropdownIndicator:Hide()
+	end
+	if button.BFL_DarkTravelPassIcon then
+		self:SetTextureAlpha(button, button.BFL_DarkTravelPassIcon, 0)
+		button.BFL_DarkTravelPassIcon:Hide()
+	end
+	if button.BFL_DarkIcon == button.BFL_DarkTravelPassIcon then
+		button.BFL_DarkIcon = nil
+	end
+
+	local textures = {}
+	local function addTexture(texture)
+		if texture then
+			textures[#textures + 1] = texture
+		end
+	end
+	addTexture(button.NormalTexture)
+	addTexture(button.PushedTexture)
+	addTexture(button.DisabledTexture)
+	addTexture(button.HighlightTexture)
+	if button.GetNormalTexture then
+		addTexture(button:GetNormalTexture())
+	end
+	if button.GetPushedTexture then
+		addTexture(button:GetPushedTexture())
+	end
+	if button.GetDisabledTexture then
+		addTexture(button:GetDisabledTexture())
+	end
+	if button.GetHighlightTexture then
+		addTexture(button:GetHighlightTexture())
+	end
+	addTexture(button.Icon)
+	addTexture(button.IconBorder)
+	addTexture(button.LetterI)
+
+	for _, texture in ipairs(textures) do
+		if texture then
+			self:SetTextureAlpha(button, texture, 1)
+		end
+	end
+end
+
 function SkinEngine:SkinTravelPassButton(button)
 	if not self:IsActive() or not button or IsForbidden(button) then
 		return
 	end
 
-	if button.BFL_DarkBackdrop then
-		button.BFL_DarkBackdrop:Hide()
+	button.BFL_DarkTravelPassButton = true
+	self:CreateBackdrop(button, "nativeButton", { left = 0, right = 0, top = 0, bottom = 0 })
+	if button.BFL_DarkBackdrop and button.GetFrameLevel then
+		button.BFL_DarkBackdrop:SetFrameLevel((button:GetFrameLevel() or 1) + 1)
 	end
+
 	if button.BFL_DarkDropdownIndicator then
 		button.BFL_DarkDropdownIndicator:Hide()
 	end
@@ -1164,6 +1386,17 @@ function SkinEngine:SkinTravelPassButton(button)
 			self:SetTextureAlpha(button, texture, 1)
 		end
 	end
+
+	if button.BFL_DarkTravelPassIcon then
+		self:SetTextureAlpha(button, button.BFL_DarkTravelPassIcon, 0)
+		button.BFL_DarkTravelPassIcon:Hide()
+	end
+	if button.BFL_DarkIcon == button.BFL_DarkTravelPassIcon then
+		button.BFL_DarkIcon = nil
+	end
+
+	self:InstallButtonHooks(button)
+	self:ApplyButtonState(button)
 end
 
 function SkinEngine:SkinNavigationButton(button)
@@ -1343,6 +1576,9 @@ function SkinEngine:HideArrowButtonTextures(button)
 	if button.Texture then
 		self:SetTextureAlpha(button, button.Texture, 0)
 	end
+	if button.BFL_DarkArrowIcon then
+		self:SetTextureAlpha(button, button.BFL_DarkArrowIcon, 1)
+	end
 end
 
 function SkinEngine:PositionArrowButtonIcon(button, direction)
@@ -1355,15 +1591,13 @@ function SkinEngine:PositionArrowButtonIcon(button, direction)
 		return
 	end
 
-	direction = direction or button.BFL_DarkArrowDirection or "down"
-	icon:ClearAllPoints()
-	if button.BFL_DarkScrollStepper and direction == "up" then
-		icon:SetPoint("TOP", button, "TOP", 0, -1)
-	elseif button.BFL_DarkScrollStepper and direction == "down" then
-		icon:SetPoint("BOTTOM", button, "BOTTOM", 0, 0)
-	else
-		icon:SetPoint("CENTER", button, "CENTER", 0, 0)
+	local anchor = button
+	if button.BFL_DarkScrollStepper and button.BFL_DarkBackdrop then
+		anchor = button.BFL_DarkBackdrop
 	end
+
+	icon:ClearAllPoints()
+	icon:SetPoint("CENTER", anchor, "CENTER", 0, 0)
 
 	if icon.SetDrawLayer then
 		icon:SetDrawLayer("OVERLAY", 7)
@@ -1377,6 +1611,9 @@ function SkinEngine:RefreshArrowButton(button)
 	end
 
 	self:HideArrowButtonTextures(button)
+	if button.BFL_DarkArrowIcon then
+		self:SetTextureAlpha(button, button.BFL_DarkArrowIcon, 1)
+	end
 	self:PositionArrowButtonIcon(button)
 end
 
@@ -1414,11 +1651,13 @@ function SkinEngine:SkinArrowButton(button, direction)
 
 	button.BFL_DarkArrowButton = true
 	button.BFL_DarkArrowDirection = direction or "down"
-	self:SkinButton(button, { insets = { left = 3, right = 3, top = -3, bottom = 3 }, keepFontColor = true })
+	local insets = button.BFL_DarkScrollStepper and { left = 3, right = 3, top = 0, bottom = 0 }
+		or { left = 3, right = 3, top = -3, bottom = 3 }
+	self:SkinButton(button, { insets = insets, keepFontColor = true })
 	self:HideArrowButtonTextures(button)
 
 	if button.BFL_DarkArrowText then
-		button.BFL_DarkArrowText:Hide()
+		self:SetObjectShown(button, button.BFL_DarkArrowText, false)
 	end
 
 	local icon = button.BFL_DarkArrowIcon
@@ -1440,8 +1679,85 @@ function SkinEngine:SkinArrowButton(button, direction)
 	self:RefreshArrowButton(button)
 end
 
+function SkinEngine:SkinCompactCheckButton(checkButton)
+	if not self:IsActive() or not checkButton or IsForbidden(checkButton) then
+		return
+	end
+
+	if checkButton.BFL_DarkBackdrop then
+		checkButton.BFL_DarkBackdrop:Hide()
+	end
+
+	local marker = checkButton.BFL_DarkCheckMarker
+	if not marker and CreateFrame then
+		local template = BackdropTemplateMixin and "BackdropTemplate" or nil
+		marker = CreateFrame("Frame", nil, checkButton, template)
+		marker:EnableMouse(false)
+		if marker.SetBackdrop then
+			marker:SetBackdrop(BACKDROP)
+		end
+		checkButton.BFL_DarkCheckMarker = marker
+		self:RegisterOverlay(checkButton, marker)
+	end
+
+	if marker then
+		marker:ClearAllPoints()
+		marker:SetPoint("CENTER", checkButton, "CENTER", -1, 0)
+		marker:SetSize(14, 14)
+		marker:SetFrameLevel(math.max((checkButton:GetFrameLevel() or 1) - 1, 0))
+		SetBackdropColors(marker, COLORS.controlDown, COLORS.controlBorder)
+		marker:Show()
+	end
+
+	if checkButton.GetNormalTexture then
+		self:SetTextureAlpha(checkButton, checkButton:GetNormalTexture(), 0)
+	end
+	if checkButton.GetPushedTexture then
+		self:SetTextureAlpha(checkButton, checkButton:GetPushedTexture(), 0)
+	end
+	if checkButton.GetDisabledTexture then
+		self:SetTextureAlpha(checkButton, checkButton:GetDisabledTexture(), 0)
+	end
+	if checkButton.GetHighlightTexture then
+		self:SetTextureAlpha(checkButton, checkButton:GetHighlightTexture(), 0.10)
+	end
+
+	local checkedTexture = checkButton.GetCheckedTexture and checkButton:GetCheckedTexture()
+	if checkedTexture then
+		checkedTexture:ClearAllPoints()
+		checkedTexture:SetPoint("CENTER", marker or checkButton, "CENTER", 0, 0)
+		checkedTexture:SetSize(16, 16)
+		checkedTexture:SetVertexColor(UnpackColor(COLORS.gold))
+		self:SetTextureAlpha(checkButton, checkedTexture, 1)
+	end
+
+	local disabledCheckedTexture = checkButton.GetDisabledCheckedTexture and checkButton:GetDisabledCheckedTexture()
+	if disabledCheckedTexture then
+		disabledCheckedTexture:ClearAllPoints()
+		disabledCheckedTexture:SetPoint("CENTER", marker or checkButton, "CENTER", 0, 0)
+		disabledCheckedTexture:SetSize(16, 16)
+		disabledCheckedTexture:SetVertexColor(UnpackColor(COLORS.disabledText))
+		self:SetTextureAlpha(checkButton, disabledCheckedTexture, 0.85)
+	end
+
+	local text = checkButton.Text or _G[GetName(checkButton) .. "Text"]
+	if text then
+		self:SetFontColor(checkButton, text, 0.88, 0.88, 0.88, 1)
+	end
+end
+
 function SkinEngine:SkinCheckButton(checkButton)
 	if not self:IsActive() or not checkButton or IsForbidden(checkButton) then
+		return
+	end
+
+	if checkButton.BFL_DarkCompactCheckButton then
+		self:SkinCompactCheckButton(checkButton)
+		return
+	end
+
+	if checkButton.BFL_DarkNoCheckChrome or checkButton.BFL_DarkNoButtonChrome then
+		self:RestoreFrame(checkButton)
 		return
 	end
 
@@ -1487,6 +1803,12 @@ function SkinEngine:SkinEditBox(editBox)
 
 	if editBox.SetTextColor then
 		editBox:SetTextColor(0.92, 0.92, 0.92, 1)
+	end
+
+	local clearButton = editBox.clearButton or editBox.ClearButton
+	if clearButton then
+		clearButton.BFL_DarkNoButtonChrome = true
+		self:RestoreFrame(clearButton)
 	end
 
 end
@@ -1613,10 +1935,12 @@ function SkinEngine:RenderCustomDropdown(dropdown)
 			button = CreateFrame("Button", nil, menu, template)
 			button:SetHeight(rowHeight)
 			button.Check = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+			ApplyDefaultSlugToFontString(button.Check)
 			button.Check:SetPoint("LEFT", button, "LEFT", 6, 0)
 			button.Check:SetWidth(16)
 			button.Check:SetJustifyH("CENTER")
 			button.Text = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+			ApplyDefaultSlugToFontString(button.Text)
 			button.Text:SetPoint("LEFT", button.Check, "RIGHT", 4, 0)
 			button.Text:SetPoint("RIGHT", button, "RIGHT", -6, 0)
 			button.Text:SetJustifyH("LEFT")
@@ -1859,16 +2183,164 @@ function SkinEngine:SkinScrollTextureThumb(scrollBar, thumb)
 		end
 		if marker.SetBackdrop then
 			marker:SetBackdrop(BACKDROP)
-			marker:SetBackdropColor(UnpackColor(COLORS.scrollThumb))
-			marker:SetBackdropBorderColor(UnpackColor(COLORS.borderNone))
+			SetBackdropColors(marker, COLORS.scrollThumb, COLORS.borderNone)
 		end
 		marker:Show()
+	end
+end
+
+function SkinEngine:ApplyScrollThumbState(scrollBar, thumb, interactionState)
+	if not self:IsActive() or not scrollBar or IsForbidden(scrollBar) then
+		return
+	end
+
+	if scrollBar.BFL_DarkScrollThumbDragging then
+		interactionState = "down"
+	elseif not interactionState and scrollBar.BFL_DarkScrollThumbOver then
+		interactionState = "hover"
+	end
+
+	local color = COLORS.scrollThumb
+	if interactionState == "down" then
+		color = COLORS.scrollThumbDown
+	elseif interactionState == "hover" then
+		color = COLORS.scrollThumbHover
+	end
+
+	if scrollBar.BFL_DarkScrollThumb then
+		SetBackdropColors(scrollBar.BFL_DarkScrollThumb, color, COLORS.borderNone)
+	elseif thumb and thumb.BFL_DarkBackdrop then
+		SetBackdropColors(thumb.BFL_DarkBackdrop, color, COLORS.borderNone)
+	end
+end
+
+function SkinEngine:InstallScrollThumbHooks(scrollBar, thumb)
+	if not scrollBar or scrollBar.BFL_DarkScrollThumbHooked then
+		return
+	end
+
+	scrollBar.BFL_DarkScrollThumbHooked = true
+	local owner = scrollBar
+	local target = thumb
+
+	local function refresh(interactionState)
+		if SkinEngine:IsActive() then
+			SkinEngine:ApplyScrollThumbState(owner, target, interactionState)
+		end
+	end
+
+	if target and target.HookScript then
+		target:HookScript("OnEnter", function()
+			owner.BFL_DarkScrollThumbOver = true
+			refresh("hover")
+		end)
+		target:HookScript("OnLeave", function()
+			owner.BFL_DarkScrollThumbOver = nil
+			refresh()
+		end)
+		target:HookScript("OnMouseDown", function(_, buttonName)
+			if buttonName == "LeftButton" then
+				owner.BFL_DarkScrollThumbDragging = true
+				refresh("down")
+			end
+		end)
+		target:HookScript("OnMouseUp", function(_, buttonName)
+			if buttonName == "LeftButton" then
+				owner.BFL_DarkScrollThumbDragging = nil
+				owner.BFL_DarkScrollThumbOver = MouseIsOver and MouseIsOver(target)
+				refresh(owner.BFL_DarkScrollThumbOver and "hover" or nil)
+			end
+		end)
+		target:HookScript("OnHide", function()
+			owner.BFL_DarkScrollThumbDragging = nil
+			owner.BFL_DarkScrollThumbOver = nil
+			refresh()
+		end)
+	elseif owner.HookScript then
+		owner:HookScript("OnEnter", function(self)
+			self.BFL_DarkScrollThumbOver = true
+			refresh("hover")
+		end)
+		owner:HookScript("OnLeave", function(self)
+			self.BFL_DarkScrollThumbOver = nil
+			refresh()
+		end)
+		owner:HookScript("OnMouseDown", function(self, buttonName)
+			if buttonName == "LeftButton" then
+				self.BFL_DarkScrollThumbDragging = true
+				refresh("down")
+			end
+		end)
+		owner:HookScript("OnMouseUp", function(self, buttonName)
+			if buttonName == "LeftButton" then
+				self.BFL_DarkScrollThumbDragging = nil
+				self.BFL_DarkScrollThumbOver = MouseIsOver and MouseIsOver(self)
+				refresh(self.BFL_DarkScrollThumbOver and "hover" or nil)
+			end
+		end)
+	end
+
+	if owner.HookScript then
+		owner:HookScript("OnHide", function(self)
+			self.BFL_DarkScrollThumbDragging = nil
+			self.BFL_DarkScrollThumbOver = nil
+			refresh()
+		end)
+	end
+end
+
+function SkinEngine:RefreshScrollBarSteppers(scrollBar)
+	if not self:IsActive() or not scrollBar or IsForbidden(scrollBar) then
+		return
+	end
+
+	for _, button in ipairs({
+		scrollBar.ScrollUpButton,
+		scrollBar.ScrollDownButton,
+		scrollBar.Back,
+		scrollBar.Forward,
+	}) do
+		if button and button.BFL_DarkArrowButton then
+			self:RefreshArrowButton(button)
+			self:ApplyButtonState(button)
+		end
+	end
+end
+
+function SkinEngine:InstallScrollBarStepperHooks(scrollBar)
+	if not scrollBar or scrollBar.BFL_DarkStepperHooksInstalled then
+		return
+	end
+
+	scrollBar.BFL_DarkStepperHooksInstalled = true
+	local function refresh()
+		if SkinEngine:IsActive() then
+			SkinEngine:RefreshScrollBarSteppers(scrollBar)
+		end
+	end
+
+	if scrollBar.HookScript then
+		scrollBar:HookScript("OnShow", refresh)
+		if IsObjectType(scrollBar, "Slider") then
+			scrollBar:HookScript("OnValueChanged", refresh)
+		end
+	end
+
+	if C_Timer and C_Timer.After then
+		C_Timer.After(0, refresh)
 	end
 end
 
 function SkinEngine:SkinScrollBar(scrollBar)
 	if not self:IsActive() or not scrollBar or IsForbidden(scrollBar) then
 		return
+	end
+
+	if scrollBar.BFL_DarkWideScrollbar == nil and self:IsBFLFrame(scrollBar) then
+		scrollBar.BFL_DarkWideScrollbar = true
+	end
+	if scrollBar.BFL_DarkWideScrollbar then
+		self:SetFrameSize(scrollBar, DARK_SCROLLBAR_WIDTH)
 	end
 
 	local trackInsets = scrollBar.BFL_DarkWideScrollbar and { left = 0, right = 0, top = 0, bottom = 0 }
@@ -1890,6 +2362,7 @@ function SkinEngine:SkinScrollBar(scrollBar)
 		self:SkinScrollTextureThumb(scrollBar, thumb)
 	end
 
+	local thumbFrame = thumb
 	if scrollBar.Track then
 		self:DampenRegions(scrollBar.Track, 0)
 		if scrollBar.BFL_DarkWideScrollbar then
@@ -1911,16 +2384,22 @@ function SkinEngine:SkinScrollBar(scrollBar)
 		if scrollBar.BFL_DarkWideScrollbar and scrollBar.Track.Thumb then
 			self:SetFrameSize(scrollBar.Track.Thumb, 12)
 		end
-		self:SkinScrollThumb(scrollBar.Track.Thumb)
+		thumbFrame = scrollBar.Track.Thumb
+		self:SkinScrollThumb(thumbFrame)
 	end
+	self:InstallScrollThumbHooks(scrollBar, thumbFrame)
+	self:ApplyScrollThumbState(scrollBar, thumbFrame)
+	local useInternalStepperLayout = scrollBar.BFL_DarkWideScrollbar and scrollBar.Track
 	if scrollBar.ScrollUpButton then
 		scrollBar.ScrollUpButton.BFL_DarkScrollStepper = true
 		self:SkinArrowButton(scrollBar.ScrollUpButton, "up")
 		if scrollBar.BFL_DarkWideScrollbar then
 			self:SetFrameSize(scrollBar.ScrollUpButton, 18, 16)
-			self:SetFramePoints(scrollBar.ScrollUpButton, {
-				{ "TOP", scrollBar, "TOP", 0, -1 },
-			})
+			if useInternalStepperLayout then
+				self:SetFramePoints(scrollBar.ScrollUpButton, {
+					{ "TOP", scrollBar, "TOP", 0, -1 },
+				})
+			end
 		end
 		self:RefreshArrowButton(scrollBar.ScrollUpButton)
 	end
@@ -1929,9 +2408,11 @@ function SkinEngine:SkinScrollBar(scrollBar)
 		self:SkinArrowButton(scrollBar.ScrollDownButton, "down")
 		if scrollBar.BFL_DarkWideScrollbar then
 			self:SetFrameSize(scrollBar.ScrollDownButton, 18, 16)
-			self:SetFramePoints(scrollBar.ScrollDownButton, {
-				{ "BOTTOM", scrollBar, "BOTTOM", 0, 1 },
-			})
+			if useInternalStepperLayout then
+				self:SetFramePoints(scrollBar.ScrollDownButton, {
+					{ "BOTTOM", scrollBar, "BOTTOM", 0, 1 },
+				})
+			end
 		end
 		self:RefreshArrowButton(scrollBar.ScrollDownButton)
 	end
@@ -1957,6 +2438,8 @@ function SkinEngine:SkinScrollBar(scrollBar)
 		end
 		self:RefreshArrowButton(scrollBar.Forward)
 	end
+	self:InstallScrollBarStepperHooks(scrollBar)
+	self:RefreshScrollBarSteppers(scrollBar)
 end
 
 function SkinEngine:SkinSliderThumb(slider, thumb)
@@ -2042,6 +2525,13 @@ function SkinEngine:SkinColorSwatch(button)
 	self:CreateBackdrop(button, "control", { left = 0, right = 0, top = 0, bottom = 0 })
 end
 
+local function IsGroupHeaderRow(row)
+	return row
+		and row.groupId
+		and not row.friendData
+		and (row.elementData or row.CountText or row.DownArrow or row.RightArrow)
+end
+
 function SkinEngine:SkinRow(row)
 	if not self:IsActive() or not row or IsForbidden(row) then
 		return
@@ -2059,10 +2549,98 @@ function SkinEngine:SkinRow(row)
 		row.BFL_DarkRowBG = row.BG
 		self:SetTextureAlpha(row, row.BG, 0)
 	end
-	if row.HighlightTexture and row.BFL_DarkRowHighlightTexture ~= row.HighlightTexture then
-		row.BFL_DarkRowHighlightTexture = row.HighlightTexture
-		self:SetTextureAlpha(row, row.HighlightTexture, 0.12)
+	local highlight = row.HighlightTexture or (row.GetHighlightTexture and row:GetHighlightTexture())
+	if highlight then
+		if row.BFL_DarkRowHighlightTexture ~= highlight then
+			row.BFL_DarkRowHighlightTexture = highlight
+		end
+		self:SetTextureAlpha(row, highlight, 0)
 	end
+
+	row.BFL_DarkNoRowHighlight = IsGroupHeaderRow(row) or nil
+	if row.BFL_DarkNoRowHighlight then
+		row.BFL_DarkRowMouseDown = nil
+		if row.UnlockHighlight then
+			row:UnlockHighlight()
+		end
+	end
+
+	self:InstallRowHooks(row)
+	local isOver = MouseIsOver and MouseIsOver(row)
+	self:ApplyRowState(row, isOver and "hover" or nil)
+
+	if row.travelPassButton then
+		self:SkinTravelPassButton(row.travelPassButton)
+	end
+	if row.PartyButton then
+		self:SkinTravelPassButton(row.PartyButton)
+	end
+end
+
+function SkinEngine:ApplyRowState(row, interactionState)
+	if not self:IsActive() or not row or IsForbidden(row) then
+		return
+	end
+
+	if row.BFL_DarkNoRowHighlight or IsGroupHeaderRow(row) then
+		row.BFL_DarkNoRowHighlight = true
+		row.BFL_DarkRowMouseDown = nil
+		if row.UnlockHighlight then
+			row:UnlockHighlight()
+		end
+		local highlight = row.HighlightTexture or (row.GetHighlightTexture and row:GetHighlightTexture())
+		if highlight then
+			self:SetTextureAlpha(row, highlight, 0)
+		end
+		self:StyleBackdrop(row, COLORS.row, COLORS.borderNone)
+		return
+	end
+
+	local bg = COLORS.row
+	if row.BFL_DarkRowMouseDown then
+		bg = COLORS.rowDown
+	elseif interactionState == "hover" then
+		bg = COLORS.rowHover
+	end
+
+	self:StyleBackdrop(row, bg, COLORS.borderNone)
+end
+
+function SkinEngine:InstallRowHooks(row)
+	if not row or row.BFL_DarkRowHooked or not row.HookScript then
+		return
+	end
+
+	row.BFL_DarkRowHooked = true
+	row:HookScript("OnEnter", function(self)
+		if SkinEngine:IsActive() then
+			SkinEngine:ApplyRowState(self, "hover")
+		end
+	end)
+	row:HookScript("OnLeave", function(self)
+		if SkinEngine:IsActive() then
+			SkinEngine:ApplyRowState(self)
+		end
+	end)
+	row:HookScript("OnMouseDown", function(self, buttonName)
+		if SkinEngine:IsActive() and buttonName == "LeftButton" then
+			self.BFL_DarkRowMouseDown = true
+			SkinEngine:ApplyRowState(self, "down")
+		end
+	end)
+	row:HookScript("OnMouseUp", function(self, buttonName)
+		if SkinEngine:IsActive() and buttonName == "LeftButton" then
+			self.BFL_DarkRowMouseDown = nil
+			local isOver = MouseIsOver and MouseIsOver(self)
+			SkinEngine:ApplyRowState(self, isOver and "hover" or nil)
+		end
+	end)
+	row:HookScript("OnHide", function(self)
+		self.BFL_DarkRowMouseDown = nil
+		if SkinEngine:IsActive() then
+			SkinEngine:ApplyRowState(self)
+		end
+	end)
 end
 
 function SkinEngine:SkinTooltip(tooltip)
@@ -2153,7 +2731,9 @@ function SkinEngine:SkinTree(root, maxDepth, currentDepth)
 			local objectType = GetObjectType(child)
 			local lowerName = LowerName(child)
 
-			if self:IsDropdownControl(child) then
+			if IsScrollBarFrame(child) then
+				self:SkinScrollBar(child)
+			elseif self:IsDropdownControl(child) then
 				self:SkinDropdown(child)
 			elseif IsObjectType(child, "EditBox") then
 				self:SkinEditBox(child)
@@ -2162,7 +2742,11 @@ function SkinEngine:SkinTree(root, maxDepth, currentDepth)
 			elseif IsObjectType(child, "Slider") then
 				self:SkinSlider(child)
 			elseif IsObjectType(child, "Button") then
-				if lowerName:find("tab") then
+				if IsButtonChromeSuppressed(child) then
+					self:RestoreFrame(child)
+				elseif IsRAFNativeTextureButton(child) then
+					self:SkinNativeTextureButton(child)
+				elseif lowerName:find("tab") then
 					self:SkinTab(child)
 				elseif lowerName:find("close") then
 					self:SkinCloseButton(child)
@@ -2193,6 +2777,10 @@ function SkinEngine:RestoreFrame(frame)
 	if not state then
 		return
 	end
+	state.textureAlpha = state.textureAlpha or {}
+	state.fontColors = state.fontColors or {}
+	state.shown = state.shown or {}
+	state.overlays = state.overlays or {}
 
 	if frame.SetScript and frame.BFL_DarkOriginalOnMouseDownSet then
 		frame:SetScript("OnMouseDown", frame.BFL_DarkOriginalOnMouseDown)
@@ -2252,6 +2840,21 @@ function SkinEngine:RestoreFrame(frame)
 	end
 	wipe(state.textureAlpha)
 
+	if state.shown then
+		for object, shown in pairs(state.shown) do
+			if object then
+				if object.SetShown then
+					object:SetShown(shown == true)
+				elseif shown and object.Show then
+					object:Show()
+				elseif not shown and object.Hide then
+					object:Hide()
+				end
+			end
+		end
+		wipe(state.shown)
+	end
+
 	for fontString, color in pairs(state.fontColors) do
 		if fontString and fontString.SetTextColor then
 			fontString:SetTextColor(color[1], color[2], color[3], color[4] or 1)
@@ -2266,12 +2869,30 @@ function SkinEngine:RestoreFrame(frame)
 	frame.BFL_DarkRowBackground = nil
 	frame.BFL_DarkRowBG = nil
 	frame.BFL_DarkRowHighlightTexture = nil
+	frame.BFL_DarkNoRowHighlight = nil
+	frame.BFL_DarkRowMouseDown = nil
+	frame.BFL_DarkKeepFontColor = nil
+	frame.BFL_DarkBorderlessIconButton = nil
+	frame.BFL_DarkIconColor = nil
+	frame.BFL_DarkIconHoverColor = nil
+	frame.BFL_DarkIconDownColor = nil
+	frame.BFL_DarkArrowButton = nil
+	frame.BFL_DarkArrowDirection = nil
+	frame.BFL_DarkTravelPassButton = nil
+	frame.BFL_DarkNativeTextureButton = nil
+	frame.BFL_DarkScrollStepper = nil
+	frame.BFL_DarkScrollThumbDragging = nil
+	frame.BFL_DarkScrollThumbOver = nil
+	frame.BFL_DarkWideScrollbar = nil
+	frame.BFL_DarkCompactCheckButton = nil
+	frame.BFL_DarkNoCheckChrome = nil
 end
 
 function SkinEngine:RestoreAll()
 	for frame, _ in pairs(self.registry) do
 		self:RestoreFrame(frame)
 	end
+	wipe(self.registry)
 end
 
 return SkinEngine

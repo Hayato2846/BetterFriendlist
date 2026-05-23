@@ -138,6 +138,11 @@ BFL:RegisterLocale("itIT", function()
 	L.SETTINGS_GROUP_ARROW_COLOR = "Arrow Color"
 	L.SETTINGS_TAB_APPEARANCE = "Aspetto"
 	L.SETTINGS_TAB_ADVANCED = "Avanzate"
+	for key, value in pairs(BFL_LOCALE_ENUS) do
+		if key == "SETTINGS_TAB_FILTER_SORT" or key:match("^FILTER_BUILDER_") or key:match("^ICON_SELECTOR_") then
+			L[key] = value
+		end
+	end
 	L.SETTINGS_ADVANCED_DESC = "Opzioni avanzate e strumenti"
 	L.SETTINGS_TAB_STATISTICS = "Statistiche"
 	L.SETTINGS_SHOW_BLIZZARD = "Mostra opzione Elenco Amici Blizzard"
@@ -726,6 +731,7 @@ BFL:RegisterLocale("itIT", function()
 	L.FILTER_ALL = "Tutti"
 	L.FILTER_ONLINE = "Online"
 	L.FILTER_OFFLINE = "Offline"
+	L.FILTER_WOW_ONLINE = "WoW Online"
 	L.FILTER_WOW = "WoW"
 	L.FILTER_BNET = "BNet"
 	L.FILTER_HIDE_AFK = "No AFK"
@@ -1319,6 +1325,10 @@ BFL:RegisterLocale("itIT", function()
 	-- Font Outline/Shadow Settings
 	L.SETTINGS_FONT_OUTLINE = "Font Outline"
 	L.SETTINGS_FONT_SHADOW = "Font Shadow"
+	L.SETTINGS_FONT_FLAGS = "Flag del carattere:"
+	L.SETTINGS_FONT_FLAGS_TOOLTIP =
+		"Scegli uno o più flag di rendering per questo carattere. Slug viene applicato solo sui client supportati."
+	L.SETTINGS_FONT_FLAG_SLUG = "Rendering Slug"
 	L.SETTINGS_FONT_OUTLINE_NONE = "None"
 	L.SETTINGS_FONT_OUTLINE_NORMAL = "Outline"
 	L.SETTINGS_FONT_OUTLINE_THICK = "Contorno Spesso"

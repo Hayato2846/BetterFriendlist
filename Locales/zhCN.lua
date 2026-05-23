@@ -4,6 +4,11 @@
 local ADDON_NAME, BFL = ...
 BFL:RegisterLocale("zhCN", function()
 	local L = BFL_LOCALE
+	for key, value in pairs(BFL_LOCALE_ENUS) do
+		if key == "SETTINGS_TAB_FILTER_SORT" or key:match("^FILTER_BUILDER_") or key:match("^ICON_SELECTOR_") then
+			L[key] = value
+		end
+	end
 	L.SETTINGS_SIMPLE_MODE = "Simple Mode"
 	L.SETTINGS_SIMPLE_MODE_DESC =
 		"禁用玩家肖像，隐藏搜索/排序选项，拓宽框架并移动选项卡以获得紧凑布局。"
@@ -734,6 +739,7 @@ BFL:RegisterLocale("zhCN", function()
 	L.FILTER_ALL = "All"
 	L.FILTER_ONLINE = "Online"
 	L.FILTER_OFFLINE = "Offline"
+	L.FILTER_WOW_ONLINE = "WoW 在线"
 	L.FILTER_WOW = "WoW"
 	L.FILTER_BNET = "BNet"
 	L.FILTER_HIDE_AFK = "No AFK"
@@ -1304,6 +1310,10 @@ BFL:RegisterLocale("zhCN", function()
 	-- Font Outline/Shadow Settings
 	L.SETTINGS_FONT_OUTLINE = "字体轮廓"
 	L.SETTINGS_FONT_SHADOW = "字体阴影"
+	L.SETTINGS_FONT_FLAGS = "字体标志："
+	L.SETTINGS_FONT_FLAGS_TOOLTIP =
+		"为此字体选择一个或多个渲染标志。Slug 仅会在支持的客户端上应用。"
+	L.SETTINGS_FONT_FLAG_SLUG = "Slug 渲染"
 	L.SETTINGS_FONT_OUTLINE_NONE = "无"
 	L.SETTINGS_FONT_OUTLINE_NORMAL = "轮廓"
 	L.SETTINGS_FONT_OUTLINE_THICK = "粗轮廓"

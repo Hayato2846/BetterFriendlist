@@ -1327,14 +1327,9 @@ function RaidFrame:CacheFontSettings()
 	local fontOutline = db.fontOutlineRaidName or "NORMAL"
 	local fontShadow = db.fontShadowRaidName -- boolean
 
-	-- Map outline
-	local outlineValue = ""
-	if fontOutline == "THINOUTLINE" then
-		outlineValue = "OUTLINE"
-	elseif fontOutline == "THICKOUTLINE" then
-		outlineValue = "THICKOUTLINE"
-	elseif fontOutline == "MONOCHROME" then
-		outlineValue = "MONOCHROME"
+	local outlineValue = fontOutline
+	if BFL.FontManager and BFL.FontManager.GetFontFlags then
+		outlineValue = BFL.FontManager:GetFontFlags(outlineValue)
 	end
 
 	-- Resolve path (locale-aware fallback)

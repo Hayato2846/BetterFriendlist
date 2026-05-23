@@ -122,10 +122,11 @@ function BU.GetBrokerFontObject(sizeOffset)
 		local fontPath = BFL.FontManager:ResolveFontPath(fontName)
 		if fontPath then
 			local useCustomNonLatinFont = BetterFriendlistDB and BetterFriendlistDB.brokerUseCustomFontForNonLatin == true
+			local fontFlags = BetterFriendlistDB and BetterFriendlistDB.brokerFontFlags or "SLUG"
 			local fontObject = BFL.FontManager:GetOrCreateFontFamily(
 				fontPath,
 				fontSize,
-				"NONE",
+				fontFlags,
 				false,
 				useCustomNonLatinFont
 			)

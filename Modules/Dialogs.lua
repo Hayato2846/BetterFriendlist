@@ -13,6 +13,12 @@ local L = BFL.L
 -- Register the Dialogs module
 local Dialogs = BFL:RegisterModule("Dialogs", {})
 
+local function ApplyDefaultSlugToFontString(fontString)
+	if BFL.FontManager and BFL.FontManager.ApplyDefaultSlugToFontString then
+		BFL.FontManager:ApplyDefaultSlugToFontString(fontString)
+	end
+end
+
 --------------------------------------------------------------------------
 -- Dialog Registration
 --------------------------------------------------------------------------
@@ -21,6 +27,7 @@ local Dialogs = BFL:RegisterModule("Dialogs", {})
 local function EnsureErrorLabel(dialog)
 	if not dialog.BFL_ErrorLabel then
 		local errorLabel = dialog:CreateFontString(nil, "ARTWORK", "GameFontRedSmall")
+		ApplyDefaultSlugToFontString(errorLabel)
 		errorLabel:SetPoint("TOP", dialog.EditBox, "BOTTOM", 0, 0)
 		errorLabel:SetPoint("LEFT", dialog, "LEFT", 30, 0)
 		errorLabel:SetPoint("RIGHT", dialog, "RIGHT", -30, 0)

@@ -25,6 +25,9 @@ end
 local function GetQuickFilters()
 	return BFL:GetModule("QuickFilters")
 end
+local function GetFilterSortRegistry()
+	return BFL:GetModule("FilterSortRegistry")
+end
 
 -- ========================================
 -- Local Variables
@@ -36,9 +39,6 @@ local updateThrottle = 0
 local lastUpdateTime = 0
 local THROTTLE_INTERVAL = 0.1 -- Update max 10 times per second (crisp but not spammy)
 local pendingDeferredUpdate = false
-
--- Quick filter cycle order (offline removed - tooltip only shows online friends)
-local FILTER_CYCLE = { "all", "online", "wow", "bnet", "ingame" }
 
 -- LibQTip tooltip reference
 local tooltip = nil
@@ -434,6 +434,8 @@ local function PreviewFriendPassesFilter(friend, currentFilter, isOnline)
 		return isOnline
 	elseif currentFilter == "offline" then
 		return not isOnline
+	elseif currentFilter == "wowonline" then
+		return isOnline and (friend.type == "wow" or client == wowClient)
 	elseif currentFilter == "wow" then
 		return isOnline and (friend.type == "wow" or client == wowClient)
 	elseif currentFilter == "bnet" then
@@ -450,6 +452,11 @@ local function PreviewFriendPassesFilter(friend, currentFilter, isOnline)
 			return isOnline
 		end
 		return isOnline and client ~= "" and client ~= "App" and client ~= "BSAp"
+	end
+
+	local Registry = GetFilterSortRegistry()
+	if Registry and Registry.EvaluateQuickFilter then
+		return Registry:EvaluateQuickFilter(currentFilter, friend)
 	end
 
 	return isOnline
@@ -538,12 +545,18 @@ end
 -- total friends as online just because the active filter is "All".
 local function GetFilteredFriendCounts()
 	local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
+	local Registry = GetFilterSortRegistry()
+	if Registry and Registry.NormalizeQuickFilterId then
+		currentFilter = Registry:NormalizeQuickFilterId(currentFilter)
+	end
+	local resolvedFilter = Registry and Registry.ResolveQuickFilter and Registry:ResolveQuickFilter(currentFilter, true)
+	local useRegistryFilter = resolvedFilter and resolvedFilter.isCustom
 
 	if previewData and previewData.friends then
-		return GetPreviewFriendCounts("all")
+		return GetPreviewFriendCounts(currentFilter)
 	end
 
-	if currentFilter == "all" or currentFilter == "online" then
+	if not useRegistryFilter and (currentFilter == "all" or currentFilter == "online") then
 		return GetFriendCounts()
 	end
 
@@ -561,9 +574,29 @@ local function GetFilteredFriendCounts()
 		if friendInfo then
 			local connected = friendInfo.connected
 			local passes = false
+			local friendForRegistry
 
-			if currentFilter == "offline" then
+			if useRegistryFilter then
+				friendForRegistry = {
+					type = "wow",
+					index = i,
+					name = friendInfo.name,
+					characterName = friendInfo.name,
+					connected = connected,
+					level = friendInfo.level,
+					className = friendInfo.className,
+					area = friendInfo.area,
+					realmName = friendInfo.name and select(2, strsplit("-", friendInfo.name)),
+					note = friendInfo.notes,
+					notes = friendInfo.notes,
+					afk = friendInfo.afk,
+					dnd = friendInfo.dnd,
+				}
+				passes = Registry:EvaluateQuickFilter(currentFilter, friendForRegistry)
+			elseif currentFilter == "offline" then
 				passes = not connected
+			elseif currentFilter == "wowonline" then
+				passes = connected
 			elseif currentFilter == "wow" then
 				-- WoW friends always pass "wow" filter if online
 				passes = connected
@@ -592,11 +625,11 @@ local function GetFilteredFriendCounts()
 
 		for i = 1, bnetTotal do
 			local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
-			if accountInfo then
-				local gameInfo = accountInfo.gameAccountInfo or {}
-				local isOnline = gameInfo.isOnline or false
-				local client = gameInfo.clientProgram or "App"
-				local isMobile = (client == "BSAp")
+				if accountInfo then
+					local gameInfo = accountInfo.gameAccountInfo or {}
+					local isOnline = gameInfo.isOnline or false
+					local client = gameInfo.clientProgram or "App"
+					local isMobile = (client == "BSAp")
 
 				if treatMobileAsOffline and isMobile then
 					isOnline = false
@@ -604,8 +637,33 @@ local function GetFilteredFriendCounts()
 
 				local passes = false
 
-				if currentFilter == "offline" then
+				if useRegistryFilter then
+					local friendForRegistry = {
+						type = "bnet",
+						index = i,
+						bnetAccountID = accountInfo.bnetAccountID,
+						accountName = accountInfo.accountName,
+						battleTag = accountInfo.battleTag,
+						connected = isOnline,
+						isAFK = accountInfo.isAFK,
+						isDND = accountInfo.isDND,
+						note = accountInfo.note,
+						customMessage = accountInfo.customMessage,
+						gameAccountInfo = gameInfo,
+						characterName = gameInfo.characterName,
+						level = gameInfo.characterLevel,
+						className = gameInfo.className,
+						areaName = gameInfo.areaName,
+						realmName = gameInfo.realmName,
+						factionName = gameInfo.factionName,
+						gameName = gameInfo.richPresence,
+						numGameAccounts = accountInfo.numGameAccounts,
+					}
+					passes = Registry:EvaluateQuickFilter(currentFilter, friendForRegistry)
+				elseif currentFilter == "offline" then
 					passes = not isOnline
+				elseif currentFilter == "wowonline" then
+					passes = isOnline and (client == BNET_CLIENT_WOW_LOCAL)
 				elseif currentFilter == "wow" then
 					passes = isOnline and (client == BNET_CLIENT_WOW_LOCAL)
 				elseif currentFilter == "bnet" then
@@ -1304,6 +1362,7 @@ local function RenderFixedFooter(footerFrame)
 	local filterIcon = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-all"
 
 	if QuickFilters then
+		currentFilter = QuickFilters:GetFilter()
 		filterText = QuickFilters:GetFilterText() or filterText
 		local icons = QuickFilters:GetIcons()
 		if icons and icons[currentFilter] then
@@ -1311,7 +1370,9 @@ local function RenderFixedFooter(footerFrame)
 		end
 	end
 
-	local filterDisplay = string.format("|T%s:16:16:0:0|t %s", filterIcon, C("ltyellow", filterText))
+	local Registry = GetFilterSortRegistry()
+	local filterIconText = Registry and Registry:FormatIcon(filterIcon, 16) or string.format("|T%s:16:16:0:0|t", filterIcon)
+	local filterDisplay = filterIconText .. " " .. C("ltyellow", filterText)
 	local filterLine = AddLine(L("BROKER_FILTER_LABEL") .. filterDisplay, "GameTooltipText")
 	filterLine:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
 	filterLine:SetPoint("RIGHT", footerFrame, "RIGHT", -10, yOffset)
@@ -1320,37 +1381,13 @@ local function RenderFixedFooter(footerFrame)
 	-- Sort
 	local primarySort = BetterFriendlistDB and BetterFriendlistDB.primarySort or "status"
 	local secondarySort = BetterFriendlistDB and BetterFriendlistDB.secondarySort or "name"
-
-	local sortNames = {
-		status = L("SORT_STATUS"),
-		name = L("SORT_NAME"),
-		level = L("SORT_LEVEL"),
-		zone = L("SORT_ZONE"),
-		game = L("SORT_GAME"),
-		faction = L("SORT_FACTION"),
-		guild = L("SORT_GUILD"),
-		class = L("SORT_CLASS"),
-		realm = L("SORT_REALM"),
-	}
-	local sortIcons = {
-		status = "Interface\\AddOns\\BetterFriendlist\\Icons\\status",
-		name = "Interface\\AddOns\\BetterFriendlist\\Icons\\name",
-		level = "Interface\\AddOns\\BetterFriendlist\\Icons\\level",
-		zone = "Interface\\AddOns\\BetterFriendlist\\Icons\\zone",
-		game = "Interface\\AddOns\\BetterFriendlist\\Icons\\game",
-		faction = "Interface\\AddOns\\BetterFriendlist\\Icons\\faction",
-		guild = "Interface\\AddOns\\BetterFriendlist\\Icons\\guild",
-		class = "Interface\\AddOns\\BetterFriendlist\\Icons\\class",
-		realm = "Interface\\AddOns\\BetterFriendlist\\Icons\\realm",
-	}
-
 	local function GetSortDisplay(mode)
-		local name = sortNames[mode] or mode
-		local icon = sortIcons[mode]
-		if icon then
-			return string.format("|T%s:14:14:0:0|t %s", icon, name)
+		if Registry then
+			local name = Registry:GetSorterText(mode)
+			local icon = Registry:GetSorterIcon(mode)
+			return Registry:FormatIcon(icon, 14) .. " " .. name
 		end
-		return name
+		return mode
 	end
 
 	local sortText = GetSortDisplay(primarySort)
@@ -1886,17 +1923,27 @@ local function CreateLibQTipTooltip(anchorFrame)
 		end
 
 		-- Apply current filter (to online friends only)
-		local currentFilter = previewData and "all" or (BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all")
+		local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
+		local Registry = GetFilterSortRegistry()
+		if Registry and Registry.NormalizeQuickFilterId then
+			currentFilter = Registry:NormalizeQuickFilterId(currentFilter)
+		end
+		local resolvedFilter = Registry and Registry.ResolveQuickFilter and Registry:ResolveQuickFilter(currentFilter, true)
+		local useRegistryFilter = resolvedFilter and resolvedFilter.isCustom
 		if currentFilter ~= "all" then
 			for groupId, groupFriends in pairs(groupedFriends) do
 				local filteredFriends = {}
 				for _, friend in ipairs(groupFriends) do
 					local include = false
 
-					if currentFilter == "online" then
+					if useRegistryFilter and Registry and Registry.EvaluateQuickFilter then
+						include = Registry:EvaluateQuickFilter(currentFilter, friend)
+					elseif currentFilter == "online" then
 						include = true
 					elseif currentFilter == "offline" then
 						include = false
+					elseif currentFilter == "wowonline" then
+						include = friend.connected and (friend.type == "wow" or friend.client == BNET_CLIENT_WOW)
 					elseif currentFilter == "wow" then
 						include = (friend.type == "wow" or friend.client == "WoW")
 					elseif currentFilter == "bnet" then
@@ -1927,6 +1974,11 @@ local function CreateLibQTipTooltip(anchorFrame)
 		local secondarySort = BetterFriendlistDB and BetterFriendlistDB.secondarySort or "name"
 
 		local function CompareFriends(a, b)
+			local SortRegistry = GetFilterSortRegistry()
+			if SortRegistry and SortRegistry.CompareFriends then
+				return SortRegistry:CompareFriends(a, b, primarySort, secondarySort)
+			end
+
 			local function CompareByMode(mode, a, b)
 				if mode == "name" then
 					local nameA = GetFriendDisplayName(a)
@@ -2518,17 +2570,27 @@ function Broker:OnClick(clickedFrame, button)
 		end
 	elseif action == "cycle_filter" then
 		local currentFilter = BetterFriendlistDB.quickFilter or "all"
-		local currentIndex = 1
+		local currentIndex = 0
+		local cycleFilters = {}
+		local Registry = GetFilterSortRegistry()
+		if Registry and Registry.GetVisibleQuickFilters then
+			for _, filter in ipairs(Registry:GetVisibleQuickFilters()) do
+				table.insert(cycleFilters, filter.id)
+			end
+		end
+		if #cycleFilters == 0 then
+			cycleFilters[1] = (Registry and Registry.FALLBACK_FILTER) or "all"
+		end
 
-		for i, filter in ipairs(FILTER_CYCLE) do
+		for i, filter in ipairs(cycleFilters) do
 			if filter == currentFilter then
 				currentIndex = i
 				break
 			end
 		end
 
-		local nextIndex = (currentIndex % #FILTER_CYCLE) + 1
-		local nextFilter = FILTER_CYCLE[nextIndex]
+		local nextIndex = (currentIndex % #cycleFilters) + 1
+		local nextFilter = cycleFilters[nextIndex]
 
 		if BetterFriendsFrame_SetQuickFilter then
 			BetterFriendsFrame_SetQuickFilter(nextFilter)

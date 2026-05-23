@@ -660,6 +660,13 @@ function BetterRaidMemberButton_OnLoad(self)
 	self:SetHitRectInsets(0, 0, -1, -1)
 end
 
+local function ClearRaidMemberGameTooltip(button)
+	button.UpdateTooltip = nil
+	if GameTooltip and GameTooltip:GetOwner() == button then
+		GameTooltip:Hide()
+	end
+end
+
 function BetterRaidMemberButton_OnEnter(self)
 	-- Always show highlight
 	if self.Highlight then
@@ -671,13 +678,17 @@ function BetterRaidMemberButton_OnEnter(self)
 		return
 	end
 
-	-- Show tooltip if unit exists
-	if self.unit then
+	-- Show tooltip only while the raid token is still valid. Roster moves can
+	-- briefly leave buttons with stale raidN tokens while Blizzard refreshes.
+	if self.unit and UnitExists(self.unit) then
 		UnitFrame_UpdateTooltip(self)
+	else
+		ClearRaidMemberGameTooltip(self)
 	end
 end
 
 function BetterRaidMemberButton_OnLeave(self)
+	ClearRaidMemberGameTooltip(self)
 	BFL_Tooltip:Hide()
 
 	if self.Highlight then
@@ -774,6 +785,8 @@ function BetterRaidMemberButton_OnDragStart(self)
 	if not isLeader and not isAssistant then
 		return
 	end
+
+	ClearRaidMemberGameTooltip(self)
 
 	-- Start ghost
 	local ghost = BFL:GetDragGhost()

@@ -4,6 +4,11 @@
 local ADDON_NAME, BFL = ...
 BFL:RegisterLocale("koKR", function()
 	local L = BFL_LOCALE
+	for key, value in pairs(BFL_LOCALE_ENUS) do
+		if key == "SETTINGS_TAB_FILTER_SORT" or key:match("^FILTER_BUILDER_") or key:match("^ICON_SELECTOR_") then
+			L[key] = value
+		end
+	end
 	L.SETTINGS_SIMPLE_MODE = "Simple Mode"
 	L.SETTINGS_SIMPLE_MODE_DESC =
 		"플레이어 초상화를 비활성화하고 검색/정렬 옵션을 숨기며 프레임을 넓히고 탭을 이동하여 컴팩트 레이아웃을 만듭니다."
@@ -744,6 +749,7 @@ BFL:RegisterLocale("koKR", function()
 	L.FILTER_ALL = "All"
 	L.FILTER_ONLINE = "Online"
 	L.FILTER_OFFLINE = "Offline"
+	L.FILTER_WOW_ONLINE = "WoW 온라인"
 	L.FILTER_WOW = "WoW"
 	L.FILTER_BNET = "BNet"
 	L.FILTER_HIDE_AFK = "No AFK"
@@ -1317,6 +1323,10 @@ BFL:RegisterLocale("koKR", function()
 	-- Font Outline/Shadow Settings
 	L.SETTINGS_FONT_OUTLINE = "글꼴 윤곽"
 	L.SETTINGS_FONT_SHADOW = "글꼴 그림자"
+	L.SETTINGS_FONT_FLAGS = "글꼴 플래그:"
+	L.SETTINGS_FONT_FLAGS_TOOLTIP =
+		"이 글꼴에 사용할 렌더링 플래그를 하나 이상 선택합니다. Slug는 지원되는 클라이언트에서만 적용됩니다."
+	L.SETTINGS_FONT_FLAG_SLUG = "Slug 렌더링"
 	L.SETTINGS_FONT_OUTLINE_NONE = "없음"
 	L.SETTINGS_FONT_OUTLINE_NORMAL = "윤곽"
 	L.SETTINGS_FONT_OUTLINE_THICK = "두꺼운 윤곽"

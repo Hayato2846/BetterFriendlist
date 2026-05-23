@@ -4,6 +4,12 @@
 local ADDON_NAME, BFL = ...
 local DarkTheme = BFL:RegisterModule("DarkTheme", {})
 
+local WHO_COLUMN_HEADER_HEIGHT = 28
+local WHO_COLUMN_HEADER_OVERLAP = -1
+local WHO_LIST_INSET_PADDING = 4
+local WHO_SCROLLBAR_RESERVE = 24
+local WHO_SCROLLBAR_OFFSET_X = 1
+
 local function GetEngine()
 	return BFL:GetModule("SkinEngine")
 end
@@ -34,9 +40,92 @@ local function SkinField(engine, parent, key, variant)
 	end
 end
 
+local HideFrameChrome
+
+local function HideFieldChrome(engine, parent, key)
+	local frame = parent and parent[key]
+	if not frame then
+		return
+	end
+
+	HideFrameChrome(engine, frame, 2)
+end
+
+HideFrameChrome = function(engine, frame, textureDepth)
+	if not engine or not frame then
+		return
+	end
+
+	engine:DampenFrameTextures(frame, 0, textureDepth or 0)
+	engine:DampenKnownArtwork(frame, 0)
+	engine:DampenNineSlice(frame, 0)
+	if frame.BFL_DarkBackdrop then
+		frame.BFL_DarkBackdrop:Hide()
+	end
+end
+
+local function SkinTabListScrollBar(engine, scrollBox, scrollBar, opts)
+	if not engine or not scrollBox or not scrollBar then
+		return
+	end
+
+	opts = opts or {}
+	scrollBar.BFL_DarkWideScrollbar = true
+	engine:SetFramePoints(scrollBar, {
+		{ "TOPLEFT", scrollBox, "TOPRIGHT", opts.scrollTopX or 0, opts.scrollTopY or 0 },
+		{ "BOTTOMLEFT", scrollBox, "BOTTOMRIGHT", opts.scrollBottomX or 0, opts.scrollBottomY or 0 },
+	})
+	engine:SkinScrollBar(scrollBar)
+end
+
+local function SkinWhoListScrollBar(engine, who, scrollBar, opts)
+	if not engine or not who or not who.ScrollBox or not scrollBar then
+		return
+	end
+
+	opts = opts or {}
+	local topFrame = who.ClassHeader or who.ScrollBox
+	scrollBar.BFL_DarkWideScrollbar = true
+	engine:SetFramePoints(scrollBar, {
+		{ "TOPLEFT", topFrame, "TOPRIGHT", opts.scrollTopX or WHO_SCROLLBAR_OFFSET_X, opts.scrollTopY or 0 },
+		{ "BOTTOMLEFT", who.ScrollBox, "BOTTOMRIGHT", opts.scrollBottomX or WHO_SCROLLBAR_OFFSET_X, opts.scrollBottomY or 0 },
+	})
+	engine:SkinScrollBar(scrollBar)
+end
+
+local function SkinTabListSurface(engine, container, scrollBox, scrollBar, opts)
+	if not engine or not container or not scrollBox then
+		return
+	end
+
+	HideFrameChrome(engine, container)
+	engine:SkinFrame(scrollBox, "inset", { stripTextures = true, textureAlpha = 0 })
+	SkinTabListScrollBar(engine, scrollBox, scrollBar, opts)
+end
+
 local function SkinButtonField(engine, parent, key)
 	if parent and parent[key] then
 		engine:SkinButton(parent[key])
+	end
+end
+
+local function SkinColumnHeaderField(engine, parent, key)
+	if parent and parent[key] then
+		engine:SkinButton(parent[key], { insets = { left = 0, right = 0, top = 0, bottom = 0 }, keepFontColor = true })
+	end
+end
+
+local function SkinNativeTextureButtonField(engine, parent, key)
+	if parent and parent[key] and engine.SkinNativeTextureButton then
+		engine:SkinNativeTextureButton(parent[key])
+	end
+end
+
+local function SkinCompactCheckButtonField(engine, parent, key)
+	if parent and parent[key] then
+		parent[key].BFL_DarkNoCheckChrome = nil
+		parent[key].BFL_DarkCompactCheckButton = true
+		engine:SkinCheckButton(parent[key])
 	end
 end
 
@@ -66,6 +155,7 @@ end
 
 local function SkinScrollBarField(engine, parent, key)
 	if parent and parent[key] then
+		parent[key].BFL_DarkWideScrollbar = true
 		engine:SkinScrollBar(parent[key])
 	end
 end
@@ -84,7 +174,9 @@ local function SkinSettingsNavigation(engine, frame)
 end
 
 function DarkTheme:Initialize()
-	self:InstallHooks()
+	if BFL:IsThemeActive("dark") then
+		self:InstallHooks()
+	end
 end
 
 function DarkTheme:OnPlayerLogin()
@@ -100,15 +192,24 @@ function DarkTheme:Apply(reason)
 	end
 
 	engine:Activate()
+	self.applied = true
 	self:InstallHooks()
 	self:SkinKnownFrames(reason)
 end
 
 function DarkTheme:Remove(reason)
 	local engine = GetEngine()
-	if engine then
-		engine:Deactivate()
+	if not engine then
+		self.applied = nil
+		return
 	end
+
+	if not self.applied and engine.active ~= true and not next(engine.registry or {}) then
+		return
+	end
+
+	self.applied = nil
+	engine:Deactivate()
 end
 
 function DarkTheme:SkinKnownFrames(reason)
@@ -191,6 +292,62 @@ function DarkTheme:LayoutMainListChrome(engine, frame)
 	end
 end
 
+function DarkTheme:LayoutWhoListChrome(engine, who)
+	if not engine or not who then
+		return
+	end
+
+	HideFrameChrome(engine, who)
+	HideFrameChrome(engine, who.ScrollBox)
+
+	if who.ScrollBox and who.NameHeader and who.ListInset and who.ListInset.Totals then
+		engine:SetFramePoints(who.ScrollBox, {
+			{ "TOPLEFT", who.NameHeader, "BOTTOMLEFT", 0, -1 },
+			{ "BOTTOMRIGHT", who.ListInset.Totals, "TOPRIGHT", -WHO_SCROLLBAR_RESERVE, 2 },
+		})
+	end
+
+	SkinWhoListScrollBar(engine, who, who.ScrollBar)
+	SkinWhoListScrollBar(engine, who, who.ClassicScrollBar, {
+		scrollTopY = -18,
+		scrollBottomY = 18,
+	})
+end
+
+function DarkTheme:LayoutWhoColumnHeaders(engine, who)
+	if not engine or not who then
+		return
+	end
+
+	if who.NameHeader and who.ListInset then
+		engine:SetFrameSize(who.NameHeader, nil, WHO_COLUMN_HEADER_HEIGHT)
+		engine:SetFramePoints(who.NameHeader, {
+			{ "TOPLEFT", who.ListInset, "TOPLEFT", WHO_LIST_INSET_PADDING, -WHO_LIST_INSET_PADDING },
+		})
+	end
+
+	if who.ColumnDropdown and who.NameHeader then
+		engine:SetFrameSize(who.ColumnDropdown, nil, WHO_COLUMN_HEADER_HEIGHT)
+		engine:SetFramePoints(who.ColumnDropdown, {
+			{ "TOPLEFT", who.NameHeader, "TOPRIGHT", WHO_COLUMN_HEADER_OVERLAP, 0 },
+		})
+	end
+
+	if who.LevelHeader and who.ColumnDropdown then
+		engine:SetFrameSize(who.LevelHeader, nil, WHO_COLUMN_HEADER_HEIGHT)
+		engine:SetFramePoints(who.LevelHeader, {
+			{ "TOPLEFT", who.ColumnDropdown, "TOPRIGHT", WHO_COLUMN_HEADER_OVERLAP, 0 },
+		})
+	end
+
+	if who.ClassHeader and who.LevelHeader then
+		engine:SetFrameSize(who.ClassHeader, nil, WHO_COLUMN_HEADER_HEIGHT)
+		engine:SetFramePoints(who.ClassHeader, {
+			{ "TOPLEFT", who.LevelHeader, "TOPRIGHT", WHO_COLUMN_HEADER_OVERLAP, 0 },
+		})
+	end
+end
+
 function DarkTheme:LayoutMainTitleButtons(engine, frame)
 	if not engine or not frame then
 		return
@@ -255,7 +412,7 @@ function DarkTheme:SkinMainFrame(engine)
 	engine:StripButtonFrameArtwork(frame)
 
 	self:LayoutMainListChrome(engine, frame)
-	SkinField(engine, frame, "Inset", "inset")
+	HideFieldChrome(engine, frame, "Inset")
 	SkinField(engine, frame, "ScrollFrame", "inset")
 	SkinScrollBarField(engine, frame, "MinimalScrollBar")
 	SkinButtonField(engine, frame, "AddFriendButton")
@@ -263,7 +420,7 @@ function DarkTheme:SkinMainFrame(engine)
 	SkinButtonField(engine, frame, "RecruitmentButton")
 	SkinButtonField(engine, frame, "PortraitButton")
 	SkinIconButtonField(engine, frame, "StreamerModeButton", { texture = frame.StreamerModeButton and frame.StreamerModeButton.Icon, size = 18 })
-	SkinButtonField(engine, frame, "HelpButton")
+	SkinIconButtonField(engine, frame, "HelpButton", { texture = frame.HelpButton and frame.HelpButton.Icon, size = 18 })
 	self:LayoutMainTitleButtons(engine, frame)
 	self:SkinMainTabs(engine)
 
@@ -332,9 +489,7 @@ function DarkTheme:SkinRecentAlliesFrame(engine)
 		return
 	end
 
-	engine:SkinFrame(recent, "panel", { stripTextures = true, textureAlpha = 0.08 })
-	SkinField(engine, recent, "ScrollBox", "inset")
-	SkinScrollBarField(engine, recent, "ScrollBar")
+	SkinTabListSurface(engine, recent, recent.ScrollBox, recent.ScrollBar)
 	engine:SkinTree(recent, 5)
 end
 
@@ -345,24 +500,22 @@ function DarkTheme:SkinRAFFrame(engine)
 		return
 	end
 
-	engine:SkinFrame(raf, "panel", { stripTextures = true, textureAlpha = 0.08 })
+	HideFrameChrome(engine, raf)
 
 	local reward = raf.RewardClaiming
 	if reward then
 		engine:SkinFrame(reward, "panel", { stripTextures = true, textureAlpha = 0 })
-		SkinButtonField(engine, reward, "NextRewardInfoButton")
-		SkinButtonField(engine, reward, "NextRewardButton")
+		SkinNativeTextureButtonField(engine, reward, "NextRewardInfoButton")
+		SkinNativeTextureButtonField(engine, reward, "NextRewardButton")
 		SkinButtonField(engine, reward, "ClaimOrViewRewardButton")
 		engine:SkinTree(reward, 4)
 	end
 
 	local recruitList = raf.RecruitList
 	if recruitList then
-		engine:SkinFrame(recruitList, "panel", { stripTextures = true, textureAlpha = 0 })
-		SkinField(engine, recruitList, "Header", "panel")
-		SkinField(engine, recruitList, "ScrollBox", "inset")
-		SkinScrollBarField(engine, recruitList, "ScrollBar")
-		SkinScrollBarField(engine, recruitList, "ClassicScrollBar")
+		HideFieldChrome(engine, recruitList, "Header")
+		SkinTabListSurface(engine, recruitList, recruitList.ScrollBox, recruitList.ScrollBar)
+		SkinTabListScrollBar(engine, recruitList.ScrollBox, recruitList.ClassicScrollBar)
 		engine:SkinTree(recruitList, 5)
 	end
 
@@ -381,27 +534,54 @@ function DarkTheme:SkinWhoFrame(engine)
 		return
 	end
 
-	engine:SkinFrame(who, "panel")
+	self:LayoutWhoColumnHeaders(engine, who)
+	self:LayoutWhoListChrome(engine, who)
 	SkinField(engine, who, "ListInset", "inset")
 	SkinEditBoxField(engine, who, "EditBox")
 	SkinDropdownField(engine, who, "ColumnDropdown")
-	SkinButtonField(engine, who, "NameHeader")
-	SkinButtonField(engine, who, "LevelHeader")
-	SkinButtonField(engine, who, "ClassHeader")
+	SkinColumnHeaderField(engine, who, "NameHeader")
+	SkinColumnHeaderField(engine, who, "LevelHeader")
+	SkinColumnHeaderField(engine, who, "ClassHeader")
+	SkinButtonField(engine, who, "WhoButton")
 	SkinButtonField(engine, who, "AddFriendButton")
 	SkinButtonField(engine, who, "GroupInviteButton")
-	SkinField(engine, who, "ScrollBox", "inset")
-	SkinScrollBarField(engine, who, "ScrollBar")
 
 	local WhoFrame = BFL:GetModule("WhoFrame")
 	if WhoFrame then
-		if WhoFrame.builderFlyout then
-			engine:SkinFrame(WhoFrame.builderFlyout, "popup", { stripTextures = true, textureAlpha = 0 })
-			engine:SkinTree(WhoFrame.builderFlyout, 6)
+		if WhoFrame.builderToggle then
+			WhoFrame.builderToggle.BFL_DarkNoButtonChrome = true
+			engine:RestoreFrame(WhoFrame.builderToggle)
 		end
-		if WhoFrame.builderContainer then
-			engine:SkinFrame(WhoFrame.builderContainer, "popup", { stripTextures = true, textureAlpha = 0 })
-			engine:SkinTree(WhoFrame.builderContainer, 6)
+		if WhoFrame.builderDockBtn then
+			WhoFrame.builderDockBtn.BFL_DarkNoButtonChrome = true
+			engine:RestoreFrame(WhoFrame.builderDockBtn)
+		end
+		if WhoFrame.builderFlyout then
+			if WhoFrame.builderDocked then
+				HideFrameChrome(engine, WhoFrame.builderFlyout)
+			else
+				engine:SkinFrame(WhoFrame.builderFlyout, "popup", { stripTextures = true, textureAlpha = 0 })
+			end
+			engine:SkinTree(WhoFrame.builderFlyout, 6)
+			if WhoFrame.builderCloseBtn then
+				WhoFrame.builderCloseBtn.BFL_DarkNoButtonChrome = nil
+				engine:SkinCloseButton(WhoFrame.builderCloseBtn)
+			end
+		end
+
+		local builderContainer = WhoFrame.builderDockedContainer or WhoFrame.builderContainer or _G.BetterFriendlistSearchBuilderFrame
+		if builderContainer then
+			engine:SkinFrame(builderContainer, "popup", { stripTextures = true, textureAlpha = 0 })
+			HideFieldChrome(engine, builderContainer, "Inset")
+			HideFieldChrome(engine, builderContainer, "InsetRight")
+			engine:SkinTree(builderContainer, 6)
+			if builderContainer.CloseButton then
+				builderContainer.CloseButton.BFL_DarkNoButtonChrome = true
+				engine:RestoreFrame(builderContainer.CloseButton)
+			end
+		end
+		if WhoFrame.builderDocked and WhoFrame.builderFlyout then
+			HideFrameChrome(engine, WhoFrame.builderFlyout)
 		end
 		if WhoFrame.classicWhoButtonPool then
 			for _, row in ipairs(WhoFrame.classicWhoButtonPool) do
@@ -410,7 +590,10 @@ function DarkTheme:SkinWhoFrame(engine)
 		end
 	end
 
-	SkinFrameByName(engine, "BetterFriendlistSearchBuilderFrame", "popup")
+	local searchBuilderFrame = _G.BetterFriendlistSearchBuilderFrame
+	if searchBuilderFrame then
+		engine:SkinFrame(searchBuilderFrame, "popup", { stripTextures = true, textureAlpha = 0 })
+	end
 end
 
 function DarkTheme:SkinRaidFrame(engine)
@@ -420,14 +603,18 @@ function DarkTheme:SkinRaidFrame(engine)
 		return
 	end
 
-	engine:SkinFrame(raid, "panel")
-	SkinField(engine, raid, "ControlPanel", "panel")
+	HideFrameChrome(engine, raid)
+	HideFieldChrome(engine, raid, "ControlPanel")
+	SkinCompactCheckButtonField(engine, raid.ControlPanel, "EveryoneAssistCheckbox")
 	SkinButtonField(engine, raid.ControlPanel, "RaidInfoButton")
 	SkinField(engine, raid, "GroupsInset", "inset")
 	SkinButtonField(engine, raid, "ConvertToRaidButton")
 	SkinButtonField(engine, raid, "RaidToolsButton")
 	SkinButtonField(engine, raid, "CombatIcon")
 	engine:SkinTree(raid, 5)
+	HideFrameChrome(engine, raid)
+	HideFieldChrome(engine, raid, "ControlPanel")
+	SkinField(engine, raid, "GroupsInset", "inset")
 end
 
 function DarkTheme:SkinQuickJoin(engine)
@@ -443,6 +630,7 @@ function DarkTheme:SkinQuickJoin(engine)
 		SkinField(engine, quickJoin.ContentInset, "ScrollBoxContainer", "inset")
 		SkinField(engine, quickJoin.ContentInset, "ScrollBox", "inset")
 		SkinScrollBarField(engine, quickJoin.ContentInset, "ScrollBar")
+		SkinScrollBarField(engine, quickJoin.ContentInset, "ClassicScrollBar")
 		SkinButtonField(engine, quickJoin.ContentInset, "JoinQueueButton")
 	end
 	engine:SkinTree(quickJoin, 5)
@@ -461,6 +649,8 @@ function DarkTheme:SkinIgnoreList(engine)
 	SkinButtonField(engine, ignore, "EnhanceQoLIgnoreButton")
 	SkinField(engine, ignore, "ScrollBox", "inset")
 	SkinScrollBarField(engine, ignore, "ScrollBar")
+	SkinScrollBarField(engine, ignore, "ClassicScrollBar")
+	SkinScrollBarField(engine, ignore.Inset, "ClassicScrollBar")
 	engine:SkinTree(ignore, 5)
 end
 
@@ -507,7 +697,11 @@ function DarkTheme:SkinSettingsFrame(engine)
 	SkinField(engine, frame, "CategoryList", "panel")
 	SkinField(engine, frame, "ButtonSeparator", "panel")
 	if frame.ContentScrollFrame then
-		engine:SkinScrollBar(frame.ContentScrollFrame.ScrollBar or _G[GetFrameName(frame.ContentScrollFrame) .. "ScrollBar"])
+		local scrollBar = frame.ContentScrollFrame.ScrollBar or _G[GetFrameName(frame.ContentScrollFrame) .. "ScrollBar"]
+		if scrollBar then
+			scrollBar.BFL_DarkWideScrollbar = true
+			engine:SkinScrollBar(scrollBar)
+		end
 	end
 	engine:SkinTree(frame, 7)
 	SkinSettingsNavigation(engine, frame)
@@ -519,6 +713,7 @@ function DarkTheme:SkinAuxiliaryFrames(engine)
 		{ "BetterFriendlistHelpFrame", "popup" },
 		{ "BetterFriendlistExportFrame", "popup" },
 		{ "BetterFriendlistImportFrame", "popup" },
+		{ "BetterFriendlistFilterSortEditorFrame", "popup" },
 		{ "BetterFriendlistNoteCleanupWizard", "popup" },
 		{ "BetterFriendlistNoteBackupViewer", "popup" },
 		{ "BetterFriendlistRaidToolsFrame", "popup" },
@@ -746,6 +941,12 @@ function DarkTheme:InstallHooks()
 			self:SkinWhoFrame(engine)
 		end
 	end)
+	self:WrapModuleMethod("WhoFrame", "SetBuilderDocked", function()
+		local engine = GetEngine()
+		if engine then
+			self:SkinWhoFrame(engine)
+		end
+	end)
 
 	for _, methodName in ipairs({
 		"RefreshThemeTab",
@@ -755,6 +956,7 @@ function DarkTheme:InstallHooks()
 		"RefreshAdvancedTab",
 		"RefreshStatisticsTab",
 		"RefreshBrokerTab",
+		"RefreshFilterSortTab",
 		"RefreshGlobalSyncTab",
 		"RefreshStreamerTab",
 		"RefreshRaidTab",
@@ -771,6 +973,9 @@ function DarkTheme:InstallHooks()
 	end)
 	self:WrapModuleMethod("Settings", "CreateImportFrame", function(_, frame)
 		self:SkinCreatedFrame(frame or _G.BetterFriendlistImportFrame)
+	end)
+	self:WrapModuleMethod("Settings", "EnsureFilterSortEditorPanel", function(_, frame)
+		self:SkinCreatedFrame(frame or _G.BetterFriendlistFilterSortEditorFrame)
 	end)
 
 	self:WrapModuleMethod("Changelog", "CreateChangelogWindow", function(_, frame)

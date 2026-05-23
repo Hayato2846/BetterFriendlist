@@ -1711,8 +1711,13 @@ local function RegisterBuiltInTests()
 		action = function(V)
 			WithTemporaryDatabase({
 				enableElvUISkin = true,
+				enableBetaFeatures = true,
 			}, function(tempDB)
-				V:AssertEqual(tempDB.theme, "elvui", "enableElvUISkin=true should migrate to theme='elvui'")
+				V:AssertEqual(
+					tempDB.theme,
+					"elvui",
+					"enableElvUISkin=true should migrate to theme='elvui' when Beta Features are enabled"
+				)
 			end)
 		end,
 	})
@@ -1723,9 +1728,11 @@ local function RegisterBuiltInTests()
 			V:AssertNotNil(BFL.GetEffectiveTheme, "BFL:GetEffectiveTheme should exist")
 			V:AssertNotNil(BFL.IsThemeActive, "BFL:IsThemeActive should exist")
 			V:AssertNotNil(BFL.UsesFlatTheme, "BFL:UsesFlatTheme should exist")
+			V:AssertNotNil(BFL.AreThemeFeaturesEnabled, "BFL:AreThemeFeaturesEnabled should exist")
 
 			WithTemporaryDatabase({
 				theme = "dark",
+				enableBetaFeatures = true,
 			}, function()
 				V:AssertEqual(BFL:GetEffectiveTheme(), "dark", "Dark theme should resolve as dark")
 				V:Assert(BFL:IsThemeActive("dark"), "Dark theme should be active")
@@ -1751,10 +1758,98 @@ local function RegisterBuiltInTests()
 
 			WithTemporaryDatabase({
 				theme = "elvui",
+				enableBetaFeatures = true,
 			}, function()
 				V:AssertEqual(BFL:GetEffectiveTheme(), "blizzard", "ElvUI theme should fall back to Blizzard")
 				V:Assert(not BFL:IsThemeActive("elvui"), "ElvUI theme should not be active without ElvUI")
 			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "Theme_BetaDisabledForcesBlizzard", {
+		description = "Disabled Beta Features should force beta themes back to Blizzard",
+		action = function(V)
+			WithTemporaryDatabase({
+				theme = "dark",
+				enableBetaFeatures = false,
+			}, function(tempDB)
+				V:AssertEqual(tempDB.theme, "blizzard", "Stored Dark theme should normalize to Blizzard")
+
+				tempDB.theme = "dark"
+				V:AssertEqual(BFL:GetEffectiveTheme(), "blizzard", "Dark theme should not become effective")
+				V:Assert(not BFL:IsThemeActive("dark"), "Dark theme should not be active when Beta is disabled")
+				V:Assert(not BFL:UsesFlatTheme(), "Beta-disabled themes should not count as flat themes")
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "Theme_BlizzardDisablesSkinEngine", {
+		description = "Blizzard theme should not leave the Dark skin engine active",
+		action = function(V)
+			local SkinEngine = BFL:GetModule("SkinEngine")
+			V:AssertNotNil(SkinEngine, "SkinEngine module should exist")
+
+			WithTemporaryDatabase({
+				theme = "blizzard",
+			}, function()
+				V:Assert(not SkinEngine:IsActive(), "SkinEngine should be inactive for Blizzard theme")
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "SkinEngine_TravelPassSkipsBlizzardTheme", {
+		description = "TravelPass invite styling should be Dark-theme only",
+		action = function(V)
+			local SkinEngine = BFL:GetModule("SkinEngine")
+			V:AssertNotNil(SkinEngine, "SkinEngine module should exist")
+			V:AssertNotNil(SkinEngine.SkinTravelPassButton, "SkinEngine:SkinTravelPassButton should exist")
+
+			local originalActive = SkinEngine.active
+			local button = {}
+			local ok, err = pcall(function()
+				WithTemporaryDatabase({
+					theme = "blizzard",
+				}, function()
+					SkinEngine.active = true
+					SkinEngine:SkinTravelPassButton(button)
+					V:AssertNil(button.BFL_DarkTravelPassButton, "TravelPass button should not be marked in Blizzard theme")
+					V:AssertNil(button.BFL_DarkSkin, "TravelPass button should not be registered in Blizzard theme")
+				end)
+			end)
+			SkinEngine.active = originalActive
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
+	TS:RegisterTest("data", "SkinEngine_RestoreShownState", {
+		description = "SkinEngine restore should return native show/hide state",
+		action = function(V)
+			local SkinEngine = BFL:GetModule("SkinEngine")
+			V:AssertNotNil(SkinEngine, "SkinEngine module should exist")
+			V:AssertNotNil(SkinEngine.SetObjectShown, "SkinEngine:SetObjectShown should exist")
+
+			local owner = {}
+			local region = { shown = true }
+			function region:IsShown()
+				return self.shown
+			end
+			function region:SetShown(shown)
+				self.shown = shown == true
+			end
+
+			local ok, err = pcall(function()
+				SkinEngine:SetObjectShown(owner, region, false)
+				V:Assert(region.shown == false, "SkinEngine should be able to hide a native region")
+				SkinEngine:RestoreFrame(owner)
+				V:Assert(region.shown == true, "SkinEngine should restore the previous shown state")
+			end)
+			SkinEngine.registry[owner] = nil
+			owner.BFL_DarkSkin = nil
+			if not ok then
+				error(err, 0)
+			end
 		end,
 	})
 
@@ -2772,6 +2867,61 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
+	TS:RegisterTest("filter", "WoWOnlineFilter_RequiresOnlineWoWClient", {
+		description = "Filter 'wowonline' must show only online WoW friends",
+		action = function(V)
+			local FriendsList = BFL:GetModule("FriendsList")
+			if not FriendsList then
+				V:Skip("FriendsList not loaded")
+				return
+			end
+
+			local originalFilter = FriendsList.filterMode
+			FriendsList.filterMode = "wowonline"
+
+			local onlineBNetWoWFriend = {
+				connected = true,
+				type = "bnet",
+				gameAccountInfo = { clientProgram = BNET_CLIENT_WOW or "WoW" },
+			}
+			local offlineBNetWoWFriend = {
+				connected = false,
+				type = "bnet",
+				gameAccountInfo = { clientProgram = BNET_CLIENT_WOW or "WoW" },
+			}
+			local otherGameFriend = {
+				connected = true,
+				type = "bnet",
+				gameAccountInfo = { clientProgram = "Pro" },
+			}
+			local onlineWoWOnlyFriend = { connected = true, type = "wow" }
+			local offlineWoWOnlyFriend = { connected = false, type = "wow" }
+
+			V:Assert(
+				FriendsList:PassesFilters(onlineBNetWoWFriend) == true,
+				"Online BNet friend in WoW should pass 'wowonline' filter"
+			)
+			V:Assert(
+				FriendsList:PassesFilters(offlineBNetWoWFriend) == false,
+				"Offline BNet friend in WoW should NOT pass 'wowonline' filter"
+			)
+			V:Assert(
+				FriendsList:PassesFilters(otherGameFriend) == false,
+				"BNet friend in another game should NOT pass 'wowonline' filter"
+			)
+			V:Assert(
+				FriendsList:PassesFilters(onlineWoWOnlyFriend) == true,
+				"Online WoW-only friend should pass 'wowonline' filter"
+			)
+			V:Assert(
+				FriendsList:PassesFilters(offlineWoWOnlyFriend) == false,
+				"Offline WoW-only friend should NOT pass 'wowonline' filter"
+			)
+
+			FriendsList.filterMode = originalFilter
+		end,
+	})
+
 	TS:RegisterTest("filter", "SearchFilter_MatchesName", {
 		description = "Search filter must match friend name",
 		action = function(V)
@@ -2861,6 +3011,186 @@ local function RegisterBuiltInTests()
 
 			-- Restore
 			FriendsList.filterMode = originalFilter
+		end,
+	})
+
+	TS:RegisterTest("filter", "Registry_CustomFilter_AST_AND_OR_NOT", {
+		description = "Custom QuickFilters must evaluate nested AND/OR/NOT AST rules",
+		action = function(V)
+			local Registry = BFL:GetModule("FilterSortRegistry")
+			if not Registry then
+				V:Skip("FilterSortRegistry not loaded")
+				return
+			end
+			if not BetterFriendlistDB then
+				V:Skip("DB not available")
+				return
+			end
+
+			Registry:EnsureDB()
+			local testId = "custom_filter_test_ast"
+			local original = BetterFriendlistDB.customQuickFilters[testId]
+			local originalVisibility = BetterFriendlistDB.quickFilterVisibility[testId]
+
+			BetterFriendlistDB.customQuickFilters[testId] = {
+				id = testId,
+				name = "AST Test",
+				icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter",
+				ast = {
+					type = "group",
+					op = "AND",
+					children = {
+						{ type = "condition", field = "online", op = "is", value = true },
+						{
+							type = "group",
+							op = "OR",
+							children = {
+								{ type = "condition", field = "status", op = "is", value = "dnd", negate = true },
+								{ type = "condition", field = "favorite", op = "is", value = true },
+							},
+						},
+					},
+				},
+			}
+			BetterFriendlistDB.quickFilterVisibility[testId] = true
+
+			V:Assert(
+				Registry:EvaluateQuickFilter(testId, { type = "bnet", connected = true, isDND = false }) == true,
+				"Online non-DND friend should pass"
+			)
+			V:Assert(
+				Registry:EvaluateQuickFilter(testId, { type = "bnet", connected = true, isDND = true }) == false,
+				"Online DND non-favorite friend should fail"
+			)
+			V:Assert(
+				Registry:EvaluateQuickFilter(testId, { type = "bnet", connected = true, isDND = true, isFavorite = true })
+					== true,
+				"Favorite DND friend should pass through OR branch"
+			)
+			V:Assert(
+				Registry:EvaluateQuickFilter(testId, { type = "bnet", connected = false, isFavorite = true }) == false,
+				"Offline friend should fail root AND condition"
+			)
+
+			BetterFriendlistDB.customQuickFilters[testId] = original
+			BetterFriendlistDB.quickFilterVisibility[testId] = originalVisibility
+		end,
+	})
+
+	TS:RegisterTest("filter", "Registry_Visibility_ActiveFilterFallback", {
+		description = "Hidden active QuickFilters must fall back to 'all'",
+		action = function(V)
+			local Registry = BFL:GetModule("FilterSortRegistry")
+			if not Registry or not BetterFriendlistDB then
+				V:Skip("FilterSortRegistry or DB not loaded")
+				return
+			end
+
+			Registry:EnsureDB()
+			local originalFilter = BetterFriendlistDB.quickFilter
+			local originalVisibility = BetterFriendlistDB.quickFilterVisibility.online
+
+			BetterFriendlistDB.quickFilter = "online"
+			BetterFriendlistDB.quickFilterVisibility.online = false
+			Registry:NormalizeCurrentSelections()
+
+			V:AssertEqual(BetterFriendlistDB.quickFilter, "all", "Hidden active filter should normalize to all")
+
+			local visible = Registry:GetVisibleQuickFilters()
+			for _, entry in ipairs(visible) do
+				V:Assert(entry.id ~= "online", "Hidden filter should not appear in visible list")
+			end
+
+			BetterFriendlistDB.quickFilter = originalFilter
+			BetterFriendlistDB.quickFilterVisibility.online = originalVisibility
+			Registry:NormalizeCurrentSelections()
+		end,
+	})
+
+	TS:RegisterTest("sort", "Registry_CustomSorter_ChainAndFallback", {
+		description = "Custom sorter chains must compare multiple fields and fall back stably",
+		action = function(V)
+			local Registry = BFL:GetModule("FilterSortRegistry")
+			if not Registry or not BetterFriendlistDB then
+				V:Skip("FilterSortRegistry or DB not loaded")
+				return
+			end
+
+			Registry:EnsureDB()
+			local testId = "custom_sorter_test_chain"
+			local original = BetterFriendlistDB.customSorters[testId]
+			local originalVisibility = BetterFriendlistDB.sorterVisibility[testId]
+			BetterFriendlistDB.customSorters[testId] = {
+				id = testId,
+				name = "Chain Test",
+				icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\sliders",
+				chain = {
+					{ field = "status", direction = "asc", empty = "last" },
+					{ field = "level", direction = "desc", empty = "last" },
+				},
+			}
+			BetterFriendlistDB.sorterVisibility[testId] = true
+
+			local high = { connected = true, _sort_status = 0, level = 70, _sort_level = 70, _sort_name = "b", index = 2 }
+			local low = { connected = true, _sort_status = 0, level = 10, _sort_level = 10, _sort_name = "a", index = 1 }
+			local offline = { connected = false, _sort_status = 4, level = 80, _sort_level = 80, _sort_name = "z", index = 3 }
+
+			V:Assert(Registry:CompareFriends(high, low, testId, "none") == true, "Higher level should sort first")
+			V:Assert(Registry:CompareFriends(high, offline, testId, "none") == true, "Online should sort before offline")
+
+			BetterFriendlistDB.customSorters[testId] = original
+			BetterFriendlistDB.sorterVisibility[testId] = originalVisibility
+		end,
+	})
+
+	TS:RegisterTest("sort", "Registry_ActiveSorterFallback_GameStatus", {
+		description = "Hidden active sorters must fall back to primary game and secondary status",
+		action = function(V)
+			local Registry = BFL:GetModule("FilterSortRegistry")
+			if not Registry or not BetterFriendlistDB then
+				V:Skip("FilterSortRegistry or DB not loaded")
+				return
+			end
+
+			Registry:EnsureDB()
+			local originalPrimary = BetterFriendlistDB.primarySort
+			local originalSecondary = BetterFriendlistDB.secondarySort
+			local originalVisibility = BetterFriendlistDB.sorterVisibility.name
+
+			BetterFriendlistDB.primarySort = "name"
+			BetterFriendlistDB.secondarySort = "missing_sorter"
+			BetterFriendlistDB.sorterVisibility.name = false
+			Registry:NormalizeCurrentSelections()
+
+			V:AssertEqual(BetterFriendlistDB.primarySort, "game", "Hidden primary sorter should fall back to game")
+			V:AssertEqual(BetterFriendlistDB.secondarySort, "status", "Invalid secondary sorter should fall back to status")
+
+			BetterFriendlistDB.primarySort = originalPrimary
+			BetterFriendlistDB.secondarySort = originalSecondary
+			BetterFriendlistDB.sorterVisibility.name = originalVisibility
+			Registry:NormalizeCurrentSelections()
+		end,
+	})
+
+	TS:RegisterTest("settings", "FilterSortBuilder_DBDefaults", {
+		description = "Filter/sort builder SavedVariables must exist and use the safe fallback IDs",
+		action = function(V)
+			local Registry = BFL:GetModule("FilterSortRegistry")
+			if not Registry or not BetterFriendlistDB then
+				V:Skip("FilterSortRegistry or DB not loaded")
+				return
+			end
+
+			Registry:EnsureDB()
+			V:AssertType(BetterFriendlistDB.customQuickFilters, "table", "customQuickFilters should be a table")
+			V:AssertType(BetterFriendlistDB.quickFilterVisibility, "table", "quickFilterVisibility should be a table")
+			V:AssertType(BetterFriendlistDB.quickFilterOrder, "table", "quickFilterOrder should be a table")
+			V:AssertType(BetterFriendlistDB.customSorters, "table", "customSorters should be a table")
+			V:AssertType(BetterFriendlistDB.sorterVisibility, "table", "sorterVisibility should be a table")
+			V:AssertType(BetterFriendlistDB.sorterOrder, "table", "sorterOrder should be a table")
+			V:AssertEqual(Registry.FALLBACK_FILTER, "all", "Fallback filter should be all")
+			V:AssertEqual(Registry.FALLBACK_PRIMARY_SORT, "game", "Fallback primary sort should be game")
+			V:AssertEqual(Registry.FALLBACK_SECONDARY_SORT, "status", "Fallback secondary sort should be status")
 		end,
 	})
 
@@ -4326,7 +4656,7 @@ function TestSuite:RunPerfyStress(durationSeconds)
 		originalTab = (BetterFriendsFrame and PanelTemplates_GetSelectedTab(BetterFriendsFrame)) or 1,
 		groupStates = {},
 		groupIds = {},
-		filterModes = { "all", "online", "offline", "wow", "bnet", "hideafk", "ingame" },
+		filterModes = { "all", "online", "offline", "wowonline", "wow", "bnet", "hideafk", "ingame" },
 		sortModes = { "status", "name", "level", "zone" },
 	}
 

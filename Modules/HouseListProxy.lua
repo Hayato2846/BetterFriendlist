@@ -217,7 +217,7 @@ function HouseListProxy:CreateButtonCombatOverlay(button)
 	end
 
 	-- Show localized combat text on the button
-	overlay:SetDisabledFontObject(GameFontDisable)
+	overlay:SetDisabledFontObject("BetterFriendlistFontDisable")
 	local L = BFL.L
 	if L and L.HOUSING_COMBAT_RESTRICTED then
 		overlay:SetText(L.HOUSING_COMBAT_RESTRICTED)

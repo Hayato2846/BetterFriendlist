@@ -84,7 +84,15 @@
 									<Anchor point="BOTTOMRIGHT" />
 								</Anchors>
 							</Frame>
-					
+
+							<!-- QuickFilter & Sorter Tab Content (BETA) -->
+							<Frame parentKey="FilterSortTab" hidden="true">
+								<Anchors>
+									<Anchor point="TOPLEFT" />
+									<Anchor point="BOTTOMRIGHT" />
+								</Anchors>
+							</Frame>
+
 							<!-- Statistics Tab Content -->
 							<Frame parentKey="StatisticsTab" hidden="true">
 								<Anchors>

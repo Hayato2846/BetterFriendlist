@@ -100,7 +100,7 @@ local pendingUpdate = false
 local currentSortMode = "status" -- Default: status, name, level, zone
 
 -- Quick filter state (session-only, not persistent)
-local filterMode = "all" -- Options: "all", "online", "wow", "bnet", "offline", "ingame"
+local filterMode = "all" -- Options: "all", "online", "wowonline", "wow", "bnet", "offline", "ingame"
 
 -- Load filter mode from database
 local function LoadFilterMode()
@@ -131,6 +131,14 @@ end
 local function ApplyFontSize(fontString)
 	InitializeManagers()
 	FontManager:ApplyFontSize(fontString)
+end
+
+local function GetFontFlags(flags)
+	InitializeManagers()
+	if FontManager and FontManager.GetFontFlags then
+		return FontManager:GetFontFlags(flags)
+	end
+	return flags
 end
 
 -- Re-apply enforced width and font on a BFL tab AFTER Blizzard's PanelTemplates_TabResize
@@ -189,14 +197,7 @@ function BFL:ApplyTabFonts()
 		end -- Classic max: prevent tabs from overflowing
 		local fontOutline = db.fontOutlineTabText or "NORMAL"
 
-		local outlineValue = ""
-		if fontOutline == "THINOUTLINE" then
-			outlineValue = "OUTLINE"
-		elseif fontOutline == "THICKOUTLINE" then
-			outlineValue = "THICKOUTLINE"
-		elseif fontOutline == "MONOCHROME" then
-			outlineValue = "MONOCHROME"
-		end
+		local outlineValue = GetFontFlags(fontOutline)
 
 		local fontPath = BFL.FontManager:ResolveFontPath(fontName)
 
@@ -275,14 +276,7 @@ function BFL:ApplyTabFonts()
 	local fontOutline = db.fontOutlineTabText or "NORMAL"
 
 	-- Map outline values to API strings
-	local outlineValue = ""
-	if fontOutline == "THINOUTLINE" then
-		outlineValue = "OUTLINE"
-	elseif fontOutline == "THICKOUTLINE" then
-		outlineValue = "THICKOUTLINE"
-	elseif fontOutline == "MONOCHROME" then
-		outlineValue = "MONOCHROME"
-	end
+	local outlineValue = GetFontFlags(fontOutline)
 
 	-- Resolve font path using FontManager (locale-aware fallback)
 	local fontPath = BFL.FontManager:ResolveFontPath(fontName)
@@ -1146,6 +1140,7 @@ local FILTER_ICONS = {
 	online = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-online", -- Online Only (user-check icon)
 	offline = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-offline", -- Offline Only (user-x icon)
 	wow = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-wow", -- WoW Only (shield icon)
+	wowonline = "Interface\\AddOns\\BetterFriendlist\\Icons\\check-circle", -- WoW Online (check circle icon)
 	bnet = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-bnet", -- Battle.net Only (share-2 icon)
 	hideafk = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-hide-afk", -- Hide AFK (eye-off icon)
 	retail = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-retail", -- Retail Only (trending-up icon)
@@ -3401,6 +3396,11 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 					BFL_AddViewHousesButton(rootDescription, contextData, isBNet)
 
+					local TotalRP3Compat = BFL:GetModule("Compat_TotalRP3")
+					if TotalRP3Compat and TotalRP3Compat.AddOpenProfileButton then
+						TotalRP3Compat:AddOpenProfileButton(ownerRegion, rootDescription, contextData, menuType)
+					end
+
 					rootDescription:CreateDivider()
 					rootDescription:CreateTitle(UNIT_FRAME_DROPDOWN_SUBSECTION_TITLE_OTHER or "Other")
 
@@ -3446,13 +3446,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					"MENU_UNIT_BN_FRIEND_OFFLINE",
 					"MENU_UNIT_FRIEND",
 					"MENU_UNIT_FRIEND_OFFLINE",
-					"MENU_UNIT_PARTY",
-					"MENU_UNIT_PLAYER",
-					"MENU_UNIT_RAID_PLAYER",
-					"MENU_UNIT_RAID",
 					"MENU_UNIT_CHAT_ROSTER",
-					"MENU_UNIT_TARGET",
-					"MENU_UNIT_FOCUS",
 					"MENU_UNIT_RECENT_ALLY",
 					"MENU_UNIT_RECENT_ALLY_OFFLINE",
 					"MENU_UNIT_WORLD_STATE_SCORE",
@@ -3982,28 +3976,13 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 
 			-- Initialize RAF data (match Blizzard's OnLoad behavior)
 			if C_RecruitAFriend and C_RecruitAFriend.IsSystemEnabled then
-				-- Ensure Blizzard's RecruitAFriendFrame is loaded and initialized
 				if not RecruitAFriendFrame then
-					-- Load the addon if not loaded yet
-					LoadAddOn("Blizzard_RecruitAFriend")
-				end
-
-				-- If Blizzard's frame exists, trigger its initialization
-				if RecruitAFriendFrame then
-					-- Call OnLoad if it hasn't been called yet (simulate first-time load)
-					if RecruitAFriendFrame.OnLoad and not RecruitAFriendFrame.rafEnabled then
-						RecruitAFriendFrame:OnLoad()
-					end
-
-					-- Call OnShow to refresh data (this is what Blizzard does when showing the tab)
-					if RecruitAFriendFrame.OnShow then
-						-- OnShow doesn't exist as a direct method, but we can trigger the event
-						-- by registering events if not already done
-						if not RecruitAFriendFrame.eventsRegistered then
-							RecruitAFriendFrame:RegisterEvent("RAF_SYSTEM_ENABLED_STATUS")
-							RecruitAFriendFrame:RegisterEvent("RAF_RECRUITING_ENABLED_STATUS")
-							RecruitAFriendFrame:RegisterEvent("RAF_INFO_UPDATED")
-							RecruitAFriendFrame.eventsRegistered = true
+					local loadAddOn = C_AddOns and C_AddOns.LoadAddOn or LoadAddOn
+					if loadAddOn then
+						if securecallfunction then
+							pcall(securecallfunction, loadAddOn, "Blizzard_RecruitAFriend")
+						else
+							pcall(loadAddOn, "Blizzard_RecruitAFriend")
 						end
 					end
 				end
@@ -4019,14 +3998,16 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 				local rafInfo = C_RecruitAFriend.GetRAFInfo()
 				if rafInfo then
 					BetterRAF_UpdateRAFInfo(frame.RecruitAFriendFrame, rafInfo)
-					-- Also store in Blizzard's frame if it exists
-					if RecruitAFriendFrame then
-						RecruitAFriendFrame.rafInfo = rafInfo
-					end
 				end
 
 				-- Request updated recruitment info (enables "Generate Link" functionality)
-				C_RecruitAFriend.RequestUpdatedRecruitmentInfo()
+				if C_RecruitAFriend.RequestUpdatedRecruitmentInfo then
+					if securecallfunction then
+						securecallfunction(C_RecruitAFriend.RequestUpdatedRecruitmentInfo)
+					else
+						C_RecruitAFriend.RequestUpdatedRecruitmentInfo()
+					end
+				end
 			end
 		end
 	elseif tabIndex == 4 then
@@ -5349,6 +5330,13 @@ function BetterRAF_NextRewardButton_OnEnter(button)
 	end
 end
 
+function BetterRAF_NextRewardButton_OnLeave(button)
+	local RAF = GetRAF()
+	if RAF then
+		RAF:NextRewardButton_OnLeave(button)
+	end
+end
+
 function BetterRAF_ClaimOrViewRewardButton_OnClick(button)
 	local RAF = GetRAF()
 	if RAF then
@@ -5365,12 +5353,8 @@ end
 
 function BetterRAF_RecruitmentButton_OnClick(button)
 	local RAF = GetRAF()
-	if RecruitAFriendRecruitmentFrame:IsShown() then
-		StaticPopupSpecial_Hide(RecruitAFriendRecruitmentFrame)
-	else
-		C_RecruitAFriend.RequestUpdatedRecruitmentInfo()
-		RecruitAFriendRewardsFrame:Hide()
-		StaticPopupSpecial_Show(RecruitAFriendRecruitmentFrame)
+	if RAF then
+		RAF:RecruitmentButton_OnClick(button)
 	end
 end
 

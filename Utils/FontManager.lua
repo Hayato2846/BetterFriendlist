@@ -71,15 +71,170 @@ end
 
 local CURRENT_ALPHABET = GetLocaleAlphabet()
 local FAMILY_COUNTER = 0
+local SLUG_RENDERING_SUPPORTED = nil
+
+local FONT_FLAG_ORDER = { "OUTLINE", "THICKOUTLINE", "MONOCHROME", "SLUG" }
+local VALID_FONT_FLAGS = {
+	OUTLINE = true,
+	THICKOUTLINE = true,
+	MONOCHROME = true,
+	SLUG = true,
+}
+
+local FONT_FLAG_ALIASES = {
+	NONE = "",
+	NORMAL = "",
+	THINOUTLINE = "OUTLINE",
+}
+
+local function GetFontFlagSet(flags)
+	local flagSet = {}
+	if flags == nil then
+		return flagSet
+	end
+
+	for flag in tostring(flags):gmatch("[^,%s]+") do
+		flag = string.upper(flag)
+		flag = FONT_FLAG_ALIASES[flag] or flag
+		if flag ~= "" and VALID_FONT_FLAGS[flag] then
+			flagSet[flag] = true
+		end
+	end
+
+	if flagSet.THICKOUTLINE then
+		flagSet.OUTLINE = nil
+	end
+
+	return flagSet
+end
+
+local function SerializeFontFlags(flagSet)
+	local flags = {}
+	for _, flag in ipairs(FONT_FLAG_ORDER) do
+		if flagSet[flag] then
+			flags[#flags + 1] = flag
+		end
+	end
+	return table.concat(flags, ",")
+end
+
+function FontManager:NormalizeFontFlags(flags)
+	return SerializeFontFlags(GetFontFlagSet(flags))
+end
+
+function FontManager:GetFontFlagSet(flags)
+	return GetFontFlagSet(flags)
+end
+
+function FontManager:SerializeFontFlags(flagSet)
+	return SerializeFontFlags(flagSet or {})
+end
+
+function FontManager:AddFontFlag(flags, flag)
+	local flagSet = GetFontFlagSet(flags)
+	flag = FONT_FLAG_ALIASES[flag] or flag
+	if flag and VALID_FONT_FLAGS[flag] then
+		if flag == "OUTLINE" then
+			flagSet.THICKOUTLINE = nil
+		elseif flag == "THICKOUTLINE" then
+			flagSet.OUTLINE = nil
+		end
+		flagSet[flag] = true
+	end
+	return SerializeFontFlags(flagSet)
+end
+
+function FontManager:RemoveFontFlag(flags, flag)
+	local flagSet = GetFontFlagSet(flags)
+	flag = FONT_FLAG_ALIASES[flag] or flag
+	if flag and VALID_FONT_FLAGS[flag] then
+		flagSet[flag] = nil
+	end
+	return SerializeFontFlags(flagSet)
+end
+
+function FontManager:IsSlugRenderingAvailable()
+	if SLUG_RENDERING_SUPPORTED ~= nil then
+		return SLUG_RENDERING_SUPPORTED
+	end
+
+	SLUG_RENDERING_SUPPORTED = false
+	if not CreateFont then
+		return false
+	end
+
+	local probeFont = _G.BFL_SlugProbeFont
+	if not probeFont then
+		local ok, createdFont = pcall(CreateFont, "BFL_SlugProbeFont")
+		if not ok or not createdFont then
+			return false
+		end
+		probeFont = createdFont
+	end
+
+	local fontPath = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
+	local ok, result = pcall(probeFont.SetFont, probeFont, fontPath, 12, "SLUG")
+	SLUG_RENDERING_SUPPORTED = ok and result ~= false
+	return SLUG_RENDERING_SUPPORTED
+end
+
+function FontManager:GetFontFlags(flags)
+	local flagSet = GetFontFlagSet(flags)
+	if flagSet.SLUG and not self:IsSlugRenderingAvailable() then
+		flagSet.SLUG = nil
+	end
+	return SerializeFontFlags(flagSet)
+end
+
+function FontManager:GetDefaultUIFontFlags(flags)
+	return self:GetFontFlags(self:AddFontFlag(flags, "SLUG"))
+end
+
+function FontManager:ApplyDefaultSlugToFontObject(fontObject)
+	if not fontObject or not fontObject.GetFont or not fontObject.SetFont then
+		return false
+	end
+
+	local fontPath, fontSize, flags = fontObject:GetFont()
+	if not fontPath or not fontSize then
+		return false
+	end
+
+	local resolvedFlags = self:GetFontFlags(flags)
+	local slugFlags = self:GetDefaultUIFontFlags(flags)
+	if slugFlags == resolvedFlags then
+		return true
+	end
+
+	local ok, result = pcall(fontObject.SetFont, fontObject, fontPath, fontSize, slugFlags)
+	return ok and result ~= false
+end
+
+function FontManager:ApplyDefaultSlugToFontString(fontString)
+	if not fontString or not fontString.GetFont or not fontString.SetFont then
+		return false
+	end
+
+	local fontPath, fontSize, flags = fontString:GetFont()
+	if not fontPath or not fontSize then
+		return false
+	end
+
+	local resolvedFlags = self:GetFontFlags(flags)
+	local slugFlags = self:GetDefaultUIFontFlags(flags)
+	if slugFlags == resolvedFlags then
+		return true
+	end
+
+	local ok, result = pcall(fontString.SetFont, fontString, fontPath, fontSize, slugFlags)
+	return ok and result ~= false
+end
 
 -- Generate and Cache FontFamily
 function FontManager:GetOrCreateFontFamily(fontPath, size, flags, shadow, useFontForNonLatinAlphabets)
 	-- Normalize inputs
 	size = math.floor(size + 0.5) -- Round to integer
-	flags = flags or ""
-	if flags == "NONE" then
-		flags = ""
-	end
+	flags = self:GetFontFlags(flags)
 
 	local shadowKey = shadow and "SHADOW" or "NONE"
 	local alphabetKey = useFontForNonLatinAlphabets and "USER_NON_LATIN" or "SYSTEM_NON_LATIN"
@@ -187,7 +342,7 @@ function FontManager:ApplyFont(fontString, fontPath, size, flags, shadow)
 	else
 		-- Fallback: Use SetFont directly if Family creation failed
 		-- This loses alphabet backups but keeps text visible
-		fontString:SetFont(fontPath, size, flags)
+		fontString:SetFont(fontPath, size, self:GetFontFlags(flags))
 		if shadow then
 			fontString:SetShadowOffset(1, -1)
 			fontString:SetShadowColor(0, 0, 0, 1)

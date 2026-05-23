@@ -23,6 +23,10 @@ local function NormalizeTheme(theme)
 	return "blizzard"
 end
 
+local function AreThemeFeaturesEnabled()
+	return BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures == true
+end
+
 local function GetStoredTheme()
 	if not BetterFriendlistDB then
 		return "blizzard"
@@ -35,8 +39,15 @@ local function GetStoredTheme()
 	return NormalizeTheme(BetterFriendlistDB.theme)
 end
 
+function BFL:AreThemeFeaturesEnabled()
+	return AreThemeFeaturesEnabled()
+end
+
 function BFL:GetEffectiveTheme()
 	local theme = GetStoredTheme()
+	if theme ~= "blizzard" and not AreThemeFeaturesEnabled() then
+		return "blizzard"
+	end
 	if theme == "elvui" and not _G.ElvUI then
 		return "blizzard"
 	end
@@ -82,6 +93,9 @@ end
 
 function ThemeManager:SetTheme(theme, reason)
 	theme = NormalizeTheme(theme)
+	if theme ~= "blizzard" and not AreThemeFeaturesEnabled() then
+		theme = "blizzard"
+	end
 
 	local DB = BFL:GetModule("DB")
 	if DB then

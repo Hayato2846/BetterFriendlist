@@ -60,6 +60,65 @@ local function GetDB()
 	return BFL:GetModule("DB")
 end
 
+local function ApplyDefaultSlugToFontString(fontString)
+	if BFL.FontManager and BFL.FontManager.ApplyDefaultSlugToFontString then
+		BFL.FontManager:ApplyDefaultSlugToFontString(fontString)
+	end
+end
+
+local function ApplyDefaultSlugToButton(button)
+	if button and button.GetFontString then
+		ApplyDefaultSlugToFontString(button:GetFontString())
+	end
+end
+
+local function ApplyBetterFriendlistSmallButtonFonts(button)
+	if not button then
+		return
+	end
+	if button.SetNormalFontObject then
+		button:SetNormalFontObject("BetterFriendlistFontNormalSmall")
+		button:SetHighlightFontObject("BetterFriendlistFontHighlightSmall")
+		button:SetDisabledFontObject("BetterFriendlistFontDisableSmall")
+	end
+	ApplyDefaultSlugToButton(button)
+end
+
+local function ApplyBetterFriendlistHeaderButtonFonts(button)
+	if not button then
+		return
+	end
+	if button.SetNormalFontObject then
+		button:SetNormalFontObject("BetterFriendlistFontHighlightSmall")
+		button:SetHighlightFontObject("BetterFriendlistFontHighlightSmall")
+		button:SetDisabledFontObject("BetterFriendlistFontDisableSmall")
+	end
+	ApplyDefaultSlugToButton(button)
+end
+
+local function ApplyStaticGuildFrameFonts(frame)
+	if not frame then
+		return
+	end
+
+	ApplyBetterFriendlistHeaderButtonFonts(frame.NameHeader)
+	ApplyBetterFriendlistHeaderButtonFonts(frame.RankHeader)
+	ApplyBetterFriendlistHeaderButtonFonts(frame.LevelHeader)
+	ApplyBetterFriendlistHeaderButtonFonts(frame.ZoneHeader)
+	ApplyBetterFriendlistHeaderButtonFonts(frame.ILvlHeader)
+
+	ApplyBetterFriendlistSmallButtonFonts(frame.FilterAll)
+	ApplyBetterFriendlistSmallButtonFonts(frame.FilterOnline)
+	ApplyBetterFriendlistSmallButtonFonts(frame.FilterOffline)
+	ApplyBetterFriendlistSmallButtonFonts(frame.OpenBlizzardGuildButton)
+	ApplyBetterFriendlistSmallButtonFonts(frame.RefreshButton)
+	ApplyBetterFriendlistSmallButtonFonts(frame.InvitePlayerButton)
+
+	if frame.SearchBox then
+		ApplyDefaultSlugToFontString(frame.SearchBox)
+	end
+end
+
 local function ShouldSuppressGuildModuleForSecretValues()
 	return BFL.HasSecretValues
 end
@@ -546,6 +605,8 @@ function GuildFrame:OnLoad(frame)
 		return
 	end
 
+	ApplyStaticGuildFrameFonts(frame)
+
 	-- NOTE: L (locale) is NOT available during OnLoad (set in Initialize).
 	-- Button/label text is set in OnShow instead.
 
@@ -641,6 +702,7 @@ function GuildFrame:SetupMemberButton(button)
 
 	-- Name text
 	button.nameText = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	ApplyDefaultSlugToFontString(button.nameText)
 	button.nameText:SetPoint("LEFT", button.classIcon, "RIGHT", 4, 0)
 	button.nameText:SetJustifyH("LEFT")
 
@@ -651,6 +713,7 @@ function GuildFrame:SetupMemberButton(button)
 
 	-- Rank text
 	button.rankText = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	ApplyDefaultSlugToFontString(button.rankText)
 	button.rankText:SetJustifyH("LEFT")
 	button.rankText:SetTextColor(0.6, 0.6, 0.6)
 	button.rankText:SetMaxLines(1)
@@ -659,16 +722,19 @@ function GuildFrame:SetupMemberButton(button)
 
 	-- Level text
 	button.levelText = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	ApplyDefaultSlugToFontString(button.levelText)
 	button.levelText:SetJustifyH("CENTER")
 
 	-- Zone text
 	button.zoneText = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	ApplyDefaultSlugToFontString(button.zoneText)
 	button.zoneText:SetJustifyH("LEFT")
 	button.zoneText:SetMaxLines(1)
 	button.zoneText:SetWordWrap(false)
 
 	-- Item Level text
 	button.ilvlText = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	ApplyDefaultSlugToFontString(button.ilvlText)
 	button.ilvlText:SetJustifyH("RIGHT")
 	button.ilvlText:SetTextColor(1, 0.82, 0)
 
@@ -982,6 +1048,7 @@ function GuildFrame:CreateEmptyState(frame)
 	if frame.EmptyText then return end
 
 	local emptyText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	ApplyDefaultSlugToFontString(emptyText)
 	emptyText:SetPoint("CENTER", frame, "CENTER", 0, 0)
 	emptyText:SetTextColor(0.5, 0.5, 0.5)
 	frame.EmptyText = emptyText
@@ -1335,10 +1402,10 @@ function GuildFrame.StylePillButton(button, isActive)
 	if not button then return end
 	if isActive then
 		button:LockHighlight()
-		button:SetNormalFontObject("GameFontHighlightSmall")
+		button:SetNormalFontObject("BetterFriendlistFontHighlightSmall")
 	else
 		button:UnlockHighlight()
-		button:SetNormalFontObject("GameFontNormalSmall")
+		button:SetNormalFontObject("BetterFriendlistFontNormalSmall")
 	end
 end
 
@@ -1497,6 +1564,7 @@ function GuildFrame:CreateMemberInfoPanel()
 
 	-- Title text
 	panel.title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	ApplyDefaultSlugToFontString(panel.title)
 	panel.title:SetPoint("LEFT", titleBg, "LEFT", 6, 0)
 	panel.title:SetText((L and L.GUILD_INFO_PANEL_TITLE) or "Member Info")
 	panel.title:SetTextColor(1, 0.82, 0)
@@ -1520,6 +1588,7 @@ function GuildFrame:CreateMemberInfoPanel()
 
 	-- Name (class colored)
 	panel.nameText = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+	ApplyDefaultSlugToFontString(panel.nameText)
 	panel.nameText:SetPoint("TOPLEFT", panel.classIcon, "TOPRIGHT", 10, -2)
 	panel.nameText:SetPoint("RIGHT", panel, "RIGHT", -18, 0)
 	panel.nameText:SetJustifyH("LEFT")
@@ -1527,6 +1596,7 @@ function GuildFrame:CreateMemberInfoPanel()
 
 	-- Subtitle (level + class)
 	panel.subText = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	ApplyDefaultSlugToFontString(panel.subText)
 	panel.subText:SetPoint("TOPLEFT", panel.nameText, "BOTTOMLEFT", 0, -4)
 	panel.subText:SetPoint("RIGHT", panel.nameText, "RIGHT", 0, 0)
 	panel.subText:SetJustifyH("LEFT")
@@ -1534,6 +1604,7 @@ function GuildFrame:CreateMemberInfoPanel()
 
 	-- Zone / last online
 	panel.zoneText = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	ApplyDefaultSlugToFontString(panel.zoneText)
 	panel.zoneText:SetPoint("TOPLEFT", panel.subText, "BOTTOMLEFT", 0, -3)
 	panel.zoneText:SetPoint("RIGHT", panel.subText, "RIGHT", 0, 0)
 	panel.zoneText:SetJustifyH("LEFT")
@@ -1544,12 +1615,14 @@ function GuildFrame:CreateMemberInfoPanel()
 
 	-- Item Level line
 	panel.ilvlText = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	ApplyDefaultSlugToFontString(panel.ilvlText)
 	panel.ilvlText:SetPoint("TOPLEFT", panel.divider1, "BOTTOMLEFT", 6, -6)
 	panel.ilvlText:SetJustifyH("LEFT")
 	panel.ilvlText:SetTextColor(1, 0.82, 0)
 
 	-- Rank dropdown label
 	panel.rankLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	ApplyDefaultSlugToFontString(panel.rankLabel)
 	panel.rankLabel:SetPoint("TOPLEFT", panel.ilvlText, "BOTTOMLEFT", 0, -10)
 	panel.rankLabel:SetText((L and L.GUILD_INFO_RANK) or "Rank")
 	panel.rankLabel:SetTextColor(0.7, 0.7, 0.7)
@@ -1564,6 +1637,7 @@ function GuildFrame:CreateMemberInfoPanel()
 
 	-- Public Note
 	panel.pubLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	ApplyDefaultSlugToFontString(panel.pubLabel)
 	panel.pubLabel:SetPoint("TOPLEFT", panel.divider2, "BOTTOMLEFT", 6, -8)
 	panel.pubLabel:SetText((L and L.GUILD_INFO_PUBLIC_NOTE) or "Public Note")
 	panel.pubLabel:SetTextColor(0.7, 0.7, 0.7)
@@ -1573,11 +1647,13 @@ function GuildFrame:CreateMemberInfoPanel()
 	panel.pubNote:SetPoint("TOPLEFT", panel.pubLabel, "BOTTOMLEFT", 5, -4)
 	panel.pubNote:SetAutoFocus(false)
 	panel.pubNote:SetMaxLetters(31)
+	ApplyDefaultSlugToFontString(panel.pubNote)
 	panel.pubNote:SetScript("OnEscapePressed", function(e) e:ClearFocus() end)
 	panel.pubNote:SetScript("OnEnterPressed", function(e) e:ClearFocus() end)
 
 	-- Officer Note
 	panel.offLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	ApplyDefaultSlugToFontString(panel.offLabel)
 	panel.offLabel:SetPoint("TOPLEFT", panel.pubNote, "BOTTOMLEFT", -5, -8)
 	panel.offLabel:SetText((L and L.GUILD_INFO_OFFICER_NOTE) or "Officer Note")
 	panel.offLabel:SetTextColor(0.5, 1, 0.5)
@@ -1587,11 +1663,13 @@ function GuildFrame:CreateMemberInfoPanel()
 	panel.offNote:SetPoint("TOPLEFT", panel.offLabel, "BOTTOMLEFT", 5, -4)
 	panel.offNote:SetAutoFocus(false)
 	panel.offNote:SetMaxLetters(31)
+	ApplyDefaultSlugToFontString(panel.offNote)
 	panel.offNote:SetScript("OnEscapePressed", function(e) e:ClearFocus() end)
 	panel.offNote:SetScript("OnEnterPressed", function(e) e:ClearFocus() end)
 
 	-- Nickname
 	panel.nickLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	ApplyDefaultSlugToFontString(panel.nickLabel)
 	panel.nickLabel:SetPoint("TOPLEFT", panel.offNote, "BOTTOMLEFT", -5, -8)
 	panel.nickLabel:SetText((L and L.GUILD_INFO_NICKNAME) or "Nickname")
 	panel.nickLabel:SetTextColor(0.7, 0.7, 0.7)
@@ -1601,6 +1679,7 @@ function GuildFrame:CreateMemberInfoPanel()
 	panel.nickBox:SetPoint("TOPLEFT", panel.nickLabel, "BOTTOMLEFT", 5, -4)
 	panel.nickBox:SetAutoFocus(false)
 	panel.nickBox:SetMaxLetters(32)
+	ApplyDefaultSlugToFontString(panel.nickBox)
 	panel.nickBox:SetScript("OnEscapePressed", function(e) e:ClearFocus() end)
 	panel.nickBox:SetScript("OnEnterPressed", function(e) e:ClearFocus() end)
 
@@ -1914,12 +1993,15 @@ function BFL_GuildFrame_OnShow(frame)
 		-- Set locale text for buttons (L is not available during OnLoad, only after Initialize)
 		if frame.OpenBlizzardGuildButton and BFL.L then
 			frame.OpenBlizzardGuildButton:SetText(BFL.L.GUILD_OPEN_MANAGEMENT or "Guild Management")
+			ApplyDefaultSlugToButton(frame.OpenBlizzardGuildButton)
 		end
 		if frame.FilterOffline and BFL.L then
 			frame.FilterOffline:SetText(BFL.L.GUILD_FILTER_OFFLINE or FRIENDS_LIST_OFFLINE or "Offline")
+			ApplyDefaultSlugToButton(frame.FilterOffline)
 		end
 		if frame.InvitePlayerButton and BFL.L then
 			frame.InvitePlayerButton:SetText(BFL.L.GUILD_INVITE_BOTTOM_BUTTON or "Invite Player")
+			ApplyDefaultSlugToButton(frame.InvitePlayerButton)
 			-- Disable if not allowed to invite
 			local canInvite = CanGuildInvite and CanGuildInvite() or false
 			frame.InvitePlayerButton:SetEnabled(canInvite)
@@ -1928,7 +2010,11 @@ function BFL_GuildFrame_OnShow(frame)
 		if frame.GuildName then
 			local f, _, flags = frame.GuildName:GetFont()
 			if f then
-				frame.GuildName:SetFont(f, 18, flags or "")
+				local fontFlags = flags or ""
+				if BFL.FontManager and BFL.FontManager.GetDefaultUIFontFlags then
+					fontFlags = BFL.FontManager:GetDefaultUIFontFlags(fontFlags)
+				end
+				frame.GuildName:SetFont(f, 18, fontFlags)
 			end
 		end
 		-- Pill-style filter buttons + MOTD tooltip

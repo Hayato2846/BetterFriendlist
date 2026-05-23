@@ -304,7 +304,7 @@ local SORT_NAMES = {
 -- Helper: Format icon for display (handles both texture paths and Font Awesome strings)
 local function FormatIconText(iconData, text)
 	-- Check if it's a texture path (starts with "Interface")
-	if type(iconData) == "string" and iconData:match("^Interface") then
+	if type(iconData) == "number" or (type(iconData) == "string" and iconData:match("^Interface")) then
 		return string.format("\124T%s:16:16:0:0\124t %s", iconData, text)
 	else
 		-- Font Awesome icon - use directly with color
@@ -314,12 +314,50 @@ end
 
 -- Helper: Format icon only for dropdown button
 local function FormatIconOnly(iconData)
-	if type(iconData) == "string" and iconData:match("^Interface") then
+	if type(iconData) == "number" or (type(iconData) == "string" and iconData:match("^Interface")) then
 		return string.format("\124T%s:16:16:0:0\124t", iconData)
 	else
 		-- Font Awesome icon
 		return string.format("|cFF00CCFF%s|r", iconData)
 	end
+end
+
+local function GetFilterSortRegistry()
+	return BFL:GetModule("FilterSortRegistry")
+end
+
+local function GetVisibleSorters()
+	local Registry = GetFilterSortRegistry()
+	if Registry and Registry.GetVisibleSorters then
+		return Registry:GetVisibleSorters()
+	end
+	local sorters = {}
+	for id, name in pairs(SORT_NAMES) do
+		table.insert(sorters, { id = id, name = name, icon = SORT_ICONS[id] })
+	end
+	table.sort(sorters, function(a, b)
+		return (a.name or a.id) < (b.name or b.id)
+	end)
+	return sorters
+end
+
+local function GetSorterIcon(sortMode)
+	local Registry = GetFilterSortRegistry()
+	if Registry and Registry.GetSorterIcon then
+		return Registry:GetSorterIcon(sortMode)
+	end
+	return SORT_ICONS[sortMode] or SORT_ICONS.name
+end
+
+local function GetSorterName(sortMode)
+	if sortMode == "none" then
+		return L.SORT_NONE or "None"
+	end
+	local Registry = GetFilterSortRegistry()
+	if Registry and Registry.GetSorterText then
+		return Registry:GetSorterText(sortMode)
+	end
+	return SORT_NAMES[sortMode] or sortMode or "Status"
 end
 
 function FrameInitializer:InitializeSortDropdown(frame)
@@ -492,7 +530,7 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 
 					-- Update secondary dropdown text (in case it was reset to none)
 					local currentSecondary = FriendsList.secondarySort or "none"
-					local secondaryIcon = SORT_ICONS[currentSecondary] or SORT_ICONS.name
+					local secondaryIcon = GetSorterIcon(currentSecondary)
 					UIDropDownMenu_SetText(secondaryDropdown, string.format("|T%s:14:14:-2:-2|t", secondaryIcon))
 				end
 				-- Check against DB/Module state
@@ -503,22 +541,16 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 				UIDropDownMenu_AddButton(info)
 			end
 
-			AddPrimaryOption("status", L.SORT_STATUS, SORT_ICONS.status)
-			AddPrimaryOption("name", L.SORT_NAME, SORT_ICONS.name)
-			AddPrimaryOption("level", L.SORT_LEVEL, SORT_ICONS.level)
-			AddPrimaryOption("zone", L.SORT_ZONE, SORT_ICONS.zone)
-			AddPrimaryOption("game", L.SORT_GAME, SORT_ICONS.game)
-			AddPrimaryOption("faction", L.SORT_FACTION, SORT_ICONS.faction)
-			AddPrimaryOption("guild", L.SORT_GUILD, SORT_ICONS.guild)
-			AddPrimaryOption("class", L.SORT_CLASS, SORT_ICONS.class)
-			AddPrimaryOption("realm", L.SORT_REALM, SORT_ICONS.realm)
+			for _, sorter in ipairs(GetVisibleSorters()) do
+				AddPrimaryOption(sorter.id, sorter.name, sorter.icon)
+			end
 		end)
 
 		-- Set initial text for Primary
 		local DB = BFL:GetModule("DB")
 		local db = DB and DB:Get() or {}
 		local currentPrimary = db.primarySort or FriendsList.sortMode or "status"
-		local primaryIcon = SORT_ICONS[currentPrimary] or SORT_ICONS.status
+		local primaryIcon = GetSorterIcon(currentPrimary)
 		UIDropDownMenu_SetText(primaryDropdown, string.format("|T%s:14:14:-2:-2|t", primaryIcon))
 
 		-- Secondary Sort Dropdown
@@ -552,20 +584,14 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 			end
 
 			AddSecondaryOption("none", L.SORT_NONE, SORT_ICONS.none)
-			AddSecondaryOption("status", L.SORT_STATUS, SORT_ICONS.status)
-			AddSecondaryOption("name", L.SORT_NAME, SORT_ICONS.name)
-			AddSecondaryOption("level", L.SORT_LEVEL, SORT_ICONS.level)
-			AddSecondaryOption("zone", L.SORT_ZONE, SORT_ICONS.zone)
-			AddSecondaryOption("game", L.SORT_GAME, SORT_ICONS.game)
-			AddSecondaryOption("faction", L.SORT_FACTION, SORT_ICONS.faction)
-			AddSecondaryOption("guild", L.SORT_GUILD, SORT_ICONS.guild)
-			AddSecondaryOption("class", L.SORT_CLASS, SORT_ICONS.class)
-			AddSecondaryOption("realm", L.SORT_REALM, SORT_ICONS.realm)
+			for _, sorter in ipairs(GetVisibleSorters()) do
+				AddSecondaryOption(sorter.id, sorter.name, sorter.icon)
+			end
 		end)
 
 		-- Set initial text for Secondary
 		local currentSecondary = db.secondarySort or FriendsList.secondarySort or "name"
-		local secondaryIcon = SORT_ICONS[currentSecondary] or SORT_ICONS.name
+		local secondaryIcon = GetSorterIcon(currentSecondary)
 		UIDropDownMenu_SetText(secondaryDropdown, string.format("|T%s:14:14:-2:-2|t", secondaryIcon))
 
 		-- Setup tooltips for Classic
@@ -573,7 +599,7 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 		local primaryButton = _G[primaryDropdown:GetName() .. "Button"]
 		if primaryButton then
 			primaryButton:HookScript("OnEnter", function()
-				local sortName = SORT_NAMES[FriendsList.sortMode] or "Status"
+				local sortName = GetSorterName(FriendsList.sortMode)
 				BFL_Tooltip:SetOwner(primaryDropdown, "ANCHOR_RIGHT")
 				BFL_Tooltip:SetText(L.SORT_PRIMARY_LABEL .. ": " .. sortName)
 				BFL_Tooltip:AddLine(L.SORT_PRIMARY_DESC, 1, 1, 1, true)
@@ -582,7 +608,7 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 			primaryButton:HookScript("OnLeave", BFL_Tooltip_Hide)
 		else
 			primaryDropdown:SetScript("OnEnter", function()
-				local sortName = SORT_NAMES[FriendsList.sortMode] or "Status"
+				local sortName = GetSorterName(FriendsList.sortMode)
 				BFL_Tooltip:SetOwner(primaryDropdown, "ANCHOR_RIGHT")
 				BFL_Tooltip:SetText(L.SORT_PRIMARY_LABEL .. ": " .. sortName)
 				BFL_Tooltip:AddLine(L.SORT_PRIMARY_DESC, 1, 1, 1, true)
@@ -594,8 +620,7 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 		local secondaryButton = _G[secondaryDropdown:GetName() .. "Button"]
 		if secondaryButton then
 			secondaryButton:HookScript("OnEnter", function()
-				local sortName = FriendsList.secondarySort == "none" and "None"
-					or (SORT_NAMES[FriendsList.secondarySort] or "Name")
+				local sortName = GetSorterName(FriendsList.secondarySort)
 				BFL_Tooltip:SetOwner(secondaryDropdown, "ANCHOR_RIGHT")
 				BFL_Tooltip:SetText(L.SORT_SECONDARY_LABEL .. ": " .. sortName)
 				BFL_Tooltip:AddLine(L.SORT_SECONDARY_DESC, 1, 1, 1, true)
@@ -604,8 +629,7 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 			secondaryButton:HookScript("OnLeave", BFL_Tooltip_Hide)
 		else
 			secondaryDropdown:SetScript("OnEnter", function()
-				local sortName = FriendsList.secondarySort == "none" and "None"
-					or (SORT_NAMES[FriendsList.secondarySort] or "Name")
+				local sortName = GetSorterName(FriendsList.secondarySort)
 				BFL_Tooltip:SetOwner(secondaryDropdown, "ANCHOR_RIGHT")
 				BFL_Tooltip:SetText(L.SORT_SECONDARY_LABEL .. ": " .. sortName)
 				BFL_Tooltip:AddLine(L.SORT_SECONDARY_DESC, 1, 1, 1, true)
@@ -645,30 +669,21 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 	primaryDropdown:SetupMenu(function(dropdown, rootDescription)
 		rootDescription:SetTag("MENU_FRIENDS_PRIMARY_SORT")
 
-		-- Create sort options with icons (using helper function)
-		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.status, L.SORT_STATUS), "status")
-		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.name, L.SORT_NAME), "name")
-		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.level, L.SORT_LEVEL), "level")
-		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.zone, L.SORT_ZONE), "zone")
-
-		-- PHASE 9B+9C: Add 5 new sort options
-		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.game, L.SORT_GAME), "game")
-		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.faction, L.SORT_FACTION), "faction")
-		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.guild, L.SORT_GUILD), "guild")
-		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.class, L.SORT_CLASS), "class")
-		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.realm, L.SORT_REALM), "realm")
+		for _, sorter in ipairs(GetVisibleSorters()) do
+			CreatePrimaryRadio(rootDescription, FormatIconText(sorter.icon, sorter.name), sorter.id)
+		end
 	end)
 
 	-- Show icon only (like QuickFilters)
 	primaryDropdown:SetSelectionTranslator(function(selection)
-		return FormatIconOnly(SORT_ICONS[selection.data])
+		return FormatIconOnly(GetSorterIcon(selection.data))
 	end)
 
 	-- Generate menu once to trigger initial selection display
 	primaryDropdown:GenerateMenu()
 
 	primaryDropdown:SetScript("OnEnter", function()
-		local sortName = SORT_NAMES[FriendsList.sortMode] or "Status"
+		local sortName = GetSorterName(FriendsList.sortMode)
 		BFL_Tooltip:SetOwner(primaryDropdown, "ANCHOR_RIGHT")
 		BFL_Tooltip:SetText(L.SORT_PRIMARY_LABEL .. ": " .. sortName)
 		BFL_Tooltip:AddLine(L.SORT_PRIMARY_DESC, 1, 1, 1, true)
@@ -702,33 +717,22 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 	secondaryDropdown:SetupMenu(function(dropdown, rootDescription)
 		rootDescription:SetTag("MENU_FRIENDS_SECONDARY_SORT")
 
-		-- Create secondary sort options with icons (using helper function)
 		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.none, L.SORT_NONE), "none")
-		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.status, L.SORT_STATUS), "status")
-		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.name, L.SORT_NAME), "name")
-		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.level, L.SORT_LEVEL), "level")
-		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.zone, L.SORT_ZONE), "zone")
-
-		-- PHASE 9B+9C: Add 5 new sort options
-		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.game, L.SORT_GAME), "game")
-		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.faction, L.SORT_FACTION), "faction")
-		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.guild, L.SORT_GUILD), "guild")
-		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.class, L.SORT_CLASS), "class")
-		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.realm, L.SORT_REALM), "realm")
+		for _, sorter in ipairs(GetVisibleSorters()) do
+			CreateSecondaryRadio(rootDescription, FormatIconText(sorter.icon, sorter.name), sorter.id)
+		end
 	end)
 
 	-- Show icon only (X for none, sort icons for others)
 	secondaryDropdown:SetSelectionTranslator(function(selection)
-		local iconData = SORT_ICONS[selection.data] or SORT_ICONS.name
-		return FormatIconOnly(iconData)
+		return FormatIconOnly(GetSorterIcon(selection.data))
 	end)
 
 	-- Generate menu once to trigger initial selection display
 	secondaryDropdown:GenerateMenu()
 
 	secondaryDropdown:SetScript("OnEnter", function()
-		local sortName = FriendsList.secondarySort == "none" and "None"
-			or (SORT_NAMES[FriendsList.secondarySort] or "Name")
+		local sortName = GetSorterName(FriendsList.secondarySort)
 		BFL_Tooltip:SetOwner(secondaryDropdown, "ANCHOR_RIGHT")
 		BFL_Tooltip:SetText(L.SORT_SECONDARY_LABEL .. ": " .. sortName)
 		BFL_Tooltip:AddLine(L.SORT_SECONDARY_DESC, 1, 1, 1, true)

@@ -20,6 +20,27 @@ end
 local function GetFontManager()
 	return BFL.FontManager
 end
+local function GetFilterSortRegistry()
+	return BFL:GetModule("FilterSortRegistry")
+end
+
+local function GetDefaultUIFontFlags(flags)
+	local FontManager = GetFontManager()
+	if FontManager and FontManager.GetDefaultUIFontFlags then
+		return FontManager:GetDefaultUIFontFlags(flags)
+	end
+	if FontManager and FontManager.GetFontFlags then
+		return FontManager:GetFontFlags(flags)
+	end
+	return flags
+end
+
+local function ApplyDefaultSlugToFontString(fontString)
+	local FontManager = GetFontManager()
+	if FontManager and FontManager.ApplyDefaultSlugToFontString then
+		FontManager:ApplyDefaultSlugToFontString(fontString)
+	end
+end
 
 local function GetFriendsListModule()
 	return BFL:GetModule("FriendsList")
@@ -266,7 +287,7 @@ local function CalculateCompactRowHeight(self, nameSize, nameText, nameWidth)
 		measure:SetFont(self.fontCache.namePath, nameFontSize, outline)
 	else
 		local _, _, flags = measure:GetFont()
-		measure:SetFont(STANDARD_TEXT_FONT, nameFontSize, flags)
+		measure:SetFont(STANDARD_TEXT_FONT, nameFontSize, GetDefaultUIFontFlags(flags))
 	end
 
 	measure:SetWidth(nameWidth)
@@ -315,9 +336,10 @@ local function EnsureGroupHeaderCountText(button)
 		countText:SetFontObject(baseFontObj)
 	elseif _G.GameFontNormal then
 		countText:SetFontObject(_G.GameFontNormal)
+		ApplyDefaultSlugToFontString(countText)
 	else
 		-- Only hardcode fallback if no FontObject is available at all
-		countText:SetFont(STANDARD_TEXT_FONT, 12, "")
+		countText:SetFont(STANDARD_TEXT_FONT, 12, GetDefaultUIFontFlags(""))
 	end
 	EnsureGroupHeaderFont(countText)
 	button.CountText = countText
@@ -338,18 +360,19 @@ EnsureGroupHeaderFont = function(fs)
 	local fallback = _G.GameFontNormal
 	if fallback then
 		fs:SetFontObject(fallback)
+		ApplyDefaultSlugToFontString(fs)
 		return
 	end
 
 	if fallback and fallback.GetFont then
 		local fontPath, fontSize, fontFlags = fallback:GetFont()
 		if fontPath then
-			fs:SetFont(fontPath, fontSize or 12, fontFlags)
+			fs:SetFont(fontPath, fontSize or 12, GetDefaultUIFontFlags(fontFlags))
 			return
 		end
 	end
 
-	fs:SetFont(STANDARD_TEXT_FONT, 12, "")
+	fs:SetFont(STANDARD_TEXT_FONT, 12, GetDefaultUIFontFlags(""))
 end
 
 local function SyncGroupHeaderFont(fs, countFs)
@@ -403,17 +426,18 @@ local function EnsureFontSet(fs)
 	local fallback = _G.GameFontNormal
 	if fallback then
 		fs:SetFontObject(fallback)
+		ApplyDefaultSlugToFontString(fs)
 		if fs:GetFont() then
 			return
 		end
 	end
-	fs:SetFont(STANDARD_TEXT_FONT, 12, "")
+	fs:SetFont(STANDARD_TEXT_FONT, 12, GetDefaultUIFontFlags(""))
 end
 
 local function SafeSetText(fs, text)
 	EnsureGroupHeaderFont(fs)
 	if not IsFontReady(fs) then
-		fs:SetFont(STANDARD_TEXT_FONT, 12, "")
+		fs:SetFont(STANDARD_TEXT_FONT, 12, GetDefaultUIFontFlags(""))
 	end
 	if IsFontReady(fs) then
 		local ok = pcall(fs.SetText, fs, text or "")
@@ -1079,7 +1103,7 @@ local function CreateElementFactory(friendsList) -- Capture friendsList referenc
 				button.gameAccountBadgeBg = badgeBg
 
 				local badgeText = badge:CreateFontString(nil, "OVERLAY", nil, 2)
-				badgeText:SetFont(STANDARD_TEXT_FONT, 10, "OUTLINE")
+				badgeText:SetFont(STANDARD_TEXT_FONT, 10, GetDefaultUIFontFlags("OUTLINE"))
 				badgeText:SetPoint("CENTER", badge, "CENTER", 0, 0)
 				badgeText:SetTextColor(1, 0.82, 0, 1) -- Gold
 				badgeText:SetJustifyH("CENTER")
@@ -1132,6 +1156,7 @@ local function CreateElementFactory(friendsList) -- Capture friendsList referenc
 			-- Clickable overlay on game icon for switching preferred game account
 			if not button.gameIconOverlay then
 				local overlay = CreateFrame("Button", nil, button)
+				overlay.BFL_DarkInvisibleOverlayButton = true
 				overlay:SetSize(28, 28)
 				overlay:Hide()
 				overlay:SetScript("OnClick", function(self)
@@ -1152,6 +1177,7 @@ local function CreateElementFactory(friendsList) -- Capture friendsList referenc
 				end)
 				button.gameIconOverlay = overlay
 			end
+			button.gameIconOverlay.BFL_DarkInvisibleOverlayButton = true
 
 			-- Enable drag
 			button:RegisterForDrag("LeftButton")
@@ -2036,7 +2062,7 @@ end
 -- ========================================
 FriendsList.friendsList = {} -- Raw friends data from API
 FriendsList.searchText = "" -- Current search filter
-FriendsList.filterMode = "all" -- Current filter mode: all, online, offline, wow, bnet
+FriendsList.filterMode = "all" -- Current filter mode: all, online, offline, wowonline, wow, bnet
 FriendsList.sortMode = "status" -- Current sort mode: status, name, level, zone
 
 -- Reference to Groups
@@ -3088,8 +3114,14 @@ function FriendsList:Initialize() -- Initialize sort modes and filter from datab
 
 	local DB = BFL:GetModule("DB")
 	local db = DB and DB:Get() or {}
-	self.sortMode = db.primarySort or "status"
-	self.secondarySort = db.secondarySort or "name"
+	local Registry = GetFilterSortRegistry()
+	if Registry and Registry.NormalizeCurrentSelections then
+		Registry:NormalizeCurrentSelections()
+	end
+	self.sortMode = Registry and Registry.NormalizePrimarySorterId and Registry:NormalizePrimarySorterId(db.primarySort)
+		or (db.primarySort or "status")
+	self.secondarySort = Registry and Registry.NormalizeSecondarySorterId and Registry:NormalizeSecondarySorterId(db.secondarySort, self.sortMode)
+		or (db.secondarySort or "name")
 
 	-- Compatibility: Prevent invalid state where Primary == Secondary
 	if self.sortMode == self.secondarySort then
@@ -3103,7 +3135,8 @@ function FriendsList:Initialize() -- Initialize sort modes and filter from datab
 	end
 
 	-- CRITICAL: Load filterMode from DB to ensure consistency
-	self.filterMode = db.quickFilter or "all"
+	self.filterMode = Registry and Registry.NormalizeQuickFilterId and Registry:NormalizeQuickFilterId(db.quickFilter)
+		or (db.quickFilter or "all")
 
 	-- Initialize settings cache
 	self:UpdateSettingsCache()
@@ -3196,7 +3229,7 @@ function FriendsList:UpdateFontCache()
 	local nameFontName = DB:Get("fontFriendName", "Friz Quadrata TT")
 	self.fontCache.namePath = BFL.FontManager:ResolveFontPath(nameFontName)
 	self.fontCache.nameSize = DB:Get("fontSizeFriendName", 12)
-	self.fontCache.nameOutline = DB:Get("fontOutlineFriendName", "NONE")
+	self.fontCache.nameOutline = BFL.FontManager:GetFontFlags(DB:Get("fontOutlineFriendName", "NONE"))
 	self.fontCache.nameShadow = DB:Get("fontShadowFriendName", false)
 	self.fontCache.nameR, self.fontCache.nameG, self.fontCache.nameB, self.fontCache.nameA =
 		GetColor("fontColorFriendName")
@@ -3205,7 +3238,7 @@ function FriendsList:UpdateFontCache()
 	local infoFontName = DB:Get("fontFriendInfo", "Friz Quadrata TT")
 	self.fontCache.infoPath = BFL.FontManager:ResolveFontPath(infoFontName)
 	self.fontCache.infoSize = DB:Get("fontSizeFriendInfo", 10)
-	self.fontCache.infoOutline = DB:Get("fontOutlineFriendInfo", "NONE")
+	self.fontCache.infoOutline = BFL.FontManager:GetFontFlags(DB:Get("fontOutlineFriendInfo", "NONE"))
 	self.fontCache.infoShadow = DB:Get("fontShadowFriendInfo", false)
 	self.fontCache.infoR, self.fontCache.infoG, self.fontCache.infoB, self.fontCache.infoA =
 		GetColor("fontColorFriendInfo")
@@ -4457,6 +4490,13 @@ end
 function FriendsList:ApplySort()
 	local primarySort = self.sortMode or "status"
 	local secondarySort = self.secondarySort or "name"
+	local Registry = GetFilterSortRegistry()
+	if Registry and Registry.CompareFriends then
+		table.sort(self.friendsList, function(a, b)
+			return Registry:CompareFriends(a, b, primarySort, secondarySort)
+		end)
+		return
+	end
 
 	-- Set string tiebreaker fields for the inline comparator
 	currentPrimaryStringField = sortStringField[primarySort]
@@ -4469,6 +4509,10 @@ end
 -- Compare two friends by a specific sort mode (returns true, false, or nil if equal)
 -- Compare two friends by a specific sort mode (Optimized)
 function FriendsList:CompareFriends(a, b, sortMode)
+	local Registry = GetFilterSortRegistry()
+	if Registry and Registry.CompareFriends then
+		return Registry:CompareFriends(a, b, sortMode or self.sortMode, "none")
+	end
 	local comparator = compareByMode[sortMode]
 	if comparator then
 		return comparator(a, b)
@@ -4521,6 +4565,11 @@ function FriendsList:PassesFilters(friend) -- Search text filter
 		end
 	end
 
+	local Registry = GetFilterSortRegistry()
+	if Registry and Registry.EvaluateQuickFilter then
+		return Registry:EvaluateQuickFilter(self.filterMode, friend)
+	end
+
 	-- Filter mode (use 'connected' field for both BNet and WoW friends)
 	if self.filterMode == "online" then
 		if not friend.connected then
@@ -4541,6 +4590,19 @@ function FriendsList:PassesFilters(friend) -- Search text filter
 			end
 		end
 		-- WoW friends always pass
+	elseif self.filterMode == "wowonline" then
+		if friend.type == "bnet" then
+			if not friend.connected or not friend.gameAccountInfo then
+				return false
+			end
+			if friend.gameAccountInfo.clientProgram ~= BNET_CLIENT_WOW then
+				return false
+			end
+		elseif friend.type == "wow" then
+			if not friend.connected then
+				return false
+			end
+		end
 	elseif self.filterMode == "bnet" then
 		if friend.type ~= "bnet" then
 			return false
@@ -4784,7 +4846,8 @@ end
 
 -- Set filter mode
 function FriendsList:SetFilterMode(mode)
-	local newMode = mode or "all"
+	local Registry = GetFilterSortRegistry()
+	local newMode = Registry and Registry.NormalizeQuickFilterId and Registry:NormalizeQuickFilterId(mode) or (mode or "all")
 	if self.filterMode == newMode then
 		return
 	end
@@ -4802,7 +4865,8 @@ end
 
 -- Set sort mode
 function FriendsList:SetSortMode(mode)
-	local newMode = mode or "status"
+	local Registry = GetFilterSortRegistry()
+	local newMode = Registry and Registry.NormalizePrimarySorterId and Registry:NormalizePrimarySorterId(mode) or (mode or "status")
 	if self.sortMode == newMode then
 		return
 	end
@@ -4827,6 +4891,11 @@ end
 
 -- Set secondary sort mode (for multi-criteria sorting)
 function FriendsList:SetSecondarySortMode(mode)
+	mode = mode or "name"
+	local Registry = GetFilterSortRegistry()
+	if Registry and Registry.NormalizeSecondarySorterId then
+		mode = Registry:NormalizeSecondarySorterId(mode, self.sortMode)
+	end
 	if self.secondarySort == mode then
 		return
 	end
@@ -4851,26 +4920,9 @@ end
 
 -- Helper to populate the Sort menu for the Contacts menu
 function FriendsList:PopulateSortMenu(rootDescription, sortType)
-	local L = BFL.L
-	local FrameInitializer = BFL.FrameInitializer
-	local UI = BFL.UI
-
-	-- Sort Icons (mirrored from FrameInitializer)
-	local SORT_ICONS = {
-		status = "Interface\\AddOns\\BetterFriendlist\\Icons\\status",
-		name = "Interface\\AddOns\\BetterFriendlist\\Icons\\name",
-		level = "Interface\\AddOns\\BetterFriendlist\\Icons\\level",
-		zone = "Interface\\AddOns\\BetterFriendlist\\Icons\\zone",
-		game = "Interface\\AddOns\\BetterFriendlist\\Icons\\game",
-		faction = "Interface\\AddOns\\BetterFriendlist\\Icons\\faction",
-		guild = "Interface\\AddOns\\BetterFriendlist\\Icons\\guild",
-		class = "Interface\\AddOns\\BetterFriendlist\\Icons\\class",
-		realm = "Interface\\AddOns\\BetterFriendlist\\Icons\\realm",
-		none = "Interface\\BUTTONS\\UI-GroupLoot-Pass-Up",
-	}
-
-	local function FormatIconText(iconData, text)
-		return string.format("\124T%s:16:16:0:0\124t %s", iconData, text)
+	local Registry = GetFilterSortRegistry()
+	if not Registry then
+		return
 	end
 
 	if sortType == "primary" then
@@ -4886,15 +4938,9 @@ function FriendsList:PopulateSortMenu(rootDescription, sortType)
 			root:CreateRadio(text, IsPrimarySelected, SetPrimarySelected, mode)
 		end
 
-		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.status, L.SORT_STATUS), "status")
-		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.name, L.SORT_NAME), "name")
-		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.level, L.SORT_LEVEL), "level")
-		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.zone, L.SORT_ZONE), "zone")
-		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.game, L.SORT_GAME), "game")
-		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.faction, L.SORT_FACTION), "faction")
-		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.guild, L.SORT_GUILD), "guild")
-		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.class, L.SORT_CLASS), "class")
-		CreatePrimaryRadio(rootDescription, FormatIconText(SORT_ICONS.realm, L.SORT_REALM), "realm")
+		for _, sorter in ipairs(Registry:GetVisibleSorters()) do
+			CreatePrimaryRadio(rootDescription, Registry:FormatIcon(sorter.icon, 16) .. " " .. sorter.name, sorter.id)
+		end
 	elseif sortType == "secondary" then
 		local function IsSecondarySelected(mode)
 			return self.secondarySort == mode
@@ -4912,16 +4958,14 @@ function FriendsList:PopulateSortMenu(rootDescription, sortType)
 			root:CreateRadio(text, IsSecondarySelected, SetSecondarySelected, mode)
 		end
 
-		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.none, L.SORT_NONE), "none")
-		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.status, L.SORT_STATUS), "status")
-		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.name, L.SORT_NAME), "name")
-		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.level, L.SORT_LEVEL), "level")
-		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.zone, L.SORT_ZONE), "zone")
-		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.game, L.SORT_GAME), "game")
-		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.faction, L.SORT_FACTION), "faction")
-		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.guild, L.SORT_GUILD), "guild")
-		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.class, L.SORT_CLASS), "class")
-		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.realm, L.SORT_REALM), "realm")
+		CreateSecondaryRadio(
+			rootDescription,
+			Registry:FormatIcon("Interface\\BUTTONS\\UI-GroupLoot-Pass-Up", 16) .. " " .. (L.SORT_NONE or "None"),
+			"none"
+		)
+		for _, sorter in ipairs(Registry:GetVisibleSorters()) do
+			CreateSecondaryRadio(rootDescription, Registry:FormatIcon(sorter.icon, 16) .. " " .. sorter.name, sorter.id)
+		end
 	end
 end
 
@@ -5901,13 +5945,17 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 			fontSize = DB:Get("fontSizeGroupHeader", 12)
 			fontOutline = DB:Get("fontOutlineGroupHeader", "NONE")
 			fontShadow = DB:Get("fontShadowGroupHeader", false)
+			local fontFlags = fontOutline
+			if BFL.FontManager and BFL.FontManager.GetFontFlags then
+				fontFlags = BFL.FontManager:GetFontFlags(fontOutline)
+			end
 
 			local fontPath = BFL.FontManager:ResolveFontPath(fontName)
 			-- Use FontManager to apply font with Alphabet support
 			if fontPath and BFL.FontManager and BFL.FontManager.GetOrCreateFontFamily then
 				-- For Group Headers (Buttons), we must set the Normal/Highlight FontObject
 				-- instead of just setting the FontString, otherwise interaction resets it
-				local familyObj = BFL.FontManager:GetOrCreateFontFamily(fontPath, fontSize, fontOutline, fontShadow)
+				local familyObj = BFL.FontManager:GetOrCreateFontFamily(fontPath, fontSize, fontFlags, fontShadow)
 				if familyObj then
 					button:SetNormalFontObject(familyObj)
 					button:SetHighlightFontObject(familyObj)
@@ -5916,7 +5964,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 					appliedFont = true
 				end
 			elseif fontPath then
-				fs:SetFont(fontPath, fontSize, fontOutline)
+				fs:SetFont(fontPath, fontSize, fontFlags)
 				appliedFont = true
 
 				if fontShadow then
@@ -5931,6 +5979,9 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 
 		if not appliedFont then
 			local outline = fontOutline
+			if BFL.FontManager and BFL.FontManager.GetFontFlags then
+				outline = BFL.FontManager:GetFontFlags(outline)
+			end
 			if outline == "NONE" then
 				outline = ""
 			end
@@ -7561,7 +7612,11 @@ function FriendsList:UpdateFriendButton(button, elementData)
 				button.gameAccountBadge:SetSize(badgeSize, badgeSize)
 				if button.gameAccountBadgeText and button.gameAccountBadgeText.SetFont then
 					local fontHeight = math.max(10, math.floor(badgeSize * 0.55))
-					button.gameAccountBadgeText:SetFont(STANDARD_TEXT_FONT, fontHeight, "OUTLINE")
+					button.gameAccountBadgeText:SetFont(
+						STANDARD_TEXT_FONT,
+						fontHeight,
+						GetDefaultUIFontFlags("OUTLINE")
+					)
 				end
 
 				button.gameAccountBadge:ClearAllPoints()

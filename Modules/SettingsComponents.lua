@@ -30,12 +30,29 @@ local DROPDOWN_WIDTH_BONUS = 8 -- Add the shift back as width
 local dropdownFontCache = {}
 local dropdownFontCounter = 0
 local defaultDropdownFontCache = {}
+local function GetResolvedFontFlags(flags)
+	if BFL.FontManager and BFL.FontManager.GetDefaultUIFontFlags then
+		return BFL.FontManager:GetDefaultUIFontFlags(flags)
+	end
+	if BFL.FontManager and BFL.FontManager.GetFontFlags then
+		return BFL.FontManager:GetFontFlags(flags)
+	end
+	return flags
+end
+
+local function GetFontCacheVariant()
+	if BFL.FontManager and BFL.FontManager.IsSlugRenderingAvailable and BFL.FontManager:IsSlugRenderingAvailable() then
+		return "SLUG_SUPPORTED"
+	end
+	return "BASE"
+end
+
 local function GetDropdownFontObject(fontPath, sizeOffset)
 	if not fontPath then
 		return nil
 	end
 	sizeOffset = sizeOffset or 2
-	local cacheKey = fontPath .. "|+" .. tostring(sizeOffset)
+	local cacheKey = fontPath .. "|+" .. tostring(sizeOffset) .. "|" .. GetFontCacheVariant()
 	local fontObject = dropdownFontCache[cacheKey]
 	if not fontObject then
 		local baseFont = _G.BetterFriendlistFontNormalSmall or _G.GameFontNormalSmall
@@ -43,7 +60,7 @@ local function GetDropdownFontObject(fontPath, sizeOffset)
 		local previewSize = (baseSize or 12) + sizeOffset
 		dropdownFontCounter = dropdownFontCounter + 1
 		fontObject = CreateFont("BFLDropdownFont" .. tostring(dropdownFontCounter))
-		fontObject:SetFont(fontPath, previewSize, baseFlags)
+		fontObject:SetFont(fontPath, previewSize, GetResolvedFontFlags(baseFlags))
 		dropdownFontCache[cacheKey] = fontObject
 	end
 	return fontObject
@@ -51,7 +68,7 @@ end
 
 local function GetDefaultDropdownFontObject(sizeOffset)
 	sizeOffset = sizeOffset or 2
-	local cacheKey = tostring(sizeOffset)
+	local cacheKey = tostring(sizeOffset) .. "|" .. GetFontCacheVariant()
 	local fontObject = defaultDropdownFontCache[cacheKey]
 	if not fontObject then
 		local baseFont = _G.BetterFriendlistFontNormalSmall or _G.GameFontNormalSmall
@@ -59,7 +76,7 @@ local function GetDefaultDropdownFontObject(sizeOffset)
 		local previewSize = (baseSize or 12) + sizeOffset
 		dropdownFontCounter = dropdownFontCounter + 1
 		fontObject = CreateFont("BFLDropdownDefaultFont" .. tostring(dropdownFontCounter))
-		fontObject:SetFont(select(1, baseFont:GetFont()), previewSize, baseFlags)
+		fontObject:SetFont(select(1, baseFont:GetFont()), previewSize, GetResolvedFontFlags(baseFlags))
 		defaultDropdownFontCache[cacheKey] = fontObject
 	end
 	return fontObject
@@ -301,6 +318,15 @@ local function AttachDarkDropdownData(dropdown, entries, isSelectedCallback, onS
 			return fontPath and GetDropdownFontObject(fontPath, 2) or defaultFontObject
 		end,
 		setText = function(value)
+			if entries.getSelectionText then
+				local label = entries.getSelectionText()
+				if dropdown.SetText then
+					dropdown:SetText(label)
+				elseif UIDropDownMenu_SetText then
+					UIDropDownMenu_SetText(dropdown, label)
+				end
+				return
+			end
 			for i = 1, #entryValues do
 				if entryValues[i] == value then
 					local label = entryLabels[i]
@@ -329,6 +355,7 @@ local function CreateClassicDropdown(parent, entries, isSelectedCallback, onSele
 	local useCheckboxes = entries.useCheckboxes
 	local dropdownText = _G[dropdownName .. "Text"]
 	local defaultFontObject = GetDefaultDropdownFontObject(2)
+	local getSelectionText = entries.getSelectionText
 
 	local function ApplySelectionFont(selectionValue)
 		if not dropdownText or not entryFontPaths then
@@ -350,6 +377,20 @@ local function CreateClassicDropdown(parent, entries, isSelectedCallback, onSele
 	dropdown.onSelectionCallback = onSelectionCallback
 	AttachDarkDropdownData(dropdown, entries, isSelectedCallback, onSelectionCallback, ApplySelectionFont)
 
+	local function UpdateDropdownText(selectionValue)
+		if getSelectionText then
+			UIDropDownMenu_SetText(dropdown, getSelectionText())
+			return
+		end
+		for i = 1, #entryValues do
+			if entryValues[i] == selectionValue then
+				UIDropDownMenu_SetText(dropdown, entryLabels[i])
+				ApplySelectionFont(selectionValue)
+				return
+			end
+		end
+	end
+
 	UIDropDownMenu_Initialize(dropdown, function(self, level)
 		level = level or 1
 		for i = 1, #entryLabels do
@@ -368,8 +409,7 @@ local function CreateClassicDropdown(parent, entries, isSelectedCallback, onSele
 			end
 			info.func = function()
 				onSelectionCallback(entryValues[i])
-				UIDropDownMenu_SetText(dropdown, entryLabels[i])
-				ApplySelectionFont(entryValues[i])
+				UpdateDropdownText(entryValues[i])
 				if useCheckboxes then
 					if UIDropDownMenu_Refresh then
 						UIDropDownMenu_Refresh(dropdown)
@@ -384,11 +424,14 @@ local function CreateClassicDropdown(parent, entries, isSelectedCallback, onSele
 		end
 	end)
 
-	for i = 1, #entryValues do
-		if isSelectedCallback(entryValues[i]) then
-			UIDropDownMenu_SetText(dropdown, entryLabels[i])
-			ApplySelectionFont(entryValues[i])
-			break
+	if getSelectionText then
+		UIDropDownMenu_SetText(dropdown, getSelectionText())
+	else
+		for i = 1, #entryValues do
+			if isSelectedCallback(entryValues[i]) then
+				UpdateDropdownText(entryValues[i])
+				break
+			end
 		end
 	end
 
@@ -447,6 +490,7 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 			local useCheckboxes = entries.useCheckboxes
 			local dropdownText = dropdown.Text
 			local defaultFontObject = GetDefaultDropdownFontObject(2)
+			local getSelectionText = entries.getSelectionText
 
 			local function ApplySelectionFont(selectionValue)
 				if not dropdownText or not entryFontPaths then
@@ -464,6 +508,20 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 				end
 			end
 
+			local function UpdateDropdownText(selectionValue)
+				if getSelectionText then
+					dropdown:SetText(getSelectionText())
+					return
+				end
+				for i = 1, #entryValues do
+					if entryValues[i] == selectionValue then
+						dropdown:SetText(entryLabels[i])
+						ApplySelectionFont(selectionValue)
+						return
+					end
+				end
+			end
+
 			AttachDarkDropdownData(dropdown, entries, isSelectedCallback, onSelectionCallback, ApplySelectionFont)
 
 			dropdown:SetupMenu(function(dropdown, rootDescription)
@@ -477,7 +535,7 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 					if useCheckboxes then
 						item = rootDescription:CreateCheckbox(entryLabels[i], isSelectedCallback, function(val)
 							onSelectionCallback(val)
-							ApplySelectionFont(val)
+							UpdateDropdownText(val)
 						end, entryValues[i])
 						if item.SetCloseOnClick then
 							item:SetCloseOnClick(false)
@@ -485,7 +543,7 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 					else
 						item = rootDescription:CreateRadio(entryLabels[i], isSelectedCallback, function(val)
 							onSelectionCallback(val)
-							ApplySelectionFont(val)
+							UpdateDropdownText(val)
 						end, entryValues[i])
 					end
 
@@ -504,6 +562,9 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 			end)
 
 			dropdown:SetSelectionTranslator(function(selection)
+				if getSelectionText then
+					return getSelectionText()
+				end
 				for i = 1, #entryValues do
 					if entryValues[i] == selection.data then
 						return entryLabels[i]
@@ -512,12 +573,14 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 				return entryLabels[1]
 			end)
 
-			-- Initial text
-			for i = 1, #entryValues do
-				if isSelectedCallback(entryValues[i]) then
-					dropdown:SetText(entryLabels[i])
-					ApplySelectionFont(entryValues[i])
-					break
+			if getSelectionText then
+				dropdown:SetText(getSelectionText())
+			else
+				for i = 1, #entryValues do
+					if isSelectedCallback(entryValues[i]) then
+						UpdateDropdownText(entryValues[i])
+						break
+					end
 				end
 			end
 		end
@@ -982,6 +1045,9 @@ function Components:CreateButtonRow(parent, leftText, rightText, leftCallback, r
 	-- Left Button
 	local leftButton = CreateFrame("Button", nil, holder, "UIPanelDynamicResizeButtonTemplate")
 	leftButton:SetText(leftText)
+	leftButton:SetNormalFontObject("BetterFriendlistFontNormalSmall")
+	leftButton:SetHighlightFontObject("BetterFriendlistFontHighlightSmall")
+	leftButton:SetDisabledFontObject("BetterFriendlistFontDisableSmall")
 	DynamicResizeButton_Resize(leftButton)
 	leftButton:SetPoint("LEFT", 20, 0)
 	leftButton:SetScript("OnClick", leftCallback)
@@ -991,6 +1057,9 @@ function Components:CreateButtonRow(parent, leftText, rightText, leftCallback, r
 	if rightText and rightCallback then
 		local rightButton = CreateFrame("Button", nil, holder, "UIPanelDynamicResizeButtonTemplate")
 		rightButton:SetText(rightText)
+		rightButton:SetNormalFontObject("BetterFriendlistFontNormalSmall")
+		rightButton:SetHighlightFontObject("BetterFriendlistFontHighlightSmall")
+		rightButton:SetDisabledFontObject("BetterFriendlistFontDisableSmall")
 		DynamicResizeButton_Resize(rightButton)
 		rightButton:SetPoint("LEFT", leftButton, "RIGHT", 10, 0)
 		rightButton:SetScript("OnClick", rightCallback)
@@ -1413,7 +1482,7 @@ function Components:CreateListItem(
 
 		-- Use White text with Outline for universal readability on any color background
 		local font, size, flags = text:GetFont()
-		text:SetFont(font, size, "OUTLINE")
+		text:SetFont(font, size, GetResolvedFontFlags("OUTLINE"))
 		text:SetTextColor(1, 1, 1)
 	end
 
@@ -1456,7 +1525,7 @@ function Components:CreateListItem(
 
 	-- Use White text with Outline for universal readability on any color background
 	local font, size, flags = nameIcon:GetFont()
-	nameIcon:SetFont(font, size, "OUTLINE")
+	nameIcon:SetFont(font, size, GetResolvedFontFlags("OUTLINE"))
 	nameIcon:SetTextColor(1, 1, 1)
 
 	-- Store order index

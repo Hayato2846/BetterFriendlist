@@ -33,6 +33,113 @@ local function GetGroups()
 	return BFL and BFL:GetModule("Groups")
 end
 
+local FONT_FLAG_VALUES = { "NONE", "OUTLINE", "THICKOUTLINE", "MONOCHROME", "SLUG" }
+
+local function GetFontFlagLabel(value)
+	if value == "NONE" then
+		return L.SETTINGS_FONT_OUTLINE_NONE or "None"
+	elseif value == "OUTLINE" then
+		return L.SETTINGS_FONT_OUTLINE_NORMAL or "Outline"
+	elseif value == "THICKOUTLINE" then
+		return L.SETTINGS_FONT_OUTLINE_THICK or "Thick Outline"
+	elseif value == "MONOCHROME" then
+		return L.SETTINGS_FONT_OUTLINE_MONOCHROME or "Monochrome"
+	elseif value == "SLUG" then
+		return L.SETTINGS_FONT_FLAG_SLUG or "Slug Rendering"
+	end
+	return tostring(value)
+end
+
+local function CreateFontFlagsDropdown(parent, db, dbKey, refreshCallback)
+	local function GetFlagSet()
+		if BFL.FontManager and BFL.FontManager.GetFontFlagSet then
+			return BFL.FontManager:GetFontFlagSet(db:Get(dbKey, ""))
+		end
+		return {}
+	end
+
+	local function GetSelectionText()
+		local flagSet = GetFlagSet()
+		local parts = {}
+		for _, value in ipairs(FONT_FLAG_VALUES) do
+			if value ~= "NONE" and flagSet[value] then
+				parts[#parts + 1] = GetFontFlagLabel(value)
+			end
+		end
+		if #parts == 0 then
+			return GetFontFlagLabel("NONE")
+		end
+		return table.concat(parts, ", ")
+	end
+
+	local flagOptions = {
+		labels = {
+			GetFontFlagLabel("NONE"),
+			GetFontFlagLabel("OUTLINE"),
+			GetFontFlagLabel("THICKOUTLINE"),
+			GetFontFlagLabel("MONOCHROME"),
+			GetFontFlagLabel("SLUG"),
+		},
+		values = FONT_FLAG_VALUES,
+		useCheckboxes = true,
+		getSelectionText = GetSelectionText,
+	}
+
+	local holder
+	holder = Components:CreateDropdown(
+		parent,
+		L.SETTINGS_FONT_FLAGS or "Font Flags:",
+		flagOptions,
+		function(value)
+			local flagSet = GetFlagSet()
+			if value == "NONE" then
+				return next(flagSet) == nil
+			end
+			return flagSet[value] == true
+		end,
+		function(value)
+			local flagSet = GetFlagSet()
+			if value == "NONE" then
+				flagSet = {}
+			else
+				flagSet[value] = not flagSet[value]
+				if value == "OUTLINE" and flagSet.OUTLINE then
+					flagSet.THICKOUTLINE = nil
+				elseif value == "THICKOUTLINE" and flagSet.THICKOUTLINE then
+					flagSet.OUTLINE = nil
+				end
+			end
+
+			local flags = BFL.FontManager and BFL.FontManager.SerializeFontFlags
+					and BFL.FontManager:SerializeFontFlags(flagSet)
+				or ""
+			db:Set(dbKey, flags)
+
+			if holder and holder.DropDown then
+				if holder.DropDown.SetText then
+					holder.DropDown:SetText(GetSelectionText())
+				elseif UIDropDownMenu_SetText then
+					UIDropDownMenu_SetText(holder.DropDown, GetSelectionText())
+				end
+			end
+
+			if refreshCallback then
+				refreshCallback()
+			end
+		end
+	)
+
+	if holder.SetTooltip then
+		holder:SetTooltip(
+			L.SETTINGS_FONT_FLAGS or "Font Flags:",
+			L.SETTINGS_FONT_FLAGS_TOOLTIP
+				or "Choose one or more rendering flags for this font. Slug is applied only on clients that support it."
+		)
+	end
+
+	return holder
+end
+
 --------------------------------------------------------------------------
 -- PRIVATE HELPER FUNCTIONS
 --------------------------------------------------------------------------
@@ -343,6 +450,11 @@ function Settings:OnLoad(frame)
 			self:Cancel()
 		end)
 	end
+
+	settingsFrame:HookScript("OnHide", function()
+		self:ClearFilterSortPreview(true)
+		self:HideFilterSortEditorPanel()
+	end)
 end
 
 -- Show the settings window
@@ -376,7 +488,7 @@ local TAB_DEFINITIONS = {
 		id = 10,
 		name = L.SETTINGS_TAB_THEME or "Theme",
 		icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\sliders.blp",
-		beta = false,
+		beta = true,
 	},
 	{
 		id = 2,
@@ -407,6 +519,12 @@ local TAB_DEFINITIONS = {
 		name = L.SETTINGS_TAB_ADVANCED,
 		icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\sliders.blp",
 		beta = false,
+	},
+	{
+		id = 11,
+		name = L.SETTINGS_TAB_FILTER_SORT or "QuickFilter & Sorter",
+		icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter.blp",
+		beta = true,
 	},
 
 	-- Data Broker & Global Sync (Stable)
@@ -450,6 +568,15 @@ local function GetVisibleTabs()
 	end
 
 	return visibleTabs
+end
+
+local function IsTabVisible(tabID)
+	for _, tabDef in ipairs(GetVisibleTabs()) do
+		if tabDef.id == tabID then
+			return true
+		end
+	end
+	return false
 end
 
 -- Get all beta tab IDs (for auto-switching when disabling beta)
@@ -581,6 +708,8 @@ end
 
 -- Hide the settings window
 function Settings:Hide()
+	self:ClearFilterSortPreview(true)
+	self:HideFilterSortEditorPanel()
 	if settingsFrame then
 		settingsFrame:Hide()
 	end
@@ -592,7 +721,15 @@ function Settings:SelectCategory(categoryID)
 		return
 	end
 
+	if not IsTabVisible(categoryID) then
+		categoryID = 1
+	end
+
 	currentTab = categoryID
+	if categoryID ~= 11 then
+		self:ClearFilterSortPreview(true)
+		self:HideFilterSortEditorPanel()
+	end
 
 	-- Update Button Selection States
 	for _, button in pairs(categoryButtons) do
@@ -651,6 +788,9 @@ function Settings:SelectCategory(categoryID)
 		if content.AdvancedTab then
 			content.AdvancedTab:Hide()
 		end
+		if content.FilterSortTab then
+			content.FilterSortTab:Hide()
+		end
 		if content.StreamerTab then
 			content.StreamerTab:Hide()
 		end
@@ -682,6 +822,9 @@ function Settings:SelectCategory(categoryID)
 		elseif categoryID == 4 and content.AdvancedTab then
 			content.AdvancedTab:Show()
 			self:RefreshAdvancedTab()
+		elseif categoryID == 11 and content.FilterSortTab then
+			content.FilterSortTab:Show()
+			self:RefreshFilterSortTab()
 		elseif categoryID == 5 and content.BrokerTab then
 			content.BrokerTab:Show()
 			self:RefreshBrokerTab()
@@ -731,6 +874,8 @@ function Settings:AdjustContentHeight(tabID)
 		activeTab = content.GroupsTab
 	elseif tabID == 4 then
 		activeTab = content.AdvancedTab
+	elseif tabID == 11 then
+		activeTab = content.FilterSortTab
 	elseif tabID == 5 then
 		activeTab = content.BrokerTab
 	elseif tabID == 6 then
@@ -2026,15 +2171,36 @@ function Settings:ImportSettings(importString)
 				"fontOutlineFriendInfo",
 				"fontShadowFriendInfo",
 				"fontColorFriendInfo",
+				"fontTabText",
+				"fontSizeTabText",
+				"fontOutlineTabText",
+				"fontShadowTabText",
+				"fontRaidName",
+				"fontSizeRaidName",
+				"fontOutlineRaidName",
+				"fontShadowRaidName",
 				"fontGroupHeader",
 				"fontSizeGroupHeader",
 				"fontOutlineGroupHeader",
 				"fontShadowGroupHeader",
 				"colorGroupCount",
 				"colorGroupArrow",
+				"brokerFont",
+				"brokerFontSize",
+				"brokerFontFlags",
+				"brokerUseCustomFontForNonLatin",
 				-- Sort & Filter
+				"quickFilter",
 				"primarySort",
 				"secondarySort",
+				"customQuickFilters",
+				"quickFilterVisibility",
+				"quickFilterOrder",
+				"nextCustomQuickFilterId",
+				"customSorters",
+				"sorterVisibility",
+				"sorterOrder",
+				"nextCustomSorterId",
 				-- Broker
 				"brokerEnabled",
 				"brokerShowIcon",
@@ -2065,6 +2231,11 @@ function Settings:ImportSettings(importString)
 	end
 	if DB.NormalizeThemeSetting then
 		DB:NormalizeThemeSetting()
+	end
+	local Registry = BFL:GetModule("FilterSortRegistry")
+	if Registry and Registry.NormalizeDB then
+		Registry:NormalizeDB()
+		Registry:NormalizeCurrentSelections()
 	end
 
 	-- Reload Groups module (this will apply imported colors)
@@ -3161,6 +3332,9 @@ function Settings:OnThemeChanged(theme)
 	if theme ~= "blizzard" and theme ~= "dark" and theme ~= "elvui" then
 		theme = "blizzard"
 	end
+	if theme ~= "blizzard" and (not BetterFriendlistDB or BetterFriendlistDB.enableBetaFeatures ~= true) then
+		theme = "blizzard"
+	end
 	if theme == "elvui" and not _G.ElvUI then
 		theme = "blizzard"
 	end
@@ -4086,8 +4260,34 @@ function Settings:RefreshFontsTab()
 	end
 	local fontOptions = { labels = fontList, values = fontList, fontPaths = fontPaths, useCheckboxes = true }
 
+	local function RefreshAllConfiguredFonts()
+		local FriendsList = BFL:GetModule("FriendsList")
+		if FriendsList and FriendsList.InvalidateSettingsCache then
+			FriendsList:InvalidateSettingsCache()
+		end
+		C_Timer.After(0.01, function()
+			if BFL.ApplyTabFonts then
+				BFL:ApplyTabFonts()
+			end
+			local RaidFrame = BFL:GetModule("RaidFrame")
+			if RaidFrame and RaidFrame.UpdateAllMemberButtons then
+				RaidFrame:UpdateAllMemberButtons()
+			end
+			local Broker = BFL:GetModule("Broker")
+			if Broker and Broker.RefreshTooltip then
+				Broker:RefreshTooltip()
+			end
+			local GBroker = BFL:GetModule("GuildBroker")
+			if GBroker and GBroker.RefreshTooltip then
+				GBroker:RefreshTooltip()
+			end
+			BFL:ForceRefreshFriendsList()
+		end)
+	end
+
 	-- -------------------------------------------------------------------------
 	-- Friend Name Settings
+	local nameFontHeader = Components:CreateHeader(tab, L.SETTINGS_FRIEND_NAME_SETTINGS or "Friend Name Settings")
 	table.insert(allFrames, nameFontHeader)
 
 	-- Name Font Face
@@ -4150,6 +4350,9 @@ function Settings:RefreshFontsTab()
 		end
 	)
 	table.insert(allFrames, nameSizeSlider)
+
+	local nameFlagsDropdown = CreateFontFlagsDropdown(tab, DB, "fontOutlineFriendName", RefreshAllConfiguredFonts)
+	table.insert(allFrames, nameFlagsDropdown)
 
 	-- Name Font Color
 	local nameColorPicker = Components:CreateColorPicker(
@@ -4234,6 +4437,9 @@ function Settings:RefreshFontsTab()
 	)
 	table.insert(allFrames, infoSizeSlider)
 
+	local infoFlagsDropdown = CreateFontFlagsDropdown(tab, DB, "fontOutlineFriendInfo", RefreshAllConfiguredFonts)
+	table.insert(allFrames, infoFlagsDropdown)
+
 	-- Info Font Color
 	local infoColorPicker = Components:CreateColorPicker(
 		tab,
@@ -4308,6 +4514,14 @@ function Settings:RefreshFontsTab()
 	)
 	table.insert(allFrames, tabSizeSlider)
 
+	local tabFlagsDropdown = CreateFontFlagsDropdown(tab, DB, "fontOutlineTabText", function()
+		C_Timer.After(0.01, function()
+			BFL:ApplyTabFonts()
+			BFL:ForceRefreshFriendsList()
+		end)
+	end)
+	table.insert(allFrames, tabFlagsDropdown)
+
 	-- -------------------------------------------------------------------------
 	-- Raid Name Settings
 	-- -------------------------------------------------------------------------
@@ -4373,6 +4587,17 @@ function Settings:RefreshFontsTab()
 		end
 	)
 	table.insert(allFrames, raidSizeSlider)
+
+	local raidFlagsDropdown = CreateFontFlagsDropdown(tab, DB, "fontOutlineRaidName", function()
+		C_Timer.After(0.01, function()
+			local RaidFrame = BFL:GetModule("RaidFrame")
+			if RaidFrame and RaidFrame.UpdateAllMemberButtons then
+				RaidFrame:UpdateAllMemberButtons()
+			end
+			BFL:ForceRefreshFriendsList()
+		end)
+	end)
+	table.insert(allFrames, raidFlagsDropdown)
 
 	-- Anchor all frames vertically
 	Components:AnchorChain(allFrames, -5)
@@ -4582,6 +4807,13 @@ function Settings:RefreshGroupsTab()
 		end
 	)
 	table.insert(allFrames, GroupSizeSlider)
+
+	local groupFlagsDropdown = CreateFontFlagsDropdown(tab, DB, "fontOutlineGroupHeader", function()
+		C_Timer.After(0.01, function()
+			BFL:ForceRefreshFriendsList()
+		end)
+	end)
+	table.insert(allFrames, groupFlagsDropdown)
 
 	-- Spacer
 	table.insert(allFrames, Components:CreateSpacer(tab))
@@ -5195,10 +5427,33 @@ function Settings:RefreshAdvancedTab()
 		L.SETTINGS_BETA_FEATURES_ENABLE,
 		BetterFriendlistDB.enableBetaFeatures or false,
 		function(checked)
-			BetterFriendlistDB.enableBetaFeatures = checked
+			local DB = GetDB()
+			if not DB then
+				return
+			end
+
+			local ThemeManager = BFL:GetModule("ThemeManager")
+			local oldStoredTheme = DB:Get("theme", "blizzard")
+			local oldEffectiveTheme = BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() or oldStoredTheme
+			DB:Set("enableBetaFeatures", checked)
 
 			-- If disabling Beta and currently on ANY Beta tab, switch to General
 			if not checked then
+				if oldStoredTheme ~= "blizzard" then
+					if oldEffectiveTheme == "elvui" then
+						DB:Set("theme", "blizzard")
+						if ThemeManager and ThemeManager.ShowReloadDialog then
+							ThemeManager:ShowReloadDialog()
+						end
+					elseif ThemeManager and ThemeManager.SetTheme then
+						ThemeManager:SetTheme("blizzard", "beta-disabled")
+					else
+						DB:Set("theme", "blizzard")
+					end
+				elseif ThemeManager and ThemeManager.ApplyCurrentTheme then
+					ThemeManager:ApplyCurrentTheme("beta-disabled")
+				end
+
 				local betaTabIds = GetBetaTabIds()
 				for _, betaTabId in ipairs(betaTabIds) do
 					if currentTab == betaTabId then
@@ -5222,7 +5477,7 @@ function Settings:RefreshAdvancedTab()
 				BFL:DebugPrint(L.SETTINGS_BETA_TABS_HIDDEN)
 			end
 
-			-- Data Broker is stable now, no reload required when toggling Beta features
+			-- Data Broker is stable now; only ElvUI theme fallback may request a reload above.
 		end
 	)
 	betaToggle:SetTooltip(L.SETTINGS_BETA_FEATURES_TITLE, L.SETTINGS_BETA_FEATURES_TOOLTIP)
@@ -5487,6 +5742,1242 @@ function Settings:RefreshStatisticsTab()
 end
 
 -- ===========================================
+-- QUICKFILTER & SORTER BUILDER TAB (Tab ID 11, Beta)
+-- ===========================================
+local function BFL_Settings_CreateSmallButton(parent, text, width, onClick)
+	local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+	button:SetSize(width or 64, 22)
+	button:SetText(text)
+	if button.SetNormalFontObject then
+		button:SetNormalFontObject("BetterFriendlistFontNormalSmall")
+		button:SetHighlightFontObject("BetterFriendlistFontHighlightSmall")
+		button:SetDisabledFontObject("BetterFriendlistFontDisableSmall")
+	end
+	if onClick then
+		button:SetScript("OnClick", onClick)
+	end
+	return button
+end
+
+local function BFL_Settings_ValueToText(value)
+	if type(value) == "table" then
+		local parts = {}
+		for _, item in ipairs(value) do
+			table.insert(parts, tostring(item))
+		end
+		return table.concat(parts, ",")
+	elseif value == true then
+		return "true"
+	elseif value == false then
+		return "false"
+	end
+	return tostring(value or "")
+end
+
+local function BFL_Settings_ParseFilterValue(fieldDef, op, text)
+	text = text or ""
+	if op == "empty" or op == "notempty" then
+		return nil
+	end
+	if op == "between" then
+		local left, right = strsplit(",", text)
+		return { tonumber(left) or 0, tonumber(right) or tonumber(left) or 0 }
+	end
+	if op == "in" or op == "notin" then
+		local values = {}
+		for value in string.gmatch(text, "([^,]+)") do
+			value = strtrim(value)
+			if value ~= "" then
+				table.insert(values, value)
+			end
+		end
+		return values
+	end
+	if fieldDef and fieldDef.type == "boolean" then
+		local lower = text:lower()
+		return lower == "true" or lower == "1" or lower == "yes" or lower == "on"
+	elseif fieldDef and fieldDef.type == "number" then
+		return tonumber(text) or 0
+	end
+	return text
+end
+
+local bflFilterSortDropdownCounter = 0
+
+local function BFL_Settings_GetOptionLabel(entries, value)
+	if not entries then
+		return tostring(value or "")
+	end
+	for i, optionValue in ipairs(entries.values or {}) do
+		if optionValue == value then
+			return entries.labels and entries.labels[i] or tostring(value or "")
+		end
+	end
+	return entries.labels and entries.labels[1] or tostring(value or "")
+end
+
+local function BFL_Settings_CreateInlineDropdown(parent, entries, selectedValue, onSelectionCallback, width)
+	width = width or 120
+	entries = entries or { labels = {}, values = {} }
+	local labels = entries.labels or {}
+	local values = entries.values or {}
+	local dropdown
+
+	local function UpdateText(value)
+		local text = BFL_Settings_GetOptionLabel(entries, value)
+		if dropdown.SetText then
+			dropdown:SetText(text)
+		elseif UIDropDownMenu_SetText then
+			UIDropDownMenu_SetText(dropdown, text)
+		end
+	end
+
+	if BFL.IsClassic or not BFL.HasModernMenu then
+		bflFilterSortDropdownCounter = bflFilterSortDropdownCounter + 1
+		local dropdownName = "BFLFilterSortDropdown" .. tostring(bflFilterSortDropdownCounter)
+		dropdown = CreateFrame("Frame", dropdownName, parent, "UIDropDownMenuTemplate")
+		dropdown:SetSize(width + 24, 24)
+
+		UIDropDownMenu_Initialize(dropdown, function(_, level)
+			level = level or 1
+			for i, label in ipairs(labels) do
+				local value = values[i]
+				local info = UIDropDownMenu_CreateInfo()
+				info.text = label
+				info.value = value
+				info.checked = selectedValue == value
+				info.func = function()
+					selectedValue = value
+					if onSelectionCallback then
+						onSelectionCallback(value)
+					end
+					UpdateText(value)
+					CloseDropDownMenus()
+				end
+				UIDropDownMenu_AddButton(info, level)
+			end
+		end)
+		UIDropDownMenu_SetWidth(dropdown, math.max(40, width - 30))
+		UIDropDownMenu_JustifyText(dropdown, "LEFT")
+	else
+		dropdown = CreateFrame("DropdownButton", nil, parent, "WowStyle1DropdownTemplate")
+		dropdown:SetWidth(width)
+		dropdown:SetNormalFontObject("BetterFriendlistFontHighlightSmall")
+		dropdown:SetHighlightFontObject("BetterFriendlistFontHighlightSmall")
+		dropdown:SetDisabledFontObject("BetterFriendlistFontDisableSmall")
+		if dropdown.Text then
+			dropdown.Text:SetFontObject("BetterFriendlistFontHighlightSmall")
+			dropdown.Text:SetJustifyH("LEFT")
+		end
+
+		dropdown:SetupMenu(function(_, rootDescription)
+			if rootDescription.SetScrollMode then
+				rootDescription:SetScrollMode(300)
+			end
+			for i, label in ipairs(labels) do
+				local value = values[i]
+				rootDescription:CreateRadio(label, function(optionValue)
+					return selectedValue == optionValue
+				end, function(optionValue)
+					selectedValue = optionValue
+					if onSelectionCallback then
+						onSelectionCallback(optionValue)
+					end
+					UpdateText(optionValue)
+				end, value)
+			end
+		end)
+	end
+
+	UpdateText(selectedValue)
+	return dropdown
+end
+
+local function BFL_Settings_CreateOptions(labels, values)
+	return { labels = labels, values = values }
+end
+
+local function BFL_Settings_GetOperatorLabel(operator)
+	local key = "FILTER_BUILDER_OP_" .. tostring(operator or ""):upper()
+	return L[key] or tostring(operator or "")
+end
+
+local function BFL_Settings_BuildOperatorOptions(operators)
+	local labels = {}
+	local values = {}
+	for _, operator in ipairs(operators or {}) do
+		table.insert(labels, BFL_Settings_GetOperatorLabel(operator))
+		table.insert(values, operator)
+	end
+	return BFL_Settings_CreateOptions(labels, values)
+end
+
+local function BFL_Settings_BuildCatalogOptions(catalog, getLabel)
+	local labels = {}
+	local values = {}
+	for _, field in ipairs(catalog or {}) do
+		table.insert(labels, getLabel(field))
+		table.insert(values, field.id)
+	end
+	return BFL_Settings_CreateOptions(labels, values)
+end
+
+local function BFL_Settings_BuildValueOptions(fieldDef)
+	if not fieldDef then
+		return nil
+	end
+	if fieldDef.type == "boolean" then
+		return BFL_Settings_CreateOptions({
+			L.FILTER_BUILDER_VALUE_TRUE or "True",
+			L.FILTER_BUILDER_VALUE_FALSE or "False",
+		}, { true, false })
+	elseif fieldDef.values then
+		local labels = {}
+		local values = {}
+		for _, value in ipairs(fieldDef.values) do
+			table.insert(labels, tostring(value))
+			table.insert(values, value)
+		end
+		return BFL_Settings_CreateOptions(labels, values)
+	end
+	return nil
+end
+
+local function BFL_Settings_GetDefaultValueForField(fieldDef)
+	if fieldDef and fieldDef.type == "boolean" then
+		return true
+	elseif fieldDef and fieldDef.values and fieldDef.values[1] ~= nil then
+		return fieldDef.values[1]
+	end
+	return ""
+end
+
+local function BFL_Settings_GetSorterFieldDefaultDirection(fieldDef)
+	return (fieldDef and fieldDef.defaultDirection) or "asc"
+end
+
+function Settings:EnsureFilterSortEditorPanel()
+	if not settingsFrame then
+		settingsFrame = BetterFriendlistSettingsFrame
+	end
+	if not settingsFrame then
+		return nil
+	end
+
+	local frame = self.filterSortEditorFrame
+	if not frame then
+		frame = CreateFrame("Frame", "BetterFriendlistFilterSortEditorFrame", settingsFrame, "ButtonFrameTemplate")
+		frame:SetFrameStrata(settingsFrame:GetFrameStrata() or "HIGH")
+		frame:SetFrameLevel((settingsFrame:GetFrameLevel() or 1) + 10)
+		frame:SetWidth(470)
+		frame:SetClampedToScreen(true)
+		frame:EnableMouse(true)
+		frame.components = {}
+
+		if frame.portrait then
+			frame.portrait:Hide()
+		end
+		if frame.PortraitContainer then
+			frame.PortraitContainer:Hide()
+		end
+		if ButtonFrameTemplate_HidePortrait then
+			ButtonFrameTemplate_HidePortrait(frame)
+		end
+		if ButtonFrameTemplate_HideAttic then
+			ButtonFrameTemplate_HideAttic(frame)
+		end
+
+		if frame.CloseButton then
+			frame.CloseButton:SetScript("OnClick", function()
+				frame:Hide()
+			end)
+		end
+
+		if frame.TitleContainer and frame.TitleContainer.TitleText then
+			frame.title = frame.TitleContainer.TitleText
+			frame.title:SetFontObject("BetterFriendlistFontNormal")
+		elseif frame.TitleText then
+			frame.title = frame.TitleText
+			frame.title:SetFontObject("BetterFriendlistFontNormal")
+		else
+			frame.title = frame:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
+			frame.title:SetPoint("TOP", 0, -5)
+		end
+
+		frame.ScrollFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
+		frame.ScrollFrame:SetPoint("TOPLEFT", 12, -45)
+		frame.ScrollFrame:SetPoint("BOTTOMRIGHT", -30, 8)
+
+		frame.Content = CreateFrame("Frame", nil, frame.ScrollFrame)
+		frame.Content:SetSize(420, 500)
+		frame.ScrollFrame:SetScrollChild(frame.Content)
+
+		frame:SetScript("OnHide", function()
+			if frame.ScrollFrame then
+				frame.ScrollFrame:SetVerticalScroll(0)
+			end
+		end)
+
+		self.filterSortEditorFrame = frame
+	end
+
+	frame:ClearAllPoints()
+	frame:SetPoint("TOPLEFT", settingsFrame, "TOPRIGHT", 5, 0)
+	frame:SetPoint("BOTTOMLEFT", settingsFrame, "BOTTOMRIGHT", 5, 0)
+	frame:SetWidth(470)
+	if frame.Content and frame.ScrollFrame then
+		local width = math.max(360, (frame.ScrollFrame:GetWidth() or 430) - 8)
+		frame.Content:SetWidth(width)
+	end
+
+	return frame
+end
+
+function Settings:HideFilterSortEditorPanel()
+	local frame = self.filterSortEditorFrame
+	if frame then
+		frame:Hide()
+	end
+end
+
+function Settings:ClearFilterSortEditorPanel()
+	local frame = self.filterSortEditorFrame
+	if not frame then
+		return
+	end
+	for _, component in ipairs(frame.components or {}) do
+		if component.Hide then
+			component:Hide()
+		end
+	end
+	frame.components = {}
+	if frame.ScrollFrame then
+		frame.ScrollFrame:SetVerticalScroll(0)
+	end
+end
+
+function Settings:UpdateFilterSortEditorHeight(frames)
+	local frame = self.filterSortEditorFrame
+	if not frame or not frame.Content then
+		return
+	end
+	local height = 80
+	for _, child in ipairs(frames or {}) do
+		height = height + (child:GetHeight() or 28) + 10
+	end
+	frame.Content:SetHeight(math.max(500, height))
+end
+
+function Settings:ShowFilterSortCreateDialog(kind, templateId)
+	kind = kind == "sorter" and "sorter" or "filter"
+	local content = settingsFrame and settingsFrame.ContentScrollFrame and settingsFrame.ContentScrollFrame.Content
+	local tab = content and content.FilterSortTab
+	if not tab then
+		return
+	end
+
+	tab.bflBuilderKind = kind
+	tab.bflFilterSortCreate = {
+		kind = kind,
+		templateId = templateId or "__blank",
+	}
+	self:RefreshFilterSortTab()
+	self:AdjustContentHeight(11)
+end
+
+function Settings:IsFilterSortPreviewActive(kind, id)
+	local state = self.filterSortPreview
+	return state and state.active and state.kind == kind and state.id == id
+end
+
+function Settings:ApplyFilterSortPreview(kind, id)
+	local Registry = BFL:GetModule("FilterSortRegistry")
+	local FriendsList = BFL:GetModule("FriendsList")
+	if not Registry or not FriendsList then
+		return
+	end
+
+	local state = self.filterSortPreview
+	if not state or not state.active then
+		state = {
+			active = true,
+			previousFilter = FriendsList.filterMode or Registry.FALLBACK_FILTER,
+			previousPrimary = FriendsList.sortMode or Registry.FALLBACK_PRIMARY_SORT,
+			previousSecondary = FriendsList.secondarySort or Registry.FALLBACK_SECONDARY_SORT,
+		}
+		self.filterSortPreview = state
+	end
+
+	local filterMode = FriendsList.filterMode or state.previousFilter or Registry.FALLBACK_FILTER
+	local primarySort = FriendsList.sortMode or state.previousPrimary or Registry.FALLBACK_PRIMARY_SORT
+	local secondarySort = FriendsList.secondarySort or state.previousSecondary or Registry.FALLBACK_SECONDARY_SORT
+
+	if kind == "filter" then
+		filterMode = Registry:NormalizeQuickFilterId(id)
+	else
+		primarySort = Registry:NormalizePrimarySorterId(id)
+		secondarySort = Registry:NormalizeSecondarySorterId(secondarySort, primarySort)
+	end
+
+	state.kind = kind
+	state.id = id
+	FriendsList.filterMode = filterMode
+	FriendsList.sortMode = primarySort
+	FriendsList.secondarySort = secondarySort
+	if FriendsList.ApplySort then
+		FriendsList:ApplySort()
+	end
+	BFL:ForceRefreshFriendsList()
+	self:RefreshFilterSortTab()
+	self:AdjustContentHeight(11)
+end
+
+function Settings:ClearFilterSortPreview(skipRefresh)
+	local state = self.filterSortPreview
+	if not state or not state.active then
+		return
+	end
+
+	local FriendsList = BFL:GetModule("FriendsList")
+	if FriendsList then
+		FriendsList.filterMode = state.previousFilter or "all"
+		FriendsList.sortMode = state.previousPrimary or "game"
+		FriendsList.secondarySort = state.previousSecondary or "status"
+		if FriendsList.ApplySort then
+			FriendsList:ApplySort()
+		end
+		BFL:ForceRefreshFriendsList()
+	end
+	self.filterSortPreview = nil
+	if not skipRefresh then
+		self:RefreshFilterSortTab()
+		self:AdjustContentHeight(11)
+	end
+end
+
+function Settings:RefreshFilterSortTab()
+	if not settingsFrame or not Components then
+		return
+	end
+
+	local content = settingsFrame.ContentScrollFrame.Content
+	if not content or not content.FilterSortTab then
+		return
+	end
+
+	local Registry = BFL:GetModule("FilterSortRegistry")
+	if not Registry then
+		return
+	end
+	Registry:NormalizeDB()
+
+	local tab = content.FilterSortTab
+	if tab.components then
+		for _, component in ipairs(tab.components) do
+			if component.Hide then
+				component:Hide()
+			end
+		end
+	end
+	tab.components = {}
+	tab.bflBuilderKind = tab.bflBuilderKind or "filter"
+
+	local selectedKind = tab.bflBuilderKind
+	local selectedId = selectedKind == "filter" and tab.bflSelectedFilterId or tab.bflSelectedSorterId
+	local allEntries = selectedKind == "filter" and Registry:GetQuickFilters(true) or Registry:GetSorters(true)
+	if not selectedId and allEntries[1] then
+		selectedId = allEntries[1].id
+		if selectedKind == "filter" then
+			tab.bflSelectedFilterId = selectedId
+		else
+			tab.bflSelectedSorterId = selectedId
+		end
+	end
+
+	local DB = GetDB()
+	local db = DB and DB:Get() or BetterFriendlistDB or {}
+	local allFrames = {}
+	local filterFields = Registry:GetFilterFieldCatalog()
+	local sortFields = Registry:GetSortFieldCatalog()
+	local fieldById = {}
+	local sortFieldById = {}
+	for _, field in ipairs(filterFields) do
+		fieldById[field.id] = field
+	end
+	for _, field in ipairs(sortFields) do
+		sortFieldById[field.id] = field
+	end
+	local editorPanel = self:EnsureFilterSortEditorPanel()
+	local editorContent = editorPanel and editorPanel.Content
+	local editorFrames = {}
+	if editorPanel then
+		self:ClearFilterSortEditorPanel()
+		editorPanel:Show()
+	end
+
+	local function Refresh()
+		self:RefreshFilterSortTab()
+		self:AdjustContentHeight(11)
+	end
+
+	local function SelectEntry(kind, id)
+		tab.bflBuilderKind = kind
+		tab.bflFilterSortCreate = nil
+		if kind == "filter" then
+			tab.bflSelectedFilterId = id
+		else
+			tab.bflSelectedSorterId = id
+		end
+		Refresh()
+	end
+
+	local function GetFieldLabel(field)
+		return (field and (L[field.labelKey] or field.id)) or "?"
+	end
+
+	local filterFieldOptions = BFL_Settings_BuildCatalogOptions(filterFields, GetFieldLabel)
+	local sortFieldOptions = BFL_Settings_BuildCatalogOptions(sortFields, GetFieldLabel)
+	local groupOperatorOptions = BFL_Settings_CreateOptions({ "AND", "OR" }, { "AND", "OR" })
+	local directionOptions = BFL_Settings_CreateOptions({
+		L.FILTER_BUILDER_DIRECTION_ASC or "ASC",
+		L.FILTER_BUILDER_DIRECTION_DESC or "DESC",
+	}, { "asc", "desc" })
+	local emptyOptions = BFL_Settings_CreateOptions({
+		L.FILTER_BUILDER_EMPTY_FIRST or "Empty first",
+		L.FILTER_BUILDER_EMPTY_LAST or "Empty last",
+	}, { "first", "last" })
+
+	local function GetEntry(kind, id)
+		if kind == "filter" then
+			return Registry:ResolveQuickFilter(id, false)
+		end
+		return Registry:ResolveSorter(id, false, Registry.FALLBACK_PRIMARY_SORT)
+	end
+
+	local entryListItems = {}
+	local draggingEntryRow = nil
+
+	local function SetEntryRowBackground(row, isHover)
+		if not row or not row.bg then
+			return
+		end
+		if isHover then
+			row.bg:SetColorTexture(0.3, 0.3, 0.3, 0.7)
+		elseif row.entryId == selectedId then
+			row.bg:SetColorTexture(0.22, 0.18, 0.08, 0.75)
+		else
+			row.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
+		end
+	end
+
+	local function MoveEntryToIndex(fromIndex, targetIndex)
+		if not fromIndex or not targetIndex or fromIndex == targetIndex then
+			return false
+		end
+		local movedEntry = table.remove(allEntries, fromIndex)
+		if not movedEntry then
+			return false
+		end
+		table.insert(allEntries, targetIndex, movedEntry)
+		local orderedIds = {}
+		for _, entry in ipairs(allEntries) do
+			table.insert(orderedIds, entry.id)
+		end
+		if selectedKind == "filter" then
+			DB:Set("quickFilterOrder", orderedIds)
+		else
+			DB:Set("sorterOrder", orderedIds)
+		end
+		return true
+	end
+
+	local function AddModeRow()
+		local row = CreateFrame("Frame", nil, tab)
+		row:SetHeight(28)
+		row:SetPoint("LEFT", 20, 0)
+		row:SetPoint("RIGHT", -20, 0)
+
+		local filterButton = BFL_Settings_CreateSmallButton(row, L.FILTER_BUILDER_FILTERS or "QuickFilters", 110, function()
+			tab.bflBuilderKind = "filter"
+			tab.bflFilterSortCreate = nil
+			Refresh()
+		end)
+		filterButton:SetPoint("LEFT", 0, 0)
+		filterButton:SetEnabled(selectedKind ~= "filter")
+
+		local sorterButton = BFL_Settings_CreateSmallButton(row, L.FILTER_BUILDER_SORTERS or "Sorters", 90, function()
+			tab.bflBuilderKind = "sorter"
+			tab.bflFilterSortCreate = nil
+			Refresh()
+		end)
+		sorterButton:SetPoint("LEFT", filterButton, "RIGHT", 8, 0)
+		sorterButton:SetEnabled(selectedKind ~= "sorter")
+
+		local createButton = BFL_Settings_CreateSmallButton(
+			row,
+			selectedKind == "filter" and (L.FILTER_BUILDER_ADD_FILTER or "New Filter")
+				or (L.FILTER_BUILDER_ADD_SORTER or "New Sorter"),
+			120,
+			function()
+				self:ShowFilterSortCreateDialog(selectedKind)
+			end
+		)
+		createButton:SetPoint("RIGHT", 0, 0)
+		table.insert(allFrames, row)
+	end
+
+	local function AddEntryRow(entry, orderIndex)
+		local row = CreateFrame("Button", nil, tab)
+		row.entryId = entry.id
+		row.orderIndex = orderIndex
+		row:SetHeight(34)
+		row:SetPoint("LEFT", 20, 0)
+		row:SetPoint("RIGHT", -20, 0)
+		row:EnableMouse(true)
+		row:RegisterForDrag("LeftButton")
+		row:SetScript("OnClick", function(selfRow)
+			if selfRow.bflLastDragStop and GetTime() - selfRow.bflLastDragStop < 0.15 then
+				return
+			end
+			SelectEntry(selectedKind, entry.id)
+		end)
+
+		row.bg = row:CreateTexture(nil, "BACKGROUND")
+		row.bg:SetAllPoints()
+		SetEntryRowBackground(row, false)
+
+		row.dragHandle = row:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
+		row.dragHandle:SetPoint("LEFT", 5, 0)
+		row.dragHandle:SetText(":::")
+		row.dragHandle:SetTextColor(0.5, 0.5, 0.5)
+
+		row.orderText = row:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
+		row.orderText:SetPoint("LEFT", row.dragHandle, "RIGHT", 5, 0)
+		row.orderText:SetWidth(24)
+		row.orderText:SetJustifyH("RIGHT")
+		row.orderText:SetText(orderIndex)
+		row.orderText:SetTextColor(0.7, 0.7, 0.7)
+
+		local check = CreateFrame("CheckButton", nil, row, BFL.IsClassic and "InterfaceOptionsCheckButtonTemplate" or "SettingsCheckboxTemplate")
+		check:SetSize(24, 24)
+		check:SetPoint("LEFT", row.orderText, "RIGHT", 8, 0)
+		check:SetChecked(entry.visible ~= false)
+		check:SetScript("OnClick", function(self)
+			if selectedKind == "filter" then
+				Registry:SetQuickFilterVisibility(entry.id, self:GetChecked())
+			else
+				Registry:SetSorterVisibility(entry.id, self:GetChecked())
+			end
+			Refresh()
+		end)
+
+		local iconButton = CreateFrame("Button", nil, row)
+		iconButton:SetSize(24, 24)
+		iconButton:SetPoint("LEFT", check, "RIGHT", 4, 0)
+		iconButton.texture = iconButton:CreateTexture(nil, "ARTWORK")
+		iconButton.texture:SetAllPoints()
+		iconButton.texture:SetTexture(entry.icon)
+		iconButton:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
+		iconButton:SetScript("OnClick", function()
+			SelectEntry(selectedKind, entry.id)
+		end)
+
+		local name = row:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlightSmall")
+		name:SetPoint("LEFT", iconButton, "RIGHT", 8, 0)
+		name:SetPoint("RIGHT", row, "RIGHT", -130, 0)
+		name:SetJustifyH("LEFT")
+		name:SetWordWrap(false)
+		name:SetText((selectedId == entry.id and "|cffffffff" or "") .. entry.name .. (entry.isCustom and "" or " |cff888888(Built-in)|r"))
+
+		local copy = BFL_Settings_CreateSmallButton(row, L.FILTER_BUILDER_DUPLICATE or "Copy", 48, function()
+			self:ShowFilterSortCreateDialog(selectedKind, entry.id)
+		end)
+		copy:SetPoint("RIGHT", row, "RIGHT", -66, 0)
+
+		local delete = BFL_Settings_CreateSmallButton(row, entry.isCustom and (L.FILTER_BUILDER_DELETE or "Delete") or (L.FILTER_BUILDER_RESET or "Reset"), 58, function()
+			if entry.isCustom then
+				if selectedKind == "filter" then
+					Registry:DeleteCustomQuickFilter(entry.id)
+					tab.bflSelectedFilterId = nil
+				else
+					Registry:DeleteCustomSorter(entry.id)
+					tab.bflSelectedSorterId = nil
+				end
+			else
+				if selectedKind == "filter" then
+					Registry:SetQuickFilterVisibility(entry.id, true)
+				else
+					Registry:SetSorterVisibility(entry.id, true)
+				end
+			end
+			Refresh()
+		end)
+		delete:SetPoint("LEFT", copy, "RIGHT", 4, 0)
+		row:SetScript("OnDragStart", function(selfRow)
+			draggingEntryRow = selfRow
+			local ghost = BFL:GetDragGhost()
+			ghost.text:SetText(entry.name)
+			ghost.text:SetTextColor(1, 0.82, 0)
+			ghost.stripe:SetColorTexture(1, 0.82, 0)
+			ghost:SetSize(math.max(160, ghost.text:GetStringWidth() + 55), selfRow:GetHeight())
+			ghost:Show()
+
+			local cursorX, cursorY = GetCursorPosition()
+			local scale = UIParent:GetEffectiveScale()
+			ghost:ClearAllPoints()
+			ghost:SetPoint("CENTER", UIParent, "BOTTOMLEFT", cursorX / scale, cursorY / scale)
+			selfRow:SetAlpha(0.0)
+
+			ghost:SetScript("OnUpdate", function(g)
+				local cX, cY = GetCursorPosition()
+				local s = UIParent:GetEffectiveScale()
+				g:ClearAllPoints()
+				g:SetPoint("CENTER", UIParent, "BOTTOMLEFT", cX / s, cY / s)
+			end)
+
+			selfRow:SetScript("OnUpdate", function(updateSelf)
+				for _, otherItem in ipairs(entryListItems) do
+					if otherItem ~= updateSelf and otherItem:IsVisible() then
+						SetEntryRowBackground(otherItem, MouseIsOver(otherItem))
+					end
+				end
+			end)
+		end)
+
+		row:SetScript("OnDragStop", function(selfRow)
+			local ghost = BFL:GetDragGhost()
+			ghost:Hide()
+			ghost:SetScript("OnUpdate", nil)
+			ghost:ClearAllPoints()
+			draggingEntryRow = nil
+			selfRow:SetAlpha(1.0)
+			selfRow:SetScript("OnUpdate", nil)
+			selfRow.bflLastDragStop = GetTime()
+
+			local targetIndex = nil
+			for _, otherItem in ipairs(entryListItems) do
+				if otherItem ~= selfRow and otherItem:IsVisible() and MouseIsOver(otherItem) then
+					targetIndex = otherItem.orderIndex
+				end
+				SetEntryRowBackground(otherItem, false)
+			end
+
+			if MoveEntryToIndex(selfRow.orderIndex, targetIndex) then
+				Refresh()
+			else
+				SetEntryRowBackground(selfRow, false)
+			end
+		end)
+
+		row:SetScript("OnEnter", function(selfRow)
+			if not draggingEntryRow then
+				SetEntryRowBackground(selfRow, true)
+			end
+		end)
+		row:SetScript("OnLeave", function(selfRow)
+			if not draggingEntryRow then
+				SetEntryRowBackground(selfRow, false)
+			end
+		end)
+
+		table.insert(entryListItems, row)
+		table.insert(allFrames, row)
+	end
+
+	local function AddNameAndIconEditor(entry)
+		local customTable = entry and entry.isCustom and (
+			selectedKind == "filter" and db.customQuickFilters and db.customQuickFilters[entry.id]
+				or db.customSorters and db.customSorters[entry.id]
+		)
+		if not customTable then
+			local label = Components:CreateLabel(
+				editorContent,
+				L.FILTER_BUILDER_BUILTIN_LOCKED
+					or "Built-ins can be shown, hidden, reordered, or duplicated. Duplicate one to edit its rules.",
+				true
+			)
+			table.insert(editorFrames, label)
+			return nil
+		end
+
+		local nameInput = Components:CreateInput(editorContent, L.FILTER_BUILDER_NAME or "Name", customTable.name, function(value)
+			if selectedKind == "filter" then
+				Registry:UpdateCustomQuickFilter(entry.id, { name = value })
+			else
+				Registry:UpdateCustomSorter(entry.id, { name = value })
+			end
+			Refresh()
+		end, 220)
+		table.insert(editorFrames, nameInput)
+
+		local iconRow = CreateFrame("Frame", nil, editorContent)
+		iconRow:SetHeight(30)
+		iconRow:SetPoint("LEFT", 20, 0)
+		iconRow:SetPoint("RIGHT", -20, 0)
+		local iconLabel = iconRow:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
+		iconLabel:SetPoint("LEFT", 0, 0)
+		iconLabel:SetText(L.FILTER_BUILDER_ICON or "Icon")
+		local iconButton = BFL_Settings_CreateSmallButton(iconRow, BFL.FormatIcon(customTable.icon, 18) .. " " .. (L.ICON_SELECTOR_TITLE or "Select Icon"), 170, function(selfButton)
+			if BFL.ShowIconSelector then
+				BFL.ShowIconSelector(selfButton, customTable.icon, function(iconRef)
+					if selectedKind == "filter" then
+						Registry:UpdateCustomQuickFilter(entry.id, { icon = iconRef })
+					else
+						Registry:UpdateCustomSorter(entry.id, { icon = iconRef })
+					end
+					Refresh()
+				end)
+			end
+		end)
+		iconButton:SetPoint("RIGHT", 0, 0)
+		table.insert(editorFrames, iconRow)
+		return customTable
+	end
+
+	local function AddPreviewRow(entry, matches, total)
+		local row = CreateFrame("Frame", nil, editorContent)
+		row:SetHeight(30)
+		row:SetPoint("LEFT", 20, 0)
+		row:SetPoint("RIGHT", -20, 0)
+
+		local label = row:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlightSmall")
+		label:SetPoint("LEFT", 0, 0)
+		label:SetPoint("RIGHT", row, "RIGHT", -210, 0)
+		label:SetJustifyH("LEFT")
+		label:SetWordWrap(false)
+		if selectedKind == "filter" then
+			label:SetText(string.format(L.FILTER_BUILDER_PREVIEW_COUNT or "Preview: %d / %d friends match", matches or 0, total or 0))
+		else
+			label:SetText(L.FILTER_BUILDER_PREVIEW_SORTER or "Preview selected sorter")
+		end
+
+		local isActive = self:IsFilterSortPreviewActive(selectedKind, entry.id)
+		local previewButton = BFL_Settings_CreateSmallButton(row, L.FILTER_BUILDER_PREVIEW_APPLY or "Preview", 92, function()
+			self:ApplyFilterSortPreview(selectedKind, entry.id)
+		end)
+		previewButton:SetPoint("RIGHT", row, "RIGHT", isActive and -96 or 0, 0)
+
+		if isActive then
+			local stopButton = BFL_Settings_CreateSmallButton(row, L.FILTER_BUILDER_PREVIEW_STOP or "Stop Preview", 90, function()
+				self:ClearFilterSortPreview()
+			end)
+			stopButton:SetPoint("LEFT", previewButton, "RIGHT", 6, 0)
+		end
+
+		table.insert(editorFrames, row)
+	end
+
+	local function AddCreateEditor(kind, templateId)
+		kind = kind == "sorter" and "sorter" or "filter"
+		local entries = kind == "filter" and Registry:GetQuickFilters(true) or Registry:GetSorters(true)
+		local selectedTemplate = templateId or "__blank"
+		local templateEntry = selectedTemplate ~= "__blank"
+			and (kind == "filter" and Registry:ResolveQuickFilter(selectedTemplate, false)
+				or Registry:ResolveSorter(selectedTemplate, false, Registry.FALLBACK_PRIMARY_SORT))
+			or nil
+		local iconRef = templateEntry and templateEntry.icon
+			or (kind == "filter" and "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-all"
+				or "Interface\\AddOns\\BetterFriendlist\\Icons\\sliders")
+		local defaultName = kind == "filter" and (L.FILTER_BUILDER_NEW_FILTER or "Custom Filter")
+			or (L.FILTER_BUILDER_NEW_SORTER or "Custom Sorter")
+		if templateEntry then
+			defaultName = templateEntry.name .. " " .. (L.FILTER_BUILDER_COPY_SUFFIX or "Copy")
+		end
+
+		local header = Components:CreateHeader(
+			editorContent,
+			kind == "filter" and (L.FILTER_BUILDER_CREATE_FILTER_TITLE or "Create QuickFilter")
+				or (L.FILTER_BUILDER_CREATE_SORTER_TITLE or "Create Sorter")
+		)
+		table.insert(editorFrames, header)
+
+		local nameRow = CreateFrame("Frame", nil, editorContent)
+		nameRow:SetHeight(30)
+		nameRow:SetPoint("LEFT", 20, 0)
+		nameRow:SetPoint("RIGHT", -20, 0)
+		local nameLabel = nameRow:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
+		nameLabel:SetPoint("LEFT", 0, 0)
+		nameLabel:SetText(L.FILTER_BUILDER_NAME or "Name")
+		local nameBox = CreateFrame("EditBox", nil, nameRow, "InputBoxTemplate")
+		nameBox:SetSize(220, 20)
+		nameBox:SetAutoFocus(false)
+		nameBox:SetFontObject("BetterFriendlistFontHighlight")
+		nameBox:SetText(defaultName)
+		nameBox:SetPoint("RIGHT", 0, 0)
+		table.insert(editorFrames, nameRow)
+
+		local templateLabels = { L.FILTER_BUILDER_TEMPLATE_BLANK or "Blank" }
+		local templateValues = { "__blank" }
+		for _, entry in ipairs(entries) do
+			table.insert(templateLabels, (entry.isCustom and "" or "|cff888888") .. entry.name .. (entry.isCustom and "" or "|r"))
+			table.insert(templateValues, entry.id)
+		end
+
+		local templateRow = CreateFrame("Frame", nil, editorContent)
+		templateRow:SetHeight(30)
+		templateRow:SetPoint("LEFT", 20, 0)
+		templateRow:SetPoint("RIGHT", -20, 0)
+		local templateLabel = templateRow:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
+		templateLabel:SetPoint("LEFT", 0, 0)
+		templateLabel:SetText(L.FILTER_BUILDER_TEMPLATE or "Template")
+		local templateDropdown =
+			BFL_Settings_CreateInlineDropdown(templateRow, BFL_Settings_CreateOptions(templateLabels, templateValues), selectedTemplate, function(value)
+				selectedTemplate = value
+				local selectedEntry = value ~= "__blank"
+					and (kind == "filter" and Registry:ResolveQuickFilter(value, false)
+						or Registry:ResolveSorter(value, false, Registry.FALLBACK_PRIMARY_SORT))
+					or nil
+				if selectedEntry then
+					iconRef = selectedEntry.icon or iconRef
+					nameBox:SetText(selectedEntry.name .. " " .. (L.FILTER_BUILDER_COPY_SUFFIX or "Copy"))
+				else
+					iconRef = kind == "filter" and "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-all"
+						or "Interface\\AddOns\\BetterFriendlist\\Icons\\sliders"
+					nameBox:SetText(kind == "filter" and (L.FILTER_BUILDER_NEW_FILTER or "Custom Filter") or (L.FILTER_BUILDER_NEW_SORTER or "Custom Sorter"))
+				end
+				if editorPanel and editorPanel.iconButton then
+					editorPanel.iconButton:SetText(BFL.FormatIcon(iconRef, 18) .. " " .. (L.ICON_SELECTOR_TITLE or "Select Icon"))
+				end
+			end, 220)
+		templateDropdown:SetPoint("RIGHT", 0, 0)
+		table.insert(editorFrames, templateRow)
+
+		local iconRow = CreateFrame("Frame", nil, editorContent)
+		iconRow:SetHeight(30)
+		iconRow:SetPoint("LEFT", 20, 0)
+		iconRow:SetPoint("RIGHT", -20, 0)
+		local iconLabel = iconRow:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
+		iconLabel:SetPoint("LEFT", 0, 0)
+		iconLabel:SetText(L.FILTER_BUILDER_ICON or "Icon")
+		local iconButton = BFL_Settings_CreateSmallButton(iconRow, BFL.FormatIcon(iconRef, 18) .. " " .. (L.ICON_SELECTOR_TITLE or "Select Icon"), 190, function(selfButton)
+			if BFL.ShowIconSelector then
+				BFL.ShowIconSelector(selfButton, iconRef, function(selectedIcon)
+					iconRef = selectedIcon
+					selfButton:SetText(BFL.FormatIcon(iconRef, 18) .. " " .. (L.ICON_SELECTOR_TITLE or "Select Icon"))
+				end)
+			end
+		end)
+		iconButton:SetPoint("RIGHT", 0, 0)
+		if editorPanel then
+			editorPanel.iconButton = iconButton
+		end
+		table.insert(editorFrames, iconRow)
+
+		local actions = CreateFrame("Frame", nil, editorContent)
+		actions:SetHeight(30)
+		actions:SetPoint("LEFT", 20, 0)
+		actions:SetPoint("RIGHT", -20, 0)
+		local createButton = BFL_Settings_CreateSmallButton(actions, L.FILTER_BUILDER_CREATE or "Create", 100, function()
+			local sourceId = selectedTemplate ~= "__blank" and selectedTemplate or nil
+			local id
+			if kind == "filter" then
+				id = Registry:CreateCustomQuickFilter(sourceId)
+				if id then
+					Registry:UpdateCustomQuickFilter(id, { name = nameBox:GetText(), icon = iconRef })
+					tab.bflSelectedFilterId = id
+				end
+			else
+				id = Registry:CreateCustomSorter(sourceId)
+				if id then
+					Registry:UpdateCustomSorter(id, { name = nameBox:GetText(), icon = iconRef })
+					tab.bflSelectedSorterId = id
+				end
+			end
+			if id then
+				tab.bflBuilderKind = kind
+				tab.bflFilterSortCreate = nil
+				Refresh()
+			end
+		end)
+		createButton:SetPoint("RIGHT", 0, 0)
+		local cancelButton = BFL_Settings_CreateSmallButton(actions, L.BUTTON_CANCEL or "Cancel", 90, function()
+			tab.bflFilterSortCreate = nil
+			Refresh()
+		end)
+		cancelButton:SetPoint("RIGHT", createButton, "LEFT", -8, 0)
+		table.insert(editorFrames, actions)
+
+		nameBox:SetFocus()
+		nameBox:HighlightText()
+	end
+
+	local function SaveFilterAST(filter)
+		Registry:UpdateCustomQuickFilter(selectedId, { ast = filter.ast })
+		BFL:ForceRefreshFriendsList()
+	end
+
+	local function AddFilterNodeRows(filter, parentNode, depth)
+		depth = depth or 0
+		parentNode.children = parentNode.children or {}
+
+		local groupRow = CreateFrame("Frame", nil, editorContent)
+		groupRow:SetHeight(28)
+		groupRow:SetPoint("LEFT", 20 + depth * 18, 0)
+		groupRow:SetPoint("RIGHT", -20, 0)
+		local title = groupRow:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlightSmall")
+		title:SetPoint("LEFT", 0, 0)
+		title:SetText((L.FILTER_BUILDER_GROUP or "Group") .. ":")
+		local opDropdown = BFL_Settings_CreateInlineDropdown(groupRow, groupOperatorOptions, parentNode.op == "OR" and "OR" or "AND", function(value)
+			parentNode.op = value == "OR" and "OR" or "AND"
+			SaveFilterAST(filter)
+			Refresh()
+		end, 70)
+		opDropdown:SetPoint("LEFT", title, "RIGHT", 8, 0)
+		local notButton = BFL_Settings_CreateSmallButton(groupRow, parentNode.negate and "NOT" or "not", 48, function()
+			parentNode.negate = not parentNode.negate
+			SaveFilterAST(filter)
+			Refresh()
+		end)
+		notButton:SetPoint("LEFT", opDropdown, "RIGHT", 6, 0)
+		local addCondition = BFL_Settings_CreateSmallButton(groupRow, L.FILTER_BUILDER_ADD_CONDITION or "Add Condition", 112, function()
+			table.insert(parentNode.children, { type = "condition", field = "online", op = "is", value = true })
+			SaveFilterAST(filter)
+			Refresh()
+		end)
+		addCondition:SetPoint("RIGHT", groupRow, "RIGHT", -118, 0)
+		local addGroup = BFL_Settings_CreateSmallButton(groupRow, L.FILTER_BUILDER_ADD_GROUP or "Add Group", 86, function()
+			table.insert(parentNode.children, { type = "group", op = "AND", children = {} })
+			SaveFilterAST(filter)
+			Refresh()
+		end)
+		addGroup:SetPoint("LEFT", addCondition, "RIGHT", 6, 0)
+		table.insert(editorFrames, groupRow)
+
+		for index, node in ipairs(parentNode.children) do
+			if node.type == "group" then
+				AddFilterNodeRows(filter, node, depth + 1)
+			else
+				local row = CreateFrame("Frame", nil, editorContent)
+				row:SetHeight(30)
+				row:SetPoint("LEFT", 34 + depth * 18, 0)
+				row:SetPoint("RIGHT", -20, 0)
+				local fieldDef = fieldById[node.field] or filterFields[1]
+				node.field = fieldDef.id
+				local fieldDropdown = BFL_Settings_CreateInlineDropdown(row, filterFieldOptions, node.field, function(value)
+					local nextField = fieldById[value] or filterFields[1]
+					node.field = nextField.id
+					node.op = Registry:GetOperatorsForField(node.field)[1]
+					node.value = BFL_Settings_GetDefaultValueForField(nextField)
+					SaveFilterAST(filter)
+					Refresh()
+				end, 120)
+				fieldDropdown:SetPoint("LEFT", 0, 0)
+				local operatorOptions = BFL_Settings_BuildOperatorOptions(Registry:GetOperatorsForField(node.field))
+				local opDropdown = BFL_Settings_CreateInlineDropdown(row, operatorOptions, node.op or "is", function(value)
+					node.op = value
+					SaveFilterAST(filter)
+					Refresh()
+				end, 96)
+				opDropdown:SetPoint("LEFT", fieldDropdown, "RIGHT", 6, 0)
+
+				local valueHolder = CreateFrame("Frame", nil, row)
+				valueHolder:SetSize(100, 24)
+				valueHolder:SetPoint("LEFT", opDropdown, "RIGHT", 8, 0)
+				if node.op == "empty" or node.op == "notempty" then
+					local emptyText = valueHolder:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontDisableSmall")
+					emptyText:SetPoint("CENTER")
+					emptyText:SetText("-")
+				else
+					local valueOptions = BFL_Settings_BuildValueOptions(fieldDef)
+					if valueOptions then
+						if fieldDef.type == "boolean" and type(node.value) ~= "boolean" then
+							node.value = BFL_Settings_GetDefaultValueForField(fieldDef)
+						end
+						local valueDropdown = BFL_Settings_CreateInlineDropdown(valueHolder, valueOptions, node.value, function(value)
+							node.value = value
+							SaveFilterAST(filter)
+							Refresh()
+						end, 96)
+						valueDropdown:SetPoint("LEFT", 0, 0)
+					else
+						local valueBox = CreateFrame("EditBox", nil, valueHolder, "InputBoxTemplate")
+						valueBox:SetSize(95, 20)
+						valueBox:SetAutoFocus(false)
+						valueBox:SetText(BFL_Settings_ValueToText(node.value))
+						valueBox:SetPoint("LEFT", 0, 0)
+						valueBox:SetScript("OnEnterPressed", function(selfBox)
+							node.value = BFL_Settings_ParseFilterValue(fieldDef, node.op, selfBox:GetText())
+							selfBox:ClearFocus()
+							SaveFilterAST(filter)
+						end)
+						valueBox:SetScript("OnEditFocusLost", function(selfBox)
+							node.value = BFL_Settings_ParseFilterValue(fieldDef, node.op, selfBox:GetText())
+							SaveFilterAST(filter)
+						end)
+					end
+				end
+				local notButton = BFL_Settings_CreateSmallButton(row, node.negate and "NOT" or "not", 46, function()
+					node.negate = not node.negate
+					SaveFilterAST(filter)
+					Refresh()
+				end)
+				notButton:SetPoint("LEFT", valueHolder, "RIGHT", 8, 0)
+				local up = BFL_Settings_CreateSmallButton(row, L.FILTER_BUILDER_UP or "Up", 36, function()
+					if index > 1 then
+						parentNode.children[index], parentNode.children[index - 1] =
+							parentNode.children[index - 1], parentNode.children[index]
+						SaveFilterAST(filter)
+						Refresh()
+					end
+				end)
+				up:SetPoint("LEFT", notButton, "RIGHT", 6, 0)
+				local down = BFL_Settings_CreateSmallButton(row, L.FILTER_BUILDER_DOWN or "Down", 48, function()
+					if index < #parentNode.children then
+						parentNode.children[index], parentNode.children[index + 1] =
+							parentNode.children[index + 1], parentNode.children[index]
+						SaveFilterAST(filter)
+						Refresh()
+					end
+				end)
+				down:SetPoint("LEFT", up, "RIGHT", 4, 0)
+				local delete = BFL_Settings_CreateSmallButton(row, "X", 28, function()
+					table.remove(parentNode.children, index)
+					SaveFilterAST(filter)
+					Refresh()
+				end)
+				delete:SetPoint("LEFT", down, "RIGHT", 4, 0)
+				table.insert(editorFrames, row)
+			end
+		end
+	end
+
+	local function SaveSorter(sorter)
+		Registry:UpdateCustomSorter(selectedId, { chain = sorter.chain })
+		local FriendsList = BFL:GetModule("FriendsList")
+		if FriendsList and FriendsList.sortMode == selectedId and FriendsList.ApplySort then
+			FriendsList:ApplySort()
+		end
+		BFL:ForceRefreshFriendsList()
+	end
+
+	local function AddSorterRows(sorter)
+		sorter.chain = sorter.chain or {}
+		for index, step in ipairs(sorter.chain) do
+			local row = CreateFrame("Frame", nil, editorContent)
+			row:SetHeight(30)
+			row:SetPoint("LEFT", 20, 0)
+			row:SetPoint("RIGHT", -20, 0)
+			local fieldDef = sortFieldById[step.field] or sortFields[1]
+			step.field = fieldDef.id
+			local label = row:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlightSmall")
+			label:SetPoint("LEFT", 0, 0)
+			label:SetWidth(24)
+			label:SetText(tostring(index) .. ".")
+			local fieldDropdown = BFL_Settings_CreateInlineDropdown(row, sortFieldOptions, step.field, function(value)
+				local nextField = sortFieldById[value] or sortFields[1]
+				step.field = nextField.id
+				step.direction = BFL_Settings_GetSorterFieldDefaultDirection(nextField)
+				SaveSorter(sorter)
+				Refresh()
+			end, 140)
+			fieldDropdown:SetPoint("LEFT", label, "RIGHT", 4, 0)
+			local directionDropdown = BFL_Settings_CreateInlineDropdown(row, directionOptions, step.direction == "desc" and "desc" or "asc", function(value)
+				step.direction = value == "desc" and "desc" or "asc"
+				SaveSorter(sorter)
+				Refresh()
+			end, 70)
+			directionDropdown:SetPoint("LEFT", fieldDropdown, "RIGHT", 8, 0)
+			local emptyDropdown = BFL_Settings_CreateInlineDropdown(row, emptyOptions, step.empty == "first" and "first" or "last", function(value)
+				step.empty = value == "first" and "first" or "last"
+				SaveSorter(sorter)
+				Refresh()
+			end, 106)
+			emptyDropdown:SetPoint("LEFT", directionDropdown, "RIGHT", 6, 0)
+			local up = BFL_Settings_CreateSmallButton(row, L.FILTER_BUILDER_UP or "Up", 36, function()
+				if index > 1 then
+					sorter.chain[index], sorter.chain[index - 1] = sorter.chain[index - 1], sorter.chain[index]
+					SaveSorter(sorter)
+					Refresh()
+				end
+			end)
+			up:SetPoint("LEFT", emptyDropdown, "RIGHT", 6, 0)
+			local down = BFL_Settings_CreateSmallButton(row, L.FILTER_BUILDER_DOWN or "Down", 48, function()
+				if index < #sorter.chain then
+					sorter.chain[index], sorter.chain[index + 1] = sorter.chain[index + 1], sorter.chain[index]
+					SaveSorter(sorter)
+					Refresh()
+				end
+			end)
+			down:SetPoint("LEFT", up, "RIGHT", 4, 0)
+			local delete = BFL_Settings_CreateSmallButton(row, "X", 28, function()
+				table.remove(sorter.chain, index)
+				SaveSorter(sorter)
+				Refresh()
+			end)
+			delete:SetPoint("LEFT", down, "RIGHT", 4, 0)
+			table.insert(editorFrames, row)
+		end
+
+		local addStep = Components:CreateButton(editorContent, L.FILTER_BUILDER_ADD_SORT_STEP or "Add Sort Step", function()
+			if #sorter.chain < Registry.MAX_SORT_STEPS then
+				table.insert(sorter.chain, { field = "name", direction = "asc", empty = "last" })
+				SaveSorter(sorter)
+				Refresh()
+			end
+		end)
+		table.insert(editorFrames, addStep)
+	end
+
+	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_TAB_FILTER_SORT or "QuickFilter & Sorter"))
+	table.insert(
+		allFrames,
+		Components:CreateLabel(
+			tab,
+			L.FILTER_BUILDER_DESC
+				or "Choose which entries appear in menus, change their order, and create custom filters or sorter chains.",
+			true
+		)
+	)
+	AddModeRow()
+
+	table.insert(allFrames, Components:CreateHeader(tab, selectedKind == "filter" and (L.FILTER_BUILDER_FILTERS or "QuickFilters") or (L.FILTER_BUILDER_SORTERS or "Sorters")))
+	for i, entry in ipairs(allEntries) do
+		AddEntryRow(entry, i)
+	end
+
+	local entry = GetEntry(selectedKind, selectedId)
+	local createState = tab.bflFilterSortCreate
+	if editorPanel and editorContent then
+		if createState then
+			editorPanel.title:SetText(
+				createState.kind == "filter" and (L.FILTER_BUILDER_CREATE_FILTER_TITLE or "Create QuickFilter")
+					or (L.FILTER_BUILDER_CREATE_SORTER_TITLE or "Create Sorter")
+			)
+			AddCreateEditor(createState.kind, createState.templateId)
+		elseif entry then
+			editorPanel.title:SetText((L.FILTER_BUILDER_EDITOR or "Editor") .. ": " .. entry.name)
+			table.insert(editorFrames, Components:CreateHeader(editorContent, L.FILTER_BUILDER_EDITOR or "Editor"))
+			if selectedKind == "filter" then
+				local matches, total = Registry:CountQuickFilterMatches(entry.id)
+				AddPreviewRow(entry, matches, total)
+			else
+				AddPreviewRow(entry)
+			end
+
+			local customTable = AddNameAndIconEditor(entry)
+			if selectedKind == "filter" then
+				if customTable then
+					AddFilterNodeRows(customTable, customTable.ast, 0)
+				end
+			elseif customTable then
+				AddSorterRows(customTable)
+			end
+		else
+			editorPanel:Hide()
+		end
+
+		if editorPanel:IsShown() then
+			Components:AnchorChain(editorFrames, -5)
+			editorPanel.components = editorFrames
+			self:UpdateFilterSortEditorHeight(editorFrames)
+		end
+	end
+
+	Components:AnchorChain(allFrames, -5)
+	tab.components = allFrames
+end
+
+-- ===========================================
 -- DATA BROKER TAB (Tab ID 5)
 -- ===========================================
 function Settings:RefreshBrokerTab()
@@ -5649,6 +7140,9 @@ function Settings:RefreshBrokerTab()
 		)
 	end
 	table.insert(allFrames, brokerFontSize)
+
+	local brokerFlagsDropdown = CreateFontFlagsDropdown(tab, DB, "brokerFontFlags", RefreshBrokerTooltips)
+	table.insert(allFrames, brokerFlagsDropdown)
 
 	local brokerNonLatinFont = Components:CreateCheckbox(
 		tab,

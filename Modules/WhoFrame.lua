@@ -13,6 +13,58 @@ local WhoFrame = BFL:RegisterModule("WhoFrame", {})
 -- ========================================
 
 -- No direct dependencies, but uses global WoW API
+local function ApplyDefaultSlugToFontString(fontString)
+	if BFL.FontManager and BFL.FontManager.ApplyDefaultSlugToFontString then
+		BFL.FontManager:ApplyDefaultSlugToFontString(fontString)
+	end
+end
+
+local function ApplyDefaultSlugToButton(button)
+	if button and button.GetFontString then
+		ApplyDefaultSlugToFontString(button:GetFontString())
+	end
+end
+
+local function ApplyBetterFriendlistSmallButtonFonts(button)
+	if not button then
+		return
+	end
+	if button.SetNormalFontObject then
+		button:SetNormalFontObject("BetterFriendlistFontNormalSmall")
+		button:SetHighlightFontObject("BetterFriendlistFontHighlightSmall")
+		button:SetDisabledFontObject("BetterFriendlistFontDisableSmall")
+	end
+	ApplyDefaultSlugToButton(button)
+end
+
+local function ApplyBetterFriendlistHeaderButtonFonts(button)
+	if not button then
+		return
+	end
+	if button.SetNormalFontObject then
+		button:SetNormalFontObject("BetterFriendlistFontHighlightSmall")
+		button:SetHighlightFontObject("BetterFriendlistFontHighlightSmall")
+		button:SetDisabledFontObject("BetterFriendlistFontDisableSmall")
+	end
+	ApplyDefaultSlugToButton(button)
+end
+
+local function ApplyStaticWhoFrameFonts(frame)
+	if not frame then
+		return
+	end
+
+	ApplyBetterFriendlistHeaderButtonFonts(frame.NameHeader)
+	ApplyBetterFriendlistHeaderButtonFonts(frame.LevelHeader)
+	ApplyBetterFriendlistHeaderButtonFonts(frame.ClassHeader)
+	ApplyBetterFriendlistSmallButtonFonts(frame.WhoButton)
+	ApplyBetterFriendlistSmallButtonFonts(frame.AddFriendButton)
+	ApplyBetterFriendlistSmallButtonFonts(frame.GroupInviteButton)
+
+	if frame.EditBox then
+		ApplyDefaultSlugToFontString(frame.EditBox)
+	end
+end
 
 -- ========================================
 -- Local Variables
@@ -25,6 +77,9 @@ local CLASS_ICON_SIZE = 14
 local CLASS_ICON_OFFSET = 4
 local NAME_OFFSET_WITH_ICON = 22 -- 4 (icon offset) + 14 (icon) + 4 (gap)
 local NAME_OFFSET_WITHOUT_ICON = 6
+local WHO_HEADER_INSET_X = 4
+local WHO_HEADER_OVERLAP = -1
+local WHO_SCROLLBAR_RESERVE = 24
 
 -- Class icon texture coordinates (from WoW global CLASS_ICON_TCOORDS)
 local CLASS_ICON_TEXTURE = "Interface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES"
@@ -138,22 +193,20 @@ function WhoFrame:UpdateResponsiveLayout()
 	self._lastLayoutWidth = roundedWidth
 	self._lastLayoutSettingsVersion = BFL.SettingsVersion
 
-	-- Calculate available width for column headers
-	-- XML positions: NameHeader starts at x=4 (TOPLEFT from ListInset)
-	-- Reserve space for:
-	--   - Left: NameHeader padding (adjusted for class icons)
-	--   - Right: Scrollbar (20px) + overlap (7px) + visual gap (7px) = 34px
+	-- Calculate available width for column headers. The header row is a true table
+	-- header for the ScrollBox, so its outer width must match the ScrollBox width.
 	local showClassIcons = self:GetSetting("whoShowClassIcons", true)
-	local headerLeftPadding = showClassIcons and NAME_OFFSET_WITH_ICON or NAME_OFFSET_WITHOUT_ICON
-	local scrollbarAndPadding = 34 -- 20px scrollbar + 7px overlap + 7px visual gap
-	local availableWidth = frameWidth - headerLeftPadding - scrollbarAndPadding
+	local listInsetWidth = (whoFrame.ListInset and whoFrame.ListInset.GetWidth and whoFrame.ListInset:GetWidth()) or frameWidth
+	if not listInsetWidth or listInsetWidth <= 1 then
+		listInsetWidth = frameWidth
+	end
+	local availableWidth = listInsetWidth - WHO_HEADER_INSET_X - WHO_SCROLLBAR_RESERVE
 
-	-- CRITICAL: Headers overlap by -2px each (3 overlaps = 6px gained back)
-	-- NameHeader at x=4, then each subsequent header at x=-2 (overlap)
-	-- So we need to ADD back the overlap space to availableWidth
-	local headerOverlap = -2 -- Each header overlaps by 2px
+	-- Adjacent headers overlap by one pixel so their 1px borders collapse into
+	-- a single table divider instead of rendering gaps or double-width lines.
+	local headerOverlap = WHO_HEADER_OVERLAP
 	local numOverlaps = 3 -- ColumnDropdown, LevelHeader, ClassHeader each overlap
-	local totalOverlapGain = numOverlaps * math.abs(headerOverlap) -- 6px
+	local totalOverlapGain = numOverlaps * math.abs(headerOverlap)
 
 	-- Adjust available width to account for overlaps
 	local effectiveWidth = availableWidth + totalOverlapGain
@@ -212,10 +265,10 @@ function WhoFrame:UpdateResponsiveLayout()
 
 	-- Classic: Reposition headers dynamically (XML uses fixed positions, won't adapt to responsive widths)
 	if BFL.IsClassic then
-		local headerOverlapX = -2
+		local headerOverlapX = WHO_HEADER_OVERLAP
 		if whoFrame.ColumnDropdown and whoFrame.NameHeader then
 			whoFrame.ColumnDropdown:ClearAllPoints()
-			whoFrame.ColumnDropdown:SetPoint("TOPLEFT", whoFrame.NameHeader, "TOPRIGHT", headerOverlapX - 14, 2)
+			whoFrame.ColumnDropdown:SetPoint("TOPLEFT", whoFrame.NameHeader, "TOPRIGHT", headerOverlapX, 0)
 		end
 		-- Anchor Level and Class relative to NameHeader using accumulated widths
 		-- (UIDropDownMenu frame edges are unreliable due to internal padding)
@@ -267,7 +320,7 @@ function WhoFrame:UpdateResponsiveLayout()
 						if self.columnWidths then
 							local widths = self.columnWidths
 							local nameStart = NAME_OFFSET_WITHOUT_ICON -- No data = no icon
-							local headerGap = -2 -- Match XML header overlap
+							local headerGap = WHO_HEADER_OVERLAP
 
 							-- Direct header-aligned positioning (same as InitButton)
 							button.Name:SetJustifyH("LEFT")
@@ -312,6 +365,8 @@ end
 
 -- Initialize Who Frame with ScrollBox (Retail) or FauxScrollFrame (Classic)
 function WhoFrame:OnLoad(frame)
+	ApplyStaticWhoFrameFonts(frame)
+
 	-- Classic: Use FauxScrollFrame approach
 	if BFL.IsClassic or not BFL.HasModernScrollBox then
 		self:InitializeClassicWhoFrame(frame)
@@ -462,6 +517,9 @@ function WhoFrame:InitializeClassicWhoFrame(frame)
 		downButton:SetScript("OnClick", function()
 			scrollBar:SetValue(scrollBar:GetValue() + 1)
 		end)
+
+		scrollBar.ScrollUpButton = upButton
+		scrollBar.ScrollDownButton = downButton
 
 		-- Mouse wheel support function
 		local function OnMouseWheel(self, delta)
@@ -727,7 +785,7 @@ function WhoFrame:InitButton(button, elementData)
 	if self.columnWidths then
 		local widths = self.columnWidths
 		local nameStart = showClassIcons and NAME_OFFSET_WITH_ICON or NAME_OFFSET_WITHOUT_ICON
-		local headerGap = -2 -- Match XML header overlap (-2px between each header)
+		local headerGap = WHO_HEADER_OVERLAP
 
 		-- Name column: aligned with NameHeader, text offset for class icon
 		button.Name:SetJustifyH("LEFT")
@@ -1431,6 +1489,7 @@ end
 function WhoFrame:CreateEmptyState(frame)
 	local parent = frame.ScrollBox or frame
 	local emptyText = parent:CreateFontString(nil, "OVERLAY", "GameFontDisableLarge")
+	ApplyDefaultSlugToFontString(emptyText)
 	emptyText:SetPoint("CENTER", parent, "CENTER", 0, 20)
 	emptyText:SetText(BFL.L and BFL.L.WHO_NO_RESULTS or "No players found")
 	emptyText:SetTextColor(0.5, 0.5, 0.5)
@@ -1472,7 +1531,7 @@ function WhoFrame:GetHoveredColumn(button)
 
 	local relativeX = cursorX - buttonLeft
 	local widths = self.columnWidths
-	local headerGap = -2
+	local headerGap = WHO_HEADER_OVERLAP
 
 	-- Column boundaries (accumulated from left)
 	local nameEnd = widths.name
@@ -2701,6 +2760,7 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	-- DO NOT modify EditBox anchors. Place the toggle button inside the EditBox,
 	-- overlaying the right-side padding area (left of the clear "X" button).
 	local toggleBtn = CreateFrame("Button", nil, editBox)
+	toggleBtn.BFL_DarkNoButtonChrome = true
 	toggleBtn:SetSize(16, 16)
 	toggleBtn:SetPoint("RIGHT", editBox, "RIGHT", -20, 0) -- left of the clear button
 	toggleBtn:SetFrameLevel(editBox:GetFrameLevel() + 5)
@@ -2744,21 +2804,12 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	flyout:Hide()
 	flyout:EnableMouse(true) -- Block clicks from passing through
 
-	-- ESC to close
-	flyout:EnableKeyboard(true)
-	flyout:SetScript("OnKeyDown", function(self, key)
-		if key == "ESCAPE" and not WhoFrame.builderDocked then
-			WhoFrame:ToggleSearchBuilder(false)
-			return
-		end
-
-		if RegionUtil and RegionUtil.RunStandardKeybind then
-			RegionUtil.RunStandardKeybind(key)
-		end
-	end)
+	-- EditBoxes handle Enter/Escape locally; the panel itself must not consume global input.
+	flyout:EnableKeyboard(false)
 
 	-- Title bar
 	local title = flyout:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	ApplyDefaultSlugToFontString(title)
 	title:SetPoint("TOPLEFT", flyout, "TOPLEFT", 10, -8)
 	title:SetText(L.WHO_BUILDER_TITLE or "Search Builder")
 
@@ -2780,21 +2831,68 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	local labelWidth = 55
 	local rowHeight = 24
 	local padding = 10
+	local fieldGap = 6
+	local dropdownHeight = 20
+	local builderDropdowns = {}
+
+	local function GetBuilderFieldWidth()
+		local parentWidth = flyout.GetWidth and flyout:GetWidth() or 0
+		if parentWidth and parentWidth > 1 then
+			return math.max(140, parentWidth - (padding * 2) - labelWidth - fieldGap)
+		end
+		return 180
+	end
+
+	local function SetBuilderDropdownWidth(dropdown)
+		if not dropdown then
+			return
+		end
+
+		local width = GetBuilderFieldWidth()
+		if BFL.HasModernDropdown and dropdown.SetWidth then
+			dropdown:SetWidth(width)
+		elseif UIDropDownMenu_SetWidth then
+			UIDropDownMenu_SetWidth(dropdown, width)
+		end
+	end
+
+	local function RegisterBuilderDropdown(dropdown)
+		if not dropdown then
+			return
+		end
+
+		builderDropdowns[#builderDropdowns + 1] = dropdown
+		if dropdown.SetHeight then
+			dropdown:SetHeight(dropdownHeight)
+		end
+		SetBuilderDropdownWidth(dropdown)
+	end
+
+	local function RefreshBuilderDropdowns()
+		for _, dropdown in ipairs(builderDropdowns) do
+			SetBuilderDropdownWidth(dropdown)
+		end
+	end
+
+	flyout:HookScript("OnShow", RefreshBuilderDropdowns)
+	flyout:HookScript("OnSizeChanged", RefreshBuilderDropdowns)
 
 	-- Helper: Create a labeled row with an EditBox
 	local function CreateInputRow(parent, labelText, yPos)
 		local label = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+		ApplyDefaultSlugToFontString(label)
 		label:SetPoint("TOPLEFT", parent, "TOPLEFT", padding, yPos)
 		label:SetWidth(labelWidth)
 		label:SetJustifyH("LEFT")
 		label:SetText(labelText)
 
 		local input = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
-		input:SetPoint("LEFT", label, "RIGHT", 6, 0)
+		input:SetPoint("LEFT", label, "RIGHT", fieldGap, 0)
 		input:SetPoint("RIGHT", parent, "RIGHT", -padding, 0)
 		input:SetHeight(20)
 		input:SetAutoFocus(false)
 		input:SetFontObject("GameFontHighlight")
+		ApplyDefaultSlugToFontString(input)
 		input:SetScript("OnTextChanged", function()
 			WhoFrame:UpdateBuilderPreview()
 		end)
@@ -2827,6 +2925,7 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 
 	-- Row 4: Class dropdown
 	local classLabel = flyout:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	ApplyDefaultSlugToFontString(classLabel)
 	classLabel:SetPoint("TOPLEFT", flyout, "TOPLEFT", padding, yOffset)
 	classLabel:SetWidth(labelWidth)
 	classLabel:SetJustifyH("LEFT")
@@ -2837,10 +2936,11 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 
 	local classDropdown = BFL.CreateDropdown(flyout, nil, 140)
 	if BFL.HasModernDropdown then
-		classDropdown:SetPoint("LEFT", classLabel, "RIGHT", 0, 0)
+		classDropdown:SetPoint("LEFT", classLabel, "RIGHT", fieldGap, 0)
 	else
 		classDropdown:SetPoint("LEFT", classLabel, "RIGHT", -14, -2)
 	end
+	RegisterBuilderDropdown(classDropdown)
 	self.builder.classDropdown = classDropdown
 
 	-- Forward declaration (RebuildRaceDropdown is defined after RebuildClassDropdown)
@@ -2893,6 +2993,7 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 
 	-- Row 5: Race dropdown
 	local raceLabel = flyout:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	ApplyDefaultSlugToFontString(raceLabel)
 	raceLabel:SetPoint("TOPLEFT", flyout, "TOPLEFT", padding, yOffset)
 	raceLabel:SetWidth(labelWidth)
 	raceLabel:SetJustifyH("LEFT")
@@ -2900,10 +3001,11 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 
 	local raceDropdown = BFL.CreateDropdown(flyout, nil, 140)
 	if BFL.HasModernDropdown then
-		raceDropdown:SetPoint("LEFT", raceLabel, "RIGHT", 0, 0)
+		raceDropdown:SetPoint("LEFT", raceLabel, "RIGHT", fieldGap, 0)
 	else
 		raceDropdown:SetPoint("LEFT", raceLabel, "RIGHT", -14, -2)
 	end
+	RegisterBuilderDropdown(raceDropdown)
 	self.builder.raceDropdown = raceDropdown
 
 	-- Function to build/rebuild race dropdown with optional class filter
@@ -2982,16 +3084,18 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 
 	-- Row 6: Level range
 	local levelLabel = flyout:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	ApplyDefaultSlugToFontString(levelLabel)
 	levelLabel:SetPoint("TOPLEFT", flyout, "TOPLEFT", padding, yOffset)
 	levelLabel:SetWidth(labelWidth)
 	levelLabel:SetJustifyH("LEFT")
 	levelLabel:SetText((L.WHO_BUILDER_LEVEL or "Level") .. ":")
 
 	local levelMin = CreateFrame("EditBox", nil, flyout, "InputBoxTemplate")
-	levelMin:SetPoint("LEFT", levelLabel, "RIGHT", 6, 0)
+	levelMin:SetPoint("LEFT", levelLabel, "RIGHT", fieldGap, 0)
 	levelMin:SetSize(40, 18)
 	levelMin:SetAutoFocus(false)
 	levelMin:SetFontObject("GameFontHighlight")
+	ApplyDefaultSlugToFontString(levelMin)
 	levelMin:SetNumeric(true)
 	levelMin:SetMaxLetters(3)
 	levelMin:SetScript("OnTextChanged", function(self)
@@ -3016,7 +3120,9 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	end)
 	levelMin:SetScript("OnEscapePressed", function(self)
 		self:ClearFocus()
-		WhoFrame:ToggleSearchBuilder(false)
+		if not WhoFrame.builderDocked then
+			WhoFrame:ToggleSearchBuilder(false)
+		end
 	end)
 	self.builder.levelMin = levelMin
 
@@ -3024,6 +3130,7 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	levelMax:SetPoint("LEFT", levelMin, "RIGHT", 50, 0)
 
 	local toLabel = flyout:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	ApplyDefaultSlugToFontString(toLabel)
 	toLabel:SetPoint("LEFT", levelMin, "RIGHT", 0, 0)
 	toLabel:SetPoint("RIGHT", levelMax, "LEFT", 0, 0)
 	toLabel:SetJustifyH("CENTER")
@@ -3031,6 +3138,7 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	levelMax:SetSize(40, 18)
 	levelMax:SetAutoFocus(false)
 	levelMax:SetFontObject("GameFontHighlight")
+	ApplyDefaultSlugToFontString(levelMax)
 	levelMax:SetNumeric(true)
 	levelMax:SetMaxLetters(3)
 	levelMax:SetScript("OnTextChanged", function(self)
@@ -3055,7 +3163,9 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	end)
 	levelMax:SetScript("OnEscapePressed", function(self)
 		self:ClearFocus()
-		WhoFrame:ToggleSearchBuilder(false)
+		if not WhoFrame.builderDocked then
+			WhoFrame:ToggleSearchBuilder(false)
+		end
 	end)
 	self.builder.levelMax = levelMax
 	yOffset = yOffset - rowHeight
@@ -3073,6 +3183,10 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	searchBtn:SetSize(80, 22)
 	searchBtn:SetPoint("BOTTOMRIGHT", flyout, "BOTTOM", -2, 6)
 	searchBtn:SetText(L.WHO_BUILDER_SEARCH or "Search")
+	searchBtn:SetNormalFontObject("BetterFriendlistFontNormalSmall")
+	searchBtn:SetHighlightFontObject("BetterFriendlistFontHighlightSmall")
+	searchBtn:SetDisabledFontObject("BetterFriendlistFontDisableSmall")
+	ApplyDefaultSlugToButton(searchBtn)
 	searchBtn:SetScript("OnClick", function()
 		WhoFrame:ExecuteBuilderSearch()
 	end)
@@ -3082,18 +3196,24 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	resetBtn:SetSize(80, 22)
 	resetBtn:SetPoint("BOTTOMLEFT", flyout, "BOTTOM", 2, 6)
 	resetBtn:SetText(L.WHO_BUILDER_RESET or "Reset")
+	resetBtn:SetNormalFontObject("BetterFriendlistFontNormalSmall")
+	resetBtn:SetHighlightFontObject("BetterFriendlistFontHighlightSmall")
+	resetBtn:SetDisabledFontObject("BetterFriendlistFontDisableSmall")
+	ApplyDefaultSlugToButton(resetBtn)
 	resetBtn:SetScript("OnClick", function()
 		WhoFrame:ResetBuilder()
 	end)
 
 	-- Preview row (between separator and buttons, using TOPLEFT for proper multi-line alignment)
 	local previewLabel = flyout:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	ApplyDefaultSlugToFontString(previewLabel)
 	previewLabel:SetPoint("TOPLEFT", sep, "BOTTOMLEFT", 0, -4)
 	previewLabel:SetText(L.WHO_BUILDER_PREVIEW or "Preview:")
 	previewLabel:SetTextColor(0.6, 0.6, 0.6)
 	previewLabel:SetJustifyV("TOP")
 
 	local previewText = flyout:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	ApplyDefaultSlugToFontString(previewText)
 	previewText:SetPoint("TOPLEFT", previewLabel, "TOPRIGHT", 4, 0)
 	previewText:SetPoint("RIGHT", flyout, "RIGHT", -6, 0)
 	previewText:SetJustifyH("LEFT")
@@ -3106,6 +3226,7 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 
 	-- Dock toggle button (next to close button in title bar)
 	local dockBtn = CreateFrame("Button", nil, flyout)
+	dockBtn.BFL_DarkNoButtonChrome = true
 	dockBtn:SetSize(16, 16)
 	dockBtn:SetPoint("RIGHT", closeBtn, "LEFT", -2, 0)
 	dockBtn:SetFrameLevel(flyout:GetFrameLevel() + 2)
@@ -3196,6 +3317,7 @@ function WhoFrame:GetOrCreateDockedContainer()
 
 	-- Override close button to toggle builder
 	if container.CloseButton then
+		container.CloseButton.BFL_DarkNoButtonChrome = true
 		container.CloseButton:SetScript("OnClick", function()
 			WhoFrame:ToggleSearchBuilder(false)
 		end)

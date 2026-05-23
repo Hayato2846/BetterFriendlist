@@ -4,6 +4,11 @@
 local ADDON_NAME, BFL = ...
 BFL:RegisterLocale("ruRU", function()
 	local L = BFL_LOCALE
+	for key, value in pairs(BFL_LOCALE_ENUS) do
+		if key == "SETTINGS_TAB_FILTER_SORT" or key:match("^FILTER_BUILDER_") or key:match("^ICON_SELECTOR_") then
+			L[key] = value
+		end
+	end
 	L.SETTINGS_SIMPLE_MODE = "Упрощённый режим"
 	L.SETTINGS_SIMPLE_MODE_DESC =
 		"Отключает портрет игрока, скрывает параметры поиска/сортировки, расширяет фрейм и смещает вкладки для компактного макета"
@@ -770,6 +775,7 @@ BFL:RegisterLocale("ruRU", function()
 	L.FILTER_ALL = "Все"
 	L.FILTER_ONLINE = "В сети"
 	L.FILTER_OFFLINE = "Не в сети"
+	L.FILTER_WOW_ONLINE = "WoW онлайн"
 	L.FILTER_WOW = "WoW"
 	L.FILTER_BNET = "BNet"
 	L.FILTER_HIDE_AFK = "Не AFK"
@@ -1345,6 +1351,10 @@ BFL:RegisterLocale("ruRU", function()
 	-- Font Outline/Shadow Settings
 	L.SETTINGS_FONT_OUTLINE = "Контур шрифта"
 	L.SETTINGS_FONT_SHADOW = "Тень шрифта"
+	L.SETTINGS_FONT_FLAGS = "Флаги шрифта:"
+	L.SETTINGS_FONT_FLAGS_TOOLTIP =
+		"Выберите один или несколько флагов рендеринга для этого шрифта. Slug применяется только на поддерживаемых клиентах."
+	L.SETTINGS_FONT_FLAG_SLUG = "Рендеринг Slug"
 	L.SETTINGS_FONT_OUTLINE_NONE = "Нет"
 	L.SETTINGS_FONT_OUTLINE_NORMAL = "Контур"
 	L.SETTINGS_FONT_OUTLINE_THICK = "Толстый контур"

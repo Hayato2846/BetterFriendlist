@@ -4,329 +4,223 @@
 
 local ADDON_NAME, BFL = ...
 
--- Register Module
 local QuickFilters = BFL:RegisterModule("QuickFilters", {})
-
--- Localization
 local L = BFL.L
 
--- ========================================
--- Module Dependencies
--- ========================================
+local filterMode = "all"
 
 local function GetFriendsList()
 	return BFL:GetModule("FriendsList")
 end
 
--- ========================================
--- Local Variables
--- ========================================
+local function GetRegistry()
+	return BFL:GetModule("FilterSortRegistry")
+end
 
--- Filter icons (Feather Icons for custom filters)
-local FILTER_ICONS = {
-	all = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-all", -- All Friends (users icon)
-	online = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-online", -- Online Only (user-check icon)
-	offline = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-offline", -- Offline Only (user-x icon)
-	wow = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-wow", -- WoW Only (shield icon)
-	bnet = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-bnet", -- Battle.net Only (share-2 icon)
-	hideafk = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-hide-afk", -- Hide AFK (eye-off icon)
-	retail = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-retail", -- Retail Only (trending-up icon)
-	ingame = "Interface\\AddOns\\BetterFriendlist\\Icons\\game", -- In A Game (game icon)
-}
+local function FormatIcon(icon, size)
+	local Registry = GetRegistry()
+	if Registry and Registry.FormatIcon then
+		return Registry:FormatIcon(icon, size or 16)
+	end
+	size = size or 16
+	return string.format("|T%s:%d:%d:0:0|t", icon or "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-all", size, size)
+end
 
--- Current filter mode
-local filterMode = "all"
+local function GetVisibleFilters()
+	local Registry = GetRegistry()
+	if Registry and Registry.GetVisibleQuickFilters then
+		return Registry:GetVisibleQuickFilters()
+	end
+	return {
+		{ id = "all", name = L.FILTER_ALL, icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-all" },
+	}
+end
 
--- ========================================
--- Public API
--- ========================================
+local function ResolveFilter(mode)
+	local Registry = GetRegistry()
+	if Registry and Registry.NormalizeQuickFilterId then
+		return Registry:NormalizeQuickFilterId(mode)
+	end
+	return mode or "all"
+end
 
--- Initialize (called from ADDON_LOADED)
 function QuickFilters:Initialize()
-	-- Load current filter from database
+	local Registry = GetRegistry()
+	if Registry and Registry.NormalizeCurrentSelections then
+		Registry:NormalizeCurrentSelections()
+	end
 	if BetterFriendlistDB and BetterFriendlistDB.quickFilter then
-		filterMode = BetterFriendlistDB.quickFilter
+		filterMode = ResolveFilter(BetterFriendlistDB.quickFilter)
+		BetterFriendlistDB.quickFilter = filterMode
 	end
 end
 
--- Initialize Quick Filter Dropdown
 function QuickFilters:InitDropdown(dropdown)
 	if not dropdown then
 		return
 	end
 
-	-- Classic mode: Use UIDropDownMenu
 	if BFL.IsClassic or not BFL.HasModernDropdown then
-		-- BFL:DebugPrint("|cff00ffffQuickFilters:|r Classic mode - using UIDropDownMenu for Quick Filter dropdown")
-
-		-- Only set width if ElvUI is not active (ElvUI Skin handles sizing)
 		local isElvUIActive = BFL.IsThemeActive and BFL:IsThemeActive("elvui")
 		if not isElvUIActive then
 			UIDropDownMenu_SetWidth(dropdown, 70)
 		end
 		UIDropDownMenu_Initialize(dropdown, function(self, level)
-			local info = UIDropDownMenu_CreateInfo()
-
-			local function AddFilterOption(mode, label, icon)
-				info.text = string.format("|T%s:14:14:0:0|t %s", icon, label)
-				info.value = mode
+			for _, filter in ipairs(GetVisibleFilters()) do
+				local info = UIDropDownMenu_CreateInfo()
+				local iconText = FormatIcon(filter.icon, 14)
+				info.text = iconText .. " " .. filter.name
+				info.value = filter.id
 				info.func = function()
-					QuickFilters:SetFilter(mode)
-					UIDropDownMenu_SetText(dropdown, string.format("|T%s:14:14:-2:-2|t", icon))
+					QuickFilters:SetFilter(filter.id)
+					UIDropDownMenu_SetText(dropdown, iconText)
 				end
-				-- CRITICAL: Read from DB for checked state, not local variable
-				local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
-				info.checked = (currentFilter == mode)
+				local currentFilter = ResolveFilter(BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all")
+				info.checked = (currentFilter == filter.id)
 				UIDropDownMenu_AddButton(info)
 			end
-
-			AddFilterOption("all", L.FILTER_ALL, FILTER_ICONS.all)
-			AddFilterOption("online", L.FILTER_ONLINE, FILTER_ICONS.online)
-			AddFilterOption("offline", L.FILTER_OFFLINE, FILTER_ICONS.offline)
-			AddFilterOption("wow", L.FILTER_WOW, FILTER_ICONS.wow)
-			AddFilterOption("bnet", L.FILTER_BNET, FILTER_ICONS.bnet)
-			AddFilterOption("hideafk", L.FILTER_HIDE_AFK, FILTER_ICONS.hideafk)
-			AddFilterOption("retail", L.FILTER_RETAIL, FILTER_ICONS.retail)
-			AddFilterOption("ingame", L.FILTER_INGAME, FILTER_ICONS.ingame)
 		end)
 
-		-- Set initial selected text (read from DB, not local variable)
-		local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
-		local currentIcon = FILTER_ICONS[currentFilter] or FILTER_ICONS.all
-		UIDropDownMenu_SetText(dropdown, string.format("|T%s:14:14:-2:-2|t", currentIcon))
+		local currentFilter = ResolveFilter(BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all")
+		UIDropDownMenu_SetText(dropdown, FormatIcon(self:GetIcon(currentFilter), 14))
 
-		-- Setup tooltip for Classic
-		-- We need to hook the button inside the dropdown frame because it consumes mouse events
 		local dropdownName = dropdown:GetName()
 		local buttonName = dropdownName and (dropdownName .. "Button")
 		local button = buttonName and _G[buttonName]
-
-		if button then
-			button:HookScript("OnEnter", function()
-				local filterText = QuickFilters:GetFilterText()
-
-				BFL_Tooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
-				BFL_Tooltip:SetText(string.format(L.TOOLTIP_QUICK_FILTER or "Quick Filter: %s", filterText))
-				BFL_Tooltip:Show()
-			end)
-			button:HookScript("OnLeave", BFL_Tooltip_Hide)
-		else
-			dropdown:SetScript("OnEnter", function()
-				local filterText = QuickFilters:GetFilterText()
-
-				BFL_Tooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
-				BFL_Tooltip:SetText(string.format(L.TOOLTIP_QUICK_FILTER or "Quick Filter: %s", filterText))
-				BFL_Tooltip:Show()
-			end)
-			dropdown:SetScript("OnLeave", BFL_Tooltip_Hide)
+		local function ShowTooltip()
+			local filterText = QuickFilters:GetFilterText()
+			BFL_Tooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
+			BFL_Tooltip:SetText(string.format(L.TOOLTIP_QUICK_FILTER or "Quick Filter: %s", filterText))
+			BFL_Tooltip:Show()
 		end
 
+		if button then
+			button:HookScript("OnEnter", ShowTooltip)
+			button:HookScript("OnLeave", BFL_Tooltip_Hide)
+		else
+			dropdown:SetScript("OnEnter", ShowTooltip)
+			dropdown:SetScript("OnLeave", BFL_Tooltip_Hide)
+		end
 		return
 	end
 
-	-- Helper function to check if a filter mode is selected
-	-- IMPORTANT: Read from DB to stay in sync with external changes (e.g., Broker middle click)
 	local function IsSelected(mode)
-		local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
+		local currentFilter = ResolveFilter(BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all")
 		return currentFilter == mode
 	end
 
-	-- Helper function to set the filter mode
 	local function SetSelected(mode)
-		-- CRITICAL: Read from DB to prevent race conditions
-		-- Using local filterMode variable can lead to stale comparisons when events fire during dropdown changes
-		local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
+		local currentFilter = ResolveFilter(BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all")
 		if mode ~= currentFilter then
 			self:SetFilter(mode)
 		end
 	end
 
-	-- Helper function to create radio button with icon
-	local function CreateRadio(rootDescription, text, mode)
-		rootDescription:CreateRadio(text, IsSelected, SetSelected, mode)
-	end
-
-	-- Set dropdown width (same as StatusDropdown)
 	dropdown:SetWidth(51)
-
-	-- Setup the dropdown menu
 	dropdown:SetupMenu(function(dropdown, rootDescription)
 		rootDescription:SetTag("MENU_FRIENDS_QUICKFILTER")
-
-		-- Format for icon + text in menu (with vertical offset +2)
-		local optionText = "\124T%s:16:16:0:0\124t %s"
-
-		-- Create filter options with icons
-		local allText = string.format(optionText, FILTER_ICONS.all, L.FILTER_ALL)
-		CreateRadio(rootDescription, allText, "all")
-
-		local onlineText = string.format(optionText, FILTER_ICONS.online, L.FILTER_ONLINE)
-		CreateRadio(rootDescription, onlineText, "online")
-
-		local offlineText = string.format(optionText, FILTER_ICONS.offline, L.FILTER_OFFLINE)
-		CreateRadio(rootDescription, offlineText, "offline")
-
-		local wowText = string.format(optionText, FILTER_ICONS.wow, L.FILTER_WOW)
-		CreateRadio(rootDescription, wowText, "wow")
-
-		local bnetText = string.format(optionText, FILTER_ICONS.bnet, L.FILTER_BNET)
-		CreateRadio(rootDescription, bnetText, "bnet")
-
-		local hideafkText = string.format(optionText, FILTER_ICONS.hideafk, L.FILTER_HIDE_AFK)
-		CreateRadio(rootDescription, hideafkText, "hideafk")
-
-		local retailText = string.format(optionText, FILTER_ICONS.retail, L.FILTER_RETAIL)
-		CreateRadio(rootDescription, retailText, "retail")
-
-		local ingameText = string.format(optionText, FILTER_ICONS.ingame, L.FILTER_INGAME)
-		CreateRadio(rootDescription, ingameText, "ingame")
+		for _, filter in ipairs(GetVisibleFilters()) do
+			rootDescription:CreateRadio(FormatIcon(filter.icon, 16) .. " " .. filter.name, IsSelected, SetSelected, filter.id)
+		end
 	end)
 
-	-- SetSelectionTranslator: Shows only the icon (centered)
 	dropdown:SetSelectionTranslator(function(selection)
-		return string.format("\124T%s:16:16:0:0\124t", FILTER_ICONS[selection.data])
+		local Registry = GetRegistry()
+		local icon = Registry and Registry:GetQuickFilterIcon(selection.data) or self:GetIcon(selection.data)
+		return FormatIcon(icon, 16)
 	end)
 
-	-- Setup tooltip
 	dropdown:SetScript("OnEnter", function()
 		local filterText = self:GetFilterText()
-
 		BFL_Tooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
 		BFL_Tooltip:SetText(string.format(L.TOOLTIP_QUICK_FILTER or "Quick Filter: %s", filterText))
 		BFL_Tooltip:Show()
 	end)
-
 	dropdown:SetScript("OnLeave", BFL_Tooltip_Hide)
 end
 
--- Set the quick filter mode
 function QuickFilters:SetFilter(mode)
-	-- Update database FIRST to ensure consistency
+	mode = ResolveFilter(mode)
+
 	if BetterFriendlistDB then
 		BetterFriendlistDB.quickFilter = mode
 	end
-
-	-- Update local cache AFTER DB write
 	filterMode = mode
 
-	-- Update FriendsList module with new filter (use mode parameter, not cached variable)
 	local FriendsList = GetFriendsList()
 	if FriendsList then
 		FriendsList:SetFilterMode(mode)
 	end
 
-	-- Update Broker text to reflect new filter counts
 	local Broker = BFL:GetModule("Broker")
 	if Broker and Broker.UpdateBrokerText then
 		Broker:UpdateBrokerText()
 	end
 
-	-- Return true to indicate filter changed (caller should refresh display)
 	return true
 end
 
--- Get current filter mode
 function QuickFilters:GetFilter()
-	-- ALWAYS read from DB for consistency
-	local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
-	-- Update local cache
+	local currentFilter = ResolveFilter(BetterFriendlistDB and BetterFriendlistDB.quickFilter or filterMode or "all")
 	filterMode = currentFilter
+	if BetterFriendlistDB then
+		BetterFriendlistDB.quickFilter = currentFilter
+	end
 	return currentFilter
 end
 
--- Get filter text for UI display
 function QuickFilters:GetFilterText()
-	-- ALWAYS read from DB to ensure correct text after external changes (e.g., Broker)
-	local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or filterMode
-
-	local filterTexts = {
-		all = L.FILTER_ALL,
-		online = L.FILTER_ONLINE,
-		offline = L.FILTER_OFFLINE,
-		wow = L.FILTER_WOW,
-		bnet = L.FILTER_BNET,
-		hideafk = L.FILTER_HIDE_AFK,
-		retail = L.FILTER_RETAIL,
-		ingame = L.FILTER_INGAME,
-	}
-	return filterTexts[currentFilter] or L.FILTER_ALL
+	local Registry = GetRegistry()
+	local currentFilter = self:GetFilter()
+	if Registry and Registry.GetQuickFilterText then
+		return Registry:GetQuickFilterText(currentFilter)
+	end
+	return L.FILTER_ALL
 end
 
--- Get filter icons table
+function QuickFilters:GetIcon(mode)
+	local Registry = GetRegistry()
+	if Registry and Registry.GetQuickFilterIcon then
+		return Registry:GetQuickFilterIcon(mode or self:GetFilter())
+	end
+	return "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-all"
+end
+
 function QuickFilters:GetIcons()
-	return FILTER_ICONS
+	local Registry = GetRegistry()
+	if Registry and Registry.GetQuickFilterIcons then
+		return Registry:GetQuickFilterIcons()
+	end
+	return { all = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-all" }
 end
 
--- Refresh the dropdown display (icon) based on current filter
--- Called when filter changes externally (e.g. via Broker)
 function QuickFilters:RefreshDropdown(dropdown)
 	if not dropdown then
 		return
 	end
 
-	-- Get current filter from DB
 	local currentFilter = self:GetFilter()
-	local icon = FILTER_ICONS[currentFilter]
+	local icon = self:GetIcon(currentFilter)
+	local size = (BFL.IsClassic or not BFL.HasModernDropdown) and 14 or 16
+	local text = FormatIcon(icon, size)
 
-	if icon then
-		-- Manually update the text to match the translator format
-		-- This forces the dropdown button to show the correct icon
-
-		if BFL.IsClassic or not BFL.HasModernDropdown then
-			-- Classic: Use 14x14 icon with -2:-2 offset to match InitDropdown
-			local text = string.format("\124T%s:14:14:-2:-2\124t", icon)
-			UIDropDownMenu_SetText(dropdown, text)
-		elseif dropdown.SetText then
-			-- Retail: Use 16x16 icon with 0:0 offset (centered)
-			local text = string.format("\124T%s:16:16:0:0\124t", icon)
-			dropdown:SetText(text)
-		end
+	if BFL.IsClassic or not BFL.HasModernDropdown then
+		UIDropDownMenu_SetText(dropdown, text)
+	elseif dropdown.SetText then
+		dropdown:SetText(text)
 	end
 end
 
--- Populate a Menu description (for Contacts Menu integration)
 function QuickFilters:PopulateMenu(rootDescription)
-	local L = BFL.L
-	local FILTER_ICONS = self:GetIcons()
-
-	-- Format for icon + text in menu
-	local optionText = "\124T%s:16:16:0:0\124t %s"
-
 	local function IsSelected(mode)
-		local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
-		return currentFilter == mode
+		return self:GetFilter() == mode
 	end
 
 	local function SetSelected(mode)
 		self:SetFilter(mode)
 	end
 
-	local function CreateRadio(root, text, mode)
-		root:CreateRadio(text, IsSelected, SetSelected, mode)
+	for _, filter in ipairs(GetVisibleFilters()) do
+		rootDescription:CreateRadio(FormatIcon(filter.icon, 16) .. " " .. filter.name, IsSelected, SetSelected, filter.id)
 	end
-
-	-- Create filter options with icons
-	local allText = string.format(optionText, FILTER_ICONS.all, L.FILTER_ALL)
-	CreateRadio(rootDescription, allText, "all")
-
-	local onlineText = string.format(optionText, FILTER_ICONS.online, L.FILTER_ONLINE)
-	CreateRadio(rootDescription, onlineText, "online")
-
-	local offlineText = string.format(optionText, FILTER_ICONS.offline, L.FILTER_OFFLINE)
-	CreateRadio(rootDescription, offlineText, "offline")
-
-	local wowText = string.format(optionText, FILTER_ICONS.wow, L.FILTER_WOW)
-	CreateRadio(rootDescription, wowText, "wow")
-
-	local bnetText = string.format(optionText, FILTER_ICONS.bnet, L.FILTER_BNET)
-	CreateRadio(rootDescription, bnetText, "bnet")
-
-	local hideafkText = string.format(optionText, FILTER_ICONS.hideafk, L.FILTER_HIDE_AFK)
-	CreateRadio(rootDescription, hideafkText, "hideafk")
-
-	local retailText = string.format(optionText, FILTER_ICONS.retail, L.FILTER_RETAIL)
-	CreateRadio(rootDescription, retailText, "retail")
-
-	local ingameText = string.format(optionText, FILTER_ICONS.ingame, L.FILTER_INGAME)
-	CreateRadio(rootDescription, ingameText, "ingame")
 end

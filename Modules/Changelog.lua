@@ -20,21 +20,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [DRAFT]
 
 ### Added
+- **QuickFilter & Sorter Builder** - Added a beta-gated settings tab for controlling visible QuickFilters and Sorters, creating custom filter rules and sorter chains, and choosing BFL or Blizzard icons.
 - **Theme Settings** - Added a Theme settings section with Blizzard, Dark, and ElvUI theme choices.
 - **Dark Theme** - Added a BFL-owned dark skinning engine covering BetterFriendlist windows, rows, dialogs, and broker tooltips.
+- **Font Rendering** - Added per-font rendering flag settings and enabled Slug rendering across BetterFriendlist UI text on compatible clients.
+- **WoW Online Filter** - Added a quick filter for showing only online friends who are currently in WoW.
 
 ### Changed
+- **QuickFilter & Sorter Builder** - Creation and editing now happen in a docked editor panel, rule fields use dropdowns, and Preview temporarily applies the selected filter or sorter to the friends list.
+- **Filter/Sort Registry** - QuickFilter menus, sort dropdowns, and Broker cycling now read from a shared registry; hidden active selections fall back to Filter `all`, Primary Sort `game`, and Secondary Sort `status`.
 - **ElvUI Skin Setting** - Moved the ElvUI skin option from General to Theme and migrated existing profiles automatically.
+- **Theme Settings** - Theme choices are now beta-gated and automatically switch back to Blizzard when Beta Features are disabled.
 - **Dark Theme Visuals** - Refined the Dark theme with translucent black Aurora-style surfaces, clearer control hairlines, Material-like navigation states, and cleaner list dividers.
 
 ### Fixed
+- **QuickFilter & Sorter Builder** - Updated the docked editor to use the same modern frame styling as the Settings and Raid Help windows.
+- **Retail Unit Menus** - Avoided adding BetterFriendlist group options to protected Blizzard unit menus.
+- **Total RP 3 Compatibility** - Restored the Total RP 3 profile action in BetterFriendlist friend context menus without using Blizzard menu callbacks.
+- **Raid Drag Tooltips** - Fixed a Lua error that could occur after moving players between raid groups with drag and drop.
 - **Dark Theme Coverage** - Improved Dark theme coverage for frame borders, tabs, scroll bars, dropdown menus, sliders, close buttons, and standard Blizzard button templates that could still show Blizzard styling.
-- **Dark Theme Controls** - Replaced text-based close and dropdown indicators with BFL icons, removed extra borders from header icon buttons, and preserved TravelPass invite textures.
+- **Dark Theme Controls** - Replaced text-based close and dropdown indicators with BFL icons and removed extra borders from header icon buttons.
 - **Dark Theme Tabs** - Centered tab labels, matched bottom-tab opacity to the main frame, and added accent borders for selected top and bottom tabs.
-- **Dark Theme Main List** - Widened and aligned the main scrollbar, lined up the footer buttons with the list edges, and made disabled buttons visually distinct without dimming selected tabs.
+- **Dark Theme Main List** - Widened and aligned the main scrollbar, lined up the footer buttons with the list edges, removed the duplicate outer list frame, and made disabled buttons visually distinct without dimming selected tabs.
 - **Dark Theme Performance** - Reduced Friendlist rerender work and stopped row skinning from interfering with configured group header colors.
 - **Dark Theme Frame Chrome** - Prevented Blizzard ButtonFrame portrait/corner artwork from reappearing over the Dark theme after portrait visibility updates.
 - **Dark Theme Polish** - Aligned header and title icon buttons, changed borderless button hover to icon-only glow, and tightened the main scrollbar alignment and stepper state layout.
+- **Dark Theme Scrolling** - Fixed scrollbar stepper icon alignment and initial visibility, removed group header highlighting, improved scrollbar thumb highlighting while dragging, and unified Dark theme scrollbar styling across BFL windows.
+- **Theme Isolation** - Prevented Dark theme skin state from leaking into the Blizzard theme after switching themes.
+- **Dark Theme Texture Buttons** - Preserved native invite and RAF reward textures while cleaning up Dark theme borders, RAF list separators, and tooltip behavior.
+- **Dark Theme Overlay Buttons** - Prevented invisible Friends row game-account overlays from receiving visible button chrome.
+- **Dark Theme Tab Lists** - Applied the Friends tab list chrome rules to Recent Allies and Recruit A Friend so list insets and scrollbars align consistently.
+- **Dark Theme Who Tab** - Fitted WHO column headers inside the list inset, aligned them as table columns, extended the scrollbar through the header gutter, and kept search utility buttons borderless.
+- **Dark Theme Search Builder and Raid Tab** - Removed redundant inner frames, aligned Search Builder dropdowns with inputs, added a compact raid assist checkbox, and stopped the builder from capturing unrelated keys.
+- **Theme Settings** - Fixed an error when disabling Beta Features from the settings window.
+- **Recruit A Friend Rewards** - Prevented viewing rewards from breaking reward tabs or causing a protected Copy Link error in the recruitment dialog.
 
 ## [2.5.9]        - 2026-05-17
 

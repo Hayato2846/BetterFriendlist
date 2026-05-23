@@ -138,6 +138,11 @@ BFL:RegisterLocale("frFR", function()
 	L.SETTINGS_GROUP_COUNT_COLOR = "Couleur Compteur"
 	L.SETTINGS_GROUP_ARROW_COLOR = "Couleur Flèche"
 	L.SETTINGS_TAB_APPEARANCE = "Apparence"
+	for key, value in pairs(BFL_LOCALE_ENUS) do
+		if key == "SETTINGS_TAB_FILTER_SORT" or key:match("^FILTER_BUILDER_") or key:match("^ICON_SELECTOR_") then
+			L[key] = value
+		end
+	end
 	L.SETTINGS_TAB_ADVANCED = "Avancé"
 	L.SETTINGS_ADVANCED_DESC = "Options avancées et outils"
 	L.SETTINGS_TAB_STATISTICS = "Statistiques"
@@ -732,6 +737,7 @@ BFL:RegisterLocale("frFR", function()
 	L.FILTER_ALL = "Tous"
 	L.FILTER_ONLINE = "En Ligne"
 	L.FILTER_OFFLINE = "Hors Ligne"
+	L.FILTER_WOW_ONLINE = "WoW en ligne"
 	L.FILTER_WOW = "WoW"
 	L.FILTER_BNET = "BNet"
 	L.FILTER_HIDE_AFK = "Masquer AFK"
@@ -1325,6 +1331,10 @@ BFL:RegisterLocale("frFR", function()
 	-- Font Outline/Shadow Settings
 	L.SETTINGS_FONT_OUTLINE = "Contour Police"
 	L.SETTINGS_FONT_SHADOW = "Ombre Police"
+	L.SETTINGS_FONT_FLAGS = "Options de police :"
+	L.SETTINGS_FONT_FLAGS_TOOLTIP =
+		"Choisissez un ou plusieurs indicateurs de rendu pour cette police. Slug ne s'applique que sur les clients compatibles."
+	L.SETTINGS_FONT_FLAG_SLUG = "Rendu Slug"
 	L.SETTINGS_FONT_OUTLINE_NONE = "Aucun"
 	L.SETTINGS_FONT_OUTLINE_NORMAL = "Contour"
 	L.SETTINGS_FONT_OUTLINE_THICK = "Contour Épais"

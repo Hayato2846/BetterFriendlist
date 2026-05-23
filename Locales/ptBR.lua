@@ -4,6 +4,11 @@
 local ADDON_NAME, BFL = ...
 BFL:RegisterLocale("ptBR", function()
 	local L = BFL_LOCALE
+	for key, value in pairs(BFL_LOCALE_ENUS) do
+		if key == "SETTINGS_TAB_FILTER_SORT" or key:match("^FILTER_BUILDER_") or key:match("^ICON_SELECTOR_") then
+			L[key] = value
+		end
+	end
 	L.SETTINGS_SIMPLE_MODE = "Simple Mode"
 	L.SETTINGS_SIMPLE_MODE_DESC =
 		"Desativa o retrato do jogador, oculta opções de pesquisa/ordenação, amplia o quadro e desloca as abas para um layout compacto."
@@ -727,6 +732,7 @@ BFL:RegisterLocale("ptBR", function()
 	L.FILTER_ALL = "Todos"
 	L.FILTER_ONLINE = "Online"
 	L.FILTER_OFFLINE = "Offline"
+	L.FILTER_WOW_ONLINE = "WoW Online"
 	L.FILTER_WOW = "WoW"
 	L.FILTER_BNET = "BNet"
 	L.FILTER_HIDE_AFK = "Sem AFK"
@@ -1319,6 +1325,10 @@ BFL:RegisterLocale("ptBR", function()
 	-- Font Outline/Shadow Settings
 	L.SETTINGS_FONT_OUTLINE = "Font Outline"
 	L.SETTINGS_FONT_SHADOW = "Font Shadow"
+	L.SETTINGS_FONT_FLAGS = "Flags da fonte:"
+	L.SETTINGS_FONT_FLAGS_TOOLTIP =
+		"Escolha uma ou mais flags de renderização para esta fonte. Slug só é aplicado em clientes compatíveis."
+	L.SETTINGS_FONT_FLAG_SLUG = "Renderização Slug"
 	L.SETTINGS_FONT_OUTLINE_NONE = "None"
 	L.SETTINGS_FONT_OUTLINE_NORMAL = "Outline"
 	L.SETTINGS_FONT_OUTLINE_THICK = "Contorno Espesso"

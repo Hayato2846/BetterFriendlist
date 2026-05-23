@@ -4,35 +4,35 @@
 	<!-- 10pt Base (Small) -->
 	<FontFamily name="BetterFriendlistFontFamily_Small" virtual="true">
 		<Member alphabet="roman">
-			<Font font="Fonts\FRIZQT__.TTF" height="10">
+			<Font font="Fonts\FRIZQT__.TTF" height="10" slug="true">
 				<Shadow x="1" y="-1">
 					<Color r="0" g="0" b="0" />
 				</Shadow>
 			</Font>
 		</Member>
 		<Member alphabet="korean">
-			<Font font="Fonts\2002.TTF" height="11">
+			<Font font="Fonts\2002.TTF" height="11" slug="true">
 				<Shadow x="1" y="-1">
 					<Color r="0" g="0" b="0" />
 				</Shadow>
 			</Font>
 		</Member>
 		<Member alphabet="simplifiedchinese">
-			<Font font="Fonts\ARKai_T.ttf" height="15">
+			<Font font="Fonts\ARKai_T.ttf" height="15" slug="true">
 				<Shadow x="1" y="-1">
 					<Color r="0" g="0" b="0" />
 				</Shadow>
 			</Font>
 		</Member>
 		<Member alphabet="traditionalchinese">
-			<Font font="Fonts\blei00d.TTF" height="15">
+			<Font font="Fonts\blei00d.TTF" height="15" slug="true">
 				<Shadow x="1" y="-1">
 					<Color r="0" g="0" b="0" />
 				</Shadow>
 			</Font>
 		</Member>
 		<Member alphabet="russian">
-			<Font font="Fonts\FRIZQT___CYR.TTF" height="10">
+			<Font font="Fonts\FRIZQT___CYR.TTF" height="10" slug="true">
 				<Shadow x="1" y="-1">
 					<Color r="0" g="0" b="0" />
 				</Shadow>
@@ -43,35 +43,35 @@
 	<!-- 11pt Base -->
 	<FontFamily name="BetterFriendlistFontFamily_11" virtual="true">
 		<Member alphabet="roman">
-			<Font font="Fonts\FRIZQT__.TTF" height="11">
+			<Font font="Fonts\FRIZQT__.TTF" height="11" slug="true">
 				<Shadow x="1" y="-1">
 					<Color r="0" g="0" b="0" />
 				</Shadow>
 			</Font>
 		</Member>
 		<Member alphabet="korean">
-			<Font font="Fonts\2002.TTF" height="12">
+			<Font font="Fonts\2002.TTF" height="12" slug="true">
 				<Shadow x="1" y="-1">
 					<Color r="0" g="0" b="0" />
 				</Shadow>
 			</Font>
 		</Member>
 		<Member alphabet="simplifiedchinese">
-			<Font font="Fonts\ARKai_T.ttf" height="16">
+			<Font font="Fonts\ARKai_T.ttf" height="16" slug="true">
 				<Shadow x="1" y="-1">
 					<Color r="0" g="0" b="0" />
 				</Shadow>
 			</Font>
 		</Member>
 		<Member alphabet="traditionalchinese">
-			<Font font="Fonts\blei00d.TTF" height="16">
+			<Font font="Fonts\blei00d.TTF" height="16" slug="true">
 				<Shadow x="1" y="-1">
 					<Color r="0" g="0" b="0" />
 				</Shadow>
 			</Font>
 		</Member>
 		<Member alphabet="russian">
-			<Font font="Fonts\FRIZQT___CYR.TTF" height="11">
+			<Font font="Fonts\FRIZQT___CYR.TTF" height="11" slug="true">
 				<Shadow x="1" y="-1">
 					<Color r="0" g="0" b="0" />
 				</Shadow>
@@ -82,35 +82,35 @@
 	<!-- 12pt Base (Normal) -->
 	<FontFamily name="BetterFriendlistFontFamily_Normal" virtual="true">
 		<Member alphabet="roman">
-			<Font font="Fonts\FRIZQT__.TTF" height="12">
+			<Font font="Fonts\FRIZQT__.TTF" height="12" slug="true">
 				<Shadow x="1" y="-1">
 					<Color r="0" g="0" b="0" />
 				</Shadow>
 			</Font>
 		</Member>
 		<Member alphabet="korean">
-			<Font font="Fonts\2002.TTF" height="13">
+			<Font font="Fonts\2002.TTF" height="13" slug="true">
 				<Shadow x="1" y="-1">
 					<Color r="0" g="0" b="0" />
 				</Shadow>
 			</Font>
 		</Member>
 		<Member alphabet="simplifiedchinese">
-			<Font font="Fonts\ARKai_T.ttf" height="17">
+			<Font font="Fonts\ARKai_T.ttf" height="17" slug="true">
 				<Shadow x="1" y="-1">
 					<Color r="0" g="0" b="0" />
 				</Shadow>
 			</Font>
 		</Member>
 		<Member alphabet="traditionalchinese">
-			<Font font="Fonts\blei00d.TTF" height="17">
+			<Font font="Fonts\blei00d.TTF" height="17" slug="true">
 				<Shadow x="1" y="-1">
 					<Color r="0" g="0" b="0" />
 				</Shadow>
 			</Font>
 		</Member>
 		<Member alphabet="russian">
-			<Font font="Fonts\FRIZQT___CYR.TTF" height="12">
+			<Font font="Fonts\FRIZQT___CYR.TTF" height="12" slug="true">
 				<Shadow x="1" y="-1">
 					<Color r="0" g="0" b="0" />
 				</Shadow>
@@ -121,35 +121,35 @@
 	<!-- 13pt Base (Friends Normal) -->
 	<FontFamily name="BetterFriendlistFontFamily_FriendsNormal" virtual="true">
 		<Member alphabet="roman">
-			<Font font="Fonts\FRIZQT__.TTF" height="13">
+			<Font font="Fonts\FRIZQT__.TTF" height="13" slug="true">
 				<Shadow x="1" y="-1">
 					<Color r="0" g="0" b="0" />
 				</Shadow>
 			</Font>
 		</Member>
 		<Member alphabet="korean">
-			<Font font="Fonts\2002.TTF" height="14">
+			<Font font="Fonts\2002.TTF" height="14" slug="true">
 				<Shadow x="1" y="-1">
 					<Color r="0" g="0" b="0" />
 				</Shadow>
 			</Font>
 		</Member>
 		<Member alphabet="simplifiedchinese">
-			<Font font="Fonts\ARKai_T.ttf" height="18">
+			<Font font="Fonts\ARKai_T.ttf" height="18" slug="true">
 				<Shadow x="1" y="-1">
 					<Color r="0" g="0" b="0" />
 				</Shadow>
 			</Font>
 		</Member>
 		<Member alphabet="traditionalchinese">
-			<Font font="Fonts\blei00d.TTF" height="18">
+			<Font font="Fonts\blei00d.TTF" height="18" slug="true">
 				<Shadow x="1" y="-1">
 					<Color r="0" g="0" b="0" />
 				</Shadow>
 			</Font>
 		</Member>
 		<Member alphabet="russian">
-			<Font font="Fonts\FRIZQT___CYR.TTF" height="13">
+			<Font font="Fonts\FRIZQT___CYR.TTF" height="13" slug="true">
 				<Shadow x="1" y="-1">
 					<Color r="0" g="0" b="0" />
 				</Shadow>
@@ -160,35 +160,35 @@
 	<!-- 14pt Base (Large) -->
 	<FontFamily name="BetterFriendlistFontFamily_Large" virtual="true">
 		<Member alphabet="roman">
-			<Font font="Fonts\FRIZQT__.TTF" height="14">
+			<Font font="Fonts\FRIZQT__.TTF" height="14" slug="true">
 				<Shadow x="1" y="-1">
 					<Color r="0" g="0" b="0" />
 				</Shadow>
 			</Font>
 		</Member>
 		<Member alphabet="korean">
-			<Font font="Fonts\2002.TTF" height="15">
+			<Font font="Fonts\2002.TTF" height="15" slug="true">
 				<Shadow x="1" y="-1">
 					<Color r="0" g="0" b="0" />
 				</Shadow>
 			</Font>
 		</Member>
 		<Member alphabet="simplifiedchinese">
-			<Font font="Fonts\ARKai_T.ttf" height="19">
+			<Font font="Fonts\ARKai_T.ttf" height="19" slug="true">
 				<Shadow x="1" y="-1">
 					<Color r="0" g="0" b="0" />
 				</Shadow>
 			</Font>
 		</Member>
 		<Member alphabet="traditionalchinese">
-			<Font font="Fonts\blei00d.TTF" height="19">
+			<Font font="Fonts\blei00d.TTF" height="19" slug="true">
 				<Shadow x="1" y="-1">
 					<Color r="0" g="0" b="0" />
 				</Shadow>
 			</Font>
 		</Member>
 		<Member alphabet="russian">
-			<Font font="Fonts\FRIZQT___CYR.TTF" height="14">
+			<Font font="Fonts\FRIZQT___CYR.TTF" height="14" slug="true">
 				<Shadow x="1" y="-1">
 					<Color r="0" g="0" b="0" />
 				</Shadow>
@@ -537,7 +537,7 @@
 					</Anchors>
 				</Texture>
 				<!-- Friend Name (Line 1: BattleNet Name (CharacterName)) -->
-				<FontString parentKey="Name" inherits="GameFontNormal" justifyH="LEFT">
+				<FontString parentKey="Name" inherits="BetterFriendlistFriendsFontNormal" justifyH="LEFT">
 					<Size x="280" y="0" />
 					<Anchors>
 						<Anchor point="TOPLEFT" x="24" y="-6" />
@@ -1826,7 +1826,7 @@
 								</Texture>
 							</Layer>
 							<Layer level="ARTWORK">
-								<FontString parentKey="EarnInfo" inherits="FriendsFont_Normal"
+								<FontString parentKey="EarnInfo" inherits="BetterFriendlistFontNormal"
 									justifyH="LEFT">
 									<Size x="230" y="12" />
 									<Anchors>
@@ -1863,7 +1863,7 @@
 								</Anchors>
 								<Layers>
 									<Layer level="OVERLAY">
-										<FontString parentKey="Text" inherits="FriendsFont_Normal"
+										<FontString parentKey="Text" inherits="BetterFriendlistFontNormal"
 											justifyH="LEFT">
 											<Size x="230" y="12" />
 										</FontString>
@@ -1933,8 +1933,7 @@
 										BetterRAF_NextRewardButton_OnEnter(self)
 									</OnEnter>
 									<OnLeave>
-										BFL_Tooltip:Hide()
-										ResetCursor()
+										BetterRAF_NextRewardButton_OnLeave(self)
 									</OnLeave>
 								</Scripts>
 							</Button>
@@ -1974,7 +1973,7 @@
 								<Scripts>
 									<OnHyperlinkClick function="GetURLIndexAndLoadURL" />
 								</Scripts>
-								<FontString inherits="FriendsFont_Large" justifyH="CENTER" />
+								<FontString inherits="BetterFriendlistFontNormalLarge" justifyH="CENTER" />
 							</SimpleHTML>
 							<!-- Header with Recruit Count -->
 							<Frame parentKey="Header">
@@ -1996,14 +1995,14 @@
 									</Layer>
 									<Layer level="ARTWORK">
 										<FontString parentKey="RecruitedFriends"
-											inherits="FriendsFont_Normal"
+											inherits="BetterFriendlistFontNormal"
 											text="RAF_RECRUITED_FRIENDS">
 											<Anchors>
 												<Anchor point="LEFT" x="5" />
 											</Anchors>
 											<Color color="NORMAL_FONT_COLOR" />
 										</FontString>
-										<FontString parentKey="Count" inherits="FriendsFont_Normal"
+										<FontString parentKey="Count" inherits="BetterFriendlistFontNormal"
 											justifyH="RIGHT">
 											<Anchors>
 												<Anchor point="RIGHT" x="-5" />
@@ -2026,9 +2025,9 @@
 							<EventFrame parentKey="ScrollBar" inherits="MinimalScrollBar">
 								<Anchors>
 									<Anchor point="TOPLEFT" relativeKey="$parent.ScrollBox"
-										relativePoint="TOPRIGHT" x="5" y="0" />
+										relativePoint="TOPRIGHT" x="2" y="0" />
 									<Anchor point="BOTTOMLEFT" relativeKey="$parent.ScrollBox"
-										relativePoint="BOTTOMRIGHT" x="5" y="0" />
+										relativePoint="BOTTOMRIGHT" x="2" y="0" />
 								</Anchors>
 							</EventFrame>
 						</Frames>

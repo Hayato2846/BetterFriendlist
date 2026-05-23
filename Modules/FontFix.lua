@@ -5,6 +5,29 @@
 local ADDON_NAME, BFL = ...
 local FontFix = BFL:RegisterModule("FontFix", {})
 
+local BFL_FONT_OBJECTS = {
+	"BetterFriendlistFixedSmallFont",
+	"BetterFriendlistFontNormalSmall",
+	"BetterFriendlistFontHighlightSmall",
+	"BetterFriendlistTabFontNormal",
+	"BetterFriendlistTabFontHighlight",
+	"BetterFriendlistTabFontDisable",
+	"BetterFriendlistFontNormal",
+	"BetterFriendlistFontNormalLeft",
+	"BetterFriendlistFontHighlight",
+	"BetterFriendlistFontHighlightLeft",
+	"BetterFriendlistFontDisable",
+	"BetterFriendlistFontDisableSmall",
+	"BetterFriendlistFriendsFontNormal",
+	"BetterFriendlistFriendsFontSmall",
+	"BetterFriendlistFriendsFontUserText",
+	"BetterFriendlistFont11",
+	"BetterFriendlistFontNormalMed3",
+	"BetterFriendlistFontLarge",
+	"BetterFriendlistFontNormalLarge",
+	"BetterFriendlistFontNormalHuge",
+}
+
 function FontFix:Initialize()
 	-- Apply immediately
 	self:ApplyFixedFonts()
@@ -25,7 +48,27 @@ function FontFix:Initialize()
 	end
 end
 
+function FontFix:ApplyDefaultSlugFontObjects()
+	if not BFL.IsClassic then
+		return
+	end
+
+	local fontManager = BFL.FontManager
+	if not fontManager or not fontManager.ApplyDefaultSlugToFontObject then
+		return
+	end
+
+	for _, fontName in ipairs(BFL_FONT_OBJECTS) do
+		local fontObject = _G[fontName]
+		if fontObject then
+			fontManager:ApplyDefaultSlugToFontObject(fontObject)
+		end
+	end
+end
+
 function FontFix:ApplyFixedFonts()
+	self:ApplyDefaultSlugFontObjects()
+
 	local frame = _G.BetterFriendsFrame
 	if not frame then
 		return

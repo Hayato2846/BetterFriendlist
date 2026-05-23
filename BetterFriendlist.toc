@@ -8,7 +8,7 @@
 ## X-WoWI-ID: 26984
 ## X-Wago-ID: rNkPLl6a 
 ## SavedVariables: BetterFriendlistDB
-## OptionalDeps: LibStub, LibDataBroker-1.1, LibSharedMedia-3.0, CustomNames, FriendListColors, EnhanceQoL
+## OptionalDeps: LibStub, LibDataBroker-1.1, LibSharedMedia-3.0, CustomNames, FriendListColors, EnhanceQoL, totalRP3
 
 ## Category: User Interface
 ## Category-deDE: Benutzerinterface
@@ -64,6 +64,8 @@ UI\FrameInitializer.lua
 Modules\StreamerMode.lua
 Modules\HouseListProxy.lua [AllowLoadGameType mainline]
 Modules\Database.lua
+Modules\FilterSortRegistry.lua
+Modules\IconSelector.lua
 Modules\Changelog.lua
 Modules\HelpFrame.lua
 Modules\Statistics.lua
@@ -110,6 +112,7 @@ Modules\ElvUISkin.lua
 Modules\AddOnSkins.lua [AllowLoadGameType mainline]
 Modules\Compat_GlobalIgnoreList.lua
 Modules\Compat_EnhanceQoL.lua
+Modules\Compat_TotalRP3.lua
 Modules\FontFix.lua
 
 # UI Callbacks
