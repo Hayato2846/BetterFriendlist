@@ -9,15 +9,20 @@ memory-bank
 *.log
 *.zip
 *.ps1
+!tools/
+!tools/*.ps1
 plans/
 reference/
 predecessor/
 docs/
+!docs/
+!docs/DEPLOYMENT_TESTING.md
 
 # Ignore documentation files but keep README and CHANGELOG
 *.md
 !README.md
 !CHANGELOG.md
+!docs/DEPLOYMENT_TESTING.md
 
 # Ignore text files
 *.txt
