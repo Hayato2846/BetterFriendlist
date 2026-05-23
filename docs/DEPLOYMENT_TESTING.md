@@ -36,6 +36,25 @@ to the matching deployment slot, not to another WoW client folder.
 Prefer `CleanCopy` for normal QA because it keeps the WoW install independent from dirty
 working-tree files. Use `Link` only when fast edit/reload iteration matters.
 
+If Windows blocks replacing an existing non-linked client AddOn folder, `CleanCopy` mirrors
+the checkout directly into that folder as a fallback. This keeps `/reload` testing working
+until the client folder can be converted to a link after closing file watchers.
+
+## Codex Workflow
+
+Codex should run the needed scripts directly instead of asking the user to trigger VSCode
+tasks. After changing addon runtime files, package metadata, or deployment tooling, Codex
+should run the relevant checks and deploy a fresh `CleanCopy` before handing the turn back.
+
+Default target is Retail:
+
+```powershell
+.\tools\BFL-Deploy.ps1 -Mode CleanCopy -Client retail -Source .
+```
+
+Use `-Client all` when the change affects cross-flavor loading, TOC/XML structure,
+compatibility code, or release packaging.
+
 ## Common Commands
 
 Deploy the current checkout to Retail:
@@ -72,7 +91,7 @@ Back up Retail SavedVariables:
 
 1. Merge feature branches into `main`.
 2. Create a release-candidate worktree from `main`.
-3. Run `.\tools\BFL-PackageCheck.ps1`.
+3. Run `.\tools\BFL-PackageCheck.ps1`; it also verifies that tracked internal files are excluded by `.pkgmeta`.
 4. Deploy the candidate with `CleanCopy` to Retail and the relevant Classic clients.
 5. Test with clean and migrated SavedVariables profiles.
 6. Update `CHANGELOG.md` and the `.toc` version when doing release work.

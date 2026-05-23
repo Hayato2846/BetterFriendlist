@@ -22,14 +22,25 @@ ignore:
   - .github
   - .gitignore
   - .pkgmeta
+  - .codex-worktrees
   - README.md
   - CHANGELOG.md
   - RELEASE_NOTES_v1.0.md
   - RELEASE_WORKFLOW_SETUP.md
   - docs
+  - memory-bank
+  - old_version
   - predecessor
   - reference
+  - tools
   - "*.md"
+  - "*.ps1"
+  - "*.py"
+  - "*.txt"
+  - "*.zip"
+  - "*.log"
+  - "*.bak"
+  - "*.lua.bak"
   - BUG_*.md
   - COMBAT_*.md
   - FRIENDGROUPS_*.md
