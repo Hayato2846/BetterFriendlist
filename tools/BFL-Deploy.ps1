@@ -118,7 +118,11 @@ function Set-BFLAddonLink {
             }
         }
 
-        Remove-Item -LiteralPath $LinkPath -Recurse -Force
+        if ($existing.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+            Remove-Item -LiteralPath $LinkPath -Force
+        } else {
+            Remove-Item -LiteralPath $LinkPath -Recurse -Force
+        }
     }
 
     New-Item -ItemType $Type -Path $LinkPath -Target $resolvedTarget | Out-Null
