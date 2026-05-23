@@ -14,6 +14,8 @@ param(
     [switch]$Force
 )
 
+$ErrorActionPreference = 'Stop'
+
 . "$PSScriptRoot\BFL-Paths.ps1"
 
 function Copy-BFLAddon {
@@ -119,13 +121,17 @@ function Set-BFLAddonLink {
         }
 
         if ($existing.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
-            Remove-Item -LiteralPath $LinkPath -Force
+            [System.IO.Directory]::Delete($LinkPath)
         } else {
             Remove-Item -LiteralPath $LinkPath -Recurse -Force
         }
+
+        if (Test-Path -LiteralPath $LinkPath) {
+            throw "Failed to remove existing addon path: $LinkPath"
+        }
     }
 
-    New-Item -ItemType $Type -Path $LinkPath -Target $resolvedTarget | Out-Null
+    New-Item -ItemType $Type -Path $LinkPath -Target $resolvedTarget -ErrorAction Stop | Out-Null
     Write-Host "Linked $LinkPath -> $resolvedTarget"
 }
 
