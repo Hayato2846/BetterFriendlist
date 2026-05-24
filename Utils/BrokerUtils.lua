@@ -325,11 +325,29 @@ end
 -- ========================================
 
 --- Get the ElvUI engine object (cached check)
+function BFL:GetElvUIEngine(requireInitialized)
+	if type(_G.ElvUI) ~= "table" then
+		return nil
+	end
+
+	local ok, E = pcall(function()
+		return select(1, unpack(_G.ElvUI))
+	end)
+	if not ok or type(E) ~= "table" or type(E.GetModule) ~= "function" then
+		return nil
+	end
+	if requireInitialized and not E.initialized then
+		return nil
+	end
+	return E
+end
+
+function BFL:IsElvUIAvailable()
+	return self:GetElvUIEngine(false) ~= nil
+end
+
 function BU.GetElvUIEngine()
-	if not _G.ElvUI then return nil end
-	local ok, E = pcall(function() return select(1, unpack(_G.ElvUI)) end)
-	if ok and E and E.initialized then return E end
-	return nil
+	return BFL.GetElvUIEngine and BFL:GetElvUIEngine(true) or nil
 end
 
 --- Apply ElvUI skin to a LibQTip tooltip (mirrors ElvUI TT:SetStyle)

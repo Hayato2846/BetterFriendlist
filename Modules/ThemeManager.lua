@@ -48,7 +48,7 @@ function BFL:GetEffectiveTheme()
 	if theme ~= "blizzard" and not AreThemeFeaturesEnabled() then
 		return "blizzard"
 	end
-	if theme == "elvui" and not _G.ElvUI then
+	if theme == "elvui" and (not BFL.IsElvUIAvailable or not BFL:IsElvUIAvailable()) then
 		return "blizzard"
 	end
 	return theme
