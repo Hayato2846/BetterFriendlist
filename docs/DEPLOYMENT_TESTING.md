@@ -98,8 +98,50 @@ Back up Retail SavedVariables:
 7. Push the tag; GitHub Actions packages and publishes the release.
 8. Download/install the generated ZIP with `BFL-InstallRelease.ps1` and do one exact-package smoke test.
 
+## Review Automation
+
+Run the local review gate before opening or updating a PR:
+
+```powershell
+.\tools\BFL-ReviewCheck.ps1
+```
+
+The review check runs package validation, verifies TOC file references, checks changed locale
+keys against `enUS`, scans changed Lua files for common bug patterns, and prints diff-based
+review risk buckets. On pull requests, GitHub Actions runs the same script and writes the
+summary to the job output.
+
+Use the risk buckets as a review guide, not as a substitute for in-game QA. Anything touching
+TOC/XML, compatibility helpers, secure buttons, context menus, tooltips, SavedVariables, or
+locale files still needs the matching Retail/Classic review path.
+
 ## VSCode
 
 Open VSCode on `C:\Users\hofer\Documents\BFL\repos\BetterFriendlist` or a specific worktree.
 Do not use the WoW `Interface\AddOns\BetterFriendlist` path as the main editing workspace
 after migration; that path is a deployment target and may be replaced by scripts.
+The `.vscode` folder is intentionally ignored by Git and excluded from release packaging.
+`tools\BFL-Worktree.ps1 -Action Create` copies the local `.vscode` folder from the source
+repo into each new worktree by default; pass `-SkipVSCodeCopy` when a worktree should start
+without local editor settings.
+
+Recommended daily setup:
+
+- Prefer VSCode Insiders on this machine; it currently has the newer WoW API, Lua, GitLens,
+  Todo Tree, StyLua, Error Lens, spell checker, and Codex/ChatGPT extensions installed.
+- Use Project Manager entries for the main repo and active feature worktrees so each Codex
+  chat or feature starts in the correct checkout.
+- Treat editor diagnostics as the first pass only. WoW Lua LS, Ketho WoW API, LuaLS, and
+  Error Lens help catch missing globals, nil/arity issues, and flavor-only APIs, but API
+  decisions still need the local Retail and Classic `wow-ui-source` clones.
+- For normal hand-test loops, run the VSCode task `QA: Package + Deploy Retail`. Use
+  `QA: Package + Deploy All` when TOC/XML, package metadata, compatibility code, or release
+  packaging could affect multiple flavors.
+- Use the VSCode task `Review Check` before opening or refreshing a pull request.
+- Keep XML auto-close/rename support available, but do not format WoW XML on save.
+- Use GitLens and GitHub Actions after pushing branches to review history and CI without
+  leaving the editor.
+- Use Todo Tree for intentional short-lived tags such as `TODO`, `FIXME`, `PERF`, `TAINT`,
+  `MIGRATION`, or `REVIEW`; do not use source comments as a long-term backlog.
+- Keep StyLua as a manual formatting tool until the project adopts a checked-in formatter
+  configuration, to avoid broad formatting churn.

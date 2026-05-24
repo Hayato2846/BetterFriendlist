@@ -6,7 +6,8 @@ param(
     [string]$Branch,
     [string]$Base = 'main',
     [string]$Root,
-    [string]$Repo
+    [string]$Repo,
+    [switch]$SkipVSCodeCopy
 )
 
 . "$PSScriptRoot\BFL-Paths.ps1"
@@ -38,5 +39,15 @@ switch ($Action) {
             throw "Worktree target already exists: $target"
         }
         & git -C $repoPath worktree add $target -b $Branch $Base
+        if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+        }
+
+        $sourceVSCode = Join-Path $repoPath '.vscode'
+        $targetVSCode = Join-Path $target '.vscode'
+        if (-not $SkipVSCodeCopy -and (Test-Path -LiteralPath $sourceVSCode) -and -not (Test-Path -LiteralPath $targetVSCode)) {
+            Copy-Item -LiteralPath $sourceVSCode -Destination $targetVSCode -Recurse -Force
+            Write-Host "Copied local VSCode settings to $targetVSCode"
+        }
     }
 }

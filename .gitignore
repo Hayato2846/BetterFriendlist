@@ -1,5 +1,13 @@
 .git
-.github
+.github/*
+!.github/FUNDING.yml
+!.github/ISSUE_TEMPLATE/
+!.github/ISSUE_TEMPLATE/*.md
+!.github/workflows/
+!.github/workflows/*.yml
+!.github/*.chatmode.md
+!.github/copilot-instructions.md
+!.github/PULL_REQUEST_TEMPLATE.md
 .pkgmeta
 .vscode
 .ai-context
@@ -23,6 +31,7 @@ docs/
 !README.md
 !CHANGELOG.md
 !docs/DEPLOYMENT_TESTING.md
+!.github/PULL_REQUEST_TEMPLATE.md
 
 # Ignore text files
 *.txt
