@@ -32,6 +32,24 @@ local function SafeCall(fn, ...)
 	pcall(fn, ...)
 end
 
+local function IsShown(frame)
+	if not frame then
+		return false
+	end
+	if frame.IsShown then
+		return frame:IsShown() == true
+	end
+	return true
+end
+
+local function BuildSkinKey(...)
+	local key = ""
+	for i = 1, select("#", ...) do
+		key = key .. ":" .. tostring(select(i, ...))
+	end
+	return key
+end
+
 local function SkinFrameByName(engine, name, variant)
 	local frame = _G[name]
 	if frame then
@@ -340,7 +358,10 @@ function DarkTheme:Remove(reason)
 	end
 
 	self.applied = nil
+	self.mainTabsSkinPending = nil
+	self.visibleMainContentRefreshPending = nil
 	engine:Deactivate()
+	self:ClearMainFrameSkinKeys()
 end
 
 function DarkTheme:SkinKnownFrames(reason)
@@ -405,6 +426,165 @@ function DarkTheme:SkinMainTabsDeferred()
 		C_Timer.After(0, FlushMainTabs)
 	else
 		FlushMainTabs()
+	end
+end
+
+local function GetMainFrameStaticSkinKey(frame)
+	local header = frame and frame.FriendsTabHeader
+	local bnetFrame = header and header.BattlenetFrame
+	local broadcast = header and header.BroadcastFrame
+	return BuildSkinKey(
+		frame,
+		frame and frame.Inset,
+		frame and frame.ScrollFrame,
+		frame and frame.MinimalScrollBar,
+		frame and frame.AddFriendButton,
+		frame and frame.SendMessageButton,
+		frame and frame.RecruitmentButton,
+		frame and frame.PortraitButton,
+		frame and frame.StreamerModeButton,
+		frame and frame.HelpButton,
+		header,
+		bnetFrame,
+		broadcast,
+		broadcast and broadcast.EditBox,
+		broadcast and broadcast.UpdateButton,
+		broadcast and broadcast.CancelButton,
+		header and header.StatusDropdown,
+		header and header.SearchBox,
+		header and header.QuickFilterDropdown,
+		header and header.PrimarySortDropdown,
+		header and header.SecondarySortDropdown,
+		bnetFrame and bnetFrame.ContactsMenuButton,
+		bnetFrame and bnetFrame.SettingsButton
+	)
+end
+
+function DarkTheme:ClearMainFrameSkinKeys()
+	local frame = _G.BetterFriendsFrame
+	if not frame then
+		return
+	end
+
+	frame.BFL_DarkMainFrameStaticSkinKey = nil
+	local who = frame.WhoFrame
+	if who then
+		who.BFL_DarkWhoStaticSkinKey = nil
+		who.BFL_DarkWhoBuilderSkinKey = nil
+	end
+	if frame.QuickJoinFrame then
+		frame.QuickJoinFrame.BFL_DarkQuickJoinSkinKey = nil
+	end
+	if frame.RecentAlliesFrame then
+		frame.RecentAlliesFrame.BFL_DarkRecentAlliesSkinKey = nil
+	end
+	if frame.RecruitAFriendFrame then
+		frame.RecruitAFriendFrame.BFL_DarkRAFSkinKey = nil
+	end
+	if frame.RaidFrame then
+		frame.RaidFrame.BFL_DarkRaidSkinKey = nil
+	end
+	if frame.IgnoreListWindow then
+		frame.IgnoreListWindow.BFL_DarkIgnoreListSkinKey = nil
+	end
+	if frame.GuildFrame then
+		frame.GuildFrame.BFL_DarkGuildSkinKey = nil
+	end
+end
+
+function DarkTheme:RefreshMainFrameControls(engine, frame)
+	if not engine or not frame then
+		return
+	end
+
+	self:LayoutMainListChrome(engine, frame)
+	self:LayoutMainTitleButtons(engine, frame)
+	self:SkinMainTabs(engine)
+
+	for _, key in ipairs({
+		"AddFriendButton",
+		"SendMessageButton",
+		"RecruitmentButton",
+		"PortraitButton",
+	}) do
+		if frame[key] then
+			engine:ApplyButtonState(frame[key])
+		end
+	end
+
+	local header = frame.FriendsTabHeader
+	if header then
+		self:LayoutHeaderButtons(engine, header)
+		local bnetFrame = header.BattlenetFrame
+		if bnetFrame then
+			if bnetFrame.ContactsMenuButton then
+				engine:ApplyButtonState(bnetFrame.ContactsMenuButton)
+			end
+			if bnetFrame.SettingsButton then
+				engine:ApplyButtonState(bnetFrame.SettingsButton)
+			end
+		end
+	end
+end
+
+function DarkTheme:SkinVisibleMainContent(engine, frame)
+	frame = frame or _G.BetterFriendsFrame
+	if not engine or not engine:IsActive() or not frame then
+		return
+	end
+
+	if IsShown(frame.ScrollFrame) or IsShown(frame.MinimalScrollBar) then
+		self:SkinFriendsListRows(engine)
+	end
+	if IsShown(frame.RecentAlliesFrame) then
+		self:SkinRecentAlliesFrame(engine)
+	end
+	if IsShown(frame.RecruitAFriendFrame) then
+		self:SkinRAFFrame(engine)
+	end
+	if IsShown(frame.WhoFrame) then
+		self:SkinWhoFrame(engine)
+	end
+	if IsShown(frame.RaidFrame) then
+		self:SkinRaidFrame(engine)
+	end
+	if IsShown(frame.QuickJoinFrame) then
+		self:SkinQuickJoin(engine)
+	end
+	if IsShown(frame.IgnoreListWindow) then
+		self:SkinIgnoreList(engine)
+	end
+	if IsShown(frame.GuildFrame) then
+		self:SkinGuildFrame(engine)
+	end
+end
+
+function DarkTheme:RefreshVisibleMainContentDeferred()
+	local engine = GetEngine()
+	if not engine or not engine:IsActive() then
+		self.visibleMainContentRefreshPending = nil
+		return
+	end
+
+	if self.visibleMainContentRefreshPending then
+		return
+	end
+	self.visibleMainContentRefreshPending = true
+
+	local function FlushVisibleMainContent()
+		self.visibleMainContentRefreshPending = nil
+		local delayedEngine = GetEngine()
+		local frame = _G.BetterFriendsFrame
+		if delayedEngine and delayedEngine:IsActive() and frame then
+			self:RefreshMainFrameControls(delayedEngine, frame)
+			self:SkinVisibleMainContent(delayedEngine, frame)
+		end
+	end
+
+	if C_Timer and C_Timer.After then
+		C_Timer.After(0, FlushVisibleMainContent)
+	else
+		FlushVisibleMainContent()
 	end
 end
 
@@ -688,51 +868,45 @@ function DarkTheme:SkinMainFrame(engine)
 		return
 	end
 
-	engine:SkinFrame(frame, "main", { stripTextures = true, textureAlpha = 0.10 })
-	engine:SkinTree(frame, 6)
-	engine:StripButtonFrameArtwork(frame)
+	local staticSkinKey = GetMainFrameStaticSkinKey(frame)
+	if frame.BFL_DarkMainFrameStaticSkinKey ~= staticSkinKey or not frame.BFL_DarkBackdrop then
+		frame.BFL_DarkMainFrameStaticSkinKey = staticSkinKey
+		engine:SkinFrame(frame, "main", { stripTextures = true, textureAlpha = 0.10 })
+		engine:SkinTree(frame, 6)
+		engine:StripButtonFrameArtwork(frame)
 
-	self:LayoutMainListChrome(engine, frame)
-	HideFieldChrome(engine, frame, "Inset")
-	SkinField(engine, frame, "ScrollFrame", "inset")
-	SkinScrollBarField(engine, frame, "MinimalScrollBar")
-	SkinButtonField(engine, frame, "AddFriendButton")
-	SkinButtonField(engine, frame, "SendMessageButton")
-	SkinButtonField(engine, frame, "RecruitmentButton")
-	SkinButtonField(engine, frame, "PortraitButton")
-	SkinIconButtonField(engine, frame, "StreamerModeButton", { texture = frame.StreamerModeButton and frame.StreamerModeButton.Icon, size = 18 })
-	SkinIconButtonField(engine, frame, "HelpButton", { texture = frame.HelpButton and frame.HelpButton.Icon, size = 18 })
-	self:LayoutMainTitleButtons(engine, frame)
-	self:SkinMainTabs(engine)
+		HideFieldChrome(engine, frame, "Inset")
+		SkinField(engine, frame, "ScrollFrame", "inset")
+		SkinScrollBarField(engine, frame, "MinimalScrollBar")
+		SkinButtonField(engine, frame, "AddFriendButton")
+		SkinButtonField(engine, frame, "SendMessageButton")
+		SkinButtonField(engine, frame, "RecruitmentButton")
+		SkinButtonField(engine, frame, "PortraitButton")
+		SkinIconButtonField(engine, frame, "StreamerModeButton", { texture = frame.StreamerModeButton and frame.StreamerModeButton.Icon, size = 18 })
+		SkinIconButtonField(engine, frame, "HelpButton", { texture = frame.HelpButton and frame.HelpButton.Icon, size = 18 })
 
-	local header = frame.FriendsTabHeader
-	if header then
-		engine:SkinFrame(header, "panel")
-		SkinField(engine, header, "BattlenetFrame", "panel")
-		SkinField(engine, header, "BroadcastFrame", "popup")
-		if header.BroadcastFrame then
-			SkinEditBoxField(engine, header.BroadcastFrame, "EditBox")
-			SkinButtonField(engine, header.BroadcastFrame, "UpdateButton")
-			SkinButtonField(engine, header.BroadcastFrame, "CancelButton")
+		local header = frame.FriendsTabHeader
+		if header then
+			engine:SkinFrame(header, "panel")
+			SkinField(engine, header, "BattlenetFrame", "panel")
+			SkinField(engine, header, "BroadcastFrame", "popup")
+			if header.BroadcastFrame then
+				SkinEditBoxField(engine, header.BroadcastFrame, "EditBox")
+				SkinButtonField(engine, header.BroadcastFrame, "UpdateButton")
+				SkinButtonField(engine, header.BroadcastFrame, "CancelButton")
+			end
+			SkinDropdownField(engine, header, "StatusDropdown")
+			SkinEditBoxField(engine, header, "SearchBox")
+			SkinDropdownField(engine, header, "QuickFilterDropdown")
+			SkinDropdownField(engine, header, "PrimarySortDropdown")
+			SkinDropdownField(engine, header, "SecondarySortDropdown")
+			SkinButtonField(engine, header.BattlenetFrame, "ContactsMenuButton")
+			SkinButtonField(engine, header.BattlenetFrame, "SettingsButton")
 		end
-		SkinDropdownField(engine, header, "StatusDropdown")
-		SkinEditBoxField(engine, header, "SearchBox")
-		SkinDropdownField(engine, header, "QuickFilterDropdown")
-		SkinDropdownField(engine, header, "PrimarySortDropdown")
-		SkinDropdownField(engine, header, "SecondarySortDropdown")
-		SkinButtonField(engine, header.BattlenetFrame, "ContactsMenuButton")
-		SkinButtonField(engine, header.BattlenetFrame, "SettingsButton")
-		self:LayoutHeaderButtons(engine, header)
 	end
 
-	self:SkinFriendsListRows(engine)
-	self:SkinRecentAlliesFrame(engine)
-	self:SkinRAFFrame(engine)
-	self:SkinWhoFrame(engine)
-	self:SkinRaidFrame(engine)
-	self:SkinQuickJoin(engine)
-	self:SkinIgnoreList(engine)
-	self:SkinGuildFrame(engine)
+	self:RefreshMainFrameControls(engine, frame)
+	self:SkinVisibleMainContent(engine, frame)
 end
 
 function DarkTheme:SkinFriendsListRows(engine)
@@ -830,6 +1004,12 @@ function DarkTheme:SkinRecentAlliesFrame(engine)
 		return
 	end
 
+	local staticSkinKey = BuildSkinKey(recent, recent.ScrollBox, recent.ScrollBar, recent.ClassicScrollBar)
+	if recent.BFL_DarkRecentAlliesSkinKey == staticSkinKey then
+		return
+	end
+	recent.BFL_DarkRecentAlliesSkinKey = staticSkinKey
+
 	SkinTabListSurface(engine, recent, recent.ScrollBox, recent.ScrollBar)
 	engine:SkinTree(recent, 5)
 end
@@ -841,9 +1021,36 @@ function DarkTheme:SkinRAFFrame(engine)
 		return
 	end
 
+	local reward = raf.RewardClaiming
+	local recruitList = raf.RecruitList
+	local splash = raf.SplashFrame
+	local staticSkinKey = BuildSkinKey(
+		raf,
+		reward,
+		reward and reward.NextRewardInfoButton,
+		reward and reward.NextRewardButton,
+		reward and reward.ClaimOrViewRewardButton,
+		recruitList,
+		recruitList and recruitList.Header,
+		recruitList and recruitList.ScrollBox,
+		recruitList and recruitList.ScrollBar,
+		recruitList and recruitList.ClassicScrollBar,
+		splash,
+		splash and splash.OKButton
+	)
+	if raf.BFL_DarkRAFSkinKey == staticSkinKey then
+		if reward and reward.ClaimOrViewRewardButton then
+			engine:ApplyButtonState(reward.ClaimOrViewRewardButton)
+		end
+		if splash and splash.OKButton then
+			engine:ApplyButtonState(splash.OKButton)
+		end
+		return
+	end
+	raf.BFL_DarkRAFSkinKey = staticSkinKey
+
 	HideFrameChrome(engine, raf)
 
-	local reward = raf.RewardClaiming
 	if reward then
 		engine:SkinFrame(reward, "panel", { stripTextures = true, textureAlpha = 0 })
 		SkinNativeTextureButtonField(engine, reward, "NextRewardInfoButton")
@@ -852,7 +1059,6 @@ function DarkTheme:SkinRAFFrame(engine)
 		engine:SkinTree(reward, 4)
 	end
 
-	local recruitList = raf.RecruitList
 	if recruitList then
 		HideFieldChrome(engine, recruitList, "Header")
 		SkinTabListSurface(engine, recruitList, recruitList.ScrollBox, recruitList.ScrollBar)
@@ -860,7 +1066,6 @@ function DarkTheme:SkinRAFFrame(engine)
 		engine:SkinTree(recruitList, 5)
 	end
 
-	local splash = raf.SplashFrame
 	if splash then
 		engine:SkinFrame(splash, "popup", { stripTextures = true, textureAlpha = 0 })
 		SkinButtonField(engine, splash, "OKButton")
@@ -997,6 +1202,32 @@ function DarkTheme:SkinRaidFrame(engine)
 		return
 	end
 
+	local control = raid.ControlPanel
+	local staticSkinKey = BuildSkinKey(
+		raid,
+		control,
+		control and control.RaidInfoButton,
+		control and control.EveryoneAssistCheckbox,
+		raid.GroupsInset,
+		raid.ConvertToRaidButton,
+		raid.RaidToolsButton,
+		raid.CombatIcon
+	)
+	if raid.BFL_DarkRaidSkinKey == staticSkinKey then
+		for _, button in ipairs({
+			control and control.RaidInfoButton,
+			raid.ConvertToRaidButton,
+			raid.RaidToolsButton,
+			raid.CombatIcon,
+		}) do
+			if button then
+				engine:ApplyButtonState(button)
+			end
+		end
+		return
+	end
+	raid.BFL_DarkRaidSkinKey = staticSkinKey
+
 	HideFrameChrome(engine, raid)
 	HideFieldChrome(engine, raid, "ControlPanel")
 	SkinButtonField(engine, raid.ControlPanel, "RaidInfoButton")
@@ -1050,6 +1281,30 @@ function DarkTheme:SkinIgnoreList(engine)
 		return
 	end
 
+	local staticSkinKey = BuildSkinKey(
+		ignore,
+		ignore.UnignorePlayerButton,
+		ignore.GlobalIgnoreListButton,
+		ignore.EnhanceQoLIgnoreButton,
+		ignore.ScrollBox,
+		ignore.ScrollBar,
+		ignore.ClassicScrollBar,
+		ignore.Inset and ignore.Inset.ClassicScrollBar
+	)
+	if ignore.BFL_DarkIgnoreListSkinKey == staticSkinKey then
+		for _, button in ipairs({
+			ignore.UnignorePlayerButton,
+			ignore.GlobalIgnoreListButton,
+			ignore.EnhanceQoLIgnoreButton,
+		}) do
+			if button then
+				engine:ApplyButtonState(button)
+			end
+		end
+		return
+	end
+	ignore.BFL_DarkIgnoreListSkinKey = staticSkinKey
+
 	engine:SkinFrame(ignore, "popup", { stripTextures = true, textureAlpha = 0.08 })
 	SkinButtonField(engine, ignore, "UnignorePlayerButton")
 	SkinButtonField(engine, ignore, "GlobalIgnoreListButton")
@@ -1067,6 +1322,46 @@ function DarkTheme:SkinGuildFrame(engine)
 	if not guild then
 		return
 	end
+
+	local staticSkinKey = BuildSkinKey(
+		guild,
+		guild.SearchBox,
+		guild.ListInset,
+		guild.ScrollBox,
+		guild.ScrollBar,
+		guild.NameHeader,
+		guild.RankHeader,
+		guild.LevelHeader,
+		guild.ZoneHeader,
+		guild.ILvlHeader,
+		guild.FilterAll,
+		guild.FilterOnline,
+		guild.FilterOffline,
+		guild.OpenBlizzardGuildButton,
+		guild.RefreshButton,
+		guild.InvitePlayerButton
+	)
+	if guild.BFL_DarkGuildSkinKey == staticSkinKey then
+		for _, key in ipairs({
+			"NameHeader",
+			"RankHeader",
+			"LevelHeader",
+			"ZoneHeader",
+			"ILvlHeader",
+			"FilterAll",
+			"FilterOnline",
+			"FilterOffline",
+			"OpenBlizzardGuildButton",
+			"RefreshButton",
+			"InvitePlayerButton",
+		}) do
+			if guild[key] then
+				engine:ApplyButtonState(guild[key])
+			end
+		end
+		return
+	end
+	guild.BFL_DarkGuildSkinKey = staticSkinKey
 
 	engine:SkinFrame(guild, "panel")
 	SkinEditBoxField(engine, guild, "SearchBox")
@@ -1585,14 +1880,14 @@ function DarkTheme:InstallGlobalTabHooks()
 	if not self.bottomTabHooked and type(_G.BetterFriendsFrame_ShowBottomTab) == "function" then
 		self.bottomTabHooked = true
 		hooksecurefunc("BetterFriendsFrame_ShowBottomTab", function()
-			DarkTheme:SkinMainTabsDeferred()
+			DarkTheme:RefreshVisibleMainContentDeferred()
 		end)
 	end
 
 	if not self.topTabHooked and type(_G.BetterFriendsFrame_ShowTab) == "function" then
 		self.topTabHooked = true
 		hooksecurefunc("BetterFriendsFrame_ShowTab", function()
-			DarkTheme:SkinMainTabsDeferred()
+			DarkTheme:RefreshVisibleMainContentDeferred()
 		end)
 	end
 
