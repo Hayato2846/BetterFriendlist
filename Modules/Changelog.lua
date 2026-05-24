@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dark Theme Visuals** - Refined the Dark theme with translucent black Aurora-style surfaces, clearer control hairlines, Material-like navigation states, and cleaner list dividers.
 - **Friend List Sorting** - Reduced CPU time and memory churn when changing QuickFilters and Sorter selections.
 - **Dark Theme Performance** - Reduced repeated tab, button, row, and backdrop skinning work during high-frequency UI refreshes.
+- **Dark Theme Performance** - Reduced repeated scrollbar, tab, row, and button state work during list, WHO, and Quick Join updates.
 
 ### Fixed
 - **QuickFilter & Sorter Builder** - Updated the docked editor to use the same modern frame styling as the Settings and Raid Help windows.

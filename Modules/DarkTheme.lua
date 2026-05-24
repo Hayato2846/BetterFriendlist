@@ -246,6 +246,24 @@ local function SkinScrollBarField(engine, parent, key)
 	end
 end
 
+local function RefreshFriendListRow(row)
+	local engine = DarkTheme.refreshFriendsListRowsEngine
+	if not engine or not row then
+		return
+	end
+	if row.BFL_DarkRowSkinned then
+		engine:ApplyRowState(row, row.BFL_DarkRowOver and "hover" or nil)
+		if row.travelPassButton then
+			engine:SkinTravelPassButton(row.travelPassButton)
+		end
+		if row.PartyButton then
+			engine:SkinTravelPassButton(row.PartyButton)
+		end
+	else
+		engine:SkinRow(row)
+	end
+end
+
 local function SkinSettingsNavigation(engine, frame)
 	local list = frame and frame.CategoryList
 	if not list or not list.GetChildren then
@@ -777,57 +795,42 @@ function DarkTheme:RefreshFriendsListRows(engine)
 		return
 	end
 
-	local function RefreshRow(row)
-		if not row then
-			return
-		end
-		if row.BFL_DarkRowSkinned then
-			engine:ApplyRowState(row, row.BFL_DarkRowOver and "hover" or nil)
-			if row.travelPassButton then
-				engine:SkinTravelPassButton(row.travelPassButton)
-			end
-			if row.PartyButton then
-				engine:SkinTravelPassButton(row.PartyButton)
-			end
-		else
-			engine:SkinRow(row)
-		end
-	end
-
+	self.refreshFriendsListRowsEngine = engine
 	if FriendsList.scrollBox and FriendsList.scrollBox.ForEachFrame then
-		FriendsList.scrollBox:ForEachFrame(RefreshRow)
+		FriendsList.scrollBox:ForEachFrame(RefreshFriendListRow)
 	end
 
 	local pool = FriendsList.classicButtonPool
 	if pool then
 		for _, row in ipairs(pool) do
-			RefreshRow(row)
+			RefreshFriendListRow(row)
 		end
 	end
 	pool = FriendsList.classicHeaderPool
 	if pool then
 		for _, row in ipairs(pool) do
-			RefreshRow(row)
+			RefreshFriendListRow(row)
 		end
 	end
 	pool = FriendsList.classicInviteHeaderPool
 	if pool then
 		for _, row in ipairs(pool) do
-			RefreshRow(row)
+			RefreshFriendListRow(row)
 		end
 	end
 	pool = FriendsList.classicInviteButtonPool
 	if pool then
 		for _, row in ipairs(pool) do
-			RefreshRow(row)
+			RefreshFriendListRow(row)
 		end
 	end
 	pool = FriendsList.classicDividerPool
 	if pool then
 		for _, row in ipairs(pool) do
-			RefreshRow(row)
+			RefreshFriendListRow(row)
 		end
 	end
+	self.refreshFriendsListRowsEngine = nil
 end
 
 function DarkTheme:SkinRecentAlliesFrame(engine)
@@ -882,65 +885,118 @@ function DarkTheme:SkinWhoFrame(engine)
 		return
 	end
 
-	self:LayoutWhoColumnHeaders(engine, who)
-	self:LayoutWhoListChrome(engine, who)
-	SkinField(engine, who, "ListInset", "inset")
-	SkinEditBoxField(engine, who, "EditBox")
-	SkinDropdownField(engine, who, "ColumnDropdown")
-	SkinColumnHeaderField(engine, who, "NameHeader")
-	SkinColumnHeaderField(engine, who, "LevelHeader")
-	SkinColumnHeaderField(engine, who, "ClassHeader")
-	SkinButtonField(engine, who, "WhoButton")
-	SkinButtonField(engine, who, "AddFriendButton")
-	SkinButtonField(engine, who, "GroupInviteButton")
+	local staticSkinKey = tostring(who.ScrollBox)
+		.. ":"
+		.. tostring(who.ScrollBar)
+		.. ":"
+		.. tostring(who.ClassicScrollBar)
+		.. ":"
+		.. tostring(who.ListInset)
+		.. ":"
+		.. tostring(who.EditBox)
+		.. ":"
+		.. tostring(who.ColumnDropdown)
+		.. ":"
+		.. tostring(who.NameHeader)
+		.. ":"
+		.. tostring(who.LevelHeader)
+		.. ":"
+		.. tostring(who.ClassHeader)
+		.. ":"
+		.. tostring(who.WhoButton)
+		.. ":"
+		.. tostring(who.AddFriendButton)
+		.. ":"
+		.. tostring(who.GroupInviteButton)
+	if who.BFL_DarkWhoStaticSkinKey ~= staticSkinKey then
+		who.BFL_DarkWhoStaticSkinKey = staticSkinKey
+		self:LayoutWhoColumnHeaders(engine, who)
+		self:LayoutWhoListChrome(engine, who)
+		SkinField(engine, who, "ListInset", "inset")
+		SkinEditBoxField(engine, who, "EditBox")
+		SkinDropdownField(engine, who, "ColumnDropdown")
+		SkinColumnHeaderField(engine, who, "NameHeader")
+		SkinColumnHeaderField(engine, who, "LevelHeader")
+		SkinColumnHeaderField(engine, who, "ClassHeader")
+		SkinButtonField(engine, who, "WhoButton")
+		SkinButtonField(engine, who, "AddFriendButton")
+		SkinButtonField(engine, who, "GroupInviteButton")
+	else
+		if who.WhoButton then
+			engine:ApplyButtonState(who.WhoButton)
+		end
+		if who.AddFriendButton then
+			engine:ApplyButtonState(who.AddFriendButton)
+		end
+		if who.GroupInviteButton then
+			engine:ApplyButtonState(who.GroupInviteButton)
+		end
+	end
 
 	local WhoFrame = BFL:GetModule("WhoFrame")
 	if WhoFrame then
-		if WhoFrame.builderToggle then
-			WhoFrame.builderToggle.BFL_DarkNoButtonChrome = true
-			engine:RestoreFrame(WhoFrame.builderToggle)
-		end
-		if WhoFrame.builderDockBtn then
-			WhoFrame.builderDockBtn.BFL_DarkNoButtonChrome = true
-			engine:RestoreFrame(WhoFrame.builderDockBtn)
-		end
-		if WhoFrame.builderFlyout then
-			if WhoFrame.builderDocked then
-				HideFrameChrome(engine, WhoFrame.builderFlyout)
-			else
-				engine:SkinFrame(WhoFrame.builderFlyout, "popup", { stripTextures = true, textureAlpha = 0 })
+		local builderContainer = WhoFrame.builderDockedContainer or WhoFrame.builderContainer or _G.BetterFriendlistSearchBuilderFrame
+		local builderSkinKey = tostring(WhoFrame.builderToggle)
+			.. ":"
+			.. tostring(WhoFrame.builderDockBtn)
+			.. ":"
+			.. tostring(WhoFrame.builderFlyout)
+			.. ":"
+			.. tostring(WhoFrame.builderDocked)
+			.. ":"
+			.. tostring(builderContainer)
+			.. ":"
+			.. tostring(WhoFrame.builderCloseBtn)
+			.. ":"
+			.. tostring(_G.BetterFriendlistSearchBuilderFrame)
+		if who.BFL_DarkWhoBuilderSkinKey ~= builderSkinKey then
+			who.BFL_DarkWhoBuilderSkinKey = builderSkinKey
+			if WhoFrame.builderToggle then
+				WhoFrame.builderToggle.BFL_DarkNoButtonChrome = true
+				engine:RestoreFrame(WhoFrame.builderToggle)
 			end
-			engine:SkinTree(WhoFrame.builderFlyout, 6)
-			if WhoFrame.builderCloseBtn then
-				WhoFrame.builderCloseBtn.BFL_DarkNoButtonChrome = nil
-				engine:SkinCloseButton(WhoFrame.builderCloseBtn)
+			if WhoFrame.builderDockBtn then
+				WhoFrame.builderDockBtn.BFL_DarkNoButtonChrome = true
+				engine:RestoreFrame(WhoFrame.builderDockBtn)
+			end
+			if WhoFrame.builderFlyout then
+				if WhoFrame.builderDocked then
+					HideFrameChrome(engine, WhoFrame.builderFlyout)
+				else
+					engine:SkinFrame(WhoFrame.builderFlyout, "popup", { stripTextures = true, textureAlpha = 0 })
+				end
+				engine:SkinTree(WhoFrame.builderFlyout, 6)
+				if WhoFrame.builderCloseBtn then
+					WhoFrame.builderCloseBtn.BFL_DarkNoButtonChrome = nil
+					engine:SkinCloseButton(WhoFrame.builderCloseBtn)
+				end
+			end
+
+			if builderContainer then
+				engine:SkinFrame(builderContainer, "popup", { stripTextures = true, textureAlpha = 0 })
+				HideFieldChrome(engine, builderContainer, "Inset")
+				HideFieldChrome(engine, builderContainer, "InsetRight")
+				engine:SkinTree(builderContainer, 6)
+				if builderContainer.CloseButton then
+					builderContainer.CloseButton.BFL_DarkNoButtonChrome = true
+					engine:RestoreFrame(builderContainer.CloseButton)
+				end
+			end
+			if WhoFrame.builderDocked and WhoFrame.builderFlyout then
+				HideFrameChrome(engine, WhoFrame.builderFlyout)
+			end
+
+			local searchBuilderFrame = _G.BetterFriendlistSearchBuilderFrame
+			if searchBuilderFrame then
+				engine:SkinFrame(searchBuilderFrame, "popup", { stripTextures = true, textureAlpha = 0 })
 			end
 		end
 
-		local builderContainer = WhoFrame.builderDockedContainer or WhoFrame.builderContainer or _G.BetterFriendlistSearchBuilderFrame
-		if builderContainer then
-			engine:SkinFrame(builderContainer, "popup", { stripTextures = true, textureAlpha = 0 })
-			HideFieldChrome(engine, builderContainer, "Inset")
-			HideFieldChrome(engine, builderContainer, "InsetRight")
-			engine:SkinTree(builderContainer, 6)
-			if builderContainer.CloseButton then
-				builderContainer.CloseButton.BFL_DarkNoButtonChrome = true
-				engine:RestoreFrame(builderContainer.CloseButton)
-			end
-		end
-		if WhoFrame.builderDocked and WhoFrame.builderFlyout then
-			HideFrameChrome(engine, WhoFrame.builderFlyout)
-		end
 		if WhoFrame.classicWhoButtonPool then
 			for _, row in ipairs(WhoFrame.classicWhoButtonPool) do
 				engine:SkinRow(row)
 			end
 		end
-	end
-
-	local searchBuilderFrame = _G.BetterFriendlistSearchBuilderFrame
-	if searchBuilderFrame then
-		engine:SkinFrame(searchBuilderFrame, "popup", { stripTextures = true, textureAlpha = 0 })
 	end
 end
 
@@ -972,10 +1028,28 @@ function DarkTheme:SkinQuickJoin(engine)
 		return
 	end
 
-	HideFrameChrome(engine, quickJoin)
-	if quickJoin.ContentInset then
-		self:LayoutQuickJoinListChrome(engine, quickJoin)
-		SkinButtonField(engine, quickJoin.ContentInset, "JoinQueueButton")
+	local content = quickJoin.ContentInset
+	if content then
+		local listSurface = content.ScrollBoxContainer or content.ScrollBox
+		local skinKey = tostring(content)
+			.. ":"
+			.. tostring(listSurface)
+			.. ":"
+			.. tostring(content.ScrollBar)
+			.. ":"
+			.. tostring(content.ClassicScrollBar)
+			.. ":"
+			.. tostring(content.JoinQueueButton)
+		if quickJoin.BFL_DarkQuickJoinSkinKey ~= skinKey then
+			quickJoin.BFL_DarkQuickJoinSkinKey = skinKey
+			HideFrameChrome(engine, quickJoin)
+			self:LayoutQuickJoinListChrome(engine, quickJoin)
+			SkinButtonField(engine, content, "JoinQueueButton")
+		elseif content.JoinQueueButton then
+			engine:ApplyButtonState(content.JoinQueueButton)
+		end
+	else
+		HideFrameChrome(engine, quickJoin)
 	end
 end
 
