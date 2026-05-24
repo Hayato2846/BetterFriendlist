@@ -9,6 +9,17 @@ local WHO_COLUMN_HEADER_OVERLAP = -1
 local WHO_LIST_INSET_PADDING = 4
 local WHO_SCROLLBAR_RESERVE = 24
 local WHO_SCROLLBAR_OFFSET_X = 1
+local QUICK_JOIN_CONTENT_OFFSET_Y = -6
+local QUICK_JOIN_REQUEST_BUTTON_OFFSET_X = 1
+local QUICK_JOIN_REQUEST_BUTTON_OFFSET_Y = 1
+local SETTINGS_SCROLLBAR_RESERVE = 30
+local SETTINGS_SCROLLBAR_RIGHT_OFFSET_X = -3
+local SETTINGS_SCROLLBAR_TRACK_TOP_OFFSET_Y = -22
+local SETTINGS_SCROLLBAR_TRACK_BOTTOM_OFFSET_Y = 22
+local SETTINGS_SCROLLBAR_BUTTON_TOP_OFFSET_Y = -4
+local SETTINGS_SCROLLBAR_BUTTON_BOTTOM_OFFSET_Y = 4
+local HELP_SCROLLBAR_TOP_OFFSET_Y = 3
+local HELP_SCROLLBAR_BOTTOM_OFFSET_Y = 1
 
 local function GetEngine()
 	return BFL:GetModule("SkinEngine")
@@ -31,6 +42,31 @@ end
 
 local function GetFrameName(frame)
 	return (frame and frame.GetName and frame:GetName()) or ""
+end
+
+local function GetScrollFrameScrollBar(scrollFrame)
+	if not scrollFrame then
+		return nil
+	end
+	if scrollFrame.ScrollBar then
+		return scrollFrame.ScrollBar
+	end
+
+	local frameName = GetFrameName(scrollFrame)
+	if frameName ~= "" then
+		return _G[frameName .. "ScrollBar"]
+	end
+end
+
+local function SkinBorderOnlyInset(engine, frame)
+	if not engine or not frame then
+		return
+	end
+
+	engine:SkinFrame(frame, "inset", { stripTextures = true, textureAlpha = 0 })
+	if engine.colors and frame.BFL_DarkBackdrop then
+		engine:StyleBackdrop(frame, engine.colors.borderNone, engine.colors.borderSoft)
+	end
 end
 
 local function SkinField(engine, parent, key, variant)
@@ -78,6 +114,28 @@ local function SkinTabListScrollBar(engine, scrollBox, scrollBar, opts)
 	engine:SkinScrollBar(scrollBar)
 end
 
+local function RefreshScrollBarSteppers(engine, scrollBar)
+	if not engine or not scrollBar then
+		return
+	end
+
+	engine:RefreshScrollBarSteppers(scrollBar)
+	if C_Timer and C_Timer.After then
+		C_Timer.After(0, function()
+			local delayedEngine = GetEngine()
+			if delayedEngine and delayedEngine:IsActive() then
+				delayedEngine:RefreshScrollBarSteppers(scrollBar)
+			end
+		end)
+		C_Timer.After(0.05, function()
+			local delayedEngine = GetEngine()
+			if delayedEngine and delayedEngine:IsActive() then
+				delayedEngine:RefreshScrollBarSteppers(scrollBar)
+			end
+		end)
+	end
+end
+
 local function SkinWhoListScrollBar(engine, who, scrollBar, opts)
 	if not engine or not who or not who.ScrollBox or not scrollBar then
 		return
@@ -121,11 +179,18 @@ local function SkinNativeTextureButtonField(engine, parent, key)
 	end
 end
 
-local function SkinCompactCheckButtonField(engine, parent, key)
+local function SkinRaidAssistCheckButtonField(engine, parent, key)
 	if parent and parent[key] then
-		parent[key].BFL_DarkNoCheckChrome = nil
-		parent[key].BFL_DarkCompactCheckButton = true
-		engine:SkinCheckButton(parent[key])
+		local checkButton = parent[key]
+		checkButton.BFL_DarkNoCheckChrome = nil
+		checkButton.BFL_DarkCompactCheckButton = nil
+		checkButton.BFL_DarkCheckButtonInsets = { left = 1, right = 1, top = -1, bottom = -1 }
+		checkButton.BFL_DarkCheckButtonNormalAlpha = 0
+		checkButton.BFL_DarkCheckButtonPushedAlpha = 0
+		checkButton.BFL_DarkCheckButtonDisabledAlpha = 0
+		checkButton.BFL_DarkCheckButtonHighlightAlpha = 0.10
+		engine:SetFrameSize(checkButton, 24, 24)
+		engine:SkinCheckButton(checkButton)
 	end
 end
 
@@ -312,6 +377,143 @@ function DarkTheme:LayoutWhoListChrome(engine, who)
 		scrollTopY = -18,
 		scrollBottomY = 18,
 	})
+end
+
+function DarkTheme:LayoutQuickJoinListChrome(engine, quickJoin)
+	if not engine or not quickJoin or not quickJoin.ContentInset then
+		return
+	end
+
+	local content = quickJoin.ContentInset
+	local listSurface = content.ScrollBoxContainer or content.ScrollBox
+
+	HideFrameChrome(engine, quickJoin)
+	HideFrameChrome(engine, content)
+	engine:SetFramePoints(content, {
+		{ "TOPLEFT", quickJoin, "TOPLEFT", 0, 80 + QUICK_JOIN_CONTENT_OFFSET_Y },
+		{ "BOTTOMRIGHT", quickJoin, "BOTTOMRIGHT", 0, QUICK_JOIN_CONTENT_OFFSET_Y },
+	})
+	if content.JoinQueueButton then
+		local buttonAnchor = listSurface or content
+		engine:SetFramePoints(content.JoinQueueButton, {
+			{ "TOPRIGHT", buttonAnchor, "BOTTOMRIGHT", QUICK_JOIN_REQUEST_BUTTON_OFFSET_X, QUICK_JOIN_REQUEST_BUTTON_OFFSET_Y },
+		})
+	end
+
+	if listSurface then
+		engine:SkinFrame(listSurface, "inset", { stripTextures = true, textureAlpha = 0 })
+	end
+	HideFrameChrome(engine, content.ScrollBox)
+
+	SkinTabListScrollBar(engine, listSurface or content, content.ScrollBar, {
+		scrollTopY = 2,
+		scrollBottomY = 2,
+	})
+	SkinTabListScrollBar(engine, listSurface or content, content.ClassicScrollBar, {
+		scrollTopY = 2,
+		scrollBottomY = 2,
+	})
+end
+
+function DarkTheme:LayoutSettingsContentChrome(engine, frame)
+	if not engine or not frame or not frame.MainInset or not frame.ContentScrollFrame then
+		return
+	end
+
+	local scrollFrame = frame.ContentScrollFrame
+	local scrollBar = GetScrollFrameScrollBar(scrollFrame)
+	engine:SetFramePoints(scrollFrame, {
+		{ "TOPLEFT", frame.MainInset, "TOPLEFT", 8, -5 },
+		{ "BOTTOMRIGHT", frame.MainInset, "BOTTOMRIGHT", -SETTINGS_SCROLLBAR_RESERVE, 1 },
+	})
+
+	if scrollBar then
+		scrollBar.BFL_DarkWideScrollbar = true
+		engine:SetFramePoints(scrollBar, {
+			{
+				"TOPRIGHT",
+				frame.MainInset,
+				"TOPRIGHT",
+				SETTINGS_SCROLLBAR_RIGHT_OFFSET_X,
+				SETTINGS_SCROLLBAR_TRACK_TOP_OFFSET_Y,
+			},
+			{
+				"BOTTOMRIGHT",
+				frame.MainInset,
+				"BOTTOMRIGHT",
+				SETTINGS_SCROLLBAR_RIGHT_OFFSET_X,
+				SETTINGS_SCROLLBAR_TRACK_BOTTOM_OFFSET_Y,
+			},
+		})
+		engine:SkinScrollBar(scrollBar)
+		engine:SetFramePoints(scrollBar, {
+			{
+				"TOPRIGHT",
+				frame.MainInset,
+				"TOPRIGHT",
+				SETTINGS_SCROLLBAR_RIGHT_OFFSET_X,
+				SETTINGS_SCROLLBAR_TRACK_TOP_OFFSET_Y,
+			},
+			{
+				"BOTTOMRIGHT",
+				frame.MainInset,
+				"BOTTOMRIGHT",
+				SETTINGS_SCROLLBAR_RIGHT_OFFSET_X,
+				SETTINGS_SCROLLBAR_TRACK_BOTTOM_OFFSET_Y,
+			},
+		})
+		local topButton = scrollBar.ScrollUpButton or scrollBar.Back
+		local bottomButton = scrollBar.ScrollDownButton or scrollBar.Forward
+		if topButton then
+			engine:SetFramePoints(topButton, {
+				{
+					"TOPRIGHT",
+					frame.MainInset,
+					"TOPRIGHT",
+					SETTINGS_SCROLLBAR_RIGHT_OFFSET_X,
+					SETTINGS_SCROLLBAR_BUTTON_TOP_OFFSET_Y,
+				},
+			})
+		end
+		if bottomButton then
+			engine:SetFramePoints(bottomButton, {
+				{
+					"BOTTOMRIGHT",
+					frame.MainInset,
+					"BOTTOMRIGHT",
+					SETTINGS_SCROLLBAR_RIGHT_OFFSET_X,
+					SETTINGS_SCROLLBAR_BUTTON_BOTTOM_OFFSET_Y,
+				},
+			})
+		end
+		RefreshScrollBarSteppers(engine, scrollBar)
+	end
+end
+
+function DarkTheme:SkinHelpFrame(engine)
+	local frame = _G.BetterFriendlistHelpFrame
+	if not frame then
+		return
+	end
+
+	engine:SkinFrame(frame, "popup", { stripTextures = true, textureAlpha = 0.08 })
+	HideFieldChrome(engine, frame, "Inset")
+	if frame.ScrollFrame then
+		SkinBorderOnlyInset(engine, frame.ScrollFrame)
+		local scrollBar = frame.ScrollBar or GetScrollFrameScrollBar(frame.ScrollFrame)
+		if scrollBar then
+			SkinTabListScrollBar(engine, frame.ScrollFrame, scrollBar, {
+				scrollTopY = HELP_SCROLLBAR_TOP_OFFSET_Y,
+				scrollBottomY = HELP_SCROLLBAR_BOTTOM_OFFSET_Y,
+			})
+			RefreshScrollBarSteppers(engine, scrollBar)
+		end
+	end
+	engine:SkinTree(frame, 6)
+	HideFieldChrome(engine, frame, "Inset")
+	if frame.ScrollFrame then
+		SkinBorderOnlyInset(engine, frame.ScrollFrame)
+	end
 end
 
 function DarkTheme:LayoutWhoColumnHeaders(engine, who)
@@ -605,7 +807,6 @@ function DarkTheme:SkinRaidFrame(engine)
 
 	HideFrameChrome(engine, raid)
 	HideFieldChrome(engine, raid, "ControlPanel")
-	SkinCompactCheckButtonField(engine, raid.ControlPanel, "EveryoneAssistCheckbox")
 	SkinButtonField(engine, raid.ControlPanel, "RaidInfoButton")
 	SkinField(engine, raid, "GroupsInset", "inset")
 	SkinButtonField(engine, raid, "ConvertToRaidButton")
@@ -615,6 +816,7 @@ function DarkTheme:SkinRaidFrame(engine)
 	HideFrameChrome(engine, raid)
 	HideFieldChrome(engine, raid, "ControlPanel")
 	SkinField(engine, raid, "GroupsInset", "inset")
+	SkinRaidAssistCheckButtonField(engine, raid.ControlPanel, "EveryoneAssistCheckbox")
 end
 
 function DarkTheme:SkinQuickJoin(engine)
@@ -624,16 +826,11 @@ function DarkTheme:SkinQuickJoin(engine)
 		return
 	end
 
-	engine:SkinFrame(quickJoin, "panel")
-	SkinField(engine, quickJoin, "ContentInset", "inset")
+	HideFrameChrome(engine, quickJoin)
 	if quickJoin.ContentInset then
-		SkinField(engine, quickJoin.ContentInset, "ScrollBoxContainer", "inset")
-		SkinField(engine, quickJoin.ContentInset, "ScrollBox", "inset")
-		SkinScrollBarField(engine, quickJoin.ContentInset, "ScrollBar")
-		SkinScrollBarField(engine, quickJoin.ContentInset, "ClassicScrollBar")
+		self:LayoutQuickJoinListChrome(engine, quickJoin)
 		SkinButtonField(engine, quickJoin.ContentInset, "JoinQueueButton")
 	end
-	engine:SkinTree(quickJoin, 5)
 end
 
 function DarkTheme:SkinIgnoreList(engine)
@@ -696,21 +893,15 @@ function DarkTheme:SkinSettingsFrame(engine)
 	SkinField(engine, frame, "MainInset", "inset")
 	SkinField(engine, frame, "CategoryList", "panel")
 	SkinField(engine, frame, "ButtonSeparator", "panel")
-	if frame.ContentScrollFrame then
-		local scrollBar = frame.ContentScrollFrame.ScrollBar or _G[GetFrameName(frame.ContentScrollFrame) .. "ScrollBar"]
-		if scrollBar then
-			scrollBar.BFL_DarkWideScrollbar = true
-			engine:SkinScrollBar(scrollBar)
-		end
-	end
+	self:LayoutSettingsContentChrome(engine, frame)
 	engine:SkinTree(frame, 7)
+	self:LayoutSettingsContentChrome(engine, frame)
 	SkinSettingsNavigation(engine, frame)
 end
 
 function DarkTheme:SkinAuxiliaryFrames(engine)
 	for _, frameInfo in ipairs({
 		{ "BetterFriendlistChangelogFrame", "popup" },
-		{ "BetterFriendlistHelpFrame", "popup" },
 		{ "BetterFriendlistExportFrame", "popup" },
 		{ "BetterFriendlistImportFrame", "popup" },
 		{ "BetterFriendlistFilterSortEditorFrame", "popup" },
@@ -722,6 +913,7 @@ function DarkTheme:SkinAuxiliaryFrames(engine)
 	}) do
 		SkinFrameByName(engine, frameInfo[1], frameInfo[2])
 	end
+	self:SkinHelpFrame(engine)
 end
 
 function DarkTheme:SkinCreatedFrame(frame)
@@ -949,6 +1141,19 @@ function DarkTheme:InstallHooks()
 	end)
 
 	for _, methodName in ipairs({
+		"Initialize",
+		"InitializeClassicQuickJoin",
+		"Update",
+	}) do
+		self:WrapModuleMethod("QuickJoin", methodName, function()
+			local engine = GetEngine()
+			if engine then
+				self:SkinQuickJoin(engine)
+			end
+		end)
+	end
+
+	for _, methodName in ipairs({
 		"RefreshThemeTab",
 		"RefreshGeneralTab",
 		"RefreshFontsTab",
@@ -1000,7 +1205,10 @@ function DarkTheme:InstallHooks()
 		BFL.HelpFrame.CreateFrame = function(helpSelf, ...)
 			local frame = original(helpSelf, ...)
 			if BFL:IsThemeActive("dark") then
-				DarkTheme:SkinCreatedFrame(frame or _G.BetterFriendlistHelpFrame)
+				local engine = GetEngine()
+				if engine then
+					DarkTheme:SkinHelpFrame(engine)
+				end
 			end
 			return frame
 		end

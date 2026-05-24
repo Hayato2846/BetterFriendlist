@@ -24,21 +24,24 @@ C:\Users\hofer\Documents\BFL\
   savedvariables\BetterFriendlist\
 ```
 
-Each WoW client keeps an `Interface\AddOns\BetterFriendlist` link. That link should point
-to the matching deployment slot, not to another WoW client folder.
+Each WoW client uses either a managed `Interface\AddOns\BetterFriendlist` folder or a link
+to the matching deployment slot. Existing non-linked client folders are normal on Windows
+because WoW, VSCode, antivirus, or file watchers can keep the AddOn directory locked.
 
 ## Modes
 
-- `CleanCopy`: copies a repo or worktree into a deployment slot and links the WoW client to that slot.
-- `Link`: links a WoW client directly to a repo or worktree for live development.
+- `CleanCopy`: mirrors a repo or worktree into the active client AddOn folder when that folder already exists as a normal non-git directory. If the client path is missing or already linked, it uses the deployment slot/link layout.
+- `Link`: links a WoW client directly to a repo, worktree, or deployment slot for live development.
 - `Zip`: installs a release ZIP into a deployment slot for user-equivalent testing.
 
-Prefer `CleanCopy` for normal QA because it keeps the WoW install independent from dirty
-working-tree files. Use `Link` only when fast edit/reload iteration matters.
+Prefer `CleanCopy` for normal QA because it deploys a filtered runtime copy without internal
+repo, docs, or tooling files. Use `Link` only when fast edit/reload iteration matters or when
+you explicitly want to convert the client folder to a link after closing programs that hold
+the folder open.
 
-If Windows blocks replacing an existing non-linked client AddOn folder, `CleanCopy` mirrors
-the checkout directly into that folder as a fallback. This keeps `/reload` testing working
-until the client folder can be converted to a link after closing file watchers.
+For existing non-linked client AddOn folders, direct mirroring is the expected `CleanCopy`
+path, not a warning fallback. The deploy script refuses direct mirroring into links, unexpected
+paths, or repository roots.
 
 ## Codex Workflow
 
