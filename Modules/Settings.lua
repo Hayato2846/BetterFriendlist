@@ -5738,6 +5738,12 @@ end
 -- ===========================================
 -- QUICKFILTER & SORTER BUILDER TAB (Tab ID 11, Beta)
 -- ===========================================
+local BFL_FILTER_SORT_EDITOR_WIDTH = 470
+local BFL_FILTER_SORT_EDITOR_CONTENT_WIDTH = 420
+local BFL_FILTER_SORT_EDITOR_SIDE_PADDING = 18
+local BFL_FILTER_SORT_EDITOR_MAX_DEPTH = 2
+local BFL_FILTER_SORT_EDITOR_FORM_LABEL_WIDTH = 86
+
 local function BFL_Settings_CreateSmallButton(parent, text, width, onClick)
 	local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
 	button:SetSize(width or 64, 22)
@@ -5751,6 +5757,40 @@ local function BFL_Settings_CreateSmallButton(parent, text, width, onClick)
 		button:SetScript("OnClick", onClick)
 	end
 	return button
+end
+
+local function BFL_Settings_GetEditorIndent(depth)
+	return BFL_FILTER_SORT_EDITOR_SIDE_PADDING + math.min(depth or 0, BFL_FILTER_SORT_EDITOR_MAX_DEPTH) * 12
+end
+
+local function BFL_Settings_CreateEditorRow(parent, height, leftOffset, rightOffset)
+	local template = BackdropTemplateMixin and "BackdropTemplate" or nil
+	local row = CreateFrame("Frame", nil, parent, template)
+	row:SetHeight(height or 30)
+	row:SetPoint("LEFT", leftOffset or BFL_FILTER_SORT_EDITOR_SIDE_PADDING, 0)
+	row:SetPoint("RIGHT", -(rightOffset or BFL_FILTER_SORT_EDITOR_SIDE_PADDING), 0)
+	if row.SetBackdrop then
+		row:SetBackdrop({
+			bgFile = "Interface\\Buttons\\WHITE8x8",
+			edgeFile = "Interface\\Buttons\\WHITE8x8",
+			edgeSize = 1,
+			insets = { left = 1, right = 1, top = 1, bottom = 1 },
+		})
+		row:SetBackdropColor(0.02, 0.02, 0.02, 0.28)
+		row:SetBackdropBorderColor(0.55, 0.55, 0.55, 0.16)
+	end
+	return row
+end
+
+local function BFL_Settings_CreateEditorFormRow(parent, labelText, height)
+	local row = BFL_Settings_CreateEditorRow(parent, height or 42)
+	local label = row:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlightSmall")
+	label:SetPoint("LEFT", 10, 0)
+	label:SetWidth(BFL_FILTER_SORT_EDITOR_FORM_LABEL_WIDTH)
+	label:SetJustifyH("LEFT")
+	label:SetWordWrap(false)
+	label:SetText(labelText or "")
+	return row, label
 end
 
 local function BFL_Settings_ValueToText(value)
@@ -5963,7 +6003,7 @@ function Settings:EnsureFilterSortEditorPanel()
 		frame = CreateFrame("Frame", "BetterFriendlistFilterSortEditorFrame", settingsFrame, "ButtonFrameTemplate")
 		frame:SetFrameStrata(settingsFrame:GetFrameStrata() or "HIGH")
 		frame:SetFrameLevel((settingsFrame:GetFrameLevel() or 1) + 10)
-		frame:SetWidth(470)
+		frame:SetWidth(BFL_FILTER_SORT_EDITOR_WIDTH)
 		frame:SetClampedToScreen(true)
 		frame:EnableMouse(true)
 		frame.components = {}
@@ -6003,7 +6043,7 @@ function Settings:EnsureFilterSortEditorPanel()
 		frame.ScrollFrame:SetPoint("BOTTOMRIGHT", -30, 8)
 
 		frame.Content = CreateFrame("Frame", nil, frame.ScrollFrame)
-		frame.Content:SetSize(420, 500)
+		frame.Content:SetSize(BFL_FILTER_SORT_EDITOR_CONTENT_WIDTH, 500)
 		frame.ScrollFrame:SetScrollChild(frame.Content)
 
 		frame:SetScript("OnHide", function()
@@ -6018,10 +6058,9 @@ function Settings:EnsureFilterSortEditorPanel()
 	frame:ClearAllPoints()
 	frame:SetPoint("TOPLEFT", settingsFrame, "TOPRIGHT", 5, 0)
 	frame:SetPoint("BOTTOMLEFT", settingsFrame, "BOTTOMRIGHT", 5, 0)
-	frame:SetWidth(470)
-	if frame.Content and frame.ScrollFrame then
-		local width = math.max(360, (frame.ScrollFrame:GetWidth() or 430) - 8)
-		frame.Content:SetWidth(width)
+	frame:SetWidth(BFL_FILTER_SORT_EDITOR_WIDTH)
+	if frame.Content then
+		frame.Content:SetWidth(BFL_FILTER_SORT_EDITOR_CONTENT_WIDTH)
 	end
 
 	return frame
@@ -6484,33 +6523,49 @@ function Settings:RefreshFilterSortTab()
 				or db.customSorters and db.customSorters[entry.id]
 		)
 		if not customTable then
-			local label = Components:CreateLabel(
-				editorContent,
+			local row = BFL_Settings_CreateEditorRow(editorContent, 54)
+			local label = row:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlightSmall")
+			label:SetPoint("LEFT", 12, 0)
+			label:SetPoint("RIGHT", row, "RIGHT", -12, 0)
+			label:SetJustifyH("LEFT")
+			label:SetWordWrap(true)
+			label:SetText(
 				L.FILTER_BUILDER_BUILTIN_LOCKED
-					or "Built-ins can be shown, hidden, reordered, or duplicated. Duplicate one to edit its rules.",
-				true
+					or "Built-ins can be shown, hidden, reordered, or duplicated. Duplicate one to edit its rules."
 			)
-			table.insert(editorFrames, label)
+			table.insert(editorFrames, row)
 			return nil
 		end
 
-		local nameInput = Components:CreateInput(editorContent, L.FILTER_BUILDER_NAME or "Name", customTable.name, function(value)
+		local nameRow, nameLabel = BFL_Settings_CreateEditorFormRow(editorContent, L.FILTER_BUILDER_NAME or "Name")
+		local nameBox = CreateFrame("EditBox", nil, nameRow, "InputBoxTemplate")
+		nameBox:SetHeight(20)
+		nameBox:SetAutoFocus(false)
+		nameBox:SetFontObject("BetterFriendlistFontHighlight")
+		nameBox:SetText(customTable.name or "")
+		nameBox:SetPoint("LEFT", nameLabel, "RIGHT", 12, 0)
+		nameBox:SetPoint("RIGHT", nameRow, "RIGHT", -12, 0)
+		local savedName = customTable.name or ""
+		local function SaveName()
+			local value = nameBox:GetText()
+			if value == savedName then
+				return
+			end
+			savedName = value
 			if selectedKind == "filter" then
 				Registry:UpdateCustomQuickFilter(entry.id, { name = value })
 			else
 				Registry:UpdateCustomSorter(entry.id, { name = value })
 			end
 			Refresh()
-		end, 220)
-		table.insert(editorFrames, nameInput)
+		end
+		nameBox:SetScript("OnEnterPressed", function(selfBox)
+			selfBox:ClearFocus()
+		end)
+		nameBox:SetScript("OnEditFocusLost", SaveName)
+		table.insert(editorFrames, nameRow)
 
-		local iconRow = CreateFrame("Frame", nil, editorContent)
-		iconRow:SetHeight(30)
-		iconRow:SetPoint("LEFT", 20, 0)
-		iconRow:SetPoint("RIGHT", -20, 0)
-		local iconLabel = iconRow:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
-		iconLabel:SetPoint("LEFT", 0, 0)
-		iconLabel:SetText(L.FILTER_BUILDER_ICON or "Icon")
+		local iconRow = BFL_Settings_CreateEditorFormRow(editorContent, L.FILTER_BUILDER_ICON or "Icon")
 		local iconButton = BFL_Settings_CreateSmallButton(iconRow, BFL.FormatIcon(customTable.icon, 18) .. " " .. (L.ICON_SELECTOR_TITLE or "Select Icon"), 170, function(selfButton)
 			if BFL.ShowIconSelector then
 				BFL.ShowIconSelector(selfButton, customTable.icon, function(iconRef)
@@ -6523,20 +6578,18 @@ function Settings:RefreshFilterSortTab()
 				end)
 			end
 		end)
-		iconButton:SetPoint("RIGHT", 0, 0)
+		iconButton:SetPoint("RIGHT", iconRow, "RIGHT", -12, 0)
 		table.insert(editorFrames, iconRow)
 		return customTable
 	end
 
 	local function AddPreviewRow(entry, matches, total)
-		local row = CreateFrame("Frame", nil, editorContent)
-		row:SetHeight(30)
-		row:SetPoint("LEFT", 20, 0)
-		row:SetPoint("RIGHT", -20, 0)
+		local row = BFL_Settings_CreateEditorRow(editorContent, 58)
+		local isActive = self:IsFilterSortPreviewActive(selectedKind, entry.id)
 
 		local label = row:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlightSmall")
-		label:SetPoint("LEFT", 0, 0)
-		label:SetPoint("RIGHT", row, "RIGHT", -210, 0)
+		label:SetPoint("TOPLEFT", row, "TOPLEFT", 12, -11)
+		label:SetPoint("TOPRIGHT", row, "TOPRIGHT", -12, -11)
 		label:SetJustifyH("LEFT")
 		label:SetWordWrap(false)
 		if selectedKind == "filter" then
@@ -6545,17 +6598,18 @@ function Settings:RefreshFilterSortTab()
 			label:SetText(L.FILTER_BUILDER_PREVIEW_SORTER or "Preview selected sorter")
 		end
 
-		local isActive = self:IsFilterSortPreviewActive(selectedKind, entry.id)
 		local previewButton = BFL_Settings_CreateSmallButton(row, L.FILTER_BUILDER_PREVIEW_APPLY or "Preview", 92, function()
 			self:ApplyFilterSortPreview(selectedKind, entry.id)
 		end)
-		previewButton:SetPoint("RIGHT", row, "RIGHT", isActive and -96 or 0, 0)
 
 		if isActive then
 			local stopButton = BFL_Settings_CreateSmallButton(row, L.FILTER_BUILDER_PREVIEW_STOP or "Stop Preview", 90, function()
 				self:ClearFilterSortPreview()
 			end)
-			stopButton:SetPoint("LEFT", previewButton, "RIGHT", 6, 0)
+			stopButton:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -10, 8)
+			previewButton:SetPoint("RIGHT", stopButton, "LEFT", -8, 0)
+		else
+			previewButton:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -10, 8)
 		end
 
 		table.insert(editorFrames, row)
@@ -6578,26 +6632,14 @@ function Settings:RefreshFilterSortTab()
 			defaultName = templateEntry.name .. " " .. (L.FILTER_BUILDER_COPY_SUFFIX or "Copy")
 		end
 
-		local header = Components:CreateHeader(
-			editorContent,
-			kind == "filter" and (L.FILTER_BUILDER_CREATE_FILTER_TITLE or "Create QuickFilter")
-				or (L.FILTER_BUILDER_CREATE_SORTER_TITLE or "Create Sorter")
-		)
-		table.insert(editorFrames, header)
-
-		local nameRow = CreateFrame("Frame", nil, editorContent)
-		nameRow:SetHeight(30)
-		nameRow:SetPoint("LEFT", 20, 0)
-		nameRow:SetPoint("RIGHT", -20, 0)
-		local nameLabel = nameRow:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
-		nameLabel:SetPoint("LEFT", 0, 0)
-		nameLabel:SetText(L.FILTER_BUILDER_NAME or "Name")
+		local nameRow, nameLabel = BFL_Settings_CreateEditorFormRow(editorContent, L.FILTER_BUILDER_NAME or "Name")
 		local nameBox = CreateFrame("EditBox", nil, nameRow, "InputBoxTemplate")
-		nameBox:SetSize(220, 20)
+		nameBox:SetHeight(20)
 		nameBox:SetAutoFocus(false)
 		nameBox:SetFontObject("BetterFriendlistFontHighlight")
 		nameBox:SetText(defaultName)
-		nameBox:SetPoint("RIGHT", 0, 0)
+		nameBox:SetPoint("LEFT", nameLabel, "RIGHT", 12, 0)
+		nameBox:SetPoint("RIGHT", nameRow, "RIGHT", -12, 0)
 		table.insert(editorFrames, nameRow)
 
 		local templateLabels = { L.FILTER_BUILDER_TEMPLATE_BLANK or "Blank" }
@@ -6607,13 +6649,7 @@ function Settings:RefreshFilterSortTab()
 			table.insert(templateValues, entry.id)
 		end
 
-		local templateRow = CreateFrame("Frame", nil, editorContent)
-		templateRow:SetHeight(30)
-		templateRow:SetPoint("LEFT", 20, 0)
-		templateRow:SetPoint("RIGHT", -20, 0)
-		local templateLabel = templateRow:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
-		templateLabel:SetPoint("LEFT", 0, 0)
-		templateLabel:SetText(L.FILTER_BUILDER_TEMPLATE or "Template")
+		local templateRow, templateLabel = BFL_Settings_CreateEditorFormRow(editorContent, L.FILTER_BUILDER_TEMPLATE or "Template")
 		local templateDropdown =
 			BFL_Settings_CreateInlineDropdown(templateRow, BFL_Settings_CreateOptions(templateLabels, templateValues), selectedTemplate, function(value)
 				selectedTemplate = value
@@ -6632,17 +6668,11 @@ function Settings:RefreshFilterSortTab()
 				if editorPanel and editorPanel.iconButton then
 					editorPanel.iconButton:SetText(BFL.FormatIcon(iconRef, 18) .. " " .. (L.ICON_SELECTOR_TITLE or "Select Icon"))
 				end
-			end, 220)
-		templateDropdown:SetPoint("RIGHT", 0, 0)
+			end, 230)
+		templateDropdown:SetPoint("LEFT", templateLabel, "RIGHT", 12, 0)
 		table.insert(editorFrames, templateRow)
 
-		local iconRow = CreateFrame("Frame", nil, editorContent)
-		iconRow:SetHeight(30)
-		iconRow:SetPoint("LEFT", 20, 0)
-		iconRow:SetPoint("RIGHT", -20, 0)
-		local iconLabel = iconRow:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
-		iconLabel:SetPoint("LEFT", 0, 0)
-		iconLabel:SetText(L.FILTER_BUILDER_ICON or "Icon")
+		local iconRow = BFL_Settings_CreateEditorFormRow(editorContent, L.FILTER_BUILDER_ICON or "Icon")
 		local iconButton = BFL_Settings_CreateSmallButton(iconRow, BFL.FormatIcon(iconRef, 18) .. " " .. (L.ICON_SELECTOR_TITLE or "Select Icon"), 190, function(selfButton)
 			if BFL.ShowIconSelector then
 				BFL.ShowIconSelector(selfButton, iconRef, function(selectedIcon)
@@ -6651,16 +6681,13 @@ function Settings:RefreshFilterSortTab()
 				end)
 			end
 		end)
-		iconButton:SetPoint("RIGHT", 0, 0)
+		iconButton:SetPoint("RIGHT", iconRow, "RIGHT", -12, 0)
 		if editorPanel then
 			editorPanel.iconButton = iconButton
 		end
 		table.insert(editorFrames, iconRow)
 
-		local actions = CreateFrame("Frame", nil, editorContent)
-		actions:SetHeight(30)
-		actions:SetPoint("LEFT", 20, 0)
-		actions:SetPoint("RIGHT", -20, 0)
+		local actions = BFL_Settings_CreateEditorRow(editorContent, 42)
 		local createButton = BFL_Settings_CreateSmallButton(actions, L.FILTER_BUILDER_CREATE or "Create", 100, function()
 			local sourceId = selectedTemplate ~= "__blank" and selectedTemplate or nil
 			local id
@@ -6683,7 +6710,7 @@ function Settings:RefreshFilterSortTab()
 				Refresh()
 			end
 		end)
-		createButton:SetPoint("RIGHT", 0, 0)
+		createButton:SetPoint("RIGHT", actions, "RIGHT", -12, 0)
 		local cancelButton = BFL_Settings_CreateSmallButton(actions, L.BUTTON_CANCEL or "Cancel", 90, function()
 			tab.bflFilterSortCreate = nil
 			Refresh()
@@ -6700,51 +6727,56 @@ function Settings:RefreshFilterSortTab()
 		BFL:ForceRefreshFriendsList()
 	end
 
-	local function AddFilterNodeRows(filter, parentNode, depth)
+	local function AddFilterNodeRows(filter, parentNode, depth, ownerChildren, ownerIndex)
 		depth = depth or 0
 		parentNode.children = parentNode.children or {}
+		local canDeleteGroup = ownerChildren and ownerIndex
 
-		local groupRow = CreateFrame("Frame", nil, editorContent)
-		groupRow:SetHeight(28)
-		groupRow:SetPoint("LEFT", 20 + depth * 18, 0)
-		groupRow:SetPoint("RIGHT", -20, 0)
+		local groupRow = BFL_Settings_CreateEditorRow(editorContent, 58, BFL_Settings_GetEditorIndent(depth), BFL_FILTER_SORT_EDITOR_SIDE_PADDING)
 		local title = groupRow:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlightSmall")
-		title:SetPoint("LEFT", 0, 0)
+		title:SetPoint("TOPLEFT", groupRow, "TOPLEFT", 10, -12)
+		title:SetWidth(46)
+		title:SetJustifyH("LEFT")
 		title:SetText((L.FILTER_BUILDER_GROUP or "Group") .. ":")
 		local opDropdown = BFL_Settings_CreateInlineDropdown(groupRow, groupOperatorOptions, parentNode.op == "OR" and "OR" or "AND", function(value)
 			parentNode.op = value == "OR" and "OR" or "AND"
 			SaveFilterAST(filter)
 			Refresh()
-		end, 70)
+		end, 66)
 		opDropdown:SetPoint("LEFT", title, "RIGHT", 8, 0)
-		local notButton = BFL_Settings_CreateSmallButton(groupRow, parentNode.negate and "NOT" or "not", 48, function()
+		local notButton = BFL_Settings_CreateSmallButton(groupRow, parentNode.negate and "NOT" or "not", 44, function()
 			parentNode.negate = not parentNode.negate
 			SaveFilterAST(filter)
 			Refresh()
 		end)
-		notButton:SetPoint("LEFT", opDropdown, "RIGHT", 6, 0)
+		notButton:SetPoint("TOPRIGHT", groupRow, "TOPRIGHT", -10, -7)
 		local addCondition = BFL_Settings_CreateSmallButton(groupRow, L.FILTER_BUILDER_ADD_CONDITION or "Add Condition", 112, function()
 			table.insert(parentNode.children, { type = "condition", field = "online", op = "is", value = true })
 			SaveFilterAST(filter)
 			Refresh()
 		end)
-		addCondition:SetPoint("RIGHT", groupRow, "RIGHT", -118, 0)
-		local addGroup = BFL_Settings_CreateSmallButton(groupRow, L.FILTER_BUILDER_ADD_GROUP or "Add Group", 86, function()
+		local addGroup = BFL_Settings_CreateSmallButton(groupRow, L.FILTER_BUILDER_ADD_GROUP or "Add Group", 82, function()
 			table.insert(parentNode.children, { type = "group", op = "AND", children = {} })
 			SaveFilterAST(filter)
 			Refresh()
 		end)
-		addGroup:SetPoint("LEFT", addCondition, "RIGHT", 6, 0)
+		addGroup:SetPoint("BOTTOMRIGHT", groupRow, "BOTTOMRIGHT", -10, 7)
+		addCondition:SetPoint("RIGHT", addGroup, "LEFT", -8, 0)
+		if canDeleteGroup then
+			local deleteGroup = BFL_Settings_CreateSmallButton(groupRow, L.FILTER_BUILDER_DELETE or "Delete", 58, function()
+				table.remove(ownerChildren, ownerIndex)
+				SaveFilterAST(filter)
+				Refresh()
+			end)
+			deleteGroup:SetPoint("RIGHT", addCondition, "LEFT", -8, 0)
+		end
 		table.insert(editorFrames, groupRow)
 
 		for index, node in ipairs(parentNode.children) do
 			if node.type == "group" then
-				AddFilterNodeRows(filter, node, depth + 1)
+				AddFilterNodeRows(filter, node, depth + 1, parentNode.children, index)
 			else
-				local row = CreateFrame("Frame", nil, editorContent)
-				row:SetHeight(30)
-				row:SetPoint("LEFT", 34 + depth * 18, 0)
-				row:SetPoint("RIGHT", -20, 0)
+				local row = BFL_Settings_CreateEditorRow(editorContent, 64, BFL_Settings_GetEditorIndent(depth) + 14, BFL_FILTER_SORT_EDITOR_SIDE_PADDING)
 				local fieldDef = fieldById[node.field] or filterFields[1]
 				node.field = fieldDef.id
 				local fieldDropdown = BFL_Settings_CreateInlineDropdown(row, filterFieldOptions, node.field, function(value)
@@ -6754,19 +6786,19 @@ function Settings:RefreshFilterSortTab()
 					node.value = BFL_Settings_GetDefaultValueForField(nextField)
 					SaveFilterAST(filter)
 					Refresh()
-				end, 120)
-				fieldDropdown:SetPoint("LEFT", 0, 0)
+				end, 112)
+				fieldDropdown:SetPoint("TOPLEFT", row, "TOPLEFT", 10, -10)
 				local operatorOptions = BFL_Settings_BuildOperatorOptions(Registry:GetOperatorsForField(node.field))
 				local opDropdown = BFL_Settings_CreateInlineDropdown(row, operatorOptions, node.op or "is", function(value)
 					node.op = value
 					SaveFilterAST(filter)
 					Refresh()
-				end, 96)
+				end, 88)
 				opDropdown:SetPoint("LEFT", fieldDropdown, "RIGHT", 6, 0)
 
 				local valueHolder = CreateFrame("Frame", nil, row)
-				valueHolder:SetSize(100, 24)
-				valueHolder:SetPoint("LEFT", opDropdown, "RIGHT", 8, 0)
+				valueHolder:SetSize(106, 24)
+				valueHolder:SetPoint("LEFT", opDropdown, "RIGHT", 6, 0)
 				if node.op == "empty" or node.op == "notempty" then
 					local emptyText = valueHolder:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontDisableSmall")
 					emptyText:SetPoint("CENTER")
@@ -6781,11 +6813,11 @@ function Settings:RefreshFilterSortTab()
 							node.value = value
 							SaveFilterAST(filter)
 							Refresh()
-						end, 96)
+						end, 106)
 						valueDropdown:SetPoint("LEFT", 0, 0)
 					else
 						local valueBox = CreateFrame("EditBox", nil, valueHolder, "InputBoxTemplate")
-						valueBox:SetSize(95, 20)
+						valueBox:SetSize(106, 20)
 						valueBox:SetAutoFocus(false)
 						valueBox:SetText(BFL_Settings_ValueToText(node.value))
 						valueBox:SetPoint("LEFT", 0, 0)
@@ -6805,7 +6837,7 @@ function Settings:RefreshFilterSortTab()
 					SaveFilterAST(filter)
 					Refresh()
 				end)
-				notButton:SetPoint("LEFT", valueHolder, "RIGHT", 8, 0)
+				notButton:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 10, 8)
 				local up = BFL_Settings_CreateSmallButton(row, L.FILTER_BUILDER_UP or "Up", 36, function()
 					if index > 1 then
 						parentNode.children[index], parentNode.children[index - 1] =
@@ -6814,7 +6846,7 @@ function Settings:RefreshFilterSortTab()
 						Refresh()
 					end
 				end)
-				up:SetPoint("LEFT", notButton, "RIGHT", 6, 0)
+				up:SetEnabled(index > 1)
 				local down = BFL_Settings_CreateSmallButton(row, L.FILTER_BUILDER_DOWN or "Down", 48, function()
 					if index < #parentNode.children then
 						parentNode.children[index], parentNode.children[index + 1] =
@@ -6823,13 +6855,15 @@ function Settings:RefreshFilterSortTab()
 						Refresh()
 					end
 				end)
-				down:SetPoint("LEFT", up, "RIGHT", 4, 0)
+				down:SetEnabled(index < #parentNode.children)
 				local delete = BFL_Settings_CreateSmallButton(row, "X", 28, function()
 					table.remove(parentNode.children, index)
 					SaveFilterAST(filter)
 					Refresh()
 				end)
-				delete:SetPoint("LEFT", down, "RIGHT", 4, 0)
+				delete:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -10, 8)
+				down:SetPoint("RIGHT", delete, "LEFT", -4, 0)
+				up:SetPoint("RIGHT", down, "LEFT", -4, 0)
 				table.insert(editorFrames, row)
 			end
 		end
@@ -6847,14 +6881,11 @@ function Settings:RefreshFilterSortTab()
 	local function AddSorterRows(sorter)
 		sorter.chain = sorter.chain or {}
 		for index, step in ipairs(sorter.chain) do
-			local row = CreateFrame("Frame", nil, editorContent)
-			row:SetHeight(30)
-			row:SetPoint("LEFT", 20, 0)
-			row:SetPoint("RIGHT", -20, 0)
+			local row = BFL_Settings_CreateEditorRow(editorContent, 64)
 			local fieldDef = sortFieldById[step.field] or sortFields[1]
 			step.field = fieldDef.id
 			local label = row:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlightSmall")
-			label:SetPoint("LEFT", 0, 0)
+			label:SetPoint("TOPLEFT", row, "TOPLEFT", 10, -14)
 			label:SetWidth(24)
 			label:SetText(tostring(index) .. ".")
 			local fieldDropdown = BFL_Settings_CreateInlineDropdown(row, sortFieldOptions, step.field, function(value)
@@ -6863,19 +6894,19 @@ function Settings:RefreshFilterSortTab()
 				step.direction = BFL_Settings_GetSorterFieldDefaultDirection(nextField)
 				SaveSorter(sorter)
 				Refresh()
-			end, 140)
+			end, 126)
 			fieldDropdown:SetPoint("LEFT", label, "RIGHT", 4, 0)
 			local directionDropdown = BFL_Settings_CreateInlineDropdown(row, directionOptions, step.direction == "desc" and "desc" or "asc", function(value)
 				step.direction = value == "desc" and "desc" or "asc"
 				SaveSorter(sorter)
 				Refresh()
-			end, 70)
-			directionDropdown:SetPoint("LEFT", fieldDropdown, "RIGHT", 8, 0)
+			end, 64)
+			directionDropdown:SetPoint("LEFT", fieldDropdown, "RIGHT", 6, 0)
 			local emptyDropdown = BFL_Settings_CreateInlineDropdown(row, emptyOptions, step.empty == "first" and "first" or "last", function(value)
 				step.empty = value == "first" and "first" or "last"
 				SaveSorter(sorter)
 				Refresh()
-			end, 106)
+			end, 104)
 			emptyDropdown:SetPoint("LEFT", directionDropdown, "RIGHT", 6, 0)
 			local up = BFL_Settings_CreateSmallButton(row, L.FILTER_BUILDER_UP or "Up", 36, function()
 				if index > 1 then
@@ -6884,7 +6915,7 @@ function Settings:RefreshFilterSortTab()
 					Refresh()
 				end
 			end)
-			up:SetPoint("LEFT", emptyDropdown, "RIGHT", 6, 0)
+			up:SetEnabled(index > 1)
 			local down = BFL_Settings_CreateSmallButton(row, L.FILTER_BUILDER_DOWN or "Down", 48, function()
 				if index < #sorter.chain then
 					sorter.chain[index], sorter.chain[index + 1] = sorter.chain[index + 1], sorter.chain[index]
@@ -6892,13 +6923,15 @@ function Settings:RefreshFilterSortTab()
 					Refresh()
 				end
 			end)
-			down:SetPoint("LEFT", up, "RIGHT", 4, 0)
+			down:SetEnabled(index < #sorter.chain)
 			local delete = BFL_Settings_CreateSmallButton(row, "X", 28, function()
 				table.remove(sorter.chain, index)
 				SaveSorter(sorter)
 				Refresh()
 			end)
-			delete:SetPoint("LEFT", down, "RIGHT", 4, 0)
+			delete:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -10, 8)
+			down:SetPoint("RIGHT", delete, "LEFT", -4, 0)
+			up:SetPoint("RIGHT", down, "LEFT", -4, 0)
 			table.insert(editorFrames, row)
 		end
 
@@ -6940,7 +6973,6 @@ function Settings:RefreshFilterSortTab()
 			AddCreateEditor(createState.kind, createState.templateId)
 		elseif entry then
 			editorPanel.title:SetText((L.FILTER_BUILDER_EDITOR or "Editor") .. ": " .. entry.name)
-			table.insert(editorFrames, Components:CreateHeader(editorContent, L.FILTER_BUILDER_EDITOR or "Editor"))
 			if selectedKind == "filter" then
 				local matches, total = Registry:CountQuickFilterMatches(entry.id)
 				AddPreviewRow(entry, matches, total)
