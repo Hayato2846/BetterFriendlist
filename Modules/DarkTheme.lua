@@ -251,17 +251,7 @@ local function RefreshFriendListRow(row)
 	if not engine or not row then
 		return
 	end
-	if row.BFL_DarkRowSkinned then
-		engine:ApplyRowState(row, row.BFL_DarkRowOver and "hover" or nil)
-		if row.travelPassButton then
-			engine:SkinTravelPassButton(row.travelPassButton)
-		end
-		if row.PartyButton then
-			engine:SkinTravelPassButton(row.PartyButton)
-		end
-	else
-		engine:SkinRow(row)
-	end
+	engine:RefreshRow(row)
 end
 
 local function SkinSettingsNavigation(engine, frame)
@@ -1397,25 +1387,25 @@ function DarkTheme:InstallHooks()
 	self:WrapModuleMethod("FriendsList", "UpdateFriendButton", function(_, _, _, _, _, button)
 		local engine = GetEngine()
 		if engine then
-			engine:SkinRow(button)
+			engine:RefreshRow(button)
 		end
 	end)
 	self:WrapModuleMethod("FriendsList", "UpdateGroupHeaderButton", function(_, _, _, _, _, button)
 		local engine = GetEngine()
 		if engine then
-			engine:SkinRow(button)
+			engine:RefreshRow(button)
 		end
 	end)
 	self:WrapModuleMethod("FriendsList", "UpdateInviteHeaderButton", function(_, _, _, _, _, button)
 		local engine = GetEngine()
 		if engine then
-			engine:SkinRow(button)
+			engine:RefreshRow(button)
 		end
 	end)
 	self:WrapModuleMethod("FriendsList", "UpdateInviteButton", function(_, _, _, _, _, button)
 		local engine = GetEngine()
 		if engine then
-			engine:SkinRow(button)
+			engine:RefreshRow(button)
 		end
 	end)
 	self:WrapModuleMethod("FriendsList", "RenderDisplay", function()

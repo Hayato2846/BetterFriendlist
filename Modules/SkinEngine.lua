@@ -1823,6 +1823,18 @@ function SkinEngine:SkinTravelPassButton(button)
 	self:ApplyButtonState(button)
 end
 
+function SkinEngine:RefreshTravelPassButton(button)
+	if not self:IsActive() or not button or IsForbidden(button) then
+		return
+	end
+
+	if button.BFL_DarkTravelPassSkinned then
+		self:ApplyButtonState(button)
+	else
+		self:SkinTravelPassButton(button)
+	end
+end
+
 function SkinEngine:SkinNavigationButton(button)
 	if not self:IsActive() or not button or IsForbidden(button) then
 		return
@@ -1955,6 +1967,15 @@ end
 
 function SkinEngine:SkinTab(tab)
 	if not self:IsActive() or not tab or IsForbidden(tab) then
+		return
+	end
+
+	if tab.BFL_DarkTabButton and tab.BFL_DarkTabSkinned and tab.BFL_DarkButtonSkinned then
+		self:ApplyButtonState(tab)
+		local fs = tab.Text or (tab.GetFontString and tab:GetFontString())
+		if fs and (not tab.BFL_DarkTextCentered or fs.BFL_DarkCenteredForTab ~= tab) then
+			self:CenterTabText(tab)
+		end
 		return
 	end
 
@@ -3077,15 +3098,19 @@ function SkinEngine:SkinRow(row)
 		self:SetTextureAlpha(row, row.BG, 0)
 	end
 	local highlight = row.HighlightTexture or (row.GetHighlightTexture and row:GetHighlightTexture())
-	if highlight then
-		if row.BFL_DarkRowHighlightTexture ~= highlight then
-			row.BFL_DarkRowHighlightTexture = highlight
+	if row.BFL_DarkRowHighlightTexture ~= highlight then
+		row.BFL_DarkRowHighlightTexture = highlight
+		if highlight then
+			self:SetTextureAlpha(row, highlight, 0)
 		end
-		self:SetTextureAlpha(row, highlight, 0)
 	end
 
-	row.BFL_DarkNoRowHighlight = IsGroupHeaderRow(row) or nil
-	if row.BFL_DarkNoRowHighlight then
+	local noRowHighlight = IsGroupHeaderRow(row) == true
+	if row.BFL_DarkNoRowHighlight ~= noRowHighlight then
+		row.BFL_DarkNoRowHighlight = noRowHighlight
+		row.BFL_DarkRowStateKey = nil
+	end
+	if noRowHighlight then
 		row.BFL_DarkRowMouseDown = nil
 		if row.UnlockHighlight then
 			row:UnlockHighlight()
@@ -3095,10 +3120,46 @@ function SkinEngine:SkinRow(row)
 	self:ApplyRowState(row, row.BFL_DarkRowOver and "hover" or nil)
 
 	if row.travelPassButton then
-		self:SkinTravelPassButton(row.travelPassButton)
+		self:RefreshTravelPassButton(row.travelPassButton)
 	end
 	if row.PartyButton then
-		self:SkinTravelPassButton(row.PartyButton)
+		self:RefreshTravelPassButton(row.PartyButton)
+	end
+end
+
+function SkinEngine:RefreshRow(row)
+	if not self:IsActive() or not row or IsForbidden(row) then
+		return
+	end
+
+	if not row.BFL_DarkRowSkinned then
+		self:SkinRow(row)
+		return
+	end
+
+	local noRowHighlight = IsGroupHeaderRow(row) == true
+	if row.BFL_DarkNoRowHighlight ~= noRowHighlight then
+		row.BFL_DarkNoRowHighlight = noRowHighlight
+		row.BFL_DarkRowStateKey = nil
+	end
+
+	local highlight = row.HighlightTexture or (row.GetHighlightTexture and row:GetHighlightTexture())
+	if
+		(row.background and row.BFL_DarkRowBackground ~= row.background)
+		or (row.BG and row.BFL_DarkRowBG ~= row.BG)
+		or row.BFL_DarkRowHighlightTexture ~= highlight
+	then
+		self:SkinRow(row)
+		return
+	end
+
+	self:ApplyRowState(row, row.BFL_DarkRowOver and "hover" or nil)
+
+	if row.travelPassButton then
+		self:RefreshTravelPassButton(row.travelPassButton)
+	end
+	if row.PartyButton then
+		self:RefreshTravelPassButton(row.PartyButton)
 	end
 end
 
@@ -3107,7 +3168,11 @@ function SkinEngine:ApplyRowState(row, interactionState)
 		return
 	end
 
-	local noRowHighlight = row.BFL_DarkNoRowHighlight or IsGroupHeaderRow(row)
+	local noRowHighlight = row.BFL_DarkNoRowHighlight
+	if noRowHighlight == nil then
+		noRowHighlight = IsGroupHeaderRow(row) == true
+		row.BFL_DarkNoRowHighlight = noRowHighlight
+	end
 	local stateKey = (noRowHighlight and "noHighlight" or (interactionState or "normal"))
 		.. ":"
 		.. (row.BFL_DarkRowMouseDown and "down" or "")
@@ -3123,9 +3188,7 @@ function SkinEngine:ApplyRowState(row, interactionState)
 			row:UnlockHighlight()
 		end
 		local highlight = row.HighlightTexture or (row.GetHighlightTexture and row:GetHighlightTexture())
-		if highlight then
-			self:SetTextureAlpha(row, highlight, 0)
-		end
+		self:SetTextureAlpha(row, highlight, 0)
 		self:StyleBackdrop(row, COLORS.row, COLORS.borderNone)
 		return
 	end
