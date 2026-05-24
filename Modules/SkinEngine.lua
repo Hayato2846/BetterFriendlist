@@ -3076,6 +3076,48 @@ local function IsGroupHeaderRow(row)
 		and (row.elementData or row.CountText or row.DownArrow or row.RightArrow)
 end
 
+local TRAVEL_PASS_ROW_BUTTON_KEY = "BFL_DarkTravelPassRowButton"
+local TRAVEL_PASS_ROW_SHOWN_KEY = "BFL_DarkTravelPassRowShown"
+local TRAVEL_PASS_ROW_ENABLED_KEY = "BFL_DarkTravelPassRowEnabled"
+local PARTY_ROW_BUTTON_KEY = "BFL_DarkPartyRowButton"
+local PARTY_ROW_SHOWN_KEY = "BFL_DarkPartyRowShown"
+local PARTY_ROW_ENABLED_KEY = "BFL_DarkPartyRowEnabled"
+
+local function IsShownForRowRefresh(button)
+	if button and button.IsShown then
+		return button:IsShown() == true
+	end
+	return true
+end
+
+local function RefreshRowTravelPassButton(engine, row, button, buttonKey, shownKey, enabledKey)
+	if not button then
+		row[buttonKey] = nil
+		row[shownKey] = nil
+		row[enabledKey] = nil
+		return
+	end
+
+	local shown = IsShownForRowRefresh(button)
+	local enabled = IsControlEnabled(button)
+	if not button.BFL_DarkTravelPassSkinned then
+		engine:SkinTravelPassButton(button)
+	elseif
+		row[buttonKey] == button
+		and row[shownKey] == shown
+		and row[enabledKey] == enabled
+		and button.BFL_DarkButtonStateKey
+	then
+		return
+	else
+		engine:ApplyButtonState(button)
+	end
+
+	row[buttonKey] = button
+	row[shownKey] = shown
+	row[enabledKey] = enabled
+end
+
 function SkinEngine:SkinRow(row)
 	if not self:IsActive() or not row or IsForbidden(row) then
 		return
@@ -3119,12 +3161,8 @@ function SkinEngine:SkinRow(row)
 
 	self:ApplyRowState(row, row.BFL_DarkRowOver and "hover" or nil)
 
-	if row.travelPassButton then
-		self:RefreshTravelPassButton(row.travelPassButton)
-	end
-	if row.PartyButton then
-		self:RefreshTravelPassButton(row.PartyButton)
-	end
+	RefreshRowTravelPassButton(self, row, row.travelPassButton, TRAVEL_PASS_ROW_BUTTON_KEY, TRAVEL_PASS_ROW_SHOWN_KEY, TRAVEL_PASS_ROW_ENABLED_KEY)
+	RefreshRowTravelPassButton(self, row, row.PartyButton, PARTY_ROW_BUTTON_KEY, PARTY_ROW_SHOWN_KEY, PARTY_ROW_ENABLED_KEY)
 end
 
 function SkinEngine:RefreshRow(row)
@@ -3155,12 +3193,8 @@ function SkinEngine:RefreshRow(row)
 
 	self:ApplyRowState(row, row.BFL_DarkRowOver and "hover" or nil)
 
-	if row.travelPassButton then
-		self:RefreshTravelPassButton(row.travelPassButton)
-	end
-	if row.PartyButton then
-		self:RefreshTravelPassButton(row.PartyButton)
-	end
+	RefreshRowTravelPassButton(self, row, row.travelPassButton, TRAVEL_PASS_ROW_BUTTON_KEY, TRAVEL_PASS_ROW_SHOWN_KEY, TRAVEL_PASS_ROW_ENABLED_KEY)
+	RefreshRowTravelPassButton(self, row, row.PartyButton, PARTY_ROW_BUTTON_KEY, PARTY_ROW_SHOWN_KEY, PARTY_ROW_ENABLED_KEY)
 end
 
 function SkinEngine:ApplyRowState(row, interactionState)
@@ -3540,6 +3574,12 @@ function SkinEngine:RestoreFrame(frame)
 	frame.BFL_DarkNoRowHighlight = nil
 	frame.BFL_DarkRowMouseDown = nil
 	frame.BFL_DarkRowStateKey = nil
+	frame.BFL_DarkTravelPassRowButton = nil
+	frame.BFL_DarkTravelPassRowShown = nil
+	frame.BFL_DarkTravelPassRowEnabled = nil
+	frame.BFL_DarkPartyRowButton = nil
+	frame.BFL_DarkPartyRowShown = nil
+	frame.BFL_DarkPartyRowEnabled = nil
 	frame.BFL_DarkKeepFontColor = nil
 	frame.BFL_DarkButtonSkinned = nil
 	frame.BFL_DarkButtonStateKey = nil

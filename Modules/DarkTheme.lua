@@ -1259,6 +1259,38 @@ function DarkTheme:WrapModuleMethod(moduleName, methodName, after)
 	end
 end
 
+function DarkTheme:RefreshUpdatedFriendRow(button)
+	local engine = GetEngine()
+	if engine then
+		self.friendListRowUpdateCounter = (self.friendListRowUpdateCounter or 0) + 1
+		engine:RefreshRow(button)
+	end
+end
+
+function DarkTheme:WrapFriendsListRenderMethod(methodName)
+	local module = BFL:GetModule("FriendsList")
+	if not module or type(module[methodName]) ~= "function" then
+		return
+	end
+
+	local hookKey = "BFL_DarkHook_" .. methodName
+	if module[hookKey] then
+		return
+	end
+	module[hookKey] = true
+
+	local original = module[methodName]
+	module[methodName] = function(moduleSelf, ...)
+		local rowUpdateCounter = self.friendListRowUpdateCounter or 0
+		local r1, r2, r3, r4 = original(moduleSelf, ...)
+		local engine = GetEngine()
+		if engine and engine:IsActive() and (self.friendListRowUpdateCounter or 0) == rowUpdateCounter then
+			self:RefreshFriendsListRows(engine)
+		end
+		return r1, r2, r3, r4
+	end
+end
+
 function DarkTheme:InstallNoteCleanupWizardHooks()
 	local wizard = BFL.NoteCleanupWizard
 	if not wizard or wizard.BFL_DarkHooksInstalled then
@@ -1385,41 +1417,19 @@ function DarkTheme:InstallHooks()
 	end
 
 	self:WrapModuleMethod("FriendsList", "UpdateFriendButton", function(_, _, _, _, _, button)
-		local engine = GetEngine()
-		if engine then
-			engine:RefreshRow(button)
-		end
+		self:RefreshUpdatedFriendRow(button)
 	end)
 	self:WrapModuleMethod("FriendsList", "UpdateGroupHeaderButton", function(_, _, _, _, _, button)
-		local engine = GetEngine()
-		if engine then
-			engine:RefreshRow(button)
-		end
+		self:RefreshUpdatedFriendRow(button)
 	end)
 	self:WrapModuleMethod("FriendsList", "UpdateInviteHeaderButton", function(_, _, _, _, _, button)
-		local engine = GetEngine()
-		if engine then
-			engine:RefreshRow(button)
-		end
+		self:RefreshUpdatedFriendRow(button)
 	end)
 	self:WrapModuleMethod("FriendsList", "UpdateInviteButton", function(_, _, _, _, _, button)
-		local engine = GetEngine()
-		if engine then
-			engine:RefreshRow(button)
-		end
+		self:RefreshUpdatedFriendRow(button)
 	end)
-	self:WrapModuleMethod("FriendsList", "RenderDisplay", function()
-		local engine = GetEngine()
-		if engine then
-			self:RefreshFriendsListRows(engine)
-		end
-	end)
-	self:WrapModuleMethod("FriendsList", "RenderClassicButtons", function()
-		local engine = GetEngine()
-		if engine then
-			self:RefreshFriendsListRows(engine)
-		end
-	end)
+	self:WrapFriendsListRenderMethod("RenderDisplay")
+	self:WrapFriendsListRenderMethod("RenderClassicButtons")
 
 	self:WrapModuleMethod("RecentAllies", "OnLoad", function()
 		local engine = GetEngine()

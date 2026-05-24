@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dark Theme Performance** - Reduced repeated tab, button, row, and backdrop skinning work during high-frequency UI refreshes.
 - **Dark Theme Performance** - Reduced repeated scrollbar, tab, row, and button state work during list, WHO, and Quick Join updates.
 - **Dark Theme Performance** - Reduced repeated Friendlist row and tab refresh work during stress-test navigation.
+- **Dark Theme Performance** - Avoided redundant row refresh passes when visible Friendlist rows were already updated.
 
 ### Fixed
 - **QuickFilter & Sorter Builder** - Updated the docked editor to use the same modern frame styling as the Settings and Raid Help windows.
