@@ -16,6 +16,13 @@ local DARK_SCROLLBAR_WIDTH = 22
 local DARK_SCROLLBAR_STEPPER_HEIGHT = 16
 local DARK_SCROLLBAR_STEPPER_TOP_OFFSET_Y = -2
 local DARK_SCROLLBAR_STEPPER_BOTTOM_OFFSET_Y = 2
+local ZERO_INSETS = { left = 0, right = 0, top = 0, bottom = 0 }
+local BUTTON_INSETS = { left = 1, right = 1, top = -1, bottom = -1 }
+local SCROLLBAR_TRACK_INSETS = { left = 1, right = 1, top = 0, bottom = 0 }
+local ARROW_BUTTON_INSETS = { left = 3, right = 3, top = -3, bottom = 3 }
+local SLIDER_STEPPER_INSETS = { left = 2, right = 2, top = 0, bottom = 0 }
+local TAB_BUTTON_OPTS = { variant = "tab", insets = ZERO_INSETS }
+local NAV_BUTTON_OPTS = { variant = "nav", keepFontColor = true, insets = ZERO_INSETS }
 
 local function ApplyDefaultSlugToFontString(fontString)
 	if BFL.FontManager and BFL.FontManager.ApplyDefaultSlugToFontString then
@@ -164,17 +171,6 @@ local NINE_SLICE_KEYS = {
 SkinEngine.colors = COLORS
 SkinEngine.registry = {}
 
-local function SafeCall(fn, ...)
-	if not fn then
-		return nil
-	end
-	local ok, result = pcall(fn, ...)
-	if ok then
-		return result
-	end
-	return nil
-end
-
 local function IsForbidden(frame)
 	return frame and frame.IsForbidden and frame:IsForbidden()
 end
@@ -285,15 +281,28 @@ local function IsButtonChromeSuppressed(button)
 		)
 end
 
-local function CopyColor(color)
-	if not color then
-		return nil
-	end
-	return { color[1], color[2], color[3], color[4] }
-end
-
 local function UnpackColor(color)
 	return color[1], color[2], color[3], color[4]
+end
+
+local function SameColor(left, right)
+	if left == right then
+		return true
+	end
+	return left
+		and right
+		and left[1] == right[1]
+		and left[2] == right[2]
+		and left[3] == right[3]
+		and left[4] == right[4]
+end
+
+local function SetBackdropStoredColors(backdrop, bgColor, borderColor)
+	if not backdrop then
+		return
+	end
+	backdrop.BFL_DarkBaseColor = bgColor
+	backdrop.BFL_DarkBorderColor = borderColor
 end
 
 local function IsControlEnabled(frame)
@@ -333,25 +342,30 @@ local function IsScrollBarFrame(frame)
 		and (parent.ScrollBar == frame or parent.ClassicScrollBar == frame or parent.MinimalScrollBar == frame)
 end
 
+local function SetOverlayAlpha(owner, overlay, alpha)
+	if overlay and overlay.SetAlpha then
+		SkinEngine:SetTextureAlpha(owner, overlay, alpha)
+	end
+end
+
 local function SetButtonOverlayAlpha(button, alpha)
 	if not button then
 		return
 	end
 
-	local overlays = {
-		button.BFL_DarkArrowIcon,
-		button.BFL_DarkIcon,
-		button.Icon,
-		button.icon,
-	}
-	if button.BFL_DarkDropdownIndicator then
-		overlays[#overlays + 1] = button.BFL_DarkDropdownIndicator.Icon
+	SetOverlayAlpha(button, button.BFL_DarkArrowIcon, alpha)
+	SetOverlayAlpha(button, button.BFL_DarkIcon, alpha)
+	SetOverlayAlpha(button, button.Icon, alpha)
+	SetOverlayAlpha(button, button.icon, alpha)
+	local dropdown = button.BFL_DarkDropdownIndicator
+	if dropdown then
+		SetOverlayAlpha(button, dropdown.Icon, alpha)
 	end
+end
 
-	for _, overlay in ipairs(overlays) do
-		if overlay and overlay.SetAlpha then
-			SkinEngine:SetTextureAlpha(button, overlay, alpha)
-		end
+local function SetOverlayColor(owner, overlay, color)
+	if overlay and overlay.SetVertexColor then
+		SkinEngine:SetTextureVertexColor(owner, overlay, UnpackColor(color))
 	end
 end
 
@@ -360,16 +374,15 @@ local function SetButtonIconColor(button, color)
 		return
 	end
 
-	local overlays = {
-		button.BFL_DarkArrowIcon,
-		button.BFL_DarkIcon,
-		button.Icon,
-		button.icon,
-	}
-	for _, overlay in ipairs(overlays) do
-		if overlay and overlay.SetVertexColor then
-			SkinEngine:SetTextureVertexColor(button, overlay, UnpackColor(color))
-		end
+	SetOverlayColor(button, button.BFL_DarkArrowIcon, color)
+	SetOverlayColor(button, button.BFL_DarkIcon, color)
+	SetOverlayColor(button, button.Icon, color)
+	SetOverlayColor(button, button.icon, color)
+end
+
+local function SetOverlayBlendMode(owner, overlay, blendMode)
+	if overlay and overlay.SetBlendMode then
+		SkinEngine:SetTextureBlendMode(owner, overlay, blendMode or "BLEND")
 	end
 end
 
@@ -378,17 +391,10 @@ local function SetButtonIconBlendMode(button, blendMode)
 		return
 	end
 
-	local overlays = {
-		button.BFL_DarkArrowIcon,
-		button.BFL_DarkIcon,
-		button.Icon,
-		button.icon,
-	}
-	for _, overlay in ipairs(overlays) do
-		if overlay and overlay.SetBlendMode then
-			SkinEngine:SetTextureBlendMode(button, overlay, blendMode or "BLEND")
-		end
-	end
+	SetOverlayBlendMode(button, button.BFL_DarkArrowIcon, blendMode)
+	SetOverlayBlendMode(button, button.BFL_DarkIcon, blendMode)
+	SetOverlayBlendMode(button, button.Icon, blendMode)
+	SetOverlayBlendMode(button, button.icon, blendMode)
 end
 
 local function SetButtonHoverIcon(button, alpha, color)
@@ -415,8 +421,17 @@ local function SetBackdropColors(backdrop, bgColor, borderColor)
 		return
 	end
 
+	borderColor = borderColor or COLORS.borderNone
+	if SameColor(backdrop.BFL_DarkAppliedBgColor, bgColor) and SameColor(backdrop.BFL_DarkAppliedBorderColor, borderColor) then
+		SetBackdropStoredColors(backdrop, bgColor, borderColor)
+		return
+	end
+
 	backdrop:SetBackdropColor(UnpackColor(bgColor))
-	backdrop:SetBackdropBorderColor(UnpackColor(borderColor or COLORS.borderNone))
+	backdrop:SetBackdropBorderColor(UnpackColor(borderColor))
+	backdrop.BFL_DarkAppliedBgColor = bgColor
+	backdrop.BFL_DarkAppliedBorderColor = borderColor
+	SetBackdropStoredColors(backdrop, bgColor, borderColor)
 end
 
 local function ConfigureBackdropLine(backdrop, key, point, color)
@@ -480,19 +495,22 @@ local function ApplyBackdropLines(backdrop, variant)
 end
 
 function SkinEngine:IsActive()
-	return self.active == true and BFL.IsThemeActive and BFL:IsThemeActive("dark")
+	return self.active == true and self.activeTheme == "dark"
 end
 
 function SkinEngine:Activate()
 	self.active = true
+	self.activeTheme = "dark"
 end
 
 function SkinEngine:Deactivate()
 	if self.active ~= true and not next(self.registry) then
+		self.activeTheme = nil
 		return
 	end
 
 	self.active = false
+	self.activeTheme = nil
 	self:RestoreAll()
 end
 
@@ -644,6 +662,12 @@ function SkinEngine:SetTextureVertexColor(frame, texture, r, g, b, a)
 		return
 	end
 
+	if texture.GetVertexColor then
+		local currentR, currentG, currentB, currentA = texture:GetVertexColor()
+		if currentR == (r or 1) and currentG == (g or 1) and currentB == (b or 1) and currentA == (a or 1) then
+			return
+		end
+	end
 	self:RememberTextureVertexColor(frame, texture)
 	texture:SetVertexColor(r or 1, g or 1, b or 1, a or 1)
 end
@@ -668,8 +692,12 @@ function SkinEngine:SetTextureBlendMode(frame, texture, blendMode)
 		return
 	end
 
+	blendMode = blendMode or "BLEND"
+	if texture.GetBlendMode and texture:GetBlendMode() == blendMode then
+		return
+	end
 	self:RememberTextureBlendMode(frame, texture)
-	texture:SetBlendMode(blendMode or "BLEND")
+	texture:SetBlendMode(blendMode)
 end
 
 function SkinEngine:RememberRegionPoints(frame, region)
@@ -795,6 +823,12 @@ function SkinEngine:SetFontColor(frame, fontString, r, g, b, a)
 	if not fontString or not fontString.SetTextColor then
 		return
 	end
+	if fontString.GetTextColor then
+		local currentR, currentG, currentB, currentA = fontString:GetTextColor()
+		if currentR == r and currentG == g and currentB == b and currentA == (a or 1) then
+			return
+		end
+	end
 	self:RememberFontColor(frame, fontString)
 	fontString:SetTextColor(r, g, b, a or 1)
 end
@@ -827,32 +861,7 @@ function SkinEngine:SetFontJustify(frame, fontString, justifyH, justifyV)
 	end
 end
 
-function SkinEngine:CreateBackdrop(frame, variant, insets)
-	if not frame or IsForbidden(frame) or not CreateFrame then
-		return nil
-	end
-
-	local state = self:GetState(frame)
-	local backdrop = frame.BFL_DarkBackdrop
-	if not backdrop then
-		local template = BackdropTemplateMixin and "BackdropTemplate" or nil
-		backdrop = CreateFrame("Frame", nil, frame, template)
-		backdrop:SetFrameLevel(math.max((frame:GetFrameLevel() or 1) - 1, 0))
-		if backdrop.SetBackdrop then
-			backdrop:SetBackdrop(BACKDROP)
-		else
-			backdrop.bg = backdrop:CreateTexture(nil, "BACKGROUND")
-			backdrop.bg:SetAllPoints()
-		end
-		frame.BFL_DarkBackdrop = backdrop
-		state.backdrops[backdrop] = true
-	end
-
-	backdrop:ClearAllPoints()
-	insets = insets or { left = 0, right = 0, top = 0, bottom = 0 }
-	backdrop:SetPoint("TOPLEFT", frame, "TOPLEFT", insets.left or 0, insets.top or 0)
-	backdrop:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -(insets.right or 0), -(insets.bottom or 0))
-
+local function ResolveBackdropColors(variant)
 	local bg = COLORS.panelSoft
 	local border = COLORS.borderMuted
 	if variant == "main" then
@@ -890,15 +899,66 @@ function SkinEngine:CreateBackdrop(frame, variant, insets)
 		border = COLORS.borderNone
 	end
 
-	if backdrop.SetBackdropColor then
-		backdrop:SetBackdropColor(UnpackColor(bg))
-		backdrop:SetBackdropBorderColor(UnpackColor(border))
-	elseif backdrop.bg then
-		backdrop.bg:SetColorTexture(UnpackColor(bg))
+	return bg, border
+end
+
+function SkinEngine:CreateBackdrop(frame, variant, insets)
+	if not frame or IsForbidden(frame) or not CreateFrame then
+		return nil
 	end
-	backdrop.BFL_DarkBaseColor = CopyColor(bg)
-	backdrop.BFL_DarkBorderColor = CopyColor(border)
-	ApplyBackdropLines(backdrop, variant)
+
+	variant = variant or "panel"
+	insets = insets or ZERO_INSETS
+	local state = self:GetState(frame)
+	local backdrop = frame.BFL_DarkBackdrop
+	if not backdrop then
+		local template = BackdropTemplateMixin and "BackdropTemplate" or nil
+		backdrop = CreateFrame("Frame", nil, frame, template)
+		backdrop:SetFrameLevel(math.max((frame:GetFrameLevel() or 1) - 1, 0))
+		if backdrop.SetBackdrop then
+			backdrop:SetBackdrop(BACKDROP)
+		else
+			backdrop.bg = backdrop:CreateTexture(nil, "BACKGROUND")
+			backdrop.bg:SetAllPoints()
+		end
+		frame.BFL_DarkBackdrop = backdrop
+		state.backdrops[backdrop] = true
+	end
+
+	local left = insets.left or 0
+	local right = insets.right or 0
+	local top = insets.top or 0
+	local bottom = insets.bottom or 0
+	if
+		backdrop.BFL_DarkInsetLeft ~= left
+		or backdrop.BFL_DarkInsetRight ~= right
+		or backdrop.BFL_DarkInsetTop ~= top
+		or backdrop.BFL_DarkInsetBottom ~= bottom
+	then
+		backdrop.BFL_DarkInsetLeft = left
+		backdrop.BFL_DarkInsetRight = right
+		backdrop.BFL_DarkInsetTop = top
+		backdrop.BFL_DarkInsetBottom = bottom
+		backdrop:ClearAllPoints()
+		backdrop:SetPoint("TOPLEFT", frame, "TOPLEFT", left, top)
+		backdrop:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -right, -bottom)
+	end
+
+	local bg, border = ResolveBackdropColors(variant)
+
+	if backdrop.SetBackdropColor then
+		SetBackdropColors(backdrop, bg, border)
+	elseif backdrop.bg then
+		if not SameColor(backdrop.BFL_DarkAppliedBgColor, bg) then
+			backdrop.bg:SetColorTexture(UnpackColor(bg))
+			backdrop.BFL_DarkAppliedBgColor = bg
+		end
+		SetBackdropStoredColors(backdrop, bg, border)
+	end
+	if backdrop.BFL_DarkVariant ~= variant then
+		backdrop.BFL_DarkVariant = variant
+		ApplyBackdropLines(backdrop, variant)
+	end
 	backdrop:Show()
 
 	return backdrop
@@ -1076,12 +1136,25 @@ function SkinEngine:SkinFrame(frame, variant, opts)
 		return
 	end
 
-	opts = opts or {}
-	self:CreateBackdrop(frame, variant or "panel", opts.insets)
+	variant = variant or "panel"
+	self:CreateBackdrop(frame, variant, opts and opts.insets)
 
-	if opts.stripTextures then
-		self:DampenRegions(frame, opts.textureAlpha or 0)
-		self:DampenKnownArtwork(frame, opts.decorAlpha or 0)
+	local stripTextures = opts and opts.stripTextures == true
+	local textureAlpha = (opts and opts.textureAlpha) or 0
+	local decorAlpha = (opts and opts.decorAlpha) or 0
+	if
+		stripTextures
+		and (
+			frame.BFL_DarkFrameStripTextures ~= true
+			or frame.BFL_DarkFrameTextureAlpha ~= textureAlpha
+			or frame.BFL_DarkFrameDecorAlpha ~= decorAlpha
+		)
+	then
+		frame.BFL_DarkFrameStripTextures = true
+		frame.BFL_DarkFrameTextureAlpha = textureAlpha
+		frame.BFL_DarkFrameDecorAlpha = decorAlpha
+		self:DampenRegions(frame, textureAlpha)
+		self:DampenKnownArtwork(frame, decorAlpha)
 	end
 
 	if frame.TitleContainer and frame.TitleContainer.TitleText then
@@ -1106,8 +1179,7 @@ function SkinEngine:StyleBackdrop(frame, bgColor, borderColor)
 
 	bgColor = bgColor or backdrop.BFL_DarkBaseColor or COLORS.control
 	borderColor = borderColor or backdrop.BFL_DarkBorderColor or COLORS.borderSoft
-	backdrop:SetBackdropColor(UnpackColor(bgColor))
-	backdrop:SetBackdropBorderColor(UnpackColor(borderColor))
+	SetBackdropColors(backdrop, bgColor, borderColor)
 end
 
 function SkinEngine:ApplyButtonState(button, interactionState)
@@ -1192,7 +1264,8 @@ function SkinEngine:ApplyButtonState(button, interactionState)
 	local fs = button.GetFontString and button:GetFontString()
 	if fs and (not button.BFL_DarkKeepFontColor or not enabled) then
 		if enabled then
-			self:SetFontColor(button, fs, 0.92, 0.92, 0.92, 1)
+			local color = button.BFL_DarkTabButton and selectedTab and 1 or 0.92
+			self:SetFontColor(button, fs, color, color, color, 1)
 		else
 			self:SetFontColor(button, fs, UnpackColor(COLORS.disabledText))
 		end
@@ -1300,12 +1373,43 @@ function SkinEngine:SkinButton(button, opts)
 		button.BFL_DarkDropdownIndicator:Hide()
 	end
 
-	opts = opts or {}
-	button.BFL_DarkKeepFontColor = opts.keepFontColor == true
-	self:CreateBackdrop(button, opts.variant or "button", opts.insets or { left = 1, right = 1, top = -1, bottom = -1 })
+	local variant = (opts and opts.variant) or "button"
+	local insets = (opts and opts.insets) or BUTTON_INSETS
+	local keepFontColor = opts and opts.keepFontColor == true
+	local keepNormalTexture = opts and opts.keepNormalTexture == true
+	local textureAlpha = (opts and opts.textureAlpha) or 0
+	button.BFL_DarkKeepFontColor = keepFontColor
+
+	local left = insets.left or 0
+	local right = insets.right or 0
+	local top = insets.top or 0
+	local bottom = insets.bottom or 0
+	if
+		button.BFL_DarkButtonSkinned
+		and button.BFL_DarkButtonVariant == variant
+		and button.BFL_DarkButtonInsetLeft == left
+		and button.BFL_DarkButtonInsetRight == right
+		and button.BFL_DarkButtonInsetTop == top
+		and button.BFL_DarkButtonInsetBottom == bottom
+		and button.BFL_DarkButtonKeepNormalTexture == keepNormalTexture
+		and button.BFL_DarkButtonTextureAlpha == textureAlpha
+	then
+		self:ApplyButtonState(button)
+		return
+	end
+
+	button.BFL_DarkButtonSkinned = true
+	button.BFL_DarkButtonVariant = variant
+	button.BFL_DarkButtonInsetLeft = left
+	button.BFL_DarkButtonInsetRight = right
+	button.BFL_DarkButtonInsetTop = top
+	button.BFL_DarkButtonInsetBottom = bottom
+	button.BFL_DarkButtonKeepNormalTexture = keepNormalTexture
+	button.BFL_DarkButtonTextureAlpha = textureAlpha
+	self:CreateBackdrop(button, variant, insets)
 
 	if button.GetNormalTexture then
-		self:SetTextureAlpha(button, button:GetNormalTexture(), opts.keepNormalTexture and 0.35 or 0)
+		self:SetTextureAlpha(button, button:GetNormalTexture(), keepNormalTexture and 0.35 or 0)
 	end
 	if button.GetPushedTexture then
 		self:SetTextureAlpha(button, button:GetPushedTexture(), 0)
@@ -1316,10 +1420,10 @@ function SkinEngine:SkinButton(button, opts)
 	if button.GetHighlightTexture then
 		self:SetTextureAlpha(button, button:GetHighlightTexture(), 0.18)
 	end
-	self:SkinButtonTextures(button, opts.textureAlpha or 0)
+	self:SkinButtonTextures(button, textureAlpha)
 
 	local fs = button.GetFontString and button:GetFontString()
-	if fs and not opts.keepFontColor then
+	if fs and not keepFontColor then
 		self:SetFontColor(button, fs, 0.92, 0.92, 0.92, 1)
 	end
 
@@ -1332,28 +1436,56 @@ function SkinEngine:SkinIconButton(button, iconPath, opts)
 		return
 	end
 
-	opts = opts or {}
-	button.BFL_DarkBorderlessIconButton = true
-	button.BFL_DarkIconColor = opts.color or COLORS.icon
-	button.BFL_DarkIconHoverColor = opts.hoverColor or COLORS.iconHover
-	button.BFL_DarkIconDownColor = opts.downColor or COLORS.iconDown
+	local insets = (opts and opts.insets) or ZERO_INSETS
+	local textureAlpha = (opts and opts.textureAlpha) or 0
+	local stripRegions = opts and opts.stripRegions == true
+	local iconSize = (opts and opts.size) or 14
+	local iconX = (opts and opts.x) or 0
+	local iconY = (opts and opts.y) or 0
+	local iconAlpha = (opts and opts.alpha) or 1
+	local explicitTexture = opts and opts.texture
 
-	self:CreateBackdrop(button, "icon", opts.insets or { left = 0, right = 0, top = 0, bottom = 0 })
-	self:SkinButtonTextures(button, opts.textureAlpha or 0)
-	if button.GetNormalTexture then
-		self:SetTextureAlpha(button, button:GetNormalTexture(), 0)
-	end
-	if button.GetPushedTexture then
-		self:SetTextureAlpha(button, button:GetPushedTexture(), 0)
-	end
-	if button.GetDisabledTexture then
-		self:SetTextureAlpha(button, button:GetDisabledTexture(), 0)
-	end
-	if button.GetHighlightTexture then
-		self:SetTextureAlpha(button, button:GetHighlightTexture(), 0)
-	end
-	if opts.stripRegions then
-		self:DampenRegions(button, 0)
+	button.BFL_DarkBorderlessIconButton = true
+	button.BFL_DarkIconColor = (opts and opts.color) or COLORS.icon
+	button.BFL_DarkIconHoverColor = (opts and opts.hoverColor) or COLORS.iconHover
+	button.BFL_DarkIconDownColor = (opts and opts.downColor) or COLORS.iconDown
+
+	local needsSetup = not button.BFL_DarkIconButtonSkinned
+		or button.BFL_DarkIconButtonTextureAlpha ~= textureAlpha
+		or button.BFL_DarkIconButtonStripRegions ~= stripRegions
+		or button.BFL_DarkIconButtonSize ~= iconSize
+		or button.BFL_DarkIconButtonX ~= iconX
+		or button.BFL_DarkIconButtonY ~= iconY
+		or button.BFL_DarkIconButtonExplicitTexture ~= explicitTexture
+		or button.BFL_DarkIconButtonIconPath ~= iconPath
+
+	if needsSetup then
+		button.BFL_DarkIconButtonSkinned = true
+		button.BFL_DarkIconButtonTextureAlpha = textureAlpha
+		button.BFL_DarkIconButtonStripRegions = stripRegions
+		button.BFL_DarkIconButtonSize = iconSize
+		button.BFL_DarkIconButtonX = iconX
+		button.BFL_DarkIconButtonY = iconY
+		button.BFL_DarkIconButtonExplicitTexture = explicitTexture
+		button.BFL_DarkIconButtonIconPath = iconPath
+
+		self:CreateBackdrop(button, "icon", insets)
+		self:SkinButtonTextures(button, textureAlpha)
+		if button.GetNormalTexture then
+			self:SetTextureAlpha(button, button:GetNormalTexture(), 0)
+		end
+		if button.GetPushedTexture then
+			self:SetTextureAlpha(button, button:GetPushedTexture(), 0)
+		end
+		if button.GetDisabledTexture then
+			self:SetTextureAlpha(button, button:GetDisabledTexture(), 0)
+		end
+		if button.GetHighlightTexture then
+			self:SetTextureAlpha(button, button:GetHighlightTexture(), 0)
+		end
+		if stripRegions then
+			self:DampenRegions(button, 0)
+		end
 	end
 	self:StyleBackdrop(button, COLORS.borderNone, COLORS.borderNone)
 
@@ -1364,7 +1496,7 @@ function SkinEngine:SkinIconButton(button, iconPath, opts)
 		self:SetObjectShown(button, button.BFL_DarkArrowText, false)
 	end
 
-	local icon = opts.texture or button.BFL_DarkIcon
+	local icon = explicitTexture or button.BFL_DarkIcon
 	if not icon and button.CreateTexture then
 		icon = button:CreateTexture(nil, "OVERLAY")
 		button.BFL_DarkIcon = icon
@@ -1377,19 +1509,18 @@ function SkinEngine:SkinIconButton(button, iconPath, opts)
 	if iconPath and icon.SetTexture then
 		icon:SetTexture(iconPath)
 	end
-	if icon.ClearAllPoints then
+	if needsSetup and icon.ClearAllPoints then
 		self:SetRegionPoints(button, icon, {
-			{ "CENTER", button, "CENTER", opts.x or 0, opts.y or 0 },
+			{ "CENTER", button, "CENTER", iconX, iconY },
 		})
 	end
 	if icon.SetSize then
-		local size = opts.size or 14
-		self:SetRegionSize(button, icon, size, size)
+		self:SetRegionSize(button, icon, iconSize, iconSize)
 	end
 	if icon.SetVertexColor then
 		self:SetTextureVertexColor(button, icon, UnpackColor(button.BFL_DarkIconColor))
 	end
-	self:SetTextureAlpha(button, icon, opts.alpha or 1)
+	self:SetTextureAlpha(button, icon, iconAlpha)
 	icon:Show()
 	button.BFL_DarkIcon = icon
 
@@ -1412,7 +1543,7 @@ function SkinEngine:SkinIconButton(button, iconPath, opts)
 		elseif icon.GetTexture and hoverIcon.SetTexture then
 			hoverIcon:SetTexture(icon:GetTexture())
 		end
-		if hoverIcon.ClearAllPoints then
+		if needsSetup and hoverIcon.ClearAllPoints then
 			self:SetRegionPoints(button, hoverIcon, {
 				{ "CENTER", icon, "CENTER", 0, 0 },
 			})
@@ -1460,37 +1591,25 @@ function SkinEngine:SkinNativeTextureButton(button)
 		button.BFL_DarkIcon = nil
 	end
 
-	local textures = {}
-	local function addTexture(texture)
-		if texture then
-			textures[#textures + 1] = texture
-		end
-	end
-	addTexture(button.NormalTexture)
-	addTexture(button.PushedTexture)
-	addTexture(button.DisabledTexture)
-	addTexture(button.HighlightTexture)
+	self:SetTextureAlpha(button, button.NormalTexture, 1)
+	self:SetTextureAlpha(button, button.PushedTexture, 1)
+	self:SetTextureAlpha(button, button.DisabledTexture, 1)
+	self:SetTextureAlpha(button, button.HighlightTexture, 1)
 	if button.GetNormalTexture then
-		addTexture(button:GetNormalTexture())
+		self:SetTextureAlpha(button, button:GetNormalTexture(), 1)
 	end
 	if button.GetPushedTexture then
-		addTexture(button:GetPushedTexture())
+		self:SetTextureAlpha(button, button:GetPushedTexture(), 1)
 	end
 	if button.GetDisabledTexture then
-		addTexture(button:GetDisabledTexture())
+		self:SetTextureAlpha(button, button:GetDisabledTexture(), 1)
 	end
 	if button.GetHighlightTexture then
-		addTexture(button:GetHighlightTexture())
+		self:SetTextureAlpha(button, button:GetHighlightTexture(), 1)
 	end
-	addTexture(button.Icon)
-	addTexture(button.IconBorder)
-	addTexture(button.LetterI)
-
-	for _, texture in ipairs(textures) do
-		if texture then
-			self:SetTextureAlpha(button, texture, 1)
-		end
-	end
+	self:SetTextureAlpha(button, button.Icon, 1)
+	self:SetTextureAlpha(button, button.IconBorder, 1)
+	self:SetTextureAlpha(button, button.LetterI, 1)
 end
 
 function SkinEngine:SkinTravelPassButton(button)
@@ -1499,49 +1618,45 @@ function SkinEngine:SkinTravelPassButton(button)
 	end
 
 	button.BFL_DarkTravelPassButton = true
-	self:CreateBackdrop(button, "nativeButton", { left = 0, right = 0, top = 0, bottom = 0 })
-	if button.BFL_DarkBackdrop and button.GetFrameLevel then
-		button.BFL_DarkBackdrop:SetFrameLevel((button:GetFrameLevel() or 1) + 1)
-	end
-
-	if button.BFL_DarkDropdownIndicator then
-		button.BFL_DarkDropdownIndicator:Hide()
-	end
-
-	local textures = {
-		button.NormalTexture,
-		button.PushedTexture,
-		button.DisabledTexture,
-		button.HighlightTexture,
-	}
-	if button.GetNormalTexture then
-		table.insert(textures, button:GetNormalTexture())
-	end
-	if button.GetPushedTexture then
-		table.insert(textures, button:GetPushedTexture())
-	end
-	if button.GetDisabledTexture then
-		table.insert(textures, button:GetDisabledTexture())
-	end
-	if button.GetHighlightTexture then
-		table.insert(textures, button:GetHighlightTexture())
-	end
-
-	for _, texture in ipairs(textures) do
-		if texture then
-			self:SetTextureAlpha(button, texture, 1)
+	if not button.BFL_DarkTravelPassSkinned then
+		button.BFL_DarkTravelPassSkinned = true
+		self:CreateBackdrop(button, "nativeButton", ZERO_INSETS)
+		if button.BFL_DarkBackdrop and button.GetFrameLevel then
+			button.BFL_DarkBackdrop:SetFrameLevel((button:GetFrameLevel() or 1) + 1)
 		end
+
+		if button.BFL_DarkDropdownIndicator then
+			button.BFL_DarkDropdownIndicator:Hide()
+		end
+
+		self:SetTextureAlpha(button, button.NormalTexture, 1)
+		self:SetTextureAlpha(button, button.PushedTexture, 1)
+		self:SetTextureAlpha(button, button.DisabledTexture, 1)
+		self:SetTextureAlpha(button, button.HighlightTexture, 1)
+		if button.GetNormalTexture then
+			self:SetTextureAlpha(button, button:GetNormalTexture(), 1)
+		end
+		if button.GetPushedTexture then
+			self:SetTextureAlpha(button, button:GetPushedTexture(), 1)
+		end
+		if button.GetDisabledTexture then
+			self:SetTextureAlpha(button, button:GetDisabledTexture(), 1)
+		end
+		if button.GetHighlightTexture then
+			self:SetTextureAlpha(button, button:GetHighlightTexture(), 1)
+		end
+
+		if button.BFL_DarkTravelPassIcon then
+			self:SetTextureAlpha(button, button.BFL_DarkTravelPassIcon, 0)
+			button.BFL_DarkTravelPassIcon:Hide()
+		end
+		if button.BFL_DarkIcon == button.BFL_DarkTravelPassIcon then
+			button.BFL_DarkIcon = nil
+		end
+
+		self:InstallButtonHooks(button)
 	end
 
-	if button.BFL_DarkTravelPassIcon then
-		self:SetTextureAlpha(button, button.BFL_DarkTravelPassIcon, 0)
-		button.BFL_DarkTravelPassIcon:Hide()
-	end
-	if button.BFL_DarkIcon == button.BFL_DarkTravelPassIcon then
-		button.BFL_DarkIcon = nil
-	end
-
-	self:InstallButtonHooks(button)
 	self:ApplyButtonState(button)
 end
 
@@ -1550,16 +1665,11 @@ function SkinEngine:SkinNavigationButton(button)
 		return
 	end
 
-	self:SkinButton(button, { variant = "nav", keepFontColor = true, insets = { left = 0, right = 0, top = 0, bottom = 0 } })
+	self:SkinButton(button, NAV_BUTTON_OPTS)
 
 	local selected = button.selectedTex and button.selectedTex.IsShown and button.selectedTex:IsShown()
 	local bg = selected and COLORS.controlHover or COLORS.panelSoft
 	local border = selected and COLORS.controlBorderHover or COLORS.borderMuted
-	local backdrop = button.BFL_DarkBackdrop
-	if backdrop then
-		backdrop.BFL_DarkBaseColor = CopyColor(bg)
-		backdrop.BFL_DarkBorderColor = CopyColor(border)
-	end
 	self:StyleBackdrop(button, bg, border)
 
 	if button.selectedTex and button.selectedTex.SetAlpha then
@@ -1604,6 +1714,12 @@ function SkinEngine:CenterTabText(tab)
 	if not fs then
 		return
 	end
+	if tab.BFL_DarkTextCentered and fs.BFL_DarkCenteredForTab == tab then
+		local point, relativeTo, relativePoint, xOffset, yOffset = fs:GetPoint(1)
+		if point == "CENTER" and relativeTo == tab and relativePoint == "CENTER" and (xOffset or 0) == 0 and (yOffset or 0) == 0 then
+			return
+		end
+	end
 
 	if not tab.BFL_DarkOriginalTextPoints then
 		if tab.BFL_OriginalTextPoints and tab.BFL_OriginalTextPoints[1] then
@@ -1631,6 +1747,8 @@ function SkinEngine:CenterTabText(tab)
 		{ "CENTER", tab, "CENTER", 0, 0 },
 	})
 	self:SetFontJustify(tab, fs, "CENTER", "MIDDLE")
+	tab.BFL_DarkTextCentered = true
+	fs.BFL_DarkCenteredForTab = tab
 end
 
 function SkinEngine:RefreshRelatedTabs(tab)
@@ -1678,35 +1796,17 @@ function SkinEngine:SkinTab(tab)
 	end
 
 	tab.BFL_DarkTabButton = true
-	self:SkinButton(tab, { variant = "tab", insets = { left = 0, right = 0, top = 0, bottom = 0 } })
-	self:DampenRegions(tab, 0)
-	self:InstallTabHooks(tab)
-
-	local selected = self:IsTabSelected(tab)
-	tab.BFL_DarkTabSelected = selected
-
-	local enabled = selected or tab.isDisabled ~= true
-	local bg = COLORS.controlDisabled
-	local border = COLORS.controlBorderDisabled
-	if enabled then
-		bg = selected and COLORS.tabHover or COLORS.tab
-		border = selected and COLORS.accent or COLORS.borderMuted
+	self:SkinButton(tab, TAB_BUTTON_OPTS)
+	if not tab.BFL_DarkTabSkinned then
+		tab.BFL_DarkTabSkinned = true
+		self:DampenRegions(tab, 0)
+		self:InstallTabHooks(tab)
 	end
-	local backdrop = tab.BFL_DarkBackdrop
-	if backdrop then
-		backdrop.BFL_DarkBaseColor = CopyColor(bg)
-		backdrop.BFL_DarkBorderColor = CopyColor(border)
-	end
-	self:StyleBackdrop(tab, bg, border)
+
+	self:ApplyButtonState(tab)
 
 	local fs = tab.Text or (tab.GetFontString and tab:GetFontString())
 	if fs then
-		if enabled then
-			local color = selected and 1 or 0.92
-			self:SetFontColor(tab, fs, color, color, color, 1)
-		else
-			self:SetFontColor(tab, fs, UnpackColor(COLORS.disabledText))
-		end
 		self:CenterTabText(tab)
 	end
 end
@@ -1810,9 +1910,9 @@ function SkinEngine:SkinArrowButton(button, direction)
 
 	button.BFL_DarkArrowButton = true
 	button.BFL_DarkArrowDirection = direction or "down"
-	local insets = button.BFL_DarkScrollStepper and { left = 0, right = 0, top = 0, bottom = 0 }
-		or button.BFL_DarkSliderStepper and { left = 2, right = 2, top = 0, bottom = 0 }
-		or { left = 3, right = 3, top = -3, bottom = 3 }
+	local insets = button.BFL_DarkScrollStepper and ZERO_INSETS
+		or button.BFL_DarkSliderStepper and SLIDER_STEPPER_INSETS
+		or ARROW_BUTTON_INSETS
 	self:SkinButton(button, { insets = insets, keepFontColor = true })
 	self:HideArrowButtonTextures(button)
 
@@ -1961,7 +2061,7 @@ function SkinEngine:SkinEditBox(editBox)
 		return
 	end
 
-	self:CreateBackdrop(editBox, "editbox", { left = 0, right = 0, top = 0, bottom = 0 })
+	self:CreateBackdrop(editBox, "editbox", ZERO_INSETS)
 	self:DampenNamedTextures(editBox, 0, {
 		"Left",
 		"Middle",
@@ -2269,7 +2369,7 @@ function SkinEngine:SkinDropdown(dropdown)
 		return
 	end
 
-	self:CreateBackdrop(dropdown, "dropdown", { left = 0, right = 0, top = 0, bottom = 0 })
+	self:CreateBackdrop(dropdown, "dropdown", ZERO_INSETS)
 	self:DampenRegions(dropdown, 0)
 	self:DampenKnownArtwork(dropdown, 0)
 	self:SkinButtonTextures(dropdown, 0)
@@ -2325,7 +2425,7 @@ function SkinEngine:SkinScrollThumb(thumb)
 	end
 
 	if thumb.CreateTexture or thumb.SetBackdrop then
-		self:CreateBackdrop(thumb, "thumb", { left = 0, right = 0, top = 0, bottom = 0 })
+		self:CreateBackdrop(thumb, "thumb", ZERO_INSETS)
 	end
 	self:DampenRegions(thumb, 0)
 end
@@ -2539,8 +2639,7 @@ function SkinEngine:SkinScrollBar(scrollBar)
 		self:SetFrameSize(scrollBar, DARK_SCROLLBAR_WIDTH)
 	end
 
-	local trackInsets = scrollBar.BFL_DarkWideScrollbar and { left = 0, right = 0, top = 0, bottom = 0 }
-		or { left = 1, right = 1, top = 0, bottom = 0 }
+	local trackInsets = scrollBar.BFL_DarkWideScrollbar and ZERO_INSETS or SCROLLBAR_TRACK_INSETS
 	self:CreateBackdrop(scrollBar, "scrollbar", trackInsets)
 	self:DampenRegions(scrollBar, 0)
 	self:DampenNamedTextures(scrollBar, 0, {
@@ -2715,7 +2814,7 @@ function SkinEngine:SkinColorSwatch(button)
 	end
 
 	button.BFL_DarkColorSwatchButton = true
-	self:CreateBackdrop(button, "control", { left = 0, right = 0, top = 0, bottom = 0 })
+	self:CreateBackdrop(button, "control", ZERO_INSETS)
 end
 
 local function IsGroupHeaderRow(row)
@@ -2732,7 +2831,11 @@ function SkinEngine:SkinRow(row)
 
 	if not row.BFL_DarkRowSkinned then
 		row.BFL_DarkRowSkinned = true
-		self:CreateBackdrop(row, "row", { left = 0, right = 0, top = 0, bottom = 0 })
+		self:CreateBackdrop(row, "row", ZERO_INSETS)
+		self:InstallRowHooks(row)
+		if row.BFL_DarkRowOver == nil and MouseIsOver then
+			row.BFL_DarkRowOver = MouseIsOver(row) or nil
+		end
 	end
 	if row.background and row.BFL_DarkRowBackground ~= row.background then
 		row.BFL_DarkRowBackground = row.background
@@ -2758,9 +2861,7 @@ function SkinEngine:SkinRow(row)
 		end
 	end
 
-	self:InstallRowHooks(row)
-	local isOver = MouseIsOver and MouseIsOver(row)
-	self:ApplyRowState(row, isOver and "hover" or nil)
+	self:ApplyRowState(row, row.BFL_DarkRowOver and "hover" or nil)
 
 	if row.travelPassButton then
 		self:SkinTravelPassButton(row.travelPassButton)
@@ -2806,11 +2907,13 @@ function SkinEngine:InstallRowHooks(row)
 
 	row.BFL_DarkRowHooked = true
 	row:HookScript("OnEnter", function(self)
+		self.BFL_DarkRowOver = true
 		if SkinEngine:IsActive() then
 			SkinEngine:ApplyRowState(self, "hover")
 		end
 	end)
 	row:HookScript("OnLeave", function(self)
+		self.BFL_DarkRowOver = nil
 		if SkinEngine:IsActive() then
 			SkinEngine:ApplyRowState(self)
 		end
@@ -2824,7 +2927,7 @@ function SkinEngine:InstallRowHooks(row)
 	row:HookScript("OnMouseUp", function(self, buttonName)
 		if SkinEngine:IsActive() and buttonName == "LeftButton" then
 			self.BFL_DarkRowMouseDown = nil
-			local isOver = MouseIsOver and MouseIsOver(self)
+			local isOver = self.BFL_DarkRowOver or (MouseIsOver and MouseIsOver(self))
 			SkinEngine:ApplyRowState(self, isOver and "hover" or nil)
 		end
 	end)
@@ -3043,7 +3146,12 @@ function SkinEngine:RestoreFrame(frame)
 		end
 		frame.BFL_DarkTabButton = nil
 		frame.BFL_DarkTabSelected = nil
+		frame.BFL_DarkTabSkinned = nil
+		frame.BFL_DarkTextCentered = nil
 		frame.BFL_DarkOriginalTextPoints = nil
+		if fs then
+			fs.BFL_DarkCenteredForTab = nil
+		end
 		if state.tabUseTextCenterStored then
 			frame.BFL_UseTextCenter = state.tabUseTextCenter
 			state.tabUseTextCenterStored = nil
@@ -3119,20 +3227,41 @@ function SkinEngine:RestoreFrame(frame)
 	if frame.bflDarkSkinned ~= nil then
 		frame.bflDarkSkinned = nil
 	end
+	frame.BFL_DarkFrameStripTextures = nil
+	frame.BFL_DarkFrameTextureAlpha = nil
+	frame.BFL_DarkFrameDecorAlpha = nil
 	frame.BFL_DarkRowSkinned = nil
+	frame.BFL_DarkRowOver = nil
 	frame.BFL_DarkRowBackground = nil
 	frame.BFL_DarkRowBG = nil
 	frame.BFL_DarkRowHighlightTexture = nil
 	frame.BFL_DarkNoRowHighlight = nil
 	frame.BFL_DarkRowMouseDown = nil
 	frame.BFL_DarkKeepFontColor = nil
+	frame.BFL_DarkButtonSkinned = nil
+	frame.BFL_DarkButtonVariant = nil
+	frame.BFL_DarkButtonInsetLeft = nil
+	frame.BFL_DarkButtonInsetRight = nil
+	frame.BFL_DarkButtonInsetTop = nil
+	frame.BFL_DarkButtonInsetBottom = nil
+	frame.BFL_DarkButtonKeepNormalTexture = nil
+	frame.BFL_DarkButtonTextureAlpha = nil
 	frame.BFL_DarkBorderlessIconButton = nil
+	frame.BFL_DarkIconButtonSkinned = nil
+	frame.BFL_DarkIconButtonTextureAlpha = nil
+	frame.BFL_DarkIconButtonStripRegions = nil
+	frame.BFL_DarkIconButtonSize = nil
+	frame.BFL_DarkIconButtonX = nil
+	frame.BFL_DarkIconButtonY = nil
+	frame.BFL_DarkIconButtonExplicitTexture = nil
+	frame.BFL_DarkIconButtonIconPath = nil
 	frame.BFL_DarkIconColor = nil
 	frame.BFL_DarkIconHoverColor = nil
 	frame.BFL_DarkIconDownColor = nil
 	frame.BFL_DarkArrowButton = nil
 	frame.BFL_DarkArrowDirection = nil
 	frame.BFL_DarkTravelPassButton = nil
+	frame.BFL_DarkTravelPassSkinned = nil
 	frame.BFL_DarkNativeTextureButton = nil
 	frame.BFL_DarkColorSwatchButton = nil
 	frame.BFL_DarkScrollStepper = nil

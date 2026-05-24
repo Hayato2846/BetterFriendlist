@@ -374,16 +374,29 @@ function DarkTheme:SkinMainTabs(engine)
 end
 
 function DarkTheme:SkinMainTabsDeferred()
-	if not BFL:IsThemeActive("dark") then
+	local engine = GetEngine()
+	if not engine or not engine:IsActive() then
+		self.mainTabsSkinPending = nil
 		return
 	end
 
+	if self.mainTabsSkinPending then
+		return
+	end
+	self.mainTabsSkinPending = true
+
+	local function FlushMainTabs()
+		self.mainTabsSkinPending = nil
+		local delayedEngine = GetEngine()
+		if delayedEngine and delayedEngine:IsActive() then
+			self:SkinMainTabs(delayedEngine)
+		end
+	end
+
 	if C_Timer and C_Timer.After then
-		C_Timer.After(0, function()
-			self:SkinMainTabs()
-		end)
+		C_Timer.After(0, FlushMainTabs)
 	else
-		self:SkinMainTabs()
+		FlushMainTabs()
 	end
 end
 
@@ -726,18 +739,93 @@ function DarkTheme:SkinFriendsListRows(engine)
 		end)
 	end
 
-	local pools = {
-		FriendsList.classicButtonPool,
-		FriendsList.classicHeaderPool,
-		FriendsList.classicInviteHeaderPool,
-		FriendsList.classicInviteButtonPool,
-		FriendsList.classicDividerPool,
-	}
-	for _, pool in ipairs(pools) do
-		if pool then
-			for _, row in ipairs(pool) do
-				engine:SkinRow(row)
+	local pool = FriendsList.classicButtonPool
+	if pool then
+		for _, row in ipairs(pool) do
+			engine:SkinRow(row)
+		end
+	end
+	pool = FriendsList.classicHeaderPool
+	if pool then
+		for _, row in ipairs(pool) do
+			engine:SkinRow(row)
+		end
+	end
+	pool = FriendsList.classicInviteHeaderPool
+	if pool then
+		for _, row in ipairs(pool) do
+			engine:SkinRow(row)
+		end
+	end
+	pool = FriendsList.classicInviteButtonPool
+	if pool then
+		for _, row in ipairs(pool) do
+			engine:SkinRow(row)
+		end
+	end
+	pool = FriendsList.classicDividerPool
+	if pool then
+		for _, row in ipairs(pool) do
+			engine:SkinRow(row)
+		end
+	end
+end
+
+function DarkTheme:RefreshFriendsListRows(engine)
+	local FriendsList = BFL:GetModule("FriendsList")
+	if not FriendsList then
+		return
+	end
+
+	local function RefreshRow(row)
+		if not row then
+			return
+		end
+		if row.BFL_DarkRowSkinned then
+			engine:ApplyRowState(row, row.BFL_DarkRowOver and "hover" or nil)
+			if row.travelPassButton then
+				engine:SkinTravelPassButton(row.travelPassButton)
 			end
+			if row.PartyButton then
+				engine:SkinTravelPassButton(row.PartyButton)
+			end
+		else
+			engine:SkinRow(row)
+		end
+	end
+
+	if FriendsList.scrollBox and FriendsList.scrollBox.ForEachFrame then
+		FriendsList.scrollBox:ForEachFrame(RefreshRow)
+	end
+
+	local pool = FriendsList.classicButtonPool
+	if pool then
+		for _, row in ipairs(pool) do
+			RefreshRow(row)
+		end
+	end
+	pool = FriendsList.classicHeaderPool
+	if pool then
+		for _, row in ipairs(pool) do
+			RefreshRow(row)
+		end
+	end
+	pool = FriendsList.classicInviteHeaderPool
+	if pool then
+		for _, row in ipairs(pool) do
+			RefreshRow(row)
+		end
+	end
+	pool = FriendsList.classicInviteButtonPool
+	if pool then
+		for _, row in ipairs(pool) do
+			RefreshRow(row)
+		end
+	end
+	pool = FriendsList.classicDividerPool
+	if pool then
+		for _, row in ipairs(pool) do
+			RefreshRow(row)
 		end
 	end
 end
@@ -1070,7 +1158,12 @@ function DarkTheme:SkinSettingsFrameDeferred()
 	end
 
 	if C_Timer and C_Timer.After then
+		if self.settingsSkinPending then
+			return
+		end
+		self.settingsSkinPending = true
 		C_Timer.After(0, function()
+			self.settingsSkinPending = nil
 			local delayedEngine = GetEngine()
 			if delayedEngine and delayedEngine:IsActive() then
 				self:SkinSettingsFrame(delayedEngine)
@@ -1094,8 +1187,9 @@ function DarkTheme:WrapModuleMethod(moduleName, methodName, after)
 	local original = module[methodName]
 	module[methodName] = function(moduleSelf, ...)
 		local r1, r2, r3, r4 = original(moduleSelf, ...)
-		if BFL:IsThemeActive("dark") then
-			SafeCall(after, moduleSelf, r1, r2, r3, r4, ...)
+		local engine = GetEngine()
+		if engine and engine:IsActive() then
+			after(moduleSelf, r1, r2, r3, r4, ...)
 		end
 		return r1, r2, r3, r4
 	end
@@ -1253,13 +1347,13 @@ function DarkTheme:InstallHooks()
 	self:WrapModuleMethod("FriendsList", "RenderDisplay", function()
 		local engine = GetEngine()
 		if engine then
-			self:SkinFriendsListRows(engine)
+			self:RefreshFriendsListRows(engine)
 		end
 	end)
 	self:WrapModuleMethod("FriendsList", "RenderClassicButtons", function()
 		local engine = GetEngine()
 		if engine then
-			self:SkinFriendsListRows(engine)
+			self:RefreshFriendsListRows(engine)
 		end
 	end)
 
