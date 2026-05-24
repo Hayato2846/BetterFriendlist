@@ -11,6 +11,10 @@ param(
     [string]$WowRoot,
     [ValidateSet('Junction', 'SymbolicLink')]
     [string]$LinkType = 'Junction',
+    [ValidateRange(0, 10)]
+    [int]$MirrorRetries = 1,
+    [ValidateRange(0, 30)]
+    [int]$MirrorWaitSeconds = 1,
     [switch]$Force
 )
 
@@ -43,12 +47,27 @@ function Invoke-BFLAddonMirror {
 
     Remove-BFLExcludedArtifacts -DestinationRoot $DestinationRoot -ExcludeDirs $excludeDirs -ExcludeFiles $excludeFiles
 
-    $args = @($SourceRoot, $DestinationRoot, '/MIR', '/NFL', '/NDL', '/NJH', '/NJS', '/NP', '/XD') +
+    $args = @(
+        $SourceRoot, $DestinationRoot,
+        '/MIR',
+        "/R:$MirrorRetries",
+        "/W:$MirrorWaitSeconds",
+        '/NFL', '/NDL', '/NJH', '/NJS', '/NP',
+        '/XD'
+    ) +
         $excludeDirs + @('/XF') + $excludeFiles
 
-    & robocopy @args | Out-Null
-    if ($LASTEXITCODE -ge 8) {
-        throw "robocopy failed with exit code $LASTEXITCODE"
+    $robocopyOutput = & robocopy @args 2>&1
+    $robocopyExitCode = $LASTEXITCODE
+    if ($robocopyExitCode -ge 8) {
+        $details = @($robocopyOutput | Select-String -Pattern 'ERROR|FEHLER|Access denied|Zugriff verweigert' |
+            Select-Object -First 8)
+        if ($details.Count -eq 0) {
+            $details = @($robocopyOutput | Select-Object -Last 12)
+        }
+
+        $detailText = ($details | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine
+        throw "robocopy failed with exit code $robocopyExitCode while mirroring '$SourceRoot' to '$DestinationRoot'. $detailText"
     }
 
     Assert-BFLAddonRoot $DestinationRoot | Out-Null

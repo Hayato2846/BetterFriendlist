@@ -46,7 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dark Theme Frame Chrome** - Prevented Blizzard ButtonFrame portrait/corner artwork from reappearing over the Dark theme after portrait visibility updates.
 - **Dark Theme Polish** - Aligned header and title icon buttons, changed borderless button hover to icon-only glow, and tightened the main scrollbar alignment and stepper state layout.
 - **Dark Theme Scrolling** - Fixed scrollbar stepper icon alignment and initial visibility, removed group header highlighting, improved scrollbar thumb highlighting while dragging, and unified Dark theme scrollbar styling across BFL windows.
-- **Theme Isolation** - Prevented Dark theme skin state from leaking into the Blizzard theme after switching themes.
+- **Theme Isolation** - Prevented Dark theme skin state from leaking into the Blizzard theme after switching themes, including top/bottom tab layout, selected tab text, icon coloring, checkboxes, edit boxes, and scrollbar thumbs.
 - **Dark Theme Texture Buttons** - Preserved native invite and RAF reward textures while cleaning up Dark theme borders, RAF list separators, and tooltip behavior.
 - **Dark Theme Overlay Buttons** - Prevented invisible Friends row game-account overlays from receiving visible button chrome.
 - **Dark Theme Tab Lists** - Applied the Friends tab list chrome rules to Recent Allies and Recruit A Friend so list insets and scrollbars align consistently.
@@ -56,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dark Theme Quick Join Tab** - Removed the extra outer inset frame, added breathing room below the title buttons, and aligned the scrollbar and request button with the Contacts tab layout.
 - **Dark Theme Raid Help** - Cleaned up Raid Roster Help inset chrome and aligned its scrollbar with other tab lists.
 - **Dark Theme Settings** - Fixed settings scrollbar stepper icons after tab switches and aligned Font Settings dropdowns, sliders, and color controls.
+- **Dark Theme Advanced Dialogs** - Skinned the FriendGroups migration dialog, Note Cleanup Wizard, and Note Backup Viewer consistently with the Dark theme.
 - **Theme Settings** - Fixed an error when disabling Beta Features from the settings window.
 - **Recruit A Friend Rewards** - Prevented viewing rewards from breaking reward tabs or causing a protected Copy Link error in the recruitment dialog.
 

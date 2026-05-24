@@ -128,6 +128,13 @@ function ThemeManager:ApplyCurrentTheme(reason)
 		end
 	end
 
+	if BFL.ApplyTabFonts then
+		BFL:ApplyTabFonts()
+	end
+	if theme == "blizzard" and BFL.RefreshMainTabVisualState then
+		BFL:RefreshMainTabVisualState()
+	end
+
 	if BFL.ForceRefreshFriendsList then
 		BFL:ForceRefreshFriendsList()
 	end
@@ -168,6 +175,38 @@ local function IsBetterFriendlistPopup(which)
 		or which:sub(1, 16) == "BETTERFRIENDLIST"
 end
 
+local function SkinStaticPopupButton(engine, popup, key)
+	local popupName = popup and popup.GetName and popup:GetName()
+	local button = popup and popup[key]
+	if not button and popupName and popupName ~= "" then
+		button = _G[popupName .. key]
+	end
+	if button then
+		engine:SkinButton(button)
+	end
+end
+
+local function SkinStaticPopupButtons(engine, popup)
+	for _, key in ipairs({
+		"Button1",
+		"Button2",
+		"Button3",
+		"Button4",
+		"ExtraButton",
+	}) do
+		SkinStaticPopupButton(engine, popup, key)
+	end
+
+	local container = popup and popup.ButtonContainer
+	if container and container.GetChildren then
+		for _, child in ipairs({ container:GetChildren() }) do
+			if child and child.IsObjectType and child:IsObjectType("Button") then
+				engine:SkinButton(child)
+			end
+		end
+	end
+end
+
 function ThemeManager:SkinStaticPopup(which)
 	if not IsBetterFriendlistPopup(which) or not BFL:IsThemeActive("dark") then
 		return
@@ -181,8 +220,13 @@ function ThemeManager:SkinStaticPopup(which)
 	for i = 1, STATICPOPUP_NUMDIALOGS or 4 do
 		local popup = _G["StaticPopup" .. i]
 		if popup and popup:IsShown() and popup.which == which then
-			Engine:SkinFrame(popup, "popup")
-			Engine:SkinTree(popup, 3)
+			Engine:SkinFrame(popup, "popup", { stripTextures = true, textureAlpha = 0 })
+			Engine:DampenNineSlice(popup, 0)
+			if popup.AlertIcon then
+				Engine:SetTextureAlpha(popup, popup.AlertIcon, 0)
+			end
+			Engine:SkinTree(popup, 4)
+			SkinStaticPopupButtons(Engine, popup)
 		end
 	end
 end

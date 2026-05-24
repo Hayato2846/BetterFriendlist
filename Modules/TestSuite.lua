@@ -1853,6 +1853,254 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
+	TS:RegisterTest("data", "SkinEngine_RestoreTabState", {
+		description = "Dark tab skinning should restore the previous tab text layout state",
+		action = function(V)
+			local SkinEngine = BFL:GetModule("SkinEngine")
+			V:AssertNotNil(SkinEngine, "SkinEngine module should exist")
+			V:AssertNotNil(SkinEngine.CenterTabText, "SkinEngine:CenterTabText should exist")
+
+			local tab = { BFL_UseTextCenter = true, BFL_DarkTabButton = true }
+			local fs = {
+				points = { { "LEFT", tab, "LEFT", 7, -5 } },
+				justifyH = "LEFT",
+				justifyV = "TOP",
+			}
+			tab.Text = fs
+
+			function fs:GetNumPoints()
+				return #self.points
+			end
+			function fs:GetPoint(index)
+				return unpack(self.points[index])
+			end
+			function fs:ClearAllPoints()
+				self.points = {}
+			end
+			function fs:SetPoint(...)
+				self.points[#self.points + 1] = { ... }
+			end
+			function fs:GetJustifyH()
+				return self.justifyH
+			end
+			function fs:GetJustifyV()
+				return self.justifyV
+			end
+			function fs:SetJustifyH(value)
+				self.justifyH = value
+			end
+			function fs:SetJustifyV(value)
+				self.justifyV = value
+			end
+
+			local ok, err = pcall(function()
+				SkinEngine:CenterTabText(tab)
+				V:AssertEqual(fs.points[1][1], "CENTER", "Dark theme should center tab text while active")
+				V:AssertEqual(fs.justifyH, "CENTER", "Dark theme should center horizontal tab text")
+				V:AssertEqual(fs.justifyV, "MIDDLE", "Dark theme should center vertical tab text")
+
+				SkinEngine:RestoreFrame(tab)
+				V:Assert(tab.BFL_UseTextCenter == true, "Restore should preserve the previous BFL_UseTextCenter value")
+				V:AssertEqual(fs.points[1][1], "LEFT", "Restore should return the original tab text point")
+				V:AssertEqual(fs.points[1][4], 7, "Restore should return the original tab text x offset")
+				V:AssertEqual(fs.points[1][5], -5, "Restore should return the original tab text y offset")
+				V:AssertEqual(fs.justifyH, "LEFT", "Restore should return the original horizontal justify")
+				V:AssertEqual(fs.justifyV, "TOP", "Restore should return the original vertical justify")
+			end)
+			SkinEngine.registry[tab] = nil
+			tab.BFL_DarkSkin = nil
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
+	TS:RegisterTest("data", "SkinEngine_RestoreVisualState", {
+		description = "SkinEngine restore should return native texture, region, and text state",
+		action = function(V)
+			local SkinEngine = BFL:GetModule("SkinEngine")
+			V:AssertNotNil(SkinEngine, "SkinEngine module should exist")
+			V:AssertNotNil(SkinEngine.SetTextureVertexColor, "SkinEngine:SetTextureVertexColor should exist")
+			V:AssertNotNil(SkinEngine.SetTextureBlendMode, "SkinEngine:SetTextureBlendMode should exist")
+			V:AssertNotNil(SkinEngine.SetRegionPoints, "SkinEngine:SetRegionPoints should exist")
+			V:AssertNotNil(SkinEngine.SetFontJustify, "SkinEngine:SetFontJustify should exist")
+
+			local owner = {}
+			local region = {
+				alpha = 0.65,
+				color = { 0.2, 0.3, 0.4, 0.5 },
+				blendMode = "ADD",
+				points = { { "TOPLEFT", owner, "TOPLEFT", 3, -4 } },
+				width = 33,
+				height = 17,
+			}
+			local editBox = {
+				color = { 0.1, 0.2, 0.3, 0.4 },
+				justifyH = "RIGHT",
+				justifyV = "BOTTOM",
+			}
+
+			function region:GetAlpha()
+				return self.alpha
+			end
+			function region:SetAlpha(alpha)
+				self.alpha = alpha
+			end
+			function region:GetVertexColor()
+				return self.color[1], self.color[2], self.color[3], self.color[4]
+			end
+			function region:SetVertexColor(r, g, b, a)
+				self.color = { r, g, b, a }
+			end
+			function region:GetBlendMode()
+				return self.blendMode
+			end
+			function region:SetBlendMode(blendMode)
+				self.blendMode = blendMode
+			end
+			function region:GetNumPoints()
+				return #self.points
+			end
+			function region:GetPoint(index)
+				return unpack(self.points[index])
+			end
+			function region:ClearAllPoints()
+				self.points = {}
+			end
+			function region:SetPoint(...)
+				self.points[#self.points + 1] = { ... }
+			end
+			function region:GetSize()
+				return self.width, self.height
+			end
+			function region:SetSize(width, height)
+				self.width = width
+				self.height = height
+			end
+
+			function editBox:GetTextColor()
+				return self.color[1], self.color[2], self.color[3], self.color[4]
+			end
+			function editBox:SetTextColor(r, g, b, a)
+				self.color = { r, g, b, a }
+			end
+			function editBox:GetJustifyH()
+				return self.justifyH
+			end
+			function editBox:GetJustifyV()
+				return self.justifyV
+			end
+			function editBox:SetJustifyH(value)
+				self.justifyH = value
+			end
+			function editBox:SetJustifyV(value)
+				self.justifyV = value
+			end
+
+			local ok, err = pcall(function()
+				SkinEngine:SetTextureAlpha(owner, region, 0)
+				SkinEngine:SetTextureVertexColor(owner, region, 1, 0.82, 0, 1)
+				SkinEngine:SetTextureBlendMode(owner, region, "BLEND")
+				SkinEngine:SetRegionPoints(owner, region, {
+					{ "CENTER", owner, "CENTER", 0, 0 },
+				})
+				SkinEngine:SetRegionSize(owner, region, 16, 16)
+				SkinEngine:SetFontColor(owner, editBox, 0.92, 0.92, 0.92, 1)
+				SkinEngine:SetFontJustify(owner, editBox, "CENTER", "MIDDLE")
+
+				SkinEngine:RestoreFrame(owner)
+				V:AssertEqual(region.alpha, 0.65, "Restore should return texture alpha")
+				V:AssertEqual(region.color[1], 0.2, "Restore should return texture vertex red")
+				V:AssertEqual(region.color[2], 0.3, "Restore should return texture vertex green")
+				V:AssertEqual(region.color[3], 0.4, "Restore should return texture vertex blue")
+				V:AssertEqual(region.color[4], 0.5, "Restore should return texture vertex alpha")
+				V:AssertEqual(region.blendMode, "ADD", "Restore should return texture blend mode")
+				V:AssertEqual(region.points[1][1], "TOPLEFT", "Restore should return region point")
+				V:AssertEqual(region.points[1][4], 3, "Restore should return region x offset")
+				V:AssertEqual(region.points[1][5], -4, "Restore should return region y offset")
+				V:AssertEqual(region.width, 33, "Restore should return region width")
+				V:AssertEqual(region.height, 17, "Restore should return region height")
+				V:AssertEqual(editBox.color[1], 0.1, "Restore should return text color")
+				V:AssertEqual(editBox.justifyH, "RIGHT", "Restore should return horizontal justify")
+				V:AssertEqual(editBox.justifyV, "BOTTOM", "Restore should return vertical justify")
+			end)
+			SkinEngine.registry[owner] = nil
+			owner.BFL_DarkSkin = nil
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
+	TS:RegisterTest("data", "Tabs_VisualState_FontObjects", {
+		description = "Tab visual refresh should move selected/deselected font state cleanly",
+		action = function(V)
+			V:AssertNotNil(BFL.ApplyTabVisualState, "BFL:ApplyTabVisualState should exist")
+
+			local originalSelect = _G.PanelTemplates_SelectTab
+			local originalDeselect = _G.PanelTemplates_DeselectTab
+			local originalDisabled = _G.PanelTemplates_SetDisabledTabState
+
+			local fs = { color = {} }
+			function fs:SetFontObject(fontObject)
+				self.fontObject = fontObject
+			end
+			function fs:SetTextColor(r, g, b, a)
+				self.color = { r, g, b, a }
+			end
+
+			local tab = { Text = fs }
+			function tab:SetNormalFontObject(fontObject)
+				self.normalFontObject = fontObject
+			end
+			function tab:SetHighlightFontObject(fontObject)
+				self.highlightFontObject = fontObject
+			end
+			function tab:SetDisabledFontObject(fontObject)
+				self.disabledFontObject = fontObject
+			end
+			function tab:GetFontString()
+				return self.Text
+			end
+
+			local ok, err = pcall(function()
+				_G.PanelTemplates_SelectTab = function(target)
+					target.panelState = "selected"
+				end
+				_G.PanelTemplates_DeselectTab = function(target)
+					target.panelState = "deselected"
+				end
+				_G.PanelTemplates_SetDisabledTabState = function(target)
+					target.panelState = "disabled"
+				end
+
+				BFL:ApplyTabVisualState(tab, true, false)
+				V:AssertEqual(tab.panelState, "selected", "Selected tab should use selected panel state")
+				V:AssertEqual(tab.normalFontObject, "BetterFriendlistTabFontNormal", "Selected tab should keep normal font object")
+				V:AssertEqual(tab.highlightFontObject, "BetterFriendlistTabFontHighlight", "Selected tab should keep highlight font object")
+				V:AssertEqual(tab.disabledFontObject, "BetterFriendlistTabFontHighlight", "Selected tab should use highlight disabled font")
+				V:AssertEqual(fs.fontObject, "BetterFriendlistTabFontHighlight", "Selected tab text should use highlight font")
+
+				BFL:ApplyTabVisualState(tab, false, false)
+				V:AssertEqual(tab.panelState, "deselected", "Deselected tab should use deselected panel state")
+				V:AssertEqual(tab.disabledFontObject, "BetterFriendlistTabFontDisable", "Deselected tab should restore disabled font")
+				V:AssertEqual(fs.fontObject, "BetterFriendlistTabFontNormal", "Deselected tab text should use normal font")
+
+				BFL:ApplyTabVisualState(tab, false, true)
+				V:AssertEqual(tab.panelState, "disabled", "Disabled tab should use disabled panel state")
+				V:AssertEqual(tab.disabledFontObject, "BetterFriendlistTabFontDisable", "Disabled tab should keep disabled font")
+				V:AssertEqual(fs.fontObject, "BetterFriendlistTabFontDisable", "Disabled tab text should use disabled font")
+			end)
+
+			_G.PanelTemplates_SelectTab = originalSelect
+			_G.PanelTemplates_DeselectTab = originalDeselect
+			_G.PanelTemplates_SetDisabledTabState = originalDisabled
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
 	TS:RegisterTest("data", "Database_Migration_DefaultFrameWidth", {
 		description = "defaultFrameWidth should be migrated to the new minimum",
 		action = function(V)

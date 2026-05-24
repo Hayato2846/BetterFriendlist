@@ -58,6 +58,27 @@ local function GetScrollFrameScrollBar(scrollFrame)
 	end
 end
 
+local function FindScrollBarForFrame(scrollFrame)
+	local scrollBar = GetScrollFrameScrollBar(scrollFrame)
+	if scrollBar then
+		return scrollBar
+	end
+
+	if not scrollFrame or not scrollFrame.GetChildren then
+		return nil
+	end
+
+	for _, child in ipairs({ scrollFrame:GetChildren() }) do
+		local childName = GetFrameName(child)
+		local lowerName = childName ~= "" and string.lower(childName) or ""
+		if lowerName:find("scrollbar") or child.ScrollUpButton or child.ScrollDownButton or (child.Back and child.Forward) then
+			return child
+		end
+	end
+
+	return nil
+end
+
 local function SkinBorderOnlyInset(engine, frame)
 	if not engine or not frame then
 		return
@@ -234,6 +255,43 @@ local function SkinSettingsNavigation(engine, frame)
 	for _, child in ipairs({ list:GetChildren() }) do
 		if child and (child.selectedTex or child.id) then
 			engine:SkinNavigationButton(child)
+		end
+	end
+end
+
+local function SkinFontString(engine, owner, fontString, r, g, b, a)
+	if engine and fontString then
+		engine:SetFontColor(owner or fontString, fontString, r, g, b, a or 1)
+	end
+end
+
+local function SkinFontStringFields(engine, owner, fields, r, g, b, a)
+	if not owner or not fields then
+		return
+	end
+
+	for _, key in ipairs(fields) do
+		SkinFontString(engine, owner, owner[key], r, g, b, a)
+	end
+end
+
+local function SkinNoteCleanupRows(engine, rows)
+	if not engine or type(rows) ~= "table" then
+		return
+	end
+
+	for _, row in ipairs(rows) do
+		if row then
+			SkinFontStringFields(engine, row, {
+				"accountName",
+				"battleTag",
+				"noteText",
+				"backedUpNote",
+				"currentNote",
+			}, 0.92, 0.92, 0.92, 1)
+			if row.cleanedInput then
+				engine:SkinEditBox(row.cleanedInput)
+			end
 		end
 	end
 end
@@ -899,26 +957,105 @@ function DarkTheme:SkinSettingsFrame(engine)
 	SkinSettingsNavigation(engine, frame)
 end
 
+function DarkTheme:SkinNoteCleanupFrame(engine, frame)
+	if not engine or not engine:IsActive() or not frame then
+		return
+	end
+
+	local colors = engine.colors or {}
+
+	engine:SkinFrame(frame, "popup", { stripTextures = true, textureAlpha = 0.04 })
+	engine:StripButtonFrameArtwork(frame)
+	HideFieldChrome(engine, frame, "Inset")
+
+	SkinFontString(engine, frame, frame.descText, 0.92, 0.92, 0.92, 1)
+	SkinFontString(engine, frame, frame.countLabel, 0.92, 0.92, 0.92, 1)
+
+	if frame.searchBox then
+		engine:SkinEditBox(frame.searchBox)
+		SkinFontString(engine, frame.searchBox, frame.searchBox.Instructions, 0.52, 0.52, 0.54, 1)
+	end
+
+	for _, key in ipairs({
+		"applyButton",
+		"viewBackupButton",
+		"backupButton",
+		"restoreButton",
+	}) do
+		SkinButtonField(engine, frame, key)
+	end
+
+	if frame.headerBar then
+		engine:SkinFrame(frame.headerBar, "panel", {
+			insets = { left = 0, right = 0, top = 0, bottom = 0 },
+		})
+		if frame.headerBar.bg then
+			engine:SetTextureAlpha(frame.headerBar, frame.headerBar.bg, 0)
+		end
+		if colors.controlDown and colors.borderNone then
+			engine:StyleBackdrop(frame.headerBar, colors.controlDown, colors.borderNone)
+		end
+	end
+
+	if frame.headerLabels then
+		for _, label in ipairs(frame.headerLabels) do
+			SkinFontString(engine, frame.headerBar or frame, label, 1, 0.82, 0, 1)
+		end
+	end
+
+	if frame.scrollFrame then
+		SkinBorderOnlyInset(engine, frame.scrollFrame)
+		local scrollBar = FindScrollBarForFrame(frame.scrollFrame)
+		if scrollBar then
+			scrollBar.BFL_DarkWideScrollbar = true
+			SkinTabListScrollBar(engine, frame.scrollFrame, scrollBar, {
+				scrollTopX = 1,
+				scrollBottomX = 1,
+			})
+			RefreshScrollBarSteppers(engine, scrollBar)
+		end
+	end
+
+	engine:SkinTree(frame, 7)
+	HideFieldChrome(engine, frame, "Inset")
+	SkinNoteCleanupRows(engine, frame.rowFrames)
+
+	for _, key in ipairs({
+		"applyButton",
+		"viewBackupButton",
+		"backupButton",
+		"restoreButton",
+	}) do
+		SkinButtonField(engine, frame, key)
+	end
+end
+
 function DarkTheme:SkinAuxiliaryFrames(engine)
 	for _, frameInfo in ipairs({
 		{ "BetterFriendlistChangelogFrame", "popup" },
 		{ "BetterFriendlistExportFrame", "popup" },
 		{ "BetterFriendlistImportFrame", "popup" },
 		{ "BetterFriendlistFilterSortEditorFrame", "popup" },
-		{ "BetterFriendlistNoteCleanupWizard", "popup" },
-		{ "BetterFriendlistNoteBackupViewer", "popup" },
 		{ "BetterFriendlistRaidToolsFrame", "popup" },
 		{ "BetterSavedInstancesFrame", "popup" },
 		{ "BFL_GuildMemberInfoPanel", "popup" },
 	}) do
 		SkinFrameByName(engine, frameInfo[1], frameInfo[2])
 	end
+	self:SkinNoteCleanupFrame(engine, _G.BetterFriendlistNoteCleanupWizard)
+	self:SkinNoteCleanupFrame(engine, _G.BetterFriendlistNoteBackupViewer)
 	self:SkinHelpFrame(engine)
 end
 
 function DarkTheme:SkinCreatedFrame(frame)
 	local engine = GetEngine()
 	if not engine or not engine:IsActive() or not frame then
+		return
+	end
+
+	local frameName = GetFrameName(frame)
+	if frameName == "BetterFriendlistNoteCleanupWizard" or frameName == "BetterFriendlistNoteBackupViewer" then
+		self:SkinNoteCleanupFrame(engine, frame)
 		return
 	end
 
@@ -962,6 +1099,61 @@ function DarkTheme:WrapModuleMethod(moduleName, methodName, after)
 		end
 		return r1, r2, r3, r4
 	end
+end
+
+function DarkTheme:InstallNoteCleanupWizardHooks()
+	local wizard = BFL.NoteCleanupWizard
+	if not wizard or wizard.BFL_DarkHooksInstalled then
+		return
+	end
+
+	wizard.BFL_DarkHooksInstalled = true
+
+	local function Wrap(methodName, after)
+		local original = wizard[methodName]
+		if type(original) ~= "function" then
+			return
+		end
+
+		wizard[methodName] = function(wizardSelf, ...)
+			local r1, r2, r3, r4 = original(wizardSelf, ...)
+			if BFL:IsThemeActive("dark") then
+				SafeCall(after, r1, r2, r3, r4)
+			end
+			return r1, r2, r3, r4
+		end
+	end
+
+	Wrap("CreateWizardFrame", function(frame)
+		local engine = GetEngine()
+		self:SkinNoteCleanupFrame(engine, frame or _G.BetterFriendlistNoteCleanupWizard)
+	end)
+	Wrap("CreateBackupViewerFrame", function(frame)
+		local engine = GetEngine()
+		self:SkinNoteCleanupFrame(engine, frame or _G.BetterFriendlistNoteBackupViewer)
+	end)
+	Wrap("RefreshRows", function()
+		local engine = GetEngine()
+		local frame = _G.BetterFriendlistNoteCleanupWizard
+		if engine and engine:IsActive() and frame then
+			SkinNoteCleanupRows(engine, frame.rowFrames)
+		end
+	end)
+	Wrap("RefreshBackupRows", function()
+		local engine = GetEngine()
+		local frame = _G.BetterFriendlistNoteBackupViewer
+		if engine and engine:IsActive() and frame then
+			SkinNoteCleanupRows(engine, frame.rowFrames)
+		end
+	end)
+	Wrap("Show", function()
+		local engine = GetEngine()
+		self:SkinNoteCleanupFrame(engine, _G.BetterFriendlistNoteCleanupWizard)
+	end)
+	Wrap("ShowBackupViewer", function()
+		local engine = GetEngine()
+		self:SkinNoteCleanupFrame(engine, _G.BetterFriendlistNoteBackupViewer)
+	end)
 end
 
 function DarkTheme:InstallSettingsComponentHooks()
@@ -1013,12 +1205,14 @@ end
 function DarkTheme:InstallHooks()
 	if self.hooksInstalled then
 		self:InstallSettingsComponentHooks()
+		self:InstallNoteCleanupWizardHooks()
 		self:InstallGlobalTabHooks()
 		return
 	end
 	self.hooksInstalled = true
 
 	self:InstallSettingsComponentHooks()
+	self:InstallNoteCleanupWizardHooks()
 	self:InstallGlobalTabHooks()
 
 	if not self.portraitVisibilityHooked and hooksecurefunc and type(BFL.UpdatePortraitVisibility) == "function" then

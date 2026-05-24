@@ -368,7 +368,7 @@ local function SetButtonIconColor(button, color)
 	}
 	for _, overlay in ipairs(overlays) do
 		if overlay and overlay.SetVertexColor then
-			overlay:SetVertexColor(UnpackColor(color))
+			SkinEngine:SetTextureVertexColor(button, overlay, UnpackColor(color))
 		end
 	end
 end
@@ -386,7 +386,7 @@ local function SetButtonIconBlendMode(button, blendMode)
 	}
 	for _, overlay in ipairs(overlays) do
 		if overlay and overlay.SetBlendMode then
-			overlay:SetBlendMode(blendMode or "BLEND")
+			SkinEngine:SetTextureBlendMode(button, overlay, blendMode or "BLEND")
 		end
 	end
 end
@@ -398,7 +398,7 @@ local function SetButtonHoverIcon(button, alpha, color)
 	end
 
 	if color and hoverIcon.SetVertexColor then
-		hoverIcon:SetVertexColor(UnpackColor(color))
+		SkinEngine:SetTextureVertexColor(button, hoverIcon, UnpackColor(color))
 	end
 	if hoverIcon.SetAlpha then
 		SkinEngine:SetTextureAlpha(button, hoverIcon, alpha or 0)
@@ -504,7 +504,12 @@ function SkinEngine:GetState(frame)
 	if not state then
 		state = {
 			textureAlpha = {},
+			textureVertexColors = {},
+			textureBlendModes = {},
 			fontColors = {},
+			fontJustify = {},
+			regionPoints = {},
+			regionSizes = {},
 			shown = {},
 			backdrops = {},
 			overlays = {},
@@ -512,7 +517,12 @@ function SkinEngine:GetState(frame)
 		frame.BFL_DarkSkin = state
 	else
 		state.textureAlpha = state.textureAlpha or {}
+		state.textureVertexColors = state.textureVertexColors or {}
+		state.textureBlendModes = state.textureBlendModes or {}
 		state.fontColors = state.fontColors or {}
+		state.fontJustify = state.fontJustify or {}
+		state.regionPoints = state.regionPoints or {}
+		state.regionSizes = state.regionSizes or {}
 		state.shown = state.shown or {}
 		state.backdrops = state.backdrops or {}
 		state.overlays = state.overlays or {}
@@ -614,6 +624,109 @@ function SkinEngine:SetTextureAlpha(frame, texture, alpha)
 	texture:SetAlpha(alpha)
 end
 
+function SkinEngine:RememberTextureVertexColor(frame, texture)
+	if not texture or not texture.SetVertexColor then
+		return
+	end
+
+	local state = self:GetState(frame)
+	if state and not state.textureVertexColors[texture] then
+		local r, g, b, a = 1, 1, 1, 1
+		if texture.GetVertexColor then
+			r, g, b, a = texture:GetVertexColor()
+		end
+		state.textureVertexColors[texture] = { r or 1, g or 1, b or 1, a or 1 }
+	end
+end
+
+function SkinEngine:SetTextureVertexColor(frame, texture, r, g, b, a)
+	if not texture or not texture.SetVertexColor then
+		return
+	end
+
+	self:RememberTextureVertexColor(frame, texture)
+	texture:SetVertexColor(r or 1, g or 1, b or 1, a or 1)
+end
+
+function SkinEngine:RememberTextureBlendMode(frame, texture)
+	if not texture or not texture.SetBlendMode then
+		return
+	end
+
+	local state = self:GetState(frame)
+	if state and not state.textureBlendModes[texture] then
+		local blendMode = "BLEND"
+		if texture.GetBlendMode then
+			blendMode = texture:GetBlendMode() or blendMode
+		end
+		state.textureBlendModes[texture] = blendMode
+	end
+end
+
+function SkinEngine:SetTextureBlendMode(frame, texture, blendMode)
+	if not texture or not texture.SetBlendMode then
+		return
+	end
+
+	self:RememberTextureBlendMode(frame, texture)
+	texture:SetBlendMode(blendMode or "BLEND")
+end
+
+function SkinEngine:RememberRegionPoints(frame, region)
+	if not region or not region.GetNumPoints or not region.GetPoint then
+		return
+	end
+
+	local state = self:GetState(frame)
+	if not state or state.regionPoints[region] then
+		return
+	end
+
+	state.regionPoints[region] = {}
+	for i = 1, region:GetNumPoints() do
+		state.regionPoints[region][i] = { region:GetPoint(i) }
+	end
+end
+
+function SkinEngine:SetRegionPoints(frame, region, points)
+	if not region or not region.ClearAllPoints or not region.SetPoint then
+		return
+	end
+
+	self:RememberRegionPoints(frame, region)
+	region:ClearAllPoints()
+	for _, point in ipairs(points or {}) do
+		ApplyStoredPoint(region, point)
+	end
+end
+
+function SkinEngine:RememberRegionSize(frame, region)
+	if not region or not region.GetSize then
+		return
+	end
+
+	local state = self:GetState(frame)
+	if state and not state.regionSizes[region] then
+		local width, height = region:GetSize()
+		state.regionSizes[region] = { width, height }
+	end
+end
+
+function SkinEngine:SetRegionSize(frame, region, width, height)
+	if not region then
+		return
+	end
+
+	self:RememberRegionSize(frame, region)
+	if width and height and region.SetSize then
+		region:SetSize(width, height)
+	elseif width and region.SetWidth then
+		region:SetWidth(width)
+	elseif height and region.SetHeight then
+		region:SetHeight(height)
+	end
+end
+
 function SkinEngine:RememberShown(frame, object)
 	if not object or not object.IsShown then
 		return
@@ -684,6 +797,34 @@ function SkinEngine:SetFontColor(frame, fontString, r, g, b, a)
 	end
 	self:RememberFontColor(frame, fontString)
 	fontString:SetTextColor(r, g, b, a or 1)
+end
+
+function SkinEngine:RememberFontJustify(frame, fontString)
+	if not fontString or (not fontString.GetJustifyH and not fontString.GetJustifyV) then
+		return
+	end
+
+	local state = self:GetState(frame)
+	if state and not state.fontJustify[fontString] then
+		state.fontJustify[fontString] = {
+			fontString.GetJustifyH and fontString:GetJustifyH() or nil,
+			fontString.GetJustifyV and fontString:GetJustifyV() or nil,
+		}
+	end
+end
+
+function SkinEngine:SetFontJustify(frame, fontString, justifyH, justifyV)
+	if not fontString then
+		return
+	end
+
+	self:RememberFontJustify(frame, fontString)
+	if justifyH and fontString.SetJustifyH then
+		fontString:SetJustifyH(justifyH)
+	end
+	if justifyV and fontString.SetJustifyV then
+		fontString:SetJustifyV(justifyV)
+	end
 end
 
 function SkinEngine:CreateBackdrop(frame, variant, insets)
@@ -1237,15 +1378,16 @@ function SkinEngine:SkinIconButton(button, iconPath, opts)
 		icon:SetTexture(iconPath)
 	end
 	if icon.ClearAllPoints then
-		icon:ClearAllPoints()
-		icon:SetPoint("CENTER", button, "CENTER", opts.x or 0, opts.y or 0)
+		self:SetRegionPoints(button, icon, {
+			{ "CENTER", button, "CENTER", opts.x or 0, opts.y or 0 },
+		})
 	end
 	if icon.SetSize then
 		local size = opts.size or 14
-		icon:SetSize(size, size)
+		self:SetRegionSize(button, icon, size, size)
 	end
 	if icon.SetVertexColor then
-		icon:SetVertexColor(UnpackColor(button.BFL_DarkIconColor))
+		self:SetTextureVertexColor(button, icon, UnpackColor(button.BFL_DarkIconColor))
 	end
 	self:SetTextureAlpha(button, icon, opts.alpha or 1)
 	icon:Show()
@@ -1271,17 +1413,18 @@ function SkinEngine:SkinIconButton(button, iconPath, opts)
 			hoverIcon:SetTexture(icon:GetTexture())
 		end
 		if hoverIcon.ClearAllPoints then
-			hoverIcon:ClearAllPoints()
-			hoverIcon:SetPoint("CENTER", icon, "CENTER", 0, 0)
+			self:SetRegionPoints(button, hoverIcon, {
+				{ "CENTER", icon, "CENTER", 0, 0 },
+			})
 		end
 		if hoverIcon.SetSize and icon.GetSize then
-			hoverIcon:SetSize(icon:GetSize())
+			self:SetRegionSize(button, hoverIcon, icon:GetSize())
 		end
 		if hoverIcon.SetTexCoord and icon.GetTexCoord then
 			hoverIcon:SetTexCoord(icon:GetTexCoord())
 		end
 		if hoverIcon.SetBlendMode then
-			hoverIcon:SetBlendMode("ADD")
+			self:SetTextureBlendMode(button, hoverIcon, "ADD")
 		end
 		if hoverIcon.SetAlpha then
 			self:SetTextureAlpha(button, hoverIcon, 0)
@@ -1470,11 +1613,24 @@ function SkinEngine:CenterTabText(tab)
 		end
 	end
 
+	local state = self:GetState(tab)
+	if state and not state.tabUseTextCenterStored then
+		state.tabUseTextCenterStored = true
+		state.tabUseTextCenter = tab.BFL_UseTextCenter
+	end
+	if state and not state.regionPoints[fs] then
+		if tab.BFL_OriginalTextPoints and tab.BFL_OriginalTextPoints[1] then
+			state.regionPoints[fs] = { { unpack(tab.BFL_OriginalTextPoints) } }
+		else
+			self:RememberRegionPoints(tab, fs)
+		end
+	end
+
 	tab.BFL_UseTextCenter = true
-	fs:ClearAllPoints()
-	fs:SetPoint("CENTER", tab, "CENTER", 0, 0)
-	fs:SetJustifyH("CENTER")
-	fs:SetJustifyV("MIDDLE")
+	self:SetRegionPoints(tab, fs, {
+		{ "CENTER", tab, "CENTER", 0, 0 },
+	})
+	self:SetFontJustify(tab, fs, "CENTER", "MIDDLE")
 end
 
 function SkinEngine:RefreshRelatedTabs(tab)
@@ -1673,9 +1829,9 @@ function SkinEngine:SkinArrowButton(button, direction)
 
 	if icon then
 		icon:SetTexture(ICONS[button.BFL_DarkArrowDirection] or ICONS.down)
-		icon:SetSize(10, 10)
-		icon:SetVertexColor(UnpackColor(COLORS.gold))
-		icon:SetAlpha(1)
+		self:SetRegionSize(button, icon, 10, 10)
+		self:SetTextureVertexColor(button, icon, UnpackColor(COLORS.gold))
+		self:SetTextureAlpha(button, icon, 1)
 		self:PositionArrowButtonIcon(button)
 	end
 	self:InstallArrowButtonHooks(button)
@@ -1728,19 +1884,21 @@ function SkinEngine:SkinCompactCheckButton(checkButton)
 
 	local checkedTexture = checkButton.GetCheckedTexture and checkButton:GetCheckedTexture()
 	if checkedTexture then
-		checkedTexture:ClearAllPoints()
-		checkedTexture:SetPoint("CENTER", marker or checkButton, "CENTER", 0, 0)
-		checkedTexture:SetSize(16, 16)
-		checkedTexture:SetVertexColor(UnpackColor(COLORS.gold))
+		self:SetRegionPoints(checkButton, checkedTexture, {
+			{ "CENTER", marker or checkButton, "CENTER", 0, 0 },
+		})
+		self:SetRegionSize(checkButton, checkedTexture, 16, 16)
+		self:SetTextureVertexColor(checkButton, checkedTexture, UnpackColor(COLORS.gold))
 		self:SetTextureAlpha(checkButton, checkedTexture, 1)
 	end
 
 	local disabledCheckedTexture = checkButton.GetDisabledCheckedTexture and checkButton:GetDisabledCheckedTexture()
 	if disabledCheckedTexture then
-		disabledCheckedTexture:ClearAllPoints()
-		disabledCheckedTexture:SetPoint("CENTER", marker or checkButton, "CENTER", 0, 0)
-		disabledCheckedTexture:SetSize(16, 16)
-		disabledCheckedTexture:SetVertexColor(UnpackColor(COLORS.disabledText))
+		self:SetRegionPoints(checkButton, disabledCheckedTexture, {
+			{ "CENTER", marker or checkButton, "CENTER", 0, 0 },
+		})
+		self:SetRegionSize(checkButton, disabledCheckedTexture, 16, 16)
+		self:SetTextureVertexColor(checkButton, disabledCheckedTexture, UnpackColor(COLORS.disabledText))
 		self:SetTextureAlpha(checkButton, disabledCheckedTexture, 0.85)
 	end
 
@@ -1823,9 +1981,7 @@ function SkinEngine:SkinEditBox(editBox)
 		"Backdrop",
 	})
 
-	if editBox.SetTextColor then
-		editBox:SetTextColor(0.92, 0.92, 0.92, 1)
-	end
+	self:SetFontColor(editBox, editBox, 0.92, 0.92, 0.92, 1)
 
 	local clearButton = editBox.clearButton or editBox.ClearButton
 	if clearButton then
@@ -2179,10 +2335,7 @@ function SkinEngine:SkinScrollTextureThumb(scrollBar, thumb)
 		return
 	end
 
-	if thumb.SetAlpha then
-		self:RememberTextureAlpha(scrollBar, thumb)
-		thumb:SetAlpha(0)
-	end
+	self:SetTextureAlpha(scrollBar, thumb, 0)
 
 	local marker = scrollBar.BFL_DarkScrollThumb
 	if not marker and CreateFrame then
@@ -2823,7 +2976,12 @@ function SkinEngine:RestoreFrame(frame)
 		return
 	end
 	state.textureAlpha = state.textureAlpha or {}
+	state.textureVertexColors = state.textureVertexColors or {}
+	state.textureBlendModes = state.textureBlendModes or {}
 	state.fontColors = state.fontColors or {}
+	state.fontJustify = state.fontJustify or {}
+	state.regionPoints = state.regionPoints or {}
+	state.regionSizes = state.regionSizes or {}
 	state.shown = state.shown or {}
 	state.overlays = state.overlays or {}
 
@@ -2857,17 +3015,42 @@ function SkinEngine:RestoreFrame(frame)
 		state.size = nil
 	end
 
+	local restoredRegionPoints = {}
+	for region, points in pairs(state.regionPoints) do
+		if region and region.ClearAllPoints and region.SetPoint then
+			region:ClearAllPoints()
+			for _, point in ipairs(points) do
+				ApplyStoredPoint(region, point)
+			end
+			restoredRegionPoints[region] = true
+		end
+	end
+	wipe(state.regionPoints)
+
+	for region, size in pairs(state.regionSizes) do
+		if region and region.SetSize and size[1] and size[2] then
+			region:SetSize(size[1], size[2])
+		end
+	end
+	wipe(state.regionSizes)
+
 	if frame.BFL_DarkTabButton then
 		local fs = frame.Text or (frame.GetFontString and frame:GetFontString())
 		local originalPoints = frame.BFL_DarkOriginalTextPoints
-		if fs and originalPoints and originalPoints[1] then
+		if fs and originalPoints and originalPoints[1] and not restoredRegionPoints[fs] then
 			fs:ClearAllPoints()
 			fs:SetPoint(unpack(originalPoints))
 		end
 		frame.BFL_DarkTabButton = nil
 		frame.BFL_DarkTabSelected = nil
 		frame.BFL_DarkOriginalTextPoints = nil
-		frame.BFL_UseTextCenter = false
+		if state.tabUseTextCenterStored then
+			frame.BFL_UseTextCenter = state.tabUseTextCenter
+			state.tabUseTextCenterStored = nil
+			state.tabUseTextCenter = nil
+		else
+			frame.BFL_UseTextCenter = false
+		end
 	end
 
 	if state.overlays then
@@ -2884,6 +3067,20 @@ function SkinEngine:RestoreFrame(frame)
 		end
 	end
 	wipe(state.textureAlpha)
+
+	for texture, color in pairs(state.textureVertexColors) do
+		if texture and texture.SetVertexColor then
+			texture:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
+		end
+	end
+	wipe(state.textureVertexColors)
+
+	for texture, blendMode in pairs(state.textureBlendModes) do
+		if texture and texture.SetBlendMode then
+			texture:SetBlendMode(blendMode or "BLEND")
+		end
+	end
+	wipe(state.textureBlendModes)
 
 	if state.shown then
 		for object, shown in pairs(state.shown) do
@@ -2906,6 +3103,18 @@ function SkinEngine:RestoreFrame(frame)
 		end
 	end
 	wipe(state.fontColors)
+
+	for fontString, justify in pairs(state.fontJustify) do
+		if fontString then
+			if justify[1] and fontString.SetJustifyH then
+				fontString:SetJustifyH(justify[1])
+			end
+			if justify[2] and fontString.SetJustifyV then
+				fontString:SetJustifyV(justify[2])
+			end
+		end
+	end
+	wipe(state.fontJustify)
 
 	if frame.bflDarkSkinned ~= nil then
 		frame.bflDarkSkinned = nil
@@ -2934,6 +3143,11 @@ function SkinEngine:RestoreFrame(frame)
 	frame.BFL_DarkWideScrollbar = nil
 	frame.BFL_DarkCompactCheckButton = nil
 	frame.BFL_DarkNoCheckChrome = nil
+	frame.BFL_DarkCheckButtonInsets = nil
+	frame.BFL_DarkCheckButtonNormalAlpha = nil
+	frame.BFL_DarkCheckButtonPushedAlpha = nil
+	frame.BFL_DarkCheckButtonDisabledAlpha = nil
+	frame.BFL_DarkCheckButtonHighlightAlpha = nil
 end
 
 function SkinEngine:RestoreAll()

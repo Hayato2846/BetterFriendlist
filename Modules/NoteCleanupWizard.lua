@@ -590,6 +590,7 @@ function NoteCleanupWizard:CreateWizardFrame()
 	descText:SetJustifyH("LEFT")
 	descText:SetWordWrap(true)
 	descText:SetText(L.WIZARD_DESC)
+	frame.descText = descText
 
 	-- ========================================
 	-- Top Bar: Search + Buttons
@@ -598,12 +599,14 @@ function NoteCleanupWizard:CreateWizardFrame()
 	topBar:SetHeight(30)
 	topBar:SetPoint("TOPLEFT", frame.Inset or frame, "TOPLEFT", 8, -8)
 	topBar:SetPoint("TOPRIGHT", frame.Inset or frame, "TOPRIGHT", -8, -8)
+	frame.topBar = topBar
 
 	-- Search box
 	local searchBox = CreateFrame("EditBox", nil, topBar, "SearchBoxTemplate")
 	searchBox:SetSize(200, 22)
 	searchBox:SetPoint("LEFT", topBar, "LEFT", 4, 0)
 	searchBox:SetAutoFocus(false)
+	frame.searchBox = searchBox
 
 	if searchBox.Instructions then
 		searchBox.Instructions:SetText(L.WIZARD_SEARCH_PLACEHOLDER)
@@ -622,6 +625,7 @@ function NoteCleanupWizard:CreateWizardFrame()
 	backupBtn:SetSize(140, 24)
 	backupBtn:SetText(L.WIZARD_BACKUP_BTN)
 	backupBtn:SetPoint("RIGHT", topBar, "RIGHT", 0, 0)
+	frame.backupButton = backupBtn
 	if backupBtn.SetNormalFontObject then
 		backupBtn:SetNormalFontObject("BetterFriendlistFontNormal")
 	end
@@ -652,6 +656,7 @@ function NoteCleanupWizard:CreateWizardFrame()
 	viewBackupBtn:SetSize(140, 24)
 	viewBackupBtn:SetText(L.WIZARD_VIEW_BACKUP_BTN)
 	viewBackupBtn:SetPoint("RIGHT", backupBtn, "LEFT", -8, 0)
+	frame.viewBackupButton = viewBackupBtn
 	if viewBackupBtn.SetNormalFontObject then
 		viewBackupBtn:SetNormalFontObject("BetterFriendlistFontNormal")
 	end
@@ -675,6 +680,7 @@ function NoteCleanupWizard:CreateWizardFrame()
 	applyBtn:SetSize(140, 24)
 	applyBtn:SetText(L.WIZARD_APPLY_BTN)
 	applyBtn:SetPoint("RIGHT", viewBackupBtn, "LEFT", -8, 0)
+	frame.applyButton = applyBtn
 	if applyBtn.SetNormalFontObject then
 		applyBtn:SetNormalFontObject("BetterFriendlistFontNormal")
 	end
@@ -713,6 +719,7 @@ function NoteCleanupWizard:CreateWizardFrame()
 	headerBar:SetHeight(HEADER_HEIGHT)
 	headerBar:SetPoint("TOPLEFT", topBar, "BOTTOMLEFT", 0, -4)
 	headerBar:SetPoint("TOPRIGHT", topBar, "BOTTOMRIGHT", 0, -4)
+	frame.headerBar = headerBar
 
 	headerBar.bg = headerBar:CreateTexture(nil, "BACKGROUND")
 	headerBar.bg:SetAllPoints()
@@ -743,6 +750,7 @@ function NoteCleanupWizard:CreateWizardFrame()
 	h4:SetPoint("LEFT", headerBar, "LEFT", STATUS_COL_WIDTH + colW1 + colW2 + colW3 + COLUMN_PADDING, 0)
 	h4:SetText(L.WIZARD_COL_CLEANED)
 	h4:SetJustifyH("LEFT")
+	frame.headerLabels = { h1, h2, h3, h4 }
 
 	-- ========================================
 	-- Scroll Frame for the table
@@ -758,6 +766,7 @@ function NoteCleanupWizard:CreateWizardFrame()
 
 	frame.scrollChild = scrollChild
 	frame.scrollFrame = scrollFrame
+	frame.rowFrames = rowFrames
 
 	-- Update scrollChild width when frame resizes
 	scrollFrame:SetScript("OnSizeChanged", function(self, width, height)
@@ -772,6 +781,7 @@ function NoteCleanupWizard:CreateWizardFrame()
 	bottomBar:SetHeight(28)
 	bottomBar:SetPoint("BOTTOMLEFT", frame.Inset or frame, "BOTTOMLEFT", 8, 4)
 	bottomBar:SetPoint("BOTTOMRIGHT", frame.Inset or frame, "BOTTOMRIGHT", -8, 4)
+	frame.bottomBar = bottomBar
 
 	local countLabel = bottomBar:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 	countLabel:SetPoint("LEFT", bottomBar, "LEFT", 4, 0)
@@ -1253,6 +1263,7 @@ function NoteCleanupWizard:CreateBackupViewerFrame()
 	descText:SetJustifyH("LEFT")
 	descText:SetWordWrap(true)
 	descText:SetText(L.WIZARD_BACKUP_VIEWER_DESC)
+	frame.descText = descText
 
 	-- ========================================
 	-- Top Bar: Search + Restore Button
@@ -1261,12 +1272,14 @@ function NoteCleanupWizard:CreateBackupViewerFrame()
 	topBar:SetHeight(30)
 	topBar:SetPoint("TOPLEFT", frame.Inset or frame, "TOPLEFT", 8, -8)
 	topBar:SetPoint("TOPRIGHT", frame.Inset or frame, "TOPRIGHT", -8, -8)
+	frame.topBar = topBar
 
 	-- Search box
 	local searchBox = CreateFrame("EditBox", nil, topBar, "SearchBoxTemplate")
 	searchBox:SetSize(200, 22)
 	searchBox:SetPoint("LEFT", topBar, "LEFT", 4, 0)
 	searchBox:SetAutoFocus(false)
+	frame.searchBox = searchBox
 
 	if searchBox.Instructions then
 		searchBox.Instructions:SetText(L.WIZARD_SEARCH_PLACEHOLDER)
@@ -1285,6 +1298,7 @@ function NoteCleanupWizard:CreateBackupViewerFrame()
 	backupBtn:SetSize(140, 24)
 	backupBtn:SetText(L.WIZARD_BACKUP_BTN)
 	backupBtn:SetPoint("RIGHT", topBar, "RIGHT", 0, 0)
+	frame.backupButton = backupBtn
 	if backupBtn.SetNormalFontObject then
 		backupBtn:SetNormalFontObject("BetterFriendlistFontNormal")
 	end
@@ -1323,6 +1337,7 @@ function NoteCleanupWizard:CreateBackupViewerFrame()
 	restoreBtn:SetSize(160, 24)
 	restoreBtn:SetText(L.WIZARD_RESTORE_BTN)
 	restoreBtn:SetPoint("RIGHT", backupBtn, "LEFT", -8, 0)
+	frame.restoreButton = restoreBtn
 	if restoreBtn.SetNormalFontObject then
 		restoreBtn:SetNormalFontObject("BetterFriendlistFontNormal")
 	end
@@ -1360,6 +1375,7 @@ function NoteCleanupWizard:CreateBackupViewerFrame()
 	headerBar:SetHeight(HEADER_HEIGHT)
 	headerBar:SetPoint("TOPLEFT", topBar, "BOTTOMLEFT", 0, -4)
 	headerBar:SetPoint("TOPRIGHT", topBar, "BOTTOMRIGHT", 0, -4)
+	frame.headerBar = headerBar
 
 	headerBar.bg = headerBar:CreateTexture(nil, "BACKGROUND")
 	headerBar.bg:SetAllPoints()
@@ -1390,6 +1406,7 @@ function NoteCleanupWizard:CreateBackupViewerFrame()
 	h4:SetPoint("LEFT", headerBar, "LEFT", STATUS_COL_WIDTH + colW1 + colW2 + colW3 + COLUMN_PADDING, 0)
 	h4:SetText(L.WIZARD_COL_CURRENT)
 	h4:SetJustifyH("LEFT")
+	frame.headerLabels = { h1, h2, h3, h4 }
 
 	-- ========================================
 	-- Scroll Frame
@@ -1405,6 +1422,7 @@ function NoteCleanupWizard:CreateBackupViewerFrame()
 
 	frame.scrollChild = scrollChild
 	frame.scrollFrame = scrollFrame
+	frame.rowFrames = backupRowFrames
 
 	scrollFrame:SetScript("OnSizeChanged", function(self, width, height)
 		scrollChild:SetWidth(width)
@@ -1418,6 +1436,7 @@ function NoteCleanupWizard:CreateBackupViewerFrame()
 	bottomBar:SetHeight(28)
 	bottomBar:SetPoint("BOTTOMLEFT", frame.Inset or frame, "BOTTOMLEFT", 8, 4)
 	bottomBar:SetPoint("BOTTOMRIGHT", frame.Inset or frame, "BOTTOMRIGHT", -8, 4)
+	frame.bottomBar = bottomBar
 
 	local countLabel = bottomBar:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
 	countLabel:SetPoint("LEFT", bottomBar, "LEFT", 4, 0)

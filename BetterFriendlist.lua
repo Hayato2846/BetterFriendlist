@@ -181,6 +181,110 @@ if not BFL.IsClassic and PanelTemplates_TabResize and not issecretvalue then
 	end)
 end
 
+local TAB_FONT_NORMAL = "BetterFriendlistTabFontNormal"
+local TAB_FONT_HIGHLIGHT = "BetterFriendlistTabFontHighlight"
+local TAB_FONT_DISABLED = "BetterFriendlistTabFontDisable"
+
+local function GetColorRGBA(color, fallbackR, fallbackG, fallbackB, fallbackA)
+	if color then
+		if color.GetRGBA then
+			return color:GetRGBA()
+		elseif color.GetRGB then
+			local r, g, b = color:GetRGB()
+			return r, g, b, color.a or fallbackA or 1
+		end
+
+		return color.r or fallbackR, color.g or fallbackG, color.b or fallbackB, color.a or fallbackA or 1
+	end
+
+	return fallbackR, fallbackG, fallbackB, fallbackA or 1
+end
+
+local function ApplyTabFontObjects(tab)
+	if not tab or not tab.SetNormalFontObject then
+		return
+	end
+
+	tab:SetNormalFontObject(TAB_FONT_NORMAL)
+	tab:SetHighlightFontObject(TAB_FONT_HIGHLIGHT)
+	tab:SetDisabledFontObject(TAB_FONT_DISABLED)
+end
+
+local function ApplyTabFontStringState(tab, fontObject, color, fallbackR, fallbackG, fallbackB)
+	local fs = tab and (tab.Text or (tab.GetFontString and tab:GetFontString()))
+	if not fs then
+		return
+	end
+
+	if fs.SetFontObject then
+		fs:SetFontObject(fontObject)
+	end
+	if fs.SetTextColor then
+		fs:SetTextColor(GetColorRGBA(color, fallbackR, fallbackG, fallbackB, 1))
+	end
+end
+
+function BFL:ApplyTabVisualState(tab, selected, disabled)
+	if not tab then
+		return
+	end
+
+	if disabled then
+		if PanelTemplates_SetDisabledTabState then
+			PanelTemplates_SetDisabledTabState(tab)
+		end
+		ApplyTabFontObjects(tab)
+		ApplyTabFontStringState(tab, TAB_FONT_DISABLED, GRAY_FONT_COLOR, 0.5, 0.5, 0.5)
+	elseif selected then
+		if PanelTemplates_SelectTab then
+			PanelTemplates_SelectTab(tab)
+		end
+		ApplyTabFontObjects(tab)
+		if tab.SetDisabledFontObject then
+			tab:SetDisabledFontObject(TAB_FONT_HIGHLIGHT)
+		end
+		ApplyTabFontStringState(tab, TAB_FONT_HIGHLIGHT, HIGHLIGHT_FONT_COLOR, 1, 1, 1)
+	else
+		if PanelTemplates_DeselectTab then
+			PanelTemplates_DeselectTab(tab)
+		end
+		ApplyTabFontObjects(tab)
+		ApplyTabFontStringState(tab, TAB_FONT_NORMAL, NORMAL_FONT_COLOR, 1, 0.82, 0)
+	end
+end
+
+function BFL:RefreshTopTabVisualState(selectedTabId)
+	local frame = _G.BetterFriendsFrame
+	local header = frame and frame.FriendsTabHeader
+	if not header then
+		return
+	end
+
+	selectedTabId = selectedTabId or (PanelTemplates_GetSelectedTab and PanelTemplates_GetSelectedTab(header)) or header.selectedTab
+	for i = 1, header.numTabs or 4 do
+		local tab = _G["BetterFriendsFrameTab" .. i]
+		self:ApplyTabVisualState(tab, selectedTabId == i, tab and tab.isDisabled)
+	end
+end
+
+function BFL:RefreshBottomTabVisualState(selectedTabId)
+	local frame = _G.BetterFriendsFrame
+	if not frame then
+		return
+	end
+
+	selectedTabId = selectedTabId or (PanelTemplates_GetSelectedTab and PanelTemplates_GetSelectedTab(frame)) or frame.selectedTab
+	for i = 1, frame.numTabs or 4 do
+		local tab = _G["BetterFriendsFrameBottomTab" .. i]
+		self:ApplyTabVisualState(tab, selectedTabId == i, tab and tab.isDisabled)
+	end
+end
+
+function BFL:RefreshMainTabVisualState()
+	self:RefreshTopTabVisualState()
+	self:RefreshBottomTabVisualState()
+end
+
 function BFL:ApplyTabFonts()
 	local db = BetterFriendlistDB
 	if not db then
@@ -262,6 +366,7 @@ function BFL:ApplyTabFonts()
 				end
 			end
 		end
+		self:RefreshMainTabVisualState()
 		return
 	end
 
@@ -876,6 +981,7 @@ function BFL:ApplyTabFonts()
 		topTab1:ClearAllPoints()
 		topTab1:SetPoint("TOPLEFT", BetterFriendsFrame, "TOPLEFT", topStartX, topTabY)
 	end
+	self:RefreshMainTabVisualState()
 end
 
 -- Helper: Format last online time
@@ -3890,27 +3996,7 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 	end
 
 	-- FORCE FONT UPDATE: Ensure Custom Fonts win against ElvUI
-	for i = 1, 4 do
-		local tab = _G["BetterFriendsFrameTab" .. i]
-		if tab then
-			-- Ensure fonts are strictly enforcing BetterFriendlist style
-			-- Use Small font (10pt) to match Bottom Tabs (and standard Blizzard tabs)
-			tab:SetNormalFontObject("BetterFriendlistTabFontNormal")
-			tab:SetHighlightFontObject("BetterFriendlistTabFontHighlight")
-			tab:SetDisabledFontObject("BetterFriendlistTabFontDisable")
-
-			if i == tabIndex then
-				-- Re-enforce selection state visually just to be safe
-				PanelTemplates_SelectTab(tab)
-				local fs = tab:GetFontString()
-				if fs then
-					fs:SetFontObject("BetterFriendlistTabFontHighlight")
-				end
-			else
-				PanelTemplates_DeselectTab(tab)
-			end
-		end
-	end
+	BFL:RefreshTopTabVisualState(tabIndex)
 
 	-- Use hybrid helper functions for all child frames
 	HideChildFrame(frame.SortFrame)
@@ -5403,29 +5489,7 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex)
 	-- We do not manually hide it here to prevent race conditions (Scenario 1 fix)
 
 	-- FORCE FONT UPDATE: Ensure Custom Fonts win against ElvUI
-	for i = 1, 4 do
-		local tab = _G["BetterFriendsFrameBottomTab" .. i]
-		if tab then
-			-- Ensure fonts are strictly enforcing BetterFriendlist style
-			tab:SetNormalFontObject("BetterFriendlistTabFontNormal")
-			tab:SetHighlightFontObject("BetterFriendlistTabFontHighlight")
-			tab:SetDisabledFontObject("BetterFriendlistTabFontDisable")
-
-			if i == tabIndex then
-				-- Re-enforce selection state visually just to be safe
-				PanelTemplates_SelectTab(tab)
-				local fs = tab:GetFontString()
-				if fs then
-					fs:SetFontObject("BetterFriendlistTabFontHighlight")
-				end
-			elseif tab.isDisabled then
-				-- Fix #43: Respect disabled state (e.g., Story Mode raid tab)
-				PanelTemplates_SetDisabledTabState(tab)
-			else
-				PanelTemplates_DeselectTab(tab)
-			end
-		end
-	end
+	BFL:RefreshBottomTabVisualState(tabIndex)
 
 	-- Use hybrid helper functions
 	HideChildFrame(frame.ScrollFrame)

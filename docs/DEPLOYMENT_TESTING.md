@@ -58,6 +58,32 @@ Default target is Retail:
 Use `-Client all` when the change affects cross-flavor loading, TOC/XML structure,
 compatibility code, or release packaging.
 
+## CleanCopy Troubleshooting
+
+`BFL-Deploy.ps1` uses `robocopy` for `CleanCopy` mirrors. Keep robocopy retries bounded:
+the script passes `/R:1 /W:1` by default so access, permission, or lock failures surface
+within seconds. Do not remove those options; robocopy's default retry behavior can make a
+simple `Access denied` look like a long-running deploy.
+
+If a direct client deploy appears to hang after this line:
+
+```text
+Mirroring CleanCopy directly to existing client AddOn folder: C:\Program Files (x86)\World of Warcraft\_retail_\Interface\AddOns\BetterFriendlist
+```
+
+the first suspect is the client AddOn destination, not package generation. Common causes are:
+
+- Missing elevation for `C:\Program Files (x86)\World of Warcraft`.
+- WoW, WowUp, antivirus, VSCode, or another watcher holding files in `Interface\AddOns\BetterFriendlist`.
+- A previous timed-out PowerShell/robocopy deploy process still running.
+
+The useful diagnostic is the robocopy error line, for example
+`FEHLER 5 (0x00000005) Zugriff verweigert` or `Access denied`. When that happens, rerun the
+official deploy command with elevated permissions. If elevated deploy still fails, close WoW,
+WowUp, and other watchers for the target client, then retry. After any timeout, verify the
+client copy instead of assuming it succeeded; compare hashes for the changed runtime files or
+check the target `LastWriteTime`.
+
 ## Common Commands
 
 Deploy the current checkout to Retail:
