@@ -42,6 +42,13 @@ local function IsShown(frame)
 	return true
 end
 
+local function GetSelectedPanelTab(frame)
+	if not frame then
+		return nil
+	end
+	return (PanelTemplates_GetSelectedTab and PanelTemplates_GetSelectedTab(frame)) or frame.selectedTab
+end
+
 local function BuildSkinKey(...)
 	local key = ""
 	for i = 1, select("#", ...) do
@@ -360,6 +367,8 @@ function DarkTheme:Remove(reason)
 	self.applied = nil
 	self.mainTabsSkinPending = nil
 	self.visibleMainContentRefreshPending = nil
+	self.visibleMainContentRefreshBottomTab = nil
+	self.visibleMainContentRefreshTopTab = nil
 	engine:Deactivate()
 	self:ClearMainFrameSkinKeys()
 end
@@ -559,11 +568,64 @@ function DarkTheme:SkinVisibleMainContent(engine, frame)
 	end
 end
 
-function DarkTheme:RefreshVisibleMainContentDeferred()
+function DarkTheme:SkinMainContentForTabs(engine, frame, bottomTabIndex, topTabIndex)
+	frame = frame or _G.BetterFriendsFrame
+	if not engine or not engine:IsActive() or not frame then
+		return
+	end
+
+	bottomTabIndex = bottomTabIndex or GetSelectedPanelTab(frame) or 1
+
+	if bottomTabIndex == 1 then
+		topTabIndex = topTabIndex or GetSelectedPanelTab(frame.FriendsTabHeader) or 1
+		if BFL.IsClassic and topTabIndex == 2 then
+			self:SkinWhoFrame(engine)
+		elseif BFL.IsClassic and topTabIndex == 4 then
+			self:SkinRaidFrame(engine)
+		elseif BFL.IsClassic or topTabIndex == 1 then
+			self:SkinFriendsListRows(engine)
+		elseif topTabIndex == 2 then
+			self:SkinRecentAlliesFrame(engine)
+		elseif topTabIndex == 3 then
+			self:SkinRAFFrame(engine)
+		elseif topTabIndex == 4 then
+			self:SkinGuildFrame(engine)
+		else
+			self:SkinVisibleMainContent(engine, frame)
+		end
+	elseif bottomTabIndex == 2 then
+		self:SkinWhoFrame(engine)
+	elseif bottomTabIndex == 3 then
+		if BFL.IsClassic then
+			self:SkinGuildFrame(engine)
+		else
+			self:SkinRaidFrame(engine)
+		end
+	elseif bottomTabIndex == 4 then
+		if BFL.IsClassic then
+			self:SkinRaidFrame(engine)
+		else
+			self:SkinQuickJoin(engine)
+		end
+	else
+		self:SkinVisibleMainContent(engine, frame)
+	end
+end
+
+function DarkTheme:RefreshVisibleMainContentDeferred(bottomTabIndex, topTabIndex)
 	local engine = GetEngine()
 	if not engine or not engine:IsActive() then
 		self.visibleMainContentRefreshPending = nil
+		self.visibleMainContentRefreshBottomTab = nil
+		self.visibleMainContentRefreshTopTab = nil
 		return
+	end
+
+	if bottomTabIndex then
+		self.visibleMainContentRefreshBottomTab = bottomTabIndex
+	end
+	if topTabIndex then
+		self.visibleMainContentRefreshTopTab = topTabIndex
 	end
 
 	if self.visibleMainContentRefreshPending then
@@ -573,11 +635,14 @@ function DarkTheme:RefreshVisibleMainContentDeferred()
 
 	local function FlushVisibleMainContent()
 		self.visibleMainContentRefreshPending = nil
+		local pendingBottomTab = self.visibleMainContentRefreshBottomTab
+		local pendingTopTab = self.visibleMainContentRefreshTopTab
+		self.visibleMainContentRefreshBottomTab = nil
+		self.visibleMainContentRefreshTopTab = nil
 		local delayedEngine = GetEngine()
 		local frame = _G.BetterFriendsFrame
 		if delayedEngine and delayedEngine:IsActive() and frame then
-			self:RefreshMainFrameControls(delayedEngine, frame)
-			self:SkinVisibleMainContent(delayedEngine, frame)
+			self:SkinMainContentForTabs(delayedEngine, frame, pendingBottomTab, pendingTopTab)
 		end
 	end
 
@@ -1879,15 +1944,15 @@ function DarkTheme:InstallGlobalTabHooks()
 
 	if not self.bottomTabHooked and type(_G.BetterFriendsFrame_ShowBottomTab) == "function" then
 		self.bottomTabHooked = true
-		hooksecurefunc("BetterFriendsFrame_ShowBottomTab", function()
-			DarkTheme:RefreshVisibleMainContentDeferred()
+		hooksecurefunc("BetterFriendsFrame_ShowBottomTab", function(tabIndex)
+			DarkTheme:RefreshVisibleMainContentDeferred(tabIndex)
 		end)
 	end
 
 	if not self.topTabHooked and type(_G.BetterFriendsFrame_ShowTab) == "function" then
 		self.topTabHooked = true
-		hooksecurefunc("BetterFriendsFrame_ShowTab", function()
-			DarkTheme:RefreshVisibleMainContentDeferred()
+		hooksecurefunc("BetterFriendsFrame_ShowTab", function(tabIndex)
+			DarkTheme:RefreshVisibleMainContentDeferred(1, tabIndex)
 		end)
 	end
 

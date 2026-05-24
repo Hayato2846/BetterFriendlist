@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dark Theme Performance** - Reduced repeated scrollbar, tab, row, and button state work during list, WHO, and Quick Join updates.
 - **Dark Theme Performance** - Reduced repeated Friendlist row and tab refresh work during stress-test navigation.
 - **Dark Theme Performance** - Avoided redundant row refresh passes when visible Friendlist rows were already updated.
+- **Dark Theme Performance** - Narrowed deferred tab refreshes to the active content pane and coalesced Broker count updates during event bursts.
 
 ### Fixed
 - **QuickFilter & Sorter Builder** - Updated the docked editor to use the same modern frame styling as the Settings and Raid Help windows.
@@ -51,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dark Theme Quick Join Tab** - Removed the extra outer inset frame, added breathing room below the title buttons, and aligned the scrollbar and request button with the Contacts tab layout.
 - **Dark Theme Raid Help** - Cleaned up Raid Roster Help inset chrome and aligned its scrollbar with other tab lists.
 - **Dark Theme Settings** - Fixed settings scrollbar stepper icons after tab switches and aligned Font Settings dropdowns, sliders, and color controls.
+- **Dark Theme Hover States** - Fixed hover highlights that could stick on buttons, settings navigation, and Friendlist rows.
 - **Dark Theme Advanced Dialogs** - Skinned the FriendGroups migration dialog, Note Cleanup Wizard, and Note Backup Viewer consistently with the Dark theme.
 - **Theme Settings** - Fixed an error when disabling Beta Features from the settings window.
 - **Recruit A Friend Rewards** - Prevented viewing rewards from breaking reward tabs or causing a protected Copy Link error in the recruitment dialog.

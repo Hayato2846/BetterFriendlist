@@ -1330,6 +1330,10 @@ function SkinEngine:ApplyButtonState(button, interactionState)
 	if button.BFL_DarkTabButton then
 		button.BFL_DarkTabSelected = selectedTab
 	end
+	local selectedNav = button.BFL_DarkButtonVariant == "nav"
+		and button.selectedTex
+		and button.selectedTex.IsShown
+		and button.selectedTex:IsShown()
 
 	local enabled = IsControlEnabled(button)
 	if button.BFL_DarkTabButton then
@@ -1340,6 +1344,7 @@ function SkinEngine:ApplyButtonState(button, interactionState)
 		or button.BFL_DarkTravelPassButton and "travel"
 		or button.BFL_DarkArrowButton and "arrow"
 		or button.BFL_DarkTabButton and "tab"
+		or (button.BFL_DarkButtonVariant == "nav" and "nav")
 		or "button"
 	local stateKey = stateKind
 		.. ":"
@@ -1348,6 +1353,8 @@ function SkinEngine:ApplyButtonState(button, interactionState)
 		.. (enabled and "1" or "0")
 		.. ":"
 		.. (selectedTab and "1" or "0")
+		.. ":"
+		.. (selectedNav and "1" or "0")
 		.. ":"
 		.. (button.BFL_DarkScrollStepper and "scroll" or "")
 	local arrowNeedsRefresh = button.BFL_DarkArrowButton and not button.BFL_DarkArrowTexturesHidden
@@ -1389,8 +1396,7 @@ function SkinEngine:ApplyButtonState(button, interactionState)
 		self:RefreshArrowButton(button)
 	end
 
-	local bg
-	local border
+	local bg, border = ResolveBackdropColors(button.BFL_DarkButtonVariant or "button")
 	if not enabled then
 		bg = COLORS.controlDisabled
 		border = COLORS.controlBorderDisabled
@@ -1404,6 +1410,17 @@ function SkinEngine:ApplyButtonState(button, interactionState)
 		else
 			bg = selectedTab and COLORS.tabHover or COLORS.tab
 			border = selectedTab and COLORS.accent or COLORS.borderMuted
+		end
+	elseif button.BFL_DarkButtonVariant == "nav" then
+		if interactionState == "down" then
+			bg = COLORS.controlDown
+			border = COLORS.accent
+		elseif interactionState == "hover" or selectedNav then
+			bg = COLORS.controlHover
+			border = COLORS.controlBorderHover
+		else
+			bg = COLORS.panelSoft
+			border = COLORS.borderMuted
 		end
 	elseif interactionState == "down" then
 		bg = COLORS.controlDown
@@ -1842,14 +1859,12 @@ function SkinEngine:SkinNavigationButton(button)
 
 	self:SkinButton(button, NAV_BUTTON_OPTS)
 
-	local selected = button.selectedTex and button.selectedTex.IsShown and button.selectedTex:IsShown()
-	local bg = selected and COLORS.controlHover or COLORS.panelSoft
-	local border = selected and COLORS.controlBorderHover or COLORS.borderMuted
-	self:StyleBackdrop(button, bg, border)
-
 	if button.selectedTex and button.selectedTex.SetAlpha then
 		self:SetTextureAlpha(button, button.selectedTex, 0)
 	end
+	local selected = button.selectedTex and button.selectedTex.IsShown and button.selectedTex:IsShown()
+	button.BFL_DarkButtonStateKey = nil
+	self:ApplyButtonState(button)
 
 	local indicator = button.BFL_DarkNavIndicator
 	if not indicator and button.CreateTexture then
@@ -3125,7 +3140,10 @@ function SkinEngine:SkinRow(row)
 
 	if not row.BFL_DarkRowSkinned then
 		row.BFL_DarkRowSkinned = true
-		self:CreateBackdrop(row, "row", ZERO_INSETS)
+		local backdrop = self:CreateBackdrop(row, "row", ZERO_INSETS)
+		if backdrop and backdrop.SetFrameLevel and row.GetFrameLevel then
+			backdrop:SetFrameLevel(row:GetFrameLevel() or 1)
+		end
 		self:InstallRowHooks(row)
 		if row.BFL_DarkRowOver == nil and MouseIsOver then
 			row.BFL_DarkRowOver = MouseIsOver(row) or nil
@@ -3228,13 +3246,16 @@ function SkinEngine:ApplyRowState(row, interactionState)
 	end
 
 	local bg = COLORS.row
+	local border = COLORS.borderNone
 	if row.BFL_DarkRowMouseDown then
 		bg = COLORS.rowDown
+		border = COLORS.accent
 	elseif interactionState == "hover" then
 		bg = COLORS.rowHover
+		border = COLORS.controlBorderHover
 	end
 
-	self:StyleBackdrop(row, bg, COLORS.borderNone)
+	self:StyleBackdrop(row, bg, border)
 end
 
 function SkinEngine:InstallRowHooks(row)
@@ -3270,6 +3291,7 @@ function SkinEngine:InstallRowHooks(row)
 	end)
 	row:HookScript("OnHide", function(self)
 		self.BFL_DarkRowMouseDown = nil
+		self.BFL_DarkRowOver = nil
 		if SkinEngine:IsActive() then
 			SkinEngine:ApplyRowState(self)
 		end
