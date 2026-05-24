@@ -38,13 +38,11 @@ function FontFix:Initialize()
 	end)
 
 	-- And if ElvUI updates media
-	if _G.ElvUI then
-		local E = unpack(_G.ElvUI)
-		if E and E.UpdateMedia then
-			hooksecurefunc(E, "UpdateMedia", function()
-				self:ApplyFixedFonts()
-			end)
-		end
+	local E = BFL.GetElvUIEngine and BFL:GetElvUIEngine(false)
+	if E and E.UpdateMedia then
+		hooksecurefunc(E, "UpdateMedia", function()
+			self:ApplyFixedFonts()
+		end)
 	end
 end
 

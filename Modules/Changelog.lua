@@ -60,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dark Theme Settings** - Fixed settings scrollbar stepper icons after tab switches and aligned Font Settings dropdowns, sliders, and color controls.
 - **Dark Theme Advanced Dialogs** - Skinned the FriendGroups migration dialog, Note Cleanup Wizard, and Note Backup Viewer consistently with the Dark theme.
 - **Theme Settings** - Fixed an error when disabling Beta Features from the settings window.
+- **ElvUI Skin** - Prevented startup errors when the ElvUI theme was still selected but ElvUI was disabled.
 - **Recruit A Friend Rewards** - Prevented viewing rewards from breaking reward tabs or causing a protected Copy Link error in the recruitment dialog.
 
 ## [2.5.9]        - 2026-05-17

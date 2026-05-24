@@ -174,25 +174,27 @@ end
 
 function ElvUISkin:Initialize()
 	-- Check if ElvUI is loaded immediately
-	if _G.ElvUI then
+	if BFL.IsElvUIAvailable and BFL:IsElvUIAvailable() then
 		self:RegisterSkin()
 	else
 		-- Wait for ElvUI to load (in case BFL loads first)
-		-- Check for "ElvUI" or "ElvUI_Classic" or generic _G.ElvUI presence
+		-- Check for "ElvUI" or "ElvUI_Classic" or a valid ElvUI engine.
 		local listener = CreateFrame("Frame")
 		listener:RegisterEvent("ADDON_LOADED")
 		listener:SetScript("OnEvent", function(f, event, addonName)
-			if addonName == "ElvUI" or addonName == "ElvUI_Classic" or _G.ElvUI then
-				self:RegisterSkin()
-				f:UnregisterEvent("ADDON_LOADED")
+			if addonName == "ElvUI" or addonName == "ElvUI_Classic" or (BFL.IsElvUIAvailable and BFL:IsElvUIAvailable()) then
+				if self:RegisterSkin() ~= false then
+					f:UnregisterEvent("ADDON_LOADED")
+				end
 			end
 		end)
 	end
 end
 
 function ElvUISkin:RegisterSkin()
-	if not _G.ElvUI then
-		return
+	local E = BFL.GetElvUIEngine and BFL:GetElvUIEngine(false)
+	if not E then
+		return false
 	end
 
 	local isEnabled = BFL.IsThemeActive and BFL:IsThemeActive("elvui")
@@ -202,11 +204,10 @@ function ElvUISkin:RegisterSkin()
 	end
 
 	-- BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Registering skin...")
-	local E, L, V, P, G = unpack(_G.ElvUI)
 	local RealS = E:GetModule("Skins")
 	if not RealS then
 		-- BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Skins module not found!")
-		return
+		return false
 	end
 
 	-- Create Safety Proxy to prevent nil value crashes in ElvUI Skins module
@@ -245,14 +246,16 @@ function ElvUISkin:RegisterSkin()
 	-- Register callback for skinning
 	-- This ensures our skin runs when ElvUI skins are applied
 	-- Try both typical addon names to be safe
-	S:AddCallbackForAddon("BetterFriendlist", "BetterFriendlist", function()
-		-- BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Callback triggered")
-		xpcall(function()
-			self:SkinFrames(E, S)
-		end, function(err)
-			-- BFL:DebugPrint("|cffff0000BetterFriendlist ElvUI Skin Error:|r " .. tostring(err))
+	if S.AddCallbackForAddon then
+		S:AddCallbackForAddon("BetterFriendlist", "BetterFriendlist", function()
+			-- BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Callback triggered")
+			xpcall(function()
+				self:SkinFrames(E, S)
+			end, function(err)
+				-- BFL:DebugPrint("|cffff0000BetterFriendlist ElvUI Skin Error:|r " .. tostring(err))
+			end)
 		end)
-	end)
+	end
 
 	-- Force run if ElvUI is already initialized (Classic fix)
 	if E.initialized then
@@ -265,6 +268,8 @@ function ElvUISkin:RegisterSkin()
 	else
 		-- BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Direct call skipped (E.initialized=false)")
 	end
+
+	return true
 end
 
 function ElvUISkin:SkinFrames(E, S)
