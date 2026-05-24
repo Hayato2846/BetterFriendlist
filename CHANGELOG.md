@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **QuickFilter & Sorter Builder** - Updated the docked editor to use the same modern frame styling as the Settings and Raid Help windows.
+- **QuickFilter & Sorter Builder** - Cleaned up the docked editor layout so preview, metadata, filter rules, and sorter steps no longer overlap.
+- **QuickFilter & Sorter Builder** - Added the missing delete action for nested filter groups.
 - **Retail Unit Menus** - Avoided adding BetterFriendlist group options to protected Blizzard unit menus.
 - **Total RP 3 Compatibility** - Restored the Total RP 3 profile action in BetterFriendlist friend context menus without using Blizzard menu callbacks.
 - **Raid Drag Tooltips** - Fixed a Lua error that could occur after moving players between raid groups with drag and drop.
