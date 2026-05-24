@@ -4423,6 +4423,32 @@ local sortStringField = {
 	realm = "_sort_realmName",
 }
 
+local fastSortMode = {
+	none = true,
+	status = true,
+	name = true,
+	level = true,
+	zone = true,
+	game = true,
+	faction = true,
+	guild = true,
+	class = true,
+	realm = true,
+}
+
+local function CanUseFastSortMode(registry, mode)
+	if not fastSortMode[mode] then
+		return false
+	end
+	if mode == "none" then
+		return true
+	end
+	if registry and registry.IsSorterVisible and not registry:IsSorterVisible(mode) then
+		return false
+	end
+	return true
+end
+
 local currentPrimaryStringField = nil
 local currentSecondaryStringField = nil
 
@@ -4491,19 +4517,31 @@ function FriendsList:ApplySort()
 	local primarySort = self.sortMode or "status"
 	local secondarySort = self.secondarySort or "name"
 	local Registry = GetFilterSortRegistry()
-	if Registry and Registry.CompareFriends then
-		table.sort(self.friendsList, function(a, b)
-			return Registry:CompareFriends(a, b, primarySort, secondarySort)
-		end)
+
+	if CanUseFastSortMode(Registry, primarySort) and CanUseFastSortMode(Registry, secondarySort) then
+		-- Set string tiebreaker fields for the inline comparator
+		currentPrimaryStringField = sortStringField[primarySort]
+		currentSecondaryStringField = sortStringField[secondarySort]
+
+		-- Use inline comparator with pre-computed numeric keys (Phase 9.4+ Optimization)
+		table.sort(self.friendsList, SortComparator)
 		return
 	end
 
-	-- Set string tiebreaker fields for the inline comparator
-	currentPrimaryStringField = sortStringField[primarySort]
-	currentSecondaryStringField = sortStringField[secondarySort]
-
-	-- Use inline comparator with pre-computed numeric keys (Phase 9.4+ Optimization)
-	table.sort(self.friendsList, SortComparator)
+	if Registry and Registry.CreateSortPlan and Registry.CompareFriendsWithSortPlan then
+		local sortPlan = Registry:CreateSortPlan(primarySort, secondarySort)
+		table.sort(self.friendsList, function(a, b)
+			return Registry:CompareFriendsWithSortPlan(a, b, sortPlan)
+		end)
+	elseif Registry and Registry.CompareFriends then
+		table.sort(self.friendsList, function(a, b)
+			return Registry:CompareFriends(a, b, primarySort, secondarySort)
+		end)
+	else
+		currentPrimaryStringField = sortStringField[primarySort]
+		currentSecondaryStringField = sortStringField[secondarySort]
+		table.sort(self.friendsList, SortComparator)
+	end
 end
 
 -- Compare two friends by a specific sort mode (returns true, false, or nil if equal)
