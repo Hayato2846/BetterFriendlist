@@ -28,6 +28,18 @@ Each WoW client uses either a managed `Interface\AddOns\BetterFriendlist` folder
 to the matching deployment slot. Existing non-linked client folders are normal on Windows
 because WoW, VSCode, antivirus, or file watchers can keep the AddOn directory locked.
 
+## Worktrees
+
+Use one branch and one worktree for each feature, bugfix, or parallel Codex chat. When the
+work is driven by a GitHub issue, include the issue number in both names with an
+`issue-NNN-` prefix, for example:
+
+```powershell
+.\tools\BFL-Worktree.ps1 -Action Create -Name issue-89-elvui-skin-disabled -Branch fix/issue-89-elvui-skin-disabled
+```
+
+For non-issue work, use a concise feature name such as `quickfilter-sorter-tab`.
+
 ## Modes
 
 - `CleanCopy`: mirrors a repo or worktree into the active client AddOn folder when that folder already exists as a normal non-git directory. If the client path is missing or already linked, it uses the deployment slot/link layout.
