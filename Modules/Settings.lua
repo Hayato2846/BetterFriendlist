@@ -34,6 +34,7 @@ local function GetGroups()
 end
 
 local FONT_FLAG_VALUES = { "NONE", "OUTLINE", "THICKOUTLINE", "MONOCHROME", "SLUG" }
+local FONT_SETTINGS_CONTROL_WIDTH = 220
 
 local function GetFontFlagLabel(value)
 	if value == "NONE" then
@@ -50,7 +51,7 @@ local function GetFontFlagLabel(value)
 	return tostring(value)
 end
 
-local function CreateFontFlagsDropdown(parent, db, dbKey, refreshCallback)
+local function CreateFontFlagsDropdown(parent, db, dbKey, refreshCallback, controlWidth)
 	local function GetFlagSet()
 		if BFL.FontManager and BFL.FontManager.GetFontFlagSet then
 			return BFL.FontManager:GetFontFlagSet(db:Get(dbKey, ""))
@@ -126,7 +127,8 @@ local function CreateFontFlagsDropdown(parent, db, dbKey, refreshCallback)
 			if refreshCallback then
 				refreshCallback()
 			end
-		end
+		end,
+		controlWidth
 	)
 
 	if holder.SetTooltip then
@@ -4316,15 +4318,9 @@ function Settings:RefreshFontsTab()
 			C_Timer.After(0.01, function()
 				BFL:ForceRefreshFriendsList()
 			end)
-		end
+		end,
+		FONT_SETTINGS_CONTROL_WIDTH
 	)
-	-- Shift 10px right to prevent clipping (matching other dropdowns)
-	if nameFontDropdown.DropDown then
-		local point, relativeTo, relativePoint, xOfs, yOfs = nameFontDropdown.DropDown:GetPoint(1)
-		if point then
-			nameFontDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
-		end
-	end
 	table.insert(allFrames, nameFontDropdown)
 
 	-- Name Font Size
@@ -4347,11 +4343,18 @@ function Settings:RefreshFontsTab()
 			C_Timer.After(0.01, function()
 				BFL:ForceRefreshFriendsList()
 			end)
-		end
+		end,
+		FONT_SETTINGS_CONTROL_WIDTH
 	)
 	table.insert(allFrames, nameSizeSlider)
 
-	local nameFlagsDropdown = CreateFontFlagsDropdown(tab, DB, "fontOutlineFriendName", RefreshAllConfiguredFonts)
+	local nameFlagsDropdown = CreateFontFlagsDropdown(
+		tab,
+		DB,
+		"fontOutlineFriendName",
+		RefreshAllConfiguredFonts,
+		FONT_SETTINGS_CONTROL_WIDTH
+	)
 	table.insert(allFrames, nameFlagsDropdown)
 
 	-- Name Font Color
@@ -4401,15 +4404,9 @@ function Settings:RefreshFontsTab()
 			C_Timer.After(0.01, function()
 				BFL:ForceRefreshFriendsList()
 			end)
-		end
+		end,
+		FONT_SETTINGS_CONTROL_WIDTH
 	)
-	-- Shift 10px right to prevent clipping
-	if infoFontDropdown.DropDown then
-		local point, relativeTo, relativePoint, xOfs, yOfs = infoFontDropdown.DropDown:GetPoint(1)
-		if point then
-			infoFontDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
-		end
-	end
 	table.insert(allFrames, infoFontDropdown)
 
 	-- Info Font Size
@@ -4433,11 +4430,18 @@ function Settings:RefreshFontsTab()
 			C_Timer.After(0.01, function()
 				BFL:ForceRefreshFriendsList()
 			end)
-		end
+		end,
+		FONT_SETTINGS_CONTROL_WIDTH
 	)
 	table.insert(allFrames, infoSizeSlider)
 
-	local infoFlagsDropdown = CreateFontFlagsDropdown(tab, DB, "fontOutlineFriendInfo", RefreshAllConfiguredFonts)
+	local infoFlagsDropdown = CreateFontFlagsDropdown(
+		tab,
+		DB,
+		"fontOutlineFriendInfo",
+		RefreshAllConfiguredFonts,
+		FONT_SETTINGS_CONTROL_WIDTH
+	)
 	table.insert(allFrames, infoFlagsDropdown)
 
 	-- Info Font Color
@@ -4485,13 +4489,7 @@ function Settings:RefreshFontsTab()
 			BFL:ApplyTabFonts() -- Immediate Apply
 			BFL:ForceRefreshFriendsList()
 		end)
-	end)
-	if tabFontDropdown.DropDown then
-		local point, relativeTo, relativePoint, xOfs, yOfs = tabFontDropdown.DropDown:GetPoint(1)
-		if point then
-			tabFontDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
-		end
-	end
+	end, FONT_SETTINGS_CONTROL_WIDTH)
 	table.insert(allFrames, tabFontDropdown)
 
 	-- Tabs Font Size
@@ -4510,7 +4508,8 @@ function Settings:RefreshFontsTab()
 				BFL:ApplyTabFonts() -- Immediate Apply
 				BFL:ForceRefreshFriendsList()
 			end)
-		end
+		end,
+		FONT_SETTINGS_CONTROL_WIDTH
 	)
 	table.insert(allFrames, tabSizeSlider)
 
@@ -4519,7 +4518,7 @@ function Settings:RefreshFontsTab()
 			BFL:ApplyTabFonts()
 			BFL:ForceRefreshFriendsList()
 		end)
-	end)
+	end, FONT_SETTINGS_CONTROL_WIDTH)
 	table.insert(allFrames, tabFlagsDropdown)
 
 	-- -------------------------------------------------------------------------
@@ -4556,13 +4555,7 @@ function Settings:RefreshFontsTab()
 			end
 			BFL:ForceRefreshFriendsList()
 		end)
-	end)
-	if raidFontDropdown.DropDown then
-		local point, relativeTo, relativePoint, xOfs, yOfs = raidFontDropdown.DropDown:GetPoint(1)
-		if point then
-			raidFontDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
-		end
-	end
+	end, FONT_SETTINGS_CONTROL_WIDTH)
 	table.insert(allFrames, raidFontDropdown)
 
 	-- Raid Font Size
@@ -4584,7 +4577,8 @@ function Settings:RefreshFontsTab()
 				end
 				BFL:ForceRefreshFriendsList()
 			end)
-		end
+		end,
+		FONT_SETTINGS_CONTROL_WIDTH
 	)
 	table.insert(allFrames, raidSizeSlider)
 
@@ -4596,7 +4590,7 @@ function Settings:RefreshFontsTab()
 			end
 			BFL:ForceRefreshFriendsList()
 		end)
-	end)
+	end, FONT_SETTINGS_CONTROL_WIDTH)
 	table.insert(allFrames, raidFlagsDropdown)
 
 	-- Anchor all frames vertically

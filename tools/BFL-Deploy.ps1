@@ -37,7 +37,7 @@ function Invoke-BFLAddonMirror {
         'reference', 'tools', 'WoW UI Source'
     )
     $excludeFiles = @(
-        '.gitignore', '.pkgmeta', '*.bak', '*.html', '*.log', '*.lua.bak',
+        '.git', '.gitignore', '.pkgmeta', '*.bak', '*.html', '*.log', '*.lua.bak',
         '*.md', '*.png', '*.ps1', '*.py', '*.txt', '*.zip'
     )
 
@@ -158,6 +158,24 @@ function Copy-BFLAddonToClientPath {
     Invoke-BFLAddonMirror -SourceRoot $sourceRoot -DestinationRoot $destinationRoot
 }
 
+function Test-BFLDirectClientMirrorTarget {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return $false
+    }
+
+    $existing = Get-Item -LiteralPath $Path -Force
+    if ($existing.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+        return $false
+    }
+
+    $gitPath = Join-Path $existing.FullName '.git'
+    return -not (Test-Path -LiteralPath $gitPath)
+}
+
 function Expand-BFLReleaseZip {
     param(
         [Parameter(Mandatory = $true)][string]$ZipPath,
@@ -245,25 +263,14 @@ foreach ($clientName in $clients) {
 
     switch ($Mode) {
         'CleanCopy' {
-            Copy-BFLAddon -From $Source -To $info.DeployPath -BFLRoot $rootPath
-            try {
-                Set-BFLAddonLink -LinkPath $info.AddOnPath -TargetPath $info.DeployPath -Type $LinkType -Force:$Force
+            if (Test-BFLDirectClientMirrorTarget -Path $info.AddOnPath) {
+                Write-Host "Mirroring CleanCopy directly to existing client AddOn folder: $($info.AddOnPath)"
+                Copy-BFLAddonToClientPath -From $Source -To $info.AddOnPath -ExpectedPath $info.AddOnPath
+                continue
             }
-            catch {
-                $linkError = $_.Exception.Message
-                if (Test-Path -LiteralPath $info.AddOnPath) {
-                    $existing = Get-Item -LiteralPath $info.AddOnPath -Force
-                    $isLink = [bool]($existing.Attributes -band [System.IO.FileAttributes]::ReparsePoint)
-                    $gitPath = Join-Path $existing.FullName '.git'
-                    if (-not $isLink -and -not (Test-Path -LiteralPath $gitPath)) {
-                        Write-Warning "Could not replace addon path with a link ($linkError). Mirroring directly to existing client folder."
-                        Copy-BFLAddonToClientPath -From $Source -To $info.AddOnPath -ExpectedPath $info.AddOnPath
-                        continue
-                    }
-                }
 
-                throw
-            }
+            Copy-BFLAddon -From $Source -To $info.DeployPath -BFLRoot $rootPath
+            Set-BFLAddonLink -LinkPath $info.AddOnPath -TargetPath $info.DeployPath -Type $LinkType -Force:$Force
         }
         'Link' {
             Set-BFLAddonLink -LinkPath $info.AddOnPath -TargetPath $Source -Type $LinkType -Force:$Force

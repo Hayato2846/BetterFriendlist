@@ -1405,6 +1405,7 @@
 								</Scripts>
 							</Button>
 							<CheckButton parentKey="EveryoneAssistCheckbox" inherits="UICheckButtonTemplate">
+								<Size x="24" y="24"/>
 								<Anchors>
 									<Anchor point="TOPLEFT" x="31" y="-10"/>
 								</Anchors>

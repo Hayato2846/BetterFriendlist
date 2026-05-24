@@ -22,6 +22,15 @@ local SPACING_OPTION = -10
 local CONTROL_GAP = 10 -- Gap between Label and Control
 local FIXED_CONTROL_WIDTH = 170 -- Standard width for Dropdowns and Sliders to ensure alignment
 local CHECKBOX_X_OFFSET = 4 -- Push checkboxes slightly right to align visual box with Dropdown/Slider edges
+local SLIDER_HEIGHT = 22
+local SLIDER_TRACK_HEIGHT = 18
+local SLIDER_TRACK_INSET_Y = -5
+local SLIDER_STEPPER_WIDTH = 14
+local SLIDER_STEPPER_HEIGHT = 20
+local SLIDER_STEPPER_GAP = 4
+local SLIDER_VALUE_WIDTH = 30
+local SLIDER_VALUE_GAP = 8
+local COLOR_SWATCH_BUTTON_SIZE = 24
 
 -- Alignment Tweaks (Visual Correction)
 local DROPDOWN_X_OFFSET = -8 -- Shift Classic Dropdowns left to align visually
@@ -30,6 +39,43 @@ local DROPDOWN_WIDTH_BONUS = 8 -- Add the shift back as width
 local dropdownFontCache = {}
 local dropdownFontCounter = 0
 local defaultDropdownFontCache = {}
+
+local function LayoutStepperSlider(slider)
+	if not slider then
+		return
+	end
+
+	slider:SetHeight(SLIDER_HEIGHT)
+
+	local innerSlider = slider.Slider
+	if innerSlider then
+		innerSlider.BFL_DarkSliderTrackInsets = {
+			left = 0,
+			right = 0,
+			top = SLIDER_TRACK_INSET_Y,
+			bottom = SLIDER_TRACK_INSET_Y,
+		}
+		innerSlider:ClearAllPoints()
+		innerSlider:SetPoint("LEFT", slider, "LEFT", SLIDER_STEPPER_WIDTH + SLIDER_STEPPER_GAP, 0)
+		innerSlider:SetPoint("RIGHT", slider, "RIGHT", -(SLIDER_STEPPER_WIDTH + SLIDER_STEPPER_GAP), 0)
+		innerSlider:SetHeight(SLIDER_TRACK_HEIGHT)
+	end
+
+	if slider.Back and innerSlider then
+		slider.Back.BFL_DarkSliderStepper = true
+		slider.Back:ClearAllPoints()
+		slider.Back:SetSize(SLIDER_STEPPER_WIDTH, SLIDER_STEPPER_HEIGHT)
+		slider.Back:SetPoint("RIGHT", innerSlider, "LEFT", -SLIDER_STEPPER_GAP, 0)
+	end
+
+	if slider.Forward and innerSlider then
+		slider.Forward.BFL_DarkSliderStepper = true
+		slider.Forward:ClearAllPoints()
+		slider.Forward:SetSize(SLIDER_STEPPER_WIDTH, SLIDER_STEPPER_HEIGHT)
+		slider.Forward:SetPoint("LEFT", innerSlider, "RIGHT", SLIDER_STEPPER_GAP, 0)
+	end
+end
+
 local function GetResolvedFontFlags(flags)
 	if BFL.FontManager and BFL.FontManager.GetDefaultUIFontFlags then
 		return BFL.FontManager:GetDefaultUIFontFlags(flags)
@@ -207,8 +253,11 @@ end
 -- ========================================
 -- SLIDER (Label Left, Slider Right - Grid Aligned)
 -- ========================================
-function Components:CreateSlider(parent, labelText, min, max, initialValue, formatter, callback)
+function Components:CreateSlider(parent, labelText, min, max, initialValue, formatter, callback, controlWidth)
+	formatter = formatter or tostring
+
 	local holder = CreateFrame("Frame", nil, parent)
+	holder.ControlWidth = controlWidth
 	holder:SetHeight(COMPONENT_HEIGHT)
 	holder:SetPoint("LEFT", PADDING_LEFT, 0)
 	holder:SetPoint("RIGHT", -PADDING_RIGHT, 0)
@@ -220,15 +269,26 @@ function Components:CreateSlider(parent, labelText, min, max, initialValue, form
 
 	-- Slider: Dynamic positioning
 	holder.Slider = CreateFrame("Slider", nil, holder, "MinimalSliderWithSteppersTemplate")
-	holder.Slider:SetHeight(16) -- Slightly smaller height for better look
-	holder.Slider:SetWidth(FIXED_CONTROL_WIDTH) -- Set initial width immediately to avoid layout issues
+	holder.Slider:SetHeight(SLIDER_HEIGHT)
+	holder.Slider:SetWidth((holder.ControlWidth or FIXED_CONTROL_WIDTH) - SLIDER_VALUE_WIDTH - SLIDER_VALUE_GAP)
+	LayoutStepperSlider(holder.Slider)
+
+	holder.ValueLabel = holder:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
+	holder.ValueLabel:SetJustifyH("RIGHT")
+	holder.ValueLabel:SetWidth(SLIDER_VALUE_WIDTH)
+	holder.ValueLabel:SetText(formatter(initialValue))
 
 	-- Dynamic Resizing Handler
 	holder:SetScript("OnSizeChanged", function(self, width, height)
-		-- Sliders now use FIXED_CONTROL_WIDTH to align with Dropdowns
+		local controlWidth = holder.ControlWidth or FIXED_CONTROL_WIDTH
+
+		holder.ValueLabel:ClearAllPoints()
+		holder.ValueLabel:SetPoint("RIGHT", self, "RIGHT", 0, 0)
+
 		holder.Slider:ClearAllPoints()
-		holder.Slider:SetPoint("RIGHT", self, "RIGHT", 0, 0)
-		holder.Slider:SetWidth(FIXED_CONTROL_WIDTH)
+		holder.Slider:SetPoint("RIGHT", holder.ValueLabel, "LEFT", -SLIDER_VALUE_GAP, 0)
+		holder.Slider:SetWidth(controlWidth - SLIDER_VALUE_WIDTH - SLIDER_VALUE_GAP)
+		LayoutStepperSlider(holder.Slider)
 
 		-- Label takes remaining space
 		holder.Label:ClearAllPoints()
@@ -241,22 +301,30 @@ function Components:CreateSlider(parent, labelText, min, max, initialValue, form
 		holder:GetScript("OnSizeChanged")(holder, holder:GetWidth(), holder:GetHeight())
 	end
 
-	holder.Slider:Init(initialValue, min, max, max - min, {
-		[MinimalSliderWithSteppersMixin.Label.Right] = formatter,
-	})
+	holder.Slider:Init(initialValue, min, max, max - min, {})
 
 	holder.Slider:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged, function(_, value)
 		if not holder.isUpdatingStep then
 			callback(value)
+			holder.ValueLabel:SetText(formatter(value))
 		end
 	end)
 
 	function holder:SetValue(value)
 		holder.Slider:SetValue(value)
+		holder.ValueLabel:SetText(formatter(value))
 	end
 
 	function holder:GetValue()
 		return holder.Slider:GetValue()
+	end
+
+	function holder:SetControlWidth(width)
+		holder.ControlWidth = width
+		local layout = holder:GetScript("OnSizeChanged")
+		if layout then
+			layout(holder, holder:GetWidth(), holder:GetHeight())
+		end
 	end
 
 	function holder:SetStep(step)
@@ -271,9 +339,8 @@ function Components:CreateSlider(parent, labelText, min, max, initialValue, form
 
 		-- Re-Initialize with correct step count to fix buttons and drag snapping
 		local steps = (max - min) / step
-		holder.Slider:Init(currentVal, min, max, steps, {
-			[MinimalSliderWithSteppersMixin.Label.Right] = formatter,
-		})
+		holder.Slider:Init(currentVal, min, max, steps, {})
+		holder.ValueLabel:SetText(formatter(currentVal))
 
 		if holder.Slider.SetValueStep then
 			holder.Slider:SetValueStep(step)
@@ -455,8 +522,9 @@ local function CreateClassicDropdown(parent, entries, isSelectedCallback, onSele
 	return dropdown
 end
 
-function Components:CreateDropdown(parent, labelText, entries, isSelectedCallback, onSelectionCallback)
+function Components:CreateDropdown(parent, labelText, entries, isSelectedCallback, onSelectionCallback, controlWidth)
 	local holder = CreateFrame("Frame", nil, parent)
+	holder.ControlWidth = controlWidth
 	holder:SetHeight(COMPONENT_HEIGHT + 8) -- Dropdowns are taller
 	holder:SetPoint("LEFT", PADDING_LEFT, 0)
 	holder:SetPoint("RIGHT", -PADDING_RIGHT, 0)
@@ -589,7 +657,7 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 	-- Dynamic Resizing Handler
 	holder:SetScript("OnSizeChanged", function(self, width, height)
 		-- Valid dropdown width
-		local dropdownWidth = FIXED_CONTROL_WIDTH
+		local dropdownWidth = holder.ControlWidth or FIXED_CONTROL_WIDTH
 
 		-- Dropdown positioning (Right Aligned)
 		if BFL.IsClassic or not BFL.HasModernMenu then
@@ -615,6 +683,14 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 
 	holder.Label = label
 	holder.DropDown = dropdown
+
+	function holder:SetControlWidth(width)
+		holder.ControlWidth = width
+		local layout = holder:GetScript("OnSizeChanged")
+		if layout then
+			layout(holder, holder:GetWidth(), holder:GetHeight())
+		end
+	end
 
 	holder.SetTooltip = function(_, title, desc)
 		dropdown:SetScript("OnEnter", function(self)
@@ -649,7 +725,7 @@ function Components:CreateColorPicker(parent, labelText, initialColor, callback)
 
 	-- Color Button anchored RIGHT
 	local colorButton = CreateFrame("Button", nil, holder)
-	colorButton:SetSize(28, 28)
+	colorButton:SetSize(COLOR_SWATCH_BUTTON_SIZE, COLOR_SWATCH_BUTTON_SIZE)
 
 	-- Dynamic Resizing Handler
 	holder:SetScript("OnSizeChanged", function(self, width, height)
@@ -768,6 +844,8 @@ function Components:CreateColorPicker(parent, labelText, initialColor, callback)
 		end
 	end)
 
+	holder.colorButton = colorButton
+
 	return holder
 end
 
@@ -797,7 +875,7 @@ function Components:CreateSliderWithColorPicker(
 
 	-- Color Button (Right aligned)
 	local colorButton = CreateFrame("Button", nil, holder)
-	colorButton:SetSize(28, 28)
+	colorButton:SetSize(COLOR_SWATCH_BUTTON_SIZE, COLOR_SWATCH_BUTTON_SIZE)
 
 	local colorBorder = colorButton:CreateTexture(nil, "BACKGROUND")
 	colorBorder:SetAllPoints(colorButton)
@@ -897,7 +975,8 @@ function Components:CreateSliderWithColorPicker(
 
 	-- Slider (Left of Color Button)
 	holder.Slider = CreateFrame("Slider", nil, holder, "MinimalSliderWithSteppersTemplate")
-	holder.Slider:SetHeight(16)
+	holder.Slider:SetHeight(SLIDER_HEIGHT)
+	LayoutStepperSlider(holder.Slider)
 
 	-- Value Label (Centered in gap)
 	holder.ValueLabel = holder:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
@@ -923,6 +1002,7 @@ function Components:CreateSliderWithColorPicker(
 		holder.Slider:ClearAllPoints()
 		holder.Slider:SetPoint("RIGHT", holder.ValueLabel, "LEFT", -5, 0)
 		holder.Slider:SetWidth(sliderWidth)
+		LayoutStepperSlider(holder.Slider)
 
 		-- Label fills remaining space
 		holder.Label:ClearAllPoints()
@@ -934,6 +1014,7 @@ function Components:CreateSliderWithColorPicker(
 	-- Trigger Layout
 	-- Force initial width on slider in case layout trigger fails (default to minWidth)
 	holder.Slider:SetWidth(150)
+	LayoutStepperSlider(holder.Slider)
 
 	if holder:GetWidth() > 0 then
 		holder:GetScript("OnSizeChanged")(holder, holder:GetWidth(), holder:GetHeight())
@@ -987,6 +1068,8 @@ function Components:CreateSliderWithColorPicker(
 		-- Restore callback processing
 		holder.isUpdatingStep = false
 	end
+
+	holder.colorButton = colorButton
 
 	return holder
 end

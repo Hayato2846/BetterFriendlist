@@ -41,7 +41,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dark Theme Overlay Buttons** - Prevented invisible Friends row game-account overlays from receiving visible button chrome.
 - **Dark Theme Tab Lists** - Applied the Friends tab list chrome rules to Recent Allies and Recruit A Friend so list insets and scrollbars align consistently.
 - **Dark Theme Who Tab** - Fitted WHO column headers inside the list inset, aligned them as table columns, extended the scrollbar through the header gutter, and kept search utility buttons borderless.
-- **Dark Theme Search Builder and Raid Tab** - Removed redundant inner frames, aligned Search Builder dropdowns with inputs, added a compact raid assist checkbox, and stopped the builder from capturing unrelated keys.
+- **Dark Theme Search Builder and Raid Tab** - Removed redundant inner frames, aligned Search Builder dropdowns with inputs, cleaned up raid controls, and stopped the builder from capturing unrelated keys.
+- **Dark Theme Raid Tab** - Aligned and cleaned up the Assist All checkbox styling.
+- **Dark Theme Quick Join Tab** - Removed the extra outer inset frame, added breathing room below the title buttons, and aligned the scrollbar and request button with the Contacts tab layout.
+- **Dark Theme Raid Help** - Cleaned up Raid Roster Help inset chrome and aligned its scrollbar with other tab lists.
+- **Dark Theme Settings** - Fixed settings scrollbar stepper icons after tab switches and aligned Font Settings dropdowns, sliders, and color controls.
 - **Theme Settings** - Fixed an error when disabling Beta Features from the settings window.
 - **Recruit A Friend Rewards** - Prevented viewing rewards from breaking reward tabs or causing a protected Copy Link error in the recruitment dialog.
 

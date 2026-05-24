@@ -13,6 +13,9 @@ local BACKDROP = {
 }
 
 local DARK_SCROLLBAR_WIDTH = 22
+local DARK_SCROLLBAR_STEPPER_HEIGHT = 16
+local DARK_SCROLLBAR_STEPPER_TOP_OFFSET_Y = -2
+local DARK_SCROLLBAR_STEPPER_BOTTOM_OFFSET_Y = 2
 
 local function ApplyDefaultSlugToFontString(fontString)
 	if BFL.FontManager and BFL.FontManager.ApplyDefaultSlugToFontString then
@@ -1651,7 +1654,8 @@ function SkinEngine:SkinArrowButton(button, direction)
 
 	button.BFL_DarkArrowButton = true
 	button.BFL_DarkArrowDirection = direction or "down"
-	local insets = button.BFL_DarkScrollStepper and { left = 3, right = 3, top = 0, bottom = 0 }
+	local insets = button.BFL_DarkScrollStepper and { left = 0, right = 0, top = 0, bottom = 0 }
+		or button.BFL_DarkSliderStepper and { left = 2, right = 2, top = 0, bottom = 0 }
 		or { left = 3, right = 3, top = -3, bottom = 3 }
 	self:SkinButton(button, { insets = insets, keepFontColor = true })
 	self:HideArrowButtonTextures(button)
@@ -1761,13 +1765,31 @@ function SkinEngine:SkinCheckButton(checkButton)
 		return
 	end
 
-	self:CreateBackdrop(checkButton, "control", { left = 4, right = 4, top = -4, bottom = -4 })
+	self:CreateBackdrop(
+		checkButton,
+		"control",
+		checkButton.BFL_DarkCheckButtonInsets or { left = 4, right = 4, top = -4, bottom = -4 }
+	)
 
 	if checkButton.GetNormalTexture then
-		self:SetTextureAlpha(checkButton, checkButton:GetNormalTexture(), 0.25)
+		local normalAlpha = checkButton.BFL_DarkCheckButtonNormalAlpha
+		if normalAlpha == nil then
+			normalAlpha = 0.25
+		end
+		self:SetTextureAlpha(checkButton, checkButton:GetNormalTexture(), normalAlpha)
+	end
+	if checkButton.GetPushedTexture and checkButton.BFL_DarkCheckButtonPushedAlpha ~= nil then
+		self:SetTextureAlpha(checkButton, checkButton:GetPushedTexture(), checkButton.BFL_DarkCheckButtonPushedAlpha)
+	end
+	if checkButton.GetDisabledTexture and checkButton.BFL_DarkCheckButtonDisabledAlpha ~= nil then
+		self:SetTextureAlpha(checkButton, checkButton:GetDisabledTexture(), checkButton.BFL_DarkCheckButtonDisabledAlpha)
 	end
 	if checkButton.GetHighlightTexture then
-		self:SetTextureAlpha(checkButton, checkButton:GetHighlightTexture(), 0.18)
+		local highlightAlpha = checkButton.BFL_DarkCheckButtonHighlightAlpha
+		if highlightAlpha == nil then
+			highlightAlpha = 0.18
+		end
+		self:SetTextureAlpha(checkButton, checkButton:GetHighlightTexture(), highlightAlpha)
 	end
 
 	local text = checkButton.Text or _G[GetName(checkButton) .. "Text"]
@@ -2318,13 +2340,34 @@ function SkinEngine:InstallScrollBarStepperHooks(scrollBar)
 			SkinEngine:RefreshScrollBarSteppers(scrollBar)
 		end
 	end
-
-	if scrollBar.HookScript then
-		scrollBar:HookScript("OnShow", refresh)
-		if IsObjectType(scrollBar, "Slider") then
-			scrollBar:HookScript("OnValueChanged", refresh)
+	local function refreshSoon()
+		refresh()
+		if C_Timer and C_Timer.After then
+			C_Timer.After(0, refresh)
 		end
 	end
+	local function hookScript(frame, scriptName)
+		if not frame or not frame.HookScript then
+			return
+		end
+		if frame.HasScript then
+			local ok, hasScript = pcall(frame.HasScript, frame, scriptName)
+			if ok and not hasScript then
+				return
+			end
+		end
+		pcall(frame.HookScript, frame, scriptName, refreshSoon)
+	end
+
+	hookScript(scrollBar, "OnShow")
+	if IsObjectType(scrollBar, "Slider") then
+		hookScript(scrollBar, "OnValueChanged")
+	end
+
+	local parent = scrollBar.GetParent and scrollBar:GetParent()
+	hookScript(parent, "OnShow")
+	hookScript(parent, "OnScrollRangeChanged")
+	hookScript(parent, "OnVerticalScroll")
 
 	if C_Timer and C_Timer.After then
 		C_Timer.After(0, refresh)
@@ -2394,12 +2437,10 @@ function SkinEngine:SkinScrollBar(scrollBar)
 		scrollBar.ScrollUpButton.BFL_DarkScrollStepper = true
 		self:SkinArrowButton(scrollBar.ScrollUpButton, "up")
 		if scrollBar.BFL_DarkWideScrollbar then
-			self:SetFrameSize(scrollBar.ScrollUpButton, 18, 16)
-			if useInternalStepperLayout then
-				self:SetFramePoints(scrollBar.ScrollUpButton, {
-					{ "TOP", scrollBar, "TOP", 0, -1 },
-				})
-			end
+			self:SetFrameSize(scrollBar.ScrollUpButton, DARK_SCROLLBAR_WIDTH, DARK_SCROLLBAR_STEPPER_HEIGHT)
+			self:SetFramePoints(scrollBar.ScrollUpButton, {
+				{ "TOP", scrollBar, "TOP", 0, DARK_SCROLLBAR_STEPPER_TOP_OFFSET_Y },
+			})
 		end
 		self:RefreshArrowButton(scrollBar.ScrollUpButton)
 	end
@@ -2407,12 +2448,10 @@ function SkinEngine:SkinScrollBar(scrollBar)
 		scrollBar.ScrollDownButton.BFL_DarkScrollStepper = true
 		self:SkinArrowButton(scrollBar.ScrollDownButton, "down")
 		if scrollBar.BFL_DarkWideScrollbar then
-			self:SetFrameSize(scrollBar.ScrollDownButton, 18, 16)
-			if useInternalStepperLayout then
-				self:SetFramePoints(scrollBar.ScrollDownButton, {
-					{ "BOTTOM", scrollBar, "BOTTOM", 0, 1 },
-				})
-			end
+			self:SetFrameSize(scrollBar.ScrollDownButton, DARK_SCROLLBAR_WIDTH, DARK_SCROLLBAR_STEPPER_HEIGHT)
+			self:SetFramePoints(scrollBar.ScrollDownButton, {
+				{ "BOTTOM", scrollBar, "BOTTOM", 0, DARK_SCROLLBAR_STEPPER_BOTTOM_OFFSET_Y },
+			})
 		end
 		self:RefreshArrowButton(scrollBar.ScrollDownButton)
 	end
@@ -2420,9 +2459,9 @@ function SkinEngine:SkinScrollBar(scrollBar)
 		scrollBar.Back.BFL_DarkScrollStepper = true
 		self:SkinArrowButton(scrollBar.Back, "up")
 		if scrollBar.BFL_DarkWideScrollbar then
-			self:SetFrameSize(scrollBar.Back, 18, 16)
+			self:SetFrameSize(scrollBar.Back, DARK_SCROLLBAR_WIDTH, DARK_SCROLLBAR_STEPPER_HEIGHT)
 			self:SetFramePoints(scrollBar.Back, {
-				{ "TOP", scrollBar, "TOP", 0, -1 },
+				{ "TOP", scrollBar, "TOP", 0, DARK_SCROLLBAR_STEPPER_TOP_OFFSET_Y },
 			})
 		end
 		self:RefreshArrowButton(scrollBar.Back)
@@ -2431,9 +2470,9 @@ function SkinEngine:SkinScrollBar(scrollBar)
 		scrollBar.Forward.BFL_DarkScrollStepper = true
 		self:SkinArrowButton(scrollBar.Forward, "down")
 		if scrollBar.BFL_DarkWideScrollbar then
-			self:SetFrameSize(scrollBar.Forward, 18, 16)
+			self:SetFrameSize(scrollBar.Forward, DARK_SCROLLBAR_WIDTH, DARK_SCROLLBAR_STEPPER_HEIGHT)
 			self:SetFramePoints(scrollBar.Forward, {
-				{ "BOTTOM", scrollBar, "BOTTOM", 0, 1 },
+				{ "BOTTOM", scrollBar, "BOTTOM", 0, DARK_SCROLLBAR_STEPPER_BOTTOM_OFFSET_Y },
 			})
 		end
 		self:RefreshArrowButton(scrollBar.Forward)
@@ -2503,7 +2542,7 @@ function SkinEngine:SkinSlider(slider)
 		return
 	end
 
-	self:CreateBackdrop(slider, "slider", { left = 0, right = 0, top = 6, bottom = 6 })
+	self:CreateBackdrop(slider, "slider", slider.BFL_DarkSliderTrackInsets or { left = 0, right = 0, top = 6, bottom = 6 })
 	self:DampenNamedTextures(slider, 0, {
 		"Left",
 		"Middle",
@@ -2522,6 +2561,7 @@ function SkinEngine:SkinColorSwatch(button)
 		return
 	end
 
+	button.BFL_DarkColorSwatchButton = true
 	self:CreateBackdrop(button, "control", { left = 0, right = 0, top = 0, bottom = 0 })
 end
 
@@ -2707,6 +2747,9 @@ function SkinEngine:SkinControl(control)
 	if control.Label then
 		self:SetFontColor(control, control.Label, 0.88, 0.88, 0.88, 1)
 	end
+	if control.ValueLabel then
+		self:SetFontColor(control, control.ValueLabel, 1, 0.82, 0, 1)
+	end
 	if control.text then
 		self:SetFontColor(control, control.text, 1, 0.82, 0, 1)
 	end
@@ -2746,6 +2789,8 @@ function SkinEngine:SkinTree(root, maxDepth, currentDepth)
 					self:RestoreFrame(child)
 				elseif IsRAFNativeTextureButton(child) then
 					self:SkinNativeTextureButton(child)
+				elseif child.BFL_DarkColorSwatchButton then
+					self:SkinColorSwatch(child)
 				elseif lowerName:find("tab") then
 					self:SkinTab(child)
 				elseif lowerName:find("close") then
@@ -2880,7 +2925,10 @@ function SkinEngine:RestoreFrame(frame)
 	frame.BFL_DarkArrowDirection = nil
 	frame.BFL_DarkTravelPassButton = nil
 	frame.BFL_DarkNativeTextureButton = nil
+	frame.BFL_DarkColorSwatchButton = nil
 	frame.BFL_DarkScrollStepper = nil
+	frame.BFL_DarkSliderStepper = nil
+	frame.BFL_DarkSliderTrackInsets = nil
 	frame.BFL_DarkScrollThumbDragging = nil
 	frame.BFL_DarkScrollThumbOver = nil
 	frame.BFL_DarkWideScrollbar = nil
