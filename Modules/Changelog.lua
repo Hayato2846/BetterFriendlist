@@ -38,7 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dark Theme Performance** - Reduced repeated Friendlist row and tab refresh work during stress-test navigation.
 - **Dark Theme Performance** - Avoided redundant row refresh passes when visible Friendlist rows were already updated.
 - **Dark Theme Performance** - Narrowed deferred tab refreshes to the active content pane and coalesced Broker count updates during event bursts.
-- **Quick Join Performance** - Reduced repeated group-priority lookups while sorting available Quick Join groups.
+- **Quick Join Performance** - Reduced repeated group-priority and friend-relationship lookups while sorting available Quick Join groups.
 
 ### Fixed
 - **Dark Theme Portrait** - Restored the BFL avatar as a compact square header icon without adding button chrome.

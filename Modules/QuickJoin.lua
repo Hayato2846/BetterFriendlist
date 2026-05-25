@@ -381,6 +381,18 @@ local function GetLeaderGUIDFromMembers(members)
 	return firstGUID
 end
 
+local function GetPriorityFromRelationship(relationship)
+	if relationship == "bnfriend" then
+		return 1000
+	elseif relationship == "wowfriend" then
+		return 500
+	elseif relationship == "guild" then
+		return 100
+	end
+
+	return nil
+end
+
 --[[
 	Helper: PopulateGroupMemberDetails
 	Populates leaderName, leaderColor, and otherFriends from the members list.
@@ -420,6 +432,9 @@ local function PopulateGroupMemberDetails(info)
 				end
 
 				if isLeader then
+					info.leaderGUID = info.leaderGUID or member.guid
+					info.leaderRelationship = relationship
+					info.leaderPriority = GetPriorityFromRelationship(relationship) or 0
 					if name and name ~= "" then
 						-- Always use the resolved name for the leader if found in members list
 						-- This ensures we use BNet/Friend name instead of Character name
@@ -2233,6 +2248,10 @@ end
 function QuickJoin:GetGroupPriority(groupGUID, groupInfo)
 	local cached = groupGUID and self.groupCache[groupGUID]
 	groupInfo = groupInfo or (cached and cached.info) or (groupGUID and self.mockGroups[groupGUID])
+	if groupInfo and groupInfo.leaderPriority then
+		return groupInfo.leaderPriority
+	end
+
 	local leaderGUID = groupInfo and groupInfo.leaderGUID
 	if not leaderGUID then
 		leaderGUID = GetLeaderGUIDFromMembers(groupInfo and groupInfo.members)
@@ -2244,30 +2263,26 @@ function QuickJoin:GetGroupPriority(groupGUID, groupInfo)
 		return 0
 	end
 
-	local priority = 0
-	local accountInfo = C_BattleNet.GetAccountInfoByGUID(leaderGUID)
-
-	if accountInfo then
-		-- BNet friend (highest priority)
-		priority = priority + 1000
-	else
-		-- Check for WoW friend
-		local friendInfo = GetFriendInfoByGUID(leaderGUID)
-		if friendInfo then
-			priority = priority + 500
-		else
-			-- Check for guild member
-			if IsInGuild() then
-				local guildName = GetGuildInfo("player")
-				local memberGuildName = GetGuildInfo("unit") -- TODO: Need proper unit token
-				if guildName and memberGuildName and guildName == memberGuildName then
-					priority = priority + 100
-				end
-			end
-		end
+	local priority = GetPriorityFromRelationship(groupInfo and groupInfo.leaderRelationship)
+	if priority then
+		return priority
 	end
 
-	return priority
+	local relationship = TryGetCachedRelationship(leaderGUID)
+	priority = relationship and GetPriorityFromRelationship(relationship.relationship)
+	if priority then
+		return priority
+	end
+
+	if C_BattleNet.GetAccountInfoByGUID(leaderGUID) then
+		return 1000
+	end
+
+	if C_FriendList and C_FriendList.IsFriend and C_FriendList.IsFriend(leaderGUID) then
+		return 500
+	end
+
+	return 0
 end
 
 -- QuickJoinEntry methods (Legacy/Bottom definition merged with top)
