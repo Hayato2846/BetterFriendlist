@@ -425,6 +425,24 @@ local function GetVisibleNextRewardName(frame)
 	return nil
 end
 
+local function IsNextRewardDressupReward(nextReward)
+	if not nextReward or IsSecret(nextReward) then
+		return false
+	end
+
+	if nextReward.petInfo and not IsSecret(nextReward.petInfo) then
+		return (SafeNumber(nextReward.petInfo.displayID, 0) or 0) > 0
+	end
+
+	if nextReward.mountInfo and not IsSecret(nextReward.mountInfo) then
+		return (SafeNumber(nextReward.mountInfo.mountID, 0) or 0) > 0
+	end
+
+	return (nextReward.appearanceInfo ~= nil and not IsSecret(nextReward.appearanceInfo))
+		or (nextReward.appearanceSetInfo ~= nil and not IsSecret(nextReward.appearanceSetInfo))
+		or (nextReward.illusionInfo ~= nil and not IsSecret(nextReward.illusionInfo))
+end
+
 local function SafeBattleTagName(battleTag, fallback)
 	if IsSecret(battleTag) then
 		return fallback or "Unknown"
@@ -1533,48 +1551,41 @@ function RAF:NextRewardButton_OnEnter(button)
 
 	local tooltip = BFL_Tooltip or GameTooltip
 	local itemID = SafeNumber(nextReward.itemID, 0) or 0
+	local dressupReward = IsNextRewardDressupReward(nextReward)
 	local itemLink
 	if itemID > 0 and C_Item and C_Item.GetItemInfo then
 		_, itemLink = C_Item.GetItemInfo(itemID)
 	end
 
 	tooltip:SetOwner(button, "ANCHOR_RIGHT")
-	if itemLink and tooltip.SetHyperlink then
-		tooltip:SetHyperlink(itemLink)
-	else
-		if tooltip.ClearLines then
-			tooltip:ClearLines()
-		end
-		local rewardName = GetNextRewardDisplayName(nextReward, GetVisibleNextRewardName(frame))
-			or RAF_NEXT_REWARD
-			or L.RAF_NEXT_REWARD
-		GameTooltip_SetTitle(tooltip, rewardName, HIGHLIGHT_FONT_COLOR, true)
-		if itemID > 0 and RETRIEVING_DATA then
-			GameTooltip_AddNormalLine(tooltip, RETRIEVING_DATA, true)
+	local itemTooltipSet = itemID > 0 and tooltip.SetItemByID and tooltip:SetItemByID(itemID)
+	if not itemTooltipSet then
+		if itemLink and tooltip.SetHyperlink then
+			tooltip:SetHyperlink(itemLink)
+		else
+			if tooltip.ClearLines then
+				tooltip:ClearLines()
+			end
+			local rewardName = GetNextRewardDisplayName(nextReward, GetVisibleNextRewardName(frame))
+				or RAF_NEXT_REWARD
+				or L.RAF_NEXT_REWARD
+			GameTooltip_SetTitle(tooltip, rewardName, HIGHLIGHT_FONT_COLOR, true)
+			if itemID > 0 and RETRIEVING_DATA then
+				GameTooltip_AddNormalLine(tooltip, RETRIEVING_DATA, true)
+			end
 		end
 	end
 	tooltip:Show()
 
-	if itemID > 0 and Item and Item.CreateFromItemID then
-		if button.BFL_NextRewardTooltipItemID ~= itemID then
-			button.BFL_NextRewardTooltipItemID = itemID
-			button.BFL_NextRewardTooltipItem = Item:CreateFromItemID(itemID)
+	if dressupReward then
+		button.UpdateTooltip = function()
+			RAF:NextRewardButton_OnEnter(button)
 		end
-		local item = button.BFL_NextRewardTooltipItem
-		if item and item.ContinueOnItemLoad then
-			item:ContinueOnItemLoad(function()
-				if button.IsMouseOver and button:IsMouseOver() then
-					RAF:NextRewardButton_OnEnter(button)
-				end
-			end)
-		end
+	else
+		button.UpdateTooltip = nil
 	end
 
-	button.UpdateTooltip = function()
-		RAF:NextRewardButton_OnEnter(button)
-	end
-
-	if IsModifiedClick("DRESSUP") then
+	if IsModifiedClick("DRESSUP") and dressupReward then
 		ShowInspectCursor()
 	else
 		ResetCursor()
