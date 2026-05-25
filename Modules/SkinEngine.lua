@@ -820,6 +820,10 @@ function SkinEngine:SetRegionPoints(frame, region, points)
 		return
 	end
 
+	if FramePointsMatch(region, points) then
+		return
+	end
+
 	self:RememberRegionPoints(frame, region)
 	region:ClearAllPoints()
 	for _, point in ipairs(points or {}) do
@@ -962,11 +966,23 @@ function SkinEngine:SetFontJustify(frame, fontString, justifyH, justifyV)
 		return
 	end
 
+	local needsH = justifyH and fontString.SetJustifyH
+	if needsH and fontString.GetJustifyH and fontString:GetJustifyH() == justifyH then
+		needsH = false
+	end
+	local needsV = justifyV and fontString.SetJustifyV
+	if needsV and fontString.GetJustifyV and fontString:GetJustifyV() == justifyV then
+		needsV = false
+	end
+	if not needsH and not needsV then
+		return
+	end
+
 	self:RememberFontJustify(frame, fontString)
-	if justifyH and fontString.SetJustifyH then
+	if needsH then
 		fontString:SetJustifyH(justifyH)
 	end
-	if justifyV and fontString.SetJustifyV then
+	if needsV then
 		fontString:SetJustifyV(justifyV)
 	end
 end

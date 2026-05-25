@@ -1959,6 +1959,10 @@ function DarkTheme:InstallGlobalTabHooks()
 	if not self.applyTabFontsHooked and type(BFL.ApplyTabFonts) == "function" then
 		self.applyTabFontsHooked = true
 		hooksecurefunc(BFL, "ApplyTabFonts", function()
+			local cache = BFL._tabFontCache
+			if cache and cache.appliedThisCall == false then
+				return
+			end
 			DarkTheme:SkinMainTabsDeferred()
 		end)
 	end
