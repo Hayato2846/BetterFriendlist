@@ -32,6 +32,31 @@ local function SafeCall(fn, ...)
 	pcall(fn, ...)
 end
 
+local function IsShown(frame)
+	if not frame then
+		return false
+	end
+	if frame.IsShown then
+		return frame:IsShown() == true
+	end
+	return true
+end
+
+local function GetSelectedPanelTab(frame)
+	if not frame then
+		return nil
+	end
+	return (PanelTemplates_GetSelectedTab and PanelTemplates_GetSelectedTab(frame)) or frame.selectedTab
+end
+
+local function BuildSkinKey(...)
+	local key = ""
+	for i = 1, select("#", ...) do
+		key = key .. ":" .. tostring(select(i, ...))
+	end
+	return key
+end
+
 local function SkinFrameByName(engine, name, variant)
 	local frame = _G[name]
 	if frame then
@@ -227,6 +252,138 @@ local function SkinIconButtonField(engine, parent, key, opts)
 	end
 end
 
+local function SetObjectShown(engine, owner, object, shown)
+	if not object then
+		return
+	end
+	if engine and engine.SetObjectShown then
+		engine:SetObjectShown(owner, object, shown)
+	elseif object.SetShown then
+		object:SetShown(shown == true)
+	elseif shown and object.Show then
+		object:Show()
+	elseif not shown and object.Hide then
+		object:Hide()
+	end
+end
+
+local function IsSimpleModeEnabled()
+	local DB = BFL and BFL.GetModule and BFL:GetModule("DB")
+	if DB and DB.Get then
+		return DB:Get("simpleMode", false) == true
+	end
+	return BetterFriendlistDB and BetterFriendlistDB.simpleMode == true
+end
+
+local DARK_PORTRAIT_SIZE = 42
+local DARK_PORTRAIT_OFFSET_X = 8
+local DARK_PORTRAIT_OFFSET_Y = -6
+
+local function RestorePortraitArtwork(engine, frame)
+	if not frame then
+		return
+	end
+
+	local portraitButton = frame.PortraitButton
+	local showPortrait = not IsSimpleModeEnabled()
+	if portraitButton then
+		portraitButton.BFL_DarkInvisibleOverlayButton = true
+		if engine then
+			engine:RestoreFrame(portraitButton)
+		end
+
+		if showPortrait then
+			if engine then
+				engine:SetFrameSize(portraitButton, DARK_PORTRAIT_SIZE, DARK_PORTRAIT_SIZE)
+				engine:SetFramePoints(portraitButton, {
+					{ "TOPLEFT", frame, "TOPLEFT", DARK_PORTRAIT_OFFSET_X, DARK_PORTRAIT_OFFSET_Y },
+				})
+			else
+				portraitButton:ClearAllPoints()
+				portraitButton:SetPoint("TOPLEFT", frame, "TOPLEFT", DARK_PORTRAIT_OFFSET_X, DARK_PORTRAIT_OFFSET_Y)
+				portraitButton:SetSize(DARK_PORTRAIT_SIZE, DARK_PORTRAIT_SIZE)
+			end
+			if portraitButton.SetFrameLevel and frame.GetFrameLevel then
+				portraitButton:SetFrameLevel((frame:GetFrameLevel() or 0) + 5)
+			end
+			SetObjectShown(engine, portraitButton, portraitButton, true)
+			if portraitButton.Icon and portraitButton.Icon ~= portraitButton.BFL_DarkPortraitIcon then
+				SetObjectShown(engine, portraitButton, portraitButton.Icon, false)
+			end
+
+			local icon = portraitButton.BFL_DarkPortraitIcon
+			if not icon and portraitButton.CreateTexture then
+				icon = portraitButton:CreateTexture(nil, "ARTWORK")
+				portraitButton.BFL_DarkPortraitIcon = icon
+				if engine and engine.RegisterOverlay then
+					engine:RegisterOverlay(portraitButton, icon)
+				end
+			end
+
+			if icon then
+				icon:ClearAllPoints()
+				icon:SetPoint("CENTER", portraitButton, "CENTER", 0, 0)
+				icon:SetSize(DARK_PORTRAIT_SIZE, DARK_PORTRAIT_SIZE)
+				if icon.SetTexture then
+					icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Textures\\PortraitIcon.blp")
+				end
+				if icon.SetTexCoord then
+					icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+				end
+				if icon.SetVertexColor then
+					icon:SetVertexColor(1, 1, 1, 1)
+				end
+				if icon.SetAlpha then
+					icon:SetAlpha(1)
+				end
+				if icon.SetDrawLayer then
+					icon:SetDrawLayer("ARTWORK", 0)
+				end
+				if portraitButton.BFL_DarkPortraitMask and icon.RemoveMaskTexture then
+					icon:RemoveMaskTexture(portraitButton.BFL_DarkPortraitMask)
+				end
+				portraitButton.BFL_DarkPortraitMaskApplied = nil
+				icon:Show()
+			end
+		else
+			if portraitButton.Icon and portraitButton.Icon ~= portraitButton.BFL_DarkPortraitIcon then
+				SetObjectShown(engine, portraitButton, portraitButton.Icon, false)
+			end
+			if portraitButton.BFL_DarkPortraitIcon then
+				portraitButton.BFL_DarkPortraitIcon:Hide()
+			end
+			if portraitButton.BFL_DarkPortraitMask then
+				portraitButton.BFL_DarkPortraitMask:Hide()
+			end
+			SetObjectShown(engine, portraitButton, portraitButton, false)
+		end
+	end
+
+	if frame.PortraitIcon then
+		if portraitButton and frame.PortraitIcon ~= portraitButton.BFL_DarkPortraitIcon then
+			SetObjectShown(engine, frame, frame.PortraitIcon, false)
+		elseif showPortrait and engine then
+			engine:SetTextureAlpha(frame, frame.PortraitIcon, 1)
+		elseif showPortrait then
+			frame.PortraitIcon:SetAlpha(1)
+		else
+			SetObjectShown(engine, frame, frame.PortraitIcon, false)
+		end
+	end
+	if frame.PortraitMask and frame.PortraitMask.Show then
+		if portraitButton and frame.PortraitMask ~= portraitButton.BFL_DarkPortraitMask then
+			SetObjectShown(engine, frame, frame.PortraitMask, false)
+		elseif showPortrait then
+			if frame.PortraitMask.SetAlpha then
+				frame.PortraitMask:SetAlpha(1)
+			end
+			frame.PortraitMask:Show()
+		else
+			SetObjectShown(engine, frame, frame.PortraitMask, false)
+		end
+	end
+end
+
 local function SkinDropdownField(engine, parent, key)
 	if parent and parent[key] then
 		engine:SkinDropdown(parent[key])
@@ -244,6 +401,14 @@ local function SkinScrollBarField(engine, parent, key)
 		parent[key].BFL_DarkWideScrollbar = true
 		engine:SkinScrollBar(parent[key])
 	end
+end
+
+local function RefreshFriendListRow(row)
+	local engine = DarkTheme.refreshFriendsListRowsEngine
+	if not engine or not row then
+		return
+	end
+	engine:RefreshRow(row)
 end
 
 local function SkinSettingsNavigation(engine, frame)
@@ -332,7 +497,12 @@ function DarkTheme:Remove(reason)
 	end
 
 	self.applied = nil
+	self.mainTabsSkinPending = nil
+	self.visibleMainContentRefreshPending = nil
+	self.visibleMainContentRefreshBottomTab = nil
+	self.visibleMainContentRefreshTopTab = nil
 	engine:Deactivate()
+	self:ClearMainFrameSkinKeys()
 end
 
 function DarkTheme:SkinKnownFrames(reason)
@@ -374,16 +544,243 @@ function DarkTheme:SkinMainTabs(engine)
 end
 
 function DarkTheme:SkinMainTabsDeferred()
-	if not BFL:IsThemeActive("dark") then
+	local engine = GetEngine()
+	if not engine or not engine:IsActive() then
+		self.mainTabsSkinPending = nil
 		return
 	end
 
+	if self.mainTabsSkinPending then
+		return
+	end
+	self.mainTabsSkinPending = true
+
+	local function FlushMainTabs()
+		self.mainTabsSkinPending = nil
+		local delayedEngine = GetEngine()
+		if delayedEngine and delayedEngine:IsActive() then
+			self:SkinMainTabs(delayedEngine)
+		end
+	end
+
 	if C_Timer and C_Timer.After then
-		C_Timer.After(0, function()
-			self:SkinMainTabs()
-		end)
+		C_Timer.After(0, FlushMainTabs)
 	else
-		self:SkinMainTabs()
+		FlushMainTabs()
+	end
+end
+
+local function GetMainFrameStaticSkinKey(frame)
+	local header = frame and frame.FriendsTabHeader
+	local bnetFrame = header and header.BattlenetFrame
+	local broadcast = header and header.BroadcastFrame
+	return BuildSkinKey(
+		frame,
+		frame and frame.Inset,
+		frame and frame.ScrollFrame,
+		frame and frame.MinimalScrollBar,
+		frame and frame.AddFriendButton,
+		frame and frame.SendMessageButton,
+		frame and frame.RecruitmentButton,
+		frame and frame.PortraitButton,
+		frame and frame.StreamerModeButton,
+		frame and frame.HelpButton,
+		header,
+		bnetFrame,
+		broadcast,
+		broadcast and broadcast.EditBox,
+		broadcast and broadcast.UpdateButton,
+		broadcast and broadcast.CancelButton,
+		header and header.StatusDropdown,
+		header and header.SearchBox,
+		header and header.QuickFilterDropdown,
+		header and header.PrimarySortDropdown,
+		header and header.SecondarySortDropdown,
+		bnetFrame and bnetFrame.ContactsMenuButton,
+		bnetFrame and bnetFrame.SettingsButton
+	)
+end
+
+function DarkTheme:ClearMainFrameSkinKeys()
+	local frame = _G.BetterFriendsFrame
+	if not frame then
+		return
+	end
+
+	frame.BFL_DarkMainFrameStaticSkinKey = nil
+	local who = frame.WhoFrame
+	if who then
+		who.BFL_DarkWhoStaticSkinKey = nil
+		who.BFL_DarkWhoBuilderSkinKey = nil
+	end
+	if frame.QuickJoinFrame then
+		frame.QuickJoinFrame.BFL_DarkQuickJoinSkinKey = nil
+	end
+	if frame.RecentAlliesFrame then
+		frame.RecentAlliesFrame.BFL_DarkRecentAlliesSkinKey = nil
+	end
+	if frame.RecruitAFriendFrame then
+		frame.RecruitAFriendFrame.BFL_DarkRAFSkinKey = nil
+	end
+	if frame.RaidFrame then
+		frame.RaidFrame.BFL_DarkRaidSkinKey = nil
+	end
+	if frame.IgnoreListWindow then
+		frame.IgnoreListWindow.BFL_DarkIgnoreListSkinKey = nil
+	end
+	if frame.GuildFrame then
+		frame.GuildFrame.BFL_DarkGuildSkinKey = nil
+	end
+end
+
+function DarkTheme:RefreshMainFrameControls(engine, frame)
+	if not engine or not frame then
+		return
+	end
+
+	self:LayoutMainListChrome(engine, frame)
+	self:LayoutMainTitleButtons(engine, frame)
+	self:SkinMainTabs(engine)
+
+	for _, key in ipairs({
+		"AddFriendButton",
+		"SendMessageButton",
+		"RecruitmentButton",
+	}) do
+		if frame[key] then
+			engine:ApplyButtonState(frame[key])
+		end
+	end
+
+	local header = frame.FriendsTabHeader
+	if header then
+		self:LayoutHeaderButtons(engine, header)
+		local bnetFrame = header.BattlenetFrame
+		if bnetFrame then
+			if bnetFrame.ContactsMenuButton then
+				engine:ApplyButtonState(bnetFrame.ContactsMenuButton)
+			end
+			if bnetFrame.SettingsButton then
+				engine:ApplyButtonState(bnetFrame.SettingsButton)
+			end
+		end
+	end
+end
+
+function DarkTheme:SkinVisibleMainContent(engine, frame)
+	frame = frame or _G.BetterFriendsFrame
+	if not engine or not engine:IsActive() or not frame then
+		return
+	end
+
+	if IsShown(frame.ScrollFrame) or IsShown(frame.MinimalScrollBar) then
+		self:SkinFriendsListRows(engine)
+	end
+	if IsShown(frame.RecentAlliesFrame) then
+		self:SkinRecentAlliesFrame(engine)
+	end
+	if IsShown(frame.RecruitAFriendFrame) then
+		self:SkinRAFFrame(engine)
+	end
+	if IsShown(frame.WhoFrame) then
+		self:SkinWhoFrame(engine)
+	end
+	if IsShown(frame.RaidFrame) then
+		self:SkinRaidFrame(engine)
+	end
+	if IsShown(frame.QuickJoinFrame) then
+		self:SkinQuickJoin(engine)
+	end
+	if IsShown(frame.IgnoreListWindow) then
+		self:SkinIgnoreList(engine)
+	end
+	if IsShown(frame.GuildFrame) then
+		self:SkinGuildFrame(engine)
+	end
+end
+
+function DarkTheme:SkinMainContentForTabs(engine, frame, bottomTabIndex, topTabIndex)
+	frame = frame or _G.BetterFriendsFrame
+	if not engine or not engine:IsActive() or not frame then
+		return
+	end
+
+	bottomTabIndex = bottomTabIndex or GetSelectedPanelTab(frame) or 1
+
+	if bottomTabIndex == 1 then
+		topTabIndex = topTabIndex or GetSelectedPanelTab(frame.FriendsTabHeader) or 1
+		if BFL.IsClassic and topTabIndex == 2 then
+			self:SkinWhoFrame(engine)
+		elseif BFL.IsClassic and topTabIndex == 4 then
+			self:SkinRaidFrame(engine)
+		elseif BFL.IsClassic or topTabIndex == 1 then
+			self:SkinFriendsListRows(engine)
+		elseif topTabIndex == 2 then
+			self:SkinRecentAlliesFrame(engine)
+		elseif topTabIndex == 3 then
+			self:SkinRAFFrame(engine)
+		elseif topTabIndex == 4 then
+			self:SkinGuildFrame(engine)
+		else
+			self:SkinVisibleMainContent(engine, frame)
+		end
+	elseif bottomTabIndex == 2 then
+		self:SkinWhoFrame(engine)
+	elseif bottomTabIndex == 3 then
+		if BFL.IsClassic then
+			self:SkinGuildFrame(engine)
+		else
+			self:SkinRaidFrame(engine)
+		end
+	elseif bottomTabIndex == 4 then
+		if BFL.IsClassic then
+			self:SkinRaidFrame(engine)
+		else
+			self:SkinQuickJoin(engine)
+		end
+	else
+		self:SkinVisibleMainContent(engine, frame)
+	end
+end
+
+function DarkTheme:RefreshVisibleMainContentDeferred(bottomTabIndex, topTabIndex)
+	local engine = GetEngine()
+	if not engine or not engine:IsActive() then
+		self.visibleMainContentRefreshPending = nil
+		self.visibleMainContentRefreshBottomTab = nil
+		self.visibleMainContentRefreshTopTab = nil
+		return
+	end
+
+	if bottomTabIndex then
+		self.visibleMainContentRefreshBottomTab = bottomTabIndex
+	end
+	if topTabIndex then
+		self.visibleMainContentRefreshTopTab = topTabIndex
+	end
+
+	if self.visibleMainContentRefreshPending then
+		return
+	end
+	self.visibleMainContentRefreshPending = true
+
+	local function FlushVisibleMainContent()
+		self.visibleMainContentRefreshPending = nil
+		local pendingBottomTab = self.visibleMainContentRefreshBottomTab
+		local pendingTopTab = self.visibleMainContentRefreshTopTab
+		self.visibleMainContentRefreshBottomTab = nil
+		self.visibleMainContentRefreshTopTab = nil
+		local delayedEngine = GetEngine()
+		local frame = _G.BetterFriendsFrame
+		if delayedEngine and delayedEngine:IsActive() and frame then
+			self:SkinMainContentForTabs(delayedEngine, frame, pendingBottomTab, pendingTopTab)
+		end
+	end
+
+	if C_Timer and C_Timer.After then
+		C_Timer.After(0, FlushVisibleMainContent)
+	else
+		FlushVisibleMainContent()
 	end
 end
 
@@ -667,51 +1064,54 @@ function DarkTheme:SkinMainFrame(engine)
 		return
 	end
 
-	engine:SkinFrame(frame, "main", { stripTextures = true, textureAlpha = 0.10 })
-	engine:SkinTree(frame, 6)
-	engine:StripButtonFrameArtwork(frame)
+	local staticSkinKey = GetMainFrameStaticSkinKey(frame)
+	if frame.BFL_DarkMainFrameStaticSkinKey ~= staticSkinKey or not frame.BFL_DarkBackdrop then
+		frame.BFL_DarkMainFrameStaticSkinKey = staticSkinKey
+		RestorePortraitArtwork(engine, frame)
+		engine:SkinFrame(frame, "main", { stripTextures = true, textureAlpha = 0.10 })
+		engine:SkinTree(frame, 6)
+		engine:StripButtonFrameArtwork(frame)
+		RestorePortraitArtwork(engine, frame)
 
-	self:LayoutMainListChrome(engine, frame)
-	HideFieldChrome(engine, frame, "Inset")
-	SkinField(engine, frame, "ScrollFrame", "inset")
-	SkinScrollBarField(engine, frame, "MinimalScrollBar")
-	SkinButtonField(engine, frame, "AddFriendButton")
-	SkinButtonField(engine, frame, "SendMessageButton")
-	SkinButtonField(engine, frame, "RecruitmentButton")
-	SkinButtonField(engine, frame, "PortraitButton")
-	SkinIconButtonField(engine, frame, "StreamerModeButton", { texture = frame.StreamerModeButton and frame.StreamerModeButton.Icon, size = 18 })
-	SkinIconButtonField(engine, frame, "HelpButton", { texture = frame.HelpButton and frame.HelpButton.Icon, size = 18 })
-	self:LayoutMainTitleButtons(engine, frame)
-	self:SkinMainTabs(engine)
+		HideFieldChrome(engine, frame, "Inset")
+		SkinField(engine, frame, "ScrollFrame", "inset")
+		SkinScrollBarField(engine, frame, "MinimalScrollBar")
+		SkinButtonField(engine, frame, "AddFriendButton")
+		SkinButtonField(engine, frame, "SendMessageButton")
+		SkinButtonField(engine, frame, "RecruitmentButton")
+		local streamerActive = BFL.StreamerMode and BFL.StreamerMode.IsActive and BFL.StreamerMode:IsActive()
+		SkinIconButtonField(engine, frame, "StreamerModeButton", {
+			texture = frame.StreamerModeButton and frame.StreamerModeButton.Icon,
+			size = 18,
+			color = streamerActive and { 0.64, 0.33, 1.0, 1 } or { 0.62, 0.62, 0.64, 0.82 },
+			hoverColor = streamerActive and { 0.78, 0.52, 1.0, 1 } or { 0.86, 0.86, 0.88, 1 },
+			downColor = streamerActive and { 0.54, 0.24, 0.88, 1 } or { 0.48, 0.48, 0.50, 1 },
+		})
+		SkinIconButtonField(engine, frame, "HelpButton", { texture = frame.HelpButton and frame.HelpButton.Icon, size = 18 })
 
-	local header = frame.FriendsTabHeader
-	if header then
-		engine:SkinFrame(header, "panel")
-		SkinField(engine, header, "BattlenetFrame", "panel")
-		SkinField(engine, header, "BroadcastFrame", "popup")
-		if header.BroadcastFrame then
-			SkinEditBoxField(engine, header.BroadcastFrame, "EditBox")
-			SkinButtonField(engine, header.BroadcastFrame, "UpdateButton")
-			SkinButtonField(engine, header.BroadcastFrame, "CancelButton")
+		local header = frame.FriendsTabHeader
+		if header then
+			engine:SkinFrame(header, "panel")
+			SkinField(engine, header, "BattlenetFrame", "panel")
+			SkinField(engine, header, "BroadcastFrame", "popup")
+			if header.BroadcastFrame then
+				SkinEditBoxField(engine, header.BroadcastFrame, "EditBox")
+				SkinButtonField(engine, header.BroadcastFrame, "UpdateButton")
+				SkinButtonField(engine, header.BroadcastFrame, "CancelButton")
+			end
+			SkinDropdownField(engine, header, "StatusDropdown")
+			SkinEditBoxField(engine, header, "SearchBox")
+			SkinDropdownField(engine, header, "QuickFilterDropdown")
+			SkinDropdownField(engine, header, "PrimarySortDropdown")
+			SkinDropdownField(engine, header, "SecondarySortDropdown")
+			SkinButtonField(engine, header.BattlenetFrame, "ContactsMenuButton")
+			SkinButtonField(engine, header.BattlenetFrame, "SettingsButton")
 		end
-		SkinDropdownField(engine, header, "StatusDropdown")
-		SkinEditBoxField(engine, header, "SearchBox")
-		SkinDropdownField(engine, header, "QuickFilterDropdown")
-		SkinDropdownField(engine, header, "PrimarySortDropdown")
-		SkinDropdownField(engine, header, "SecondarySortDropdown")
-		SkinButtonField(engine, header.BattlenetFrame, "ContactsMenuButton")
-		SkinButtonField(engine, header.BattlenetFrame, "SettingsButton")
-		self:LayoutHeaderButtons(engine, header)
 	end
 
-	self:SkinFriendsListRows(engine)
-	self:SkinRecentAlliesFrame(engine)
-	self:SkinRAFFrame(engine)
-	self:SkinWhoFrame(engine)
-	self:SkinRaidFrame(engine)
-	self:SkinQuickJoin(engine)
-	self:SkinIgnoreList(engine)
-	self:SkinGuildFrame(engine)
+	RestorePortraitArtwork(engine, frame)
+	self:RefreshMainFrameControls(engine, frame)
+	self:SkinVisibleMainContent(engine, frame)
 end
 
 function DarkTheme:SkinFriendsListRows(engine)
@@ -726,20 +1126,80 @@ function DarkTheme:SkinFriendsListRows(engine)
 		end)
 	end
 
-	local pools = {
-		FriendsList.classicButtonPool,
-		FriendsList.classicHeaderPool,
-		FriendsList.classicInviteHeaderPool,
-		FriendsList.classicInviteButtonPool,
-		FriendsList.classicDividerPool,
-	}
-	for _, pool in ipairs(pools) do
-		if pool then
-			for _, row in ipairs(pool) do
-				engine:SkinRow(row)
-			end
+	local pool = FriendsList.classicButtonPool
+	if pool then
+		for _, row in ipairs(pool) do
+			engine:SkinRow(row)
 		end
 	end
+	pool = FriendsList.classicHeaderPool
+	if pool then
+		for _, row in ipairs(pool) do
+			engine:SkinRow(row)
+		end
+	end
+	pool = FriendsList.classicInviteHeaderPool
+	if pool then
+		for _, row in ipairs(pool) do
+			engine:SkinRow(row)
+		end
+	end
+	pool = FriendsList.classicInviteButtonPool
+	if pool then
+		for _, row in ipairs(pool) do
+			engine:SkinRow(row)
+		end
+	end
+	pool = FriendsList.classicDividerPool
+	if pool then
+		for _, row in ipairs(pool) do
+			engine:SkinRow(row)
+		end
+	end
+end
+
+function DarkTheme:RefreshFriendsListRows(engine)
+	local FriendsList = BFL:GetModule("FriendsList")
+	if not FriendsList then
+		return
+	end
+
+	self.refreshFriendsListRowsEngine = engine
+	if FriendsList.scrollBox and FriendsList.scrollBox.ForEachFrame then
+		FriendsList.scrollBox:ForEachFrame(RefreshFriendListRow)
+	end
+
+	local pool = FriendsList.classicButtonPool
+	if pool then
+		for _, row in ipairs(pool) do
+			RefreshFriendListRow(row)
+		end
+	end
+	pool = FriendsList.classicHeaderPool
+	if pool then
+		for _, row in ipairs(pool) do
+			RefreshFriendListRow(row)
+		end
+	end
+	pool = FriendsList.classicInviteHeaderPool
+	if pool then
+		for _, row in ipairs(pool) do
+			RefreshFriendListRow(row)
+		end
+	end
+	pool = FriendsList.classicInviteButtonPool
+	if pool then
+		for _, row in ipairs(pool) do
+			RefreshFriendListRow(row)
+		end
+	end
+	pool = FriendsList.classicDividerPool
+	if pool then
+		for _, row in ipairs(pool) do
+			RefreshFriendListRow(row)
+		end
+	end
+	self.refreshFriendsListRowsEngine = nil
 end
 
 function DarkTheme:SkinRecentAlliesFrame(engine)
@@ -748,6 +1208,12 @@ function DarkTheme:SkinRecentAlliesFrame(engine)
 	if not recent then
 		return
 	end
+
+	local staticSkinKey = BuildSkinKey(recent, recent.ScrollBox, recent.ScrollBar, recent.ClassicScrollBar)
+	if recent.BFL_DarkRecentAlliesSkinKey == staticSkinKey then
+		return
+	end
+	recent.BFL_DarkRecentAlliesSkinKey = staticSkinKey
 
 	SkinTabListSurface(engine, recent, recent.ScrollBox, recent.ScrollBar)
 	engine:SkinTree(recent, 5)
@@ -760,9 +1226,36 @@ function DarkTheme:SkinRAFFrame(engine)
 		return
 	end
 
+	local reward = raf.RewardClaiming
+	local recruitList = raf.RecruitList
+	local splash = raf.SplashFrame
+	local staticSkinKey = BuildSkinKey(
+		raf,
+		reward,
+		reward and reward.NextRewardInfoButton,
+		reward and reward.NextRewardButton,
+		reward and reward.ClaimOrViewRewardButton,
+		recruitList,
+		recruitList and recruitList.Header,
+		recruitList and recruitList.ScrollBox,
+		recruitList and recruitList.ScrollBar,
+		recruitList and recruitList.ClassicScrollBar,
+		splash,
+		splash and splash.OKButton
+	)
+	if raf.BFL_DarkRAFSkinKey == staticSkinKey then
+		if reward and reward.ClaimOrViewRewardButton then
+			engine:ApplyButtonState(reward.ClaimOrViewRewardButton)
+		end
+		if splash and splash.OKButton then
+			engine:ApplyButtonState(splash.OKButton)
+		end
+		return
+	end
+	raf.BFL_DarkRAFSkinKey = staticSkinKey
+
 	HideFrameChrome(engine, raf)
 
-	local reward = raf.RewardClaiming
 	if reward then
 		engine:SkinFrame(reward, "panel", { stripTextures = true, textureAlpha = 0 })
 		SkinNativeTextureButtonField(engine, reward, "NextRewardInfoButton")
@@ -771,7 +1264,6 @@ function DarkTheme:SkinRAFFrame(engine)
 		engine:SkinTree(reward, 4)
 	end
 
-	local recruitList = raf.RecruitList
 	if recruitList then
 		HideFieldChrome(engine, recruitList, "Header")
 		SkinTabListSurface(engine, recruitList, recruitList.ScrollBox, recruitList.ScrollBar)
@@ -779,7 +1271,6 @@ function DarkTheme:SkinRAFFrame(engine)
 		engine:SkinTree(recruitList, 5)
 	end
 
-	local splash = raf.SplashFrame
 	if splash then
 		engine:SkinFrame(splash, "popup", { stripTextures = true, textureAlpha = 0 })
 		SkinButtonField(engine, splash, "OKButton")
@@ -794,65 +1285,118 @@ function DarkTheme:SkinWhoFrame(engine)
 		return
 	end
 
-	self:LayoutWhoColumnHeaders(engine, who)
-	self:LayoutWhoListChrome(engine, who)
-	SkinField(engine, who, "ListInset", "inset")
-	SkinEditBoxField(engine, who, "EditBox")
-	SkinDropdownField(engine, who, "ColumnDropdown")
-	SkinColumnHeaderField(engine, who, "NameHeader")
-	SkinColumnHeaderField(engine, who, "LevelHeader")
-	SkinColumnHeaderField(engine, who, "ClassHeader")
-	SkinButtonField(engine, who, "WhoButton")
-	SkinButtonField(engine, who, "AddFriendButton")
-	SkinButtonField(engine, who, "GroupInviteButton")
+	local staticSkinKey = tostring(who.ScrollBox)
+		.. ":"
+		.. tostring(who.ScrollBar)
+		.. ":"
+		.. tostring(who.ClassicScrollBar)
+		.. ":"
+		.. tostring(who.ListInset)
+		.. ":"
+		.. tostring(who.EditBox)
+		.. ":"
+		.. tostring(who.ColumnDropdown)
+		.. ":"
+		.. tostring(who.NameHeader)
+		.. ":"
+		.. tostring(who.LevelHeader)
+		.. ":"
+		.. tostring(who.ClassHeader)
+		.. ":"
+		.. tostring(who.WhoButton)
+		.. ":"
+		.. tostring(who.AddFriendButton)
+		.. ":"
+		.. tostring(who.GroupInviteButton)
+	if who.BFL_DarkWhoStaticSkinKey ~= staticSkinKey then
+		who.BFL_DarkWhoStaticSkinKey = staticSkinKey
+		self:LayoutWhoColumnHeaders(engine, who)
+		self:LayoutWhoListChrome(engine, who)
+		SkinField(engine, who, "ListInset", "inset")
+		SkinEditBoxField(engine, who, "EditBox")
+		SkinDropdownField(engine, who, "ColumnDropdown")
+		SkinColumnHeaderField(engine, who, "NameHeader")
+		SkinColumnHeaderField(engine, who, "LevelHeader")
+		SkinColumnHeaderField(engine, who, "ClassHeader")
+		SkinButtonField(engine, who, "WhoButton")
+		SkinButtonField(engine, who, "AddFriendButton")
+		SkinButtonField(engine, who, "GroupInviteButton")
+	else
+		if who.WhoButton then
+			engine:ApplyButtonState(who.WhoButton)
+		end
+		if who.AddFriendButton then
+			engine:ApplyButtonState(who.AddFriendButton)
+		end
+		if who.GroupInviteButton then
+			engine:ApplyButtonState(who.GroupInviteButton)
+		end
+	end
 
 	local WhoFrame = BFL:GetModule("WhoFrame")
 	if WhoFrame then
-		if WhoFrame.builderToggle then
-			WhoFrame.builderToggle.BFL_DarkNoButtonChrome = true
-			engine:RestoreFrame(WhoFrame.builderToggle)
-		end
-		if WhoFrame.builderDockBtn then
-			WhoFrame.builderDockBtn.BFL_DarkNoButtonChrome = true
-			engine:RestoreFrame(WhoFrame.builderDockBtn)
-		end
-		if WhoFrame.builderFlyout then
-			if WhoFrame.builderDocked then
-				HideFrameChrome(engine, WhoFrame.builderFlyout)
-			else
-				engine:SkinFrame(WhoFrame.builderFlyout, "popup", { stripTextures = true, textureAlpha = 0 })
+		local builderContainer = WhoFrame.builderDockedContainer or WhoFrame.builderContainer or _G.BetterFriendlistSearchBuilderFrame
+		local builderSkinKey = tostring(WhoFrame.builderToggle)
+			.. ":"
+			.. tostring(WhoFrame.builderDockBtn)
+			.. ":"
+			.. tostring(WhoFrame.builderFlyout)
+			.. ":"
+			.. tostring(WhoFrame.builderDocked)
+			.. ":"
+			.. tostring(builderContainer)
+			.. ":"
+			.. tostring(WhoFrame.builderCloseBtn)
+			.. ":"
+			.. tostring(_G.BetterFriendlistSearchBuilderFrame)
+		if who.BFL_DarkWhoBuilderSkinKey ~= builderSkinKey then
+			who.BFL_DarkWhoBuilderSkinKey = builderSkinKey
+			if WhoFrame.builderToggle then
+				WhoFrame.builderToggle.BFL_DarkNoButtonChrome = true
+				engine:RestoreFrame(WhoFrame.builderToggle)
 			end
-			engine:SkinTree(WhoFrame.builderFlyout, 6)
-			if WhoFrame.builderCloseBtn then
-				WhoFrame.builderCloseBtn.BFL_DarkNoButtonChrome = nil
-				engine:SkinCloseButton(WhoFrame.builderCloseBtn)
+			if WhoFrame.builderDockBtn then
+				WhoFrame.builderDockBtn.BFL_DarkNoButtonChrome = true
+				engine:RestoreFrame(WhoFrame.builderDockBtn)
+			end
+			if WhoFrame.builderFlyout then
+				if WhoFrame.builderDocked then
+					HideFrameChrome(engine, WhoFrame.builderFlyout)
+				else
+					engine:SkinFrame(WhoFrame.builderFlyout, "popup", { stripTextures = true, textureAlpha = 0 })
+				end
+				engine:SkinTree(WhoFrame.builderFlyout, 6)
+				if WhoFrame.builderCloseBtn then
+					WhoFrame.builderCloseBtn.BFL_DarkNoButtonChrome = nil
+					engine:SkinCloseButton(WhoFrame.builderCloseBtn)
+				end
+			end
+
+			if builderContainer then
+				engine:SkinFrame(builderContainer, "popup", { stripTextures = true, textureAlpha = 0 })
+				HideFieldChrome(engine, builderContainer, "Inset")
+				HideFieldChrome(engine, builderContainer, "InsetRight")
+				engine:SkinTree(builderContainer, 6)
+				if builderContainer.CloseButton then
+					builderContainer.CloseButton.BFL_DarkNoButtonChrome = true
+					engine:RestoreFrame(builderContainer.CloseButton)
+				end
+			end
+			if WhoFrame.builderDocked and WhoFrame.builderFlyout then
+				HideFrameChrome(engine, WhoFrame.builderFlyout)
+			end
+
+			local searchBuilderFrame = _G.BetterFriendlistSearchBuilderFrame
+			if searchBuilderFrame then
+				engine:SkinFrame(searchBuilderFrame, "popup", { stripTextures = true, textureAlpha = 0 })
 			end
 		end
 
-		local builderContainer = WhoFrame.builderDockedContainer or WhoFrame.builderContainer or _G.BetterFriendlistSearchBuilderFrame
-		if builderContainer then
-			engine:SkinFrame(builderContainer, "popup", { stripTextures = true, textureAlpha = 0 })
-			HideFieldChrome(engine, builderContainer, "Inset")
-			HideFieldChrome(engine, builderContainer, "InsetRight")
-			engine:SkinTree(builderContainer, 6)
-			if builderContainer.CloseButton then
-				builderContainer.CloseButton.BFL_DarkNoButtonChrome = true
-				engine:RestoreFrame(builderContainer.CloseButton)
-			end
-		end
-		if WhoFrame.builderDocked and WhoFrame.builderFlyout then
-			HideFrameChrome(engine, WhoFrame.builderFlyout)
-		end
 		if WhoFrame.classicWhoButtonPool then
 			for _, row in ipairs(WhoFrame.classicWhoButtonPool) do
 				engine:SkinRow(row)
 			end
 		end
-	end
-
-	local searchBuilderFrame = _G.BetterFriendlistSearchBuilderFrame
-	if searchBuilderFrame then
-		engine:SkinFrame(searchBuilderFrame, "popup", { stripTextures = true, textureAlpha = 0 })
 	end
 end
 
@@ -862,6 +1406,32 @@ function DarkTheme:SkinRaidFrame(engine)
 	if not raid then
 		return
 	end
+
+	local control = raid.ControlPanel
+	local staticSkinKey = BuildSkinKey(
+		raid,
+		control,
+		control and control.RaidInfoButton,
+		control and control.EveryoneAssistCheckbox,
+		raid.GroupsInset,
+		raid.ConvertToRaidButton,
+		raid.RaidToolsButton,
+		raid.CombatIcon
+	)
+	if raid.BFL_DarkRaidSkinKey == staticSkinKey then
+		for _, button in ipairs({
+			control and control.RaidInfoButton,
+			raid.ConvertToRaidButton,
+			raid.RaidToolsButton,
+			raid.CombatIcon,
+		}) do
+			if button then
+				engine:ApplyButtonState(button)
+			end
+		end
+		return
+	end
+	raid.BFL_DarkRaidSkinKey = staticSkinKey
 
 	HideFrameChrome(engine, raid)
 	HideFieldChrome(engine, raid, "ControlPanel")
@@ -884,10 +1454,28 @@ function DarkTheme:SkinQuickJoin(engine)
 		return
 	end
 
-	HideFrameChrome(engine, quickJoin)
-	if quickJoin.ContentInset then
-		self:LayoutQuickJoinListChrome(engine, quickJoin)
-		SkinButtonField(engine, quickJoin.ContentInset, "JoinQueueButton")
+	local content = quickJoin.ContentInset
+	if content then
+		local listSurface = content.ScrollBoxContainer or content.ScrollBox
+		local skinKey = tostring(content)
+			.. ":"
+			.. tostring(listSurface)
+			.. ":"
+			.. tostring(content.ScrollBar)
+			.. ":"
+			.. tostring(content.ClassicScrollBar)
+			.. ":"
+			.. tostring(content.JoinQueueButton)
+		if quickJoin.BFL_DarkQuickJoinSkinKey ~= skinKey then
+			quickJoin.BFL_DarkQuickJoinSkinKey = skinKey
+			HideFrameChrome(engine, quickJoin)
+			self:LayoutQuickJoinListChrome(engine, quickJoin)
+			SkinButtonField(engine, content, "JoinQueueButton")
+		elseif content.JoinQueueButton then
+			engine:ApplyButtonState(content.JoinQueueButton)
+		end
+	else
+		HideFrameChrome(engine, quickJoin)
 	end
 end
 
@@ -897,6 +1485,30 @@ function DarkTheme:SkinIgnoreList(engine)
 	if not ignore then
 		return
 	end
+
+	local staticSkinKey = BuildSkinKey(
+		ignore,
+		ignore.UnignorePlayerButton,
+		ignore.GlobalIgnoreListButton,
+		ignore.EnhanceQoLIgnoreButton,
+		ignore.ScrollBox,
+		ignore.ScrollBar,
+		ignore.ClassicScrollBar,
+		ignore.Inset and ignore.Inset.ClassicScrollBar
+	)
+	if ignore.BFL_DarkIgnoreListSkinKey == staticSkinKey then
+		for _, button in ipairs({
+			ignore.UnignorePlayerButton,
+			ignore.GlobalIgnoreListButton,
+			ignore.EnhanceQoLIgnoreButton,
+		}) do
+			if button then
+				engine:ApplyButtonState(button)
+			end
+		end
+		return
+	end
+	ignore.BFL_DarkIgnoreListSkinKey = staticSkinKey
 
 	engine:SkinFrame(ignore, "popup", { stripTextures = true, textureAlpha = 0.08 })
 	SkinButtonField(engine, ignore, "UnignorePlayerButton")
@@ -915,6 +1527,46 @@ function DarkTheme:SkinGuildFrame(engine)
 	if not guild then
 		return
 	end
+
+	local staticSkinKey = BuildSkinKey(
+		guild,
+		guild.SearchBox,
+		guild.ListInset,
+		guild.ScrollBox,
+		guild.ScrollBar,
+		guild.NameHeader,
+		guild.RankHeader,
+		guild.LevelHeader,
+		guild.ZoneHeader,
+		guild.ILvlHeader,
+		guild.FilterAll,
+		guild.FilterOnline,
+		guild.FilterOffline,
+		guild.OpenBlizzardGuildButton,
+		guild.RefreshButton,
+		guild.InvitePlayerButton
+	)
+	if guild.BFL_DarkGuildSkinKey == staticSkinKey then
+		for _, key in ipairs({
+			"NameHeader",
+			"RankHeader",
+			"LevelHeader",
+			"ZoneHeader",
+			"ILvlHeader",
+			"FilterAll",
+			"FilterOnline",
+			"FilterOffline",
+			"OpenBlizzardGuildButton",
+			"RefreshButton",
+			"InvitePlayerButton",
+		}) do
+			if guild[key] then
+				engine:ApplyButtonState(guild[key])
+			end
+		end
+		return
+	end
+	guild.BFL_DarkGuildSkinKey = staticSkinKey
 
 	engine:SkinFrame(guild, "panel")
 	SkinEditBoxField(engine, guild, "SearchBox")
@@ -1070,7 +1722,12 @@ function DarkTheme:SkinSettingsFrameDeferred()
 	end
 
 	if C_Timer and C_Timer.After then
+		if self.settingsSkinPending then
+			return
+		end
+		self.settingsSkinPending = true
 		C_Timer.After(0, function()
+			self.settingsSkinPending = nil
 			local delayedEngine = GetEngine()
 			if delayedEngine and delayedEngine:IsActive() then
 				self:SkinSettingsFrame(delayedEngine)
@@ -1094,8 +1751,41 @@ function DarkTheme:WrapModuleMethod(moduleName, methodName, after)
 	local original = module[methodName]
 	module[methodName] = function(moduleSelf, ...)
 		local r1, r2, r3, r4 = original(moduleSelf, ...)
-		if BFL:IsThemeActive("dark") then
-			SafeCall(after, moduleSelf, r1, r2, r3, r4, ...)
+		local engine = GetEngine()
+		if engine and engine:IsActive() then
+			after(moduleSelf, r1, r2, r3, r4, ...)
+		end
+		return r1, r2, r3, r4
+	end
+end
+
+function DarkTheme:RefreshUpdatedFriendRow(button)
+	local engine = GetEngine()
+	if engine then
+		self.friendListRowUpdateCounter = (self.friendListRowUpdateCounter or 0) + 1
+		engine:RefreshRow(button)
+	end
+end
+
+function DarkTheme:WrapFriendsListRenderMethod(methodName)
+	local module = BFL:GetModule("FriendsList")
+	if not module or type(module[methodName]) ~= "function" then
+		return
+	end
+
+	local hookKey = "BFL_DarkHook_" .. methodName
+	if module[hookKey] then
+		return
+	end
+	module[hookKey] = true
+
+	local original = module[methodName]
+	module[methodName] = function(moduleSelf, ...)
+		local rowUpdateCounter = self.friendListRowUpdateCounter or 0
+		local r1, r2, r3, r4 = original(moduleSelf, ...)
+		local engine = GetEngine()
+		if engine and engine:IsActive() and (self.friendListRowUpdateCounter or 0) == rowUpdateCounter then
+			self:RefreshFriendsListRows(engine)
 		end
 		return r1, r2, r3, r4
 	end
@@ -1227,41 +1917,19 @@ function DarkTheme:InstallHooks()
 	end
 
 	self:WrapModuleMethod("FriendsList", "UpdateFriendButton", function(_, _, _, _, _, button)
-		local engine = GetEngine()
-		if engine then
-			engine:SkinRow(button)
-		end
+		self:RefreshUpdatedFriendRow(button)
 	end)
 	self:WrapModuleMethod("FriendsList", "UpdateGroupHeaderButton", function(_, _, _, _, _, button)
-		local engine = GetEngine()
-		if engine then
-			engine:SkinRow(button)
-		end
+		self:RefreshUpdatedFriendRow(button)
 	end)
 	self:WrapModuleMethod("FriendsList", "UpdateInviteHeaderButton", function(_, _, _, _, _, button)
-		local engine = GetEngine()
-		if engine then
-			engine:SkinRow(button)
-		end
+		self:RefreshUpdatedFriendRow(button)
 	end)
 	self:WrapModuleMethod("FriendsList", "UpdateInviteButton", function(_, _, _, _, _, button)
-		local engine = GetEngine()
-		if engine then
-			engine:SkinRow(button)
-		end
+		self:RefreshUpdatedFriendRow(button)
 	end)
-	self:WrapModuleMethod("FriendsList", "RenderDisplay", function()
-		local engine = GetEngine()
-		if engine then
-			self:SkinFriendsListRows(engine)
-		end
-	end)
-	self:WrapModuleMethod("FriendsList", "RenderClassicButtons", function()
-		local engine = GetEngine()
-		if engine then
-			self:SkinFriendsListRows(engine)
-		end
-	end)
+	self:WrapFriendsListRenderMethod("RenderDisplay")
+	self:WrapFriendsListRenderMethod("RenderClassicButtons")
 
 	self:WrapModuleMethod("RecentAllies", "OnLoad", function()
 		local engine = GetEngine()
@@ -1416,22 +2084,36 @@ function DarkTheme:InstallGlobalTabHooks()
 
 	if not self.bottomTabHooked and type(_G.BetterFriendsFrame_ShowBottomTab) == "function" then
 		self.bottomTabHooked = true
-		hooksecurefunc("BetterFriendsFrame_ShowBottomTab", function()
-			DarkTheme:SkinMainTabsDeferred()
+		hooksecurefunc("BetterFriendsFrame_ShowBottomTab", function(tabIndex)
+			DarkTheme:RefreshVisibleMainContentDeferred(tabIndex)
 		end)
 	end
 
 	if not self.topTabHooked and type(_G.BetterFriendsFrame_ShowTab) == "function" then
 		self.topTabHooked = true
-		hooksecurefunc("BetterFriendsFrame_ShowTab", function()
-			DarkTheme:SkinMainTabsDeferred()
+		hooksecurefunc("BetterFriendsFrame_ShowTab", function(tabIndex)
+			DarkTheme:RefreshVisibleMainContentDeferred(1, tabIndex)
 		end)
 	end
 
 	if not self.applyTabFontsHooked and type(BFL.ApplyTabFonts) == "function" then
 		self.applyTabFontsHooked = true
 		hooksecurefunc(BFL, "ApplyTabFonts", function()
+			local cache = BFL._tabFontCache
+			if cache and cache.appliedThisCall == false then
+				return
+			end
 			DarkTheme:SkinMainTabsDeferred()
+		end)
+	end
+
+	if not self.applyTabVisualStateHooked and type(BFL.ApplyTabVisualState) == "function" then
+		self.applyTabVisualStateHooked = true
+		hooksecurefunc(BFL, "ApplyTabVisualState", function(_, tab)
+			local engine = GetEngine()
+			if engine and engine:IsActive() and tab then
+				engine:CenterTabText(tab)
+			end
 		end)
 	end
 end

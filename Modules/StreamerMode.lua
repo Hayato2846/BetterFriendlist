@@ -74,6 +74,35 @@ function StreamerMode:IsActive()
 	return BetterFriendlistDB and BetterFriendlistDB.streamerModeActive
 end
 
+function StreamerMode:ApplyToggleButtonVisualState()
+	local button = self.toggleButton
+	local icon = button and button.Icon
+	if not button or not icon then
+		return
+	end
+
+	local active = self:IsActive()
+	button.BFL_DarkIconColor = active and { 0.64, 0.33, 1.0, 1 } or { 0.62, 0.62, 0.64, 0.82 }
+	button.BFL_DarkIconHoverColor = active and { 0.78, 0.52, 1.0, 1 } or { 0.86, 0.86, 0.88, 1 }
+	button.BFL_DarkIconDownColor = active and { 0.54, 0.24, 0.88, 1 } or { 0.48, 0.48, 0.50, 1 }
+	button.BFL_DarkButtonStateKey = nil
+
+	icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\twitch")
+	icon:SetDesaturated(true)
+	if active then
+		icon:SetVertexColor(0.64, 0.33, 1.0)
+		icon:SetAlpha(1.0)
+	else
+		icon:SetVertexColor(1, 1, 1)
+		icon:SetAlpha(0.7)
+	end
+
+	local SkinEngine = BFL:GetModule("SkinEngine")
+	if SkinEngine and SkinEngine.IsActive and SkinEngine:IsActive() and SkinEngine.ApplyButtonState then
+		SkinEngine:ApplyButtonState(button)
+	end
+end
+
 function StreamerMode:UpdateAdjacentButtonAnchors()
 	-- Re-anchor HelpButton when StreamerModeButton is hidden/shown
 	if not BetterFriendsFrame then
@@ -145,10 +174,7 @@ function StreamerMode:UpdateState()
 
 	if self:IsActive() then
 		-- Privacy ON -> Twitch Purple (Active)
-		self.toggleButton.Icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\twitch")
-		self.toggleButton.Icon:SetDesaturated(true) -- Desaturate to remove native icon color (likely gold/orange)
-		self.toggleButton.Icon:SetVertexColor(0.64, 0.33, 1.0) -- Twitch Purple
-		self.toggleButton.Icon:SetAlpha(1.0)
+		self:ApplyToggleButtonVisualState()
 
 		-- Update Header Text if parent frame exists
 		if
@@ -168,10 +194,7 @@ function StreamerMode:UpdateState()
 		end
 	else
 		-- Privacy OFF -> Gray (Inactive)
-		self.toggleButton.Icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\twitch")
-		self.toggleButton.Icon:SetDesaturated(true) -- Force Grayscale
-		self.toggleButton.Icon:SetVertexColor(1, 1, 1) -- White vertex + Desaturated = Pure Gray
-		self.toggleButton.Icon:SetAlpha(0.7)
+		self:ApplyToggleButtonVisualState()
 
 		-- Restore Header Text & Color
 		if

@@ -934,6 +934,23 @@ local function BuildDisplayEntry(entry, isCustom)
 	}
 end
 
+local function ResolveSorterEntry(registry, id, requireVisible, fallbackId)
+	if id == "none" then
+		return nil
+	end
+
+	local db = registry:EnsureDB()
+	id = id or fallbackId or registry.FALLBACK_PRIMARY_SORT
+	local entry = BUILTIN_SORTER_MAP[id]
+	if not entry and db and db.customSorters then
+		entry = db.customSorters[id]
+	end
+	if entry and (not requireVisible or registry:IsSorterVisible(id)) then
+		return entry
+	end
+	return BUILTIN_SORTER_MAP[fallbackId or registry.FALLBACK_PRIMARY_SORT]
+end
+
 function Registry:ResolveQuickFilter(id, requireVisible)
 	local db = self:EnsureDB()
 	id = id or self.FALLBACK_FILTER
@@ -951,22 +968,11 @@ function Registry:ResolveQuickFilter(id, requireVisible)
 end
 
 function Registry:ResolveSorter(id, requireVisible, fallbackId)
-	if id == "none" then
+	local entry = ResolveSorterEntry(self, id, requireVisible, fallbackId)
+	if not entry then
 		return nil
 	end
-	local db = self:EnsureDB()
-	id = id or fallbackId or self.FALLBACK_PRIMARY_SORT
-	local entry = BUILTIN_SORTER_MAP[id]
-	local isCustom = false
-	if not entry and db and db.customSorters then
-		entry = db.customSorters[id]
-		isCustom = entry ~= nil
-	end
-	if entry and (not requireVisible or self:IsSorterVisible(id)) then
-		return BuildDisplayEntry(entry, isCustom)
-	end
-	entry = BUILTIN_SORTER_MAP[fallbackId or self.FALLBACK_PRIMARY_SORT]
-	return BuildDisplayEntry(entry, false)
+	return BuildDisplayEntry(entry, not BUILTIN_SORTER_MAP[entry.id])
 end
 
 function Registry:IsQuickFilterVisible(id)
@@ -1219,16 +1225,28 @@ local function ChainContainsField(chain, field)
 	return false
 end
 
-function Registry:CompareFriends(a, b, primaryId, secondaryId)
-	local primary = self:ResolveSorter(primaryId, true, self.FALLBACK_PRIMARY_SORT)
-	local secondary = self:ResolveSorter(secondaryId, true, self.FALLBACK_SECONDARY_SORT)
+local NAME_FALLBACK_SORT_STEP = { field = "name", direction = "asc", empty = "last" }
 
+function Registry:CreateSortPlan(primaryId, secondaryId)
+	local primary = ResolveSorterEntry(self, primaryId, true, self.FALLBACK_PRIMARY_SORT)
+	local secondary = ResolveSorterEntry(self, secondaryId, true, self.FALLBACK_SECONDARY_SORT)
+	return {
+		primary = primary,
+		secondary = secondary,
+		primaryContainsFavorite = primary and ChainContainsField(primary.chain, "favorite") or false,
+	}
+end
+
+function Registry:CompareFriendsWithSortPlan(a, b, plan)
+	plan = plan or self:CreateSortPlan()
+	local primary = plan.primary
+	local secondary = plan.secondary
 	local result = primary and CompareChain(primary.chain, a, b)
 	if result ~= nil then
 		return result
 	end
 
-	if primary and not ChainContainsField(primary.chain, "favorite") and a.isFavorite ~= b.isFavorite then
+	if primary and not plan.primaryContainsFavorite and a.isFavorite ~= b.isFavorite then
 		return a.isFavorite and true or false
 	end
 
@@ -1247,11 +1265,15 @@ function Registry:CompareFriends(a, b, primaryId, secondaryId)
 		end
 	end
 
-	result = CompareSortStep({ field = "name", direction = "asc", empty = "last" }, a, b)
+	result = CompareSortStep(NAME_FALLBACK_SORT_STEP, a, b)
 	if result ~= nil then
 		return result
 	end
 	return (a.index or a.bnetAccountID or 0) < (b.index or b.bnetAccountID or 0)
+end
+
+function Registry:CompareFriends(a, b, primaryId, secondaryId)
+	return self:CompareFriendsWithSortPlan(a, b, self:CreateSortPlan(primaryId, secondaryId))
 end
 
 function Registry:GetQuickFilterText(id)

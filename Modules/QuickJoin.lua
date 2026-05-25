@@ -24,6 +24,12 @@
 local addonName, BFL = ...
 local L = BFL.L
 
+local function AddChatMessage(message)
+	if DEFAULT_CHAT_FRAME and message then
+		DEFAULT_CHAT_FRAME:AddMessage(message)
+	end
+end
+
 -- Create Module
 local QuickJoin = {}
 BFL:RegisterModule("QuickJoin", QuickJoin)
@@ -50,6 +56,8 @@ QuickJoin.relationshipCache = {} -- Short-lived cache for relationship lookups
 QuickJoin.mockMemberByGuid = {} -- Fast lookup for mock member GUIDs
 QuickJoin.entriesCache = nil -- Cached QuickJoinEntry list
 QuickJoin.entriesCacheVersion = nil
+QuickJoin.groupPriorityCache = {} -- Per-update sort priority cache
+QuickJoin.groupSortOrderCache = {} -- Per-update stable sort order cache
 
 -- Dirty flag: Set when data changes while frame is hidden
 local needsRenderOnShow = false
@@ -354,6 +362,37 @@ local function BetterFriendlist_HasRelationshipWithLeader(partyGuid)
 	return false
 end
 
+local function GetLeaderGUIDFromMembers(members)
+	if not members or #members == 0 then
+		return nil
+	end
+
+	local firstGUID
+	for _, member in ipairs(members) do
+		local guid = member and member.guid
+		if guid and not firstGUID then
+			firstGUID = guid
+		end
+		if guid and member and member.isLeader then
+			return guid
+		end
+	end
+
+	return firstGUID
+end
+
+local function GetPriorityFromRelationship(relationship)
+	if relationship == "bnfriend" then
+		return 1000
+	elseif relationship == "wowfriend" then
+		return 500
+	elseif relationship == "guild" then
+		return 100
+	end
+
+	return nil
+end
+
 --[[
 	Helper: PopulateGroupMemberDetails
 	Populates leaderName, leaderColor, and otherFriends from the members list.
@@ -393,6 +432,9 @@ local function PopulateGroupMemberDetails(info)
 				end
 
 				if isLeader then
+					info.leaderGUID = info.leaderGUID or member.guid
+					info.leaderRelationship = relationship
+					info.leaderPriority = GetPriorityFromRelationship(relationship) or 0
 					if name and name ~= "" then
 						-- Always use the resolved name for the leader if found in members list
 						-- This ensures we use BNet/Friend name instead of Character name
@@ -1323,6 +1365,10 @@ function QuickJoin:Update(forceUpdate)
 
 	-- Get all available groups from Social Queue API
 	local groups = C_SocialQueue.GetAllGroups(false, false) or {}
+	local priorityCache = self.groupPriorityCache
+	local sortOrderCache = self.groupSortOrderCache
+	wipe(priorityCache)
+	wipe(sortOrderCache)
 
 	-- Add mock groups to the list (if any exist)
 	if next(self.mockGroups) ~= nil then
@@ -1344,13 +1390,21 @@ function QuickJoin:Update(forceUpdate)
 		local isOwnGroup = leaderGUID and C_AccountInfo.IsGUIDRelatedToLocalAccount(leaderGUID)
 
 		if groupInfo and groupInfo.canJoin and groupInfo.numQueues > 0 and not isOwnGroup then
-			table.insert(self.availableGroups, groupGUID)
+			local sortIndex = #self.availableGroups + 1
+			self.availableGroups[sortIndex] = groupGUID
+			priorityCache[groupGUID] = self:GetGroupPriority(groupGUID, groupInfo)
+			sortOrderCache[groupGUID] = sortIndex
 		end
 	end
 
 	-- Sort groups by priority (BNet friends first, then WoW friends, then guild)
 	table.sort(self.availableGroups, function(a, b)
-		return self:GetGroupPriority(a) > self:GetGroupPriority(b)
+		local leftPriority = priorityCache[a] or 0
+		local rightPriority = priorityCache[b] or 0
+		if leftPriority == rightPriority then
+			return (sortOrderCache[a] or 0) < (sortOrderCache[b] or 0)
+		end
+		return leftPriority > rightPriority
 	end)
 
 	-- Update tab counter (ALWAYS update this, even if frame is hidden)
@@ -2191,48 +2245,44 @@ function QuickJoin:RequestToJoin(groupGUID, applyAsTank, applyAsHealer, applyAsD
 end
 
 -- Get priority for sorting groups (higher = more important)
-function QuickJoin:GetGroupPriority(groupGUID)
-	local members = C_SocialQueue.GetGroupMembers(groupGUID)
-	if not members or #members == 0 then
+function QuickJoin:GetGroupPriority(groupGUID, groupInfo)
+	local cached = groupGUID and self.groupCache[groupGUID]
+	groupInfo = groupInfo or (cached and cached.info) or (groupGUID and self.mockGroups[groupGUID])
+	if groupInfo and groupInfo.leaderPriority then
+		return groupInfo.leaderPriority
+	end
+
+	local leaderGUID = groupInfo and groupInfo.leaderGUID
+	if not leaderGUID then
+		leaderGUID = GetLeaderGUIDFromMembers(groupInfo and groupInfo.members)
+	end
+	if not leaderGUID and groupGUID and C_SocialQueue and C_SocialQueue.GetGroupMembers then
+		leaderGUID = GetLeaderGUIDFromMembers(C_SocialQueue.GetGroupMembers(groupGUID))
+	end
+	if not leaderGUID then
 		return 0
 	end
 
-	local priority = 0
-
-	-- Sort members (leader first) - simple sort by checking if they're leader
-	table.sort(members, function(a, b)
-		-- Leader has isLeader flag or is first in original list
-		return (a.isLeader or false) and not (b.isLeader or false)
-	end)
-
-	-- Check relationship with leader
-	if not members or #members == 0 or not members[1] then
-		return 0
-	end
-	local leaderGUID = members[1].guid
-	local accountInfo = C_BattleNet.GetAccountInfoByGUID(leaderGUID)
-
-	if accountInfo then
-		-- BNet friend (highest priority)
-		priority = priority + 1000
-	else
-		-- Check for WoW friend
-		local friendInfo = GetFriendInfoByGUID(leaderGUID)
-		if friendInfo then
-			priority = priority + 500
-		else
-			-- Check for guild member
-			if IsInGuild() then
-				local guildName = GetGuildInfo("player")
-				local memberGuildName = GetGuildInfo("unit") -- TODO: Need proper unit token
-				if guildName and memberGuildName and guildName == memberGuildName then
-					priority = priority + 100
-				end
-			end
-		end
+	local priority = GetPriorityFromRelationship(groupInfo and groupInfo.leaderRelationship)
+	if priority then
+		return priority
 	end
 
-	return priority
+	local relationship = TryGetCachedRelationship(leaderGUID)
+	priority = relationship and GetPriorityFromRelationship(relationship.relationship)
+	if priority then
+		return priority
+	end
+
+	if C_BattleNet.GetAccountInfoByGUID(leaderGUID) then
+		return 1000
+	end
+
+	if C_FriendList and C_FriendList.IsFriend and C_FriendList.IsFriend(leaderGUID) then
+		return 500
+	end
+
+	return 0
 end
 
 -- QuickJoinEntry methods (Legacy/Bottom definition merged with top)
@@ -2853,7 +2903,7 @@ function QuickJoin:ClearMockGroups()
 	wipe(self.mockMemberByGuid)
 
 	-- BFL:DebugPrint(string.format("|cff00ff00QuickJoin Mock:|r Cleared %d mock groups", count))
-	print(string.format("|cff00ff00BFL QuickJoin:|r Cleared %d mock groups", count))
+	AddChatMessage(string.format("|cff00ff00BFL QuickJoin:|r Cleared %d mock groups", count))
 
 	self:Update(true)
 end
@@ -2992,7 +3042,7 @@ function QuickJoin:CreateMockPreset_All()
 	for _ in pairs(self.mockGroups) do
 		count = count + 1
 	end
-	print(string.format("|cff00ff00BFL QuickJoin:|r Created %d mock groups (dynamic updates enabled)", count))
+	AddChatMessage(string.format("|cff00ff00BFL QuickJoin:|r Created %d mock groups (dynamic updates enabled)", count))
 
 	self:Update(true)
 end
@@ -3032,7 +3082,7 @@ function QuickJoin:CreateMockPreset_Dungeon()
 	for _ in pairs(self.mockGroups) do
 		count = count + 1
 	end
-	print(string.format("|cff00ff00BFL QuickJoin:|r Created %d dungeon mock groups", count))
+	AddChatMessage(string.format("|cff00ff00BFL QuickJoin:|r Created %d dungeon mock groups", count))
 
 	self:Update(true)
 end
@@ -3062,7 +3112,7 @@ function QuickJoin:CreateMockPreset_PvP()
 	for _ in pairs(self.mockGroups) do
 		count = count + 1
 	end
-	print(string.format("|cff00ff00BFL QuickJoin:|r Created %d PvP mock groups", count))
+	AddChatMessage(string.format("|cff00ff00BFL QuickJoin:|r Created %d PvP mock groups", count))
 
 	self:Update(true)
 end
@@ -3091,7 +3141,7 @@ function QuickJoin:CreateMockPreset_Raid()
 	for _ in pairs(self.mockGroups) do
 		count = count + 1
 	end
-	print(string.format("|cff00ff00BFL QuickJoin:|r Created %d raid mock groups", count))
+	AddChatMessage(string.format("|cff00ff00BFL QuickJoin:|r Created %d raid mock groups", count))
 
 	self:Update(true)
 end
@@ -3163,7 +3213,7 @@ function QuickJoin:CreateMockPreset_Icons()
 		numMembers = 3,
 	})
 
-	print("|cff00ff00BFL QuickJoin:|r " .. BFL.L.QJ_MOCK_CREATED_FALLBACK)
+	AddChatMessage("|cff00ff00BFL QuickJoin:|r " .. BFL.L.QJ_MOCK_CREATED_FALLBACK)
 
 	self:Update(true)
 end
@@ -3267,7 +3317,7 @@ function QuickJoin:CreateMockPreset_Stress()
 
 	-- Don't enable dynamic updates for stress test (too much CPU)
 
-	print("|cff00ff00BFL QuickJoin:|r " .. BFL.L.QJ_MOCK_CREATED_STRESS)
+	AddChatMessage("|cff00ff00BFL QuickJoin:|r " .. BFL.L.QJ_MOCK_CREATED_STRESS)
 
 	self:Update(true)
 end
@@ -3363,7 +3413,7 @@ function QuickJoin:SimulateMockEvent(eventType)
 			comment = activity[3],
 			numMembers = math.random(1, 4),
 		})
-		print("|cff00ff00BFL QuickJoin:|r " .. BFL.L.QJ_SIM_ADDED)
+		AddChatMessage("|cff00ff00BFL QuickJoin:|r " .. BFL.L.QJ_SIM_ADDED)
 	elseif eventType == "group_removed" then
 		-- Remove a random group
 		local guids = {}
@@ -3373,9 +3423,9 @@ function QuickJoin:SimulateMockEvent(eventType)
 		if #guids > 0 then
 			local guid = guids[math.random(#guids)]
 			self:RemoveMockGroup(guid)
-			print("|cff00ff00BFL QuickJoin:|r " .. BFL.L.QJ_SIM_REMOVED)
+			AddChatMessage("|cff00ff00BFL QuickJoin:|r " .. BFL.L.QJ_SIM_REMOVED)
 		else
-			print("|cffff8800BFL QuickJoin:|r " .. BFL.L.QJ_ERR_NO_GROUPS_REMOVE)
+			AddChatMessage("|cffff8800BFL QuickJoin:|r " .. BFL.L.QJ_ERR_NO_GROUPS_REMOVE)
 		end
 	elseif eventType == "group_updated" then
 		-- Update a random group
@@ -3388,12 +3438,12 @@ function QuickJoin:SimulateMockEvent(eventType)
 			local group = self.mockGroups[guid]
 			group.numMembers = math.random(1, 5)
 			group.members = CreateMockMembers(group.numMembers, group.leaderName)
-			print(
+			AddChatMessage(
 				"|cff00ff00BFL QuickJoin:|r "
 					.. string.format(BFL.L.QJ_SIM_UPDATED_FMT, group.leaderName, group.numMembers)
 			)
 		else
-			print("|cffff8800BFL QuickJoin:|r " .. BFL.L.QJ_ERR_NO_GROUPS_UPDATE)
+			AddChatMessage("|cffff8800BFL QuickJoin:|r " .. BFL.L.QJ_ERR_NO_GROUPS_UPDATE)
 		end
 	end
 
@@ -3443,7 +3493,7 @@ SlashCmdList["BFLQUICKJOIN"] = function(msg)
 			numMembers = numMembers,
 		})
 		QuickJoin:Update(true)
-		print(
+		AddChatMessage(
 			"|cff00ff00BFL QuickJoin:|r "
 				.. string.format(BFL.L.QJ_ADDED_GROUP_FMT, leaderName, activityName, numMembers)
 		)
@@ -3457,20 +3507,20 @@ SlashCmdList["BFLQUICKJOIN"] = function(msg)
 		elseif eventType == "update" or eventType == "updated" then
 			QuickJoin:SimulateMockEvent("group_updated")
 		else
-			print(BFL.L.QJ_EVENT_COMMANDS)
-			print("  |cffffcc00/bfl qj event add|r - " .. BFL.L.QJ_HELP_CMD_ADD_DESC)
-			print("  |cffffcc00/bfl qj event remove|r - " .. BFL.L.QJ_HELP_CMD_REMOVE_DESC)
-			print("  |cffffcc00/bfl qj event update|r - " .. BFL.L.QJ_HELP_CMD_UPDATE_DESC)
+			AddChatMessage(BFL.L.QJ_EVENT_COMMANDS)
+			AddChatMessage("  |cffffcc00/bfl qj event add|r - " .. BFL.L.QJ_HELP_CMD_ADD_DESC)
+			AddChatMessage("  |cffffcc00/bfl qj event remove|r - " .. BFL.L.QJ_HELP_CMD_REMOVE_DESC)
+			AddChatMessage("  |cffffcc00/bfl qj event update|r - " .. BFL.L.QJ_HELP_CMD_UPDATE_DESC)
 		end
 	elseif cmd == "clear" then
 		QuickJoin:ClearMockGroups()
 	elseif cmd == "list" then
-		print(BFL.L.QJ_LIST_HEADER)
+		AddChatMessage(BFL.L.QJ_LIST_HEADER)
 		local count = 0
 		for guid, group in pairs(QuickJoin.mockGroups) do
 			count = count + 1
 			local queueType = group._queueType or "unknown"
-			print(
+			AddChatMessage(
 				string.format(
 					"  %d. |cff00ff00%s|r - %s (%s, %d members)",
 					count,
@@ -3482,7 +3532,7 @@ SlashCmdList["BFLQUICKJOIN"] = function(msg)
 			)
 		end
 		if count == 0 then
-			print("  |cff888888" .. BFL.L.QJ_NO_GROUPS_HINT .. "|r")
+			AddChatMessage("  |cff888888" .. BFL.L.QJ_NO_GROUPS_HINT .. "|r")
 		end
 	elseif cmd == "config" then
 		local setting = args[2] and args[2]:lower()
@@ -3490,51 +3540,53 @@ SlashCmdList["BFLQUICKJOIN"] = function(msg)
 
 		if setting == "dynamic" then
 			QuickJoin.mockConfig.dynamicUpdates = (value == "on" or value == "true" or value == "1")
-			print(
+			AddChatMessage(
 				"|cff00ff00BFL QuickJoin:|r "
 					.. string.format(BFL.L.RAID_DYN_UPDATES, QuickJoin.mockConfig.dynamicUpdates and "ON" or "OFF")
 			)
 		elseif setting == "interval" then
 			local interval = tonumber(value) or 3.0
 			QuickJoin.mockConfig.updateInterval = math.max(1.0, interval)
-			print(
+			AddChatMessage(
 				"|cff00ff00BFL QuickJoin:|r "
 					.. string.format(BFL.L.RAID_UPDATE_INTERVAL, QuickJoin.mockConfig.updateInterval)
 			)
 		else
-			print(BFL.L.QJ_CONFIG_HEADER)
-			print(string.format(BFL.L.RAID_DYN_UPDATES_STATUS, QuickJoin.mockConfig.dynamicUpdates and "ON" or "OFF"))
-			print(string.format(BFL.L.RAID_UPDATE_INTERVAL_STATUS, QuickJoin.mockConfig.updateInterval))
-			print("")
-			print("  |cffffcc00/bfl qj config dynamic on|off|r")
-			print("  |cffffcc00/bfl qj config interval <seconds>|r")
+			AddChatMessage(BFL.L.QJ_CONFIG_HEADER)
+			AddChatMessage(
+				string.format(BFL.L.RAID_DYN_UPDATES_STATUS, QuickJoin.mockConfig.dynamicUpdates and "ON" or "OFF")
+			)
+			AddChatMessage(string.format(BFL.L.RAID_UPDATE_INTERVAL_STATUS, QuickJoin.mockConfig.updateInterval))
+			AddChatMessage("")
+			AddChatMessage("  |cffffcc00/bfl qj config dynamic on|off|r")
+			AddChatMessage("  |cffffcc00/bfl qj config interval <seconds>|r")
 		end
 	else
 		-- Help
-		print(BFL.L.CORE_HELP_QJ_COMMANDS)
-		print("")
-		print(BFL.L.CORE_HELP_MOCK_COMMANDS)
-		print(BFL.L.CORE_HELP_QJ_MOCK)
-		print(BFL.L.CORE_HELP_QJ_DUNGEON)
-		print(BFL.L.CORE_HELP_QJ_PVP)
-		print(BFL.L.CORE_HELP_QJ_RAID)
-		print(BFL.L.QJ_MOCK_ICONS_HELP)
-		print(BFL.L.CORE_HELP_QJ_STRESS)
-		print("")
-		print(BFL.L.RAID_HELP_MANAGEMENT)
-		print(BFL.L.QJ_CMD_ADD_HELP)
-		print(BFL.L.CORE_HELP_QJ_LIST)
-		print(BFL.L.CORE_HELP_QJ_CLEAR)
-		print("")
-		print(BFL.L.RAID_HELP_EVENTS)
-		print("  |cffffcc00/bfl qj event add|r - " .. BFL.L.QJ_HELP_CMD_ADD_DESC)
-		print("  |cffffcc00/bfl qj event remove|r - " .. BFL.L.QJ_HELP_CMD_REMOVE_DESC)
-		print("  |cffffcc00/bfl qj event update|r - " .. BFL.L.QJ_HELP_CMD_UPDATE_DESC)
-		print("")
-		print(BFL.L.HELP_HEADER_CONFIGURATION)
-		print(BFL.L.QJ_CMD_CONFIG_HELP)
-		print("")
-		print(BFL.L.QJ_EXT_FOOTER)
+		AddChatMessage(BFL.L.CORE_HELP_QJ_COMMANDS)
+		AddChatMessage("")
+		AddChatMessage(BFL.L.CORE_HELP_MOCK_COMMANDS)
+		AddChatMessage(BFL.L.CORE_HELP_QJ_MOCK)
+		AddChatMessage(BFL.L.CORE_HELP_QJ_DUNGEON)
+		AddChatMessage(BFL.L.CORE_HELP_QJ_PVP)
+		AddChatMessage(BFL.L.CORE_HELP_QJ_RAID)
+		AddChatMessage(BFL.L.QJ_MOCK_ICONS_HELP)
+		AddChatMessage(BFL.L.CORE_HELP_QJ_STRESS)
+		AddChatMessage("")
+		AddChatMessage(BFL.L.RAID_HELP_MANAGEMENT)
+		AddChatMessage(BFL.L.QJ_CMD_ADD_HELP)
+		AddChatMessage(BFL.L.CORE_HELP_QJ_LIST)
+		AddChatMessage(BFL.L.CORE_HELP_QJ_CLEAR)
+		AddChatMessage("")
+		AddChatMessage(BFL.L.RAID_HELP_EVENTS)
+		AddChatMessage("  |cffffcc00/bfl qj event add|r - " .. BFL.L.QJ_HELP_CMD_ADD_DESC)
+		AddChatMessage("  |cffffcc00/bfl qj event remove|r - " .. BFL.L.QJ_HELP_CMD_REMOVE_DESC)
+		AddChatMessage("  |cffffcc00/bfl qj event update|r - " .. BFL.L.QJ_HELP_CMD_UPDATE_DESC)
+		AddChatMessage("")
+		AddChatMessage(BFL.L.HELP_HEADER_CONFIGURATION)
+		AddChatMessage(BFL.L.QJ_CMD_CONFIG_HELP)
+		AddChatMessage("")
+		AddChatMessage(BFL.L.QJ_EXT_FOOTER)
 	end
 end
 

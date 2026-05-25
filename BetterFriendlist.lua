@@ -200,6 +200,12 @@ local function GetColorRGBA(color, fallbackR, fallbackG, fallbackB, fallbackA)
 	return fallbackR, fallbackG, fallbackB, fallbackA or 1
 end
 
+local function AddChatMessage(message)
+	if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+		DEFAULT_CHAT_FRAME:AddMessage(message)
+	end
+end
+
 local function ApplyTabFontObjects(tab)
 	if not tab or not tab.SetNormalFontObject then
 		return
@@ -442,14 +448,18 @@ function BFL:ApplyTabFonts()
 		or 0
 	local selectedBottomTabId = frame and PanelTemplates_GetSelectedTab(frame) or 0
 	local isFlatThemeActive = BFL.UsesFlatTheme and BFL:UsesFlatTheme()
+	local isElvUISkinActive = BFL.IsThemeActive and BFL:IsThemeActive("elvui")
+	local shouldCenterTopTabs = isElvUISkinActive or isFlatThemeActive
+	local selectedTopLayoutId = shouldCenterTopTabs and 0 or selectedTopTabId
+	local selectedBottomLayoutId = isFlatThemeActive and 0 or selectedBottomTabId
 	local signature = table.concat({
 		tostring(frameWidth),
 		fontPath or "",
 		tostring(fontSize),
 		outlineValue,
 		tostring(isFlatThemeActive),
-		tostring(selectedTopTabId),
-		tostring(selectedBottomTabId),
+		tostring(selectedTopLayoutId),
+		tostring(selectedBottomLayoutId),
 		GetTabSignature(bottomTabs[1]),
 		GetTabSignature(bottomTabs[2]),
 		GetTabSignature(bottomTabs[3]),
@@ -460,10 +470,12 @@ function BFL:ApplyTabFonts()
 		GetTabSignature(topTabs[4]),
 	}, "||")
 	if self._tabFontCache and self._tabFontCache.signature == signature then
+		self._tabFontCache.appliedThisCall = false
 		return
 	end
 	self._tabFontCache = self._tabFontCache or {}
 	self._tabFontCache.signature = signature
+	self._tabFontCache.appliedThisCall = true
 
 	local tabOverlap = 15 -- Tabs overlap by 15px in XML anchoring
 
@@ -947,8 +959,6 @@ function BFL:ApplyTabFonts()
 	-- so increasing tab height would push the entire content area down.
 	-- Flat themes center tab text at (0,0) on every Select/Deselect.
 	-- Use matching 0 offsets so ProcessTabGroup and theme hooks produce identical results.
-	local isElvUISkinActive = BFL.IsThemeActive and BFL:IsThemeActive("elvui")
-	local shouldCenterTopTabs = isElvUISkinActive or isFlatThemeActive
 	local topTextMode = shouldCenterTopTabs and "center" or nil
 	local topTextBias = shouldCenterTopTabs and 0 or -1
 	local topBaseOffset = shouldCenterTopTabs and 0 or -5
@@ -4170,7 +4180,7 @@ function BetterFriendlist_SetSortMethod(method)
 		level = L.SORT_LEVEL,
 		zone = L.SORT_ZONE,
 	}
-	print("|cff00ff00BetterFriendlist:|r " .. string.format(L.SORT_CHANGED, (methodNames[method] or method)))
+	AddChatMessage("|cff00ff00BetterFriendlist:|r " .. string.format(L.SORT_CHANGED, (methodNames[method] or method)))
 end
 
 -- Update Quick Join tab with group count (matching Blizzard's FriendsFrame_UpdateQuickJoinTab)
@@ -4197,10 +4207,16 @@ function BetterFriendsFrame_UpdateQuickJoinTab() -- Quick Join is Retail only
 	end
 
 	-- Update tab text with count
-	frame.BottomTab4:SetText(QUICK_JOIN .. " " .. string.format(NUMBER_IN_PARENTHESES, numGroups))
+	local quickJoinTabText = QUICK_JOIN .. " " .. string.format(NUMBER_IN_PARENTHESES, numGroups)
+	local textChanged = not frame.BottomTab4.GetText or frame.BottomTab4:GetText() ~= quickJoinTabText
+	if textChanged then
+		frame.BottomTab4:SetText(quickJoinTabText)
+	end
 
-	-- Re-apply tab fonts (hook prevents PanelTemplates_TabResize from overriding our widths)
-	BFL:ApplyTabFonts()
+	-- Re-apply tab fonts only when the label actually changes or the tab layout has not been initialized yet.
+	if textChanged or not (BFL._tabFontCache and BFL._tabFontCache.signature) then
+		BFL:ApplyTabFonts()
+	end
 end
 
 --------------------------------------------------------------------------
@@ -5220,16 +5236,16 @@ function BetterFriendsFrame_ShowIgnoreList() -- Show IgnoreList module UI (alway
 		-- Fallback: show console message
 		local numIgnores = C_FriendList.GetNumIgnores()
 		if numIgnores == 0 then
-			print(L.IGNORE_LIST_EMPTY)
+			AddChatMessage(L.IGNORE_LIST_EMPTY)
 		else
-			print(string.format(L.IGNORE_LIST_HEADER, numIgnores))
+			AddChatMessage(string.format(L.IGNORE_LIST_HEADER, numIgnores))
 			for i = 1, numIgnores do
 				local name = C_FriendList.GetIgnoreName(i)
 				if name then
-					print("  " .. i .. ". " .. name)
+					AddChatMessage("  " .. i .. ". " .. name)
 				end
 			end
-			print(L.IGNORE_LIST_HELP)
+			AddChatMessage(L.IGNORE_LIST_HELP)
 		end
 	end
 end
@@ -5736,10 +5752,10 @@ SLASH_BFLRESET1 = "/bflreset"
 SlashCmdList["BFLRESET"] = function(msg)
 	if msg == "warning" then
 		BetterFriendlistDB.classicGuildUIWarningShown = nil
-		print("|cff00ff00BetterFriendlist:|r " .. L.CMD_RESET_FILTER_SUCCESS)
+		AddChatMessage("|cff00ff00BetterFriendlist:|r " .. L.CMD_RESET_FILTER_SUCCESS)
 	else
-		print("|cff00ff00BetterFriendlist " .. L.CMD_RESET_HEADER .. "|r")
-		print("  |cffFFD100/bflreset warning|r - " .. L.CMD_RESET_HELP_WARNING)
+		AddChatMessage("|cff00ff00BetterFriendlist " .. L.CMD_RESET_HEADER .. "|r")
+		AddChatMessage("  |cffFFD100/bflreset warning|r - " .. L.CMD_RESET_HELP_WARNING)
 	end
 end
 

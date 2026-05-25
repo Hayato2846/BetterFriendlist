@@ -22,8 +22,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **ElvUI Skin Setting** - Moved the ElvUI skin option from General to Theme and migrated existing profiles automatically.
 - **Theme Settings** - Theme choices are now beta-gated and automatically switch back to Blizzard when Beta Features are disabled.
 - **Dark Theme Visuals** - Refined the Dark theme with translucent black Aurora-style surfaces, clearer control hairlines, Material-like navigation states, and cleaner list dividers.
+- **Friend List Sorting** - Reduced CPU time and memory churn when changing QuickFilters and Sorter selections.
+- **Dark Theme Performance** - Reduced repeated tab, button, row, and backdrop skinning work during high-frequency UI refreshes.
+- **Dark Theme Performance** - Reduced repeated scrollbar, tab, row, and button state work during list, WHO, and Quick Join updates.
+- **Dark Theme Performance** - Reduced repeated Friendlist row and tab refresh work during stress-test navigation.
+- **Dark Theme Performance** - Avoided redundant row refresh passes when visible Friendlist rows were already updated.
+- **Dark Theme Performance** - Narrowed deferred tab refreshes to the active content pane and coalesced Broker count updates during event bursts.
+- **Quick Join Performance** - Reduced repeated group-priority and friend-relationship lookups while sorting available Quick Join groups.
 
 ### Fixed
+- **Dark Theme Portrait** - Restored the BFL avatar as a compact square header icon without adding button chrome.
 - **QuickFilter & Sorter Builder** - Updated the docked editor to use the same modern frame styling as the Settings and Raid Help windows.
 - **QuickFilter & Sorter Builder** - Cleaned up the docked editor layout so preview, metadata, filter rules, and sorter steps no longer overlap.
 - **QuickFilter & Sorter Builder** - Added the missing delete action for nested filter groups.
@@ -33,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dark Theme Coverage** - Improved Dark theme coverage for frame borders, tabs, scroll bars, dropdown menus, sliders, close buttons, and standard Blizzard button templates that could still show Blizzard styling.
 - **Dark Theme Controls** - Replaced text-based close and dropdown indicators with BFL icons and removed extra borders from header icon buttons.
 - **Dark Theme Tabs** - Centered tab labels, matched bottom-tab opacity to the main frame, and added accent borders for selected top and bottom tabs.
+- **Dark Theme Tabs** - Kept top and bottom tab labels centered after tab state refreshes.
 - **Dark Theme Main List** - Widened and aligned the main scrollbar, lined up the footer buttons with the list edges, removed the duplicate outer list frame, and made disabled buttons visually distinct without dimming selected tabs.
 - **Dark Theme Performance** - Reduced Friendlist rerender work and stopped row skinning from interfering with configured group header colors.
 - **Dark Theme Frame Chrome** - Prevented Blizzard ButtonFrame portrait/corner artwork from reappearing over the Dark theme after portrait visibility updates.
@@ -48,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dark Theme Quick Join Tab** - Removed the extra outer inset frame, added breathing room below the title buttons, and aligned the scrollbar and request button with the Contacts tab layout.
 - **Dark Theme Raid Help** - Cleaned up Raid Roster Help inset chrome and aligned its scrollbar with other tab lists.
 - **Dark Theme Settings** - Fixed settings scrollbar stepper icons after tab switches and aligned Font Settings dropdowns, sliders, and color controls.
+- **Dark Theme Hover States** - Fixed hover highlights that could stick on buttons, settings navigation, and Friendlist rows.
 - **Dark Theme Advanced Dialogs** - Skinned the FriendGroups migration dialog, Note Cleanup Wizard, and Note Backup Viewer consistently with the Dark theme.
 - **Theme Settings** - Fixed an error when disabling Beta Features from the settings window.
 - **ElvUI Skin** - Prevented startup errors when the ElvUI theme was still selected but ElvUI was disabled.

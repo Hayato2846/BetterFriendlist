@@ -39,6 +39,7 @@ local updateThrottle = 0
 local lastUpdateTime = 0
 local THROTTLE_INTERVAL = 0.1 -- Update max 10 times per second (crisp but not spammy)
 local pendingDeferredUpdate = false
+local pendingTextUpdate = false
 
 -- LibQTip tooltip reference
 local tooltip = nil
@@ -693,14 +694,14 @@ end
 -- Broker Text Update
 -- ========================================
 
-function Broker:UpdateBrokerText()
+function Broker:UpdateBrokerText(force)
 	if not dataObject then
 		return
 	end
 
 	-- Throttle updates
 	local currentTime = GetTime()
-	if currentTime - lastUpdateTime < THROTTLE_INTERVAL then
+	if not force and currentTime - lastUpdateTime < THROTTLE_INTERVAL then
 		return
 	end
 	lastUpdateTime = currentTime
@@ -758,17 +759,27 @@ function Broker:UpdateBrokerText()
 end
 
 function Broker:ScheduleBrokerTextUpdate()
-	self:UpdateBrokerText()
+	pendingTextUpdate = true
 
 	if pendingDeferredUpdate then
 		return
 	end
 
 	pendingDeferredUpdate = true
-	C_Timer.After(0.25, function()
+	local function FlushBrokerTextUpdate()
 		pendingDeferredUpdate = false
-		Broker:UpdateBrokerText()
-	end)
+		if not pendingTextUpdate then
+			return
+		end
+		pendingTextUpdate = false
+		Broker:UpdateBrokerText(true)
+	end
+
+	if C_Timer and C_Timer.After then
+		C_Timer.After(0.25, FlushBrokerTextUpdate)
+	else
+		FlushBrokerTextUpdate()
+	end
 end
 
 -- ========================================
@@ -2726,10 +2737,14 @@ function Broker:ToggleEnabled()
 
 	BetterFriendlistDB.brokerEnabled = not BetterFriendlistDB.brokerEnabled
 
+	local message
 	if BetterFriendlistDB.brokerEnabled then
-		print("|cff00ff00BetterFriendlist:|r Data Broker |cff00ff00ENABLED|r - /reload to apply")
+		message = "|cff00ff00BetterFriendlist:|r Data Broker |cff00ff00ENABLED|r - /reload to apply"
 	else
-		print("|cff00ff00BetterFriendlist:|r Data Broker |cffff0000DISABLED|r - /reload to apply")
+		message = "|cff00ff00BetterFriendlist:|r Data Broker |cffff0000DISABLED|r - /reload to apply"
+	end
+	if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+		DEFAULT_CHAT_FRAME:AddMessage(message)
 	end
 end
 
