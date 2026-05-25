@@ -252,6 +252,35 @@ local function SkinIconButtonField(engine, parent, key, opts)
 	end
 end
 
+local function RestorePortraitArtwork(engine, frame)
+	if not frame then
+		return
+	end
+
+	local portraitButton = frame.PortraitButton
+	if portraitButton then
+		portraitButton.BFL_DarkInvisibleOverlayButton = true
+		if engine then
+			engine:RestoreFrame(portraitButton)
+		end
+	end
+
+	if frame.PortraitIcon then
+		if engine then
+			engine:SetTextureAlpha(frame, frame.PortraitIcon, 1)
+		else
+			frame.PortraitIcon:SetAlpha(1)
+		end
+		frame.PortraitIcon:Show()
+	end
+	if frame.PortraitMask and frame.PortraitMask.Show then
+		if frame.PortraitMask.SetAlpha then
+			frame.PortraitMask:SetAlpha(1)
+		end
+		frame.PortraitMask:Show()
+	end
+end
+
 local function SkinDropdownField(engine, parent, key)
 	if parent and parent[key] then
 		engine:SkinDropdown(parent[key])
@@ -514,7 +543,6 @@ function DarkTheme:RefreshMainFrameControls(engine, frame)
 		"AddFriendButton",
 		"SendMessageButton",
 		"RecruitmentButton",
-		"PortraitButton",
 	}) do
 		if frame[key] then
 			engine:ApplyButtonState(frame[key])
@@ -936,9 +964,11 @@ function DarkTheme:SkinMainFrame(engine)
 	local staticSkinKey = GetMainFrameStaticSkinKey(frame)
 	if frame.BFL_DarkMainFrameStaticSkinKey ~= staticSkinKey or not frame.BFL_DarkBackdrop then
 		frame.BFL_DarkMainFrameStaticSkinKey = staticSkinKey
+		RestorePortraitArtwork(engine, frame)
 		engine:SkinFrame(frame, "main", { stripTextures = true, textureAlpha = 0.10 })
 		engine:SkinTree(frame, 6)
 		engine:StripButtonFrameArtwork(frame)
+		RestorePortraitArtwork(engine, frame)
 
 		HideFieldChrome(engine, frame, "Inset")
 		SkinField(engine, frame, "ScrollFrame", "inset")
@@ -946,8 +976,14 @@ function DarkTheme:SkinMainFrame(engine)
 		SkinButtonField(engine, frame, "AddFriendButton")
 		SkinButtonField(engine, frame, "SendMessageButton")
 		SkinButtonField(engine, frame, "RecruitmentButton")
-		SkinButtonField(engine, frame, "PortraitButton")
-		SkinIconButtonField(engine, frame, "StreamerModeButton", { texture = frame.StreamerModeButton and frame.StreamerModeButton.Icon, size = 18 })
+		local streamerActive = BFL.StreamerMode and BFL.StreamerMode.IsActive and BFL.StreamerMode:IsActive()
+		SkinIconButtonField(engine, frame, "StreamerModeButton", {
+			texture = frame.StreamerModeButton and frame.StreamerModeButton.Icon,
+			size = 18,
+			color = streamerActive and { 0.64, 0.33, 1.0, 1 } or { 0.62, 0.62, 0.64, 0.82 },
+			hoverColor = streamerActive and { 0.78, 0.52, 1.0, 1 } or { 0.86, 0.86, 0.88, 1 },
+			downColor = streamerActive and { 0.54, 0.24, 0.88, 1 } or { 0.48, 0.48, 0.50, 1 },
+		})
 		SkinIconButtonField(engine, frame, "HelpButton", { texture = frame.HelpButton and frame.HelpButton.Icon, size = 18 })
 
 		local header = frame.FriendsTabHeader
@@ -970,6 +1006,7 @@ function DarkTheme:SkinMainFrame(engine)
 		end
 	end
 
+	RestorePortraitArtwork(engine, frame)
 	self:RefreshMainFrameControls(engine, frame)
 	self:SkinVisibleMainContent(engine, frame)
 end

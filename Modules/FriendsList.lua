@@ -42,6 +42,12 @@ local function ApplyDefaultSlugToFontString(fontString)
 	end
 end
 
+local function AddChatMessage(message)
+	if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+		DEFAULT_CHAT_FRAME:AddMessage(message)
+	end
+end
+
 local function GetFriendsListModule()
 	return BFL:GetModule("FriendsList")
 end
@@ -1387,7 +1393,10 @@ function FriendsList:UpdateSearchBoxState()
 				-- Restore XML exact layout (Retail)
 				-- <Anchor point="TOPLEFT" relativeKey="$parent.$parent.Inset" x="10" y="60"/>
 				-- Adjusted (Phase 29): Shifted 0.5px left for pixel-perfect alignment
-				searchBox:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 9.5, 60)
+				local flatThemeActive = BFL.UsesFlatTheme and BFL:UsesFlatTheme()
+				local searchLeftOffset = flatThemeActive and 4 or 9.5
+				searchBox.BFL_NormalModeRowLeftOffset = searchLeftOffset
+				searchBox:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", searchLeftOffset, 60)
 
 				-- Fixed: Do not hardcode width (220), use responsive width calculation (Phase 28)
 				if self.UpdateSearchBoxWidth then
@@ -1397,7 +1406,8 @@ function FriendsList:UpdateSearchBoxState()
 				end
 			end
 
-			searchBox:SetHeight(28)
+			local normalSearchHeight = (BFL.UsesFlatTheme and BFL:UsesFlatTheme()) and 24 or 28
+			searchBox:SetHeight(normalSearchHeight)
 
 			-- Re-anchor dropdowns after reparenting
 			-- XML anchors ($parent.SearchBox) may be invalidated when SearchBox
@@ -1445,14 +1455,17 @@ function FriendsList:UpdateSearchBoxState()
 				if header.QuickFilterDropdown then
 					header.QuickFilterDropdown:ClearAllPoints()
 					header.QuickFilterDropdown:SetPoint("LEFT", searchBox, "RIGHT", 5, 0)
+					header.QuickFilterDropdown:SetHeight(24)
 				end
 				if header.PrimarySortDropdown and header.QuickFilterDropdown then
 					header.PrimarySortDropdown:ClearAllPoints()
 					header.PrimarySortDropdown:SetPoint("LEFT", header.QuickFilterDropdown, "RIGHT", 5, 0)
+					header.PrimarySortDropdown:SetHeight(24)
 				end
 				if header.SecondarySortDropdown and header.PrimarySortDropdown then
 					header.SecondarySortDropdown:ClearAllPoints()
 					header.SecondarySortDropdown:SetPoint("LEFT", header.PrimarySortDropdown, "RIGHT", 5, 0)
+					header.SecondarySortDropdown:SetHeight(24)
 				end
 			end
 
@@ -5567,7 +5580,7 @@ function FriendsList:InviteGroupToParty(groupId)
 	end
 
 	if #inviteCandidates == 0 then
-		print(BFL.L.MSG_NO_FRIENDS_AVAILABLE)
+		AddChatMessage(BFL.L.MSG_NO_FRIENDS_AVAILABLE)
 		return
 	end
 
@@ -5585,7 +5598,7 @@ function FriendsList:InviteGroupToParty(groupId)
 			UIErrorsFrame:AddMessage(ERR_AFFECTING_COMBAT, 1.0, 0.1, 0.1, 1.0)
 			return
 		end
-		print(BFL.L.MSG_INVITE_CONVERT_RAID)
+		AddChatMessage(BFL.L.MSG_INVITE_CONVERT_RAID)
 		if BFL.ConvertToRaid then
 			BFL.ConvertToRaid()
 		end
@@ -5596,7 +5609,7 @@ function FriendsList:InviteGroupToParty(groupId)
 	local inviteLimit = #inviteCandidates
 
 	if totalSize > raidCap then
-		print(string.format(BFL.L.MSG_INVITE_RAID_FULL, raidCap))
+		AddChatMessage(string.format(BFL.L.MSG_INVITE_RAID_FULL, raidCap))
 		inviteLimit = raidCap - numGroupMembers
 		if inviteLimit < 0 then
 			inviteLimit = 0
@@ -5617,7 +5630,7 @@ function FriendsList:InviteGroupToParty(groupId)
 	end
 
 	if inviteCount > 0 then
-		print(string.format(BFL.L.MSG_INVITE_COUNT, inviteCount))
+		AddChatMessage(string.format(BFL.L.MSG_INVITE_COUNT, inviteCount))
 	end
 end
 
@@ -8398,8 +8411,20 @@ function FriendsList:UpdateSearchBoxWidth()
 	-- - QuickFilter dropdown (~125px)
 	-- - Sort dropdown (~80px)
 	-- Total reserved space: ~205px (with padding)
-	local fixedElementsWidth = 205
+	local isFlatThemeActive = BFL.UsesFlatTheme and BFL:UsesFlatTheme()
+	local dropdownWidth = 51
+	local dropdownSpacing = 5
+	local rowLeftOffset = (header.SearchBox and header.SearchBox.BFL_NormalModeRowLeftOffset)
+		or (isFlatThemeActive and 4 or 9.5)
+	local rowRightPadding = isFlatThemeActive and 4 or 27
+	local fixedElementsWidth = (dropdownWidth * 3) + (dropdownSpacing * 3) + rowLeftOffset + rowRightPadding
 	local availableWidth = frameWidth - fixedElementsWidth
+	if frame.Inset and frame.Inset.GetWidth then
+		local insetWidth = frame.Inset:GetWidth()
+		if insetWidth and insetWidth > 0 then
+			availableWidth = insetWidth - rowLeftOffset - rowRightPadding - (dropdownWidth * 3) - (dropdownSpacing * 3)
+		end
+	end
 
 	-- Clamp SearchBox to functional minimum (175px)
 	-- NO MAXIMUM: Scale up to max frame width (800px - 205px = 595px)
