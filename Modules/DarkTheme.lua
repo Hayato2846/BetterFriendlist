@@ -252,32 +252,139 @@ local function SkinIconButtonField(engine, parent, key, opts)
 	end
 end
 
+local function SetObjectShown(engine, owner, object, shown)
+	if not object then
+		return
+	end
+	if engine and engine.SetObjectShown then
+		engine:SetObjectShown(owner, object, shown)
+	elseif object.SetShown then
+		object:SetShown(shown == true)
+	elseif shown and object.Show then
+		object:Show()
+	elseif not shown and object.Hide then
+		object:Hide()
+	end
+end
+
+local function IsSimpleModeEnabled()
+	local DB = BFL and BFL.GetModule and BFL:GetModule("DB")
+	if DB and DB.Get then
+		return DB:Get("simpleMode", false) == true
+	end
+	return BetterFriendlistDB and BetterFriendlistDB.simpleMode == true
+end
+
 local function RestorePortraitArtwork(engine, frame)
 	if not frame then
 		return
 	end
 
 	local portraitButton = frame.PortraitButton
+	local showPortrait = not IsSimpleModeEnabled()
 	if portraitButton then
 		portraitButton.BFL_DarkInvisibleOverlayButton = true
 		if engine then
 			engine:RestoreFrame(portraitButton)
 		end
+
+		if showPortrait then
+			if portraitButton.SetFrameLevel and frame.GetFrameLevel then
+				portraitButton:SetFrameLevel((frame:GetFrameLevel() or 0) + 5)
+			end
+			SetObjectShown(engine, portraitButton, portraitButton, true)
+
+			local icon = portraitButton.BFL_DarkPortraitIcon
+			if not icon and portraitButton.CreateTexture then
+				icon = portraitButton:CreateTexture(nil, "ARTWORK")
+				portraitButton.BFL_DarkPortraitIcon = icon
+				if engine and engine.RegisterOverlay then
+					engine:RegisterOverlay(portraitButton, icon)
+				end
+			end
+
+			if icon then
+				icon:ClearAllPoints()
+				icon:SetPoint("CENTER", portraitButton, "CENTER", 0, 0)
+				icon:SetSize(60, 60)
+				if icon.SetTexture then
+					icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Textures\\PortraitIcon.blp")
+				end
+				if icon.SetTexCoord then
+					icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+				end
+				if icon.SetVertexColor then
+					icon:SetVertexColor(1, 1, 1, 1)
+				end
+				if icon.SetAlpha then
+					icon:SetAlpha(1)
+				end
+				if icon.SetDrawLayer then
+					icon:SetDrawLayer("ARTWORK", 0)
+				end
+
+				local mask = portraitButton.BFL_DarkPortraitMask
+				if not mask and portraitButton.CreateMaskTexture then
+					mask = portraitButton:CreateMaskTexture()
+					portraitButton.BFL_DarkPortraitMask = mask
+					if engine and engine.RegisterOverlay then
+						engine:RegisterOverlay(portraitButton, mask)
+					end
+				end
+				if mask then
+					mask:ClearAllPoints()
+					mask:SetPoint("CENTER", portraitButton, "CENTER", 0, 0)
+					mask:SetSize(60, 60)
+					if mask.SetTexture then
+						mask:SetTexture(
+							"Interface\\CharacterFrame\\TempPortraitAlphaMask",
+							"CLAMPTOBLACKADDITIVE",
+							"CLAMPTOBLACKADDITIVE"
+						)
+					end
+					if not portraitButton.BFL_DarkPortraitMaskApplied and icon.AddMaskTexture then
+						icon:AddMaskTexture(mask)
+						portraitButton.BFL_DarkPortraitMaskApplied = true
+					end
+					if mask.Show then
+						mask:Show()
+					end
+				end
+				icon:Show()
+			end
+		else
+			if portraitButton.BFL_DarkPortraitIcon then
+				portraitButton.BFL_DarkPortraitIcon:Hide()
+			end
+			if portraitButton.BFL_DarkPortraitMask then
+				portraitButton.BFL_DarkPortraitMask:Hide()
+			end
+			SetObjectShown(engine, portraitButton, portraitButton, false)
+		end
 	end
 
 	if frame.PortraitIcon then
-		if engine then
+		if portraitButton and frame.PortraitIcon ~= portraitButton.BFL_DarkPortraitIcon then
+			SetObjectShown(engine, frame, frame.PortraitIcon, false)
+		elseif showPortrait and engine then
 			engine:SetTextureAlpha(frame, frame.PortraitIcon, 1)
-		else
+		elseif showPortrait then
 			frame.PortraitIcon:SetAlpha(1)
+		else
+			SetObjectShown(engine, frame, frame.PortraitIcon, false)
 		end
-		frame.PortraitIcon:Show()
 	end
 	if frame.PortraitMask and frame.PortraitMask.Show then
-		if frame.PortraitMask.SetAlpha then
-			frame.PortraitMask:SetAlpha(1)
+		if portraitButton and frame.PortraitMask ~= portraitButton.BFL_DarkPortraitMask then
+			SetObjectShown(engine, frame, frame.PortraitMask, false)
+		elseif showPortrait then
+			if frame.PortraitMask.SetAlpha then
+				frame.PortraitMask:SetAlpha(1)
+			end
+			frame.PortraitMask:Show()
+		else
+			SetObjectShown(engine, frame, frame.PortraitMask, false)
 		end
-		frame.PortraitMask:Show()
 	end
 end
 
