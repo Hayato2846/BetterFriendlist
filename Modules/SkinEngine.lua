@@ -1987,10 +1987,7 @@ function SkinEngine:SkinTab(tab)
 
 	if tab.BFL_DarkTabButton and tab.BFL_DarkTabSkinned and tab.BFL_DarkButtonSkinned then
 		self:ApplyButtonState(tab)
-		local fs = tab.Text or (tab.GetFontString and tab:GetFontString())
-		if fs and (not tab.BFL_DarkTextCentered or fs.BFL_DarkCenteredForTab ~= tab) then
-			self:CenterTabText(tab)
-		end
+		self:CenterTabText(tab)
 		return
 	end
 
@@ -2002,10 +1999,7 @@ function SkinEngine:SkinTab(tab)
 		self:InstallTabHooks(tab)
 	end
 
-	local fs = tab.Text or (tab.GetFontString and tab:GetFontString())
-	if fs and (not tab.BFL_DarkTextCentered or fs.BFL_DarkCenteredForTab ~= tab) then
-		self:CenterTabText(tab)
-	end
+	self:CenterTabText(tab)
 end
 
 function SkinEngine:SkinCloseButton(button)

@@ -1962,6 +1962,16 @@ function DarkTheme:InstallGlobalTabHooks()
 			DarkTheme:SkinMainTabsDeferred()
 		end)
 	end
+
+	if not self.applyTabVisualStateHooked and type(BFL.ApplyTabVisualState) == "function" then
+		self.applyTabVisualStateHooked = true
+		hooksecurefunc(BFL, "ApplyTabVisualState", function(_, tab)
+			local engine = GetEngine()
+			if engine and engine:IsActive() and tab then
+				engine:CenterTabText(tab)
+			end
+		end)
+	end
 end
 
 return DarkTheme
