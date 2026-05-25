@@ -1377,7 +1377,7 @@ function RaidFrame:UpdateAllMemberButtons()
 		local subgroup = member.subgroup or 1
 		if subgroup >= 1 and subgroup <= 8 then
 			-- Get combat role for this member
-			if member.unit then
+			if member.unit and not member._isMock then
 				member.combatRole = UnitGroupRolesAssigned(member.unit)
 			end
 
@@ -1972,9 +1972,14 @@ function RaidFrame:UpdateMemberButton(button, memberData)
 	end
 
 	-- Update Role Icon (Tank/Healer/DPS)
-	-- FIX: Always fetch fresh from API if unit available, fallback to stored role field
+	-- FIX: Always fetch fresh from API if unit available, but keep stored roles for mock preview data
 	-- This fixes the combatRole vs role field mismatch after group swaps
-	local combatRole = memberData.unit and UnitGroupRolesAssigned(memberData.unit) or memberData.role
+	local combatRole
+	if memberData._isMock then
+		combatRole = memberData.combatRole or memberData.role
+	else
+		combatRole = memberData.unit and UnitGroupRolesAssigned(memberData.unit) or memberData.combatRole or memberData.role
+	end
 	if
 		combatRole
 		and combatRole ~= "NONE"

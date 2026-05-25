@@ -255,7 +255,9 @@ function BetterRaidFrame_Update()
 	-- Fix: Also exclude "solo raids" (IsInRaid but only 1 member) - e.g. after leaving Story Mode
 	local numMembers = GetNumGroupMembers()
 	local isSoloRaid = IsInRaid() and numMembers <= 1
-	local isInRaid = IsInRaid() and not IsInStoryModeRaid() and not isSoloRaid
+	local isRealRaid = IsInRaid() and not IsInStoryModeRaid() and not isSoloRaid
+	local isPreviewRaid = RaidFrame.mockEnabled and RaidFrame.raidMembers and #RaidFrame.raidMembers > 0
+	local showRaidRoster = isRealRaid or isPreviewRaid
 	local controlPanel = frame.ControlPanel
 
 	-- Show/hide UI elements based on group type (Raid vs Party)
@@ -271,7 +273,7 @@ function BetterRaidFrame_Update()
 			controlPanel.MemberCount:Show()
 		end
 		if controlPanel.CombatIcon then
-			controlPanel.CombatIcon:SetShown(isInRaid and InCombatLockdown())
+			controlPanel.CombatIcon:SetShown(isRealRaid and InCombatLockdown())
 		end
 		if controlPanel.RoleSummary then
 			controlPanel.RoleSummary:Show()
@@ -281,21 +283,24 @@ function BetterRaidFrame_Update()
 
 	-- Show/hide member buttons and groups container
 	if frame.GroupsInset and frame.GroupsInset.GroupsContainer then
-		frame.GroupsInset.GroupsContainer:SetShown(isInRaid)
+		frame.GroupsInset.GroupsContainer:SetShown(showRaidRoster)
 	end
 
 	-- Show/hide "Not in Raid" placeholder text
 	if frame.NotInRaid then
-		frame.NotInRaid:SetShown(not isInRaid)
+		frame.NotInRaid:SetShown(not showRaidRoster)
 	end
 
 	-- Always update control panel buttons (enable/disable based on state)
 	BetterRaidFrame_UpdateControlPanelButtons()
 
-	-- Only update member buttons if in raid
-	if isInRaid then
+	-- Only update member buttons if in raid or internal preview mode has mock raid data
+	if showRaidRoster then
 		-- Update member buttons via module
 		RaidFrame:UpdateAllMemberButtons()
+		if isPreviewRaid and RaidFrame.UpdateMockControlPanel then
+			RaidFrame:UpdateMockControlPanel()
+		end
 	end
 
 	-- Always update control panel layout (adjusts for frame width changes)

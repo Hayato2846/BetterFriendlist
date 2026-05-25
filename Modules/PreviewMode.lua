@@ -1614,7 +1614,9 @@ function PreviewMode:RefreshAllUI()
 			RaidFrame:UpdateAllMemberButtons()
 		end
 		-- Update control panel (role counts, etc.)
-		if RaidFrame.UpdateControlPanel then
+		if RaidFrame.mockEnabled and RaidFrame.UpdateMockControlPanel then
+			RaidFrame:UpdateMockControlPanel()
+		elseif RaidFrame.UpdateControlPanel then
 			RaidFrame:UpdateControlPanel()
 		end
 	end
