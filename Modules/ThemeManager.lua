@@ -24,12 +24,31 @@ local function NormalizeTheme(theme)
 end
 
 local function AreThemeFeaturesEnabled()
-	return BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures == true
+	return BFL.IsRetail == true and BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures == true
+end
+
+local function ShouldUseLegacyElvUISkinSetting()
+	return not AreThemeFeaturesEnabled()
+end
+
+local function IsLegacyElvUISkinEnabled()
+	if not BetterFriendlistDB then
+		return false
+	end
+	return BetterFriendlistDB.enableElvUISkin == true or BetterFriendlistDB.theme == "elvui"
+end
+
+local function IsElvUIAvailable()
+	return BFL.IsElvUIAvailable and BFL:IsElvUIAvailable()
 end
 
 local function GetStoredTheme()
 	if not BetterFriendlistDB then
 		return "blizzard"
+	end
+
+	if ShouldUseLegacyElvUISkinSetting() then
+		return IsLegacyElvUISkinEnabled() and "elvui" or "blizzard"
 	end
 
 	if BetterFriendlistDB.theme == nil then
@@ -43,12 +62,16 @@ function BFL:AreThemeFeaturesEnabled()
 	return AreThemeFeaturesEnabled()
 end
 
+function BFL:ShouldUseLegacyElvUISkinSetting()
+	return ShouldUseLegacyElvUISkinSetting()
+end
+
 function BFL:GetEffectiveTheme()
 	local theme = GetStoredTheme()
-	if theme ~= "blizzard" and not AreThemeFeaturesEnabled() then
+	if theme == "dark" and not AreThemeFeaturesEnabled() then
 		return "blizzard"
 	end
-	if theme == "elvui" and (not BFL.IsElvUIAvailable or not BFL:IsElvUIAvailable()) then
+	if theme == "elvui" and not IsElvUIAvailable() then
 		return "blizzard"
 	end
 	return theme
@@ -93,15 +116,17 @@ end
 
 function ThemeManager:SetTheme(theme, reason)
 	theme = NormalizeTheme(theme)
-	if theme ~= "blizzard" and not AreThemeFeaturesEnabled() then
+	if theme == "dark" and not AreThemeFeaturesEnabled() then
 		theme = "blizzard"
 	end
 
 	local DB = BFL:GetModule("DB")
 	if DB then
 		DB:Set("theme", theme)
+		DB:Set("enableElvUISkin", theme == "elvui")
 	elseif BetterFriendlistDB then
 		BetterFriendlistDB.theme = theme
+		BetterFriendlistDB.enableElvUISkin = theme == "elvui"
 	end
 
 	self:ApplyCurrentTheme(reason or "set-theme")

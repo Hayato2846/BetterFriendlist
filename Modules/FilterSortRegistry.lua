@@ -934,6 +934,18 @@ local function BuildDisplayEntry(entry, isCustom)
 	}
 end
 
+function Registry:AreBuilderFeaturesEnabled()
+	return BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures == true
+end
+
+local function IsBuiltinQuickFilter(id)
+	return id and BUILTIN_QUICK_FILTER_MAP[id] ~= nil
+end
+
+local function IsBuiltinSorter(id)
+	return id and BUILTIN_SORTER_MAP[id] ~= nil
+end
+
 local function ResolveSorterEntry(registry, id, requireVisible, fallbackId)
 	if id == "none" then
 		return nil
@@ -980,6 +992,9 @@ function Registry:IsQuickFilterVisible(id)
 	if not db or not id then
 		return true
 	end
+	if not self:AreBuilderFeaturesEnabled() then
+		return IsBuiltinQuickFilter(id)
+	end
 	if db.quickFilterVisibility[id] == nil then
 		return true
 	end
@@ -990,6 +1005,9 @@ function Registry:IsSorterVisible(id)
 	local db = self:EnsureDB()
 	if not db or not id then
 		return true
+	end
+	if not self:AreBuilderFeaturesEnabled() then
+		return IsBuiltinSorter(id)
 	end
 	if db.sorterVisibility[id] == nil then
 		return true
@@ -1018,7 +1036,8 @@ end
 
 function Registry:GetQuickFilters(includeHidden)
 	local db = self:EnsureDB()
-	local orderMap = BuildOrderMap(db and db.quickFilterOrder)
+	local useBuilderSettings = self:AreBuilderFeaturesEnabled()
+	local orderMap = useBuilderSettings and BuildOrderMap(db and db.quickFilterOrder) or {}
 	local list = {}
 
 	for _, entry in ipairs(BUILTIN_QUICK_FILTERS) do
@@ -1054,7 +1073,8 @@ end
 
 function Registry:GetSorters(includeHidden)
 	local db = self:EnsureDB()
-	local orderMap = BuildOrderMap(db and db.sorterOrder)
+	local useBuilderSettings = self:AreBuilderFeaturesEnabled()
+	local orderMap = useBuilderSettings and BuildOrderMap(db and db.sorterOrder) or {}
 	local list = {}
 
 	for _, entry in ipairs(BUILTIN_SORTERS) do

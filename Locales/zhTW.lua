@@ -978,7 +978,7 @@ BFL:RegisterLocale("zhTW", function()
 	L.CORE_ACTIVITY_TRACKING_HEADER = "|cff00ff00=== Activity ===|r"
 	L.CORE_ACTIVITY_TOTAL_FRIENDS = "Friends Active: %d"
 	L.CORE_BETA_FEATURES_DISABLED_MSG = "Beta Disabled!"
-	L.CORE_BETA_ENABLE_HINT = "|cffffcc00Enable:|r ESC > AddOns > BFL"
+	L.CORE_BETA_ENABLE_HINT = "|cffffcc00Enable:|r ESC > AddOns > BFL > Advanced > Beta Features"
 	L.CORE_STATISTICS_MODULE_NOT_LOADED = "Stats not loaded"
 	L.CORE_STATISTICS_HEADER = "|cff00ff00=== Statistics ===|r"
 	L.CORE_STATS_OVERVIEW = "|cffffcc00Summary:|r"

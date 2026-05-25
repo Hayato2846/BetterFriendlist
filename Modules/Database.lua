@@ -41,6 +41,7 @@ local defaults = {
 	-- Visual Settings
 	compactMode = false, -- Use compact button layout
 	theme = "blizzard", -- UI theme: "blizzard", "dark", "elvui"
+	enableElvUISkin = false, -- Legacy ElvUI skin toggle shown outside Retail beta theme settings
 	fontSize = "normal", -- "small", "normal", "large"
 	-- Font Customization (LibSharedMedia)
 	fontFriendName = "Friz Quadrata TT",
@@ -321,8 +322,18 @@ function DB:NormalizeThemeSetting()
 		BetterFriendlistDB.theme = "blizzard"
 	end
 
-	if BetterFriendlistDB.theme ~= "blizzard" and BetterFriendlistDB.enableBetaFeatures ~= true then
+	local wasDarkTheme = BetterFriendlistDB.theme == "dark"
+	local themeFeaturesEnabled = BFL.IsRetail == true and BetterFriendlistDB.enableBetaFeatures == true
+	if wasDarkTheme and not themeFeaturesEnabled then
 		BetterFriendlistDB.theme = "blizzard"
+	end
+
+	if BetterFriendlistDB.theme == "elvui" then
+		BetterFriendlistDB.enableElvUISkin = true
+	elseif BetterFriendlistDB.theme == "dark" or wasDarkTheme then
+		BetterFriendlistDB.enableElvUISkin = false
+	elseif BetterFriendlistDB.enableElvUISkin == nil then
+		BetterFriendlistDB.enableElvUISkin = false
 	end
 end
 

@@ -39,6 +39,7 @@ ignore:
   - "*.txt"
   - "*.zip"
   - "*.log"
+  - "*.code-workspace"
   - "*.bak"
   - "*.lua.bak"
   - BUG_*.md

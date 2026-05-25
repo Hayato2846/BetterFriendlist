@@ -1729,6 +1729,7 @@ local function RegisterBuiltInTests()
 			V:AssertNotNil(BFL.IsThemeActive, "BFL:IsThemeActive should exist")
 			V:AssertNotNil(BFL.UsesFlatTheme, "BFL:UsesFlatTheme should exist")
 			V:AssertNotNil(BFL.AreThemeFeaturesEnabled, "BFL:AreThemeFeaturesEnabled should exist")
+			V:AssertNotNil(BFL.ShouldUseLegacyElvUISkinSetting, "BFL:ShouldUseLegacyElvUISkinSetting should exist")
 
 			WithTemporaryDatabase({
 				theme = "dark",
@@ -1780,6 +1781,57 @@ local function RegisterBuiltInTests()
 				V:Assert(not BFL:IsThemeActive("dark"), "Dark theme should not be active when Beta is disabled")
 				V:Assert(not BFL:UsesFlatTheme(), "Beta-disabled themes should not count as flat themes")
 			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "Theme_NonRetailDisablesBetaThemes", {
+		description = "Non-Retail clients should not activate Retail beta themes",
+		action = function(V)
+			local originalIsRetail = BFL.IsRetail
+			BFL.IsRetail = false
+
+			local ok, err = pcall(function()
+				WithTemporaryDatabase({
+					theme = "dark",
+					enableBetaFeatures = true,
+				}, function(tempDB)
+					V:AssertEqual(tempDB.theme, "blizzard", "Stored Dark theme should normalize on non-Retail")
+					V:Assert(not BFL:AreThemeFeaturesEnabled(), "Theme features should be Retail-only")
+					V:AssertEqual(BFL:GetEffectiveTheme(), "blizzard", "Dark theme should not become effective")
+				end)
+			end)
+
+			BFL.IsRetail = originalIsRetail
+			if not ok then
+				error(err, 2)
+			end
+		end,
+	})
+
+	TS:RegisterTest("data", "Theme_LegacyElvUISkinWithoutThemeTab", {
+		description = "Legacy ElvUI skin setting should remain effective without Retail beta theme settings",
+		action = function(V)
+			local originalIsElvUIAvailable = BFL.IsElvUIAvailable
+			BFL.IsElvUIAvailable = function()
+				return true
+			end
+
+			local ok, err = pcall(function()
+				WithTemporaryDatabase({
+					theme = "blizzard",
+					enableElvUISkin = true,
+					enableBetaFeatures = false,
+				}, function()
+					V:Assert(BFL:ShouldUseLegacyElvUISkinSetting(), "Legacy ElvUI setting should be active")
+					V:AssertEqual(BFL:GetEffectiveTheme(), "elvui", "Legacy ElvUI skin should become effective")
+					V:Assert(BFL:IsThemeActive("elvui"), "ElvUI skin should be active through the legacy setting")
+				end)
+			end)
+
+			BFL.IsElvUIAvailable = originalIsElvUIAvailable
+			if not ok then
+				error(err, 2)
+			end
 		end,
 	})
 
@@ -3336,8 +3388,10 @@ local function RegisterBuiltInTests()
 
 			Registry:EnsureDB()
 			local originalFilter = BetterFriendlistDB.quickFilter
+			local originalBeta = BetterFriendlistDB.enableBetaFeatures
 			local originalVisibility = BetterFriendlistDB.quickFilterVisibility.online
 
+			BetterFriendlistDB.enableBetaFeatures = true
 			BetterFriendlistDB.quickFilter = "online"
 			BetterFriendlistDB.quickFilterVisibility.online = false
 			Registry:NormalizeCurrentSelections()
@@ -3350,6 +3404,45 @@ local function RegisterBuiltInTests()
 			end
 
 			BetterFriendlistDB.quickFilter = originalFilter
+			BetterFriendlistDB.enableBetaFeatures = originalBeta
+			BetterFriendlistDB.quickFilterVisibility.online = originalVisibility
+			Registry:NormalizeCurrentSelections()
+		end,
+	})
+
+	TS:RegisterTest("filter", "Registry_BetaDisabledShowsAllBuiltinFilters", {
+		description = "Disabled Beta Features should ignore built-in QuickFilter visibility settings",
+		action = function(V)
+			local Registry = BFL:GetModule("FilterSortRegistry")
+			if not Registry or not BetterFriendlistDB then
+				V:Skip("FilterSortRegistry or DB not loaded")
+				return
+			end
+
+			Registry:EnsureDB()
+			local originalFilter = BetterFriendlistDB.quickFilter
+			local originalBeta = BetterFriendlistDB.enableBetaFeatures
+			local originalVisibility = BetterFriendlistDB.quickFilterVisibility.online
+
+			BetterFriendlistDB.enableBetaFeatures = false
+			BetterFriendlistDB.quickFilter = "online"
+			BetterFriendlistDB.quickFilterVisibility.online = false
+			Registry:NormalizeCurrentSelections()
+
+			V:AssertEqual(BetterFriendlistDB.quickFilter, "online", "Hidden built-in filter should remain selectable")
+			V:Assert(Registry:IsQuickFilterVisible("online"), "Built-in filter should be visible when Beta is disabled")
+
+			local found = false
+			for _, entry in ipairs(Registry:GetVisibleQuickFilters()) do
+				if entry.id == "online" then
+					found = true
+					break
+				end
+			end
+			V:Assert(found, "Hidden built-in filter should appear in the visible filter list")
+
+			BetterFriendlistDB.quickFilter = originalFilter
+			BetterFriendlistDB.enableBetaFeatures = originalBeta
 			BetterFriendlistDB.quickFilterVisibility.online = originalVisibility
 			Registry:NormalizeCurrentSelections()
 		end,
@@ -3403,8 +3496,10 @@ local function RegisterBuiltInTests()
 			Registry:EnsureDB()
 			local originalPrimary = BetterFriendlistDB.primarySort
 			local originalSecondary = BetterFriendlistDB.secondarySort
+			local originalBeta = BetterFriendlistDB.enableBetaFeatures
 			local originalVisibility = BetterFriendlistDB.sorterVisibility.name
 
+			BetterFriendlistDB.enableBetaFeatures = true
 			BetterFriendlistDB.primarySort = "name"
 			BetterFriendlistDB.secondarySort = "missing_sorter"
 			BetterFriendlistDB.sorterVisibility.name = false
@@ -3415,6 +3510,48 @@ local function RegisterBuiltInTests()
 
 			BetterFriendlistDB.primarySort = originalPrimary
 			BetterFriendlistDB.secondarySort = originalSecondary
+			BetterFriendlistDB.enableBetaFeatures = originalBeta
+			BetterFriendlistDB.sorterVisibility.name = originalVisibility
+			Registry:NormalizeCurrentSelections()
+		end,
+	})
+
+	TS:RegisterTest("sort", "Registry_BetaDisabledShowsAllBuiltinSorters", {
+		description = "Disabled Beta Features should ignore built-in Sorter visibility settings",
+		action = function(V)
+			local Registry = BFL:GetModule("FilterSortRegistry")
+			if not Registry or not BetterFriendlistDB then
+				V:Skip("FilterSortRegistry or DB not loaded")
+				return
+			end
+
+			Registry:EnsureDB()
+			local originalPrimary = BetterFriendlistDB.primarySort
+			local originalSecondary = BetterFriendlistDB.secondarySort
+			local originalBeta = BetterFriendlistDB.enableBetaFeatures
+			local originalVisibility = BetterFriendlistDB.sorterVisibility.name
+
+			BetterFriendlistDB.enableBetaFeatures = false
+			BetterFriendlistDB.primarySort = "name"
+			BetterFriendlistDB.secondarySort = "status"
+			BetterFriendlistDB.sorterVisibility.name = false
+			Registry:NormalizeCurrentSelections()
+
+			V:AssertEqual(BetterFriendlistDB.primarySort, "name", "Hidden built-in sorter should remain selectable")
+			V:Assert(Registry:IsSorterVisible("name"), "Built-in sorter should be visible when Beta is disabled")
+
+			local found = false
+			for _, entry in ipairs(Registry:GetVisibleSorters()) do
+				if entry.id == "name" then
+					found = true
+					break
+				end
+			end
+			V:Assert(found, "Hidden built-in sorter should appear in the visible sorter list")
+
+			BetterFriendlistDB.primarySort = originalPrimary
+			BetterFriendlistDB.secondarySort = originalSecondary
+			BetterFriendlistDB.enableBetaFeatures = originalBeta
 			BetterFriendlistDB.sorterVisibility.name = originalVisibility
 			Registry:NormalizeCurrentSelections()
 		end,

@@ -1189,7 +1189,7 @@ BFL:RegisterLocale("deDE", function()
 	L.CORE_ACTIVITY_TRACKING_HEADER = "|cff00ff00=== BetterFriendlist Aktivitäts-Tracking ===|r"
 	L.CORE_ACTIVITY_TOTAL_FRIENDS = "Freunde mit Aktivität gesamt: %d"
 	L.CORE_BETA_FEATURES_DISABLED_MSG = "Beta-Funktionen sind deaktiviert!"
-	L.CORE_BETA_ENABLE_HINT = "|cffffcc00Beta-Funktionen aktivieren in:|r ESC > AddOns > BetterFriendlist > Allgemein"
+	L.CORE_BETA_ENABLE_HINT = "|cffffcc00Beta-Funktionen aktivieren in:|r ESC > AddOns > BetterFriendlist > Erweitert > Beta-Funktionen"
 	L.CORE_STATISTICS_MODULE_NOT_LOADED = "Statistik-Modul nicht geladen"
 	L.CORE_STATISTICS_HEADER = "|cff00ff00=== BetterFriendlist Erweiterte Statistiken ===|r"
 	L.CORE_STATS_OVERVIEW = "|cffffcc00Übersicht:|r"

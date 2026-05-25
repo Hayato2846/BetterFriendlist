@@ -113,7 +113,7 @@ Deploy the current checkout to every detected client:
 Install a release ZIP for exact package testing:
 
 ```powershell
-.\tools\BFL-InstallRelease.ps1 -Client retail -Zip C:\Users\hofer\Documents\BFL\releases\BetterFriendlist\BetterFriendlist-2.5.9.zip
+.\tools\BFL-InstallRelease.ps1 -Client retail -Zip C:\Users\hofer\Documents\BFL\releases\BetterFriendlist\BetterFriendlist-2.6.0.zip
 ```
 
 Create a feature worktree:
@@ -165,6 +165,22 @@ The `.vscode` folder is intentionally ignored by Git and excluded from release p
 `tools\BFL-Worktree.ps1 -Action Create` copies the local `.vscode` folder from the source
 repo into each new worktree by default; pass `-SkipVSCodeCopy` when a worktree should start
 without local editor settings.
+
+For a persistent Source Control view across reboots, open the generated
+`BetterFriendlist.code-workspace` from the main repo. It lists the main checkout and all
+current worktrees as real VSCode workspace folders, which is more reliable than depending
+only on repository auto-detection. Regenerate it after manual worktree changes with:
+
+```powershell
+.\tools\BFL-Worktree.ps1 -Action Workspace
+```
+
+To migrate convenience folders from an older workspace, import it once and exclude broad
+parent folders that would nest the repo and worktree roots:
+
+```powershell
+.\tools\BFL-Worktree.ps1 -Action Workspace -ImportWorkspacePath C:\Users\hofer\Documents\BetterFriendlist.code-workspace -ExcludeImportedFolderName BFL
+```
 
 Recommended daily setup:
 

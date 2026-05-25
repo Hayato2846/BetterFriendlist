@@ -1122,7 +1122,7 @@ BFL:RegisterLocale("ruRU", function()
 	L.CORE_ACTIVITY_TRACKING_HEADER = "|cff00ff00=== Активность ===|r"
 	L.CORE_ACTIVITY_TOTAL_FRIENDS = "Активно друзей: %d"
 	L.CORE_BETA_FEATURES_DISABLED_MSG = "Бета отключена!"
-	L.CORE_BETA_ENABLE_HINT = "|cffffcc00Enable:|r ESC > AddOns > BFL"
+	L.CORE_BETA_ENABLE_HINT = "|cffffcc00Enable:|r ESC > AddOns > BFL > Advanced > Beta Features"
 	L.CORE_STATISTICS_MODULE_NOT_LOADED = "Статистика не загружена"
 	L.CORE_STATISTICS_HEADER = "|cff00ff00=== Статистика ===|r"
 	L.CORE_STATS_OVERVIEW = "|cffffcc00Сводка:|r"

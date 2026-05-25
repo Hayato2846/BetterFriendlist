@@ -10,6 +10,7 @@
 !.github/PULL_REQUEST_TEMPLATE.md
 .pkgmeta
 .vscode
+*.code-workspace
 .ai-context
 memory-bank
 /old_version

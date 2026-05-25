@@ -491,6 +491,7 @@ local TAB_DEFINITIONS = {
 		name = L.SETTINGS_TAB_THEME or "Theme",
 		icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\sliders.blp",
 		beta = true,
+		retailOnly = true,
 	},
 	{
 		id = 2,
@@ -557,6 +558,24 @@ local TAB_DEFINITIONS = {
 local COLOR_STABLE = "|cffffff00" -- Gold
 local COLOR_BETA = "|cffff8800" -- Orange
 
+local function IsTabAvailableForClient(tabDef)
+	return not tabDef.retailOnly or BFL.IsRetail == true
+end
+
+local function ShouldShowLegacyElvUISkinSetting()
+	if BFL.ShouldUseLegacyElvUISkinSetting then
+		return BFL:ShouldUseLegacyElvUISkinSetting()
+	end
+	return not (BFL.IsRetail == true and BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures == true)
+end
+
+local function IsLegacyElvUISkinSelected(DB)
+	if not DB then
+		return false
+	end
+	return DB:Get("theme", "blizzard") == "elvui" or DB:Get("enableElvUISkin", false) == true
+end
+
 -- Get all tabs that should be visible based on current settings
 local function GetVisibleTabs()
 	local betaEnabled = BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures or false
@@ -564,7 +583,7 @@ local function GetVisibleTabs()
 
 	for _, tabDef in ipairs(TAB_DEFINITIONS) do
 		-- Show tab if: it's stable OR (it's beta AND beta features are enabled)
-		if not tabDef.beta or betaEnabled then
+		if IsTabAvailableForClient(tabDef) and (not tabDef.beta or betaEnabled) then
 			table.insert(visibleTabs, tabDef)
 		end
 	end
@@ -585,7 +604,7 @@ end
 local function GetBetaTabIds()
 	local betaTabIds = {}
 	for _, tabDef in ipairs(TAB_DEFINITIONS) do
-		if tabDef.beta then
+		if tabDef.beta and IsTabAvailableForClient(tabDef) then
 			table.insert(betaTabIds, tabDef.id)
 		end
 	end
@@ -3334,16 +3353,17 @@ function Settings:OnThemeChanged(theme)
 	if theme ~= "blizzard" and theme ~= "dark" and theme ~= "elvui" then
 		theme = "blizzard"
 	end
-	if theme ~= "blizzard" and (not BetterFriendlistDB or BetterFriendlistDB.enableBetaFeatures ~= true) then
+	if theme == "dark" and (not BFL.AreThemeFeaturesEnabled or not BFL:AreThemeFeaturesEnabled()) then
 		theme = "blizzard"
 	end
-	if theme == "elvui" and not _G.ElvUI then
+	if theme == "elvui" and (not BFL.IsElvUIAvailable or not BFL:IsElvUIAvailable()) then
 		theme = "blizzard"
 	end
 
 	local oldStoredTheme = DB:Get("theme", "blizzard")
 	local oldEffectiveTheme = BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() or oldStoredTheme
 	DB:Set("theme", theme)
+	DB:Set("enableElvUISkin", theme == "elvui")
 
 	local ThemeManager = BFL:GetModule("ThemeManager")
 	local touchesElvUI = oldEffectiveTheme == "elvui" or theme == "elvui"
@@ -3362,6 +3382,28 @@ function Settings:OnThemeChanged(theme)
 
 	if ThemeManager and ThemeManager.ApplyCurrentTheme then
 		ThemeManager:ApplyCurrentTheme("settings")
+	end
+end
+
+function Settings:OnLegacyElvUISkinChanged(checked)
+	local DB = GetDB()
+	if not DB then
+		return
+	end
+
+	local oldStoredTheme = DB:Get("theme", "blizzard")
+	local oldEffectiveTheme = BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() or oldStoredTheme
+	local enabled = checked == true
+	DB:Set("enableElvUISkin", enabled)
+	DB:Set("theme", enabled and "elvui" or "blizzard")
+
+	local ThemeManager = BFL:GetModule("ThemeManager")
+	if oldEffectiveTheme == "elvui" or enabled then
+		if ThemeManager and ThemeManager.ShowReloadDialog then
+			ThemeManager:ShowReloadDialog()
+		end
+	elseif ThemeManager and ThemeManager.ApplyCurrentTheme then
+		ThemeManager:ApplyCurrentTheme("legacy-elvui-setting")
 	end
 end
 
@@ -3398,7 +3440,7 @@ function Settings:RefreshThemeTab()
 		L.SETTINGS_THEME_DARK or "Dark",
 	}
 	local values = { "blizzard", "dark" }
-	if _G.ElvUI then
+	if BFL.IsElvUIAvailable and BFL:IsElvUIAvailable() then
 		table.insert(labels, L.SETTINGS_THEME_ELVUI or "ElvUI")
 		table.insert(values, "elvui")
 	end
@@ -3651,6 +3693,20 @@ function Settings:RefreshGeneralTab()
 		tooltipDesc = L.SETTINGS_SHOW_BLIZZARD_DESC or "Shows the original Blizzard Friends button in the social menu",
 	})
 	table.insert(allFrames, row7)
+
+	if ShouldShowLegacyElvUISkinSetting() then
+		local elvUISkinToggle = Components:CreateCheckbox(tab, {
+			label = L.SETTINGS_ENABLE_ELVUI_SKIN,
+			initialValue = IsLegacyElvUISkinSelected(DB),
+			callback = function(val)
+				self:OnLegacyElvUISkinChanged(val)
+			end,
+			tooltipTitle = L.SETTINGS_ENABLE_ELVUI_SKIN,
+			tooltipDesc = L.SETTINGS_ENABLE_ELVUI_SKIN_DESC
+				or "Enables the ElvUI skin for BetterFriendlist. Requires ElvUI to be installed and enabled.",
+		})
+		table.insert(allFrames, elvUISkinToggle)
+	end
 
 	-- Spacer before next section
 	table.insert(allFrames, Components:CreateSpacer(tab))
@@ -5433,16 +5489,18 @@ function Settings:RefreshAdvancedTab()
 
 			-- If disabling Beta and currently on ANY Beta tab, switch to General
 			if not checked then
-				if oldStoredTheme ~= "blizzard" then
-					if oldEffectiveTheme == "elvui" then
-						DB:Set("theme", "blizzard")
-						if ThemeManager and ThemeManager.ShowReloadDialog then
-							ThemeManager:ShowReloadDialog()
-						end
-					elseif ThemeManager and ThemeManager.SetTheme then
+				if oldStoredTheme == "dark" then
+					if ThemeManager and ThemeManager.SetTheme then
 						ThemeManager:SetTheme("blizzard", "beta-disabled")
 					else
 						DB:Set("theme", "blizzard")
+						DB:Set("enableElvUISkin", false)
+					end
+				elseif oldStoredTheme == "elvui" or oldEffectiveTheme == "elvui" or DB:Get("enableElvUISkin", false) == true then
+					DB:Set("enableElvUISkin", true)
+					DB:Set("theme", "elvui")
+					if ThemeManager and ThemeManager.ApplyCurrentTheme then
+						ThemeManager:ApplyCurrentTheme("beta-disabled-elvui-legacy")
 					end
 				elseif ThemeManager and ThemeManager.ApplyCurrentTheme then
 					ThemeManager:ApplyCurrentTheme("beta-disabled")
@@ -5455,11 +5513,29 @@ function Settings:RefreshAdvancedTab()
 						break
 					end
 				end
+			else
+				if BFL.IsRetail and DB:Get("enableElvUISkin", false) == true and DB:Get("theme", "blizzard") == "blizzard" then
+					DB:Set("theme", "elvui")
+				end
+				if ThemeManager and ThemeManager.ApplyCurrentTheme then
+					ThemeManager:ApplyCurrentTheme("beta-enabled")
+				end
+			end
+
+			local Registry = BFL:GetModule("FilterSortRegistry")
+			if Registry and Registry.NormalizeCurrentSelections then
+				Registry:NormalizeCurrentSelections()
+			end
+			if BFL.ForceRefreshFriendsList then
+				BFL:ForceRefreshFriendsList()
 			end
 
 			-- Refresh Settings UI (show/hide Beta tabs)
 			if BetterFriendlistSettings_RefreshTabs then
 				BetterFriendlistSettings_RefreshTabs()
+			end
+			if currentTab == 1 then
+				self:RefreshGeneralTab()
 			end
 
 			-- User feedback
@@ -5481,7 +5557,7 @@ function Settings:RefreshAdvancedTab()
 	-- Only show if there are actual beta features
 	local hasBetaFeatures = false
 	for _, tabDef in ipairs(TAB_DEFINITIONS) do
-		if tabDef.beta then
+		if tabDef.beta and IsTabAvailableForClient(tabDef) then
 			hasBetaFeatures = true
 			break
 		end
@@ -5500,7 +5576,7 @@ function Settings:RefreshAdvancedTab()
 		-- Dynamic list from TAB_DEFINITIONS
 		local listY = -20
 		for _, tabDef in ipairs(TAB_DEFINITIONS) do
-			if tabDef.beta then
+			if tabDef.beta and IsTabAvailableForClient(tabDef) then
 				local icon = listContainer:CreateTexture(nil, "ARTWORK")
 				icon:SetSize(14, 14)
 				icon:SetPoint("TOPLEFT", 5, listY)

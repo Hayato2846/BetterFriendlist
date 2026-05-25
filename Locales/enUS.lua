@@ -1204,7 +1204,7 @@ local function LoadEnUS()
 	L.CORE_ACTIVITY_TRACKING_HEADER = "|cff00ff00=== BetterFriendlist Activity Tracking ===|r"
 	L.CORE_ACTIVITY_TOTAL_FRIENDS = "Total friends with activity: %d"
 	L.CORE_BETA_FEATURES_DISABLED_MSG = "Beta Features are disabled!"
-	L.CORE_BETA_ENABLE_HINT = "|cffffcc00Enable Beta Features in:|r ESC > AddOns > BetterFriendlist > General"
+	L.CORE_BETA_ENABLE_HINT = "|cffffcc00Enable Beta Features in:|r ESC > AddOns > BetterFriendlist > Advanced > Beta Features"
 	L.CORE_STATISTICS_MODULE_NOT_LOADED = "Statistics module not loaded"
 	L.CORE_STATISTICS_HEADER = "|cff00ff00=== BetterFriendlist Enhanced Statistics ===|r"
 	L.CORE_STATS_OVERVIEW = "|cffffcc00Overview:|r"
