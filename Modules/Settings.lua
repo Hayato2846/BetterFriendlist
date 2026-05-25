@@ -563,6 +563,12 @@ local function IsTabAvailableForClient(tabDef)
 end
 
 local function ShouldShowLegacyElvUISkinSetting()
+	if BFL.ShouldShowLegacyElvUISkinSetting then
+		return BFL:ShouldShowLegacyElvUISkinSetting()
+	end
+	if not (BFL.IsElvUIAvailable and BFL:IsElvUIAvailable()) then
+		return false
+	end
 	if BFL.ShouldUseLegacyElvUISkinSetting then
 		return BFL:ShouldUseLegacyElvUISkinSetting()
 	end

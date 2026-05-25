@@ -31,15 +31,19 @@ local function ShouldUseLegacyElvUISkinSetting()
 	return not AreThemeFeaturesEnabled()
 end
 
+local function IsElvUIAvailable()
+	return BFL.IsElvUIAvailable and BFL:IsElvUIAvailable()
+end
+
+local function ShouldShowLegacyElvUISkinSetting()
+	return ShouldUseLegacyElvUISkinSetting() and IsElvUIAvailable()
+end
+
 local function IsLegacyElvUISkinEnabled()
 	if not BetterFriendlistDB then
 		return false
 	end
 	return BetterFriendlistDB.enableElvUISkin == true or BetterFriendlistDB.theme == "elvui"
-end
-
-local function IsElvUIAvailable()
-	return BFL.IsElvUIAvailable and BFL:IsElvUIAvailable()
 end
 
 local function GetStoredTheme()
@@ -64,6 +68,10 @@ end
 
 function BFL:ShouldUseLegacyElvUISkinSetting()
 	return ShouldUseLegacyElvUISkinSetting()
+end
+
+function BFL:ShouldShowLegacyElvUISkinSetting()
+	return ShouldShowLegacyElvUISkinSetting()
 end
 
 function BFL:GetEffectiveTheme()

@@ -1730,6 +1730,7 @@ local function RegisterBuiltInTests()
 			V:AssertNotNil(BFL.UsesFlatTheme, "BFL:UsesFlatTheme should exist")
 			V:AssertNotNil(BFL.AreThemeFeaturesEnabled, "BFL:AreThemeFeaturesEnabled should exist")
 			V:AssertNotNil(BFL.ShouldUseLegacyElvUISkinSetting, "BFL:ShouldUseLegacyElvUISkinSetting should exist")
+			V:AssertNotNil(BFL.ShouldShowLegacyElvUISkinSetting, "BFL:ShouldShowLegacyElvUISkinSetting should exist")
 
 			WithTemporaryDatabase({
 				theme = "dark",
@@ -1825,6 +1826,33 @@ local function RegisterBuiltInTests()
 					V:Assert(BFL:ShouldUseLegacyElvUISkinSetting(), "Legacy ElvUI setting should be active")
 					V:AssertEqual(BFL:GetEffectiveTheme(), "elvui", "Legacy ElvUI skin should become effective")
 					V:Assert(BFL:IsThemeActive("elvui"), "ElvUI skin should be active through the legacy setting")
+				end)
+			end)
+
+			BFL.IsElvUIAvailable = originalIsElvUIAvailable
+			if not ok then
+				error(err, 2)
+			end
+		end,
+	})
+
+	TS:RegisterTest("data", "Theme_LegacyElvUISkinHiddenWithoutAddon", {
+		description = "Legacy ElvUI skin setting should be hidden when ElvUI is unavailable",
+		action = function(V)
+			local originalIsElvUIAvailable = BFL.IsElvUIAvailable
+			BFL.IsElvUIAvailable = function()
+				return false
+			end
+
+			local ok, err = pcall(function()
+				WithTemporaryDatabase({
+					theme = "elvui",
+					enableElvUISkin = true,
+					enableBetaFeatures = false,
+				}, function()
+					V:Assert(BFL:ShouldUseLegacyElvUISkinSetting(), "Legacy ElvUI setting path should still be active")
+					V:Assert(not BFL:ShouldShowLegacyElvUISkinSetting(), "Legacy ElvUI setting should be hidden without ElvUI")
+					V:AssertEqual(BFL:GetEffectiveTheme(), "blizzard", "ElvUI should fall back to Blizzard without ElvUI")
 				end)
 			end)
 
