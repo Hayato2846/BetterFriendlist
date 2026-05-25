@@ -40,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dark Theme Performance** - Narrowed deferred tab refreshes to the active content pane and coalesced Broker count updates during event bursts.
 
 ### Fixed
-- **Dark Theme Portrait** - Restored the BFL avatar in the main window header without adding button chrome.
+- **Dark Theme Portrait** - Restored the BFL avatar as a compact square header icon without adding button chrome.
 - **QuickFilter & Sorter Builder** - Updated the docked editor to use the same modern frame styling as the Settings and Raid Help windows.
 - **Retail Unit Menus** - Avoided adding BetterFriendlist group options to protected Blizzard unit menus.
 - **Total RP 3 Compatibility** - Restored the Total RP 3 profile action in BetterFriendlist friend context menus without using Blizzard menu callbacks.

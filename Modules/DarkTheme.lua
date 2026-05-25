@@ -275,6 +275,10 @@ local function IsSimpleModeEnabled()
 	return BetterFriendlistDB and BetterFriendlistDB.simpleMode == true
 end
 
+local DARK_PORTRAIT_SIZE = 42
+local DARK_PORTRAIT_OFFSET_X = 8
+local DARK_PORTRAIT_OFFSET_Y = -6
+
 local function RestorePortraitArtwork(engine, frame)
 	if not frame then
 		return
@@ -289,10 +293,23 @@ local function RestorePortraitArtwork(engine, frame)
 		end
 
 		if showPortrait then
+			if engine then
+				engine:SetFrameSize(portraitButton, DARK_PORTRAIT_SIZE, DARK_PORTRAIT_SIZE)
+				engine:SetFramePoints(portraitButton, {
+					{ "TOPLEFT", frame, "TOPLEFT", DARK_PORTRAIT_OFFSET_X, DARK_PORTRAIT_OFFSET_Y },
+				})
+			else
+				portraitButton:ClearAllPoints()
+				portraitButton:SetPoint("TOPLEFT", frame, "TOPLEFT", DARK_PORTRAIT_OFFSET_X, DARK_PORTRAIT_OFFSET_Y)
+				portraitButton:SetSize(DARK_PORTRAIT_SIZE, DARK_PORTRAIT_SIZE)
+			end
 			if portraitButton.SetFrameLevel and frame.GetFrameLevel then
 				portraitButton:SetFrameLevel((frame:GetFrameLevel() or 0) + 5)
 			end
 			SetObjectShown(engine, portraitButton, portraitButton, true)
+			if portraitButton.Icon and portraitButton.Icon ~= portraitButton.BFL_DarkPortraitIcon then
+				SetObjectShown(engine, portraitButton, portraitButton.Icon, false)
+			end
 
 			local icon = portraitButton.BFL_DarkPortraitIcon
 			if not icon and portraitButton.CreateTexture then
@@ -306,7 +323,7 @@ local function RestorePortraitArtwork(engine, frame)
 			if icon then
 				icon:ClearAllPoints()
 				icon:SetPoint("CENTER", portraitButton, "CENTER", 0, 0)
-				icon:SetSize(60, 60)
+				icon:SetSize(DARK_PORTRAIT_SIZE, DARK_PORTRAIT_SIZE)
 				if icon.SetTexture then
 					icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Textures\\PortraitIcon.blp")
 				end
@@ -322,37 +339,16 @@ local function RestorePortraitArtwork(engine, frame)
 				if icon.SetDrawLayer then
 					icon:SetDrawLayer("ARTWORK", 0)
 				end
-
-				local mask = portraitButton.BFL_DarkPortraitMask
-				if not mask and portraitButton.CreateMaskTexture then
-					mask = portraitButton:CreateMaskTexture()
-					portraitButton.BFL_DarkPortraitMask = mask
-					if engine and engine.RegisterOverlay then
-						engine:RegisterOverlay(portraitButton, mask)
-					end
+				if portraitButton.BFL_DarkPortraitMask and icon.RemoveMaskTexture then
+					icon:RemoveMaskTexture(portraitButton.BFL_DarkPortraitMask)
 				end
-				if mask then
-					mask:ClearAllPoints()
-					mask:SetPoint("CENTER", portraitButton, "CENTER", 0, 0)
-					mask:SetSize(60, 60)
-					if mask.SetTexture then
-						mask:SetTexture(
-							"Interface\\CharacterFrame\\TempPortraitAlphaMask",
-							"CLAMPTOBLACKADDITIVE",
-							"CLAMPTOBLACKADDITIVE"
-						)
-					end
-					if not portraitButton.BFL_DarkPortraitMaskApplied and icon.AddMaskTexture then
-						icon:AddMaskTexture(mask)
-						portraitButton.BFL_DarkPortraitMaskApplied = true
-					end
-					if mask.Show then
-						mask:Show()
-					end
-				end
+				portraitButton.BFL_DarkPortraitMaskApplied = nil
 				icon:Show()
 			end
 		else
+			if portraitButton.Icon and portraitButton.Icon ~= portraitButton.BFL_DarkPortraitIcon then
+				SetObjectShown(engine, portraitButton, portraitButton.Icon, false)
+			end
 			if portraitButton.BFL_DarkPortraitIcon then
 				portraitButton.BFL_DarkPortraitIcon:Hide()
 			end
