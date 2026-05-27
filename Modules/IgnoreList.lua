@@ -100,7 +100,7 @@ function IgnoreList:OnLoad(frame)
 		end
 	end)
 
-	ScrollUtil.InitScrollBoxListWithScrollBar(frame.ScrollBox, frame.ScrollBar, scrollBoxView)
+	BFL.InitScrollBoxListWithScrollBar(frame.ScrollBox, frame.ScrollBar, scrollBoxView)
 end
 
 -- Initialize Classic IgnoreList FauxScrollFrame

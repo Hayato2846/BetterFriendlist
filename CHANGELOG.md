@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+
+### Changed
+- **Client Compatibility** - Prepared friend invites and raid controls for upcoming Retail client changes while preserving current Retail and Classic support.
+- **Raid Tools** - Improved handling for temporarily uncached raid roster names.
+- **Font Rendering** - Made custom font handling more defensive on newer clients.
+
 ## [2.6.0]        - 2026-05-25
 
 ### Added

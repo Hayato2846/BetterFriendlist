@@ -387,7 +387,7 @@ function WhoFrame:OnLoad(frame)
 		return cachedExtent
 	end)
 
-	ScrollUtil.InitScrollBoxListWithScrollBar(frame.ScrollBox, frame.ScrollBar, view)
+	BFL.InitScrollBoxListWithScrollBar(frame.ScrollBox, frame.ScrollBar, view)
 
 	-- Anchor ScrollBox flush inside ListInset for a clean, crisp layout
 	frame.ScrollBox:ClearAllPoints()

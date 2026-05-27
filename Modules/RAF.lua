@@ -576,7 +576,7 @@ function RAF:OnLoad(frame)
 			view:SetElementInitializer("BetterRecruitListButtonTemplate", function(button, elementData)
 				BetterRecruitListButton_Init(button, elementData)
 			end)
-			ScrollUtil.InitScrollBoxListWithScrollBar(frame.RecruitList.ScrollBox, frame.RecruitList.ScrollBar, view)
+			BFL.InitScrollBoxListWithScrollBar(frame.RecruitList.ScrollBox, frame.RecruitList.ScrollBar, view)
 		end
 	end
 

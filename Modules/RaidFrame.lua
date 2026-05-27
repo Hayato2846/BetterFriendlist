@@ -8,6 +8,34 @@ local L = BFL.L
 local FontManager = BFL.FontManager
 local RaidFrame = BFL:RegisterModule("RaidFrame", {})
 
+local function IsPendingRaidRosterName(name)
+	return BFL and BFL.IsPendingRaidRosterName and BFL:IsPendingRaidRosterName(name)
+end
+
+local function SafeSetFont(fontObject, fontPath, fontSize, flags)
+	local manager = BFL.FontManager or FontManager
+	if manager and manager.SafeSetFont then
+		return manager:SafeSetFont(fontObject, fontPath, fontSize, flags)
+	end
+	if not fontObject or not fontObject.SetFont or not fontPath or not fontSize then
+		return false
+	end
+	local ok, result = pcall(fontObject.SetFont, fontObject, fontPath, fontSize, flags)
+	return ok and result ~= false
+end
+
+local function GetUnitRosterName(unit)
+	if not unit or not UnitExists(unit) then
+		return nil
+	end
+
+	local unitName, realm = UnitFullName(unit)
+	if unitName and realm and realm ~= "" then
+		return unitName .. "-" .. realm
+	end
+	return unitName or UnitName(unit)
+end
+
 -- ========================================
 -- CONSTANTS
 -- ========================================
@@ -654,6 +682,9 @@ function RaidFrame:CreateSecureProxy_DISABLED_OLD()
 		if InCombatLockdown() then
 			return
 		end
+		if self.pendingName or IsPendingRaidRosterName(self.name) then
+			return
+		end
 
 		-- Logic for LeftButton Selection
 		if button == "LeftButton" then
@@ -728,12 +759,6 @@ function RaidFrame:UpdateSecureAttributesForButton(button)
 	if InCombatLockdown() then
 		return
 	end
-	if not button.unit then
-		return
-	end
-
-	local DB = BFL and BFL:GetModule("DB")
-	local shortcuts = DB and DB:Get("raidShortcuts") or {}
 
 	-- Clear all attributes first
 	for _, mod in ipairs({ "", "shift-", "ctrl-", "alt-", "shift-ctrl-", "shift-alt-", "ctrl-alt-" }) do
@@ -743,6 +768,15 @@ function RaidFrame:UpdateSecureAttributesForButton(button)
 			button:SetAttribute(mod .. "macrotext" .. i, nil)
 		end
 	end
+
+	if not button.unit or button.pendingName or IsPendingRaidRosterName(button.name) then
+		button:SetAttribute("unit", nil)
+		button:SetAttribute("type2", nil)
+		return
+	end
+
+	local DB = BFL and BFL:GetModule("DB")
+	local shortcuts = DB and DB:Get("raidShortcuts") or {}
 
 	-- Set unit attribute
 	button:SetAttribute("unit", button.unit)
@@ -815,6 +849,9 @@ function RaidFrame:HandleShortcutClick(button, clickedButton, modifier)
 	if not button.unit then
 		return false
 	end
+	if button.pendingName or IsPendingRaidRosterName(button.name) then
+		return false
+	end
 
 	local DB = BFL and BFL:GetModule("DB")
 	local shortcuts = DB and DB:Get("raidShortcuts") or {}
@@ -825,13 +862,13 @@ function RaidFrame:HandleShortcutClick(button, clickedButton, modifier)
 			if data.modifier == modifier and data.button == clickedButton then
 				-- Execute action (ONLY Promote/Lead, MainTank/MainAssist handled via attributes)
 				if actionKey == "lead" then
-					PromoteToLeader(button.unit)
+					BFL.PromoteToLeader(button.unit)
 					return true
 				elseif actionKey == "promote" then
 					if UnitIsGroupAssistant(button.unit) then
-						DemoteAssistant(button.unit)
+						BFL.DemoteAssistant(button.unit)
 					else
-						PromoteToAssistant(button.unit)
+						BFL.PromoteToAssistant(button.unit)
 					end
 					return true
 				end
@@ -968,15 +1005,18 @@ function RaidFrame:PerformCustomAction(action, unit)
 		return
 	end
 	local name = UnitName(unit)
+	if IsPendingRaidRosterName(name) then
+		return
+	end
 
 	if action == "lead" then
 		BFL:DebugPrint("Calls PromoteToLeader for unit: " .. tostring(unit) .. " (" .. tostring(name) .. ")")
-		PromoteToLeader(unit)
+		BFL.PromoteToLeader(unit)
 	elseif action == "promote" then
 		if UnitIsGroupAssistant(unit) then
-			DemoteAssistant(unit)
+			BFL.DemoteAssistant(unit)
 		else
-			PromoteToAssistant(unit)
+			BFL.PromoteToAssistant(unit)
 		end
 	end
 end
@@ -1205,9 +1245,22 @@ function RaidFrame:UpdateRaidMembers()
 		local name, rank, subgroup, level, class, fileName, zone, online, isDead, role, isML = GetRaidRosterInfo(i)
 
 		if name then
+			local unit = "raid" .. i
+			local pendingName = IsPendingRaidRosterName(name)
+			if pendingName then
+				local unitName = GetUnitRosterName(unit)
+				if unitName and not IsPendingRaidRosterName(unitName) then
+					name = unitName
+					pendingName = false
+				else
+					name = UNKNOWN or "Unknown"
+				end
+			end
+
 			local member = {
 				index = i,
 				name = name,
+				pendingName = pendingName,
 				rank = rank, -- 0 = member, 1 = assistant, 2 = leader
 				subgroup = subgroup,
 				level = level,
@@ -1218,7 +1271,7 @@ function RaidFrame:UpdateRaidMembers()
 				isDead = isDead,
 				role = role, -- "MAINTANK", "MAINASSIST" or nil (raid assignment)
 				isML = isML, -- Is master looter
-				unit = "raid" .. i,
+				unit = unit,
 			}
 
 			table.insert(self.raidMembers, member)
@@ -1544,6 +1597,7 @@ function RaidFrame:UpdateMemberButtonVisuals(button, member)
 	button.unit = member.unit
 	button.name = member.name
 	button.raidSlot = member.index
+	button.pendingName = member.pendingName
 
 	-- Update level
 	if button.Level then
@@ -1565,7 +1619,7 @@ function RaidFrame:UpdateMemberButtonVisuals(button, member)
 			if BFL.FontManager and BFL.FontManager.ApplyFont then
 				BFL.FontManager:ApplyFont(button.Name, fc.path, fc.size, fc.outline, fc.shadow)
 			else
-				button.Name:SetFont(fc.path, fc.size, fc.outline)
+				SafeSetFont(button.Name, fc.path, fc.size, fc.outline)
 				if fc.shadow then
 					button.Name:SetShadowOffset(1, -1)
 				else
@@ -1788,6 +1842,7 @@ function RaidFrame:UpdateMemberButton(button, memberData)
 		button.unit = nil
 		button.name = nil
 		button.raidSlot = nil
+		button.pendingName = nil
 
 		-- Fix #53: Clear secure attributes to prevent interaction with Blizzard raid frame
 		-- Stale "unit" attributes on empty buttons cause the game's secure action system
@@ -1879,6 +1934,7 @@ function RaidFrame:UpdateMemberButton(button, memberData)
 	button.unit = memberData.unit
 	button.name = memberData.name
 	button.raidSlot = memberData.raidIndex
+	button.pendingName = memberData.pendingName
 
 	-- Update class icon
 	if button.ClassIcon and memberData.classFileName then
@@ -1934,7 +1990,7 @@ function RaidFrame:UpdateMemberButton(button, memberData)
 			if BFL.FontManager and BFL.FontManager.ApplyFont then
 				BFL.FontManager:ApplyFont(button.Name, fc.path, fc.size, fc.outline, fc.shadow)
 			else
-				button.Name:SetFont(fc.path, fc.size, fc.outline)
+				SafeSetFont(button.Name, fc.path, fc.size, fc.outline)
 				if fc.shadow then
 					button.Name:SetShadowOffset(1, -1)
 				else
@@ -2256,7 +2312,7 @@ function RaidFrame:DoReadyCheck()
 		return false
 	end
 
-	DoReadyCheck()
+	BFL.DoReadyCheck()
 	return true
 end
 
@@ -2289,7 +2345,7 @@ function RaidFrame:SetEveryoneIsAssistant(enabled)
 		return false
 	end
 
-	SetEveryoneIsAssistant(enabled)
+	BFL.SetEveryoneIsAssistant(enabled)
 	return true
 end
 
@@ -3421,6 +3477,7 @@ function RaidFrame:ClearMockData()
 						button.unit = nil
 						button.name = nil
 						button.raidSlot = nil
+						button.pendingName = nil
 					end
 				end
 			end

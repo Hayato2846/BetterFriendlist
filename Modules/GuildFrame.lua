@@ -60,6 +60,18 @@ local function GetDB()
 	return BFL:GetModule("DB")
 end
 
+local function SafeSetFont(fontObject, fontPath, fontSize, flags)
+	local manager = BFL.FontManager or FontManager
+	if manager and manager.SafeSetFont then
+		return manager:SafeSetFont(fontObject, fontPath, fontSize, flags)
+	end
+	if not fontObject or not fontObject.SetFont or not fontPath or not fontSize then
+		return false
+	end
+	local ok, result = pcall(fontObject.SetFont, fontObject, fontPath, fontSize, flags)
+	return ok and result ~= false
+end
+
 local function ApplyDefaultSlugToFontString(fontString)
 	if BFL.FontManager and BFL.FontManager.ApplyDefaultSlugToFontString then
 		BFL.FontManager:ApplyDefaultSlugToFontString(fontString)
@@ -667,7 +679,7 @@ function GuildFrame:OnLoad(frame)
 		return BUTTON_HEIGHT
 	end)
 
-	ScrollUtil.InitScrollBoxListWithScrollBar(frame.ScrollBox, frame.ScrollBar, view)
+	BFL.InitScrollBoxListWithScrollBar(frame.ScrollBox, frame.ScrollBar, view)
 
 	-- ScrollBox: flush inside ListInset (WhoFrame pattern)
 	frame.ScrollBox:ClearAllPoints()
@@ -2014,7 +2026,7 @@ function BFL_GuildFrame_OnShow(frame)
 				if BFL.FontManager and BFL.FontManager.GetDefaultUIFontFlags then
 					fontFlags = BFL.FontManager:GetDefaultUIFontFlags(fontFlags)
 				end
-				frame.GuildName:SetFont(f, 18, fontFlags)
+				SafeSetFont(frame.GuildName, f, 18, fontFlags)
 			end
 		end
 		-- Pill-style filter buttons + MOTD tooltip

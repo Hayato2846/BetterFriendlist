@@ -81,6 +81,12 @@ local VALID_FONT_FLAGS = {
 	SLUG = true,
 }
 
+if table.freeze then
+	table.freeze(ALPHABETS)
+	table.freeze(FONT_FLAG_ORDER)
+	table.freeze(VALID_FONT_FLAGS)
+end
+
 local FONT_FLAG_ALIASES = {
 	NONE = "",
 	NORMAL = "",
@@ -190,6 +196,53 @@ function FontManager:GetDefaultUIFontFlags(flags)
 	return self:GetFontFlags(self:AddFontFlag(flags, "SLUG"))
 end
 
+function FontManager:SafeSetFont(fontObject, fontPath, fontSize, flags)
+	if not fontObject or not fontObject.SetFont or not fontPath or not fontSize then
+		return false
+	end
+
+	local resolvedFlags = self:GetFontFlags(flags)
+	local ok, result = pcall(fontObject.SetFont, fontObject, fontPath, fontSize, resolvedFlags)
+	return ok and result ~= false
+end
+
+function FontManager:SetSmoothScalingIfAvailable(fontString, enabled)
+	if not fontString or not fontString.SetSmoothScaling then
+		return false
+	end
+
+	local ok = pcall(fontString.SetSmoothScaling, fontString, not not enabled)
+	return ok
+end
+
+function FontManager:GetTextWidth(fontString, text)
+	if not fontString then
+		return 0
+	end
+
+	local measurementText = text
+	if measurementText == nil and fontString.GetText then
+		measurementText = fontString:GetText()
+	end
+
+	if measurementText ~= nil and fontString.GetUnboundedStringWidthForText then
+		local ok, width = pcall(fontString.GetUnboundedStringWidthForText, fontString, measurementText)
+		if ok and width then
+			return width
+		end
+	end
+
+	if text ~= nil and fontString.SetText and fontString.GetText then
+		local originalText = fontString:GetText()
+		fontString:SetText(text)
+		local width = fontString.GetStringWidth and fontString:GetStringWidth() or 0
+		fontString:SetText(originalText)
+		return width or 0
+	end
+
+	return fontString.GetStringWidth and fontString:GetStringWidth() or 0
+end
+
 function FontManager:ApplyDefaultSlugToFontObject(fontObject)
 	if not fontObject or not fontObject.GetFont or not fontObject.SetFont then
 		return false
@@ -206,8 +259,7 @@ function FontManager:ApplyDefaultSlugToFontObject(fontObject)
 		return true
 	end
 
-	local ok, result = pcall(fontObject.SetFont, fontObject, fontPath, fontSize, slugFlags)
-	return ok and result ~= false
+	return self:SafeSetFont(fontObject, fontPath, fontSize, slugFlags)
 end
 
 function FontManager:ApplyDefaultSlugToFontString(fontString)
@@ -226,8 +278,7 @@ function FontManager:ApplyDefaultSlugToFontString(fontString)
 		return true
 	end
 
-	local ok, result = pcall(fontString.SetFont, fontString, fontPath, fontSize, slugFlags)
-	return ok and result ~= false
+	return self:SafeSetFont(fontString, fontPath, fontSize, slugFlags)
 end
 
 -- Generate and Cache FontFamily
@@ -342,7 +393,7 @@ function FontManager:ApplyFont(fontString, fontPath, size, flags, shadow)
 	else
 		-- Fallback: Use SetFont directly if Family creation failed
 		-- This loses alphabet backups but keeps text visible
-		fontString:SetFont(fontPath, size, self:GetFontFlags(flags))
+		self:SafeSetFont(fontString, fontPath, size, flags)
 		if shadow then
 			fontString:SetShadowOffset(1, -1)
 			fontString:SetShadowColor(0, 0, 0, 1)
@@ -351,6 +402,7 @@ function FontManager:ApplyFont(fontString, fontPath, size, flags, shadow)
 			fontString:SetShadowColor(0, 0, 0, 0)
 		end
 	end
+	self:SetSmoothScalingIfAvailable(fontString, true)
 end
 
 -- ========================================

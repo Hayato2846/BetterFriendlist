@@ -79,6 +79,75 @@ function Compat.ModifyMenu(tag, callback)
 	end
 end
 
+local function GetMenuTooltipFrame(tooltip)
+	return tooltip or _G.BFL_Tooltip or GameTooltip
+end
+
+function Compat.ShowMenuTooltip(owner, tooltip, func, ...)
+	if type(tooltip) == "function" then
+		return Compat.ShowMenuTooltip(owner, nil, tooltip, func, ...)
+	end
+	if not owner or type(func) ~= "function" then
+		return false
+	end
+
+	local argCount = select("#", ...)
+	local args = { ... }
+	local tooltipFrame = GetMenuTooltipFrame(tooltip)
+	if not tooltipFrame then
+		return false
+	end
+
+	if MenuUtil and MenuUtil.ShowTooltipEx then
+		local ok = pcall(MenuUtil.ShowTooltipEx, owner, tooltipFrame, func, unpack(args, 1, argCount))
+		if ok then
+			return true
+		end
+	end
+	if MenuUtil and MenuUtil.ShowTooltip then
+		local ok = pcall(MenuUtil.ShowTooltip, owner, func, unpack(args, 1, argCount))
+		if ok then
+			return true
+		end
+	end
+	if tooltipFrame.SetOwner and tooltipFrame.Show then
+		local ok = pcall(function()
+			tooltipFrame:SetOwner(owner, "ANCHOR_RIGHT")
+			func(tooltipFrame, unpack(args, 1, argCount))
+			tooltipFrame:Show()
+		end)
+		return ok
+	end
+	return false
+end
+
+function Compat.HideMenuTooltip(owner, tooltip)
+	if not owner then
+		return false
+	end
+
+	local tooltipFrame = GetMenuTooltipFrame(tooltip)
+	if MenuUtil and MenuUtil.HideTooltipEx and tooltipFrame then
+		local ok = pcall(MenuUtil.HideTooltipEx, owner, tooltipFrame)
+		if ok then
+			return true
+		end
+	end
+	if MenuUtil and MenuUtil.HideTooltip then
+		local ok = pcall(MenuUtil.HideTooltip, owner)
+		if ok then
+			return true
+		end
+	end
+	if tooltipFrame and tooltipFrame.Hide then
+		if not tooltipFrame.GetOwner or tooltipFrame:GetOwner() == owner then
+			tooltipFrame:Hide()
+			return true
+		end
+	end
+	return false
+end
+
 -- Convert Retail menu generator to Classic EasyMenu format
 -- Helper for modules that need to support both
 function Compat.CreateEasyMenuTable(items)
@@ -517,6 +586,49 @@ function Compat.HasModernScrollBox()
 	return CreateScrollBoxListLinearView ~= nil and ScrollUtil ~= nil
 end
 
+local scrollBoxRegistrations = setmetatable({}, { __mode = "k" })
+local scrollBarRegistrations = setmetatable({}, { __mode = "k" })
+
+local function DebugCompatWarning(message)
+	if BFL.DebugPrint then
+		BFL:DebugPrint("|cffffcc00BFL Compat:|r " .. tostring(message))
+	end
+end
+
+function Compat.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view)
+	if not (ScrollUtil and ScrollUtil.InitScrollBoxListWithScrollBar and scrollBox and scrollBar and view) then
+		return false
+	end
+
+	local existing = scrollBoxRegistrations[scrollBox]
+	if existing then
+		if existing.scrollBar == scrollBar then
+			return true
+		end
+		DebugCompatWarning("ScrollBox is already registered with another ScrollBar; skipping duplicate initialization.")
+		return false
+	end
+
+	local existingScrollBox = scrollBarRegistrations[scrollBar]
+	if existingScrollBox and existingScrollBox ~= scrollBox then
+		DebugCompatWarning("ScrollBar is already registered with another ScrollBox; skipping duplicate initialization.")
+		return false
+	end
+
+	local ok, err = pcall(ScrollUtil.InitScrollBoxListWithScrollBar, scrollBox, scrollBar, view)
+	if not ok then
+		DebugCompatWarning(err or "ScrollBox initialization failed.")
+		return false
+	end
+
+	scrollBoxRegistrations[scrollBox] = {
+		scrollBar = scrollBar,
+		view = view,
+	}
+	scrollBarRegistrations[scrollBar] = scrollBox
+	return true
+end
+
 -- Create button pool for Classic scroll frames
 -- @param parent: Parent scroll frame
 -- @param templateName: Button template name
@@ -860,11 +972,257 @@ end
 
 -- Invite Battle.net friend
 function Compat.BNInviteFriend(gameAccountID)
-	if BNInviteFriend then
+	if C_BattleNet and C_BattleNet.InviteFriend then
+		C_BattleNet.InviteFriend(gameAccountID)
+		return true
+	elseif BNInviteFriend then
 		BNInviteFriend(gameAccountID)
-	else
-		-- BFL:DebugPrint("BNInviteFriend not available")
+		return true
 	end
+	return false
+end
+
+function Compat.DoReadyCheck()
+	if C_PartyInfo and C_PartyInfo.DoReadyCheck then
+		C_PartyInfo.DoReadyCheck()
+		return true
+	elseif DoReadyCheck then
+		DoReadyCheck()
+		return true
+	end
+	return false
+end
+
+function Compat.ConfirmReadyCheck(isReady)
+	if isReady == nil then
+		isReady = false
+	end
+
+	if C_PartyInfo and C_PartyInfo.ConfirmReadyCheck then
+		C_PartyInfo.ConfirmReadyCheck(isReady)
+		return true
+	elseif ConfirmReadyCheck then
+		ConfirmReadyCheck(isReady)
+		return true
+	end
+	return false
+end
+
+function Compat.PromoteToAssistant(name, exactNameMatch)
+	if C_PartyInfo and C_PartyInfo.PromoteToAssistant then
+		C_PartyInfo.PromoteToAssistant(name, exactNameMatch)
+		return true
+	elseif PromoteToAssistant then
+		PromoteToAssistant(name, exactNameMatch)
+		return true
+	end
+	return false
+end
+
+function Compat.PromoteToLeader(name, exactNameMatch)
+	if C_PartyInfo and C_PartyInfo.PromoteToLeader then
+		C_PartyInfo.PromoteToLeader(name, exactNameMatch)
+		return true
+	elseif PromoteToLeader then
+		PromoteToLeader(name, exactNameMatch)
+		return true
+	end
+	return false
+end
+
+function Compat.DemoteAssistant(name, exactNameMatch)
+	if C_PartyInfo and C_PartyInfo.DemoteAssistant then
+		C_PartyInfo.DemoteAssistant(name, exactNameMatch)
+		return true
+	elseif DemoteAssistant then
+		DemoteAssistant(name, exactNameMatch)
+		return true
+	end
+	return false
+end
+
+function Compat.SetEveryoneIsAssistant(isAssistant)
+	isAssistant = not not isAssistant
+	if C_PartyInfo and C_PartyInfo.SetEveryoneIsAssistant then
+		C_PartyInfo.SetEveryoneIsAssistant(isAssistant)
+		return true
+	elseif SetEveryoneIsAssistant then
+		SetEveryoneIsAssistant(isAssistant)
+		return true
+	end
+	return false
+end
+
+function Compat.UninviteUnit(name, reason, exactNameMatch)
+	if C_PartyInfo and C_PartyInfo.UninviteUnit then
+		C_PartyInfo.UninviteUnit(name, reason, exactNameMatch)
+		return true
+	elseif UninviteUnit then
+		UninviteUnit(name, reason, exactNameMatch)
+		return true
+	end
+	return false
+end
+
+function Compat.IsGUIDInGroup(guid, category)
+	if C_PartyInfo and C_PartyInfo.IsGUIDInGroup then
+		return C_PartyInfo.IsGUIDInGroup(guid, category)
+	elseif IsGUIDInGroup then
+		return IsGUIDInGroup(guid, category)
+	end
+	return false
+end
+
+function Compat.GetAutoCompletePresenceID(name)
+	if C_AutoComplete and C_AutoComplete.GetAutoCompletePresenceID then
+		return C_AutoComplete.GetAutoCompletePresenceID(name)
+	elseif GetAutoCompletePresenceID then
+		return GetAutoCompletePresenceID(name)
+	end
+	return nil
+end
+
+function Compat.GetAutoCompleteRealms()
+	if C_AutoComplete and C_AutoComplete.GetAutoCompleteRealms then
+		return C_AutoComplete.GetAutoCompleteRealms()
+	elseif GetAutoCompleteRealms then
+		return GetAutoCompleteRealms()
+	end
+	return {}
+end
+
+local function GetAutoCompleteIncludeFlags(includeFlags)
+	return includeFlags or AUTOCOMPLETE_FLAG_ALL or 0xffffffff
+end
+
+local function GetAutoCompleteExcludeFlags(excludeFlags)
+	return excludeFlags or AUTOCOMPLETE_FLAG_NONE or 0
+end
+
+function Compat.GetAutoCompleteResults(name, numResults, cursorPosition, allowFullMatch, includeFlags, excludeFlags)
+	includeFlags = GetAutoCompleteIncludeFlags(includeFlags)
+	excludeFlags = GetAutoCompleteExcludeFlags(excludeFlags)
+
+	if C_AutoComplete and C_AutoComplete.GetAutoCompleteResults then
+		return C_AutoComplete.GetAutoCompleteResults(
+			name or "",
+			numResults or AUTOCOMPLETE_MAX_BUTTONS or 5,
+			cursorPosition or 0,
+			not not allowFullMatch,
+			includeFlags,
+			excludeFlags
+		)
+	elseif GetAutoCompleteResults then
+		return GetAutoCompleteResults(
+			name or "",
+			numResults or AUTOCOMPLETE_MAX_BUTTONS or 5,
+			cursorPosition or 0,
+			not not allowFullMatch,
+			includeFlags,
+			excludeFlags
+		)
+	end
+	return {}
+end
+
+function Compat.IsRecognizedName(name, includeFlags, excludeFlags)
+	includeFlags = GetAutoCompleteIncludeFlags(includeFlags)
+	excludeFlags = GetAutoCompleteExcludeFlags(excludeFlags)
+
+	if C_AutoComplete and C_AutoComplete.IsRecognizedName then
+		return C_AutoComplete.IsRecognizedName(
+			name or "",
+			includeFlags,
+			excludeFlags
+		)
+	elseif IsRecognizedName then
+		return IsRecognizedName(name or "", includeFlags, excludeFlags)
+	end
+	return false
+end
+
+function Compat.MakeModifiers()
+	if MakeModifiers then
+		local ok, modifiers = pcall(MakeModifiers)
+		if ok then
+			return modifiers
+		end
+	elseif C_ClickBindings and C_ClickBindings.MakeModifiers then
+		local ok, modifiers = pcall(C_ClickBindings.MakeModifiers)
+		if ok then
+			return modifiers
+		end
+	end
+	return 0
+end
+
+function Compat.GetStringFromModifiers(modifiers)
+	modifiers = modifiers or 0
+	if GetStringFromModifiers then
+		local ok, modifierString = pcall(GetStringFromModifiers, modifiers)
+		if ok then
+			return modifierString
+		end
+	elseif C_ClickBindings and C_ClickBindings.GetStringFromModifiers then
+		local ok, modifierString = pcall(C_ClickBindings.GetStringFromModifiers, modifiers)
+		if ok then
+			return modifierString
+		end
+	end
+	return ""
+end
+
+local function EscapeControlCharacter(character)
+	local byte = string.byte(character)
+	if byte == 10 or byte == 13 or byte == 9 then
+		return character
+	end
+	return "\\" .. tostring(byte)
+end
+
+function Compat.EscapeDebugString(text)
+	if text == nil then
+		return ""
+	end
+
+	if StringUtil and StringUtil.EscapeDecimalNonPrintables then
+		local ok, escapedText = pcall(StringUtil.EscapeDecimalNonPrintables, tostring(text))
+		if ok and escapedText then
+			return escapedText
+		end
+	end
+
+	return tostring(text):gsub("[%z\001-\031\127]", EscapeControlCharacter)
+end
+
+local function GetPerformanceFunction(functionName)
+	if C_Performance and C_Performance[functionName] then
+		return C_Performance[functionName]
+	end
+	return _G[functionName]
+end
+
+local function GetPerformanceUsage(functionName)
+	local getter = GetPerformanceFunction(functionName)
+	if getter then
+		local ok, value1, value2 = pcall(getter)
+		if ok then
+			return value1, value2
+		end
+	end
+	return nil
+end
+
+function Compat.GetEventCPUUsage()
+	return GetPerformanceUsage("GetEventCPUUsage")
+end
+
+function Compat.GetFunctionCPUUsage()
+	return GetPerformanceUsage("GetFunctionCPUUsage")
+end
+
+function Compat.GetScriptCPUUsage()
+	return GetPerformanceUsage("GetScriptCPUUsage")
 end
 
 ------------------------------------------------------------
@@ -1064,6 +1422,8 @@ BFL.CreateDropdown = Compat.CreateDropdown
 BFL.InitializeDropdown = Compat.InitializeDropdown
 BFL.InitializeMultiSelectDropdown = Compat.InitializeMultiSelectDropdown
 BFL.RefreshDropdown = Compat.RefreshDropdown
+BFL.ShowMenuTooltip = Compat.ShowMenuTooltip
+BFL.HideMenuTooltip = Compat.HideMenuTooltip
 
 -- ColorPicker
 BFL.ShowColorPicker = Compat.ShowColorPicker
@@ -1082,6 +1442,25 @@ BFL.ConvertToRaid = Compat.ConvertToRaid
 BFL.ConvertToParty = Compat.ConvertToParty
 BFL.RequestInviteFromUnit = Compat.RequestInviteFromUnit
 BFL.BNInviteFriend = Compat.BNInviteFriend
+BFL.DoReadyCheck = Compat.DoReadyCheck
+BFL.ConfirmReadyCheck = Compat.ConfirmReadyCheck
+BFL.PromoteToAssistant = Compat.PromoteToAssistant
+BFL.PromoteToLeader = Compat.PromoteToLeader
+BFL.DemoteAssistant = Compat.DemoteAssistant
+BFL.SetEveryoneIsAssistant = Compat.SetEveryoneIsAssistant
+BFL.UninviteUnit = Compat.UninviteUnit
+BFL.IsGUIDInGroup = Compat.IsGUIDInGroup
+BFL.GetAutoCompletePresenceID = Compat.GetAutoCompletePresenceID
+BFL.GetAutoCompleteRealms = Compat.GetAutoCompleteRealms
+BFL.GetAutoCompleteResults = Compat.GetAutoCompleteResults
+BFL.IsRecognizedName = Compat.IsRecognizedName
+BFL.MakeModifiers = Compat.MakeModifiers
+BFL.GetStringFromModifiers = Compat.GetStringFromModifiers
+BFL.InitScrollBoxListWithScrollBar = Compat.InitScrollBoxListWithScrollBar
+BFL.EscapeDebugString = Compat.EscapeDebugString
+BFL.GetEventCPUUsage = Compat.GetEventCPUUsage
+BFL.GetFunctionCPUUsage = Compat.GetFunctionCPUUsage
+BFL.GetScriptCPUUsage = Compat.GetScriptCPUUsage
 BFL.GetMaxLevel = Compat.GetMaxLevel
 
 -- Guild Operations

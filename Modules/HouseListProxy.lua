@@ -12,6 +12,18 @@ local HouseListProxy = BFL:RegisterModule("HouseListProxy", {})
 
 local TARGET_ADDON = "Blizzard_HouseList"
 
+local function SafeSetButtonState(button, buttonState)
+	if not button or not button.SetButtonState then
+		return false
+	end
+	if InCombatLockdown and InCombatLockdown() then
+		return false
+	end
+
+	local ok = pcall(button.SetButtonState, button, buttonState)
+	return ok
+end
+
 -- ========================================
 -- Initialization
 -- ========================================
@@ -102,13 +114,13 @@ function HouseListProxy:CreateGlobalProxy()
 
 	proxy:SetScript("OnMouseDown", function(self)
 		if self.visualButton then
-			self.visualButton:SetButtonState("PUSHED")
+			SafeSetButtonState(self.visualButton, "PUSHED")
 		end
 	end)
 
 	proxy:SetScript("OnMouseUp", function(self)
 		if self.visualButton then
-			self.visualButton:SetButtonState("NORMAL")
+			SafeSetButtonState(self.visualButton, "NORMAL")
 		end
 	end)
 

@@ -234,7 +234,10 @@ function StateValidator:CaptureUIState()
 	if FriendsList and FriendsList.scrollFrame then
 		local scroll = FriendsList.scrollFrame
 		if scroll.GetVerticalScroll then
-			state.scrollPosition = scroll:GetVerticalScroll()
+			local ok, scrollPosition = pcall(scroll.GetVerticalScroll, scroll)
+			if ok and scrollPosition then
+				state.scrollPosition = scrollPosition
+			end
 		end
 	end
 

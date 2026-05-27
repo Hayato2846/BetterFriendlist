@@ -96,7 +96,7 @@ function RecentAllies:OnLoad(frame)
 		end
 	end)
 
-	ScrollUtil.InitScrollBoxListWithScrollBar(frame.ScrollBox, frame.ScrollBar, view)
+	BFL.InitScrollBoxListWithScrollBar(frame.ScrollBox, frame.ScrollBar, view)
 end
 
 -- Show Recent Allies Frame (RecentAlliesListMixin:OnShow)

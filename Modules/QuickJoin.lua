@@ -64,6 +64,13 @@ local needsRenderOnShow = false
 local updateTimer = nil
 local RELATIONSHIP_CACHE_TTL = 0.5
 
+local function GetOpaqueIdCachePart(id)
+	if id == nil then
+		return ""
+	end
+	return tostring(id)
+end
+
 local function GetRelationshipCacheKey(guid, missingNameFallback, clubId)
 	-- Fast path: most calls have no clubId/fallback (avoids all concat/tostring)
 	if not clubId and not missingNameFallback then
@@ -72,7 +79,7 @@ local function GetRelationshipCacheKey(guid, missingNameFallback, clubId)
 	-- Slow path: build composite key only when needed
 	return guid
 		.. "|"
-		.. (clubId and tostring(clubId) or "")
+		.. GetOpaqueIdCachePart(clubId)
 		.. "|"
 		.. (missingNameFallback and tostring(missingNameFallback) or "")
 end
@@ -996,7 +1003,7 @@ function QuickJoin:Initialize()
 			-- Set padding
 			view:SetPadding(5, 5, 5, 5, 2)
 
-			ScrollUtil.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view)
+			BFL.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view)
 
 			-- Dynamic Width Adjustment based on ScrollBar visibility
 			local function UpdateScrollBoxWidth()

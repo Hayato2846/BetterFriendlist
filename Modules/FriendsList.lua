@@ -35,6 +35,18 @@ local function GetDefaultUIFontFlags(flags)
 	return flags
 end
 
+local function SafeSetFont(fontObject, fontPath, fontSize, flags)
+	local FontManager = GetFontManager()
+	if FontManager and FontManager.SafeSetFont then
+		return FontManager:SafeSetFont(fontObject, fontPath, fontSize, flags)
+	end
+	if not fontObject or not fontObject.SetFont or not fontPath or not fontSize then
+		return false
+	end
+	local ok, result = pcall(fontObject.SetFont, fontObject, fontPath, fontSize, flags)
+	return ok and result ~= false
+end
+
 local function ApplyDefaultSlugToFontString(fontString)
 	local FontManager = GetFontManager()
 	if FontManager and FontManager.ApplyDefaultSlugToFontString then
@@ -290,10 +302,10 @@ local function CalculateCompactRowHeight(self, nameSize, nameText, nameWidth)
 		if outline == "NONE" then
 			outline = ""
 		end
-		measure:SetFont(self.fontCache.namePath, nameFontSize, outline)
+		SafeSetFont(measure, self.fontCache.namePath, nameFontSize, outline)
 	else
 		local _, _, flags = measure:GetFont()
-		measure:SetFont(STANDARD_TEXT_FONT, nameFontSize, GetDefaultUIFontFlags(flags))
+		SafeSetFont(measure, STANDARD_TEXT_FONT, nameFontSize, GetDefaultUIFontFlags(flags))
 	end
 
 	measure:SetWidth(nameWidth)
@@ -345,7 +357,7 @@ local function EnsureGroupHeaderCountText(button)
 		ApplyDefaultSlugToFontString(countText)
 	else
 		-- Only hardcode fallback if no FontObject is available at all
-		countText:SetFont(STANDARD_TEXT_FONT, 12, GetDefaultUIFontFlags(""))
+		SafeSetFont(countText, STANDARD_TEXT_FONT, 12, GetDefaultUIFontFlags(""))
 	end
 	EnsureGroupHeaderFont(countText)
 	button.CountText = countText
@@ -373,12 +385,12 @@ EnsureGroupHeaderFont = function(fs)
 	if fallback and fallback.GetFont then
 		local fontPath, fontSize, fontFlags = fallback:GetFont()
 		if fontPath then
-			fs:SetFont(fontPath, fontSize or 12, GetDefaultUIFontFlags(fontFlags))
+			SafeSetFont(fs, fontPath, fontSize or 12, GetDefaultUIFontFlags(fontFlags))
 			return
 		end
 	end
 
-	fs:SetFont(STANDARD_TEXT_FONT, 12, GetDefaultUIFontFlags(""))
+	SafeSetFont(fs, STANDARD_TEXT_FONT, 12, GetDefaultUIFontFlags(""))
 end
 
 local function SyncGroupHeaderFont(fs, countFs)
@@ -393,14 +405,14 @@ local function SyncGroupHeaderFont(fs, countFs)
 		-- that may persist from EnsureGroupHeaderCountText or previous renders
 		local fontPath, fontSize, fontFlags = fs:GetFont()
 		if fontPath then
-			countFs:SetFont(fontPath, fontSize, fontFlags or "")
+			SafeSetFont(countFs, fontPath, fontSize, fontFlags or "")
 		end
 		return
 	end
 
 	local fontPath, fontSize, fontFlags = fs:GetFont()
 	if fontPath then
-		countFs:SetFont(fontPath, fontSize, fontFlags)
+		SafeSetFont(countFs, fontPath, fontSize, fontFlags)
 	end
 end
 
@@ -437,13 +449,13 @@ local function EnsureFontSet(fs)
 			return
 		end
 	end
-	fs:SetFont(STANDARD_TEXT_FONT, 12, GetDefaultUIFontFlags(""))
+	SafeSetFont(fs, STANDARD_TEXT_FONT, 12, GetDefaultUIFontFlags(""))
 end
 
 local function SafeSetText(fs, text)
 	EnsureGroupHeaderFont(fs)
 	if not IsFontReady(fs) then
-		fs:SetFont(STANDARD_TEXT_FONT, 12, GetDefaultUIFontFlags(""))
+		SafeSetFont(fs, STANDARD_TEXT_FONT, 12, GetDefaultUIFontFlags(""))
 	end
 	if IsFontReady(fs) then
 		local ok = pcall(fs.SetText, fs, text or "")
@@ -1109,7 +1121,7 @@ local function CreateElementFactory(friendsList) -- Capture friendsList referenc
 				button.gameAccountBadgeBg = badgeBg
 
 				local badgeText = badge:CreateFontString(nil, "OVERLAY", nil, 2)
-				badgeText:SetFont(STANDARD_TEXT_FONT, 10, GetDefaultUIFontFlags("OUTLINE"))
+				SafeSetFont(badgeText, STANDARD_TEXT_FONT, 10, GetDefaultUIFontFlags("OUTLINE"))
 				badgeText:SetPoint("CENTER", badge, "CENTER", 0, 0)
 				badgeText:SetTextColor(1, 0.82, 0, 1) -- Gold
 				badgeText:SetJustifyH("CENTER")
@@ -1566,7 +1578,7 @@ function FriendsList:InitializeScrollBox()
 	view:SetElementExtentCalculator(CreateExtentCalculator(self))
 
 	-- Initialize ScrollBox with view and scrollbar
-	ScrollUtil.InitScrollBoxListWithScrollBar(scrollFrame.ScrollBox, scrollBar, view)
+	BFL.InitScrollBoxListWithScrollBar(scrollFrame.ScrollBox, scrollBar, view)
 
 	-- Store reference for later use
 	self.scrollBox = scrollFrame.ScrollBox
@@ -6015,7 +6027,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 					appliedFont = true
 				end
 			elseif fontPath then
-				fs:SetFont(fontPath, fontSize, fontFlags)
+				SafeSetFont(fs, fontPath, fontSize, fontFlags)
 				appliedFont = true
 
 				if fontShadow then
@@ -6036,7 +6048,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 			if outline == "NONE" then
 				outline = ""
 			end
-			fs:SetFont(STANDARD_TEXT_FONT, fontSize, outline)
+			SafeSetFont(fs, STANDARD_TEXT_FONT, fontSize, outline)
 			if fontShadow then
 				fs:SetShadowColor(0, 0, 0, 1)
 				fs:SetShadowOffset(1, -1)
@@ -7206,7 +7218,7 @@ function FriendsList:UpdateMultiAccountRow(button, friend, availableWidth)
 		entryFrame.icon:Show()
 
 		if infoFontPath then
-			entryFrame.text:SetFont(infoFontPath, infoFontSize, infoFontOutline)
+			SafeSetFont(entryFrame.text, infoFontPath, infoFontSize, infoFontOutline)
 		end
 		if infoShadow then
 			entryFrame.text:SetShadowOffset(1, -1)
@@ -7251,7 +7263,7 @@ function FriendsList:UpdateMultiAccountRow(button, friend, availableWidth)
 
 	if data.remainder and data.remainder > 0 and row.remainderText then
 		if infoFontPath then
-			row.remainderText:SetFont(infoFontPath, infoFontSize, infoFontOutline)
+			SafeSetFont(row.remainderText, infoFontPath, infoFontSize, infoFontOutline)
 		end
 		if infoShadow then
 			row.remainderText:SetShadowOffset(1, -1)
@@ -7447,7 +7459,7 @@ function FriendsList:UpdateFriendButton(button, elementData)
 					self.fontCache.nameShadow
 				)
 			else
-				button.Name:SetFont(self.fontCache.namePath, self.fontCache.nameSize, outline)
+				SafeSetFont(button.Name, self.fontCache.namePath, self.fontCache.nameSize, outline)
 				if self.fontCache.nameShadow then
 					button.Name:SetShadowColor(0, 0, 0, 1)
 					button.Name:SetShadowOffset(1, -1)
@@ -7482,7 +7494,7 @@ function FriendsList:UpdateFriendButton(button, elementData)
 					self.fontCache.infoShadow
 				)
 			else
-				button.Info:SetFont(self.fontCache.infoPath, self.fontCache.infoSize, outline)
+				SafeSetFont(button.Info, self.fontCache.infoPath, self.fontCache.infoSize, outline)
 
 				if self.fontCache.infoShadow then
 					button.Info:SetShadowColor(0, 0, 0, 1)
@@ -7663,7 +7675,8 @@ function FriendsList:UpdateFriendButton(button, elementData)
 				button.gameAccountBadge:SetSize(badgeSize, badgeSize)
 				if button.gameAccountBadgeText and button.gameAccountBadgeText.SetFont then
 					local fontHeight = math.max(10, math.floor(badgeSize * 0.55))
-					button.gameAccountBadgeText:SetFont(
+					SafeSetFont(
+						button.gameAccountBadgeText,
 						STANDARD_TEXT_FONT,
 						fontHeight,
 						GetDefaultUIFontFlags("OUTLINE")
@@ -7935,7 +7948,7 @@ function FriendsList:UpdateFriendButton(button, elementData)
 					if button.favoriteMeasureFontVersion ~= button.lastFontVersion then
 						local fontPath, fontSize, fontFlags = button.Name:GetFont()
 						if fontPath then
-							button.favoriteMeasure:SetFont(fontPath, fontSize, fontFlags)
+							SafeSetFont(button.favoriteMeasure, fontPath, fontSize, fontFlags)
 							button.favoriteMeasureFontVersion = button.lastFontVersion
 						end
 					end

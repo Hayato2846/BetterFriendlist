@@ -101,7 +101,7 @@ function BetterQuickJoinFrame_OnLoad(self)
 		end)
 
 		-- Initialize ScrollBox with view
-		ScrollUtil.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view)
+		BFL.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view)
 
 		-- Add scroll bar visibility behavior
 		local scrollBoxAnchorsWithBar = {
