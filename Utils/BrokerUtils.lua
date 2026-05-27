@@ -185,6 +185,17 @@ function BU.ApplyBrokerFontToTooltip(tt, sizeOffset)
 end
 
 -- ========================================
+-- Broker Tooltip Layout Helpers
+-- ========================================
+function BU.AddTooltipSeparator(tt, r, g, b, a)
+	if not tt or not tt.AddSeparator then
+		return nil
+	end
+
+	return tt:AddSeparator(1, r or 0.3, g or 0.3, b or 0.3, a or 0.5)
+end
+
+-- ========================================
 -- Menu Open Detection
 -- ========================================
 function BU.IsMenuOpen()

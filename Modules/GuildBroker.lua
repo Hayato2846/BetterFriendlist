@@ -54,6 +54,7 @@ local GetClassIcon = BFL.BrokerUtils.GetClassIcon
 local FormatLastOnline = BFL.BrokerUtils.FormatLastOnline
 local IsMenuOpen = BFL.BrokerUtils.IsMenuOpen
 local AddNameToEditBox = BFL.BrokerUtils.AddNameToEditBox
+local AddTooltipSeparator = BFL.BrokerUtils.AddTooltipSeparator
 local ApplyBrokerFontToFontString = BFL.BrokerUtils.ApplyBrokerFontToFontString
 local ApplyBrokerFontToTooltip = BFL.BrokerUtils.ApplyBrokerFontToTooltip
 
@@ -1845,11 +1846,18 @@ local function CreateLibQTipTooltip(anchorFrame)
 		-- Render content: grouped or flat
 		if groupData then
 			local collapsedGroups = BetterFriendlistDB and BetterFriendlistDB.guildBrokerCollapsedGroups or {}
+			local displayedRankGroupCount = 0
 
 			for _, groupKey in ipairs(groupData.order) do
 				local groupMembers = groupData.groups[groupKey]
 				if groupMembers and #groupMembers > 0 then
 					local collapsed = collapsedGroups[groupKey]
+					if groupMode == "by_rank" then
+						if displayedRankGroupCount > 0 then
+							AddTooltipSeparator(tt)
+						end
+						displayedRankGroupCount = displayedRankGroupCount + 1
+					end
 
 					-- Group header row
 					local groupRow = tt:AddRow()

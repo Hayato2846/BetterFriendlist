@@ -58,6 +58,7 @@ local GetStatusIcon = BFL.BrokerUtils.GetStatusIcon
 local ClassColorText = BFL.BrokerUtils.ClassColorText
 local GetFactionIcon = BFL.BrokerUtils.GetFactionIcon
 local C = BFL.BrokerUtils.C
+local AddTooltipSeparator = BFL.BrokerUtils.AddTooltipSeparator
 
 -- Get class color for friend (returns color table or white fallback)
 local function GetClassColorForFriend(friend)
@@ -2088,6 +2089,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 		end
 
 		local displayedCount = 0
+		local displayedGroupCount = 0
 
 		-- Helper to render a friend row
 		local function RenderFriendRow(friend, indentation)
@@ -2248,6 +2250,11 @@ local function CreateLibQTipTooltip(anchorFrame)
 				end
 
 				if groupInfo then
+					if displayedGroupCount > 0 then
+						AddTooltipSeparator(tt)
+					end
+					displayedGroupCount = displayedGroupCount + 1
+
 					local groupRow = tt:AddRow()
 					local groupCell = groupRow:GetCell(1)
 

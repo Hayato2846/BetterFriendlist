@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+
+### Improved
+- **Broker Tooltips** - Added the subtle broker separator between Friends Broker groups and Guild Broker rank groups.
+
 ## [2.6.0]        - 2026-05-25
 
 ### Added
