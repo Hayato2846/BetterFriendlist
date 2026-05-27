@@ -141,6 +141,30 @@ local function GetFontFlags(flags)
 	return flags
 end
 
+local function SafeSetFont(fontObject, fontPath, fontSize, flags)
+	InitializeManagers()
+	if FontManager and FontManager.SafeSetFont and FontManager:SafeSetFont(fontObject, fontPath, fontSize, flags) then
+		return true
+	end
+
+	if fontObject and fontObject.SetFont and fontPath and fontSize then
+		local ok, result = pcall(fontObject.SetFont, fontObject, fontPath, fontSize, flags)
+		return ok and result ~= false
+	end
+	return false
+end
+
+local function GetTextWidth(fontString, fallback, text)
+	InitializeManagers()
+	if FontManager and FontManager.GetTextWidth then
+		local width = FontManager:GetTextWidth(fontString, text)
+		if width and width > 0 then
+			return width
+		end
+	end
+	return fallback or 0
+end
+
 -- Re-apply enforced width and font on a BFL tab AFTER Blizzard's PanelTemplates_TabResize
 -- overwrites them. Call this directly after any PanelTemplates_TabResize on BFL tabs.
 local function BFL_EnforceTabWidth(tab)
@@ -159,7 +183,7 @@ local function BFL_EnforceTabWidth(tab)
 			fs:SetWidth(tab.BFL_TextWidth)
 		end
 		if tab.BFL_FontPath then
-			fs:SetFont(tab.BFL_FontPath, tab.BFL_FontSize, tab.BFL_FontOutline)
+			SafeSetFont(fs, tab.BFL_FontPath, tab.BFL_FontSize, tab.BFL_FontOutline)
 			fs:SetShadowOffset(0, 0)
 		end
 	end
@@ -324,12 +348,12 @@ function BFL:ApplyTabFonts()
 			if tab then
 				local fs = tab.Text or (tab.GetFontString and tab:GetFontString())
 				if fs then
-					fs:SetFont(fontPath, fontSize, outlineValue)
+					SafeSetFont(fs, fontPath, fontSize, outlineValue)
 					fs:SetShadowOffset(0, 0)
 					-- Measure text and size tab accordingly
 					fs:SetWidth(0)
 					fs:SetWordWrap(false)
-					local textWidth = fs:GetStringWidth() or 50
+					local textWidth = GetTextWidth(fs, 50)
 					PanelTemplates_TabResize(tab, padding, nil, nil, nil)
 				end
 			end
@@ -394,15 +418,15 @@ function BFL:ApplyTabFonts()
 
 	-- Update tab-only font objects (do not touch shared small fonts)
 	if _G.BetterFriendlistTabFontNormal then
-		_G.BetterFriendlistTabFontNormal:SetFont(fontPath, fontSize, outlineValue)
+		SafeSetFont(_G.BetterFriendlistTabFontNormal, fontPath, fontSize, outlineValue)
 		_G.BetterFriendlistTabFontNormal:SetShadowOffset(0, 0)
 	end
 	if _G.BetterFriendlistTabFontHighlight then
-		_G.BetterFriendlistTabFontHighlight:SetFont(fontPath, fontSize, outlineValue)
+		SafeSetFont(_G.BetterFriendlistTabFontHighlight, fontPath, fontSize, outlineValue)
 		_G.BetterFriendlistTabFontHighlight:SetShadowOffset(0, 0)
 	end
 	if _G.BetterFriendlistTabFontDisable then
-		_G.BetterFriendlistTabFontDisable:SetFont(fontPath, fontSize, outlineValue)
+		SafeSetFont(_G.BetterFriendlistTabFontDisable, fontPath, fontSize, outlineValue)
 		_G.BetterFriendlistTabFontDisable:SetShadowOffset(0, 0)
 	end
 
@@ -530,7 +554,7 @@ function BFL:ApplyTabFonts()
 			if tab and tab:IsShown() then
 				local fs = tab.Text or (tab.GetFontString and tab:GetFontString())
 				if fs then
-					fs:SetFont(fontPath, fontSize, outlineValue)
+					SafeSetFont(fs, fontPath, fontSize, outlineValue)
 					fs:SetShadowOffset(0, 0)
 					tabList[#tabList + 1] = { tab = tab, fs = fs }
 				end
@@ -577,7 +601,7 @@ function BFL:ApplyTabFonts()
 			info.fs:SetWidth(textAreaWidth)
 			info.tab.BFL_TextWidth = textAreaWidth
 			info.fs:SetWordWrap(false)
-			local singleLineWidth = info.fs:GetStringWidth() or 0
+			local singleLineWidth = GetTextWidth(info.fs, 0)
 			local needsWrap = singleLineWidth > textAreaWidth
 			info.tab.BFL_ShowTooltip = needsWrap
 			if needsWrap then
@@ -611,7 +635,7 @@ function BFL:ApplyTabFonts()
 			-- Measure ideal width (without constraints)
 			info.fs:SetWidth(0)
 			info.fs:SetWordWrap(false)
-			local idealTextWidth = info.fs:GetStringWidth() or 50
+			local idealTextWidth = GetTextWidth(info.fs, 50)
 			local idealTabWidth = idealTextWidth + padding
 
 			-- Use custom width if provided; otherwise clamp by max allowed
@@ -719,7 +743,7 @@ function BFL:ApplyTabFonts()
 
 			-- Check if text needs wrapping
 			info.fs:SetWordWrap(false)
-			local singleLineWidth = info.fs:GetStringWidth() or 0
+			local singleLineWidth = GetTextWidth(info.fs, 0)
 			local needsWrap = singleLineWidth > textAreaWidth
 			info.tab.BFL_ShowTooltip = needsWrap
 
@@ -2438,7 +2462,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 									if FriendsFrame_InviteOrRequestToJoin and playerGuid and gameAccountID then
 										FriendsFrame_InviteOrRequestToJoin(playerGuid, gameAccountID)
 									elseif gameAccountID then
-										BNInviteFriend(gameAccountID)
+										BFL.BNInviteFriend(gameAccountID)
 									end
 
 									if friendUID and gameAccountID then
@@ -2954,8 +2978,8 @@ frame:SetScript("OnEvent", function(self, event, ...)
 							end
 							if FriendsFrame_InviteOrRequestToJoin and entry.playerGuid and entry.gameAccountID then
 								FriendsFrame_InviteOrRequestToJoin(entry.playerGuid, entry.gameAccountID)
-							elseif entry.gameAccountID and BNInviteFriend then
-								BNInviteFriend(entry.gameAccountID)
+							elseif entry.gameAccountID then
+								BFL.BNInviteFriend(entry.gameAccountID)
 							end
 							if friendUID and entry.gameAccountID and FriendsList.SetLastInvitedAccountID then
 								FriendsList:SetLastInvitedAccountID(friendUID, entry.gameAccountID)
@@ -4354,7 +4378,7 @@ local function ShowMultiAccountInvitePicker(invitableAccounts, anchorButton)
 						if FriendsFrame_InviteOrRequestToJoin and entry.playerGuid then
 							FriendsFrame_InviteOrRequestToJoin(entry.playerGuid, gameAccountID)
 						else
-							BNInviteFriend(gameAccountID)
+							BFL.BNInviteFriend(gameAccountID)
 						end
 					end
 
@@ -4398,7 +4422,7 @@ local function ShowMultiAccountInvitePicker(invitableAccounts, anchorButton)
 						if FriendsFrame_InviteOrRequestToJoin and entry.playerGuid then
 							FriendsFrame_InviteOrRequestToJoin(entry.playerGuid, gameAccountID)
 						else
-							BNInviteFriend(gameAccountID)
+							BFL.BNInviteFriend(gameAccountID)
 						end
 					end
 
@@ -4516,10 +4540,10 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 				if inviteType == "REQUEST_INVITE" or inviteType == "REQUEST_INVITE_CROSS_FACTION" then
 					BNRequestInviteFriend(singleAccount.gameAccountID)
 				else
-					BNInviteFriend(singleAccount.gameAccountID)
+					BFL.BNInviteFriend(singleAccount.gameAccountID)
 				end
 			else
-				BNInviteFriend(singleAccount.gameAccountID)
+				BFL.BNInviteFriend(singleAccount.gameAccountID)
 			end
 		else
 			-- Multiple invitable accounts: show picker
@@ -4539,7 +4563,7 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 			and gameAccountInfo.realmID
 			and gameAccountInfo.realmID ~= 0
 		then
-			BNInviteFriend(gameAccountInfo.gameAccountID)
+			BFL.BNInviteFriend(gameAccountInfo.gameAccountID)
 			return
 		end
 	end
@@ -4547,7 +4571,7 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 	-- Single game account fallback
 	local gameAccountInfo = C_BattleNet.GetFriendGameAccountInfo(actualIndex, 1)
 	if gameAccountInfo and gameAccountInfo.gameAccountID then
-		BNInviteFriend(gameAccountInfo.gameAccountID)
+		BFL.BNInviteFriend(gameAccountInfo.gameAccountID)
 	end
 end
 

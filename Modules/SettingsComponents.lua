@@ -86,6 +86,17 @@ local function GetResolvedFontFlags(flags)
 	return flags
 end
 
+local function SafeSetFont(fontObject, fontPath, fontSize, flags)
+	if BFL.FontManager and BFL.FontManager.SafeSetFont then
+		return BFL.FontManager:SafeSetFont(fontObject, fontPath, fontSize, flags)
+	end
+	if not fontObject or not fontObject.SetFont or not fontPath or not fontSize then
+		return false
+	end
+	local ok, result = pcall(fontObject.SetFont, fontObject, fontPath, fontSize, flags)
+	return ok and result ~= false
+end
+
 local function GetFontCacheVariant()
 	if BFL.FontManager and BFL.FontManager.IsSlugRenderingAvailable and BFL.FontManager:IsSlugRenderingAvailable() then
 		return "SLUG_SUPPORTED"
@@ -106,7 +117,7 @@ local function GetDropdownFontObject(fontPath, sizeOffset)
 		local previewSize = (baseSize or 12) + sizeOffset
 		dropdownFontCounter = dropdownFontCounter + 1
 		fontObject = CreateFont("BFLDropdownFont" .. tostring(dropdownFontCounter))
-		fontObject:SetFont(fontPath, previewSize, GetResolvedFontFlags(baseFlags))
+		SafeSetFont(fontObject, fontPath, previewSize, GetResolvedFontFlags(baseFlags))
 		dropdownFontCache[cacheKey] = fontObject
 	end
 	return fontObject
@@ -122,7 +133,7 @@ local function GetDefaultDropdownFontObject(sizeOffset)
 		local previewSize = (baseSize or 12) + sizeOffset
 		dropdownFontCounter = dropdownFontCounter + 1
 		fontObject = CreateFont("BFLDropdownDefaultFont" .. tostring(dropdownFontCounter))
-		fontObject:SetFont(select(1, baseFont:GetFont()), previewSize, GetResolvedFontFlags(baseFlags))
+		SafeSetFont(fontObject, select(1, baseFont:GetFont()), previewSize, GetResolvedFontFlags(baseFlags))
 		defaultDropdownFontCache[cacheKey] = fontObject
 	end
 	return fontObject
@@ -1565,7 +1576,7 @@ function Components:CreateListItem(
 
 		-- Use White text with Outline for universal readability on any color background
 		local font, size, flags = text:GetFont()
-		text:SetFont(font, size, GetResolvedFontFlags("OUTLINE"))
+		SafeSetFont(text, font, size, GetResolvedFontFlags("OUTLINE"))
 		text:SetTextColor(1, 1, 1)
 	end
 
@@ -1608,7 +1619,7 @@ function Components:CreateListItem(
 
 	-- Use White text with Outline for universal readability on any color background
 	local font, size, flags = nameIcon:GetFont()
-	nameIcon:SetFont(font, size, GetResolvedFontFlags("OUTLINE"))
+	SafeSetFont(nameIcon, font, size, GetResolvedFontFlags("OUTLINE"))
 	nameIcon:SetTextColor(1, 1, 1)
 
 	-- Store order index

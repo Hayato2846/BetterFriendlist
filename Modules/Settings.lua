@@ -33,6 +33,14 @@ local function GetGroups()
 	return BFL and BFL:GetModule("Groups")
 end
 
+local function SafeResetVerticalScroll(scrollFrame)
+	if not scrollFrame or not scrollFrame.SetVerticalScroll then
+		return false
+	end
+	local ok = pcall(scrollFrame.SetVerticalScroll, scrollFrame, 0)
+	return ok
+end
+
 local FONT_FLAG_VALUES = { "NONE", "OUTLINE", "THICKOUTLINE", "MONOCHROME", "SLUG" }
 local FONT_SETTINGS_CONTROL_WIDTH = 220
 
@@ -874,7 +882,7 @@ function Settings:SelectCategory(categoryID)
 
 		-- Reset scroll position to top (User Request: Fix scroll staying down when switching tabs)
 		if settingsFrame.ContentScrollFrame then
-			settingsFrame.ContentScrollFrame:SetVerticalScroll(0)
+			SafeResetVerticalScroll(settingsFrame.ContentScrollFrame)
 		end
 	end
 end
@@ -6130,7 +6138,7 @@ function Settings:EnsureFilterSortEditorPanel()
 
 		frame:SetScript("OnHide", function()
 			if frame.ScrollFrame then
-				frame.ScrollFrame:SetVerticalScroll(0)
+				SafeResetVerticalScroll(frame.ScrollFrame)
 			end
 		end)
 
@@ -6167,7 +6175,7 @@ function Settings:ClearFilterSortEditorPanel()
 	end
 	frame.components = {}
 	if frame.ScrollFrame then
-		frame.ScrollFrame:SetVerticalScroll(0)
+		SafeResetVerticalScroll(frame.ScrollFrame)
 	end
 end
 

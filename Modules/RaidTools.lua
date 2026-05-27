@@ -6,6 +6,10 @@ local RaidTools = BFL:RegisterModule("RaidTools", {})
 
 local L
 
+local function IsPendingRaidRosterName(name)
+	return BFL and BFL.IsPendingRaidRosterName and BFL:IsPendingRaidRosterName(name)
+end
+
 -- Frame reference (lazy-init)
 local toolsFrame = nil
 
@@ -344,7 +348,7 @@ function RaidTools:Initialize()
 			if unitName then
 				for i = 1, MAX_RAID_MEMBERS do
 					local name = GetRaidRosterInfo(i)
-					if name == unitName then
+					if name == unitName and not IsPendingRaidRosterName(name) then
 						local unit = "raid" .. i
 						if UnitGUID(unit) == guid then
 							local specID = GetInspectSpecialization(unit)
@@ -385,23 +389,24 @@ function RaidTools:BuildInspectQueue()
 		if not name then
 			break
 		end
+		if not IsPendingRaidRosterName(name) then
+			local unit = "raid" .. i
+			if not UnitExists(unit) then
+				break
+			end
 
-		local unit = "raid" .. i
-		if not UnitExists(unit) then
-			break
-		end
+			local _, _, classID = UnitClass(unit)
 
-		local _, _, classID = UnitClass(unit)
-
-		-- Skip self (detected via GetSpecialization), already cached, pure classes, disconnected
-		if
-			not UnitIsUnit(unit, "player")
-			and not specCache[name]
-			and classID
-			and AMBIGUOUS_CLASSES[classID]
-			and UnitIsConnected(unit)
-		then
-			table.insert(inspectQueue, name)
+			-- Skip self (detected via GetSpecialization), already cached, pure classes, disconnected
+			if
+				not UnitIsUnit(unit, "player")
+				and not specCache[name]
+				and classID
+				and AMBIGUOUS_CLASSES[classID]
+				and UnitIsConnected(unit)
+			then
+				table.insert(inspectQueue, name)
+			end
 		end
 	end
 end
@@ -424,7 +429,7 @@ function RaidTools:ProcessInspectQueue()
 	-- Find the unit
 	for i = 1, MAX_RAID_MEMBERS do
 		local name = GetRaidRosterInfo(i)
-		if name == targetName then
+		if name == targetName and not IsPendingRaidRosterName(name) then
 			local unit = "raid" .. i
 			if UnitIsConnected(unit) and CanInspect(unit) then
 				inspectInProgress = targetName
@@ -473,10 +478,12 @@ local function BuildShortNameLookup()
 		if not name then
 			break
 		end
-		-- Strip realm: "Player-Realm" -> "Player"
-		local shortName = name:match("^([^%-]+)")
-		if shortName then
-			lookup[shortName] = name
+		if not IsPendingRaidRosterName(name) then
+			-- Strip realm: "Player-Realm" -> "Player"
+			local shortName = name:match("^([^%-]+)")
+			if shortName then
+				lookup[shortName] = name
+			end
 		end
 	end
 	return lookup
@@ -537,9 +544,11 @@ local function GetDetailsMeterSnapshot()
 				if not name then
 					break
 				end
-				local damage = Details:GetActor(segment, 1, name)
-				local healing = Details:GetActor(segment, 2, name)
-				meterSnapshot[name] = (damage and damage.total or 0) + (healing and healing.total or 0)
+				if not IsPendingRaidRosterName(name) then
+					local damage = Details:GetActor(segment, 1, name)
+					local healing = Details:GetActor(segment, 2, name)
+					meterSnapshot[name] = (damage and damage.total or 0) + (healing and healing.total or 0)
+				end
 			end
 			break -- Use first segment that has data
 		end
@@ -752,10 +761,9 @@ function RaidTools:CollectRosterData(maxGroup, preserveGroups)
 			break
 		end
 
-		local _, _, classID = UnitClass(unit)
-
 		-- Skip players in preserved groups or beyond max group
-		if not preserveGroups[subgroup] and subgroup <= maxGroup then
+		if not IsPendingRaidRosterName(name) and not preserveGroups[subgroup] and subgroup <= maxGroup then
+			local _, _, classID = UnitClass(unit)
 			local role = UnitGroupRolesAssigned(unit)
 			if role == "NONE" then
 				role = "DAMAGER"
@@ -1089,9 +1097,13 @@ local function BuildDelta()
 		if not name then
 			break
 		end
-		nameToIndex[name] = i
-		nameToGroup[name] = subgroup
-		groupSizes[subgroup] = groupSizes[subgroup] + 1
+		if subgroup then
+			groupSizes[subgroup] = groupSizes[subgroup] + 1
+		end
+		if not IsPendingRaidRosterName(name) then
+			nameToIndex[name] = i
+			nameToGroup[name] = subgroup
+		end
 	end
 
 	local delta = {}
@@ -1162,7 +1174,7 @@ local function IsGroupOrderCorrect(groupNum)
 		if not name then
 			break
 		end
-		if subgroup == groupNum then
+		if subgroup == groupNum and not IsPendingRaidRosterName(name) then
 			table.insert(currentOrder, name)
 		end
 	end
@@ -1214,7 +1226,9 @@ local function CountCorrectPositions()
 		if not name then
 			break
 		end
-		nameToGroup[name] = subgroup
+		if not IsPendingRaidRosterName(name) then
+			nameToGroup[name] = subgroup
+		end
 	end
 	for slot = 1, MAX_RAID_MEMBERS do
 		local unit = targetUnits[slot]
@@ -1322,7 +1336,12 @@ ProcessOneDelta = function()
 				if not swapPartner then
 					for i = 1, MAX_RAID_MEMBERS do
 						local name, _, subgroup = GetRaidRosterInfo(i)
-						if name and subgroup == first.targetGroup and i ~= first.raidIndex then
+						if
+							name
+							and not IsPendingRaidRosterName(name)
+							and subgroup == first.targetGroup
+							and i ~= first.raidIndex
+						then
 							swapPartner = { raidIndex = i }
 							break
 						end
@@ -1349,7 +1368,7 @@ ProcessOneDelta = function()
 			if not name then
 				break
 			end
-			if subgroup == reorderGroup then
+			if subgroup == reorderGroup and not IsPendingRaidRosterName(name) then
 				SetRaidSubgroup(i, tempGroup)
 				UpdateProgress()
 				ScheduleSafetyTimer()
@@ -1375,7 +1394,7 @@ ProcessOneDelta = function()
 		local targetName = refillOrder[refillIdx]
 		for i = 1, MAX_RAID_MEMBERS do
 			local name = GetRaidRosterInfo(i)
-			if name == targetName then
+			if name == targetName and not IsPendingRaidRosterName(name) then
 				SetRaidSubgroup(i, reorderGroup)
 				refillIdx = refillIdx + 1
 				UpdateProgress()
@@ -1620,8 +1639,8 @@ function RaidTools:PromoteTanksToAssist()
 		end
 
 		local unit = "raid" .. i
-		if UnitGroupRolesAssigned(unit) == "TANK" and rank == 0 then
-			PromoteToAssistant(unit)
+		if not IsPendingRaidRosterName(name) and UnitGroupRolesAssigned(unit) == "TANK" and rank == 0 then
+			BFL.PromoteToAssistant(unit)
 			promoted = promoted + 1
 		end
 	end

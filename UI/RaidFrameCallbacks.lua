@@ -51,6 +51,18 @@ local function GetRaidFrame()
 	return BFL:GetModule("RaidFrame")
 end
 
+local function IsPendingRaidRosterName(name)
+	return BFL and BFL.IsPendingRaidRosterName and BFL:IsPendingRaidRosterName(name)
+end
+
+local function GetSafeRaidRosterName(raidIndex)
+	local name = GetRaidRosterInfo(raidIndex)
+	if IsPendingRaidRosterName(name) then
+		return UNKNOWN or "Unknown"
+	end
+	return name
+end
+
 -- ========================================
 -- MULTI-SELECT HELPER FUNCTIONS (Phase 8.2)
 -- ========================================
@@ -81,6 +93,9 @@ end
 
 local function TogglePlayerSelection(button)
 	if not button.unit or not button.name or not button.groupIndex then
+		return
+	end
+	if button.pendingName or IsPendingRaidRosterName(button.name) then
 		return
 	end
 
@@ -429,7 +444,7 @@ function BetterRaidFrame_DoReadyCheck()
 		return
 	end
 	if UnitIsGroupLeader("player") or UnitIsGroupAssistant("player") then
-		DoReadyCheck()
+		BFL.DoReadyCheck()
 	else
 		UIErrorsFrame:AddMessage(L.RAID_ERROR_READY_CHECK_PERMISSION, 1.0, 0.1, 0.1, 1.0)
 	end
@@ -471,7 +486,7 @@ function BetterRaidFrame_EveryoneAssistCheckbox_OnClick(self)
 		local checked = self:GetChecked()
 		-- Set cooldown to prevent OnEvent from resetting state before server confirms
 		self.clickCooldown = GetTime()
-		SetEveryoneIsAssistant(checked)
+		BFL.SetEveryoneIsAssistant(checked)
 	end
 end
 
@@ -682,6 +697,10 @@ function BetterRaidMemberButton_OnEnter(self)
 	if BetterRaidFrame_DraggedUnit then
 		return
 	end
+	if self.pendingName or IsPendingRaidRosterName(self.name) then
+		ClearRaidMemberGameTooltip(self)
+		return
+	end
 
 	-- Show tooltip only while the raid token is still valid. Roster moves can
 	-- briefly leave buttons with stale raidN tokens while Blizzard refreshes.
@@ -706,6 +725,9 @@ function BetterRaidMemberButton_PostClick(self, button)
 	-- Hier ist sicher, dass Secure Attributes bereits verarbeitet wurden
 
 	if not self.unit or not self.name then
+		return
+	end
+	if self.pendingName or IsPendingRaidRosterName(self.name) then
 		return
 	end
 
@@ -775,6 +797,9 @@ end
 
 function BetterRaidMemberButton_OnDragStart(self)
 	if not self.unit or not self.name then
+		return
+	end
+	if self.pendingName or IsPendingRaidRosterName(self.name) then
 		return
 	end
 
@@ -1015,8 +1040,8 @@ function BetterRaidMemberButton_OnDragStop(self)
 
 				if success then
 					-- Success feedback (green toast)
-					local sourceName = GetRaidRosterInfo(sourceRaidIndex)
-					local targetName = GetRaidRosterInfo(targetRaidIndex)
+					local sourceName = GetSafeRaidRosterName(sourceRaidIndex)
+					local targetName = GetSafeRaidRosterName(targetRaidIndex)
 					if sourceName and targetName then
 						UIErrorsFrame:AddMessage(
 							string.format(L.RAID_MSG_SWAP_SUCCESS, sourceName, targetName),
@@ -1047,7 +1072,7 @@ function BetterRaidMemberButton_OnDragStop(self)
 
 			if success then
 				-- Success feedback (green toast)
-				local playerName = GetRaidRosterInfo(sourceRaidIndex)
+				local playerName = GetSafeRaidRosterName(sourceRaidIndex)
 				if playerName then
 					UIErrorsFrame:AddMessage(
 						string.format(L.RAID_MSG_MOVE_SUCCESS, playerName, targetSubgroup),

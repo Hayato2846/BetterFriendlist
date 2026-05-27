@@ -1146,6 +1146,17 @@ function BFL:IsSecret(value)
 	return issecretvalue ~= nil and issecretvalue(value)
 end
 
+function BFL:IsPendingRaidRosterName(name)
+	if name == nil or name == "" then
+		return true
+	end
+	if self:IsSecret(name) then
+		return true
+	end
+	local unknownName = UNKNOWN or "Unknown"
+	return name == unknownName or name == "Unknown"
+end
+
 -- Get a safe (non-secret) account name for string operations.
 -- Returns battleTag if accountName is a kString secret, otherwise accountName.
 -- Falls back to battleTag or "Unknown" if accountName is nil.
