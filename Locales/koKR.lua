@@ -1409,6 +1409,9 @@ BFL:RegisterLocale("koKR", function()
 	L.SETTINGS_RAID_MOUSE_RIGHT = "우클릭"
 	L.SETTINGS_RAID_MOUSE_MIDDLE = "중앙클릭"
 	L.SETTINGS_RAID_DESC = "공격대 및 그룹 관리를 위한 마우스 단축키를 구성합니다."
+	L.SETTINGS_RAID_ENABLE_READY_CHECK_BUTTON = "Ready Check 버튼 활성화"
+	L.SETTINGS_RAID_ENABLE_READY_CHECK_BUTTON_DESC =
+		"공격대 탭의 공격대 정보 옆에 작은 Ready Check 버튼을 표시합니다."
 	L.SETTINGS_RAID_MODIFIER_LABEL = "모드:"
 	L.SETTINGS_RAID_BUTTON_LABEL = "버튼:"
 	L.SETTINGS_RAID_WARNING = "주의: 단축키는 보안 작업입니다(전투 중에만 해제됨)."

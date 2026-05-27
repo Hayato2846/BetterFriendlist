@@ -1447,6 +1447,9 @@ BFL:RegisterLocale("ruRU", function()
 	L.SETTINGS_RAID_MOUSE_MIDDLE = "Средняя кнопка"
 	L.SETTINGS_RAID_DESC =
 		"Настройте сочетания клавиш мыши для управления рейдом и группой"
+	L.SETTINGS_RAID_ENABLE_READY_CHECK_BUTTON = "Включить кнопку проверки готовности"
+	L.SETTINGS_RAID_ENABLE_READY_CHECK_BUTTON_DESC =
+		"Показывает компактную кнопку проверки готовности рядом с информацией о рейде на вкладке рейда."
 	L.SETTINGS_RAID_MODIFIER_LABEL = "Мод:"
 	L.SETTINGS_RAID_BUTTON_LABEL = "Кнп:"
 	L.SETTINGS_RAID_WARNING =

@@ -1414,6 +1414,9 @@ BFL:RegisterLocale("ptBR", function()
 	-- RAID SHORTCUTS (Phase 26) - PARTIAL
 	-- ========================================
 	L.SETTINGS_RAID_DESC = "Configure atalhos do mouse para gerenciamento de raide e grupo."
+	L.SETTINGS_RAID_ENABLE_READY_CHECK_BUTTON = "Ativar botão de Ready Check"
+	L.SETTINGS_RAID_ENABLE_READY_CHECK_BUTTON_DESC =
+		"Mostra um botão compacto de Ready Check ao lado de Info do raide na aba Raide."
 	L.SETTINGS_RAID_MODIFIER_LABEL = "Mod:"
 	L.SETTINGS_RAID_BUTTON_LABEL = "Btn:"
 	L.SETTINGS_RAID_WARNING = "Nota: Os atalhos são ações seguras (apenas fora de combate)."

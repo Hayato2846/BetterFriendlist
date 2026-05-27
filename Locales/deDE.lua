@@ -1478,6 +1478,9 @@ BFL:RegisterLocale("deDE", function()
 	L.SETTINGS_RAID_MOUSE_RIGHT = "Rechtsklick"
 	L.SETTINGS_RAID_MOUSE_MIDDLE = "Mittelklick"
 	L.SETTINGS_RAID_DESC = "Konfiguriere Kürzel für Schlachtzugs- und Gruppenverwaltung."
+	L.SETTINGS_RAID_ENABLE_READY_CHECK_BUTTON = "Ready-Check-Button aktivieren"
+	L.SETTINGS_RAID_ENABLE_READY_CHECK_BUTTON_DESC =
+		"Zeigt einen kompakten Ready-Check-Button neben Raid Info im Raid-Tab."
 	L.SETTINGS_RAID_MODIFIER_LABEL = "Mod:"
 	L.SETTINGS_RAID_BUTTON_LABEL = "Btn:"
 	L.SETTINGS_RAID_WARNING = "Hinweis: Kürzel sind sichere Aktionen (außerhalb des Kampfes)."

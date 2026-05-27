@@ -435,6 +435,8 @@ function RaidFrame:UpdateControlPanelLayout()
 	local checkboxLabelGap = 2 -- Gap between checkbox and label
 	local buttonRightPadding = 3 -- Padding from right edge
 	local centerElementGap = 5 -- Gap between RoleSummary and MemberCount (reduced from 8)
+	local utilityButtonGap = 5
+	local utilitySlotWidth = 22
 
 	-- Calculate dynamic Y-offset for vertical centering
 	local checkboxHeight = controlPanel.EveryoneAssistCheckbox and controlPanel.EveryoneAssistCheckbox:GetHeight() or 24
@@ -443,24 +445,29 @@ function RaidFrame:UpdateControlPanelLayout()
 	-- Measure actual element sizes
 	local checkboxWidth = controlPanel.EveryoneAssistCheckbox and controlPanel.EveryoneAssistCheckbox:GetWidth() or 24
 	local labelTextWidth = controlPanel.EveryoneAssistLabel and controlPanel.EveryoneAssistLabel:GetStringWidth() or 100
-	local buttonWidth = controlPanel.RaidInfoButton and controlPanel.RaidInfoButton:GetWidth() or 90
 
 	-- Reduce button width if needed
 	local optimizedButtonWidth = 75 -- Reduced from 90
+	local hasUtilitySlot = (controlPanel.ReadyCheckButton and controlPanel.ReadyCheckButton:IsShown())
+		or (controlPanel.CombatIcon and controlPanel.CombatIcon:IsShown())
+	local rightReservedWidth = optimizedButtonWidth
+	if hasUtilitySlot then
+		rightReservedWidth = rightReservedWidth + utilityButtonGap + utilitySlotWidth
+	end
 
 	-- Get actual text widths for center elements
 	local roleSummaryWidth = controlPanel.RoleSummary and controlPanel.RoleSummary:GetStringWidth() or 90
 	local memberCountWidth = controlPanel.MemberCount and controlPanel.MemberCount:GetStringWidth() or 50
 	local centerSectionWidth = roleSummaryWidth + centerElementGap + memberCountWidth
 
-	-- BFL:DebugPrint(string.format("  Measured widths: Checkbox=%.1f, LabelText=%.1f, Button=%.1f",
-	--     checkboxWidth, labelTextWidth, buttonWidth))
+	-- BFL:DebugPrint(string.format("  Measured widths: Checkbox=%.1f, LabelText=%.1f, RightReserved=%.1f",
+	--     checkboxWidth, labelTextWidth, rightReservedWidth))
 	-- BFL:DebugPrint(string.format("  Center section: RoleSummary=%.1f + gap=%.1f + MemberCount=%.1f = %.1f total",
 	--     roleSummaryWidth, centerElementGap, memberCountWidth, centerSectionWidth))
 
 	-- Calculate section boundaries with actual positions
 	local leftSectionEnd = checkboxStartX + checkboxWidth + checkboxLabelGap + labelTextWidth
-	local rightSectionStart = panelWidth - optimizedButtonWidth - buttonRightPadding
+	local rightSectionStart = panelWidth - rightReservedWidth - buttonRightPadding
 	local availableCenter = rightSectionStart - leftSectionEnd
 
 	-- Auto-hide Assist Label if space is too tight (Classic fix)
@@ -474,7 +481,7 @@ function RaidFrame:UpdateControlPanelLayout()
 
 	-- BFL:DebugPrint(string.format("  Layout boundaries:"))
 	-- BFL:DebugPrint(string.format("    Left section: %.1f to %.1f", checkboxStartX, leftSectionEnd))
-	-- BFL:DebugPrint(string.format("    Right section: %.1f to %.1f (button width=%.1f)", rightSectionStart, panelWidth - buttonRightPadding, optimizedButtonWidth))
+	-- BFL:DebugPrint(string.format("    Right section: %.1f to %.1f (reserved width=%.1f)", rightSectionStart, panelWidth - buttonRightPadding, rightReservedWidth))
 	-- BFL:DebugPrint(string.format("    Available center: %.1f (need %.1f) - %s",
 	--     availableCenter, centerSectionWidth,
 	--     availableCenter >= centerSectionWidth and "|cff00ff00OK|r" or "|cffff0000TIGHT|r"))
@@ -528,6 +535,12 @@ function RaidFrame:UpdateControlPanelLayout()
 		--     actualWidth or -1, buttonRightPadding, actualX or -1))
 	end
 
+	local utilityCenterOffset = -(utilityButtonGap + (utilitySlotWidth / 2))
+	if controlPanel.ReadyCheckButton then
+		controlPanel.ReadyCheckButton:ClearAllPoints()
+		controlPanel.ReadyCheckButton:SetPoint("CENTER", controlPanel.RaidInfoButton, "LEFT", utilityCenterOffset, 0)
+	end
+
 	-- Reposition RoleSummary (centered in available space)
 	if controlPanel.RoleSummary then
 		controlPanel.RoleSummary:ClearAllPoints()
@@ -558,8 +571,8 @@ function RaidFrame:UpdateControlPanelLayout()
 	-- Reposition CombatIcon (if visible, between counts and button)
 	if controlPanel.CombatIcon then
 		controlPanel.CombatIcon:ClearAllPoints()
-		controlPanel.CombatIcon:SetPoint("RIGHT", controlPanel.RaidInfoButton, "LEFT", -5, -1)
-		-- BFL:DebugPrint(string.format("  CombatIcon: Anchored to RaidInfoButton, offset=-5"))
+		controlPanel.CombatIcon:SetPoint("CENTER", controlPanel.RaidInfoButton, "LEFT", utilityCenterOffset, -1)
+		-- BFL:DebugPrint(string.format("  CombatIcon: Anchored to shared utility slot"))
 	end
 
 	-- BFL:DebugPrint("|cff00ff00ControlPanel layout completed|r")

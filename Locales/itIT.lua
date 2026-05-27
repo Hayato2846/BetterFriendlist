@@ -1415,6 +1415,9 @@ BFL:RegisterLocale("itIT", function()
 	-- RAID SHORTCUTS (Phase 26) - PARTIAL
 	-- ========================================
 	L.SETTINGS_RAID_DESC = "Configura i tasti scorciatoia del mouse per la gestione delle incursioni e dei gruppi."
+	L.SETTINGS_RAID_ENABLE_READY_CHECK_BUTTON = "Abilita pulsante Ready Check"
+	L.SETTINGS_RAID_ENABLE_READY_CHECK_BUTTON_DESC =
+		"Mostra un pulsante Ready Check compatto accanto a Info incursione nella scheda Incursione."
 	L.SETTINGS_RAID_MODIFIER_LABEL = "Mod:"
 	L.SETTINGS_RAID_BUTTON_LABEL = "Btn:"
 	L.SETTINGS_RAID_WARNING = "Nota: Gli scorciatoia sono azioni sicure (solo fuori dal combattimento)."

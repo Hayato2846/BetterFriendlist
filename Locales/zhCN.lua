@@ -1394,6 +1394,8 @@ BFL:RegisterLocale("zhCN", function()
 	L.SETTINGS_RAID_MOUSE_RIGHT = "右键点击"
 	L.SETTINGS_RAID_MOUSE_MIDDLE = "中键点击"
 	L.SETTINGS_RAID_DESC = "配置团队与队伍管理所需的鼠标快捷键。"
+	L.SETTINGS_RAID_ENABLE_READY_CHECK_BUTTON = "启用就位确认按钮"
+	L.SETTINGS_RAID_ENABLE_READY_CHECK_BUTTON_DESC = "在团队标签页的团队信息旁显示紧凑的就位确认按钮。"
 	L.SETTINGS_RAID_MODIFIER_LABEL = "修改键："
 	L.SETTINGS_RAID_BUTTON_LABEL = "按钮："
 	L.SETTINGS_RAID_WARNING = "注意：快捷键是安全操作（仅限非战斗状态）。"

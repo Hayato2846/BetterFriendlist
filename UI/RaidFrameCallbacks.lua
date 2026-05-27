@@ -333,8 +333,11 @@ function BetterRaidFrame_UpdateControlPanelButtons()
 	local isLeader = UnitIsGroupLeader("player")
 	local isAssistant = UnitIsGroupAssistant("player")
 	local canControl = isLeader or isAssistant
+	local isInGroup = IsInGroup()
 	local inRaid = IsInRaid()
 	local inCombat = BFL:IsActionRestricted()
+	local DB = BFL:GetModule("DB")
+	local readyCheckEnabled = BetterFriendlistDB and DB and DB:Get("enableReadyCheckButton", false)
 
 	-- Everyone is Assistant checkbox: Only Raid Leader can toggle
 	-- Must be in a real raid AND be leader (Blizzard only checks leader because
@@ -360,17 +363,35 @@ function BetterRaidFrame_UpdateControlPanelButtons()
 	-- Ready Check: Only Leader or Assistant, and only in a group
 	-- 12.0.1: DoReadyCheck is combat-restricted
 	if controlPanel.ReadyCheckButton then
-		if IsInGroup() and canControl and not inCombat then
+		local showReadyCheck = readyCheckEnabled and not inCombat
+		local canReadyCheck = showReadyCheck and isInGroup and canControl
+		controlPanel.ReadyCheckButton:SetShown(showReadyCheck)
+		controlPanel.ReadyCheckButton.tooltip = nil
+
+		if canReadyCheck then
 			controlPanel.ReadyCheckButton:Enable()
 		else
 			controlPanel.ReadyCheckButton:Disable()
+			if showReadyCheck then
+				if not isInGroup then
+					controlPanel.ReadyCheckButton.tooltip = L.RAID_ERR_NOT_IN_GROUP or "You are not in a group"
+				elseif not canControl then
+					controlPanel.ReadyCheckButton.tooltip = L.RAID_ERROR_READY_CHECK_PERMISSION
+						or "You must be the raid leader or assistant to initiate a ready check."
+				end
+			end
+		end
+
+		if controlPanel.ReadyCheckButton.Icon then
+			controlPanel.ReadyCheckButton.Icon:SetDesaturated(not canReadyCheck)
+			controlPanel.ReadyCheckButton.Icon:SetAlpha(canReadyCheck and 1.0 or 0.45)
 		end
 	end
 
 	-- Convert to Raid: Only if in Party (not Raid) and is Leader
 	-- 12.0.1: ConvertToRaid is combat-restricted
 	if controlPanel.ConvertToRaidButton then
-		if not inRaid and IsInGroup() and isLeader and not inCombat then
+		if not inRaid and isInGroup and isLeader and not inCombat then
 			controlPanel.ConvertToRaidButton:Enable()
 		else
 			controlPanel.ConvertToRaidButton:Disable()
@@ -396,6 +417,11 @@ function BetterRaidFrame_UpdateControlPanelButtons()
 				RaidTools:Hide()
 			end
 		end
+	end
+
+	local RaidFrame = BFL:GetModule("RaidFrame")
+	if RaidFrame and RaidFrame.UpdateControlPanelLayout then
+		RaidFrame:UpdateControlPanelLayout()
 	end
 end
 
@@ -441,6 +467,10 @@ end -- ========================================
 function BetterRaidFrame_DoReadyCheck()
 	if BFL:IsActionRestricted() then
 		UIErrorsFrame:AddMessage(ERR_AFFECTING_COMBAT, 1.0, 0.1, 0.1, 1.0)
+		return
+	end
+	if not IsInGroup() then
+		UIErrorsFrame:AddMessage(L.RAID_ERR_NOT_IN_GROUP or "You are not in a group", 1.0, 0.1, 0.1, 1.0)
 		return
 	end
 	if UnitIsGroupLeader("player") or UnitIsGroupAssistant("player") then

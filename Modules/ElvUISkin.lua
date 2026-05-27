@@ -1018,6 +1018,10 @@ function ElvUISkin:SkinFrames(E, S)
 			S:HandleButton(frame.RaidFrame.ControlPanel.RaidInfoButton)
 		end
 
+		if frame.RaidFrame.ControlPanel and frame.RaidFrame.ControlPanel.ReadyCheckButton then
+			S:HandleButton(frame.RaidFrame.ControlPanel.ReadyCheckButton)
+		end
+
 		-- Skin EveryoneAssistCheckbox
 		if frame.RaidFrame.ControlPanel and frame.RaidFrame.ControlPanel.EveryoneAssistCheckbox then
 			S:HandleCheckBox(frame.RaidFrame.ControlPanel.EveryoneAssistCheckbox)

@@ -1412,6 +1412,8 @@ BFL:RegisterLocale("zhTW", function()
 	L.SETTINGS_RAID_MOUSE_RIGHT = "右鍵點擊"
 	L.SETTINGS_RAID_MOUSE_MIDDLE = "中鍵點擊"
 	L.SETTINGS_RAID_DESC = "配置團隊與團伋管理所需的滑鼠快捷鍵。"
+	L.SETTINGS_RAID_ENABLE_READY_CHECK_BUTTON = "啟用就位確認按鈕"
+	L.SETTINGS_RAID_ENABLE_READY_CHECK_BUTTON_DESC = "在團隊分頁的團隊資訊旁顯示精簡的就位確認按鈕。"
 	L.SETTINGS_RAID_MODIFIER_LABEL = "修改鍵："
 	L.SETTINGS_RAID_BUTTON_LABEL = "按鈕："
 	L.SETTINGS_RAID_WARNING = "註意：快捷鍵是安全新作業（僅限非戰鬥狀態）。"

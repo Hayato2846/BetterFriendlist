@@ -1420,6 +1420,9 @@ BFL:RegisterLocale("frFR", function()
 	-- RAID SHORTCUTS (Phase 26) - PARTIAL
 	-- ========================================
 	L.SETTINGS_RAID_DESC = "Configurez les raccourcis souris pour la gestion des raids et des groupes."
+	L.SETTINGS_RAID_ENABLE_READY_CHECK_BUTTON = "Activer le bouton Ready Check"
+	L.SETTINGS_RAID_ENABLE_READY_CHECK_BUTTON_DESC =
+		"Affiche un bouton Ready Check compact à côté d'Infos raid dans l'onglet Raid."
 	L.SETTINGS_RAID_MODIFIER_LABEL = "Mod :"
 	L.SETTINGS_RAID_BUTTON_LABEL = "Btn :"
 	L.SETTINGS_RAID_WARNING = "Remarque : Les raccourcis sont des actions sécurisées (hors combat uniquement)."

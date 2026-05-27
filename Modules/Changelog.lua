@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [DRAFT]
 
+### Added
+- **Raid Tab** - Added an optional compact Ready Check button next to Raid Info.
+
 ### Improved
 - **Broker Tooltips** - Added the subtle broker separator between Friends Broker groups and Guild Broker rank groups.
 

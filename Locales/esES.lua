@@ -1424,6 +1424,9 @@ BFL:RegisterLocale("esES", function()
 	-- RAID SHORTCUTS (Phase 26) - PARTIAL
 	-- ========================================
 	L.SETTINGS_RAID_DESC = "Configura atajos de ratón para gestión de banda y grupo."
+	L.SETTINGS_RAID_ENABLE_READY_CHECK_BUTTON = "Activar botón de Ready Check"
+	L.SETTINGS_RAID_ENABLE_READY_CHECK_BUTTON_DESC =
+		"Muestra un botón compacto de Ready Check junto a Info de banda en la pestaña Banda."
 	L.SETTINGS_RAID_MODIFIER_LABEL = "Mod:"
 	L.SETTINGS_RAID_BUTTON_LABEL = "Btn:"
 	L.SETTINGS_RAID_WARNING = "Nota: Los atajos son acciones seguras (solo fuera de combate)."

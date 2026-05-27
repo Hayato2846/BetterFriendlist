@@ -34,6 +34,7 @@ local defaults = {
 	raidToolsPreserveGroups = {}, -- Table of preserved group numbers: {[1]=true, [3]=true} = groups 1 and 3 are preserved
 	raidToolsResumeAfterCombat = true, -- Auto-resume sorting after leaving combat
 	raidToolsBalanceDps = false, -- Balance DPS across groups during split
+	enableReadyCheckButton = false, -- Show compact ready check button in the raid header
 
 	nicknames = {}, -- {friendUID: "Nickname"} - custom nicknames for friends
 	lastInvitedAccounts = {}, -- {friendUID: gameAccountID} - remembers last invited game account per friend

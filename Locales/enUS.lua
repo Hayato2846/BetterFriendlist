@@ -1512,6 +1512,8 @@ local function LoadEnUS()
 	L.SETTINGS_RAID_MOUSE_RIGHT = "Right Click"
 	L.SETTINGS_RAID_MOUSE_MIDDLE = "Middle Click"
 	L.SETTINGS_RAID_DESC = "Configure shortcuts for raid and group management actions on the Raid Frame."
+	L.SETTINGS_RAID_ENABLE_READY_CHECK_BUTTON = "Enable Ready Check Button"
+	L.SETTINGS_RAID_ENABLE_READY_CHECK_BUTTON_DESC = "Show a compact ready check button next to Raid Info in the Raid tab."
 	L.SETTINGS_RAID_ENABLE_SHORTCUTS = "Enable Shortcuts"
 	L.SETTINGS_RAID_ENABLE_SHORTCUTS_DESC = "Enable or disable all custom mouse shortcuts on the Raid Frame."
 	L.SETTINGS_RAID_MODIFIER_LABEL = "Mod:"

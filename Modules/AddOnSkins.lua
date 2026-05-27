@@ -238,6 +238,7 @@ SkinBetterFriendlist = function(event, addon)
 		if frame.RaidFrame.ConvertToRaidButton then S:HandleButton(frame.RaidFrame.ConvertToRaidButton) end
 		if frame.RaidFrame.ControlPanel then
 			if frame.RaidFrame.ControlPanel.RaidInfoButton then S:HandleButton(frame.RaidFrame.ControlPanel.RaidInfoButton) end
+			if frame.RaidFrame.ControlPanel.ReadyCheckButton then S:HandleButton(frame.RaidFrame.ControlPanel.ReadyCheckButton) end
 			if frame.RaidFrame.ControlPanel.EveryoneAssistCheckbox then S:HandleCheckBox(frame.RaidFrame.ControlPanel.EveryoneAssistCheckbox) end
 		end
 	end

@@ -1412,18 +1412,20 @@ function DarkTheme:SkinRaidFrame(engine)
 		raid,
 		control,
 		control and control.RaidInfoButton,
+		control and control.ReadyCheckButton,
 		control and control.EveryoneAssistCheckbox,
 		raid.GroupsInset,
 		raid.ConvertToRaidButton,
 		raid.RaidToolsButton,
-		raid.CombatIcon
+		control and control.CombatIcon
 	)
 	if raid.BFL_DarkRaidSkinKey == staticSkinKey then
 		for _, button in ipairs({
 			control and control.RaidInfoButton,
+			control and control.ReadyCheckButton,
 			raid.ConvertToRaidButton,
 			raid.RaidToolsButton,
-			raid.CombatIcon,
+			control and control.CombatIcon,
 		}) do
 			if button then
 				engine:ApplyButtonState(button)
@@ -1436,10 +1438,11 @@ function DarkTheme:SkinRaidFrame(engine)
 	HideFrameChrome(engine, raid)
 	HideFieldChrome(engine, raid, "ControlPanel")
 	SkinButtonField(engine, raid.ControlPanel, "RaidInfoButton")
+	SkinButtonField(engine, raid.ControlPanel, "ReadyCheckButton")
 	SkinField(engine, raid, "GroupsInset", "inset")
 	SkinButtonField(engine, raid, "ConvertToRaidButton")
 	SkinButtonField(engine, raid, "RaidToolsButton")
-	SkinButtonField(engine, raid, "CombatIcon")
+	SkinButtonField(engine, raid.ControlPanel, "CombatIcon")
 	engine:SkinTree(raid, 5)
 	HideFrameChrome(engine, raid)
 	HideFieldChrome(engine, raid, "ControlPanel")

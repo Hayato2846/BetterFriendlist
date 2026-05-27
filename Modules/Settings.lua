@@ -8722,6 +8722,27 @@ function Settings:RefreshRaidTab()
 	-- Spacer
 	table.insert(allFrames, Components:CreateSpacer(tab))
 
+	local readyCheckToggle = Components:CreateCheckbox(tab, {
+		label = L.SETTINGS_RAID_ENABLE_READY_CHECK_BUTTON or "Enable Ready Check Button",
+		initialValue = DB:Get("enableReadyCheckButton", false),
+		callback = function(val)
+			DB:Set("enableReadyCheckButton", val)
+			if BetterRaidFrame_UpdateControlPanelButtons then
+				BetterRaidFrame_UpdateControlPanelButtons()
+			end
+			local RaidFrame = BFL:GetModule("RaidFrame")
+			if RaidFrame and RaidFrame.UpdateControlPanelLayout then
+				RaidFrame:UpdateControlPanelLayout()
+			end
+		end,
+		tooltipTitle = L.SETTINGS_RAID_ENABLE_READY_CHECK_BUTTON or "Enable Ready Check Button",
+		tooltipDesc = L.SETTINGS_RAID_ENABLE_READY_CHECK_BUTTON_DESC
+			or "Show a compact ready check button next to Raid Info in the Raid tab.",
+	})
+	table.insert(allFrames, readyCheckToggle)
+
+	table.insert(allFrames, Components:CreateSpacer(tab))
+
 	-- Shortcuts Configuration
 	local shortcuts = DB:Get("raidShortcuts") or {}
 
