@@ -212,7 +212,7 @@ FriendsList.selectedFriend = nil
 FriendsList.selectedFriendUID = nil
 FriendsList.selectedButton = nil -- Reference to the selected button for highlight management
 
--- Invite restriction constants (matching Blizzard's)
+-- BFL-owned invite restriction ordering. Blizzard keeps native constants local.
 local INVITE_RESTRICTION_NONE = 0
 local INVITE_RESTRICTION_LEADER = 1
 local INVITE_RESTRICTION_FACTION = 2
@@ -229,6 +229,33 @@ local INVITE_RESTRICTION_MOBILE = 9
 local INVITE_RESTRICTION_REGION = 10
 local INVITE_RESTRICTION_QUEST_SESSION = 11
 local INVITE_RESTRICTION_NO_GAME_ACCOUNTS = 12
+local INVITE_RESTRICTION_GAME_MODE = 13
+
+local CLASS_ID_TO_GAME_MODE = {}
+if Enum and Enum.GameMode then
+	CLASS_ID_TO_GAME_MODE[14] = Enum.GameMode.Plunderstorm
+	CLASS_ID_TO_GAME_MODE[15] = Enum.GameMode.WoWHack
+end
+
+local function CanInviteGameAccountByGameMode(gameAccountInfo)
+	if BFL.IsClassic or not C_GameRules or not C_GameRules.GetActiveGameMode or not Enum or not Enum.GameMode then
+		return true
+	end
+
+	local standardGameMode = Enum.GameMode.Standard
+	if not standardGameMode then
+		return true
+	end
+
+	local otherGameMode = CLASS_ID_TO_GAME_MODE[gameAccountInfo.classID]
+	local activeGameMode = C_GameRules.GetActiveGameMode()
+
+	if otherGameMode then
+		return otherGameMode == activeGameMode
+	end
+
+	return activeGameMode == standardGameMode
+end
 
 -- ========================================
 -- Helper Functions
@@ -3899,6 +3926,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 					end
 
 					local playerFactionGroup = UnitFactionGroup("player")
+					local playerRealmID = (GetNativeRealmID and GetNativeRealmID()) or (GetRealmID and GetRealmID())
 
 					for k = 1, numGameAccounts do
 						local gameAccountInfo = C_BattleNet.GetFriendGameAccountInfo(i, k)
@@ -3931,6 +3959,8 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 										accountRestriction = INVITE_RESTRICTION_WOW_PROJECT_ID
 									elseif gameAccountInfo.realmID == 0 then
 										accountRestriction = INVITE_RESTRICTION_INFO
+									elseif BFL.IsClassic and playerRealmID and gameAccountInfo.realmID ~= playerRealmID then
+										accountRestriction = INVITE_RESTRICTION_REALM
 									elseif not gameAccountInfo.isInCurrentRegion then
 										accountRestriction = INVITE_RESTRICTION_REGION
 									else
@@ -3948,7 +3978,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 										end
 										-- Check game mode restriction (Retail only)
 										if not accountRestriction and not BFL.IsClassic then
-											if CanInviteByGameMode and not CanInviteByGameMode(gameAccountInfo) then
+											if not CanInviteGameAccountByGameMode(gameAccountInfo) then
 												accountRestriction = INVITE_RESTRICTION_GAME_MODE
 											end
 										end
@@ -3962,6 +3992,8 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 									end
 								elseif gameAccountInfo.realmID == 0 then
 									accountRestriction = INVITE_RESTRICTION_INFO
+								elseif BFL.IsClassic and playerRealmID and gameAccountInfo.realmID ~= playerRealmID then
+									accountRestriction = INVITE_RESTRICTION_REALM
 								elseif not gameAccountInfo.isInCurrentRegion then
 									accountRestriction = INVITE_RESTRICTION_REGION
 								elseif gameAccountInfo.realmID and gameAccountInfo.realmID ~= 0 then

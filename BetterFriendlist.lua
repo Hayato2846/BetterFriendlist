@@ -86,6 +86,63 @@ end
 -- Constants
 -- NUM_BUTTONS handled by ScrollBox
 
+-- BFL-owned invite restriction values are produced by Modules/FriendsList.lua.
+-- Blizzard's native invite restriction constants are local to FriendsFrame.lua.
+local BFL_INVITE_RESTRICTION_NONE = 0
+local BFL_INVITE_RESTRICTION_LEADER = 1
+local BFL_INVITE_RESTRICTION_FACTION = 2
+local BFL_INVITE_RESTRICTION_REALM = 3
+local BFL_INVITE_RESTRICTION_INFO = 4
+local BFL_INVITE_RESTRICTION_CLIENT = 5
+local BFL_INVITE_RESTRICTION_WOW_PROJECT_ID = 6
+local BFL_INVITE_RESTRICTION_WOW_PROJECT_MAINLINE = 7
+local BFL_INVITE_RESTRICTION_WOW_PROJECT_CLASSIC = 8
+local BFL_INVITE_RESTRICTION_MOBILE = 9
+local BFL_INVITE_RESTRICTION_REGION = 10
+local BFL_INVITE_RESTRICTION_QUEST_SESSION = 11
+local BFL_INVITE_RESTRICTION_NO_GAME_ACCOUNTS = 12
+local BFL_INVITE_RESTRICTION_GAME_MODE = 13
+
+local function GetBFLInviteRestrictionText(restriction, locale)
+	if restriction == nil or restriction == BFL_INVITE_RESTRICTION_NONE then
+		return nil
+	end
+
+	local L = locale or BFL.L or {}
+	if restriction == BFL_INVITE_RESTRICTION_LEADER then
+		return ERR_TRAVEL_PASS_NOT_LEADER or L.TRAVEL_PASS_NOT_LEADER or "You are not the group leader"
+	elseif restriction == BFL_INVITE_RESTRICTION_CLIENT then
+		return ERR_TRAVEL_PASS_NOT_WOW or L.TRAVEL_PASS_NOT_WOW or "Not playing WoW"
+	elseif restriction == BFL_INVITE_RESTRICTION_WOW_PROJECT_CLASSIC then
+		return ERR_TRAVEL_PASS_WRONG_PROJECT_CLASSIC_OVERRIDE
+			or L.TRAVEL_PASS_WOW_CLASSIC
+			or "Different WoW version (Classic)"
+	elseif restriction == BFL_INVITE_RESTRICTION_WOW_PROJECT_MAINLINE then
+		return ERR_TRAVEL_PASS_WRONG_PROJECT_MAINLINE_OVERRIDE
+			or L.TRAVEL_PASS_WOW_MAINLINE
+			or "Different WoW version (Retail)"
+	elseif restriction == BFL_INVITE_RESTRICTION_WOW_PROJECT_ID then
+		return ERR_TRAVEL_PASS_WRONG_PROJECT or L.TRAVEL_PASS_DIFFERENT_VERSION or "Different WoW version"
+	elseif restriction == BFL_INVITE_RESTRICTION_REALM then
+		return ERR_TRAVEL_PASS_DIFFERENT_REALM or L.TRAVEL_PASS_DIFFERENT_REALM or "Different realm"
+	elseif restriction == BFL_INVITE_RESTRICTION_INFO then
+		return ERR_TRAVEL_PASS_NO_INFO or L.TRAVEL_PASS_NO_INFO or "No realm info"
+	elseif restriction == BFL_INVITE_RESTRICTION_MOBILE then
+		return ERR_TRAVEL_PASS_MOBILE or L.TRAVEL_PASS_MOBILE or "Cannot invite mobile friends"
+	elseif restriction == BFL_INVITE_RESTRICTION_REGION then
+		return ERR_TRAVEL_PASS_DIFFERENT_REGION or L.TRAVEL_PASS_DIFFERENT_REGION or "Different region"
+	elseif restriction == BFL_INVITE_RESTRICTION_NO_GAME_ACCOUNTS then
+		return L.TRAVEL_PASS_NO_GAME_ACCOUNTS or "No game accounts"
+	elseif restriction == BFL_INVITE_RESTRICTION_FACTION then
+		return L.TRAVEL_PASS_DIFFERENT_FACTION or "Different faction"
+	elseif restriction == BFL_INVITE_RESTRICTION_QUEST_SESSION then
+		return L.TRAVEL_PASS_QUEST_SESSION or "Quest Session"
+	elseif restriction == BFL_INVITE_RESTRICTION_GAME_MODE then
+		return ERR_TRAVEL_PASS_GAME_MODE or L.TRAVEL_PASS_GAME_MODE or "Different game mode"
+	end
+	return nil
+end
+
 -- Display state
 -- friendsList handled by FriendsList module
 
@@ -2343,39 +2400,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end
 
 				local function GetRestrictionText(restriction)
-					if not restriction or restriction == INVITE_RESTRICTION_NONE then
-						return nil
-					end
-
-					if restriction == INVITE_RESTRICTION_CLIENT then
-						return ERR_TRAVEL_PASS_NOT_WOW or (L and L.TRAVEL_PASS_NOT_WOW) or "Not playing WoW"
-					elseif restriction == INVITE_RESTRICTION_WOW_PROJECT_CLASSIC then
-						return ERR_TRAVEL_PASS_WRONG_PROJECT_CLASSIC_OVERRIDE
-							or (L and L.TRAVEL_PASS_WOW_CLASSIC)
-							or "Different WoW version (Classic)"
-					elseif restriction == INVITE_RESTRICTION_WOW_PROJECT_MAINLINE then
-						return ERR_TRAVEL_PASS_WRONG_PROJECT_MAINLINE_OVERRIDE
-							or (L and L.TRAVEL_PASS_WOW_MAINLINE)
-							or "Different WoW version (Retail)"
-					elseif restriction == INVITE_RESTRICTION_WOW_PROJECT_ID then
-						return ERR_TRAVEL_PASS_WRONG_PROJECT
-							or (L and L.TRAVEL_PASS_DIFFERENT_VERSION)
-							or "Different WoW version"
-					elseif restriction == INVITE_RESTRICTION_INFO then
-						return ERR_TRAVEL_PASS_NO_INFO or (L and L.TRAVEL_PASS_NO_INFO) or "No realm info"
-					elseif restriction == INVITE_RESTRICTION_REGION then
-						return ERR_TRAVEL_PASS_DIFFERENT_REGION
-							or (L and L.TRAVEL_PASS_DIFFERENT_REGION)
-							or "Different region"
-					elseif restriction == INVITE_RESTRICTION_NO_GAME_ACCOUNTS then
-						return (L and L.TRAVEL_PASS_NO_GAME_ACCOUNTS) or "No game accounts"
-					elseif restriction == INVITE_RESTRICTION_FACTION then
-						return (L and L.TRAVEL_PASS_DIFFERENT_FACTION) or "Different faction"
-					elseif restriction == INVITE_RESTRICTION_QUEST_SESSION then
-						return (L and L.TRAVEL_PASS_QUEST_SESSION) or "Quest Session"
-					end
-
-					return nil
+					return GetBFLInviteRestrictionText(restriction, L)
 				end
 
 				local function FormatEntryText(entry)
@@ -4247,13 +4272,19 @@ end
 -- TRAVEL PASS BUTTON HANDLERS
 --------------------------------------------------------------------------
 
-local CLASS_ID_TO_GAME_MODE = {
-	[14] = Enum.GameMode.Plunderstorm,
-	[15] = Enum.GameMode.WoWHack,
-}
+local CLASS_ID_TO_GAME_MODE = {}
+if Enum and Enum.GameMode then
+	CLASS_ID_TO_GAME_MODE[14] = Enum.GameMode.Plunderstorm
+	CLASS_ID_TO_GAME_MODE[15] = Enum.GameMode.WoWHack
+end
 
 local function CanInviteByGameMode(gameAccountInfo)
-	if not C_GameRules or not C_GameRules.GetActiveGameMode then
+	if not C_GameRules or not C_GameRules.GetActiveGameMode or not Enum or not Enum.GameMode then
+		return true
+	end
+
+	local standardGameMode = Enum.GameMode.Standard
+	if not standardGameMode then
 		return true
 	end
 
@@ -4264,42 +4295,14 @@ local function CanInviteByGameMode(gameAccountInfo)
 		return otherGameMode == activeGameMode
 	else
 		-- If we're both in standard we can invite them.
-		return activeGameMode == Enum.GameMode.Standard
+		return activeGameMode == standardGameMode
 	end
 end
 
 -- Multi-Game-Account Invite Picker
 -- Shows a menu to select which game account to invite when a friend has multiple WoW accounts online
 local function GetInviteRestrictionText(restriction)
-	local L = BFL.L or {}
-
-	if not restriction or restriction == INVITE_RESTRICTION_NONE then
-		return nil
-	end
-	if restriction == INVITE_RESTRICTION_CLIENT then
-		return ERR_TRAVEL_PASS_NOT_WOW or L.TRAVEL_PASS_NOT_WOW or "Not playing WoW"
-	elseif restriction == INVITE_RESTRICTION_WOW_PROJECT_CLASSIC then
-		return ERR_TRAVEL_PASS_WRONG_PROJECT_CLASSIC_OVERRIDE
-			or L.TRAVEL_PASS_WOW_CLASSIC
-			or "Different WoW version (Classic)"
-	elseif restriction == INVITE_RESTRICTION_WOW_PROJECT_MAINLINE then
-		return ERR_TRAVEL_PASS_WRONG_PROJECT_MAINLINE_OVERRIDE
-			or L.TRAVEL_PASS_WOW_MAINLINE
-			or "Different WoW version (Retail)"
-	elseif restriction == INVITE_RESTRICTION_WOW_PROJECT_ID then
-		return ERR_TRAVEL_PASS_WRONG_PROJECT or L.TRAVEL_PASS_DIFFERENT_VERSION or "Different WoW version"
-	elseif restriction == INVITE_RESTRICTION_INFO then
-		return ERR_TRAVEL_PASS_NO_INFO or L.TRAVEL_PASS_NO_INFO or "No realm info"
-	elseif restriction == INVITE_RESTRICTION_REGION then
-		return ERR_TRAVEL_PASS_DIFFERENT_REGION or L.TRAVEL_PASS_DIFFERENT_REGION or "Different region"
-	elseif restriction == INVITE_RESTRICTION_NO_GAME_ACCOUNTS then
-		return L.TRAVEL_PASS_NO_GAME_ACCOUNTS or "No game accounts"
-	elseif restriction == INVITE_RESTRICTION_FACTION then
-		return L.TRAVEL_PASS_DIFFERENT_FACTION or "Different faction"
-	elseif restriction == INVITE_RESTRICTION_QUEST_SESSION then
-		return L.TRAVEL_PASS_QUEST_SESSION or "Quest Session"
-	end
-	return nil
+	return GetBFLInviteRestrictionText(restriction)
 end
 
 BFL.GetInviteRestrictionText = GetInviteRestrictionText
@@ -4471,7 +4474,7 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 		local numValidGameAccounts = 0
 		local lastGameAccountID, lastGameAccountGUID
 		local playerFactionGroup = UnitFactionGroup("player")
-		local playerRealmID = GetRealmID()
+		local playerRealmID = (GetNativeRealmID and GetNativeRealmID()) or (GetRealmID and GetRealmID())
 		local WOW_PROJECT_ID = WOW_PROJECT_ID
 
 		for i = 1, numGameAccounts do
@@ -4488,7 +4491,13 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 			if gameAccountInfo.realmID == 0 then
 				isValid = false
 			end
+			if isValid and BFL.IsClassic and playerRealmID and gameAccountInfo.realmID ~= playerRealmID then
+				isValid = false
+			end
 			if not gameAccountInfo.isInCurrentRegion then
+				isValid = false
+			end
+			if not gameAccountInfo.playerGuid then
 				isValid = false
 			end
 
@@ -4580,8 +4589,8 @@ local inviteTypeToButtonText = {
 	["SUGGEST_INVITE"] = SUGGEST_INVITE,
 	["REQUEST_INVITE"] = REQUEST_INVITE,
 	["INVITE_CROSS_FACTION"] = TRAVEL_PASS_INVITE_CROSS_FACTION,
-	["SUGGEST_INVITE_CROSS_FACTION"] = SUGGEST_INVITE,
-	["REQUEST_INVITE_CROSS_FACTION"] = REQUEST_INVITE,
+	["SUGGEST_INVITE_CROSS_FACTION"] = SUGGEST_INVITE_CROSS_FACTION or SUGGEST_INVITE,
+	["REQUEST_INVITE_CROSS_FACTION"] = REQUEST_INVITE_CROSS_FACTION or REQUEST_INVITE,
 }
 
 local inviteTypeIsCrossFaction = {
@@ -4594,6 +4603,60 @@ local FACTION_LABELS_FROM_STRING = {
 	["Alliance"] = FACTION_ALLIANCE,
 	["Horde"] = FACTION_HORDE,
 }
+
+local function AddSocialQueueGroupMembersToTooltip(tooltip, guid)
+	if
+		not tooltip
+		or not guid
+		or not C_SocialQueue
+		or not C_SocialQueue.GetGroupForPlayer
+		or not C_SocialQueue.GetGroupMembers
+	then
+		return
+	end
+
+	local group = C_SocialQueue.GetGroupForPlayer(guid)
+	if not group then
+		return
+	end
+
+	local members = C_SocialQueue.GetGroupMembers(group)
+	if not members then
+		return
+	end
+
+	local numDisplayed = 0
+	for i = 1, #members do
+		local member = members[i]
+		if member and member.guid and member.guid ~= guid then
+			local name, color
+			if SocialQueueUtil_GetRelationshipInfo then
+				name, color = SocialQueueUtil_GetRelationshipInfo(member.guid, nil, member.clubId)
+			end
+			if name and name ~= "" then
+				if numDisplayed == 0 then
+					if SOCIAL_QUEUE_ALSO_IN_GROUP then
+						tooltip:AddLine(SOCIAL_QUEUE_ALSO_IN_GROUP)
+					end
+				elseif numDisplayed >= 7 then
+					if SOCIAL_QUEUE_AND_MORE then
+						tooltip:AddLine(
+							SOCIAL_QUEUE_AND_MORE,
+							GRAY_FONT_COLOR.r,
+							GRAY_FONT_COLOR.g,
+							GRAY_FONT_COLOR.b,
+							1
+						)
+					end
+					break
+				end
+
+				tooltip:AddLine((color or "") .. name .. (color and FONT_COLOR_CODE_CLOSE or ""))
+				numDisplayed = numDisplayed + 1
+			end
+		end
+	end
+end
 
 function BetterFriendsList_TravelPassButton_OnEnter(self)
 	local friendData = self.friendData
@@ -4629,6 +4692,8 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 	then
 		local inviteType, guid, factionName = FriendsFrame_GetDisplayedInviteTypeAndGuid(actualIndex)
 		local restriction = FriendsFrame_GetInviteRestriction(actualIndex)
+		local restrictionText = FriendsFrame_GetInviteRestrictionText(restriction)
+		local hasRestriction = restrictionText and restrictionText ~= ""
 
 		if inviteType and inviteTypeToButtonText[inviteType] then
 			BFL_Tooltip:SetText(
@@ -4646,35 +4711,15 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 				end
 			end
 
-			if restriction == INVITE_RESTRICTION_NONE then
+			if not hasRestriction then
 				if
-					(inviteType == "REQUEST_INVITE" or inviteType == "REQUEST_INVITE_CROSS_FACTION") and C_SocialQueue
+					(inviteType == "REQUEST_INVITE" or inviteType == "REQUEST_INVITE_CROSS_FACTION")
 				then
-					-- Show who is in the group (Social Queue)
-					local group = C_SocialQueue.GetGroupForPlayer(guid)
-					local members = C_SocialQueue.GetGroupMembers(group)
-					local numDisplayed = 0
-					if members then
-						for i = 1, #members do
-							if members[i].guid ~= guid then
-								if numDisplayed == 0 then
-									BFL_Tooltip:AddLine(SOCIAL_QUEUE_ALSO_IN_GROUP)
-								elseif numDisplayed >= 7 then
-									BFL_Tooltip:AddLine(GRAY_FONT_COLOR.r, GRAY_FONT_COLOR.g, GRAY_FONT_COLOR.b, 1)
-									break
-								end
-
-								local name, color =
-									SocialQueueUtil_GetRelationshipInfo(members[i].guid, nil, members[i].clubId)
-								BFL_Tooltip:AddLine(color .. name .. FONT_COLOR_CODE_CLOSE)
-								numDisplayed = numDisplayed + 1
-							end
-						end
-					end
+					AddSocialQueueGroupMembersToTooltip(BFL_Tooltip, guid)
 				end
 			else
 				BFL_Tooltip:AddLine(
-					FriendsFrame_GetInviteRestrictionText(restriction),
+					restrictionText,
 					RED_FONT_COLOR.r,
 					RED_FONT_COLOR.g,
 					RED_FONT_COLOR.b,
@@ -4692,15 +4737,18 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 	local restriction = nil -- Will be set to NO_GAME_ACCOUNTS if no valid accounts found
 	local numGameAccounts = C_BattleNet.GetFriendNumGameAccounts(actualIndex)
 	local playerFactionGroup = UnitFactionGroup("player")
-	local hasWowAccount = false
+	local playerRealmID = (GetNativeRealmID and GetNativeRealmID()) or (GetRealmID and GetRealmID())
 	local isCrossFaction = false
 	local factionName = nil
+	local displayedGuid = nil
 
 	for i = 1, numGameAccounts do
 		local gameAccountInfo = C_BattleNet.GetFriendGameAccountInfo(actualIndex, i)
 		if gameAccountInfo then
 			if gameAccountInfo.clientProgram == BNET_CLIENT_WOW then
-				hasWowAccount = true
+				if gameAccountInfo.playerGuid and not displayedGuid then
+					displayedGuid = gameAccountInfo.playerGuid
+				end
 				if gameAccountInfo.factionName then
 					factionName = gameAccountInfo.factionName
 					isCrossFaction = (factionName ~= playerFactionGroup)
@@ -4714,7 +4762,7 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 					then
 						-- Friend is on Classic, we're not
 						if not restriction then
-							restriction = INVITE_RESTRICTION_WOW_PROJECT_CLASSIC
+							restriction = BFL_INVITE_RESTRICTION_WOW_PROJECT_CLASSIC
 						end
 					elseif
 						gameAccountInfo.wowProjectID == WOW_PROJECT_MAINLINE
@@ -4722,43 +4770,47 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 					then
 						-- Friend is on Mainline, we're not
 						if not restriction then
-							restriction = INVITE_RESTRICTION_WOW_PROJECT_MAINLINE
+							restriction = BFL_INVITE_RESTRICTION_WOW_PROJECT_MAINLINE
 						end
 					elseif gameAccountInfo.wowProjectID ~= WOW_PROJECT_ID then
 						-- Different WoW version (other)
 						if not restriction then
-							restriction = INVITE_RESTRICTION_WOW_PROJECT_ID
+							restriction = BFL_INVITE_RESTRICTION_WOW_PROJECT_ID
 						end
 					elseif gameAccountInfo.realmID == 0 then
 						-- No realm info
 						if not restriction then
-							restriction = INVITE_RESTRICTION_INFO
+							restriction = BFL_INVITE_RESTRICTION_INFO
 						end
+					elseif BFL.IsClassic and playerRealmID and gameAccountInfo.realmID ~= playerRealmID then
+						restriction = BFL_INVITE_RESTRICTION_REALM
 					elseif not gameAccountInfo.isInCurrentRegion then
 						-- Different region
-						restriction = INVITE_RESTRICTION_REGION
+						restriction = BFL_INVITE_RESTRICTION_REGION
 					else
 						-- At least one valid WoW account that can be invited
-						restriction = INVITE_RESTRICTION_NONE
+						restriction = BFL_INVITE_RESTRICTION_NONE
 						break
 					end
 				elseif gameAccountInfo.realmID == 0 then
 					-- No realm info
 					if not restriction then
-						restriction = INVITE_RESTRICTION_INFO
+						restriction = BFL_INVITE_RESTRICTION_INFO
 					end
+				elseif BFL.IsClassic and playerRealmID and gameAccountInfo.realmID ~= playerRealmID then
+					restriction = BFL_INVITE_RESTRICTION_REALM
 				elseif not gameAccountInfo.isInCurrentRegion then
 					-- Different region
-					restriction = INVITE_RESTRICTION_REGION
+					restriction = BFL_INVITE_RESTRICTION_REGION
 				elseif gameAccountInfo.realmID and gameAccountInfo.realmID ~= 0 then
 					-- Valid WoW account (no project ID check needed)
-					restriction = INVITE_RESTRICTION_NONE
+					restriction = BFL_INVITE_RESTRICTION_NONE
 					break
 				end
 			else
 				-- Non-WoW client (App, BSAp, etc.)
 				if not restriction then
-					restriction = INVITE_RESTRICTION_CLIENT
+					restriction = BFL_INVITE_RESTRICTION_CLIENT
 				end
 			end
 		end
@@ -4766,12 +4818,21 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 
 	-- If no restriction was set, means no game accounts at all
 	if not restriction then
-		restriction = INVITE_RESTRICTION_NO_GAME_ACCOUNTS
+		restriction = BFL_INVITE_RESTRICTION_NO_GAME_ACCOUNTS
+	end
+
+	if FriendsFrame_GetPlayerGUIDFromIndex then
+		displayedGuid = FriendsFrame_GetPlayerGUIDFromIndex(actualIndex) or displayedGuid
+	end
+
+	local displayedInviteType = displayedGuid and GetDisplayedInviteType and GetDisplayedInviteType(displayedGuid) or nil
+	if displayedInviteType and isCrossFaction then
+		displayedInviteType = displayedInviteType .. "_CROSS_FACTION"
 	end
 
 	-- Set tooltip text based on restriction
-	local tooltipText = TRAVEL_PASS_INVITE or "Invite to Group"
-	if isCrossFaction then
+	local tooltipText = inviteTypeToButtonText[displayedInviteType] or TRAVEL_PASS_INVITE or "Invite to Group"
+	if not inviteTypeToButtonText[displayedInviteType] and isCrossFaction then
 		tooltipText = TRAVEL_PASS_INVITE_CROSS_FACTION or "Invite to Group"
 	end
 
@@ -4785,24 +4846,16 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 		end
 	end
 
+	if
+		restriction == BFL_INVITE_RESTRICTION_NONE
+		and (displayedInviteType == "REQUEST_INVITE" or displayedInviteType == "REQUEST_INVITE_CROSS_FACTION")
+	then
+		AddSocialQueueGroupMembersToTooltip(BFL_Tooltip, displayedGuid)
+	end
+
 	-- Add restriction text in red if there's a restriction
-	if restriction ~= INVITE_RESTRICTION_NONE then
-		local restrictionText = ""
-		if restriction == INVITE_RESTRICTION_CLIENT then
-			restrictionText = ERR_TRAVEL_PASS_NOT_WOW or L.TRAVEL_PASS_NOT_WOW
-		elseif restriction == INVITE_RESTRICTION_WOW_PROJECT_CLASSIC then
-			restrictionText = ERR_TRAVEL_PASS_WRONG_PROJECT_CLASSIC_OVERRIDE or L.TRAVEL_PASS_WOW_CLASSIC
-		elseif restriction == INVITE_RESTRICTION_WOW_PROJECT_MAINLINE then
-			restrictionText = ERR_TRAVEL_PASS_WRONG_PROJECT_MAINLINE_OVERRIDE or L.TRAVEL_PASS_WOW_MAINLINE
-		elseif restriction == INVITE_RESTRICTION_WOW_PROJECT_ID then
-			restrictionText = ERR_TRAVEL_PASS_WRONG_PROJECT or L.TRAVEL_PASS_DIFFERENT_VERSION
-		elseif restriction == INVITE_RESTRICTION_INFO then
-			restrictionText = ERR_TRAVEL_PASS_NO_INFO or L.TRAVEL_PASS_NO_INFO
-		elseif restriction == INVITE_RESTRICTION_REGION then
-			restrictionText = ERR_TRAVEL_PASS_DIFFERENT_REGION or L.TRAVEL_PASS_DIFFERENT_REGION
-		elseif restriction == INVITE_RESTRICTION_NO_GAME_ACCOUNTS then
-			restrictionText = L.TRAVEL_PASS_NO_GAME_ACCOUNTS
-		end
+	if restriction ~= BFL_INVITE_RESTRICTION_NONE then
+		local restrictionText = GetBFLInviteRestrictionText(restriction) or ""
 
 		if restrictionText ~= "" then
 			BFL_Tooltip:AddLine(restrictionText, RED_FONT_COLOR.r, RED_FONT_COLOR.g, RED_FONT_COLOR.b, true)
