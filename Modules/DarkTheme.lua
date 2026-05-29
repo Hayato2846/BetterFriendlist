@@ -1438,7 +1438,10 @@ function DarkTheme:SkinRaidFrame(engine)
 	HideFrameChrome(engine, raid)
 	HideFieldChrome(engine, raid, "ControlPanel")
 	SkinButtonField(engine, raid.ControlPanel, "RaidInfoButton")
-	SkinButtonField(engine, raid.ControlPanel, "ReadyCheckButton")
+	SkinIconButtonField(engine, control, "ReadyCheckButton", {
+		texture = control and control.ReadyCheckButton and control.ReadyCheckButton.Icon,
+		size = 14,
+	})
 	SkinField(engine, raid, "GroupsInset", "inset")
 	SkinButtonField(engine, raid, "ConvertToRaidButton")
 	SkinButtonField(engine, raid, "RaidToolsButton")
