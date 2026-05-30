@@ -1150,7 +1150,11 @@ local function CreateElementFactory(friendsList) -- Capture friendsList referenc
 				local badgeText = badge:CreateFontString(nil, "OVERLAY", nil, 2)
 				SafeSetFont(badgeText, STANDARD_TEXT_FONT, 10, GetDefaultUIFontFlags("OUTLINE"))
 				badgeText:SetPoint("CENTER", badge, "CENTER", 0, 0)
-				badgeText:SetTextColor(1, 0.82, 0, 1) -- Gold
+				local accentR, accentG, accentB = 1, 0.82, 0
+				if BFL.GetThemeAccentColor then
+					accentR, accentG, accentB = BFL:GetThemeAccentColor(accentR, accentG, accentB, 1)
+				end
+				badgeText:SetTextColor(accentR, accentG, accentB, 1) -- Gold
 				badgeText:SetJustifyH("CENTER")
 				badge.gameAccountBadgeText = badgeText
 				button.gameAccountBadgeText = badgeText
@@ -6623,9 +6627,12 @@ Button_OnDragStart = function(self)
 			-- Format text nicely (including class color if available)
 			local text = BetterFriendsList_DraggedFriend
 			local colorR, colorG, colorB = 1, 0.82, 0 -- Default Gold
+			if BFL.GetThemeAccentColor then
+				colorR, colorG, colorB = BFL:GetThemeAccentColor(colorR, colorG, colorB, 1)
+			end
 
 			-- Reset base text color to Gold to prevent tinting issues from previous drags
-			ghost.text:SetTextColor(1, 0.82, 0)
+			ghost.text:SetTextColor(colorR, colorG, colorB)
 
 			if self.friendData.className then
 				local classFile = GetClassFileFromClassName(self.friendData.className)
@@ -7713,6 +7720,11 @@ function FriendsList:UpdateFriendButton(button, elementData)
 						fontHeight,
 						GetDefaultUIFontFlags("OUTLINE")
 					)
+					local accentR, accentG, accentB = 1, 0.82, 0
+					if BFL.GetThemeAccentColor then
+						accentR, accentG, accentB = BFL:GetThemeAccentColor(accentR, accentG, accentB, 1)
+					end
+					button.gameAccountBadgeText:SetTextColor(accentR, accentG, accentB, 1)
 				end
 
 				button.gameAccountBadge:ClearAllPoints()

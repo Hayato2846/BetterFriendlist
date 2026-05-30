@@ -13,6 +13,13 @@ end
 -- Frame reference (lazy-init)
 local toolsFrame = nil
 
+local function GetAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
+	if BFL.GetThemeAccentColor then
+		return BFL:GetThemeAccentColor(fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1)
+	end
+	return fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1
+end
+
 -- Processing state
 local processing = false
 local processStart = 0
@@ -1756,8 +1763,25 @@ local function CreateSectionHeader(parent, text, yOffset)
 	header:SetPoint("TOPLEFT", parent, "TOPLEFT", 15, yOffset)
 	header:SetJustifyH("LEFT")
 	header:SetText(text)
-	header:SetTextColor(1.0, 0.82, 0)
+	header:SetTextColor(GetAccentColor(1, 0.82, 0, 1))
+	if parent.BFL_AccentFontStrings then
+		table.insert(parent.BFL_AccentFontStrings, header)
+	end
 	return header
+end
+
+function RaidTools:RefreshAccentColors(frame)
+	frame = frame or toolsFrame
+	if not frame or not frame.BFL_AccentFontStrings then
+		return
+	end
+
+	local accentR, accentG, accentB = GetAccentColor(1, 0.82, 0, 1)
+	for _, fontString in ipairs(frame.BFL_AccentFontStrings) do
+		if fontString and fontString.SetTextColor then
+			fontString:SetTextColor(accentR, accentG, accentB)
+		end
+	end
 end
 
 function RaidTools:CreateFrame()
@@ -1766,6 +1790,7 @@ function RaidTools:CreateFrame()
 	end
 
 	local frame = CreateFrame("Frame", "BetterFriendlistRaidToolsFrame", BetterFriendsFrame, "ButtonFrameTemplate")
+	frame.BFL_AccentFontStrings = {}
 	frame:SetSize(280, 400)
 	frame:SetPoint("TOPLEFT", BetterFriendsFrame, "TOPRIGHT", 5, 0)
 	frame:SetFrameStrata("HIGH")
@@ -1797,6 +1822,7 @@ function RaidTools:CreateFrame()
 	local content = CreateFrame("Frame", nil, frame)
 	content:SetPoint("TOPLEFT", 12, -30)
 	content:SetPoint("BOTTOMRIGHT", -12, 10)
+	content.BFL_AccentFontStrings = frame.BFL_AccentFontStrings
 
 	local DB = BFL:GetModule("DB")
 	local yPos = -10
@@ -1944,6 +1970,7 @@ function RaidTools:CreateFrame()
 
 	-- Sound and events
 	frame:SetScript("OnShow", function()
+		RaidTools:RefreshAccentColors(frame)
 		-- Close HelpFrame when opening Tools
 		if BFL.HelpFrame then
 			BFL.HelpFrame:Hide()

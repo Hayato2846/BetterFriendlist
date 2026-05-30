@@ -7,6 +7,13 @@ BFL.HelpFrame = HelpFrame
 
 local helpFrame = nil
 
+local function GetAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
+	if BFL.GetThemeAccentColor then
+		return BFL:GetThemeAccentColor(fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1)
+	end
+	return fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1
+end
+
 local function GetFormattedShortcut(action)
 	local db = BetterFriendlistDB
 	local shortcuts = db and db.raidShortcuts or {}
@@ -57,6 +64,23 @@ local function GetFormattedShortcut(action)
 	else
 		return modText .. " + " .. btnText
 	end
+end
+
+function HelpFrame:UpdateAccentColors(frame)
+	if not frame or not frame.accentTextElements then
+		return
+	end
+
+	local accentR, accentG, accentB = GetAccentColor(1, 0.82, 0, 1)
+	for _, fontString in ipairs(frame.accentTextElements) do
+		if fontString and fontString.SetTextColor then
+			fontString:SetTextColor(accentR, accentG, accentB)
+		end
+	end
+end
+
+function HelpFrame:RefreshAccentColors()
+	self:UpdateAccentColors(helpFrame)
 end
 
 function HelpFrame:UpdateText(frame)
@@ -166,6 +190,12 @@ function HelpFrame:CreateFrame()
 
 	-- Logic to store updateable text elements
 	frame.textElements = {}
+	frame.accentTextElements = {}
+
+	local function TrackAccentText(fontString)
+		table.insert(frame.accentTextElements, fontString)
+		fontString:SetTextColor(GetAccentColor(1, 0.82, 0, 1))
+	end
 
 	local L = BFL.L or {}
 
@@ -175,7 +205,7 @@ function HelpFrame:CreateFrame()
 	title:SetPoint("TOPRIGHT", -10, -10)
 	title:SetJustifyH("LEFT")
 	title:SetText(L.RAID_HELP_TITLE)
-	title:SetTextColor(1.0, 0.82, 0)
+	TrackAccentText(title)
 
 	-- Section 1: Multi-Selection
 	local section1Title = content:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
@@ -183,7 +213,7 @@ function HelpFrame:CreateFrame()
 	section1Title:SetPoint("TOPRIGHT", title, "BOTTOMRIGHT", 0, -15)
 	section1Title:SetJustifyH("LEFT")
 	section1Title:SetText(L.RAID_HELP_MULTISELECT_TITLE)
-	section1Title:SetTextColor(1.0, 0.82, 0)
+	TrackAccentText(section1Title)
 
 	local section1Text = content:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
 	section1Text:SetPoint("TOPLEFT", section1Title, "BOTTOMLEFT", 5, -5)
@@ -198,7 +228,7 @@ function HelpFrame:CreateFrame()
 	section2Title:SetPoint("TOPRIGHT", section1Text, "BOTTOMRIGHT", 5, -15)
 	section2Title:SetJustifyH("LEFT")
 	section2Title:SetText(L.RAID_HELP_MAINTANK_TITLE)
-	section2Title:SetTextColor(1.0, 0.82, 0)
+	TrackAccentText(section2Title)
 
 	local section2Text = content:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
 	section2Text:SetPoint("TOPLEFT", section2Title, "BOTTOMLEFT", 5, -5)
@@ -214,7 +244,7 @@ function HelpFrame:CreateFrame()
 	section3Title:SetPoint("TOPRIGHT", section2Text, "BOTTOMRIGHT", 5, -15)
 	section3Title:SetJustifyH("LEFT")
 	section3Title:SetText(L.RAID_HELP_MAINASSIST_TITLE)
-	section3Title:SetTextColor(1.0, 0.82, 0)
+	TrackAccentText(section3Title)
 
 	local section3Text = content:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
 	section3Text:SetPoint("TOPLEFT", section3Title, "BOTTOMLEFT", 5, -5)
@@ -230,7 +260,7 @@ function HelpFrame:CreateFrame()
 	sectionLeadTitle:SetPoint("TOPRIGHT", section3Text, "BOTTOMRIGHT", 5, -15)
 	sectionLeadTitle:SetJustifyH("LEFT")
 	sectionLeadTitle:SetText(L.RAID_HELP_LEAD_TITLE)
-	sectionLeadTitle:SetTextColor(1.0, 0.82, 0)
+	TrackAccentText(sectionLeadTitle)
 
 	local sectionLeadText = content:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
 	sectionLeadText:SetPoint("TOPLEFT", sectionLeadTitle, "BOTTOMLEFT", 5, -5)
@@ -246,7 +276,7 @@ function HelpFrame:CreateFrame()
 	sectionPromoteTitle:SetPoint("TOPRIGHT", sectionLeadText, "BOTTOMRIGHT", 5, -15)
 	sectionPromoteTitle:SetJustifyH("LEFT")
 	sectionPromoteTitle:SetText(L.RAID_HELP_PROMOTE_TITLE)
-	sectionPromoteTitle:SetTextColor(1.0, 0.82, 0)
+	TrackAccentText(sectionPromoteTitle)
 
 	local sectionPromoteText = content:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
 	sectionPromoteText:SetPoint("TOPLEFT", sectionPromoteTitle, "BOTTOMLEFT", 5, -5)
@@ -262,7 +292,7 @@ function HelpFrame:CreateFrame()
 	section4Title:SetPoint("TOPRIGHT", sectionPromoteText, "BOTTOMRIGHT", 5, -15)
 	section4Title:SetJustifyH("LEFT")
 	section4Title:SetText(L.RAID_HELP_DRAGDROP_TITLE)
-	section4Title:SetTextColor(1.0, 0.82, 0)
+	TrackAccentText(section4Title)
 
 	local section4Text = content:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
 	section4Text:SetPoint("TOPLEFT", section4Title, "BOTTOMLEFT", 5, -5)
@@ -277,7 +307,7 @@ function HelpFrame:CreateFrame()
 	section5Title:SetPoint("TOPRIGHT", section4Text, "BOTTOMRIGHT", 5, -15)
 	section5Title:SetJustifyH("LEFT")
 	section5Title:SetText(L.RAID_HELP_COMBAT_TITLE)
-	section5Title:SetTextColor(1.0, 0.82, 0)
+	TrackAccentText(section5Title)
 
 	local section5Text = content:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
 	section5Text:SetPoint("TOPLEFT", section5Title, "BOTTOMLEFT", 5, -5)
@@ -316,6 +346,7 @@ function HelpFrame:CreateFrame()
 
 	-- Sound effects
 	frame:SetScript("OnShow", function()
+		HelpFrame:UpdateAccentColors(frame)
 		HelpFrame:UpdateText(frame) -- Update text on show
 		-- Close RaidTools when opening Help
 		local RaidTools = BFL:GetModule("RaidTools")

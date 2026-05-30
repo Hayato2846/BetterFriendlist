@@ -269,7 +269,7 @@ local function CreateGroupButton(parent, groupId, groupName, orderIndex)
 
 	button.colorButton:SetScript("OnEnter", function(self)
 		BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
-		BFL_Tooltip:SetText(L.TOOLTIP_GROUP_COLOR, 1, 0.82, 0)
+		BFL_Tooltip:SetText(L.TOOLTIP_GROUP_COLOR, GetAccentColor(1, 0.82, 0, 1))
 		BFL_Tooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC, 0.8, 0.8, 0.8, true)
 		BFL_Tooltip:Show()
 	end)
@@ -499,7 +499,6 @@ local TAB_DEFINITIONS = {
 		name = L.SETTINGS_TAB_THEME or "Theme",
 		icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\sliders.blp",
 		beta = true,
-		retailOnly = true,
 	},
 	{
 		id = 2,
@@ -565,6 +564,13 @@ local TAB_DEFINITIONS = {
 -- Color scheme
 local COLOR_STABLE = "|cffffff00" -- Gold
 local COLOR_BETA = "|cffff8800" -- Orange
+
+local function GetAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
+	if BFL.GetThemeAccentColor then
+		return BFL:GetThemeAccentColor(fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1)
+	end
+	return fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1
+end
 
 local function IsTabAvailableForClient(tabDef)
 	return not tabDef.retailOnly or BFL.IsRetail == true
@@ -691,7 +697,7 @@ function Settings:RefreshCategories()
 		button:SetPoint("TOPRIGHT", listFrame, "TOPRIGHT", 0, -((i - 1) * (BUTTON_HEIGHT + SPACING)))
 
 		-- Styling
-		local r, g, b = 1, 0.82, 0 -- Default Gold
+		local r, g, b = GetAccentColor(1, 0.82, 0) -- Default Gold
 		if catDef.beta then
 			r, g, b = 1, 0.53, 0 -- Orange
 		end
@@ -796,7 +802,7 @@ function Settings:SelectCategory(categoryID)
 			if isBeta then
 				r, g, b = 1, 0.53, 0 -- Beta Orange
 			else
-				r, g, b = 1, 0.82, 0 -- Normal Gold
+				r, g, b = GetAccentColor(1, 0.82, 0) -- Normal Gold
 			end
 
 			button.text:SetTextColor(r, g, b)
@@ -2175,6 +2181,8 @@ function Settings:ImportSettings(importString)
 				-- General
 				"compactMode",
 				"theme",
+				"darkThemeSettings",
+				"customTheme",
 				"enableElvUISkin",
 				"fontSize",
 				"windowScale",
@@ -2266,6 +2274,9 @@ function Settings:ImportSettings(importString)
 	end
 	if DB.NormalizeThemeSetting then
 		DB:NormalizeThemeSetting()
+	end
+	if DB.NormalizeThemeSettings then
+		DB:NormalizeThemeSettings()
 	end
 	local Registry = BFL:GetModule("FilterSortRegistry")
 	if Registry and Registry.NormalizeDB then
@@ -3358,16 +3369,32 @@ end
 --------------------------------------------------------------------------
 
 -- Theme setting callbacks
+local function IsDarkSkinThemeValue(theme)
+	return theme == "dark" or theme == "custom"
+end
+
+local function ApplyThemeSettingsChanged(reason)
+	local ThemeManager = BFL:GetModule("ThemeManager")
+	if ThemeManager and ThemeManager.ApplyCurrentTheme then
+		ThemeManager:ApplyCurrentTheme(reason or "theme-settings")
+	end
+end
+
+local function FormatThemePercent(value)
+	value = tonumber(value) or 0
+	return string.format("%d%%", math.floor(value * 100 + 0.5))
+end
+
 function Settings:OnThemeChanged(theme)
 	local DB = GetDB()
 	if not DB then
 		return
 	end
 
-	if theme ~= "blizzard" and theme ~= "dark" and theme ~= "elvui" then
+	if theme ~= "blizzard" and theme ~= "dark" and theme ~= "custom" and theme ~= "elvui" then
 		theme = "blizzard"
 	end
-	if theme == "dark" and (not BFL.AreThemeFeaturesEnabled or not BFL:AreThemeFeaturesEnabled()) then
+	if IsDarkSkinThemeValue(theme) and (not BFL.AreThemeFeaturesEnabled or not BFL:AreThemeFeaturesEnabled()) then
 		theme = "blizzard"
 	end
 	if theme == "elvui" and (not BFL.IsElvUIAvailable or not BFL:IsElvUIAvailable()) then
@@ -3382,7 +3409,7 @@ function Settings:OnThemeChanged(theme)
 	local ThemeManager = BFL:GetModule("ThemeManager")
 	local touchesElvUI = oldEffectiveTheme == "elvui" or theme == "elvui"
 	if touchesElvUI then
-		if oldEffectiveTheme == "dark" then
+		if IsDarkSkinThemeValue(oldEffectiveTheme) then
 			local DarkTheme = BFL:GetModule("DarkTheme")
 			if DarkTheme and DarkTheme.Remove then
 				DarkTheme:Remove("settings-elvui")
@@ -3397,6 +3424,7 @@ function Settings:OnThemeChanged(theme)
 	if ThemeManager and ThemeManager.ApplyCurrentTheme then
 		ThemeManager:ApplyCurrentTheme("settings")
 	end
+	self:RefreshThemeTab()
 end
 
 function Settings:OnLegacyElvUISkinChanged(checked)
@@ -3436,6 +3464,9 @@ function Settings:RefreshThemeTab()
 	if not DB then
 		return
 	end
+	local ThemePalette = BFL:GetModule("ThemePalette")
+	local SkinEngine = BFL:GetModule("SkinEngine")
+	local currentTheme = BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() or DB:Get("theme", "blizzard")
 
 	if tab.components then
 		for _, component in ipairs(tab.components) do
@@ -3452,8 +3483,9 @@ function Settings:RefreshThemeTab()
 	local labels = {
 		L.SETTINGS_THEME_BLIZZARD or "Blizzard",
 		L.SETTINGS_THEME_DARK or "Dark",
+		L.SETTINGS_THEME_CUSTOM or "Custom",
 	}
-	local values = { "blizzard", "dark" }
+	local values = { "blizzard", "dark", "custom" }
 	if BFL.IsElvUIAvailable and BFL:IsElvUIAvailable() then
 		table.insert(labels, L.SETTINGS_THEME_ELVUI or "ElvUI")
 		table.insert(values, "elvui")
@@ -3467,8 +3499,7 @@ function Settings:RefreshThemeTab()
 			values = values,
 		},
 		function(value)
-			local selectedTheme = BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() or DB:Get("theme", "blizzard")
-			return selectedTheme == value
+			return currentTheme == value
 		end,
 		function(value)
 			self:OnThemeChanged(value)
@@ -3480,6 +3511,225 @@ function Settings:RefreshThemeTab()
 			or "Choose the visual style for BetterFriendlist. ElvUI requires a UI reload."
 	)
 	table.insert(allFrames, themeDropdown)
+
+	local function SetDarkSetting(key, value)
+		if ThemePalette and ThemePalette.SetDarkSetting then
+			ThemePalette:SetDarkSetting(key, value)
+			ApplyThemeSettingsChanged("dark-theme-setting")
+		end
+	end
+
+	local function SetCustomColor(key, r, g, b, a)
+		if ThemePalette and ThemePalette.SetCustomColor then
+			ThemePalette:SetCustomColor(key, { r = r, g = g, b = b, a = a })
+			ApplyThemeSettingsChanged("custom-theme-setting")
+		end
+	end
+
+	local function ResetCustomColor(key)
+		if ThemePalette and ThemePalette.SetCustomColor then
+			ThemePalette:SetCustomColor(key, nil)
+			ApplyThemeSettingsChanged("custom-theme-reset-color")
+			self:RefreshThemeTab()
+		end
+	end
+
+	local function AddThemeSlider(label, key, tooltip, minValue)
+		local settings = ThemePalette and ThemePalette:GetDarkSettings() or DB:Get("darkThemeSettings", {})
+		local slider = Components:CreateSlider(tab, label, minValue or 0, 1, settings[key] or 0, FormatThemePercent, function(value)
+			SetDarkSetting(key, value)
+		end)
+		if slider.SetStep then
+			slider:SetStep(0.01)
+		end
+		if slider.SetTooltip then
+			slider:SetTooltip(label, tooltip)
+		end
+		table.insert(allFrames, slider)
+	end
+
+	local function AddThemeColor(label, initialColor, callback, resetCallback, tooltip)
+		local picker = Components:CreateColorPicker(tab, label, initialColor, callback, {
+			tooltipTitle = label,
+			tooltipDesc = tooltip,
+			resetCallback = resetCallback,
+			resetTooltip = L.SETTINGS_THEME_RESET_COLOR_TOOLTIP or "Right-click to inherit this color from the Dark theme.",
+		})
+		table.insert(allFrames, picker)
+	end
+
+	local function ToColor(array, fallback)
+		local color = array or fallback
+		if type(color) ~= "table" then
+			return { r = 1, g = 1, b = 1, a = 1 }
+		end
+		return {
+			r = color.r or color[1] or 1,
+			g = color.g or color[2] or 1,
+			b = color.b or color[3] or 1,
+			a = color.a or color[4] or 1,
+		}
+	end
+
+	if currentTheme == "dark" then
+		local darkSettings = ThemePalette and ThemePalette:GetDarkSettings() or DB:Get("darkThemeSettings", {})
+		table.insert(allFrames, Components:CreateSpacer(tab))
+		table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_THEME_DARK_HEADER or "Dark Theme Settings"))
+		AddThemeColor(
+			L.SETTINGS_THEME_ACCENT_COLOR or "Accent Color",
+			darkSettings.accentColor,
+			function(r, g, b, a)
+				SetDarkSetting("accentColor", { r = r, g = g, b = b, a = a })
+			end,
+			nil,
+			L.SETTINGS_THEME_ACCENT_COLOR_DESC or "Controls selected, hover, slider, and icon accents."
+		)
+		AddThemeSlider(L.SETTINGS_THEME_WINDOW_OPACITY or "Window Opacity", "windowOpacity", L.SETTINGS_THEME_WINDOW_OPACITY_DESC, 0.15)
+		AddThemeSlider(
+			L.SETTINGS_THEME_POPUP_OPACITY or "Popup & Tooltip Opacity",
+			"popupOpacity",
+			L.SETTINGS_THEME_POPUP_OPACITY_DESC,
+			0.15
+		)
+		AddThemeSlider(
+			L.SETTINGS_THEME_LIST_OPACITY or "List & Inset Opacity",
+			"listOpacity",
+			L.SETTINGS_THEME_LIST_OPACITY_DESC,
+			0.05
+		)
+		AddThemeSlider(
+			L.SETTINGS_THEME_CONTROL_OPACITY or "Control Opacity",
+			"controlOpacity",
+			L.SETTINGS_THEME_CONTROL_OPACITY_DESC,
+			0.05
+		)
+		AddThemeSlider(L.SETTINGS_THEME_HOVER_STRENGTH or "Hover Strength", "hoverStrength", L.SETTINGS_THEME_HOVER_STRENGTH_DESC)
+		AddThemeSlider(
+			L.SETTINGS_THEME_SELECTION_STRENGTH or "Selection Strength",
+			"selectionStrength",
+			L.SETTINGS_THEME_SELECTION_STRENGTH_DESC
+		)
+		AddThemeSlider(L.SETTINGS_THEME_BORDER_STRENGTH or "Border Strength", "borderStrength", L.SETTINGS_THEME_BORDER_STRENGTH_DESC)
+		AddThemeSlider(
+			L.SETTINGS_THEME_ARTWORK_VISIBILITY or "Blizzard Artwork Visibility",
+			"artworkVisibility",
+			L.SETTINGS_THEME_ARTWORK_VISIBILITY_DESC
+		)
+		table.insert(
+			allFrames,
+			Components:CreateButtonRow(tab, L.SETTINGS_THEME_RESET_DARK or "Reset Dark Settings", nil, function()
+				if ThemePalette and ThemePalette.ResetDarkSettings then
+					ThemePalette:ResetDarkSettings()
+					ApplyThemeSettingsChanged("reset-dark-theme")
+					self:RefreshThemeTab()
+				end
+			end)
+		)
+	elseif currentTheme == "custom" then
+		local resolvedColors = SkinEngine and SkinEngine.defaultColors or {}
+		if ThemePalette and SkinEngine and SkinEngine.defaultColors then
+			resolvedColors = {}
+			ThemePalette:ApplyToColors(resolvedColors, SkinEngine.defaultColors)
+		end
+
+		local customTheme = ThemePalette and ThemePalette:GetCustomTheme() or DB:Get("customTheme", {})
+		local customMap = {
+			{
+				key = "backgroundColor",
+				label = L.SETTINGS_THEME_CUSTOM_BACKGROUND or "Background",
+				token = "panel",
+				desc = L.SETTINGS_THEME_CUSTOM_BACKGROUND_DESC,
+			},
+			{
+				key = "surfaceColor",
+				label = L.SETTINGS_THEME_CUSTOM_SURFACE or "Surface",
+				token = "panelSoft",
+				desc = L.SETTINGS_THEME_CUSTOM_SURFACE_DESC,
+			},
+			{
+				key = "insetColor",
+				label = L.SETTINGS_THEME_CUSTOM_INSET or "Inset & List",
+				token = "inset",
+				desc = L.SETTINGS_THEME_CUSTOM_INSET_DESC,
+			},
+			{
+				key = "controlColor",
+				label = L.SETTINGS_THEME_CUSTOM_CONTROL or "Control",
+				token = "control",
+				desc = L.SETTINGS_THEME_CUSTOM_CONTROL_DESC,
+			},
+			{
+				key = "borderColor",
+				label = L.SETTINGS_THEME_CUSTOM_BORDER or "Border",
+				token = "border",
+				desc = L.SETTINGS_THEME_CUSTOM_BORDER_DESC,
+			},
+			{
+				key = "accentColor",
+				label = L.SETTINGS_THEME_CUSTOM_ACCENT or "Accent",
+				token = "accent",
+				desc = L.SETTINGS_THEME_CUSTOM_ACCENT_DESC,
+			},
+			{
+				key = "textColor",
+				label = L.SETTINGS_THEME_CUSTOM_TEXT or "Control Text",
+				token = "text",
+				desc = L.SETTINGS_THEME_CUSTOM_TEXT_DESC,
+			},
+			{
+				key = "disabledTextColor",
+				label = L.SETTINGS_THEME_CUSTOM_DISABLED_TEXT or "Disabled Text",
+				token = "disabledText",
+				desc = L.SETTINGS_THEME_CUSTOM_DISABLED_TEXT_DESC,
+			},
+			{
+				key = "hoverColor",
+				label = L.SETTINGS_THEME_CUSTOM_HOVER or "Hover",
+				token = "rowHover",
+				desc = L.SETTINGS_THEME_CUSTOM_HOVER_DESC,
+			},
+			{
+				key = "selectedColor",
+				label = L.SETTINGS_THEME_CUSTOM_SELECTED or "Selected & Pressed",
+				token = "rowDown",
+				desc = L.SETTINGS_THEME_CUSTOM_SELECTED_DESC,
+			},
+			{
+				key = "scrollThumbColor",
+				label = L.SETTINGS_THEME_CUSTOM_SCROLL_THUMB or "Scrollbar Thumb",
+				token = "scrollThumb",
+				desc = L.SETTINGS_THEME_CUSTOM_SCROLL_THUMB_DESC,
+			},
+			{
+				key = "iconColor",
+				label = L.SETTINGS_THEME_CUSTOM_ICON or "Icon Tint",
+				token = "icon",
+				desc = L.SETTINGS_THEME_CUSTOM_ICON_DESC,
+			},
+		}
+
+		table.insert(allFrames, Components:CreateSpacer(tab))
+		table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_THEME_CUSTOM_HEADER or "Custom Theme"))
+		for _, definition in ipairs(customMap) do
+			local fallback = resolvedColors[definition.token] or (SkinEngine and SkinEngine.defaultColors and SkinEngine.defaultColors[definition.token])
+			local initialColor = customTheme[definition.key] or ToColor(fallback)
+			AddThemeColor(definition.label, initialColor, function(r, g, b, a)
+				SetCustomColor(definition.key, r, g, b, a)
+			end, function()
+				ResetCustomColor(definition.key)
+			end, definition.desc)
+		end
+		table.insert(
+			allFrames,
+			Components:CreateButtonRow(tab, L.SETTINGS_THEME_RESET_CUSTOM or "Reset Custom Theme", nil, function()
+				if ThemePalette and ThemePalette.ResetCustomTheme then
+					ThemePalette:ResetCustomTheme()
+					ApplyThemeSettingsChanged("reset-custom-theme")
+					self:RefreshThemeTab()
+				end
+			end)
+		)
+	end
 
 	Components:AnchorChain(allFrames, -5)
 	tab.components = allFrames
@@ -5094,7 +5344,7 @@ function Settings:RefreshGroupsTab()
 		if listItem.colorButton then
 			listItem.colorButton:SetScript("OnEnter", function(self)
 				BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
-				BFL_Tooltip:SetText(L.SETTINGS_GROUP_COLOR, 1, 0.82, 0)
+				BFL_Tooltip:SetText(L.SETTINGS_GROUP_COLOR, GetAccentColor(1, 0.82, 0, 1))
 				BFL_Tooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC, 1, 1, 1, true)
 				BFL_Tooltip:Show()
 			end)
@@ -5503,7 +5753,7 @@ function Settings:RefreshAdvancedTab()
 
 			-- If disabling Beta and currently on ANY Beta tab, switch to General
 			if not checked then
-				if oldStoredTheme == "dark" then
+				if IsDarkSkinThemeValue(oldStoredTheme) then
 					if ThemeManager and ThemeManager.SetTheme then
 						ThemeManager:SetTheme("blizzard", "beta-disabled")
 					else
@@ -5528,7 +5778,7 @@ function Settings:RefreshAdvancedTab()
 					end
 				end
 			else
-				if BFL.IsRetail and DB:Get("enableElvUISkin", false) == true and DB:Get("theme", "blizzard") == "blizzard" then
+				if DB:Get("enableElvUISkin", false) == true and DB:Get("theme", "blizzard") == "blizzard" then
 					DB:Set("theme", "elvui")
 				end
 				if ThemeManager and ThemeManager.ApplyCurrentTheme then
@@ -6539,9 +6789,10 @@ function Settings:RefreshFilterSortTab()
 		row:SetScript("OnDragStart", function(selfRow)
 			draggingEntryRow = selfRow
 			local ghost = BFL:GetDragGhost()
+			local accentR, accentG, accentB = GetAccentColor(1, 0.82, 0)
 			ghost.text:SetText(entry.name)
-			ghost.text:SetTextColor(1, 0.82, 0)
-			ghost.stripe:SetColorTexture(1, 0.82, 0)
+			ghost.text:SetTextColor(accentR, accentG, accentB)
+			ghost.stripe:SetColorTexture(accentR, accentG, accentB)
 			ghost:SetSize(math.max(160, ghost.text:GetStringWidth() + 55), selfRow:GetHeight())
 			ghost:Show()
 

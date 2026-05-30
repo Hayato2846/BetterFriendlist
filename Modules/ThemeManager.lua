@@ -7,12 +7,14 @@ local ThemeManager = BFL:RegisterModule("ThemeManager", {})
 local VALID_THEMES = {
 	blizzard = true,
 	dark = true,
+	custom = true,
 	elvui = true,
 }
 
 BFL.THEMES = {
 	BLIZZARD = "blizzard",
 	DARK = "dark",
+	CUSTOM = "custom",
 	ELVUI = "elvui",
 }
 
@@ -24,7 +26,7 @@ local function NormalizeTheme(theme)
 end
 
 local function AreThemeFeaturesEnabled()
-	return BFL.IsRetail == true and BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures == true
+	return BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures == true
 end
 
 local function ShouldUseLegacyElvUISkinSetting()
@@ -76,7 +78,7 @@ end
 
 function BFL:GetEffectiveTheme()
 	local theme = GetStoredTheme()
-	if theme == "dark" and not AreThemeFeaturesEnabled() then
+	if (theme == "dark" or theme == "custom") and not AreThemeFeaturesEnabled() then
 		return "blizzard"
 	end
 	if theme == "elvui" and not IsElvUIAvailable() then
@@ -91,7 +93,12 @@ end
 
 function BFL:UsesFlatTheme()
 	local theme = self:GetEffectiveTheme()
-	return theme == "dark" or theme == "elvui"
+	return theme == "dark" or theme == "custom" or theme == "elvui"
+end
+
+function BFL:UsesDarkSkinTheme()
+	local theme = self:GetEffectiveTheme()
+	return theme == "dark" or theme == "custom"
 end
 
 function ThemeManager:Initialize()
@@ -124,7 +131,7 @@ end
 
 function ThemeManager:SetTheme(theme, reason)
 	theme = NormalizeTheme(theme)
-	if theme == "dark" and not AreThemeFeaturesEnabled() then
+	if (theme == "dark" or theme == "custom") and not AreThemeFeaturesEnabled() then
 		theme = "blizzard"
 	end
 
@@ -154,7 +161,7 @@ function ThemeManager:ApplyCurrentTheme(reason)
 
 	local DarkTheme = BFL:GetModule("DarkTheme")
 	if DarkTheme then
-		if theme == "dark" then
+		if BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme() then
 			DarkTheme:Apply(reason)
 		else
 			DarkTheme:Remove(reason)
@@ -170,6 +177,26 @@ function ThemeManager:ApplyCurrentTheme(reason)
 
 	if BFL.ForceRefreshFriendsList then
 		BFL:ForceRefreshFriendsList()
+	end
+
+	local Changelog = BFL:GetModule("Changelog")
+	if Changelog and Changelog.RefreshAccentColors then
+		Changelog:RefreshAccentColors()
+	end
+	if BFL.HelpFrame and BFL.HelpFrame.RefreshAccentColors then
+		BFL.HelpFrame:RefreshAccentColors()
+	end
+	local RaidTools = BFL:GetModule("RaidTools")
+	if RaidTools and RaidTools.RefreshAccentColors then
+		RaidTools:RefreshAccentColors()
+	end
+	local GuildFrame = BFL:GetModule("GuildFrame")
+	if GuildFrame and GuildFrame.RefreshMemberInfoPanelAccent then
+		GuildFrame:RefreshMemberInfoPanelAccent()
+	end
+	local WhoFrame = BFL:GetModule("WhoFrame")
+	if WhoFrame and WhoFrame.RefreshAccentColors then
+		WhoFrame:RefreshAccentColors()
 	end
 
 	return true
@@ -241,7 +268,7 @@ local function SkinStaticPopupButtons(engine, popup)
 end
 
 function ThemeManager:SkinStaticPopup(which)
-	if not IsBetterFriendlistPopup(which) or not BFL:IsThemeActive("dark") then
+	if not IsBetterFriendlistPopup(which) or not (BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme()) then
 		return
 	end
 
@@ -271,7 +298,7 @@ function ThemeManager:InstallStaticPopupHook()
 
 	self.staticPopupHooked = true
 	hooksecurefunc("StaticPopup_Show", function(which)
-		if not IsBetterFriendlistPopup(which) or not BFL:IsThemeActive("dark") then
+		if not IsBetterFriendlistPopup(which) or not (BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme()) then
 			return
 		end
 

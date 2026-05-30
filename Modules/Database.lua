@@ -6,6 +6,7 @@ local DB = BFL:RegisterModule("DB", {})
 
 -- Optimization: Cache CustomNames Lib usage
 local CustomNamesLib = nil
+local ThemePalette = BFL:GetModule("ThemePalette")
 
 -- Default values
 local defaults = {
@@ -41,8 +42,10 @@ local defaults = {
 	preferredGameAccounts = {}, -- {friendUID: gameAccountID} - user-selected preferred game account per friend
 	-- Visual Settings
 	compactMode = false, -- Use compact button layout
-	theme = "blizzard", -- UI theme: "blizzard", "dark", "elvui"
-	enableElvUISkin = false, -- Legacy ElvUI skin toggle shown outside Retail beta theme settings
+	theme = "blizzard", -- UI theme: "blizzard", "dark", "custom", "elvui"
+	darkThemeSettings = ThemePalette and ThemePalette:GetDefaultDarkSettings() or {},
+	customTheme = {},
+	enableElvUISkin = false, -- Legacy ElvUI skin toggle shown outside beta theme settings
 	fontSize = "normal", -- "small", "normal", "large"
 	-- Font Customization (LibSharedMedia)
 	fontFriendName = "Friz Quadrata TT",
@@ -277,6 +280,7 @@ local INFO_PRESET_FORMATS = {
 local VALID_THEMES = {
 	blizzard = true,
 	dark = true,
+	custom = true,
 	elvui = true,
 }
 
@@ -323,18 +327,33 @@ function DB:NormalizeThemeSetting()
 		BetterFriendlistDB.theme = "blizzard"
 	end
 
-	local wasDarkTheme = BetterFriendlistDB.theme == "dark"
-	local themeFeaturesEnabled = BFL.IsRetail == true and BetterFriendlistDB.enableBetaFeatures == true
-	if wasDarkTheme and not themeFeaturesEnabled then
+	local wasDarkSkinTheme = BetterFriendlistDB.theme == "dark" or BetterFriendlistDB.theme == "custom"
+	local themeFeaturesEnabled = BetterFriendlistDB.enableBetaFeatures == true
+	if wasDarkSkinTheme and not themeFeaturesEnabled then
 		BetterFriendlistDB.theme = "blizzard"
 	end
 
 	if BetterFriendlistDB.theme == "elvui" then
 		BetterFriendlistDB.enableElvUISkin = true
-	elseif BetterFriendlistDB.theme == "dark" or wasDarkTheme then
+	elseif BetterFriendlistDB.theme == "dark" or BetterFriendlistDB.theme == "custom" or wasDarkSkinTheme then
 		BetterFriendlistDB.enableElvUISkin = false
 	elseif BetterFriendlistDB.enableElvUISkin == nil then
 		BetterFriendlistDB.enableElvUISkin = false
+	end
+end
+
+function DB:NormalizeThemeSettings()
+	local Palette = BFL:GetModule("ThemePalette")
+	if Palette and Palette.NormalizeSavedSettings then
+		Palette:NormalizeSavedSettings(BetterFriendlistDB)
+		return
+	end
+
+	if type(BetterFriendlistDB.darkThemeSettings) ~= "table" then
+		BetterFriendlistDB.darkThemeSettings = {}
+	end
+	if type(BetterFriendlistDB.customTheme) ~= "table" then
+		BetterFriendlistDB.customTheme = {}
 	end
 end
 
@@ -442,6 +461,8 @@ function DB:Initialize()
 			end
 		end
 	end
+	self:NormalizeThemeSettings()
+	self:NormalizeThemeSetting()
 
 	-- MIGRATION: Merge defaults for raidShortcuts (Fix for missing keys in existing DB)
 	if BetterFriendlistDB.raidShortcuts then

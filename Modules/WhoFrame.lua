@@ -49,6 +49,13 @@ local function ApplyBetterFriendlistHeaderButtonFonts(button)
 	ApplyDefaultSlugToButton(button)
 end
 
+local function GetAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
+	if BFL.GetThemeAccentColor then
+		return BFL:GetThemeAccentColor(fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1)
+	end
+	return fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1
+end
+
 local function ApplyStaticWhoFrameFonts(frame)
 	if not frame then
 		return
@@ -1679,7 +1686,7 @@ function _G.BetterWhoListButton_OnEnter(self)
 	if classColor then
 		BFL_Tooltip:AddLine(info.fullName or "", classColor.r, classColor.g, classColor.b)
 	else
-		BFL_Tooltip:AddLine(info.fullName or "", 1, 0.82, 0)
+		BFL_Tooltip:AddLine(info.fullName or "", GetAccentColor(1, 0.82, 0, 1))
 	end
 
 	-- Level, Race, Class line
@@ -3218,7 +3225,7 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	previewText:SetPoint("RIGHT", flyout, "RIGHT", -6, 0)
 	previewText:SetJustifyH("LEFT")
 	previewText:SetJustifyV("TOP")
-	previewText:SetTextColor(1, 0.82, 0)
+	previewText:SetTextColor(GetAccentColor(1, 0.82, 0, 1))
 	previewText:SetWordWrap(true)
 	previewText:SetText(L.WHO_BUILDER_PREVIEW_EMPTY or "Fill in fields to build a search")
 	self.builder.previewText = previewText
@@ -3468,7 +3475,7 @@ function WhoFrame:ToggleSearchBuilder(show)
 			self.builderDockedContainer:Show()
 		end
 		self.builderFlyout:Show()
-		self.builderToggle.icon:SetVertexColor(1, 0.82, 0) -- Gold tint when active
+		self.builderToggle.icon:SetVertexColor(GetAccentColor(1, 0.82, 0, 1))
 		self:UpdateBuilderPreview()
 	else
 		self.builderFlyout:Hide()
@@ -3494,6 +3501,18 @@ function WhoFrame:ToggleSearchBuilder(show)
 			if self.builder.levelMax then
 				self.builder.levelMax:ClearFocus()
 			end
+		end
+	end
+end
+
+function WhoFrame:RefreshAccentColors()
+	if self.builderFlyout and self.builderFlyout:IsShown() and self.builderToggle and self.builderToggle.icon then
+		self.builderToggle.icon:SetVertexColor(GetAccentColor(1, 0.82, 0, 1))
+	end
+	if self.builder and self.builder.previewText and not self.builderDocked then
+		local query = self:ComposeBuilderQuery()
+		if query ~= "" then
+			self.builder.previewText:SetTextColor(GetAccentColor(1, 0.82, 0, 1))
 		end
 	end
 end
@@ -3572,7 +3591,7 @@ function WhoFrame:UpdateBuilderPreview()
 		self.builder.previewText:SetTextColor(0.5, 0.5, 0.5)
 	else
 		self.builder.previewText:SetText(query)
-		self.builder.previewText:SetTextColor(1, 0.82, 0)
+		self.builder.previewText:SetTextColor(GetAccentColor(1, 0.82, 0, 1))
 	end
 end
 

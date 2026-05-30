@@ -416,16 +416,20 @@ end
 ------------------------------------------------------------
 -- ColorPicker Compatibility
 ------------------------------------------------------------
--- Retail 10.1+: ColorPickerFrame:SetupColorPickerAndShow(info)
--- Classic: ColorPickerFrame.func = ..., ColorPickerFrame:Show()
+-- Supported Retail and Classic clients: ColorPickerFrame:SetupColorPickerAndShow(info)
+-- Legacy fallback: ColorPickerFrame.func = ..., ColorPickerFrame:Show()
 
 function Compat.ShowColorPicker(r, g, b, a, callback, cancelCallback)
-	if BFL.HasModernColorPicker and ColorPickerFrame.SetupColorPickerAndShow then
-		-- Retail: Modern API
+	if not ColorPickerFrame then
+		return
+	end
+
+	if ColorPickerFrame and ColorPickerFrame.SetupColorPickerAndShow then
+		-- Shared modern color picker API exists on current Retail and Classic clients.
 		local info = {
 			swatchFunc = function()
 				local newR, newG, newB = ColorPickerFrame:GetColorRGB()
-				local newA = ColorPickerFrame:GetColorAlpha()
+				local newA = ColorPickerFrame.GetColorAlpha and ColorPickerFrame:GetColorAlpha() or a
 				callback(newR, newG, newB, newA)
 			end,
 			cancelFunc = function()
@@ -435,7 +439,7 @@ function Compat.ShowColorPicker(r, g, b, a, callback, cancelCallback)
 			end,
 			opacityFunc = function()
 				local newR, newG, newB = ColorPickerFrame:GetColorRGB()
-				local newA = ColorPickerFrame:GetColorAlpha()
+				local newA = ColorPickerFrame.GetColorAlpha and ColorPickerFrame:GetColorAlpha() or a
 				callback(newR, newG, newB, newA)
 			end,
 			r = r,
@@ -446,10 +450,11 @@ function Compat.ShowColorPicker(r, g, b, a, callback, cancelCallback)
 		}
 		ColorPickerFrame:SetupColorPickerAndShow(info)
 	else
-		-- Classic: Legacy API
+		-- Legacy fallback for clients without SetupColorPickerAndShow.
 		ColorPickerFrame.func = function()
 			local newR, newG, newB = ColorPickerFrame:GetColorRGB()
-			callback(newR, newG, newB, a)
+			local newA = ColorPickerFrame.GetColorAlpha and ColorPickerFrame:GetColorAlpha() or a
+			callback(newR, newG, newB, newA)
 		end
 		ColorPickerFrame.cancelFunc = function()
 			if cancelCallback then
@@ -458,7 +463,7 @@ function Compat.ShowColorPicker(r, g, b, a, callback, cancelCallback)
 		end
 		ColorPickerFrame.hasOpacity = (a ~= nil)
 		if a then
-			ColorPickerFrame.opacity = 1 - a -- Classic uses inverted opacity
+			ColorPickerFrame.opacity = a
 			ColorPickerFrame.opacityFunc = ColorPickerFrame.func
 		end
 		ColorPickerFrame:SetColorRGB(r, g, b)

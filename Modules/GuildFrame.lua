@@ -72,6 +72,13 @@ local function SafeSetFont(fontObject, fontPath, fontSize, flags)
 	return ok and result ~= false
 end
 
+local function GetAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
+	if BFL.GetThemeAccentColor then
+		return BFL:GetThemeAccentColor(fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1)
+	end
+	return fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1
+end
+
 local function ApplyDefaultSlugToFontString(fontString)
 	if BFL.FontManager and BFL.FontManager.ApplyDefaultSlugToFontString then
 		BFL.FontManager:ApplyDefaultSlugToFontString(fontString)
@@ -748,7 +755,7 @@ function GuildFrame:SetupMemberButton(button)
 	button.ilvlText = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	ApplyDefaultSlugToFontString(button.ilvlText)
 	button.ilvlText:SetJustifyH("RIGHT")
-	button.ilvlText:SetTextColor(1, 0.82, 0)
+	button.ilvlText:SetTextColor(GetAccentColor(1, 0.82, 0, 1))
 
 	-- Highlight texture
 	button.highlight = button:CreateTexture(nil, "HIGHLIGHT")
@@ -881,6 +888,7 @@ function GuildFrame:UpdateMemberButton(button, member, dataIndex)
 
 	-- Item Level
 	if button.ilvlText then
+		button.ilvlText:SetTextColor(GetAccentColor(1, 0.82, 0, 1))
 		local ilvl = member.itemLevel or 0
 		if ilvl > 0 then
 			button.ilvlText:SetText(tostring(math.floor(ilvl)))
@@ -1187,7 +1195,7 @@ function GuildFrame:OnMemberEnter(button)
 	if member.itemLevel and member.itemLevel > 0 then
 		GameTooltip:AddLine(" ")
 		GameTooltip:AddLine(format("%s: %d",
-			(L and L.GUILD_INFO_ILVL) or "Item Level", math.floor(member.itemLevel)), 1, 0.82, 0)
+			(L and L.GUILD_INFO_ILVL) or "Item Level", math.floor(member.itemLevel)), GetAccentColor(1, 0.82, 0, 1))
 	end
 
 	-- Hints
@@ -1462,7 +1470,7 @@ function GuildFrame:SetupMOTDTooltip()
 		if not text or text == "" then return end
 		GameTooltip:SetOwner(fs, "ANCHOR_BOTTOMLEFT", 0, -2)
 		GameTooltip:ClearLines()
-		GameTooltip:AddLine((L and L.GUILD_MOTD_TOOLTIP_HEADER) or "Message of the Day", 1, 0.82, 0)
+		GameTooltip:AddLine((L and L.GUILD_MOTD_TOOLTIP_HEADER) or "Message of the Day", GetAccentColor(1, 0.82, 0, 1))
 		GameTooltip:AddLine(text, 1, 1, 1, true)
 		GameTooltip:Show()
 	end)
@@ -1527,7 +1535,7 @@ local function CreatePanelDivider(parent, anchorTo, yOffset)
 	div:SetHeight(1)
 	div:SetPoint("TOPLEFT", anchorTo, "BOTTOMLEFT", 0, yOffset or -6)
 	div:SetPoint("TOPRIGHT", anchorTo, "BOTTOMRIGHT", 0, yOffset or -6)
-	div:SetColorTexture(1, 0.82, 0, 0.35)
+	div:SetColorTexture(GetAccentColor(1, 0.82, 0, 0.35))
 	return div
 end
 
@@ -1572,14 +1580,15 @@ function GuildFrame:CreateMemberInfoPanel()
 	titleBgEdge:SetHeight(1)
 	titleBgEdge:SetPoint("BOTTOMLEFT", titleBg, "BOTTOMLEFT", 0, -1)
 	titleBgEdge:SetPoint("BOTTOMRIGHT", titleBg, "BOTTOMRIGHT", 0, -1)
-	titleBgEdge:SetColorTexture(1, 0.82, 0, 0.55)
+	titleBgEdge:SetColorTexture(GetAccentColor(1, 0.82, 0, 0.55))
+	panel.titleBgEdge = titleBgEdge
 
 	-- Title text
 	panel.title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	ApplyDefaultSlugToFontString(panel.title)
 	panel.title:SetPoint("LEFT", titleBg, "LEFT", 6, 0)
 	panel.title:SetText((L and L.GUILD_INFO_PANEL_TITLE) or "Member Info")
-	panel.title:SetTextColor(1, 0.82, 0)
+	panel.title:SetTextColor(GetAccentColor(1, 0.82, 0, 1))
 
 	-- Close button
 	panel.closeBtn = CreateFrame("Button", nil, panel, "UIPanelCloseButton")
@@ -1630,7 +1639,7 @@ function GuildFrame:CreateMemberInfoPanel()
 	ApplyDefaultSlugToFontString(panel.ilvlText)
 	panel.ilvlText:SetPoint("TOPLEFT", panel.divider1, "BOTTOMLEFT", 6, -6)
 	panel.ilvlText:SetJustifyH("LEFT")
-	panel.ilvlText:SetTextColor(1, 0.82, 0)
+	panel.ilvlText:SetTextColor(GetAccentColor(1, 0.82, 0, 1))
 
 	-- Rank dropdown label
 	panel.rankLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -1717,6 +1726,30 @@ function GuildFrame:CreateMemberInfoPanel()
 	return panel
 end
 
+function GuildFrame:RefreshMemberInfoPanelAccent()
+	local panel = self._infoPanel
+	if not panel then
+		return
+	end
+
+	local accentR, accentG, accentB = GetAccentColor(1, 0.82, 0, 1)
+	if panel.title then
+		panel.title:SetTextColor(accentR, accentG, accentB)
+	end
+	if panel.ilvlText then
+		panel.ilvlText:SetTextColor(accentR, accentG, accentB)
+	end
+	if panel.titleBgEdge then
+		panel.titleBgEdge:SetColorTexture(accentR, accentG, accentB, 0.55)
+	end
+	if panel.divider1 then
+		panel.divider1:SetColorTexture(accentR, accentG, accentB, 0.35)
+	end
+	if panel.divider2 then
+		panel.divider2:SetColorTexture(accentR, accentG, accentB, 0.35)
+	end
+end
+
 -- Populate/refresh the rank dropdown based on the given member and current
 -- player permissions. Uses SetGuildMemberRank (non-protected).
 function GuildFrame:_RefreshRankDropdown(member)
@@ -1771,6 +1804,7 @@ function GuildFrame:ShowMemberInfoPanel(member)
 
 	if not member then return end
 	local panel = self:CreateMemberInfoPanel()
+	self:RefreshMemberInfoPanelAccent()
 	panel._currentMember = member
 
 	-- Anchor to right side of main frame

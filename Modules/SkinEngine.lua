@@ -30,7 +30,7 @@ local function ApplyDefaultSlugToFontString(fontString)
 	end
 end
 
-local COLORS = {
+local DEFAULT_COLORS = {
 	panel = { 0.000, 0.000, 0.000, 0.68 },
 	popup = { 0.000, 0.000, 0.000, 0.78 },
 	panelSoft = { 0.030, 0.030, 0.034, 0.42 },
@@ -71,8 +71,19 @@ local COLORS = {
 	accentSoft = { 1.0, 0.82, 0.0, 0.22 },
 	accentState = { 1.0, 0.82, 0.0, 0.14 },
 	gold = { 1.0, 0.82, 0.0, 0.9 },
+	text = { 0.92, 0.92, 0.92, 1 },
 	disabledText = { 0.45, 0.45, 0.46, 0.85 },
 }
+
+local function CopyColorTable(source)
+	local result = {}
+	for key, value in pairs(source or {}) do
+		result[key] = { value[1], value[2], value[3], value[4] }
+	end
+	return result
+end
+
+local COLORS = CopyColorTable(DEFAULT_COLORS)
 
 local ICONS = {
 	close = "Interface\\AddOns\\BetterFriendlist\\Icons\\x.blp",
@@ -169,7 +180,20 @@ local NINE_SLICE_KEYS = {
 }
 
 SkinEngine.colors = COLORS
+SkinEngine.defaultColors = DEFAULT_COLORS
 SkinEngine.registry = {}
+
+function SkinEngine:RefreshThemeColors()
+	local ThemePalette = BFL:GetModule("ThemePalette")
+	if ThemePalette and ThemePalette.ApplyToColors then
+		ThemePalette:ApplyToColors(COLORS, DEFAULT_COLORS)
+	else
+		for key, value in pairs(DEFAULT_COLORS) do
+			COLORS[key] = { value[1], value[2], value[3], value[4] }
+		end
+	end
+	self.themeColorVersion = (self.themeColorVersion or 0) + 1
+end
 
 local function IsForbidden(frame)
 	return frame and frame.IsForbidden and frame:IsForbidden()
@@ -579,15 +603,17 @@ local function ApplyBackdropLines(backdrop, variant)
 end
 
 function SkinEngine:IsActive()
-	return self.active == true and self.activeTheme == "dark"
+	return self.active == true and (self.activeTheme == "dark" or self.activeTheme == "custom")
 end
 
-function SkinEngine:Activate()
+function SkinEngine:Activate(theme)
+	self:RefreshThemeColors()
 	self.active = true
-	self.activeTheme = "dark"
+	self.activeTheme = theme == "custom" and "custom" or "dark"
 end
 
 function SkinEngine:Deactivate()
+	self:RefreshThemeColors()
 	if self.active ~= true and not next(self.registry) then
 		self.activeTheme = nil
 		return
@@ -1307,7 +1333,7 @@ function SkinEngine:SkinFrame(frame, variant, opts)
 	end
 
 	if frame.TitleContainer and frame.TitleContainer.TitleText then
-		self:SetFontColor(frame, frame.TitleContainer.TitleText, 1, 0.82, 0, 1)
+		self:SetFontColor(frame, frame.TitleContainer.TitleText, UnpackColor(COLORS.gold))
 	end
 
 	local closeButton = frame.CloseButton
@@ -1363,6 +1389,8 @@ function SkinEngine:ApplyButtonState(button, interactionState)
 		or (button.BFL_DarkButtonVariant == "nav" and "nav")
 		or "button"
 	local stateKey = stateKind
+		.. ":"
+		.. tostring(self.themeColorVersion or 0)
 		.. ":"
 		.. (interactionState or "")
 		.. ":"
@@ -1431,7 +1459,10 @@ function SkinEngine:ApplyButtonState(button, interactionState)
 		if interactionState == "down" then
 			bg = COLORS.controlDown
 			border = COLORS.accent
-		elseif interactionState == "hover" or selectedNav then
+		elseif selectedNav then
+			bg = interactionState == "hover" and COLORS.rowHover or COLORS.accentState
+			border = COLORS.accent
+		elseif interactionState == "hover" then
 			bg = COLORS.controlHover
 			border = COLORS.controlBorderHover
 		else
@@ -1451,8 +1482,8 @@ function SkinEngine:ApplyButtonState(button, interactionState)
 	local fs = button.GetFontString and button:GetFontString()
 	if fs and (not button.BFL_DarkKeepFontColor or not enabled) then
 		if enabled then
-			local color = button.BFL_DarkTabButton and selectedTab and 1 or 0.92
-			self:SetFontColor(button, fs, color, color, color, 1)
+			local color = button.BFL_DarkTabButton and selectedTab and COLORS.gold or COLORS.text
+			self:SetFontColor(button, fs, UnpackColor(color))
 		else
 			self:SetFontColor(button, fs, UnpackColor(COLORS.disabledText))
 		end
@@ -2293,6 +2324,18 @@ function SkinEngine:SkinCheckButton(checkButton)
 		self:SetTextureAlpha(checkButton, checkButton:GetHighlightTexture(), highlightAlpha)
 	end
 
+	local checkedTexture = checkButton.GetCheckedTexture and checkButton:GetCheckedTexture()
+	if checkedTexture then
+		self:SetTextureVertexColor(checkButton, checkedTexture, UnpackColor(COLORS.gold))
+		self:SetTextureAlpha(checkButton, checkedTexture, 1)
+	end
+
+	local disabledCheckedTexture = checkButton.GetDisabledCheckedTexture and checkButton:GetDisabledCheckedTexture()
+	if disabledCheckedTexture then
+		self:SetTextureVertexColor(checkButton, disabledCheckedTexture, UnpackColor(COLORS.disabledText))
+		self:SetTextureAlpha(checkButton, disabledCheckedTexture, 0.85)
+	end
+
 	local text = checkButton.Text or _G[GetName(checkButton) .. "Text"]
 	if text then
 		self:SetFontColor(checkButton, text, 0.88, 0.88, 0.88, 1)
@@ -2487,24 +2530,26 @@ function SkinEngine:RenderCustomDropdown(dropdown)
 		end
 		local selected = data.isSelected and data.isSelected(value)
 		button.Check:SetText(selected and (data.useCheckboxes and "x" or "o") or "")
-		button.Check:SetTextColor(1, 0.82, 0, 1)
+		button.Check:SetTextColor(UnpackColor(COLORS.gold))
 		if button.SetBackdrop then
 			button:SetBackdrop(BACKDROP)
-			button:SetBackdropColor(UnpackColor(selected and COLORS.controlHover or COLORS.panelSoft))
-			button:SetBackdropBorderColor(0, 0, 0, 0)
+			button:SetBackdropColor(UnpackColor(selected and COLORS.accentState or COLORS.panelSoft))
+			button:SetBackdropBorderColor(UnpackColor(selected and COLORS.accentSoft or COLORS.borderNone))
 		end
 		button:SetScript("OnEnter", function(self)
+			local ownerData = self.ownerDropdown and self.ownerDropdown.BFL_DarkDropdownData
+			local isSelected = ownerData and ownerData.isSelected and ownerData.isSelected(self.itemValue)
 			if self.SetBackdrop then
-				self:SetBackdropColor(UnpackColor(COLORS.controlHover))
-				self:SetBackdropBorderColor(UnpackColor(COLORS.controlBorderHover))
+				self:SetBackdropColor(UnpackColor(isSelected and COLORS.rowHover or COLORS.controlHover))
+				self:SetBackdropBorderColor(UnpackColor(isSelected and COLORS.accent or COLORS.controlBorderHover))
 			end
 		end)
 		button:SetScript("OnLeave", function(self)
 			local ownerData = self.ownerDropdown and self.ownerDropdown.BFL_DarkDropdownData
 			local isSelected = ownerData and ownerData.isSelected and ownerData.isSelected(self.itemValue)
 			if self.SetBackdrop then
-				self:SetBackdropColor(UnpackColor(isSelected and COLORS.controlHover or COLORS.panelSoft))
-				self:SetBackdropBorderColor(0, 0, 0, 0)
+				self:SetBackdropColor(UnpackColor(isSelected and COLORS.accentState or COLORS.panelSoft))
+				self:SetBackdropBorderColor(UnpackColor(isSelected and COLORS.accentSoft or COLORS.borderNone))
 			end
 		end)
 		button:SetScript("OnClick", function(self)
@@ -3065,7 +3110,7 @@ function SkinEngine:SkinSlider(slider)
 			slider.MaxText,
 		}) do
 			if label then
-				self:SetFontColor(slider, label, 1, 0.82, 0, 1)
+				self:SetFontColor(slider, label, UnpackColor(COLORS.gold))
 			end
 		end
 		return
@@ -3235,7 +3280,9 @@ function SkinEngine:ApplyRowState(row, interactionState)
 		noRowHighlight = IsGroupHeaderRow(row) == true
 		row.BFL_DarkNoRowHighlight = noRowHighlight
 	end
-	local stateKey = (noRowHighlight and "noHighlight" or (interactionState or "normal"))
+	local stateKey = tostring(self.themeColorVersion or 0)
+		.. ":"
+		.. (noRowHighlight and "noHighlight" or (interactionState or "normal"))
 		.. ":"
 		.. (row.BFL_DarkRowMouseDown and "down" or "")
 	if row.BFL_DarkRowStateKey == stateKey then
@@ -3373,10 +3420,10 @@ function SkinEngine:SkinControl(control)
 		self:SetFontColor(control, control.Label, 0.88, 0.88, 0.88, 1)
 	end
 	if control.ValueLabel then
-		self:SetFontColor(control, control.ValueLabel, 1, 0.82, 0, 1)
+		self:SetFontColor(control, control.ValueLabel, UnpackColor(COLORS.gold))
 	end
 	if control.text then
-		self:SetFontColor(control, control.text, 1, 0.82, 0, 1)
+		self:SetFontColor(control, control.text, UnpackColor(COLORS.gold))
 	end
 
 	self:SkinTree(control, 2)

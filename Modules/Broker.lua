@@ -60,6 +60,13 @@ local GetFactionIcon = BFL.BrokerUtils.GetFactionIcon
 local C = BFL.BrokerUtils.C
 local AddTooltipSeparator = BFL.BrokerUtils.AddTooltipSeparator
 
+local function GetAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
+	if BFL.GetThemeAccentColor then
+		return BFL:GetThemeAccentColor(fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1)
+	end
+	return fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1
+end
+
 -- Get class color for friend (returns color table or white fallback)
 local function GetClassColorForFriend(friend)
 	return BFL.ClassUtils:GetClassColorForFriend(friend)
@@ -789,7 +796,7 @@ end
 
 -- Basic Tooltip
 local function CreateBasicTooltip(gameTooltip)
-	gameTooltip:AddLine(L("BROKER_TITLE"), 1, 0.82, 0, 1)
+	gameTooltip:AddLine(L("BROKER_TITLE"), GetAccentColor(1, 0.82, 0, 1))
 	gameTooltip:AddLine(" ")
 
 	local wowOnline, wowTotal, bnetOnline, bnetTotal = GetFilteredFriendCounts()
@@ -836,7 +843,7 @@ end
 
 -- Advanced Tooltip with Groups and Activity
 local function CreateAdvancedTooltip(gameTooltip)
-	gameTooltip:AddLine(L("BROKER_TITLE"), 1, 0.82, 0, 1)
+	gameTooltip:AddLine(L("BROKER_TITLE"), GetAccentColor(1, 0.82, 0, 1))
 	gameTooltip:AddLine(" ")
 
 	local Groups = GetGroups()
@@ -987,7 +994,7 @@ local function CreateAdvancedTooltip(gameTooltip)
 		if groupFriends and #groupFriends > 0 then
 			local groupInfo = groupsData[groupId]
 			if groupInfo then
-				gameTooltip:AddLine(groupInfo.name, 1, 0.82, 0, 1)
+				gameTooltip:AddLine(groupInfo.name, GetAccentColor(1, 0.82, 0, 1))
 
 				for i, friend in ipairs(groupFriends) do
 					if i > 5 then
@@ -2455,7 +2462,7 @@ function CreateDetailTooltip(cell, data)
 		end
 	end
 
-	tt2:SetText(displayName, 1, 0.82, 0)
+	tt2:SetText(displayName, GetAccentColor(1, 0.82, 0, 1))
 
 	-- Status info
 	if data.isAFK or data.isDND then

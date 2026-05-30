@@ -336,7 +336,11 @@ function BFL:ApplyTabVisualState(tab, selected, disabled)
 			PanelTemplates_DeselectTab(tab)
 		end
 		ApplyTabFontObjects(tab)
-		ApplyTabFontStringState(tab, TAB_FONT_NORMAL, NORMAL_FONT_COLOR, 1, 0.82, 0)
+		local r, g, b = 1, 0.82, 0
+		if BFL.GetThemeAccentColor then
+			r, g, b = BFL:GetThemeAccentColor(r, g, b, 1)
+		end
+		ApplyTabFontStringState(tab, TAB_FONT_NORMAL, NORMAL_FONT_COLOR, r, g, b)
 	end
 end
 

@@ -7,6 +7,13 @@ local Changelog = BFL:RegisterModule("Changelog", {})
 
 local changelogFrame = nil
 
+local function GetAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
+	if BFL.GetThemeAccentColor then
+		return BFL:GetThemeAccentColor(fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1)
+	end
+	return fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1
+end
+
 -- Changelog content
 local CHANGELOG_TEXT = [[# Changelog
 
@@ -20,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [DRAFT]
 
 ### Added
+- **Custom Theme & Theme Settings** - Added a Custom theme that inherits from Dark and adds controls for colors, transparency, hover states, selection states, borders, scrollbars, icons, and Blizzard artwork visibility.
 - **Raid Tab** - Added an optional compact Ready Check button next to Raid Info.
 
 ### Improved
@@ -29,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Friend Tooltips** - Restored the "Also in group" details and Blizzard-matching restrictions on Battle.net request-to-join buttons.
 
 ### Changed
+- **Theme Settings** - Expanded Dark theme settings and made the beta Theme tab available across supported Retail and Classic clients.
 - **Client Compatibility** - Prepared friend invites and raid controls for upcoming Retail client changes while preserving current Retail and Classic support.
 - **Raid Tools** - Improved handling for temporarily uncached raid roster names.
 - **Font Rendering** - Made custom font handling more defensive on newer clients.
@@ -56,7 +65,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Quick Join** - Reduced repeated group-priority and friend-relationship lookups while sorting available groups.
 
 ### Outlook
-- **Custom Theme & Theme Settings** - A future Custom theme will inherit from the Dark theme and add full controls for colors, transparency, and related visual details. Dark theme settings will also expand in upcoming releases.
 - **Guild Tab** - A Retail and Classic Guild tab is planned for upcoming releases, with a BetterFriendlist-owned roster view for searching guild members, filtering online/offline members, sorting by rank, name, level, class, zone, status, and last online time, and showing guild counts, notes, status, and class information through the shared safe roster provider.
 
 ## [2.5.9]        - 2026-05-17
@@ -461,6 +469,7 @@ end
 function Changelog:ShowGlow(show)
 	if BetterFriendsFrame and BetterFriendsFrame.PortraitButton then
 		local button = BetterFriendsFrame.PortraitButton
+		local accentR, accentG, accentB, accentA = GetAccentColor(1, 0.82, 0, 1)
 
 		-- Create NewLabel texture if it doesn't exist
 		if not button.NewLabel then
@@ -477,9 +486,11 @@ function Changelog:ShowGlow(show)
 				button.NewLabel:SetAtlas("CharacterCreate-NewLabel")
 				button.NewLabel:SetSize(64, 48)
 			end
-			-- Desaturate to remove the native color, then color it gold
+			-- Desaturate to remove the native color, then color it with the active accent.
 			button.NewLabel:SetDesaturated(true)
-			button.NewLabel:SetVertexColor(1, 0.82, 0, 1)
+		end
+		if button.NewLabel then
+			button.NewLabel:SetVertexColor(accentR, accentG, accentB, accentA)
 		end
 
 		if show then
@@ -508,6 +519,7 @@ function Changelog:ToggleChangelog()
 	if changelogFrame:IsShown() then
 		changelogFrame:Hide()
 	else
+		self:RefreshAccentColors()
 		changelogFrame:Show()
 		-- Update version in DB
 		local DB = BFL:GetModule("DB")
@@ -518,7 +530,7 @@ end
 
 function Changelog:OnPortraitEnter(button)
 	BFL_Tooltip:SetOwner(button, "ANCHOR_RIGHT")
-	BFL_Tooltip:SetText("BetterFriendlist " .. (BFL.VERSION or ""), 1, 0.82, 0)
+	BFL_Tooltip:SetText("BetterFriendlist " .. (BFL.VERSION or ""), GetAccentColor(1, 0.82, 0, 1))
 
 	local DB = BFL:GetModule("DB")
 	local lastVersion = DB:Get("lastChangelogVersion", "0.0.0")
@@ -537,9 +549,35 @@ function Changelog:Show()
 	self:ToggleChangelog()
 end
 
+function Changelog:RefreshAccentColors()
+	if not changelogFrame then
+		return
+	end
+
+	local accentR, accentG, accentB = GetAccentColor(1, 0.82, 0, 1)
+	if changelogFrame.BFL_AccentTextures then
+		for _, texture in ipairs(changelogFrame.BFL_AccentTextures) do
+			if texture and texture.SetColorTexture then
+				texture:SetColorTexture(accentR, accentG, accentB, 1)
+			elseif texture and texture.SetVertexColor then
+				texture:SetVertexColor(accentR, accentG, accentB, 1)
+			end
+		end
+	end
+	if changelogFrame.BFL_AccentFontStrings then
+		for _, fontString in ipairs(changelogFrame.BFL_AccentFontStrings) do
+			if fontString and fontString.SetTextColor then
+				fontString:SetTextColor(accentR, accentG, accentB)
+			end
+		end
+	end
+end
+
 function Changelog:CreateChangelogWindow()
 	-- Use ButtonFrameTemplate to match Settings window
 	local frame = CreateFrame("Frame", "BetterFriendlistChangelogFrame", UIParent, "ButtonFrameTemplate")
+	frame.BFL_AccentTextures = {}
+	frame.BFL_AccentFontStrings = {}
 	frame:SetSize(600, 500)
 	frame:SetPoint("CENTER")
 	frame:SetFrameStrata("DIALOG")
@@ -619,7 +657,8 @@ function Changelog:CreateChangelogWindow()
 	local dcIcon = discordBtn:CreateTexture(nil, "ARTWORK")
 	dcIcon:SetSize(14, 14)
 	dcIcon:SetPoint("LEFT", 10, 0)
-	dcIcon:SetColorTexture(1, 0.82, 0) -- Gold
+	dcIcon:SetColorTexture(GetAccentColor(1, 0.82, 0, 1))
+	table.insert(frame.BFL_AccentTextures, dcIcon)
 
 	local dcMask = discordBtn:CreateMaskTexture()
 	dcMask:SetSize(14, 14)
@@ -641,7 +680,8 @@ function Changelog:CreateChangelogWindow()
 	local ghIcon = githubBtn:CreateTexture(nil, "ARTWORK")
 	ghIcon:SetSize(14, 14)
 	ghIcon:SetPoint("LEFT", 10, 0)
-	ghIcon:SetColorTexture(1, 0.82, 0) -- Gold
+	ghIcon:SetColorTexture(GetAccentColor(1, 0.82, 0, 1))
+	table.insert(frame.BFL_AccentTextures, ghIcon)
 
 	local ghMask = githubBtn:CreateMaskTexture()
 	ghMask:SetSize(14, 14)
@@ -663,7 +703,8 @@ function Changelog:CreateChangelogWindow()
 	local kofiIcon = kofiBtn:CreateTexture(nil, "ARTWORK")
 	kofiIcon:SetSize(14, 14)
 	kofiIcon:SetPoint("LEFT", 10, 0)
-	kofiIcon:SetColorTexture(1, 0.82, 0) -- Gold
+	kofiIcon:SetColorTexture(GetAccentColor(1, 0.82, 0, 1))
+	table.insert(frame.BFL_AccentTextures, kofiIcon)
 
 	local kofiMask = kofiBtn:CreateMaskTexture()
 	kofiMask:SetSize(14, 14)
@@ -768,7 +809,8 @@ function Changelog:CreateChangelogWindow()
 				fs:SetWidth(510)
 				fs:SetJustifyH("LEFT")
 				fs:SetText(block.content)
-				fs:SetTextColor(1, 0.82, 0) -- Gold
+				fs:SetTextColor(GetAccentColor(1, 0.82, 0, 1))
+				table.insert(frame.BFL_AccentFontStrings, fs)
 				currentY = currentY - fs:GetStringHeight() - 5
 			elseif block.type == "h4" then
 				local fs = entryContent:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
@@ -841,5 +883,6 @@ function Changelog:CreateChangelogWindow()
 	RecalculateHeight(content, entryFrames)
 
 	changelogFrame = frame
+	self:RefreshAccentColors()
 	frame:Hide()
 end

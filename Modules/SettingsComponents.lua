@@ -7,6 +7,13 @@ BFL.SettingsComponents = {}
 local Components = BFL.SettingsComponents
 local L = BFL.L or BFL_L
 
+local function GetAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
+	if BFL.GetThemeAccentColor then
+		return BFL:GetThemeAccentColor(fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1)
+	end
+	return fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1
+end
+
 -- ========================================
 -- Constants
 -- ========================================
@@ -723,7 +730,8 @@ end
 -- ========================================
 -- COLOR PICKER (Label Left, Button Right - Grid Aligned)
 -- ========================================
-function Components:CreateColorPicker(parent, labelText, initialColor, callback)
+function Components:CreateColorPicker(parent, labelText, initialColor, callback, opts)
+	opts = opts or {}
 	local holder = CreateFrame("Frame", nil, parent)
 	holder:SetHeight(COMPONENT_HEIGHT)
 	holder:SetPoint("LEFT", PADDING_LEFT, 0)
@@ -737,6 +745,7 @@ function Components:CreateColorPicker(parent, labelText, initialColor, callback)
 	-- Color Button anchored RIGHT
 	local colorButton = CreateFrame("Button", nil, holder)
 	colorButton:SetSize(COLOR_SWATCH_BUTTON_SIZE, COLOR_SWATCH_BUTTON_SIZE)
+	colorButton:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 
 	-- Dynamic Resizing Handler
 	holder:SetScript("OnSizeChanged", function(self, width, height)
@@ -770,8 +779,11 @@ function Components:CreateColorPicker(parent, labelText, initialColor, callback)
 	-- Tooltip
 	colorButton:SetScript("OnEnter", function(self)
 		BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
-		BFL_Tooltip:SetText(L.SETTINGS_FONT_COLOR or "Font Color", 1, 0.82, 0)
-		BFL_Tooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 1, 1, 1, true)
+		BFL_Tooltip:SetText(opts.tooltipTitle or L.SETTINGS_FONT_COLOR or "Font Color", GetAccentColor(1, 0.82, 0, 1))
+		BFL_Tooltip:AddLine(opts.tooltipDesc or L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 1, 1, 1, true)
+		if opts.resetCallback then
+			BFL_Tooltip:AddLine(opts.resetTooltip or "Right-click to reset", 0.75, 0.75, 0.75, true)
+		end
 		BFL_Tooltip:Show()
 	end)
 	colorButton:SetScript("OnLeave", function()
@@ -798,60 +810,27 @@ function Components:CreateColorPicker(parent, labelText, initialColor, callback)
 		initialColor and initialColor.a or 1
 	)
 
-	colorButton:SetScript("OnClick", function()
+	colorButton:SetScript("OnClick", function(_, buttonName)
+		if buttonName == "RightButton" and opts.resetCallback then
+			opts.resetCallback(holder)
+			return
+		end
+
 		local r, g, b, a =
 			holder.currentColor.r, holder.currentColor.g, holder.currentColor.b, holder.currentColor.a or 1
 
-		local info = {
-			r = r,
-			g = g,
-			b = b,
-			opacity = a,
-			hasOpacity = true,
-			swatchFunc = function()
-				local nr, ng, nb = ColorPickerFrame:GetColorRGB()
-				local na = 1
-				if ColorPickerFrame.GetColorAlpha then
-					na = ColorPickerFrame:GetColorAlpha()
-				elseif ColorPickerFrame.GetOpacity then
-					na = ColorPickerFrame:GetOpacity()
-				end
+		if BFL.ShowColorPicker then
+			BFL.ShowColorPicker(r, g, b, a, function(nr, ng, nb, na)
 				holder:SetColor(nr, ng, nb, na)
 				if callback then
 					callback(nr, ng, nb, na)
 				end
-			end,
-			opacityFunc = function()
-				local nr, ng, nb = ColorPickerFrame:GetColorRGB()
-				local na = 1
-				if ColorPickerFrame.GetColorAlpha then
-					na = ColorPickerFrame:GetColorAlpha()
-				elseif ColorPickerFrame.GetOpacity then
-					na = ColorPickerFrame:GetOpacity()
-				end
-				holder:SetColor(nr, ng, nb, na)
+			end, function(pr, pg, pb, pa)
+				holder:SetColor(pr, pg, pb, pa)
 				if callback then
-					callback(nr, ng, nb, na)
+					callback(pr, pg, pb, pa)
 				end
-			end,
-			cancelFunc = function(prev)
-				holder:SetColor(prev.r, prev.g, prev.b, prev.opacity)
-				if callback then
-					callback(prev.r, prev.g, prev.b, prev.opacity)
-				end
-			end,
-		}
-
-		if ColorPickerFrame.SetupColorPickerAndShow then
-			ColorPickerFrame:SetupColorPickerAndShow(info)
-		else
-			ColorPickerFrame.func = info.swatchFunc
-			ColorPickerFrame.opacityFunc = info.opacityFunc
-			ColorPickerFrame.cancelFunc = info.cancelFunc
-			ColorPickerFrame.hasOpacity = info.hasOpacity
-			ColorPickerFrame.opacity = info.opacity
-			ColorPickerFrame:SetColorRGB(info.r, info.g, info.b)
-			ColorPickerFrame:Show()
+			end)
 		end
 	end)
 
@@ -903,7 +882,7 @@ function Components:CreateSliderWithColorPicker(
 	-- Tooltip
 	colorButton:SetScript("OnEnter", function(self)
 		BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
-		BFL_Tooltip:SetText(L.SETTINGS_FONT_COLOR or "Font Color", 1, 0.82, 0)
+		BFL_Tooltip:SetText(L.SETTINGS_FONT_COLOR or "Font Color", GetAccentColor(1, 0.82, 0, 1))
 		BFL_Tooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 1, 1, 1, true)
 		BFL_Tooltip:Show()
 	end)
@@ -924,63 +903,20 @@ function Components:CreateSliderWithColorPicker(
 		local r, g, b, a =
 			holder.currentColor.r, holder.currentColor.g, holder.currentColor.b, holder.currentColor.a or 1
 
-		local info = {
-			r = r,
-			g = g,
-			b = b,
-			opacity = a,
-			hasOpacity = true,
-			swatchFunc = function()
-				local nr, ng, nb = ColorPickerFrame:GetColorRGB()
-				-- Retail 11.x uses GetColorAlpha, not GetOpacity for ColorPickerFrame when using new API mixin
-				local na = 1
-				if ColorPickerFrame.GetColorAlpha then
-					na = ColorPickerFrame:GetColorAlpha()
-				elseif ColorPickerFrame.GetOpacity then
-					na = ColorPickerFrame:GetOpacity()
-				end
-
+		if BFL.ShowColorPicker then
+			BFL.ShowColorPicker(r, g, b, a, function(nr, ng, nb, na)
 				holder.currentColor = { r = nr, g = ng, b = nb, a = na }
 				colorSwatch:SetColorTexture(nr, ng, nb, na)
 				if colorCallback then
 					colorCallback(nr, ng, nb, na)
 				end
-			end,
-			opacityFunc = function()
-				local nr, ng, nb = ColorPickerFrame:GetColorRGB()
-				-- Retail 11.x uses GetColorAlpha, not GetOpacity for ColorPickerFrame when using new API mixin
-				local na = 1
-				if ColorPickerFrame.GetColorAlpha then
-					na = ColorPickerFrame:GetColorAlpha()
-				elseif ColorPickerFrame.GetOpacity then
-					na = ColorPickerFrame:GetOpacity()
-				end
-
-				holder.currentColor = { r = nr, g = ng, b = nb, a = na }
-				colorSwatch:SetColorTexture(nr, ng, nb, na)
+			end, function(pr, pg, pb, pa)
+				holder.currentColor = { r = pr, g = pg, b = pb, a = pa }
+				colorSwatch:SetColorTexture(pr, pg, pb, pa)
 				if colorCallback then
-					colorCallback(nr, ng, nb, na)
+					colorCallback(pr, pg, pb, pa)
 				end
-			end,
-			cancelFunc = function(prev)
-				holder.currentColor = { r = prev.r, g = prev.g, b = prev.b, a = prev.opacity }
-				colorSwatch:SetColorTexture(prev.r, prev.g, prev.b, prev.opacity)
-				if colorCallback then
-					colorCallback(prev.r, prev.g, prev.b, prev.opacity)
-				end
-			end,
-		}
-
-		if ColorPickerFrame.SetupColorPickerAndShow then
-			ColorPickerFrame:SetupColorPickerAndShow(info)
-		else
-			ColorPickerFrame.func = info.swatchFunc
-			ColorPickerFrame.opacityFunc = info.opacityFunc
-			ColorPickerFrame.cancelFunc = info.cancelFunc
-			ColorPickerFrame.hasOpacity = info.hasOpacity
-			ColorPickerFrame.opacity = info.opacity
-			ColorPickerFrame:SetColorRGB(info.r, info.g, info.b)
-			ColorPickerFrame:Show()
+			end)
 		end
 	end)
 
@@ -1231,6 +1167,7 @@ function Components:CreateListItem(
 		holder:SetScript("OnDragStart", function(self)
 			-- Init Ghost
 			local ghost = BFL:GetDragGhost()
+			local accentR, accentG, accentB = GetAccentColor(1, 0.82, 0)
 			ghost.text:SetText(itemText)
 
 			-- Calculate width based on text length + padding
@@ -1238,7 +1175,7 @@ function Components:CreateListItem(
 			ghost:SetSize(width, self:GetHeight())
 
 			-- Reset Text Color to Gold (Precludes residue from other drags like RaidFrames)
-			ghost.text:SetTextColor(1, 0.82, 0)
+			ghost.text:SetTextColor(accentR, accentG, accentB)
 
 			-- Apply Color to Stripe
 			if initialColors and initialColors.fallback then
@@ -1248,7 +1185,7 @@ function Components:CreateListItem(
 					initialColors.fallback.b
 				)
 			else
-				ghost.stripe:SetColorTexture(1, 0.82, 0) -- Default Gold
+				ghost.stripe:SetColorTexture(accentR, accentG, accentB) -- Default Gold
 			end
 
 			ghost:Show()
@@ -1311,7 +1248,7 @@ function Components:CreateListItem(
 	holder.nameText:SetPoint("LEFT", holder.orderText, "RIGHT", 10, 0)
 	holder.nameText:SetJustifyH("LEFT")
 	holder.nameText:SetText(itemText)
-	holder.nameText:SetTextColor(1, 0.82, 0)
+	holder.nameText:SetTextColor(GetAccentColor(1, 0.82, 0, 1))
 
 	local rightOffset = -10
 
@@ -1342,7 +1279,7 @@ function Components:CreateListItem(
 		deleteIcon:SetSize(18, 18)
 		deleteIcon:SetPoint("CENTER")
 		deleteIcon:SetTexture(texturePath)
-		deleteIcon:SetVertexColor(1, 0.82, 0)
+		deleteIcon:SetVertexColor(GetAccentColor(1, 0.82, 0, 1))
 		holder.deleteButton.icon = deleteIcon
 
 		holder.deleteButton:SetScript("OnClick", function()
@@ -1358,7 +1295,7 @@ function Components:CreateListItem(
 			BFL_Tooltip:Show()
 		end)
 		holder.deleteButton:SetScript("OnLeave", function(self)
-			self.icon:SetVertexColor(1, 0.82, 0)
+			self.icon:SetVertexColor(GetAccentColor(1, 0.82, 0, 1))
 			BFL_Tooltip:Hide()
 		end)
 	end
@@ -1394,7 +1331,7 @@ function Components:CreateListItem(
 		renameIcon:SetSize(18, 18)
 		renameIcon:SetPoint("CENTER")
 		renameIcon:SetTexture(texturePath)
-		renameIcon:SetVertexColor(1, 0.82, 0)
+		renameIcon:SetVertexColor(GetAccentColor(1, 0.82, 0, 1))
 		holder.renameButton.icon = renameIcon
 
 		holder.renameButton:SetScript("OnClick", function()
@@ -1410,7 +1347,7 @@ function Components:CreateListItem(
 			BFL_Tooltip:Show()
 		end)
 		holder.renameButton:SetScript("OnLeave", function(self)
-			self.icon:SetVertexColor(1, 0.82, 0)
+			self.icon:SetVertexColor(GetAccentColor(1, 0.82, 0, 1))
 			BFL_Tooltip:Hide()
 		end)
 	end
@@ -1466,7 +1403,7 @@ function Components:CreateListItem(
 		end)
 		holder.arrowColorButton:SetScript("OnEnter", function(self)
 			BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
-			BFL_Tooltip:SetText(L.SETTINGS_GROUP_ARROW_COLOR or "Arrow Color", 1, 0.82, 0)
+			BFL_Tooltip:SetText(L.SETTINGS_GROUP_ARROW_COLOR or "Arrow Color", GetAccentColor(1, 0.82, 0, 1))
 			BFL_Tooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 1, 1, 1, true)
 			BFL_Tooltip:AddLine(L.TOOLTIP_RIGHT_CLICK_INHERIT or "Right-click to inherit from Group", 0.6, 0.6, 0.6)
 			BFL_Tooltip:Show()
@@ -1560,7 +1497,7 @@ function Components:CreateListItem(
 		end)
 		holder.countColorButton:SetScript("OnEnter", function(self)
 			BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
-			BFL_Tooltip:SetText(L.SETTINGS_GROUP_COUNT_COLOR or "Count Color", 1, 0.82, 0)
+			BFL_Tooltip:SetText(L.SETTINGS_GROUP_COUNT_COLOR or "Count Color", GetAccentColor(1, 0.82, 0, 1))
 			BFL_Tooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 1, 1, 1, true)
 			BFL_Tooltip:AddLine(L.TOOLTIP_RIGHT_CLICK_INHERIT or "Right-click to inherit from Group", 0.6, 0.6, 0.6)
 			BFL_Tooltip:Show()
@@ -1604,7 +1541,7 @@ function Components:CreateListItem(
 	end)
 	holder.colorButton:SetScript("OnEnter", function(self)
 		BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
-		BFL_Tooltip:SetText(L.SETTINGS_GROUP_COLOR or "Group Color", 1, 0.82, 0)
+		BFL_Tooltip:SetText(L.SETTINGS_GROUP_COLOR or "Group Color", GetAccentColor(1, 0.82, 0, 1))
 		BFL_Tooltip:AddLine(L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 1, 1, 1, true)
 		BFL_Tooltip:Show()
 	end)
