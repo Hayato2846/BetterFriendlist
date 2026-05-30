@@ -37,7 +37,7 @@ BFL.HasModernMenu = BFL.IsRetail -- MenuUtil, Menu.ModifyMenu (Retail 11.0+)
 BFL.HasRecentAllies = BFL.IsTWW or BFL.IsMidnight -- C_RecentAllies (TWW 11.0.7+)
 BFL.HasEditMode = BFL.IsRetail -- Edit Mode API (Retail 10.0+)
 BFL.HasModernDropdown = BFL.IsRetail -- WowStyle1DropdownTemplate (Retail 10.0+)
-BFL.HasModernColorPicker = BFL.IsRetail -- ColorPickerFrame:SetupColorPickerAndShow (Retail 10.1+)
+BFL.HasModernColorPicker = true -- ColorPickerFrame:SetupColorPickerAndShow on supported Retail and Classic clients
 
 -- Feature Detection (detect available APIs for optional features)
 BFL.UseClassID = false -- 11.2.7+ classID optimization
@@ -102,6 +102,58 @@ function BFL:DebugPrint(...)
 	if self.debugPrintEnabled then
 		print(...)
 	end
+end
+
+local function ClampColorComponent(value, fallback)
+	value = tonumber(value)
+	if value == nil then
+		return fallback
+	end
+	if value < 0 then
+		return 0
+	end
+	if value > 1 then
+		return 1
+	end
+	return value
+end
+
+local function ColorComponentToHex(value)
+	value = ClampColorComponent(value, 1)
+	return math.floor((value * 255) + 0.5)
+end
+
+function BFL:GetThemeAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
+	fallbackR = fallbackR ~= nil and fallbackR or 1
+	fallbackG = fallbackG ~= nil and fallbackG or 0.82
+	fallbackB = fallbackB ~= nil and fallbackB or 0
+	fallbackA = fallbackA ~= nil and fallbackA or 1
+
+	if self.UsesDarkSkinTheme and self:UsesDarkSkinTheme() then
+		local SkinEngine = self.GetModule and self:GetModule("SkinEngine")
+		local color = SkinEngine and SkinEngine.colors and (SkinEngine.colors.gold or SkinEngine.colors.accent)
+		if color then
+			return ClampColorComponent(color[1], fallbackR),
+				ClampColorComponent(color[2], fallbackG),
+				ClampColorComponent(color[3], fallbackB),
+				ClampColorComponent(fallbackA, color[4] or 1)
+		end
+	end
+
+	return fallbackR, fallbackG, fallbackB, fallbackA
+end
+
+function BFL:GetThemeAccentHex(fallbackHex)
+	if self.UsesDarkSkinTheme and self:UsesDarkSkinTheme() then
+		local r, g, b = self:GetThemeAccentColor()
+		return string.format("%02x%02x%02x", ColorComponentToHex(r), ColorComponentToHex(g), ColorComponentToHex(b))
+	end
+
+	return fallbackHex or "ffcc00"
+end
+
+function BFL:GetThemeAccentColorCode(fallbackHex)
+	return "|cff" .. self:GetThemeAccentHex(fallbackHex)
 end
 
 -- Toggle debug print mode (slash command)

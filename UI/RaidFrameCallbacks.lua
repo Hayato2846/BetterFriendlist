@@ -800,6 +800,10 @@ function BetterRaidMemberButton_OnDragStart(self)
 		local isMultiDrag = raidIndex and IsPlayerSelected(raidIndex) and #BetterRaidFrame_SelectedPlayers > 1
 
 		if isMultiDrag then
+			local accentR, accentG, accentB = 1, 0.82, 0
+			if BFL.GetThemeAccentColor then
+				accentR, accentG, accentB = BFL:GetThemeAccentColor(accentR, accentG, accentB, 1)
+			end
 			-- Multi-selection mode: Show list of names
 			local names = {}
 			for _, data in ipairs(BetterRaidFrame_SelectedPlayers) do
@@ -814,10 +818,10 @@ function BetterRaidMemberButton_OnDragStart(self)
 			end
 
 			ghost.text:SetText(table.concat(names, "\n"))
-			ghost.text:SetTextColor(1, 0.82, 0) -- Reset base color to Gold
+			ghost.text:SetTextColor(accentR, accentG, accentB) -- Reset base color to Gold
 
 			if ghost.stripe then
-				ghost.stripe:SetColorTexture(1, 0.82, 0, 1.0) -- Gold for group drag
+				ghost.stripe:SetColorTexture(accentR, accentG, accentB, 1.0) -- Gold for group drag
 			end
 
 			-- Dynamic size

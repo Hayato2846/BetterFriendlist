@@ -1728,6 +1728,7 @@ local function RegisterBuiltInTests()
 			V:AssertNotNil(BFL.GetEffectiveTheme, "BFL:GetEffectiveTheme should exist")
 			V:AssertNotNil(BFL.IsThemeActive, "BFL:IsThemeActive should exist")
 			V:AssertNotNil(BFL.UsesFlatTheme, "BFL:UsesFlatTheme should exist")
+			V:AssertNotNil(BFL.UsesDarkSkinTheme, "BFL:UsesDarkSkinTheme should exist")
 			V:AssertNotNil(BFL.AreThemeFeaturesEnabled, "BFL:AreThemeFeaturesEnabled should exist")
 			V:AssertNotNil(BFL.ShouldUseLegacyElvUISkinSetting, "BFL:ShouldUseLegacyElvUISkinSetting should exist")
 			V:AssertNotNil(BFL.ShouldShowLegacyElvUISkinSetting, "BFL:ShouldShowLegacyElvUISkinSetting should exist")
@@ -1739,6 +1740,17 @@ local function RegisterBuiltInTests()
 				V:AssertEqual(BFL:GetEffectiveTheme(), "dark", "Dark theme should resolve as dark")
 				V:Assert(BFL:IsThemeActive("dark"), "Dark theme should be active")
 				V:Assert(BFL:UsesFlatTheme(), "Dark theme should count as a flat theme")
+				V:Assert(BFL:UsesDarkSkinTheme(), "Dark theme should use the BFL skin engine")
+			end)
+
+			WithTemporaryDatabase({
+				theme = "custom",
+				enableBetaFeatures = true,
+			}, function()
+				V:AssertEqual(BFL:GetEffectiveTheme(), "custom", "Custom theme should resolve as custom")
+				V:Assert(BFL:IsThemeActive("custom"), "Custom theme should be active")
+				V:Assert(BFL:UsesFlatTheme(), "Custom theme should count as a flat theme")
+				V:Assert(BFL:UsesDarkSkinTheme(), "Custom theme should use the BFL skin engine")
 			end)
 
 			WithTemporaryDatabase({
@@ -1781,12 +1793,17 @@ local function RegisterBuiltInTests()
 				V:AssertEqual(BFL:GetEffectiveTheme(), "blizzard", "Dark theme should not become effective")
 				V:Assert(not BFL:IsThemeActive("dark"), "Dark theme should not be active when Beta is disabled")
 				V:Assert(not BFL:UsesFlatTheme(), "Beta-disabled themes should not count as flat themes")
+
+				tempDB.theme = "custom"
+				V:AssertEqual(BFL:GetEffectiveTheme(), "blizzard", "Custom theme should not become effective")
+				V:Assert(not BFL:IsThemeActive("custom"), "Custom theme should not be active when Beta is disabled")
+				V:Assert(not BFL:UsesDarkSkinTheme(), "Custom theme should not use the skin engine when Beta is disabled")
 			end)
 		end,
 	})
 
-	TS:RegisterTest("data", "Theme_NonRetailDisablesBetaThemes", {
-		description = "Non-Retail clients should not activate Retail beta themes",
+	TS:RegisterTest("data", "Theme_NonRetailAllowsBetaThemes", {
+		description = "Non-Retail clients should activate cross-flavor beta themes",
 		action = function(V)
 			local originalIsRetail = BFL.IsRetail
 			BFL.IsRetail = false
@@ -1796,9 +1813,9 @@ local function RegisterBuiltInTests()
 					theme = "dark",
 					enableBetaFeatures = true,
 				}, function(tempDB)
-					V:AssertEqual(tempDB.theme, "blizzard", "Stored Dark theme should normalize on non-Retail")
-					V:Assert(not BFL:AreThemeFeaturesEnabled(), "Theme features should be Retail-only")
-					V:AssertEqual(BFL:GetEffectiveTheme(), "blizzard", "Dark theme should not become effective")
+					V:AssertEqual(tempDB.theme, "dark", "Stored Dark theme should remain available on non-Retail")
+					V:Assert(BFL:AreThemeFeaturesEnabled(), "Theme features should be cross-flavor")
+					V:AssertEqual(BFL:GetEffectiveTheme(), "dark", "Dark theme should become effective")
 				end)
 			end)
 
@@ -1809,8 +1826,62 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
+	TS:RegisterTest("data", "ThemePalette_NormalizesSavedSettings", {
+		description = "Theme palette settings should merge defaults and clamp invalid values",
+		action = function(V)
+			WithTemporaryDatabase({
+				enableBetaFeatures = true,
+				theme = "custom",
+				darkThemeSettings = {
+					windowOpacity = 2,
+					accentColor = { r = 2, g = -1, b = 0.5, a = 3 },
+				},
+				customTheme = {
+					backgroundColor = { r = -1, g = 0.25, b = 2, a = 0.5 },
+					unknownColor = { r = 1, g = 1, b = 1, a = 1 },
+				},
+			}, function(tempDB)
+				V:AssertEqual(tempDB.darkThemeSettings.windowOpacity, 1, "Opacity should be clamped")
+				V:AssertEqual(tempDB.darkThemeSettings.accentColor.r, 1, "Accent red should be clamped")
+				V:AssertEqual(tempDB.darkThemeSettings.accentColor.g, 0, "Accent green should be clamped")
+				V:AssertEqual(tempDB.customTheme.backgroundColor.r, 0, "Custom red should be clamped")
+				V:AssertEqual(tempDB.customTheme.backgroundColor.b, 1, "Custom blue should be clamped")
+				V:AssertNil(tempDB.customTheme.unknownColor, "Unknown custom theme keys should be discarded")
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "ThemePalette_DarkAccentFeedsInteractiveTokens", {
+		description = "Dark accent color should drive interactive skin tokens",
+		action = function(V)
+			local ThemePalette = BFL:GetModule("ThemePalette")
+			local SkinEngine = BFL:GetModule("SkinEngine")
+			V:AssertNotNil(ThemePalette, "ThemePalette should be loaded")
+			V:AssertNotNil(SkinEngine, "SkinEngine should be loaded")
+
+			WithTemporaryDatabase({
+				enableBetaFeatures = true,
+				theme = "dark",
+				darkThemeSettings = {
+					accentColor = { r = 0.2, g = 0.4, b = 0.8, a = 1 },
+					hoverStrength = 0.2,
+					selectionStrength = 0.3,
+				},
+			}, function()
+				local colors = {}
+				ThemePalette:ApplyToColors(colors, SkinEngine.defaultColors)
+
+				V:AssertEqual(colors.gold[1], 0.2, "Gold token should inherit accent red")
+				V:AssertEqual(colors.icon[3], 0.8, "Icon token should inherit accent blue")
+				V:AssertEqual(colors.rowHover[2], 0.4, "Row hover should inherit accent green")
+				V:Assert(colors.scrollThumbHover[3] > colors.scrollThumbHover[1], "Scrollbar hover should be accent tinted")
+				V:Assert(colors.controlBorderHover[3] > colors.controlBorderHover[1], "Control hover border should be accent tinted")
+			end)
+		end,
+	})
+
 	TS:RegisterTest("data", "Theme_LegacyElvUISkinWithoutThemeTab", {
-		description = "Legacy ElvUI skin setting should remain effective without Retail beta theme settings",
+		description = "Legacy ElvUI skin setting should remain effective without beta theme settings",
 		action = function(V)
 			local originalIsElvUIAvailable = BFL.IsElvUIAvailable
 			BFL.IsElvUIAvailable = function()

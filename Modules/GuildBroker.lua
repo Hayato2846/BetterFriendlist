@@ -57,6 +57,13 @@ local AddNameToEditBox = BFL.BrokerUtils.AddNameToEditBox
 local ApplyBrokerFontToFontString = BFL.BrokerUtils.ApplyBrokerFontToFontString
 local ApplyBrokerFontToTooltip = BFL.BrokerUtils.ApplyBrokerFontToTooltip
 
+local function GetAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
+	if BFL.GetThemeAccentColor then
+		return BFL:GetThemeAccentColor(fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1)
+	end
+	return fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1
+end
+
 -- Guild Finder applicant count cache
 local applicantCount = 0
 local lastApplicantRequestTime = 0
@@ -2007,7 +2014,7 @@ end
 -- ========================================
 
 local function CreateBasicTooltip(gameTooltip)
-	gameTooltip:AddLine(L("GUILD_BROKER_TITLE"), 1, 0.82, 0, 1)
+	gameTooltip:AddLine(L("GUILD_BROKER_TITLE"), GetAccentColor(1, 0.82, 0, 1))
 	gameTooltip:AddLine(" ")
 
 	if not SafeIsInGuild() then

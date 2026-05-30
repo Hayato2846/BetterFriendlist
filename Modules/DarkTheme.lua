@@ -25,6 +25,14 @@ local function GetEngine()
 	return BFL:GetModule("SkinEngine")
 end
 
+local function GetArtworkAlpha(defaultAlpha)
+	local ThemePalette = BFL:GetModule("ThemePalette")
+	if ThemePalette and ThemePalette.GetArtworkAlpha then
+		return ThemePalette:GetArtworkAlpha(defaultAlpha or 0)
+	end
+	return defaultAlpha or 0
+end
+
 local function SafeCall(fn, ...)
 	if not fn then
 		return
@@ -60,7 +68,7 @@ end
 local function SkinFrameByName(engine, name, variant)
 	local frame = _G[name]
 	if frame then
-		engine:SkinFrame(frame, variant or "panel", { stripTextures = true, textureAlpha = 0.08 })
+		engine:SkinFrame(frame, variant or "panel", { stripTextures = true, textureAlpha = GetArtworkAlpha(0.08) })
 		engine:SkinTree(frame, 6)
 	end
 end
@@ -117,7 +125,7 @@ end
 
 local function SkinField(engine, parent, key, variant)
 	if parent and parent[key] then
-		engine:SkinFrame(parent[key], variant or "panel", { stripTextures = true, textureAlpha = 0.10 })
+		engine:SkinFrame(parent[key], variant or "panel", { stripTextures = true, textureAlpha = GetArtworkAlpha(0.10) })
 		engine:SkinTree(parent[key], 5)
 	end
 end
@@ -462,13 +470,13 @@ local function SkinNoteCleanupRows(engine, rows)
 end
 
 function DarkTheme:Initialize()
-	if BFL:IsThemeActive("dark") then
+	if BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme() then
 		self:InstallHooks()
 	end
 end
 
 function DarkTheme:OnPlayerLogin()
-	if BFL:IsThemeActive("dark") then
+	if BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme() then
 		self:Apply("player-login")
 	end
 end
@@ -479,9 +487,10 @@ function DarkTheme:Apply(reason)
 		return
 	end
 
-	engine:Activate()
+	engine:Activate(BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() or "dark")
 	self.applied = true
 	self:InstallHooks()
+	self:ClearMainFrameSkinKeys()
 	self:SkinKnownFrames(reason)
 end
 
@@ -951,7 +960,7 @@ function DarkTheme:SkinHelpFrame(engine)
 		return
 	end
 
-	engine:SkinFrame(frame, "popup", { stripTextures = true, textureAlpha = 0.08 })
+	engine:SkinFrame(frame, "popup", { stripTextures = true, textureAlpha = GetArtworkAlpha(0.08) })
 	HideFieldChrome(engine, frame, "Inset")
 	if frame.ScrollFrame then
 		SkinBorderOnlyInset(engine, frame.ScrollFrame)
@@ -1068,7 +1077,7 @@ function DarkTheme:SkinMainFrame(engine)
 	if frame.BFL_DarkMainFrameStaticSkinKey ~= staticSkinKey or not frame.BFL_DarkBackdrop then
 		frame.BFL_DarkMainFrameStaticSkinKey = staticSkinKey
 		RestorePortraitArtwork(engine, frame)
-		engine:SkinFrame(frame, "main", { stripTextures = true, textureAlpha = 0.10 })
+		engine:SkinFrame(frame, "main", { stripTextures = true, textureAlpha = GetArtworkAlpha(0.10) })
 		engine:SkinTree(frame, 6)
 		engine:StripButtonFrameArtwork(frame)
 		RestorePortraitArtwork(engine, frame)
@@ -1510,7 +1519,7 @@ function DarkTheme:SkinIgnoreList(engine)
 	end
 	ignore.BFL_DarkIgnoreListSkinKey = staticSkinKey
 
-	engine:SkinFrame(ignore, "popup", { stripTextures = true, textureAlpha = 0.08 })
+	engine:SkinFrame(ignore, "popup", { stripTextures = true, textureAlpha = GetArtworkAlpha(0.08) })
 	SkinButtonField(engine, ignore, "UnignorePlayerButton")
 	SkinButtonField(engine, ignore, "GlobalIgnoreListButton")
 	SkinButtonField(engine, ignore, "EnhanceQoLIgnoreButton")
@@ -1599,7 +1608,7 @@ function DarkTheme:SkinSettingsFrame(engine)
 		return
 	end
 
-	engine:SkinFrame(frame, "main", { stripTextures = true, textureAlpha = 0.08 })
+	engine:SkinFrame(frame, "main", { stripTextures = true, textureAlpha = GetArtworkAlpha(0.08) })
 	SkinField(engine, frame, "MainInset", "inset")
 	SkinField(engine, frame, "CategoryList", "panel")
 	SkinField(engine, frame, "ButtonSeparator", "panel")
@@ -1616,7 +1625,7 @@ function DarkTheme:SkinNoteCleanupFrame(engine, frame)
 
 	local colors = engine.colors or {}
 
-	engine:SkinFrame(frame, "popup", { stripTextures = true, textureAlpha = 0.04 })
+	engine:SkinFrame(frame, "popup", { stripTextures = true, textureAlpha = GetArtworkAlpha(0.04) })
 	engine:StripButtonFrameArtwork(frame)
 	HideFieldChrome(engine, frame, "Inset")
 
@@ -1650,8 +1659,9 @@ function DarkTheme:SkinNoteCleanupFrame(engine, frame)
 	end
 
 	if frame.headerLabels then
+		local accent = colors.gold or { 1, 0.82, 0, 1 }
 		for _, label in ipairs(frame.headerLabels) do
-			SkinFontString(engine, frame.headerBar or frame, label, 1, 0.82, 0, 1)
+			SkinFontString(engine, frame.headerBar or frame, label, accent[1], accent[2], accent[3], accent[4])
 		end
 	end
 
@@ -1711,7 +1721,7 @@ function DarkTheme:SkinCreatedFrame(frame)
 		return
 	end
 
-	engine:SkinFrame(frame, "popup", { stripTextures = true, textureAlpha = 0.08 })
+	engine:SkinFrame(frame, "popup", { stripTextures = true, textureAlpha = GetArtworkAlpha(0.08) })
 	engine:SkinTree(frame, 7)
 end
 
@@ -1807,7 +1817,7 @@ function DarkTheme:InstallNoteCleanupWizardHooks()
 
 		wizard[methodName] = function(wizardSelf, ...)
 			local r1, r2, r3, r4 = original(wizardSelf, ...)
-			if BFL:IsThemeActive("dark") then
+			if BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme() then
 				SafeCall(after, r1, r2, r3, r4)
 			end
 			return r1, r2, r3, r4
@@ -2066,7 +2076,7 @@ function DarkTheme:InstallHooks()
 		local original = BFL.HelpFrame.CreateFrame
 		BFL.HelpFrame.CreateFrame = function(helpSelf, ...)
 			local frame = original(helpSelf, ...)
-			if BFL:IsThemeActive("dark") then
+			if BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme() then
 				local engine = GetEngine()
 				if engine then
 					DarkTheme:SkinHelpFrame(engine)

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+
+### Added
+- **Custom Theme & Theme Settings** - Added a Custom theme that inherits from Dark and adds controls for colors, transparency, hover states, selection states, borders, scrollbars, icons, and Blizzard artwork visibility.
+
+### Changed
+- **Theme Settings** - Expanded Dark theme settings and made the beta Theme tab available across supported Retail and Classic clients.
+
 ## [2.6.0]        - 2026-05-25
 
 ### Added
@@ -30,7 +38,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Quick Join** - Reduced repeated group-priority and friend-relationship lookups while sorting available groups.
 
 ### Outlook
-- **Custom Theme & Theme Settings** - A future Custom theme will inherit from the Dark theme and add full controls for colors, transparency, and related visual details. Dark theme settings will also expand in upcoming releases.
 - **Guild Tab** - A Retail and Classic Guild tab is planned for upcoming releases, with a BetterFriendlist-owned roster view for searching guild members, filtering online/offline members, sorting by rank, name, level, class, zone, status, and last online time, and showing guild counts, notes, status, and class information through the shared safe roster provider.
 
 ## [2.5.9]        - 2026-05-17

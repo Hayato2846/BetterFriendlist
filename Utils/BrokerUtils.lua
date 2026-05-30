@@ -42,6 +42,9 @@ function BU.C(color, text)
 
 	-- Otherwise use predefined or custom hex
 	local hex = COLOR_TABLE[color] or color
+	if color == "dkyellow" or color == "ltyellow" or color == "gold" then
+		hex = (BFL.GetThemeAccentHex and BFL:GetThemeAccentHex(hex)) or hex
+	end
 	return "|cff" .. hex .. text .. "|r"
 end
 
