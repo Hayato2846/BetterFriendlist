@@ -41,6 +41,27 @@ local FILTER_ALL = "all"
 local FILTER_ONLINE = "online"
 local FILTER_OFFLINE = "offline"
 
+local function GetSortOptions()
+	return {
+		{ value = SORT_RANK, text = RANK or "Rank" },
+		{ value = SORT_NAME, text = NAME or "Name" },
+		{ value = SORT_LEVEL, text = LEVEL or "Level" },
+		{ value = SORT_CLASS, text = CLASS or "Class" },
+		{ value = SORT_ZONE, text = ZONE or "Zone" },
+		{ value = SORT_LAST_ONLINE, text = LASTONLINE or "Last Online" },
+		{ value = SORT_STATUS, text = STATUS or "Status" },
+	}
+end
+
+local function IsValidSortMode(mode)
+	for _, option in ipairs(GetSortOptions()) do
+		if option.value == mode then
+			return true
+		end
+	end
+	return false
+end
+
 -- State
 local guildDataProvider = nil
 local needsRenderOnShow = false
@@ -77,6 +98,26 @@ local function GetAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
 		return BFL:GetThemeAccentColor(fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1)
 	end
 	return fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1
+end
+
+local function GetGuildRosterData()
+	return BFL:GetModule("GuildRosterData")
+end
+
+local function IsGuildTabEnabled()
+	return BFL.IsGuildTabEnabled and BFL:IsGuildTabEnabled()
+end
+
+local function CanViewOfficerNote()
+	local provider = GetGuildRosterData()
+	if provider and provider.CanViewOfficerNote then
+		return provider:CanViewOfficerNote()
+	end
+	if not (C_GuildInfo and C_GuildInfo.CanViewOfficerNote) then
+		return false
+	end
+	local ok, result = pcall(C_GuildInfo.CanViewOfficerNote)
+	return ok and result == true
 end
 
 local function ApplyDefaultSlugToFontString(fontString)
@@ -139,7 +180,7 @@ local function ApplyStaticGuildFrameFonts(frame)
 end
 
 local function ShouldSuppressGuildModuleForSecretValues()
-	return BFL.HasSecretValues
+	return false
 end
 
 -- ========================================
@@ -152,22 +193,33 @@ function GuildFrame:Initialize()
 	-- State
 	self.guildMembers = {}
 	self.displayList = {}
-	self.filterMode = FILTER_ONLINE
+	local DB = GetDB()
+	self.filterMode = DB and DB:Get("guildTabFilterMode", FILTER_ONLINE) or FILTER_ONLINE
 	self.searchText = ""
-	self.sortMode = SORT_RANK
+	self.sortMode = DB and DB:Get("guildTabSortMode", SORT_RANK) or SORT_RANK
+	if not IsValidSortMode(self.sortMode) then
+		self.sortMode = SORT_RANK
+	end
 	self.sortReversed = {}
 	self.selectedMember = nil
 	self.totalMembers = 0
 	self.onlineMembers = 0
-	self.suppressedForSecretValues = ShouldSuppressGuildModuleForSecretValues()
+	self.suppressedForSecretValues = false
+	self.eventsRegistered = false
+	self.showHookInstalled = false
 
-	-- Retail 12.x Communities reads secret guild/member values while opening.
-	-- Keep BetterFriendlist out of that path entirely.
-	if self.suppressedForSecretValues then
+	self:EnsureEnabled()
+end
+
+function GuildFrame:IsEnabled()
+	return IsGuildTabEnabled() == true
+end
+
+function GuildFrame:RegisterGuildEvents()
+	if self.eventsRegistered then
 		return
 	end
 
-	-- Register events
 	BFL:RegisterEventCallback("GUILD_ROSTER_UPDATE", function(...)
 		self:OnGuildRosterUpdate(...)
 	end, 50)
@@ -180,8 +232,18 @@ function GuildFrame:Initialize()
 		self:OnPlayerGuildUpdate(...)
 	end, 50)
 
+	self.eventsRegistered = true
+end
+
+function GuildFrame:EnsureEnabled()
+	if not self:IsEnabled() then
+		return false
+	end
+
+	self:RegisterGuildEvents()
+
 	-- Hook OnShow to re-render if data changed while hidden
-	if BetterFriendsFrame then
+	if BetterFriendsFrame and not self.showHookInstalled then
 		BetterFriendsFrame:HookScript("OnShow", function()
 			if needsRenderOnShow then
 				local guildFrame = BetterFriendsFrame.GuildFrame
@@ -191,16 +253,28 @@ function GuildFrame:Initialize()
 				end
 			end
 		end)
+		self.showHookInstalled = true
+	end
+
+	return true
+end
+
+function GuildFrame:OnGuildTabSettingChanged()
+	rosterDirty = true
+	needsRenderOnShow = true
+	if self:EnsureEnabled() then
+		self:Refresh()
 	end
 end
 
 function GuildFrame:OnPlayerLogin()
-	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+	if not self:EnsureEnabled() then
 		return
 	end
 
 	-- Request initial guild roster data if in a guild
-	if IsInGuild() then
+	local provider = GetGuildRosterData()
+	if provider and provider.IsInGuild and provider:IsInGuild() then
 		self:RequestRosterUpdate()
 	end
 end
@@ -210,7 +284,7 @@ end
 -- ========================================
 
 function GuildFrame:OnGuildRosterUpdate(canRequestRosterUpdate)
-	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+	if not self:IsEnabled() then
 		return
 	end
 
@@ -226,7 +300,7 @@ function GuildFrame:OnGuildRosterUpdate(canRequestRosterUpdate)
 end
 
 function GuildFrame:OnPlayerGuildUpdate(unitTarget)
-	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+	if not self:IsEnabled() then
 		return
 	end
 
@@ -236,7 +310,8 @@ function GuildFrame:OnPlayerGuildUpdate(unitTarget)
 	local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
 	if guildFrame and guildFrame:IsShown() then
 		self:UpdateEmptyState()
-		if IsInGuild() then
+		local provider = GetGuildRosterData()
+		if provider and provider.IsInGuild and provider:IsInGuild() then
 			self:RequestRosterUpdate()
 		end
 	else
@@ -249,7 +324,7 @@ end
 -- ========================================
 
 function GuildFrame:RequestRosterUpdate()
-	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+	if not self:EnsureEnabled() then
 		return false
 	end
 
@@ -258,90 +333,41 @@ function GuildFrame:RequestRosterUpdate()
 		return false -- Throttled
 	end
 	lastRosterRequestTime = now
-	BFL.GuildRoster()
-	return true
+	local provider = GetGuildRosterData()
+	if provider and provider.RequestRosterUpdate then
+		return provider:RequestRosterUpdate()
+	end
+	local ok = pcall(BFL.GuildRoster)
+	return ok == true
 end
 
 function GuildFrame:CollectRoster()
-	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+	if not self:IsEnabled() then
 		self.guildMembers = {}
 		self.totalMembers = 0
 		self.onlineMembers = 0
 		return
 	end
 
-	if not IsInGuild() then
+	local provider = GetGuildRosterData()
+	if not (provider and provider.IsInGuild and provider:IsInGuild()) then
 		self.guildMembers = {}
 		self.totalMembers = 0
 		self.onlineMembers = 0
 		return
 	end
 
-	local numTotal, numOnline = GetNumGuildMembers()
-	self.totalMembers = numTotal or 0
-	self.onlineMembers = numOnline or 0
-
-	local members = {}
-
-	for i = 1, (numTotal or 0) do
-		local fullName, rank, rankIndex, level, className, zone, note, officerNote, online, status, classFile,
-			achievementPoints, achievementRank, isMobile, isSoREligible, standingID, guid = BFL.GetGuildRosterInfo(i)
-
-		if fullName then
-			local name, realm = strsplit("-", fullName, 2)
-			local isAFK = (status == 1)
-			local isDND = (status == 2)
-
-			-- Last online time
-			local lastYears, lastMonths, lastDays, lastHours = 0, 0, 0, 0
-			if not online then
-				lastYears, lastMonths, lastDays, lastHours = BFL.GetGuildRosterLastOnline(i)
-			end
-
-			-- Secret value guards (12.0+)
-			local safeName = fullName
-			local safeParsedName = name
-			local safeZone = zone or ""
-			if BFL.HasSecretValues then
-				if BFL:IsSecret(fullName) then
-					safeName = "Unknown"
-					safeParsedName = "Unknown"
-				end
-				if BFL:IsSecret(zone) then
-					safeZone = ""
-				end
-			end
-
-			members[#members + 1] = {
-				guildIndex = i,
-				fullName = safeName,
-				name = safeParsedName or safeName,
-				realm = realm or "",
-				rank = rank or "",
-				rankIndex = rankIndex or 0,
-				level = level or 0,
-				classFile = classFile or "",
-				className = className or "",
-				zone = safeZone,
-				note = note or "",
-				officerNote = officerNote or "",
-				online = online or false,
-				isAFK = isAFK,
-				isDND = isDND,
-				isMobile = isMobile or false,
-				achievementPoints = achievementPoints or 0,
-				achievementRank = achievementRank or 0,
-				itemLevel = nil, -- Guild roster API does not currently expose item level
-				guid = guid or "",
-				lastOnlineYears = lastYears or 0,
-				lastOnlineMonths = lastMonths or 0,
-				lastOnlineDays = lastDays or 0,
-				lastOnlineHours = lastHours or 0,
-			}
-		end
+	if not (provider and provider.CollectRoster) then
+		self.guildMembers = {}
+		self.totalMembers = 0
+		self.onlineMembers = 0
+		return
 	end
 
+	local members, counts = provider:CollectRoster()
 	self.guildMembers = members
+	self.totalMembers = counts and counts.total or #members
+	self.onlineMembers = counts and counts.online or 0
 	rosterDirty = false
 end
 
@@ -351,6 +377,10 @@ end
 
 function GuildFrame:SetFilter(mode)
 	self.filterMode = mode
+	local DB = GetDB()
+	if DB and DB.Set then
+		DB:Set("guildTabFilterMode", mode)
+	end
 	self:Refresh()
 end
 
@@ -375,7 +405,7 @@ function GuildFrame:PassesFilter(member)
 		if member.zone:lower():find(s, 1, true) then return true end
 		if member.className:lower():find(s, 1, true) then return true end
 		if member.note:lower():find(s, 1, true) then return true end
-		if C_GuildInfo and C_GuildInfo.CanViewOfficerNote and C_GuildInfo.CanViewOfficerNote() then
+		if CanViewOfficerNote() then
 			if member.officerNote:lower():find(s, 1, true) then return true end
 		end
 		return false
@@ -389,12 +419,20 @@ end
 -- ========================================
 
 function GuildFrame:SetSort(mode)
+	if not IsValidSortMode(mode) then
+		return
+	end
 	if self.sortMode == mode then
 		-- Toggle reverse on same column
 		self.sortReversed[mode] = not self.sortReversed[mode]
 	else
 		self.sortMode = mode
 	end
+	local DB = GetDB()
+	if DB and DB.Set then
+		DB:Set("guildTabSortMode", self.sortMode)
+	end
+	self:RefreshSortDropdown()
 	self:Refresh()
 end
 
@@ -485,7 +523,7 @@ end
 -- ========================================
 
 function GuildFrame:BuildDisplayList()
-	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+	if not self:IsEnabled() then
 		self.guildMembers = {}
 		self.displayList = {}
 		return self.displayList
@@ -512,7 +550,7 @@ end
 -- ========================================
 
 function GuildFrame:Refresh()
-	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+	if not self:IsEnabled() then
 		self.guildMembers = {}
 		self.displayList = {}
 		return
@@ -619,12 +657,86 @@ end
 -- Retail ScrollBox Initialization
 -- ========================================
 
-function GuildFrame:OnLoad(frame)
-	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+function GuildFrame:ApplyV1Visibility(frame)
+	if not frame then
 		return
 	end
 
+	if frame.ILvlHeader then
+		frame.ILvlHeader:Hide()
+		frame.ILvlHeader:Disable()
+	end
+	if frame.InvitePlayerButton then
+		frame.InvitePlayerButton:Hide()
+		frame.InvitePlayerButton:Disable()
+	end
+	if frame.MOTDText then
+		frame.MOTDText:SetText("")
+		frame.MOTDText:Hide()
+	end
+	if frame.HeaderDivider then
+		frame.HeaderDivider:Hide()
+	end
+	if frame._bflTabard then
+		frame._bflTabard:Hide()
+	end
+end
+
+function GuildFrame:GetSortLabel(mode)
+	for _, option in ipairs(GetSortOptions()) do
+		if option.value == mode then
+			return option.text
+		end
+	end
+	return RANK or "Rank"
+end
+
+function GuildFrame:RefreshSortDropdown()
+	local frame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
+	local dropdown = frame and frame.SortDropdown
+	if not dropdown or not UIDropDownMenu_SetText then
+		return
+	end
+	UIDropDownMenu_SetText(dropdown, self:GetSortLabel(self.sortMode))
+end
+
+function GuildFrame:CreateSortDropdown(frame)
+	if not (frame and UIDropDownMenu_Initialize) then
+		return
+	end
+	if frame.SortDropdown then
+		return
+	end
+
+	local dropdown = CreateFrame("Frame", "BFL_GuildSortDropdown", frame, "UIDropDownMenuTemplate")
+	frame.SortDropdown = dropdown
+	if UIDropDownMenu_SetWidth then
+		UIDropDownMenu_SetWidth(dropdown, 112)
+	end
+	if UIDropDownMenu_SetText then
+		UIDropDownMenu_SetText(dropdown, self:GetSortLabel(self.sortMode))
+	end
+
+	UIDropDownMenu_Initialize(dropdown, function(_, level)
+		for _, option in ipairs(GetSortOptions()) do
+			local info = UIDropDownMenu_CreateInfo()
+			info.text = option.text
+			info.value = option.value
+			info.checked = self.sortMode == option.value
+			info.func = function(menuButton)
+				self:SetSort(menuButton.value)
+				self:RefreshSortDropdown()
+			end
+			UIDropDownMenu_AddButton(info, level)
+		end
+	end)
+end
+
+function GuildFrame:OnLoad(frame)
+	self.frame = frame
 	ApplyStaticGuildFrameFonts(frame)
+	self:ApplyV1Visibility(frame)
+	self:CreateSortDropdown(frame)
 
 	-- NOTE: L (locale) is NOT available during OnLoad (set in Initialize).
 	-- Button/label text is set in OnShow instead.
@@ -666,6 +778,12 @@ function GuildFrame:OnLoad(frame)
 			self:UpdateLayout()
 		end
 	end
+	if BFL.IsClassic and frame.SortDropdown then
+		frame.SortDropdown:ClearAllPoints()
+		frame.SortDropdown:SetPoint("TOPLEFT", frame, "TOPLEFT", -10, -34)
+	end
+
+	self:CreateEmptyState(frame)
 
 	if BFL.IsClassic or not BFL.HasModernScrollBox then
 		self:InitializeClassicScrollFrame(frame)
@@ -933,17 +1051,18 @@ end
 -- ========================================
 
 function GuildFrame:UpdateHeaderInfo()
-	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+	if not self:IsEnabled() then
 		return
 	end
 
 	local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
 	if not guildFrame then return end
+	local provider = GetGuildRosterData()
 
 	-- Guild name
 	if guildFrame.GuildName then
-		if IsInGuild() then
-			local guildName = GetGuildInfo("player")
+		if provider and provider.IsInGuild and provider:IsInGuild() then
+			local guildName = provider.GetGuildName and provider:GetGuildName() or ""
 			guildFrame.GuildName:SetText(guildName or "")
 		else
 			guildFrame.GuildName:SetText("")
@@ -958,31 +1077,19 @@ function GuildFrame:UpdateHeaderInfo()
 		guildFrame.MemberCount:SetText(format(fmt, online, total))
 	end
 
-	-- Tabard (optional)
 	self:UpdateTabard()
-
-	-- MOTD
 	self:UpdateMOTD()
 end
 
 function GuildFrame:UpdateMOTD()
-	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
-		return
-	end
-
 	local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
 	if not guildFrame or not guildFrame.MOTDText then return end
 
-	local motd = ""
-	if IsInGuild() and BFL.GetGuildMOTD then
-		motd = BFL.GetGuildMOTD() or ""
+	guildFrame.MOTDText:SetText("")
+	guildFrame.MOTDText:Hide()
+	if guildFrame.HeaderDivider then
+		guildFrame.HeaderDivider:Hide()
 	end
-
-	-- Replace literal pipe-n (|n) and backslash-n with real newlines
-	motd = motd:gsub("|n", "\n"):gsub("\\n", "\n")
-
-	guildFrame.MOTDText:SetText(motd)
-	guildFrame.MOTDText:Show()
 
 	-- Defer layout update so FontString width is resolved before measuring height
 	if self._layoutTimer then self._layoutTimer:Cancel() end
@@ -997,7 +1104,7 @@ end
 -- ========================================
 
 function GuildFrame:UpdateLayout()
-	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+	if not self:IsEnabled() then
 		return
 	end
 
@@ -1005,6 +1112,7 @@ function GuildFrame:UpdateLayout()
 	local inset = BetterFriendsFrame and BetterFriendsFrame.Inset
 	if not guildFrame or not inset then return end
 	if BFL.IsClassic then return end
+	self:ApplyV1Visibility(guildFrame)
 
 	-- Measure MOTD height (0 when empty)
 	local motdText = guildFrame.MOTDText and guildFrame.MOTDText:GetText()
@@ -1030,6 +1138,11 @@ function GuildFrame:UpdateLayout()
 	local listInsetTop = searchTop - 48
 
 	-- Reposition dynamic elements
+	if guildFrame.SortDropdown then
+		guildFrame.SortDropdown:ClearAllPoints()
+		guildFrame.SortDropdown:SetPoint("TOPLEFT", inset, "TOPLEFT", -14, filterTop + 2)
+	end
+
 	guildFrame.FilterAll:ClearAllPoints()
 	guildFrame.FilterAll:SetPoint("TOPRIGHT", inset, "TOPRIGHT", -6, filterTop)
 	-- FilterOnline/FilterOffline chain from FilterAll via static anchors
@@ -1054,10 +1167,12 @@ end
 function GuildFrame:UpdateFilterHighlight()
 	local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
 	if not guildFrame then return end
+	self:ApplyV1Visibility(guildFrame)
 
 	GuildFrame.StylePillButton(guildFrame.FilterAll, self.filterMode == FILTER_ALL)
 	GuildFrame.StylePillButton(guildFrame.FilterOnline, self.filterMode == FILTER_ONLINE)
 	GuildFrame.StylePillButton(guildFrame.FilterOffline, self.filterMode == FILTER_OFFLINE)
+	self:RefreshSortDropdown()
 end
 
 -- ========================================
@@ -1079,8 +1194,10 @@ function GuildFrame:UpdateEmptyState()
 	if not guildFrame then return end
 
 	local hasContent = false
+	local provider = GetGuildRosterData()
+	local inGuild = provider and provider.IsInGuild and provider:IsInGuild()
 
-	if not IsInGuild() then
+	if not inGuild then
 		if guildFrame.EmptyText then
 			guildFrame.EmptyText:SetText(L and L.GUILD_NOT_IN_GUILD or "You are not in a guild.")
 			guildFrame.EmptyText:Show()
@@ -1136,7 +1253,6 @@ function GuildFrame:OnMemberClick(button, mouseButton)
 		self:ShowContextMenu(button, member)
 	else
 		self.selectedMember = member
-		self:ShowMemberInfoPanel(member)
 	end
 end
 
@@ -1185,17 +1301,10 @@ function GuildFrame:OnMemberEnter(button)
 		GameTooltip:AddLine(" ")
 		GameTooltip:AddLine(format("%s %s", NOTE_COLON or "Note:", member.note), 1, 1, 1, true)
 	end
-	if C_GuildInfo and C_GuildInfo.CanViewOfficerNote and C_GuildInfo.CanViewOfficerNote() then
+	if CanViewOfficerNote() then
 		if member.officerNote and member.officerNote ~= "" then
 			GameTooltip:AddLine(format("%s %s", OFFICER_NOTE_COLON or "Officer Note:", member.officerNote), 0.5, 1, 0.5, true)
 		end
-	end
-
-	-- Item Level
-	if member.itemLevel and member.itemLevel > 0 then
-		GameTooltip:AddLine(" ")
-		GameTooltip:AddLine(format("%s: %d",
-			(L and L.GUILD_INFO_ILVL) or "Item Level", math.floor(member.itemLevel)), GetAccentColor(1, 0.82, 0, 1))
 	end
 
 	-- Hints
@@ -1210,7 +1319,7 @@ end
 -- ========================================
 
 function GuildFrame:ShowContextMenu(button, member)
-	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+	if not self:IsEnabled() then
 		return
 	end
 
@@ -1226,24 +1335,18 @@ end
 -- ========================================
 
 function GuildFrame:OpenBlizzardGuildUI(memberIndex)
-	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+	if BFL:IsActionRestricted() then
 		return
 	end
 
-	if BFL.IsClassic then
-		local useClassicGuildUI = GetCVar("useClassicGuildUI")
-		if useClassicGuildUI == "1" then
-			SetCVar("useClassicGuildUI", "0")
-		end
+	local toggle = ToggleGuildFrame or GuildFrame_Toggle
+	if not toggle then
+		return
 	end
-	-- Preselect the member (if a valid guild roster index was provided)
-	if memberIndex and type(memberIndex) == "number" and _G.SetGuildRosterSelection then
-		pcall(_G.SetGuildRosterSelection, memberIndex)
-	end
-	ToggleGuildFrame()
-	-- Some clients expect the selection to be applied after the frame opens
-	if memberIndex and type(memberIndex) == "number" and _G.SetGuildRosterSelection and _G.GuildFrame and _G.GuildFrame:IsShown() then
-		pcall(_G.SetGuildRosterSelection, memberIndex)
+	if BFL.HasSecretValues and securecallfunction then
+		pcall(securecallfunction, toggle)
+	else
+		pcall(toggle)
 	end
 end
 
@@ -1252,7 +1355,7 @@ end
 -- ========================================
 
 function GuildFrame:GetMemberByName(name)
-	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+	if not self:IsEnabled() then
 		return nil
 	end
 
@@ -1277,7 +1380,7 @@ end
 -- ========================================
 
 function GuildFrame:UpdateResponsiveLayout()
-	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+	if not self:IsEnabled() then
 		return
 	end
 
@@ -1298,13 +1401,8 @@ function GuildFrame:UpdateResponsiveLayout()
 	local scrollbarAndPadding = 34
 	local effectiveWidth = frameWidth - NAME_OFFSET_WITH_ICON - scrollbarAndPadding + 8
 
-	-- iLvl column is optional based on setting
-	local DB = GetDB()
-	local showILvl = true
-	if DB and DB.Get then
-		showILvl = DB:Get("guildTabShowILvlColumn", true) ~= false
-	end
-	local ilvlWidth = showILvl and 60 or 0
+	local showILvl = false
+	local ilvlWidth = 0
 
 	local remaining = effectiveWidth - ilvlWidth
 	local nameWidth = math.floor(remaining * 0.35)
@@ -1430,7 +1528,7 @@ function GuildFrame.StylePillButton(button, isActive)
 end
 
 function GuildFrame:SetupFilterPills()
-	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+	if not self:IsEnabled() then
 		return
 	end
 
@@ -1456,25 +1554,7 @@ end
 -- ========================================
 
 function GuildFrame:SetupMOTDTooltip()
-	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
-		return
-	end
-
-	local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
-	if not guildFrame or not guildFrame.MOTDText then return end
-	if guildFrame.MOTDText._bflTooltipHooked then return end
-	guildFrame.MOTDText._bflTooltipHooked = true
-
-	guildFrame.MOTDText:SetScript("OnEnter", function(fs)
-		local text = fs:GetText()
-		if not text or text == "" then return end
-		GameTooltip:SetOwner(fs, "ANCHOR_BOTTOMLEFT", 0, -2)
-		GameTooltip:ClearLines()
-		GameTooltip:AddLine((L and L.GUILD_MOTD_TOOLTIP_HEADER) or "Message of the Day", GetAccentColor(1, 0.82, 0, 1))
-		GameTooltip:AddLine(text, 1, 1, 1, true)
-		GameTooltip:Show()
-	end)
-	guildFrame.MOTDText:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	return
 end
 
 -- ========================================
@@ -1482,48 +1562,9 @@ end
 -- ========================================
 
 function GuildFrame:UpdateTabard()
-	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
-		return
-	end
-
 	local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
 	if not guildFrame then return end
-
-	local DB = GetDB()
-	local show = DB and DB:Get("guildTabShowTabard", false) == true
-
-	if not show or not IsInGuild() then
-		if guildFrame._bflTabard then guildFrame._bflTabard:Hide() end
-		return
-	end
-
-	-- Tabard is Retail-only (GetGuildTabardFiles not supported in all Classic flavors)
-	if not GetGuildTabardFiles then
-		if guildFrame._bflTabard then guildFrame._bflTabard:Hide() end
-		return
-	end
-
-	if not guildFrame._bflTabard then
-		local size = 28
-		local t = CreateFrame("Frame", nil, guildFrame)
-		t:SetSize(size, size)
-		-- Anchor relative to GuildName, to its left
-		t:SetPoint("RIGHT", guildFrame.GuildName, "LEFT", -4, 0)
-		t.bg = t:CreateTexture(nil, "BACKGROUND")
-		t.bg:SetAllPoints()
-		t.emblem = t:CreateTexture(nil, "OVERLAY")
-		t.emblem:SetAllPoints()
-		t.border = t:CreateTexture(nil, "OVERLAY", nil, 1)
-		t.border:SetAllPoints()
-		guildFrame._bflTabard = t
-	end
-
-	local t = guildFrame._bflTabard
-	local bgFile, emblemFile, borderFile = GetGuildTabardFiles()
-	if bgFile and bgFile ~= "" then t.bg:SetTexture(bgFile) else t.bg:SetTexture(nil) end
-	if emblemFile and emblemFile ~= "" then t.emblem:SetTexture(emblemFile) else t.emblem:SetTexture(nil) end
-	if borderFile and borderFile ~= "" then t.border:SetTexture(borderFile) else t.border:SetTexture(nil) end
-	t:Show()
+	if guildFrame._bflTabard then guildFrame._bflTabard:Hide() end
 end
 
 -- ========================================
@@ -1540,10 +1581,10 @@ local function CreatePanelDivider(parent, anchorTo, yOffset)
 end
 
 function GuildFrame:CreateMemberInfoPanel()
-	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
-		return nil
-	end
+	return nil
+end
 
+function GuildFrame:CreateMemberInfoPanel_Legacy()
 	if self._infoPanel then return self._infoPanel end
 
 	local panel = CreateFrame("Frame", "BFL_GuildMemberInfoPanel", UIParent,
@@ -1753,10 +1794,10 @@ end
 -- Populate/refresh the rank dropdown based on the given member and current
 -- player permissions. Uses SetGuildMemberRank (non-protected).
 function GuildFrame:_RefreshRankDropdown(member)
-	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
-		return
-	end
+	return
+end
 
+function GuildFrame:_RefreshRankDropdown_Legacy(member)
 	local panel = self._infoPanel
 	if not panel or not panel.rankDropdown then return end
 
@@ -1798,12 +1839,13 @@ function GuildFrame:_RefreshRankDropdown(member)
 end
 
 function GuildFrame:ShowMemberInfoPanel(member)
-	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
-		return
-	end
+	return
+end
 
+function GuildFrame:ShowMemberInfoPanel_Legacy(member)
 	if not member then return end
-	local panel = self:CreateMemberInfoPanel()
+	local panel = self:CreateMemberInfoPanel_Legacy()
+	if not panel then return end
 	self:RefreshMemberInfoPanelAccent()
 	panel._currentMember = member
 
@@ -1858,7 +1900,7 @@ function GuildFrame:ShowMemberInfoPanel(member)
 	end
 
 	-- Rank dropdown
-	self:_RefreshRankDropdown(member)
+	self:_RefreshRankDropdown_Legacy(member)
 
 	-- Public note (editable if permitted)
 	panel.pubNote:SetText(member.note or "")
@@ -1906,10 +1948,10 @@ function GuildFrame:HideMemberInfoPanel()
 end
 
 function GuildFrame:SaveMemberInfoPanel()
-	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
-		return
-	end
+	return
+end
 
+function GuildFrame:SaveMemberInfoPanel_Legacy()
 	local panel = self._infoPanel
 	if not panel or not panel._currentMember then return end
 	local member = panel._currentMember
@@ -2002,22 +2044,7 @@ local function EnsureInviteDialog()
 end
 
 function GuildFrame:ShowInviteDialog()
-	if self.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
-		return
-	end
-
-	if not CanGuildInvite or not CanGuildInvite() then
-		BFL:DebugPrint("No permission to invite to guild")
-		return
-	end
-	if BFL:IsActionRestricted() then
-		BFL:DebugPrint("Cannot invite: action restricted")
-		return
-	end
-	EnsureInviteDialog()
-	local guildName = (IsInGuild() and GetGuildInfo and GetGuildInfo("player")) or ""
-	local titleFmt = (L and L.GUILD_INVITE_DIALOG_TITLE) or "Invite to %s"
-	StaticPopup_Show(INVITE_DIALOG_KEY, format(titleFmt, guildName))
+	return
 end
 
 
@@ -2032,25 +2059,20 @@ end
 function BFL_GuildFrame_OnShow(frame)
 	local GF = BFL:GetModule("GuildFrame")
 	if GF then
-		if GF.suppressedForSecretValues or ShouldSuppressGuildModuleForSecretValues() then
+		if not GF:EnsureEnabled() then
+			frame:Hide()
 			return
 		end
+		GF:ApplyV1Visibility(frame)
 
 		-- Set locale text for buttons (L is not available during OnLoad, only after Initialize)
 		if frame.OpenBlizzardGuildButton and BFL.L then
-			frame.OpenBlizzardGuildButton:SetText(BFL.L.GUILD_OPEN_MANAGEMENT or "Guild Management")
+			frame.OpenBlizzardGuildButton:SetText(BFL.L.GUILD_ACTION_OPEN_BLIZZARD or "Open Guild UI")
 			ApplyDefaultSlugToButton(frame.OpenBlizzardGuildButton)
 		end
 		if frame.FilterOffline and BFL.L then
 			frame.FilterOffline:SetText(BFL.L.GUILD_FILTER_OFFLINE or FRIENDS_LIST_OFFLINE or "Offline")
 			ApplyDefaultSlugToButton(frame.FilterOffline)
-		end
-		if frame.InvitePlayerButton and BFL.L then
-			frame.InvitePlayerButton:SetText(BFL.L.GUILD_INVITE_BOTTOM_BUTTON or "Invite Player")
-			ApplyDefaultSlugToButton(frame.InvitePlayerButton)
-			-- Disable if not allowed to invite
-			local canInvite = CanGuildInvite and CanGuildInvite() or false
-			frame.InvitePlayerButton:SetEnabled(canInvite)
 		end
 		-- Enlarge GuildName for visual weight
 		if frame.GuildName then
@@ -2063,12 +2085,12 @@ function BFL_GuildFrame_OnShow(frame)
 				SafeSetFont(frame.GuildName, f, 18, fontFlags)
 			end
 		end
-		-- Pill-style filter buttons + MOTD tooltip
+		-- Pill-style filter buttons
 		GF:SetupFilterPills()
-		GF:SetupMOTDTooltip()
 
 		-- Request roster update
-		if IsInGuild() then
+		local provider = GetGuildRosterData()
+		if provider and provider.IsInGuild and provider:IsInGuild() then
 			GF:RequestRosterUpdate()
 		end
 		GF:Refresh()
@@ -2082,60 +2104,58 @@ end
 
 function BFL_GuildFrame_SearchChanged(editBox)
 	local GF = BFL:GetModule("GuildFrame")
-	if GF then
+	if GF and GF:IsEnabled() then
 		GF:SetSearchText(editBox:GetText())
 	end
 end
 
 function BFL_GuildFrame_FilterAll()
 	local GF = BFL:GetModule("GuildFrame")
-	if GF then
+	if GF and GF:IsEnabled() then
 		GF:SetFilter(FILTER_ALL)
 	end
 end
 
 function BFL_GuildFrame_FilterOnline()
 	local GF = BFL:GetModule("GuildFrame")
-	if GF then
+	if GF and GF:IsEnabled() then
 		GF:SetFilter(FILTER_ONLINE)
 	end
 end
 
 function BFL_GuildFrame_FilterOffline()
 	local GF = BFL:GetModule("GuildFrame")
-	if GF then
+	if GF and GF:IsEnabled() then
 		GF:SetFilter(FILTER_OFFLINE)
 	end
 end
 
 function BFL_GuildFrame_SortByName()
 	local GF = BFL:GetModule("GuildFrame")
-	if GF then GF:SetSort(SORT_NAME) end
+	if GF and GF:IsEnabled() then GF:SetSort(SORT_NAME) end
 end
 
 function BFL_GuildFrame_SortByRank()
 	local GF = BFL:GetModule("GuildFrame")
-	if GF then GF:SetSort(SORT_RANK) end
+	if GF and GF:IsEnabled() then GF:SetSort(SORT_RANK) end
 end
 
 function BFL_GuildFrame_SortByLevel()
 	local GF = BFL:GetModule("GuildFrame")
-	if GF then GF:SetSort(SORT_LEVEL) end
+	if GF and GF:IsEnabled() then GF:SetSort(SORT_LEVEL) end
 end
 
 function BFL_GuildFrame_SortByZone()
 	local GF = BFL:GetModule("GuildFrame")
-	if GF then GF:SetSort(SORT_ZONE) end
+	if GF and GF:IsEnabled() then GF:SetSort(SORT_ZONE) end
 end
 
 function BFL_GuildFrame_SortByILvl()
-	local GF = BFL:GetModule("GuildFrame")
-	if GF then GF:SetSort(SORT_ILVL) end
+	return
 end
 
 function BFL_GuildFrame_ShowInviteDialog()
-	local GF = BFL:GetModule("GuildFrame")
-	if GF then GF:ShowInviteDialog() end
+	return
 end
 
 function BFL_GuildFrame_OpenBlizzardGuild()
@@ -2145,7 +2165,7 @@ end
 
 function BFL_GuildFrame_RefreshRoster()
 	local GF = BFL:GetModule("GuildFrame")
-	if GF then
+	if GF and GF:IsEnabled() then
 		local success = GF:RequestRosterUpdate()
 		if not success then
 			BFL:DebugPrint("Guild roster refresh throttled (10s cooldown)")

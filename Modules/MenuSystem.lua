@@ -195,58 +195,6 @@ function MenuSystem:ShowGuildMemberMenu(button, member)
 	local fullName = member.fullName
 	local displayName = Ambiguate(fullName, "guild")
 
-	-- Helper: confirm-and-execute via StaticPopup
-	local function ShowConfirm(dialogKey, text, onAccept)
-		StaticPopupDialogs[dialogKey] = {
-			text = text,
-			button1 = ACCEPT or "Accept",
-			button2 = CANCEL or "Cancel",
-			OnAccept = onAccept,
-			timeout = 0,
-			whileDead = 1,
-			hideOnEscape = 1,
-			preferredIndex = 3,
-		}
-		StaticPopup_Show(dialogKey)
-	end
-
-	-- Helper: remove confirmation requires typing the member name
-	local function ShowRemoveConfirm()
-		local key = "BFL_GUILD_UNINVITE_CONFIRM"
-		StaticPopupDialogs[key] = {
-			text = format((L and L.GUILD_CONFIRM_REMOVE)
-				or "Type %s to confirm removing this member from the guild:", displayName),
-			button1 = ACCEPT or "Accept",
-			button2 = CANCEL or "Cancel",
-			hasEditBox = 1,
-			editBoxWidth = 240,
-			OnShow = function(self)
-				self.editBox:SetText("")
-				self.editBox:SetFocus()
-				self.button1:Disable()
-			end,
-			EditBoxOnTextChanged = function(self)
-				local parent = self:GetParent()
-				if self:GetText() == displayName then
-					parent.button1:Enable()
-				else
-					parent.button1:Disable()
-				end
-			end,
-			OnAccept = function(self)
-				if self.editBox:GetText() == displayName and GuildUninvite then
-					GuildUninvite(fullName)
-				end
-			end,
-			EditBoxOnEscapePressed = function(self) self:GetParent():Hide() end,
-			timeout = 0,
-			whileDead = 1,
-			hideOnEscape = 1,
-			preferredIndex = 3,
-		}
-		StaticPopup_Show(key)
-	end
-
 	-- Helper: copy-name dialog
 	local function ShowCopyName()
 		local key = "BFL_GUILD_COPY_NAME"
@@ -270,116 +218,102 @@ function MenuSystem:ShowGuildMemberMenu(button, member)
 		StaticPopup_Show(key)
 	end
 
+	local function RefreshGuildSurfaces()
+		local GuildFrame = BFL:GetModule("GuildFrame")
+		if GuildFrame and GuildFrame.Refresh then GuildFrame:Refresh() end
+		local GuildBroker = BFL:GetModule("GuildBroker")
+		if GuildBroker and GuildBroker.RefreshTooltip then GuildBroker:RefreshTooltip() end
+	end
+
+	local function ShowNicknameDialog()
+		if not fullName then
+			return
+		end
+		local DB = BFL:GetModule("DB")
+		local currentNick = DB and DB:GetGuildNickname(fullName) or ""
+		StaticPopupDialogs["BFL_GUILD_SET_NICKNAME"] = {
+			text = string.format(L.GUILD_BROKER_NICKNAME_PROMPT or "Enter a nickname for %s:", displayName),
+			button1 = ACCEPT,
+			button2 = CANCEL,
+			button3 = currentNick ~= "" and (L.GUILD_BROKER_MENU_REMOVE_NICKNAME or "Remove") or nil,
+			hasEditBox = true,
+			editBoxWidth = 250,
+			OnShow = function(self)
+				self.EditBox:SetText(currentNick)
+				self.EditBox:SetFocus()
+				self.EditBox:HighlightText()
+			end,
+			OnAccept = function(self)
+				local newNick = self.EditBox:GetText()
+				if DB and newNick and newNick:trim() ~= "" then
+					DB:SetGuildNickname(fullName, newNick:trim())
+					RefreshGuildSurfaces()
+				end
+			end,
+			OnAlt = function()
+				if DB then
+					DB:SetGuildNickname(fullName, nil)
+					RefreshGuildSurfaces()
+				end
+			end,
+			EditBoxOnEnterPressed = function(self)
+				local parent = self:GetParent()
+				local newNick = parent.EditBox:GetText()
+				if DB and newNick and newNick:trim() ~= "" then
+					DB:SetGuildNickname(fullName, newNick:trim())
+					RefreshGuildSurfaces()
+				end
+				parent:Hide()
+			end,
+			EditBoxOnEscapePressed = function(self)
+				self:GetParent():Hide()
+			end,
+			timeout = 0,
+			whileDead = true,
+			hideOnEscape = true,
+			preferredIndex = 3,
+		}
+		StaticPopup_Show("BFL_GUILD_SET_NICKNAME")
+	end
+
+	local function InviteToGroup()
+		if fullName and BFL.InviteUnit and not BFL:IsActionRestricted() then
+			BFL.InviteUnit(fullName)
+		end
+	end
+
+	local function Whisper()
+		if fullName then
+			BFL:SecureSendTell(fullName:gsub(" ", ""))
+		end
+	end
+
+	local function OpenNativeGuildUI()
+		local GuildFrame = BFL:GetModule("GuildFrame")
+		if GuildFrame then GuildFrame:OpenBlizzardGuildUI() end
+	end
+
 	if MenuUtil and MenuUtil.CreateContextMenu then
 		-- Retail: Modern menu
 		MenuUtil.CreateContextMenu(button, function(owner, rootDescription)
 			rootDescription:CreateTitle(displayName)
 
-			-- View Member Info Panel
-			rootDescription:CreateButton((L and L.GUILD_ACTION_OPEN_INFO) or "View Member Info", function()
-				local GuildFrame = BFL:GetModule("GuildFrame")
-				if GuildFrame then GuildFrame:ShowMemberInfoPanel(member) end
-			end)
-
-			rootDescription:CreateDivider()
-
 			-- Communication
 			if member.online and fullName then
-				rootDescription:CreateButton((L and L.GUILD_ACTION_WHISPER) or WHISPER or "Whisper", function()
-					local whisperName = fullName:gsub(" ", "")
-					BFL:SecureSendTell(whisperName)
-				end)
-				rootDescription:CreateButton((L and L.GUILD_ACTION_INVITE_PARTY) or PARTY_INVITE or "Invite", function()
-					BFL.InviteUnit(fullName)
-				end)
-			end
-
-			-- Management (remove only; rank changes now live in the Member Info panel)
-			local canRemove = CanGuildRemove and CanGuildRemove() or false
-			if canRemove then
-				rootDescription:CreateDivider()
-				rootDescription:CreateButton((L and L.GUILD_ACTION_REMOVE) or "Remove from Guild", function()
-					ShowRemoveConfirm()
-				end)
+				rootDescription:CreateButton((L and L.GUILD_ACTION_WHISPER) or WHISPER or "Whisper", Whisper)
+				rootDescription:CreateButton((L and L.GUILD_ACTION_INVITE_PARTY) or PARTY_INVITE or "Invite", InviteToGroup)
 			end
 
 			rootDescription:CreateDivider()
 
-			-- BFL: Nickname + Note editing
+			-- BFL-local nickname only; guild notes/admin actions stay in the native UI.
 			if fullName then
 				local DB = BFL:GetModule("DB")
 				local currentNick = DB and DB:GetGuildNickname(fullName) or ""
 				local nickLabel = currentNick ~= ""
 					and (L.GUILD_BROKER_MENU_EDIT_NICKNAME or "Edit Nickname")
 					or (L.GUILD_BROKER_MENU_SET_NICKNAME or "Set Nickname")
-				rootDescription:CreateButton(nickLabel, function()
-					StaticPopupDialogs["BFL_GUILD_SET_NICKNAME"] = {
-						text = string.format(L.GUILD_BROKER_NICKNAME_PROMPT or "Enter a nickname for %s:", displayName),
-						button1 = ACCEPT,
-						button2 = CANCEL,
-						button3 = currentNick ~= "" and (L.GUILD_BROKER_MENU_REMOVE_NICKNAME or "Remove") or nil,
-						hasEditBox = true,
-						editBoxWidth = 250,
-						OnShow = function(self)
-							self.EditBox:SetText(currentNick)
-							self.EditBox:SetFocus()
-							self.EditBox:HighlightText()
-						end,
-						OnAccept = function(self)
-							local newNick = self.EditBox:GetText()
-							if newNick and newNick:trim() ~= "" then
-								DB:SetGuildNickname(fullName, newNick:trim())
-								local GuildFrame = BFL:GetModule("GuildFrame")
-								if GuildFrame then GuildFrame:Refresh() end
-								local GuildBroker = BFL:GetModule("GuildBroker")
-								if GuildBroker and GuildBroker.RefreshTooltip then GuildBroker:RefreshTooltip() end
-							end
-						end,
-						OnAlt = function()
-							DB:SetGuildNickname(fullName, nil)
-							local GuildFrame = BFL:GetModule("GuildFrame")
-							if GuildFrame then GuildFrame:Refresh() end
-							local GuildBroker = BFL:GetModule("GuildBroker")
-							if GuildBroker and GuildBroker.RefreshTooltip then GuildBroker:RefreshTooltip() end
-						end,
-						EditBoxOnEnterPressed = function(self)
-							local parent = self:GetParent()
-							local newNick = parent.EditBox:GetText()
-							if newNick and newNick:trim() ~= "" then
-								DB:SetGuildNickname(fullName, newNick:trim())
-								local GuildFrame = BFL:GetModule("GuildFrame")
-								if GuildFrame then GuildFrame:Refresh() end
-								local GuildBroker = BFL:GetModule("GuildBroker")
-								if GuildBroker and GuildBroker.RefreshTooltip then GuildBroker:RefreshTooltip() end
-							end
-							parent:Hide()
-						end,
-						EditBoxOnEscapePressed = function(self)
-							self:GetParent():Hide()
-						end,
-						timeout = 0,
-						whileDead = true,
-						hideOnEscape = true,
-						preferredIndex = 3,
-					}
-					StaticPopup_Show("BFL_GUILD_SET_NICKNAME")
-				end)
-			end
-
-			if CanEditPublicNote and CanEditPublicNote() and member.guildIndex then
-				rootDescription:CreateButton(L.GUILD_BROKER_MENU_EDIT_NOTE or "Edit Note", function()
-					SetGuildRosterSelection(member.guildIndex)
-					StaticPopup_Show("SET_GUILDPLAYERNOTE")
-				end)
-			end
-
-			if C_GuildInfo and C_GuildInfo.CanViewOfficerNote and C_GuildInfo.CanViewOfficerNote() then
-				if CanEditOfficerNote and CanEditOfficerNote() and member.guildIndex then
-					rootDescription:CreateButton(L.GUILD_BROKER_MENU_EDIT_OFFICER_NOTE or "Edit Officer Note", function()
-						SetGuildRosterSelection(member.guildIndex)
-						StaticPopup_Show("SET_GUILDOFFICERNOTE")
-					end)
-				end
+				rootDescription:CreateButton(nickLabel, ShowNicknameDialog)
 			end
 
 			rootDescription:CreateDivider()
@@ -388,18 +322,59 @@ function MenuSystem:ShowGuildMemberMenu(button, member)
 			rootDescription:CreateButton((L and L.GUILD_ACTION_COPY_NAME) or "Copy Name", function()
 				ShowCopyName()
 			end)
-			rootDescription:CreateButton((L and L.GUILD_ACTION_OPEN_BLIZZARD) or "Open in Guild UI", function()
-				local GuildFrame = BFL:GetModule("GuildFrame")
-				if GuildFrame then GuildFrame:OpenBlizzardGuildUI(member.guildIndex) end
-			end)
+			rootDescription:CreateButton((L and L.GUILD_ACTION_OPEN_BLIZZARD) or "Open in Guild UI", OpenNativeGuildUI)
 		end)
-	elseif BFL.OpenContextMenu then
-		-- Classic fallback: delegate to native Guild member dropdown
-		if member.guildIndex then
-			SetGuildRosterSelection(member.guildIndex)
+	elseif UIDropDownMenu_Initialize and ToggleDropDownMenu then
+		if not self.GuildMemberDropdown then
+			self.GuildMemberDropdown = CreateFrame("Frame", "BFL_GuildMemberDropdown", UIParent, "UIDropDownMenuTemplate")
 		end
-		if UIDROPDOWNMENU_INIT_MENU then
-			ToggleDropDownMenu(1, nil, _G["GuildMemberDropDown"], "cursor", 0, 0)
-		end
+
+		UIDropDownMenu_Initialize(self.GuildMemberDropdown, function(dropdown, level)
+			local info = UIDropDownMenu_CreateInfo()
+			info.text = displayName
+			info.isTitle = true
+			info.notCheckable = true
+			UIDropDownMenu_AddButton(info, level)
+
+			if member.online and fullName then
+				info = UIDropDownMenu_CreateInfo()
+				info.text = (L and L.GUILD_ACTION_WHISPER) or WHISPER or "Whisper"
+				info.notCheckable = true
+				info.func = Whisper
+				UIDropDownMenu_AddButton(info, level)
+
+				info = UIDropDownMenu_CreateInfo()
+				info.text = (L and L.GUILD_ACTION_INVITE_PARTY) or PARTY_INVITE or "Invite"
+				info.notCheckable = true
+				info.func = InviteToGroup
+				UIDropDownMenu_AddButton(info, level)
+			end
+
+			if fullName then
+				local DB = BFL:GetModule("DB")
+				local currentNick = DB and DB:GetGuildNickname(fullName) or ""
+				info = UIDropDownMenu_CreateInfo()
+				info.text = currentNick ~= ""
+					and (L.GUILD_BROKER_MENU_EDIT_NICKNAME or "Edit Nickname")
+					or (L.GUILD_BROKER_MENU_SET_NICKNAME or "Set Nickname")
+				info.notCheckable = true
+				info.func = ShowNicknameDialog
+				UIDropDownMenu_AddButton(info, level)
+			end
+
+			info = UIDropDownMenu_CreateInfo()
+			info.text = (L and L.GUILD_ACTION_COPY_NAME) or "Copy Name"
+			info.notCheckable = true
+			info.func = ShowCopyName
+			UIDropDownMenu_AddButton(info, level)
+
+			info = UIDropDownMenu_CreateInfo()
+			info.text = (L and L.GUILD_ACTION_OPEN_BLIZZARD) or "Open in Guild UI"
+			info.notCheckable = true
+			info.func = OpenNativeGuildUI
+			UIDropDownMenu_AddButton(info, level)
+		end, "MENU")
+
+		ToggleDropDownMenu(1, nil, self.GuildMemberDropdown, button, 0, 0)
 	end
 end

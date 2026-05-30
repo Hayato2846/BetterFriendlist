@@ -759,8 +759,9 @@ BFL:RegisterLocale("deDE", function()
 	L.SETTINGS_CLOSE_ON_GUILD_TAB_DESC = "BetterFriendlist automatisch schließen, wenn du auf den Gilden-Tab klickst"
 	L.SETTINGS_HIDE_GUILD_TAB = "Gilden-Tab ausblenden"
 	L.SETTINGS_HIDE_GUILD_TAB_DESC = "Versteckt den Gilden-Tab aus der Freundesliste"
-	L.SETTINGS_ENABLE_GUILD_TAB = "Gilden-Tab aktivieren"
-	L.SETTINGS_ENABLE_GUILD_TAB_DESC = "Zeigt einen Gilden-Tab in BetterFriendlist mit einer vollstaendigen Gildenansicht"
+	L.SETTINGS_ENABLE_GUILD_TAB = "Gildenroster-Tab (Beta)"
+	L.SETTINGS_ENABLE_GUILD_TAB_DESC =
+		"Beta: Zeigt einen read-only Gildenroster-Tab. Benoetigt Beta-Funktionen und bleibt in Retail und Classic identisch."
 	L.SETTINGS_USE_UI_PANEL_SYSTEM = "UI-Hierarchie respektieren"
 	L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC =
 		"Verhindert, dass sich BetterFriendlist über andere UI-Fenster öffnet (Charakter, Zauberbuch, etc.). Erfordert /reload."

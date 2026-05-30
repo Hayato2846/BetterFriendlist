@@ -80,6 +80,7 @@ Modules\RecentAllies.lua [AllowLoadGameType mainline]
 Modules\MenuSystem.lua
 Modules\QuickFilters.lua
 Modules\Broker.lua
+Modules\GuildRosterData.lua
 Modules\GuildBroker.lua
 Modules\GuildFrame.lua
 Modules\SettingsComponents.lua

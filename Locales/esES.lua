@@ -663,8 +663,9 @@ BFL:RegisterLocale("esES", function()
 	L.SETTINGS_CLOSE_ON_GUILD_TAB_DESC = "Cierra la lista de amigos al abrir la de Hermandad"
 	L.SETTINGS_HIDE_GUILD_TAB = "Ocultar Pestaña Hermandad"
 	L.SETTINGS_HIDE_GUILD_TAB_DESC = "Oculta la pestaña Hermandad de la lista de amigos"
-	L.SETTINGS_ENABLE_GUILD_TAB = "Activar pestaña de Hermandad"
-	L.SETTINGS_ENABLE_GUILD_TAB_DESC = "Muestra una pestaña de Hermandad en BetterFriendlist con la lista completa de miembros"
+	L.SETTINGS_ENABLE_GUILD_TAB = "Guild Roster Tab (Beta)"
+	L.SETTINGS_ENABLE_GUILD_TAB_DESC =
+		"Beta: Shows a read-only guild roster tab. Requires Beta Features and stays identical on Retail and Classic."
 	L.SETTINGS_USE_UI_PANEL_SYSTEM = "Respetar Jerarquía UI"
 	L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC =
 		"Evita solapamientos con otras ventanas (Personaje, Libro de Hechizos...). Requiere /reload."

@@ -27,20 +27,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [DRAFT]
 
 ### Added
+- **Guild Roster Tab Beta** - Added a Retail-first, default-off beta Guild Roster tab using the same read-only feature set on Retail and Classic.
 - **Custom Theme & Theme Settings** - Added a Custom theme that inherits from Dark and adds controls for colors, transparency, hover states, selection states, borders, scrollbars, icons, and Blizzard artwork visibility.
 - **Raid Tab** - Added an optional compact Ready Check button next to Raid Info.
 
 ### Improved
 - **Broker Tooltips** - Added the subtle broker separator between Friends Broker groups and Guild Broker rank groups.
 
-### Fixed
-- **Friend Tooltips** - Restored the "Also in group" details and Blizzard-matching restrictions on Battle.net request-to-join buttons.
-
 ### Changed
+- **Guild Roster Data** - Added a shared safe roster provider for the Guild Broker and Guild Tab path, with pcall guards, secret-value fallbacks, and no C_Club data in the tab.
 - **Theme Settings** - Expanded Dark theme settings and made the beta Theme tab available across supported Retail and Classic clients.
 - **Client Compatibility** - Prepared friend invites and raid controls for upcoming Retail client changes while preserving current Retail and Classic support.
 - **Raid Tools** - Improved handling for temporarily uncached raid roster names.
 - **Font Rendering** - Made custom font handling more defensive on newer clients.
+
+### Fixed
+- **ElvUI Skin** - Fixed startup, availability, and settings-toggle issues when ElvUI was selected, unavailable, or managed outside the Retail beta Theme tab.
+- **Menu Compatibility** - Fixed protected Retail unit menu handling and restored Total RP 3 profile actions in BetterFriendlist friend menus.
+- **Raid Tools** - Fixed a Lua error after moving players between raid groups with drag and drop.
+- **Recruit A Friend** - Fixed reward-viewing tab issues, protected Copy Link errors, and a tooltip stack overflow.
+
+### Performance
+- **Friend List Sorting** - Reduced CPU time and memory churn when changing QuickFilters and Sorter selections.
+- **Quick Join** - Reduced repeated group-priority and friend-relationship lookups while sorting available groups.
 
 ## [2.6.0]        - 2026-05-25
 
@@ -55,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Theme Safety** - Theme choices now fall back safely when Beta Features are disabled, on non-Retail clients, or when ElvUI is unavailable.
 
 ### Fixed
+- **Friend Tooltips** - Restored the "Also in group" details and Blizzard-matching restrictions on Battle.net request-to-join buttons.
 - **ElvUI Skin** - Fixed startup, availability, and settings-toggle issues when ElvUI was selected, unavailable, or managed outside the Retail beta Theme tab.
 - **Menu Compatibility** - Fixed protected Retail unit menu handling and restored Total RP 3 profile actions in BetterFriendlist friend menus.
 - **Raid Tools** - Fixed a Lua error after moving players between raid groups with drag and drop.

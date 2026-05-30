@@ -197,8 +197,8 @@ local defaults = {
 	enableGuildTab = false, -- Enable the Guild tab in BetterFriendlist (default: OFF, opt-in)
 	guildTabFilterMode = "online", -- Default filter for Guild Tab (default: online)
 	guildTabSortMode = "rank", -- Default sort for Guild Tab (default: rank)
-	guildTabShowTabard = true, -- Show guild tabard in Guild tab header (default: ON)
-	guildTabShowILvlColumn = true, -- Show Item Level column (default: ON)
+	guildTabShowTabard = false, -- Deprecated/hidden: not part of the Retail-first Guild Tab beta
+	guildTabShowILvlColumn = false, -- Deprecated/hidden: not part of the Retail-first Guild Tab beta
 	-- Classic Guild Tab Settings (legacy, kept for compat)
 	closeOnGuildTabClick = false, -- Close BetterFriendlist when opening Guild Frame (Classic only, default: OFF)
 	hideGuildTab = false, -- Hide the Guild tab completely (Classic only, default: OFF)

@@ -655,8 +655,9 @@ BFL:RegisterLocale("itIT", function()
 	L.SETTINGS_CLOSE_ON_GUILD_TAB_DESC = "Chiudi lista amici quando apri gilda"
 	L.SETTINGS_HIDE_GUILD_TAB = "Nascondi Tab Gilda"
 	L.SETTINGS_HIDE_GUILD_TAB_DESC = "Nascondi tab gilda dalla lista amici"
-	L.SETTINGS_ENABLE_GUILD_TAB = "Attiva tab Gilda"
-	L.SETTINGS_ENABLE_GUILD_TAB_DESC = "Mostra un tab Gilda in BetterFriendlist con la lista completa dei membri"
+	L.SETTINGS_ENABLE_GUILD_TAB = "Guild Roster Tab (Beta)"
+	L.SETTINGS_ENABLE_GUILD_TAB_DESC =
+		"Beta: Shows a read-only guild roster tab. Requires Beta Features and stays identical on Retail and Classic."
 	L.SETTINGS_USE_UI_PANEL_SYSTEM = "Usa Sistema Pannelli UI"
 	L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Evita sovrapposizioni. Richiede reload."
 

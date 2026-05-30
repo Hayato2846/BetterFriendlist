@@ -771,8 +771,7 @@ function FrameInitializer:InitializeTabs(frame)
 	else
 		-- Retail: Set up the tabs on the FriendsTabHeader
 		-- Base tabs: Friends, Recent Allies, RAF. Guild tab (Tab4) added conditionally.
-		-- Guild Tab is currently a work in progress and hidden regardless of user setting.
-		local enableGuildTab = false -- WIP: was BetterFriendlistDB and BetterFriendlistDB.enableGuildTab
+		local enableGuildTab = BFL.IsGuildTabEnabled and BFL:IsGuildTabEnabled()
 		local numTopTabs = enableGuildTab and 4 or 3
 		PanelTemplates_SetNumTabs(frame.FriendsTabHeader, numTopTabs)
 		PanelTemplates_SetTab(frame.FriendsTabHeader, 1)

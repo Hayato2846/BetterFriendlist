@@ -763,8 +763,9 @@ local function LoadEnUS()
 	L.SETTINGS_CLOSE_ON_GUILD_TAB_DESC = "Automatically close BetterFriendlist when you click the Guild tab"
 	L.SETTINGS_HIDE_GUILD_TAB = "Hide Guild Tab"
 	L.SETTINGS_HIDE_GUILD_TAB_DESC = "Hide the Guild tab from the friendlist"
-	L.SETTINGS_ENABLE_GUILD_TAB = "Enable Guild Tab"
-	L.SETTINGS_ENABLE_GUILD_TAB_DESC = "Show a Guild tab in BetterFriendlist with a full guild roster view"
+	L.SETTINGS_ENABLE_GUILD_TAB = "Guild Roster Tab (Beta)"
+	L.SETTINGS_ENABLE_GUILD_TAB_DESC =
+		"Beta: Shows a read-only guild roster tab. Requires Beta Features and stays identical on Retail and Classic."
 	L.SETTINGS_USE_UI_PANEL_SYSTEM = "Respect UI Hierarchy"
 	L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC =
 		"Prevent BetterFriendlist from opening over other UI windows (Character, Spellbook, etc.). Requires /reload."

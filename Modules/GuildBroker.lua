@@ -258,6 +258,29 @@ function GuildBroker:CollectGuildRoster()
 		return rosterCache
 	end
 
+	local maxRows = BetterFriendlistDB and BetterFriendlistDB.guildBrokerMaxRows or 100
+	local GuildRosterData = BFL:GetModule("GuildRosterData")
+	if GuildRosterData and GuildRosterData.CollectRoster and GuildRosterData:HasBaseRosterAPI() then
+		local baseMembers = GuildRosterData:CollectRoster({ maxRows = maxRows })
+		local professionLookup = BuildGuildProfessionLookup()
+		local members = {}
+
+		for _, baseMember in ipairs(baseMembers) do
+			local member = {}
+			for key, value in pairs(baseMember) do
+				member[key] = value
+			end
+			member.professions = professionLookup[NormalizeRosterName(member.fullName)]
+				or professionLookup[NormalizeRosterName(member.name)]
+				or ""
+			members[#members + 1] = member
+		end
+
+		rosterCache = members
+		rosterCacheTime = now
+		return members
+	end
+
 	if not GetNumGuildMembers then
 		rosterCache = {}
 		rosterCacheTime = now
@@ -276,7 +299,6 @@ function GuildBroker:CollectGuildRoster()
 		return rosterCache
 	end
 
-	local maxRows = BetterFriendlistDB and BetterFriendlistDB.guildBrokerMaxRows or 100
 	local members = {}
 	local professionLookup = BuildGuildProfessionLookup()
 

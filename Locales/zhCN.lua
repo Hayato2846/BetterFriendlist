@@ -615,8 +615,9 @@ BFL:RegisterLocale("zhCN", function()
 	L.SETTINGS_CLOSE_ON_GUILD_TAB_DESC = "点击公会标签时自动关闭 BetterFriendlist"
 	L.SETTINGS_HIDE_GUILD_TAB = "隐藏公会标签"
 	L.SETTINGS_HIDE_GUILD_TAB_DESC = "从好友列表中隐藏公会标签"
-	L.SETTINGS_ENABLE_GUILD_TAB = "启用公会标签"
-	L.SETTINGS_ENABLE_GUILD_TAB_DESC = "在BetterFriendlist中显示完整公会成员列表的公会标签"
+	L.SETTINGS_ENABLE_GUILD_TAB = "Guild Roster Tab (Beta)"
+	L.SETTINGS_ENABLE_GUILD_TAB_DESC =
+		"Beta: Shows a read-only guild roster tab. Requires Beta Features and stays identical on Retail and Classic."
 	L.SETTINGS_USE_UI_PANEL_SYSTEM = "遵守UI层级"
 	L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC =
 		"防止BetterFriendlist在其他UI窗口(角色、法术书等)上方打开。需要/reload。"

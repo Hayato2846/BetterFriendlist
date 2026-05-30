@@ -661,8 +661,9 @@ BFL:RegisterLocale("frFR", function()
 	L.SETTINGS_CLOSE_ON_GUILD_TAB_DESC = "Ferme la liste d'amis quand la Guilde s'ouvre"
 	L.SETTINGS_HIDE_GUILD_TAB = "Masquer Onglet Guilde"
 	L.SETTINGS_HIDE_GUILD_TAB_DESC = "Masque l'onglet Guilde de la liste d'amis"
-	L.SETTINGS_ENABLE_GUILD_TAB = "Activer l'onglet Guilde"
-	L.SETTINGS_ENABLE_GUILD_TAB_DESC = "Affiche un onglet Guilde dans BetterFriendlist avec la liste complète des membres"
+	L.SETTINGS_ENABLE_GUILD_TAB = "Guild Roster Tab (Beta)"
+	L.SETTINGS_ENABLE_GUILD_TAB_DESC =
+		"Beta: Shows a read-only guild roster tab. Requires Beta Features and stays identical on Retail and Classic."
 	L.SETTINGS_USE_UI_PANEL_SYSTEM = "Respecter Hiérarchie UI"
 	L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC = "Évite chevauchements avec autres fenêtres. Requiert /reload."
 

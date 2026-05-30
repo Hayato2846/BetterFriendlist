@@ -3777,8 +3777,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			if BFL.IsClassic and BetterFriendsFrame then
 				-- Classic has 4 main tabs: Friends(1), Who(2), Guild(3), Raid(4)
 
-				-- Guild Tab is currently a work in progress and hidden regardless of user setting.
-				local enableGuildTab = false -- WIP: was BetterFriendlistDB and BetterFriendlistDB.enableGuildTab
+				local enableGuildTab = BFL.IsGuildTabEnabled and BFL:IsGuildTabEnabled()
 
 				-- TAB 3: Guild tab (set locale text, hide if disabled)
 				if BetterFriendsFrame.BottomTab3 then
@@ -3842,8 +3841,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					end
 					PanelTemplates_TabResize(tab4, 0)
 
-					-- Guild Tab is currently a work in progress and hidden regardless of user setting.
-					local enableGuildTab = false -- WIP: was BetterFriendlistDB and BetterFriendlistDB.enableGuildTab
+					local enableGuildTab = BFL.IsGuildTabEnabled and BFL:IsGuildTabEnabled()
 					if enableGuildTab then
 						tab4:Show()
 						PanelTemplates_SetNumTabs(BetterFriendsFrame.FriendsTabHeader, 4)
@@ -3928,39 +3926,6 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		-- Localize UI Elements (replacing hardcoded XML text)
 		LocalizeUI()
 
-		-- Classic: Auto-disable useClassicGuildUI CVar on every login
-		-- This ensures the setting persists across game restarts
-		if BFL.IsClassic then
-			local useClassicGuildUI = GetCVar("useClassicGuildUI")
-			if useClassicGuildUI == "1" then
-				SetCVar("useClassicGuildUI", "0")
-
-				-- Show warning popup only on first detection
-				if not BetterFriendlistDB.classicGuildUIWarningShown then
-					BetterFriendlistDB.classicGuildUIWarningShown = true
-
-					-- Define popup dialog
-					StaticPopupDialogs["BFL_CLASSIC_GUILD_UI_WARNING"] = {
-						text = (BFL.L.CLASSIC_GUILD_UI_WARNING_TITLE or "Classic Guild UI Disabled")
-							.. "\n\n"
-							.. (
-								BFL.L.CLASSIC_GUILD_UI_WARNING_TEXT
-								or "BetterFriendlist has disabled the 'Use Classic Guild UI' setting for proper integration.\n\nThe Guild tab now opens Blizzard's Guild Frame instead of showing it within BetterFriendlist."
-							),
-						button1 = OKAY,
-						timeout = 0,
-						whileDead = true,
-						hideOnEscape = true,
-						preferredIndex = STATICPOPUP_NUMDIALOGS,
-					}
-
-					C_Timer.After(1, function()
-						StaticPopup_Show("BFL_CLASSIC_GUILD_UI_WARNING")
-					end)
-				end
-			end
-		end
-
 		-- Override Close Button to use our Hide function
 		if BetterFriendsFrame.CloseButton then
 			BetterFriendsFrame.CloseButton:SetScript("OnClick", function()
@@ -3998,6 +3963,9 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 	local frame = BetterFriendsFrame
 	if not frame then
 		return
+	end
+	if tabIndex == 4 and (BFL.IsClassic or not (BFL.IsGuildTabEnabled and BFL:IsGuildTabEnabled())) then
+		tabIndex = 1
 	end
 
 	-- Update FriendsTabHeader.selectedTab to match displayed content
@@ -4161,7 +4129,7 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 		end
 	elseif tabIndex == 4 then
 		-- Retail: Guild roster
-		if not BFL.IsClassic then
+		if not BFL.IsClassic and BFL.IsGuildTabEnabled and BFL:IsGuildTabEnabled() then
 			ShowChildFrame(frame.GuildFrame)
 			local GuildFrameModule = BFL:GetModule("GuildFrame")
 			if GuildFrameModule and GuildFrameModule.Refresh then
@@ -5546,29 +5514,20 @@ end
 -- ========================================
 
 -- Handle Guild Tab Click (Classic only)
--- Opens Blizzard Guild Frame, optionally closes BFL based on setting
+-- Legacy helper: hand off to Blizzard's Guild UI without mutating CVars.
 function BetterFriendsFrame_HandleGuildTabClick()
 	if not BFL.IsClassic then
 		return
 	end
 
-	-- Check and disable useClassicGuildUI CVar before opening Guild Frame (silent, no popup)
-	local useClassicGuildUI = GetCVar("useClassicGuildUI")
-	if useClassicGuildUI == "1" then
-		SetCVar("useClassicGuildUI", "0")
+	local GuildFrame = BFL:GetModule("GuildFrame")
+	if GuildFrame and GuildFrame.OpenBlizzardGuildUI then
+		GuildFrame:OpenBlizzardGuildUI()
 	end
-
-	-- Toggle Blizzard Guild Frame
-	ToggleGuildFrame()
 
 	-- Switch back to Friends tab (tab 1)
 	PanelTemplates_SetTab(BetterFriendsFrame, 1)
 	BetterFriendsFrame_ShowBottomTab(1)
-
-	-- Close BFL Frame only if setting is enabled
-	if BetterFriendlistDB and BetterFriendlistDB.closeOnGuildTabClick then
-		HideUIPanel(BetterFriendsFrame)
-	end
 end
 
 -- Function to show specific bottom tab
@@ -5692,7 +5651,7 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex)
 				end
 			elseif activeTopTab == 4 then
 				-- Top Tab 4: Guild roster
-				if frame.GuildFrame then
+				if frame.GuildFrame and BFL.IsGuildTabEnabled and BFL:IsGuildTabEnabled() then
 					ShowChildFrame(frame.GuildFrame)
 					local GuildFrameModule = BFL:GetModule("GuildFrame")
 					if GuildFrameModule and GuildFrameModule.Refresh then
@@ -5725,7 +5684,16 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex)
 	elseif tabIndex == 3 then
 		if BFL.IsClassic then
 			-- Classic: Guild Tab - show guild roster
-			ShowChildFrame(frame.GuildFrame)
+			if BFL.IsGuildTabEnabled and BFL:IsGuildTabEnabled() then
+				ShowChildFrame(frame.GuildFrame)
+				local GuildFrameModule = BFL:GetModule("GuildFrame")
+				if GuildFrameModule and GuildFrameModule.Refresh then
+					GuildFrameModule:Refresh()
+				end
+			else
+				PanelTemplates_SetTab(frame, 1)
+				BetterFriendsFrame_ShowBottomTab(1)
+			end
 		else
 			-- Retail: Raid
 			ShowChildFrame(frame.RaidFrame)

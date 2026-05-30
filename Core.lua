@@ -191,6 +191,40 @@ function BFL:IsActionRestricted()
 	return false
 end
 
+function BFL:HasGuildRosterBaseAPI()
+	return IsInGuild ~= nil
+		and GetNumGuildMembers ~= nil
+		and self.GuildRoster ~= nil
+		and self.GetGuildRosterInfo ~= nil
+end
+
+function BFL:GetGuildTabCapability()
+	local provider = self.GetModule and self:GetModule("GuildRosterData")
+	local hasBaseRosterAPI = false
+	if provider and provider.HasBaseRosterAPI then
+		hasBaseRosterAPI = provider:HasBaseRosterAPI() == true
+	else
+		hasBaseRosterAPI = self:HasGuildRosterBaseAPI()
+	end
+
+	local betaEnabled = BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures == true
+	local settingEnabled = BetterFriendlistDB and BetterFriendlistDB.enableGuildTab == true
+
+	return {
+		betaEnabled = betaEnabled,
+		settingEnabled = settingEnabled,
+		hasBaseRosterAPI = hasBaseRosterAPI,
+		canShowSetting = hasBaseRosterAPI,
+		canShowRoster = betaEnabled and settingEnabled and hasBaseRosterAPI,
+		canOpenNativeGuildUI = ToggleGuildFrame ~= nil or GuildFrame_Toggle ~= nil,
+	}
+end
+
+function BFL:IsGuildTabEnabled()
+	local capability = self:GetGuildTabCapability()
+	return capability and capability.canShowRoster == true
+end
+
 function BFL:UpdateBindingGlobals()
 	local L = self.L or _G.BFL_L
 	_G.BINDING_NAME_BETTERFRIENDLIST_TOGGLE = (L and L.KEYBIND_TOGGLE_BETTERFRIENDLIST) or "Toggle BetterFriendlist"

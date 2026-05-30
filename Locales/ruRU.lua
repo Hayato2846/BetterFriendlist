@@ -650,8 +650,9 @@ BFL:RegisterLocale("ruRU", function()
 		"Автоматически закрывать BetterFriendlist при нажатии на вкладку Гильдия"
 	L.SETTINGS_HIDE_GUILD_TAB = "Скрыть вкладку Гильдия"
 	L.SETTINGS_HIDE_GUILD_TAB_DESC = "Скрыть вкладку Гильдия из списка друзей"
-	L.SETTINGS_ENABLE_GUILD_TAB = "Включить вкладку Гильдия"
-	L.SETTINGS_ENABLE_GUILD_TAB_DESC = "Показать вкладку Гильдия в BetterFriendlist с полным списком участников"
+	L.SETTINGS_ENABLE_GUILD_TAB = "Guild Roster Tab (Beta)"
+	L.SETTINGS_ENABLE_GUILD_TAB_DESC =
+		"Beta: Shows a read-only guild roster tab. Requires Beta Features and stays identical on Retail and Classic."
 	L.SETTINGS_USE_UI_PANEL_SYSTEM = "Соблюдать иерархию UI"
 	L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC =
 		"Предотвращает открытие BetterFriendlist поверх других окон UI (Персонаж, Книга заклинаний и т.д.). Требуется /reload."

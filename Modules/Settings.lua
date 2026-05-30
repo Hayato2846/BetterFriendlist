@@ -3181,14 +3181,19 @@ function Settings:OnEnableGuildTabChanged(checked)
 		return
 	end
 
-	DB:Set("enableGuildTab", checked)
+	DB:Set("enableGuildTab", checked and true or false)
+	self:RefreshGuildTabVisibility()
+end
+
+function Settings:RefreshGuildTabVisibility()
+	local showGuildTab = BFL.IsGuildTabEnabled and BFL:IsGuildTabEnabled()
 
 	if not BetterFriendsFrame then return end
 
 	if BFL.IsClassic then
 		-- Classic: Tab 3 = Guild, Tab 4 = Raid
 		if BetterFriendsFrame.BottomTab3 then
-			if checked then
+			if showGuildTab then
 				BetterFriendsFrame.BottomTab3:Show()
 				local L = BFL.L
 				BetterFriendsFrame.BottomTab3:SetText(L and L.GUILD_TAB_TITLE or GUILD or "Guild")
@@ -3209,7 +3214,7 @@ function Settings:OnEnableGuildTabChanged(checked)
 		-- Reposition Raid tab
 		if BetterFriendsFrame.BottomTab4 then
 			BetterFriendsFrame.BottomTab4:ClearAllPoints()
-			if checked then
+			if showGuildTab then
 				BetterFriendsFrame.BottomTab4:SetPoint("LEFT", BetterFriendsFrame.BottomTab3, "RIGHT", -15, 0)
 			else
 				BetterFriendsFrame.BottomTab4:SetPoint("LEFT", BetterFriendsFrame.BottomTab2, "RIGHT", -15, 0)
@@ -3220,7 +3225,7 @@ function Settings:OnEnableGuildTabChanged(checked)
 		local header = BetterFriendsFrame.FriendsTabHeader
 		local tab4 = header and header.Tab4
 		if tab4 then
-			if checked then
+			if showGuildTab then
 				tab4:Show()
 				PanelTemplates_SetNumTabs(header, 4)
 				PanelTemplates_UpdateTabs(header)
@@ -3241,6 +3246,11 @@ function Settings:OnEnableGuildTabChanged(checked)
 	-- Recalculate tab layout after visibility change
 	if BFL.ApplyTabFonts then
 		BFL:ApplyTabFonts()
+	end
+
+	local GuildFrame = BFL:GetModule("GuildFrame")
+	if GuildFrame and GuildFrame.OnGuildTabSettingChanged then
+		GuildFrame:OnGuildTabSettingChanged()
 	end
 end
 
@@ -4241,54 +4251,21 @@ function Settings:RefreshGeneralTab()
 	}, whisperClickDropdown)
 	table.insert(allFrames, whisperClickRow)
 
-	-- Behavior Settings Row 3 (Guild Tab) -- WIP: hidden from settings while
-	-- the Guild Tab is being reworked. Re-enable this block when ready.
-	--[[
+	-- Behavior Settings Row 3 (Guild Roster Tab Beta)
+	local guildCapability = BFL.GetGuildTabCapability and BFL:GetGuildTabCapability() or {}
+	local betaEnabled = guildCapability.betaEnabled == true
 	local guildTabCheckbox = Components:CreateCheckbox(tab, {
-		label = L.SETTINGS_ENABLE_GUILD_TAB or "Enable Guild Tab",
+		label = L.SETTINGS_ENABLE_GUILD_TAB or "Guild Roster Tab (Beta)",
 		initialValue = DB:Get("enableGuildTab", false),
 		callback = function(val)
 			self:OnEnableGuildTabChanged(val)
 		end,
-		tooltipTitle = L.SETTINGS_ENABLE_GUILD_TAB or "Enable Guild Tab",
+		disabled = not betaEnabled or guildCapability.canShowSetting == false,
+		tooltipTitle = L.SETTINGS_ENABLE_GUILD_TAB or "Guild Roster Tab (Beta)",
 		tooltipDesc = L.SETTINGS_ENABLE_GUILD_TAB_DESC
-			or "Show a Guild tab in BetterFriendlist with a full guild roster view",
+			or "Beta: show a read-only guild roster tab. Requires Beta Features to be enabled.",
 	})
 	table.insert(allFrames, guildTabCheckbox)
-
-	local guildTabShowTabardCB = Components:CreateCheckbox(tab, {
-		label = L.SETTINGS_SHOW_GUILD_TABARD or "Show Guild Tabard",
-		initialValue = DB:Get("guildTabShowTabard", true) ~= false,
-		callback = function(val)
-			DB:Set("guildTabShowTabard", val and true or false)
-			local GuildFrame = BFL:GetModule("GuildFrame")
-			if GuildFrame and GuildFrame.UpdateTabard then
-				GuildFrame:UpdateTabard()
-			end
-		end,
-		tooltipTitle = L.SETTINGS_SHOW_GUILD_TABARD or "Show Guild Tabard",
-		tooltipDesc = L.SETTINGS_SHOW_GUILD_TABARD_DESC
-			or "Display the guild's tabard in the Guild tab header.",
-	})
-	table.insert(allFrames, guildTabShowTabardCB)
-
-	local guildTabShowILvlCB = Components:CreateCheckbox(tab, {
-		label = L.SETTINGS_SHOW_ILVL_COLUMN or "Show Item Level Column",
-		initialValue = DB:Get("guildTabShowILvlColumn", true) ~= false,
-		callback = function(val)
-			DB:Set("guildTabShowILvlColumn", val and true or false)
-			local GuildFrame = BFL:GetModule("GuildFrame")
-			if GuildFrame and GuildFrame.UpdateResponsiveLayout then
-				GuildFrame:UpdateResponsiveLayout()
-				GuildFrame:Refresh()
-			end
-		end,
-		tooltipTitle = L.SETTINGS_SHOW_ILVL_COLUMN or "Show Item Level Column",
-		tooltipDesc = L.SETTINGS_SHOW_ILVL_COLUMN_DESC
-			or "Show an item level column in the Guild tab list.",
-	})
-	table.insert(allFrames, guildTabShowILvlCB)
-	--]]
 
 	-- Spacer before next section
 	table.insert(allFrames, Components:CreateSpacer(tab))
@@ -5802,6 +5779,9 @@ function Settings:RefreshAdvancedTab()
 				self:RefreshGeneralTab()
 			end
 
+			self:RefreshGuildTabVisibility()
+			self:RefreshGeneralTab()
+
 			-- User feedback
 			if checked then
 				BFL:DebugPrint(L.SETTINGS_BETA_FEATURES_ENABLED)
@@ -5855,6 +5835,17 @@ function Settings:RefreshAdvancedTab()
 				listY = listY - 18
 			end
 		end
+		local guildIcon = listContainer:CreateTexture(nil, "ARTWORK")
+		guildIcon:SetSize(14, 14)
+		guildIcon:SetPoint("TOPLEFT", 5, listY)
+		guildIcon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\users.blp")
+		guildIcon:SetVertexColor(1, 0.53, 0)
+
+		local guildText = listContainer:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
+		guildText:SetPoint("LEFT", guildIcon, "RIGHT", 6, 0)
+		guildText:SetPoint("TOP", guildIcon, "TOP", 0, -1)
+		guildText:SetText(L.SETTINGS_ENABLE_GUILD_TAB or "Guild Roster Tab (Beta)")
+		listY = listY - 18
 		listContainer:SetHeight(math.abs(listY) + 10)
 		table.insert(allFrames, listContainer)
 	end

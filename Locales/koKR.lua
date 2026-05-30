@@ -625,8 +625,9 @@ BFL:RegisterLocale("koKR", function()
 	L.SETTINGS_CLOSE_ON_GUILD_TAB_DESC = "길드 탭을 클릭할 때 BetterFriendlist를 자동으로 닫습니다"
 	L.SETTINGS_HIDE_GUILD_TAB = "길드 탭 숨기기"
 	L.SETTINGS_HIDE_GUILD_TAB_DESC = "친구 목록에서 길드 탭을 숨깁니다"
-	L.SETTINGS_ENABLE_GUILD_TAB = "길드 탭 활성화"
-	L.SETTINGS_ENABLE_GUILD_TAB_DESC = "BetterFriendlist에 전체 길드 명단이 포함된 길드 탭을 표시합니다"
+	L.SETTINGS_ENABLE_GUILD_TAB = "Guild Roster Tab (Beta)"
+	L.SETTINGS_ENABLE_GUILD_TAB_DESC =
+		"Beta: Shows a read-only guild roster tab. Requires Beta Features and stays identical on Retail and Classic."
 	L.SETTINGS_USE_UI_PANEL_SYSTEM = "UI 계층 구조 준수"
 	L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC =
 		"BetterFriendlist가 다른 UI 창(캐릭터, 주문서 등) 위에 열리지 않도록 합니다. /reload 필요."
