@@ -93,6 +93,14 @@
 								</Anchors>
 							</Frame>
 
+							<!-- Guild Tab Content (BETA) -->
+							<Frame parentKey="GuildTab" hidden="true">
+								<Anchors>
+									<Anchor point="TOPLEFT" />
+									<Anchor point="BOTTOMRIGHT" />
+								</Anchors>
+							</Frame>
+
 							<!-- Statistics Tab Content -->
 							<Frame parentKey="StatisticsTab" hidden="true">
 								<Anchors>

@@ -17,6 +17,21 @@ local function GetRegistry()
 	return BFL:GetModule("FilterSortRegistry")
 end
 
+local function GetActiveGuildFrame()
+	local frame = BetterFriendsFrame
+	if BFL.IsClassic or not frame or not frame.FriendsTabHeader then
+		return nil
+	end
+	if (PanelTemplates_GetSelectedTab(frame.FriendsTabHeader) or 1) ~= 4 then
+		return nil
+	end
+	local GuildFrame = BFL:GetModule("GuildFrame")
+	if GuildFrame and GuildFrame.IsEnabled and GuildFrame:IsEnabled() then
+		return GuildFrame
+	end
+	return nil
+end
+
 local function FormatIcon(icon, size)
 	local Registry = GetRegistry()
 	if Registry and Registry.FormatIcon then
@@ -105,11 +120,20 @@ function QuickFilters:InitDropdown(dropdown)
 	end
 
 	local function IsSelected(mode)
+		local GuildFrame = GetActiveGuildFrame()
+		if GuildFrame then
+			return GuildFrame.filterMode == mode
+		end
 		local currentFilter = ResolveFilter(BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all")
 		return currentFilter == mode
 	end
 
 	local function SetSelected(mode)
+		local GuildFrame = GetActiveGuildFrame()
+		if GuildFrame and GuildFrame.SetFilter then
+			GuildFrame:SetFilter(mode)
+			return
+		end
 		local currentFilter = ResolveFilter(BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all")
 		if mode ~= currentFilter then
 			self:SetFilter(mode)
@@ -118,6 +142,13 @@ function QuickFilters:InitDropdown(dropdown)
 
 	dropdown:SetWidth(51)
 	dropdown:SetupMenu(function(dropdown, rootDescription)
+		local GuildFrame = GetActiveGuildFrame()
+		if GuildFrame and GuildFrame.PopulateFilterMenu then
+			rootDescription:SetTag("MENU_GUILD_STATUS_FILTER")
+			GuildFrame:PopulateFilterMenu(rootDescription)
+			return
+		end
+
 		rootDescription:SetTag("MENU_FRIENDS_QUICKFILTER")
 		for _, filter in ipairs(GetVisibleFilters()) do
 			rootDescription:CreateRadio(FormatIcon(filter.icon, 16) .. " " .. filter.name, IsSelected, SetSelected, filter.id)
@@ -125,12 +156,24 @@ function QuickFilters:InitDropdown(dropdown)
 	end)
 
 	dropdown:SetSelectionTranslator(function(selection)
+		local GuildFrame = GetActiveGuildFrame()
+		if GuildFrame and GuildFrame.GetHeaderFilterIcon then
+			return FormatIcon(GuildFrame:GetHeaderFilterIcon(), 16)
+		end
 		local Registry = GetRegistry()
 		local icon = Registry and Registry:GetQuickFilterIcon(selection.data) or self:GetIcon(selection.data)
 		return FormatIcon(icon, 16)
 	end)
 
 	dropdown:SetScript("OnEnter", function()
+		local GuildFrame = GetActiveGuildFrame()
+		if GuildFrame and GuildFrame.GetHeaderFilterText then
+			BFL_Tooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
+			BFL_Tooltip:SetText(string.format(L.GUILD_HEADER_FILTER_TOOLTIP or "Guild Filter: %s", GuildFrame:GetHeaderFilterText()))
+			BFL_Tooltip:Show()
+			return
+		end
+
 		local filterText = self:GetFilterText()
 		BFL_Tooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
 		BFL_Tooltip:SetText(string.format(L.TOOLTIP_QUICK_FILTER or "Quick Filter: %s", filterText))
@@ -196,6 +239,17 @@ end
 
 function QuickFilters:RefreshDropdown(dropdown)
 	if not dropdown then
+		return
+	end
+
+	local GuildFrame = GetActiveGuildFrame()
+	if GuildFrame and GuildFrame.GetHeaderFilterIcon then
+		local text = FormatIcon(GuildFrame:GetHeaderFilterIcon(), (BFL.IsClassic or not BFL.HasModernDropdown) and 14 or 16)
+		if BFL.IsClassic or not BFL.HasModernDropdown then
+			UIDropDownMenu_SetText(dropdown, text)
+		elseif dropdown.SetText then
+			dropdown:SetText(text)
+		end
 		return
 	end
 

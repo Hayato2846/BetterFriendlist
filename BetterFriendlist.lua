@@ -1535,6 +1535,12 @@ function BetterFriendsFrame_OnSearchTextChanged(editBox)
 			if RAF then
 				RAF:SetSearchText(searchText)
 			end
+		elseif activeTopTab == 4 then
+			-- Tab 4: Guild roster
+			local GuildFrame = BFL:GetModule("GuildFrame")
+			if GuildFrame and GuildFrame.SetSearchText then
+				GuildFrame:SetSearchText(searchText)
+			end
 		end
 	end)
 	BFL.searchDebounceTimer = newTimer
@@ -2316,6 +2322,49 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end)
 			end
 
+			local function BFL_GetDisplayedInviteTypeSafe(guid)
+				if not guid or not GetDisplayedInviteType or BFL:IsSecret(guid) then
+					return nil
+				end
+
+				local ok, inviteType = pcall(GetDisplayedInviteType, guid)
+				if ok then
+					return inviteType
+				end
+				return nil
+			end
+
+			local function BFL_GetInviteButtonText(inviteType)
+				local fallback = PARTY_INVITE or INVITE or "Invite"
+				if inviteType == "SUGGEST_INVITE" or inviteType == "SUGGEST_INVITE_CROSS_FACTION" then
+					return SUGGEST_INVITE or fallback
+				elseif inviteType == "REQUEST_INVITE" or inviteType == "REQUEST_INVITE_CROSS_FACTION" then
+					return REQUEST_INVITE or fallback
+				elseif inviteType == "INVITE_CROSS_FACTION" and TRAVEL_PASS_INVITE_CROSS_FACTION then
+					return TRAVEL_PASS_INVITE_CROSS_FACTION
+				end
+				return fallback
+			end
+
+			local function BFL_InvokeBNetInviteOrRequest(entry)
+				if not entry or entry.isInvitable == false or not entry.gameAccountID then
+					return false
+				end
+
+				local inviteType = entry.inviteType or BFL_GetDisplayedInviteTypeSafe(entry.playerGuid)
+				if FriendsFrame_InviteOrRequestToJoin and entry.playerGuid then
+					FriendsFrame_InviteOrRequestToJoin(entry.playerGuid, entry.gameAccountID)
+					return true
+				elseif (inviteType == "REQUEST_INVITE" or inviteType == "REQUEST_INVITE_CROSS_FACTION") and BNRequestInviteFriend then
+					BNRequestInviteFriend(entry.gameAccountID)
+					return true
+				elseif BFL.BNInviteFriend then
+					BFL.BNInviteFriend(entry.gameAccountID)
+					return true
+				end
+				return false
+			end
+
 			-- Multi-Game-Account: Replace Blizzard's single invite button with a character picker submenu
 			-- Only for BNet friend menus where the friend has multiple invitable WoW accounts
 			local function BFL_ReplaceInviteButton(owner, rootDescription, contextData)
@@ -2399,7 +2448,18 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					local entry = FriendsList:BuildAccountDisplay(ga)
 					if entry then
 						entry.isPreferred = lastInvited and entry.gameAccountID == lastInvited or false
+						entry.inviteType = BFL_GetDisplayedInviteTypeSafe(entry.playerGuid)
+						entry.inviteText = BFL_GetInviteButtonText(entry.inviteType)
 						entries[#entries + 1] = entry
+					end
+				end
+
+				local inviteText = entries[1] and entries[1].inviteText
+				local mixedInviteTypes = false
+				for _, entry in ipairs(entries) do
+					if entry.inviteText ~= inviteText then
+						mixedInviteTypes = true
+						break
 					end
 				end
 
@@ -2409,6 +2469,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 				local function FormatEntryText(entry)
 					local label = entry.text or "Unknown"
+					if mixedInviteTypes and entry.inviteText then
+						label = entry.inviteText .. ": " .. label
+					end
 					if entry.isPreferred then
 						label = "* " .. label
 					end
@@ -2472,6 +2535,16 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 						if isInvite then
 							found = true
+							local replacementText = mixedInviteTypes
+									and (TRAVEL_PASS_INVITE or PARTY_INVITE or INVITE or "Invite")
+								or inviteText
+							if replacementText then
+								if elementDescription.SetText then
+									elementDescription:SetText(replacementText)
+								else
+									elementDescription.text = replacementText
+								end
+							end
 							-- Convert from single-click button to submenu parent
 							-- Suppress original handler: return MenuResponse.Open to keep submenu visible
 							elementDescription:SetResponder(function()
@@ -2481,21 +2554,10 @@ frame:SetScript("OnEvent", function(self, event, ...)
 							-- Add character entries as submenu children
 							for _, entry in ipairs(entries) do
 								local displayText = FormatEntryText(entry)
-								local gameAccountID = entry.gameAccountID
-								local playerGuid = entry.playerGuid
 								elementDescription:CreateButton(displayText, function()
-									if not entry.isInvitable then
-										return
-									end
-
-									if FriendsFrame_InviteOrRequestToJoin and playerGuid and gameAccountID then
-										FriendsFrame_InviteOrRequestToJoin(playerGuid, gameAccountID)
-									elseif gameAccountID then
-										BFL.BNInviteFriend(gameAccountID)
-									end
-
-									if friendUID and gameAccountID then
-										FriendsList:SetLastInvitedAccountID(friendUID, gameAccountID)
+									local didInvite = BFL_InvokeBNetInviteOrRequest(entry)
+									if didInvite and friendUID and entry.gameAccountID then
+										FriendsList:SetLastInvitedAccountID(friendUID, entry.gameAccountID)
 									end
 								end)
 							end
@@ -2997,34 +3059,44 @@ frame:SetScript("OnEvent", function(self, event, ...)
 							local entry = FriendsList.BuildAccountDisplay and FriendsList:BuildAccountDisplay(ga)
 							if entry then
 								entry.isPreferred = lastInvited and entry.gameAccountID == lastInvited or false
+								entry.inviteType = BFL_GetDisplayedInviteTypeSafe(entry.playerGuid)
+								entry.inviteText = BFL_GetInviteButtonText(entry.inviteType)
 								entries[#entries + 1] = entry
 							end
 						end
 
 						local function InviteEntry(entry)
-							if not entry or entry.isInvitable == false then
-								return
-							end
-							if FriendsFrame_InviteOrRequestToJoin and entry.playerGuid and entry.gameAccountID then
-								FriendsFrame_InviteOrRequestToJoin(entry.playerGuid, entry.gameAccountID)
-							elseif entry.gameAccountID then
-								BFL.BNInviteFriend(entry.gameAccountID)
-							end
-							if friendUID and entry.gameAccountID and FriendsList.SetLastInvitedAccountID then
+							local didInvite = BFL_InvokeBNetInviteOrRequest(entry)
+							if didInvite and friendUID and entry.gameAccountID and FriendsList.SetLastInvitedAccountID then
 								FriendsList:SetLastInvitedAccountID(friendUID, entry.gameAccountID)
 							end
 						end
 
 						if #entries > 1 then
-							local inviteMenu = rootDescription:CreateButton(PARTY_INVITE or INVITE or "Invite")
+							local inviteText = entries[1].inviteText
+							local mixedInviteTypes = false
+							for _, entry in ipairs(entries) do
+								if entry.inviteText ~= inviteText then
+									mixedInviteTypes = true
+									break
+								end
+							end
+
+							local inviteMenu = rootDescription:CreateButton(
+								mixedInviteTypes and (TRAVEL_PASS_INVITE or PARTY_INVITE or INVITE or "Invite")
+									or (inviteText or BFL_GetInviteButtonText(nil))
+							)
 							for _, entry in ipairs(entries) do
 								local label = entry.text or entry.name or UNKNOWN or "Unknown"
+								if mixedInviteTypes and entry.inviteText then
+									label = entry.inviteText .. ": " .. label
+								end
 								inviteMenu:CreateButton(label, function()
 									InviteEntry(entry)
 								end)
 							end
 						elseif entries[1] then
-							rootDescription:CreateButton(PARTY_INVITE or INVITE or "Invite", function()
+							rootDescription:CreateButton(entries[1].inviteText or BFL_GetInviteButtonText(nil), function()
 								InviteEntry(entries[1])
 							end)
 						end
@@ -3034,15 +3106,8 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 				local fullName = BFL_GetContextFullName(contextData)
 				if fullName and BFL.InviteUnit then
-					local inviteType = contextData.guid and GetDisplayedInviteType and GetDisplayedInviteType(contextData.guid) or "INVITE"
-					local buttonText = PARTY_INVITE or INVITE or "Invite"
-					if inviteType == "SUGGEST_INVITE" or inviteType == "SUGGEST_INVITE_CROSS_FACTION" then
-						buttonText = SUGGEST_INVITE or buttonText
-					elseif inviteType == "REQUEST_INVITE" or inviteType == "REQUEST_INVITE_CROSS_FACTION" then
-						buttonText = REQUEST_INVITE or buttonText
-					elseif inviteType == "INVITE_CROSS_FACTION" and TRAVEL_PASS_INVITE_CROSS_FACTION then
-						buttonText = TRAVEL_PASS_INVITE_CROSS_FACTION
-					end
+					local inviteType = BFL_GetDisplayedInviteTypeSafe(contextData.guid) or "INVITE"
+					local buttonText = BFL_GetInviteButtonText(inviteType)
 
 					rootDescription:CreateButton(buttonText, function()
 						if inviteType == "REQUEST_INVITE" or inviteType == "REQUEST_INVITE_CROSS_FACTION" then
@@ -3994,6 +4059,10 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 		if RAF and RAF.SetSearchText then
 			RAF:SetSearchText("")
 		end
+		local GuildFrame = BFL:GetModule("GuildFrame")
+		if GuildFrame and GuildFrame.SetSearchText then
+			GuildFrame:SetSearchText("")
+		end
 
 		-- Update placeholder text based on active tab
 		local L = BFL.L
@@ -4005,7 +4074,7 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 			elseif tabIndex == 3 then
 				searchBox.Instructions:SetText(L.SEARCH_RAF_INSTRUCTION)
 			elseif tabIndex == 4 then
-				searchBox.Instructions:SetText(SEARCH or "Search")
+				searchBox.Instructions:SetText(L.GUILD_SEARCH_PLACEHOLDER or SEARCH or "Search")
 			end
 		end
 
@@ -4017,6 +4086,11 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 	local FriendsList = BFL:GetModule("FriendsList")
 	if FriendsList and FriendsList.UpdateSearchBoxState then
 		FriendsList:UpdateSearchBoxState()
+	end
+
+	local GuildFrameModule = BFL:GetModule("GuildFrame")
+	if GuildFrameModule and GuildFrameModule.OnTopTabChanged then
+		GuildFrameModule:OnTopTabChanged(tabIndex)
 	end
 
 	-- Force layout update for Tab 1 to position ScrollFrame correctly
@@ -5730,9 +5804,15 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex)
 			elseif activeTopTab == 3 then
 				searchBox.Instructions:SetText(L.SEARCH_RAF_INSTRUCTION)
 			elseif activeTopTab == 4 then
-				searchBox.Instructions:SetText(SEARCH or "Search")
+				searchBox.Instructions:SetText(L.GUILD_SEARCH_PLACEHOLDER or SEARCH or "Search")
 			end
 		end
+	end
+
+	local GuildFrameModule = BFL:GetModule("GuildFrame")
+	if GuildFrameModule and GuildFrameModule.OnTopTabChanged then
+		local activeTopTab = frame.FriendsTabHeader and PanelTemplates_GetSelectedTab(frame.FriendsTabHeader) or 1
+		GuildFrameModule:OnTopTabChanged(activeTopTab)
 	end
 
 	-- Apply custom tab fonts from DB settings (Applied LAST to respect selection state for sizing)

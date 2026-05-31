@@ -536,6 +536,12 @@ local TAB_DEFINITIONS = {
 		icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter.blp",
 		beta = true,
 	},
+	{
+		id = 12,
+		name = L.SETTINGS_TAB_GUILD or GUILD or "Guild",
+		icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\guild.blp",
+		beta = true,
+	},
 
 	-- Data Broker & Global Sync (Stable)
 	{
@@ -832,6 +838,9 @@ function Settings:SelectCategory(categoryID)
 		if content.FilterSortTab then
 			content.FilterSortTab:Hide()
 		end
+		if content.GuildTab then
+			content.GuildTab:Hide()
+		end
 		if content.StreamerTab then
 			content.StreamerTab:Hide()
 		end
@@ -866,6 +875,9 @@ function Settings:SelectCategory(categoryID)
 		elseif categoryID == 11 and content.FilterSortTab then
 			content.FilterSortTab:Show()
 			self:RefreshFilterSortTab()
+		elseif categoryID == 12 and content.GuildTab then
+			content.GuildTab:Show()
+			self:RefreshGuildTab()
 		elseif categoryID == 5 and content.BrokerTab then
 			content.BrokerTab:Show()
 			self:RefreshBrokerTab()
@@ -917,6 +929,8 @@ function Settings:AdjustContentHeight(tabID)
 		activeTab = content.AdvancedTab
 	elseif tabID == 11 then
 		activeTab = content.FilterSortTab
+	elseif tabID == 12 then
+		activeTab = content.GuildTab
 	elseif tabID == 5 then
 		activeTab = content.BrokerTab
 	elseif tabID == 6 then
@@ -2244,6 +2258,12 @@ function Settings:ImportSettings(importString)
 				"sorterVisibility",
 				"sorterOrder",
 				"nextCustomSorterId",
+				-- Guild Tab
+				"enableGuildTab",
+				"guildTabFilterMode",
+				"guildTabSortMode",
+				"guildTabShowClassIcons",
+				"guildTabUseNicknames",
 				-- Broker
 				"brokerEnabled",
 				"brokerShowIcon",
@@ -3183,6 +3203,7 @@ function Settings:OnEnableGuildTabChanged(checked)
 
 	DB:Set("enableGuildTab", checked and true or false)
 	self:RefreshGuildTabVisibility()
+	self:RefreshGuildTab()
 end
 
 function Settings:RefreshGuildTabVisibility()
@@ -4251,22 +4272,6 @@ function Settings:RefreshGeneralTab()
 	}, whisperClickDropdown)
 	table.insert(allFrames, whisperClickRow)
 
-	-- Behavior Settings Row 3 (Guild Roster Tab Beta)
-	local guildCapability = BFL.GetGuildTabCapability and BFL:GetGuildTabCapability() or {}
-	local betaEnabled = guildCapability.betaEnabled == true
-	local guildTabCheckbox = Components:CreateCheckbox(tab, {
-		label = L.SETTINGS_ENABLE_GUILD_TAB or "Guild Roster Tab (Beta)",
-		initialValue = DB:Get("enableGuildTab", false),
-		callback = function(val)
-			self:OnEnableGuildTabChanged(val)
-		end,
-		disabled = not betaEnabled or guildCapability.canShowSetting == false,
-		tooltipTitle = L.SETTINGS_ENABLE_GUILD_TAB or "Guild Roster Tab (Beta)",
-		tooltipDesc = L.SETTINGS_ENABLE_GUILD_TAB_DESC
-			or "Beta: show a read-only guild roster tab. Requires Beta Features to be enabled.",
-	})
-	table.insert(allFrames, guildTabCheckbox)
-
 	-- Spacer before next section
 	table.insert(allFrames, Components:CreateSpacer(tab))
 
@@ -4522,6 +4527,175 @@ function Settings:RefreshGeneralTab()
 	Components:AnchorChain(allFrames, -5)
 
 	-- Store components for cleanup
+	tab.components = allFrames
+end
+
+function Settings:RefreshGuildTab()
+	if not settingsFrame or not Components then
+		return
+	end
+
+	local content = settingsFrame.ContentScrollFrame.Content
+	if not content or not content.GuildTab then
+		return
+	end
+
+	local tab = content.GuildTab
+	local DB = GetDB()
+	if not DB then
+		return
+	end
+
+	if tab.components then
+		for _, component in ipairs(tab.components) do
+			if component.Hide then
+				component:Hide()
+			end
+		end
+	end
+	tab.components = {}
+
+	local allFrames = {}
+	local capability = BFL.GetGuildTabCapability and BFL:GetGuildTabCapability() or {}
+	local guildControlsDisabled = capability.canShowSetting == false
+
+	local function RefreshGuildFrame()
+		local GuildFrame = BFL:GetModule("GuildFrame")
+		if GuildFrame then
+			if GuildFrame.EnsureEnabled then
+				GuildFrame:EnsureEnabled()
+			end
+			if GuildFrame.RefreshHeaderControls then
+				GuildFrame:RefreshHeaderControls()
+			end
+			if GuildFrame.Refresh then
+				GuildFrame:Refresh()
+			end
+		end
+	end
+
+	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_TAB_GUILD or GUILD or "Guild"))
+	table.insert(
+		allFrames,
+		Components:CreateLabel(
+			tab,
+			L.SETTINGS_GUILD_DESC
+				or "Configure the beta Guild roster tab. The tab is only available while Beta Features are enabled.",
+			true,
+			{ r = 0.75, g = 0.75, b = 0.75, a = 1 }
+		)
+	)
+
+	local enableGuildTab = Components:CreateCheckbox(tab, {
+		label = L.SETTINGS_ENABLE_GUILD_TAB or "Enable Guild Tab",
+		initialValue = DB:Get("enableGuildTab", false),
+		callback = function(val)
+			self:OnEnableGuildTabChanged(val)
+		end,
+		disabled = guildControlsDisabled,
+		tooltipTitle = L.SETTINGS_ENABLE_GUILD_TAB or "Enable Guild Tab",
+		tooltipDesc = L.SETTINGS_ENABLE_GUILD_TAB_DESC
+			or "Shows the beta Guild roster tab with roster actions backed by the supported guild APIs.",
+	})
+	table.insert(allFrames, enableGuildTab)
+
+	table.insert(allFrames, Components:CreateSpacer(tab))
+	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_GUILD_ROSTER_HEADER or "Roster Defaults"))
+
+	local filterOptions = {
+		labels = {
+			L.GUILD_FILTER_ONLINE or "Online",
+			L.GUILD_FILTER_ALL or "All",
+			L.GUILD_FILTER_OFFLINE or "Offline",
+		},
+		values = { "online", "all", "offline" },
+	}
+	local filterDropdown = Components:CreateDropdown(
+		tab,
+		L.SETTINGS_GUILD_DEFAULT_FILTER or "Default Filter",
+		filterOptions,
+		function(val)
+			return DB:Get("guildTabFilterMode", "online") == val
+		end,
+		function(val)
+			DB:Set("guildTabFilterMode", val)
+			local GuildFrame = BFL:GetModule("GuildFrame")
+			if GuildFrame and GuildFrame.SetFilter then
+				GuildFrame:SetFilter(val)
+			else
+				RefreshGuildFrame()
+			end
+		end
+	)
+	if filterDropdown.SetTooltip then
+		filterDropdown:SetTooltip(
+			L.SETTINGS_GUILD_DEFAULT_FILTER or "Default Filter",
+			L.SETTINGS_GUILD_DEFAULT_FILTER_DESC or "Initial status filter used by the Guild tab."
+		)
+	end
+	table.insert(allFrames, filterDropdown)
+
+	local sortOptions = {
+		labels = {
+			RANK or "Rank",
+			NAME or "Name",
+			LEVEL or "Level",
+			CLASS or "Class",
+			ZONE or "Zone",
+			STATUS or "Status",
+			LASTONLINE or "Last Online",
+		},
+		values = { "rank", "name", "level", "class", "zone", "status", "lastonline" },
+	}
+	local sortDropdown = Components:CreateDropdown(
+		tab,
+		L.SETTINGS_GUILD_DEFAULT_SORT or "Default Sort",
+		sortOptions,
+		function(val)
+			return DB:Get("guildTabSortMode", "rank") == val
+		end,
+		function(val)
+			DB:Set("guildTabSortMode", val)
+			local GuildFrame = BFL:GetModule("GuildFrame")
+			if GuildFrame and GuildFrame.SetSort then
+				GuildFrame:SetSort(val, true)
+			else
+				RefreshGuildFrame()
+			end
+		end
+	)
+	if sortDropdown.SetTooltip then
+		sortDropdown:SetTooltip(
+			L.SETTINGS_GUILD_DEFAULT_SORT or "Default Sort",
+			L.SETTINGS_GUILD_DEFAULT_SORT_DESC or "Initial sort mode used by the Guild tab."
+		)
+	end
+	table.insert(allFrames, sortDropdown)
+
+	local visualRow = Components:CreateDoubleCheckbox(tab, {
+		label = L.SETTINGS_GUILD_SHOW_CLASS_ICONS or "Show Class Icons",
+		initialValue = DB:Get("guildTabShowClassIcons", true),
+		callback = function(val)
+			DB:Set("guildTabShowClassIcons", val and true or false)
+			RefreshGuildFrame()
+		end,
+		tooltipTitle = L.SETTINGS_GUILD_SHOW_CLASS_ICONS or "Show Class Icons",
+		tooltipDesc = L.SETTINGS_GUILD_SHOW_CLASS_ICONS_DESC
+			or "Display class icons in Guild roster rows.",
+	}, {
+		label = L.SETTINGS_GUILD_USE_NICKNAMES or "Use BFL Guild Nicknames",
+		initialValue = DB:Get("guildTabUseNicknames", true),
+		callback = function(val)
+			DB:Set("guildTabUseNicknames", val and true or false)
+			RefreshGuildFrame()
+		end,
+		tooltipTitle = L.SETTINGS_GUILD_USE_NICKNAMES or "Use BFL Guild Nicknames",
+		tooltipDesc = L.SETTINGS_GUILD_USE_NICKNAMES_DESC
+			or "Use local BetterFriendlist guild nicknames in the Guild tab.",
+	})
+	table.insert(allFrames, visualRow)
+
+	Components:AnchorChain(allFrames, -5)
 	tab.components = allFrames
 end
 
@@ -5777,10 +5951,11 @@ function Settings:RefreshAdvancedTab()
 			end
 			if currentTab == 1 then
 				self:RefreshGeneralTab()
+			elseif currentTab == 12 then
+				self:RefreshGuildTab()
 			end
 
 			self:RefreshGuildTabVisibility()
-			self:RefreshGeneralTab()
 
 			-- User feedback
 			if checked then
@@ -5835,17 +6010,6 @@ function Settings:RefreshAdvancedTab()
 				listY = listY - 18
 			end
 		end
-		local guildIcon = listContainer:CreateTexture(nil, "ARTWORK")
-		guildIcon:SetSize(14, 14)
-		guildIcon:SetPoint("TOPLEFT", 5, listY)
-		guildIcon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\users.blp")
-		guildIcon:SetVertexColor(1, 0.53, 0)
-
-		local guildText = listContainer:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-		guildText:SetPoint("LEFT", guildIcon, "RIGHT", 6, 0)
-		guildText:SetPoint("TOP", guildIcon, "TOP", 0, -1)
-		guildText:SetText(L.SETTINGS_ENABLE_GUILD_TAB or "Guild Roster Tab (Beta)")
-		listY = listY - 18
 		listContainer:SetHeight(math.abs(listY) + 10)
 		table.insert(allFrames, listContainer)
 	end

@@ -27,15 +27,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [DRAFT]
 
 ### Added
-- **Guild Roster Tab Beta** - Added a Retail-first, default-off beta Guild Roster tab using the same read-only feature set on Retail and Classic.
+- **Guild Roster Tab Beta** - Added a beta-gated Guild settings tab and a default-off Guild roster tab with shared Retail/Classic controls.
+- **Guild Roster Actions** - Added supported guild roster actions for communication, notes, rank changes, member removal, invites, MOTD, guild info, leadership handoff, guild control, leave, and disband where the client API and permissions allow them.
 - **Custom Theme & Theme Settings** - Added a Custom theme that inherits from Dark and adds controls for colors, transparency, hover states, selection states, borders, scrollbars, icons, and Blizzard artwork visibility.
 - **Raid Tab** - Added an optional compact Ready Check button next to Raid Info.
 
 ### Improved
+- **Guild Tab Layout** - Reworked the Guild tab around the existing Friendlist header controls on Retail and a compact Classic control row, removing fake filter buttons and dead layout elements.
 - **Broker Tooltips** - Added the subtle broker separator between Friends Broker groups and Guild Broker rank groups.
 
 ### Changed
-- **Guild Roster Data** - Added a shared safe roster provider for the Guild Broker and Guild Tab path, with pcall guards, secret-value fallbacks, and no C_Club data in the tab.
+- **Guild Roster Data** - Added shared guild action and permission handling for the Guild Broker and Guild Tab, including per-target secret-value guards.
 - **Theme Settings** - Expanded Dark theme settings and made the beta Theme tab available across supported Retail and Classic clients.
 - **Client Compatibility** - Prepared friend invites and raid controls for upcoming Retail client changes while preserving current Retail and Classic support.
 - **Raid Tools** - Improved handling for temporarily uncached raid roster names.
@@ -44,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **ElvUI Skin** - Fixed startup, availability, and settings-toggle issues when ElvUI was selected, unavailable, or managed outside the Retail beta Theme tab.
 - **Menu Compatibility** - Fixed protected Retail unit menu handling and restored Total RP 3 profile actions in BetterFriendlist friend menus.
+- **Friend Menus** - Restored Blizzard's invite versus request-to-join labels and actions for Battle.net friends.
 - **Raid Tools** - Fixed a Lua error after moving players between raid groups with drag and drop.
 - **Recruit A Friend** - Fixed reward-viewing tab issues, protected Copy Link errors, and a tooltip stack overflow.
 

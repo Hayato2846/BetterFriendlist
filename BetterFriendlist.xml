@@ -3684,7 +3684,7 @@
 						</Anchors>
 						<Scripts>
 							<OnClick>
-								BFL_GuildFrame_OpenBlizzardGuild()
+								BFL_GuildFrame_OpenBlizzardGuild(self)
 							</OnClick>
 						</Scripts>
 					</Button>

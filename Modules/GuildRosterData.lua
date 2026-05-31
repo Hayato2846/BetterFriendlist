@@ -1,5 +1,5 @@
 -- Modules/GuildRosterData.lua
--- Shared, read-only guild roster provider for Guild Broker and Guild Tab.
+-- Shared guild roster data provider for Guild Broker and Guild Tab.
 
 local ADDON_NAME, BFL = ...
 

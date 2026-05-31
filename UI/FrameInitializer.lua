@@ -643,8 +643,26 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 
 	local primaryDropdown = header.PrimarySortDropdown
 	local secondaryDropdown = header.SecondarySortDropdown
+	local function GetActiveGuildFrame()
+		local bflFrame = BetterFriendsFrame
+		if BFL.IsClassic or not bflFrame or not bflFrame.FriendsTabHeader then
+			return nil
+		end
+		if (PanelTemplates_GetSelectedTab(bflFrame.FriendsTabHeader) or 1) ~= 4 then
+			return nil
+		end
+		local GuildFrame = BFL:GetModule("GuildFrame")
+		if GuildFrame and GuildFrame.IsEnabled and GuildFrame:IsEnabled() then
+			return GuildFrame
+		end
+		return nil
+	end
 
 	local function IsPrimarySelected(sortMode)
+		local GuildFrame = GetActiveGuildFrame()
+		if GuildFrame then
+			return GuildFrame.sortMode == sortMode
+		end
 		-- Always read from DB when checking selection
 		local DB = BFL:GetModule("DB")
 		local db = DB and DB:Get() or {}
@@ -653,6 +671,12 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 	end
 
 	local function SetPrimarySelected(sortMode)
+		local GuildFrame = GetActiveGuildFrame()
+		if GuildFrame and GuildFrame.SetSort then
+			GuildFrame:SetSort(sortMode, true)
+			return
+		end
+
 		FriendsList:SetSortMode(sortMode)
 		FriendsList:RenderDisplay()
 
@@ -667,6 +691,13 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 	end
 
 	primaryDropdown:SetupMenu(function(dropdown, rootDescription)
+		local GuildFrame = GetActiveGuildFrame()
+		if GuildFrame and GuildFrame.PopulateSortMenu then
+			rootDescription:SetTag("MENU_GUILD_PRIMARY_SORT")
+			GuildFrame:PopulateSortMenu(rootDescription)
+			return
+		end
+
 		rootDescription:SetTag("MENU_FRIENDS_PRIMARY_SORT")
 
 		for _, sorter in ipairs(GetVisibleSorters()) do
@@ -676,6 +707,10 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 
 	-- Show icon only (like QuickFilters)
 	primaryDropdown:SetSelectionTranslator(function(selection)
+		local GuildFrame = GetActiveGuildFrame()
+		if GuildFrame and GuildFrame.GetHeaderSortIcon then
+			return FormatIconOnly(GuildFrame:GetHeaderSortIcon())
+		end
 		return FormatIconOnly(GetSorterIcon(selection.data))
 	end)
 
@@ -683,6 +718,13 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 	primaryDropdown:GenerateMenu()
 
 	primaryDropdown:SetScript("OnEnter", function()
+		local GuildFrame = GetActiveGuildFrame()
+		if GuildFrame and GuildFrame.GetHeaderSortText then
+			BFL_Tooltip:SetOwner(primaryDropdown, "ANCHOR_RIGHT")
+			BFL_Tooltip:SetText((L.GUILD_HEADER_SORT_TOOLTIP or "Guild Sort: %s"):format(GuildFrame:GetHeaderSortText()))
+			BFL_Tooltip:Show()
+			return
+		end
 		local sortName = GetSorterName(FriendsList.sortMode)
 		BFL_Tooltip:SetOwner(primaryDropdown, "ANCHOR_RIGHT")
 		BFL_Tooltip:SetText(L.SORT_PRIMARY_LABEL .. ": " .. sortName)

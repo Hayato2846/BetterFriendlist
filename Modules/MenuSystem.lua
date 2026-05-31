@@ -191,6 +191,34 @@ end
 function MenuSystem:ShowGuildMemberMenu(button, member)
 	if not button or not member then return end
 
+	local GuildActions = BFL:GetModule("GuildActions")
+	if GuildActions then
+		if MenuUtil and MenuUtil.CreateContextMenu then
+			MenuUtil.CreateContextMenu(button, function(owner, rootDescription)
+				GuildActions:PopulateMemberMenu(rootDescription, member)
+			end)
+			return
+		elseif UIDropDownMenu_Initialize and ToggleDropDownMenu then
+			if not self.GuildMemberDropdown then
+				self.GuildMemberDropdown = CreateFrame("Frame", "BFL_GuildMemberDropdown", UIParent, "UIDropDownMenuTemplate")
+			end
+
+			UIDropDownMenu_Initialize(self.GuildMemberDropdown, function(dropdown, level)
+				if (level or 1) == 1 then
+					local info = UIDropDownMenu_CreateInfo()
+					info.text = GuildActions:GetDisplayName(member)
+					info.isTitle = true
+					info.notCheckable = true
+					UIDropDownMenu_AddButton(info, level)
+				end
+				GuildActions:AddClassicMemberMenuButtons(member, level)
+			end, "MENU")
+
+			ToggleDropDownMenu(1, nil, self.GuildMemberDropdown, button, 0, 0)
+			return
+		end
+	end
+
 	local L = BFL.L
 	local fullName = member.fullName
 	local displayName = Ambiguate(fullName, "guild")

@@ -42,6 +42,10 @@ local FILTER_ONLINE = "online"
 local FILTER_OFFLINE = "offline"
 
 local function GetSortOptions()
+	local actions = BFL.GetModule and BFL:GetModule("GuildActions")
+	if actions and actions.GetSortOptions then
+		return actions:GetSortOptions()
+	end
 	return {
 		{ value = SORT_RANK, text = RANK or "Rank" },
 		{ value = SORT_NAME, text = NAME or "Name" },
@@ -81,6 +85,21 @@ local function GetDB()
 	return BFL:GetModule("DB")
 end
 
+local function ShouldShowClassIcons()
+	local DB = GetDB()
+	return not DB or DB:Get("guildTabShowClassIcons", true) ~= false
+end
+
+local function ShouldUseGuildNicknames()
+	local DB = GetDB()
+	return DB and DB:Get("guildTabUseNicknames", true) ~= false
+end
+
+local function IsSimpleModeEnabled()
+	local DB = GetDB()
+	return DB and DB:Get("simpleMode", false) == true
+end
+
 local function SafeSetFont(fontObject, fontPath, fontSize, flags)
 	local manager = BFL.FontManager or FontManager
 	if manager and manager.SafeSetFont then
@@ -104,11 +123,19 @@ local function GetGuildRosterData()
 	return BFL:GetModule("GuildRosterData")
 end
 
+local function GetGuildActions()
+	return BFL:GetModule("GuildActions")
+end
+
 local function IsGuildTabEnabled()
 	return BFL.IsGuildTabEnabled and BFL:IsGuildTabEnabled()
 end
 
 local function CanViewOfficerNote()
+	local actions = GetGuildActions()
+	if actions and actions.CanViewOfficerNote then
+		return actions:CanViewOfficerNote()
+	end
 	local provider = GetGuildRosterData()
 	if provider and provider.CanViewOfficerNote then
 		return provider:CanViewOfficerNote()
@@ -381,6 +408,7 @@ function GuildFrame:SetFilter(mode)
 	if DB and DB.Set then
 		DB:Set("guildTabFilterMode", mode)
 	end
+	self:RefreshHeaderControls()
 	self:Refresh()
 end
 
@@ -400,13 +428,14 @@ function GuildFrame:PassesFilter(member)
 	-- Search text
 	if self.searchText ~= "" then
 		local s = self.searchText
-		if member.name:lower():find(s, 1, true) then return true end
-		if member.rank:lower():find(s, 1, true) then return true end
-		if member.zone:lower():find(s, 1, true) then return true end
-		if member.className:lower():find(s, 1, true) then return true end
-		if member.note:lower():find(s, 1, true) then return true end
+		if (member.name or ""):lower():find(s, 1, true) then return true end
+		if (member.fullName or ""):lower():find(s, 1, true) then return true end
+		if (member.rank or ""):lower():find(s, 1, true) then return true end
+		if (member.zone or ""):lower():find(s, 1, true) then return true end
+		if (member.className or ""):lower():find(s, 1, true) then return true end
+		if (member.note or ""):lower():find(s, 1, true) then return true end
 		if CanViewOfficerNote() then
-			if member.officerNote:lower():find(s, 1, true) then return true end
+			if (member.officerNote or ""):lower():find(s, 1, true) then return true end
 		end
 		return false
 	end
@@ -418,11 +447,11 @@ end
 -- Sorting
 -- ========================================
 
-function GuildFrame:SetSort(mode)
+function GuildFrame:SetSort(mode, skipToggle)
 	if not IsValidSortMode(mode) then
 		return
 	end
-	if self.sortMode == mode then
+	if self.sortMode == mode and not skipToggle then
 		-- Toggle reverse on same column
 		self.sortReversed[mode] = not self.sortReversed[mode]
 	else
@@ -433,6 +462,7 @@ function GuildFrame:SetSort(mode)
 		DB:Set("guildTabSortMode", self.sortMode)
 	end
 	self:RefreshSortDropdown()
+	self:RefreshHeaderControls()
 	self:Refresh()
 end
 
@@ -666,16 +696,43 @@ function GuildFrame:ApplyV1Visibility(frame)
 		frame.ILvlHeader:Hide()
 		frame.ILvlHeader:Disable()
 	end
+	if frame.FilterAll then
+		frame.FilterAll:Hide()
+		frame.FilterAll:Disable()
+	end
+	if frame.FilterOnline then
+		frame.FilterOnline:Hide()
+		frame.FilterOnline:Disable()
+	end
+	if frame.FilterOffline then
+		frame.FilterOffline:Hide()
+		frame.FilterOffline:Disable()
+	end
 	if frame.InvitePlayerButton then
 		frame.InvitePlayerButton:Hide()
 		frame.InvitePlayerButton:Disable()
 	end
-	if frame.MOTDText then
-		frame.MOTDText:SetText("")
-		frame.MOTDText:Hide()
+	if frame.SearchBox then
+		if BFL.IsClassic then
+			frame.SearchBox:Show()
+		else
+			frame.SearchBox:SetText("")
+			frame.SearchBox:Hide()
+		end
 	end
-	if frame.HeaderDivider then
-		frame.HeaderDivider:Hide()
+	if frame.SortDropdown then
+		if BFL.IsClassic then
+			frame.SortDropdown:Show()
+		else
+			frame.SortDropdown:Hide()
+		end
+	end
+	if frame.FilterDropdown then
+		if BFL.IsClassic then
+			frame.FilterDropdown:Show()
+		else
+			frame.FilterDropdown:Hide()
+		end
 	end
 	if frame._bflTabard then
 		frame._bflTabard:Hide()
@@ -698,6 +755,20 @@ function GuildFrame:RefreshSortDropdown()
 		return
 	end
 	UIDropDownMenu_SetText(dropdown, self:GetSortLabel(self.sortMode))
+end
+
+function GuildFrame:RefreshFilterDropdown()
+	local frame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
+	local dropdown = frame and frame.FilterDropdown
+	if not dropdown or not UIDropDownMenu_SetText then
+		return
+	end
+	local actions = GetGuildActions()
+	local text = actions and actions.GetFilterLabel and actions:GetFilterLabel(self.filterMode)
+		or (self.filterMode == FILTER_ALL and (ALL or "All"))
+		or (self.filterMode == FILTER_OFFLINE and (FRIENDS_LIST_OFFLINE or "Offline"))
+		or (FRIENDS_LIST_ONLINE or "Online")
+	UIDropDownMenu_SetText(dropdown, text)
 end
 
 function GuildFrame:CreateSortDropdown(frame)
@@ -732,11 +803,48 @@ function GuildFrame:CreateSortDropdown(frame)
 	end)
 end
 
+function GuildFrame:CreateFilterDropdown(frame)
+	if not (frame and UIDropDownMenu_Initialize) then
+		return
+	end
+	if frame.FilterDropdown then
+		return
+	end
+
+	local dropdown = CreateFrame("Frame", "BFL_GuildFilterDropdown", frame, "UIDropDownMenuTemplate")
+	frame.FilterDropdown = dropdown
+	if UIDropDownMenu_SetWidth then
+		UIDropDownMenu_SetWidth(dropdown, 104)
+	end
+	self:RefreshFilterDropdown()
+
+	UIDropDownMenu_Initialize(dropdown, function(_, level)
+		local actions = GetGuildActions()
+		local options = actions and actions.GetFilterOptions and actions:GetFilterOptions() or {
+			{ value = FILTER_ONLINE, text = FRIENDS_LIST_ONLINE or "Online" },
+			{ value = FILTER_ALL, text = ALL or "All" },
+			{ value = FILTER_OFFLINE, text = FRIENDS_LIST_OFFLINE or "Offline" },
+		}
+		for _, option in ipairs(options) do
+			local info = UIDropDownMenu_CreateInfo()
+			info.text = option.text
+			info.value = option.value
+			info.checked = self.filterMode == option.value
+			info.func = function(menuButton)
+				self:SetFilter(menuButton.value)
+				self:RefreshFilterDropdown()
+			end
+			UIDropDownMenu_AddButton(info, level)
+		end
+	end)
+end
+
 function GuildFrame:OnLoad(frame)
 	self.frame = frame
 	ApplyStaticGuildFrameFonts(frame)
 	self:ApplyV1Visibility(frame)
 	self:CreateSortDropdown(frame)
+	self:CreateFilterDropdown(frame)
 
 	-- NOTE: L (locale) is NOT available during OnLoad (set in Initialize).
 	-- Button/label text is set in OnShow instead.
@@ -755,19 +863,13 @@ function GuildFrame:OnLoad(frame)
 			frame.MemberCount:ClearAllPoints()
 			frame.MemberCount:SetPoint("TOPRIGHT", inset, "TOPRIGHT", -6, -4)
 
-			-- Row 2: MOTD below guild name, full Inset width, multi-line -- STATIC anchors
+			-- Row 2: MOTD below guild name, compact two-line max.
 			frame.MOTDText:ClearAllPoints()
 			frame.MOTDText:SetPoint("TOPLEFT", frame.GuildName, "BOTTOMLEFT", 0, -2)
 			frame.MOTDText:SetPoint("RIGHT", inset, "RIGHT", -6, 0)
 			frame.MOTDText:SetWordWrap(true)
-			frame.MOTDText:SetMaxLines(3)
+			frame.MOTDText:SetMaxLines(2)
 			frame.MOTDText:SetNonSpaceWrap(true)
-
-			-- Filter button chain (relative order is static, y-position is dynamic)
-			frame.FilterOnline:ClearAllPoints()
-			frame.FilterOnline:SetPoint("RIGHT", frame.FilterAll, "LEFT", -4, 0)
-			frame.FilterOffline:ClearAllPoints()
-			frame.FilterOffline:SetPoint("RIGHT", frame.FilterOnline, "LEFT", -4, 0)
 
 			-- Bottom buttons: align left edge to Inset (pixel-perfect)
 			frame.OpenBlizzardGuildButton:ClearAllPoints()
@@ -778,9 +880,20 @@ function GuildFrame:OnLoad(frame)
 			self:UpdateLayout()
 		end
 	end
-	if BFL.IsClassic and frame.SortDropdown then
-		frame.SortDropdown:ClearAllPoints()
-		frame.SortDropdown:SetPoint("TOPLEFT", frame, "TOPLEFT", -10, -34)
+	if BFL.IsClassic then
+		if frame.SearchBox then
+			frame.SearchBox:ClearAllPoints()
+			frame.SearchBox:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -32)
+			frame.SearchBox:SetSize(142, 20)
+		end
+		if frame.FilterDropdown then
+			frame.FilterDropdown:ClearAllPoints()
+			frame.FilterDropdown:SetPoint("LEFT", frame.SearchBox or frame, "RIGHT", -12, 0)
+		end
+		if frame.SortDropdown then
+			frame.SortDropdown:ClearAllPoints()
+			frame.SortDropdown:SetPoint("LEFT", frame.FilterDropdown or frame.SearchBox or frame, "RIGHT", -10, 0)
+		end
 	end
 
 	self:CreateEmptyState(frame)
@@ -906,7 +1019,12 @@ function GuildFrame:UpdateMemberButton(button, member, dataIndex)
 	button.memberData = member
 
 	-- Zebra striping
-	if dataIndex % 2 == 0 then
+	local isSelected = self.selectedMember
+		and (self.selectedMember.fullName == member.fullName or self.selectedMember.guildIndex == member.guildIndex)
+	if isSelected then
+		local r, g, b = GetAccentColor(1, 0.82, 0, 1)
+		button.bg:SetColorTexture(r, g, b, 0.18)
+	elseif dataIndex % 2 == 0 then
 		button.bg:SetColorTexture(ZEBRA_EVEN_COLOR.r, ZEBRA_EVEN_COLOR.g, ZEBRA_EVEN_COLOR.b, ZEBRA_EVEN_COLOR.a)
 	else
 		button.bg:SetColorTexture(ZEBRA_ODD_COLOR.r, ZEBRA_ODD_COLOR.g, ZEBRA_ODD_COLOR.b, ZEBRA_ODD_COLOR.a)
@@ -914,7 +1032,7 @@ function GuildFrame:UpdateMemberButton(button, member, dataIndex)
 
 	-- Class icon
 	local classCoords = CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[member.classFile]
-	if classCoords and button.classIcon then
+	if ShouldShowClassIcons() and classCoords and button.classIcon then
 		button.classIcon:SetTexCoord(unpack(classCoords))
 		button.classIcon:Show()
 	elseif button.classIcon then
@@ -935,9 +1053,9 @@ function GuildFrame:UpdateMemberButton(button, member, dataIndex)
 
 	if button.nameText then
 		local displayName = Ambiguate(member.fullName, "guild")
-		local DB = GetDB()
+		local DB = ShouldUseGuildNicknames() and GetDB()
 		local nickname = DB and DB:GetGuildNickname(member.fullName) or nil
-		if nickname and nickname ~= "" then
+		if ShouldUseGuildNicknames() and nickname and nickname ~= "" then
 			displayName = nickname
 		end
 		if member.online then
@@ -1079,16 +1197,34 @@ function GuildFrame:UpdateHeaderInfo()
 
 	self:UpdateTabard()
 	self:UpdateMOTD()
+	self:UpdateHeaderEditButtons()
 end
 
 function GuildFrame:UpdateMOTD()
 	local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
 	if not guildFrame or not guildFrame.MOTDText then return end
 
-	guildFrame.MOTDText:SetText("")
-	guildFrame.MOTDText:Hide()
-	if guildFrame.HeaderDivider then
-		guildFrame.HeaderDivider:Hide()
+	local motd = ""
+	if BFL.GetGuildMOTD then
+		local ok, result = pcall(BFL.GetGuildMOTD)
+		if ok and result then
+			motd = tostring(result):gsub("|n", " "):gsub("\\n", " "):gsub("\n", " ")
+		end
+	end
+
+	if motd ~= "" then
+		local label = (L and L.GUILD_HEADER_MOTD) or "MOTD:"
+		guildFrame.MOTDText:SetText(label .. " " .. motd)
+		guildFrame.MOTDText:Show()
+		if guildFrame.HeaderDivider then
+			guildFrame.HeaderDivider:Show()
+		end
+	else
+		guildFrame.MOTDText:SetText("")
+		guildFrame.MOTDText:Hide()
+		if guildFrame.HeaderDivider then
+			guildFrame.HeaderDivider:Hide()
+		end
 	end
 
 	-- Defer layout update so FontString width is resolved before measuring height
@@ -1097,6 +1233,188 @@ function GuildFrame:UpdateMOTD()
 		self._layoutTimer = nil
 		self:UpdateLayout()
 	end)
+end
+
+function GuildFrame:IsRetailHeaderActive()
+	local frame = BetterFriendsFrame
+	if BFL.IsClassic or not frame or not frame.FriendsTabHeader then
+		return false
+	end
+	return (PanelTemplates_GetSelectedTab(frame.FriendsTabHeader) or 1) == 4
+		and self:IsEnabled()
+end
+
+function GuildFrame:RefreshHeaderControls()
+	local frame = BetterFriendsFrame
+	local header = frame and frame.FriendsTabHeader
+	if not header or BFL.IsClassic then
+		return
+	end
+
+	local active = self:IsRetailHeaderActive()
+	local actions = GetGuildActions()
+	if active and actions then
+		if header.SecondarySortDropdown then
+			header.SecondarySortDropdown:Hide()
+		end
+		if header.QuickFilterDropdown then
+			if header.QuickFilterDropdown.GenerateMenu then
+				header.QuickFilterDropdown:GenerateMenu()
+			elseif UIDropDownMenu_SetText then
+				UIDropDownMenu_SetText(
+					header.QuickFilterDropdown,
+					actions:GetFilterLabel(self.filterMode)
+				)
+			end
+		end
+		if header.PrimarySortDropdown then
+			if header.PrimarySortDropdown.GenerateMenu then
+				header.PrimarySortDropdown:GenerateMenu()
+			elseif UIDropDownMenu_SetText then
+				UIDropDownMenu_SetText(
+					header.PrimarySortDropdown,
+					actions:GetSortLabel(self.sortMode)
+				)
+			end
+		end
+	else
+		if header.SecondarySortDropdown then
+			local simpleMode = IsSimpleModeEnabled()
+			if simpleMode then
+				header.SecondarySortDropdown:Hide()
+			else
+				header.SecondarySortDropdown:Show()
+			end
+			if not simpleMode and header.SecondarySortDropdown.GenerateMenu then
+				header.SecondarySortDropdown:GenerateMenu()
+			end
+		end
+		local QuickFilters = BFL:GetModule("QuickFilters")
+		if QuickFilters and QuickFilters.RefreshDropdown and header.QuickFilterDropdown then
+			QuickFilters:RefreshDropdown(header.QuickFilterDropdown)
+		end
+		if header.PrimarySortDropdown and header.PrimarySortDropdown.GenerateMenu then
+			header.PrimarySortDropdown:GenerateMenu()
+		end
+	end
+end
+
+function GuildFrame:OnTopTabChanged(tabIndex)
+	self:RefreshHeaderControls()
+end
+
+function GuildFrame:PopulateFilterMenu(rootDescription)
+	local actions = GetGuildActions()
+	if actions and actions.PopulateFilterMenu then
+		actions:PopulateFilterMenu(rootDescription)
+	end
+end
+
+function GuildFrame:PopulateSortMenu(rootDescription)
+	local actions = GetGuildActions()
+	if actions and actions.PopulateSortMenu then
+		actions:PopulateSortMenu(rootDescription)
+	end
+end
+
+function GuildFrame:GetHeaderFilterText()
+	local actions = GetGuildActions()
+	return actions and actions.GetFilterLabel and actions:GetFilterLabel(self.filterMode)
+		or self.filterMode
+end
+
+function GuildFrame:GetHeaderFilterIcon()
+	local actions = GetGuildActions()
+	return actions and actions.GetFilterIcon and actions:GetFilterIcon(self.filterMode)
+		or "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-online.blp"
+end
+
+function GuildFrame:GetHeaderSortText()
+	local actions = GetGuildActions()
+	return actions and actions.GetSortLabel and actions:GetSortLabel(self.sortMode)
+		or self:GetSortLabel(self.sortMode)
+end
+
+function GuildFrame:GetHeaderSortIcon()
+	local actions = GetGuildActions()
+	return actions and actions.GetSortIcon and actions:GetSortIcon(self.sortMode)
+		or "Interface\\AddOns\\BetterFriendlist\\Icons\\guild.blp"
+end
+
+function GuildFrame:EnsureHeaderEditButtons(guildFrame)
+	if not guildFrame or guildFrame._bflHeaderEditButtonsReady then
+		return
+	end
+
+	local function CreateEditButton(name, tooltipTitle, onClick)
+		local button = CreateFrame("Button", name, guildFrame)
+		button:SetSize(16, 16)
+		local icon = button:CreateTexture(nil, "ARTWORK")
+		icon:SetAllPoints()
+		icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\edit-2.blp")
+		button.icon = icon
+		button:SetScript("OnClick", onClick)
+		button:SetScript("OnEnter", function(btn)
+			GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
+			GameTooltip:SetText(tooltipTitle)
+			GameTooltip:Show()
+		end)
+		button:SetScript("OnLeave", function(btn)
+			if GameTooltip:IsOwned(btn) then
+				GameTooltip:Hide()
+			end
+		end)
+		button:Hide()
+		return button
+	end
+
+	guildFrame.InfoEditButton = CreateEditButton(
+		"BFL_GuildInfoEditButton",
+		(BFL.L and BFL.L.GUILD_ACTION_EDIT_INFO) or "Guild Info",
+		function()
+		local actions = GetGuildActions()
+		if actions and actions.EditGuildInfo then
+			actions:EditGuildInfo()
+		end
+	end)
+	guildFrame.InfoEditButton:SetPoint("LEFT", guildFrame.GuildName, "RIGHT", 5, 0)
+
+	guildFrame.MOTDEditButton = CreateEditButton(
+		"BFL_GuildMOTDEditButton",
+		(BFL.L and BFL.L.GUILD_ACTION_EDIT_MOTD) or "MOTD",
+		function()
+		local actions = GetGuildActions()
+		if actions and actions.EditMOTD then
+			actions:EditMOTD()
+		end
+	end)
+	guildFrame.MOTDEditButton:SetPoint("TOPRIGHT", guildFrame.MOTDText or guildFrame, "TOPRIGHT", -2, 0)
+
+	guildFrame._bflHeaderEditButtonsReady = true
+end
+
+function GuildFrame:UpdateHeaderEditButtons()
+	local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
+	if not guildFrame then
+		return
+	end
+	self:EnsureHeaderEditButtons(guildFrame)
+
+	if guildFrame.InfoEditButton then
+		if CanEditGuildInfo and CanEditGuildInfo() == true then
+			guildFrame.InfoEditButton:Show()
+		else
+			guildFrame.InfoEditButton:Hide()
+		end
+	end
+
+	if guildFrame.MOTDEditButton then
+		if CanEditMOTD and CanEditMOTD() == true and guildFrame.MOTDText and guildFrame.MOTDText:IsShown() then
+			guildFrame.MOTDEditButton:Show()
+		else
+			guildFrame.MOTDEditButton:Hide()
+		end
+	end
 end
 
 -- ========================================
@@ -1121,35 +1439,13 @@ function GuildFrame:UpdateLayout()
 		motdHeight = guildFrame.MOTDText:GetStringHeight() or 0
 	end
 
-	-- Calculate row positions from Inset top (negative y = downward)
-	-- Row 1: GuildName at -4, height ~14px -> bottom at ~-18
-	-- Row 2: MOTD at GuildName bottom -2 = ~-20, height = motdHeight
+	-- Calculate row positions from Inset top (negative y = downward).
+	-- Retail Guild uses the shared header Search/Filter/Sorter row, so this frame
+	-- only owns the guild header and list.
 	local guildNameHeight = guildFrame.GuildName and guildFrame.GuildName:GetStringHeight() or 14
 	local motdBottom = -4 - guildNameHeight - 2 - motdHeight
 
-	-- Row 3: Search + filters below MOTD
-	local searchTop = motdBottom - 4
-	local filterTop = motdBottom - 6 -- 2px lower for visual centering (filters 16px, search 20px)
-
-	-- ListInset: below search, room for column header straddle
-	-- Headers at ListInset + (4, 25) from XML -> header top = listInsetTop + 25
-	-- Need header top <= searchTop - 20 (search bottom) with 3px gap
-	-- listInsetTop + 25 = searchTop - 20 - 3 -> listInsetTop = searchTop - 48
-	local listInsetTop = searchTop - 48
-
-	-- Reposition dynamic elements
-	if guildFrame.SortDropdown then
-		guildFrame.SortDropdown:ClearAllPoints()
-		guildFrame.SortDropdown:SetPoint("TOPLEFT", inset, "TOPLEFT", -14, filterTop + 2)
-	end
-
-	guildFrame.FilterAll:ClearAllPoints()
-	guildFrame.FilterAll:SetPoint("TOPRIGHT", inset, "TOPRIGHT", -6, filterTop)
-	-- FilterOnline/FilterOffline chain from FilterAll via static anchors
-
-	guildFrame.SearchBox:ClearAllPoints()
-	guildFrame.SearchBox:SetPoint("TOPLEFT", inset, "TOPLEFT", 35, searchTop)
-	guildFrame.SearchBox:SetPoint("RIGHT", guildFrame.FilterOffline, "LEFT", -8, 0)
+	local listInsetTop = motdBottom - 10
 
 	guildFrame.ListInset:ClearAllPoints()
 	guildFrame.ListInset:SetPoint("TOPLEFT", inset, "TOPLEFT", 0, listInsetTop)
@@ -1169,10 +1465,9 @@ function GuildFrame:UpdateFilterHighlight()
 	if not guildFrame then return end
 	self:ApplyV1Visibility(guildFrame)
 
-	GuildFrame.StylePillButton(guildFrame.FilterAll, self.filterMode == FILTER_ALL)
-	GuildFrame.StylePillButton(guildFrame.FilterOnline, self.filterMode == FILTER_ONLINE)
-	GuildFrame.StylePillButton(guildFrame.FilterOffline, self.filterMode == FILTER_OFFLINE)
+	self:RefreshFilterDropdown()
 	self:RefreshSortDropdown()
+	self:RefreshHeaderControls()
 end
 
 -- ========================================
@@ -1253,6 +1548,7 @@ function GuildFrame:OnMemberClick(button, mouseButton)
 		self:ShowContextMenu(button, member)
 	else
 		self.selectedMember = member
+		self:Refresh()
 	end
 end
 
@@ -1265,10 +1561,10 @@ function GuildFrame:OnMemberEnter(button)
 
 	-- Name with class color (show nickname if set)
 	local classColor = RAID_CLASS_COLORS and RAID_CLASS_COLORS[member.classFile]
-	local DB = GetDB()
+	local DB = ShouldUseGuildNicknames() and GetDB()
 	local nickname = DB and DB:GetGuildNickname(member.fullName) or nil
 	local tooltipName = Ambiguate(member.fullName, "guild")
-	if nickname and nickname ~= "" then
+	if ShouldUseGuildNicknames() and nickname and nickname ~= "" then
 		tooltipName = nickname .. " (" .. Ambiguate(member.fullName, "guild") .. ")"
 	end
 	if classColor then
@@ -1335,6 +1631,12 @@ end
 -- ========================================
 
 function GuildFrame:OpenBlizzardGuildUI(memberIndex)
+	local actions = GetGuildActions()
+	if actions and actions.OpenBlizzardGuildUI then
+		actions:OpenBlizzardGuildUI()
+		return
+	end
+
 	if BFL:IsActionRestricted() then
 		return
 	end
@@ -1388,32 +1690,41 @@ function GuildFrame:UpdateResponsiveLayout()
 	if not frame or not frame.GuildFrame then return end
 
 	local guildFrame = frame.GuildFrame
-	local frameWidth = frame:GetWidth()
+	local frameWidth = (guildFrame.ListInset and guildFrame.ListInset:GetWidth()) or frame:GetWidth()
 
 	-- Cache check
 	local roundedWidth = math.floor(frameWidth + 0.5)
 	if self._lastLayoutWidth == roundedWidth then return end
 	self._lastLayoutWidth = roundedWidth
 
-	-- Match WhoFrame pattern: use frame width with scrollbar/padding deduction
-	-- Reserve: class icon left padding + scrollbar area
-	-- Recover: header overlaps
-	local scrollbarAndPadding = 34
-	local effectiveWidth = frameWidth - NAME_OFFSET_WITH_ICON - scrollbarAndPadding + 8
+	local scrollbarAndPadding = 28
+	local effectiveWidth = math.max((frameWidth or 360) - scrollbarAndPadding, 220)
 
-	local showILvl = false
 	local ilvlWidth = 0
-
 	local remaining = effectiveWidth - ilvlWidth
 	local nameWidth = math.floor(remaining * 0.35)
 	local rankWidth = math.floor(remaining * 0.22)
 	local levelWidth = math.floor(remaining * 0.08)
 	local zoneWidth = remaining - nameWidth - rankWidth - levelWidth
 
-	nameWidth = math.max(nameWidth, 90)
-	rankWidth = math.max(rankWidth, 55)
+	nameWidth = math.max(nameWidth, 82)
+	rankWidth = math.max(rankWidth, 52)
 	levelWidth = math.max(levelWidth, 28)
-	zoneWidth = math.max(zoneWidth, 60)
+	zoneWidth = math.max(zoneWidth, 54)
+
+	local totalWidth = nameWidth + rankWidth + levelWidth + zoneWidth
+	if totalWidth > remaining then
+		local overflow = totalWidth - remaining
+		local zoneShrink = math.min(overflow, math.max(zoneWidth - 54, 0))
+		zoneWidth = zoneWidth - zoneShrink
+		overflow = overflow - zoneShrink
+		local rankShrink = math.min(overflow, math.max(rankWidth - 48, 0))
+		rankWidth = rankWidth - rankShrink
+		overflow = overflow - rankShrink
+		if overflow > 0 then
+			nameWidth = math.max(nameWidth - overflow, 70)
+		end
+	end
 
 	self.columnWidths = {
 		name = nameWidth,
@@ -1449,15 +1760,7 @@ function GuildFrame:UpdateResponsiveLayout()
 		end
 	end
 	if guildFrame.ILvlHeader then
-		if showILvl then
-			guildFrame.ILvlHeader:SetWidth(ilvlWidth)
-			if guildFrame.ILvlHeader.Middle then
-				guildFrame.ILvlHeader.Middle:SetWidth(ilvlWidth - 9)
-			end
-			guildFrame.ILvlHeader:Show()
-		else
-			guildFrame.ILvlHeader:Hide()
-		end
+		guildFrame.ILvlHeader:Hide()
 	end
 
 	-- Update button widths for Retail
@@ -1471,12 +1774,24 @@ function GuildFrame:ApplyColumnWidths(button)
 	if not self.columnWidths then return end
 
 	local w = self.columnWidths
+	local showClassIcons = ShouldShowClassIcons()
+	local nameOffset = showClassIcons and NAME_OFFSET_WITH_ICON or 8
 
 	-- Name column: class icon + name text fill the Name header width
 	-- Reserve space for status icon at the right edge of the name cell
 	local statusIconReserve = STATUS_ICON_SIZE + 4
+	if button.classIcon then
+		button.classIcon:ClearAllPoints()
+		if showClassIcons then
+			button.classIcon:SetPoint("LEFT", button, "LEFT", CLASS_ICON_OFFSET, 0)
+		else
+			button.classIcon:Hide()
+		end
+	end
 	if button.nameText then
-		button.nameText:SetWidth(w.name - NAME_OFFSET_WITH_ICON - 2 - statusIconReserve)
+		button.nameText:ClearAllPoints()
+		button.nameText:SetPoint("LEFT", button, "LEFT", nameOffset, 0)
+		button.nameText:SetWidth(math.max(w.name - nameOffset - 2 - statusIconReserve, 24))
 	end
 	-- Status icon: sits at the right edge of the name column (before rank)
 	if button.statusIcon then
@@ -1535,18 +1850,10 @@ function GuildFrame:SetupFilterPills()
 	local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
 	if not guildFrame then return end
 
-	if guildFrame.FilterAll and L and L.GUILD_FILTER_ALL then
-		guildFrame.FilterAll:SetText(L.GUILD_FILTER_ALL)
-	end
-	if guildFrame.FilterOnline and L and L.GUILD_FILTER_ONLINE then
-		guildFrame.FilterOnline:SetText(L.GUILD_FILTER_ONLINE)
-	end
-	if guildFrame.FilterOffline and L and L.GUILD_FILTER_OFFLINE then
-		guildFrame.FilterOffline:SetText(L.GUILD_FILTER_OFFLINE)
-	end
-	GuildFrame.StylePillButton(guildFrame.FilterAll, self.filterMode == FILTER_ALL)
-	GuildFrame.StylePillButton(guildFrame.FilterOnline, self.filterMode == FILTER_ONLINE)
-	GuildFrame.StylePillButton(guildFrame.FilterOffline, self.filterMode == FILTER_OFFLINE)
+	self:ApplyV1Visibility(guildFrame)
+	self:RefreshFilterDropdown()
+	self:RefreshSortDropdown()
+	self:RefreshHeaderControls()
 end
 
 -- ========================================
@@ -2044,7 +2351,10 @@ local function EnsureInviteDialog()
 end
 
 function GuildFrame:ShowInviteDialog()
-	return
+	local actions = GetGuildActions()
+	if actions and actions.InviteToGuild then
+		actions:InviteToGuild()
+	end
 end
 
 
@@ -2067,12 +2377,15 @@ function BFL_GuildFrame_OnShow(frame)
 
 		-- Set locale text for buttons (L is not available during OnLoad, only after Initialize)
 		if frame.OpenBlizzardGuildButton and BFL.L then
-			frame.OpenBlizzardGuildButton:SetText(BFL.L.GUILD_ACTION_OPEN_BLIZZARD or "Open Guild UI")
+			frame.OpenBlizzardGuildButton:SetText(BFL.L.GUILD_ACTIONS_MENU or "Guild Actions")
 			ApplyDefaultSlugToButton(frame.OpenBlizzardGuildButton)
 		end
 		if frame.FilterOffline and BFL.L then
 			frame.FilterOffline:SetText(BFL.L.GUILD_FILTER_OFFLINE or FRIENDS_LIST_OFFLINE or "Offline")
 			ApplyDefaultSlugToButton(frame.FilterOffline)
+		end
+		if frame.SearchBox and frame.SearchBox.Instructions and BFL.L then
+			frame.SearchBox.Instructions:SetText(BFL.L.GUILD_SEARCH_PLACEHOLDER or SEARCH or "Search")
 		end
 		-- Enlarge GuildName for visual weight
 		if frame.GuildName then
@@ -2087,6 +2400,7 @@ function BFL_GuildFrame_OnShow(frame)
 		end
 		-- Pill-style filter buttons
 		GF:SetupFilterPills()
+		GF:UpdateHeaderEditButtons()
 
 		-- Request roster update
 		local provider = GetGuildRosterData()
@@ -2155,10 +2469,21 @@ function BFL_GuildFrame_SortByILvl()
 end
 
 function BFL_GuildFrame_ShowInviteDialog()
-	return
+	local GF = BFL:GetModule("GuildFrame")
+	if GF and GF.ShowInviteDialog then
+		GF:ShowInviteDialog()
+	end
 end
 
-function BFL_GuildFrame_OpenBlizzardGuild()
+function BFL_GuildFrame_OpenBlizzardGuild(button)
+	local actions = BFL:GetModule("GuildActions")
+	if actions and actions.ShowGuildActionsMenu then
+		local owner = button
+			or (BetterFriendsFrame and BetterFriendsFrame.GuildFrame and BetterFriendsFrame.GuildFrame.OpenBlizzardGuildButton)
+			or UIParent
+		actions:ShowGuildActionsMenu(owner)
+		return
+	end
 	local GF = BFL:GetModule("GuildFrame")
 	if GF then GF:OpenBlizzardGuildUI() end
 end

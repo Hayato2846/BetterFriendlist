@@ -197,6 +197,8 @@ local defaults = {
 	enableGuildTab = false, -- Enable the Guild tab in BetterFriendlist (default: OFF, opt-in)
 	guildTabFilterMode = "online", -- Default filter for Guild Tab (default: online)
 	guildTabSortMode = "rank", -- Default sort for Guild Tab (default: rank)
+	guildTabShowClassIcons = true, -- Display class icons in Guild Tab rows
+	guildTabUseNicknames = true, -- Use BetterFriendlist-local guild nicknames in Guild Tab rows
 	guildTabShowTabard = false, -- Deprecated/hidden: not part of the Retail-first Guild Tab beta
 	guildTabShowILvlColumn = false, -- Deprecated/hidden: not part of the Retail-first Guild Tab beta
 	-- Classic Guild Tab Settings (legacy, kept for compat)

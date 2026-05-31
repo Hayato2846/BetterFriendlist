@@ -786,6 +786,32 @@ function GuildBroker:OpenMemberContextMenu(data)
 		return
 	end
 
+	local GuildActions = BFL:GetModule("GuildActions")
+	if GuildActions then
+		if MenuUtil and MenuUtil.CreateContextMenu then
+			MenuUtil.CreateContextMenu(UIParent, function(owner, rootDescription)
+				GuildActions:PopulateMemberMenu(rootDescription, data)
+			end)
+			return
+		elseif UIDropDownMenu_Initialize and ToggleDropDownMenu then
+			if not self.GuildMemberDropdown then
+				self.GuildMemberDropdown = CreateFrame("Frame", "BFL_GuildBrokerMemberDropdown", UIParent, "UIDropDownMenuTemplate")
+			end
+			UIDropDownMenu_Initialize(self.GuildMemberDropdown, function(dropdown, level)
+				if (level or 1) == 1 then
+					local info = UIDropDownMenu_CreateInfo()
+					info.text = GuildActions:GetDisplayName(data)
+					info.isTitle = true
+					info.notCheckable = true
+					UIDropDownMenu_AddButton(info, level)
+				end
+				GuildActions:AddClassicMemberMenuButtons(data, level)
+			end, "MENU")
+			ToggleDropDownMenu(1, nil, self.GuildMemberDropdown, UIParent, 0, 0)
+			return
+		end
+	end
+
 	local canUseGuildActions = not ShouldAvoidSecretValueGuildActions()
 	local hasUsableFullName = data.fullName and data.fullName ~= "Unknown"
 
@@ -1023,6 +1049,12 @@ local function GetMemberGUID(memberData)
 end
 
 function GuildBroker:PromoteMember(data)
+	local GuildActions = BFL:GetModule("GuildActions")
+	if GuildActions and GuildActions.PromoteMember then
+		GuildActions:PromoteMember(data)
+		return
+	end
+
 	if ShouldAvoidSecretValueGuildActions() then
 		BFL:DebugPrint(L("GUILD_BROKER_ACTION_RESTRICTED"))
 		return
@@ -1076,6 +1108,12 @@ function GuildBroker:PromoteMember(data)
 end
 
 function GuildBroker:DemoteMember(data)
+	local GuildActions = BFL:GetModule("GuildActions")
+	if GuildActions and GuildActions.DemoteMember then
+		GuildActions:DemoteMember(data)
+		return
+	end
+
 	if ShouldAvoidSecretValueGuildActions() then
 		BFL:DebugPrint(L("GUILD_BROKER_ACTION_RESTRICTED"))
 		return
@@ -1127,6 +1165,12 @@ function GuildBroker:DemoteMember(data)
 end
 
 function GuildBroker:RemoveMember(data)
+	local GuildActions = BFL:GetModule("GuildActions")
+	if GuildActions and GuildActions.RemoveMember then
+		GuildActions:RemoveMember(data)
+		return
+	end
+
 	if ShouldAvoidSecretValueGuildActions() then
 		BFL:DebugPrint(L("GUILD_BROKER_ACTION_RESTRICTED"))
 		return
