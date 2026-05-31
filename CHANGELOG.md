@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+
+### Fixed
+- **Quick Join** - Fixed a Lua error when opening Quick Join entries during performance tests.
+
+### Performance
+- **Top Tabs** - Reduced hitches when switching between Friends, Recent Allies, Recruit A Friend, and Guild tabs.
+- **Guild Roster** - Reduced memory churn when reopening or switching to the Guild roster tab.
+- **Quick Join** - Reduced repeated row-height work while showing available groups.
+
 ## [2.6.1]        - 2026-05-31
 
 ### Added
@@ -142,11 +152,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Retail: Secret Values** - Fixed crashes when encountering protected values in tooltips, display names, Quick Join, and debug commands.
 - **Retail: Chat & Whisper Taint** - Fixed mass taint errors when receiving chat messages or whispering in popout mode.
 - **Raid Frame: Combat Restriction** - Raid actions (Convert, Assist, Promote) now block properly during combat instead of showing a cryptic error. Buttons are visually disabled in combat.
-
-## [2.5.2]       - 2026-03-24
-
-### Fixed
-- **Housing: Combat Restriction** - The "View Houses" context menu entry now shows a clear error message during combat instead of the cryptic "Interface action failed because of an AddOn" error. Visit House buttons in the house list show a gray overlay with a tooltip when combat starts while the list is already open.
 
 ---
 

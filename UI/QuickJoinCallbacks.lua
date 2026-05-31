@@ -68,6 +68,11 @@ function BetterQuickJoinFrame_OnLoad(self)
 		view:SetElementInitializer("BetterQuickJoinGroupButtonTemplate", function(button, elementData)
 			-- elementData is a QuickJoinEntry from QuickJoin module
 			-- It has ApplyToFrame() method that dynamically creates FontStrings
+			if not elementData or not elementData.ApplyToFrame then
+				button.entry = nil
+				button.guid = nil
+				return
+			end
 
 			-- Store font object for dynamic text creation
 			button.fontObject = BetterFriendlistFontNormalSmall
@@ -97,7 +102,10 @@ function BetterQuickJoinFrame_OnLoad(self)
 
 		-- Dynamic height calculator (matches Blizzard's approach)
 		view:SetElementExtentCalculator(function(dataIndex, elementData)
-			return elementData:CalculateHeight()
+			if elementData and elementData.CalculateHeight then
+				return elementData:CalculateHeight()
+			end
+			return 50
 		end)
 
 		-- Initialize ScrollBox with view

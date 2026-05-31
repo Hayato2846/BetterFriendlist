@@ -4373,6 +4373,38 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
+	TS:RegisterTest("updates", "SearchText_SkipRefresh", {
+		description = "Programmatic search resets can update state without forcing a refresh",
+		action = function(V)
+			local FriendsList = BFL:GetModule("FriendsList")
+			if not FriendsList then
+				V:Skip("FriendsList not loaded")
+				return
+			end
+
+			local originalSearch = FriendsList.searchText
+			local testSearch = "__bfl_skip_refresh_test__"
+			if originalSearch == testSearch then
+				testSearch = testSearch .. "2"
+			end
+
+			local refreshCalled = false
+			local originalRefresh = BFL.ForceRefreshFriendsList
+			BFL.ForceRefreshFriendsList = function(...)
+				refreshCalled = true
+			end
+
+			FriendsList:SetSearchText(testSearch, true)
+
+			BFL.ForceRefreshFriendsList = originalRefresh
+			local changed = FriendsList.searchText == testSearch
+			FriendsList.searchText = originalSearch
+
+			V:Assert(changed == true, "SetSearchText should still update search state")
+			V:Assert(refreshCalled == false, "skipRefresh should suppress ForceRefreshFriendsList")
+		end,
+	})
+
 	TS:RegisterTest("updates", "SearchText_FiltersCorrectly", {
 		description = "SetSearchText must affect filter results",
 		action = function(V)
@@ -5325,6 +5357,7 @@ function TestSuite:RunPerfyStress(durationSeconds)
 		sortIndex = 1,
 		filterIndex = 1,
 		groupIndex = 1,
+		topTabIndex = 1,
 		scrollDirection = 1,
 		scrollStep = 0.2,
 		nextWhoTime = 0,
@@ -5339,6 +5372,11 @@ function TestSuite:RunPerfyStress(durationSeconds)
 		originalSecondarySort = FriendsList and FriendsList.secondarySort,
 		originalSearchText = FriendsList and FriendsList.searchText,
 		originalTab = (BetterFriendsFrame and PanelTemplates_GetSelectedTab(BetterFriendsFrame)) or 1,
+		originalTopTab = (
+			BetterFriendsFrame
+			and BetterFriendsFrame.FriendsTabHeader
+			and PanelTemplates_GetSelectedTab(BetterFriendsFrame.FriendsTabHeader)
+		) or 1,
 		groupStates = {},
 		groupIds = {},
 		filterModes = { "all", "online", "offline", "wowonline", "wow", "bnet", "hideafk", "ingame" },
@@ -5368,12 +5406,58 @@ function TestSuite:RunPerfyStress(durationSeconds)
 	local raidTab = BFL.IsRetail and 3 or 4
 	local quickJoinTab = BFL.IsRetail and 4 or nil
 
+	local function IsTopTabAvailable(tabIndex)
+		local frame = BetterFriendsFrame
+		local header = frame and frame.FriendsTabHeader
+		if not header then
+			return false
+		end
+		if BFL.IsClassic then
+			return tabIndex == 1
+		end
+		local tab = header["Tab" .. tabIndex] or _G["BetterFriendsFrameTab" .. tabIndex]
+		if not tab or tab.isDisabled then
+			return false
+		end
+		if tab.IsShown and not tab:IsShown() then
+			return false
+		end
+		if tabIndex == 2 then
+			return frame.RecentAlliesFrame ~= nil
+		elseif tabIndex == 3 then
+			return frame.RecruitAFriendFrame ~= nil
+				and C_RecruitAFriend
+				and C_RecruitAFriend.IsEnabled
+				and C_RecruitAFriend.IsEnabled()
+		elseif tabIndex == 4 then
+			return frame.GuildFrame ~= nil
+				and BFL.IsGuildTabEnabled
+				and BFL:IsGuildTabEnabled()
+		end
+		return tabIndex == 1
+	end
+
+	local function BuildTopTabList()
+		local tabs = { 1 }
+		if BFL.IsClassic then
+			return tabs
+		end
+		for tabIndex = 2, 4 do
+			if IsTopTabAvailable(tabIndex) then
+				tabs[#tabs + 1] = tabIndex
+			end
+		end
+		return tabs
+	end
+
 	local function EnsureTab(tabIndex)
 		if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
 			if tabIndex then
-				PanelTemplates_SetTab(BetterFriendsFrame, tabIndex)
-				if BetterFriendsFrame_ShowBottomTab then
+				local selectedTab = PanelTemplates_GetSelectedTab(BetterFriendsFrame)
+				if selectedTab ~= tabIndex and BetterFriendsFrame_ShowBottomTab then
 					BetterFriendsFrame_ShowBottomTab(tabIndex)
+				elseif selectedTab ~= tabIndex then
+					PanelTemplates_SetTab(BetterFriendsFrame, tabIndex)
 				end
 			end
 			return
@@ -5384,6 +5468,32 @@ function TestSuite:RunPerfyStress(durationSeconds)
 			_G.ToggleBetterFriendsFrame(tabIndex)
 		elseif BetterFriendsFrame then
 			BetterFriendsFrame:Show()
+		end
+	end
+
+	local function SwitchNextTopTab()
+		if not BetterFriendsFrame_ShowTab then
+			return
+		end
+		EnsureTab(friendsTab)
+		local topTabs = BuildTopTabList()
+		if #topTabs == 0 then
+			return
+		end
+		if context.topTabIndex > #topTabs then
+			context.topTabIndex = 1
+		end
+		local topTab = topTabs[context.topTabIndex]
+		context.topTabIndex = (context.topTabIndex % #topTabs) + 1
+
+		local frame = BetterFriendsFrame
+		local header = frame and frame.FriendsTabHeader
+		local tabButton = header and (header["Tab" .. topTab] or _G["BetterFriendsFrameTab" .. topTab])
+		local onClick = tabButton and tabButton.GetScript and tabButton:GetScript("OnClick")
+		if onClick then
+			onClick(tabButton, "LeftButton")
+		else
+			BetterFriendsFrame_ShowTab(topTab)
 		end
 	end
 
@@ -5504,6 +5614,7 @@ function TestSuite:RunPerfyStress(durationSeconds)
 		function()
 			EnsureTab(friendsTab)
 		end,
+		SwitchNextTopTab,
 		function()
 			if FriendsList and FriendsList.RenderDisplay then
 				FriendsList:RenderDisplay(true)
@@ -5513,6 +5624,7 @@ function TestSuite:RunPerfyStress(durationSeconds)
 		ToggleNextGroup,
 		ApplyNextFilter,
 		ApplyNextSort,
+		SwitchNextTopTab,
 		TriggerWhoInteraction,
 		function()
 			if quickJoinTab then
@@ -5652,6 +5764,9 @@ function TestSuite:StopPerfyStress(reason)
 			PanelTemplates_SetTab(BetterFriendsFrame, context.originalTab)
 			if BetterFriendsFrame_ShowBottomTab then
 				BetterFriendsFrame_ShowBottomTab(context.originalTab)
+			end
+			if context.originalTab == 1 and context.originalTopTab and BetterFriendsFrame_ShowTab then
+				BetterFriendsFrame_ShowTab(context.originalTopTab)
 			end
 		end
 	end

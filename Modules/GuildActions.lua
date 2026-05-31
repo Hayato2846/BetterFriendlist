@@ -37,6 +37,38 @@ local function T(key, fallback)
 	return (BFL.L and BFL.L[key]) or fallback or key
 end
 
+local FILTER_OPTIONS = {
+	{ value = FILTER_ONLINE, icon = FILTER_ICONS.online },
+	{ value = FILTER_ALL, icon = FILTER_ICONS.all },
+	{ value = FILTER_OFFLINE, icon = FILTER_ICONS.offline },
+}
+
+local SORT_OPTIONS = {
+	{ value = SORT_RANK, icon = SORT_ICONS.rank },
+	{ value = SORT_NAME, icon = SORT_ICONS.name },
+	{ value = SORT_LEVEL, icon = SORT_ICONS.level },
+	{ value = SORT_CLASS, icon = SORT_ICONS.class },
+	{ value = SORT_ZONE, icon = SORT_ICONS.zone },
+	{ value = SORT_STATUS, icon = SORT_ICONS.status },
+	{ value = SORT_LAST_ONLINE, icon = SORT_ICONS.lastonline },
+}
+
+local function RefreshFilterOptionText()
+	FILTER_OPTIONS[1].text = T("GUILD_FILTER_ONLINE", FRIENDS_LIST_ONLINE or "Online")
+	FILTER_OPTIONS[2].text = T("GUILD_FILTER_ALL", ALL or "All")
+	FILTER_OPTIONS[3].text = T("GUILD_FILTER_OFFLINE", FRIENDS_LIST_OFFLINE or "Offline")
+end
+
+local function RefreshSortOptionText()
+	SORT_OPTIONS[1].text = RANK or "Rank"
+	SORT_OPTIONS[2].text = NAME or "Name"
+	SORT_OPTIONS[3].text = LEVEL or "Level"
+	SORT_OPTIONS[4].text = CLASS or "Class"
+	SORT_OPTIONS[5].text = ZONE or "Zone"
+	SORT_OPTIONS[6].text = STATUS or "Status"
+	SORT_OPTIONS[7].text = LASTONLINE or "Last Online"
+end
+
 local function SafeCall(fn, ...)
 	if type(fn) ~= "function" then
 		return false
@@ -768,11 +800,8 @@ function GuildActions:DisbandGuild()
 end
 
 function GuildActions:GetFilterOptions()
-	return {
-		{ value = FILTER_ONLINE, text = T("GUILD_FILTER_ONLINE", FRIENDS_LIST_ONLINE or "Online"), icon = FILTER_ICONS.online },
-		{ value = FILTER_ALL, text = T("GUILD_FILTER_ALL", ALL or "All"), icon = FILTER_ICONS.all },
-		{ value = FILTER_OFFLINE, text = T("GUILD_FILTER_OFFLINE", FRIENDS_LIST_OFFLINE or "Offline"), icon = FILTER_ICONS.offline },
-	}
+	RefreshFilterOptionText()
+	return FILTER_OPTIONS
 end
 
 function GuildActions:GetFilterLabel(mode)
@@ -789,15 +818,8 @@ function GuildActions:GetFilterIcon(mode)
 end
 
 function GuildActions:GetSortOptions()
-	return {
-		{ value = SORT_RANK, text = RANK or "Rank", icon = SORT_ICONS.rank },
-		{ value = SORT_NAME, text = NAME or "Name", icon = SORT_ICONS.name },
-		{ value = SORT_LEVEL, text = LEVEL or "Level", icon = SORT_ICONS.level },
-		{ value = SORT_CLASS, text = CLASS or "Class", icon = SORT_ICONS.class },
-		{ value = SORT_ZONE, text = ZONE or "Zone", icon = SORT_ICONS.zone },
-		{ value = SORT_STATUS, text = STATUS or "Status", icon = SORT_ICONS.status },
-		{ value = SORT_LAST_ONLINE, text = LASTONLINE or "Last Online", icon = SORT_ICONS.lastonline },
-	}
+	RefreshSortOptionText()
+	return SORT_OPTIONS
 end
 
 function GuildActions:GetSortLabel(mode)

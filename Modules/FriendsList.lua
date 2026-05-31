@@ -4934,13 +4934,15 @@ function FriendsList:ShowGameAccountPicker(anchorFrame, friend)
 end
 
 -- Set search text
-function FriendsList:SetSearchText(text)
+function FriendsList:SetSearchText(text, skipRefresh)
 	local newText = text or ""
 	if self.searchText == newText then
 		return
 	end
 	self.searchText = newText
-	BFL:ForceRefreshFriendsList()
+	if not skipRefresh then
+		BFL:ForceRefreshFriendsList()
+	end
 end
 
 -- Set filter mode

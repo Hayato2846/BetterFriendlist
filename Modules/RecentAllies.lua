@@ -215,12 +215,16 @@ function RecentAllies:MatchesSearch(ally, searchNormalized)
 end
 
 -- Set search text and refresh the list
-function RecentAllies:SetSearchText(text)
+function RecentAllies:SetSearchText(text, skipRefresh)
 	local newText = text or ""
 	if self.searchText == newText then
 		return
 	end
 	self.searchText = newText
+
+	if skipRefresh then
+		return
+	end
 
 	-- Refresh the list with the new search filter
 	local frame = BetterFriendsFrame and BetterFriendsFrame.RecentAlliesFrame

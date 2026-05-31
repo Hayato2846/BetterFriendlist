@@ -75,6 +75,32 @@ local lastRosterRequestTime = 0
 -- Dirty flag: Set when data changes while frame is hidden
 local rosterDirty = true
 
+local function MarkDisplayListDirty(self)
+	if not self then
+		return
+	end
+	self._displayListDirty = true
+	self._retailScrollBoxDirty = true
+end
+
+local function MarkRetailRowsDirty(self)
+	if not self then
+		return
+	end
+	self._retailScrollBoxVisualDirty = true
+end
+
+local function ResetGuildRenderCache(self)
+	if not self then
+		return
+	end
+	self._displayListDirty = true
+	self._retailScrollBoxDirty = true
+	self._retailScrollBoxVisualDirty = true
+	self._retailRowData = nil
+	self._headerControlsSignature = nil
+end
+
 -- Zebra stripe colors (same as WhoFrame)
 local ZEBRA_EVEN_COLOR = { r = 0.1, g = 0.1, b = 0.1, a = 0.3 }
 local ZEBRA_ODD_COLOR = { r = 0, g = 0, b = 0, a = 0 }
@@ -251,6 +277,7 @@ function GuildFrame:Initialize()
 	self.suppressedForSecretValues = false
 	self.eventsRegistered = false
 	self.showHookInstalled = false
+	ResetGuildRenderCache(self)
 
 	self:EnsureEnabled()
 end
@@ -305,6 +332,7 @@ end
 
 function GuildFrame:OnGuildTabSettingChanged()
 	rosterDirty = true
+	MarkDisplayListDirty(self)
 	needsRenderOnShow = true
 	if self:EnsureEnabled() then
 		self:Refresh()
@@ -333,6 +361,7 @@ function GuildFrame:OnGuildRosterUpdate(canRequestRosterUpdate)
 	end
 
 	rosterDirty = true
+	MarkDisplayListDirty(self)
 
 	-- Check if our frame is visible
 	local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
@@ -349,6 +378,7 @@ function GuildFrame:OnPlayerGuildUpdate(unitTarget)
 	end
 
 	rosterDirty = true
+	MarkDisplayListDirty(self)
 
 	-- Update empty state visibility
 	local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
@@ -390,6 +420,8 @@ function GuildFrame:CollectRoster()
 		self.guildMembers = {}
 		self.totalMembers = 0
 		self.onlineMembers = 0
+		rosterDirty = false
+		MarkDisplayListDirty(self)
 		return
 	end
 
@@ -398,6 +430,8 @@ function GuildFrame:CollectRoster()
 		self.guildMembers = {}
 		self.totalMembers = 0
 		self.onlineMembers = 0
+		rosterDirty = false
+		MarkDisplayListDirty(self)
 		return
 	end
 
@@ -405,6 +439,8 @@ function GuildFrame:CollectRoster()
 		self.guildMembers = {}
 		self.totalMembers = 0
 		self.onlineMembers = 0
+		rosterDirty = false
+		MarkDisplayListDirty(self)
 		return
 	end
 
@@ -413,6 +449,7 @@ function GuildFrame:CollectRoster()
 	self.totalMembers = counts and counts.total or #members
 	self.onlineMembers = counts and counts.online or 0
 	rosterDirty = false
+	MarkDisplayListDirty(self)
 end
 
 -- ========================================
@@ -420,7 +457,11 @@ end
 -- ========================================
 
 function GuildFrame:SetFilter(mode)
+	if self.filterMode == mode then
+		return
+	end
 	self.filterMode = mode
+	MarkDisplayListDirty(self)
 	local DB = GetDB()
 	if DB and DB.Set then
 		DB:Set("guildTabFilterMode", mode)
@@ -429,9 +470,22 @@ function GuildFrame:SetFilter(mode)
 	self:Refresh()
 end
 
-function GuildFrame:SetSearchText(text)
-	self.searchText = (text or ""):lower()
-	self:Refresh()
+function GuildFrame:SetSearchText(text, skipRefresh)
+	local newText = (text or ""):lower()
+	if self.searchText == newText then
+		return
+	end
+	self.searchText = newText
+	MarkDisplayListDirty(self)
+
+	if skipRefresh then
+		return
+	end
+
+	local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
+	if guildFrame and guildFrame:IsShown() then
+		self:Refresh()
+	end
 end
 
 function GuildFrame:PassesFilter(member)
@@ -468,12 +522,16 @@ function GuildFrame:SetSort(mode, skipToggle)
 	if not IsValidSortMode(mode) then
 		return
 	end
+	if self.sortMode == mode and skipToggle then
+		return
+	end
 	if self.sortMode == mode and not skipToggle then
 		-- Toggle reverse on same column
 		self.sortReversed[mode] = not self.sortReversed[mode]
 	else
 		self.sortMode = mode
 	end
+	MarkDisplayListDirty(self)
 	local DB = GetDB()
 	if DB and DB.Set then
 		DB:Set("guildTabSortMode", self.sortMode)
@@ -573,11 +631,16 @@ function GuildFrame:BuildDisplayList()
 	if not self:IsEnabled() then
 		self.guildMembers = {}
 		self.displayList = {}
-		return self.displayList
+		ResetGuildRenderCache(self)
+		return self.displayList, false
 	end
 
 	if rosterDirty then
 		self:CollectRoster()
+	end
+
+	if not self._displayListDirty and self.displayList then
+		return self.displayList, true
 	end
 
 	local filtered = {}
@@ -589,7 +652,9 @@ function GuildFrame:BuildDisplayList()
 
 	self:SortMembers(filtered)
 	self.displayList = filtered
-	return filtered
+	self._displayListDirty = false
+	self._retailScrollBoxDirty = true
+	return filtered, false
 end
 
 -- ========================================
@@ -600,6 +665,7 @@ function GuildFrame:Refresh()
 	if not self:IsEnabled() then
 		self.guildMembers = {}
 		self.displayList = {}
+		ResetGuildRenderCache(self)
 		return
 	end
 
@@ -621,19 +687,107 @@ function GuildFrame:Refresh()
 	end
 end
 
+function GuildFrame:RefreshVisibleRetailRows()
+	local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
+	local scrollBox = guildFrame and guildFrame.ScrollBox
+	if not (scrollBox and scrollBox.ForEachFrame) then
+		self._retailScrollBoxVisualDirty = false
+		return
+	end
+
+	scrollBox:ForEachFrame(function(button, elementData)
+		if elementData and elementData.member then
+			self:UpdateMemberButton(button, elementData.member, elementData.index)
+		end
+	end)
+	self._retailScrollBoxVisualDirty = false
+end
+
 function GuildFrame:UpdateRetailScrollBox()
 	local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
 	if not guildFrame or not guildFrame.ScrollBox then return end
 	if not guildDataProvider then return end
 
-	guildDataProvider:Flush()
-
-	for i, member in ipairs(self.displayList) do
-		guildDataProvider:Insert({
-			index = i,
-			member = member,
-		})
+	local displayList = self.displayList or {}
+	local scrollBox = guildFrame.ScrollBox
+	if not self._retailScrollBoxDirty then
+		if self._retailScrollBoxVisualDirty then
+			self:RefreshVisibleRetailRows()
+		end
+		return
 	end
+
+	local currentProvider = scrollBox.GetDataProvider and scrollBox:GetDataProvider() or guildDataProvider
+	local structureChanged = true
+	if currentProvider and currentProvider.Enumerate then
+		local currentSize = (currentProvider.GetSize and currentProvider:GetSize())
+			or (currentProvider.Count and currentProvider:Count())
+			or 0
+		if currentSize == #displayList then
+			structureChanged = false
+			local index = 1
+			for _, oldData in currentProvider:Enumerate() do
+				local member = displayList[index]
+				if not oldData
+					or not oldData.member
+					or not member
+					or oldData.member.guildIndex ~= member.guildIndex
+					or oldData.member.fullName ~= member.fullName
+				then
+					structureChanged = true
+					break
+				end
+				index = index + 1
+			end
+		end
+	end
+
+	if not structureChanged and currentProvider and currentProvider.Enumerate then
+		local index = 1
+		for _, oldData in currentProvider:Enumerate() do
+			oldData.index = index
+			oldData.member = displayList[index]
+			index = index + 1
+		end
+		self._retailScrollBoxDirty = false
+		MarkRetailRowsDirty(self)
+		self:RefreshVisibleRetailRows()
+		return
+	end
+
+	local rowData = self._retailRowData
+	if not rowData then
+		rowData = {}
+		self._retailRowData = rowData
+	end
+
+	for i, member in ipairs(displayList) do
+		local data = rowData[i]
+		if not data then
+			data = {}
+			rowData[i] = data
+		end
+		data.index = i
+		data.member = member
+	end
+	for i = #displayList + 1, #rowData do
+		rowData[i] = nil
+	end
+
+	guildDataProvider:Flush()
+	if guildDataProvider.InsertTable then
+		guildDataProvider:InsertTable(rowData)
+	else
+		for i = 1, #rowData do
+			guildDataProvider:Insert(rowData[i])
+		end
+	end
+
+	if scrollBox.SetDataProvider and scrollBox.GetDataProvider and scrollBox:GetDataProvider() ~= guildDataProvider then
+		scrollBox:SetDataProvider(guildDataProvider, ScrollBoxConstants.RetainScrollPosition)
+	end
+	self._retailScrollBoxDirty = false
+	self._retailScrollBoxVisualDirty = false
 end
 
 -- ========================================
@@ -1305,7 +1459,7 @@ function GuildFrame:IsRetailHeaderActive()
 		and self:IsEnabled()
 end
 
-function GuildFrame:RefreshHeaderControls()
+function GuildFrame:RefreshHeaderControls(force)
 	local frame = BetterFriendsFrame
 	local header = frame and frame.FriendsTabHeader
 	if not header or BFL.IsClassic then
@@ -1313,6 +1467,20 @@ function GuildFrame:RefreshHeaderControls()
 	end
 
 	local active = self:IsRetailHeaderActive()
+	local simpleMode = IsSimpleModeEnabled()
+	local signature = table.concat({
+		active and "active" or "inactive",
+		simpleMode and "simple" or "full",
+		tostring(self.filterMode or ""),
+		tostring(self.sortMode or ""),
+		self.sortReversed and self.sortReversed[self.sortMode] and "reversed" or "normal",
+		tostring(BFL.SettingsVersion or 0),
+	}, "|")
+	if not force and self._headerControlsSignature == signature then
+		return
+	end
+	self._headerControlsSignature = signature
+
 	local actions = GetGuildActions()
 	if active and actions then
 		if header.SecondarySortDropdown then
@@ -1361,6 +1529,15 @@ function GuildFrame:RefreshHeaderControls()
 end
 
 function GuildFrame:OnTopTabChanged(tabIndex)
+	if BFL.IsClassic then
+		return
+	end
+
+	local active = tabIndex == 4 and self:IsEnabled() or false
+	if self._lastRetailHeaderActive == active then
+		return
+	end
+	self._lastRetailHeaderActive = active
 	self:RefreshHeaderControls()
 end
 
@@ -1596,6 +1773,7 @@ function GuildFrame:OnMemberClick(button, mouseButton)
 		self:ShowContextMenu(button, member)
 	else
 		self.selectedMember = member
+		MarkRetailRowsDirty(self)
 		self:Refresh()
 	end
 end
@@ -1727,7 +1905,8 @@ function GuildFrame:UpdateResponsiveLayout()
 
 	-- Update button widths for Retail
 	if BFL.HasModernScrollBox and guildDataProvider then
-		self:UpdateRetailScrollBox()
+		MarkRetailRowsDirty(self)
+		self:RefreshVisibleRetailRows()
 	end
 end
 
