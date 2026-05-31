@@ -33,6 +33,14 @@ local function GetArtworkAlpha(defaultAlpha)
 	return defaultAlpha or 0
 end
 
+local function GetAvatarAlpha(defaultAlpha)
+	local ThemePalette = BFL:GetModule("ThemePalette")
+	if ThemePalette and ThemePalette.GetAvatarAlpha then
+		return ThemePalette:GetAvatarAlpha(defaultAlpha or 1)
+	end
+	return defaultAlpha or 1
+end
+
 local function SafeCall(fn, ...)
 	if not fn then
 		return
@@ -293,11 +301,15 @@ local function RestorePortraitArtwork(engine, frame)
 	end
 
 	local portraitButton = frame.PortraitButton
-	local showPortrait = not IsSimpleModeEnabled()
+	local avatarAlpha = GetAvatarAlpha(1)
+	local showPortrait = not IsSimpleModeEnabled() and avatarAlpha > 0
 	if portraitButton then
 		portraitButton.BFL_DarkInvisibleOverlayButton = true
 		if engine then
 			engine:RestoreFrame(portraitButton)
+		end
+		if portraitButton.SetAlpha then
+			portraitButton:SetAlpha(avatarAlpha)
 		end
 
 		if showPortrait then
@@ -342,7 +354,7 @@ local function RestorePortraitArtwork(engine, frame)
 					icon:SetVertexColor(1, 1, 1, 1)
 				end
 				if icon.SetAlpha then
-					icon:SetAlpha(1)
+					icon:SetAlpha(avatarAlpha)
 				end
 				if icon.SetDrawLayer then
 					icon:SetDrawLayer("ARTWORK", 0)
@@ -371,9 +383,9 @@ local function RestorePortraitArtwork(engine, frame)
 		if portraitButton and frame.PortraitIcon ~= portraitButton.BFL_DarkPortraitIcon then
 			SetObjectShown(engine, frame, frame.PortraitIcon, false)
 		elseif showPortrait and engine then
-			engine:SetTextureAlpha(frame, frame.PortraitIcon, 1)
+			engine:SetTextureAlpha(frame, frame.PortraitIcon, avatarAlpha)
 		elseif showPortrait then
-			frame.PortraitIcon:SetAlpha(1)
+			frame.PortraitIcon:SetAlpha(avatarAlpha)
 		else
 			SetObjectShown(engine, frame, frame.PortraitIcon, false)
 		end
@@ -383,13 +395,17 @@ local function RestorePortraitArtwork(engine, frame)
 			SetObjectShown(engine, frame, frame.PortraitMask, false)
 		elseif showPortrait then
 			if frame.PortraitMask.SetAlpha then
-				frame.PortraitMask:SetAlpha(1)
+				frame.PortraitMask:SetAlpha(avatarAlpha)
 			end
 			frame.PortraitMask:Show()
 		else
 			SetObjectShown(engine, frame, frame.PortraitMask, false)
 		end
 	end
+end
+
+function DarkTheme:RefreshPortraitArtwork(engine, frame)
+	RestorePortraitArtwork(engine or GetEngine(), frame or _G.BetterFriendsFrame)
 end
 
 local function SkinDropdownField(engine, parent, key)
@@ -1924,6 +1940,7 @@ function DarkTheme:InstallHooks()
 			local engine = GetEngine()
 			local frame = _G.BetterFriendsFrame
 			if engine and frame and engine:IsActive() then
+				self:RefreshPortraitArtwork(engine, frame)
 				engine:StripButtonFrameArtwork(frame)
 			end
 		end)

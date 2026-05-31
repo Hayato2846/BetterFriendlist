@@ -35,7 +35,7 @@ local SLIDER_TRACK_INSET_Y = -5
 local SLIDER_STEPPER_WIDTH = 14
 local SLIDER_STEPPER_HEIGHT = 20
 local SLIDER_STEPPER_GAP = 4
-local SLIDER_VALUE_WIDTH = 30
+local SLIDER_VALUE_WIDTH = 42
 local SLIDER_VALUE_GAP = 8
 local COLOR_SWATCH_BUTTON_SIZE = 24
 
@@ -936,7 +936,7 @@ function Components:CreateSliderWithColorPicker(
 		colorButton:SetPoint("RIGHT", 0, 0)
 
 		-- Value Label Left of ColorButton
-		holder.ValueLabel:SetWidth(30)
+		holder.ValueLabel:SetWidth(SLIDER_VALUE_WIDTH)
 		holder.ValueLabel:ClearAllPoints()
 		holder.ValueLabel:SetPoint("RIGHT", colorButton, "LEFT", -5, 0)
 

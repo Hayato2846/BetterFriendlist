@@ -168,6 +168,11 @@ function ThemeManager:ApplyCurrentTheme(reason)
 		end
 	end
 
+	local ThemePalette = BFL:GetModule("ThemePalette")
+	if ThemePalette and ThemePalette.ApplyAvatarVisibility then
+		ThemePalette:ApplyAvatarVisibility()
+	end
+
 	if BFL.ApplyTabFonts then
 		BFL:ApplyTabFonts()
 	end

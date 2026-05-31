@@ -13,14 +13,36 @@ local DEFAULT_DARK_SETTINGS = {
 	hoverStrength = 0.10,
 	selectionStrength = 0.14,
 	borderStrength = 0.82,
-	artworkVisibility = 1.0,
+	avatarVisibility = 1.0,
 }
 
-local DARK_SETTING_MIN = {
+local DEFAULT_CUSTOM_SETTINGS = {
+	accentColor = { r = 0.18, g = 0.88, b = 0.82, a = 1 },
+	windowOpacity = 0.68,
+	popupOpacity = 0.78,
+	listOpacity = 0.42,
+	controlOpacity = 0.42,
+	hoverStrength = 0.10,
+	selectionStrength = 0.14,
+	borderStrength = 0.82,
+	avatarVisibility = 1.0,
+}
+
+local THEME_SETTING_MIN = {
 	windowOpacity = 0.15,
 	popupOpacity = 0.15,
 	listOpacity = 0.05,
 	controlOpacity = 0.05,
+}
+
+local THEME_SETTING_DB_KEYS = {
+	dark = "darkThemeSettings",
+	custom = "customThemeSettings",
+}
+
+local THEME_SETTING_DEFAULTS = {
+	dark = DEFAULT_DARK_SETTINGS,
+	custom = DEFAULT_CUSTOM_SETTINGS,
 }
 
 local CUSTOM_COLOR_KEYS = {
@@ -151,28 +173,79 @@ local function Darken(color, amount)
 	return color
 end
 
+local function MixColor(color, target, amount)
+	color = NormalizeColor(color, target)
+	target = NormalizeColor(target, color)
+	if not color or not target then
+		return nil
+	end
+
+	amount = Clamp(amount or 0.5, 0, 1) or 0.5
+	return {
+		r = color.r + (target.r - color.r) * amount,
+		g = color.g + (target.g - color.g) * amount,
+		b = color.b + (target.b - color.b) * amount,
+		a = color.a ~= nil and color.a or target.a or 1,
+	}
+end
+
 function ThemePalette:GetDefaultDarkSettings()
 	return Copy(DEFAULT_DARK_SETTINGS)
+end
+
+function ThemePalette:GetDefaultCustomSettings()
+	return Copy(DEFAULT_CUSTOM_SETTINGS)
 end
 
 function ThemePalette:GetDefaultCustomTheme()
 	return {}
 end
 
-function ThemePalette:NormalizeDarkSettings(settings)
+local function NormalizeThemeSettings(settings, defaults)
 	settings = type(settings) == "table" and settings or {}
-	local result = Copy(DEFAULT_DARK_SETTINGS)
+	local result = Copy(defaults)
 
-	result.accentColor = NormalizeColor(settings.accentColor, DEFAULT_DARK_SETTINGS.accentColor)
-	for key, defaultValue in pairs(DEFAULT_DARK_SETTINGS) do
+	local legacyAvatarVisibility = settings.avatarVisibility
+	if legacyAvatarVisibility == nil and settings.artworkVisibility ~= nil then
+		legacyAvatarVisibility = settings.artworkVisibility
+	end
+
+	result.accentColor = NormalizeColor(settings.accentColor, defaults.accentColor)
+	for key, defaultValue in pairs(defaults) do
 		if key ~= "accentColor" then
-			result[key] = Clamp(settings[key], DARK_SETTING_MIN[key] or 0, 1)
+			local value = key == "avatarVisibility" and legacyAvatarVisibility or settings[key]
+			result[key] = Clamp(value, THEME_SETTING_MIN[key] or 0, 1)
 			if result[key] == nil then
 				result[key] = defaultValue
 			end
 		end
 	end
 
+	return result
+end
+
+function ThemePalette:NormalizeDarkSettings(settings)
+	return NormalizeThemeSettings(settings, DEFAULT_DARK_SETTINGS)
+end
+
+function ThemePalette:NormalizeCustomSettings(settings)
+	return NormalizeThemeSettings(settings, DEFAULT_CUSTOM_SETTINGS)
+end
+
+function ThemePalette:GetCustomSettingsInspiredByDark(settings)
+	local dark = self:NormalizeDarkSettings(settings)
+	local result = self:NormalizeCustomSettings(dark)
+	result.accentColor = MixColor(dark.accentColor, DEFAULT_CUSTOM_SETTINGS.accentColor, 0.58)
+	result.listOpacity = Clamp((dark.listOpacity or DEFAULT_CUSTOM_SETTINGS.listOpacity) + 0.03, 0.05, 1)
+		or DEFAULT_CUSTOM_SETTINGS.listOpacity
+	result.controlOpacity = Clamp((dark.controlOpacity or DEFAULT_CUSTOM_SETTINGS.controlOpacity) + 0.03, 0.05, 1)
+		or DEFAULT_CUSTOM_SETTINGS.controlOpacity
+	result.hoverStrength = Clamp((dark.hoverStrength or DEFAULT_CUSTOM_SETTINGS.hoverStrength) + 0.02, 0, 1)
+		or DEFAULT_CUSTOM_SETTINGS.hoverStrength
+	result.selectionStrength = Clamp((dark.selectionStrength or DEFAULT_CUSTOM_SETTINGS.selectionStrength) + 0.02, 0, 1)
+		or DEFAULT_CUSTOM_SETTINGS.selectionStrength
+	result.borderStrength = Clamp((dark.borderStrength or DEFAULT_CUSTOM_SETTINGS.borderStrength) - 0.05, 0, 1)
+		or DEFAULT_CUSTOM_SETTINGS.borderStrength
 	return result
 end
 
@@ -198,19 +271,35 @@ function ThemePalette:NormalizeSavedSettings(db)
 	end
 
 	db.darkThemeSettings = self:NormalizeDarkSettings(db.darkThemeSettings)
+	db.customThemeSettings = self:NormalizeCustomSettings(db.customThemeSettings)
+	db.blizzardThemeSettings = nil
 	db.customTheme = self:NormalizeCustomTheme(db.customTheme)
 end
 
-function ThemePalette:GetDarkSettings()
+function ThemePalette:GetThemeSettings(theme)
+	theme = THEME_SETTING_DB_KEYS[theme] and theme or "dark"
 	local DB = BFL:GetModule("DB")
+	local dbKey = THEME_SETTING_DB_KEYS[theme]
 	local settings
 	if DB and DB.Get then
-		settings = DB:Get("darkThemeSettings")
+		settings = DB:Get(dbKey)
 	elseif BetterFriendlistDB then
-		settings = BetterFriendlistDB.darkThemeSettings
+		settings = BetterFriendlistDB[dbKey]
+	end
+
+	if theme == "custom" then
+		return self:NormalizeCustomSettings(settings)
 	end
 
 	return self:NormalizeDarkSettings(settings)
+end
+
+function ThemePalette:GetDarkSettings()
+	return self:GetThemeSettings("dark")
+end
+
+function ThemePalette:GetCustomSettings()
+	return self:GetThemeSettings("custom")
 end
 
 function ThemePalette:GetCustomTheme()
@@ -225,19 +314,31 @@ function ThemePalette:GetCustomTheme()
 	return self:NormalizeCustomTheme(customTheme)
 end
 
-function ThemePalette:SetDarkSetting(key, value)
+function ThemePalette:SetThemeSetting(theme, key, value)
+	if not THEME_SETTING_DB_KEYS[theme] then
+		return
+	end
 	local DB = BFL:GetModule("DB")
 	if not DB then
 		return
 	end
 
-	local settings = self:GetDarkSettings()
+	local defaults = THEME_SETTING_DEFAULTS[theme] or DEFAULT_DARK_SETTINGS
+	local settings = self:GetThemeSettings(theme)
 	if key == "accentColor" then
-		settings[key] = NormalizeColor(value, DEFAULT_DARK_SETTINGS.accentColor)
-	elseif DEFAULT_DARK_SETTINGS[key] ~= nil then
-		settings[key] = Clamp(value, 0, 1) or DEFAULT_DARK_SETTINGS[key]
+		settings[key] = NormalizeColor(value, defaults.accentColor)
+	elseif defaults[key] ~= nil then
+		settings[key] = Clamp(value, 0, 1) or defaults[key]
 	end
-	DB:Set("darkThemeSettings", settings)
+	DB:Set(THEME_SETTING_DB_KEYS[theme], settings)
+end
+
+function ThemePalette:SetDarkSetting(key, value)
+	self:SetThemeSetting("dark", key, value)
+end
+
+function ThemePalette:SetCustomSetting(key, value)
+	self:SetThemeSetting("custom", key, value)
 end
 
 function ThemePalette:SetCustomColor(key, color)
@@ -267,6 +368,13 @@ function ThemePalette:ResetDarkSettings()
 	end
 end
 
+function ThemePalette:ResetCustomSettings()
+	local DB = BFL:GetModule("DB")
+	if DB then
+		DB:Set("customThemeSettings", self:GetDefaultCustomSettings())
+	end
+end
+
 function ThemePalette:ResetCustomTheme()
 	local DB = BFL:GetModule("DB")
 	if DB then
@@ -284,8 +392,82 @@ function ThemePalette:GetResolvedCustomColor(key, fallback)
 end
 
 function ThemePalette:GetArtworkAlpha(defaultAlpha)
-	local settings = self:GetDarkSettings()
-	return (defaultAlpha or 0) * (settings.artworkVisibility or 1)
+	return defaultAlpha or 0
+end
+
+function ThemePalette:GetAvatarVisibility(theme)
+	theme = theme or (BFL.GetEffectiveTheme and BFL:GetEffectiveTheme()) or "blizzard"
+	if theme == "blizzard" then
+		return 1
+	end
+	local settings = self:GetThemeSettings(theme)
+	return settings.avatarVisibility or 1
+end
+
+function ThemePalette:GetAvatarAlpha(defaultAlpha, theme)
+	return (defaultAlpha or 1) * self:GetAvatarVisibility(theme)
+end
+
+local function IsSimpleModeEnabled()
+	local DB = BFL and BFL.GetModule and BFL:GetModule("DB")
+	if DB and DB.Get then
+		return DB:Get("simpleMode", false) == true
+	end
+	return BetterFriendlistDB and BetterFriendlistDB.simpleMode == true
+end
+
+local function SetObjectShown(object, shown)
+	if not object then
+		return
+	end
+	if object.SetShown then
+		object:SetShown(shown == true)
+	elseif shown and object.Show then
+		object:Show()
+	elseif not shown and object.Hide then
+		object:Hide()
+	end
+end
+
+function ThemePalette:ApplyAvatarVisibility(frame)
+	local theme = BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() or "blizzard"
+	if theme ~= "blizzard" then
+		return
+	end
+
+	frame = frame or _G.BetterFriendsFrame
+	if not frame then
+		return
+	end
+
+	local alpha = self:GetAvatarAlpha(1, "blizzard")
+	local showAvatar = not IsSimpleModeEnabled() and alpha > 0
+
+	for _, object in ipairs({
+		frame.PortraitIcon,
+		frame.PortraitMask,
+		frame.PortraitButton,
+	}) do
+		if object then
+			if object.SetAlpha then
+				object:SetAlpha(alpha)
+			end
+			SetObjectShown(object, showAvatar)
+		end
+	end
+end
+
+function BFL:UpdatePortraitVisibility(reason)
+	local ThemeManager = self.GetModule and self:GetModule("ThemeManager")
+	if ThemeManager and ThemeManager.ApplyCurrentTheme then
+		ThemeManager:ApplyCurrentTheme(reason or "avatar-visibility")
+		return
+	end
+
+	local ThemePaletteModule = self.GetModule and self:GetModule("ThemePalette")
+	if ThemePaletteModule and ThemePaletteModule.ApplyAvatarVisibility then
+		ThemePaletteModule:ApplyAvatarVisibility()
+	end
 end
 
 function ThemePalette:ApplyToColors(colors, baseColors)
@@ -297,11 +479,11 @@ function ThemePalette:ApplyToColors(colors, baseColors)
 		colors[key] = CopyArray(value)
 	end
 
-	local settings = self:GetDarkSettings()
 	local theme = BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() or "blizzard"
 	if theme ~= "dark" and theme ~= "custom" then
 		return
 	end
+	local settings = self:GetThemeSettings(theme)
 
 	local accent = ToArray(settings.accentColor, baseColors.accent)
 	local accentAlpha = (accent and accent[4]) or 1

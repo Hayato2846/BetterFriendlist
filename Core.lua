@@ -144,7 +144,8 @@ function BFL:GetThemeAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
 end
 
 function BFL:GetThemeAccentHex(fallbackHex)
-	if self.UsesDarkSkinTheme and self:UsesDarkSkinTheme() then
+	local theme = self.GetEffectiveTheme and self:GetEffectiveTheme() or "blizzard"
+	if theme == "dark" or theme == "custom" then
 		local r, g, b = self:GetThemeAccentColor()
 		return string.format("%02x%02x%02x", ColorComponentToHex(r), ColorComponentToHex(g), ColorComponentToHex(b))
 	end

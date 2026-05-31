@@ -1834,7 +1834,15 @@ local function RegisterBuiltInTests()
 				theme = "custom",
 				darkThemeSettings = {
 					windowOpacity = 2,
+					artworkVisibility = 0.33,
 					accentColor = { r = 2, g = -1, b = 0.5, a = 3 },
+				},
+				customThemeSettings = {
+					hoverStrength = 0.25,
+				},
+				blizzardThemeSettings = {
+					accentColor = { r = 2, g = 0.2, b = -1, a = 1 },
+					avatarVisibility = 2,
 				},
 				customTheme = {
 					backgroundColor = { r = -1, g = 0.25, b = 2, a = 0.5 },
@@ -1842,8 +1850,11 @@ local function RegisterBuiltInTests()
 				},
 			}, function(tempDB)
 				V:AssertEqual(tempDB.darkThemeSettings.windowOpacity, 1, "Opacity should be clamped")
+				V:AssertEqual(tempDB.darkThemeSettings.avatarVisibility, 0.33, "Legacy artwork visibility should migrate to avatar visibility")
 				V:AssertEqual(tempDB.darkThemeSettings.accentColor.r, 1, "Accent red should be clamped")
 				V:AssertEqual(tempDB.darkThemeSettings.accentColor.g, 0, "Accent green should be clamped")
+				V:AssertEqual(tempDB.customThemeSettings.hoverStrength, 0.25, "Custom theme settings should normalize independently")
+				V:AssertNil(tempDB.blizzardThemeSettings, "Blizzard theme settings should be removed")
 				V:AssertEqual(tempDB.customTheme.backgroundColor.r, 0, "Custom red should be clamped")
 				V:AssertEqual(tempDB.customTheme.backgroundColor.b, 1, "Custom blue should be clamped")
 				V:AssertNil(tempDB.customTheme.unknownColor, "Unknown custom theme keys should be discarded")
@@ -1876,6 +1887,102 @@ local function RegisterBuiltInTests()
 				V:AssertEqual(colors.rowHover[2], 0.4, "Row hover should inherit accent green")
 				V:Assert(colors.scrollThumbHover[3] > colors.scrollThumbHover[1], "Scrollbar hover should be accent tinted")
 				V:Assert(colors.controlBorderHover[3] > colors.controlBorderHover[1], "Control hover border should be accent tinted")
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "ThemePalette_ThemeSpecificSettingsPersist", {
+		description = "Theme palette sliders should persist to the selected theme only",
+		action = function(V)
+			local ThemePalette = BFL:GetModule("ThemePalette")
+			V:AssertNotNil(ThemePalette, "ThemePalette should be loaded")
+
+			WithTemporaryDatabase({
+				enableBetaFeatures = true,
+				theme = "custom",
+				darkThemeSettings = {
+					hoverStrength = 0.12,
+					borderStrength = 0.44,
+				},
+				customThemeSettings = {
+					hoverStrength = 0.22,
+					borderStrength = 0.55,
+				},
+			}, function(tempDB)
+				ThemePalette:SetThemeSetting("custom", "hoverStrength", 0.36)
+				ThemePalette:SetThemeSetting("dark", "borderStrength", 0.66)
+				ThemePalette:SetThemeSetting("blizzard", "accentColor", { r = 0.11, g = 0.22, b = 0.33, a = 1 })
+
+				V:AssertEqual(tempDB.customThemeSettings.hoverStrength, 0.36, "Custom hover strength should persist")
+				V:AssertEqual(tempDB.darkThemeSettings.hoverStrength, 0.12, "Dark hover strength should remain unchanged")
+				V:AssertEqual(tempDB.darkThemeSettings.borderStrength, 0.66, "Dark border strength should persist")
+				V:AssertEqual(tempDB.customThemeSettings.borderStrength, 0.55, "Custom border strength should remain unchanged")
+				V:AssertNil(tempDB.blizzardThemeSettings, "Blizzard settings should not be created")
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "ThemePalette_CopiedCustomAccentMigrationDerivesIndependentDefault", {
+		description = "Copied Dark accent defaults should migrate to an independent Custom accent",
+		action = function(V)
+			WithTemporaryDatabase({
+				enableBetaFeatures = true,
+				theme = "custom",
+				themeSettingsIndependentDefaultsVersion = 0,
+				darkThemeSettings = {
+					accentColor = { r = 0.2, g = 0.4, b = 0.8, a = 1 },
+				},
+				customThemeSettings = {
+					accentColor = { r = 0.2, g = 0.4, b = 0.8, a = 1 },
+				},
+				blizzardThemeSettings = {
+					accentColor = { r = 0.2, g = 0.4, b = 0.8, a = 1 },
+					avatarVisibility = 0.5,
+				},
+			}, function(tempDB)
+				V:Assert(
+					tempDB.customThemeSettings.accentColor.r ~= 0.2
+						or tempDB.customThemeSettings.accentColor.g ~= 0.4
+						or tempDB.customThemeSettings.accentColor.b ~= 0.8,
+					"Custom accent should be derived, not copied"
+				)
+				V:AssertNil(tempDB.blizzardThemeSettings, "Blizzard theme settings should be removed")
+				V:AssertEqual(
+					tempDB.themeSettingsIndependentDefaultsVersion,
+					1,
+					"Independent theme default migration should be marked complete"
+				)
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "ThemePalette_CustomSettingsDriveCustomTheme", {
+		description = "Custom theme slider settings should drive inherited skin tokens",
+		action = function(V)
+			local ThemePalette = BFL:GetModule("ThemePalette")
+			local SkinEngine = BFL:GetModule("SkinEngine")
+			V:AssertNotNil(ThemePalette, "ThemePalette should be loaded")
+			V:AssertNotNil(SkinEngine, "SkinEngine should be loaded")
+
+			WithTemporaryDatabase({
+				enableBetaFeatures = true,
+				theme = "custom",
+				darkThemeSettings = {
+					hoverStrength = 0.10,
+					selectionStrength = 0.14,
+				},
+				customThemeSettings = {
+					hoverStrength = 0.31,
+					selectionStrength = 0.47,
+					borderStrength = 0.25,
+				},
+			}, function()
+				local colors = {}
+				ThemePalette:ApplyToColors(colors, SkinEngine.defaultColors)
+
+				V:AssertEqual(colors.rowHover[4], 0.31, "Custom row hover should use custom hover strength")
+				V:AssertEqual(colors.rowDown[4], 0.47, "Custom selected rows should use custom selection strength")
+				V:AssertEqual(colors.border[4], 0.25, "Custom border should use custom border strength")
 			end)
 		end,
 	})

@@ -44,6 +44,7 @@ local defaults = {
 	compactMode = false, -- Use compact button layout
 	theme = "blizzard", -- UI theme: "blizzard", "dark", "custom", "elvui"
 	darkThemeSettings = ThemePalette and ThemePalette:GetDefaultDarkSettings() or {},
+	customThemeSettings = ThemePalette and ThemePalette:GetDefaultCustomSettings() or {},
 	customTheme = {},
 	enableElvUISkin = false, -- Legacy ElvUI skin toggle shown outside beta theme settings
 	fontSize = "normal", -- "small", "normal", "large"
@@ -237,6 +238,7 @@ local defaults = {
 	socialKeybindMigrated = false, -- Track if TOGGLESOCIAL was moved to BetterFriendlist's native binding on secret-value clients
 	socialKeybindMigrationVersion = nil, -- Last social keybind migration version
 	socialKeybindMigratedKeys = {}, -- Keys moved from TOGGLESOCIAL to BETTERFRIENDLIST_TOGGLE
+	themeSettingsIndependentDefaultsVersion = 1, -- Tracks independent Theme tab default derivation
 	lastChangelogVersion = "0.0.0", -- Last version the user saw the changelog for
 	version = BFL.Version,
 }
@@ -285,6 +287,34 @@ local VALID_THEMES = {
 	custom = true,
 	elvui = true,
 }
+
+local THEME_SETTINGS_INDEPENDENT_DEFAULTS_VERSION = 1
+
+local function GetColorComponent(color, namedKey, indexedKey)
+	if type(color) ~= "table" then
+		return nil
+	end
+	return tonumber(color[namedKey] ~= nil and color[namedKey] or color[indexedKey])
+end
+
+local function ColorsEqual(left, right)
+	local leftR = GetColorComponent(left, "r", 1)
+	local leftG = GetColorComponent(left, "g", 2)
+	local leftB = GetColorComponent(left, "b", 3)
+	local rightR = GetColorComponent(right, "r", 1)
+	local rightG = GetColorComponent(right, "g", 2)
+	local rightB = GetColorComponent(right, "b", 3)
+
+	return leftR ~= nil
+		and leftG ~= nil
+		and leftB ~= nil
+		and rightR ~= nil
+		and rightG ~= nil
+		and rightB ~= nil
+		and math.abs(leftR - rightR) < 0.0001
+		and math.abs(leftG - rightG) < 0.0001
+		and math.abs(leftB - rightB) < 0.0001
+end
 
 -- Resolve the name format preset to a format string
 function DB:GetNameFormatString()
@@ -354,6 +384,10 @@ function DB:NormalizeThemeSettings()
 	if type(BetterFriendlistDB.darkThemeSettings) ~= "table" then
 		BetterFriendlistDB.darkThemeSettings = {}
 	end
+	if type(BetterFriendlistDB.customThemeSettings) ~= "table" then
+		BetterFriendlistDB.customThemeSettings = {}
+	end
+	BetterFriendlistDB.blizzardThemeSettings = nil
 	if type(BetterFriendlistDB.customTheme) ~= "table" then
 		BetterFriendlistDB.customTheme = {}
 	end
@@ -451,6 +485,30 @@ function DB:Initialize()
 		BetterFriendlistDB.nameFormatCustom = "%name% (%battletag%)"
 	elseif currentPreset == "name_character" then
 		BetterFriendlistDB.nameFormatPreset = "default"
+	end
+
+	-- MIGRATION: Custom theme controls are independent, but inspired by Dark.
+	-- If a pre-release build copied Dark accent 1:1, replace only that copied accent.
+	local themeDefaultMigrationVersion = BetterFriendlistDB.themeSettingsIndependentDefaultsVersion or 0
+	local darkSettings = type(BetterFriendlistDB.darkThemeSettings) == "table" and BetterFriendlistDB.darkThemeSettings or nil
+	local Palette = BFL:GetModule("ThemePalette") or ThemePalette
+	local inspiredCustom = Palette
+		and Palette.GetCustomSettingsInspiredByDark
+		and Palette:GetCustomSettingsInspiredByDark(darkSettings)
+
+	if darkSettings and inspiredCustom then
+		if BetterFriendlistDB.customThemeSettings == nil then
+			BetterFriendlistDB.customThemeSettings = self:InternalDeepCopy(inspiredCustom)
+		elseif
+			themeDefaultMigrationVersion < THEME_SETTINGS_INDEPENDENT_DEFAULTS_VERSION
+			and ColorsEqual(BetterFriendlistDB.customThemeSettings.accentColor, darkSettings.accentColor)
+		then
+			BetterFriendlistDB.customThemeSettings.accentColor = self:InternalDeepCopy(inspiredCustom.accentColor)
+		end
+	end
+	BetterFriendlistDB.blizzardThemeSettings = nil
+	if themeDefaultMigrationVersion < THEME_SETTINGS_INDEPENDENT_DEFAULTS_VERSION then
+		BetterFriendlistDB.themeSettingsIndependentDefaultsVersion = THEME_SETTINGS_INDEPENDENT_DEFAULTS_VERSION
 	end
 
 	-- Apply defaults

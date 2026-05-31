@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Guild Roster Tab Beta** - Added a beta-gated Guild settings tab and a default-off Guild roster tab with shared Retail/Classic controls.
 - **Guild Roster Actions** - Added API-open guild roster actions for communication, party invites, guild invites, adjacent promote/demote, name-based member removal, leadership handoff, leave, disband, and Classic-only MOTD editing.
 - **External AddOn Menu Bridge Beta** - Added a default-off beta bridge and official companion AddOn for showing compatible AddOn actions in supported BetterFriendlist context menus.
-- **Custom Theme & Theme Settings** - Added a Custom theme that inherits from Dark and adds controls for colors, transparency, hover states, selection states, borders, scrollbars, icons, and Blizzard artwork visibility.
+- **Custom Theme & Theme Settings** - Added a Custom theme that inherits from Dark and adds controls for colors, transparency, hover states, selection states, borders, scrollbars, icons, and BFL Avatar visibility.
 - **Raid Tab** - Added an optional compact Ready Check button next to Raid Info.
 
 ### Improved
@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Guild Roster Data** - Added shared guild action and permission handling for the Guild Broker and Guild Tab, including per-target secret-value guards.
 - **Theme Settings** - Expanded Dark theme settings and made the beta Theme tab available across supported Retail and Classic clients.
+- **Theme Settings** - Made Custom theme opacity, strength, and BFL Avatar sliders configurable in the Custom theme.
 - **Client Compatibility** - Prepared friend invites and raid controls for upcoming Retail client changes while preserving current Retail and Classic support.
 - **Raid Tools** - Improved handling for temporarily uncached raid roster names.
 - **Font Rendering** - Made custom font handling more defensive on newer clients.
@@ -37,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Recruit A Friend** - Shortened the search placeholder and kept it on one line in the header search field.
 - **Guild Tab** - Made the guild search placeholder punctuation match the other search fields.
 - **Tabs** - Fixed truncated top and bottom tab labels showing duplicate hover tooltips.
+- **Theme Settings** - Fixed clipped 100% slider values and made theme strength sliders persist correctly.
 
 ### Performance
 - **Friend List Sorting** - Reduced CPU time and memory churn when changing QuickFilters and Sorter selections.

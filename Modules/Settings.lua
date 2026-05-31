@@ -3122,6 +3122,7 @@ function Settings:OnSimpleModeChanged(checked)
 	if BFL.UpdatePortraitVisibility then
 		BFL:UpdatePortraitVisibility("SettingsToggle")
 	end
+	self:RefreshThemeTab()
 
 	-- Classic Fix: Prompt for Reload on Simple Mode toggle
 	-- The Atlas texture system in Classic is unstable dynamically but works fine on login
@@ -3532,10 +3533,12 @@ function Settings:RefreshThemeTab()
 	)
 	table.insert(allFrames, themeDropdown)
 
-	local function SetDarkSetting(key, value)
-		if ThemePalette and ThemePalette.SetDarkSetting then
-			ThemePalette:SetDarkSetting(key, value)
-			ApplyThemeSettingsChanged("dark-theme-setting")
+	local simpleMode = DB:Get("simpleMode", false)
+
+	local function SetThemeSetting(theme, key, value)
+		if ThemePalette and ThemePalette.SetThemeSetting then
+			ThemePalette:SetThemeSetting(theme, key, value)
+			ApplyThemeSettingsChanged(theme .. "-theme-setting")
 		end
 	end
 
@@ -3554,10 +3557,24 @@ function Settings:RefreshThemeTab()
 		end
 	end
 
-	local function AddThemeSlider(label, key, tooltip, minValue)
-		local settings = ThemePalette and ThemePalette:GetDarkSettings() or DB:Get("darkThemeSettings", {})
-		local slider = Components:CreateSlider(tab, label, minValue or 0, 1, settings[key] or 0, FormatThemePercent, function(value)
-			SetDarkSetting(key, value)
+	local function GetThemeSettings(theme)
+		if ThemePalette and ThemePalette.GetThemeSettings then
+			return ThemePalette:GetThemeSettings(theme)
+		end
+		if theme == "custom" then
+			return DB:Get("customThemeSettings", {})
+		end
+		return DB:Get("darkThemeSettings", {})
+	end
+
+	local function AddThemeSlider(theme, label, key, tooltip, minValue)
+		local settings = GetThemeSettings(theme)
+		local initialValue = settings[key]
+		if initialValue == nil then
+			initialValue = 0
+		end
+		local slider = Components:CreateSlider(tab, label, minValue or 0, 1, initialValue, FormatThemePercent, function(value)
+			SetThemeSetting(theme, key, value)
 		end)
 		if slider.SetStep then
 			slider:SetStep(0.01)
@@ -3566,6 +3583,53 @@ function Settings:RefreshThemeTab()
 			slider:SetTooltip(label, tooltip)
 		end
 		table.insert(allFrames, slider)
+	end
+
+	local function AddAvatarSlider(theme)
+		if simpleMode then
+			return
+		end
+		AddThemeSlider(
+			theme,
+			L.SETTINGS_THEME_ARTWORK_VISIBILITY or "BFL Avatar",
+			"avatarVisibility",
+			L.SETTINGS_THEME_ARTWORK_VISIBILITY_DESC,
+			0
+		)
+	end
+
+	local function AddCommonSkinSliders(theme)
+		AddThemeSlider(theme, L.SETTINGS_THEME_WINDOW_OPACITY or "Window Opacity", "windowOpacity", L.SETTINGS_THEME_WINDOW_OPACITY_DESC, 0.15)
+		AddThemeSlider(
+			theme,
+			L.SETTINGS_THEME_POPUP_OPACITY or "Popup & Tooltip Opacity",
+			"popupOpacity",
+			L.SETTINGS_THEME_POPUP_OPACITY_DESC,
+			0.15
+		)
+		AddThemeSlider(
+			theme,
+			L.SETTINGS_THEME_LIST_OPACITY or "List & Inset Opacity",
+			"listOpacity",
+			L.SETTINGS_THEME_LIST_OPACITY_DESC,
+			0.05
+		)
+		AddThemeSlider(
+			theme,
+			L.SETTINGS_THEME_CONTROL_OPACITY or "Control Opacity",
+			"controlOpacity",
+			L.SETTINGS_THEME_CONTROL_OPACITY_DESC,
+			0.05
+		)
+		AddThemeSlider(theme, L.SETTINGS_THEME_HOVER_STRENGTH or "Hover Strength", "hoverStrength", L.SETTINGS_THEME_HOVER_STRENGTH_DESC)
+		AddThemeSlider(
+			theme,
+			L.SETTINGS_THEME_SELECTION_STRENGTH or "Selection Strength",
+			"selectionStrength",
+			L.SETTINGS_THEME_SELECTION_STRENGTH_DESC
+		)
+		AddThemeSlider(theme, L.SETTINGS_THEME_BORDER_STRENGTH or "Border Strength", "borderStrength", L.SETTINGS_THEME_BORDER_STRENGTH_DESC)
+		AddAvatarSlider(theme)
 	end
 
 	local function AddThemeColor(label, initialColor, callback, resetCallback, tooltip)
@@ -3592,49 +3656,19 @@ function Settings:RefreshThemeTab()
 	end
 
 	if currentTheme == "dark" then
-		local darkSettings = ThemePalette and ThemePalette:GetDarkSettings() or DB:Get("darkThemeSettings", {})
+		local darkSettings = GetThemeSettings("dark")
 		table.insert(allFrames, Components:CreateSpacer(tab))
 		table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_THEME_DARK_HEADER or "Dark Theme Settings"))
 		AddThemeColor(
 			L.SETTINGS_THEME_ACCENT_COLOR or "Accent Color",
 			darkSettings.accentColor,
 			function(r, g, b, a)
-				SetDarkSetting("accentColor", { r = r, g = g, b = b, a = a })
+				SetThemeSetting("dark", "accentColor", { r = r, g = g, b = b, a = a })
 			end,
 			nil,
 			L.SETTINGS_THEME_ACCENT_COLOR_DESC or "Controls selected, hover, slider, and icon accents."
 		)
-		AddThemeSlider(L.SETTINGS_THEME_WINDOW_OPACITY or "Window Opacity", "windowOpacity", L.SETTINGS_THEME_WINDOW_OPACITY_DESC, 0.15)
-		AddThemeSlider(
-			L.SETTINGS_THEME_POPUP_OPACITY or "Popup & Tooltip Opacity",
-			"popupOpacity",
-			L.SETTINGS_THEME_POPUP_OPACITY_DESC,
-			0.15
-		)
-		AddThemeSlider(
-			L.SETTINGS_THEME_LIST_OPACITY or "List & Inset Opacity",
-			"listOpacity",
-			L.SETTINGS_THEME_LIST_OPACITY_DESC,
-			0.05
-		)
-		AddThemeSlider(
-			L.SETTINGS_THEME_CONTROL_OPACITY or "Control Opacity",
-			"controlOpacity",
-			L.SETTINGS_THEME_CONTROL_OPACITY_DESC,
-			0.05
-		)
-		AddThemeSlider(L.SETTINGS_THEME_HOVER_STRENGTH or "Hover Strength", "hoverStrength", L.SETTINGS_THEME_HOVER_STRENGTH_DESC)
-		AddThemeSlider(
-			L.SETTINGS_THEME_SELECTION_STRENGTH or "Selection Strength",
-			"selectionStrength",
-			L.SETTINGS_THEME_SELECTION_STRENGTH_DESC
-		)
-		AddThemeSlider(L.SETTINGS_THEME_BORDER_STRENGTH or "Border Strength", "borderStrength", L.SETTINGS_THEME_BORDER_STRENGTH_DESC)
-		AddThemeSlider(
-			L.SETTINGS_THEME_ARTWORK_VISIBILITY or "Blizzard Artwork Visibility",
-			"artworkVisibility",
-			L.SETTINGS_THEME_ARTWORK_VISIBILITY_DESC
-		)
+		AddCommonSkinSliders("dark")
 		table.insert(
 			allFrames,
 			Components:CreateButtonRow(tab, L.SETTINGS_THEME_RESET_DARK or "Reset Dark Settings", nil, function()
@@ -3730,6 +3764,7 @@ function Settings:RefreshThemeTab()
 
 		table.insert(allFrames, Components:CreateSpacer(tab))
 		table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_THEME_CUSTOM_HEADER or "Custom Theme"))
+		AddCommonSkinSliders("custom")
 		for _, definition in ipairs(customMap) do
 			local fallback = resolvedColors[definition.token] or (SkinEngine and SkinEngine.defaultColors and SkinEngine.defaultColors[definition.token])
 			local initialColor = customTheme[definition.key] or ToColor(fallback)
@@ -3743,6 +3778,9 @@ function Settings:RefreshThemeTab()
 			allFrames,
 			Components:CreateButtonRow(tab, L.SETTINGS_THEME_RESET_CUSTOM or "Reset Custom Theme", nil, function()
 				if ThemePalette and ThemePalette.ResetCustomTheme then
+					if ThemePalette.ResetCustomSettings then
+						ThemePalette:ResetCustomSettings()
+					end
 					ThemePalette:ResetCustomTheme()
 					ApplyThemeSettingsChanged("reset-custom-theme")
 					self:RefreshThemeTab()
