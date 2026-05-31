@@ -7,16 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [DRAFT]
-
-### Fixed
-- **Quick Join** - Fixed a Lua error when opening Quick Join entries during performance tests.
-
-### Performance
-- **Top Tabs** - Reduced hitches when switching between Friends, Recent Allies, Recruit A Friend, and Guild tabs.
-- **Guild Roster** - Reduced memory churn when reopening or switching to the Guild roster tab.
-- **Quick Join** - Reduced repeated row-height work while showing available groups.
-
 ## [2.6.1]        - 2026-05-31
 
 ### Added
@@ -37,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Friend Menus** - Restored Blizzard's invite versus request-to-join labels and actions for Battle.net friends.
 - **Recruit A Friend** - Shortened the search placeholder and kept it on one line in the header search field.
 - **Tabs** - Fixed truncated top and bottom tab labels showing duplicate hover tooltips.
+
+### Performance
+- **Top Tabs** - Reduced hitches when switching between Friends, Recent Allies, Recruit A Friend, and Guild tabs.
+- **Guild Roster** - Reduced memory churn when reopening or switching to the Guild roster tab.
+- **Quick Join** - Reduced repeated row-height work while showing available groups.
 
 ## [2.6.0]        - 2026-05-25
 
