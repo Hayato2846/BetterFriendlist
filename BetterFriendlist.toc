@@ -8,7 +8,7 @@
 ## X-WoWI-ID: 26984
 ## X-Wago-ID: rNkPLl6a 
 ## SavedVariables: BetterFriendlistDB
-## OptionalDeps: LibStub, LibDataBroker-1.1, LibSharedMedia-3.0, CustomNames, FriendListColors, EnhanceQoL, totalRP3
+## OptionalDeps: !BetterFriendlist_MenuBridge, LibStub, LibDataBroker-1.1, LibSharedMedia-3.0, CustomNames, FriendListColors, EnhanceQoL, totalRP3
 
 ## Category: User Interface
 ## Category-deDE: Benutzerinterface
@@ -79,6 +79,7 @@ Modules\IgnoreList.lua
 Modules\RecentAllies.lua [AllowLoadGameType mainline]
 Modules\GuildActions.lua
 Modules\MenuSystem.lua
+Modules\MenuBridge.lua
 Modules\QuickFilters.lua
 Modules\Broker.lua
 Modules\GuildRosterData.lua

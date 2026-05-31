@@ -13,6 +13,9 @@ BFL:RegisterLocale("koKR", function()
 	L.SETTINGS_SIMPLE_MODE_DESC =
 		"플레이어 초상화를 비활성화하고 검색/정렬 옵션을 숨기며 프레임을 넓히고 탭을 이동하여 컴팩트 레이아웃을 만듭니다."
 	L.MENU_CHANGELOG = "Changelog"
+	L.MENU_EXTERNAL_ADDONS = "AddOns"
+	L.SETTINGS_EXTERNAL_MENU_BRIDGE = "External AddOn Menu Bridge (Beta)"
+	L.SETTINGS_EXTERNAL_MENU_BRIDGE_DESC = "Adds compatible AddOn actions to supported BetterFriendlist context menus."
 	L.KEYBIND_TOGGLE_BETTERFRIENDLIST = "Toggle BetterFriendlist"
 	-- ========================================
 	-- DIALOGS & POPUPS

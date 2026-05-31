@@ -20,6 +20,7 @@ if (-not (Test-Path -LiteralPath $pkgmetaPath -PathType Leaf)) {
     throw '.pkgmeta is missing.'
 }
 
+$pkgmetaText = Get-Content -LiteralPath $pkgmetaPath -Raw
 $pkgmetaLines = Get-Content -LiteralPath $pkgmetaPath
 $ignorePatterns = @()
 $inIgnoreBlock = $false
@@ -92,6 +93,11 @@ if ($missingRequiredIgnores.Count -gt 0) {
     throw "Missing .pkgmeta ignore entries: $($missingRequiredIgnores -join ', ')"
 }
 
+$menuBridgeMoveFolderPattern = '(?m)^\s*["'']?BetterFriendlist/!BetterFriendlist_MenuBridge["'']?\s*:\s*["'']?!BetterFriendlist_MenuBridge["'']?\s*$'
+if ($pkgmetaText -notmatch '(?m)^move-folders:\s*$' -or $pkgmetaText -notmatch $menuBridgeMoveFolderPattern) {
+    throw '.pkgmeta must move BetterFriendlist/!BetterFriendlist_MenuBridge to a sibling !BetterFriendlist_MenuBridge addon folder.'
+}
+
 $trackedFiles = & git ls-files
 $internalFiles = @(
     foreach ($file in $trackedFiles) {
@@ -126,3 +132,44 @@ if ($leakingFiles.Count -gt 0) {
 }
 
 Write-Host '[OK] Package metadata excludes tracked internal files.'
+
+Write-Host ''
+Write-Host '[BFL] Companion addon metadata'
+
+$mainTocPath = Join-Path (Get-Location) 'BetterFriendlist.toc'
+if (-not (Test-Path -LiteralPath $mainTocPath -PathType Leaf)) {
+    throw 'BetterFriendlist.toc is missing.'
+}
+
+$mainTocText = Get-Content -LiteralPath $mainTocPath -Raw
+if ($mainTocText -notmatch '(?m)^## OptionalDeps:.*!BetterFriendlist_MenuBridge') {
+    throw 'BetterFriendlist.toc must list !BetterFriendlist_MenuBridge in OptionalDeps.'
+}
+if ($mainTocText -notmatch '(?m)^Modules\\MenuBridge\.lua\s*$') {
+    throw 'BetterFriendlist.toc must load Modules\MenuBridge.lua.'
+}
+
+$menuBridgeRoot = Join-Path (Get-Location) '!BetterFriendlist_MenuBridge'
+$menuBridgeTocPath = Join-Path $menuBridgeRoot '!BetterFriendlist_MenuBridge.toc'
+$menuBridgeLuaPath = Join-Path $menuBridgeRoot '!BetterFriendlist_MenuBridge.lua'
+if (-not (Test-Path -LiteralPath $menuBridgeTocPath -PathType Leaf)) {
+    throw 'Companion TOC is missing: !BetterFriendlist_MenuBridge\!BetterFriendlist_MenuBridge.toc'
+}
+if (-not (Test-Path -LiteralPath $menuBridgeLuaPath -PathType Leaf)) {
+    throw 'Companion Lua is missing: !BetterFriendlist_MenuBridge\!BetterFriendlist_MenuBridge.lua'
+}
+
+$menuBridgeTocText = Get-Content -LiteralPath $menuBridgeTocPath -Raw
+if ($menuBridgeTocText -match '(?m)^##\s*SavedVariables') {
+    throw 'Companion addon must not define SavedVariables.'
+}
+if ($menuBridgeTocText -notmatch '(?m)^!BetterFriendlist_MenuBridge\.lua\s*$') {
+    throw 'Companion TOC must load !BetterFriendlist_MenuBridge.lua.'
+}
+
+$menuBridgeLuaText = Get-Content -LiteralPath $menuBridgeLuaPath -Raw
+if ($menuBridgeLuaText -notmatch 'BetterFriendlist_MenuBridgeCaptures') {
+    throw 'Companion Lua must publish BetterFriendlist_MenuBridgeCaptures for BetterFriendlist import.'
+}
+
+Write-Host '[OK] Companion addon metadata is release-ready.'

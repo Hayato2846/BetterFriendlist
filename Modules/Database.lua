@@ -132,6 +132,7 @@ local defaults = {
 	debugPrintEnabled = false, -- Toggle debug prints with /bfl debug print
 	-- Beta Features
 	enableBetaFeatures = false, -- Enable experimental Beta features (default: OFF)
+	externalMenuBridgeEnabled = false, -- Add supported addon actions to supported BFL context menus (default: OFF)
 	-- Global Sync Settings
 	enableGlobalSync = false, -- Enable Global Friend Sync (default: OFF)
 	enableGlobalSyncDeletion = false, -- Enable deletion of friends during sync (default: OFF)
@@ -732,8 +733,7 @@ function DB:ResetFontColors()
 		BFL:ForceRefreshFriendsList()
 	end
 
-	-- BFL:DebugPrint("Database: Font colors reset to defaults.")
-	print("|cff00ff00BetterFriendlist:|r Font colors reset to Blizzard defaults.")
+	BFL:DebugPrint("Database: Font colors reset to Blizzard defaults.")
 end
 
 function DB:Get(key, default)

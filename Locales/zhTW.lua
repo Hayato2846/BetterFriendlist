@@ -268,6 +268,9 @@ BFL:RegisterLocale("zhTW", function()
 	L.EMPTY_TEXT = "空"
 	L.LEVEL_FORMAT = "%d 級"
 
+	L.MENU_EXTERNAL_ADDONS = "AddOns"
+	L.SETTINGS_EXTERNAL_MENU_BRIDGE = "External AddOn Menu Bridge (Beta)"
+	L.SETTINGS_EXTERNAL_MENU_BRIDGE_DESC = "Adds compatible AddOn actions to supported BetterFriendlist context menus."
 	L.KEYBIND_TOGGLE_BETTERFRIENDLIST = "Toggle BetterFriendlist"
 	-- ========================================
 	-- BETA FEATURES (Advanced Tab)

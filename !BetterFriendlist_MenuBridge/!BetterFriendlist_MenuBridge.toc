@@ -1,0 +1,9 @@
+## Interface: 120007, 120005, 120001, 120000, 110207, 50504, 50503, 50500, 40402, 38000, 30405, 20505, 20504, 11508
+## Title: BetterFriendlist Menu Bridge
+## Notes: Companion for BetterFriendlist. Shows actions from compatible AddOns in supported BetterFriendlist context menus.
+## Author: Hayato2846
+## Version: 2.6.0
+## IconTexture: Interface\AddOns\BetterFriendlist\Textures\PortraitIcon.blp
+## OptionalDeps: Blizzard_Menu
+
+!BetterFriendlist_MenuBridge.lua

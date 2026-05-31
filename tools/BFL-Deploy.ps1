@@ -25,7 +25,9 @@ $ErrorActionPreference = 'Stop'
 function Invoke-BFLAddonMirror {
     param(
         [Parameter(Mandatory = $true)][string]$SourceRoot,
-        [Parameter(Mandatory = $true)][string]$DestinationRoot
+        [Parameter(Mandatory = $true)][string]$DestinationRoot,
+        [string]$TocFile = 'BetterFriendlist.toc',
+        [string[]]$ExtraExcludeDirs = @()
     )
 
     Ensure-BFLDirectory (Split-Path -Parent $DestinationRoot)
@@ -40,6 +42,11 @@ function Invoke-BFLAddonMirror {
         'docs', 'memory-bank', 'old_version', 'plans', 'predecessor',
         'reference', 'tools', 'WoW UI Source'
     )
+    if ($ExtraExcludeDirs.Count -gt 0) {
+        $excludeDirs += $ExtraExcludeDirs
+    }
+    $excludeDirs = @($excludeDirs | Select-Object -Unique)
+
     $excludeFiles = @(
         '.git', '.gitignore', '.pkgmeta', '*.bak', '*.html', '*.log', '*.lua.bak',
         '*.md', '*.png', '*.ps1', '*.py', '*.txt', '*.zip'
@@ -70,7 +77,7 @@ function Invoke-BFLAddonMirror {
         throw "robocopy failed with exit code $robocopyExitCode while mirroring '$SourceRoot' to '$DestinationRoot'. $detailText"
     }
 
-    Assert-BFLAddonRoot $DestinationRoot | Out-Null
+    Assert-BFLAddonRootByToc -Path $DestinationRoot -TocFile $TocFile | Out-Null
 }
 
 function Remove-BFLExcludedArtifacts {
@@ -126,10 +133,12 @@ function Copy-BFLAddon {
     param(
         [Parameter(Mandatory = $true)][string]$From,
         [Parameter(Mandatory = $true)][string]$To,
-        [Parameter(Mandatory = $true)][string]$BFLRoot
+        [Parameter(Mandatory = $true)][string]$BFLRoot,
+        [string]$TocFile = 'BetterFriendlist.toc',
+        [string[]]$ExtraExcludeDirs = @()
     )
 
-    $sourceRoot = Assert-BFLAddonRoot $From
+    $sourceRoot = Assert-BFLAddonRootByToc -Path $From -TocFile $TocFile
     $destinationRoot = [System.IO.Path]::GetFullPath($To)
     $deployRoot = Join-Path (Resolve-BFLRoot $BFLRoot) 'deploy'
 
@@ -144,17 +153,19 @@ function Copy-BFLAddon {
         throw "Deployment slot is a link. Remove it before CleanCopy: $destinationRoot"
     }
 
-    Invoke-BFLAddonMirror -SourceRoot $sourceRoot -DestinationRoot $destinationRoot
+    Invoke-BFLAddonMirror -SourceRoot $sourceRoot -DestinationRoot $destinationRoot -TocFile $TocFile -ExtraExcludeDirs $ExtraExcludeDirs
 }
 
 function Copy-BFLAddonToClientPath {
     param(
         [Parameter(Mandatory = $true)][string]$From,
         [Parameter(Mandatory = $true)][string]$To,
-        [Parameter(Mandatory = $true)][string]$ExpectedPath
+        [Parameter(Mandatory = $true)][string]$ExpectedPath,
+        [string]$TocFile = 'BetterFriendlist.toc',
+        [string[]]$ExtraExcludeDirs = @()
     )
 
-    $sourceRoot = Assert-BFLAddonRoot $From
+    $sourceRoot = Assert-BFLAddonRootByToc -Path $From -TocFile $TocFile
     $destinationRoot = [System.IO.Path]::GetFullPath($To)
     $expectedRoot = [System.IO.Path]::GetFullPath($ExpectedPath)
 
@@ -174,7 +185,7 @@ function Copy-BFLAddonToClientPath {
         }
     }
 
-    Invoke-BFLAddonMirror -SourceRoot $sourceRoot -DestinationRoot $destinationRoot
+    Invoke-BFLAddonMirror -SourceRoot $sourceRoot -DestinationRoot $destinationRoot -TocFile $TocFile -ExtraExcludeDirs $ExtraExcludeDirs
 }
 
 function Test-BFLDirectClientMirrorTarget {
@@ -195,10 +206,30 @@ function Test-BFLDirectClientMirrorTarget {
     return -not (Test-Path -LiteralPath $gitPath)
 }
 
+function Find-BFLAddonRootInExpandedZip {
+    param(
+        [Parameter(Mandatory = $true)][string]$TempRoot,
+        [Parameter(Mandatory = $true)][string]$TocFile,
+        [switch]$Required
+    )
+
+    $candidate = Get-ChildItem -LiteralPath $TempRoot -Recurse -Filter $TocFile |
+        Select-Object -First 1
+    if (-not $candidate) {
+        if ($Required) {
+            throw "ZIP does not contain $TocFile"
+        }
+        return $null
+    }
+
+    return Split-Path -Parent $candidate.FullName
+}
+
 function Expand-BFLReleaseZip {
     param(
         [Parameter(Mandatory = $true)][string]$ZipPath,
         [Parameter(Mandatory = $true)][string]$To,
+        [string]$MenuBridgeTo,
         [Parameter(Mandatory = $true)][string]$BFLRoot
     )
 
@@ -210,12 +241,25 @@ function Expand-BFLReleaseZip {
     Ensure-BFLDirectory $tempRoot
     try {
         Expand-Archive -LiteralPath $ZipPath -DestinationPath $tempRoot -Force
-        $candidate = Get-ChildItem -LiteralPath $tempRoot -Recurse -Filter 'BetterFriendlist.toc' |
-            Select-Object -First 1
-        if (-not $candidate) {
-            throw "ZIP does not contain BetterFriendlist.toc"
+        $candidateRoot = Find-BFLAddonRootInExpandedZip -TempRoot $tempRoot -TocFile 'BetterFriendlist.toc' -Required
+        Copy-BFLAddon -From $candidateRoot -To $To -BFLRoot $BFLRoot -ExtraExcludeDirs @('!BetterFriendlist_MenuBridge')
+
+        $menuBridgeDeployed = $false
+        if (-not [string]::IsNullOrWhiteSpace($MenuBridgeTo)) {
+            $menuBridgeRoot = Find-BFLAddonRootInExpandedZip -TempRoot $tempRoot -TocFile '!BetterFriendlist_MenuBridge.toc'
+            if ($menuBridgeRoot) {
+                Copy-BFLAddon `
+                    -From $menuBridgeRoot `
+                    -To $MenuBridgeTo `
+                    -BFLRoot $BFLRoot `
+                    -TocFile '!BetterFriendlist_MenuBridge.toc'
+                $menuBridgeDeployed = $true
+            }
         }
-        Copy-BFLAddon -From (Split-Path -Parent $candidate.FullName) -To $To -BFLRoot $BFLRoot
+
+        return [PSCustomObject]@{
+            MenuBridgeDeployed = $menuBridgeDeployed
+        }
     }
     finally {
         if (Test-Path -LiteralPath $tempRoot) {
@@ -228,10 +272,11 @@ function Set-BFLAddonLink {
         [Parameter(Mandatory = $true)][string]$LinkPath,
         [Parameter(Mandatory = $true)][string]$TargetPath,
         [Parameter(Mandatory = $true)][string]$Type,
+        [string]$TocFile = 'BetterFriendlist.toc',
         [switch]$Force
     )
 
-    $resolvedTarget = Assert-BFLAddonRoot $TargetPath
+    $resolvedTarget = Assert-BFLAddonRootByToc -Path $TargetPath -TocFile $TocFile
     Ensure-BFLDirectory (Split-Path -Parent $LinkPath)
 
     if (Test-Path -LiteralPath $LinkPath) {
@@ -282,24 +327,67 @@ foreach ($clientName in $clients) {
 
     switch ($Mode) {
         'CleanCopy' {
+            $menuBridgeSource = Join-Path ([System.IO.Path]::GetFullPath($Source)) '!BetterFriendlist_MenuBridge'
             if (Test-BFLDirectClientMirrorTarget -Path $info.AddOnPath) {
                 Write-Host "Mirroring CleanCopy directly to existing client AddOn folder: $($info.AddOnPath)"
-                Copy-BFLAddonToClientPath -From $Source -To $info.AddOnPath -ExpectedPath $info.AddOnPath
+                Copy-BFLAddonToClientPath `
+                    -From $Source `
+                    -To $info.AddOnPath `
+                    -ExpectedPath $info.AddOnPath `
+                    -ExtraExcludeDirs @('!BetterFriendlist_MenuBridge')
+                Write-Host "Mirroring CleanCopy directly to companion AddOn folder: $($info.MenuBridgeAddOnPath)"
+                Copy-BFLAddonToClientPath `
+                    -From $menuBridgeSource `
+                    -To $info.MenuBridgeAddOnPath `
+                    -ExpectedPath $info.MenuBridgeAddOnPath `
+                    -TocFile '!BetterFriendlist_MenuBridge.toc'
                 continue
             }
 
-            Copy-BFLAddon -From $Source -To $info.DeployPath -BFLRoot $rootPath
+            Copy-BFLAddon -From $Source -To $info.DeployPath -BFLRoot $rootPath -ExtraExcludeDirs @('!BetterFriendlist_MenuBridge')
             Set-BFLAddonLink -LinkPath $info.AddOnPath -TargetPath $info.DeployPath -Type $LinkType -Force:$Force
+            Copy-BFLAddon `
+                -From $menuBridgeSource `
+                -To $info.MenuBridgeDeployPath `
+                -BFLRoot $rootPath `
+                -TocFile '!BetterFriendlist_MenuBridge.toc'
+            Set-BFLAddonLink `
+                -LinkPath $info.MenuBridgeAddOnPath `
+                -TargetPath $info.MenuBridgeDeployPath `
+                -Type $LinkType `
+                -TocFile '!BetterFriendlist_MenuBridge.toc' `
+                -Force:$Force
         }
         'Link' {
+            $menuBridgeSource = Join-Path ([System.IO.Path]::GetFullPath($Source)) '!BetterFriendlist_MenuBridge'
             Set-BFLAddonLink -LinkPath $info.AddOnPath -TargetPath $Source -Type $LinkType -Force:$Force
+            Set-BFLAddonLink `
+                -LinkPath $info.MenuBridgeAddOnPath `
+                -TargetPath $menuBridgeSource `
+                -Type $LinkType `
+                -TocFile '!BetterFriendlist_MenuBridge.toc' `
+                -Force:$Force
         }
         'Zip' {
             if ([string]::IsNullOrWhiteSpace($Zip)) {
                 throw '-Zip is required for Zip mode.'
             }
-            Expand-BFLReleaseZip -ZipPath $Zip -To $info.DeployPath -BFLRoot $rootPath
+            $zipDeploy = Expand-BFLReleaseZip `
+                -ZipPath $Zip `
+                -To $info.DeployPath `
+                -MenuBridgeTo $info.MenuBridgeDeployPath `
+                -BFLRoot $rootPath
             Set-BFLAddonLink -LinkPath $info.AddOnPath -TargetPath $info.DeployPath -Type $LinkType -Force:$Force
+            if ($zipDeploy.MenuBridgeDeployed) {
+                Set-BFLAddonLink `
+                    -LinkPath $info.MenuBridgeAddOnPath `
+                    -TargetPath $info.MenuBridgeDeployPath `
+                    -Type $LinkType `
+                    -TocFile '!BetterFriendlist_MenuBridge.toc' `
+                    -Force:$Force
+            } else {
+                Write-Warning "ZIP does not contain !BetterFriendlist_MenuBridge; companion deployment skipped for $($info.Key)."
+            }
         }
     }
 }

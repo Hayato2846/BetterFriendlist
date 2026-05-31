@@ -126,6 +126,9 @@ BFL:RegisterLocale("ruRU", function()
 	L.DIALOG_MIGRATE_BTN2 = "Только перенести"
 	L.DIALOG_MIGRATE_BTN3 = "Отмена"
 
+	L.MENU_EXTERNAL_ADDONS = "AddOns"
+	L.SETTINGS_EXTERNAL_MENU_BRIDGE = "External AddOn Menu Bridge (Beta)"
+	L.SETTINGS_EXTERNAL_MENU_BRIDGE_DESC = "Adds compatible AddOn actions to supported BetterFriendlist context menus."
 	L.KEYBIND_TOGGLE_BETTERFRIENDLIST = "Toggle BetterFriendlist"
 	-- ========================================
 	-- SETTINGS PANEL

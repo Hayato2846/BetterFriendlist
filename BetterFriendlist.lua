@@ -3587,6 +3587,11 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end
 				owner = owner or UIParent
 
+				local MenuBridge = BFL:GetModule("MenuBridge")
+				if MenuBridge and MenuBridge.WarmUpLazyModifiers then
+					MenuBridge:WarmUpLazyModifiers(owner)
+				end
+
 				local isBNet = menuType == "BN_FRIEND" or menuType == "BN_FRIEND_OFFLINE" or contextData.bnetIDAccount
 				local isOffline = menuType == "BN_FRIEND_OFFLINE"
 					or menuType == "FRIEND_OFFLINE"
@@ -3636,11 +3641,6 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 					BFL_AddViewHousesButton(rootDescription, contextData, isBNet)
 
-					local TotalRP3Compat = BFL:GetModule("Compat_TotalRP3")
-					if TotalRP3Compat and TotalRP3Compat.AddOpenProfileButton then
-						TotalRP3Compat:AddOpenProfileButton(ownerRegion, rootDescription, contextData, menuType)
-					end
-
 					rootDescription:CreateDivider()
 					rootDescription:CreateTitle(UNIT_FRAME_DROPDOWN_SUBSECTION_TITLE_OTHER or "Other")
 
@@ -3674,6 +3674,10 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 					if isFriendMenu then
 						AddGroupsToFriendMenu(ownerRegion, rootDescription, contextData)
+					end
+
+					if MenuBridge and MenuBridge.PopulateMenu then
+						MenuBridge:PopulateMenu(ownerRegion, rootDescription, contextData, menuType)
 					end
 				end)
 
