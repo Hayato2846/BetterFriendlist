@@ -569,7 +569,7 @@ BFL:RegisterLocale("koKR", function()
 	L.GUILD_BROKER_SETTINGS_NOTE_COLOR = "메모 색상"
 	L.GUILD_BROKER_SETTINGS_OFFICER_NOTE_COLOR = "간부 메모 색상"
 
-	L.GUILD_BROKER_ACTION_GUILD_FRAME = "길드 창 열기"
+	L.GUILD_BROKER_ACTION_GUILD_FRAME = "BFL 길드 탭 열기"
 	L.GUILD_BROKER_ACTION_SETTINGS = "설정 열기"
 	L.GUILD_BROKER_GROUP_NONE = "그룹 없음"
 	L.GUILD_BROKER_GROUP_BY_RANK = "등급별 그룹"
@@ -587,7 +587,7 @@ BFL:RegisterLocale("koKR", function()
 	L.GUILD_BROKER_HINT_COPY = " 채팅에 복사"
 	L.GUILD_BROKER_HINT_ICON_ACTIONS = "--- 브로커 아이콘 동작 ---"
 	L.GUILD_BROKER_HINT_LEFT_CLICK = "좌클릭:"
-	L.GUILD_BROKER_HINT_TOGGLE = " 툴팁 전환"
+	L.GUILD_BROKER_HINT_TOGGLE = " BFL 길드 탭 열기"
 	L.GUILD_BROKER_HINT_RIGHT_CLICK = "우클릭:"
 	L.GUILD_BROKER_HINT_SETTINGS = " 설정"
 	L.GUILD_BROKER_HINT_MIDDLE_CLICK = "중클릭:"
@@ -601,14 +601,9 @@ BFL:RegisterLocale("koKR", function()
 	L.GUILD_BROKER_MENU_REMOVE_NICKNAME = "삭제"
 	L.GUILD_BROKER_NICKNAME_PROMPT = "%s의 별명을 입력하세요:"
 
-	L.GUILD_BROKER_MENU_EDIT_NOTE = "메모 편집"
-	L.GUILD_BROKER_MENU_EDIT_OFFICER_NOTE = "관리자 메모 편집"
 	L.GUILD_BROKER_MENU_PROMOTE = "승급"
 	L.GUILD_BROKER_MENU_DEMOTE = "강등"
 	L.GUILD_BROKER_MENU_REMOVE = "길드에서 추방"
-	L.GUILD_BROKER_PROMOTE_CONFIRM = "%s을(를) %s(으)로 승급하시겠습니까?"
-	L.GUILD_BROKER_DEMOTE_CONFIRM = "%s을(를) %s(으)로 강등하시겠습니까?"
-	L.GUILD_BROKER_REMOVE_CONFIRM = "%s을(를) 길드에서 추방하시겠습니까?"
 	L.GUILD_BROKER_ACTION_RESTRICTED = "전투 중에는 이 동작을 사용할 수 없습니다."
 	L.GUILD_BROKER_NO_PERMISSION = "이 작업을 수행할 권한이 없습니다."
 	L.GUILD_BROKER_LAST_ONLINE_YEARS = "%dy"
@@ -646,11 +641,7 @@ BFL:RegisterLocale("koKR", function()
 	L.LASTONLINE_YEARS = "%d년"
 
 	-- ========================================
-	-- GUILD UI WARNING
 	-- ========================================
-	L.CLASSIC_GUILD_UI_WARNING_TITLE = "클래식 길드 UI 비활성화됨"
-	L.CLASSIC_GUILD_UI_WARNING_TEXT =
-		"BetterFriendlist는 Blizzard의 최신 길드 UI만 BetterFriendlist와 호환되므로 클래식 길드 UI 설정을 비활성화했습니다.\n\n길드 탭은 이제 Blizzard의 최신 길드 UI를 엽니다."
 
 	-- ========================================
 	-- AUDITED MISSING STRINGS
@@ -1665,7 +1656,6 @@ L.SETTINGS_SHOW_ILVL_COLUMN_DESC = "Show an item level column in the Guild tab l
 	L.GUILD_ACTION_TARGET = "Target"
 	L.GUILD_ACTION_COPY_NAME = "Copy Name"
 	L.GUILD_ACTION_OPEN_INFO = "View Member Info"
-	L.GUILD_ACTION_OPEN_BLIZZARD = "Open in Guild UI"
 	L.GUILD_INVITE_DIALOG_TITLE = "Invite to %s"
 	L.GUILD_INVITE_PLACEHOLDER = "Character-Realm"
 	L.GUILD_INVITE_BUTTON = "Invite"
@@ -1753,19 +1743,11 @@ L.SETTINGS_SHOW_ILVL_COLUMN_DESC = "Show an item level column in the Guild tab l
 	L.GUILD_ACTIONS_MENU = "Guild Actions"
 	L.GUILD_ACTION_INVITE_TO_GUILD = "Invite to Guild"
 	L.GUILD_ACTION_EDIT_MOTD = "Edit MOTD"
-	L.GUILD_ACTION_EDIT_INFO = "Edit Guild Info"
-	L.GUILD_ACTION_GUILD_CONTROL = "Guild Control"
 	L.GUILD_ACTION_LEAVE_GUILD = "Leave Guild"
 	L.GUILD_ACTION_DISBAND_GUILD = "Disband Guild"
 	L.GUILD_ACTION_SET_LEADER = "Set Guild Leader"
-	L.GUILD_ACTION_EDIT_PUBLIC_NOTE = "Edit Public Note"
-	L.GUILD_ACTION_EDIT_OFFICER_NOTE = "Edit Officer Note"
-	L.GUILD_ACTION_SET_RANK = "Set Rank"
 	L.GUILD_INVITE_PLAYER_TITLE = "Invite player to guild"
 	L.GUILD_EDIT_MOTD_TITLE = "Edit guild MOTD"
-	L.GUILD_EDIT_INFO_TITLE = "Edit guild information"
-	L.GUILD_EDIT_PUBLIC_NOTE_TITLE = "Public note for %s"
-	L.GUILD_EDIT_OFFICER_NOTE_TITLE = "Officer note for %s"
 	L.GUILD_REMOVE_CONFIRM = "Remove %s from the guild?"
 	L.GUILD_SET_RANK_CONFIRM = "Set %s to %s?"
 	L.GUILD_ACTION_RESTRICTED = "This action is not available right now."

@@ -495,7 +495,7 @@ BFL:RegisterLocale("zhCN", function()
 	L.GUILD_BROKER_SETTINGS_ZONE_COLOR = "区域颜色"
 	L.GUILD_BROKER_SETTINGS_NOTE_COLOR = "备注颜色"
 	L.GUILD_BROKER_SETTINGS_OFFICER_NOTE_COLOR = "官员备注颜色"
-	L.GUILD_BROKER_ACTION_GUILD_FRAME = "打开公会窗口"
+	L.GUILD_BROKER_ACTION_GUILD_FRAME = "打开 BFL 公会标签"
 	L.GUILD_BROKER_ACTION_SETTINGS = "打开设置"
 	L.GUILD_BROKER_GROUP_NONE = "不分组"
 	L.GUILD_BROKER_GROUP_BY_RANK = "按阶级分组"
@@ -513,7 +513,7 @@ BFL:RegisterLocale("zhCN", function()
 	L.GUILD_BROKER_HINT_COPY = " 复制到聊天"
 	L.GUILD_BROKER_HINT_ICON_ACTIONS = "--- 图标操作 ---"
 	L.GUILD_BROKER_HINT_LEFT_CLICK = "左键:"
-	L.GUILD_BROKER_HINT_TOGGLE = " 切换提示框"
+	L.GUILD_BROKER_HINT_TOGGLE = " 打开 BFL 公会标签"
 	L.GUILD_BROKER_HINT_RIGHT_CLICK = "右键:"
 	L.GUILD_BROKER_HINT_SETTINGS = " 设置"
 	L.GUILD_BROKER_HINT_MIDDLE_CLICK = "中键:"
@@ -526,14 +526,9 @@ BFL:RegisterLocale("zhCN", function()
 	L.GUILD_BROKER_MENU_EDIT_NICKNAME = "编辑昵称"
 	L.GUILD_BROKER_MENU_REMOVE_NICKNAME = "移除"
 	L.GUILD_BROKER_NICKNAME_PROMPT = "输入 %s 的昵称："
-	L.GUILD_BROKER_MENU_EDIT_NOTE = "编辑备注"
-	L.GUILD_BROKER_MENU_EDIT_OFFICER_NOTE = "编辑官员备注"
 	L.GUILD_BROKER_MENU_PROMOTE = "晋升"
 	L.GUILD_BROKER_MENU_DEMOTE = "降级"
 	L.GUILD_BROKER_MENU_REMOVE = "踢出公会"
-	L.GUILD_BROKER_PROMOTE_CONFIRM = "将 %s 晋升为 %s？"
-	L.GUILD_BROKER_DEMOTE_CONFIRM = "将 %s 降级为 %s？"
-	L.GUILD_BROKER_REMOVE_CONFIRM = "将 %s 踢出公会？"
 	L.GUILD_BROKER_ACTION_RESTRICTED = "战斗中无法执行此操作。"
 	L.GUILD_BROKER_NO_PERMISSION = "你没有执行此操作的权限。"
 	L.GUILD_BROKER_LAST_ONLINE_YEARS = "%dy"
@@ -636,11 +631,7 @@ BFL:RegisterLocale("zhCN", function()
 	L.LASTONLINE_YEARS = "%d y"
 
 	-- ========================================
-	-- GUILD UI WARNING
 	-- ========================================
-	L.CLASSIC_GUILD_UI_WARNING_TITLE = "Classic Guild UI Disabled"
-	L.CLASSIC_GUILD_UI_WARNING_TEXT =
-		"BetterFriendlist has disabled the Classic Guild UI because only the modern Blizzard Guild UI is compatible with BetterFriendlist.\n\nThe Guild tab now opens the modern Blizzard Guild UI."
 
 	-- ========================================
 	-- AUDITED MISSING STRINGS
@@ -1644,7 +1635,6 @@ L.SETTINGS_SHOW_ILVL_COLUMN_DESC = "Show an item level column in the Guild tab l
 	L.GUILD_ACTION_TARGET = "Target"
 	L.GUILD_ACTION_COPY_NAME = "Copy Name"
 	L.GUILD_ACTION_OPEN_INFO = "View Member Info"
-	L.GUILD_ACTION_OPEN_BLIZZARD = "Open in Guild UI"
 	L.GUILD_INVITE_DIALOG_TITLE = "Invite to %s"
 	L.GUILD_INVITE_PLACEHOLDER = "Character-Realm"
 	L.GUILD_INVITE_BUTTON = "Invite"
@@ -1732,19 +1722,11 @@ L.SETTINGS_SHOW_ILVL_COLUMN_DESC = "Show an item level column in the Guild tab l
 	L.GUILD_ACTIONS_MENU = "Guild Actions"
 	L.GUILD_ACTION_INVITE_TO_GUILD = "Invite to Guild"
 	L.GUILD_ACTION_EDIT_MOTD = "Edit MOTD"
-	L.GUILD_ACTION_EDIT_INFO = "Edit Guild Info"
-	L.GUILD_ACTION_GUILD_CONTROL = "Guild Control"
 	L.GUILD_ACTION_LEAVE_GUILD = "Leave Guild"
 	L.GUILD_ACTION_DISBAND_GUILD = "Disband Guild"
 	L.GUILD_ACTION_SET_LEADER = "Set Guild Leader"
-	L.GUILD_ACTION_EDIT_PUBLIC_NOTE = "Edit Public Note"
-	L.GUILD_ACTION_EDIT_OFFICER_NOTE = "Edit Officer Note"
-	L.GUILD_ACTION_SET_RANK = "Set Rank"
 	L.GUILD_INVITE_PLAYER_TITLE = "Invite player to guild"
 	L.GUILD_EDIT_MOTD_TITLE = "Edit guild MOTD"
-	L.GUILD_EDIT_INFO_TITLE = "Edit guild information"
-	L.GUILD_EDIT_PUBLIC_NOTE_TITLE = "Public note for %s"
-	L.GUILD_EDIT_OFFICER_NOTE_TITLE = "Officer note for %s"
 	L.GUILD_REMOVE_CONFIRM = "Remove %s from the guild?"
 	L.GUILD_SET_RANK_CONFIRM = "Set %s to %s?"
 	L.GUILD_ACTION_RESTRICTED = "This action is not available right now."

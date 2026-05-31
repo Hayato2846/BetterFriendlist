@@ -696,7 +696,7 @@ local function LoadEnUS()
 	L.GUILD_BROKER_SETTINGS_OFFICER_NOTE_COLOR = "Officer Note Color"
 
 	-- Click Actions
-	L.GUILD_BROKER_ACTION_GUILD_FRAME = "Open Guild Frame"
+	L.GUILD_BROKER_ACTION_GUILD_FRAME = "Open BFL Guild Tab"
 	L.GUILD_BROKER_ACTION_SETTINGS = "Open Settings"
 
 	-- Group Modes
@@ -720,7 +720,7 @@ local function LoadEnUS()
 	L.GUILD_BROKER_HINT_COPY = " Copy to Chat"
 	L.GUILD_BROKER_HINT_ICON_ACTIONS = "--- Broker Icon Actions ---"
 	L.GUILD_BROKER_HINT_LEFT_CLICK = "Left Click:"
-	L.GUILD_BROKER_HINT_TOGGLE = " Toggle Tooltip"
+	L.GUILD_BROKER_HINT_TOGGLE = " Open BFL Guild Tab"
 	L.GUILD_BROKER_HINT_RIGHT_CLICK = "Right Click:"
 	L.GUILD_BROKER_HINT_SETTINGS = " Settings"
 	L.GUILD_BROKER_HINT_MIDDLE_CLICK = "Middle Click:"
@@ -735,16 +735,11 @@ local function LoadEnUS()
 	L.GUILD_BROKER_MENU_EDIT_NICKNAME = "Edit Nickname"
 	L.GUILD_BROKER_MENU_REMOVE_NICKNAME = "Remove"
 	L.GUILD_BROKER_NICKNAME_PROMPT = "Enter a nickname for %s:"
-	L.GUILD_BROKER_MENU_EDIT_NOTE = "Edit Note"
-	L.GUILD_BROKER_MENU_EDIT_OFFICER_NOTE = "Edit Officer Note"
 	L.GUILD_BROKER_MENU_PROMOTE = "Promote"
 	L.GUILD_BROKER_MENU_DEMOTE = "Demote"
 	L.GUILD_BROKER_MENU_REMOVE = "Remove from Guild"
 
 	-- Rank Management
-	L.GUILD_BROKER_PROMOTE_CONFIRM = "Promote %s to %s?"
-	L.GUILD_BROKER_DEMOTE_CONFIRM = "Demote %s to %s?"
-	L.GUILD_BROKER_REMOVE_CONFIRM = "Remove %s from the guild?"
 	L.GUILD_BROKER_ACTION_RESTRICTED = "This action is not available during combat."
 	L.GUILD_BROKER_NO_PERMISSION = "You do not have permission to do this."
 
@@ -784,11 +779,7 @@ local function LoadEnUS()
 	L.LASTONLINE_YEARS = "%d years"
 
 	-- ========================================
-	-- GUILD UI WARNING
 	-- ========================================
-	L.CLASSIC_GUILD_UI_WARNING_TITLE = "Classic Guild UI Disabled"
-	L.CLASSIC_GUILD_UI_WARNING_TEXT =
-		"BetterFriendlist has disabled the Classic Guild UI setting as only Blizzard's modern Guild UI is compatible with BetterFriendlist.\n\nThe Guild tab now opens Blizzard's modern Guild UI."
 
 	-- ========================================
 	-- AUDITED MISSING STRINGS
@@ -1746,7 +1737,6 @@ local function LoadEnUS()
 	L.GUILD_ACTION_TARGET = "Target"
 	L.GUILD_ACTION_COPY_NAME = "Copy Name"
 	L.GUILD_ACTION_OPEN_INFO = "View Member Info"
-	L.GUILD_ACTION_OPEN_BLIZZARD = "Open in Guild UI"
 	L.GUILD_INVITE_DIALOG_TITLE = "Invite to %s"
 	L.GUILD_INVITE_PLACEHOLDER = "Character-Realm"
 	L.GUILD_INVITE_BUTTON = "Invite"
@@ -1779,19 +1769,11 @@ local function LoadEnUS()
 	L.GUILD_ACTIONS_MENU = "Guild Actions"
 	L.GUILD_ACTION_INVITE_TO_GUILD = "Invite to Guild"
 	L.GUILD_ACTION_EDIT_MOTD = "Edit MOTD"
-	L.GUILD_ACTION_EDIT_INFO = "Edit Guild Info"
-	L.GUILD_ACTION_GUILD_CONTROL = "Guild Control"
 	L.GUILD_ACTION_LEAVE_GUILD = "Leave Guild"
 	L.GUILD_ACTION_DISBAND_GUILD = "Disband Guild"
 	L.GUILD_ACTION_SET_LEADER = "Set Guild Leader"
-	L.GUILD_ACTION_EDIT_PUBLIC_NOTE = "Edit Public Note"
-	L.GUILD_ACTION_EDIT_OFFICER_NOTE = "Edit Officer Note"
-	L.GUILD_ACTION_SET_RANK = "Set Rank"
 	L.GUILD_INVITE_PLAYER_TITLE = "Invite player to guild"
 	L.GUILD_EDIT_MOTD_TITLE = "Edit guild MOTD"
-	L.GUILD_EDIT_INFO_TITLE = "Edit guild information"
-	L.GUILD_EDIT_PUBLIC_NOTE_TITLE = "Public note for %s"
-	L.GUILD_EDIT_OFFICER_NOTE_TITLE = "Officer note for %s"
 	L.GUILD_REMOVE_CONFIRM = "Remove %s from the guild?"
 	L.GUILD_SET_RANK_CONFIRM = "Set %s to %s?"
 	L.GUILD_ACTION_RESTRICTED = "This action is not available right now."

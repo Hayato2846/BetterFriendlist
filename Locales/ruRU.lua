@@ -524,7 +524,7 @@ BFL:RegisterLocale("ruRU", function()
 	L.GUILD_BROKER_SETTINGS_ZONE_COLOR = "Цвет зоны"
 	L.GUILD_BROKER_SETTINGS_NOTE_COLOR = "Цвет заметки"
 	L.GUILD_BROKER_SETTINGS_OFFICER_NOTE_COLOR = "Цвет офицерской заметки"
-	L.GUILD_BROKER_ACTION_GUILD_FRAME = "Открыть окно гильдии"
+	L.GUILD_BROKER_ACTION_GUILD_FRAME = "Открыть вкладку гильдии BFL"
 	L.GUILD_BROKER_ACTION_SETTINGS = "Открыть настройки"
 	L.GUILD_BROKER_GROUP_NONE = "Без группировки"
 	L.GUILD_BROKER_GROUP_BY_RANK = "По рангу"
@@ -542,7 +542,7 @@ BFL:RegisterLocale("ruRU", function()
 	L.GUILD_BROKER_HINT_COPY = " Скопировать в чат"
 	L.GUILD_BROKER_HINT_ICON_ACTIONS = "--- Действия иконки ---"
 	L.GUILD_BROKER_HINT_LEFT_CLICK = "Левый клик:"
-	L.GUILD_BROKER_HINT_TOGGLE = " Переключить тултип"
+	L.GUILD_BROKER_HINT_TOGGLE = " Открыть вкладку гильдии BFL"
 	L.GUILD_BROKER_HINT_RIGHT_CLICK = "Правый клик:"
 	L.GUILD_BROKER_HINT_SETTINGS = " Настройки"
 	L.GUILD_BROKER_HINT_MIDDLE_CLICK = "Средний клик:"
@@ -555,14 +555,9 @@ BFL:RegisterLocale("ruRU", function()
 	L.GUILD_BROKER_MENU_EDIT_NICKNAME = "Изменить прозвище"
 	L.GUILD_BROKER_MENU_REMOVE_NICKNAME = "Удалить"
 	L.GUILD_BROKER_NICKNAME_PROMPT = "Введите прозвище для %s:"
-	L.GUILD_BROKER_MENU_EDIT_NOTE = "Изменить заметку"
-	L.GUILD_BROKER_MENU_EDIT_OFFICER_NOTE = "Изменить офицерскую заметку"
 	L.GUILD_BROKER_MENU_PROMOTE = "Повысить"
 	L.GUILD_BROKER_MENU_DEMOTE = "Понизить"
 	L.GUILD_BROKER_MENU_REMOVE = "Исключить из гильдии"
-	L.GUILD_BROKER_PROMOTE_CONFIRM = "Повысить %s до %s?"
-	L.GUILD_BROKER_DEMOTE_CONFIRM = "Понизить %s до %s?"
-	L.GUILD_BROKER_REMOVE_CONFIRM = "Исключить %s из гильдии?"
 	L.GUILD_BROKER_ACTION_RESTRICTED = "Это действие недоступно во время боя."
 	L.GUILD_BROKER_NO_PERMISSION = "У вас нет прав для этого."
 	L.GUILD_BROKER_LAST_ONLINE_YEARS = "%dy"
@@ -671,11 +666,7 @@ BFL:RegisterLocale("ruRU", function()
 	L.LASTONLINE_YEARS = "%d лет"
 
 	-- ========================================
-	-- GUILD UI WARNING
 	-- ========================================
-	L.CLASSIC_GUILD_UI_WARNING_TITLE = "Классический интерфейс гильдии отключен"
-	L.CLASSIC_GUILD_UI_WARNING_TEXT =
-		"BetterFriendlist отключил классический интерфейс гильдии, так как только современный интерфейс гильдии Blizzard совместим с BetterFriendlist.\n\nВкладка Гильдия теперь открывает современный интерфейс гильдии Blizzard."
 
 	-- ========================================
 	-- AUDITED MISSING STRINGS
@@ -1718,7 +1709,6 @@ L.SETTINGS_SHOW_ILVL_COLUMN_DESC = "Show an item level column in the Guild tab l
 	L.GUILD_ACTION_TARGET = "Target"
 	L.GUILD_ACTION_COPY_NAME = "Copy Name"
 	L.GUILD_ACTION_OPEN_INFO = "View Member Info"
-	L.GUILD_ACTION_OPEN_BLIZZARD = "Open in Guild UI"
 	L.GUILD_INVITE_DIALOG_TITLE = "Invite to %s"
 	L.GUILD_INVITE_PLACEHOLDER = "Character-Realm"
 	L.GUILD_INVITE_BUTTON = "Invite"
@@ -1806,19 +1796,11 @@ L.SETTINGS_SHOW_ILVL_COLUMN_DESC = "Show an item level column in the Guild tab l
 	L.GUILD_ACTIONS_MENU = "Guild Actions"
 	L.GUILD_ACTION_INVITE_TO_GUILD = "Invite to Guild"
 	L.GUILD_ACTION_EDIT_MOTD = "Edit MOTD"
-	L.GUILD_ACTION_EDIT_INFO = "Edit Guild Info"
-	L.GUILD_ACTION_GUILD_CONTROL = "Guild Control"
 	L.GUILD_ACTION_LEAVE_GUILD = "Leave Guild"
 	L.GUILD_ACTION_DISBAND_GUILD = "Disband Guild"
 	L.GUILD_ACTION_SET_LEADER = "Set Guild Leader"
-	L.GUILD_ACTION_EDIT_PUBLIC_NOTE = "Edit Public Note"
-	L.GUILD_ACTION_EDIT_OFFICER_NOTE = "Edit Officer Note"
-	L.GUILD_ACTION_SET_RANK = "Set Rank"
 	L.GUILD_INVITE_PLAYER_TITLE = "Invite player to guild"
 	L.GUILD_EDIT_MOTD_TITLE = "Edit guild MOTD"
-	L.GUILD_EDIT_INFO_TITLE = "Edit guild information"
-	L.GUILD_EDIT_PUBLIC_NOTE_TITLE = "Public note for %s"
-	L.GUILD_EDIT_OFFICER_NOTE_TITLE = "Officer note for %s"
 	L.GUILD_REMOVE_CONFIRM = "Remove %s from the guild?"
 	L.GUILD_SET_RANK_CONFIRM = "Set %s to %s?"
 	L.GUILD_ACTION_RESTRICTED = "This action is not available right now."

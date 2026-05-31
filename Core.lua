@@ -216,7 +216,6 @@ function BFL:GetGuildTabCapability()
 		hasBaseRosterAPI = hasBaseRosterAPI,
 		canShowSetting = hasBaseRosterAPI,
 		canShowRoster = betaEnabled and settingEnabled and hasBaseRosterAPI,
-		canOpenNativeGuildUI = ToggleGuildFrame ~= nil or GuildFrame_Toggle ~= nil,
 	}
 end
 

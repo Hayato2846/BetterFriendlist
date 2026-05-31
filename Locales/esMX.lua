@@ -608,7 +608,7 @@ BFL:RegisterLocale("esMX", function()
 	L.GUILD_BROKER_SETTINGS_ZONE_COLOR = "Color de zona"
 	L.GUILD_BROKER_SETTINGS_NOTE_COLOR = "Color de nota"
 	L.GUILD_BROKER_SETTINGS_OFFICER_NOTE_COLOR = "Color de nota de oficial"
-	L.GUILD_BROKER_ACTION_GUILD_FRAME = "Abrir ventana de hermandad"
+	L.GUILD_BROKER_ACTION_GUILD_FRAME = "Abrir pestaña de hermandad BFL"
 	L.GUILD_BROKER_ACTION_SETTINGS = "Abrir ajustes"
 	L.GUILD_BROKER_GROUP_NONE = "Sin agrupación"
 	L.GUILD_BROKER_GROUP_BY_RANK = "Agrupar por rango"
@@ -626,7 +626,7 @@ BFL:RegisterLocale("esMX", function()
 	L.GUILD_BROKER_HINT_COPY = " Copiar al chat"
 	L.GUILD_BROKER_HINT_ICON_ACTIONS = "--- Acciones del icono ---"
 	L.GUILD_BROKER_HINT_LEFT_CLICK = "Clic izquierdo:"
-	L.GUILD_BROKER_HINT_TOGGLE = " Alternar tooltip"
+	L.GUILD_BROKER_HINT_TOGGLE = " Abrir pestaña de hermandad BFL"
 	L.GUILD_BROKER_HINT_RIGHT_CLICK = "Clic derecho:"
 	L.GUILD_BROKER_HINT_SETTINGS = " Ajustes"
 	L.GUILD_BROKER_HINT_MIDDLE_CLICK = "Clic central:"
@@ -639,14 +639,9 @@ BFL:RegisterLocale("esMX", function()
 	L.GUILD_BROKER_MENU_EDIT_NICKNAME = "Editar apodo"
 	L.GUILD_BROKER_MENU_REMOVE_NICKNAME = "Eliminar"
 	L.GUILD_BROKER_NICKNAME_PROMPT = "Introduce un apodo para %s:"
-	L.GUILD_BROKER_MENU_EDIT_NOTE = "Editar nota"
-	L.GUILD_BROKER_MENU_EDIT_OFFICER_NOTE = "Editar nota de oficial"
 	L.GUILD_BROKER_MENU_PROMOTE = "Ascender"
 	L.GUILD_BROKER_MENU_DEMOTE = "Degradar"
 	L.GUILD_BROKER_MENU_REMOVE = "Expulsar de la hermandad"
-	L.GUILD_BROKER_PROMOTE_CONFIRM = "¿Ascender a %s a %s?"
-	L.GUILD_BROKER_DEMOTE_CONFIRM = "¿Degradar a %s a %s?"
-	L.GUILD_BROKER_REMOVE_CONFIRM = "¿Expulsar a %s de la hermandad?"
 	L.GUILD_BROKER_ACTION_RESTRICTED = "Esta acción no está disponible durante el combate."
 	L.GUILD_BROKER_NO_PERMISSION = "No tienes permiso para hacer esto."
 	L.GUILD_BROKER_LAST_ONLINE_YEARS = "%dy"
@@ -684,11 +679,7 @@ BFL:RegisterLocale("esMX", function()
 	L.LASTONLINE_YEARS = "%d años"
 
 	-- ========================================
-	-- GUILD UI WARNING
 	-- ========================================
-	L.CLASSIC_GUILD_UI_WARNING_TITLE = "IU Hermandad Clásica Deshabilitada"
-	L.CLASSIC_GUILD_UI_WARNING_TEXT =
-		"BetterFriendlist ha deshabilitado la configuración de IU Hermandad Clásica ya que solo la moderna es compatible.\n\nLa pestaña Hermandad abrirá la interfaz moderna."
 
 	-- ========================================
 	-- AUDITED MISSING STRINGS
@@ -1702,7 +1693,6 @@ L.SETTINGS_SHOW_ILVL_COLUMN_DESC = "Show an item level column in the Guild tab l
 	L.GUILD_ACTION_TARGET = "Target"
 	L.GUILD_ACTION_COPY_NAME = "Copy Name"
 	L.GUILD_ACTION_OPEN_INFO = "View Member Info"
-	L.GUILD_ACTION_OPEN_BLIZZARD = "Open in Guild UI"
 	L.GUILD_INVITE_DIALOG_TITLE = "Invite to %s"
 	L.GUILD_INVITE_PLACEHOLDER = "Character-Realm"
 	L.GUILD_INVITE_BUTTON = "Invite"
@@ -1735,19 +1725,11 @@ L.SETTINGS_SHOW_ILVL_COLUMN_DESC = "Show an item level column in the Guild tab l
 	L.GUILD_ACTIONS_MENU = "Guild Actions"
 	L.GUILD_ACTION_INVITE_TO_GUILD = "Invite to Guild"
 	L.GUILD_ACTION_EDIT_MOTD = "Edit MOTD"
-	L.GUILD_ACTION_EDIT_INFO = "Edit Guild Info"
-	L.GUILD_ACTION_GUILD_CONTROL = "Guild Control"
 	L.GUILD_ACTION_LEAVE_GUILD = "Leave Guild"
 	L.GUILD_ACTION_DISBAND_GUILD = "Disband Guild"
 	L.GUILD_ACTION_SET_LEADER = "Set Guild Leader"
-	L.GUILD_ACTION_EDIT_PUBLIC_NOTE = "Edit Public Note"
-	L.GUILD_ACTION_EDIT_OFFICER_NOTE = "Edit Officer Note"
-	L.GUILD_ACTION_SET_RANK = "Set Rank"
 	L.GUILD_INVITE_PLAYER_TITLE = "Invite player to guild"
 	L.GUILD_EDIT_MOTD_TITLE = "Edit guild MOTD"
-	L.GUILD_EDIT_INFO_TITLE = "Edit guild information"
-	L.GUILD_EDIT_PUBLIC_NOTE_TITLE = "Public note for %s"
-	L.GUILD_EDIT_OFFICER_NOTE_TITLE = "Officer note for %s"
 	L.GUILD_REMOVE_CONFIRM = "Remove %s from the guild?"
 	L.GUILD_SET_RANK_CONFIRM = "Set %s to %s?"
 	L.GUILD_ACTION_RESTRICTED = "This action is not available right now."

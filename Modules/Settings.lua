@@ -3039,17 +3039,6 @@ function Settings:OnAccordionGroupsChanged(checked)
 	BFL:ForceRefreshFriendsList()
 end
 
--- Classic: Close on Guild Tab Click toggle
-function Settings:OnCloseOnGuildTabClickChanged(checked)
-	local DB = GetDB()
-	if not DB then
-		return
-	end
-
-	DB:Set("closeOnGuildTabClick", checked)
-	-- No UI refresh needed - only affects Guild tab click behavior
-end
-
 -- Use UI Panel System toggle
 function Settings:OnUseUIPanelSystemChanged(checked)
 	local DB = GetDB()
@@ -8235,17 +8224,21 @@ function Settings:RefreshBrokerTab()
 		-- Left Click Action
 		local clickActionOptions = {
 			labels = {
-				L.GUILD_BROKER_ACTION_GUILD_FRAME or "Open Guild Frame",
+				L.GUILD_BROKER_ACTION_GUILD_FRAME or "Open Guild Tab",
 				L.GUILD_BROKER_ACTION_SETTINGS or "Open Settings",
 			},
-			values = { "guild_frame", "settings" },
+			values = { "guild_tab", "settings" },
 		}
 		local guildClickAction = Components:CreateDropdown(
 			tab,
 			L.GUILD_BROKER_SETTINGS_CLICK_ACTION or "Left Click Action",
 			clickActionOptions,
 			function(val)
-				return val == DB:Get("guildBrokerClickAction", "guild_frame")
+				local current = DB:Get("guildBrokerClickAction", "guild_tab")
+				if current == "guild_frame" then
+					current = "guild_tab"
+				end
+				return val == current
 			end,
 			function(val)
 				BetterFriendlistDB.guildBrokerClickAction = val

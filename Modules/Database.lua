@@ -166,7 +166,7 @@ local defaults = {
 	guildBrokerShowLabel = true, -- Show label text (default: ON)
 	guildBrokerShowTotal = true, -- Show total member count (default: ON)
 	guildBrokerTooltipMode = "advanced", -- Tooltip detail level: "basic" or "advanced" (default: advanced)
-	guildBrokerClickAction = "guild_frame", -- Left click action: "guild_frame", "settings" (default: guild_frame)
+	guildBrokerClickAction = "guild_tab", -- Left click action: "guild_tab", "settings" (default: guild_tab)
 	guildBrokerShowHints = true, -- Show hint text in tooltip footer (default: ON)
 	guildBrokerShowApplicants = true, -- Show pending Guild Finder applicant count when available
 	guildBrokerGroupMode = "none", -- Group mode: "none", "by_rank", "by_class" (default: none)
@@ -203,7 +203,6 @@ local defaults = {
 	guildTabShowTabard = false, -- Deprecated/hidden: not part of the Retail-first Guild Tab beta
 	guildTabShowILvlColumn = false, -- Deprecated/hidden: not part of the Retail-first Guild Tab beta
 	-- Classic Guild Tab Settings (legacy, kept for compat)
-	closeOnGuildTabClick = false, -- Close BetterFriendlist when opening Guild Frame (Classic only, default: OFF)
 	hideGuildTab = false, -- Hide the Guild tab completely (Classic only, default: OFF)
 	-- UI Panel System
 	useUIPanelSystem = false, -- Use ShowUIPanel/HideUIPanel for automatic repositioning (default: OFF)

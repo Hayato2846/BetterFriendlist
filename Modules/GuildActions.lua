@@ -52,6 +52,13 @@ local function IsUsableString(value)
 	return type(value) == "string" and value ~= "" and value ~= "Unknown" and not IsSecretValue(value)
 end
 
+local function IsClassicGuildFlavor()
+	return BFL.IsClassic == true
+		or BFL.IsClassicEra == true
+		or BFL.IsMoPClassic == true
+		or BFL.IsCataClassic == true
+end
+
 local function Trim(value)
 	return tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", "")
 end
@@ -285,23 +292,7 @@ function GuildActions:GetSelfRankOrder()
 	return nil
 end
 
-function GuildActions:GetNumRanks()
-	if GuildControlGetNumRanks then
-		local ok, numRanks = SafeCall(GuildControlGetNumRanks)
-		if ok and type(numRanks) == "number" then
-			return numRanks
-		end
-	end
-	return 0
-end
-
 function GuildActions:GetRankName(rankOrder)
-	if GuildControlGetRankName and type(rankOrder) == "number" then
-		local ok, name = SafeCall(GuildControlGetRankName, rankOrder)
-		if ok and IsUsableString(name) then
-			return name
-		end
-	end
 	return string.format("%s %d", RANK or "Rank", rankOrder or 0)
 end
 
@@ -331,46 +322,13 @@ function GuildActions:IsRankAssignmentAllowed(member, rankOrder)
 	return (CanGuildDemote and CanGuildDemote() == true) and currentRankOrder > selfRankOrder
 end
 
-function GuildActions:GetRankOptions(member)
-	local options = {}
-	local numRanks = self:GetNumRanks()
-	if numRanks <= 0 then
-		return options
-	end
-
-	local currentRankOrder = self:GetMemberRankOrder(member)
-	local selfRankOrder = self:GetSelfRankOrder()
-	local canPromote = CanGuildPromote and CanGuildPromote() == true
-	local canDemote = CanGuildDemote and CanGuildDemote() == true
-
-	local highest = currentRankOrder or 1
-	local lowest = currentRankOrder or numRanks
-	if canPromote and selfRankOrder then
-		highest = selfRankOrder + 1
-	end
-	if canDemote then
-		lowest = numRanks
-	end
-
-	for rankOrder = 1, numRanks do
-		local inRange = rankOrder >= highest and rankOrder <= lowest
-		local enabled = inRange and self:IsRankAssignmentAllowed(member, rankOrder)
-		options[#options + 1] = {
-			rankOrder = rankOrder,
-			text = string.format("%d. %s", rankOrder, self:GetRankName(rankOrder)),
-			selected = rankOrder == currentRankOrder,
-			enabled = enabled,
-		}
-	end
-
-	return options
-end
-
 function GuildActions:CanPromote(member)
 	local currentRankOrder = self:GetMemberRankOrder(member)
 	local selfRankOrder = self:GetSelfRankOrder()
 	return CanGuildPromote
 		and CanGuildPromote() == true
+		and C_GuildInfo
+		and C_GuildInfo.Promote
 		and currentRankOrder
 		and selfRankOrder
 		and currentRankOrder > selfRankOrder + 1
@@ -381,13 +339,12 @@ end
 function GuildActions:CanDemote(member)
 	local currentRankOrder = self:GetMemberRankOrder(member)
 	local selfRankOrder = self:GetSelfRankOrder()
-	local numRanks = self:GetNumRanks()
 	return CanGuildDemote
 		and CanGuildDemote() == true
+		and C_GuildInfo
+		and C_GuildInfo.Demote
 		and currentRankOrder
 		and selfRankOrder
-		and numRanks > 0
-		and currentRankOrder < numRanks
 		and currentRankOrder > selfRankOrder
 		and not self:IsSelf(member)
 		and self:IsRankAssignmentAllowed(member, currentRankOrder + 1)
@@ -398,6 +355,8 @@ function GuildActions:CanRemoveMember(member)
 	local selfRankOrder = self:GetSelfRankOrder()
 	return CanGuildRemove
 		and CanGuildRemove() == true
+		and IsUsableString(self:GetFullName(member))
+		and ((C_GuildInfo and C_GuildInfo.Uninvite) or GuildUninvite)
 		and currentRankOrder
 		and selfRankOrder
 		and currentRankOrder > selfRankOrder
@@ -407,6 +366,7 @@ end
 function GuildActions:CanSetLeader(member)
 	return IsGuildLeader
 		and IsGuildLeader() == true
+		and ((C_GuildInfo and C_GuildInfo.SetLeader) or (StaticPopupDialogs and StaticPopupDialogs.CONFIRM_GUILD_PROMOTE))
 		and member
 		and not self:IsSelf(member)
 		and IsUsableString(self:GetFullName(member))
@@ -422,16 +382,6 @@ function GuildActions:CanInviteParty(member)
 		and not (BFL.IsActionRestricted and BFL:IsActionRestricted())
 end
 
-function GuildActions:CanEditPublicNote(member)
-	if not member then
-		return false
-	end
-	if self:IsSelf(member) then
-		return true
-	end
-	return CanEditPublicNote and CanEditPublicNote() == true
-end
-
 function GuildActions:CanViewOfficerNote()
 	if C_GuildInfo and C_GuildInfo.CanViewOfficerNote then
 		local ok, result = SafeCall(C_GuildInfo.CanViewOfficerNote)
@@ -440,12 +390,47 @@ function GuildActions:CanViewOfficerNote()
 	return false
 end
 
-function GuildActions:CanEditOfficerNote()
-	if C_GuildInfo and C_GuildInfo.CanEditOfficerNote then
-		local ok, result = SafeCall(C_GuildInfo.CanEditOfficerNote)
-		return ok and result == true
+function GuildActions:CanEditMOTD()
+	return IsClassicGuildFlavor()
+		and CanEditMOTD
+		and CanEditMOTD() == true
+		and StaticPopup_Show
+		and StaticPopupDialogs
+		and StaticPopupDialogs["SET_GUILDMOTD"] ~= nil
+end
+
+function GuildActions:GetMemberCapabilities(member)
+	local hasName = IsUsableString(self:GetFullName(member))
+	local online = member and member.online == true
+	return {
+		whisper = hasName and online,
+		inviteParty = self:CanInviteParty(member),
+		who = hasName,
+		nickname = hasName,
+		copyName = hasName,
+		promote = self:CanPromote(member),
+		demote = self:CanDemote(member),
+		remove = self:CanRemoveMember(member),
+		setLeader = self:CanSetLeader(member),
+	}
+end
+
+function GuildActions:GetGuildCapabilities()
+	local isLeader = IsGuildLeader and IsGuildLeader() == true
+	local inGuild = true
+	if IsInGuild then
+		local ok, result = SafeCall(IsInGuild)
+		inGuild = ok and result == true
 	end
-	return false
+	local canInviteAPI = ((C_GuildInfo and C_GuildInfo.Invite) or GuildInvite) ~= nil
+	local canLeaveAPI = StaticPopup_Show ~= nil or (C_GuildInfo and C_GuildInfo.Leave) ~= nil
+	local canDisbandAPI = StaticPopup_Show ~= nil or (C_GuildInfo and C_GuildInfo.Disband) ~= nil
+	return {
+		invite = inGuild and CanGuildInvite and CanGuildInvite() == true and canInviteAPI,
+		editMOTD = self:CanEditMOTD(),
+		leave = inGuild and not isLeader and canLeaveAPI,
+		disband = inGuild and isLeader and canDisbandAPI,
+	}
 end
 
 function GuildActions:Whisper(member)
@@ -562,76 +547,6 @@ function GuildActions:SetNicknameDialog(member)
 	StaticPopup_Show("BFL_GUILD_SET_NICKNAME")
 end
 
-function GuildActions:EditNote(member, isPublic)
-	if isPublic then
-		if not self:CanEditPublicNote(member) then
-			ShowActionMessage("GUILD_ACTION_NO_PERMISSION", "You do not have permission to do this.")
-			return
-		end
-	else
-		if not self:CanViewOfficerNote() or not self:CanEditOfficerNote() then
-			ShowActionMessage("GUILD_ACTION_NO_PERMISSION", "You do not have permission to do this.")
-			return
-		end
-	end
-
-	if not self:IsActionReady() then
-		return
-	end
-
-	local guid = self:GetMemberGUID(member)
-	if not IsUsableString(guid) or not (C_GuildInfo and C_GuildInfo.SetNote) then
-		if member and member.index and SetGuildRosterSelection then
-			SetGuildRosterSelection(member.index)
-			StaticPopup_Show(isPublic and "SET_GUILDPLAYERNOTE" or "SET_GUILDOFFICERNOTE")
-		end
-		return
-	end
-
-	local currentNote = isPublic and (member.note or "") or (member.officerNote or "")
-	local dialogKey = "BFL_GUILD_EDIT_NOTE"
-	StaticPopupDialogs[dialogKey] = {
-		text = string.format(
-			isPublic and T("GUILD_EDIT_PUBLIC_NOTE_TITLE", "Public note for %s")
-				or T("GUILD_EDIT_OFFICER_NOTE_TITLE", "Officer note for %s"),
-			self:GetDisplayName(member)
-		),
-		button1 = SAVE or ACCEPT or "Save",
-		button2 = CANCEL,
-		hasEditBox = true,
-		editBoxWidth = 280,
-		maxLetters = 31,
-		OnShow = function(dialog)
-			local editBox = GetEditBox(dialog)
-			if editBox then
-				editBox:SetText(currentNote)
-				editBox:SetFocus()
-				editBox:HighlightText()
-			end
-		end,
-		OnAccept = function(dialog)
-			local editBox = GetEditBox(dialog)
-			local newNote = editBox and editBox:GetText() or ""
-			C_GuildInfo.SetNote(guid, newNote, isPublic == true)
-			RefreshGuildSurfacesSoon(true)
-		end,
-		EditBoxOnEnterPressed = function(editBox)
-			local parent = editBox:GetParent()
-			C_GuildInfo.SetNote(guid, editBox:GetText() or "", isPublic == true)
-			RefreshGuildSurfacesSoon(true)
-			parent:Hide()
-		end,
-		EditBoxOnEscapePressed = function(editBox)
-			editBox:GetParent():Hide()
-		end,
-		timeout = 0,
-		whileDead = true,
-		hideOnEscape = true,
-		preferredIndex = 3,
-	}
-	StaticPopup_Show(dialogKey)
-end
-
 function GuildActions:SetRank(member, rankOrder)
 	rankOrder = tonumber(rankOrder)
 	if not member or not rankOrder then
@@ -650,8 +565,14 @@ function GuildActions:SetRank(member, rankOrder)
 		return
 	end
 
-	local guid = self:GetMemberGUID(member)
 	local fullName = self:GetFullName(member)
+	local isPromote = rankOrder == currentRankOrder - 1
+	local isDemote = rankOrder == currentRankOrder + 1
+	if not (IsUsableString(fullName) and (isPromote or isDemote)) then
+		ShowActionMessage("GUILD_ACTION_RESTRICTED", "This action is not available right now.")
+		return
+	end
+
 	local targetRankName = self:GetRankName(rankOrder)
 	local dialogKey = "BFL_GUILD_SET_RANK"
 
@@ -660,16 +581,15 @@ function GuildActions:SetRank(member, rankOrder)
 		button1 = ACCEPT,
 		button2 = CANCEL,
 		OnAccept = function()
-			if IsUsableString(guid) and C_GuildInfo and C_GuildInfo.SetGuildRankOrder then
-				C_GuildInfo.SetGuildRankOrder(guid, rankOrder)
-			elseif fullName and currentRankOrder and C_GuildInfo then
-				if rankOrder == currentRankOrder - 1 and C_GuildInfo.Promote then
-					C_GuildInfo.Promote(fullName)
-				elseif rankOrder == currentRankOrder + 1 and C_GuildInfo.Demote then
-					C_GuildInfo.Demote(fullName)
-				end
+			if isPromote and C_GuildInfo and C_GuildInfo.Promote then
+				C_GuildInfo.Promote(fullName)
+				RefreshGuildSurfacesSoon(true)
+			elseif isDemote and C_GuildInfo and C_GuildInfo.Demote then
+				C_GuildInfo.Demote(fullName)
+				RefreshGuildSurfacesSoon(true)
+			else
+				ShowActionMessage("GUILD_ACTION_RESTRICTED", "This action is not available right now.")
 			end
-			RefreshGuildSurfacesSoon(true)
 		end,
 		timeout = 30,
 		whileDead = true,
@@ -706,9 +626,8 @@ function GuildActions:RemoveMember(member)
 		return
 	end
 
-	local guid = self:GetMemberGUID(member)
 	local fullName = self:GetFullName(member)
-	if not IsUsableString(guid) and not IsUsableString(fullName) then
+	if not IsUsableString(fullName) then
 		ShowActionMessage("GUILD_ACTION_RESTRICTED", "This action is not available right now.")
 		return
 	end
@@ -718,12 +637,12 @@ function GuildActions:RemoveMember(member)
 		button1 = ACCEPT,
 		button2 = CANCEL,
 		OnAccept = function()
-			if IsUsableString(guid) and C_GuildInfo and C_GuildInfo.RemoveFromGuild then
-				C_GuildInfo.RemoveFromGuild(guid)
-			elseif IsUsableString(fullName) and C_GuildInfo and C_GuildInfo.Uninvite then
+			if IsUsableString(fullName) and C_GuildInfo and C_GuildInfo.Uninvite then
 				C_GuildInfo.Uninvite(fullName)
 			elseif IsUsableString(fullName) and GuildUninvite then
 				GuildUninvite(fullName)
+			else
+				ShowActionMessage("GUILD_ACTION_RESTRICTED", "This action is not available right now.")
 			end
 			RefreshGuildSurfacesSoon(true)
 		end,
@@ -809,18 +728,8 @@ function GuildActions:InviteToGuild()
 	StaticPopup_Show("BFL_GUILD_INVITE_PLAYER")
 end
 
-local function GetGuildMOTD()
-	if BFL.GetGuildMOTD then
-		local ok, motd = SafeCall(BFL.GetGuildMOTD)
-		if ok and not IsSecretValue(motd) then
-			return tostring(motd or "")
-		end
-	end
-	return ""
-end
-
 function GuildActions:EditMOTD()
-	if not (CanEditMOTD and CanEditMOTD() == true) then
+	if not self:CanEditMOTD() then
 		ShowActionMessage("GUILD_ACTION_NO_PERMISSION", "You do not have permission to do this.")
 		return
 	end
@@ -828,154 +737,7 @@ function GuildActions:EditMOTD()
 		return
 	end
 
-	local current = GetGuildMOTD()
-	StaticPopupDialogs["BFL_GUILD_EDIT_MOTD"] = {
-		text = T("GUILD_EDIT_MOTD_TITLE", "Edit guild MOTD"),
-		button1 = SAVE or ACCEPT or "Save",
-		button2 = CANCEL,
-		hasEditBox = true,
-		editBoxWidth = 320,
-		maxLetters = 255,
-		OnShow = function(dialog)
-			local editBox = GetEditBox(dialog)
-			if editBox then
-				editBox:SetText(current)
-				editBox:SetFocus()
-				editBox:HighlightText()
-			end
-		end,
-		OnAccept = function(dialog)
-			local editBox = GetEditBox(dialog)
-			local motd = editBox and editBox:GetText() or ""
-			if C_GuildInfo and C_GuildInfo.SetMOTD then
-				C_GuildInfo.SetMOTD(motd)
-			elseif GuildSetMOTD then
-				GuildSetMOTD(motd)
-			elseif SetGuildRosterMOTD then
-				SetGuildRosterMOTD(motd)
-			end
-			if BFL.CacheGuildMOTD then
-				BFL.CacheGuildMOTD(motd)
-			end
-			RefreshGuildSurfacesSoon(true)
-		end,
-		EditBoxOnEnterPressed = function(editBox)
-			local parent = editBox:GetParent()
-			local motd = editBox:GetText() or ""
-			if C_GuildInfo and C_GuildInfo.SetMOTD then
-				C_GuildInfo.SetMOTD(motd)
-			elseif GuildSetMOTD then
-				GuildSetMOTD(motd)
-			elseif SetGuildRosterMOTD then
-				SetGuildRosterMOTD(motd)
-			end
-			if BFL.CacheGuildMOTD then
-				BFL.CacheGuildMOTD(motd)
-			end
-			RefreshGuildSurfacesSoon(true)
-			parent:Hide()
-		end,
-		EditBoxOnEscapePressed = function(editBox)
-			editBox:GetParent():Hide()
-		end,
-		timeout = 0,
-		whileDead = true,
-		hideOnEscape = true,
-		preferredIndex = 3,
-	}
-	StaticPopup_Show("BFL_GUILD_EDIT_MOTD")
-end
-
-function GuildActions:EditGuildInfo()
-	if not (CanEditGuildInfo and CanEditGuildInfo() == true) then
-		ShowActionMessage("GUILD_ACTION_NO_PERMISSION", "You do not have permission to do this.")
-		return
-	end
-	if not self:IsActionReady() then
-		return
-	end
-
-	local current = ""
-	if C_GuildInfo and C_GuildInfo.GetInfoText then
-		local ok, text = SafeCall(C_GuildInfo.GetInfoText)
-		current = (ok and not IsSecretValue(text)) and tostring(text or "") or ""
-	elseif GetGuildInfoText then
-		local ok, text = SafeCall(GetGuildInfoText)
-		current = (ok and not IsSecretValue(text)) and tostring(text or "") or ""
-	end
-
-	StaticPopupDialogs["BFL_GUILD_EDIT_INFO"] = {
-		text = T("GUILD_EDIT_INFO_TITLE", "Edit guild information"),
-		button1 = SAVE or ACCEPT or "Save",
-		button2 = CANCEL,
-		hasEditBox = true,
-		editBoxWidth = 360,
-		maxLetters = 500,
-		OnShow = function(dialog)
-			local editBox = GetEditBox(dialog)
-			if editBox then
-				editBox:SetText(current)
-				editBox:SetFocus()
-				editBox:HighlightText()
-			end
-		end,
-		OnAccept = function(dialog)
-			local editBox = GetEditBox(dialog)
-			local text = editBox and editBox:GetText() or ""
-			if C_GuildInfo and C_GuildInfo.SetInfoText then
-				C_GuildInfo.SetInfoText(text)
-			elseif SetGuildInfoText then
-				SetGuildInfoText(text)
-			end
-			RefreshGuildSurfacesSoon(true)
-		end,
-		EditBoxOnEnterPressed = function(editBox)
-			local parent = editBox:GetParent()
-			local text = editBox:GetText() or ""
-			if C_GuildInfo and C_GuildInfo.SetInfoText then
-				C_GuildInfo.SetInfoText(text)
-			elseif SetGuildInfoText then
-				SetGuildInfoText(text)
-			end
-			RefreshGuildSurfacesSoon(true)
-			parent:Hide()
-		end,
-		EditBoxOnEscapePressed = function(editBox)
-			editBox:GetParent():Hide()
-		end,
-		timeout = 0,
-		whileDead = true,
-		hideOnEscape = true,
-		preferredIndex = 3,
-	}
-	StaticPopup_Show("BFL_GUILD_EDIT_INFO")
-end
-
-function GuildActions:OpenBlizzardGuildUI()
-	if not self:IsActionReady() then
-		return
-	end
-	local toggle = ToggleGuildFrame or GuildFrame_Toggle
-	if toggle then
-		pcall(toggle)
-	end
-end
-
-function GuildActions:OpenGuildControl()
-	if not self:IsActionReady() then
-		return
-	end
-	self:OpenBlizzardGuildUI()
-
-	local loadAddOn = C_AddOns and C_AddOns.LoadAddOn or LoadAddOn
-	if loadAddOn then
-		pcall(loadAddOn, "Blizzard_GuildControlUI")
-	end
-	if GuildControlUI_OpenRanks then
-		pcall(GuildControlUI_OpenRanks)
-	elseif GuildControlUI and GuildControlUI.Show then
-		GuildControlUI:Show()
-	end
+	StaticPopup_Show("SET_GUILDMOTD")
 end
 
 function GuildActions:LeaveGuild()
@@ -1091,21 +853,22 @@ end
 
 function GuildActions:PopulateMemberMenu(rootDescription, member)
 	rootDescription:CreateTitle(self:GetDisplayName(member))
+	local caps = self:GetMemberCapabilities(member)
 
 	local hasCommunication = false
-	if member.online and IsUsableString(self:GetFullName(member)) then
+	if caps.whisper then
 		rootDescription:CreateButton(T("GUILD_ACTION_WHISPER", WHISPER or "Whisper"), function()
 			self:Whisper(member)
 		end)
 		hasCommunication = true
 	end
-	if self:CanInviteParty(member) then
+	if caps.inviteParty then
 		rootDescription:CreateButton(T("GUILD_ACTION_INVITE_PARTY", PARTY_INVITE or "Invite"), function()
 			self:InviteParty(member)
 		end)
 		hasCommunication = true
 	end
-	if IsUsableString(self:GetFullName(member)) then
+	if caps.who then
 		rootDescription:CreateButton(T("GUILD_BROKER_MENU_WHO", WHO or "Who"), function()
 			self:Who(member)
 		end)
@@ -1116,55 +879,25 @@ function GuildActions:PopulateMemberMenu(rootDescription, member)
 		rootDescription:CreateDivider()
 	end
 
-	if IsUsableString(self:GetFullName(member)) then
+	if caps.nickname or caps.copyName then
 		local DB = BFL:GetModule("DB")
 		local currentNick = DB and DB:GetGuildNickname(self:GetFullName(member)) or ""
-		local nickLabel = currentNick ~= "" and T("GUILD_BROKER_MENU_EDIT_NICKNAME", "Edit Nickname")
-			or T("GUILD_BROKER_MENU_SET_NICKNAME", "Set Nickname")
-		rootDescription:CreateButton(nickLabel, function()
-			self:SetNicknameDialog(member)
-		end)
-		rootDescription:CreateButton(T("GUILD_ACTION_COPY_NAME", "Copy Name"), function()
-			self:CopyName(member)
-		end)
-	end
-
-	local hasNotes = false
-	if self:CanEditPublicNote(member) then
-		if not hasNotes then
-			rootDescription:CreateDivider()
-			hasNotes = true
+		if caps.nickname then
+			local nickLabel = currentNick ~= "" and T("GUILD_BROKER_MENU_EDIT_NICKNAME", "Edit Nickname")
+				or T("GUILD_BROKER_MENU_SET_NICKNAME", "Set Nickname")
+			rootDescription:CreateButton(nickLabel, function()
+				self:SetNicknameDialog(member)
+			end)
 		end
-		rootDescription:CreateButton(T("GUILD_ACTION_EDIT_PUBLIC_NOTE", "Edit Public Note"), function()
-			self:EditNote(member, true)
-		end)
-	end
-	if self:CanViewOfficerNote() and self:CanEditOfficerNote() then
-		if not hasNotes then
-			rootDescription:CreateDivider()
-			hasNotes = true
+		if caps.copyName then
+			rootDescription:CreateButton(T("GUILD_ACTION_COPY_NAME", "Copy Name"), function()
+				self:CopyName(member)
+			end)
 		end
-		rootDescription:CreateButton(T("GUILD_ACTION_EDIT_OFFICER_NOTE", "Edit Officer Note"), function()
-			self:EditNote(member, false)
-		end)
 	end
 
 	local hasManagement = false
-	local rankOptions = self:GetRankOptions(member)
-	if #rankOptions > 0 then
-		rootDescription:CreateDivider()
-		hasManagement = true
-		local rankMenu = rootDescription:CreateButton(T("GUILD_ACTION_SET_RANK", "Set Rank"))
-		for _, option in ipairs(rankOptions) do
-			local rankItem = rankMenu:CreateRadio(option.text, function(rankOrder)
-				return self:GetMemberRankOrder(member) == rankOrder
-			end, function(rankOrder)
-				self:SetRank(member, rankOrder)
-			end, option.rankOrder)
-			SetMenuElementEnabled(rankItem, option.enabled)
-		end
-	end
-	if self:CanPromote(member) then
+	if caps.promote then
 		if not hasManagement then
 			rootDescription:CreateDivider()
 			hasManagement = true
@@ -1173,7 +906,7 @@ function GuildActions:PopulateMemberMenu(rootDescription, member)
 			self:PromoteMember(member)
 		end)
 	end
-	if self:CanDemote(member) then
+	if caps.demote then
 		if not hasManagement then
 			rootDescription:CreateDivider()
 			hasManagement = true
@@ -1182,7 +915,7 @@ function GuildActions:PopulateMemberMenu(rootDescription, member)
 			self:DemoteMember(member)
 		end)
 	end
-	if self:CanRemoveMember(member) then
+	if caps.remove then
 		if not hasManagement then
 			rootDescription:CreateDivider()
 			hasManagement = true
@@ -1191,7 +924,7 @@ function GuildActions:PopulateMemberMenu(rootDescription, member)
 			self:RemoveMember(member)
 		end)
 	end
-	if self:CanSetLeader(member) then
+	if caps.setLeader then
 		if not hasManagement then
 			rootDescription:CreateDivider()
 			hasManagement = true
@@ -1200,29 +933,11 @@ function GuildActions:PopulateMemberMenu(rootDescription, member)
 			self:SetLeader(member)
 		end)
 	end
-
-	rootDescription:CreateDivider()
-	rootDescription:CreateButton(T("GUILD_ACTION_OPEN_BLIZZARD", "Open in Guild UI"), function()
-		self:OpenBlizzardGuildUI()
-	end)
 end
 
 function GuildActions:AddClassicMemberMenuButtons(member, level)
 	level = level or 1
-	if level == 2 and UIDROPDOWNMENU_MENU_VALUE == "BFL_GUILD_RANKS" then
-		for _, option in ipairs(self:GetRankOptions(member)) do
-			local info = UIDropDownMenu_CreateInfo()
-			info.text = option.text
-			info.value = option.rankOrder
-			info.checked = option.selected
-			info.disabled = not option.enabled
-			info.func = function(menuButton)
-				self:SetRank(member, menuButton.value)
-			end
-			UIDropDownMenu_AddButton(info, level)
-		end
-		return
-	end
+	local caps = self:GetMemberCapabilities(member)
 
 	local function AddButton(text, func, disabled)
 		local info = UIDropDownMenu_CreateInfo()
@@ -1233,97 +948,76 @@ function GuildActions:AddClassicMemberMenuButtons(member, level)
 		UIDropDownMenu_AddButton(info, level)
 	end
 
-	if member.online and IsUsableString(self:GetFullName(member)) then
+	if caps.whisper then
 		AddButton(T("GUILD_ACTION_WHISPER", WHISPER or "Whisper"), function()
 			self:Whisper(member)
 		end)
 	end
-	AddButton(T("GUILD_ACTION_INVITE_PARTY", PARTY_INVITE or "Invite"), function()
-		self:InviteParty(member)
-	end, not self:CanInviteParty(member))
-	if IsUsableString(self:GetFullName(member)) then
+	if caps.inviteParty then
+		AddButton(T("GUILD_ACTION_INVITE_PARTY", PARTY_INVITE or "Invite"), function()
+			self:InviteParty(member)
+		end)
+	end
+	if caps.who then
 		AddButton(T("GUILD_BROKER_MENU_WHO", WHO or "Who"), function()
 			self:Who(member)
 		end)
+	end
+	if caps.nickname then
 		AddButton(T("GUILD_BROKER_MENU_SET_NICKNAME", "Set Nickname"), function()
 			self:SetNicknameDialog(member)
 		end)
+	end
+	if caps.copyName then
 		AddButton(T("GUILD_ACTION_COPY_NAME", "Copy Name"), function()
 			self:CopyName(member)
 		end)
 	end
 
-	if self:CanEditPublicNote(member) then
-		AddButton(T("GUILD_ACTION_EDIT_PUBLIC_NOTE", "Edit Public Note"), function()
-			self:EditNote(member, true)
+	if caps.promote then
+		AddButton(T("GUILD_ACTION_PROMOTE", "Promote"), function()
+			self:PromoteMember(member)
 		end)
 	end
-	if self:CanViewOfficerNote() and self:CanEditOfficerNote() then
-		AddButton(T("GUILD_ACTION_EDIT_OFFICER_NOTE", "Edit Officer Note"), function()
-			self:EditNote(member, false)
+	if caps.demote then
+		AddButton(T("GUILD_ACTION_DEMOTE", "Demote"), function()
+			self:DemoteMember(member)
 		end)
 	end
-
-	if #self:GetRankOptions(member) > 0 then
-		local info = UIDropDownMenu_CreateInfo()
-		info.text = T("GUILD_ACTION_SET_RANK", "Set Rank")
-		info.notCheckable = true
-		info.hasArrow = true
-		info.menuList = "BFL_GUILD_RANKS"
-		UIDropDownMenu_AddButton(info, level)
+	if caps.remove then
+		AddButton(T("GUILD_ACTION_REMOVE", "Remove from Guild"), function()
+			self:RemoveMember(member)
+		end)
 	end
-	AddButton(T("GUILD_ACTION_PROMOTE", "Promote"), function()
-		self:PromoteMember(member)
-	end, not self:CanPromote(member))
-	AddButton(T("GUILD_ACTION_DEMOTE", "Demote"), function()
-		self:DemoteMember(member)
-	end, not self:CanDemote(member))
-	AddButton(T("GUILD_ACTION_REMOVE", "Remove from Guild"), function()
-		self:RemoveMember(member)
-	end, not self:CanRemoveMember(member))
-	if self:CanSetLeader(member) then
+	if caps.setLeader then
 		AddButton(T("GUILD_ACTION_SET_LEADER", "Set Guild Leader"), function()
 			self:SetLeader(member)
 		end)
 	end
-	AddButton(T("GUILD_ACTION_OPEN_BLIZZARD", "Open in Guild UI"), function()
-		self:OpenBlizzardGuildUI()
-	end)
 end
 
 function GuildActions:PopulateGuildActionsMenu(rootDescription)
 	rootDescription:CreateTitle(T("GUILD_ACTIONS_MENU", "Guild Actions"))
+	local caps = self:GetGuildCapabilities()
 
 	local inviteItem = rootDescription:CreateButton(T("GUILD_ACTION_INVITE_TO_GUILD", "Invite to Guild"), function()
 		self:InviteToGuild()
 	end)
-	SetMenuElementEnabled(inviteItem, CanGuildInvite and CanGuildInvite() == true)
+	SetMenuElementEnabled(inviteItem, caps.invite)
 
-	local motdItem = rootDescription:CreateButton(T("GUILD_ACTION_EDIT_MOTD", "Edit MOTD"), function()
-		self:EditMOTD()
-	end)
-	SetMenuElementEnabled(motdItem, CanEditMOTD and CanEditMOTD() == true)
-
-	local infoItem = rootDescription:CreateButton(T("GUILD_ACTION_EDIT_INFO", "Edit Guild Info"), function()
-		self:EditGuildInfo()
-	end)
-	SetMenuElementEnabled(infoItem, CanEditGuildInfo and CanEditGuildInfo() == true)
+	if caps.editMOTD then
+		rootDescription:CreateButton(T("GUILD_ACTION_EDIT_MOTD", "Edit MOTD"), function()
+			self:EditMOTD()
+		end)
+	end
 
 	rootDescription:CreateDivider()
-	rootDescription:CreateButton(T("GUILD_ACTION_OPEN_BLIZZARD", "Open in Guild UI"), function()
-		self:OpenBlizzardGuildUI()
-	end)
-	rootDescription:CreateButton(T("GUILD_ACTION_GUILD_CONTROL", "Guild Control"), function()
-		self:OpenGuildControl()
-	end)
-
-	rootDescription:CreateDivider()
-	if not (IsGuildLeader and IsGuildLeader() == true) then
+	if caps.leave then
 		rootDescription:CreateButton(T("GUILD_ACTION_LEAVE_GUILD", "Leave Guild"), function()
 			self:LeaveGuild()
 		end)
 	end
-	if IsGuildLeader and IsGuildLeader() == true then
+	if caps.disband then
 		rootDescription:CreateButton(T("GUILD_ACTION_DISBAND_GUILD", "Disband Guild"), function()
 			self:DisbandGuild()
 		end)
@@ -1339,7 +1033,6 @@ function GuildActions:ShowGuildActionsMenu(owner)
 	end
 
 	if not (UIDropDownMenu_Initialize and ToggleDropDownMenu) then
-		self:OpenBlizzardGuildUI()
 		return
 	end
 
@@ -1362,27 +1055,22 @@ function GuildActions:ShowGuildActionsMenu(owner)
 		info.isTitle = true
 		info.notCheckable = true
 		UIDropDownMenu_AddButton(info, level)
+		local caps = self:GetGuildCapabilities()
 
 		AddButton(T("GUILD_ACTION_INVITE_TO_GUILD", "Invite to Guild"), function()
 			self:InviteToGuild()
-		end, not (CanGuildInvite and CanGuildInvite() == true))
-		AddButton(T("GUILD_ACTION_EDIT_MOTD", "Edit MOTD"), function()
-			self:EditMOTD()
-		end, not (CanEditMOTD and CanEditMOTD() == true))
-		AddButton(T("GUILD_ACTION_EDIT_INFO", "Edit Guild Info"), function()
-			self:EditGuildInfo()
-		end, not (CanEditGuildInfo and CanEditGuildInfo() == true))
-		AddButton(T("GUILD_ACTION_OPEN_BLIZZARD", "Open in Guild UI"), function()
-			self:OpenBlizzardGuildUI()
-		end)
-		AddButton(T("GUILD_ACTION_GUILD_CONTROL", "Guild Control"), function()
-			self:OpenGuildControl()
-		end)
-		if not (IsGuildLeader and IsGuildLeader() == true) then
+		end, not caps.invite)
+		if caps.editMOTD then
+			AddButton(T("GUILD_ACTION_EDIT_MOTD", "Edit MOTD"), function()
+				self:EditMOTD()
+			end)
+		end
+		if caps.leave then
 			AddButton(T("GUILD_ACTION_LEAVE_GUILD", "Leave Guild"), function()
 				self:LeaveGuild()
 			end)
-		else
+		end
+		if caps.disband then
 			AddButton(T("GUILD_ACTION_DISBAND_GUILD", "Disband Guild"), function()
 				self:DisbandGuild()
 			end)

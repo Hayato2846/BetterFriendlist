@@ -812,7 +812,6 @@ function GuildBroker:OpenMemberContextMenu(data)
 		end
 	end
 
-	local canUseGuildActions = not ShouldAvoidSecretValueGuildActions()
 	local hasUsableFullName = data.fullName and data.fullName ~= "Unknown"
 
 	-- Use MenuUtil (Retail) or fallback
@@ -929,123 +928,8 @@ function GuildBroker:OpenMemberContextMenu(data)
 				end)
 			end
 
-			-- Edit Note
-			if canUseGuildActions and CanEditPublicNote and CanEditPublicNote() then
-				rootDescription:CreateButton(L("GUILD_BROKER_MENU_EDIT_NOTE"), function()
-					SetGuildRosterSelection(data.index)
-					StaticPopup_Show("SET_GUILDPLAYERNOTE")
-				end)
-			end
-
-			-- Edit Officer Note
-			local canViewOfficer = false
-			if canUseGuildActions and C_GuildInfo and C_GuildInfo.CanViewOfficerNote then
-				local okOfficerView, result = pcall(C_GuildInfo.CanViewOfficerNote)
-				canViewOfficer = okOfficerView and result or false
-			end
-			local canEditOfficer = canUseGuildActions and CanEditOfficerNote and CanEditOfficerNote()
-			if canViewOfficer and canEditOfficer then
-				rootDescription:CreateButton(L("GUILD_BROKER_MENU_EDIT_OFFICER_NOTE"), function()
-					SetGuildRosterSelection(data.index)
-					StaticPopup_Show("SET_GUILDOFFICERNOTE")
-				end)
-			end
-
-			-- Separator before rank management
-			local hasRankOptions = false
-
-			-- Promote
-			if canUseGuildActions and CanGuildPromote and CanGuildPromote() and data.rankIndex and data.rankIndex > 1 then
-				if not hasRankOptions then
-					rootDescription:CreateDivider()
-					hasRankOptions = true
-				end
-
-				rootDescription:CreateButton(L("GUILD_BROKER_MENU_PROMOTE"), function()
-					GuildBroker:PromoteMember(data)
-				end)
-			end
-
-			-- Demote
-			if canUseGuildActions and CanGuildDemote and CanGuildDemote() then
-				local numRanks = GuildControlGetNumRanks and GuildControlGetNumRanks() or 10
-				if data.rankIndex and data.rankIndex < (numRanks - 1) then
-					if not hasRankOptions then
-						rootDescription:CreateDivider()
-						hasRankOptions = true
-					end
-
-					rootDescription:CreateButton(L("GUILD_BROKER_MENU_DEMOTE"), function()
-						GuildBroker:DemoteMember(data)
-					end)
-				end
-			end
-
-			-- Remove
-			if canUseGuildActions and CanGuildRemove and CanGuildRemove() then
-				if not hasRankOptions then
-					rootDescription:CreateDivider()
-				end
-
-				rootDescription:CreateButton(L("GUILD_BROKER_MENU_REMOVE"), function()
-					GuildBroker:RemoveMember(data)
-				end)
-			end
 		end)
-	elseif BFL.OpenContextMenu and canUseGuildActions then
-		-- Classic fallback: Use WoW friend-style context menu for guild members
-		-- The guild roster index-based popup actions work via SetGuildRosterSelection
-		if data.index then
-			SetGuildRosterSelection(data.index)
-		end
-		-- Fallback to basic dropdown
-		if UIDROPDOWNMENU_INIT_MENU then
-			ToggleDropDownMenu(1, nil, _G["GuildMemberDropDown"], "cursor", 0, 0)
-		end
 	end
-end
-
--- ========================================
--- Rank Management (SetGuildRankOrder / RemoveFromGuild)
--- ========================================
-
--- Get member GUID via C_Club
-local function GetMemberGUID(memberData)
-	if ShouldAvoidSecretValueGuildActions() then
-		return nil, nil
-	end
-
-	if not C_Club or not C_Club.GetGuildClubId or not C_Club.GetMemberInfo then
-		return nil, nil
-	end
-
-	local okClubId, clubId = pcall(C_Club.GetGuildClubId)
-	if not okClubId or not clubId then
-		return nil, nil
-	end
-
-	-- Find member by name in club roster
-	local okMembers, members = pcall(C_Club.GetClubMembers, clubId)
-	if not okMembers or not members then
-		return nil, nil
-	end
-
-	for _, memberId in ipairs(members) do
-		local okMemberInfo, memberInfo = pcall(C_Club.GetMemberInfo, clubId, memberId)
-		if okMemberInfo and memberInfo then
-			local infoName = memberInfo.name
-			if IsSecretValue(infoName) then
-				-- Cannot compare secret names
-			elseif infoName and memberData.fullName then
-				-- C_Club names may or may not have realm suffix
-				if infoName == memberData.fullName or infoName == memberData.name then
-					return memberInfo.guid, memberInfo.guildRankOrder
-				end
-			end
-		end
-	end
-
-	return nil, nil
 end
 
 function GuildBroker:PromoteMember(data)
@@ -1055,56 +939,7 @@ function GuildBroker:PromoteMember(data)
 		return
 	end
 
-	if ShouldAvoidSecretValueGuildActions() then
-		BFL:DebugPrint(L("GUILD_BROKER_ACTION_RESTRICTED"))
-		return
-	end
-
-	if BFL:IsActionRestricted() then
-		BFL:DebugPrint(L("GUILD_BROKER_ACTION_RESTRICTED"))
-		return
-	end
-
-	if not CanGuildPromote or not CanGuildPromote() then
-		BFL:DebugPrint(L("GUILD_BROKER_NO_PERMISSION"))
-		return
-	end
-
-	local guid, currentRankOrder = GetMemberGUID(data)
-	if not guid then
-		BFL:DebugPrint("Could not resolve member GUID for rank change.")
-		return
-	end
-
-	if BFL.HasSecretValues and BFL:IsSecret(guid) then
-		BFL:DebugPrint(L("GUILD_BROKER_ACTION_RESTRICTED"))
-		return
-	end
-
-	if not currentRankOrder or currentRankOrder <= 1 then
-		return -- Already highest rank or GM
-	end
-
-	local newRankOrder = currentRankOrder - 1
-
-	-- Get rank name for confirmation
-	local newRankName = GuildControlGetRankName and GuildControlGetRankName(newRankOrder + 1) or "?"
-
-	-- Confirmation dialog
-	StaticPopupDialogs["BFL_GUILD_PROMOTE"] = {
-		text = string.format(L("GUILD_BROKER_PROMOTE_CONFIRM"), data.name or "?", newRankName),
-		button1 = ACCEPT,
-		button2 = CANCEL,
-		OnAccept = function()
-			if C_GuildInfo and C_GuildInfo.SetGuildRankOrder then
-				C_GuildInfo.SetGuildRankOrder(guid, newRankOrder)
-			end
-		end,
-		timeout = 30,
-		whileDead = true,
-		hideOnEscape = true,
-	}
-	StaticPopup_Show("BFL_GUILD_PROMOTE")
+	BFL:DebugPrint(L("GUILD_BROKER_ACTION_RESTRICTED"))
 end
 
 function GuildBroker:DemoteMember(data)
@@ -1114,54 +949,7 @@ function GuildBroker:DemoteMember(data)
 		return
 	end
 
-	if ShouldAvoidSecretValueGuildActions() then
-		BFL:DebugPrint(L("GUILD_BROKER_ACTION_RESTRICTED"))
-		return
-	end
-
-	if BFL:IsActionRestricted() then
-		BFL:DebugPrint(L("GUILD_BROKER_ACTION_RESTRICTED"))
-		return
-	end
-
-	if not CanGuildDemote or not CanGuildDemote() then
-		BFL:DebugPrint(L("GUILD_BROKER_NO_PERMISSION"))
-		return
-	end
-
-	local guid, currentRankOrder = GetMemberGUID(data)
-	if not guid then
-		BFL:DebugPrint("Could not resolve member GUID for rank change.")
-		return
-	end
-
-	if BFL.HasSecretValues and BFL:IsSecret(guid) then
-		BFL:DebugPrint(L("GUILD_BROKER_ACTION_RESTRICTED"))
-		return
-	end
-
-	local numRanks = GuildControlGetNumRanks and GuildControlGetNumRanks() or 10
-	if not currentRankOrder or currentRankOrder >= (numRanks - 1) then
-		return -- Already lowest rank
-	end
-
-	local newRankOrder = currentRankOrder + 1
-	local newRankName = GuildControlGetRankName and GuildControlGetRankName(newRankOrder + 1) or "?"
-
-	StaticPopupDialogs["BFL_GUILD_DEMOTE"] = {
-		text = string.format(L("GUILD_BROKER_DEMOTE_CONFIRM"), data.name or "?", newRankName),
-		button1 = ACCEPT,
-		button2 = CANCEL,
-		OnAccept = function()
-			if C_GuildInfo and C_GuildInfo.SetGuildRankOrder then
-				C_GuildInfo.SetGuildRankOrder(guid, newRankOrder)
-			end
-		end,
-		timeout = 30,
-		whileDead = true,
-		hideOnEscape = true,
-	}
-	StaticPopup_Show("BFL_GUILD_DEMOTE")
+	BFL:DebugPrint(L("GUILD_BROKER_ACTION_RESTRICTED"))
 end
 
 function GuildBroker:RemoveMember(data)
@@ -1171,46 +959,7 @@ function GuildBroker:RemoveMember(data)
 		return
 	end
 
-	if ShouldAvoidSecretValueGuildActions() then
-		BFL:DebugPrint(L("GUILD_BROKER_ACTION_RESTRICTED"))
-		return
-	end
-
-	if BFL:IsActionRestricted() then
-		BFL:DebugPrint(L("GUILD_BROKER_ACTION_RESTRICTED"))
-		return
-	end
-
-	if not CanGuildRemove or not CanGuildRemove() then
-		BFL:DebugPrint(L("GUILD_BROKER_NO_PERMISSION"))
-		return
-	end
-
-	local guid = GetMemberGUID(data)
-	if not guid then
-		BFL:DebugPrint("Could not resolve member GUID for removal.")
-		return
-	end
-
-	if BFL.HasSecretValues and BFL:IsSecret(guid) then
-		BFL:DebugPrint(L("GUILD_BROKER_ACTION_RESTRICTED"))
-		return
-	end
-
-	StaticPopupDialogs["BFL_GUILD_REMOVE"] = {
-		text = string.format(L("GUILD_BROKER_REMOVE_CONFIRM"), data.name or "?"),
-		button1 = ACCEPT,
-		button2 = CANCEL,
-		OnAccept = function()
-			if C_GuildInfo and C_GuildInfo.RemoveFromGuild then
-				C_GuildInfo.RemoveFromGuild(guid)
-			end
-		end,
-		timeout = 30,
-		whileDead = true,
-		hideOnEscape = true,
-	}
-	StaticPopup_Show("BFL_GUILD_REMOVE")
+	BFL:DebugPrint(L("GUILD_BROKER_ACTION_RESTRICTED"))
 end
 
 -- ========================================
@@ -2150,46 +1899,39 @@ local function OpenGuildBrokerSettings()
 	return false
 end
 
-local function SafeCallGuildFrameToggle(toggleFunc)
-	if not toggleFunc then
-		return false, "missing-toggle"
+local function OpenBetterFriendlistGuildTab()
+	if not (BFL.IsGuildTabEnabled and BFL:IsGuildTabEnabled()) then
+		return OpenGuildBrokerSettings(), "settings"
 	end
 
-	if BFL.HasSecretValues and securecallfunction then
-		local ok = pcall(securecallfunction, toggleFunc)
-		return ok, ok and "securecallfunction" or "securecallfunction-failed"
+	if ShowBetterFriendsFrame then
+		ShowBetterFriendsFrame(1)
+	elseif BetterFriendsFrame then
+		BetterFriendsFrame:Show()
 	end
 
-	local ok = pcall(toggleFunc)
-	return ok, ok and "pcall" or "pcall-failed"
-end
-
-local function OpenBlizzardGuildFrame()
-	if InCombatLockdown and InCombatLockdown() then
-		return false, "combat"
+	if BetterFriendsFrame_ShowTab then
+		BetterFriendsFrame_ShowTab(4)
+		return true, "guild_tab"
 	end
 
-	if BFL.IsActionRestricted and BFL:IsActionRestricted() then
-		return false, "restricted"
-	end
-
-	local ok, method = SafeCallGuildFrameToggle(ToggleGuildFrame)
-	if ok then
-		return true, method
-	end
-
-	return SafeCallGuildFrameToggle(GuildFrame_Toggle)
+	return false, "missing-guild-tab"
 end
 
 local function RunConfiguredLeftClickAction()
-	local action = (BetterFriendlistDB and BetterFriendlistDB.guildBrokerClickAction) or "guild_frame"
+	local action = (BetterFriendlistDB and BetterFriendlistDB.guildBrokerClickAction) or "guild_tab"
+	if action == "guild_frame" then
+		action = "guild_tab"
+		if BetterFriendlistDB then
+			BetterFriendlistDB.guildBrokerClickAction = "guild_tab"
+		end
+	end
 
 	if action == "settings" then
 		return OpenGuildBrokerSettings(), "settings"
 	end
 
-	local ok, method = OpenBlizzardGuildFrame()
-	return ok, "guild_frame", method
+	return OpenBetterFriendlistGuildTab()
 end
 
 function GuildBroker:OnClick(clickedFrame, button)

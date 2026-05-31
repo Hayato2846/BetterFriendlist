@@ -1557,8 +1557,7 @@ function DarkTheme:SkinGuildFrame(engine)
 		guild.FilterAll,
 		guild.FilterOnline,
 		guild.FilterOffline,
-		guild.OpenBlizzardGuildButton,
-		guild.RefreshButton,
+		guild.ActionsButton,
 		guild.InvitePlayerButton
 	)
 	if guild.BFL_DarkGuildSkinKey == staticSkinKey then
@@ -1571,8 +1570,7 @@ function DarkTheme:SkinGuildFrame(engine)
 			"FilterAll",
 			"FilterOnline",
 			"FilterOffline",
-			"OpenBlizzardGuildButton",
-			"RefreshButton",
+			"ActionsButton",
 			"InvitePlayerButton",
 		}) do
 			if guild[key] then
@@ -1597,8 +1595,7 @@ function DarkTheme:SkinGuildFrame(engine)
 		"FilterAll",
 		"FilterOnline",
 		"FilterOffline",
-		"OpenBlizzardGuildButton",
-		"RefreshButton",
+		"ActionsButton",
 		"InvitePlayerButton",
 	}) do
 		SkinButtonField(engine, guild, key)

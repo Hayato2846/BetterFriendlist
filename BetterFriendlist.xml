@@ -1292,7 +1292,7 @@
 
 	<!-- Guild Member Button Template (Retail ScrollBox) -->
 	<Button name="BFL_GuildMemberButtonTemplate" virtual="true" registerForClicks="LeftButtonUp,RightButtonUp">
-		<Size x="300" y="24" />
+		<Size x="300" y="38" />
 	</Button>
 
 	<!-- Main Friends Frame -->
@@ -3401,7 +3401,7 @@
 						</Scripts>
 						<FontString inherits="BetterFriendlistFontHighlight" justifyH="LEFT" />
 					</EditBox>
-					<!-- List Inset (starts below header area; now includes column headers) -->
+					<!-- List Inset (Guild roster surface; column headers are hidden by GuildFrame.lua) -->
 					<Frame parentKey="ListInset" inherits="InsetFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT" relativeKey="$parent.HeaderDivider"
@@ -3674,32 +3674,17 @@
 						</Scripts>
 					</Button>
 					<!-- Bottom Buttons -->
-					<Button parentKey="OpenBlizzardGuildButton" inherits="UIPanelButtonTemplate">
+					<Button parentKey="ActionsButton" inherits="UIPanelButtonTemplate">
 						<NormalFont style="BetterFriendlistFontNormal" />
 						<HighlightFont style="BetterFriendlistFontHighlight" />
 						<DisabledFont style="BetterFriendlistFontDisable" />
-						<Size x="130" y="21" />
+						<Size x="134" y="21" />
 						<Anchors>
-							<Anchor point="BOTTOMLEFT" relativeKey="$parent.$parent" x="4" y="4" />
+							<Anchor point="BOTTOMLEFT" relativeKey="$parent.$parent" x="12" y="4" />
 						</Anchors>
 						<Scripts>
 							<OnClick>
-								BFL_GuildFrame_OpenBlizzardGuild(self)
-							</OnClick>
-						</Scripts>
-					</Button>
-					<Button parentKey="RefreshButton" inherits="UIPanelButtonTemplate" text="REFRESH">
-						<NormalFont style="BetterFriendlistFontNormal" />
-						<HighlightFont style="BetterFriendlistFontHighlight" />
-						<DisabledFont style="BetterFriendlistFontDisable" />
-						<Size x="85" y="21" />
-						<Anchors>
-							<Anchor point="LEFT" relativeKey="$parent.OpenBlizzardGuildButton"
-								relativePoint="RIGHT" x="1" y="0" />
-						</Anchors>
-						<Scripts>
-							<OnClick>
-								BFL_GuildFrame_RefreshRoster()
+								BFL_GuildFrame_ShowActionsMenu(self)
 							</OnClick>
 						</Scripts>
 					</Button>
@@ -3709,7 +3694,7 @@
 						<DisabledFont style="BetterFriendlistFontDisable" />
 						<Size x="100" y="21" />
 						<Anchors>
-							<Anchor point="LEFT" relativeKey="$parent.RefreshButton"
+							<Anchor point="LEFT" relativeKey="$parent.ActionsButton"
 								relativePoint="RIGHT" x="1" y="0" />
 						</Anchors>
 						<Scripts>
@@ -3724,7 +3709,7 @@
 							<Anchor point="TOPLEFT" relativeKey="$parent.NameHeader"
 								relativePoint="BOTTOMLEFT" x="7" y="-2" />
 							<Anchor point="BOTTOMRIGHT" relativeKey="$parent.ListInset"
-								relativePoint="BOTTOMRIGHT" x="-25" y="4" />
+								relativePoint="BOTTOMRIGHT" x="-22" y="4" />
 						</Anchors>
 					</Frame>
 					<!-- ScrollBar -->

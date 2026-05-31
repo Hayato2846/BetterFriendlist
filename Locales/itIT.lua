@@ -600,7 +600,7 @@ BFL:RegisterLocale("itIT", function()
 	L.GUILD_BROKER_SETTINGS_ZONE_COLOR = "Colore zona"
 	L.GUILD_BROKER_SETTINGS_NOTE_COLOR = "Colore nota"
 	L.GUILD_BROKER_SETTINGS_OFFICER_NOTE_COLOR = "Colore nota ufficiale"
-	L.GUILD_BROKER_ACTION_GUILD_FRAME = "Apri finestra gilda"
+	L.GUILD_BROKER_ACTION_GUILD_FRAME = "Apri scheda gilda BFL"
 	L.GUILD_BROKER_ACTION_SETTINGS = "Apri impostazioni"
 	L.GUILD_BROKER_GROUP_NONE = "Nessun raggruppamento"
 	L.GUILD_BROKER_GROUP_BY_RANK = "Raggruppa per grado"
@@ -618,7 +618,7 @@ BFL:RegisterLocale("itIT", function()
 	L.GUILD_BROKER_HINT_COPY = " Copia in chat"
 	L.GUILD_BROKER_HINT_ICON_ACTIONS = "--- Azioni icona ---"
 	L.GUILD_BROKER_HINT_LEFT_CLICK = "Clic sinistro:"
-	L.GUILD_BROKER_HINT_TOGGLE = " Alterna tooltip"
+	L.GUILD_BROKER_HINT_TOGGLE = " Apri scheda gilda BFL"
 	L.GUILD_BROKER_HINT_RIGHT_CLICK = "Clic destro:"
 	L.GUILD_BROKER_HINT_SETTINGS = " Impostazioni"
 	L.GUILD_BROKER_HINT_MIDDLE_CLICK = "Clic centrale:"
@@ -631,14 +631,9 @@ BFL:RegisterLocale("itIT", function()
 	L.GUILD_BROKER_MENU_EDIT_NICKNAME = "Modifica soprannome"
 	L.GUILD_BROKER_MENU_REMOVE_NICKNAME = "Rimuovi"
 	L.GUILD_BROKER_NICKNAME_PROMPT = "Inserisci un soprannome per %s:"
-	L.GUILD_BROKER_MENU_EDIT_NOTE = "Modifica nota"
-	L.GUILD_BROKER_MENU_EDIT_OFFICER_NOTE = "Modifica nota ufficiale"
 	L.GUILD_BROKER_MENU_PROMOTE = "Promuovi"
 	L.GUILD_BROKER_MENU_DEMOTE = "Degrada"
 	L.GUILD_BROKER_MENU_REMOVE = "Espelli dalla gilda"
-	L.GUILD_BROKER_PROMOTE_CONFIRM = "Promuovere %s a %s?"
-	L.GUILD_BROKER_DEMOTE_CONFIRM = "Degradare %s a %s?"
-	L.GUILD_BROKER_REMOVE_CONFIRM = "Espellere %s dalla gilda?"
 	L.GUILD_BROKER_ACTION_RESTRICTED = "Questa azione non è disponibile durante il combattimento."
 	L.GUILD_BROKER_NO_PERMISSION = "Non hai il permesso per farlo."
 	L.GUILD_BROKER_LAST_ONLINE_YEARS = "%dy"
@@ -675,11 +670,7 @@ BFL:RegisterLocale("itIT", function()
 	L.LASTONLINE_YEARS = "%d anni"
 
 	-- ========================================
-	-- GUILD UI WARNING
 	-- ========================================
-	L.CLASSIC_GUILD_UI_WARNING_TITLE = "UI Gilda Classica Disabilitata"
-	L.CLASSIC_GUILD_UI_WARNING_TEXT =
-		"BetterFriendlist ha disabilitato l'UI Gilda Classica.\n\nIl tab Gilda aprirà l'interfaccia moderna."
 
 	-- ========================================
 	-- AUDITED MISSING STRINGS
@@ -1692,7 +1683,6 @@ L.SETTINGS_SHOW_ILVL_COLUMN_DESC = "Show an item level column in the Guild tab l
 	L.GUILD_ACTION_TARGET = "Target"
 	L.GUILD_ACTION_COPY_NAME = "Copy Name"
 	L.GUILD_ACTION_OPEN_INFO = "View Member Info"
-	L.GUILD_ACTION_OPEN_BLIZZARD = "Open in Guild UI"
 	L.GUILD_INVITE_DIALOG_TITLE = "Invite to %s"
 	L.GUILD_INVITE_PLACEHOLDER = "Character-Realm"
 	L.GUILD_INVITE_BUTTON = "Invite"
@@ -1725,19 +1715,11 @@ L.SETTINGS_SHOW_ILVL_COLUMN_DESC = "Show an item level column in the Guild tab l
 	L.GUILD_ACTIONS_MENU = "Guild Actions"
 	L.GUILD_ACTION_INVITE_TO_GUILD = "Invite to Guild"
 	L.GUILD_ACTION_EDIT_MOTD = "Edit MOTD"
-	L.GUILD_ACTION_EDIT_INFO = "Edit Guild Info"
-	L.GUILD_ACTION_GUILD_CONTROL = "Guild Control"
 	L.GUILD_ACTION_LEAVE_GUILD = "Leave Guild"
 	L.GUILD_ACTION_DISBAND_GUILD = "Disband Guild"
 	L.GUILD_ACTION_SET_LEADER = "Set Guild Leader"
-	L.GUILD_ACTION_EDIT_PUBLIC_NOTE = "Edit Public Note"
-	L.GUILD_ACTION_EDIT_OFFICER_NOTE = "Edit Officer Note"
-	L.GUILD_ACTION_SET_RANK = "Set Rank"
 	L.GUILD_INVITE_PLAYER_TITLE = "Invite player to guild"
 	L.GUILD_EDIT_MOTD_TITLE = "Edit guild MOTD"
-	L.GUILD_EDIT_INFO_TITLE = "Edit guild information"
-	L.GUILD_EDIT_PUBLIC_NOTE_TITLE = "Public note for %s"
-	L.GUILD_EDIT_OFFICER_NOTE_TITLE = "Officer note for %s"
 	L.GUILD_REMOVE_CONFIRM = "Remove %s from the guild?"
 	L.GUILD_SET_RANK_CONFIRM = "Set %s to %s?"
 	L.GUILD_ACTION_RESTRICTED = "This action is not available right now."

@@ -15,10 +15,10 @@ local GuildFrame = BFL:RegisterModule("GuildFrame", {})
 local L -- Set during Initialize (BFL.L)
 
 -- Constants
-local BUTTON_HEIGHT = 24
-local CLASS_ICON_SIZE = 18
-local CLASS_ICON_OFFSET = 4
-local NAME_OFFSET_WITH_ICON = 26
+local BUTTON_HEIGHT = 38
+local CLASS_ICON_SIZE = 22
+local CLASS_ICON_OFFSET = 5
+local NAME_OFFSET_WITH_ICON = 34
 local STATUS_ICON_SIZE = 14
 local STATUS_TEX_AFK = _G.FRIENDS_TEXTURE_AFK or "Interface\\FriendsFrame\\StatusIcon-Away"
 local STATUS_TEX_DND = _G.FRIENDS_TEXTURE_DND or "Interface\\FriendsFrame\\StatusIcon-DnD"
@@ -40,6 +40,7 @@ local SORT_STATUS = "status"
 local FILTER_ALL = "all"
 local FILTER_ONLINE = "online"
 local FILTER_OFFLINE = "offline"
+local GUILD_COLUMN_HEADERS = { "NameHeader", "RankHeader", "LevelHeader", "ZoneHeader", "ILvlHeader" }
 
 local function GetSortOptions()
 	local actions = BFL.GetModule and BFL:GetModule("GuildActions")
@@ -77,6 +78,7 @@ local rosterDirty = true
 -- Zebra stripe colors (same as WhoFrame)
 local ZEBRA_EVEN_COLOR = { r = 0.1, g = 0.1, b = 0.1, a = 0.3 }
 local ZEBRA_ODD_COLOR = { r = 0, g = 0, b = 0, a = 0 }
+local GUILD_SCROLLBAR_RESERVE = 22
 
 -- ========================================
 -- Module Dependencies
@@ -98,6 +100,22 @@ end
 local function IsSimpleModeEnabled()
 	local DB = GetDB()
 	return DB and DB:Get("simpleMode", false) == true
+end
+
+local function HideGuildColumnHeaders(frame)
+	if not frame then
+		return
+	end
+	for _, key in ipairs(GUILD_COLUMN_HEADERS) do
+		local header = frame[key]
+		if header then
+			header:Hide()
+			if header.Disable then
+				header:Disable()
+			end
+			header:EnableMouse(false)
+		end
+	end
 end
 
 local function SafeSetFont(fontObject, fontPath, fontSize, flags)
@@ -197,8 +215,7 @@ local function ApplyStaticGuildFrameFonts(frame)
 	ApplyBetterFriendlistSmallButtonFonts(frame.FilterAll)
 	ApplyBetterFriendlistSmallButtonFonts(frame.FilterOnline)
 	ApplyBetterFriendlistSmallButtonFonts(frame.FilterOffline)
-	ApplyBetterFriendlistSmallButtonFonts(frame.OpenBlizzardGuildButton)
-	ApplyBetterFriendlistSmallButtonFonts(frame.RefreshButton)
+	ApplyDefaultSlugToButton(frame.ActionsButton)
 	ApplyBetterFriendlistSmallButtonFonts(frame.InvitePlayerButton)
 
 	if frame.SearchBox then
@@ -629,16 +646,25 @@ function GuildFrame:UpdateClassicScrollFrame()
 
 	local displayList = self.displayList
 	local numEntries = #displayList
+	local buttonCount = self.classicButtons and #self.classicButtons or 0
+	local scrollHeight = guildFrame.FauxScroll:GetHeight() or 0
+	if scrollHeight <= 0 then
+		scrollHeight = BUTTON_HEIGHT * 12
+	end
+	local visibleRows = math.max(1, math.floor(scrollHeight / BUTTON_HEIGHT))
+	if buttonCount > 0 then
+		visibleRows = math.min(buttonCount, visibleRows)
+	end
 
-	FauxScrollFrame_Update(guildFrame.FauxScroll, numEntries, 15, BUTTON_HEIGHT)
+	FauxScrollFrame_Update(guildFrame.FauxScroll, numEntries, visibleRows, BUTTON_HEIGHT)
 
 	local offset = FauxScrollFrame_GetOffset(guildFrame.FauxScroll)
 
-	for i = 1, 15 do
+	for i = 1, buttonCount do
 		local dataIndex = offset + i
 		local button = self.classicButtons and self.classicButtons[i]
 		if button then
-			if dataIndex <= numEntries then
+			if i <= visibleRows and dataIndex <= numEntries then
 				local member = displayList[dataIndex]
 				self:UpdateMemberButton(button, member, dataIndex)
 				button:Show()
@@ -653,7 +679,7 @@ function GuildFrame:InitializeClassicScrollFrame(guildFrame)
 	if not guildFrame.FauxScroll then return end
 
 	self.classicButtons = {}
-	for i = 1, 15 do
+	for i = 1, 20 do
 		local button = CreateFrame("Button", "BFL_GuildMemberButton" .. i, guildFrame.FauxScroll, nil)
 		button:SetHeight(BUTTON_HEIGHT)
 		button:SetPoint("TOPLEFT", guildFrame.FauxScroll, "TOPLEFT", 0, -((i - 1) * BUTTON_HEIGHT))
@@ -692,10 +718,7 @@ function GuildFrame:ApplyV1Visibility(frame)
 		return
 	end
 
-	if frame.ILvlHeader then
-		frame.ILvlHeader:Hide()
-		frame.ILvlHeader:Disable()
-	end
+	HideGuildColumnHeaders(frame)
 	if frame.FilterAll then
 		frame.FilterAll:Hide()
 		frame.FilterAll:Disable()
@@ -871,10 +894,9 @@ function GuildFrame:OnLoad(frame)
 			frame.MOTDText:SetMaxLines(2)
 			frame.MOTDText:SetNonSpaceWrap(true)
 
-			-- Bottom buttons: align left edge to Inset (pixel-perfect)
-			frame.OpenBlizzardGuildButton:ClearAllPoints()
-			frame.OpenBlizzardGuildButton:SetPoint("TOPLEFT", inset, "BOTTOMLEFT", 0, -4)
-			-- RefreshButton chains from OpenBlizzardGuildButton via XML
+			-- Bottom buttons: mirror the Friends tab Add Friend / Send Message layout.
+			frame.ActionsButton:ClearAllPoints()
+			frame.ActionsButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 12, 4)
 
 			-- Initial layout with empty MOTD
 			self:UpdateLayout()
@@ -922,9 +944,12 @@ function GuildFrame:OnLoad(frame)
 	-- ScrollBox: flush inside ListInset (WhoFrame pattern)
 	frame.ScrollBox:ClearAllPoints()
 	frame.ScrollBox:SetPoint("TOPLEFT", frame.ListInset, "TOPLEFT", 4, -4)
-	frame.ScrollBox:SetPoint("BOTTOMRIGHT", frame.ListInset, "BOTTOMRIGHT", -18, 2)
+	frame.ScrollBox:SetPoint("BOTTOMRIGHT", frame.ListInset, "BOTTOMRIGHT", -GUILD_SCROLLBAR_RESERVE, 2)
 
-	-- ScrollBar uses XML anchors (ScrollBox TOPRIGHT + (0, 0))
+	frame.ScrollBar:ClearAllPoints()
+	frame.ScrollBar:SetWidth(GUILD_SCROLLBAR_RESERVE)
+	frame.ScrollBar:SetPoint("TOPLEFT", frame.ScrollBox, "TOPRIGHT", 0, 0)
+	frame.ScrollBar:SetPoint("BOTTOMLEFT", frame.ScrollBox, "BOTTOMRIGHT", 0, 0)
 
 	-- Create DataProvider
 	guildDataProvider = CreateDataProvider()
@@ -945,23 +970,32 @@ function GuildFrame:SetupMemberButton(button)
 	button.bg:SetColorTexture(0, 0, 0, 0)
 
 	-- Class icon
+	button.iconBorder = button:CreateTexture(nil, "BORDER")
+	button.iconBorder:SetColorTexture(0, 0, 0, 0.85)
+	button.iconBorder:Hide()
+
 	button.classIcon = button:CreateTexture(nil, "ARTWORK")
 	button.classIcon:SetSize(CLASS_ICON_SIZE, CLASS_ICON_SIZE)
-	button.classIcon:SetPoint("LEFT", button, "LEFT", CLASS_ICON_OFFSET, 0)
+	button.classIcon:SetPoint("TOPLEFT", button, "TOPLEFT", CLASS_ICON_OFFSET, -8)
 	button.classIcon:SetTexture(CLASS_ICON_TEXTURE)
 
-	-- Name text
-	button.nameText = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	-- Primary name line
+	button.nameText = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	ApplyDefaultSlugToFontString(button.nameText)
-	button.nameText:SetPoint("LEFT", button.classIcon, "RIGHT", 4, 0)
+	button.nameText:SetPoint("TOPLEFT", button.classIcon, "TOPRIGHT", 4, 1)
 	button.nameText:SetJustifyH("LEFT")
+	button.nameText:SetMaxLines(1)
+	button.nameText:SetWordWrap(false)
+	button.nameText:SetNonSpaceWrap(false)
+	button.nameText:SetShadowColor(0, 0, 0, 0.9)
+	button.nameText:SetShadowOffset(1, -1)
 
 	-- Status icon (Blizzard AFK/DND/Mobile textures; hidden for online & offline)
 	button.statusIcon = button:CreateTexture(nil, "OVERLAY")
 	button.statusIcon:SetSize(STATUS_ICON_SIZE, STATUS_ICON_SIZE)
 	button.statusIcon:Hide()
 
-	-- Rank text
+	-- Secondary info line (rank, level, class, zone/last online)
 	button.rankText = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	ApplyDefaultSlugToFontString(button.rankText)
 	button.rankText:SetJustifyH("LEFT")
@@ -969,11 +1003,14 @@ function GuildFrame:SetupMemberButton(button)
 	button.rankText:SetMaxLines(1)
 	button.rankText:SetWordWrap(false)
 	button.rankText:SetNonSpaceWrap(false)
+	button.rankText:SetShadowColor(0, 0, 0, 0.75)
+	button.rankText:SetShadowOffset(1, -1)
 
 	-- Level text
 	button.levelText = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	ApplyDefaultSlugToFontString(button.levelText)
 	button.levelText:SetJustifyH("CENTER")
+	button.levelText:Hide()
 
 	-- Zone text
 	button.zoneText = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -981,17 +1018,25 @@ function GuildFrame:SetupMemberButton(button)
 	button.zoneText:SetJustifyH("LEFT")
 	button.zoneText:SetMaxLines(1)
 	button.zoneText:SetWordWrap(false)
+	button.zoneText:Hide()
 
 	-- Item Level text
 	button.ilvlText = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	ApplyDefaultSlugToFontString(button.ilvlText)
 	button.ilvlText:SetJustifyH("RIGHT")
 	button.ilvlText:SetTextColor(GetAccentColor(1, 0.82, 0, 1))
+	button.ilvlText:Hide()
 
 	-- Highlight texture
 	button.highlight = button:CreateTexture(nil, "HIGHLIGHT")
 	button.highlight:SetAllPoints()
-	button.highlight:SetColorTexture(1, 1, 1, 0.1)
+	button.highlight:SetColorTexture(GetAccentColor(1, 0.82, 0, 0.14))
+
+	button.selectionBar = button:CreateTexture(nil, "OVERLAY")
+	button.selectionBar:SetPoint("TOPLEFT", button, "TOPLEFT", 0, -3)
+	button.selectionBar:SetPoint("BOTTOMLEFT", button, "BOTTOMLEFT", 0, 3)
+	button.selectionBar:SetWidth(2)
+	button.selectionBar:Hide()
 
 	-- Enable mouse
 	button:EnableMouse(true)
@@ -1023,11 +1068,21 @@ function GuildFrame:UpdateMemberButton(button, member, dataIndex)
 		and (self.selectedMember.fullName == member.fullName or self.selectedMember.guildIndex == member.guildIndex)
 	if isSelected then
 		local r, g, b = GetAccentColor(1, 0.82, 0, 1)
-		button.bg:SetColorTexture(r, g, b, 0.18)
+		button.bg:SetColorTexture(r, g, b, 0.15)
+		if button.selectionBar then
+			button.selectionBar:SetColorTexture(r, g, b, 0.9)
+			button.selectionBar:Show()
+		end
 	elseif dataIndex % 2 == 0 then
 		button.bg:SetColorTexture(ZEBRA_EVEN_COLOR.r, ZEBRA_EVEN_COLOR.g, ZEBRA_EVEN_COLOR.b, ZEBRA_EVEN_COLOR.a)
+		if button.selectionBar then
+			button.selectionBar:Hide()
+		end
 	else
 		button.bg:SetColorTexture(ZEBRA_ODD_COLOR.r, ZEBRA_ODD_COLOR.g, ZEBRA_ODD_COLOR.b, ZEBRA_ODD_COLOR.a)
+		if button.selectionBar then
+			button.selectionBar:Hide()
+		end
 	end
 
 	-- Class icon
@@ -1035,8 +1090,14 @@ function GuildFrame:UpdateMemberButton(button, member, dataIndex)
 	if ShouldShowClassIcons() and classCoords and button.classIcon then
 		button.classIcon:SetTexCoord(unpack(classCoords))
 		button.classIcon:Show()
+		if button.iconBorder then
+			button.iconBorder:Show()
+		end
 	elseif button.classIcon then
 		button.classIcon:Hide()
+		if button.iconBorder then
+			button.iconBorder:Hide()
+		end
 	end
 
 	-- Name with class color
@@ -1089,55 +1150,55 @@ function GuildFrame:UpdateMemberButton(button, member, dataIndex)
 		button.classIcon:SetAlpha(member.online and 1.0 or 0.55)
 	end
 
-	-- Rank
+	local locationText = ""
+	if member.online then
+		locationText = member.zone or ""
+	else
+		locationText = self:FormatLastOnline(member)
+	end
+	local levelLabel = LEVEL_ABBR or LEVEL or "Level"
+	local levelText = ""
+	if member.level and member.level > 0 then
+		levelText = string.format("%s %d", levelLabel, member.level)
+	end
+	local infoParts = {}
+	if member.rank and member.rank ~= "" then
+		table.insert(infoParts, member.rank)
+	end
+	if levelText ~= "" then
+		table.insert(infoParts, levelText)
+	end
+	if member.className and member.className ~= "" then
+		table.insert(infoParts, member.className)
+	end
+	if locationText ~= "" then
+		table.insert(infoParts, locationText)
+	end
 	if button.rankText then
-		button.rankText:SetText(member.rank)
+		button.rankText:SetText(table.concat(infoParts, " - "))
+		if member.online then
+			button.rankText:SetTextColor(0.72, 0.72, 0.62)
+		else
+			button.rankText:SetTextColor(0.5, 0.5, 0.5)
+		end
 	end
 
-	-- Level
 	if button.levelText then
-		if member.online then
-			-- Color by difficulty
-			local color = GetQuestDifficultyColor and GetQuestDifficultyColor(member.level)
-			if color then
-				button.levelText:SetTextColor(color.r, color.g, color.b)
-			else
-				button.levelText:SetTextColor(1, 1, 1)
-			end
-		else
-			button.levelText:SetTextColor(0.5, 0.5, 0.5)
-		end
-		button.levelText:SetText(member.level)
+		button.levelText:SetText("")
+		button.levelText:Hide()
 	end
 
-	-- Zone
 	if button.zoneText then
-		if member.online then
-			button.zoneText:SetText(member.zone)
-			button.zoneText:SetTextColor(0.8, 0.8, 0.6)
-		else
-			-- Offline: Show last online time
-			button.zoneText:SetText(self:FormatLastOnline(member))
-			button.zoneText:SetTextColor(0.5, 0.5, 0.5)
-		end
+		button.zoneText:SetText("")
+		button.zoneText:Hide()
 	end
 
-	-- Item Level
 	if button.ilvlText then
-		button.ilvlText:SetTextColor(GetAccentColor(1, 0.82, 0, 1))
-		local ilvl = member.itemLevel or 0
-		if ilvl > 0 then
-			button.ilvlText:SetText(tostring(math.floor(ilvl)))
-			button.ilvlText:SetAlpha(member.online and 1.0 or 0.55)
-			button.ilvlText:Show()
-		else
-			button.ilvlText:SetText("-")
-			button.ilvlText:SetAlpha(member.online and 0.55 or 0.35)
-			button.ilvlText:Show()
-		end
+		button.ilvlText:SetText("")
+		button.ilvlText:Hide()
 	end
 
-	-- Apply responsive column widths
+	-- Apply responsive row layout
 	self:ApplyColumnWidths(button)
 end
 
@@ -1368,17 +1429,6 @@ function GuildFrame:EnsureHeaderEditButtons(guildFrame)
 		return button
 	end
 
-	guildFrame.InfoEditButton = CreateEditButton(
-		"BFL_GuildInfoEditButton",
-		(BFL.L and BFL.L.GUILD_ACTION_EDIT_INFO) or "Guild Info",
-		function()
-		local actions = GetGuildActions()
-		if actions and actions.EditGuildInfo then
-			actions:EditGuildInfo()
-		end
-	end)
-	guildFrame.InfoEditButton:SetPoint("LEFT", guildFrame.GuildName, "RIGHT", 5, 0)
-
 	guildFrame.MOTDEditButton = CreateEditButton(
 		"BFL_GuildMOTDEditButton",
 		(BFL.L and BFL.L.GUILD_ACTION_EDIT_MOTD) or "MOTD",
@@ -1401,15 +1451,13 @@ function GuildFrame:UpdateHeaderEditButtons()
 	self:EnsureHeaderEditButtons(guildFrame)
 
 	if guildFrame.InfoEditButton then
-		if CanEditGuildInfo and CanEditGuildInfo() == true then
-			guildFrame.InfoEditButton:Show()
-		else
-			guildFrame.InfoEditButton:Hide()
-		end
+		guildFrame.InfoEditButton:Hide()
 	end
 
 	if guildFrame.MOTDEditButton then
-		if CanEditMOTD and CanEditMOTD() == true and guildFrame.MOTDText and guildFrame.MOTDText:IsShown() then
+		local actions = GetGuildActions()
+		if actions and actions.CanEditMOTD and actions:CanEditMOTD()
+			and guildFrame.MOTDText and guildFrame.MOTDText:IsShown() then
 			guildFrame.MOTDEditButton:Show()
 		else
 			guildFrame.MOTDEditButton:Hide()
@@ -1451,9 +1499,9 @@ function GuildFrame:UpdateLayout()
 	guildFrame.ListInset:SetPoint("TOPLEFT", inset, "TOPLEFT", 0, listInsetTop)
 	guildFrame.ListInset:SetPoint("BOTTOMRIGHT", inset, "BOTTOMRIGHT", 0, 0)
 
-	-- NameHeader follows ListInset via XML (TOPLEFT + 4, 25)
-	-- Sub-headers chain from NameHeader via XML
-	-- ScrollBox/ScrollBar follow ListInset via Lua OnLoad anchors
+	-- Column headers are hidden; sorting is handled through the shared header dropdown.
+	-- ScrollBox/ScrollBar follow ListInset via Lua OnLoad anchors.
+	self:UpdateResponsiveLayout()
 end
 
 -- ========================================
@@ -1627,32 +1675,6 @@ function GuildFrame:ShowContextMenu(button, member)
 end
 
 -- ========================================
--- Open Blizzard Guild Frame
--- ========================================
-
-function GuildFrame:OpenBlizzardGuildUI(memberIndex)
-	local actions = GetGuildActions()
-	if actions and actions.OpenBlizzardGuildUI then
-		actions:OpenBlizzardGuildUI()
-		return
-	end
-
-	if BFL:IsActionRestricted() then
-		return
-	end
-
-	local toggle = ToggleGuildFrame or GuildFrame_Toggle
-	if not toggle then
-		return
-	end
-	if BFL.HasSecretValues and securecallfunction then
-		pcall(securecallfunction, toggle)
-	else
-		pcall(toggle)
-	end
-end
-
--- ========================================
 -- Public API
 -- ========================================
 
@@ -1678,7 +1700,7 @@ function GuildFrame:GetMemberCount()
 end
 
 -- ========================================
--- Column Width Management (Responsive)
+-- Row Layout Management (Responsive)
 -- ========================================
 
 function GuildFrame:UpdateResponsiveLayout()
@@ -1691,77 +1713,17 @@ function GuildFrame:UpdateResponsiveLayout()
 
 	local guildFrame = frame.GuildFrame
 	local frameWidth = (guildFrame.ListInset and guildFrame.ListInset:GetWidth()) or frame:GetWidth()
+	HideGuildColumnHeaders(guildFrame)
 
 	-- Cache check
 	local roundedWidth = math.floor(frameWidth + 0.5)
 	if self._lastLayoutWidth == roundedWidth then return end
 	self._lastLayoutWidth = roundedWidth
 
-	local scrollbarAndPadding = 28
+	local scrollbarAndPadding = GUILD_SCROLLBAR_RESERVE + 10
 	local effectiveWidth = math.max((frameWidth or 360) - scrollbarAndPadding, 220)
 
-	local ilvlWidth = 0
-	local remaining = effectiveWidth - ilvlWidth
-	local nameWidth = math.floor(remaining * 0.35)
-	local rankWidth = math.floor(remaining * 0.22)
-	local levelWidth = math.floor(remaining * 0.08)
-	local zoneWidth = remaining - nameWidth - rankWidth - levelWidth
-
-	nameWidth = math.max(nameWidth, 82)
-	rankWidth = math.max(rankWidth, 52)
-	levelWidth = math.max(levelWidth, 28)
-	zoneWidth = math.max(zoneWidth, 54)
-
-	local totalWidth = nameWidth + rankWidth + levelWidth + zoneWidth
-	if totalWidth > remaining then
-		local overflow = totalWidth - remaining
-		local zoneShrink = math.min(overflow, math.max(zoneWidth - 54, 0))
-		zoneWidth = zoneWidth - zoneShrink
-		overflow = overflow - zoneShrink
-		local rankShrink = math.min(overflow, math.max(rankWidth - 48, 0))
-		rankWidth = rankWidth - rankShrink
-		overflow = overflow - rankShrink
-		if overflow > 0 then
-			nameWidth = math.max(nameWidth - overflow, 70)
-		end
-	end
-
-	self.columnWidths = {
-		name = nameWidth,
-		rank = rankWidth,
-		level = levelWidth,
-		zone = zoneWidth,
-		ilvl = ilvlWidth,
-	}
-
-	-- Update column headers
-	if guildFrame.NameHeader then
-		guildFrame.NameHeader:SetWidth(nameWidth)
-		if guildFrame.NameHeader.Middle then
-			guildFrame.NameHeader.Middle:SetWidth(nameWidth - 9)
-		end
-	end
-	if guildFrame.RankHeader then
-		guildFrame.RankHeader:SetWidth(rankWidth)
-		if guildFrame.RankHeader.Middle then
-			guildFrame.RankHeader.Middle:SetWidth(rankWidth - 9)
-		end
-	end
-	if guildFrame.LevelHeader then
-		guildFrame.LevelHeader:SetWidth(levelWidth)
-		if guildFrame.LevelHeader.Middle then
-			guildFrame.LevelHeader.Middle:SetWidth(levelWidth - 9)
-		end
-	end
-	if guildFrame.ZoneHeader then
-		guildFrame.ZoneHeader:SetWidth(zoneWidth)
-		if guildFrame.ZoneHeader.Middle then
-			guildFrame.ZoneHeader.Middle:SetWidth(zoneWidth - 9)
-		end
-	end
-	if guildFrame.ILvlHeader then
-		guildFrame.ILvlHeader:Hide()
-	end
+	self.rowContentWidth = effectiveWidth
 
 	-- Update button widths for Retail
 	if BFL.HasModernScrollBox and guildDataProvider then
@@ -1769,61 +1731,57 @@ function GuildFrame:UpdateResponsiveLayout()
 	end
 end
 
--- Apply column widths to a button's text elements
+-- Apply Friendlist-style row layout to a button's text elements.
 function GuildFrame:ApplyColumnWidths(button)
-	if not self.columnWidths then return end
-
-	local w = self.columnWidths
 	local showClassIcons = ShouldShowClassIcons()
 	local nameOffset = showClassIcons and NAME_OFFSET_WITH_ICON or 8
+	local width = button:GetWidth()
+	if not width or width <= 1 then
+		width = self.rowContentWidth or 340
+	end
 
-	-- Name column: class icon + name text fill the Name header width
-	-- Reserve space for status icon at the right edge of the name cell
-	local statusIconReserve = STATUS_ICON_SIZE + 4
 	if button.classIcon then
 		button.classIcon:ClearAllPoints()
 		if showClassIcons then
-			button.classIcon:SetPoint("LEFT", button, "LEFT", CLASS_ICON_OFFSET, 0)
+			button.classIcon:SetSize(CLASS_ICON_SIZE, CLASS_ICON_SIZE)
+			button.classIcon:SetPoint("TOPLEFT", button, "TOPLEFT", CLASS_ICON_OFFSET, -8)
 		else
 			button.classIcon:Hide()
 		end
 	end
+	if button.iconBorder then
+		button.iconBorder:ClearAllPoints()
+		if showClassIcons and button.classIcon and button.classIcon:IsShown() then
+			button.iconBorder:SetPoint("TOPLEFT", button.classIcon, "TOPLEFT", -1, 1)
+			button.iconBorder:SetPoint("BOTTOMRIGHT", button.classIcon, "BOTTOMRIGHT", 1, -1)
+			button.iconBorder:Show()
+		else
+			button.iconBorder:Hide()
+		end
+	end
+	local rightReserve = STATUS_ICON_SIZE + 14
 	if button.nameText then
 		button.nameText:ClearAllPoints()
-		button.nameText:SetPoint("LEFT", button, "LEFT", nameOffset, 0)
-		button.nameText:SetWidth(math.max(w.name - nameOffset - 2 - statusIconReserve, 24))
+		button.nameText:SetPoint("TOPLEFT", button, "TOPLEFT", nameOffset, -4)
+		button.nameText:SetWidth(math.max(width - nameOffset - rightReserve, 40))
 	end
-	-- Status icon: sits at the right edge of the name column (before rank)
 	if button.statusIcon then
 		button.statusIcon:ClearAllPoints()
-		button.statusIcon:SetPoint("RIGHT", button, "LEFT", w.name - 4, 0)
+		button.statusIcon:SetPoint("TOPRIGHT", button, "TOPRIGHT", -7, -7)
 	end
-	-- Rank, Level, Zone: positioned at cumulative header offsets from button LEFT
 	if button.rankText then
 		button.rankText:ClearAllPoints()
-		button.rankText:SetPoint("LEFT", button, "LEFT", w.name, 0)
-		button.rankText:SetWidth(w.rank - 4)
+		button.rankText:SetPoint("TOPLEFT", button, "TOPLEFT", nameOffset, -21)
+		button.rankText:SetWidth(math.max(width - nameOffset - 10, 40))
 	end
 	if button.levelText then
-		button.levelText:ClearAllPoints()
-		button.levelText:SetPoint("LEFT", button, "LEFT", w.name + w.rank, 0)
-		button.levelText:SetWidth(w.level - 4)
+		button.levelText:Hide()
 	end
 	if button.zoneText then
-		button.zoneText:ClearAllPoints()
-		button.zoneText:SetPoint("LEFT", button, "LEFT", w.name + w.rank + w.level, 0)
-		button.zoneText:SetWidth(w.zone - 4)
+		button.zoneText:Hide()
 	end
-	-- iLvl: rightmost column
 	if button.ilvlText then
-		button.ilvlText:ClearAllPoints()
-		if (w.ilvl or 0) > 0 then
-			button.ilvlText:SetPoint("LEFT", button, "LEFT", w.name + w.rank + w.level + w.zone, 0)
-			button.ilvlText:SetWidth(w.ilvl - 4)
-			button.ilvlText:Show()
-		else
-			button.ilvlText:Hide()
-		end
+		button.ilvlText:Hide()
 	end
 end
 
@@ -1989,20 +1947,22 @@ function GuildFrame:CreateMemberInfoPanel_Legacy()
 	panel.ilvlText:SetJustifyH("LEFT")
 	panel.ilvlText:SetTextColor(GetAccentColor(1, 0.82, 0, 1))
 
-	-- Rank dropdown label
+	-- Rank label
 	panel.rankLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	ApplyDefaultSlugToFontString(panel.rankLabel)
 	panel.rankLabel:SetPoint("TOPLEFT", panel.ilvlText, "BOTTOMLEFT", 0, -10)
 	panel.rankLabel:SetText((L and L.GUILD_INFO_RANK) or "Rank")
 	panel.rankLabel:SetTextColor(0.7, 0.7, 0.7)
 
-	-- Rank dropdown (uses non-protected SetGuildMemberRank)
-	panel.rankDropdown = CreateFrame("Frame", "BFL_GuildMemberRankDropdown", panel, "UIDropDownMenuTemplate")
-	panel.rankDropdown:SetPoint("TOPLEFT", panel.rankLabel, "BOTTOMLEFT", -16, -2)
-	UIDropDownMenu_SetWidth(panel.rankDropdown, 200)
+	panel.rankText = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	ApplyDefaultSlugToFontString(panel.rankText)
+	panel.rankText:SetPoint("TOPLEFT", panel.rankLabel, "BOTTOMLEFT", 0, -4)
+	panel.rankText:SetPoint("RIGHT", panel, "RIGHT", -18, 0)
+	panel.rankText:SetJustifyH("LEFT")
+	panel.rankText:SetTextColor(0.85, 0.85, 0.85)
 
 	-- Divider before notes
-	panel.divider2 = CreatePanelDivider(panel, panel.rankDropdown, -4)
+	panel.divider2 = CreatePanelDivider(panel, panel.rankText, -8)
 
 	-- Public Note
 	panel.pubLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -2098,51 +2058,22 @@ function GuildFrame:RefreshMemberInfoPanelAccent()
 	end
 end
 
--- Populate/refresh the rank dropdown based on the given member and current
--- player permissions. Uses SetGuildMemberRank (non-protected).
+-- Rank changes are handled only through adjacent promote/demote actions.
 function GuildFrame:_RefreshRankDropdown(member)
 	return
 end
 
 function GuildFrame:_RefreshRankDropdown_Legacy(member)
 	local panel = self._infoPanel
-	if not panel or not panel.rankDropdown then return end
-
-	panel._pendingRankIndex = member.rankIndex
-
-	local canPromote = _G.CanGuildPromote and _G.CanGuildPromote() or false
-	local canDemote = _G.CanGuildDemote and _G.CanGuildDemote() or false
-	local canChange = canPromote or canDemote
-
-	UIDropDownMenu_Initialize(panel.rankDropdown, function(dropdown, level)
-		local info = UIDropDownMenu_CreateInfo()
-		local numRanks = (_G.GuildControlGetNumRanks and _G.GuildControlGetNumRanks()) or 0
-		for rankIdx = 0, numRanks - 1 do
-			local rankName = _G.GuildControlGetRankName and _G.GuildControlGetRankName(rankIdx) or ""
-			if rankName and rankName ~= "" then
-				info = UIDropDownMenu_CreateInfo()
-				info.text = format("%d. %s", rankIdx + 1, rankName)
-				info.value = rankIdx
-				info.checked = (rankIdx == panel._pendingRankIndex)
-				info.func = function(self_info)
-					panel._pendingRankIndex = self_info.value
-					UIDropDownMenu_SetSelectedValue(panel.rankDropdown, self_info.value)
-					UIDropDownMenu_SetText(panel.rankDropdown, self_info.text)
-				end
-				UIDropDownMenu_AddButton(info, level)
-			end
-		end
-	end)
-
-	UIDropDownMenu_SetSelectedValue(panel.rankDropdown, member.rankIndex or 0)
-	local currentRankName = _G.GuildControlGetRankName and _G.GuildControlGetRankName(member.rankIndex or 0) or ""
-	UIDropDownMenu_SetText(panel.rankDropdown, format("%d. %s", (member.rankIndex or 0) + 1, currentRankName))
-
-	if canChange then
-		UIDropDownMenu_EnableDropDown(panel.rankDropdown)
-	else
-		UIDropDownMenu_DisableDropDown(panel.rankDropdown)
+	if not panel or not panel.rankText then
+		return
 	end
+
+	local rankText = member and member.rank or ""
+	if rankText == "" and member and member.rankIndex ~= nil then
+		rankText = format("#%d", (member.rankIndex or 0) + 1)
+	end
+	panel.rankText:SetText(rankText ~= "" and rankText or "-")
 end
 
 function GuildFrame:ShowMemberInfoPanel(member)
@@ -2209,30 +2140,20 @@ function GuildFrame:ShowMemberInfoPanel_Legacy(member)
 	-- Rank dropdown
 	self:_RefreshRankDropdown_Legacy(member)
 
-	-- Public note (editable if permitted)
+	-- Guild notes are read-only in BFL; Blizzard note setters are restricted.
 	panel.pubNote:SetText(member.note or "")
-	local canEditPub = CanEditPublicNote and CanEditPublicNote() or false
-	panel.pubNote:SetEnabled(canEditPub)
-	if not canEditPub then
-		panel.pubNote:SetTextColor(0.5, 0.5, 0.5)
-	else
-		panel.pubNote:SetTextColor(1, 1, 1)
-	end
+	panel.pubNote:SetEnabled(false)
+	panel.pubNote:SetTextColor(0.5, 0.5, 0.5)
 
-	-- Officer note (editable/viewable if permitted)
+	-- Officer note (viewable if permitted)
 	local canViewOff = C_GuildInfo and C_GuildInfo.CanViewOfficerNote
 		and C_GuildInfo.CanViewOfficerNote() or false
-	local canEditOff = CanEditOfficerNote and CanEditOfficerNote() or false
 	if canViewOff then
 		panel.offNote:SetText(member.officerNote or "")
 		panel.offNote:Show()
 		panel.offLabel:Show()
-		panel.offNote:SetEnabled(canEditOff)
-		if not canEditOff then
-			panel.offNote:SetTextColor(0.5, 0.5, 0.5)
-		else
-			panel.offNote:SetTextColor(0.5, 1, 0.5)
-		end
+		panel.offNote:SetEnabled(false)
+		panel.offNote:SetTextColor(0.5, 0.5, 0.5)
 	else
 		panel.offNote:Hide()
 		panel.offLabel:Hide()
@@ -2263,38 +2184,6 @@ function GuildFrame:SaveMemberInfoPanel_Legacy()
 	if not panel or not panel._currentMember then return end
 	local member = panel._currentMember
 
-	if BFL:IsActionRestricted() then
-		BFL:DebugPrint("Cannot save guild changes: combat restriction active")
-		return
-	end
-
-	-- Public note
-	if CanEditPublicNote and CanEditPublicNote() and GuildRosterSetPublicNote then
-		local newPub = panel.pubNote:GetText() or ""
-		if newPub ~= (member.note or "") and member.guildIndex then
-			GuildRosterSetPublicNote(member.guildIndex, newPub)
-		end
-	end
-
-	-- Officer note
-	if CanEditOfficerNote and CanEditOfficerNote() and GuildRosterSetOfficerNote then
-		local newOff = panel.offNote:GetText() or ""
-		if newOff ~= (member.officerNote or "") and member.guildIndex then
-			GuildRosterSetOfficerNote(member.guildIndex, newOff)
-		end
-	end
-
-	-- Rank change via non-protected SetGuildMemberRank(playerIndex, newRankIndex)
-	local newRank = panel._pendingRankIndex
-	if newRank and newRank ~= member.rankIndex and member.guildIndex and _G.SetGuildMemberRank then
-		local canPromote = _G.CanGuildPromote and _G.CanGuildPromote() or false
-		local canDemote = _G.CanGuildDemote and _G.CanGuildDemote() or false
-		local isPromoting = newRank < member.rankIndex
-		if (isPromoting and canPromote) or ((not isPromoting) and canDemote) then
-			pcall(_G.SetGuildMemberRank, member.guildIndex, newRank)
-		end
-	end
-
 	-- Nickname (local)
 	local DB = GetDB()
 	if DB and DB.SetGuildNickname then
@@ -2303,8 +2192,7 @@ function GuildFrame:SaveMemberInfoPanel_Legacy()
 	end
 
 	self:HideMemberInfoPanel()
-	-- Request refresh so new notes appear in tooltips
-	self:RequestRosterUpdate()
+	self:Refresh()
 end
 
 -- ========================================
@@ -2376,9 +2264,9 @@ function BFL_GuildFrame_OnShow(frame)
 		GF:ApplyV1Visibility(frame)
 
 		-- Set locale text for buttons (L is not available during OnLoad, only after Initialize)
-		if frame.OpenBlizzardGuildButton and BFL.L then
-			frame.OpenBlizzardGuildButton:SetText(BFL.L.GUILD_ACTIONS_MENU or "Guild Actions")
-			ApplyDefaultSlugToButton(frame.OpenBlizzardGuildButton)
+		if frame.ActionsButton and BFL.L then
+			frame.ActionsButton:SetText(BFL.L.GUILD_ACTIONS_MENU or "Guild Actions")
+			ApplyDefaultSlugToButton(frame.ActionsButton)
 		end
 		if frame.FilterOffline and BFL.L then
 			frame.FilterOffline:SetText(BFL.L.GUILD_FILTER_OFFLINE or FRIENDS_LIST_OFFLINE or "Offline")
@@ -2475,25 +2363,12 @@ function BFL_GuildFrame_ShowInviteDialog()
 	end
 end
 
-function BFL_GuildFrame_OpenBlizzardGuild(button)
+function BFL_GuildFrame_ShowActionsMenu(button)
 	local actions = BFL:GetModule("GuildActions")
 	if actions and actions.ShowGuildActionsMenu then
 		local owner = button
-			or (BetterFriendsFrame and BetterFriendsFrame.GuildFrame and BetterFriendsFrame.GuildFrame.OpenBlizzardGuildButton)
+			or (BetterFriendsFrame and BetterFriendsFrame.GuildFrame and BetterFriendsFrame.GuildFrame.ActionsButton)
 			or UIParent
 		actions:ShowGuildActionsMenu(owner)
-		return
-	end
-	local GF = BFL:GetModule("GuildFrame")
-	if GF then GF:OpenBlizzardGuildUI() end
-end
-
-function BFL_GuildFrame_RefreshRoster()
-	local GF = BFL:GetModule("GuildFrame")
-	if GF and GF:IsEnabled() then
-		local success = GF:RequestRosterUpdate()
-		if not success then
-			BFL:DebugPrint("Guild roster refresh throttled (10s cooldown)")
-		end
 	end
 end

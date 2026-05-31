@@ -11,13 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Guild Roster Tab Beta** - Added a beta-gated Guild settings tab and a default-off Guild roster tab with shared Retail/Classic controls.
-- **Guild Roster Actions** - Added supported guild roster actions for communication, notes, rank changes, member removal, invites, MOTD, guild info, leadership handoff, guild control, leave, and disband where the client API and permissions allow them.
+- **Guild Roster Actions** - Added API-open guild roster actions for communication, party invites, guild invites, adjacent promote/demote, name-based member removal, leadership handoff, leave, disband, and Classic-only MOTD editing.
 - **External AddOn Menu Bridge Beta** - Added a default-off beta bridge and official companion AddOn for showing compatible AddOn actions in supported BetterFriendlist context menus.
 - **Custom Theme & Theme Settings** - Added a Custom theme that inherits from Dark and adds controls for colors, transparency, hover states, selection states, borders, scrollbars, icons, and Blizzard artwork visibility.
 - **Raid Tab** - Added an optional compact Ready Check button next to Raid Info.
 
 ### Improved
-- **Guild Tab Layout** - Reworked the Guild tab around the existing Friendlist header controls on Retail and a compact Classic control row, removing fake filter buttons and dead layout elements.
+- **Guild Tab Layout** - Reworked the Guild tab around the existing Friendlist header controls on Retail and a compact Classic control row, removing fake filter buttons, column headers, column-style roster rows, dead layout elements, and the redundant Refresh button. Guild rows now use larger class icons, stronger names, cleaner secondary text, improved selection styling, and Friendlist-aligned scrollbar spacing.
 - **Broker Tooltips** - Added the subtle broker separator between Friends Broker groups and Guild Broker rank groups.
 
 ### Changed
@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Font Rendering** - Made custom font handling more defensive on newer clients.
 
 ### Fixed
+- **Guild Actions** - Removed restricted Guild editors and Retail Communities handoffs from BFL menus, keeping only API-open actions and read-only note display.
 - **ElvUI Skin** - Fixed startup, availability, and settings-toggle issues when ElvUI was selected, unavailable, or managed outside the Retail beta Theme tab.
 - **Menu Compatibility** - Fixed protected Retail unit menu handling and restored Total RP 3 profile actions in BetterFriendlist friend menus.
 - **Friend Menus** - Restored Blizzard's invite versus request-to-join labels and actions for Battle.net friends.

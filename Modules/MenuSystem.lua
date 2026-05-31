@@ -316,11 +316,6 @@ function MenuSystem:ShowGuildMemberMenu(button, member)
 		end
 	end
 
-	local function OpenNativeGuildUI()
-		local GuildFrame = BFL:GetModule("GuildFrame")
-		if GuildFrame then GuildFrame:OpenBlizzardGuildUI() end
-	end
-
 	if MenuUtil and MenuUtil.CreateContextMenu then
 		-- Retail: Modern menu
 		MenuUtil.CreateContextMenu(button, function(owner, rootDescription)
@@ -350,7 +345,6 @@ function MenuSystem:ShowGuildMemberMenu(button, member)
 			rootDescription:CreateButton((L and L.GUILD_ACTION_COPY_NAME) or "Copy Name", function()
 				ShowCopyName()
 			end)
-			rootDescription:CreateButton((L and L.GUILD_ACTION_OPEN_BLIZZARD) or "Open in Guild UI", OpenNativeGuildUI)
 		end)
 	elseif UIDropDownMenu_Initialize and ToggleDropDownMenu then
 		if not self.GuildMemberDropdown then
@@ -396,11 +390,6 @@ function MenuSystem:ShowGuildMemberMenu(button, member)
 			info.func = ShowCopyName
 			UIDropDownMenu_AddButton(info, level)
 
-			info = UIDropDownMenu_CreateInfo()
-			info.text = (L and L.GUILD_ACTION_OPEN_BLIZZARD) or "Open in Guild UI"
-			info.notCheckable = true
-			info.func = OpenNativeGuildUI
-			UIDropDownMenu_AddButton(info, level)
 		end, "MENU")
 
 		ToggleDropDownMenu(1, nil, self.GuildMemberDropdown, button, 0, 0)

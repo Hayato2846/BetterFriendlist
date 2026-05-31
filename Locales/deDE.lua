@@ -676,7 +676,7 @@ BFL:RegisterLocale("deDE", function()
 	L.GUILD_BROKER_SETTINGS_OFFICER_NOTE_COLOR = "Offiziersnotiz-Farbe"
 
 	-- Click Actions
-	L.GUILD_BROKER_ACTION_GUILD_FRAME = "Gildenfenster öffnen"
+	L.GUILD_BROKER_ACTION_GUILD_FRAME = "BFL-Gilden-Tab öffnen"
 	L.GUILD_BROKER_ACTION_SETTINGS = "Einstellungen öffnen"
 
 	-- Group Modes
@@ -700,7 +700,7 @@ BFL:RegisterLocale("deDE", function()
 	L.GUILD_BROKER_HINT_COPY = " In Chat kopieren"
 	L.GUILD_BROKER_HINT_ICON_ACTIONS = "--- Broker-Symbol-Aktionen ---"
 	L.GUILD_BROKER_HINT_LEFT_CLICK = "Linksklick:"
-	L.GUILD_BROKER_HINT_TOGGLE = " Tooltip umschalten"
+	L.GUILD_BROKER_HINT_TOGGLE = " BFL-Gilden-Tab öffnen"
 	L.GUILD_BROKER_HINT_RIGHT_CLICK = "Rechtsklick:"
 	L.GUILD_BROKER_HINT_SETTINGS = " Einstellungen"
 	L.GUILD_BROKER_HINT_MIDDLE_CLICK = "Mittelklick:"
@@ -715,16 +715,11 @@ BFL:RegisterLocale("deDE", function()
 	L.GUILD_BROKER_MENU_EDIT_NICKNAME = "Spitzname bearbeiten"
 	L.GUILD_BROKER_MENU_REMOVE_NICKNAME = "Entfernen"
 	L.GUILD_BROKER_NICKNAME_PROMPT = "Spitzname für %s eingeben:"
-	L.GUILD_BROKER_MENU_EDIT_NOTE = "Notiz bearbeiten"
-	L.GUILD_BROKER_MENU_EDIT_OFFICER_NOTE = "Offiziersnotiz bearbeiten"
 	L.GUILD_BROKER_MENU_PROMOTE = "Befördern"
 	L.GUILD_BROKER_MENU_DEMOTE = "Degradieren"
 	L.GUILD_BROKER_MENU_REMOVE = "Aus der Gilde entfernen"
 
 	-- Rank Management
-	L.GUILD_BROKER_PROMOTE_CONFIRM = "%s zu %s befördern?"
-	L.GUILD_BROKER_DEMOTE_CONFIRM = "%s zu %s degradieren?"
-	L.GUILD_BROKER_REMOVE_CONFIRM = "%s aus der Gilde entfernen?"
 	L.GUILD_BROKER_ACTION_RESTRICTED = "Diese Aktion ist im Kampf nicht verfügbar."
 	L.GUILD_BROKER_NO_PERMISSION = "Du hast keine Berechtigung dafür."
 
@@ -780,11 +775,7 @@ BFL:RegisterLocale("deDE", function()
 	L.LASTONLINE_YEARS = "%d Jahre"
 
 	-- ========================================
-	-- GUILD UI WARNING
 	-- ========================================
-	L.CLASSIC_GUILD_UI_WARNING_TITLE = "Klassisches Gildenfenster deaktiviert"
-	L.CLASSIC_GUILD_UI_WARNING_TEXT =
-		"BetterFriendlist hat die Klassisches Gildenfenster Einstellung deaktiviert, da nur Blizzards modernes Gildenfenster mit BetterFriendlist kompatibel ist.\n\nDer Gilden-Tab öffnet nun Blizzards modernes Gildenfenster."
 
 	-- Global Friend Sync
 	L.SETTINGS_GLOBAL_SYNC_ENABLE = "Globalen Freundes-Sync aktivieren"
@@ -1712,7 +1703,6 @@ L.SETTINGS_SHOW_ILVL_COLUMN_DESC = "Fuegt eine Gegenstandsstufen-Spalte zur Gild
 	L.GUILD_ACTION_TARGET = "Anvisieren"
 	L.GUILD_ACTION_COPY_NAME = "Namen kopieren"
 	L.GUILD_ACTION_OPEN_INFO = "Mitgliedsinfo anzeigen"
-	L.GUILD_ACTION_OPEN_BLIZZARD = "In Gildenverwaltung oeffnen"
 	L.GUILD_INVITE_DIALOG_TITLE = "In %s einladen"
 	L.GUILD_INVITE_PLACEHOLDER = "Charakter-Realm"
 	L.GUILD_INVITE_BUTTON = "Einladen"
@@ -1745,19 +1735,11 @@ L.SETTINGS_SHOW_ILVL_COLUMN_DESC = "Fuegt eine Gegenstandsstufen-Spalte zur Gild
 	L.GUILD_ACTIONS_MENU = "Gildenaktionen"
 	L.GUILD_ACTION_INVITE_TO_GUILD = "In Gilde einladen"
 	L.GUILD_ACTION_EDIT_MOTD = "MOTD bearbeiten"
-	L.GUILD_ACTION_EDIT_INFO = "Gildeninfo bearbeiten"
-	L.GUILD_ACTION_GUILD_CONTROL = "Gildenverwaltung"
 	L.GUILD_ACTION_LEAVE_GUILD = "Gilde verlassen"
 	L.GUILD_ACTION_DISBAND_GUILD = "Gilde aufloesen"
 	L.GUILD_ACTION_SET_LEADER = "Gildenleitung uebertragen"
-	L.GUILD_ACTION_EDIT_PUBLIC_NOTE = "Oeffentliche Notiz bearbeiten"
-	L.GUILD_ACTION_EDIT_OFFICER_NOTE = "Offiziersnotiz bearbeiten"
-	L.GUILD_ACTION_SET_RANK = "Rang setzen"
 	L.GUILD_INVITE_PLAYER_TITLE = "Spieler in die Gilde einladen"
 	L.GUILD_EDIT_MOTD_TITLE = "Gilden-MOTD bearbeiten"
-	L.GUILD_EDIT_INFO_TITLE = "Gildeninformation bearbeiten"
-	L.GUILD_EDIT_PUBLIC_NOTE_TITLE = "Oeffentliche Notiz fuer %s"
-	L.GUILD_EDIT_OFFICER_NOTE_TITLE = "Offiziersnotiz fuer %s"
 	L.GUILD_REMOVE_CONFIRM = "%s aus der Gilde entfernen?"
 	L.GUILD_SET_RANK_CONFIRM = "%s auf %s setzen?"
 	L.GUILD_ACTION_RESTRICTED = "Diese Aktion ist gerade nicht verfuegbar."

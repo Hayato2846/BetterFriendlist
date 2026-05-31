@@ -5597,19 +5597,8 @@ end
 -- BOTTOM TAB MANAGEMENT
 -- ========================================
 
--- Handle Guild Tab Click (Classic only)
--- Legacy helper: hand off to Blizzard's Guild UI without mutating CVars.
+-- Handle legacy Guild Tab Click (Classic only)
 function BetterFriendsFrame_HandleGuildTabClick()
-	if not BFL.IsClassic then
-		return
-	end
-
-	local GuildFrame = BFL:GetModule("GuildFrame")
-	if GuildFrame and GuildFrame.OpenBlizzardGuildUI then
-		GuildFrame:OpenBlizzardGuildUI()
-	end
-
-	-- Switch back to Friends tab (tab 1)
 	PanelTemplates_SetTab(BetterFriendsFrame, 1)
 	BetterFriendsFrame_ShowBottomTab(1)
 end
