@@ -55,12 +55,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Recruit A Friend** - Shortened the search placeholder and kept it on one line in the header search field.
 - **Guild Tab** - Made the guild search placeholder punctuation match the other search fields.
 - **Tabs** - Fixed truncated top and bottom tab labels showing duplicate hover tooltips.
+- **Quick Join** - Fixed a Lua error when opening Quick Join entries during performance tests.
 - **Theme Settings** - Fixed clipped 100% slider values and made theme strength sliders persist correctly.
 - **Simple Mode** - Restored hiding of portrait and header controls after theme avatar visibility changes.
 
 ### Performance
+- **Top Tabs** - Reduced hitches when switching between Friends, Recent Allies, Recruit A Friend, and Guild tabs.
+- **Guild Roster** - Reduced memory churn when reopening or switching to the Guild roster tab.
 - **Friend List Sorting** - Reduced CPU time and memory churn when changing QuickFilters and Sorter selections.
-- **Quick Join** - Reduced repeated group-priority and friend-relationship lookups while sorting available groups.
+- **Quick Join** - Reduced repeated group-priority, friend-relationship, and row-height work while sorting and showing available groups.
 
 ## [2.6.0]        - 2026-05-25
 

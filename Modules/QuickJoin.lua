@@ -488,6 +488,9 @@ end
 -- QuickJoinEntry Class
 local QuickJoinEntry = {}
 QuickJoinEntry.__index = QuickJoinEntry
+local MAX_NUM_DISPLAYED_QUEUES = 6
+local QUICK_JOIN_ENTRY_NAME_SEPARATION = QUICK_JOIN_NAME_SEPARATION or 5
+local QUICK_JOIN_ENTRY_FONT_HEIGHT = 12
 
 -- PERF: Object pool to avoid per-update table allocations
 -- Entries are recycled via wipe() instead of creating new tables each frame
@@ -524,6 +527,7 @@ local function ReleaseEntries(entries)
 			entry.guid = nil
 			entry.groupInfo = nil
 			entry.hasRelationshipWithLeader = nil
+			entry.cachedHeight = nil
 			entryPoolSize = entryPoolSize + 1
 			entryPool[entryPoolSize] = entry
 		end
@@ -548,6 +552,13 @@ local function TruncateArray(array, newCount)
 	for i = newCount + 1, #array do
 		array[i] = nil
 	end
+end
+
+local function CalculateQuickJoinEntryHeight(memberCount, queueCount)
+	local lineHeight = QUICK_JOIN_ENTRY_FONT_HEIGHT + QUICK_JOIN_ENTRY_NAME_SEPARATION
+	local namesHeight = lineHeight * memberCount
+	local queuesHeight = lineHeight * math.min(queueCount, MAX_NUM_DISPLAYED_QUEUES)
+	return 13 + math.max(namesHeight, queuesHeight)
 end
 
 local function GetActiveLFGListInfo(queues)
@@ -688,8 +699,131 @@ function QuickJoinEntry:New(guid, groupInfo)
 	-- Clear zombie indices from previous pool cycle
 	wipe(entry.zombieMemberIndices)
 	wipe(entry.zombieQueueIndices)
+	entry.cachedHeight = CalculateQuickJoinEntryHeight(#entry.displayedMembers, #entry.displayedQueues)
 
 	return entry
+end
+
+local function EnsureQuickJoinFontArray(frame, arrayName, baseKey)
+	local array = frame[arrayName]
+	if not array then
+		array = {}
+		frame[arrayName] = array
+	end
+
+	local baseFontString = frame[baseKey]
+	if baseFontString and not array[1] then
+		array[1] = baseFontString
+	end
+
+	return array
+end
+
+function QuickJoinEntry:ApplyToFrame(frame)
+	if not frame then
+		return
+	end
+
+	local members = EnsureQuickJoinFontArray(frame, "Members", "MemberName")
+	local queues = EnsureQuickJoinFontArray(frame, "Queues", "QueueName")
+	local canJoin = self:CanJoin()
+
+	for i = 1, #self.displayedMembers do
+		local member = self.displayedMembers[i]
+		local name, color, _, playerLink = BetterFriendlist_GetRelationshipInfo(member.guid, nil, member.clubId)
+		local nameObj = members[i]
+		if not nameObj then
+			nameObj = frame:CreateFontString(nil, "ARTWORK", "BetterQuickJoinButtonMemberTemplate")
+			nameObj:SetPoint("TOPLEFT", members[i - 1], "BOTTOMLEFT", 0, -QUICK_JOIN_ENTRY_NAME_SEPARATION)
+			members[i] = nameObj
+		end
+
+		local displayName = name or member.name or playerLink or ""
+		nameObj.playerLink = playerLink
+		nameObj.name = displayName
+
+		if not BFL:IsSecret(displayName) then
+			if i < #self.displayedMembers then
+				displayName = displayName .. ","
+			end
+
+			if self.zombieMemberIndices[i] or not canJoin then
+				displayName = DISABLED_FONT_COLOR_CODE .. displayName .. FONT_COLOR_CODE_CLOSE
+			else
+				displayName = (color or FRIENDS_WOW_NAME_COLOR_CODE) .. displayName .. FONT_COLOR_CODE_CLOSE
+			end
+		end
+
+		nameObj:SetText(displayName)
+		nameObj:Show()
+	end
+
+	for i = #self.displayedMembers + 1, #members do
+		members[i]:Hide()
+	end
+
+	local firstQueue = self.displayedQueues[1]
+	local queueData = firstQueue and firstQueue.queueData
+	local useGroupIcon = queueData and queueData.queueType == "lfglist"
+	if frame.Icon then
+		frame.Icon:SetAtlas(useGroupIcon and "socialqueuing-icon-group" or "socialqueuing-icon-eye")
+		if frame.MemberName then
+			frame.Icon:SetHeight(math.max(17, frame.MemberName:GetHeight()))
+			frame.Icon:SetWidth(math.max(16, frame.Icon:GetHeight() * 0.95))
+		end
+		frame.Icon:SetDesaturation(canJoin and 0 or 1)
+		frame.Icon:SetAlpha(canJoin and 0.9 or 0.3)
+	end
+
+	if frame.QueueName and frame.MemberName and frame.Icon then
+		frame.QueueName:ClearAllPoints()
+		frame.QueueName:SetPoint("TOPLEFT", frame.MemberName, "TOPRIGHT", frame.Icon:GetWidth() + 4, 0)
+	end
+
+	for i = 1, #self.displayedQueues do
+		local queue = self.displayedQueues[i]
+		local queueObj = queues[i]
+		if not queueObj then
+			queueObj = frame:CreateFontString(nil, "ARTWORK", "BetterQuickJoinButtonQueueTemplate")
+			queueObj:SetPoint("TOPLEFT", queues[i - 1], "BOTTOMLEFT", 0, -QUICK_JOIN_ENTRY_NAME_SEPARATION)
+			queues[i] = queueObj
+		end
+
+		if i == MAX_NUM_DISPLAYED_QUEUES and i ~= #self.displayedQueues then
+			local color = canJoin and "|cffcccccc" or DISABLED_FONT_COLOR_CODE
+			queueObj:SetText(
+				string.format(color .. "+%d" .. FONT_COLOR_CODE_CLOSE, 1 + #self.displayedQueues - MAX_NUM_DISPLAYED_QUEUES)
+			)
+			queueObj:Show()
+			break
+		end
+
+		local queueName = queue.cachedQueueName or ""
+		if not BFL:IsSecret(queueName) then
+			if queue.queueData and queue.queueData.queueType == "lfglist" then
+				queueName = string.format(LFG_LIST_IN_QUOTES, queueName)
+			end
+			if i < #self.displayedQueues then
+				queueName = queueName .. PLAYER_LIST_DELIMITER
+			end
+			if self.zombieQueueIndices[i] or not canJoin then
+				queueName = DISABLED_FONT_COLOR_CODE .. queueName .. FONT_COLOR_CODE_CLOSE
+			end
+		end
+
+		queueObj:SetText(queueName)
+		queueObj:Show()
+	end
+
+	for i = #self.displayedQueues + 1, #queues do
+		queues[i]:Hide()
+	end
+
+	frame:SetHeight(self:CalculateHeight())
+end
+
+function QuickJoinEntry:CalculateHeight()
+	return self.cachedHeight or CalculateQuickJoinEntryHeight(#self.displayedMembers, #self.displayedQueues)
 end
 
 function QuickJoinEntry:CanJoin()

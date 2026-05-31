@@ -1526,17 +1526,71 @@ end
 -- Search debounce timer
 BFL.searchDebounceTimer = BFL.searchDebounceTimer or nil
 
+local function CancelSearchDebounceTimer()
+	if BFL.searchDebounceTimer then
+		BFL.searchDebounceTimer:Cancel()
+		BFL.searchDebounceTimer = nil
+	end
+end
+
+local function SetSearchBoxTextSilently(searchBox, text)
+	if not searchBox then
+		return
+	end
+
+	local newText = text or ""
+	if searchBox.GetText and searchBox:GetText() == newText then
+		return
+	end
+
+	local wasSuppressed = BFL.suppressSearchTextChanged
+	BFL.suppressSearchTextChanged = true
+	searchBox:SetText(newText)
+	BFL.suppressSearchTextChanged = wasSuppressed
+end
+
+local function ClearTopTabSearchState(frame, tabIndex)
+	CancelSearchDebounceTimer()
+	searchText = ""
+
+	local searchBox = frame and frame.FriendsTabHeader and frame.FriendsTabHeader.SearchBox
+	SetSearchBoxTextSilently(searchBox, "")
+
+	local FriendsList = BFL:GetModule("FriendsList")
+	if FriendsList and FriendsList.SetSearchText then
+		FriendsList:SetSearchText("", true)
+	end
+	local RecentAllies = BFL:GetModule("RecentAllies")
+	if RecentAllies and RecentAllies.SetSearchText then
+		RecentAllies:SetSearchText("", true)
+	end
+	local RAF = BFL:GetModule("RAF")
+	if RAF and RAF.SetSearchText then
+		RAF:SetSearchText("", true)
+	end
+	local GuildFrame = BFL:GetModule("GuildFrame")
+	if GuildFrame and GuildFrame.SetSearchText then
+		GuildFrame:SetSearchText("", true)
+	end
+
+	if searchBox and searchBox.Instructions then
+		UpdateSearchBoxInstruction(searchBox, tabIndex or 1)
+	end
+end
+
 -- Handle search box text changes (called from XML)
 -- Routes search to the correct module based on active top tab
 function BetterFriendsFrame_OnSearchTextChanged(editBox)
+	if BFL.suppressSearchTextChanged then
+		return
+	end
+
 	local text = editBox:GetText()
 	-- Convert to lowercase, handle empty string as well
 	local newSearchText = (text and text ~= "") and text:lower() or ""
 
 	-- Cancel pending search update
-	if BFL.searchDebounceTimer then
-		BFL.searchDebounceTimer:Cancel()
-	end
+	CancelSearchDebounceTimer()
 
 	-- Debounce: Wait 0.3s after last keystroke before updating
 	local newTimer = C_Timer.NewTimer(0.3, function()
@@ -1555,9 +1609,6 @@ function BetterFriendsFrame_OnSearchTextChanged(editBox)
 			local FriendsList = GetFriendsList()
 			if FriendsList then
 				FriendsList:SetSearchText(searchText)
-			end
-			if frame and frame:IsShown() then
-				RequestUpdate(true)
 			end
 		elseif activeTopTab == 2 then
 			-- Tab 2: Recent Allies
@@ -1739,10 +1790,7 @@ end
 -- Show the friends frame
 -- tabIndex: Optional tab to show (1=Friends, 2=Who, 3=Raid, 4=Quick Join)
 function ShowBetterFriendsFrame(tabIndex) -- Clear search box
-	if BetterFriendsFrame.FriendsTabHeader and BetterFriendsFrame.FriendsTabHeader.SearchBox then
-		BetterFriendsFrame.FriendsTabHeader.SearchBox:SetText("")
-		searchText = ""
-	end
+	ClearTopTabSearchState(BetterFriendsFrame, 1)
 
 	-- Use UI Panel system if enabled (for auto-repositioning)
 	-- Note: ShowUIPanel is protected in combat (since 8.2.0), fallback to Show()
@@ -4079,39 +4127,9 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 		PanelTemplates_SetTab(frame.FriendsTabHeader, tabIndex)
 	end
 
-	-- Clear search and update placeholder when switching tabs
-	local searchBox = frame.FriendsTabHeader and frame.FriendsTabHeader.SearchBox
-	if searchBox then
-		-- Clear the search text on tab switch
-		searchBox:SetText("")
-		searchText = ""
-
-		-- Clear search state in all modules
-		local FriendsList = BFL:GetModule("FriendsList")
-		if FriendsList then
-			FriendsList:SetSearchText("")
-		end
-		local RecentAllies = BFL:GetModule("RecentAllies")
-		if RecentAllies and RecentAllies.SetSearchText then
-			RecentAllies:SetSearchText("")
-		end
-		local RAF = BFL:GetModule("RAF")
-		if RAF and RAF.SetSearchText then
-			RAF:SetSearchText("")
-		end
-		local GuildFrame = BFL:GetModule("GuildFrame")
-		if GuildFrame and GuildFrame.SetSearchText then
-			GuildFrame:SetSearchText("")
-		end
-
-		-- Update placeholder text based on active tab
-		if searchBox.Instructions then
-			UpdateSearchBoxInstruction(searchBox, tabIndex)
-		end
-
-		-- SearchBox visibility is managed by UpdateSearchBoxState (respects Simple Mode)
-		-- Do NOT unconditionally Show() here - it would override Simple Mode's hidden state
-	end
+	-- Clear search and update placeholder when switching tabs. Programmatic clearing is
+	-- kept silent so tab clicks do not schedule an extra debounced refresh.
+	ClearTopTabSearchState(frame, tabIndex)
 
 	-- Force SearchBox state update (handles Simple Mode visibility + positioning)
 	local FriendsList = BFL:GetModule("FriendsList")
@@ -4236,10 +4254,6 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 		-- Retail: Guild roster
 		if not BFL.IsClassic and BFL.IsGuildTabEnabled and BFL:IsGuildTabEnabled() then
 			ShowChildFrame(frame.GuildFrame)
-			local GuildFrameModule = BFL:GetModule("GuildFrame")
-			if GuildFrameModule and GuildFrameModule.Refresh then
-				GuildFrameModule:Refresh()
-			end
 		-- Classic: Raid Frame
 		else
 			if frame.RaidFrame then
@@ -5747,10 +5761,6 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex)
 				-- Top Tab 4: Guild roster
 				if frame.GuildFrame and BFL.IsGuildTabEnabled and BFL:IsGuildTabEnabled() then
 					ShowChildFrame(frame.GuildFrame)
-					local GuildFrameModule = BFL:GetModule("GuildFrame")
-					if GuildFrameModule and GuildFrameModule.Refresh then
-						GuildFrameModule:Refresh()
-					end
 				end
 			end
 		else
@@ -5780,10 +5790,6 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex)
 			-- Classic: Guild Tab - show guild roster
 			if BFL.IsGuildTabEnabled and BFL:IsGuildTabEnabled() then
 				ShowChildFrame(frame.GuildFrame)
-				local GuildFrameModule = BFL:GetModule("GuildFrame")
-				if GuildFrameModule and GuildFrameModule.Refresh then
-					GuildFrameModule:Refresh()
-				end
 			else
 				PanelTemplates_SetTab(frame, 1)
 				BetterFriendsFrame_ShowBottomTab(1)
