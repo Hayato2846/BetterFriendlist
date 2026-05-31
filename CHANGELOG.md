@@ -7,43 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [DRAFT]
+## [2.6.1]        - 2026-05-31
 
 ### Added
-- **Guild Roster Tab Beta** - Added a beta-gated Guild settings tab and a default-off Guild roster tab with shared Retail/Classic controls.
-- **Guild Roster Actions** - Added API-open guild roster actions for communication, party invites, guild invites, adjacent promote/demote, name-based member removal, leadership handoff, leave, disband, and Classic-only MOTD editing.
+- **Guild Tab Beta** - Added a default-off beta Guild tab for Retail and Classic with BetterFriendlist-owned roster search, online/offline filtering, sorting, guild counts, member details, notes, class and status indicators, and safe member actions where permissions and Blizzard APIs allow them.
 - **External AddOn Menu Bridge Beta** - Added a default-off beta bridge and official companion AddOn for showing compatible AddOn actions in supported BetterFriendlist context menus.
-- **Custom Theme & Theme Settings** - Added a Custom theme that inherits from Dark and adds controls for colors, transparency, hover states, selection states, borders, scrollbars, icons, and BFL Avatar visibility.
+- **Theme Customization** - Added a Custom theme based on Dark, with expanded Dark and Custom settings for colors, opacity, hover and selection states, borders, scrollbars, icons, and BFL Avatar visibility across Retail and Classic.
 - **Raid Tab** - Added an optional compact Ready Check button next to Raid Info.
 
 ### Improved
-- **Guild Tab Layout** - Reworked the Guild tab around the existing Friendlist header controls on Retail and a compact Classic control row, removing fake filter buttons, column headers, column-style roster rows, dead layout elements, and the redundant Refresh button. Guild rows now use larger class icons, stronger names, cleaner secondary text, improved selection styling, and Friendlist-aligned scrollbar spacing.
-- **Broker Tooltips** - Added the subtle broker separator between Friends Broker groups and Guild Broker rank groups.
+- **Guild Broker Tooltips** - Added a subtle separator between Friends Broker groups and Guild Broker rank groups.
 
 ### Changed
-- **Guild Roster Data** - Added shared guild action and permission handling for the Guild Broker and Guild Tab, including per-target secret-value guards.
-- **Theme Settings** - Expanded Dark theme settings and made the beta Theme tab available across supported Retail and Classic clients.
-- **Theme Settings** - Made Custom theme opacity, strength, and BFL Avatar sliders configurable in the Custom theme.
 - **Client Compatibility** - Prepared friend invites and raid controls for upcoming Retail client changes while preserving current Retail and Classic support.
 - **Raid Tools** - Improved handling for temporarily uncached raid roster names.
 - **Font Rendering** - Made custom font handling more defensive on newer clients.
 
 ### Fixed
-- **Guild Actions** - Removed restricted Guild editors and Retail Communities handoffs from BFL menus, keeping only API-open actions and read-only note display.
-- **ElvUI Skin** - Fixed startup, availability, and settings-toggle issues when ElvUI was selected, unavailable, or managed outside the Retail beta Theme tab.
-- **Menu Compatibility** - Fixed protected Retail unit menu handling and restored Total RP 3 profile actions in BetterFriendlist friend menus.
 - **Friend Menus** - Restored Blizzard's invite versus request-to-join labels and actions for Battle.net friends.
-- **Raid Tools** - Fixed a Lua error after moving players between raid groups with drag and drop.
-- **Recruit A Friend** - Fixed reward-viewing tab issues, protected Copy Link errors, and a tooltip stack overflow.
 - **Recruit A Friend** - Shortened the search placeholder and kept it on one line in the header search field.
-- **Guild Tab** - Made the guild search placeholder punctuation match the other search fields.
 - **Tabs** - Fixed truncated top and bottom tab labels showing duplicate hover tooltips.
-- **Theme Settings** - Fixed clipped 100% slider values and made theme strength sliders persist correctly.
-- **Simple Mode** - Restored hiding of portrait and header controls after theme avatar visibility changes.
-
-### Performance
-- **Friend List Sorting** - Reduced CPU time and memory churn when changing QuickFilters and Sorter selections.
-- **Quick Join** - Reduced repeated group-priority and friend-relationship lookups while sorting available groups.
 
 ## [2.6.0]        - 2026-05-25
 
