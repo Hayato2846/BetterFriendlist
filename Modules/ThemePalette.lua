@@ -457,19 +457,6 @@ function ThemePalette:ApplyAvatarVisibility(frame)
 	end
 end
 
-function BFL:UpdatePortraitVisibility(reason)
-	local ThemeManager = self.GetModule and self:GetModule("ThemeManager")
-	if ThemeManager and ThemeManager.ApplyCurrentTheme then
-		ThemeManager:ApplyCurrentTheme(reason or "avatar-visibility")
-		return
-	end
-
-	local ThemePaletteModule = self.GetModule and self:GetModule("ThemePalette")
-	if ThemePaletteModule and ThemePaletteModule.ApplyAvatarVisibility then
-		ThemePaletteModule:ApplyAvatarVisibility()
-	end
-end
-
 function ThemePalette:ApplyToColors(colors, baseColors)
 	if type(colors) ~= "table" or type(baseColors) ~= "table" then
 		return

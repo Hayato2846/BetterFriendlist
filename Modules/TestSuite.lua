@@ -1987,6 +1987,100 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
+	TS:RegisterTest("data", "SimpleMode_UpdatePortraitVisibilityOwnsLayout", {
+		description = "Simple Mode should keep Core portrait visibility responsible for header layout",
+		action = function(V)
+			V:AssertNotNil(BFL.UpdatePortraitVisibility, "BFL:UpdatePortraitVisibility should exist")
+
+			local function MakeObject()
+				local object = {
+					shown = true,
+					points = {},
+				}
+				function object:SetShown(shown)
+					self.shown = shown == true
+				end
+				function object:IsShown()
+					return self.shown == true
+				end
+				function object:Show()
+					self.shown = true
+				end
+				function object:Hide()
+					self.shown = false
+				end
+				function object:SetAlpha(alpha)
+					self.alpha = alpha
+				end
+				function object:ClearAllPoints()
+					self.points = {}
+				end
+				function object:SetPoint(...)
+					self.points[#self.points + 1] = { ... }
+				end
+				function object:SetWidth(width)
+					self.width = width
+				end
+				return object
+			end
+
+			local frame = MakeObject()
+			function frame:GetName()
+				return "BetterFriendsFrame"
+			end
+			function frame:GetRegions()
+			end
+			function frame:GetChildren()
+			end
+			function frame:SetPortraitShown(shown)
+				self.portraitShown = shown == true
+			end
+
+			frame.PortraitContainer = MakeObject()
+			frame.portrait = MakeObject()
+			frame.PortraitButton = MakeObject()
+			frame.PortraitIcon = MakeObject()
+			frame.PortraitMask = MakeObject()
+			frame.TitleContainer = MakeObject()
+			frame.FriendsTabHeader = {
+				BattlenetFrame = MakeObject(),
+				QuickFilterDropdown = MakeObject(),
+				PrimarySortDropdown = MakeObject(),
+				SecondarySortDropdown = MakeObject(),
+				Tab1 = MakeObject(),
+			}
+
+			local globalPortrait = MakeObject()
+			local originalFrame = _G.BetterFriendsFrame
+			local originalPortrait = _G.BetterFriendsFramePortrait
+			_G.BetterFriendsFrame = frame
+			_G.BetterFriendsFramePortrait = globalPortrait
+
+			local ok, err = pcall(function()
+				WithTemporaryDatabase({
+					simpleMode = true,
+					theme = "blizzard",
+				}, function()
+					BFL:UpdatePortraitVisibility("test-simple-mode")
+
+					V:Assert(frame.PortraitButton.shown == false, "Simple Mode should hide the portrait button")
+					V:Assert(frame.PortraitIcon.shown == false, "Simple Mode should hide the portrait icon")
+					V:Assert(globalPortrait.shown == false, "Simple Mode should hide the global portrait")
+					V:Assert(frame.FriendsTabHeader.QuickFilterDropdown.shown == false, "Simple Mode should hide quick filter dropdown")
+					V:Assert(frame.FriendsTabHeader.PrimarySortDropdown.shown == false, "Simple Mode should hide primary sort dropdown")
+					V:Assert(frame.FriendsTabHeader.SecondarySortDropdown.shown == false, "Simple Mode should hide secondary sort dropdown")
+					V:AssertEqual(frame.FriendsTabHeader.Tab1.points[1][5], -60, "Simple Mode should move top tabs up")
+				end)
+			end)
+
+			_G.BetterFriendsFrame = originalFrame
+			_G.BetterFriendsFramePortrait = originalPortrait
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
 	TS:RegisterTest("data", "Theme_LegacyElvUISkinWithoutThemeTab", {
 		description = "Legacy ElvUI skin setting should remain effective without beta theme settings",
 		action = function(V)

@@ -56,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Guild Tab** - Made the guild search placeholder punctuation match the other search fields.
 - **Tabs** - Fixed truncated top and bottom tab labels showing duplicate hover tooltips.
 - **Theme Settings** - Fixed clipped 100% slider values and made theme strength sliders persist correctly.
+- **Simple Mode** - Restored hiding of portrait and header controls after theme avatar visibility changes.
 
 ### Performance
 - **Friend List Sorting** - Reduced CPU time and memory churn when changing QuickFilters and Sorter selections.
