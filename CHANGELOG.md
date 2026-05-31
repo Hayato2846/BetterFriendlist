@@ -34,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Friend Menus** - Restored Blizzard's invite versus request-to-join labels and actions for Battle.net friends.
 - **Raid Tools** - Fixed a Lua error after moving players between raid groups with drag and drop.
 - **Recruit A Friend** - Fixed reward-viewing tab issues, protected Copy Link errors, and a tooltip stack overflow.
+- **Recruit A Friend** - Shortened the search placeholder and kept it on one line in the header search field.
+- **Guild Tab** - Made the guild search placeholder punctuation match the other search fields.
 - **Tabs** - Fixed truncated top and bottom tab labels showing duplicate hover tooltips.
 
 ### Performance

@@ -40,6 +40,36 @@ end
 local FontManager = nil -- Will be initialized after modules load
 local ColorManager = nil -- Will be initialized after modules load
 
+local function SetSearchBoxInstruction(searchBox, text)
+	if not searchBox or not searchBox.Instructions then
+		return
+	end
+
+	local instructions = searchBox.Instructions
+	instructions:SetText(text or SEARCH or "Search")
+	if instructions.SetWordWrap then
+		instructions:SetWordWrap(false)
+	end
+	if instructions.SetMaxLines then
+		instructions:SetMaxLines(1)
+	end
+end
+
+local function UpdateSearchBoxInstruction(searchBox, tabIndex)
+	local locale = BFL.L or L or {}
+	if tabIndex == 1 then
+		SetSearchBoxInstruction(searchBox, locale.SEARCH_FRIENDS_INSTRUCTION)
+	elseif tabIndex == 2 then
+		SetSearchBoxInstruction(searchBox, locale.SEARCH_RECENT_ALLIES_INSTRUCTION)
+	elseif tabIndex == 3 then
+		SetSearchBoxInstruction(searchBox, locale.SEARCH_RAF_INSTRUCTION)
+	elseif tabIndex == 4 then
+		SetSearchBoxInstruction(searchBox, locale.GUILD_SEARCH_PLACEHOLDER)
+	else
+		SetSearchBoxInstruction(searchBox, SEARCH or "Search")
+	end
+end
+
 -- Initialize manager references
 local function InitializeManagers()
 	if not FontManager then
@@ -1155,7 +1185,7 @@ local function LocalizeUI()
 		and frame.FriendsTabHeader.SearchBox
 		and frame.FriendsTabHeader.SearchBox.Instructions
 	then
-		frame.FriendsTabHeader.SearchBox.Instructions:SetText(L.SEARCH_FRIENDS_INSTRUCTION)
+		UpdateSearchBoxInstruction(frame.FriendsTabHeader.SearchBox, 1)
 	end
 
 	-- Broadcast Frame
@@ -4075,17 +4105,8 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 		end
 
 		-- Update placeholder text based on active tab
-		local L = BFL.L
 		if searchBox.Instructions then
-			if tabIndex == 1 then
-				searchBox.Instructions:SetText(L.SEARCH_FRIENDS_INSTRUCTION)
-			elseif tabIndex == 2 then
-				searchBox.Instructions:SetText(L.SEARCH_RECENT_ALLIES_INSTRUCTION)
-			elseif tabIndex == 3 then
-				searchBox.Instructions:SetText(L.SEARCH_RAF_INSTRUCTION)
-			elseif tabIndex == 4 then
-				searchBox.Instructions:SetText(L.GUILD_SEARCH_PLACEHOLDER or SEARCH or "Search")
-			end
+			UpdateSearchBoxInstruction(searchBox, tabIndex)
 		end
 
 		-- SearchBox visibility is managed by UpdateSearchBoxState (respects Simple Mode)
@@ -5795,16 +5816,7 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex)
 		local searchBox = frame.FriendsTabHeader.SearchBox
 		if searchBox and searchBox.Instructions then
 			local activeTopTab = PanelTemplates_GetSelectedTab(frame.FriendsTabHeader) or 1
-			local L = BFL.L
-			if activeTopTab == 1 then
-				searchBox.Instructions:SetText(L.SEARCH_FRIENDS_INSTRUCTION)
-			elseif activeTopTab == 2 then
-				searchBox.Instructions:SetText(L.SEARCH_RECENT_ALLIES_INSTRUCTION)
-			elseif activeTopTab == 3 then
-				searchBox.Instructions:SetText(L.SEARCH_RAF_INSTRUCTION)
-			elseif activeTopTab == 4 then
-				searchBox.Instructions:SetText(L.GUILD_SEARCH_PLACEHOLDER or SEARCH or "Search")
-			end
+			UpdateSearchBoxInstruction(searchBox, activeTopTab)
 		end
 	end
 
