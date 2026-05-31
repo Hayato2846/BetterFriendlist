@@ -817,22 +817,28 @@ function BFL:ApplyTabFonts()
 					local originalOnLeave = info.tab:GetScript("OnLeave")
 
 					info.tab:SetScript("OnEnter", function(self)
-						if originalOnEnter then
-							originalOnEnter(self)
-						end
-						if not self.BFL_ShowTooltip then
+						self.BFL_NativeTooltipShown = false
+						if self.BFL_ShowTooltip then
+							BFL_Tooltip:SetOwner(self, "ANCHOR_TOP")
+							BFL_Tooltip:ClearLines()
+							BFL_Tooltip:SetText(self:GetText() or "", 1, 1, 1, 1, true)
+							BFL_Tooltip:Show()
 							return
 						end
-						BFL_Tooltip:SetOwner(self, "ANCHOR_TOP")
-						BFL_Tooltip:SetText(self:GetText() or "", 1, 1, 1, 1, true)
-						BFL_Tooltip:Show()
+						if originalOnEnter then
+							originalOnEnter(self)
+							self.BFL_NativeTooltipShown = true
+						end
 					end)
 
 					info.tab:SetScript("OnLeave", function(self)
 						BFL_Tooltip:Hide()
-						if originalOnLeave then
+						if self.BFL_NativeTooltipShown and originalOnLeave then
 							originalOnLeave(self)
+						elseif GameTooltip and GameTooltip.GetOwner and GameTooltip:GetOwner() == self then
+							GameTooltip:Hide()
 						end
+						self.BFL_NativeTooltipShown = nil
 					end)
 
 					info.tab.BFL_TooltipHooked = true
