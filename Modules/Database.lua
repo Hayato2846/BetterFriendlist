@@ -360,7 +360,7 @@ function DB:NormalizeThemeSetting()
 	end
 
 	local wasDarkSkinTheme = BetterFriendlistDB.theme == "dark" or BetterFriendlistDB.theme == "custom"
-	local themeFeaturesEnabled = BetterFriendlistDB.enableBetaFeatures == true
+	local themeFeaturesEnabled = BFL.IsRetail == true and BetterFriendlistDB.enableBetaFeatures == true
 	if wasDarkSkinTheme and not themeFeaturesEnabled then
 		BetterFriendlistDB.theme = "blizzard"
 	end

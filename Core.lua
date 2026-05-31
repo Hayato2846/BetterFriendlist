@@ -200,12 +200,15 @@ function BFL:HasGuildRosterBaseAPI()
 end
 
 function BFL:GetGuildTabCapability()
-	local provider = self.GetModule and self:GetModule("GuildRosterData")
+	local clientSupported = self.IsRetail == true
 	local hasBaseRosterAPI = false
-	if provider and provider.HasBaseRosterAPI then
-		hasBaseRosterAPI = provider:HasBaseRosterAPI() == true
-	else
-		hasBaseRosterAPI = self:HasGuildRosterBaseAPI()
+	if clientSupported then
+		local provider = self.GetModule and self:GetModule("GuildRosterData")
+		if provider and provider.HasBaseRosterAPI then
+			hasBaseRosterAPI = provider:HasBaseRosterAPI() == true
+		else
+			hasBaseRosterAPI = self:HasGuildRosterBaseAPI()
+		end
 	end
 
 	local betaEnabled = BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures == true
@@ -214,9 +217,10 @@ function BFL:GetGuildTabCapability()
 	return {
 		betaEnabled = betaEnabled,
 		settingEnabled = settingEnabled,
+		clientSupported = clientSupported,
 		hasBaseRosterAPI = hasBaseRosterAPI,
-		canShowSetting = hasBaseRosterAPI,
-		canShowRoster = betaEnabled and settingEnabled and hasBaseRosterAPI,
+		canShowSetting = clientSupported and hasBaseRosterAPI,
+		canShowRoster = clientSupported and betaEnabled and settingEnabled and hasBaseRosterAPI,
 	}
 end
 

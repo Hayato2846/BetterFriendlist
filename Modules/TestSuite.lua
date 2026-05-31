@@ -1733,25 +1733,33 @@ local function RegisterBuiltInTests()
 			V:AssertNotNil(BFL.ShouldUseLegacyElvUISkinSetting, "BFL:ShouldUseLegacyElvUISkinSetting should exist")
 			V:AssertNotNil(BFL.ShouldShowLegacyElvUISkinSetting, "BFL:ShouldShowLegacyElvUISkinSetting should exist")
 
-			WithTemporaryDatabase({
-				theme = "dark",
-				enableBetaFeatures = true,
-			}, function()
-				V:AssertEqual(BFL:GetEffectiveTheme(), "dark", "Dark theme should resolve as dark")
-				V:Assert(BFL:IsThemeActive("dark"), "Dark theme should be active")
-				V:Assert(BFL:UsesFlatTheme(), "Dark theme should count as a flat theme")
-				V:Assert(BFL:UsesDarkSkinTheme(), "Dark theme should use the BFL skin engine")
-			end)
+			local originalIsRetail = BFL.IsRetail
+			BFL.IsRetail = true
+			local ok, err = pcall(function()
+				WithTemporaryDatabase({
+					theme = "dark",
+					enableBetaFeatures = true,
+				}, function()
+					V:AssertEqual(BFL:GetEffectiveTheme(), "dark", "Dark theme should resolve as dark")
+					V:Assert(BFL:IsThemeActive("dark"), "Dark theme should be active")
+					V:Assert(BFL:UsesFlatTheme(), "Dark theme should count as a flat theme")
+					V:Assert(BFL:UsesDarkSkinTheme(), "Dark theme should use the BFL skin engine")
+				end)
 
-			WithTemporaryDatabase({
-				theme = "custom",
-				enableBetaFeatures = true,
-			}, function()
-				V:AssertEqual(BFL:GetEffectiveTheme(), "custom", "Custom theme should resolve as custom")
-				V:Assert(BFL:IsThemeActive("custom"), "Custom theme should be active")
-				V:Assert(BFL:UsesFlatTheme(), "Custom theme should count as a flat theme")
-				V:Assert(BFL:UsesDarkSkinTheme(), "Custom theme should use the BFL skin engine")
+				WithTemporaryDatabase({
+					theme = "custom",
+					enableBetaFeatures = true,
+				}, function()
+					V:AssertEqual(BFL:GetEffectiveTheme(), "custom", "Custom theme should resolve as custom")
+					V:Assert(BFL:IsThemeActive("custom"), "Custom theme should be active")
+					V:Assert(BFL:UsesFlatTheme(), "Custom theme should count as a flat theme")
+					V:Assert(BFL:UsesDarkSkinTheme(), "Custom theme should use the BFL skin engine")
+				end)
 			end)
+			BFL.IsRetail = originalIsRetail
+			if not ok then
+				error(err, 2)
+			end
 
 			WithTemporaryDatabase({
 				theme = "blizzard",
@@ -1802,24 +1810,48 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
-	TS:RegisterTest("data", "Theme_NonRetailAllowsBetaThemes", {
-		description = "Non-Retail clients should activate cross-flavor beta themes",
+	TS:RegisterTest("data", "Theme_NonRetailForcesBetaThemesToBlizzard", {
+		description = "Non-Retail clients should keep beta themes disabled but retain the legacy ElvUI path",
 		action = function(V)
 			local originalIsRetail = BFL.IsRetail
+			local originalIsElvUIAvailable = BFL.IsElvUIAvailable
 			BFL.IsRetail = false
+			BFL.IsElvUIAvailable = function()
+				return true
+			end
 
 			local ok, err = pcall(function()
 				WithTemporaryDatabase({
 					theme = "dark",
 					enableBetaFeatures = true,
 				}, function(tempDB)
-					V:AssertEqual(tempDB.theme, "dark", "Stored Dark theme should remain available on non-Retail")
-					V:Assert(BFL:AreThemeFeaturesEnabled(), "Theme features should be cross-flavor")
-					V:AssertEqual(BFL:GetEffectiveTheme(), "dark", "Dark theme should become effective")
+					V:AssertEqual(tempDB.theme, "blizzard", "Stored Dark theme should normalize to Blizzard on non-Retail")
+					V:Assert(not BFL:AreThemeFeaturesEnabled(), "Theme features should be Retail-only")
+					V:AssertEqual(BFL:GetEffectiveTheme(), "blizzard", "Dark theme should not become effective on non-Retail")
+				end)
+
+				WithTemporaryDatabase({
+					theme = "blizzard",
+					enableElvUISkin = true,
+					enableBetaFeatures = true,
+				}, function()
+					V:Assert(BFL:ShouldUseLegacyElvUISkinSetting(), "Non-Retail should keep the legacy ElvUI setting path")
+					V:AssertEqual(BFL:GetEffectiveTheme(), "elvui", "Legacy ElvUI skin should remain effective on non-Retail")
+				end)
+
+				WithTemporaryDatabase({
+					enableBetaFeatures = true,
+					enableGuildTab = true,
+				}, function()
+					local capability = BFL:GetGuildTabCapability()
+					V:Assert(capability.clientSupported == false, "Guild tab beta should be unsupported on non-Retail")
+					V:Assert(capability.canShowSetting == false, "Guild tab setting should be hidden on non-Retail")
+					V:Assert(capability.canShowRoster == false, "Guild tab should not become active on non-Retail")
 				end)
 			end)
 
 			BFL.IsRetail = originalIsRetail
+			BFL.IsElvUIAvailable = originalIsElvUIAvailable
 			if not ok then
 				error(err, 2)
 			end

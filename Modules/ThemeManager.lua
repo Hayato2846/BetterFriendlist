@@ -26,7 +26,7 @@ local function NormalizeTheme(theme)
 end
 
 local function AreThemeFeaturesEnabled()
-	return BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures == true
+	return BFL.IsRetail == true and BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures == true
 end
 
 local function ShouldUseLegacyElvUISkinSetting()

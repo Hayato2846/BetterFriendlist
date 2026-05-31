@@ -499,6 +499,7 @@ local TAB_DEFINITIONS = {
 		name = L.SETTINGS_TAB_THEME or "Theme",
 		icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\sliders.blp",
 		beta = true,
+		retailOnly = true,
 	},
 	{
 		id = 2,
@@ -541,6 +542,7 @@ local TAB_DEFINITIONS = {
 		name = L.SETTINGS_TAB_GUILD or GUILD or "Guild",
 		icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\guild.blp",
 		beta = true,
+		retailOnly = true,
 	},
 
 	-- Data Broker & Global Sync (Stable)

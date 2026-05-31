@@ -215,10 +215,79 @@ function Test-LocaleKeyCoverage {
     }
 }
 
+function Test-IsUntrackedFile {
+    param([string]$File)
+
+    $untracked = @(& git ls-files --others --exclude-standard -- $File 2>$null)
+    return $untracked.Count -gt 0
+}
+
+function Add-ChangedLinesFromDiff {
+    param(
+        [hashtable]$LineLookup,
+        [string[]]$DiffLines
+    )
+
+    $newLine = $null
+    foreach ($diffLine in $DiffLines) {
+        if ($diffLine -match '^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@') {
+            $newLine = [int]$Matches[1]
+            continue
+        }
+
+        if ($null -eq $newLine) {
+            continue
+        }
+
+        if ($diffLine.StartsWith('+++')) {
+            continue
+        }
+
+        if ($diffLine.StartsWith('+')) {
+            $LineLookup[$newLine] = $true
+            $newLine++
+            continue
+        }
+
+        if ($diffLine.StartsWith(' ')) {
+            $newLine++
+        }
+    }
+}
+
+function Get-ChangedLineLookup {
+    param(
+        [string]$File,
+        [string]$BaseRef
+    )
+
+    if (Test-IsUntrackedFile $File) {
+        return $null
+    }
+
+    $lineLookup = @{}
+    $diffSpecs = @()
+    if (-not [string]::IsNullOrWhiteSpace($BaseRef)) {
+        $diffSpecs += @{ Args = @('diff', '-U0', "$BaseRef...HEAD", '--', $File) }
+    }
+    $diffSpecs += @{ Args = @('diff', '-U0', '--cached', '--', $File) }
+    $diffSpecs += @{ Args = @('diff', '-U0', '--', $File) }
+
+    foreach ($spec in $diffSpecs) {
+        $diffLines = @(& git @($spec.Args) 2>$null)
+        if ($LASTEXITCODE -eq 0 -and $diffLines.Count -gt 0) {
+            Add-ChangedLinesFromDiff -LineLookup $lineLookup -DiffLines $diffLines
+        }
+    }
+
+    return $lineLookup
+}
+
 function Test-StaticLuaPatterns {
     param(
         [string]$RepoRoot,
-        [string[]]$ChangedFiles
+        [string[]]$ChangedFiles,
+        [string]$BaseRef
     )
 
     $luaFiles = @(
@@ -244,16 +313,20 @@ function Test-StaticLuaPatterns {
     foreach ($file in $luaFiles) {
         $path = Join-Path $RepoRoot ($file -replace '/', [System.IO.Path]::DirectorySeparatorChar)
         $lines = @(Get-Content -LiteralPath $path -Encoding UTF8)
+        $changedLineLookup = Get-ChangedLineLookup -File $file -BaseRef $BaseRef
         $warnedApi = @{}
 
         for ($i = 0; $i -lt $lines.Count; $i++) {
+            $lineNo = $i + 1
+            if ($null -ne $changedLineLookup -and -not $changedLineLookup.ContainsKey($lineNo)) {
+                continue
+            }
+
             $line = $lines[$i]
             $trimmed = $line.Trim()
             if ($trimmed.StartsWith('--')) {
                 continue
             }
-
-            $lineNo = $i + 1
 
             if ($line -match '\bor\s+true\b' -and $line -notmatch 'FIX|or true pattern') {
                 Add-Failure "${file}:$lineNo uses 'or true'; use an explicit nil check."
@@ -380,7 +453,7 @@ Write-ReviewSection 'Locale Key Coverage'
 Test-LocaleKeyCoverage -RepoRoot $repoRoot -ChangedFiles $changedFiles -BaseRef $BaseRef
 
 Write-ReviewSection 'Static Lua Patterns'
-Test-StaticLuaPatterns -RepoRoot $repoRoot -ChangedFiles $changedFiles
+Test-StaticLuaPatterns -RepoRoot $repoRoot -ChangedFiles $changedFiles -BaseRef $BaseRef
 
 Write-ReviewSection 'Result'
 Write-ReviewLine "Failures: $($script:Failures.Count)"
