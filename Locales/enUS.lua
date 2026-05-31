@@ -11,6 +11,9 @@ local function LoadEnUS()
 	L.SETTINGS_SIMPLE_MODE_DESC =
 		"Disables the player portrait, hides search/sort options, widens the frame, and shifts tabs for a compact layout."
 	L.MENU_CHANGELOG = "Changelog"
+	L.MENU_EXTERNAL_ADDONS = "AddOns"
+	L.SETTINGS_EXTERNAL_MENU_BRIDGE = "External AddOn Menu Bridge (Beta)"
+	L.SETTINGS_EXTERNAL_MENU_BRIDGE_DESC = "Adds compatible AddOn actions to supported BetterFriendlist context menus."
 	L.KEYBIND_TOGGLE_BETTERFRIENDLIST = "Toggle BetterFriendlist"
 	-- ========================================
 	-- DIALOGS & POPUPS

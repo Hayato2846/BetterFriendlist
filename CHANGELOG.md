@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Guild Roster Tab Beta** - Added a Retail-first, default-off beta Guild Roster tab using the same read-only feature set on Retail and Classic.
+- **External AddOn Menu Bridge Beta** - Added a default-off beta bridge and official companion AddOn for showing compatible AddOn actions in supported BetterFriendlist context menus.
 - **Custom Theme & Theme Settings** - Added a Custom theme that inherits from Dark and adds controls for colors, transparency, hover states, selection states, borders, scrollbars, icons, and Blizzard artwork visibility.
 - **Raid Tab** - Added an optional compact Ready Check button next to Raid Info.
 

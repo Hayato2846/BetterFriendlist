@@ -8,6 +8,9 @@ BFL:RegisterLocale("frFR", function()
 	L.SETTINGS_SIMPLE_MODE_DESC =
 		"Désactive le portrait du joueur, masque les options de recherche/tri, élargit la fenêtre et déplace les onglets pour une interface compacte."
 	L.MENU_CHANGELOG = "Journal des modifications"
+	L.MENU_EXTERNAL_ADDONS = "AddOns"
+	L.SETTINGS_EXTERNAL_MENU_BRIDGE = "External AddOn Menu Bridge (Beta)"
+	L.SETTINGS_EXTERNAL_MENU_BRIDGE_DESC = "Adds compatible AddOn actions to supported BetterFriendlist context menus."
 	L.KEYBIND_TOGGLE_BETTERFRIENDLIST = "Toggle BetterFriendlist"
 	-- ========================================
 	-- DIALOGS & POPUPS

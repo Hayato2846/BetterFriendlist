@@ -5,6 +5,9 @@ enable-nolib-creation: no
 # Release channel: alpha, beta, or release
 release-type: release
 
+move-folders:
+  "BetterFriendlist/!BetterFriendlist_MenuBridge": "!BetterFriendlist_MenuBridge"
+
 # External libraries
 # externals:
 #   Libs/LibStub:

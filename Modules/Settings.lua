@@ -5522,7 +5522,7 @@ function Settings:RefreshAdvancedTab()
 									importedGroups,
 									importedAssignments
 								)
-								print("|cff00ff00BetterFriendlist:|r " .. importMsg)
+								BFL:DebugPrint("|cff00ff00BetterFriendlist:|r " .. importMsg)
 								-- Reload groups from DB and force re-render
 								local Groups = BFL:GetModule("Groups")
 								if Groups and Groups.Initialize then
@@ -5727,6 +5727,10 @@ function Settings:RefreshAdvancedTab()
 			local oldStoredTheme = DB:Get("theme", "blizzard")
 			local oldEffectiveTheme = BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() or oldStoredTheme
 			DB:Set("enableBetaFeatures", checked)
+			local MenuBridge = BFL:GetModule("MenuBridge")
+			if MenuBridge and MenuBridge.RefreshEnabledState then
+				MenuBridge:RefreshEnabledState()
+			end
 
 			-- If disabling Beta and currently on ANY Beta tab, switch to General
 			if not checked then
@@ -5792,10 +5796,36 @@ function Settings:RefreshAdvancedTab()
 			end
 
 			-- Data Broker is stable now; only ElvUI theme fallback may request a reload above.
+			if currentTab == 4 then
+				self:RefreshAdvancedTab()
+			end
 		end
 	)
 	betaToggle:SetTooltip(L.SETTINGS_BETA_FEATURES_TITLE, L.SETTINGS_BETA_FEATURES_TOOLTIP)
 	table.insert(allFrames, betaToggle)
+
+	if BFL.HasSecretValues then
+		local bridgeToggle = Components:CreateCheckbox(tab, {
+			label = L.SETTINGS_EXTERNAL_MENU_BRIDGE or "External AddOn Menu Bridge (Beta)",
+			initialValue = BetterFriendlistDB.externalMenuBridgeEnabled or false,
+			disabled = BetterFriendlistDB.enableBetaFeatures ~= true,
+			callback = function(checked)
+				local DB = GetDB()
+				if not DB then
+					return
+				end
+				DB:Set("externalMenuBridgeEnabled", checked == true)
+				local MenuBridge = BFL:GetModule("MenuBridge")
+				if MenuBridge and MenuBridge.RefreshEnabledState then
+					MenuBridge:RefreshEnabledState()
+				end
+			end,
+			tooltipTitle = L.SETTINGS_EXTERNAL_MENU_BRIDGE or "External AddOn Menu Bridge (Beta)",
+			tooltipDesc = L.SETTINGS_EXTERNAL_MENU_BRIDGE_DESC
+				or "Adds compatible AddOn actions to supported BetterFriendlist context menus.",
+		})
+		table.insert(allFrames, bridgeToggle)
+	end
 
 	-- Beta feature list (informational)
 	-- Only show if there are actual beta features
@@ -9123,16 +9153,8 @@ function Settings:RefreshRaidTab()
 			return { labels = validLabels, values = validValues }
 		end
 
-		-- Validation Function (legacy, now replaced by filtering)
 		local function ValidateShortcut(mod, btn)
-			if IsReservedCombination(mod, btn) then
-				print(
-					"|cffff0000BetterFriendlist:|r "
-						.. (L.SETTINGS_RAID_ERROR_RESERVED or "This combination is reserved.")
-				)
-				return false
-			end
-			return true
+			return not IsReservedCombination(mod, btn)
 		end
 
 		-- Only show dropdowns if enabled

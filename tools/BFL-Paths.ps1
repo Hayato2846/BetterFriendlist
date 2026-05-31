@@ -68,6 +68,8 @@ function Get-BFLClientInfo {
     $clientRoot = Join-Path $wowRootPath $folderName
     $addOnsRoot = Join-Path $clientRoot 'Interface\AddOns'
     $deployPath = Join-Path (Join-Path $rootPath "deploy\$Client") 'BetterFriendlist'
+    $menuBridgeAddonName = '!BetterFriendlist_MenuBridge'
+    $menuBridgeDeployPath = Join-Path (Join-Path $rootPath "deploy\$Client") $menuBridgeAddonName
 
     [PSCustomObject]@{
         Key = $Client
@@ -76,19 +78,37 @@ function Get-BFLClientInfo {
         AddOnsRoot = $addOnsRoot
         AddOnPath = Join-Path $addOnsRoot 'BetterFriendlist'
         DeployPath = $deployPath
+        MenuBridgeAddOnPath = Join-Path $addOnsRoot $menuBridgeAddonName
+        MenuBridgeDeployPath = $menuBridgeDeployPath
         SavedVariablesRoot = Join-Path $clientRoot 'WTF\Account'
     }
+}
+
+function Assert-BFLAddonRootByToc {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$TocFile,
+        [string]$Label = 'addon root'
+    )
+
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    $tocPath = Join-Path $fullPath $TocFile
+    if (-not (Test-Path -LiteralPath $tocPath -PathType Leaf)) {
+        throw "Not a $Label ($TocFile missing): $fullPath"
+    }
+    return $fullPath
 }
 
 function Assert-BFLAddonRoot {
     param([Parameter(Mandatory = $true)][string]$Path)
 
-    $fullPath = [System.IO.Path]::GetFullPath($Path)
-    $tocPath = Join-Path $fullPath 'BetterFriendlist.toc'
-    if (-not (Test-Path -LiteralPath $tocPath -PathType Leaf)) {
-        throw "Not a BetterFriendlist addon root: $fullPath"
-    }
-    return $fullPath
+    return Assert-BFLAddonRootByToc -Path $Path -TocFile 'BetterFriendlist.toc' -Label 'BetterFriendlist addon root'
+}
+
+function Assert-BFLMenuBridgeAddonRoot {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    return Assert-BFLAddonRootByToc -Path $Path -TocFile '!BetterFriendlist_MenuBridge.toc' -Label 'BetterFriendlist menu bridge addon root'
 }
 
 function Ensure-BFLDirectory {

@@ -279,8 +279,8 @@ function Compat:GetProfileTarget(contextData, menuType)
 	return nil
 end
 
-function Compat:AddOpenProfileButton(owner, rootDescription, contextData, menuType)
-	if not (rootDescription and rootDescription.CreateButton and contextData and menuType) then
+function Compat:CanShowOpenProfileButton(owner, contextData, menuType)
+	if not (contextData and menuType) then
 		return false
 	end
 	if not self:ShouldCustomizeMenus(owner) then
@@ -289,19 +289,24 @@ function Compat:AddOpenProfileButton(owner, rootDescription, contextData, menuTy
 	if not GetTRP3Config("UnitPopups_ShowOpenProfile", true) then
 		return false
 	end
-
-	local label = GetTRP3Locale("UNIT_POPUPS_OPEN_PROFILE")
-	if not label then
+	if not GetTRP3Locale("UNIT_POPUPS_OPEN_PROFILE") then
 		return false
 	end
+	return self:GetProfileTarget(contextData, menuType) ~= nil
+end
 
+function Compat:AddOpenProfileButton(owner, rootDescription, contextData, menuType, suppressHeader)
+	if not (rootDescription and rootDescription.CreateButton and contextData and menuType) then
+		return false
+	end
+	local label = GetTRP3Locale("UNIT_POPUPS_OPEN_PROFILE")
 	local profileTarget = self:GetProfileTarget(contextData, menuType)
-	if not profileTarget then
+	if not label or not profileTarget or not self:CanShowOpenProfileButton(owner, contextData, menuType) then
 		return false
 	end
 
 	local header = GetTRP3Locale("UNIT_POPUPS_ROLEPLAY_OPTIONS_HEADER")
-	if header and rootDescription.CreateDivider and rootDescription.CreateTitle then
+	if not suppressHeader and header and rootDescription.CreateDivider and rootDescription.CreateTitle then
 		rootDescription:CreateDivider()
 		rootDescription:CreateTitle(header)
 	end
@@ -312,4 +317,38 @@ function Compat:AddOpenProfileButton(owner, rootDescription, contextData, menuTy
 		end
 	end)
 	return true
+end
+
+function Compat:Initialize()
+	if self.menuBridgeProviderRegistered then
+		return
+	end
+	if not BFL.RegisterExternalMenuProvider then
+		return
+	end
+
+	local menuTypes = {}
+	for menuType in pairs(CharacterProfileMenus) do
+		menuTypes[menuType] = true
+	end
+	for menuType in pairs(BattleNetProfileMenus) do
+		menuTypes[menuType] = true
+	end
+
+	local provider = {
+		id = "totalrp3-open-profile",
+		addonName = "totalRP3",
+		menuTypes = menuTypes,
+		fallbackIfDynamicModifier = true,
+		canShow = function(owner, contextData)
+			return Compat:CanShowOpenProfileButton(owner, contextData, contextData and contextData.menuType)
+		end,
+		populate = function(owner, rootDescription, contextData)
+			return Compat:AddOpenProfileButton(owner, rootDescription, contextData, contextData and contextData.menuType, true)
+		end,
+	}
+
+	if BFL:RegisterExternalMenuProvider(provider) then
+		self.menuBridgeProviderRegistered = true
+	end
 end

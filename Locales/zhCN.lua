@@ -111,6 +111,9 @@ BFL:RegisterLocale("zhCN", function()
 	L.DIALOG_MIGRATE_BTN2 = "仅迁移"
 	L.DIALOG_MIGRATE_BTN3 = "取消"
 
+	L.MENU_EXTERNAL_ADDONS = "AddOns"
+	L.SETTINGS_EXTERNAL_MENU_BRIDGE = "External AddOn Menu Bridge (Beta)"
+	L.SETTINGS_EXTERNAL_MENU_BRIDGE_DESC = "Adds compatible AddOn actions to supported BetterFriendlist context menus."
 	L.KEYBIND_TOGGLE_BETTERFRIENDLIST = "Toggle BetterFriendlist"
 	-- ========================================
 	-- SETTINGS PANEL
