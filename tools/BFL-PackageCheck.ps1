@@ -93,7 +93,12 @@ if ($missingRequiredIgnores.Count -gt 0) {
     throw "Missing .pkgmeta ignore entries: $($missingRequiredIgnores -join ', ')"
 }
 
-$menuBridgeMoveFolderPattern = '(?m)^\s*["'']?BetterFriendlist/!BetterFriendlist_MenuBridge["'']?\s*:\s*["'']?!BetterFriendlist_MenuBridge["'']?\s*$'
+$quotedMenuBridgeMoveFolderSourcePattern = '(?m)^\s*["'']BetterFriendlist/!BetterFriendlist_MenuBridge["'']\s*:'
+if ($pkgmetaText -match $quotedMenuBridgeMoveFolderSourcePattern) {
+    throw '.pkgmeta move-folders source key must not be quoted; BigWigs packager does not strip quotes from keys.'
+}
+
+$menuBridgeMoveFolderPattern = '(?m)^\s*BetterFriendlist/!BetterFriendlist_MenuBridge\s*:\s*["'']?!BetterFriendlist_MenuBridge["'']?\s*$'
 if ($pkgmetaText -notmatch '(?m)^move-folders:\s*$' -or $pkgmetaText -notmatch $menuBridgeMoveFolderPattern) {
     throw '.pkgmeta must move BetterFriendlist/!BetterFriendlist_MenuBridge to a sibling !BetterFriendlist_MenuBridge addon folder.'
 }

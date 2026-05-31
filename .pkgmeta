@@ -6,7 +6,7 @@ enable-nolib-creation: no
 release-type: release
 
 move-folders:
-  "BetterFriendlist/!BetterFriendlist_MenuBridge": "!BetterFriendlist_MenuBridge"
+  BetterFriendlist/!BetterFriendlist_MenuBridge: "!BetterFriendlist_MenuBridge"
 
 # External libraries
 # externals:
