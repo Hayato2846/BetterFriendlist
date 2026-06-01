@@ -28,9 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improved
 - **Broker Tooltip Theming** - Added settings for the shared Friends/Guild Broker separator color and per-theme Broker tooltip background color and opacity.
-
-### Changed
-- **Client Compatibility** - Routed WHO and Recent Allies party invites through the shared compatibility wrapper so Retail/PTR2 and Classic clients use guarded invite APIs consistently.
+- **Party Invites** - Improved the invite buttons in the WHO list and Recent Allies so they keep working reliably on Retail and Classic, including upcoming Retail updates.
 
 ---
 ## [2.6.1]        - 2026-05-31
