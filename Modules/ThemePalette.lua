@@ -45,6 +45,22 @@ local THEME_SETTING_DEFAULTS = {
 	custom = DEFAULT_CUSTOM_SETTINGS,
 }
 
+local DEFAULT_BROKER_SEPARATOR_COLOR = { r = 0.3, g = 0.3, b = 0.3, a = 0.5 }
+
+local BROKER_TOOLTIP_THEME_ORDER = {
+	"blizzard",
+	"dark",
+	"custom",
+	"elvui",
+}
+
+local BROKER_TOOLTIP_THEME_KEYS = {
+	blizzard = true,
+	dark = true,
+	custom = true,
+	elvui = true,
+}
+
 local CUSTOM_COLOR_KEYS = {
 	backgroundColor = true,
 	surfaceColor = true,
@@ -201,6 +217,10 @@ function ThemePalette:GetDefaultCustomTheme()
 	return {}
 end
 
+function ThemePalette:GetDefaultBrokerSeparatorColor()
+	return Copy(DEFAULT_BROKER_SEPARATOR_COLOR)
+end
+
 local function NormalizeThemeSettings(settings, defaults)
 	settings = type(settings) == "table" and settings or {}
 	local result = Copy(defaults)
@@ -265,6 +285,44 @@ function ThemePalette:NormalizeCustomTheme(customTheme)
 	return result
 end
 
+local function NormalizeBrokerTooltipTheme(theme)
+	return BROKER_TOOLTIP_THEME_KEYS[theme] and theme or "blizzard"
+end
+
+function ThemePalette:NormalizeBrokerSeparatorColor(color)
+	return NormalizeColor(color, DEFAULT_BROKER_SEPARATOR_COLOR)
+end
+
+function ThemePalette:GetDefaultBrokerTooltipThemeSettings()
+	local result = {}
+	for _, theme in ipairs(BROKER_TOOLTIP_THEME_ORDER) do
+		result[theme] = {}
+	end
+	return result
+end
+
+function ThemePalette:NormalizeBrokerTooltipThemeSettings(settings)
+	settings = type(settings) == "table" and settings or {}
+	local result = self:GetDefaultBrokerTooltipThemeSettings()
+
+	for _, theme in ipairs(BROKER_TOOLTIP_THEME_ORDER) do
+		local source = type(settings[theme]) == "table" and settings[theme] or {}
+		local normalized = result[theme]
+
+		local backgroundColor = NormalizeColor(source.backgroundColor)
+		if backgroundColor then
+			normalized.backgroundColor = backgroundColor
+		end
+
+		local opacity = Clamp(source.opacity, 0, 1)
+		if opacity ~= nil then
+			normalized.opacity = opacity
+		end
+	end
+
+	return result
+end
+
 function ThemePalette:NormalizeSavedSettings(db)
 	if type(db) ~= "table" then
 		return
@@ -274,6 +332,8 @@ function ThemePalette:NormalizeSavedSettings(db)
 	db.customThemeSettings = self:NormalizeCustomSettings(db.customThemeSettings)
 	db.blizzardThemeSettings = nil
 	db.customTheme = self:NormalizeCustomTheme(db.customTheme)
+	db.brokerSeparatorColor = self:NormalizeBrokerSeparatorColor(db.brokerSeparatorColor)
+	db.brokerTooltipThemeSettings = self:NormalizeBrokerTooltipThemeSettings(db.brokerTooltipThemeSettings)
 end
 
 function ThemePalette:GetThemeSettings(theme)
@@ -312,6 +372,53 @@ function ThemePalette:GetCustomTheme()
 	end
 
 	return self:NormalizeCustomTheme(customTheme)
+end
+
+function ThemePalette:GetBrokerTooltipThemeSettings(theme)
+	theme = NormalizeBrokerTooltipTheme(theme)
+	local DB = BFL:GetModule("DB")
+	local settings
+	if DB and DB.Get then
+		settings = DB:Get("brokerTooltipThemeSettings")
+	elseif BetterFriendlistDB then
+		settings = BetterFriendlistDB.brokerTooltipThemeSettings
+	end
+
+	settings = self:NormalizeBrokerTooltipThemeSettings(settings)
+	return Copy(settings[theme] or {})
+end
+
+function ThemePalette:SetBrokerTooltipThemeSetting(theme, key, value)
+	theme = NormalizeBrokerTooltipTheme(theme)
+	if key ~= "backgroundColor" and key ~= "opacity" then
+		return
+	end
+
+	local DB = BFL:GetModule("DB")
+	if not DB then
+		return
+	end
+
+	local settings = self:NormalizeBrokerTooltipThemeSettings(DB:Get("brokerTooltipThemeSettings"))
+	local themeSettings = settings[theme]
+	if key == "backgroundColor" then
+		themeSettings.backgroundColor = NormalizeColor(value)
+	else
+		themeSettings.opacity = Clamp(value, 0, 1)
+	end
+	DB:Set("brokerTooltipThemeSettings", settings)
+end
+
+function ThemePalette:ResetBrokerTooltipThemeSettings(theme)
+	theme = NormalizeBrokerTooltipTheme(theme)
+	local DB = BFL:GetModule("DB")
+	if not DB then
+		return
+	end
+
+	local settings = self:NormalizeBrokerTooltipThemeSettings(DB:Get("brokerTooltipThemeSettings"))
+	settings[theme] = {}
+	DB:Set("brokerTooltipThemeSettings", settings)
 end
 
 function ThemePalette:SetThemeSetting(theme, key, value)

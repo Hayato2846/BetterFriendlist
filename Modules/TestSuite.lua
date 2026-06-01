@@ -1954,6 +1954,138 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
+	TS:RegisterTest("data", "ThemePalette_BrokerTooltipSettingsNormalize", {
+		description = "Broker tooltip theme settings should clamp values and discard unknown keys",
+		action = function(V)
+			WithTemporaryDatabase({
+				brokerSeparatorColor = { r = 2, g = -1, b = 0.25, a = 1.5 },
+				brokerTooltipThemeSettings = {
+					dark = {
+						backgroundColor = { r = -1, g = 0.25, b = 2, a = 0.4 },
+						opacity = 1.5,
+						ignored = true,
+					},
+					custom = {
+						opacity = -0.5,
+					},
+					unknown = {
+						opacity = 0.3,
+					},
+				},
+			}, function(tempDB)
+				V:AssertEqual(tempDB.brokerSeparatorColor.r, 1, "Separator red should be clamped")
+				V:AssertEqual(tempDB.brokerSeparatorColor.g, 0, "Separator green should be clamped")
+				V:AssertEqual(tempDB.brokerSeparatorColor.a, 1, "Separator alpha should be clamped")
+
+				local settings = tempDB.brokerTooltipThemeSettings
+				V:AssertType(settings.blizzard, "table", "Blizzard broker tooltip settings should exist")
+				V:AssertType(settings.elvui, "table", "ElvUI broker tooltip settings should exist")
+				V:AssertNil(settings.unknown, "Unknown broker tooltip themes should be discarded")
+				V:AssertEqual(settings.dark.backgroundColor.r, 0, "Broker tooltip red should be clamped")
+				V:AssertEqual(settings.dark.backgroundColor.b, 1, "Broker tooltip blue should be clamped")
+				V:AssertEqual(settings.dark.opacity, 1, "Broker tooltip opacity should be clamped")
+				V:AssertEqual(settings.custom.opacity, 0, "Broker tooltip opacity should allow transparent values")
+				V:AssertNil(settings.dark.ignored, "Unknown broker tooltip setting keys should be discarded")
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "ThemePalette_BrokerTooltipSettingsPersistAndReset", {
+		description = "Broker tooltip overrides should persist per theme and reset back to inheritance",
+		action = function(V)
+			local ThemePalette = BFL:GetModule("ThemePalette")
+			V:AssertNotNil(ThemePalette, "ThemePalette should be loaded")
+
+			WithTemporaryDatabase({
+				brokerTooltipThemeSettings = {},
+			}, function(tempDB)
+				ThemePalette:SetBrokerTooltipThemeSetting("dark", "backgroundColor", { r = 0.12, g = 0.23, b = 0.34, a = 0.45 })
+				ThemePalette:SetBrokerTooltipThemeSetting("dark", "opacity", 0.42)
+				ThemePalette:SetBrokerTooltipThemeSetting("custom", "opacity", 0.61)
+
+				local dark = ThemePalette:GetBrokerTooltipThemeSettings("dark")
+				V:AssertEqual(dark.backgroundColor.r, 0.12, "Dark broker tooltip background should persist")
+				V:AssertEqual(dark.opacity, 0.42, "Dark broker tooltip opacity should persist")
+				V:AssertEqual(tempDB.brokerTooltipThemeSettings.custom.opacity, 0.61, "Custom broker tooltip opacity should persist independently")
+
+				ThemePalette:ResetBrokerTooltipThemeSettings("dark")
+				V:AssertNil(tempDB.brokerTooltipThemeSettings.dark.backgroundColor, "Dark broker tooltip color should reset to inheritance")
+				V:AssertNil(tempDB.brokerTooltipThemeSettings.dark.opacity, "Dark broker tooltip opacity should reset to inheritance")
+				V:AssertEqual(tempDB.brokerTooltipThemeSettings.custom.opacity, 0.61, "Custom broker tooltip settings should survive Dark reset")
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "BrokerUtils_SeparatorColorResolution", {
+		description = "Broker separator helper should resolve and apply the shared saved color",
+		action = function(V)
+			local BrokerUtils = BFL.BrokerUtils
+			V:AssertNotNil(BrokerUtils, "BrokerUtils should be loaded")
+			V:AssertNotNil(BrokerUtils.GetBrokerSeparatorColor, "Broker separator resolver should exist")
+
+			WithTemporaryDatabase({
+				brokerSeparatorColor = { r = 0.12, g = 0.34, b = 0.56, a = 0.78 },
+			}, function()
+				local color = BrokerUtils.GetBrokerSeparatorColor()
+				V:AssertEqual(color.r, 0.12, "Separator red should resolve from DB")
+				V:AssertEqual(color.a, 0.78, "Separator alpha should resolve from DB")
+
+				local texture = {}
+				function texture:SetColorTexture(r, g, b, a)
+					self.r, self.g, self.b, self.a = r, g, b, a
+				end
+
+				BrokerUtils.ApplyBrokerSeparatorColor(texture)
+				V:AssertEqual(texture.g, 0.34, "Texture green should receive the shared separator color")
+				V:AssertEqual(texture.a, 0.78, "Texture alpha should receive the shared separator color")
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "BrokerUtils_BrokerTooltipBackgroundResolution", {
+		description = "Broker tooltip background resolver should combine per-theme color, opacity, and inheritance",
+		action = function(V)
+			local BrokerUtils = BFL.BrokerUtils
+			local ThemePalette = BFL:GetModule("ThemePalette")
+			V:AssertNotNil(BrokerUtils, "BrokerUtils should be loaded")
+			V:AssertNotNil(ThemePalette, "ThemePalette should be loaded")
+
+			WithTemporaryDatabase({
+				brokerTooltipThemeSettings = {
+					dark = { opacity = 0.42 },
+					custom = { backgroundColor = { r = 0.11, g = 0.22, b = 0.33, a = 0.44 } },
+				},
+			}, function()
+				local originalGameTooltip = GameTooltip
+				GameTooltip = {
+					GetBackdropColor = function()
+						return 0, 0, 0, 0
+					end,
+				}
+				local ok, err = pcall(function()
+					local blizzardFallback = BrokerUtils.GetBrokerTooltipFallbackBackground("blizzard")
+					V:Assert(blizzardFallback.a > 0, "Transparent GameTooltip state should not become the Blizzard default opacity")
+				end)
+				GameTooltip = originalGameTooltip
+				if not ok then
+					error(err, 2)
+				end
+
+				local inherited = { r = 0.5, g = 0.6, b = 0.7, a = 0.8 }
+				local dark = BrokerUtils.ResolveBrokerTooltipBackground("dark", inherited)
+				V:AssertEqual(dark.r, 0.5, "Opacity-only override should inherit red")
+				V:AssertEqual(dark.a, 0.42, "Opacity-only override should replace alpha")
+
+				local custom = BrokerUtils.ResolveBrokerTooltipBackground("custom", inherited)
+				V:AssertEqual(custom.r, 0.11, "Color override should replace red")
+				V:AssertEqual(custom.a, 0.44, "Color override should use saved alpha when opacity is inherited")
+				V:AssertNil(BrokerUtils.ResolveBrokerTooltipBackground("blizzard", inherited), "Themes without overrides should inherit without applying a color")
+
+				ThemePalette:ResetBrokerTooltipThemeSettings("custom")
+				V:AssertNil(BrokerUtils.ResolveBrokerTooltipBackground("custom", inherited), "Reset theme should return to inherited tooltip styling")
+			end)
+		end,
+	})
 	TS:RegisterTest("data", "ThemePalette_CopiedCustomAccentMigrationDerivesIndependentDefault", {
 		description = "Copied Dark accent defaults should migrate to an independent Custom accent",
 		action = function(V)

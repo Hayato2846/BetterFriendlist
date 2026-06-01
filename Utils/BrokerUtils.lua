@@ -188,11 +188,343 @@ function BU.ApplyBrokerFontToTooltip(tt, sizeOffset)
 end
 
 -- ========================================
+-- Broker Tooltip Appearance Helpers
+-- ========================================
+local DEFAULT_BROKER_SEPARATOR_COLOR = { r = 0.3, g = 0.3, b = 0.3, a = 0.5 }
+local DEFAULT_BROKER_SEPARATOR_HEIGHT = 1
+local DEFAULT_BROKER_TOOLTIP_BACKGROUND = { r = 0, g = 0, b = 0, a = 0.85 }
+
+local BROKER_TOOLTIP_THEME_KEYS = {
+	blizzard = true,
+	dark = true,
+	custom = true,
+	elvui = true,
+}
+
+local function Clamp(value, minValue, maxValue)
+	value = tonumber(value)
+	if value == nil then
+		return nil
+	end
+	if value < minValue then
+		return minValue
+	end
+	if value > maxValue then
+		return maxValue
+	end
+	return value
+end
+
+local function CopyColor(color)
+	if type(color) ~= "table" then
+		return nil
+	end
+	return {
+		r = color.r ~= nil and color.r or color[1] or 1,
+		g = color.g ~= nil and color.g or color[2] or 1,
+		b = color.b ~= nil and color.b or color[3] or 1,
+		a = color.a ~= nil and color.a or color[4] or 1,
+	}
+end
+
+local function NormalizeColor(color, fallback)
+	if type(color) ~= "table" then
+		return fallback and CopyColor(fallback) or nil
+	end
+
+	local r = Clamp(color.r ~= nil and color.r or color[1], 0, 1)
+	local g = Clamp(color.g ~= nil and color.g or color[2], 0, 1)
+	local b = Clamp(color.b ~= nil and color.b or color[3], 0, 1)
+	local a = Clamp(color.a ~= nil and color.a or color[4], 0, 1)
+
+	if fallback then
+		r = r ~= nil and r or fallback.r or fallback[1] or 1
+		g = g ~= nil and g or fallback.g or fallback[2] or 1
+		b = b ~= nil and b or fallback.b or fallback[3] or 1
+		a = a ~= nil and a or fallback.a or fallback[4] or 1
+	end
+
+	if r == nil or g == nil or b == nil then
+		return fallback and CopyColor(fallback) or nil
+	end
+
+	return { r = r, g = g, b = b, a = a ~= nil and a or 1 }
+end
+
+local function IsUsableTooltipBackground(color)
+	return color and ((color.a or 0) > 0.001)
+end
+
+local function NormalizeTooltipTheme(theme)
+	return BROKER_TOOLTIP_THEME_KEYS[theme] and theme or "blizzard"
+end
+
+local function GetEffectiveTooltipTheme()
+	local theme = BFL and BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() or "blizzard"
+	return NormalizeTooltipTheme(theme)
+end
+
+function BU.GetDefaultBrokerSeparatorColor()
+	return CopyColor(DEFAULT_BROKER_SEPARATOR_COLOR)
+end
+
+function BU.GetBrokerSeparatorColor()
+	local color = BetterFriendlistDB and BetterFriendlistDB.brokerSeparatorColor
+	local Palette = BFL and BFL.GetModule and BFL:GetModule("ThemePalette")
+	if Palette and Palette.NormalizeBrokerSeparatorColor then
+		return Palette:NormalizeBrokerSeparatorColor(color)
+	end
+	return NormalizeColor(color, DEFAULT_BROKER_SEPARATOR_COLOR)
+end
+
+function BU.GetBrokerSeparatorHeight()
+	return DEFAULT_BROKER_SEPARATOR_HEIGHT
+end
+
+function BU.ApplyBrokerSeparatorColor(texture)
+	if not texture or not texture.SetColorTexture then
+		return nil
+	end
+
+	local color = BU.GetBrokerSeparatorColor()
+	texture:SetColorTexture(color.r, color.g, color.b, color.a or 1)
+	return color
+end
+
+function BU.ApplyBrokerFooterSeparatorStyle(texture)
+	if not texture then
+		return nil
+	end
+
+	if texture.SetHeight then
+		texture:SetHeight(BU.GetBrokerSeparatorHeight())
+	end
+	return BU.ApplyBrokerSeparatorColor(texture)
+end
+
+local function GetStoredBrokerTooltipSettings(theme)
+	theme = NormalizeTooltipTheme(theme)
+	local Palette = BFL and BFL.GetModule and BFL:GetModule("ThemePalette")
+	if Palette and Palette.GetBrokerTooltipThemeSettings then
+		return Palette:GetBrokerTooltipThemeSettings(theme)
+	end
+
+	local allSettings = BetterFriendlistDB and BetterFriendlistDB.brokerTooltipThemeSettings
+	local settings = type(allSettings) == "table" and allSettings[theme] or nil
+	settings = type(settings) == "table" and settings or {}
+	return {
+		backgroundColor = NormalizeColor(settings.backgroundColor),
+		opacity = Clamp(settings.opacity, 0, 1),
+	}
+end
+
+local function GetBackdropColor(object)
+	if not object or not object.GetBackdropColor then
+		return nil
+	end
+
+	local ok, r, g, b, a = pcall(object.GetBackdropColor, object)
+	if not ok or r == nil then
+		return nil
+	end
+	if type(r) == "table" then
+		return NormalizeColor(r, DEFAULT_BROKER_TOOLTIP_BACKGROUND)
+	end
+	return NormalizeColor({ r = r, g = g, b = b, a = a }, DEFAULT_BROKER_TOOLTIP_BACKGROUND)
+end
+
+local function GetNineSliceCenterColor(nineSlice)
+	if not nineSlice or not nineSlice.GetCenterColor then
+		return nil
+	end
+
+	local ok, r, g, b, a = pcall(nineSlice.GetCenterColor, nineSlice)
+	if not ok or r == nil then
+		return nil
+	end
+	if type(r) == "table" then
+		return NormalizeColor(r, DEFAULT_BROKER_TOOLTIP_BACKGROUND)
+	end
+	return NormalizeColor({ r = r, g = g, b = b, a = a }, DEFAULT_BROKER_TOOLTIP_BACKGROUND)
+end
+
+local function CaptureTooltipBackground(tt)
+	if not tt then
+		return nil
+	end
+
+	local color = GetBackdropColor(tt.BFL_DarkBackdrop)
+	if IsUsableTooltipBackground(color) then
+		return color
+	end
+
+	color = GetBackdropColor(tt.backdrop)
+	if IsUsableTooltipBackground(color) then
+		return color
+	end
+
+	color = GetBackdropColor(tt.Backdrop)
+	if IsUsableTooltipBackground(color) then
+		return color
+	end
+
+	color = GetBackdropColor(tt)
+	if IsUsableTooltipBackground(color) then
+		return color
+	end
+
+	color = GetNineSliceCenterColor(tt.NineSlice)
+	if IsUsableTooltipBackground(color) then
+		return color
+	end
+
+	return nil
+end
+
+local function ApplyBackdropColor(object, color)
+	if not object or not color then
+		return false
+	end
+
+	local applied = false
+	if object.SetBackdropColor then
+		local ok = pcall(object.SetBackdropColor, object, color.r, color.g, color.b, color.a or 1)
+		applied = ok or applied
+	end
+	if object.bg and object.bg.SetColorTexture then
+		local ok = pcall(object.bg.SetColorTexture, object.bg, color.r, color.g, color.b, color.a or 1)
+		applied = ok or applied
+	end
+	if object.SetColorTexture then
+		local ok = pcall(object.SetColorTexture, object, color.r, color.g, color.b, color.a or 1)
+		applied = ok or applied
+	end
+	return applied
+end
+
+local function ApplyTooltipBackground(tt, color)
+	if not tt or not color then
+		return false
+	end
+
+	local applied = false
+	applied = ApplyBackdropColor(tt.BFL_DarkBackdrop, color) or applied
+	applied = ApplyBackdropColor(tt.backdrop, color) or applied
+	applied = ApplyBackdropColor(tt.Backdrop, color) or applied
+	applied = ApplyBackdropColor(tt, color) or applied
+
+	if tt.NineSlice and tt.NineSlice.SetCenterColor then
+		local ok = pcall(tt.NineSlice.SetCenterColor, tt.NineSlice, color.r, color.g, color.b, color.a or 1)
+		applied = ok or applied
+	end
+
+	return applied
+end
+
+local function GetSkinEnginePopupColor(theme)
+	theme = NormalizeTooltipTheme(theme)
+	local Engine = BFL and BFL.GetModule and BFL:GetModule("SkinEngine")
+	local baseColors = Engine and Engine.defaultColors
+	if type(baseColors) ~= "table" then
+		return nil
+	end
+
+	if theme == "dark" or theme == "custom" then
+		local Palette = BFL and BFL.GetModule and BFL:GetModule("ThemePalette")
+		if Palette and Palette.ApplyToColors then
+			local colors = {}
+			Palette:ApplyToColors(colors, baseColors)
+			return NormalizeColor(colors.popup, DEFAULT_BROKER_TOOLTIP_BACKGROUND)
+		end
+	end
+
+	return NormalizeColor(baseColors.popup, DEFAULT_BROKER_TOOLTIP_BACKGROUND)
+end
+
+function BU.GetBrokerTooltipFallbackBackground(theme, tt)
+	theme = NormalizeTooltipTheme(theme or GetEffectiveTooltipTheme())
+
+	local current = CaptureTooltipBackground(tt)
+	if current then
+		return current
+	end
+
+	if theme == "dark" or theme == "custom" then
+		return GetSkinEnginePopupColor(theme) or CopyColor(DEFAULT_BROKER_TOOLTIP_BACKGROUND)
+	end
+
+	current = CaptureTooltipBackground(GameTooltip)
+	if current then
+		return current
+	end
+
+	if theme == "elvui" then
+		local E = BU.GetElvUIEngine and BU.GetElvUIEngine()
+		local media = E and E.media
+		local elvUIColor = media and (media.backdropfadecolor or media.backdropcolor)
+		return NormalizeColor(elvUIColor, DEFAULT_BROKER_TOOLTIP_BACKGROUND)
+	end
+
+	return GetSkinEnginePopupColor(theme) or CopyColor(DEFAULT_BROKER_TOOLTIP_BACKGROUND)
+end
+
+function BU.ResolveBrokerTooltipBackground(theme, currentColor)
+	theme = NormalizeTooltipTheme(theme or GetEffectiveTooltipTheme())
+	local settings = GetStoredBrokerTooltipSettings(theme)
+	if not settings.backgroundColor and settings.opacity == nil then
+		return nil
+	end
+
+	local fallback = NormalizeColor(currentColor) or BU.GetBrokerTooltipFallbackBackground(theme)
+	local color = settings.backgroundColor and NormalizeColor(settings.backgroundColor, fallback) or CopyColor(fallback)
+	if settings.opacity ~= nil then
+		color.a = settings.opacity
+	end
+	return color
+end
+
+function BU.ApplyBrokerTooltipThemeBackground(tt)
+	if not tt then
+		return nil
+	end
+
+	local current = CaptureTooltipBackground(tt)
+	local color = BU.ResolveBrokerTooltipBackground(GetEffectiveTooltipTheme(), current)
+	if not color then
+		return nil
+	end
+
+	if not tt.bflBrokerBackgroundApplied then
+		tt.bflBrokerOriginalBackground = current
+	end
+	tt.bflBrokerBackgroundApplied = true
+	ApplyTooltipBackground(tt, color)
+	return color
+end
+
+function BU.RestoreBrokerTooltipBackground(tt)
+	if not tt or not tt.bflBrokerBackgroundApplied then
+		return
+	end
+
+	if tt.bflBrokerOriginalBackground then
+		ApplyTooltipBackground(tt, tt.bflBrokerOriginalBackground)
+	end
+	tt.bflBrokerOriginalBackground = nil
+	tt.bflBrokerBackgroundApplied = nil
+end
+
+-- ========================================
 -- Broker Tooltip Layout Helpers
 -- ========================================
 function BU.AddTooltipSeparator(tt, r, g, b, a)
 	if not tt or not tt.AddSeparator then
 		return nil
+	end
+
+	if r == nil and g == nil and b == nil and a == nil then
+		local color = BU.GetBrokerSeparatorColor()
+		r, g, b, a = color.r, color.g, color.b, color.a
 	end
 
 	return tt:AddSeparator(1, r or 0.3, g or 0.3, b or 0.3, a or 0.5)
@@ -367,34 +699,38 @@ end
 --- Apply ElvUI skin to a LibQTip tooltip (mirrors ElvUI TT:SetStyle)
 function BU.ApplyElvUISkin(tt)
 	if not tt then return end
-	if BFL and BFL.IsThemeActive and BFL:IsThemeActive("dark") then
+
+	if BFL and BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme() then
 		local Engine = BFL:GetModule("SkinEngine")
 		if Engine then
 			Engine:SkinTooltip(tt)
 		end
+		BU.ApplyBrokerTooltipThemeBackground(tt)
 		return
 	end
 
 	local E = BU.GetElvUIEngine()
-	if not E then return end
-
 	local wantSkin = BFL and BFL.IsThemeActive and BFL:IsThemeActive("elvui")
-	if not wantSkin then return end
+	if E and wantSkin then
+		-- Hide default NineSlice backdrop (same as ElvUI TT:SetStyle)
+		if tt.NineSlice then tt.NineSlice:SetAlpha(0) end
 
-	-- Hide default NineSlice backdrop (same as ElvUI TT:SetStyle)
-	if tt.NineSlice then tt.NineSlice:SetAlpha(0) end
+		-- Apply ElvUI template directly on the tooltip frame
+		if tt.SetTemplate then
+			tt:SetTemplate("Transparent")
+		end
 
-	-- Apply ElvUI template directly on the tooltip frame
-	if tt.SetTemplate then
-		tt:SetTemplate("Transparent")
+		tt.bflElvUISkinned = true
 	end
 
-	tt.bflElvUISkinned = true
+	BU.ApplyBrokerTooltipThemeBackground(tt)
 end
 
 --- Remove ElvUI skin from a LibQTip tooltip (restore default appearance)
 function BU.RemoveElvUISkin(tt)
 	if not tt then return end
+
+	BU.RestoreBrokerTooltipBackground(tt)
 
 	if tt.bflDarkSkinned and BFL then
 		local Engine = BFL:GetModule("SkinEngine")

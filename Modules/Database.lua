@@ -159,6 +159,13 @@ local defaults = {
 	brokerFontSize = 12, -- Broker tooltip font size
 	brokerFontFlags = "SLUG", -- Broker tooltip font rendering flags
 	brokerUseCustomFontForNonLatin = false, -- Use selected broker tooltip font for non-latin alphabets (default: OFF)
+	brokerSeparatorColor = { r = 0.3, g = 0.3, b = 0.3, a = 0.5 }, -- Shared Friends/Guild Broker group and footer separator color
+	brokerTooltipThemeSettings = {
+		blizzard = {},
+		dark = {},
+		custom = {},
+		elvui = {},
+	}, -- Per-theme broker tooltip background overrides; nil values inherit theme defaults
 	brokerShowColStatus = false, -- Column: Status icon (default: OFF)
 	brokerGroupHeaderAlign = "LEFT", -- Friends Broker group header alignment: LEFT/CENTER/RIGHT
 	-- Guild Data Broker Settings
@@ -390,6 +397,23 @@ function DB:NormalizeThemeSettings()
 	BetterFriendlistDB.blizzardThemeSettings = nil
 	if type(BetterFriendlistDB.customTheme) ~= "table" then
 		BetterFriendlistDB.customTheme = {}
+	end
+	if type(BetterFriendlistDB.brokerSeparatorColor) ~= "table" then
+		BetterFriendlistDB.brokerSeparatorColor = self:InternalDeepCopy(defaults.brokerSeparatorColor)
+	end
+	if type(BetterFriendlistDB.brokerTooltipThemeSettings) ~= "table" then
+		BetterFriendlistDB.brokerTooltipThemeSettings = self:InternalDeepCopy(defaults.brokerTooltipThemeSettings)
+	else
+		for _, theme in ipairs({ "blizzard", "dark", "custom", "elvui" }) do
+			if type(BetterFriendlistDB.brokerTooltipThemeSettings[theme]) ~= "table" then
+				BetterFriendlistDB.brokerTooltipThemeSettings[theme] = {}
+			end
+		end
+		for theme in pairs(BetterFriendlistDB.brokerTooltipThemeSettings) do
+			if theme ~= "blizzard" and theme ~= "dark" and theme ~= "custom" and theme ~= "elvui" then
+				BetterFriendlistDB.brokerTooltipThemeSettings[theme] = nil
+			end
+		end
 	end
 end
 
