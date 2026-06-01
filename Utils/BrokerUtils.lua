@@ -281,6 +281,20 @@ function BU.GetBrokerSeparatorHeight()
 	return DEFAULT_BROKER_SEPARATOR_HEIGHT
 end
 
+local function GetPixelAlignedBrokerSeparatorHeight(region)
+	local height = BU.GetBrokerSeparatorHeight()
+	if PixelUtil and PixelUtil.GetNearestPixelSize and region and region.GetEffectiveScale then
+		local scaleOk, scale = pcall(region.GetEffectiveScale, region)
+		if scaleOk and scale then
+			local ok, alignedHeight = pcall(PixelUtil.GetNearestPixelSize, height, scale, height)
+			if ok and alignedHeight and alignedHeight > 0 then
+				return alignedHeight
+			end
+		end
+	end
+	return height
+end
+
 function BU.ApplyBrokerSeparatorColor(texture)
 	if not texture or not texture.SetColorTexture then
 		return nil
@@ -297,7 +311,7 @@ function BU.ApplyBrokerFooterSeparatorStyle(texture)
 	end
 
 	if texture.SetHeight then
-		texture:SetHeight(BU.GetBrokerSeparatorHeight())
+		texture:SetHeight(GetPixelAlignedBrokerSeparatorHeight(texture))
 	end
 	return BU.ApplyBrokerSeparatorColor(texture)
 end
@@ -522,12 +536,13 @@ function BU.AddTooltipSeparator(tt, r, g, b, a)
 		return nil
 	end
 
-	if r == nil and g == nil and b == nil and a == nil then
-		local color = BU.GetBrokerSeparatorColor()
-		r, g, b, a = color.r, color.g, color.b, color.a
-	end
+	local color = BU.GetBrokerSeparatorColor()
+	r = r ~= nil and r or color.r
+	g = g ~= nil and g or color.g
+	b = b ~= nil and b or color.b
+	a = a ~= nil and a or color.a
 
-	return tt:AddSeparator(1, r or 0.3, g or 0.3, b or 0.3, a or 0.5)
+	return tt:AddSeparator(BU.GetBrokerSeparatorHeight(), r or 0.3, g or 0.3, b or 0.3, a or 0.5)
 end
 
 -- ========================================

@@ -117,6 +117,12 @@ function TooltipManager:AcquireRow(tooltip, rowIndex)
 	row:SetParent(tooltip.ScrollChild)
 	row:SetFrameLevel(tooltip.ScrollChild:GetFrameLevel() + 2)
 	row:SetHeight(1)
+	row:ClearBackdrop()
+	row.IsSeparator = nil
+	if row.SeparatorTexture then
+		row.SeparatorTexture:Hide()
+		row.SeparatorTexture:ClearAllPoints()
+	end
 	row:SetPoint("LEFT", tooltip.ScrollChild)
 	row:SetPoint("RIGHT", tooltip.ScrollChild)
 
@@ -354,6 +360,10 @@ function TooltipManager:ReleaseRow(row)
 	row:SetParent(nil)
 	row:ClearAllPoints()
 	row:ClearBackdrop()
+	if row.SeparatorTexture then
+		row.SeparatorTexture:Hide()
+		row.SeparatorTexture:ClearAllPoints()
+	end
 
 	for _, cell in pairs(row.Cells) do
 		self:ReleaseCell(cell)
@@ -365,6 +375,7 @@ function TooltipManager:ReleaseRow(row)
 	row.Height = 0
 	row.Index = 0
 	row.IsHeading = nil
+	row.IsSeparator = nil
 	row.Tooltip = nil
 
 	ScriptManager:ClearScripts(row)

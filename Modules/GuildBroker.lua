@@ -1424,7 +1424,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 			headerCell:SetFontObject(BetterFriendlistFontNormalLarge or "GameTooltipHeaderText")
 			headerCell:SetJustifyH("LEFT")
 			headerCell:SetText(C("dkyellow", L("GUILD_BROKER_TITLE")))
-			tt:AddSeparator()
+			AddTooltipSeparator(tt)
 
 			local noGuildRow = tt:AddRow()
 			local noGuildCell = noGuildRow:GetCell(1)
@@ -1435,7 +1435,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 			-- Show icon action hints if enabled
 			local showHints = BetterFriendlistDB and BetterFriendlistDB.guildBrokerShowHints ~= false
 			if showHints then
-				tt:AddSeparator()
+				AddTooltipSeparator(tt)
 				local hint1 = tt:AddRow()
 				local hint1Cell = hint1:GetCell(1)
 				hint1Cell:SetColSpan(numColumns)
@@ -1489,7 +1489,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 		local guildName = SafeGetGuildInfo() or L("GUILD_BROKER_NO_GUILD")
 		headerCell:SetText(C("dkyellow", guildName))
 		AddGuildMOTDRow(tt)
-		tt:AddSeparator()
+		AddTooltipSeparator(tt)
 
 		-- Column Headers
 		local headerCells = {}
@@ -1497,7 +1497,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 			table.insert(headerCells, C("ltyellow", col.label))
 		end
 		tt:AddRow(unpack(headerCells))
-		tt:AddSeparator()
+		AddTooltipSeparator(tt)
 
 		-- Collect and process roster data
 		local members = GuildBroker:CollectGuildRoster()
@@ -1687,14 +1687,14 @@ local function CreateLibQTipTooltip(anchorFrame)
 					groupCell:SetColSpan(numColumns)
 					groupCell:SetJustifyH("LEFT")
 
-					local prefix = collapsed and "(+) " or "(-) "
+					local prefix = collapsed and "+ " or "- "
 					local countText = string.format("(%d)", #groupMembers)
 
 					-- Color by class file for class grouping
 					local headerText
 					if groupMode == "by_class" then
 						local sampleMember = groupMembers[1]
-						headerText = prefix .. ClassColorTextByFile(sampleMember.classFile, groupKey) .. " " .. C("gray", countText)
+						headerText = ClassColorTextByFile(sampleMember.classFile, prefix .. groupKey) .. " " .. C("gray", countText)
 					elseif groupMode == "by_rank" then
 						local rankColor = BetterFriendlistDB and BetterFriendlistDB.guildBrokerRankColor
 						if rankColor then
@@ -1702,12 +1702,12 @@ local function CreateLibQTipTooltip(anchorFrame)
 								math.floor(rankColor[1] * 255),
 								math.floor(rankColor[2] * 255),
 								math.floor(rankColor[3] * 255))
-							headerText = prefix .. C(hex, groupKey) .. " " .. C("gray", countText)
+							headerText = C(hex, prefix .. groupKey) .. " " .. C("gray", countText)
 						else
-							headerText = prefix .. C("gold", groupKey) .. " " .. C("gray", countText)
+							headerText = C("gold", prefix .. groupKey) .. " " .. C("gray", countText)
 						end
 					else
-						headerText = prefix .. C("gold", groupKey) .. " " .. C("gray", countText)
+						headerText = C("gold", prefix .. groupKey) .. " " .. C("gray", countText)
 					end
 					groupCell:SetText("  " .. headerText)
 

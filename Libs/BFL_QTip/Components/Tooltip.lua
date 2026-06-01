@@ -128,6 +128,20 @@ local function GetTooltipAnchor(frame)
 	return verticalHalf .. horizontalHalf, frame, (verticalHalf == "TOP" and "BOTTOM" or "TOP") .. horizontalHalf
 end
 
+local function GetPixelAlignedSeparatorHeight(row, height)
+	height = tonumber(height) or 1
+	if PixelUtil and PixelUtil.GetNearestPixelSize and row and row.GetEffectiveScale then
+		local scaleOk, scale = pcall(row.GetEffectiveScale, row)
+		if scaleOk and scale then
+			local ok, alignedHeight = pcall(PixelUtil.GetNearestPixelSize, height, scale, height)
+			if ok and alignedHeight and alignedHeight > 0 then
+				return alignedHeight
+			end
+		end
+	end
+	return height
+end
+
 --------------------------------------------------------------------------------
 ---- Scripts
 --------------------------------------------------------------------------------
@@ -197,14 +211,25 @@ function Tooltip:AddSeparator(height, r, g, b, a)
 	local row = self:AddRow()
 	local color = NORMAL_FONT_COLOR
 
-	height = height or 1
+	height = GetPixelAlignedSeparatorHeight(row, height)
 
 	TooltipManager:SetTooltipSize(self, self.Width, self.Height + height)
 
+	row.IsSeparator = true
 	row.Height = height
 	row:SetHeight(height)
-	row:SetBackdrop(TooltipManager.DefaultBackdrop)
-	row:SetBackdropColor(r or color.r, g or color.g, b or color.b, a or 1)
+	row:ClearBackdrop()
+
+	local texture = row.SeparatorTexture
+	if not texture then
+		texture = row:CreateTexture(nil, "ARTWORK")
+		row.SeparatorTexture = texture
+	end
+
+	texture:ClearAllPoints()
+	texture:SetAllPoints(row)
+	texture:SetColorTexture(r or color.r, g or color.g, b or color.b, a or 1)
+	texture:Show()
 
 	return row
 end

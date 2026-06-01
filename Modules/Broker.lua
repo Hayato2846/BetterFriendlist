@@ -1687,7 +1687,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 		headerCell:SetFontObject(BetterFriendlistFontNormalLarge)
 		headerCell:SetJustifyH("LEFT")
 		headerCell:SetText(C("dkyellow", L("BROKER_TITLE")))
-		tt:AddSeparator()
+		AddTooltipSeparator(tt)
 
 		-- Column Headers
 		local headerCells = {}
@@ -1695,7 +1695,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 			table.insert(headerCells, C("ltyellow", col.label))
 		end
 		tt:AddRow(unpack(headerCells))
-		tt:AddSeparator()
+		AddTooltipSeparator(tt)
 
 		local Groups = GetGroups()
 		local groupsData = Groups and Groups:GetAll() or {}

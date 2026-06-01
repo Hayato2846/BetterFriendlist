@@ -2034,10 +2034,29 @@ local function RegisterBuiltInTests()
 				function texture:SetColorTexture(r, g, b, a)
 					self.r, self.g, self.b, self.a = r, g, b, a
 				end
+				function texture:SetHeight(height)
+					self.height = height
+				end
 
 				BrokerUtils.ApplyBrokerSeparatorColor(texture)
 				V:AssertEqual(texture.g, 0.34, "Texture green should receive the shared separator color")
 				V:AssertEqual(texture.a, 0.78, "Texture alpha should receive the shared separator color")
+
+				BrokerUtils.ApplyBrokerFooterSeparatorStyle(texture)
+				V:AssertEqual(texture.height, BrokerUtils.GetBrokerSeparatorHeight(), "Footer separator should use shared height")
+				V:AssertEqual(texture.r, 0.12, "Footer separator red should receive the shared separator color")
+
+				local tooltip = {}
+				function tooltip:AddSeparator(height, r, g, b, a)
+					self.height, self.r, self.g, self.b, self.a = height, r, g, b, a
+					return self
+				end
+
+				local separatorRow = BrokerUtils.AddTooltipSeparator(tooltip)
+				V:AssertEqual(separatorRow, tooltip, "Tooltip separator helper should return the QTip separator row")
+				V:AssertEqual(tooltip.height, BrokerUtils.GetBrokerSeparatorHeight(), "Tooltip separator should use shared height")
+				V:AssertEqual(tooltip.r, 0.12, "Tooltip separator red should use saved color")
+				V:AssertEqual(tooltip.a, 0.78, "Tooltip separator alpha should use saved color")
 			end)
 		end,
 	})
