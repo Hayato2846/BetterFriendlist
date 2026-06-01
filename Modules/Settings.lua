@@ -1,4 +1,4 @@
-﻿-- Settings.lua
+-- Settings.lua
 -- Settings panel and configuration management module
 
 local ADDON_NAME, BFL = ...
@@ -3559,6 +3559,33 @@ function Settings:RefreshThemeTab()
 		end
 	end
 
+	local function RefreshBrokerTooltips()
+		local Broker = BFL:GetModule("Broker")
+		if Broker and Broker.RefreshTooltip then
+			Broker:RefreshTooltip()
+		end
+
+		local GBroker = BFL:GetModule("GuildBroker")
+		if GBroker and GBroker.RefreshTooltip then
+			GBroker:RefreshTooltip()
+		end
+	end
+
+	local function SetBrokerTooltipThemeSetting(theme, key, value)
+		if ThemePalette and ThemePalette.SetBrokerTooltipThemeSetting then
+			ThemePalette:SetBrokerTooltipThemeSetting(theme, key, value)
+			RefreshBrokerTooltips()
+		end
+	end
+
+	local function ResetBrokerTooltipThemeSettings(theme)
+		if ThemePalette and ThemePalette.ResetBrokerTooltipThemeSettings then
+			ThemePalette:ResetBrokerTooltipThemeSettings(theme)
+			RefreshBrokerTooltips()
+			self:RefreshThemeTab()
+		end
+	end
+
 	local function GetThemeSettings(theme)
 		if ThemePalette and ThemePalette.GetThemeSettings then
 			return ThemePalette:GetThemeSettings(theme)
@@ -3655,6 +3682,72 @@ function Settings:RefreshThemeTab()
 			b = color.b or color[3] or 1,
 			a = color.a or color[4] or 1,
 		}
+	end
+
+	local function AddBrokerTooltipSection(theme)
+		if not ThemePalette or not ThemePalette.GetBrokerTooltipThemeSettings then
+			return
+		end
+
+		local settings = ThemePalette:GetBrokerTooltipThemeSettings(theme)
+		local BrokerUtils = BFL.BrokerUtils
+		local fallback = BrokerUtils and BrokerUtils.GetBrokerTooltipFallbackBackground
+			and BrokerUtils.GetBrokerTooltipFallbackBackground(theme)
+			or { r = 0, g = 0, b = 0, a = 0.85 }
+		local initialColor = ToColor(settings.backgroundColor, fallback)
+		local initialOpacity = settings.opacity
+		if initialOpacity == nil then
+			initialOpacity = initialColor.a or fallback.a or 1
+		end
+		initialColor.a = initialOpacity
+
+		table.insert(allFrames, Components:CreateSpacer(tab))
+		table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_THEME_BROKER_TOOLTIP_HEADER or "Broker Tooltips"))
+
+		local brokerBackgroundPicker = Components:CreateColorPicker(
+			tab,
+			L.SETTINGS_THEME_BROKER_TOOLTIP_BACKGROUND or "Background Color",
+			initialColor,
+			function(r, g, b, a)
+				SetBrokerTooltipThemeSetting(theme, "backgroundColor", { r = r, g = g, b = b, a = a })
+			end,
+			{
+				tooltipTitle = L.SETTINGS_THEME_BROKER_TOOLTIP_BACKGROUND or "Background Color",
+				tooltipDesc = L.SETTINGS_THEME_BROKER_TOOLTIP_BACKGROUND_DESC
+					or "Overrides the background color for Friends and Guild Data Broker tooltips in the selected theme.",
+			}
+		)
+		table.insert(allFrames, brokerBackgroundPicker)
+
+		local brokerOpacitySlider = Components:CreateSlider(
+			tab,
+			L.SETTINGS_THEME_BROKER_TOOLTIP_OPACITY or "Broker Tooltip Opacity",
+			0,
+			1,
+			initialOpacity,
+			FormatThemePercent,
+			function(value)
+				SetBrokerTooltipThemeSetting(theme, "opacity", value)
+			end
+		)
+		if brokerOpacitySlider.SetStep then
+			brokerOpacitySlider:SetStep(0.01)
+		end
+		if brokerOpacitySlider.SetTooltip then
+			brokerOpacitySlider:SetTooltip(
+				L.SETTINGS_THEME_BROKER_TOOLTIP_OPACITY or "Broker Tooltip Opacity",
+				L.SETTINGS_THEME_BROKER_TOOLTIP_OPACITY_DESC
+					or "Overrides the background opacity for Friends and Guild Data Broker tooltips in the selected theme."
+			)
+		end
+		table.insert(allFrames, brokerOpacitySlider)
+
+		table.insert(
+			allFrames,
+			Components:CreateButtonRow(tab, L.SETTINGS_THEME_BROKER_TOOLTIP_RESET or "Reset Broker Tooltips", nil, function()
+				ResetBrokerTooltipThemeSettings(theme)
+			end)
+		)
 	end
 
 	if currentTheme == "dark" then
@@ -3790,6 +3883,8 @@ function Settings:RefreshThemeTab()
 			end)
 		)
 	end
+
+	AddBrokerTooltipSection(currentTheme)
 
 	Components:AnchorChain(allFrames, -5)
 	tab.components = allFrames
@@ -7751,6 +7846,45 @@ function Settings:RefreshBrokerTab()
 		{ r = 1, g = 0.82, b = 0, a = 1 }
 	)
 	table.insert(allFrames, brokerNonLatinWarning)
+
+	table.insert(allFrames, Components:CreateSpacer(tab))
+	table.insert(allFrames, Components:CreateHeader(tab, L.BROKER_SETTINGS_APPEARANCE_HEADER or "Broker Tooltip Appearance"))
+
+	local BrokerUtils = BFL.BrokerUtils
+	local separatorColor = BrokerUtils and BrokerUtils.GetBrokerSeparatorColor and BrokerUtils.GetBrokerSeparatorColor()
+		or DB:Get("brokerSeparatorColor", { r = 0.3, g = 0.3, b = 0.3, a = 0.5 })
+	separatorColor = {
+		r = separatorColor.r or separatorColor[1] or 0.3,
+		g = separatorColor.g or separatorColor[2] or 0.3,
+		b = separatorColor.b or separatorColor[3] or 0.3,
+		a = separatorColor.a or separatorColor[4] or 0.5,
+	}
+	local separatorPicker = Components:CreateColorPicker(
+		tab,
+		L.BROKER_SETTINGS_SEPARATOR_COLOR or "Separator Color",
+		separatorColor,
+		function(r, g, b, a)
+			DB:Set("brokerSeparatorColor", { r = r, g = g, b = b, a = a })
+			RefreshBrokerTooltips()
+		end,
+		{
+			tooltipTitle = L.BROKER_SETTINGS_SEPARATOR_COLOR or "Separator Color",
+			tooltipDesc = L.BROKER_SETTINGS_SEPARATOR_COLOR_TOOLTIP
+				or "Sets the shared color for Friends and Guild Broker group separators and footer dividers.",
+			resetCallback = function(holder)
+				local color = BrokerUtils and BrokerUtils.GetDefaultBrokerSeparatorColor
+					and BrokerUtils.GetDefaultBrokerSeparatorColor()
+					or { r = 0.3, g = 0.3, b = 0.3, a = 0.5 }
+				DB:Set("brokerSeparatorColor", color)
+				if holder and holder.SetColor then
+					holder:SetColor(color.r, color.g, color.b, color.a)
+				end
+				RefreshBrokerTooltips()
+			end,
+			resetTooltip = L.BROKER_SETTINGS_SEPARATOR_RESET_TOOLTIP or "Right-click to reset the separator color.",
+		}
+	)
+	table.insert(allFrames, separatorPicker)
 
 	if DB:Get("brokerEnabled", true) then
 		-- Show Icon

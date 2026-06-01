@@ -59,6 +59,7 @@ local ClassColorText = BFL.BrokerUtils.ClassColorText
 local GetFactionIcon = BFL.BrokerUtils.GetFactionIcon
 local C = BFL.BrokerUtils.C
 local AddTooltipSeparator = BFL.BrokerUtils.AddTooltipSeparator
+local ApplyBrokerFooterSeparatorStyle = BFL.BrokerUtils.ApplyBrokerFooterSeparatorStyle
 
 local function GetAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
 	if BFL.GetThemeAccentColor then
@@ -1352,8 +1353,7 @@ local function RenderFixedFooter(footerFrame)
 
 	local function AddSeparator()
 		local tex = footerFrame:CreateTexture(nil, "ARTWORK")
-		tex:SetColorTexture(0.3, 0.3, 0.3, 0.5)
-		tex:SetHeight(1)
+		ApplyBrokerFooterSeparatorStyle(tex)
 		table.insert(footerFrame.content, tex)
 		return tex
 	end
@@ -2347,7 +2347,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 
 		-- Footer (Empty check only)
 		if displayedCount == 0 then
-			tt:AddSeparator()
+			AddTooltipSeparator(tt)
 			local emptyRow = tt:AddRow()
 			local emptyCell = emptyRow:GetCell(1)
 			emptyCell:SetColSpan(numColumns)

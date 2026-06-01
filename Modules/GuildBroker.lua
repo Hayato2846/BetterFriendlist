@@ -55,6 +55,7 @@ local FormatLastOnline = BFL.BrokerUtils.FormatLastOnline
 local IsMenuOpen = BFL.BrokerUtils.IsMenuOpen
 local AddNameToEditBox = BFL.BrokerUtils.AddNameToEditBox
 local AddTooltipSeparator = BFL.BrokerUtils.AddTooltipSeparator
+local ApplyBrokerFooterSeparatorStyle = BFL.BrokerUtils.ApplyBrokerFooterSeparatorStyle
 local ApplyBrokerFontToFontString = BFL.BrokerUtils.ApplyBrokerFontToFontString
 local ApplyBrokerFontToTooltip = BFL.BrokerUtils.ApplyBrokerFontToTooltip
 
@@ -1058,8 +1059,7 @@ local function RenderFixedFooter(footerFrame)
 
 	local function AddSeparator()
 		local line = footerFrame:CreateTexture(nil, "OVERLAY")
-		line:SetHeight(1)
-		line:SetColorTexture(0.5, 0.5, 0.5, 0.3)
+		ApplyBrokerFooterSeparatorStyle(line)
 		table.insert(footerFrame.lines, line)
 		line:Show()
 		return line
@@ -1753,7 +1753,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 
 		-- Empty state
 		if displayedCount == 0 then
-			tt:AddSeparator()
+			AddTooltipSeparator(tt)
 			local emptyRow = tt:AddRow()
 			local emptyCell = emptyRow:GetCell(1)
 			emptyCell:SetColSpan(numColumns)

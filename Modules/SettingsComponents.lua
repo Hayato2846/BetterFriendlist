@@ -1,4 +1,4 @@
-﻿-- SettingsComponents.lua
+-- SettingsComponents.lua
 -- Reusable UI components for Settings panel
 
 local ADDON_NAME, BFL = ...
@@ -349,9 +349,9 @@ function Components:CreateSlider(parent, labelText, min, max, initialValue, form
 		-- Block callback to prevent unwanted updates during re-init
 		holder.isUpdatingStep = true
 
-		-- Use current value or initial value if current is unavailable/zero/bad
+		-- The first Init uses a coarse temporary step count, so fractional defaults can snap to min/max.
 		local currentVal = holder.Slider:GetValue()
-		if not currentVal or (currentVal == 0 and min > 0) then
+		if holder.Slider.stepSize == nil or currentVal == nil then
 			currentVal = initialValue
 		end
 
@@ -993,9 +993,9 @@ function Components:CreateSliderWithColorPicker(
 		-- Block callback to prevent unwanted updates during re-init
 		holder.isUpdatingStep = true
 
-		-- Use current value or initial value if current is unavailable/zero/bad
+		-- The first Init uses a coarse temporary step count, so fractional defaults can snap to min/max.
 		local currentVal = holder.Slider:GetValue()
-		if not currentVal or (currentVal == 0 and min > 0) then
+		if holder.Slider.stepSize == nil or currentVal == nil then
 			currentVal = initialValue
 		end
 
