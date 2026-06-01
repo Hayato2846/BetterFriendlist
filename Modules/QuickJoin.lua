@@ -1084,6 +1084,79 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 	end
 end
 
+function QuickJoin:UpdateRetailScrollBoxWidth()
+	local scrollBoxContainer = self.retailScrollBoxContainer
+	local scrollBar = self.retailScrollBar
+	if not scrollBoxContainer or not scrollBar then
+		return
+	end
+
+	scrollBoxContainer:ClearAllPoints()
+	scrollBoxContainer:SetPoint("TOPLEFT", 4, -4)
+	if scrollBar:IsShown() then
+		scrollBoxContainer:SetPoint("BOTTOMRIGHT", -24, 4)
+	else
+		scrollBoxContainer:SetPoint("BOTTOMRIGHT", -4, 4)
+	end
+end
+
+function QuickJoin:InitializeRetailScrollBox(frame)
+	if BFL.IsClassic or not BFL.HasModernScrollBox then
+		return false
+	end
+
+	local contentInset = frame and frame.ContentInset
+	local scrollBoxContainer = contentInset and contentInset.ScrollBoxContainer
+	local scrollBox = scrollBoxContainer and scrollBoxContainer.ScrollBox
+	local scrollBar = contentInset and contentInset.ScrollBar
+	if not scrollBoxContainer or not scrollBox or not scrollBar then
+		return false
+	end
+
+	frame.ScrollBox = scrollBox
+	frame.ScrollBar = scrollBar
+
+	if self.retailScrollBox == scrollBox and self.retailScrollBar == scrollBar then
+		self:UpdateRetailScrollBoxWidth()
+		return true
+	end
+
+	self.dataProvider = self.dataProvider or CreateDataProvider()
+
+	local view = CreateScrollBoxListLinearView()
+	view:SetElementInitializer("BetterFriendlistQuickJoinCardTemplate", function(button, elementData)
+		if not elementData or not elementData.groupInfo then
+			button.entry = nil
+			button.guid = nil
+			return
+		end
+		self:OnScrollBoxInitialize(button, elementData)
+	end)
+	view:SetPadding(5, 5, 5, 5, 2)
+
+	if not BFL.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view) then
+		return false
+	end
+
+	self.retailScrollBoxContainer = scrollBoxContainer
+	self.retailScrollBox = scrollBox
+	self.retailScrollBar = scrollBar
+	self.retailScrollBoxView = view
+
+	if self.retailScrollBarHooked ~= scrollBar then
+		scrollBar:HookScript("OnShow", function()
+			self:UpdateRetailScrollBoxWidth()
+		end)
+		scrollBar:HookScript("OnHide", function()
+			self:UpdateRetailScrollBoxWidth()
+		end)
+		self.retailScrollBarHooked = scrollBar
+	end
+
+	self:UpdateRetailScrollBoxWidth()
+	return true
+end
+
 -- Initialize the QuickJoin module
 function QuickJoin:Initialize()
 	-- Classic Guard: QuickJoin/Social Queue is Retail-only
@@ -1119,42 +1192,7 @@ function QuickJoin:Initialize()
 			-- BFL:DebugPrint("|cff00ffffQuickJoin:|r Using Classic FauxScrollFrame mode")
 			self:InitializeClassicQuickJoin()
 		else
-			-- Retail: Use modern ScrollBox system
-			-- BFL:DebugPrint("|cff00ffffQuickJoin:|r Using Retail ScrollBox mode")
-			local scrollBoxContainer = BetterFriendsFrame.QuickJoinFrame.ContentInset.ScrollBoxContainer
-			local scrollBox = scrollBoxContainer.ScrollBox
-			local scrollBar = BetterFriendsFrame.QuickJoinFrame.ContentInset.ScrollBar
-
-			-- Create DataProvider
-			self.dataProvider = CreateDataProvider()
-
-			-- Initialize ScrollBox with Linear View
-			local view = CreateScrollBoxListLinearView()
-			view:SetElementInitializer("BetterFriendlistQuickJoinCardTemplate", function(button, elementData)
-				self:OnScrollBoxInitialize(button, elementData)
-			end)
-
-			-- Set padding
-			view:SetPadding(5, 5, 5, 5, 2)
-
-			BFL.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view)
-
-			-- Dynamic Width Adjustment based on ScrollBar visibility
-			local function UpdateScrollBoxWidth()
-				scrollBoxContainer:ClearAllPoints()
-				scrollBoxContainer:SetPoint("TOPLEFT", 4, -4)
-				if scrollBar:IsShown() then
-					scrollBoxContainer:SetPoint("BOTTOMRIGHT", -24, 4)
-				else
-					scrollBoxContainer:SetPoint("BOTTOMRIGHT", -4, 4)
-				end
-			end
-
-			scrollBar:HookScript("OnShow", UpdateScrollBoxWidth)
-			scrollBar:HookScript("OnHide", UpdateScrollBoxWidth)
-
-			-- Initial check
-			UpdateScrollBoxWidth()
+			self:InitializeRetailScrollBox(BetterFriendsFrame.QuickJoinFrame)
 		end
 	end
 

@@ -11,9 +11,6 @@
 local addonName, BFL = ...
 local L = BFL.L
 
--- Import UI constants
-local UI = BFL.UI.CONSTANTS
-
 -- Cached module reference (avoids repeated BFL:GetModule lookups in hot paths)
 local QuickJoinModule
 
@@ -42,97 +39,30 @@ function BetterQuickJoinFrame_OnLoad(self)
 		return
 	end
 
-	local scrollBox = contentInset.ScrollBoxContainer and contentInset.ScrollBoxContainer.ScrollBox
-	local scrollBar = contentInset.ScrollBar
-
 	-- Initialize Join button
 	if contentInset.JoinQueueButton then
 		contentInset.JoinQueueButton:SetText(JOIN_QUEUE)
 		contentInset.JoinQueueButton:Disable()
 	end
 
+	local QuickJoin = GetQuickJoinModule()
+
 	-- Classic mode: Skip ScrollBox initialization (handled by QuickJoin module)
 	if BFL.IsClassic or not BFL.HasModernScrollBox then
 		-- BFL:DebugPrint("|cff00ffffQuickJoinCallbacks:|r Classic mode - skipping ScrollBox init")
-		self.QuickJoin = GetQuickJoinModule()
+		self.QuickJoin = QuickJoin
 		self.selectedGUID = nil
 		return
 	end
 
-	-- Retail: Initialize ScrollBox
-	if scrollBox and scrollBar then
-		-- Create view with Blizzard-style dynamic text creation
-		local view = CreateScrollBoxListLinearView()
-
-		-- Element initializer - button setup
-		view:SetElementInitializer("BetterQuickJoinGroupButtonTemplate", function(button, elementData)
-			-- elementData is a QuickJoinEntry from QuickJoin module
-			-- It has ApplyToFrame() method that dynamically creates FontStrings
-			if not elementData or not elementData.ApplyToFrame then
-				button.entry = nil
-				button.guid = nil
-				return
-			end
-
-			-- Store font object for dynamic text creation
-			button.fontObject = BetterFriendlistFontNormalSmall
-
-			-- Apply entry data to button (creates FontStrings dynamically)
-			elementData:ApplyToFrame(button)
-
-			-- Store entry reference
-			button.entry = elementData
-			button.guid = elementData.guid
-
-			-- Register button for selection tracking
-			local QuickJoin = GetQuickJoinModule()
-			if QuickJoin then
-				QuickJoin.selectedButtons[elementData.guid] = button
-			end
-
-			-- Set selection state
-			local selected = QuickJoin and elementData.guid == QuickJoin.selectedGUID
-			if button.Selected then
-				button.Selected:SetShown(selected)
-			end
-			if button.Highlight then
-				button.Highlight:SetAlpha(selected and 0 or UI.ALPHA_DIMMED)
-			end
-		end)
-
-		-- Dynamic height calculator (matches Blizzard's approach)
-		view:SetElementExtentCalculator(function(dataIndex, elementData)
-			if elementData and elementData.CalculateHeight then
-				return elementData:CalculateHeight()
-			end
-			return 50
-		end)
-
-		-- Initialize ScrollBox with view
-		BFL.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view)
-
-		-- Add scroll bar visibility behavior
-		local scrollBoxAnchorsWithBar = {
-			CreateAnchor("TOPLEFT", 4, -4),
-			CreateAnchor("BOTTOMRIGHT", scrollBar, "BOTTOMLEFT", 0, 4),
-		}
-		local scrollBoxAnchorsWithoutBar = {
-			CreateAnchor("TOPLEFT", 4, -4),
-			CreateAnchor("BOTTOMRIGHT", -4, 4),
-		}
-		ScrollUtil.AddManagedScrollBarVisibilityBehavior(
-			scrollBox,
-			scrollBar,
-			scrollBoxAnchorsWithBar,
-			scrollBoxAnchorsWithoutBar
-		)
-
-		-- Store reference for easy access
-		self.ScrollBox = scrollBox
+	-- Retail: let the QuickJoin module own the view so the card template
+	-- cannot be displaced by the Blizzard-style fallback row template.
+	if QuickJoin and QuickJoin.InitializeRetailScrollBox then
+		QuickJoin:InitializeRetailScrollBox(self)
 	end
 
 	-- Store reference to QuickJoin module
-	self.QuickJoin = GetQuickJoinModule()
+	self.QuickJoin = QuickJoin
 	self.selectedGUID = nil
 end
 
