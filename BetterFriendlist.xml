@@ -2381,8 +2381,8 @@
 						</Anchors>
 						<Scripts>
 							<OnClick>
-								if BetterFriendsFrame.WhoFrame.selectedName then
-								C_PartyInfo.InviteUnit(BetterFriendsFrame.WhoFrame.selectedName)
+								if BetterFriendsFrame.WhoFrame.selectedName and BFL.InviteUnit then
+									BFL.InviteUnit(BetterFriendsFrame.WhoFrame.selectedName)
 								end
 							</OnClick>
 						</Scripts>

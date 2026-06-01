@@ -3197,8 +3197,6 @@ frame:SetScript("OnEvent", function(self, event, ...)
 						if inviteType == "REQUEST_INVITE" or inviteType == "REQUEST_INVITE_CROSS_FACTION" then
 							if BFL.RequestInviteFromUnit then
 								BFL.RequestInviteFromUnit(fullName)
-							elseif C_PartyInfo and C_PartyInfo.RequestInviteFromUnit then
-								C_PartyInfo.RequestInviteFromUnit(fullName)
 							end
 						elseif BFL.InviteUnit then
 							BFL.InviteUnit(fullName)

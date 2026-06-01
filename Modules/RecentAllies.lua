@@ -332,8 +332,8 @@ function RecentAllies:InitializeEntry(button, elementData)
 
 	-- Setup party button click handler
 	button.PartyButton:SetScript("OnClick", function()
-		if characterData and characterData.fullName then
-			C_PartyInfo.InviteUnit(characterData.fullName)
+		if characterData and characterData.fullName and BFL.InviteUnit then
+			BFL.InviteUnit(characterData.fullName)
 		end
 	end)
 
