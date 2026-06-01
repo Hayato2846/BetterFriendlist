@@ -24,7 +24,9 @@ jobs:
           GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Send Discord Notification
-        if: success() && !contains(github.ref_name, '-')
+        # Announce only first-time stable or beta release tags.
+        # Correction pushes still package and upload, but must not repost release notes.
+        if: success() && github.event.created == true && github.event.forced != true && (!contains(github.ref_name, '-') || contains(github.ref_name, 'beta'))
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           VERSION: ${{ github.ref_name }}
@@ -45,6 +47,7 @@ jobs:
           clean_version = version
           if version.startswith('v'):
               clean_version = version[1:]
+          is_beta = "beta" in clean_version.lower()
 
           # Extract content from CHANGELOG.md
           changelog_body = ""
@@ -85,7 +88,8 @@ jobs:
               )
 
           # Use changelog body if found, otherwise fallback to release body
-          body = changelog_body.strip() if changelog_body else "New version released!"
+          fallback_body = "New beta version available for testing!" if is_beta else "New version released!"
+          body = changelog_body.strip() if changelog_body else fallback_body
 
           # Define Project Links
           links = (
@@ -99,17 +103,37 @@ jobs:
           if len(body) > 3500:
               body = body[:3500] + "\n...(truncated)"
 
+          beta_notice = ""
+          if is_beta:
+              beta_notice = (
+                  "**Beta Version:** This is a preview build for testing before the next stable release. "
+                  "Please report issues on Discord or GitHub.\n\n"
+              )
+
+          embed_title = (
+              f"Beta Version {clean_version} available for testing!"
+              if is_beta
+              else f"Version {clean_version} released!"
+          )
+          embed_color = 5793266 if is_beta else 16766720 # Discord blurple for beta, gold for stable
+          webhook_username = "BetterFriendlist Beta" if is_beta else "BetterFriendlist Release"
+          footer_text = (
+              "BetterFriendlist Beta - World of Warcraft Addon"
+              if is_beta
+              else "BetterFriendlist - World of Warcraft Addon"
+          )
+
           # Construct JSON Payload with Embed
           payload = {
-              "username": "BetterFriendlist Release",
+              "username": webhook_username,
               "avatar_url": "https://media.forgecdn.net/avatars/thumbnails/1514/711/64/64/638983629917728143.png",
               "embeds": [
                   {
-                      "title": f"Version {clean_version} released!",
-                      "description": f"{links}\n\n{body}",
-                      "color": 16766720, # Gold color
+                      "title": embed_title,
+                      "description": f"{links}\n\n{beta_notice}{body}",
+                      "color": embed_color,
                       "footer": {
-                          "text": "BetterFriendlist - World of Warcraft Addon"
+                          "text": footer_text
                       }
                   }
               ]

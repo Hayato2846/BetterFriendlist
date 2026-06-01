@@ -137,6 +137,9 @@ Back up Retail SavedVariables:
 5. Test with clean and migrated SavedVariables profiles.
 6. Update `CHANGELOG.md` and the `.toc` version when doing release work.
 7. Push the tag; GitHub Actions packages and publishes the release.
+   Discord release notes are sent only for newly created stable or beta release tags, not for
+   force-pushed tag corrections. Beta release notes use a distinct embed color and include
+   a beta-version notice.
 8. Download/install the generated ZIP with `BFL-InstallRelease.ps1` and do one exact-package smoke test.
 
 ## Review Automation
