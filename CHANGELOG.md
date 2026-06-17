@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Quick Join** - Restored the card-style group display with activity images.
 - **Broker Separators** - Made Friends and Guild Broker header, group, empty-state, and footer separator lines use the same configured color and pixel-consistent thickness.
 - **Guild Broker Groups** - Made expand and collapse indicators match Friends Broker formatting and use the same color as their group headers.
+- **Menu Bridge** - Matched the companion AddOn category metadata to BetterFriendlist.
 - **Predefined Groups** - Fixed Favorites, In-Game, and Recently Added groups sometimes expanding without their matching friends.
 
 ### Known Issues
