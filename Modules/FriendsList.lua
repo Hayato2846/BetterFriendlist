@@ -3762,7 +3762,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 	local bnetFriends = C_BattleNet.GetFriendNumGameAccounts and C_BattleNet.GetFriendAccountInfo or nil
 	-- Classic safeguard: BNGetNumFriends may not exist
 	if bnetFriends and BNGetNumFriends then
-		local numBNetTotal, numBNetOnline = BNGetNumFriends()
+		local numBNetTotal, numBNetOnline, numBNetFavorite = BNGetNumFriends()
 
 		-- BNet data completeness check: After login/reload, the first API responses
 		-- may lack battleTags (returns nil/empty). Without battleTags, friend UIDs
@@ -3835,7 +3835,8 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 				friend.note = accountInfo.note
 				friend.customMessage = accountInfo.customMessage
 				friend.customMessageTime = accountInfo.customMessageTime
-				friend.isFavorite = accountInfo.isFavorite
+				local isFavoriteByOrder = numBNetFavorite and i <= numBNetFavorite
+				friend.isFavorite = accountInfo.isFavorite or isFavoriteByOrder or false
 				friend.gameAccountInfo = accountInfo.gameAccountInfo
 				friend.lastOnlineTime = accountInfo.lastOnlineTime
 				friend.isAFK = accountInfo.isAFK
@@ -5088,12 +5089,15 @@ function FriendsList:GetFriendsForGroup(targetGroupId)
 	end
 	local enableInGameGroup = DB:Get("enableInGameGroup", false)
 	local inGameGroupMode = DB:Get("inGameGroupMode", "same_game")
+	local enableRecentlyAddedGroup = DB:Get("enableRecentlyAddedGroup", false)
 	local friendGroups = (BetterFriendlistDB and BetterFriendlistDB.friendGroups) or {}
 
 	-- Get visible groups to check if favorites/ingame are actually enabled
 	local Groups = GetGroups()
 	local visibleGroups = Groups and Groups:GetAll() or {}
-	local favoritesVisible = visibleGroups["favorites"] == true
+	local favoritesVisible = visibleGroups["favorites"] ~= nil
+	local inGameVisible = enableInGameGroup and visibleGroups["ingame"] ~= nil
+	local recentlyAddedVisible = enableRecentlyAddedGroup and visibleGroups["recentlyadded"] ~= nil
 
 	for _, friend in ipairs(self.friendsList) do
 		-- Apply filters first
@@ -5112,7 +5116,7 @@ function FriendsList:GetFriendsForGroup(targetGroupId)
 			end
 
 			-- Check In-Game Group
-			if enableInGameGroup then
+			if inGameVisible then
 				local mode = inGameGroupMode
 				local isInGame = false
 
@@ -5147,6 +5151,17 @@ function FriendsList:GetFriendsForGroup(targetGroupId)
 
 				if isInGame then
 					if targetGroupId == "ingame" then
+						isInTargetGroup = true
+					end
+					isInAnyGroup = true
+				end
+			end
+
+			-- Check Recently Added Group
+			if recentlyAddedVisible then
+				local RecentlyAddedModule = BFL:GetModule("RecentlyAdded")
+				if RecentlyAddedModule and RecentlyAddedModule:IsFriendRecentlyAdded(friendUID) then
+					if targetGroupId == "recentlyadded" then
 						isInTargetGroup = true
 					end
 					isInAnyGroup = true

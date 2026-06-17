@@ -547,10 +547,11 @@ function TestSuite:RunAll()
 end
 
 function TestSuite:RunSingleTest(testName)
+	local normalizedTestName = testName and testName:lower()
 	-- Find test by name across all categories
 	for _, category in ipairs(TEST_CATEGORIES) do
 		for _, test in ipairs(self.tests[category]) do
-			if test.name == testName then
+			if test.name == testName or (normalizedTestName and test.name:lower() == normalizedTestName) then
 				self.Reporter:Header("RUNNING SINGLE TEST")
 				local result = self:RunTest(test)
 				return result
@@ -4832,6 +4833,123 @@ local function RegisterBuiltInTests()
 	-- GITHUB ISSUE REGRESSION TESTS
 	-- Tests derived from actual bug reports
 	-- =============================================
+
+	-- Issue #92: Predefined groups can expand empty when the optimized group path rebuilds them
+	local issue92State = {}
+	TS:RegisterTest("issues", "Issue92_PredefinedGroups_OptimizedFallback", {
+		description = "#92: Favorites, In-Game, and Recently Added should populate through optimized group expansion",
+		setup = function()
+			local FriendsList = BFL:GetModule("FriendsList")
+			issue92State = {
+				friendsList = {},
+				groupedFriends = FriendsList and FriendsList.groupedFriends or nil,
+				cachedGroupedFriends = FriendsList and FriendsList.cachedGroupedFriends or nil,
+				searchText = FriendsList and FriendsList.searchText or nil,
+				filterMode = FriendsList and FriendsList.filterMode or nil,
+				recentlyAddedTimestamps = BetterFriendlistDB and BetterFriendlistDB.recentlyAddedTimestamps or nil,
+			}
+			if FriendsList and FriendsList.friendsList then
+				for i, friend in ipairs(FriendsList.friendsList) do
+					issue92State.friendsList[i] = friend
+				end
+			end
+		end,
+		action = function(V)
+			local DB = BFL:GetModule("DB")
+			local FriendsList = BFL:GetModule("FriendsList")
+			local Groups = BFL:GetModule("Groups")
+			local RecentlyAddedModule = BFL:GetModule("RecentlyAdded")
+			if not DB or not FriendsList or not Groups or not RecentlyAddedModule then
+				V:Skip("Required group modules not loaded")
+				return
+			end
+			if not BetterFriendlistDB then
+				V:Skip("BetterFriendlistDB not available")
+				return
+			end
+
+			DB:Set("showFavoritesGroup", true)
+			DB:Set("enableInGameGroup", true)
+			DB:Set("inGameGroupMode", "same_game")
+			DB:Set("enableRecentlyAddedGroup", true)
+
+			FriendsList.searchText = ""
+			FriendsList.filterMode = "all"
+			FriendsList.groupedFriends = nil
+			FriendsList.cachedGroupedFriends = nil
+			BetterFriendlistDB.friendGroups = {}
+
+			local projectID = WOW_PROJECT_ID or WOW_PROJECT_MAINLINE or 1
+			local favoriteFriend = {
+				type = "bnet",
+				bnetAccountID = 92001,
+				battleTag = "Issue92Favorite#0001",
+				accountName = "Issue92Favorite",
+				connected = false,
+				isFavorite = true,
+				gameAccountInfo = { isOnline = false, clientProgram = "" },
+			}
+			local inGameFriend = {
+				type = "bnet",
+				bnetAccountID = 92002,
+				battleTag = "Issue92InGame#0001",
+				accountName = "Issue92InGame",
+				connected = true,
+				isFavorite = false,
+				gameAccountInfo = {
+					isOnline = true,
+					clientProgram = BNET_CLIENT_WOW or "WoW",
+					wowProjectID = projectID,
+				},
+			}
+			local recentFriend = {
+				type = "bnet",
+				bnetAccountID = 92003,
+				battleTag = "Issue92Recent#0001",
+				accountName = "Issue92Recent",
+				connected = false,
+				isFavorite = false,
+				gameAccountInfo = { isOnline = false, clientProgram = "" },
+			}
+			local recentUID = GetFriendUID(recentFriend)
+			BetterFriendlistDB.recentlyAddedTimestamps = {
+				[recentUID] = time(),
+			}
+
+			wipe(FriendsList.friendsList)
+			table.insert(FriendsList.friendsList, favoriteFriend)
+			table.insert(FriendsList.friendsList, inGameFriend)
+			table.insert(FriendsList.friendsList, recentFriend)
+
+			local favorites = FriendsList:GetFriendsForGroup("favorites")
+			local inGame = FriendsList:GetFriendsForGroup("ingame")
+			local recent = FriendsList:GetFriendsForGroup("recentlyadded")
+
+			V:AssertEqual(#favorites, 1, "Favorites group should include the favorite friend")
+			V:AssertEqual(favorites[1], favoriteFriend, "Favorites group should return the expected friend")
+			V:AssertEqual(#inGame, 1, "In-Game group should include the same-project WoW friend")
+			V:AssertEqual(inGame[1], inGameFriend, "In-Game group should return the expected friend")
+			V:AssertEqual(#recent, 1, "Recently Added group should include recent friends")
+			V:AssertEqual(recent[1], recentFriend, "Recently Added group should return the expected friend")
+		end,
+		teardown = function()
+			local FriendsList = BFL:GetModule("FriendsList")
+			if FriendsList then
+				wipe(FriendsList.friendsList)
+				for i, friend in ipairs(issue92State.friendsList or {}) do
+					FriendsList.friendsList[i] = friend
+				end
+				FriendsList.groupedFriends = issue92State.groupedFriends
+				FriendsList.cachedGroupedFriends = issue92State.cachedGroupedFriends
+				FriendsList.searchText = issue92State.searchText or ""
+				FriendsList.filterMode = issue92State.filterMode or "all"
+				FriendsList.lastBuildInputs = nil
+			end
+			if BetterFriendlistDB then
+				BetterFriendlistDB.recentlyAddedTimestamps = issue92State.recentlyAddedTimestamps
+			end
+		end,
+	})
 
 	-- Issue #41: "Show Collapse Arrow" does nothing
 	TS:RegisterTest("issues", "Issue41_ShowGroupArrow_Setting", {
