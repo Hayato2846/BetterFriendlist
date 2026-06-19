@@ -47,6 +47,7 @@ BFL.UseNativeCallbacks = false -- 12.0.0+ Frame:RegisterEventCallback
 local SOCIAL_BINDING = "TOGGLESOCIAL"
 local BFL_SOCIAL_BINDING = "BETTERFRIENDLIST_TOGGLE"
 local SOCIAL_BINDING_MIGRATION_VERSION = "2.5.6-social-keybind-v1"
+local CLASSIC_GUILD_UI_CVAR = "useClassicGuildUI"
 
 _G.BINDING_NAME_BETTERFRIENDLIST_TOGGLE = "Toggle BetterFriendlist"
 
@@ -77,6 +78,39 @@ local function DetectOptionalFeatures()
 	end
 	if BFL.HasSecretValues then
 		-- BFL:DebugPrint("|cff00ff00BetterFriendlist:|r Secret Values API detected (12.0.0+)")
+	end
+end
+
+local function ShouldForceSeparateClassicGuildWindow()
+	return BFL.IsClassicEra or BFL.IsTBCClassic or BFL.IsWrathClassic or BFL.IsCataClassic
+end
+
+local function EnsureSeparateClassicGuildWindow()
+	if not ShouldForceSeparateClassicGuildWindow() then
+		return
+	end
+
+	local getCVarBool = (C_CVar and C_CVar.GetCVarBool) or GetCVarBool
+	local setCVar = (C_CVar and C_CVar.SetCVar) or SetCVar
+	if not (getCVarBool and setCVar) then
+		return
+	end
+
+	local ok, useClassicGuildUI = pcall(getCVarBool, CLASSIC_GUILD_UI_CVAR)
+	if not ok or useClassicGuildUI ~= true then
+		return
+	end
+
+	local setOk = pcall(setCVar, CLASSIC_GUILD_UI_CVAR, "0")
+	if not setOk then
+		return
+	end
+
+	if FriendsFrame_UpdateGuildTabVisibility then
+		pcall(FriendsFrame_UpdateGuildTabVisibility)
+	end
+	if UpdateMicroButtons then
+		pcall(UpdateMicroButtons)
 	end
 end
 
@@ -2188,6 +2222,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 
 			-- Detect optional features (version-specific APIs)
 			DetectOptionalFeatures()
+			EnsureSeparateClassicGuildWindow()
 
 			-- Initialize all modules
 			for name, module in pairs(BFL.Modules) do
@@ -2233,6 +2268,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 			BFL:InstallFriendsFrameRedirects()
 			BFL:InstallBetterFriendsFrameEscapeHandler()
 		elseif addonName == "Blizzard_FriendsFrame" then
+			EnsureSeparateClassicGuildWindow()
 			BFL:InstallFriendsFrameRedirects()
 		end
 	elseif event == "PLAYER_LOGIN" then
@@ -2242,6 +2278,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 			-- BFL:DebugPrint("|cff00ff00[BFL]|r Using native Frame:RegisterEventCallback (12.0.0+)")
 		end
 
+		EnsureSeparateClassicGuildWindow()
 		BFL:InstallSocialKeybindOverride()
 		BFL:MigrateSocialKeybindToNativeBinding()
 		BFL:InstallFriendsFrameRedirects()
