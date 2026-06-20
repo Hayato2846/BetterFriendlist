@@ -1,4 +1,4 @@
-## Interface: 120007, 120005, 120001, 120000, 110207, 50504, 50503, 50500, 40402, 38000, 30405, 20505, 20504, 11508
+## Interface: 120100, 120007, 120005, 120001, 120000, 110207, 50504, 50503, 50500, 40402, 38000, 30405, 20505, 20504, 11508
 ## Title: BetterFriendlist
 ## Notes: Complete replacement for WoW Friends frame - Custom groups, Raid management, Quick Join, and more!
 ## Author: Hayato2846
@@ -28,6 +28,7 @@ Core.lua
 # Private Library Forks (taint-isolated)
 Libs\BFL_CallbackHandler.lua
 Libs\BFL_QTip\BFL_QTip.xml
+Libs\LibSettingsDesigner\LibSettingsDesigner.xml
 Utils\ClassicCompat.lua
 Utils\BFL_Tooltip.lua
 
@@ -69,7 +70,6 @@ Modules\FilterSortRegistry.lua
 Modules\IconSelector.lua
 Modules\Changelog.lua
 Modules\HelpFrame.lua
-Modules\Statistics.lua
 Modules\FrameSettings.lua
 Modules\Groups.lua
 Modules\RecentlyAdded.lua
@@ -86,6 +86,7 @@ Modules\GuildRosterData.lua
 Modules\GuildBroker.lua
 Modules\GuildFrame.lua
 Modules\SettingsComponents.lua
+Modules\SettingsDesigner.lua
 Modules\Settings.lua
 Modules\NoteSync.lua
 Modules\NoteCleanupWizard.lua

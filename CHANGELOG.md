@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [DRAFT]
 
+### Added
+- **Settings Center** - Added a LibSettingsDesigner-based settings center with dashboard, search-ready task categories, Retail/Classic shared loading, expanded native controls for theme, groups, raid shortcuts, broker columns, and explicit BFL Dark/Custom and ElvUI skin hooks.
+- **Settings Icons** - Added BetterFriendlist-specific Settings Center icons and a transparent Settings avatar.
+
+### Improved
+- **Settings Center** - Moved the new settings window behind a beta toggle so the classic settings window remains the default, with smooth switching between both Beta Features sections.
+- **Settings Center** - Updated the LibSettingsDesigner runtime and added dashboard help, new-setting search, seen-state badges, and enabled-feature summaries.
+- **Settings Center** - Added explicit Blizzard, BFL Dark/Custom, and ElvUI theme colors, a native reload-needed topbar action, cleaner dashboard status tiles, and safer return flow after external settings tools.
+- **Settings Center** - Improved section headers so settings pages show friendly localized titles instead of internal group IDs.
+- **Settings Center** - Restored a Beta Features overview that lists the currently available beta areas and links to their settings once beta features are enabled.
+- **Settings Center** - Polished Groups & Sorting with a compact Group Order table, clearer default sorting controls, and an inline QuickFilter/Sorter editor.
+- **Settings Center** - Reworked the QuickFilter/Sorter editor into a manager page with separate full-width editor pages for selected entries.
+- **Settings Center** - Moved the QuickFilter/Sorter editor and Global Sync database tools into native Settings Center pages, and combined Broker column ordering with visibility checkboxes.
+- **Settings Center Help** - Added expandable changelog notes, version navigation, and Discord, GitHub, and Ko-fi support links to the Settings Center.
+- **Settings Icons** - Refined the Help, Streamer Mode, and Name & Info icons for cleaner shapes and clearer feature recognition.
+
 ### Changed
 - **Client Compatibility** - Prepared Recruit A Friend, Quick Join, Battle.net friend metadata, censored Group Finder entries, and guild rank refreshes for Retail 12.1 while keeping current Retail and Classic support intact.
 - **Quick Join** - Added an explicit show action for censored Group Finder entries on Retail 12.1 PTR.
@@ -16,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Classic Guild Window** - Kept Classic clients on Blizzard's separate Guild window so the Guild keybind no longer opens the Friends list.
+
+### Removed
+- **Settings Statistics** - Removed the retired settings statistics page from the modern and legacy settings flows.
 
 ---
 

@@ -1,0 +1,7 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+	<!-- LibSettingsDesigner
+	     License: https://raw.githubusercontent.com/R41z0r/LibSettingsDesigner/main/LICENSE.md
+	     Do not remove this notice from redistributed copies. -->
+	<Script file="LibSettingsDesignerConfig.lua" />
+	<Script file="LibSettingsDesignerUI.lua" />
+</Ui>

@@ -203,6 +203,10 @@ function ThemeManager:ApplyCurrentTheme(reason)
 	if WhoFrame and WhoFrame.RefreshAccentColors then
 		WhoFrame:RefreshAccentColors()
 	end
+	local SettingsDesigner = BFL:GetModule("SettingsDesigner")
+	if SettingsDesigner and SettingsDesigner.ApplySkin then
+		SettingsDesigner:ApplySkin(reason or "theme-manager")
+	end
 
 	return true
 end

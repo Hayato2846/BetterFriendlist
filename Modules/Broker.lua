@@ -19,9 +19,6 @@ end
 local function GetGroups()
 	return BFL:GetModule("Groups")
 end
-local function GetStatistics()
-	return BFL:GetModule("Statistics")
-end
 local function GetQuickFilters()
 	return BFL:GetModule("QuickFilters")
 end

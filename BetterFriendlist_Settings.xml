@@ -103,15 +103,6 @@
 					</Anchors>
 				</Frame>
 				
-				<!-- Statistics Tab Content -->
-				<Frame parentKey="StatisticsTab" hidden="true">
-					<Anchors>
-						<Anchor point="TOPLEFT" />
-						<Anchor point="BOTTOMRIGHT" />
-					</Anchors>
-				</Frame>
-				
-
 				<!-- Data Broker Tab Content (STABLE) -->
 				<Frame parentKey="BrokerTab" hidden="true">
 					<Anchors>

@@ -6,6 +6,11 @@ local L = BFL.L
 local Changelog = BFL:RegisterModule("Changelog", {})
 
 local changelogFrame = nil
+local SUPPORT_LINKS = {
+	{ id = "discord", url = "https://discord.gg/dpaV8vh3w3" },
+	{ id = "github", url = "https://github.com/Hayato2846/BetterFriendlist/issues" },
+	{ id = "kofi", url = "https://ko-fi.com/hayato2846" },
+}
 
 local function GetAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
 	if BFL.GetThemeAccentColor then
@@ -26,6 +31,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [DRAFT]
 
+### Added
+- **Settings Center** - Added a LibSettingsDesigner-based settings center with dashboard, search-ready task categories, Retail/Classic shared loading, expanded native controls for theme, groups, raid shortcuts, broker columns, and explicit BFL Dark/Custom and ElvUI skin hooks.
+- **Settings Icons** - Added BetterFriendlist-specific Settings Center icons and a transparent Settings avatar.
+
+### Improved
+- **Settings Center** - Moved the new settings window behind a beta toggle so the classic settings window remains the default, with smooth switching between both Beta Features sections.
+- **Settings Center** - Updated the LibSettingsDesigner runtime and added dashboard help, new-setting search, seen-state badges, and enabled-feature summaries.
+- **Settings Center** - Added explicit Blizzard, BFL Dark/Custom, and ElvUI theme colors, a native reload-needed topbar action, cleaner dashboard status tiles, and safer return flow after external settings tools.
+- **Settings Center** - Improved section headers so settings pages show friendly localized titles instead of internal group IDs.
+- **Settings Center** - Restored a Beta Features overview that lists the currently available beta areas and links to their settings once beta features are enabled.
+- **Settings Center** - Polished Groups & Sorting with a compact Group Order table, clearer default sorting controls, and an inline QuickFilter/Sorter editor.
+- **Settings Center** - Reworked the QuickFilter/Sorter editor into a manager page with separate full-width editor pages for selected entries.
+- **Settings Center** - Moved the QuickFilter/Sorter editor and Global Sync database tools into native Settings Center pages, and combined Broker column ordering with visibility checkboxes.
+- **Settings Center Help** - Added expandable changelog notes, version navigation, and Discord, GitHub, and Ko-fi support links to the Settings Center.
+- **Settings Icons** - Refined the Help, Streamer Mode, and Name & Info icons for cleaner shapes and clearer feature recognition.
+
 ### Changed
 - **Client Compatibility** - Prepared Recruit A Friend, Quick Join, Battle.net friend metadata, censored Group Finder entries, and guild rank refreshes for Retail 12.1 while keeping current Retail and Classic support intact.
 - **Quick Join** - Added an explicit show action for censored Group Finder entries on Retail 12.1 PTR.
@@ -33,6 +54,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Classic Guild Window** - Kept Classic clients on Blizzard's separate Guild window so the Guild keybind no longer opens the Friends list.
+
+### Removed
+- **Settings Statistics** - Removed the retired settings statistics page from the modern and legacy settings flows.
 
 ---
 
@@ -249,7 +273,7 @@ local function FormatInline(text)
 	return text
 end
 
-local function ParseChangelog(text)
+local function ParseChangelog(text, includeUndated)
 	local entries = {}
 	local currentEntry = nil
 
@@ -264,10 +288,13 @@ local function ParseChangelog(text)
 			date = ""
 		end
 
-		if version and date ~= "" then -- Maintain previous behavior of requiring date mostly, or strictly adhering to "Header has date"
+		if version and (date ~= "" or includeUndated == true) then -- Maintain legacy behavior unless callers opt into draft/undated entries.
 			-- Actually, let's stick closer to original logic but allow extra spaces
 			-- Trim date just in case
 			date = date:match("^%s*(.-)%s*$")
+			if date == "" then
+				date = L.SETTINGS_CENTER_CHANGELOG_DRAFT or "Draft"
+			end
 
 			if currentEntry then
 				table.insert(entries, currentEntry)
@@ -322,6 +349,44 @@ local function ParseChangelog(text)
 	return entries
 end
 
+local function NormalizeEntryID(value)
+	value = tostring(value or ""):lower():gsub("[^%w]+", "-"):gsub("^-+", ""):gsub("-+$", "")
+	if value == "" then
+		value = "entry"
+	end
+	return value
+end
+
+local function FormatVersionTitle(version)
+	local template = L.CHANGELOG_HEADER_VERSION or "Version %s"
+	local ok, title = pcall(string.format, template, tostring(version or ""))
+	if ok and title and title ~= "" then
+		return title
+	end
+	return "Version " .. tostring(version or "")
+end
+
+local function ConvertBlockToInfoEntry(block)
+	if type(block) ~= "table" then
+		return nil
+	end
+	if block.type == "separator" then
+		return { type = "spacer", height = 8 }
+	end
+	local content = block.content or ""
+	if content == "" then
+		return nil
+	end
+	if block.type == "h3" then
+		return { type = "text", text = "|cffffd100" .. content .. "|r" }
+	elseif block.type == "h4" then
+		return { type = "text", text = "|cffcccccc" .. content .. "|r" }
+	elseif block.type == "list_item" then
+		return { type = "text", text = "- " .. content }
+	end
+	return { type = "text", text = content }
+end
+
 local function RecalculateHeight(contentFrame, entryFrames)
 	local totalHeight = 10
 	for _, frame in ipairs(entryFrames) do
@@ -358,6 +423,58 @@ local function ShowCopyDialog(url, title)
 		preferredIndex = 3,
 	}
 	StaticPopup_Show("BETTERFRIENDLIST_COPY_URL")
+end
+
+function Changelog:ShowCopyDialog(url, title)
+	ShowCopyDialog(url, title)
+end
+
+function Changelog:GetSupportLinks()
+	local labels = {
+		discord = L.CHANGELOG_POPUP_DISCORD or "Discord",
+		github = L.CHANGELOG_POPUP_GITHUB or "GitHub Issues",
+		kofi = L.CHANGELOG_POPUP_SUPPORT or "Ko-fi",
+	}
+	local links = {}
+	for index, link in ipairs(SUPPORT_LINKS) do
+		links[index] = {
+			id = link.id,
+			url = link.url,
+			label = labels[link.id] or link.id,
+		}
+	end
+	return links
+end
+
+function Changelog:GetSettingsCenterEntries(limit)
+	local entries = {}
+	for index, entryData in ipairs(ParseChangelog(CHANGELOG_TEXT, true)) do
+		if limit and #entries >= limit then
+			break
+		end
+		local content = {}
+		for _, block in ipairs(entryData.blocks or {}) do
+			local infoEntry = ConvertBlockToInfoEntry(block)
+			if infoEntry then
+				content[#content + 1] = infoEntry
+			end
+		end
+		if #content == 0 then
+			content[#content + 1] = {
+				type = "text",
+				text = L.SETTINGS_CENTER_CHANGELOG_EMPTY or "No release notes available.",
+			}
+		end
+		entries[#entries + 1] = {
+			type = "expandable",
+			id = "bfl-changelog-" .. NormalizeEntryID(entryData.version or index),
+			title = FormatVersionTitle(entryData.version),
+			rightText = entryData.date,
+			defaultExpanded = #entries == 0,
+			entries = content,
+		}
+	end
+	return entries
 end
 
 function Changelog:ShowDiscordPopup()

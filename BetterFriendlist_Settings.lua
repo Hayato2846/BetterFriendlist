@@ -164,14 +164,6 @@ Settings:ShowImportDialog()
 end
 end
 
--- Refresh statistics display
-function BetterFriendlistSettings_RefreshStatistics()
-local Settings = GetSettings()
-if Settings then
-Settings:RefreshStatistics()
-end
-end
-
 -- Compact mode changed
 function BetterFriendlistSettings_OnCompactModeChanged(checked)
 local Settings = GetSettings()

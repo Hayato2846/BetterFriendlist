@@ -273,6 +273,11 @@ function ElvUISkin:RegisterSkin()
 end
 
 function ElvUISkin:SkinFrames(E, S)
+	local SettingsDesigner = BFL:GetModule("SettingsDesigner")
+	if SettingsDesigner and SettingsDesigner.ApplyElvUISkin then
+		SettingsDesigner:ApplyElvUISkin(E, S)
+	end
+
 	if not _G.BetterFriendsFrame then
 		return
 	end
@@ -1041,6 +1046,10 @@ function ElvUISkin:SkinFrames(E, S)
 	BFL:DebugPrint("ElvUISkin: Skinning Settings")
 	xpcall(function()
 		self:SkinSettings(E, S)
+		local Designer = BFL:GetModule("SettingsDesigner")
+		if Designer and Designer.ApplyElvUISkin then
+			Designer:ApplyElvUISkin(E, S)
+		end
 	end, function(err)
 		BFL:DebugPrint("ElvUISkin: Error skinning Settings: " .. tostring(err))
 	end)

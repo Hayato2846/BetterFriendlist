@@ -538,6 +538,10 @@ function DarkTheme:SkinKnownFrames(reason)
 
 	self:SkinMainFrame(engine)
 	self:SkinSettingsFrame(engine)
+	local SettingsDesigner = BFL:GetModule("SettingsDesigner")
+	if SettingsDesigner and SettingsDesigner.ApplySkin then
+		SettingsDesigner:ApplySkin(reason or "dark-theme")
+	end
 	self:SkinAuxiliaryFrames(engine)
 
 	if _G.BFL_Tooltip then
@@ -1748,6 +1752,10 @@ function DarkTheme:SkinSettingsFrameDeferred()
 	local engine = GetEngine()
 	if engine and engine:IsActive() then
 		self:SkinSettingsFrame(engine)
+		local SettingsDesigner = BFL:GetModule("SettingsDesigner")
+		if SettingsDesigner and SettingsDesigner.ApplySkin then
+			SettingsDesigner:ApplySkin("deferred")
+		end
 	end
 
 	if C_Timer and C_Timer.After then
@@ -1760,6 +1768,10 @@ function DarkTheme:SkinSettingsFrameDeferred()
 			local delayedEngine = GetEngine()
 			if delayedEngine and delayedEngine:IsActive() then
 				self:SkinSettingsFrame(delayedEngine)
+				local SettingsDesigner = BFL:GetModule("SettingsDesigner")
+				if SettingsDesigner and SettingsDesigner.ApplySkin then
+					SettingsDesigner:ApplySkin("deferred")
+				end
 			end
 		end)
 	end
@@ -2051,7 +2063,6 @@ function DarkTheme:InstallHooks()
 		"RefreshFontsTab",
 		"RefreshGroupsTab",
 		"RefreshAdvancedTab",
-		"RefreshStatisticsTab",
 		"RefreshBrokerTab",
 		"RefreshFilterSortTab",
 		"RefreshGlobalSyncTab",
