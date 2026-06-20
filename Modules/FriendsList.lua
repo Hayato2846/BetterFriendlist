@@ -2198,6 +2198,10 @@ end
 
 -- Resolve current BNet friend index by stable identifiers (index is not persistent)
 function FriendsList:ResolveBNetFriendIndex(bnetAccountID, battleTag)
+	if BFL.IsBattleNetFriendsListEnabled and not BFL.IsBattleNetFriendsListEnabled() then
+		return nil
+	end
+
 	local numBNet = BNGetNumFriends and select(1, BNGetNumFriends()) or 0
 	if numBNet == 0 then
 		return nil
@@ -3759,10 +3763,15 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 	self:SyncGroups()
 
 	-- Get Battle.net friends (Classic: May not be available)
-	local bnetFriends = C_BattleNet.GetFriendNumGameAccounts and C_BattleNet.GetFriendAccountInfo or nil
+	local bnetFriends = C_BattleNet
+		and C_BattleNet.GetFriendNumGameAccounts
+		and C_BattleNet.GetFriendAccountInfo
+		and (not BFL.IsBattleNetFriendsListEnabled or BFL.IsBattleNetFriendsListEnabled())
+		or nil
 	-- Classic safeguard: BNGetNumFriends may not exist
 	if bnetFriends and BNGetNumFriends then
 		local numBNetTotal, numBNetOnline, numBNetFavorite = BNGetNumFriends()
+		local friendTagsEnabled = BFL.AreBattleNetFriendTagsEnabled and BFL.AreBattleNetFriendTagsEnabled()
 
 		-- BNet data completeness check: After login/reload, the first API responses
 		-- may lack battleTags (returns nil/empty). Without battleTags, friend UIDs
@@ -3787,7 +3796,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 				isUpdatingFriendsList = false
 				return
 			else
-				local firstInfo = C_BattleNet.GetFriendAccountInfo(1)
+				local firstInfo = BFL.GetBNetFriendInfo and BFL.GetBNetFriendInfo(1)
 				if firstInfo and firstInfo.battleTag and firstInfo.battleTag ~= "" then
 					self.bnetDataReady = true
 					-- Cancel zero fallback timer if it was pending from a previous call
@@ -3805,7 +3814,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 		end
 
 		for i = 1, numBNetTotal do
-			local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
+			local accountInfo = BFL.GetBNetFriendInfo and BFL.GetBNetFriendInfo(i)
 			if accountInfo then
 				local friend = GetNextFriendObject()
 
@@ -3837,6 +3846,8 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 				friend.customMessageTime = accountInfo.customMessageTime
 				local isFavoriteByOrder = numBNetFavorite and i <= numBNetFavorite
 				friend.isFavorite = accountInfo.isFavorite or isFavoriteByOrder or false
+				friend.friendLevel = accountInfo.friendLevel
+				friend.friendTags = friendTagsEnabled and accountInfo.friendTags or nil
 				friend.gameAccountInfo = accountInfo.gameAccountInfo
 				friend.lastOnlineTime = accountInfo.lastOnlineTime
 				friend.isAFK = accountInfo.isAFK
@@ -3861,6 +3872,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 						friend.characterName = gameInfo.characterName
 						friend.className = gameInfo.className
 						friend.classID = gameInfo.classID -- 11.2.7+: Store classID for optimized class color lookup
+						friend.classFilename = gameInfo.classFilename
 						friend.areaName = gameInfo.areaName
 						-- friend.richPresence = gameInfo.richPresence -- REVERTED: Caused issues with zone display
 						friend.level = gameInfo.characterLevel
@@ -8247,6 +8259,7 @@ end
 -- Update invite button
 function FriendsList:UpdateInviteButton(button, data)
 	local inviteID, accountName
+	button.friendLevel = nil
 
 	-- Get invite info from mock or real API
 	if BFL.MockFriendInvites.enabled then
@@ -8254,9 +8267,15 @@ function FriendsList:UpdateInviteButton(button, data)
 		if mockInvite then
 			inviteID = mockInvite.inviteID
 			accountName = mockInvite.accountName
+			button.friendLevel = mockInvite.friendLevel
 		end
 	else
-		inviteID, accountName = BNGetFriendInviteInfo(data.inviteIndex)
+		local inviteInfo = BFL.GetBNetFriendInviteInfo and BFL.GetBNetFriendInviteInfo(data.inviteIndex)
+		if inviteInfo then
+			inviteID = inviteInfo.inviteID
+			accountName = inviteInfo.accountName
+			button.friendLevel = inviteInfo.friendLevel
+		end
 	end
 
 	if not inviteID then
@@ -8353,7 +8372,11 @@ function FriendsList:UpdateInviteButton(button, data)
 					accountName = mockInvite.accountName
 				end
 			else
-				inviteID, accountName = BNGetFriendInviteInfo(parent.inviteIndex)
+				local inviteInfo = BFL.GetBNetFriendInviteInfo and BFL.GetBNetFriendInviteInfo(parent.inviteIndex)
+				if inviteInfo then
+					inviteID = inviteInfo.inviteID
+					accountName = inviteInfo.accountName
+				end
 			end
 
 			if not inviteID then

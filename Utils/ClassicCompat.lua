@@ -547,6 +547,49 @@ function Compat.GetBNetFriendGameAccountInfo(friendIndex, gameAccountIndex)
 	return nil
 end
 
+function Compat.IsBattleNetFriendsListSupported()
+	if not (C_BattleNet and C_BattleNet.GetFriendAccountInfo) then
+		return false
+	end
+	if C_BattleNet.IsBattleNetFriendsListSupported then
+		return C_BattleNet.IsBattleNetFriendsListSupported()
+	end
+	return true
+end
+
+function Compat.IsBattleNetFriendsListEnabled()
+	if not Compat.IsBattleNetFriendsListSupported() then
+		return false
+	end
+	if C_BattleNet.IsBattleNetFriendsListEnabled then
+		return C_BattleNet.IsBattleNetFriendsListEnabled()
+	end
+	return true
+end
+
+function Compat.AreBattleNetFriendTagsEnabled()
+	if not Compat.IsBattleNetFriendsListEnabled() then
+		return false
+	end
+	return C_BattleNet and C_BattleNet.AreFriendTagsEnabled and C_BattleNet.AreFriendTagsEnabled() or false
+end
+
+function Compat.GetBNetFriendInviteInfo(inviteIndex)
+	if C_BattleNet and C_BattleNet.GetFriendInviteInfo then
+		return C_BattleNet.GetFriendInviteInfo(inviteIndex)
+	end
+	if BNGetFriendInviteInfo then
+		local inviteID, accountName = BNGetFriendInviteInfo(inviteIndex)
+		if inviteID then
+			return {
+				inviteID = inviteID,
+				accountName = accountName,
+			}
+		end
+	end
+	return nil
+end
+
 ------------------------------------------------------------
 -- C_RecentAllies Compatibility (TWW-only!)
 ------------------------------------------------------------
@@ -576,6 +619,69 @@ function Compat.IsRecentAllyDataReady()
 		return C_RecentAllies.IsRecentAllyDataReady()
 	end
 	return true -- Return true so we don't show loading spinner forever
+end
+
+------------------------------------------------------------
+-- Recruit-A-Friend Compatibility
+------------------------------------------------------------
+-- 12.0.7: C_RecruitAFriend.IsEnabled()
+-- 12.1+:  C_RecruitAFriend.IsSystemSupported() / IsSystemEnabled()
+
+function Compat.IsRAFSystemSupported()
+	if not BFL.IsRetail or not C_RecruitAFriend then
+		return false
+	end
+	if C_RecruitAFriend.IsSystemSupported then
+		return C_RecruitAFriend.IsSystemSupported()
+	end
+	return C_RecruitAFriend.IsEnabled ~= nil
+end
+
+function Compat.IsRAFSystemEnabled()
+	if not BFL.IsRetail or not C_RecruitAFriend then
+		return false
+	end
+	if C_RecruitAFriend.IsSystemEnabled then
+		return C_RecruitAFriend.IsSystemEnabled()
+	end
+	if C_RecruitAFriend.IsEnabled then
+		return C_RecruitAFriend.IsEnabled()
+	end
+	return false
+end
+
+function Compat.CanSummonRAFFriend(guid)
+	if not guid or not Compat.IsRAFSystemEnabled() or not (C_RecruitAFriend and C_RecruitAFriend.CanSummonFriend) then
+		return false
+	end
+	local canSummon, reason = C_RecruitAFriend.CanSummonFriend(guid)
+	return canSummon == true, reason
+end
+
+------------------------------------------------------------
+-- Social Queue / Quick Join Compatibility
+------------------------------------------------------------
+-- 12.0.7: namespace presence means available.
+-- 12.1+: use explicit system support/enabled checks.
+
+function Compat.IsSocialQueueSupported()
+	if not BFL.IsRetail or not C_SocialQueue then
+		return false
+	end
+	if C_SocialQueue.IsSystemSupported then
+		return C_SocialQueue.IsSystemSupported()
+	end
+	return C_SocialQueue.GetAllGroups ~= nil
+end
+
+function Compat.IsSocialQueueEnabled()
+	if not Compat.IsSocialQueueSupported() then
+		return false
+	end
+	if C_SocialQueue.IsSystemEnabled then
+		return C_SocialQueue.IsSystemEnabled()
+	end
+	return true
 end
 
 ------------------------------------------------------------
@@ -1436,6 +1542,17 @@ BFL.ShowColorPicker = Compat.ShowColorPicker
 -- BNet Status
 BFL.GetMyBNetStatus = Compat.GetMyBNetStatus
 BFL.SetMyBNetStatus = Compat.SetMyBNetStatus
+BFL.GetBNetFriendInfo = Compat.GetBNetFriendInfo
+BFL.GetBNetFriendGameAccountInfo = Compat.GetBNetFriendGameAccountInfo
+BFL.IsBattleNetFriendsListSupported = Compat.IsBattleNetFriendsListSupported
+BFL.IsBattleNetFriendsListEnabled = Compat.IsBattleNetFriendsListEnabled
+BFL.AreBattleNetFriendTagsEnabled = Compat.AreBattleNetFriendTagsEnabled
+BFL.GetBNetFriendInviteInfo = Compat.GetBNetFriendInviteInfo
+BFL.IsRAFSystemSupported = Compat.IsRAFSystemSupported
+BFL.IsRAFSystemEnabled = Compat.IsRAFSystemEnabled
+BFL.CanSummonRAFFriend = Compat.CanSummonRAFFriend
+BFL.IsSocialQueueSupported = Compat.IsSocialQueueSupported
+BFL.IsSocialQueueEnabled = Compat.IsSocialQueueEnabled
 
 -- Friend/Group Operations
 BFL.AddFriend = Compat.AddFriend

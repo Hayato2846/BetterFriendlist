@@ -5727,9 +5727,10 @@ function TestSuite:RunPerfyStress(durationSeconds)
 			return frame.RecentAlliesFrame ~= nil
 		elseif tabIndex == 3 then
 			return frame.RecruitAFriendFrame ~= nil
-				and C_RecruitAFriend
-				and C_RecruitAFriend.IsEnabled
-				and C_RecruitAFriend.IsEnabled()
+				and BFL.IsRAFSystemSupported
+				and BFL.IsRAFSystemSupported()
+				and BFL.IsRAFSystemEnabled
+				and BFL.IsRAFSystemEnabled()
 		elseif tabIndex == 4 then
 			return frame.GuildFrame ~= nil
 				and BFL.IsGuildTabEnabled

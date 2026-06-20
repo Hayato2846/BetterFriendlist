@@ -203,6 +203,11 @@ function BetterQuickJoinGroupButton_OnClick(self, button)
 
 	if button == "LeftButton" then
 		if self.entry and self.entry:CanJoin() then
+			if self.entry.groupInfo and self.entry.groupInfo.lfgListCensored then
+				QuickJoin:RevealCensoredGroup(self.guid)
+				return
+			end
+
 			-- Select this group
 			QuickJoin:SelectGroup(self.guid)
 		end

@@ -1168,12 +1168,8 @@ local function LocalizeUI()
 		end
 		if frame.FriendsTabHeader.Tab3 then
 			frame.FriendsTabHeader.Tab3:SetText(L.RECRUIT_A_FRIEND or RECRUIT_A_FRIEND)
-			-- Check if RAF is enabled
-			if not BFL.IsClassic and C_RecruitAFriend and C_RecruitAFriend.IsEnabled then
-				if not C_RecruitAFriend.IsEnabled() then
-					frame.FriendsTabHeader.Tab3:Hide()
-				end
-			elseif not BFL.IsClassic then
+			-- RAF is Retail-only and 12.1 uses IsSystemSupported/IsSystemEnabled instead of IsEnabled.
+			if not (BFL.IsRAFSystemSupported and BFL.IsRAFSystemSupported() and BFL.IsRAFSystemEnabled()) then
 				frame.FriendsTabHeader.Tab3:Hide()
 			end
 		end
@@ -1274,6 +1270,12 @@ frame:RegisterEvent("BN_FRIEND_ACCOUNT_OFFLINE")
 frame:RegisterEvent("BN_FRIEND_INFO_CHANGED")
 frame:RegisterEvent("PLAYER_LOGIN")
 frame:RegisterEvent("SOCIAL_QUEUE_UPDATE")
+pcall(frame.RegisterEvent, frame, "SOCIAL_UI_SOCIAL_QUEUE_SYSTEM_STATUS_UPDATED")
+pcall(frame.RegisterEvent, frame, "BATTLE_NET_FRIEND_TAG_ENABLED_STATUS_UPDATED")
+pcall(frame.RegisterEvent, frame, "SOCIAL_UI_FRIENDS_LIST_SYSTEM_STATUS_UPDATED")
+pcall(frame.RegisterEvent, frame, "CONFIRM_BATTLE_NET_FRIEND_INVITE_SHOW")
+pcall(frame.RegisterEvent, frame, "LFG_LIST_REVEALED_CENSORED_ACTIVE_ENTRY")
+pcall(frame.RegisterEvent, frame, "LFG_LIST_SEARCH_RESULT_UPDATED")
 frame:RegisterEvent("GROUP_LEFT")
 frame:RegisterEvent("GROUP_JOINED")
 frame:RegisterEvent("GROUP_ROSTER_UPDATE")
@@ -1441,16 +1443,18 @@ function GetFriendUID(friend)
 			return "bnet_" .. friend.battleTag
 		elseif friend.bnetAccountID then
 			-- Fallback: Try to look up battleTag from bnetAccountID
-			local numBNet = BNGetNumFriends()
-			for i = 1, numBNet do
-				local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
-				if
-					accountInfo
-					and accountInfo.bnetAccountID == friend.bnetAccountID
-					and accountInfo.battleTag
-					and accountInfo.battleTag ~= ""
-				then
-					return "bnet_" .. accountInfo.battleTag
+			if BNGetNumFriends and (not BFL.IsBattleNetFriendsListEnabled or BFL.IsBattleNetFriendsListEnabled()) then
+				local numBNet = BNGetNumFriends()
+				for i = 1, numBNet do
+					local accountInfo = BFL.GetBNetFriendInfo and BFL.GetBNetFriendInfo(i)
+					if
+						accountInfo
+						and accountInfo.bnetAccountID == friend.bnetAccountID
+						and accountInfo.battleTag
+						and accountInfo.battleTag ~= ""
+					then
+						return "bnet_" .. accountInfo.battleTag
+					end
 				end
 			end
 			-- Last resort: use bnetAccountID (will cause issues with persistence)
@@ -2798,10 +2802,14 @@ frame:SetScript("OnEvent", function(self, event, ...)
 							end
 						end
 
-						if not friendUID and BNGetNumFriends and C_BattleNet and C_BattleNet.GetFriendAccountInfo then
+						if
+							not friendUID
+							and BNGetNumFriends
+							and (not BFL.IsBattleNetFriendsListEnabled or BFL.IsBattleNetFriendsListEnabled())
+						then
 							local numBNet = BNGetNumFriends()
 							for i = 1, numBNet do
-								local bnInfo = C_BattleNet.GetFriendAccountInfo(i)
+								local bnInfo = BFL.GetBNetFriendInfo and BFL.GetBNetFriendInfo(i)
 								if bnInfo and bnInfo.bnetAccountID == bnetIDAccount then
 									if bnInfo.battleTag and bnInfo.battleTag ~= "" then
 										friendUID = "bnet_" .. bnInfo.battleTag
@@ -2821,10 +2829,10 @@ frame:SetScript("OnEvent", function(self, event, ...)
 							end
 						end
 
-						if BNGetNumFriends and C_BattleNet and C_BattleNet.GetFriendAccountInfo then
+						if BNGetNumFriends and (not BFL.IsBattleNetFriendsListEnabled or BFL.IsBattleNetFriendsListEnabled()) then
 							local numBNet = BNGetNumFriends()
 							for i = 1, numBNet do
-								local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
+								local accountInfo = BFL.GetBNetFriendInfo and BFL.GetBNetFriendInfo(i)
 								if
 									accountInfo
 									and accountInfo.gameAccountInfo
@@ -4016,12 +4024,35 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		-- This ensures data stays synchronized with WoW API
 		-- The UpdateFriendsList() function will apply search filter automatically
 		RequestUpdate() -- No longer checks if frame is shown
-	elseif event == "SOCIAL_QUEUE_UPDATE" or event == "GROUP_LEFT" or event == "GROUP_JOINED" then
+	elseif
+		event == "SOCIAL_QUEUE_UPDATE"
+		or event == "SOCIAL_UI_SOCIAL_QUEUE_SYSTEM_STATUS_UPDATED"
+		or event == "LFG_LIST_REVEALED_CENSORED_ACTIVE_ENTRY"
+		or event == "LFG_LIST_SEARCH_RESULT_UPDATED"
+		or event == "GROUP_LEFT"
+		or event == "GROUP_JOINED"
+	then
 		-- Update Quick Join tab counter when social queue changes
+		BFL.HasQuickJoin = BFL.IsSocialQueueSupported and BFL.IsSocialQueueSupported() or false
+		local QuickJoin = BFL:GetModule("QuickJoin")
+		if event == "SOCIAL_UI_SOCIAL_QUEUE_SYSTEM_STATUS_UPDATED" and QuickJoin and QuickJoin.OnSystemStatusUpdated then
+			QuickJoin:OnSystemStatusUpdated()
+		elseif event == "LFG_LIST_REVEALED_CENSORED_ACTIVE_ENTRY" and QuickJoin and QuickJoin.Update then
+			QuickJoin:Update(true)
+		elseif event == "LFG_LIST_SEARCH_RESULT_UPDATED" and QuickJoin and QuickJoin.OnLFGListSearchResultUpdated then
+			QuickJoin:OnLFGListSearchResultUpdated(...)
+		end
 		if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
 			BetterFriendsFrame_UpdateQuickJoinTab()
 		end
 		-- Fire callbacks for RaidFrame module
+		BFL:FireEventCallbacks(event, ...)
+	elseif
+		event == "BATTLE_NET_FRIEND_TAG_ENABLED_STATUS_UPDATED"
+		or event == "SOCIAL_UI_FRIENDS_LIST_SYSTEM_STATUS_UPDATED"
+		or event == "CONFIRM_BATTLE_NET_FRIEND_INVITE_SHOW"
+	then
+		RequestUpdate()
 		BFL:FireEventCallbacks(event, ...)
 	elseif event == "GROUP_ROSTER_UPDATE" or event == "RAID_ROSTER_UPDATE" or event == "PLAYER_ROLES_ASSIGNED" then
 		-- Fire callbacks for RaidFrame module to update raid info
@@ -4206,14 +4237,13 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 		end
 	elseif tabIndex == 3 then
 		-- Retail: Recruit A Friend
-		-- Check IsEnabled() as requested
-		local rafEnabled = C_RecruitAFriend and C_RecruitAFriend.IsEnabled and C_RecruitAFriend.IsEnabled()
+		local rafEnabled = BFL.IsRAFSystemEnabled and BFL.IsRAFSystemEnabled()
 		if not BFL.IsClassic and frame.RecruitAFriendFrame and rafEnabled then
 			ShowChildFrame(frame.RecruitAFriendFrame)
 			ShowChildFrame(frame.RecruitmentButton)
 
 			-- Initialize RAF data (match Blizzard's OnLoad behavior)
-			if C_RecruitAFriend and C_RecruitAFriend.IsSystemEnabled then
+			if C_RecruitAFriend and (BFL.IsRAFSystemSupported and BFL.IsRAFSystemSupported()) then
 				if not RecruitAFriendFrame then
 					local loadAddOn = C_AddOns and C_AddOns.LoadAddOn or LoadAddOn
 					if loadAddOn then
@@ -4323,7 +4353,7 @@ end
 
 -- Update Quick Join tab with group count (matching Blizzard's FriendsFrame_UpdateQuickJoinTab)
 function BetterFriendsFrame_UpdateQuickJoinTab() -- Quick Join is Retail only
-	if BFL.IsClassic then
+	if BFL.IsClassic or (BFL.IsSocialQueueSupported and not BFL.IsSocialQueueSupported()) then
 		return
 	end
 
@@ -4341,7 +4371,9 @@ function BetterFriendsFrame_UpdateQuickJoinTab() -- Quick Join is Retail only
 		numGroups = groups and #groups or 0
 	else
 		-- Fallback to C_SocialQueue if module not loaded
-		numGroups = C_SocialQueue and C_SocialQueue.GetAllGroups and #C_SocialQueue.GetAllGroups() or 0
+		if BFL.IsSocialQueueEnabled and BFL.IsSocialQueueEnabled() and C_SocialQueue and C_SocialQueue.GetAllGroups then
+			numGroups = #C_SocialQueue.GetAllGroups()
+		end
 	end
 
 	-- Update tab text with count
@@ -4540,11 +4572,17 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 	end
 
 	-- Get the actual Battle.net friend index from our stored data
+	if BFL.IsBattleNetFriendsListEnabled and not BFL.IsBattleNetFriendsListEnabled() then
+		return
+	end
+	if not BNGetNumFriends then
+		return
+	end
 	local numBNet = BNGetNumFriends()
 	local actualIndex = nil
 
 	for i = 1, numBNet do
-		local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
+		local accountInfo = BFL.GetBNetFriendInfo and BFL.GetBNetFriendInfo(i)
 		if accountInfo and accountInfo.bnetAccountID == friendData.bnetAccountID then
 			actualIndex = i
 			break
@@ -4697,6 +4735,7 @@ local function AddSocialQueueGroupMembersToTooltip(tooltip, guid)
 	if
 		not tooltip
 		or not guid
+		or (BFL.IsSocialQueueEnabled and not BFL.IsSocialQueueEnabled())
 		or not C_SocialQueue
 		or not C_SocialQueue.GetGroupForPlayer
 		or not C_SocialQueue.GetGroupMembers
@@ -4756,11 +4795,17 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 	BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
 
 	-- Get the actual Battle.net friend index
+	if BFL.IsBattleNetFriendsListEnabled and not BFL.IsBattleNetFriendsListEnabled() then
+		return
+	end
+	if not BNGetNumFriends then
+		return
+	end
 	local numBNet = BNGetNumFriends()
 	local actualIndex = nil
 
 	for i = 1, numBNet do
-		local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
+		local accountInfo = BFL.GetBNetFriendInfo and BFL.GetBNetFriendInfo(i)
 		if accountInfo and accountInfo.bnetAccountID == friendData.bnetAccountID then
 			actualIndex = i
 			break

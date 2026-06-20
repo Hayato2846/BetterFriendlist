@@ -207,6 +207,8 @@ local function GenerateMockBNetFriend(index, isOnline, options)
 	local accountName = battleTag:match("([^#]+)")
 	local characterName = options.characterName or MOCK_NAMES[(index % #MOCK_NAMES) + 1]
 	local faction = math.random(2) == 1 and "Alliance" or "Horde"
+	local friendLevel = options.friendLevel or ((index % 3) + 1)
+	local friendTags = options.friendTags or { index % 10, (index + 3) % 10 }
 
 	-- Determine status (DND, AFK, normal)
 	local isDND = options.isDND or (isOnline and math.random(10) == 1)
@@ -221,6 +223,8 @@ local function GenerateMockBNetFriend(index, isOnline, options)
 		connected = isOnline,
 		note = options.note or (math.random(3) == 1 and "Real friend from raids" or nil),
 		isFavorite = options.isFavorite or (index <= 3),
+		friendLevel = friendLevel,
+		friendTags = friendTags,
 		lastOnlineTime = not isOnline and (time() - math.random(86400, 604800)) or nil,
 		-- Game account info (always present to prevent errors in FriendsFrame_GetBNetAccountNameAndStatus)
 		gameAccountInfo = {
@@ -231,6 +235,7 @@ local function GenerateMockBNetFriend(index, isOnline, options)
 			characterName = (isOnline and game.program == "WoW") and characterName or "",
 			className = (isOnline and game.program == "WoW") and classInfo.name or "",
 			classID = (isOnline and game.program == "WoW") and classInfo.classID or 0,
+			classFilename = (isOnline and game.program == "WoW") and classInfo.file or "",
 			characterLevel = (isOnline and game.program == "WoW") and level or "",
 			areaName = (isOnline and game.program == "WoW") and zone or "",
 			richPresence = isOnline and game.richPresence or "",
@@ -244,6 +249,7 @@ local function GenerateMockBNetFriend(index, isOnline, options)
 		characterName = isOnline and game.program == "WoW" and characterName or nil,
 		className = isOnline and game.program == "WoW" and classInfo.name or nil,
 		classID = isOnline and game.program == "WoW" and classInfo.classID or nil,
+		classFilename = isOnline and game.program == "WoW" and classInfo.file or nil,
 		level = isOnline and game.program == "WoW" and level or nil,
 		areaName = isOnline and game.program == "WoW" and zone or nil,
 		realmName = isOnline and game.program == "WoW" and "Blackrock" or nil,
@@ -686,7 +692,7 @@ function PreviewMode:Enable()
 	print("  |cffffffff• " .. #self.mockData.friends .. " mock friends|r")
 	print("  |cffffffff• " .. #self.mockData.groups .. " custom groups|r")
 	print("  |cffffffff• Raid frame with 25 players|r")
-	print("  |cffffffff• Quick Join with ~11 groups|r")
+	print("  |cffffffff• Quick Join with Retail 12.1 censored/reveal groups|r")
 	print("  |cffffffff• 2 friend invite requests|r")
 	print("  |cffffffff• BattleTag hidden (" .. self.MOCK_BATTLETAG .. ")|r")
 	print("")
@@ -1033,6 +1039,7 @@ function PreviewMode:GenerateBrokerPreviewData()
 			characterName = sample.characterName,
 			className = sample.className,
 			classID = sample.classID,
+			classFilename = sample.classFile,
 			characterLevel = sample.level,
 			areaName = sample.zone,
 			realmName = "Blackrock",
@@ -1051,6 +1058,8 @@ function PreviewMode:GenerateBrokerPreviewData()
 			connected = true,
 			note = sample.note .. " (" .. sample.alphabet .. ")",
 			isFavorite = false,
+			friendLevel = (i % 3) + 1,
+			friendTags = { i - 1, i + 2 },
 			client = "WoW",
 			isMobile = false,
 			gameAccountID = gameAccountID,
@@ -1059,6 +1068,7 @@ function PreviewMode:GenerateBrokerPreviewData()
 			characterName = sample.characterName,
 			className = sample.className,
 			classID = sample.classID,
+			classFilename = sample.classFile,
 			level = sample.level,
 			area = sample.zone,
 			realmName = "Blackrock",
@@ -1125,6 +1135,8 @@ function PreviewMode:GenerateBrokerPreviewData()
 		connected = true,
 		note = "Latin baseline row for comparison",
 		isFavorite = false,
+		friendLevel = 2,
+		friendTags = { 2, 3, 8 },
 		client = "WoW",
 		gameAccountID = 9005,
 		gameAccountInfo = {
@@ -1135,6 +1147,7 @@ function PreviewMode:GenerateBrokerPreviewData()
 			characterName = "Latincontrol",
 			className = "Paladin",
 			classID = 2,
+			classFilename = "PALADIN",
 			characterLevel = 80,
 			areaName = "Stormwind City",
 			realmName = "Blackrock",
@@ -1146,6 +1159,7 @@ function PreviewMode:GenerateBrokerPreviewData()
 		characterName = "Latincontrol",
 		className = "Paladin",
 		classID = 2,
+		classFilename = "PALADIN",
 		level = 80,
 		area = "Stormwind City",
 		realmName = "Blackrock",
@@ -1479,7 +1493,9 @@ end
 
 function PreviewMode:EnableQuickJoinMock()
 	local QuickJoin = BFL:GetModule("QuickJoin")
-	if QuickJoin and QuickJoin.CreateMockPreset_All then
+	if QuickJoin and QuickJoin.CreateMockPreset_12_1 then
+		QuickJoin:CreateMockPreset_12_1()
+	elseif QuickJoin and QuickJoin.CreateMockPreset_All then
 		QuickJoin:CreateMockPreset_All()
 	end
 end
@@ -1514,8 +1530,8 @@ function PreviewMode:EnableInviteMock()
 	-- Use existing mock invite system
 	BFL.MockFriendInvites.enabled = true
 	BFL.MockFriendInvites.invites = {
-		{ inviteID = 1000001, accountName = "NewFriend#1234" },
-		{ inviteID = 1000002, accountName = "GuildRecruit#5678" },
+		{ inviteID = 1000001, accountName = "NewFriend#1234", friendLevel = 1 },
+		{ inviteID = 1000002, accountName = "GuildRecruit#5678", friendLevel = 2 },
 	}
 end
 
@@ -1662,6 +1678,7 @@ function PreviewMode:HandleCommand(args)
 			print("  |cffffffff- " .. #self.mockData.guildMembers .. " broker guild rows|r")
 			print("  |cffffffff• " .. #self.mockData.friends .. " mock friends|r")
 			print("  |cffffffff• " .. #self.mockData.groups .. " custom groups|r")
+			print("  |cffffffff• Quick Join Retail 12.1 censored/reveal groups|r")
 		else
 			print("|cff00ff00BetterFriendlist:|r Preview mode is |cffff0000DISABLED|r")
 		end

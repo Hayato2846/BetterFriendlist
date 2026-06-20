@@ -303,6 +303,12 @@ function GuildFrame:RegisterGuildEvents()
 		self:OnPlayerGuildUpdate(...)
 	end, 50)
 
+	pcall(function()
+		BFL:RegisterEventCallback("GUILD_RANKS_UPDATE_ACTIVE_PLAYER", function(...)
+			self:OnGuildRosterUpdate(...)
+		end, 50)
+	end)
+
 	self.eventsRegistered = true
 end
 
