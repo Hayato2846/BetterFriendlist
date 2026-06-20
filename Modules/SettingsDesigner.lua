@@ -36,6 +36,7 @@ local SETTINGS_ICON_TEXTURES = {
 	["bfl-groups-order"] = SETTINGS_ICON_ROOT .. "page-groups-order.tga",
 	["bfl-social-who"] = SETTINGS_ICON_ROOT .. "page-social-who.tga",
 	["bfl-social-raid"] = SETTINGS_ICON_ROOT .. "page-social-raid.tga",
+	["bfl-social-auto-raid-assist"] = SETTINGS_ICON_ROOT .. "page-social-auto-raid-assist.tga",
 	["bfl-social-guild"] = SETTINGS_ICON_ROOT .. "page-social-guild.tga",
 	["bfl-broker-friends"] = SETTINGS_ICON_ROOT .. "page-broker-friends.tga",
 	["bfl-broker-guild"] = SETTINGS_ICON_ROOT .. "page-broker-guild.tga",
@@ -3030,7 +3031,7 @@ local function RegisterSocialPages()
 			"AUTO_RAID_ASSIST_DESC",
 			"Automatically promote selected friends and characters to raid assistant when they join your raid."
 		),
-		iconKey = "bfl-social-raid",
+		iconKey = "bfl-social-auto-raid-assist",
 		mainToggleID = "autoRaidAssist.enabled.detail",
 		order = 115,
 		newTagID = "raid-auto-assist",

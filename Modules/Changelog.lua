@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Settings Center** - Polished Groups & Sorting with a compact Group Order table, clearer default sorting controls, and an inline QuickFilter/Sorter editor.
 - **Settings Center** - Reworked the QuickFilter/Sorter editor into a manager page with separate full-width editor pages for selected entries.
 - **Settings Center** - Moved the QuickFilter/Sorter editor and Global Sync database tools into native Settings Center pages, and combined Broker column ordering with visibility checkboxes.
+- **Settings Icons** - Refined the Who, Raid, and Auto Raid Assist icons in the Social Tools category.
 - **Auto Raid Assist** - Expanded target suggestions to include current party and raid characters in addition to friends and guild members.
 - **Auto Raid Assist** - Added detailed `/bfl debug` traces for conversion hooks, roster checks, target matching, promotion queues, and assistant promotion attempts.
 - **Settings Center Help** - Added expandable changelog notes, version navigation, and Discord, GitHub, and Ko-fi support links to the Settings Center.
