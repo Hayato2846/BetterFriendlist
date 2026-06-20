@@ -32,6 +32,7 @@ docs/
 !README.md
 !CHANGELOG.md
 !docs/DEPLOYMENT_TESTING.md
+!docs/BFL_12_1_FRIEND_TAGS_IMPLEMENTATION_PLAN.md
 !.github/PULL_REQUEST_TEMPLATE.md
 
 # Ignore text files

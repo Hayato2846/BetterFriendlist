@@ -1199,18 +1199,17 @@ end
 function BFL:OpenConfig()
 	local Settings = self:GetModule("Settings")
 	if Settings then
-		-- Check if settings frame is already shown
+		local SettingsDesigner = self:GetModule("SettingsDesigner")
+		if SettingsDesigner and SettingsDesigner.IsShown and SettingsDesigner:IsShown() then
+			Settings:Hide()
+			return
+		end
+
 		if _G.BetterFriendlistSettingsFrame and _G.BetterFriendlistSettingsFrame:IsShown() then
 			Settings:Hide()
 			return
 		end
 
-		-- Ensure main frame is visible first
-		if _G.BetterFriendsFrame and not _G.BetterFriendsFrame:IsShown() then
-			if _G.ToggleBetterFriendsFrame then
-				_G.ToggleBetterFriendsFrame()
-			end
-		end
 		Settings:Show()
 	end
 end
@@ -2403,14 +2402,14 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 	elseif msg == "settings" or msg == "config" or msg == "options" then
 		local Settings = BFL:GetModule("Settings")
 		if Settings then
-			-- Ensure main frame is visible first
-			if _G.BetterFriendsFrame and not _G.BetterFriendsFrame:IsShown() then
-				if _G.ToggleBetterFriendsFrame then
-					_G.ToggleBetterFriendsFrame()
-				end
-			end
-			-- Show settings frame
 			Settings:Show()
+		else
+			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_SETTINGS_NOT_LOADED)
+		end
+	elseif msg == "settingslegacy" or msg == "legacysettings" then
+		local Settings = BFL:GetModule("Settings")
+		if Settings and Settings.ShowLegacy then
+			Settings:ShowLegacy()
 		else
 			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_SETTINGS_NOT_LOADED)
 		end

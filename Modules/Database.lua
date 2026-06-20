@@ -14,6 +14,7 @@ local defaults = {
 	customGroups = {},
 	friendGroups = {},
 	showBlizzardOption = false, -- Show "Show Blizzard's Friendlist" in menu
+	showWelcomeMessage = true, -- Show the welcome message on login
 	groupOrder = nil, -- nil = use default order (favorites, custom alphabetically, nogroup)
 	groupColors = {}, -- {groupId: {r, g, b}} - custom colors for group headers
 	groupCountColors = {}, -- {groupId: {r, g, b}} - custom colors for group counts (overrides global)
@@ -133,6 +134,7 @@ local defaults = {
 	debugPrintEnabled = false, -- Toggle debug prints with /bfl debug print
 	-- Beta Features
 	enableBetaFeatures = false, -- Enable experimental Beta features (default: OFF)
+	enableSettingsCenterBeta = false, -- Use the LibSettingsDesigner Settings Center beta (default: OFF)
 	externalMenuBridgeEnabled = false, -- Add supported addon actions to supported BFL context menus (default: OFF)
 	-- Global Sync Settings
 	enableGlobalSync = false, -- Enable Global Friend Sync (default: OFF)
@@ -141,6 +143,8 @@ local defaults = {
 	-- Main Frame Edit Mode (Phase EditMode)
 	mainFrameSize = {}, -- {[layoutName] = {width, height}} - Main frame size per layout
 	mainFramePosition = {}, -- {[layoutName] = {point, x, y}} - Main frame position per layout
+	settingsCenterWindow = { width = 1080, height = 700, locked = false, density = "compact" }, -- LibSettingsDesigner window state
+	settingsCenterSeenNewTags = {}, -- Host-owned seen state for LibSettingsDesigner new badges
 	mainFramePositionMigrated = false, -- Track if old position has been migrated (one-time)
 	lockWindow = false, -- Lock the frame to prevent movement
 	defaultFrameWidth = 415, -- User-customizable default width (350-800)
@@ -821,6 +825,10 @@ function DB:Get(key, default)
 	-- If no key provided, return entire database
 	if key == nil then
 		return BetterFriendlistDB
+	end
+
+	if type(BetterFriendlistDB) ~= "table" then
+		return default
 	end
 
 	if BetterFriendlistDB[key] ~= nil then

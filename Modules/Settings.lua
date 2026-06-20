@@ -41,6 +41,141 @@ local function SafeResetVerticalScroll(scrollFrame)
 	return ok
 end
 
+local function HideComponentList(container)
+	if not container or not container.components then
+		return
+	end
+	for _, component in ipairs(container.components) do
+		if component and component.Hide then
+			component:Hide()
+		end
+	end
+	container.components = {}
+end
+
+function Settings:GetFilterSortTabHost()
+	if self.filterSortCustomHost and self.filterSortCustomHost.tab then
+		return self.filterSortCustomHost.tab
+	end
+	local content = settingsFrame and settingsFrame.ContentScrollFrame and settingsFrame.ContentScrollFrame.Content
+	return content and content.FilterSortTab or nil
+end
+
+function Settings:RequestFilterSortLayout()
+	local host = self.filterSortCustomHost
+	if host and host.requestLayout then
+		host.requestLayout()
+		return
+	end
+	self:AdjustContentHeight(11)
+end
+
+function Settings:RenderFilterSortEditor(parent, opts)
+	if not parent then
+		return nil
+	end
+	opts = opts or {}
+	parent.components = parent.components or {}
+	parent.bflBuilderKind = parent.bflBuilderKind or self.filterSortBuilderKind or "filter"
+	local focusID = tostring(opts.focusID or "")
+	local createKind, createTemplate = focusID:match("^create%-([%a]+):?(.*)$")
+	local entryKind, entryID = focusID:match("^(filter):(.+)$")
+	if not entryKind then
+		entryKind, entryID = focusID:match("^(sorter):(.+)$")
+	end
+
+	if createKind then
+		createKind = createKind == "sorter" and "sorter" or "filter"
+		parent.bflBuilderKind = createKind
+		parent.bflFilterSortCreate = {
+			kind = createKind,
+			templateId = createTemplate ~= "" and createTemplate or "__blank",
+		}
+	elseif entryKind and entryID and entryID ~= "" then
+		parent.bflBuilderKind = entryKind
+		parent.bflFilterSortCreate = nil
+		if entryKind == "filter" then
+			parent.bflSelectedFilterId = entryID
+		else
+			parent.bflSelectedSorterId = entryID
+		end
+	elseif opts.focusID == "sorter" or opts.focusID == "create-sorter" then
+		parent.bflBuilderKind = "sorter"
+	elseif opts.focusID == "filter" or opts.focusID == "create-filter" or opts.focusID == "builder" then
+		parent.bflBuilderKind = "filter"
+	end
+	if (not createKind) and (opts.focusID == "create-sorter" or opts.focusID == "create-filter") then
+		parent.bflFilterSortCreate = {
+			kind = opts.focusID == "create-sorter" and "sorter" or "filter",
+			templateId = "__blank",
+		}
+	end
+	self.filterSortBuilderKind = parent.bflBuilderKind
+
+	self.filterSortCustomHost = {
+		tab = parent,
+		anchor = opts.anchorFrame or parent,
+		inlineEditor = opts.inlineEditor == true,
+		settingsCenter = opts.settingsCenter == true,
+		viewMode = opts.viewMode or "legacy",
+		openEditorPage = opts.openEditorPage,
+		openManagerPage = opts.openManagerPage,
+		requestLayout = opts.requestLayout,
+	}
+	self:RefreshFilterSortTab()
+	return {
+		Release = function()
+			HideComponentList(parent)
+			if self.filterSortCustomHost and self.filterSortCustomHost.tab == parent then
+				self.filterSortCustomHost = nil
+			end
+			self:HideFilterSortEditorPanel()
+		end,
+		Refresh = function()
+			self:RefreshFilterSortTab()
+		end,
+	}
+end
+
+function Settings:GetFilterSortEditorPageHeight()
+	return math.max(560, self.filterSortInlinePageHeight or 840)
+end
+
+function Settings:GetGlobalSyncTabHost()
+	if self.globalSyncCustomHost and self.globalSyncCustomHost.tab then
+		return self.globalSyncCustomHost.tab
+	end
+	local content = settingsFrame and settingsFrame.ContentScrollFrame and settingsFrame.ContentScrollFrame.Content
+	return content and content.GlobalSyncTab or nil
+end
+
+function Settings:RenderGlobalSyncEditor(parent, opts)
+	if not parent then
+		return nil
+	end
+	opts = opts or {}
+	if opts.focusID == "restore" then
+		self.showDeletedFriends = true
+	end
+	parent.components = parent.components or {}
+	self.globalSyncCustomHost = {
+		tab = parent,
+		requestLayout = opts.requestLayout,
+	}
+	self:RefreshGlobalSyncTab()
+	return {
+		Release = function()
+			HideComponentList(parent)
+			if self.globalSyncCustomHost and self.globalSyncCustomHost.tab == parent then
+				self.globalSyncCustomHost = nil
+			end
+		end,
+		Refresh = function()
+			self:RefreshGlobalSyncTab()
+		end,
+	}
+end
+
 local FONT_FLAG_VALUES = { "NONE", "OUTLINE", "THICKOUTLINE", "MONOCHROME", "SLUG" }
 local FONT_SETTINGS_CONTROL_WIDTH = 220
 
@@ -467,20 +602,111 @@ function Settings:OnLoad(frame)
 	end)
 end
 
--- Show the settings window
-function Settings:Show()
+function Settings:IsSettingsCenterEnabled()
+	return BetterFriendlistDB and BetterFriendlistDB.enableSettingsCenterBeta == true
+end
+
+function Settings:ShowSettingsCenter(pageID, focusControlID)
+	local Designer = BFL:GetModule("SettingsDesigner")
+	if Designer and Designer.Show then
+		local frame = Designer:Show(pageID, focusControlID)
+		if frame then
+			return true
+		end
+	end
+	return false
+end
+
+function Settings:HideLegacyWindow()
+	self:ClearFilterSortPreview(true)
+	self:HideFilterSortEditorPanel()
+	if settingsFrame then
+		settingsFrame:Hide()
+	end
+end
+
+function Settings:OnSettingsCenterBetaChanged(checked)
+	local DB = GetDB()
+	if not DB then
+		return
+	end
+
+	checked = checked == true
+	DB:Set("enableSettingsCenterBeta", checked)
+
+	if checked then
+		self:HideLegacyWindow()
+		self:ShowSettingsCenter("advanced.beta", "enableSettingsCenterBeta")
+		BFL:DebugPrint(L.SETTINGS_CENTER_BETA_ENABLED or "New Settings Center |cff00ff00ENABLED|r")
+	else
+		local Designer = BFL:GetModule("SettingsDesigner")
+		if Designer and Designer.Hide then
+			Designer:Hide()
+		end
+		self:ShowLegacy(4, "betaFeatures")
+		BFL:DebugPrint(L.SETTINGS_CENTER_BETA_DISABLED or "New Settings Center |cffff0000DISABLED|r")
+	end
+end
+
+-- Show the active settings window. Legacy remains the default until the
+-- Settings Center beta is explicitly enabled.
+function Settings:Show(pageID, focusControlID)
+	if self:IsSettingsCenterEnabled() and self:ShowSettingsCenter(pageID, focusControlID) then
+		return
+	end
+
+	self:ShowLegacy()
+end
+
+-- Show the legacy XML settings window.
+function Settings:ShowLegacy(categoryID, focusSection)
+	local Designer = BFL:GetModule("SettingsDesigner")
+	if Designer and Designer.Hide then
+		Designer:Hide()
+	end
+
 	if not settingsFrame then
 		settingsFrame = BetterFriendlistSettingsFrame
 	end
 
 	if settingsFrame then
+		if _G.BetterFriendsFrame and not _G.BetterFriendsFrame:IsShown() then
+			if _G.ToggleBetterFriendsFrame then
+				_G.ToggleBetterFriendsFrame()
+			end
+		end
 		self:LoadSettings()
 		self:RefreshCategories() -- Update category visibility based on Beta features
 		settingsFrame:Show()
-		self:SelectCategory(currentTab or 1) -- Restore or show first category
+		self:SelectCategory(categoryID or currentTab or 1) -- Restore or show first category
+		if focusSection == "betaFeatures" then
+			self:ScrollToLegacyBetaFeatures()
+		end
 	else
 		-- BFL:DebugPrint("|cffff0000BetterFriendlist Settings:|r Frame not initialized!")
 	end
+end
+
+function Settings:ScrollToLegacyBetaFeatures()
+	local scrollFrame = settingsFrame and settingsFrame.ContentScrollFrame
+	local content = scrollFrame and scrollFrame.Content
+	local anchor = self.legacyBetaFeaturesAnchor
+	if not (scrollFrame and content and anchor and anchor.GetTop and scrollFrame.SetVerticalScroll) then
+		return
+	end
+
+	if scrollFrame.UpdateScrollChildRect then
+		pcall(scrollFrame.UpdateScrollChildRect, scrollFrame)
+	end
+
+	local contentTop = content:GetTop()
+	local anchorTop = anchor:GetTop()
+	if not (contentTop and anchorTop) then
+		return
+	end
+
+	local offset = math.max(0, contentTop - anchorTop - 8)
+	pcall(scrollFrame.SetVerticalScroll, scrollFrame, offset)
 end
 
 -- ===========================================
@@ -757,6 +983,11 @@ end
 
 -- Hide the settings window
 function Settings:Hide()
+	local Designer = BFL:GetModule("SettingsDesigner")
+	if Designer and Designer.Hide then
+		Designer:Hide()
+	end
+
 	self:ClearFilterSortPreview(true)
 	self:HideFilterSortEditorPanel()
 	if settingsFrame then
@@ -2488,235 +2719,6 @@ function Settings:ShowImportDialog()
 	self.importFrame:Show()
 	self.importFrame.scrollFrame.editBox:SetText("")
 	self.importFrame.scrollFrame.editBox:SetFocus()
-end
-
--- Refresh statistics display
-function Settings:RefreshStatistics()
-	if not settingsFrame then
-		return
-	end
-
-	local content = settingsFrame.ContentScrollFrame.Content
-	if not content or not content.StatisticsTab then
-		return
-	end
-
-	local statsTab = content.StatisticsTab
-
-	-- Get Statistics module
-	local Statistics = BFL:GetModule("Statistics")
-	if not Statistics then
-		-- BFL:DebugPrint("Settings: Statistics module not available")
-		return
-	end
-
-	-- Get statistics data
-	local stats = Statistics:GetStatistics()
-	if not stats then
-		-- BFL:DebugPrint("Settings: Failed to get statistics")
-		return
-	end
-
-	-- Helper function to format percentage
-	local function FormatPercent(value, total)
-		if total == 0 then
-			return 0
-		end
-		return math.floor((value / total) * 100 + 0.5)
-	end
-
-	-- Update Overview section
-	if statsTab.TotalFriends then
-		statsTab.TotalFriends:SetText(string.format(L.STATS_TOTAL_FRIENDS, stats.totalFriends))
-	end
-
-	if statsTab.OnlineFriends then
-		local onlinePct = FormatPercent(stats.onlineFriends, stats.totalFriends)
-		local offlinePct = FormatPercent(stats.offlineFriends, stats.totalFriends)
-		statsTab.OnlineFriends:SetText(
-			string.format(L.STATS_ONLINE_OFFLINE, stats.onlineFriends, onlinePct, stats.offlineFriends, offlinePct)
-		)
-	end
-
-	if statsTab.FriendTypes then
-		statsTab.FriendTypes:SetText(string.format(L.STATS_BNET_WOW, stats.bnetFriends, stats.wowFriends))
-	end
-
-	-- Update Friendship Health (NEW)
-	if statsTab.FriendshipHealth then
-		local totalHealthFriends = stats.totalFriends - (stats.friendshipHealth.unknown or 0)
-		if totalHealthFriends > 0 then
-			local healthText = string.format(
-				L.STATS_HEALTH_FMT,
-				stats.friendshipHealth.active,
-				FormatPercent(stats.friendshipHealth.active, totalHealthFriends),
-				stats.friendshipHealth.regular,
-				FormatPercent(stats.friendshipHealth.regular, totalHealthFriends),
-				stats.friendshipHealth.drifting,
-				FormatPercent(stats.friendshipHealth.drifting, totalHealthFriends),
-				stats.friendshipHealth.stale,
-				FormatPercent(stats.friendshipHealth.stale, totalHealthFriends),
-				stats.friendshipHealth.dormant,
-				FormatPercent(stats.friendshipHealth.dormant, totalHealthFriends)
-			)
-			statsTab.FriendshipHealth:SetText(healthText)
-		else
-			statsTab.FriendshipHealth:SetText(L.STATS_NO_HEALTH_DATA)
-		end
-	end
-
-	-- Update Top 5 Classes
-	if statsTab.ClassList then
-		local topClasses = Statistics:GetTopClasses(5)
-		if topClasses and #topClasses > 0 then
-			local classParts = {}
-			for i, class in ipairs(topClasses) do
-				if i > 1 then
-					table.insert(classParts, "\n")
-				end
-				local pct = FormatPercent(class.count, stats.totalFriends)
-				table.insert(classParts, string.format(L.STATS_CLASS_FMT, i, class.name, class.count, pct))
-			end
-			statsTab.ClassList:SetText(table.concat(classParts))
-		else
-			statsTab.ClassList:SetText(L.STATS_NO_CLASS_DATA)
-		end
-	end
-
-	-- Update Level Distribution (NEW)
-	if statsTab.LevelDistribution then
-		if stats.levelDistribution.leveledFriends > 0 then
-			local levelText = string.format(
-				L.STATS_MAX_LEVEL,
-				stats.levelDistribution.maxLevel,
-				stats.levelDistribution.ranges[1].count,
-				stats.levelDistribution.ranges[2].count,
-				stats.levelDistribution.ranges[3].count,
-				stats.levelDistribution.ranges[3].count and stats.levelDistribution.average
-			)
-			-- Logic fix in my mind: code used stats.levelDistribution.average as last arg.
-			-- Let's check original code carefully.
-			local levelText = string.format(
-				L.STATS_MAX_LEVEL,
-				stats.levelDistribution.maxLevel,
-				stats.levelDistribution.ranges[1].count,
-				stats.levelDistribution.ranges[2].count,
-				stats.levelDistribution.ranges[3].count,
-				stats.levelDistribution.average
-			)
-			statsTab.LevelDistribution:SetText(levelText)
-		else
-			statsTab.LevelDistribution:SetText(L.STATS_NO_LEVEL_DATA)
-		end
-	end
-
-	-- Update Top 5 Realms
-	if statsTab.RealmList then
-		local topRealms = Statistics:GetTopRealms(5)
-		if topRealms and #topRealms > 0 then
-			local realmParts = {}
-			-- Add realm categories first
-			local samePct = FormatPercent(stats.realmDistribution.sameRealm, stats.totalFriends)
-			local otherPct = FormatPercent(stats.realmDistribution.otherRealms, stats.totalFriends)
-			table.insert(
-				realmParts,
-				string.format(
-					L.STATS_SAME_REALM,
-					stats.realmDistribution.sameRealm,
-					samePct,
-					stats.realmDistribution.otherRealms,
-					otherPct
-				)
-			)
-			table.insert(realmParts, L.STATS_TOP_REALMS)
-			for i, realm in ipairs(topRealms) do
-				table.insert(realmParts, string.format(L.STATS_REALM_FMT, i, realm.name, realm.count))
-			end
-			statsTab.RealmList:SetText(table.concat(realmParts))
-		else
-			statsTab.RealmList:SetText(L.STATS_NO_REALM_DATA)
-		end
-	end
-
-	-- Update Faction Distribution
-	if statsTab.FactionList then
-		local factionText = string.format(
-			L.STATS_FACTION_DISTRIBUTION,
-			stats.factionCounts.alliance or 0,
-			stats.factionCounts.horde or 0
-		)
-		statsTab.FactionList:SetText(factionText)
-	end
-
-	-- Update Game Distribution (NEW)
-	if statsTab.GameDistribution then
-		local totalGamePlayers = stats.gameCounts.wow
-			+ stats.gameCounts.classic
-			+ stats.gameCounts.diablo
-			+ stats.gameCounts.hearthstone
-			+ stats.gameCounts.starcraft
-			+ stats.gameCounts.mobile
-			+ stats.gameCounts.other
-		if totalGamePlayers > 0 then
-			local gameParts = {}
-			if stats.gameCounts.wow > 0 then
-				table.insert(gameParts, string.format(L.STATS_GAME_WOW, stats.gameCounts.wow))
-			end
-			if stats.gameCounts.classic > 0 then
-				table.insert(gameParts, string.format(L.STATS_GAME_CLASSIC, stats.gameCounts.classic))
-			end
-			if stats.gameCounts.diablo > 0 then
-				table.insert(gameParts, string.format(L.STATS_GAME_DIABLO, stats.gameCounts.diablo))
-			end
-			if stats.gameCounts.hearthstone > 0 then
-				table.insert(gameParts, string.format(L.STATS_GAME_HEARTHSTONE, stats.gameCounts.hearthstone))
-			end
-			if stats.gameCounts.mobile > 0 then
-				table.insert(gameParts, string.format(L.STATS_GAME_MOBILE, stats.gameCounts.mobile))
-			end
-			if stats.gameCounts.other > 0 then
-				table.insert(gameParts, string.format(L.STATS_GAME_OTHER, stats.gameCounts.other))
-			end
-			statsTab.GameDistribution:SetText(table.concat(gameParts))
-		else
-			statsTab.GameDistribution:SetText(L.STATS_NO_GAME_DATA)
-		end
-	end
-
-	-- Update Mobile vs Desktop (NEW)
-	if statsTab.MobileVsDesktop then
-		if stats.mobileVsDesktop.desktop > 0 or stats.mobileVsDesktop.mobile > 0 then
-			local total = stats.mobileVsDesktop.desktop + stats.mobileVsDesktop.mobile
-			local desktopPct = FormatPercent(stats.mobileVsDesktop.desktop, total)
-			local mobilePct = FormatPercent(stats.mobileVsDesktop.mobile, total)
-			local mobileText = string.format(
-				L.STATS_MOBILE_DESKTOP,
-				stats.mobileVsDesktop.desktop,
-				desktopPct,
-				stats.mobileVsDesktop.mobile,
-				mobilePct
-			)
-			statsTab.MobileVsDesktop:SetText(mobileText)
-		else
-			statsTab.MobileVsDesktop:SetText(L.STATS_NO_MOBILE_DATA)
-		end
-	end
-
-	-- Update Notes and Favorites (NEW)
-	if statsTab.NotesAndFavorites then
-		local notesPct = FormatPercent(stats.notesAndFavorites.withNotes, stats.totalFriends)
-		local favPct = FormatPercent(stats.notesAndFavorites.favorites, stats.totalFriends)
-		local notesText = string.format(
-			L.STATS_NOTES_FAVORITES,
-			stats.notesAndFavorites.withNotes,
-			notesPct,
-			stats.notesAndFavorites.favorites,
-			favPct
-		)
-		statsTab.NotesAndFavorites:SetText(notesText)
-	end
-
-	-- BFL:DebugPrint("Settings: Statistics refreshed successfully")
 end
 
 -- Create export frame
@@ -5983,7 +5985,9 @@ function Settings:RefreshAdvancedTab()
 	-- ===========================================
 	-- Beta Features Section
 	-- ===========================================
-	table.insert(allFrames, Components:CreateHeader(tab, "|cffff8800" .. L.SETTINGS_BETA_FEATURES_TITLE .. "|r"))
+	local betaFeaturesHeader = Components:CreateHeader(tab, "|cffff8800" .. L.SETTINGS_BETA_FEATURES_TITLE .. "|r")
+	self.legacyBetaFeaturesAnchor = betaFeaturesHeader
+	table.insert(allFrames, betaFeaturesHeader)
 
 	-- Beta features description
 	table.insert(allFrames, Components:CreateLabel(tab, L.SETTINGS_BETA_FEATURES_DESC, true))
@@ -6103,6 +6107,18 @@ function Settings:RefreshAdvancedTab()
 	betaToggle:SetTooltip(L.SETTINGS_BETA_FEATURES_TITLE, L.SETTINGS_BETA_FEATURES_TOOLTIP)
 	table.insert(allFrames, betaToggle)
 
+	local settingsCenterToggle = Components:CreateCheckbox(tab, {
+		label = L.SETTINGS_ENABLE_SETTINGS_CENTER or "New Settings Center (Beta)",
+		initialValue = BetterFriendlistDB.enableSettingsCenterBeta == true,
+		callback = function(checked)
+			self:OnSettingsCenterBetaChanged(checked)
+		end,
+		tooltipTitle = L.SETTINGS_ENABLE_SETTINGS_CENTER or "New Settings Center (Beta)",
+		tooltipDesc = L.SETTINGS_ENABLE_SETTINGS_CENTER_DESC
+			or "Use the new LibSettingsDesigner Settings Center instead of the classic settings window.",
+	})
+	table.insert(allFrames, settingsCenterToggle)
+
 	if BFL.HasSecretValues then
 		local bridgeToggle = Components:CreateCheckbox(tab, {
 			label = L.SETTINGS_EXTERNAL_MENU_BRIDGE or "External AddOn Menu Bridge (Beta)",
@@ -6128,7 +6144,7 @@ function Settings:RefreshAdvancedTab()
 
 	-- Beta feature list (informational)
 	-- Only show if there are actual beta features
-	local hasBetaFeatures = false
+	local hasBetaFeatures = true
 	for _, tabDef in ipairs(TAB_DEFINITIONS) do
 		if tabDef.beta and IsTabAvailableForClient(tabDef) then
 			hasBetaFeatures = true
@@ -6148,6 +6164,18 @@ function Settings:RefreshAdvancedTab()
 
 		-- Dynamic list from TAB_DEFINITIONS
 		local listY = -20
+		local settingsCenterIcon = listContainer:CreateTexture(nil, "ARTWORK")
+		settingsCenterIcon:SetSize(14, 14)
+		settingsCenterIcon:SetPoint("TOPLEFT", 5, listY)
+		settingsCenterIcon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Textures\\SettingsCenter\\page-advanced-beta.tga")
+		settingsCenterIcon:SetVertexColor(1, 0.53, 0)
+
+		local settingsCenterText = listContainer:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
+		settingsCenterText:SetPoint("LEFT", settingsCenterIcon, "RIGHT", 6, 0)
+		settingsCenterText:SetPoint("TOP", settingsCenterIcon, "TOP", 0, -1)
+		settingsCenterText:SetText(L.SETTINGS_ENABLE_SETTINGS_CENTER or "New Settings Center (Beta)")
+		listY = listY - 18
+
 		for _, tabDef in ipairs(TAB_DEFINITIONS) do
 			if tabDef.beta and IsTabAvailableForClient(tabDef) then
 				local icon = listContainer:CreateTexture(nil, "ARTWORK")
@@ -6175,215 +6203,6 @@ function Settings:RefreshAdvancedTab()
 	tab.components = allFrames
 end
 
--- Refresh Statistics Tab
-function Settings:RefreshStatisticsTab()
-	if not settingsFrame or not Components then
-		return
-	end
-
-	local content = settingsFrame.ContentScrollFrame.Content
-	if not content or not content.StatisticsTab then
-		return
-	end
-
-	local tab = content.StatisticsTab
-
-	-- Clear existing content (but keep the tab frame itself)
-	if tab.components then
-		for _, component in ipairs(tab.components) do
-			if component.Hide then
-				component:Hide()
-			end
-		end
-	end
-	tab.components = {}
-
-	local allFrames = {}
-	local yOffset = -15
-
-	-- Title
-	local title = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormalLarge")
-	title:SetPoint("TOPLEFT", 10, yOffset)
-	title:SetText(L.STATS_HEADER or "Friend Network Statistics")
-	table.insert(allFrames, title)
-	yOffset = yOffset - 25
-
-	-- Description
-	local desc = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
-	desc:SetPoint("TOPLEFT", 10, yOffset)
-	desc:SetText(L.STATS_DESC or "Overview of your friend network and activity")
-	table.insert(allFrames, desc)
-	yOffset = yOffset - 30
-
-	-- ===========================================
-	-- Overview Section
-	-- ===========================================
-	local overviewHeader = Components:CreateHeader(tab, L.STATS_OVERVIEW_HEADER or "Overview")
-	overviewHeader:SetPoint("TOPLEFT", 10, yOffset)
-	table.insert(allFrames, overviewHeader)
-	yOffset = yOffset - 25
-
-	-- Total Friends
-	tab.TotalFriends = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
-	tab.TotalFriends:SetPoint("TOPLEFT", 20, yOffset)
-	tab.TotalFriends:SetText(string.format(L.STATS_TOTAL_FRIENDS or "Total Friends: %s", "--"))
-	table.insert(allFrames, tab.TotalFriends)
-	yOffset = yOffset - 20
-
-	-- Online/Offline
-	tab.OnlineFriends = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
-	tab.OnlineFriends:SetPoint("TOPLEFT", 20, yOffset)
-	tab.OnlineFriends:SetText(string.format(L.STATS_ONLINE_OFFLINE or "Online: %s  |  Offline: %s", "--", "--"))
-	table.insert(allFrames, tab.OnlineFriends)
-	yOffset = yOffset - 20
-
-	-- Friend Types
-	tab.FriendTypes = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
-	tab.FriendTypes:SetPoint("TOPLEFT", 20, yOffset)
-	tab.FriendTypes:SetText(string.format(L.STATS_BNET_WOW or "Battle.net: %s  |  WoW: %s", "--", "--"))
-	table.insert(allFrames, tab.FriendTypes)
-	yOffset = yOffset - 30
-
-	-- Store left column start position
-	local leftColumnStart = yOffset
-
-	-- ===========================================
-	-- LEFT COLUMN
-	-- ===========================================
-
-	-- Friendship Health Section
-	local healthHeader = Components:CreateHeader(tab, L.STATS_HEALTH_HEADER or "Friendship Health")
-	healthHeader:SetPoint("TOPLEFT", 10, yOffset)
-	table.insert(allFrames, healthHeader)
-	yOffset = yOffset - 25
-
-	tab.FriendshipHealth = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-	tab.FriendshipHealth:SetPoint("TOPLEFT", 20, yOffset)
-	tab.FriendshipHealth:SetWidth(210)
-	tab.FriendshipHealth:SetJustifyH("LEFT")
-	tab.FriendshipHealth:SetText(L.STATS_NO_DATA or "No health data available")
-	table.insert(allFrames, tab.FriendshipHealth)
-	yOffset = yOffset - 90
-
-	-- Top 5 Classes Section
-	local classHeader = Components:CreateHeader(tab, L.STATS_CLASSES_HEADER or "Top 5 Classes")
-	classHeader:SetPoint("TOPLEFT", 10, yOffset)
-	table.insert(allFrames, classHeader)
-	yOffset = yOffset - 25
-
-	tab.ClassList = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-	tab.ClassList:SetPoint("TOPLEFT", 20, yOffset)
-	tab.ClassList:SetWidth(210)
-	tab.ClassList:SetJustifyH("LEFT")
-	tab.ClassList:SetText(L.STATS_NO_DATA or "No class data available")
-	table.insert(allFrames, tab.ClassList)
-	yOffset = yOffset - 90
-
-	-- Realm Clusters Section
-	local realmHeader = Components:CreateHeader(tab, L.STATS_REALMS_HEADER or "Realm Clusters")
-	realmHeader:SetPoint("TOPLEFT", 10, yOffset)
-	table.insert(allFrames, realmHeader)
-	yOffset = yOffset - 25
-
-	tab.RealmList = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-	tab.RealmList:SetPoint("TOPLEFT", 20, yOffset)
-	tab.RealmList:SetWidth(210)
-	tab.RealmList:SetJustifyH("LEFT")
-	tab.RealmList:SetText(L.STATS_NO_DATA or "No realm data available")
-	table.insert(allFrames, tab.RealmList)
-	yOffset = yOffset - 110
-
-	-- Organization Section
-	local notesHeader = Components:CreateHeader(tab, L.STATS_ORGANIZATION_HEADER or "Organization")
-	notesHeader:SetPoint("TOPLEFT", 10, yOffset)
-	table.insert(allFrames, notesHeader)
-	yOffset = yOffset - 25
-
-	tab.NotesAndFavorites = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-	tab.NotesAndFavorites:SetPoint("TOPLEFT", 20, yOffset)
-	tab.NotesAndFavorites:SetWidth(210)
-	tab.NotesAndFavorites:SetJustifyH("LEFT")
-	tab.NotesAndFavorites:SetText(L.STATS_NO_DATA or "No data available")
-	table.insert(allFrames, tab.NotesAndFavorites)
-	yOffset = yOffset - 60
-
-	-- ===========================================
-	-- RIGHT COLUMN
-	-- ===========================================
-	yOffset = leftColumnStart
-
-	-- Level Distribution Section
-	local levelHeader = Components:CreateHeader(tab, L.STATS_LEVELS_HEADER or "Level Distribution")
-	levelHeader:SetPoint("TOPLEFT", 240, yOffset)
-	table.insert(allFrames, levelHeader)
-	yOffset = yOffset - 25
-
-	tab.LevelDistribution = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-	tab.LevelDistribution:SetPoint("TOPLEFT", 250, yOffset)
-	tab.LevelDistribution:SetWidth(190)
-	tab.LevelDistribution:SetJustifyH("LEFT")
-	tab.LevelDistribution:SetText(L.STATS_NO_DATA or "No level data available")
-	table.insert(allFrames, tab.LevelDistribution)
-	yOffset = yOffset - 90
-
-	-- Game Distribution Section
-	local gameHeader = Components:CreateHeader(tab, L.STATS_GAMES_HEADER or "Game Distribution")
-	gameHeader:SetPoint("TOPLEFT", 240, yOffset)
-	table.insert(allFrames, gameHeader)
-	yOffset = yOffset - 25
-
-	tab.GameDistribution = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-	tab.GameDistribution:SetPoint("TOPLEFT", 250, yOffset)
-	tab.GameDistribution:SetWidth(190)
-	tab.GameDistribution:SetJustifyH("LEFT")
-	tab.GameDistribution:SetText(L.STATS_NO_DATA or "No game data available")
-	table.insert(allFrames, tab.GameDistribution)
-	yOffset = yOffset - 90
-
-	-- Mobile vs Desktop Section
-	local mobileHeader = Components:CreateHeader(tab, L.STATS_MOBILE_HEADER or "Mobile vs. Desktop")
-	mobileHeader:SetPoint("TOPLEFT", 240, yOffset)
-	table.insert(allFrames, mobileHeader)
-	yOffset = yOffset - 25
-
-	tab.MobileVsDesktop = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-	tab.MobileVsDesktop:SetPoint("TOPLEFT", 250, yOffset)
-	tab.MobileVsDesktop:SetWidth(190)
-	tab.MobileVsDesktop:SetJustifyH("LEFT")
-	tab.MobileVsDesktop:SetText(L.STATS_NO_DATA or "No mobile data available")
-	table.insert(allFrames, tab.MobileVsDesktop)
-	yOffset = yOffset - 60
-
-	-- Faction Distribution Section
-	local factionHeader = Components:CreateHeader(tab, L.STATS_FACTIONS_HEADER or "Faction Distribution")
-	factionHeader:SetPoint("TOPLEFT", 240, yOffset)
-	table.insert(allFrames, factionHeader)
-	yOffset = yOffset - 25
-
-	tab.FactionList = tab:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-	tab.FactionList:SetPoint("TOPLEFT", 250, yOffset)
-	tab.FactionList:SetWidth(190)
-	tab.FactionList:SetJustifyH("LEFT")
-	tab.FactionList:SetText(L.STATS_NO_DATA or "No faction data available")
-	table.insert(allFrames, tab.FactionList)
-
-	-- ===========================================
-	-- Refresh Button (below Organization section)
-	-- ===========================================
-	local refreshButton = Components:CreateButton(tab, L.STATS_REFRESH_BTN or "Refresh Statistics", function()
-		self:RefreshStatistics()
-	end, L.STATS_REFRESH_TOOLTIP or "Update statistics with current data")
-	refreshButton:SetPoint("TOPLEFT", 10, yOffset)
-	refreshButton:SetSize(150, 24)
-	table.insert(allFrames, refreshButton)
-
-	-- Store components for cleanup
-	tab.components = allFrames
-
-	-- Trigger initial data refresh
-	self:RefreshStatistics()
-end
-
 -- ===========================================
 -- QUICKFILTER & SORTER BUILDER TAB (Tab ID 11, Beta)
 -- ===========================================
@@ -6393,18 +6212,123 @@ local BFL_FILTER_SORT_EDITOR_SIDE_PADDING = 18
 local BFL_FILTER_SORT_EDITOR_MAX_DEPTH = 2
 local BFL_FILTER_SORT_EDITOR_FORM_LABEL_WIDTH = 86
 
-local function BFL_Settings_CreateSmallButton(parent, text, width, onClick)
-	local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-	button:SetSize(width or 64, 22)
-	button:SetText(text)
-	if button.SetNormalFontObject then
-		button:SetNormalFontObject("BetterFriendlistFontNormalSmall")
-		button:SetHighlightFontObject("BetterFriendlistFontHighlightSmall")
-		button:SetDisabledFontObject("BetterFriendlistFontDisableSmall")
+local function BFL_Settings_ApplyBuilderButtonStyle(button, state)
+	if not (button and button.SetBackdrop) then
+		return
 	end
+	local bg = { 0.030, 0.026, 0.018, 0.90 }
+	local border = { 0.48, 0.34, 0.10, 0.72 }
+	local textColor = { 1, 0.82, 0, 1 }
+	if state == "hover" then
+		bg = { 0.085, 0.070, 0.035, 0.95 }
+		border = { 0.92, 0.72, 0.20, 0.95 }
+		textColor = { 1, 0.92, 0.45, 1 }
+	elseif state == "selected" then
+		bg = { 0.070, 0.054, 0.020, 0.94 }
+		border = { 0.90, 0.68, 0.18, 0.95 }
+		textColor = { 1, 0.86, 0.12, 1 }
+	elseif state == "disabled" then
+		bg = { 0.018, 0.016, 0.012, 0.72 }
+		border = { 0.20, 0.16, 0.08, 0.46 }
+		textColor = { 0.45, 0.43, 0.36, 1 }
+	end
+	button:SetBackdrop({
+		bgFile = "Interface\\Buttons\\WHITE8x8",
+		edgeFile = "Interface\\Buttons\\WHITE8x8",
+		tile = false,
+		edgeSize = 1,
+		insets = { left = 1, right = 1, top = 1, bottom = 1 },
+	})
+	button:SetBackdropColor(bg[1], bg[2], bg[3], bg[4])
+	button:SetBackdropBorderColor(border[1], border[2], border[3], border[4])
+	if button.Text then
+		button.Text:SetTextColor(textColor[1], textColor[2], textColor[3], textColor[4])
+	end
+end
+
+local function BFL_Settings_ApplyBuilderPanelStyle(frame, bg, border)
+	if not (frame and frame.SetBackdrop) then
+		return
+	end
+	frame:SetBackdrop({
+		bgFile = "Interface\\Buttons\\WHITE8x8",
+		edgeFile = "Interface\\Buttons\\WHITE8x8",
+		tile = false,
+		edgeSize = 1,
+		insets = { left = 1, right = 1, top = 1, bottom = 1 },
+	})
+	bg = bg or { 0.012, 0.011, 0.009, 0.62 }
+	border = border or { 0.42, 0.31, 0.10, 0.56 }
+	frame:SetBackdropColor(bg[1], bg[2], bg[3], bg[4])
+	frame:SetBackdropBorderColor(border[1], border[2], border[3], border[4])
+end
+
+local function BFL_Settings_ApplyBuilderRowStyle(row, state)
+	if not (row and row.SetBackdrop) then
+		return false
+	end
+	local bg = { 0.020, 0.018, 0.014, 0.64 }
+	local border = { 0.18, 0.14, 0.08, 0.52 }
+	if state == "selected" then
+		bg = { 0.070, 0.054, 0.020, 0.88 }
+		border = { 0.80, 0.60, 0.16, 0.78 }
+	elseif state == "hover" then
+		bg = { 0.055, 0.045, 0.022, 0.78 }
+		border = { 0.62, 0.46, 0.14, 0.72 }
+	elseif state == "target" then
+		bg = { 0.095, 0.074, 0.025, 0.92 }
+		border = { 0.96, 0.74, 0.16, 0.96 }
+	end
+	BFL_Settings_ApplyBuilderPanelStyle(row, bg, border)
+	if row.bg then
+		row.bg:Hide()
+	end
+	return true
+end
+
+local function BFL_Settings_GetStackHeight(frames, startY)
+	local height = math.abs(startY or 0) + 24
+	for _, frame in ipairs(frames or {}) do
+		if frame and frame.GetHeight then
+			height = height + (frame:GetHeight() or 0) + 10
+		end
+	end
+	return height
+end
+
+local function BFL_Settings_CreateSmallButton(parent, text, width, onClick)
+	local button = CreateFrame("Button", nil, parent, "BackdropTemplate")
+	button:SetSize(width or 64, 22)
+	button.Text = button:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormalSmall")
+	button.Text:SetPoint("LEFT", button, "LEFT", 7, 0)
+	button.Text:SetPoint("RIGHT", button, "RIGHT", -7, 0)
+	button.Text:SetJustifyH("CENTER")
+	button.Text:SetWordWrap(false)
+	button.SetText = function(self, value)
+		self.Text:SetText(value or "")
+	end
+	button.GetText = function(self)
+		return self.Text:GetText()
+	end
+	button:SetText(text)
+	BFL_Settings_ApplyBuilderButtonStyle(button)
 	if onClick then
 		button:SetScript("OnClick", onClick)
 	end
+	button:SetScript("OnEnter", function(self)
+		if self:IsEnabled() then
+			BFL_Settings_ApplyBuilderButtonStyle(self, "hover")
+		end
+	end)
+	button:SetScript("OnLeave", function(self)
+		BFL_Settings_ApplyBuilderButtonStyle(self, self:IsEnabled() and (self.bflSelected and "selected" or nil) or "disabled")
+	end)
+	button:SetScript("OnEnable", function(self)
+		BFL_Settings_ApplyBuilderButtonStyle(self, self.bflSelected and "selected" or nil)
+	end)
+	button:SetScript("OnDisable", function(self)
+		BFL_Settings_ApplyBuilderButtonStyle(self, "disabled")
+	end)
 	return button
 end
 
@@ -6640,18 +6564,57 @@ local function BFL_Settings_GetSorterFieldDefaultDirection(fieldDef)
 end
 
 function Settings:EnsureFilterSortEditorPanel()
-	if not settingsFrame then
+	local customHost = self.filterSortCustomHost
+	local anchorFrame = customHost and customHost.anchor
+	if not settingsFrame and not anchorFrame then
 		settingsFrame = BetterFriendlistSettingsFrame
 	end
-	if not settingsFrame then
+	anchorFrame = anchorFrame or settingsFrame
+	if not anchorFrame then
 		return nil
+	end
+
+	if customHost and customHost.inlineEditor then
+		local parentFrame = customHost.editorParent or customHost.tab or anchorFrame
+		local frame = self.filterSortInlineEditorFrame
+		if not frame then
+			frame = CreateFrame("Frame", nil, parentFrame, "BackdropTemplate")
+			frame:SetHeight(220)
+			frame.components = {}
+			BFL_Settings_ApplyBuilderPanelStyle(frame, { 0.010, 0.010, 0.009, 0.58 }, { 0.50, 0.36, 0.10, 0.62 })
+
+			frame.title = frame:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
+			frame.title:SetPoint("TOPLEFT", frame, "TOPLEFT", 14, -12)
+			frame.title:SetPoint("RIGHT", frame, "RIGHT", -14, 0)
+			frame.title:SetHeight(20)
+			frame.title:SetJustifyH("LEFT")
+
+			frame.Content = CreateFrame("Frame", nil, frame)
+			frame.Content:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -42)
+			frame.Content:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -10, -42)
+			frame.Content:SetHeight(1)
+
+			self.filterSortInlineEditorFrame = frame
+		end
+
+		parentFrame = customHost.editorParent or customHost.tab or anchorFrame
+		frame:SetParent(parentFrame)
+		frame:SetFrameStrata((anchorFrame.GetFrameStrata and anchorFrame:GetFrameStrata()) or "HIGH")
+		frame:SetFrameLevel(((anchorFrame.GetFrameLevel and anchorFrame:GetFrameLevel()) or 1) + 4)
+		frame:ClearAllPoints()
+		frame:SetPoint("LEFT", parentFrame, "LEFT", 14, 0)
+		frame:SetPoint("RIGHT", parentFrame, "RIGHT", -14, 0)
+		frame:SetHeight(frame:GetHeight() > 0 and frame:GetHeight() or 220)
+		if frame.Content then
+			frame.Content:SetWidth(math.max(320, (parentFrame:GetWidth() or BFL_FILTER_SORT_EDITOR_CONTENT_WIDTH) - 28))
+		end
+		BFL_Settings_ApplyBuilderPanelStyle(frame, { 0.010, 0.010, 0.009, 0.58 }, { 0.50, 0.36, 0.10, 0.62 })
+		return frame
 	end
 
 	local frame = self.filterSortEditorFrame
 	if not frame then
-		frame = CreateFrame("Frame", "BetterFriendlistFilterSortEditorFrame", settingsFrame, "ButtonFrameTemplate")
-		frame:SetFrameStrata(settingsFrame:GetFrameStrata() or "HIGH")
-		frame:SetFrameLevel((settingsFrame:GetFrameLevel() or 1) + 10)
+		frame = CreateFrame("Frame", "BetterFriendlistFilterSortEditorFrame", anchorFrame, "ButtonFrameTemplate")
 		frame:SetWidth(BFL_FILTER_SORT_EDITOR_WIDTH)
 		frame:SetClampedToScreen(true)
 		frame:EnableMouse(true)
@@ -6704,9 +6667,17 @@ function Settings:EnsureFilterSortEditorPanel()
 		self.filterSortEditorFrame = frame
 	end
 
+	frame:SetParent(anchorFrame)
+	frame:SetFrameStrata(anchorFrame:GetFrameStrata() or "HIGH")
+	frame:SetFrameLevel((anchorFrame:GetFrameLevel() or 1) + 10)
 	frame:ClearAllPoints()
-	frame:SetPoint("TOPLEFT", settingsFrame, "TOPRIGHT", 5, 0)
-	frame:SetPoint("BOTTOMLEFT", settingsFrame, "BOTTOMRIGHT", 5, 0)
+	if customHost then
+		frame:SetPoint("TOPRIGHT", anchorFrame, "TOPRIGHT", -38, -104)
+		frame:SetPoint("BOTTOMRIGHT", anchorFrame, "BOTTOMRIGHT", -38, 36)
+	else
+		frame:SetPoint("TOPLEFT", settingsFrame, "TOPRIGHT", 5, 0)
+		frame:SetPoint("BOTTOMLEFT", settingsFrame, "BOTTOMRIGHT", 5, 0)
+	end
 	frame:SetWidth(BFL_FILTER_SORT_EDITOR_WIDTH)
 	if frame.Content then
 		frame.Content:SetWidth(BFL_FILTER_SORT_EDITOR_CONTENT_WIDTH)
@@ -6716,14 +6687,17 @@ function Settings:EnsureFilterSortEditorPanel()
 end
 
 function Settings:HideFilterSortEditorPanel()
-	local frame = self.filterSortEditorFrame
-	if frame then
-		frame:Hide()
+	if self.filterSortEditorFrame then
+		self.filterSortEditorFrame:Hide()
+	end
+	if self.filterSortInlineEditorFrame then
+		self.filterSortInlineEditorFrame:Hide()
 	end
 end
 
 function Settings:ClearFilterSortEditorPanel()
-	local frame = self.filterSortEditorFrame
+	local customHost = self.filterSortCustomHost
+	local frame = customHost and customHost.inlineEditor and self.filterSortInlineEditorFrame or self.filterSortEditorFrame
 	if not frame then
 		return
 	end
@@ -6739,10 +6713,20 @@ function Settings:ClearFilterSortEditorPanel()
 end
 
 function Settings:UpdateFilterSortEditorHeight(frames)
-	local frame = self.filterSortEditorFrame
+	local customHost = self.filterSortCustomHost
+	local frame = customHost and customHost.inlineEditor and self.filterSortInlineEditorFrame or self.filterSortEditorFrame
 	if not frame or not frame.Content then
 		return
 	end
+	if customHost and customHost.inlineEditor then
+		local height = BFL_Settings_GetStackHeight(frames, -5)
+		height = math.max(96, height)
+		frame.Content:SetHeight(height)
+		frame:SetHeight(height + 54)
+		self.filterSortInlineEditorHeight = height + 54
+		return
+	end
+
 	local height = 80
 	for _, child in ipairs(frames or {}) do
 		height = height + (child:GetHeight() or 28) + 10
@@ -6752,19 +6736,19 @@ end
 
 function Settings:ShowFilterSortCreateDialog(kind, templateId)
 	kind = kind == "sorter" and "sorter" or "filter"
-	local content = settingsFrame and settingsFrame.ContentScrollFrame and settingsFrame.ContentScrollFrame.Content
-	local tab = content and content.FilterSortTab
+	local tab = self:GetFilterSortTabHost()
 	if not tab then
 		return
 	end
 
 	tab.bflBuilderKind = kind
+	self.filterSortBuilderKind = kind
 	tab.bflFilterSortCreate = {
 		kind = kind,
 		templateId = templateId or "__blank",
 	}
 	self:RefreshFilterSortTab()
-	self:AdjustContentHeight(11)
+	self:RequestFilterSortLayout()
 end
 
 function Settings:IsFilterSortPreviewActive(kind, id)
@@ -6811,7 +6795,7 @@ function Settings:ApplyFilterSortPreview(kind, id)
 	end
 	BFL:ForceRefreshFriendsList()
 	self:RefreshFilterSortTab()
-	self:AdjustContentHeight(11)
+	self:RequestFilterSortLayout()
 end
 
 function Settings:ClearFilterSortPreview(skipRefresh)
@@ -6823,8 +6807,8 @@ function Settings:ClearFilterSortPreview(skipRefresh)
 	local FriendsList = BFL:GetModule("FriendsList")
 	if FriendsList then
 		FriendsList.filterMode = state.previousFilter or "all"
-		FriendsList.sortMode = state.previousPrimary or "game"
-		FriendsList.secondarySort = state.previousSecondary or "status"
+		FriendsList.sortMode = state.previousPrimary or "status"
+		FriendsList.secondarySort = state.previousSecondary or "name"
 		if FriendsList.ApplySort then
 			FriendsList:ApplySort()
 		end
@@ -6833,38 +6817,28 @@ function Settings:ClearFilterSortPreview(skipRefresh)
 	self.filterSortPreview = nil
 	if not skipRefresh then
 		self:RefreshFilterSortTab()
-		self:AdjustContentHeight(11)
+		self:RequestFilterSortLayout()
 	end
 end
 
 function Settings:RefreshFilterSortTab()
-	if not settingsFrame or not Components then
+	if not Components then
 		return
 	end
 
-	local content = settingsFrame.ContentScrollFrame.Content
-	if not content or not content.FilterSortTab then
-		return
-	end
+	local tab = self:GetFilterSortTabHost()
 
 	local Registry = BFL:GetModule("FilterSortRegistry")
-	if not Registry then
+	if not tab or not Registry then
 		return
 	end
 	Registry:NormalizeDB()
 
-	local tab = content.FilterSortTab
-	if tab.components then
-		for _, component in ipairs(tab.components) do
-			if component.Hide then
-				component:Hide()
-			end
-		end
-	end
-	tab.components = {}
-	tab.bflBuilderKind = tab.bflBuilderKind or "filter"
+	HideComponentList(tab)
+	tab.bflBuilderKind = tab.bflBuilderKind or self.filterSortBuilderKind or "filter"
 
 	local selectedKind = tab.bflBuilderKind
+	self.filterSortBuilderKind = selectedKind
 	local selectedId = selectedKind == "filter" and tab.bflSelectedFilterId or tab.bflSelectedSorterId
 	local allEntries = selectedKind == "filter" and Registry:GetQuickFilters(true) or Registry:GetSorters(true)
 	if not selectedId and allEntries[1] then
@@ -6879,6 +6853,12 @@ function Settings:RefreshFilterSortTab()
 	local DB = GetDB()
 	local db = DB and DB:Get() or BetterFriendlistDB or {}
 	local allFrames = {}
+	local isSettingsCenterInline = self.filterSortCustomHost
+		and self.filterSortCustomHost.inlineEditor
+		and self.filterSortCustomHost.settingsCenter
+	local filterSortViewMode = self.filterSortCustomHost and self.filterSortCustomHost.viewMode or "legacy"
+	local isSettingsCenterOverview = isSettingsCenterInline and filterSortViewMode == "overview"
+	local isSettingsCenterEditor = isSettingsCenterInline and filterSortViewMode == "editor"
 	local filterFields = Registry:GetFilterFieldCatalog()
 	local sortFields = Registry:GetSortFieldCatalog()
 	local fieldById = {}
@@ -6889,9 +6869,17 @@ function Settings:RefreshFilterSortTab()
 	for _, field in ipairs(sortFields) do
 		sortFieldById[field.id] = field
 	end
-	local editorPanel = self:EnsureFilterSortEditorPanel()
+	local listParent = tab
+	local listFrames = allFrames
+	if self.filterSortCustomHost then
+		self.filterSortCustomHost.editorParent = nil
+	end
+	local editorPanel = not isSettingsCenterOverview and self:EnsureFilterSortEditorPanel() or nil
 	local editorContent = editorPanel and editorPanel.Content
 	local editorFrames = {}
+	if isSettingsCenterOverview then
+		self:HideFilterSortEditorPanel()
+	end
 	if editorPanel then
 		self:ClearFilterSortEditorPanel()
 		editorPanel:Show()
@@ -6899,11 +6887,33 @@ function Settings:RefreshFilterSortTab()
 
 	local function Refresh()
 		self:RefreshFilterSortTab()
-		self:AdjustContentHeight(11)
+		self:RequestFilterSortLayout()
+	end
+
+	local function OpenEntryEditor(kind, entryID, templateID)
+		local host = self.filterSortCustomHost
+		if host and host.openEditorPage then
+			host.openEditorPage(kind, entryID, templateID)
+			return true
+		end
+		return false
+	end
+
+	local function OpenManagerPage(kind)
+		local host = self.filterSortCustomHost
+		if host and host.openManagerPage then
+			host.openManagerPage(kind)
+			return true
+		end
+		return false
 	end
 
 	local function SelectEntry(kind, id)
+		if isSettingsCenterOverview and OpenEntryEditor(kind, id) then
+			return
+		end
 		tab.bflBuilderKind = kind
+		self.filterSortBuilderKind = kind
 		tab.bflFilterSortCreate = nil
 		if kind == "filter" then
 			tab.bflSelectedFilterId = id
@@ -6940,7 +6950,13 @@ function Settings:RefreshFilterSortTab()
 	local draggingEntryRow = nil
 
 	local function SetEntryRowBackground(row, isHover)
-		if not row or not row.bg then
+		if not row then
+			return
+		end
+		if isSettingsCenterInline and BFL_Settings_ApplyBuilderRowStyle(row, isHover and "hover" or (row.entryId == selectedId and "selected" or nil)) then
+			return
+		end
+		if not row.bg then
 			return
 		end
 		if isHover then
@@ -6974,26 +6990,41 @@ function Settings:RefreshFilterSortTab()
 	end
 
 	local function AddModeRow()
-		local row = CreateFrame("Frame", nil, tab)
-		row:SetHeight(28)
-		row:SetPoint("LEFT", 20, 0)
-		row:SetPoint("RIGHT", -20, 0)
+		local row = CreateFrame("Frame", nil, listParent, isSettingsCenterInline and "BackdropTemplate" or nil)
+		row:SetHeight(isSettingsCenterInline and 44 or 28)
+		row:SetPoint("LEFT", isSettingsCenterInline and 14 or 20, 0)
+		row:SetPoint("RIGHT", isSettingsCenterInline and -14 or -20, 0)
+		if isSettingsCenterInline then
+			BFL_Settings_ApplyBuilderPanelStyle(row, { 0.014, 0.012, 0.010, 0.58 }, { 0.32, 0.24, 0.08, 0.52 })
+		end
 
 		local filterButton = BFL_Settings_CreateSmallButton(row, L.FILTER_BUILDER_FILTERS or "QuickFilters", 110, function()
 			tab.bflBuilderKind = "filter"
+			self.filterSortBuilderKind = "filter"
 			tab.bflFilterSortCreate = nil
 			Refresh()
 		end)
-		filterButton:SetPoint("LEFT", 0, 0)
-		filterButton:SetEnabled(selectedKind ~= "filter")
+		filterButton:SetPoint("LEFT", isSettingsCenterInline and 12 or 0, 0)
+		if isSettingsCenterInline then
+			filterButton.bflSelected = selectedKind == "filter"
+			BFL_Settings_ApplyBuilderButtonStyle(filterButton, filterButton.bflSelected and "selected" or nil)
+		else
+			filterButton:SetEnabled(selectedKind ~= "filter")
+		end
 
 		local sorterButton = BFL_Settings_CreateSmallButton(row, L.FILTER_BUILDER_SORTERS or "Sorters", 90, function()
 			tab.bflBuilderKind = "sorter"
+			self.filterSortBuilderKind = "sorter"
 			tab.bflFilterSortCreate = nil
 			Refresh()
 		end)
 		sorterButton:SetPoint("LEFT", filterButton, "RIGHT", 8, 0)
-		sorterButton:SetEnabled(selectedKind ~= "sorter")
+		if isSettingsCenterInline then
+			sorterButton.bflSelected = selectedKind == "sorter"
+			BFL_Settings_ApplyBuilderButtonStyle(sorterButton, sorterButton.bflSelected and "selected" or nil)
+		else
+			sorterButton:SetEnabled(selectedKind ~= "sorter")
+		end
 
 		local createButton = BFL_Settings_CreateSmallButton(
 			row,
@@ -7001,37 +7032,55 @@ function Settings:RefreshFilterSortTab()
 				or (L.FILTER_BUILDER_ADD_SORTER or "New Sorter"),
 			120,
 			function()
-				self:ShowFilterSortCreateDialog(selectedKind)
+				if not OpenEntryEditor(selectedKind) then
+					self:ShowFilterSortCreateDialog(selectedKind)
+				end
 			end
 		)
-		createButton:SetPoint("RIGHT", 0, 0)
-		table.insert(allFrames, row)
+		createButton:SetPoint("RIGHT", isSettingsCenterInline and -12 or 0, 0)
+		table.insert(listFrames, row)
 	end
 
 	local function AddEntryRow(entry, orderIndex)
-		local row = CreateFrame("Button", nil, tab)
+		local row = CreateFrame("Button", nil, listParent, isSettingsCenterInline and "BackdropTemplate" or nil)
 		row.entryId = entry.id
 		row.orderIndex = orderIndex
-		row:SetHeight(34)
-		row:SetPoint("LEFT", 20, 0)
-		row:SetPoint("RIGHT", -20, 0)
+		row:SetHeight(isSettingsCenterInline and 38 or 34)
+		row:SetPoint("LEFT", isSettingsCenterInline and 14 or 20, 0)
+		row:SetPoint("RIGHT", isSettingsCenterInline and -14 or -20, 0)
 		row:EnableMouse(true)
+		row:RegisterForClicks("LeftButtonUp")
 		row:RegisterForDrag("LeftButton")
 		row:SetScript("OnClick", function(selfRow)
+			if selfRow.bflHandledMouseUp and GetTime() - selfRow.bflHandledMouseUp < 0.15 then
+				return
+			end
 			if selfRow.bflLastDragStop and GetTime() - selfRow.bflLastDragStop < 0.15 then
 				return
 			end
 			SelectEntry(selectedKind, entry.id)
 		end)
+		row:SetScript("OnMouseUp", function(selfRow, button)
+			if button ~= "LeftButton" or not MouseIsOver(selfRow) then
+				return
+			end
+			if selfRow.bflLastDragStop and GetTime() - selfRow.bflLastDragStop < 0.15 then
+				return
+			end
+			selfRow.bflHandledMouseUp = GetTime()
+			SelectEntry(selectedKind, entry.id)
+		end)
 
-		row.bg = row:CreateTexture(nil, "BACKGROUND")
-		row.bg:SetAllPoints()
+		if not isSettingsCenterInline then
+			row.bg = row:CreateTexture(nil, "BACKGROUND")
+			row.bg:SetAllPoints()
+		end
 		SetEntryRowBackground(row, false)
 
 		row.dragHandle = row:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
-		row.dragHandle:SetPoint("LEFT", 5, 0)
+		row.dragHandle:SetPoint("LEFT", isSettingsCenterInline and 10 or 5, 0)
 		row.dragHandle:SetText(":::")
-		row.dragHandle:SetTextColor(0.5, 0.5, 0.5)
+		row.dragHandle:SetTextColor(isSettingsCenterInline and 1 or 0.5, isSettingsCenterInline and 0.82 or 0.5, isSettingsCenterInline and 0 or 0.5, isSettingsCenterInline and 0.72 or 1)
 
 		row.orderText = row:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
 		row.orderText:SetPoint("LEFT", row.dragHandle, "RIGHT", 5, 0)
@@ -7069,10 +7118,16 @@ function Settings:RefreshFilterSortTab()
 		name:SetPoint("RIGHT", row, "RIGHT", -130, 0)
 		name:SetJustifyH("LEFT")
 		name:SetWordWrap(false)
-		name:SetText((selectedId == entry.id and "|cffffffff" or "") .. entry.name .. (entry.isCustom and "" or " |cff888888(Built-in)|r"))
+		local displayName = entry.name
+		if not entry.isCustom then
+			displayName = displayName .. " |cff888888(Built-in)|r"
+		end
+		name:SetText((selectedId == entry.id and "|cffffffff" or "") .. displayName)
 
 		local copy = BFL_Settings_CreateSmallButton(row, L.FILTER_BUILDER_DUPLICATE or "Copy", 48, function()
-			self:ShowFilterSortCreateDialog(selectedKind, entry.id)
+			if not OpenEntryEditor(selectedKind, nil, entry.id) then
+				self:ShowFilterSortCreateDialog(selectedKind, entry.id)
+			end
 		end)
 		copy:SetPoint("RIGHT", row, "RIGHT", -66, 0)
 
@@ -7121,7 +7176,11 @@ function Settings:RefreshFilterSortTab()
 			selfRow:SetScript("OnUpdate", function(updateSelf)
 				for _, otherItem in ipairs(entryListItems) do
 					if otherItem ~= updateSelf and otherItem:IsVisible() then
-						SetEntryRowBackground(otherItem, MouseIsOver(otherItem))
+						if isSettingsCenterInline and MouseIsOver(otherItem) then
+							BFL_Settings_ApplyBuilderRowStyle(otherItem, "target")
+						else
+							SetEntryRowBackground(otherItem, MouseIsOver(otherItem))
+						end
 					end
 				end
 			end)
@@ -7164,6 +7223,35 @@ function Settings:RefreshFilterSortTab()
 		end)
 
 		table.insert(entryListItems, row)
+		table.insert(listFrames, row)
+	end
+
+	local function AddEditorNavigationRow()
+		local row = CreateFrame("Frame", nil, tab, "BackdropTemplate")
+		row:SetHeight(44)
+		row:SetPoint("LEFT", 14, 0)
+		row:SetPoint("RIGHT", -14, 0)
+		BFL_Settings_ApplyBuilderPanelStyle(row, { 0.014, 0.012, 0.010, 0.58 }, { 0.32, 0.24, 0.08, 0.52 })
+
+		local backButton = BFL_Settings_CreateSmallButton(
+			row,
+			L.SETTINGS_CENTER_BACK_TO_QUICKFILTER_MANAGER or "Back to QuickFilter & Sorter",
+			220,
+			function()
+				if not OpenManagerPage(selectedKind) then
+					Refresh()
+				end
+			end
+		)
+		backButton:SetPoint("LEFT", 12, 0)
+
+		local hint = row:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontDisableSmall")
+		hint:SetPoint("LEFT", backButton, "RIGHT", 12, 0)
+		hint:SetPoint("RIGHT", row, "RIGHT", -12, 0)
+		hint:SetJustifyH("LEFT")
+		hint:SetWordWrap(false)
+		hint:SetText(L.SETTINGS_CENTER_QUICKFILTER_MANAGER_HINT or "Return to the list to choose another entry.")
+
 		table.insert(allFrames, row)
 	end
 
@@ -7265,6 +7353,38 @@ function Settings:RefreshFilterSortTab()
 		table.insert(editorFrames, row)
 	end
 
+	local function AddEntryActionsRow(entry)
+		local row = BFL_Settings_CreateEditorRow(editorContent, 42)
+		local duplicateButton = BFL_Settings_CreateSmallButton(row, L.FILTER_BUILDER_DUPLICATE or "Copy", 90, function()
+			self:ShowFilterSortCreateDialog(selectedKind, entry.id)
+		end)
+		duplicateButton:SetPoint("RIGHT", row, "RIGHT", -12, 0)
+
+		local resetOrDeleteButton = BFL_Settings_CreateSmallButton(
+			row,
+			entry.isCustom and (L.FILTER_BUILDER_DELETE or "Delete") or (L.FILTER_BUILDER_RESET or "Reset"),
+			90,
+			function()
+				if entry.isCustom then
+					if selectedKind == "filter" then
+						Registry:DeleteCustomQuickFilter(entry.id)
+						tab.bflSelectedFilterId = nil
+					else
+						Registry:DeleteCustomSorter(entry.id)
+						tab.bflSelectedSorterId = nil
+					end
+				elseif selectedKind == "filter" then
+					Registry:SetQuickFilterVisibility(entry.id, true)
+				else
+					Registry:SetSorterVisibility(entry.id, true)
+				end
+				Refresh()
+			end
+		)
+		resetOrDeleteButton:SetPoint("RIGHT", duplicateButton, "LEFT", -8, 0)
+		table.insert(editorFrames, row)
+	end
+
 	local function AddCreateEditor(kind, templateId)
 		kind = kind == "sorter" and "sorter" or "filter"
 		local entries = kind == "filter" and Registry:GetQuickFilters(true) or Registry:GetSorters(true)
@@ -7356,6 +7476,7 @@ function Settings:RefreshFilterSortTab()
 			end
 			if id then
 				tab.bflBuilderKind = kind
+				self.filterSortBuilderKind = kind
 				tab.bflFilterSortCreate = nil
 				Refresh()
 			end
@@ -7595,21 +7716,29 @@ function Settings:RefreshFilterSortTab()
 		table.insert(editorFrames, addStep)
 	end
 
-	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_TAB_FILTER_SORT or "QuickFilter & Sorter"))
-	table.insert(
-		allFrames,
-		Components:CreateLabel(
-			tab,
-			L.FILTER_BUILDER_DESC
-				or "Choose which entries appear in menus, change their order, and create custom filters or sorter chains.",
-			true
+	if not isSettingsCenterInline then
+		table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_TAB_FILTER_SORT or "QuickFilter & Sorter"))
+		table.insert(
+			allFrames,
+			Components:CreateLabel(
+				tab,
+				L.FILTER_BUILDER_DESC
+					or "Choose which entries appear in menus, change their order, and create custom filters or sorter chains.",
+				true
+			)
 		)
-	)
-	AddModeRow()
+	end
+	if not isSettingsCenterEditor then
+		AddModeRow()
 
-	table.insert(allFrames, Components:CreateHeader(tab, selectedKind == "filter" and (L.FILTER_BUILDER_FILTERS or "QuickFilters") or (L.FILTER_BUILDER_SORTERS or "Sorters")))
-	for i, entry in ipairs(allEntries) do
-		AddEntryRow(entry, i)
+		if not isSettingsCenterInline then
+			table.insert(allFrames, Components:CreateHeader(tab, selectedKind == "filter" and (L.FILTER_BUILDER_FILTERS or "QuickFilters") or (L.FILTER_BUILDER_SORTERS or "Sorters")))
+		end
+		for i, entry in ipairs(allEntries) do
+			AddEntryRow(entry, i)
+		end
+	else
+		AddEditorNavigationRow()
 	end
 
 	local entry = GetEntry(selectedKind, selectedId)
@@ -7629,6 +7758,9 @@ function Settings:RefreshFilterSortTab()
 			else
 				AddPreviewRow(entry)
 			end
+			if isSettingsCenterEditor then
+				AddEntryActionsRow(entry)
+			end
 
 			local customTable = AddNameAndIconEditor(entry)
 			if selectedKind == "filter" then
@@ -7646,10 +7778,19 @@ function Settings:RefreshFilterSortTab()
 			Components:AnchorChain(editorFrames, -5)
 			editorPanel.components = editorFrames
 			self:UpdateFilterSortEditorHeight(editorFrames)
+			if self.filterSortCustomHost and self.filterSortCustomHost.inlineEditor then
+				table.insert(allFrames, editorPanel)
+			end
 		end
 	end
 
 	Components:AnchorChain(allFrames, -5)
+	if isSettingsCenterInline then
+		self.filterSortInlinePageHeight = math.max(560, BFL_Settings_GetStackHeight(allFrames, -5) + 30)
+		if tab.SetHeight then
+			tab:SetHeight(self.filterSortInlinePageHeight)
+		end
+	end
 	tab.components = allFrames
 end
 
@@ -8834,30 +8975,14 @@ end
 -- GLOBAL SYNC TAB (Tab ID 6)
 -- ===========================================
 function Settings:RefreshGlobalSyncTab()
-	if not settingsFrame then
-		return
-	end
-
-	local content = settingsFrame.ContentScrollFrame.Content
-	if not content or not content.GlobalSyncTab then
-		return
-	end
-
-	local tab = content.GlobalSyncTab
 	local DB = GetDB()
-	if not DB then
+	local tab = self:GetGlobalSyncTabHost()
+	if not tab or not DB then
 		return
 	end
 
 	-- Clear existing content
-	if tab.components then
-		for _, component in ipairs(tab.components) do
-			if component.Hide then
-				component:Hide()
-			end
-		end
-	end
-	tab.components = {}
+	HideComponentList(tab)
 
 	local allFrames = {}
 
