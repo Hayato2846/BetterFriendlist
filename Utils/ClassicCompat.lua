@@ -1119,34 +1119,90 @@ function Compat.ConfirmReadyCheck(isReady)
 	return false
 end
 
+local function GetExactPlayerNameForPartyAction(nameOrUnit)
+	if type(nameOrUnit) ~= "string" or nameOrUnit == "" then
+		return nameOrUnit, false
+	end
+	if not (UnitExists and UnitExists(nameOrUnit)) then
+		return nameOrUnit, false
+	end
+
+	local name, realm
+	if UnitFullName then
+		name, realm = UnitFullName(nameOrUnit)
+	end
+	if not name and UnitName then
+		name, realm = UnitName(nameOrUnit)
+	end
+	if not name or name == "" then
+		return nameOrUnit, false
+	end
+	if not realm or realm == "" then
+		realm = GetNormalizedRealmName and GetNormalizedRealmName() or nil
+	end
+
+	local isSameRealm = false
+	if UnitRealmRelationship and LE_REALM_RELATION_SAME then
+		isSameRealm = UnitRealmRelationship(nameOrUnit) == LE_REALM_RELATION_SAME
+	elseif realm and GetNormalizedRealmName then
+		isSameRealm = realm == GetNormalizedRealmName()
+	end
+
+	if realm and realm ~= "" and not isSameRealm then
+		return name .. "-" .. realm, true
+	end
+	return name, true
+end
+
 function Compat.PromoteToAssistant(name, exactNameMatch)
+	local exactName, exactFromUnit = GetExactPlayerNameForPartyAction(name)
+	if exactName == nil or exactName == "" then
+		return false
+	end
+	if exactNameMatch == nil and exactFromUnit then
+		exactNameMatch = true
+	end
 	if C_PartyInfo and C_PartyInfo.PromoteToAssistant then
-		C_PartyInfo.PromoteToAssistant(name, exactNameMatch)
+		C_PartyInfo.PromoteToAssistant(exactName, exactNameMatch)
 		return true
 	elseif PromoteToAssistant then
-		PromoteToAssistant(name, exactNameMatch)
+		PromoteToAssistant(exactName, exactNameMatch)
 		return true
 	end
 	return false
 end
 
 function Compat.PromoteToLeader(name, exactNameMatch)
+	local exactName, exactFromUnit = GetExactPlayerNameForPartyAction(name)
+	if exactName == nil or exactName == "" then
+		return false
+	end
+	if exactNameMatch == nil and exactFromUnit then
+		exactNameMatch = true
+	end
 	if C_PartyInfo and C_PartyInfo.PromoteToLeader then
-		C_PartyInfo.PromoteToLeader(name, exactNameMatch)
+		C_PartyInfo.PromoteToLeader(exactName, exactNameMatch)
 		return true
 	elseif PromoteToLeader then
-		PromoteToLeader(name, exactNameMatch)
+		PromoteToLeader(exactName, exactNameMatch)
 		return true
 	end
 	return false
 end
 
 function Compat.DemoteAssistant(name, exactNameMatch)
+	local exactName, exactFromUnit = GetExactPlayerNameForPartyAction(name)
+	if exactName == nil or exactName == "" then
+		return false
+	end
+	if exactNameMatch == nil and exactFromUnit then
+		exactNameMatch = true
+	end
 	if C_PartyInfo and C_PartyInfo.DemoteAssistant then
-		C_PartyInfo.DemoteAssistant(name, exactNameMatch)
+		C_PartyInfo.DemoteAssistant(exactName, exactNameMatch)
 		return true
 	elseif DemoteAssistant then
-		DemoteAssistant(name, exactNameMatch)
+		DemoteAssistant(exactName, exactNameMatch)
 		return true
 	end
 	return false

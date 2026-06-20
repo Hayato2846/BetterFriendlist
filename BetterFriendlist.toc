@@ -66,6 +66,8 @@ Modules\StreamerMode.lua
 Modules\HouseListProxy.lua [AllowLoadGameType mainline]
 Modules\ThemePalette.lua
 Modules\Database.lua
+Modules\ContactIdentity.lua
+Modules\ContactMemory.lua
 Modules\FilterSortRegistry.lua
 Modules\IconSelector.lua
 Modules\Changelog.lua
@@ -86,6 +88,7 @@ Modules\GuildRosterData.lua
 Modules\GuildBroker.lua
 Modules\GuildFrame.lua
 Modules\SettingsComponents.lua
+Modules\AutoRaidAssist.lua
 Modules\SettingsDesigner.lua
 Modules\Settings.lua
 Modules\NoteSync.lua

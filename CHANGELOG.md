@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Settings Center** - Added a LibSettingsDesigner-based settings center with dashboard, search-ready task categories, Retail/Classic shared loading, expanded native controls for theme, groups, raid shortcuts, broker columns, and explicit BFL Dark/Custom and ElvUI skin hooks.
 - **Settings Icons** - Added BetterFriendlist-specific Settings Center icons and a transparent Settings avatar.
+- **Contact Memory Beta** - Added a default-off local notes and tags MVP for friends and ignored players. Enable Beta Features and Contact Memory under Settings > Advanced or the Settings Center Beta page; entries are available in BFL context menus and tooltips without touching Blizzard notes.
+- **Contact Memory Debug** - Added a temporary `/bflcmdebug` chat command for diagnosing friend tooltip note and tag resolution.
+- **Auto Raid Assist** - Added an opt-in Settings Center picker that can auto-promote selected BattleTag friends, nickname matches, or manual Character-Realm targets to raid assistant.
 
 ### Improved
 - **Settings Center** - Moved the new settings window behind a beta toggle so the classic settings window remains the default, with smooth switching between both Beta Features sections.
@@ -22,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Settings Center** - Polished Groups & Sorting with a compact Group Order table, clearer default sorting controls, and an inline QuickFilter/Sorter editor.
 - **Settings Center** - Reworked the QuickFilter/Sorter editor into a manager page with separate full-width editor pages for selected entries.
 - **Settings Center** - Moved the QuickFilter/Sorter editor and Global Sync database tools into native Settings Center pages, and combined Broker column ordering with visibility checkboxes.
+- **Auto Raid Assist** - Expanded target suggestions to include current party and raid characters in addition to friends and guild members.
+- **Auto Raid Assist** - Added detailed `/bfl debug` traces for conversion hooks, roster checks, target matching, promotion queues, and assistant promotion attempts.
 - **Settings Center Help** - Added expandable changelog notes, version navigation, and Discord, GitHub, and Ko-fi support links to the Settings Center.
 - **Settings Icons** - Refined the Help, Streamer Mode, and Name & Info icons for cleaner shapes and clearer feature recognition.
 
@@ -31,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Preview Mode** - Updated `/bfl preview` to generate Retail 12.1 Quick Join mock entries, including censored Group Finder rows, reveal testing, long-title layout coverage, and new Battle.net metadata fields.
 
 ### Fixed
+- **Auto Raid Assist** - Improved automatic promotion after converting a party to a raid by reacting to group formation, queueing multiple matching promotions, and using exact character names for assistant promotion.
+- **Auto Raid Assist** - Added the missing native enable toggle to the Settings Center editor and retried assistant promotion after cooldowns so multiple matching raid members are handled reliably.
+- **Auto Raid Assist** - Matched Blizzard's same-realm promotion naming so local-realm raid members can be promoted correctly.
+- **Contact Memory Beta** - Fixed private notes and tags not appearing in friend tooltips that use Blizzard's native FriendsTooltip frame.
 - **Classic Guild Window** - Kept Classic clients on Blizzard's separate Guild window so the Guild keybind no longer opens the Friends list.
 
 ### Removed

@@ -136,6 +136,22 @@ local defaults = {
 	enableBetaFeatures = false, -- Enable experimental Beta features (default: OFF)
 	enableSettingsCenterBeta = false, -- Use the LibSettingsDesigner Settings Center beta (default: OFF)
 	externalMenuBridgeEnabled = false, -- Add supported addon actions to supported BFL context menus (default: OFF)
+	contactMemory = {
+		version = 1,
+		enabled = false,
+		contacts = {},
+		tags = {},
+		settings = {
+			showTooltipSection = true,
+			hideInStreamerMode = true,
+			nextTagId = 1,
+		},
+	},
+	autoRaidAssist = {
+		version = 1,
+		enabled = false,
+		targets = {},
+	},
 	-- Global Sync Settings
 	enableGlobalSync = false, -- Enable Global Friend Sync (default: OFF)
 	enableGlobalSyncDeletion = false, -- Enable deletion of friends during sync (default: OFF)

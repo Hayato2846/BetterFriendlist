@@ -1687,6 +1687,1146 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
+	TS:RegisterTest("data", "ContactMemory_DBDefaults", {
+		description = "Contact Memory defaults should be present and disabled",
+		action = function(V)
+			WithTemporaryDatabase({}, function(tempDB)
+				local ContactMemory = BFL:GetModule("ContactMemory")
+				V:AssertNotNil(ContactMemory, "ContactMemory module should exist")
+
+				local contactMemoryDB = ContactMemory:NormalizeDB()
+				V:AssertType(tempDB.contactMemory, "table", "contactMemory should be a table")
+				V:AssertEqual(contactMemoryDB.version, 1, "Contact Memory schema version should be 1")
+				V:AssertEqual(contactMemoryDB.enabled, false, "Contact Memory should default to disabled")
+				V:AssertType(contactMemoryDB.contacts, "table", "contacts should be a table")
+				V:AssertType(contactMemoryDB.tags, "table", "tags should be a table")
+				V:AssertType(contactMemoryDB.settings, "table", "settings should be a table")
+				V:AssertEqual(
+					contactMemoryDB.settings.hideInStreamerMode,
+					true,
+					"Private data should hide in Streamer Mode by default"
+				)
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "ContactMemory_DisabledState", {
+		description = "Contact Memory should require both its toggle and Beta Features",
+		action = function(V)
+			WithTemporaryDatabase({
+				enableBetaFeatures = false,
+				contactMemory = {
+					enabled = true,
+				},
+			}, function()
+				local ContactMemory = BFL:GetModule("ContactMemory")
+				V:AssertNotNil(ContactMemory, "ContactMemory module should exist")
+				V:Assert(ContactMemory:IsEnabled() == false, "Beta disabled should disable Contact Memory")
+
+				BetterFriendlistDB.enableBetaFeatures = true
+				V:Assert(ContactMemory:IsEnabled() == true, "Both toggles enabled should enable Contact Memory")
+
+				ContactMemory:SetEnabled(false)
+				V:Assert(ContactMemory:IsEnabled() == false, "Contact Memory toggle should disable the feature")
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "ContactMemory_SettingsDesignerControls", {
+		description = "Contact Memory should register explicit Settings Center controls without dotted DB keys",
+		action = function(V)
+			WithTemporaryDatabase({
+				enableBetaFeatures = true,
+				contactMemory = {
+					enabled = false,
+				},
+			}, function(tempDB)
+				local ContactMemory = BFL:GetModule("ContactMemory")
+				V:AssertNotNil(ContactMemory, "ContactMemory module should exist")
+
+				local fakeApp = {
+					pagesByID = {
+						["advanced.beta"] = {},
+					},
+					groups = {},
+					controls = {},
+					GetPage = function(self, pageID)
+						return self.pagesByID[pageID]
+					end,
+					RegisterGroup = function(self, pageID, data)
+						self.groups[data.id] = data
+						data.pageID = pageID
+						return data
+					end,
+					RegisterControl = function(self, pageID, data)
+						self.controls[data.id] = data
+						data.pageID = pageID
+						return data
+					end,
+				}
+
+				V:Assert(
+					ContactMemory:RegisterSettingsDesignerControls(fakeApp),
+					"RegisterSettingsDesignerControls should register controls"
+				)
+				V:AssertNotNil(fakeApp.groups.contactMemory, "Contact Memory settings group should be registered")
+				V:AssertEqual(
+					fakeApp.groups.contactMemory.title,
+					(BFL.L and BFL.L.CONTACT_MEMORY_TITLE) or "Contact Memory",
+					"Contact Memory group should keep the localized title"
+				)
+
+				local enableControl = fakeApp.controls["contactMemory.enabled"]
+				local tooltipControl = fakeApp.controls["contactMemory.showTooltipSection"]
+				local streamerControl = fakeApp.controls["contactMemory.hideInStreamerMode"]
+				V:AssertNotNil(enableControl, "Enable control should be registered")
+				V:AssertNotNil(tooltipControl, "Tooltip control should be registered")
+				V:AssertNotNil(streamerControl, "Streamer Mode control should be registered")
+				V:AssertEqual(
+					enableControl.groupTitle,
+					(BFL.L and BFL.L.CONTACT_MEMORY_TITLE) or "Contact Memory",
+					"Enable control should pass the localized group title"
+				)
+				V:AssertEqual(
+					tooltipControl.groupTitle,
+					(BFL.L and BFL.L.CONTACT_MEMORY_TITLE) or "Contact Memory",
+					"Tooltip control should pass the localized group title"
+				)
+				V:AssertEqual(
+					streamerControl.groupTitle,
+					(BFL.L and BFL.L.CONTACT_MEMORY_TITLE) or "Contact Memory",
+					"Streamer control should pass the localized group title"
+				)
+				V:AssertNil(enableControl.key, "Enable control should use explicit accessors instead of dotted keys")
+				V:AssertNil(tooltipControl.key, "Tooltip control should use explicit accessors instead of dotted keys")
+				V:AssertNil(streamerControl.key, "Streamer control should use explicit accessors instead of dotted keys")
+
+				enableControl.setValue(true)
+				V:AssertEqual(tempDB.contactMemory.enabled, true, "Enable control should update Contact Memory state")
+				V:AssertEqual(enableControl.getValue(), true, "Enable control getter should read Contact Memory state")
+
+				tooltipControl.setValue(false)
+				V:AssertEqual(
+					ContactMemory:GetSetting("showTooltipSection", true),
+					false,
+					"Tooltip control should update nested settings"
+				)
+
+				streamerControl.setValue(false)
+				V:AssertEqual(
+					ContactMemory:GetSetting("hideInStreamerMode", true),
+					false,
+					"Streamer control should update nested settings"
+				)
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "ContactMemory_KeyResolution", {
+		description = "Contact Memory should resolve player and Battle.net contact keys",
+		action = function(V)
+			WithTemporaryDatabase({}, function()
+				local ContactMemory = BFL:GetModule("ContactMemory")
+				local ContactIdentity = BFL:GetModule("ContactIdentity")
+				V:AssertNotNil(ContactMemory, "ContactMemory module should exist")
+				V:AssertNotNil(ContactIdentity, "ContactIdentity module should exist")
+
+				V:AssertEqual(
+					ContactMemory:ResolveContactKeyFromFriend("wow_Test-Realm"),
+					"player:Test-Realm",
+					"WoW friend UIDs should resolve to player keys"
+				)
+				V:AssertEqual(
+					ContactMemory:ResolveContactKeyFromFriend("bnet_Player#1234"),
+					"bnet:Player#1234",
+					"BattleTag UIDs should resolve to bnet keys"
+				)
+				V:AssertEqual(
+					ContactMemory:ResolveContactKeyFromFriend({ type = "bnet", battleTag = "Player#1234" }),
+					"bnet:Player#1234",
+					"BNet friend tables should prefer BattleTag keys"
+				)
+				V:AssertEqual(
+					ContactMemory:ResolveContactKeyFromContext({ name = "Unit", server = "Realm" }),
+					"player:Unit-Realm",
+					"Context name and realm should resolve to a player key"
+				)
+				V:AssertEqual(
+					ContactMemory:ResolveContactKeyFromFriend("bnet_Player#1234"),
+					ContactIdentity:ResolveContactKeyFromFriend("bnet_Player#1234"),
+					"Contact Memory should share ContactIdentity BNet key resolution"
+				)
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "ContactMemory_TooltipAliasResolution", {
+		description = "Contact Memory tooltips should resolve saved notes and tags across related contact keys",
+		action = function(V)
+			WithTemporaryDatabase({
+				enableBetaFeatures = true,
+				contactMemory = {
+					enabled = true,
+				},
+			}, function()
+				local ContactMemory = BFL:GetModule("ContactMemory")
+				V:AssertNotNil(ContactMemory, "ContactMemory module should exist")
+
+				V:Assert(
+					ContactMemory:SetPrivateNote("bnet:42", "Raid caller"),
+					"Private note should be saved under BNet account aliases"
+				)
+				local bnetTooltipKey = ContactMemory:FindTooltipContactKey(ContactMemory:GetRelatedContactKeysFromFriend({
+					type = "bnet",
+					battleTag = "Player#1234",
+					bnetAccountID = 42,
+				}, "bnet:Player#1234"))
+				V:AssertEqual(
+					bnetTooltipKey,
+					"bnet:42",
+					"Tooltip lookup should find notes stored under the BNet account ID alias"
+				)
+
+				local tooltip = {
+					lines = {},
+					AddLine = function(self, text)
+						self.lines[#self.lines + 1] = text
+					end,
+					Show = function(self)
+						self.shown = true
+					end,
+				}
+				V:Assert(
+					ContactMemory:AddTooltipLinesForFriend(tooltip, {
+						type = "bnet",
+						battleTag = "Player#1234",
+						bnetAccountID = 42,
+					}),
+					"Friend tooltip should display a note saved under a related key"
+				)
+				V:AssertEqual(tooltip.lines[#tooltip.lines], "Raid caller", "Tooltip should include the private note")
+
+				local friendSummary = ContactMemory:GetTooltipSummaryForFriend({
+					type = "bnet",
+					battleTag = "Player#1234",
+					bnetAccountID = 42,
+				})
+				V:AssertNotNil(friendSummary, "Friend tooltip summary should be available without a GameTooltip AddLine API")
+				V:AssertEqual(friendSummary.note, "Raid caller", "Friend tooltip summary should include the related note")
+
+				local tagId = ContactMemory:CreateTag("Progression")
+				V:AssertNotNil(tagId, "CreateTag should return a tag ID")
+				V:Assert(ContactMemory:SetTag("player:Unit-Realm", tagId, true), "Tag should be saved under player alias")
+
+				local playerTooltipKey = ContactMemory:FindTooltipContactKey(ContactMemory:GetRelatedContactKeysFromFriend({
+					type = "bnet",
+					battleTag = "Other#1234",
+					bnetAccountID = 99,
+					gameAccountInfo = {
+						characterName = "Unit",
+						realmName = "Realm",
+					},
+				}, "bnet:Other#1234"))
+				V:AssertEqual(
+					playerTooltipKey,
+					"player:Unit-Realm",
+					"Tooltip lookup should find tags stored under the active character alias"
+				)
+
+				local tagSummary = ContactMemory:GetTooltipSummary(playerTooltipKey)
+				V:AssertNotNil(tagSummary, "Tooltip summary should exist for related player tags")
+				V:AssertEqual(tagSummary.tagsText, "Progression", "Tooltip summary should include related tags")
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "AutoRaidAssist_DBDefaults", {
+		description = "Auto Raid Assist defaults should be present and disabled",
+		action = function(V)
+			WithTemporaryDatabase({}, function(tempDB)
+				local AutoRaidAssist = BFL:GetModule("AutoRaidAssist")
+				V:AssertNotNil(AutoRaidAssist, "AutoRaidAssist module should exist")
+
+				local assistDB = AutoRaidAssist:NormalizeDB()
+				V:AssertType(tempDB.autoRaidAssist, "table", "autoRaidAssist should be a table")
+				V:AssertEqual(assistDB.version, 1, "Auto Raid Assist schema version should be 1")
+				V:AssertEqual(assistDB.enabled, false, "Auto Raid Assist should default to disabled")
+				V:AssertType(assistDB.targets, "table", "Auto Raid Assist targets should be a table")
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "AutoRaidAssist_TargetCRUD", {
+		description = "Auto Raid Assist should store stable contact keys and reject duplicates",
+		action = function(V)
+			WithTemporaryDatabase({}, function()
+				local AutoRaidAssist = BFL:GetModule("AutoRaidAssist")
+				V:AssertNotNil(AutoRaidAssist, "AutoRaidAssist module should exist")
+
+				local ok = AutoRaidAssist:AddManualCharacterTarget("Unit-Realm")
+				V:Assert(ok == true, "Manual Character-Realm target should be accepted")
+				V:AssertEqual(#AutoRaidAssist:GetTargets(), 1, "One target should be stored")
+				V:AssertEqual(
+					AutoRaidAssist:GetTargets()[1].key,
+					"player:Unit-Realm",
+					"Manual target should use a player contact key"
+				)
+
+				local duplicateOK, duplicateReason = AutoRaidAssist:AddManualCharacterTarget("Unit-Realm")
+				V:Assert(duplicateOK == false, "Duplicate target should be rejected")
+				V:AssertEqual(duplicateReason, "duplicate", "Duplicate target should return duplicate reason")
+
+				local invalidOK, invalidReason = AutoRaidAssist:AddManualCharacterTarget("Unit")
+				V:Assert(invalidOK == false, "Bare character names should be rejected")
+				V:AssertEqual(invalidReason, "invalidCharacter", "Invalid manual target should return validation reason")
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "AutoRaidAssist_GuildCandidates", {
+		description = "Auto Raid Assist should suggest guild characters and add them as guild targets",
+		action = function(V)
+			WithTemporaryDatabase({}, function()
+				local AutoRaidAssist = BFL:GetModule("AutoRaidAssist")
+				local FriendsList = BFL:GetModule("FriendsList")
+				V:AssertNotNil(AutoRaidAssist, "AutoRaidAssist module should exist")
+
+				local originalFriends = FriendsList and FriendsList.friendsList
+				local originalGuildRosterData = BFL.Modules and BFL.Modules.GuildRosterData
+				local originalGuildRosterRequest = AutoRaidAssist.lastGuildRosterRequest
+				local fakeGuildRosterData = {
+					requested = false,
+					HasBaseRosterAPI = function()
+						return true
+					end,
+					IsInGuild = function()
+						return true
+					end,
+					RequestRosterUpdate = function(self)
+						self.requested = true
+						return true
+					end,
+					CollectRoster = function()
+						return {
+							{
+								name = "Dimmy",
+								fullName = "Dimmy-Realm",
+								realm = "Realm",
+								rank = "Raider",
+							},
+							{
+								name = "Seb",
+								fullName = "Seb-OtherRealm",
+								realm = "OtherRealm",
+								rank = "Member",
+							},
+						}
+					end,
+				}
+
+				local ok, err = pcall(function()
+					if FriendsList then
+						FriendsList.friendsList = {}
+					end
+					BFL.Modules.GuildRosterData = fakeGuildRosterData
+					AutoRaidAssist.lastGuildRosterRequest = nil
+
+					local candidates = AutoRaidAssist:BuildCandidateList("dim", 10)
+					V:AssertEqual(#candidates, 1, "Guild character query should return one candidate")
+					V:AssertEqual(candidates[1].key, "player:Dimmy-Realm", "Guild candidate should use a player key")
+					V:AssertEqual(candidates[1].source, "guild", "Guild candidate should be marked as guild source")
+					V:Assert(fakeGuildRosterData.requested == true, "Guild roster refresh should be requested")
+
+					local addOK = AutoRaidAssist:AddTargetFromCandidate(candidates[1])
+					V:Assert(addOK == true, "Guild candidate should be addable")
+					V:AssertEqual(AutoRaidAssist:GetTargets()[1].source, "guild", "Stored target should keep guild source")
+				end)
+
+				if FriendsList then
+					FriendsList.friendsList = originalFriends
+				end
+				BFL.Modules.GuildRosterData = originalGuildRosterData
+				AutoRaidAssist.lastGuildRosterRequest = originalGuildRosterRequest
+				if not ok then
+					error(err, 2)
+				end
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "AutoRaidAssist_GroupCandidates", {
+		description = "Auto Raid Assist should suggest current group and raid characters",
+		action = function(V)
+			WithTemporaryDatabase({}, function()
+				local AutoRaidAssist = BFL:GetModule("AutoRaidAssist")
+				local FriendsList = BFL:GetModule("FriendsList")
+				V:AssertNotNil(AutoRaidAssist, "AutoRaidAssist module should exist")
+
+				local originalFriends = FriendsList and FriendsList.friendsList
+				local originalGuildRosterData = BFL.Modules and BFL.Modules.GuildRosterData
+				local originalIsInRaid = IsInRaid
+				local originalIsInGroup = IsInGroup
+				local originalGetNumGroupMembers = GetNumGroupMembers
+				local originalGetNumSubgroupMembers = GetNumSubgroupMembers
+				local originalUnitExists = UnitExists
+				local originalUnitIsUnit = UnitIsUnit
+				local originalUnitFullName = UnitFullName
+				local originalUnitName = UnitName
+				local originalGetNormalizedRealmName = GetNormalizedRealmName
+
+				local ok, err = pcall(function()
+					if FriendsList then
+						FriendsList.friendsList = {}
+					end
+					BFL.Modules.GuildRosterData = nil
+
+					IsInRaid = function()
+						return false
+					end
+					IsInGroup = function()
+						return true
+					end
+					GetNumGroupMembers = function()
+						return 0
+					end
+					GetNumSubgroupMembers = function()
+						return 2
+					end
+					UnitExists = function(unit)
+						return unit == "party1" or unit == "party2"
+					end
+					UnitIsUnit = function(unit, other)
+						return unit == "player" and other == "player"
+					end
+					UnitFullName = function(unit)
+						if unit == "party1" then
+							return "Groupie", "Realm"
+						end
+						if unit == "party2" then
+							return "Other", "Realm"
+						end
+						return nil, nil
+					end
+					UnitName = function(unit)
+						if unit == "party1" then
+							return "Groupie", "Realm"
+						end
+						return nil, nil
+					end
+					GetNormalizedRealmName = function()
+						return "Realm"
+					end
+
+					local candidates = AutoRaidAssist:BuildCandidateList("groupie", 10)
+					V:AssertEqual(#candidates, 1, "Group character query should return one candidate")
+					V:AssertEqual(candidates[1].key, "player:Groupie-Realm", "Group candidate should use a player key")
+					V:AssertEqual(candidates[1].source, "group", "Group candidate should be marked as group source")
+
+					local addOK = AutoRaidAssist:AddTargetFromCandidate(candidates[1])
+					V:Assert(addOK == true, "Group candidate should be addable")
+					V:AssertEqual(AutoRaidAssist:GetTargets()[1].source, "group", "Stored target should keep group source")
+				end)
+
+				if FriendsList then
+					FriendsList.friendsList = originalFriends
+				end
+				BFL.Modules.GuildRosterData = originalGuildRosterData
+				IsInRaid = originalIsInRaid
+				IsInGroup = originalIsInGroup
+				GetNumGroupMembers = originalGetNumGroupMembers
+				GetNumSubgroupMembers = originalGetNumSubgroupMembers
+				UnitExists = originalUnitExists
+				UnitIsUnit = originalUnitIsUnit
+				UnitFullName = originalUnitFullName
+				UnitName = originalUnitName
+				GetNormalizedRealmName = originalGetNormalizedRealmName
+				if not ok then
+					error(err, 2)
+				end
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "AutoRaidAssist_RosterSettleRetries", {
+		description = "Auto Raid Assist should retry roster checks after party to raid transitions settle",
+		action = function(V)
+			WithTemporaryDatabase({
+				autoRaidAssist = {
+					enabled = true,
+				},
+			}, function()
+				local AutoRaidAssist = BFL:GetModule("AutoRaidAssist")
+				V:AssertNotNil(AutoRaidAssist, "AutoRaidAssist module should exist")
+
+				local originalCTimer = C_Timer
+				local originalPendingTimer = AutoRaidAssist.pendingTimer
+				local originalRosterRetryTimers = AutoRaidAssist.rosterRetryTimers
+				local timers = {}
+
+				local ok, err = pcall(function()
+					AutoRaidAssist.pendingTimer = nil
+					AutoRaidAssist.rosterRetryTimers = nil
+					C_Timer = {
+						NewTimer = function(delay, callback)
+							local timer = {
+								delay = delay,
+								callback = callback,
+								cancelled = false,
+								Cancel = function(self)
+									self.cancelled = true
+								end,
+							}
+							timers[#timers + 1] = timer
+							return timer
+						end,
+					}
+
+					AutoRaidAssist:ScheduleRosterEvaluate("test")
+					V:AssertEqual(#timers, 3, "Roster scheduling should create one debounce timer and two settle retries")
+					V:AssertEqual(timers[2].delay, 1.0, "First settle retry should run after the roster transition starts settling")
+					V:AssertEqual(timers[3].delay, 2.5, "Second settle retry should cover delayed raid unit token availability")
+
+					AutoRaidAssist:ScheduleRosterEvaluate("test-again")
+					V:Assert(timers[2].cancelled == true, "New roster scheduling should cancel the previous first settle retry")
+					V:Assert(timers[3].cancelled == true, "New roster scheduling should cancel the previous second settle retry")
+				end)
+
+				C_Timer = originalCTimer
+				AutoRaidAssist.pendingTimer = originalPendingTimer
+				AutoRaidAssist.rosterRetryTimers = originalRosterRetryTimers
+				if not ok then
+					error(err, 2)
+				end
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "AutoRaidAssist_ConversionTriggers", {
+		description = "Auto Raid Assist should listen for group formation and direct party-to-raid conversion calls",
+		action = function(V)
+			WithTemporaryDatabase({
+				autoRaidAssist = {
+					enabled = true,
+				},
+			}, function()
+				local AutoRaidAssist = BFL:GetModule("AutoRaidAssist")
+				V:AssertNotNil(AutoRaidAssist, "AutoRaidAssist module should exist")
+				V:Assert(
+					type(BFL.EventCallbacks) == "table" and type(BFL.EventCallbacks.GROUP_FORMED) == "table",
+					"GROUP_FORMED should be registered as an Auto Raid Assist trigger"
+				)
+
+				local originalHooksecurefunc = hooksecurefunc
+				local originalConvertToRaid = ConvertToRaid
+				local originalRaidFrameConvertToRaid = RaidFrame_ConvertToRaid
+				local originalCPartyInfo = C_PartyInfo
+				local originalBFLConvertToRaid = BFL.ConvertToRaid
+				local originalScheduleRosterEvaluate = AutoRaidAssist.ScheduleRosterEvaluate
+				local originalConversionHooksRegistered = AutoRaidAssist.conversionHooksRegistered
+				local hooks = {}
+				local scheduledReasons = {}
+
+				local ok, err = pcall(function()
+					hooksecurefunc = function(target, methodName, callback)
+						if type(target) == "table" then
+							hooks[#hooks + 1] = {
+								name = methodName,
+								callback = callback,
+							}
+						else
+							hooks[#hooks + 1] = {
+								name = target,
+								callback = methodName,
+							}
+						end
+					end
+					BFL.ConvertToRaid = function() end
+					C_PartyInfo = {
+						ConvertToRaid = function() end,
+						ConfirmConvertToRaid = function() end,
+					}
+					ConvertToRaid = function() end
+					RaidFrame_ConvertToRaid = function() end
+					AutoRaidAssist.ScheduleRosterEvaluate = function(_, reason)
+						scheduledReasons[#scheduledReasons + 1] = reason
+					end
+					AutoRaidAssist.conversionHooksRegistered = nil
+
+					AutoRaidAssist:RegisterConversionHooks()
+
+					local hooked = {}
+					for _, hook in ipairs(hooks) do
+						hooked[hook.name] = true
+						hook.callback()
+					end
+
+					V:Assert(hooked.ConvertToRaid == true, "ConvertToRaid should be hooked")
+					V:Assert(hooked.ConfirmConvertToRaid == true, "ConfirmConvertToRaid should be hooked")
+					V:Assert(hooked.RaidFrame_ConvertToRaid == true, "RaidFrame_ConvertToRaid should be hooked when available")
+					V:Assert(#scheduledReasons >= 1, "Conversion hooks should schedule a roster evaluation")
+					V:AssertEqual(scheduledReasons[1], "convert-to-raid", "Conversion hooks should use a distinct reason")
+				end)
+
+				hooksecurefunc = originalHooksecurefunc
+				ConvertToRaid = originalConvertToRaid
+				RaidFrame_ConvertToRaid = originalRaidFrameConvertToRaid
+				C_PartyInfo = originalCPartyInfo
+				BFL.ConvertToRaid = originalBFLConvertToRaid
+				AutoRaidAssist.ScheduleRosterEvaluate = originalScheduleRosterEvaluate
+				AutoRaidAssist.conversionHooksRegistered = originalConversionHooksRegistered
+				if not ok then
+					error(err, 2)
+				end
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "AutoRaidAssist_PromotionQueueMultipleMatches", {
+		description = "Auto Raid Assist should queue multiple matching raid promotions instead of firing them in one batch",
+		action = function(V)
+			WithTemporaryDatabase({
+				autoRaidAssist = {
+					enabled = true,
+					targets = {
+						{
+							key = "player:Alpha-Realm",
+							id = "player:Alpha-Realm",
+							kind = "player",
+							value = "Alpha-Realm",
+						},
+						{
+							key = "player:Beta-Realm",
+							id = "player:Beta-Realm",
+							kind = "player",
+							value = "Beta-Realm",
+						},
+					},
+				},
+			}, function()
+				local AutoRaidAssist = BFL:GetModule("AutoRaidAssist")
+				V:AssertNotNil(AutoRaidAssist, "AutoRaidAssist module should exist")
+
+				local originalCTimer = C_Timer
+				local originalIsInRaid = IsInRaid
+				local originalGetNumGroupMembers = GetNumGroupMembers
+				local originalUnitExists = UnitExists
+				local originalUnitIsUnit = UnitIsUnit
+				local originalUnitIsGroupLeader = UnitIsGroupLeader
+				local originalUnitIsGroupAssistant = UnitIsGroupAssistant
+				local originalUnitFullName = UnitFullName
+				local originalUnitName = UnitName
+				local originalGetNormalizedRealmName = GetNormalizedRealmName
+				local originalGetTime = GetTime
+				local originalCPartyInfo = C_PartyInfo
+				local originalIsActionRestricted = BFL.IsActionRestricted
+				local originalLastPromotionAttempt = AutoRaidAssist.lastPromotionAttempt
+				local originalPromotionQueue = AutoRaidAssist.promotionQueue
+				local originalPromotionQueueLookup = AutoRaidAssist.promotionQueueLookup
+				local originalPromotionQueueTimer = AutoRaidAssist.promotionQueueTimer
+				local originalPromotionRetryTimers = AutoRaidAssist.promotionRetryTimers
+				local timers = {}
+				local promoted = {}
+				local assistants = {}
+				local unitByExactName = {
+					["Alpha-Realm"] = "raid1",
+					["Beta-Realm"] = "raid2",
+				}
+				local now = 100
+
+				local ok, err = pcall(function()
+					AutoRaidAssist.lastPromotionAttempt = {}
+					AutoRaidAssist.promotionQueue = {}
+					AutoRaidAssist.promotionQueueLookup = {}
+					AutoRaidAssist.promotionQueueTimer = nil
+					AutoRaidAssist.promotionRetryTimers = {}
+
+					C_Timer = {
+						NewTimer = function(delay, callback)
+							local timer = {
+								delay = delay,
+								callback = callback,
+								cancelled = false,
+								Cancel = function(self)
+									self.cancelled = true
+								end,
+							}
+							timers[#timers + 1] = timer
+							return timer
+						end,
+					}
+					IsInRaid = function()
+						return true
+					end
+					GetNumGroupMembers = function()
+						return 2
+					end
+					UnitExists = function(unit)
+						return unit == "raid1" or unit == "raid2" or unit == "player"
+					end
+					UnitIsUnit = function(unit, other)
+						return unit == "player" and other == "player"
+					end
+					UnitIsGroupLeader = function(unit)
+						return unit == "player"
+					end
+					UnitIsGroupAssistant = function(unit)
+						return assistants[unit] == true
+					end
+					UnitFullName = function(unit)
+						if unit == "raid1" then
+							return "Alpha", "Realm"
+						end
+						if unit == "raid2" then
+							return "Beta", "Realm"
+						end
+						return nil, nil
+					end
+					UnitName = UnitFullName
+					GetNormalizedRealmName = function()
+						return "Realm"
+					end
+					GetTime = function()
+						return now
+					end
+					BFL.IsActionRestricted = function()
+						return false
+					end
+					C_PartyInfo = {
+						PromoteToAssistant = function(name, exactNameMatch)
+							promoted[#promoted + 1] = {
+								name = name,
+								exactNameMatch = exactNameMatch,
+							}
+							local unit = unitByExactName[name] or name
+							assistants[unit] = true
+						end,
+					}
+
+					V:AssertType(BFL.PromoteToAssistant, "function", "PromoteToAssistant wrapper should exist")
+					V:Assert(BFL.PromoteToAssistant("raid1") == true, "Wrapper should accept raid unit tokens")
+					V:AssertEqual(promoted[1].name, "Alpha-Realm", "Wrapper should convert unit tokens to full names")
+					V:AssertEqual(promoted[1].exactNameMatch, true, "Wrapper should use exact matching for unit tokens")
+					promoted = {}
+					assistants = {}
+					AutoRaidAssist.lastPromotionAttempt = {}
+					AutoRaidAssist.promotionQueue = {}
+					AutoRaidAssist.promotionQueueLookup = {}
+					AutoRaidAssist.promotionQueueTimer = nil
+					AutoRaidAssist.promotionRetryTimers = {}
+
+					C_PartyInfo.PromoteToAssistant = function(name, exactNameMatch)
+						promoted[#promoted + 1] = {
+							name = name,
+							exactNameMatch = exactNameMatch,
+						}
+						local unit = unitByExactName[name] or name
+						assistants[unit] = true
+						return true
+					end
+
+					V:Assert(AutoRaidAssist:Evaluate("test") == true, "Evaluate should enqueue and promote matching targets")
+					V:AssertEqual(#promoted, 1, "Only the first matching target should be promoted immediately")
+					V:AssertEqual(promoted[1].name, "Alpha-Realm", "First queued promotion should pass the full player name")
+					V:AssertEqual(promoted[1].exactNameMatch, true, "First queued promotion should use exact matching")
+					V:Assert(#timers >= 2, "Second matching target and promotion verification should be delayed")
+
+					local queueTimer
+					for _, timer in ipairs(timers) do
+						if not timer.cancelled and timer.delay < 2 then
+							queueTimer = timer
+							break
+						end
+					end
+					V:AssertNotNil(queueTimer, "Second matching target should have a queue timer")
+
+					now = now + queueTimer.delay
+					queueTimer.callback()
+					V:AssertEqual(#promoted, 2, "Second matching target should be promoted by the queue timer")
+					V:AssertEqual(promoted[2].name, "Beta-Realm", "Second queued promotion should pass the full player name")
+					V:AssertEqual(promoted[2].exactNameMatch, true, "Second queued promotion should use exact matching")
+				end)
+
+				C_Timer = originalCTimer
+				IsInRaid = originalIsInRaid
+				GetNumGroupMembers = originalGetNumGroupMembers
+				UnitExists = originalUnitExists
+				UnitIsUnit = originalUnitIsUnit
+				UnitIsGroupLeader = originalUnitIsGroupLeader
+				UnitIsGroupAssistant = originalUnitIsGroupAssistant
+				UnitFullName = originalUnitFullName
+				UnitName = originalUnitName
+				GetNormalizedRealmName = originalGetNormalizedRealmName
+				GetTime = originalGetTime
+				C_PartyInfo = originalCPartyInfo
+				BFL.IsActionRestricted = originalIsActionRestricted
+				AutoRaidAssist.lastPromotionAttempt = originalLastPromotionAttempt
+				AutoRaidAssist.promotionQueue = originalPromotionQueue
+				AutoRaidAssist.promotionQueueLookup = originalPromotionQueueLookup
+				AutoRaidAssist.promotionQueueTimer = originalPromotionQueueTimer
+				AutoRaidAssist.promotionRetryTimers = originalPromotionRetryTimers
+				if not ok then
+					error(err, 2)
+				end
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "AutoRaidAssist_PromotionNameMatchesUnitPopup", {
+		description = "Auto Raid Assist should pass same-realm and cross-realm names like Blizzard's unit popup",
+		action = function(V)
+			local originalCPartyInfo = C_PartyInfo
+			local originalUnitExists = UnitExists
+			local originalUnitFullName = UnitFullName
+			local originalUnitName = UnitName
+			local originalUnitRealmRelationship = UnitRealmRelationship
+			local originalGetNormalizedRealmName = GetNormalizedRealmName
+			local originalSameRealm = LE_REALM_RELATION_SAME
+			local calls = {}
+
+			local ok, err = pcall(function()
+				LE_REALM_RELATION_SAME = 1
+				UnitExists = function(unit)
+					return unit == "raid1" or unit == "raid2"
+				end
+				UnitFullName = function(unit)
+					if unit == "raid1" then
+						return "Sameplayer", "Home"
+					end
+					if unit == "raid2" then
+						return "Crossplayer", "Away"
+					end
+					return nil, nil
+				end
+				UnitName = UnitFullName
+				UnitRealmRelationship = function(unit)
+					if unit == "raid1" then
+						return LE_REALM_RELATION_SAME
+					end
+					return 2
+				end
+				GetNormalizedRealmName = function()
+					return "Home"
+				end
+				C_PartyInfo = {
+					PromoteToAssistant = function(name, exactNameMatch)
+						calls[#calls + 1] = {
+							name = name,
+							exactNameMatch = exactNameMatch,
+						}
+					end,
+				}
+
+				V:Assert(BFL.PromoteToAssistant("raid1") == true, "Same-realm promote should dispatch")
+				V:AssertEqual(calls[1].name, "Sameplayer", "Same-realm unit should be passed without realm")
+				V:AssertEqual(calls[1].exactNameMatch, true, "Same-realm unit should use exact matching")
+
+				V:Assert(BFL.PromoteToAssistant("raid2") == true, "Cross-realm promote should dispatch")
+				V:AssertEqual(calls[2].name, "Crossplayer-Away", "Cross-realm unit should include realm")
+				V:AssertEqual(calls[2].exactNameMatch, true, "Cross-realm unit should use exact matching")
+			end)
+
+			C_PartyInfo = originalCPartyInfo
+			UnitExists = originalUnitExists
+			UnitFullName = originalUnitFullName
+			UnitName = originalUnitName
+			UnitRealmRelationship = originalUnitRealmRelationship
+			GetNormalizedRealmName = originalGetNormalizedRealmName
+			LE_REALM_RELATION_SAME = originalSameRealm
+			if not ok then
+				error(err, 2)
+			end
+		end,
+	})
+
+	TS:RegisterTest("data", "AutoRaidAssist_PromotionCooldownRetry", {
+		description = "Auto Raid Assist should retry matching targets after the promote cooldown expires",
+		action = function(V)
+			WithTemporaryDatabase({
+				autoRaidAssist = {
+					enabled = true,
+					targets = {
+						{
+							key = "player:Gamma-Realm",
+							id = "player:Gamma-Realm",
+							kind = "player",
+							value = "Gamma-Realm",
+						},
+					},
+				},
+			}, function()
+				local AutoRaidAssist = BFL:GetModule("AutoRaidAssist")
+				V:AssertNotNil(AutoRaidAssist, "AutoRaidAssist module should exist")
+
+				local originalCTimer = C_Timer
+				local originalIsInRaid = IsInRaid
+				local originalGetNumGroupMembers = GetNumGroupMembers
+				local originalUnitExists = UnitExists
+				local originalUnitIsUnit = UnitIsUnit
+				local originalUnitIsGroupLeader = UnitIsGroupLeader
+				local originalUnitIsGroupAssistant = UnitIsGroupAssistant
+				local originalUnitFullName = UnitFullName
+				local originalUnitName = UnitName
+				local originalGetNormalizedRealmName = GetNormalizedRealmName
+				local originalGetTime = GetTime
+				local originalCPartyInfo = C_PartyInfo
+				local originalIsActionRestricted = BFL.IsActionRestricted
+				local originalLastPromotionAttempt = AutoRaidAssist.lastPromotionAttempt
+				local originalPromotionQueue = AutoRaidAssist.promotionQueue
+				local originalPromotionQueueLookup = AutoRaidAssist.promotionQueueLookup
+				local originalPromotionQueueTimer = AutoRaidAssist.promotionQueueTimer
+				local originalPromotionRetryTimers = AutoRaidAssist.promotionRetryTimers
+				local timers = {}
+				local promoted = {}
+				local assistants = {}
+				local now = 100
+
+				local ok, err = pcall(function()
+					AutoRaidAssist.lastPromotionAttempt = {
+						["player:gamma-realm"] = 99,
+					}
+					AutoRaidAssist.promotionQueue = {}
+					AutoRaidAssist.promotionQueueLookup = {}
+					AutoRaidAssist.promotionQueueTimer = nil
+					AutoRaidAssist.promotionRetryTimers = {}
+
+					C_Timer = {
+						NewTimer = function(delay, callback)
+							local timer = {
+								delay = delay,
+								callback = callback,
+								cancelled = false,
+								Cancel = function(self)
+									self.cancelled = true
+								end,
+							}
+							timers[#timers + 1] = timer
+							return timer
+						end,
+					}
+					IsInRaid = function()
+						return true
+					end
+					GetNumGroupMembers = function()
+						return 1
+					end
+					UnitExists = function(unit)
+						return unit == "raid1" or unit == "player"
+					end
+					UnitIsUnit = function(unit, other)
+						return unit == "player" and other == "player"
+					end
+					UnitIsGroupLeader = function(unit)
+						return unit == "player"
+					end
+					UnitIsGroupAssistant = function(unit)
+						return assistants[unit] == true
+					end
+					UnitFullName = function(unit)
+						if unit == "raid1" then
+							return "Gamma", "Realm"
+						end
+						return nil, nil
+					end
+					UnitName = UnitFullName
+					GetNormalizedRealmName = function()
+						return "Realm"
+					end
+					GetTime = function()
+						return now
+					end
+					BFL.IsActionRestricted = function()
+						return false
+					end
+					C_PartyInfo = {
+						PromoteToAssistant = function(name, exactNameMatch)
+							promoted[#promoted + 1] = {
+								name = name,
+								exactNameMatch = exactNameMatch,
+							}
+							assistants.raid1 = true
+							return true
+						end,
+					}
+
+					V:Assert(
+						AutoRaidAssist:Evaluate("test-cooldown") == false,
+						"Evaluate should wait while the matching target is still on cooldown"
+					)
+					V:AssertEqual(#promoted, 0, "Cooldown target should not be promoted immediately")
+					V:AssertEqual(#timers, 1, "Cooldown target should schedule a retry timer")
+					V:Assert(timers[1].delay > 1, "Retry timer should wait for the remaining cooldown")
+
+					now = now + timers[1].delay
+					timers[1].callback()
+					V:AssertEqual(#promoted, 1, "Cooldown target should be promoted after the retry timer")
+					V:AssertEqual(promoted[1].name, "Gamma-Realm", "Retry promotion should pass the full player name")
+					V:AssertEqual(promoted[1].exactNameMatch, true, "Retry promotion should use exact matching")
+				end)
+
+				C_Timer = originalCTimer
+				IsInRaid = originalIsInRaid
+				GetNumGroupMembers = originalGetNumGroupMembers
+				UnitExists = originalUnitExists
+				UnitIsUnit = originalUnitIsUnit
+				UnitIsGroupLeader = originalUnitIsGroupLeader
+				UnitIsGroupAssistant = originalUnitIsGroupAssistant
+				UnitFullName = originalUnitFullName
+				UnitName = originalUnitName
+				GetNormalizedRealmName = originalGetNormalizedRealmName
+				GetTime = originalGetTime
+				C_PartyInfo = originalCPartyInfo
+				BFL.IsActionRestricted = originalIsActionRestricted
+				AutoRaidAssist.lastPromotionAttempt = originalLastPromotionAttempt
+				AutoRaidAssist.promotionQueue = originalPromotionQueue
+				AutoRaidAssist.promotionQueueLookup = originalPromotionQueueLookup
+				AutoRaidAssist.promotionQueueTimer = originalPromotionQueueTimer
+				AutoRaidAssist.promotionRetryTimers = originalPromotionRetryTimers
+				if not ok then
+					error(err, 2)
+				end
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "AutoRaidAssist_SettingsDesignerControls", {
+		description = "Auto Raid Assist should register explicit Settings Center controls without dotted DB keys",
+		action = function(V)
+			WithTemporaryDatabase({}, function(tempDB)
+				local AutoRaidAssist = BFL:GetModule("AutoRaidAssist")
+				V:AssertNotNil(AutoRaidAssist, "AutoRaidAssist module should exist")
+				V:AssertType(
+					AutoRaidAssist.RenderSettingsPage,
+					"function",
+					"Auto Raid Assist should expose a shared settings renderer"
+				)
+
+				local fakeApp = {
+					groups = {},
+					controls = {},
+					RegisterGroup = function(self, pageID, data)
+						self.groups[data.id] = data
+						data.pageID = pageID
+						return data
+					end,
+					RegisterControl = function(self, pageID, data)
+						self.controls[data.id] = data
+						data.pageID = pageID
+						return data
+					end,
+				}
+
+				V:Assert(
+					AutoRaidAssist:RegisterSettingsDesignerControls(fakeApp, { pageID = "social.raid" }),
+					"RegisterSettingsDesignerControls should register controls"
+				)
+				V:AssertNotNil(fakeApp.groups.autoAssist, "Auto Raid Assist group should be registered")
+
+				local enableControl = fakeApp.controls["autoRaidAssist.enabled"]
+				local manageControl = fakeApp.controls["autoRaidAssist.manage"]
+				V:AssertNotNil(enableControl, "Enable control should be registered")
+				V:AssertNotNil(manageControl, "Manage button should be registered")
+				V:AssertNil(enableControl.key, "Enable control should use explicit accessors instead of dotted keys")
+				V:AssertEqual(
+					enableControl.groupTitle,
+					(BFL.L and BFL.L.AUTO_RAID_ASSIST_TITLE) or "Auto Raid Assist",
+					"Enable control should pass the localized group title"
+				)
+				V:AssertEqual(
+					manageControl.groupTitle,
+					(BFL.L and BFL.L.AUTO_RAID_ASSIST_TITLE) or "Auto Raid Assist",
+					"Manage control should pass the localized group title"
+				)
+
+				enableControl.setValue(true)
+				V:AssertEqual(tempDB.autoRaidAssist.enabled, true, "Enable control should update Auto Raid Assist state")
+				V:AssertEqual(enableControl.getValue(), true, "Enable control getter should read Auto Raid Assist state")
+
+				local detailApp = {
+					groups = {},
+					controls = {},
+					RegisterGroup = function(self, pageID, data)
+						self.groups[data.id] = data
+						data.pageID = pageID
+						return data
+					end,
+					RegisterControl = function(self, pageID, data)
+						self.controls[data.id] = data
+						data.pageID = pageID
+						return data
+					end,
+				}
+
+				V:Assert(
+					AutoRaidAssist:RegisterSettingsDesignerControls(detailApp, {
+						pageID = "social.raid.autoAssist",
+						groupID = "autoAssistDetails",
+						enabledControlID = "autoRaidAssist.enabled.detail",
+						includeManageButton = false,
+						includeEditor = true,
+						order = 100,
+						editorOrder = 110,
+					}),
+					"RegisterSettingsDesignerControls should register detail page controls"
+				)
+
+				local detailEnable = detailApp.controls["autoRaidAssist.enabled.detail"]
+				local detailEditor = detailApp.controls["autoRaidAssist.targetsEditor"]
+				V:AssertNotNil(detailEnable, "Detail page enable control should be registered")
+				V:AssertNotNil(detailEditor, "Detail page target editor control should be registered")
+				V:AssertNil(detailApp.controls["autoRaidAssist.manage"], "Detail page should not register a Manage button")
+				V:AssertEqual(detailEnable.type, "toggle", "Detail page enable control should use native toggle type")
+				V:AssertEqual(detailEditor.type, "custom", "Detail page target editor should use a custom control")
+				V:AssertNil(detailEnable.key, "Detail page enable control should use explicit accessors")
+				V:AssertEqual(detailEditor.trackCustomized, false, "Target editor should not count as a customized setting")
+				V:AssertType(detailEditor.render, "function", "Target editor should provide a LibSettingsDesigner renderer")
+				V:Assert(
+					detailEditor.getHeight() > AutoRaidAssist:GetSettingsPageHeight({ settingsCenter = true }),
+					"Target editor control height should include the LibSettingsDesigner row chrome"
+				)
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "ContactMemory_NoteCRUDAndTags", {
+		description = "Contact Memory should save private notes, tags, and tooltip summaries",
+		action = function(V)
+			WithTemporaryDatabase({
+				enableBetaFeatures = true,
+				contactMemory = {
+					enabled = true,
+				},
+			}, function()
+				local ContactMemory = BFL:GetModule("ContactMemory")
+				V:AssertNotNil(ContactMemory, "ContactMemory module should exist")
+
+				local contactKey = "player:Unit-Realm"
+				V:Assert(ContactMemory:SetPrivateNote(contactKey, "  Great key partner  "), "SetPrivateNote should succeed")
+				V:AssertEqual(
+					ContactMemory:GetContact(contactKey).privateNote,
+					"Great key partner",
+					"Private note should be trimmed and stored"
+				)
+
+				local tagId = ContactMemory:CreateTag("Mythic Plus")
+				V:AssertNotNil(tagId, "CreateTag should return a tag ID")
+				V:Assert(ContactMemory:SetTag(contactKey, tagId, true), "SetTag should assign the tag")
+
+				local tagNames = ContactMemory:GetContactTagNames(contactKey)
+				V:AssertEqual(#tagNames, 1, "One tag should be assigned")
+				V:AssertEqual(tagNames[1], "Mythic Plus", "Assigned tag should be returned by name")
+
+				local summary = ContactMemory:GetTooltipSummary(contactKey)
+				V:AssertNotNil(summary, "Tooltip summary should exist for a noted/tagged contact")
+				V:AssertEqual(summary.note, "Great key partner", "Tooltip summary should include the private note")
+				V:AssertEqual(summary.tagsText, "Mythic Plus", "Tooltip summary should include tags")
+
+				V:Assert(ContactMemory:SetTag(contactKey, tagId, false), "SetTag should remove the tag")
+				V:Assert(ContactMemory:SetPrivateNote(contactKey, nil), "Clearing the note should succeed")
+				V:AssertNil(ContactMemory:GetContact(contactKey, false), "Empty contact should be cleaned up")
+			end)
+		end,
+	})
+
 	TS:RegisterTest("data", "Database_Migration_NameDisplayFormat", {
 		description = "Legacy name display flags should migrate to nameDisplayFormat",
 		action = function(V)
