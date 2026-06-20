@@ -18,7 +18,7 @@ local L = BFL.L
 local RAF = BFL:RegisterModule("RAF", {})
 
 -- Classic Guard: RAF doesn't exist in Classic Era or MoP Classic
-BFL.HasRAF = BFL.IsRetail and C_RecruitAFriend ~= nil
+BFL.HasRAF = BFL.IsRAFSystemSupported and BFL.IsRAFSystemSupported() or (BFL.IsRetail and C_RecruitAFriend ~= nil)
 
 -- Local constants for RAF display
 local RECRUIT_HEIGHT = 34
@@ -540,8 +540,8 @@ function RAF:OnLoad(frame)
 		return
 	end
 
-	-- Check if RAF is enabled
-	frame.rafEnabled = C_RecruitAFriend.IsEnabled and C_RecruitAFriend.IsEnabled() or false
+	-- Check if RAF is enabled. 12.1 replaced IsEnabled() with system status APIs.
+	frame.rafEnabled = BFL.IsRAFSystemEnabled and BFL.IsRAFSystemEnabled() or false
 	frame.rafRecruitingEnabled = C_RecruitAFriend.IsRecruitingEnabled and C_RecruitAFriend.IsRecruitingEnabled()
 		or false
 

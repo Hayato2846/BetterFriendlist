@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+
+### Changed
+- **Client Compatibility** - Prepared Recruit A Friend, Quick Join, Battle.net friend metadata, censored Group Finder entries, and guild rank refreshes for Retail 12.1 while keeping current Retail and Classic support intact.
+- **Quick Join** - Added an explicit show action for censored Group Finder entries on Retail 12.1 PTR.
+- **Preview Mode** - Updated `/bfl preview` to generate Retail 12.1 Quick Join mock entries, including censored Group Finder rows, reveal testing, long-title layout coverage, and new Battle.net metadata fields.
+
+---
+
 ## [2.6.2-beta3]        - 2026-06-01
 
 ### Improved

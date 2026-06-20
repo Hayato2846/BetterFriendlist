@@ -35,7 +35,26 @@ local QuickJoin = {}
 BFL:RegisterModule("QuickJoin", QuickJoin)
 
 -- Classic Guard: QuickJoin/Social Queue doesn't exist in Classic
-BFL.HasQuickJoin = BFL.IsRetail and C_SocialQueue ~= nil
+local function IsSocialQueueSupported()
+	if BFL.IsSocialQueueSupported then
+		return BFL.IsSocialQueueSupported()
+	end
+	return BFL.IsRetail and C_SocialQueue ~= nil
+end
+
+local function IsSocialQueueEnabled()
+	if BFL.IsSocialQueueEnabled then
+		return BFL.IsSocialQueueEnabled()
+	end
+	return IsSocialQueueSupported()
+end
+
+local function RefreshQuickJoinAvailability()
+	BFL.HasQuickJoin = IsSocialQueueSupported()
+	return BFL.HasQuickJoin
+end
+
+BFL.HasQuickJoin = RefreshQuickJoinAvailability()
 
 -- Constants
 local MAX_DISPLAYED_MEMBERS = 8 -- Maximum members shown in group list
@@ -111,6 +130,65 @@ local function CacheAndReturnRelationship(guid, missingNameFallback, clubId, nam
 		entry.expires = GetTime() + RELATIONSHIP_CACHE_TTL
 	end
 	return name, color, relationship, playerLink
+end
+
+local function GetCensoredLFGGroupName()
+	local text = CENSORED_LFG_GROUP_NAME or "Censored Group"
+	if RED_FONT_COLOR and RED_FONT_COLOR.WrapTextInColorCode then
+		return RED_FONT_COLOR:WrapTextInColorCode(text)
+	end
+	return text
+end
+
+local function GetCensoredLFGGroupRevealText()
+	local showText = CENSORED_LFG_GROUP_SHOW or SHOW or "Show"
+	if NORMAL_FONT_COLOR and NORMAL_FONT_COLOR.WrapTextInColorCode then
+		showText = NORMAL_FONT_COLOR:WrapTextInColorCode(showText)
+	end
+	return string.format("%s %s", GetCensoredLFGGroupName(), showText)
+end
+
+local function CanRevealCensoredLFGSearchResult(lfgListID)
+	return lfgListID ~= nil and C_LFGList and C_LFGList.RevealCensoredSearchResult ~= nil
+end
+
+local GetLFGListIDFromGroupInfo
+
+local function CanRevealCensoredLFGGroup(groupInfo)
+	if not groupInfo or not groupInfo.lfgListCensored then
+		return false
+	end
+	if groupInfo.canRevealCensoredLFG then
+		return true
+	end
+	return CanRevealCensoredLFGSearchResult(GetLFGListIDFromGroupInfo(groupInfo))
+end
+
+GetLFGListIDFromGroupInfo = function(groupInfo)
+	if not groupInfo then
+		return nil
+	end
+	if groupInfo.lfgListID then
+		return groupInfo.lfgListID
+	end
+
+	local lfgListInfo = groupInfo.lfgListInfo
+	local queueData = lfgListInfo and lfgListInfo.queueData
+	if queueData and queueData.lfgListID then
+		return queueData.lfgListID
+	end
+
+	local queues = groupInfo.queues
+	if queues then
+		for _, queue in ipairs(queues) do
+			queueData = queue and queue.queueData
+			if queueData and queueData.lfgListID then
+				return queueData.lfgListID
+			end
+		end
+	end
+
+	return nil
 end
 
 --[[
@@ -361,6 +439,9 @@ end
 	Used for auto-accept logic in tooltips
 ]]
 local function BetterFriendlist_HasRelationshipWithLeader(partyGuid)
+	if not IsSocialQueueEnabled() or not (C_SocialQueue and C_SocialQueue.GetGroupInfo) then
+		return false
+	end
 	local leaderGuid = select(8, C_SocialQueue.GetGroupInfo(partyGuid))
 	if leaderGuid then
 		local _, _, relationship = BetterFriendlist_GetRelationshipInfo(leaderGuid)
@@ -657,6 +738,7 @@ function QuickJoinEntry:New(guid, groupInfo)
 			queueData.name = groupTitle
 			queueData.queueType = queueType
 			queueData.lfgListID = lfgListID
+			queueData.comment = groupInfo.lfgListCensored and nil or (queue.queueData and queue.queueData.comment)
 
 			-- CRITICAL: Blizzard caches the queue name (QuickJoin.lua:386-393)
 			-- This is what gets displayed in the button!
@@ -683,6 +765,7 @@ function QuickJoinEntry:New(guid, groupInfo)
 		queueData.name = groupTitle
 		queueData.queueType = "lfg"
 		queueData.lfgListID = nil
+		queueData.comment = nil
 
 		queueEntry.cachedQueueName = groupTitle
 		-- Use role needs from groupInfo for fallback too
@@ -875,20 +958,36 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 	if self.groupInfo and self.groupInfo.activityName then
 		activityName = self.groupInfo.activityName
 	end
+	if self.groupInfo and self.groupInfo.lfgListCensored then
+		groupTitle = GetCensoredLFGGroupName()
+		comment = nil
+	end
 
 	-- Get leader name - CRITICAL FIX: For lfglist queues, use searchResultInfo.leaderName (CHARACTER name)!
 	-- Like Blizzard's LFGListUtil_SetSearchEntryTooltip, NOT the BNet account name from GetRelationshipInfo
 
 	-- User Request: Prioritize BNet Name if available
 	local isBNetFriend = false
-	if self.groupInfo and self.groupInfo.leaderGUID and C_BattleNet.GetAccountInfoByGUID(self.groupInfo.leaderGUID) then
+	if
+		self.groupInfo
+		and self.groupInfo.leaderGUID
+		and C_BattleNet
+		and C_BattleNet.GetAccountInfoByGUID
+		and C_BattleNet.GetAccountInfoByGUID(self.groupInfo.leaderGUID)
+	then
 		isBNetFriend = true
 	end
 
 	-- First, try to get fresh searchResultInfo.leaderName for lfglist queues (ONLY if not BNet friend)
 	if not isBNetFriend and self.displayedQueues and #self.displayedQueues > 0 and self.displayedQueues[1] then
 		local firstQueue = self.displayedQueues[1]
-		if firstQueue.queueData and firstQueue.queueData.queueType == "lfglist" and firstQueue.queueData.lfgListID then
+		if
+			firstQueue.queueData
+			and firstQueue.queueData.queueType == "lfglist"
+			and firstQueue.queueData.lfgListID
+			and C_LFGList
+			and C_LFGList.GetSearchResultInfo
+		then
 			-- CRITICAL: Fetch FRESH searchResultInfo to get CHARACTER name (not cached BNet name)
 			local searchResultInfo = C_LFGList.GetSearchResultInfo(firstQueue.queueData.lfgListID)
 			if searchResultInfo then
@@ -896,6 +995,10 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 				-- Values may have become secret since GetGroupInfo() was called.
 				if BFL:IsSecret(searchResultInfo.searchResultID) then
 					hasSecrets = true
+				end
+				if not hasSecrets and searchResultInfo.censored then
+					groupTitle = GetCensoredLFGGroupName()
+					comment = nil
 				end
 				-- Secret strings can be stored and passed to SetText/string.format safely
 				if searchResultInfo.leaderName then
@@ -978,6 +1081,8 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 	-- Format: "|cff44ccff[Comment]|r Comment text" (blue bracket, then gray text)
 	if comment and (hasSecrets or comment ~= "") then
 		tooltip:AddLine(string.format("[%s] %s", "Comment", comment), 0.6, 0.6, 0.6, true)
+	elseif self.groupInfo and self.groupInfo.lfgListCensored and CENSORED_LFG_COMMENT then
+		tooltip:AddLine(CENSORED_LFG_COMMENT, 0.6, 0.6, 0.6, true)
 	end
 
 	-- Blank line after title/activity/comment section, before leader
@@ -1160,6 +1265,7 @@ end
 -- Initialize the QuickJoin module
 function QuickJoin:Initialize()
 	-- Classic Guard: QuickJoin/Social Queue is Retail-only
+	RefreshQuickJoinAvailability()
 	if BFL.IsClassic or not BFL.HasQuickJoin then
 		-- BFL:DebugPrint("|cffffcc00BFL QuickJoin:|r Not available in Classic - module disabled")
 		self.initialized = true -- Prevent future initialization attempts
@@ -1171,7 +1277,7 @@ function QuickJoin:Initialize()
 	end
 
 	-- Get Social Queue Configuration
-	self.config = C_SocialQueue.GetConfig()
+	self.config = C_SocialQueue.GetConfig and C_SocialQueue.GetConfig()
 
 	if not self.config then
 		-- Set fallback config
@@ -1223,6 +1329,50 @@ function QuickJoin:Initialize()
 	end
 
 	self.initialized = true
+end
+
+function QuickJoin:ClearLiveState()
+	self.lastUpdate = GetTime()
+	self.updateQueued = false
+	self.entriesCache = nil
+	self.entriesCacheVersion = nil
+	self.availableGroups = {}
+	wipe(self.groupPriorityCache)
+	wipe(self.groupSortOrderCache)
+
+	if self.selectedGUID then
+		self:SelectGroup(nil)
+	end
+
+	ReleaseEntries(self._lastEntries)
+	self._lastEntries = nil
+
+	if self.dataProvider then
+		self.dataProvider:Flush()
+	end
+	if self.classicQuickJoinDataList then
+		wipe(self.classicQuickJoinDataList)
+		self:RenderClassicQuickJoinCards()
+	end
+
+	if
+		BetterFriendsFrame
+		and BetterFriendsFrame.QuickJoinFrame
+		and BetterFriendsFrame.QuickJoinFrame.ContentInset
+		and BetterFriendsFrame.QuickJoinFrame.ContentInset.NoGroupsText
+	then
+		local noGroupsText = BetterFriendsFrame.QuickJoinFrame.ContentInset.NoGroupsText
+		noGroupsText:SetShown(true)
+		noGroupsText:SetText(L.QUICK_JOIN_NO_GROUPS or QUICK_JOIN_NO_GROUPS or "No groups available")
+	end
+
+	if BetterFriendsFrame and BetterFriendsFrame_UpdateQuickJoinTab then
+		BetterFriendsFrame_UpdateQuickJoinTab()
+	end
+
+	if self.onUpdateCallback then
+		self.onUpdateCallback(self.availableGroups)
+	end
 end
 
 -- Initialize Classic FauxScrollFrame for QuickJoin
@@ -1466,8 +1616,13 @@ function QuickJoin:OnScrollBoxInitialize(button, elementData)
 	-- 5. Setup Join Button
 	if button.JoinButton then
 		button.JoinButton:SetEnabled(info.canJoin)
+		button.JoinButton:SetText(info.lfgListCensored and (CENSORED_LFG_GROUP_SHOW or SHOW or "Show") or JOIN)
 		button.JoinButton:SetScript("OnClick", function()
-			self:RequestToJoin(entry.guid)
+			if entry.groupInfo and entry.groupInfo.lfgListCensored then
+				self:RevealCensoredGroup(entry.guid)
+			else
+				self:RequestToJoin(entry.guid)
+			end
 		end)
 	end
 
@@ -1542,15 +1697,23 @@ function QuickJoin:Update(forceUpdate)
 	self.entriesCache = nil
 	self.entriesCacheVersion = nil
 
+	RefreshQuickJoinAvailability()
+	local hasMockGroups = next(self.mockGroups) ~= nil
+	local canReadLiveGroups = IsSocialQueueEnabled() and C_SocialQueue and C_SocialQueue.GetAllGroups
+	if not canReadLiveGroups and not hasMockGroups then
+		self:ClearLiveState()
+		return
+	end
+
 	-- Get all available groups from Social Queue API
-	local groups = C_SocialQueue.GetAllGroups(false, false) or {}
+	local groups = canReadLiveGroups and C_SocialQueue.GetAllGroups(false, false) or {}
 	local priorityCache = self.groupPriorityCache
 	local sortOrderCache = self.groupSortOrderCache
 	wipe(priorityCache)
 	wipe(sortOrderCache)
 
 	-- Add mock groups to the list (if any exist)
-	if next(self.mockGroups) ~= nil then
+	if hasMockGroups then
 		for guid, _ in pairs(self.mockGroups) do
 			table.insert(groups, guid)
 		end
@@ -1674,6 +1837,17 @@ function QuickJoin:GetGroupInfo(groupGUID)
 		return cached.info
 	end
 
+	if
+		not IsSocialQueueEnabled()
+		or not C_SocialQueue
+		or not C_SocialQueue.GetGroupInfo
+		or not C_SocialQueue.GetGroupMembers
+		or not C_SocialQueue.GetGroupQueues
+		or not C_SocialQueue.GetGroupForPlayer
+	then
+		return nil
+	end
+
 	-- Keep a reference to the old (possibly expired) cache entry.
 	-- If we transition from non-secret to secret, we can reuse resolved
 	-- data (activityName, activityIcon, role counts) from the old entry
@@ -1732,7 +1906,9 @@ function QuickJoin:GetGroupInfo(groupGUID)
 
 				-- For LFG List: Blizzard displays searchResultInfo.name (the custom group title)
 				-- NOT the activity name! (QuickJoin.lua doesn't even use activities)
-				local searchResultInfo = C_LFGList.GetSearchResultInfo(queueData.lfgListID)
+				local searchResultInfo = C_LFGList
+					and C_LFGList.GetSearchResultInfo
+					and C_LFGList.GetSearchResultInfo(queueData.lfgListID)
 
 				-- 12.0.0+: C_LFGList.GetSearchResultInfo returns secret field values during
 				-- combat lockdown (SecretInChatMessagingLockdown). Secret values can be
@@ -1740,10 +1916,15 @@ function QuickJoin:GetGroupInfo(groupGUID)
 				-- compared, iterated (pairs/next), indexed, or used in arithmetic.
 				-- We detect this and use a passthrough path that preserves display data.
 				local hasSecretValues = searchResultInfo and BFL:IsSecret(searchResultInfo.searchResultID)
+				local isCensored = searchResultInfo and not hasSecretValues and searchResultInfo.censored == true
 
 				if searchResultInfo then
 					if hasSecretValues then
 						info._hasSecretValues = true
+					elseif isCensored then
+						info.lfgListCensored = true
+						info.lfgListID = queueData.lfgListID
+						info.canRevealCensoredLFG = CanRevealCensoredLFGSearchResult(queueData.lfgListID)
 					end
 
 					-- Detailed SearchResult Dump (skip when secret - pairs() crashes on secret values)
@@ -1753,8 +1934,17 @@ function QuickJoin:GetGroupInfo(groupGUID)
 						end
 					end
 
-					-- Protected strings are safe to use directly
-					info.groupTitle = searchResultInfo.name
+					-- Protected strings are safe to use directly, but 12.1 censored entries
+					-- should not expose their original group title until Blizzard reveals them.
+					if isCensored then
+						if info.canRevealCensoredLFG then
+							info.groupTitle = GetCensoredLFGGroupRevealText()
+						else
+							info.groupTitle = GetCensoredLFGGroupName()
+						end
+					else
+						info.groupTitle = searchResultInfo.name
+					end
 
 					-- IMPORTANT: Use numMembers from searchResultInfo, NOT from members array!
 					-- members array only contains visible members (usually just leader)
@@ -1768,7 +1958,12 @@ function QuickJoin:GetGroupInfo(groupGUID)
 					if hasSecretValues or searchResultInfo.leaderName then
 						-- Only overwrite if NOT a BNet friend (User Request: Prioritize BNet Name)
 						local isBNetFriend = false
-						if info.leaderGUID and C_BattleNet.GetAccountInfoByGUID(info.leaderGUID) then
+						if
+							info.leaderGUID
+							and C_BattleNet
+							and C_BattleNet.GetAccountInfoByGUID
+							and C_BattleNet.GetAccountInfoByGUID(info.leaderGUID)
+						then
 							isBNetFriend = true
 						end
 
@@ -1784,7 +1979,10 @@ function QuickJoin:GetGroupInfo(groupGUID)
 					-- Try even during secret mode (pcall) - the API might still work.
 					-- If it fails, fall back to previously cached non-secret data.
 					local gotRoleCounts = false
-					local ok, memberCounts = pcall(C_LFGList.GetSearchResultMemberCounts, queueData.lfgListID)
+					local ok, memberCounts = false, nil
+					if C_LFGList and C_LFGList.GetSearchResultMemberCounts then
+						ok, memberCounts = pcall(C_LFGList.GetSearchResultMemberCounts, queueData.lfgListID)
+					end
 					if ok and memberCounts then
 						local t = memberCounts.TANK
 						local h = memberCounts.HEALER
@@ -2377,6 +2575,51 @@ function QuickJoin:GetAvailableGroups()
 	return self.availableGroups
 end
 
+function QuickJoin:RevealCensoredGroup(groupGUID)
+	if not groupGUID then
+		return false
+	end
+
+	local groupInfo = self:GetGroupInfo(groupGUID)
+	if not groupInfo or not groupInfo.lfgListCensored then
+		return false
+	end
+
+	if groupInfo._isMock then
+		groupInfo.lfgListCensored = false
+		groupInfo.canRevealCensoredLFG = false
+		groupInfo.groupTitle = groupInfo._revealedGroupTitle or groupInfo.groupTitle
+		if groupInfo._revealedActivityName then
+			groupInfo.activityName = groupInfo._revealedActivityName
+		end
+		if groupInfo.queues and groupInfo.queues[1] and groupInfo.queues[1].queueData then
+			groupInfo.queues[1].queueData.name = groupInfo.groupTitle
+			groupInfo.queues[1].queueData.comment = groupInfo._revealedComment or ""
+		end
+		self.entriesCache = nil
+		self.entriesCacheVersion = nil
+		self:Update(true)
+		return true
+	end
+
+	local lfgListID = GetLFGListIDFromGroupInfo(groupInfo)
+	if not CanRevealCensoredLFGSearchResult(lfgListID) then
+		return false
+	end
+
+	local ok = pcall(C_LFGList.RevealCensoredSearchResult, lfgListID)
+	if not ok then
+		UIErrorsFrame:AddMessage(QUICK_JOIN_FAILED or "Quick Join request failed", 1.0, 0.1, 0.1, 1.0)
+		return false
+	end
+
+	self.groupCache[groupGUID] = nil
+	self.entriesCache = nil
+	self.entriesCacheVersion = nil
+	self:Update(true)
+	return true
+end
+
 -- Request to join a group
 function QuickJoin:RequestToJoin(groupGUID, applyAsTank, applyAsHealer, applyAsDamage)
 	if not groupGUID then
@@ -2414,6 +2657,11 @@ function QuickJoin:RequestToJoin(groupGUID, applyAsTank, applyAsHealer, applyAsD
 		return true
 	end
 
+	if not IsSocialQueueEnabled() or not (C_SocialQueue and C_SocialQueue.RequestToJoin) then
+		UIErrorsFrame:AddMessage(QUICK_JOIN_FAILED or "Quick Join request failed", 1.0, 0.1, 0.1, 1.0)
+		return false
+	end
+
 	local success = C_SocialQueue.RequestToJoin(groupGUID, applyAsTank, applyAsHealer, applyAsDamage)
 
 	if not success then
@@ -2435,7 +2683,7 @@ function QuickJoin:GetGroupPriority(groupGUID, groupInfo)
 	if not leaderGUID then
 		leaderGUID = GetLeaderGUIDFromMembers(groupInfo and groupInfo.members)
 	end
-	if not leaderGUID and groupGUID and C_SocialQueue and C_SocialQueue.GetGroupMembers then
+	if not leaderGUID and groupGUID and IsSocialQueueEnabled() and C_SocialQueue and C_SocialQueue.GetGroupMembers then
 		leaderGUID = GetLeaderGUIDFromMembers(C_SocialQueue.GetGroupMembers(groupGUID))
 	end
 	if not leaderGUID then
@@ -2582,7 +2830,41 @@ end
 
 function QuickJoin:OnConfigUpdated()
 	-- Reload configuration
-	self.config = C_SocialQueue.GetConfig()
+	if IsSocialQueueEnabled() and C_SocialQueue and C_SocialQueue.GetConfig then
+		self.config = C_SocialQueue.GetConfig()
+	end
+end
+
+function QuickJoin:OnSystemStatusUpdated()
+	RefreshQuickJoinAvailability()
+	if IsSocialQueueEnabled() and C_SocialQueue and C_SocialQueue.GetConfig then
+		self.config = C_SocialQueue.GetConfig()
+	else
+		self:ClearLiveState()
+		return
+	end
+	self:Update(true)
+end
+
+function QuickJoin:OnLFGListSearchResultUpdated(searchResultID)
+	if not searchResultID then
+		return
+	end
+
+	local matched = false
+	for groupGUID, cached in pairs(self.groupCache) do
+		local info = cached and cached.info
+		if GetLFGListIDFromGroupInfo(info) == searchResultID then
+			self.groupCache[groupGUID] = nil
+			matched = true
+		end
+	end
+
+	if matched then
+		self.entriesCache = nil
+		self.entriesCacheVersion = nil
+		self:Update(true)
+	end
 end
 
 function QuickJoin:OnGroupJoined()
@@ -2615,6 +2897,10 @@ function QuickJoin:GetGroupDisplayName(groupGUID)
 		end
 	end
 
+	if not IsSocialQueueEnabled() or not (C_SocialQueue and C_SocialQueue.GetGroupMembers) then
+		return ""
+	end
+
 	local members = C_SocialQueue.GetGroupMembers(groupGUID)
 	if not members or #members == 0 then
 		return ""
@@ -2634,7 +2920,7 @@ function QuickJoin:GetGroupDisplayName(groupGUID)
 	local color = "|cffffffff" -- Default white
 
 	-- Try to determine relationship for color
-	local accountInfo = C_BattleNet.GetAccountInfoByGUID(members[1].guid)
+	local accountInfo = C_BattleNet and C_BattleNet.GetAccountInfoByGUID and C_BattleNet.GetAccountInfoByGUID(members[1].guid)
 	if accountInfo then
 		color = FRIENDS_BNET_NAME_COLOR_CODE or "|cff82c5ff" -- BNet blue
 	else
@@ -2660,6 +2946,10 @@ function QuickJoin:GetQueueDisplayName(groupGUID)
 		return mockGroup.groupTitle or mockGroup.activityName or ""
 	end
 
+	if not IsSocialQueueEnabled() or not (C_SocialQueue and C_SocialQueue.GetGroupQueues) then
+		return ""
+	end
+
 	local queues = C_SocialQueue.GetGroupQueues(groupGUID)
 	if not queues or #queues == 0 or not queues[1] then
 		return ""
@@ -2670,7 +2960,7 @@ function QuickJoin:GetQueueDisplayName(groupGUID)
 	local queueData = queues[1].queueData
 
 	if queueData then
-		if queueData.queueType == "lfglist" and queueData.lfgListID then
+		if queueData.queueType == "lfglist" and queueData.lfgListID and C_LFGList and C_LFGList.GetActivityInfoTable then
 			local activityInfo = C_LFGList.GetActivityInfoTable(queueData.lfgListID)
 			if activityInfo then
 				queueName = activityInfo.fullName or activityInfo.shortName or ""
@@ -2997,6 +3287,17 @@ function QuickJoin:CreateMockGroup(params)
 			teamSize = params.teamSize,
 		}),
 	}
+	local firstQueueData = queues[1] and queues[1].queueData
+	local isCensored = (params.censored or params.lfgListCensored) and queueType == "lfglist"
+	local revealedGroupTitle = params.revealedGroupTitle or params.originalGroupTitle or params.activityName
+	local revealedActivityName = params.revealedActivityName or params.activityType
+	local groupTitle = isCensored and GetCensoredLFGGroupRevealText() or params.activityName
+	local activityName = isCensored and (params.activityType or params.activityName) or params.activityName
+	local lfgListID = firstQueueData and firstQueueData.lfgListID
+	if isCensored and firstQueueData then
+		firstQueueData.name = groupTitle
+		firstQueueData.comment = nil
+	end
 
 	-- Build complete mock group following C_SocialQueue.GetGroupInfo structure
 	local mockGroup = {
@@ -3017,12 +3318,18 @@ function QuickJoin:CreateMockGroup(params)
 		-- Calculated fields (for display)
 		numMembers = numMembers,
 		leaderName = params.leaderName,
-		groupTitle = params.activityName,
-		activityName = params.activityName, -- Prioritize specific name
+		groupTitle = groupTitle,
+		activityName = activityName, -- Prioritize specific name
 		activityType = params.activityType, -- Store type for fallback logic
 		activityIcon = params.icon, -- Allow nil to test resolution logic
 		queueInfo = "",
 		requestedToJoin = false,
+		lfgListID = lfgListID,
+		lfgListCensored = isCensored,
+		canRevealCensoredLFG = isCensored,
+		_revealedGroupTitle = revealedGroupTitle,
+		_revealedActivityName = revealedActivityName,
+		_revealedComment = params.comment,
 
 		-- Mock metadata
 		_isMock = true,
@@ -3223,6 +3530,67 @@ function QuickJoin:CreateMockPreset_All()
 	end
 	AddChatMessage(string.format("|cff00ff00BFL QuickJoin:|r Created %d mock groups (dynamic updates enabled)", count))
 
+	self:Update(true)
+end
+
+function QuickJoin:CreateMockPreset_12_1()
+	self:ClearMockGroups()
+
+	self:CreateMockGroup({
+		leaderName = "Censorcheck",
+		queueType = "lfglist",
+		activityName = "Stonevault +12 chill key",
+		activityType = "Mythic+ Dungeon",
+		comment = "Hidden until the preview reveal action is clicked.",
+		numMembers = 4,
+		needTank = false,
+		needHealer = true,
+		needDamage = true,
+		icon = 525134,
+		censored = true,
+	})
+
+	self:CreateMockGroup({
+		leaderName = "Reviewlead",
+		queueType = "lfglist",
+		activityName = "Manaforge Omega normal learning",
+		activityType = "Raid",
+		comment = "Censored raid listing for tooltip and context-menu testing.",
+		numMembers = 13,
+		needTank = true,
+		needHealer = true,
+		needDamage = true,
+		icon = 1536895,
+		censored = true,
+	})
+
+	self:CreateMockGroup({
+		leaderName = "Visiblelead",
+		queueType = "lfglist",
+		activityName = "Visible comparison listing",
+		activityType = "Mythic+ Dungeon",
+		comment = "Normal, non-censored entry for side-by-side comparison.",
+		numMembers = 3,
+		needTank = true,
+		needHealer = false,
+		needDamage = true,
+		icon = 525134,
+	})
+
+	self:CreateMockGroup({
+		leaderName = "Longtitle",
+		queueType = "lfglist",
+		activityName = "ThisIsAVeryLong12Point1GroupFinderTitleForRevealAndTruncationTesting",
+		activityType = "Raid",
+		comment = "Long title comparison row for layout review.",
+		numMembers = 18,
+		needTank = false,
+		needHealer = true,
+		needDamage = true,
+		icon = 1536895,
+	})
+
+	AddChatMessage("|cff00ff00BFL QuickJoin:|r Created Retail 12.1 PTR preview groups")
 	self:Update(true)
 end
 
@@ -3653,6 +4021,8 @@ SlashCmdList["BFLQUICKJOIN"] = function(msg)
 			QuickJoin:CreateMockPreset_PvP()
 		elseif subCmd == "raid" then
 			QuickJoin:CreateMockPreset_Raid()
+		elseif subCmd == "12.1" or subCmd == "121" or subCmd == "midnight" or subCmd == "censored" then
+			QuickJoin:CreateMockPreset_12_1()
 		elseif subCmd == "stress" or subCmd == "many" then
 			QuickJoin:CreateMockPreset_Stress()
 		elseif subCmd == "icons" or subCmd == "fallback" then
@@ -3749,6 +4119,7 @@ SlashCmdList["BFLQUICKJOIN"] = function(msg)
 		AddChatMessage(BFL.L.CORE_HELP_QJ_DUNGEON)
 		AddChatMessage(BFL.L.CORE_HELP_QJ_PVP)
 		AddChatMessage(BFL.L.CORE_HELP_QJ_RAID)
+		AddChatMessage("  |cffffffff/bfl qj mock 12.1|r - Retail 12.1 PTR")
 		AddChatMessage(BFL.L.QJ_MOCK_ICONS_HELP)
 		AddChatMessage(BFL.L.CORE_HELP_QJ_STRESS)
 		AddChatMessage("")
@@ -3943,6 +4314,12 @@ function QuickJoin:OpenContextMenu(guid, anchorFrame)
 	MenuUtil.CreateContextMenu(anchorFrame, function(owner, rootDescription)
 		-- Title: Leader name
 		rootDescription:CreateTitle(leaderInfo.name or UNKNOWN)
+
+		if CanRevealCensoredLFGGroup(groupInfo) then
+			rootDescription:CreateButton(CENSORED_LFG_GROUP_SHOW or SHOW or "Show", function()
+				self:RevealCensoredGroup(guid)
+			end)
+		end
 
 		-- Whisper button
 		rootDescription:CreateButton(WHISPER, function()

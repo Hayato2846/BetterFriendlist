@@ -351,6 +351,7 @@ local function ApplyGameAccountToFriend(friend, gameInfo)
 	friend.timerunningSeasonID = gameInfo.timerunningSeasonID
 	friend.gameAccountID = gameInfo.gameAccountID
 	friend.gameAccountInfo = gameInfo
+	friend.classFilename = gameInfo.classFilename
 
 	if client == (BNET_CLIENT_WOW or "WoW") then
 		friend.characterName = gameInfo.characterName or ""
@@ -526,14 +527,14 @@ local function GetFriendCounts()
 	wowOnline = C_FriendList.GetNumOnlineFriends() or 0
 
 	-- BNet Friends
-	if BNConnected() then
+	if BNConnected() and (not BFL.IsBattleNetFriendsListEnabled or BFL.IsBattleNetFriendsListEnabled()) then
 		local numTotal, numOnline = BNGetNumFriends()
 		bnetTotal = numTotal or 0
 
 		if treatMobileAsOffline then
 			bnetOnline = 0
 			for i = 1, numOnline do
-				local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
+				local accountInfo = BFL.GetBNetFriendInfo and BFL.GetBNetFriendInfo(i)
 				if accountInfo and accountInfo.gameAccountInfo then
 					local client = accountInfo.gameAccountInfo.clientProgram or "App"
 					if client ~= "BSAp" then
@@ -629,12 +630,12 @@ local function GetFilteredFriendCounts()
 	end
 
 	-- BNet Friends
-	if BNConnected() then
+	if BNConnected() and (not BFL.IsBattleNetFriendsListEnabled or BFL.IsBattleNetFriendsListEnabled()) then
 		local numBNetTotal, numBNetOnline = BNGetNumFriends()
 		bnetTotal = numBNetTotal or 0
 
 		for i = 1, bnetTotal do
-			local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
+			local accountInfo = BFL.GetBNetFriendInfo and BFL.GetBNetFriendInfo(i)
 				if accountInfo then
 					local gameInfo = accountInfo.gameAccountInfo or {}
 					local isOnline = gameInfo.isOnline or false
@@ -859,10 +860,11 @@ local function CreateAdvancedTooltip(gameTooltip)
 
 	local friends = {}
 
-	if BNConnected() then
+	if BNConnected() and (not BFL.IsBattleNetFriendsListEnabled or BFL.IsBattleNetFriendsListEnabled()) then
 		local numBNetTotal, numBNetOnline = BNGetNumFriends()
+		local friendTagsEnabled = BFL.AreBattleNetFriendTagsEnabled and BFL.AreBattleNetFriendTagsEnabled()
 		for i = 1, numBNetOnline do
-			local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
+			local accountInfo = BFL.GetBNetFriendInfo and BFL.GetBNetFriendInfo(i)
 			if accountInfo and accountInfo.gameAccountInfo and accountInfo.gameAccountInfo.isOnline then
 				local friendUID = (accountInfo.battleTag and accountInfo.battleTag ~= "")
 						and ("bnet_" .. accountInfo.battleTag)
@@ -872,6 +874,8 @@ local function CreateAdvancedTooltip(gameTooltip)
 					id = friendUID,
 					type = "bnet",
 					isFavorite = accountInfo.isFavorite,
+					friendLevel = accountInfo.friendLevel,
+					friendTags = friendTagsEnabled and accountInfo.friendTags or nil,
 					client = gameInfo.clientProgram or "App",
 					wowProjectID = gameInfo.wowProjectID,
 					connected = true,
@@ -1824,10 +1828,11 @@ local function CreateLibQTipTooltip(anchorFrame)
 			end
 		else
 			-- Collect BNet Friends (ALL)
-			if BNConnected() then
+			if BNConnected() and (not BFL.IsBattleNetFriendsListEnabled or BFL.IsBattleNetFriendsListEnabled()) then
 				local numBNetTotal = BNGetNumFriends()
+				local friendTagsEnabled = BFL.AreBattleNetFriendTagsEnabled and BFL.AreBattleNetFriendTagsEnabled()
 				for i = 1, numBNetTotal do
-					local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
+					local accountInfo = BFL.GetBNetFriendInfo and BFL.GetBNetFriendInfo(i)
 					if accountInfo then
 						local gameInfo = accountInfo.gameAccountInfo or {}
 						local isOnline = gameInfo.isOnline or false
@@ -1855,6 +1860,8 @@ local function CreateLibQTipTooltip(anchorFrame)
 							note = accountInfo.note or "",
 							connected = isOnline,
 							isFavorite = accountInfo.isFavorite,
+							friendLevel = accountInfo.friendLevel,
+							friendTags = friendTagsEnabled and accountInfo.friendTags or nil,
 							accountInfo = accountInfo,
 							index = i,
 						}
