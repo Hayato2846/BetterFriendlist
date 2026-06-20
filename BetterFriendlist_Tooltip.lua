@@ -5,6 +5,8 @@
 local _, BFL = ...
 
 local ShowSafeRetailBNetTooltip
+local AddContactMemoryTooltipLines
+local ResizeFriendsTooltipForMeasuredLines
 
 -- Proxy button for Retail: a real Frame object avoids taint on FriendsTooltip.button
 -- Blizzard's FriendsTooltip OnUpdate calls: if self.hasBroadcast then self.button:OnEnter() end
@@ -39,6 +41,12 @@ if not BFL.IsClassic then
 						FriendsTooltipHeader:SetText(safeName)
 					end
 				end
+			end
+
+			if AddContactMemoryTooltipLines
+				and AddContactMemoryTooltipLines(FriendsTooltip, self.friendData)
+				and ResizeFriendsTooltipForMeasuredLines then
+				ResizeFriendsTooltipForMeasuredLines(FriendsTooltip)
 			end
 		end
 	end
@@ -111,6 +119,138 @@ local function HideTooltipLine(line)
 		line:SetText("")
 		line:Hide()
 	end
+end
+
+local function GetContactMemoryTooltipLines(tooltip)
+	if not tooltip then
+		return nil
+	end
+	if not tooltip.ContactMemoryLines then
+		tooltip.ContactMemoryLines = {}
+	end
+	return tooltip.ContactMemoryLines
+end
+
+local function HideContactMemoryTooltipLines(tooltip)
+	local lines = GetContactMemoryTooltipLines(tooltip)
+	if not lines then
+		return
+	end
+	for _, line in ipairs(lines) do
+		HideTooltipLine(line)
+	end
+end
+
+local function EnsureContactMemoryTooltipLine(tooltip, index, fontObjectName)
+	local lines = GetContactMemoryTooltipLines(tooltip)
+	if not lines then
+		return nil
+	end
+
+	local line = lines[index]
+	if not line and tooltip.CreateFontString then
+		line = tooltip:CreateFontString(nil, "ARTWORK", fontObjectName or "FriendsFont_Small")
+		line:SetJustifyH("LEFT")
+		line:SetJustifyV("TOP")
+		if line.SetWordWrap then
+			line:SetWordWrap(true)
+		end
+		if line.SetNonSpaceWrap then
+			line:SetNonSpaceWrap(true)
+		end
+		lines[index] = line
+	end
+
+	if line then
+		local fontObject = fontObjectName and _G[fontObjectName]
+		if fontObject and line.SetFontObject then
+			line:SetFontObject(fontObject)
+		end
+		line:SetWidth(176)
+	end
+	return line
+end
+
+local function GetLastFriendsTooltipAnchor()
+	local candidates = {
+		FriendsTooltipGameAccountMany,
+	}
+
+	for index = FRIENDS_TOOLTIP_MAX_GAME_ACCOUNTS or 4, 2, -1 do
+		candidates[#candidates + 1] = _G["FriendsTooltipGameAccount" .. index .. "Info"]
+		candidates[#candidates + 1] = _G["FriendsTooltipGameAccount" .. index .. "Name"]
+	end
+
+	candidates[#candidates + 1] = FriendsTooltipOtherGameAccounts
+	candidates[#candidates + 1] = FriendsTooltipLastOnline
+	candidates[#candidates + 1] = FriendsTooltipBroadcastText
+	candidates[#candidates + 1] = FriendsTooltipNoteText
+	candidates[#candidates + 1] = FriendsTooltipGameAccount1Info
+	candidates[#candidates + 1] = FriendsTooltipGameAccount1Name
+	candidates[#candidates + 1] = FriendsTooltipHeader
+
+	for _, line in ipairs(candidates) do
+		if line and line.IsShown and line:IsShown() then
+			return line
+		end
+	end
+	return FriendsTooltipHeader
+end
+
+local function SetContactMemoryTooltipLine(line, anchor, text, yOffset, r, g, b)
+	if not line then
+		return anchor
+	end
+	line:ClearAllPoints()
+	line:SetTextColor(r or 1, g or 1, b or 1)
+	return SetTooltipLine(line, anchor or GetLastFriendsTooltipAnchor(), text, yOffset)
+end
+
+ResizeFriendsTooltipForMeasuredLines = function(tooltip)
+	if not (tooltip and tooltip.SetHeight and tooltip.SetWidth) then
+		return
+	end
+	local margin = FRIENDS_TOOLTIP_MARGIN_WIDTH or 12
+	local maxWidth = FRIENDS_TOOLTIP_MAX_WIDTH or 320
+	tooltip:SetHeight((tooltip.height or tooltip:GetHeight() or 0) + margin)
+	tooltip:SetWidth(math.min(maxWidth, (tooltip.maxWidth or tooltip:GetWidth() or 0) + margin))
+end
+
+local function AddContactMemoryFriendsTooltipLines(tooltip, friendData, anchor)
+	local ContactMemory = BFL:GetModule("ContactMemory")
+	HideContactMemoryTooltipLines(tooltip)
+	if not (ContactMemory and ContactMemory.GetTooltipSummaryForFriend) then
+		return nil
+	end
+
+	local summary = ContactMemory:GetTooltipSummaryForFriend(friendData)
+	if not summary then
+		return nil
+	end
+
+	anchor = anchor or GetLastFriendsTooltipAnchor()
+	local lineIndex = 1
+	local title = EnsureContactMemoryTooltipLine(tooltip, lineIndex, "FriendsFont_Normal")
+	anchor = SetContactMemoryTooltipLine(title, anchor, summary.title, -8, 1, 0.82, 0)
+
+	if summary.tagsText then
+		lineIndex = lineIndex + 1
+		local tags = EnsureContactMemoryTooltipLine(tooltip, lineIndex, "FriendsFont_Small")
+		anchor = SetContactMemoryTooltipLine(tags, anchor, summary.tagsText, -2, 0.50, 0.78, 1.00)
+	end
+
+	if summary.note then
+		lineIndex = lineIndex + 1
+		local note = EnsureContactMemoryTooltipLine(tooltip, lineIndex, "FriendsFont_Small")
+		anchor = SetContactMemoryTooltipLine(note, anchor, summary.note, -2, 1, 1, 1)
+	end
+
+	local lines = GetContactMemoryTooltipLines(tooltip)
+	for index = lineIndex + 1, #(lines or {}) do
+		HideTooltipLine(lines[index])
+	end
+
+	return anchor
 end
 
 local function GetSafeLastOnlineText(lastOnlineTime)
@@ -298,6 +438,17 @@ local function BuildGameAccountIconPrefix(clientProgram)
 	return ""
 end
 
+AddContactMemoryTooltipLines = function(tooltip, friendData, anchor)
+	local ContactMemory = BFL:GetModule("ContactMemory")
+	if tooltip and tooltip == FriendsTooltip then
+		return AddContactMemoryFriendsTooltipLines(tooltip, friendData, anchor)
+	end
+	if ContactMemory and ContactMemory.AddTooltipLinesForFriend then
+		return ContactMemory:AddTooltipLinesForFriend(tooltip, friendData)
+	end
+	return false
+end
+
 ShowSafeRetailBNetTooltip = function(button, anchorButton, friendData)
 	local tooltip = FriendsTooltip
 	if not tooltip or not friendData then
@@ -471,6 +622,7 @@ ShowSafeRetailBNetTooltip = function(button, anchorButton, friendData)
 		HideTooltipLine(FriendsTooltipGameAccountMany)
 	end
 
+	anchor = AddContactMemoryTooltipLines(tooltip, friendData) or anchor
 	tooltip.button = button
 	tooltip:ClearAllPoints()
 	tooltip:SetPoint("TOPLEFT", anchorButton or button, "TOPRIGHT", 36, 0)
@@ -563,6 +715,8 @@ function BetterFriendsList_Button_OnEnter(self)
 			BFL_Tooltip:AddLine(friendData.note, 1, 0.82, 0, true)
 		end
 
+		AddContactMemoryTooltipLines(BFL_Tooltip, friendData)
+
 		-- RaiderIO integration: query public API for M+ score in Preview Mode
 		if _G.RaiderIO and _G.RaiderIO.GetProfile and friendData.characterName then
 			local realm = friendData.realmName
@@ -602,6 +756,9 @@ function BetterFriendsList_Button_OnEnter(self)
 		end
 
 		ApplyStreamerModeOverride(friendData)
+		if AddContactMemoryTooltipLines(tooltip, friendData) then
+			ResizeFriendsTooltipForMeasuredLines(tooltip)
+		end
 
 		tooltip:Show()
 		return
@@ -624,7 +781,9 @@ function BetterFriendsList_Button_OnEnter(self)
 		-- On 12.0.0+, avoid Blizzard's BNet tooltip path. It reads raw
 		-- accountInfo fields through BNet_GetBNetAccountName/FriendsFrame helpers,
 		-- which taints SecretValue reads when entered from addon-owned buttons.
+		local usedSafeRetailBNetTooltip = false
 		if BFL.HasSecretValues and friendData.type == "bnet" then
+			usedSafeRetailBNetTooltip = true
 			ShowSafeRetailBNetTooltip(proxyButton, self, friendData)
 		else
 			FriendsListButtonMixin.OnEnter(proxyButton)
@@ -636,6 +795,11 @@ function BetterFriendsList_Button_OnEnter(self)
 		end
 
 		ApplyStreamerModeOverride(friendData)
+		if not usedSafeRetailBNetTooltip then
+			if AddContactMemoryTooltipLines(tooltip, friendData) then
+				ResizeFriendsTooltipForMeasuredLines(tooltip)
+			end
+		end
 	end
 end
 

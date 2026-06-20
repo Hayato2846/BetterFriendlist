@@ -192,6 +192,20 @@ end
 -- Initialize a button in the ignore list (exact Blizzard implementation)
 function IgnoreList:InitButton(button, elementData)
 	button.index = elementData.index
+	button.type = nil
+	button.contactDisplayName = nil
+	button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+	button:SetScript("OnClick", function(clickedButton, mouseButton)
+		BetterIgnoreListButton_OnClick(clickedButton, mouseButton)
+	end)
+	button:SetScript("OnEnter", function(enteredButton)
+		IgnoreList:ShowContactMemoryTooltip(enteredButton)
+	end)
+	button:SetScript("OnLeave", function()
+		if BFL_Tooltip then
+			BFL_Tooltip:Hide()
+		end
+	end)
 
 	if elementData.squelchType == SQUELCH_TYPE_IGNORE then
 		local name = C_FriendList.GetIgnoreName(button.index)
@@ -200,11 +214,13 @@ function IgnoreList:InitButton(button, elementData)
 		else
 			button.name:SetText(name)
 			button.type = SQUELCH_TYPE_IGNORE
+			button.contactDisplayName = name
 		end
 	elseif elementData.squelchType == SQUELCH_TYPE_BLOCK_INVITE then
 		local blockID, blockName = BNGetBlockedInfo(button.index)
-		button.name:SetText(blockName)
+		button.name:SetText(blockName or UNKNOWN)
 		button.type = SQUELCH_TYPE_BLOCK_INVITE
+		button.contactDisplayName = blockName
 	end
 
 	local selectedSquelchType, selectedSquelchIndex = self:GetSelected()
@@ -231,6 +247,50 @@ function IgnoreList:SetButtonSelected(button, selected)
 	else
 		button:UnlockHighlight()
 	end
+end
+
+function IgnoreList:ShowContactMemoryTooltip(button)
+	if not button or not button.type or not button.index then
+		return
+	end
+
+	local ContactMemory = BFL:GetModule("ContactMemory")
+	if not (ContactMemory and ContactMemory.IsEnabled and ContactMemory:IsEnabled()) then
+		return
+	end
+
+	local tooltip = BFL.Tooltip or BFL_Tooltip
+	if not tooltip then
+		return
+	end
+
+	tooltip:SetOwner(button, "ANCHOR_RIGHT")
+	tooltip:ClearLines()
+	tooltip:SetText(button.contactDisplayName or UNKNOWN or "Unknown")
+	local shown = ContactMemory:AddTooltipLinesForIgnore(tooltip, button.type, button.index)
+	if not shown then
+		tooltip:Hide()
+	end
+end
+
+function IgnoreList:OpenContactMemoryMenu(button)
+	if not button or not button.type or not button.index then
+		return false
+	end
+
+	local ContactMemory = BFL:GetModule("ContactMemory")
+	if not (ContactMemory and ContactMemory.IsEnabled and ContactMemory:IsEnabled()) then
+		return false
+	end
+
+	local contactKey, displayName = ContactMemory:ResolveContactKeyFromIgnore(button.type, button.index)
+	if not contactKey then
+		return false
+	end
+
+	return ContactMemory:OpenMenu(button, contactKey, displayName or button.contactDisplayName, function()
+		self:Update()
+	end)
 end
 
 -- Update the ignore list display (exact Blizzard implementation)
@@ -385,8 +445,15 @@ end
 -- Global XML Event Handlers
 -- ========================================
 
-function BetterIgnoreListButton_OnClick(button)
+function BetterIgnoreListButton_OnClick(button, mouseButton)
 	local IgnoreList = BFL:GetModule("IgnoreList")
+	if mouseButton == "RightButton" then
+		if IgnoreList and IgnoreList:OpenContactMemoryMenu(button) then
+			PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+		end
+		return
+	end
+
 	if IgnoreList and button.type and button.index then
 		IgnoreList:SelectSquelched(button.type, button.index)
 		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)

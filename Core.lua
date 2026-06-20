@@ -123,7 +123,7 @@ BFL.EventCallbacks = {}
 --------------------------------------------------------------------------
 -- Debug Print System
 --------------------------------------------------------------------------
--- All debug prints are gated behind /bfl print toggle
+-- All debug prints are gated behind /bfl debug
 -- Default: OFF (no debug spam), persists in SavedVariables
 --------------------------------------------------------------------------
 

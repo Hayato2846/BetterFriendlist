@@ -2904,6 +2904,24 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					})
 				end)
 
+				local ContactMemory = BFL:GetModule("ContactMemory")
+				if ContactMemory and ContactMemory.IsEnabled and ContactMemory:IsEnabled() then
+					local contactKey = friendData and ContactMemory:ResolveContactKeyFromFriend(friendData)
+						or ContactMemory:ResolveContactKeyFromContext(contextData)
+						or ContactMemory:ResolveContactKeyFromFriend(friendUID)
+					if contactKey then
+						ContactMemory:UpsertContact("friend-menu", {
+							key = contactKey,
+							displayName = menuDisplayName or contextName or battleTag,
+							battleTag = battleTag,
+							normalizedName = friendData and friendData.name or contextName,
+						})
+						ContactMemory:PopulateMenu(rootDescription, contactKey, menuDisplayName or contextName or battleTag, function()
+							BFL:ForceRefreshFriendsList()
+						end)
+					end
+				end
+
 				-- Keep richer game-account controls on BFL-owned menus only. Native Blizzard
 				-- Menu.ModifyMenu callbacks append BFL group/nickname entries without mutating
 				-- or expanding Blizzard-owned menu behavior.

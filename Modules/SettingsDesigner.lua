@@ -3012,6 +3012,43 @@ local function RegisterSocialPages()
 	AddToggle("social.raid", { key = "raidShortcutEnabled_promote", group = "raid", label = T("SETTINGS_RAID_ACTION_PROMOTE", "Promote Assistant"), default = true, order = 140 })
 	RegisterRaidShortcutControls()
 
+	local AutoRaidAssist = BFL:GetModule("AutoRaidAssist")
+	if AutoRaidAssist and AutoRaidAssist.RegisterSettingsDesignerControls then
+		AutoRaidAssist:RegisterSettingsDesignerControls(app, {
+			pageID = "social.raid",
+			groupID = "autoAssist",
+			groupOrder = 200,
+			order = 200,
+		})
+	end
+
+	RegisterPage({
+		id = "social.raid.autoAssist",
+		category = "social",
+		title = T("AUTO_RAID_ASSIST_TITLE", "Auto Raid Assist"),
+		description = T(
+			"AUTO_RAID_ASSIST_DESC",
+			"Automatically promote selected friends and characters to raid assistant when they join your raid."
+		),
+		iconKey = "bfl-social-raid",
+		mainToggleID = "autoRaidAssist.enabled.detail",
+		order = 115,
+		newTagID = "raid-auto-assist",
+		keywords = { "raid", "assistant", "assist", "promote", "battletag", "nickname", "character", "realm" },
+	})
+	if AutoRaidAssist and AutoRaidAssist.RegisterSettingsDesignerControls then
+		AutoRaidAssist:RegisterSettingsDesignerControls(app, {
+			pageID = "social.raid.autoAssist",
+			groupID = "autoAssistDetails",
+			groupOrder = 100,
+			order = 100,
+			enabledControlID = "autoRaidAssist.enabled.detail",
+			includeManageButton = false,
+			includeEditor = true,
+			editorOrder = 110,
+		})
+	end
+
 	RegisterPage({ id = "social.guild", category = "social", title = T("SETTINGS_CENTER_PAGE_SOCIAL_GUILD", GUILD or "Guild"), iconKey = "bfl-social-guild", mainToggleID = "enableGuildTab", order = 120, visibleWhen = IsGuildTabVisible, newTagID = "social.guild" })
 	AddGroup("social.guild", "guild", T("SETTINGS_GUILD_ROSTER_HEADER", "Roster Defaults"), 100)
 	AddToggle("social.guild", { key = "enableGuildTab", group = "guild", label = T("SETTINGS_ENABLE_GUILD_TAB", "Enable Guild Tab"), desc = T("SETTINGS_ENABLE_GUILD_TAB_DESC", "Show the BetterFriendlist Guild tab."), default = false, order = 100, method = "OnEnableGuildTabChanged", refreshOnChange = true, newTagID = "enableGuildTab" })
