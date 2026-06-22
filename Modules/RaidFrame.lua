@@ -141,6 +141,56 @@ local function GetRoleIconString(role, size)
 	end
 end
 
+local function SetRoleCountAtlas(texture, atlas)
+	if BFL.IsRetail and texture and texture.SetAtlas and atlas then
+		texture:SetAtlas(atlas, TextureKitConstants and TextureKitConstants.IgnoreAtlasSize or false)
+	end
+end
+
+local function SetRoleCountDisplay(roleCount, tanks, healers, damagers)
+	if not roleCount then
+		return
+	end
+
+	SetRoleCountAtlas(roleCount.TankIcon, "UI-LFG-RoleIcon-Tank-Micro-GroupFinder")
+	SetRoleCountAtlas(roleCount.HealerIcon, "UI-LFG-RoleIcon-Healer-Micro-GroupFinder")
+	SetRoleCountAtlas(roleCount.DamagerIcon, "UI-LFG-RoleIcon-DPS-Micro-GroupFinder")
+
+	if roleCount.TankCount and roleCount.HealerCount and roleCount.DamagerCount then
+		roleCount.TankCount:SetText(tanks or 0)
+		roleCount.HealerCount:SetText(healers or 0)
+		roleCount.DamagerCount:SetText(damagers or 0)
+		return
+	end
+
+	if roleCount.SetText then
+		local iconSize = 14
+		local tankIcon = GetRoleIconString("TANK", iconSize)
+		local healIcon = GetRoleIconString("HEALER", iconSize)
+		local dpsIcon = GetRoleIconString("DAMAGER", iconSize)
+		roleCount:SetText(string.format("%s %d  %s %d  %s %d", tankIcon, tanks or 0, healIcon, healers or 0, dpsIcon, damagers or 0))
+	end
+end
+
+local function GetControlElementWidth(element, fallback)
+	if not element then
+		return fallback or 0
+	end
+	if element.GetStringWidth then
+		local width = element:GetStringWidth()
+		if width and width > 0 then
+			return width
+		end
+	end
+	if element.GetWidth then
+		local width = element:GetWidth()
+		if width and width > 0 then
+			return width
+		end
+	end
+	return fallback or 0
+end
+
 --- Set role icon on a Texture object (Retail/Classic compatible)
 --- Uses SetAtlas on Retail, SetTexture+SetTexCoord on Classic
 local function SetRoleIconTexture(texture, role)
@@ -456,8 +506,8 @@ function RaidFrame:UpdateControlPanelLayout()
 	end
 
 	-- Get actual text widths for center elements
-	local roleSummaryWidth = controlPanel.RoleSummary and controlPanel.RoleSummary:GetStringWidth() or 90
-	local memberCountWidth = controlPanel.MemberCount and controlPanel.MemberCount:GetStringWidth() or 50
+	local roleSummaryWidth = GetControlElementWidth(controlPanel.RoleSummary, 125)
+	local memberCountWidth = GetControlElementWidth(controlPanel.MemberCount, 50)
 	local centerSectionWidth = roleSummaryWidth + centerElementGap + memberCountWidth
 
 	-- BFL:DebugPrint(string.format("  Measured widths: Checkbox=%.1f, LabelText=%.1f, RightReserved=%.1f",
@@ -546,13 +596,9 @@ function RaidFrame:UpdateControlPanelLayout()
 		controlPanel.RoleSummary:ClearAllPoints()
 		-- Anchor to LEFT of panel, then offset to center position
 		controlPanel.RoleSummary:SetPoint("LEFT", controlPanel, "LEFT", centerStart, 0)
-		controlPanel.RoleSummary:SetJustifyH("LEFT")
-
-		local actualX = controlPanel.RoleSummary:GetLeft()
-		local actualText = controlPanel.RoleSummary:GetText()
-		local actualStringWidth = controlPanel.RoleSummary:GetStringWidth()
-		-- BFL:DebugPrint(string.format("  ✓ RoleSummary: Target x=%.1f, Actual x=%.1f, StringWidth=%.1f, Text='%s'",
-		--     centerStart, actualX or -1, actualStringWidth, actualText or "nil"))
+		if controlPanel.RoleSummary.SetJustifyH then
+			controlPanel.RoleSummary:SetJustifyH("LEFT")
+		end
 	end
 
 	-- Reposition MemberCount (right of RoleSummary with reduced gap)
@@ -1821,16 +1867,7 @@ function RaidFrame:UpdateRoleSummary()
 		end
 	end
 
-	-- Format: Tank Icon + count, Healer Icon + count, DPS Icon + count
-	-- Using Blizzard's modern micro role icons (same as in GroupFinder and FriendsFrame)
-	local iconSize = 14 -- Reduced from 16 for better fit in Classic
-
-	local tankIcon = GetRoleIconString("TANK", iconSize)
-	local healIcon = GetRoleIconString("HEALER", iconSize)
-	local dpsIcon = GetRoleIconString("DAMAGER", iconSize)
-
-	local text = string.format("%s %d  %s %d  %s %d", tankIcon, tanks, healIcon, healers, dpsIcon, dps)
-	frame.ControlPanel.RoleSummary:SetText(text)
+	SetRoleCountDisplay(frame.ControlPanel.RoleSummary, tanks, healers, dps)
 
 	-- Trigger layout update to recalculate centering with new string width
 	self:UpdateControlPanelLayout()
@@ -3123,13 +3160,7 @@ function RaidFrame:UpdateMockControlPanel()
 			end
 		end
 
-		local iconSize = 14 -- Reduced from 16
-		local tankIcon = GetRoleIconString("TANK", iconSize)
-		local healIcon = GetRoleIconString("HEALER", iconSize)
-		local dpsIcon = GetRoleIconString("DAMAGER", iconSize)
-		controlPanel.RoleSummary:SetText(
-			string.format("%s %d  %s %d  %s %d", tankIcon, tanks, healIcon, healers, dpsIcon, dps)
-		)
+		SetRoleCountDisplay(controlPanel.RoleSummary, tanks, healers, dps)
 	end
 
 	-- Trigger layout update

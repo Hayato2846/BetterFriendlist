@@ -1772,7 +1772,7 @@ local function RegisterBuiltInTests()
 				V:AssertNotNil(fakeApp.groups.contactMemory, "Contact Memory settings group should be registered")
 				V:AssertEqual(
 					fakeApp.groups.contactMemory.title,
-					(BFL.L and BFL.L.CONTACT_MEMORY_TITLE) or "Contact Memory",
+					(BFL.L and BFL.L.CONTACT_MEMORY_TITLE) or "Private Notes",
 					"Contact Memory group should keep the localized title"
 				)
 
@@ -1784,17 +1784,17 @@ local function RegisterBuiltInTests()
 				V:AssertNotNil(streamerControl, "Streamer Mode control should be registered")
 				V:AssertEqual(
 					enableControl.groupTitle,
-					(BFL.L and BFL.L.CONTACT_MEMORY_TITLE) or "Contact Memory",
+					(BFL.L and BFL.L.CONTACT_MEMORY_TITLE) or "Private Notes",
 					"Enable control should pass the localized group title"
 				)
 				V:AssertEqual(
 					tooltipControl.groupTitle,
-					(BFL.L and BFL.L.CONTACT_MEMORY_TITLE) or "Contact Memory",
+					(BFL.L and BFL.L.CONTACT_MEMORY_TITLE) or "Private Notes",
 					"Tooltip control should pass the localized group title"
 				)
 				V:AssertEqual(
 					streamerControl.groupTitle,
-					(BFL.L and BFL.L.CONTACT_MEMORY_TITLE) or "Contact Memory",
+					(BFL.L and BFL.L.CONTACT_MEMORY_TITLE) or "Private Notes",
 					"Streamer control should pass the localized group title"
 				)
 				V:AssertNil(enableControl.key, "Enable control should use explicit accessors instead of dotted keys")
@@ -1861,7 +1861,7 @@ local function RegisterBuiltInTests()
 	})
 
 	TS:RegisterTest("data", "ContactMemory_TooltipAliasResolution", {
-		description = "Contact Memory tooltips should resolve saved notes and tags across related contact keys",
+		description = "Contact Memory tooltips should resolve saved notes and embedded friend tags across related contact keys",
 		action = function(V)
 			WithTemporaryDatabase({
 				enableBetaFeatures = true,
@@ -1914,11 +1914,21 @@ local function RegisterBuiltInTests()
 				V:AssertNotNil(friendSummary, "Friend tooltip summary should be available without a GameTooltip AddLine API")
 				V:AssertEqual(friendSummary.note, "Raid caller", "Friend tooltip summary should include the related note")
 
-				local tagId = ContactMemory:CreateTag("Progression")
-				V:AssertNotNil(tagId, "CreateTag should return a tag ID")
-				V:Assert(ContactMemory:SetTag("player:Unit-Realm", tagId, true), "Tag should be saved under player alias")
+				local FriendTags = BFL:GetModule("FriendTags")
+				V:AssertNotNil(FriendTags, "FriendTags module should exist")
+				FriendTags:NormalizeDB()
+				local tagId = FriendTags:CreateCustomTag("Progression")
+				V:AssertNotNil(tagId, "CreateCustomTag should return a tag ID")
+				V:Assert(
+					FriendTags:SetCustomTagForFriend({
+						type = "wow",
+						uid = "wow_Unit-Realm",
+						name = "Unit-Realm",
+					}, tagId, true),
+					"Friend tag should be saved under the player alias UID"
+				)
 
-				local playerTooltipKey = ContactMemory:FindTooltipContactKey(ContactMemory:GetRelatedContactKeysFromFriend({
+				local relatedFriend = {
 					type = "bnet",
 					battleTag = "Other#1234",
 					bnetAccountID = 99,
@@ -1926,16 +1936,622 @@ local function RegisterBuiltInTests()
 						characterName = "Unit",
 						realmName = "Realm",
 					},
-				}, "bnet:Other#1234"))
+				}
+				local playerTooltipKey = ContactMemory:FindTooltipContactKey(ContactMemory:GetRelatedContactKeysFromFriend(
+					relatedFriend,
+					"bnet:Other#1234"
+				))
 				V:AssertEqual(
 					playerTooltipKey,
-					"player:Unit-Realm",
-					"Tooltip lookup should find tags stored under the active character alias"
+					"bnet:Other#1234",
+					"Contact Memory should keep note lookup separate from friend tag assignments"
 				)
 
-				local tagSummary = ContactMemory:GetTooltipSummary(playerTooltipKey)
-				V:AssertNotNil(tagSummary, "Tooltip summary should exist for related player tags")
-				V:AssertEqual(tagSummary.tagsText, "Progression", "Tooltip summary should include related tags")
+				local tagSummary = ContactMemory:GetTooltipSummaryForFriend(relatedFriend)
+				V:AssertNotNil(tagSummary, "Tooltip summary should exist for related friend tags")
+				V:AssertEqual(tagSummary.tagsText, "Progression", "Tooltip summary should include FriendTags tags")
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "FriendTags_DBDefaults", {
+		description = "Friend Tags defaults should be present for Contact Memory extension data",
+		action = function(V)
+			WithTemporaryDatabase({}, function(tempDB)
+				local FriendTags = BFL:GetModule("FriendTags")
+				V:AssertNotNil(FriendTags, "FriendTags module should exist")
+
+				FriendTags:NormalizeDB()
+				V:AssertType(tempDB.friendTagSettings, "table", "friendTagSettings should be a table")
+				V:AssertType(tempDB.friendTagProfiles, "table", "friendTagProfiles should be a table")
+				V:AssertType(tempDB.customFriendTags, "table", "customFriendTags should be a table")
+				V:AssertType(tempDB.friendCustomTags, "table", "friendCustomTags should be a table")
+				V:AssertType(tempDB.friendBlizzardTags, "table", "friendBlizzardTags should be a table")
+				V:AssertEqual(tempDB.friendTagSettings.enabled, true, "Friend Tags should default to enabled")
+				V:AssertEqual(tempDB.friendTagSettings.maxRowChips, 3, "Row chips should default to three tags")
+				V:AssertEqual(
+					tempDB.friendTagSettings.compactRowMode,
+					"icon_only",
+					"Compact rows should default to icon-only tags"
+				)
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "FriendTags_RoleIconsUseRaidCountAtlases", {
+		description = "Friend Tags role chips should use the modern raid count role icon atlases",
+		action = function(V)
+			WithTemporaryDatabase({
+				friendTagProfiles = {
+					["blizzard:damager"] = {
+						iconType = "atlas",
+						iconValue = "roleicon-tiny-dps",
+					},
+				},
+			}, function(tempDB)
+				local FriendTags = BFL:GetModule("FriendTags")
+				V:AssertNotNil(FriendTags, "FriendTags module should exist")
+				FriendTags:NormalizeDB()
+
+				local icon = FriendTags:GetIconInfo("damager")
+				V:AssertEqual(
+					icon.iconType,
+					"atlas",
+					"DPS icon option should resolve as an atlas icon"
+				)
+				V:AssertEqual(
+					icon.iconValue,
+					"UI-LFG-RoleIcon-DPS-Micro-GroupFinder",
+					"DPS icon option should use Blizzard's RoleCount atlas as the primary icon value"
+				)
+				V:AssertEqual(
+					icon.atlas,
+					"UI-LFG-RoleIcon-DPS-Micro-GroupFinder",
+					"DPS icon option should use Blizzard's RoleCount atlas"
+				)
+				V:AssertEqual(
+					icon.fallbackAtlas,
+					"groupfinder-icon-role-large-dps",
+					"DPS icon option should keep Blizzard's Classic RoleCount atlas as fallback"
+				)
+				V:AssertNil(
+					tempDB.friendTagProfiles["blizzard:damager"],
+					"Legacy tiny DPS icon override should be cleared so the RoleCount default can apply"
+				)
+
+				local profile = FriendTags:GetChipProfile("blizzard:damager")
+				V:AssertEqual(
+					profile.iconType,
+					"atlas",
+					"DPS chip profile should render as an atlas icon"
+				)
+				V:AssertEqual(
+					profile.iconValue,
+					"UI-LFG-RoleIcon-DPS-Micro-GroupFinder",
+					"DPS chip profile should prefer Blizzard's RoleCount atlas over the legacy texture fallback"
+				)
+				V:AssertEqual(
+					profile.icon,
+					"UI-LFG-RoleIcon-DPS-Micro-GroupFinder",
+					"DPS chip profile legacy icon field should not point at the old role texture on Retail"
+				)
+				V:AssertEqual(
+					profile.atlas,
+					"UI-LFG-RoleIcon-DPS-Micro-GroupFinder",
+					"DPS chip profile should resolve to Blizzard's RoleCount atlas"
+				)
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "FriendTags_LocalBlizzardFallback", {
+		description = "Friend Tags should store Blizzard-compatible tags locally before native 12.1 APIs are available",
+		action = function(V)
+			WithTemporaryDatabase({
+				enableBetaFeatures = true,
+				contactMemory = {
+					enabled = true,
+				},
+			}, function(tempDB)
+				local FriendTags = BFL:GetModule("FriendTags")
+				V:AssertNotNil(FriendTags, "FriendTags module should exist")
+				FriendTags:NormalizeDB()
+
+				local friend = {
+					type = "bnet",
+					uid = "bnet_Player#1234",
+					battleTag = "Player#1234",
+				}
+
+				V:Assert(FriendTags:IsEnabled() == true, "Friend Tags should be enabled with Beta and Contact Memory")
+				V:Assert(
+					FriendTags:SetBlizzardTagsForFriend(friend, { ["blizzard:raiding"] = true }),
+					"Blizzard-compatible tag should be saved locally without a native account ID"
+				)
+				V:Assert(
+					tempDB.friendBlizzardTags["bnet_Player#1234"]["blizzard:raiding"] == true,
+					"Local Blizzard-compatible tag assignment should be stored"
+				)
+				V:Assert(
+					FriendTags:GetSearchText(friend):find("Raiding", 1, true) ~= nil,
+					"Search text should include assigned Blizzard-compatible tags"
+				)
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "FriendTags_MigratesLegacyContactMemoryTags", {
+		description = "Friend Tags should migrate old Contact Memory tags into unified custom friend tags",
+		action = function(V)
+			WithTemporaryDatabase({
+				enableBetaFeatures = true,
+				contactMemory = {
+					enabled = true,
+					tags = {
+						progression = {
+							name = "Progression",
+							order = 5,
+							color = { r = 0.2, g = 0.6, b = 1 },
+						},
+					},
+					contacts = {
+						["player:Unit-Realm"] = {
+							tags = {
+								progression = true,
+							},
+						},
+						["bnet:42"] = {
+							tags = {
+								progression = true,
+							},
+						},
+					},
+				},
+			}, function(tempDB)
+				local FriendTags = BFL:GetModule("FriendTags")
+				V:AssertNotNil(FriendTags, "FriendTags module should exist")
+				FriendTags:NormalizeDB()
+
+				local migratedTagId = tempDB.friendTagsLegacyContactMemoryTagMap.progression
+				V:AssertNotNil(migratedTagId, "Legacy Contact Memory tag should receive a FriendTags custom ID")
+				V:AssertEqual(
+					tempDB.customFriendTags[migratedTagId].name,
+					"Progression",
+					"Migrated custom tag should keep the legacy tag name"
+				)
+				V:Assert(
+					tempDB.friendCustomTags["wow_Unit-Realm"][migratedTagId] == true,
+					"Player-key legacy assignments should migrate to WoW friend UIDs"
+				)
+				V:Assert(
+					tempDB.friendCustomTags["bnet_42"][migratedTagId] == true,
+					"Battle.net account-key legacy assignments should migrate to Battle.net friend UIDs"
+				)
+				V:AssertEqual(
+					tempDB.friendTagsLegacyContactMemoryMigrated,
+					true,
+					"Legacy Contact Memory migration should be marked complete"
+				)
+				V:AssertNil(
+					tempDB.contactMemory.contacts["player:Unit-Realm"],
+					"Tag-only legacy Contact Memory contacts should be cleaned after migration"
+				)
+				V:Assert(
+					FriendTags:FriendHasTag({
+						type = "wow",
+						uid = "wow_Unit-Realm",
+						name = "Unit-Realm",
+					}, "Progression"),
+					"Migrated WoW assignments should be readable through FriendTags"
+				)
+				V:Assert(
+					FriendTags:FriendHasTag({
+						type = "bnet",
+						bnetAccountID = 42,
+					}, "Progression"),
+					"Migrated Battle.net account assignments should be readable through FriendTags aliases"
+				)
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "FriendTags_MenuCommitsBlizzardTagsImmediately", {
+		description = "Friend Tags menu checkboxes should commit Blizzard-compatible tags before the menu closes",
+		action = function(V)
+			WithTemporaryDatabase({
+				enableBetaFeatures = true,
+				contactMemory = {
+					enabled = true,
+				},
+			}, function(tempDB)
+				local FriendTags = BFL:GetModule("FriendTags")
+				V:AssertNotNil(FriendTags, "FriendTags module should exist")
+				FriendTags:NormalizeDB()
+
+				local oldForceRefreshFriendsList = BFL.ForceRefreshFriendsList
+				local refreshes = 0
+				local ok, err = pcall(function()
+					BFL.ForceRefreshFriendsList = function()
+						refreshes = refreshes + 1
+					end
+
+					local capturedDPSCheckbox
+					local submenu = {}
+					function submenu:SetScrollMode() end
+					function submenu:CreateTitle() end
+					function submenu:CreateDivider() end
+					function submenu:CreateButton()
+						return {
+							SetScrollMode = function() end,
+							CreateTitle = function() end,
+							CreateDivider = function() end,
+							CreateButton = function() end,
+							CreateCheckbox = function() end,
+						}
+					end
+					function submenu:CreateCheckbox(text, isSelected, onSelected)
+						local checkbox = {
+							text = text,
+							isSelected = isSelected,
+							onSelected = onSelected,
+						}
+						if text == "DPS" or text == "Damage" then
+							capturedDPSCheckbox = checkbox
+						end
+						return checkbox
+					end
+
+					local rootDescription = {}
+					function rootDescription:CreateButton()
+						return submenu
+					end
+					function rootDescription:AddMenuReleasedCallback()
+						error("Friend tag menu should not defer Blizzard-compatible tag commits to menu release", 0)
+					end
+
+					local friend = {
+						type = "bnet",
+						uid = "bnet_Player#1234",
+						battleTag = "Player#1234",
+					}
+
+					V:Assert(
+						FriendTags:PopulateMenu(rootDescription, friend, friend.uid, "Player", nil),
+						"Friend Tags menu should populate for Battle.net friends"
+					)
+					V:AssertNotNil(capturedDPSCheckbox, "DPS checkbox should be present in the tag menu")
+					V:AssertEqual(capturedDPSCheckbox.isSelected(), false, "DPS should start unchecked")
+
+					local response = capturedDPSCheckbox.onSelected()
+					if MenuResponse and MenuResponse.Refresh then
+						V:AssertEqual(response, MenuResponse.Refresh, "Tag click should refresh the open menu")
+					end
+					V:AssertEqual(refreshes, 1, "Tag click should refresh the visible friends list immediately")
+					V:Assert(
+						tempDB.friendBlizzardTags["bnet_Player#1234"]["blizzard:damager"] == true,
+						"DPS tag should be saved immediately without waiting for menu close"
+					)
+					V:AssertEqual(
+						capturedDPSCheckbox.isSelected(),
+						true,
+						"Open menu checkbox state should update immediately after click"
+					)
+				end)
+
+				BFL.ForceRefreshFriendsList = oldForceRefreshFriendsList
+				if not ok then
+					error(err, 0)
+				end
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "ContactMemory_MenuEmbedsFriendTagsOnly", {
+		description = "Contact Memory friend menus should embed FriendTags and stop exposing legacy Contact Memory tags",
+		action = function(V)
+			WithTemporaryDatabase({
+				enableBetaFeatures = true,
+				contactMemory = {
+					enabled = true,
+				},
+			}, function()
+				local ContactMemory = BFL:GetModule("ContactMemory")
+				local FriendTags = BFL:GetModule("FriendTags")
+				V:AssertNotNil(ContactMemory, "ContactMemory module should exist")
+				V:AssertNotNil(FriendTags, "FriendTags module should exist")
+				FriendTags:NormalizeDB()
+
+				local legacyTagId = ContactMemory:CreateTag("Legacy CM Tag")
+				V:AssertNotNil(legacyTagId, "Legacy Contact Memory tag setup should succeed")
+				V:Assert(ContactMemory:SetTag("player:Unit-Realm", legacyTagId, true), "Legacy Contact Memory tag assignment should succeed")
+
+				local customTagId = FriendTags:CreateCustomTag("Key Team")
+				V:AssertNotNil(customTagId, "FriendTags custom tag setup should succeed")
+
+				local entries = {}
+				local submenu = {}
+				function submenu:SetScrollMode() end
+				function submenu:CreateDivider()
+					entries[#entries + 1] = { type = "divider" }
+				end
+				function submenu:CreateTitle(text)
+					entries[#entries + 1] = { type = "title", text = text }
+				end
+				function submenu:CreateButton(text)
+					entries[#entries + 1] = { type = "button", text = text }
+					return submenu
+				end
+				function submenu:CreateCheckbox(text)
+					entries[#entries + 1] = { type = "checkbox", text = text }
+				end
+
+				local rootDescription = {}
+				function rootDescription:CreateButton(text)
+					entries[#entries + 1] = { type = "root", text = text }
+					return submenu
+				end
+
+				V:Assert(
+					ContactMemory:PopulateMenu(rootDescription, "player:Unit-Realm", "Unit", nil, {
+						friendData = {
+							type = "wow",
+							uid = "wow_Unit-Realm",
+							name = "Unit-Realm",
+						},
+						friendUID = "wow_Unit-Realm",
+					}),
+					"Contact Memory menu should populate"
+				)
+
+				local seen = {}
+				for _, entry in ipairs(entries) do
+					if entry.text then
+						seen[entry.text] = true
+					end
+				end
+				V:Assert(seen["Notes & Tags"], "Notes & Tags should be the single root menu entry")
+				V:Assert(seen["Edit Private Note"], "Contact Memory menu should keep note actions")
+				V:Assert(seen["Friend Tags"], "FriendTags should be embedded under Contact Memory")
+				V:Assert(seen["Custom Tags"], "Embedded FriendTags section should show custom tags")
+				V:Assert(seen["Key Team"], "Embedded FriendTags section should show custom tag assignments")
+				V:AssertNil(seen["Create Tag"], "Legacy Contact Memory tag creation should not be exposed")
+				V:AssertNil(seen["Legacy CM Tag"], "Legacy Contact Memory tags should not be exposed as a second tag system")
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "FriendTags_NativeWritesRequireUserInitiated", {
+		description = "Native Blizzard Friend Tag writes should require explicit user initiation",
+		action = function(V)
+			WithTemporaryDatabase({
+				enableBetaFeatures = true,
+				contactMemory = {
+					enabled = true,
+				},
+			}, function()
+				local FriendTags = BFL:GetModule("FriendTags")
+				V:AssertNotNil(FriendTags, "FriendTags module should exist")
+				FriendTags:NormalizeDB()
+
+				local oldC_BattleNet = C_BattleNet
+				local oldEnum = Enum
+				local oldIsRetail = BFL.IsRetail
+				local oldAreBattleNetFriendTagsEnabled = BFL.AreBattleNetFriendTagsEnabled
+				local calls = 0
+
+				local ok, err = pcall(function()
+					BFL.IsRetail = true
+					BFL.AreBattleNetFriendTagsEnabled = function()
+						return true
+					end
+					C_BattleNet = {
+						AreFriendTagsEnabled = function()
+							return true
+						end,
+						SetFriendTags = function(accountID, tags)
+							calls = calls + 1
+							V:AssertEqual(accountID, 42, "Native write should use the Battle.net account ID")
+							V:AssertEqual(#tags, 1, "Native write should send one enum tag")
+							return true
+						end,
+					}
+					Enum = {
+						BattleNetFriendTag = {
+							Raiding = 2,
+						},
+					}
+
+					local friend = {
+						type = "bnet",
+						uid = "bnet_Player#1234",
+						bnetAccountID = 42,
+					}
+
+					local writeOK, reason = FriendTags:SetBlizzardTagsForFriend(friend, { ["blizzard:raiding"] = true })
+					V:AssertEqual(writeOK, false, "Native write should be rejected without user initiation")
+					V:AssertEqual(reason, "notUserInitiated", "Rejected native write should report notUserInitiated")
+					V:AssertEqual(calls, 0, "Rejected native write should not call C_BattleNet.SetFriendTags")
+
+					writeOK = FriendTags:SetBlizzardTagsForFriend(friend, { ["blizzard:raiding"] = true }, {
+						userInitiated = true,
+					})
+					V:AssertEqual(writeOK, true, "User-initiated native write should succeed")
+					V:AssertEqual(calls, 1, "User-initiated native write should call C_BattleNet.SetFriendTags once")
+				end)
+
+				C_BattleNet = oldC_BattleNet
+				Enum = oldEnum
+				BFL.IsRetail = oldIsRetail
+				BFL.AreBattleNetFriendTagsEnabled = oldAreBattleNetFriendTagsEnabled
+				if not ok then
+					error(err, 0)
+				end
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "FriendTags_StableMenuUIDIsolation", {
+		description = "Friend Tags should isolate assignments by stable menu UID even if cached friend data has a temporary UID",
+		action = function(V)
+			WithTemporaryDatabase({
+				enableBetaFeatures = true,
+				contactMemory = {
+					enabled = true,
+				},
+			}, function(tempDB)
+				local FriendTags = BFL:GetModule("FriendTags")
+				V:AssertNotNil(FriendTags, "FriendTags module should exist")
+				FriendTags:NormalizeDB()
+
+				local friendA = FriendTags:NormalizeFriendContext({
+					type = "bnet",
+					uid = "bnet_unknown",
+					bnetAccountID = 101,
+				}, "bnet_PlayerA#1111")
+				local friendB = FriendTags:NormalizeFriendContext({
+					type = "bnet",
+					uid = "bnet_unknown",
+					bnetAccountID = 202,
+				}, "bnet_PlayerB#2222")
+
+				V:AssertEqual(friendA.uid, "bnet_PlayerA#1111", "Explicit menu UID should override temporary cached UID")
+				V:AssertEqual(friendB.uid, "bnet_PlayerB#2222", "Each friend should keep its own explicit menu UID")
+
+				V:Assert(
+					FriendTags:SetBlizzardTagsForFriend(friendA, {
+						["blizzard:raiding"] = true,
+						["blizzard:dungeons"] = true,
+					}),
+					"Multiple Blizzard-compatible tags should be saved for the intended friend"
+				)
+
+				V:AssertType(
+					tempDB.friendBlizzardTags["bnet_PlayerA#1111"],
+					"table",
+					"Friend A should receive the tag set under its stable UID"
+				)
+				V:AssertNil(
+					tempDB.friendBlizzardTags["bnet_PlayerB#2222"],
+					"Friend B should not receive Friend A tags"
+				)
+				V:AssertNil(tempDB.friendBlizzardTags.bnet_unknown, "Temporary bnet_unknown should never be used as a tag key")
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "FriendTags_CustomTagCRUDAndChipProfile", {
+		description = "Friend Tags should support custom tag rename/delete and icon-only chip profiles",
+		action = function(V)
+			WithTemporaryDatabase({
+				enableBetaFeatures = true,
+				contactMemory = {
+					enabled = true,
+				},
+			}, function(tempDB)
+				local FriendTags = BFL:GetModule("FriendTags")
+				V:AssertNotNil(FriendTags, "FriendTags module should exist")
+				FriendTags:NormalizeDB()
+
+				local friend = {
+					type = "wow",
+					uid = "wow_Unit-Realm",
+					name = "Unit-Realm",
+				}
+
+				local tagId = FriendTags:CreateCustomTag("Key Team")
+				V:AssertNotNil(tagId, "CreateCustomTag should return a tag ID")
+				V:Assert(FriendTags:RenameCustomTag(tagId, "Key Push"), "RenameCustomTag should succeed")
+				V:Assert(FriendTags:SetCustomTagsForFriend(friend, { [tagId] = true }), "Bulk custom tag assignment should succeed")
+				V:Assert(FriendTags:FriendHasTag(friend, tagId), "FriendHasTag should match custom tag ID")
+				V:Assert(FriendTags:FriendHasTag(friend, "Key Push"), "FriendHasTag should match renamed custom tag name")
+
+				V:Assert(FriendTags:SetChipProfile(tagId, {
+					chipLabel = "",
+					iconType = "texture",
+					iconValue = "Interface\\Icons\\INV_Misc_QuestionMark",
+				}), "SetChipProfile should accept icon-only labels")
+
+				local profile = FriendTags:GetChipProfile(tagId)
+				V:AssertEqual(profile.chipLabel, "", "Empty chip label should be preserved for icon-only chips")
+				V:AssertEqual(
+					profile.icon,
+					"Interface\\Icons\\INV_Misc_QuestionMark",
+					"Icon-only profile should keep its icon"
+				)
+				V:Assert(FriendTags:FriendHasTag(friend, tagId), "Icon-only chip profile should keep the tag assigned")
+
+				V:Assert(FriendTags:DeleteCustomTag(tagId), "DeleteCustomTag should succeed")
+				V:AssertNil(tempDB.customFriendTags[tagId], "Deleted custom tag definition should be removed")
+				V:AssertNil(tempDB.friendCustomTags["wow_Unit-Realm"], "Deleted custom tag assignment should be removed")
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "FriendTags_DynamicTagGroupCollapseState", {
+		description = "Dynamic Friend Tag groups should store collapse state without creating real groups",
+		action = function(V)
+			WithTemporaryDatabase({
+				groupStates = {},
+			}, function(tempDB)
+				local FriendsList = BFL:GetModule("FriendsList")
+				V:AssertNotNil(FriendsList, "FriendsList module should exist")
+
+				local oldForceRefresh = BFL.ForceRefreshFriendsList
+				local refreshes = 0
+				BFL.ForceRefreshFriendsList = function()
+					refreshes = refreshes + 1
+				end
+
+				local ok, err = pcall(function()
+					FriendsList:ToggleGroup("tag:custom:key_push")
+					V:AssertEqual(
+						tempDB.groupStates["tag:custom:key_push"],
+						true,
+						"First toggle should collapse the virtual tag group"
+					)
+					FriendsList:ToggleGroup("tag:custom:key_push")
+					V:AssertEqual(
+						tempDB.groupStates["tag:custom:key_push"],
+						false,
+						"Second toggle should expand the virtual tag group"
+					)
+					V:AssertEqual(refreshes, 2, "Virtual tag group toggles should refresh the friend list")
+				end)
+
+				BFL.ForceRefreshFriendsList = oldForceRefresh
+				if not ok then
+					error(err, 0)
+				end
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "FriendTags_CustomTagsSearch", {
+		description = "Friend Tags should create, assign, and search BetterFriendlist custom tags",
+		action = function(V)
+			WithTemporaryDatabase({
+				enableBetaFeatures = true,
+				contactMemory = {
+					enabled = true,
+				},
+			}, function()
+				local FriendTags = BFL:GetModule("FriendTags")
+				V:AssertNotNil(FriendTags, "FriendTags module should exist")
+				FriendTags:NormalizeDB()
+
+				local friend = {
+					type = "wow",
+					uid = "wow_Unit-Realm",
+					name = "Unit-Realm",
+				}
+				local tagId = FriendTags:CreateCustomTag("Guild Lead")
+				V:AssertNotNil(tagId, "CreateCustomTag should return a tag ID")
+				V:Assert(FriendTags:SetCustomTagForFriend(friend, tagId, true), "Custom tag should be assigned")
+				V:Assert(FriendTags:FriendHasTag(friend, "Guild Lead"), "FriendHasTag should match assigned custom tags")
+				V:Assert(
+					FriendTags:GetTooltipTextForFriend(friend):find("Guild Lead", 1, true) ~= nil,
+					"Tooltip text should include assigned custom tags"
+				)
 			end)
 		end,
 	})
@@ -2787,8 +3403,8 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
-	TS:RegisterTest("data", "ContactMemory_NoteCRUDAndTags", {
-		description = "Contact Memory should save private notes, tags, and tooltip summaries",
+	TS:RegisterTest("data", "ContactMemory_NoteCRUD", {
+		description = "Contact Memory should save private notes and tooltip summaries",
 		action = function(V)
 			WithTemporaryDatabase({
 				enableBetaFeatures = true,
@@ -2807,20 +3423,11 @@ local function RegisterBuiltInTests()
 					"Private note should be trimmed and stored"
 				)
 
-				local tagId = ContactMemory:CreateTag("Mythic Plus")
-				V:AssertNotNil(tagId, "CreateTag should return a tag ID")
-				V:Assert(ContactMemory:SetTag(contactKey, tagId, true), "SetTag should assign the tag")
-
-				local tagNames = ContactMemory:GetContactTagNames(contactKey)
-				V:AssertEqual(#tagNames, 1, "One tag should be assigned")
-				V:AssertEqual(tagNames[1], "Mythic Plus", "Assigned tag should be returned by name")
-
 				local summary = ContactMemory:GetTooltipSummary(contactKey)
-				V:AssertNotNil(summary, "Tooltip summary should exist for a noted/tagged contact")
+				V:AssertNotNil(summary, "Tooltip summary should exist for a noted contact")
 				V:AssertEqual(summary.note, "Great key partner", "Tooltip summary should include the private note")
-				V:AssertEqual(summary.tagsText, "Mythic Plus", "Tooltip summary should include tags")
+				V:AssertNil(summary.tagsText, "Contact Memory note summaries should not expose legacy tags")
 
-				V:Assert(ContactMemory:SetTag(contactKey, tagId, false), "SetTag should remove the tag")
 				V:Assert(ContactMemory:SetPrivateNote(contactKey, nil), "Clearing the note should succeed")
 				V:AssertNil(ContactMemory:GetContact(contactKey, false), "Empty contact should be cleaned up")
 			end)

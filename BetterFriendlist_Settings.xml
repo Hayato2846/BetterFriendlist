@@ -95,6 +95,14 @@
 					</Anchors>
 				</Frame>
 
+				<!-- Friend Tags Tab Content (BETA) -->
+				<Frame parentKey="FriendTagsTab" hidden="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" />
+						<Anchor point="BOTTOMRIGHT" />
+					</Anchors>
+				</Frame>
+
 				<!-- Guild Tab Content (BETA) -->
 				<Frame parentKey="GuildTab" hidden="true">
 					<Anchors>

@@ -1466,11 +1466,6 @@
 						</Frames>
 						<Layers>
 							<Layer level="OVERLAY">
-								<FontString parentKey="RoleSummary" inherits="BetterFriendlistFontHighlight" justifyH="LEFT">
-									<Anchors>
-										<Anchor point="RIGHT" relativeKey="$parent.RaidInfoButton" relativePoint="LEFT" x="-100" y="0"/>
-									</Anchors>
-								</FontString>
 								<FontString parentKey="MemberCount" inherits="BetterFriendlistFontHighlight" justifyH="LEFT">
 									<Anchors>
 										<Anchor point="LEFT" relativeKey="$parent.RoleSummary" relativePoint="RIGHT" x="5" y="0"/>
@@ -1484,6 +1479,11 @@
 							</Layer>
 						</Layers>
 						<Frames>
+							<Frame parentKey="RoleSummary" inherits="RoleCountNoScriptsTemplate">
+								<Anchors>
+									<Anchor point="RIGHT" relativeKey="$parent.RaidInfoButton" relativePoint="LEFT" x="-100" y="0"/>
+								</Anchors>
+							</Frame>
 							<Button parentKey="CombatIcon" hidden="true">
 								<Size x="16" y="16"/>
 								<Anchors>

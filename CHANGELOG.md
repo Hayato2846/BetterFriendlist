@@ -12,8 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Settings Center** - Added a LibSettingsDesigner-based settings center with dashboard, search-ready task categories, Retail/Classic shared loading, expanded native controls for theme, groups, raid shortcuts, broker columns, and explicit BFL Dark/Custom and ElvUI skin hooks.
 - **Settings Icons** - Added BetterFriendlist-specific Settings Center icons and a transparent Settings avatar.
-- **Contact Memory Beta** - Added a default-off local notes and tags MVP for friends and ignored players. Enable Beta Features and Contact Memory under Settings > Advanced or the Settings Center Beta page; entries are available in BFL context menus and tooltips without touching Blizzard notes.
-- **Contact Memory Debug** - Added a temporary `/bflcmdebug` chat command for diagnosing friend tooltip note and tag resolution.
+- **Private Notes Beta** - Added a default-off local private notes MVP for friends and ignored players. Enable Beta Features and Private Notes under Settings > Advanced or the Settings Center Beta page; entries are available in BFL context menus and Notes & Tags tooltips without touching Blizzard notes.
+- **Friend Tags** - Added Blizzard-compatible friend tags, custom BetterFriendlist tags, row chips, tooltip output, and Settings Center controls. Local Blizzard-compatible tags are kept for Retail 12.0.x and handed off to Blizzard's native tag API when available.
 - **Auto Raid Assist** - Added an opt-in Settings Center picker that can auto-promote selected BattleTag friends, nickname matches, or manual Character-Realm targets to raid assistant.
 
 ### Improved
@@ -24,11 +24,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Settings Center** - Restored a Beta Features overview that lists the currently available beta areas and links to their settings once beta features are enabled.
 - **Settings Center** - Polished Groups & Sorting with a compact Group Order table, clearer default sorting controls, and an inline QuickFilter/Sorter editor.
 - **Settings Center** - Reworked the QuickFilter/Sorter editor into a manager page with separate full-width editor pages for selected entries.
+- **QuickFilter Builder** - Added friend tag fields for tag text, tag source, tag count, and has-tag rules.
 - **Settings Center** - Moved the QuickFilter/Sorter editor and Global Sync database tools into native Settings Center pages, and combined Broker column ordering with visibility checkboxes.
 - **Auto Raid Assist** - Expanded target suggestions to include current party and raid characters in addition to friends and guild members.
 - **Auto Raid Assist** - Added detailed `/bfl debug` traces for conversion hooks, roster checks, target matching, promotion queues, and assistant promotion attempts.
 - **Settings Center Help** - Added expandable changelog notes, version navigation, and Discord, GitHub, and Ko-fi support links to the Settings Center.
 - **Settings Icons** - Refined the Help, Streamer Mode, and Name & Info icons for cleaner shapes and clearer feature recognition.
+- **Friend Tags** - Updated role tag chips and the raid role counter to use Blizzard's RoleCount icons, with fallbacks for older clients.
+- **Friend Tags** - Removed temporary diagnostic chat commands and noisy debug traces from context menu and drag/drop hot paths.
+- **Notes & Tags** - Unified the friend context menu and tooltip surface while keeping Private Notes and Friend Tags as clear sub-features.
 
 ### Changed
 - **Client Compatibility** - Prepared Recruit A Friend, Quick Join, Battle.net friend metadata, censored Group Finder entries, and guild rank refreshes for Retail 12.1 while keeping current Retail and Classic support intact.
@@ -36,10 +40,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Preview Mode** - Updated `/bfl preview` to generate Retail 12.1 Quick Join mock entries, including censored Group Finder rows, reveal testing, long-title layout coverage, and new Battle.net metadata fields.
 
 ### Fixed
+- **Friend Tags** - Fixed tag assignments leaking to another friend when a menu opened with a temporary Battle.net friend identifier.
+- **Friend Tags** - Friend tag menu selections now refresh row chips immediately while the context menu stays open.
 - **Auto Raid Assist** - Improved automatic promotion after converting a party to a raid by reacting to group formation, queueing multiple matching promotions, and using exact character names for assistant promotion.
 - **Auto Raid Assist** - Added the missing native enable toggle to the Settings Center editor and retried assistant promotion after cooldowns so multiple matching raid members are handled reliably.
 - **Auto Raid Assist** - Matched Blizzard's same-realm promotion naming so local-realm raid members can be promoted correctly.
-- **Contact Memory Beta** - Fixed private notes and tags not appearing in friend tooltips that use Blizzard's native FriendsTooltip frame.
+- **Notes & Tags** - Fixed private notes and friend tags not appearing in friend tooltips that use Blizzard's native FriendsTooltip frame.
 - **Classic Guild Window** - Kept Classic clients on Blizzard's separate Guild window so the Guild keybind no longer opens the Friends list.
 
 ### Removed

@@ -2947,16 +2947,6 @@
 						</Frames>
 						<Layers>
 							<Layer level="OVERLAY">
-								<!-- Role Summary Display (Tank, Healer, DPS counts with icons) -
-								Top left -->
-								<FontString parentKey="RoleSummary"
-									inherits="BetterFriendlistFontHighlight" justifyH="LEFT">
-									<Anchors>
-										<Anchor point="RIGHT" relativeKey="$parent.RaidInfoButton"
-											relativePoint="LEFT" x="-85" y="0" />
-									</Anchors>
-								</FontString>
-
 								<!-- Member Count Display - Right next to Role Summary -->
 								<FontString parentKey="MemberCount"
 									inherits="BetterFriendlistFontHighlight" justifyH="LEFT">
@@ -2978,6 +2968,12 @@
 							</Layer>
 						</Layers>
 						<Frames>
+							<Frame parentKey="RoleSummary" inherits="RoleCountNoScriptsTemplate">
+								<Anchors>
+									<Anchor point="RIGHT" relativeKey="$parent.RaidInfoButton"
+										relativePoint="LEFT" x="-85" y="0" />
+								</Anchors>
+							</Frame>
 							<!-- Combat Icon - Shows between MemberCount and RaidInfo button during
 							combat -->
 							<Button parentKey="CombatIcon" hidden="true">

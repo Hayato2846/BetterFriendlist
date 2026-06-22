@@ -571,7 +571,11 @@ function Compat.AreBattleNetFriendTagsEnabled()
 	if not Compat.IsBattleNetFriendsListEnabled() then
 		return false
 	end
-	return C_BattleNet and C_BattleNet.AreFriendTagsEnabled and C_BattleNet.AreFriendTagsEnabled() or false
+	if not (BFL.IsRetail == true and C_BattleNet and type(C_BattleNet.AreFriendTagsEnabled) == "function") then
+		return false
+	end
+	local ok, enabled = pcall(C_BattleNet.AreFriendTagsEnabled)
+	return ok and enabled == true or false
 end
 
 function Compat.GetBNetFriendInviteInfo(inviteIndex)

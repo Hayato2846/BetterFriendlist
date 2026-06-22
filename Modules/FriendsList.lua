@@ -350,6 +350,17 @@ local function CalculateCompactRowHeight(self, nameSize, nameText, nameWidth)
 	return math.max(MIN_ROW_HEIGHT, math.min(MAX_ROW_HEIGHT, math.floor(calculatedHeight)))
 end
 
+local function CopyFriendTags(friendTags)
+	if type(friendTags) ~= "table" then
+		return nil
+	end
+	local copy = {}
+	for index, tag in ipairs(friendTags) do
+		copy[index] = tag
+	end
+	return copy
+end
+
 local function FormatColorCode(r, g, b, a)
 	local alpha = a
 	if alpha == nil then
@@ -716,7 +727,12 @@ local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self, info
 		end
 
 		local hasMultiAccountRow = self and ShouldShowMultiAccountRow(self, item.friend)
-		return CalculateFriendRowHeight(isCompactMode, nameSize, infoSize, infoDisabled, hasMultiAccountRow)
+		local rowHeight = CalculateFriendRowHeight(isCompactMode, nameSize, infoSize, infoDisabled, hasMultiAccountRow)
+		local TagChips = BFL:GetModule("TagChips")
+		if TagChips and TagChips.GetRowExtraHeight then
+			rowHeight = rowHeight + TagChips:GetRowExtraHeight(item.friend, self)
+		end
+		return rowHeight
 	else
 		return 34 -- Default fallback
 	end
@@ -744,6 +760,7 @@ local function BuildDisplayList(self)
 	local currentSignature = table.concat({
 		BFL.FriendsListVersion or 0,
 		BFL.SettingsVersion or 0, -- Fix: Track settings/groups changes
+		BFL.FriendTagsVersion or 0,
 		self.filterMode or "all",
 		self.searchText or "",
 		numInvitesForSignature,
@@ -829,6 +846,8 @@ local function BuildDisplayList(self)
 		ingame = 0,
 		recentlyadded = 0,
 	}
+	local virtualTagGroups = {}
+	local virtualTagGroupByTagId = {}
 
 	-- Initialize custom group tables
 	for groupId, groupData in pairs(friendGroups) do
@@ -842,6 +861,51 @@ local function BuildDisplayList(self)
 			groupedFriends[groupId] = groupedFriends[groupId] or {}
 			totalGroupCounts[groupId] = 0
 			onlineGroupCounts[groupId] = 0
+		end
+	end
+
+	local FriendTags = BFL:GetModule("FriendTags")
+	local enableDynamicTagGroups = FriendTags
+		and FriendTags.IsEnabled
+		and FriendTags:IsEnabled()
+		and FriendTags.GetSetting
+		and FriendTags:GetSetting("enableDynamicTagGroups", false) == true
+
+	if enableDynamicTagGroups then
+		for _, tag in ipairs(FriendTags:GetAllTagDefinitions()) do
+			tag.chipProfile = FriendTags:GetChipProfile(tag)
+			if FriendTags:ShouldIncludeTagOnSurface(tag, "group") then
+				local groupId = "tag:" .. tag.id
+				local profile = tag.chipProfile or {}
+				local label = FriendTags:GetChipLabel(tag)
+				if not label or label == "" then
+					label = tag.name or tag.id
+				end
+				local order = tonumber(profile.order) or tonumber(tag.order) or 0
+				local color = profile.color or tag.color or { r = 0.50, g = 0.78, b = 1.00, a = 1 }
+				local groupData = {
+					id = groupId,
+					tagId = tag.id,
+					name = label,
+					builtin = true,
+					virtualTagGroup = true,
+					order = 900 + (order / 1000),
+					collapsed = BetterFriendlistDB
+						and BetterFriendlistDB.groupStates
+						and BetterFriendlistDB.groupStates[groupId] == true,
+					color = {
+						r = color.r or color[1] or 0.50,
+						g = color.g or color[2] or 0.78,
+						b = color.b or color[3] or 1.00,
+						a = color.a or color[4] or 1,
+					},
+				}
+				virtualTagGroups[#virtualTagGroups + 1] = groupData
+				virtualTagGroupByTagId[tag.id] = groupId
+				groupedFriends[groupId] = groupedFriends[groupId] or {}
+				totalGroupCounts[groupId] = 0
+				onlineGroupCounts[groupId] = 0
+			end
 		end
 	end
 
@@ -957,6 +1021,16 @@ local function BuildDisplayList(self)
 			table.insert(friendGroupIds, "nogroup")
 		end
 
+		if enableDynamicTagGroups then
+			for _, tag in ipairs(FriendTags:GetTagsForFriend(friend, "group")) do
+				local tagGroupId = virtualTagGroupByTagId[tag.id]
+				if tagGroupId and groupedFriends[tagGroupId] and not assignedGroups[tagGroupId] then
+					table.insert(friendGroupIds, tagGroupId)
+					assignedGroups[tagGroupId] = true
+				end
+			end
+		end
+
 		-- Update counts and lists
 		for _, groupId in ipairs(friendGroupIds) do
 			-- Increment total count
@@ -981,6 +1055,9 @@ local function BuildDisplayList(self)
 		if type(groupData) == "table" then
 			table.insert(orderedGroups, groupData)
 		end
+	end
+	for _, groupData in ipairs(virtualTagGroups) do
+		table.insert(orderedGroups, groupData)
 	end
 
 	-- ROBUSTNESS FIX: Ensure nogroup is always present in orderedGroups
@@ -1028,7 +1105,9 @@ local function BuildDisplayList(self)
 			local hasActiveFilter = (self.filterMode and self.filterMode ~= "all")
 				or (self.searchText and self.searchText ~= "")
 
-			if hideEmptyGroups then
+			if groupData.virtualTagGroup and #groupFriends == 0 then
+				shouldSkip = true
+			elseif hideEmptyGroups then
 				-- Count online friends only (for display purpose)
 				local onlineCount = 0
 				for _, friend in ipairs(groupFriends) do
@@ -1200,6 +1279,11 @@ local function CreateElementFactory(friendsList) -- Capture friendsList referenc
 				row.remainderText:SetJustifyH("LEFT")
 
 				button.multiAccountRow = row
+			end
+
+			local TagChips = BFL:GetModule("TagChips")
+			if TagChips and TagChips.EnsureRow then
+				TagChips:EnsureRow(button)
 			end
 
 			-- Clickable overlay on game icon for switching preferred game account
@@ -3847,7 +3931,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 				local isFavoriteByOrder = numBNetFavorite and i <= numBNetFavorite
 				friend.isFavorite = accountInfo.isFavorite or isFavoriteByOrder or false
 				friend.friendLevel = accountInfo.friendLevel
-				friend.friendTags = friendTagsEnabled and accountInfo.friendTags or nil
+				friend.friendTags = friendTagsEnabled and CopyFriendTags(accountInfo.friendTags) or nil
 				friend.gameAccountInfo = accountInfo.gameAccountInfo
 				friend.lastOnlineTime = accountInfo.lastOnlineTime
 				friend.isAFK = accountInfo.isAFK
@@ -4671,6 +4755,13 @@ function FriendsList:PassesFilters(friend) -- Search text filter
 			found = contains(friend.name) or contains(friend.note)
 		end
 
+		if not found then
+			local FriendTags = BFL:GetModule("FriendTags")
+			if FriendTags and FriendTags.GetSearchText then
+				found = contains(FriendTags:GetSearchText(friend))
+			end
+		end
+
 		-- If no match found in any field, filter out this friend
 		if not found then
 			return false
@@ -5302,6 +5393,18 @@ end
 
 -- Toggle group collapsed state (Optimized)
 function FriendsList:ToggleGroup(groupId)
+	if type(groupId) == "string" and groupId:match("^tag:") then
+		if not BetterFriendlistDB then
+			return
+		end
+		BetterFriendlistDB.groupStates = BetterFriendlistDB.groupStates or {}
+		local newCollapsed = BetterFriendlistDB.groupStates[groupId] ~= true
+		BetterFriendlistDB.groupStates[groupId] = newCollapsed
+		BFL.SettingsVersion = (BFL.SettingsVersion or 0) + 1
+		BFL:ForceRefreshFriendsList()
+		return
+	end
+
 	local Groups = GetGroups()
 	if not Groups then
 		return
@@ -6009,7 +6112,15 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 	local countR, countG, countB, countA = 1, 1, 1, 1
 	local arrowR, arrowG, arrowB, arrowA = 1, 1, 1, 1
 
-	if Groups then
+	if elementData.color then
+		r = elementData.color.r or elementData.color[1] or r
+		g = elementData.color.g or elementData.color[2] or g
+		b = elementData.color.b or elementData.color[3] or b
+		a = elementData.color.a or elementData.color[4] or a
+		colorCode = FormatColorCode(r, g, b, a)
+	end
+
+	if Groups and not elementData.virtualTagGroup then
 		local group = Groups:Get(groupId)
 		if group and group.color then
 			r = group.color.r or group.color[1] or 1
@@ -6292,6 +6403,42 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 		BFL_Tooltip:Hide()
 	end)
 
+	if elementData.virtualTagGroup then
+		button:SetScript("OnEnter", function(self)
+			BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+			BFL_Tooltip:SetText(name or self.groupId, 1, 1, 1)
+			BFL_Tooltip:AddLine(
+				L.FRIEND_TAGS_DYNAMIC_GROUP_TOOLTIP or "Dynamic friend tag group. Assignments are stored as tags, not friend groups.",
+				0.7,
+				0.7,
+				0.7,
+				true
+			)
+			BFL_Tooltip:Show()
+		end)
+		button:SetScript("OnLeave", function()
+			BFL_Tooltip:Hide()
+		end)
+		button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+		button:SetScript("OnClick", function(self, buttonName)
+			if buttonName == "RightButton" and MenuUtil and MenuUtil.CreateContextMenu then
+				MenuUtil.CreateContextMenu(self, function(owner, rootDescription)
+					rootDescription:CreateTitle(name or self.groupId)
+					rootDescription:CreateButton(L.FRIEND_TAGS_EDITOR_EDIT or EDIT or "Edit", function()
+						local FriendTags = BFL:GetModule("FriendTags")
+						if FriendTags and FriendTags.OpenSettings then
+							FriendTags:OpenSettings(elementData.tagId)
+						end
+					end)
+				end)
+			else
+				FriendsList:ToggleGroup(self.groupId)
+			end
+		end)
+		button:Show()
+		return
+	end
+
 	-- Add right-click menu functionality
 	if Groups then
 		local group = Groups:Get(groupId)
@@ -6521,20 +6668,6 @@ Button_OnDragUpdate = function(self)
 	local Broker = BFL:GetModule("Broker")
 	local brokerTargets = Broker and Broker.GetDropTargets and Broker:GetDropTargets()
 
-	-- DEBUG: Throttle print to check if we see broker targets
-	if brokerTargets and #brokerTargets > 0 then
-		-- Optional: print once
-		if not self.hasPrintedBrokerFetch then
-			BFL:DebugPrint(string.format("DragUpdate: Found %d broker targets", #brokerTargets))
-			self.hasPrintedBrokerFetch = true
-		end
-	elseif Broker and not brokerTargets then
-		if not self.hasPrintedBrokerFetch then
-			BFL:DebugPrint("DragUpdate: No broker targets found - GetDropTargets returned nil")
-			self.hasPrintedBrokerFetch = true
-		end
-	end
-
 	if framesToCheck then
 		-- Iterate frames (Universal)
 		for _, frame in pairs(framesToCheck) do
@@ -6698,7 +6831,6 @@ Button_OnDragStart = function(self)
 		BFL_Tooltip:Hide()
 
 		-- Enable OnUpdate
-		self.hasPrintedBrokerFetch = nil -- Reset debug flag for new drag session
 		self:SetScript("OnUpdate", Button_OnDragUpdate)
 	end
 end
@@ -6724,7 +6856,6 @@ Button_OnDragStop = function(self)
 	-- Guard Phase
 	local currentUID = FriendsList:GetFriendUID(self.friendData)
 	if not BetterFriendsList_DraggedUID or BetterFriendsList_DraggedUID ~= currentUID then
-		BFL:DebugPrint("DragStop ignored: UID mismatch (Phantom Event)")
 		return
 	end
 
@@ -6830,58 +6961,32 @@ Button_OnDragStop = function(self)
 
 	-- If dropped on a group, add friend to that group
 	-- Pcall protection for logic
-	local success, err = pcall(function()
-		-- DEBUG: Trace DragStop
-		if droppedOnGroup then
-			BFL:DebugPrint(string.format("DragStop detected on group: %s", tostring(droppedOnGroup)))
-		else
-			-- Optional: BFL:DebugPrint("DragStop: No group detected")
-		end
-
+	local success = pcall(function()
 		if droppedOnGroup and self.friendData then
 			local friendUID = FriendsList:GetFriendUID(self.friendData)
-			BFL:DebugPrint(
-				string.format("Dropped friend: %s (UID: %s)", tostring(self.friendData.name), tostring(friendUID))
-			)
 
 			if friendUID then
 				-- Without Shift: Remove from all other custom groups (move)
 				-- With Shift: Keep in other groups (add to multiple groups)
 				if not IsShiftKeyDown() then
-					BFL:DebugPrint("Shift NOT down - attempting MOVE (Remove from old groups)")
 					if BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friendUID] then
 						for i = #BetterFriendlistDB.friendGroups[friendUID], 1, -1 do
 							if BetterFriendlistDB.friendGroups[friendUID][i] then
 								local groupId = BetterFriendlistDB.friendGroups[friendUID][i]
 								-- Check if valid group and NOT builtin (can't remove from builtin like favorites)
 								if friendGroups[groupId] and not friendGroups[groupId].builtin then
-									BFL:DebugPrint(string.format("Removing from old group: %s", tostring(groupId)))
 									table.remove(BetterFriendlistDB.friendGroups[friendUID], i)
-								else
-									BFL:DebugPrint(
-										string.format(
-											"Skipping removal from builtin/invalid group: %s",
-											tostring(groupId)
-										)
-									)
 								end
 							end
 						end
-					else
-						BFL:DebugPrint("No existing groups found for friend")
 					end
-				else
-					BFL:DebugPrint("Shift IS down - attempting ADD (Keep in old groups)")
 				end
 
 				-- Add to target group
 				local DB = GetDB()
 				if DB then
-					BFL:DebugPrint(string.format("Adding to target group: %s", tostring(droppedOnGroup)))
 					-- Robustness: Force add (DB handles duplicates)
 					DB:AddFriendToGroup(friendUID, droppedOnGroup)
-				else
-					BFL:DebugPrint("Error: DB module not found")
 				end
 				BFL:ForceRefreshFriendsList()
 			end
@@ -6889,7 +6994,7 @@ Button_OnDragStop = function(self)
 	end)
 
 	if not success then
-		BFL:DebugPrint("Error in DragStop: " .. tostring(err))
+		return
 	end
 
 	-- Clear dragged friend name
@@ -8097,6 +8202,11 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		self:UpdateMultiAccountRow(button, friend, nameWidth)
 	else
 		self:UpdateMultiAccountRow(button, friend)
+	end
+
+	local TagChips = BFL:GetModule("TagChips")
+	if TagChips and TagChips.UpdateRowChips then
+		TagChips:UpdateRowChips(button, friend, self)
 	end
 
 	-- Ensure button is visible

@@ -61,6 +61,11 @@ function Settings:GetFilterSortTabHost()
 	return content and content.FilterSortTab or nil
 end
 
+function Settings:GetFriendTagsTabHost()
+	local content = settingsFrame and settingsFrame.ContentScrollFrame and settingsFrame.ContentScrollFrame.Content
+	return content and content.FriendTagsTab or nil
+end
+
 function Settings:RequestFilterSortLayout()
 	local host = self.filterSortCustomHost
 	if host and host.requestLayout then
@@ -764,6 +769,12 @@ local TAB_DEFINITIONS = {
 		beta = true,
 	},
 	{
+		id = 13,
+		name = L.SETTINGS_TAB_FRIEND_TAGS or "Friend Tags",
+		icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\tag.blp",
+		beta = true,
+	},
+	{
 		id = 12,
 		name = L.SETTINGS_TAB_GUILD or GUILD or "Guild",
 		icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\guild.blp",
@@ -1071,6 +1082,9 @@ function Settings:SelectCategory(categoryID)
 		if content.FilterSortTab then
 			content.FilterSortTab:Hide()
 		end
+		if content.FriendTagsTab then
+			content.FriendTagsTab:Hide()
+		end
 		if content.GuildTab then
 			content.GuildTab:Hide()
 		end
@@ -1108,6 +1122,9 @@ function Settings:SelectCategory(categoryID)
 		elseif categoryID == 11 and content.FilterSortTab then
 			content.FilterSortTab:Show()
 			self:RefreshFilterSortTab()
+		elseif categoryID == 13 and content.FriendTagsTab then
+			content.FriendTagsTab:Show()
+			self:RefreshFriendTagsTab()
 		elseif categoryID == 12 and content.GuildTab then
 			content.GuildTab:Show()
 			self:RefreshGuildTab()
@@ -1162,6 +1179,8 @@ function Settings:AdjustContentHeight(tabID)
 		activeTab = content.AdvancedTab
 	elseif tabID == 11 then
 		activeTab = content.FilterSortTab
+	elseif tabID == 13 then
+		activeTab = content.FriendTagsTab
 	elseif tabID == 12 then
 		activeTab = content.GuildTab
 	elseif tabID == 5 then
@@ -4656,6 +4675,326 @@ function Settings:RefreshGeneralTab()
 	tab.components = allFrames
 end
 
+local function OpenLegacyFriendTagEditor(tagId)
+	local Editor = BFL:GetModule("FriendTagEditor")
+	if Editor and Editor.Show then
+		Editor:Show(tagId)
+		return true
+	end
+	return false
+end
+
+local function CreateLegacyFriendTagRow(parent, FriendTags, tag, refreshCallback)
+	local row = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+	row:SetHeight(36)
+	row:SetPoint("LEFT", UI.SPACING_MEDIUM, 0)
+	row:SetPoint("RIGHT", -UI.SPACING_MEDIUM, 0)
+	row:SetBackdrop({
+		bgFile = "Interface\\Buttons\\WHITE8X8",
+		edgeFile = "Interface\\Buttons\\WHITE8X8",
+		edgeSize = 1,
+	})
+	row:SetBackdropColor(0.05, 0.05, 0.06, 0.45)
+	row:SetBackdropBorderColor(0.24, 0.24, 0.28, 0.55)
+
+	local profile = FriendTags and FriendTags:GetChipProfile(tag)
+	local icon = row:CreateTexture(nil, "ARTWORK")
+	icon:SetSize(18, 18)
+	icon:SetPoint("LEFT", row, "LEFT", 8, 0)
+	if profile and profile.icon then
+		icon:SetTexture(profile.icon)
+	else
+		icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\tag")
+	end
+
+	local name = row:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
+	name:SetPoint("LEFT", icon, "RIGHT", 8, 0)
+	name:SetPoint("RIGHT", row, "RIGHT", tag.source == "custom" and -210 or -142, 0)
+	name:SetJustifyH("LEFT")
+	name:SetWordWrap(false)
+	local label = FriendTags and FriendTags.GetChipLabel and FriendTags:GetChipLabel(tag) or nil
+	if label and label ~= "" and label ~= tag.name then
+		name:SetText((tag.name or tag.id) .. "  |cffaaaaaa(" .. label .. ")|r")
+	else
+		name:SetText(tag.name or tag.id)
+	end
+
+	local source = row:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlightSmall")
+	source:SetPoint("LEFT", name, "RIGHT", 6, 0)
+	source:SetWidth(66)
+	source:SetJustifyH("LEFT")
+	if tag.source == "custom" then
+		source:SetText(L.FRIEND_TAGS_SOURCE_CUSTOM or "Custom")
+		source:SetTextColor(0.64, 0.86, 0.56, 1)
+	else
+		source:SetText(L.FRIEND_TAGS_SOURCE_BLIZZARD or "Blizzard")
+		source:SetTextColor(0.50, 0.78, 1.00, 1)
+	end
+
+	local function CreateRowButton(text, width, rightOffset, onClick)
+		local button = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+		button:SetSize(width or 58, 22)
+		button:SetPoint("RIGHT", row, "RIGHT", rightOffset, 0)
+		button:SetText(text)
+		button:SetScript("OnClick", onClick)
+		return button
+	end
+
+	if tag.source == "custom" then
+		CreateRowButton(L.FRIEND_TAGS_EDITOR_DELETE or DELETE or "Delete", 58, -8, function()
+			if StaticPopup_Show and StaticPopupDialogs and StaticPopupDialogs["BFL_FRIEND_TAG_EDITOR_DELETE_CUSTOM"] then
+				StaticPopup_Show("BFL_FRIEND_TAG_EDITOR_DELETE_CUSTOM", tag.name or tag.id, nil, { tagId = tag.id })
+			elseif FriendTags and FriendTags.DeleteCustomTag then
+				FriendTags:DeleteCustomTag(tag.id, refreshCallback)
+			end
+		end)
+		CreateRowButton(L.FRIEND_TAGS_EDITOR_RESET or RESET or "Reset", 58, -70, function()
+			if FriendTags and FriendTags.ResetChipProfile then
+				FriendTags:ResetChipProfile(tag.id, refreshCallback)
+			end
+		end)
+		CreateRowButton(L.FRIEND_TAGS_EDITOR_EDIT or EDIT or "Edit", 58, -132, function()
+			OpenLegacyFriendTagEditor(tag.id)
+		end)
+	else
+		CreateRowButton(L.FRIEND_TAGS_EDITOR_RESET or RESET or "Reset", 58, -8, function()
+			if FriendTags and FriendTags.ResetChipProfile then
+				FriendTags:ResetChipProfile(tag.id, refreshCallback)
+			end
+		end)
+		CreateRowButton(L.FRIEND_TAGS_EDITOR_EDIT or EDIT or "Edit", 58, -70, function()
+			OpenLegacyFriendTagEditor(tag.id)
+		end)
+	end
+
+	return row
+end
+
+function Settings:RefreshFriendTagsTab()
+	if not settingsFrame or not Components then
+		return
+	end
+
+	local tab = self:GetFriendTagsTabHost()
+	if not tab then
+		return
+	end
+
+	local DB = GetDB()
+	local FriendTags = BFL:GetModule("FriendTags")
+	if not DB or not FriendTags then
+		return
+	end
+
+	if tab.components then
+		for _, component in ipairs(tab.components) do
+			if component.Hide then
+				component:Hide()
+			end
+		end
+	end
+	tab.components = {}
+
+	local allFrames = {}
+	local function RefreshFriendTagsSettings()
+		if BFL.ForceRefreshFriendsList then
+			BFL:ForceRefreshFriendsList()
+		end
+		self:RefreshFriendTagsTab()
+	end
+
+	local ContactMemory = BFL:GetModule("ContactMemory")
+	local contactMemoryEnabled = ContactMemory
+		and ContactMemory.GetEnabledSetting
+		and ContactMemory:GetEnabledSetting() == true
+
+	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_TAB_FRIEND_TAGS or "Friend Tags"))
+	table.insert(
+		allFrames,
+		Components:CreateLabel(
+			tab,
+			L.FRIEND_TAGS_SETTINGS_DESC
+				or "Configure Blizzard-compatible friend tags, custom tags, and compact contact chips.",
+			true,
+			{ r = 0.75, g = 0.75, b = 0.75, a = 1 }
+		)
+	)
+
+	local enableTags = Components:CreateCheckbox(tab, {
+		label = L.FRIEND_TAGS_ENABLE or "Enable Friend Tags",
+		initialValue = FriendTags:GetSetting("enabled", true) ~= false,
+		callback = function(val)
+			FriendTags:SetSetting("enabled", val == true, RefreshFriendTagsSettings)
+		end,
+		disabled = not contactMemoryEnabled,
+		tooltipTitle = L.FRIEND_TAGS_ENABLE or "Enable Friend Tags",
+		tooltipDesc = contactMemoryEnabled
+				and (L.FRIEND_TAGS_ENABLE_DESC or "Adds Blizzard-compatible and custom tags for friends.")
+			or (L.FRIEND_TAGS_REQUIRES_CONTACT_MEMORY or "Enable Private Notes first to use Friend Tags."),
+	})
+	table.insert(allFrames, enableTags)
+
+	table.insert(allFrames, Components:CreateSpacer(tab))
+	table.insert(allFrames, Components:CreateHeader(tab, L.FRIEND_TAGS_SETTINGS_VISIBILITY or "Visibility"))
+
+	table.insert(allFrames, Components:CreateDoubleCheckbox(tab, {
+		label = L.FRIEND_TAGS_SHOW_ROW_CHIPS or "Show Row Chips",
+		initialValue = FriendTags:GetSetting("showRowChips", true) ~= false,
+		callback = function(val)
+			FriendTags:SetSetting("showRowChips", val == true, RefreshFriendTagsSettings)
+		end,
+		tooltipTitle = L.FRIEND_TAGS_SHOW_ROW_CHIPS or "Show Row Chips",
+		tooltipDesc = L.FRIEND_TAGS_SHOW_ROW_CHIPS_DESC or "Show compact tag chips below friend rows.",
+	}, {
+		label = L.FRIEND_TAGS_SHOW_TOOLTIP_CHIPS or "Show Tooltip Chips",
+		initialValue = FriendTags:GetSetting("showTooltipChips", true) ~= false,
+		callback = function(val)
+			FriendTags:SetSetting("showTooltipChips", val == true, RefreshFriendTagsSettings)
+		end,
+		tooltipTitle = L.FRIEND_TAGS_SHOW_TOOLTIP_CHIPS or "Show Tooltip Chips",
+		tooltipDesc = L.FRIEND_TAGS_SHOW_TOOLTIP_CHIPS_DESC or "Show tags in BetterFriendlist tooltips.",
+	}))
+
+	table.insert(allFrames, Components:CreateDoubleCheckbox(tab, {
+		label = L.FRIEND_TAGS_SHOW_BROKER_CHIPS or "Show Broker Chips",
+		initialValue = FriendTags:GetSetting("showBrokerChips", true) ~= false,
+		callback = function(val)
+			FriendTags:SetSetting("showBrokerChips", val == true, RefreshFriendTagsSettings)
+		end,
+		tooltipTitle = L.FRIEND_TAGS_SHOW_BROKER_CHIPS or "Show Broker Chips",
+		tooltipDesc = L.FRIEND_TAGS_SHOW_BROKER_CHIPS_DESC or "Show tags in the Data Broker tooltip.",
+	}, {
+		label = L.FRIEND_TAGS_STREAMER_MODE or "Show in Streamer Mode",
+		initialValue = FriendTags:GetSetting("showTagsInStreamerMode", false) == true,
+		callback = function(val)
+			FriendTags:SetSetting("showTagsInStreamerMode", val == true, RefreshFriendTagsSettings)
+		end,
+		tooltipTitle = L.FRIEND_TAGS_STREAMER_MODE or "Show in Streamer Mode",
+		tooltipDesc = L.FRIEND_TAGS_STREAMER_MODE_DESC or "Allow friend tags while Streamer Mode is active.",
+	}))
+
+	local compactOptions = {
+		labels = {
+			L.FRIEND_TAGS_COMPACT_HIDDEN or "Hidden",
+			L.FRIEND_TAGS_COMPACT_ICON_ONLY or "Icons Only",
+			L.FRIEND_TAGS_COMPACT_CHIP_LINE or "Chip Line",
+		},
+		values = { "hidden", "icon_only", "chip_line" },
+	}
+	local compactDropdown = Components:CreateDropdown(
+		tab,
+		L.FRIEND_TAGS_SETTINGS_COMPACT_MODE or "Compact Row Mode",
+		compactOptions,
+		function(value)
+			return FriendTags:GetSetting("compactRowMode", "icon_only") == value
+		end,
+		function(value)
+			FriendTags:SetSetting("compactRowMode", value, RefreshFriendTagsSettings)
+		end
+	)
+	if compactDropdown.SetTooltip then
+		compactDropdown:SetTooltip(
+			L.FRIEND_TAGS_SETTINGS_COMPACT_MODE or "Compact Row Mode",
+			L.FRIEND_TAGS_SETTINGS_COMPACT_MODE_DESC or "Choose how tags are shown when BetterFriendlist uses compact rows."
+		)
+	end
+	table.insert(allFrames, compactDropdown)
+
+	table.insert(allFrames, Components:CreateSlider(tab, L.FRIEND_TAGS_MAX_ROW_CHIPS or "Max Row Chips", 1, 8,
+		FriendTags:GetSetting("maxRowChips", 3), function(value)
+			return tostring(math.floor((tonumber(value) or 0) + 0.5))
+		end, function(value)
+			FriendTags:SetSetting("maxRowChips", math.floor((tonumber(value) or 3) + 0.5), RefreshFriendTagsSettings)
+		end))
+
+	table.insert(allFrames, Components:CreateSlider(tab, L.FRIEND_TAGS_MAX_TOOLTIP_CHIPS or "Max Tooltip Chips", 1, 20,
+		FriendTags:GetSetting("maxTooltipChips", 8), function(value)
+			return tostring(math.floor((tonumber(value) or 0) + 0.5))
+		end, function(value)
+			FriendTags:SetSetting("maxTooltipChips", math.floor((tonumber(value) or 8) + 0.5), RefreshFriendTagsSettings)
+		end))
+
+	table.insert(allFrames, Components:CreateSpacer(tab))
+	table.insert(allFrames, Components:CreateHeader(tab, L.FRIEND_TAGS_SETTINGS_GROUPS or "Dynamic Tag Groups"))
+	table.insert(allFrames, Components:CreateDoubleCheckbox(tab, {
+		label = L.FRIEND_TAGS_SETTINGS_DYNAMIC_GROUPS or "Show Dynamic Tag Groups",
+		initialValue = FriendTags:GetSetting("enableDynamicTagGroups", false) == true,
+		callback = function(val)
+			FriendTags:SetSetting("enableDynamicTagGroups", val == true, RefreshFriendTagsSettings)
+		end,
+		tooltipTitle = L.FRIEND_TAGS_SETTINGS_DYNAMIC_GROUPS or "Show Dynamic Tag Groups",
+		tooltipDesc = L.FRIEND_TAGS_SETTINGS_DYNAMIC_GROUPS_DESC
+			or "Add virtual groups for assigned tags without writing those groups to Blizzard notes.",
+	}, {
+		label = L.FRIEND_TAGS_SHOW_MENU_COUNTS or "Show Menu Counts",
+		initialValue = FriendTags:GetSetting("showMenuTagCounts", true) ~= false,
+		callback = function(val)
+			FriendTags:SetSetting("showMenuTagCounts", val == true, RefreshFriendTagsSettings)
+		end,
+		tooltipTitle = L.FRIEND_TAGS_SHOW_MENU_COUNTS or "Show Menu Counts",
+		tooltipDesc = L.FRIEND_TAGS_SHOW_MENU_COUNTS_DESC or "Show assigned tag counts in supported context menus.",
+	}))
+
+	table.insert(allFrames, Components:CreateDoubleCheckbox(tab, {
+		label = L.FRIEND_TAGS_SEARCH_BLIZZARD or "Search Blizzard Tags",
+		initialValue = FriendTags:GetSetting("includeBlizzardTagsInSearch", true) ~= false,
+		callback = function(val)
+			FriendTags:SetSetting("includeBlizzardTagsInSearch", val == true, RefreshFriendTagsSettings)
+		end,
+		tooltipTitle = L.FRIEND_TAGS_SEARCH_BLIZZARD or "Search Blizzard Tags",
+		tooltipDesc = L.FRIEND_TAGS_SEARCH_BLIZZARD_DESC or "Include Blizzard-compatible tags in friend search.",
+	}, {
+		label = L.FRIEND_TAGS_SEARCH_CUSTOM or "Search Custom Tags",
+		initialValue = FriendTags:GetSetting("includeCustomTagsInSearch", true) ~= false,
+		callback = function(val)
+			FriendTags:SetSetting("includeCustomTagsInSearch", val == true, RefreshFriendTagsSettings)
+		end,
+		tooltipTitle = L.FRIEND_TAGS_SEARCH_CUSTOM or "Search Custom Tags",
+		tooltipDesc = L.FRIEND_TAGS_SEARCH_CUSTOM_DESC or "Include custom tags in friend search.",
+	}))
+
+	table.insert(allFrames, Components:CreateSpacer(tab))
+	table.insert(allFrames, Components:CreateHeader(tab, L.FRIEND_TAGS_SETTINGS_EDITOR or "Tag Editor"))
+	table.insert(
+		allFrames,
+		Components:CreateButton(tab, L.FRIEND_TAGS_EDITOR_OPEN or "Open Tag Editor", function()
+			OpenLegacyFriendTagEditor()
+		end, L.FRIEND_TAGS_EDITOR_DESC or "Customize labels, icons, colors, visibility, and custom tags.")
+	)
+
+	if FriendTags:IsBlizzardTagAPIAvailable() then
+		local count = FriendTags:GetLocalBlizzardTagAssignmentCount()
+		local handoffButton = Components:CreateButton(
+			tab,
+			string.format("%s (%d)", L.FRIEND_TAGS_SYNC_LOCAL_BUTTON or "Sync Local Blizzard Tags", count or 0),
+			function()
+				FriendTags:HandoffKnownLocalBlizzardTags(RefreshFriendTagsSettings)
+			end,
+			L.FRIEND_TAGS_SYNC_LOCAL_DESC
+				or "Moves locally stored Blizzard-compatible tag selections to Blizzard's native 12.1 tag storage."
+		)
+		if count <= 0 or not FriendTags:AreBlizzardTagsEnabled() then
+			handoffButton:Disable()
+		end
+		table.insert(allFrames, handoffButton)
+	end
+
+	table.insert(allFrames, Components:CreateSpacer(tab))
+	table.insert(allFrames, Components:CreateHeader(tab, L.FRIEND_TAGS_SETTINGS_TAG_LIST or "Tags"))
+
+	local definitions = FriendTags:GetAllTagDefinitions()
+	if #definitions == 0 then
+		table.insert(allFrames, Components:CreateLabel(tab, L.FRIEND_TAGS_SETTINGS_TAG_LIST_EMPTY or "No tags available.", true))
+	else
+		for _, tag in ipairs(definitions) do
+			table.insert(allFrames, CreateLegacyFriendTagRow(tab, FriendTags, tag, RefreshFriendTagsSettings))
+		end
+	end
+
+	Components:AnchorChain(allFrames, -5)
+	tab.components = allFrames
+end
+
 function Settings:RefreshGuildTab()
 	if not settingsFrame or not Components then
 		return
@@ -6125,14 +6464,14 @@ function Settings:RefreshAdvancedTab()
 		and contactMemory:GetEnabledSetting()
 		or type(contactMemoryDB) == "table" and contactMemoryDB.enabled == true
 	local contactMemoryTooltipDesc = L.CONTACT_MEMORY_SETTINGS_ENABLE_DESC
-		or "Adds local private notes and tags for friends and ignored players."
+		or "Adds local private notes for friends and ignored players."
 	if BetterFriendlistDB.enableBetaFeatures ~= true then
 		contactMemoryTooltipDesc = contactMemoryTooltipDesc
 			.. "\n\n"
-			.. (L.CONTACT_MEMORY_DISABLED_BETA or "Enable Beta Features to use Contact Memory.")
+			.. (L.CONTACT_MEMORY_DISABLED_BETA or "Enable Beta Features to use Private Notes.")
 	end
 	local contactMemoryToggle = Components:CreateCheckbox(tab, {
-		label = L.CONTACT_MEMORY_SETTINGS_ENABLE or "Contact Memory (Beta)",
+		label = L.CONTACT_MEMORY_SETTINGS_ENABLE or "Private Notes (Beta)",
 		initialValue = contactMemoryEnabled,
 		disabled = BetterFriendlistDB.enableBetaFeatures ~= true,
 		callback = function(checked)
@@ -6150,7 +6489,7 @@ function Settings:RefreshAdvancedTab()
 			end
 			self:RefreshAdvancedTab()
 		end,
-		tooltipTitle = L.CONTACT_MEMORY_SETTINGS_ENABLE or "Contact Memory (Beta)",
+		tooltipTitle = L.CONTACT_MEMORY_SETTINGS_ENABLE or "Private Notes (Beta)",
 		tooltipDesc = contactMemoryTooltipDesc,
 	})
 	table.insert(allFrames, contactMemoryToggle)
@@ -6195,7 +6534,7 @@ function Settings:RefreshAdvancedTab()
 		end,
 		tooltipTitle = L.CONTACT_MEMORY_SETTINGS_TOOLTIPS or "Show in Tooltips",
 		tooltipDesc = L.CONTACT_MEMORY_SETTINGS_TOOLTIPS_DESC
-			or "Show private notes and tags in supported friend and ignore tooltips.",
+			or "Show private notes in supported friend and ignore tooltips.",
 	})
 	table.insert(allFrames, contactMemoryTooltipToggle)
 
@@ -6208,7 +6547,7 @@ function Settings:RefreshAdvancedTab()
 		end,
 		tooltipTitle = L.CONTACT_MEMORY_SETTINGS_HIDE_STREAMER or "Hide in Streamer Mode",
 		tooltipDesc = L.CONTACT_MEMORY_SETTINGS_HIDE_STREAMER_DESC
-			or "Hide Contact Memory notes and tags while Streamer Mode is active.",
+			or "Hide private notes while Streamer Mode is active.",
 	})
 	table.insert(allFrames, contactMemoryStreamerToggle)
 
