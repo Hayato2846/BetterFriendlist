@@ -336,6 +336,18 @@ local function GetFieldValue(friend, field)
 		return GetRecentlyAddedAgeDays(friend)
 	elseif field == "accountCount" then
 		return friend.numGameAccounts or (friend.gameAccounts and #friend.gameAccounts) or 0
+	elseif field == "tag" then
+		local FriendTags = BFL:GetModule("FriendTags")
+		return FriendTags and FriendTags.GetSearchText and FriendTags:GetSearchText(friend) or ""
+	elseif field == "tagSource" then
+		local FriendTags = BFL:GetModule("FriendTags")
+		return FriendTags and FriendTags.GetTagSourceText and FriendTags:GetTagSourceText(friend) or ""
+	elseif field == "tagCount" then
+		local FriendTags = BFL:GetModule("FriendTags")
+		return FriendTags and FriendTags.GetTagCount and FriendTags:GetTagCount(friend) or 0
+	elseif field == "hasTag" then
+		local FriendTags = BFL:GetModule("FriendTags")
+		return FriendTags and FriendTags.GetTagCount and FriendTags:GetTagCount(friend) > 0 or false
 	elseif field == "displayName" or field == "name" then
 		return friend.displayName or friend.name or friend.accountName or friend.battleTag or friend.characterName
 	end
@@ -368,6 +380,10 @@ local FILTER_FIELDS = {
 	{ id = "multiAccount", labelKey = "FILTER_BUILDER_FIELD_MULTI_ACCOUNT", type = "boolean" },
 	{ id = "lastOnline", labelKey = "FILTER_BUILDER_FIELD_LAST_ONLINE", type = "number" },
 	{ id = "recentlyAdded", labelKey = "FILTER_BUILDER_FIELD_RECENTLY_ADDED", type = "number" },
+	{ id = "tag", labelKey = "FILTER_BUILDER_FIELD_TAG", type = "string" },
+	{ id = "tagSource", labelKey = "FILTER_BUILDER_FIELD_TAG_SOURCE", type = "enum", values = { "blizzard", "custom" } },
+	{ id = "tagCount", labelKey = "FILTER_BUILDER_FIELD_TAG_COUNT", type = "number" },
+	{ id = "hasTag", labelKey = "FILTER_BUILDER_FIELD_HAS_TAG", type = "boolean" },
 }
 
 local FILTER_FIELD_MAP = {}

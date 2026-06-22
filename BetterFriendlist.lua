@@ -665,18 +665,6 @@ function BFL:ApplyTabFonts()
 		end
 		local maxTabWidth = math.floor(availableWidth / numTabs)
 
-		-- DEBUG
-		BFL:DebugPrint(
-			string.format(
-				"ProcessTabGroup: numTabs=%d, startX=%d, maxRightEdge=%d, overlap=%d, maxTabWidth=%d",
-				numTabs,
-				startX,
-				maxRightEdge,
-				resolvedOverlap,
-				maxTabWidth
-			)
-		)
-
 		local maxHeight = 32 -- Track max height for bottom tab positioning
 		local heightPad = extraHeight or 0
 		local bias = textBias or 0
@@ -740,19 +728,6 @@ function BFL:ApplyTabFonts()
 			finalWidth = math.max(40, finalWidth)
 
 			local textAreaWidth = math.max(20, finalWidth - textPadding)
-
-			-- DEBUG
-			local tabName = info.tab:GetName() or "unknown"
-			BFL:DebugPrint(
-				string.format(
-					"  Tab %d (%s): ideal=%d, max=%d, final=%d",
-					i,
-					tabName,
-					math.floor(idealTabWidth),
-					maxTabWidth,
-					finalWidth
-				)
-			)
 
 			-- Store enforced width and text area width for hooksecurefunc restoration.
 			-- textAreaWidth now uses Blizzard's standard 20px padding, so storing
@@ -953,9 +928,6 @@ function BFL:ApplyTabFonts()
 						rightEdge = right - left
 					end
 				end
-				BFL:DebugPrint(
-					string.format("ProcessTabGroup: rightEdge=%d (limit=%d)", math.floor(rightEdge + 0.5), maxRightEdge)
-				)
 			end
 		end
 
@@ -1039,9 +1011,6 @@ function BFL:ApplyTabFonts()
 
 		return widths
 	end
-
-	-- DEBUG
-	BFL:DebugPrint(string.format("ApplyTabFonts: frameWidth=%d", frameWidth))
 
 	local insetLeft, insetRight = GetInsetBounds()
 
@@ -1701,13 +1670,11 @@ function ConfigureUIPanelAttributes(enable)
 		BetterFriendsFrame:SetAttribute("UIPanelLayout-pushable", 0) -- 8+ recommended for custom addons (Blizzard uses 0-7)
 		-- BetterFriendsFrame:SetAttribute("UIPanelLayout-width", width) -- Custom width is not recommended
 		BetterFriendsFrame:SetAttribute("UIPanelLayout-whileDead", true)
-		BFL:DebugPrint("UI Panel Layout attributes enabled")
 	else
 		-- Disable UI Panel Layout system
 		-- CRITICAL: Remove from UIPanelWindows first (ShowUIPanel auto-registers it)
 		if UIPanelWindows and UIPanelWindows["BetterFriendsFrame"] then
 			UIPanelWindows["BetterFriendsFrame"] = nil
-			BFL:DebugPrint("BetterFriendsFrame removed from UIPanelWindows")
 		end
 
 		-- Then disable attributes (false disables, nil doesn't work reliably)
@@ -1716,7 +1683,6 @@ function ConfigureUIPanelAttributes(enable)
 		BetterFriendsFrame:SetAttribute("UIPanelLayout-area", "")
 		BetterFriendsFrame:SetAttribute("UIPanelLayout-pushable", nil)
 		BetterFriendsFrame:SetAttribute("UIPanelLayout-whileDead", false)
-		BFL:DebugPrint("UI Panel Layout attributes disabled")
 	end
 end
 
@@ -1802,7 +1768,6 @@ function ShowBetterFriendsFrame(tabIndex) -- Clear search box
 		-- Configure UI Panel Layout attributes
 		ConfigureUIPanelAttributes(true)
 		ShowUIPanel(BetterFriendsFrame)
-		BFL:DebugPrint("ShowUIPanel called")
 	else
 		-- Direct :Show() - combat-safe fallback
 		if BetterFriendlistDB and BetterFriendlistDB.useUIPanelSystem and InCombatLockdown() then
@@ -2460,18 +2425,15 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					return
 				end
 				if not rootDescription or not rootDescription.EnumerateElementDescriptions then
-					BFL:DebugPrint("ReplaceInvite: No rootDescription or EnumerateElementDescriptions")
 					return
 				end
 				if not contextData or not contextData.bnetIDAccount then
-					BFL:DebugPrint("ReplaceInvite: No contextData or bnetIDAccount")
 					return
 				end
 
 				-- Find friend data from FriendsList module
 				local FriendsList = GetFriendsList()
 				if not FriendsList or not FriendsList.friendsList then
-					BFL:DebugPrint("ReplaceInvite: No FriendsList module")
 					return
 				end
 
@@ -2485,35 +2447,19 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 				-- Only enhance for friends with multiple invitable accounts
 				if not friendData then
-					BFL:DebugPrint("ReplaceInvite: Friend not found for bnetID=" .. tostring(contextData.bnetIDAccount))
 					return
 				end
 				if not friendData.invitableAccounts then
-					BFL:DebugPrint(
-						"ReplaceInvite: No invitableAccounts for friend (numGameAccounts="
-							.. tostring(friendData.numGameAccounts)
-							.. ")"
-					)
 					return
 				end
 				if #friendData.invitableAccounts <= 1 then
-					BFL:DebugPrint(
-						"ReplaceInvite: Only " .. #friendData.invitableAccounts .. " invitable account(s), skipping"
-					)
 					return
 				end
-
-				BFL:DebugPrint(
-					"ReplaceInvite: Friend has "
-						.. #friendData.invitableAccounts
-						.. " invitable accounts, searching menu elements..."
-				)
 
 				-- Text/data keys used by Blizzard's invite buttons
 				local inviteTexts = {}
 				if PARTY_INVITE then
 					inviteTexts[PARTY_INVITE] = true
-					BFL:DebugPrint("ReplaceInvite: PARTY_INVITE = '" .. tostring(PARTY_INVITE) .. "'")
 				end
 				if SUGGEST_INVITE then
 					inviteTexts[SUGGEST_INVITE] = true
@@ -2585,44 +2531,27 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					return tostring(aName):lower() < tostring(bName):lower()
 				end)
 
-				local found = false
-				local ok, err = pcall(function()
+				pcall(function()
 					local elementCount = 0
 					for _, elementDescription in rootDescription:EnumerateElementDescriptions() do
 						elementCount = elementCount + 1
 						local text = elementDescription.text
-						local rawTextType = type(text)
 						if type(text) == "function" then
 							local fOk, fResult = pcall(text)
 							if fOk then
 								text = fResult
 							end
 						end
-
-						-- Debug: log every element's text and data
 						local dataVal = elementDescription.data
-						BFL:DebugPrint(
-							"  Element #"
-								.. elementCount
-								.. ": text="
-								.. tostring(text)
-								.. " (raw type="
-								.. rawTextType
-								.. "), data="
-								.. tostring(dataVal)
-						)
 
 						local isInvite = false
 						if text and inviteTexts[text] then
 							isInvite = true
-							BFL:DebugPrint("  -> MATCHED via text!")
 						elseif dataVal and inviteDataKeys[tostring(dataVal)] then
 							isInvite = true
-							BFL:DebugPrint("  -> MATCHED via data key!")
 						end
 
 						if isInvite then
-							found = true
 							local replacementText = mixedInviteTypes
 									and (TRAVEL_PASS_INVITE or PARTY_INVITE or INVITE or "Invite")
 								or inviteText
@@ -2649,19 +2578,10 @@ frame:SetScript("OnEvent", function(self, event, ...)
 									end
 								end)
 							end
-							BFL:DebugPrint(
-								"ReplaceInvite: Successfully converted invite button to submenu with "
-									.. #friendData.invitableAccounts
-									.. " entries"
-							)
 							break -- Only one invite button should be visible at a time
 						end
 					end
-					BFL:DebugPrint("ReplaceInvite: Scanned " .. elementCount .. " elements, found=" .. tostring(found))
 				end)
-				if not ok then
-					BFL:DebugPrint("ReplaceInvite: pcall ERROR: " .. tostring(err))
-				end
 			end
 
 			local function AddGroupsToFriendMenu(owner, rootDescription, contextData)
@@ -2745,9 +2665,6 @@ frame:SetScript("OnEvent", function(self, event, ...)
 							if idMatch or tagMatch or guidMatch then
 								friendData = friend
 								friendUID = FriendsList:GetFriendUID(friend)
-								BFL:DebugPrint(
-									"|cff00ff00[MENU UID]|r Resolved BNet UID via FriendsList: " .. tostring(friendUID)
-								)
 								break
 							end
 						end
@@ -2774,10 +2691,6 @@ frame:SetScript("OnEvent", function(self, event, ...)
 								if indexMatch or guidMatch or nameMatch then
 									friendData = friend
 									friendUID = FriendsList:GetFriendUID(friend)
-									BFL:DebugPrint(
-										"|cff00ff00[MENU UID]|r Resolved WoW UID via FriendsList: "
-											.. tostring(friendUID)
-									)
 									break
 								end
 							end
@@ -2904,6 +2817,31 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					})
 				end)
 
+				local FriendTags = BFL:GetModule("FriendTags")
+				local tagFriendData
+				if FriendTags and FriendTags.IsEnabled and FriendTags:IsEnabled() then
+					if not friendData and bnetIDAccount and FriendsList and FriendsList.friendsList then
+						for _, f in ipairs(FriendsList.friendsList) do
+							if f.type == "bnet" and f.bnetAccountID == bnetIDAccount then
+								friendData = f
+								break
+							end
+						end
+					end
+
+					tagFriendData = friendData or {
+						uid = friendUID,
+						type = (bnetIDAccount or (type(friendUID) == "string" and friendUID:match("^bnet_"))) and "bnet" or "wow",
+						bnetAccountID = bnetIDAccount,
+						battleTag = battleTag,
+						name = contextName,
+						accountName = menuDisplayName,
+					}
+					if tagFriendData and not tagFriendData.uid then
+						tagFriendData.uid = friendUID
+					end
+				end
+
 				local ContactMemory = BFL:GetModule("ContactMemory")
 				if ContactMemory and ContactMemory.IsEnabled and ContactMemory:IsEnabled() then
 					local contactKey = friendData and ContactMemory:ResolveContactKeyFromFriend(friendData)
@@ -2918,7 +2856,10 @@ frame:SetScript("OnEvent", function(self, event, ...)
 						})
 						ContactMemory:PopulateMenu(rootDescription, contactKey, menuDisplayName or contextName or battleTag, function()
 							BFL:ForceRefreshFriendsList()
-						end)
+						end, {
+							friendData = tagFriendData,
+							friendUID = friendUID,
+						})
 					end
 				end
 

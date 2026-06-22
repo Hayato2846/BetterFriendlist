@@ -104,6 +104,17 @@ local function ApplyBrokerColumnColor(text, settingKey)
 	return text
 end
 
+local function CopyFriendTags(friendTags)
+	if type(friendTags) ~= "table" then
+		return nil
+	end
+	local copy = {}
+	for index, tag in ipairs(friendTags) do
+		copy[index] = tag
+	end
+	return copy
+end
+
 -- Helper: Add friend name to active chat editbox (Shift+Click)
 local AddNameToEditBox = BFL.BrokerUtils.AddNameToEditBox
 
@@ -872,7 +883,7 @@ local function CreateAdvancedTooltip(gameTooltip)
 					type = "bnet",
 					isFavorite = accountInfo.isFavorite,
 					friendLevel = accountInfo.friendLevel,
-					friendTags = friendTagsEnabled and accountInfo.friendTags or nil,
+					friendTags = friendTagsEnabled and CopyFriendTags(accountInfo.friendTags) or nil,
 					client = gameInfo.clientProgram or "App",
 					wowProjectID = gameInfo.wowProjectID,
 					connected = true,
@@ -1858,7 +1869,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 							connected = isOnline,
 							isFavorite = accountInfo.isFavorite,
 							friendLevel = accountInfo.friendLevel,
-							friendTags = friendTagsEnabled and accountInfo.friendTags or nil,
+							friendTags = friendTagsEnabled and CopyFriendTags(accountInfo.friendTags) or nil,
 							accountInfo = accountInfo,
 							index = i,
 						}
@@ -2509,6 +2520,14 @@ function CreateDetailTooltip(cell, data)
 		tt2:AddLine(" ")
 		tt2:AddLine(C("ltblue", L("NOTE_LABEL")))
 		tt2:AddLine(data.note, 1, 1, 1, true)
+	end
+
+	local FriendTags = BFL:GetModule("FriendTags")
+	local tagText = FriendTags and FriendTags.GetBrokerTextForFriend and FriendTags:GetBrokerTextForFriend(data)
+	if tagText and tagText ~= "" then
+		tt2:AddLine(" ")
+		tt2:AddLine(C("ltblue", (BFL.L and BFL.L.FRIEND_TAGS_TOOLTIP_TITLE) or "Friend Tags"))
+		tt2:AddLine(tagText, 0.50, 0.78, 1.00, true)
 	end
 
 	-- Broadcast message (BNet only)

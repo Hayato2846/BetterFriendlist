@@ -67,6 +67,9 @@ Modules\HouseListProxy.lua [AllowLoadGameType mainline]
 Modules\ThemePalette.lua
 Modules\Database.lua
 Modules\ContactIdentity.lua
+Modules\FriendTags.lua
+Modules\TagChips.lua
+Modules\FriendTagEditor.lua
 Modules\ContactMemory.lua
 Modules\FilterSortRegistry.lua
 Modules\IconSelector.lua

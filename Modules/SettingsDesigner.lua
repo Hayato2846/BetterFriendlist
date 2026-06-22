@@ -2067,6 +2067,106 @@ local function IsBetaEnabled()
 	return GetDB("enableBetaFeatures", false) == true
 end
 
+local function GetFriendTagsModule()
+	local FriendTags = BFL:GetModule("FriendTags")
+	if FriendTags and FriendTags.NormalizeDB then
+		FriendTags:NormalizeDB()
+	end
+	return FriendTags
+end
+
+local function GetFriendTagSetting(key, default)
+	local FriendTags = GetFriendTagsModule()
+	if FriendTags and FriendTags.GetSetting then
+		return FriendTags:GetSetting(key, default)
+	end
+	local db = GetProfile()
+	db.friendTagSettings = db.friendTagSettings or {}
+	local value = db.friendTagSettings[key]
+	if value == nil then
+		return default
+	end
+	return value
+end
+
+local function SetFriendTagSetting(key, value)
+	local FriendTags = GetFriendTagsModule()
+	if FriendTags and FriendTags.SetSetting then
+		FriendTags:SetSetting(key, value, RefreshFriends)
+		return
+	end
+	local db = GetProfile()
+	db.friendTagSettings = db.friendTagSettings or {}
+	db.friendTagSettings[key] = value
+	BumpSettingsVersion()
+	RefreshFriends()
+end
+
+local function IsContactMemoryEnabledForFriendTags()
+	if not IsBetaEnabled() then
+		return false
+	end
+	local ContactMemory = BFL:GetModule("ContactMemory")
+	return ContactMemory and ContactMemory.IsEnabled and ContactMemory:IsEnabled()
+end
+
+local function IsFriendTagsEnabled()
+	local FriendTags = GetFriendTagsModule()
+	return FriendTags and FriendTags.IsEnabled and FriendTags:IsEnabled()
+end
+
+local function OpenFriendTagEditor(tagId)
+	local Editor = BFL:GetModule("FriendTagEditor")
+	if Editor and Editor.Show then
+		Editor:Show(tagId)
+	end
+end
+
+local function BuildFriendTagEntries()
+	local FriendTags = GetFriendTagsModule()
+	local entries = {}
+	if not (FriendTags and FriendTags.GetAllTagDefinitions) then
+		return entries
+	end
+	for _, def in ipairs(FriendTags:GetAllTagDefinitions()) do
+		local profile = FriendTags:GetChipProfile(def)
+		entries[#entries + 1] = {
+			id = def.id,
+			key = def.id,
+			label = (def.name or def.id)
+				.. "  "
+				.. (def.source == "blizzard" and T("FRIEND_TAGS_SOURCE_BLIZZARD", "Blizzard") or T("FRIEND_TAGS_SOURCE_CUSTOM", "Custom")),
+			icon = profile and profile.icon or def.icon or "Interface\\AddOns\\BetterFriendlist\\Icons\\tag",
+			source = def.source,
+			visible = profile and profile.visible ~= false,
+		}
+	end
+	return entries
+end
+
+local function MoveFriendTagEntry(fromIndex, toIndex)
+	local FriendTags = GetFriendTagsModule()
+	if not (FriendTags and FriendTags.SetChipProfile) then
+		return
+	end
+	local entries = BuildFriendTagEntries()
+	if fromIndex < 1 or fromIndex > #entries or toIndex < 1 or toIndex > #entries then
+		return
+	end
+	local moved = table.remove(entries, fromIndex)
+	table.insert(entries, toIndex, moved)
+	for index, entry in ipairs(entries) do
+		FriendTags:SetChipProfile(entry.id, { order = index * 10 }, RefreshFriends)
+	end
+end
+
+local function SyncKnownBlizzardTags()
+	local FriendTags = GetFriendTagsModule()
+	if FriendTags and FriendTags.HandoffKnownLocalBlizzardTags then
+		FriendTags:HandoffKnownLocalBlizzardTags(RefreshFriends)
+	end
+end
+
 local function SetSettingsCenterBetaEnabled(value)
 	local Settings = BFL:GetModule("Settings")
 	if Settings and Settings.OnSettingsCenterBetaChanged then
@@ -2904,6 +3004,290 @@ local function RegisterAppearancePages()
 	AddToggle("appearance.frame", { key = "lockWindow", group = "size", label = T("SETTINGS_LOCK_WINDOW", "Lock Window"), desc = T("SETTINGS_LOCK_WINDOW_DESC", "Prevent the BetterFriendlist frame from being moved."), default = false, order = 130, after = function(value) local FrameSettings = BFL:GetModule("FrameSettings"); if FrameSettings and FrameSettings.ApplyLock then FrameSettings:ApplyLock(value) end end })
 end
 
+local function RegisterFriendTagsControls()
+	RegisterPage({
+		id = "groups.friendtags",
+		category = "groups",
+		title = T("SETTINGS_CENTER_PAGE_FRIEND_TAGS", "Friend Tags & Chips"),
+		description = T("SETTINGS_CENTER_PAGE_FRIEND_TAGS_DESC", "Controls friend tags, Blizzard-compatible tags, and row chips."),
+		iconKey = "bfl-groups-order",
+		mainToggleID = "friendTags.enabled",
+		order = 135,
+		visibleWhen = IsBetaEnabled,
+		newTagID = "friend-tags",
+	})
+
+	AddGroup("groups.friendtags", "general", T("FRIEND_TAGS_SETTINGS_GENERAL", "Friend Tags"), 100)
+	AddToggle("groups.friendtags", {
+		id = "friendTags.enabled",
+		group = "general",
+		label = T("FRIEND_TAGS_SETTINGS_ENABLE", "Friend Tags"),
+		desc = T("FRIEND_TAGS_SETTINGS_ENABLE_DESC", "Adds Blizzard-compatible and custom tags for friends."),
+		default = true,
+		order = 100,
+		parentCheck = IsContactMemoryEnabledForFriendTags,
+		getValue = function()
+			return GetFriendTagSetting("enabled", true) == true
+		end,
+		setValue = function(value)
+			SetFriendTagSetting("enabled", value == true)
+		end,
+		refreshOnChange = true,
+	})
+	AddToggle("groups.friendtags", {
+		id = "friendTags.showRowChips",
+		group = "general",
+		label = T("FRIEND_TAGS_SETTINGS_ROW_CHIPS", "Show Row Chips"),
+		desc = T("FRIEND_TAGS_SETTINGS_ROW_CHIPS_DESC", "Show friend tags as compact chips below the friend info line."),
+		default = true,
+		order = 110,
+		parentCheck = IsFriendTagsEnabled,
+		getValue = function()
+			return GetFriendTagSetting("showRowChips", true) == true
+		end,
+		setValue = function(value)
+			SetFriendTagSetting("showRowChips", value == true)
+		end,
+		refreshOnChange = true,
+	})
+	AddSlider("groups.friendtags", {
+		id = "friendTags.maxRowChips",
+		group = "general",
+		label = T("FRIEND_TAGS_SETTINGS_MAX_ROW_CHIPS", "Maximum Row Chips"),
+		desc = T("FRIEND_TAGS_SETTINGS_MAX_ROW_CHIPS_DESC", "Limits how many tags are shown in each friend row before using a +count chip."),
+		min = 1,
+		max = 4,
+		step = 1,
+		default = 3,
+		integer = true,
+		order = 120,
+		parentCheck = IsFriendTagsEnabled,
+		getValue = function()
+			return GetFriendTagSetting("maxRowChips", 3)
+		end,
+		setValue = function(value)
+			SetFriendTagSetting("maxRowChips", value)
+		end,
+	})
+	AddDropdown("groups.friendtags", {
+		id = "friendTags.compactRowMode",
+		group = "general",
+		label = T("FRIEND_TAGS_SETTINGS_COMPACT_MODE", "Compact Row Chips"),
+		desc = T("FRIEND_TAGS_SETTINGS_COMPACT_MODE_DESC", "Controls how friend tags are shown when Compact Mode is enabled."),
+		list = {
+			hidden = T("FRIEND_TAGS_COMPACT_HIDDEN", "Hidden"),
+			icon_only = T("FRIEND_TAGS_COMPACT_ICON_ONLY", "Icon Only"),
+			chip_line = T("FRIEND_TAGS_COMPACT_CHIP_LINE", "Chip Line"),
+		},
+		orderList = { "icon_only", "chip_line", "hidden" },
+		default = "icon_only",
+		order = 125,
+		parentCheck = IsFriendTagsEnabled,
+		getValue = function()
+			return GetFriendTagSetting("compactRowMode", "icon_only")
+		end,
+		setValue = function(value)
+			SetFriendTagSetting("compactRowMode", value or "icon_only")
+		end,
+	})
+	AddToggle("groups.friendtags", {
+		id = "friendTags.showTooltipChips",
+		group = "general",
+		label = T("FRIEND_TAGS_SETTINGS_TOOLTIPS", "Show in Tooltips"),
+		desc = T("FRIEND_TAGS_SETTINGS_TOOLTIPS_DESC", "Include friend tags in Notes & Tags tooltip sections."),
+		default = true,
+		order = 130,
+		parentCheck = IsFriendTagsEnabled,
+		getValue = function()
+			return GetFriendTagSetting("showTooltipChips", true) == true
+		end,
+		setValue = function(value)
+			SetFriendTagSetting("showTooltipChips", value == true)
+		end,
+	})
+	AddSlider("groups.friendtags", {
+		id = "friendTags.maxTooltipChips",
+		group = "general",
+		label = T("FRIEND_TAGS_SETTINGS_MAX_TOOLTIP_CHIPS", "Maximum Tooltip Tags"),
+		desc = T("FRIEND_TAGS_SETTINGS_MAX_TOOLTIP_CHIPS_DESC", "Limits how many tags are listed in Notes & Tags tooltips."),
+		min = 1,
+		max = 12,
+		step = 1,
+		default = 8,
+		integer = true,
+		order = 140,
+		parentCheck = IsFriendTagsEnabled,
+		getValue = function()
+			return GetFriendTagSetting("maxTooltipChips", 8)
+		end,
+		setValue = function(value)
+			SetFriendTagSetting("maxTooltipChips", value)
+		end,
+	})
+
+	AddGroup("groups.friendtags", "search", T("FRIEND_TAGS_SETTINGS_SEARCH", "Search & Privacy"), 200)
+	AddToggle("groups.friendtags", {
+		id = "friendTags.includeBlizzardTagsInSearch",
+		group = "search",
+		label = T("FRIEND_TAGS_SETTINGS_SEARCH_BLIZZARD", "Search Blizzard Tags"),
+		desc = T("FRIEND_TAGS_SETTINGS_SEARCH_BLIZZARD_DESC", "Let friend list search match Blizzard-compatible tags."),
+		default = true,
+		order = 200,
+		parentCheck = IsFriendTagsEnabled,
+		getValue = function()
+			return GetFriendTagSetting("includeBlizzardTagsInSearch", true) == true
+		end,
+		setValue = function(value)
+			SetFriendTagSetting("includeBlizzardTagsInSearch", value == true)
+		end,
+	})
+	AddToggle("groups.friendtags", {
+		id = "friendTags.includeCustomTagsInSearch",
+		group = "search",
+		label = T("FRIEND_TAGS_SETTINGS_SEARCH_CUSTOM", "Search Custom Tags"),
+		desc = T("FRIEND_TAGS_SETTINGS_SEARCH_CUSTOM_DESC", "Let friend list search match BetterFriendlist custom tags."),
+		default = true,
+		order = 210,
+		parentCheck = IsFriendTagsEnabled,
+		getValue = function()
+			return GetFriendTagSetting("includeCustomTagsInSearch", true) == true
+		end,
+		setValue = function(value)
+			SetFriendTagSetting("includeCustomTagsInSearch", value == true)
+		end,
+	})
+	AddToggle("groups.friendtags", {
+		id = "friendTags.showTagsInStreamerMode",
+		group = "search",
+		label = T("FRIEND_TAGS_SETTINGS_STREAMER", "Show in Streamer Mode"),
+		desc = T("FRIEND_TAGS_SETTINGS_STREAMER_DESC", "Keep friend tags visible while Streamer Mode is active."),
+		default = false,
+		order = 220,
+		parentCheck = IsFriendTagsEnabled,
+		getValue = function()
+			return GetFriendTagSetting("showTagsInStreamerMode", false) == true
+		end,
+		setValue = function(value)
+			SetFriendTagSetting("showTagsInStreamerMode", value == true)
+		end,
+	})
+	AddToggle("groups.friendtags", {
+		id = "friendTags.showBrokerChips",
+		group = "search",
+		label = T("FRIEND_TAGS_SETTINGS_BROKER", "Show in Broker Tooltips"),
+		desc = T("FRIEND_TAGS_SETTINGS_BROKER_DESC", "Allow broker integrations to include friend tags where supported."),
+		default = true,
+		order = 230,
+		parentCheck = IsFriendTagsEnabled,
+		getValue = function()
+			return GetFriendTagSetting("showBrokerChips", true) == true
+		end,
+		setValue = function(value)
+			SetFriendTagSetting("showBrokerChips", value == true)
+		end,
+	})
+
+	AddGroup("groups.friendtags", "groups", T("FRIEND_TAGS_SETTINGS_GROUPS", "Dynamic Tag Groups"), 300)
+	AddToggle("groups.friendtags", {
+		id = "friendTags.enableDynamicTagGroups",
+		group = "groups",
+		label = T("FRIEND_TAGS_SETTINGS_DYNAMIC_GROUPS", "Show Dynamic Tag Groups"),
+		desc = T("FRIEND_TAGS_SETTINGS_DYNAMIC_GROUPS_DESC", "Shows optional tag-based groups without changing existing custom groups."),
+		default = false,
+		order = 300,
+		parentCheck = IsFriendTagsEnabled,
+		getValue = function()
+			return GetFriendTagSetting("enableDynamicTagGroups", false) == true
+		end,
+		setValue = function(value)
+			SetFriendTagSetting("enableDynamicTagGroups", value == true)
+		end,
+		refreshOnChange = true,
+	})
+
+	AddGroup("groups.friendtags", "editor", T("FRIEND_TAGS_SETTINGS_EDITOR", "Tag Editor"), 400)
+	AddButton("groups.friendtags", {
+		id = "friendTags.openEditor",
+		group = "editor",
+		label = T("FRIEND_TAGS_EDITOR_TITLE", "Friend Tags & Chips"),
+		desc = T("FRIEND_TAGS_EDITOR_DESC", "Edit chip labels, icons, colors, visibility, custom tags, and order."),
+		buttonText = T("FRIEND_TAGS_EDITOR_OPEN", "Open Editor"),
+		order = 400,
+		parentCheck = IsFriendTagsEnabled,
+		onClick = function()
+			OpenFriendTagEditor()
+		end,
+	})
+	AddButton("groups.friendtags", {
+		id = "friendTags.syncLocalBlizzard",
+		group = "editor",
+		label = T("FRIEND_TAGS_SYNC_LOCAL_TITLE", "Sync Local Blizzard-compatible Tags"),
+		desc = T("FRIEND_TAGS_SYNC_LOCAL_DESC", "Transfers locally stored 12.0.7 Blizzard-compatible tags for currently known Battle.net friends to Blizzard when the 12.1 API is available."),
+		buttonText = T("FRIEND_TAGS_SYNC_LOCAL_BUTTON", "Sync Known Friends"),
+		order = 410,
+		parentCheck = function()
+			local FriendTags = GetFriendTagsModule()
+			return IsFriendTagsEnabled() and FriendTags and FriendTags.AreBlizzardTagsEnabled and FriendTags:AreBlizzardTagsEnabled()
+		end,
+		onClick = SyncKnownBlizzardTags,
+	})
+	AddReorderList("groups.friendtags", {
+		id = "friendTags.tagList",
+		group = "editor",
+		label = T("FRIEND_TAGS_SETTINGS_TAG_LIST", "Tags"),
+		desc = T("FRIEND_TAGS_SETTINGS_TAG_LIST_DESC", "Change tag order, visibility, and open the full chip editor."),
+		order = 430,
+		getEntries = BuildFriendTagEntries,
+		moveEntry = MoveFriendTagEntry,
+		emptyText = T("FRIEND_TAGS_SETTINGS_TAG_LIST_EMPTY", "No tags available."),
+		entryToggle = {
+			getValue = function(tagId)
+				local FriendTags = GetFriendTagsModule()
+				local profile = FriendTags and FriendTags:GetChipProfile(tagId)
+				return profile and profile.visible ~= false
+			end,
+			setValue = function(tagId, _, value)
+				local FriendTags = GetFriendTagsModule()
+				if FriendTags then
+					FriendTags:SetChipProfile(tagId, { visible = value == true }, RefreshFriends)
+				end
+			end,
+		},
+		rowActions = {
+			{
+				id = "edit",
+				label = T("FRIEND_TAGS_EDITOR_EDIT", "Edit"),
+				onClick = function(tagId)
+					OpenFriendTagEditor(tagId)
+				end,
+			},
+			{
+				id = "reset",
+				label = T("FRIEND_TAGS_EDITOR_RESET", "Reset"),
+				onClick = function(tagId)
+					local FriendTags = GetFriendTagsModule()
+					if FriendTags then
+						FriendTags:ResetChipProfile(tagId, RefreshFriends)
+					end
+				end,
+			},
+			{
+				id = "delete",
+				label = T("FRIEND_TAGS_EDITOR_DELETE", "Delete"),
+				visibleWhen = function(entry)
+					return entry and entry.source == "custom"
+				end,
+				onClick = function(tagId)
+					local FriendTags = GetFriendTagsModule()
+					if FriendTags then
+						FriendTags:DeleteCustomTag(tagId, RefreshFriends)
+					end
+				end,
+			},
+		},
+	})
+end
+
 local function RegisterGroupsPages()
 	RegisterPage({ id = "groups.builtins", category = "groups", title = T("SETTINGS_CENTER_PAGE_GROUPS_BUILTINS", "Built-In Groups"), description = T("SETTINGS_CENTER_PAGE_GROUPS_BUILTINS_DESC", "Controls automatic BetterFriendlist groups."), iconKey = "bfl-groups-builtins", order = 100 })
 	AddGroup("groups.builtins", "builtin", T("SETTINGS_GROUP_MANAGEMENT", "Group Management"), 100)
@@ -2957,6 +3341,7 @@ local function RegisterGroupsPages()
 		render = RenderSortingDefaultsCustomPage,
 	})
 	RegisterSortingControls()
+	RegisterFriendTagsControls()
 	RegisterPage({
 		id = "groups.quickfilter",
 		category = "groups",
