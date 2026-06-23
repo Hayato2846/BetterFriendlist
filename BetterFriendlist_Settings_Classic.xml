@@ -101,6 +101,14 @@
 								</Anchors>
 							</Frame>
 
+							<!-- Private Notes Tab Content (BETA) -->
+							<Frame parentKey="ContactMemoryTab" hidden="true">
+								<Anchors>
+									<Anchor point="TOPLEFT" />
+									<Anchor point="BOTTOMRIGHT" />
+								</Anchors>
+							</Frame>
+
 							<!-- Guild Tab Content (BETA) -->
 							<Frame parentKey="GuildTab" hidden="true">
 								<Anchors>

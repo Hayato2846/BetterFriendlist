@@ -66,6 +66,11 @@ function Settings:GetFriendTagsTabHost()
 	return content and content.FriendTagsTab or nil
 end
 
+function Settings:GetContactMemoryTabHost()
+	local content = settingsFrame and settingsFrame.ContentScrollFrame and settingsFrame.ContentScrollFrame.Content
+	return content and content.ContactMemoryTab or nil
+end
+
 function Settings:RequestFilterSortLayout()
 	local host = self.filterSortCustomHost
 	if host and host.requestLayout then
@@ -769,6 +774,12 @@ local TAB_DEFINITIONS = {
 		beta = true,
 	},
 	{
+		id = 14,
+		name = L.CONTACT_MEMORY_TITLE or "Private Notes",
+		icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\file-text.blp",
+		beta = true,
+	},
+	{
 		id = 13,
 		name = L.SETTINGS_TAB_FRIEND_TAGS or "Friend Tags",
 		icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\tag.blp",
@@ -1082,6 +1093,9 @@ function Settings:SelectCategory(categoryID)
 		if content.FilterSortTab then
 			content.FilterSortTab:Hide()
 		end
+		if content.ContactMemoryTab then
+			content.ContactMemoryTab:Hide()
+		end
 		if content.FriendTagsTab then
 			content.FriendTagsTab:Hide()
 		end
@@ -1122,6 +1136,9 @@ function Settings:SelectCategory(categoryID)
 		elseif categoryID == 11 and content.FilterSortTab then
 			content.FilterSortTab:Show()
 			self:RefreshFilterSortTab()
+		elseif categoryID == 14 and content.ContactMemoryTab then
+			content.ContactMemoryTab:Show()
+			self:RefreshContactMemoryTab()
 		elseif categoryID == 13 and content.FriendTagsTab then
 			content.FriendTagsTab:Show()
 			self:RefreshFriendTagsTab()
@@ -1179,6 +1196,8 @@ function Settings:AdjustContentHeight(tabID)
 		activeTab = content.AdvancedTab
 	elseif tabID == 11 then
 		activeTab = content.FilterSortTab
+	elseif tabID == 14 then
+		activeTab = content.ContactMemoryTab
 	elseif tabID == 13 then
 		activeTab = content.FriendTagsTab
 	elseif tabID == 12 then
@@ -4770,6 +4789,146 @@ local function CreateLegacyFriendTagRow(parent, FriendTags, tag, refreshCallback
 	return row
 end
 
+function Settings:RefreshContactMemoryTab()
+	if not settingsFrame or not Components then
+		return
+	end
+
+	local tab = self:GetContactMemoryTabHost()
+	if not tab then
+		return
+	end
+
+	if tab.components then
+		for _, component in ipairs(tab.components) do
+			if component.Hide then
+				component:Hide()
+			end
+		end
+	end
+	tab.components = {}
+
+	local allFrames = {}
+	local contactMemory = BFL:GetModule("ContactMemory")
+	local contactMemoryDB = BetterFriendlistDB and BetterFriendlistDB.contactMemory
+	local betaEnabled = BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures == true
+	local contactMemoryEnabled = false
+	if contactMemory and contactMemory.GetEnabledSetting then
+		contactMemoryEnabled = contactMemory:GetEnabledSetting() == true
+	elseif type(contactMemoryDB) == "table" then
+		contactMemoryEnabled = contactMemoryDB.enabled == true
+	end
+
+	local function RefreshContactMemorySettings()
+		if BFL.ForceRefreshFriendsList then
+			BFL:ForceRefreshFriendsList()
+		end
+		self:RefreshContactMemoryTab()
+	end
+
+	table.insert(allFrames, Components:CreateHeader(tab, L.CONTACT_MEMORY_TITLE or "Private Notes"))
+	table.insert(
+		allFrames,
+		Components:CreateLabel(
+			tab,
+			L.CONTACT_MEMORY_SETTINGS_ENABLE_DESC or "Adds local private notes for friends and ignored players.",
+			true,
+			{ r = 0.75, g = 0.75, b = 0.75, a = 1 }
+		)
+	)
+
+	local contactMemoryTooltipDesc = L.CONTACT_MEMORY_SETTINGS_ENABLE_DESC
+		or "Adds local private notes for friends and ignored players."
+	if not betaEnabled then
+		contactMemoryTooltipDesc = contactMemoryTooltipDesc
+			.. "\n\n"
+			.. (L.CONTACT_MEMORY_DISABLED_BETA or "Enable Beta Features to use Private Notes.")
+	end
+
+	local contactMemoryToggle = Components:CreateCheckbox(tab, {
+		label = L.CONTACT_MEMORY_SETTINGS_ENABLE or "Private Notes (Beta)",
+		initialValue = contactMemoryEnabled,
+		disabled = not betaEnabled,
+		callback = function(checked)
+			if contactMemory and contactMemory.SetEnabled then
+				contactMemory:SetEnabled(checked == true)
+			else
+				if type(BetterFriendlistDB.contactMemory) ~= "table" then
+					BetterFriendlistDB.contactMemory = {}
+				end
+				BetterFriendlistDB.contactMemory.enabled = checked == true
+				BFL.SettingsVersion = (BFL.SettingsVersion or 0) + 1
+			end
+			RefreshContactMemorySettings()
+		end,
+		tooltipTitle = L.CONTACT_MEMORY_SETTINGS_ENABLE or "Private Notes (Beta)",
+		tooltipDesc = contactMemoryTooltipDesc,
+	})
+	table.insert(allFrames, contactMemoryToggle)
+
+	local detailsDisabled = not betaEnabled or contactMemoryEnabled ~= true
+	local function GetContactMemorySetting(key, defaultValue)
+		if contactMemory and contactMemory.GetSetting then
+			return contactMemory:GetSetting(key, defaultValue)
+		end
+		if type(contactMemoryDB) == "table" and type(contactMemoryDB.settings) == "table" then
+			local value = contactMemoryDB.settings[key]
+			if value ~= nil then
+				return value
+			end
+		end
+		return defaultValue
+	end
+	local function SetContactMemorySetting(key, value)
+		if contactMemory and contactMemory.SetSetting then
+			contactMemory:SetSetting(key, value == true)
+			return
+		end
+		if type(BetterFriendlistDB.contactMemory) ~= "table" then
+			BetterFriendlistDB.contactMemory = {}
+		end
+		if type(BetterFriendlistDB.contactMemory.settings) ~= "table" then
+			BetterFriendlistDB.contactMemory.settings = {}
+		end
+		BetterFriendlistDB.contactMemory.settings[key] = value == true
+		BFL.SettingsVersion = (BFL.SettingsVersion or 0) + 1
+		if BFL.ForceRefreshFriendsList then
+			BFL:ForceRefreshFriendsList()
+		end
+	end
+
+	table.insert(allFrames, Components:CreateSpacer(tab))
+
+	local contactMemoryTooltipToggle = Components:CreateCheckbox(tab, {
+		label = L.CONTACT_MEMORY_SETTINGS_TOOLTIPS or "Show in Tooltips",
+		initialValue = GetContactMemorySetting("showTooltipSection", true) == true,
+		disabled = detailsDisabled,
+		callback = function(checked)
+			SetContactMemorySetting("showTooltipSection", checked == true)
+		end,
+		tooltipTitle = L.CONTACT_MEMORY_SETTINGS_TOOLTIPS or "Show in Tooltips",
+		tooltipDesc = L.CONTACT_MEMORY_SETTINGS_TOOLTIPS_DESC
+			or "Show private notes in supported friend and ignore tooltips.",
+	})
+	table.insert(allFrames, contactMemoryTooltipToggle)
+
+	local contactMemoryStreamerToggle = Components:CreateCheckbox(tab, {
+		label = L.CONTACT_MEMORY_SETTINGS_HIDE_STREAMER or "Hide in Streamer Mode",
+		initialValue = GetContactMemorySetting("hideInStreamerMode", true) == true,
+		disabled = detailsDisabled,
+		callback = function(checked)
+			SetContactMemorySetting("hideInStreamerMode", checked == true)
+		end,
+		tooltipTitle = L.CONTACT_MEMORY_SETTINGS_HIDE_STREAMER or "Hide in Streamer Mode",
+		tooltipDesc = L.CONTACT_MEMORY_SETTINGS_HIDE_STREAMER_DESC
+			or "Hide private notes while Streamer Mode is active.",
+	})
+	table.insert(allFrames, contactMemoryStreamerToggle)
+
+	Components:AnchorChain(allFrames, -5)
+	tab.components = allFrames
+end
+
 function Settings:RefreshFriendTagsTab()
 	if not settingsFrame or not Components then
 		return
@@ -6457,99 +6616,6 @@ function Settings:RefreshAdvancedTab()
 			or "Use the new LibSettingsDesigner Settings Center instead of the classic settings window.",
 	})
 	table.insert(allFrames, settingsCenterToggle)
-
-	local contactMemory = BFL:GetModule("ContactMemory")
-	local contactMemoryDB = BetterFriendlistDB.contactMemory
-	local contactMemoryEnabled = contactMemory and contactMemory.GetEnabledSetting
-		and contactMemory:GetEnabledSetting()
-		or type(contactMemoryDB) == "table" and contactMemoryDB.enabled == true
-	local contactMemoryTooltipDesc = L.CONTACT_MEMORY_SETTINGS_ENABLE_DESC
-		or "Adds local private notes for friends and ignored players."
-	if BetterFriendlistDB.enableBetaFeatures ~= true then
-		contactMemoryTooltipDesc = contactMemoryTooltipDesc
-			.. "\n\n"
-			.. (L.CONTACT_MEMORY_DISABLED_BETA or "Enable Beta Features to use Private Notes.")
-	end
-	local contactMemoryToggle = Components:CreateCheckbox(tab, {
-		label = L.CONTACT_MEMORY_SETTINGS_ENABLE or "Private Notes (Beta)",
-		initialValue = contactMemoryEnabled,
-		disabled = BetterFriendlistDB.enableBetaFeatures ~= true,
-		callback = function(checked)
-			if contactMemory and contactMemory.SetEnabled then
-				contactMemory:SetEnabled(checked == true)
-			else
-				if type(BetterFriendlistDB.contactMemory) ~= "table" then
-					BetterFriendlistDB.contactMemory = {}
-				end
-				BetterFriendlistDB.contactMemory.enabled = checked == true
-				BFL.SettingsVersion = (BFL.SettingsVersion or 0) + 1
-				if BFL.ForceRefreshFriendsList then
-					BFL:ForceRefreshFriendsList()
-				end
-			end
-			self:RefreshAdvancedTab()
-		end,
-		tooltipTitle = L.CONTACT_MEMORY_SETTINGS_ENABLE or "Private Notes (Beta)",
-		tooltipDesc = contactMemoryTooltipDesc,
-	})
-	table.insert(allFrames, contactMemoryToggle)
-
-	local contactMemoryDetailsDisabled = BetterFriendlistDB.enableBetaFeatures ~= true or contactMemoryEnabled ~= true
-	local function GetContactMemorySetting(key, defaultValue)
-		if contactMemory and contactMemory.GetSetting then
-			return contactMemory:GetSetting(key, defaultValue)
-		end
-		if type(contactMemoryDB) == "table" and type(contactMemoryDB.settings) == "table" then
-			local value = contactMemoryDB.settings[key]
-			if value ~= nil then
-				return value
-			end
-		end
-		return defaultValue
-	end
-	local function SetContactMemorySetting(key, value)
-		if contactMemory and contactMemory.SetSetting then
-			contactMemory:SetSetting(key, value == true)
-			return
-		end
-		if type(BetterFriendlistDB.contactMemory) ~= "table" then
-			BetterFriendlistDB.contactMemory = {}
-		end
-		if type(BetterFriendlistDB.contactMemory.settings) ~= "table" then
-			BetterFriendlistDB.contactMemory.settings = {}
-		end
-		BetterFriendlistDB.contactMemory.settings[key] = value == true
-		BFL.SettingsVersion = (BFL.SettingsVersion or 0) + 1
-		if BFL.ForceRefreshFriendsList then
-			BFL:ForceRefreshFriendsList()
-		end
-	end
-
-	local contactMemoryTooltipToggle = Components:CreateCheckbox(tab, {
-		label = L.CONTACT_MEMORY_SETTINGS_TOOLTIPS or "Show in Tooltips",
-		initialValue = GetContactMemorySetting("showTooltipSection", true) == true,
-		disabled = contactMemoryDetailsDisabled,
-		callback = function(checked)
-			SetContactMemorySetting("showTooltipSection", checked == true)
-		end,
-		tooltipTitle = L.CONTACT_MEMORY_SETTINGS_TOOLTIPS or "Show in Tooltips",
-		tooltipDesc = L.CONTACT_MEMORY_SETTINGS_TOOLTIPS_DESC
-			or "Show private notes in supported friend and ignore tooltips.",
-	})
-	table.insert(allFrames, contactMemoryTooltipToggle)
-
-	local contactMemoryStreamerToggle = Components:CreateCheckbox(tab, {
-		label = L.CONTACT_MEMORY_SETTINGS_HIDE_STREAMER or "Hide in Streamer Mode",
-		initialValue = GetContactMemorySetting("hideInStreamerMode", true) == true,
-		disabled = contactMemoryDetailsDisabled,
-		callback = function(checked)
-			SetContactMemorySetting("hideInStreamerMode", checked == true)
-		end,
-		tooltipTitle = L.CONTACT_MEMORY_SETTINGS_HIDE_STREAMER or "Hide in Streamer Mode",
-		tooltipDesc = L.CONTACT_MEMORY_SETTINGS_HIDE_STREAMER_DESC
-			or "Hide private notes while Streamer Mode is active.",
-	})
-	table.insert(allFrames, contactMemoryStreamerToggle)
 
 	if BFL.HasSecretValues then
 		local bridgeToggle = Components:CreateCheckbox(tab, {
