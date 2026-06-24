@@ -644,6 +644,45 @@ local function ApplyStreamerModeOverride(friendData)
 	end
 end
 
+local function RefreshFriendsTooltipAdditions(tooltip, friendData)
+	if not tooltip then
+		return false
+	end
+
+	ApplyStreamerModeOverride(friendData)
+	if AddContactMemoryTooltipLines and AddContactMemoryTooltipLines(tooltip, friendData) then
+		if ResizeFriendsTooltipForMeasuredLines then
+			ResizeFriendsTooltipForMeasuredLines(tooltip)
+		end
+		return true
+	end
+
+	return false
+end
+
+local ClassicFriendsTooltipHooked = false
+
+local function EnsureClassicFriendsTooltipHook()
+	if ClassicFriendsTooltipHooked or not BFL.IsClassic or not hooksecurefunc or not FriendsFrameTooltip_Show then
+		return
+	end
+
+	local ok = pcall(hooksecurefunc, "FriendsFrameTooltip_Show", function(button)
+		if not FriendsTooltip then
+			return
+		end
+		if button and button.friendData then
+			RefreshFriendsTooltipAdditions(FriendsTooltip, button.friendData)
+		elseif FriendsTooltip.ContactMemoryLines then
+			HideContactMemoryTooltipLines(FriendsTooltip)
+		end
+	end)
+
+	ClassicFriendsTooltipHooked = ok and true or false
+end
+
+EnsureClassicFriendsTooltipHook()
+
 -- Button OnEnter handler
 function BetterFriendsList_Button_OnEnter(self)
 	if not self.friendIndex or not self.friendData then
@@ -745,6 +784,8 @@ function BetterFriendsList_Button_OnEnter(self)
 
 	-- Classic path: use FriendsFrameTooltip_Show (exists only in Classic)
 	if BFL.IsClassic then
+		EnsureClassicFriendsTooltipHook()
+
 		self.buttonType = buttonType
 		self.id = resolvedIndex
 
@@ -755,9 +796,8 @@ function BetterFriendsList_Button_OnEnter(self)
 			FriendsFrameTooltip_Show(self)
 		end
 
-		ApplyStreamerModeOverride(friendData)
-		if AddContactMemoryTooltipLines(tooltip, friendData) then
-			ResizeFriendsTooltipForMeasuredLines(tooltip)
+		if not ClassicFriendsTooltipHooked then
+			RefreshFriendsTooltipAdditions(tooltip, friendData)
 		end
 
 		tooltip:Show()

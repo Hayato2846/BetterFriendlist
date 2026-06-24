@@ -29,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+
+### Fixed
+- **Classic Friend Tooltips** - Fixed private notes extending below the tooltip background while a Battle.net broadcast is shown.
+
+---
+
 ## [2.6.3]        - 2026-06-22
 
 ### Added
@@ -184,14 +191,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Retail: Quick Join** - Fixed a Lua error caused by protected values during combat restrictions.
-
-## [2.5.4]        - 2026-04-03
-
-### Fixed
-- **Classic: Sort Dropdown** - Fixed an error when selecting a sort option (e.g., "Game") in Classic clients.
-
-### Improved
-- **Quick Join: Known Players** - Quick Join entries now also show guild members and community members next to the group leader, not just friends. Community members additionally display the community name they belong to.
 
 ---
 
