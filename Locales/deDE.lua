@@ -1523,7 +1523,7 @@ BFL:RegisterLocale("deDE", function()
 	L.CORE_HELP_PERF_RESET = "  |cffffffff/bfl perf reset|r - Statistiken zurücksetzen"
 	L.CORE_HELP_PERF_MEM = "  |cffffffff/bfl perf memory|r - Speichernutzung anzeigen"
 	L.CORE_HELP_TEST_COMMANDS = "|cffffcc00Test-Befehle:|r"
-	L.TESTSUITE_PERFY_HELP = "  |cffffffff/bfl test perfy [seconds]|r - Run Perfy stress test"
+	L.TESTSUITE_PERFY_HELP = "  |cffffffff/bfl test perfy [visible|background|idle] [seconds]|r - Run Perfy stress test"
 	L.TESTSUITE_PERFY_STARTING = "Starting Perfy stress test for %d seconds"
 	L.TESTSUITE_PERFY_ALREADY_RUNNING = "Perfy stress test already running"
 	L.TESTSUITE_PERFY_MISSING_ADDON = "Perfy addon not loaded (!!!Perfy)"

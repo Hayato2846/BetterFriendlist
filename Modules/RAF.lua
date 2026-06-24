@@ -327,6 +327,16 @@ local function IsBetterFriendlistRewardsContext()
 		and BetterFriendsFrame.RecruitAFriendFrame:IsShown()
 end
 
+local function IsBetterRAFFrameVisible(frame)
+	return BetterFriendsFrame and BetterFriendsFrame:IsShown() and frame and frame:IsShown()
+end
+
+local function MarkRecruitListDirty(frame)
+	if frame then
+		frame.recruitListDirty = true
+	end
+end
+
 local function HookNativeRewardTabs()
 	local rewardsFrame = RecruitAFriendRewardsFrame
 	local rewardTabPool = rewardsFrame and rewardsFrame.rewardTabPool
@@ -686,7 +696,11 @@ function RAF:OnEvent(frame, event, ...)
 		self:UpdateRAFInfo(frame, rafInfo)
 	elseif event == "BN_FRIEND_INFO_CHANGED" then
 		if frame.rafInfo and frame.rafInfo.recruits then
-			self:UpdateRecruitList(frame, frame.rafInfo.recruits)
+			if IsBetterRAFFrameVisible(frame) then
+				self:UpdateRecruitList(frame, frame.rafInfo.recruits)
+			else
+				MarkRecruitListDirty(frame)
+			end
 		end
 	end
 end
@@ -875,6 +889,11 @@ function RAF:UpdateRecruitList(frame, recruits)
 	if not frame or not frame.RecruitList then
 		return
 	end
+	if not IsBetterRAFFrameVisible(frame) then
+		MarkRecruitListDirty(frame)
+		return
+	end
+	frame.recruitListDirty = nil
 
 	local numRecruits = recruits and #recruits or 0
 
@@ -1097,7 +1116,11 @@ function RAF:UpdateRAFInfo(frame, rafInfo)
 
 	-- Update recruit list
 	if rafInfo.recruits then
-		self:UpdateRecruitList(frame, rafInfo.recruits)
+		if IsBetterRAFFrameVisible(frame) then
+			self:UpdateRecruitList(frame, rafInfo.recruits)
+		else
+			MarkRecruitListDirty(frame)
+		end
 	end
 
 	-- Update month count (matches Blizzard's conditional logic)
@@ -1184,8 +1207,10 @@ function RAF:SetSearchText(text, skipRefresh)
 
 	-- Refresh the list with the new search filter
 	local frame = BetterFriendsFrame and BetterFriendsFrame.RecruitAFriendFrame
-	if frame and frame:IsShown() and frame.rafInfo and frame.rafInfo.recruits then
+	if IsBetterRAFFrameVisible(frame) and frame.rafInfo and frame.rafInfo.recruits then
 		self:UpdateRecruitList(frame, frame.rafInfo.recruits)
+	elseif frame then
+		MarkRecruitListDirty(frame)
 	end
 end
 

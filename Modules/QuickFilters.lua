@@ -196,8 +196,12 @@ function QuickFilters:SetFilter(mode)
 	end
 
 	local Broker = BFL:GetModule("Broker")
-	if Broker and Broker.UpdateBrokerText then
-		Broker:UpdateBrokerText()
+	if Broker then
+		if Broker.ScheduleBrokerTextUpdate then
+			Broker:ScheduleBrokerTextUpdate()
+		elseif Broker.UpdateBrokerText then
+			Broker:UpdateBrokerText()
+		end
 	end
 
 	return true

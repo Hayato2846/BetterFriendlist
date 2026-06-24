@@ -80,6 +80,43 @@ local function SafeString(value)
 	return str
 end
 
+function Registry:InvalidateCaches()
+	self.cacheVersion = (self.cacheVersion or 0) + 1
+	BFL.FilterSortRegistryVersion = (BFL.FilterSortRegistryVersion or 0) + 1
+	self.runtimeCache = nil
+	self.ensuredDB = nil
+	self.ensuredDBSettingsVersion = nil
+	self.ensuredDBCacheVersion = nil
+end
+
+local function GetRegistryCache(registry)
+	local db = BetterFriendlistDB
+	local cacheVersion = registry.cacheVersion or 0
+	local settingsVersion = BFL.SettingsVersion or 0
+	local betaEnabled = db and db.enableBetaFeatures == true
+	local cache = registry.runtimeCache
+	if
+		cache
+		and cache.db == db
+		and cache.cacheVersion == cacheVersion
+		and cache.settingsVersion == settingsVersion
+		and cache.betaEnabled == betaEnabled
+	then
+		return cache
+	end
+
+	cache = {
+		db = db,
+		cacheVersion = cacheVersion,
+		settingsVersion = settingsVersion,
+		betaEnabled = betaEnabled,
+		quickFilterEntries = {},
+		quickFilterPlans = {},
+	}
+	registry.runtimeCache = cache
+	return cache
+end
+
 local function NormalizeString(value)
 	local text = SafeString(value)
 	if text == "" then
@@ -860,6 +897,16 @@ function Registry:EnsureDB()
 	if not BetterFriendlistDB then
 		return nil
 	end
+	local settingsVersion = BFL.SettingsVersion or 0
+	local cacheVersion = self.cacheVersion or 0
+	if
+		self.ensuredDB == BetterFriendlistDB
+		and self.ensuredDBSettingsVersion == settingsVersion
+		and self.ensuredDBCacheVersion == cacheVersion
+	then
+		return BetterFriendlistDB
+	end
+
 	BetterFriendlistDB.customQuickFilters = BetterFriendlistDB.customQuickFilters or {}
 	BetterFriendlistDB.quickFilterVisibility = BetterFriendlistDB.quickFilterVisibility or {}
 	BetterFriendlistDB.quickFilterOrder = BetterFriendlistDB.quickFilterOrder or {}
@@ -868,6 +915,9 @@ function Registry:EnsureDB()
 	BetterFriendlistDB.sorterVisibility = BetterFriendlistDB.sorterVisibility or {}
 	BetterFriendlistDB.sorterOrder = BetterFriendlistDB.sorterOrder or {}
 	BetterFriendlistDB.nextCustomSorterId = BetterFriendlistDB.nextCustomSorterId or 1
+	self.ensuredDB = BetterFriendlistDB
+	self.ensuredDBSettingsVersion = settingsVersion
+	self.ensuredDBCacheVersion = cacheVersion
 	return BetterFriendlistDB
 end
 
@@ -935,6 +985,7 @@ function Registry:NormalizeDB()
 	for id in pairs(db.customSorters) do
 		AddUnique(db.sorterOrder, id)
 	end
+	self:InvalidateCaches()
 end
 
 local function BuildDisplayEntry(entry, isCustom)
@@ -979,20 +1030,35 @@ local function ResolveSorterEntry(registry, id, requireVisible, fallbackId)
 	return BUILTIN_SORTER_MAP[fallbackId or registry.FALLBACK_PRIMARY_SORT]
 end
 
-function Registry:ResolveQuickFilter(id, requireVisible)
-	local db = self:EnsureDB()
-	id = id or self.FALLBACK_FILTER
+local function ResolveQuickFilterEntry(registry, id, requireVisible)
+	local cache = GetRegistryCache(registry)
+	local cacheKey = tostring(id or registry.FALLBACK_FILTER) .. "|" .. tostring(requireVisible and 1 or 0)
+	local cached = cache.quickFilterEntries[cacheKey]
+	if cached then
+		return cached.entry, cached.isCustom
+	end
+
+	local db = registry:EnsureDB()
+	id = id or registry.FALLBACK_FILTER
 	local entry = BUILTIN_QUICK_FILTER_MAP[id]
 	local isCustom = false
 	if not entry and db and db.customQuickFilters then
 		entry = db.customQuickFilters[id]
 		isCustom = entry ~= nil
 	end
-	if entry and (not requireVisible or self:IsQuickFilterVisible(id)) then
-		return BuildDisplayEntry(entry, isCustom)
+	if not (entry and (not requireVisible or registry:IsQuickFilterVisible(id))) then
+		entry = BUILTIN_QUICK_FILTER_MAP[registry.FALLBACK_FILTER]
+		isCustom = false
 	end
-	entry = BUILTIN_QUICK_FILTER_MAP[self.FALLBACK_FILTER]
-	return BuildDisplayEntry(entry, false)
+
+	cached = { entry = entry, isCustom = isCustom }
+	cache.quickFilterEntries[cacheKey] = cached
+	return entry, isCustom
+end
+
+function Registry:ResolveQuickFilter(id, requireVisible)
+	local entry, isCustom = ResolveQuickFilterEntry(self, id, requireVisible)
+	return entry and BuildDisplayEntry(entry, isCustom) or nil
 end
 
 function Registry:ResolveSorter(id, requireVisible, fallbackId)
@@ -1130,6 +1196,7 @@ function Registry:SetQuickFilterVisibility(id, visible)
 		return
 	end
 	db.quickFilterVisibility[id] = visible and true or false
+	self:InvalidateCaches()
 	self:NormalizeCurrentSelections()
 	if BFL.ForceRefreshFriendsList then
 		BFL:ForceRefreshFriendsList()
@@ -1142,20 +1209,100 @@ function Registry:SetSorterVisibility(id, visible)
 		return
 	end
 	db.sorterVisibility[id] = visible and true or false
+	self:InvalidateCaches()
 	self:NormalizeCurrentSelections()
 	if BFL.ForceRefreshFriendsList then
 		BFL:ForceRefreshFriendsList()
 	end
 end
 
-function Registry:EvaluateQuickFilter(id, friend)
-	local db = self:EnsureDB()
-	local visibleEntry = self:ResolveQuickFilter(id, true)
-	if visibleEntry.isCustom and db and db.customQuickFilters[visibleEntry.id] then
-		return EvaluateAST(db.customQuickFilters[visibleEntry.id].ast, friend)
+local function GetQuickFilterPlan(registry, id)
+	local cache = GetRegistryCache(registry)
+	local cacheKey = tostring(id or registry.FALLBACK_FILTER)
+	local plan = cache.quickFilterPlans[cacheKey]
+	if plan then
+		return plan
 	end
-	local builtin = BUILTIN_QUICK_FILTER_MAP[visibleEntry.id] or BUILTIN_QUICK_FILTER_MAP[self.FALLBACK_FILTER]
-	return builtin.evaluator(friend)
+
+	local entry, isCustom = ResolveQuickFilterEntry(registry, id, true)
+	if isCustom then
+		plan = {
+			isCustom = true,
+			id = entry.id,
+			ast = entry.ast,
+		}
+	else
+		local evaluator = (entry and entry.evaluator) or BuiltinQuickFilter_All
+		plan = {
+			isCustom = false,
+			evaluator = evaluator,
+		}
+	end
+	cache.quickFilterPlans[cacheKey] = plan
+	return plan
+end
+
+function Registry:EvaluateQuickFilter(id, friend)
+	local cacheKey = tostring(id or self.FALLBACK_FILTER)
+	if cacheKey == self.FALLBACK_FILTER then
+		return true
+	end
+
+	local useFriendCache = type(friend) == "table"
+	local plan = GetQuickFilterPlan(self, id)
+	if useFriendCache then
+		local cacheVersion = self.cacheVersion or 0
+		local settingsVersion = BFL.SettingsVersion or 0
+		local friendsVersion = BFL.FriendsListVersion or 0
+		local tagsDefinitionVersion = 0
+		local tagsAssignmentVersion = 0
+		if plan.isCustom then
+			local FriendTags = BFL:GetModule("FriendTags")
+			tagsDefinitionVersion = FriendTags and FriendTags.GetDefinitionVersion and FriendTags:GetDefinitionVersion()
+				or BFL.FriendTagsVersion
+				or 0
+			tagsAssignmentVersion = FriendTags and FriendTags.GetFriendAssignmentVersion and FriendTags:GetFriendAssignmentVersion(friend)
+				or BFL.FriendTagsVersion
+				or 0
+		end
+		local nicknameVersion = BFL.NicknameCacheVersion or 0
+		local resultCache = friend._bflQuickFilterResults
+		if
+			friend._bflQuickFilterCacheVersion ~= cacheVersion
+			or friend._bflQuickFilterSettingsVersion ~= settingsVersion
+			or friend._bflQuickFilterFriendsVersion ~= friendsVersion
+			or friend._bflQuickFilterTagsDefinitionVersion ~= tagsDefinitionVersion
+			or friend._bflQuickFilterTagsAssignmentVersion ~= tagsAssignmentVersion
+			or friend._bflQuickFilterNicknameVersion ~= nicknameVersion
+		then
+			resultCache = {}
+			friend._bflQuickFilterResults = resultCache
+			friend._bflQuickFilterCacheVersion = cacheVersion
+			friend._bflQuickFilterSettingsVersion = settingsVersion
+			friend._bflQuickFilterFriendsVersion = friendsVersion
+			friend._bflQuickFilterTagsDefinitionVersion = tagsDefinitionVersion
+			friend._bflQuickFilterTagsAssignmentVersion = tagsAssignmentVersion
+			friend._bflQuickFilterNicknameVersion = nicknameVersion
+		end
+		local cached = resultCache[cacheKey]
+		if cached ~= nil then
+			return cached
+		end
+
+		local result
+		if plan.isCustom then
+			result = EvaluateAST(plan.ast, friend) and true or false
+		else
+			result = plan.evaluator(friend) and true or false
+		end
+		resultCache[cacheKey] = result
+		return result
+	end
+
+	if plan.isCustom then
+		return EvaluateAST(plan.ast, friend)
+	end
+	return plan.evaluator(friend)
 end
 
 local function GetSortValue(friend, field)
@@ -1313,12 +1460,12 @@ function Registry:CompareFriends(a, b, primaryId, secondaryId)
 end
 
 function Registry:GetQuickFilterText(id)
-	local entry = self:ResolveQuickFilter(id, false)
-	return entry and entry.name or GetLocale("FILTER_ALL", "All Friends")
+	local entry = ResolveQuickFilterEntry(self, id, false)
+	return entry and (entry.name or GetLocale(entry.labelKey, entry.id)) or GetLocale("FILTER_ALL", "All Friends")
 end
 
 function Registry:GetQuickFilterIcon(id)
-	local entry = self:ResolveQuickFilter(id, false)
+	local entry = ResolveQuickFilterEntry(self, id, false)
 	return entry and entry.icon or BFL_ICON_PREFIX .. "filter-all"
 end
 
@@ -1326,15 +1473,15 @@ function Registry:GetSorterText(id)
 	if id == "none" then
 		return GetLocale("SORT_NONE", "None")
 	end
-	local entry = self:ResolveSorter(id, false, self.FALLBACK_PRIMARY_SORT)
-	return entry and entry.name or id
+	local entry = ResolveSorterEntry(self, id, false, self.FALLBACK_PRIMARY_SORT)
+	return entry and (entry.name or GetLocale(entry.labelKey, entry.id)) or id
 end
 
 function Registry:GetSorterIcon(id)
 	if id == "none" then
 		return "Interface\\BUTTONS\\UI-GroupLoot-Pass-Up"
 	end
-	local entry = self:ResolveSorter(id, false, self.FALLBACK_PRIMARY_SORT)
+	local entry = ResolveSorterEntry(self, id, false, self.FALLBACK_PRIMARY_SORT)
 	return entry and entry.icon or BFL_ICON_PREFIX .. "game"
 end
 
@@ -1371,7 +1518,7 @@ function Registry:GetOperatorsForField(fieldId)
 end
 
 function Registry:NormalizeQuickFilterId(id)
-	local entry = self:ResolveQuickFilter(id, true)
+	local entry = ResolveQuickFilterEntry(self, id, true)
 	return entry and entry.id or self.FALLBACK_FILTER
 end
 
@@ -1511,6 +1658,7 @@ function Registry:CreateCustomQuickFilter(templateId)
 		ast = NormalizeGroup(ast),
 	}
 	AddUnique(db.quickFilterOrder, id)
+	self:InvalidateCaches()
 	return id
 end
 
@@ -1532,6 +1680,7 @@ function Registry:UpdateCustomQuickFilter(id, patch)
 	if patch.ast ~= nil then
 		filter.ast = NormalizeGroup(patch.ast)
 	end
+	self:InvalidateCaches()
 	return true
 end
 
@@ -1543,6 +1692,7 @@ function Registry:DeleteCustomQuickFilter(id)
 	db.customQuickFilters[id] = nil
 	db.quickFilterVisibility[id] = nil
 	self:RemoveFromOrder(db.quickFilterOrder, id)
+	self:InvalidateCaches()
 	self:NormalizeCurrentSelections()
 	return true
 end
@@ -1565,6 +1715,7 @@ function Registry:CreateCustomSorter(templateId)
 		chain = NormalizeSorterChain(template and template.chain or nil),
 	}
 	AddUnique(db.sorterOrder, id)
+	self:InvalidateCaches()
 	return id
 end
 
@@ -1586,6 +1737,7 @@ function Registry:UpdateCustomSorter(id, patch)
 	if patch.chain ~= nil then
 		sorter.chain = NormalizeSorterChain(patch.chain)
 	end
+	self:InvalidateCaches()
 	return true
 end
 
@@ -1597,6 +1749,7 @@ function Registry:DeleteCustomSorter(id)
 	db.customSorters[id] = nil
 	db.sorterVisibility[id] = nil
 	self:RemoveFromOrder(db.sorterOrder, id)
+	self:InvalidateCaches()
 	self:NormalizeCurrentSelections()
 	return true
 end
@@ -1636,12 +1789,20 @@ end
 
 function Registry:MoveQuickFilter(id, delta)
 	local db = self:EnsureDB()
-	return db and MoveInOrder(db.quickFilterOrder, id, delta) or false
+	local moved = db and MoveInOrder(db.quickFilterOrder, id, delta) or false
+	if moved then
+		self:InvalidateCaches()
+	end
+	return moved
 end
 
 function Registry:MoveSorter(id, delta)
 	local db = self:EnsureDB()
-	return db and MoveInOrder(db.sorterOrder, id, delta) or false
+	local moved = db and MoveInOrder(db.sorterOrder, id, delta) or false
+	if moved then
+		self:InvalidateCaches()
+	end
+	return moved
 end
 
 function Registry:CountQuickFilterMatches(id)

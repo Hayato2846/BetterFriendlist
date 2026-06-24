@@ -1216,8 +1216,15 @@ function PreviewMode:ApplyMockFriends()
 	end
 
 	-- Override UpdateFriendsList to inject mock data
-	FriendsList.UpdateFriendsList = function(self)
+	FriendsList.UpdateFriendsList = function(self, ignoreVisibility)
 		if PreviewMode.enabled and #PreviewMode.mockData.friends > 0 then
+			if (not BetterFriendsFrame or not BetterFriendsFrame:IsShown()) and not ignoreVisibility then
+				if self.MarkNeedsRenderOnShow then
+					self:MarkNeedsRenderOnShow()
+				end
+				return
+			end
+
 			-- Use mock data instead of real API data
 			wipe(self.friendsList)
 
@@ -1230,10 +1237,10 @@ function PreviewMode:ApplyMockFriends()
 			self:ApplySort()
 
 			-- Build display list to update UI
-			self:RenderDisplay()
+			self:RenderDisplay(ignoreVisibility)
 		else
 			-- Call original function for real data
-			PreviewMode.originalUpdateFriendsList(self)
+			PreviewMode.originalUpdateFriendsList(self, ignoreVisibility)
 		end
 	end
 

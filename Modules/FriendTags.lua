@@ -273,10 +273,10 @@ local function HasAny(set)
 end
 
 local function IsUsableFriendUID(uid)
-	if IsSecret(uid) then
+	if type(uid) ~= "string" and type(uid) ~= "number" then
 		return false
 	end
-	if type(uid) ~= "string" and type(uid) ~= "number" then
+	if IsSecret(uid) then
 		return false
 	end
 	uid = tostring(uid)
@@ -501,7 +501,7 @@ local function NormalizeBoolean(value, defaultValue)
 	return value == true
 end
 
-local function GetTagSortOrder(tag)
+local function CalculateTagSortOrder(tag)
 	if type(tag) ~= "table" then
 		return 0
 	end
@@ -512,6 +512,50 @@ local function GetTagSortOrder(tag)
 	return tonumber(tag.order) or 0
 end
 
+local function GetTagSortOrder(tag)
+	if type(tag) ~= "table" then
+		return 0
+	end
+	if tag._bflSortOrder ~= nil then
+		return tag._bflSortOrder
+	end
+	return CalculateTagSortOrder(tag)
+end
+
+local function RefreshTagSortMetadata(tag)
+	if type(tag) ~= "table" then
+		return tag
+	end
+	tag._bflSortOrder = CalculateTagSortOrder(tag)
+	tag._bflSortName = tag.name or tag.id or ""
+	return tag
+end
+
+local function CompareTagDefinitions(a, b)
+	local aOrder = GetTagSortOrder(a)
+	local bOrder = GetTagSortOrder(b)
+	if aOrder ~= bOrder then
+		return aOrder < bOrder
+	end
+	local aName = type(a) == "table" and (a._bflSortName or a.name or a.id or "") or ""
+	local bName = type(b) == "table" and (b._bflSortName or b.name or b.id or "") or ""
+	return aName < bName
+end
+
+local function AddTagsFromSet(self, tags, set, surface)
+	if type(set) ~= "table" then
+		return
+	end
+	for tagId, enabled in pairs(set) do
+		if enabled == true then
+			local tag = self:GetTagDefinition(tagId)
+			if tag and self:ShouldIncludeTagOnSurface(tag, surface) then
+				tags[#tags + 1] = tag
+			end
+		end
+	end
+end
+
 local function GetPopupEditBox(dialog)
 	if not dialog then
 		return nil
@@ -519,11 +563,81 @@ local function GetPopupEditBox(dialog)
 	return dialog.editBox or dialog.EditBox or (_G[dialog:GetName() and (dialog:GetName() .. "EditBox") or ""])
 end
 
-local function RefreshSurfaces(refreshCallback)
+local function ClearRuntimeCaches()
+	FriendTags.runtimeCache = nil
+end
+
+local FRIEND_CACHE_TAG_SURFACES = { "default", "row", "search", "tooltip", "broker", "group", "menu" }
+
+local function GetDefinitionVersion()
+	return BFL.FriendTagsDefinitionVersion or BFL.FriendTagsVersion or 0
+end
+
+local function BumpDefinitionVersion()
+	BFL.FriendTagsDefinitionVersion = (BFL.FriendTagsDefinitionVersion or BFL.FriendTagsVersion or 0) + 1
 	BFL.FriendTagsVersion = (BFL.FriendTagsVersion or 0) + 1
-	BFL.SettingsVersion = (BFL.SettingsVersion or 0) + 1
+	return BFL.FriendTagsDefinitionVersion
+end
+
+local function BumpAssignmentVersion()
+	BFL.FriendTagsAssignmentVersion = (BFL.FriendTagsAssignmentVersion or 0) + 1
+	BFL.FriendTagsVersion = (BFL.FriendTagsVersion or 0) + 1
+	return BFL.FriendTagsAssignmentVersion
+end
+
+local function UpdateAssignmentVersionFromUID(versions, version, uid)
+	if IsUsableFriendUID(uid) then
+		local uidVersion = versions[tostring(uid)]
+		if uidVersion and uidVersion > version then
+			return uidVersion
+		end
+	end
+	return version
+end
+
+local function MarkAssignmentUID(self, version, uid)
+	if IsUsableFriendUID(uid) then
+		self.friendAssignmentVersions[tostring(uid)] = version
+	end
+end
+
+local function RefreshRuntimeCacheMetadata(self)
+	local cache = self and self.runtimeCache
+	if not cache then
+		return
+	end
+	cache.definitionVersion = GetDefinitionVersion()
+	cache.settingsVersion = BFL.SettingsVersion or 0
+	cache.betaEnabled = BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures == true
+end
+
+local function ClearRuntimeFriendCaches(cache)
+	if not cache then
+		return
+	end
+	cache.blizzardTagSets = {}
+	cache.customTagSets = {}
+	cache.tagsByFriendSurface = {}
+	cache.searchTextByFriend = {}
+	cache.tooltipTextByFriend = {}
+	cache.brokerTextByFriend = {}
+end
+
+local function RefreshSurfaces(refreshCallback, options)
+	options = options or {}
+	BumpDefinitionVersion()
+	if options.settingsVersion ~= false then
+		BFL.SettingsVersion = (BFL.SettingsVersion or 0) + 1
+	end
+	if options.clearCaches == false then
+		RefreshRuntimeCacheMetadata(FriendTags)
+	else
+		ClearRuntimeCaches()
+	end
 	if type(refreshCallback) == "function" then
 		refreshCallback()
+	elseif BFL.ScheduleFriendsListRefresh then
+		BFL:ScheduleFriendsListRefresh("friend-tags", 0.05)
 	elseif BFL.ForceRefreshFriendsList then
 		BFL:ForceRefreshFriendsList()
 	end
@@ -651,10 +765,14 @@ local function GetEnumValue(def)
 end
 
 local function GetEnumToTagIdMap()
+	if FriendTags.enumToTagIdMap then
+		return FriendTags.enumToTagIdMap
+	end
 	local map = {}
 	for _, def in ipairs(BLIZZARD_TAGS) do
 		map[GetEnumValue(def)] = def.id
 	end
+	FriendTags.enumToTagIdMap = map
 	return map
 end
 
@@ -671,9 +789,240 @@ local function GetLocalizedTagName(def)
 	return T(def.labelKey, def.name or def.fallback or def.id)
 end
 
+local function GetRuntimeCache(self)
+	local db = BetterFriendlistDB
+	local cache = self.runtimeCache
+	local definitionVersion = GetDefinitionVersion()
+	local settingsVersion = BFL.SettingsVersion or 0
+	local betaEnabled = db and db.enableBetaFeatures == true
+
+	if
+		cache
+		and cache.db == db
+		and cache.definitionVersion == definitionVersion
+		and cache.settingsVersion == settingsVersion
+		and cache.betaEnabled == betaEnabled
+	then
+		return cache
+	end
+
+	cache = {
+		db = db,
+		definitionVersion = definitionVersion,
+		settingsVersion = settingsVersion,
+		betaEnabled = betaEnabled,
+		blizzardTagDefinitions = nil,
+		customTagDefinitions = nil,
+		allTagDefinitions = nil,
+		tagDefinitionById = nil,
+		defaultChipProfiles = {},
+		chipProfiles = {},
+		displayBySurface = {},
+		blizzardTagSets = {},
+		customTagSets = {},
+		tagsByFriendSurface = {},
+		searchTextByFriend = {},
+		tooltipTextByFriend = {},
+		brokerTextByFriend = {},
+	}
+	self.runtimeCache = cache
+	return cache
+end
+
+local function GetFriendCacheKey(self, friend, surface, explicitUID)
+	local surfaceKey = tostring(surface or "")
+	if type(friend) == "table" and explicitUID == nil then
+		local friendsVersion = BFL.FriendsListVersion or 0
+		local cacheKeys = friend._bflFriendTagsCacheKeys
+		if friend._bflFriendTagsCacheKeyVersion ~= friendsVersion then
+			cacheKeys = {}
+			friend._bflFriendTagsCacheKeys = cacheKeys
+			friend._bflFriendTagsCacheKeyVersion = friendsVersion
+		end
+		local cached = cacheKeys[surfaceKey]
+		if cached then
+			return cached
+		end
+
+		local uid = self:GetFriendUID(friend)
+		uid = uid or friend.uid or friend.battleTag or friend.bnetAccountID or friend.name or friend.characterName
+		local cacheKey = surfaceKey .. "|" .. tostring(friend.type or "") .. "|" .. tostring(uid or "")
+		cacheKeys[surfaceKey] = cacheKey
+		return cacheKey
+	end
+
+	local uid = self:GetFriendUID(friend, explicitUID)
+	local friendType
+	if type(friend) == "table" then
+		uid = uid or friend.uid or friend.battleTag or friend.bnetAccountID or friend.name or friend.characterName
+		friendType = friend.type
+	else
+		uid = uid or friend
+	end
+	return surfaceKey .. "|" .. tostring(friendType or "") .. "|" .. tostring(uid or "")
+end
+
+local function ClearFriendRuntimeCaches(self, friend, explicitUID)
+	local cache = self and self.runtimeCache
+	if not cache then
+		return
+	end
+
+	local function clearForUID(uid)
+		if not IsUsableFriendUID(uid) then
+			return
+		end
+		uid = tostring(uid)
+		local function clearKey(map, surface)
+			if type(map) ~= "table" then
+				return
+			end
+			map[tostring(surface or "") .. "||" .. uid] = nil
+			map[tostring(surface or "") .. "|bnet|" .. uid] = nil
+			map[tostring(surface or "") .. "|wow|" .. uid] = nil
+			if type(friend) == "table" and friend.type and friend.type ~= "bnet" and friend.type ~= "wow" then
+				map[tostring(surface or "") .. "|" .. tostring(friend.type) .. "|" .. uid] = nil
+			end
+		end
+		for _, surface in ipairs(FRIEND_CACHE_TAG_SURFACES) do
+			clearKey(cache.tagsByFriendSurface, surface)
+		end
+		clearKey(cache.blizzardTagSets, "blizzardSet")
+		clearKey(cache.customTagSets, "customSet")
+		clearKey(cache.searchTextByFriend, "searchText")
+		clearKey(cache.tooltipTextByFriend, "tooltipText")
+		clearKey(cache.tooltipTextByFriend, "tooltipTextNoLegacy")
+		clearKey(cache.brokerTextByFriend, "brokerText")
+	end
+
+	clearForUID(explicitUID)
+	clearForUID(self:GetFriendUID(friend, explicitUID))
+	if type(friend) == "table" then
+		clearForUID(friend.uid)
+		if friend.battleTag and not IsSecret(friend.battleTag) then
+			clearForUID("bnet_" .. tostring(friend.battleTag))
+		end
+		if friend.bnetAccountID and not IsSecret(friend.bnetAccountID) then
+			clearForUID("bnet_" .. tostring(friend.bnetAccountID))
+		end
+		clearForUID(GetWoWFriendUID(friend.name or friend.characterName, friend.realmName))
+		friend._bflFriendTagsCacheKeys = nil
+		friend._bflFriendTagsCacheKeyVersion = nil
+		friend._bflFriendTagsRelatedUIDs = nil
+		friend._bflFriendTagsRelatedUIDVersion = nil
+	elseif type(friend) == "string" then
+		clearForUID(friend)
+	end
+end
+
+local function MarkFriendAssignmentVersion(self, friend, explicitUID)
+	local version = BumpAssignmentVersion()
+	self.friendAssignmentVersions = self.friendAssignmentVersions or {}
+
+	MarkAssignmentUID(self, version, explicitUID)
+	for _, uid in ipairs(self:GetRelatedFriendUIDs(friend, explicitUID)) do
+		MarkAssignmentUID(self, version, uid)
+	end
+	if type(friend) == "table" then
+		MarkAssignmentUID(self, version, friend.uid)
+		if friend.battleTag and not IsSecret(friend.battleTag) then
+			MarkAssignmentUID(self, version, "bnet_" .. tostring(friend.battleTag))
+		end
+		if friend.bnetAccountID and not IsSecret(friend.bnetAccountID) then
+			MarkAssignmentUID(self, version, "bnet_" .. tostring(friend.bnetAccountID))
+		end
+		MarkAssignmentUID(self, version, GetWoWFriendUID(friend.name or friend.characterName, friend.realmName))
+	elseif type(friend) == "string" then
+		MarkAssignmentUID(self, version, friend)
+	end
+
+	return version
+end
+
+local function RefreshFriendAssignment(refreshCallback, friend, explicitUID, suppressRefresh)
+	if friend ~= nil or explicitUID ~= nil then
+		MarkFriendAssignmentVersion(FriendTags, friend, explicitUID)
+	else
+		BumpAssignmentVersion()
+		FriendTags.allFriendAssignmentsVersion = BFL.FriendTagsAssignmentVersion or 0
+	end
+	RefreshRuntimeCacheMetadata(FriendTags)
+	if friend ~= nil or explicitUID ~= nil then
+		ClearFriendRuntimeCaches(FriendTags, friend, explicitUID)
+	else
+		ClearRuntimeFriendCaches(FriendTags.runtimeCache)
+	end
+	if suppressRefresh then
+		return
+	end
+	if type(refreshCallback) == "function" then
+		refreshCallback()
+	elseif BFL.ScheduleFriendsListRefresh then
+		BFL:ScheduleFriendsListRefresh("friend-tags-assignment", 0.05)
+	elseif BFL.ForceRefreshFriendsList then
+		BFL:ForceRefreshFriendsList()
+	end
+end
+
+function FriendTags:GetDefinitionVersion()
+	return GetDefinitionVersion()
+end
+
+function FriendTags:GetAssignmentVersion()
+	return BFL.FriendTagsAssignmentVersion or 0
+end
+
+function FriendTags:GetFriendAssignmentVersion(friend, explicitUID)
+	local version = self.allFriendAssignmentsVersion or 0
+	local versions = self.friendAssignmentVersions
+	if not versions then
+		return version
+	end
+	local globalVersion = BFL.FriendTagsAssignmentVersion or 0
+	local friendsVersion = BFL.FriendsListVersion or 0
+	if type(friend) == "table" and explicitUID == nil then
+		if
+			friend._bflFriendTagsAssignmentFriendsVersion == friendsVersion
+			and friend._bflFriendTagsAssignmentGlobalVersion == globalVersion
+		then
+			return friend._bflFriendTagsAssignmentVersion or version
+		end
+	end
+
+	version = UpdateAssignmentVersionFromUID(versions, version, explicitUID)
+	for _, uid in ipairs(self:GetRelatedFriendUIDs(friend, explicitUID)) do
+		version = UpdateAssignmentVersionFromUID(versions, version, uid)
+	end
+	if type(friend) == "table" then
+		version = UpdateAssignmentVersionFromUID(versions, version, friend.uid)
+		if friend.battleTag and not IsSecret(friend.battleTag) then
+			version = UpdateAssignmentVersionFromUID(versions, version, "bnet_" .. tostring(friend.battleTag))
+		end
+		if friend.bnetAccountID and not IsSecret(friend.bnetAccountID) then
+			version = UpdateAssignmentVersionFromUID(versions, version, "bnet_" .. tostring(friend.bnetAccountID))
+		end
+		version = UpdateAssignmentVersionFromUID(versions, version, GetWoWFriendUID(friend.name or friend.characterName, friend.realmName))
+		if explicitUID == nil then
+			friend._bflFriendTagsAssignmentFriendsVersion = friendsVersion
+			friend._bflFriendTagsAssignmentGlobalVersion = globalVersion
+			friend._bflFriendTagsAssignmentVersion = version
+		end
+	elseif type(friend) == "string" then
+		version = UpdateAssignmentVersionFromUID(versions, version, friend)
+	end
+	return version
+end
+
 function FriendTags:NormalizeDB()
 	if not BetterFriendlistDB then
 		BetterFriendlistDB = {}
+	end
+	if self.normalizedDB ~= BetterFriendlistDB then
+		self.normalizedDB = BetterFriendlistDB
+		self.roleIconNormalizedDB = nil
+		self.friendAssignmentVersions = {}
+		self.allFriendAssignmentsVersion = BFL.FriendTagsAssignmentVersion or 0
+		ClearRuntimeCaches()
 	end
 
 	BetterFriendlistDB.friendTagSettings = BetterFriendlistDB.friendTagSettings or {}
@@ -693,10 +1042,17 @@ function FriendTags:NormalizeDB()
 		BetterFriendlistDB.friendTagsLegacyContactMemoryMigrated = false
 	end
 	BetterFriendlistDB.nextCustomFriendTagID = tonumber(BetterFriendlistDB.nextCustomFriendTagID) or 1
-	NormalizeRoleTagIconOverrides(BetterFriendlistDB)
-	self:MigrateLegacyContactMemoryTags(BetterFriendlistDB)
+	if self.roleIconNormalizedDB ~= BetterFriendlistDB then
+		NormalizeRoleTagIconOverrides(BetterFriendlistDB)
+		self.roleIconNormalizedDB = BetterFriendlistDB
+	end
+	if BetterFriendlistDB.friendTagsLegacyContactMemoryMigrated ~= true then
+		self:MigrateLegacyContactMemoryTags(BetterFriendlistDB)
+	end
 	BetterFriendlistDB.friendTagsSchemaVersion = SCHEMA_VERSION
 	BFL.FriendTagsVersion = BFL.FriendTagsVersion or 1
+	BFL.FriendTagsDefinitionVersion = BFL.FriendTagsDefinitionVersion or BFL.FriendTagsVersion or 1
+	BFL.FriendTagsAssignmentVersion = BFL.FriendTagsAssignmentVersion or 0
 
 	return BetterFriendlistDB
 end
@@ -769,7 +1125,11 @@ function FriendTags:MigrateLegacyContactMemoryTags(db)
 
 	db.friendTagsLegacyContactMemoryMigrated = true
 	if migratedAssignments > 0 or migratedTags > 0 then
-		BFL.FriendTagsVersion = (BFL.FriendTagsVersion or 0) + 1
+		BumpDefinitionVersion()
+		if migratedAssignments > 0 then
+			BumpAssignmentVersion()
+			self.allFriendAssignmentsVersion = BFL.FriendTagsAssignmentVersion or 0
+		end
 	end
 	return migratedAssignments, migratedTags
 end
@@ -830,38 +1190,56 @@ function FriendTags:SetSetting(key, value, refreshCallback)
 	return true
 end
 
+function FriendTags:ClearCaches()
+	ClearRuntimeCaches()
+end
+
 function FriendTags:Invalidate(reason, refreshCallback)
 	RefreshSurfaces(refreshCallback)
 end
 
 function FriendTags:IsEnabled()
+	local cache = GetRuntimeCache(self)
+	if cache.isEnabled ~= nil then
+		return cache.isEnabled
+	end
+	local enabled = false
 	if not BetterFriendlistDB or BetterFriendlistDB.enableBetaFeatures ~= true then
+		cache.isEnabled = false
 		return false
 	end
 	local ContactMemory = BFL:GetModule("ContactMemory")
-	if ContactMemory and ContactMemory.GetEnabledSetting and ContactMemory:GetEnabledSetting() ~= true then
-		return false
+	if not (ContactMemory and ContactMemory.GetEnabledSetting and ContactMemory:GetEnabledSetting() ~= true) then
+		enabled = self:GetSetting("enabled", true) ~= false
 	end
-	return self:GetSetting("enabled", true) ~= false
+	cache.isEnabled = enabled
+	return enabled
 end
 
 function FriendTags:CanDisplayTags(surface)
+	surface = surface or "default"
+	local cache = GetRuntimeCache(self)
+	if cache.displayBySurface[surface] ~= nil then
+		return cache.displayBySurface[surface]
+	end
+	local canDisplay = true
 	if not self:IsEnabled() then
-		return false
+		canDisplay = false
+	elseif
+		BetterFriendlistDB
+		and BetterFriendlistDB.streamerModeActive
+		and self:GetSetting("showTagsInStreamerMode", false) ~= true
+	then
+		canDisplay = false
+	elseif surface == "row" and self:GetSetting("showRowChips", true) ~= true then
+		canDisplay = false
+	elseif surface == "tooltip" and self:GetSetting("showTooltipChips", true) ~= true then
+		canDisplay = false
+	elseif surface == "broker" and self:GetSetting("showBrokerChips", true) ~= true then
+		canDisplay = false
 	end
-	if BetterFriendlistDB and BetterFriendlistDB.streamerModeActive and self:GetSetting("showTagsInStreamerMode", false) ~= true then
-		return false
-	end
-	if surface == "row" and self:GetSetting("showRowChips", true) ~= true then
-		return false
-	end
-	if surface == "tooltip" and self:GetSetting("showTooltipChips", true) ~= true then
-		return false
-	end
-	if surface == "broker" and self:GetSetting("showBrokerChips", true) ~= true then
-		return false
-	end
-	return true
+	cache.displayBySurface[surface] = canDisplay
+	return canDisplay
 end
 
 function FriendTags:IsBlizzardTagAPIAvailable()
@@ -893,42 +1271,68 @@ function FriendTags:GetFriendUID(friend, explicitUID)
 	if IsUsableFriendUID(explicitUID) then
 		return tostring(explicitUID)
 	end
-	if IsSecret(friend) then
+	local friendType = type(friend)
+	if friendType == "string" or friendType == "number" then
+		return IsUsableFriendUID(friend) and tostring(friend) or nil
+	end
+	if friendType ~= "table" then
 		return nil
 	end
-	if type(friend) == "string" then
-		return IsUsableFriendUID(friend) and friend or nil
+
+	local friendsVersion = BFL.FriendsListVersion or 0
+	if friend._bflFriendTagsUIDVersion == friendsVersion then
+		return friend._bflFriendTagsUID or nil
 	end
-	if type(friend) ~= "table" then
-		return nil
-	end
+
+	local uid
 	if IsUsableFriendUID(friend.uid) then
-		return tostring(friend.uid)
-	end
-	if friend.type == "bnet" then
-		if friend.battleTag and not IsSecret(friend.battleTag) then
-			return "bnet_" .. tostring(friend.battleTag)
+		uid = tostring(friend.uid)
+	elseif friend.type == "bnet" then
+		local battleTag = friend.battleTag
+		if battleTag and not IsSecret(battleTag) then
+			uid = "bnet_" .. tostring(battleTag)
 		end
-		if friend.bnetAccountID and not IsSecret(friend.bnetAccountID) then
-			return "bnet_" .. tostring(friend.bnetAccountID)
+		if not uid then
+			local accountID = friend.bnetAccountID
+			if accountID and not IsSecret(accountID) then
+				uid = "bnet_" .. tostring(accountID)
+			end
 		end
 	end
 
-	local name = friend.name or friend.characterName
-	local realm = friend.realmName
-	if name and BFL.NormalizeWoWFriendName then
-		local normalized = BFL:NormalizeWoWFriendName(realm and (name .. "-" .. realm) or name)
-		return normalized and ("wow_" .. normalized) or nil
+	if not uid then
+		local name = friend.name or friend.characterName
+		local realm = friend.realmName
+		if name and BFL.NormalizeWoWFriendName then
+			local normalized = BFL:NormalizeWoWFriendName(realm and (name .. "-" .. realm) or name)
+			uid = normalized and ("wow_" .. normalized) or nil
+		elseif name then
+			uid = "wow_" .. tostring(name)
+		end
 	end
-	return name and ("wow_" .. tostring(name)) or nil
+
+	friend._bflFriendTagsUIDVersion = friendsVersion
+	friend._bflFriendTagsUID = uid or false
+	return uid
 end
 
 function FriendTags:GetRelatedFriendUIDs(friend, explicitUID)
+	local useFriendCache = type(friend) == "table" and explicitUID == nil
+	if useFriendCache then
+		local friendsVersion = BFL.FriendsListVersion or 0
+		if
+			friend._bflFriendTagsRelatedUIDVersion == friendsVersion
+			and type(friend._bflFriendTagsRelatedUIDs) == "table"
+		then
+			return friend._bflFriendTagsRelatedUIDs
+		end
+	end
+
 	local uids = {}
 	local seen = {}
 	AddUniqueUID(uids, seen, self:GetFriendUID(friend, explicitUID))
 
-	if type(friend) ~= "table" or IsSecret(friend) then
+	if type(friend) ~= "table" then
 		return uids
 	end
 
@@ -953,10 +1357,19 @@ function FriendTags:GetRelatedFriendUIDs(friend, explicitUID)
 		AddUniqueUID(uids, seen, GetWoWFriendUID(friend.name or friend.characterName, friend.realmName))
 	end
 
+	if useFriendCache then
+		friend._bflFriendTagsRelatedUIDs = uids
+		friend._bflFriendTagsRelatedUIDVersion = BFL.FriendsListVersion or 0
+	end
 	return uids
 end
 
 function FriendTags:GetBlizzardTagDefinitions()
+	local cache = GetRuntimeCache(self)
+	if cache.blizzardTagDefinitions then
+		return cache.blizzardTagDefinitions
+	end
+
 	local definitions = {}
 	for _, def in ipairs(BLIZZARD_TAGS) do
 		local icon = GetIconInfo(def.defaultIcon)
@@ -981,14 +1394,21 @@ function FriendTags:GetBlizzardTagDefinitions()
 			order = tonumber(def.order) or 0,
 		}
 	end
+	cache.blizzardTagDefinitions = definitions
 	return definitions
 end
 
 function FriendTags:GetBlizzardTagLabel(tagId)
-	return GetLocalizedTagName(BLIZZARD_TAG_BY_ID[tagId])
+	local def = self:GetTagDefinition(tagId)
+	return (def and def.name) or GetLocalizedTagName(BLIZZARD_TAG_BY_ID[tagId])
 end
 
 function FriendTags:GetIconOptions()
+	local cache = GetRuntimeCache(self)
+	if cache.iconOptions then
+		return cache.iconOptions
+	end
+
 	local options = {}
 	for _, icon in ipairs(ICON_OPTIONS) do
 		local iconInfo = GetIconInfo(icon)
@@ -1004,6 +1424,7 @@ function FriendTags:GetIconOptions()
 			texCoord = CopyTexCoord(iconInfo.texCoord),
 		}
 	end
+	cache.iconOptions = options
 	return options
 end
 
@@ -1021,6 +1442,11 @@ function FriendTags:GetIconInfo(iconID)
 end
 
 function FriendTags:GetCustomTagDefinitions()
+	local cache = GetRuntimeCache(self)
+	if cache.customTagDefinitions then
+		return cache.customTagDefinitions
+	end
+
 	local db = self:NormalizeDB()
 	local definitions = {}
 	for id, def in pairs(db.customFriendTags) do
@@ -1028,7 +1454,7 @@ function FriendTags:GetCustomTagDefinitions()
 			local name = NormalizeTagName(def.name)
 			if name then
 				local icon = CopyIconInfo(def, GetIconInfo("tag"))
-				definitions[#definitions + 1] = {
+				definitions[#definitions + 1] = RefreshTagSortMetadata({
 					id = id,
 					source = SOURCE_CUSTOM,
 					name = name,
@@ -1043,7 +1469,7 @@ function FriendTags:GetCustomTagDefinitions()
 					texCoord = CopyTexCoord(icon.texCoord),
 					createdAt = def.createdAt,
 					updatedAt = def.updatedAt,
-				}
+				})
 			end
 		end
 	end
@@ -1053,44 +1479,45 @@ function FriendTags:GetCustomTagDefinitions()
 		end
 		return (a.name or a.id) < (b.name or b.id)
 	end)
+	cache.customTagDefinitions = definitions
 	return definitions
 end
 
 function FriendTags:GetAllTagDefinitions()
+	local cache = GetRuntimeCache(self)
+	if cache.allTagDefinitions then
+		return cache.allTagDefinitions
+	end
+
 	local definitions = {}
+	local byId = {}
 	for _, def in ipairs(self:GetBlizzardTagDefinitions()) do
+		def.chipProfile = self:GetChipProfile(def)
+		RefreshTagSortMetadata(def)
 		definitions[#definitions + 1] = def
+		byId[def.id] = def
 	end
 	for _, def in ipairs(self:GetCustomTagDefinitions()) do
+		def.chipProfile = self:GetChipProfile(def)
+		RefreshTagSortMetadata(def)
 		definitions[#definitions + 1] = def
+		byId[def.id] = def
 	end
-	table.sort(definitions, function(a, b)
-		local aProfile = self:GetChipProfile(a)
-		local bProfile = self:GetChipProfile(b)
-		local aOrder = aProfile and aProfile.order or a.order or 0
-		local bOrder = bProfile and bProfile.order or b.order or 0
-		if aOrder ~= bOrder then
-			return aOrder < bOrder
-		end
-		return (a.name or a.id) < (b.name or b.id)
-	end)
+	table.sort(definitions, CompareTagDefinitions)
+	cache.allTagDefinitions = definitions
+	cache.tagDefinitionById = byId
 	return definitions
 end
 
 function FriendTags:GetTagDefinition(tagId)
-	if BLIZZARD_TAG_BY_ID[tagId] then
-		for _, def in ipairs(self:GetBlizzardTagDefinitions()) do
-			if def.id == tagId then
-				return def
-			end
-		end
+	if type(tagId) ~= "string" then
+		return nil
 	end
-	for _, def in ipairs(self:GetCustomTagDefinitions()) do
-		if def.id == tagId then
-			return def
-		end
+	local cache = GetRuntimeCache(self)
+	if not cache.tagDefinitionById then
+		self:GetAllTagDefinitions()
 	end
-	return nil
+	return cache.tagDefinitionById and cache.tagDefinitionById[tagId] or nil
 end
 
 function FriendTags:GetDefaultChipProfile(tag)
@@ -1100,11 +1527,15 @@ function FriendTags:GetDefaultChipProfile(tag)
 	if type(tag) ~= "table" then
 		return nil
 	end
+	local cache = GetRuntimeCache(self)
+	if cache.defaultChipProfiles[tag.id] then
+		return cache.defaultChipProfiles[tag.id]
+	end
 
 	local defaultIcon = tag.defaultIcon and GetIconInfo(tag.defaultIcon) or GetIconInfo("tag")
 	defaultIcon = CopyIconInfo(tag, defaultIcon)
 	local defaultOrder = tonumber(tag.order) or (tag.source == SOURCE_CUSTOM and 1000 or 0)
-	return {
+	local profile = {
 		chipLabel = nil,
 		iconType = defaultIcon.iconType,
 		iconValue = defaultIcon.iconValue,
@@ -1121,6 +1552,8 @@ function FriendTags:GetDefaultChipProfile(tag)
 		brokerVisible = true,
 		order = defaultOrder,
 	}
+	cache.defaultChipProfiles[tag.id] = profile
+	return profile
 end
 
 function FriendTags:PruneChipProfileOverride(tagId, profile)
@@ -1186,9 +1619,16 @@ function FriendTags:GetChipProfile(tag)
 	if type(tag) ~= "table" then
 		return nil
 	end
+	local cache = GetRuntimeCache(self)
+	if cache.chipProfiles[tag.id] then
+		return cache.chipProfiles[tag.id]
+	end
 
 	local db = self:NormalizeDB()
 	local defaultProfile = self:GetDefaultChipProfile(tag)
+	if type(defaultProfile) ~= "table" then
+		return nil
+	end
 	local override = CopyProfile(db.friendTagProfiles[tag.id])
 	local iconType = override.iconType ~= nil and override.iconType or defaultProfile.iconType
 	local iconValue = override.iconValue ~= nil and override.iconValue or defaultProfile.iconValue
@@ -1206,7 +1646,7 @@ function FriendTags:GetChipProfile(tag)
 		texCoord = nil
 	end
 
-	return {
+	local profile = {
 		chipLabel = override.chipLabel,
 		iconType = iconType,
 		iconValue = iconValue,
@@ -1223,6 +1663,8 @@ function FriendTags:GetChipProfile(tag)
 		color = CopyColor(override.color, defaultProfile.color),
 		textColor = CopyColor(override.textColor, defaultProfile.textColor),
 	}
+	cache.chipProfiles[tag.id] = profile
+	return profile
 end
 
 function FriendTags:SetChipProfile(tagId, profilePatch, refreshCallback)
@@ -1376,26 +1818,35 @@ function FriendTags:TryHandoffLocalBlizzardTags(friend, nativeSet)
 end
 
 function FriendTags:GetBlizzardTagIdSetForFriend(friend, explicitUID)
-	if type(friend) ~= "table" or friend.type ~= "bnet" then
-		return {}
+	local cache = GetRuntimeCache(self)
+	local cacheKey = GetFriendCacheKey(self, friend, "blizzardSet", explicitUID)
+	if cache.blizzardTagSets[cacheKey] then
+		return cache.blizzardTagSets[cacheKey]
 	end
-	if self:AreBlizzardTagsEnabled() then
+
+	local result
+	if type(friend) ~= "table" or friend.type ~= "bnet" then
+		result = {}
+	elseif self:AreBlizzardTagsEnabled() then
 		local nativeSet = self:GetNativeBlizzardTagIdSet(friend)
 		local uid = self:GetFriendUID(friend, explicitUID)
 		local pendingSet = uid and self.pendingBlizzardTagSets and self.pendingBlizzardTagSets[uid]
 		if HasAny(pendingSet) then
-			return CopySet(pendingSet)
-		end
-
-		local storedSet = self:GetStoredBlizzardTagIdSet(friend, explicitUID)
-		for tagId, enabled in pairs(storedSet) do
-			if enabled and BLIZZARD_TAG_BY_ID[tagId] then
-				nativeSet[tagId] = true
+			result = CopySet(pendingSet)
+		else
+			local storedSet = self:GetStoredBlizzardTagIdSet(friend, explicitUID)
+			for tagId, enabled in pairs(storedSet) do
+				if enabled and BLIZZARD_TAG_BY_ID[tagId] then
+					nativeSet[tagId] = true
+				end
 			end
+			result = nativeSet
 		end
-		return nativeSet
+	else
+		result = self:GetStoredBlizzardTagIdSet(friend, explicitUID)
 	end
-	return self:GetStoredBlizzardTagIdSet(friend, explicitUID)
+	cache.blizzardTagSets[cacheKey] = result
+	return result
 end
 
 function FriendTags:SetBlizzardTagsForFriend(friend, tagIds, options)
@@ -1432,9 +1883,9 @@ function FriendTags:SetBlizzardTagsForFriend(friend, tagIds, options)
 			self.pendingBlizzardTagSets = self.pendingBlizzardTagSets or {}
 			self.pendingBlizzardTagSets[uid] = CopySet(desired)
 			if not options.suppressRefresh then
-				RefreshSurfaces(options.refreshCallback)
+				RefreshFriendAssignment(options.refreshCallback, friend, uid)
 			else
-				BFL.FriendTagsVersion = (BFL.FriendTagsVersion or 0) + 1
+				RefreshFriendAssignment(nil, friend, uid, true)
 			end
 			return true
 		end
@@ -1445,9 +1896,9 @@ function FriendTags:SetBlizzardTagsForFriend(friend, tagIds, options)
 		self.pendingBlizzardTagSets[uid] = nil
 	end
 	if not options.suppressRefresh then
-		RefreshSurfaces(options.refreshCallback)
+		RefreshFriendAssignment(options.refreshCallback, friend, uid)
 	else
-		BFL.FriendTagsVersion = (BFL.FriendTagsVersion or 0) + 1
+		RefreshFriendAssignment(nil, friend, uid, true)
 	end
 	return true
 end
@@ -1535,6 +1986,12 @@ function FriendTags:HandoffKnownLocalBlizzardTags(refreshCallback)
 end
 
 function FriendTags:GetCustomTagIdSetForFriend(friend, explicitUID)
+	local cache = GetRuntimeCache(self)
+	local cacheKey = GetFriendCacheKey(self, friend, "customSet", explicitUID)
+	if cache.customTagSets[cacheKey] then
+		return cache.customTagSets[cacheKey]
+	end
+
 	local db = self:NormalizeDB()
 	local result = {}
 	for _, uid in ipairs(self:GetRelatedFriendUIDs(friend, explicitUID)) do
@@ -1547,6 +2004,7 @@ function FriendTags:GetCustomTagIdSetForFriend(friend, explicitUID)
 			end
 		end
 	end
+	cache.customTagSets[cacheKey] = result
 	return result
 end
 
@@ -1570,7 +2028,7 @@ function FriendTags:SetCustomTagsForFriend(friend, tagIds, refreshCallback, expl
 	end
 
 	db.friendCustomTags[uid] = HasAny(filtered) and filtered or nil
-	RefreshSurfaces(refreshCallback)
+	RefreshFriendAssignment(refreshCallback, friend, uid)
 	return true
 end
 
@@ -1586,7 +2044,7 @@ function FriendTags:SetCustomTagForFriend(friend, tagId, enabled, refreshCallbac
 	local set = CopySet(db.friendCustomTags[uid])
 	set[tagId] = enabled == true or nil
 	db.friendCustomTags[uid] = HasAny(set) and set or nil
-	RefreshSurfaces(refreshCallback)
+	RefreshFriendAssignment(refreshCallback, friend, uid)
 	return true
 end
 
@@ -1713,70 +2171,28 @@ function FriendTags:GetTagsForFriend(friend, surface)
 		return {}
 	end
 
+	local cache = GetRuntimeCache(self)
+	local cacheKey = GetFriendCacheKey(self, friend, surface or "default")
+	if cache.tagsByFriendSurface[cacheKey] then
+		return cache.tagsByFriendSurface[cacheKey]
+	end
+
 	local tags = {}
-	local seen = {}
 
-	if type(friend) == "table" and friend.type == "bnet" then
-		local blizzardSet = self:GetBlizzardTagIdSetForFriend(friend)
-		for _, def in ipairs(self:GetBlizzardTagDefinitions()) do
-			if blizzardSet[def.id] then
-				local tag = {
-					id = def.id,
-					source = SOURCE_BLIZZARD,
-					name = def.name or GetLocalizedTagName(def),
-					group = def.group,
-					color = def.color,
-					iconType = def.iconType or "texture",
-					iconValue = def.iconValue or def.icon,
-					icon = def.icon or TAG_ICON,
-					atlas = def.atlas,
-					fallbackAtlas = def.fallbackAtlas,
-					texture = def.texture,
-					texCoord = CopyTexCoord(def.texCoord),
-					order = def.order,
-				}
-				tag.chipProfile = self:GetChipProfile(tag)
-				if self:ShouldIncludeTagOnSurface(tag, surface) then
-					tags[#tags + 1] = tag
-					seen[tag.source .. ":" .. tag.name:lower()] = true
-				end
-			end
-		end
-	end
-
+	local blizzardSet = type(friend) == "table" and friend.type == "bnet" and self:GetBlizzardTagIdSetForFriend(friend)
+		or nil
 	local customSet = self:GetCustomTagIdSetForFriend(friend)
-	for _, def in ipairs(self:GetCustomTagDefinitions()) do
-		if customSet[def.id] then
-				local tag = {
-					id = def.id,
-					source = SOURCE_CUSTOM,
-					name = def.name,
-					color = def.color,
-					iconType = def.iconType,
-					iconValue = def.iconValue,
-					icon = def.icon or TAG_ICON,
-					atlas = def.atlas,
-					fallbackAtlas = def.fallbackAtlas,
-					texture = def.texture,
-					texCoord = CopyTexCoord(def.texCoord),
-					order = def.order,
-				}
-				tag.chipProfile = self:GetChipProfile(tag)
-				if self:ShouldIncludeTagOnSurface(tag, surface) then
-					tags[#tags + 1] = tag
-					seen[tag.source .. ":" .. tag.name:lower()] = true
-				end
+	AddTagsFromSet(self, tags, blizzardSet, surface)
+	AddTagsFromSet(self, tags, customSet, surface)
+	if #tags == 2 then
+		if CompareTagDefinitions(tags[2], tags[1]) then
+			tags[1], tags[2] = tags[2], tags[1]
 		end
+	elseif #tags > 2 then
+		table.sort(tags, CompareTagDefinitions)
 	end
 
-	table.sort(tags, function(a, b)
-		local aOrder = GetTagSortOrder(a)
-		local bOrder = GetTagSortOrder(b)
-		if aOrder ~= bOrder then
-			return aOrder < bOrder
-		end
-		return (a.name or a.id) < (b.name or b.id)
-	end)
+	cache.tagsByFriendSurface[cacheKey] = tags
 	return tags
 end
 
@@ -1792,8 +2208,15 @@ function FriendTags:GetSearchText(friend)
 	if not self:CanDisplayTags("search") then
 		return ""
 	end
+	local cache = GetRuntimeCache(self)
+	local cacheKey = GetFriendCacheKey(self, friend, "searchText")
+	if cache.searchTextByFriend[cacheKey] ~= nil then
+		return cache.searchTextByFriend[cacheKey]
+	end
+
 	local tags = self:GetTagsForFriend(friend, "search")
 	if #tags == 0 then
+		cache.searchTextByFriend[cacheKey] = ""
 		return ""
 	end
 	local parts = {}
@@ -1804,15 +2227,25 @@ function FriendTags:GetSearchText(friend)
 			parts[#parts + 1] = chipLabel
 		end
 	end
-	return table.concat(parts, " ")
+	local text = table.concat(parts, " ")
+	cache.searchTextByFriend[cacheKey] = text
+	return text
 end
 
 function FriendTags:GetTooltipTextForFriend(friend, includeLegacy)
 	if not self:CanDisplayTags("tooltip") then
 		return nil
 	end
+	local cache = GetRuntimeCache(self)
+	local cacheKey = GetFriendCacheKey(self, friend, includeLegacy == false and "tooltipTextNoLegacy" or "tooltipText")
+	local cached = cache.tooltipTextByFriend[cacheKey]
+	if cached ~= nil then
+		return cached or nil
+	end
+
 	local tags = self:GetTagsForFriend(friend, "tooltip")
 	if #tags == 0 then
+		cache.tooltipTextByFriend[cacheKey] = false
 		return nil
 	end
 	local maxTags = tonumber(self:GetSetting("maxTooltipChips", 8)) or 8
@@ -1823,6 +2256,7 @@ function FriendTags:GetTooltipTextForFriend(friend, includeLegacy)
 		end
 	end
 	if #names == 0 then
+		cache.tooltipTextByFriend[cacheKey] = false
 		return nil
 	end
 	local visibleNames = {}
@@ -1833,15 +2267,25 @@ function FriendTags:GetTooltipTextForFriend(friend, includeLegacy)
 		end
 		visibleNames[#visibleNames + 1] = name
 	end
-	return table.concat(visibleNames, ", ")
+	local text = table.concat(visibleNames, ", ")
+	cache.tooltipTextByFriend[cacheKey] = text
+	return text
 end
 
 function FriendTags:GetBrokerTextForFriend(friend)
 	if not self:CanDisplayTags("broker") then
 		return nil
 	end
+	local cache = GetRuntimeCache(self)
+	local cacheKey = GetFriendCacheKey(self, friend, "brokerText")
+	local cached = cache.brokerTextByFriend[cacheKey]
+	if cached ~= nil then
+		return cached or nil
+	end
+
 	local tags = self:GetTagsForFriend(friend, "broker")
 	if #tags == 0 then
+		cache.brokerTextByFriend[cacheKey] = false
 		return nil
 	end
 	local maxTags = tonumber(self:GetSetting("maxTooltipChips", 8)) or 8
@@ -1853,7 +2297,9 @@ function FriendTags:GetBrokerTextForFriend(friend)
 		end
 		names[#names + 1] = tag.name
 	end
-	return table.concat(names, ", ")
+	local text = table.concat(names, ", ")
+	cache.brokerTextByFriend[cacheKey] = text
+	return text
 end
 
 function FriendTags:FriendHasTag(friend, query, surface)
@@ -1941,7 +2387,7 @@ function FriendTags:PopulateMenuContent(submenu, friend, explicitUID, displayNam
 			or T("FRIEND_TAGS_BLIZZARD_COMPAT_SECTION", "Blizzard-compatible Tags")
 		submenu:CreateTitle(sectionTitle)
 
-		local workingBlizzardSet = self:GetBlizzardTagIdSetForFriend(friend, explicitUID)
+		local workingBlizzardSet = CopySet(self:GetBlizzardTagIdSetForFriend(friend, explicitUID))
 		local function CommitBlizzardTags()
 			self:SetBlizzardTagsForFriend(friend, workingBlizzardSet, {
 				refreshCallback = refreshCallback,
@@ -2089,7 +2535,7 @@ function FriendTags:Initialize()
 		end
 		BFL:RegisterEventCallback("BN_FRIEND_INFO_CHANGED", function()
 			self.pendingBlizzardTagSets = {}
-			BFL.FriendTagsVersion = (BFL.FriendTagsVersion or 0) + 1
+			RefreshFriendAssignment(nil, nil, nil, true)
 		end, 85)
 	end
 end

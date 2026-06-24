@@ -37,6 +37,13 @@ local lastUpdateTime = 0
 local THROTTLE_INTERVAL = 0.1 -- Update max 10 times per second (crisp but not spammy)
 local pendingDeferredUpdate = false
 local pendingTextUpdate = false
+local friendCountsCache = nil
+local FRIEND_COUNTS_CACHE_TTL = 2.0
+local friendCountsEventVersion = 0
+local bnetCountsCache = nil
+-- Mobile filtering needs per-account Battle.net reads; keep it out of idle broker bursts.
+local BNET_COUNTS_SNAPSHOT_TTL = 60.0
+local bnetCountsHardInvalidated = true
 
 -- LibQTip tooltip reference
 local tooltip = nil
@@ -63,6 +70,106 @@ local function GetAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
 		return BFL:GetThemeAccentColor(fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1)
 	end
 	return fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1
+end
+
+local function InvalidateFriendCountsCache()
+	friendCountsCache = nil
+	friendCountsEventVersion = friendCountsEventVersion + 1
+end
+
+local function InvalidateBattleNetCountsCache()
+	bnetCountsCache = nil
+	bnetCountsHardInvalidated = true
+end
+
+local function CountBattleNetOnlineFriends(numTotal)
+	local onlineCount = 0
+	for i = 1, numTotal or 0 do
+		if BNGetFriendInfo then
+			local _, _, _, _, _, _, client, isOnline = BNGetFriendInfo(i)
+			if isOnline and client ~= "BSAp" then
+				onlineCount = onlineCount + 1
+			end
+		else
+			local accountInfo = BFL.GetBNetFriendInfo and BFL.GetBNetFriendInfo(i)
+			local gameInfo = accountInfo and accountInfo.gameAccountInfo
+			local client = gameInfo and gameInfo.clientProgram or "App"
+			if accountInfo and gameInfo and gameInfo.isOnline and client ~= "BSAp" then
+				onlineCount = onlineCount + 1
+			end
+		end
+	end
+	return onlineCount
+end
+
+local function ClampBattleNetOnlineCount(onlineCount, numOnline)
+	onlineCount = onlineCount or 0
+	numOnline = numOnline or 0
+	if onlineCount > numOnline then
+		return numOnline
+	end
+	if onlineCount < 0 then
+		return 0
+	end
+	return onlineCount
+end
+
+local function RefreshBattleNetCountsSnapshot(numTotal, numOnline, now)
+	local filteredOnline = CountBattleNetOnlineFriends(numTotal)
+	bnetCountsCache = {
+		time = now,
+		numTotal = numTotal,
+		numOnline = numOnline,
+		total = numTotal,
+		online = filteredOnline,
+	}
+	bnetCountsHardInvalidated = false
+	return numTotal, filteredOnline
+end
+
+local function GetBattleNetCounts(treatMobileAsOffline)
+	if not BNConnected or not BNGetNumFriends then
+		return 0, 0
+	end
+
+	if not (BNConnected() and (not BFL.IsBattleNetFriendsListEnabled or BFL.IsBattleNetFriendsListEnabled())) then
+		return 0, 0
+	end
+
+	local numTotal, numOnline = BNGetNumFriends()
+	numTotal = numTotal or 0
+	numOnline = numOnline or 0
+
+	if not treatMobileAsOffline then
+		return numTotal, numOnline
+	end
+
+	local now = GetTime and GetTime() or 0
+	if numTotal == 0 or numOnline == 0 then
+		bnetCountsCache = {
+			time = now,
+			numTotal = numTotal,
+			numOnline = numOnline,
+			total = numTotal,
+			online = 0,
+		}
+		bnetCountsHardInvalidated = false
+		return numTotal, 0
+	end
+
+	local cacheAge = bnetCountsCache and (now - (bnetCountsCache.time or 0)) or BNET_COUNTS_SNAPSHOT_TTL + 1
+	if
+		not bnetCountsCache
+		or bnetCountsHardInvalidated
+		or bnetCountsCache.numTotal ~= numTotal
+		or cacheAge > BNET_COUNTS_SNAPSHOT_TTL
+	then
+		return RefreshBattleNetCountsSnapshot(numTotal, numOnline, now)
+	end
+
+	bnetCountsCache.numOnline = numOnline
+	bnetCountsCache.total = numTotal
+	return numTotal, ClampBattleNetOnlineCount(bnetCountsCache.online, numOnline)
 end
 
 -- Get class color for friend (returns color table or white fallback)
@@ -535,25 +642,7 @@ local function GetFriendCounts()
 	wowOnline = C_FriendList.GetNumOnlineFriends() or 0
 
 	-- BNet Friends
-	if BNConnected() and (not BFL.IsBattleNetFriendsListEnabled or BFL.IsBattleNetFriendsListEnabled()) then
-		local numTotal, numOnline = BNGetNumFriends()
-		bnetTotal = numTotal or 0
-
-		if treatMobileAsOffline then
-			bnetOnline = 0
-			for i = 1, numOnline do
-				local accountInfo = BFL.GetBNetFriendInfo and BFL.GetBNetFriendInfo(i)
-				if accountInfo and accountInfo.gameAccountInfo then
-					local client = accountInfo.gameAccountInfo.clientProgram or "App"
-					if client ~= "BSAp" then
-						bnetOnline = bnetOnline + 1
-					end
-				end
-			end
-		else
-			bnetOnline = numOnline or 0
-		end
-	end
+	bnetTotal, bnetOnline = GetBattleNetCounts(treatMobileAsOffline)
 
 	return wowOnline, wowTotal, bnetOnline, bnetTotal
 end
@@ -562,149 +651,182 @@ end
 -- Returns wowFiltered, wowTotal, bnetFiltered, bnetTotal
 -- The first value is the number to display as "online/current"; never report
 -- total friends as online just because the active filter is "All".
+local function BuildFriendCountsCacheSignature(currentFilter)
+	return table.concat({
+		currentFilter or "all",
+		BFL.FriendsListVersion or 0,
+		BFL.FilterSortRegistryVersion or 0,
+		BFL.FriendTagsVersion or 0,
+		BFL.SettingsVersion or 0,
+		BetterFriendlistDB and BetterFriendlistDB.treatMobileAsOffline and 1 or 0,
+		friendCountsEventVersion or 0,
+		tostring(previewData or ""),
+	}, "|")
+end
+
 local function GetFilteredFriendCounts()
 	local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
 	local Registry = GetFilterSortRegistry()
 	if Registry and Registry.NormalizeQuickFilterId then
 		currentFilter = Registry:NormalizeQuickFilterId(currentFilter)
 	end
+	local cacheSignature = BuildFriendCountsCacheSignature(currentFilter)
+	local now = GetTime and GetTime() or 0
+	if
+		friendCountsCache
+		and friendCountsCache.signature == cacheSignature
+		and now - (friendCountsCache.time or 0) <= FRIEND_COUNTS_CACHE_TTL
+	then
+		return friendCountsCache.wowOnline,
+			friendCountsCache.wowTotal,
+			friendCountsCache.bnetOnline,
+			friendCountsCache.bnetTotal
+	end
+
 	local resolvedFilter = Registry and Registry.ResolveQuickFilter and Registry:ResolveQuickFilter(currentFilter, true)
 	local useRegistryFilter = resolvedFilter and resolvedFilter.isCustom
 
+	local wowFiltered, wowTotal, bnetFiltered, bnetTotal
 	if previewData and previewData.friends then
-		return GetPreviewFriendCounts(currentFilter)
-	end
+		wowFiltered, wowTotal, bnetFiltered, bnetTotal = GetPreviewFriendCounts(currentFilter)
+	elseif not useRegistryFilter and (currentFilter == "all" or currentFilter == "online") then
+		wowFiltered, wowTotal, bnetFiltered, bnetTotal = GetFriendCounts()
+	else
+		local treatMobileAsOffline = BetterFriendlistDB and BetterFriendlistDB.treatMobileAsOffline
+		local BNET_CLIENT_WOW_LOCAL = BNET_CLIENT_WOW or "WoW"
 
-	if not useRegistryFilter and (currentFilter == "all" or currentFilter == "online") then
-		return GetFriendCounts()
-	end
+		wowFiltered, wowTotal = 0, 0
+		bnetFiltered, bnetTotal = 0, 0
 
-	local treatMobileAsOffline = BetterFriendlistDB and BetterFriendlistDB.treatMobileAsOffline
-	local BNET_CLIENT_WOW_LOCAL = BNET_CLIENT_WOW or "WoW"
+		-- WoW Friends
+		local numWoWFriends = C_FriendList.GetNumFriends() or 0
+		wowTotal = numWoWFriends
+		for i = 1, numWoWFriends do
+			local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
+			if friendInfo then
+				local connected = friendInfo.connected
+				local passes = false
+				local friendForRegistry
 
-	local wowFiltered, wowTotal = 0, 0
-	local bnetFiltered, bnetTotal = 0, 0
+				if useRegistryFilter then
+					friendForRegistry = {
+						type = "wow",
+						index = i,
+						name = friendInfo.name,
+						characterName = friendInfo.name,
+						connected = connected,
+						level = friendInfo.level,
+						className = friendInfo.className,
+						area = friendInfo.area,
+						realmName = friendInfo.name and select(2, strsplit("-", friendInfo.name)),
+						note = friendInfo.notes,
+						notes = friendInfo.notes,
+						afk = friendInfo.afk,
+						dnd = friendInfo.dnd,
+					}
+					passes = Registry:EvaluateQuickFilter(currentFilter, friendForRegistry)
+				elseif currentFilter == "offline" then
+					passes = not connected
+				elseif currentFilter == "wowonline" then
+					passes = connected
+				elseif currentFilter == "wow" then
+					-- WoW friends always pass "wow" filter if online
+					passes = connected
+				elseif currentFilter == "bnet" then
+					-- WoW friends never pass "bnet" filter
+					passes = false
+				elseif currentFilter == "hideafk" then
+					passes = connected and not (friendInfo.afk or friendInfo.dnd)
+				elseif currentFilter == "retail" then
+					-- WoW friends assumed same version as player
+					passes = connected
+				elseif currentFilter == "ingame" then
+					passes = connected
+				end
 
-	-- WoW Friends
-	local numWoWFriends = C_FriendList.GetNumFriends() or 0
-	wowTotal = numWoWFriends
-	for i = 1, numWoWFriends do
-		local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
-		if friendInfo then
-			local connected = friendInfo.connected
-			local passes = false
-			local friendForRegistry
-
-			if useRegistryFilter then
-				friendForRegistry = {
-					type = "wow",
-					index = i,
-					name = friendInfo.name,
-					characterName = friendInfo.name,
-					connected = connected,
-					level = friendInfo.level,
-					className = friendInfo.className,
-					area = friendInfo.area,
-					realmName = friendInfo.name and select(2, strsplit("-", friendInfo.name)),
-					note = friendInfo.notes,
-					notes = friendInfo.notes,
-					afk = friendInfo.afk,
-					dnd = friendInfo.dnd,
-				}
-				passes = Registry:EvaluateQuickFilter(currentFilter, friendForRegistry)
-			elseif currentFilter == "offline" then
-				passes = not connected
-			elseif currentFilter == "wowonline" then
-				passes = connected
-			elseif currentFilter == "wow" then
-				-- WoW friends always pass "wow" filter if online
-				passes = connected
-			elseif currentFilter == "bnet" then
-				-- WoW friends never pass "bnet" filter
-				passes = false
-			elseif currentFilter == "hideafk" then
-				passes = connected and not (friendInfo.afk or friendInfo.dnd)
-			elseif currentFilter == "retail" then
-				-- WoW friends assumed same version as player
-				passes = connected
-			elseif currentFilter == "ingame" then
-				passes = connected
-			end
-
-			if passes then
-				wowFiltered = wowFiltered + 1
+				if passes then
+					wowFiltered = wowFiltered + 1
+				end
 			end
 		end
-	end
 
-	-- BNet Friends
-	if BNConnected() and (not BFL.IsBattleNetFriendsListEnabled or BFL.IsBattleNetFriendsListEnabled()) then
-		local numBNetTotal, numBNetOnline = BNGetNumFriends()
-		bnetTotal = numBNetTotal or 0
+		-- BNet Friends
+		if BNConnected() and (not BFL.IsBattleNetFriendsListEnabled or BFL.IsBattleNetFriendsListEnabled()) then
+			local numBNetTotal, numBNetOnline = BNGetNumFriends()
+			bnetTotal = numBNetTotal or 0
 
-		for i = 1, bnetTotal do
-			local accountInfo = BFL.GetBNetFriendInfo and BFL.GetBNetFriendInfo(i)
+			for i = 1, bnetTotal do
+				local accountInfo = BFL.GetBNetFriendInfo and BFL.GetBNetFriendInfo(i)
 				if accountInfo then
 					local gameInfo = accountInfo.gameAccountInfo or {}
 					local isOnline = gameInfo.isOnline or false
 					local client = gameInfo.clientProgram or "App"
 					local isMobile = (client == "BSAp")
 
-				if treatMobileAsOffline and isMobile then
-					isOnline = false
-				end
-
-				local passes = false
-
-				if useRegistryFilter then
-					local friendForRegistry = {
-						type = "bnet",
-						index = i,
-						bnetAccountID = accountInfo.bnetAccountID,
-						accountName = accountInfo.accountName,
-						battleTag = accountInfo.battleTag,
-						connected = isOnline,
-						isAFK = accountInfo.isAFK,
-						isDND = accountInfo.isDND,
-						note = accountInfo.note,
-						customMessage = accountInfo.customMessage,
-						gameAccountInfo = gameInfo,
-						characterName = gameInfo.characterName,
-						level = gameInfo.characterLevel,
-						className = gameInfo.className,
-						areaName = gameInfo.areaName,
-						realmName = gameInfo.realmName,
-						factionName = gameInfo.factionName,
-						gameName = gameInfo.richPresence,
-						numGameAccounts = accountInfo.numGameAccounts,
-					}
-					passes = Registry:EvaluateQuickFilter(currentFilter, friendForRegistry)
-				elseif currentFilter == "offline" then
-					passes = not isOnline
-				elseif currentFilter == "wowonline" then
-					passes = isOnline and (client == BNET_CLIENT_WOW_LOCAL)
-				elseif currentFilter == "wow" then
-					passes = isOnline and (client == BNET_CLIENT_WOW_LOCAL)
-				elseif currentFilter == "bnet" then
-					passes = isOnline and (client ~= BNET_CLIENT_WOW_LOCAL)
-				elseif currentFilter == "hideafk" then
-					passes = isOnline and not (accountInfo.isAFK or accountInfo.isDND)
-				elseif currentFilter == "retail" then
-					passes = isOnline and (client == BNET_CLIENT_WOW_LOCAL)
-					if passes and gameInfo.wowProjectID and gameInfo.wowProjectID ~= WOW_PROJECT_MAINLINE then
-						passes = false
+					if treatMobileAsOffline and isMobile then
+						isOnline = false
 					end
-				elseif currentFilter == "ingame" then
-					passes = isOnline and client ~= "" and client ~= "App" and client ~= "BSAp"
-				end
 
-				if passes then
-					bnetFiltered = bnetFiltered + 1
+					local passes = false
+
+					if useRegistryFilter then
+						local friendForRegistry = {
+							type = "bnet",
+							index = i,
+							bnetAccountID = accountInfo.bnetAccountID,
+							accountName = accountInfo.accountName,
+							battleTag = accountInfo.battleTag,
+							connected = isOnline,
+							isAFK = accountInfo.isAFK,
+							isDND = accountInfo.isDND,
+							note = accountInfo.note,
+							customMessage = accountInfo.customMessage,
+							gameAccountInfo = gameInfo,
+							characterName = gameInfo.characterName,
+							level = gameInfo.characterLevel,
+							className = gameInfo.className,
+							areaName = gameInfo.areaName,
+							realmName = gameInfo.realmName,
+							factionName = gameInfo.factionName,
+							gameName = gameInfo.richPresence,
+							numGameAccounts = accountInfo.numGameAccounts,
+						}
+						passes = Registry:EvaluateQuickFilter(currentFilter, friendForRegistry)
+					elseif currentFilter == "offline" then
+						passes = not isOnline
+					elseif currentFilter == "wowonline" then
+						passes = isOnline and (client == BNET_CLIENT_WOW_LOCAL)
+					elseif currentFilter == "wow" then
+						passes = isOnline and (client == BNET_CLIENT_WOW_LOCAL)
+					elseif currentFilter == "bnet" then
+						passes = isOnline and (client ~= BNET_CLIENT_WOW_LOCAL)
+					elseif currentFilter == "hideafk" then
+						passes = isOnline and not (accountInfo.isAFK or accountInfo.isDND)
+					elseif currentFilter == "retail" then
+						passes = isOnline and (client == BNET_CLIENT_WOW_LOCAL)
+						if passes and gameInfo.wowProjectID and gameInfo.wowProjectID ~= WOW_PROJECT_MAINLINE then
+							passes = false
+						end
+					elseif currentFilter == "ingame" then
+						passes = isOnline and client ~= "" and client ~= "App" and client ~= "BSAp"
+					end
+
+					if passes then
+						bnetFiltered = bnetFiltered + 1
+					end
 				end
 			end
 		end
 	end
 
+	friendCountsCache = {
+		signature = cacheSignature,
+		time = now,
+		wowOnline = wowFiltered,
+		wowTotal = wowTotal,
+		bnetOnline = bnetFiltered,
+		bnetTotal = bnetTotal,
+	}
 	return wowFiltered, wowTotal, bnetFiltered, bnetTotal
 end
 
@@ -776,11 +898,32 @@ function Broker:UpdateBrokerText(force)
 	end
 end
 
-function Broker:ScheduleBrokerTextUpdate()
+function Broker:ScheduleBrokerTextUpdate(hardInvalidate, hardInvalidateBattleNet)
 	pendingTextUpdate = true
+	local invalidateBattleNet = hardInvalidateBattleNet
+	if invalidateBattleNet == nil then
+		invalidateBattleNet = hardInvalidate
+	end
 
 	if pendingDeferredUpdate then
+		if hardInvalidate then
+			InvalidateFriendCountsCache()
+		else
+			friendCountsCache = nil
+		end
+		if invalidateBattleNet then
+			InvalidateBattleNetCountsCache()
+		end
 		return
+	end
+
+	if hardInvalidate then
+		InvalidateFriendCountsCache()
+	else
+		friendCountsCache = nil
+	end
+	if invalidateBattleNet then
+		InvalidateBattleNetCountsCache()
 	end
 
 	pendingDeferredUpdate = true
@@ -2414,6 +2557,7 @@ end
 
 function Broker:SetPreviewData(data)
 	previewData = data
+	InvalidateFriendCountsCache()
 end
 
 -- Refresh the tooltip (re-create it) to update content
@@ -2707,6 +2851,9 @@ function Broker:Initialize()
 	-- Define Tooltip Handlers based on LibQTip availability
 	if LQT then
 		dataObjectDef.OnEnter = function(anchorFrame)
+			if tooltip and tooltip.IsShown and tooltip:IsShown() and tooltip.anchorFrame == anchorFrame then
+				return
+			end
 			tooltip = CreateLibQTipTooltip(anchorFrame)
 		end
 	else
@@ -2750,16 +2897,20 @@ function Broker:RegisterEvents()
 		Broker:ScheduleBrokerTextUpdate()
 	end)
 
+	BFL:RegisterEventCallback("BN_FRIEND_LIST_SIZE_CHANGED", function(...)
+		Broker:ScheduleBrokerTextUpdate(true, true)
+	end)
+
 	BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function(...)
-		Broker:ScheduleBrokerTextUpdate()
+		Broker:ScheduleBrokerTextUpdate(true, false)
 	end)
 
 	BFL:RegisterEventCallback("BN_CONNECTED", function(...)
-		Broker:ScheduleBrokerTextUpdate()
+		Broker:ScheduleBrokerTextUpdate(true, true)
 	end)
 
 	BFL:RegisterEventCallback("BN_DISCONNECTED", function(...)
-		Broker:ScheduleBrokerTextUpdate()
+		Broker:ScheduleBrokerTextUpdate(true, true)
 	end)
 end
 

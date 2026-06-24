@@ -2138,6 +2138,10 @@ end
 function BFL:ForceRefreshFriendsList()
 	local FriendsList = self:GetModule("FriendsList")
 	if FriendsList then
+		if FriendsList.CancelScheduledRefresh then
+			FriendsList:CancelScheduledRefresh()
+		end
+
 		-- Update font cache (colors, sizes, etc) in case settings changed
 		if FriendsList.UpdateFontCache then
 			FriendsList:UpdateFontCache()
@@ -2179,6 +2183,15 @@ function BFL:ForceRefreshFriendsList()
 		and BetterFriendsFrame.FriendsTabHeader.QuickFilterDropdown
 	then
 		QuickFilters:RefreshDropdown(BetterFriendsFrame.FriendsTabHeader.QuickFilterDropdown)
+	end
+end
+
+function BFL:ScheduleFriendsListRefresh(reason, delay, ignoreVisibility)
+	local FriendsList = self:GetModule("FriendsList")
+	if FriendsList and FriendsList.ScheduleRefresh then
+		FriendsList:ScheduleRefresh(reason, delay, ignoreVisibility)
+	elseif self.ForceRefreshFriendsList then
+		self:ForceRefreshFriendsList()
 	end
 end
 

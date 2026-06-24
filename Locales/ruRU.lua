@@ -1402,7 +1402,7 @@ BFL:RegisterLocale("ruRU", function()
 	L.CORE_HELP_PERF_MEM = "  |cffffffff/bfl perf memory|r - Память"
 	L.CORE_HELP_TEST_COMMANDS = "|cffffcc00Test:|r"
 	L.TESTSUITE_PERFY_HELP =
-		"  |cffffffff/bfl test perfy [seconds]|r - Запуск стресс-тест производительности"
+		"  |cffffffff/bfl test perfy [visible|background|idle] [seconds]|r - Запуск стресс-тест производительности"
 	L.TESTSUITE_PERFY_STARTING = "Запуск стресс-теста Perfy на %d секунд"
 	L.TESTSUITE_PERFY_ALREADY_RUNNING = "Стресс-тест Perfy уже запущен"
 	L.TESTSUITE_PERFY_MISSING_ADDON = "Аддон Perfy недоступен (!!!Perfy)"

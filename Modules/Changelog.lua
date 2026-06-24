@@ -29,14 +29,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [DRAFT]
-
-### Fixed
-- **Classic Friend Tooltips** - Fixed private notes extending below the tooltip background while a Battle.net broadcast is shown.
-- **Legacy QuickFilter & Sorter Settings** - Restored normal button styling when the Settings Center beta is disabled.
-
----
-
 ## [2.6.3]        - 2026-06-22
 
 ### Added

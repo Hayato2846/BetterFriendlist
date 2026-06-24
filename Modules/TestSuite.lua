@@ -677,7 +677,7 @@ function TestSuite:ShowHelp()
 	print("  |cffffffff/bfl test data|r         - Run data tests")
 	print("  |cffffffff/bfl test events|r       - Run event tests")
 	print("  |cffffffff/bfl test perf|r         - Run performance tests")
-	print(GetLocalizedText("TESTSUITE_PERFY_HELP", "  |cffffffff/bfl test perfy [seconds]|r - Run Perfy stress test"))
+	print(GetLocalizedText("TESTSUITE_PERFY_HELP", "  |cffffffff/bfl test perfy [visible|background|idle] [seconds]|r - Run Perfy stress test"))
 	print("  |cffffffff/bfl test classic|r      - Run Classic-specific tests")
 	print("  |cffffffff/bfl test integration|r  - Run integration tests")
 	print("  |cffffffff/bfl test settings|r     - Run settings tests")
@@ -6249,25 +6249,29 @@ local function RegisterBuiltInTests()
 			end
 
 			local originalFilter = FriendsList.filterMode
+			local originalDBFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter
 			local refreshCalled = false
+			local refreshReason
 
-			-- Hook ForceRefreshFriendsList
-			local originalRefresh = BFL.ForceRefreshFriendsList
-			BFL.ForceRefreshFriendsList = function(...)
+			-- Hook coalesced refresh path
+			local originalRefresh = BFL.ScheduleFriendsListRefresh
+			BFL.ScheduleFriendsListRefresh = function(_, reason)
 				refreshCalled = true
-				if originalRefresh then
-					return originalRefresh(...)
-				end
+				refreshReason = reason
 			end
 
 			-- Change filter mode
 			FriendsList:SetFilterMode(originalFilter == "all" and "online" or "all")
 
 			-- Restore
-			BFL.ForceRefreshFriendsList = originalRefresh
-			FriendsList:SetFilterMode(originalFilter) -- Restore original
+			BFL.ScheduleFriendsListRefresh = originalRefresh
+			FriendsList.filterMode = originalFilter
+			if BetterFriendlistDB then
+				BetterFriendlistDB.quickFilter = originalDBFilter
+			end
 
-			V:Assert(refreshCalled == true, "SetFilterMode should trigger ForceRefreshFriendsList")
+			V:Assert(refreshCalled == true, "SetFilterMode should schedule friends list refresh")
+			V:Assert(refreshReason == "filter", "SetFilterMode should use filter refresh reason")
 		end,
 	})
 
@@ -6281,15 +6285,17 @@ local function RegisterBuiltInTests()
 			end
 
 			local originalSort = FriendsList.sortMode
+			local originalSecondarySort = FriendsList.secondarySort
+			local originalDBSort = BetterFriendlistDB and BetterFriendlistDB.primarySort
+			local originalDBSecondarySort = BetterFriendlistDB and BetterFriendlistDB.secondarySort
 			local refreshCalled = false
+			local refreshReason
 
-			-- Hook ForceRefreshFriendsList
-			local originalRefresh = BFL.ForceRefreshFriendsList
-			BFL.ForceRefreshFriendsList = function(...)
+			-- Hook coalesced refresh path
+			local originalRefresh = BFL.ScheduleFriendsListRefresh
+			BFL.ScheduleFriendsListRefresh = function(_, reason)
 				refreshCalled = true
-				if originalRefresh then
-					return originalRefresh(...)
-				end
+				refreshReason = reason
 			end
 
 			-- Change sort mode to something different
@@ -6297,10 +6303,16 @@ local function RegisterBuiltInTests()
 			FriendsList:SetSortMode(newSort)
 
 			-- Restore
-			BFL.ForceRefreshFriendsList = originalRefresh
-			FriendsList:SetSortMode(originalSort) -- Restore original
+			BFL.ScheduleFriendsListRefresh = originalRefresh
+			FriendsList.sortMode = originalSort
+			FriendsList.secondarySort = originalSecondarySort
+			if BetterFriendlistDB then
+				BetterFriendlistDB.primarySort = originalDBSort
+				BetterFriendlistDB.secondarySort = originalDBSecondarySort
+			end
 
-			V:Assert(refreshCalled == true, "SetSortMode should trigger ForceRefreshFriendsList")
+			V:Assert(refreshCalled == true, "SetSortMode should schedule friends list refresh")
+			V:Assert(refreshReason == "primary-sort", "SetSortMode should use primary-sort refresh reason")
 		end,
 	})
 
@@ -7315,6 +7327,404 @@ local function RegisterBuiltInTests()
 	})
 end
 
+local PERFY_263_CUSTOM_TAG_NAMES = {
+	"Perfy Progression",
+	"Perfy Keys",
+	"Perfy Raid Lead",
+	"Perfy Backup",
+	"Perfy Bench",
+	"Perfy Social",
+}
+
+local PERFY_263_BLIZZARD_TAG_SETS = {
+	{ ["blizzard:raiding"] = true, ["blizzard:damager"] = true },
+	{ ["blizzard:dungeons"] = true, ["blizzard:healer"] = true },
+	{ ["blizzard:pvp"] = true, ["blizzard:tank"] = true },
+	{ ["blizzard:delves"] = true, ["blizzard:questing"] = true },
+}
+
+local PERFY_263_SEARCH_TERMS = {
+	"",
+	"Perfy",
+	"Raiding",
+	"Keys",
+	"DPS",
+	"Healer",
+	"Backup",
+}
+
+local PERFY_263_RAID_QUERIES = {
+	"",
+	"perfy",
+	"assist",
+	"target",
+	"blackhand",
+}
+
+local PERFY_NIL_SENTINEL = {}
+
+local function PerfyDeepCopy(value, seen)
+	local DB = BFL:GetModule("DB")
+	if DB and DB.InternalDeepCopy then
+		return DB:InternalDeepCopy(value)
+	end
+	if type(value) ~= "table" then
+		return value
+	end
+	seen = seen or {}
+	if seen[value] then
+		return seen[value]
+	end
+	local copy = {}
+	seen[value] = copy
+	for k, v in pairs(value) do
+		copy[PerfyDeepCopy(k, seen)] = PerfyDeepCopy(v, seen)
+	end
+	return copy
+end
+
+local function CapturePerfy263FeatureState()
+	if not BetterFriendlistDB then
+		return nil
+	end
+	return {
+		enableBetaFeatures = BetterFriendlistDB.enableBetaFeatures,
+		streamerModeActive = BetterFriendlistDB.streamerModeActive,
+		contactMemory = PerfyDeepCopy(BetterFriendlistDB.contactMemory),
+		friendTagSettings = PerfyDeepCopy(BetterFriendlistDB.friendTagSettings),
+		friendTagProfiles = PerfyDeepCopy(BetterFriendlistDB.friendTagProfiles),
+		customFriendTags = PerfyDeepCopy(BetterFriendlistDB.customFriendTags),
+		friendCustomTags = PerfyDeepCopy(BetterFriendlistDB.friendCustomTags),
+		friendBlizzardTags = PerfyDeepCopy(BetterFriendlistDB.friendBlizzardTags),
+		nextCustomFriendTagID = BetterFriendlistDB.nextCustomFriendTagID,
+		autoRaidAssist = PerfyDeepCopy(BetterFriendlistDB.autoRaidAssist),
+		settingsVersion = BFL.SettingsVersion,
+		friendTagsVersion = BFL.FriendTagsVersion,
+		friendTagsDefinitionVersion = BFL.FriendTagsDefinitionVersion,
+		friendTagsAssignmentVersion = BFL.FriendTagsAssignmentVersion,
+	}
+end
+
+local function RestorePerfy263FeatureState(snapshot)
+	if not (BetterFriendlistDB and snapshot) then
+		return
+	end
+
+	BetterFriendlistDB.enableBetaFeatures = snapshot.enableBetaFeatures
+	BetterFriendlistDB.streamerModeActive = snapshot.streamerModeActive
+	BetterFriendlistDB.contactMemory = PerfyDeepCopy(snapshot.contactMemory)
+	BetterFriendlistDB.friendTagSettings = PerfyDeepCopy(snapshot.friendTagSettings)
+	BetterFriendlistDB.friendTagProfiles = PerfyDeepCopy(snapshot.friendTagProfiles)
+	BetterFriendlistDB.customFriendTags = PerfyDeepCopy(snapshot.customFriendTags)
+	BetterFriendlistDB.friendCustomTags = PerfyDeepCopy(snapshot.friendCustomTags)
+	BetterFriendlistDB.friendBlizzardTags = PerfyDeepCopy(snapshot.friendBlizzardTags)
+	BetterFriendlistDB.nextCustomFriendTagID = snapshot.nextCustomFriendTagID
+	BetterFriendlistDB.autoRaidAssist = PerfyDeepCopy(snapshot.autoRaidAssist)
+	BFL.SettingsVersion = (snapshot.settingsVersion or BFL.SettingsVersion or 0) + 1
+	BFL.FriendTagsVersion = (snapshot.friendTagsVersion or BFL.FriendTagsVersion or 0) + 1
+	BFL.FriendTagsDefinitionVersion = (snapshot.friendTagsDefinitionVersion or BFL.FriendTagsDefinitionVersion or BFL.FriendTagsVersion or 0) + 1
+	BFL.FriendTagsAssignmentVersion = (snapshot.friendTagsAssignmentVersion or BFL.FriendTagsAssignmentVersion or 0) + 1
+	local FriendTags = BFL:GetModule("FriendTags")
+	if FriendTags then
+		FriendTags.friendAssignmentVersions = {}
+		FriendTags.allFriendAssignmentsVersion = BFL.FriendTagsAssignmentVersion or 0
+		if FriendTags.ClearCaches then
+			FriendTags:ClearCaches()
+		end
+	end
+end
+
+local function RefreshPerfy263FeatureSurfaces(FriendsList, forceRender)
+	BFL.SettingsVersion = (BFL.SettingsVersion or 0) + 1
+	BFL.FriendTagsVersion = (BFL.FriendTagsVersion or 0) + 1
+	BFL.FriendTagsDefinitionVersion = (BFL.FriendTagsDefinitionVersion or BFL.FriendTagsVersion or 0) + 1
+	BFL.FriendTagsAssignmentVersion = (BFL.FriendTagsAssignmentVersion or 0) + 1
+	local FriendTags = BFL:GetModule("FriendTags")
+	if FriendTags then
+		FriendTags.friendAssignmentVersions = {}
+		FriendTags.allFriendAssignmentsVersion = BFL.FriendTagsAssignmentVersion or 0
+		if FriendTags.ClearCaches then
+			FriendTags:ClearCaches()
+		end
+	end
+	if FriendsList and FriendsList.InvalidateSettingsCache then
+		FriendsList:InvalidateSettingsCache()
+	end
+	if FriendsList then
+		FriendsList.lastBuildInputs = nil
+		if forceRender and FriendsList.RenderDisplay then
+			FriendsList:RenderDisplay(true)
+		elseif FriendsList.ScheduleRefresh then
+			FriendsList:ScheduleRefresh("perfy-263-feature-state", 0.05, false)
+		end
+	end
+end
+
+local function GetPerfy263FriendCharacter(friend, fallbackIndex)
+	if type(friend) == "table" then
+		local gameAccountInfo = type(friend.gameAccountInfo) == "table" and friend.gameAccountInfo or nil
+		local name = gameAccountInfo and gameAccountInfo.characterName or friend.characterName or friend.name
+		local realm = gameAccountInfo and gameAccountInfo.realmName or friend.realmName
+		if type(name) == "string" and name ~= "" then
+			name = name:match("([^%-]+)") or name
+			if not realm or realm == "" then
+				realm = GetNormalizedRealmName and GetNormalizedRealmName() or "Blackhand"
+			end
+			return name, realm
+		end
+	end
+	return "PerfyAssist" .. tostring(fallbackIndex), "Blackhand"
+end
+
+local function BuildPerfy263RaidRoster(friends)
+	local roster = {}
+	for index, friend in ipairs(friends or {}) do
+		if #roster >= 40 then
+			break
+		end
+		local name, realm = GetPerfy263FriendCharacter(friend, index)
+		roster[#roster + 1] = {
+			name = name,
+			realm = realm,
+		}
+	end
+	while #roster < 40 do
+		local index = #roster + 1
+		roster[index] = {
+			name = "PerfyAssist" .. tostring(index),
+			realm = "Blackhand",
+		}
+	end
+	return roster
+end
+
+local function GetPerfy263RaidEntry(context, unit)
+	if unit == "player" then
+		return { name = "PerfyLeader", realm = "Blackhand" }
+	end
+	local index = type(unit) == "string" and tonumber(unit:match("^raid(%d+)$")) or nil
+	return index and context.raidRoster and context.raidRoster[index] or nil
+end
+
+local function OverridePerfy263Global(context, name, replacement)
+	context.globalOverrides = context.globalOverrides or {}
+	if context.globalOverrides[name] == nil then
+		local original = _G[name]
+		context.globalOverrides[name] = original == nil and PERFY_NIL_SENTINEL or original
+	end
+	_G[name] = replacement
+end
+
+local function InstallPerfy263RaidMocks(context)
+	context.promotedUnits = {}
+	OverridePerfy263Global(context, "IsInRaid", function()
+		return true
+	end)
+	OverridePerfy263Global(context, "IsInGroup", function()
+		return true
+	end)
+	OverridePerfy263Global(context, "GetNumGroupMembers", function()
+		return context.raidRoster and #context.raidRoster or 0
+	end)
+	OverridePerfy263Global(context, "GetNumSubgroupMembers", function()
+		return math.min(context.raidRoster and #context.raidRoster or 0, 4)
+	end)
+	OverridePerfy263Global(context, "UnitExists", function(unit)
+		return unit == "player" or GetPerfy263RaidEntry(context, unit) ~= nil
+	end)
+	OverridePerfy263Global(context, "UnitIsUnit", function(left, right)
+		return left == right or (left == "player" and right == "player")
+	end)
+	OverridePerfy263Global(context, "UnitIsGroupLeader", function(unit)
+		return unit == "player"
+	end)
+	OverridePerfy263Global(context, "UnitIsGroupAssistant", function(unit)
+		return context.promotedUnits and context.promotedUnits[unit] == true
+	end)
+	OverridePerfy263Global(context, "UnitFullName", function(unit)
+		local entry = GetPerfy263RaidEntry(context, unit)
+		return entry and entry.name or nil, entry and entry.realm or nil
+	end)
+	OverridePerfy263Global(context, "UnitName", function(unit)
+		local entry = GetPerfy263RaidEntry(context, unit)
+		return entry and entry.name or nil, entry and entry.realm or nil
+	end)
+	OverridePerfy263Global(context, "GetNormalizedRealmName", function()
+		return "Blackhand"
+	end)
+	OverridePerfy263Global(context, "UnitRealmRelationship", function()
+		return LE_REALM_RELATION_SAME or 1
+	end)
+
+	context.bflOverrides = {
+		PromoteToAssistant = BFL.PromoteToAssistant,
+		IsActionRestricted = BFL.IsActionRestricted,
+	}
+	BFL.PromoteToAssistant = function(unit)
+		context.promotedUnits[unit] = true
+		context.promoteCount = (context.promoteCount or 0) + 1
+		return true
+	end
+	BFL.IsActionRestricted = function()
+		return false
+	end
+end
+
+local function RestorePerfy263RaidMocks(context)
+	if not context then
+		return
+	end
+	for name, original in pairs(context.globalOverrides or {}) do
+		_G[name] = original == PERFY_NIL_SENTINEL and nil or original
+	end
+	context.globalOverrides = nil
+	if context.bflOverrides then
+		BFL.PromoteToAssistant = context.bflOverrides.PromoteToAssistant
+		BFL.IsActionRestricted = context.bflOverrides.IsActionRestricted
+		context.bflOverrides = nil
+	end
+end
+
+local function ResetPerfy263AutoRaidRuntime(AutoRaidAssist)
+	if not AutoRaidAssist then
+		return
+	end
+	if AutoRaidAssist.pendingTimer and AutoRaidAssist.pendingTimer.Cancel then
+		AutoRaidAssist.pendingTimer:Cancel()
+	end
+	AutoRaidAssist.pendingTimer = nil
+	if AutoRaidAssist.CancelRosterRetryTimers then
+		AutoRaidAssist:CancelRosterRetryTimers()
+	end
+	if AutoRaidAssist.CancelPromotionRetryTimers then
+		AutoRaidAssist:CancelPromotionRetryTimers()
+	end
+	if AutoRaidAssist.ClearPromotionQueue then
+		AutoRaidAssist:ClearPromotionQueue()
+	end
+	AutoRaidAssist.lastPromotionAttempt = {}
+	AutoRaidAssist.promotionAttemptCounts = {}
+	AutoRaidAssist.needsCombatRetry = nil
+end
+
+local function SeedPerfy263FeatureData(context, FriendsList, ContactMemory, FriendTags, AutoRaidAssist)
+	if not BetterFriendlistDB then
+		return
+	end
+
+	BetterFriendlistDB.enableBetaFeatures = true
+	BetterFriendlistDB.streamerModeActive = false
+
+	local contactDB = ContactMemory and ContactMemory.NormalizeDB and ContactMemory:NormalizeDB()
+	if contactDB then
+		contactDB.enabled = true
+		contactDB.settings = contactDB.settings or {}
+		contactDB.settings.showTooltipSection = true
+		contactDB.settings.hideInStreamerMode = false
+	end
+
+	local tagDB = FriendTags and FriendTags.NormalizeDB and FriendTags:NormalizeDB()
+	if tagDB then
+		tagDB.friendTagSettings = tagDB.friendTagSettings or {}
+		tagDB.friendTagSettings.enabled = true
+		tagDB.friendTagSettings.showRowChips = true
+		tagDB.friendTagSettings.showTooltipChips = true
+		tagDB.friendTagSettings.showBrokerChips = true
+		tagDB.friendTagSettings.showTagsInStreamerMode = true
+		tagDB.friendTagSettings.rowMode = "chip_line"
+		tagDB.friendTagSettings.compactRowMode = "chip_line"
+		tagDB.friendTagSettings.maxRowChips = 4
+		tagDB.friendTagSettings.maxTooltipChips = 8
+		tagDB.friendTagSettings.enableDynamicTagGroups = true
+		tagDB.friendTagSettings.includeCustomTagsInSearch = true
+		tagDB.friendTagSettings.includeBlizzardTagsInSearch = true
+		context.customTagIds = {}
+		for _, tagName in ipairs(PERFY_263_CUSTOM_TAG_NAMES) do
+			local tagId = FriendTags:CreateCustomTag(tagName)
+			if tagId then
+				context.customTagIds[#context.customTagIds + 1] = tagId
+			end
+		end
+	end
+
+	if FriendsList and FriendsList.UpdateFriendsList then
+		FriendsList:UpdateFriendsList(context.forceRender)
+	end
+
+	context.perfyFriends = {}
+	context.contactKeys = {}
+	local friends = FriendsList and FriendsList.friendsList or {}
+	if #friends == 0 then
+		local PreviewMode = BFL:GetModule("PreviewMode")
+		friends = PreviewMode and PreviewMode.mockData and PreviewMode.mockData.friends or friends
+	end
+	for index, friend in ipairs(friends) do
+		if type(friend) == "table" then
+			context.perfyFriends[#context.perfyFriends + 1] = friend
+			local note = string.format(
+				"Perfy 2.6.3 private note %03d - raid role, backup plan, tag search payload",
+				index
+			)
+			local contactKey = ContactMemory and ContactMemory.ResolveContactKeyFromFriend
+				and ContactMemory:ResolveContactKeyFromFriend(friend)
+			if contactKey then
+				context.contactKeys[#context.contactKeys + 1] = contactKey
+				ContactMemory:SetPrivateNote(contactKey, note)
+			end
+			if tagDB and FriendTags then
+				local uid = FriendTags:GetFriendUID(friend)
+				if uid then
+					local customSet = {}
+					if context.customTagIds and #context.customTagIds > 0 then
+						for offset = 0, 2 do
+							local tagId = context.customTagIds[((index + offset - 1) % #context.customTagIds) + 1]
+							if tagId then
+								customSet[tagId] = true
+							end
+						end
+					end
+					tagDB.friendCustomTags[uid] = next(customSet) and customSet or nil
+					if friend.type == "bnet" then
+						tagDB.friendBlizzardTags[uid] = PerfyDeepCopy(PERFY_263_BLIZZARD_TAG_SETS[((index - 1) % #PERFY_263_BLIZZARD_TAG_SETS) + 1])
+					end
+				end
+			end
+		end
+	end
+
+	context.raidRoster = BuildPerfy263RaidRoster(context.perfyFriends)
+	InstallPerfy263RaidMocks(context)
+	if AutoRaidAssist and AutoRaidAssist.NormalizeDB then
+		local assistDB = AutoRaidAssist:NormalizeDB()
+		assistDB.enabled = true
+		assistDB.targets = {}
+		local ContactIdentity = BFL:GetModule("ContactIdentity")
+		if ContactIdentity then
+			for index, entry in ipairs(context.raidRoster) do
+				if index > 32 then
+					break
+				end
+				local key = ContactIdentity:GetContactKeyFromPlayerName(entry.name, entry.realm)
+				local _, value = ContactIdentity:SplitContactKey(key)
+				if key then
+					assistDB.targets[#assistDB.targets + 1] = {
+						id = key,
+						key = key,
+						kind = "player",
+						value = value,
+						source = (index % 3 == 0 and "group") or (index % 3 == 1 and "friend") or "manual",
+						displayName = entry.name,
+						addedAt = time and time() or 0,
+					}
+				end
+			end
+		end
+		ResetPerfy263AutoRaidRuntime(AutoRaidAssist)
+	end
+
+	RefreshPerfy263FeatureSurfaces(FriendsList, context.forceRender)
+end
+
 local function IsPerfyAddonLoaded()
 	if C_AddOns and C_AddOns.IsAddOnLoaded then
 		return C_AddOns.IsAddOnLoaded("!!!Perfy")
@@ -7367,16 +7777,47 @@ local function StopAddonProfiler()
 	end
 end
 
-function TestSuite:HandlePerfyCommand(args)
-	local trimmed = strtrim(args or "")
-	local durationSeconds = tonumber(trimmed)
-	if not durationSeconds or durationSeconds <= 0 then
-		durationSeconds = 30
+local PERFY_STRESS_MODES = {
+	visible = true,
+	stress = true,
+	background = true,
+	idle = true,
+}
+
+local function NormalizePerfyStressMode(mode)
+	mode = tostring(mode or "visible"):lower()
+	if mode == "stress" then
+		return "visible"
 	end
-	self:RunPerfyStress(durationSeconds)
+	if PERFY_STRESS_MODES[mode] then
+		return mode
+	end
+	return "visible"
 end
 
-function TestSuite:RunPerfyStress(durationSeconds)
+local function ParsePerfyCommand(args)
+	local mode = "visible"
+	local durationSeconds = 30
+	for token in string.gmatch(strtrim(args or ""), "%S+") do
+		local lowered = token:lower()
+		if PERFY_STRESS_MODES[lowered] then
+			mode = NormalizePerfyStressMode(lowered)
+		else
+			local parsedDuration = tonumber(token)
+			if parsedDuration and parsedDuration > 0 then
+				durationSeconds = parsedDuration
+			end
+		end
+	end
+	return mode, durationSeconds
+end
+
+function TestSuite:HandlePerfyCommand(args)
+	local mode, durationSeconds = ParsePerfyCommand(args)
+	self:RunPerfyStress(durationSeconds, mode)
+end
+
+function TestSuite:RunPerfyStress(durationSeconds, mode)
 	if self.perfyStressActive then
 		self.Reporter:Warn(GetLocalizedText("TESTSUITE_PERFY_ALREADY_RUNNING", "Perfy stress test already running"))
 		return
@@ -7395,26 +7836,31 @@ function TestSuite:RunPerfyStress(durationSeconds)
 	local FriendsList = BFL:GetModule("FriendsList")
 	local QuickFilters = BFL:GetModule("QuickFilters")
 	local Groups = BFL:GetModule("Groups")
-	local QuickJoin = BFL:GetModule("QuickJoin")
-	local RaidFrame = BFL:GetModule("RaidFrame")
-	local PreviewMode = BFL:GetModule("PreviewMode")
+	local ContactMemory = BFL:GetModule("ContactMemory")
+	local FriendTags = BFL:GetModule("FriendTags")
+	local TagChips = BFL:GetModule("TagChips")
+	local AutoRaidAssist = BFL:GetModule("AutoRaidAssist")
 	local ScenarioManager = BFL.ScenarioManager
+	mode = NormalizePerfyStressMode(mode)
+	local visibleMode = mode == "visible"
+	local backgroundMode = mode == "background"
+	local idleMode = mode == "idle"
 
 	local context = {
+		mode = mode,
+		forceRender = visibleMode,
+		frameWasShown = BetterFriendsFrame and BetterFriendsFrame:IsShown() or false,
 		actionIndex = 1,
 		sortIndex = 1,
 		filterIndex = 1,
-		groupIndex = 1,
-		topTabIndex = 1,
+		tagSearchIndex = 1,
+		raidQueryIndex = 1,
+		friendIndex = 1,
+		contactIndex = 1,
+		dynamicTagsEnabled = true,
 		scrollDirection = 1,
 		scrollStep = 0.2,
-		nextWhoTime = 0,
-		whoInterval = 10,
-		whoMockEnabled = false,
-		whoMockHooked = false,
-		whoMockResults = {},
-		whoOriginalGetNum = nil,
-		whoOriginalGetInfo = nil,
+		featureSnapshot = CapturePerfy263FeatureState(),
 		originalFilter = QuickFilters and QuickFilters:GetFilter() or (FriendsList and FriendsList.filterMode),
 		originalSort = FriendsList and FriendsList.sortMode,
 		originalSecondarySort = FriendsList and FriendsList.secondarySort,
@@ -7426,78 +7872,26 @@ function TestSuite:RunPerfyStress(durationSeconds)
 			and PanelTemplates_GetSelectedTab(BetterFriendsFrame.FriendsTabHeader)
 		) or 1,
 		groupStates = {},
-		groupIds = {},
-		filterModes = { "all", "online", "offline", "wowonline", "wow", "bnet", "hideafk", "ingame" },
+		filterModes = { "all", "online", "offline", "wowonline", "wow", "bnet" },
 		sortModes = { "status", "name", "level", "zone" },
 	}
 
 	if Groups and Groups.groups then
-		local orderedGroups = {}
 		for groupId, groupData in pairs(Groups.groups) do
 			context.groupStates[groupId] = groupData.collapsed
-			local order = groupData.order or 50
-			table.insert(orderedGroups, { id = groupId, order = order })
 		end
-		table.sort(orderedGroups, function(a, b)
-			if a.order == b.order then
-				return tostring(a.id) < tostring(b.id)
-			end
-			return a.order < b.order
-		end)
-		for _, entry in ipairs(orderedGroups) do
-			table.insert(context.groupIds, entry.id)
+	end
+
+	if not visibleMode and BetterFriendsFrame and BetterFriendsFrame:IsShown() then
+		context.hiddenForPerfyMode = true
+		if _G.HideBetterFriendsFrame then
+			_G.HideBetterFriendsFrame()
+		else
+			BetterFriendsFrame:Hide()
 		end
 	end
 
 	local friendsTab = 1
-	local whoTab = 2
-	local raidTab = BFL.IsRetail and 3 or 4
-	local quickJoinTab = BFL.IsRetail and 4 or nil
-
-	local function IsTopTabAvailable(tabIndex)
-		local frame = BetterFriendsFrame
-		local header = frame and frame.FriendsTabHeader
-		if not header then
-			return false
-		end
-		if BFL.IsClassic then
-			return tabIndex == 1
-		end
-		local tab = header["Tab" .. tabIndex] or _G["BetterFriendsFrameTab" .. tabIndex]
-		if not tab or tab.isDisabled then
-			return false
-		end
-		if tab.IsShown and not tab:IsShown() then
-			return false
-		end
-		if tabIndex == 2 then
-			return frame.RecentAlliesFrame ~= nil
-		elseif tabIndex == 3 then
-			return frame.RecruitAFriendFrame ~= nil
-				and BFL.IsRAFSystemSupported
-				and BFL.IsRAFSystemSupported()
-				and BFL.IsRAFSystemEnabled
-				and BFL.IsRAFSystemEnabled()
-		elseif tabIndex == 4 then
-			return frame.GuildFrame ~= nil
-				and BFL.IsGuildTabEnabled
-				and BFL:IsGuildTabEnabled()
-		end
-		return tabIndex == 1
-	end
-
-	local function BuildTopTabList()
-		local tabs = { 1 }
-		if BFL.IsClassic then
-			return tabs
-		end
-		for tabIndex = 2, 4 do
-			if IsTopTabAvailable(tabIndex) then
-				tabs[#tabs + 1] = tabIndex
-			end
-		end
-		return tabs
-	end
 
 	local function EnsureTab(tabIndex)
 		if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
@@ -7517,32 +7911,6 @@ function TestSuite:RunPerfyStress(durationSeconds)
 			_G.ToggleBetterFriendsFrame(tabIndex)
 		elseif BetterFriendsFrame then
 			BetterFriendsFrame:Show()
-		end
-	end
-
-	local function SwitchNextTopTab()
-		if not BetterFriendsFrame_ShowTab then
-			return
-		end
-		EnsureTab(friendsTab)
-		local topTabs = BuildTopTabList()
-		if #topTabs == 0 then
-			return
-		end
-		if context.topTabIndex > #topTabs then
-			context.topTabIndex = 1
-		end
-		local topTab = topTabs[context.topTabIndex]
-		context.topTabIndex = (context.topTabIndex % #topTabs) + 1
-
-		local frame = BetterFriendsFrame
-		local header = frame and frame.FriendsTabHeader
-		local tabButton = header and (header["Tab" .. topTab] or _G["BetterFriendsFrameTab" .. topTab])
-		local onClick = tabButton and tabButton.GetScript and tabButton:GetScript("OnClick")
-		if onClick then
-			onClick(tabButton, "LeftButton")
-		else
-			BetterFriendsFrame_ShowTab(topTab)
 		end
 	end
 
@@ -7586,15 +7954,6 @@ function TestSuite:RunPerfyStress(durationSeconds)
 		end
 	end
 
-	local function ToggleNextGroup()
-		if not FriendsList or #context.groupIds == 0 then
-			return
-		end
-		local groupId = context.groupIds[context.groupIndex]
-		context.groupIndex = (context.groupIndex % #context.groupIds) + 1
-		FriendsList:ToggleGroup(groupId)
-	end
-
 	local function ApplyNextFilter()
 		local mode = context.filterModes[context.filterIndex]
 		context.filterIndex = (context.filterIndex % #context.filterModes) + 1
@@ -7613,94 +7972,145 @@ function TestSuite:RunPerfyStress(durationSeconds)
 		end
 	end
 
-	local function EnsureWhoMock()
-		if context.whoMockEnabled then
+	local function ApplyNextTagSearch()
+		if not (FriendsList and FriendsList.SetSearchText) then
 			return
 		end
-		if PreviewMode and PreviewMode.EnableWhoMock then
-			PreviewMode:EnableWhoMock()
-			context.whoMockEnabled = true
-		end
-		if not (C_FriendList and C_FriendList.GetNumWhoResults and C_FriendList.GetWhoInfo) then
-			return
-		end
-		if context.whoMockHooked then
-			return
-		end
-		context.whoOriginalGetNum = C_FriendList.GetNumWhoResults
-		context.whoOriginalGetInfo = C_FriendList.GetWhoInfo
-		context.whoMockHooked = true
-		C_FriendList.GetNumWhoResults = function()
-			local results = (PreviewMode and PreviewMode.mockData and PreviewMode.mockData.whoResults)
-				or context.whoMockResults
-			local count = results and #results or 0
-			return count, count
-		end
-		C_FriendList.GetWhoInfo = function(index)
-			local results = (PreviewMode and PreviewMode.mockData and PreviewMode.mockData.whoResults)
-				or context.whoMockResults
-			return results and results[index] or nil
+		local term = PERFY_263_SEARCH_TERMS[context.tagSearchIndex] or ""
+		context.tagSearchIndex = (context.tagSearchIndex % #PERFY_263_SEARCH_TERMS) + 1
+		FriendsList:SetSearchText(term)
+		if context.forceRender and FriendsList.RenderDisplay then
+			FriendsList:RenderDisplay(true)
 		end
 	end
 
-	local function TriggerWhoInteraction()
-		if not (BetterFriendsFrame and BetterFriendsFrame.WhoFrame) then
+	local function ToggleDynamicTagGroups()
+		if not (FriendTags and FriendTags.SetSetting) then
 			return
 		end
-		local now = GetTime()
-		if now < context.nextWhoTime then
+		context.dynamicTagsEnabled = not context.dynamicTagsEnabled
+		FriendTags:SetSetting("enableDynamicTagGroups", context.dynamicTagsEnabled)
+	end
+
+	local function ExerciseTooltipSummaries()
+		if not (ContactMemory or FriendTags) then
 			return
 		end
-		context.nextWhoTime = now + context.whoInterval
-		EnsureTab(whoTab)
-		EnsureWhoMock()
-		if _G.BetterWhoFrame_Update then
-			_G.BetterWhoFrame_Update(true)
+		local tooltip = {
+			AddLine = function()
+				context.tooltipLineCount = (context.tooltipLineCount or 0) + 1
+			end,
+			Show = function()
+				context.tooltipShowCount = (context.tooltipShowCount or 0) + 1
+			end,
+		}
+		local friends = context.perfyFriends or {}
+		if #friends == 0 then
+			return
+		end
+		for offset = 0, 7 do
+			local index = ((context.friendIndex + offset - 1) % #friends) + 1
+			local friend = friends[index]
+			if ContactMemory and ContactMemory.AddTooltipLinesForFriend then
+				ContactMemory:AddTooltipLinesForFriend(tooltip, friend)
+			end
+			if FriendTags then
+				if FriendTags.GetTooltipTextForFriend then
+					FriendTags:GetTooltipTextForFriend(friend)
+				end
+				if FriendTags.GetBrokerTextForFriend then
+					FriendTags:GetBrokerTextForFriend(friend)
+				end
+			end
 		end
 	end
 
-	context.actions = {
-		function()
-			EnsureTab(friendsTab)
-		end,
-		SwitchNextTopTab,
-		function()
-			if FriendsList and FriendsList.RenderDisplay then
-				FriendsList:RenderDisplay(true)
+	local function ExerciseTagRows()
+		local friends = context.perfyFriends or {}
+		if #friends == 0 then
+			return
+		end
+		for offset = 0, 19 do
+			local index = ((context.friendIndex + offset - 1) % #friends) + 1
+			local friend = friends[index]
+			if TagChips and TagChips.GetRowExtraHeight then
+				TagChips:GetRowExtraHeight(friend, FriendsList)
 			end
-		end,
-		ScrollFriendsList,
-		ToggleNextGroup,
-		ApplyNextFilter,
-		ApplyNextSort,
-		SwitchNextTopTab,
-		TriggerWhoInteraction,
-		function()
-			if quickJoinTab then
-				EnsureTab(quickJoinTab)
+			if FriendTags then
+				if FriendTags.GetTagsForFriend then
+					FriendTags:GetTagsForFriend(friend, "row")
+					FriendTags:GetTagsForFriend(friend, "search")
+				end
+				if FriendTags.FriendHasTag then
+					FriendTags:FriendHasTag(friend, "Perfy")
+				end
 			end
-			if QuickJoin and QuickJoin.Update then
-				QuickJoin:Update(true)
-			end
-		end,
-		function()
-			EnsureTab(raidTab)
-			if RaidFrame and RaidFrame.UpdateGroupLayout then
-				RaidFrame:UpdateGroupLayout()
-			end
-		end,
-		function()
-			if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
-				HideBetterFriendsFrame()
-			else
-				EnsureTab(friendsTab)
-			end
-		end,
-	}
+		end
+	end
 
-	self.perfyStressActive = true
-	self.perfyStressContext = context
-	self.perfyStressEndTime = GetTime() + durationSeconds
+	local function RotateTagAssignment()
+		local friends = context.perfyFriends or {}
+		local tagIds = context.customTagIds or {}
+		if not (FriendTags and #friends > 0 and #tagIds > 0) then
+			return
+		end
+		local friend = friends[context.friendIndex]
+		context.friendIndex = (context.friendIndex % #friends) + 1
+		local tagId = tagIds[((context.friendIndex - 1) % #tagIds) + 1]
+		context.tagToggle = not context.tagToggle
+		if FriendTags.SetCustomTagForFriend then
+			FriendTags:SetCustomTagForFriend(friend, tagId, context.tagToggle)
+		end
+		if friend and friend.type == "bnet" and FriendTags.SetBlizzardTagsForFriend then
+			local localFriend = PerfyDeepCopy(friend)
+			localFriend.bnetAccountID = nil
+			FriendTags:SetBlizzardTagsForFriend(
+				localFriend,
+				PERFY_263_BLIZZARD_TAG_SETS[((context.friendIndex - 1) % #PERFY_263_BLIZZARD_TAG_SETS) + 1]
+			)
+		end
+	end
+
+	local function RotatePrivateNote()
+		local keys = context.contactKeys or {}
+		if not (ContactMemory and ContactMemory.SetPrivateNote and #keys > 0) then
+			return
+		end
+		local key = keys[context.contactIndex]
+		context.contactIndex = (context.contactIndex % #keys) + 1
+		ContactMemory:SetPrivateNote(
+			key,
+			string.format("Perfy 2.6.3 rotating note %03d", context.contactIndex)
+		)
+	end
+
+	local function ExerciseAutoRaidCandidates()
+		if not (AutoRaidAssist and AutoRaidAssist.BuildCandidateList) then
+			return
+		end
+		local query = PERFY_263_RAID_QUERIES[context.raidQueryIndex] or ""
+		context.raidQueryIndex = (context.raidQueryIndex % #PERFY_263_RAID_QUERIES) + 1
+		context.lastAutoRaidCandidates = AutoRaidAssist:BuildCandidateList(query, 25)
+	end
+
+	local function ExerciseAutoRaidEvaluate()
+		if not (AutoRaidAssist and AutoRaidAssist.Evaluate) then
+			return
+		end
+		context.promotedUnits = {}
+		ResetPerfy263AutoRaidRuntime(AutoRaidAssist)
+		AutoRaidAssist:Evaluate("perfy-263")
+	end
+
+	local function ExerciseAutoRaidRosterSchedule()
+		if not (AutoRaidAssist and AutoRaidAssist.ScheduleRosterEvaluate) then
+			return
+		end
+		AutoRaidAssist:ScheduleRosterEvaluate("perfy-263")
+		if AutoRaidAssist.CancelRosterRetryTimers then
+			AutoRaidAssist:CancelRosterRetryTimers()
+		end
+	end
 
 	if ScenarioManager and ScenarioManager.Load then
 		ScenarioManager:Load("stress_200")
@@ -7708,13 +8118,85 @@ function TestSuite:RunPerfyStress(durationSeconds)
 		self.Reporter:Warn("ScenarioManager not available")
 	end
 
-	if QuickJoin and QuickJoin.CreateMockPreset_Stress then
-		QuickJoin:CreateMockPreset_Stress()
+	local seeded, seedError = pcall(SeedPerfy263FeatureData, context, FriendsList, ContactMemory, FriendTags, AutoRaidAssist)
+	if not seeded then
+		ResetPerfy263AutoRaidRuntime(AutoRaidAssist)
+		RestorePerfy263RaidMocks(context)
+		RestorePerfy263FeatureState(context.featureSnapshot)
+		if ScenarioManager and ScenarioManager.Clear then
+			ScenarioManager:Clear()
+		end
+		self.Reporter:Warn(
+			string.format(
+				GetLocalizedText("TESTSUITE_PERFY_ACTION_FAILED", "Perfy stress action failed: %s"),
+				tostring(seedError)
+			)
+		)
+		return
 	end
 
-	if RaidFrame and RaidFrame.CreateMockPreset_Stress then
-		RaidFrame:CreateMockPreset_Stress()
+	local visibleActions = {
+		function()
+			EnsureTab(friendsTab)
+		end,
+		function()
+			if FriendsList and FriendsList.RenderDisplay then
+				FriendsList:RenderDisplay(true)
+			end
+		end,
+		ScrollFriendsList,
+		ApplyNextTagSearch,
+		ToggleDynamicTagGroups,
+		ExerciseTooltipSummaries,
+		ExerciseTagRows,
+		RotateTagAssignment,
+		RotatePrivateNote,
+		ApplyNextFilter,
+		ApplyNextSort,
+		ExerciseAutoRaidCandidates,
+		ExerciseAutoRaidEvaluate,
+		ExerciseAutoRaidRosterSchedule,
+		function()
+			if FriendsList and FriendsList.UpdateFriendsList then
+				FriendsList:UpdateFriendsList()
+			end
+		end
+	}
+
+	local backgroundActions = {
+		ApplyNextTagSearch,
+		ToggleDynamicTagGroups,
+		ExerciseTooltipSummaries,
+		ExerciseTagRows,
+		RotateTagAssignment,
+		RotatePrivateNote,
+		ApplyNextFilter,
+		ApplyNextSort,
+		ExerciseAutoRaidCandidates,
+		ExerciseAutoRaidEvaluate,
+		ExerciseAutoRaidRosterSchedule,
+		function()
+			if FriendsList and FriendsList.UpdateFriendsList then
+				FriendsList:UpdateFriendsList()
+			end
+		end,
+	}
+
+	local idleActions = {
+		function() end,
+	}
+
+	if idleMode then
+		context.actions = idleActions
+	elseif backgroundMode then
+		context.actions = backgroundActions
+	else
+		context.actions = visibleActions
 	end
+
+	self.perfyStressActive = true
+	self.perfyStressContext = context
+	self.perfyStressEndTime = GetTime() + durationSeconds
 
 	context.addonProfilerActive = StartAddonProfiler()
 	StartPerfyTracking(durationSeconds)
@@ -7761,32 +8243,23 @@ function TestSuite:StopPerfyStress(reason)
 		self.perfyStressTicker = nil
 	end
 
+	StopPerfyTracking()
+
 	local context = self.perfyStressContext
 	self.perfyStressContext = nil
 
 	local FriendsList = BFL:GetModule("FriendsList")
 	local QuickFilters = BFL:GetModule("QuickFilters")
 	local Groups = BFL:GetModule("Groups")
-	local QuickJoin = BFL:GetModule("QuickJoin")
-	local RaidFrame = BFL:GetModule("RaidFrame")
-	local PreviewMode = BFL:GetModule("PreviewMode")
+	local AutoRaidAssist = BFL:GetModule("AutoRaidAssist")
 	local ScenarioManager = BFL.ScenarioManager
 
 	if context then
 		if context.addonProfilerActive then
 			StopAddonProfiler()
 		end
-		if context.whoMockHooked and C_FriendList then
-			if context.whoOriginalGetNum then
-				C_FriendList.GetNumWhoResults = context.whoOriginalGetNum
-			end
-			if context.whoOriginalGetInfo then
-				C_FriendList.GetWhoInfo = context.whoOriginalGetInfo
-			end
-		end
-		if context.whoMockEnabled and PreviewMode and PreviewMode.DisableWhoMock then
-			PreviewMode:DisableWhoMock()
-		end
+		ResetPerfy263AutoRaidRuntime(AutoRaidAssist)
+		RestorePerfy263RaidMocks(context)
 		if QuickFilters and QuickFilters.SetFilter and context.originalFilter then
 			QuickFilters:SetFilter(context.originalFilter)
 		elseif FriendsList and FriendsList.SetFilterMode and context.originalFilter then
@@ -7809,6 +8282,13 @@ function TestSuite:StopPerfyStress(reason)
 				end
 			end
 		end
+		if context.hiddenForPerfyMode and context.frameWasShown and BetterFriendsFrame and not BetterFriendsFrame:IsShown() then
+			if _G.ShowBetterFriendsFrame then
+				_G.ShowBetterFriendsFrame(context.originalTab or 1)
+			else
+				BetterFriendsFrame:Show()
+			end
+		end
 		if BetterFriendsFrame and BetterFriendsFrame:IsShown() and context.originalTab then
 			PanelTemplates_SetTab(BetterFriendsFrame, context.originalTab)
 			if BetterFriendsFrame_ShowBottomTab then
@@ -7823,19 +8303,18 @@ function TestSuite:StopPerfyStress(reason)
 	if ScenarioManager and ScenarioManager.Clear then
 		ScenarioManager:Clear()
 	end
-	if QuickJoin and QuickJoin.ClearMockGroups then
-		QuickJoin:ClearMockGroups()
-	end
-	if RaidFrame and RaidFrame.ClearMockData then
-		RaidFrame:ClearMockData()
+	if context then
+		RestorePerfy263FeatureState(context.featureSnapshot)
+		RefreshPerfy263FeatureSurfaces(FriendsList, context.forceRender or context.frameWasShown)
 	end
 
-	BFL:ForceRefreshFriendsList()
+	if not context or context.forceRender or context.frameWasShown then
+		BFL:ForceRefreshFriendsList()
+	end
 
 	if reason == "done" then
 		self.Reporter:Info(GetLocalizedText("TESTSUITE_PERFY_DONE", "Perfy stress test finished"))
 	else
-		StopPerfyTracking()
 		self.Reporter:Warn(
 			string.format(
 				GetLocalizedText("TESTSUITE_PERFY_ABORTED", "Perfy stress test stopped: %s"),

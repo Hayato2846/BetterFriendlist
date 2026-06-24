@@ -181,6 +181,44 @@ local function Timer_UpdateFriendsList()
 	end
 end
 
+local RENDER_ONLY_REFRESH_REASONS = {
+	["friend-tags"] = true,
+	["friend-tags-assignment"] = true,
+	filter = true,
+	search = true,
+}
+
+local function IsRenderOnlyRefresh(reason)
+	return RENDER_ONLY_REFRESH_REASONS[tostring(reason or "")] == true
+end
+
+local function Timer_ScheduledFriendsListRefresh()
+	local self = BFL.FriendsList
+	if not self then
+		return
+	end
+	local ignoreVisibility = self.scheduledRefreshIgnoreVisibility == true
+	local renderOnly = self.scheduledRefreshRenderOnly == true
+	self.scheduledRefreshTimer = nil
+	self.scheduledRefreshIgnoreVisibility = nil
+	self.scheduledRefreshRenderOnly = nil
+	if self.UpdateFontCache then
+		self:UpdateFontCache()
+	end
+	self:ClearPendingUpdate()
+	if renderOnly then
+		if self.UpdateSettingsCache then
+			self:UpdateSettingsCache()
+		end
+		self:RenderDisplay(ignoreVisibility)
+		if self.UpdateSendMessageButton then
+			self:UpdateSendMessageButton()
+		end
+	else
+		self:UpdateFriendsList(ignoreVisibility)
+	end
+end
+
 -- PERFY OPTIMIZATION (Phase 2A): Pre-defined SetScript Handlers
 local function FriendButton_OnSizeChanged(self, width, height)
 	local padding = self.textRightPadding or 80
@@ -729,7 +767,11 @@ local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self, info
 		local hasMultiAccountRow = self and ShouldShowMultiAccountRow(self, item.friend)
 		local rowHeight = CalculateFriendRowHeight(isCompactMode, nameSize, infoSize, infoDisabled, hasMultiAccountRow)
 		local TagChips = BFL:GetModule("TagChips")
-		if TagChips and TagChips.GetRowExtraHeight then
+		if TagChips and TagChips.GetRowData then
+			local tagChipRowData = TagChips:GetRowData(item.friend, self)
+			item._bflTagChipsRowData = tagChipRowData
+			rowHeight = rowHeight + tagChipRowData.height
+		elseif TagChips and TagChips.GetRowExtraHeight then
 			rowHeight = rowHeight + TagChips:GetRowExtraHeight(item.friend, self)
 		end
 		return rowHeight
@@ -757,10 +799,42 @@ local function BuildDisplayList(self)
 	end
 
 	local invitesCollapsed = GetCVarBool("friendInvitesCollapsed") and 1 or 0
+	local FriendTags = BFL:GetModule("FriendTags")
+	local friendTagsDefinitionVersion = FriendTags and FriendTags.GetDefinitionVersion and FriendTags:GetDefinitionVersion()
+		or BFL.FriendTagsVersion
+		or 0
+	local friendTagsEnabled = FriendTags
+		and FriendTags.IsEnabled
+		and FriendTags:IsEnabled()
+	local enableDynamicTagGroups = friendTagsEnabled
+		and FriendTags.GetSetting
+		and FriendTags:GetSetting("enableDynamicTagGroups", false) == true
+	local tagAssignmentsAffectDisplay = (self.searchText or "") ~= "" or enableDynamicTagGroups == true
+	local Registry = GetFilterSortRegistry()
+	if not tagAssignmentsAffectDisplay and Registry and Registry.ResolveQuickFilter then
+		local resolvedFilter = Registry:ResolveQuickFilter(self.filterMode or "all", true)
+		tagAssignmentsAffectDisplay = resolvedFilter and resolvedFilter.isCustom == true
+	end
+	if
+		not tagAssignmentsAffectDisplay
+		and not (self.settingsCache and self.settingsCache.infoDisabled)
+		and FriendTags
+		and FriendTags.CanDisplayTags
+		and FriendTags:CanDisplayTags("row")
+	then
+		tagAssignmentsAffectDisplay = true
+	end
+	local friendTagsAssignmentVersion = tagAssignmentsAffectDisplay
+		and FriendTags
+		and FriendTags.GetAssignmentVersion
+		and FriendTags:GetAssignmentVersion()
+		or 0
 	local currentSignature = table.concat({
 		BFL.FriendsListVersion or 0,
 		BFL.SettingsVersion or 0, -- Fix: Track settings/groups changes
-		BFL.FriendTagsVersion or 0,
+		friendTagsDefinitionVersion,
+		friendTagsAssignmentVersion,
+		BFL.FilterSortRegistryVersion or 0,
 		self.filterMode or "all",
 		self.searchText or "",
 		numInvitesForSignature,
@@ -863,13 +937,6 @@ local function BuildDisplayList(self)
 			onlineGroupCounts[groupId] = 0
 		end
 	end
-
-	local FriendTags = BFL:GetModule("FriendTags")
-	local enableDynamicTagGroups = FriendTags
-		and FriendTags.IsEnabled
-		and FriendTags:IsEnabled()
-		and FriendTags.GetSetting
-		and FriendTags:GetSetting("enableDynamicTagGroups", false) == true
 
 	if enableDynamicTagGroups then
 		for _, tag in ipairs(FriendTags:GetAllTagDefinitions()) do
@@ -1031,6 +1098,8 @@ local function BuildDisplayList(self)
 			end
 		end
 
+		local passesFilters = self:PassesFilters(friend)
+
 		-- Update counts and lists
 		for _, groupId in ipairs(friendGroupIds) do
 			-- Increment total count
@@ -1042,7 +1111,7 @@ local function BuildDisplayList(self)
 			end
 
 			-- Add to display list if passes filters
-			if self:PassesFilters(friend) then
+			if passesFilters then
 				table.insert(groupedFriends[groupId], friend)
 			end
 		end
@@ -3490,6 +3559,7 @@ function FriendsList:OnFriendListUpdate(forceImmediate) -- Event Coalescing (Mic
 			self.updateTimer:Cancel()
 			self.updateTimer = nil
 		end
+		self:CancelScheduledRefresh()
 		self:UpdateFriendsList()
 		return
 	end
@@ -3499,7 +3569,9 @@ function FriendsList:OnFriendListUpdate(forceImmediate) -- Event Coalescing (Mic
 	-- Just mark as dirty (needsRenderOnShow) and return.
 	-- This saves valid memory/CPU cycles during gameplay when frame is closed.
 	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
-		needsRenderOnShow = true
+		if not needsRenderOnShow then
+			needsRenderOnShow = true
+		end
 		return
 	end
 
@@ -3512,6 +3584,39 @@ function FriendsList:OnFriendListUpdate(forceImmediate) -- Event Coalescing (Mic
 	-- Schedule update with a small delay (0.1s) to batch multiple events
 	-- This significantly reduces CPU usage during login or mass status changes
 	self.updateTimer = C_Timer.After(0.1, Timer_UpdateFriendsList)
+end
+
+function FriendsList:CancelScheduledRefresh()
+	if self.scheduledRefreshTimer and self.scheduledRefreshTimer.Cancel then
+		self.scheduledRefreshTimer:Cancel()
+	end
+	self.scheduledRefreshTimer = nil
+	self.scheduledRefreshIgnoreVisibility = nil
+	self.scheduledRefreshRenderOnly = nil
+end
+
+function FriendsList:ScheduleRefresh(reason, delay, ignoreVisibility)
+	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
+		if not needsRenderOnShow then
+			needsRenderOnShow = true
+		end
+		return
+	end
+	local renderOnly = IsRenderOnlyRefresh(reason)
+	self.scheduledRefreshIgnoreVisibility = self.scheduledRefreshIgnoreVisibility or ignoreVisibility == true
+	if self.scheduledRefreshTimer then
+		if not renderOnly then
+			self.scheduledRefreshRenderOnly = false
+		end
+		return
+	end
+	self.scheduledRefreshRenderOnly = renderOnly
+	delay = delay or 0.05
+	if C_Timer and C_Timer.NewTimer then
+		self.scheduledRefreshTimer = C_Timer.NewTimer(delay, Timer_ScheduledFriendsListRefresh)
+	else
+		Timer_ScheduledFriendsListRefresh()
+	end
 end
 
 -- Sync groups from Groups module
@@ -3806,6 +3911,14 @@ local sortNumericKey = {
 }
 
 -- Update the friends list from WoW API
+function FriendsList:MarkNeedsRenderOnShow()
+	if needsRenderOnShow then
+		return false
+	end
+	needsRenderOnShow = true
+	return true
+end
+
 function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimization:
 	-- If the frame is hidden, we don't need to fetch data or rebuild the list.
 	-- Just mark it as dirty so it updates when shown.
@@ -4454,8 +4567,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 	-- PERFY FIX (Phase 23): Handle pending updates that were blocked during execution
 	if hasPendingUpdate then
 		hasPendingUpdate = false
-		-- Re-run update immediately to show latest state
-		self:UpdateFriendsList(ignoreVisibility)
+		self:ScheduleRefresh("pending-update", 0.05, ignoreVisibility)
 	end
 end
 
@@ -4716,50 +4828,112 @@ function FriendsList:CompareFriends(a, b, sortMode)
 	return nil
 end
 
+local function NormalizeSearchValue(text)
+	if text and text ~= "" and text ~= "???" then
+		text = tostring(text)
+		if text:sub(1, 2) == "|K" then
+			return nil
+		end
+		return BFL:StripAccents(text)
+	end
+	return nil
+end
+
+local function SearchCacheContains(normalizedText, searchNormalized)
+	return normalizedText and normalizedText:find(searchNormalized, 1, true) ~= nil
+end
+
+local function GetNormalizedSearchText(self)
+	local searchText = self.searchText or ""
+	if self._normalizedSearchTextRaw ~= searchText then
+		self._normalizedSearchTextRaw = searchText
+		self._normalizedSearchText = BFL:StripAccents(searchText)
+	end
+	return self._normalizedSearchText
+end
+
+local function RefreshFriendSearchCache(self, friend)
+	if type(friend) ~= "table" then
+		return
+	end
+	local friendsVersion = BFL.FriendsListVersion or 0
+	local nicknameVersion = BFL.NicknameCacheVersion or 0
+	if
+		friend._bfl_search_friend_version == friendsVersion
+		and friend._bfl_search_nickname_version == nicknameVersion
+	then
+		return
+	end
+
+	friend._bfl_search_friend_version = friendsVersion
+	friend._bfl_search_nickname_version = nicknameVersion
+	friend._bfl_search_accountName = NormalizeSearchValue(friend.accountName)
+	friend._bfl_search_battleTag = NormalizeSearchValue(friend.battleTag)
+	friend._bfl_search_characterName = NormalizeSearchValue(friend.characterName)
+	friend._bfl_search_realmName = NormalizeSearchValue(friend.realmName)
+	friend._bfl_search_note = NormalizeSearchValue(friend.note)
+	friend._bfl_search_name = NormalizeSearchValue(friend.name)
+
+	local DB = GetDB()
+	local uid = friend.uid or GetFriendUID(friend)
+	local nickname = DB and DB:GetNickname(uid) or nil
+	friend._bfl_search_nickname = NormalizeSearchValue(nickname)
+end
+
+local function GetFriendTagSearchCache(friend)
+	if type(friend) ~= "table" then
+		return nil
+	end
+	local FriendTags = BFL:GetModule("FriendTags")
+	local tagDefinitionVersion = FriendTags and FriendTags.GetDefinitionVersion and FriendTags:GetDefinitionVersion()
+		or BFL.FriendTagsVersion
+		or 0
+	local tagAssignmentVersion = FriendTags and FriendTags.GetFriendAssignmentVersion and FriendTags:GetFriendAssignmentVersion(friend)
+		or BFL.FriendTagsVersion
+		or 0
+	local settingsVersion = BFL.SettingsVersion or 0
+	if
+		friend._bfl_search_tag_definition_version == tagDefinitionVersion
+		and friend._bfl_search_tag_assignment_version == tagAssignmentVersion
+		and friend._bfl_search_tag_settings_version == settingsVersion
+	then
+		return friend._bfl_search_tag_text
+	end
+
+	local text = FriendTags and FriendTags.GetSearchText and FriendTags:GetSearchText(friend) or nil
+	friend._bfl_search_tag_definition_version = tagDefinitionVersion
+	friend._bfl_search_tag_assignment_version = tagAssignmentVersion
+	friend._bfl_search_tag_settings_version = settingsVersion
+	friend._bfl_search_tag_text = NormalizeSearchValue(text)
+	return friend._bfl_search_tag_text
+end
+
 -- Check if friend passes current filters
 function FriendsList:PassesFilters(friend) -- Search text filter
 	if self.searchText and self.searchText ~= "" then
-		local searchNormalized = BFL:StripAccents(self.searchText)
+		local searchNormalized = GetNormalizedSearchText(self)
 		local found = false
-
-		-- Helper function to check if a field contains the search text (accent-insensitive)
-		local function contains(text)
-			if text and text ~= "" and text ~= "???" then
-				-- Fix #50: Skip kStrings (|K...|k) - these are Blizzard privacy-protected
-				-- strings (Real Names) that cannot be searched programmatically.
-				-- Calling lower() on them mangles the escape code |K -> |k.
-				if text:sub(1, 2) == "|K" then
-					return false
-				end
-				return BFL:StripAccents(text):find(searchNormalized, 1, true) ~= nil
-			end
-			return false
-		end
+		RefreshFriendSearchCache(self, friend)
 
 		-- Search in multiple fields depending on friend type
 		if friend.type == "bnet" then
 			-- BNet friends: search in accountName, battleTag, characterName, realmName, note, nickname
 			-- Note: accountName is a kString (Real Name) and will be skipped by contains()
 			-- This is a Blizzard privacy limitation - Real Names cannot be searched
-			local DB = GetDB()
-			local uid = friend.uid or GetFriendUID(friend)
-			local nickname = DB and DB:GetNickname(uid) or nil
-			found = contains(friend.accountName)
-				or contains(friend.battleTag)
-				or contains(friend.characterName)
-				or contains(friend.realmName)
-				or contains(friend.note)
-				or contains(nickname)
+			found = SearchCacheContains(friend._bfl_search_accountName, searchNormalized)
+				or SearchCacheContains(friend._bfl_search_battleTag, searchNormalized)
+				or SearchCacheContains(friend._bfl_search_characterName, searchNormalized)
+				or SearchCacheContains(friend._bfl_search_realmName, searchNormalized)
+				or SearchCacheContains(friend._bfl_search_note, searchNormalized)
+				or SearchCacheContains(friend._bfl_search_nickname, searchNormalized)
 		else
 			-- WoW friends: search in name, note
-			found = contains(friend.name) or contains(friend.note)
+			found = SearchCacheContains(friend._bfl_search_name, searchNormalized)
+				or SearchCacheContains(friend._bfl_search_note, searchNormalized)
 		end
 
 		if not found then
-			local FriendTags = BFL:GetModule("FriendTags")
-			if FriendTags and FriendTags.GetSearchText then
-				found = contains(FriendTags:GetSearchText(friend))
-			end
+			found = SearchCacheContains(GetFriendTagSearchCache(friend), searchNormalized)
 		end
 
 		-- If no match found in any field, filter out this friend
@@ -4768,21 +4942,26 @@ function FriendsList:PassesFilters(friend) -- Search text filter
 		end
 	end
 
+	local filterMode = self.filterMode or "all"
+	if filterMode == "all" then
+		return true
+	end
+
 	local Registry = GetFilterSortRegistry()
 	if Registry and Registry.EvaluateQuickFilter then
-		return Registry:EvaluateQuickFilter(self.filterMode, friend)
+		return Registry:EvaluateQuickFilter(filterMode, friend)
 	end
 
 	-- Filter mode (use 'connected' field for both BNet and WoW friends)
-	if self.filterMode == "online" then
+	if filterMode == "online" then
 		if not friend.connected then
 			return false
 		end
-	elseif self.filterMode == "offline" then
+	elseif filterMode == "offline" then
 		if friend.connected then
 			return false
 		end
-	elseif self.filterMode == "wow" then
+	elseif filterMode == "wow" then
 		if friend.type == "bnet" then
 			-- BNet friend must be in WoW
 			if not friend.connected or not friend.gameAccountInfo then
@@ -4793,7 +4972,7 @@ function FriendsList:PassesFilters(friend) -- Search text filter
 			end
 		end
 		-- WoW friends always pass
-	elseif self.filterMode == "wowonline" then
+	elseif filterMode == "wowonline" then
 		if friend.type == "bnet" then
 			if not friend.connected or not friend.gameAccountInfo then
 				return false
@@ -4806,11 +4985,11 @@ function FriendsList:PassesFilters(friend) -- Search text filter
 				return false
 			end
 		end
-	elseif self.filterMode == "bnet" then
+	elseif filterMode == "bnet" then
 		if friend.type ~= "bnet" then
 			return false
 		end
-	elseif self.filterMode == "hideafk" then
+	elseif filterMode == "hideafk" then
 		-- Hide AFK/DND friends (show all friends, but hide those who are AFK or DND)
 		if friend.type == "bnet" then
 			-- CRITICAL: isAFK/isDND are on friend object directly, not in gameAccountInfo
@@ -4823,7 +5002,7 @@ function FriendsList:PassesFilters(friend) -- Search text filter
 				return false
 			end
 		end
-	elseif self.filterMode == "retail" then
+	elseif filterMode == "retail" then
 		-- Show only Retail/Mainline WoW friends
 		if friend.type == "bnet" then
 			-- BNet friend must be in WoW Retail
@@ -4839,7 +5018,7 @@ function FriendsList:PassesFilters(friend) -- Search text filter
 			end
 		end
 		-- WoW friends are assumed to be on same version as player
-	elseif self.filterMode == "ingame" then
+	elseif filterMode == "ingame" then
 		-- Show only friends currently playing any game (not just on App/Mobile)
 		if friend.type == "bnet" then
 			if not friend.connected or not friend.gameAccountInfo then
@@ -5045,7 +5224,26 @@ function FriendsList:SetSearchText(text, skipRefresh)
 	end
 	self.searchText = newText
 	if not skipRefresh then
+		if BFL.ScheduleFriendsListRefresh then
+			BFL:ScheduleFriendsListRefresh("search", 0.05)
+		else
+			BFL:ForceRefreshFriendsList()
+		end
+	end
+end
+
+local function RequestFriendsListRefresh(reason)
+	if BFL.ScheduleFriendsListRefresh then
+		BFL:ScheduleFriendsListRefresh(reason, 0.05)
+	else
 		BFL:ForceRefreshFriendsList()
+	end
+
+	local QuickFilters = BFL:GetModule("QuickFilters")
+	local header = BetterFriendsFrame and BetterFriendsFrame.FriendsTabHeader
+	local dropdown = header and header.QuickFilterDropdown
+	if QuickFilters and dropdown and QuickFilters.RefreshDropdown then
+		QuickFilters:RefreshDropdown(dropdown)
 	end
 end
 
@@ -5065,7 +5263,7 @@ function FriendsList:SetFilterMode(mode)
 		db.quickFilter = self.filterMode
 	end
 
-	BFL:ForceRefreshFriendsList()
+	RequestFriendsListRefresh("filter")
 end
 
 -- Set sort mode
@@ -5090,8 +5288,7 @@ function FriendsList:SetSortMode(mode)
 		db.primarySort = self.sortMode
 	end
 
-	self:ApplySort()
-	BFL:ForceRefreshFriendsList()
+	RequestFriendsListRefresh("primary-sort")
 end
 
 -- Set secondary sort mode (for multi-criteria sorting)
@@ -5119,8 +5316,7 @@ function FriendsList:SetSecondarySortMode(mode)
 		db.secondarySort = self.secondarySort
 	end
 
-	self:ApplySort()
-	BFL:ForceRefreshFriendsList()
+	RequestFriendsListRefresh("secondary-sort")
 end
 
 -- Helper to populate the Sort menu for the Contacts menu
@@ -5931,8 +6127,12 @@ end
 
 -- Friends Display Rendering
 function FriendsList:RenderDisplay(ignoreVisibility)
-	-- REFACTORED (Phase 21): Ensure layout (SearchBox) matches current settings
-	-- MOVED UP: Must happen even if frame is hidden to avoid SearchBox pop-in delay on show
+	if (not BetterFriendsFrame or not BetterFriendsFrame:IsShown()) and not ignoreVisibility then
+		needsRenderOnShow = true
+		return
+	end
+
+	-- Keep layout (SearchBox) in sync before visible or explicitly forced renders.
 	self:UpdateScrollBoxExtent()
 
 	-- Skip update if Friends list elements are hidden (means we're on another tab)
@@ -8206,7 +8406,7 @@ function FriendsList:UpdateFriendButton(button, elementData)
 
 	local TagChips = BFL:GetModule("TagChips")
 	if TagChips and TagChips.UpdateRowChips then
-		TagChips:UpdateRowChips(button, friend, self)
+		TagChips:UpdateRowChips(button, friend, self, elementData and elementData._bflTagChipsRowData)
 	end
 
 	-- Ensure button is visible

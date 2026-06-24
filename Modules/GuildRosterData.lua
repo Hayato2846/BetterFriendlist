@@ -40,6 +40,13 @@ local function SafeBoolean(value)
 	return value == true
 end
 
+local function GetCacheTime()
+	if GetTime then
+		return GetTime()
+	end
+	return time and time() or 0
+end
+
 function GuildRosterData:HasBaseRosterAPI()
 	return IsInGuild ~= nil
 		and GetNumGuildMembers ~= nil
@@ -91,6 +98,7 @@ function GuildRosterData:RequestRosterUpdate()
 	if not self:HasBaseRosterAPI() then
 		return false
 	end
+	self.rosterSnapshotCache = nil
 	local ok = pcall(BFL.GuildRoster)
 	return ok == true
 end
@@ -175,5 +183,55 @@ function GuildRosterData:CollectRoster(options)
 	end
 
 	return members, { online = online, total = total }
+end
+
+function GuildRosterData:CollectRosterCached(options)
+	options = options or {}
+	local maxAge = tonumber(options.maxAge) or 10
+	if maxAge <= 0 then
+		return self:CollectRoster(options)
+	end
+
+	if not self:HasBaseRosterAPI() or not self:IsInGuild() then
+		self.rosterSnapshotCache = nil
+		return {}, { online = 0, total = 0 }
+	end
+
+	local online, total = self:GetCounts()
+	local maxRows = SafeNumber(options.maxRows, total)
+	if maxRows <= 0 or maxRows > total then
+		maxRows = total
+	end
+	local signature = table.concat({
+		self:GetGuildName() or "",
+		total or 0,
+		online or 0,
+		maxRows or 0,
+	}, "|")
+	local now = GetCacheTime()
+	local cache = self.rosterSnapshotCache
+	if
+		cache
+		and cache.signature == signature
+		and now - (cache.time or 0) <= maxAge
+	then
+		return cache.members, cache.counts
+	end
+
+	local collectOptions = {}
+	for key, value in pairs(options) do
+		if key ~= "maxAge" then
+			collectOptions[key] = value
+		end
+	end
+	collectOptions.maxRows = maxRows
+	local members, counts = self:CollectRoster(collectOptions)
+	self.rosterSnapshotCache = {
+		signature = signature,
+		time = now,
+		members = members,
+		counts = counts,
+	}
+	return members, counts
 end
 

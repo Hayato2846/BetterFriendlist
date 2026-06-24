@@ -1451,19 +1451,39 @@ UpdateFriendsDisplay = function()
 	end
 end
 
+local function IsBetterFriendsFrameVisible()
+	return BetterFriendsFrame and BetterFriendsFrame:IsShown()
+end
+
+local function MarkFriendsListNeedsUpdate()
+	local FriendsList = GetFriendsList()
+	if FriendsList and FriendsList.NeedsRenderOnShow and FriendsList:NeedsRenderOnShow() then
+		return
+	end
+	if FriendsList and FriendsList.MarkNeedsRenderOnShow then
+		FriendsList:MarkNeedsRenderOnShow()
+	end
+end
+
 -- Throttled update function to batch rapid events
--- IMPROVED (Phase 14d): Always update data layer, only conditionally update display
+-- Keep hidden-frame events cheap: mark dirty and refresh data when the frame opens.
 local function RequestUpdate(forceDisplay)
 	local currentTime = GetTime()
+	local frameVisible = forceDisplay or IsBetterFriendsFrameVisible()
+
+	if not frameVisible then
+		pendingUpdate = false
+		MarkFriendsListNeedsUpdate()
+		return
+	end
 
 	-- If enough time has passed, update immediately
 	if currentTime - lastUpdateTime >= UPDATE_THROTTLE then
 		lastUpdateTime = currentTime
 		pendingUpdate = false
-		UpdateFriendsList() -- ALWAYS update data
+		UpdateFriendsList()
 
-		-- Only update display if frame is shown (unless forced)
-		if forceDisplay or (BetterFriendsFrame and BetterFriendsFrame:IsShown()) then
+		if forceDisplay or IsBetterFriendsFrameVisible() then
 			UpdateFriendsDisplay()
 		end
 	else
@@ -1474,10 +1494,13 @@ local function RequestUpdate(forceDisplay)
 				if pendingUpdate then
 					lastUpdateTime = GetTime()
 					pendingUpdate = false
-					UpdateFriendsList() -- ALWAYS update data
+					if not IsBetterFriendsFrameVisible() then
+						MarkFriendsListNeedsUpdate()
+						return
+					end
+					UpdateFriendsList()
 
-					-- Only update display if frame is shown
-					if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
+					if IsBetterFriendsFrameVisible() then
 						UpdateFriendsDisplay()
 					end
 				end
@@ -3979,10 +4002,12 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		-- eventFrame already fires callbacks for all registered events (including these).
 		-- Calling it again would execute each callback twice per event.
 
-		-- CRITICAL (Phase 14d): Always update friend list data, even if UI is hidden
-		-- This ensures data stays synchronized with WoW API
-		-- The UpdateFriendsList() function will apply search filter automatically
-		RequestUpdate() -- No longer checks if frame is shown
+		-- Hidden frames only mark the list dirty; data is refreshed on open.
+		if IsBetterFriendsFrameVisible() then
+			RequestUpdate()
+		else
+			MarkFriendsListNeedsUpdate()
+		end
 	elseif
 		event == "SOCIAL_QUEUE_UPDATE"
 		or event == "SOCIAL_UI_SOCIAL_QUEUE_SYSTEM_STATUS_UPDATED"
@@ -5542,6 +5567,13 @@ function BetterRAF_OnHide(frame)
 	local RAF = GetRAF()
 	if RAF then
 		RAF:OnHide(frame)
+	end
+end
+
+function BetterRAF_UpdateRAFInfo(frame, rafInfo)
+	local RAF = GetRAF()
+	if RAF then
+		RAF:UpdateRAFInfo(frame, rafInfo)
 	end
 end
 

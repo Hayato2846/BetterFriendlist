@@ -54,7 +54,14 @@ local function SafeTime()
 	return 0
 end
 
+local function IsDebugLogEnabled()
+	return BFL and BFL.DebugPrint and BFL.debugPrintEnabled == true
+end
+
 local function DebugValue(value)
+	if not IsDebugLogEnabled() then
+		return nil
+	end
 	if value == nil then
 		return "<nil>"
 	end
@@ -78,7 +85,7 @@ local function CountTableKeys(tableValue)
 end
 
 local function DebugLog(message, ...)
-	if not (BFL and BFL.DebugPrint) then
+	if not IsDebugLogEnabled() then
 		return
 	end
 	if select("#", ...) > 0 then
@@ -111,6 +118,19 @@ local function AddSearchText(parts, value)
 	if value ~= nil and value ~= "" and not (BFL.IsSecret and BFL:IsSecret(value)) then
 		parts[#parts + 1] = tostring(value):lower()
 	end
+end
+
+local function ClearSearchParts(parts)
+	for index = 1, #parts do
+		parts[index] = nil
+	end
+end
+
+local function FinalizeCandidateSearch(candidate, parts)
+	candidate.haystack = table.concat(parts, " ")
+	candidate.sortKey = tostring(candidate.displayName or candidate.value or ""):lower()
+	ClearSearchParts(parts)
+	return candidate
 end
 
 local function GetCurrentGroupLabel()
@@ -266,6 +286,8 @@ function AutoRaidAssist:NormalizeDB()
 		db.targets = normalizedTargets
 	end
 
+	self.normalizedDB = db
+	self.dbCacheDirty = false
 	return db
 end
 
@@ -275,7 +297,10 @@ function AutoRaidAssist:Initialize()
 	self.promotionQueue = {}
 	self.promotionQueueLookup = {}
 	self.promotionRetryTimers = {}
-	self:NormalizeDB()
+	self.candidateCache = nil
+	self.normalizedDB = nil
+	self.dbCacheDirty = true
+	self:GetDB()
 	DebugLog("Initialize enabled=%s targets=%d", DebugValue(self:IsEnabled()), self:GetTargetCount())
 	self:RegisterEvents()
 	self:RegisterWithSettingsDesigner()
@@ -296,10 +321,18 @@ function AutoRaidAssist:RegisterEvents()
 	DebugLog("RegisterEvents installing callbacks")
 
 	local function Schedule(reason)
+		if not AutoRaidAssist:GetEnabledSetting() then
+			return
+		end
+		AutoRaidAssist:InvalidateCandidateCache()
 		DebugLog("Event trigger reason=%s -> ScheduleEvaluate", DebugValue(reason))
 		AutoRaidAssist:ScheduleEvaluate(reason)
 	end
 	local function ScheduleRoster(reason)
+		if not AutoRaidAssist:GetEnabledSetting() then
+			return
+		end
+		AutoRaidAssist:InvalidateCandidateCache()
 		DebugLog("Roster event trigger reason=%s -> ScheduleRosterEvaluate", DebugValue(reason))
 		AutoRaidAssist:ScheduleRosterEvaluate(reason)
 	end
@@ -324,6 +357,12 @@ function AutoRaidAssist:RegisterEvents()
 	end, 80)
 	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_ONLINE", function()
 		Schedule("bnet-online")
+	end, 80)
+	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_OFFLINE", function()
+		Schedule("bnet-offline")
+	end, 80)
+	BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function()
+		Schedule("friendlist")
 	end, 80)
 	BFL:RegisterEventCallback("PLAYER_REGEN_ENABLED", function()
 		if AutoRaidAssist.needsCombatRetry then
@@ -373,6 +412,17 @@ function AutoRaidAssist:RegisterConversionHooks()
 end
 
 function AutoRaidAssist:GetDB()
+	local db = type(BetterFriendlistDB) == "table" and BetterFriendlistDB.autoRaidAssist or nil
+	if
+		not self.dbCacheDirty
+		and self.normalizedDB == db
+		and type(db) == "table"
+		and db.version ~= nil
+		and db.enabled ~= nil
+		and type(db.targets) == "table"
+	then
+		return db
+	end
 	return self:NormalizeDB()
 end
 
@@ -399,6 +449,7 @@ function AutoRaidAssist:SetEnabled(enabled)
 	db.enabled = newValue
 	DebugLog("SetEnabled changed enabled=%s targets=%d", DebugValue(newValue), self:GetTargetCount())
 	NotifySettingsChanged()
+	self:InvalidateCandidateCache()
 	if newValue then
 		self:ScheduleEvaluate("enabled")
 	else
@@ -470,6 +521,7 @@ function AutoRaidAssist:AddTarget(contactKey, source, displayName)
 		#db.targets
 	)
 	NotifySettingsChanged()
+	self:InvalidateCandidateCache()
 	self:ScheduleEvaluate("target-added")
 	return true
 end
@@ -554,6 +606,7 @@ function AutoRaidAssist:RemoveTarget(contactKey)
 		if ContactIdentity:NormalizeLookupKey(target.key or target.id) == lookupKey then
 			table.remove(db.targets, index)
 			NotifySettingsChanged()
+			self:InvalidateCandidateCache()
 			self:RemoveQueuedPromotion(lookupKey)
 			self:CancelPromotionRetryTimer(lookupKey)
 			self:ResetPromotionAttemptCount(lookupKey)
@@ -624,13 +677,43 @@ function AutoRaidAssist:GetCurrentGroupCandidateUnits()
 	return units
 end
 
-function AutoRaidAssist:AddCurrentGroupCandidates(candidates, seen, query)
-	local ContactIdentity = GetContactIdentity()
+function AutoRaidAssist:InvalidateCandidateCache()
+	self.candidateCache = nil
+	self.candidateSourceVersion = (self.candidateSourceVersion or 0) + 1
+end
+
+function AutoRaidAssist:GetCandidateCacheSignature(FriendsList, GuildRosterData)
+	local groupState = "solo"
+	if IsInRaid and IsInRaid() then
+		groupState = "raid"
+	elseif IsInGroup and IsInGroup() then
+		groupState = "party"
+	end
+	local groupCount = GetNumGroupMembers and GetNumGroupMembers() or 0
+	local guildOnline, guildTotal = 0, 0
+	if GuildRosterData and GuildRosterData.GetCounts then
+		guildOnline, guildTotal = GuildRosterData:GetCounts()
+	end
+	return table.concat({
+		self.candidateSourceVersion or 0,
+		BFL.NicknameCacheVersion or 0,
+		FriendsList and FriendsList.friendsList and #FriendsList.friendsList or 0,
+		groupState,
+		groupCount or 0,
+		guildOnline or 0,
+		guildTotal or 0,
+	}, "|")
+end
+
+function AutoRaidAssist:AddCurrentGroupCandidates(candidates, seen, query, ContactIdentity, DB, parts)
+	ContactIdentity = ContactIdentity or GetContactIdentity()
 	if not ContactIdentity then
 		return
 	end
 
-	local DB = GetDB()
+	DB = DB or GetDB()
+	parts = parts or {}
+	query = query or ""
 	local groupLabel = GetCurrentGroupLabel()
 	for _, unit in ipairs(self:GetCurrentGroupCandidateUnits()) do
 		if (not UnitExists or UnitExists(unit)) and not (UnitIsUnit and UnitIsUnit(unit, "player")) then
@@ -653,7 +736,6 @@ function AutoRaidAssist:AddCurrentGroupCandidates(candidates, seen, query)
 				local nicknameUID = normalizedName and ("wow_" .. normalizedName) or nil
 				local nickname = nicknameUID and DB and DB.GetNickname and DB:GetNickname(nicknameUID) or nil
 				local displayName = ContactIdentity:CleanString(name) or value or key
-				local parts = {}
 				AddSearchText(parts, displayName)
 				AddSearchText(parts, nickname)
 				AddSearchText(parts, normalizedName)
@@ -661,38 +743,41 @@ function AutoRaidAssist:AddCurrentGroupCandidates(candidates, seen, query)
 				AddSearchText(parts, realm)
 				AddSearchText(parts, groupLabel)
 
-				local haystack = table.concat(parts, " ")
-				if query == "" or haystack:find(query, 1, true) then
+				local candidate = FinalizeCandidateSearch({
+					key = key,
+					kind = "player",
+					value = normalizedName or value,
+					source = "group",
+					displayName = displayName,
+					nickname = nickname,
+					subtitle = groupLabel .. " - " .. tostring(normalizedName or value or ""),
+				}, parts)
+				if query == "" or candidate.haystack:find(query, 1, true) then
 					seen[lookupKey] = true
-					candidates[#candidates + 1] = {
-						key = key,
-						kind = "player",
-						value = normalizedName or value,
-						source = "group",
-						displayName = displayName,
-						nickname = nickname,
-						subtitle = groupLabel .. " - " .. tostring(normalizedName or value or ""),
-					}
+					candidates[#candidates + 1] = candidate
 				end
 			end
 		end
 	end
 end
 
-function AutoRaidAssist:BuildCandidateList(query, limit)
+function AutoRaidAssist:BuildCandidateCache()
 	local ContactIdentity = GetContactIdentity()
 	local FriendsList = GetFriendsList()
 	if not ContactIdentity then
-		return {}
+		return { signature = "missing-identity", candidates = {}, results = {} }
 	end
 
-	query = ContactIdentity:CleanString(query) or ""
-	query = query:lower()
-	limit = limit or MAX_SUGGESTIONS
+	local GuildRosterData = GetGuildRosterData()
+	local signature = self:GetCandidateCacheSignature(FriendsList, GuildRosterData)
+	if self.candidateCache and self.candidateCache.signature == signature then
+		return self.candidateCache
+	end
 
 	local DB = GetDB()
 	local candidates = {}
 	local seen = {}
+	local parts = {}
 
 	if FriendsList and FriendsList.friendsList then
 		for _, friend in ipairs(FriendsList.friendsList) do
@@ -709,7 +794,6 @@ function AutoRaidAssist:BuildCandidateList(query, limit)
 				end
 				local nickname = DB and DB.GetNickname and DB:GetNickname(nicknameUID) or nil
 				local gameAccountInfo = type(friend.gameAccountInfo) == "table" and friend.gameAccountInfo or nil
-				local parts = {}
 				AddSearchText(parts, displayName)
 				AddSearchText(parts, nickname)
 				AddSearchText(parts, friend.accountName)
@@ -720,29 +804,30 @@ function AutoRaidAssist:BuildCandidateList(query, limit)
 				AddSearchText(parts, gameAccountInfo and gameAccountInfo.characterName)
 				AddSearchText(parts, gameAccountInfo and gameAccountInfo.realmName)
 
-				local haystack = table.concat(parts, " ")
-				if query == "" or haystack:find(query, 1, true) then
-					seen[lookupKey] = true
-					candidates[#candidates + 1] = {
-						key = key,
-						kind = kind,
-						value = value,
-						friend = friend,
-						displayName = displayName,
-						nickname = nickname,
-						subtitle = self:GetCandidateSubtitle(friend, kind, value),
-					}
-				end
+				seen[lookupKey] = true
+				candidates[#candidates + 1] = FinalizeCandidateSearch({
+					key = key,
+					kind = kind,
+					value = value,
+					friend = friend,
+					displayName = displayName,
+					nickname = nickname,
+					subtitle = self:GetCandidateSubtitle(friend, kind, value),
+				}, parts)
 			end
 		end
 	end
 
-	local GuildRosterData = GetGuildRosterData()
 	if GuildRosterData and GuildRosterData.CollectRoster and GuildRosterData.HasBaseRosterAPI
 		and GuildRosterData:HasBaseRosterAPI() and (not GuildRosterData.IsInGuild or GuildRosterData:IsInGuild()) then
 		self:RequestGuildRosterRefresh()
 
-		local members = GuildRosterData:CollectRoster()
+		local members
+		if GuildRosterData.CollectRosterCached then
+			members = GuildRosterData:CollectRosterCached({ maxAge = 15 })
+		else
+			members = GuildRosterData:CollectRoster()
+		end
 		for _, member in ipairs(members or {}) do
 			local realm = member.realm
 			if (not realm or realm == "") and GetNormalizedRealmName then
@@ -755,7 +840,6 @@ function AutoRaidAssist:BuildCandidateList(query, limit)
 				local nicknameUID = "wow_" .. normalizedName
 				local nickname = DB and DB.GetNickname and DB:GetNickname(nicknameUID) or nil
 				local displayName = member.name or normalizedName
-				local parts = {}
 				AddSearchText(parts, displayName)
 				AddSearchText(parts, nickname)
 				AddSearchText(parts, normalizedName)
@@ -763,37 +847,63 @@ function AutoRaidAssist:BuildCandidateList(query, limit)
 				AddSearchText(parts, member.realm)
 				AddSearchText(parts, member.rank)
 
-				local haystack = table.concat(parts, " ")
-				if query == "" or haystack:find(query, 1, true) then
-					seen[lookupKey] = true
-					candidates[#candidates + 1] = {
-						key = key,
-						kind = "player",
-						value = normalizedName,
-						source = "guild",
-						displayName = displayName,
-						nickname = nickname,
-						subtitle = (GUILD or "Guild") .. " - " .. normalizedName,
-					}
-				end
+				seen[lookupKey] = true
+				candidates[#candidates + 1] = FinalizeCandidateSearch({
+					key = key,
+					kind = "player",
+					value = normalizedName,
+					source = "guild",
+					displayName = displayName,
+					nickname = nickname,
+					subtitle = (GUILD or "Guild") .. " - " .. normalizedName,
+				}, parts)
 			end
 		end
 	end
 
-	self:AddCurrentGroupCandidates(candidates, seen, query)
+	self:AddCurrentGroupCandidates(candidates, seen, "", ContactIdentity, DB, parts)
 
 	table.sort(candidates, function(a, b)
-		return tostring(a.displayName or a.value):lower() < tostring(b.displayName or b.value):lower()
+		return (a.sortKey or "") < (b.sortKey or "")
 	end)
 
-	if #candidates > limit then
-		local limited = {}
-		for i = 1, limit do
-			limited[i] = candidates[i]
-		end
-		return limited
+	self.candidateCache = {
+		signature = signature,
+		candidates = candidates,
+		results = {},
+	}
+	return self.candidateCache
+end
+
+function AutoRaidAssist:BuildCandidateList(query, limit)
+	local ContactIdentity = GetContactIdentity()
+	if not ContactIdentity then
+		return {}
 	end
-	return candidates
+
+	query = ContactIdentity:CleanString(query) or ""
+	query = query:lower()
+	limit = limit or MAX_SUGGESTIONS
+
+	local cache = self:BuildCandidateCache()
+	local resultKey = query .. "|" .. tostring(limit)
+	if cache.results and cache.results[resultKey] then
+		return cache.results[resultKey]
+	end
+
+	local results = {}
+	for _, candidate in ipairs(cache.candidates or {}) do
+		if query == "" or (candidate.haystack and candidate.haystack:find(query, 1, true)) then
+			results[#results + 1] = candidate
+			if #results >= limit then
+				break
+			end
+		end
+	end
+	if cache.results then
+		cache.results[resultKey] = results
+	end
+	return results
 end
 
 function AutoRaidAssist:GetCandidateSubtitle(friend, kind, value)
