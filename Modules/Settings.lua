@@ -85,6 +85,7 @@ function Settings:RenderFilterSortEditor(parent, opts)
 		return nil
 	end
 	opts = opts or {}
+	parent.BFL_SettingsCenterBuilderSkin = opts.settingsCenter == true and opts.inlineEditor == true
 	parent.components = parent.components or {}
 	parent.bflBuilderKind = parent.bflBuilderKind or self.filterSortBuilderKind or "filter"
 	local focusID = tostring(opts.focusID or "")
@@ -136,6 +137,7 @@ function Settings:RenderFilterSortEditor(parent, opts)
 	return {
 		Release = function()
 			HideComponentList(parent)
+			parent.BFL_SettingsCenterBuilderSkin = nil
 			if self.filterSortCustomHost and self.filterSortCustomHost.tab == parent then
 				self.filterSortCustomHost = nil
 			end
@@ -6794,39 +6796,62 @@ local function BFL_Settings_GetStackHeight(frames, startY)
 	return height
 end
 
-local function BFL_Settings_CreateSmallButton(parent, text, width, onClick)
-	local button = CreateFrame("Button", nil, parent, "BackdropTemplate")
-	button:SetSize(width or 64, 22)
-	button.Text = button:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormalSmall")
-	button.Text:SetPoint("LEFT", button, "LEFT", 7, 0)
-	button.Text:SetPoint("RIGHT", button, "RIGHT", -7, 0)
-	button.Text:SetJustifyH("CENTER")
-	button.Text:SetWordWrap(false)
-	button.SetText = function(self, value)
-		self.Text:SetText(value or "")
+local function BFL_Settings_ShouldUseBuilderSkin(parent)
+	local frame = parent
+	while frame do
+		if frame.BFL_SettingsCenterBuilderSkin then
+			return true
+		end
+		frame = frame.GetParent and frame:GetParent() or nil
 	end
-	button.GetText = function(self)
-		return self.Text:GetText()
+	return false
+end
+
+local function BFL_Settings_CreateSmallButton(parent, text, width, onClick)
+	local useBuilderSkin = BFL_Settings_ShouldUseBuilderSkin(parent)
+	local button = CreateFrame("Button", nil, parent, useBuilderSkin and "BackdropTemplate" or "UIPanelButtonTemplate")
+	button:SetSize(width or 64, 22)
+	button.BFL_SettingsCenterBuilderSkin = useBuilderSkin
+	if useBuilderSkin then
+		button.Text = button:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormalSmall")
+		button.Text:SetPoint("LEFT", button, "LEFT", 7, 0)
+		button.Text:SetPoint("RIGHT", button, "RIGHT", -7, 0)
+		button.Text:SetJustifyH("CENTER")
+		button.Text:SetWordWrap(false)
+		button.SetText = function(self, value)
+			self.Text:SetText(value or "")
+		end
+		button.GetText = function(self)
+			return self.Text:GetText()
+		end
+	elseif button.SetNormalFontObject then
+		button:SetNormalFontObject("BetterFriendlistFontNormalSmall")
+		button:SetHighlightFontObject("BetterFriendlistFontHighlightSmall")
+		button:SetDisabledFontObject("BetterFriendlistFontDisableSmall")
 	end
 	button:SetText(text)
-	BFL_Settings_ApplyBuilderButtonStyle(button)
+	if useBuilderSkin then
+		BFL_Settings_ApplyBuilderButtonStyle(button)
+	end
 	if onClick then
 		button:SetScript("OnClick", onClick)
 	end
-	button:SetScript("OnEnter", function(self)
-		if self:IsEnabled() then
-			BFL_Settings_ApplyBuilderButtonStyle(self, "hover")
-		end
-	end)
-	button:SetScript("OnLeave", function(self)
-		BFL_Settings_ApplyBuilderButtonStyle(self, self:IsEnabled() and (self.bflSelected and "selected" or nil) or "disabled")
-	end)
-	button:SetScript("OnEnable", function(self)
-		BFL_Settings_ApplyBuilderButtonStyle(self, self.bflSelected and "selected" or nil)
-	end)
-	button:SetScript("OnDisable", function(self)
-		BFL_Settings_ApplyBuilderButtonStyle(self, "disabled")
-	end)
+	if useBuilderSkin then
+		button:SetScript("OnEnter", function(self)
+			if self:IsEnabled() then
+				BFL_Settings_ApplyBuilderButtonStyle(self, "hover")
+			end
+		end)
+		button:SetScript("OnLeave", function(self)
+			BFL_Settings_ApplyBuilderButtonStyle(self, self:IsEnabled() and (self.bflSelected and "selected" or nil) or "disabled")
+		end)
+		button:SetScript("OnEnable", function(self)
+			BFL_Settings_ApplyBuilderButtonStyle(self, self.bflSelected and "selected" or nil)
+		end)
+		button:SetScript("OnDisable", function(self)
+			BFL_Settings_ApplyBuilderButtonStyle(self, "disabled")
+		end)
+	end
 	return button
 end
 
@@ -7096,6 +7121,7 @@ function Settings:EnsureFilterSortEditorPanel()
 		end
 
 		parentFrame = customHost.editorParent or customHost.tab or anchorFrame
+		frame.BFL_SettingsCenterBuilderSkin = customHost.settingsCenter == true
 		frame:SetParent(parentFrame)
 		frame:SetFrameStrata((anchorFrame.GetFrameStrata and anchorFrame:GetFrameStrata()) or "HIGH")
 		frame:SetFrameLevel(((anchorFrame.GetFrameLevel and anchorFrame:GetFrameLevel()) or 1) + 4)
@@ -7165,6 +7191,7 @@ function Settings:EnsureFilterSortEditorPanel()
 		self.filterSortEditorFrame = frame
 	end
 
+	frame.BFL_SettingsCenterBuilderSkin = nil
 	frame:SetParent(anchorFrame)
 	frame:SetFrameStrata(anchorFrame:GetFrameStrata() or "HIGH")
 	frame:SetFrameLevel((anchorFrame:GetFrameLevel() or 1) + 10)
