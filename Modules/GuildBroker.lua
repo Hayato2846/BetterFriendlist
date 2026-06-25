@@ -846,11 +846,12 @@ function GuildBroker:OpenMemberContextMenu(data)
 			if data.name and data.name ~= "Unknown" then
 				rootDescription:CreateButton(L("GUILD_BROKER_MENU_COPY_NAME"), function()
 					local copyText = data.fullName or data.name
+					local editBoxWidth = 280
 					StaticPopupDialogs["BETTERFRIENDLIST_COPY_URL"] = {
 						text = BFL.L and BFL.L.COPY_CHARACTER_NAME_POPUP_TITLE or "Copy Name",
 						button1 = CLOSE,
 						hasEditBox = true,
-						editBoxWidth = 350,
+						editBoxWidth = editBoxWidth,
 						OnShow = function(self)
 							self.EditBox:SetText(copyText)
 							self.EditBox:SetFocus()
@@ -860,6 +861,9 @@ function GuildBroker:OpenMemberContextMenu(data)
 									editBox:GetParent():Hide()
 								end
 							end)
+							if BFL.BrokerUtils and BFL.BrokerUtils.FixCopyStaticPopupLayout then
+								BFL.BrokerUtils.FixCopyStaticPopupLayout(self, editBoxWidth)
+							end
 						end,
 						EditBoxOnEnterPressed = function(self)
 							self:GetParent():Hide()
@@ -872,7 +876,10 @@ function GuildBroker:OpenMemberContextMenu(data)
 						hideOnEscape = true,
 						preferredIndex = 3,
 					}
-					StaticPopup_Show("BETTERFRIENDLIST_COPY_URL")
+					local dialog = StaticPopup_Show("BETTERFRIENDLIST_COPY_URL")
+					if dialog and BFL.BrokerUtils and BFL.BrokerUtils.FixCopyStaticPopupLayout then
+						BFL.BrokerUtils.FixCopyStaticPopupLayout(dialog, editBoxWidth)
+					end
 				end)
 			end
 

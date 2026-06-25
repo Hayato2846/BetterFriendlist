@@ -6,6 +6,7 @@ local DarkTheme = BFL:RegisterModule("DarkTheme", {})
 
 local WHO_COLUMN_HEADER_HEIGHT = 28
 local WHO_COLUMN_HEADER_OVERLAP = -1
+local WHO_CLASSIC_DROPDOWN_X_OFFSET = -12
 local WHO_LIST_INSET_PADDING = 4
 local WHO_SCROLLBAR_RESERVE = 24
 local WHO_SCROLLBAR_OFFSET_X = 1
@@ -1005,6 +1006,9 @@ function DarkTheme:LayoutWhoColumnHeaders(engine, who)
 		return
 	end
 
+	local dropdownOffset = BFL.IsClassic and WHO_CLASSIC_DROPDOWN_X_OFFSET or 0
+	local levelHeaderOffset = WHO_COLUMN_HEADER_OVERLAP - dropdownOffset
+
 	if who.NameHeader and who.ListInset then
 		engine:SetFrameSize(who.NameHeader, nil, WHO_COLUMN_HEADER_HEIGHT)
 		engine:SetFramePoints(who.NameHeader, {
@@ -1015,14 +1019,14 @@ function DarkTheme:LayoutWhoColumnHeaders(engine, who)
 	if who.ColumnDropdown and who.NameHeader then
 		engine:SetFrameSize(who.ColumnDropdown, nil, WHO_COLUMN_HEADER_HEIGHT)
 		engine:SetFramePoints(who.ColumnDropdown, {
-			{ "TOPLEFT", who.NameHeader, "TOPRIGHT", WHO_COLUMN_HEADER_OVERLAP, 0 },
+			{ "TOPLEFT", who.NameHeader, "TOPRIGHT", WHO_COLUMN_HEADER_OVERLAP + dropdownOffset, 0 },
 		})
 	end
 
 	if who.LevelHeader and who.ColumnDropdown then
 		engine:SetFrameSize(who.LevelHeader, nil, WHO_COLUMN_HEADER_HEIGHT)
 		engine:SetFramePoints(who.LevelHeader, {
-			{ "TOPLEFT", who.ColumnDropdown, "TOPRIGHT", WHO_COLUMN_HEADER_OVERLAP, 0 },
+			{ "TOPLEFT", who.ColumnDropdown, "TOPRIGHT", levelHeaderOffset, 0 },
 		})
 	end
 

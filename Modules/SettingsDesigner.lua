@@ -280,15 +280,19 @@ local function ShowSupportURL(label, url)
 		Changelog:ShowCopyDialog(url, label)
 		return
 	end
+	local editBoxWidth = 350
 	StaticPopupDialogs["BFL_SETTINGS_CENTER_COPY_URL"] = {
 		text = label or T("SETTINGS_CENTER_SUPPORT_COPY_LINKS", "Copy Links"),
 		button1 = CLOSE or "Close",
 		hasEditBox = true,
-		editBoxWidth = 350,
+		editBoxWidth = editBoxWidth,
 		OnShow = function(self)
 			self.EditBox:SetText(url or "")
 			self.EditBox:SetFocus()
 			self.EditBox:HighlightText()
+			if BFL.BrokerUtils and BFL.BrokerUtils.FixCopyStaticPopupLayout then
+				BFL.BrokerUtils.FixCopyStaticPopupLayout(self, editBoxWidth)
+			end
 		end,
 		EditBoxOnEnterPressed = function(self)
 			self:GetParent():Hide()
@@ -301,7 +305,10 @@ local function ShowSupportURL(label, url)
 		hideOnEscape = true,
 		preferredIndex = 3,
 	}
-	StaticPopup_Show("BFL_SETTINGS_CENTER_COPY_URL")
+	local dialog = StaticPopup_Show("BFL_SETTINGS_CENTER_COPY_URL")
+	if dialog and BFL.BrokerUtils and BFL.BrokerUtils.FixCopyStaticPopupLayout then
+		BFL.BrokerUtils.FixCopyStaticPopupLayout(dialog, editBoxWidth)
+	end
 end
 
 local function RestoreAfterExternalFrame(externalFrame)

@@ -29,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.6.4]        - 2026-06-25
+
+### Fixed
+- **Classic Friends List** - Fixed class-colored names for WoW friends whose localized class data could miss Classic class ID gaps, including druids on Anniversary realms.
+- **Classic UI** - Adjusted the WHO zone dropdown spacing and stabilized copy-name dialogs so their input fields fit on first open.
+
+---
+
 ## [2.6.3]        - 2026-06-22
 
 ### Added
@@ -377,11 +385,12 @@ local function RecalculateHeight(contentFrame, entryFrames)
 end
 
 local function ShowCopyDialog(url, title)
+	local editBoxWidth = 350
 	StaticPopupDialogs["BETTERFRIENDLIST_COPY_URL"] = {
 		text = title or "Copy URL",
 		button1 = "Close",
 		hasEditBox = true,
-		editBoxWidth = 350,
+		editBoxWidth = editBoxWidth,
 		OnShow = function(self)
 			self.EditBox:SetText(url)
 			self.EditBox:SetFocus()
@@ -391,6 +400,9 @@ local function ShowCopyDialog(url, title)
 					editBox:GetParent():Hide()
 				end
 			end)
+			if BFL.BrokerUtils and BFL.BrokerUtils.FixCopyStaticPopupLayout then
+				BFL.BrokerUtils.FixCopyStaticPopupLayout(self, editBoxWidth)
+			end
 		end,
 		EditBoxOnEnterPressed = function(self)
 			self:GetParent():Hide()
@@ -403,7 +415,10 @@ local function ShowCopyDialog(url, title)
 		hideOnEscape = true,
 		preferredIndex = 3,
 	}
-	StaticPopup_Show("BETTERFRIENDLIST_COPY_URL")
+	local dialog = StaticPopup_Show("BETTERFRIENDLIST_COPY_URL")
+	if dialog and BFL.BrokerUtils and BFL.BrokerUtils.FixCopyStaticPopupLayout then
+		BFL.BrokerUtils.FixCopyStaticPopupLayout(dialog, editBoxWidth)
+	end
 end
 
 function Changelog:ShowCopyDialog(url, title)

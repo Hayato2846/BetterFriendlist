@@ -2124,11 +2124,12 @@ frame:SetScript("OnEvent", function(self, event, ...)
 						end
 					end
 
+					local editBoxWidth = 280
 					StaticPopupDialogs["BETTERFRIENDLIST_COPY_URL"] = {
 						text = L.COPY_CHARACTER_NAME_POPUP_TITLE,
 						button1 = CLOSE,
 						hasEditBox = true,
-						editBoxWidth = 350,
+						editBoxWidth = editBoxWidth,
 						OnShow = function(self)
 							self.EditBox:SetText(copyNameText or "")
 							self.EditBox:SetFocus()
@@ -2138,6 +2139,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
 									editBox:GetParent():Hide()
 								end
 							end)
+							if BFL.BrokerUtils and BFL.BrokerUtils.FixCopyStaticPopupLayout then
+								BFL.BrokerUtils.FixCopyStaticPopupLayout(self, editBoxWidth)
+							end
 						end,
 						EditBoxOnEnterPressed = function(self)
 							self:GetParent():Hide()
@@ -2150,7 +2154,10 @@ frame:SetScript("OnEvent", function(self, event, ...)
 						hideOnEscape = true,
 						preferredIndex = 3,
 					}
-					StaticPopup_Show("BETTERFRIENDLIST_COPY_URL")
+					local dialog = StaticPopup_Show("BETTERFRIENDLIST_COPY_URL")
+					if dialog and BFL.BrokerUtils and BFL.BrokerUtils.FixCopyStaticPopupLayout then
+						BFL.BrokerUtils.FixCopyStaticPopupLayout(dialog, editBoxWidth)
+					end
 				end
 			end
 
@@ -2204,11 +2211,12 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				-- Helper: Build a copy handler for a specific name string
 				local function BuildCopyHandler(copyNameText)
 					return function()
+						local editBoxWidth = 280
 						StaticPopupDialogs["BETTERFRIENDLIST_COPY_URL"] = {
 							text = L.COPY_CHARACTER_NAME_POPUP_TITLE,
 							button1 = CLOSE,
 							hasEditBox = true,
-							editBoxWidth = 350,
+							editBoxWidth = editBoxWidth,
 							OnShow = function(self)
 								self.EditBox:SetText(copyNameText or "")
 								self.EditBox:SetFocus()
@@ -2218,6 +2226,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
 										editBox:GetParent():Hide()
 									end
 								end)
+								if BFL.BrokerUtils and BFL.BrokerUtils.FixCopyStaticPopupLayout then
+									BFL.BrokerUtils.FixCopyStaticPopupLayout(self, editBoxWidth)
+								end
 							end,
 							EditBoxOnEnterPressed = function(self)
 								self:GetParent():Hide()
@@ -2230,7 +2241,10 @@ frame:SetScript("OnEvent", function(self, event, ...)
 							hideOnEscape = true,
 							preferredIndex = 3,
 						}
-						StaticPopup_Show("BETTERFRIENDLIST_COPY_URL")
+						local dialog = StaticPopup_Show("BETTERFRIENDLIST_COPY_URL")
+						if dialog and BFL.BrokerUtils and BFL.BrokerUtils.FixCopyStaticPopupLayout then
+							BFL.BrokerUtils.FixCopyStaticPopupLayout(dialog, editBoxWidth)
+						end
 					end
 				end
 

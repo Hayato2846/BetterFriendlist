@@ -86,6 +86,9 @@ local NAME_OFFSET_WITH_ICON = 22 -- 4 (icon offset) + 14 (icon) + 4 (gap)
 local NAME_OFFSET_WITHOUT_ICON = 6
 local WHO_HEADER_INSET_X = 4
 local WHO_HEADER_OVERLAP = -1
+local WHO_CLASSIC_DROPDOWN_X_OFFSET = -12
+local WHO_CLASSIC_DROPDOWN_VISUAL_WIDTH = 76
+local WHO_CLASSIC_ELVUI_DROPDOWN_VISUAL_WIDTH = 106
 local WHO_SCROLLBAR_RESERVE = 24
 
 -- Class icon texture coordinates (from WoW global CLASS_ICON_TCOORDS)
@@ -107,6 +110,23 @@ local selectedWhoButton = nil
 -- Font cache for performance
 local cachedFontHeight = nil
 local cachedExtent = nil
+
+local function GetClassicColumnDropdownVisualWidth()
+	local isClassicElvUISkinActive = BFL.IsClassic and BFL.IsThemeActive and BFL:IsThemeActive("elvui")
+	return isClassicElvUISkinActive and WHO_CLASSIC_ELVUI_DROPDOWN_VISUAL_WIDTH or WHO_CLASSIC_DROPDOWN_VISUAL_WIDTH
+end
+
+local function ApplyClassicColumnDropdownVisualWidth(dropdown, logicalWidth)
+	if not (BFL.IsClassic and dropdown and UIDropDownMenu_SetWidth) then
+		return
+	end
+
+	UIDropDownMenu_SetWidth(dropdown, GetClassicColumnDropdownVisualWidth())
+	if logicalWidth then
+		dropdown.BFL_ClassicColumnLogicalWidth = logicalWidth
+		dropdown:SetWidth(logicalWidth)
+	end
+end
 
 -- Dirty flag: Set when data changes while frame is hidden
 local needsRenderOnShow = false
@@ -254,6 +274,7 @@ function WhoFrame:UpdateResponsiveLayout()
 
 	if whoFrame.ColumnDropdown then
 		whoFrame.ColumnDropdown:SetWidth(columnWidth)
+		ApplyClassicColumnDropdownVisualWidth(whoFrame.ColumnDropdown, columnWidth)
 	end
 
 	if whoFrame.LevelHeader then
@@ -275,7 +296,13 @@ function WhoFrame:UpdateResponsiveLayout()
 		local headerOverlapX = WHO_HEADER_OVERLAP
 		if whoFrame.ColumnDropdown and whoFrame.NameHeader then
 			whoFrame.ColumnDropdown:ClearAllPoints()
-			whoFrame.ColumnDropdown:SetPoint("TOPLEFT", whoFrame.NameHeader, "TOPRIGHT", headerOverlapX, 0)
+			whoFrame.ColumnDropdown:SetPoint(
+				"TOPLEFT",
+				whoFrame.NameHeader,
+				"TOPRIGHT",
+				headerOverlapX + WHO_CLASSIC_DROPDOWN_X_OFFSET,
+				0
+			)
 		end
 		-- Anchor Level and Class relative to NameHeader using accumulated widths
 		-- (UIDropDownMenu frame edges are unreliable due to internal padding)
@@ -585,9 +612,8 @@ function WhoFrame:InitializeClassicDropdown(dropdown)
 		return
 	end
 
-	local isClassicElvUISkinActive = BFL.IsClassic and BFL.IsThemeActive and BFL:IsThemeActive("elvui")
-
 	local function NormalizeClassicColumnDropdown()
+		ApplyClassicColumnDropdownVisualWidth(dropdown, dropdown.BFL_ClassicColumnLogicalWidth)
 		dropdown:SetHeight(24)
 		local name = dropdown:GetName()
 		if name then
@@ -635,8 +661,9 @@ function WhoFrame:InitializeClassicDropdown(dropdown)
 		UIDropDownMenu_AddButton(info)
 	end)
 
-	UIDropDownMenu_SetWidth(dropdown, isClassicElvUISkinActive and 110 or 80)
+	ApplyClassicColumnDropdownVisualWidth(dropdown, dropdown.BFL_ClassicColumnLogicalWidth)
 	UIDropDownMenu_SetSelectedValue(dropdown, 1)
+	local isClassicElvUISkinActive = BFL.IsClassic and BFL.IsThemeActive and BFL:IsThemeActive("elvui")
 	if not isClassicElvUISkinActive then
 		return
 	end

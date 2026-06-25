@@ -226,15 +226,22 @@ function MenuSystem:ShowGuildMemberMenu(button, member)
 	-- Helper: copy-name dialog
 	local function ShowCopyName()
 		local key = "BFL_GUILD_COPY_NAME"
+		local editBoxWidth = 240
 		StaticPopupDialogs[key] = {
 			text = (L and L.GUILD_COPY_NAME_TITLE) or "Copy Name",
 			button1 = OKAY or "Okay",
 			hasEditBox = 1,
-			editBoxWidth = 240,
+			editBoxWidth = editBoxWidth,
 			OnShow = function(self)
-				self.editBox:SetText(fullName or "")
-				self.editBox:HighlightText()
-				self.editBox:SetFocus()
+				local editBox = self.EditBox or self.editBox
+				if editBox then
+					editBox:SetText(fullName or "")
+					editBox:HighlightText()
+					editBox:SetFocus()
+				end
+				if BFL.BrokerUtils and BFL.BrokerUtils.FixCopyStaticPopupLayout then
+					BFL.BrokerUtils.FixCopyStaticPopupLayout(self, editBoxWidth)
+				end
 			end,
 			EditBoxOnEnterPressed = function(self) self:GetParent():Hide() end,
 			EditBoxOnEscapePressed = function(self) self:GetParent():Hide() end,
@@ -243,7 +250,10 @@ function MenuSystem:ShowGuildMemberMenu(button, member)
 			hideOnEscape = 1,
 			preferredIndex = 3,
 		}
-		StaticPopup_Show(key)
+		local dialog = StaticPopup_Show(key)
+		if dialog and BFL.BrokerUtils and BFL.BrokerUtils.FixCopyStaticPopupLayout then
+			BFL.BrokerUtils.FixCopyStaticPopupLayout(dialog, editBoxWidth)
+		end
 	end
 
 	local function RefreshGuildSurfaces()

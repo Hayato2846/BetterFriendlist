@@ -7,6 +7,9 @@ local ADDON_NAME, BFL = ...
 -- Register Module
 local ElvUISkin = BFL:RegisterModule("ElvUISkin", {})
 
+local WHO_CLASSIC_DROPDOWN_X_OFFSET = -12
+local WHO_CLASSIC_ELVUI_DROPDOWN_VISUAL_WIDTH = 106
+
 -- Helper to handle scrollbars across Retail and Classic
 local function SkinScrollBar(S, scrollBar)
 	if not scrollBar then
@@ -56,6 +59,9 @@ local function FixClassicDropdownHitbox(dropdown, width, height)
 
 	if targetWidth and UIDropDownMenu_SetWidth then
 		UIDropDownMenu_SetWidth(dropdown, targetWidth)
+		if dropdown.BFL_ClassicColumnLogicalWidth then
+			dropdown:SetWidth(dropdown.BFL_ClassicColumnLogicalWidth)
+		end
 	end
 	if targetHeight then
 		dropdown:SetHeight(targetHeight)
@@ -958,20 +964,22 @@ function ElvUISkin:SkinFrames(E, S)
 		-- Fix Dropdown height and alignment
 		if frame.WhoFrame.ColumnDropdown then
 			if BFL.IsClassic then
-				FixClassicDropdownHitbox(frame.WhoFrame.ColumnDropdown, 110, 24)
+				FixClassicDropdownHitbox(frame.WhoFrame.ColumnDropdown, WHO_CLASSIC_ELVUI_DROPDOWN_VISUAL_WIDTH, 24)
 			else
 				frame.WhoFrame.ColumnDropdown:SetHeight(26) -- Match header height
 			end
 
 			-- Re-anchor to NameHeader
+			local dropdownOffset = BFL.IsClassic and WHO_CLASSIC_DROPDOWN_X_OFFSET or 0
 			frame.WhoFrame.ColumnDropdown:ClearAllPoints()
-			frame.WhoFrame.ColumnDropdown:SetPoint("LEFT", frame.WhoFrame.NameHeader, "RIGHT", -1, 0)
+			frame.WhoFrame.ColumnDropdown:SetPoint("LEFT", frame.WhoFrame.NameHeader, "RIGHT", -1 + dropdownOffset, 0)
 		end
 
 		-- Re-anchor LevelHeader
 		if frame.WhoFrame.LevelHeader and frame.WhoFrame.ColumnDropdown then
+			local dropdownOffset = BFL.IsClassic and WHO_CLASSIC_DROPDOWN_X_OFFSET or 0
 			frame.WhoFrame.LevelHeader:ClearAllPoints()
-			frame.WhoFrame.LevelHeader:SetPoint("LEFT", frame.WhoFrame.ColumnDropdown, "RIGHT", -1, 0)
+			frame.WhoFrame.LevelHeader:SetPoint("LEFT", frame.WhoFrame.ColumnDropdown, "RIGHT", -1 - dropdownOffset, 0)
 		end
 
 		-- Re-anchor ClassHeader

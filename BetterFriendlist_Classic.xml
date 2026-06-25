@@ -1136,7 +1136,7 @@
 					<!-- Column Dropdown (Classic: UIDropDownMenu instead of modern Dropdown) -->
 					<Frame name="$parentColumnDropdown" parentKey="ColumnDropdown" inherits="UIDropDownMenuTemplate" frameStrata="HIGH">
 						<Anchors>
-							<Anchor point="TOPLEFT" x="87" y="-59"/> 
+							<Anchor point="TOPLEFT" x="75" y="-59"/>
 						</Anchors>
 						<Scripts>
 							<OnLoad>

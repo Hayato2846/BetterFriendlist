@@ -929,6 +929,65 @@ end
 -- ========================================
 -- Chat Name Insert Helper
 -- ========================================
+local function GetStaticPopupEditBox(dialog)
+	if not dialog then
+		return nil
+	end
+
+	if dialog.GetEditBox then
+		local ok, editBox = pcall(dialog.GetEditBox, dialog)
+		if ok and editBox then
+			return editBox
+		end
+	end
+
+	return dialog.EditBox or dialog.editBox
+end
+
+local function ApplyCopyStaticPopupLayout(dialog, editBoxWidth)
+	local editBox = GetStaticPopupEditBox(dialog)
+	if not editBox then
+		return
+	end
+
+	editBoxWidth = editBoxWidth or 350
+	if editBox.SetDesiredWidth then
+		editBox:SetDesiredWidth(editBoxWidth)
+	else
+		editBox:SetWidth(editBoxWidth)
+	end
+
+	local actualEditBoxWidth = editBoxWidth
+	if editBox.GetWidth then
+		actualEditBoxWidth = math.max(actualEditBoxWidth, editBox:GetWidth() or 0)
+	end
+
+	local minDialogWidth = math.max(actualEditBoxWidth + 40, 320)
+	if dialog.SetMinimumWidth then
+		dialog:SetMinimumWidth(minDialogWidth)
+	end
+	if dialog.SetWidth then
+		dialog:SetWidth(minDialogWidth)
+	end
+	if dialog.Layout then
+		dialog:Layout()
+	elseif dialog.Resize then
+		dialog:Resize()
+	end
+end
+
+function BU.FixCopyStaticPopupLayout(dialog, editBoxWidth)
+	ApplyCopyStaticPopupLayout(dialog, editBoxWidth)
+
+	if C_Timer and C_Timer.After then
+		C_Timer.After(0, function()
+			if dialog and (not dialog.IsShown or dialog:IsShown()) then
+				ApplyCopyStaticPopupLayout(dialog, editBoxWidth)
+			end
+		end)
+	end
+end
+
 function BU.AddNameToEditBox(name, realm)
 	if not name then
 		return false

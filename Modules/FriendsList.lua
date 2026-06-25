@@ -2178,15 +2178,8 @@ local function GetAccountClassFile(account)
 		return nil
 	end
 
-	if account.classID and account.classID > 0 and C_CreatureInfo and C_CreatureInfo.GetClassInfo then
-		local info = C_CreatureInfo.GetClassInfo(account.classID)
-		if info and info.classFile then
-			return info.classFile
-		end
-	end
-
-	if account.className and BFL.ClassUtils then
-		return BFL.ClassUtils:GetClassFileFromClassName(account.className)
+	if BFL.ClassUtils and BFL.ClassUtils.GetClassFileForFriend then
+		return BFL.ClassUtils:GetClassFileForFriend(account)
 	end
 
 	return nil
@@ -2204,20 +2197,7 @@ function FriendsList:BuildAccountDisplay(gameAccountInfo)
 	local charName = gameAccountInfo.characterName or "Unknown"
 	local realmName = gameAccountInfo.realmName or ""
 
-	-- Resolve class file via classID (11.2.7+) or localized class name
-	local classFile
-	if gameAccountInfo.classID and gameAccountInfo.classID > 0 then
-		if C_CreatureInfo and C_CreatureInfo.GetClassInfo then
-			local info = C_CreatureInfo.GetClassInfo(gameAccountInfo.classID)
-			if info and info.classFile then
-				classFile = info.classFile
-			end
-		end
-	end
-
-	if not classFile and gameAccountInfo.className and BFL.ClassUtils then
-		classFile = GetClassFileFromClassName(gameAccountInfo.className)
-	end
+	local classFile = GetAccountClassFile(gameAccountInfo)
 
 	local coloredName = charName
 	if classFile and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFile] then
@@ -6997,11 +6977,7 @@ Button_OnDragStart = function(self)
 			ghost.text:SetTextColor(colorR, colorG, colorB)
 
 			if self.friendData.className then
-				local classFile = GetClassFileFromClassName(self.friendData.className)
-				if not classFile and self.friendData.type == "bnet" then
-					-- For BNet, we might need to look it up differently if classFile isn't direct
-					classFile = GetClassFileForFriend(self.friendData)
-				end
+				local classFile = GetClassFileForFriend(self.friendData)
 
 				local classColor = classFile and RAID_CLASS_COLORS[classFile]
 				if classColor then
@@ -7386,7 +7362,7 @@ function FriendsList:GetFormattedButtonText(friend)
 				end
 
 				if useClassColor and not shouldGray then
-					local classFile = GetClassFileFromClassName(friend.className)
+					local classFile = GetClassFileForFriend(friend)
 					local classColor = classFile and RAID_CLASS_COLORS[classFile]
 					if classColor then
 						line1Text = "|c" .. (classColor.colorStr or "ffffffff") .. characterName .. "|r"
