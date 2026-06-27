@@ -23,6 +23,7 @@ move-folders:
 ignore:
   - .git
   - .github
+  - .agents
   - .gitignore
   - .pkgmeta
   - .codex-worktrees

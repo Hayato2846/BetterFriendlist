@@ -13,6 +13,9 @@
 *.code-workspace
 .ai-context
 memory-bank
+.agents/*
+!.agents/skills/
+!.agents/skills/**
 /old_version
 /WoW UI Source
 *.log
@@ -30,6 +33,7 @@ docs/
 # Ignore documentation files but keep README and CHANGELOG
 *.md
 !AGENTS.md
+!.agents/skills/**/SKILL.md
 !README.md
 !CHANGELOG.md
 !docs/DEPLOYMENT_TESTING.md

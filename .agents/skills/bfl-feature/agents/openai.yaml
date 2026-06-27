@@ -1,0 +1,4 @@
+interface:
+  display_name: "BFL Feature"
+  short_description: "Plan and execute BetterFriendlist features"
+  default_prompt: "Use $bfl-feature to shape and implement this BetterFriendlist feature with clear validation."
