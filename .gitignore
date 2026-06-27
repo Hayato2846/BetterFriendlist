@@ -29,6 +29,7 @@ docs/
 
 # Ignore documentation files but keep README and CHANGELOG
 *.md
+!AGENTS.md
 !README.md
 !CHANGELOG.md
 !docs/DEPLOYMENT_TESTING.md
