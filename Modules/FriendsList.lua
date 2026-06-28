@@ -24,6 +24,68 @@ local function GetFilterSortRegistry()
 	return BFL:GetModule("FilterSortRegistry")
 end
 
+local IsModernDropdown = BFL.IsModernDropdown
+
+local function SetTextureOrAtlas(texture, atlasName, fallbackFile, useAtlasSize)
+	if BFL.SetTextureOrAtlas then
+		return BFL.SetTextureOrAtlas(texture, atlasName, fallbackFile, useAtlasSize)
+	end
+	if texture and fallbackFile then
+		texture:SetTexture(fallbackFile)
+	end
+	return false
+end
+
+local function SetGroupHeaderArrowTexture(arrow, direction, flipAtlas)
+	if not arrow then
+		return
+	end
+
+	local atlas = direction == "down" and "friendslist-categorybutton-arrow-down" or "friendslist-categorybutton-arrow-left"
+	local fallback
+	if direction == "down" then
+		fallback = "Interface\\AddOns\\BetterFriendlist\\Icons\\chevron-down"
+	elseif flipAtlas then
+		fallback = "Interface\\AddOns\\BetterFriendlist\\Icons\\chevron-left"
+	else
+		fallback = "Interface\\AddOns\\BetterFriendlist\\Icons\\chevron-right"
+	end
+
+	local usedAtlas = SetTextureOrAtlas(arrow, atlas, fallback)
+	if arrow.SetRotation then
+		arrow:SetRotation((flipAtlas and usedAtlas) and math.pi or 0)
+	end
+end
+
+local INVITE_BUTTON_ATLAS_SETS = {
+	default = {
+		normal = "friendslist-invitebutton-default-normal",
+		pushed = "friendslist-invitebutton-default-pressed",
+		disabled = "friendslist-invitebutton-default-disabled",
+	},
+	horde = {
+		normal = "friendslist-invitebutton-horde-normal",
+		pushed = "friendslist-invitebutton-horde-pressed",
+		disabled = "friendslist-invitebutton-horde-disabled",
+	},
+	alliance = {
+		normal = "friendslist-invitebutton-alliance-normal",
+		pushed = "friendslist-invitebutton-alliance-pressed",
+		disabled = "friendslist-invitebutton-alliance-disabled",
+	},
+}
+
+local function SetTravelPassButtonTextures(travelPassButton, atlasSetKey)
+	if not travelPassButton then
+		return
+	end
+
+	local atlasSet = INVITE_BUTTON_ATLAS_SETS[atlasSetKey] or INVITE_BUTTON_ATLAS_SETS.default
+	SetTextureOrAtlas(travelPassButton.NormalTexture, atlasSet.normal, "Interface\\FriendsFrame\\TravelPass-Invite")
+	SetTextureOrAtlas(travelPassButton.PushedTexture, atlasSet.pushed, "Interface\\FriendsFrame\\TravelPass-Invite")
+	SetTextureOrAtlas(travelPassButton.DisabledTexture, atlasSet.disabled, "Interface\\FriendsFrame\\TravelPass-Invite")
+end
+
 local function GetDefaultUIFontFlags(flags)
 	local FontManager = GetFontManager()
 	if FontManager and FontManager.GetDefaultUIFontFlags then
@@ -1611,16 +1673,22 @@ function FriendsList:UpdateSearchBoxState()
 			local header = frame.FriendsTabHeader
 			if BFL.IsClassic then
 				local isClassicElvUISkinActive = BFL.IsThemeActive and BFL:IsThemeActive("elvui")
-				local classicSortSpacing = isClassicElvUISkinActive and 8 or -10
-				local classicSecondarySpacing = isClassicElvUISkinActive and 8 or -15
+				local useModernHeaderDropdowns = IsModernDropdown(header.QuickFilterDropdown)
+					and IsModernDropdown(header.PrimarySortDropdown)
+					and IsModernDropdown(header.SecondarySortDropdown)
+				local classicSortSpacing = isClassicElvUISkinActive and 8 or (useModernHeaderDropdowns and 5 or -10)
+				local classicSecondarySpacing = isClassicElvUISkinActive and 8 or (useModernHeaderDropdowns and 5 or -15)
+				local classicDropdownXOffset = useModernHeaderDropdowns and 0 or -16
 
-				-- Classic: UIDropDownMenuTemplate frames are ~180px wide.
-				-- Place all 3 dropdowns in a separate row ABOVE the SearchBox
-				-- (instead of Retail-style to the right, which overflows the frame).
-				-- UIDropDownMenuTemplate has ~16px built-in left margin, ~8px top margin.
+				-- Classic keeps a separate row above the SearchBox because the frame is
+				-- narrower than Retail. Modern dropdowns use Retail-like compact spacing;
+				-- UIDropDownMenu fallbacks keep their larger legacy offsets.
 				if header.QuickFilterDropdown then
 					header.QuickFilterDropdown:ClearAllPoints()
-					header.QuickFilterDropdown:SetPoint("TOPLEFT", searchBox, "TOPLEFT", -16, 32)
+					header.QuickFilterDropdown:SetPoint("TOPLEFT", searchBox, "TOPLEFT", classicDropdownXOffset, 32)
+					if useModernHeaderDropdowns and header.QuickFilterDropdown.SetWidth then
+						header.QuickFilterDropdown:SetWidth(51)
+					end
 					header.QuickFilterDropdown:SetHeight(24)
 				end
 				if header.PrimarySortDropdown and header.QuickFilterDropdown then
@@ -1632,6 +1700,9 @@ function FriendsList:UpdateSearchBoxState()
 						classicSortSpacing,
 						0
 					)
+					if useModernHeaderDropdowns and header.PrimarySortDropdown.SetWidth then
+						header.PrimarySortDropdown:SetWidth(51)
+					end
 					header.PrimarySortDropdown:SetHeight(24)
 				end
 				if header.SecondarySortDropdown and header.PrimarySortDropdown then
@@ -1643,6 +1714,9 @@ function FriendsList:UpdateSearchBoxState()
 						classicSecondarySpacing,
 						0
 					)
+					if useModernHeaderDropdowns and header.SecondarySortDropdown.SetWidth then
+						header.SecondarySortDropdown:SetWidth(51)
+					end
 					header.SecondarySortDropdown:SetHeight(24)
 				end
 			else
@@ -1732,7 +1806,7 @@ function FriendsList:InitializeScrollBox()
 	end
 
 	-- Classic: Use FauxScrollFrame approach
-	if BFL.IsClassic or not BFL.HasModernScrollBox then
+	if not BFL.HasModernScrollBox then
 		-- BFL:DebugPrint("|cff00ffffFriendsList:|r Using Classic FauxScrollFrame mode")
 		self:InitializeClassicScrollFrame(scrollFrame)
 		return
@@ -5082,117 +5156,67 @@ function FriendsList:ShowGameAccountPicker(anchorFrame, friend)
 
 	local currentPrefID = self:GetPreferredGameAccountID(friendUID)
 
-	-- Retail: Use MenuUtil
-	if MenuUtil and MenuUtil.CreateContextMenu then
-		MenuUtil.CreateContextMenu(anchorFrame, function(ownerRegion, rootDescription)
-			-- Header: Friend display name (respects name formatting & Streamer Mode)
-			rootDescription:CreateTitle(self:GetDisplayName(friend))
-
-			local function IsSelected(gaID)
-				if gaID == "default" then
-					return currentPrefID == nil
-				end
-				return currentPrefID == gaID
-			end
-
-			local function SetSelected(gaID)
-				if gaID == "default" then
-					self:ClearPreferredGameAccount(friendUID)
-				else
-					self:SetPreferredGameAccount(friendUID, gaID)
-				end
-			end
-
-			-- "Default (Server)" option
-			local defaultText = (L and L.MENU_DEFAULT_FOCUS) or "Default (Server)"
-			rootDescription:CreateRadio(defaultText, IsSelected, SetSelected, "default")
-
-			rootDescription:CreateDivider()
-
-			-- List all game accounts (excluding App/CLNT/BSAp)
-			for _, ga in ipairs(friend.gameAccounts) do
-				if ga.clientProgram ~= "App" and ga.clientProgram ~= "CLNT" and ga.clientProgram ~= "BSAp" then
-					local isWoW = ga.clientProgram == (BNET_CLIENT_WOW or "WoW")
-					local label
-					if isWoW then
-						local display = self:BuildAccountDisplay(ga)
-						label = display and (display.coloredName or display.text) or ga.characterName or "Unknown"
-						if ga.areaName and ga.areaName ~= "" then
-							label = label .. " - " .. ga.areaName
-						end
-					else
-						-- Non-WoW: just richPresence, no character name
-						label = ga.richPresence or ga.clientProgram or "Unknown"
-					end
-
-					-- Prepend game icon
-					label = BFL:GetClientEmbeddedIcon(ga.clientProgram, 16) .. label
-
-					rootDescription:CreateRadio(label, IsSelected, SetSelected, ga.gameAccountID)
-				end
-			end
-		end)
-		return
+	local function IsSelected(gaID)
+		if gaID == "default" then
+			return currentPrefID == nil
+		end
+		return currentPrefID == gaID
 	end
 
-	-- Classic: Use UIDropDownMenu
-	if UIDropDownMenu_Initialize and ToggleDropDownMenu then
-		if not BFL.GameAccountPickerDropdown then
-			BFL.GameAccountPickerDropdown =
-				CreateFrame("Frame", "BFL_GameAccountPickerDropdown", UIParent, "UIDropDownMenuTemplate")
+	local function SetSelected(gaID)
+		if gaID == "default" then
+			self:ClearPreferredGameAccount(friendUID)
+		else
+			self:SetPreferredGameAccount(friendUID, gaID)
 		end
+		if CloseDropDownMenus then
+			CloseDropDownMenus()
+		end
+	end
 
-		UIDropDownMenu_Initialize(BFL.GameAccountPickerDropdown, function(self, level)
-			-- Header: Friend display name (respects name formatting & Streamer Mode)
-			local titleInfo = UIDropDownMenu_CreateInfo()
-			titleInfo.text = FriendsList:GetDisplayName(friend)
-			titleInfo.isTitle = true
-			titleInfo.notCheckable = true
-			UIDropDownMenu_AddButton(titleInfo, level)
+	local items = {
+		{
+			type = "title",
+			text = self:GetDisplayName(friend),
+		},
+		{
+			type = "radio",
+			text = (L and L.MENU_DEFAULT_FOCUS) or "Default (Server)",
+			value = "default",
+			checked = IsSelected,
+			func = SetSelected,
+		},
+		{ type = "divider" },
+	}
 
-			-- Default option
-			local defaultInfo = UIDropDownMenu_CreateInfo()
-			defaultInfo.text = (L and L.MENU_DEFAULT_FOCUS) or "Default (Server)"
-			defaultInfo.checked = (currentPrefID == nil)
-			defaultInfo.func = function()
-				FriendsList:ClearPreferredGameAccount(friendUID)
-				CloseDropDownMenus()
-			end
-			UIDropDownMenu_AddButton(defaultInfo, level)
-
-			-- Game accounts
-			for _, ga in ipairs(friend.gameAccounts) do
-				if ga.clientProgram ~= "App" and ga.clientProgram ~= "CLNT" and ga.clientProgram ~= "BSAp" then
-					local isWoW = ga.clientProgram == (BNET_CLIENT_WOW or "WoW")
-					local label
-					if isWoW then
-						local display = FriendsList:BuildAccountDisplay(ga)
-						label = display and (display.coloredName or display.text) or ga.characterName or "Unknown"
-						if ga.areaName and ga.areaName ~= "" then
-							label = label .. " - " .. ga.areaName
-						end
-					else
-						-- Non-WoW: just richPresence, no character name
-						label = ga.richPresence or ga.clientProgram or "Unknown"
-					end
-
-					-- Prepend game icon
-					label = BFL:GetClientEmbeddedIcon(ga.clientProgram, 16) .. label
-
-					local info = UIDropDownMenu_CreateInfo()
-					info.text = label
-					info.checked = (currentPrefID ~= nil and ga.gameAccountID == currentPrefID)
-					local gaID = ga.gameAccountID
-					info.func = function()
-						FriendsList:SetPreferredGameAccount(friendUID, gaID)
-						CloseDropDownMenus()
-					end
-					UIDropDownMenu_AddButton(info, level)
+	for _, ga in ipairs(friend.gameAccounts) do
+		if ga.clientProgram ~= "App" and ga.clientProgram ~= "CLNT" and ga.clientProgram ~= "BSAp" then
+			local isWoW = ga.clientProgram == (BNET_CLIENT_WOW or "WoW")
+			local label
+			if isWoW then
+				local display = self:BuildAccountDisplay(ga)
+				label = display and (display.coloredName or display.text) or ga.characterName or "Unknown"
+				if ga.areaName and ga.areaName ~= "" then
+					label = label .. " - " .. ga.areaName
 				end
+			else
+				-- Non-WoW: just richPresence, no character name
+				label = ga.richPresence or ga.clientProgram or "Unknown"
 			end
-		end, "MENU")
 
-		ToggleDropDownMenu(1, nil, BFL.GameAccountPickerDropdown, anchorFrame, 0, 0)
+			label = BFL:GetClientEmbeddedIcon(ga.clientProgram, 16) .. label
+			table.insert(items, {
+				type = "radio",
+				text = label,
+				value = ga.gameAccountID,
+				checked = IsSelected,
+				func = SetSelected,
+			})
+		end
+	end
+
+	if BFL.OpenSimpleContextMenu then
+		BFL.OpenSimpleContextMenu(anchorFrame, "BFL_GameAccountPickerDropdown", items)
 	end
 end
 
@@ -6137,7 +6161,7 @@ function FriendsList:RenderDisplay(ignoreVisibility)
 	local newDisplayList, cacheHit = BuildDisplayList(self)
 
 	-- Classic: Use FauxScrollFrame rendering
-	if BFL.IsClassic or not BFL.HasModernScrollBox then
+	if not BFL.HasModernScrollBox then
 		-- Convert DataProvider to display list for Classic
 		self.classicDisplayList = newDisplayList
 		-- Render with Classic button pool
@@ -6261,6 +6285,152 @@ end
 -- ========================================
 -- Button Update Functions (called by ScrollBox Factory)
 -- ========================================
+
+local function AddGroupCollapseMenuItems(items)
+	table.insert(items, {
+		type = "divider",
+	})
+	table.insert(items, {
+		text = BFL.L.MENU_COLLAPSE_ALL,
+		func = function()
+			local Groups = GetGroups()
+			if Groups and Groups.groups then
+				for gid in pairs(Groups.groups) do
+					Groups:SetCollapsed(gid, true, true)
+				end
+				BFL:ForceRefreshFriendsList()
+			end
+		end,
+	})
+	table.insert(items, {
+		text = BFL.L.MENU_EXPAND_ALL,
+		func = function()
+			local Groups = GetGroups()
+			if Groups and Groups.groups then
+				for gid in pairs(Groups.groups) do
+					Groups:SetCollapsed(gid, false, true)
+				end
+				BFL:ForceRefreshFriendsList()
+			end
+		end,
+	})
+end
+
+local function AddRecentlyAddedMenuItems(items, Groups)
+	local RecentlyAddedModule = BFL:GetModule("RecentlyAdded")
+	if not RecentlyAddedModule then
+		return
+	end
+
+	local recentUIDs = RecentlyAddedModule:GetAllRecentFriendUIDs()
+	if not recentUIDs or #recentUIDs == 0 then
+		return
+	end
+
+	local customGroups = {}
+	local allGroups = Groups and Groups:GetAll()
+	for gid, gData in pairs(allGroups or {}) do
+		if not gData.builtin then
+			table.insert(customGroups, { id = gid, data = gData })
+		end
+	end
+
+	if #customGroups > 0 then
+		table.sort(customGroups, function(a, b)
+			return (a.data.order or 0) < (b.data.order or 0)
+		end)
+
+		local children = {}
+		for _, customGroup in ipairs(customGroups) do
+			local targetGroupId = customGroup.id
+			table.insert(children, {
+				text = customGroup.data.name,
+				func = function()
+					local DB = BFL:GetModule("DB")
+					if DB then
+						for _, uid in ipairs(recentUIDs) do
+							if not DB:IsFriendInGroup(uid, targetGroupId) then
+								DB:AddFriendToGroup(uid, targetGroupId)
+							end
+						end
+					end
+					BFL:ForceRefreshFriendsList()
+				end,
+			})
+		end
+
+		table.insert(items, {
+			text = BFL.L.MENU_ADD_ALL_TO_GROUP or "Add All to Group",
+			children = children,
+		})
+	end
+
+	table.insert(items, {
+		text = BFL.L.MENU_CLEAR_ALL_RECENTLY_ADDED or "Clear All",
+		func = function()
+			RecentlyAddedModule:ClearAll()
+			BFL:ForceRefreshFriendsList()
+		end,
+	})
+end
+
+local function BuildGroupHeaderMenuItems(groupId, includeDelete)
+	local Groups = GetGroups()
+	local groupData = Groups and Groups:Get(groupId)
+	if not groupData then
+		return {}
+	end
+
+	local items = {
+		{
+			type = "title",
+			text = groupData.name,
+		},
+		{
+			text = BFL.L.MENU_RENAME_GROUP,
+			func = function()
+				StaticPopup_Show("BETTER_FRIENDLIST_RENAME_GROUP", nil, nil, groupId)
+			end,
+		},
+		{
+			text = BFL.L.MENU_CHANGE_COLOR,
+			func = function()
+				FriendsList:OpenColorPicker(groupId)
+			end,
+		},
+	}
+
+	if includeDelete then
+		table.insert(items, {
+			text = BFL.L.MENU_DELETE_GROUP,
+			func = function()
+				StaticPopup_Show("BETTER_FRIENDLIST_DELETE_GROUP", nil, nil, groupId)
+			end,
+		})
+	end
+
+	local invitableCount = FriendsList:GetInvitableCount(groupId)
+	if invitableCount > 0 then
+		if includeDelete then
+			table.insert(items, {
+				type = "divider",
+			})
+		end
+		table.insert(items, {
+			text = BFL.L.MENU_INVITE_GROUP .. " (" .. invitableCount .. ")",
+			func = function()
+				FriendsList:InviteGroupToParty(groupId)
+			end,
+		})
+	end
+
+	if groupId == "recentlyadded" then
+		AddRecentlyAddedMenuItems(items, Groups)
+	end
+
+	AddGroupCollapseMenuItems(items)
+	return items
+end
 
 -- Update group header button (NEW - Phase 1)
 function FriendsList:UpdateGroupHeaderButton(button, elementData)
@@ -6449,21 +6619,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 			targetArrow:ClearAllPoints()
 
 			-- Restore normal textures first (resetting any overrides)
-			if BFL.IsClassic then
-				if targetArrow == button.RightArrow then
-					targetArrow:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\chevron-right")
-				else
-					targetArrow:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\chevron-down")
-				end
-			else
-				if targetArrow == button.RightArrow then
-					targetArrow:SetAtlas("friendslist-categorybutton-arrow-left")
-					targetArrow:SetRotation(0)
-				else
-					targetArrow:SetAtlas("friendslist-categorybutton-arrow-down")
-					targetArrow:SetRotation(0)
-				end
-			end
+			SetGroupHeaderArrowTexture(targetArrow, targetArrow == button.DownArrow and "down" or "right", false)
 
 			-- Base coordinates for unpressed state
 			local point, x, y
@@ -6472,12 +6628,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 
 				-- Override texture for Right Arrow (Collapsed state) to point Left
 				if targetArrow == button.RightArrow then
-					if not BFL.IsClassic then
-						targetArrow:SetAtlas("friendslist-categorybutton-arrow-left")
-						targetArrow:SetRotation(math.pi)
-					else
-						targetArrow:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\chevron-left")
-					end
+					SetGroupHeaderArrowTexture(targetArrow, "right", true)
 				end
 
 				x = (targetArrow == button.DownArrow) and -8 or -6
@@ -6601,16 +6752,22 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 		end)
 		button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 		button:SetScript("OnClick", function(self, buttonName)
-			if buttonName == "RightButton" and MenuUtil and MenuUtil.CreateContextMenu then
-				MenuUtil.CreateContextMenu(self, function(owner, rootDescription)
-					rootDescription:CreateTitle(name or self.groupId)
-					rootDescription:CreateButton(L.FRIEND_TAGS_EDITOR_EDIT or EDIT or "Edit", function()
-						local FriendTags = BFL:GetModule("FriendTags")
-						if FriendTags and FriendTags.OpenSettings then
-							FriendTags:OpenSettings(elementData.tagId)
-						end
-					end)
-				end)
+			if buttonName == "RightButton" and BFL.OpenSimpleContextMenu then
+				BFL.OpenSimpleContextMenu(self, "BFL_VirtualTagGroupDropdown", {
+					{
+						type = "title",
+						text = name or self.groupId,
+					},
+					{
+						text = L.FRIEND_TAGS_EDITOR_EDIT or EDIT or "Edit",
+						func = function()
+							local FriendTags = BFL:GetModule("FriendTags")
+							if FriendTags and FriendTags.OpenSettings then
+								FriendTags:OpenSettings(elementData.tagId)
+							end
+						end,
+					},
+				})
 			else
 				FriendsList:ToggleGroup(self.groupId)
 			end
@@ -6622,175 +6779,17 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 	-- Add right-click menu functionality
 	if Groups then
 		local group = Groups:Get(groupId)
-		if group and not group.builtin then
-			-- Custom groups: Full context menu with Rename/Delete
-			button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-			button:SetScript("OnClick", function(self, buttonName)
-				if buttonName == "RightButton" then
-					-- Open context menu for custom group header
-					MenuUtil.CreateContextMenu(self, function(owner, rootDescription)
-						local groupData = Groups:Get(self.groupId)
-						if not groupData then
-							return
-						end
-
-						rootDescription:CreateTitle(groupData.name)
-
-						rootDescription:CreateButton(BFL.L.MENU_RENAME_GROUP, function()
-							StaticPopup_Show("BETTER_FRIENDLIST_RENAME_GROUP", nil, nil, self.groupId)
-						end)
-
-						rootDescription:CreateButton(BFL.L.MENU_CHANGE_COLOR, function()
-							FriendsList:OpenColorPicker(self.groupId)
-						end)
-
-						rootDescription:CreateButton(BFL.L.MENU_DELETE_GROUP, function()
-							StaticPopup_Show("BETTER_FRIENDLIST_DELETE_GROUP", nil, nil, self.groupId)
-						end)
-
-						-- Fix #30/#33: Only show Invite button if there are invitable friends (same WoW version, not in party)
-						local invitableCount = FriendsList:GetInvitableCount(self.groupId)
-						if invitableCount > 0 then
-							rootDescription:CreateDivider()
-
-							rootDescription:CreateButton(
-								BFL.L.MENU_INVITE_GROUP .. " (" .. invitableCount .. ")",
-								function()
-									FriendsList:InviteGroupToParty(self.groupId)
-								end
-							)
-						end
-
-						rootDescription:CreateDivider()
-
-						-- Group-wide action buttons
-						rootDescription:CreateButton(BFL.L.MENU_COLLAPSE_ALL, function()
-							for gid in pairs(Groups.groups) do
-								Groups:SetCollapsed(gid, true, true) -- true = force collapse
-							end
-							BFL:ForceRefreshFriendsList()
-						end)
-
-						rootDescription:CreateButton(BFL.L.MENU_EXPAND_ALL, function()
-							for gid in pairs(Groups.groups) do
-								Groups:SetCollapsed(gid, false, true) -- false = force expand
-							end
-							BFL:ForceRefreshFriendsList()
-						end)
-					end)
-				else
-					-- Left click: toggle collapse
-					FriendsList:ToggleGroup(self.groupId)
-				end
-			end)
-		else
-			-- Built-in groups: Right-click for Collapse/Expand All + Invite
-			button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-			button:SetScript("OnClick", function(self, buttonName)
-				if buttonName == "RightButton" then
-					-- Open context menu for built-in group header
-					MenuUtil.CreateContextMenu(self, function(owner, rootDescription)
-						local groupData = Groups:Get(self.groupId)
-						if not groupData then
-							return
-						end
-
-						rootDescription:CreateTitle(groupData.name)
-
-						rootDescription:CreateButton(BFL.L.MENU_RENAME_GROUP, function()
-							StaticPopup_Show("BETTER_FRIENDLIST_RENAME_GROUP", nil, nil, self.groupId)
-						end)
-
-						rootDescription:CreateButton(BFL.L.MENU_CHANGE_COLOR, function()
-							FriendsList:OpenColorPicker(self.groupId)
-						end)
-
-						-- Fix #30/#33: Only show Invite button if there are invitable friends (same WoW version, not in party)
-						local invitableCount = FriendsList:GetInvitableCount(self.groupId)
-						if invitableCount > 0 then
-							rootDescription:CreateButton(
-								BFL.L.MENU_INVITE_GROUP .. " (" .. invitableCount .. ")",
-								function()
-									FriendsList:InviteGroupToParty(self.groupId)
-								end
-							)
-						end
-
-						-- Recently Added group: Bulk actions
-						if self.groupId == "recentlyadded" then
-							local RecentlyAddedModule = BFL:GetModule("RecentlyAdded")
-							if RecentlyAddedModule then
-								local recentUIDs = RecentlyAddedModule:GetAllRecentFriendUIDs()
-								if #recentUIDs > 0 then
-									-- "Add All to Group" submenu
-									local customGroups = {}
-									local allGroups = Groups:GetAll()
-									for gid, gData in pairs(allGroups) do
-										if not gData.builtin then
-											table.insert(customGroups, { id = gid, data = gData })
-										end
-									end
-									if #customGroups > 0 then
-										table.sort(customGroups, function(a, b)
-											return (a.data.order or 0) < (b.data.order or 0)
-										end)
-										local addAllButton = rootDescription:CreateButton(
-											BFL.L.MENU_ADD_ALL_TO_GROUP or "Add All to Group"
-										)
-										for _, cg in ipairs(customGroups) do
-											local targetGroupId = cg.id
-											addAllButton:CreateButton(cg.data.name, function()
-												local DB = BFL:GetModule("DB")
-												if DB then
-													for _, uid in ipairs(recentUIDs) do
-														if not DB:IsFriendInGroup(uid, targetGroupId) then
-															DB:AddFriendToGroup(uid, targetGroupId)
-														end
-													end
-												end
-												BFL:ForceRefreshFriendsList()
-											end)
-										end
-									end
-
-									-- "Clear All" button
-									rootDescription:CreateButton(
-										BFL.L.MENU_CLEAR_ALL_RECENTLY_ADDED or "Clear All",
-										function()
-											RecentlyAddedModule:ClearAll()
-											BFL:ForceRefreshFriendsList()
-										end
-									)
-								end
-							end
-						end
-
-						rootDescription:CreateDivider()
-
-						rootDescription:CreateButton(BFL.L.MENU_COLLAPSE_ALL, function()
-							if Groups then
-								for gid in pairs(Groups.groups) do
-									Groups:SetCollapsed(gid, true, true) -- true = force collapse
-								end
-								BFL:ForceRefreshFriendsList()
-							end
-						end)
-
-						rootDescription:CreateButton(BFL.L.MENU_EXPAND_ALL, function()
-							if Groups then
-								for gid in pairs(Groups.groups) do
-									Groups:SetCollapsed(gid, false, true) -- false = force expand
-								end
-								BFL:ForceRefreshFriendsList()
-							end
-						end)
-					end)
-				else
-					-- Left click: toggle collapse
-					FriendsList:ToggleGroup(self.groupId)
-				end
-			end)
-		end
+		local includeDelete = group and not group.builtin
+		button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+		button:SetScript("OnClick", function(self, buttonName)
+			if buttonName == "RightButton" and BFL.OpenSimpleContextMenu then
+				BFL.OpenSimpleContextMenu(self, "BFL_GroupHeaderDropdown", function()
+					return BuildGroupHeaderMenuItems(self.groupId, includeDelete)
+				end)
+			else
+				FriendsList:ToggleGroup(self.groupId)
+			end
+		end)
 	end
 
 	-- Ensure button is visible
@@ -8083,32 +8082,12 @@ function FriendsList:UpdateFriendButton(button, elementData)
 					button.travelPassButton:Disable()
 				end
 
-				-- Set atlas based on faction for cross-faction invites
-				if not BFL.IsClassic then
-					local targetAtlas = friend.inviteAtlas or "default"
-					if button.lastInviteAtlas ~= targetAtlas then
-						button.lastInviteAtlas = targetAtlas
-
-						if targetAtlas == "horde" then
-							button.travelPassButton.NormalTexture:SetAtlas("friendslist-invitebutton-horde-normal")
-							button.travelPassButton.PushedTexture:SetAtlas("friendslist-invitebutton-horde-pressed")
-							button.travelPassButton.DisabledTexture:SetAtlas("friendslist-invitebutton-horde-disabled")
-						elseif targetAtlas == "alliance" then
-							button.travelPassButton.NormalTexture:SetAtlas("friendslist-invitebutton-alliance-normal")
-							button.travelPassButton.PushedTexture:SetAtlas("friendslist-invitebutton-alliance-pressed")
-							button.travelPassButton.DisabledTexture:SetAtlas(
-								"friendslist-invitebutton-alliance-disabled"
-							)
-						else -- default (also covers BNet-only friends with no inviteAtlas)
-							button.travelPassButton.NormalTexture:SetAtlas("friendslist-invitebutton-default-normal")
-							button.travelPassButton.PushedTexture:SetAtlas("friendslist-invitebutton-default-pressed")
-							button.travelPassButton.DisabledTexture:SetAtlas(
-								"friendslist-invitebutton-default-disabled"
-							)
-						end
-					end
+				-- Set art based on faction when the client has the atlas, otherwise keep the file fallback.
+				local targetAtlas = friend.inviteAtlas or "default"
+				if button.lastInviteAtlas ~= targetAtlas then
+					button.lastInviteAtlas = targetAtlas
+					SetTravelPassButtonTextures(button.travelPassButton, targetAtlas)
 				end
-				-- Classic: Uses file-based textures from XML (Interface\FriendsFrame\TravelPass-Invite)
 
 				button.travelPassButton:Show()
 			else
@@ -8243,17 +8222,16 @@ function FriendsList:UpdateFriendButton(button, elementData)
 			if button.lastFavoriteIconStyle ~= iconStyle then
 				if iconStyle == "blizzard" then
 					local applied = false
-					if
-						C_Texture
-						and C_Texture.GetAtlasInfo
-						and C_Texture.GetAtlasInfo("friendslist-favorite")
-						and button.favoriteIcon.SetAtlas
-					then
-						button.favoriteIcon:SetAtlas("friendslist-favorite", true)
-						applied = true
+					if BFL.SetTextureOrAtlas then
+						applied = BFL.SetTextureOrAtlas(
+							button.favoriteIcon,
+							"friendslist-favorite",
+							"Interface\\AddOns\\BetterFriendlist\\Icons\\star",
+							true
+						)
 					elseif button.favoriteIcon.SetAtlas then
-						button.favoriteIcon:SetAtlas("friendslist-favorite", true)
-						applied = true
+						local ok = pcall(button.favoriteIcon.SetAtlas, button.favoriteIcon, "friendslist-favorite", true)
+						applied = ok == true
 					end
 					if not applied then
 						button.favoriteIcon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\star")
@@ -8441,21 +8419,7 @@ function FriendsList:UpdateInviteHeaderButton(button, data)
 			targetArrow:ClearAllPoints()
 
 			-- Restore normal textures (resetting overrides)
-			if BFL.IsClassic then
-				if targetArrow == button.RightArrow then
-					targetArrow:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\chevron-right")
-				else
-					targetArrow:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\chevron-down")
-				end
-			else
-				if targetArrow == button.RightArrow then
-					targetArrow:SetAtlas("friendslist-categorybutton-arrow-left")
-					targetArrow:SetRotation(0)
-				else
-					targetArrow:SetAtlas("friendslist-categorybutton-arrow-down")
-					targetArrow:SetRotation(0)
-				end
-			end
+			SetGroupHeaderArrowTexture(targetArrow, targetArrow == button.DownArrow and "down" or "right", false)
 
 			-- Position Calculation
 			local point, x, y
@@ -8463,12 +8427,7 @@ function FriendsList:UpdateInviteHeaderButton(button, data)
 				point = "RIGHT"
 				-- Flip right arrow to point left if aligned right
 				if targetArrow == button.RightArrow then
-					if not BFL.IsClassic then
-						targetArrow:SetAtlas("friendslist-categorybutton-arrow-left")
-						targetArrow:SetRotation(math.pi)
-					else
-						targetArrow:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\chevron-left")
-					end
+					SetGroupHeaderArrowTexture(targetArrow, "right", true)
 				end
 				x = (targetArrow == button.DownArrow) and -8 or -6
 				y = (targetArrow == button.DownArrow) and -2 or 0
@@ -8669,44 +8628,59 @@ function FriendsList:UpdateInviteButton(button, data)
 				return
 			end
 
-			MenuUtil.CreateContextMenu(self, function(owner, rootDescription)
-				rootDescription:CreateButton("Decline", function()
-					if BFL.MockFriendInvites.enabled then
-						-- Mock: Remove from list and refresh
-						for i, invite in ipairs(BFL.MockFriendInvites.invites) do
-							if invite.inviteID == inviteID then
-								table.remove(BFL.MockFriendInvites.invites, i)
-								BFL:DebugPrint(
-									"|cffff0000BetterFriendlist:|r "
-										.. string.format(
-											BFL.L.MOCK_INVITE_DECLINED,
-											BFL:SafeToString(invite.accountName)
-										)
-								)
-								break
-							end
-						end
-						BFL:ForceRefreshFriendsList()
-					else
-						-- Real API call
-						BNDeclineFriendInvite(inviteID)
-					end
-				end)
+			if not BFL.OpenSimpleContextMenu then
+				return
+			end
 
-				if not BFL.MockFriendInvites.enabled then
-					rootDescription:CreateButton("Report Player", function()
+			local items = {
+				{
+					text = BFL.L.DECLINE or DECLINE or "Decline",
+					func = function()
+						if BFL.MockFriendInvites.enabled then
+							-- Mock: Remove from list and refresh
+							for i, invite in ipairs(BFL.MockFriendInvites.invites) do
+								if invite.inviteID == inviteID then
+									table.remove(BFL.MockFriendInvites.invites, i)
+									BFL:DebugPrint(
+										"|cffff0000BetterFriendlist:|r "
+											.. string.format(
+												BFL.L.MOCK_INVITE_DECLINED,
+												BFL:SafeToString(invite.accountName)
+											)
+									)
+									break
+								end
+							end
+							BFL:ForceRefreshFriendsList()
+						else
+							-- Real API call
+							BNDeclineFriendInvite(inviteID)
+						end
+					end,
+				},
+			}
+
+			if not BFL.MockFriendInvites.enabled then
+				items[#items + 1] = {
+					text = REPORT_PLAYER or "Report Player",
+					func = function()
 						if C_ReportSystem and C_ReportSystem.OpenReportPlayerDialog then
 							C_ReportSystem.OpenReportPlayerDialog(
 								C_ReportSystem.ReportType.InappropriateBattleNetName,
 								accountName
 							)
 						end
-					end)
-					rootDescription:CreateButton("Block Invites", function()
+					end,
+				}
+				items[#items + 1] = {
+					text = BLOCK_INVITES or "Block Invites",
+					func = function()
 						BNSetBlocked(inviteID, true)
-					end)
-				end
-			end)
+					end,
+				}
+			end
+
+			BFL.OpenSimpleContextMenu(self, "BFL_BNetInviteDeclineDropdown", items)
 		end)
 		button.DeclineButton.handlerRegistered = true
 	end

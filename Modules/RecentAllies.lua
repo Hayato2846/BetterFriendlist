@@ -101,6 +101,11 @@ end
 
 -- Show Recent Allies Frame (RecentAlliesListMixin:OnShow)
 function RecentAllies:OnShow(frame)
+	if not BFL.HasRecentAllies then
+		self:Refresh(frame, ScrollBoxConstants and ScrollBoxConstants.DiscardScrollPosition)
+		return
+	end
+
 	FrameUtil.RegisterFrameForEvents(frame, RecentAlliesListEvents)
 
 	-- Show spinner initially, will hide when data is ready
@@ -112,12 +117,14 @@ end
 
 -- Hide Recent Allies Frame (RecentAlliesListMixin:OnHide)
 function RecentAllies:OnHide(frame)
-	FrameUtil.UnregisterFrameForEvents(frame, RecentAlliesListEvents)
+	if BFL.HasRecentAllies then
+		FrameUtil.UnregisterFrameForEvents(frame, RecentAlliesListEvents)
+	end
 end
 
 -- Event handler (RecentAlliesListMixin:OnEvent)
 function RecentAllies:OnEvent(frame, event, ...)
-	if event == "RECENT_ALLIES_CACHE_UPDATE" then
+	if BFL.HasRecentAllies and event == "RECENT_ALLIES_CACHE_UPDATE" then
 		self:Refresh(frame, ScrollBoxConstants.RetainScrollPosition)
 	end
 end
@@ -125,7 +132,7 @@ end
 -- Refresh the list (RecentAlliesListMixin:Refresh)
 function RecentAllies:Refresh(frame, retainScrollPosition)
 	-- Check if the Recent Allies system is enabled at all
-	if not C_RecentAllies or not C_RecentAllies.IsSystemEnabled() then
+	if not BFL.HasRecentAllies or not C_RecentAllies or not C_RecentAllies.IsSystemEnabled() then
 		self:SetLoadingSpinnerShown(frame, false)
 		-- Show a message that the system is not available
 		if not frame.UnavailableText then
@@ -321,7 +328,7 @@ function RecentAllies:InitializeEntry(button, elementData)
 		local remainingDays = (stateData.pinExpirationDate - GetServerTime()) / SECONDS_PER_DAY
 		local isNearingExpiration = remainingDays <= 7
 		local atlas = isNearingExpiration and "friendslist-recentallies-pin" or "friendslist-recentallies-pin-yellow"
-		button.StateIconContainer.PinDisplay.Icon:SetAtlas(atlas, true)
+		BFL.SetTextureOrAtlas(button.StateIconContainer.PinDisplay.Icon, atlas, nil, true)
 	end
 
 	-- Field renamed in 12.0.5: hasFriendRequestPending -> friendRequestSentThisSession

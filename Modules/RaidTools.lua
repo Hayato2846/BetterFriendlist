@@ -1831,7 +1831,12 @@ function RaidTools:CreateFrame()
 	CreateSectionHeader(content, L.RAID_TOOLS_SORT_HEADER or "Sort", yPos)
 	yPos = yPos - 25
 
-	local dropdownXOffset = BFL.HasModernDropdown and 10 or -6
+	local preferModernDropdowns = BFL.CanCreateModernDropdown and BFL.CanCreateModernDropdown()
+
+	local function GetDropdownXOffset(dropdown)
+		local isModernDropdown = BFL.IsModernDropdown and BFL.IsModernDropdown(dropdown)
+		return isModernDropdown and 10 or -6
+	end
 
 	local sortModeOptions = {
 		labels = {
@@ -1840,8 +1845,8 @@ function RaidTools:CreateFrame()
 		},
 		values = { "tmrh", "thmr" },
 	}
-	local sortModeDropdown = BFL.CreateDropdown(content, "BFLRaidToolsSortMode", 236)
-	sortModeDropdown:SetPoint("TOPLEFT", content, "TOPLEFT", dropdownXOffset, yPos)
+	local sortModeDropdown = BFL.CreateDropdown(content, "BFLRaidToolsSortMode", 236, preferModernDropdowns)
+	sortModeDropdown:SetPoint("TOPLEFT", content, "TOPLEFT", GetDropdownXOffset(sortModeDropdown), yPos)
 	BFL.InitializeDropdown(sortModeDropdown, sortModeOptions, function(val)
 		return val == DB:Get("raidToolsSortMode", "tmrh")
 	end, function(val)
@@ -1929,8 +1934,8 @@ function RaidTools:CreateFrame()
 		return table.concat(selected, ", ")
 	end
 
-	local preserveDropdown = BFL.CreateDropdown(content, "BFLRaidToolsPreserveGroups", 236)
-	preserveDropdown:SetPoint("TOPLEFT", content, "TOPLEFT", dropdownXOffset, yPos)
+	local preserveDropdown = BFL.CreateDropdown(content, "BFLRaidToolsPreserveGroups", 236, preferModernDropdowns)
+	preserveDropdown:SetPoint("TOPLEFT", content, "TOPLEFT", GetDropdownXOffset(preserveDropdown), yPos)
 	BFL.InitializeMultiSelectDropdown(preserveDropdown, preserveOptions, function(val)
 		local preserved = DB:Get("raidToolsPreserveGroups", {})
 		return preserved[val] == true

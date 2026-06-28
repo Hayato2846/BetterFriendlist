@@ -155,7 +155,7 @@ function HelpFrame:CreateFrame()
 	-- ScrollFrame with modern ScrollUtil
 	local scrollFrame
 
-	if not BFL.IsClassic and ScrollUtil and ScrollUtil.InitScrollFrameWithScrollBar then
+	if BFL.HasModernScrollBox and ScrollUtil and ScrollUtil.InitScrollFrameWithScrollBar then
 		-- Retail: Modern ScrollUtil
 		scrollFrame = CreateFrame("ScrollFrame", nil, frame)
 		frame.ScrollFrame = scrollFrame

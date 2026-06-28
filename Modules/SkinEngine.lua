@@ -1761,7 +1761,7 @@ function SkinEngine:SkinIconButton(button, iconPath, opts)
 		elseif icon.GetAtlas and hoverIcon.SetAtlas then
 			local atlas = icon:GetAtlas()
 			if atlas then
-				hoverIcon:SetAtlas(atlas, true)
+				BFL.SetTextureOrAtlas(hoverIcon, atlas, nil, true)
 			elseif icon.GetTexture and hoverIcon.SetTexture then
 				hoverIcon:SetTexture(icon:GetTexture())
 			end

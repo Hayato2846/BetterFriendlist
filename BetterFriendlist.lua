@@ -3356,6 +3356,10 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			end
 
 			local function BFL_AddRecentAllyNativeButtons(rootDescription, contextData)
+				if not BFL.HasRecentAllies then
+					return
+				end
+
 				local recentAllyData = contextData and contextData.recentAllyData
 				if not recentAllyData or not recentAllyData.characterData then
 					return
@@ -3397,7 +3401,11 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			end
 
 			local function BFL_AddRafSummonButton(rootDescription, contextData, isBNet, isOffline)
-				if isOffline or not (C_RecruitAFriend and C_RecruitAFriend.IsRecruitAFriendLinked) then
+				if
+					isOffline
+					or not (BFL.IsRAFSystemEnabled and BFL.IsRAFSystemEnabled())
+					or not (C_RecruitAFriend and C_RecruitAFriend.IsRecruitAFriendLinked)
+				then
 					return
 				end
 				local guid = BFL_GetContextGUID(contextData, isBNet)
@@ -3652,7 +3660,8 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			end
 
 			function BFL:OpenBetterFriendlistContextMenu(button, menuType, contextData, name)
-				if not (MenuUtil and MenuUtil.CreateContextMenu and contextData) then
+				local createContextMenu = BFL.CreateContextMenu
+				if not (createContextMenu and contextData) then
 					return false
 				end
 
@@ -3684,7 +3693,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					or menuType == "FRIEND_OFFLINE"
 				local menuTypeWrapper = contextData.bflWhoPlayerMenu and "WHO" or nil
 
-				MenuUtil.CreateContextMenu(owner, function(ownerRegion, rootDescription)
+				createContextMenu(owner, function(ownerRegion, rootDescription)
 					local title = BFL_FirstSafeText(contextData.bfl_streamerDisplayName, name, contextData.name)
 					rootDescription:CreateTitle(title)
 
@@ -4212,7 +4221,7 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 		UpdateFriendsDisplay()
 	elseif tabIndex == 2 then
 		-- Retail: Recent Allies
-		if not BFL.IsClassic and frame.RecentAlliesFrame then
+		if BFL.HasRecentAllies and frame.RecentAlliesFrame then
 			ShowChildFrame(frame.RecentAlliesFrame)
 			local RecentAllies = BFL:GetModule("RecentAllies")
 			if RecentAllies then
@@ -4235,13 +4244,14 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 		end
 	elseif tabIndex == 3 then
 		-- Retail: Recruit A Friend
+		local rafSupported = BFL.IsRAFSystemSupported and BFL.IsRAFSystemSupported()
 		local rafEnabled = BFL.IsRAFSystemEnabled and BFL.IsRAFSystemEnabled()
-		if not BFL.IsClassic and frame.RecruitAFriendFrame and rafEnabled then
+		if frame.RecruitAFriendFrame and rafSupported and rafEnabled then
 			ShowChildFrame(frame.RecruitAFriendFrame)
 			ShowChildFrame(frame.RecruitmentButton)
 
 			-- Initialize RAF data (match Blizzard's OnLoad behavior)
-			if C_RecruitAFriend and (BFL.IsRAFSystemSupported and BFL.IsRAFSystemSupported()) then
+			if C_RecruitAFriend then
 				if not RecruitAFriendFrame then
 					local loadAddOn = C_AddOns and C_AddOns.LoadAddOn or LoadAddOn
 					if loadAddOn then
@@ -4484,79 +4494,40 @@ local function ShowMultiAccountInvitePicker(invitableAccounts, anchorButton)
 		return tostring(a.text or ""):lower() < tostring(b.text or ""):lower()
 	end)
 
-	-- Retail: Use MenuUtil if available
-	if MenuUtil and MenuUtil.CreateContextMenu then
-		MenuUtil.CreateContextMenu(anchorButton, function(ownerRegion, rootDescription)
-			rootDescription:CreateTitle(L.INVITE_ACCOUNT_PICKER_TITLE or "Invite Character")
-			for _, entry in ipairs(entries) do
-				local text = FormatEntryText(entry)
-				local gameAccountID = entry.gameAccountID
-				rootDescription:CreateButton(text, function()
-					if not entry.isInvitable then
-						return
-					end
-					if gameAccountID then
-						-- Use Blizzard's wrapper for proper Invite vs Request-To-Join handling
-						if FriendsFrame_InviteOrRequestToJoin and entry.playerGuid then
-							FriendsFrame_InviteOrRequestToJoin(entry.playerGuid, gameAccountID)
-						else
-							BFL.BNInviteFriend(gameAccountID)
-						end
-					end
-
-					if FriendsList and friendUID and gameAccountID then
-						FriendsList:SetLastInvitedAccountID(friendUID, gameAccountID)
-					end
-				end)
-			end
-		end)
-		return
-	end
-
-	-- Classic: Use UIDropDownMenu
-	if UIDropDownMenu_Initialize and ToggleDropDownMenu then
-		if not BFL.InvitePickerDropdown then
-			BFL.InvitePickerDropdown =
-				CreateFrame("Frame", "BFL_InvitePickerDropdown", UIParent, "UIDropDownMenuTemplate")
-		end
-
-		local accounts = invitableAccounts -- closure capture
-		UIDropDownMenu_Initialize(BFL.InvitePickerDropdown, function(self, level)
-			-- Title
-			local titleInfo = UIDropDownMenu_CreateInfo()
-			titleInfo.text = L.INVITE_ACCOUNT_PICKER_TITLE or "Invite Character"
-			titleInfo.isTitle = true
-			titleInfo.notCheckable = true
-			UIDropDownMenu_AddButton(titleInfo, level)
-
-			for _, entry in ipairs(entries) do
-				local info = UIDropDownMenu_CreateInfo()
-				info.text = FormatEntryText(entry)
-				info.notCheckable = true
-				local gameAccountID = entry.gameAccountID
-				info.disabled = entry.isInvitable == false
-				info.func = function()
-					if not entry.isInvitable then
-						return
-					end
-					if gameAccountID then
-						-- Use Blizzard's wrapper for proper Invite vs Request-To-Join handling
-						if FriendsFrame_InviteOrRequestToJoin and entry.playerGuid then
-							FriendsFrame_InviteOrRequestToJoin(entry.playerGuid, gameAccountID)
-						else
-							BFL.BNInviteFriend(gameAccountID)
-						end
-					end
-
-					if FriendsList and friendUID and gameAccountID then
-						FriendsList:SetLastInvitedAccountID(friendUID, gameAccountID)
+	local items = {
+		{
+			type = "title",
+			text = L.INVITE_ACCOUNT_PICKER_TITLE or "Invite Character",
+		},
+	}
+	for _, entry in ipairs(entries) do
+		local capturedEntry = entry
+		local gameAccountID = capturedEntry.gameAccountID
+		table.insert(items, {
+			text = FormatEntryText(capturedEntry),
+			disabled = capturedEntry.isInvitable == false,
+			func = function()
+				if capturedEntry.isInvitable == false then
+					return
+				end
+				if gameAccountID then
+					-- Use Blizzard's wrapper for proper Invite vs Request-To-Join handling.
+					if FriendsFrame_InviteOrRequestToJoin and capturedEntry.playerGuid then
+						FriendsFrame_InviteOrRequestToJoin(capturedEntry.playerGuid, gameAccountID)
+					else
+						BFL.BNInviteFriend(gameAccountID)
 					end
 				end
-				UIDropDownMenu_AddButton(info, level)
-			end
-		end, "MENU")
 
-		ToggleDropDownMenu(1, nil, BFL.InvitePickerDropdown, anchorButton, 0, 0)
+				if FriendsList and friendUID and gameAccountID then
+					FriendsList:SetLastInvitedAccountID(friendUID, gameAccountID)
+				end
+			end,
+		})
+	end
+
+	if BFL.OpenSimpleContextMenu then
+		BFL.OpenSimpleContextMenu(anchorButton, "BFL_InvitePickerDropdown", items)
 	end
 end
 
@@ -5290,15 +5261,18 @@ function BetterFriendsFrame_ShowContactsMenu(button)
 			local changelogText = L.MENU_CHANGELOG or "Changelog"
 			local Changelog = BFL:GetModule("Changelog")
 			if Changelog and Changelog:IsNewVersion() then
-				local atlas, size
 				if BFL.IsClassic then
-					atlas = "communities-icon-invitemail"
-					size = ":48:64"
-					changelogText = string.format("|A:%s%s|a %s", atlas, size, changelogText)
+					local newIcon = BFL.GetAtlasOrTextureMarkup
+						and BFL.GetAtlasOrTextureMarkup("communities-icon-invitemail", nil, 48, 64)
+						or ""
+					changelogText = string.format("%s %s", newIcon, changelogText)
 				else
 					-- Retail: Use "NewCharacter-Alliance" (56x29) positioned after text
 					-- Height: 29, Width: 56
-					changelogText = string.format("%s|A:NewCharacter-Alliance:29:56|a", changelogText)
+					local newIcon = BFL.GetAtlasOrTextureMarkup
+						and BFL.GetAtlasOrTextureMarkup("NewCharacter-Alliance", nil, 29, 56)
+						or ""
+					changelogText = string.format("%s%s", changelogText, newIcon)
 				end
 			end
 
@@ -5415,7 +5389,11 @@ function BetterFriendsFrame_ShowContactsMenu(button)
 	end
 
 	-- Fallback: Manual creation (forces cursor anchor, but tries to fix it)
-	local menu = MenuUtil.CreateContextMenu(button, generator)
+	local createContextMenu = BFL.CreateContextMenu
+	if not createContextMenu then
+		return
+	end
+	local menu = createContextMenu(button, generator)
 
 	if menu then
 		table.insert(_G.BFL_ActiveContactsMenus, menu)
@@ -5792,7 +5770,7 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex)
 				UpdateFriendsDisplay()
 			elseif activeTopTab == 2 then
 				-- Top Tab 2: Recent Allies
-				if frame.RecentAlliesFrame then
+				if BFL.HasRecentAllies and frame.RecentAlliesFrame then
 					ShowChildFrame(frame.RecentAlliesFrame)
 					local RecentAllies = BFL:GetModule("RecentAllies")
 					if RecentAllies then
@@ -5801,7 +5779,9 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex)
 				end
 			elseif activeTopTab == 3 then
 				-- Top Tab 3: Recruit A Friend
-				if frame.RecruitAFriendFrame then
+				local rafSupported = BFL.IsRAFSystemSupported and BFL.IsRAFSystemSupported()
+				local rafEnabled = BFL.IsRAFSystemEnabled and BFL.IsRAFSystemEnabled()
+				if frame.RecruitAFriendFrame and rafSupported and rafEnabled then
 					ShowChildFrame(frame.RecruitAFriendFrame)
 					ShowChildFrame(frame.RecruitmentButton)
 				end

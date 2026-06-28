@@ -1978,6 +1978,389 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
+	TS:RegisterTest("data", "FriendTagEditor_IconDropdown_AllowsModernDropdown", {
+		description = "Friend Tag editor icon picker should use the shared dropdown factory without forcing legacy mode",
+		action = function(V)
+			local FriendTagEditor = BFL:GetModule("FriendTagEditor")
+			local FriendTags = BFL:GetModule("FriendTags")
+			V:AssertNotNil(FriendTagEditor, "FriendTagEditor module should exist")
+			V:AssertNotNil(FriendTags, "FriendTags module should exist")
+			V:AssertType(FriendTagEditor.CreateIconControls, "function", "FriendTagEditor should create icon controls")
+
+			local oldCreateDropdown = BFL.CreateDropdown
+			local oldInitializeDropdown = BFL.InitializeDropdown
+			local oldIsModernDropdown = BFL.IsModernDropdown
+			local oldGetIconOptions = FriendTags.GetIconOptions
+			local oldCreateFrame = CreateFrame
+			local oldSetWidth = UIDropDownMenu_SetWidth
+			local oldJustifyText = UIDropDownMenu_JustifyText
+			local oldSetText = UIDropDownMenu_SetText
+			local oldRefreshPreview = FriendTagEditor.RefreshPreview
+			local oldEditState = FriendTagEditor.editState
+			local capturedCreate
+			local capturedInit
+
+			local function MakeObject()
+				local object = {}
+				function object:SetPoint(...)
+					self.point = { ... }
+				end
+				function object:SetWidth(width)
+					self.width = width
+				end
+				function object:SetSize(width, height)
+					self.width = width
+					self.height = height
+				end
+				function object:SetText(text)
+					self.text = text
+				end
+				function object:GetText()
+					return self.text or ""
+				end
+				function object:SetShown(shown)
+					self.shown = shown
+				end
+				function object:SetScript(script, handler)
+					self.scripts = self.scripts or {}
+					self.scripts[script] = handler
+				end
+				function object:SetAutoFocus(value)
+					self.autoFocus = value
+				end
+				function object:SetMaxLetters(value)
+					self.maxLetters = value
+				end
+				function object:SetFontObject(value)
+					self.fontObject = value
+				end
+				return object
+			end
+
+			local ok, err = pcall(function()
+				FriendTagEditor.editState = {
+					iconMode = "option",
+					iconOptionID = "tag",
+					iconType = "texture",
+					iconValue = "Interface\\Icons\\INV_Misc_Note_01",
+					icon = "Interface\\Icons\\INV_Misc_Note_01",
+					texture = "Interface\\Icons\\INV_Misc_Note_01",
+				}
+				FriendTagEditor.RefreshPreview = function() end
+				FriendTags.GetIconOptions = function()
+					return {
+						{
+							id = "tag",
+							label = "Tag",
+							iconType = "texture",
+							iconValue = "Interface\\Icons\\INV_Misc_Note_01",
+							icon = "Interface\\Icons\\INV_Misc_Note_01",
+							texture = "Interface\\Icons\\INV_Misc_Note_01",
+						},
+					}
+				end
+				BFL.CreateDropdown = function(parent, name, width, preferModern)
+					capturedCreate = {
+						parent = parent,
+						name = name,
+						width = width,
+						preferModern = preferModern,
+					}
+					local dropdown = MakeObject()
+					dropdown.SetupMenu = function() end
+					return dropdown
+				end
+				BFL.IsModernDropdown = function(dropdown)
+					return dropdown and dropdown.SetupMenu ~= nil
+				end
+				BFL.InitializeDropdown = function(dropdown, options, getter, setter)
+					capturedInit = {
+						dropdown = dropdown,
+						options = options,
+						getter = getter,
+						setter = setter,
+					}
+				end
+				UIDropDownMenu_SetWidth = function()
+					error("Legacy width should not be used for modern FriendTagEditor dropdown")
+				end
+				UIDropDownMenu_JustifyText = function()
+					error("Legacy justify should not be used for modern FriendTagEditor dropdown")
+				end
+				UIDropDownMenu_SetText = function()
+					error("Legacy text should not be used for modern FriendTagEditor dropdown")
+				end
+				CreateFrame = function()
+					return MakeObject()
+				end
+
+				local parent = MakeObject()
+				function parent:CreateFontString()
+					return MakeObject()
+				end
+
+				FriendTagEditor:CreateIconControls(parent, -40)
+
+				V:AssertNotNil(capturedCreate, "Icon dropdown should be created through BFL.CreateDropdown")
+				V:AssertEqual(capturedCreate.preferModern, true, "Icon dropdown should allow modern dropdown creation")
+				V:AssertNotNil(capturedInit, "Icon dropdown should initialize through BFL.InitializeDropdown")
+				V:AssertEqual(capturedInit.options.getSelectionText("tag"), "Tag", "Icon dropdown should preserve selection text")
+				V:AssertEqual(FriendTagEditor.iconDropdown.text, "Tag", "Modern dropdown text should be set without UIDropDownMenu")
+			end)
+
+			BFL.CreateDropdown = oldCreateDropdown
+			BFL.InitializeDropdown = oldInitializeDropdown
+			BFL.IsModernDropdown = oldIsModernDropdown
+			FriendTags.GetIconOptions = oldGetIconOptions
+			CreateFrame = oldCreateFrame
+			UIDropDownMenu_SetWidth = oldSetWidth
+			UIDropDownMenu_JustifyText = oldJustifyText
+			UIDropDownMenu_SetText = oldSetText
+			FriendTagEditor.RefreshPreview = oldRefreshPreview
+			FriendTagEditor.editState = oldEditState
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
+	TS:RegisterTest("data", "SettingsComponents_Dropdowns_UseSharedInitializers", {
+		description = "Settings component dropdowns should initialize modern single and multi select controls through BFL compat helpers",
+		action = function(V)
+			local Components = BFL.SettingsComponents
+			V:AssertNotNil(Components, "SettingsComponents should exist")
+			V:AssertType(Components.CreateDropdown, "function", "SettingsComponents should create dropdown controls")
+
+			local oldCanCreateModernDropdown = BFL.CanCreateModernDropdown
+			local oldCreateDropdown = BFL.CreateDropdown
+			local oldIsModernDropdown = BFL.IsModernDropdown
+			local oldInitializeDropdown = BFL.InitializeDropdown
+			local oldInitializeMultiSelectDropdown = BFL.InitializeMultiSelectDropdown
+			local oldCreateFrame = CreateFrame
+			local oldCreateFont = CreateFont
+			local oldGameFontNormalSmall = _G.GameFontNormalSmall
+			local capturedCreate = {}
+			local capturedSingle
+			local capturedMulti
+			local directSetupMenuCalls = 0
+
+			local function MakeObject()
+				local object = {}
+				function object:SetPoint(...)
+					self.point = { ... }
+				end
+				function object:ClearAllPoints()
+					self.pointsCleared = true
+				end
+				function object:SetWidth(width)
+					self.width = width
+				end
+				function object:SetHeight(height)
+					self.height = height
+				end
+				function object:SetSize(width, height)
+					self.width = width
+					self.height = height
+				end
+				function object:SetText(text)
+					self.text = text
+				end
+				function object:GetObjectType()
+					return self.objectType or "Frame"
+				end
+				function object:GetRegions()
+					return
+				end
+				function object:SetChecked(checked)
+					self.checked = checked
+				end
+				function object:GetChecked()
+					return self.checked
+				end
+				function object:SetFontObject(fontObject)
+					self.fontObject = fontObject
+				end
+				function object:SetJustifyH(justify)
+					self.justifyH = justify
+				end
+				function object:SetNormalFontObject(fontObject)
+					self.normalFontObject = fontObject
+				end
+				function object:SetHighlightFontObject(fontObject)
+					self.highlightFontObject = fontObject
+				end
+				function object:SetDisabledFontObject(fontObject)
+					self.disabledFontObject = fontObject
+				end
+				function object:SetScript(script, handler)
+					self.scripts = self.scripts or {}
+					self.scripts[script] = handler
+				end
+				function object:GetScript(script)
+					return self.scripts and self.scripts[script]
+				end
+				function object:GetWidth()
+					return self.width or 0
+				end
+				function object:GetHeight()
+					return self.height or 0
+				end
+				function object:CreateFontString()
+					return MakeObject()
+				end
+				return object
+			end
+
+			local ok, err = pcall(function()
+				_G.GameFontNormalSmall = {
+					GetFont = function()
+						return "Fonts\\FRIZQT__.TTF", 12, ""
+					end,
+				}
+				CreateFont = function(name)
+					local font = MakeObject()
+					font.name = name
+					function font:SetFont(path, size, flags)
+						self.font = {
+							path = path,
+							size = size,
+							flags = flags,
+						}
+						return true
+					end
+					return font
+				end
+				CreateFrame = function()
+					return MakeObject()
+				end
+				BFL.CanCreateModernDropdown = function()
+					return true
+				end
+				BFL.CreateDropdown = function(parent, name, width, preferModern)
+					local dropdown = MakeObject()
+					dropdown.Text = MakeObject()
+					dropdown.SetupMenu = function()
+						directSetupMenuCalls = directSetupMenuCalls + 1
+					end
+					capturedCreate[#capturedCreate + 1] = {
+						parent = parent,
+						name = name,
+						width = width,
+						preferModern = preferModern,
+						dropdown = dropdown,
+					}
+					return dropdown
+				end
+				BFL.IsModernDropdown = function(dropdown)
+					return dropdown and dropdown.SetupMenu ~= nil
+				end
+				BFL.InitializeDropdown = function(dropdown, options, getter, setter, scrollHeight)
+					capturedSingle = {
+						dropdown = dropdown,
+						options = options,
+						getter = getter,
+						setter = setter,
+						scrollHeight = scrollHeight,
+					}
+				end
+				BFL.InitializeMultiSelectDropdown = function(dropdown, options, getter, setter, getText)
+					capturedMulti = {
+						dropdown = dropdown,
+						options = options,
+						getter = getter,
+						setter = setter,
+						getText = getText,
+					}
+				end
+
+				local parent = MakeObject()
+				local singleSelected
+				local multiSelected
+
+				Components:CreateDropdown(parent, "Mode", {
+					labels = { "Alpha", "Beta" },
+					values = { "alpha", "beta" },
+				}, function(value)
+					return value == "alpha"
+				end, function(value)
+					singleSelected = value
+				end, 120)
+
+				Components:CreateDropdown(parent, "Fonts", {
+					labels = { "One", "Two" },
+					values = { "one", "two" },
+					useCheckboxes = true,
+				}, function(value)
+					return value == "two"
+				end, function(value)
+					multiSelected = value
+				end, 120)
+
+				V:AssertEqual(#capturedCreate, 2, "Both settings dropdowns should use BFL.CreateDropdown")
+				V:AssertEqual(capturedCreate[1].preferModern, true, "Settings dropdowns should allow modern dropdown creation")
+				V:AssertEqual(capturedCreate[2].preferModern, true, "Settings multi dropdowns should allow modern dropdown creation")
+				V:AssertNotNil(capturedSingle, "Single-select settings dropdown should use BFL.InitializeDropdown")
+				V:AssertNotNil(capturedMulti, "Multi-select settings dropdown should use BFL.InitializeMultiSelectDropdown")
+				V:AssertEqual(directSetupMenuCalls, 0, "SettingsComponents should not call SetupMenu directly")
+				V:AssertEqual(capturedSingle.scrollHeight, 300, "Settings dropdowns should preserve their expanded scroll height")
+				V:AssertEqual(capturedSingle.options.getSelectionText("beta"), "Beta", "Single-select dropdown should expose selection text")
+				V:AssertType(capturedSingle.options.getItemFontObject, "function", "Single-select dropdown should expose item font objects")
+				V:AssertType(capturedMulti.options.getItemFontObject, "function", "Multi-select dropdown should expose item font objects")
+				V:AssertEqual(capturedMulti.getText(), "Two", "Multi-select dropdown should expose current display text")
+
+				capturedSingle.setter("beta")
+				V:AssertEqual(singleSelected, "beta", "Single-select setter should invoke the original callback")
+				V:AssertEqual(capturedSingle.dropdown.text, "Beta", "Single-select setter should update dropdown text")
+
+				capturedMulti.setter("one")
+				V:AssertEqual(multiSelected, "one", "Multi-select setter should invoke the original callback")
+				V:AssertEqual(capturedMulti.dropdown.text, "One", "Multi-select setter should update dropdown text")
+
+				capturedMulti = nil
+				local checkboxDropdownValue
+				local row = Components:CreateCheckboxDropdown(parent, {
+					label = "Enabled",
+					initialValue = true,
+					callback = function() end,
+				}, {
+					label = "Style",
+					entries = {
+						labels = { "Compact", "Detailed" },
+						values = { "compact", "detailed" },
+						useCheckboxes = true,
+					},
+					isSelectedCallback = function(value)
+						return value == "compact"
+					end,
+					onSelectionCallback = function(value)
+						checkboxDropdownValue = value
+					end,
+				})
+
+				V:AssertNotNil(row.RightDropdown, "Checkbox dropdown row should expose the modern dropdown")
+				V:AssertNotNil(capturedMulti, "Checkbox dropdown row should use BFL.InitializeMultiSelectDropdown")
+				V:AssertEqual(directSetupMenuCalls, 0, "Checkbox dropdown row should not call SetupMenu directly")
+				V:AssertEqual(capturedMulti.getText(), "Compact", "Checkbox dropdown row should expose current display text")
+
+				capturedMulti.setter("detailed")
+				V:AssertEqual(checkboxDropdownValue, "detailed", "Checkbox dropdown row setter should invoke the original callback")
+				V:AssertEqual(capturedMulti.dropdown.text, "Detailed", "Checkbox dropdown row setter should update dropdown text")
+			end)
+
+			BFL.CanCreateModernDropdown = oldCanCreateModernDropdown
+			BFL.CreateDropdown = oldCreateDropdown
+			BFL.IsModernDropdown = oldIsModernDropdown
+			BFL.InitializeDropdown = oldInitializeDropdown
+			BFL.InitializeMultiSelectDropdown = oldInitializeMultiSelectDropdown
+			CreateFrame = oldCreateFrame
+			CreateFont = oldCreateFont
+			_G.GameFontNormalSmall = oldGameFontNormalSmall
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
 	TS:RegisterTest("data", "FriendTags_RoleIconsUseRaidCountAtlases", {
 		description = "Friend Tags role chips should use the modern raid count role icon atlases",
 		action = function(V)
@@ -2316,6 +2699,571 @@ local function RegisterBuiltInTests()
 				V:Assert(seen["Key Team"], "Embedded FriendTags section should show custom tag assignments")
 				V:AssertNil(seen["Create Tag"], "Legacy Contact Memory tag creation should not be exposed")
 				V:AssertNil(seen["Legacy CM Tag"], "Legacy Contact Memory tags should not be exposed as a second tag system")
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "ContactMemory_OpenMenu_UsesSharedContextMenu", {
+		description = "Contact Memory context menus should delegate to the shared simple menu wrapper",
+		action = function(V)
+			local ContactMemory = BFL:GetModule("ContactMemory")
+			V:AssertNotNil(ContactMemory, "ContactMemory module should exist")
+			V:AssertType(ContactMemory.OpenMenu, "function", "ContactMemory should expose OpenMenu")
+
+			local oldOpenSimpleContextMenu = BFL.OpenSimpleContextMenu
+			local oldIsEnabled = ContactMemory.IsEnabled
+			local oldUpsertContact = ContactMemory.UpsertContact
+			local oldGetContact = ContactMemory.GetContact
+			local captured
+			local upserted
+
+			local ok, err = pcall(function()
+				ContactMemory.IsEnabled = function()
+					return true
+				end
+				ContactMemory.GetContact = function()
+					return nil
+				end
+				ContactMemory.UpsertContact = function(_, reason, data)
+					upserted = {
+						reason = reason,
+						data = data,
+					}
+				end
+				BFL.OpenSimpleContextMenu = function(owner, name, itemsOrFactory)
+					captured = {
+						owner = owner,
+						name = name,
+						items = type(itemsOrFactory) == "function" and itemsOrFactory() or itemsOrFactory,
+					}
+					return true
+				end
+
+				local anchor = {}
+				local result = ContactMemory:OpenMenu(anchor, "player:Unit-Realm", "Unit", nil)
+
+				V:AssertEqual(result, true, "OpenMenu should return the shared wrapper result")
+				V:AssertNotNil(captured, "Shared simple context menu wrapper should be called")
+				V:AssertEqual(captured.owner, anchor, "Anchor should be passed through")
+				V:AssertEqual(captured.name, "BFLContactMemoryDropdown", "Stable dropdown name should be preserved")
+				V:AssertType(captured.items, "table", "Menu factory should provide shared simple menu items")
+				V:AssertNotNil(upserted, "OpenMenu should still upsert contact metadata")
+				V:AssertEqual(upserted.reason, "context-menu", "Contact metadata reason should be preserved")
+			end)
+
+			BFL.OpenSimpleContextMenu = oldOpenSimpleContextMenu
+			ContactMemory.IsEnabled = oldIsEnabled
+			ContactMemory.UpsertContact = oldUpsertContact
+			ContactMemory.GetContact = oldGetContact
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
+	TS:RegisterTest("data", "Compat_PopulateSimpleMenu_ReturnsCallbackResponse", {
+		description = "Shared simple menus should return callback responses for modern menu refresh handling",
+		action = function(V)
+			V:AssertType(BFL.PopulateSimpleMenu, "function", "BFL.PopulateSimpleMenu should exist")
+
+			local buttonResponse = {}
+			local checkboxResponse = {}
+			local radioResponse = {}
+			local created = {}
+
+			local rootDescription = {}
+			function rootDescription:CreateButton(text, onSelected)
+				created.button = {
+					text = text,
+					onSelected = onSelected,
+				}
+				return {}
+			end
+			function rootDescription:CreateCheckbox(text, isSelected, onSelected)
+				created.checkbox = {
+					text = text,
+					isSelected = isSelected,
+					onSelected = onSelected,
+				}
+				return {}
+			end
+			function rootDescription:CreateRadio(text, isSelected, onSelected, value)
+				created.radio = {
+					text = text,
+					isSelected = isSelected,
+					onSelected = onSelected,
+					value = value,
+				}
+				return {}
+			end
+
+			local populated = BFL.PopulateSimpleMenu(rootDescription, {
+				{
+					text = "Button",
+					value = "buttonValue",
+					func = function(value)
+						V:AssertEqual(value, "buttonValue", "Button callbacks should receive item.value")
+						return buttonResponse
+					end,
+				},
+				{
+					type = "checkbox",
+					text = "Checkbox",
+					value = "checkboxValue",
+					checked = function(value)
+						return value == "checkboxValue"
+					end,
+					func = function(value)
+						V:AssertEqual(value, "checkboxValue", "Checkbox callbacks should receive item.value")
+						return checkboxResponse
+					end,
+				},
+				{
+					type = "radio",
+					text = "Radio",
+					value = "radioValue",
+					checked = function(value)
+						return value == "radioValue"
+					end,
+					func = function(value)
+						V:AssertEqual(value, "radioValue", "Radio callbacks should receive the selected value")
+						return radioResponse
+					end,
+				},
+			})
+
+			V:Assert(populated == true, "PopulateSimpleMenu should populate valid menu roots")
+			V:AssertNotNil(created.button, "Button item should be created")
+			V:AssertNotNil(created.checkbox, "Checkbox item should be created")
+			V:AssertNotNil(created.radio, "Radio item should be created")
+			V:AssertEqual(created.button.onSelected(), buttonResponse, "Button callbacks should return their response")
+			V:AssertEqual(created.checkbox.isSelected(), true, "Checkbox checked state should use item.value")
+			V:AssertEqual(created.checkbox.onSelected(), checkboxResponse, "Checkbox callbacks should return their response")
+			V:AssertEqual(created.radio.value, "radioValue", "Radio item value should be passed to the menu API")
+			V:AssertEqual(created.radio.isSelected("radioValue"), true, "Radio checked state should use callback value")
+			V:AssertEqual(created.radio.onSelected("radioValue"), radioResponse, "Radio callbacks should return their response")
+		end,
+	})
+
+	TS:RegisterTest("data", "Compat_CreateContextMenu_ReturnsMenu", {
+		description = "Shared context menu wrapper should return the modern menu instance",
+		action = function(V)
+			V:AssertType(BFL.CreateContextMenu, "function", "BFL.CreateContextMenu should exist")
+
+			local oldMenuUtil = MenuUtil
+			local owner = {}
+			local generator = function() end
+			local expectedMenu = {}
+			local capturedOwner
+			local capturedGenerator
+
+			local ok, err = pcall(function()
+				MenuUtil = {
+					CreateContextMenu = function(menuOwner, menuGenerator)
+						capturedOwner = menuOwner
+						capturedGenerator = menuGenerator
+						return expectedMenu
+					end,
+				}
+
+				local menu = BFL.CreateContextMenu(owner, generator)
+				V:AssertEqual(menu, expectedMenu, "CreateContextMenu should return MenuUtil's menu instance")
+				V:AssertEqual(capturedOwner, owner, "CreateContextMenu should pass through the owner")
+				V:AssertEqual(capturedGenerator, generator, "CreateContextMenu should pass through the generator")
+			end)
+
+			MenuUtil = oldMenuUtil
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
+	TS:RegisterTest("data", "Compat_CreateContextMenu_ClassicRootDescriptionFallback", {
+		description = "Shared context menu wrapper should translate rootDescription menus to EasyMenu on Classic",
+		action = function(V)
+			V:AssertType(BFL.CreateContextMenu, "function", "BFL.CreateContextMenu should exist")
+
+			local oldMenuUtil = MenuUtil
+			local oldEasyMenu = EasyMenu
+			local oldCreateFrame = CreateFrame
+			local oldUIParent = UIParent
+			local owner = {}
+			local capturedEasyMenu
+			local selected = {}
+
+			local ok, err = pcall(function()
+				MenuUtil = nil
+				UIParent = {}
+				CreateFrame = function(frameType, name, parent, template)
+					return {
+						frameType = frameType,
+						name = name,
+						parent = parent,
+						template = template,
+					}
+				end
+				EasyMenu = function(menuTable, menuFrame, menuOwner)
+					capturedEasyMenu = {
+						menuTable = menuTable,
+						menuFrame = menuFrame,
+						menuOwner = menuOwner,
+					}
+				end
+
+				local menu = BFL.CreateContextMenu(owner, function(menuOwner, rootDescription)
+					V:AssertEqual(menuOwner, owner, "Classic fallback should pass through the owner")
+					V:AssertType(rootDescription.CreateButton, "function", "Classic fallback should provide rootDescription buttons")
+
+					rootDescription:CreateTitle("Title")
+					rootDescription:CreateButton("Button", function()
+						selected.button = true
+					end)
+					rootDescription:CreateDivider()
+					local parent = rootDescription:CreateButton("Parent")
+					parent:CreateButton("Child", function()
+						selected.child = true
+					end)
+					local disabled = rootDescription:CreateButton("Disabled")
+					disabled:SetEnabled(false)
+					rootDescription:CreateCheckbox("Check", function()
+						return true
+					end, function()
+						selected.check = true
+					end)
+					rootDescription:CreateRadio("Radio", function(value)
+						return value == "radioValue"
+					end, function(value)
+						selected.radio = value
+					end, "radioValue")
+				end)
+
+				V:AssertNotNil(menu, "Classic fallback should return the backing menu frame")
+				V:AssertNotNil(capturedEasyMenu, "Classic fallback should open EasyMenu")
+				V:AssertEqual(capturedEasyMenu.menuOwner, owner, "EasyMenu should anchor to the owner")
+
+				local menuTable = capturedEasyMenu.menuTable
+				V:AssertEqual(menuTable[1].text, "Title", "Title text should be preserved")
+				V:Assert(menuTable[1].isTitle == true, "Title should be marked as an EasyMenu title")
+				V:AssertEqual(menuTable[2].text, "Button", "Button text should be preserved")
+				menuTable[2].func()
+				V:Assert(selected.button == true, "Button callback should be callable")
+				V:Assert(menuTable[4].hasArrow == true, "Nested rootDescription button should become an EasyMenu submenu")
+				V:AssertEqual(menuTable[4].menuList[1].text, "Child", "Submenu child text should be preserved")
+				menuTable[4].menuList[1].func()
+				V:Assert(selected.child == true, "Submenu callback should be callable")
+				V:Assert(menuTable[5].disabled == true, "SetEnabled(false) should disable the EasyMenu item")
+				V:Assert(menuTable[6].checked() == true, "Checkbox checked callback should be preserved")
+				menuTable[6].func()
+				V:Assert(selected.check == true, "Checkbox callback should be callable")
+				V:Assert(menuTable[7].checked() == true, "Radio checked callback should receive the radio value")
+				menuTable[7].func(nil, "radioValue")
+				V:AssertEqual(selected.radio, "radioValue", "Radio callback should receive the selected value")
+			end)
+
+			MenuUtil = oldMenuUtil
+			EasyMenu = oldEasyMenu
+			CreateFrame = oldCreateFrame
+			UIParent = oldUIParent
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
+	TS:RegisterTest("data", "Compat_PopulateSimpleMenu_SupportsNestedItems", {
+		description = "Shared simple menus should populate submenu children through the same item model",
+		action = function(V)
+			V:AssertType(BFL.PopulateSimpleMenu, "function", "BFL.PopulateSimpleMenu should exist")
+
+			local childResponse = {}
+			local parent
+			local rootDescription = {}
+			function rootDescription:CreateButton(text, onSelected)
+				local element = {
+					text = text,
+					onSelected = onSelected,
+					children = {},
+				}
+				function element:CreateButton(childText, childOnSelected)
+					local child = {
+						text = childText,
+						onSelected = childOnSelected,
+					}
+					table.insert(self.children, child)
+					return child
+				end
+				parent = element
+				return element
+			end
+
+			local populated = BFL.PopulateSimpleMenu(rootDescription, {
+				{
+					text = "Parent",
+					children = {
+						{
+							text = "Child",
+							value = "childValue",
+							func = function(value)
+								V:AssertEqual(value, "childValue", "Nested callbacks should receive item.value")
+								return childResponse
+							end,
+						},
+					},
+				},
+			})
+
+			V:Assert(populated == true, "PopulateSimpleMenu should populate nested menu roots")
+			V:AssertNotNil(parent, "Parent submenu item should be created")
+			V:AssertEqual(parent.text, "Parent", "Parent submenu label should be preserved")
+			V:AssertEqual(#parent.children, 1, "Nested submenu should create one child item")
+			V:AssertEqual(parent.children[1].text, "Child", "Nested child label should be preserved")
+			V:AssertEqual(parent.children[1].onSelected(), childResponse, "Nested callbacks should return their response")
+		end,
+	})
+
+	TS:RegisterTest("data", "GuildBroker_ContextMenu_DelegatesToGuildActions", {
+		description = "GuildBroker member menus should use the shared GuildActions menu path",
+		action = function(V)
+			local GuildBroker = BFL:GetModule("GuildBroker")
+			local GuildActions = BFL:GetModule("GuildActions")
+			V:AssertNotNil(GuildBroker, "GuildBroker module should exist")
+			V:AssertNotNil(GuildActions, "GuildActions module should exist")
+			V:AssertType(GuildBroker.OpenMemberContextMenu, "function", "GuildBroker should expose OpenMemberContextMenu")
+			V:AssertType(GuildActions.ShowMemberMenu, "function", "GuildActions should expose ShowMemberMenu")
+
+			local oldShowMemberMenu = GuildActions.ShowMemberMenu
+			local captured
+			local ok, err = pcall(function()
+				GuildActions.ShowMemberMenu = function(_, owner, member, name)
+					captured = {
+						owner = owner,
+						member = member,
+						name = name,
+					}
+					return true
+				end
+
+				local member = {
+					name = "Unit",
+					fullName = "Unit-Realm",
+					online = true,
+				}
+				local result = GuildBroker:OpenMemberContextMenu(member)
+				V:AssertEqual(result, true, "GuildBroker should return the shared menu result")
+				V:AssertNotNil(captured, "GuildActions:ShowMemberMenu should be called")
+				V:AssertEqual(captured.member, member, "GuildBroker should pass the original member data")
+				V:AssertEqual(
+					captured.name,
+					"BFL_GuildBrokerMemberDropdown",
+					"GuildBroker should use the stable broker dropdown name"
+				)
+			end)
+
+			GuildActions.ShowMemberMenu = oldShowMemberMenu
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
+	TS:RegisterTest("data", "GuildActions_Menus_UseSharedSimpleWrapper", {
+		description = "Guild member and guild action menus should delegate to the shared simple context menu wrapper",
+		action = function(V)
+			local GuildActions = BFL:GetModule("GuildActions")
+			V:AssertNotNil(GuildActions, "GuildActions module should exist")
+			V:AssertType(GuildActions.ShowMemberMenu, "function", "GuildActions should expose member menus")
+			V:AssertType(GuildActions.ShowGuildActionsMenu, "function", "GuildActions should expose guild action menus")
+
+			local oldOpenSimpleContextMenu = BFL.OpenSimpleContextMenu
+			local oldGetMemberCapabilities = GuildActions.GetMemberCapabilities
+			local oldGetGuildCapabilities = GuildActions.GetGuildCapabilities
+			local captured = {}
+
+			local ok, err = pcall(function()
+				BFL.OpenSimpleContextMenu = function(owner, name, itemsOrFactory)
+					captured[#captured + 1] = {
+						owner = owner,
+						name = name,
+						items = type(itemsOrFactory) == "function" and itemsOrFactory() or itemsOrFactory,
+					}
+					return true
+				end
+				GuildActions.GetMemberCapabilities = function()
+					return {
+						whisper = true,
+						inviteParty = true,
+						who = true,
+						nickname = true,
+						copyName = true,
+						promote = false,
+						demote = false,
+						remove = false,
+						setLeader = false,
+					}
+				end
+				GuildActions.GetGuildCapabilities = function()
+					return {
+						invite = true,
+						editMOTD = true,
+						leave = false,
+						disband = false,
+					}
+				end
+
+				local owner = {}
+				local memberResult = GuildActions:ShowMemberMenu(owner, {
+					name = "Unit",
+					fullName = "Unit-Realm",
+					online = true,
+				}, "BFL_TestGuildMemberDropdown")
+				local actionsResult = GuildActions:ShowGuildActionsMenu(owner)
+
+				V:AssertEqual(memberResult, true, "Member menu should return the shared wrapper result")
+				V:AssertEqual(actionsResult, true, "Guild actions menu should return the shared wrapper result")
+				V:AssertEqual(#captured, 2, "Both guild menus should use BFL.OpenSimpleContextMenu")
+				V:AssertEqual(captured[1].name, "BFL_TestGuildMemberDropdown", "Member menu should preserve caller dropdown name")
+				V:AssertEqual(captured[2].name, "BFL_GuildActionsDropdown", "Guild actions menu should use stable dropdown name")
+				V:AssertType(captured[1].items, "table", "Member menu should provide simple menu items")
+				V:AssertType(captured[2].items, "table", "Guild actions menu should provide simple menu items")
+			end)
+
+			BFL.OpenSimpleContextMenu = oldOpenSimpleContextMenu
+			GuildActions.GetMemberCapabilities = oldGetMemberCapabilities
+			GuildActions.GetGuildCapabilities = oldGetGuildCapabilities
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
+	TS:RegisterTest("data", "GuildFrame_Dropdowns_UseSharedInitializer", {
+		description = "Guild roster sort and filter dropdowns should share the BFL dropdown initializer",
+		action = function(V)
+			local GuildFrame = BFL:GetModule("GuildFrame")
+			V:AssertNotNil(GuildFrame, "GuildFrame module should exist")
+			V:AssertType(GuildFrame.CreateSortDropdown, "function", "GuildFrame should create sort dropdowns")
+			V:AssertType(GuildFrame.CreateFilterDropdown, "function", "GuildFrame should create filter dropdowns")
+
+			local oldCreateDropdown = BFL.CreateDropdown
+			local oldInitializeDropdown = BFL.InitializeDropdown
+			local oldIsModernDropdown = BFL.IsModernDropdown
+			local oldSetSort = GuildFrame.SetSort
+			local oldSetFilter = GuildFrame.SetFilter
+			local oldRefreshSortDropdown = GuildFrame.RefreshSortDropdown
+			local oldRefreshFilterDropdown = GuildFrame.RefreshFilterDropdown
+			local oldSortMode = GuildFrame.sortMode
+			local oldFilterMode = GuildFrame.filterMode
+			local captured = {}
+
+			local ok, err = pcall(function()
+				GuildFrame.sortMode = "rank"
+				GuildFrame.filterMode = "online"
+				BFL.IsModernDropdown = function()
+					return false
+				end
+				BFL.CreateDropdown = function(parent, name, width)
+					return {
+						parent = parent,
+						name = name,
+						width = width,
+					}
+				end
+				BFL.InitializeDropdown = function(dropdown, options, getter, setter)
+					captured[#captured + 1] = {
+						dropdown = dropdown,
+						options = options,
+						getter = getter,
+						setter = setter,
+					}
+					return true
+				end
+				GuildFrame.RefreshSortDropdown = function() end
+				GuildFrame.RefreshFilterDropdown = function() end
+
+				local sortArgs
+				GuildFrame.SetSort = function(_, mode, skipToggle)
+					sortArgs = {
+						mode = mode,
+						skipToggle = skipToggle,
+					}
+				end
+				local filterMode
+				GuildFrame.SetFilter = function(_, mode)
+					filterMode = mode
+				end
+
+				local frame = {}
+				GuildFrame:CreateSortDropdown(frame)
+				GuildFrame:CreateFilterDropdown(frame)
+
+				V:AssertNotNil(frame.SortDropdown, "Sort dropdown should be created")
+				V:AssertNotNil(frame.FilterDropdown, "Filter dropdown should be created")
+				V:AssertEqual(#captured, 2, "Both guild dropdowns should use BFL.InitializeDropdown")
+				V:AssertEqual(captured[1].dropdown.name, "BFL_GuildSortDropdown", "Sort dropdown name should be stable")
+				V:AssertEqual(captured[2].dropdown.name, "BFL_GuildFilterDropdown", "Filter dropdown name should be stable")
+				V:AssertType(captured[1].options.getSelectionText, "function", "Sort dropdown should provide selection text")
+				V:AssertType(captured[2].options.getSelectionText, "function", "Filter dropdown should provide selection text")
+				V:Assert(captured[1].getter("rank") == true, "Sort getter should use current GuildFrame sort mode")
+				V:Assert(captured[2].getter("online") == true, "Filter getter should use current GuildFrame filter mode")
+				V:Assert(table.concat(captured[1].options.values, ","):find("nickname", 1, true) ~= nil, "Sort dropdown should include nickname sort")
+				V:Assert(table.concat(captured[1].options.values, ","):find("status", 1, true) ~= nil, "Sort dropdown should include status sort")
+				V:Assert(table.concat(captured[1].options.values, ","):find("lastonline", 1, true) ~= nil, "Sort dropdown should include last-online sort")
+				V:Assert(table.concat(captured[2].options.values, ","):find("offline", 1, true) ~= nil, "Filter dropdown should include offline filter")
+
+				captured[1].setter("name")
+				V:AssertEqual(sortArgs.mode, "name", "Sort setter should pass selected mode")
+				V:AssertEqual(sortArgs.skipToggle, true, "Sort dropdown should not toggle direction when reselecting")
+
+				captured[2].setter("all")
+				V:AssertEqual(filterMode, "all", "Filter setter should pass selected mode")
+			end)
+
+			BFL.CreateDropdown = oldCreateDropdown
+			BFL.InitializeDropdown = oldInitializeDropdown
+			BFL.IsModernDropdown = oldIsModernDropdown
+			GuildFrame.SetSort = oldSetSort
+			GuildFrame.SetFilter = oldSetFilter
+			GuildFrame.RefreshSortDropdown = oldRefreshSortDropdown
+			GuildFrame.RefreshFilterDropdown = oldRefreshFilterDropdown
+			GuildFrame.sortMode = oldSortMode
+			GuildFrame.filterMode = oldFilterMode
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
+	TS:RegisterTest("data", "GuildFrame_NicknameSort_UsesGuildNicknames", {
+		description = "Guild roster nickname sorting should match the nickname option exposed by settings",
+		action = function(V)
+			WithTemporaryDatabase({
+				guildNicknames = {
+					["Ada-Realm"] = "Beta",
+					["Zed-Realm"] = "Alpha",
+				},
+			}, function()
+				local GuildFrame = BFL:GetModule("GuildFrame")
+				V:AssertNotNil(GuildFrame, "GuildFrame module should exist")
+				V:AssertType(GuildFrame.SortMembers, "function", "GuildFrame should sort members")
+
+				local oldSortMode = GuildFrame.sortMode
+				local oldSortReversed = GuildFrame.sortReversed
+				local ok, err = pcall(function()
+					GuildFrame.sortMode = "nickname"
+					GuildFrame.sortReversed = {}
+					local members = {
+						{ name = "Ada", fullName = "Ada-Realm", online = true, guildIndex = 1 },
+						{ name = "Zed", fullName = "Zed-Realm", online = true, guildIndex = 2 },
+					}
+					GuildFrame:SortMembers(members)
+					V:AssertEqual(members[1].fullName, "Zed-Realm", "Nickname sort should use stored guild nicknames")
+				end)
+				GuildFrame.sortMode = oldSortMode
+				GuildFrame.sortReversed = oldSortReversed
+				if not ok then
+					error(err, 0)
+				end
 			end)
 		end,
 	})
@@ -3943,6 +4891,9 @@ local function RegisterBuiltInTests()
 				function object:SetAlpha(alpha)
 					self.alpha = alpha
 				end
+				function object:SetVertexColor(r, g, b, a)
+					self.vertexColor = { r, g, b, a }
+				end
 				function object:ClearAllPoints()
 					self.points = {}
 				end
@@ -3951,6 +4902,24 @@ local function RegisterBuiltInTests()
 				end
 				function object:SetWidth(width)
 					self.width = width
+				end
+				function object:SetHeight(height)
+					self.height = height
+				end
+				function object:SetSize(width, height)
+					self.width = width
+					self.height = height
+				end
+				function object:SetTexture(texture)
+					self.texture = texture
+				end
+				function object:SetTexCoord(...)
+					self.texCoord = { ... }
+				end
+				function object:CreateTexture()
+					local texture = MakeObject()
+					self.createdTexture = texture
+					return texture
 				end
 				return object
 			end
@@ -3972,6 +4941,12 @@ local function RegisterBuiltInTests()
 			frame.PortraitButton = MakeObject()
 			frame.PortraitIcon = MakeObject()
 			frame.PortraitMask = MakeObject()
+			frame.PortraitFrame = MakeObject()
+			frame.TopLeftCorner = MakeObject()
+			frame.TopBorder = MakeObject()
+			frame.LeftBorder = MakeObject()
+			frame.TopRightCorner = MakeObject()
+			frame.BotLeftCorner = MakeObject()
 			frame.TitleContainer = MakeObject()
 			frame.FriendsTabHeader = {
 				BattlenetFrame = MakeObject(),
@@ -3984,8 +4959,10 @@ local function RegisterBuiltInTests()
 			local globalPortrait = MakeObject()
 			local originalFrame = _G.BetterFriendsFrame
 			local originalPortrait = _G.BetterFriendsFramePortrait
+			local originalIsClassic = BFL.IsClassic
 			_G.BetterFriendsFrame = frame
 			_G.BetterFriendsFramePortrait = globalPortrait
+			BFL.IsClassic = true
 
 			local ok, err = pcall(function()
 				WithTemporaryDatabase({
@@ -3996,6 +4973,16 @@ local function RegisterBuiltInTests()
 
 					V:Assert(frame.PortraitButton.shown == false, "Simple Mode should hide the portrait button")
 					V:Assert(frame.PortraitIcon.shown == false, "Simple Mode should hide the portrait icon")
+					V:Assert(frame.PortraitFrame.shown == false, "Simple Mode should hide the portrait frame ring")
+					V:Assert(frame.TopLeftCorner.shown == true, "Simple Mode should show the no-portrait top-left corner")
+					V:AssertEqual(frame.TopLeftCorner.texture, "Interface\\FrameGeneral\\UI-Frame", "Simple Mode should use Classic UI-Frame art for the top-left corner")
+					V:AssertEqual(frame.TopLeftCorner.width, 33, "Simple Mode top-left corner should use the Classic frame corner width")
+					V:AssertEqual(frame.TopLeftCorner.points[1][1], "TOPLEFT", "Simple Mode top-left corner should be anchored to the frame top-left")
+					V:Assert(frame.BFL_SimpleModeTopLeftCorner.shown == true, "Simple Mode should show the explicit top-left corner patch")
+					V:AssertEqual(frame.BFL_SimpleModeTopLeftCorner.texture, "Interface\\FrameGeneral\\UI-Frame", "Simple Mode patch should use Classic UI-Frame art")
+					V:AssertEqual(frame.TopBorder.points[1][1], "TOPLEFT", "Simple Mode should re-anchor top border from the top-left corner")
+					V:AssertEqual(frame.TopBorder.points[1][3], "TOPRIGHT", "Simple Mode top border should start at the top-left corner's right edge")
+					V:AssertEqual(frame.LeftBorder.points[1][3], "BOTTOMLEFT", "Simple Mode left border should start below the top-left corner")
 					V:Assert(globalPortrait.shown == false, "Simple Mode should hide the global portrait")
 					V:Assert(frame.FriendsTabHeader.QuickFilterDropdown.shown == false, "Simple Mode should hide quick filter dropdown")
 					V:Assert(frame.FriendsTabHeader.PrimarySortDropdown.shown == false, "Simple Mode should hide primary sort dropdown")
@@ -4006,6 +4993,7 @@ local function RegisterBuiltInTests()
 
 			_G.BetterFriendsFrame = originalFrame
 			_G.BetterFriendsFramePortrait = originalPortrait
+			BFL.IsClassic = originalIsClassic
 			if not ok then
 				error(err, 0)
 			end
@@ -4482,13 +5470,18 @@ local function RegisterBuiltInTests()
 	})
 
 	TS:RegisterTest("classic", "Classic_NoRecentAllies", {
-		description = "RecentAllies availability should match API support",
+		description = "RecentAllies availability should require supported build, ScrollBox, and API support",
 		action = function(V)
 			local compatAvailable = false
 			if BFL.Compat and BFL.Compat.IsRecentAlliesAvailable then
 				compatAvailable = BFL.Compat.IsRecentAlliesAvailable()
 			end
-			V:Assert(BFL.HasRecentAllies == compatAvailable, "HasRecentAllies should match API availability")
+			local expected = ((BFL.IsTWW or BFL.IsMidnight) and BFL.HasModernScrollBox and compatAvailable) == true
+			V:AssertEqual(
+				BFL.HasRecentAllies == true,
+				expected,
+				"HasRecentAllies should require supported build, ScrollBox, and API availability"
+			)
 		end,
 	})
 
@@ -4499,6 +5492,387 @@ local function RegisterBuiltInTests()
 		end,
 		action = function(V)
 			V:Assert(BFL.HasModernScrollBox, "HasModernScrollBox should be true in Retail")
+		end,
+	})
+
+	TS:RegisterTest("classic", "CapabilityFlags_ModernMenuDropdown", {
+		description = "Menu and dropdown feature flags should reflect client capabilities across Retail and Classic",
+		action = function(V)
+			V:AssertType(BFL.Capabilities, "table", "BFL.Capabilities should exist")
+			V:AssertEqual(
+				BFL.HasModernMenu,
+				BFL.Capabilities.ModernMenu == true,
+				"HasModernMenu should reflect the detected menu capability"
+			)
+			V:AssertEqual(
+				BFL.HasModernDropdown,
+				BFL.Capabilities.ModernDropdown == true,
+				"HasModernDropdown should reflect the detected dropdown capability"
+			)
+			V:AssertEqual(
+				BFL.CanUseModernScrollBox,
+				BFL.Capabilities.ModernScrollBox == true,
+				"CanUseModernScrollBox should expose the raw ScrollBox capability"
+			)
+			if BFL.IsClassic then
+				V:Assert(
+					BFL.HasModernScrollBox == false or BFL.HasModernScrollBox == BFL.Capabilities.ModernScrollBox,
+					"Classic HasModernScrollBox should stay validated-gated until individual frames opt in"
+				)
+			end
+		end,
+	})
+
+	TS:RegisterTest("classic", "CreateDropdown_ForceLegacyOption", {
+		description = "Shared dropdown factory should allow callers to force UIDropDownMenu fallback without changing boolean opt-in semantics",
+		action = function(V)
+			V:AssertType(BFL.CreateDropdown, "function", "BFL.CreateDropdown should exist")
+
+			local oldCreateFrame = CreateFrame
+			local oldSetWidth = UIDropDownMenu_SetWidth
+			local oldHasModernDropdown = BFL.HasModernDropdown
+			local oldCapabilities = BFL.Capabilities
+			local oldDropdownButtonMixin = DropdownButtonMixin
+			local created = {}
+
+			local ok, err = pcall(function()
+				BFL.HasModernDropdown = true
+				BFL.Capabilities = { ModernDropdown = true }
+				DropdownButtonMixin = { SetupMenu = function() end }
+				CreateFrame = function(frameType, name, parent, template)
+					local frame = {
+						frameType = frameType,
+						name = name,
+						parent = parent,
+						template = template,
+						SetWidth = function(self, width)
+							self.width = width
+						end,
+					}
+					if frameType == "DropdownButton" then
+						frame.SetupMenu = function() end
+					end
+					table.insert(created, frame)
+					return frame
+				end
+				UIDropDownMenu_SetWidth = function(frame, width)
+					frame.legacyWidth = width
+				end
+
+				local modern = BFL.CreateDropdown({}, "BFLTestModernDropdown", 111, true)
+				V:AssertEqual(modern.frameType, "DropdownButton", "Boolean true should still opt into modern dropdowns")
+				V:AssertEqual(modern.template, "WowStyle1DropdownTemplate", "Modern dropdown template should be preserved")
+
+				local legacy = BFL.CreateDropdown({}, "BFLTestLegacyDropdown", 123, { forceLegacy = true })
+				V:AssertEqual(legacy.frameType, "Frame", "forceLegacy should create a legacy frame")
+				V:AssertEqual(legacy.template, "UIDropDownMenuTemplate", "forceLegacy should use UIDropDownMenuTemplate")
+				V:AssertEqual(legacy.legacyWidth, 123, "forceLegacy should still apply the requested width")
+			end)
+
+			CreateFrame = oldCreateFrame
+			UIDropDownMenu_SetWidth = oldSetWidth
+			BFL.HasModernDropdown = oldHasModernDropdown
+			BFL.Capabilities = oldCapabilities
+			DropdownButtonMixin = oldDropdownButtonMixin
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
+	TS:RegisterTest("classic", "DropdownDisplayHelpers_HandleModernAndLegacy", {
+		description = "Shared dropdown display helpers should set text, width, and justification across modern and legacy dropdowns",
+		action = function(V)
+			V:AssertType(BFL.SetDropdownText, "function", "BFL.SetDropdownText should exist")
+			V:AssertType(BFL.SetDropdownWidth, "function", "BFL.SetDropdownWidth should exist")
+			V:AssertType(BFL.JustifyDropdownText, "function", "BFL.JustifyDropdownText should exist")
+			V:AssertType(BFL.SetDropdownSelectedValue, "function", "BFL.SetDropdownSelectedValue should exist")
+			V:AssertType(BFL.RefreshDropdown, "function", "BFL.RefreshDropdown should exist")
+
+			local oldSetText = UIDropDownMenu_SetText
+			local oldSetWidth = UIDropDownMenu_SetWidth
+			local oldJustify = UIDropDownMenu_JustifyText
+			local oldSetSelectedValue = UIDropDownMenu_SetSelectedValue
+			local oldRefresh = UIDropDownMenu_Refresh
+			local legacyCalls = {}
+
+			local ok, err = pcall(function()
+				UIDropDownMenu_SetText = function(dropdown, text)
+					legacyCalls.text = {
+						dropdown = dropdown,
+						text = text,
+					}
+				end
+				UIDropDownMenu_SetWidth = function(dropdown, width)
+					legacyCalls.width = {
+						dropdown = dropdown,
+						width = width,
+					}
+				end
+				UIDropDownMenu_JustifyText = function(dropdown, justify)
+					legacyCalls.justify = {
+						dropdown = dropdown,
+						justify = justify,
+					}
+				end
+				UIDropDownMenu_SetSelectedValue = function(dropdown, value)
+					legacyCalls.selected = {
+						dropdown = dropdown,
+						value = value,
+					}
+				end
+				UIDropDownMenu_Refresh = function(dropdown)
+					legacyCalls.refresh = {
+						dropdown = dropdown,
+					}
+				end
+
+				local modern = {
+					SetupMenu = function() end,
+					Update = function(self)
+						self.updated = true
+					end,
+					SetWidth = function(self, width)
+						self.width = width
+					end,
+					Text = {
+						SetText = function(self, text)
+							self.text = text
+						end,
+						SetJustifyH = function(self, justify)
+							self.justify = justify
+						end,
+					},
+				}
+				V:Assert(BFL.SetDropdownText(modern, "Modern") == true, "Modern dropdown text should be handled")
+				V:Assert(BFL.SetDropdownWidth(modern, 144) == true, "Modern dropdown width should be handled")
+				V:Assert(BFL.JustifyDropdownText(modern, "RIGHT") == true, "Modern dropdown justification should be handled")
+				V:Assert(BFL.SetDropdownSelectedValue(modern, "ignored") == false, "Modern dropdown selected value should be getter-driven")
+				V:Assert(BFL.RefreshDropdown(modern, "Modern refresh") == true, "Modern dropdown refresh should be handled")
+				V:AssertEqual(modern.Text.text, "Modern refresh", "Modern dropdown refresh should update its text region")
+				V:AssertEqual(modern.width, 144, "Modern dropdown width should use SetWidth")
+				V:AssertEqual(modern.Text.justify, "RIGHT", "Modern dropdown justification should use text region")
+				V:Assert(modern.updated == true, "Modern dropdown refresh should call Update")
+
+				local legacy = {}
+				V:Assert(BFL.SetDropdownText(legacy, "Legacy") == true, "Legacy dropdown text should be handled")
+				V:Assert(BFL.SetDropdownWidth(legacy, 155) == true, "Legacy dropdown width should be handled")
+				V:Assert(BFL.JustifyDropdownText(legacy, "LEFT") == true, "Legacy dropdown justification should be handled")
+				V:Assert(BFL.SetDropdownSelectedValue(legacy, "zone") == true, "Legacy dropdown selected value should be handled")
+				V:Assert(BFL.RefreshDropdown(legacy) == true, "Legacy dropdown refresh should be handled")
+				V:AssertEqual(legacyCalls.text.text, "Legacy", "Legacy dropdown text should use UIDropDownMenu_SetText")
+				V:AssertEqual(legacyCalls.width.width, 155, "Legacy dropdown width should use UIDropDownMenu_SetWidth")
+				V:AssertEqual(legacyCalls.justify.justify, "LEFT", "Legacy dropdown justification should use UIDropDownMenu_JustifyText")
+				V:AssertEqual(legacyCalls.selected.value, "zone", "Legacy dropdown selected value should use UIDropDownMenu_SetSelectedValue")
+				V:AssertEqual(legacyCalls.refresh.dropdown, legacy, "Legacy dropdown refresh should use UIDropDownMenu_Refresh")
+			end)
+
+			UIDropDownMenu_SetText = oldSetText
+			UIDropDownMenu_SetWidth = oldSetWidth
+			UIDropDownMenu_JustifyText = oldJustify
+			UIDropDownMenu_SetSelectedValue = oldSetSelectedValue
+			UIDropDownMenu_Refresh = oldRefresh
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
+	TS:RegisterTest("classic", "InitializeDropdown_ModernPopulateRootDescription", {
+		description = "Shared dropdown initializer should support dynamic modern menu population without caller SetupMenu usage",
+		action = function(V)
+			V:AssertType(BFL.InitializeDropdown, "function", "BFL.InitializeDropdown should exist")
+
+			local capturedGenerator
+			local capturedTranslator
+			local translatorAtSetup
+			local dropdown = {
+				SetupMenu = function(self, generator)
+					translatorAtSetup = self.selectionTranslator
+					capturedGenerator = generator
+				end,
+				SetSelectionTranslator = function(self, translator)
+					capturedTranslator = translator
+					self.selectionTranslator = translator
+				end,
+			}
+			local rootDescription = {
+				SetScrollMode = function(self, height)
+					self.scrollHeight = height
+				end,
+				CreateButton = function(self, text, callback, data)
+					self.createdButton = {
+						text = text,
+						callback = callback,
+						data = data,
+					}
+					return self.createdButton
+				end,
+			}
+			local populated
+
+			BFL.InitializeDropdown(dropdown, {
+				getSelectionText = function(value)
+					return "Selected:" .. tostring(value)
+				end,
+				populateRootDescription = function(root, owner)
+					populated = owner == dropdown
+					root:CreateButton("Dynamic", function() end, "value")
+				end,
+			}, nil, nil, 240)
+
+			V:AssertType(capturedGenerator, "function", "Modern dropdown should receive a setup generator")
+			V:AssertType(capturedTranslator, "function", "Modern dropdown should receive a selection translator")
+			V:AssertType(translatorAtSetup, "function", "Modern dropdown should have a selection translator before SetupMenu runs")
+			capturedGenerator(dropdown, rootDescription)
+			V:Assert(populated == true, "populateRootDescription should receive the dropdown owner")
+			V:AssertEqual(rootDescription.scrollHeight, 240, "Dynamic modern dropdown should preserve scroll height")
+			V:AssertEqual(rootDescription.createdButton.text, "Dynamic", "Dynamic modern dropdown should populate the root description")
+			V:AssertEqual(capturedTranslator({ data = "value" }), "Selected:value", "Dynamic modern dropdown should use getSelectionText")
+		end,
+	})
+
+	TS:RegisterTest("classic", "InitializeDropdown_UsesSelectionText", {
+		description = "Shared dropdown initializer should allow legacy menu labels and button text to differ",
+		action = function(V)
+			V:AssertType(BFL.InitializeDropdown, "function", "BFL.InitializeDropdown should exist")
+
+			local oldInitialize = UIDropDownMenu_Initialize
+			local oldCreateInfo = UIDropDownMenu_CreateInfo
+			local oldAddButton = UIDropDownMenu_AddButton
+			local oldSetSelectedValue = UIDropDownMenu_SetSelectedValue
+			local oldSetText = UIDropDownMenu_SetText
+			local oldClose = CloseDropDownMenus
+
+			local dropdown = {}
+			local buttons = {}
+			local selectedValue
+			local setValue
+
+			local ok, err = pcall(function()
+				UIDropDownMenu_CreateInfo = function()
+					return {}
+				end
+				UIDropDownMenu_AddButton = function(info)
+					table.insert(buttons, info)
+				end
+				UIDropDownMenu_SetSelectedValue = function(frame, value)
+					selectedValue = value
+					frame.selectedValue = value
+				end
+				UIDropDownMenu_SetText = function(frame, text)
+					frame.text = text
+				end
+				CloseDropDownMenus = function() end
+				UIDropDownMenu_Initialize = function(frame, initializer)
+					frame.initializer = initializer
+					initializer(frame, 1)
+				end
+
+				BFL.InitializeDropdown(dropdown, {
+					labels = { "Verbose Label", "Hidden Label" },
+					values = { "value1", "value2" },
+					getSelectionText = function(value)
+						return "IconOnly:" .. tostring(value)
+					end,
+					isOptionHidden = function(value)
+						return value == "value2"
+					end,
+					getItemFontObject = function(value, index)
+						V:AssertEqual(value, "value1", "Font resolver should receive item value")
+						V:AssertEqual(index, 1, "Font resolver should receive item index")
+						return "BFLTestFontObject"
+					end,
+				}, function(value)
+					return value == "value1"
+				end, function(value)
+					setValue = value
+				end)
+
+				V:AssertEqual(selectedValue, "value1", "Initial selected value should be set")
+				V:AssertEqual(dropdown.text, "IconOnly:value1", "Initial legacy dropdown text should use getSelectionText")
+				V:AssertEqual(#buttons, 1, "One dropdown button should be created")
+				V:AssertEqual(buttons[1].fontObject, "BFLTestFontObject", "Legacy dropdown item should receive item font object")
+				buttons[1].func()
+				V:AssertEqual(setValue, "value1", "Selection callback should receive the selected value")
+				V:AssertEqual(dropdown.text, "IconOnly:value1", "Post-click legacy dropdown text should use getSelectionText")
+			end)
+
+			UIDropDownMenu_Initialize = oldInitialize
+			UIDropDownMenu_CreateInfo = oldCreateInfo
+			UIDropDownMenu_AddButton = oldAddButton
+			UIDropDownMenu_SetSelectedValue = oldSetSelectedValue
+			UIDropDownMenu_SetText = oldSetText
+			CloseDropDownMenus = oldClose
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
+	TS:RegisterTest("classic", "InitializeMultiSelectDropdown_AppliesItemFonts", {
+		description = "Shared multi-select dropdown initializer should pass item font objects to legacy menu rows",
+		action = function(V)
+			V:AssertType(BFL.InitializeMultiSelectDropdown, "function", "BFL.InitializeMultiSelectDropdown should exist")
+
+			local oldInitialize = UIDropDownMenu_Initialize
+			local oldCreateInfo = UIDropDownMenu_CreateInfo
+			local oldAddButton = UIDropDownMenu_AddButton
+			local oldSetText = UIDropDownMenu_SetText
+
+			local dropdown = {}
+			local buttons = {}
+			local toggledValue
+			local toggledChecked
+
+			local ok, err = pcall(function()
+				UIDropDownMenu_CreateInfo = function()
+					return {}
+				end
+				UIDropDownMenu_AddButton = function(info)
+					table.insert(buttons, info)
+				end
+				UIDropDownMenu_SetText = function(frame, text)
+					frame.text = text
+				end
+				UIDropDownMenu_Initialize = function(frame, initializer)
+					frame.initializer = initializer
+					initializer(frame, 1)
+				end
+
+				BFL.InitializeMultiSelectDropdown(dropdown, {
+					labels = { "First", "Second" },
+					values = { "first", "second" },
+					getItemFontObject = function(value, index)
+						return "BFLFont" .. tostring(index) .. ":" .. tostring(value)
+					end,
+				}, function(value)
+					return value == "first"
+				end, function(value, checked)
+					toggledValue = value
+					toggledChecked = checked
+				end, function()
+					return "Selected text"
+				end)
+
+				V:AssertEqual(dropdown.text, "Selected text", "Initial multi-select text should be set")
+				V:AssertEqual(#buttons, 2, "Two dropdown buttons should be created")
+				V:AssertEqual(buttons[1].fontObject, "BFLFont1:first", "First item should receive its font object")
+				V:AssertEqual(buttons[2].fontObject, "BFLFont2:second", "Second item should receive its font object")
+				V:AssertType(buttons[2].checked, "function", "Legacy checkbox state should be dynamic")
+				V:AssertEqual(buttons[2].checked(), false, "Unchecked item should report false before click")
+				buttons[2].func()
+				V:AssertEqual(toggledValue, "second", "Selection callback should receive the toggled value")
+				V:AssertEqual(toggledChecked, true, "Selection callback should receive the new checked state")
+			end)
+
+			UIDropDownMenu_Initialize = oldInitialize
+			UIDropDownMenu_CreateInfo = oldCreateInfo
+			UIDropDownMenu_AddButton = oldAddButton
+			UIDropDownMenu_SetText = oldSetText
+			if not ok then
+				error(err, 0)
+			end
 		end,
 	})
 

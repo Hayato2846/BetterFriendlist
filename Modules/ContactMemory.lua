@@ -1027,6 +1027,42 @@ function ContactMemory:ShowNoteDialog(contactKey, displayName, refreshCallback)
 	return dialog
 end
 
+function ContactMemory:GetMenuItems(contactKey, displayName, refreshCallback, includeTitle)
+	if not self:IsEnabled() or not contactKey then
+		return {}
+	end
+
+	local L = BFL.L or {}
+	local contact = self:GetContact(contactKey, false)
+	local items = {}
+
+	if includeTitle then
+		items[#items + 1] = {
+			type = "title",
+			text = L.CONTACT_MEMORY_MENU_TITLE or "Notes & Tags",
+		}
+	end
+
+	items[#items + 1] = {
+		text = L.CONTACT_MEMORY_EDIT_NOTE or "Edit Private Note",
+		func = function()
+			self:ShowNoteDialog(contactKey, displayName, refreshCallback)
+		end,
+	}
+
+	if contact and contact.privateNote then
+		items[#items + 1] = {
+			text = L.CONTACT_MEMORY_CLEAR_NOTE or "Clear Private Note",
+			func = function()
+				self:SetPrivateNote(contactKey, nil)
+				RefreshSurfaces(refreshCallback)
+			end,
+		}
+	end
+
+	return items
+end
+
 function ContactMemory:PopulateMenu(rootDescription, contactKey, displayName, refreshCallback, options)
 	if not rootDescription or not rootDescription.CreateButton or not self:IsEnabled() or not contactKey then
 		return false
@@ -1042,15 +1078,21 @@ function ContactMemory:PopulateMenu(rootDescription, contactKey, displayName, re
 		submenu:SetScrollMode(options.friendData and 340 or 260)
 	end
 
-	submenu:CreateButton(L.CONTACT_MEMORY_EDIT_NOTE or "Edit Private Note", function()
-		self:ShowNoteDialog(contactKey, displayName, refreshCallback)
-	end)
-
-	if contact and contact.privateNote then
-		submenu:CreateButton(L.CONTACT_MEMORY_CLEAR_NOTE or "Clear Private Note", function()
-			self:SetPrivateNote(contactKey, nil)
-			RefreshSurfaces(refreshCallback)
+	if BFL.PopulateSimpleMenu then
+		BFL.PopulateSimpleMenu(submenu, function()
+			return self:GetMenuItems(contactKey, displayName, refreshCallback, false)
 		end)
+	else
+		submenu:CreateButton(L.CONTACT_MEMORY_EDIT_NOTE or "Edit Private Note", function()
+			self:ShowNoteDialog(contactKey, displayName, refreshCallback)
+		end)
+
+		if contact and contact.privateNote then
+			submenu:CreateButton(L.CONTACT_MEMORY_CLEAR_NOTE or "Clear Private Note", function()
+				self:SetPrivateNote(contactKey, nil)
+				RefreshSurfaces(refreshCallback)
+			end)
+		end
 	end
 
 	local FriendTags = BFL:GetModule("FriendTags")
@@ -1065,64 +1107,20 @@ function ContactMemory:PopulateMenu(rootDescription, contactKey, displayName, re
 	return true
 end
 
-function ContactMemory:AddClassicDropdownButton(text, level, func, checked)
-	if not UIDropDownMenu_CreateInfo or not UIDropDownMenu_AddButton then
-		return
-	end
-	local info = UIDropDownMenu_CreateInfo()
-	info.text = text
-	info.func = func
-	info.checked = checked
-	info.notCheckable = checked == nil
-	info.keepShownOnClick = checked ~= nil
-	UIDropDownMenu_AddButton(info, level)
-end
-
 function ContactMemory:OpenMenu(anchor, contactKey, displayName, refreshCallback)
 	if not self:IsEnabled() or not contactKey then
 		return false
 	end
 
-	if MenuUtil and MenuUtil.CreateContextMenu then
-		MenuUtil.CreateContextMenu(anchor, function(owner, rootDescription)
-			self:PopulateMenu(rootDescription, contactKey, displayName, refreshCallback)
-		end)
-		return true
-	end
+	self:UpsertContact("context-menu", { key = contactKey, displayName = displayName })
 
-	if not (UIDropDownMenu_Initialize and ToggleDropDownMenu) then
+	if not BFL.OpenSimpleContextMenu then
 		return false
 	end
 
-	if not self.dropdown then
-		self.dropdown = CreateFrame("Frame", "BFLContactMemoryDropdown", UIParent, "UIDropDownMenuTemplate")
-	end
-
-	self:UpsertContact("context-menu", { key = contactKey, displayName = displayName })
-	local L = BFL.L or {}
-	UIDropDownMenu_Initialize(self.dropdown, function(dropdown, level)
-		level = level or 1
-		local title = UIDropDownMenu_CreateInfo()
-		title.text = L.CONTACT_MEMORY_MENU_TITLE or "Notes & Tags"
-		title.isTitle = true
-		title.notCheckable = true
-		UIDropDownMenu_AddButton(title, level)
-
-		self:AddClassicDropdownButton(L.CONTACT_MEMORY_EDIT_NOTE or "Edit Private Note", level, function()
-			self:ShowNoteDialog(contactKey, displayName, refreshCallback)
-		end)
-
-		local contact = self:GetContact(contactKey, false)
-		if contact and contact.privateNote then
-			self:AddClassicDropdownButton(L.CONTACT_MEMORY_CLEAR_NOTE or "Clear Private Note", level, function()
-				self:SetPrivateNote(contactKey, nil)
-				RefreshSurfaces(refreshCallback)
-			end)
-		end
-	end, "MENU")
-
-	ToggleDropDownMenu(1, nil, self.dropdown, anchor, 0, 0)
-	return true
+	return BFL.OpenSimpleContextMenu(anchor or UIParent, "BFLContactMemoryDropdown", function()
+		return self:GetMenuItems(contactKey, displayName, refreshCallback, true)
+	end)
 end
 
 return ContactMemory

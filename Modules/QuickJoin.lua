@@ -849,7 +849,8 @@ function QuickJoinEntry:ApplyToFrame(frame)
 	local queueData = firstQueue and firstQueue.queueData
 	local useGroupIcon = queueData and queueData.queueType == "lfglist"
 	if frame.Icon then
-		frame.Icon:SetAtlas(useGroupIcon and "socialqueuing-icon-group" or "socialqueuing-icon-eye")
+		local atlas = useGroupIcon and "socialqueuing-icon-group" or "socialqueuing-icon-eye"
+		BFL.SetTextureOrAtlas(frame.Icon, atlas)
 		if frame.MemberName then
 			frame.Icon:SetHeight(math.max(17, frame.MemberName:GetHeight()))
 			frame.Icon:SetWidth(math.max(16, frame.Icon:GetHeight() * 0.95))
@@ -1206,7 +1207,7 @@ function QuickJoin:UpdateRetailScrollBoxWidth()
 end
 
 function QuickJoin:InitializeRetailScrollBox(frame)
-	if BFL.IsClassic or not BFL.HasModernScrollBox then
+	if not BFL.HasModernScrollBox then
 		return false
 	end
 
@@ -1294,7 +1295,7 @@ function QuickJoin:Initialize()
 	-- Initialize ScrollBox (Phase 1: Activity Cards)
 	if BetterFriendsFrame and BetterFriendsFrame.QuickJoinFrame then
 		-- Classic: Use FauxScrollFrame approach
-		if BFL.IsClassic or not BFL.HasModernScrollBox then
+		if not BFL.HasModernScrollBox then
 			-- BFL:DebugPrint("|cff00ffffQuickJoin:|r Using Classic FauxScrollFrame mode")
 			self:InitializeClassicQuickJoin()
 		else
@@ -1781,7 +1782,7 @@ function QuickJoin:Update(forceUpdate)
 		self._lastEntries = entries
 
 		-- Classic mode: Use simple list and render
-		if BFL.IsClassic or not BFL.HasModernScrollBox then
+		if not BFL.HasModernScrollBox then
 			self.classicQuickJoinDataList = entries
 			self:RenderClassicQuickJoinCards()
 		else
@@ -4311,7 +4312,11 @@ function QuickJoin:OpenContextMenu(guid, anchorFrame)
 	end
 
 	-- Create context menu
-	MenuUtil.CreateContextMenu(anchorFrame, function(owner, rootDescription)
+	local createContextMenu = BFL.CreateContextMenu
+	if not createContextMenu then
+		return
+	end
+	createContextMenu(anchorFrame, function(owner, rootDescription)
 		-- Title: Leader name
 		rootDescription:CreateTitle(leaderInfo.name or UNKNOWN)
 

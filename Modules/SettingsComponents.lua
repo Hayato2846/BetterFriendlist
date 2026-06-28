@@ -405,21 +405,13 @@ local function AttachDarkDropdownData(dropdown, entries, isSelectedCallback, onS
 		setText = function(value)
 			if entries.getSelectionText then
 				local label = entries.getSelectionText()
-				if dropdown.SetText then
-					dropdown:SetText(label)
-				elseif UIDropDownMenu_SetText then
-					UIDropDownMenu_SetText(dropdown, label)
-				end
+				BFL.SetDropdownText(dropdown, label)
 				return
 			end
 			for i = 1, #entryValues do
 				if entryValues[i] == value then
 					local label = entryLabels[i]
-					if dropdown.SetText then
-						dropdown:SetText(label)
-					elseif UIDropDownMenu_SetText then
-						UIDropDownMenu_SetText(dropdown, label)
-					end
+					BFL.SetDropdownText(dropdown, label)
 					return
 				end
 			end
@@ -427,11 +419,55 @@ local function AttachDarkDropdownData(dropdown, entries, isSelectedCallback, onS
 	}
 end
 
+function Components:IsModernDropdown(dropdown)
+	return BFL.IsModernDropdown(dropdown)
+end
+
+local function CanUseModernSettingsDropdown()
+	return BFL.CanCreateModernDropdown and BFL.CanCreateModernDropdown()
+end
+
+function Components:CreateModernDropdown(parent, width, textFontObject)
+	if not CanUseModernSettingsDropdown() then
+		return nil
+	end
+
+	local dropdown
+	if BFL.CreateDropdown then
+		dropdown = BFL.CreateDropdown(parent, nil, width, true)
+	else
+		dropdown = CreateFrame("DropdownButton", nil, parent, "WowStyle1DropdownTemplate")
+		dropdown:SetWidth(width)
+	end
+	if not self:IsModernDropdown(dropdown) then
+		return nil
+	end
+
+	if dropdown.SetWidth then
+		dropdown:SetWidth(width)
+	end
+	if dropdown.SetNormalFontObject then
+		dropdown:SetNormalFontObject("BetterFriendlistFontHighlightSmall")
+		dropdown:SetHighlightFontObject("BetterFriendlistFontHighlightSmall")
+		dropdown:SetDisabledFontObject("BetterFriendlistFontDisableSmall")
+	end
+	if dropdown.Text then
+		dropdown.Text:SetFontObject(textFontObject or GetDefaultDropdownFontObject(2))
+		dropdown.Text:SetJustifyH("LEFT")
+	end
+	return dropdown
+end
+
 local function CreateClassicDropdown(parent, entries, isSelectedCallback, onSelectionCallback)
 	classicDropdownCounter = classicDropdownCounter + 1
 	local dropdownName = "BFLSettingsDropdown" .. classicDropdownCounter
 
-	local dropdown = CreateFrame("Frame", dropdownName, parent, "UIDropDownMenuTemplate")
+	local dropdown
+	if BFL.CreateDropdown then
+		dropdown = BFL.CreateDropdown(parent, dropdownName, 150, { forceLegacy = true })
+	else
+		dropdown = CreateFrame("Frame", dropdownName, parent, "UIDropDownMenuTemplate")
+	end
 	-- Note: UIDropDownMenu widths are quirky. 150 width + padding buttons ~ 180 total
 
 	local entryLabels = entries.labels
@@ -464,53 +500,74 @@ local function CreateClassicDropdown(parent, entries, isSelectedCallback, onSele
 
 	local function UpdateDropdownText(selectionValue)
 		if getSelectionText then
-			UIDropDownMenu_SetText(dropdown, getSelectionText())
+			BFL.SetDropdownText(dropdown, getSelectionText())
 			return
 		end
 		for i = 1, #entryValues do
 			if entryValues[i] == selectionValue then
-				UIDropDownMenu_SetText(dropdown, entryLabels[i])
+				BFL.SetDropdownText(dropdown, entryLabels[i])
 				ApplySelectionFont(selectionValue)
 				return
 			end
 		end
 	end
 
-	UIDropDownMenu_Initialize(dropdown, function(self, level)
-		level = level or 1
-		for i = 1, #entryLabels do
-			local info = UIDropDownMenu_CreateInfo()
-			info.text = entryLabels[i]
-			info.value = entryValues[i]
-			info.checked = isSelectedCallback(entryValues[i])
-			if useCheckboxes then
-				info.isNotRadio = true
-				info.keepShownOnClick = true
-			end
-			local fontPath = entryFontPaths and entryFontPaths[i]
-			local fontObject = fontPath and GetDropdownFontObject(fontPath, 2) or defaultFontObject
-			if fontObject then
-				info.fontObject = fontObject
-			end
-			info.func = function()
-				onSelectionCallback(entryValues[i])
-				UpdateDropdownText(entryValues[i])
-				if useCheckboxes then
-					if UIDropDownMenu_Refresh then
-						UIDropDownMenu_Refresh(dropdown)
-					elseif UIDropDownMenu_RefreshAll then
-						UIDropDownMenu_RefreshAll(dropdown)
-					end
-				else
-					CloseDropDownMenus()
-				end
-			end
-			UIDropDownMenu_AddButton(info, level)
+	local function GetCurrentDropdownText()
+		if getSelectionText then
+			return getSelectionText()
 		end
-	end)
+		for i = 1, #entryValues do
+			if isSelectedCallback(entryValues[i]) then
+				return entryLabels[i]
+			end
+		end
+		return entryLabels[1] or ""
+	end
+
+	local function GetItemFontObject(selectionValue, index)
+		local fontPath = entryFontPaths and entryFontPaths[index]
+		return fontPath and GetDropdownFontObject(fontPath, 2) or defaultFontObject
+	end
+
+	local function RefreshCheckboxDropdown()
+		BFL.RefreshDropdown(dropdown)
+	end
+
+	if useCheckboxes then
+		BFL.InitializeMultiSelectDropdown(dropdown, {
+			labels = entryLabels,
+			values = entryValues,
+			getItemFontObject = GetItemFontObject,
+		}, isSelectedCallback, function(selectionValue)
+			onSelectionCallback(selectionValue)
+			UpdateDropdownText(selectionValue)
+			RefreshCheckboxDropdown()
+		end, GetCurrentDropdownText)
+	else
+		BFL.InitializeDropdown(dropdown, {
+			labels = entryLabels,
+			values = entryValues,
+			getSelectionText = function(selectionValue)
+				if getSelectionText then
+					return getSelectionText()
+				end
+				for i = 1, #entryValues do
+					if entryValues[i] == selectionValue then
+						ApplySelectionFont(selectionValue)
+						return entryLabels[i]
+					end
+				end
+				return entryLabels[1] or ""
+			end,
+			getItemFontObject = GetItemFontObject,
+		}, isSelectedCallback, function(selectionValue)
+			onSelectionCallback(selectionValue)
+			UpdateDropdownText(selectionValue)
+		end)
+	end
 
 	if getSelectionText then
-		UIDropDownMenu_SetText(dropdown, getSelectionText())
+		BFL.SetDropdownText(dropdown, getSelectionText())
 	else
 		for i = 1, #entryValues do
 			if isSelectedCallback(entryValues[i]) then
@@ -520,8 +577,8 @@ local function CreateClassicDropdown(parent, entries, isSelectedCallback, onSele
 		end
 	end
 
-	UIDropDownMenu_SetWidth(dropdown, 150)
-	UIDropDownMenu_JustifyText(dropdown, "LEFT")
+	BFL.SetDropdownWidth(dropdown, 150)
+	BFL.JustifyDropdownText(dropdown, "LEFT")
 
 	-- Classic + ElvUI: Expand clickable button area
 	if BFL.IsClassic then
@@ -552,23 +609,11 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 	label:SetJustifyH("LEFT")
 	label:SetText(labelText)
 
-	local dropdown
+	local dropdown = Components:CreateModernDropdown(holder, controlWidth or FIXED_CONTROL_WIDTH)
 
-	if BFL.IsClassic or not BFL.HasModernMenu then
+	if not dropdown then
 		dropdown = CreateClassicDropdown(holder, entries, isSelectedCallback, onSelectionCallback)
 	else
-		-- Retail WowStyle1DropdownTemplate
-		dropdown = CreateFrame("DropdownButton", nil, holder, "WowStyle1DropdownTemplate")
-
-		dropdown:SetNormalFontObject("BetterFriendlistFontHighlightSmall")
-		dropdown:SetHighlightFontObject("BetterFriendlistFontHighlightSmall")
-		dropdown:SetDisabledFontObject("BetterFriendlistFontDisableSmall")
-
-		if dropdown.Text then
-			dropdown.Text:SetFontObject(GetDefaultDropdownFontObject(2))
-			dropdown.Text:SetJustifyH("LEFT")
-		end
-
 		if entries and entries.labels and entries.values then
 			local entryLabels = entries.labels
 			local entryValues = entries.values
@@ -594,6 +639,23 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 				end
 			end
 
+			local function GetCurrentDropdownText()
+				if getSelectionText then
+					return getSelectionText()
+				end
+				for i = 1, #entryValues do
+					if isSelectedCallback(entryValues[i]) then
+						return entryLabels[i]
+					end
+				end
+				return entryLabels[1] or ""
+			end
+
+			local function GetItemFontObject(selectionValue, index)
+				local fontPath = entryFontPaths and entryFontPaths[index]
+				return fontPath and GetDropdownFontObject(fontPath, 2) or defaultFontObject
+			end
+
 			local function UpdateDropdownText(selectionValue)
 				if getSelectionText then
 					dropdown:SetText(getSelectionText())
@@ -610,54 +672,37 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 
 			AttachDarkDropdownData(dropdown, entries, isSelectedCallback, onSelectionCallback, ApplySelectionFont)
 
-			dropdown:SetupMenu(function(dropdown, rootDescription)
-				-- 300px height limit to ensure scrolling for long lists (e.g. Fonts)
-				if rootDescription.SetScrollMode then
-					rootDescription:SetScrollMode(300)
-				end
-
-				for i = 1, #entryLabels do
-					local item
-					if useCheckboxes then
-						item = rootDescription:CreateCheckbox(entryLabels[i], isSelectedCallback, function(val)
-							onSelectionCallback(val)
-							UpdateDropdownText(val)
-						end, entryValues[i])
-						if item.SetCloseOnClick then
-							item:SetCloseOnClick(false)
+			if useCheckboxes then
+				BFL.InitializeMultiSelectDropdown(dropdown, {
+					labels = entryLabels,
+					values = entryValues,
+					getItemFontObject = GetItemFontObject,
+				}, isSelectedCallback, function(selectionValue)
+					onSelectionCallback(selectionValue)
+					UpdateDropdownText(selectionValue)
+				end, GetCurrentDropdownText)
+			else
+				BFL.InitializeDropdown(dropdown, {
+					labels = entryLabels,
+					values = entryValues,
+					getSelectionText = function(selectionValue)
+						if getSelectionText then
+							return getSelectionText()
 						end
-					else
-						item = rootDescription:CreateRadio(entryLabels[i], isSelectedCallback, function(val)
-							onSelectionCallback(val)
-							UpdateDropdownText(val)
-						end, entryValues[i])
-					end
-
-					-- Lazy font loading: defer CreateFont() to AddInitializer (only runs for visible items)
-					do
-						local entryFontPath = entryFontPaths and entryFontPaths[i]
-						item:AddInitializer(function(button)
-							if button.fontString then
-								local entryFontObject = entryFontPath and GetDropdownFontObject(entryFontPath, 2)
-									or defaultFontObject
-								button.fontString:SetFontObject(entryFontObject or defaultFontObject)
+						for i = 1, #entryValues do
+							if entryValues[i] == selectionValue then
+								ApplySelectionFont(selectionValue)
+								return entryLabels[i]
 							end
-						end)
-					end
-				end
-			end)
-
-			dropdown:SetSelectionTranslator(function(selection)
-				if getSelectionText then
-					return getSelectionText()
-				end
-				for i = 1, #entryValues do
-					if entryValues[i] == selection.data then
-						return entryLabels[i]
-					end
-				end
-				return entryLabels[1]
-			end)
+						end
+						return entryLabels[1] or ""
+					end,
+					getItemFontObject = GetItemFontObject,
+				}, isSelectedCallback, function(selectionValue)
+					onSelectionCallback(selectionValue)
+					UpdateDropdownText(selectionValue)
+				end, 300)
+			end
 
 			if getSelectionText then
 				dropdown:SetText(getSelectionText())
@@ -678,10 +723,10 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 		local dropdownWidth = holder.ControlWidth or FIXED_CONTROL_WIDTH
 
 		-- Dropdown positioning (Right Aligned)
-		if BFL.IsClassic or not BFL.HasModernMenu then
+		if not Components:IsModernDropdown(dropdown) then
 			dropdown:ClearAllPoints()
 			dropdown:SetPoint("RIGHT", self, "RIGHT", DROPDOWN_X_OFFSET, 0)
-			UIDropDownMenu_SetWidth(dropdown, dropdownWidth)
+			BFL.SetDropdownWidth(dropdown, dropdownWidth)
 		else
 			dropdown:ClearAllPoints()
 			dropdown:SetPoint("RIGHT", self, "RIGHT", 0, 0)
@@ -1807,7 +1852,8 @@ function Components:CreateCheckboxDropdown(parent, checkboxData, dropdownData)
 		rightLabel:SetJustifyH("LEFT")
 		rightLabel:SetText(dropdownData.label)
 
-		if BFL.IsClassic or not BFL.HasModernMenu then
+		dropdown = Components:CreateModernDropdown(holder, FIXED_CONTROL_WIDTH)
+		if not dropdown then
 			dropdown = CreateClassicDropdown(
 				holder,
 				dropdownData.entries,
@@ -1815,16 +1861,6 @@ function Components:CreateCheckboxDropdown(parent, checkboxData, dropdownData)
 				dropdownData.onSelectionCallback
 			)
 		else
-			dropdown = CreateFrame("DropdownButton", nil, holder, "WowStyle1DropdownTemplate")
-			dropdown:SetNormalFontObject("BetterFriendlistFontHighlightSmall")
-			dropdown:SetHighlightFontObject("BetterFriendlistFontHighlightSmall")
-			dropdown:SetDisabledFontObject("BetterFriendlistFontDisableSmall")
-
-			if dropdown.Text then
-				dropdown.Text:SetFontObject(GetDefaultDropdownFontObject(2))
-				dropdown.Text:SetJustifyH("LEFT")
-			end
-
 			if dropdownData.entries and dropdownData.entries.labels and dropdownData.entries.values then
 				local entryLabels = dropdownData.entries.labels
 				local entryValues = dropdownData.entries.values
@@ -1857,65 +1893,58 @@ function Components:CreateCheckboxDropdown(parent, checkboxData, dropdownData)
 					ApplySelectionFont
 				)
 
-				dropdown:SetupMenu(function(_, rootDescription)
-					if rootDescription.SetScrollMode then
-						rootDescription:SetScrollMode(300)
-					end
-
-					for i = 1, #entryLabels do
-						local item
-						if useCheckboxes then
-							item = rootDescription:CreateCheckbox(
-								entryLabels[i],
-								dropdownData.isSelectedCallback,
-								function(val)
-									dropdownData.onSelectionCallback(val)
-									ApplySelectionFont(val)
-								end,
-								entryValues[i]
-							)
-							if item.SetCloseOnClick then
-								item:SetCloseOnClick(false)
-							end
-						else
-							item = rootDescription:CreateRadio(
-								entryLabels[i],
-								dropdownData.isSelectedCallback,
-								function(val)
-									dropdownData.onSelectionCallback(val)
-									ApplySelectionFont(val)
-								end,
-								entryValues[i]
-							)
-						end
-
-						-- Lazy font loading: defer CreateFont() to AddInitializer (only runs for visible items)
-						do
-							local entryFontPath = entryFontPaths and entryFontPaths[i]
-							item:AddInitializer(function(button)
-								if button.fontString then
-									local entryFontObject = entryFontPath and GetDropdownFontObject(entryFontPath, 2)
-										or defaultFontObject
-									button.fontString:SetFontObject(entryFontObject or defaultFontObject)
-								end
-							end)
-						end
-					end
-				end)
-
-				dropdown:SetSelectionTranslator(function(selection)
+				local function GetCurrentDropdownText()
 					for i = 1, #entryValues do
-						if entryValues[i] == selection.data then
+						if dropdownData.isSelectedCallback(entryValues[i]) then
+							return entryLabels[i]
+						end
+					end
+					return entryLabels[1] or ""
+				end
+
+				local function GetItemFontObject(selectionValue, index)
+					local fontPath = entryFontPaths and entryFontPaths[index]
+					return fontPath and GetDropdownFontObject(fontPath, 2) or defaultFontObject
+				end
+
+				local function GetSelectionText(selectionValue)
+					for i = 1, #entryValues do
+						if entryValues[i] == selectionValue then
 							return entryLabels[i]
 						end
 					end
 					return entryLabels[1]
-				end)
+				end
+
+				local function UpdateDropdownText(selectionValue)
+					dropdown:SetText(GetSelectionText(selectionValue))
+					ApplySelectionFont(selectionValue)
+				end
+
+				if useCheckboxes then
+					BFL.InitializeMultiSelectDropdown(dropdown, {
+						labels = entryLabels,
+						values = entryValues,
+						getItemFontObject = GetItemFontObject,
+					}, dropdownData.isSelectedCallback, function(selectionValue)
+						dropdownData.onSelectionCallback(selectionValue)
+						UpdateDropdownText(selectionValue)
+					end, GetCurrentDropdownText)
+				else
+					BFL.InitializeDropdown(dropdown, {
+						labels = entryLabels,
+						values = entryValues,
+						getSelectionText = GetSelectionText,
+						getItemFontObject = GetItemFontObject,
+					}, dropdownData.isSelectedCallback, function(selectionValue)
+						dropdownData.onSelectionCallback(selectionValue)
+						UpdateDropdownText(selectionValue)
+					end, 300)
+				end
 
 				for i = 1, #entryValues do
 					if dropdownData.isSelectedCallback(entryValues[i]) then
-						dropdown:SetText(entryLabels[i])
-						ApplySelectionFont(entryValues[i])
+						UpdateDropdownText(entryValues[i])
 						break
 					end
 				end
@@ -1950,15 +1979,16 @@ function Components:CreateCheckboxDropdown(parent, checkboxData, dropdownData)
 
 		if rightLabel and dropdown then
 			local dropdownWidth = FIXED_CONTROL_WIDTH
-			-- Classic: UIDropDownMenu adds ~30px internal padding, so use smaller width
-			if BFL.IsClassic then
+			local modernDropdown = Components:IsModernDropdown(dropdown)
+			-- Classic UIDropDownMenu adds ~30px internal padding, so use smaller width.
+			if not modernDropdown and BFL.IsClassic then
 				dropdownWidth = 120
 			end
 
 			dropdown:ClearAllPoints()
-			if BFL.IsClassic or not BFL.HasModernMenu then
+			if not modernDropdown then
 				dropdown:SetPoint("RIGHT", self, "RIGHT", DROPDOWN_X_OFFSET, 0)
-				UIDropDownMenu_SetWidth(dropdown, dropdownWidth)
+				BFL.SetDropdownWidth(dropdown, dropdownWidth)
 			else
 				dropdown:SetPoint("RIGHT", self, "RIGHT", 0, 0)
 				dropdown:SetWidth(dropdownWidth)

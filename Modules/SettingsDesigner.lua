@@ -8,6 +8,7 @@ local L = BFL.L or _G.BFL_L or {}
 local Designer = BFL.LibSettingsDesigner
 local Config = Designer and Designer.Config
 local ConfigUI = Designer and Designer.UI
+local Components = BFL.SettingsComponents
 
 local APP_ID = "BetterFriendlist"
 local ASSET_ROOT = "Interface\\AddOns\\BetterFriendlist\\Libs\\LibSettingsDesigner\\Assets\\"
@@ -1141,72 +1142,54 @@ local function CreateSettingsDropdown(parent, entries, selectedValue, onSelectio
 
 	local function UpdateText(value)
 		local text = GetDropdownLabel(entries, value)
-		if dropdown.SetText then
-			dropdown:SetText(text)
-		elseif UIDropDownMenu_SetText then
-			UIDropDownMenu_SetText(dropdown, text)
-		elseif dropdown.Text and dropdown.Text.SetText then
-			dropdown.Text:SetText(text)
-		end
+		BFL.SetDropdownText(dropdown, text)
 	end
 
-	if BFL.IsClassic or not BFL.HasModernMenu then
+	dropdown = Components and Components.CreateModernDropdown
+		and Components:CreateModernDropdown(parent, width, "BetterFriendlistFontHighlightSmall")
+		or nil
+	if not dropdown then
 		bflDropdownCounter = bflDropdownCounter + 1
 		local dropdownName = "BFLSettingsCenterDropdown" .. tostring(bflDropdownCounter)
-		dropdown = CreateFrame("Frame", dropdownName, parent, "UIDropDownMenuTemplate")
+		if BFL.CreateDropdown then
+			dropdown = BFL.CreateDropdown(parent, dropdownName, math.max(80, width - 30), { forceLegacy = true })
+		else
+			dropdown = CreateFrame("Frame", dropdownName, parent, "UIDropDownMenuTemplate")
+		end
 		dropdown:SetSize(width + 24, 24)
-		UIDropDownMenu_Initialize(dropdown, function(_, level)
-			level = level or 1
-			for index, label in ipairs(entries.labels or {}) do
-				local value = entries.values and entries.values[index]
-				local info = UIDropDownMenu_CreateInfo()
-				info.text = label
-				info.value = value
-				info.checked = selectedValue == value
-				info.func = function()
-					selectedValue = value
-					if onSelectionCallback then
-						onSelectionCallback(value)
-					end
-					UpdateText(value)
-					CloseDropDownMenus()
-				end
-				UIDropDownMenu_AddButton(info, level)
+		BFL.InitializeDropdown(dropdown, {
+			labels = entries.labels or {},
+			values = entries.values or {},
+			getSelectionText = function(value)
+				return GetDropdownLabel(entries, value)
+			end,
+		}, function(value)
+			return selectedValue == value
+		end, function(value)
+			selectedValue = value
+			if onSelectionCallback then
+				onSelectionCallback(value)
 			end
+			UpdateText(value)
 		end)
-		UIDropDownMenu_SetWidth(dropdown, math.max(80, width - 30))
-		UIDropDownMenu_JustifyText(dropdown, "LEFT")
+		BFL.SetDropdownWidth(dropdown, math.max(80, width - 30))
+		BFL.JustifyDropdownText(dropdown, "LEFT")
 	else
-		dropdown = CreateFrame("DropdownButton", nil, parent, "WowStyle1DropdownTemplate")
-		dropdown:SetWidth(width)
-		if dropdown.SetNormalFontObject then
-			dropdown:SetNormalFontObject("BetterFriendlistFontHighlightSmall")
-			dropdown:SetHighlightFontObject("BetterFriendlistFontHighlightSmall")
-			dropdown:SetDisabledFontObject("BetterFriendlistFontDisableSmall")
-		end
-		if dropdown.Text then
-			dropdown.Text:SetFontObject("BetterFriendlistFontHighlightSmall")
-			dropdown.Text:SetJustifyH("LEFT")
-		end
-		if dropdown.SetupMenu then
-			dropdown:SetupMenu(function(_, rootDescription)
-				if rootDescription.SetScrollMode then
-					rootDescription:SetScrollMode(300)
-				end
-				for index, label in ipairs(entries.labels or {}) do
-					local value = entries.values and entries.values[index]
-					rootDescription:CreateRadio(label, function(optionValue)
-						return selectedValue == optionValue
-					end, function(optionValue)
-						selectedValue = optionValue
-						if onSelectionCallback then
-							onSelectionCallback(optionValue)
-						end
-						UpdateText(optionValue)
-					end, value)
-				end
-			end)
-		end
+		BFL.InitializeDropdown(dropdown, {
+			labels = entries.labels or {},
+			values = entries.values or {},
+			getSelectionText = function(value)
+				return GetDropdownLabel(entries, value)
+			end,
+		}, function(value)
+			return selectedValue == value
+		end, function(value)
+			selectedValue = value
+			if onSelectionCallback then
+				onSelectionCallback(value)
+			end
+			UpdateText(value)
+		end, 300)
 	end
 
 	UpdateText(selectedValue)
@@ -3442,11 +3425,40 @@ local function RegisterSocialPages()
 		})
 	end
 
+	local function BuildGuildOptionList(options, fallbackList, fallbackOrder)
+		local list = {}
+		local orderList = {}
+		if type(options) == "table" then
+			for _, option in ipairs(options) do
+				if option.value ~= nil then
+					list[option.value] = option.text or tostring(option.value)
+					orderList[#orderList + 1] = option.value
+				end
+			end
+		end
+		if #orderList == 0 then
+			return fallbackList, fallbackOrder
+		end
+		return list, orderList
+	end
+
+	local guildActions = BFL:GetModule("GuildActions")
+	local guildFilterList, guildFilterOrder = BuildGuildOptionList(
+		guildActions and guildActions.GetFilterOptions and guildActions:GetFilterOptions(),
+		{ online = FRIENDS_LIST_ONLINE or "Online", all = ALL or "All", offline = FRIENDS_LIST_OFFLINE or "Offline" },
+		{ "online", "all", "offline" }
+	)
+	local guildSortList, guildSortOrder = BuildGuildOptionList(
+		guildActions and guildActions.GetSortOptions and guildActions:GetSortOptions(),
+		{ rank = RANK or "Rank", name = NAME or "Name", level = LEVEL or "Level", class = CLASS or "Class", zone = ZONE or "Zone", nickname = T("GUILD_NICKNAME", "Nickname"), status = STATUS or "Status", lastonline = LASTONLINE or "Last Online" },
+		{ "rank", "name", "level", "class", "zone", "nickname", "status", "lastonline" }
+	)
+
 	RegisterPage({ id = "social.guild", category = "social", title = T("SETTINGS_CENTER_PAGE_SOCIAL_GUILD", GUILD or "Guild"), iconKey = "bfl-social-guild", mainToggleID = "enableGuildTab", order = 120, visibleWhen = IsGuildTabVisible, newTagID = "social.guild" })
 	AddGroup("social.guild", "guild", T("SETTINGS_GUILD_ROSTER_HEADER", "Roster Defaults"), 100)
 	AddToggle("social.guild", { key = "enableGuildTab", group = "guild", label = T("SETTINGS_ENABLE_GUILD_TAB", "Enable Guild Tab"), desc = T("SETTINGS_ENABLE_GUILD_TAB_DESC", "Show the BetterFriendlist Guild tab."), default = false, order = 100, method = "OnEnableGuildTabChanged", refreshOnChange = true, newTagID = "enableGuildTab" })
-	AddDropdown("social.guild", { key = "guildTabFilterMode", group = "guild", label = T("SETTINGS_GUILD_DEFAULT_FILTER", "Default Filter"), list = { all = ALL or "All", online = FRIENDS_LIST_ONLINE or "Online" }, orderList = { "online", "all" }, default = "online", order = 110, after = RefreshGuild })
-	AddDropdown("social.guild", { key = "guildTabSortMode", group = "guild", label = T("SETTINGS_GUILD_DEFAULT_SORT", "Default Sort"), list = { rank = RANK or "Rank", name = NAME or "Name", level = LEVEL or "Level", class = CLASS or "Class", zone = ZONE or "Zone", nickname = T("GUILD_NICKNAME", "Nickname") }, orderList = { "rank", "name", "level", "class", "zone", "nickname" }, default = "rank", order = 120, after = RefreshGuild })
+	AddDropdown("social.guild", { key = "guildTabFilterMode", group = "guild", label = T("SETTINGS_GUILD_DEFAULT_FILTER", "Default Filter"), list = guildFilterList, orderList = guildFilterOrder, default = "online", order = 110, after = RefreshGuild })
+	AddDropdown("social.guild", { key = "guildTabSortMode", group = "guild", label = T("SETTINGS_GUILD_DEFAULT_SORT", "Default Sort"), list = guildSortList, orderList = guildSortOrder, default = "rank", order = 120, after = RefreshGuild })
 	AddToggle("social.guild", { key = "guildTabShowClassIcons", group = "guild", label = T("SETTINGS_GUILD_SHOW_CLASS_ICONS", "Show Class Icons"), default = true, order = 130, after = RefreshGuild })
 	AddToggle("social.guild", { key = "guildTabUseNicknames", group = "guild", label = T("SETTINGS_GUILD_USE_NICKNAMES", "Use BFL Guild Nicknames"), default = true, order = 140, after = RefreshGuild })
 end

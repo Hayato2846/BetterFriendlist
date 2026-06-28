@@ -22,6 +22,7 @@ local currentTab = 1
 local draggedGroupButton = nil
 local groupButtons = {}
 local categoryButtons = {} -- Store vertical category buttons
+local DELETE_ICON_FALLBACK = "Interface\\AddOns\\BetterFriendlist\\Icons\\trash-2"
 
 -- Helper to get Database module
 local function GetDB()
@@ -39,6 +40,17 @@ local function SafeResetVerticalScroll(scrollFrame)
 	end
 	local ok = pcall(scrollFrame.SetVerticalScroll, scrollFrame, 0)
 	return ok
+end
+
+local function SetDeleteIconTexture(texture)
+	if not texture then
+		return
+	end
+	if BFL.SetTextureOrAtlas then
+		BFL.SetTextureOrAtlas(texture, "transmog-icon-remove", DELETE_ICON_FALLBACK, true)
+	else
+		texture:SetTexture(DELETE_ICON_FALLBACK)
+	end
 end
 
 local function HideComponentList(container)
@@ -272,11 +284,7 @@ local function CreateFontFlagsDropdown(parent, db, dbKey, refreshCallback, contr
 			db:Set(dbKey, flags)
 
 			if holder and holder.DropDown then
-				if holder.DropDown.SetText then
-					holder.DropDown:SetText(GetSelectionText())
-				elseif UIDropDownMenu_SetText then
-					UIDropDownMenu_SetText(holder.DropDown, GetSelectionText())
-				end
+				BFL.SetDropdownText(holder.DropDown, GetSelectionText())
 			end
 
 			if refreshCallback then
@@ -438,14 +446,14 @@ local function CreateGroupButton(parent, groupId, groupName, orderIndex)
 		local texture = button.deleteButton:CreateTexture(nil, "ARTWORK")
 		texture:SetPoint("TOPLEFT", button.deleteButton, "TOPLEFT", UI.SPACING_TINY, -UI.SPACING_TINY)
 		texture:SetPoint("BOTTOMRIGHT", button.deleteButton, "BOTTOMRIGHT", -UI.SPACING_TINY, UI.SPACING_TINY)
-		texture:SetAtlas("transmog-icon-remove", true)
+		SetDeleteIconTexture(texture)
 		texture:SetVertexColor(0.9, 0.2, 0.2)
 		button.deleteButton.texture = texture
 
 		local highlight = button.deleteButton:CreateTexture(nil, "HIGHLIGHT")
 		highlight:SetPoint("TOPLEFT", button.deleteButton, "TOPLEFT", UI.SPACING_TINY, -UI.SPACING_TINY)
 		highlight:SetPoint("BOTTOMRIGHT", button.deleteButton, "BOTTOMRIGHT", -UI.SPACING_TINY, UI.SPACING_TINY)
-		highlight:SetAtlas("transmog-icon-remove", true)
+		SetDeleteIconTexture(highlight)
 		highlight:SetVertexColor(1, 0.4, 0.4)
 		highlight:SetAlpha(0.8)
 
@@ -3155,6 +3163,9 @@ function Settings:OnSimpleModeChanged(checked)
 			if FriendsList and FriendsList.UpdateScrollBoxExtent then
 				FriendsList:UpdateScrollBoxExtent()
 			end
+			if BFL.UpdatePortraitVisibility then
+				BFL:UpdatePortraitVisibility("SettingsToggleDeferred")
+			end
 		end)
 	end
 
@@ -3167,27 +3178,9 @@ function Settings:OnSimpleModeChanged(checked)
 		BFL:UpdatePortraitVisibility("SettingsToggle")
 	end
 	self:RefreshThemeTab()
-
-	-- Classic Fix: Prompt for Reload on Simple Mode toggle
-	-- The Atlas texture system in Classic is unstable dynamically but works fine on login
-	if BFL.IsClassic then
-		StaticPopupDialogs["BFL_SIMPLE_MODE_RELOAD"] = {
-			text = (L.MSG_RELOAD_REQUIRED or "A reload is required to apply this change correctly in Classic.")
-				.. "\n\n"
-				.. (L.MSG_RELOAD_NOW or "Reload UI now?"),
-			button1 = ACCEPT,
-			button2 = CANCEL,
-			OnAccept = ReloadUI,
-			timeout = 0,
-			whileDead = true,
-			hideOnEscape = true,
-			preferredIndex = 3,
-		}
-		StaticPopup_Show("BFL_SIMPLE_MODE_RELOAD")
-	end
 end
 
--- Legacy code (no longer needed with ReloadUI)
+-- Legacy code (no longer used for Simple Mode)
 --[[ function Settings:OnUseUIPanelSystemChanged_OLD(checked)
 	local DB = GetDB()
 	if not DB then return end
@@ -4099,10 +4092,10 @@ function Settings:RefreshGeneralTab()
 
 	-- Row 6: Favorite Icon + Favorite Icon Dropdown (conditional)
 	local favoriteIconEnabled = DB:Get("enableFavoriteIcon", true)
-	local blizzardIconTag = "|A:friendslist-favorite:20:20|a"
-	if not (C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo("friendslist-favorite")) then
-		blizzardIconTag = "|TInterface\\AddOns\\BetterFriendlist\\Icons\\star:20:20|t"
-	end
+	local hasBlizzardFavoriteIcon = BFL.HasAtlas and BFL.HasAtlas("friendslist-favorite")
+	local blizzardIconTag = BFL.GetAtlasOrTextureMarkup
+		and BFL.GetAtlasOrTextureMarkup("friendslist-favorite", "Interface\\AddOns\\BetterFriendlist\\Icons\\star", 20, 20)
+		or "|TInterface\\AddOns\\BetterFriendlist\\Icons\\star:20:20|t"
 
 	local favoriteEntries = {
 		labels = {
@@ -4114,7 +4107,7 @@ function Settings:RefreshGeneralTab()
 	}
 
 	local favoriteDropdownData = nil
-	if favoriteIconEnabled and not BFL.IsClassic then
+	if favoriteIconEnabled and hasBlizzardFavoriteIcon then
 		favoriteDropdownData = {
 			label = L.SETTINGS_FAVORITE_ICON_STYLE or "Favorite Icon",
 			entries = favoriteEntries,
@@ -5405,11 +5398,7 @@ function Settings:RefreshFontsTab()
 			DB:Set("fontFriendName", val)
 			currentNameFont = val
 			if nameFontDropdown.DropDown then
-				if nameFontDropdown.DropDown.SetText then
-					nameFontDropdown.DropDown:SetText(val)
-				elseif UIDropDownMenu_SetText then
-					UIDropDownMenu_SetText(nameFontDropdown.DropDown, val)
-				end
+				BFL.SetDropdownText(nameFontDropdown.DropDown, val)
 			end
 			-- Defer update to next frame to ensure resource availability
 			C_Timer.After(0.01, function()
@@ -5491,11 +5480,7 @@ function Settings:RefreshFontsTab()
 			DB:Set("fontFriendInfo", val)
 			currentInfoFont = val
 			if infoFontDropdown.DropDown then
-				if infoFontDropdown.DropDown.SetText then
-					infoFontDropdown.DropDown:SetText(val)
-				elseif UIDropDownMenu_SetText then
-					UIDropDownMenu_SetText(infoFontDropdown.DropDown, val)
-				end
+				BFL.SetDropdownText(infoFontDropdown.DropDown, val)
 			end
 			-- Defer update to next frame
 			C_Timer.After(0.01, function()
@@ -5576,11 +5561,7 @@ function Settings:RefreshFontsTab()
 		DB:Set("fontTabText", val)
 		currentTabFont = val
 		if tabFontDropdown.DropDown then
-			if tabFontDropdown.DropDown.SetText then
-				tabFontDropdown.DropDown:SetText(val)
-			elseif UIDropDownMenu_SetText then
-				UIDropDownMenu_SetText(tabFontDropdown.DropDown, val)
-			end
+			BFL.SetDropdownText(tabFontDropdown.DropDown, val)
 		end
 		C_Timer.After(0.01, function()
 			BFL:ApplyTabFonts() -- Immediate Apply
@@ -5639,11 +5620,7 @@ function Settings:RefreshFontsTab()
 		DB:Set("fontRaidName", val)
 		currentRaidFont = val
 		if raidFontDropdown.DropDown then
-			if raidFontDropdown.DropDown.SetText then
-				raidFontDropdown.DropDown:SetText(val)
-			elseif UIDropDownMenu_SetText then
-				UIDropDownMenu_SetText(raidFontDropdown.DropDown, val)
-			end
+			BFL.SetDropdownText(raidFontDropdown.DropDown, val)
 		end
 		C_Timer.After(0.01, function()
 			local RaidFrame = BFL:GetModule("RaidFrame")
@@ -5860,11 +5837,7 @@ function Settings:RefreshGroupsTab()
 		DB:Set("fontGroupHeader", val)
 		currentGroupFont = val
 		if groupFontDropdown.DropDown then
-			if groupFontDropdown.DropDown.SetText then
-				groupFontDropdown.DropDown:SetText(val)
-			elseif UIDropDownMenu_SetText then
-				UIDropDownMenu_SetText(groupFontDropdown.DropDown, val)
-			end
+			BFL.SetDropdownText(groupFontDropdown.DropDown, val)
 		end
 		-- Defer update
 		C_Timer.After(0.01, function()
@@ -6955,68 +6928,55 @@ local function BFL_Settings_CreateInlineDropdown(parent, entries, selectedValue,
 
 	local function UpdateText(value)
 		local text = BFL_Settings_GetOptionLabel(entries, value)
-		if dropdown.SetText then
-			dropdown:SetText(text)
-		elseif UIDropDownMenu_SetText then
-			UIDropDownMenu_SetText(dropdown, text)
-		end
+		BFL.SetDropdownText(dropdown, text)
 	end
 
-	if BFL.IsClassic or not BFL.HasModernMenu then
+	dropdown = Components and Components.CreateModernDropdown
+		and Components:CreateModernDropdown(parent, width, "BetterFriendlistFontHighlightSmall")
+		or nil
+	if not dropdown then
 		bflFilterSortDropdownCounter = bflFilterSortDropdownCounter + 1
 		local dropdownName = "BFLFilterSortDropdown" .. tostring(bflFilterSortDropdownCounter)
-		dropdown = CreateFrame("Frame", dropdownName, parent, "UIDropDownMenuTemplate")
+		if BFL.CreateDropdown then
+			dropdown = BFL.CreateDropdown(parent, dropdownName, math.max(40, width - 30), { forceLegacy = true })
+		else
+			dropdown = CreateFrame("Frame", dropdownName, parent, "UIDropDownMenuTemplate")
+		end
 		dropdown:SetSize(width + 24, 24)
 
-		UIDropDownMenu_Initialize(dropdown, function(_, level)
-			level = level or 1
-			for i, label in ipairs(labels) do
-				local value = values[i]
-				local info = UIDropDownMenu_CreateInfo()
-				info.text = label
-				info.value = value
-				info.checked = selectedValue == value
-				info.func = function()
-					selectedValue = value
-					if onSelectionCallback then
-						onSelectionCallback(value)
-					end
-					UpdateText(value)
-					CloseDropDownMenus()
-				end
-				UIDropDownMenu_AddButton(info, level)
+		BFL.InitializeDropdown(dropdown, {
+			labels = labels,
+			values = values,
+			getSelectionText = function(value)
+				return BFL_Settings_GetOptionLabel(entries, value)
+			end,
+		}, function(value)
+			return selectedValue == value
+		end, function(value)
+			selectedValue = value
+			if onSelectionCallback then
+				onSelectionCallback(value)
 			end
+			UpdateText(value)
 		end)
-		UIDropDownMenu_SetWidth(dropdown, math.max(40, width - 30))
-		UIDropDownMenu_JustifyText(dropdown, "LEFT")
+		BFL.SetDropdownWidth(dropdown, math.max(40, width - 30))
+		BFL.JustifyDropdownText(dropdown, "LEFT")
 	else
-		dropdown = CreateFrame("DropdownButton", nil, parent, "WowStyle1DropdownTemplate")
-		dropdown:SetWidth(width)
-		dropdown:SetNormalFontObject("BetterFriendlistFontHighlightSmall")
-		dropdown:SetHighlightFontObject("BetterFriendlistFontHighlightSmall")
-		dropdown:SetDisabledFontObject("BetterFriendlistFontDisableSmall")
-		if dropdown.Text then
-			dropdown.Text:SetFontObject("BetterFriendlistFontHighlightSmall")
-			dropdown.Text:SetJustifyH("LEFT")
-		end
-
-		dropdown:SetupMenu(function(_, rootDescription)
-			if rootDescription.SetScrollMode then
-				rootDescription:SetScrollMode(300)
+		BFL.InitializeDropdown(dropdown, {
+			labels = labels,
+			values = values,
+			getSelectionText = function(value)
+				return BFL_Settings_GetOptionLabel(entries, value)
+			end,
+		}, function(value)
+			return selectedValue == value
+		end, function(value)
+			selectedValue = value
+			if onSelectionCallback then
+				onSelectionCallback(value)
 			end
-			for i, label in ipairs(labels) do
-				local value = values[i]
-				rootDescription:CreateRadio(label, function(optionValue)
-					return selectedValue == optionValue
-				end, function(optionValue)
-					selectedValue = optionValue
-					if onSelectionCallback then
-						onSelectionCallback(optionValue)
-					end
-					UpdateText(optionValue)
-				end, value)
-			end
-		end)
+			UpdateText(value)
+		end, 300)
 	end
 
 	UpdateText(selectedValue)
@@ -8435,11 +8395,7 @@ function Settings:RefreshBrokerTab()
 			DB:Set("brokerFont", val)
 			currentBrokerFont = val
 			if brokerFontDropdown.DropDown then
-				if brokerFontDropdown.DropDown.SetText then
-					brokerFontDropdown.DropDown:SetText(val)
-				elseif UIDropDownMenu_SetText then
-					UIDropDownMenu_SetText(brokerFontDropdown.DropDown, val)
-				end
+				BFL.SetDropdownText(brokerFontDropdown.DropDown, val)
 			end
 			RefreshBrokerTooltips()
 		end
@@ -10198,8 +10154,9 @@ function Settings:RefreshRaidTab()
 
 			local ddMod = modDropdown.DropDown
 			ddMod:ClearAllPoints()
-			if BFL.IsClassic or not BFL.HasModernMenu then
-				UIDropDownMenu_SetWidth(ddMod, 95)
+			local ddModIsModern = BFL.IsModernDropdown(ddMod)
+			if not ddModIsModern then
+				BFL.SetDropdownWidth(ddMod, 95)
 				ddMod:SetPoint("TOPLEFT", modDropdown, "TOPLEFT", -15, -2)
 			else
 				ddMod:SetPoint("LEFT", modDropdown, "LEFT", 0, 0)
@@ -10259,8 +10216,9 @@ function Settings:RefreshRaidTab()
 
 			local ddBtn = btnDropdown.DropDown
 			ddBtn:ClearAllPoints()
-			if BFL.IsClassic or not BFL.HasModernMenu then
-				UIDropDownMenu_SetWidth(ddBtn, 95)
+			local ddBtnIsModern = BFL.IsModernDropdown(ddBtn)
+			if not ddBtnIsModern then
+				BFL.SetDropdownWidth(ddBtn, 95)
 				ddBtn:SetPoint("TOPLEFT", btnDropdown, "TOPLEFT", -15, -2)
 			else
 				ddBtn:SetPoint("LEFT", btnDropdown, "LEFT", 0, 0)

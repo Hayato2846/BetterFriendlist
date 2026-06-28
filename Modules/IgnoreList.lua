@@ -81,7 +81,7 @@ function IgnoreList:OnLoad(frame)
 	end
 
 	-- Classic: Use FauxScrollFrame approach
-	if BFL.IsClassic or not BFL.HasModernScrollBox then
+	if not BFL.HasModernScrollBox then
 		-- BFL:DebugPrint("|cff00ffffIgnoreList:|r Using Classic FauxScrollFrame mode")
 		self:InitializeClassicIgnoreList(frame)
 		return
@@ -326,7 +326,7 @@ function IgnoreList:Update()
 
 	if numIgnores and numIgnores > 0 then
 		-- Only show header if there are actually ignored players
-		if not BFL.IsClassic and BFL.HasModernScrollBox then
+		if BFL.HasModernScrollBox then
 			table.insert(dataList, { header = "BetterFriendsFrameIgnoredHeaderTemplate" })
 		end
 
@@ -337,7 +337,7 @@ function IgnoreList:Update()
 
 	local numBlocks = BNGetNumBlocked()
 	if numBlocks and numBlocks > 0 then
-		if not BFL.IsClassic and BFL.HasModernScrollBox then
+		if BFL.HasModernScrollBox then
 			table.insert(dataList, { header = "BetterFriendsFrameBlockedInviteHeaderTemplate" })
 		end
 		for index = 1, numBlocks do
@@ -346,7 +346,7 @@ function IgnoreList:Update()
 	end
 
 	-- Classic mode: Use simple list and render
-	if BFL.IsClassic or not BFL.HasModernScrollBox then
+	if not BFL.HasModernScrollBox then
 		self.classicIgnoreDataList = dataList
 		self:RenderClassicIgnoreButtons()
 	else
@@ -393,7 +393,7 @@ function IgnoreList:SelectSquelched(squelchType, index)
 		local button = nil
 
 		-- Classic mode: Manual iteration through button pool
-		if BFL.IsClassic or not BFL.HasModernScrollBox then
+		if not BFL.HasModernScrollBox then
 			if self.classicIgnoreButtonPool then
 				for _, btn in ipairs(self.classicIgnoreButtonPool) do
 					if btn.type == type and btn.index == index then

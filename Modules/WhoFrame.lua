@@ -49,6 +49,8 @@ local function ApplyBetterFriendlistHeaderButtonFonts(button)
 	ApplyDefaultSlugToButton(button)
 end
 
+local IsModernDropdown = BFL.IsModernDropdown
+
 local function GetAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
 	if BFL.GetThemeAccentColor then
 		return BFL:GetThemeAccentColor(fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1)
@@ -117,13 +119,27 @@ local function GetClassicColumnDropdownVisualWidth()
 end
 
 local function ApplyClassicColumnDropdownVisualWidth(dropdown, logicalWidth)
-	if not (BFL.IsClassic and dropdown and UIDropDownMenu_SetWidth) then
+	if not (BFL.IsClassic and dropdown) then
 		return
 	end
 
-	UIDropDownMenu_SetWidth(dropdown, GetClassicColumnDropdownVisualWidth())
 	if logicalWidth then
 		dropdown.BFL_ClassicColumnLogicalWidth = logicalWidth
+	end
+
+	if IsModernDropdown(dropdown) then
+		if logicalWidth and dropdown.SetWidth then
+			dropdown:SetWidth(logicalWidth)
+		end
+		return
+	end
+
+	if not BFL.SetDropdownWidth then
+		return
+	end
+
+	BFL.SetDropdownWidth(dropdown, GetClassicColumnDropdownVisualWidth())
+	if logicalWidth then
 		dropdown:SetWidth(logicalWidth)
 	end
 end
@@ -294,13 +310,15 @@ function WhoFrame:UpdateResponsiveLayout()
 	-- Classic: Reposition headers dynamically (XML uses fixed positions, won't adapt to responsive widths)
 	if BFL.IsClassic then
 		local headerOverlapX = WHO_HEADER_OVERLAP
+		local isModernColumnDropdown = IsModernDropdown(whoFrame.ColumnDropdown)
+		local dropdownOffsetX = isModernColumnDropdown and 0 or WHO_CLASSIC_DROPDOWN_X_OFFSET
 		if whoFrame.ColumnDropdown and whoFrame.NameHeader then
 			whoFrame.ColumnDropdown:ClearAllPoints()
 			whoFrame.ColumnDropdown:SetPoint(
 				"TOPLEFT",
 				whoFrame.NameHeader,
 				"TOPRIGHT",
-				headerOverlapX + WHO_CLASSIC_DROPDOWN_X_OFFSET,
+				headerOverlapX + dropdownOffsetX,
 				0
 			)
 		end
@@ -402,7 +420,7 @@ function WhoFrame:OnLoad(frame)
 	ApplyStaticWhoFrameFonts(frame)
 
 	-- Classic: Use FauxScrollFrame approach
-	if BFL.IsClassic or not BFL.HasModernScrollBox then
+	if not BFL.HasModernScrollBox then
 		self:InitializeClassicWhoFrame(frame)
 		return
 	end
@@ -606,7 +624,7 @@ function WhoFrame:InitializeClassicWhoFrame(frame)
 	end)
 end
 
--- Initialize Classic Dropdown (UIDropDownMenu)
+-- Legacy Classic UIDropDownMenu fallback for older XML/worktree states.
 function WhoFrame:InitializeClassicDropdown(dropdown)
 	if not dropdown then
 		return
@@ -627,42 +645,28 @@ function WhoFrame:InitializeClassicDropdown(dropdown)
 		end
 	end
 
-	UIDropDownMenu_Initialize(dropdown, function(self, level, menuList)
-		local info = UIDropDownMenu_CreateInfo()
-
-		local function OnClick(self, arg1, arg2, checked)
-			WhoFrame:SetSortValue(arg1)
-			UIDropDownMenu_SetSelectedValue(dropdown, arg1)
-			-- Force update
-			if WhoFrame and WhoFrame.Update then
-				WhoFrame:Update(true)
-			end
+	local options = {
+		labels = { ZONE or "Zone", GUILD or "Guild", RACE or "Race" },
+		values = { 1, 2, 3 },
+	}
+	local function IsSelected(value)
+		return WhoFrame:GetSortValue() == value
+	end
+	local function SelectValue(value)
+		WhoFrame:SetSortValue(value)
+		if WhoFrame and WhoFrame.Update then
+			WhoFrame:Update(true)
 		end
+	end
 
-		info.text = ZONE
-		info.value = 1
-		info.arg1 = 1
-		info.func = OnClick
-		info.checked = (WhoFrame:GetSortValue() == 1)
-		UIDropDownMenu_AddButton(info)
-
-		info.text = GUILD
-		info.value = 2
-		info.arg1 = 2
-		info.func = OnClick
-		info.checked = (WhoFrame:GetSortValue() == 2)
-		UIDropDownMenu_AddButton(info)
-
-		info.text = RACE
-		info.value = 3
-		info.arg1 = 3
-		info.func = OnClick
-		info.checked = (WhoFrame:GetSortValue() == 3)
-		UIDropDownMenu_AddButton(info)
-	end)
+	if BFL.InitializeDropdown then
+		BFL.InitializeDropdown(dropdown, options, IsSelected, SelectValue)
+	end
 
 	ApplyClassicColumnDropdownVisualWidth(dropdown, dropdown.BFL_ClassicColumnLogicalWidth)
-	UIDropDownMenu_SetSelectedValue(dropdown, 1)
+	if BFL.SetDropdownSelectedValue then
+		BFL.SetDropdownSelectedValue(dropdown, WhoFrame:GetSortValue())
+	end
 	local isClassicElvUISkinActive = BFL.IsClassic and BFL.IsThemeActive and BFL:IsThemeActive("elvui")
 	if not isClassicElvUISkinActive then
 		return
@@ -1165,7 +1169,7 @@ function WhoFrame:Update(forceRebuild)
 	end
 
 	-- Classic: Check if using Classic mode
-	local isClassicMode = BFL.IsClassic or not BFL.HasModernScrollBox
+	local isClassicMode = not BFL.HasModernScrollBox
 
 	-- Retail: Check if DataProvider exists
 	if not isClassicMode and not whoDataProvider then
@@ -1427,7 +1431,7 @@ function WhoFrame:SortByColumn(sortType, preserveDirection)
 				fontObject = fontObj,
 			})
 		end
-	elseif self.classicWhoFrame or (BFL.IsClassic or not BFL.HasModernScrollBox) then
+	elseif self.classicWhoFrame or not BFL.HasModernScrollBox then
 		-- Classic Mode Support
 		self.classicWhoDataList = {}
 		local fontObj = "BetterFriendlistFontNormalSmall"
@@ -1911,7 +1915,20 @@ function WhoFrameEditBoxMixin:OnLoad()
 
 	-- Set up search icon
 	if self.searchIcon then
-		self.searchIcon:SetAtlas("glues-characterSelect-icon-search", TextureKitConstants.IgnoreAtlasSize)
+		if BFL.SetTextureOrAtlas then
+			local ignoreAtlasSize = true
+			if TextureKitConstants and TextureKitConstants.IgnoreAtlasSize ~= nil then
+				ignoreAtlasSize = TextureKitConstants.IgnoreAtlasSize
+			end
+			BFL.SetTextureOrAtlas(
+				self.searchIcon,
+				"glues-characterSelect-icon-search",
+				"Interface\\AddOns\\BetterFriendlist\\Icons\\search",
+				ignoreAtlasSize
+			)
+		else
+			self.searchIcon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\search")
+		end
 	end
 
 	-- Instructions are already configured by SearchBoxTemplate via KeyValues
@@ -2006,55 +2023,61 @@ function WhoFrameColumnDropdownMixin:OnLoad()
 		self.Arrow:SetPoint("RIGHT", self, -1, -2)
 	end
 
-	-- CRITICAL: Set selection translator BEFORE SetupMenu
-	self:SetSelectionTranslator(function(selection)
-		-- selection.data contains {value, sortType}
-		local selectionTexts = { ZONE, GUILD, RACE }
-		return selectionTexts[selection.data.value] or ZONE
-	end)
+	BFL.InitializeDropdown(self, {
+		getSelectionText = function(data)
+			data = data or {}
+			-- data contains {value, sortType}
+			local selectionTexts = { ZONE, GUILD, RACE }
+			return selectionTexts[data.value] or ZONE
+		end,
+		populateRootDescription = function(rootDescription)
+			rootDescription:SetTag("MENU_WHO_COLUMN")
 
-	-- Setup menu generator
-	self:SetupMenu(function(dropdown, rootDescription)
-		rootDescription:SetTag("MENU_WHO_COLUMN")
-
-		-- Create radio group for column selection
-		local function IsSelected(data)
-			return WhoFrame:GetSortValue() == data.value
-		end
-
-		local function SetSelected(data)
-			WhoFrame:SetSortValue(data.value)
-
-			-- Force dropdown to update its text immediately
-			self:GenerateMenu()
-
-			-- Update the Who list after changing sort
-			-- CRITICAL: Must force rebuild because data count hasn't changed,
-			-- but the displayed content (Variable column) has changed!
-			if WhoFrame and WhoFrame.Update then
-				WhoFrame:Update(true)
-			elseif _G.BetterWhoFrame_Update then
-				_G.BetterWhoFrame_Update(true)
+			-- Create radio group for column selection
+			local function IsSelected(data)
+				return WhoFrame:GetSortValue() == data.value
 			end
-		end
 
-		local function CreateRadio(text, value, sortType)
-			local radio = rootDescription:CreateButton(text, function() end, { value = value, sortType = sortType })
-			radio:SetIsSelected(IsSelected)
-			radio:SetResponder(SetSelected)
-			radio:AddInitializer(function(button, description, menu)
-				-- Ensure dropdown items use the correct font
-				local fontString = button.fontString or button.Text
-				if fontString then
-					fontString:SetFontObject("BetterFriendlistFontNormalSmall")
+			local function SetSelected(data)
+				WhoFrame:SetSortValue(data.value)
+
+				-- Force dropdown to update its text immediately
+				if self.GenerateMenu then
+					self:GenerateMenu()
 				end
-			end)
-		end
 
-		CreateRadio(ZONE, 1, "zone")
-		CreateRadio(GUILD, 2, "guild")
-		CreateRadio(RACE, 3, "race")
-	end)
+				-- Update the Who list after changing sort
+				-- CRITICAL: Must force rebuild because data count hasn't changed,
+				-- but the displayed content (Variable column) has changed!
+				if WhoFrame and WhoFrame.Update then
+					WhoFrame:Update(true)
+				elseif _G.BetterWhoFrame_Update then
+					_G.BetterWhoFrame_Update(true)
+				end
+			end
+
+			local function CreateRadio(text, value, sortType)
+				local radio = rootDescription:CreateButton(text, function() end, { value = value, sortType = sortType })
+				radio:SetIsSelected(IsSelected)
+				radio:SetResponder(SetSelected)
+				radio:AddInitializer(function(button, description, menu)
+					-- Ensure dropdown items use the correct font
+					local fontString = button.fontString or button.Text
+					if fontString then
+						fontString:SetFontObject("BetterFriendlistFontNormalSmall")
+					end
+				end)
+			end
+
+			CreateRadio(ZONE, 1, "zone")
+			CreateRadio(GUILD, 2, "guild")
+			CreateRadio(RACE, 3, "race")
+		end,
+	}, nil, nil)
+
+	if self.GenerateMenu then
+		self:GenerateMenu()
+	end
 end
 
 -- Export mixins globally for XML access
@@ -2883,10 +2906,11 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 		end
 
 		local width = GetBuilderFieldWidth()
-		if BFL.HasModernDropdown and dropdown.SetWidth then
+		local isModernDropdown = IsModernDropdown(dropdown)
+		if isModernDropdown and dropdown.SetWidth then
 			dropdown:SetWidth(width)
-		elseif UIDropDownMenu_SetWidth then
-			UIDropDownMenu_SetWidth(dropdown, width)
+		elseif BFL.SetDropdownWidth then
+			BFL.SetDropdownWidth(dropdown, width)
 		end
 	end
 
@@ -2968,8 +2992,10 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	self.builder.selectedClass = "" -- "" = All
 	self.builder.selectedRace = "" -- "" = All (pre-declare for cross-reference)
 
-	local classDropdown = BFL.CreateDropdown(flyout, nil, 140)
-	if BFL.HasModernDropdown then
+	local useModernBuilderDropdowns = BFL.CanCreateModernDropdown and BFL.CanCreateModernDropdown()
+
+	local classDropdown = BFL.CreateDropdown(flyout, nil, 140, useModernBuilderDropdowns)
+	if IsModernDropdown(classDropdown) then
 		classDropdown:SetPoint("LEFT", classLabel, "RIGHT", fieldGap, 0)
 	else
 		classDropdown:SetPoint("LEFT", classLabel, "RIGHT", -14, -2)
@@ -3033,8 +3059,8 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	raceLabel:SetJustifyH("LEFT")
 	raceLabel:SetText((L.WHO_BUILDER_RACE or "Race") .. ":")
 
-	local raceDropdown = BFL.CreateDropdown(flyout, nil, 140)
-	if BFL.HasModernDropdown then
+	local raceDropdown = BFL.CreateDropdown(flyout, nil, 140, useModernBuilderDropdowns)
+	if IsModernDropdown(raceDropdown) then
 		raceDropdown:SetPoint("LEFT", raceLabel, "RIGHT", fieldGap, 0)
 	else
 		raceDropdown:SetPoint("LEFT", raceLabel, "RIGHT", -14, -2)

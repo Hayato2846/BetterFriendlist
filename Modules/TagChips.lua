@@ -253,68 +253,8 @@ local function Chip_OnLeave()
 	end
 end
 
-local function ResetTexCoord(texture)
-	if texture and texture.SetTexCoord then
-		texture:SetTexCoord(0, 1, 0, 1)
-	end
-end
-
-local function ApplyTexCoord(texture, texCoord)
-	if texture and texture.SetTexCoord and type(texCoord) == "table" then
-		texture:SetTexCoord(
-			tonumber(texCoord[1]) or 0,
-			tonumber(texCoord[2]) or 1,
-			tonumber(texCoord[3]) or 0,
-			tonumber(texCoord[4]) or 1
-		)
-	end
-end
-
-local function TrySetAtlas(texture, atlas)
-	if not (texture and texture.SetAtlas and atlas and atlas ~= "") then
-		return false
-	end
-	local width = texture.GetWidth and texture:GetWidth() or nil
-	local height = texture.GetHeight and texture:GetHeight() or nil
-	ResetTexCoord(texture)
-	local ok = pcall(texture.SetAtlas, texture, atlas, false)
-	if ok then
-		if width and height and width > 0 and height > 0 and texture.SetSize then
-			texture:SetSize(width, height)
-		end
-		texture:Show()
-		return true
-	end
-	return false
-end
-
 local function ApplyIcon(texture, profile)
-	if not texture then
-		return false
-	end
-	profile = type(profile) == "table" and profile or {}
-	local iconType = profile.iconType
-	local iconValue = profile.iconValue or profile.icon
-	if not iconValue or iconValue == "" then
-		texture:Hide()
-		return false
-	end
-	if iconType == "atlas" then
-		if TrySetAtlas(texture, iconValue) or TrySetAtlas(texture, profile.atlas) or TrySetAtlas(texture, profile.fallbackAtlas) then
-			return true
-		end
-	end
-
-	local texturePath = profile.texture or profile.icon or (iconType ~= "atlas" and iconValue) or nil
-	if not texturePath or texturePath == "" then
-		texture:Hide()
-		return false
-	end
-	ResetTexCoord(texture)
-	texture:SetTexture(texturePath)
-	ApplyTexCoord(texture, profile.texCoord)
-	texture:Show()
-	return true
+	return BFL.ApplyIconProfile and BFL.ApplyIconProfile(texture, profile) or false
 end
 
 local function SetChipTooltip(chip, tag, overflowTags)
