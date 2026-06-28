@@ -974,6 +974,15 @@ function GuildFrame:GetSortLabel(mode)
 	return RANK or "Rank"
 end
 
+function GuildFrame:GetFilterLabel(mode)
+	for _, option in ipairs(GetFilterOptions()) do
+		if option.value == mode then
+			return option.text
+		end
+	end
+	return FRIENDS_LIST_ONLINE or "Online"
+end
+
 local function IsModernDropdown(dropdown)
 	return BFL.IsModernDropdown and BFL.IsModernDropdown(dropdown)
 end
@@ -1065,12 +1074,7 @@ function GuildFrame:RefreshFilterDropdown()
 	if not dropdown then
 		return
 	end
-	local actions = GetGuildActions()
-	local text = actions and actions.GetFilterLabel and actions:GetFilterLabel(self.filterMode)
-		or (self.filterMode == FILTER_ALL and (ALL or "All"))
-		or (self.filterMode == FILTER_OFFLINE and (FRIENDS_LIST_OFFLINE or "Offline"))
-		or (FRIENDS_LIST_ONLINE or "Online")
-	SetDropdownText(dropdown, text)
+	SetDropdownText(dropdown, self:GetFilterLabel(self.filterMode))
 	RefreshModernDropdown(dropdown)
 end
 
