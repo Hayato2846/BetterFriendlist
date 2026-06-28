@@ -23,9 +23,12 @@
 
 ## Validation
 
-- For runtime, TOC, XML, locale, package, or deploy-tooling changes, run `tools\BFL-PackageCheck.ps1` and deploy a fresh `CleanCopy` before handing back.
+- For normal handoff, PR readiness, or "ready for QA" checks, run `tools\BFL-ReadyForQA.ps1`; pass `-DeployClient retail` for ordinary runtime QA and `-DeployClient all` when cross-flavor loading, TOC/XML, compatibility code, settings runtime, or release packaging changed.
+- For narrow tooling, ignore, package, or release metadata checks, `tools\BFL-PackageCheck.ps1` remains the focused package guard.
+- Use `tools\BFL-PreCommitDelta.ps1` to compare current pre-commit warnings against the checked-in baseline. Update that baseline with `-UpdateBaseline` only when intentionally accepting or removing known warning signatures.
+- For runtime, TOC, XML, locale, package, or deploy-tooling changes, deploy a fresh `CleanCopy` before handing back unless the user explicitly says not to deploy.
 - Deploy to Retail for ordinary runtime changes. Deploy to all clients when TOC/XML, package metadata, compatibility code, or release packaging changes.
-- Use `tools\BFL-ReviewCheck.ps1` before opening or refreshing a PR.
+- Use `tools\BFL-ReviewCheck.ps1` for focused review diagnostics when the full ready-for-QA flow is too broad.
 - Keep `.pkgmeta` aligned with ignored internal files so release packages do not include Codex, docs, tools, logs, backups, or workspace metadata.
 
 ## VSCode And Codex

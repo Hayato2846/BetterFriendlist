@@ -47,10 +47,12 @@ If the request is vague, ask the smallest useful clarification or state the work
 
 Choose the smallest validation set that matches risk:
 
-- Tooling, ignore, packaging, or release metadata: run `tools\BFL-PackageCheck.ps1`.
-- Runtime Lua/XML/locales/settings/package changes: run `tools\BFL-PackageCheck.ps1`, then deploy with `tools\BFL-Deploy.ps1 -Mode CleanCopy`.
-- Cross-flavor loading, TOC/XML, compatibility, settings runtime, or packaging changes: deploy with `-Client all`.
-- PR-ready work: run `tools\BFL-ReviewCheck.ps1`.
+- Normal handoff, PR readiness, or "ready for QA": run `tools\BFL-ReadyForQA.ps1`.
+- Runtime Lua/XML/locales/settings/package changes: run `tools\BFL-ReadyForQA.ps1 -DeployClient retail`.
+- Cross-flavor loading, TOC/XML, compatibility, settings runtime, or packaging changes: run `tools\BFL-ReadyForQA.ps1 -DeployClient all`.
+- Tooling, ignore, packaging, or release metadata only: run `tools\BFL-PackageCheck.ps1`, or the full ready-for-QA flow when the change affects handoff confidence.
+- Pre-commit warning noise: run `tools\BFL-PreCommitDelta.ps1` and treat new warning signatures as regressions. Use `tools\BFL-PreCommitDelta.ps1 -UpdateBaseline` only when intentionally accepting a changed warning baseline.
+- Focused review diagnostics: run `tools\BFL-ReviewCheck.ps1` when the full ready-for-QA flow is too broad.
 - Performance investigations: keep Perfy instrumentation separate and clean it with `tools\BFL-PerfyCleanup.ps1`; do not run `git restore .` as cleanup.
 - Broad or risky changes: inspect `git diff --stat`, review changed files for common BFL bug traps, and run the filtered pre-commit check once.
 
