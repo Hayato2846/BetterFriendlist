@@ -450,7 +450,7 @@ function BFL:ApplyTabFonts()
 			end
 		end
 
-		local isClassicElvUISkinActive = BFL.IsThemeActive and BFL:IsThemeActive("elvui")
+		local isClassicElvUISkinActive = BFL.IsElvUISkinActive and BFL:IsElvUISkinActive()
 		if isClassicElvUISkinActive and BetterFriendsFrame then
 			local frameWidth = BetterFriendsFrame:GetWidth()
 			if not frameWidth or frameWidth <= 0 then
@@ -563,7 +563,7 @@ function BFL:ApplyTabFonts()
 		or 0
 	local selectedBottomTabId = frame and PanelTemplates_GetSelectedTab(frame) or 0
 	local isFlatThemeActive = BFL.UsesFlatTheme and BFL:UsesFlatTheme()
-	local isElvUISkinActive = BFL.IsThemeActive and BFL:IsThemeActive("elvui")
+	local isElvUISkinActive = BFL.IsElvUISkinActive and BFL:IsElvUISkinActive()
 	local shouldCenterTopTabs = isElvUISkinActive or isFlatThemeActive
 	local selectedTopLayoutId = shouldCenterTopTabs and 0 or selectedTopTabId
 	local selectedBottomLayoutId = isFlatThemeActive and 0 or selectedBottomTabId
@@ -5255,8 +5255,8 @@ function BetterFriendsFrame_ShowContactsMenu(button)
 		local simpleMode = DB and DB:Get("simpleMode", false) or false
 		local isElvUIActive = BFL.IsClassic
 			and _G.ElvUI
-			and BFL.IsThemeActive
-			and BFL:IsThemeActive("elvui")
+			and BFL.IsElvUISkinActive
+			and BFL:IsElvUISkinActive()
 		if simpleMode or isElvUIActive then
 			local changelogText = L.MENU_CHANGELOG or "Changelog"
 			local Changelog = BFL:GetModule("Changelog")

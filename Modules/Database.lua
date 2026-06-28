@@ -401,7 +401,7 @@ function DB:NormalizeThemeSetting()
 		return
 	end
 
-	if BetterFriendlistDB.theme == nil then
+	if BetterFriendlistDB.theme == nil or (BetterFriendlistDB.theme == "blizzard" and BetterFriendlistDB.enableElvUISkin == true) then
 		BetterFriendlistDB.theme = BetterFriendlistDB.enableElvUISkin == true and "elvui" or "blizzard"
 	end
 
@@ -409,15 +409,15 @@ function DB:NormalizeThemeSetting()
 		BetterFriendlistDB.theme = "blizzard"
 	end
 
-	local wasDarkSkinTheme = BetterFriendlistDB.theme == "dark" or BetterFriendlistDB.theme == "custom"
-	local themeFeaturesEnabled = BFL.IsRetail == true and BetterFriendlistDB.enableBetaFeatures == true
-	if wasDarkSkinTheme and not themeFeaturesEnabled then
-		BetterFriendlistDB.theme = "blizzard"
-	end
-
+	-- Dark and Custom themes are standard features now.
+	-- Keep stored selections intact regardless of enableBetaFeatures.
+	-- Legacy ElvUI preference migration is handled above.
+	-- Do not normalize non-ElvUI themes based on Beta Features.
+	-- Runtime fallback still handles unavailable addon-backed themes.
+	-- Per-theme palette data is normalized separately below.
 	if BetterFriendlistDB.theme == "elvui" then
 		BetterFriendlistDB.enableElvUISkin = true
-	elseif BetterFriendlistDB.theme == "dark" or BetterFriendlistDB.theme == "custom" or wasDarkSkinTheme then
+	elseif BetterFriendlistDB.theme == "dark" or BetterFriendlistDB.theme == "custom" then
 		BetterFriendlistDB.enableElvUISkin = false
 	elseif BetterFriendlistDB.enableElvUISkin == nil then
 		BetterFriendlistDB.enableElvUISkin = false

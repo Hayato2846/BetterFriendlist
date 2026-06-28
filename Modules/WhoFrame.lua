@@ -114,7 +114,7 @@ local cachedFontHeight = nil
 local cachedExtent = nil
 
 local function GetClassicColumnDropdownVisualWidth()
-	local isClassicElvUISkinActive = BFL.IsClassic and BFL.IsThemeActive and BFL:IsThemeActive("elvui")
+	local isClassicElvUISkinActive = BFL.IsClassic and BFL.IsElvUISkinActive and BFL:IsElvUISkinActive()
 	return isClassicElvUISkinActive and WHO_CLASSIC_ELVUI_DROPDOWN_VISUAL_WIDTH or WHO_CLASSIC_DROPDOWN_VISUAL_WIDTH
 end
 
@@ -264,7 +264,7 @@ function WhoFrame:UpdateResponsiveLayout()
 
 	-- Apply minimum widths
 	nameWidth = math.max(nameWidth, 80)
-	local isClassicElvUISkinActive = BFL.IsClassic and BFL.IsThemeActive and BFL:IsThemeActive("elvui")
+	local isClassicElvUISkinActive = BFL.IsClassic and BFL.IsElvUISkinActive and BFL:IsElvUISkinActive()
 	local minColumnWidth = isClassicElvUISkinActive and 110 or 70
 	columnWidth = math.max(columnWidth, minColumnWidth)
 	levelWidth = math.max(levelWidth, 28)
@@ -667,7 +667,7 @@ function WhoFrame:InitializeClassicDropdown(dropdown)
 	if BFL.SetDropdownSelectedValue then
 		BFL.SetDropdownSelectedValue(dropdown, WhoFrame:GetSortValue())
 	end
-	local isClassicElvUISkinActive = BFL.IsClassic and BFL.IsThemeActive and BFL:IsThemeActive("elvui")
+	local isClassicElvUISkinActive = BFL.IsClassic and BFL.IsElvUISkinActive and BFL:IsElvUISkinActive()
 	if not isClassicElvUISkinActive then
 		return
 	end

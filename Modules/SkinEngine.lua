@@ -22,7 +22,9 @@ local SCROLLBAR_TRACK_INSETS = { left = 1, right = 1, top = 0, bottom = 0 }
 local ARROW_BUTTON_INSETS = { left = 3, right = 3, top = -3, bottom = 3 }
 local SLIDER_STEPPER_INSETS = { left = 2, right = 2, top = 0, bottom = 0 }
 local TAB_BUTTON_OPTS = { variant = "tab", insets = ZERO_INSETS }
+local CLASSIC_TAB_BUTTON_OPTS = { variant = "tab", insets = { left = 4, right = 4, top = -2, bottom = 3 } }
 local NAV_BUTTON_OPTS = { variant = "nav", keepFontColor = true, insets = ZERO_INSETS }
+local CLASSIC_DROPDOWN_TEXT_OFFSET_X = -7
 
 local function ApplyDefaultSlugToFontString(fontString)
 	if BFL.FontManager and BFL.FontManager.ApplyDefaultSlugToFontString then
@@ -855,6 +857,32 @@ function SkinEngine:SetRegionPoints(frame, region, points)
 	for _, point in ipairs(points or {}) do
 		ApplyStoredPoint(region, point)
 	end
+end
+
+function SkinEngine:OffsetRegionPoints(frame, region, xOffset, yOffset)
+	if not region or not region.GetNumPoints or not region.GetPoint then
+		return
+	end
+
+	local state = self:GetState(frame)
+	if state and not state.regionPoints[region] then
+		self:RememberRegionPoints(frame, region)
+	end
+
+	local basePoints = state and state.regionPoints[region]
+	local points = {}
+	if basePoints and #basePoints > 0 then
+		for i, point in ipairs(basePoints) do
+			points[i] = { point[1], point[2], point[3], (point[4] or 0) + (xOffset or 0), (point[5] or 0) + (yOffset or 0) }
+		end
+	else
+		for i = 1, region:GetNumPoints() do
+			local point, relativeTo, relativePoint, xOfs, yOfs = region:GetPoint(i)
+			points[i] = { point, relativeTo, relativePoint, (xOfs or 0) + (xOffset or 0), (yOfs or 0) + (yOffset or 0) }
+		end
+	end
+
+	self:SetRegionPoints(frame, region, points)
 end
 
 function SkinEngine:RememberRegionSize(frame, region)
@@ -2039,7 +2067,7 @@ function SkinEngine:SkinTab(tab)
 	end
 
 	tab.BFL_DarkTabButton = true
-	self:SkinButton(tab, TAB_BUTTON_OPTS)
+	self:SkinButton(tab, BFL.IsClassic and CLASSIC_TAB_BUTTON_OPTS or TAB_BUTTON_OPTS)
 	if not tab.BFL_DarkTabSkinned then
 		tab.BFL_DarkTabSkinned = true
 		self:DampenRegions(tab, 0)
@@ -2688,6 +2716,9 @@ function SkinEngine:SkinDropdown(dropdown)
 		local text = _G[name .. "Text"]
 		if text then
 			self:SetFontColor(dropdown, text, 0.92, 0.92, 0.92, 1)
+			if BFL.IsClassic then
+				self:OffsetRegionPoints(dropdown, text, CLASSIC_DROPDOWN_TEXT_OFFSET_X, 0)
+			end
 		end
 	end
 
@@ -2703,6 +2734,9 @@ function SkinEngine:SkinDropdown(dropdown)
 
 	if dropdown.Text then
 		self:SetFontColor(dropdown, dropdown.Text, 0.92, 0.92, 0.92, 1)
+		if BFL.IsClassic then
+			self:OffsetRegionPoints(dropdown, dropdown.Text, CLASSIC_DROPDOWN_TEXT_OFFSET_X, 0)
+		end
 	end
 
 end

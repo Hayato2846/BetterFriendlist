@@ -9,8 +9,215 @@ local ElvUISkin = BFL:RegisterModule("ElvUISkin", {})
 
 local WHO_CLASSIC_DROPDOWN_X_OFFSET = -12
 local WHO_CLASSIC_ELVUI_DROPDOWN_VISUAL_WIDTH = 106
+local ELVUI_CLASSIC_STATUS_DROPDOWN_WIDTH = 57
+local ELVUI_CLASSIC_MAIN_DROPDOWN_TEXT_Y_OFFSET = 0
+local ELVUI_CLASSIC_WHO_COLUMN_DROPDOWN_Y_OFFSET = 2
 
 local IsModernDropdown = BFL.IsModernDropdown
+local classicDropdownSelectedValueFixes = setmetatable({}, { __mode = "k" })
+local classicDropdownTextHookInstalled = false
+
+local function GetTexturePathFromMarkup(text)
+	if type(text) ~= "string" then
+		return nil
+	end
+	return text:match("|T([^:|]+)")
+end
+
+local function NormalizeClassicDropdownTextureMarkup(text)
+	if type(text) ~= "string" then
+		return text
+	end
+	return text:gsub(":14:14:%-2:%-2", ":14:14:0:0")
+end
+
+local function GetClassicDropdownTextRegion(dropdown)
+	if not dropdown then
+		return nil
+	end
+
+	if dropdown.Text and dropdown.Text.SetText then
+		return dropdown.Text
+	end
+	if dropdown.TextRegion and dropdown.TextRegion.SetText then
+		return dropdown.TextRegion
+	end
+	if dropdown.SelectionText and dropdown.SelectionText.SetText then
+		return dropdown.SelectionText
+	end
+	if dropdown.GetFontString then
+		local fontString = dropdown:GetFontString()
+		if fontString and fontString.SetText then
+			return fontString
+		end
+	end
+
+	local ddName = dropdown.GetName and dropdown:GetName()
+	return ddName and _G[ddName .. "Text"] or nil
+end
+
+local function GetClassicDropdownButtonRegion(dropdown)
+	if not dropdown then
+		return nil
+	end
+	if dropdown.Button then
+		return dropdown.Button
+	end
+
+	local ddName = dropdown.GetName and dropdown:GetName()
+	return ddName and (_G[ddName .. "Button"] or _G[ddName .. "_Button"]) or nil
+end
+
+local function SetClassicDropdownSelectedIcon(dropdown, texturePath, xOffset, yOffset)
+	if not (dropdown and texturePath) then
+		return nil
+	end
+
+	local icon = dropdown.BFL_ClassicSelectedValueIcon
+	if not icon then
+		icon = dropdown:CreateTexture(nil, "OVERLAY")
+		dropdown.BFL_ClassicSelectedValueIcon = icon
+	end
+
+	icon:SetTexture(texturePath)
+	icon:SetSize(14, 14)
+	icon:ClearAllPoints()
+	icon:SetPoint("CENTER", dropdown, "CENTER", xOffset or -8, yOffset or 0)
+	icon:Show()
+	return icon
+end
+
+local function ApplyClassicDropdownSelectedValueFix(dropdown)
+	local config = classicDropdownSelectedValueFixes[dropdown]
+	if not config then
+		return
+	end
+
+	local text = GetClassicDropdownTextRegion(dropdown)
+	if not text then
+		return
+	end
+
+	if config.normalizeTextureMarkup and text.GetText and text.SetText then
+		text:SetText(NormalizeClassicDropdownTextureMarkup(text:GetText()))
+	end
+
+	if config.iconOnlySelectedValue and text.GetText and text.SetText then
+		local currentText = text:GetText()
+		local texturePath = GetTexturePathFromMarkup(currentText)
+		if texturePath then
+			dropdown.BFL_ClassicSelectedValueIconPath = texturePath
+			SetClassicDropdownSelectedIcon(dropdown, texturePath, config.iconXOffset, config.iconYOffset)
+			text:SetText("")
+			if text.SetAlpha then
+				text:SetAlpha(0)
+			end
+			return
+		elseif dropdown.BFL_ClassicSelectedValueIconPath and (currentText == nil or currentText == "") then
+			SetClassicDropdownSelectedIcon(
+				dropdown,
+				dropdown.BFL_ClassicSelectedValueIconPath,
+				config.iconXOffset,
+				config.iconYOffset
+			)
+			if text.SetAlpha then
+				text:SetAlpha(0)
+			end
+			return
+		end
+	end
+
+	if dropdown.BFL_ClassicSelectedValueIcon then
+		dropdown.BFL_ClassicSelectedValueIcon:Hide()
+	end
+	dropdown.BFL_ClassicSelectedValueIconPath = nil
+	if text.SetAlpha then
+		text:SetAlpha(1)
+	end
+
+	local yOffset = config.textYOffset or 0
+	text:ClearAllPoints()
+	if config.centerSelectedValue then
+		local textWidth = math.max((dropdown.BFL_ClassicDropdownWidth or dropdown:GetWidth() or 50) - 20, 1)
+		local textHeight = dropdown.BFL_ClassicDropdownHeight or dropdown:GetHeight() or 24
+		if text.SetSize then
+			text:SetSize(textWidth, textHeight)
+		end
+		text:SetPoint("CENTER", dropdown, "CENTER", -10, yOffset)
+		text:SetJustifyH("CENTER")
+		if text.SetJustifyV then
+			text:SetJustifyV("MIDDLE")
+		end
+	else
+		local button = GetClassicDropdownButtonRegion(dropdown)
+		text:SetPoint("LEFT", dropdown, "LEFT", 8, yOffset)
+		if button then
+			text:SetPoint("RIGHT", button, "RIGHT", -20, yOffset)
+		else
+			text:SetPoint("RIGHT", dropdown, "RIGHT", -20, yOffset)
+		end
+		text:SetJustifyH("LEFT")
+	end
+	text:SetWordWrap(false)
+end
+
+local function ScheduleClassicDropdownSelectedValueFix(dropdown)
+	ApplyClassicDropdownSelectedValueFix(dropdown)
+	if C_Timer and C_Timer.After then
+		C_Timer.After(0, function()
+			ApplyClassicDropdownSelectedValueFix(dropdown)
+		end)
+	end
+end
+
+local function RegisterClassicDropdownSelectedValueFix(dropdown)
+	if not (dropdown and BFL and BFL.IsClassic) then
+		return
+	end
+
+	classicDropdownSelectedValueFixes[dropdown] = {
+		centerSelectedValue = true,
+		iconOnlySelectedValue = true,
+		iconXOffset = -8,
+		iconYOffset = 0,
+		normalizeTextureMarkup = true,
+		textYOffset = 0,
+	}
+	ScheduleClassicDropdownSelectedValueFix(dropdown)
+
+	if not classicDropdownTextHookInstalled and hooksecurefunc and BFL.SetDropdownText then
+		classicDropdownTextHookInstalled = true
+		hooksecurefunc(BFL, "SetDropdownText", function(updatedDropdown)
+			ScheduleClassicDropdownSelectedValueFix(updatedDropdown)
+		end)
+	end
+
+	if not dropdown.BFL_ClassicSelectedValueHookInstalled then
+		dropdown.BFL_ClassicSelectedValueHookInstalled = true
+		if dropdown.HookScript then
+			dropdown:HookScript("OnShow", function(self)
+				ScheduleClassicDropdownSelectedValueFix(self)
+			end)
+		end
+		if hooksecurefunc then
+			if dropdown.SetText then
+				hooksecurefunc(dropdown, "SetText", function(self)
+					ScheduleClassicDropdownSelectedValueFix(self)
+				end)
+			end
+			if dropdown.Update then
+				hooksecurefunc(dropdown, "Update", function(self)
+					ScheduleClassicDropdownSelectedValueFix(self)
+				end)
+			end
+			if dropdown.GenerateMenu then
+				hooksecurefunc(dropdown, "GenerateMenu", function(self)
+					ScheduleClassicDropdownSelectedValueFix(self)
+				end)
+			end
+		end
+	end
+end
 
 -- Helper to handle scrollbars across Retail and Classic
 local function SkinScrollBar(S, scrollBar)
@@ -42,9 +249,45 @@ local function SkinScrollBar(S, scrollBar)
 	end
 end
 
+local function GetWhoScrollBar(whoFrame)
+	if not whoFrame then
+		return nil
+	end
+	if whoFrame.ScrollBar then
+		return whoFrame.ScrollBar
+	end
+	if whoFrame.ClassicScrollBar then
+		return whoFrame.ClassicScrollBar
+	end
+	if whoFrame.ScrollFrame and whoFrame.ScrollFrame.ScrollBar then
+		return whoFrame.ScrollFrame.ScrollBar
+	end
+	if whoFrame.ScrollFrame and whoFrame.ScrollFrame.GetName then
+		return _G[whoFrame.ScrollFrame:GetName() .. "ScrollBar"]
+	end
+	return _G.BetterWhoScrollBar
+end
+
+local function ApplyWhoColumnDropdownAlignment(whoFrame)
+	if not (BFL and BFL.IsClassic and whoFrame and whoFrame.ColumnDropdown and whoFrame.NameHeader) then
+		return
+	end
+
+	local modernDropdown = IsModernDropdown(whoFrame.ColumnDropdown)
+	local dropdownOffset = (not modernDropdown) and WHO_CLASSIC_DROPDOWN_X_OFFSET or 0
+	whoFrame.ColumnDropdown:ClearAllPoints()
+	whoFrame.ColumnDropdown:SetPoint(
+		"TOPLEFT",
+		whoFrame.NameHeader,
+		"TOPRIGHT",
+		-1 + dropdownOffset,
+		ELVUI_CLASSIC_WHO_COLUMN_DROPDOWN_Y_OFFSET
+	)
+end
+
 -- Normalize Classic dropdown hitbox/geometry after ElvUI skinning.
 -- Without this, the clickable region can drift outside the visual box.
-local function FixClassicDropdownHitbox(dropdown, width, height)
+local function FixClassicDropdownHitbox(dropdown, width, height, textYOffset)
 	if not (BFL and BFL.IsClassic and dropdown) then
 		return
 	end
@@ -55,9 +298,13 @@ local function FixClassicDropdownHitbox(dropdown, width, height)
 	if height then
 		dropdown.BFL_ClassicDropdownHeight = height
 	end
+	if textYOffset ~= nil then
+		dropdown.BFL_ClassicDropdownTextYOffset = textYOffset
+	end
 
 	local targetWidth = dropdown.BFL_ClassicDropdownWidth
 	local targetHeight = dropdown.BFL_ClassicDropdownHeight
+	local targetTextYOffset = dropdown.BFL_ClassicDropdownTextYOffset or 0
 
 	if targetWidth and IsModernDropdown(dropdown) and dropdown.SetWidth then
 		dropdown:SetWidth(targetWidth)
@@ -88,11 +335,15 @@ local function FixClassicDropdownHitbox(dropdown, width, height)
 	end
 
 	if text and button then
-		text:ClearAllPoints()
-		text:SetPoint("LEFT", dropdown, "LEFT", 8, 0)
-		text:SetPoint("RIGHT", button, "RIGHT", -20, 0)
-		text:SetJustifyH("LEFT")
-		text:SetWordWrap(false)
+		if classicDropdownSelectedValueFixes[dropdown] then
+			ApplyClassicDropdownSelectedValueFix(dropdown)
+		else
+			text:ClearAllPoints()
+			text:SetPoint("LEFT", dropdown, "LEFT", 8, targetTextYOffset)
+			text:SetPoint("RIGHT", button, "RIGHT", -20, targetTextYOffset)
+			text:SetJustifyH("LEFT")
+			text:SetWordWrap(false)
+		end
 	end
 
 	if not dropdown.BFL_ClassicDropdownHookInstalled then
@@ -207,12 +458,12 @@ function ElvUISkin:RegisterSkin()
 		return false
 	end
 
-	local isEnabled = BFL.IsThemeActive and BFL:IsThemeActive("elvui")
+	local isEnabled = self:IsSkinEnabled()
 	if not isEnabled then
 		-- BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Skin disabled in theme settings")
 		return
 	end
-
+	self:InstallClassicPortraitGuard()
 	-- BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Registering skin...")
 	local RealS = E:GetModule("Skins")
 	if not RealS then
@@ -253,10 +504,10 @@ function ElvUISkin:RegisterSkin()
 		end,
 	})
 
-	-- Register callback for skinning
-	-- This ensures our skin runs when ElvUI skins are applied
-	-- Try both typical addon names to be safe
-	if S.AddCallbackForAddon then
+	-- Register callback once; ThemeManager may re-apply after theme changes.
+	-- The callback itself still covers ElvUI's normal addon skin pass.
+	if S.AddCallbackForAddon and not self.ElvUICallbackRegistered then
+		self.ElvUICallbackRegistered = true
 		S:AddCallbackForAddon("BetterFriendlist", "BetterFriendlist", function()
 			-- BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Callback triggered")
 			xpcall(function()
@@ -283,6 +534,7 @@ function ElvUISkin:RegisterSkin()
 end
 
 function ElvUISkin:SkinFrames(E, S)
+	if not self:IsSkinEnabled() then self:HideClassicMainFrameShell(); return end
 	local SettingsDesigner = BFL:GetModule("SettingsDesigner")
 	if SettingsDesigner and SettingsDesigner.ApplyElvUISkin then
 		SettingsDesigner:ApplyElvUISkin(E, S)
@@ -327,7 +579,7 @@ function ElvUISkin:SkinFrames(E, S)
 
 	-- BFL:DebugPrint("ElvUISkin: SkinFrames started")
 	local frame = _G.BetterFriendsFrame
-
+	self:SkinClassicMainFrameShell(E, S, frame)
 	-- Skin Main Frame
 	-- BFL:DebugPrint("ElvUISkin: Skinning Main Frame")
 	if frame.PortraitContainer or frame.portrait then
@@ -337,15 +589,14 @@ function ElvUISkin:SkinFrames(E, S)
 			S:HandlePortraitFrame(frame)
 		end)
 	end
-
+	local portraitButton, shouldSkinPortrait = frame.PortraitButton, frame.PortraitButton ~= nil
 	-- Skin Portrait Button (Changelog)
-	if frame.PortraitButton then
+	if portraitButton then
 		-- BFL:DebugPrint("ElvUISkin: Skinning PortraitButton")
-		local button = frame.PortraitButton
+		local button = portraitButton
 
 		-- Classic: Hide portrait when ElvUI active and NOT in Simple Mode
 		-- (Changelog will be accessible via Contacts Menu instead)
-		local shouldSkinPortrait = true
 		if BFL.IsClassic then
 			local DB = BFL:GetModule("DB")
 			local simpleMode = DB and DB:Get("simpleMode", false) or false
@@ -356,7 +607,7 @@ function ElvUISkin:SkinFrames(E, S)
 		end
 
 		if shouldSkinPortrait then
-			-- Reset position and size to fit ElvUI style
+			button:Show() -- Reset position and size to fit ElvUI style
 			button:ClearAllPoints()
 			button:SetPoint("TOPLEFT", frame, "TOPLEFT", 4, -4)
 			button:SetSize(42, 42) -- Standard ElvUI icon size (square)
@@ -432,7 +683,7 @@ function ElvUISkin:SkinFrames(E, S)
 			end)
 		end
 	end
-
+	self:HideClassicPortraitArtifacts(frame, shouldSkinPortrait and portraitButton or nil, true)
 	-- Skin Tabs (Top)
 	BFL:DebugPrint("ElvUISkin: Skinning Top Tabs")
 	for i = 1, 4 do
@@ -585,8 +836,8 @@ function ElvUISkin:SkinFrames(E, S)
 				end
 			end
 		end
+		-- Classic portrait artifacts are handled after the portrait block.
 	end
-
 	-- Skin ScrollBars
 	BFL:DebugPrint("ElvUISkin: Skinning ScrollBars")
 	-- Friends List ScrollBar - Point 7
@@ -639,8 +890,37 @@ function ElvUISkin:SkinFrames(E, S)
 	end
 
 	-- Who Frame ScrollBar
-	if frame.WhoFrame and frame.WhoFrame.ScrollBar then
-		SkinScrollBar(S, frame.WhoFrame.ScrollBar)
+	if frame.WhoFrame then
+		local whoScrollBar = GetWhoScrollBar(frame.WhoFrame)
+		if whoScrollBar then
+			SkinScrollBar(S, whoScrollBar)
+		end
+
+		local WhoFrameModule = BFL:GetModule("WhoFrame")
+		if
+			BFL.IsClassic
+			and WhoFrameModule
+			and WhoFrameModule.InitializeClassicWhoFrame
+			and hooksecurefunc
+			and not self.ClassicWhoScrollBarHooked
+		then
+			self.ClassicWhoScrollBarHooked = true
+			hooksecurefunc(WhoFrameModule, "InitializeClassicWhoFrame", function(_, whoFrame)
+				local function SkinDelayedWhoScrollBar()
+					if self:IsSkinEnabled() then
+						local delayedWhoScrollBar = GetWhoScrollBar(whoFrame)
+						if delayedWhoScrollBar then
+							SkinScrollBar(S, delayedWhoScrollBar)
+						end
+					end
+				end
+				if C_Timer and C_Timer.After then
+					C_Timer.After(0, SkinDelayedWhoScrollBar)
+				else
+					SkinDelayedWhoScrollBar()
+				end
+			end)
+		end
 	end
 
 	-- Raid Frame ScrollBar
@@ -863,14 +1143,14 @@ function ElvUISkin:SkinFrames(E, S)
 
 		if frame.FriendsTabHeader.StatusDropdown then
 			if BFL.IsClassic then
-				-- Classic: Keep visual width at 38px but expand clickable area
+				-- Classic: ElvUI's arrow plus the status icon needs more room than the Blizzard skin.
 				local dropdown = frame.FriendsTabHeader.StatusDropdown
 
 				if S.HandleDropDownBox then
-					S:HandleDropDownBox(dropdown, 38)
+					S:HandleDropDownBox(dropdown, ELVUI_CLASSIC_STATUS_DROPDOWN_WIDTH)
 				end
 
-				FixClassicDropdownHitbox(dropdown, 38, 24)
+				FixClassicDropdownHitbox(dropdown, ELVUI_CLASSIC_STATUS_DROPDOWN_WIDTH, 24)
 
 				-- Reposition: 1px gap left of BattlenetFrame
 				dropdown:ClearAllPoints()
@@ -889,7 +1169,8 @@ function ElvUISkin:SkinFrames(E, S)
 				if S.HandleDropDownBox then
 					S:HandleDropDownBox(dropdown, width)
 				end
-				FixClassicDropdownHitbox(dropdown, width, isModernDropdown and 30 or 24)
+				FixClassicDropdownHitbox(dropdown, width, 24, ELVUI_CLASSIC_MAIN_DROPDOWN_TEXT_Y_OFFSET)
+				RegisterClassicDropdownSelectedValueFix(dropdown)
 				-- Restore position (matches FriendsList.lua Classic layout)
 				if frame.FriendsTabHeader.SearchBox then
 					dropdown:ClearAllPoints()
@@ -910,7 +1191,8 @@ function ElvUISkin:SkinFrames(E, S)
 				if S.HandleDropDownBox then
 					S:HandleDropDownBox(dropdown, width)
 				end
-				FixClassicDropdownHitbox(dropdown, width, isModernDropdown and 30 or 24)
+				FixClassicDropdownHitbox(dropdown, width, 24, ELVUI_CLASSIC_MAIN_DROPDOWN_TEXT_Y_OFFSET)
+				RegisterClassicDropdownSelectedValueFix(dropdown)
 				-- Anchor to QuickFilter with positive spacing.
 				if frame.FriendsTabHeader.QuickFilterDropdown then
 					dropdown:ClearAllPoints()
@@ -941,7 +1223,8 @@ function ElvUISkin:SkinFrames(E, S)
 				if S.HandleDropDownBox then
 					S:HandleDropDownBox(dropdown, width)
 				end
-				FixClassicDropdownHitbox(dropdown, width, isModernDropdown and 30 or 24)
+				FixClassicDropdownHitbox(dropdown, width, 24, ELVUI_CLASSIC_MAIN_DROPDOWN_TEXT_Y_OFFSET)
+				RegisterClassicDropdownSelectedValueFix(dropdown)
 				-- Anchor to PrimarySort with positive spacing.
 				if frame.FriendsTabHeader.PrimarySortDropdown then
 					dropdown:ClearAllPoints()
@@ -990,10 +1273,7 @@ function ElvUISkin:SkinFrames(E, S)
 				frame.WhoFrame.ColumnDropdown:SetHeight(26) -- Match header height
 			end
 
-			-- Re-anchor to NameHeader
-			local dropdownOffset = (BFL.IsClassic and not modernDropdown) and WHO_CLASSIC_DROPDOWN_X_OFFSET or 0
-			frame.WhoFrame.ColumnDropdown:ClearAllPoints()
-			frame.WhoFrame.ColumnDropdown:SetPoint("LEFT", frame.WhoFrame.NameHeader, "RIGHT", -1 + dropdownOffset, 0)
+			ApplyWhoColumnDropdownAlignment(frame.WhoFrame)
 		end
 
 		-- Re-anchor LevelHeader
@@ -1007,6 +1287,22 @@ function ElvUISkin:SkinFrames(E, S)
 		if frame.WhoFrame.ClassHeader and frame.WhoFrame.LevelHeader then
 			frame.WhoFrame.ClassHeader:ClearAllPoints()
 			frame.WhoFrame.ClassHeader:SetPoint("LEFT", frame.WhoFrame.LevelHeader, "RIGHT", -1, 0)
+		end
+
+		local WhoFrameModule = BFL:GetModule("WhoFrame")
+		if
+			BFL.IsClassic
+			and WhoFrameModule
+			and WhoFrameModule.UpdateResponsiveLayout
+			and hooksecurefunc
+			and not self.WhoHeaderAlignmentHooked
+		then
+			self.WhoHeaderAlignmentHooked = true
+			hooksecurefunc(WhoFrameModule, "UpdateResponsiveLayout", function()
+				if self:IsSkinEnabled() then
+					ApplyWhoColumnDropdownAlignment(frame.WhoFrame)
+				end
+			end)
 		end
 	end
 
@@ -1200,7 +1496,7 @@ function ElvUISkin:HookFriendsList(E, S)
 		end
 	end
 
-	-- Hook Group Header
+	if self.FriendsListHooksInstalled then return end; self.FriendsListHooksInstalled = true
 	hooksecurefunc(FriendsList, "UpdateGroupHeaderButton", function(_, button, elementData)
 		if not button.isSkinned then
 			S:HandleButton(button)
@@ -2408,5 +2704,231 @@ function ElvUISkin:SkinRaidTools(E, S)
 
 	-- CLASSIC FINETUNING: Additional Classic-specific tweaks for RaidTools here
 	if BFL.IsClassic then
+	end
+end
+
+local function HideClassicPortraitObject(object)
+	if not object then
+		return
+	end
+	if object.GetRegions then
+		for _, region in ipairs({ object:GetRegions() }) do
+			if region and region.SetAlpha then
+				region:SetAlpha(0)
+			end
+			if region and region.Hide then
+				region:Hide()
+			end
+		end
+	end
+	if object.SetAlpha then
+		object:SetAlpha(0)
+	end
+	if object.Hide then
+		object:Hide()
+	end
+end
+
+local function IsFrameAncestorOf(candidate, child)
+	if not (candidate and child and child.GetParent) then
+		return false
+	end
+
+	local parent = child:GetParent()
+	while parent do
+		if parent == candidate then
+			return true
+		end
+		parent = parent.GetParent and parent:GetParent()
+	end
+	return false
+end
+
+function ElvUISkin:HideClassicPortraitArtifacts(frame, keepButton, schedule)
+	if not (BFL and BFL.IsClassic and frame) then
+		return
+	end
+
+	local frameName = frame.GetName and frame:GetName()
+	local candidates = {
+		frame.PortraitIcon,
+		frame.PortraitMask,
+		frame.PortraitFrame,
+		frame.PortraitContainer,
+		frame.Portrait,
+		frame.portrait,
+		frame.CircleMask,
+		frame.TopLeftCorner,
+		frame.TopBorder,
+		frame.LeftBorder,
+		frame.BFL_SimpleModeTopLeftCorner,
+		frame.PortraitOverlay,
+		frameName and _G[frameName .. "Portrait"],
+		frameName and _G[frameName .. "PortraitFrame"],
+		frameName and _G[frameName .. "CircleMask"],
+		frameName and _G[frameName .. "TopLeftCorner"],
+		frameName and _G[frameName .. "TopBorder"],
+		frameName and _G[frameName .. "LeftBorder"],
+		frameName and _G[frameName .. "BFL_SimpleModeTopLeftCorner"],
+		frameName and _G[frameName .. "PortraitOverlay"],
+		_G.BetterFriendsFramePortraitFrame,
+		_G.BetterFriendsFramePortrait,
+		_G.BetterFriendsFrameTopLeftCorner,
+		_G.BetterFriendsFrameTopBorder,
+		_G.BetterFriendsFrameLeftBorder,
+		_G.BetterFriendsFrameBFL_SimpleModeTopLeftCorner,
+	}
+
+	for _, object in ipairs(candidates) do
+		if object and object ~= keepButton and not IsFrameAncestorOf(object, keepButton) then
+			HideClassicPortraitObject(object)
+		end
+	end
+
+	if schedule then
+		self:ScheduleHideClassicPortraitArtifacts(frame, keepButton)
+	end
+end
+
+function ElvUISkin:ScheduleHideClassicPortraitArtifacts(frame, keepButton)
+	if not (BFL and BFL.IsClassic and frame and C_Timer and C_Timer.After) then
+		return
+	end
+
+	local function HideDelayed()
+		if self:IsSkinEnabled() then
+			self:HideClassicPortraitArtifacts(frame, keepButton)
+		end
+	end
+
+	C_Timer.After(0, HideDelayed)
+	C_Timer.After(0.1, HideDelayed)
+	C_Timer.After(0.25, HideDelayed)
+end
+
+function ElvUISkin:InstallClassicPortraitGuard()
+	if not (BFL and BFL.IsClassic) or self.ClassicPortraitGuardInstalled then
+		return
+	end
+	self.ClassicPortraitGuardInstalled = true
+
+	local function HidePortraitArtifacts()
+		if not self:IsSkinEnabled() then
+			return
+		end
+		local frame = _G.BetterFriendsFrame
+		if frame then
+			self:HideClassicPortraitArtifacts(frame, frame.PortraitButton, true)
+		end
+	end
+
+	if hooksecurefunc and type(BFL.UpdatePortraitVisibility) == "function" then
+		hooksecurefunc(BFL, "UpdatePortraitVisibility", HidePortraitArtifacts)
+	end
+	HidePortraitArtifacts()
+end
+
+function ElvUISkin:IsSkinEnabled()
+	if BFL.IsThemeActive and BFL:IsThemeActive("elvui") then
+		return true
+	end
+	if not (BFL.IsElvUIAvailable and BFL:IsElvUIAvailable()) then
+		return false
+	end
+
+	local theme
+	local legacyEnabled = false
+	local DB = BFL:GetModule("DB")
+	if DB and DB.Get then
+		theme = DB:Get("theme", nil)
+		legacyEnabled = DB:Get("enableElvUISkin", false) == true
+	elseif BetterFriendlistDB then
+		theme = BetterFriendlistDB.theme
+		legacyEnabled = BetterFriendlistDB.enableElvUISkin == true
+	end
+
+	if theme == "elvui" then
+		return true
+	end
+	if theme and theme ~= "blizzard" then
+		return false
+	end
+	return legacyEnabled == true
+end
+
+local function GetElvUIColor(color, fallbackR, fallbackG, fallbackB, fallbackA)
+	if type(color) == "table" then
+		return color.r or color[1] or fallbackR, color.g or color[2] or fallbackG, color.b or color[3] or fallbackB, color.a or color[4] or fallbackA
+	end
+	return fallbackR, fallbackG, fallbackB, fallbackA
+end
+
+function ElvUISkin:SkinClassicMainFrameShell(E, S, frame)
+	if not (BFL and BFL.IsClassic and frame) then
+		return
+	end
+
+	local shell = frame.BFL_ElvUIClassicShell
+	if not shell then
+		local template = _G.BackdropTemplateMixin and "BackdropTemplate" or nil
+		shell = CreateFrame("Frame", nil, frame, template)
+		shell:EnableMouse(false)
+		frame.BFL_ElvUIClassicShell = shell
+	end
+
+	shell:ClearAllPoints()
+	shell:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+	shell:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
+	if shell.SetFrameStrata and frame.GetFrameStrata then
+		shell:SetFrameStrata(frame:GetFrameStrata())
+	end
+	if shell.SetFrameLevel and frame.GetFrameLevel then
+		shell:SetFrameLevel(math.max((frame:GetFrameLevel() or 1), 0))
+	end
+
+	if S and S.HandleFrame and not shell.BFL_ElvUIHandled then
+		pcall(S.HandleFrame, S, shell, true)
+		shell.BFL_ElvUIHandled = true
+	end
+
+	if shell.backdrop then
+		shell.backdrop:ClearAllPoints()
+		shell.backdrop:SetAllPoints(shell)
+	end
+	if shell.SetBackdrop then
+		shell:SetBackdrop({
+			bgFile = "Interface\\Buttons\\WHITE8X8",
+			edgeFile = "Interface\\Buttons\\WHITE8X8",
+			edgeSize = 1,
+		})
+	end
+	if not shell.BFL_ElvUIClassicBg then
+		shell.BFL_ElvUIClassicBg = shell:CreateTexture(nil, "BACKGROUND")
+	end
+	shell.BFL_ElvUIClassicBg:SetAllPoints(shell)
+
+	local bgR, bgG, bgB, bgA = GetElvUIColor(E and E.media and E.media.backdropcolor, 0.06, 0.06, 0.06, 0.92)
+	local borderR, borderG, borderB, borderA = GetElvUIColor(E and E.media and E.media.bordercolor, 0.18, 0.18, 0.18, 1)
+	shell.BFL_ElvUIClassicBg:SetColorTexture(bgR, bgG, bgB, bgA)
+	if shell.SetBackdropColor then
+		shell:SetBackdropColor(bgR, bgG, bgB, bgA)
+	end
+	if shell.SetBackdropBorderColor then
+		shell:SetBackdropBorderColor(borderR, borderG, borderB, borderA)
+	end
+	if shell.backdrop and shell.backdrop.SetBackdropColor then
+		shell.backdrop:SetBackdropColor(bgR, bgG, bgB, bgA)
+	end
+	if shell.backdrop and shell.backdrop.SetBackdropBorderColor then
+		shell.backdrop:SetBackdropBorderColor(borderR, borderG, borderB, borderA)
+	end
+	shell:Show()
+end
+
+function ElvUISkin:HideClassicMainFrameShell()
+	local frame = _G.BetterFriendsFrame
+	local shell = frame and frame.BFL_ElvUIClassicShell
+	if shell then
+		shell:Hide()
 	end
 end

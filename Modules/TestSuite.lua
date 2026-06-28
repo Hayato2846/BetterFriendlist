@@ -4414,7 +4414,7 @@ local function RegisterBuiltInTests()
 				V:AssertEqual(
 					tempDB.theme,
 					"elvui",
-					"enableElvUISkin=true should migrate to theme='elvui' when Beta Features are enabled"
+					"enableElvUISkin=true should migrate to theme='elvui'"
 				)
 			end)
 		end,
@@ -4486,30 +4486,30 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
-	TS:RegisterTest("data", "Theme_BetaDisabledForcesBlizzard", {
-		description = "Disabled Beta Features should force beta themes back to Blizzard",
+	TS:RegisterTest("data", "Theme_BetaDisabledKeepsStandardThemes", {
+		description = "Disabled Beta Features should not disable standard themes",
 		action = function(V)
 			WithTemporaryDatabase({
 				theme = "dark",
 				enableBetaFeatures = false,
 			}, function(tempDB)
-				V:AssertEqual(tempDB.theme, "blizzard", "Stored Dark theme should normalize to Blizzard")
+				V:AssertEqual(tempDB.theme, "dark", "Stored Dark theme should remain selected")
 
 				tempDB.theme = "dark"
-				V:AssertEqual(BFL:GetEffectiveTheme(), "blizzard", "Dark theme should not become effective")
-				V:Assert(not BFL:IsThemeActive("dark"), "Dark theme should not be active when Beta is disabled")
-				V:Assert(not BFL:UsesFlatTheme(), "Beta-disabled themes should not count as flat themes")
+				V:AssertEqual(BFL:GetEffectiveTheme(), "dark", "Dark theme should become effective")
+				V:Assert(BFL:IsThemeActive("dark"), "Dark theme should be active when Beta is disabled")
+				V:Assert(BFL:UsesFlatTheme(), "Standard themes should count as flat themes")
 
 				tempDB.theme = "custom"
-				V:AssertEqual(BFL:GetEffectiveTheme(), "blizzard", "Custom theme should not become effective")
-				V:Assert(not BFL:IsThemeActive("custom"), "Custom theme should not be active when Beta is disabled")
-				V:Assert(not BFL:UsesDarkSkinTheme(), "Custom theme should not use the skin engine when Beta is disabled")
+				V:AssertEqual(BFL:GetEffectiveTheme(), "custom", "Custom theme should become effective")
+				V:Assert(BFL:IsThemeActive("custom"), "Custom theme should be active when Beta is disabled")
+				V:Assert(BFL:UsesDarkSkinTheme(), "Custom theme should use the skin engine when Beta is disabled")
 			end)
 		end,
 	})
 
-	TS:RegisterTest("data", "Theme_NonRetailForcesBetaThemesToBlizzard", {
-		description = "Non-Retail clients should keep beta themes disabled but retain the legacy ElvUI path",
+	TS:RegisterTest("data", "Theme_NonRetailAllowsStandardThemes", {
+		description = "Non-Retail clients should allow standard themes while keeping guild beta gated",
 		action = function(V)
 			local originalIsRetail = BFL.IsRetail
 			local originalIsElvUIAvailable = BFL.IsElvUIAvailable
@@ -4523,18 +4523,18 @@ local function RegisterBuiltInTests()
 					theme = "dark",
 					enableBetaFeatures = true,
 				}, function(tempDB)
-					V:AssertEqual(tempDB.theme, "blizzard", "Stored Dark theme should normalize to Blizzard on non-Retail")
-					V:Assert(not BFL:AreThemeFeaturesEnabled(), "Theme features should be Retail-only")
-					V:AssertEqual(BFL:GetEffectiveTheme(), "blizzard", "Dark theme should not become effective on non-Retail")
+					V:AssertEqual(tempDB.theme, "dark", "Stored Dark theme should be retained on non-Retail")
+					V:Assert(BFL:AreThemeFeaturesEnabled(), "Theme features should be available without Beta gating")
+					V:AssertEqual(BFL:GetEffectiveTheme(), "dark", "Dark theme should become effective on non-Retail")
 				end)
 
 				WithTemporaryDatabase({
-					theme = "blizzard",
+					theme = "elvui",
 					enableElvUISkin = true,
 					enableBetaFeatures = true,
 				}, function()
-					V:Assert(BFL:ShouldUseLegacyElvUISkinSetting(), "Non-Retail should keep the legacy ElvUI setting path")
-					V:AssertEqual(BFL:GetEffectiveTheme(), "elvui", "Legacy ElvUI skin should remain effective on non-Retail")
+					V:Assert(not BFL:ShouldUseLegacyElvUISkinSetting(), "Non-Retail should use the standard theme setting path")
+					V:AssertEqual(BFL:GetEffectiveTheme(), "elvui", "ElvUI theme should remain effective on non-Retail")
 				end)
 
 				WithTemporaryDatabase({
@@ -5002,8 +5002,8 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
-	TS:RegisterTest("data", "Theme_LegacyElvUISkinWithoutThemeTab", {
-		description = "Legacy ElvUI skin setting should remain effective without beta theme settings",
+	TS:RegisterTest("data", "Theme_LegacyElvUISkinMigratesToTheme", {
+		description = "Legacy ElvUI skin setting should migrate to the standard theme setting",
 		action = function(V)
 			local originalIsElvUIAvailable = BFL.IsElvUIAvailable
 			BFL.IsElvUIAvailable = function()
@@ -5016,9 +5016,9 @@ local function RegisterBuiltInTests()
 					enableElvUISkin = true,
 					enableBetaFeatures = false,
 				}, function()
-					V:Assert(BFL:ShouldUseLegacyElvUISkinSetting(), "Legacy ElvUI setting should be active")
-					V:AssertEqual(BFL:GetEffectiveTheme(), "elvui", "Legacy ElvUI skin should become effective")
-					V:Assert(BFL:IsThemeActive("elvui"), "ElvUI skin should be active through the legacy setting")
+					V:Assert(not BFL:ShouldUseLegacyElvUISkinSetting(), "Legacy ElvUI setting path should be inactive")
+					V:AssertEqual(BFL:GetEffectiveTheme(), "elvui", "Legacy ElvUI skin should migrate to the theme setting")
+					V:Assert(BFL:IsThemeActive("elvui"), "ElvUI skin should be active through the theme setting")
 				end)
 			end)
 
@@ -5043,7 +5043,7 @@ local function RegisterBuiltInTests()
 					enableElvUISkin = true,
 					enableBetaFeatures = false,
 				}, function()
-					V:Assert(BFL:ShouldUseLegacyElvUISkinSetting(), "Legacy ElvUI setting path should still be active")
+					V:Assert(not BFL:ShouldUseLegacyElvUISkinSetting(), "Legacy ElvUI setting path should be inactive")
 					V:Assert(not BFL:ShouldShowLegacyElvUISkinSetting(), "Legacy ElvUI setting should be hidden without ElvUI")
 					V:AssertEqual(BFL:GetEffectiveTheme(), "blizzard", "ElvUI should fall back to Blizzard without ElvUI")
 				end)

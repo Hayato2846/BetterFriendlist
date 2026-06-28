@@ -7,9 +7,20 @@ local DarkTheme = BFL:RegisterModule("DarkTheme", {})
 local WHO_COLUMN_HEADER_HEIGHT = 28
 local WHO_COLUMN_HEADER_OVERLAP = -1
 local WHO_CLASSIC_DROPDOWN_X_OFFSET = -12
+local WHO_CLASSIC_COLUMN_HEADER_OFFSET_Y = 30
+local WHO_CLASSIC_COLUMN_HEADER_TEXT_OFFSET_Y = 0
+local WHO_CLASSIC_DROPDOWN_TEXT_OFFSET_X = -7
 local WHO_LIST_INSET_PADDING = 4
 local WHO_SCROLLBAR_RESERVE = 24
 local WHO_SCROLLBAR_OFFSET_X = 1
+local CLASSIC_SEARCH_OFFSET_Y = 4
+local CLASSIC_SEARCH_SIMPLE_TOP_Y = -1
+local CLASSIC_SEARCH_NORMAL_TOP_Y = 50 + CLASSIC_SEARCH_OFFSET_Y
+local CLASSIC_SEARCH_SIMPLE_LEFT_OFFSET_X = 8
+local CLASSIC_SEARCH_NORMAL_LEFT_OFFSET_X = 9.5
+local CLASSIC_SEARCH_RIGHT_OFFSET_X = -24
+local CLASSIC_BOTTOM_TAB_GAP = 0
+local CLASSIC_BOTTOM_TAB_OFFSET_Y = -28
 local QUICK_JOIN_CONTENT_OFFSET_Y = -6
 local QUICK_JOIN_REQUEST_BUTTON_OFFSET_X = 1
 local QUICK_JOIN_REQUEST_BUTTON_OFFSET_Y = 1
@@ -201,6 +212,59 @@ local function RefreshScrollBarSteppers(engine, scrollBar)
 	end
 end
 
+local function LayoutClassicScrollBarTrack(engine, scrollBar)
+	if not (BFL.IsClassic and engine and scrollBar) then
+		return
+	end
+
+	local topStepper = scrollBar.Back or scrollBar.ScrollUpButton
+	local bottomStepper = scrollBar.Forward or scrollBar.ScrollDownButton
+	local track = scrollBar.Track
+	if engine.DampenFrameTextures then
+		engine:DampenFrameTextures(scrollBar.Background, 0, 3)
+		engine:DampenFrameTextures(scrollBar.ScrollBarBackground, 0, 3)
+	end
+	if engine.SetTextureAlpha then
+		engine:SetTextureAlpha(scrollBar, scrollBar.trackBG, 0)
+		if track and not track.GetChildren then
+			engine:SetTextureAlpha(scrollBar, track, 0)
+		end
+	end
+	if topStepper then
+		engine:SetFrameSize(topStepper, 22, 16)
+		engine:SetFramePoints(topStepper, {
+			{ "TOP", scrollBar, "TOP", 0, 0 },
+		})
+	end
+	if bottomStepper then
+		engine:SetFrameSize(bottomStepper, 22, 16)
+		engine:SetFramePoints(bottomStepper, {
+			{ "BOTTOM", scrollBar, "BOTTOM", 0, 0 },
+		})
+	end
+	if track and topStepper and bottomStepper and track.GetChildren then
+		engine:DampenFrameTextures(track, 0, 1)
+		engine:SkinFrame(track, "scrollbar", { stripTextures = true, textureAlpha = 0 })
+		engine:SetFramePoints(track, {
+			{ "TOP", topStepper, "BOTTOM", 0, 0 },
+			{ "BOTTOM", bottomStepper, "TOP", 0, 0 },
+		})
+		if track.BFL_DarkBackdrop then
+			engine:SetFramePoints(track.BFL_DarkBackdrop, {
+				{ "TOPLEFT", track, "TOPLEFT", 0, 0 },
+				{ "BOTTOMRIGHT", track, "BOTTOMRIGHT", 0, 0 },
+			})
+		end
+	end
+	if scrollBar.BFL_DarkBackdrop and topStepper and bottomStepper then
+		engine:SetFramePoints(scrollBar.BFL_DarkBackdrop, {
+			{ "TOPLEFT", topStepper, "BOTTOMLEFT", 0, 0 },
+			{ "BOTTOMRIGHT", bottomStepper, "TOPRIGHT", 0, 0 },
+		})
+	end
+	RefreshScrollBarSteppers(engine, scrollBar)
+end
+
 local function SkinWhoListScrollBar(engine, who, scrollBar, opts)
 	if not engine or not who or not who.ScrollBox or not scrollBar then
 		return
@@ -286,6 +350,198 @@ local function SetObjectShown(engine, owner, object, shown)
 	end
 end
 
+local function LayoutClassicBottomTabs(engine, frame)
+	if not BFL.IsClassic or not engine or not frame then
+		return
+	end
+
+	local previousTab
+	for i = 1, 4 do
+		local tab = frame["BottomTab" .. i] or _G["BetterFriendsFrameBottomTab" .. i]
+		if tab and tab.IsShown and tab:IsShown() then
+			if previousTab then
+				engine:SetFramePoints(tab, {
+					{ "LEFT", previousTab, "RIGHT", CLASSIC_BOTTOM_TAB_GAP, 0 },
+				})
+			else
+				engine:SetFramePoints(tab, {
+					{ "BOTTOMLEFT", frame, "BOTTOMLEFT", 5, CLASSIC_BOTTOM_TAB_OFFSET_Y },
+				})
+			end
+			previousTab = tab
+		end
+	end
+end
+
+local function HideClassicPortraitObject(engine, owner, object)
+	if not object then
+		return
+	end
+	if engine and engine.DampenFrameTextures and object.GetChildren then
+		engine:DampenFrameTextures(object, 0, 4)
+	end
+	if object.SetTexture and engine and engine.SetTextureAlpha then
+		engine:SetTextureAlpha(owner, object, 0)
+	elseif object.SetAlpha then
+		object:SetAlpha(0)
+	end
+	if object.SetShown or object.Hide then
+		SetObjectShown(engine, owner, object, false)
+	end
+	if object.GetRegions and engine and engine.SetTextureAlpha then
+		for _, region in ipairs({ object:GetRegions() }) do
+			if region and region.SetAlpha then
+				engine:SetTextureAlpha(object, region, 0)
+			end
+		end
+	end
+end
+
+local function AddPortraitCandidate(objects, object)
+	if object then
+		objects[#objects + 1] = object
+	end
+end
+
+local function HideClassicPortraitTexture(engine, frame, portraitButton)
+	if not BFL.IsClassic then
+		return false
+	end
+
+	if frame then
+		local frameName = frame.GetName and frame:GetName()
+		local objects = {}
+		AddPortraitCandidate(objects, frame.PortraitIcon)
+		AddPortraitCandidate(objects, frame.PortraitMask)
+		AddPortraitCandidate(objects, frame.PortraitFrame)
+		AddPortraitCandidate(objects, frame.PortraitContainer)
+		AddPortraitCandidate(objects, frame.Portrait)
+		AddPortraitCandidate(objects, frame.portrait)
+		AddPortraitCandidate(objects, frame.CircleMask)
+		AddPortraitCandidate(objects, frame.TopLeftCorner)
+		AddPortraitCandidate(objects, frame.TopBorder)
+		AddPortraitCandidate(objects, frame.LeftBorder)
+		AddPortraitCandidate(objects, frame.BFL_SimpleModeTopLeftCorner)
+		AddPortraitCandidate(objects, frame.PortraitOverlay)
+		AddPortraitCandidate(objects, frameName and _G[frameName .. "Portrait"])
+		AddPortraitCandidate(objects, frameName and _G[frameName .. "PortraitFrame"])
+		AddPortraitCandidate(objects, frameName and _G[frameName .. "CircleMask"])
+		AddPortraitCandidate(objects, frameName and _G[frameName .. "TopLeftCorner"])
+		AddPortraitCandidate(objects, frameName and _G[frameName .. "TopBorder"])
+		AddPortraitCandidate(objects, frameName and _G[frameName .. "LeftBorder"])
+		AddPortraitCandidate(objects, frameName and _G[frameName .. "BFL_SimpleModeTopLeftCorner"])
+		AddPortraitCandidate(objects, frameName and _G[frameName .. "PortraitOverlay"])
+		AddPortraitCandidate(objects, _G.BetterFriendsFramePortraitFrame)
+		AddPortraitCandidate(objects, _G.BetterFriendsFramePortrait)
+		AddPortraitCandidate(objects, _G.BetterFriendsFrameTopLeftCorner)
+		AddPortraitCandidate(objects, _G.BetterFriendsFrameTopBorder)
+		AddPortraitCandidate(objects, _G.BetterFriendsFrameLeftBorder)
+		AddPortraitCandidate(objects, _G.BetterFriendsFrameBFL_SimpleModeTopLeftCorner)
+		for _, object in ipairs(objects) do
+			if object ~= portraitButton then
+				HideClassicPortraitObject(engine, frame, object)
+			end
+		end
+	end
+	return true
+end
+
+local function ScheduleClassicPortraitHide(engine, frame)
+	if not (BFL.IsClassic and frame and C_Timer and C_Timer.After) then
+		return
+	end
+
+	local function HideDelayed()
+		local delayedEngine = GetEngine()
+		if delayedEngine and delayedEngine.IsActive and delayedEngine:IsActive() then
+			HideClassicPortraitTexture(delayedEngine, frame, frame.PortraitButton)
+		end
+	end
+
+	C_Timer.After(0, HideDelayed)
+	C_Timer.After(0.1, HideDelayed)
+	C_Timer.After(0.25, HideDelayed)
+end
+
+local function RestoreRaidTexture(engine, owner, texture)
+	if not (BFL.IsClassic and engine and owner and texture) then
+		return
+	end
+	if texture.SetAlpha then
+		engine:SetTextureAlpha(owner, texture, 1)
+	end
+	if texture.SetVertexColor then
+		engine:SetTextureVertexColor(owner, texture, 1, 1, 1, 1)
+	end
+end
+
+local function RestoreClassicRaidRoleIcons(engine, raid)
+	if not (BFL.IsClassic and engine and raid) then
+		return
+	end
+
+	local control = raid.ControlPanel
+	local roleSummary = control and control.RoleSummary
+	if roleSummary then
+		RestoreRaidTexture(engine, roleSummary, roleSummary.TankIcon)
+		RestoreRaidTexture(engine, roleSummary, roleSummary.HealerIcon)
+		RestoreRaidTexture(engine, roleSummary, roleSummary.DamagerIcon)
+	end
+
+	local groupsContainer = raid.GroupsInset and raid.GroupsInset.GroupsContainer
+	if not groupsContainer then
+		return
+	end
+
+	for groupIndex = 1, 8 do
+		local group = groupsContainer["Group" .. groupIndex]
+		if group then
+			for slotIndex = 1, 5 do
+				local slot = group["Slot" .. slotIndex]
+				if slot then
+					RestoreRaidTexture(engine, slot, slot.RoleIcon)
+					RestoreRaidTexture(engine, slot, slot.MainTankIcon)
+					RestoreRaidTexture(engine, slot, slot.MainAssistIcon)
+				end
+			end
+		end
+	end
+end
+
+local function GetControlText(control)
+	if not control then
+		return nil
+	end
+	if control.Text then
+		return control.Text
+	end
+	if control.GetFontString then
+		local fontString = control:GetFontString()
+		if fontString then
+			return fontString
+		end
+	end
+	local name = control.GetName and control:GetName()
+	return name and _G[name .. "Text"] or nil
+end
+
+local function OffsetControlText(engine, control, xOffset, yOffset)
+	local text = GetControlText(control)
+	if text and engine and engine.OffsetRegionPoints then
+		engine:OffsetRegionPoints(control, text, xOffset or 0, yOffset or 0)
+	end
+end
+
+local function AdjustClassicWhoColumnHeaderText(engine, who)
+	if not (BFL.IsClassic and engine and who) then
+		return
+	end
+	OffsetControlText(engine, who.NameHeader, 0, WHO_CLASSIC_COLUMN_HEADER_TEXT_OFFSET_Y)
+	OffsetControlText(engine, who.ColumnDropdown, WHO_CLASSIC_DROPDOWN_TEXT_OFFSET_X, WHO_CLASSIC_COLUMN_HEADER_TEXT_OFFSET_Y)
+	OffsetControlText(engine, who.LevelHeader, 0, WHO_CLASSIC_COLUMN_HEADER_TEXT_OFFSET_Y)
+	OffsetControlText(engine, who.ClassHeader, 0, WHO_CLASSIC_COLUMN_HEADER_TEXT_OFFSET_Y)
+end
+
 local function IsSimpleModeEnabled()
 	local DB = BFL and BFL.GetModule and BFL:GetModule("DB")
 	if DB and DB.Get then
@@ -313,6 +569,10 @@ local function RestorePortraitArtwork(engine, frame)
 		end
 		if portraitButton.SetAlpha then
 			portraitButton:SetAlpha(avatarAlpha)
+		end
+
+		if BFL.IsClassic then
+			HideClassicPortraitTexture(engine, frame, portraitButton)
 		end
 
 		if showPortrait then
@@ -573,6 +833,8 @@ function DarkTheme:SkinMainTabs(engine)
 			SkinTabField(engine, header, "Tab" .. i)
 		end
 	end
+
+	LayoutClassicBottomTabs(engine, frame)
 end
 
 function DarkTheme:SkinMainTabsDeferred()
@@ -696,6 +958,11 @@ function DarkTheme:RefreshMainFrameControls(engine, frame)
 				engine:ApplyButtonState(bnetFrame.SettingsButton)
 			end
 		end
+	end
+
+	if BFL.IsClassic then
+		HideClassicPortraitTexture(engine, frame, frame.PortraitButton)
+		ScheduleClassicPortraitHide(engine, frame)
 	end
 end
 
@@ -821,14 +1088,31 @@ function DarkTheme:LayoutMainListChrome(engine, frame)
 		return
 	end
 
-	local scrollBar = frame.MinimalScrollBar
-	if scrollBar then
+	local function LayoutFriendsScrollBar(scrollBar, anchorToScrollFrame)
+		if not scrollBar then
+			return
+		end
 		scrollBar.BFL_DarkWideScrollbar = true
-		engine:SetFrameSize(scrollBar, 22)
-		engine:SetFramePoints(scrollBar, {
-			{ "TOPLEFT", frame.ScrollFrame, "TOPRIGHT", 0, 2 },
-			{ "BOTTOMLEFT", frame.ScrollFrame, "BOTTOMRIGHT", 0, 2 },
-		})
+		if anchorToScrollFrame then
+			engine:SetFrameSize(scrollBar, 22)
+			engine:SetFramePoints(scrollBar, {
+				{ "TOPLEFT", frame.ScrollFrame, "TOPRIGHT", 0, 0 },
+				{ "BOTTOMLEFT", frame.ScrollFrame, "BOTTOMRIGHT", 0, 0 },
+			})
+		end
+		engine:SkinScrollBar(scrollBar)
+		LayoutClassicScrollBarTrack(engine, scrollBar)
+	end
+
+	LayoutFriendsScrollBar(frame.MinimalScrollBar, true)
+
+	local fauxScrollFrame = frame.ScrollFrame.FauxScrollFrame
+	if fauxScrollFrame then
+		local fauxName = fauxScrollFrame.GetName and fauxScrollFrame:GetName()
+		local fauxScrollBar = GetScrollFrameScrollBar(fauxScrollFrame) or (fauxName and _G[fauxName .. "ScrollBar"])
+		if fauxScrollBar and fauxScrollBar ~= frame.MinimalScrollBar then
+			LayoutFriendsScrollBar(fauxScrollBar, false)
+		end
 	end
 
 	if frame.AddFriendButton then
@@ -1011,11 +1295,12 @@ function DarkTheme:LayoutWhoColumnHeaders(engine, who)
 	local useClassicDropdownOffset = BFL.IsClassic and who.ColumnDropdown and not IsModernDropdown(who.ColumnDropdown)
 	local dropdownOffset = useClassicDropdownOffset and WHO_CLASSIC_DROPDOWN_X_OFFSET or 0
 	local levelHeaderOffset = WHO_COLUMN_HEADER_OVERLAP - dropdownOffset
+	local headerYOffset = BFL.IsClassic and WHO_CLASSIC_COLUMN_HEADER_OFFSET_Y or 0
 
 	if who.NameHeader and who.ListInset then
 		engine:SetFrameSize(who.NameHeader, nil, WHO_COLUMN_HEADER_HEIGHT)
 		engine:SetFramePoints(who.NameHeader, {
-			{ "TOPLEFT", who.ListInset, "TOPLEFT", WHO_LIST_INSET_PADDING, -WHO_LIST_INSET_PADDING },
+			{ "TOPLEFT", who.ListInset, "TOPLEFT", WHO_LIST_INSET_PADDING, -WHO_LIST_INSET_PADDING + headerYOffset },
 		})
 	end
 
@@ -1069,6 +1354,29 @@ function DarkTheme:LayoutMainTitleButtons(engine, frame)
 	end
 end
 
+local function LayoutClassicFriendsSearchBox(engine, searchBox)
+	if not (BFL.IsClassic and engine and searchBox) then
+		return
+	end
+
+	local frame = _G.BetterFriendsFrame
+	if not (frame and frame.Inset) then
+		return
+	end
+
+	local simpleMode = IsSimpleModeEnabled()
+	local leftOffset = simpleMode and CLASSIC_SEARCH_SIMPLE_LEFT_OFFSET_X or CLASSIC_SEARCH_NORMAL_LEFT_OFFSET_X
+	local topOffset = simpleMode and CLASSIC_SEARCH_SIMPLE_TOP_Y or CLASSIC_SEARCH_NORMAL_TOP_Y
+	engine:SetFramePoints(searchBox, {
+		{ "TOPLEFT", frame.Inset, "TOPLEFT", leftOffset, topOffset },
+		{ "TOPRIGHT", frame.Inset, "TOPRIGHT", CLASSIC_SEARCH_RIGHT_OFFSET_X, topOffset },
+	})
+	engine:SetFrameSize(searchBox, nil, simpleMode and 22 or 24)
+	if searchBox.SetWidth then
+		searchBox:SetWidth(0)
+	end
+end
+
 function DarkTheme:LayoutHeaderButtons(engine, header)
 	local bnetFrame = header and header.BattlenetFrame
 	if not engine or not bnetFrame then
@@ -1092,6 +1400,8 @@ function DarkTheme:LayoutHeaderButtons(engine, header)
 			})
 		end
 	end
+
+	LayoutClassicFriendsSearchBox(engine, header.SearchBox)
 end
 
 function DarkTheme:SkinMainFrame(engine)
@@ -1148,6 +1458,8 @@ function DarkTheme:SkinMainFrame(engine)
 	RestorePortraitArtwork(engine, frame)
 	self:RefreshMainFrameControls(engine, frame)
 	self:SkinVisibleMainContent(engine, frame)
+	RestorePortraitArtwork(engine, frame)
+	ScheduleClassicPortraitHide(engine, frame)
 end
 
 function DarkTheme:SkinFriendsListRows(engine)
@@ -1369,6 +1681,11 @@ function DarkTheme:SkinWhoFrame(engine)
 		end
 	end
 
+	if BFL.IsClassic then
+		self:LayoutWhoColumnHeaders(engine, who)
+		AdjustClassicWhoColumnHeaderText(engine, who)
+	end
+
 	local WhoFrame = BFL:GetModule("WhoFrame")
 	if WhoFrame then
 		local builderContainer = WhoFrame.builderDockedContainer or WhoFrame.builderContainer or _G.BetterFriendlistSearchBuilderFrame
@@ -1467,6 +1784,7 @@ function DarkTheme:SkinRaidFrame(engine)
 				engine:ApplyButtonState(button)
 			end
 		end
+		RestoreClassicRaidRoleIcons(engine, raid)
 		return
 	end
 	raid.BFL_DarkRaidSkinKey = staticSkinKey
@@ -1487,6 +1805,7 @@ function DarkTheme:SkinRaidFrame(engine)
 	HideFieldChrome(engine, raid, "ControlPanel")
 	SkinField(engine, raid, "GroupsInset", "inset")
 	SkinRaidAssistCheckButtonField(engine, raid.ControlPanel, "EveryoneAssistCheckbox")
+	RestoreClassicRaidRoleIcons(engine, raid)
 end
 
 function DarkTheme:SkinQuickJoin(engine)
@@ -1961,6 +2280,7 @@ function DarkTheme:InstallHooks()
 			if engine and frame and engine:IsActive() then
 				self:RefreshPortraitArtwork(engine, frame)
 				engine:StripButtonFrameArtwork(frame)
+				ScheduleClassicPortraitHide(engine, frame)
 			end
 		end)
 	end
@@ -1977,8 +2297,34 @@ function DarkTheme:InstallHooks()
 	self:WrapModuleMethod("FriendsList", "UpdateInviteButton", function(_, _, _, _, _, button)
 		self:RefreshUpdatedFriendRow(button)
 	end)
+	self:WrapModuleMethod("FriendsList", "UpdateSearchBoxState", function()
+		if BFL.IsClassic then
+			local engine = GetEngine()
+			local frame = _G.BetterFriendsFrame
+			if engine and frame then
+				self:RefreshMainFrameControls(engine, frame)
+			end
+		end
+	end)
 	self:WrapFriendsListRenderMethod("RenderDisplay")
 	self:WrapFriendsListRenderMethod("RenderClassicButtons")
+
+	for _, methodName in ipairs({
+		"UpdateMemberButton",
+		"UpdateMemberButtonVisuals",
+		"UpdateMemberButtons",
+		"UpdateRoleSummary",
+	}) do
+		self:WrapModuleMethod("RaidFrame", methodName, function()
+			if BFL.IsClassic then
+				local engine = GetEngine()
+				local frame = _G.BetterFriendsFrame
+				if engine and frame and frame.RaidFrame then
+					RestoreClassicRaidRoleIcons(engine, frame.RaidFrame)
+				end
+			end
+		end)
+	end
 
 	self:WrapModuleMethod("RecentAllies", "OnLoad", function()
 		local engine = GetEngine()
@@ -2027,6 +2373,12 @@ function DarkTheme:InstallHooks()
 	end)
 
 	self:WrapModuleMethod("WhoFrame", "Update", function()
+		local engine = GetEngine()
+		if engine then
+			self:SkinWhoFrame(engine)
+		end
+	end)
+	self:WrapModuleMethod("WhoFrame", "UpdateResponsiveLayout", function()
 		local engine = GetEngine()
 		if engine then
 			self:SkinWhoFrame(engine)

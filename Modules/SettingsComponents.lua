@@ -582,7 +582,7 @@ local function CreateClassicDropdown(parent, entries, isSelectedCallback, onSele
 
 	-- Classic + ElvUI: Expand clickable button area
 	if BFL.IsClassic then
-		local isElvUIActive = BFL.IsThemeActive and BFL:IsThemeActive("elvui")
+		local isElvUIActive = BFL.IsElvUISkinActive and BFL:IsElvUISkinActive()
 		if isElvUIActive then
 			local button = _G[dropdownName .. "Button"]
 			if button then

@@ -1,6 +1,6 @@
 -- Core.lua
 -- Main initialization file for BetterFriendlist addon
--- Version 2.6.4 - June 2026
+-- Version 2.6.5 - June 2026
 -- Complete replacement for WoW Friends frame with modular architecture
 
 -- Create addon namespace
@@ -136,9 +136,95 @@ local function CoreSetShown(frame, shown)
 	end
 end
 
+local function CoreIsClassicElvUISkinActive()
+	if not BFL.IsClassic then
+		return false
+	end
+	if BFL.IsElvUISkinActive then
+		return BFL:IsElvUISkinActive() == true
+	end
+	if BFL.IsThemeActive and BFL:IsThemeActive("elvui") then
+		return true
+	end
+
+	local DB = BFL.GetModule and BFL:GetModule("DB")
+	if DB and DB.Get then
+		return DB:Get("theme", "blizzard") == "elvui" or DB:Get("enableElvUISkin", false) == true
+	end
+	return BetterFriendlistDB
+		and (BetterFriendlistDB.theme == "elvui" or BetterFriendlistDB.enableElvUISkin == true)
+end
+
+local function CoreHideObjectArtwork(object)
+	if not object then
+		return
+	end
+	if object.GetRegions then
+		for _, region in ipairs({ object:GetRegions() }) do
+			if region and region.SetAlpha then
+				region:SetAlpha(0)
+			end
+			if region and region.Hide then
+				region:Hide()
+			end
+		end
+	end
+	if object.SetAlpha then
+		object:SetAlpha(0)
+	end
+	CoreSetShown(object, false)
+end
+
+local function CoreShowObjectArtwork(object)
+	if not object then
+		return
+	end
+	CoreSetShown(object, true)
+	if object.SetAlpha then
+		object:SetAlpha(1)
+	end
+	if object.SetVertexColor then
+		object:SetVertexColor(1, 1, 1, 1)
+	end
+end
+
+local function CoreHideClassicElvUIFrameArtifacts(frame)
+	if not (BFL.IsClassic and frame) then
+		return
+	end
+
+	local frameName = frame.GetName and frame:GetName()
+	local objects = {
+		frame.PortraitFrame,
+		frame.TopLeftCorner,
+		frame.TopBorder,
+		frame.LeftBorder,
+		frame.BFL_SimpleModeTopLeftCorner,
+		frame.PortraitOverlay,
+		frameName and _G[frameName .. "PortraitFrame"],
+		frameName and _G[frameName .. "TopLeftCorner"],
+		frameName and _G[frameName .. "TopBorder"],
+		frameName and _G[frameName .. "LeftBorder"],
+		frameName and _G[frameName .. "BFL_SimpleModeTopLeftCorner"],
+		_G.BetterFriendsFramePortraitFrame,
+		_G.BetterFriendsFrameTopLeftCorner,
+		_G.BetterFriendsFrameTopBorder,
+		_G.BetterFriendsFrameLeftBorder,
+		_G.BetterFriendsFrameBFL_SimpleModeTopLeftCorner,
+	}
+
+	for _, object in ipairs(objects) do
+		CoreHideObjectArtwork(object)
+	end
+end
+
 local function CoreUpdateClassicSimpleTopLeftPatch(frame, shown)
 	if not (frame and frame.CreateTexture) then
 		return
+	end
+
+	if shown and CoreIsClassicElvUISkinActive() then
+		shown = false
 	end
 
 	if not frame.BFL_SimpleModeTopLeftCorner then
@@ -167,6 +253,8 @@ local function CoreApplyClassicButtonFramePortraitLayout(frame, shouldShowPortra
 	if not hasButtonFramePieces then
 		return false
 	end
+	CoreShowObjectArtwork(frame.TopBorder)
+	CoreShowObjectArtwork(frame.LeftBorder)
 
 	local templateFunc = shouldShowPortrait and ButtonFrameTemplate_ShowPortrait or ButtonFrameTemplate_HidePortrait
 	if type(templateFunc) == "function" and frame.portrait and frame.PortraitFrame then
@@ -1125,19 +1213,21 @@ function BFL:UpdatePortraitVisibility(reason)
 	local simpleMode = DB:Get("simpleMode", false)
 	local shouldShow = not simpleMode
 	local shouldShowPortrait = shouldShow
+	local isClassicElvUISkinActive = CoreIsClassicElvUISkinActive()
 
-	-- Classic: Hide portrait when ElvUI is active and Simple Mode is disabled
-	-- (Changelog will be accessible via Contacts Menu instead to save space)
-	if BFL.IsClassic and not simpleMode then
-		local isElvUIActive = BFL.IsThemeActive and BFL:IsThemeActive("elvui")
-		if isElvUIActive then
-			shouldShowPortrait = false
-		end
+	-- Classic+ElvUI owns this area; never let the Simple Mode Blizzard
+	-- ButtonFrame patch draw underneath the ElvUI skin.
+	if isClassicElvUISkinActive then
+		shouldShowPortrait = false
 	end
 
 	local frame = BetterFriendsFrame
 
 	if frame then
+		if isClassicElvUISkinActive then
+			CoreHideClassicElvUIFrameArtifacts(frame)
+		end
+
 		-- Standard Hiding (The Nice Way)
 		-- We print what we find here to see if the frames actually exist
 		if frame.PortraitContainer then
@@ -1166,7 +1256,10 @@ function BFL:UpdatePortraitVisibility(reason)
 			globalPortrait:SetShown(shouldShowPortrait)
 		end
 
-		local classicButtonFrameLayoutApplied = CoreApplyClassicButtonFramePortraitLayout(frame, shouldShowPortrait)
+		local classicButtonFrameLayoutApplied = false
+		if not isClassicElvUISkinActive then
+			classicButtonFrameLayoutApplied = CoreApplyClassicButtonFramePortraitLayout(frame, shouldShowPortrait)
+		end
 
 		-- DEEP SEARCH (The "Find that Ring" Way)
 		-- We scan the frame regions AND immediate children's regions
@@ -1184,6 +1277,16 @@ function BFL:UpdatePortraitVisibility(reason)
 					local regionName = region:GetName()
 					local texture = region:GetTexture()
 					local atlas = region:GetAtlas()
+
+					if
+						isClassicElvUISkinActive
+						and objectToScan == frame
+						and regionName
+						and (regionName:find("TopBorder") or regionName:find("LeftBorder"))
+					then
+						region:SetAlpha(0)
+						region:Hide()
+					end
 
 					-- Strategy 1: SWAP the structural corner (The "Hole" for the portrait)
 
@@ -1222,7 +1325,10 @@ function BFL:UpdatePortraitVisibility(reason)
 						local parentFrame = objectToScan
 						local isMainButtonFrameCorner = BFL.IsClassic and classicButtonFrameLayoutApplied and parentFrame == frame
 
-						if isMainButtonFrameCorner then
+						if isClassicElvUISkinActive then
+							region:SetAlpha(0)
+							region:Hide()
+						elseif isMainButtonFrameCorner then
 							if not shouldShowPortrait then
 								region:Show()
 								region:SetAlpha(1)
@@ -1311,8 +1417,9 @@ function BFL:UpdatePortraitVisibility(reason)
 						end
 
 						if isRingOverlay then
-							region:SetShown(shouldShowPortrait)
-							region:SetAlpha(shouldShowPortrait and 1 or 0)
+							local showRing = shouldShowPortrait and not isClassicElvUISkinActive
+							region:SetShown(showRing)
+							region:SetAlpha(showRing and 1 or 0)
 						end
 					end
 				end
@@ -1360,14 +1467,13 @@ function BFL:UpdatePortraitVisibility(reason)
 			local totalWidth = baseWidth + extraWidth
 
 			-- Check if ElvUI is active - if yes, don't override the width set by ElvUI skin
-			local isElvUIActive = BFL.IsThemeActive and BFL:IsThemeActive("elvui")
-			if not (BFL.IsClassic and isElvUIActive) then
+			if not isClassicElvUISkinActive then
 				bnetFrame:SetWidth(totalWidth)
 			end
 
 			-- Position Adjustment (Centering)
 			-- Check if ElvUI is active - if yes, don't override the position set by ElvUI skin
-			if not (BFL.IsClassic and isElvUIActive) then
+			if not isClassicElvUISkinActive then
 				bnetFrame:ClearAllPoints()
 				if BFL.IsClassic and not shouldShowPortrait then
 					-- Shift right to center (Default x=10, shifting right by +5 to x=15)

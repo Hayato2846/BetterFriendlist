@@ -400,14 +400,14 @@ end
 local function GetThemeOptions()
 	local options = {
 		blizzard = T("SETTINGS_THEME_BLIZZARD", "Blizzard"),
+		dark = T("SETTINGS_THEME_DARK", "Dark"),
+		custom = T("SETTINGS_THEME_CUSTOM", "Custom"),
 	}
-	local order = { "blizzard" }
-	if BFL.AreThemeFeaturesEnabled and BFL:AreThemeFeaturesEnabled() then
-		options.dark = T("SETTINGS_THEME_DARK", "Dark")
-		options.custom = T("SETTINGS_THEME_CUSTOM", "Custom")
-		order[#order + 1] = "dark"
-		order[#order + 1] = "custom"
-	end
+	local order = { "blizzard", "dark", "custom" }
+	-- Dark and Custom are standard Theme page choices.
+	-- They are listed directly instead of being injected by Beta Features.
+	-- Theme tuning visibility follows the selected theme below.
+	-- ElvUI remains conditional on the addon being loaded.
 	if BFL.IsElvUIAvailable and BFL:IsElvUIAvailable() then
 		options.elvui = T("SETTINGS_THEME_ELVUI", "ElvUI")
 		order[#order + 1] = "elvui"
@@ -2167,7 +2167,7 @@ local function SetSettingsCenterBetaEnabled(value)
 end
 
 local function IsThemeCustomizationVisible()
-	return BFL.AreThemeFeaturesEnabled and BFL:AreThemeFeaturesEnabled()
+	return true
 end
 
 local function IsGuildTabAvailable()
@@ -2185,10 +2185,9 @@ local function IsGuildTabVisible()
 	return IsGuildTabAvailable()
 end
 
-local function IsRetail()
-	return BFL.IsRetail == true
-end
-
+-- Theme Customization is no longer a Retail-only beta card.
+-- Appearance owns the standard Theme page entry point.
+-- Other helpers below continue to model real beta-only pages.
 local function OpenSettingsPage(pageID, focusControlID)
 	return function()
 		SettingsDesigner:Show(pageID, focusControlID)
@@ -2243,7 +2242,7 @@ end
 
 local function ThemeVisible(theme)
 	return function()
-		return IsThemeCustomizationVisible() and GetDB("theme", "blizzard") == theme
+		return GetDB("theme", "blizzard") == theme
 	end
 end
 
@@ -3627,16 +3626,17 @@ local function RegisterAdvancedPages()
 		keywords = { "beta", "quickfilter", "sorter", "filter", "editor" },
 		newTagID = "groups.quickfilter.editor",
 	})
-	AddBetaFeatureLink({
-		id = "themeCustomization",
-		label = T("SETTINGS_BETA_FEATURE_THEME_CUSTOMIZATION", "Theme Customization"),
-		desc = T("SETTINGS_BETA_FEATURE_THEME_CUSTOMIZATION_DESC", "Unlocks Dark and Custom theme tuning for BetterFriendlist windows."),
-		pageID = "appearance.theme",
-		order = 210,
-		visibleWhen = IsRetail,
-		keywords = { "beta", "theme", "dark", "custom", "color" },
-		newTagID = "appearance.theme",
-	})
+	-- Theme Customization used to be listed here while Dark/Custom were beta.
+	-- It is now a standard Appearance page and must not be advertised as beta.
+	-- Keep QuickFilter, Guild, and Menu Bridge in this beta list.
+	-- The Appearance > Theme page is always reachable from Appearance.
+	-- Dark and Custom tuning visibility is handled by selected theme.
+	-- ElvUI remains conditional through the main theme dropdown.
+	-- This preserves the beta dashboard as a list of real beta features.
+	-- Retail and Classic share the same Theme page entry point.
+	-- The legacy ElvUI checkbox remains hidden after migration.
+	-- Saved Dark and Custom selections persist independently from Beta Features.
+	-- Do not re-add Theme Customization to advanced.beta.
 	AddBetaFeatureLink({
 		id = "guildTab",
 		label = T("SETTINGS_ENABLE_GUILD_TAB", "Guild Roster Tab (Beta)"),
