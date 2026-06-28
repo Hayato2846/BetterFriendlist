@@ -687,6 +687,7 @@ function PreviewMode:Enable()
 	self:ApplyBrokerPreviewData()
 
 	print("|cff00ff00BetterFriendlist:|r Preview data created:")
+	print("  |cffffffff- Quick Join tooltip class-row preview groups|r")
 	print("  |cffffffff- " .. #self.mockData.brokerFriends .. " broker friend rows|r")
 	print("  |cffffffff- " .. #self.mockData.guildMembers .. " broker guild rows|r")
 	print("  |cffffffff• " .. #self.mockData.friends .. " mock friends|r")
@@ -1500,11 +1501,33 @@ end
 
 function PreviewMode:EnableQuickJoinMock()
 	local QuickJoin = BFL:GetModule("QuickJoin")
-	if QuickJoin and QuickJoin.CreateMockPreset_12_1 then
+	if QuickJoin and QuickJoin.CreateMockPreset_Preview then
+		QuickJoin:CreateMockPreset_Preview()
+	elseif QuickJoin and QuickJoin.CreateMockPreset_12_1 then
 		QuickJoin:CreateMockPreset_12_1()
 	elseif QuickJoin and QuickJoin.CreateMockPreset_All then
 		QuickJoin:CreateMockPreset_All()
 	end
+end
+
+function PreviewMode:ShowQuickJoinPreview()
+	if BFL.IsClassic or not BFL.HasQuickJoin then
+		print("|cffff8800BetterFriendlist:|r Quick Join preview is only available on Retail clients.")
+		return
+	end
+
+	if _G.ShowBetterFriendsFrame then
+		_G.ShowBetterFriendsFrame(4)
+	elseif _G.ToggleBetterFriendsFrame then
+		_G.ToggleBetterFriendsFrame(4)
+	end
+
+	local QuickJoin = BFL:GetModule("QuickJoin")
+	if QuickJoin and QuickJoin.Update then
+		QuickJoin:Update(true)
+	end
+
+	print("|cff888888Hover the Quick Join preview cards to compare class rows and the count fallback.|r")
 end
 
 function PreviewMode:DisableQuickJoinMock()
@@ -1678,9 +1701,18 @@ function PreviewMode:HandleCommand(args)
 		self:Disable()
 	elseif cmd == "toggle" then
 		self:Toggle()
+	elseif cmd == "quickjoin" or cmd == "qj" or cmd == "tooltip" or cmd == "tooltips" then
+		if not self.enabled then
+			self:Enable()
+		else
+			self:EnableQuickJoinMock()
+			self:RefreshAllUI()
+		end
+		self:ShowQuickJoinPreview()
 	elseif cmd == "status" then
 		if self.enabled then
 			print("|cff00ff00BetterFriendlist:|r Preview mode is |cff00ff00ENABLED|r")
+			print("  |cffffffff- Quick Join tooltip class-row preview groups|r")
 			print("  |cffffffff- " .. #self.mockData.brokerFriends .. " broker friend rows|r")
 			print("  |cffffffff- " .. #self.mockData.guildMembers .. " broker guild rows|r")
 			print("  |cffffffff• " .. #self.mockData.friends .. " mock friends|r")
@@ -1695,6 +1727,7 @@ function PreviewMode:HandleCommand(args)
 		print("  |cffffcc00/bfl preview|r - Toggle preview mode")
 		print("  |cffffcc00/bfl preview off|r - Disable preview mode")
 		print("  |cffffcc00/bfl preview toggle|r - Toggle preview mode")
+		print("  |cffffcc00/bfl preview quickjoin|r - Open Quick Join tooltip preview")
 		print("  |cffffcc00/bfl preview status|r - Show current status")
 		print("")
 		print("|cff888888Preview mode displays realistic mock data for screenshots.|r")

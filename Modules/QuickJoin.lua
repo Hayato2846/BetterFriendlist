@@ -726,6 +726,7 @@ function QuickJoinEntry:New(guid, groupInfo)
 
 			-- Get lfgListID from queue data for fetching fresh searchResultInfo in tooltip
 			local lfgListID = queue.queueData and queue.queueData.lfgListID
+			local activityID = queue.queueData and queue.queueData.activityID
 			local queueType = queue.queueData and queue.queueData.queueType or queue.queueType or "lfg"
 
 			-- PERF: Reuse existing sub-table from previous pool cycle
@@ -738,6 +739,8 @@ function QuickJoinEntry:New(guid, groupInfo)
 			queueData.name = groupTitle
 			queueData.queueType = queueType
 			queueData.lfgListID = lfgListID
+			queueData.activityID = activityID
+			queueData.activityDisplayType = groupInfo.activityDisplayType
 			queueData.comment = groupInfo.lfgListCensored and nil or (queue.queueData and queue.queueData.comment)
 
 			-- CRITICAL: Blizzard caches the queue name (QuickJoin.lua:386-393)
@@ -948,6 +951,152 @@ local function GetQuickJoinEntryLFGListID(entry)
 	return queueData.lfgListID
 end
 
+local function GetQuickJoinEntryQueueData(entry)
+	return entry and entry.displayedQueues and entry.displayedQueues[1] and entry.displayedQueues[1].queueData
+end
+
+local function GetQuickJoinSearchResultInfo(lfgListID)
+	if not C_LFGList or not C_LFGList.GetSearchResultInfo then
+		return nil
+	end
+
+	local ok, searchResultInfo = pcall(C_LFGList.GetSearchResultInfo, lfgListID)
+	if not ok or not searchResultInfo then
+		return nil
+	end
+
+	return searchResultInfo
+end
+
+local function GetQuickJoinPrimaryActivityID(entry, searchResultInfo)
+	local queueData = GetQuickJoinEntryQueueData(entry)
+	if queueData and type(queueData.activityID) == "number" then
+		return queueData.activityID
+	end
+
+	if not searchResultInfo then
+		return nil
+	end
+
+	local ok, activityID = pcall(function()
+		return searchResultInfo.activityID
+	end)
+	if ok and type(activityID) == "number" then
+		return activityID
+	end
+
+	local okActivityIDs, activityIDs = pcall(function()
+		return searchResultInfo.activityIDs
+	end)
+	if not okActivityIDs or type(activityIDs) ~= "table" then
+		return nil
+	end
+
+	local okFirst, firstActivityID = pcall(function()
+		return activityIDs[1]
+	end)
+	if okFirst and type(firstActivityID) == "number" then
+		return firstActivityID
+	end
+
+	local okIterated, iteratedActivityID = pcall(function()
+		for key, value in pairs(activityIDs) do
+			if type(value) == "number" then
+				return value
+			end
+			if type(key) == "number" then
+				return key
+			end
+		end
+	end)
+	if okIterated and type(iteratedActivityID) == "number" then
+		return iteratedActivityID
+	end
+
+	return nil
+end
+
+local function GetQuickJoinActivityDisplayType(entry, searchResultInfo)
+	local groupInfo = entry and entry.groupInfo
+	if groupInfo and type(groupInfo.activityDisplayType) == "number" then
+		return groupInfo.activityDisplayType
+	end
+
+	local queueData = GetQuickJoinEntryQueueData(entry)
+	if queueData and type(queueData.activityDisplayType) == "number" then
+		return queueData.activityDisplayType
+	end
+
+	if not C_LFGList or not C_LFGList.GetActivityInfoTable then
+		return nil
+	end
+
+	local activityID = GetQuickJoinPrimaryActivityID(entry, searchResultInfo)
+	if not activityID then
+		return nil
+	end
+
+	local ok, activityInfo = pcall(C_LFGList.GetActivityInfoTable, activityID)
+	if ok and activityInfo and type(activityInfo.displayType) == "number" then
+		return activityInfo.displayType
+	end
+
+	return nil
+end
+
+local function QuickJoinDisplayTypeEnumeratesMembers(displayType)
+	local displayTypes = Enum and Enum.LFGListDisplayType
+	local roleEnumerate = displayTypes and displayTypes.RoleEnumerate or 1
+	local classEnumerate = displayTypes and displayTypes.ClassEnumerate or 2
+
+	return displayType == roleEnumerate or displayType == classEnumerate
+end
+
+local function BuildQuickJoinMockMemberClassEntries(entry, memberCount)
+	local groupInfo = entry and entry.groupInfo
+	local mockMembers = groupInfo and groupInfo._mockLFGListMembers
+	if not mockMembers or not memberCount or memberCount <= 0 then
+		return nil
+	end
+
+	local displayType = GetQuickJoinActivityDisplayType(entry, nil)
+	if not QuickJoinDisplayTypeEnumeratesMembers(displayType) then
+		return nil
+	end
+
+	if #mockMembers ~= memberCount then
+		return nil
+	end
+
+	local memberEntries = {}
+	for i = 1, memberCount do
+		local memberInfo = mockMembers[i]
+		if
+			not memberInfo
+			or not IsUsableTooltipValue(memberInfo.assignedRole)
+			or not IsUsableTooltipValue(memberInfo.classFilename)
+			or not IsUsableTooltipValue(memberInfo.className)
+		then
+			return nil
+		end
+
+		if memberInfo.specName and not IsUsableTooltipValue(memberInfo.specName) then
+			return nil
+		end
+
+		memberEntries[i] = {
+			role = memberInfo.assignedRole,
+			class = memberInfo.classFilename,
+			classLocalized = memberInfo.className,
+			specLocalized = memberInfo.specName,
+			isLeader = memberInfo.isLeader == true,
+			isLeaver = memberInfo.isLeaver == true,
+		}
+	end
+
+	return memberEntries
+end
+
 local function GetQuickJoinRoleIconMarkup(role, size)
 	size = tonumber(size) or 13
 
@@ -1023,11 +1172,33 @@ local function BuildQuickJoinMemberClassEntries(entry, memberCount, hasSecrets)
 		return nil
 	end
 
+	local mockEntries = BuildQuickJoinMockMemberClassEntries(entry, memberCount)
+	if mockEntries then
+		return mockEntries
+	end
+
 	if C_LFGList and C_LFGList.HasSearchResultInfo then
 		local ok, hasInfo = pcall(C_LFGList.HasSearchResultInfo, lfgListID)
 		if ok and not hasInfo then
 			return nil
 		end
+	end
+
+	local searchResultInfo = GetQuickJoinSearchResultInfo(lfgListID)
+	if not searchResultInfo then
+		return nil
+	end
+
+	local displayType = GetQuickJoinActivityDisplayType(entry, searchResultInfo)
+	if not QuickJoinDisplayTypeEnumeratesMembers(displayType) then
+		return nil
+	end
+
+	local okMemberCount, searchResultMemberCount = pcall(function()
+		return searchResultInfo.numMembers
+	end)
+	if okMemberCount and type(searchResultMemberCount) == "number" and searchResultMemberCount > 0 then
+		memberCount = searchResultMemberCount
 	end
 
 	local memberEntries = {}
@@ -2235,12 +2406,14 @@ function QuickJoin:GetGroupInfo(groupGUID)
 						if activityInfo then
 							-- BFL:DebugPrint("  ActivityInfo Found:", activityInfo.fullName)
 							info.activityName = activityInfo.fullName
+							info.activityDisplayType = activityInfo.displayType
 
 							-- Persist activity resolution so it survives secret mode transitions
 							-- (the groupCache TTL causes previousInfo to be lost after repeated secret fetches)
 							self.activityInfoCache[queueData.lfgListID] = self.activityInfoCache[queueData.lfgListID]
 								or {}
 							self.activityInfoCache[queueData.lfgListID].activityName = activityInfo.fullName
+							self.activityInfoCache[queueData.lfgListID].activityDisplayType = activityInfo.displayType
 
 							if activityInfo.groupFinderActivityGroupID then
 								local _, groupIcon =
@@ -3301,6 +3474,21 @@ local MOCK_CLASSES = {
 	{ name = "EVOKER", icon = "Interface\\Icons\\ClassIcon_Evoker", roles = { "HEALER", "DAMAGER" } },
 }
 
+local function GetMockLFGListDisplayType(kind)
+	local displayTypes = Enum and Enum.LFGListDisplayType
+	if kind == "class" then
+		return displayTypes and displayTypes.ClassEnumerate or 2
+	elseif kind == "role" then
+		return displayTypes and displayTypes.RoleEnumerate or 1
+	elseif kind == "hide" then
+		return displayTypes and displayTypes.HideAll or 3
+	elseif kind == "player" then
+		return displayTypes and displayTypes.PlayerCount or 4
+	end
+
+	return displayTypes and displayTypes.RoleCount or 0
+end
+
 -- ============================================
 -- MOCK SYSTEM STATE
 -- ============================================
@@ -3371,6 +3559,35 @@ local function CreateMockMembers(count, leaderName)
 	return members
 end
 
+local function CreateMockTooltipMembers(memberDefinitions, memberCount)
+	if type(memberDefinitions) ~= "table" then
+		return nil
+	end
+
+	if #memberDefinitions ~= memberCount then
+		return nil
+	end
+
+	local members = {}
+	for i = 1, memberCount do
+		local definition = memberDefinitions[i]
+		if type(definition) ~= "table" then
+			return nil
+		end
+
+		members[i] = {
+			assignedRole = definition.assignedRole or definition.role or "DAMAGER",
+			classFilename = definition.classFilename or definition.class or "WARRIOR",
+			className = definition.className or definition.classLocalized or definition.classFilename or "Warrior",
+			specName = definition.specName or definition.specLocalized or "",
+			isLeader = definition.isLeader == true,
+			isLeaver = definition.isLeaver == true,
+		}
+	end
+
+	return members
+end
+
 --[[
 	Create mock queue data following Blizzard API structure
 	@param queueType: "lfglist", "lfg", "pvp", "petbattle"
@@ -3389,7 +3606,8 @@ local function CreateMockQueueData(queueType, activityName, comment, options)
 	if queueType == "lfglist" then
 		-- LFG List (Group Finder) - has lfgListID and name
 		queueData.lfgListID = math.random(100000, 999999)
-		queueData.activityID = math.random(1000, 9999)
+		queueData.activityID = options.activityID or math.random(1000, 9999)
+		queueData.activityDisplayType = options.activityDisplayType
 		queueData.name = activityName -- Group title (shows in quotes)
 		queueData.comment = comment or ""
 	elseif queueType == "lfg" then
@@ -3457,6 +3675,8 @@ function QuickJoin:CreateMockGroup(params)
 			rated = params.rated,
 			battlefieldType = params.battlefieldType,
 			teamSize = params.teamSize,
+			activityID = params.activityID,
+			activityDisplayType = params.activityDisplayType,
 		}),
 	}
 	local firstQueueData = queues[1] and queues[1].queueData
@@ -3466,6 +3686,7 @@ function QuickJoin:CreateMockGroup(params)
 	local groupTitle = isCensored and GetCensoredLFGGroupRevealText() or params.activityName
 	local activityName = isCensored and (params.activityType or params.activityName) or params.activityName
 	local lfgListID = firstQueueData and firstQueueData.lfgListID
+	local tooltipMembers = CreateMockTooltipMembers(params.tooltipMembers, numMembers)
 	if isCensored and firstQueueData then
 		firstQueueData.name = groupTitle
 		firstQueueData.comment = nil
@@ -3493,6 +3714,7 @@ function QuickJoin:CreateMockGroup(params)
 		groupTitle = groupTitle,
 		activityName = activityName, -- Prioritize specific name
 		activityType = params.activityType, -- Store type for fallback logic
+		activityDisplayType = params.activityDisplayType,
 		activityIcon = params.icon, -- Allow nil to test resolution logic
 		queueInfo = "",
 		requestedToJoin = false,
@@ -3507,6 +3729,7 @@ function QuickJoin:CreateMockGroup(params)
 		_isMock = true,
 		_created = GetTime(),
 		_queueType = queueType,
+		_mockLFGListMembers = tooltipMembers,
 
 		-- Fake role distribution for display
 		numTanks = math.min(1, numMembers),
@@ -3702,6 +3925,87 @@ function QuickJoin:CreateMockPreset_All()
 	end
 	AddChatMessage(string.format("|cff00ff00BFL QuickJoin:|r Created %d mock groups (dynamic updates enabled)", count))
 
+	self:Update(true)
+end
+
+function QuickJoin:CreateMockPreset_Preview()
+	self:ClearMockGroups()
+
+	self:CreateMockGroup({
+		leaderName = "Rosterlead",
+		queueType = "lfglist",
+		activityName = "Tooltip class roster preview",
+		activityType = "Mythic+ Dungeon",
+		comment = "Hover this card to review class and role rows.",
+		numMembers = 5,
+		needTank = false,
+		needHealer = false,
+		needDamage = true,
+		icon = 525134,
+		activityDisplayType = GetMockLFGListDisplayType("role"),
+		tooltipMembers = {
+			{ role = "TANK", class = "WARRIOR", className = "Warrior", specName = "Protection", isLeader = true },
+			{ role = "HEALER", class = "PRIEST", className = "Priest", specName = "Holy" },
+			{ role = "DAMAGER", class = "MAGE", className = "Mage", specName = "Frost" },
+			{ role = "DAMAGER", class = "ROGUE", className = "Rogue", specName = "Subtlety" },
+			{ role = "DAMAGER", class = "EVOKER", className = "Evoker", specName = "Devastation" },
+		},
+	})
+
+	self:CreateMockGroup({
+		leaderName = "Raidclasses",
+		queueType = "lfglist",
+		activityName = "Raid tooltip class comparison",
+		activityType = "Raid",
+		comment = "Includes a leaver marker and mixed roles.",
+		numMembers = 8,
+		needTank = true,
+		needHealer = true,
+		needDamage = true,
+		icon = 1536895,
+		activityDisplayType = GetMockLFGListDisplayType("class"),
+		tooltipMembers = {
+			{ role = "TANK", class = "DEATHKNIGHT", className = "Death Knight", specName = "Blood", isLeader = true },
+			{ role = "TANK", class = "DEMONHUNTER", className = "Demon Hunter", specName = "Vengeance" },
+			{ role = "HEALER", class = "DRUID", className = "Druid", specName = "Restoration" },
+			{ role = "HEALER", class = "PALADIN", className = "Paladin", specName = "Holy" },
+			{ role = "DAMAGER", class = "WARLOCK", className = "Warlock", specName = "Demonology" },
+			{ role = "DAMAGER", class = "HUNTER", className = "Hunter", specName = "Marksmanship" },
+			{ role = "DAMAGER", class = "SHAMAN", className = "Shaman", specName = "Elemental", isLeaver = true },
+			{ role = "DAMAGER", class = "MONK", className = "Monk", specName = "Windwalker" },
+		},
+	})
+
+	self:CreateMockGroup({
+		leaderName = "Countfallback",
+		queueType = "lfglist",
+		activityName = "Tooltip count fallback comparison",
+		activityType = "World Quest",
+		comment = "Uses RoleCount display type, so it keeps the compact member count line.",
+		numMembers = 4,
+		needTank = true,
+		needHealer = true,
+		needDamage = true,
+		icon = 409602,
+		activityDisplayType = GetMockLFGListDisplayType("count"),
+	})
+
+	self:CreateMockGroup({
+		leaderName = "Censorcheck",
+		queueType = "lfglist",
+		activityName = "Stonevault +12 chill key",
+		activityType = "Mythic+ Dungeon",
+		comment = "Hidden until the preview reveal action is clicked.",
+		numMembers = 4,
+		needTank = false,
+		needHealer = true,
+		needDamage = true,
+		icon = 525134,
+		censored = true,
+	})
+
+	AddChatMessage("|cff00ff00BFL QuickJoin:|r Created Quick Join tooltip preview groups")
+	AddChatMessage("|cff888888Hover the Quick Join preview cards to compare class rows and the count fallback.|r")
 	self:Update(true)
 end
 
@@ -4193,6 +4497,8 @@ SlashCmdList["BFLQUICKJOIN"] = function(msg)
 			QuickJoin:CreateMockPreset_PvP()
 		elseif subCmd == "raid" then
 			QuickJoin:CreateMockPreset_Raid()
+		elseif subCmd == "preview" or subCmd == "tooltip" or subCmd == "classes" then
+			QuickJoin:CreateMockPreset_Preview()
 		elseif subCmd == "12.1" or subCmd == "121" or subCmd == "midnight" or subCmd == "censored" then
 			QuickJoin:CreateMockPreset_12_1()
 		elseif subCmd == "stress" or subCmd == "many" then
@@ -4291,6 +4597,7 @@ SlashCmdList["BFLQUICKJOIN"] = function(msg)
 		AddChatMessage(BFL.L.CORE_HELP_QJ_DUNGEON)
 		AddChatMessage(BFL.L.CORE_HELP_QJ_PVP)
 		AddChatMessage(BFL.L.CORE_HELP_QJ_RAID)
+		AddChatMessage("  |cffffffff/bfl qj mock preview|r - Tooltip class rows")
 		AddChatMessage("  |cffffffff/bfl qj mock 12.1|r - Retail 12.1 PTR")
 		AddChatMessage(BFL.L.QJ_MOCK_ICONS_HELP)
 		AddChatMessage(BFL.L.CORE_HELP_QJ_STRESS)

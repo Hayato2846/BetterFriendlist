@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Quick Join** - Group tooltips now use Retail member details when available, including classes and roles.
 
 ### Improved
+- **Preview Mode** - Quick Join preview data now includes hoverable groups for checking class and role tooltip rows, plus a direct `/bfl preview quickjoin` view.
 - **Classic Simple Mode** - Applies mode changes immediately without requiring a UI reload.
 - **Classic UI** - Modernized the Friends, WHO, Raid Tools, Settings, Guild action, invite account, and game account menus, made shared invite/header/tag/role icon art Classic-safe, and prepared safer shared Retail/Classic UI capability handling.
 
