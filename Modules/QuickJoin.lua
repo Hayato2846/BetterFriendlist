@@ -914,18 +914,186 @@ function QuickJoinEntry:CanJoin()
 	return self.groupInfo and self.groupInfo.canJoin ~= false
 end
 
+local QUICK_JOIN_ROLE_ATLASES_BORDERLESS = {
+	TANK = "groupfinder-icon-role-micro-tank",
+	HEALER = "groupfinder-icon-role-micro-heal",
+	DAMAGER = "groupfinder-icon-role-micro-dps",
+}
+
+local function IsUsableTooltipValue(value)
+	return value ~= nil and not (BFL.IsSecret and BFL:IsSecret(value))
+end
+
+local function GetQuickJoinEntryLFGListID(entry)
+	if not entry or not entry.displayedQueues or not entry.displayedQueues[1] then
+		return nil
+	end
+
+	local queueData = entry.displayedQueues[1].queueData
+	if not queueData or queueData.queueType ~= "lfglist" or not queueData.lfgListID then
+		return nil
+	end
+
+	local groupInfo = entry.groupInfo
+	if groupInfo and (groupInfo._hasSecretValues or groupInfo.lfgListCensored) then
+		return nil
+	end
+	if BFL.IsSecret and BFL:IsSecret(queueData.lfgListID) then
+		return nil
+	end
+	if BFL.StreamerMode and BFL.StreamerMode.IsActive and BFL.StreamerMode:IsActive() then
+		return nil
+	end
+
+	return queueData.lfgListID
+end
+
+local function GetQuickJoinRoleIconMarkup(role, size)
+	size = tonumber(size) or 13
+
+	local atlas = QUICK_JOIN_ROLE_ATLASES_BORDERLESS[role]
+	if atlas and BFL.GetAtlasOrTextureMarkup then
+		local markup = BFL.GetAtlasOrTextureMarkup(atlas, nil, size, size)
+		if markup and markup ~= "" then
+			return markup
+		end
+	end
+
+	if BFL.Compat and BFL.Compat.GetRoleIconMarkup then
+		local markup = BFL.Compat.GetRoleIconMarkup(role, size)
+		if markup and markup ~= "" then
+			return markup
+		end
+	end
+
+	if role == "TANK" then
+		return INLINE_TANK_ICON or "|TInterface\\LFGFrame\\UI-LFG-ICON-ROLES:13:13:0:0:64:16:0:16:0:16|t"
+	elseif role == "HEALER" then
+		return INLINE_HEALER_ICON or "|TInterface\\LFGFrame\\UI-LFG-ICON-ROLES:13:13:0:0:64:16:16:32:0:16|t"
+	elseif role == "DAMAGER" then
+		return INLINE_DAMAGER_ICON or "|TInterface\\LFGFrame\\UI-LFG-ICON-ROLES:13:13:0:0:64:16:32:48:0:16|t"
+	end
+
+	return ""
+end
+
+local function GetQuickJoinAtlasMarkup(atlas, width, height)
+	if atlas and BFL.GetAtlasOrTextureMarkup then
+		return BFL.GetAtlasOrTextureMarkup(atlas, nil, width, height)
+	end
+
+	return ""
+end
+
+local function FormatQuickJoinClassRole(className, specName)
+	className = className or UNKNOWN or ""
+	specName = specName or ""
+
+	if LFG_LIST_TOOLTIP_CLASS_ROLE then
+		return string.format(LFG_LIST_TOOLTIP_CLASS_ROLE, className, specName)
+	end
+
+	if specName ~= "" then
+		return specName .. " " .. className
+	end
+
+	return className
+end
+
+local function GetQuickJoinSearchResultPlayerInfo(lfgListID, memberIndex)
+	if not C_LFGList or not C_LFGList.GetSearchResultPlayerInfo then
+		return nil
+	end
+
+	local ok, memberInfo = pcall(C_LFGList.GetSearchResultPlayerInfo, lfgListID, memberIndex)
+	if not ok or not memberInfo then
+		return nil
+	end
+
+	return memberInfo
+end
+
+local function BuildQuickJoinMemberClassEntries(entry, memberCount, hasSecrets)
+	if hasSecrets or not memberCount or memberCount <= 0 then
+		return nil
+	end
+
+	local lfgListID = GetQuickJoinEntryLFGListID(entry)
+	if not lfgListID then
+		return nil
+	end
+
+	if C_LFGList and C_LFGList.HasSearchResultInfo then
+		local ok, hasInfo = pcall(C_LFGList.HasSearchResultInfo, lfgListID)
+		if ok and not hasInfo then
+			return nil
+		end
+	end
+
+	local memberEntries = {}
+	for i = 1, memberCount do
+		local memberInfo = GetQuickJoinSearchResultPlayerInfo(lfgListID, i)
+		if not memberInfo or not memberInfo.assignedRole then
+			return nil
+		end
+
+		if
+			not IsUsableTooltipValue(memberInfo.classFilename)
+			or not IsUsableTooltipValue(memberInfo.className)
+			or not IsUsableTooltipValue(memberInfo.assignedRole)
+		then
+			return nil
+		end
+
+		if memberInfo.specName and not IsUsableTooltipValue(memberInfo.specName) then
+			return nil
+		end
+
+		memberEntries[i] = {
+			role = memberInfo.assignedRole,
+			class = memberInfo.classFilename,
+			classLocalized = memberInfo.className,
+			specLocalized = memberInfo.specName,
+			isLeader = memberInfo.isLeader == true,
+			isLeaver = memberInfo.isLeaver == true,
+		}
+	end
+
+	return memberEntries
+end
+
+local function AddQuickJoinMemberClassLines(tooltip, memberEntries)
+	if not tooltip or not memberEntries or #memberEntries == 0 then
+		return false
+	end
+
+	tooltip:AddLine(MEMBERS_COLON or (L.MEMBERS_LABEL or "Members:"))
+
+	local leaderIcon = GetQuickJoinAtlasMarkup("groupfinder-icon-leader", 14, 9)
+	local leaverIcon = GetQuickJoinAtlasMarkup("groupfinder-icon-leaver", 12, 12)
+
+	for i = 1, #memberEntries do
+		local memberInfo = memberEntries[i]
+		local classColor = RAID_CLASS_COLORS and RAID_CLASS_COLORS[memberInfo.class] or NORMAL_FONT_COLOR
+		local roleIcon = GetQuickJoinRoleIconMarkup(memberInfo.role, 13)
+		local leaderString = (memberInfo.isLeader and leaderIcon ~= "") and (" " .. leaderIcon) or ""
+		local leaverString = (memberInfo.isLeaver and leaverIcon ~= "") and (" " .. leaverIcon) or ""
+		local line = roleIcon
+			.. " "
+			.. FormatQuickJoinClassRole(memberInfo.classLocalized, memberInfo.specLocalized)
+			.. leaderString
+			.. leaverString
+
+		tooltip:AddLine(line, classColor.r, classColor.g, classColor.b)
+	end
+
+	return true
+end
+
 function QuickJoinEntry:ApplyToTooltip(tooltip)
-	-- Blizzard's EXACT tooltip structure from LFGListUtil_SetSearchEntryTooltip (lines 4154-4312):
-	-- Blizzard uses HELPER FUNCTIONS that apply colors:
-	--   GameTooltip_AddHighlightLine() -> HIGHLIGHT_FONT_COLOR (1.0, 0.82, 0 = GOLD/YELLOW)
-	--   GameTooltip_AddNormalLine() -> NORMAL_FONT_COLOR (1.0, 1.0, 1.0 = WHITE)
-	--
-	-- Colors:
-	--   - Activity Name: HIGHLIGHT_FONT_COLOR (1.0, 0.82, 0 = gold/yellow)
-	--   - Leader Name: WHITE (1, 1, 1)
-	--   - Members count: HIGHLIGHT_FONT_COLOR (1.0, 0.82, 0 = gold/yellow)
-	--   - Available Roles text: HIGHLIGHT_FONT_COLOR (1.0, 0.82, 0 = gold/yellow)
-	--   - Comment: LFG_LIST_COMMENT_FONT_COLOR (0.6, 0.6, 0.6 = gray)
+	-- BFL-owned tooltip layout adapted from Retail's visible Group Finder data.
+	-- We read the same C_LFGList member details, but avoid delegating tooltip
+	-- construction to Blizzard frames/functions so our fallback and privacy guards stay in control.
 
 	local groupTitle = nil
 	local activityName = nil
@@ -964,8 +1132,8 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 		comment = nil
 	end
 
-	-- Get leader name - CRITICAL FIX: For lfglist queues, use searchResultInfo.leaderName (CHARACTER name)!
-	-- Like Blizzard's LFGListUtil_SetSearchEntryTooltip, NOT the BNet account name from GetRelationshipInfo
+	-- Get leader name from the LFG search result when possible instead of
+	-- treating the Battle.net account display name as the character leader name.
 
 	-- User Request: Prioritize BNet Name if available
 	local isBNetFriend = false
@@ -1140,15 +1308,18 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 	local healerCount = (self.groupInfo and self.groupInfo.numHealers) or 0
 	local dpsCount = (self.groupInfo and self.groupInfo.numDPS) or 0
 
-	local memberText = string.format(
-		"|cffffd100%s|r |cffffffff%d (%d/%d/%d)|r",
-		L.MEMBERS_LABEL or "Members:",
-		memberCount,
-		tankCount,
-		healerCount,
-		dpsCount
-	)
-	tooltip:AddLine(memberText)
+	local memberEntries = BuildQuickJoinMemberClassEntries(self, memberCount, hasSecrets)
+	if not AddQuickJoinMemberClassLines(tooltip, memberEntries) then
+		local memberText = string.format(
+			"|cffffd100%s|r |cffffffff%d (%d/%d/%d)|r",
+			L.MEMBERS_LABEL or "Members:",
+			memberCount,
+			tankCount,
+			healerCount,
+			dpsCount
+		)
+		tooltip:AddLine(memberText)
+	end
 
 	-- Line 6: Empty line (spacing) - BLIZZARD ADDS THIS BEFORE AVAILABLE ROLES
 	tooltip:AddLine(" ")

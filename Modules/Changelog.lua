@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Classic Simple Mode** - Restored the missing upper-left frame corner when the avatar is hidden.
+- **Quick Join** - Group tooltips now use Retail member details when available, including classes and roles.
 
 ### Improved
 - **Classic Simple Mode** - Applies mode changes immediately without requiring a UI reload.
