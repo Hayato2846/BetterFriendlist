@@ -1361,6 +1361,23 @@ function Compat.GetAtlasOrTextureMarkup(atlasName, fallbackFile, width, height)
 	return ""
 end
 
+function Compat.GetAtlasMarkup(atlasName, width, height, offsetX, offsetY)
+	width = tonumber(width) or 16
+	height = tonumber(height) or width
+	offsetX = tonumber(offsetX) or 0
+	offsetY = tonumber(offsetY) or 0
+
+	if not HasAtlas(atlasName) then
+		return ""
+	end
+
+	if type(CreateAtlasMarkup) == "function" then
+		return CreateAtlasMarkup(atlasName, width, height, offsetX, offsetY)
+	end
+
+	return string.format("|A:%s:%d:%d:%d:%d|a", atlasName, height, width, offsetX, offsetY)
+end
+
 function Compat.GetClientProgramIconPrefix(clientProgram, iconSize)
 	if type(clientProgram) ~= "string" or clientProgram == "" then
 		return ""
@@ -2334,6 +2351,7 @@ BFL.InitializeMultiSelectDropdown = Compat.InitializeMultiSelectDropdown
 BFL.RefreshDropdown = Compat.RefreshDropdown
 BFL.HasAtlas = Compat.HasAtlas
 BFL.SetTextureOrAtlas = Compat.SetTextureOrAtlas
+BFL.GetAtlasMarkup = Compat.GetAtlasMarkup
 BFL.GetAtlasOrTextureMarkup = Compat.GetAtlasOrTextureMarkup
 BFL.GetClientProgramIconPrefix = Compat.GetClientProgramIconPrefix
 BFL.ApplyIconProfile = Compat.ApplyIconProfile

@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Classic Simple Mode** - Restored the missing upper-left frame corner when the avatar is hidden.
-- **Quick Join** - Group tooltips now use Retail member details when available, including classes and roles.
+- **Quick Join** - Group tooltips now use Retail member details when available, including classes and roles, with correctly scaled leader markers.
 
 ### Improved
 - **Preview Mode** - Quick Join preview data now includes hoverable groups for checking class and role tooltip rows, plus a direct `/bfl preview quickjoin` view.

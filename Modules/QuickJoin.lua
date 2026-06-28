@@ -1127,6 +1127,13 @@ local function GetQuickJoinRoleIconMarkup(role, size)
 end
 
 local function GetQuickJoinAtlasMarkup(atlas, width, height)
+	if atlas and BFL.GetAtlasMarkup then
+		local markup = BFL.GetAtlasMarkup(atlas, width, height, 0, 0)
+		if markup and markup ~= "" then
+			return markup
+		end
+	end
+
 	if atlas and BFL.GetAtlasOrTextureMarkup then
 		return BFL.GetAtlasOrTextureMarkup(atlas, nil, width, height)
 	end
