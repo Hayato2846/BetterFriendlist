@@ -23,12 +23,12 @@
 
 ## Validation
 
-- For normal handoff, PR readiness, or "ready for QA" checks, run `tools\BFL-ReadyForQA.ps1`; pass `-DeployClient retail` for ordinary runtime QA and `-DeployClient all` when cross-flavor loading, TOC/XML, compatibility code, settings runtime, or release packaging changed.
-- For narrow tooling, ignore, package, or release metadata checks, `tools\BFL-PackageCheck.ps1` remains the focused package guard.
-- Use `tools\BFL-PreCommitDelta.ps1` to compare current pre-commit warnings against the checked-in baseline. Update that baseline with `-UpdateBaseline` only when intentionally accepting or removing known warning signatures.
-- For runtime, TOC, XML, locale, package, or deploy-tooling changes, deploy a fresh `CleanCopy` before handing back unless the user explicitly says not to deploy.
-- Deploy to Retail for ordinary runtime changes. Deploy to all clients when TOC/XML, package metadata, compatibility code, or release packaging changes.
-- Use `tools\BFL-ReviewCheck.ps1` for focused review diagnostics when the full ready-for-QA flow is too broad.
+- Match validation to risk. For docs, guidance, comments, or narrow tooling text changes, use `git status`, `git diff --stat`, and only the smallest relevant script.
+- For narrow tooling, ignore, package, or release metadata checks, run `tools\BFL-PackageCheck.ps1`.
+- For runtime Lua/XML/locales/settings changes, run `tools\BFL-PackageCheck.ps1`; deploy a fresh `CleanCopy` only when runtime QA is needed or requested.
+- Use `tools\BFL-PreCommitDelta.ps1` when code changes could introduce new pre-commit warning signatures. Update the baseline with `-UpdateBaseline` only when intentionally accepting or removing known warning signatures.
+- Use `tools\BFL-ReadyForQA.ps1` only for PR readiness, explicit "ready for QA", release-near work, broad/risky changes, or final handoff after substantial runtime work. Pass `-DeployClient retail` or `-DeployClient all` only when deploy validation is actually needed.
+- Use `tools\BFL-ReviewCheck.ps1` for focused review diagnostics when `ReadyForQA` is too broad.
 - Keep `.pkgmeta` aligned with ignored internal files so release packages do not include Codex, docs, tools, logs, backups, or workspace metadata.
 
 ## VSCode And Codex
@@ -36,3 +36,4 @@
 - Open VSCode on the main repo or one active worktree for implementation. Use `BetterFriendlist.code-workspace` for overview across worktrees.
 - Codex should run checks and deploy commands directly rather than asking the user to run a VSCode task.
 - Use Plan or Goal mode for broad migrations, cross-flavor work, or any task where the definition of done needs to stay visible.
+- Optimize for low process overhead: avoid repeated broad scans, full QA wrappers, manual/documentation lookups, or long status narration when the task is small and local.
