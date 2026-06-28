@@ -112,6 +112,9 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 		FRIENDS_TEXTURE_DND,
 	}
 	local function GetStatusSelectionText(status)
+		if IsModernDropdown(dropdown) then
+			return string.format("|T%s.tga:16:16:0:0|t", status or FRIENDS_TEXTURE_ONLINE)
+		end
 		return string.format("|T%s.tga:14:14:-2:-2|t", status or FRIENDS_TEXTURE_ONLINE)
 	end
 	local function IsSelected(status)
@@ -447,7 +450,7 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 		local primaryDropdown = header.PrimarySortDropdown
 		local secondaryDropdown = header.SecondarySortDropdown
 		-- Only set width if ElvUI is not active (ElvUI Skin handles sizing)
-		local isElvUIActive = BFL.IsThemeActive and BFL:IsThemeActive("elvui")
+		local isElvUIActive = BFL.IsElvUISkinActive and BFL:IsElvUISkinActive()
 		if not isElvUIActive then
 			BFL.SetDropdownWidth(primaryDropdown, 70)
 		end
@@ -497,7 +500,7 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 
 		-- Secondary Sort Dropdown
 		-- Only set width if ElvUI is not active (ElvUI Skin handles sizing)
-		local isElvUIActiveSecondary = BFL.IsThemeActive and BFL:IsThemeActive("elvui")
+		local isElvUIActiveSecondary = BFL.IsElvUISkinActive and BFL:IsElvUISkinActive()
 		if not isElvUIActiveSecondary then
 			BFL.SetDropdownWidth(secondaryDropdown, 70)
 		end

@@ -1672,7 +1672,7 @@ function FriendsList:UpdateSearchBoxState()
 			-- was reparented to BetterFriendsFrame during Simple Mode
 			local header = frame.FriendsTabHeader
 			if BFL.IsClassic then
-				local isClassicElvUISkinActive = BFL.IsThemeActive and BFL:IsThemeActive("elvui")
+				local isClassicElvUISkinActive = BFL.IsElvUISkinActive and BFL:IsElvUISkinActive()
 				local useModernHeaderDropdowns = IsModernDropdown(header.QuickFilterDropdown)
 					and IsModernDropdown(header.PrimarySortDropdown)
 					and IsModernDropdown(header.SecondarySortDropdown)

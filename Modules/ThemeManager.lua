@@ -26,7 +26,7 @@ local function NormalizeTheme(theme)
 end
 
 local function AreThemeFeaturesEnabled()
-	return BFL.IsRetail == true and BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures == true
+	return true
 end
 
 local function ShouldUseLegacyElvUISkinSetting()
@@ -64,6 +64,29 @@ local function GetStoredTheme()
 	return NormalizeTheme(BetterFriendlistDB.theme)
 end
 
+local function RefreshClassicBlizzardPortraitVisibility(reason)
+	if not (BFL.IsClassic and BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() == "blizzard") then
+		return
+	end
+	if type(BFL.UpdatePortraitVisibility) ~= "function" then
+		return
+	end
+
+	BFL:UpdatePortraitVisibility(reason or "theme-manager-blizzard")
+	if C_Timer and C_Timer.After then
+		C_Timer.After(0, function()
+			if
+				BFL.IsClassic
+				and BFL.GetEffectiveTheme
+				and BFL:GetEffectiveTheme() == "blizzard"
+				and type(BFL.UpdatePortraitVisibility) == "function"
+			then
+				BFL:UpdatePortraitVisibility((reason or "theme-manager-blizzard") .. "-deferred")
+			end
+		end)
+	end
+end
+
 function BFL:AreThemeFeaturesEnabled()
 	return AreThemeFeaturesEnabled()
 end
@@ -78,9 +101,6 @@ end
 
 function BFL:GetEffectiveTheme()
 	local theme = GetStoredTheme()
-	if (theme == "dark" or theme == "custom") and not AreThemeFeaturesEnabled() then
-		return "blizzard"
-	end
 	if theme == "elvui" and not IsElvUIAvailable() then
 		return "blizzard"
 	end
@@ -91,9 +111,18 @@ function BFL:IsThemeActive(theme)
 	return self:GetEffectiveTheme() == NormalizeTheme(theme)
 end
 
+function BFL:IsElvUISkinActive()
+	local ElvUISkin = self.GetModule and self:GetModule("ElvUISkin")
+	if ElvUISkin and ElvUISkin.IsSkinEnabled then
+		return ElvUISkin:IsSkinEnabled() == true
+	end
+
+	return self:IsThemeActive("elvui") or IsLegacyElvUISkinEnabled()
+end
+
 function BFL:UsesFlatTheme()
 	local theme = self:GetEffectiveTheme()
-	return theme == "dark" or theme == "custom" or theme == "elvui"
+	return theme == "dark" or theme == "custom"
 end
 
 function BFL:UsesDarkSkinTheme()
@@ -131,9 +160,6 @@ end
 
 function ThemeManager:SetTheme(theme, reason)
 	theme = NormalizeTheme(theme)
-	if (theme == "dark" or theme == "custom") and not AreThemeFeaturesEnabled() then
-		theme = "blizzard"
-	end
 
 	local DB = BFL:GetModule("DB")
 	if DB then
@@ -183,6 +209,7 @@ function ThemeManager:ApplyCurrentTheme(reason)
 	if BFL.ForceRefreshFriendsList then
 		BFL:ForceRefreshFriendsList()
 	end
+	RefreshClassicBlizzardPortraitVisibility(reason or "theme-manager")
 
 	local Changelog = BFL:GetModule("Changelog")
 	if Changelog and Changelog.RefreshAccentColors then
@@ -206,6 +233,16 @@ function ThemeManager:ApplyCurrentTheme(reason)
 	local SettingsDesigner = BFL:GetModule("SettingsDesigner")
 	if SettingsDesigner and SettingsDesigner.ApplySkin then
 		SettingsDesigner:ApplySkin(reason or "theme-manager")
+	end
+
+	local ElvUISkin = BFL:GetModule("ElvUISkin")
+	if ElvUISkin then
+		local useElvUISkin = (ElvUISkin.IsSkinEnabled and ElvUISkin:IsSkinEnabled()) or theme == "elvui"
+		if useElvUISkin and ElvUISkin.RegisterSkin then
+			ElvUISkin:RegisterSkin()
+		elseif ElvUISkin.HideClassicMainFrameShell then
+			ElvUISkin:HideClassicMainFrameShell()
+		end
 	end
 
 	return true

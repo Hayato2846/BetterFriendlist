@@ -744,8 +744,8 @@ local TAB_DEFINITIONS = {
 		id = 10,
 		name = L.SETTINGS_TAB_THEME or "Theme",
 		icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\sliders.blp",
-		beta = true,
-		retailOnly = true,
+		beta = false,
+		-- Theme is a standard Retail and Classic settings tab.
 	},
 	{
 		id = 2,
@@ -852,7 +852,7 @@ local function ShouldShowLegacyElvUISkinSetting()
 	if BFL.ShouldUseLegacyElvUISkinSetting then
 		return BFL:ShouldUseLegacyElvUISkinSetting()
 	end
-	return not (BFL.IsRetail == true and BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures == true)
+	return false
 end
 
 local function IsLegacyElvUISkinSelected(DB)
@@ -3452,9 +3452,9 @@ function Settings:OnThemeChanged(theme)
 	if theme ~= "blizzard" and theme ~= "dark" and theme ~= "custom" and theme ~= "elvui" then
 		theme = "blizzard"
 	end
-	if IsDarkSkinThemeValue(theme) and (not BFL.AreThemeFeaturesEnabled or not BFL:AreThemeFeaturesEnabled()) then
-		theme = "blizzard"
-	end
+	-- Dark and Custom are standard theme values.
+	-- They remain selectable even when Beta Features are disabled.
+	-- Only unavailable addon-backed themes fall back to Blizzard.
 	if theme == "elvui" and (not BFL.IsElvUIAvailable or not BFL:IsElvUIAvailable()) then
 		theme = "blizzard"
 	end
@@ -6509,14 +6509,14 @@ function Settings:RefreshAdvancedTab()
 
 			-- If disabling Beta and currently on ANY Beta tab, switch to General
 			if not checked then
-				if IsDarkSkinThemeValue(oldStoredTheme) then
-					if ThemeManager and ThemeManager.SetTheme then
-						ThemeManager:SetTheme("blizzard", "beta-disabled")
-					else
-						DB:Set("theme", "blizzard")
-						DB:Set("enableElvUISkin", false)
-					end
-				elseif oldStoredTheme == "elvui" or oldEffectiveTheme == "elvui" or DB:Get("enableElvUISkin", false) == true then
+				-- Theme is stable, so disabling Beta must not force Dark/Custom to Blizzard.
+				-- Other beta tabs still switch back to General below.
+				-- ElvUI compatibility remains synced through the theme setting.
+				-- Keep oldStoredTheme/oldEffectiveTheme so legacy ElvUI survives the toggle.
+				-- Dark and Custom are refreshed through ApplyCurrentTheme below.
+				-- ThemeManager:SetTheme("blizzard") is intentionally not called here.
+				-- Beta Features now only gates the remaining experimental tabs and toggles.
+				if oldStoredTheme == "elvui" or oldEffectiveTheme == "elvui" or DB:Get("enableElvUISkin", false) == true then
 					DB:Set("enableElvUISkin", true)
 					DB:Set("theme", "elvui")
 					if ThemeManager and ThemeManager.ApplyCurrentTheme then

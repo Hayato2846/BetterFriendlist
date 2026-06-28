@@ -80,7 +80,7 @@ function QuickFilters:InitDropdown(dropdown)
 	end
 
 	if not IsModernDropdown(dropdown) then
-		local isElvUIActive = BFL.IsThemeActive and BFL:IsThemeActive("elvui")
+		local isElvUIActive = BFL.IsElvUISkinActive and BFL:IsElvUISkinActive()
 		if not isElvUIActive then
 			BFL.SetDropdownWidth(dropdown, 70)
 		end

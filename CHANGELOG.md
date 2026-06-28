@@ -7,19 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [DRAFT]
+## [2.6.5]        - 2026-06-28
 
 ### Added
-- **NSRT Compatibility** - Added support for docking Northern Sky Raid Tools' Missing Raid Buffs panel to BetterFriendlist's Raid tab.
+- **NSRT Compatibility** - You can now dock Northern Sky Raid Tools' Missing Raid Buffs panel into the BetterFriendlist Raid tab. This currently requires an NSRT alpha version.
+- **Theme Customization** - Dark and Custom themes are no longer beta and now work on Retail and Classic. Find them in the old settings under Settings > Theme, or in the Settings Center under Appearance > Theme. ElvUI users can pick the ElvUI skin from that same Theme page.
 
 ### Fixed
-- **Classic Simple Mode** - Restored the missing upper-left frame corner when the avatar is hidden.
-- **Quick Join** - Group tooltips now use Retail member details when available, including classes and roles, with correctly scaled leader markers.
+- **Classic Themes** - The Friends window should look cleaner in Dark and Custom themes now: search box, bottom tabs, selected tab highlight, scroll buttons, WHO headers, and Raid role icons line up better.
+- **Classic Simple Mode** - The missing top-left Blizzard frame corner is back when the avatar is hidden in Blizzard theme.
+- **Quick Join** - Retail group tooltips now show better member info when available, including classes, roles, and leader markers.
 
 ### Improved
-- **Preview Mode** - Quick Join preview data now includes hoverable groups for checking class and role tooltip rows, plus a direct `/bfl preview quickjoin` view.
-- **Classic Simple Mode** - Applies mode changes immediately without requiring a UI reload.
-- **Classic UI** - Modernized the Friends, WHO, Raid Tools, Settings, Guild action, invite account, and game account menus, made shared invite/header/tag/role icon art Classic-safe, and prepared safer shared Retail/Classic UI capability handling.
+- **Classic Dropdowns** - Friends header, WHO, settings, and builder dropdowns now have cleaner icon placement and more reliable click areas in Dark/Custom themes and ElvUI.
+- **Classic Simple Mode** - Turning Simple Mode on or off updates the frame right away, no reload needed.
+- **Classic UI** - More Classic menus use the newer menu style where the client supports it, and shared icon art is safer on Classic.
 
 ---
 
