@@ -31,13 +31,194 @@ BFL.IsRetail = (tocVersion >= 100000) -- Dragonflight+ (10.x+)
 BFL.IsTWW = (tocVersion >= 110200 and tocVersion < 120000) -- The War Within (11.x)
 BFL.IsMidnight = (tocVersion >= 120000) -- Midnight (12.x+)
 
--- Feature Flags (detect what APIs are available)
-BFL.HasModernScrollBox = BFL.IsRetail -- ScrollBox API (Retail 10.0+)
-BFL.HasModernMenu = BFL.IsRetail -- MenuUtil, Menu.ModifyMenu (Retail 11.0+)
-BFL.HasRecentAllies = BFL.IsTWW or BFL.IsMidnight -- C_RecentAllies (TWW 11.0.7+)
-BFL.HasEditMode = BFL.IsRetail -- Edit Mode API (Retail 10.0+)
-BFL.HasModernDropdown = BFL.IsRetail -- WowStyle1DropdownTemplate (Retail 10.0+)
+local function HasGlobalFunction(name)
+	return type(_G[name]) == "function"
+end
+
+local function HasNamespaceFunction(namespaceName, functionName)
+	local namespace = _G[namespaceName]
+	return type(namespace) == "table" and type(namespace[functionName]) == "function"
+end
+
+local function DetectUICapabilities()
+	return {
+		ModernScrollBox = HasGlobalFunction("CreateScrollBoxListLinearView")
+			and HasGlobalFunction("CreateDataProvider")
+			and HasNamespaceFunction("ScrollUtil", "InitScrollBoxListWithScrollBar"),
+		ModernMenu = HasNamespaceFunction("MenuUtil", "CreateContextMenu")
+			or HasNamespaceFunction("Menu", "ModifyMenu"),
+		RecentAllies = HasNamespaceFunction("C_RecentAllies", "IsSystemEnabled"),
+		EditMode = BFL.IsRetail
+			and (HasNamespaceFunction("C_EditMode", "GetLayouts") or type(EditModeManagerFrame) == "table"),
+		ModernDropdown = type(DropdownButtonMixin) == "table"
+			and type(DropdownButtonMixin.SetupMenu) == "function",
+		ModernColorPicker = type(ColorPickerFrame) == "table"
+			and type(ColorPickerFrame.SetupColorPickerAndShow) == "function",
+	}
+end
+
+BFL.Capabilities = DetectUICapabilities()
+
+-- Public feature flags prefer real client capabilities where the API is self-contained.
+-- ScrollBox remains a validated-default flag because some BFL frames still need
+-- frame-level parent/anchor checks before Classic can safely use the modern path.
+BFL.HasModernScrollBox = BFL.IsRetail and BFL.Capabilities.ModernScrollBox -- ScrollBox API (Retail 10.0+)
+BFL.HasModernMenu = BFL.Capabilities.ModernMenu -- MenuUtil, Menu.ModifyMenu
+BFL.HasRecentAllies = (BFL.IsTWW or BFL.IsMidnight) and BFL.HasModernScrollBox and BFL.Capabilities.RecentAllies -- C_RecentAllies (TWW 11.0.7+)
+BFL.HasEditMode = BFL.IsRetail and BFL.Capabilities.EditMode -- Edit Mode API (Retail 10.0+)
+BFL.HasModernDropdown = BFL.Capabilities.ModernDropdown -- WowStyle1DropdownTemplate
 BFL.HasModernColorPicker = true -- ColorPickerFrame:SetupColorPickerAndShow on supported Retail and Classic clients
+
+BFL.CanUseModernScrollBox = BFL.Capabilities.ModernScrollBox
+BFL.CanUseModernMenu = BFL.Capabilities.ModernMenu
+BFL.CanUseModernDropdown = BFL.Capabilities.ModernDropdown
+
+local CORE_ATLAS_AVAILABILITY = {}
+
+local function CoreHasAtlas(atlasName)
+	if not atlasName or not (C_Texture and type(C_Texture.GetAtlasInfo) == "function") then
+		return false
+	end
+	if CORE_ATLAS_AVAILABILITY[atlasName] ~= nil then
+		return CORE_ATLAS_AVAILABILITY[atlasName]
+	end
+	local ok, info = pcall(C_Texture.GetAtlasInfo, atlasName)
+	local available = ok and info ~= nil
+	CORE_ATLAS_AVAILABILITY[atlasName] = available
+	return available
+end
+
+local function CoreTrySetAtlas(texture, atlasName, useAtlasSize)
+	if not (texture and texture.SetAtlas and CoreHasAtlas(atlasName)) then
+		return false
+	end
+	local ok = pcall(texture.SetAtlas, texture, atlasName, useAtlasSize)
+	return ok == true
+end
+
+local function CoreSetClassicTopLeftCornerTexture(texture)
+	if not texture then
+		return
+	end
+
+	if texture.SetTexture then
+		texture:SetTexture("Interface\\FrameGeneral\\UI-Frame")
+	end
+	if texture.SetTexCoord then
+		texture:SetTexCoord(0.63281250, 0.88281250, 0.28125000, 0.53125000)
+	end
+	if texture.SetSize then
+		texture:SetSize(33, 33)
+	end
+end
+
+local function CoreSetPoint(frame, ...)
+	if frame and frame.SetPoint then
+		frame:SetPoint(...)
+	end
+end
+
+local function CoreClearPoints(frame)
+	if frame and frame.ClearAllPoints then
+		frame:ClearAllPoints()
+	end
+end
+
+local function CoreSetShown(frame, shown)
+	if frame and frame.SetShown then
+		frame:SetShown(shown)
+	elseif frame then
+		if shown and frame.Show then
+			frame:Show()
+		elseif not shown and frame.Hide then
+			frame:Hide()
+		end
+	end
+end
+
+local function CoreUpdateClassicSimpleTopLeftPatch(frame, shown)
+	if not (frame and frame.CreateTexture) then
+		return
+	end
+
+	if not frame.BFL_SimpleModeTopLeftCorner then
+		frame.BFL_SimpleModeTopLeftCorner = frame:CreateTexture(nil, "OVERLAY", nil, 2)
+	end
+
+	local patch = frame.BFL_SimpleModeTopLeftCorner
+	CoreSetClassicTopLeftCornerTexture(patch)
+	CoreClearPoints(patch)
+	CoreSetPoint(patch, "TOPLEFT", frame, "TOPLEFT", -6, 1)
+	if patch.SetAlpha then
+		patch:SetAlpha(1)
+	end
+	if patch.SetVertexColor then
+		patch:SetVertexColor(1, 1, 1, 1)
+	end
+	CoreSetShown(patch, shown)
+end
+
+local function CoreApplyClassicButtonFramePortraitLayout(frame, shouldShowPortrait)
+	if not (BFL.IsClassic and frame) then
+		return false
+	end
+
+	local hasButtonFramePieces = frame.TopLeftCorner and frame.TopBorder and frame.LeftBorder and frame.TopRightCorner
+	if not hasButtonFramePieces then
+		return false
+	end
+
+	local templateFunc = shouldShowPortrait and ButtonFrameTemplate_ShowPortrait or ButtonFrameTemplate_HidePortrait
+	if type(templateFunc) == "function" and frame.portrait and frame.PortraitFrame then
+		pcall(templateFunc, frame)
+	end
+
+	if shouldShowPortrait and frame.PortraitFrame then
+		CoreSetShown(frame.PortraitFrame, true)
+		CoreSetShown(frame.TopLeftCorner, false)
+		CoreUpdateClassicSimpleTopLeftPatch(frame, false)
+
+		CoreClearPoints(frame.TopBorder)
+		CoreSetPoint(frame.TopBorder, "TOPLEFT", frame.PortraitFrame, "TOPRIGHT", 0, -10)
+		CoreSetPoint(frame.TopBorder, "TOPRIGHT", frame.TopRightCorner, "TOPLEFT", 0, 0)
+
+		CoreClearPoints(frame.LeftBorder)
+		CoreSetPoint(frame.LeftBorder, "TOPLEFT", frame.PortraitFrame, "BOTTOMLEFT", 8, 0)
+		if frame.BotLeftCorner then
+			CoreSetPoint(frame.LeftBorder, "BOTTOMLEFT", frame.BotLeftCorner, "TOPLEFT", 0, 0)
+		end
+	else
+		CoreSetShown(frame.PortraitFrame, false)
+		CoreSetShown(frame.TopLeftCorner, true)
+
+		CoreClearPoints(frame.TopLeftCorner)
+		CoreSetClassicTopLeftCornerTexture(frame.TopLeftCorner)
+		CoreSetPoint(frame.TopLeftCorner, "TOPLEFT", frame, "TOPLEFT", -6, 1)
+		if frame.TopLeftCorner.SetAlpha then
+			frame.TopLeftCorner:SetAlpha(1)
+		end
+		if frame.TopLeftCorner.SetVertexColor then
+			frame.TopLeftCorner:SetVertexColor(1, 1, 1, 1)
+		end
+		CoreUpdateClassicSimpleTopLeftPatch(frame, true)
+
+		CoreClearPoints(frame.TopBorder)
+		CoreSetPoint(frame.TopBorder, "TOPLEFT", frame.TopLeftCorner, "TOPRIGHT", 0, 0)
+		CoreSetPoint(frame.TopBorder, "TOPRIGHT", frame.TopRightCorner, "TOPLEFT", 0, 0)
+
+		CoreClearPoints(frame.LeftBorder)
+		CoreSetPoint(frame.LeftBorder, "TOPLEFT", frame.TopLeftCorner, "BOTTOMLEFT", 0, 0)
+		if frame.BotLeftCorner then
+			CoreSetPoint(frame.LeftBorder, "BOTTOMLEFT", frame.BotLeftCorner, "TOPLEFT", 0, 0)
+		end
+	end
+
+	if frame.portrait and frame.PortraitButton then
+		frame.portrait:SetShown(false)
+	end
+
+	return true
+end
 
 -- Feature Detection (detect available APIs for optional features)
 BFL.UseClassID = false -- 11.2.7+ classID optimization
@@ -985,6 +1166,8 @@ function BFL:UpdatePortraitVisibility(reason)
 			globalPortrait:SetShown(shouldShowPortrait)
 		end
 
+		local classicButtonFrameLayoutApplied = CoreApplyClassicButtonFramePortraitLayout(frame, shouldShowPortrait)
+
 		-- DEEP SEARCH (The "Find that Ring" Way)
 		-- We scan the frame regions AND immediate children's regions
 
@@ -1037,8 +1220,16 @@ function BFL:UpdatePortraitVisibility(reason)
 
 					if isTargetCorner then
 						local parentFrame = objectToScan
+						local isMainButtonFrameCorner = BFL.IsClassic and classicButtonFrameLayoutApplied and parentFrame == frame
 
-						if shouldShowPortrait then
+						if isMainButtonFrameCorner then
+							if not shouldShowPortrait then
+								region:Show()
+								region:SetAlpha(1)
+								region:SetVertexColor(1, 1, 1, 1)
+								CoreSetClassicTopLeftCornerTexture(region)
+							end
+						elseif shouldShowPortrait then
 							-- Restore original portrait corner (Open with hole)
 							region:Show() -- Ensure visible
 							region:SetAlpha(1)
@@ -1052,7 +1243,7 @@ function BFL:UpdatePortraitVisibility(reason)
 								region:SetTexture(374156) -- Original Classic FileID for FriendFrame TopLeft
 								region:SetTexCoord(0, 1, 0, 1)
 							else
-								region:SetAtlas("UI-Frame-PortraitMetal-CornerTopLeft", true)
+								CoreTrySetAtlas(region, "UI-Frame-PortraitMetal-CornerTopLeft", true)
 							end
 						else
 							-- Swap to standard square corner (Closed hole)
@@ -1061,11 +1252,9 @@ function BFL:UpdatePortraitVisibility(reason)
 							region:SetAlpha(1)
 							region:SetVertexColor(1, 1, 1, 1)
 
-							if BFL.IsClassic then
-								-- Classic workaround: Use Atlas as requested (User prefers this + Reload approach)
-								region:SetAtlas("UI-Frame-Metal-CornerTopLeft", true)
-							else
-								region:SetAtlas("UI-Frame-Metal-CornerTopLeft", true)
+							local appliedAtlas = CoreTrySetAtlas(region, "UI-Frame-Metal-CornerTopLeft", true)
+							if not appliedAtlas and BFL.IsClassic then
+								CoreSetClassicTopLeftCornerTexture(region)
 							end
 
 							if parentFrame.SimpleCornerPatch then

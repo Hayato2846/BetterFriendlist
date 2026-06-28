@@ -10,42 +10,38 @@ local SOURCE_BLIZZARD = "blizzard"
 local SOURCE_CUSTOM = "custom"
 local CUSTOM_PREFIX = "custom:"
 local TAG_ICON = "Interface\\AddOns\\BetterFriendlist\\Icons\\tag"
-local ROLE_ICON_TEXTURE = "Interface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES"
+
+local function GetRoleIconDefaults(role, legacyValues)
+	local profile = BFL.GetRoleIconProfile and BFL.GetRoleIconProfile(role) or {}
+	profile.legacyValues = legacyValues
+	return profile
+end
 
 local ROLE_ICONS = {
-	damager = {
-		atlas = "UI-LFG-RoleIcon-DPS-Micro-GroupFinder",
-		fallbackAtlas = "groupfinder-icon-role-large-dps",
-		texture = ROLE_ICON_TEXTURE,
-		texCoord = { 20 / 64, 39 / 64, 22 / 64, 41 / 64 },
-		legacyValues = {
+	damager = GetRoleIconDefaults(
+		"DAMAGER",
+		{
 			"roleicon-tiny-dps",
 			"Interface\\AddOns\\BetterFriendlist\\Icons\\zap",
 			"Interface\\AddOns\\BetterFriendlist\\Icons\\crosshair",
 			"Interface\\AddOns\\BetterFriendlist\\Icons\\target",
-		},
-	},
-	healer = {
-		atlas = "UI-LFG-RoleIcon-Healer-Micro-GroupFinder",
-		fallbackAtlas = "groupfinder-icon-role-large-heal",
-		texture = ROLE_ICON_TEXTURE,
-		texCoord = { 20 / 64, 39 / 64, 1 / 64, 20 / 64 },
-		legacyValues = {
+		}
+	),
+	healer = GetRoleIconDefaults(
+		"HEALER",
+		{
 			"roleicon-tiny-healer",
 			"Interface\\AddOns\\BetterFriendlist\\Icons\\heart",
 			"Interface\\AddOns\\BetterFriendlist\\Icons\\life-buoy",
-		},
-	},
-	tank = {
-		atlas = "UI-LFG-RoleIcon-Tank-Micro-GroupFinder",
-		fallbackAtlas = "groupfinder-icon-role-large-tank",
-		texture = ROLE_ICON_TEXTURE,
-		texCoord = { 0, 19 / 64, 22 / 64, 41 / 64 },
-		legacyValues = {
+		}
+	),
+	tank = GetRoleIconDefaults(
+		"TANK",
+		{
 			"roleicon-tiny-tank",
 			"Interface\\AddOns\\BetterFriendlist\\Icons\\shield",
-		},
-	},
+		}
+	),
 }
 
 local DEFAULT_SETTINGS = {
@@ -2370,22 +2366,27 @@ function FriendTags:OpenSettings(tagId)
 	return false
 end
 
-function FriendTags:PopulateMenuContent(submenu, friend, explicitUID, displayName, refreshCallback, options)
-	if not submenu or not submenu.CreateTitle or not self:IsEnabled() then
-		return false
+function FriendTags:GetMenuItems(friend, explicitUID, displayName, refreshCallback, options)
+	if not self:IsEnabled() then
+		return {}
 	end
+
 	options = options or {}
 	friend = self:NormalizeFriendContext(friend, explicitUID)
+	local items = {}
 
-	if options.showHeader and submenu.CreateTitle then
-		submenu:CreateTitle(T("FRIEND_TAGS_MENU_TITLE", "Friend Tags"))
+	if options.showHeader then
+		items[#items + 1] = {
+			type = "title",
+			text = T("FRIEND_TAGS_MENU_TITLE", "Friend Tags"),
+		}
 	end
 
 	if friend.type == "bnet" then
 		local sectionTitle = self:AreBlizzardTagsEnabled()
 			and T("FRIEND_TAGS_BLIZZARD_SECTION", "Blizzard Tags")
 			or T("FRIEND_TAGS_BLIZZARD_COMPAT_SECTION", "Blizzard-compatible Tags")
-		submenu:CreateTitle(sectionTitle)
+		items[#items + 1] = { type = "title", text = sectionTitle }
 
 		local workingBlizzardSet = CopySet(self:GetBlizzardTagIdSetForFriend(friend, explicitUID))
 		local function CommitBlizzardTags()
@@ -2397,66 +2398,104 @@ function FriendTags:PopulateMenuContent(submenu, friend, explicitUID, displayNam
 
 		local handoffInfo = self:GetLocalBlizzardHandoffInfo(friend, explicitUID)
 		if handoffInfo.available then
-			submenu:CreateButton(
-				string.format(T("FRIEND_TAGS_SYNC_TO_BLIZZARD", "Sync %d local tags to Blizzard"), handoffInfo.count or 0),
-				function()
+			items[#items + 1] = {
+				text = string.format(
+					T("FRIEND_TAGS_SYNC_TO_BLIZZARD", "Sync %d local tags to Blizzard"),
+					handoffInfo.count or 0
+				),
+				func = function()
 					self:HandoffLocalBlizzardTagsForFriend(friend, refreshCallback, explicitUID)
-				end
-			)
-			submenu:CreateDivider()
+				end,
+			}
+			items[#items + 1] = { type = "divider" }
 		end
 
-		submenu:CreateTitle(T("FRIEND_TAGS_INTERESTS_SECTION", "Interests"))
+		items[#items + 1] = { type = "title", text = T("FRIEND_TAGS_INTERESTS_SECTION", "Interests") }
+		local rolesTitleCreated = false
 		for _, def in ipairs(self:GetBlizzardTagDefinitions()) do
-			if def.group == "roles" then
-				if not submenu.bflRolesTitleCreated then
-					submenu:CreateDivider()
-					submenu:CreateTitle(T("FRIEND_TAGS_ROLES_SECTION", "Roles"))
-					submenu.bflRolesTitleCreated = true
-				end
+			if def.group == "roles" and not rolesTitleCreated then
+				items[#items + 1] = { type = "divider" }
+				items[#items + 1] = { type = "title", text = T("FRIEND_TAGS_ROLES_SECTION", "Roles") }
+				rolesTitleCreated = true
 			end
+
 			local tagId = def.id
-			submenu:CreateCheckbox(GetLocalizedTagName(def), function()
-				return workingBlizzardSet[tagId] == true
-			end, function()
-				workingBlizzardSet[tagId] = not workingBlizzardSet[tagId] or nil
-				CommitBlizzardTags()
-				return MenuResponse and MenuResponse.Refresh
-			end)
+			items[#items + 1] = {
+				type = "checkbox",
+				text = GetLocalizedTagName(def),
+				checked = function()
+					return workingBlizzardSet[tagId] == true
+				end,
+				func = function()
+					workingBlizzardSet[tagId] = not workingBlizzardSet[tagId] or nil
+					CommitBlizzardTags()
+					return MenuResponse and MenuResponse.Refresh
+				end,
+			}
 		end
-		submenu:CreateDivider()
+		items[#items + 1] = { type = "divider" }
 	end
 
-	submenu:CreateTitle(T("FRIEND_TAGS_CUSTOM_SECTION", "Custom Tags"))
-	submenu:CreateButton(T("FRIEND_TAGS_CREATE_CUSTOM", "Create Custom Tag"), function()
-		self:ShowCustomTagDialog(friend, displayName, refreshCallback)
-	end)
+	items[#items + 1] = { type = "title", text = T("FRIEND_TAGS_CUSTOM_SECTION", "Custom Tags") }
+	items[#items + 1] = {
+		text = T("FRIEND_TAGS_CREATE_CUSTOM", "Create Custom Tag"),
+		func = function()
+			self:ShowCustomTagDialog(friend, displayName, refreshCallback)
+		end,
+	}
 
 	local customTags = self:GetCustomTagDefinitions()
 	if #customTags > 0 then
 		for _, def in ipairs(customTags) do
 			local tagId = def.id
-			submenu:CreateCheckbox(def.name, function()
-				return self:GetCustomTagIdSetForFriend(friend, explicitUID)[tagId] == true
-			end, function()
-				local selected = self:GetCustomTagIdSetForFriend(friend, explicitUID)[tagId] == true
-				self:SetCustomTagForFriend(friend, tagId, not selected, refreshCallback)
-				return MenuResponse and MenuResponse.Refresh
-			end)
+			items[#items + 1] = {
+				type = "checkbox",
+				text = def.name,
+				checked = function()
+					return self:GetCustomTagIdSetForFriend(friend, explicitUID)[tagId] == true
+				end,
+				func = function()
+					local selected = self:GetCustomTagIdSetForFriend(friend, explicitUID)[tagId] == true
+					self:SetCustomTagForFriend(friend, tagId, not selected, refreshCallback)
+					return MenuResponse and MenuResponse.Refresh
+				end,
+			}
 		end
 	else
-		submenu:CreateTitle(T("FRIEND_TAGS_NO_CUSTOM_TAGS", "No custom tags yet"))
+		items[#items + 1] = {
+			type = "title",
+			text = T("FRIEND_TAGS_NO_CUSTOM_TAGS", "No custom tags yet"),
+		}
 	end
 
-	submenu:CreateDivider()
-	submenu:CreateButton(T("FRIEND_TAGS_MANAGE", "Manage Tags"), function()
-		local Editor = BFL:GetModule("FriendTagEditor")
-		if Editor and Editor.Show then
-			Editor:Show()
-		else
-			self:OpenSettings()
-		end
-	end)
+	items[#items + 1] = { type = "divider" }
+	items[#items + 1] = {
+		text = T("FRIEND_TAGS_MANAGE", "Manage Tags"),
+		func = function()
+			local Editor = BFL:GetModule("FriendTagEditor")
+			if Editor and Editor.Show then
+				Editor:Show()
+			else
+				self:OpenSettings()
+			end
+		end,
+	}
+
+	return items
+end
+
+function FriendTags:PopulateMenuContent(submenu, friend, explicitUID, displayName, refreshCallback, options)
+	if not submenu or not submenu.CreateTitle or not self:IsEnabled() then
+		return false
+	end
+	options = options or {}
+	friend = self:NormalizeFriendContext(friend, explicitUID)
+
+	if BFL.PopulateSimpleMenu then
+		BFL.PopulateSimpleMenu(submenu, function()
+			return self:GetMenuItems(friend, explicitUID, displayName, refreshCallback, options)
+		end)
+	end
 
 	return true
 end

@@ -799,16 +799,11 @@ function BetterRaidMemberButton_PostClick(self, button)
 		-- if the secure action didn't fire (e.g., missing unit attribute).
 		if not IsModifierKeyDown() and self.unit then
 			if UnitExists(self.unit) then
-				-- Use Blizzard's unit popup menu system
-				if ToggleDropDownMenu and FriendsDropDown then
-					-- Classic: Use dropdown-based unit menu
-					FriendsDropDown.unit = self.unit
-					FriendsDropDown.id = self.name
-					FriendsDropDown.initialize = RaidFrameDropDown_Initialize
-					ToggleDropDownMenu(1, nil, FriendsDropDown, "cursor", 0, 0)
-				elseif UnitPopup_ShowMenu then
-					-- Retail: Use modern unit popup
-					UnitPopup_ShowMenu(self, "RAID_PLAYER", self.unit, self.name)
+				if BFL.Compat and BFL.Compat.OpenUnitPopupMenu then
+					BFL.Compat.OpenUnitPopupMenu("RAID_PLAYER", {
+						unit = self.unit,
+						name = self.name,
+					})
 				end
 			end
 		end

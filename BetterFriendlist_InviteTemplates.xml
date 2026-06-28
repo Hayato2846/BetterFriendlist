@@ -15,12 +15,14 @@
 				</Texture>
 			</Layer>
 			<Layer level="ARTWORK">
-				<Texture parentKey="RightArrow" atlas="friendslist-categorybutton-arrow-right" useAtlasSize="true" hidden="true">
+				<Texture parentKey="RightArrow" hidden="true">
+					<Size x="16" y="16"/>
 					<Anchors>
 						<Anchor point="LEFT" x="8" y="0"/>
 					</Anchors>
 				</Texture>
-				<Texture parentKey="DownArrow" atlas="friendslist-categorybutton-arrow-down" useAtlasSize="true">
+				<Texture parentKey="DownArrow">
+					<Size x="16" y="16"/>
 					<Anchors>
 						<Anchor point="LEFT" x="6" y="-2"/>
 					</Anchors>
@@ -39,6 +41,16 @@
 				<Anchor point="BOTTOMRIGHT" x="0" y="1"/>
 			</Anchors>
 		</HighlightTexture>
+		<Scripts>
+			<OnLoad>
+				if self.RightArrow then
+					BFL.SetTextureOrAtlas(self.RightArrow, "friendslist-categorybutton-arrow-right", "Interface\\Buttons\\UI-PlusButton-Up");
+				end
+				if self.DownArrow then
+					BFL.SetTextureOrAtlas(self.DownArrow, "friendslist-categorybutton-arrow-down", "Interface\\Buttons\\UI-MinusButton-Up");
+				end
+			</OnLoad>
+		</Scripts>
 	</Button>
 	
 	<!-- Friend Invite Button - Blizzard Style (Text only, no icon) -->

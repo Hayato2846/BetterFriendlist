@@ -29,6 +29,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+
+### Added
+- **NSRT Compatibility** - Added support for docking Northern Sky Raid Tools' Missing Raid Buffs panel to BetterFriendlist's Raid tab.
+
+### Fixed
+- **Classic Simple Mode** - Restored the missing upper-left frame corner when the avatar is hidden.
+
+### Improved
+- **Classic Simple Mode** - Applies mode changes immediately without requiring a UI reload.
+- **Classic UI** - Modernized the Friends, WHO, Raid Tools, Settings, Guild action, invite account, and game account menus, made shared invite/header/tag/role icon art Classic-safe, and prepared safer shared Retail/Classic UI capability handling.
+
+---
+
 ## [2.6.4]        - 2026-06-25
 
 ### Fixed
@@ -187,11 +201,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Guild and Communities Taint** - On secret-value clients, BetterFriendlist now avoids Guild/Communities roster hooks and native guild menu extensions while Blizzard's Guild panel opens.
 - **Recruit A Friend Taint** - Reduced RAF list taint noise on secret-value clients by keeping raw Battle.net account payloads out of RAF list rows.
 - **Quick Join Messages** - Whisper links and Send Message actions from Quick Join now open the correct Battle.net conversation more reliably.
-
-## [2.5.5]        - 2026-04-05
-
-### Fixed
-- **Retail: Quick Join** - Fixed a Lua error caused by protected values during combat restrictions.
 
 ---
 
@@ -608,14 +617,18 @@ function Changelog:ShowGlow(show)
 			button.NewLabel = button:CreateTexture(nil, "OVERLAY")
 			button.NewLabel:SetPoint("CENTER", button, "CENTER", 0, 0)
 			if BFL.IsClassic then
-				-- Use NewCharacter-Horde texture from CharacterCreate (exists in Classic)
-				--button.NewLabel:SetTexture("interface\\encounterjournal\\adventureguide")
-				--button.NewLabel:SetTexCoord(0.677734375, 0.75, 0.099609375, 0.171875)
-				--button.NewLabel:SetSize(37, 37)  -- Scaled down from 112x58
-				button.NewLabel:SetAtlas("communities-icon-invitemail")
+				if BFL.SetTextureOrAtlas then
+					BFL.SetTextureOrAtlas(button.NewLabel, "communities-icon-invitemail", "Interface\\AddOns\\BetterFriendlist\\Icons\\mail")
+				else
+					button.NewLabel:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\mail")
+				end
 				button.NewLabel:SetSize(64, 48)
 			else
-				button.NewLabel:SetAtlas("CharacterCreate-NewLabel")
+				if BFL.SetTextureOrAtlas then
+					BFL.SetTextureOrAtlas(button.NewLabel, "CharacterCreate-NewLabel", "Interface\\AddOns\\BetterFriendlist\\Icons\\star")
+				else
+					button.NewLabel:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\star")
+				end
 				button.NewLabel:SetSize(64, 48)
 			end
 			-- Desaturate to remove the native color, then color it with the active accent.
@@ -851,7 +864,7 @@ function Changelog:CreateChangelogWindow()
 	-- ScrollFrame
 	local scrollFrame
 
-	if not BFL.IsClassic and ScrollUtil and ScrollUtil.InitScrollFrameWithScrollBar then
+	if BFL.HasModernScrollBox and ScrollUtil and ScrollUtil.InitScrollFrameWithScrollBar then
 		-- Retail: Modern ScrollUtil
 		scrollFrame = CreateFrame("ScrollFrame", nil, frame)
 		frame.ScrollFrame = scrollFrame

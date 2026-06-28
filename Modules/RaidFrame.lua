@@ -108,42 +108,22 @@ RaidFrame.DIFFICULTY_PRIMARYRAID_LFR = 17
 --- Get role icon string (Retail/Classic compatible)
 local function GetRoleIconString(role, size)
 	size = size or 16
-	if BFL.IsRetail then
-		if role == "TANK" then
-			return CreateAtlasMarkup("UI-LFG-RoleIcon-Tank-Micro-GroupFinder", size, size)
-		elseif role == "HEALER" then
-			return CreateAtlasMarkup("UI-LFG-RoleIcon-Healer-Micro-GroupFinder", size, size)
-		else
-			return CreateAtlasMarkup("UI-LFG-RoleIcon-DPS-Micro-GroupFinder", size, size)
-		end
-	else
-		-- Classic fallback using standard LFG role icons
-		-- Texture: Interface\LFGFrame\UI-LFG-ICON-PORTRAITROLES
-		if role == "TANK" then
-			return string.format(
-				"|TInterface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES:%d:%d:0:0:64:64:0:19:22:41|t",
-				size,
-				size
-			)
-		elseif role == "HEALER" then
-			return string.format(
-				"|TInterface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES:%d:%d:0:0:64:64:20:39:1:20|t",
-				size,
-				size
-			)
-		else
-			return string.format(
-				"|TInterface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES:%d:%d:0:0:64:64:20:39:22:41|t",
-				size,
-				size
-			)
-		end
+	if BFL.GetRoleIconMarkup then
+		return BFL.GetRoleIconMarkup(role, size)
 	end
+	return ""
 end
 
-local function SetRoleCountAtlas(texture, atlas)
-	if BFL.IsRetail and texture and texture.SetAtlas and atlas then
-		texture:SetAtlas(atlas, TextureKitConstants and TextureKitConstants.IgnoreAtlasSize or false)
+local function GetRoleIconUseAtlasSize()
+	if TextureKitConstants and TextureKitConstants.IgnoreAtlasSize ~= nil then
+		return TextureKitConstants.IgnoreAtlasSize
+	end
+	return false
+end
+
+local function SetRoleCountIcon(texture, role)
+	if BFL.SetRoleIconTexture then
+		BFL.SetRoleIconTexture(texture, role, GetRoleIconUseAtlasSize())
 	end
 end
 
@@ -152,9 +132,9 @@ local function SetRoleCountDisplay(roleCount, tanks, healers, damagers)
 		return
 	end
 
-	SetRoleCountAtlas(roleCount.TankIcon, "UI-LFG-RoleIcon-Tank-Micro-GroupFinder")
-	SetRoleCountAtlas(roleCount.HealerIcon, "UI-LFG-RoleIcon-Healer-Micro-GroupFinder")
-	SetRoleCountAtlas(roleCount.DamagerIcon, "UI-LFG-RoleIcon-DPS-Micro-GroupFinder")
+	SetRoleCountIcon(roleCount.TankIcon, "TANK")
+	SetRoleCountIcon(roleCount.HealerIcon, "HEALER")
+	SetRoleCountIcon(roleCount.DamagerIcon, "DAMAGER")
 
 	if roleCount.TankCount and roleCount.HealerCount and roleCount.DamagerCount then
 		roleCount.TankCount:SetText(tanks or 0)
@@ -192,29 +172,9 @@ local function GetControlElementWidth(element, fallback)
 end
 
 --- Set role icon on a Texture object (Retail/Classic compatible)
---- Uses SetAtlas on Retail, SetTexture+SetTexCoord on Classic
 local function SetRoleIconTexture(texture, role)
-	if not texture then
-		return
-	end
-	if BFL.IsRetail then
-		if role == "TANK" then
-			texture:SetAtlas("UI-LFG-RoleIcon-Tank-Micro-GroupFinder")
-		elseif role == "HEALER" then
-			texture:SetAtlas("UI-LFG-RoleIcon-Healer-Micro-GroupFinder")
-		elseif role == "DAMAGER" then
-			texture:SetAtlas("UI-LFG-RoleIcon-DPS-Micro-GroupFinder")
-		end
-	else
-		-- Classic fallback: Interface\LFGFrame\UI-LFG-ICON-PORTRAITROLES sprite sheet
-		texture:SetTexture("Interface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES")
-		if role == "TANK" then
-			texture:SetTexCoord(0, 19 / 64, 22 / 64, 41 / 64)
-		elseif role == "HEALER" then
-			texture:SetTexCoord(20 / 64, 39 / 64, 1 / 64, 20 / 64)
-		elseif role == "DAMAGER" then
-			texture:SetTexCoord(20 / 64, 39 / 64, 22 / 64, 41 / 64)
-		end
+	if BFL.SetRoleIconTexture then
+		BFL.SetRoleIconTexture(texture, role, GetRoleIconUseAtlasSize())
 	end
 end
 

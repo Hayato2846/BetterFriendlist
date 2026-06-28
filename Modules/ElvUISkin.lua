@@ -10,6 +10,8 @@ local ElvUISkin = BFL:RegisterModule("ElvUISkin", {})
 local WHO_CLASSIC_DROPDOWN_X_OFFSET = -12
 local WHO_CLASSIC_ELVUI_DROPDOWN_VISUAL_WIDTH = 106
 
+local IsModernDropdown = BFL.IsModernDropdown
+
 -- Helper to handle scrollbars across Retail and Classic
 local function SkinScrollBar(S, scrollBar)
 	if not scrollBar then
@@ -40,7 +42,7 @@ local function SkinScrollBar(S, scrollBar)
 	end
 end
 
--- Normalize Classic UIDropDownMenu hitbox/geometry after ElvUI skinning.
+-- Normalize Classic dropdown hitbox/geometry after ElvUI skinning.
 -- Without this, the clickable region can drift outside the visual box.
 local function FixClassicDropdownHitbox(dropdown, width, height)
 	if not (BFL and BFL.IsClassic and dropdown) then
@@ -57,8 +59,10 @@ local function FixClassicDropdownHitbox(dropdown, width, height)
 	local targetWidth = dropdown.BFL_ClassicDropdownWidth
 	local targetHeight = dropdown.BFL_ClassicDropdownHeight
 
-	if targetWidth and UIDropDownMenu_SetWidth then
-		UIDropDownMenu_SetWidth(dropdown, targetWidth)
+	if targetWidth and IsModernDropdown(dropdown) and dropdown.SetWidth then
+		dropdown:SetWidth(targetWidth)
+	elseif targetWidth and BFL.SetDropdownWidth then
+		BFL.SetDropdownWidth(dropdown, targetWidth)
 		if dropdown.BFL_ClassicColumnLogicalWidth then
 			dropdown:SetWidth(dropdown.BFL_ClassicColumnLogicalWidth)
 		end
@@ -701,29 +705,40 @@ function ElvUISkin:SkinFrames(E, S)
 
 		-- Dropdown
 		if frame.WhoFrame.ColumnDropdown then
-			S:HandleDropDownBox(frame.WhoFrame.ColumnDropdown)
+			local dropdown = frame.WhoFrame.ColumnDropdown
+			local modernDropdown = IsModernDropdown(dropdown)
+			if S.HandleDropDownBox then
+				S:HandleDropDownBox(dropdown)
+			elseif modernDropdown and S.HandleButton then
+				S:HandleButton(dropdown)
+			end
 
 			-- Classic: Fix text clipping into arrow and restore selected value
 			if BFL.IsClassic then
-				local dropdown = frame.WhoFrame.ColumnDropdown
-				local ddName = dropdown:GetName()
-				if ddName then
-					local ddText = _G[ddName .. "Text"]
-					local ddButton = _G[ddName .. "Button"]
-					if ddText and ddButton then
-						ddText:ClearAllPoints()
-						ddText:SetPoint("LEFT", dropdown, "LEFT", 5, 2)
-						ddText:SetPoint("RIGHT", ddButton, "LEFT", -2, 0)
-						ddText:SetJustifyH("LEFT")
-						ddText:SetWordWrap(false)
+				if modernDropdown then
+					if dropdown.GenerateMenu then
+						dropdown:GenerateMenu()
 					end
-				end
-				-- Restore selected value text after skinning
-				local WhoFrameModule = BFL:GetModule("WhoFrame")
-				if WhoFrameModule and WhoFrameModule.GetSortValue then
-					local sortValue = WhoFrameModule:GetSortValue() or 1
-					local selectionTexts = { ZONE, GUILD, RACE }
-					UIDropDownMenu_SetText(dropdown, selectionTexts[sortValue] or ZONE)
+				else
+					local ddName = dropdown:GetName()
+					if ddName then
+						local ddText = _G[ddName .. "Text"]
+						local ddButton = _G[ddName .. "Button"]
+						if ddText and ddButton then
+							ddText:ClearAllPoints()
+							ddText:SetPoint("LEFT", dropdown, "LEFT", 5, 2)
+							ddText:SetPoint("RIGHT", ddButton, "LEFT", -2, 0)
+							ddText:SetJustifyH("LEFT")
+							ddText:SetWordWrap(false)
+						end
+					end
+					-- Restore selected value text after skinning
+					local WhoFrameModule = BFL:GetModule("WhoFrame")
+					if WhoFrameModule and WhoFrameModule.GetSortValue and BFL.SetDropdownText then
+						local sortValue = WhoFrameModule:GetSortValue() or 1
+						local selectionTexts = { ZONE, GUILD, RACE }
+						BFL.SetDropdownText(dropdown, selectionTexts[sortValue] or ZONE)
+					end
 				end
 			end
 		end
@@ -829,9 +844,8 @@ function ElvUISkin:SkinFrames(E, S)
 				S:HandleDropDownBox(dropdown, width)
 			end
 
-			-- Classic uses UIDropDownMenu, Retail uses modern dropdown
-			if BFL.IsClassic and UIDropDownMenu_SetWidth then
-				UIDropDownMenu_SetWidth(dropdown, width)
+			if BFL.IsClassic and not IsModernDropdown(dropdown) and BFL.SetDropdownWidth then
+				BFL.SetDropdownWidth(dropdown, width)
 			else
 				dropdown:SetWidth(width)
 			end
@@ -870,14 +884,16 @@ function ElvUISkin:SkinFrames(E, S)
 			if BFL.IsClassic then
 				-- Classic: Re-anchor with clearer spacing to avoid visual clipping with sort dropdowns.
 				local dropdown = frame.FriendsTabHeader.QuickFilterDropdown
+				local isModernDropdown = IsModernDropdown(dropdown)
+				local width = isModernDropdown and 50 or 70
 				if S.HandleDropDownBox then
-					S:HandleDropDownBox(dropdown)
+					S:HandleDropDownBox(dropdown, width)
 				end
-				FixClassicDropdownHitbox(dropdown, 70, 24)
+				FixClassicDropdownHitbox(dropdown, width, isModernDropdown and 30 or 24)
 				-- Restore position (matches FriendsList.lua Classic layout)
 				if frame.FriendsTabHeader.SearchBox then
 					dropdown:ClearAllPoints()
-					dropdown:SetPoint("TOPLEFT", frame.FriendsTabHeader.SearchBox, "TOPLEFT", -16, 32)
+					dropdown:SetPoint("TOPLEFT", frame.FriendsTabHeader.SearchBox, "TOPLEFT", isModernDropdown and 0 or -16, 32)
 				end
 			else
 				-- Retail: Use smaller width (50) to fit in one row
@@ -889,10 +905,12 @@ function ElvUISkin:SkinFrames(E, S)
 			if BFL.IsClassic then
 				-- Classic: add spacing so controls don't overlap after skinning.
 				local dropdown = frame.FriendsTabHeader.PrimarySortDropdown
+				local isModernDropdown = IsModernDropdown(dropdown)
+				local width = isModernDropdown and 50 or 70
 				if S.HandleDropDownBox then
-					S:HandleDropDownBox(dropdown)
+					S:HandleDropDownBox(dropdown, width)
 				end
-				FixClassicDropdownHitbox(dropdown, 70, 24)
+				FixClassicDropdownHitbox(dropdown, width, isModernDropdown and 30 or 24)
 				-- Anchor to QuickFilter with positive spacing.
 				if frame.FriendsTabHeader.QuickFilterDropdown then
 					dropdown:ClearAllPoints()
@@ -918,10 +936,12 @@ function ElvUISkin:SkinFrames(E, S)
 			if BFL.IsClassic then
 				-- Classic: add spacing so controls don't overlap after skinning.
 				local dropdown = frame.FriendsTabHeader.SecondarySortDropdown
+				local isModernDropdown = IsModernDropdown(dropdown)
+				local width = isModernDropdown and 50 or 70
 				if S.HandleDropDownBox then
-					S:HandleDropDownBox(dropdown)
+					S:HandleDropDownBox(dropdown, width)
 				end
-				FixClassicDropdownHitbox(dropdown, 70, 24)
+				FixClassicDropdownHitbox(dropdown, width, isModernDropdown and 30 or 24)
 				-- Anchor to PrimarySort with positive spacing.
 				if frame.FriendsTabHeader.PrimarySortDropdown then
 					dropdown:ClearAllPoints()
@@ -963,21 +983,22 @@ function ElvUISkin:SkinFrames(E, S)
 
 		-- Fix Dropdown height and alignment
 		if frame.WhoFrame.ColumnDropdown then
-			if BFL.IsClassic then
+			local modernDropdown = IsModernDropdown(frame.WhoFrame.ColumnDropdown)
+			if BFL.IsClassic and not modernDropdown then
 				FixClassicDropdownHitbox(frame.WhoFrame.ColumnDropdown, WHO_CLASSIC_ELVUI_DROPDOWN_VISUAL_WIDTH, 24)
 			else
 				frame.WhoFrame.ColumnDropdown:SetHeight(26) -- Match header height
 			end
 
 			-- Re-anchor to NameHeader
-			local dropdownOffset = BFL.IsClassic and WHO_CLASSIC_DROPDOWN_X_OFFSET or 0
+			local dropdownOffset = (BFL.IsClassic and not modernDropdown) and WHO_CLASSIC_DROPDOWN_X_OFFSET or 0
 			frame.WhoFrame.ColumnDropdown:ClearAllPoints()
 			frame.WhoFrame.ColumnDropdown:SetPoint("LEFT", frame.WhoFrame.NameHeader, "RIGHT", -1 + dropdownOffset, 0)
 		end
 
 		-- Re-anchor LevelHeader
 		if frame.WhoFrame.LevelHeader and frame.WhoFrame.ColumnDropdown then
-			local dropdownOffset = BFL.IsClassic and WHO_CLASSIC_DROPDOWN_X_OFFSET or 0
+			local dropdownOffset = (BFL.IsClassic and not IsModernDropdown(frame.WhoFrame.ColumnDropdown)) and WHO_CLASSIC_DROPDOWN_X_OFFSET or 0
 			frame.WhoFrame.LevelHeader:ClearAllPoints()
 			frame.WhoFrame.LevelHeader:SetPoint("LEFT", frame.WhoFrame.ColumnDropdown, "RIGHT", -1 - dropdownOffset, 0)
 		end
@@ -2180,7 +2201,8 @@ function ElvUISkin:SkinSearchBuilder(E, S)
 		local isDocked = WhoFrameModule.builderDocked
 		if builder.classDropdown then
 			pcall(S.HandleDropDownBox, S, builder.classDropdown)
-			if BFL.IsClassic then
+			local modernDropdown = IsModernDropdown(builder.classDropdown)
+			if BFL.IsClassic and not modernDropdown then
 				FixClassicDropdownHitbox(builder.classDropdown, isDocked and 105 or 115, 24)
 				if not builder.classDropdown.BFL_OrigXOfs then
 					local p, rel, rp, x, y = builder.classDropdown:GetPoint(1)
@@ -2197,7 +2219,7 @@ function ElvUISkin:SkinSearchBuilder(E, S)
 						builder.classDropdown.BFL_OrigYOfs
 					)
 				end
-			elseif BFL.HasModernDropdown then
+			elseif modernDropdown then
 				if not builder.classDropdown.BFL_OrigXOfs then
 					local p, rel, rp, x, y = builder.classDropdown:GetPoint(1)
 					builder.classDropdown.BFL_OrigXOfs = x or 0
@@ -2217,7 +2239,8 @@ function ElvUISkin:SkinSearchBuilder(E, S)
 		end
 		if builder.raceDropdown then
 			pcall(S.HandleDropDownBox, S, builder.raceDropdown)
-			if BFL.IsClassic then
+			local modernDropdown = IsModernDropdown(builder.raceDropdown)
+			if BFL.IsClassic and not modernDropdown then
 				FixClassicDropdownHitbox(builder.raceDropdown, isDocked and 105 or 115, 24)
 				if not builder.raceDropdown.BFL_OrigXOfs then
 					local p, rel, rp, x, y = builder.raceDropdown:GetPoint(1)
@@ -2234,7 +2257,7 @@ function ElvUISkin:SkinSearchBuilder(E, S)
 						builder.raceDropdown.BFL_OrigYOfs
 					)
 				end
-			elseif BFL.HasModernDropdown then
+			elseif modernDropdown then
 				if not builder.raceDropdown.BFL_OrigXOfs then
 					local p, rel, rp, x, y = builder.raceDropdown:GetPoint(1)
 					builder.raceDropdown.BFL_OrigXOfs = x or 0

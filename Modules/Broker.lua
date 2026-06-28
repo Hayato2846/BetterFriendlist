@@ -2467,27 +2467,37 @@ local function CreateLibQTipTooltip(anchorFrame)
 								end
 							end
 						elseif actualButton == "RightButton" then
-							if MenuUtil and MenuUtil.CreateContextMenu then
-								MenuUtil.CreateContextMenu(frame, function(owner, rootDescription)
-									rootDescription:CreateTitle(groupInfo.name)
-
-									if not groupInfo.builtin then
-										rootDescription:CreateButton(L("MENU_RENAME_GROUP"), function()
+							if BFL.OpenSimpleContextMenu then
+								local items = {
+									{
+										type = "title",
+										text = groupInfo.name,
+									},
+								}
+								if not groupInfo.builtin then
+									table.insert(items, {
+										text = L("MENU_RENAME_GROUP"),
+										func = function()
 											StaticPopup_Show("BETTER_FRIENDLIST_RENAME_GROUP", nil, nil, groupId)
-										end)
-
-										rootDescription:CreateButton(L("MENU_CHANGE_COLOR"), function()
+										end,
+									})
+									table.insert(items, {
+										text = L("MENU_CHANGE_COLOR"),
+										func = function()
 											local FriendsList = BFL:GetModule("FriendsList")
 											if FriendsList and FriendsList.OpenColorPicker then
 												FriendsList:OpenColorPicker(groupId)
 											end
-										end)
-
-										rootDescription:CreateButton(L("MENU_DELETE_GROUP"), function()
+										end,
+									})
+									table.insert(items, {
+										text = L("MENU_DELETE_GROUP"),
+										func = function()
 											StaticPopup_Show("BETTER_FRIENDLIST_DELETE_GROUP", nil, nil, groupId)
-										end)
-									end
-								end)
+										end,
+									})
+								end
+								BFL.OpenSimpleContextMenu(frame, "BFL_BrokerGroupDropdown", items)
 							end
 						end
 					end)

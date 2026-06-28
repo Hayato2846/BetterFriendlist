@@ -64,6 +64,8 @@ local UI_CONSTANTS = {
 BFL.UI = BFL.UI or {}
 BFL.UI.CONSTANTS = UI_CONSTANTS
 
+local IsModernDropdown = BFL.IsModernDropdown
+
 -- Module registration
 local FrameInitializer = {
 	name = "FrameInitializer",
@@ -75,8 +77,7 @@ local currentSortMode = "status"
 
 --------------------------------------------------------------------------
 -- STATUS DROPDOWN INITIALIZATION
--- In Classic, WowStyle1DropdownTemplate doesn't exist, so we need to
--- create a Classic-compatible dropdown or skip initialization
+-- Dropdowns can be modern or legacy depending on flavor/XML; branch by frame API.
 --------------------------------------------------------------------------
 
 function FrameInitializer:InitializeStatusDropdown(frame)
@@ -100,50 +101,49 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 		bnStatus = FRIENDS_TEXTURE_ONLINE
 	end
 
-	-- Classic: Use UIDropDownMenu API (old-style dropdown)
-	if BFL.IsClassic then
-		-- BFL:DebugPrint("|cff00ffffFrameInitializer:|r Classic mode - using UIDropDownMenu for StatusDropdown")
+	local optionLabels = {
+		string.format("|T%s.tga:14:14:0:0|t %s", FRIENDS_TEXTURE_ONLINE, FRIENDS_LIST_AVAILABLE),
+		string.format("|T%s.tga:14:14:0:0|t %s", FRIENDS_TEXTURE_AFK, FRIENDS_LIST_AWAY),
+		string.format("|T%s.tga:14:14:0:0|t %s", FRIENDS_TEXTURE_DND, FRIENDS_LIST_BUSY),
+	}
+	local optionValues = {
+		FRIENDS_TEXTURE_ONLINE,
+		FRIENDS_TEXTURE_AFK,
+		FRIENDS_TEXTURE_DND,
+	}
+	local function GetStatusSelectionText(status)
+		return string.format("|T%s.tga:14:14:-2:-2|t", status or FRIENDS_TEXTURE_ONLINE)
+	end
+	local function IsSelected(status)
+		return bnStatus == status
+	end
+	local function SetSelected(status)
+		if status == bnStatus then
+			return
+		end
 
-		UIDropDownMenu_SetWidth(dropdown, 38)
-		UIDropDownMenu_Initialize(dropdown, function(self, level)
-			local info = UIDropDownMenu_CreateInfo()
+		bnStatus = status
+		if status == FRIENDS_TEXTURE_ONLINE then
+			BFL.SetMyBNetStatus("online")
+		elseif status == FRIENDS_TEXTURE_AFK then
+			BFL.SetMyBNetStatus("afk")
+		elseif status == FRIENDS_TEXTURE_DND then
+			BFL.SetMyBNetStatus("dnd")
+		end
+	end
 
-			-- Online option
-			info.text = string.format("|T%s.tga:14:14:0:0|t %s", FRIENDS_TEXTURE_ONLINE, FRIENDS_LIST_AVAILABLE)
-			info.value = FRIENDS_TEXTURE_ONLINE
-			info.func = function()
-				BFL.SetMyBNetStatus("online")
-				bnStatus = FRIENDS_TEXTURE_ONLINE
-				UIDropDownMenu_SetText(dropdown, string.format("|T%s.tga:14:14:-2:-2|t", FRIENDS_TEXTURE_ONLINE))
-			end
-			info.checked = (bnStatus == FRIENDS_TEXTURE_ONLINE)
-			UIDropDownMenu_AddButton(info)
+	if not IsModernDropdown(dropdown) then
+		-- BFL:DebugPrint("|cff00ffffFrameInitializer:|r legacy UIDropDownMenu path for StatusDropdown")
 
-			-- AFK option
-			info.text = string.format("|T%s.tga:14:14:0:0|t %s", FRIENDS_TEXTURE_AFK, FRIENDS_LIST_AWAY)
-			info.value = FRIENDS_TEXTURE_AFK
-			info.func = function()
-				BFL.SetMyBNetStatus("afk")
-				bnStatus = FRIENDS_TEXTURE_AFK
-				UIDropDownMenu_SetText(dropdown, string.format("|T%s.tga:14:14:-2:-2|t", FRIENDS_TEXTURE_AFK))
-			end
-			info.checked = (bnStatus == FRIENDS_TEXTURE_AFK)
-			UIDropDownMenu_AddButton(info)
-
-			-- DND option
-			info.text = string.format("|T%s.tga:14:14:0:0|t %s", FRIENDS_TEXTURE_DND, FRIENDS_LIST_BUSY)
-			info.value = FRIENDS_TEXTURE_DND
-			info.func = function()
-				BFL.SetMyBNetStatus("dnd")
-				bnStatus = FRIENDS_TEXTURE_DND
-				UIDropDownMenu_SetText(dropdown, string.format("|T%s.tga:14:14:-2:-2|t", FRIENDS_TEXTURE_DND))
-			end
-			info.checked = (bnStatus == FRIENDS_TEXTURE_DND)
-			UIDropDownMenu_AddButton(info)
-		end)
+		BFL.SetDropdownWidth(dropdown, 38)
+		BFL.InitializeDropdown(dropdown, {
+			labels = optionLabels,
+			values = optionValues,
+			getSelectionText = GetStatusSelectionText,
+		}, IsSelected, SetSelected)
 
 		-- Set initial selected text with smaller icon and left offset
-		UIDropDownMenu_SetText(dropdown, string.format("|T%s.tga:14:14:-2:-2|t", bnStatus))
+		BFL.SetDropdownText(dropdown, GetStatusSelectionText(bnStatus))
 
 		-- Restore text on show (Fix for "..." when switching tabs)
 		-- We use C_Timer.After to ensure this runs AFTER any default layout logic that might clear our text
@@ -159,9 +159,9 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 					bnStatus = FRIENDS_TEXTURE_ONLINE
 				end
 
-				UIDropDownMenu_SetText(self, string.format("|T%s.tga:14:14:-2:-2|t", bnStatus))
+				BFL.SetDropdownText(self, GetStatusSelectionText(bnStatus))
 				-- Increase width slightly to ensure icon fits without truncating to "..."
-				UIDropDownMenu_SetWidth(self, 40)
+				BFL.SetDropdownWidth(self, 40)
 			end)
 		end)
 
@@ -205,52 +205,19 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 		return
 	end
 
-	-- Retail mode: Use modern WowStyle1DropdownTemplate
-	local function IsSelected(status)
-		return bnStatus == status
-	end
-
-	local function SetSelected(status)
-		if status ~= bnStatus then
-			bnStatus = status
-
-			if status == FRIENDS_TEXTURE_ONLINE then
-				BFL.SetMyBNetStatus("online")
-			elseif status == FRIENDS_TEXTURE_AFK then
-				BFL.SetMyBNetStatus("afk")
-			elseif status == FRIENDS_TEXTURE_DND then
-				BFL.SetMyBNetStatus("dnd")
-			end
-		end
-	end
-
-	local function CreateRadio(rootDescription, text, status)
-		rootDescription:CreateRadio(text, IsSelected, SetSelected, status)
-	end
-
+	-- Modern dropdown path.
 	dropdown:SetWidth(UI_CONSTANTS.DROPDOWN_WIDTH)
-	dropdown:SetupMenu(function(dropdown, rootDescription)
-		rootDescription:SetTag("MENU_FRIENDS_STATUS")
-
-		local optionText = "|T%s.tga:16:16:0:0|t %s"
-
-		local onlineText = string.format(optionText, FRIENDS_TEXTURE_ONLINE, FRIENDS_LIST_AVAILABLE)
-		CreateRadio(rootDescription, onlineText, FRIENDS_TEXTURE_ONLINE)
-
-		local afkText = string.format(optionText, FRIENDS_TEXTURE_AFK, FRIENDS_LIST_AWAY)
-		CreateRadio(rootDescription, afkText, FRIENDS_TEXTURE_AFK)
-
-		local dndText = string.format(optionText, FRIENDS_TEXTURE_DND, FRIENDS_LIST_BUSY)
-		CreateRadio(rootDescription, dndText, FRIENDS_TEXTURE_DND)
-	end)
-
-	dropdown:SetSelectionTranslator(function(selection)
-		return string.format("|T%s.tga:16:16:0:0|t", selection.data)
-	end)
+	BFL.InitializeDropdown(dropdown, {
+		labels = optionLabels,
+		values = optionValues,
+		getSelectionText = GetStatusSelectionText,
+	}, IsSelected, SetSelected)
 
 	-- Generate menu once to trigger initial selection display
 	-- This ensures the dropdown shows the current status icon on load
-	dropdown:GenerateMenu()
+	if dropdown.GenerateMenu then
+		dropdown:GenerateMenu()
+	end
 
 	-- Set up tooltip
 	dropdown:SetScript("OnEnter", function()
@@ -366,42 +333,46 @@ function FrameInitializer:InitializeSortDropdown(frame)
 	end
 
 	local dropdown = frame.FriendsTabHeader.SortDropdown
-
-	-- Classic mode: Use UIDropDownMenu
-	if BFL.IsClassic or not BFL.HasModernDropdown then
-		-- BFL:DebugPrint("|cff00ffffFrameInitializer:|r Classic mode - using UIDropDownMenu for SortDropdown")
-
-		UIDropDownMenu_SetWidth(dropdown, 60)
-		UIDropDownMenu_Initialize(dropdown, function(self, level)
-			local info = UIDropDownMenu_CreateInfo()
-
-			local function AddSortOption(sortMode, label, icon)
-				info.text = string.format("|T%s:14:14:0:0|t %s", icon, label)
-				info.value = sortMode
-				info.func = function()
-					currentSortMode = sortMode
-					UIDropDownMenu_SetText(dropdown, string.format("|T%s:14:14:-2:-2|t", icon))
-					-- Notify main file to update display
-					if _G.UpdateFriendsList then
-						_G.UpdateFriendsList()
-					end
-					if _G.UpdateFriendsDisplay then
-						_G.UpdateFriendsDisplay()
-					end
-				end
-				info.checked = (currentSortMode == sortMode)
-				UIDropDownMenu_AddButton(info)
+	local optionLabels = {
+		string.format("|T%s:14:14:0:0|t %s", SORT_ICONS.status, L.SORT_STATUS),
+		string.format("|T%s:14:14:0:0|t %s", SORT_ICONS.name, L.SORT_NAME),
+		string.format("|T%s:14:14:0:0|t %s", SORT_ICONS.level, L.SORT_LEVEL),
+		string.format("|T%s:14:14:0:0|t %s", SORT_ICONS.zone, L.SORT_ZONE),
+	}
+	local optionValues = { "status", "name", "level", "zone" }
+	local function GetSortSelectionText(sortMode)
+		local icon = SORT_ICONS[sortMode] or SORT_ICONS.status
+		return string.format("|T%s:14:14:-2:-2|t", icon)
+	end
+	local function IsSelected(sortMode)
+		return currentSortMode == sortMode
+	end
+	local function SetSelected(sortMode)
+		if sortMode ~= currentSortMode then
+			currentSortMode = sortMode
+			-- Notify main file to update display
+			if _G.UpdateFriendsList then
+				_G.UpdateFriendsList()
 			end
+			if _G.UpdateFriendsDisplay then
+				_G.UpdateFriendsDisplay()
+			end
+		end
+	end
 
-			AddSortOption("status", L.SORT_STATUS, SORT_ICONS.status)
-			AddSortOption("name", L.SORT_NAME, SORT_ICONS.name)
-			AddSortOption("level", L.SORT_LEVEL, SORT_ICONS.level)
-			AddSortOption("zone", L.SORT_ZONE, SORT_ICONS.zone)
-		end)
+	if not IsModernDropdown(dropdown) then
+		-- BFL:DebugPrint("|cff00ffffFrameInitializer:|r legacy UIDropDownMenu path for SortDropdown")
+
+		BFL.SetDropdownWidth(dropdown, 60)
+		BFL.InitializeDropdown(dropdown, {
+			labels = optionLabels,
+			values = optionValues,
+			getSelectionText = GetSortSelectionText,
+		}, IsSelected, SetSelected)
 
 		-- Set initial selected text
 		local currentIcon = SORT_ICONS[currentSortMode] or SORT_ICONS.status
-		UIDropDownMenu_SetText(dropdown, string.format("|T%s:14:14:-2:-2|t", currentIcon))
+		BFL.SetDropdownText(dropdown, string.format("|T%s:14:14:-2:-2|t", currentIcon))
 
 		-- Setup tooltip for Classic
 		-- Hook button as it consumes mouse events
@@ -430,54 +401,18 @@ function FrameInitializer:InitializeSortDropdown(frame)
 		return
 	end
 
-	local function IsSelected(sortMode)
-		return currentSortMode == sortMode
-	end
-
-	local function SetSelected(sortMode)
-		if sortMode ~= currentSortMode then
-			currentSortMode = sortMode
-			-- Notify main file to update display
-			if _G.UpdateFriendsList then
-				_G.UpdateFriendsList()
-			end
-			if _G.UpdateFriendsDisplay then
-				_G.UpdateFriendsDisplay()
-			end
-		end
-	end
-
-	local function CreateRadio(rootDescription, text, sortMode)
-		rootDescription:CreateRadio(text, IsSelected, SetSelected, sortMode)
-	end
-
 	-- Narrower width to match QuickFilters style
 	dropdown:SetWidth(UI_CONSTANTS.DROPDOWN_WIDTH)
 
-	dropdown:SetupMenu(function(dropdown, rootDescription)
-		rootDescription:SetTag("MENU_FRIENDS_SORT")
+	BFL.InitializeDropdown(dropdown, {
+		labels = optionLabels,
+		values = optionValues,
+		getSelectionText = GetSortSelectionText,
+	}, IsSelected, SetSelected)
 
-		-- Format for icon + text in menu
-		local optionText = "\124T%s:16:16:0:0\124t %s"
-
-		-- Create sort options with icons
-		local statusText = string.format(optionText, SORT_ICONS.status, L.SORT_STATUS)
-		CreateRadio(rootDescription, statusText, "status")
-
-		local nameText = string.format(optionText, SORT_ICONS.name, L.SORT_NAME)
-		CreateRadio(rootDescription, nameText, "name")
-
-		local levelText = string.format(optionText, SORT_ICONS.level, L.SORT_LEVEL)
-		CreateRadio(rootDescription, levelText, "level")
-
-		local zoneText = string.format(optionText, SORT_ICONS.zone, L.SORT_ZONE)
-		CreateRadio(rootDescription, zoneText, "zone")
-	end)
-
-	-- SetSelectionTranslator: Show icon only (like QuickFilters)
-	dropdown:SetSelectionTranslator(function(selection)
-		return string.format("\124T%s:16:16:0:0\124t", SORT_ICONS[selection.data])
-	end)
+	if dropdown.GenerateMenu then
+		dropdown:GenerateMenu()
+	end
 
 	-- Set up tooltip
 	dropdown:SetScript("OnEnter", function()
@@ -505,9 +440,8 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 		return
 	end
 
-	-- Classic mode: Use UIDropDownMenu
-	if BFL.IsClassic or not BFL.HasModernDropdown then
-		-- BFL:DebugPrint("|cff00ffffFrameInitializer:|r Classic mode - using UIDropDownMenu for Primary/Secondary Sort dropdowns")
+	if not (IsModernDropdown(header.PrimarySortDropdown) and IsModernDropdown(header.SecondarySortDropdown)) then
+		-- BFL:DebugPrint("|cff00ffffFrameInitializer:|r legacy UIDropDownMenu path for Primary/Secondary Sort dropdowns")
 
 		-- Primary Sort Dropdown
 		local primaryDropdown = header.PrimarySortDropdown
@@ -515,84 +449,75 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 		-- Only set width if ElvUI is not active (ElvUI Skin handles sizing)
 		local isElvUIActive = BFL.IsThemeActive and BFL:IsThemeActive("elvui")
 		if not isElvUIActive then
-			UIDropDownMenu_SetWidth(primaryDropdown, 70)
+			BFL.SetDropdownWidth(primaryDropdown, 70)
 		end
-		UIDropDownMenu_Initialize(primaryDropdown, function(self, level)
-			local info = UIDropDownMenu_CreateInfo()
+		local function GetIconText(sortMode)
+			return string.format("|T%s:14:14:-2:-2|t", GetSorterIcon(sortMode))
+		end
 
-			local function AddPrimaryOption(sortMode, label, icon)
-				info.text = string.format("|T%s:14:14:0:0|t %s", icon, label)
-				info.value = sortMode
-				info.func = function()
-					FriendsList:SetSortMode(sortMode)
-					FriendsList:RenderDisplay()
-					UIDropDownMenu_SetText(primaryDropdown, string.format("|T%s:14:14:-2:-2|t", icon))
+		local function GetSortDB()
+			local DB = BFL:GetModule("DB")
+			return DB and DB:Get() or {}
+		end
 
-					-- Update secondary dropdown text (in case it was reset to none)
-					local currentSecondary = FriendsList.secondarySort or "none"
-					local secondaryIcon = GetSorterIcon(currentSecondary)
-					UIDropDownMenu_SetText(secondaryDropdown, string.format("|T%s:14:14:-2:-2|t", secondaryIcon))
-				end
-				-- Check against DB/Module state
-				local DB = BFL:GetModule("DB")
-				local db = DB and DB:Get() or {}
-				local currentSort = db.primarySort or FriendsList.sortMode or "status"
-				info.checked = (currentSort == sortMode)
-				UIDropDownMenu_AddButton(info)
+		local function BuildSortOptions(includeNone)
+			local labels = {}
+			local values = {}
+			if includeNone then
+				table.insert(labels, string.format("|T%s:14:14:0:0|t %s", SORT_ICONS.none, L.SORT_NONE))
+				table.insert(values, "none")
 			end
-
 			for _, sorter in ipairs(GetVisibleSorters()) do
-				AddPrimaryOption(sorter.id, sorter.name, sorter.icon)
+				table.insert(labels, string.format("|T%s:14:14:0:0|t %s", sorter.icon, sorter.name))
+				table.insert(values, sorter.id)
 			end
-		end)
+			return {
+				labels = labels,
+				values = values,
+				getSelectionText = GetIconText,
+			}
+		end
 
-		-- Set initial text for Primary
-		local DB = BFL:GetModule("DB")
-		local db = DB and DB:Get() or {}
-		local currentPrimary = db.primarySort or FriendsList.sortMode or "status"
-		local primaryIcon = GetSorterIcon(currentPrimary)
-		UIDropDownMenu_SetText(primaryDropdown, string.format("|T%s:14:14:-2:-2|t", primaryIcon))
+		local primaryOptions = BuildSortOptions(false)
+		BFL.InitializeDropdown(primaryDropdown, primaryOptions, function(sortMode)
+			local db = GetSortDB()
+			local currentSort = db.primarySort or FriendsList.sortMode or "status"
+			return currentSort == sortMode
+		end, function(sortMode)
+			FriendsList:SetSortMode(sortMode)
+			FriendsList:RenderDisplay()
+
+			-- Update secondary dropdown text in case the primary change reset it.
+			local currentSecondary = FriendsList.secondarySort or GetSortDB().secondarySort or "none"
+			if currentSecondary ~= "none" and currentSecondary == FriendsList.sortMode then
+				currentSecondary = "none"
+			end
+			BFL.SetDropdownText(secondaryDropdown, GetIconText(currentSecondary))
+		end)
 
 		-- Secondary Sort Dropdown
 		-- Only set width if ElvUI is not active (ElvUI Skin handles sizing)
 		local isElvUIActiveSecondary = BFL.IsThemeActive and BFL:IsThemeActive("elvui")
 		if not isElvUIActiveSecondary then
-			UIDropDownMenu_SetWidth(secondaryDropdown, 70)
+			BFL.SetDropdownWidth(secondaryDropdown, 70)
 		end
-		UIDropDownMenu_Initialize(secondaryDropdown, function(self, level)
-			local function AddSecondaryOption(sortMode, label, icon)
-				-- Prevent selecting same sort as Primary (except None)
-				if sortMode ~= "none" and sortMode == FriendsList.sortMode then
-					return
-				end
-
-				local info = UIDropDownMenu_CreateInfo()
-				info.text = string.format("|T%s:14:14:0:0|t %s", icon, label)
-				info.value = sortMode
-
-				info.func = function()
-					FriendsList:SetSecondarySortMode(sortMode)
-					FriendsList:RenderDisplay()
-					UIDropDownMenu_SetText(secondaryDropdown, string.format("|T%s:14:14:-2:-2|t", icon))
-				end
-
-				local DB = BFL:GetModule("DB")
-				local db = DB and DB:Get() or {}
-				local currentSort = db.secondarySort or FriendsList.secondarySort or "name"
-				info.checked = (currentSort == sortMode)
-				UIDropDownMenu_AddButton(info)
-			end
-
-			AddSecondaryOption("none", L.SORT_NONE, SORT_ICONS.none)
-			for _, sorter in ipairs(GetVisibleSorters()) do
-				AddSecondaryOption(sorter.id, sorter.name, sorter.icon)
-			end
+		local secondaryOptions = BuildSortOptions(true)
+		secondaryOptions.isOptionHidden = function(sortMode)
+			return sortMode ~= "none" and sortMode == FriendsList.sortMode
+		end
+		BFL.InitializeDropdown(secondaryDropdown, secondaryOptions, function(sortMode)
+			local db = GetSortDB()
+			local currentSort = db.secondarySort or FriendsList.secondarySort or "name"
+			return currentSort == sortMode
+		end, function(sortMode)
+			FriendsList:SetSecondarySortMode(sortMode)
+			FriendsList:RenderDisplay()
 		end)
-
-		-- Set initial text for Secondary
-		local currentSecondary = db.secondarySort or FriendsList.secondarySort or "name"
-		local secondaryIcon = GetSorterIcon(currentSecondary)
-		UIDropDownMenu_SetText(secondaryDropdown, string.format("|T%s:14:14:-2:-2|t", secondaryIcon))
+		local currentSecondary = GetSortDB().secondarySort or FriendsList.secondarySort or "name"
+		if currentSecondary ~= "none" and currentSecondary == FriendsList.sortMode then
+			currentSecondary = "none"
+		end
+		BFL.SetDropdownText(secondaryDropdown, GetIconText(currentSecondary))
 
 		-- Setup tooltips for Classic
 		-- Hook buttons as they consume mouse events
@@ -686,36 +611,34 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 		end
 	end
 
-	local function CreatePrimaryRadio(rootDescription, text, sortMode)
-		rootDescription:CreateRadio(text, IsPrimarySelected, SetPrimarySelected, sortMode)
-	end
+	BFL.InitializeDropdown(primaryDropdown, {
+		getSelectionText = function(sortMode)
+			local GuildFrame = GetActiveGuildFrame()
+			if GuildFrame and GuildFrame.GetHeaderSortIcon then
+				return FormatIconOnly(GuildFrame:GetHeaderSortIcon())
+			end
+			return FormatIconOnly(GetSorterIcon(sortMode))
+		end,
+		populateRootDescription = function(rootDescription)
+			local GuildFrame = GetActiveGuildFrame()
+			if GuildFrame and GuildFrame.PopulateSortMenu then
+				rootDescription:SetTag("MENU_GUILD_PRIMARY_SORT")
+				GuildFrame:PopulateSortMenu(rootDescription)
+				return
+			end
 
-	primaryDropdown:SetupMenu(function(dropdown, rootDescription)
-		local GuildFrame = GetActiveGuildFrame()
-		if GuildFrame and GuildFrame.PopulateSortMenu then
-			rootDescription:SetTag("MENU_GUILD_PRIMARY_SORT")
-			GuildFrame:PopulateSortMenu(rootDescription)
-			return
-		end
+			rootDescription:SetTag("MENU_FRIENDS_PRIMARY_SORT")
 
-		rootDescription:SetTag("MENU_FRIENDS_PRIMARY_SORT")
-
-		for _, sorter in ipairs(GetVisibleSorters()) do
-			CreatePrimaryRadio(rootDescription, FormatIconText(sorter.icon, sorter.name), sorter.id)
-		end
-	end)
-
-	-- Show icon only (like QuickFilters)
-	primaryDropdown:SetSelectionTranslator(function(selection)
-		local GuildFrame = GetActiveGuildFrame()
-		if GuildFrame and GuildFrame.GetHeaderSortIcon then
-			return FormatIconOnly(GuildFrame:GetHeaderSortIcon())
-		end
-		return FormatIconOnly(GetSorterIcon(selection.data))
-	end)
+			for _, sorter in ipairs(GetVisibleSorters()) do
+				rootDescription:CreateRadio(FormatIconText(sorter.icon, sorter.name), IsPrimarySelected, SetPrimarySelected, sorter.id)
+			end
+		end,
+	}, IsPrimarySelected, SetPrimarySelected)
 
 	-- Generate menu once to trigger initial selection display
-	primaryDropdown:GenerateMenu()
+	if primaryDropdown.GenerateMenu then
+		primaryDropdown:GenerateMenu()
+	end
 
 	primaryDropdown:SetScript("OnEnter", function()
 		local GuildFrame = GetActiveGuildFrame()
@@ -748,30 +671,26 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 		FriendsList:RenderDisplay()
 	end
 
-	local function CreateSecondaryRadio(rootDescription, text, sortMode)
-		-- Prevent selecting same sort as Primary (except None)
-		if sortMode ~= "none" and sortMode == FriendsList.sortMode then
-			return
-		end
-		rootDescription:CreateRadio(text, IsSecondarySelected, SetSecondarySelected, sortMode)
-	end
+	BFL.InitializeDropdown(secondaryDropdown, {
+		getSelectionText = function(sortMode)
+			return FormatIconOnly(GetSorterIcon(sortMode))
+		end,
+		populateRootDescription = function(rootDescription)
+			rootDescription:SetTag("MENU_FRIENDS_SECONDARY_SORT")
 
-	secondaryDropdown:SetupMenu(function(dropdown, rootDescription)
-		rootDescription:SetTag("MENU_FRIENDS_SECONDARY_SORT")
-
-		CreateSecondaryRadio(rootDescription, FormatIconText(SORT_ICONS.none, L.SORT_NONE), "none")
-		for _, sorter in ipairs(GetVisibleSorters()) do
-			CreateSecondaryRadio(rootDescription, FormatIconText(sorter.icon, sorter.name), sorter.id)
-		end
-	end)
-
-	-- Show icon only (X for none, sort icons for others)
-	secondaryDropdown:SetSelectionTranslator(function(selection)
-		return FormatIconOnly(GetSorterIcon(selection.data))
-	end)
+			rootDescription:CreateRadio(FormatIconText(SORT_ICONS.none, L.SORT_NONE), IsSecondarySelected, SetSecondarySelected, "none")
+			for _, sorter in ipairs(GetVisibleSorters()) do
+				if sorter.id ~= FriendsList.sortMode then
+					rootDescription:CreateRadio(FormatIconText(sorter.icon, sorter.name), IsSecondarySelected, SetSecondarySelected, sorter.id)
+				end
+			end
+		end,
+	}, IsSecondarySelected, SetSecondarySelected)
 
 	-- Generate menu once to trigger initial selection display
-	secondaryDropdown:GenerateMenu()
+	if secondaryDropdown.GenerateMenu then
+		secondaryDropdown:GenerateMenu()
+	end
 
 	secondaryDropdown:SetScript("OnEnter", function()
 		local sortName = GetSorterName(FriendsList.secondarySort)

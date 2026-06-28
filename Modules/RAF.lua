@@ -18,7 +18,11 @@ local L = BFL.L
 local RAF = BFL:RegisterModule("RAF", {})
 
 -- Classic Guard: RAF doesn't exist in Classic Era or MoP Classic
-BFL.HasRAF = BFL.IsRAFSystemSupported and BFL.IsRAFSystemSupported() or (BFL.IsRetail and C_RecruitAFriend ~= nil)
+if BFL.IsRAFSystemSupported then
+	BFL.HasRAF = BFL.IsRAFSystemSupported()
+else
+	BFL.HasRAF = BFL.IsRetail and C_RecruitAFriend ~= nil
+end
 
 -- Local constants for RAF display
 local RECRUIT_HEIGHT = 34
@@ -207,7 +211,7 @@ local function UpdateNativeRewardsBackground(rewardsFrame, selectedRAFVersion)
 	local atlas = useLegacyArt and rewardsFrame.legacyBackgroundAtlas or rewardsFrame.backgroundAtlas
 	if atlas then
 		local useAtlasSize = TextureKitConstants and TextureKitConstants.UseAtlasSize
-		rewardsFrame.Background:SetAtlas(atlas, useAtlasSize)
+		BFL.SetTextureOrAtlas(rewardsFrame.Background, atlas, nil, useAtlasSize)
 	end
 
 	if SetupTextureKitOnRegions and RAFUtil.GetTextureKitForRAFVersion then
@@ -573,7 +577,7 @@ function RAF:OnLoad(frame)
 	-- Set up ScrollBox (Retail) or FauxScrollFrame (Classic)
 	if frame.RecruitList and frame.RecruitList.ScrollBox and frame.RecruitList.ScrollBar then
 		-- Classic: Use FauxScrollFrame approach
-		if BFL.IsClassic or not BFL.HasModernScrollBox then
+		if not BFL.HasModernScrollBox then
 			-- BFL:DebugPrint("|cff00ffffRAF:|r Using Classic FauxScrollFrame mode")
 			self:InitializeClassicRAF(frame)
 		else
@@ -946,7 +950,7 @@ function RAF:UpdateRecruitList(frame, recruits)
 	end
 
 	-- Classic mode: Use simple list and render
-	if BFL.IsClassic or not BFL.HasModernScrollBox then
+	if not BFL.HasModernScrollBox then
 		self.classicRAFDataList = dataList
 		self:RenderClassicRAFButtons()
 		return
@@ -1030,7 +1034,7 @@ function RAF:UpdateNextReward(frame, nextReward)
 			local borderAtlas = (not nextReward.claimed and not nextReward.canClaim)
 				and "RecruitAFriend_ClaimPane_SepiaRing"
 				or "RecruitAFriend_ClaimPane_GoldRing"
-			rewardPanel.NextRewardButton.IconBorder:SetAtlas(borderAtlas, true)
+			BFL.SetTextureOrAtlas(rewardPanel.NextRewardButton.IconBorder, borderAtlas, nil, true)
 		end
 		rewardPanel.NextRewardButton:Show()
 	end
@@ -1391,19 +1395,23 @@ function RAF:RecruitActivityButton_UpdateIcon(button)
 	end
 
 	local useAtlasSize = true
+	local function SetActivityAtlas(atlas)
+		BFL.SetTextureOrAtlas(button.Icon, atlas, nil, useAtlasSize)
+	end
+
 	if button:IsMouseOver() then
 		if button.activityInfo.state == Enum.RafRecruitActivityState.RewardClaimed then
-			button.Icon:SetAtlas("RecruitAFriend_RecruitedFriends_CursorOverChecked", useAtlasSize)
+			SetActivityAtlas("RecruitAFriend_RecruitedFriends_CursorOverChecked")
 		else
-			button.Icon:SetAtlas("RecruitAFriend_RecruitedFriends_CursorOver", useAtlasSize)
+			SetActivityAtlas("RecruitAFriend_RecruitedFriends_CursorOver")
 		end
 	else
 		if button.activityInfo.state == Enum.RafRecruitActivityState.Incomplete then
-			button.Icon:SetAtlas("RecruitAFriend_RecruitedFriends_ActiveChest", useAtlasSize)
+			SetActivityAtlas("RecruitAFriend_RecruitedFriends_ActiveChest")
 		elseif button.activityInfo.state == Enum.RafRecruitActivityState.Complete then
-			button.Icon:SetAtlas("RecruitAFriend_RecruitedFriends_OpenChest", useAtlasSize)
+			SetActivityAtlas("RecruitAFriend_RecruitedFriends_OpenChest")
 		else
-			button.Icon:SetAtlas("RecruitAFriend_RecruitedFriends_ClaimedChest", useAtlasSize)
+			SetActivityAtlas("RecruitAFriend_RecruitedFriends_ClaimedChest")
 		end
 	end
 end

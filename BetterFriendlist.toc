@@ -8,7 +8,7 @@
 ## X-WoWI-ID: 26984
 ## X-Wago-ID: rNkPLl6a 
 ## SavedVariables: BetterFriendlistDB
-## OptionalDeps: !BetterFriendlist_MenuBridge, LibStub, LibDataBroker-1.1, LibSharedMedia-3.0, CustomNames, FriendListColors, EnhanceQoL, totalRP3
+## OptionalDeps: !BetterFriendlist_MenuBridge, LibStub, LibDataBroker-1.1, LibSharedMedia-3.0, CustomNames, FriendListColors, EnhanceQoL, NorthernSkyRaidTools, totalRP3
 
 ## Category: User Interface
 ## Category-deDE: Benutzerinterface
@@ -121,6 +121,7 @@ Modules\SkinEngine.lua
 Modules\DarkTheme.lua
 Modules\ElvUISkin.lua
 Modules\AddOnSkins.lua [AllowLoadGameType mainline]
+Modules\Compat_NorthernSkyRaidTools.lua [AllowLoadGameType mainline]
 Modules\Compat_GlobalIgnoreList.lua
 Modules\Compat_EnhanceQoL.lua
 Modules\Compat_TotalRP3.lua

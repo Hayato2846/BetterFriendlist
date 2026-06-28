@@ -59,6 +59,8 @@ local function IsShown(frame)
 	return true
 end
 
+local IsModernDropdown = BFL.IsModernDropdown
+
 local function GetSelectedPanelTab(frame)
 	if not frame then
 		return nil
@@ -1006,7 +1008,8 @@ function DarkTheme:LayoutWhoColumnHeaders(engine, who)
 		return
 	end
 
-	local dropdownOffset = BFL.IsClassic and WHO_CLASSIC_DROPDOWN_X_OFFSET or 0
+	local useClassicDropdownOffset = BFL.IsClassic and who.ColumnDropdown and not IsModernDropdown(who.ColumnDropdown)
+	local dropdownOffset = useClassicDropdownOffset and WHO_CLASSIC_DROPDOWN_X_OFFSET or 0
 	local levelHeaderOffset = WHO_COLUMN_HEADER_OVERLAP - dropdownOffset
 
 	if who.NameHeader and who.ListInset then

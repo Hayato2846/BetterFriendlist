@@ -16,6 +16,7 @@ local SORT_CLASS = "class"
 local SORT_ZONE = "zone"
 local SORT_LAST_ONLINE = "lastonline"
 local SORT_STATUS = "status"
+local SORT_NICKNAME = "nickname"
 
 local ICON_ROOT = "Interface\\AddOns\\BetterFriendlist\\Icons\\"
 local FILTER_ICONS = {
@@ -31,6 +32,7 @@ local SORT_ICONS = {
 	zone = ICON_ROOT .. "zone.blp",
 	status = ICON_ROOT .. "status.blp",
 	lastonline = ICON_ROOT .. "clock.blp",
+	nickname = ICON_ROOT .. "tag.blp",
 }
 
 local function T(key, fallback)
@@ -49,6 +51,7 @@ local SORT_OPTIONS = {
 	{ value = SORT_LEVEL, icon = SORT_ICONS.level },
 	{ value = SORT_CLASS, icon = SORT_ICONS.class },
 	{ value = SORT_ZONE, icon = SORT_ICONS.zone },
+	{ value = SORT_NICKNAME, icon = SORT_ICONS.nickname },
 	{ value = SORT_STATUS, icon = SORT_ICONS.status },
 	{ value = SORT_LAST_ONLINE, icon = SORT_ICONS.lastonline },
 }
@@ -65,8 +68,9 @@ local function RefreshSortOptionText()
 	SORT_OPTIONS[3].text = LEVEL or "Level"
 	SORT_OPTIONS[4].text = CLASS or "Class"
 	SORT_OPTIONS[5].text = ZONE or "Zone"
-	SORT_OPTIONS[6].text = STATUS or "Status"
-	SORT_OPTIONS[7].text = LASTONLINE or "Last Online"
+	SORT_OPTIONS[6].text = T("GUILD_NICKNAME", "Nickname")
+	SORT_OPTIONS[7].text = STATUS or "Status"
+	SORT_OPTIONS[8].text = LASTONLINE or "Last Online"
 end
 
 local function SafeCall(fn, ...)
@@ -181,17 +185,6 @@ local function RefreshGuildSurfacesSoon(requestRoster)
 		end)
 	else
 		RefreshGuildSurfaces(requestRoster)
-	end
-end
-
-local function SetMenuElementEnabled(element, enabled)
-	if not element then
-		return
-	end
-	if element.SetEnabled then
-		element:SetEnabled(enabled)
-	else
-		element.enabled = enabled
 	end
 end
 
@@ -843,6 +836,13 @@ function GuildActions:GetSortIcon(mode)
 end
 
 function GuildActions:PopulateFilterMenu(rootDescription)
+	if BFL.PopulateSimpleMenu then
+		BFL.PopulateSimpleMenu(rootDescription, function()
+			return self:GetFilterMenuItems()
+		end)
+		return
+	end
+
 	local GuildFrame = BFL:GetModule("GuildFrame")
 	local function IsSelected(mode)
 		return GuildFrame and GuildFrame.filterMode == mode
@@ -862,6 +862,13 @@ function GuildActions:PopulateFilterMenu(rootDescription)
 end
 
 function GuildActions:PopulateSortMenu(rootDescription)
+	if BFL.PopulateSimpleMenu then
+		BFL.PopulateSimpleMenu(rootDescription, function()
+			return self:GetSortMenuItems()
+		end)
+		return
+	end
+
 	local GuildFrame = BFL:GetModule("GuildFrame")
 	local function IsSelected(mode)
 		return GuildFrame and GuildFrame.sortMode == mode
@@ -880,32 +887,100 @@ function GuildActions:PopulateSortMenu(rootDescription)
 	end
 end
 
-function GuildActions:PopulateMemberMenu(rootDescription, member)
-	rootDescription:CreateTitle(self:GetDisplayName(member))
+function GuildActions:GetFilterMenuItems()
+	local GuildFrame = BFL:GetModule("GuildFrame")
+	local function IsSelected(mode)
+		return GuildFrame and GuildFrame.filterMode == mode
+	end
+	local function SetSelected(mode)
+		if GuildFrame and GuildFrame.SetFilter then
+			GuildFrame:SetFilter(mode)
+			if GuildFrame.RefreshHeaderControls then
+				GuildFrame:RefreshHeaderControls()
+			end
+		end
+	end
+
+	local items = {}
+	for _, option in ipairs(self:GetFilterOptions()) do
+		items[#items + 1] = {
+			type = "radio",
+			text = FormatIconText(option.icon, option.text, 16),
+			value = option.value,
+			checked = IsSelected,
+			func = SetSelected,
+		}
+	end
+	return items
+end
+
+function GuildActions:GetSortMenuItems()
+	local GuildFrame = BFL:GetModule("GuildFrame")
+	local function IsSelected(mode)
+		return GuildFrame and GuildFrame.sortMode == mode
+	end
+	local function SetSelected(mode)
+		if GuildFrame and GuildFrame.SetSort then
+			GuildFrame:SetSort(mode, true)
+			if GuildFrame.RefreshHeaderControls then
+				GuildFrame:RefreshHeaderControls()
+			end
+		end
+	end
+
+	local items = {}
+	for _, option in ipairs(self:GetSortOptions()) do
+		items[#items + 1] = {
+			type = "radio",
+			text = FormatIconText(option.icon, option.text, 16),
+			value = option.value,
+			checked = IsSelected,
+			func = SetSelected,
+		}
+	end
+	return items
+end
+
+function GuildActions:GetMemberMenuItems(member)
 	local caps = self:GetMemberCapabilities(member)
+	local items = {
+		{
+			type = "title",
+			text = self:GetDisplayName(member),
+		},
+	}
 
 	local hasCommunication = false
 	if caps.whisper then
-		rootDescription:CreateButton(T("GUILD_ACTION_WHISPER", WHISPER or "Whisper"), function()
-			self:Whisper(member)
-		end)
+		table.insert(items, {
+			text = T("GUILD_ACTION_WHISPER", WHISPER or "Whisper"),
+			func = function()
+				self:Whisper(member)
+			end,
+		})
 		hasCommunication = true
 	end
 	if caps.inviteParty then
-		rootDescription:CreateButton(T("GUILD_ACTION_INVITE_PARTY", PARTY_INVITE or "Invite"), function()
-			self:InviteParty(member)
-		end)
+		table.insert(items, {
+			text = T("GUILD_ACTION_INVITE_PARTY", PARTY_INVITE or "Invite"),
+			func = function()
+				self:InviteParty(member)
+			end,
+		})
 		hasCommunication = true
 	end
 	if caps.who then
-		rootDescription:CreateButton(T("GUILD_BROKER_MENU_WHO", WHO or "Who"), function()
-			self:Who(member)
-		end)
+		table.insert(items, {
+			text = T("GUILD_BROKER_MENU_WHO", WHO or "Who"),
+			func = function()
+				self:Who(member)
+			end,
+		})
 		hasCommunication = true
 	end
 
 	if hasCommunication then
-		rootDescription:CreateDivider()
+		table.insert(items, { type = "divider" })
 	end
 
 	if caps.nickname or caps.copyName then
@@ -914,199 +989,148 @@ function GuildActions:PopulateMemberMenu(rootDescription, member)
 		if caps.nickname then
 			local nickLabel = currentNick ~= "" and T("GUILD_BROKER_MENU_EDIT_NICKNAME", "Edit Nickname")
 				or T("GUILD_BROKER_MENU_SET_NICKNAME", "Set Nickname")
-			rootDescription:CreateButton(nickLabel, function()
-				self:SetNicknameDialog(member)
-			end)
+			table.insert(items, {
+				text = nickLabel,
+				func = function()
+					self:SetNicknameDialog(member)
+				end,
+			})
 		end
 		if caps.copyName then
-			rootDescription:CreateButton(T("GUILD_ACTION_COPY_NAME", "Copy Name"), function()
-				self:CopyName(member)
-			end)
+			table.insert(items, {
+				text = T("GUILD_ACTION_COPY_NAME", "Copy Name"),
+				func = function()
+					self:CopyName(member)
+				end,
+			})
 		end
 	end
 
 	local hasManagement = false
-	if caps.promote then
+	local function AddManagementDivider()
 		if not hasManagement then
-			rootDescription:CreateDivider()
+			table.insert(items, { type = "divider" })
 			hasManagement = true
 		end
-		rootDescription:CreateButton(T("GUILD_ACTION_PROMOTE", "Promote"), function()
-			self:PromoteMember(member)
-		end)
+	end
+
+	if caps.promote then
+		AddManagementDivider()
+		table.insert(items, {
+			text = T("GUILD_ACTION_PROMOTE", "Promote"),
+			func = function()
+				self:PromoteMember(member)
+			end,
+		})
 	end
 	if caps.demote then
-		if not hasManagement then
-			rootDescription:CreateDivider()
-			hasManagement = true
-		end
-		rootDescription:CreateButton(T("GUILD_ACTION_DEMOTE", "Demote"), function()
-			self:DemoteMember(member)
-		end)
+		AddManagementDivider()
+		table.insert(items, {
+			text = T("GUILD_ACTION_DEMOTE", "Demote"),
+			func = function()
+				self:DemoteMember(member)
+			end,
+		})
 	end
 	if caps.remove then
-		if not hasManagement then
-			rootDescription:CreateDivider()
-			hasManagement = true
-		end
-		rootDescription:CreateButton(T("GUILD_ACTION_REMOVE", "Remove from Guild"), function()
-			self:RemoveMember(member)
-		end)
+		AddManagementDivider()
+		table.insert(items, {
+			text = T("GUILD_ACTION_REMOVE", "Remove from Guild"),
+			func = function()
+				self:RemoveMember(member)
+			end,
+		})
 	end
 	if caps.setLeader then
-		if not hasManagement then
-			rootDescription:CreateDivider()
-			hasManagement = true
-		end
-		rootDescription:CreateButton(T("GUILD_ACTION_SET_LEADER", "Set Guild Leader"), function()
-			self:SetLeader(member)
+		AddManagementDivider()
+		table.insert(items, {
+			text = T("GUILD_ACTION_SET_LEADER", "Set Guild Leader"),
+			func = function()
+				self:SetLeader(member)
+			end,
+		})
+	end
+
+	return items
+end
+
+function GuildActions:PopulateMemberMenu(rootDescription, member)
+	if BFL.PopulateSimpleMenu then
+		BFL.PopulateSimpleMenu(rootDescription, function()
+			return self:GetMemberMenuItems(member)
 		end)
 	end
 end
 
-function GuildActions:AddClassicMemberMenuButtons(member, level)
-	level = level or 1
-	local caps = self:GetMemberCapabilities(member)
-
-	local function AddButton(text, func, disabled)
-		local info = UIDropDownMenu_CreateInfo()
-		info.text = text
-		info.notCheckable = true
-		info.disabled = disabled
-		info.func = func
-		UIDropDownMenu_AddButton(info, level)
-	end
-
-	if caps.whisper then
-		AddButton(T("GUILD_ACTION_WHISPER", WHISPER or "Whisper"), function()
-			self:Whisper(member)
+function GuildActions:ShowMemberMenu(owner, member, name)
+	if BFL.OpenSimpleContextMenu then
+		return BFL.OpenSimpleContextMenu(owner or UIParent, name or "BFL_GuildMemberDropdown", function()
+			return self:GetMemberMenuItems(member)
 		end)
 	end
-	if caps.inviteParty then
-		AddButton(T("GUILD_ACTION_INVITE_PARTY", PARTY_INVITE or "Invite"), function()
-			self:InviteParty(member)
-		end)
-	end
-	if caps.who then
-		AddButton(T("GUILD_BROKER_MENU_WHO", WHO or "Who"), function()
-			self:Who(member)
-		end)
-	end
-	if caps.nickname then
-		AddButton(T("GUILD_BROKER_MENU_SET_NICKNAME", "Set Nickname"), function()
-			self:SetNicknameDialog(member)
-		end)
-	end
-	if caps.copyName then
-		AddButton(T("GUILD_ACTION_COPY_NAME", "Copy Name"), function()
-			self:CopyName(member)
-		end)
-	end
-
-	if caps.promote then
-		AddButton(T("GUILD_ACTION_PROMOTE", "Promote"), function()
-			self:PromoteMember(member)
-		end)
-	end
-	if caps.demote then
-		AddButton(T("GUILD_ACTION_DEMOTE", "Demote"), function()
-			self:DemoteMember(member)
-		end)
-	end
-	if caps.remove then
-		AddButton(T("GUILD_ACTION_REMOVE", "Remove from Guild"), function()
-			self:RemoveMember(member)
-		end)
-	end
-	if caps.setLeader then
-		AddButton(T("GUILD_ACTION_SET_LEADER", "Set Guild Leader"), function()
-			self:SetLeader(member)
-		end)
-	end
+	return false
 end
 
 function GuildActions:PopulateGuildActionsMenu(rootDescription)
-	rootDescription:CreateTitle(T("GUILD_ACTIONS_MENU", "Guild Actions"))
-	local caps = self:GetGuildCapabilities()
-
-	local inviteItem = rootDescription:CreateButton(T("GUILD_ACTION_INVITE_TO_GUILD", "Invite to Guild"), function()
-		self:InviteToGuild()
-	end)
-	SetMenuElementEnabled(inviteItem, caps.invite)
-
-	if caps.editMOTD then
-		rootDescription:CreateButton(T("GUILD_ACTION_EDIT_MOTD", "Edit MOTD"), function()
-			self:EditMOTD()
-		end)
-	end
-
-	rootDescription:CreateDivider()
-	if caps.leave then
-		rootDescription:CreateButton(T("GUILD_ACTION_LEAVE_GUILD", "Leave Guild"), function()
-			self:LeaveGuild()
-		end)
-	end
-	if caps.disband then
-		rootDescription:CreateButton(T("GUILD_ACTION_DISBAND_GUILD", "Disband Guild"), function()
-			self:DisbandGuild()
+	if BFL.PopulateSimpleMenu then
+		BFL.PopulateSimpleMenu(rootDescription, function()
+			return self:GetGuildActionsMenuItems()
 		end)
 	end
 end
 
-function GuildActions:ShowGuildActionsMenu(owner)
-	if MenuUtil and MenuUtil.CreateContextMenu then
-		MenuUtil.CreateContextMenu(owner or UIParent, function(_, rootDescription)
-			self:PopulateGuildActionsMenu(rootDescription)
-		end)
-		return
-	end
+function GuildActions:GetGuildActionsMenuItems()
+	local caps = self:GetGuildCapabilities()
+	local items = {
+		{
+			type = "title",
+			text = T("GUILD_ACTIONS_MENU", "Guild Actions"),
+		},
+		{
+			text = T("GUILD_ACTION_INVITE_TO_GUILD", "Invite to Guild"),
+			disabled = not caps.invite,
+			func = function()
+				self:InviteToGuild()
+			end,
+		},
+	}
 
-	if not (UIDropDownMenu_Initialize and ToggleDropDownMenu) then
-		return
-	end
-
-	if not self.GuildActionsDropdown then
-		self.GuildActionsDropdown = CreateFrame("Frame", "BFL_GuildActionsDropdown", UIParent, "UIDropDownMenuTemplate")
-	end
-
-	UIDropDownMenu_Initialize(self.GuildActionsDropdown, function(_, level)
-		local function AddButton(text, func, disabled)
-			local info = UIDropDownMenu_CreateInfo()
-			info.text = text
-			info.notCheckable = true
-			info.disabled = disabled
-			info.func = func
-			UIDropDownMenu_AddButton(info, level)
-		end
-
-		local info = UIDropDownMenu_CreateInfo()
-		info.text = T("GUILD_ACTIONS_MENU", "Guild Actions")
-		info.isTitle = true
-		info.notCheckable = true
-		UIDropDownMenu_AddButton(info, level)
-		local caps = self:GetGuildCapabilities()
-
-		AddButton(T("GUILD_ACTION_INVITE_TO_GUILD", "Invite to Guild"), function()
-			self:InviteToGuild()
-		end, not caps.invite)
-		if caps.editMOTD then
-			AddButton(T("GUILD_ACTION_EDIT_MOTD", "Edit MOTD"), function()
+	if caps.editMOTD then
+		table.insert(items, {
+			text = T("GUILD_ACTION_EDIT_MOTD", "Edit MOTD"),
+			func = function()
 				self:EditMOTD()
-			end)
-		end
-		if caps.leave then
-			AddButton(T("GUILD_ACTION_LEAVE_GUILD", "Leave Guild"), function()
-				self:LeaveGuild()
-			end)
-		end
-		if caps.disband then
-			AddButton(T("GUILD_ACTION_DISBAND_GUILD", "Disband Guild"), function()
-				self:DisbandGuild()
-			end)
-		end
-	end, "MENU")
+			end,
+		})
+	end
 
-	ToggleDropDownMenu(1, nil, self.GuildActionsDropdown, owner or "cursor", 0, 0)
+	table.insert(items, { type = "divider" })
+	if caps.leave then
+		table.insert(items, {
+			text = T("GUILD_ACTION_LEAVE_GUILD", "Leave Guild"),
+			func = function()
+				self:LeaveGuild()
+			end,
+		})
+	end
+	if caps.disband then
+		table.insert(items, {
+			text = T("GUILD_ACTION_DISBAND_GUILD", "Disband Guild"),
+			func = function()
+				self:DisbandGuild()
+			end,
+		})
+	end
+	return items
+end
+
+function GuildActions:ShowGuildActionsMenu(owner)
+	if BFL.OpenSimpleContextMenu then
+		return BFL.OpenSimpleContextMenu(owner or UIParent, "BFL_GuildActionsDropdown", function()
+			return self:GetGuildActionsMenuItems()
+		end)
+	end
+	return false
 end
 
 GuildActions.FILTER_ALL = FILTER_ALL

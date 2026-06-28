@@ -9,6 +9,10 @@ local ADDON_NAME, BFL = ...
 BFL.Compat = {}
 local Compat = BFL.Compat
 
+local function HasFrameMethod(frame, methodName)
+	return frame ~= nil and type(frame[methodName]) == "function"
+end
+
 ------------------------------------------------------------
 -- C_AddOns Compatibility
 ------------------------------------------------------------
@@ -42,25 +46,126 @@ end
 -- Internal dropdown counter for unique naming
 local dropdownCounter = 1
 
+local function CreateClassicMenuDescription(parentItem, rootItems)
+	rootItems = rootItems or {}
+
+	local rootDescription = {}
+
+	local function GetTargetItems()
+		if parentItem then
+			parentItem.hasArrow = true
+			parentItem.notCheckable = true
+			parentItem.func = nil
+			parentItem.menuList = parentItem.menuList or {}
+			return parentItem.menuList
+		end
+		return rootItems
+	end
+
+	local function AddItem(item)
+		table.insert(GetTargetItems(), item)
+		return CreateClassicMenuDescription(item)
+	end
+
+	function rootDescription:SetEnabled(enabled)
+		if parentItem then
+			parentItem.disabled = not enabled
+		end
+	end
+
+	function rootDescription:CreateTitle(text)
+		return AddItem({
+			text = text or "",
+			isTitle = true,
+			notCheckable = true,
+		})
+	end
+
+	function rootDescription:CreateDivider()
+		return AddItem({
+			text = "",
+			disabled = true,
+			notCheckable = true,
+		})
+	end
+
+	function rootDescription:CreateButton(text, onSelected)
+		local item = {
+			text = text or "",
+			notCheckable = true,
+		}
+		if type(onSelected) == "function" then
+			item.func = onSelected
+		end
+		return AddItem(item)
+	end
+
+	function rootDescription:CreateCheckbox(text, isSelected, onSelected)
+		local item = {
+			text = text or "",
+			notCheckable = false,
+			isNotRadio = true,
+			keepShownOnClick = true,
+		}
+		if type(isSelected) == "function" then
+			item.checked = function()
+				return isSelected() == true
+			end
+		else
+			item.checked = isSelected == true
+		end
+		if type(onSelected) == "function" then
+			item.func = onSelected
+		end
+		return AddItem(item)
+	end
+
+	function rootDescription:CreateRadio(text, isSelected, onSelected, value)
+		local item = {
+			text = text or "",
+			arg1 = value,
+			notCheckable = false,
+		}
+		if type(isSelected) == "function" then
+			item.checked = function()
+				return isSelected(value) == true
+			end
+		else
+			item.checked = isSelected == true
+		end
+		if type(onSelected) == "function" then
+			item.func = function(_, selectedValue)
+				return onSelected(selectedValue)
+			end
+		end
+		return AddItem(item)
+	end
+
+	return rootDescription, rootItems
+end
+
 -- Create a context menu (right-click menus)
 -- @param owner: Frame that owns the menu
 -- @param menuGenerator: Function that returns menu items
---   For Retail: Standard MenuUtil generator function
---   For Classic: Should return a table in EasyMenu format
+-- @param menuGenerator: Retail rootDescription generator or EasyMenu-compatible table factory
 function Compat.CreateContextMenu(owner, menuGenerator)
 	if MenuUtil and MenuUtil.CreateContextMenu then
 		-- Retail: Modern Menu API
-		MenuUtil.CreateContextMenu(owner, menuGenerator)
+		return MenuUtil.CreateContextMenu(owner, menuGenerator)
 	else
 		-- Classic: UIDropDownMenu fallback
 		local menuFrame = CreateFrame("Frame", "BFLContextMenu" .. dropdownCounter, UIParent, "UIDropDownMenuTemplate")
 		dropdownCounter = dropdownCounter + 1
 
-		-- menuGenerator should return EasyMenu-compatible table for Classic
-		local menuTable = menuGenerator()
+		local classicRootDescription, classicMenuTable = CreateClassicMenuDescription()
+		local menuTable = menuGenerator(owner, classicRootDescription)
+		if not menuTable and #classicMenuTable > 0 then
+			menuTable = classicMenuTable
+		end
 		if menuTable then
 			EasyMenu(menuTable, menuFrame, owner or "cursor", 0, 0, "MENU")
 		end
+		return menuFrame
 	end
 end
 
@@ -170,6 +275,184 @@ function Compat.CreateEasyMenuTable(items)
 	return menuTable
 end
 
+local function GetSimpleMenuItems(itemsOrFactory)
+	if type(itemsOrFactory) == "function" then
+		return itemsOrFactory() or {}
+	end
+	return itemsOrFactory or {}
+end
+
+local function GetSimpleMenuChildren(item)
+	if not item then
+		return nil
+	end
+	return item.children or item.items or item.menuList
+end
+
+local function SetSimpleMenuElementEnabled(element, enabled)
+	if not element then
+		return
+	end
+	if element.SetEnabled then
+		element:SetEnabled(enabled)
+	else
+		element.enabled = enabled
+	end
+end
+
+local function IsSimpleMenuItemChecked(item, value)
+	if type(item.checked) == "function" then
+		return item.checked(value)
+	end
+	if type(item.isSelected) == "function" then
+		return item.isSelected(value)
+	end
+	return item.checked == true
+end
+
+local function RunSimpleMenuItem(item, value)
+	if type(item.func) == "function" then
+		return item.func(value)
+	end
+end
+
+function Compat.PopulateSimpleMenu(rootDescription, itemsOrFactory)
+	if not (rootDescription and rootDescription.CreateButton) then
+		return false
+	end
+
+	for _, item in ipairs(GetSimpleMenuItems(itemsOrFactory)) do
+		if not item.hidden then
+			local itemType = item.type or "button"
+			if itemType == "divider" then
+				if rootDescription.CreateDivider then
+					rootDescription:CreateDivider()
+				end
+			elseif itemType == "title" then
+				if rootDescription.CreateTitle then
+					rootDescription:CreateTitle(item.text or "")
+				else
+					local title = rootDescription:CreateButton(item.text or "", function() end)
+					SetSimpleMenuElementEnabled(title, false)
+				end
+			elseif GetSimpleMenuChildren(item) then
+				local element = rootDescription:CreateButton(item.text or "")
+				Compat.PopulateSimpleMenu(element, GetSimpleMenuChildren(item))
+				if item.disabled ~= nil or item.enabled ~= nil then
+					local enabled = item.enabled
+					if enabled == nil then
+						enabled = not item.disabled
+					end
+					SetSimpleMenuElementEnabled(element, enabled)
+				end
+			elseif itemType == "radio" and rootDescription.CreateRadio then
+				local element = rootDescription:CreateRadio(item.text or "", function(value)
+					return IsSimpleMenuItemChecked(item, value)
+				end, function(value)
+					return RunSimpleMenuItem(item, value)
+				end, item.value)
+				if item.disabled ~= nil or item.enabled ~= nil then
+					local enabled = item.enabled
+					if enabled == nil then
+						enabled = not item.disabled
+					end
+					SetSimpleMenuElementEnabled(element, enabled)
+				end
+			elseif itemType == "checkbox" and rootDescription.CreateCheckbox then
+				local element = rootDescription:CreateCheckbox(item.text or "", function()
+					return IsSimpleMenuItemChecked(item, item.value)
+				end, function()
+					return RunSimpleMenuItem(item, item.value)
+				end)
+				if item.disabled ~= nil or item.enabled ~= nil then
+					local enabled = item.enabled
+					if enabled == nil then
+						enabled = not item.disabled
+					end
+					SetSimpleMenuElementEnabled(element, enabled)
+				end
+			else
+				local element = rootDescription:CreateButton(item.text or "", function()
+					return RunSimpleMenuItem(item, item.value)
+				end)
+				if item.disabled ~= nil or item.enabled ~= nil then
+					local enabled = item.enabled
+					if enabled == nil then
+						enabled = not item.disabled
+					end
+					SetSimpleMenuElementEnabled(element, enabled)
+				end
+			end
+		end
+	end
+	return true
+end
+
+function Compat.OpenSimpleContextMenu(owner, name, itemsOrFactory)
+	if type(name) ~= "string" then
+		itemsOrFactory = name
+		name = nil
+	end
+
+	if MenuUtil and MenuUtil.CreateContextMenu then
+		MenuUtil.CreateContextMenu(owner or UIParent, function(_, rootDescription)
+			Compat.PopulateSimpleMenu(rootDescription, itemsOrFactory)
+		end)
+		return true
+	end
+
+	if not (UIDropDownMenu_Initialize and ToggleDropDownMenu) then
+		return false
+	end
+
+	if not name or name == "" then
+		name = "BFLSimpleContextMenu" .. dropdownCounter
+		dropdownCounter = dropdownCounter + 1
+	end
+	local menuFrame = _G[name]
+	if not menuFrame then
+		menuFrame = CreateFrame("Frame", name, UIParent, "UIDropDownMenuTemplate")
+	end
+
+	UIDropDownMenu_Initialize(menuFrame, function(_, level, menuList)
+		level = level or 1
+		local items = level == 1 and GetSimpleMenuItems(itemsOrFactory) or GetSimpleMenuItems(menuList)
+		for _, item in ipairs(items) do
+			if not item.hidden and item.type ~= "divider" then
+				local itemType = item.type or "button"
+				local children = GetSimpleMenuChildren(item)
+				local info = UIDropDownMenu_CreateInfo()
+				info.text = item.text or ""
+				info.isTitle = itemType == "title"
+				info.disabled = item.disabled or item.enabled == false
+				if children then
+					info.notCheckable = true
+					info.hasArrow = true
+					info.menuList = children
+				elseif itemType == "radio" or itemType == "checkbox" then
+					info.notCheckable = false
+					info.isNotRadio = itemType == "checkbox"
+					info.keepShownOnClick = item.keepShownOnClick == true
+					info.checked = function()
+						return IsSimpleMenuItemChecked(item, item.value)
+					end
+				else
+					info.notCheckable = true
+				end
+				if itemType ~= "title" and not children then
+					info.func = function()
+						RunSimpleMenuItem(item, item.value)
+					end
+				end
+				UIDropDownMenu_AddButton(info, level)
+			end
+		end
+	end, "MENU")
+
+	ToggleDropDownMenu(1, nil, menuFrame, owner or "cursor", 0, 0)
+	return true
+end
+
 ------------------------------------------------------------
 -- UnitPopup Compatibility
 ------------------------------------------------------------
@@ -277,12 +560,14 @@ end
 -- @param parent: Parent frame
 -- @param name: Unique name for the dropdown
 -- @param width: Dropdown width
+-- @param preferModern: Optional opt-in for modern dropdowns, or { forceLegacy = true }
 -- @return dropdown frame
-function Compat.CreateDropdown(parent, name, width)
+function Compat.CreateDropdown(parent, name, width, preferModern)
 	width = width or 150
+	local forceLegacy = type(preferModern) == "table" and preferModern.forceLegacy == true
+	local shouldUseModern = not forceLegacy and (BFL.HasModernDropdown or preferModern == true)
 
-	if BFL.HasModernDropdown then
-		-- Retail: Modern dropdown
+	if shouldUseModern and Compat.CanCreateModernDropdown() then
 		local dropdown = CreateFrame("DropdownButton", name, parent, "WowStyle1DropdownTemplate")
 		dropdown:SetWidth(width)
 		return dropdown
@@ -296,6 +581,95 @@ function Compat.CreateDropdown(parent, name, width)
 	end
 end
 
+function Compat.CanCreateModernDropdown()
+	local capabilities = BFL.Capabilities
+	return (capabilities ~= nil and capabilities.ModernDropdown == true)
+		or (type(DropdownButtonMixin) == "table" and type(DropdownButtonMixin.SetupMenu) == "function")
+end
+
+function Compat.IsModernDropdown(dropdown)
+	return HasFrameMethod(dropdown, "SetupMenu")
+end
+
+function Compat.ShouldUseLegacyDropdown(dropdown)
+	return not Compat.IsModernDropdown(dropdown)
+end
+
+function Compat.SetDropdownText(dropdown, text)
+	if not dropdown then
+		return false
+	end
+	text = text or ""
+	if Compat.IsModernDropdown(dropdown) then
+		if dropdown.SetText then
+			dropdown:SetText(text)
+			return true
+		elseif dropdown.Text and dropdown.Text.SetText then
+			dropdown.Text:SetText(text)
+			return true
+		end
+	elseif UIDropDownMenu_SetText then
+		UIDropDownMenu_SetText(dropdown, text)
+		return true
+	end
+	return false
+end
+
+function Compat.SetDropdownWidth(dropdown, width)
+	if not (dropdown and width) then
+		return false
+	end
+	if Compat.IsModernDropdown(dropdown) then
+		if dropdown.SetWidth then
+			dropdown:SetWidth(width)
+			return true
+		end
+	elseif UIDropDownMenu_SetWidth then
+		UIDropDownMenu_SetWidth(dropdown, width)
+		return true
+	end
+	return false
+end
+
+function Compat.JustifyDropdownText(dropdown, justify)
+	if not dropdown then
+		return false
+	end
+	justify = justify or "LEFT"
+	if Compat.IsModernDropdown(dropdown) then
+		local textRegion = dropdown.Text or dropdown.TextRegion or dropdown.SelectionText
+		if textRegion and textRegion.SetJustifyH then
+			textRegion:SetJustifyH(justify)
+			return true
+		end
+	elseif UIDropDownMenu_JustifyText then
+		UIDropDownMenu_JustifyText(dropdown, justify)
+		return true
+	end
+	return false
+end
+
+function Compat.SetDropdownSelectedValue(dropdown, value)
+	if not dropdown or Compat.IsModernDropdown(dropdown) then
+		return false
+	end
+	if UIDropDownMenu_SetSelectedValue then
+		UIDropDownMenu_SetSelectedValue(dropdown, value)
+		return true
+	end
+	return false
+end
+
+local function GetDropdownSelectionText(options, value, fallbackLabel)
+	if options and type(options.getSelectionText) == "function" then
+		local text = options.getSelectionText(value)
+		if text ~= nil then
+			return text
+		end
+	end
+	return fallbackLabel or tostring(value or "")
+end
+
 -- Initialize dropdown with options
 -- @param dropdown: The dropdown frame
 -- @param options: Table with { labels = {...}, values = {...} }
@@ -303,46 +677,76 @@ end
 -- @param setter: Function(value) called when selection changes
 -- @param scrollHeight: Optional max pixel height before the dropdown scrolls (Retail only)
 function Compat.InitializeDropdown(dropdown, options, getter, setter, scrollHeight)
-	if BFL.HasModernDropdown and dropdown.SetupMenu then
-		-- Retail: Modern API
+	options = options or {}
+	if Compat.IsModernDropdown(dropdown) then
+		if dropdown.SetSelectionTranslator then
+			dropdown:SetSelectionTranslator(function(selection)
+				return GetDropdownSelectionText(options, selection and selection.data, selection and selection.text)
+			end)
+		end
 		dropdown:SetupMenu(function(dropdown, rootDescription)
-			if scrollHeight then
+			if scrollHeight and rootDescription.SetScrollMode then
 				rootDescription:SetScrollMode(scrollHeight)
 			end
-			for i, label in ipairs(options.labels) do
-				local value = options.values[i]
-				rootDescription:CreateRadio(label, getter, setter, value)
+			if type(options.populateRootDescription) == "function" then
+				options.populateRootDescription(rootDescription, dropdown)
+			else
+				local labels = options.labels or {}
+				local values = options.values or {}
+				for i, label in ipairs(labels) do
+					local value = values[i]
+					if not (type(options.isOptionHidden) == "function" and options.isOptionHidden(value, i)) then
+						local element = rootDescription:CreateRadio(label, getter, setter, value)
+						if type(options.getItemFontObject) == "function" and element and element.AddInitializer then
+							local fontObject = options.getItemFontObject(value, i)
+							if fontObject then
+								element:AddInitializer(function(button)
+									if button.fontString then
+										button.fontString:SetFontObject(fontObject)
+									end
+								end)
+							end
+						end
+					end
+				end
 			end
 		end)
 	else
 		-- Classic: UIDropDownMenu
 		UIDropDownMenu_Initialize(dropdown, function(self, level, menuList)
 			level = level or 1
-			for i, label in ipairs(options.labels) do
-				local info = UIDropDownMenu_CreateInfo()
-				info.text = label
-				local capturedValue = options.values[i]
-				local capturedLabel = label
-				info.value = capturedValue
-				info.checked = getter(capturedValue)
-				info.func = function()
-					-- Use closured values, NOT self.value/self:GetText()
-					-- (setter may call UIDropDownMenu_Initialize on another dropdown,
-					-- which overwrites DropDownList1 buttons, corrupting self)
-					setter(capturedValue)
-					UIDropDownMenu_SetSelectedValue(dropdown, capturedValue)
-					UIDropDownMenu_SetText(dropdown, capturedLabel)
-					CloseDropDownMenus()
+			local labels = options.labels or {}
+			local values = options.values or {}
+			for i, label in ipairs(labels) do
+				local capturedValue = values[i]
+				if not (options and type(options.isOptionHidden) == "function" and options.isOptionHidden(capturedValue, i)) then
+					local info = UIDropDownMenu_CreateInfo()
+					info.text = label
+					local capturedLabel = label
+					info.value = capturedValue
+					info.checked = getter(capturedValue)
+					if options and type(options.getItemFontObject) == "function" then
+						info.fontObject = options.getItemFontObject(capturedValue, i)
+					end
+					info.func = function()
+						-- Use closured values, NOT self.value/self:GetText()
+						-- (setter may call UIDropDownMenu_Initialize on another dropdown,
+						-- which overwrites DropDownList1 buttons, corrupting self)
+						setter(capturedValue)
+						Compat.SetDropdownSelectedValue(dropdown, capturedValue)
+						Compat.SetDropdownText(dropdown, GetDropdownSelectionText(options, capturedValue, capturedLabel))
+						CloseDropDownMenus()
+					end
+					UIDropDownMenu_AddButton(info, level)
 				end
-				UIDropDownMenu_AddButton(info, level)
 			end
 		end)
 
 		-- Set initial selection
-		for i, value in ipairs(options.values) do
-			if getter(value) then
-				UIDropDownMenu_SetSelectedValue(dropdown, value)
-				UIDropDownMenu_SetText(dropdown, options.labels[i])
+		for i, value in ipairs(options.values or {}) do
+			if getter(value) and not (options and type(options.isOptionHidden) == "function" and options.isOptionHidden(value, i)) then
+				Compat.SetDropdownSelectedValue(dropdown, value)
+				Compat.SetDropdownText(dropdown, GetDropdownSelectionText(options, value, options.labels[i]))
 				break
 			end
 		end
@@ -356,23 +760,41 @@ end
 -- @param setter: Function(value, checked) called when a checkbox is toggled
 -- @param textFunc: Function() -> string (returns the display text for the dropdown)
 function Compat.InitializeMultiSelectDropdown(dropdown, options, getter, setter, textFunc)
-	if BFL.HasModernDropdown and dropdown.SetupMenu then
-		-- Retail: Modern API with checkboxes
+	if Compat.IsModernDropdown(dropdown) then
 		dropdown:SetupMenu(function(dropdown, rootDescription)
 			for i, label in ipairs(options.labels) do
 				local value = options.values[i]
-				rootDescription:CreateCheckbox(label, function()
+				local element = rootDescription:CreateCheckbox(label, function()
 					return getter(value)
 				end, function()
 					setter(value, not getter(value))
 				end)
+				if element then
+					if element.SetCloseOnClick then
+						element:SetCloseOnClick(false)
+					end
+					if options and type(options.getItemFontObject) == "function" and element.AddInitializer then
+						local fontObject = options.getItemFontObject(value, i)
+						if fontObject then
+							element:AddInitializer(function(button)
+								if button.fontString then
+									button.fontString:SetFontObject(fontObject)
+								end
+							end)
+						end
+					end
+				end
 			end
 		end)
-		-- Use SetDefaultText as fallback, and SetSelectionText for dynamic updates
-		dropdown:SetDefaultText(textFunc())
-		dropdown:SetSelectionText(function()
-			return textFunc()
-		end)
+		-- Use SetDefaultText as fallback, and SetSelectionText for dynamic updates.
+		if dropdown.SetDefaultText then
+			dropdown:SetDefaultText(textFunc())
+		end
+		if dropdown.SetSelectionText then
+			dropdown:SetSelectionText(function()
+				return textFunc()
+			end)
+		end
 	else
 		-- Classic: UIDropDownMenu with checkboxes
 		UIDropDownMenu_Initialize(dropdown, function(self, level, menuList)
@@ -384,33 +806,63 @@ function Compat.InitializeMultiSelectDropdown(dropdown, options, getter, setter,
 				info.value = capturedValue
 				info.isNotRadio = true
 				info.keepShownOnClick = true
+				if options and type(options.getItemFontObject) == "function" then
+					info.fontObject = options.getItemFontObject(capturedValue, i)
+				end
 				info.checked = function()
 					return getter(capturedValue)
 				end
 				info.func = function(self)
 					local newChecked = not getter(capturedValue)
 					setter(capturedValue, newChecked)
-					UIDropDownMenu_SetText(dropdown, textFunc())
+					Compat.SetDropdownText(dropdown, textFunc())
 				end
 				UIDropDownMenu_AddButton(info, level)
 			end
 		end)
 
 		-- Set initial text
-		UIDropDownMenu_SetText(dropdown, textFunc())
+		Compat.SetDropdownText(dropdown, textFunc())
 	end
 end
 
--- Refresh a dropdown's displayed text after programmatic value change
+-- Refresh a dropdown's menu state or displayed text after programmatic value change
 -- @param dropdown: The dropdown frame
--- @param text: The text to display
+-- @param text: Optional text to display
 function Compat.RefreshDropdown(dropdown, text)
-	if BFL.HasModernDropdown and dropdown.Update then
-		dropdown:Update()
-	else
-		UIDropDownMenu_SetText(dropdown, text)
-		UIDropDownMenu_SetSelectedValue(dropdown, "")
+	if not dropdown then
+		return false
 	end
+
+	if Compat.IsModernDropdown(dropdown) then
+		if text ~= nil then
+			Compat.SetDropdownText(dropdown, text)
+		end
+		if dropdown.Update then
+			dropdown:Update()
+			return true
+		elseif dropdown.GenerateMenu then
+			dropdown:GenerateMenu()
+			return true
+		elseif dropdown.UpdateSelections then
+			dropdown:UpdateSelections()
+			return true
+		end
+		return text ~= nil
+	elseif text ~= nil then
+		Compat.SetDropdownText(dropdown, text)
+		Compat.SetDropdownSelectedValue(dropdown, "")
+		return true
+	else
+		if UIDropDownMenu_Refresh then
+			UIDropDownMenu_Refresh(dropdown)
+			return true
+		elseif UIDropDownMenu_RefreshAll then
+			UIDropDownMenu_RefreshAll(dropdown)
+			return true
+		end
+	end
+	return false
 end
 
 ------------------------------------------------------------
@@ -698,6 +1150,10 @@ end
 -- These are helper utilities
 
 function Compat.HasModernScrollBox()
+	local capabilities = BFL.Capabilities
+	if capabilities and capabilities.ModernScrollBox ~= nil then
+		return capabilities.ModernScrollBox
+	end
 	return CreateScrollBoxListLinearView ~= nil and ScrollUtil ~= nil
 end
 
@@ -790,8 +1246,9 @@ end
 ------------------------------------------------------------
 -- Atlas/Texture Compatibility
 ------------------------------------------------------------
--- Many modern atlases don't exist in Classic
--- Provide fallback textures
+-- Prefer atlases only when the active client confirms they exist, then fall back
+-- to file textures. This avoids XML/load-time atlas warnings in Classic while
+-- still allowing modern Classic flavors to use newer art when available.
 
 local ATLAS_FALLBACKS = {
 	-- Travel Pass / Invite Button
@@ -799,42 +1256,88 @@ local ATLAS_FALLBACKS = {
 	["friendslist-invitebutton-default-pressed"] = "Interface\\FriendsFrame\\TravelPass-Invite",
 	["friendslist-invitebutton-default-disabled"] = "Interface\\FriendsFrame\\TravelPass-Invite",
 	["friendslist-invitebutton-highlight"] = "Interface\\FriendsFrame\\TravelPass-Invite",
+	["friendslist-invitebutton-horde-normal"] = "Interface\\FriendsFrame\\TravelPass-Invite",
+	["friendslist-invitebutton-horde-pressed"] = "Interface\\FriendsFrame\\TravelPass-Invite",
+	["friendslist-invitebutton-horde-disabled"] = "Interface\\FriendsFrame\\TravelPass-Invite",
+	["friendslist-invitebutton-alliance-normal"] = "Interface\\FriendsFrame\\TravelPass-Invite",
+	["friendslist-invitebutton-alliance-pressed"] = "Interface\\FriendsFrame\\TravelPass-Invite",
+	["friendslist-invitebutton-alliance-disabled"] = "Interface\\FriendsFrame\\TravelPass-Invite",
 
 	-- Group Header Arrows
-	["friendslist-categorybutton-arrow-right"] = "Interface\\Buttons\\UI-PlusButton-Up",
-	["friendslist-categorybutton-arrow-down"] = "Interface\\Buttons\\UI-MinusButton-Up",
+	["friendslist-categorybutton-arrow-left"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\chevron-left",
+	["friendslist-categorybutton-arrow-right"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\chevron-right",
+	["friendslist-categorybutton-arrow-down"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\chevron-down",
 
 	-- Recent Allies Pin (not available in Classic anyway)
 	["friendslist-recentallies-pin"] = "Interface\\FriendsFrame\\UI-Toast-ChatInviteIcon",
 	["friendslist-recentallies-pin-yellow"] = "Interface\\FriendsFrame\\UI-Toast-ChatInviteIcon",
+
+	-- Modern social UI
+	["communities-icon-invitemail"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\mail",
+	["NewCharacter-Alliance"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\star",
+	["CharacterCreate-NewLabel"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\star",
+	["socialqueuing-icon-eye"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\eye",
+	["socialqueuing-icon-group"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\users",
 
 	-- Clock icon
 	["icon-clock"] = "Interface\\Icons\\INV_Misc_PocketWatch_01",
 
 	-- Recruit-a-Friend
 	["recruitafriend_friendslist_v3_icon"] = "Interface\\Icons\\Achievement_GuildPerk_EverybodysFriend",
+	["RecruitAFriend_ClaimPane_GoldRing"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\award",
+	["RecruitAFriend_ClaimPane_SepiaRing"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\circle",
+	["RecruitAFriend_RecruitedFriends_CursorOverChecked"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\check-circle",
+	["RecruitAFriend_RecruitedFriends_CursorOver"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\gift",
+	["RecruitAFriend_RecruitedFriends_ActiveChest"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\gift",
+	["RecruitAFriend_RecruitedFriends_OpenChest"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\package",
+	["RecruitAFriend_RecruitedFriends_ClaimedChest"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\check-circle",
 }
+
+local ATLAS_AVAILABILITY = {}
+
+local function HasAtlas(atlasName)
+	if not atlasName or not (C_Texture and type(C_Texture.GetAtlasInfo) == "function") then
+		return false
+	end
+
+	if ATLAS_AVAILABILITY[atlasName] ~= nil then
+		return ATLAS_AVAILABILITY[atlasName]
+	end
+
+	local ok, info = pcall(C_Texture.GetAtlasInfo, atlasName)
+	local available = ok and info ~= nil
+	ATLAS_AVAILABILITY[atlasName] = available
+	return available
+end
+
+function Compat.HasAtlas(atlasName)
+	return HasAtlas(atlasName)
+end
 
 -- Set texture with atlas fallback support
 -- @param texture: Texture object
 -- @param atlasName: Atlas name to try
 -- @param fallbackFile: Optional explicit fallback file path
-function Compat.SetTextureOrAtlas(texture, atlasName, fallbackFile)
+-- @param useAtlasSize: Optional SetAtlas useAtlasSize flag
+-- @return boolean: true when an atlas was applied, false when a fallback texture was used
+function Compat.SetTextureOrAtlas(texture, atlasName, fallbackFile, useAtlasSize)
 	if not texture then
-		return
+		return false
 	end
 
-	if BFL.IsRetail and texture.SetAtlas then
-		-- Retail: Try atlas first
+	if texture.SetAtlas and HasAtlas(atlasName) then
 		local success = pcall(function()
-			texture:SetAtlas(atlasName)
+			if useAtlasSize ~= nil then
+				texture:SetAtlas(atlasName, useAtlasSize)
+			else
+				texture:SetAtlas(atlasName)
+			end
 		end)
 		if success then
-			return
+			return true
 		end
 	end
 
-	-- Classic or atlas failed: Use fallback
 	local fallback = fallbackFile or ATLAS_FALLBACKS[atlasName]
 	if fallback then
 		texture:SetTexture(fallback)
@@ -842,6 +1345,234 @@ function Compat.SetTextureOrAtlas(texture, atlasName, fallbackFile)
 		-- Last resort: try as direct texture path
 		texture:SetTexture(atlasName)
 	end
+	return false
+end
+
+function Compat.GetAtlasOrTextureMarkup(atlasName, fallbackFile, width, height)
+	width = tonumber(width) or 16
+	height = tonumber(height) or width
+	if HasAtlas(atlasName) then
+		return string.format("|A:%s:%d:%d|a", atlasName, width, height)
+	end
+	local texturePath = fallbackFile or ATLAS_FALLBACKS[atlasName]
+	if texturePath and texturePath ~= "" then
+		return string.format("|T%s:%d:%d|t", texturePath, width, height)
+	end
+	return ""
+end
+
+function Compat.GetClientProgramIconPrefix(clientProgram, iconSize)
+	if type(clientProgram) ~= "string" or clientProgram == "" then
+		return ""
+	end
+
+	iconSize = tonumber(iconSize) or 32
+	local textureAPI = C_Texture
+	local titleIconVersions = Enum and Enum["TitleIconVersion"]
+	local titleIconVersion = titleIconVersions and titleIconVersions.Small
+	if not (
+		textureAPI
+		and type(textureAPI.IsTitleIconTextureReady) == "function"
+		and type(textureAPI.GetTitleIconTexture) == "function"
+		and titleIconVersion
+		and type(BNet_GetClientEmbeddedTexture) == "function"
+	) then
+		return ""
+	end
+
+	local readyOK, ready = pcall(textureAPI.IsTitleIconTextureReady, clientProgram, titleIconVersion)
+	if not (readyOK and ready) then
+		return ""
+	end
+
+	local text = ""
+	local fetchOK = pcall(textureAPI.GetTitleIconTexture, clientProgram, titleIconVersion, function(success, texture)
+		if success and texture then
+			text = BNet_GetClientEmbeddedTexture(texture, iconSize, iconSize, 0) .. " "
+		end
+	end)
+	if not fetchOK then
+		return ""
+	end
+	return text
+end
+
+local ROLE_ICON_TEXTURE = "Interface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES"
+local ROLE_ICON_DATA = {
+	TANK = {
+		atlas = "UI-LFG-RoleIcon-Tank-Micro-GroupFinder",
+		fallbackAtlas = "groupfinder-icon-role-large-tank",
+		texCoord = { 0, 19 / 64, 22 / 64, 41 / 64 },
+	},
+	HEALER = {
+		atlas = "UI-LFG-RoleIcon-Healer-Micro-GroupFinder",
+		fallbackAtlas = "groupfinder-icon-role-large-heal",
+		texCoord = { 20 / 64, 39 / 64, 1 / 64, 20 / 64 },
+	},
+	DAMAGER = {
+		atlas = "UI-LFG-RoleIcon-DPS-Micro-GroupFinder",
+		fallbackAtlas = "groupfinder-icon-role-large-dps",
+		texCoord = { 20 / 64, 39 / 64, 22 / 64, 41 / 64 },
+	},
+}
+
+local ROLE_ALIASES = {
+	DAMAGE = "DAMAGER",
+	DPS = "DAMAGER",
+	DAMAGER = "DAMAGER",
+	HEAL = "HEALER",
+	HEALER = "HEALER",
+	TANK = "TANK",
+}
+
+local function NormalizeRole(role)
+	if type(role) ~= "string" then
+		return nil
+	end
+	return ROLE_ALIASES[role:upper()]
+end
+
+local function GetRoleIconData(role)
+	return ROLE_ICON_DATA[NormalizeRole(role)]
+end
+
+local function CopyTexCoord(texCoord)
+	if type(texCoord) ~= "table" then
+		return nil
+	end
+	return {
+		tonumber(texCoord[1]) or 0,
+		tonumber(texCoord[2]) or 1,
+		tonumber(texCoord[3]) or 0,
+		tonumber(texCoord[4]) or 1,
+	}
+end
+
+local function ResetTexCoord(texture)
+	if texture and texture.SetTexCoord then
+		texture:SetTexCoord(0, 1, 0, 1)
+	end
+end
+
+local function ApplyTexCoord(texture, texCoord)
+	if texture and texture.SetTexCoord and type(texCoord) == "table" then
+		texture:SetTexCoord(
+			tonumber(texCoord[1]) or 0,
+			tonumber(texCoord[2]) or 1,
+			tonumber(texCoord[3]) or 0,
+			tonumber(texCoord[4]) or 1
+		)
+	end
+end
+
+local function TrySetIconAtlas(texture, atlas, useAtlasSize)
+	if not (texture and texture.SetAtlas and atlas and atlas ~= "") then
+		return false
+	end
+	if not HasAtlas(atlas) then
+		return false
+	end
+	local width = texture.GetWidth and texture:GetWidth() or nil
+	local height = texture.GetHeight and texture:GetHeight() or nil
+	ResetTexCoord(texture)
+	if useAtlasSize == nil then
+		useAtlasSize = false
+	end
+	local ok = pcall(texture.SetAtlas, texture, atlas, useAtlasSize)
+	if ok then
+		if width and height and width > 0 and height > 0 and texture.SetSize then
+			texture:SetSize(width, height)
+		end
+		texture:Show()
+		return true
+	end
+	return false
+end
+
+function Compat.ApplyIconProfile(texture, profile)
+	if not texture then
+		return false
+	end
+	profile = type(profile) == "table" and profile or {}
+	local iconType = profile.iconType
+	local iconValue = profile.iconValue or profile.icon
+	if not iconValue or iconValue == "" or iconType == "none" then
+		texture:Hide()
+		return false
+	end
+	if iconType == "atlas" then
+		if TrySetIconAtlas(texture, iconValue, false)
+			or TrySetIconAtlas(texture, profile.atlas, false)
+			or TrySetIconAtlas(texture, profile.fallbackAtlas, false) then
+			return true
+		end
+	end
+
+	local texturePath = profile.texture or profile.icon or (iconType ~= "atlas" and iconValue) or nil
+	if not texturePath or texturePath == "" then
+		texture:Hide()
+		return false
+	end
+	ResetTexCoord(texture)
+	texture:SetTexture(texturePath)
+	ApplyTexCoord(texture, profile.texCoord)
+	texture:Show()
+	return true
+end
+
+function Compat.GetRoleIconAtlas(role)
+	local data = GetRoleIconData(role)
+	return data and data.atlas or nil
+end
+
+function Compat.GetRoleIconProfile(role)
+	local data = GetRoleIconData(role)
+	if not data then
+		return nil
+	end
+	return {
+		iconType = "atlas",
+		iconValue = data.atlas,
+		icon = data.atlas,
+		atlas = data.atlas,
+		fallbackAtlas = data.fallbackAtlas,
+		texture = ROLE_ICON_TEXTURE,
+		texCoord = CopyTexCoord(data.texCoord),
+	}
+end
+
+function Compat.GetRoleIconMarkup(role, size)
+	local data = GetRoleIconData(role)
+	if not data then
+		return ""
+	end
+	size = tonumber(size) or 16
+	if HasAtlas(data.atlas) and type(CreateAtlasMarkup) == "function" then
+		return CreateAtlasMarkup(data.atlas, size, size)
+	end
+	local texCoord = data.texCoord
+	return string.format(
+		"|T%s:%d:%d:0:0:64:64:%d:%d:%d:%d|t",
+		ROLE_ICON_TEXTURE,
+		size,
+		size,
+		texCoord[1] * 64,
+		texCoord[2] * 64,
+		texCoord[3] * 64,
+		texCoord[4] * 64
+	)
+end
+
+function Compat.SetRoleIconTexture(texture, role, useAtlasSize)
+	local data = GetRoleIconData(role)
+	if not texture or not data then
+		return false
+	end
+	local usedAtlas = Compat.SetTextureOrAtlas(texture, data.atlas, ROLE_ICON_TEXTURE, useAtlasSize)
+	if not usedAtlas then
+		ApplyTexCoord(texture, data.texCoord)
+	end
+	return true, usedAtlas
 end
 
 ------------------------------------------------------------
@@ -1576,6 +2307,7 @@ end
 -- These aliases allow direct access via BFL.FunctionName instead of BFL.Compat.FunctionName
 
 -- Context Menu (UnitPopup) - Used by many modules
+BFL.CreateContextMenu = Compat.CreateContextMenu
 BFL.OpenContextMenu = function(button, menuType, contextData, name)
 	if contextData then
 		contextData.bflOrigin = ADDON_NAME
@@ -1590,11 +2322,29 @@ end
 
 -- Dropdown Creation
 BFL.CreateDropdown = Compat.CreateDropdown
+BFL.CanCreateModernDropdown = Compat.CanCreateModernDropdown
+BFL.IsModernDropdown = Compat.IsModernDropdown
+BFL.ShouldUseLegacyDropdown = Compat.ShouldUseLegacyDropdown
+BFL.SetDropdownText = Compat.SetDropdownText
+BFL.SetDropdownWidth = Compat.SetDropdownWidth
+BFL.JustifyDropdownText = Compat.JustifyDropdownText
+BFL.SetDropdownSelectedValue = Compat.SetDropdownSelectedValue
 BFL.InitializeDropdown = Compat.InitializeDropdown
 BFL.InitializeMultiSelectDropdown = Compat.InitializeMultiSelectDropdown
 BFL.RefreshDropdown = Compat.RefreshDropdown
+BFL.HasAtlas = Compat.HasAtlas
+BFL.SetTextureOrAtlas = Compat.SetTextureOrAtlas
+BFL.GetAtlasOrTextureMarkup = Compat.GetAtlasOrTextureMarkup
+BFL.GetClientProgramIconPrefix = Compat.GetClientProgramIconPrefix
+BFL.ApplyIconProfile = Compat.ApplyIconProfile
+BFL.GetRoleIconAtlas = Compat.GetRoleIconAtlas
+BFL.GetRoleIconProfile = Compat.GetRoleIconProfile
+BFL.GetRoleIconMarkup = Compat.GetRoleIconMarkup
+BFL.SetRoleIconTexture = Compat.SetRoleIconTexture
 BFL.ShowMenuTooltip = Compat.ShowMenuTooltip
 BFL.HideMenuTooltip = Compat.HideMenuTooltip
+BFL.PopulateSimpleMenu = Compat.PopulateSimpleMenu
+BFL.OpenSimpleContextMenu = Compat.OpenSimpleContextMenu
 
 -- ColorPicker
 BFL.ShowColorPicker = Compat.ShowColorPicker

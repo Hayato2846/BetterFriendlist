@@ -48,7 +48,7 @@ function BetterQuickJoinFrame_OnLoad(self)
 	local QuickJoin = GetQuickJoinModule()
 
 	-- Classic mode: Skip ScrollBox initialization (handled by QuickJoin module)
-	if BFL.IsClassic or not BFL.HasModernScrollBox then
+	if not BFL.HasModernScrollBox then
 		-- BFL:DebugPrint("|cff00ffffQuickJoinCallbacks:|r Classic mode - skipping ScrollBox init")
 		self.QuickJoin = QuickJoin
 		self.selectedGUID = nil

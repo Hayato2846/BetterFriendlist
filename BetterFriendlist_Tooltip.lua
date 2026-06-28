@@ -417,23 +417,8 @@ end
 
 local function BuildGameAccountIconPrefix(clientProgram)
 	clientProgram = SafeString(clientProgram, nil)
-	if
-		clientProgram
-		and C_Texture
-		and C_Texture.IsTitleIconTextureReady
-		and C_Texture.GetTitleIconTexture
-		and Enum
-		and Enum.TitleIconVersion
-		and BNet_GetClientEmbeddedTexture
-		and C_Texture.IsTitleIconTextureReady(clientProgram, Enum.TitleIconVersion.Small)
-	then
-		local text = ""
-		C_Texture.GetTitleIconTexture(clientProgram, Enum.TitleIconVersion.Small, function(success, texture)
-			if success then
-				text = BNet_GetClientEmbeddedTexture(texture, 32, 32, 0) .. " "
-			end
-		end)
-		return text
+	if BFL.GetClientProgramIconPrefix then
+		return BFL.GetClientProgramIconPrefix(clientProgram, 32)
 	end
 	return ""
 end

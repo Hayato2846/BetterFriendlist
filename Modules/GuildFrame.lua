@@ -35,6 +35,7 @@ local SORT_ZONE = "zone"
 local SORT_ILVL = "ilvl"
 local SORT_LAST_ONLINE = "lastonline"
 local SORT_STATUS = "status"
+local SORT_NICKNAME = "nickname"
 
 -- Filter modes
 local FILTER_ALL = "all"
@@ -60,6 +61,27 @@ end
 
 local function IsValidSortMode(mode)
 	for _, option in ipairs(GetSortOptions()) do
+		if option.value == mode then
+			return true
+		end
+	end
+	return false
+end
+
+local function GetFilterOptions()
+	local actions = BFL.GetModule and BFL:GetModule("GuildActions")
+	if actions and actions.GetFilterOptions then
+		return actions:GetFilterOptions()
+	end
+	return {
+		{ value = FILTER_ONLINE, text = FRIENDS_LIST_ONLINE or "Online" },
+		{ value = FILTER_ALL, text = ALL or "All" },
+		{ value = FILTER_OFFLINE, text = FRIENDS_LIST_OFFLINE or "Offline" },
+	}
+end
+
+local function IsValidFilterMode(mode)
+	for _, option in ipairs(GetFilterOptions()) do
 		if option.value == mode then
 			return true
 		end
@@ -265,6 +287,9 @@ function GuildFrame:Initialize()
 	self.displayList = {}
 	local DB = GetDB()
 	self.filterMode = DB and DB:Get("guildTabFilterMode", FILTER_ONLINE) or FILTER_ONLINE
+	if not IsValidFilterMode(self.filterMode) then
+		self.filterMode = FILTER_ONLINE
+	end
 	self.searchText = ""
 	self.sortMode = DB and DB:Get("guildTabSortMode", SORT_RANK) or SORT_RANK
 	if not IsValidSortMode(self.sortMode) then
@@ -463,6 +488,9 @@ end
 -- ========================================
 
 function GuildFrame:SetFilter(mode)
+	if not IsValidFilterMode(mode) then
+		mode = FILTER_ONLINE
+	end
 	if self.filterMode == mode then
 		return
 	end
@@ -472,6 +500,7 @@ function GuildFrame:SetFilter(mode)
 	if DB and DB.Set then
 		DB:Set("guildTabFilterMode", mode)
 	end
+	self:RefreshFilterDropdown()
 	self:RefreshHeaderControls()
 	self:Refresh()
 end
@@ -581,6 +610,20 @@ function GuildFrame:SortMembers(list)
 			local aZone, bZone = a.zone or "", b.zone or ""
 			if aZone ~= bZone then
 				result = aZone < bZone
+			end
+		elseif mode == SORT_NICKNAME then
+			local DB = ShouldUseGuildNicknames() and GetDB()
+			local aName = DB and DB:GetGuildNickname(a.fullName) or ""
+			local bName = DB and DB:GetGuildNickname(b.fullName) or ""
+			if aName == "" then
+				aName = a.name or ""
+			end
+			if bName == "" then
+				bName = b.name or ""
+			end
+			aName, bName = aName:lower(), bName:lower()
+			if aName ~= bName then
+				result = aName < bName
 			end
 		elseif mode == SORT_ILVL then
 			if (a.itemLevel or 0) ~= (b.itemLevel or 0) then
@@ -931,19 +974,95 @@ function GuildFrame:GetSortLabel(mode)
 	return RANK or "Rank"
 end
 
+local function IsModernDropdown(dropdown)
+	return BFL.IsModernDropdown and BFL.IsModernDropdown(dropdown)
+end
+
+local function SetDropdownText(dropdown, text)
+	if not dropdown then
+		return
+	end
+	if BFL.SetDropdownText then
+		BFL.SetDropdownText(dropdown, text or "")
+	end
+end
+
+local function RefreshModernDropdown(dropdown)
+	if not IsModernDropdown(dropdown) then
+		return
+	end
+	if dropdown.GenerateMenu then
+		dropdown:GenerateMenu()
+	elseif dropdown.Update then
+		dropdown:Update()
+	end
+end
+
+local function BuildDropdownOptionsFromItems(items, fallbackOptions, getSelectionText)
+	local labels = {}
+	local values = {}
+
+	if items then
+		for _, item in ipairs(items) do
+			local itemType = item.type or "button"
+			if not item.hidden and itemType ~= "divider" and itemType ~= "title" and item.value ~= nil then
+				labels[#labels + 1] = item.text or tostring(item.value)
+				values[#values + 1] = item.value
+			end
+		end
+	end
+
+	if #values == 0 and fallbackOptions then
+		for _, option in ipairs(fallbackOptions) do
+			if option.value ~= nil then
+				labels[#labels + 1] = option.text or tostring(option.value)
+				values[#values + 1] = option.value
+			end
+		end
+	end
+
+	if #values == 0 then
+		return nil
+	end
+
+	return {
+		labels = labels,
+		values = values,
+		getSelectionText = getSelectionText,
+	}
+end
+
+local function InitializeGuildDropdown(dropdown, items, fallbackOptions, isSelected, selectValue, getSelectionText, width)
+	local options = BuildDropdownOptionsFromItems(items, fallbackOptions, getSelectionText)
+	if not (dropdown and options) then
+		return false
+	end
+
+	if not BFL.InitializeDropdown then
+		return false
+	end
+
+	if not IsModernDropdown(dropdown) and width and BFL.SetDropdownWidth then
+		BFL.SetDropdownWidth(dropdown, width)
+	end
+	BFL.InitializeDropdown(dropdown, options, isSelected, selectValue)
+	return true
+end
+
 function GuildFrame:RefreshSortDropdown()
 	local frame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
 	local dropdown = frame and frame.SortDropdown
-	if not dropdown or not UIDropDownMenu_SetText then
+	if not dropdown then
 		return
 	end
-	UIDropDownMenu_SetText(dropdown, self:GetSortLabel(self.sortMode))
+	SetDropdownText(dropdown, self:GetSortLabel(self.sortMode))
+	RefreshModernDropdown(dropdown)
 end
 
 function GuildFrame:RefreshFilterDropdown()
 	local frame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
 	local dropdown = frame and frame.FilterDropdown
-	if not dropdown or not UIDropDownMenu_SetText then
+	if not dropdown then
 		return
 	end
 	local actions = GetGuildActions()
@@ -951,75 +1070,76 @@ function GuildFrame:RefreshFilterDropdown()
 		or (self.filterMode == FILTER_ALL and (ALL or "All"))
 		or (self.filterMode == FILTER_OFFLINE and (FRIENDS_LIST_OFFLINE or "Offline"))
 		or (FRIENDS_LIST_ONLINE or "Online")
-	UIDropDownMenu_SetText(dropdown, text)
+	SetDropdownText(dropdown, text)
+	RefreshModernDropdown(dropdown)
 end
 
 function GuildFrame:CreateSortDropdown(frame)
-	if not (frame and UIDropDownMenu_Initialize) then
+	if not frame then
 		return
 	end
 	if frame.SortDropdown then
 		return
 	end
 
-	local dropdown = CreateFrame("Frame", "BFL_GuildSortDropdown", frame, "UIDropDownMenuTemplate")
-	frame.SortDropdown = dropdown
-	if UIDropDownMenu_SetWidth then
-		UIDropDownMenu_SetWidth(dropdown, 112)
-	end
-	if UIDropDownMenu_SetText then
-		UIDropDownMenu_SetText(dropdown, self:GetSortLabel(self.sortMode))
+	local dropdown = BFL.CreateDropdown and BFL.CreateDropdown(frame, "BFL_GuildSortDropdown", 112, true)
+	if not dropdown then
+		return
 	end
 
-	UIDropDownMenu_Initialize(dropdown, function(_, level)
-		for _, option in ipairs(GetSortOptions()) do
-			local info = UIDropDownMenu_CreateInfo()
-			info.text = option.text
-			info.value = option.value
-			info.checked = self.sortMode == option.value
-			info.func = function(menuButton)
-				self:SetSort(menuButton.value)
-				self:RefreshSortDropdown()
-			end
-			UIDropDownMenu_AddButton(info, level)
-		end
-	end)
+	frame.SortDropdown = dropdown
+	local actions = GetGuildActions()
+	InitializeGuildDropdown(
+		dropdown,
+		actions and actions.GetSortMenuItems and actions:GetSortMenuItems(),
+		GetSortOptions(),
+		function(value)
+			return self.sortMode == value
+		end,
+		function(value)
+			self:SetSort(value, true)
+			self:RefreshSortDropdown()
+		end,
+		function(value)
+			return self:GetSortLabel(value)
+		end,
+		112
+	)
+	self:RefreshSortDropdown()
 end
 
 function GuildFrame:CreateFilterDropdown(frame)
-	if not (frame and UIDropDownMenu_Initialize) then
+	if not frame then
 		return
 	end
 	if frame.FilterDropdown then
 		return
 	end
 
-	local dropdown = CreateFrame("Frame", "BFL_GuildFilterDropdown", frame, "UIDropDownMenuTemplate")
-	frame.FilterDropdown = dropdown
-	if UIDropDownMenu_SetWidth then
-		UIDropDownMenu_SetWidth(dropdown, 104)
+	local dropdown = BFL.CreateDropdown and BFL.CreateDropdown(frame, "BFL_GuildFilterDropdown", 104, true)
+	if not dropdown then
+		return
 	end
-	self:RefreshFilterDropdown()
 
-	UIDropDownMenu_Initialize(dropdown, function(_, level)
-		local actions = GetGuildActions()
-		local options = actions and actions.GetFilterOptions and actions:GetFilterOptions() or {
-			{ value = FILTER_ONLINE, text = FRIENDS_LIST_ONLINE or "Online" },
-			{ value = FILTER_ALL, text = ALL or "All" },
-			{ value = FILTER_OFFLINE, text = FRIENDS_LIST_OFFLINE or "Offline" },
-		}
-		for _, option in ipairs(options) do
-			local info = UIDropDownMenu_CreateInfo()
-			info.text = option.text
-			info.value = option.value
-			info.checked = self.filterMode == option.value
-			info.func = function(menuButton)
-				self:SetFilter(menuButton.value)
-				self:RefreshFilterDropdown()
-			end
-			UIDropDownMenu_AddButton(info, level)
-		end
-	end)
+	frame.FilterDropdown = dropdown
+	local actions = GetGuildActions()
+	InitializeGuildDropdown(
+		dropdown,
+		actions and actions.GetFilterMenuItems and actions:GetFilterMenuItems(),
+		GetFilterOptions(),
+		function(value)
+			return self.filterMode == value
+		end,
+		function(value)
+			self:SetFilter(value)
+			self:RefreshFilterDropdown()
+		end,
+		function(value)
+			return self:GetFilterLabel(value)
+		end,
+		104
+	)
+	self:RefreshFilterDropdown()
 end
 
 function GuildFrame:OnLoad(frame)
@@ -1080,7 +1200,7 @@ function GuildFrame:OnLoad(frame)
 
 	self:CreateEmptyState(frame)
 
-	if BFL.IsClassic or not BFL.HasModernScrollBox then
+	if not BFL.HasModernScrollBox then
 		self:InitializeClassicScrollFrame(frame)
 		return
 	end
@@ -1495,21 +1615,15 @@ function GuildFrame:RefreshHeaderControls(force)
 		if header.QuickFilterDropdown then
 			if header.QuickFilterDropdown.GenerateMenu then
 				header.QuickFilterDropdown:GenerateMenu()
-			elseif UIDropDownMenu_SetText then
-				UIDropDownMenu_SetText(
-					header.QuickFilterDropdown,
-					actions:GetFilterLabel(self.filterMode)
-				)
+			else
+				SetDropdownText(header.QuickFilterDropdown, actions:GetFilterLabel(self.filterMode))
 			end
 		end
 		if header.PrimarySortDropdown then
 			if header.PrimarySortDropdown.GenerateMenu then
 				header.PrimarySortDropdown:GenerateMenu()
-			elseif UIDropDownMenu_SetText then
-				UIDropDownMenu_SetText(
-					header.PrimarySortDropdown,
-					actions:GetSortLabel(self.sortMode)
-				)
+			else
+				SetDropdownText(header.PrimarySortDropdown, actions:GetSortLabel(self.sortMode))
 			end
 		end
 	else

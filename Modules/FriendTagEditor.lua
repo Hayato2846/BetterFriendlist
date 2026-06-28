@@ -171,65 +171,12 @@ local function CopyIconProfile(source)
 	}
 end
 
-local function ResetTexCoord(texture)
-	if texture and texture.SetTexCoord then
-		texture:SetTexCoord(0, 1, 0, 1)
-	end
-end
-
-local function ApplyTexCoord(texture, texCoord)
-	if texture and texture.SetTexCoord and type(texCoord) == "table" then
-		texture:SetTexCoord(
-			tonumber(texCoord[1]) or 0,
-			tonumber(texCoord[2]) or 1,
-			tonumber(texCoord[3]) or 0,
-			tonumber(texCoord[4]) or 1
-		)
-	end
-end
-
-local function TrySetAtlas(texture, atlas)
-	if not (texture and texture.SetAtlas and atlas and atlas ~= "") then
-		return false
-	end
-	local width = texture.GetWidth and texture:GetWidth() or nil
-	local height = texture.GetHeight and texture:GetHeight() or nil
-	ResetTexCoord(texture)
-	local ok = pcall(texture.SetAtlas, texture, atlas, false)
-	if ok then
-		if width and height and width > 0 and height > 0 and texture.SetSize then
-			texture:SetSize(width, height)
-		end
-		texture:Show()
-		return true
-	end
-	return false
-end
-
 local function ApplyIcon(texture, profile)
 	if not texture then
 		return false
 	end
 	profile = CopyIconProfile(profile)
-	if not profile.iconValue or profile.iconValue == "" or profile.iconType == "none" then
-		texture:Hide()
-		return false
-	end
-	if profile.iconType == "atlas" then
-		if TrySetAtlas(texture, profile.iconValue) or TrySetAtlas(texture, profile.atlas) or TrySetAtlas(texture, profile.fallbackAtlas) then
-			return true
-		end
-	end
-	local texturePath = profile.texture or profile.icon or (profile.iconType ~= "atlas" and profile.iconValue) or nil
-	if not texturePath or texturePath == "" then
-		texture:Hide()
-		return false
-	end
-	ResetTexCoord(texture)
-	texture:SetTexture(texturePath)
-	ApplyTexCoord(texture, profile.texCoord)
-	texture:Show()
-	return true
+	return BFL.ApplyIconProfile and BFL.ApplyIconProfile(texture, profile) or false
 end
 
 local function GetPopupEditBox(dialog)
@@ -717,25 +664,35 @@ function FriendTagEditor:CreateIconControls(parent, y)
 
 	dropdownCounter = dropdownCounter + 1
 	local dropdownName = "BFLFriendTagIconDropdown" .. tostring(dropdownCounter)
-	local dropdown = CreateFrame("Frame", dropdownName, parent, "UIDropDownMenuTemplate")
+	local dropdown = BFL.CreateDropdown and BFL.CreateDropdown(parent, dropdownName, 150, true)
+	if not dropdown then
+		return
+	end
 	dropdown:SetPoint("TOPLEFT", parent, "TOPLEFT", 120, y + 2)
-	UIDropDownMenu_SetWidth(dropdown, 150)
-	UIDropDownMenu_JustifyText(dropdown, "LEFT")
+	local isLegacyDropdown = not (BFL.IsModernDropdown and BFL.IsModernDropdown(dropdown))
+	if isLegacyDropdown then
+		BFL.SetDropdownWidth(dropdown, 150)
+		BFL.JustifyDropdownText(dropdown, "LEFT")
+	end
 	self.iconDropdown = dropdown
+
+	local function SetDropdownDisplayText(text)
+		BFL.SetDropdownText(dropdown, text or "")
+	end
 
 	local function SetDropdownText()
 		if state.iconMode == "none" then
-			UIDropDownMenu_SetText(dropdown, NONE or "None")
+			SetDropdownDisplayText(NONE or "None")
 		elseif state.iconMode == "custom" then
-			UIDropDownMenu_SetText(dropdown, L("FRIEND_TAGS_EDITOR_ICON_CUSTOM", "Custom Path"))
+			SetDropdownDisplayText(L("FRIEND_TAGS_EDITOR_ICON_CUSTOM", "Custom Path"))
 		else
 			for _, option in ipairs(options) do
 				if option.id == state.iconOptionID then
-					UIDropDownMenu_SetText(dropdown, option.label)
+					SetDropdownDisplayText(option.label)
 					return
 				end
 			end
-			UIDropDownMenu_SetText(dropdown, L("FRIEND_TAGS_ICON_TAG", "Tag"))
+			SetDropdownDisplayText(L("FRIEND_TAGS_ICON_TAG", "Tag"))
 		end
 	end
 
@@ -759,12 +716,35 @@ function FriendTagEditor:CreateIconControls(parent, y)
 		SetEditBoxText(self.iconInput, icon.texture or icon.icon or icon.iconValue or "")
 	end
 
-	UIDropDownMenu_Initialize(dropdown, function(_, level)
-		level = level or 1
-		local noneInfo = UIDropDownMenu_CreateInfo()
-		noneInfo.text = NONE or "None"
-		noneInfo.checked = state.iconMode == "none"
-		noneInfo.func = function()
+	local optionLabels = { NONE or "None" }
+	local optionValues = { "none" }
+	for _, option in ipairs(options) do
+		optionLabels[#optionLabels + 1] = option.label
+		optionValues[#optionValues + 1] = option.id
+	end
+	optionLabels[#optionLabels + 1] = L("FRIEND_TAGS_EDITOR_ICON_CUSTOM", "Custom Path")
+	optionValues[#optionValues + 1] = "custom"
+
+	local function GetOptionByID(optionID)
+		for _, option in ipairs(options) do
+			if option.id == optionID then
+				return option
+			end
+		end
+		return nil
+	end
+
+	local function IsSelected(value)
+		if value == "none" then
+			return state.iconMode == "none"
+		elseif value == "custom" then
+			return state.iconMode == "custom"
+		end
+		return state.iconMode == "option" and state.iconOptionID == value
+	end
+
+	local function SelectIconOption(value)
+		if value == "none" then
 			state.iconMode = "none"
 			state.iconType = "none"
 			state.iconValue = ""
@@ -773,31 +753,7 @@ function FriendTagEditor:CreateIconControls(parent, y)
 			state.fallbackAtlas = nil
 			state.texture = nil
 			state.texCoord = nil
-			SetDropdownText()
-			UpdateCustomInput()
-			self:RefreshPreview()
-			CloseDropDownMenus()
-		end
-		UIDropDownMenu_AddButton(noneInfo, level)
-
-		for _, option in ipairs(options) do
-			local info = UIDropDownMenu_CreateInfo()
-			info.text = option.label
-			info.checked = state.iconMode == "option" and state.iconOptionID == option.id
-			info.func = function()
-				ApplyOption(option)
-				SetDropdownText()
-				UpdateCustomInput()
-				self:RefreshPreview()
-				CloseDropDownMenus()
-			end
-			UIDropDownMenu_AddButton(info, level)
-		end
-
-		local customInfo = UIDropDownMenu_CreateInfo()
-		customInfo.text = L("FRIEND_TAGS_EDITOR_ICON_CUSTOM", "Custom Path")
-		customInfo.checked = state.iconMode == "custom"
-		customInfo.func = function()
+		elseif value == "custom" then
 			state.iconMode = "custom"
 			state.iconType = "texture"
 			state.iconValue = GetEditBoxText(self.iconInput)
@@ -806,13 +762,31 @@ function FriendTagEditor:CreateIconControls(parent, y)
 			state.fallbackAtlas = nil
 			state.texture = state.iconValue
 			state.texCoord = nil
-			SetDropdownText()
-			UpdateCustomInput()
-			self:RefreshPreview()
-			CloseDropDownMenus()
+		else
+			local option = GetOptionByID(value)
+			if option then
+				ApplyOption(option)
+			end
 		end
-		UIDropDownMenu_AddButton(customInfo, level)
-	end)
+
+		SetDropdownText()
+		UpdateCustomInput()
+		self:RefreshPreview()
+	end
+
+	BFL.InitializeDropdown(dropdown, {
+		labels = optionLabels,
+		values = optionValues,
+		getSelectionText = function(value)
+			if value == "none" then
+				return NONE or "None"
+			elseif value == "custom" then
+				return L("FRIEND_TAGS_EDITOR_ICON_CUSTOM", "Custom Path")
+			end
+			local option = GetOptionByID(value)
+			return option and option.label or L("FRIEND_TAGS_ICON_TAG", "Tag")
+		end,
+	}, IsSelected, SelectIconOption)
 	SetDropdownText()
 
 	self.iconInput = CreateInput(parent, 148, 180)

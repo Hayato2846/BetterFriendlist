@@ -8,6 +8,106 @@ Write-Host '[BFL] Whitespace check'
 & git diff --check
 
 Write-Host ''
+Write-Host '[BFL] Compatibility guard'
+
+$compatApiPattern = 'UIDropDownMenu_|EasyMenu\s*\(|ToggleDropDownMenu\s*\(|MenuUtil\.|UnitPopup_OpenMenu|UnitPopup_ShowMenu'
+$compatAllowedPathPatterns = @(
+    '^Utils/ClassicCompat\.lua$',
+    '^Modules/TestSuite\.lua$',
+    '^Modules/MenuBridge\.lua$',
+    '^Libs/LibSettingsDesigner/'
+)
+
+$compatViolations = @()
+$luaFiles = & git ls-files '*.lua'
+foreach ($file in $luaFiles) {
+    $normalizedFile = ($file -replace '\\', '/')
+    $isAllowed = $false
+    foreach ($allowedPattern in $compatAllowedPathPatterns) {
+        if ($normalizedFile -match $allowedPattern) {
+            $isAllowed = $true
+            break
+        }
+    }
+    if ($isAllowed) {
+        continue
+    }
+
+    $matches = Select-String -LiteralPath $file -Pattern $compatApiPattern -CaseSensitive
+    foreach ($match in $matches) {
+        $compatViolations += "${normalizedFile}:$($match.LineNumber): $($match.Line.Trim())"
+    }
+}
+
+if ($compatViolations.Count -gt 0) {
+    throw "Direct Blizzard menu/dropdown API usage must go through Utils\ClassicCompat.lua. Violations:`n$($compatViolations -join "`n")"
+}
+
+Write-Host '[OK] Menu and dropdown compatibility APIs are centralized.'
+
+Write-Host ''
+Write-Host '[BFL] Atlas compatibility guard'
+
+$atlasApiPattern = 'SetAtlas\s*\(|C_Texture\.GetAtlasInfo|CreateAtlasMarkup|\|A:'
+$atlasAllowedPathPatterns = @(
+    '^Core\.lua$',
+    '^Utils/ClassicCompat\.lua$',
+    '^Modules/TestSuite\.lua$',
+    '^Libs/LibSettingsDesigner/'
+)
+
+$atlasViolations = @()
+foreach ($file in $luaFiles) {
+    $normalizedFile = ($file -replace '\\', '/')
+    $isAllowed = $false
+    foreach ($allowedPattern in $atlasAllowedPathPatterns) {
+        if ($normalizedFile -match $allowedPattern) {
+            $isAllowed = $true
+            break
+        }
+    }
+    if ($isAllowed) {
+        continue
+    }
+
+    $matches = Select-String -LiteralPath $file -Pattern $atlasApiPattern -CaseSensitive
+    foreach ($match in $matches) {
+        $atlasViolations += "${normalizedFile}:$($match.LineNumber): $($match.Line.Trim())"
+    }
+}
+
+if ($atlasViolations.Count -gt 0) {
+    throw "Direct Blizzard atlas API usage must go through Utils\ClassicCompat.lua. Violations:`n$($atlasViolations -join "`n")"
+}
+
+Write-Host '[OK] Atlas compatibility APIs are centralized.'
+
+$classicXmlAtlasFiles = @(
+    'BetterFriendlist_Classic.xml',
+    'BetterFriendlist_InviteTemplates.xml',
+    'BetterFriendlist_Settings_Classic.xml'
+)
+
+$classicXmlAtlasViolations = @()
+foreach ($file in $classicXmlAtlasFiles) {
+    if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
+        continue
+    }
+
+    $matches = Select-String -LiteralPath $file -Pattern '\batlas\s*=|\|A:' -CaseSensitive
+    foreach ($match in $matches) {
+        $normalizedFile = ($file -replace '\\', '/')
+        $classicXmlAtlasViolations += "${normalizedFile}:$($match.LineNumber): $($match.Line.Trim())"
+    }
+}
+
+if ($classicXmlAtlasViolations.Count -gt 0) {
+    throw "Classic-loaded XML must not directly reference atlas entries; use runtime texture fallbacks instead. Violations:`n$($classicXmlAtlasViolations -join "`n")"
+}
+
+Write-Host '[OK] Classic-loaded XML has no direct atlas dependencies.'
+
+Write-Host ''
 Write-Host '[BFL] Project pre-commit check'
 python Utils/pre-commit-check.py 2>&1 |
     Select-String -Pattern '\[ERROR\]|\[OK\]|\[WARN\] WARN|All checks'
