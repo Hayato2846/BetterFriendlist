@@ -2606,10 +2606,10 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 		-- FriendsFrame:Show() synchronously during PLAYER_LOGIN, ArchonTooltip registers
 		-- before RaiderIO (which also initializes during PLAYER_LOGIN), reversing the
 		-- intended hook order and causing ArchonTooltip content to be wiped by RaiderIO.
-		-- On 12.0.0+ secret-value clients, avoid opening Blizzard's FriendsFrame
-		-- automatically from BFL tainted code. This keeps login-time tooltip
-		-- compatibility hooks from becoming a hidden social UI taint source.
-		if FriendsFrame and not BFL.HasSecretValues then
+		-- Only do this on pre-secret-value Retail clients. Classic Era/SoD treats
+		-- this login-time addon Show as protected and reports ADDON_ACTION_BLOCKED.
+		-- Retail tooltip-hook compatibility is the only remaining caller that needs it.
+		if FriendsFrame and BFL.IsRetail and not BFL.HasSecretValues then
 			C_Timer.After(0, function()
 				BFL._suppressFriendsFrameRedirect = true
 				FriendsFrame:SetAlpha(0)
