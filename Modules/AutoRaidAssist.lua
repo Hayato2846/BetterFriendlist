@@ -337,21 +337,21 @@ function AutoRaidAssist:RegisterEvents()
 		AutoRaidAssist:ScheduleRosterEvaluate(reason)
 	end
 
-	BFL:RegisterEventCallback("GROUP_ROSTER_UPDATE", function()
-		ScheduleRoster("group")
-	end, 70)
-	BFL:RegisterEventCallback("RAID_ROSTER_UPDATE", function()
-		ScheduleRoster("raid")
-	end, 70)
-	BFL:RegisterEventCallback("PARTY_LEADER_CHANGED", function()
-		ScheduleRoster("leader")
-	end, 70)
-	BFL:RegisterEventCallback("GROUP_FORMED", function()
-		ScheduleRoster("group-formed")
-	end, 70)
-	BFL:RegisterEventCallback("GROUP_JOINED", function()
-		ScheduleRoster("group-joined")
-	end, 70)
+	local rosterTriggerEvents = {
+		{ "GROUP_ROSTER_UPDATE", "group" }, { "RAID_ROSTER_UPDATE", "raid" }, { "PARTY_LEADER_CHANGED", "leader" },
+		{ "GROUP_FORMED", "group-formed" }, { "GROUP_JOINED", "group-joined" }, { "PLAYER_ENTERING_WORLD", "entering-world" },
+		{ "UPDATE_INSTANCE_INFO", "instance-info" }, { "INSTANCE_GROUP_SIZE_CHANGED", "instance-size" }, { "PLAYER_DIFFICULTY_CHANGED", "difficulty" },
+		{ "PLAYER_ROLES_ASSIGNED", "roles" }, { "PARTY_MEMBER_ENABLE", "party-member-enable" }, { "PARTY_MEMBER_DISABLE", "party-member-disable" },
+	}
+
+	for _, trigger in ipairs(rosterTriggerEvents) do
+		local eventName = trigger[1]
+		local reason = trigger[2]
+		BFL:RegisterEventCallback(eventName, function()
+			ScheduleRoster(reason)
+		end, 70)
+	end
+
 	BFL:RegisterEventCallback("BN_FRIEND_INFO_CHANGED", function()
 		Schedule("bnet")
 	end, 80)

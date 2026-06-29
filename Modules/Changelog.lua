@@ -33,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Raid Tab Menus** - Prevented the Retail raid-member menu fallback from reopening Blizzard's unit menu through addon Lua after the secure `togglemenu` action, fixing protected actions like Set Focus.
+- **Auto Raid Assist** - Re-checks raid assistant targets after instance, difficulty, role, and party-member state updates so promotions recover when raid unit data settles late.
+
+---
 
 ## [2.6.5]        - 2026-06-28
 

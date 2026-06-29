@@ -3768,7 +3768,7 @@ local function RegisterBuiltInTests()
 	})
 
 	TS:RegisterTest("data", "AutoRaidAssist_ConversionTriggers", {
-		description = "Auto Raid Assist should listen for group formation and direct party-to-raid conversion calls",
+		description = "Auto Raid Assist should listen for group, instance, and direct party-to-raid conversion triggers",
 		action = function(V)
 			WithTemporaryDatabase({
 				autoRaidAssist = {
@@ -3777,10 +3777,10 @@ local function RegisterBuiltInTests()
 			}, function()
 				local AutoRaidAssist = BFL:GetModule("AutoRaidAssist")
 				V:AssertNotNil(AutoRaidAssist, "AutoRaidAssist module should exist")
-				V:Assert(
-					type(BFL.EventCallbacks) == "table" and type(BFL.EventCallbacks.GROUP_FORMED) == "table",
-					"GROUP_FORMED should be registered as an Auto Raid Assist trigger"
-				)
+				local expectedRosterEvents = { "GROUP_ROSTER_UPDATE", "RAID_ROSTER_UPDATE", "PARTY_LEADER_CHANGED", "GROUP_FORMED", "GROUP_JOINED", "PLAYER_ENTERING_WORLD", "UPDATE_INSTANCE_INFO", "INSTANCE_GROUP_SIZE_CHANGED", "PLAYER_DIFFICULTY_CHANGED", "PLAYER_ROLES_ASSIGNED", "PARTY_MEMBER_ENABLE", "PARTY_MEMBER_DISABLE" }
+				for _, eventName in ipairs(expectedRosterEvents) do
+					V:Assert(type(BFL.EventCallbacks) == "table" and type(BFL.EventCallbacks[eventName]) == "table", eventName .. " should be registered as an Auto Raid Assist roster trigger")
+				end
 
 				local originalHooksecurefunc = hooksecurefunc
 				local originalConvertToRaid = ConvertToRaid
