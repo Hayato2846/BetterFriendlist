@@ -794,10 +794,13 @@ function BetterRaidMemberButton_PostClick(self, button)
 			ClearAllSelections()
 		end
 	elseif button == "RightButton" then
-		-- RightButton: Context menu is handled by the "togglemenu" secure attribute
-		-- (set in UpdateSecureAttributesForButton). This PostClick fallback only runs
-		-- if the secure action didn't fire (e.g., missing unit attribute).
+		-- RightButton: Context menu is handled by the "togglemenu" secure attribute.
+		-- PostClick still runs after the secure action; on Retail SecretValues builds,
+		-- reopening UnitPopup from addon Lua taints protected entries like Set Focus.
 		if not IsModifierKeyDown() and self.unit then
+			if BFL.HasSecretValues then
+				return
+			end
 			if UnitExists(self.unit) then
 				if BFL.Compat and BFL.Compat.OpenUnitPopupMenu then
 					BFL.Compat.OpenUnitPopupMenu("RAID_PLAYER", {

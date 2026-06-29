@@ -587,9 +587,9 @@ end
 -- ========================================
 -- SECURE ATTRIBUTES SYSTEM (Direct)
 -- ========================================
--- No Proxy. Secure Attributes set directly on visual buttons.
--- Buttons are SecureActionButtonTemplate in XML.
--- Drag & Drop works outside combat via Lua scripts.
+-- No active proxy; attributes stay on visual InsecureActionButtonTemplate buttons.
+-- That template runs SecureActionButton_OnClick outside combat without turning
+-- the parent BFL frame into a protected SecureFrameTemplate.
 
 function RaidFrame:CreateSecureProxy_DISABLED_OLD()
 	if self.SecureProxy then
