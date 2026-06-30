@@ -7,11 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [DRAFT]
+## [2.6.6]        - 2026-06-30
 
 ### Fixed
-- **Raid Tab Menus** - Prevented the Retail raid-member menu fallback from reopening Blizzard's unit menu through addon Lua after the secure `togglemenu` action, fixing protected actions like Set Focus.
-- **Auto Raid Assist** - Re-checks raid assistant targets after instance, difficulty, role, and party-member state updates so promotions recover when raid unit data settles late.
+- **Raid Tab Menus** - Right-clicking raid members on Retail should open the normal Blizzard menu again, including options like Set Focus.
+- **Auto Raid Assist** - Your chosen assistants are picked up more reliably after raid changes, zoning, difficulty changes, or when WoW is slow to finish loading the roster.
+- **Auto Raid Assist** - If you take assistant away from someone yourself, they stay that way until they leave the raid.
+- **Classic Login** - Classic Era and Season of Discovery should no longer show a protected action warning when you log in with BetterFriendlist enabled.
 
 ---
 

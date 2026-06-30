@@ -9879,9 +9879,662 @@ end
 
 function TestSuite:Initialize()
 	-- Register built-in tests
-	RegisterBuiltInTests()
+	RegisterBuiltInTests(); self:RegisterAutoRaidAssistRosterFallbackTest()
 
 	BFL:DebugPrint("|cff00ccff[BFL TestSuite]|r Initialized with " .. self:GetTestCount() .. " tests")
+end
+
+function TestSuite:RegisterAutoRaidAssistRosterFallbackTest()
+	self:RegisterTest("data", "AutoRaidAssist_RosterInfoFallbackPromotion", {
+		description = "Auto Raid Assist should promote from raid roster info when raid unit tokens are not ready yet",
+		action = function(V)
+			WithTemporaryDatabase({
+				autoRaidAssist = {
+					enabled = true,
+					targets = {
+						{
+							key = "player:Delta-Away",
+							id = "player:Delta-Away",
+							kind = "player",
+							value = "Delta-Away",
+						},
+					},
+				},
+			}, function()
+				local AutoRaidAssist = BFL:GetModule("AutoRaidAssist")
+				V:AssertNotNil(AutoRaidAssist, "AutoRaidAssist module should exist")
+
+				local originalCTimer = C_Timer
+				local originalIsInRaid = IsInRaid
+				local originalGetNumGroupMembers = GetNumGroupMembers
+				local originalGetRaidRosterInfo = GetRaidRosterInfo
+				local originalUnitExists = UnitExists
+				local originalUnitIsUnit = UnitIsUnit
+				local originalUnitIsGroupLeader = UnitIsGroupLeader
+				local originalUnitIsGroupAssistant = UnitIsGroupAssistant
+				local originalUnitFullName = UnitFullName
+				local originalUnitName = UnitName
+				local originalUnitRealmRelationship = UnitRealmRelationship
+				local originalGetNormalizedRealmName = GetNormalizedRealmName
+				local originalGetTime = GetTime
+				local originalCPartyInfo = C_PartyInfo
+				local originalIsActionRestricted = BFL.IsActionRestricted
+				local originalLastPromotionAttempt = AutoRaidAssist.lastPromotionAttempt
+				local originalPromotionAttemptCounts = AutoRaidAssist.promotionAttemptCounts
+				local originalPromotionQueue = AutoRaidAssist.promotionQueue
+				local originalPromotionQueueLookup = AutoRaidAssist.promotionQueueLookup
+				local originalPromotionQueueTimer = AutoRaidAssist.promotionQueueTimer
+				local originalPromotionRetryTimers = AutoRaidAssist.promotionRetryTimers
+				local promoted = {}
+
+				local ok, err = pcall(function()
+					AutoRaidAssist.lastPromotionAttempt = {}
+					AutoRaidAssist.promotionAttemptCounts = {}
+					AutoRaidAssist.promotionQueue = {}
+					AutoRaidAssist.promotionQueueLookup = {}
+					AutoRaidAssist.promotionQueueTimer = nil
+					AutoRaidAssist.promotionRetryTimers = {}
+
+					C_Timer = {
+						NewTimer = function(delay, callback)
+							return {
+								delay = delay,
+								callback = callback,
+								cancelled = false,
+								Cancel = function(self)
+									self.cancelled = true
+								end,
+							}
+						end,
+					}
+					IsInRaid = function()
+						return true
+					end
+					GetNumGroupMembers = function()
+						return 1
+					end
+					GetRaidRosterInfo = function(index)
+						if index == 1 then
+							return "Delta-Away", 0
+						end
+						return nil, nil
+					end
+					UnitExists = function(unit)
+						return unit == "player"
+					end
+					UnitIsUnit = function(unit, other)
+						return unit == "player" and other == "player"
+					end
+					UnitIsGroupLeader = function(unit)
+						return unit == "player"
+					end
+					UnitIsGroupAssistant = function()
+						return false
+					end
+					UnitFullName = function()
+						return nil, nil
+					end
+					UnitName = function(unit)
+						if unit == "player" then
+							return "Leader", "Home"
+						end
+						return nil, nil
+					end
+					UnitRealmRelationship = function()
+						return nil
+					end
+					GetNormalizedRealmName = function()
+						return "Home"
+					end
+					GetTime = function()
+						return 100
+					end
+					BFL.IsActionRestricted = function()
+						return false
+					end
+					C_PartyInfo = {
+						PromoteToAssistant = function(name, exactNameMatch)
+							promoted[#promoted + 1] = {
+								name = name,
+								exactNameMatch = exactNameMatch,
+							}
+							return true
+						end,
+					}
+
+					V:Assert(AutoRaidAssist:Evaluate("test-roster-fallback") == true, "Evaluate should promote a roster-backed target")
+					V:AssertEqual(#promoted, 1, "Roster-backed target should be promoted once")
+					V:AssertEqual(promoted[1].name, "Delta-Away", "Promotion should use the roster player name")
+					V:AssertEqual(promoted[1].exactNameMatch, true, "Roster promotion should use exact matching")
+				end)
+
+				C_Timer = originalCTimer
+				IsInRaid = originalIsInRaid
+				GetNumGroupMembers = originalGetNumGroupMembers
+				GetRaidRosterInfo = originalGetRaidRosterInfo
+				UnitExists = originalUnitExists
+				UnitIsUnit = originalUnitIsUnit
+				UnitIsGroupLeader = originalUnitIsGroupLeader
+				UnitIsGroupAssistant = originalUnitIsGroupAssistant
+				UnitFullName = originalUnitFullName
+				UnitName = originalUnitName
+				UnitRealmRelationship = originalUnitRealmRelationship
+				GetNormalizedRealmName = originalGetNormalizedRealmName
+				GetTime = originalGetTime
+				C_PartyInfo = originalCPartyInfo
+				BFL.IsActionRestricted = originalIsActionRestricted
+				AutoRaidAssist.lastPromotionAttempt = originalLastPromotionAttempt
+				AutoRaidAssist.promotionAttemptCounts = originalPromotionAttemptCounts
+				AutoRaidAssist.promotionQueue = originalPromotionQueue
+				AutoRaidAssist.promotionQueueLookup = originalPromotionQueueLookup
+				AutoRaidAssist.promotionQueueTimer = originalPromotionQueueTimer
+				AutoRaidAssist.promotionRetryTimers = originalPromotionRetryTimers
+				if not ok then
+					error(err, 2)
+				end
+			end)
+		end,
+	})
+
+	self:RegisterTest("data", "AutoRaidAssist_ManualDemoteSuppressesRepromote", {
+		description = "Auto Raid Assist should not re-promote a target that was manually demoted",
+		action = function(V)
+			WithTemporaryDatabase({
+				autoRaidAssist = {
+					enabled = true,
+					targets = {
+						{
+							key = "player:Echo-Realm",
+							id = "player:Echo-Realm",
+							kind = "player",
+							value = "Echo-Realm",
+						},
+					},
+				},
+			}, function()
+				local AutoRaidAssist = BFL:GetModule("AutoRaidAssist")
+				V:AssertNotNil(AutoRaidAssist, "AutoRaidAssist module should exist")
+
+				local originalCTimer = C_Timer
+				local originalIsInRaid = IsInRaid
+				local originalGetNumGroupMembers = GetNumGroupMembers
+				local originalGetRaidRosterInfo = GetRaidRosterInfo
+				local originalUnitExists = UnitExists
+				local originalUnitIsUnit = UnitIsUnit
+				local originalUnitIsGroupLeader = UnitIsGroupLeader
+				local originalUnitIsGroupAssistant = UnitIsGroupAssistant
+				local originalUnitFullName = UnitFullName
+				local originalUnitName = UnitName
+				local originalGetNormalizedRealmName = GetNormalizedRealmName
+				local originalGetTime = GetTime
+				local originalCPartyInfo = C_PartyInfo
+				local originalIsActionRestricted = BFL.IsActionRestricted
+				local originalLastPromotionAttempt = AutoRaidAssist.lastPromotionAttempt
+				local originalPromotionAttemptCounts = AutoRaidAssist.promotionAttemptCounts
+				local originalPromotionQueue = AutoRaidAssist.promotionQueue
+				local originalPromotionQueueLookup = AutoRaidAssist.promotionQueueLookup
+				local originalPromotionQueueTimer = AutoRaidAssist.promotionQueueTimer
+				local originalPromotionRetryTimers = AutoRaidAssist.promotionRetryTimers
+				local originalDemotedLookupKeys = AutoRaidAssist.demotedLookupKeys
+				local promoted = {}
+
+				local ok, err = pcall(function()
+					AutoRaidAssist.lastPromotionAttempt = {}
+					AutoRaidAssist.promotionAttemptCounts = {}
+					AutoRaidAssist.promotionQueue = {}
+					AutoRaidAssist.promotionQueueLookup = {}
+					AutoRaidAssist.promotionQueueTimer = nil
+					AutoRaidAssist.promotionRetryTimers = {}
+					AutoRaidAssist.demotedLookupKeys = nil
+
+					C_Timer = {
+						NewTimer = function(delay, callback)
+							return {
+								delay = delay,
+								callback = callback,
+								cancelled = false,
+								Cancel = function(self)
+									self.cancelled = true
+								end,
+							}
+						end,
+					}
+					IsInRaid = function()
+						return true
+					end
+					GetNumGroupMembers = function()
+						return 1
+					end
+					GetRaidRosterInfo = function(index)
+						if index == 1 then
+							return "Echo-Realm", 0
+						end
+						return nil, nil
+					end
+					UnitExists = function(unit)
+						return unit == "raid1" or unit == "player"
+					end
+					UnitIsUnit = function(unit, other)
+						return unit == "player" and other == "player"
+					end
+					UnitIsGroupLeader = function(unit)
+						return unit == "player"
+					end
+					UnitIsGroupAssistant = function()
+						return false
+					end
+					UnitFullName = function(unit)
+						if unit == "raid1" then
+							return "Echo", "Realm"
+						end
+						if unit == "player" then
+							return "Leader", "Home"
+						end
+						return nil, nil
+					end
+					UnitName = UnitFullName
+					GetNormalizedRealmName = function()
+						return "Home"
+					end
+					GetTime = function()
+						return 100
+					end
+					BFL.IsActionRestricted = function()
+						return false
+					end
+					C_PartyInfo = {
+						PromoteToAssistant = function(name, exactNameMatch)
+							promoted[#promoted + 1] = {
+								name = name,
+								exactNameMatch = exactNameMatch,
+							}
+							return true
+						end,
+					}
+
+					V:Assert(AutoRaidAssist:RememberDemotedTarget("Echo-Realm") == true, "Manual demote should be remembered")
+					V:Assert(AutoRaidAssist:IsDemotedLookupKey("player:echo-realm") == true, "Demoted lookup key should be tracked")
+					V:Assert(AutoRaidAssist:Evaluate("test-manual-demote") == false, "Evaluate should not queue a demoted target")
+					V:AssertEqual(#promoted, 0, "Demoted target should not be promoted again")
+				end)
+
+				C_Timer = originalCTimer
+				IsInRaid = originalIsInRaid
+				GetNumGroupMembers = originalGetNumGroupMembers
+				GetRaidRosterInfo = originalGetRaidRosterInfo
+				UnitExists = originalUnitExists
+				UnitIsUnit = originalUnitIsUnit
+				UnitIsGroupLeader = originalUnitIsGroupLeader
+				UnitIsGroupAssistant = originalUnitIsGroupAssistant
+				UnitFullName = originalUnitFullName
+				UnitName = originalUnitName
+				GetNormalizedRealmName = originalGetNormalizedRealmName
+				GetTime = originalGetTime
+				C_PartyInfo = originalCPartyInfo
+				BFL.IsActionRestricted = originalIsActionRestricted
+				AutoRaidAssist.lastPromotionAttempt = originalLastPromotionAttempt
+				AutoRaidAssist.promotionAttemptCounts = originalPromotionAttemptCounts
+				AutoRaidAssist.promotionQueue = originalPromotionQueue
+				AutoRaidAssist.promotionQueueLookup = originalPromotionQueueLookup
+				AutoRaidAssist.promotionQueueTimer = originalPromotionQueueTimer
+				AutoRaidAssist.promotionRetryTimers = originalPromotionRetryTimers
+				AutoRaidAssist.demotedLookupKeys = originalDemotedLookupKeys
+				if not ok then
+					error(err, 2)
+				end
+			end)
+		end,
+	})
+
+	self:RegisterTest("data", "AutoRaidAssist_ManualDemoteClearsAfterRosterLeave", {
+		description = "Auto Raid Assist should clear manual-demote suppression after the player leaves the raid",
+		action = function(V)
+			WithTemporaryDatabase({
+				autoRaidAssist = {
+					enabled = true,
+					targets = {
+						{
+							key = "player:Echo-Realm",
+							id = "player:Echo-Realm",
+							kind = "player",
+							value = "Echo-Realm",
+						},
+					},
+				},
+			}, function()
+				local AutoRaidAssist = BFL:GetModule("AutoRaidAssist")
+				V:AssertNotNil(AutoRaidAssist, "AutoRaidAssist module should exist")
+
+				local originalCTimer = C_Timer
+				local originalInCombatLockdown = InCombatLockdown
+				local originalIsInRaid = IsInRaid
+				local originalIsInGroup = IsInGroup
+				local originalGetNumGroupMembers = GetNumGroupMembers
+				local originalGetRaidRosterInfo = GetRaidRosterInfo
+				local originalUnitExists = UnitExists
+				local originalUnitIsUnit = UnitIsUnit
+				local originalUnitIsGroupLeader = UnitIsGroupLeader
+				local originalUnitIsGroupAssistant = UnitIsGroupAssistant
+				local originalUnitFullName = UnitFullName
+				local originalUnitName = UnitName
+				local originalGetNormalizedRealmName = GetNormalizedRealmName
+				local originalGetTime = GetTime
+				local originalCPartyInfo = C_PartyInfo
+				local originalIsActionRestricted = BFL.IsActionRestricted
+				local originalLastPromotionAttempt = AutoRaidAssist.lastPromotionAttempt
+				local originalPromotionAttemptCounts = AutoRaidAssist.promotionAttemptCounts
+				local originalPromotionQueue = AutoRaidAssist.promotionQueue
+				local originalPromotionQueueLookup = AutoRaidAssist.promotionQueueLookup
+				local originalPromotionQueueTimer = AutoRaidAssist.promotionQueueTimer
+				local originalPromotionRetryTimers = AutoRaidAssist.promotionRetryTimers
+				local originalDemotedLookupKeys = AutoRaidAssist.demotedLookupKeys
+				local promoted = {}
+				local rosterPresent = true
+
+				local ok, err = pcall(function()
+					AutoRaidAssist.lastPromotionAttempt = {}
+					AutoRaidAssist.promotionAttemptCounts = {}
+					AutoRaidAssist.promotionQueue = {}
+					AutoRaidAssist.promotionQueueLookup = {}
+					AutoRaidAssist.promotionQueueTimer = nil
+					AutoRaidAssist.promotionRetryTimers = {}
+					AutoRaidAssist.demotedLookupKeys = nil
+
+					C_Timer = {
+						NewTimer = function(delay, callback)
+							return {
+								delay = delay,
+								callback = callback,
+								cancelled = false,
+								Cancel = function(self)
+									self.cancelled = true
+								end,
+							}
+						end,
+					}
+					InCombatLockdown = function()
+						return false
+					end
+					IsInRaid = function()
+						return true
+					end
+					IsInGroup = function()
+						return true
+					end
+					GetNumGroupMembers = function()
+						return rosterPresent and 1 or 0
+					end
+					GetRaidRosterInfo = function(index)
+						if rosterPresent and index == 1 then
+							return "Echo-Realm", 0
+						end
+						return nil, nil
+					end
+					UnitExists = function(unit)
+						return unit == "player" or (rosterPresent and unit == "raid1")
+					end
+					UnitIsUnit = function(unit, other)
+						return unit == "player" and other == "player"
+					end
+					UnitIsGroupLeader = function(unit)
+						return unit == "player"
+					end
+					UnitIsGroupAssistant = function()
+						return false
+					end
+					UnitFullName = function(unit)
+						if unit == "raid1" and rosterPresent then
+							return "Echo", "Realm"
+						end
+						if unit == "player" then
+							return "Leader", "Home"
+						end
+						return nil, nil
+					end
+					UnitName = UnitFullName
+					GetNormalizedRealmName = function()
+						return "Home"
+					end
+					GetTime = function()
+						return 100
+					end
+					BFL.IsActionRestricted = function()
+						return false
+					end
+					C_PartyInfo = {
+						PromoteToAssistant = function(name, exactNameMatch)
+							promoted[#promoted + 1] = {
+								name = name,
+								exactNameMatch = exactNameMatch,
+							}
+							return true
+						end,
+					}
+
+					V:Assert(AutoRaidAssist:RememberDemotedTarget("Echo-Realm") == true, "Manual demote should be remembered")
+					V:Assert(AutoRaidAssist:IsDemotedLookupKey("player:echo-realm") == true, "Demoted lookup key should be tracked")
+
+					rosterPresent = false
+					V:AssertEqual(
+						AutoRaidAssist:PruneDemotedTargetsForCurrentRaid("test-roster-left"),
+						1,
+						"Leaving the raid should clear the remembered demote"
+					)
+					V:Assert(
+						AutoRaidAssist:IsDemotedLookupKey("player:echo-realm") == false,
+						"Demoted lookup key should be cleared after roster leave"
+					)
+
+					rosterPresent = true
+					V:Assert(AutoRaidAssist:Evaluate("test-reinvite") == true, "Reinvited target should be promoted again")
+					V:AssertEqual(#promoted, 1, "Reinvited target should be promoted once")
+					V:AssertEqual(promoted[1].name, "Echo-Realm", "Promotion should use the roster player name")
+					V:AssertEqual(promoted[1].exactNameMatch, true, "Promotion should use exact matching")
+				end)
+
+				C_Timer = originalCTimer
+				InCombatLockdown = originalInCombatLockdown
+				IsInRaid = originalIsInRaid
+				IsInGroup = originalIsInGroup
+				GetNumGroupMembers = originalGetNumGroupMembers
+				GetRaidRosterInfo = originalGetRaidRosterInfo
+				UnitExists = originalUnitExists
+				UnitIsUnit = originalUnitIsUnit
+				UnitIsGroupLeader = originalUnitIsGroupLeader
+				UnitIsGroupAssistant = originalUnitIsGroupAssistant
+				UnitFullName = originalUnitFullName
+				UnitName = originalUnitName
+				GetNormalizedRealmName = originalGetNormalizedRealmName
+				GetTime = originalGetTime
+				C_PartyInfo = originalCPartyInfo
+				BFL.IsActionRestricted = originalIsActionRestricted
+				AutoRaidAssist.lastPromotionAttempt = originalLastPromotionAttempt
+				AutoRaidAssist.promotionAttemptCounts = originalPromotionAttemptCounts
+				AutoRaidAssist.promotionQueue = originalPromotionQueue
+				AutoRaidAssist.promotionQueueLookup = originalPromotionQueueLookup
+				AutoRaidAssist.promotionQueueTimer = originalPromotionQueueTimer
+				AutoRaidAssist.promotionRetryTimers = originalPromotionRetryTimers
+				AutoRaidAssist.demotedLookupKeys = originalDemotedLookupKeys
+				if not ok then
+					error(err, 2)
+				end
+			end)
+		end,
+	})
+
+	self:RegisterTest("data", "AutoRaidAssist_BroadRestrictionDoesNotBlockInstancePromotion", {
+		description = "Auto Raid Assist should still promote in raid instances when only the broad BFL action restriction is active",
+		action = function(V)
+			WithTemporaryDatabase({
+				autoRaidAssist = {
+					enabled = true,
+					targets = {
+						{
+							key = "player:Instanceone-Realm",
+							id = "player:Instanceone-Realm",
+							kind = "player",
+							value = "Instanceone-Realm",
+						},
+					},
+				},
+			}, function()
+				local AutoRaidAssist = BFL:GetModule("AutoRaidAssist")
+				V:AssertNotNil(AutoRaidAssist, "AutoRaidAssist module should exist")
+
+				local originalCTimer = C_Timer
+				local originalInCombatLockdown = InCombatLockdown
+				local originalIsInRaid = IsInRaid
+				local originalIsInGroup = IsInGroup
+				local originalIsInInstance = IsInInstance
+				local originalGetNumGroupMembers = GetNumGroupMembers
+				local originalGetRaidRosterInfo = GetRaidRosterInfo
+				local originalUnitExists = UnitExists
+				local originalUnitIsUnit = UnitIsUnit
+				local originalUnitIsGroupLeader = UnitIsGroupLeader
+				local originalUnitIsGroupAssistant = UnitIsGroupAssistant
+				local originalUnitFullName = UnitFullName
+				local originalUnitName = UnitName
+				local originalUnitRealmRelationship = UnitRealmRelationship
+				local originalGetNormalizedRealmName = GetNormalizedRealmName
+				local originalGetTime = GetTime
+				local originalCPartyInfo = C_PartyInfo
+				local originalIsActionRestricted = BFL.IsActionRestricted
+				local originalLastPromotionAttempt = AutoRaidAssist.lastPromotionAttempt
+				local originalPromotionAttemptCounts = AutoRaidAssist.promotionAttemptCounts
+				local originalPromotionQueue = AutoRaidAssist.promotionQueue
+				local originalPromotionQueueLookup = AutoRaidAssist.promotionQueueLookup
+				local originalPromotionQueueTimer = AutoRaidAssist.promotionQueueTimer
+				local originalPromotionRetryTimers = AutoRaidAssist.promotionRetryTimers
+				local originalDemotedLookupKeys = AutoRaidAssist.demotedLookupKeys
+				local promoted = {}
+
+				local ok, err = pcall(function()
+					AutoRaidAssist.lastPromotionAttempt = {}
+					AutoRaidAssist.promotionAttemptCounts = {}
+					AutoRaidAssist.promotionQueue = {}
+					AutoRaidAssist.promotionQueueLookup = {}
+					AutoRaidAssist.promotionQueueTimer = nil
+					AutoRaidAssist.promotionRetryTimers = {}
+					AutoRaidAssist.demotedLookupKeys = nil
+
+					C_Timer = {
+						NewTimer = function(delay, callback)
+							return {
+								delay = delay,
+								callback = callback,
+								cancelled = false,
+								Cancel = function(self)
+									self.cancelled = true
+								end,
+							}
+						end,
+					}
+					InCombatLockdown = function()
+						return false
+					end
+					IsInRaid = function()
+						return true
+					end
+					IsInGroup = function()
+						return true
+					end
+					IsInInstance = function()
+						return true, "raid"
+					end
+					GetNumGroupMembers = function()
+						return 1
+					end
+					GetRaidRosterInfo = function(index)
+						if index == 1 then
+							return "Instanceone-Realm", 0
+						end
+						return nil, nil
+					end
+					UnitExists = function(unit)
+						return unit == "raid1" or unit == "player"
+					end
+					UnitIsUnit = function(unit, other)
+						return unit == "player" and other == "player"
+					end
+					UnitIsGroupLeader = function(unit)
+						return unit == "player"
+					end
+					UnitIsGroupAssistant = function()
+						return false
+					end
+					UnitFullName = function(unit)
+						if unit == "raid1" then
+							return "Instanceone", "Realm"
+						end
+						if unit == "player" then
+							return "Leader", "Home"
+						end
+						return nil, nil
+					end
+					UnitName = UnitFullName
+					UnitRealmRelationship = function()
+						return 2
+					end
+					GetNormalizedRealmName = function()
+						return "Home"
+					end
+					GetTime = function()
+						return 100
+					end
+					BFL.IsActionRestricted = function()
+						return true
+					end
+					C_PartyInfo = {
+						PromoteToAssistant = function(name, exactNameMatch)
+							promoted[#promoted + 1] = {
+								name = name,
+								exactNameMatch = exactNameMatch,
+							}
+							return true
+						end,
+					}
+
+					local gate = AutoRaidAssist:GetPromotionGateStatus("test-instance-restriction")
+					V:Assert(gate.ok == true, "Broad action restriction should not block out-of-combat assistant promotion")
+					V:Assert(gate.bflActionRestricted == true, "Test should simulate active broad BFL action restriction")
+					V:Assert(gate.promotionRestricted == false, "Promotion restriction should be false outside combat")
+					V:Assert(AutoRaidAssist:Evaluate("test-instance-restriction") == true, "Evaluate should promote in raid instance")
+					V:AssertEqual(#promoted, 1, "Target should be promoted once")
+					V:AssertEqual(promoted[1].name, "Instanceone-Realm", "Promotion should use exact roster name")
+					V:AssertEqual(promoted[1].exactNameMatch, true, "Promotion should use exact matching")
+				end)
+
+				C_Timer = originalCTimer
+				InCombatLockdown = originalInCombatLockdown
+				IsInRaid = originalIsInRaid
+				IsInGroup = originalIsInGroup
+				IsInInstance = originalIsInInstance
+				GetNumGroupMembers = originalGetNumGroupMembers
+				GetRaidRosterInfo = originalGetRaidRosterInfo
+				UnitExists = originalUnitExists
+				UnitIsUnit = originalUnitIsUnit
+				UnitIsGroupLeader = originalUnitIsGroupLeader
+				UnitIsGroupAssistant = originalUnitIsGroupAssistant
+				UnitFullName = originalUnitFullName
+				UnitName = originalUnitName
+				UnitRealmRelationship = originalUnitRealmRelationship
+				GetNormalizedRealmName = originalGetNormalizedRealmName
+				GetTime = originalGetTime
+				C_PartyInfo = originalCPartyInfo
+				BFL.IsActionRestricted = originalIsActionRestricted
+				AutoRaidAssist.lastPromotionAttempt = originalLastPromotionAttempt
+				AutoRaidAssist.promotionAttemptCounts = originalPromotionAttemptCounts
+				AutoRaidAssist.promotionQueue = originalPromotionQueue
+				AutoRaidAssist.promotionQueueLookup = originalPromotionQueueLookup
+				AutoRaidAssist.promotionQueueTimer = originalPromotionQueueTimer
+				AutoRaidAssist.promotionRetryTimers = originalPromotionRetryTimers
+				AutoRaidAssist.demotedLookupKeys = originalDemotedLookupKeys
+				if not ok then
+					error(err, 2)
+				end
+			end)
+		end,
+	})
 end
 
 function TestSuite:GetTestCount()

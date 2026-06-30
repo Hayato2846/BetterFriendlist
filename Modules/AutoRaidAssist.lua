@@ -97,6 +97,21 @@ local function DebugLog(message, ...)
 	BFL:DebugPrint("|cff00bfff[BFL Auto Assist]|r " .. tostring(message or ""))
 end
 
+local function GetBFLActionRestrictedState()
+	if not (BFL and BFL.IsActionRestricted) then
+		return nil
+	end
+	local ok, result = pcall(BFL.IsActionRestricted, BFL)
+	if ok then
+		return result == true
+	end
+	return "error:" .. tostring(result)
+end
+
+local function IsPromotionActionRestricted()
+	return InCombatLockdown and InCombatLockdown() == true
+end
+
 local function IsWoWGameAccount(gameAccountInfo)
 	if type(gameAccountInfo) ~= "table" then
 		return false
@@ -375,6 +390,7 @@ function AutoRaidAssist:RegisterEvents()
 	end, 70)
 
 	self:RegisterConversionHooks()
+	self:RegisterDemotionHooks()
 end
 
 function AutoRaidAssist:RegisterConversionHooks()
@@ -409,6 +425,29 @@ function AutoRaidAssist:RegisterConversionHooks()
 		"Hook global RaidFrame_ConvertToRaid installed=%s",
 		DebugValue(TryHookGlobalFunction("RaidFrame_ConvertToRaid", ScheduleConversion))
 	)
+end
+
+function AutoRaidAssist:RegisterDemotionHooks()
+	if self.demotionHooksRegistered then
+		DebugLog("RegisterDemotionHooks skipped; hooks already registered")
+		return
+	end
+	self.demotionHooksRegistered = true
+
+	local function RememberDemotion(nameOrUnit)
+		AutoRaidAssist:RememberDemotedTarget(nameOrUnit)
+	end
+
+	if C_PartyInfo then
+		DebugLog(
+			"Hook C_PartyInfo.DemoteAssistant installed=%s",
+			DebugValue(TryHookTableFunction(C_PartyInfo, "DemoteAssistant", RememberDemotion))
+		)
+	else
+		DebugLog("C_PartyInfo unavailable; skipping C_PartyInfo demotion hook")
+	end
+
+	DebugLog("Hook global DemoteAssistant installed=%s", DebugValue(TryHookGlobalFunction("DemoteAssistant", RememberDemotion)))
 end
 
 function AutoRaidAssist:GetDB()
@@ -456,6 +495,7 @@ function AutoRaidAssist:SetEnabled(enabled)
 		self:ClearPromotionQueue()
 		self:CancelPromotionRetryTimers()
 		self.promotionAttemptCounts = {}
+		self:ClearDemotedTargets("disabled")
 		self:CancelRosterRetryTimers()
 		if self.pendingTimer and self.pendingTimer.Cancel then
 			self.pendingTimer:Cancel()
@@ -610,6 +650,9 @@ function AutoRaidAssist:RemoveTarget(contactKey)
 			self:RemoveQueuedPromotion(lookupKey)
 			self:CancelPromotionRetryTimer(lookupKey)
 			self:ResetPromotionAttemptCount(lookupKey)
+			if type(self.demotedLookupKeys) == "table" then
+				self.demotedLookupKeys[lookupKey] = nil
+			end
 			DebugLog("RemoveTarget key=%s lookup=%s remainingTargets=%d", DebugValue(contactKey), DebugValue(lookupKey), #db.targets)
 			return true
 		end
@@ -945,9 +988,43 @@ function AutoRaidAssist:GetTargetDisplay(target)
 	return displayName, source .. " - " .. tostring(value or "")
 end
 
-function AutoRaidAssist:GetUnitDebugName(unit)
-	if not unit then
+local function GetRaidIndexFromUnit(unit)
+	if type(unit) ~= "string" then
 		return nil
+	end
+	return tonumber(unit:match("^raid(%d+)$"))
+end
+
+local function SplitRosterPlayerName(fullName)
+	if type(fullName) ~= "string" or fullName == "" then
+		return nil, nil
+	end
+	local name, realm = fullName:match("^([^-]+)%-(.+)$")
+	if name and name ~= "" then
+		return name, realm
+	end
+	return fullName, nil
+end
+
+function AutoRaidAssist:GetUnitRosterInfo(unit)
+	local raidIndex = GetRaidIndexFromUnit(unit)
+	if not (raidIndex and GetRaidRosterInfo) then
+		return nil, nil, nil
+	end
+	local rosterName, rank = GetRaidRosterInfo(raidIndex)
+	local name, realm = SplitRosterPlayerName(rosterName)
+	if not name then
+		return nil, nil, rank
+	end
+	if (not realm or realm == "") and GetNormalizedRealmName then
+		realm = GetNormalizedRealmName()
+	end
+	return name, realm, rank
+end
+
+function AutoRaidAssist:GetUnitNameParts(unit)
+	if not unit then
+		return nil, nil, nil
 	end
 	local name, realm
 	if UnitFullName then
@@ -956,11 +1033,23 @@ function AutoRaidAssist:GetUnitDebugName(unit)
 	if not name and UnitName then
 		name, realm = UnitName(unit)
 	end
-	if not name or name == "" then
-		return nil
+
+	local rosterName, rosterRealm, rosterRank = self:GetUnitRosterInfo(unit)
+	if not name then
+		name, realm = rosterName, rosterRealm
+	elseif not realm or realm == "" then
+		realm = rosterRealm
 	end
 	if not realm or realm == "" then
 		realm = GetNormalizedRealmName and GetNormalizedRealmName() or nil
+	end
+	return name, realm, rosterRank
+end
+
+function AutoRaidAssist:GetUnitDebugName(unit)
+	local name, realm = self:GetUnitNameParts(unit)
+	if not name or name == "" then
+		return nil
 	end
 	if realm and realm ~= "" then
 		return name .. "-" .. realm
@@ -969,25 +1058,14 @@ function AutoRaidAssist:GetUnitDebugName(unit)
 end
 
 function AutoRaidAssist:GetUnitPromotionName(unit)
-	if not unit then
-		return nil
-	end
-	local name, realm
-	if UnitFullName then
-		name, realm = UnitFullName(unit)
-	end
-	if not name and UnitName then
-		name, realm = UnitName(unit)
-	end
+	local name, realm = self:GetUnitNameParts(unit)
 	if not name or name == "" then
 		return nil
 	end
-	if not realm or realm == "" then
-		realm = GetNormalizedRealmName and GetNormalizedRealmName() or nil
-	end
 
+	local hasUnit = not UnitExists or UnitExists(unit)
 	local isSameRealm = false
-	if UnitRealmRelationship and LE_REALM_RELATION_SAME then
+	if hasUnit and UnitRealmRelationship and LE_REALM_RELATION_SAME then
 		isSameRealm = UnitRealmRelationship(unit) == LE_REALM_RELATION_SAME
 	elseif realm and GetNormalizedRealmName then
 		isSameRealm = realm == GetNormalizedRealmName()
@@ -1004,17 +1082,108 @@ function AutoRaidAssist:GetUnitContactKey(unit)
 	if not ContactIdentity or not unit then
 		return nil
 	end
-	local name, realm
-	if UnitFullName then
-		name, realm = UnitFullName(unit)
-	end
-	if not name and UnitName then
-		name, realm = UnitName(unit)
-	end
-	if not realm or realm == "" then
-		realm = GetNormalizedRealmName and GetNormalizedRealmName() or nil
-	end
+	local name, realm = self:GetUnitNameParts(unit)
 	return ContactIdentity:GetContactKeyFromPlayerName(name, realm)
+end
+
+function AutoRaidAssist:GetLookupKeyFromNameOrUnit(nameOrUnit)
+	local ContactIdentity = GetContactIdentity()
+	if not (ContactIdentity and type(nameOrUnit) == "string" and nameOrUnit ~= "") then
+		return nil
+	end
+	if BFL.IsSecret and BFL:IsSecret(nameOrUnit) then
+		return nil
+	end
+
+	local contactKey
+	if (UnitExists and UnitExists(nameOrUnit)) or GetRaidIndexFromUnit(nameOrUnit) then
+		contactKey = self:GetUnitContactKey(nameOrUnit)
+	end
+	if not contactKey then
+		local name, realm = SplitRosterPlayerName(nameOrUnit)
+		contactKey = ContactIdentity:GetContactKeyFromPlayerName(name, realm)
+	end
+	return ContactIdentity:NormalizeLookupKey(contactKey)
+end
+
+function AutoRaidAssist:ClearDemotedTargets(reason)
+	if type(self.demotedLookupKeys) ~= "table" then
+		return
+	end
+	local count = CountTableKeys(self.demotedLookupKeys)
+	self.demotedLookupKeys = nil
+	DebugLog("ClearDemotedTargets reason=%s cleared=%d", DebugValue(reason), count)
+end
+
+function AutoRaidAssist:RememberDemotedTarget(nameOrUnit)
+	local lookupKey = self:GetLookupKeyFromNameOrUnit(nameOrUnit)
+	if not lookupKey then
+		DebugLog("RememberDemotedTarget skipped value=%s reason=missingLookup", DebugValue(nameOrUnit))
+		return false
+	end
+	if type(self.demotedLookupKeys) ~= "table" then
+		self.demotedLookupKeys = {}
+	end
+	self.demotedLookupKeys[lookupKey] = true
+	self:RemoveQueuedPromotion(lookupKey)
+	self:CancelPromotionRetryTimer(lookupKey)
+	self:ResetPromotionAttemptCount(lookupKey)
+	DebugLog("RememberDemotedTarget lookup=%s value=%s", DebugValue(lookupKey), DebugValue(nameOrUnit))
+	return true
+end
+
+function AutoRaidAssist:IsDemotedLookupKey(lookupKey)
+	return lookupKey ~= nil and type(self.demotedLookupKeys) == "table" and self.demotedLookupKeys[lookupKey] == true
+end
+
+function AutoRaidAssist:BuildCurrentRaidLookupKeySet(ContactIdentity)
+	local keySet = {}
+	ContactIdentity = ContactIdentity or GetContactIdentity()
+	if not (ContactIdentity and IsInRaid and IsInRaid() and GetNumGroupMembers) then
+		return keySet
+	end
+
+	local count = GetNumGroupMembers() or 0
+	for index = 1, count do
+		local lookupKey = ContactIdentity:NormalizeLookupKey(self:GetUnitContactKey("raid" .. tostring(index)))
+		if lookupKey then
+			keySet[lookupKey] = true
+		end
+	end
+	return keySet
+end
+
+function AutoRaidAssist:PruneDemotedTargetsForCurrentRaid(reason)
+	if type(self.demotedLookupKeys) ~= "table" then
+		return 0
+	end
+
+	local currentKeys = self:BuildCurrentRaidLookupKeySet()
+	local removed = 0
+	for lookupKey in pairs(self.demotedLookupKeys) do
+		if not currentKeys[lookupKey] then
+			self.demotedLookupKeys[lookupKey] = nil
+			self:RemoveQueuedPromotion(lookupKey)
+			self:CancelPromotionRetryTimer(lookupKey)
+			self:ResetPromotionAttemptCount(lookupKey)
+			if type(self.lastPromotionAttempt) == "table" then
+				self.lastPromotionAttempt[lookupKey] = nil
+			end
+			removed = removed + 1
+		end
+	end
+	if CountTableKeys(self.demotedLookupKeys) == 0 then
+		self.demotedLookupKeys = nil
+	end
+	if removed > 0 then
+		DebugLog(
+			"PruneDemotedTargetsForCurrentRaid reason=%s removed=%d remaining=%d",
+			DebugValue(reason),
+			removed,
+			CountTableKeys(self.demotedLookupKeys)
+		)
+	end
+	return removed
 end
 
 function AutoRaidAssist:AddGameAccountKey(gameAccountInfo, keySet)
@@ -1178,6 +1347,7 @@ end
 
 function AutoRaidAssist:ScheduleRosterEvaluate(reason)
 	DebugLog("ScheduleRosterEvaluate reason=%s", DebugValue(reason))
+	self:PruneDemotedTargetsForCurrentRaid(reason or "roster")
 	self:ScheduleEvaluate(reason)
 	if not (self:IsEnabled() and C_Timer and C_Timer.NewTimer) then
 		DebugLog(
@@ -1197,95 +1367,109 @@ function AutoRaidAssist:ScheduleRosterEvaluate(reason)
 				AutoRaidAssist.rosterRetryTimers[index] = nil
 			end
 			DebugLog("Roster settle retry fired index=%d reason=%s", index, DebugValue(reason))
+			AutoRaidAssist:PruneDemotedTargetsForCurrentRaid((reason or "roster") .. "-settle")
 			AutoRaidAssist:Evaluate((reason or "roster") .. "-settle")
 		end)
 	end
 end
 
-function AutoRaidAssist:CanPromoteNow(reason)
+function AutoRaidAssist:GetPromotionGateStatus(reason)
 	reason = reason or "unknown"
-	local enabled = self:IsEnabled()
-	local targetCount = self:GetTargetCount()
-	local inRaid = IsInRaid and IsInRaid()
-	local leader = UnitIsGroupLeader and UnitIsGroupLeader("player")
-	local groupMembers = GetNumGroupMembers and GetNumGroupMembers() or 0
+	local status = {
+		reason = reason,
+		enabled = self:IsEnabled(),
+		targetCount = self:GetTargetCount(),
+		inRaid = IsInRaid and IsInRaid(),
+		inGroup = IsInGroup and IsInGroup(),
+		leader = UnitIsGroupLeader and UnitIsGroupLeader("player"),
+		assistant = UnitIsGroupAssistant and UnitIsGroupAssistant("player"),
+		groupMembers = GetNumGroupMembers and GetNumGroupMembers() or 0,
+		inCombat = InCombatLockdown and InCombatLockdown() == true,
+		promotionRestricted = IsPromotionActionRestricted(),
+		bflActionRestricted = GetBFLActionRestrictedState(),
+		hasGetNumGroupMembers = GetNumGroupMembers ~= nil,
+		hasPromote = BFL and BFL.PromoteToAssistant ~= nil,
+	}
+	if IsInInstance then
+		status.inInstance, status.instanceType = IsInInstance()
+	end
 
-	if not enabled then
+	if not status.enabled then
+		status.ok = false
+		status.gate = "disabled"
+	elseif status.targetCount == 0 then
+		status.ok = false
+		status.gate = "noTargets"
+	elseif not status.inRaid then
+		status.ok = false
+		status.gate = "notRaidGroup"
+	elseif not status.leader then
+		status.ok = false
+		status.gate = "notGroupLeader"
+	elseif status.promotionRestricted then
+		status.ok = false
+		status.gate = "actionRestricted"
+		status.retryOnRegen = true
+	elseif not (status.hasGetNumGroupMembers and status.hasPromote) then
+		status.ok = false
+		status.gate = "missingAPI"
+	else
+		status.ok = true
+		status.gate = "ok"
+	end
+	return status
+end
+
+function AutoRaidAssist:CanPromoteNow(reason)
+	local status = self:GetPromotionGateStatus(reason)
+	if not status.ok then
+		if status.gate == "notRaidGroup" then
+			self:ClearDemotedTargets("not-raid")
+		elseif status.gate == "actionRestricted" then
+			self.needsCombatRetry = true
+		end
+
 		DebugLog(
-			"CanPromoteNow reason=%s result=false gate=disabled targets=%d isInRaid=%s leader=%s members=%d",
-			DebugValue(reason),
-			targetCount,
-			DebugValue(inRaid),
-			DebugValue(leader),
-			groupMembers
+			"CanPromoteNow reason=%s result=false gate=%s targets=%d isInRaid=%s leader=%s members=%d inCombat=%s promotionRestricted=%s bflActionRestricted=%s",
+			DebugValue(status.reason),
+			DebugValue(status.gate),
+			status.targetCount,
+			DebugValue(status.inRaid),
+			DebugValue(status.leader),
+			status.groupMembers,
+			DebugValue(status.inCombat),
+			DebugValue(status.promotionRestricted),
+			DebugValue(status.bflActionRestricted)
 		)
 		return false
 	end
-	if targetCount == 0 then
-		DebugLog(
-			"CanPromoteNow reason=%s result=false gate=noTargets isInRaid=%s leader=%s members=%d",
-			DebugValue(reason),
-			DebugValue(inRaid),
-			DebugValue(leader),
-			groupMembers
-		)
-		return false
-	end
-	if not inRaid then
-		DebugLog(
-			"CanPromoteNow reason=%s result=false gate=notRaidGroup targets=%d leader=%s members=%d",
-			DebugValue(reason),
-			targetCount,
-			DebugValue(leader),
-			groupMembers
-		)
-		return false
-	end
-	if not leader then
-		DebugLog(
-			"CanPromoteNow reason=%s result=false gate=notGroupLeader targets=%d members=%d",
-			DebugValue(reason),
-			targetCount,
-			groupMembers
-		)
-		return false
-	end
-	if BFL.IsActionRestricted and BFL:IsActionRestricted() then
-		self.needsCombatRetry = true
-		DebugLog(
-			"CanPromoteNow reason=%s result=false gate=actionRestricted targets=%d members=%d retryOnRegen=true",
-			DebugValue(reason),
-			targetCount,
-			groupMembers
-		)
-		return false
-	end
-	if not (GetNumGroupMembers and BFL.PromoteToAssistant) then
-		DebugLog(
-			"CanPromoteNow reason=%s result=false gate=missingAPI hasGetNumGroupMembers=%s hasPromote=%s",
-			DebugValue(reason),
-			DebugValue(GetNumGroupMembers ~= nil),
-			DebugValue(BFL.PromoteToAssistant ~= nil)
-		)
-		return false
-	end
+
 	DebugLog(
-		"CanPromoteNow reason=%s result=true targets=%d members=%d isInRaid=%s leader=%s",
-		DebugValue(reason),
-		targetCount,
-		groupMembers,
-		DebugValue(inRaid),
-		DebugValue(leader)
+		"CanPromoteNow reason=%s result=true targets=%d members=%d isInRaid=%s leader=%s inCombat=%s bflActionRestricted=%s",
+		DebugValue(status.reason),
+		status.targetCount,
+		status.groupMembers,
+		DebugValue(status.inRaid),
+		DebugValue(status.leader),
+		DebugValue(status.inCombat),
+		DebugValue(status.bflActionRestricted)
 	)
 	return true
 end
 
 function AutoRaidAssist:GetNotPromotableReason(unit)
-	if UnitExists and not UnitExists(unit) then
+	local rosterName, _, rosterRank = self:GetUnitNameParts(unit)
+	if UnitExists and not UnitExists(unit) and (not rosterName or rosterName == "") then
 		return "missingUnit"
 	end
 	if UnitIsUnit and UnitIsUnit(unit, "player") then
 		return "player"
+	end
+	if rosterRank == 2 then
+		return "leader"
+	end
+	if rosterRank == 1 then
+		return "alreadyAssistant"
 	end
 	if UnitIsGroupLeader and UnitIsGroupLeader(unit) then
 		return "leader"
@@ -1378,7 +1562,15 @@ function AutoRaidAssist:CollectPromotionCandidates(targetKeys, ContactIdentity, 
 				notPromotableReason
 			)
 		else
-			if lookupKey and targetKeys[lookupKey] and self:GetPromotionAttemptCount(lookupKey, now) >= PROMOTION_MAX_ATTEMPTS then
+			if lookupKey and targetKeys[lookupKey] and self:IsDemotedLookupKey(lookupKey) then
+				DebugLog(
+					"CandidateCheck unit=%s name=%s key=%s lookup=%s result=skip reason=manuallyDemoted",
+					unit,
+					DebugValue(unitName),
+					DebugValue(unitKey),
+					DebugValue(lookupKey)
+				)
+			elseif lookupKey and targetKeys[lookupKey] and self:GetPromotionAttemptCount(lookupKey, now) >= PROMOTION_MAX_ATTEMPTS then
 				DebugLog(
 					"CandidateCheck unit=%s name=%s key=%s lookup=%s result=skip reason=maxAttempts attempts=%d",
 					unit,
@@ -1681,60 +1873,64 @@ function AutoRaidAssist:ProcessPromotionQueue()
 		local lookupKey = table.remove(self.promotionQueue, 1)
 		self.promotionQueueLookup[lookupKey] = nil
 		if targetKeys[lookupKey] then
-			local unit = self:FindPromotableUnitForLookupKey(lookupKey, ContactIdentity)
-			if unit then
-				local lastAttempt = self.lastPromotionAttempt[lookupKey] or 0
-				local cooldownRemaining = PROMOTION_COOLDOWN - (now - lastAttempt)
-				if cooldownRemaining <= 0 then
-					local attemptCount = self:GetPromotionAttemptCount(lookupKey, now)
-					if attemptCount >= PROMOTION_MAX_ATTEMPTS then
-						DebugLog(
-							"ProcessPromotionQueue skipped lookup=%s reason=maxAttempts attempts=%d",
-							DebugValue(lookupKey),
-							attemptCount
-						)
+			if self:IsDemotedLookupKey(lookupKey) then
+				DebugLog("ProcessPromotionQueue skipped lookup=%s reason=manuallyDemoted", DebugValue(lookupKey))
+			else
+				local unit = self:FindPromotableUnitForLookupKey(lookupKey, ContactIdentity)
+				if unit then
+					local lastAttempt = self.lastPromotionAttempt[lookupKey] or 0
+					local cooldownRemaining = PROMOTION_COOLDOWN - (now - lastAttempt)
+					if cooldownRemaining <= 0 then
+						local attemptCount = self:GetPromotionAttemptCount(lookupKey, now)
+						if attemptCount >= PROMOTION_MAX_ATTEMPTS then
+							DebugLog(
+								"ProcessPromotionQueue skipped lookup=%s reason=maxAttempts attempts=%d",
+								DebugValue(lookupKey),
+								attemptCount
+							)
+						else
+							attemptCount = self:RecordPromotionAttempt(lookupKey, now)
+							local promotionName = self:GetUnitPromotionName(unit) or unit
+							self.lastPromotionAttempt[lookupKey] = now
+							DebugLog(
+								"PromoteAttempt lookup=%s unit=%s name=%s apiName=%s attempt=%d/%d queueRemaining=%d",
+								DebugValue(lookupKey),
+								unit,
+								DebugValue(self:GetUnitDebugName(unit)),
+								DebugValue(promotionName),
+								attemptCount,
+								PROMOTION_MAX_ATTEMPTS,
+								#self.promotionQueue
+							)
+							local promoted = BFL.PromoteToAssistant(promotionName, true)
+							DebugLog(
+								"PromoteAttempt dispatched lookup=%s unit=%s apiName=%s apiResult=%s",
+								DebugValue(lookupKey),
+								unit,
+								DebugValue(promotionName),
+								DebugValue(promoted)
+							)
+							self:SchedulePromotionRetry(
+								lookupKey,
+								PROMOTION_COOLDOWN + PROMOTION_RETRY_GRACE,
+								"promotion-verify"
+							)
+							self:ScheduleNextQueuedPromotion()
+							return true
+						end
 					else
-						attemptCount = self:RecordPromotionAttempt(lookupKey, now)
-						local promotionName = self:GetUnitPromotionName(unit) or unit
-						self.lastPromotionAttempt[lookupKey] = now
 						DebugLog(
-							"PromoteAttempt lookup=%s unit=%s name=%s apiName=%s attempt=%d/%d queueRemaining=%d",
+							"ProcessPromotionQueue skipped lookup=%s reason=cooldown remaining=%.2f",
 							DebugValue(lookupKey),
-							unit,
-							DebugValue(self:GetUnitDebugName(unit)),
-							DebugValue(promotionName),
-							attemptCount,
-							PROMOTION_MAX_ATTEMPTS,
-							#self.promotionQueue
+							cooldownRemaining
 						)
-						local promoted = BFL.PromoteToAssistant(unit)
-						DebugLog(
-							"PromoteAttempt dispatched lookup=%s unit=%s apiName=%s apiResult=%s",
-							DebugValue(lookupKey),
-							unit,
-							DebugValue(promotionName),
-							DebugValue(promoted)
-						)
-						self:SchedulePromotionRetry(
-							lookupKey,
-							PROMOTION_COOLDOWN + PROMOTION_RETRY_GRACE,
-							"promotion-verify"
-						)
-						self:ScheduleNextQueuedPromotion()
-						return true
+						self.promotionQueue[#self.promotionQueue + 1] = lookupKey
+						self.promotionQueueLookup[lookupKey] = true
+						shortestCooldown = math.min(shortestCooldown or cooldownRemaining, cooldownRemaining)
 					end
 				else
-					DebugLog(
-						"ProcessPromotionQueue skipped lookup=%s reason=cooldown remaining=%.2f",
-						DebugValue(lookupKey),
-						cooldownRemaining
-					)
-					self.promotionQueue[#self.promotionQueue + 1] = lookupKey
-					self.promotionQueueLookup[lookupKey] = true
-					shortestCooldown = math.min(shortestCooldown or cooldownRemaining, cooldownRemaining)
+					DebugLog("ProcessPromotionQueue skipped lookup=%s reason=noPromotableUnit", DebugValue(lookupKey))
 				end
-			else
-				DebugLog("ProcessPromotionQueue skipped lookup=%s reason=noPromotableUnit", DebugValue(lookupKey))
 			end
 		else
 			DebugLog("ProcessPromotionQueue skipped lookup=%s reason=noLongerTarget", DebugValue(lookupKey))

@@ -732,6 +732,11 @@ function BetterRaidMemberButton_OnEnter(self)
 		return
 	end
 
+	local RaidFrame = GetRaidFrame()
+	if RaidFrame and RaidFrame.ShowSecureProxyForButton and RaidFrame:ShowSecureProxyForButton(self) then
+		return
+	end
+
 	-- Show tooltip only while the raid token is still valid. Roster moves can
 	-- briefly leave buttons with stale raidN tokens while Blizzard refreshes.
 	if self.unit and UnitExists(self.unit) then

@@ -585,68 +585,126 @@ function RaidFrame:UpdateControlPanelLayout()
 end
 
 -- ========================================
--- SECURE ATTRIBUTES SYSTEM (Direct)
+-- SECURE ATTRIBUTES SYSTEM
 -- ========================================
--- No active proxy; attributes stay on visual InsecureActionButtonTemplate buttons.
--- That template runs SecureActionButton_OnClick outside combat without turning
--- the parent BFL frame into a protected SecureFrameTemplate.
+-- Retail SecretValues builds need the right-click UnitPopup to come from a small
+-- UIParent proxy instead of the visual BFL raid button. The visual button keeps
+-- left-click, drag, and non-menu fallback behavior.
 
-function RaidFrame:CreateSecureProxy_DISABLED_OLD()
+local RAID_SHORTCUT_MODIFIERS = {
+	["SHIFT"] = "shift-",
+	["CTRL"] = "ctrl-",
+	["ALT"] = "alt-",
+	["SHIFT-CTRL"] = "shift-ctrl-",
+	["SHIFT-ALT"] = "shift-alt-",
+	["CTRL-ALT"] = "ctrl-alt-",
+}
+
+local RAID_SHORTCUT_BUTTON_IDS = {
+	LeftButton = 1,
+	RightButton = 2,
+	Button3 = 3,
+	Button4 = 4,
+	Button5 = 5,
+}
+
+local function ClearRaidButtonAttributes(button)
+	if not button then
+		return
+	end
+	for _, mod in ipairs({ "", "shift-", "ctrl-", "alt-", "shift-ctrl-", "shift-alt-", "ctrl-alt-" }) do
+		for i = 1, 5 do
+			button:SetAttribute(mod .. "type" .. i, nil)
+			button:SetAttribute(mod .. "action" .. i, nil)
+			button:SetAttribute(mod .. "macrotext" .. i, nil)
+		end
+	end
+	for i = 1, 5 do
+		button:SetAttribute("*type" .. i, nil)
+		button:SetAttribute("*action" .. i, nil)
+		button:SetAttribute("*macrotext" .. i, nil)
+	end
+	button:SetAttribute("menu-function", nil)
+end
+
+local function ApplyRaidShortcutAttributes(button, shortcuts)
+	if not button then
+		return
+	end
+
+	local DB = BFL and BFL:GetModule("DB")
+	if not DB then
+		return
+	end
+
+	for actionKey, data in pairs(shortcuts or {}) do
+		if DB:Get("raidShortcutEnabled_" .. actionKey, true) then
+			local buttonType = data.button
+			if buttonType and (actionKey == "mainTank" or actionKey == "mainAssist") then
+				local modPrefix = RAID_SHORTCUT_MODIFIERS[data.modifier] or ""
+				local btnID = RAID_SHORTCUT_BUTTON_IDS[buttonType] or 1
+
+				if actionKey == "mainTank" then
+					button:SetAttribute(modPrefix .. "type" .. btnID, "maintank")
+					button:SetAttribute(modPrefix .. "action" .. btnID, "toggle")
+				elseif actionKey == "mainAssist" then
+					button:SetAttribute(modPrefix .. "type" .. btnID, "mainassist")
+					button:SetAttribute(modPrefix .. "action" .. btnID, "toggle")
+				end
+			end
+		end
+	end
+end
+
+function RaidFrame:CreateSecureProxy()
 	if self.SecureProxy then
 		return
 	end
 
-	-- Create the proxy frame
-	-- CRITICAL: Parent must be UIParent to avoid tainting the addon frame
-	-- Use SecureActionButtonTemplate to ensure attribute machinery works correctly
 	local proxy = CreateFrame("Button", "BFL_RaidFrame_SecureProxy", UIParent, "SecureActionButtonTemplate")
 
-	-- Visual properties
-	proxy:SetFrameStrata("DIALOG") -- High strata to sit above everything
-	proxy:SetFrameLevel(9999) -- Ensure it is absolutely on top
-	proxy:Hide() -- Hidden by default
+	proxy:SetFrameStrata("DIALOG")
+	proxy:SetFrameLevel(9999)
+	proxy:SetAttribute("useOnKeyDown", false)
+	proxy:Hide()
 
-	-- Add Highlight Texture to Proxy
 	local highlight = proxy:CreateTexture(nil, "HIGHLIGHT")
 	highlight:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
 	highlight:SetBlendMode("ADD")
 	highlight:SetAllPoints(proxy)
 	proxy:SetHighlightTexture(highlight)
 
-	-- Register clicks
-	proxy:RegisterForClicks("AnyUp", "AnyDown")
+	proxy:RegisterForClicks("AnyUp")
+	if proxy.SetPassThroughButtons then
+		proxy:SetPassThroughButtons("LeftButton", "Button3", "Button4", "Button5")
+	end
 
-	-- Script Handlers
 	proxy:SetScript("OnEnter", function(self)
-		-- Just update display properties - menu handling is done via frame.menu callback
-		local unit = self:GetAttribute("unit")
-		if unit then
-			local name = UnitName(unit)
-			self.unit = unit
-			self.name = name
-			self.id = tonumber(string.match(unit, "raid(%d+)"))
-
-			-- Copy visual button properties for Drag/Drop compatibility
-			if self.visualButton then
-				self.groupIndex = self.visualButton.groupIndex
-				self.slotIndex = self.visualButton.slotIndex
+		local visualButton = self.visualButton
+		if visualButton then
+			self.unit = visualButton.unit
+			self.name = visualButton.name
+			self.id = tonumber(string.match(self.unit or "", "raid(%d+)"))
+			self.groupIndex = visualButton.groupIndex
+			self.slotIndex = visualButton.slotIndex
+			if visualButton.Highlight then
+				visualButton.Highlight:Show()
 			end
-
-			-- BFL:DebugPrint("Proxy OnEnter: name=" .. tostring(name) .. " unit=" .. tostring(unit))
 		end
 
-		-- Show tooltip
 		if self.unit then
 			pcall(UnitFrame_UpdateTooltip, self)
 		end
 	end)
 
 	proxy:SetScript("OnLeave", function(self)
-		if self.isDragging then
-			return
-		end -- Do not hide while dragging!
-
-		BFL_Tooltip:Hide()
+		local visualButton = self.visualButton
+		if visualButton and visualButton.Highlight then
+			visualButton.Highlight:Hide()
+		end
+		if GameTooltip and GameTooltip:GetOwner() == self then
+			GameTooltip:Hide()
+		end
 		self:Hide()
 		self:ClearAllPoints()
 		self.visualButton = nil
@@ -655,117 +713,23 @@ function RaidFrame:CreateSecureProxy_DISABLED_OLD()
 		self.slotIndex = nil
 	end)
 
-	-- Drag Support (Forwarding)
-	proxy:RegisterForDrag("LeftButton")
-	proxy:SetScript("OnDragStart", function(self)
-		if self.visualButton and BetterRaidMemberButton_OnDragStart then
-			self.isDragging = true -- Lock proxy position (Singleton pattern)
-			BetterRaidMemberButton_OnDragStart(self.visualButton)
-		end
-	end)
-	proxy:SetScript("OnDragStop", function(self)
-		self.isDragging = false -- Unlock
-		if BetterRaidMemberButton_OnDragStop then
-			-- We pass visualButton because OnDragStop might rely on its object identity
-			BetterRaidMemberButton_OnDragStop(self.visualButton or self)
-		end
-		-- Force cleanup if mouse is not over
-		if not self:IsMouseOver() then
-			self:GetScript("OnLeave")(self)
-		end
-	end)
-
-	-- Combat Protection
-	-- Force hide when entering combat
 	proxy:RegisterEvent("PLAYER_REGEN_DISABLED")
 	proxy:SetScript("OnEvent", function(self, event)
 		if event == "PLAYER_REGEN_DISABLED" then
-			self.isDragging = false
 			self:Hide()
 			self:ClearAllPoints()
 			self.visualButton = nil
 		end
 	end)
 
-	-- PostClick Handler for Selection Visuals
-	-- Ensures selection highlights update correctly given that we use Secure Attributes for actions
 	proxy:SetScript("PostClick", function(self, button)
-		-- FAILSAFE: If DragStop didn't fire, force it now to prevent stuck ghost
-		if self.isDragging then
-			local onDragStop = self:GetScript("OnDragStop")
-			if onDragStop then
-				onDragStop(self)
-			end
-		end
-
-		if InCombatLockdown() then
-			return
-		end
-		if self.pendingName or IsPendingRaidRosterName(self.name) then
-			return
-		end
-
-		-- Logic for LeftButton Selection
-		if button == "LeftButton" then
-			if IsControlKeyDown() then
-				-- Ctrl+LeftClick: Toggle Multi-Selection
-				local raidIndex = tonumber(string.match(self.unit or "", "raid(%d+)"))
-
-				-- Initialize Multi-Selection table if needed
-				if not BetterRaidFrame_SelectedPlayers then
-					BetterRaidFrame_SelectedPlayers = {}
-				end
-
-				if raidIndex and self.name then
-					-- Check if already selected
-					local selectedIndex = nil
-					for i, data in ipairs(BetterRaidFrame_SelectedPlayers) do
-						if data.raidIndex == raidIndex then
-							selectedIndex = i
-							break
-						end
-					end
-
-					if selectedIndex then
-						table.remove(BetterRaidFrame_SelectedPlayers, selectedIndex)
-						RaidFrame:SetButtonSelectionHighlight(raidIndex, false)
-					else
-						local _, _, subgroup = GetRaidRosterInfo(raidIndex)
-						table.insert(BetterRaidFrame_SelectedPlayers, {
-							raidIndex = raidIndex,
-							groupIndex = subgroup,
-							unit = self.unit,
-							name = self.name,
-						})
-						RaidFrame:SetButtonSelectionHighlight(raidIndex, true)
-					end
-				end
-			elseif not IsModifierKeyDown() then
-				-- Normal LeftClick (No Modifiers): Select Single + Clear Multi
-				if BetterRaidFrame_SelectedPlayers then
-					for _, data in ipairs(BetterRaidFrame_SelectedPlayers) do
-						RaidFrame:SetButtonSelectionHighlight(data.raidIndex, false)
-					end
-					wipe(BetterRaidFrame_SelectedPlayers)
-				end
-
-				if self.name then
-					RaidFrame:SetSelectedMember(self.name)
-					RaidFrame:RefreshMemberButtons() -- Update highlights
-				end
-			end
+		local visualButton = self.visualButton
+		if visualButton and BetterRaidMemberButton_PostClick then
+			BetterRaidMemberButton_PostClick(visualButton, button)
 		end
 	end)
 
 	self.SecureProxy = proxy
-
-	-- Initial setup
-	self:UpdateSecureAttributes()
-
-	-- Debug: OnShow
-	proxy:SetScript("OnShow", function(self)
-		-- BFL:DebugPrint("Proxy Shown for unit: " .. tostring(self.unit))
-	end)
 end
 
 --- Apply configured shortcuts directly to a raid member button
@@ -779,14 +743,7 @@ function RaidFrame:UpdateSecureAttributesForButton(button)
 		return
 	end
 
-	-- Clear all attributes first
-	for _, mod in ipairs({ "", "shift-", "ctrl-", "alt-", "shift-ctrl-", "shift-alt-", "ctrl-alt-" }) do
-		for i = 1, 5 do
-			button:SetAttribute(mod .. "type" .. i, nil)
-			button:SetAttribute(mod .. "action" .. i, nil)
-			button:SetAttribute(mod .. "macrotext" .. i, nil)
-		end
-	end
+	ClearRaidButtonAttributes(button)
 
 	if not button.unit or button.pendingName or IsPendingRaidRosterName(button.name) then
 		button:SetAttribute("unit", nil)
@@ -804,56 +761,53 @@ function RaidFrame:UpdateSecureAttributesForButton(button)
 	button:SetAttribute("*type1", nil)
 	button:SetAttribute("type1", nil)
 
-	-- Right Click: Toggle Menu (unmodified RightClick only)
-	-- Do NOT use *type2 wildcard - it would override modifier+RightClick shortcuts!
-	button:SetAttribute("type2", "togglemenu")
+	-- SecretValues builds route the unmodified right-click menu through the
+	-- UIParent proxy. Pre-secret clients keep the direct UnitPopup fallback.
+	button:SetAttribute("type2", BFL.HasSecretValues and nil or "togglemenu")
 
 	-- Apply ONLY MainTank/MainAssist shortcuts (have native secure types)
-	for actionKey, data in pairs(shortcuts) do
-		if DB:Get("raidShortcutEnabled_" .. actionKey, true) then
-			local modifier = data.modifier
-			local buttonType = data.button
+	ApplyRaidShortcutAttributes(button, shortcuts)
+end
 
-			if buttonType and (actionKey == "mainTank" or actionKey == "mainAssist") then
-				-- Map modifier to prefix
-				local modPrefix = ""
-				if modifier == "SHIFT" then
-					modPrefix = "shift-"
-				elseif modifier == "CTRL" then
-					modPrefix = "ctrl-"
-				elseif modifier == "ALT" then
-					modPrefix = "alt-"
-				elseif modifier == "SHIFT-CTRL" then
-					modPrefix = "shift-ctrl-"
-				elseif modifier == "SHIFT-ALT" then
-					modPrefix = "shift-alt-"
-				elseif modifier == "CTRL-ALT" then
-					modPrefix = "ctrl-alt-"
-				end
-
-				-- Map button to suffix
-				local btnID = 1
-				if buttonType == "RightButton" then
-					btnID = 2
-				elseif buttonType == "Button3" then
-					btnID = 3
-				elseif buttonType == "Button4" then
-					btnID = 4
-				elseif buttonType == "Button5" then
-					btnID = 5
-				end
-
-				-- Apply secure action (ONLY for MainTank/MainAssist)
-				if actionKey == "mainTank" then
-					button:SetAttribute(modPrefix .. "type" .. btnID, "maintank")
-					button:SetAttribute(modPrefix .. "action" .. btnID, "toggle")
-				elseif actionKey == "mainAssist" then
-					button:SetAttribute(modPrefix .. "type" .. btnID, "mainassist")
-					button:SetAttribute(modPrefix .. "action" .. btnID, "toggle")
-				end
-			end
-		end
+function RaidFrame:ShowSecureProxyForButton(button)
+	if not BFL.HasSecretValues then
+		return false
 	end
+	if InCombatLockdown() then
+		return false
+	end
+	if not button or not button.unit or button.pendingName or IsPendingRaidRosterName(button.name) then
+		return false
+	end
+	if not UnitExists(button.unit) then
+		return false
+	end
+
+	self:CreateSecureProxy()
+	local proxy = self.SecureProxy
+	if not proxy then
+		return false
+	end
+
+	ClearRaidButtonAttributes(proxy)
+	proxy.visualButton = button
+	proxy.unit = button.unit
+	proxy.name = button.name
+	proxy.groupIndex = button.groupIndex
+	proxy.slotIndex = button.slotIndex
+
+	proxy:SetAttribute("unit", button.unit)
+	proxy:SetAttribute("*type1", nil)
+	proxy:SetAttribute("type1", nil)
+	proxy:SetAttribute("type2", "togglemenu")
+
+	local DB = BFL and BFL:GetModule("DB")
+	ApplyRaidShortcutAttributes(proxy, DB and DB:Get("raidShortcuts") or {})
+
+	proxy:ClearAllPoints()
+	proxy:SetAllPoints(button)
+	proxy:Show()
+	return true
 end
 
 --- Handle Promote/Lead shortcuts via direct function calls
