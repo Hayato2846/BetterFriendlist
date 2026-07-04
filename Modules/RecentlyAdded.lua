@@ -117,10 +117,10 @@ function RecentlyAdded:BuildCurrentFriendSnapshot()
 	end
 
 	-- WoW friends
-	if C_FriendList and C_FriendList.GetNumFriends then
-		local numWoW = C_FriendList.GetNumFriends() or 0
+	if BFL.CanUseWoWFriendList and BFL.CanUseWoWFriendList() then
+		local numWoW = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
 		for i = 1, numWoW do
-			local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
+			local friendInfo = BFL.GetWoWFriendInfoByIndex(i)
 			if friendInfo and friendInfo.name then
 				local normalizedName = BFL:NormalizeWoWFriendName(friendInfo.name)
 				if normalizedName then

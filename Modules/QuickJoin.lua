@@ -1,4 +1,4 @@
-﻿--[[
+--[[
 	QuickJoin Module
 	
 	Provides Social Queue functionality for joining friends' groups.
@@ -201,9 +201,9 @@ local function GetFriendInfoByGUID(guid)
 		return nil
 	end
 
-	local numFriends = C_FriendList.GetNumFriends() or 0
+	local numFriends = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
 	for i = 1, numFriends do
-		local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
+		local friendInfo = BFL.GetWoWFriendInfoByIndex(i)
 		if friendInfo and friendInfo.guid == guid then
 			return friendInfo
 		end
@@ -282,7 +282,7 @@ function BetterFriendlist_GetRelationshipInfo(guid, missingNameFallback, clubId)
 	local name, normalizedRealmName = select(6, GetPlayerInfoByGUID(guid))
 
 	-- [STREAMER MODE CHECK FOR WOW FRIENDS]
-	if BFL.StreamerMode and BFL.StreamerMode:IsActive() and C_FriendList.IsFriend(guid) then
+	if BFL.StreamerMode and BFL.StreamerMode:IsActive() and BFL.IsWoWFriend(guid) then
 		local FL = BFL:GetModule("FriendsList")
 		local friendInfo = GetFriendInfoByGUID(guid) -- Use local helper (reliable)
 
@@ -323,7 +323,7 @@ function BetterFriendlist_GetRelationshipInfo(guid, missingNameFallback, clubId)
 	end
 
 	-- 4. Check WoW friend (with already determined name)
-	if C_FriendList.IsFriend(guid) then
+	if BFL.IsWoWFriend(guid) then
 		return CacheAndReturnRelationship(
 			guid,
 			missingNameFallback,
@@ -3057,7 +3057,7 @@ function QuickJoin:GetGroupPriority(groupGUID, groupInfo)
 		return 1000
 	end
 
-	if C_FriendList and C_FriendList.IsFriend and C_FriendList.IsFriend(leaderGUID) then
+	if BFL.IsWoWFriend and BFL.IsWoWFriend(leaderGUID) then
 		return 500
 	end
 

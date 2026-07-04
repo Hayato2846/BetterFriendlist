@@ -131,10 +131,10 @@ function NoteCleanupWizard:ScanFriends()
 	end
 
 	-- Also scan WoW-only friends
-	if C_FriendList and C_FriendList.GetNumFriends then
-		local numWoWFriends = C_FriendList.GetNumFriends()
+	if BFL.CanUseWoWFriendList and BFL.CanUseWoWFriendList() then
+		local numWoWFriends = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
 		for i = 1, numWoWFriends do
-			local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
+			local friendInfo = BFL.GetWoWFriendInfoByIndex(i)
 			if friendInfo then
 				local noteText = friendInfo.notes or ""
 				local actualNote, groups = ParseFriendGroupsNote(noteText)
@@ -261,7 +261,7 @@ function NoteCleanupWizard:ApplyCleanedNotes()
 			if data.isBNet and data.bnetAccountID then
 				BNSetFriendNote(data.bnetAccountID, data.cleanedNote)
 			elseif not data.isBNet and data.characterName then
-				C_FriendList.SetFriendNotes(data.characterName, data.cleanedNote)
+				BFL.SetFriendNotes(data.characterName, data.cleanedNote)
 			end
 		end)
 
@@ -816,10 +816,10 @@ function NoteCleanupWizard:GetBackupData()
 				end
 			end
 		elseif not entry.isBNet then
-			if C_FriendList and C_FriendList.GetNumFriends then
-				local numWoWFriends = C_FriendList.GetNumFriends()
+			if BFL.CanUseWoWFriendList and BFL.CanUseWoWFriendList() then
+				local numWoWFriends = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
 				for i = 1, numWoWFriends do
-					local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
+					local friendInfo = BFL.GetWoWFriendInfoByIndex(i)
 					if friendInfo and friendInfo.name == key then
 						currentNote = friendInfo.notes or ""
 						break
@@ -947,7 +947,7 @@ function NoteCleanupWizard:RestoreBackup()
 					end
 				end
 			elseif not data.isBNet then
-				C_FriendList.SetFriendNotes(data.key, data.backedUpNote or "")
+				BFL.SetFriendNotes(data.key, data.backedUpNote or "")
 			end
 		end)
 

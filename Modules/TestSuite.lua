@@ -8486,6 +8486,10 @@ local function RegisterBuiltInTests()
 				"CORE_HELP_TEST_COMMANDS",
 				"CORE_HELP_TEST_ACTIVITY",
 				"STATUS_AFK",
+				"STATUS_APPEAR_OFFLINE",
+				"BROKER_CLICK_APPEAR_OFFLINE",
+				"MENU_SET_TITLE_FRIEND_NAME",
+				"TITLE_FRIEND_CUSTOM_NAME_PROMPT",
 			}
 
 			local originalLocale = BFL.ConfiguredLocale
@@ -8628,6 +8632,61 @@ local function RegisterBuiltInTests()
 			local result = FriendsList:GetDisplayName(mockFriend, false)
 			V:AssertNotNil(result, "GetDisplayName should return a value")
 			V:Assert(result ~= "", "GetDisplayName should not be empty")
+		end,
+	})
+
+	TS:RegisterTest("integration", "GetDisplayName_TitleFriendCustomName", {
+		description = "Title-Friend custom names take display priority without affecting sort mode",
+		action = function(V)
+			local FriendsList = BFL:GetModule("FriendsList")
+			if not FriendsList or not FriendsList.GetDisplayName then
+				V:Skip("FriendsList not loaded")
+				return
+			end
+
+			FriendsList.settingsCache = FriendsList.settingsCache or {}
+			local oldFormat = FriendsList.settingsCache.nameFormatString
+			local oldCache = FriendsList.displayNameCache
+			FriendsList.settingsCache.nameFormatString = "%name%"
+			FriendsList.displayNameCache = {}
+
+			local mockFriend = {
+				type = "bnet",
+				uid = "bnet_TitleFriend#1234",
+				accountName = "Real Account",
+				battleTag = "TitleFriend#1234",
+				titleCustomName = "Custom Title Name",
+				connected = true,
+				note = "",
+			}
+
+			local displayResult = FriendsList:GetDisplayName(mockFriend, false)
+			local sortResult = FriendsList:GetDisplayName(mockFriend, true)
+
+			FriendsList.settingsCache.nameFormatString = oldFormat
+			FriendsList.displayNameCache = oldCache
+
+			V:AssertEqual(displayResult, "Custom Title Name", "Display mode should use Title-Friend custom name")
+			V:AssertEqual(sortResult, "TitleFriend", "Sort mode should keep BattleTag-based sorting")
+		end,
+	})
+
+	TS:RegisterTest("data", "Compat_PTRSocialWrappers_SafeDefaults", {
+		description = "PTR social API compatibility wrappers exist and return safe defaults",
+		action = function(V)
+			V:Assert(type(BFL.CanSetAppearOffline) == "function", "CanSetAppearOffline wrapper should exist")
+			V:Assert(type(BFL.SetMyBNetStatus) == "function", "SetMyBNetStatus wrapper should exist")
+			V:Assert(type(BFL.IsLegacyFriendSystemEnabled) == "function", "Legacy friend system wrapper should exist")
+			V:Assert(type(BFL.CanUseWoWFriendList) == "function", "WoW friend list gate should exist")
+			V:Assert(type(BFL.AreTitleFriendCustomNamesEnabled) == "function", "Title custom-name gate should exist")
+			V:Assert(type(BFL.GetCustomTitleFriendName) == "function", "Title custom-name getter should exist")
+			V:Assert(type(BFL.SetCustomTitleFriendName) == "function", "Title custom-name setter should exist")
+
+			V:Assert(type(BFL.IsLegacyFriendSystemEnabled()) == "boolean", "Legacy friend system gate should return boolean")
+			V:Assert(type(BFL.CanUseWoWFriendList()) == "boolean", "WoW friend list gate should return boolean")
+			V:Assert(type(BFL.GetNumWoWFriends()) == "number", "WoW friend count wrapper should return number")
+			V:Assert(type(BFL.GetNumOnlineWoWFriends()) == "number", "Online WoW friend count wrapper should return number")
+			V:Assert(BFL.SetMyBNetStatus("bfl_invalid_status") == false, "Unknown BNet status should fail safely")
 		end,
 	})
 

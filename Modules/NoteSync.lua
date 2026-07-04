@@ -118,9 +118,9 @@ function NoteSync:VerifyAllNotes()
 	end
 
 	local wowLookup = {} -- normalizedName -> info
-	local numWoWFriends = C_FriendList.GetNumFriends() or 0
+	local numWoWFriends = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
 	for i = 1, numWoWFriends do
-		local info = C_FriendList.GetFriendInfoByIndex(i)
+		local info = BFL.GetWoWFriendInfoByIndex(i)
 		if info and info.name then
 			local normalized = BFL:NormalizeWoWFriendName(info.name)
 			if normalized then
@@ -299,7 +299,7 @@ function NoteSync:VerifyAllNotes()
 					local expectedNote = self:BuildNoteWithGroups(actualNote, groupNames, WOW_NOTE_LIMIT)
 					local currentNote = info.notes or ""
 					if expectedNote ~= currentNote then
-						C_FriendList.SetFriendNotes(info.name, expectedNote)
+						BFL.SetFriendNotes(info.name, expectedNote)
 						fixedCount = fixedCount + 1
 						BFL:DebugPrint("NoteSync: Verification fixed WoW note for " .. charName)
 					end
@@ -478,9 +478,9 @@ end
 function NoteSync:SyncWoWFriend(friendUID, groupNames)
 	local charName = friendUID:gsub("^wow_", "")
 
-	local numWoWFriends = C_FriendList.GetNumFriends() or 0
+	local numWoWFriends = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
 	for i = 1, numWoWFriends do
-		local info = C_FriendList.GetFriendInfoByIndex(i)
+		local info = BFL.GetWoWFriendInfoByIndex(i)
 		if info then
 			local name = BFL:NormalizeWoWFriendName(info.name)
 			if name == charName then
@@ -493,7 +493,7 @@ function NoteSync:SyncWoWFriend(friendUID, groupNames)
 					-- Use info.name (raw API name) instead of charName (normalized with realm)
 					-- C_FriendList.SetFriendNotes expects the name in the format the API returns it
 					self.isWriting = true
-					C_FriendList.SetFriendNotes(info.name, newNote)
+					BFL.SetFriendNotes(info.name, newNote)
 					self.isWriting = false
 					BFL:DebugPrint("NoteSync: Updated WoW note for " .. charName)
 				end
@@ -556,9 +556,9 @@ function NoteSync:SyncAllFriends(callback, progressCallback)
 	end
 
 	-- Scan WoW friends
-	local numWoWFriends = C_FriendList.GetNumFriends() or 0
+	local numWoWFriends = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
 	for i = 1, numWoWFriends do
-		local info = C_FriendList.GetFriendInfoByIndex(i)
+		local info = BFL.GetWoWFriendInfoByIndex(i)
 		if info then
 			local name = BFL:NormalizeWoWFriendName(info.name)
 			if name then
@@ -721,9 +721,9 @@ function NoteSync:ImportGroupsFromNotes()
 	end
 
 	-- Scan WoW friends
-	local numWoWFriends = C_FriendList.GetNumFriends() or 0
+	local numWoWFriends = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
 	for i = 1, numWoWFriends do
-		local info = C_FriendList.GetFriendInfoByIndex(i)
+		local info = BFL.GetWoWFriendInfoByIndex(i)
 		if info and info.name then
 			local noteText = info.notes or ""
 			if noteText:find("#") then
@@ -881,9 +881,9 @@ function NoteSync:CleanFriendNote(friendUID)
 		end
 	elseif friendUID:match("^wow_") then
 		local charName = friendUID:gsub("^wow_", "")
-		local numWoWFriends = C_FriendList.GetNumFriends() or 0
+		local numWoWFriends = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
 		for i = 1, numWoWFriends do
-			local info = C_FriendList.GetFriendInfoByIndex(i)
+			local info = BFL.GetWoWFriendInfoByIndex(i)
 			if info then
 				local name = BFL:NormalizeWoWFriendName(info.name)
 				if name == charName then
@@ -891,7 +891,7 @@ function NoteSync:CleanFriendNote(friendUID)
 					if actualNote ~= (info.notes or "") then
 						-- Use info.name (raw API name) for same reason as SyncWoWFriend
 						self.isWriting = true
-						C_FriendList.SetFriendNotes(info.name, actualNote)
+						BFL.SetFriendNotes(info.name, actualNote)
 						self.isWriting = false
 					end
 					return

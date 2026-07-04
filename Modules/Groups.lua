@@ -172,7 +172,7 @@ function Groups:RunSmartMigration()
 	end
 
 	-- We need friend list data to be loaded
-	local numFriends = C_FriendList.GetNumFriends() or 0
+	local numFriends = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
 	if not numFriends or numFriends == 0 then
 		-- Try again later when list updates
 		-- Prevent multiple registrations
@@ -196,7 +196,7 @@ function Groups:RunSmartMigration()
 	-- Build a lookup of Name -> {FullNames...} from current friend list
 	local nameLookup = {}
 	for i = 1, numFriends do
-		local info = C_FriendList.GetFriendInfoByIndex(i)
+		local info = BFL.GetWoWFriendInfoByIndex(i)
 		if info and info.name then
 			-- Normalize to ensure we have the full Name-Realm format
 			local normalized = BFL:NormalizeWoWFriendName(info.name)

@@ -72,6 +72,27 @@ local function GetAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
 	return fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1
 end
 
+local function GetTitleFriendCustomName(accountInfo)
+	if
+		not (
+			accountInfo
+			and BFL.IsTitleFriend
+			and BFL.IsTitleFriend(accountInfo)
+			and BFL.AreTitleFriendCustomNamesEnabled
+			and BFL.AreTitleFriendCustomNamesEnabled()
+			and BFL.GetCustomTitleFriendName
+		)
+	then
+		return nil
+	end
+
+	local customName = BFL.GetCustomTitleFriendName(accountInfo.bnetAccountID)
+	if customName and customName ~= "" and not BFL:IsSecret(customName) then
+		return customName
+	end
+	return nil
+end
+
 local function InvalidateFriendCountsCache()
 	friendCountsCache = nil
 	friendCountsEventVersion = friendCountsEventVersion + 1
@@ -638,8 +659,8 @@ local function GetFriendCounts()
 	local treatMobileAsOffline = BetterFriendlistDB and BetterFriendlistDB.treatMobileAsOffline
 
 	-- WoW Friends (not affected by mobile setting)
-	wowTotal = C_FriendList.GetNumFriends() or 0
-	wowOnline = C_FriendList.GetNumOnlineFriends() or 0
+	wowTotal = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
+	wowOnline = (BFL.GetNumOnlineWoWFriends and BFL.GetNumOnlineWoWFriends() or 0)
 
 	-- BNet Friends
 	bnetTotal, bnetOnline = GetBattleNetCounts(treatMobileAsOffline)
@@ -699,10 +720,10 @@ local function GetFilteredFriendCounts()
 		bnetFiltered, bnetTotal = 0, 0
 
 		-- WoW Friends
-		local numWoWFriends = C_FriendList.GetNumFriends() or 0
+		local numWoWFriends = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
 		wowTotal = numWoWFriends
 		for i = 1, numWoWFriends do
-			local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
+			local friendInfo = BFL.GetWoWFriendInfoByIndex(i)
 			if friendInfo then
 				local connected = friendInfo.connected
 				local passes = false
@@ -775,6 +796,7 @@ local function GetFilteredFriendCounts()
 							index = i,
 							bnetAccountID = accountInfo.bnetAccountID,
 							accountName = accountInfo.accountName,
+							titleCustomName = GetTitleFriendCustomName(accountInfo),
 							battleTag = accountInfo.battleTag,
 							connected = isOnline,
 							isAFK = accountInfo.isAFK,
@@ -1041,9 +1063,9 @@ local function CreateAdvancedTooltip(gameTooltip)
 		end
 	end
 
-	local numWoWFriends = C_FriendList.GetNumFriends() or 0
+	local numWoWFriends = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
 	for i = 1, numWoWFriends do
-		local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
+		local friendInfo = BFL.GetWoWFriendInfoByIndex(i)
 		if friendInfo and friendInfo.connected then
 			local fullName = friendInfo.name or ""
 			local normalizedName = BFL:NormalizeWoWFriendName(fullName)
@@ -1317,7 +1339,7 @@ local function GetFriendDisplayName(friend)
 				name = shortTag ~= "" and shortTag or "Unknown"
 			end
 		else
-			name = BFL:GetSafeAccountName(friend.accountName, friend.battleTag)
+			name = friend.titleCustomName or BFL:GetSafeAccountName(friend.accountName, friend.battleTag)
 		end
 		-- Character name from game info
 		characterName = friend.characterName or friend.toonName or ""
@@ -2004,6 +2026,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 							battleTag = accountInfo.battleTag,
 							type = "bnet",
 							accountName = BFL:GetSafeAccountName(accountInfo.accountName, accountInfo.battleTag),
+							titleCustomName = GetTitleFriendCustomName(accountInfo),
 							isAFK = accountInfo.isAFK or (gameInfo.isAFK or gameInfo.isGameAFK),
 							isDND = accountInfo.isDND or (gameInfo.isDND or gameInfo.isGameBusy),
 							broadcast = accountInfo.customMessage or "",
@@ -2064,9 +2087,9 @@ local function CreateLibQTipTooltip(anchorFrame)
 			end
 
 			-- Collect WoW Friends (ALL)
-			local numWoWFriends = C_FriendList.GetNumFriends() or 0
+			local numWoWFriends = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
 			for i = 1, numWoWFriends do
-				local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
+				local friendInfo = BFL.GetWoWFriendInfoByIndex(i)
 				if friendInfo then
 					local fullName = friendInfo.name or ""
 					local name, realm = strsplit("-", fullName, 2)
@@ -2770,6 +2793,18 @@ function Broker:OnClick(clickedFrame, button)
 		elseif BetterFriendsFrame then
 			BetterFriendsFrame:Show()
 		end
+	elseif action == "appear_offline" then
+		if BFL.SetMyBNetStatus and BFL.CanSetAppearOffline and BFL.CanSetAppearOffline() then
+			local isAppearOffline = false
+			if BFL.GetMyBNetStatus then
+				local _, _, currentAppearOffline = BFL.GetMyBNetStatus()
+				isAppearOffline = currentAppearOffline == true
+			end
+			local nextStatus = isAppearOffline and "online" or "appear_offline"
+			if BFL.SetMyBNetStatus(nextStatus) then
+				self:ScheduleBrokerTextUpdate(true, true)
+			end
+		end
 	elseif action == "cycle_filter" then
 		local currentFilter = BetterFriendlistDB.quickFilter or "all"
 		local currentIndex = 0
@@ -2907,12 +2942,28 @@ function Broker:RegisterEvents()
 		Broker:ScheduleBrokerTextUpdate()
 	end)
 
+	BFL:RegisterEventCallback("BN_INFO_CHANGED", function(...)
+		Broker:ScheduleBrokerTextUpdate(true, true)
+	end)
+
+	pcall(function()
+		BFL:RegisterEventCallback("BATTLE_NET_TITLE_FRIEND_CUSTOM_NAME_ENABLED_STATUS_UPDATED", function(...)
+			Broker:ScheduleBrokerTextUpdate(true, true)
+		end)
+	end)
+
 	BFL:RegisterEventCallback("BN_FRIEND_LIST_SIZE_CHANGED", function(...)
 		Broker:ScheduleBrokerTextUpdate(true, true)
 	end)
 
 	BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function(...)
 		Broker:ScheduleBrokerTextUpdate(true, false)
+	end)
+
+	pcall(function()
+		BFL:RegisterEventCallback("LEGACY_FRIEND_SYSTEM_STATUS_UPDATED", function(...)
+			Broker:ScheduleBrokerTextUpdate(true, false)
+		end)
 	end)
 
 	BFL:RegisterEventCallback("BN_CONNECTED", function(...)

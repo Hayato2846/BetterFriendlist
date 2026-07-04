@@ -101,7 +101,7 @@ function MenuSystem:OpenFriendMenu(button, friendType, friendID, extraData)
 		-- Get name from extraData or look up by index
 		local name = extraData.name
 		if not name and type(friendID) == "number" then
-			local friendInfo = C_FriendList.GetFriendInfoByIndex(friendID)
+			local friendInfo = BFL.GetWoWFriendInfoByIndex(friendID)
 			name = friendInfo and friendInfo.name or ""
 		end
 

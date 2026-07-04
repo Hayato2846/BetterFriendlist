@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+- **Title-Friend Custom Names** - Retail PTR Title-Friend custom names are now shown in BetterFriendlist display names and Broker tooltips, with a context-menu action to edit the custom name where Blizzard exposes the feature.
+- **Battle.net Appear Offline** - Added an optional Data Broker click action for toggling Battle.net Appear Offline on clients that expose `C_BattleNet.SetAppearOffline`.
+
+### Changed
+- **Retail PTR Compatibility** - Routed WoW-character friend counts, lookups, notes, add/remove actions, and friend checks through BFL compatibility wrappers so the upcoming Legacy Friend System gate can disable those paths cleanly.
+- **Client Events** - BetterFriendlist now listens for Retail PTR Title-Friend custom-name, Legacy Friend System, and Battle.net self-status updates so visible rows and Broker text refresh when those systems change.
+
 ## [2.6.6]        - 2026-06-30
 
 ### Fixed
@@ -147,14 +157,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Guild Broker Click Action** - Fixed the configured left-click action not opening the guild frame or broker settings.
 - **Recruit A Friend Taint** - Reduced RAF list taint by keeping addon display data separate from Blizzard recruit records.
-
-## [2.5.7]        - 2026-05-16
-
-### Fixed
-- **Classic Loading** - Fixed a load error after the latest update.
-
-### Changed
-- **Client Compatibility** - Added TOC support for newer Retail and Classic client builds.
 
 ---
 

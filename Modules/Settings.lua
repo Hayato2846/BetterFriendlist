@@ -2000,11 +2000,11 @@ function Settings:MigrateFriendGroups(cleanupNotes, force)
 		end
 	end
 
-	local numWoWFriends = C_FriendList.GetNumFriends() or 0
+	local numWoWFriends = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
 	-- BFL:DebugPrint("|cff00ffffBetterFriendlist:|r Scanning", numWoWFriends, "WoW friends...")
 
 	for i = 1, numWoWFriends do
-		local info = C_FriendList.GetFriendInfoByIndex(i)
+		local info = BFL.GetWoWFriendInfoByIndex(i)
 		if info then
 			-- Normalize name to always include realm
 			local name = BFL:NormalizeWoWFriendName(info.name)
@@ -2133,9 +2133,9 @@ function Settings:MigrateFriendGroups(cleanupNotes, force)
 				end
 			else
 				if data.actualNote ~= "" then
-					C_FriendList.SetFriendNotes(data.characterName, data.actualNote)
+					BFL.SetFriendNotes(data.characterName, data.actualNote)
 				else
-					C_FriendList.SetFriendNotes(data.characterName, "")
+					BFL.SetFriendNotes(data.characterName, "")
 				end
 			end
 		end
@@ -2153,11 +2153,11 @@ function Settings:MigrateFriendGroups(cleanupNotes, force)
 	DB:Set("friendGroupsMigrated", true)
 
 	BFL:DebugPrint(
-		"|cff00ff00═══════════════════════════════════════"
+		"|cff00ff00â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"
 	)
 	BFL:DebugPrint("|cff00ff00BetterFriendlist: " .. L.SETTINGS_MIGRATION_COMPLETE)
 	BFL:DebugPrint(
-		"|cff00ff00═══════════════════════════════════════"
+		"|cff00ff00â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"
 	)
 	BFL:DebugPrint(
 		string.format(
@@ -2305,12 +2305,12 @@ function Settings:DebugDatabase()
 
 	-- WoW friends
 	-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r")
-	local numWoWFriends = C_FriendList.GetNumFriends() or 0
-	local numWoWOnline = C_FriendList.GetNumOnlineFriends()
+	local numWoWFriends = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
+	local numWoWOnline = (BFL.GetNumOnlineWoWFriends and BFL.GetNumOnlineWoWFriends() or 0)
 	-- BFL:DebugPrint("|cff00ffffBetterFriendlist Debug:|r WoW Friends:", numWoWFriends, string.format("(%d online)", numWoWOnline))
 	if numWoWFriends > 0 then
 		for i = 1, math.min(numWoWFriends, 10) do
-			local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
+			local friendInfo = BFL.GetWoWFriendInfoByIndex(i)
 			if friendInfo then
 				local status = friendInfo.connected and "|cff00ff00ONLINE|r" or "|cffaaaaaaOFFLINE|r"
 				local level = friendInfo.level and friendInfo.level > 0 and string.format(" (Lvl %d)", friendInfo.level)
@@ -9656,8 +9656,8 @@ function Settings:RefreshGlobalSyncTab()
 									if BetterFriendlistDB.enableGlobalSyncDeletion then
 										local removed = false
 										-- Check if friend exists in current list
-										for i = 1, (C_FriendList.GetNumFriends() or 0) do
-											local info = C_FriendList.GetFriendInfoByIndex(i)
+										for i = 1, ((BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)) do
+											local info = BFL.GetWoWFriendInfoByIndex(i)
 											if info then
 												-- Robust matching: Check GUID first, then Name-Realm, then Name
 												local match = false
@@ -9716,8 +9716,8 @@ function Settings:RefreshGlobalSyncTab()
 										BetterFriendlistDB.GlobalFriends[faction][friendUID].notes = text
 
 										-- Update In-Game Friend Note if friend exists locally
-										for i = 1, (C_FriendList.GetNumFriends() or 0) do
-											local info = C_FriendList.GetFriendInfoByIndex(i)
+										for i = 1, ((BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)) do
+											local info = BFL.GetWoWFriendInfoByIndex(i)
 											if info then
 												-- Robust matching
 												local match = false
@@ -9730,7 +9730,7 @@ function Settings:RefreshGlobalSyncTab()
 												end
 
 												if match then
-													C_FriendList.SetFriendNotes(info.name, text)
+													BFL.SetFriendNotes(info.name, text)
 													BFL:DebugPrint("Updated note for " .. info.name)
 													break
 												end

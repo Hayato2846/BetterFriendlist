@@ -1704,43 +1704,76 @@ end
 
 function Compat.GetMyBNetStatus()
 	if C_BattleNet and C_BattleNet.GetMyAccountInfo then
-		local info = C_BattleNet.GetMyAccountInfo()
+		local ok, info = pcall(C_BattleNet.GetMyAccountInfo)
+		if not ok then
+			info = nil
+		end
 		if info then
-			return info.isAFK, info.isDND
+			return info.isAFK, info.isDND, info.appearOffline or info.isAppearOffline
 		end
 	elseif BNGetInfo then
-		return select(5, BNGetInfo())
+		local ok, _, _, _, _, isAFK, isDND, _, isAppearOffline = pcall(BNGetInfo)
+		if ok then
+			return isAFK, isDND, isAppearOffline
+		end
 	end
-	return false, false
+	return false, false, false
+end
+
+function Compat.CanSetAppearOffline()
+	return C_BattleNet and C_BattleNet.SetAppearOffline and true or false
 end
 
 function Compat.SetMyBNetStatus(status)
-	-- status: "online", "afk", "dnd"
+	-- status: "online", "afk", "dnd", "appear_offline"
 	if status == "online" then
 		-- Modern API (12.0.1+)
-		if C_BattleNet and C_BattleNet.SetAFK then
-			C_BattleNet.SetAFK(false)
-			C_BattleNet.SetDND(false)
+		if C_BattleNet and (C_BattleNet.SetAFK or C_BattleNet.SetDND or C_BattleNet.SetAppearOffline) then
+			local didSet = false
+			if C_BattleNet.SetAFK then
+				pcall(C_BattleNet.SetAFK, false)
+				didSet = true
+			end
+			if C_BattleNet.SetDND then
+				pcall(C_BattleNet.SetDND, false)
+				didSet = true
+			end
+			if C_BattleNet.SetAppearOffline then
+				pcall(C_BattleNet.SetAppearOffline, false)
+				didSet = true
+			end
+			return didSet
 		-- Legacy/Classic API
 		elseif BNSetAFK then
-			BNSetAFK(false)
+			pcall(BNSetAFK, false)
 			if BNSetDND then
-				BNSetDND(false)
+				pcall(BNSetDND, false)
 			end
+			return true
+		end
+	elseif status == "appear_offline" then
+		if C_BattleNet and C_BattleNet.SetAppearOffline then
+			local ok = pcall(C_BattleNet.SetAppearOffline, true)
+			return ok == true
 		end
 	elseif status == "afk" then
 		if C_BattleNet and C_BattleNet.SetAFK then
-			C_BattleNet.SetAFK(true)
+			local ok = pcall(C_BattleNet.SetAFK, true)
+			return ok == true
 		elseif BNSetAFK then
-			BNSetAFK(true)
+			local ok = pcall(BNSetAFK, true)
+			return ok == true
 		end
 	elseif status == "dnd" then
 		if C_BattleNet and C_BattleNet.SetDND then
-			C_BattleNet.SetDND(true)
+			local ok = pcall(C_BattleNet.SetDND, true)
+			return ok == true
 		elseif BNSetDND then
-			BNSetDND(true)
+			local ok = pcall(BNSetDND, true)
+			return ok == true
 		end
 	end
+	return false
 end
 
 ------------------------------------------------------------
@@ -1748,48 +1781,188 @@ end
 ------------------------------------------------------------
 -- APIs for adding/removing friends and inviting to group
 
+function Compat.IsLegacyFriendSystemEnabled()
+	if C_FriendList and C_FriendList.IsLegacyFriendSystemEnabled then
+		local ok, enabled = pcall(C_FriendList.IsLegacyFriendSystemEnabled)
+		return ok and enabled == true
+	end
+	return true
+end
+
+function Compat.CanUseWoWFriendList()
+	if C_FriendList then
+		return Compat.IsLegacyFriendSystemEnabled()
+	end
+	return GetNumFriends ~= nil
+		or GetFriendInfo ~= nil
+		or AddFriend ~= nil
+		or RemoveFriend ~= nil
+		or SetFriendNotes ~= nil
+end
+
+function Compat.GetNumWoWFriends()
+	if C_FriendList and Compat.CanUseWoWFriendList() and C_FriendList.GetNumFriends then
+		return C_FriendList.GetNumFriends() or 0
+	elseif Compat.CanUseWoWFriendList() and GetNumFriends then
+		return GetNumFriends() or 0
+	end
+	return 0
+end
+
+function Compat.GetNumOnlineWoWFriends()
+	if C_FriendList and Compat.CanUseWoWFriendList() and C_FriendList.GetNumOnlineFriends then
+		return C_FriendList.GetNumOnlineFriends() or 0
+	elseif Compat.CanUseWoWFriendList() and GetNumOnlineFriends then
+		return GetNumOnlineFriends() or 0
+	end
+	return 0
+end
+
+function Compat.GetWoWFriendInfoByIndex(index)
+	if C_FriendList and Compat.CanUseWoWFriendList() and C_FriendList.GetFriendInfoByIndex then
+		return C_FriendList.GetFriendInfoByIndex(index)
+	elseif Compat.CanUseWoWFriendList() and GetFriendInfo then
+		return GetFriendInfo(index)
+	end
+	return nil
+end
+
+function Compat.GetWoWFriendInfo(name)
+	if C_FriendList and Compat.CanUseWoWFriendList() and C_FriendList.GetFriendInfo then
+		return C_FriendList.GetFriendInfo(name)
+	elseif Compat.CanUseWoWFriendList() and GetFriendInfo then
+		return GetFriendInfo(name)
+	end
+	return nil
+end
+
+function Compat.IsWoWFriend(guid)
+	if C_FriendList and Compat.CanUseWoWFriendList() and C_FriendList.IsFriend then
+		return C_FriendList.IsFriend(guid)
+	elseif Compat.CanUseWoWFriendList() and IsFriend then
+		return IsFriend(guid)
+	end
+	return false
+end
+
+function Compat.ShowFriends()
+	if C_FriendList and Compat.CanUseWoWFriendList() and C_FriendList.ShowFriends then
+		C_FriendList.ShowFriends()
+		return true
+	elseif Compat.CanUseWoWFriendList() and ShowFriends then
+		ShowFriends()
+		return true
+	end
+	return false
+end
+
 -- Add a WoW friend
 function Compat.AddFriend(name, notes)
+	if not Compat.CanUseWoWFriendList() then
+		return false
+	end
 	if C_FriendList and C_FriendList.AddFriend then
 		C_FriendList.AddFriend(name, notes or "")
+		return true
 	elseif AddFriend then
 		AddFriend(name)
 		if notes and notes ~= "" and SetFriendNotes then
 			-- Note setting might be async in old API, but we try
 			SetFriendNotes(name, notes)
 		end
+		return true
 	end
+	return false
 end
 
 -- Remove a WoW friend
 function Compat.RemoveFriend(nameOrID)
+	if not Compat.CanUseWoWFriendList() then
+		return false
+	end
 	if C_FriendList and C_FriendList.RemoveFriend then
 		C_FriendList.RemoveFriend(nameOrID)
+		return true
 	elseif RemoveFriend then
 		RemoveFriend(nameOrID)
+		return true
 	end
+	return false
 end
 
 -- Remove friend by index (Classic/Retail variance)
 function Compat.RemoveFriendByIndex(index)
+	if not Compat.CanUseWoWFriendList() then
+		return false
+	end
 	if C_FriendList and C_FriendList.RemoveFriendByIndex then
 		C_FriendList.RemoveFriendByIndex(index)
+		return true
 	elseif RemoveFriend then
 		-- Classic: Need to get name first
 		local name = GetFriendInfo(index)
 		if name then
 			RemoveFriend(name)
+			return true
 		end
 	end
+	return false
 end
 
 -- Set friend notes
 function Compat.SetFriendNotes(name, notes)
+	if not Compat.CanUseWoWFriendList() then
+		return false
+	end
 	if C_FriendList and C_FriendList.SetFriendNotes then
 		C_FriendList.SetFriendNotes(name, notes)
+		return true
 	elseif SetFriendNotes then
 		SetFriendNotes(name, notes)
+		return true
 	end
+	return false
+end
+
+function Compat.AreTitleFriendsEnabled()
+	if C_BattleNet and C_BattleNet.AreTitleFriendsEnabled then
+		local ok, enabled = pcall(C_BattleNet.AreTitleFriendsEnabled)
+		return ok and enabled == true
+	end
+	return false
+end
+
+function Compat.AreTitleFriendCustomNamesEnabled()
+	if C_BattleNet and C_BattleNet.AreTitleFriendCustomNamesEnabled then
+		local ok, enabled = pcall(C_BattleNet.AreTitleFriendCustomNamesEnabled)
+		return ok and enabled == true
+	end
+	return false
+end
+
+function Compat.IsTitleFriend(accountInfo)
+	return accountInfo
+		and Enum
+		and Enum.BattleNetFriendLevel
+		and accountInfo.friendLevel == Enum.BattleNetFriendLevel.Title
+end
+
+function Compat.GetCustomTitleFriendName(id)
+	if C_BattleNet and C_BattleNet.GetCustomTitleFriendName and id then
+		local ok, customName = pcall(C_BattleNet.GetCustomTitleFriendName, id)
+		if ok then
+			return customName
+		end
+	end
+	return nil
+end
+
+function Compat.SetCustomTitleFriendName(id, customName)
+	if C_BattleNet and C_BattleNet.SetCustomTitleFriendName and id then
+		local ok = pcall(C_BattleNet.SetCustomTitleFriendName, id, customName or "")
+		return ok == true
+	end
+	return false
 end
 
 -- Invite a unit to party
@@ -2369,6 +2542,7 @@ BFL.ShowColorPicker = Compat.ShowColorPicker
 
 -- BNet Status
 BFL.GetMyBNetStatus = Compat.GetMyBNetStatus
+BFL.CanSetAppearOffline = Compat.CanSetAppearOffline
 BFL.SetMyBNetStatus = Compat.SetMyBNetStatus
 BFL.GetBNetFriendInfo = Compat.GetBNetFriendInfo
 BFL.GetBNetFriendGameAccountInfo = Compat.GetBNetFriendGameAccountInfo
@@ -2376,6 +2550,11 @@ BFL.IsBattleNetFriendsListSupported = Compat.IsBattleNetFriendsListSupported
 BFL.IsBattleNetFriendsListEnabled = Compat.IsBattleNetFriendsListEnabled
 BFL.AreBattleNetFriendTagsEnabled = Compat.AreBattleNetFriendTagsEnabled
 BFL.GetBNetFriendInviteInfo = Compat.GetBNetFriendInviteInfo
+BFL.AreTitleFriendsEnabled = Compat.AreTitleFriendsEnabled
+BFL.AreTitleFriendCustomNamesEnabled = Compat.AreTitleFriendCustomNamesEnabled
+BFL.IsTitleFriend = Compat.IsTitleFriend
+BFL.GetCustomTitleFriendName = Compat.GetCustomTitleFriendName
+BFL.SetCustomTitleFriendName = Compat.SetCustomTitleFriendName
 BFL.IsRAFSystemSupported = Compat.IsRAFSystemSupported
 BFL.IsRAFSystemEnabled = Compat.IsRAFSystemEnabled
 BFL.CanSummonRAFFriend = Compat.CanSummonRAFFriend
@@ -2383,6 +2562,14 @@ BFL.IsSocialQueueSupported = Compat.IsSocialQueueSupported
 BFL.IsSocialQueueEnabled = Compat.IsSocialQueueEnabled
 
 -- Friend/Group Operations
+BFL.IsLegacyFriendSystemEnabled = Compat.IsLegacyFriendSystemEnabled
+BFL.CanUseWoWFriendList = Compat.CanUseWoWFriendList
+BFL.GetNumWoWFriends = Compat.GetNumWoWFriends
+BFL.GetNumOnlineWoWFriends = Compat.GetNumOnlineWoWFriends
+BFL.GetWoWFriendInfoByIndex = Compat.GetWoWFriendInfoByIndex
+BFL.GetWoWFriendInfo = Compat.GetWoWFriendInfo
+BFL.IsWoWFriend = Compat.IsWoWFriend
+BFL.ShowFriends = Compat.ShowFriends
 BFL.AddFriend = Compat.AddFriend
 BFL.RemoveFriend = Compat.RemoveFriend
 BFL.RemoveFriendByIndex = Compat.RemoveFriendByIndex

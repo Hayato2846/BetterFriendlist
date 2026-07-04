@@ -1,4 +1,4 @@
-﻿-- A friends list replacement for World of Warcraft with Battle.net support
+-- A friends list replacement for World of Warcraft with Battle.net support
 -- UI GLUE LAYER - XML Callbacks and thin wrappers for modular backend
 -- Main business logic is in Modules/ folder
 
@@ -1237,11 +1237,14 @@ frame:RegisterEvent("BN_FRIEND_LIST_SIZE_CHANGED")
 frame:RegisterEvent("BN_FRIEND_ACCOUNT_ONLINE")
 frame:RegisterEvent("BN_FRIEND_ACCOUNT_OFFLINE")
 frame:RegisterEvent("BN_FRIEND_INFO_CHANGED")
+frame:RegisterEvent("BN_INFO_CHANGED")
 frame:RegisterEvent("PLAYER_LOGIN")
 frame:RegisterEvent("SOCIAL_QUEUE_UPDATE")
 pcall(frame.RegisterEvent, frame, "SOCIAL_UI_SOCIAL_QUEUE_SYSTEM_STATUS_UPDATED")
 pcall(frame.RegisterEvent, frame, "BATTLE_NET_FRIEND_TAG_ENABLED_STATUS_UPDATED")
+pcall(frame.RegisterEvent, frame, "BATTLE_NET_TITLE_FRIEND_CUSTOM_NAME_ENABLED_STATUS_UPDATED")
 pcall(frame.RegisterEvent, frame, "SOCIAL_UI_FRIENDS_LIST_SYSTEM_STATUS_UPDATED")
+pcall(frame.RegisterEvent, frame, "LEGACY_FRIEND_SYSTEM_STATUS_UPDATED")
 pcall(frame.RegisterEvent, frame, "CONFIRM_BATTLE_NET_FRIEND_INVITE_SHOW")
 pcall(frame.RegisterEvent, frame, "LFG_LIST_REVEALED_CENSORED_ACTIVE_ENTRY")
 pcall(frame.RegisterEvent, frame, "LFG_LIST_SEARCH_RESULT_UPDATED")
@@ -2822,7 +2825,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 							end
 
 							local normalized = BFL:NormalizeWoWFriendName(targetName)
-							if not BFL:IsActionRestricted() and C_FriendList.GetFriendInfo(normalized or targetName) then
+							if not BFL:IsActionRestricted() and BFL.GetWoWFriendInfo(normalized or targetName) then
 								friendUID = "wow_" .. (normalized or targetName)
 							end
 						end
@@ -3078,18 +3081,18 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end
 
 				-- Check if already a friend (by GUID if available)
-				if contextData.guid and C_FriendList.IsFriend(contextData.guid) then
+				if contextData.guid and BFL.IsWoWFriend(contextData.guid) then
 					return
 				end
 
 				if BNFeaturesEnabledAndConnected() then
 					local button = rootDescription:CreateButton(ADD_FRIEND)
 					button:CreateButton(CHARACTER_FRIEND or "Character Friend", function()
-						C_FriendList.AddFriend(contextData.name)
+						BFL.AddFriend(contextData.name)
 					end)
 				else
 					rootDescription:CreateButton(ADD_FRIEND, function()
-						C_FriendList.AddFriend(contextData.name)
+						BFL.AddFriend(contextData.name)
 					end)
 				end
 			end
@@ -3110,7 +3113,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			end
 
 			local function BFL_HasFriendListContext(contextData)
-				return contextData and contextData.friendsList ~= nil
+				return contextData
+					and contextData.friendsList ~= nil
+					and (not BFL.CanUseWoWFriendList or BFL.CanUseWoWFriendList())
 			end
 
 			local function BFL_FindBNetFriendData(contextData)
@@ -3247,8 +3252,19 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				if isBNet then
 					local accountInfo = BFL_GetBNetAccountInfo(contextData)
 					if accountInfo then
+						local titleCustomName = nil
+						if
+							BFL.IsTitleFriend
+							and BFL.IsTitleFriend(accountInfo)
+							and BFL.AreTitleFriendCustomNamesEnabled
+							and BFL.AreTitleFriendCustomNamesEnabled()
+							and BFL.GetCustomTitleFriendName
+						then
+							titleCustomName = BFL.GetCustomTitleFriendName(contextData.bnetIDAccount)
+						end
 						return BFL_FirstSafeText(
 							contextData.bfl_streamerDisplayName,
+							titleCustomName,
 							accountInfo.accountName,
 							accountInfo.battleTag,
 							contextData.battleTag,
@@ -3355,6 +3371,115 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end
 			end
 
+			local function BFL_GetPopupEditBox(dialog)
+				if not dialog then
+					return nil
+				end
+				if dialog.GetEditBox then
+					return dialog:GetEditBox()
+				end
+				return dialog.editBox or dialog.EditBox
+			end
+
+			local function BFL_ShowSetCustomTitleFriendNamePopup(bnetIDAccount)
+				if not (bnetIDAccount and BFL.SetCustomTitleFriendName) then
+					return
+				end
+
+				if StaticPopupDialogs and StaticPopupDialogs["SET_CUSTOM_TITLE_FRIEND_NAME"] then
+					StaticPopup_Show("SET_CUSTOM_TITLE_FRIEND_NAME", nil, nil, { bnetIDAccount = bnetIDAccount })
+					return
+				end
+
+				if not StaticPopupDialogs then
+					return
+				end
+
+				StaticPopupDialogs["BFL_SET_CUSTOM_TITLE_FRIEND_NAME"] = {
+					text = SET_CUSTOM_TITLE_FRIEND_NAME or (L and L.TITLE_FRIEND_CUSTOM_NAME_PROMPT)
+						or "Enter a custom name for this Title Friend.",
+					button1 = ACCEPT,
+					button2 = CANCEL,
+					hasEditBox = 1,
+					maxLetters = 20,
+					countInvisibleLetters = true,
+					editBoxWidth = 120,
+					timeout = 0,
+					exclusive = 1,
+					whileDead = 1,
+					hideOnEscape = 1,
+					OnShow = function(dialog, data)
+						local editBox = BFL_GetPopupEditBox(dialog)
+						if not editBox then
+							return
+						end
+						local currentCustomName = BFL.GetCustomTitleFriendName
+							and data
+							and BFL.GetCustomTitleFriendName(data.bnetIDAccount)
+						if currentCustomName then
+							editBox:SetText(currentCustomName)
+						end
+						editBox:SetFocus()
+					end,
+					OnAccept = function(dialog, data)
+						local editBox = BFL_GetPopupEditBox(dialog)
+						if editBox and data and data.bnetIDAccount then
+							BFL.SetCustomTitleFriendName(data.bnetIDAccount, editBox:GetText())
+						end
+					end,
+					OnHide = function(dialog)
+						if ChatFrameUtil and ChatFrameUtil.FocusActiveWindow then
+							ChatFrameUtil.FocusActiveWindow()
+						end
+						local editBox = BFL_GetPopupEditBox(dialog)
+						if editBox then
+							editBox:SetText("")
+						end
+					end,
+					EditBoxOnEnterPressed = function(editBox, data)
+						local dialog = editBox:GetParent()
+						if data and data.bnetIDAccount then
+							BFL.SetCustomTitleFriendName(data.bnetIDAccount, editBox:GetText())
+						end
+						if dialog then
+							dialog:Hide()
+						end
+					end,
+					EditBoxOnEscapePressed = StaticPopup_StandardEditBoxOnEscapePressed,
+				}
+				StaticPopup_Show("BFL_SET_CUSTOM_TITLE_FRIEND_NAME", nil, nil, { bnetIDAccount = bnetIDAccount })
+			end
+
+			local function BFL_AddSetCustomTitleFriendNameButton(rootDescription, contextData)
+				if not (contextData and contextData.bnetIDAccount) then
+					return
+				end
+				if
+					not (
+						BFL.AreTitleFriendsEnabled
+						and BFL.AreTitleFriendsEnabled()
+						and BFL.AreTitleFriendCustomNamesEnabled
+						and BFL.AreTitleFriendCustomNamesEnabled()
+					)
+				then
+					return
+				end
+
+				local accountInfo = BFL_GetBNetAccountInfo(contextData)
+				if not (accountInfo and BFL.IsTitleFriend and BFL.IsTitleFriend(accountInfo)) then
+					return
+				end
+
+				rootDescription:CreateButton(
+					SOCIAL_UI_BATTLE_NET_TITLE_FRIEND_EDIT_NAME_BUTTON_LABEL
+						or (L and L.MENU_SET_TITLE_FRIEND_NAME)
+						or "Edit Title Friend Name",
+					function()
+						BFL_ShowSetCustomTitleFriendNamePopup(contextData.bnetIDAccount)
+					end
+				)
+			end
+
 			local function BFL_AddRecentAllyNativeButtons(rootDescription, contextData)
 				if not BFL.HasRecentAllies then
 					return
@@ -3393,6 +3518,13 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			end
 
 			local function BFL_AddViewBNetFriendsButton(rootDescription, contextData)
+				if not (contextData and contextData.bnetIDAccount and FriendsFriendsFrame_Show) then
+					return
+				end
+				local accountInfo = BFL_GetBNetAccountInfo(contextData)
+				if BFL.IsTitleFriend and BFL.IsTitleFriend(accountInfo) then
+					return
+				end
 				if contextData and contextData.bnetIDAccount and FriendsFriendsFrame_Show then
 					rootDescription:CreateButton(VIEW_FRIENDS_OF_FRIENDS or "View Friends", function()
 						FriendsFriendsFrame_Show(contextData.bnetIDAccount)
@@ -3482,12 +3614,8 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					button1 = ACCEPT,
 					button2 = CANCEL,
 					OnAccept = function()
-						if C_FriendList and C_FriendList.RemoveFriend then
-							if not C_FriendList.RemoveFriend(fullName) and UIErrorsFrame then
-								UIErrorsFrame:AddExternalErrorMessage(ERR_FRIEND_NOT_FOUND)
-							end
-						elseif BFL.RemoveFriend then
-							BFL.RemoveFriend(fullName)
+						if not (BFL.RemoveFriend and BFL.RemoveFriend(fullName)) and UIErrorsFrame then
+							UIErrorsFrame:AddExternalErrorMessage(ERR_FRIEND_NOT_FOUND)
 						end
 					end,
 					timeout = 0,
@@ -3701,6 +3829,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 					if isFriendMenu then
 						BFL_AddSetNoteButton(rootDescription, contextData, isBNet)
+						if isBNet then
+							BFL_AddSetCustomTitleFriendNameButton(rootDescription, contextData)
+						end
 					end
 					if isRecentAlly then
 						BFL_AddRecentAllyNativeButtons(rootDescription, contextData)
@@ -4020,6 +4151,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		or event == "BN_FRIEND_ACCOUNT_ONLINE"
 		or event == "BN_FRIEND_ACCOUNT_OFFLINE"
 		or event == "BN_FRIEND_INFO_CHANGED"
+		or event == "BN_INFO_CHANGED"
 	then
 		-- NOTE: BFL:FireEventCallbacks(event) is NOT called here because Core.lua's
 		-- eventFrame already fires callbacks for all registered events (including these).
@@ -4056,7 +4188,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		BFL:FireEventCallbacks(event, ...)
 	elseif
 		event == "BATTLE_NET_FRIEND_TAG_ENABLED_STATUS_UPDATED"
+		or event == "BATTLE_NET_TITLE_FRIEND_CUSTOM_NAME_ENABLED_STATUS_UPDATED"
 		or event == "SOCIAL_UI_FRIENDS_LIST_SYSTEM_STATUS_UPDATED"
+		or event == "LEGACY_FRIEND_SYSTEM_STATUS_UPDATED"
 		or event == "CONFIRM_BATTLE_NET_FRIEND_INVITE_SHOW"
 	then
 		RequestUpdate()
@@ -5044,7 +5178,7 @@ function BetterFriendsList_Button_OnClick(button, mouseButton)
 					and FriendsListModule.ResolveWoWFriendIndex
 					and FriendsListModule:ResolveWoWFriendIndex(friendData.name)
 				or friendData.index
-			local info = resolvedIndex and C_FriendList.GetFriendInfoByIndex(resolvedIndex) or nil
+			local info = resolvedIndex and BFL.GetWoWFriendInfoByIndex(resolvedIndex) or nil
 			if info then
 				BetterFriendsList_ShowDropdown(
 					info.name,

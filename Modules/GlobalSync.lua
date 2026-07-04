@@ -76,8 +76,8 @@ function GlobalSync:Initialize()
 	end
 
 	-- Request friend list update from server to ensure we have data
-	if C_FriendList.ShowFriends then
-		C_FriendList.ShowFriends()
+	if BFL.ShowFriends then
+		BFL.ShowFriends()
 	end
 
 	-- BFL:DebugPrint("GlobalSync Module Initialized")
@@ -154,7 +154,7 @@ function GlobalSync:HookDeletionAPIs()
 		if not (BFL.HasSecretValues or issecretvalue) then
 			local originalRemoveByIndex = C_FriendList.RemoveFriendByIndex
 			C_FriendList.RemoveFriendByIndex = function(index)
-				local info = C_FriendList.GetFriendInfoByIndex(index)
+				local info = BFL.GetWoWFriendInfoByIndex(index)
 				local nameToRemove = info and info.name
 
 				local result = originalRemoveByIndex(index)
@@ -297,6 +297,11 @@ function GlobalSync:RegisterEvents()
 	BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function()
 		self:OnFriendListUpdate()
 	end)
+	pcall(function()
+		BFL:RegisterEventCallback("LEGACY_FRIEND_SYSTEM_STATUS_UPDATED", function()
+			self:OnFriendListUpdate()
+		end)
+	end)
 end
 
 function GlobalSync:OnFriendListUpdate()
@@ -334,7 +339,7 @@ function GlobalSync:PerformSync()
 end
 
 function GlobalSync:ExportFriends(faction, realm)
-	local numFriends = C_FriendList.GetNumFriends() or 0
+	local numFriends = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
 
 	-- Ensure faction table exists
 	if not BetterFriendlistDB.GlobalFriends[faction] then
@@ -343,7 +348,7 @@ function GlobalSync:ExportFriends(faction, realm)
 
 	local count = 0
 	for i = 1, numFriends do
-		local info = C_FriendList.GetFriendInfoByIndex(i)
+		local info = BFL.GetWoWFriendInfoByIndex(i)
 		if info and info.name then
 			-- Construct FriendUID
 			local friendUID
@@ -410,7 +415,7 @@ function GlobalSync:ImportFriends(faction, currentRealm)
 	end
 
 	-- Check friend list cap (max 100 WoW friends)
-	local numFriends = C_FriendList.GetNumFriends() or 0
+	local numFriends = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
 	if numFriends >= 100 then
 		return
 	end
@@ -431,7 +436,7 @@ function GlobalSync:ImportFriends(faction, currentRealm)
 
 	-- Cache current friends for quick lookup
 	for i = 1, numFriends do
-		local info = C_FriendList.GetFriendInfoByIndex(i)
+		local info = BFL.GetWoWFriendInfoByIndex(i)
 		if info and info.name then
 			local uid
 			if string.find(info.name, "-") then
@@ -501,9 +506,9 @@ function GlobalSync:SyncDeletions(faction, currentRealm)
 	local friendsToRemove = {}
 
 	-- Iterate current friends
-	local numFriends = C_FriendList.GetNumFriends() or 0
+	local numFriends = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
 	for i = 1, numFriends do
-		local info = C_FriendList.GetFriendInfoByIndex(i)
+		local info = BFL.GetWoWFriendInfoByIndex(i)
 		if info and info.name then
 			-- Construct UID
 			local friendUID

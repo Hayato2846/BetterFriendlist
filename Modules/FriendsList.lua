@@ -1,4 +1,4 @@
-﻿-- Friends List Core Logic Module
+-- Friends List Core Logic Module
 
 local ADDON_NAME, BFL = ...
 local FriendsList = BFL:RegisterModule("FriendsList", {})
@@ -171,6 +171,12 @@ end
 
 local function EventCallback_BNetFriendInfoChanged(...)
 	BFL.FriendsList:OnFriendListUpdate(...)
+end
+
+local function RegisterOptionalEventCallback(eventName, callback, priority)
+	pcall(function()
+		BFL:RegisterEventCallback(eventName, callback, priority)
+	end)
 end
 
 local function EventCallback_BNetConnected(...)
@@ -2441,7 +2447,7 @@ function FriendsList:ResolveWoWFriendIndex(name)
 		return nil
 	end
 
-	local numFriends = C_FriendList and C_FriendList.GetNumFriends and C_FriendList.GetNumFriends() or 0
+	local numFriends = BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0
 	if numFriends == 0 then
 		return nil
 	end
@@ -2452,7 +2458,7 @@ function FriendsList:ResolveWoWFriendIndex(name)
 	end
 
 	for i = 1, numFriends do
-		local info = C_FriendList.GetFriendInfoByIndex(i)
+		local info = BFL.GetWoWFriendInfoByIndex(i)
 		if info and info.name then
 			local normalizedInfo = BFL:NormalizeWoWFriendName(info.name)
 			if normalizedInfo == targetName then
@@ -3047,6 +3053,7 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 	local rawName = friend.name
 	local rawBattleTag = friend.battleTag
 	local rawAccountName = friend.accountName
+	local rawTitleCustomName = friend.titleCustomName
 
 	-- CACHE CHECK (Persistent with Validation)
 	if not self.displayNameCache[uid] then
@@ -3069,6 +3076,7 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		and cacheEntry.rawName == rawName
 		and cacheEntry.rawAccountName == rawAccountName
 		and cacheEntry.rawBattleTag == rawBattleTag
+		and cacheEntry.rawTitleCustomName == rawTitleCustomName
 		and cacheEntry.nicknameVersion == nicknameVersion
 		and cacheEntry.characterName == friend.characterName
 	then -- Phase 6: Check version instead of value
@@ -3129,7 +3137,9 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		else
 			-- DISPLAY MODE: Follow Blizzard's BNet_GetBNetAccountName pattern
 			-- accountName is a kString. If nil/empty, fall back to short BattleTag.
-			if rawAccountName then
+			if rawTitleCustomName and rawTitleCustomName ~= "" and not BFL:IsSecret(rawTitleCustomName) then
+				name = rawTitleCustomName
+			elseif rawAccountName then
 				name = rawAccountName
 			else
 				-- Fallback: use short BattleTag (before #) like Blizzard does
@@ -3332,6 +3342,7 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		rawName = rawName,
 		rawBattleTag = rawBattleTag,
 		rawAccountName = rawAccountName,
+		rawTitleCustomName = rawTitleCustomName,
 		characterName = friend.characterName, -- Phase 22b: Cache invalidation for character changes
 	}
 
@@ -3434,6 +3445,9 @@ function FriendsList:Initialize() -- Initialize sort modes and filter from datab
 	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_ONLINE", EventCallback_BNetAccountOnline, 10)
 	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_OFFLINE", EventCallback_BNetAccountOffline, 10)
 	BFL:RegisterEventCallback("BN_FRIEND_INFO_CHANGED", EventCallback_BNetFriendInfoChanged, 10)
+	BFL:RegisterEventCallback("BN_INFO_CHANGED", EventCallback_BNetFriendInfoChanged, 10)
+	RegisterOptionalEventCallback("BATTLE_NET_TITLE_FRIEND_CUSTOM_NAME_ENABLED_STATUS_UPDATED", EventCallback_BNetFriendInfoChanged, 10)
+	RegisterOptionalEventCallback("LEGACY_FRIEND_SYSTEM_STATUS_UPDATED", EventCallback_FriendListUpdate, 10)
 
 	-- Additional events from Blizzard's FriendsFrame
 	BFL:RegisterEventCallback("BN_CONNECTED", EventCallback_BNetConnected, 10)
@@ -4023,6 +4037,8 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 	if bnetFriends and BNGetNumFriends then
 		local numBNetTotal, numBNetOnline, numBNetFavorite = BNGetNumFriends()
 		local friendTagsEnabled = BFL.AreBattleNetFriendTagsEnabled and BFL.AreBattleNetFriendTagsEnabled()
+		local titleFriendCustomNamesEnabled = BFL.AreTitleFriendCustomNamesEnabled
+			and BFL.AreTitleFriendCustomNamesEnabled()
 
 		-- BNet data completeness check: After login/reload, the first API responses
 		-- may lack battleTags (returns nil/empty). Without battleTags, friend UIDs
@@ -4098,6 +4114,13 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 				local isFavoriteByOrder = numBNetFavorite and i <= numBNetFavorite
 				friend.isFavorite = accountInfo.isFavorite or isFavoriteByOrder or false
 				friend.friendLevel = accountInfo.friendLevel
+				if titleFriendCustomNamesEnabled and BFL.IsTitleFriend and BFL.IsTitleFriend(accountInfo) then
+					local customName = BFL.GetCustomTitleFriendName
+						and BFL.GetCustomTitleFriendName(accountInfo.bnetAccountID)
+					if customName and customName ~= "" and not BFL:IsSecret(customName) then
+						friend.titleCustomName = customName
+					end
+				end
 				friend.friendTags = friendTagsEnabled and CopyFriendTags(accountInfo.friendTags) or nil
 				friend.gameAccountInfo = accountInfo.gameAccountInfo
 				friend.lastOnlineTime = accountInfo.lastOnlineTime
@@ -4448,12 +4471,12 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 	end
 
 	-- Get WoW friends
-	local numWoWFriends = C_FriendList.GetNumFriends() or 0
+	local numWoWFriends = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
 	-- Optimization: Cache player realm to avoid repeated API calls in loop
 	local playerRealm = GetNormalizedRealmName()
 
 	for i = 1, numWoWFriends do
-		local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
+		local friendInfo = BFL.GetWoWFriendInfoByIndex(i)
 		if friendInfo then
 			-- Normalize name to always include realm for consistent identification
 			local normalizedName = BFL:NormalizeWoWFriendName(friendInfo.name, playerRealm)
