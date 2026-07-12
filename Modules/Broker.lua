@@ -2793,18 +2793,6 @@ function Broker:OnClick(clickedFrame, button)
 		elseif BetterFriendsFrame then
 			BetterFriendsFrame:Show()
 		end
-	elseif action == "appear_offline" then
-		if BFL.SetMyBNetStatus and BFL.CanSetAppearOffline and BFL.CanSetAppearOffline() then
-			local isAppearOffline = false
-			if BFL.GetMyBNetStatus then
-				local _, _, currentAppearOffline = BFL.GetMyBNetStatus()
-				isAppearOffline = currentAppearOffline == true
-			end
-			local nextStatus = isAppearOffline and "online" or "appear_offline"
-			if BFL.SetMyBNetStatus(nextStatus) then
-				self:ScheduleBrokerTextUpdate(true, true)
-			end
-		end
 	elseif action == "cycle_filter" then
 		local currentFilter = BetterFriendlistDB.quickFilter or "all"
 		local currentIndex = 0

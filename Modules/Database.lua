@@ -486,6 +486,12 @@ function DB:Initialize()
 		BetterFriendlistDB = {}
 	end
 
+	-- The short-lived Appear Offline Broker action moved into the existing
+	-- Battle.net status dropdown. Keep old profiles from retaining a dead click action.
+	if BetterFriendlistDB.brokerClickAction == "appear_offline" then
+		BetterFriendlistDB.brokerClickAction = "toggle"
+	end
+
 	self:NormalizeThemeSetting()
 
 	-- MIGRATION: Move the temporary global Slug toggle into per-font flag settings.

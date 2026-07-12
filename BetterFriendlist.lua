@@ -4153,6 +4153,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		or event == "BN_FRIEND_INFO_CHANGED"
 		or event == "BN_INFO_CHANGED"
 	then
+		if event == "BN_INFO_CHANGED" and BFL.FrameInitializer then
+			BFL.FrameInitializer:RefreshStatusDropdown(BetterFriendsFrame)
+		end
 		-- NOTE: BFL:FireEventCallbacks(event) is NOT called here because Core.lua's
 		-- eventFrame already fires callbacks for all registered events (including these).
 		-- Calling it again would execute each callback twice per event.

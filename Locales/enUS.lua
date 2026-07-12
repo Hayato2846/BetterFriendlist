@@ -2136,8 +2136,6 @@ local function LoadEnUS()
 	L.BROKER_CLICK_TOGGLE = "Toggle Friends"
 	L.BROKER_CLICK_FRIENDS = "Open Friends"
 	L.BROKER_CLICK_SETTINGS = "Open Settings"
-	L.BROKER_CLICK_APPEAR_OFFLINE = "Toggle Appear Offline"
-	L.BROKER_ACTION_APPEAR_OFFLINE = "Toggle Appear Offline"
 	L.STATUS_APPEAR_OFFLINE = "Appear Offline"
 	L.MENU_SET_TITLE_FRIEND_NAME = "Edit Title Friend Name"
 	L.TITLE_FRIEND_CUSTOM_NAME_PROMPT = "Enter a custom name for this Title Friend."

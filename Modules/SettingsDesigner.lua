@@ -3475,10 +3475,6 @@ local function RegisterBrokerPages()
 	AddDropdown("broker.friends", { key = "brokerTooltipMode", group = "integration", label = T("BROKER_SETTINGS_TOOLTIP_MODE", "Tooltip Mode"), list = { basic = T("BROKER_TOOLTIP_BASIC", "Basic"), advanced = T("BROKER_TOOLTIP_ADVANCED", "Advanced") }, orderList = { "basic", "advanced" }, default = "advanced", order = 150, parentCheck = function() return GetDB("brokerEnabled", false) end, after = RefreshBrokerTooltips })
 	local brokerClickActions = { toggle = T("BROKER_CLICK_TOGGLE", "Toggle Friends"), friends = T("BROKER_CLICK_FRIENDS", "Open Friends"), settings = T("BROKER_CLICK_SETTINGS", "Open Settings") }
 	local brokerClickActionOrder = { "toggle", "friends", "settings" }
-	if BFL.CanSetAppearOffline and BFL.CanSetAppearOffline() then
-		brokerClickActions.appear_offline = T("BROKER_CLICK_APPEAR_OFFLINE", "Toggle Appear Offline")
-		brokerClickActionOrder[#brokerClickActionOrder + 1] = "appear_offline"
-	end
 	AddDropdown("broker.friends", { key = "brokerClickAction", group = "integration", label = T("BROKER_SETTINGS_CLICK_ACTION", "Click Action"), list = brokerClickActions, orderList = brokerClickActionOrder, default = "toggle", order = 160, parentCheck = function() return GetDB("brokerEnabled", false) end })
 	AddToggle("broker.friends", { key = "brokerShowHints", group = "integration", label = T("BROKER_SETTINGS_SHOW_HINTS", "Show Tooltip Hints"), default = true, order = 170, parentCheck = function() return GetDB("brokerEnabled", false) end, after = RefreshBrokerTooltips })
 	AddToggle("broker.friends", { key = "brokerShowClassIcons", group = "integration", label = T("BROKER_SETTINGS_SHOW_CLASS_ICONS", "Show Class Icons"), default = false, order = 180, parentCheck = function() return GetDB("brokerEnabled", false) end, after = RefreshBrokerTooltips })

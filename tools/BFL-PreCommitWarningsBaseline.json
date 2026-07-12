@@ -1,5 +1,5 @@
 ﻿{
-    "generatedAt":  "2026-07-01T09:54:15.8860076+02:00",
+    "generatedAt":  "2026-07-12T08:54:48.6005211+02:00",
     "source":  "Utils/pre-commit-check.py",
     "warningCount":  783,
     "warnings":  [
@@ -312,8 +312,8 @@
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "Database.lua",
-                         "Line":  860,
-                         "Signature":  "DEBUG-PRINT|Database.lua|860"
+                         "Line":  876,
+                         "Signature":  "DEBUG-PRINT|Database.lua|876"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
@@ -744,14 +744,14 @@
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "FriendsList.lua",
-                         "Line":  8608,
-                         "Signature":  "DEBUG-PRINT|FriendsList.lua|8608"
+                         "Line":  8648,
+                         "Signature":  "DEBUG-PRINT|FriendsList.lua|8648"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "FriendsList.lua",
-                         "Line":  8667,
-                         "Signature":  "DEBUG-PRINT|FriendsList.lua|8667"
+                         "Line":  8707,
+                         "Signature":  "DEBUG-PRINT|FriendsList.lua|8707"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
@@ -2850,8 +2850,8 @@
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "SettingsDesigner.lua",
-                         "Line":  3789,
-                         "Signature":  "DEBUG-PRINT|SettingsDesigner.lua|3789"
+                         "Line":  3785,
+                         "Signature":  "DEBUG-PRINT|SettingsDesigner.lua|3785"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
@@ -4386,128 +4386,38 @@
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9782,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9782"
+                         "Line":  9808,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9808"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9783,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9783"
+                         "Line":  9809,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9809"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9786,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9786"
+                         "Line":  9812,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9812"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9801,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9801"
+                         "Line":  9827,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9827"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9802,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9802"
+                         "Line":  9828,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9828"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9805,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9805"
-                     },
-                     {
-                         "Type":  "DEBUG-PRINT",
-                         "Path":  "TestSuite.lua",
-                         "Line":  9830,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9830"
-                     },
-                     {
-                         "Type":  "DEBUG-PRINT",
-                         "Path":  "TestSuite.lua",
-                         "Line":  9833,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9833"
-                     },
-                     {
-                         "Type":  "DEBUG-PRINT",
-                         "Path":  "TestSuite.lua",
-                         "Line":  9843,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9843"
-                     },
-                     {
-                         "Type":  "DEBUG-PRINT",
-                         "Path":  "TestSuite.lua",
-                         "Line":  9844,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9844"
-                     },
-                     {
-                         "Type":  "DEBUG-PRINT",
-                         "Path":  "TestSuite.lua",
-                         "Line":  9845,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9845"
-                     },
-                     {
-                         "Type":  "DEBUG-PRINT",
-                         "Path":  "TestSuite.lua",
-                         "Line":  9846,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9846"
-                     },
-                     {
-                         "Type":  "DEBUG-PRINT",
-                         "Path":  "TestSuite.lua",
-                         "Line":  9847,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9847"
-                     },
-                     {
-                         "Type":  "DEBUG-PRINT",
-                         "Path":  "TestSuite.lua",
-                         "Line":  9848,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9848"
-                     },
-                     {
-                         "Type":  "DEBUG-PRINT",
-                         "Path":  "TestSuite.lua",
-                         "Line":  9849,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9849"
-                     },
-                     {
-                         "Type":  "DEBUG-PRINT",
-                         "Path":  "TestSuite.lua",
-                         "Line":  9850,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9850"
-                     },
-                     {
-                         "Type":  "DEBUG-PRINT",
-                         "Path":  "TestSuite.lua",
-                         "Line":  9851,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9851"
-                     },
-                     {
-                         "Type":  "DEBUG-PRINT",
-                         "Path":  "TestSuite.lua",
-                         "Line":  9852,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9852"
-                     },
-                     {
-                         "Type":  "DEBUG-PRINT",
-                         "Path":  "TestSuite.lua",
-                         "Line":  9853,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9853"
-                     },
-                     {
-                         "Type":  "DEBUG-PRINT",
-                         "Path":  "TestSuite.lua",
-                         "Line":  9854,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9854"
-                     },
-                     {
-                         "Type":  "DEBUG-PRINT",
-                         "Path":  "TestSuite.lua",
-                         "Line":  9855,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9855"
+                         "Line":  9831,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9831"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
@@ -4518,164 +4428,254 @@
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9857,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9857"
-                     },
-                     {
-                         "Type":  "DEBUG-PRINT",
-                         "Path":  "TestSuite.lua",
-                         "Line":  9858,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9858"
-                     },
-                     {
-                         "Type":  "DEBUG-PRINT",
-                         "Path":  "TestSuite.lua",
                          "Line":  9859,
                          "Signature":  "DEBUG-PRINT|TestSuite.lua|9859"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9860,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9860"
+                         "Line":  9869,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9869"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9863,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9863"
+                         "Line":  9870,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9870"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9865,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9865"
+                         "Line":  9871,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9871"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9912,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9912"
+                         "Line":  9872,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9872"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9913,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9913"
+                         "Line":  9873,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9873"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9914,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9914"
+                         "Line":  9874,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9874"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9915,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9915"
+                         "Line":  9875,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9875"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9916,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9916"
+                         "Line":  9876,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9876"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9917,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9917"
+                         "Line":  9877,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9877"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9918,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9918"
+                         "Line":  9878,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9878"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9919,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9919"
+                         "Line":  9879,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9879"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9920,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9920"
+                         "Line":  9880,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9880"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9921,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9921"
+                         "Line":  9881,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9881"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9922,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9922"
+                         "Line":  9882,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9882"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9923,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9923"
+                         "Line":  9883,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9883"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9924,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9924"
+                         "Line":  9884,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9884"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9925,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9925"
+                         "Line":  9885,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9885"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9926,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9926"
+                         "Line":  9886,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9886"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9927,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9927"
+                         "Line":  9889,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9889"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9928,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9928"
+                         "Line":  9891,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9891"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9929,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9929"
+                         "Line":  9938,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9938"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9930,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9930"
+                         "Line":  9939,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9939"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9931,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9931"
+                         "Line":  9940,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9940"
+                     },
+                     {
+                         "Type":  "DEBUG-PRINT",
+                         "Path":  "TestSuite.lua",
+                         "Line":  9941,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9941"
+                     },
+                     {
+                         "Type":  "DEBUG-PRINT",
+                         "Path":  "TestSuite.lua",
+                         "Line":  9942,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9942"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
                          "Line":  9943,
                          "Signature":  "DEBUG-PRINT|TestSuite.lua|9943"
+                     },
+                     {
+                         "Type":  "DEBUG-PRINT",
+                         "Path":  "TestSuite.lua",
+                         "Line":  9944,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9944"
+                     },
+                     {
+                         "Type":  "DEBUG-PRINT",
+                         "Path":  "TestSuite.lua",
+                         "Line":  9945,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9945"
+                     },
+                     {
+                         "Type":  "DEBUG-PRINT",
+                         "Path":  "TestSuite.lua",
+                         "Line":  9946,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9946"
+                     },
+                     {
+                         "Type":  "DEBUG-PRINT",
+                         "Path":  "TestSuite.lua",
+                         "Line":  9947,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9947"
+                     },
+                     {
+                         "Type":  "DEBUG-PRINT",
+                         "Path":  "TestSuite.lua",
+                         "Line":  9948,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9948"
+                     },
+                     {
+                         "Type":  "DEBUG-PRINT",
+                         "Path":  "TestSuite.lua",
+                         "Line":  9949,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9949"
+                     },
+                     {
+                         "Type":  "DEBUG-PRINT",
+                         "Path":  "TestSuite.lua",
+                         "Line":  9950,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9950"
+                     },
+                     {
+                         "Type":  "DEBUG-PRINT",
+                         "Path":  "TestSuite.lua",
+                         "Line":  9951,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9951"
+                     },
+                     {
+                         "Type":  "DEBUG-PRINT",
+                         "Path":  "TestSuite.lua",
+                         "Line":  9952,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9952"
+                     },
+                     {
+                         "Type":  "DEBUG-PRINT",
+                         "Path":  "TestSuite.lua",
+                         "Line":  9953,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9953"
+                     },
+                     {
+                         "Type":  "DEBUG-PRINT",
+                         "Path":  "TestSuite.lua",
+                         "Line":  9954,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9954"
+                     },
+                     {
+                         "Type":  "DEBUG-PRINT",
+                         "Path":  "TestSuite.lua",
+                         "Line":  9955,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9955"
+                     },
+                     {
+                         "Type":  "DEBUG-PRINT",
+                         "Path":  "TestSuite.lua",
+                         "Line":  9956,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9956"
+                     },
+                     {
+                         "Type":  "DEBUG-PRINT",
+                         "Path":  "TestSuite.lua",
+                         "Line":  9957,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9957"
+                     },
+                     {
+                         "Type":  "DEBUG-PRINT",
+                         "Path":  "TestSuite.lua",
+                         "Line":  9969,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9969"
                      },
                      {
                          "Type":  "TIMER-CLEANUP",

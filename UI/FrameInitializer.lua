@@ -65,6 +65,7 @@ BFL.UI = BFL.UI or {}
 BFL.UI.CONSTANTS = UI_CONSTANTS
 
 local IsModernDropdown = BFL.IsModernDropdown
+local APPEAR_OFFLINE_TEXTURE = FRIENDS_TEXTURE_OFFLINE or "Interface\\FriendsFrame\\StatusIcon-Offline"
 
 -- Module registration
 local FrameInitializer = {
@@ -91,9 +92,11 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 	local dropdown = frame.FriendsTabHeader.StatusDropdown
 
 	-- Get current Battle.net status
-	local bnetAFK, bnetDND = BFL.GetMyBNetStatus()
+	local bnetAFK, bnetDND, bnetAppearOffline = BFL.GetMyBNetStatus()
 	local bnStatus
-	if bnetAFK then
+	if bnetAppearOffline and BFL.CanSetAppearOffline and BFL.CanSetAppearOffline() then
+		bnStatus = APPEAR_OFFLINE_TEXTURE
+	elseif bnetAFK then
 		bnStatus = FRIENDS_TEXTURE_AFK
 	elseif bnetDND then
 		bnStatus = FRIENDS_TEXTURE_DND
@@ -111,6 +114,29 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 		FRIENDS_TEXTURE_AFK,
 		FRIENDS_TEXTURE_DND,
 	}
+	if BFL.CanSetAppearOffline and BFL.CanSetAppearOffline() then
+		table.insert(
+			optionLabels,
+			string.format(
+				"|T%s.tga:14:14:0:0|t %s",
+				APPEAR_OFFLINE_TEXTURE,
+				L.STATUS_APPEAR_OFFLINE or SOCIAL_UI_PRESENCE_TYPE_LABEL_APPEAR_OFFLINE or "Appear Offline"
+			)
+		)
+		table.insert(optionValues, APPEAR_OFFLINE_TEXTURE)
+	end
+	local function GetStatusText(status)
+		if status == FRIENDS_TEXTURE_ONLINE then
+			return FRIENDS_LIST_AVAILABLE
+		elseif status == FRIENDS_TEXTURE_AFK then
+			return FRIENDS_LIST_AWAY
+		elseif status == FRIENDS_TEXTURE_DND then
+			return FRIENDS_LIST_BUSY
+		elseif status == APPEAR_OFFLINE_TEXTURE then
+			return L.STATUS_APPEAR_OFFLINE or SOCIAL_UI_PRESENCE_TYPE_LABEL_APPEAR_OFFLINE or "Appear Offline"
+		end
+		return FRIENDS_LIST_AVAILABLE
+	end
 	local function GetStatusSelectionText(status)
 		if IsModernDropdown(dropdown) then
 			return string.format("|T%s.tga:16:16:0:0|t", status or FRIENDS_TEXTURE_ONLINE)
@@ -132,8 +158,31 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 			BFL.SetMyBNetStatus("afk")
 		elseif status == FRIENDS_TEXTURE_DND then
 			BFL.SetMyBNetStatus("dnd")
+		elseif status == APPEAR_OFFLINE_TEXTURE then
+			BFL.SetMyBNetStatus("appear_offline")
 		end
 	end
+	local function RefreshStatus()
+		local isAFK, isDND, isAppearOffline = BFL.GetMyBNetStatus()
+		if isAppearOffline and BFL.CanSetAppearOffline and BFL.CanSetAppearOffline() then
+			bnStatus = APPEAR_OFFLINE_TEXTURE
+		elseif isAFK then
+			bnStatus = FRIENDS_TEXTURE_AFK
+		elseif isDND then
+			bnStatus = FRIENDS_TEXTURE_DND
+		else
+			bnStatus = FRIENDS_TEXTURE_ONLINE
+		end
+
+		if IsModernDropdown(dropdown) then
+			if dropdown.GenerateMenu then
+				dropdown:GenerateMenu()
+			end
+		else
+			BFL.SetDropdownText(dropdown, GetStatusSelectionText(bnStatus))
+		end
+	end
+	dropdown.BFLRefreshStatus = RefreshStatus
 
 	if not IsModernDropdown(dropdown) then
 		-- BFL:DebugPrint("|cff00ffffFrameInitializer:|r legacy UIDropDownMenu path for StatusDropdown")
@@ -152,17 +201,7 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 		-- We use C_Timer.After to ensure this runs AFTER any default layout logic that might clear our text
 		dropdown:SetScript("OnShow", function(self)
 			C_Timer.After(0.01, function()
-				local bnetAFK, bnetDND = BFL.GetMyBNetStatus()
-				-- Update closure variable so tooltip is also correct
-				if bnetAFK then
-					bnStatus = FRIENDS_TEXTURE_AFK
-				elseif bnetDND then
-					bnStatus = FRIENDS_TEXTURE_DND
-				else
-					bnStatus = FRIENDS_TEXTURE_ONLINE
-				end
-
-				BFL.SetDropdownText(self, GetStatusSelectionText(bnStatus))
+				RefreshStatus()
 				-- Increase width slightly to ensure icon fits without truncating to "..."
 				BFL.SetDropdownWidth(self, 40)
 			end)
@@ -173,33 +212,15 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 		local button = _G[dropdown:GetName() .. "Button"]
 		if button then
 			button:HookScript("OnEnter", function()
-				local statusText
-				if bnStatus == FRIENDS_TEXTURE_ONLINE then
-					statusText = FRIENDS_LIST_AVAILABLE
-				elseif bnStatus == FRIENDS_TEXTURE_AFK then
-					statusText = FRIENDS_LIST_AWAY
-				elseif bnStatus == FRIENDS_TEXTURE_DND then
-					statusText = FRIENDS_LIST_BUSY
-				end
-
 				BFL_Tooltip:SetOwner(dropdown, "ANCHOR_RIGHT", UI_CONSTANTS.TOOLTIP_ANCHOR_Y, 0)
-				BFL_Tooltip:SetText(string.format(FRIENDS_LIST_STATUS_TOOLTIP, statusText))
+				BFL_Tooltip:SetText(string.format(FRIENDS_LIST_STATUS_TOOLTIP, GetStatusText(bnStatus)))
 				BFL_Tooltip:Show()
 			end)
 			button:HookScript("OnLeave", BFL_Tooltip_Hide)
 		else
 			dropdown:SetScript("OnEnter", function()
-				local statusText
-				if bnStatus == FRIENDS_TEXTURE_ONLINE then
-					statusText = FRIENDS_LIST_AVAILABLE
-				elseif bnStatus == FRIENDS_TEXTURE_AFK then
-					statusText = FRIENDS_LIST_AWAY
-				elseif bnStatus == FRIENDS_TEXTURE_DND then
-					statusText = FRIENDS_LIST_BUSY
-				end
-
 				BFL_Tooltip:SetOwner(dropdown, "ANCHOR_RIGHT", UI_CONSTANTS.TOOLTIP_ANCHOR_Y, 0)
-				BFL_Tooltip:SetText(string.format(FRIENDS_LIST_STATUS_TOOLTIP, statusText))
+				BFL_Tooltip:SetText(string.format(FRIENDS_LIST_STATUS_TOOLTIP, GetStatusText(bnStatus)))
 				BFL_Tooltip:Show()
 			end)
 			dropdown:SetScript("OnLeave", BFL_Tooltip_Hide)
@@ -224,20 +245,18 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 
 	-- Set up tooltip
 	dropdown:SetScript("OnEnter", function()
-		local statusText
-		if bnStatus == FRIENDS_TEXTURE_ONLINE then
-			statusText = FRIENDS_LIST_AVAILABLE
-		elseif bnStatus == FRIENDS_TEXTURE_AFK then
-			statusText = FRIENDS_LIST_AWAY
-		elseif bnStatus == FRIENDS_TEXTURE_DND then
-			statusText = FRIENDS_LIST_BUSY
-		end
-
 		BFL_Tooltip:SetOwner(dropdown, "ANCHOR_RIGHT", UI_CONSTANTS.TOOLTIP_ANCHOR_Y, 0)
-		BFL_Tooltip:SetText(string.format(FRIENDS_LIST_STATUS_TOOLTIP, statusText))
+		BFL_Tooltip:SetText(string.format(FRIENDS_LIST_STATUS_TOOLTIP, GetStatusText(bnStatus)))
 		BFL_Tooltip:Show()
 	end)
 	dropdown:SetScript("OnLeave", BFL_Tooltip_Hide)
+end
+
+function FrameInitializer:RefreshStatusDropdown(frame)
+	local dropdown = frame and frame.FriendsTabHeader and frame.FriendsTabHeader.StatusDropdown
+	if dropdown and dropdown.BFLRefreshStatus then
+		dropdown.BFLRefreshStatus()
+	end
 end
 
 --------------------------------------------------------------------------

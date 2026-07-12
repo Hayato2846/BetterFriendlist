@@ -7,18 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [2.6.7]        - 2026-07-12
 
 ### Added
-- **Title-Friend Custom Names** - Retail PTR Title-Friend custom names are now shown in BetterFriendlist display names and Broker tooltips, with a context-menu action to edit the custom name where Blizzard exposes the feature.
-- **Battle.net Appear Offline** - Added an optional Data Broker click action for toggling Battle.net Appear Offline on clients that expose `C_BattleNet.SetAppearOffline`.
+- **WoW Contact Custom Names (Retail 12.1)** - Once Blizzard enables the new WoW-only Battle.net contacts and their custom names, BetterFriendlist displays those names in the friends list and Broker tooltip. They can also be edited from the right-click menu.
+- **Appear Offline (Retail 12.1)** - Once Blizzard enables the new Battle.net presence option, BetterFriendlist's existing status menu includes Appear Offline alongside Online, Away, and Busy.
 
-### Changed
-- **Retail PTR Compatibility** - Routed WoW-character friend counts, lookups, notes, add/remove actions, and friend checks through BFL compatibility wrappers so the upcoming Legacy Friend System gate can disable those paths cleanly.
-- **Client Events** - BetterFriendlist now listens for Retail PTR Title-Friend custom-name, Legacy Friend System, and Battle.net self-status updates so visible rows and Broker text refresh when those systems change.
+### Improved
+- **Retail 12.1 Compatibility** - BetterFriendlist now adapts when Blizzard enables the new friends system or disables older character-friend features. Friend counts, notes, adding or removing friends, and related friend actions continue to work through the transition.
+- **Retail 12.1 Social Updates** - Once Blizzard enables the new social features, changes to your Battle.net status, WoW contact names, and available friend functions are reflected in BetterFriendlist immediately.
 
 ### Fixed
-- **Static Friend Groups** - Friends assigned to a custom group no longer remain in "No Group" because of stale built-in group assignments. Built-in groups are now kept out of saved custom-group data, and dropping a friend onto "No Group" cleanly removes their custom assignments.
+- **Static Friend Groups** - Assigning a friend to a custom group now removes them from "No Group" as expected. Dropping a friend onto "No Group" removes their custom-group assignments cleanly.
 
 ---
 
