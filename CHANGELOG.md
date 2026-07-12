@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+
+### Fixed
+- **Static Friend Groups** - Friends assigned to a custom group no longer remain in "No Group" because of stale built-in group assignments. Built-in groups are now kept out of saved custom-group data, and dropping a friend onto "No Group" cleanly removes their custom assignments.
+
+---
+
 ## [2.6.6]        - 2026-06-30
 
 ### Fixed
@@ -147,14 +154,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Guild Broker Click Action** - Fixed the configured left-click action not opening the guild frame or broker settings.
 - **Recruit A Friend Taint** - Reduced RAF list taint by keeping addon display data separate from Blizzard recruit records.
-
-## [2.5.7]        - 2026-05-16
-
-### Fixed
-- **Classic Loading** - Fixed a load error after the latest update.
-
-### Changed
-- **Client Compatibility** - Added TOC support for newer Retail and Classic client builds.
 
 ---
 

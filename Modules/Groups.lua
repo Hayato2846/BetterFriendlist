@@ -488,17 +488,17 @@ function Groups:Initialize()
 		end
 	end
 
-	-- DEFENSIVE: Clean up ghost group entries in friendGroups
-	-- If a group was deleted but friendGroups still references it, remove the stale entries
-	-- This prevents friends from being "invisible" due to orphaned group assignments
+	-- DEFENSIVE: Clean up ghost and built-in group entries in friendGroups.
+	-- Built-in groups are derived dynamically and must never be persisted as assignments.
 	if BetterFriendlistDB.friendGroups then
 		local cleanedCount = 0
 		for uid, groups in pairs(BetterFriendlistDB.friendGroups) do
 			if type(groups) == "table" then
 				for i = #groups, 1, -1 do
 					local gid = groups[i]
-					-- A valid group must exist in self.groups (builtins + loaded customs)
-					if type(gid) ~= "string" or not self.groups[gid] then
+					local group = type(gid) == "string" and self.groups[gid]
+					-- A valid assignment must reference a loaded custom group.
+					if not group or group.builtin then
 						table.remove(groups, i)
 						cleanedCount = cleanedCount + 1
 					end

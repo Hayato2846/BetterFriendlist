@@ -1139,7 +1139,13 @@ local function BuildDisplayList(self)
 		-- assignedGroups already wiped at loop start (PERF: reused table)
 
 		for _, groupId in ipairs(customGroups) do
-			if type(groupId) == "string" and groupedFriends[groupId] and not assignedGroups[groupId] then
+			local groupData = type(groupId) == "string" and friendGroups[groupId]
+			if
+				groupData
+				and not groupData.builtin
+				and groupedFriends[groupId]
+				and not assignedGroups[groupId]
+			then
 				table.insert(friendGroupIds, groupId)
 				assignedGroups[groupId] = true -- Mark as assigned
 				isInAnyGroup = true
@@ -5474,7 +5480,11 @@ function FriendsList:GetFriendsForGroup(targetGroupId)
 			-- Check Custom Groups (only count groups that actually exist)
 			local customGroups = friendGroups[friendUID] or {}
 			for _, groupId in ipairs(customGroups) do
-				if type(groupId) == "string" and visibleGroups[groupId] then
+				if
+					type(groupId) == "string"
+					and visibleGroups[groupId]
+					and not visibleGroups[groupId].builtin
+				then
 					if groupId == targetGroupId then
 						isInTargetGroup = true
 					end
@@ -5812,8 +5822,14 @@ function FriendsList:GetInvitableCount(groupId)
 					and BetterFriendlistDB.friendGroups[friendUID]
 				then
 					local groups = BetterFriendlistDB.friendGroups[friendUID]
-					if #groups > 0 then
-						hasGroup = true
+					local allGroups = GetGroups()
+					local availableGroups = allGroups and allGroups:GetAll() or {}
+					for _, persistedGroupId in ipairs(groups) do
+						local persistedGroup = availableGroups[persistedGroupId]
+						if persistedGroup and not persistedGroup.builtin then
+							hasGroup = true
+							break
+						end
 					end
 				end
 				isInGroup = not hasGroup
@@ -5915,8 +5931,14 @@ function FriendsList:InviteGroupToParty(groupId)
 					and BetterFriendlistDB.friendGroups[friendUID]
 				then
 					local groups = BetterFriendlistDB.friendGroups[friendUID]
-					if #groups > 0 then
-						hasGroup = true
+					local allGroups = GetGroups()
+					local availableGroups = allGroups and allGroups:GetAll() or {}
+					for _, persistedGroupId in ipairs(groups) do
+						local persistedGroup = availableGroups[persistedGroupId]
+						if persistedGroup and not persistedGroup.builtin then
+							hasGroup = true
+							break
+						end
 					end
 				end
 				isInGroup = not hasGroup
@@ -7139,8 +7161,26 @@ Button_OnDragStop = function(self)
 	local success = pcall(function()
 		if droppedOnGroup and self.friendData then
 			local friendUID = FriendsList:GetFriendUID(self.friendData)
+			local targetGroup = friendGroups[droppedOnGroup]
 
-			if friendUID then
+			if friendUID and targetGroup then
+				-- "No Group" is derived from having no custom assignments. Dropping
+				-- here therefore means ungrouping the friend, never persisting nogroup.
+				if droppedOnGroup == "nogroup" then
+					local DB = GetDB()
+					if DB then
+						DB:SetFriendGroups(friendUID, nil)
+					end
+					BFL:ForceRefreshFriendsList()
+					return
+				end
+
+				-- Other built-in groups are computed from friend state and are not
+				-- valid drag-and-drop assignment targets.
+				if targetGroup.builtin then
+					return
+				end
+
 				-- Without Shift: Remove from all other custom groups (move)
 				-- With Shift: Keep in other groups (add to multiple groups)
 				if not IsShiftKeyDown() then
