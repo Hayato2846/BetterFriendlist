@@ -1151,7 +1151,7 @@ local function CreateAdvancedTooltip(gameTooltip)
 
 			-- Custom groups
 			for _, groupId in ipairs(customGroups) do
-				if groupsData[groupId] then
+				if groupsData[groupId] and not groupsData[groupId].builtin then
 					groupedFriends[groupId] = groupedFriends[groupId] or {}
 					table.insert(groupedFriends[groupId], friend)
 					assigned = true
@@ -1973,7 +1973,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 
 			-- Custom groups
 			for _, groupId in ipairs(customGroups) do
-				if groupsData[groupId] then
+				if groupsData[groupId] and not groupsData[groupId].builtin then
 					groupCounts[groupId].total = groupCounts[groupId].total + 1
 					if isOnline then
 						groupCounts[groupId].online = groupCounts[groupId].online + 1

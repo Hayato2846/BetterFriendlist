@@ -7304,6 +7304,33 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
+	TS:RegisterTest("bugs", "StaticGroups_AreNotPersisted", {
+		description = "Derived static groups must never be stored as custom friend assignments",
+		action = function(V)
+			local DB = BFL:GetModule("DB")
+			if not DB then
+				V:Skip("DB module not loaded")
+				return
+			end
+
+			local testUID = "wow_TestStaticGroupFriend-TestRealm"
+			local staticGroupIds = { "favorites", "ingame", "recentlyadded", "nogroup" }
+
+			for _, groupId in ipairs(staticGroupIds) do
+				local added = DB:AddFriendToGroup(testUID, groupId)
+				V:Assert(added == false, "Static group should reject assignment: " .. groupId)
+				V:Assert(DB:IsFriendInGroup(testUID, groupId) == false, "Static group must not persist: " .. groupId)
+			end
+
+			DB:SetFriendGroups(testUID, { "nogroup", "favorites", "test-custom-group", "test-custom-group" })
+			local storedGroups = DB:GetFriendGroups(testUID)
+			V:Assert(#storedGroups == 1, "Sanitization should retain one unique custom assignment")
+			V:Assert(storedGroups[1] == "test-custom-group", "Sanitization should remove all static groups")
+
+			DB:SetFriendGroups(testUID, nil)
+		end,
+	})
+
 	-- ===== DEEP LOGIC TESTS: GROUPS =====
 
 	TS:RegisterTest("groups", "GroupColor_Persistence", {

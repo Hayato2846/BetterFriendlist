@@ -8,6 +8,16 @@ local DB = BFL:RegisterModule("DB", {})
 local CustomNamesLib = nil
 local ThemePalette = BFL:GetModule("ThemePalette")
 
+-- Built-in groups are derived from friend state and must never be persisted as
+-- custom friend-group assignments. Keep this fallback local so the invariant
+-- also holds while the Groups module is still initializing.
+local NON_PERSISTED_FRIEND_GROUPS = {
+	favorites = true,
+	ingame = true,
+	recentlyadded = true,
+	nogroup = true,
+}
+
 -- Default values
 local defaults = {
 	groupStates = {},
@@ -1007,10 +1017,23 @@ end
 
 -- Set friend's groups
 function DB:SetFriendGroups(friendUID, groups)
-	if not groups or #groups == 0 then
+	local sanitizedGroups = {}
+	local seenGroups = {}
+	for _, groupId in ipairs(groups or {}) do
+		if
+			type(groupId) == "string"
+			and not NON_PERSISTED_FRIEND_GROUPS[groupId]
+			and not seenGroups[groupId]
+		then
+			table.insert(sanitizedGroups, groupId)
+			seenGroups[groupId] = true
+		end
+	end
+
+	if #sanitizedGroups == 0 then
 		BetterFriendlistDB.friendGroups[friendUID] = nil
 	else
-		BetterFriendlistDB.friendGroups[friendUID] = groups
+		BetterFriendlistDB.friendGroups[friendUID] = sanitizedGroups
 	end
 
 	-- NoteSync: Sync group change to friend note
@@ -1022,6 +1045,10 @@ end
 
 -- Add friend to group
 function DB:AddFriendToGroup(friendUID, groupId)
+	if not friendUID or type(groupId) ~= "string" or NON_PERSISTED_FRIEND_GROUPS[groupId] then
+		return false
+	end
+
 	if not BetterFriendlistDB.friendGroups[friendUID] then
 		BetterFriendlistDB.friendGroups[friendUID] = {}
 	end

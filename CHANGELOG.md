@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Retail PTR Compatibility** - Routed WoW-character friend counts, lookups, notes, add/remove actions, and friend checks through BFL compatibility wrappers so the upcoming Legacy Friend System gate can disable those paths cleanly.
 - **Client Events** - BetterFriendlist now listens for Retail PTR Title-Friend custom-name, Legacy Friend System, and Battle.net self-status updates so visible rows and Broker text refresh when those systems change.
 
+### Fixed
+- **Static Friend Groups** - Friends assigned to a custom group no longer remain in "No Group" because of stale built-in group assignments. Built-in groups are now kept out of saved custom-group data, and dropping a friend onto "No Group" cleanly removes their custom assignments.
+
+---
+
 ## [2.6.6]        - 2026-06-30
 
 ### Fixed
