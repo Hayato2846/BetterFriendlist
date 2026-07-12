@@ -1,4 +1,4 @@
-## Interface: 120100, 120007, 120005, 120001, 120000, 110207, 50504, 50503, 50500, 40402, 38000, 30405, 20505, 20504, 11508
+## Interface: 120100, 120007, 120005, 120001, 120000, 110207, 50504, 50503, 50500, 40402, 38000, 30405, 20506, 20505, 20504, 11508
 ## Title: BetterFriendlist
 ## Notes: Complete replacement for WoW Friends frame - Custom groups, Raid management, Quick Join, and more!
 ## Author: Hayato2846
