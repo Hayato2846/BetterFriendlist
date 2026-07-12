@@ -510,7 +510,7 @@ local function LoadEnUS()
 	L.FILTER_OFFLINE_ONLY = "Offline Only"
 	L.FILTER_WOW_ONLY = "WoW Only"
 	L.FILTER_BNET_ONLY = "Battle.net Only"
-	L.FILTER_HIDE_AFK = "Hide AFK/DND"
+
 	L.FILTER_RETAIL_ONLY = "Retail Only"
 	L.FILTER_TOOLTIP = "Quick Filter: %s"
 	L.SORT_STATUS = "Status"
@@ -668,8 +668,7 @@ local function LoadEnUS()
 	-- ========================================
 	L.SETTINGS_FRAME_DIMENSIONS_HEADER = "Frame Dimensions"
 	L.SETTINGS_FRAME_SCALE = "Scale:"
-	L.SETTINGS_FRAME_WIDTH = "Width:"
-	L.SETTINGS_FRAME_HEIGHT = "Height:"
+
 	L.SETTINGS_FRAME_WIDTH_DESC = "Adjust the frame width"
 	L.SETTINGS_FRAME_HEIGHT_DESC = "Adjust the frame height"
 	L.SETTINGS_FRAME_SCALE_DESC = "Adjust the frame scale"
@@ -706,8 +705,7 @@ local function LoadEnUS()
 	L.BROKER_SETTINGS_SEPARATOR_RESET_TOOLTIP = "Right-click to reset the separator color."
 	L.BROKER_SETTINGS_GROUP_HEADER_ALIGN = "Group Name Alignment"
 	L.BROKER_SETTINGS_GROUP_HEADER_ALIGN_TOOLTIP = "Set the alignment of group names in the friends broker tooltip"
-	L.BROKER_SETTINGS_TOOLTIP_MODE = "Tooltip Detail Level"
-	L.BROKER_SETTINGS_CLICK_ACTION = "Left Click Action"
+
 	L.BROKER_SETTINGS_LEFT_CLICK = "Left Click Action"
 	L.BROKER_SETTINGS_RIGHT_CLICK = "Right Click Action"
 	L.BROKER_ACTION_TOGGLE = "Toggle BetterFriendlist"
@@ -935,8 +933,7 @@ local function LoadEnUS()
 	L.SETTINGS_HIDE_GUILD_TAB = "Hide Guild Tab"
 	L.SETTINGS_HIDE_GUILD_TAB_DESC = "Hide the Guild tab from the friendlist"
 	L.SETTINGS_ENABLE_GUILD_TAB = "Guild Roster Tab (Beta)"
-	L.SETTINGS_ENABLE_GUILD_TAB_DESC =
-		"Beta: Shows the Guild roster tab with supported roster and guild-management actions."
+
 	L.SETTINGS_USE_UI_PANEL_SYSTEM = "Respect UI Hierarchy"
 	L.SETTINGS_USE_UI_PANEL_SYSTEM_DESC =
 		"Prevent BetterFriendlist from opening over other UI windows (Character, Spellbook, etc.). Requires /reload."
@@ -1065,7 +1062,7 @@ local function LoadEnUS()
 	L.BROKER_SETTINGS_SHOW_WOW_ICON = "Show WoW Icon"
 	L.BROKER_SETTINGS_SHOW_WOW_ICON_TITLE = "Show WoW Icon"
 	L.BROKER_SETTINGS_SHOW_WOW_ICON_TOOLTIP = "Show the WoW icon next to WoW friends"
-	L.BROKER_SETTINGS_SHOW_BNET_ICON = "Show BNet Icon"
+
 	L.BROKER_SETTINGS_SHOW_BNET_ICON_TITLE = "Show BNet Icon"
 	L.BROKER_SETTINGS_SHOW_BNET_ICON_TOOLTIP = "Show the Battle.net icon next to BNet friends"
 	L.BROKER_SETTINGS_CLICK_ACTION = "Click Action"

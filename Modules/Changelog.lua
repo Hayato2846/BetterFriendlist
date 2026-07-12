@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Improved
 - **Retail 12.1 Compatibility** - BetterFriendlist now adapts when Blizzard enables the new friends system or disables older character-friend features. Friend counts, notes, adding or removing friends, and related friend actions continue to work through the transition.
 - **Retail 12.1 Social Updates** - Once Blizzard enables the new social features, changes to your Battle.net status, WoW contact names, and available friend functions are reflected in BetterFriendlist immediately.
+- **Localization** - Completed and corrected all supported locale files, including recently added settings and social features, while removing stale keys, duplicate assignments, English fallback text, and encoding damage.
 
 ### Fixed
 - **Static Friend Groups** - Assigning a friend to a custom group now removes them from "No Group" as expected. Dropping a friend onto "No Group" removes their custom-group assignments cleanly.
