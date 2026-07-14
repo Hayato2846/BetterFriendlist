@@ -9964,9 +9964,283 @@ end
 
 function TestSuite:Initialize()
 	-- Register built-in tests
-	RegisterBuiltInTests(); self:RegisterAutoRaidAssistRosterFallbackTest()
+	RegisterBuiltInTests()
+	self:RegisterAutoRaidAssistRosterFallbackTest()
+	self:RegisterSearchIdentityTest()
+	self:RegisterCustomFilterMultiAccountIdentityTest()
+	self:RegisterBuiltinQuickFilterMultiAccountTest()
+	self:RegisterMobileOnlyAccountTest()
+	self:RegisterFriendUpdateDebounceTest()
 
 	BFL:DebugPrint("|cff00ccff[BFL TestSuite]|r Initialized with " .. self:GetTestCount() .. " tests")
+end
+
+function TestSuite:RegisterSearchIdentityTest()
+	self:RegisterTest("filter", "SearchFilter_MatchesVisibleBNetIdentities", {
+		description = "Search must keep BNet friends visible by title custom name or any displayed game account",
+		action = function(V)
+			local FriendsList = BFL:GetModule("FriendsList")
+			if not FriendsList then
+				V:Skip("FriendsList not loaded")
+				return
+			end
+
+			local originalSearch = FriendsList.searchText
+			local originalFilter = FriendsList.filterMode
+			FriendsList.filterMode = "all"
+
+			local friend = {
+				connected = true,
+				type = "bnet",
+				uid = "bnet_SearchIdentityTest#1234",
+				battleTag = "SearchIdentityTest#1234",
+				titleCustomName = "Gawdsmack",
+				characterName = "FocusedCharacter",
+				gameAccounts = {
+					{ characterName = "FocusedCharacter", realmName = "PrimaryRealm" },
+					{ characterName = "SecondaryCharacter", realmName = "SecondaryRealm" },
+				},
+			}
+
+			FriendsList.searchText = "gawd"
+			V:Assert(
+				FriendsList:PassesFilters(friend) == true,
+				"Friend should pass when search matches the displayed title custom name"
+			)
+
+			FriendsList.searchText = "secondarycharacter"
+			V:Assert(
+				FriendsList:PassesFilters(friend) == true,
+				"Friend should pass when search matches another displayed game account"
+			)
+
+			FriendsList.searchText = "secondaryrealm"
+			V:Assert(
+				FriendsList:PassesFilters(friend) == true,
+				"Friend should pass when search matches another displayed game account realm"
+			)
+
+			FriendsList.searchText = originalSearch
+			FriendsList.filterMode = originalFilter
+		end,
+	})
+end
+
+function TestSuite:RegisterCustomFilterMultiAccountIdentityTest()
+	self:RegisterTest("filter", "Registry_CustomFilter_MatchesVisibleBNetGameAccounts", {
+		description = "Character and Realm rules must match any visible WoW game account on a BNet friend",
+		action = function(V)
+			local Registry = BFL:GetModule("FilterSortRegistry")
+			if not Registry or not BetterFriendlistDB then
+				V:Skip("FilterSortRegistry or DB not loaded")
+				return
+			end
+
+			Registry:EnsureDB()
+			local testId = "custom_filter_test_multi_account_identity"
+			local original = BetterFriendlistDB.customQuickFilters[testId]
+			local originalVisibility = BetterFriendlistDB.quickFilterVisibility[testId]
+			local originalBeta = BetterFriendlistDB.enableBetaFeatures
+
+			BetterFriendlistDB.enableBetaFeatures = true
+			BetterFriendlistDB.customQuickFilters[testId] = {
+				id = testId,
+				name = "Multi-Account Identity Test",
+				icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter",
+				ast = {
+					type = "group",
+					op = "AND",
+					children = {
+						{ type = "condition", field = "character", op = "contains", value = "gawd" },
+						{ type = "condition", field = "realm", op = "is", value = "SecondaryRealm" },
+						{ type = "condition", field = "client", op = "is", value = BNET_CLIENT_WOW or "WoW" },
+						{ type = "condition", field = "game", op = "contains", value = "secondary presence" },
+						{ type = "condition", field = "wowProject", op = "is", value = WOW_PROJECT_MAINLINE or 1 },
+					},
+				},
+			}
+			BetterFriendlistDB.quickFilterVisibility[testId] = true
+			Registry:InvalidateCaches()
+
+			local friend = {
+				type = "bnet",
+				connected = true,
+				characterName = "FocusedCharacter",
+				realmName = "PrimaryRealm",
+				gameAccountInfo = {
+					clientProgram = "S2",
+					isOnline = true,
+					richPresence = "Focused Presence",
+				},
+				gameAccounts = {
+					{
+						clientProgram = "S2",
+						isOnline = true,
+						richPresence = "Focused Presence",
+					},
+					{
+						clientProgram = BNET_CLIENT_WOW or "WoW",
+						isOnline = true,
+						characterName = "Gawdsmack",
+						realmName = "SecondaryRealm",
+						richPresence = "Secondary Presence",
+						wowProjectID = WOW_PROJECT_MAINLINE or 1,
+					},
+				},
+			}
+
+			V:Assert(
+				Registry:EvaluateQuickFilter(testId, friend) == true,
+				"Custom filter should match identity, client, game, and project values from a secondary account"
+			)
+
+			BetterFriendlistDB.customQuickFilters[testId] = original
+			BetterFriendlistDB.quickFilterVisibility[testId] = originalVisibility
+			BetterFriendlistDB.enableBetaFeatures = originalBeta
+			Registry:InvalidateCaches()
+		end,
+	})
+end
+
+function TestSuite:RegisterBuiltinQuickFilterMultiAccountTest()
+	self:RegisterTest("filter", "Registry_BuiltinFilters_MatchSecondaryBNetGameAccount", {
+		description = "Built-in WoW, Retail, and In Game filters must inspect every online BNet game account",
+		action = function(V)
+			local Registry = BFL:GetModule("FilterSortRegistry")
+			if not Registry then
+				V:Skip("FilterSortRegistry not loaded")
+				return
+			end
+
+			local friend = {
+				type = "bnet",
+				connected = true,
+				gameAccountInfo = {
+					clientProgram = "BSAp",
+					isOnline = true,
+				},
+				gameAccounts = {
+					{
+						clientProgram = BNET_CLIENT_WOW or "WoW",
+						isOnline = true,
+						wowProjectID = WOW_PROJECT_MAINLINE or 1,
+					},
+				},
+			}
+
+			V:Assert(Registry:EvaluateQuickFilter("wow", friend) == true, "WoW filter should match the secondary account")
+			V:Assert(
+				Registry:EvaluateQuickFilter("wowonline", friend) == true,
+				"WoW Online filter should match the secondary account"
+			)
+			V:Assert(
+				Registry:EvaluateQuickFilter("retail", friend) == true,
+				"Retail filter should match the secondary account"
+			)
+			V:Assert(
+				Registry:EvaluateQuickFilter("ingame", friend) == true,
+				"In Game filter should match the secondary account"
+			)
+		end,
+	})
+end
+
+function TestSuite:RegisterMobileOnlyAccountTest()
+	self:RegisterTest("filter", "FriendsList_MobileOffline_RequiresMobileOnly", {
+		description = "Treat Mobile as Offline must not hide friends who are active on another game account",
+		action = function(V)
+			local FriendsList = BFL:GetModule("FriendsList")
+			if not FriendsList or not FriendsList.IsFocusedAccountMobileOnly then
+				V:Skip("FriendsList mobile account classifier not loaded")
+				return
+			end
+
+			local mobileAccount = { clientProgram = "BSAp", isOnline = true }
+			V:Assert(
+				FriendsList:IsFocusedAccountMobileOnly(mobileAccount, nil) == true,
+				"A single online Mobile account should be classified as mobile-only"
+			)
+			V:Assert(
+				FriendsList:IsFocusedAccountMobileOnly(mobileAccount, {
+					{ clientProgram = BNET_CLIENT_WOW or "WoW", isOnline = true },
+				}) == false,
+				"An online secondary WoW account should keep the friend online"
+			)
+			V:Assert(
+				FriendsList:IsFocusedAccountMobileOnly(mobileAccount, {
+					{ clientProgram = "D4", isOnline = true },
+				}) == false,
+				"Any online secondary game account should keep the friend online"
+			)
+		end,
+	})
+end
+
+function TestSuite:RegisterFriendUpdateDebounceTest()
+	self:RegisterTest("events", "FriendsList_EventBurst_UsesSingleCancelableTimer", {
+		description = "Visible friend events must coalesce through one cancelable timer",
+		action = function(V)
+			local FriendsList = BFL:GetModule("FriendsList")
+			if not FriendsList then
+				V:Skip("FriendsList not loaded")
+				return
+			end
+			if FriendsList.updateTimer or FriendsList.scheduledRefreshTimer then
+				V:Skip("FriendsList already has a pending refresh timer")
+				return
+			end
+
+			local originalCTimer = C_Timer
+			local originalFrame = BetterFriendsFrame
+			local originalUpdate = FriendsList.UpdateFriendsList
+			local originalReady = FriendsList.bnetDataReady
+			local originalTimer = FriendsList.updateTimer
+			local callbacks = {}
+			local handles = {}
+			local updateCount = 0
+
+			BetterFriendsFrame = { IsShown = function() return true end }
+			C_Timer = {
+				NewTimer = function(_, callback)
+					local handle = {
+						cancelled = false,
+						Cancel = function(self)
+							self.cancelled = true
+						end,
+					}
+					callbacks[#callbacks + 1] = callback
+					handles[#handles + 1] = handle
+					return handle
+				end,
+			}
+			FriendsList.bnetDataReady = true
+			FriendsList.updateTimer = nil
+			FriendsList.UpdateFriendsList = function()
+				updateCount = updateCount + 1
+			end
+
+			FriendsList:OnFriendListUpdate(false)
+			FriendsList:OnFriendListUpdate(false)
+			V:AssertEqual(#callbacks, 1, "An event burst should schedule only one timer")
+			V:AssertType(FriendsList.updateTimer.Cancel, "function", "Scheduled update should be cancelable")
+
+			callbacks[1]()
+			V:AssertEqual(updateCount, 1, "The coalesced timer should update exactly once")
+			V:AssertNil(FriendsList.updateTimer, "The timer callback should clear the active handle")
+
+			FriendsList:OnFriendListUpdate(false)
+			local pendingHandle = handles[#handles]
+			FriendsList:OnFriendListUpdate(true)
+			V:Assert(pendingHandle.cancelled == true, "A forced update should cancel the pending timer")
+			V:AssertEqual(updateCount, 2, "A forced update should run immediately once")
+
+			FriendsList.UpdateFriendsList = originalUpdate
+			FriendsList.bnetDataReady = originalReady
+			FriendsList.updateTimer = originalTimer
+			C_Timer = originalCTimer
+			BetterFriendsFrame = originalFrame
+		end,
+	})
 end
 
 function TestSuite:RegisterAutoRaidAssistRosterFallbackTest()

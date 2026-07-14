@@ -3657,7 +3657,7 @@ function FriendsList:OnFriendListUpdate(forceImmediate) -- Event Coalescing (Mic
 	-- PERFY OPTIMIZATION (Phase 2A): Use bound method instead of closure
 	-- Schedule update with a small delay (0.1s) to batch multiple events
 	-- This significantly reduces CPU usage during login or mass status changes
-	self.updateTimer = C_Timer.After(0.1, Timer_UpdateFriendsList)
+	self.updateTimer = C_Timer.NewTimer(0.1, Timer_UpdateFriendsList)
 end
 
 function FriendsList:CancelScheduledRefresh()
@@ -3691,6 +3691,29 @@ function FriendsList:ScheduleRefresh(reason, delay, ignoreVisibility)
 	else
 		Timer_ScheduledFriendsListRefresh()
 	end
+end
+
+function FriendsList:IsFocusedAccountMobileOnly(focusedGameAccount, gameAccounts)
+	if
+		type(focusedGameAccount) ~= "table"
+		or focusedGameAccount.clientProgram ~= "BSAp"
+		or not focusedGameAccount.isOnline
+	then
+		return false
+	end
+
+	if type(gameAccounts) == "table" then
+		for _, gameAccountInfo in ipairs(gameAccounts) do
+			if type(gameAccountInfo) == "table" and gameAccountInfo.isOnline then
+				local client = gameAccountInfo.clientProgram
+				if client and client ~= "" and client ~= "App" and client ~= "CLNT" and client ~= "BSAp" then
+					return false
+				end
+			end
+		end
+	end
+
+	return true
 end
 
 -- Sync groups from Groups module
@@ -3993,6 +4016,15 @@ function FriendsList:MarkNeedsRenderOnShow()
 	return true
 end
 
+function FriendsList:DeferIncompleteBNetData(ignoreVisibility)
+	needsRenderOnShow = true
+	isUpdatingFriendsList = false
+	self.bnetIncompleteRetryAttempts = (self.bnetIncompleteRetryAttempts or 0) + 1
+	if self.bnetIncompleteRetryAttempts <= 3 then
+		self:ScheduleRefresh("bnet-data-incomplete", 0.2, ignoreVisibility)
+	end
+end
+
 function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimization:
 	-- If the frame is hidden, we don't need to fetch data or rebuild the list.
 	-- Just mark it as dirty so it updates when shown.
@@ -4078,16 +4110,29 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 						self.bnetZeroFallbackTimer = nil
 					end
 				else
-					-- Data not ready yet - defer render
-					needsRenderOnShow = true
-					isUpdatingFriendsList = false
+					-- Data not ready yet - keep the last complete list and retry briefly.
+					self:DeferIncompleteBNetData(ignoreVisibility)
 					return
 				end
 			end
 		end
 
+		-- Preserve the last complete snapshot if the API temporarily omits one account.
+		-- Event bursts can expose a short interval where the reported count is newer
+		-- than individual account records.
+		local bnetAccountInfos = {}
 		for i = 1, numBNetTotal do
 			local accountInfo = BFL.GetBNetFriendInfo and BFL.GetBNetFriendInfo(i)
+			if not accountInfo then
+				self:DeferIncompleteBNetData(ignoreVisibility)
+				return
+			end
+			bnetAccountInfos[i] = accountInfo
+		end
+		self.bnetIncompleteRetryAttempts = 0
+
+		for i = 1, numBNetTotal do
+			local accountInfo = bnetAccountInfos[i]
 			if accountInfo then
 				local friend = GetNextFriendObject()
 
@@ -4181,12 +4226,6 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 						end
 					elseif gameInfo.clientProgram == "BSAp" then
 						friend.gameName = BFL.L.STATUS_MOBILE
-						-- Feature: Treat Mobile as Offline (Phase Feature Request)
-						local treatMobileAsOffline = self.settingsCache.treatMobileAsOffline
-						if treatMobileAsOffline then
-							friend.connected = false -- Treat as offline for sorting/display
-							friend.isMobileButTreatedOffline = true -- Flag for special display
-						end
 					elseif gameInfo.clientProgram == "App" then
 						friend.gameName = BFL.L.STATUS_IN_APP
 					else
@@ -4376,6 +4415,16 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 					end
 				else
 					friend.numGameAccounts = 0
+				end
+
+				-- The setting is explicitly mobile-only: keep the friend online when any
+				-- other visible game account is active, even if Battle.net focuses Mobile.
+				if
+					self.settingsCache.treatMobileAsOffline
+					and self:IsFocusedAccountMobileOnly(accountInfo.gameAccountInfo, friend.gameAccounts)
+				then
+					friend.connected = false
+					friend.isMobileButTreatedOffline = true
 				end
 
 				-- Preferred Game Account Override:
@@ -4922,6 +4971,28 @@ local function NormalizeSearchValue(text)
 	return nil
 end
 
+local function GetGameAccountSearchText(gameAccounts)
+	if type(gameAccounts) ~= "table" then
+		return nil
+	end
+
+	local searchParts = {}
+	for _, gameAccountInfo in ipairs(gameAccounts) do
+		if type(gameAccountInfo) == "table" then
+			local characterName = NormalizeSearchValue(gameAccountInfo.characterName)
+			local realmName = NormalizeSearchValue(gameAccountInfo.realmName)
+			if characterName then
+				searchParts[#searchParts + 1] = characterName
+			end
+			if realmName then
+				searchParts[#searchParts + 1] = realmName
+			end
+		end
+	end
+
+	return #searchParts > 0 and table.concat(searchParts, "\n") or nil
+end
+
 local function SearchCacheContains(normalizedText, searchNormalized)
 	return normalizedText and normalizedText:find(searchNormalized, 1, true) ~= nil
 end
@@ -4951,8 +5022,10 @@ local function RefreshFriendSearchCache(self, friend)
 	friend._bfl_search_friend_version = friendsVersion
 	friend._bfl_search_nickname_version = nicknameVersion
 	friend._bfl_search_accountName = NormalizeSearchValue(friend.accountName)
+	friend._bfl_search_titleCustomName = NormalizeSearchValue(friend.titleCustomName)
 	friend._bfl_search_battleTag = NormalizeSearchValue(friend.battleTag)
 	friend._bfl_search_characterName = NormalizeSearchValue(friend.characterName)
+	friend._bfl_search_gameAccounts = GetGameAccountSearchText(friend.gameAccounts)
 	friend._bfl_search_realmName = NormalizeSearchValue(friend.realmName)
 	friend._bfl_search_note = NormalizeSearchValue(friend.note)
 	friend._bfl_search_name = NormalizeSearchValue(friend.name)
@@ -5000,12 +5073,14 @@ function FriendsList:PassesFilters(friend) -- Search text filter
 
 		-- Search in multiple fields depending on friend type
 		if friend.type == "bnet" then
-			-- BNet friends: search in accountName, battleTag, characterName, realmName, note, nickname
+			-- BNet friends: search every safe identity that can be rendered in the list.
 			-- Note: accountName is a kString (Real Name) and will be skipped by contains()
 			-- This is a Blizzard privacy limitation - Real Names cannot be searched
 			found = SearchCacheContains(friend._bfl_search_accountName, searchNormalized)
+				or SearchCacheContains(friend._bfl_search_titleCustomName, searchNormalized)
 				or SearchCacheContains(friend._bfl_search_battleTag, searchNormalized)
 				or SearchCacheContains(friend._bfl_search_characterName, searchNormalized)
+				or SearchCacheContains(friend._bfl_search_gameAccounts, searchNormalized)
 				or SearchCacheContains(friend._bfl_search_realmName, searchNormalized)
 				or SearchCacheContains(friend._bfl_search_note, searchNormalized)
 				or SearchCacheContains(friend._bfl_search_nickname, searchNormalized)
