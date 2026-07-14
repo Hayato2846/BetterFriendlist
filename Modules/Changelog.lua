@@ -29,6 +29,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+
+### Fixed
+- **Friend Search** - Searching now keeps Battle.net friends visible when the query matches a displayed WoW contact custom name or any of their other visible game-account characters and realms.
+- **Multi-Account Filters** - Built-in WoW, Retail, and In Game filters plus custom Character, Realm, Client, Game, and WoW Project rules now inspect every visible game account instead of only the focused account.
+- **Mobile-Only Status** - Treat Mobile as Offline now keeps friends online when they are simultaneously active on another game account.
+- **Friend List Refreshes** - Event bursts now use one cancelable refresh timer, duplicate event rebuilds are avoided, and temporarily incomplete Battle.net responses keep the last complete friend list while BFL retries.
+
+---
+
 ## [2.6.7]        - 2026-07-12
 
 ### Added
@@ -174,16 +184,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **ElvUI Top Tabs** - Centered the Friends, Recent Allies, and Recruit A Friend tab labels in the ElvUI skin.
-
-## [2.5.8]        - 2026-05-16
-
-### Added
-- **Broker Tooltip Fonts** - Added an optional setting for using selected broker tooltip fonts on non-latin alphabets, with a warning about unsupported glyphs.
-- **Guild Broker MOTD** - Added the guild message of the day to the Guild Broker tooltip with guarded cross-version handling.
-
-### Fixed
-- **Guild Broker Click Action** - Fixed the configured left-click action not opening the guild frame or broker settings.
-- **Recruit A Friend Taint** - Reduced RAF list taint by keeping addon display data separate from Blizzard recruit records.
 
 ---
 

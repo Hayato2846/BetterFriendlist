@@ -1,5 +1,5 @@
 ﻿{
-    "generatedAt":  "2026-07-12T08:54:48.6005211+02:00",
+    "generatedAt":  "2026-07-14T13:05:52.0498440+02:00",
     "source":  "Utils/pre-commit-check.py",
     "warningCount":  783,
     "warnings":  [
@@ -24,8 +24,8 @@
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "BetterFriendlist.lua",
-                         "Line":  1868,
-                         "Signature":  "DEBUG-PRINT|BetterFriendlist.lua|1868"
+                         "Line":  1858,
+                         "Signature":  "DEBUG-PRINT|BetterFriendlist.lua|1858"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
@@ -744,14 +744,14 @@
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "FriendsList.lua",
-                         "Line":  8648,
-                         "Signature":  "DEBUG-PRINT|FriendsList.lua|8648"
+                         "Line":  8723,
+                         "Signature":  "DEBUG-PRINT|FriendsList.lua|8723"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "FriendsList.lua",
-                         "Line":  8707,
-                         "Signature":  "DEBUG-PRINT|FriendsList.lua|8707"
+                         "Line":  8782,
+                         "Signature":  "DEBUG-PRINT|FriendsList.lua|8782"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
@@ -4674,8 +4674,8 @@
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "TestSuite.lua",
-                         "Line":  9969,
-                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9969"
+                         "Line":  9975,
+                         "Signature":  "DEBUG-PRINT|TestSuite.lua|9975"
                      },
                      {
                          "Type":  "TIMER-CLEANUP",

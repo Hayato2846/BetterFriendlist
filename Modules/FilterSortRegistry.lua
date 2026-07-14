@@ -154,22 +154,87 @@ local function IsMobileClient(client)
 	return client == "BSAp"
 end
 
-local function IsFriendOnline(friend)
+local function IsPlayableClient(client)
+	return client and client ~= "" and client ~= "App" and client ~= "CLNT" and client ~= "BSAp"
+end
+
+local function GetVisibleGameAccounts(friend)
+	local accounts = {}
+	local seen = {}
+	local function AddAccount(gameAccountInfo)
+		if type(gameAccountInfo) ~= "table" or seen[gameAccountInfo] then
+			return
+		end
+		seen[gameAccountInfo] = true
+		accounts[#accounts + 1] = gameAccountInfo
+	end
+
+	AddAccount(GetGameInfo(friend))
+	if friend and type(friend.gameAccounts) == "table" then
+		for _, gameAccountInfo in ipairs(friend.gameAccounts) do
+			AddAccount(gameAccountInfo)
+		end
+	end
+	return accounts
+end
+
+local function IsGameAccountOnline(friend, gameAccountInfo)
+	if not gameAccountInfo then
+		return false
+	end
+	if gameAccountInfo.isOnline ~= nil then
+		return gameAccountInfo.isOnline and true or false
+	end
+	return gameAccountInfo == GetGameInfo(friend) and friend and friend.connected == true
+end
+
+local function HasOnlineGameAccount(friend, predicate)
+	for _, gameAccountInfo in ipairs(GetVisibleGameAccounts(friend)) do
+		if IsGameAccountOnline(friend, gameAccountInfo) and (not predicate or predicate(gameAccountInfo)) then
+			return true
+		end
+	end
+	return false
+end
+
+local function IsMobileOnlyFriend(friend)
 	if not friend then
 		return false
 	end
-	local client = GetClient(friend)
-	if BetterFriendlistDB and BetterFriendlistDB.treatMobileAsOffline and IsMobileClient(client) then
+
+	local hasOnlineMobileAccount = friend.isMobile == true
+	for _, gameAccountInfo in ipairs(GetVisibleGameAccounts(friend)) do
+		if IsGameAccountOnline(friend, gameAccountInfo) then
+			local client = gameAccountInfo.clientProgram
+			if IsMobileClient(client) then
+				hasOnlineMobileAccount = true
+			elseif IsPlayableClient(client) then
+				return false
+			end
+		end
+	end
+	return hasOnlineMobileAccount
+end
+
+local function IsFriendOnline(friend)
+	if not friend then
 		return false
 	end
 	if friend.connected ~= nil then
 		return friend.connected and true or false
 	end
 	if friend.isOnline ~= nil then
+		if BetterFriendlistDB and BetterFriendlistDB.treatMobileAsOffline and IsMobileOnlyFriend(friend) then
+			return false
+		end
 		return friend.isOnline and true or false
 	end
 	local gameInfo = GetGameInfo(friend)
-	return gameInfo and gameInfo.isOnline and true or false
+	local isOnline = gameInfo and gameInfo.isOnline and true or false
+	if isOnline and BetterFriendlistDB and BetterFriendlistDB.treatMobileAsOffline and IsMobileOnlyFriend(friend) then
+		return false
+	end
+	return isOnline
 end
 
 local function IsAFK(friend)
@@ -181,7 +246,7 @@ local function IsDND(friend)
 end
 
 local function IsMobile(friend)
-	return IsMobileClient(GetClient(friend)) or (friend and friend.isMobile) and true or false
+	return IsMobileOnlyFriend(friend)
 end
 
 local function GetFriendUID(friend)
@@ -392,6 +457,54 @@ local function GetFieldValue(friend, field)
 	return nil
 end
 
+local function AddUniqueFilterValue(values, seen, value)
+	local normalized = NormalizeString(value)
+	if normalized == "" or seen[normalized] then
+		return
+	end
+	seen[normalized] = true
+	values[#values + 1] = value
+end
+
+local function GetMultiAccountFilterValues(friend, field)
+	local values = {}
+	local seen = {}
+	if not friend then
+		return values
+	end
+
+	if field == "character" then
+		AddUniqueFilterValue(values, seen, friend.characterName or (friend.type == "wow" and friend.name))
+	elseif field == "realm" then
+		AddUniqueFilterValue(values, seen, friend.realmName)
+	elseif field == "client" then
+		AddUniqueFilterValue(values, seen, GetClient(friend))
+	elseif field == "game" then
+		AddUniqueFilterValue(values, seen, friend.gameName)
+	end
+
+	if friend.type ~= "bnet" then
+		return values
+	end
+
+	local wowClient = BNET_CLIENT_WOW or "WoW"
+	for _, gameAccountInfo in ipairs(GetVisibleGameAccounts(friend)) do
+		if field == "character" and gameAccountInfo.clientProgram == wowClient then
+			AddUniqueFilterValue(values, seen, gameAccountInfo.characterName)
+		elseif field == "realm" and gameAccountInfo.clientProgram == wowClient then
+			AddUniqueFilterValue(values, seen, gameAccountInfo.realmName)
+		elseif field == "client" then
+			AddUniqueFilterValue(values, seen, gameAccountInfo.clientProgram)
+		elseif field == "game" then
+			AddUniqueFilterValue(values, seen, gameAccountInfo.richPresence or gameAccountInfo.clientProgram)
+		elseif field == "wowProject" and gameAccountInfo.clientProgram == wowClient then
+			AddUniqueFilterValue(values, seen, gameAccountInfo.wowProjectID)
+		end
+	end
+
+	return values
+end
+
 local FILTER_FIELDS = {
 	{ id = "type", labelKey = "FILTER_BUILDER_FIELD_TYPE", type = "enum", values = { "wow", "bnet" } },
 	{ id = "online", labelKey = "FILTER_BUILDER_FIELD_ONLINE", type = "boolean" },
@@ -580,6 +693,47 @@ local function MatchesConditionValue(actual, op, expected)
 	return false
 end
 
+local NEGATED_MULTI_VALUE_OPERATORS = {
+	isnot = true,
+	notcontains = true,
+	notin = true,
+}
+
+local MULTI_ACCOUNT_FILTER_FIELDS = {
+	character = true,
+	realm = true,
+	client = true,
+	game = true,
+	wowProject = true,
+}
+
+local function MatchesFilterFieldValue(friend, field, op, expected)
+	if not MULTI_ACCOUNT_FILTER_FIELDS[field] then
+		return MatchesConditionValue(GetFieldValue(friend, field), op, expected)
+	end
+
+	local values = GetMultiAccountFilterValues(friend, field)
+	if #values == 0 then
+		return MatchesConditionValue(nil, op, expected)
+	end
+
+	if NEGATED_MULTI_VALUE_OPERATORS[op] then
+		for _, value in ipairs(values) do
+			if not MatchesConditionValue(value, op, expected) then
+				return false
+			end
+		end
+		return true
+	end
+
+	for _, value in ipairs(values) do
+		if MatchesConditionValue(value, op, expected) then
+			return true
+		end
+	end
+	return false
+end
+
 local function EvaluateAST(node, friend, depth, stats)
 	if type(node) ~= "table" then
 		return true
@@ -620,7 +774,7 @@ local function EvaluateAST(node, friend, depth, stats)
 		if not fieldDef then
 			result = false
 		else
-			result = MatchesConditionValue(GetFieldValue(friend, node.field), op, node.value)
+			result = MatchesFilterFieldValue(friend, node.field, op, node.value)
 		end
 	else
 		result = false
@@ -648,10 +802,10 @@ local function BuiltinQuickFilter_WoW(friend)
 	if friend and friend.type == "wow" then
 		return true
 	end
-	if not IsFriendOnline(friend) then
-		return false
-	end
-	return GetClient(friend) == (BNET_CLIENT_WOW or "WoW")
+	local wowClient = BNET_CLIENT_WOW or "WoW"
+	return HasOnlineGameAccount(friend, function(gameAccountInfo)
+		return gameAccountInfo.clientProgram == wowClient
+	end)
 end
 
 local function BuiltinQuickFilter_WoWOnline(friend)
@@ -673,22 +827,24 @@ local function BuiltinQuickFilter_Retail(friend)
 	if friend and friend.type == "wow" then
 		return true
 	end
-	if not BuiltinQuickFilter_WoW(friend) then
-		return false
-	end
-	local gameInfo = GetGameInfo(friend)
-	return not gameInfo or not gameInfo.wowProjectID or not WOW_PROJECT_MAINLINE or gameInfo.wowProjectID == WOW_PROJECT_MAINLINE
+	local wowClient = BNET_CLIENT_WOW or "WoW"
+	return HasOnlineGameAccount(friend, function(gameAccountInfo)
+		return gameAccountInfo.clientProgram == wowClient
+			and (
+				not gameAccountInfo.wowProjectID
+				or not WOW_PROJECT_MAINLINE
+				or gameAccountInfo.wowProjectID == WOW_PROJECT_MAINLINE
+			)
+	end)
 end
 
 local function BuiltinQuickFilter_InGame(friend)
 	if friend and friend.type == "wow" then
 		return IsFriendOnline(friend)
 	end
-	if not IsFriendOnline(friend) then
-		return false
-	end
-	local client = GetClient(friend)
-	return client ~= "" and client ~= "App" and client ~= "BSAp"
+	return HasOnlineGameAccount(friend, function(gameAccountInfo)
+		return IsPlayableClient(gameAccountInfo.clientProgram)
+	end)
 end
 
 local BUILTIN_QUICK_FILTERS = {

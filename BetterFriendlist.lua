@@ -1232,27 +1232,17 @@ end
 -- Initialize the addon
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
-frame:RegisterEvent("FRIENDLIST_UPDATE")
-frame:RegisterEvent("BN_FRIEND_LIST_SIZE_CHANGED")
-frame:RegisterEvent("BN_FRIEND_ACCOUNT_ONLINE")
-frame:RegisterEvent("BN_FRIEND_ACCOUNT_OFFLINE")
-frame:RegisterEvent("BN_FRIEND_INFO_CHANGED")
 frame:RegisterEvent("BN_INFO_CHANGED")
 frame:RegisterEvent("PLAYER_LOGIN")
 frame:RegisterEvent("SOCIAL_QUEUE_UPDATE")
 pcall(frame.RegisterEvent, frame, "SOCIAL_UI_SOCIAL_QUEUE_SYSTEM_STATUS_UPDATED")
 pcall(frame.RegisterEvent, frame, "BATTLE_NET_FRIEND_TAG_ENABLED_STATUS_UPDATED")
-pcall(frame.RegisterEvent, frame, "BATTLE_NET_TITLE_FRIEND_CUSTOM_NAME_ENABLED_STATUS_UPDATED")
 pcall(frame.RegisterEvent, frame, "SOCIAL_UI_FRIENDS_LIST_SYSTEM_STATUS_UPDATED")
-pcall(frame.RegisterEvent, frame, "LEGACY_FRIEND_SYSTEM_STATUS_UPDATED")
 pcall(frame.RegisterEvent, frame, "CONFIRM_BATTLE_NET_FRIEND_INVITE_SHOW")
 pcall(frame.RegisterEvent, frame, "LFG_LIST_REVEALED_CENSORED_ACTIVE_ENTRY")
 pcall(frame.RegisterEvent, frame, "LFG_LIST_SEARCH_RESULT_UPDATED")
 frame:RegisterEvent("GROUP_LEFT")
 frame:RegisterEvent("GROUP_JOINED")
-frame:RegisterEvent("GROUP_ROSTER_UPDATE")
-frame:RegisterEvent("RAID_ROSTER_UPDATE")
-frame:RegisterEvent("PLAYER_ROLES_ASSIGNED")
 frame:RegisterEvent("PLAYER_REGEN_DISABLED") -- Entering combat
 frame:RegisterEvent("PLAYER_REGEN_ENABLED") -- Leaving combat
 frame:RegisterEvent("WHO_LIST_UPDATE")
@@ -4145,27 +4135,12 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end
 			end
 		end
-	elseif
-		event == "FRIENDLIST_UPDATE"
-		or event == "BN_FRIEND_LIST_SIZE_CHANGED"
-		or event == "BN_FRIEND_ACCOUNT_ONLINE"
-		or event == "BN_FRIEND_ACCOUNT_OFFLINE"
-		or event == "BN_FRIEND_INFO_CHANGED"
-		or event == "BN_INFO_CHANGED"
-	then
-		if event == "BN_INFO_CHANGED" and BFL.FrameInitializer then
+	elseif event == "BN_INFO_CHANGED" then
+		if BFL.FrameInitializer then
 			BFL.FrameInitializer:RefreshStatusDropdown(BetterFriendsFrame)
 		end
-		-- NOTE: BFL:FireEventCallbacks(event) is NOT called here because Core.lua's
-		-- eventFrame already fires callbacks for all registered events (including these).
-		-- Calling it again would execute each callback twice per event.
-
-		-- Hidden frames only mark the list dirty; data is refreshed on open.
-		if IsBetterFriendsFrameVisible() then
-			RequestUpdate()
-		else
-			MarkFriendsListNeedsUpdate()
-		end
+		-- FriendsList owns the data refresh through Core.lua's event callback frame.
+		-- Keeping a second update path here would rebuild the list twice per event.
 	elseif
 		event == "SOCIAL_QUEUE_UPDATE"
 		or event == "SOCIAL_UI_SOCIAL_QUEUE_SYSTEM_STATUS_UPDATED"
@@ -4187,20 +4162,12 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
 			BetterFriendsFrame_UpdateQuickJoinTab()
 		end
-		-- Fire callbacks for RaidFrame module
-		BFL:FireEventCallbacks(event, ...)
 	elseif
 		event == "BATTLE_NET_FRIEND_TAG_ENABLED_STATUS_UPDATED"
-		or event == "BATTLE_NET_TITLE_FRIEND_CUSTOM_NAME_ENABLED_STATUS_UPDATED"
 		or event == "SOCIAL_UI_FRIENDS_LIST_SYSTEM_STATUS_UPDATED"
-		or event == "LEGACY_FRIEND_SYSTEM_STATUS_UPDATED"
 		or event == "CONFIRM_BATTLE_NET_FRIEND_INVITE_SHOW"
 	then
 		RequestUpdate()
-		BFL:FireEventCallbacks(event, ...)
-	elseif event == "GROUP_ROSTER_UPDATE" or event == "RAID_ROSTER_UPDATE" or event == "PLAYER_ROLES_ASSIGNED" then
-		-- Fire callbacks for RaidFrame module to update raid info
-		BFL:FireEventCallbacks(event, ...)
 	elseif event == "PLAYER_REGEN_DISABLED" then
 		-- Entering combat - update combat overlay on all raid buttons
 		BetterRaidFrame_UpdateCombatOverlay(true)
@@ -4241,9 +4208,6 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			BFL:RestoreBetterFriendsFrameUIPanelAfterCombat()
 		end
 	elseif event == "WHO_LIST_UPDATE" then
-		-- Fire callbacks for modules
-		BFL:FireEventCallbacks(event, ...)
-
 		-- Update Who list when results are received
 		if BetterFriendsFrame and BetterFriendsFrame:IsShown() and BetterFriendsFrame.WhoFrame:IsShown() then
 			BetterWhoFrame_Update()
