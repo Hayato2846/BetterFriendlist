@@ -7,13 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [DRAFT]
+## [2.6.8]        - 2026-07-14
+
+### Improved
+- **Translations** - Many translations across all supported languages have been updated, corrected, and expanded.
+- **Classic Anniversary** - BetterFriendlist now loads normally with the Classic Anniversary 2.5.6 client update.
 
 ### Fixed
-- **Friend Search** - Searching now keeps Battle.net friends visible when the query matches a displayed WoW contact custom name or any of their other visible game-account characters and realms.
-- **Multi-Account Filters** - Built-in WoW, Retail, and In Game filters plus custom Character, Realm, Client, Game, and WoW Project rules now inspect every visible game account instead of only the focused account.
-- **Mobile-Only Status** - Treat Mobile as Offline now keeps friends online when they are simultaneously active on another game account.
-- **Friend List Refreshes** - Event bursts now use one cancelable refresh timer, duplicate event rebuilds are avoided, and temporarily incomplete Battle.net responses keep the last complete friend list while BFL retries.
+- **Friend Search** - Search now checks a friend's displayed WoW contact name plus every visible character and realm linked to their Battle.net account.
+- **Multi-Account Filters** - The WoW, WoW Online, Retail, and In Game filters, along with matching custom rules, now check every visible game account instead of only the focused one.
+- **Mobile-Only Status** - Treat Mobile as Offline now only marks friends offline when the Battle.net mobile app is their only active session. They stay online while playing another Blizzard game.
+- **Friend List Refreshes** - Rapid friend-status changes no longer cause duplicate refreshes, and BetterFriendlist keeps the last complete list visible while Battle.net data is still loading.
 
 ---
 
