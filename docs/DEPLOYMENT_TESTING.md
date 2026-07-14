@@ -136,7 +136,11 @@ Back up Retail SavedVariables:
 4. Deploy the candidate with `CleanCopy` to Retail and the relevant Classic clients.
 5. Test with clean and migrated SavedVariables profiles.
 6. Update `CHANGELOG.md` and the `.toc` version when doing release work.
-7. Push the tag; GitHub Actions packages and publishes the release.
+7. Create the tag through the local release gate. It validates full locale coverage, English leakage,
+   placeholder/markup parity, translation freshness, and runtime switching through all locales before a tag exists:
+   `.\tools\BFL-CreateReleaseTag.ps1 -Version X.Y.Z`. Add `-Push` only when publication is intended.
+   Do not create or push release tags with raw git commands. GitHub Actions packages and publishes
+   only the already validated tag.
    Discord release notes are sent only for newly created stable or beta release tags, not for
    force-pushed tag corrections. Beta release notes use a distinct embed color and include
    a beta-version notice.
@@ -150,8 +154,8 @@ Run the local review gate before opening or updating a PR:
 .\tools\BFL-ReviewCheck.ps1
 ```
 
-The review check runs package validation, verifies TOC file references, checks changed locale
-keys against `enUS`, scans changed Lua files for common bug patterns, and prints diff-based
+The review check runs package validation, verifies TOC file references, enforces genuine and
+current translations for changed `enUS` keys, scans changed Lua files for common bug patterns, and prints diff-based
 review risk buckets. On pull requests, GitHub Actions runs the same script and writes the
 summary to the job output.
 

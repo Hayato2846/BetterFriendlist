@@ -1269,7 +1269,8 @@ BFL:RegisterLocale("ptBR", function()
 	L.SETTINGS_INGAME_MODE_ANY = "Qualquer Jogo"
 	L.SETTINGS_INGAME_MODE_LABEL = "   Modo:"
 	L.SETTINGS_INGAME_MODE_TOOLTIP = "Modo"
-	L.SETTINGS_INGAME_MODE_TOOLTIP_DESC = "Escolha amigos."
+	L.SETTINGS_INGAME_MODE_TOOLTIP_DESC =
+		"Escolha quais amigos incluir no grupo Em jogo:\n\n|cffffffffSomente WoW:|r amigos na mesma versão do WoW (Retail/Classic)\n|cffffffffQualquer jogo:|r amigos em qualquer jogo da Battle.net"
 	L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT = "   Unidade de duração:"
 	L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT_DESC =
 		"Escolha a unidade de tempo para quanto tempo os amigos permanecem no grupo Adicionados recentemente."
@@ -1503,7 +1504,7 @@ BFL:RegisterLocale("ptBR", function()
 	L.RAID_MOCK_CREATED_MYTHIC = "Criado 20j (M)"
 	L.RAID_MOCK_STRESS = "Stress test"
 	L.RAID_WARN_CPU = "|cffff8800Aviso:|r CPU alta"
-	L.RAID_NO_MOCK_DATA = "Sem dados. '/bfl raid mock'"
+	L.RAID_NO_MOCK_DATA = "|cffff8800Quadro de raide do BFL:|r Nenhum dado de teste. Use '/bfl raid mock' primeiro."
 	L.RAID_SIM_READY_CHECK = "Sim Ready Check..."
 	L.RAID_MOCK_CLEARED = "Limpo"
 	L.RAID_EVENT_COMMANDS = "|cff00ff00Eventos Raid:|r"

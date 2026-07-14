@@ -8489,57 +8489,57 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
+	local localeTestState
 	TS:RegisterTest("issues", "Locales_RequiredKeys", {
-		description = "Critical localization keys must exist in all locales",
-		action = function(V)
-			V:AssertNotNil(BFL.L, "Localization table should exist")
-			V:AssertNotNil(BFL.Locales, "Locale registry should exist")
-
-			local requiredKeys = {
-				"DIALOG_DELETE_GROUP_TEXT",
-				"DIALOG_RENAME_GROUP_TEXT",
-				"ERROR_GROUP_NAME_EMPTY",
-				"ERROR_GROUP_EXISTS",
-				"ERROR_GROUP_NOT_EXIST",
-				"SETTINGS_GROUP_COLOR",
-				"SETTINGS_TAB_THEME",
-				"SETTINGS_THEME_HEADER",
-				"SETTINGS_THEME_DROPDOWN",
-				"SETTINGS_THEME_DROPDOWN_DESC",
-				"SETTINGS_THEME_BLIZZARD",
-				"SETTINGS_THEME_DARK",
-				"SETTINGS_THEME_ELVUI",
-				"TOOLTIP_GROUP_COLOR_DESC",
-				"CORE_HELP_TEST_COMMANDS",
-				"CORE_HELP_TEST_ACTIVITY",
-				"STATUS_AFK",
-				"STATUS_APPEAR_OFFLINE",
-				"MENU_SET_TITLE_FRIEND_NAME",
-				"TITLE_FRIEND_CUSTOM_NAME_PROMPT",
-			}
-
-			local originalLocale = BFL.ConfiguredLocale
-			local originalMissing = BFL.MissingKeys
+		description = "Every enUS localization key must exist in every registered locale",
+		setup = function()
+			localeTestState = { locale = BFL.ConfiguredLocale, missingKeys = BFL.MissingKeys }
 			BFL.MissingKeys = {}
+		end,
+		action = function(V)
+			V:Assert(BFL.L and BFL.Locales, "Localization system should exist")
+			V:AssertNotNil(BFL_LOCALE_ENUS, "enUS fallback table should exist")
 
-			for localeName, _ in pairs(BFL.Locales) do
-				BFL:SetLocale(localeName)
+			local expectedKeys, localeNames = {}, {}
+			for key in pairs(BFL_LOCALE_ENUS) do table.insert(expectedKeys, key) end
+			table.sort(expectedKeys)
+			V:Assert(#expectedKeys > 0, "enUS fallback table should contain localization keys")
+			for localeName in pairs(BFL.Locales) do table.insert(localeNames, localeName) end
+			table.sort(localeNames)
 
-				local localeTable = BFL_LOCALE
-				if localeName == "enUS" then
-					localeTable = BFL_LOCALE_ENUS
+			local findingCount, affectedLocales = 0, 0
+			for _, localeName in ipairs(localeNames) do
+				local findings = {}
+				local switchOk, switchError = pcall(BFL.SetLocale, BFL, localeName)
+				if not switchOk then table.insert(findings, "locale load failed: " .. tostring(switchError)) else
+					local localeTable = localeName == "enUS" and BFL_LOCALE_ENUS or BFL_LOCALE
+					for _, key in ipairs(expectedKeys) do
+						local value = localeTable and rawget(localeTable, key)
+						if type(value) ~= "string" or value == "" then
+							local reason = value == nil and "missing" or value == "" and "empty" or "non-string"
+							table.insert(findings, key .. " (" .. reason .. ")")
+						end
+					end
 				end
-
-				for _, key in ipairs(requiredKeys) do
-					local value = localeTable and rawget(localeTable, key)
-					V:Assert(value ~= nil and value ~= "", "Missing localization key in " .. localeName .. ": " .. key)
+				if #findings == 0 then
+					TS.Reporter:Info(string.format("%s: %d keys checked, no findings", localeName, #expectedKeys))
+				else
+					affectedLocales = affectedLocales + 1; findingCount = findingCount + #findings
+					TS.Reporter:Warn(string.format("%s: %d localization finding(s)", localeName, #findings))
+					for _, finding in ipairs(findings) do TS.Reporter:Warn("  " .. localeName .. ":" .. finding) end
 				end
 			end
 
-			if originalLocale then
-				BFL:SetLocale(originalLocale)
+			V:Assert(findingCount == 0, string.format("%d localization finding(s) across %d locale(s); complete report shown above", findingCount, affectedLocales))
+		end,
+		teardown = function()
+			if localeTestState and localeTestState.locale then
+				BFL:SetLocale(localeTestState.locale)
 			end
-			BFL.MissingKeys = originalMissing
+			if localeTestState then
+				BFL.MissingKeys = localeTestState.missingKeys
+			end
+			localeTestState = nil
 		end,
 	})
 

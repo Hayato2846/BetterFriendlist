@@ -1227,7 +1227,8 @@ BFL:RegisterLocale("koKR", function()
 	L.SETTINGS_INGAME_MODE_ANY = "모든 게임"
 	L.SETTINGS_INGAME_MODE_LABEL = "   모드:"
 	L.SETTINGS_INGAME_MODE_TOOLTIP = "모드"
-	L.SETTINGS_INGAME_MODE_TOOLTIP_DESC = "표시할 친구를 선택합니다."
+	L.SETTINGS_INGAME_MODE_TOOLTIP_DESC =
+		"게임 중 그룹에 포함할 친구를 선택하세요:\n\n|cffffffffWoW만:|r 같은 WoW 버전(Retail/Classic)을 플레이하는 친구\n|cffffffff모든 게임:|r Battle.net 게임을 플레이하는 친구"
 	L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT = "   기간 단위:"
 	L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT_DESC =
 		"최근 추가됨 그룹에 친구가 유지되는 시간 단위를 선택하세요."
@@ -1376,7 +1377,7 @@ BFL:RegisterLocale("koKR", function()
 	L.CORE_FEATURE_MODERN_DROPDOWN = "  최신 드롭다운: %s"
 	L.CORE_FEATURE_MODERN_COLORPICKER = "  최신 색상 선택기: %s"
 	L.CORE_COMPAT_LAYER = "|cffffcc00호환성 계층:|r %s"
-	L.CORE_COMPAT_ACTIVE = "Classic 호환 모드 활성"
+	L.CORE_COMPAT_ACTIVE = "|cff00ff00Classic 호환 모드 활성|r"
 	L.CORE_COMPAT_NOT_LOADED = "|cffff0000로드되지 않음|r"
 	L.CORE_CHANGELOG_RESET = "변경 기록을 초기화했습니다."
 	L.CORE_CHANGELOG_NOT_LOADED = "변경 기록을 불러오지 않았습니다"
@@ -1460,7 +1461,7 @@ BFL:RegisterLocale("koKR", function()
 	L.RAID_MOCK_CREATED_MYTHIC = "20인 신화 시험 공격대를 만들었습니다"
 	L.RAID_MOCK_STRESS = "부하 시험"
 	L.RAID_WARN_CPU = "|cffff8800경고:|r 높은 CPU 사용량이 예상됩니다!"
-	L.RAID_NO_MOCK_DATA = "시험 데이터가 없습니다. 먼저 '/bfl raid mock'을 사용하세요."
+	L.RAID_NO_MOCK_DATA = "|cffff8800BFL 공격대 창:|r 시험 데이터가 없습니다. 먼저 '/bfl raid mock'을 사용하세요."
 	L.RAID_SIM_READY_CHECK = "전투 준비 확인 모의 실행 중..."
 	L.RAID_MOCK_CLEARED = "시험 데이터를 제거했습니다"
 	L.RAID_EVENT_COMMANDS = "|cff00ff00공격대 창 이벤트 명령어:|r"

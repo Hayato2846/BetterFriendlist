@@ -1513,7 +1513,7 @@ BFL:RegisterLocale("esES", function()
 	L.RAID_MOCK_CREATED_MYTHIC = "Creada raid 20j (Mítica)"
 	L.RAID_MOCK_STRESS = "Stress test: 40j rápido"
 	L.RAID_WARN_CPU = "|cffff8800Aviso:|r Alto uso CPU esperado"
-	L.RAID_NO_MOCK_DATA = "Sin datos prueba. Usa '/bfl raid mock'"
+	L.RAID_NO_MOCK_DATA = "|cffff8800Marco de banda de BFL:|r No hay datos de prueba. Usa primero '/bfl raid mock'."
 	L.RAID_SIM_READY_CHECK = "Simulando Ready Check..."
 	L.RAID_MOCK_CLEARED = "Datos prueba borrados"
 	L.RAID_EVENT_COMMANDS = "|cff00ff00Comandos Evento Raid:|r"

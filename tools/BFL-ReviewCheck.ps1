@@ -449,8 +449,20 @@ if (-not $SkipPackageCheck) {
 Write-ReviewSection 'TOC References'
 Test-TocReferences $repoRoot
 
-Write-ReviewSection 'Locale Key Coverage'
-Test-LocaleKeyCoverage -RepoRoot $repoRoot -ChangedFiles $changedFiles -BaseRef $BaseRef
+Write-ReviewSection 'Localization Contract'
+try {
+    $localizationScript = Join-Path $repoRoot 'tools/BFL-LocalizationCheck.ps1'
+    if (-not [string]::IsNullOrWhiteSpace($BaseRef)) {
+        & $localizationScript -Mode Changed -BaseRef $BaseRef
+    } else {
+        & $localizationScript -Mode Changed
+    }
+    if ($LASTEXITCODE -ne 0) {
+        Add-Failure "BFL-LocalizationCheck.ps1 exited with code $LASTEXITCODE."
+    }
+} catch {
+    Add-Failure "BFL-LocalizationCheck.ps1 failed: $($_.Exception.Message)"
+}
 
 Write-ReviewSection 'Static Lua Patterns'
 Test-StaticLuaPatterns -RepoRoot $repoRoot -ChangedFiles $changedFiles -BaseRef $BaseRef

@@ -1241,7 +1241,8 @@ BFL:RegisterLocale("ruRU", function()
 	L.SETTINGS_INGAME_MODE_ANY = "Любая игра"
 	L.SETTINGS_INGAME_MODE_LABEL = "   Режим:"
 	L.SETTINGS_INGAME_MODE_TOOLTIP = "Режим"
-	L.SETTINGS_INGAME_MODE_TOOLTIP_DESC = "Выбрать друзей"
+	L.SETTINGS_INGAME_MODE_TOOLTIP_DESC =
+		"Выберите друзей для группы «В игре»:\n\n|cffffffffТолько WoW:|r друзья, играющие в ту же версию WoW (Retail/Classic)\n|cffffffffЛюбая игра:|r друзья, играющие в любую игру Battle.net"
 	L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT = "   Единица времени:"
 	L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT_DESC =
 		"Выберите единицу времени, определяющую как долго друзья остаются в группе Недавно добавленные."
@@ -1392,7 +1393,7 @@ BFL:RegisterLocale("ruRU", function()
 	L.CORE_FEATURE_MODERN_DROPDOWN = "  Выпадающий список: %s"
 	L.CORE_FEATURE_MODERN_COLORPICKER = "  Выбор Цвета: %s"
 	L.CORE_COMPAT_LAYER = "|cffffcc00Совместимость:|r %s"
-	L.CORE_COMPAT_ACTIVE = "Режим совместимости Classic активен"
+	L.CORE_COMPAT_ACTIVE = "|cff00ff00Режим совместимости Classic активен|r"
 	L.CORE_COMPAT_NOT_LOADED = "|cffff0000Не загружено|r"
 	L.CORE_CHANGELOG_RESET = "Список изменений сброшен"
 	L.CORE_CHANGELOG_NOT_LOADED = "Список изменений не загружен"
@@ -1477,7 +1478,7 @@ BFL:RegisterLocale("ruRU", function()
 	L.RAID_MOCK_CREATED_MYTHIC = "Создан 20ппл (Эпохальный)"
 	L.RAID_MOCK_STRESS = "Стресс-тест"
 	L.RAID_WARN_CPU = "|cffff8800Внимание:|r ожидается высокая загрузка процессора!"
-	L.RAID_NO_MOCK_DATA = "Нет данных. '/bfl raid mock'"
+	L.RAID_NO_MOCK_DATA = "|cffff8800Рейдовая панель BFL:|r Нет тестовых данных. Сначала используйте '/bfl raid mock'."
 	L.RAID_SIM_READY_CHECK = "Симулировать проверку готовности..."
 	L.RAID_MOCK_CLEARED = "Очищено"
 	L.RAID_EVENT_COMMANDS = "|cff00ff00События рейда:|r"
