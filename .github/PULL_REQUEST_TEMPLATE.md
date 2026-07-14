@@ -5,7 +5,7 @@
 
 - [ ] Retail impact checked
 - [ ] Classic impact checked
-- [ ] Locale coverage checked or not applicable
+- [ ] Localization contract passes with genuine translations, or not applicable
 - [ ] Changelog updated or not user-visible
 - [ ] Package/review checks pass
 - [ ] Taint, combat, and secret-value impact checked or not applicable

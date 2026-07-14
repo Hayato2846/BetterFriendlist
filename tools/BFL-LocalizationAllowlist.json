@@ -1,0 +1,215 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "locale": "*",
+      "key": "SETTINGS_THEME_ELVUI",
+      "checks": ["source-identical", "english-language"],
+      "reason": "ElvUI is a product name."
+    },
+    {
+      "locale": "*",
+      "key": "MENU_BETTERFRIENDLIST_TITLE",
+      "checks": ["source-identical", "english-language"],
+      "reason": "BetterFriendList is the addon name used by this legacy menu title."
+    },
+    {
+      "locale": "*",
+      "key": "BROKER_TITLE",
+      "checks": ["source-identical", "english-language"],
+      "reason": "BetterFriendlist is the addon name."
+    },
+    {
+      "locale": "*",
+      "key": "MENU_TITLE",
+      "checks": ["source-identical", "english-language"],
+      "reason": "BetterFriendlist is the addon name."
+    },
+    {
+      "locale": "*",
+      "key": "SETTINGS_RAID_MODIFIER_SHIFT",
+      "checks": ["source-identical", "english-language"],
+      "reason": "Shift is the keyboard key label shown by the client."
+    },
+    {
+      "locale": "*",
+      "key": "SETTINGS_RAID_MODIFIER_CTRL",
+      "checks": ["source-identical", "english-language"],
+      "reason": "Ctrl is the keyboard key label shown by the client."
+    },
+    {
+      "locale": "*",
+      "key": "SETTINGS_RAID_MODIFIER_ALT",
+      "checks": ["source-identical", "english-language"],
+      "reason": "Alt is the keyboard key label shown by the client."
+    },
+    {
+      "locale": "*",
+      "key": "GUILD_CONTEXT_SECTION_ADDON",
+      "checks": ["source-identical", "english-language"],
+      "reason": "BetterFriendlist is the addon name."
+    },
+    {
+      "locale": "*",
+      "key": "SETTINGS_CENTER_SUPPORT_DISCORD",
+      "checks": ["source-identical", "english-language"],
+      "reason": "Discord is a product name."
+    }
+  ],
+  "values": [],
+  "valueSets": [
+    {
+      "locales": ["deDE"],
+      "values": [
+        "  ✓ <33.3ms = 30 FPS",
+        "%d / %d online",
+        "%d online",
+        "|cff00ff00=== BetterFriendlist v%s ===|r",
+        "|cff00ff00Online: %d (%d%%)|r  |  |cff808080Offline: %d (%d%%)|r",
+        "Client",
+        "Dungeon",
+        "Dungeons",
+        "Editor",
+        "Filter: ",
+        "Mobile",
+        "Name",
+        "Name (A-Z)",
+        "Name (BattleTag)",
+        "Normal (12px)",
+        "Offline",
+        "Online",
+        "Raid",
+        "Realm",
+        "Realm:",
+        "Status",
+        "Status:",
+        "System",
+        "Tag",
+        "Tags",
+        "Tank",
+        "Tooltip",
+        "Tooltips",
+        "Version",
+        "Version %s",
+        "WoW Online",
+        "Zone",
+        "Zone:"
+      ],
+      "checks": ["source-identical", "english-language"],
+      "reason": "Established German WoW, UI, online-status, and technical terms use the same spelling."
+    },
+    {
+      "locales": ["esES", "esMX"],
+      "values": [
+        "  ✓ <16.6ms = 60 FPS",
+        "  ✓ <33.3ms = 30 FPS",
+        "|cff00ff00=== BetterFriendlist v%s ===|r",
+        "Control",
+        "Editor",
+        "Error",
+        "General",
+        "Manual",
+        "No",
+        "Normal (12px)",
+        "Roles",
+        "Total:",
+        "Visible",
+        "Visual"
+      ],
+      "checks": ["source-identical", "english-language"],
+      "reason": "These Spanish UI words and technical metrics are correctly spelled identically to enUS."
+    },
+    {
+      "locales": ["frFR"],
+      "values": [
+        "   Support",
+        "  ✓ <16.6ms = 60 FPS",
+        "  ✓ <33.3ms = 30 FPS",
+        "|cff00ff00=== BetterFriendlist v%s ===|r",
+        "Accent",
+        "Client",
+        "Communication",
+        "Faction",
+        "Interaction",
+        "Minutes",
+        "Mobile",
+        "Modifier",
+        "Monochrome",
+        "Normal (12px)",
+        "Note",
+        "Notes",
+        "Options",
+        "Professions",
+        "Race",
+        "Raid",
+        "Surface",
+        "Tank",
+        "Type",
+        "Version",
+        "Version %s",
+        "Visible",
+        "Zone"
+      ],
+      "checks": ["source-identical", "english-language"],
+      "reason": "These French UI words, gaming terms, and technical metrics are correctly spelled identically to enUS."
+    },
+    {
+      "locales": ["itIT"],
+      "values": [
+        "  ✓ <16.6ms = 60 FPS",
+        "  ✓ <33.3ms = 30 FPS",
+        "%d / %d online",
+        "%d online",
+        "\\nMobile: %d",
+        "|cff00ff00Online: %d (%d%%)|r  |  |cff808080Offline: %d (%d%%)|r",
+        "Client",
+        "Editor",
+        "Mobile",
+        "Mod:",
+        "Modifier",
+        "No",
+        "Offline",
+        "Online",
+        "Surface",
+        "Version",
+        "WoW Online"
+      ],
+      "checks": ["source-identical", "english-language"],
+      "reason": "These Italian UI words, online-status terms, and technical metrics are correctly spelled identically to enUS."
+    },
+    {
+      "locales": ["ptBR"],
+      "values": [
+        "  ✓ <16.6ms = 60 FPS",
+        "  ✓ <33.3ms = 30 FPS",
+        "%d / %d online",
+        "%d online",
+        "\\nMobile: %d",
+        "|cff00ff00Online: %d (%d%%)|r  |  |cff808080Offline: %d (%d%%)|r",
+        "Editor",
+        "Manual",
+        "Normal (12px)",
+        "Offline",
+        "Online",
+        "Online / Total",
+        "Status",
+        "Status:",
+        "Total:",
+        "Version",
+        "Visual",
+        "WoW Online"
+      ],
+      "checks": ["source-identical", "english-language"],
+      "reason": "These Brazilian Portuguese UI words, online-status terms, and technical metrics are correctly spelled identically to enUS."
+    },
+    {
+      "locales": ["koKR"],
+      "values": [
+        "  ✓ <16.6ms = 60 FPS",
+        "  ✓ <33.3ms = 30 FPS"
+      ],
+      "checks": ["source-identical", "english-language"],
+      "reason": "FPS threshold metrics are language-neutral technical labels."
+    }
+  ]
+}

@@ -18,7 +18,9 @@
 
 - Keep runtime logic in `Modules\`, shared helpers in `Utils\`, static data in `Data\`, and UI wiring thin.
 - Check Retail and Classic impact for every user-visible feature or bugfix. Prefer existing `BFL.Is*`, `BFL.Has*`, and `BFL.Compat` helpers over raw flavor checks.
-- Put new user-facing strings through localization and update all locale files in the same change.
+- Put new user-facing strings through localization and provide real translations in all 10 non-English locale files in the same change. Never copy the English source into translated locales as a placeholder, and never defer translations to a later task.
+- When an existing `enUS` value changes, review and update that key in every translated locale in the same change. Preserve printf placeholders, WoW markup, links, and escaped newlines.
+- Treat a locale-affecting task as incomplete until `tools\BFL-LocalizationCheck.ps1 -Mode Changed -BaseRef <branch-base>` passes. Use `tools\BFL-LocalizationAllowlist.json` only for intrinsically untranslated product names, client key labels, or established locale-specific UI terms. Scope every exception to an exact locale/key or exact locale/value match and document the reason; never allow substrings or an entire locale.
 - Do not leave Perfy instrumentation in normal source. Use `tools\BFL-PerfyCleanup.ps1` to inspect cleanup candidates instead of running `git restore .`.
 
 ## Validation
@@ -30,6 +32,12 @@
 - Use `tools\BFL-ReadyForQA.ps1` only for PR readiness, explicit "ready for QA", release-near work, broad/risky changes, or final handoff after substantial runtime work. Pass `-DeployClient retail` or `-DeployClient all` only when deploy validation is actually needed.
 - Use `tools\BFL-ReviewCheck.ps1` for focused review diagnostics when `ReadyForQA` is too broad.
 - Keep `.pkgmeta` aligned with ignored internal files so release packages do not include Codex, docs, tools, logs, backups, or workspace metadata.
+
+## Release Tags
+
+- Never create or push a release tag with raw `git tag` or `git push ... vX.Y.Z` commands.
+- Use `tools\BFL-CreateReleaseTag.ps1 -Version X.Y.Z` for local validation and tag creation. Add `-Push` only when publication was explicitly requested.
+- The tag gate must pass the full localization contract, translation-freshness check, and Lua locale-switching runtime smoke before a tag exists. Do not bypass, weaken, or move these checks into `.github\workflows\release.yml`.
 
 ## VSCode And Codex
 

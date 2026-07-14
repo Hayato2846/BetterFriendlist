@@ -1,6 +1,6 @@
 ---
 name: bfl-feature
-description: Plan, scope, implement, validate, and hand off BetterFriendlist feature work. Use when Codex is asked to add, change, prototype, migrate, or finish a BFL feature or bugfix, especially when the work may touch Lua/XML, settings, localization, Retail/Classic compatibility, SavedVariables, changelog entries, deployment, or a feature worktree.
+description: Plan, scope, implement, validate, and hand off BetterFriendlist feature work. Use when Codex is asked to add, change, prototype, migrate, or finish a BFL feature or bugfix, especially when the work may touch Lua/XML, settings, localization or locale keys, Retail/Classic compatibility, SavedVariables, changelog entries, release tagging, deployment, or a feature worktree.
 ---
 
 # BFL Feature
@@ -37,7 +37,9 @@ If the request is vague, ask the smallest useful clarification or state the work
 - Prefer existing modules, compatibility helpers, settings components, and localization patterns over new abstractions.
 - Keep `BetterFriendlist.lua` and UI callback files thin. Put business logic in `Modules\`, shared helpers in `Utils\`, and static data in `Data\`.
 - Add persistent settings through DB defaults and migrations when needed. Beta features default to disabled and must leave no side effects when off.
-- Route user-facing text through localization and update all locale files in the same task.
+- Route user-facing text through localization and write genuine translations for all 10 non-English locales in the same task. Never insert English placeholders, TODO translations, or copied fallback text.
+- Treat changed `enUS` values like new localization work: review and update the same key in every translated locale while preserving printf placeholders, WoW markup, links, and escaped newlines.
+- Do not hand off locale-affecting work until `tools\BFL-LocalizationCheck.ps1 -Mode Changed -BaseRef <branch-base>` passes. Add allowlist entries only for intrinsically untranslated product names, client key labels, or established locale-specific UI terms. Scope them to an exact locale/key or exact locale/value match, justify them, and never allow substrings or an entire locale.
 - Check UI tasks against `docs/UI_CONVENTIONS.md`; use screenshots or a narrow visual assumption when layout, density, color, clipping, or state is material.
 - Verify WoW API usage against local Retail and Classic UI sources before adding or changing calls.
 - Use capability flags and BFL compatibility wrappers before raw flavor checks.
@@ -54,10 +56,17 @@ Choose the smallest validation set that matches risk:
 - Warning delta: run `tools\BFL-PreCommitDelta.ps1` when code changes could introduce new pre-commit warning signatures. Use `tools\BFL-PreCommitDelta.ps1 -UpdateBaseline` only when intentionally accepting a changed warning baseline.
 - Full QA: run `tools\BFL-ReadyForQA.ps1` only for PR readiness, explicit "ready for QA", release-near work, broad/risky changes, or final handoff after substantial runtime work.
 - Focused review diagnostics: run `tools\BFL-ReviewCheck.ps1` when `ReadyForQA` is too broad.
+- Localization: run `tools\BFL-LocalizationCheck.ps1 -Mode Changed -BaseRef <branch-base>` whenever user-facing keys or values changed. A failure means the feature remains incomplete; do not replace missing translations with English to make the check pass.
 - Performance investigations: keep Perfy instrumentation separate and clean it with `tools\BFL-PerfyCleanup.ps1`; do not run `git restore .` as cleanup.
 - Broad or risky changes: inspect `git diff --stat`, review changed files for common BFL bug traps, and run only the checks needed for the changed surface.
 
 Report any validation skipped or blocked with the exact command and reason.
+
+## Release Tags
+
+- Never create or push `v*` tags with raw git commands.
+- Use `tools\BFL-CreateReleaseTag.ps1 -Version X.Y.Z`; pass `-Push` only after the user explicitly requests publication.
+- Keep localization validation local and before tag creation. Do not move the tag gate into `.github/workflows/release.yml` or bypass its full, freshness, or Lua locale-switching runtime checks.
 
 ## Handoff
 
