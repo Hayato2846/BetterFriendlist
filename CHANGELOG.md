@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+
+### Fixed
+- **Who Searches** - Broad Who searches no longer leave an invisible Blizzard window that blocks Escape and disrupts other window positions.
+
+---
+
 ## [2.6.8]        - 2026-07-14
 
 ### Improved
@@ -162,11 +169,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Outlook
 - **Guild Tab** - A Retail and Classic Guild tab is planned for upcoming releases, with a BetterFriendlist-owned roster view for searching guild members, filtering online/offline members, sorting by rank, name, level, class, zone, status, and last online time, and showing guild counts, notes, status, and class information through the shared safe roster provider.
-
-## [2.5.9]        - 2026-05-17
-
-### Fixed
-- **ElvUI Top Tabs** - Centered the Friends, Recent Allies, and Recruit A Friend tab labels in the ElvUI skin.
 
 ---
 

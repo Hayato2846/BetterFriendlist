@@ -1013,7 +1013,11 @@ function BFL:HideBlizzardFriendsFrameForRedirect()
 		FriendsFrame.IgnoreListWindow:Hide()
 	end
 
-	FriendsFrame:Hide()
+	if InCombatLockdown() then
+		self.pendingBlizzardFriendsFrameHide = true
+		return false
+	end
+	(HideUIPanel or FriendsFrame.Hide)(FriendsFrame) -- Clear its managed UIPanel slot while still shown.
 
 	if FriendsFrame:IsShown() then
 		self.pendingBlizzardFriendsFrameHide = true
@@ -1179,11 +1183,7 @@ function BFL:InstallFriendsFrameRedirects()
 				PanelTemplates_SetTab(FriendsFrame, 1)
 			end
 
-			frame:SetAlpha(0)
-			if frame:IsShown() then
-				frame:Hide()
-			end
-			BFL.pendingBlizzardFriendsFrameHide = nil
+			BFL:HideBlizzardFriendsFrameForRedirect()
 			BFL.friendsFrameRedirectOnShowPending = true
 
 			RunNextFrame(function()
