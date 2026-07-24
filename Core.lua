@@ -2050,18 +2050,18 @@ local eventFrame = CreateFrame("Frame")
 -- @param priority: Optional priority (lower = called first), default 50
 function BFL:RegisterEventCallback(event, callback, priority)
 	priority = priority or 50
-
 	if not self.EventCallbacks[event] then
+		local registerEvent = self.Compat and self.Compat.RegisterEvent or eventFrame.RegisterEvent
+		local ok, registered = pcall(registerEvent, eventFrame, event)
+		if not ok or registered == false then
+			return false
+		end
 		self.EventCallbacks[event] = {}
-		-- Auto-register WoW event with the event frame
-		eventFrame:RegisterEvent(event)
 	end
-
 	table.insert(self.EventCallbacks[event], {
 		callback = callback,
 		priority = priority,
 	})
-
 	-- Sort by priority
 	table.sort(self.EventCallbacks[event], function(a, b)
 		return a.priority < b.priority

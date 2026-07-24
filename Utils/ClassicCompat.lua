@@ -1639,6 +1639,10 @@ local CLASSIC_ONLY_EVENTS = {
 
 -- Check if an event exists in the current game version
 function Compat.EventExists(eventName)
+	if type(eventName) ~= "string" or eventName == "" then
+		return false
+	end
+
 	-- Events in the retail-only list
 	for _, event in ipairs(RETAIL_ONLY_EVENTS) do
 		if event == eventName then
@@ -1653,17 +1657,33 @@ function Compat.EventExists(eventName)
 		end
 	end
 
-	-- Assume event exists in all versions
+	-- Prefer the client's event registry when available. Events can differ by
+	-- flavor and may be added or removed between builds.
+	if C_EventUtils and type(C_EventUtils.IsEventValid) == "function" then
+		local ok, exists = pcall(C_EventUtils.IsEventValid, eventName)
+		if ok then
+			return exists == true
+		end
+	end
+
+	-- Older clients do not expose event validation. Registration still uses
+	-- pcall below so an unknown event cannot abort addon initialization.
 	return true
 end
 
 -- Safe event registration
 function Compat.RegisterEvent(frame, eventName)
-	if Compat.EventExists(eventName) then
-		frame:RegisterEvent(eventName)
-		return true
+	local frameType = type(frame)
+	if
+		(frameType ~= "table" and frameType ~= "userdata")
+		or type(frame.RegisterEvent) ~= "function"
+		or not Compat.EventExists(eventName)
+	then
+		return false
 	end
-	return false
+
+	local ok, result = pcall(frame.RegisterEvent, frame, eventName)
+	return ok and result ~= false
 end
 
 ------------------------------------------------------------

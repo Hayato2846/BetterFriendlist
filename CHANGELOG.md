@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+
+### Improved
+- **Classic Era 1.15.9 Compatibility** - BetterFriendlist and its Menu Bridge now declare support for the latest Classic Era client.
+
+### Fixed
+- **Event Compatibility** - Client-specific or removed events no longer stop addon initialization when Blizzard changes the event registry between game flavors or builds.
+- **Raid Spec Inspection** - Raid role tools now read the character GUID from `INSPECT_READY` correctly so specialization inspection can complete.
+
+---
+
 ## [2.6.9]        - 2026-07-22
 
 ### Fixed
@@ -143,32 +154,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Top Tabs** - Reduced hitches when switching between Friends, Recent Allies, Recruit A Friend, and Guild tabs.
 - **Guild Roster** - Reduced memory churn when reopening or switching to the Guild roster tab.
 - **Quick Join** - Reduced repeated row-height work while showing available groups.
-
-## [2.6.0]        - 2026-05-25
-
-### Added
-- **QuickFilter & Sorter Builder** - Added a dedicated settings tab for choosing visible QuickFilters and Sorters, building custom filter rules and sorter chains, previewing changes, and choosing BFL or Blizzard icons. Enable Beta Features under Advanced > Beta Features to show the tab.
-- **Theme Settings and Dark Theme** - Added a dedicated Retail Theme tab with Blizzard, Dark, and ElvUI choices, plus a BFL-owned Dark theme for BetterFriendlist windows, rows, dialogs, settings, and broker tooltips. Enable Beta Features under Advanced > Beta Features to show the tab. Classic support will follow as soon as possible in one of the next releases.
-- **Font Rendering** - Added per-font rendering flag settings and Slug rendering support on compatible clients.
-- **WoW Online Filter** - Added a quick filter for showing only online friends who are currently in WoW.
-
-### Changed
-- **QuickFilter and Sorter Menus** - QuickFilter menus, sort dropdowns, and Broker cycling now respect custom visibility and order, with safe fallbacks for hidden active selections.
-- **Theme Safety** - Theme choices now fall back safely when Beta Features are disabled, on non-Retail clients, or when ElvUI is unavailable.
-
-### Fixed
-- **Friend Tooltips** - Restored the "Also in group" details and Blizzard-matching restrictions on Battle.net request-to-join buttons.
-- **ElvUI Skin** - Fixed startup, availability, and settings-toggle issues when ElvUI was selected, unavailable, or managed outside the Retail beta Theme tab.
-- **Menu Compatibility** - Fixed protected Retail unit menu handling and restored Total RP 3 profile actions in BetterFriendlist friend menus.
-- **Raid Tools** - Fixed a Lua error after moving players between raid groups with drag and drop.
-- **Recruit A Friend** - Fixed reward-viewing tab issues, protected Copy Link errors, and a tooltip stack overflow.
-
-### Performance
-- **Friend List Sorting** - Reduced CPU time and memory churn when changing QuickFilters and Sorter selections.
-- **Quick Join** - Reduced repeated group-priority and friend-relationship lookups while sorting available groups.
-
-### Outlook
-- **Guild Tab** - A Retail and Classic Guild tab is planned for upcoming releases, with a BetterFriendlist-owned roster view for searching guild members, filtering online/offline members, sorting by rank, name, level, class, zone, status, and last online time, and showing guild counts, notes, status, and class information through the shared safe roster provider.
 
 ---
 

@@ -9971,7 +9971,7 @@ function TestSuite:Initialize()
 	self:RegisterBuiltinQuickFilterMultiAccountTest()
 	self:RegisterMobileOnlyAccountTest()
 	self:RegisterFriendUpdateDebounceTest()
-
+	self:RegisterEventCompatibilityTests()
 	BFL:DebugPrint("|cff00ccff[BFL TestSuite]|r Initialized with " .. self:GetTestCount() .. " tests")
 end
 
@@ -10892,6 +10892,25 @@ function TestSuite:RegisterAutoRaidAssistRosterFallbackTest()
 					error(err, 2)
 				end
 			end)
+		end,
+	})
+end
+
+function TestSuite:RegisterEventCompatibilityTests()
+	self:RegisterTest("events", "EventCallback_RejectsUnknownEvent", {
+		description = "Unknown client events must not abort initialization or leave a callback registry entry",
+		action = function(V)
+			local testEvent = "BFL_TEST_UNKNOWN_EVENT"
+			local originalCallbacks = BFL.EventCallbacks[testEvent]
+			BFL.EventCallbacks[testEvent] = nil
+
+			local ok, registered = pcall(BFL.RegisterEventCallback, BFL, testEvent, function() end, 50)
+			local callbacksAfterRegistration = BFL.EventCallbacks[testEvent]
+			BFL.EventCallbacks[testEvent] = originalCallbacks
+
+			V:Assert(ok, "Unknown event registration should not raise a Lua error")
+			V:AssertEqual(registered, false, "Unknown event registration should return false")
+			V:AssertNil(callbacksAfterRegistration, "Unknown events should not create callback registry entries")
 		end,
 	})
 end

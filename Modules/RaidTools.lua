@@ -346,7 +346,7 @@ function RaidTools:Initialize()
 
 	-- Spec detection via inspection (only available when GetInspectSpecialization exists)
 	if GetInspectSpecialization then
-		BFL:RegisterEventCallback("INSPECT_READY", function(_, guid)
+		BFL:RegisterEventCallback("INSPECT_READY", function(guid)
 			if not guid then
 				return
 			end
