@@ -2638,17 +2638,31 @@ function SkinEngine:InstallCustomDropdown(dropdown)
 	end
 
 	dropdown.BFL_DarkCustomDropdownInstalled = true
-	dropdown.BFL_DarkOriginalOnMouseDown = dropdown.GetScript and dropdown:GetScript("OnMouseDown")
-	dropdown.BFL_DarkOriginalOnMouseDownSet = true
-	if dropdown.SetScript then
-		dropdown:SetScript("OnMouseDown", function(self, button)
+	local isModernDropdown = BFL.IsModernDropdown and BFL.IsModernDropdown(dropdown)
+	if isModernDropdown and type(dropdown.OnMouseDown_Intrinsic) == "function" then
+		dropdown.BFL_DarkOriginalOnMouseDownIntrinsic = dropdown.OnMouseDown_Intrinsic
+		dropdown.BFL_DarkOriginalOnMouseDownIntrinsicSet = true
+		dropdown.OnMouseDown_Intrinsic = function(self, button)
 			if SkinEngine:ToggleCustomDropdown(self) then
 				return
 			end
-			if self.BFL_DarkOriginalOnMouseDown then
-				self.BFL_DarkOriginalOnMouseDown(self, button)
+			if self.BFL_DarkOriginalOnMouseDownIntrinsic then
+				self.BFL_DarkOriginalOnMouseDownIntrinsic(self, button)
 			end
-		end)
+		end
+	else
+		dropdown.BFL_DarkOriginalOnMouseDown = dropdown.GetScript and dropdown:GetScript("OnMouseDown")
+		dropdown.BFL_DarkOriginalOnMouseDownSet = true
+		if dropdown.SetScript then
+			dropdown:SetScript("OnMouseDown", function(self, button)
+				if SkinEngine:ToggleCustomDropdown(self) then
+					return
+				end
+				if self.BFL_DarkOriginalOnMouseDown then
+					self.BFL_DarkOriginalOnMouseDown(self, button)
+				end
+			end)
+		end
 	end
 	if dropdown.HookScript then
 		dropdown:HookScript("OnHide", function(self)
@@ -3537,6 +3551,12 @@ function SkinEngine:RestoreFrame(frame)
 	state.shown = state.shown or {}
 	state.overlays = state.overlays or {}
 
+	if frame.BFL_DarkOriginalOnMouseDownIntrinsicSet then
+		frame.OnMouseDown_Intrinsic = frame.BFL_DarkOriginalOnMouseDownIntrinsic
+		frame.BFL_DarkOriginalOnMouseDownIntrinsic = nil
+		frame.BFL_DarkOriginalOnMouseDownIntrinsicSet = nil
+		frame.BFL_DarkCustomDropdownInstalled = nil
+	end
 	if frame.SetScript and frame.BFL_DarkOriginalOnMouseDownSet then
 		frame:SetScript("OnMouseDown", frame.BFL_DarkOriginalOnMouseDown)
 		frame.BFL_DarkOriginalOnMouseDown = nil
