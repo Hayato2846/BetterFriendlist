@@ -759,9 +759,13 @@ end
 -- @param getter: Function(value) -> boolean (is this value currently selected?)
 -- @param setter: Function(value, checked) called when a checkbox is toggled
 -- @param textFunc: Function() -> string (returns the display text for the dropdown)
-function Compat.InitializeMultiSelectDropdown(dropdown, options, getter, setter, textFunc)
+-- @param scrollHeight: Optional max pixel height before the dropdown scrolls (Retail only)
+function Compat.InitializeMultiSelectDropdown(dropdown, options, getter, setter, textFunc, scrollHeight)
 	if Compat.IsModernDropdown(dropdown) then
 		dropdown:SetupMenu(function(dropdown, rootDescription)
+			if scrollHeight and rootDescription.SetScrollMode then
+				rootDescription:SetScrollMode(scrollHeight)
+			end
 			for i, label in ipairs(options.labels) do
 				local value = options.values[i]
 				local element = rootDescription:CreateCheckbox(label, function()

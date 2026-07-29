@@ -1,13 +1,13 @@
 ﻿{
-    "generatedAt":  "2026-07-14T13:05:52.0498440+02:00",
+    "generatedAt":  "2026-07-29T21:15:02.4247967+02:00",
     "source":  "Utils/pre-commit-check.py",
     "warningCount":  783,
     "warnings":  [
                      {
                          "Type":  "CLASSIC-GUARD",
                          "Path":  "ClassicCompat.lua",
-                         "Line":  1299,
-                         "Signature":  "CLASSIC-GUARD|ClassicCompat.lua|1299"
+                         "Line":  1303,
+                         "Signature":  "CLASSIC-GUARD|ClassicCompat.lua|1303"
                      },
                      {
                          "Type":  "CLASSIC-GUARD",
@@ -72,8 +72,8 @@
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "ClassicCompat.lua",
-                         "Line":  1165,
-                         "Signature":  "DEBUG-PRINT|ClassicCompat.lua|1165"
+                         "Line":  1169,
+                         "Signature":  "DEBUG-PRINT|ClassicCompat.lua|1169"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
