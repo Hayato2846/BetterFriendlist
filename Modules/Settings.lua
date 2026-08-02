@@ -697,6 +697,10 @@ function Settings:ShowLegacy(categoryID, focusSection)
 		end
 		self:LoadSettings()
 		self:RefreshCategories() -- Update category visibility based on Beta features
+		local FriendsUI = BFL:GetModule("FriendsUI")
+		if FriendsUI and FriendsUI.AnchorAuxiliaryWindow then
+			FriendsUI:AnchorAuxiliaryWindow(settingsFrame, 0)
+		end
 		settingsFrame:Show()
 		self:SelectCategory(categoryID or currentTab or 1) -- Restore or show first category
 		if focusSection == "betaFeatures" then
@@ -739,6 +743,14 @@ local TAB_DEFINITIONS = {
 		name = L.SETTINGS_TAB_GENERAL,
 		icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\settings.blp",
 		beta = false,
+	},
+	{
+		id = 15,
+		name = L.SETTINGS_CENTER_PAGE_FRIEND_TABS or "Friend Tabs",
+		icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\layout.blp",
+		beta = false,
+		retailOnly = true,
+		modernOnly = true,
 	},
 	{
 		id = 10,
@@ -839,7 +851,14 @@ local function GetAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
 end
 
 local function IsTabAvailableForClient(tabDef)
-	return not tabDef.retailOnly or BFL.IsRetail == true
+	if tabDef.retailOnly and BFL.IsRetail ~= true then
+		return false
+	end
+	if tabDef.modernOnly then
+		local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+		return FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
+	end
+	return true
 end
 
 local function ShouldShowLegacyElvUISkinSetting()
@@ -1088,6 +1107,9 @@ function Settings:SelectCategory(categoryID)
 		if content.GeneralTab then
 			content.GeneralTab:Hide()
 		end
+		if content.FriendTabsTab then
+			content.FriendTabsTab:Hide()
+		end
 		if content.ThemeTab then
 			content.ThemeTab:Hide()
 		end
@@ -1131,6 +1153,9 @@ function Settings:SelectCategory(categoryID)
 		if categoryID == 1 and content.GeneralTab then
 			content.GeneralTab:Show()
 			self:RefreshGeneralTab()
+		elseif categoryID == 15 and content.FriendTabsTab then
+			content.FriendTabsTab:Show()
+			self:RefreshFriendTabsTab()
 		elseif categoryID == 10 and content.ThemeTab then
 			content.ThemeTab:Show()
 			self:RefreshThemeTab()
@@ -1196,6 +1221,8 @@ function Settings:AdjustContentHeight(tabID)
 	local activeTab = nil
 	if tabID == 1 then
 		activeTab = content.GeneralTab
+	elseif tabID == 15 then
+		activeTab = content.FriendTabsTab
 	elseif tabID == 10 then
 		activeTab = content.ThemeTab
 	elseif tabID == 2 then
@@ -2608,6 +2635,10 @@ function Settings:ImportSettings(importString)
 
 	-- Force full display refresh - import affects groups and display structure
 	BFL:ForceRefreshFriendsList()
+	local PreviewMode = BFL:GetModule("PreviewMode")
+	if PreviewMode and PreviewMode.OnSettingChanged then
+		PreviewMode:OnSettingChanged("settingsImport")
+	end
 
 	return true, nil
 end
@@ -3138,6 +3169,17 @@ function Settings:OnSimpleModeChanged(checked)
 	end
 
 	DB:Set("simpleMode", checked)
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() then
+		if FriendsUI.ApplyModernPortrait then
+			FriendsUI:ApplyModernPortrait()
+		end
+		if BFL.ForceRefreshFriendsList then
+			BFL:ForceRefreshFriendsList()
+		end
+		self:RefreshThemeTab()
+		return
+	end
 
 	-- Reset top tab to Friends when deactivating Simple Mode
 	-- Without this, a stale activeTopTab (e.g. Recent Allies) causes ShowBottomTab
@@ -3299,6 +3341,10 @@ function Settings:RefreshGuildTabVisibility()
 	local GuildFrame = BFL:GetModule("GuildFrame")
 	if GuildFrame and GuildFrame.OnGuildTabSettingChanged then
 		GuildFrame:OnGuildTabSettingChanged()
+	end
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.RefreshNavigation then
+		FriendsUI:RefreshNavigation()
 	end
 end
 
@@ -3925,6 +3971,271 @@ function Settings:RefreshThemeTab()
 	tab.components = allFrames
 end
 
+function Settings:RefreshFriendTabsTab()
+	if not settingsFrame or not Components then
+		return
+	end
+	local content = settingsFrame.ContentScrollFrame.Content
+	local tab = content and content.FriendTabsTab
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if not (tab and FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()) then
+		return
+	end
+
+	HideComponentList(tab)
+	if tab.FriendTabSettingsHost then
+		tab.FriendTabSettingsHost:Hide()
+	end
+
+	local allFrames = {}
+	local entries = FriendsUI:GetFriendTabSettingsEntries()
+	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_FRIEND_TABS_ORDER or "Tab Order & Visibility"))
+
+	local columns = CreateFrame("Frame", nil, tab)
+	columns:SetHeight(24)
+	columns:SetPoint("LEFT", 12, 0)
+	columns:SetPoint("RIGHT", -12, 0)
+	columns.Visible = columns:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
+	columns.Visible:SetPoint("RIGHT", columns, "RIGHT", -178, 0)
+	columns.Visible:SetWidth(72)
+	columns.Visible:SetJustifyH("CENTER")
+	columns.Visible:SetText(SHOW or ENABLE or "Show")
+	columns.Conditional = columns:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
+	columns.Conditional:SetPoint("RIGHT", columns, "RIGHT", -8, 0)
+	columns.Conditional:SetWidth(150)
+	columns.Conditional:SetJustifyH("CENTER")
+	columns.Conditional:SetText(L.SETTINGS_FRIEND_TABS_CONDITIONAL or "Conditional Visibility")
+	columns.Divider = columns:CreateTexture(nil, "BACKGROUND")
+	columns.Divider:SetPoint("BOTTOMLEFT", columns, "BOTTOMLEFT", 0, 0)
+	columns.Divider:SetPoint("BOTTOMRIGHT", columns, "BOTTOMRIGHT", 0, 0)
+	columns.Divider:SetHeight(1)
+	columns.Divider:SetColorTexture(0.36, 0.36, 0.36, 0.45)
+	table.insert(allFrames, columns)
+
+	local listItems = {}
+	local dragState = {}
+
+	local function SetCheckButtonText(check)
+		if check.Text then
+			check.Text:SetText("")
+		end
+		if check.SetText then
+			check:SetText("")
+		end
+	end
+
+	local function SetTooltip(owner, title, description)
+		owner:SetScript("OnEnter", function(self)
+			BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+			BFL_Tooltip:SetText(title or "", 1, 0.82, 0)
+			if description and description ~= "" then
+				BFL_Tooltip:AddLine(description, 0.85, 0.85, 0.85, true)
+			end
+			BFL_Tooltip:Show()
+		end)
+		owner:SetScript("OnLeave", function()
+			BFL_Tooltip:Hide()
+		end)
+	end
+
+	local function HideDragGhost()
+		local ghost = BFL.GetDragGhost and BFL:GetDragGhost()
+		if not ghost then
+			return
+		end
+		ghost:Hide()
+		ghost:SetScript("OnUpdate", nil)
+		ghost:ClearAllPoints()
+		if ghost.BFLFriendTabIcon then
+			ghost.BFLFriendTabIcon:Hide()
+		end
+		if ghost.text then
+			ghost.text:ClearAllPoints()
+			ghost.text:SetPoint("CENTER", 3, 0)
+		end
+	end
+
+	local function ShowDragGhost(row)
+		local ghost = BFL.GetDragGhost and BFL:GetDragGhost()
+		if not ghost then
+			return
+		end
+		if not ghost.BFLFriendTabIcon then
+			ghost.BFLFriendTabIcon = ghost:CreateTexture(nil, "OVERLAY")
+			ghost.BFLFriendTabIcon:SetSize(28, 28)
+		end
+		ghost.BFLFriendTabIcon:ClearAllPoints()
+		ghost.BFLFriendTabIcon:SetPoint("LEFT", ghost, "LEFT", 12, 0)
+		FriendsUI:ApplyFriendTabIcon(ghost.BFLFriendTabIcon, row.sectionID, true)
+		ghost.BFLFriendTabIcon:Show()
+
+		local r, g, b = GetAccentColor(1, 0.82, 0)
+		ghost.text:ClearAllPoints()
+		ghost.text:SetPoint("LEFT", ghost.BFLFriendTabIcon, "RIGHT", 10, 0)
+		ghost.text:SetText(row.Label:GetText() or "")
+		ghost.text:SetTextColor(r, g, b)
+		ghost.stripe:SetColorTexture(r, g, b)
+		ghost:SetSize(math.max(210, ghost.text:GetStringWidth() + 82), row:GetHeight())
+		ghost:Show()
+		ghost:SetScript("OnUpdate", function(activeGhost)
+			local cursorX, cursorY = GetCursorPosition()
+			local scale = UIParent:GetEffectiveScale()
+			activeGhost:ClearAllPoints()
+			activeGhost:SetPoint("CENTER", UIParent, "BOTTOMLEFT", cursorX / scale, cursorY / scale)
+		end)
+	end
+
+	local function RefreshDropHighlights()
+		for index, row in ipairs(listItems) do
+			local highlighted = dragState.dropIndex == index
+			row.Highlight:SetShown(highlighted)
+			row.Highlight:SetAlpha(highlighted and 0.52 or 0.28)
+		end
+	end
+
+	local function FinishDrag(row)
+		row:SetScript("OnUpdate", nil)
+		row:SetAlpha(1)
+		HideDragGhost()
+		local fromIndex = dragState.fromIndex
+		local toIndex = dragState.dropIndex
+		dragState.fromIndex = nil
+		dragState.dropIndex = nil
+		RefreshDropHighlights()
+		if fromIndex and toIndex and fromIndex ~= toIndex then
+			FriendsUI:MoveFriendTab(fromIndex, toIndex)
+			self:RefreshFriendTabsTab()
+			self:AdjustContentHeight(15)
+		end
+	end
+
+	for index, entry in ipairs(entries) do
+		local row = CreateFrame("Button", nil, tab)
+		row:SetHeight(42)
+		row:SetPoint("LEFT", 12, 0)
+		row:SetPoint("RIGHT", -12, 0)
+		row:RegisterForDrag("LeftButton")
+		row.sectionID = entry.id
+		row.orderIndex = index
+
+		row.Highlight = row:CreateTexture(nil, "BACKGROUND")
+		row.Highlight:SetAllPoints()
+		row.Highlight:SetTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
+		row.Highlight:SetBlendMode("ADD")
+		row.Highlight:SetAlpha(0.28)
+		row.Highlight:Hide()
+		row.Divider = row:CreateTexture(nil, "BACKGROUND")
+		row.Divider:SetPoint("BOTTOMLEFT", 0, 0)
+		row.Divider:SetPoint("BOTTOMRIGHT", 0, 0)
+		row.Divider:SetHeight(1)
+		row.Divider:SetColorTexture(0.22, 0.22, 0.22, 0.45)
+
+		row.DragHandle = row:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontDisableSmall")
+		row.DragHandle:SetPoint("LEFT", 4, 0)
+		row.DragHandle:SetWidth(18)
+		row.DragHandle:SetText(":::")
+		row.DragHandle:SetTextColor(0.55, 0.55, 0.55, 1)
+		row.Order = row:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontDisableSmall")
+		row.Order:SetPoint("LEFT", row.DragHandle, "RIGHT", 2, 0)
+		row.Order:SetWidth(22)
+		row.Order:SetJustifyH("RIGHT")
+		row.Order:SetText(index)
+
+		row.Icon = row:CreateTexture(nil, "ARTWORK")
+		row.Icon:SetSize(30, 30)
+		row.Icon:SetPoint("LEFT", row.Order, "RIGHT", 10, 0)
+		FriendsUI:ApplyFriendTabIcon(row.Icon, entry.id, true)
+
+		row.Label = row:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
+		row.Label:SetPoint("LEFT", row.Icon, "RIGHT", 10, 0)
+		row.Label:SetPoint("RIGHT", row, "RIGHT", -268, 0)
+		row.Label:SetJustifyH("LEFT")
+		row.Label:SetWordWrap(false)
+		row.Label:SetText(entry.label or entry.id)
+
+		row.VisibleCheck = CreateFrame("CheckButton", nil, row, "SettingsCheckboxTemplate")
+		row.VisibleCheck:SetPoint("RIGHT", row, "RIGHT", -196, 0)
+		SetCheckButtonText(row.VisibleCheck)
+		row.VisibleCheck:SetChecked(FriendsUI:IsFriendTabVisible(entry.id))
+		row.VisibleCheck:SetScript("OnClick", function(check)
+			FriendsUI:SetFriendTabVisible(row.sectionID, check:GetChecked() == true)
+			self:RefreshFriendTabsTab()
+			self:AdjustContentHeight(15)
+		end)
+		SetTooltip(
+			row.VisibleCheck,
+			entry.label or entry.id,
+			L.SETTINGS_FRIEND_TABS_VISIBILITY_DESC or "Show or hide this tab in the Modern Friendlist."
+		)
+
+		local conditional = entry.id == "friend_requests" or entry.id == "quick_join"
+		row.ConditionalCheck = CreateFrame("CheckButton", nil, row, "SettingsCheckboxTemplate")
+		row.ConditionalCheck:SetPoint("RIGHT", row, "RIGHT", -68, 0)
+		SetCheckButtonText(row.ConditionalCheck)
+		row.ConditionalCheck:SetShown(conditional)
+		if conditional then
+			local visible = FriendsUI:IsFriendTabVisible(entry.id)
+			row.ConditionalCheck:SetChecked(FriendsUI:IsFriendTabPopulatedOnly(entry.id))
+			row.ConditionalCheck:SetEnabled(visible)
+			row.ConditionalCheck:SetAlpha(visible and 1 or 0.42)
+			row.ConditionalCheck:SetScript("OnClick", function(check)
+				FriendsUI:SetFriendTabPopulatedOnly(row.sectionID, check:GetChecked() == true)
+			end)
+			local key = entry.id == "friend_requests"
+					and "SETTINGS_FRIEND_TABS_REQUESTS_POPULATED_ONLY"
+				or "SETTINGS_FRIEND_TABS_QUICK_JOIN_POPULATED_ONLY"
+			SetTooltip(row.ConditionalCheck, L[key], L[key .. "_DESC"])
+		end
+
+		row:SetScript("OnEnter", function()
+			if not dragState.fromIndex then
+				row.Highlight:Show()
+			end
+		end)
+		row:SetScript("OnLeave", function()
+			if dragState.dropIndex ~= row.orderIndex then
+				row.Highlight:Hide()
+			end
+		end)
+		row:SetScript("OnDragStart", function()
+			dragState.fromIndex = row.orderIndex
+			dragState.dropIndex = row.orderIndex
+			row:SetAlpha(0.18)
+			ShowDragGhost(row)
+			row:SetScript("OnUpdate", function()
+				local dropIndex
+				for targetIndex, target in ipairs(listItems) do
+					if target:IsShown() and BFL:IsRegionMouseOver(target) then
+						dropIndex = targetIndex
+						break
+					end
+				end
+				if dropIndex ~= dragState.dropIndex then
+					dragState.dropIndex = dropIndex
+					RefreshDropHighlights()
+				end
+			end)
+			RefreshDropHighlights()
+		end)
+		row:SetScript("OnDragStop", function()
+			FinishDrag(row)
+		end)
+
+		listItems[#listItems + 1] = row
+		allFrames[#allFrames + 1] = row
+	end
+
+	if #entries == 0 then
+		allFrames[#allFrames + 1] = Components:CreateLabel(
+			tab,
+			L.SETTINGS_FRIEND_TABS_ORDER_EMPTY or "No Friend tabs are available."
+		)
+	end
+
+	Components:AnchorChain(allFrames, -5)
+	tab.components = allFrames
+end
+
 -- Refresh General Tab with new component library
 function Settings:RefreshGeneralTab()
 	if not settingsFrame or not Components then
@@ -3953,6 +4264,39 @@ function Settings:RefreshGeneralTab()
 	tab.components = {}
 
 	local allFrames = {}
+
+	-- Keep the Retail 12.1 / Legacy UI choice as the first General setting.
+	if BFL.IsRetail then
+		local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+		table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_FRIENDS_UI_STYLE_HEADER or "Friendlist UI"))
+		local styleDropdown = Components:CreateDropdown(
+			tab,
+			L.SETTINGS_FRIENDS_UI_STYLE or "Interface Style",
+			{
+				labels = {
+					L.SETTINGS_FRIENDS_UI_STYLE_MODERN or "Modern (Retail 12.1)",
+					L.SETTINGS_FRIENDS_UI_STYLE_LEGACY or "Legacy",
+				},
+				values = { "modern", "legacy" },
+			},
+			function(value)
+				return FriendsUI and FriendsUI:GetRequestedStyle() == value
+			end,
+			function(value)
+				if FriendsUI then
+					FriendsUI:SetStyle(value)
+					self:RefreshCategories()
+					self:RefreshGeneralTab()
+				end
+			end
+		)
+		styleDropdown:SetTooltip(
+			L.SETTINGS_FRIENDS_UI_STYLE or "Interface Style",
+			L.SETTINGS_FRIENDS_UI_STYLE_DESC or "Choose the Retail 12.1 layout or the previous BetterFriendlist layout."
+		)
+		table.insert(allFrames, styleDropdown)
+		table.insert(allFrames, Components:CreateSpacer(tab))
+	end
 
 	-- Header: Display Options
 	local displayHeader = Components:CreateHeader(tab, L.SETTINGS_DISPLAY_OPTIONS or "Display Options")
@@ -4031,7 +4375,7 @@ function Settings:RefreshGeneralTab()
 	-- Row 3: Realm Name & Hide Max Level
 	local row3 = Components:CreateDoubleCheckbox(tab, { -- Left
 		label = L.SETTINGS_SHOW_REALM_NAME,
-		initialValue = DB:Get("showRealmName", true),
+		initialValue = DB:Get("showRealmName", false),
 		callback = function(val)
 			self:OnShowRealmNameChanged(val)
 		end,
@@ -4069,8 +4413,31 @@ function Settings:RefreshGeneralTab()
 	})
 	table.insert(allFrames, row4)
 
-	-- Row 5: Welcome Message & Hide Empty
-	local row5 = Components:CreateDoubleCheckbox(tab, { -- Left
+	-- Row 5: Shared row visuals used by both the Modern and Legacy friend lists
+	local row5 = Components:CreateDoubleCheckbox(tab, {
+		label = L.SETTINGS_SHOW_GAME_ICON or "Show Game Icon",
+		initialValue = DB:Get("showGameIcon", true),
+		callback = function(val)
+			DB:Set("showGameIcon", val)
+			BFL:ForceRefreshFriendsList()
+		end,
+		tooltipTitle = L.SETTINGS_SHOW_GAME_ICON or "Show Game Icon",
+		tooltipDesc = L.SETTINGS_SHOW_GAME_ICON_DESC or "Display game icons next to Battle.net friends.",
+	}, {
+		label = L.SETTINGS_COLOR_LEVEL_BY_DIFFICULTY or "Color Levels by Difficulty",
+		initialValue = DB:Get("colorLevelByDifficulty", true),
+		callback = function(val)
+			DB:Set("colorLevelByDifficulty", val)
+			BFL:ForceRefreshFriendsList()
+		end,
+		tooltipTitle = L.SETTINGS_COLOR_LEVEL_BY_DIFFICULTY or "Color Levels by Difficulty",
+		tooltipDesc = L.SETTINGS_COLOR_LEVEL_BY_DIFFICULTY_DESC
+			or "Color level text by difficulty relative to your character.",
+	})
+	table.insert(allFrames, row5)
+
+	-- Row 6: Welcome Message & Hide Empty
+	local row6 = Components:CreateDoubleCheckbox(tab, { -- Left
 		label = L.SETTINGS_SHOW_WELCOME_MESSAGE,
 		initialValue = DB:Get("showWelcomeMessage", true),
 		callback = function(val)
@@ -4088,9 +4455,9 @@ function Settings:RefreshGeneralTab()
 		tooltipTitle = L.SETTINGS_HIDE_EMPTY_GROUPS,
 		tooltipDesc = L.SETTINGS_HIDE_EMPTY_GROUPS_DESC or "Automatically hides groups that have no online members",
 	})
-	table.insert(allFrames, row5)
+	table.insert(allFrames, row6)
 
-	-- Row 6: Favorite Icon + Favorite Icon Dropdown (conditional)
+	-- Row 7: Favorite Icon + Favorite Icon Dropdown (conditional)
 	local favoriteIconEnabled = DB:Get("enableFavoriteIcon", true)
 	local hasBlizzardFavoriteIcon = BFL.HasAtlas and BFL.HasAtlas("friendslist-favorite")
 	local blizzardIconTag = BFL.GetAtlasOrTextureMarkup
@@ -4123,7 +4490,7 @@ function Settings:RefreshGeneralTab()
 		}
 	end
 
-	local row6 = Components:CreateCheckboxDropdown(tab, {
+	local row7 = Components:CreateCheckboxDropdown(tab, {
 		label = L.SETTINGS_ENABLE_FAVORITE_ICON,
 		initialValue = favoriteIconEnabled,
 		callback = function(val)
@@ -4134,10 +4501,10 @@ function Settings:RefreshGeneralTab()
 		tooltipTitle = L.SETTINGS_ENABLE_FAVORITE_ICON,
 		tooltipDesc = L.SETTINGS_ENABLE_FAVORITE_ICON_DESC or "Display a star icon on the friend button for favorites.",
 	}, favoriteDropdownData)
-	table.insert(allFrames, row6)
+	table.insert(allFrames, row7)
 
-	-- Row 7: Blizzard Option
-	local row7 = Components:CreateCheckbox(tab, {
+	-- Row 8: Blizzard Option
+	local row8 = Components:CreateCheckbox(tab, {
 		label = L.SETTINGS_SHOW_BLIZZARD,
 		initialValue = DB:Get("showBlizzardOption", false),
 		callback = function(val)
@@ -4146,7 +4513,7 @@ function Settings:RefreshGeneralTab()
 		tooltipTitle = L.SETTINGS_SHOW_BLIZZARD,
 		tooltipDesc = L.SETTINGS_SHOW_BLIZZARD_DESC or "Shows the original Blizzard Friends button in the social menu",
 	})
-	table.insert(allFrames, row7)
+	table.insert(allFrames, row8)
 
 	if ShouldShowLegacyElvUISkinSetting() then
 		local elvUISkinToggle = Components:CreateCheckbox(tab, {
@@ -4355,7 +4722,7 @@ function Settings:RefreshGeneralTab()
 	-- Behavior Settings Row 1 (Accordion / Compact)
 	local behaviorRow1 = Components:CreateDoubleCheckbox(tab, {
 		label = L.SETTINGS_ACCORDION_GROUPS,
-		initialValue = DB:Get("accordionGroups", true),
+		initialValue = DB:Get("accordionGroups", false),
 		callback = function(val)
 			self:OnAccordionGroupsChanged(val)
 		end,
@@ -4373,7 +4740,10 @@ function Settings:RefreshGeneralTab()
 	})
 	table.insert(allFrames, behaviorRow1)
 
-	-- Behavior Settings Row 2 (UI Panel / Simple Mode)
+	-- In Modern, Simple Mode only controls the portrait. Legacy retains its
+	-- established compact frame behavior and optional search control.
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	local modernActive = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
 	local behaviorRow2 = Components:CreateDoubleCheckbox(tab, {
 		label = L.SETTINGS_USE_UI_PANEL_SYSTEM or "Use UI Panel System",
 		initialValue = DB:Get("useUIPanelSystem", false),
@@ -4388,12 +4758,27 @@ function Settings:RefreshGeneralTab()
 		initialValue = DB:Get("simpleMode", false),
 		callback = function(val)
 			self:OnSimpleModeChanged(val)
+			self:RefreshGeneralTab()
 		end,
 		tooltipTitle = L.SETTINGS_SIMPLE_MODE or "Simple Mode",
 		tooltipDesc = L.SETTINGS_SIMPLE_MODE_DESC
 			or "Hides the player portrait and adds a changelog option to the contacts menu.",
 	})
 	table.insert(allFrames, behaviorRow2)
+
+	if not modernActive and DB:Get("simpleMode", false) then
+		table.insert(allFrames, Components:CreateCheckbox(tab, {
+			label = L.SETTINGS_SIMPLE_MODE_SHOW_SEARCH or "Show Search in Simple Mode",
+			initialValue = DB:Get("simpleModeShowSearch", true),
+			callback = function(val)
+				DB:Set("simpleModeShowSearch", val)
+				BFL:ForceRefreshFriendsList()
+			end,
+			tooltipTitle = L.SETTINGS_SIMPLE_MODE_SHOW_SEARCH or "Show Search in Simple Mode",
+			tooltipDesc = L.SETTINGS_SIMPLE_MODE_SHOW_SEARCH_DESC
+				or "Keep the search field visible while Simple Mode is enabled.",
+		}))
+	end
 
 	local whisperClickEnabled = DB:Get("friendListClickWhisperEnabled", false)
 	local whisperClickDropdown = nil
@@ -4602,10 +4987,12 @@ function Settings:RefreshGeneralTab()
 	end
 
 	-- Frame Width Input
-	local width = 415
+	local FrameSettings = BFL:GetModule("FrameSettings")
+	local layoutKey = FrameSettings and FrameSettings.GetLayoutKey and FrameSettings:GetLayoutKey() or "Default"
+	local width = layoutKey == "RetailModern" and 410 or 415
 	local dbSize = DB:Get("mainFrameSize")
-	if dbSize and dbSize["Default"] and dbSize["Default"].width then
-		width = dbSize["Default"].width
+	if dbSize and dbSize[layoutKey] and dbSize[layoutKey].width then
+		width = dbSize[layoutKey].width
 	end
 
 	local widthInput = Components:CreateInput(
@@ -4625,9 +5012,9 @@ function Settings:RefreshGeneralTab()
 	table.insert(allFrames, widthInput)
 
 	-- Frame Height Input
-	local height = 570
-	if dbSize and dbSize["Default"] and dbSize["Default"].height then
-		height = dbSize["Default"].height
+	local height = layoutKey == "RetailModern" and 675 or 570
+	if dbSize and dbSize[layoutKey] and dbSize[layoutKey].height then
+		height = dbSize[layoutKey].height
 	end
 
 	local heightInput = Components:CreateInput(
@@ -4957,11 +5344,6 @@ function Settings:RefreshFriendTagsTab()
 		self:RefreshFriendTagsTab()
 	end
 
-	local ContactMemory = BFL:GetModule("ContactMemory")
-	local contactMemoryEnabled = ContactMemory
-		and ContactMemory.GetEnabledSetting
-		and ContactMemory:GetEnabledSetting() == true
-
 	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_TAB_FRIEND_TAGS or "Friend Tags"))
 	table.insert(
 		allFrames,
@@ -4980,11 +5362,8 @@ function Settings:RefreshFriendTagsTab()
 		callback = function(val)
 			FriendTags:SetSetting("enabled", val == true, RefreshFriendTagsSettings)
 		end,
-		disabled = not contactMemoryEnabled,
 		tooltipTitle = L.FRIEND_TAGS_ENABLE or "Enable Friend Tags",
-		tooltipDesc = contactMemoryEnabled
-				and (L.FRIEND_TAGS_ENABLE_DESC or "Adds Blizzard-compatible and custom tags for friends.")
-			or (L.FRIEND_TAGS_REQUIRES_CONTACT_MEMORY or "Enable Private Notes first to use Friend Tags."),
+		tooltipDesc = L.FRIEND_TAGS_ENABLE_DESC or "Adds Blizzard-compatible and custom tags for friends.",
 	})
 	table.insert(allFrames, enableTags)
 
@@ -5988,7 +6367,7 @@ function Settings:RefreshGroupsTab()
 			btn:SetScript("OnUpdate", function(self)
 				for _, otherItem in ipairs(listItems) do
 					if otherItem ~= self and otherItem:IsVisible() then
-						if MouseIsOver(otherItem) then
+						if BFL:IsRegionMouseOver(otherItem) then
 							otherItem.bg:SetColorTexture(0.3, 0.3, 0.3, 0.7)
 						else
 							otherItem.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
@@ -6006,7 +6385,7 @@ function Settings:RefreshGroupsTab()
 			for _, otherItem in ipairs(listItems) do
 				otherItem.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5) -- Reset
 				if otherItem ~= btn and otherItem:IsVisible() then
-					if MouseIsOver(otherItem) then
+					if BFL:IsRegionMouseOver(otherItem) then
 						targetIndex = otherItem.orderIndex
 					end
 				end
@@ -6436,11 +6815,16 @@ function Settings:RefreshAdvancedTab()
 		L.SETTINGS_TAINT_FREE_WHISPER or "Taint-Free Whisper",
 		BetterFriendlistDB.taintFreeWhisper or false,
 		function(checked)
-			BetterFriendlistDB.taintFreeWhisper = checked
+			local DB = GetDB()
+			if DB then
+				DB:Set("taintFreeWhisper", checked)
+			else
+				BetterFriendlistDB.taintFreeWhisper = checked
+			end
 			if not checked and BFL.CloseTaintFreeWhisper then
 				BFL:CloseTaintFreeWhisper(true)
 			end
-			if BFL.SettingsVersion then
+			if not DB and BFL.SettingsVersion then
 				BFL.SettingsVersion = BFL.SettingsVersion + 1
 			end
 		end
@@ -7546,7 +7930,7 @@ function Settings:RefreshFilterSortTab()
 			SelectEntry(selectedKind, entry.id)
 		end)
 		row:SetScript("OnMouseUp", function(selfRow, button)
-			if button ~= "LeftButton" or not MouseIsOver(selfRow) then
+			if button ~= "LeftButton" or not BFL:IsRegionMouseOver(selfRow) then
 				return
 			end
 			if selfRow.bflLastDragStop and GetTime() - selfRow.bflLastDragStop < 0.15 then
@@ -7661,10 +8045,10 @@ function Settings:RefreshFilterSortTab()
 			selfRow:SetScript("OnUpdate", function(updateSelf)
 				for _, otherItem in ipairs(entryListItems) do
 					if otherItem ~= updateSelf and otherItem:IsVisible() then
-						if isSettingsCenterInline and MouseIsOver(otherItem) then
+						if isSettingsCenterInline and BFL:IsRegionMouseOver(otherItem) then
 							BFL_Settings_ApplyBuilderRowStyle(otherItem, "target")
 						else
-							SetEntryRowBackground(otherItem, MouseIsOver(otherItem))
+							SetEntryRowBackground(otherItem, BFL:IsRegionMouseOver(otherItem))
 						end
 					end
 				end
@@ -7683,7 +8067,7 @@ function Settings:RefreshFilterSortTab()
 
 			local targetIndex = nil
 			for _, otherItem in ipairs(entryListItems) do
-				if otherItem ~= selfRow and otherItem:IsVisible() and MouseIsOver(otherItem) then
+				if otherItem ~= selfRow and otherItem:IsVisible() and BFL:IsRegionMouseOver(otherItem) then
 					targetIndex = otherItem.orderIndex
 				end
 				SetEntryRowBackground(otherItem, false)
@@ -8343,9 +8727,9 @@ function Settings:RefreshBrokerTab()
 	local enableBroker = Components:CreateCheckbox(
 		tab,
 		L.BROKER_SETTINGS_ENABLE or "Enable Data Broker",
-		DB:Get("brokerEnabled", true),
+		DB:Get("brokerEnabled", false),
 		function(val)
-			BetterFriendlistDB.brokerEnabled = val
+			DB:Set("brokerEnabled", val)
 
 			-- Refresh to update sub-options visibility
 			self:RefreshBrokerTab()
@@ -8508,14 +8892,14 @@ function Settings:RefreshBrokerTab()
 	)
 	table.insert(allFrames, separatorPicker)
 
-	if DB:Get("brokerEnabled", true) then
+	if DB:Get("brokerEnabled", false) then
 		-- Show Icon
 		local showIcon = Components:CreateCheckbox(
 			tab,
 			L.BROKER_SETTINGS_SHOW_ICON or "Show Icon on Display Addon",
 			DB:Get("brokerShowIcon", true),
 			function(val)
-				BetterFriendlistDB.brokerShowIcon = val
+				DB:Set("brokerShowIcon", val)
 				local Broker = BFL:GetModule("Broker")
 				if Broker and Broker.UpdateBrokerText then
 					Broker:UpdateBrokerText()
@@ -8534,7 +8918,7 @@ function Settings:RefreshBrokerTab()
 			L.BROKER_SETTINGS_SHOW_LABEL or "Show Label",
 			DB:Get("brokerShowLabel", true),
 			function(val)
-				BetterFriendlistDB.brokerShowLabel = val
+				DB:Set("brokerShowLabel", val)
 				local Broker = BFL:GetModule("Broker")
 				if Broker and Broker.UpdateBrokerText then
 					Broker:UpdateBrokerText()
@@ -8553,7 +8937,7 @@ function Settings:RefreshBrokerTab()
 			L.BROKER_SETTINGS_SHOW_TOTAL or "Show Total Count",
 			DB:Get("brokerShowTotal", true),
 			function(val)
-				BetterFriendlistDB.brokerShowTotal = val
+				DB:Set("brokerShowTotal", val)
 				local Broker = BFL:GetModule("Broker")
 				if Broker and Broker.UpdateBrokerText then
 					Broker:UpdateBrokerText()
@@ -8573,7 +8957,7 @@ function Settings:RefreshBrokerTab()
 			L.BROKER_SETTINGS_SHOW_GROUPS,
 			DB:Get("brokerShowGroups", false),
 			function(val)
-				BetterFriendlistDB.brokerShowGroups = val
+				DB:Set("brokerShowGroups", val)
 				-- Refresh tab to show/hide sub-options
 				self:RefreshBrokerTab()
 				-- Update broker text immediately
@@ -8597,7 +8981,7 @@ function Settings:RefreshBrokerTab()
 				L.BROKER_SETTINGS_SHOW_WOW_ICON or "Show WoW Icon",
 				DB:Get("brokerShowWoWIcon", true),
 				function(val)
-					BetterFriendlistDB.brokerShowWoWIcon = val
+					DB:Set("brokerShowWoWIcon", val)
 					local Broker = BFL:GetModule("Broker")
 					if Broker and Broker.UpdateBrokerText then
 						Broker:UpdateBrokerText()
@@ -8618,7 +9002,7 @@ function Settings:RefreshBrokerTab()
 				L.BROKER_SETTINGS_SHOW_BNET_ICON or "Show Battle.net Icon",
 				DB:Get("brokerShowBNetIcon", true),
 				function(val)
-					BetterFriendlistDB.brokerShowBNetIcon = val
+					DB:Set("brokerShowBNetIcon", val)
 					local Broker = BFL:GetModule("Broker")
 					if Broker and Broker.UpdateBrokerText then
 						Broker:UpdateBrokerText()
@@ -8643,7 +9027,7 @@ function Settings:RefreshBrokerTab()
 			L.BROKER_SETTINGS_SHOW_HINTS or "Show Tooltip Hints",
 			DB:Get("brokerShowHints", true),
 			function(val)
-				BetterFriendlistDB.brokerShowHints = val
+				DB:Set("brokerShowHints", val)
 			end
 		)
 		showHints:SetTooltip(
@@ -8662,7 +9046,7 @@ function Settings:RefreshBrokerTab()
 			L.BROKER_SETTINGS_SHOW_CLASS_ICONS or "Show Class Icons",
 			DB:Get("brokerShowClassIcons", false),
 			function(val)
-				BetterFriendlistDB.brokerShowClassIcons = val
+				DB:Set("brokerShowClassIcons", val)
 			end
 		)
 		if brokerShowClassIcons.SetTooltip then
@@ -8726,9 +9110,9 @@ function Settings:RefreshBrokerTab()
 				{ r = 1, g = 1, b = 1 },
 				function(r, g, b)
 					if math.abs(r - 1) < 0.01 and math.abs(g - 1) < 0.01 and math.abs(b - 1) < 0.01 then
-						BetterFriendlistDB[settingKey] = nil
+						DB:Set(settingKey, nil)
 					else
-						BetterFriendlistDB[settingKey] = { r, g, b }
+						DB:Set(settingKey, { r, g, b })
 					end
 				end
 			)
@@ -8799,7 +9183,7 @@ function Settings:RefreshBrokerTab()
 				btn:SetScript("OnUpdate", function(self)
 					for _, otherItem in ipairs(listItems) do
 						if otherItem ~= self and otherItem:IsVisible() then
-							if MouseIsOver(otherItem) then
+							if BFL:IsRegionMouseOver(otherItem) then
 								otherItem.bg:SetColorTexture(0.3, 0.3, 0.3, 0.7)
 							else
 								otherItem.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
@@ -8817,7 +9201,7 @@ function Settings:RefreshBrokerTab()
 				for _, otherItem in ipairs(listItems) do
 					otherItem.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
 					if otherItem ~= btn and otherItem:IsVisible() then
-						if MouseIsOver(otherItem) then
+						if BFL:IsRegionMouseOver(otherItem) then
 							targetIndex = otherItem.orderIndex
 						end
 					end
@@ -8903,7 +9287,7 @@ function Settings:RefreshBrokerTab()
 		L.GUILD_BROKER_SETTINGS_ENABLE or "Enable Guild Broker",
 		DB:Get("guildBrokerEnabled", false),
 		function(val)
-			BetterFriendlistDB.guildBrokerEnabled = val
+			DB:Set("guildBrokerEnabled", val)
 			self:RefreshBrokerTab()
 
 			local statusText = val and "|cff00ff00" .. (L.STATUS_ENABLED or "ENABLED") .. "|r"
@@ -8940,7 +9324,7 @@ function Settings:RefreshBrokerTab()
 			L.GUILD_BROKER_SETTINGS_SHOW_ICON or "Show Icon",
 			DB:Get("guildBrokerShowIcon", true),
 			function(val)
-				BetterFriendlistDB.guildBrokerShowIcon = val
+				DB:Set("guildBrokerShowIcon", val)
 				local GBroker = BFL:GetModule("GuildBroker")
 				if GBroker and GBroker.UpdateBrokerText then
 					GBroker:UpdateBrokerText()
@@ -8955,7 +9339,7 @@ function Settings:RefreshBrokerTab()
 			L.GUILD_BROKER_SETTINGS_SHOW_LABEL or "Show Label",
 			DB:Get("guildBrokerShowLabel", true),
 			function(val)
-				BetterFriendlistDB.guildBrokerShowLabel = val
+				DB:Set("guildBrokerShowLabel", val)
 				local GBroker = BFL:GetModule("GuildBroker")
 				if GBroker and GBroker.UpdateBrokerText then
 					GBroker:UpdateBrokerText()
@@ -8970,7 +9354,7 @@ function Settings:RefreshBrokerTab()
 			L.GUILD_BROKER_SETTINGS_SHOW_TOTAL or "Show Total Count",
 			DB:Get("guildBrokerShowTotal", true),
 			function(val)
-				BetterFriendlistDB.guildBrokerShowTotal = val
+				DB:Set("guildBrokerShowTotal", val)
 				local GBroker = BFL:GetModule("GuildBroker")
 				if GBroker and GBroker.UpdateBrokerText then
 					GBroker:UpdateBrokerText()
@@ -9010,7 +9394,7 @@ function Settings:RefreshBrokerTab()
 			L.GUILD_BROKER_SETTINGS_SHOW_HINTS or "Show Hints",
 			DB:Get("guildBrokerShowHints", true),
 			function(val)
-				BetterFriendlistDB.guildBrokerShowHints = val
+				DB:Set("guildBrokerShowHints", val)
 			end
 		)
 		table.insert(allFrames, guildShowHints)
@@ -9037,7 +9421,7 @@ function Settings:RefreshBrokerTab()
 				return val == current
 			end,
 			function(val)
-				BetterFriendlistDB.guildBrokerClickAction = val
+				DB:Set("guildBrokerClickAction", val)
 			end
 		)
 		table.insert(allFrames, guildClickAction)
@@ -9059,7 +9443,7 @@ function Settings:RefreshBrokerTab()
 				return val == DB:Get("guildBrokerGroupMode", "none")
 			end,
 			function(val)
-				BetterFriendlistDB.guildBrokerGroupMode = val
+				DB:Set("guildBrokerGroupMode", val)
 			end
 		)
 		table.insert(allFrames, guildGroupMode)
@@ -9080,7 +9464,7 @@ function Settings:RefreshBrokerTab()
 				return val == DB:Get("guildBrokerFilter", "online")
 			end,
 			function(val)
-				BetterFriendlistDB.guildBrokerFilter = val
+				DB:Set("guildBrokerFilter", val)
 			end
 		)
 		table.insert(allFrames, guildFilter)
@@ -9095,7 +9479,7 @@ function Settings:RefreshBrokerTab()
 				return tostring(val)
 			end,
 			function(val)
-				BetterFriendlistDB.guildBrokerMaxRows = val
+				DB:Set("guildBrokerMaxRows", val)
 			end
 		)
 		if guildMaxRows.SetTooltip then
@@ -9114,7 +9498,7 @@ function Settings:RefreshBrokerTab()
 			L.GUILD_BROKER_SETTINGS_HIDE_LEVEL_AT_MAX or "Hide Level at Max",
 			DB:Get("guildBrokerHideLevelAtMax", false),
 			function(val)
-				BetterFriendlistDB.guildBrokerHideLevelAtMax = val
+				DB:Set("guildBrokerHideLevelAtMax", val)
 			end
 		)
 		if guildHideLevelAtMax.SetTooltip then
@@ -9131,7 +9515,7 @@ function Settings:RefreshBrokerTab()
 			L.GUILD_BROKER_SETTINGS_SHOW_CLASS_ICONS or "Show Class Icons",
 			DB:Get("guildBrokerShowClassIcons", false),
 			function(val)
-				BetterFriendlistDB.guildBrokerShowClassIcons = val
+				DB:Set("guildBrokerShowClassIcons", val)
 			end
 		)
 		if guildShowClassIcons.SetTooltip then
@@ -9148,7 +9532,7 @@ function Settings:RefreshBrokerTab()
 			L.GUILD_BROKER_SETTINGS_EXCLUDE_SELF or "Exclude Yourself",
 			DB:Get("guildBrokerExcludeSelf", false),
 			function(val)
-				BetterFriendlistDB.guildBrokerExcludeSelf = val
+				DB:Set("guildBrokerExcludeSelf", val)
 				local GBroker = BFL:GetModule("GuildBroker")
 				if GBroker and GBroker.UpdateBrokerText then
 					GBroker:UpdateBrokerText()
@@ -9185,7 +9569,7 @@ function Settings:RefreshBrokerTab()
 				return val == DB:Get("guildBrokerSortMode", "name")
 			end,
 			function(val)
-				BetterFriendlistDB.guildBrokerSortMode = val
+				DB:Set("guildBrokerSortMode", val)
 			end
 		)
 		table.insert(allFrames, guildSortMode)
@@ -9202,11 +9586,11 @@ function Settings:RefreshBrokerTab()
 			nickUseClassColor,
 			function(checked)
 				if checked then
-					BetterFriendlistDB.guildBrokerNicknameColor = nil
+					DB:Set("guildBrokerNicknameColor", nil)
 				else
 					-- Set a default custom color (white) when unchecking
 					local currentColor = { 1, 1, 1 }
-					BetterFriendlistDB.guildBrokerNicknameColor = currentColor
+					DB:Set("guildBrokerNicknameColor", currentColor)
 				end
 				-- Toggle color picker visibility
 				if nickColorPicker then
@@ -9229,7 +9613,7 @@ function Settings:RefreshBrokerTab()
 			currentNickColor and { r = currentNickColor[1], g = currentNickColor[2], b = currentNickColor[3] } or
 			{ r = 1, g = 1, b = 1 },
 			function(r, g, b)
-				BetterFriendlistDB.guildBrokerNicknameColor = { r, g, b }
+				DB:Set("guildBrokerNicknameColor", { r, g, b })
 			end
 		)
 		if nickUseClassColor then
@@ -9247,9 +9631,9 @@ function Settings:RefreshBrokerTab()
 			{ r = 1, g = 1, b = 1 },
 			function(r, g, b)
 				if math.abs(r - 1) < 0.01 and math.abs(g - 1) < 0.01 and math.abs(b - 1) < 0.01 then
-					BetterFriendlistDB.guildBrokerRankColor = nil
+					DB:Set("guildBrokerRankColor", nil)
 				else
-					BetterFriendlistDB.guildBrokerRankColor = { r, g, b }
+					DB:Set("guildBrokerRankColor", { r, g, b })
 				end
 			end
 		)
@@ -9264,9 +9648,9 @@ function Settings:RefreshBrokerTab()
 			{ r = 1, g = 1, b = 1 },
 			function(r, g, b)
 				if math.abs(r - 1) < 0.01 and math.abs(g - 1) < 0.01 and math.abs(b - 1) < 0.01 then
-					BetterFriendlistDB.guildBrokerZoneColor = nil
+					DB:Set("guildBrokerZoneColor", nil)
 				else
-					BetterFriendlistDB.guildBrokerZoneColor = { r, g, b }
+					DB:Set("guildBrokerZoneColor", { r, g, b })
 				end
 			end
 		)
@@ -9281,9 +9665,9 @@ function Settings:RefreshBrokerTab()
 			{ r = 1, g = 1, b = 1 },
 			function(r, g, b)
 				if math.abs(r - 1) < 0.01 and math.abs(g - 1) < 0.01 and math.abs(b - 1) < 0.01 then
-					BetterFriendlistDB.guildBrokerNoteColor = nil
+					DB:Set("guildBrokerNoteColor", nil)
 				else
-					BetterFriendlistDB.guildBrokerNoteColor = { r, g, b }
+					DB:Set("guildBrokerNoteColor", { r, g, b })
 				end
 			end
 		)
@@ -9299,9 +9683,9 @@ function Settings:RefreshBrokerTab()
 			{ r = 1, g = 1, b = 1 },
 			function(r, g, b)
 				if math.abs(r - 1) < 0.01 and math.abs(g - 1) < 0.01 and math.abs(b - 1) < 0.01 then
-					BetterFriendlistDB.guildBrokerOfficerNoteColor = nil
+					DB:Set("guildBrokerOfficerNoteColor", nil)
 				else
-					BetterFriendlistDB.guildBrokerOfficerNoteColor = { r, g, b }
+					DB:Set("guildBrokerOfficerNoteColor", { r, g, b })
 				end
 			end
 		)
@@ -9364,7 +9748,7 @@ function Settings:RefreshBrokerTab()
 				btn:SetScript("OnUpdate", function(self)
 					for _, otherItem in ipairs(guildListItems) do
 						if otherItem ~= self and otherItem:IsVisible() then
-							if MouseIsOver(otherItem) then
+							if BFL:IsRegionMouseOver(otherItem) then
 								otherItem.bg:SetColorTexture(0.3, 0.3, 0.3, 0.7)
 							else
 								otherItem.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
@@ -9381,7 +9765,7 @@ function Settings:RefreshBrokerTab()
 				for _, otherItem in ipairs(guildListItems) do
 					otherItem.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
 					if otherItem ~= btn and otherItem:IsVisible() then
-						if MouseIsOver(otherItem) then
+						if BFL:IsRegionMouseOver(otherItem) then
 							targetIndex = otherItem.orderIndex
 						end
 					end
@@ -9485,7 +9869,7 @@ function Settings:RefreshGlobalSyncTab()
 		L.SETTINGS_GLOBAL_SYNC_ENABLE or "Enable Global Friend Sync",
 		DB:Get("enableGlobalSync", false),
 		function(val)
-			BetterFriendlistDB.enableGlobalSync = val
+			DB:Set("enableGlobalSync", val)
 			if val then
 				BFL:DebugPrint("Global Sync |cff00ff00" .. (L.STATUS_ENABLED or "ENABLED") .. "|r")
 				-- Trigger sync
@@ -9513,7 +9897,7 @@ function Settings:RefreshGlobalSyncTab()
 			L.SETTINGS_GLOBAL_SYNC_DELETION or "Enable Deletion",
 			DB:Get("enableGlobalSyncDeletion", false),
 			function(val)
-				BetterFriendlistDB.enableGlobalSyncDeletion = val
+				DB:Set("enableGlobalSyncDeletion", val)
 				if val then
 					BFL:DebugPrint("Global Sync Deletion |cff00ff00" .. (L.STATUS_ENABLED or "ENABLED") .. "|r")
 				else
@@ -10403,6 +10787,19 @@ function Settings:RefreshWhoTab()
 	)
 	table.insert(allFrames, zebraCb)
 
+	local zebraStrengthSlider = Components:CreateSlider(tab, L.SETTINGS_WHO_ZEBRA_STRIPE_STRENGTH or "Alternating Row Strength", 0, 1,
+		DB:Get("whoZebraStripeStrength", 0.3), function(value)
+			return string.format("%d%%", math.floor((tonumber(value) or 0) * 100 + 0.5))
+		end, function(value)
+			DB:Set("whoZebraStripeStrength", value)
+			local WhoFrameModule = BFL:GetModule("WhoFrame")
+			if WhoFrameModule then
+				WhoFrameModule:Update(true)
+			end
+		end)
+	zebraStrengthSlider:SetStep(0.01)
+	table.insert(allFrames, zebraStrengthSlider)
+
 	table.insert(allFrames, Components:CreateSpacer(tab))
 
 	-- Behavior Options
@@ -10419,7 +10816,7 @@ function Settings:RefreshWhoTab()
 			},
 			values = { "whisper", "invite" },
 		}, function(val)
-			return val == DB:Get("whoDoubleClickAction", "whisper")
+			return val == (DB:Get("whoDoubleClickAction", "whisper") == "invite" and "invite" or "whisper")
 		end, function(val)
 			DB:Set("whoDoubleClickAction", val)
 		end)

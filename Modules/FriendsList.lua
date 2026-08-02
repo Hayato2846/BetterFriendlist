@@ -290,7 +290,8 @@ end
 -- PERFY OPTIMIZATION (Phase 2A): Pre-defined SetScript Handlers
 local function FriendButton_OnSizeChanged(self, width, height)
 	local padding = self.textRightPadding or 80
-	local nameWidth = width - 44 - padding
+	local leftInset = self.textLeftInset or 44
+	local nameWidth = width - leftInset - padding
 	if nameWidth < 10 then
 		nameWidth = 10
 	end
@@ -367,52 +368,150 @@ end
 -- Helper Functions
 -- ========================================
 
--- Fix #35/#40: Calculate dynamic friend row height based on font size
--- Base height is designed for 12px fonts, scales proportionally for larger sizes
+-- Dynamic friend-row geometry. Text is laid out top-down with an explicit
+-- three-pixel outer inset; every optional line contributes only its own line
+-- height plus the small gap that precedes it.
 local BASE_FONT_SIZE = 12
-local BASE_ROW_HEIGHT = 34
-local BASE_COMPACT_ROW_HEIGHT = 24
-local MIN_ROW_HEIGHT = 24 -- Minimum height even for tiny fonts
-local MAX_ROW_HEIGHT = 72 -- Maximum to prevent overly large rows (allows extra detail rows)
+local FRIEND_ROW_VERTICAL_PADDING = 3
+local FRIEND_ROW_LINE_GAP = 1
+local LEGACY_ROW_MINIMUM = 22 -- 16px status icon plus the shared vertical inset
+local MODERN_ROW_MINIMUM = 40 -- 34px Modern action button plus the shared vertical inset
+local FRIEND_TEXT_BASE_RIGHT_PADDING = 25
+local FRIEND_TEXT_RIGHT_ELEMENT_GAP = 24
+local FRIEND_GAME_ICON_RIGHT_OFFSET = 30
 
--- Fix #35: Calculate row height based on combined font heights
-local function CalculateFriendRowHeight(isCompactMode, nameSize, infoSize, infoDisabled, hasMultiAccountRow)
+local function GetMultiAccountLineHeight(infoSize)
+	local fontSize = infoSize or BASE_FONT_SIZE
+	return math.max(12, math.floor(fontSize * 1.2), fontSize + 2)
+end
+
+local function CalculateFriendRowHeight(
+	isCompactMode,
+	nameSize,
+	infoSize,
+	infoDisabled,
+	hasMultiAccountRow,
+	tagExtraHeight,
+	minimumHeight,
+	nameContentHeight
+)
 	local nameFontSize = nameSize or BASE_FONT_SIZE
 	local infoFontSize = infoSize or BASE_FONT_SIZE
-
-	-- Calculate line height for each font (font size + 2px breathing room)
 	local nameLineHeight = nameFontSize + 2
 	local infoLineHeight = infoFontSize + 2
+	local resolvedNameHeight = math.max(nameLineHeight, tonumber(nameContentHeight) or nameLineHeight)
+	local calculatedHeight = (FRIEND_ROW_VERTICAL_PADDING * 2) + resolvedNameHeight
 
-	local calculatedHeight
-	if isCompactMode then
-		-- Compact Mode: name can wrap to 2 lines (maxLines=2), info hidden
-		-- 2 * nameLineHeight + padding (4px top + 4px bottom)
-		calculatedHeight = (nameLineHeight * 2) + 8
-	elseif infoDisabled then
-		-- Info Disabled: single name line only, no info line
-		-- nameLineHeight + padding (4px top + 4px bottom)
-		calculatedHeight = nameLineHeight + 8
-	else
-		-- Normal: name + info stacked (each 1 line max), add padding (4px top + 2px gap + 4px bottom)
-		calculatedHeight = nameLineHeight + infoLineHeight + 10
+	if not isCompactMode and not infoDisabled then
+		calculatedHeight = calculatedHeight + FRIEND_ROW_LINE_GAP + infoLineHeight
 		if hasMultiAccountRow then
-			-- Extra multi-account row sits below the info line; reuse info line height with a small gap
-			calculatedHeight = calculatedHeight + infoLineHeight + 2
+			calculatedHeight = calculatedHeight + FRIEND_ROW_LINE_GAP + GetMultiAccountLineHeight(infoFontSize)
 		end
 	end
 
-	-- Clamp to reasonable bounds
-	return math.max(MIN_ROW_HEIGHT, math.min(MAX_ROW_HEIGHT, math.floor(calculatedHeight)))
+	calculatedHeight = calculatedHeight + math.max(0, tonumber(tagExtraHeight) or 0)
+	return math.max(tonumber(minimumHeight) or 1, math.ceil(calculatedHeight))
 end
 
-local function CalculateCompactRowHeight(self, nameSize, nameText, nameWidth)
+function FriendsList:CalculateFriendRowHeight(
+	nameSize,
+	infoSize,
+	infoDisabled,
+	hasMultiAccountRow,
+	tagExtraHeight,
+	minimumHeight,
+	nameContentHeight
+)
+	return CalculateFriendRowHeight(
+		false,
+		nameSize,
+		infoSize,
+		infoDisabled,
+		hasMultiAccountRow,
+		tagExtraHeight,
+		minimumHeight,
+		nameContentHeight
+	)
+end
+
+local function GetFriendTextRightPadding(
+	self,
+	friend,
+	isModern,
+	isCompactMode,
+	nameSize,
+	infoSize,
+	showFavoriteIcon
+)
+	local settings = self and self.settingsCache or nil
+	local showGameIcon = not settings or settings.showGameIcon
+	if showGameIcon == nil then
+		showGameIcon = true
+	end
+
+	local isConnectedBNetFriend = friend and friend.type == "bnet" and friend.connected == true
+	local hasGameIcon = isConnectedBNetFriend
+		and showGameIcon
+		and friend.gameAccountInfo
+		and friend.gameAccountInfo.clientProgram
+		and friend.gameAccountInfo.clientProgram ~= ""
+	-- Modern cards always expose their right-side social action, including
+	-- WoW-only friends. Reserve that space during both measurement and render
+	-- so long title/contact names wrap before the button instead of underneath it.
+	local hasActionButton = friend ~= nil and (isModern or isConnectedBNetFriend)
+
+	local minimumHeight = isModern and MODERN_ROW_MINIMUM or 34
+	local iconBaseRowHeight = CalculateFriendRowHeight(
+		isCompactMode,
+		nameSize,
+		infoSize,
+		settings and settings.infoDisabled or false,
+		false,
+		0,
+		minimumHeight
+	)
+
+	local padding = FRIEND_TEXT_BASE_RIGHT_PADDING
+	if hasGameIcon then
+		local gameIconSize = math.floor(iconBaseRowHeight * 0.82)
+		padding = FRIEND_GAME_ICON_RIGHT_OFFSET + gameIconSize + FRIEND_TEXT_RIGHT_ELEMENT_GAP
+	elseif hasActionButton then
+		local actionHeight = math.floor(iconBaseRowHeight * 0.94)
+		local actionWidth = math.floor(actionHeight * 0.75)
+		padding = actionWidth + FRIEND_TEXT_RIGHT_ELEMENT_GAP
+	end
+
+	if showFavoriteIcon then
+		local iconScale = (settings and settings.favoriteIconStyle) == "blizzard" and 1.2 or 0.70
+		padding = padding + math.floor((nameSize or BASE_FONT_SIZE) * iconScale) + 2
+	end
+
+	return padding
+end
+
+function FriendsList:GetFriendTextRightPadding(friend, isModern, isCompactMode, nameSize, infoSize, showFavoriteIcon)
+	return GetFriendTextRightPadding(
+		self,
+		friend,
+		isModern,
+		isCompactMode,
+		nameSize,
+		infoSize,
+		showFavoriteIcon
+	)
+end
+
+local function MeasureWrappedFriendNameHeight(self, nameSize, nameText, nameWidth)
 	local nameFontSize = nameSize or BASE_FONT_SIZE
 	local nameLineHeight = nameFontSize + 2
-	local fallbackHeight = (nameLineHeight * 2) + 8
+	local fallbackContentHeight = nameLineHeight * 2
+
+	local function Finish(contentHeight)
+		return math.max(nameLineHeight, math.ceil(contentHeight))
+	end
 
 	if not nameText or nameText == "" or not nameWidth or nameWidth <= 0 then
-		return math.max(MIN_ROW_HEIGHT, math.min(MAX_ROW_HEIGHT, math.floor(fallbackHeight)))
+		return Finish(fallbackContentHeight)
 	end
 
 	if self and not self.nameMeasure then
@@ -422,11 +521,14 @@ local function CalculateCompactRowHeight(self, nameSize, nameText, nameWidth)
 			self.nameMeasure:Hide()
 			self.nameMeasure:SetJustifyH("LEFT")
 			self.nameMeasure:SetWordWrap(true)
+			if self.nameMeasure.SetNonSpaceWrap then
+				self.nameMeasure:SetNonSpaceWrap(true)
+			end
 		end
 	end
 
 	if not (self and self.nameMeasure) then
-		return math.max(MIN_ROW_HEIGHT, math.min(MAX_ROW_HEIGHT, math.floor(fallbackHeight)))
+		return Finish(fallbackContentHeight)
 	end
 
 	local measure = self.nameMeasure
@@ -443,17 +545,32 @@ local function CalculateCompactRowHeight(self, nameSize, nameText, nameWidth)
 
 	measure:SetWidth(nameWidth)
 	if measure.SetMaxLines then
-		measure:SetMaxLines(2)
+		measure:SetMaxLines(0)
 	end
+	-- Retail 12.1 retains a FontString's previous wrapping geometry until its
+	-- height constraint is cleared. Blizzard does the same reset in the
+	-- Objective Tracker before measuring variable-height text.
+	measure:SetHeight(0)
 	measure:SetText(nameText)
 
-	local measuredHeight = measure:GetStringHeight() or 0
+	local measuredHeight = math.max(measure:GetStringHeight() or 0, measure:GetHeight() or 0)
+	-- Keep the live row safe from sub-pixel rounding differences between the
+	-- hidden measuring string and the ScrollBox-created FontString. This also
+	-- gives CJK/non-space names an explicit multi-line minimum instead of
+	-- allowing the live FontString to fall back to an ellipsis.
+	if measure.GetUnboundedStringWidth then
+		local unboundedWidth = measure:GetUnboundedStringWidth() or 0
+		if unboundedWidth > 0 then
+			local wrappedLines = math.max(1, math.ceil(unboundedWidth / math.max(1, nameWidth - 1)))
+			local measuredLineHeight = measure.GetLineHeight and measure:GetLineHeight() or 0
+			measuredHeight = math.max(measuredHeight, wrappedLines * math.max(nameLineHeight, measuredLineHeight))
+		end
+	end
 	if measuredHeight <= 0 then
-		return math.max(MIN_ROW_HEIGHT, math.min(MAX_ROW_HEIGHT, math.floor(fallbackHeight)))
+		return Finish(fallbackContentHeight)
 	end
 
-	local calculatedHeight = measuredHeight + 8
-	return math.max(MIN_ROW_HEIGHT, math.min(MAX_ROW_HEIGHT, math.floor(calculatedHeight)))
+	return Finish(measuredHeight)
 end
 
 local function CopyFriendTags(friendTags)
@@ -485,6 +602,116 @@ local GROUP_HEADER_TEXT_GAP = 4
 
 local EnsureGroupHeaderFont
 
+local function GetGroupHeaderFontString(button)
+	if not button then
+		return nil
+	end
+	return button.HeaderText or (button.GetFontString and button:GetFontString())
+end
+
+local function DecodeUTF8Codepoint(text, index)
+	local first = string.byte(text, index)
+	if not first then
+		return nil
+	end
+	if first <= 0x7F then
+		return first, index + 1
+	end
+
+	local second = string.byte(text, index + 1)
+	if not second or second < 0x80 or second > 0xBF then
+		return nil
+	end
+	if first >= 0xC2 and first <= 0xDF then
+		return ((first - 0xC0) * 0x40) + (second - 0x80), index + 2
+	end
+
+	local third = string.byte(text, index + 2)
+	if not third or third < 0x80 or third > 0xBF then
+		return nil
+	end
+	if first >= 0xE0 and first <= 0xEF then
+		if (first == 0xE0 and second < 0xA0) or (first == 0xED and second > 0x9F) then
+			return nil
+		end
+		return ((first - 0xE0) * 0x1000) + ((second - 0x80) * 0x40) + (third - 0x80), index + 3
+	end
+
+	local fourth = string.byte(text, index + 3)
+	if not fourth or fourth < 0x80 or fourth > 0xBF then
+		return nil
+	end
+	if first >= 0xF0 and first <= 0xF4 then
+		if (first == 0xF0 and second < 0x90) or (first == 0xF4 and second > 0x8F) then
+			return nil
+		end
+		return
+			((first - 0xF0) * 0x40000)
+				+ ((second - 0x80) * 0x1000)
+				+ ((third - 0x80) * 0x40)
+				+ (fourth - 0x80),
+			index + 4
+	end
+
+	return nil
+end
+
+local function IsLatinOrNeutralHeaderCodepoint(codepoint)
+	return codepoint <= 0x7F
+		or (codepoint >= 0x00A0 and codepoint <= 0x036F)
+		or (codepoint >= 0x1AB0 and codepoint <= 0x1AFF)
+		or (codepoint >= 0x1D00 and codepoint <= 0x1DFF)
+		or (codepoint >= 0x1E00 and codepoint <= 0x1EFF)
+		or (codepoint >= 0x2000 and codepoint <= 0x206F)
+		or (codepoint >= 0x20A0 and codepoint <= 0x20CF)
+		or (codepoint >= 0x2100 and codepoint <= 0x27BF)
+		or (codepoint >= 0x2C60 and codepoint <= 0x2C7F)
+		or (codepoint >= 0x2E00 and codepoint <= 0x2E7F)
+		or (codepoint >= 0xA720 and codepoint <= 0xA7FF)
+		or (codepoint >= 0xAB30 and codepoint <= 0xAB6F)
+		or (codepoint >= 0xFB00 and codepoint <= 0xFB06)
+		or (codepoint >= 0xFE00 and codepoint <= 0xFE0F)
+		or (codepoint >= 0xFE20 and codepoint <= 0xFE2F)
+		or (codepoint >= 0x10780 and codepoint <= 0x107BF)
+		or (codepoint >= 0x1DF00 and codepoint <= 0x1DFFF)
+end
+
+local function HasNonLatinScript(text)
+	if type(text) ~= "string" then
+		return false
+	end
+
+	local index = 1
+	while index <= #text do
+		local codepoint, nextIndex = DecodeUTF8Codepoint(text, index)
+		if not codepoint or not IsLatinOrNeutralHeaderCodepoint(codepoint) then
+			return true
+		end
+		index = nextIndex
+	end
+
+	return false
+end
+
+function FriendsList:ShouldUseNativeMultilingualGroupHeaderFont(button, text)
+	-- Retail 12.1 can hang in the native renderer when a runtime-created
+	-- FontFamily resolves several non-Latin alphabets while ScrollBox headers
+	-- are initialized. Extended Latin stays on BFL's configurable font path;
+	-- other scripts use Blizzard's initialized family. Malformed UTF-8 fails
+	-- safe to the native family, while Legacy keeps its existing path.
+	return button ~= nil and button.HeaderText ~= nil and HasNonLatinScript(text)
+end
+
+local function GetGroupHeaderContentWidth(fontString)
+	if fontString.GetUnboundedStringWidth then
+		local ok, width = pcall(fontString.GetUnboundedStringWidth, fontString)
+		if ok and width then
+			return width
+		end
+	end
+	return fontString:GetStringWidth() or 0
+end
+
 local function EnsureGroupHeaderCountText(button)
 	if button.CountText then
 		return button.CountText
@@ -492,7 +719,7 @@ local function EnsureGroupHeaderCountText(button)
 
 	local countText = button:CreateFontString(nil, "OVERLAY")
 	countText:SetJustifyH("LEFT")
-	local baseFont = button.GetFontString and button:GetFontString()
+	local baseFont = GetGroupHeaderFontString(button)
 	local baseFontObj = baseFont and baseFont:GetFontObject()
 	if baseFontObj then
 		countText:SetFontObject(baseFontObj)
@@ -623,8 +850,91 @@ local function EnsureHeaderFontFromButton(button, fs, countFs)
 	return true
 end
 
-local function ApplyGroupHeaderText(button, nameText, countText, nameColor, countColor, align)
-	local fs = button:GetFontString()
+-- ScrollBox can recycle a header button while its font regions are between
+-- initializers. Never let a failed font/text update create a self-sustaining
+-- C_Timer.After(0) chain: coalesce failures and permit one next-frame retry.
+local function ScheduleGroupHeaderTextRetry(button, retry)
+	if not (button and C_Timer and C_Timer.After) then
+		return
+	end
+
+	button._deferredHeaderUpdateCallback = retry
+	button._deferredHeaderUpdateElementData = button.elementData
+	if button._deferredHeaderUpdate then
+		return
+	end
+
+	button._deferredHeaderUpdate = true
+	C_Timer.After(0, function()
+		button._deferredHeaderUpdate = false
+		local callback = button._deferredHeaderUpdateCallback
+		local expectedElementData = button._deferredHeaderUpdateElementData
+		button._deferredHeaderUpdateCallback = nil
+		button._deferredHeaderUpdateElementData = nil
+
+		if callback and button.elementData == expectedElementData then
+			callback()
+		end
+	end)
+end
+
+local function ClearGroupHeaderTextRetry(button)
+	button._deferredHeaderUpdateCallback = nil
+	button._deferredHeaderUpdateElementData = nil
+end
+
+local function ApplyModernGroupCollapseButton(button, collapsed, showArrow, arrowAlign, textAlign, color)
+	local collapseButton = button and button.HeaderText and button.CollapseButton
+	if not collapseButton then
+		return false
+	end
+
+	showArrow = showArrow ~= false
+	arrowAlign = arrowAlign == "CENTER" and "CENTER" or arrowAlign == "RIGHT" and "RIGHT" or "LEFT"
+	button._bflCollapseButtonShown = showArrow
+	button._bflCollapseButtonAlign = arrowAlign
+	button._bflCollapseButtonState = collapsed == true
+	if not showArrow then
+		collapseButton:Hide()
+		return true
+	end
+
+	collapseButton:Show()
+	if collapseButton.UpdateCollapsedState then
+		collapseButton:UpdateCollapsedState(collapsed == true)
+	end
+
+	local xOffset = arrowAlign == "RIGHT" and -6 or arrowAlign == "LEFT" and 6 or 0
+	if arrowAlign == "CENTER" and textAlign == "CENTER" then
+		local textWidth = button.HeaderText:GetStringWidth() or 0
+		if button.CountText and button.CountText:IsShown() then
+			textWidth = textWidth + GROUP_HEADER_TEXT_GAP + (button.CountText:GetStringWidth() or 0)
+		end
+		xOffset = -(textWidth / 2) - 12
+	end
+	collapseButton:ClearAllPoints()
+	collapseButton:SetPoint(arrowAlign, button, arrowAlign, xOffset, 0)
+
+	local arrowColor = color or { r = 1, g = 1, b = 1, a = 1 }
+	if collapseButton.Icon then
+		collapseButton.Icon:SetDesaturated(true)
+		collapseButton.Icon:SetVertexColor(arrowColor.r or 1, arrowColor.g or 1, arrowColor.b or 1, arrowColor.a or 1)
+	end
+	local highlight = collapseButton.GetHighlightTexture and collapseButton:GetHighlightTexture()
+	if highlight then
+		highlight:SetDesaturated(true)
+		highlight:SetVertexColor(
+			arrowColor.r or 1,
+			arrowColor.g or 1,
+			arrowColor.b or 1,
+			arrowColor.a or 1
+		)
+	end
+	return true
+end
+
+local function ApplyGroupHeaderText(button, nameText, countText, nameColor, countColor, align, allowDeferred)
+	local fs = GetGroupHeaderFontString(button)
 	if not fs then
 		return
 	end
@@ -635,11 +945,9 @@ local function ApplyGroupHeaderText(button, nameText, countText, nameColor, coun
 
 	EnsureHeaderFontFromButton(button, fs, countFs)
 	if not IsFontReady(fs) or not IsFontReady(countFs) then
-		if not button._deferredHeaderUpdate then
-			button._deferredHeaderUpdate = true
-			C_Timer.After(0, function()
-				button._deferredHeaderUpdate = false
-				ApplyGroupHeaderText(button, nameText, countText, nameColor, countColor, align)
+		if allowDeferred ~= false then
+			ScheduleGroupHeaderTextRetry(button, function()
+				ApplyGroupHeaderText(button, nameText, countText, nameColor, countColor, align, false)
 			end)
 		end
 		return
@@ -657,15 +965,14 @@ local function ApplyGroupHeaderText(button, nameText, countText, nameColor, coun
 		okCount = SafeSetText(countFs, "")
 	end
 	if not okName or not okCount then
-		if not button._deferredHeaderUpdate then
-			button._deferredHeaderUpdate = true
-			C_Timer.After(0, function()
-				button._deferredHeaderUpdate = false
-				ApplyGroupHeaderText(button, nameText, countText, nameColor, countColor, align)
+		if allowDeferred ~= false then
+			ScheduleGroupHeaderTextRetry(button, function()
+				ApplyGroupHeaderText(button, nameText, countText, nameColor, countColor, align, false)
 			end)
 		end
 		return
 	end
+	ClearGroupHeaderTextRetry(button)
 
 	if nameColor then
 		fs:SetTextColor(nameColor.r, nameColor.g, nameColor.b, nameColor.a or 1)
@@ -682,7 +989,40 @@ local function ApplyGroupHeaderText(button, nameText, countText, nameColor, coun
 	fs:ClearAllPoints()
 	countFs:ClearAllPoints()
 
-	if align == "RIGHT" then
+	if button.HeaderText then
+		-- The Modern 12.1 header owns independent FontStrings rather than a
+		-- stateful ButtonText. Give both regions explicit, finite widths and
+		-- one anchor each; this avoids the over-constrained
+		-- HeaderText -> CountText -> CollapseButton chain that could make the
+		-- native FontFamily layout continuously invalidate itself.
+		local collapseShown = button._bflCollapseButtonShown == true
+		local collapseAlign = button._bflCollapseButtonAlign
+		local leftPadding = collapseShown and collapseAlign == "LEFT" and 32 or 8
+		local rightPadding = collapseShown and collapseAlign == "RIGHT" and 32 or 8
+		local availableWidth = math.max(1, (button:GetWidth() or 0) - leftPadding - rightPadding)
+		local countWidth = GetGroupHeaderContentWidth(countFs)
+		local hasCount = countText and countText ~= ""
+		if not hasCount then
+			countWidth = 0
+		end
+		local gap = hasCount and GROUP_HEADER_TEXT_GAP or 0
+		local maxNameWidth = math.max(1, availableWidth - countWidth - gap)
+		local nameWidth = math.min(GetGroupHeaderContentWidth(fs), maxNameWidth)
+		local totalWidth = nameWidth + gap + countWidth
+		local offset = leftPadding
+		if align == "RIGHT" then
+			offset = leftPadding + math.max(0, availableWidth - totalWidth)
+		elseif align == "CENTER" then
+			offset = leftPadding + math.max(0, (availableWidth - totalWidth) / 2)
+		end
+
+		fs:SetWidth(nameWidth)
+		countFs:SetWidth(math.max(1, countWidth))
+		fs:SetPoint("LEFT", button, "LEFT", offset, 0)
+		countFs:SetPoint("LEFT", fs, "RIGHT", gap, 0)
+		fs:SetJustifyH("LEFT")
+		countFs:SetJustifyH("LEFT")
+	elseif align == "RIGHT" then
 		countFs:SetPoint("RIGHT", button, "RIGHT", -22, 0)
 		fs:SetPoint("RIGHT", countFs, "LEFT", -GROUP_HEADER_TEXT_GAP, 0)
 		fs:SetJustifyH("RIGHT")
@@ -708,19 +1048,17 @@ local function ApplyGroupHeaderText(button, nameText, countText, nameColor, coun
 	end
 end
 
-local function ApplyGroupHeaderSingleText(button, text, align)
-	local fs = button:GetFontString()
+local function ApplyGroupHeaderSingleText(button, text, align, allowDeferred)
+	local fs = GetGroupHeaderFontString(button)
 	if not fs then
 		return
 	end
 
 	EnsureHeaderFontFromButton(button, fs)
 	if not IsFontReady(fs) then
-		if not button._deferredHeaderUpdate then
-			button._deferredHeaderUpdate = true
-			C_Timer.After(0, function()
-				button._deferredHeaderUpdate = false
-				ApplyGroupHeaderSingleText(button, text, align)
+		if allowDeferred ~= false then
+			ScheduleGroupHeaderTextRetry(button, function()
+				ApplyGroupHeaderSingleText(button, text, align, false)
 			end)
 		end
 		return
@@ -729,22 +1067,38 @@ local function ApplyGroupHeaderSingleText(button, text, align)
 	EnsureGroupHeaderFont(fs)
 	fs:Show()
 	if not SafeSetText(fs, text or "") then
-		if not button._deferredHeaderUpdate then
-			button._deferredHeaderUpdate = true
-			C_Timer.After(0, function()
-				button._deferredHeaderUpdate = false
-				ApplyGroupHeaderSingleText(button, text, align)
+		if allowDeferred ~= false then
+			ScheduleGroupHeaderTextRetry(button, function()
+				ApplyGroupHeaderSingleText(button, text, align, false)
 			end)
 		end
 		return
 	end
+	ClearGroupHeaderTextRetry(button)
 
 	if button.CountText then
 		button.CountText:Hide()
 	end
 
 	fs:ClearAllPoints()
-	if align == "CENTER" then
+	if button.HeaderText then
+		local collapseShown = button._bflCollapseButtonShown == true
+		local collapseAlign = button._bflCollapseButtonAlign
+		local leftPadding = collapseShown and collapseAlign == "LEFT" and 32 or 8
+		local rightPadding = collapseShown and collapseAlign == "RIGHT" and 32 or 8
+		local availableWidth = math.max(1, (button:GetWidth() or 0) - leftPadding - rightPadding)
+		fs:SetWidth(availableWidth)
+		if align == "CENTER" then
+			fs:SetPoint("CENTER", button, "CENTER", (leftPadding - rightPadding) / 2, 0)
+			fs:SetJustifyH("CENTER")
+		elseif align == "RIGHT" then
+			fs:SetPoint("RIGHT", button, "RIGHT", -rightPadding, 0)
+			fs:SetJustifyH("RIGHT")
+		else
+			fs:SetPoint("LEFT", button, "LEFT", leftPadding, 0)
+			fs:SetJustifyH("LEFT")
+		end
+	elseif align == "CENTER" then
 		fs:SetPoint("CENTER", button, "CENTER", 0, 0)
 		fs:SetJustifyH("CENTER")
 	elseif align == "RIGHT" then
@@ -759,7 +1113,7 @@ end
 -- Get height of a display list item based on its type
 -- CRITICAL: These heights MUST match XML template heights and ButtonPool SetHeight() calls
 -- Otherwise buttons will drift out of position!
-local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self, infoDisabled)
+local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self, infoDisabled, isModern)
 	if not item then
 		return 0
 	end
@@ -778,8 +1132,18 @@ local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self, info
 	elseif itemType == BUTTON_TYPE_SEARCH then
 		return 30
 	elseif itemType == BUTTON_TYPE_FRIEND then
-		-- Fix #35/#40: Use dynamic height for friend rows
-		if isCompactMode and self then
+		local minimumHeight = isModern and MODERN_ROW_MINIMUM or LEGACY_ROW_MINIMUM
+		local tagExtraHeight = 0
+		local TagChips = BFL:GetModule("TagChips")
+		if TagChips and TagChips.GetRowData then
+			local tagChipRowData = TagChips:GetRowData(item.friend, self)
+			item._bflTagChipsRowData = tagChipRowData
+			tagExtraHeight = tagChipRowData.height or 0
+		elseif TagChips and TagChips.GetRowExtraHeight then
+			tagExtraHeight = TagChips:GetRowExtraHeight(item.friend, self)
+		end
+
+		if self then
 			local friend = item.friend
 			local line1Text = friend and friend._cache_text_line1
 			if friend and not line1Text and self.GetFormattedButtonText then
@@ -794,7 +1158,7 @@ local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self, info
 				and self.settingsCache.enableFavoriteIcon
 
 			local displayLine1 = line1Text or ""
-			if line1SuffixText ~= "" and showFavIcon then
+			if isCompactMode and line1SuffixText ~= "" and showFavIcon then
 				local spacer = "  "
 				if (self.settingsCache and self.settingsCache.favoriteIconStyle) == "blizzard" then
 					spacer = "     "
@@ -803,46 +1167,43 @@ local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self, info
 			end
 
 			local buttonWidth = self:GetButtonWidth()
-			local padding = 25
-			local showGameIcon = self.settingsCache and self.settingsCache.showGameIcon
-			if showGameIcon == nil then
-				showGameIcon = true
-			end
-			local hasGameIcon = false
-			if showGameIcon and friend and friend.connected then
-				if friend.type == "bnet" and friend.gameAccountInfo and friend.gameAccountInfo.clientProgram then
-					hasGameIcon = true
-				end
-			end
-			if hasGameIcon then
-				padding = 80
-			elseif friend and friend.type == "bnet" and friend.connected then
-				padding = 45
-			end
-
-			if showFavIcon and (self.settingsCache and self.settingsCache.favoriteIconStyle) == "blizzard" then
-				padding = padding + 8
-			end
-
-			local nameWidth = buttonWidth - 44 - padding
+			local padding = GetFriendTextRightPadding(
+				self,
+				friend,
+				isModern,
+				isCompactMode,
+				nameSize,
+				infoSize,
+				showFavIcon
+			)
+			local leftInset = isModern and 38 or 44
+			local nameWidth = buttonWidth - leftInset - padding
 			if nameWidth < 10 then
 				nameWidth = 10
 			end
 
-			return CalculateCompactRowHeight(self, nameSize, displayLine1, nameWidth)
+			local nameContentHeight = MeasureWrappedFriendNameHeight(
+				self,
+				nameSize,
+				displayLine1,
+				nameWidth
+			)
+			item._bflNameContentHeight = nameContentHeight
 		end
 
 		local hasMultiAccountRow = self and ShouldShowMultiAccountRow(self, item.friend)
-		local rowHeight = CalculateFriendRowHeight(isCompactMode, nameSize, infoSize, infoDisabled, hasMultiAccountRow)
-		local TagChips = BFL:GetModule("TagChips")
-		if TagChips and TagChips.GetRowData then
-			local tagChipRowData = TagChips:GetRowData(item.friend, self)
-			item._bflTagChipsRowData = tagChipRowData
-			rowHeight = rowHeight + tagChipRowData.height
-		elseif TagChips and TagChips.GetRowExtraHeight then
-			rowHeight = rowHeight + TagChips:GetRowExtraHeight(item.friend, self)
-		end
-		return rowHeight
+		local nameContentHeight = item._bflNameContentHeight or ((nameSize or BASE_FONT_SIZE) + 2)
+		item._bflNameContentHeight = nameContentHeight
+		return CalculateFriendRowHeight(
+			isCompactMode,
+			nameSize,
+			infoSize,
+			infoDisabled,
+			hasMultiAccountRow,
+			tagExtraHeight,
+			minimumHeight,
+			nameContentHeight
+		)
 	else
 		return 34 -- Default fallback
 	end
@@ -867,6 +1228,7 @@ local function BuildDisplayList(self)
 	end
 
 	local invitesCollapsed = GetCVarBool("friendInvitesCollapsed") and 1 or 0
+	local buttonWidthForSignature = math.floor((self:GetButtonWidth() or 0) + 0.5)
 	local FriendTags = BFL:GetModule("FriendTags")
 	local friendTagsDefinitionVersion = FriendTags and FriendTags.GetDefinitionVersion and FriendTags:GetDefinitionVersion()
 		or BFL.FriendTagsVersion
@@ -905,6 +1267,7 @@ local function BuildDisplayList(self)
 		BFL.FilterSortRegistryVersion or 0,
 		self.filterMode or "all",
 		self.searchText or "",
+		buttonWidthForSignature,
 		numInvitesForSignature,
 		invitesCollapsed,
 	}, "|")
@@ -944,10 +1307,12 @@ local function BuildDisplayList(self)
 	-- 	})
 	-- end
 
-	-- Add friend invites at top (real or mock)
+	-- Legacy keeps friend requests inline. Retail Modern owns a separate request provider.
 	local numInvites = numInvitesForSignature
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	local showInvitesInline = not FriendsUI or FriendsUI:ShouldShowInvitesInline()
 
-	if numInvites and numInvites > 0 then
+	if showInvitesInline and numInvites and numInvites > 0 then
 		table.insert(displayList, {
 			buttonType = BUTTON_TYPE_INVITE_HEADER,
 			count = numInvites,
@@ -1334,8 +1699,10 @@ local function CreateElementFactory(friendsList) -- Capture friendsList referenc
 				button.dragOverlay = dragOverlay
 			end
 
-			-- Create selection highlight
-			if not button.selectionHighlight then
+			-- Modern SocialUI cards own Blizzard's native
+			-- friends-card-selected highlight. Keep the old QuestLog texture
+			-- strictly for templates that do not provide one.
+			if not button.selectionHighlight and not button.highlight then
 				local selectionHighlight = button:CreateTexture(nil, "BACKGROUND")
 				selectionHighlight:SetTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
 				selectionHighlight:SetBlendMode("ADD")
@@ -1476,6 +1843,8 @@ local function CreateElementFactory(friendsList) -- Capture friendsList referenc
 
 	return function(factory, elementData)
 		local buttonType = elementData.buttonType
+		local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+		local modern = FriendsUI and FriendsUI:IsModernActive()
 
 		if buttonType == BUTTON_TYPE_DIVIDER then
 			factory("BetterFriendsDividerTemplate")
@@ -1484,12 +1853,12 @@ local function CreateElementFactory(friendsList) -- Capture friendsList referenc
 		elseif buttonType == BUTTON_TYPE_INVITE then
 			factory("BFL_FriendInviteButtonTemplate", InitInviteButton)
 		elseif buttonType == BUTTON_TYPE_GROUP_HEADER then
-			factory("BetterFriendsGroupHeaderTemplate", InitGroupHeader)
+			factory(modern and "BFLModernGroupHeaderTemplate" or "BetterFriendsGroupHeaderTemplate", InitGroupHeader)
 
 		-- elseif buttonType == BUTTON_TYPE_SEARCH then
 		-- 	factory("BetterFriendsSearchBoxTemplate", InitSearchBox)
 		else -- BUTTON_TYPE_FRIEND
-			factory("BetterFriendsListButtonTemplate", InitFriendButton)
+			factory(modern and "BFLModernFriendCardTemplate" or "BetterFriendsListButtonTemplate", InitFriendButton)
 		end
 	end
 end
@@ -1500,12 +1869,14 @@ local function CreateExtentCalculator(self)
 	-- PERFY OPTIMIZATION: Direct cache access (no DB dependency in closure)
 	return function(dataIndex, elementData)
 		local isCompactMode = self.settingsCache.compactMode or false
+		local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+		local modern = FriendsUI and FriendsUI:IsModernActive()
 		-- Fix #35/#40: Get font sizes from settings cache for dynamic row height
 		local nameSize = self.settingsCache.fontSizeFriendName or 12
 		local infoSize = self.settingsCache.fontSizeFriendInfo or 10
 
 		if elementData.buttonType == BUTTON_TYPE_GROUP_HEADER then
-			return 22
+			return modern and 24 or 22
 		elseif elementData.buttonType == BUTTON_TYPE_INVITE_HEADER then
 			return 22
 		elseif elementData.buttonType == BUTTON_TYPE_INVITE then
@@ -1515,15 +1886,17 @@ local function CreateExtentCalculator(self)
 		elseif elementData.buttonType == BUTTON_TYPE_SEARCH then
 			return 30
 		elseif elementData.buttonType == BUTTON_TYPE_FRIEND then
-			-- Fix #35/#40: Use dynamic height based on font size
-			return GetItemHeight(
+			local height = GetItemHeight(
 				elementData,
 				isCompactMode,
 				nameSize,
 				infoSize,
 				self,
-				self.settingsCache and self.settingsCache.infoDisabled
+				self.settingsCache and self.settingsCache.infoDisabled,
+				modern
 			)
+			elementData._bflCalculatedHeight = height
+			return height
 		else
 			return 34
 		end
@@ -1540,6 +1913,11 @@ function FriendsList:UpdateSearchBoxState()
 	if not frame or not frame.ScrollFrame then
 		return
 	end
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() then
+		FriendsUI:ApplyModernContentLayout(FriendsUI:GetSelectedSection(), true)
+		return
+	end
 
 	-- CRITICAL: Refresh cache before reading simpleMode to prevent stale state
 	-- when called from OnSimpleModeChanged before ForceRefreshFriendsList has run
@@ -1550,6 +1928,14 @@ function FriendsList:UpdateSearchBoxState()
 	local showSearch = self.settingsCache.simpleModeShowSearch
 	if showSearch == nil then
 		showSearch = true
+	end
+	local titleContainer = frame.TitleContainer
+	if titleContainer then
+		-- ButtonFrameTemplate reserves a portrait-sized title inset. Simple mode
+		-- hides that portrait, so use Blizzard's no-portrait title bounds instead.
+		titleContainer:ClearAllPoints()
+		titleContainer:SetPoint("TOPLEFT", frame, "TOPLEFT", simpleMode and 30 or 58, -1)
+		titleContainer:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -24, -1)
 	end
 	local searchBox = frame.FriendsTabHeader and frame.FriendsTabHeader.SearchBox
 	local scrollFrame = frame.ScrollFrame
@@ -1786,6 +2172,11 @@ end
 
 -- Get button width based on current frame size (Phase 3)
 function FriendsList:GetButtonWidth()
+	local scrollBoxWidth = self.scrollBox and self.scrollBox.GetWidth and self.scrollBox:GetWidth()
+	if scrollBoxWidth and scrollBoxWidth > 0 then
+		return scrollBoxWidth
+	end
+
 	local frame = BetterFriendsFrame
 	if not frame then
 		return 398 -- Default width from XML
@@ -1847,8 +2238,12 @@ function FriendsList:InitializeScrollBox()
 	view:SetElementFactory(CreateElementFactory(self))
 	view:SetElementExtentCalculator(CreateExtentCalculator(self))
 
-	-- Initialize ScrollBox with view and scrollbar
-	BFL.InitScrollBoxListWithScrollBar(scrollFrame.ScrollBox, scrollBar, view)
+	-- Initialize once, then replace only the view on live Modern/Legacy switches.
+	if self.scrollBox and self.scrollBox.SetView then
+		self.scrollBox:SetView(view)
+	else
+		BFL.InitScrollBoxListWithScrollBar(scrollFrame.ScrollBox, scrollBar, view)
+	end
 
 	-- Store reference for later use
 	self.scrollBox = scrollFrame.ScrollBox
@@ -2113,8 +2508,9 @@ function FriendsList:RenderClassicButtons()
 				isCompactMode,
 				nameSize,
 				infoSize,
-				nil,
-				self.settingsCache and self.settingsCache.infoDisabled
+				self,
+				self.settingsCache and self.settingsCache.infoDisabled,
+				false
 			)
 	end
 
@@ -2211,7 +2607,8 @@ function FriendsList:RenderClassicButtons()
 					nameSize,
 					infoSize,
 					self,
-					self.settingsCache and self.settingsCache.infoDisabled
+					self.settingsCache and self.settingsCache.infoDisabled,
+					false
 				)
 				button:SetHeight(itemHeight)
 
@@ -2657,9 +3054,30 @@ local function GetColoredLevelText(level)
 
 	local color = GetQuestDifficultyColor and GetQuestDifficultyColor(level)
 	if color then
-		return string.format("|cff%02x%02x%02x%d|r", color.r * 255, color.g * 255, color.b * 255, level)
+		return string.format(
+			"|cff%02x%02x%02x%d|r",
+			math.floor(((color.r or 1) * 255) + 0.5),
+			math.floor(((color.g or 1) * 255) + 0.5),
+			math.floor(((color.b or 1) * 255) + 0.5),
+			level
+		)
 	end
 	return tostring(level)
+end
+
+local function FormatLevelLine(level, levelText)
+	local formatString = (L and L.LEVEL_FORMAT) or "Level %d"
+	local ok, formatted = pcall(string.format, formatString, level)
+	if not ok then
+		formatted = tostring(level)
+	end
+	if levelText and levelText ~= "" and levelText ~= tostring(level) then
+		-- LEVEL_FORMAT is localized and normally uses %d. Replacing the
+		-- already-formatted number preserves its grammar while allowing the
+		-- difficulty color to affect only the level, not the zone/status text.
+		formatted = formatted:gsub(tostring(level), levelText, 1)
+	end
+	return formatted
 end
 
 -- Build a short summary of online game accounts for the info line (BNet only)
@@ -2749,6 +3167,7 @@ local function BuildMultiAccountRowData(self, friend)
 			entries[#entries + 1] = {
 				name = nameText,
 				clientProgram = ga.clientProgram,
+				previewTitleIcon = ga._previewTitleIcon,
 				classFile = display and display.classFile,
 				level = ga.characterLevel,
 				zone = ga.areaName or "",
@@ -2858,13 +3277,13 @@ function FriendsList:FormatInfoLine(friend)
 					if hideMaxLevel and level == maxLevel then
 						return AppendMultiAccountInfo(zone)
 					else
-						return AppendMultiAccountInfo(string.format(L.LEVEL_FORMAT, level) .. ", " .. zone)
+						return AppendMultiAccountInfo(FormatLevelLine(level, levelText) .. ", " .. zone)
 					end
 				elseif level then
 					if hideMaxLevel and level == maxLevel then
 						return AppendMultiAccountInfo(L.FRIEND_MAX_LEVEL or "")
 					else
-						return AppendMultiAccountInfo(string.format(L.LEVEL_FORMAT, level))
+						return AppendMultiAccountInfo(FormatLevelLine(level, levelText))
 					end
 				elseif zone and zone ~= "" then
 					return AppendMultiAccountInfo(zone)
@@ -2879,13 +3298,13 @@ function FriendsList:FormatInfoLine(friend)
 					if hideMaxLevel and level == maxLevel then
 						return zone
 					else
-						return string.format(L.LEVEL_FORMAT, level) .. ", " .. zone
+						return FormatLevelLine(level, levelText) .. ", " .. zone
 					end
 				elseif level then
 					if hideMaxLevel and level == maxLevel then
 						return L.FRIEND_MAX_LEVEL or ""
 					else
-						return string.format(L.LEVEL_FORMAT, level)
+						return FormatLevelLine(level, levelText)
 					end
 				elseif zone and zone ~= "" then
 					return zone
@@ -3562,6 +3981,7 @@ function FriendsList:UpdateSettingsCache()
 	-- Track layout-affecting settings for forceLayoutRebuild
 	local oldInfoDisabled = self.settingsCache.infoDisabled
 	local oldCompactMode = self.settingsCache.compactMode
+	local oldShowMultiAccountInfo = self.settingsCache.showMultiAccountInfo
 
 	-- Core Display Settings (Phase 22: Preset system)
 	self.settingsCache.nameDisplayFormat = DB:Get("nameDisplayFormat", "%name%") -- Legacy compat
@@ -3573,7 +3993,10 @@ function FriendsList:UpdateSettingsCache()
 	self.settingsCache.compactMode = DB:Get("compactMode", false)
 
 	-- Force layout rebuild if row height-affecting settings changed
-	if oldInfoDisabled ~= self.settingsCache.infoDisabled or oldCompactMode ~= self.settingsCache.compactMode then
+	if
+		oldInfoDisabled ~= self.settingsCache.infoDisabled
+		or oldCompactMode ~= self.settingsCache.compactMode
+	then
 		self.forceLayoutRebuild = true
 	end
 
@@ -3598,6 +4021,9 @@ function FriendsList:UpdateSettingsCache()
 	self.settingsCache.showFactionBg = DB:Get("showFactionBg", false)
 	self.settingsCache.showMultiAccountBadge = DB:Get("showMultiAccountBadge", true)
 	self.settingsCache.showMultiAccountInfo = DB:Get("showMultiAccountInfo", true)
+	if oldShowMultiAccountInfo ~= self.settingsCache.showMultiAccountInfo then
+		self.forceLayoutRebuild = true
+	end
 	self.settingsCache.fontColorFriendInfo = DB:Get("fontColorFriendInfo") or { r = 0.5, g = 0.5, b = 0.5, a = 1 }
 
 	-- Fix #35/#40: Font Size Settings for Dynamic Row Height
@@ -6323,17 +6749,36 @@ function FriendsList:RenderDisplay(ignoreVisibility)
 			self.forceLayoutRebuild = false
 		end
 
-		-- Force full rebuild if any friend's multi-account row status changed
-		-- (height changes require ScrollBox layout recalculation)
-		-- PERF: Skip on BuildDisplayList cache hit (structure unchanged)
+		-- The rows themselves are structurally stable, but settings, tag
+		-- assignments, and live account data can change their calculated extent.
+		-- Rebuild only when the top-down content stack actually gained or lost
+		-- height; otherwise keep the fast in-place visual refresh.
 		if not structureChanged and not cacheHit and currentProvider then
+			local isCompactMode = self.settingsCache.compactMode or false
+			local nameSize = self.settingsCache.fontSizeFriendName or BASE_FONT_SIZE
+			local infoSize = self.settingsCache.fontSizeFriendInfo or BASE_FONT_SIZE
+			local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+			local modern = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
 			local index = 1
 			for _, oldData in currentProvider:Enumerate() do
 				local newData = newDisplayList[index]
-				if oldData.buttonType == BUTTON_TYPE_FRIEND and oldData.friend then
-					local oldHasRow = oldData._hasMultiAccountRow or false
-					local newHasRow = ShouldShowMultiAccountRow(self, newData.friend)
-					if oldHasRow ~= newHasRow then
+				if
+					oldData.buttonType == BUTTON_TYPE_FRIEND
+					and oldData.friend
+					and newData
+					and newData.buttonType == BUTTON_TYPE_FRIEND
+				then
+					local newHeight = GetItemHeight(
+						newData,
+						isCompactMode,
+						nameSize,
+						infoSize,
+						self,
+						self.settingsCache.infoDisabled,
+						modern
+					)
+					newData._bflCalculatedHeight = newHeight
+					if oldData._bflCalculatedHeight == nil or oldData._bflCalculatedHeight ~= newHeight then
 						structureChanged = true
 						break
 					end
@@ -6359,8 +6804,10 @@ function FriendsList:RenderDisplay(ignoreVisibility)
 					oldData.name = newData.name -- Fix #31/#32/#37: Copy renamed group name
 				elseif newData.buttonType == BUTTON_TYPE_FRIEND then
 					-- friend reference is same, so data inside friend object is already new
-					-- Copy multi-account row status for height change tracking
 					oldData._hasMultiAccountRow = newData._hasMultiAccountRow
+					oldData._bflCalculatedHeight = newData._bflCalculatedHeight
+					oldData._bflNameContentHeight = newData._bflNameContentHeight
+					oldData._bflTagChipsRowData = newData._bflTagChipsRowData
 				end
 
 				index = index + 1
@@ -6641,8 +7088,17 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 	-- PERFY OPTIMIZATION: Direct cache access
 	-- Apply Text Alignment and Font Settings (Feature Request)
 	local align = self.settingsCache.groupHeaderAlign or "LEFT"
+	local showArrow = self.settingsCache.showGroupArrow
+	if showArrow == nil then
+		showArrow = true
+	end
+	local arrowAlign = self.settingsCache.groupArrowAlign or "LEFT"
+	local arrowColor = { r = arrowR, g = arrowG, b = arrowB, a = arrowA }
+	local usesModernCollapse =
+		ApplyModernGroupCollapseButton(button, collapsed, showArrow, arrowAlign, align, arrowColor)
+	local useNativeMultilingualFont = self:ShouldUseNativeMultilingualGroupHeaderFont(button, name)
 
-	local fs = button:GetFontString()
+	local fs = GetGroupHeaderFontString(button)
 	if fs then
 		-- Font Settings
 		local appliedFont = false
@@ -6659,29 +7115,48 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 				fontFlags = BFL.FontManager:GetFontFlags(fontOutline)
 			end
 
-			local fontPath = BFL.FontManager:ResolveFontPath(fontName)
-			-- Use FontManager to apply font with Alphabet support
-			if fontPath and BFL.FontManager and BFL.FontManager.GetOrCreateFontFamily then
-				-- For Group Headers (Buttons), we must set the Normal/Highlight FontObject
-				-- instead of just setting the FontString, otherwise interaction resets it
-				local familyObj = BFL.FontManager:GetOrCreateFontFamily(fontPath, fontSize, fontFlags, fontShadow)
-				if familyObj then
-					button:SetNormalFontObject(familyObj)
-					button:SetHighlightFontObject(familyObj)
-					-- Also set current fs immediately to ensure visual update
-					fs:SetFontObject(familyObj)
-					appliedFont = true
-				end
-			elseif fontPath then
-				SafeSetFont(fs, fontPath, fontSize, fontFlags)
+			if useNativeMultilingualFont and _G.GameFontNormal then
+				-- Do not recreate Blizzard's alphabet fallback at runtime for
+				-- multilingual Modern headers. GameFontNormal inherits the
+				-- preinitialized SystemFont_Shadow_Med1 FontFamily.
+				fs:SetFontObject(_G.GameFontNormal)
 				appliedFont = true
-
 				if fontShadow then
 					fs:SetShadowColor(0, 0, 0, 1)
 					fs:SetShadowOffset(1, -1)
 				else
 					fs:SetShadowColor(0, 0, 0, 0)
 					fs:SetShadowOffset(0, 0)
+				end
+			else
+				local fontPath = BFL.FontManager:ResolveFontPath(fontName)
+				-- Use FontManager to apply font with Alphabet support
+				if fontPath and BFL.FontManager and BFL.FontManager.GetOrCreateFontFamily then
+					-- For Group Headers (Buttons), we must set the Normal/Highlight FontObject
+					-- instead of just setting the FontString, otherwise interaction resets it
+					local familyObj = BFL.FontManager:GetOrCreateFontFamily(fontPath, fontSize, fontFlags, fontShadow)
+					if familyObj then
+						-- Modern headers use a dedicated FontString so the engine
+						-- never has to reconcile a FontFamily with Button font
+						-- states. Legacy headers keep their normal/highlight state.
+						if not button.HeaderText then
+							button:SetNormalFontObject(familyObj)
+							button:SetHighlightFontObject(familyObj)
+						end
+						fs:SetFontObject(familyObj)
+						appliedFont = true
+					end
+				elseif fontPath then
+					SafeSetFont(fs, fontPath, fontSize, fontFlags)
+					appliedFont = true
+
+					if fontShadow then
+						fs:SetShadowColor(0, 0, 0, 1)
+						fs:SetShadowOffset(1, -1)
+					else
+						fs:SetShadowColor(0, 0, 0, 0)
+						fs:SetShadowOffset(0, 0)
+					end
 				end
 			end
 		end
@@ -6714,14 +7189,6 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 		)
 	end
 
-	-- PERFY OPTIMIZATION: Direct cache access
-	-- Show/hide and align collapse arrows (Feature Request)
-	local showArrow = self.settingsCache.showGroupArrow
-	if showArrow == nil then
-		showArrow = true
-	end
-	local arrowAlign = self.settingsCache.groupArrowAlign or "LEFT"
-
 	-- Reset visibility first
 	if button.DownArrow then
 		button.DownArrow:Hide()
@@ -6730,7 +7197,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 		button.RightArrow:Hide()
 	end
 
-	if showArrow then
+	if showArrow and not usesModernCollapse then
 		local targetArrow = collapsed and button.RightArrow or button.DownArrow
 		if targetArrow then
 			targetArrow:Show()
@@ -6759,7 +7226,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 				if align == "CENTER" then
 					-- If text is also centered, offset arrow to the left of text
 					local textWidth = 0
-					local headerFs = button:GetFontString()
+					local headerFs = GetGroupHeaderFontString(button)
 					if headerFs then
 						textWidth = headerFs:GetStringWidth() or 0
 					end
@@ -6813,12 +7280,18 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 
 	-- Apply font scaling
 	local FontManager = GetFontManager()
-	local headerFs = button:GetFontString()
+	local headerFs = GetGroupHeaderFontString(button)
 	if FontManager and headerFs then
 		EnsureGroupHeaderFont(headerFs)
-		if IsFontReady(headerFs) then
+		if IsFontReady(headerFs) and not useNativeMultilingualFont then
 			pcall(FontManager.ApplyFontSize, FontManager, headerFs)
 		end
+	end
+
+	if usesModernCollapse then
+		-- Re-evaluate CENTER after the configurable header font and final strings
+		-- have their measured widths.
+		ApplyModernGroupCollapseButton(button, collapsed, showArrow, arrowAlign, align, arrowColor)
 	end
 
 	-- Tooltips for group headers
@@ -6892,6 +7365,10 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 				FriendsList:ToggleGroup(self.groupId)
 			end
 		end)
+		local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+		if FriendsUI and FriendsUI.StyleGroupHeader then
+			FriendsUI:StyleGroupHeader(button)
+		end
 		button:Show()
 		return
 	end
@@ -6910,6 +7387,11 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 				FriendsList:ToggleGroup(self.groupId)
 			end
 		end)
+	end
+
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.StyleGroupHeader then
+		FriendsUI:StyleGroupHeader(button)
 	end
 
 	-- Ensure button is visible
@@ -6974,8 +7456,8 @@ Button_OnDragUpdate = function(self)
 			if frame:IsShown() and frame.groupId and frame.dropHighlight then
 				local groupData = friendGroups[frame.groupId]
 				if groupData and not groupData.builtin then
-					-- Check if cursor is over this header using MouseIsOver for robustness
-					local isOver = MouseIsOver(frame)
+					-- Region:IsMouseOver is shared by Retail and supported Classic clients.
+					local isOver = BFL:IsRegionMouseOver(frame)
 
 					if isOver and BetterFriendsList_DraggedFriend then
 						-- Show highlight and update text
@@ -7039,7 +7521,7 @@ Button_OnDragUpdate = function(self)
 			if frame:IsShown() and frame.groupId and frame.dropHighlight then
 				local groupData = friendGroups[frame.groupId]
 				if groupData and not groupData.builtin then
-					local isOver = MouseIsOver(frame)
+					local isOver = BFL:IsRegionMouseOver(frame)
 					if isOver and BetterFriendsList_DraggedFriend then
 						frame.dropHighlight:Show()
 						-- Note: LibQTip lines use custom cell setting, so SetText might not work directly/cleanly
@@ -7225,12 +7707,12 @@ Button_OnDragStop = function(self)
 		end
 	end
 
-	-- Detect Drop Target using MouseIsOver for robustness
+	-- Detect Drop Target using the frame's Region mouse-over method.
 	local droppedOnGroup = nil
 	if framesToCheck then
 		for _, frame in pairs(framesToCheck) do
 			if frame:IsShown() and frame.groupId then
-				if MouseIsOver(frame) then
+				if BFL:IsRegionMouseOver(frame) then
 					droppedOnGroup = frame.groupId
 					break
 				end
@@ -7245,7 +7727,7 @@ Button_OnDragStop = function(self)
 		if brokerTargets then
 			for _, frame in pairs(brokerTargets) do
 				if frame:IsShown() and frame.groupId then
-					if MouseIsOver(frame) then
+					if BFL:IsRegionMouseOver(frame) then
 						droppedOnGroup = frame.groupId
 						break
 					end
@@ -7426,19 +7908,20 @@ function FriendsList:GetFormattedButtonText(friend)
 		local grayOtherFaction = self.settingsCache.grayOtherFaction or false
 
 		if friend.connected then
-			if not usedExternalFormatter then
-				local isOppositeFaction = friend.factionName
-					and friend.factionName ~= playerFactionGroup
-					and friend.factionName ~= ""
-				local shouldGray = grayOtherFaction and isOppositeFaction
+			local isOppositeFaction = friend.factionName
+				and friend.factionName ~= playerFactionGroup
+				and friend.factionName ~= ""
+			local shouldGray = grayOtherFaction and isOppositeFaction
 
-				if shouldGray then
-					-- Strip inner color codes so gray applies uniformly (Phase 22b)
-					local stripped = displayName:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-					line1Text = "|cff808080" .. stripped .. "|r"
-				else
-					line1Text = displayName
-				end
+			if shouldGray then
+				-- The setting remains authoritative even when FriendListColors
+				-- supplied the initial string. Strip nested colors before applying
+				-- one uniform other-faction tint.
+				local graySource = usedExternalFormatter and line1Text or displayName
+				local stripped = (graySource or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+				line1Text = "|cff808080" .. stripped .. "|r"
+			elseif not usedExternalFormatter then
+				line1Text = displayName
 			end
 		else
 			-- Offline
@@ -7477,12 +7960,14 @@ function FriendsList:GetFormattedButtonText(friend)
 		local showRealmName = self.settingsCache.showRealmName
 
 		if friend.connected then
-			if not usedExternalFormatter then
-				local isOppositeFaction = friend.factionName
-					and friend.factionName ~= playerFactionGroup
-					and friend.factionName ~= ""
-				local shouldGray = grayOtherFaction and isOppositeFaction
-
+			local isOppositeFaction = friend.factionName
+				and friend.factionName ~= playerFactionGroup
+				and friend.factionName ~= ""
+			local shouldGray = grayOtherFaction and isOppositeFaction
+			if shouldGray and usedExternalFormatter then
+				local stripped = (line1Text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+				line1Text = "|cff808080" .. stripped .. "|r"
+			elseif not usedExternalFormatter then
 				local characterName = displayName
 
 				if showFactionIcons and friend.factionName then
@@ -7555,46 +8040,157 @@ function FriendsList:GetFormattedButtonText(friend)
 	return line1Text, line2Text
 end
 
-local function ApplyClientIcon(texture, clientProgram, iconSize)
+local function ApplyLegacyClientIcon(texture, clientProgram)
+	if clientProgram and BNet_GetClientTexture then
+		local ok, texturePath = pcall(BNet_GetClientTexture, clientProgram)
+		if ok and texturePath then
+			texture:SetTexture(texturePath)
+			return true
+		end
+	end
+
+	if clientProgram and BNet_GetBattlenetClientAtlas and texture.SetAtlas then
+		local ok, atlas = pcall(BNet_GetBattlenetClientAtlas, clientProgram)
+		if ok and atlas then
+			ok = pcall(texture.SetAtlas, texture, atlas, false)
+			if ok then
+				return true
+			end
+		end
+	end
+
+	texture:SetTexture("Interface\\FriendsFrame\\Battlenet-Battleneticon")
+	return false
+end
+
+local function HasAssignedTexture(texture)
+	if not (texture and texture.GetTexture) then
+		return false
+	end
+	local ok, value = pcall(texture.GetTexture, texture)
+	if not ok then
+		return false
+	end
+	if issecretvalue and issecretvalue(value) then
+		return true
+	end
+	return value ~= nil
+end
+
+local function ApplyClientIcon(texture, clientProgram, iconSize, titleIconVersion, useModernTitleIcon, previewTexture)
 	if not texture then
-		return
+		return false
 	end
 
 	texture:SetTexCoord(0, 1, 0, 1)
-
-	local applied = false
-
-	-- Use C_Texture.SetTitleIconTexture (same API the primary game icon uses)
-	if
-		not applied
-		and clientProgram
-		and C_Texture
-		and C_Texture.SetTitleIconTexture
-		and Enum
-		and Enum.TitleIconVersion
-	then
-		local ok = pcall(C_Texture.SetTitleIconTexture, texture, clientProgram, Enum.TitleIconVersion.Small)
-		if ok then
-			applied = true
-		end
-	end
-
-	-- Classic fallback: BNet_GetClientTexture returns a file path
-	if not applied and clientProgram and BNet_GetClientTexture then
-		local texturePath = BNet_GetClientTexture(clientProgram)
-		if texturePath then
-			texture:SetTexture(texturePath)
-			applied = true
-		end
-	end
-
-	if not applied then
-		texture:SetTexture("Interface\\FriendsFrame\\Battlenet-Battleneticon")
-	end
-
 	if iconSize then
 		texture:SetSize(iconSize, iconSize)
 	end
+
+	if previewTexture then
+		texture.BFLTitleIconRequestKey = nil
+		texture.BFLTitleIconAppliedKey = "preview:" .. previewTexture
+		texture:SetTexture(nil)
+		texture:SetTexture(previewTexture)
+		return true
+	end
+
+	local version = titleIconVersion or (Enum and Enum.TitleIconVersion and Enum.TitleIconVersion.Small)
+	local requestKey = clientProgram and version and (tostring(clientProgram) .. ":" .. tostring(version)) or nil
+
+	if useModernTitleIcon then
+		if requestKey and texture.BFLTitleIconAppliedKey == requestKey and HasAssignedTexture(texture) then
+			return true
+		end
+		if not (requestKey and C_Texture and C_Texture.SetTitleIconTexture and version) then
+			return false
+		end
+
+		-- Match Blizzard's 12.1 friend-card implementation exactly for real
+		-- Battle.net rows. Synthetic Preview rows have already returned through
+		-- the deterministic local-texture branch above.
+		texture.BFLTitleIconRequestKey = nil
+		texture:SetTexture(nil)
+		local ok = pcall(C_Texture.SetTitleIconTexture, texture, clientProgram, version)
+		if ok then
+			texture.BFLTitleIconAppliedKey = requestKey
+		else
+			texture.BFLTitleIconAppliedKey = nil
+		end
+		return ok
+	end
+
+	-- A row may be recycled while the 12.1 title texture is loading. The key
+	-- lets the callback reject stale results without consulting Preview Mode or
+	-- treating mock rows differently from live Battle.net data.
+	if requestKey and texture.BFLTitleIconAppliedKey == requestKey then
+		return true
+	end
+
+	if requestKey and texture.BFLTitleIconRequestKey == requestKey then
+		return true
+	end
+
+	texture.BFLTitleIconAppliedKey = nil
+	texture.BFLTitleIconRequestKey = requestKey
+	texture:SetTexture(nil)
+
+	if requestKey and C_Texture and version then
+		local ready = false
+		if C_Texture.IsTitleIconTextureReady then
+			local ok, isReady = pcall(C_Texture.IsTitleIconTextureReady, clientProgram, version)
+			ready = ok and isReady == true
+		end
+
+		if ready and C_Texture.SetTitleIconTexture then
+			local ok = pcall(C_Texture.SetTitleIconTexture, texture, clientProgram, version)
+			if ok then
+				texture.BFLTitleIconRequestKey = nil
+				texture.BFLTitleIconAppliedKey = requestKey
+				return true
+			end
+		end
+
+		if C_Texture.GetTitleIconTexture then
+			local ok = pcall(C_Texture.GetTitleIconTexture, clientProgram, version, function(success, resolvedTexture)
+				if texture.BFLTitleIconRequestKey ~= requestKey then
+					return
+				end
+
+				texture.BFLTitleIconRequestKey = nil
+				if success and resolvedTexture then
+					texture:SetTexture(resolvedTexture)
+					texture.BFLTitleIconAppliedKey = requestKey
+				else
+					ApplyLegacyClientIcon(texture, clientProgram)
+					texture.BFLTitleIconAppliedKey = requestKey
+				end
+				if iconSize then
+					texture:SetSize(iconSize, iconSize)
+				end
+			end)
+			if ok then
+				-- Match Blizzard's card path as well. SetTitleIconTexture can
+				-- populate the region before the explicit resolver completes.
+				if texture.BFLTitleIconRequestKey == requestKey and C_Texture.SetTitleIconTexture then
+					pcall(C_Texture.SetTitleIconTexture, texture, clientProgram, version)
+				end
+				return true
+			end
+		elseif C_Texture.SetTitleIconTexture then
+			local ok = pcall(C_Texture.SetTitleIconTexture, texture, clientProgram, version)
+			if ok then
+				texture.BFLTitleIconRequestKey = nil
+				texture.BFLTitleIconAppliedKey = requestKey
+				return true
+			end
+		end
+	end
+
+	ApplyLegacyClientIcon(texture, clientProgram)
+	texture.BFLTitleIconRequestKey = nil
+	texture.BFLTitleIconAppliedKey = requestKey
+	return false
 end
 
 -- Returns an embedded texture string (|T...|t) for a game client icon, for use in text/menu labels
@@ -7603,36 +8199,41 @@ function BFL:GetClientEmbeddedIcon(clientProgram, size)
 		return ""
 	end
 	size = size or 16
-
 	-- Retail: Use C_Texture API for proper high-res icon
-	if
-		C_Texture
-		and C_Texture.GetTitleIconTexture
-		and C_Texture.IsTitleIconTextureReady
-		and Enum
-		and Enum.TitleIconVersion
-		and C_Texture.IsTitleIconTextureReady(clientProgram, Enum.TitleIconVersion.Small)
-	then
-		local iconStr = ""
-		C_Texture.GetTitleIconTexture(clientProgram, Enum.TitleIconVersion.Small, function(success, texture)
-			if success and BNet_GetClientEmbeddedTexture then
-				iconStr = BNet_GetClientEmbeddedTexture(texture, size, size, 0) .. " "
+	if C_Texture and C_Texture.GetTitleIconTexture and C_Texture.IsTitleIconTextureReady then
+		if
+			Enum
+			and Enum.TitleIconVersion
+			and C_Texture.IsTitleIconTextureReady(clientProgram, Enum.TitleIconVersion.Small)
+		then
+			local iconStr = ""
+			C_Texture.GetTitleIconTexture(clientProgram, Enum.TitleIconVersion.Small, function(success, texture)
+				if success and BNet_GetClientEmbeddedTexture then
+					iconStr = BNet_GetClientEmbeddedTexture(texture, size, size, 0) .. " "
+				end
+			end)
+			if iconStr ~= "" then
+				return iconStr
 			end
-		end)
-		if iconStr ~= "" then
-			return iconStr
 		end
 	end
 
-	-- Classic fallback: BNet_GetClientTexture
+	-- Synchronous fallback for Classic or a title icon that is not ready yet.
 	if BNet_GetClientTexture then
-		local texturePath = BNet_GetClientTexture(clientProgram)
-		if texturePath then
+		local ok, texturePath = pcall(BNet_GetClientTexture, clientProgram)
+		if ok and texturePath then
 			if BNet_GetClientEmbeddedTexture then
 				return BNet_GetClientEmbeddedTexture(texturePath, size, size, 0) .. " "
 			else
 				return "|T" .. texturePath .. ":" .. size .. ":" .. size .. ":0:0|t "
 			end
+		end
+	end
+
+	if BNet_GetClientEmbeddedAtlas then
+		local ok, markup = pcall(BNet_GetClientEmbeddedAtlas, clientProgram, size, size, 0, 0)
+		if ok and markup then
+			return markup .. " "
 		end
 	end
 
@@ -7666,6 +8267,8 @@ function FriendsList:UpdateMultiAccountRow(button, friend, availableWidth)
 	local infoG = (self.fontCache and self.fontCache.infoG) or 0.5
 	local infoB = (self.fontCache and self.fontCache.infoB) or 0.5
 	local infoA = (self.fontCache and self.fontCache.infoA) or 1
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	local modern = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
 
 	local rowWidth = availableWidth or row:GetWidth() or (button and button.Name and button.Name:GetWidth()) or 0
 	if not rowWidth or rowWidth <= 0 then
@@ -7673,13 +8276,13 @@ function FriendsList:UpdateMultiAccountRow(button, friend, availableWidth)
 	end
 	rowWidth = math.max(rowWidth, 120) -- Ensure usable width for text/icon layout
 	local iconSize = math.max(12, math.floor(infoFontSize * 1.2))
-	local rowHeight = math.max(iconSize, infoFontSize + 2)
+	local rowHeight = GetMultiAccountLineHeight(infoFontSize)
 	row:SetHeight(rowHeight)
 	row:SetWidth(rowWidth)
 
 	row:ClearAllPoints()
-	row:SetPoint("TOPLEFT", button.Info, "BOTTOMLEFT", 0, -2)
-	row:SetPoint("TOPRIGHT", button.Info, "BOTTOMRIGHT", 0, -2)
+	row:SetPoint("TOPLEFT", button.Info, "BOTTOMLEFT", 0, -FRIEND_ROW_LINE_GAP)
+	row:SetPoint("TOPRIGHT", button.Info, "BOTTOMRIGHT", 0, -FRIEND_ROW_LINE_GAP)
 
 	for _, entry in ipairs(row.entries) do
 		entry:Hide()
@@ -7699,7 +8302,14 @@ function FriendsList:UpdateMultiAccountRow(button, friend, availableWidth)
 		entryFrame:SetPoint("LEFT", row, "LEFT", cursorX, 0)
 		entryFrame:SetSize(rowWidth - cursorX, rowHeight)
 
-		ApplyClientIcon(entryFrame.icon, entryData.clientProgram, iconSize)
+		ApplyClientIcon(
+			entryFrame.icon,
+			entryData.clientProgram,
+			iconSize,
+			Enum and Enum.TitleIconVersion and Enum.TitleIconVersion.Small,
+			modern,
+			entryData.previewTitleIcon
+		)
 		entryFrame.icon:SetSize(iconSize, iconSize)
 		entryFrame.icon:Show()
 
@@ -7768,6 +8378,69 @@ function FriendsList:UpdateMultiAccountRow(button, friend, availableWidth)
 end
 
 -- Update friend button (called by ScrollBox factory for each visible friend)
+local function SetFriendStatusVisual(button, statusTexture)
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	local modern = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
+	local visual = statusTexture
+	if modern then
+		if statusTexture == "Interface\\FriendsFrame\\StatusIcon-Online" then
+			visual = "friends-status-online"
+		elseif statusTexture == "Interface\\FriendsFrame\\StatusIcon-Away" then
+			visual = "friends-status-away"
+		elseif statusTexture == "Interface\\FriendsFrame\\StatusIcon-DnD" then
+			visual = "friends-status-busy"
+		else
+			visual = "friends-status-offline"
+		end
+	end
+
+	if button.lastStatusVisual == visual then
+		return
+	end
+	if modern and BFL.SetTextureOrAtlas then
+		BFL.SetTextureOrAtlas(button.status, visual, statusTexture, true)
+	else
+		button.status:SetTexture(statusTexture)
+	end
+	button.lastStatusVisual = visual
+end
+
+function FriendsList:SetButtonSelectionVisual(button, selected)
+	if not button then
+		return
+	end
+	selected = selected == true
+	if button.SetHighlightLocked then
+		button:SetHighlightLocked(selected)
+	elseif selected and button.LockHighlight then
+		button:LockHighlight()
+	elseif not selected and button.UnlockHighlight then
+		button:UnlockHighlight()
+	elseif button.selectionHighlight then
+		button.selectionHighlight:SetShown(selected)
+	end
+	if button.selectionHighlight then
+		button.selectionHighlight:SetShown(selected)
+	end
+end
+
+function FriendsList:ClearSelection()
+	local selectedButton = self.selectedButton
+
+	-- Clear the model first so a pooled row cannot immediately restore a stale
+	-- highlight while the dependent button state is being refreshed.
+	self.selectedFriend = nil
+	self.selectedFriendUID = nil
+	self.selectedButton = nil
+
+	if selectedButton then
+		self:SetButtonSelectionVisual(selectedButton, false)
+	end
+	if self.UpdateSendMessageButton then
+		self:UpdateSendMessageButton()
+	end
+end
+
 function FriendsList:UpdateFriendButton(button, elementData)
 	local friend = elementData.friend
 	local groupId = elementData.groupId
@@ -7777,14 +8450,15 @@ function FriendsList:UpdateFriendButton(button, elementData)
 	button.friendData = friend
 	button.groupId = groupId
 
-	-- Sync selection highlight state to correct data
-	if button.selectionHighlight then
-		if self.selectedFriend == friend then
-			button.selectionHighlight:Show()
-			self.selectedButton = button
-		else
-			button.selectionHighlight:Hide()
-		end
+	-- Sync selection state to the recycled row. Modern cards use the template's
+	-- native friends-card-selected highlight; legacy rows retain their custom
+	-- selection texture.
+	local friendUID = friend.uid or (self.GetFriendUID and self:GetFriendUID(friend))
+	local isSelected = self.selectedFriend == friend
+		or (self.selectedFriendUID ~= nil and friendUID ~= nil and self.selectedFriendUID == friendUID)
+	self:SetButtonSelectionVisual(button, isSelected)
+	if isSelected then
+		self.selectedButton = button
 	end
 
 	-- [Phase 5 Optimized] Static setup moved to InitFriendButton (friendInfo removed, using friendData)
@@ -7814,6 +8488,9 @@ function FriendsList:UpdateFriendButton(button, elementData)
 	-- Calculate dynamic row height for icon positioning (needed for layout updates)
 	local nameSize = self.fontCache and self.fontCache.nameSize or BASE_FONT_SIZE
 	local infoSize = self.fontCache and self.fontCache.infoSize or BASE_FONT_SIZE
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	local modern = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
+	local visualMinimum = modern and MODERN_ROW_MINIMUM or 34
 	local rowHeight = button:GetHeight()
 		or CalculateFriendRowHeight(
 			isCompactMode,
@@ -7822,8 +8499,15 @@ function FriendsList:UpdateFriendButton(button, elementData)
 			self.settingsCache.infoDisabled,
 			hasMultiAccountRow
 		)
-	local iconBaseRowHeight =
-		CalculateFriendRowHeight(isCompactMode, nameSize, infoSize, self.settingsCache.infoDisabled, false)
+	local iconBaseRowHeight = CalculateFriendRowHeight(
+		isCompactMode,
+		nameSize,
+		infoSize,
+		self.settingsCache.infoDisabled,
+		false,
+		0,
+		visualMinimum
+	)
 
 	-- Compact mode: actual row height may be smaller than the 2-line fallback used by
 	-- CalculateFriendRowHeight. Clamp icon base so icons never exceed the real row.
@@ -7834,47 +8518,71 @@ function FriendsList:UpdateFriendButton(button, elementData)
 	-- OPTIMIZATION: Layout Caching (Phase 9.9)
 	-- Update layout if CompactMode changed OR font version changed OR row height changed
 	local infoDisabled = self.settingsCache.infoDisabled or false
+	local nameContentHeight = elementData and elementData._bflNameContentHeight or (nameSize + 2)
+	local showFavoriteIcon = friend.type == "bnet"
+		and friend.isFavorite
+		and self.settingsCache.enableFavoriteIcon
+	local textRightPadding = GetFriendTextRightPadding(
+		self,
+		friend,
+		modern,
+		isCompactMode,
+		nameSize,
+		infoSize,
+		showFavoriteIcon
+	)
+	local textRightPaddingChanged = button.textRightPadding ~= textRightPadding
+	button.textRightPadding = textRightPadding
 	local layoutChanged = button.lastCompactMode ~= isCompactMode
 		or button.lastLayoutFontVersion ~= self.fontCacheVersion
 		or button.lastRowHeight ~= rowHeight
 		or button.lastInfoDisabled ~= infoDisabled
 		or button.lastHasMultiAccountRow ~= hasMultiAccountRow
+		or button.lastModernLayout ~= modern
+		or button.lastNameContentHeight ~= nameContentHeight
+		or textRightPaddingChanged
 	if layoutChanged then
 		button.lastCompactMode = isCompactMode
 		button.lastLayoutFontVersion = self.fontCacheVersion
 		button.lastRowHeight = rowHeight
 		button.lastInfoDisabled = infoDisabled
 		button.lastHasMultiAccountRow = hasMultiAccountRow
+		button.lastModernLayout = modern
+		button.lastNameContentHeight = nameContentHeight
 
-		-- Reset name position based on compact mode and info disabled state
-		if isCompactMode or infoDisabled then
-			button.Name:SetPoint("LEFT", 44, 0) -- Centered vertically for single line
-		else
-			button.Name:SetPoint("LEFT", 44, 7) -- Upper position for two lines
+		local textLeftInset = modern and 38 or 44
+		button.textLeftInset = textLeftInset
+		local nameLineHeight = nameSize + 2
+		local infoLineHeight = infoSize + 2
+
+		-- XML supplies safe creation anchors only. Live friends are stacked from
+		-- the card's top edge so added lines grow downward instead of recentering
+		-- the existing text in a larger fixed-height row.
+		button.Name:ClearAllPoints()
+		button.Name:SetPoint("TOPLEFT", button, "TOPLEFT", textLeftInset, -FRIEND_ROW_VERTICAL_PADDING)
+		button.Name:SetHeight(math.max(nameLineHeight, nameContentHeight))
+		button.Info:ClearAllPoints()
+		button.Info:SetPoint("TOPLEFT", button.Name, "BOTTOMLEFT", 0, -FRIEND_ROW_LINE_GAP)
+		button.Info:SetHeight(infoLineHeight)
+		FriendButton_OnSizeChanged(button, button:GetWidth(), rowHeight)
+		button.Name:SetWordWrap(true)
+		if button.Name.SetNonSpaceWrap then
+			button.Name:SetNonSpaceWrap(true)
+		end
+		if button.Name.SetMaxLines then
+			button.Name:SetMaxLines(0)
 		end
 
 		-- Show/hide friend elements based on compact mode and info disabled state
 		if isCompactMode then
 			button.Info:Hide() -- Hide second line in compact mode
-			-- Allow name to wrap to 2 lines since info is hidden
-			if button.Name.SetMaxLines then
-				button.Name:SetMaxLines(2)
-			end
 			if button.Info.SetMaxLines then
-				button.Info:SetMaxLines(2)
+				button.Info:SetMaxLines(1)
 			end
 		elseif infoDisabled then
 			button.Info:Hide() -- Hide second line when info is disabled
-			-- Single line only (row height is slim, no space for wrapping)
-			if button.Name.SetMaxLines then
-				button.Name:SetMaxLines(1)
-			end
 		else
 			button.Info:Show()
-			-- Normal mode: no wrapping, truncate with ellipsis
-			if button.Name.SetMaxLines then
-				button.Name:SetMaxLines(1)
-			end
 			if button.Info.SetMaxLines then
 				button.Info:SetMaxLines(1)
 			end
@@ -8040,7 +8748,6 @@ function FriendsList:UpdateFriendButton(button, elementData)
 					elseif playerFaction == "Horde" then
 						bgR, bgG, bgB, bgA = 0.80, 0.16, 0.16, 0.2
 					end
-				else
 				end
 			end
 		else
@@ -8063,7 +8770,8 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		local statusTexture
 
 		if friend.connected then
-			local isMobile = friend.gameAccountInfo and friend.gameAccountInfo.clientProgram == "BSAp"
+			local isMobile = friend.gameAccountInfo
+				and (friend.gameAccountInfo.clientProgram == "BSAp" or friend.gameAccountInfo.clientProgram == "App")
 			-- Check both account status (App) and game status (WoW /afk)
 			local isAFK = friend.isAFK
 				or (friend.gameAccountInfo and (friend.gameAccountInfo.isAFK or friend.gameAccountInfo.isGameAFK))
@@ -8081,46 +8789,48 @@ function FriendsList:UpdateFriendButton(button, elementData)
 			statusTexture = "Interface\\FriendsFrame\\StatusIcon-Offline"
 		end
 
-		if button.lastStatusTexture ~= statusTexture then
-			button.status:SetTexture(statusTexture)
-			button.lastStatusTexture = statusTexture
-		end
+
+		SetFriendStatusVisual(button, statusTexture)
 
 		-- Set game icon using Blizzard's modern API
-		if friend.gameAccountInfo and friend.gameAccountInfo.clientProgram and friend.connected then
+		if showGameIcon and friend.gameAccountInfo and friend.gameAccountInfo.clientProgram and friend.connected then
 			local clientProgram = friend.gameAccountInfo.clientProgram
+			local previewTitleIcon = friend._isMock
+				and (friend._previewTitleIcon or friend.gameAccountInfo._previewTitleIcon)
+				or nil
 
-			local canSetTitleIcon = false
-			if C_Texture and C_Texture.SetTitleIconTexture then
-				if Enum and Enum.TitleIconVersion then
-					canSetTitleIcon = true
-				end
+			local iconCacheKey = (modern and "modern-title:" or "legacy-title:")
+				.. clientProgram
+				.. ":"
+				.. tostring(previewTitleIcon or "")
+			local hasResolvedIcon = HasAssignedTexture(button.gameIcon)
+			if button.lastClientProgram ~= iconCacheKey or (modern and not hasResolvedIcon) then
+				ApplyClientIcon(
+					button.gameIcon,
+					clientProgram,
+					nil,
+					Enum and Enum.TitleIconVersion and Enum.TitleIconVersion.Medium,
+					modern,
+					previewTitleIcon
+				)
+				button.lastClientProgram = iconCacheKey
 			end
-			if canSetTitleIcon then
-				-- Use Blizzard's modern texture API (11.0+) for ALL client programs including Battle.net App
-				-- Optimized Phase 4: Avoid C-Call if unnecessary (though SetTitleIconTexture is fast, avoiding it is faster)
-				if button.lastClientProgram ~= clientProgram then
-					C_Texture.SetTitleIconTexture(button.gameIcon, clientProgram, Enum.TitleIconVersion.Medium)
-					button.lastClientProgram = clientProgram
-				end
 
-				-- Fade icon for WoW friends on different project versions
-				local fadeIcon = (clientProgram == BNET_CLIENT_WOW)
-					and (friend.gameAccountInfo.wowProjectID ~= WOW_PROJECT_ID)
-				local targetAlpha = fadeIcon and 0.6 or 1
+			-- Fade icon for WoW friends on different project versions
+			local fadeIcon = (clientProgram == BNET_CLIENT_WOW)
+				and (friend.gameAccountInfo.wowProjectID ~= WOW_PROJECT_ID)
+			local targetAlpha = fadeIcon and 0.6 or 1
 
-				if button.lastGameIconAlpha ~= targetAlpha then
-					button.gameIcon:SetAlpha(targetAlpha)
-					button.lastGameIconAlpha = targetAlpha
-				end
-
-				button.gameIcon:Show()
-			else
-				button.gameIcon:Hide()
-				button.lastClientProgram = nil
+			if button.lastGameIconAlpha ~= targetAlpha then
+				button.gameIcon:SetAlpha(targetAlpha)
+				button.lastGameIconAlpha = targetAlpha
 			end
+
+			button.gameIcon:Show()
 		else
 			button.gameIcon:Hide()
+			button.gameIcon.BFLTitleIconRequestKey = nil
+			button.gameIcon.BFLTitleIconAppliedKey = nil
 			button.lastClientProgram = nil -- Reset state
 		end
 
@@ -8146,6 +8856,7 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		-- Multi-Game-Account Badge: Show count when friend has multiple game accounts online
 		if button.gameAccountBadge then
 			local showBadge = self.settingsCache.showMultiAccountBadge
+				and showGameIcon
 				and friend.connected
 				and friend.numGameAccounts
 				and friend.numGameAccounts > 1
@@ -8248,12 +8959,11 @@ function FriendsList:UpdateFriendButton(button, elementData)
 
 			-- Phase 4.1: Faction Background
 			if self.settingsCache.showFactionBg then
-				-- WoW friends are typically same faction as player
-				local playerFaction = self.playerFaction
+				local faction = friend.factionName or self.playerFaction
 
-				if playerFaction == "Alliance" then
+				if faction == "Alliance" or faction == "Allianz" then
 					bgR, bgG, bgB, bgA = 0.0, 0.44, 0.87, 0.2 -- Alliance Blue
-				elseif playerFaction == "Horde" then
+				elseif faction == "Horde" then
 					bgR, bgG, bgB, bgA = 0.80, 0.16, 0.16, 0.2 -- Horde Red
 				end
 			end
@@ -8284,12 +8994,12 @@ function FriendsList:UpdateFriendButton(button, elementData)
 			statusTexture = "Interface\\FriendsFrame\\StatusIcon-Offline"
 		end
 
-		if button.lastStatusTexture ~= statusTexture then
-			button.status:SetTexture(statusTexture)
-			button.lastStatusTexture = statusTexture
-		end
+
+		SetFriendStatusVisual(button, statusTexture)
 
 		button.gameIcon:Hide()
+		button.gameIcon.BFLTitleIconRequestKey = nil
+		button.gameIcon.BFLTitleIconAppliedKey = nil
 		button.lastClientProgram = nil -- Reset state
 
 		-- Hide badge for WoW friends (only BNet friends have multi-account)
@@ -8413,6 +9123,9 @@ function FriendsList:UpdateFriendButton(button, elementData)
 						button.favoriteMeasure:Hide()
 						button.favoriteMeasure:SetJustifyH("LEFT")
 						button.favoriteMeasure:SetWordWrap(true)
+						if button.favoriteMeasure.SetNonSpaceWrap then
+							button.favoriteMeasure:SetNonSpaceWrap(true)
+						end
 					end
 
 					if button.favoriteMeasureFontVersion ~= button.lastFontVersion then
@@ -8425,7 +9138,7 @@ function FriendsList:UpdateFriendButton(button, elementData)
 
 					button.favoriteMeasure:SetWidth(nameWidth)
 					if button.favoriteMeasure.SetMaxLines then
-						button.favoriteMeasure:SetMaxLines(isCompactMode and 2 or 1)
+						button.favoriteMeasure:SetMaxLines(0)
 					end
 					EnsureFontSet(button.favoriteMeasure)
 					button.favoriteMeasure:SetText(baseText)
@@ -8470,25 +9183,9 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		end
 	end
 
-	-- Auto-Resize Text: Calculate dynamic padding based on visible right-side elements
-	local padding = 25 -- Base padding (safe margin from right edge)
-
-	-- GameIcon (Status/Client) is at -38, width 28 -> Left edge at -66
-	if button.gameIcon and button.gameIcon:IsShown() then
-		padding = 80 -- Clear -66px with margin
-	-- TravelPass (Invite) is at -8, width 24 -> Left edge at -32
-	elseif button.travelPassButton and button.travelPassButton:IsShown() then
-		padding = 45 -- Clear -32px with margin
-	end
-
-	if button.textRightPadding ~= padding then
-		button.textRightPadding = padding
-		-- Force update immediately if padding changed
-		if button:GetScript("OnSizeChanged") then
-			button:GetScript("OnSizeChanged")(button, button:GetWidth(), button:GetHeight())
-		end
-	end
-
+	-- Row measurement and live rendering share this padding, so wrapped names
+	-- receive their required height before the ScrollBox commits the element.
+	local padding = button.textRightPadding or FRIEND_TEXT_BASE_RIGHT_PADDING
 	local nameWidth = (button.Name and button.Name:GetWidth()) or (self:GetButtonWidth() - 44 - padding)
 	if nameWidth and nameWidth > 0 then
 		self:UpdateMultiAccountRow(button, friend, nameWidth)
@@ -8501,8 +9198,25 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		TagChips:UpdateRowChips(button, friend, self, elementData and elementData._bflTagChipsRowData)
 	end
 
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.StyleFriendCard then
+		FriendsUI:StyleFriendCard(button)
+	end
+
 	-- Ensure button is visible
 	button:Show()
+end
+
+function FriendsList:OnFriendsUIStyleChanged()
+	if not BFL.HasModernScrollBox then
+		return
+	end
+	self.lastBuildSignature = nil
+	self.cachedDisplayList = nil
+	self.cachedGroupedFriends = nil
+	self.forceLayoutRebuild = true
+	self:InitializeScrollBox()
+	self:RenderDisplay(true)
 end
 
 -- ========================================
@@ -8864,6 +9578,10 @@ end
 -- Update SearchBox width dynamically based on available space
 function FriendsList:UpdateSearchBoxWidth()
 	local frame = BetterFriendsFrame
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() then
+		return
+	end
 	-- Fix: Simple Mode and Classic checks
 	local DB = GetDB()
 	local simpleMode = DB and DB:Get("simpleMode", false)

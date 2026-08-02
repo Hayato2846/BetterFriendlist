@@ -168,6 +168,419 @@ local function RefreshFriends()
 	end
 end
 
+local function RefreshWho()
+	local WhoFrame = BFL:GetModule("WhoFrame")
+	if WhoFrame and WhoFrame.Update then
+		WhoFrame:Update(true)
+	end
+end
+
+function SettingsDesigner:GetFriendsUI()
+	return BFL.FriendsUI or BFL:GetModule("FriendsUI")
+end
+
+function SettingsDesigner:IsModernFriendsUI()
+	local FriendsUI = self:GetFriendsUI()
+	return BFL.IsRetail == true
+		and FriendsUI
+		and FriendsUI.IsModernActive
+		and FriendsUI:IsModernActive()
+end
+
+function SettingsDesigner:BuildFriendTabEntries()
+	local FriendsUI = self:GetFriendsUI()
+	return FriendsUI and FriendsUI.GetFriendTabSettingsEntries and FriendsUI:GetFriendTabSettingsEntries() or {}
+end
+
+function SettingsDesigner:MoveFriendTabEntry(fromIndex, toIndex)
+	local FriendsUI = self:GetFriendsUI()
+	if FriendsUI and FriendsUI.MoveFriendTab then
+		FriendsUI:MoveFriendTab(fromIndex, toIndex)
+	end
+end
+
+SettingsDesigner.FRIEND_TAB_SETTINGS_ROW_HEIGHT = 46
+SettingsDesigner.FRIEND_TAB_SETTINGS_HEADER_HEIGHT = 34
+
+function SettingsDesigner:SetFriendTabSettingsBackdrop(frame, mode, alternate)
+	if not frame.SetBackdrop then
+		return
+	end
+	frame:SetBackdrop({
+		bgFile = "Interface\\Buttons\\WHITE8X8",
+		edgeFile = "Interface\\Buttons\\WHITE8X8",
+		edgeSize = 1,
+	})
+	if mode == "target" then
+		frame:SetBackdropColor(0.18, 0.14, 0.05, 0.98)
+		frame:SetBackdropBorderColor(0.95, 0.72, 0.16, 0.90)
+	elseif mode == "hover" then
+		frame:SetBackdropColor(0.095, 0.075, 0.035, 0.94)
+		frame:SetBackdropBorderColor(0.62, 0.46, 0.14, 0.78)
+	elseif alternate then
+		frame:SetBackdropColor(0.050, 0.046, 0.039, 0.94)
+		frame:SetBackdropBorderColor(0.24, 0.20, 0.14, 0.60)
+	else
+		frame:SetBackdropColor(0.029, 0.027, 0.024, 0.94)
+		frame:SetBackdropBorderColor(0.19, 0.17, 0.13, 0.52)
+	end
+end
+
+function SettingsDesigner:SetFriendTabSettingsTooltip(owner, title, description)
+	owner:SetScript("OnEnter", function(self)
+		if not GameTooltip then
+			return
+		end
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(title or "", 1, 0.82, 0)
+		if description and description ~= "" then
+			GameTooltip:AddLine(description, 1, 1, 1, true)
+		end
+		GameTooltip:Show()
+	end)
+	owner:SetScript("OnLeave", function()
+		if GameTooltip then
+			GameTooltip:Hide()
+		end
+	end)
+end
+
+function SettingsDesigner:GetFriendTabSettingsControlHeight()
+	-- LibSettingsDesigner reserves the title/description area inside the control.
+	return 78 + self:GetFriendTabSettingsPanelHeight()
+end
+
+function SettingsDesigner:GetFriendTabSettingsPanelHeight()
+	local entries = self:BuildFriendTabEntries()
+	return 20
+		+ self.FRIEND_TAB_SETTINGS_HEADER_HEIGHT
+		+ (math.max(1, #entries) * self.FRIEND_TAB_SETTINGS_ROW_HEIGHT)
+end
+
+function SettingsDesigner:RenderFriendTabSettings(parent)
+	if not parent then
+		return nil
+	end
+
+	local handle = {
+		parent = parent,
+		rows = {},
+		dragIndex = nil,
+		dropIndex = nil,
+		dragRow = nil,
+	}
+
+	local panel = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+	panel:SetAllPoints(parent)
+	panel:SetBackdrop({
+		bgFile = "Interface\\Buttons\\WHITE8X8",
+		edgeFile = "Interface\\Buttons\\WHITE8X8",
+		edgeSize = 1,
+	})
+	panel:SetBackdropColor(0.012, 0.011, 0.010, 0.72)
+	panel:SetBackdropBorderColor(0.34, 0.27, 0.14, 0.76)
+	handle.panel = panel
+
+	local header = CreateFrame("Frame", nil, panel, "BackdropTemplate")
+	header:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, -10)
+	header:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -10, -10)
+	header:SetHeight(self.FRIEND_TAB_SETTINGS_HEADER_HEIGHT)
+	header:SetBackdrop({
+		bgFile = "Interface\\Buttons\\WHITE8X8",
+		edgeFile = "Interface\\Buttons\\WHITE8X8",
+		edgeSize = 1,
+	})
+	header:SetBackdropColor(0.085, 0.066, 0.032, 0.98)
+	header:SetBackdropBorderColor(0.52, 0.38, 0.13, 0.86)
+
+	local orderHeader = header:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormalSmall")
+	orderHeader:SetPoint("LEFT", header, "LEFT", 14, 0)
+	orderHeader:SetText(T("SETTINGS_FRIEND_TABS_ORDER", "Tab Order & Visibility"))
+	orderHeader:SetTextColor(1, 0.82, 0, 1)
+
+	local conditionalHeader = header:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlightSmall")
+	conditionalHeader:SetPoint("RIGHT", header, "RIGHT", -12, 0)
+	conditionalHeader:SetWidth(132)
+	conditionalHeader:SetJustifyH("CENTER")
+	conditionalHeader:SetText(T("SETTINGS_FRIEND_TABS_CONDITIONAL", "Conditional Visibility"))
+
+	local visibleHeader = header:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlightSmall")
+	visibleHeader:SetPoint("RIGHT", conditionalHeader, "LEFT", -14, 0)
+	visibleHeader:SetWidth(70)
+	visibleHeader:SetJustifyH("CENTER")
+	visibleHeader:SetText(SHOW or ENABLE or "Show")
+
+	local function RefreshDropVisuals()
+		for index, row in ipairs(handle.rows) do
+			local mode = handle.dropIndex == index and "target" or nil
+			SettingsDesigner:SetFriendTabSettingsBackdrop(row, mode, index % 2 == 0)
+		end
+	end
+
+	local function HideDragGhost()
+		local ghost = BFL.GetDragGhost and BFL:GetDragGhost()
+		if not ghost then
+			return
+		end
+		ghost:Hide()
+		ghost:SetScript("OnUpdate", nil)
+		ghost:ClearAllPoints()
+		if ghost.BFLFriendTabIcon then
+			ghost.BFLFriendTabIcon:Hide()
+		end
+		if ghost.text then
+			ghost.text:ClearAllPoints()
+			ghost.text:SetPoint("CENTER", 3, 0)
+		end
+	end
+
+	local function ShowDragGhost(row)
+		local ghost = BFL.GetDragGhost and BFL:GetDragGhost()
+		local FriendsUI = SettingsDesigner:GetFriendsUI()
+		if not (ghost and row and row.sectionID) then
+			return
+		end
+		if not ghost.BFLFriendTabIcon then
+			ghost.BFLFriendTabIcon = ghost:CreateTexture(nil, "OVERLAY")
+			ghost.BFLFriendTabIcon:SetSize(28, 28)
+		end
+		ghost.BFLFriendTabIcon:ClearAllPoints()
+		ghost.BFLFriendTabIcon:SetPoint("LEFT", ghost, "LEFT", 12, 0)
+		if FriendsUI and FriendsUI.ApplyFriendTabIcon then
+			FriendsUI:ApplyFriendTabIcon(ghost.BFLFriendTabIcon, row.sectionID, true)
+		end
+		ghost.BFLFriendTabIcon:Show()
+
+		local accentR, accentG, accentB = 1, 0.82, 0
+		if BFL.GetThemeAccentColor then
+			accentR, accentG, accentB = BFL:GetThemeAccentColor(accentR, accentG, accentB, 1)
+		end
+		ghost.text:ClearAllPoints()
+		ghost.text:SetPoint("LEFT", ghost.BFLFriendTabIcon, "RIGHT", 10, 0)
+		ghost.text:SetText(row.Label:GetText() or "")
+		ghost.text:SetTextColor(accentR, accentG, accentB)
+		ghost.stripe:SetColorTexture(accentR, accentG, accentB)
+		ghost:SetSize(math.max(210, ghost.text:GetStringWidth() + 82), row:GetHeight())
+		ghost:Show()
+
+		local function UpdateGhostPosition(activeGhost)
+			local cursorX, cursorY = GetCursorPosition()
+			local scale = UIParent:GetEffectiveScale()
+			activeGhost:ClearAllPoints()
+			activeGhost:SetPoint("CENTER", UIParent, "BOTTOMLEFT", cursorX / scale, cursorY / scale)
+		end
+		UpdateGhostPosition(ghost)
+		ghost:SetScript("OnUpdate", UpdateGhostPosition)
+	end
+
+	local function FinishDrag(releasing)
+		local fromIndex = handle.dragIndex
+		local toIndex = handle.dropIndex
+		local dragRow = handle.dragRow
+		handle.dragIndex = nil
+		handle.dropIndex = nil
+		handle.dragRow = nil
+		panel:SetScript("OnUpdate", nil)
+		HideDragGhost()
+		if dragRow then
+			dragRow:SetAlpha(1)
+		end
+		if not releasing and fromIndex and toIndex and fromIndex ~= toIndex then
+			SettingsDesigner:MoveFriendTabEntry(fromIndex, toIndex)
+		end
+		if not releasing then
+			handle:Refresh()
+		end
+	end
+
+	for index = 1, math.max(1, #self:BuildFriendTabEntries()) do
+		local row = CreateFrame("Button", nil, panel, "BackdropTemplate")
+		row:SetPoint(
+			"TOPLEFT",
+			header,
+			"BOTTOMLEFT",
+			0,
+			-((index - 1) * self.FRIEND_TAB_SETTINGS_ROW_HEIGHT)
+		)
+		row:SetPoint(
+			"TOPRIGHT",
+			header,
+			"BOTTOMRIGHT",
+			0,
+			-((index - 1) * self.FRIEND_TAB_SETTINGS_ROW_HEIGHT)
+		)
+		row:SetHeight(self.FRIEND_TAB_SETTINGS_ROW_HEIGHT - 2)
+		row:RegisterForDrag("LeftButton")
+		row:EnableMouse(true)
+		self:SetFriendTabSettingsBackdrop(row, nil, index % 2 == 0)
+
+		row.DragHandle = row:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontDisableSmall")
+		row.DragHandle:SetPoint("LEFT", row, "LEFT", 10, 0)
+		row.DragHandle:SetWidth(18)
+		row.DragHandle:SetJustifyH("CENTER")
+		row.DragHandle:SetText(":::")
+		row.DragHandle:SetTextColor(1, 0.82, 0, 0.72)
+
+		row.Order = row:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontDisableSmall")
+		row.Order:SetPoint("LEFT", row.DragHandle, "RIGHT", 2, 0)
+		row.Order:SetWidth(20)
+		row.Order:SetJustifyH("RIGHT")
+		row.Order:SetTextColor(0.62, 0.58, 0.50, 1)
+
+		row.IconWell = CreateFrame("Frame", nil, row, "BackdropTemplate")
+		row.IconWell:SetSize(32, 32)
+		row.IconWell:SetPoint("LEFT", row.Order, "RIGHT", 9, 0)
+		row.IconWell:SetBackdrop({
+			bgFile = "Interface\\Buttons\\WHITE8X8",
+			edgeFile = "Interface\\Buttons\\WHITE8X8",
+			edgeSize = 1,
+		})
+		row.IconWell:SetBackdropColor(0.015, 0.014, 0.012, 0.92)
+		row.IconWell:SetBackdropBorderColor(0.38, 0.30, 0.14, 0.78)
+
+		row.Icon = row.IconWell:CreateTexture(nil, "ARTWORK")
+		row.Icon:SetSize(30, 30)
+		row.Icon:SetPoint("CENTER")
+
+		row.Label = row:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
+		row.Label:SetPoint("LEFT", row.IconWell, "RIGHT", 10, 0)
+		row.Label:SetPoint("RIGHT", row, "RIGHT", -258, 0)
+		row.Label:SetJustifyH("LEFT")
+		row.Label:SetWordWrap(false)
+
+		row.VisibleCheck = CreateFrame("CheckButton", nil, row, "SettingsCheckboxTemplate")
+		row.VisibleCheck:SetPoint("RIGHT", row, "RIGHT", -166, 0)
+		row.VisibleLabel = row:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlightSmall")
+		row.VisibleLabel:SetPoint("RIGHT", row.VisibleCheck, "LEFT", -4, 0)
+		row.VisibleLabel:SetWidth(54)
+		row.VisibleLabel:SetJustifyH("RIGHT")
+		row.VisibleLabel:SetText(SHOW or ENABLE or "Show")
+
+		row.ConditionalCheck = CreateFrame("CheckButton", nil, row, "SettingsCheckboxTemplate")
+		row.ConditionalCheck:SetPoint("RIGHT", row, "RIGHT", -12, 0)
+		row.ConditionalLabel = row:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlightSmall")
+		row.ConditionalLabel:SetPoint("RIGHT", row.ConditionalCheck, "LEFT", -4, 0)
+		row.ConditionalLabel:SetWidth(112)
+		row.ConditionalLabel:SetJustifyH("RIGHT")
+		row.ConditionalLabel:SetText(T("SETTINGS_FRIEND_TABS_CONDITIONAL", "Only with entries"))
+
+		row.VisibleCheck:SetScript("OnClick", function(check)
+			local FriendsUI = SettingsDesigner:GetFriendsUI()
+			if FriendsUI and row.sectionID then
+				FriendsUI:SetFriendTabVisible(row.sectionID, check:GetChecked() == true)
+				handle:Refresh()
+			end
+		end)
+		row.ConditionalCheck:SetScript("OnClick", function(check)
+			local FriendsUI = SettingsDesigner:GetFriendsUI()
+			if FriendsUI and row.sectionID then
+				FriendsUI:SetFriendTabPopulatedOnly(row.sectionID, check:GetChecked() == true)
+				handle:Refresh()
+			end
+		end)
+
+		row:SetScript("OnDragStart", function()
+			handle.dragIndex = row.entryIndex
+			handle.dropIndex = row.entryIndex
+			handle.dragRow = row
+			row:SetAlpha(0.20)
+			ShowDragGhost(row)
+			panel:SetScript("OnUpdate", function()
+				local dropIndex
+				for targetIndex, target in ipairs(handle.rows) do
+					if target:IsShown() and BFL:IsRegionMouseOver(target) then
+						dropIndex = targetIndex
+						break
+					end
+				end
+				if handle.dropIndex ~= dropIndex then
+					handle.dropIndex = dropIndex
+					RefreshDropVisuals()
+				end
+			end)
+			RefreshDropVisuals()
+		end)
+		row:SetScript("OnDragStop", function()
+			FinishDrag(false)
+		end)
+		row:SetScript("OnEnter", function()
+			if not handle.dragRow then
+				SettingsDesigner:SetFriendTabSettingsBackdrop(row, "hover", row.entryIndex % 2 == 0)
+			end
+		end)
+		row:SetScript("OnLeave", function()
+			if not handle.dragRow then
+				SettingsDesigner:SetFriendTabSettingsBackdrop(row, nil, row.entryIndex % 2 == 0)
+			end
+		end)
+
+		handle.rows[index] = row
+	end
+
+	function handle:Refresh()
+		local entries = SettingsDesigner:BuildFriendTabEntries()
+		local FriendsUI = SettingsDesigner:GetFriendsUI()
+		for index, row in ipairs(self.rows) do
+			local entry = entries[index]
+			if entry then
+				row.entryIndex = index
+				row.sectionID = entry.id
+				row.Order:SetText(index)
+				row.Label:SetText(entry.label or entry.id)
+				if FriendsUI and FriendsUI.ApplyFriendTabIcon then
+					FriendsUI:ApplyFriendTabIcon(row.Icon, entry.id, true)
+				else
+					row.Icon:SetTexture(entry.customTexture or entry.fallback or 134400)
+				end
+				row.VisibleCheck:SetChecked(FriendsUI and FriendsUI:IsFriendTabVisible(entry.id) or false)
+
+				local conditional = entry.id == "friend_requests" or entry.id == "quick_join"
+				row.ConditionalCheck:SetShown(conditional)
+				row.ConditionalLabel:SetShown(conditional)
+				if conditional then
+					local visible = FriendsUI and FriendsUI:IsFriendTabVisible(entry.id)
+					row.ConditionalCheck:SetChecked(FriendsUI and FriendsUI:IsFriendTabPopulatedOnly(entry.id) or false)
+					row.ConditionalCheck:SetEnabled(visible == true)
+					row.ConditionalCheck:SetAlpha(visible and 1 or 0.42)
+					row.ConditionalLabel:SetAlpha(visible and 1 or 0.42)
+					local tooltipKey = entry.id == "friend_requests"
+						and "SETTINGS_FRIEND_TABS_REQUESTS_POPULATED_ONLY"
+						or "SETTINGS_FRIEND_TABS_QUICK_JOIN_POPULATED_ONLY"
+					local descriptionKey = tooltipKey .. "_DESC"
+					SettingsDesigner:SetFriendTabSettingsTooltip(
+						row.ConditionalCheck,
+						T(tooltipKey, "Show only when populated"),
+						T(descriptionKey, "Hide this tab when it has no entries.")
+					)
+				end
+
+				SettingsDesigner:SetFriendTabSettingsTooltip(
+					row.VisibleCheck,
+					entry.label or entry.id,
+					T(
+						"SETTINGS_FRIEND_TABS_ORDER_DESC",
+						"Drag tabs into the desired order. Use each row's switch to show or hide that tab."
+					)
+				)
+				row:Show()
+			else
+				row.entryIndex = nil
+				row.sectionID = nil
+				row:Hide()
+			end
+		end
+		RefreshDropVisuals()
+	end
+
+	handle:Refresh()
+	function handle:Release()
+		FinishDrag(true)
+		panel:Hide()
+		panel:SetParent(nil)
+	end
+	return handle
+end
+
 local function RefreshGuild()
 	local GuildFrame = BFL:GetModule("GuildFrame")
 	if GuildFrame and GuildFrame.Refresh then
@@ -759,6 +1172,30 @@ local function ApplyThemeChange()
 	RefreshBrokerDisplays()
 end
 
+-- Theme tuning sliders emit a value for every drag increment. Persist those values
+-- immediately, but coalesce the expensive global reskin until the drag pauses.
+local pendingThemeChangeTimer
+
+local function CancelScheduledThemeChange()
+	if pendingThemeChangeTimer and pendingThemeChangeTimer.Cancel then
+		pendingThemeChangeTimer:Cancel()
+	end
+	pendingThemeChangeTimer = nil
+end
+
+local function ScheduleThemeChange()
+	CancelScheduledThemeChange()
+	if C_Timer and C_Timer.NewTimer then
+		local timer = C_Timer.NewTimer(0.1, function()
+			pendingThemeChangeTimer = nil
+			ApplyThemeChange()
+		end)
+		pendingThemeChangeTimer = timer
+	else
+		ApplyThemeChange()
+	end
+end
+
 local THEME_SETTING_LABELS = {
 	accentColor = { "SETTINGS_THEME_ACCENT_COLOR", "Accent Color" },
 	windowOpacity = { "SETTINGS_THEME_WINDOW_OPACITY", "Window Opacity" },
@@ -1202,6 +1639,19 @@ local function RefreshSettingsCenter(state)
 	end
 end
 
+local function RefreshVisibleSettingsCenter()
+	if not (C_Timer and C_Timer.After) then
+		return
+	end
+	C_Timer.After(0, function()
+		local frame = ConfigUI and ConfigUI.GetFrame and ConfigUI:GetFrame(APP_ID)
+		local state = frame and frame._LibSettingsDesignerState
+		if frame and frame:IsShown() and state and state.RenderContent then
+			state:RenderContent()
+		end
+	end)
+end
+
 local function GetGroupOrderPageHeight()
 	local count = #BuildGroupEntries()
 	return 92 + (math.max(count, 1) * 34)
@@ -1214,6 +1664,7 @@ local function RenderGroupOrderCustomPage(parent, _, _, state)
 	local frames = {}
 	local entryRows = {}
 	local entries = BuildGroupEntries()
+	local showGroupArrow = GetDB("showGroupArrow", true) ~= false
 	local y = -14
 	local draggingRow
 
@@ -1237,11 +1688,11 @@ local function RenderGroupOrderCustomPage(parent, _, _, state)
 	end
 
 	local function GetDropTargetIndex(activeRow)
-		if not MouseIsOver then
-			return nil
-		end
+		-- MouseIsOver was removed as a global in Retail 12.1. Use the shared
+		-- Region-method wrapper, which is available across supported flavors,
+		-- and fails closed for missing or non-Region values.
 		for _, row in ipairs(entryRows) do
-			if row ~= activeRow and row:IsVisible() and MouseIsOver(row) then
+			if row ~= activeRow and row:IsVisible() and BFL:IsRegionMouseOver(row) then
 				return row.orderIndex
 			end
 		end
@@ -1251,7 +1702,7 @@ local function RenderGroupOrderCustomPage(parent, _, _, state)
 	local function UpdateDropTargetHighlights(activeRow)
 		for _, row in ipairs(entryRows) do
 			if row ~= activeRow and row:IsVisible() then
-				SetGroupOrderRowBackdrop(row, MouseIsOver and MouseIsOver(row) and "target" or nil)
+				SetGroupOrderRowBackdrop(row, BFL:IsRegionMouseOver(row) and "target" or nil)
 			end
 		end
 	end
@@ -1334,8 +1785,10 @@ local function RenderGroupOrderCustomPage(parent, _, _, state)
 	local columns = {
 		{ text = T("SETTINGS_GROUP_COLOR", "Group Color"), x = -260 },
 		{ text = T("SETTINGS_GROUP_COUNT_COLOR", "Count Color"), x = -178 },
-		{ text = T("SETTINGS_GROUP_ARROW_COLOR", "Arrow Color"), x = -96 },
 	}
+	if showGroupArrow then
+		columns[#columns + 1] = { text = T("SETTINGS_GROUP_ARROW_COLOR", "Arrow Color"), x = -96 }
+	end
 	for _, column in ipairs(columns) do
 		local label = orderSection:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontDisableSmall")
 		label:SetPoint("TOPRIGHT", orderSection, "TOPRIGHT", column.x + 24, -14)
@@ -1384,8 +1837,10 @@ local function RenderGroupOrderCustomPage(parent, _, _, state)
 			groupSwatch:SetPoint("RIGHT", row, "RIGHT", -260, 0)
 			local countSwatch = CreateGroupColorSwatch(row, "groupCountColors", entry.id, T("SETTINGS_GROUP_COUNT_COLOR", "Count Color"))
 			countSwatch:SetPoint("RIGHT", row, "RIGHT", -178, 0)
-			local arrowSwatch = CreateGroupColorSwatch(row, "groupArrowColors", entry.id, T("SETTINGS_GROUP_ARROW_COLOR", "Arrow Color"))
-			arrowSwatch:SetPoint("RIGHT", row, "RIGHT", -96, 0)
+			if showGroupArrow then
+				local arrowSwatch = CreateGroupColorSwatch(row, "groupArrowColors", entry.id, T("SETTINGS_GROUP_ARROW_COLOR", "Arrow Color"))
+				arrowSwatch:SetPoint("RIGHT", row, "RIGHT", -96, 0)
+			end
 
 			local up = CreateFlatActionButton(row, "^", 28, 22)
 			up:SetPoint("RIGHT", row, "RIGHT", -16, 0)
@@ -1562,13 +2017,13 @@ local function SetThemeSetting(theme, key, value)
 	local ThemePalette = GetThemePalette()
 	if ThemePalette and ThemePalette.SetThemeSetting then
 		ThemePalette:SetThemeSetting(theme, value ~= nil and key or key, value)
-		ApplyThemeChange()
+		ScheduleThemeChange()
 		return
 	end
 	local dbKey = theme == "custom" and "customThemeSettings" or "darkThemeSettings"
 	local settings = CopyTable(GetDB(dbKey, {})) or {}
 	settings[key] = value
-	SetDB(dbKey, settings, ApplyThemeChange)
+	SetDB(dbKey, settings, ScheduleThemeChange)
 end
 
 local function GetCustomThemeColor(key)
@@ -1585,12 +2040,12 @@ local function SetCustomThemeColor(key, r, g, b, a)
 	local ThemePalette = GetThemePalette()
 	if ThemePalette and ThemePalette.SetCustomColor then
 		ThemePalette:SetCustomColor(key, ToColorTable(r, g, b, a))
-		ApplyThemeChange()
+		ScheduleThemeChange()
 		return
 	end
 	local customTheme = CopyTable(GetDB("customTheme", {})) or {}
 	customTheme[key] = ToColorTable(r, g, b, a)
-	SetDB("customTheme", customTheme, ApplyThemeChange)
+	SetDB("customTheme", customTheme, ScheduleThemeChange)
 end
 
 local function RememberGroupTitle(pageID, groupID, title)
@@ -1905,6 +2360,7 @@ local function AddReorderList(pageID, data)
 		formatOrder = data.formatOrder,
 		setEntryFormat = data.setEntryFormat,
 		order = data.order,
+		refreshOnChange = data.refreshOnChange,
 		parentCheck = data.parentCheck,
 		isEnabled = data.isEnabled,
 		visibleWhen = data.visibleWhen,
@@ -2092,14 +2548,6 @@ local function SetFriendTagSetting(key, value)
 	RefreshFriends()
 end
 
-local function IsContactMemoryEnabledForFriendTags()
-	if not IsBetaEnabled() then
-		return false
-	end
-	local ContactMemory = BFL:GetModule("ContactMemory")
-	return ContactMemory and ContactMemory.IsEnabled and ContactMemory:IsEnabled()
-end
-
 local function IsFriendTagsEnabled()
 	local FriendTags = GetFriendTagsModule()
 	return FriendTags and FriendTags.IsEnabled and FriendTags:IsEnabled()
@@ -2249,21 +2697,29 @@ end
 local function RegisterThemeTuning(theme, title, baseOrder)
 	local visible = ThemeVisible(theme)
 	local groupID = theme .. "Tuning"
+	local ThemePalette = GetThemePalette()
+	local defaults = {}
+	if theme == "dark" and ThemePalette and ThemePalette.GetDefaultDarkSettings then
+		defaults = ThemePalette:GetDefaultDarkSettings() or {}
+	elseif theme == "custom" and ThemePalette and ThemePalette.GetDefaultCustomSettings then
+		defaults = ThemePalette:GetDefaultCustomSettings() or {}
+	end
+	local defaultAccent = defaults.accentColor
+		or (theme == "dark" and { r = 1, g = 0.82, b = 0, a = 1 } or { r = 0.18, g = 0.88, b = 0.82, a = 1 })
 	AddGroup("appearance.theme", groupID, title, baseOrder)
 	AddColor("appearance.theme", {
 		id = theme .. ".accentColor",
 		group = groupID,
 		label = T(THEME_SETTING_LABELS.accentColor[1], THEME_SETTING_LABELS.accentColor[2]),
-		default = theme == "dark" and { r = 1, g = 0.82, b = 0, a = 1 } or { r = 0.18, g = 0.88, b = 0.82, a = 1 },
+		default = defaultAccent,
 		order = baseOrder + 1,
 		visibleWhen = visible,
 		getColor = function()
-			return AsColor(GetThemeSetting(theme, "accentColor"), theme == "dark" and { r = 1, g = 0.82, b = 0, a = 1 } or { r = 0.18, g = 0.88, b = 0.82, a = 1 })
+			return AsColor(GetThemeSetting(theme, "accentColor"), defaultAccent)
 		end,
 		setColor = function(r, g, b, a)
 			SetThemeSetting(theme, "accentColor", ToColorTable(r, g, b, a))
 		end,
-		skinRefresh = true,
 	})
 	local sliderKeys = {
 		"windowOpacity",
@@ -2284,7 +2740,7 @@ local function RegisterThemeTuning(theme, title, baseOrder)
 			min = THEME_SLIDER_MIN[key] or 0,
 			max = 1,
 			step = 0.01,
-			default = GetThemeSetting(theme, key) or 0,
+			default = defaults[key] or 0,
 			formatter = PercentFormatter,
 			order = baseOrder + 10 + index,
 			visibleWhen = visible,
@@ -2294,7 +2750,6 @@ local function RegisterThemeTuning(theme, title, baseOrder)
 			setValue = function(value)
 				SetThemeSetting(theme, key, value)
 			end,
-			skinRefresh = true,
 		})
 	end
 	AddButton("appearance.theme", {
@@ -2312,7 +2767,9 @@ local function RegisterThemeTuning(theme, title, baseOrder)
 			elseif theme == "custom" and ThemePalette and ThemePalette.ResetCustomSettings then
 				ThemePalette:ResetCustomSettings()
 			end
+			CancelScheduledThemeChange()
 			ApplyThemeChange()
+			RefreshVisibleSettingsCenter()
 		end,
 	})
 end
@@ -2338,7 +2795,6 @@ local function RegisterCustomPaletteControls()
 		visibleWhen = visible,
 		getColor = GetCustomThemeColor,
 		setColor = SetCustomThemeColor,
-		skinRefresh = true,
 	})
 	AddButton("appearance.theme", {
 		id = "customTheme.palette.reset",
@@ -2349,13 +2805,15 @@ local function RegisterCustomPaletteControls()
 		order = 420,
 		visibleWhen = visible,
 		onClick = function()
+			CancelScheduledThemeChange()
 			local ThemePalette = GetThemePalette()
 			if ThemePalette and ThemePalette.ResetCustomTheme then
 				ThemePalette:ResetCustomTheme()
 			else
-				SetDB("customTheme", {}, ApplyThemeChange)
+				SetDB("customTheme", {})
 			end
 			ApplyThemeChange()
+			RefreshVisibleSettingsCenter()
 		end,
 	})
 end
@@ -2800,8 +3258,12 @@ local function RenderSortingDefaultsCustomPage(parent, _, _, state, focusID)
 end
 
 local function MainFrameSize(layoutKey, field, fallback)
+	if layoutKey == nil then
+		local FrameSettings = BFL:GetModule("FrameSettings")
+		layoutKey = FrameSettings and FrameSettings.GetLayoutKey and FrameSettings:GetLayoutKey() or "Default"
+	end
 	local size = GetDB("mainFrameSize", {})
-	local layout = type(size) == "table" and size[layoutKey or "default"] or nil
+	local layout = type(size) == "table" and size[layoutKey] or nil
 	if type(layout) == "table" and layout[field] ~= nil then
 		return layout[field]
 	end
@@ -2820,6 +3282,78 @@ local function RegisterCategories()
 end
 
 local function RegisterFriendsPages()
+	RegisterPage({
+		id = "friends.general",
+		category = "friends",
+		title = T("SETTINGS_TAB_GENERAL", "General"),
+		description = T(
+			"SETTINGS_FRIENDS_UI_STYLE_DESC",
+			"Choose the Retail 12.1 layout or the previous BetterFriendlist layout."
+		),
+		iconKey = "bfl-friends-display",
+		order = 80,
+		visibleWhen = function() return BFL.IsRetail == true end,
+	})
+	AddGroup("friends.general", "interface", T("SETTINGS_FRIENDS_UI_STYLE_HEADER", "Friendlist UI"), 100)
+	AddDropdown("friends.general", {
+		key = "friendsFrameStyle",
+		group = "interface",
+		label = T("SETTINGS_FRIENDS_UI_STYLE", "Interface Style"),
+		desc = T("SETTINGS_FRIENDS_UI_STYLE_DESC", "Choose the Retail 12.1 layout or the previous BetterFriendlist layout."),
+		list = {
+			modern = T("SETTINGS_FRIENDS_UI_STYLE_MODERN", "Modern (Retail 12.1)"),
+			legacy = T("SETTINGS_FRIENDS_UI_STYLE_LEGACY", "Legacy"),
+		},
+		orderList = { "modern", "legacy" },
+		default = BFL.IsRetail and "modern" or "legacy",
+		order = 100,
+		visibleWhen = function() return BFL.IsRetail == true end,
+		getValue = function()
+			local FriendsUI = SettingsDesigner:GetFriendsUI()
+			return FriendsUI and FriendsUI:GetRequestedStyle() or "legacy"
+		end,
+		setValue = function(value)
+			local FriendsUI = SettingsDesigner:GetFriendsUI()
+			if FriendsUI then
+				FriendsUI:SetStyle(value)
+			end
+		end,
+		refreshOnChange = true,
+	})
+
+	RegisterPage({
+		id = "friends.tabs",
+		category = "friends",
+		title = T("SETTINGS_CENTER_PAGE_FRIEND_TABS", "Friend Tabs"),
+		description = T(
+			"SETTINGS_CENTER_PAGE_FRIEND_TABS_DESC",
+			"Controls the order and visibility of the Modern Friendlist side tabs."
+		),
+		iconKey = "bfl-friends-display",
+		order = 90,
+		visibleWhen = function() return SettingsDesigner:IsModernFriendsUI() end,
+	})
+	AddGroup("friends.tabs", "order", T("SETTINGS_FRIEND_TABS_ORDER", "Tab Order & Visibility"), 100)
+	app:RegisterControl("friends.tabs", {
+		id = "friends.tabs.order",
+		groupID = "order",
+		groupTitle = T("SETTINGS_FRIEND_TABS_ORDER", "Tab Order & Visibility"),
+		type = "custom",
+		label = T("SETTINGS_FRIEND_TABS_ORDER", "Tab Order & Visibility"),
+		description = T(
+			"SETTINGS_FRIEND_TABS_ORDER_DESC",
+			"Drag tabs into the desired order. Use each row's switch to show or hide that tab."
+		),
+		order = 100,
+		trackCustomized = false,
+		getHeight = function()
+			return SettingsDesigner:GetFriendTabSettingsControlHeight()
+		end,
+		render = function(parent)
+			return SettingsDesigner:RenderFriendTabSettings(parent)
+		end,
+	})
+
 	RegisterPage({
 		id = "friends.display",
 		category = "friends",
@@ -2843,8 +3377,6 @@ local function RegisterFriendsPages()
 	AddToggle("friends.display", { key = "showBlizzardOption", group = "rows", label = T("SETTINGS_SHOW_BLIZZARD", "Show Blizzard's Friendlist Option"), desc = T("SETTINGS_SHOW_BLIZZARD_DESC", "Shows the original Blizzard Friends button in the social menu."), default = false, order = 210, method = "OnShowBlizzardOptionChanged" })
 	AddToggle("friends.display", { key = "showGameIcon", group = "rows", label = T("SETTINGS_SHOW_GAME_ICON", "Show Game Icon"), desc = T("SETTINGS_SHOW_GAME_ICON_DESC", "Display game icons next to Battle.net friends."), default = true, order = 220, after = RefreshFriends })
 	AddToggle("friends.display", { key = "colorLevelByDifficulty", group = "rows", label = T("SETTINGS_COLOR_LEVEL_BY_DIFFICULTY", "Color Levels by Difficulty"), desc = T("SETTINGS_COLOR_LEVEL_BY_DIFFICULTY_DESC", "Color level text by difficulty relative to your character."), default = true, order = 230, after = RefreshFriends })
-	AddToggle("friends.display", { key = "showNoteIcon", group = "rows", label = T("SETTINGS_SHOW_NOTE_ICON", "Show Note Icon"), desc = T("SETTINGS_SHOW_NOTE_ICON_DESC", "Display an icon when a friend has a note."), default = false, order = 240, after = RefreshFriends })
-
 	AddGroup("friends.display", "favorites", T("SETTINGS_FAVORITE_ICON_STYLE", "Favorite Icon"), 200)
 	AddToggle("friends.display", { key = "enableFavoriteIcon", group = "favorites", label = T("SETTINGS_ENABLE_FAVORITE_ICON", "Enable Favorite Icon"), desc = T("SETTINGS_ENABLE_FAVORITE_ICON_DESC", "Display a star icon on the friend button for favorites."), default = true, order = 300, after = RefreshFriends, refreshOnChange = true })
 	AddDropdown("friends.display", {
@@ -2875,21 +3407,22 @@ local function RegisterFriendsPages()
 		label = T("SETTINGS_NAME_FORMAT_LABEL", "Preset:"),
 		desc = T("SETTINGS_NAME_FORMAT_DESC", "Choose the primary name format used in the friends list."),
 		list = {
-			default = T("SETTINGS_NAME_FORMAT_DEFAULT", "Default"),
-			battletag = T("SETTINGS_NAME_FORMAT_BATTLETAG", "BattleTag"),
-			nickname = T("SETTINGS_NAME_FORMAT_NICKNAME", "Nickname"),
-			name_nickname = T("SETTINGS_NAME_FORMAT_NAME_NICKNAME", "Name (Nickname)"),
-			name_note = T("SETTINGS_NAME_FORMAT_NAME_NOTE", "Name (Note)"),
-			name_battletag = T("SETTINGS_NAME_FORMAT_NAME_BATTLETAG", "Name (BattleTag)"),
-			custom = T("SETTINGS_NAME_FORMAT_CUSTOM", "Custom"),
+			default = T("NAME_PRESET_DEFAULT", "Name (Character)"),
+			battletag = T("NAME_PRESET_BATTLETAG", "BattleTag (Character)"),
+			battletag_only = T("NAME_PRESET_BATTLETAG_ONLY", "BattleTag Only"),
+			nickname = T("NAME_PRESET_NICKNAME", "Nickname (Character)"),
+			character = T("NAME_PRESET_CHARACTER", "Character Only"),
+			name_only = T("NAME_PRESET_NAME_ONLY", "Name Only"),
+			custom = T("NAME_PRESET_CUSTOM", "Custom..."),
 		},
-		orderList = { "default", "battletag", "nickname", "name_nickname", "name_note", "name_battletag", "custom" },
+		orderList = { "default", "battletag", "battletag_only", "nickname", "character", "name_only", "custom" },
 		default = "default",
 		order = 100,
+		isEnabled = function() return _G.FriendListColorsAPI == nil end,
 		after = RefreshFriends,
 		refreshOnChange = true,
 	})
-	AddInput("friends.formatting", { key = "nameFormatCustom", group = "names", label = T("SETTINGS_NAME_FORMAT_CUSTOM_LABEL", "Custom Format:"), desc = T("SETTINGS_NAME_FORMAT_TOOLTIP", "Custom Name Format"), default = "%name%", inputWidth = 280, maxChars = 80, order = 110, visibleWhen = function() return GetDB("nameFormatPreset", "default") == "custom" end, after = RefreshFriends })
+	AddInput("friends.formatting", { key = "nameFormatCustom", group = "names", label = T("SETTINGS_NAME_FORMAT_CUSTOM_LABEL", "Custom Format:"), desc = T("SETTINGS_NAME_FORMAT_TOOLTIP", "Custom Name Format"), default = "%name%", inputWidth = 280, maxChars = 80, order = 110, visibleWhen = function() return GetDB("nameFormatPreset", "default") == "custom" end, isEnabled = function() return _G.FriendListColorsAPI == nil end, after = RefreshFriends })
 
 	AddGroup("friends.formatting", "info", T("SETTINGS_INFO_FORMAT_HEADER", "Friend Info Formatting"), 200)
 	AddDropdown("friends.formatting", {
@@ -2927,7 +3460,7 @@ local function RegisterFriendsPages()
 	AddToggle("friends.behavior", { key = "accordionGroups", group = "list", label = T("SETTINGS_ACCORDION_GROUPS", "Accordion Groups"), desc = T("SETTINGS_ACCORDION_GROUPS_DESC", "Only one group can be expanded at a time."), default = false, order = 100, method = "OnAccordionGroupsChanged" })
 	AddToggle("friends.behavior", { key = "compactMode", group = "list", label = T("SETTINGS_COMPACT_MODE", "Compact Mode"), desc = T("SETTINGS_COMPACT_MODE_DESC", "Use compact friend row spacing."), default = false, order = 110, method = "OnCompactModeChanged" })
 	AddToggle("friends.behavior", { key = "simpleMode", group = "list", label = T("SETTINGS_SIMPLE_MODE", "Simple Mode"), desc = T("SETTINGS_SIMPLE_MODE_DESC", "Use a simplified Friends frame layout."), default = false, order = 120, method = "OnSimpleModeChanged", refreshOnChange = true })
-	AddToggle("friends.behavior", { key = "simpleModeShowSearch", group = "list", label = T("SETTINGS_SIMPLE_MODE_SHOW_SEARCH", "Show Search in Simple Mode"), desc = T("SETTINGS_SIMPLE_MODE_SHOW_SEARCH_DESC", "Keep the search field visible while Simple Mode is enabled."), default = true, order = 130, parentCheck = function() return GetDB("simpleMode", false) end, after = RefreshFriends })
+	AddToggle("friends.behavior", { key = "simpleModeShowSearch", group = "list", label = T("SETTINGS_SIMPLE_MODE_SHOW_SEARCH", "Show Search in Simple Mode"), desc = T("SETTINGS_SIMPLE_MODE_SHOW_SEARCH_DESC", "Keep the search field visible while Simple Mode is enabled."), default = true, order = 130, parentCheck = function() return GetDB("simpleMode", false) end, visibleWhen = function() local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI"); return not (BFL.IsRetail and FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()) end, after = RefreshFriends })
 	AddToggle("friends.behavior", { key = "useUIPanelSystem", group = "list", label = T("SETTINGS_USE_UI_PANEL_SYSTEM", "Respect UI Hierarchy"), desc = T("SETTINGS_USE_UI_PANEL_SYSTEM_DESC", "Use Blizzard panel behavior for the BetterFriendlist frame."), default = false, order = 140, method = "OnUseUIPanelSystemChanged" })
 	AddGroup("friends.behavior", "clicks", T("SETTINGS_CENTER_GROUP_CLICKS", "Click Actions"), 200)
 	AddToggle("friends.behavior", { key = "friendListClickWhisperEnabled", group = "clicks", label = T("SETTINGS_FRIEND_CLICK_WHISPER", "Click to Whisper"), desc = T("SETTINGS_FRIEND_CLICK_WHISPER_DESC", "Allow friend row clicks to start whispers."), default = false, order = 200, method = "OnFriendListClickWhisperEnabledChanged", refreshOnChange = true })
@@ -2987,9 +3520,30 @@ local function RegisterAppearancePages()
 
 	RegisterPage({ id = "appearance.frame", category = "appearance", title = T("SETTINGS_CENTER_PAGE_APPEARANCE_FRAME", "Frame"), description = T("SETTINGS_CENTER_PAGE_APPEARANCE_FRAME_DESC", "Controls BetterFriendlist frame dimensions, scale, and movement."), iconKey = "bfl-appearance-frame", order = 120 })
 	AddGroup("appearance.frame", "size", T("SETTINGS_FRAME_DIMENSIONS_HEADER", "Frame Dimensions"), 100)
-	AddSlider("appearance.frame", { id = "defaultFrameWidth", key = "defaultFrameWidth", group = "size", label = T("SETTINGS_FRAME_WIDTH", "Width:"), min = 380, max = 800, step = 5, default = 415, integer = true, order = 100, getValue = function() return MainFrameSize("default", "width", 415) end, setValue = function(value) SetDB("defaultFrameWidth", value); RefreshFrameSize(value, nil) end })
-	AddSlider("appearance.frame", { id = "defaultFrameHeight", key = "defaultFrameHeight", group = "size", label = T("SETTINGS_FRAME_HEIGHT", "Height:"), min = 400, max = 1200, step = 5, default = 570, integer = true, order = 110, getValue = function() return MainFrameSize("default", "height", 570) end, setValue = function(value) SetDB("defaultFrameHeight", value); RefreshFrameSize(nil, value) end })
-	AddSlider("appearance.frame", { key = "windowScale", group = "size", label = T("SETTINGS_FRAME_SCALE", "Scale:"), min = 0.5, max = 2.0, step = 0.05, default = 1.0, formatter = function(value) return string.format("%d%%", math.floor((tonumber(value) or 1) * 100 + 0.5)) end, order = 120, after = RefreshFriends })
+	AddSlider("appearance.frame", { id = "defaultFrameWidth", key = "defaultFrameWidth", group = "size", label = T("SETTINGS_FRAME_WIDTH", "Width:"), min = 380, max = 800, step = 5, default = 415, integer = true, order = 100, getValue = function() return MainFrameSize(nil, "width", 415) end, setValue = function(value) RefreshFrameSize(value, nil) end })
+	AddSlider("appearance.frame", { id = "defaultFrameHeight", key = "defaultFrameHeight", group = "size", label = T("SETTINGS_FRAME_HEIGHT", "Height:"), min = 400, max = 1200, step = 5, default = 570, integer = true, order = 110, getValue = function() return MainFrameSize(nil, "height", 570) end, setValue = function(value) RefreshFrameSize(nil, value) end })
+	AddSlider("appearance.frame", {
+		key = "windowScale",
+		group = "size",
+		label = T("SETTINGS_FRAME_SCALE", "Scale:"),
+		min = 0.5,
+		max = 2.0,
+		step = 0.05,
+		default = 1.0,
+		formatter = function(value)
+			return string.format("%d%%", math.floor((tonumber(value) or 1) * 100 + 0.5))
+		end,
+		order = 120,
+		setValue = function(value)
+			local FrameSettings = BFL:GetModule("FrameSettings")
+			if FrameSettings and FrameSettings.ApplyScale then
+				FrameSettings:ApplyScale(value)
+			else
+				SetDB("windowScale", value)
+			end
+			RefreshFriends()
+		end,
+	})
 	AddToggle("appearance.frame", { key = "lockWindow", group = "size", label = T("SETTINGS_LOCK_WINDOW", "Lock Window"), desc = T("SETTINGS_LOCK_WINDOW_DESC", "Prevent the BetterFriendlist frame from being moved."), default = false, order = 130, after = function(value) local FrameSettings = BFL:GetModule("FrameSettings"); if FrameSettings and FrameSettings.ApplyLock then FrameSettings:ApplyLock(value) end end })
 end
 
@@ -3014,7 +3568,7 @@ local function RegisterFriendTagsControls()
 		desc = T("FRIEND_TAGS_SETTINGS_ENABLE_DESC", "Adds Blizzard-compatible and custom tags for friends."),
 		default = true,
 		order = 100,
-		parentCheck = IsContactMemoryEnabledForFriendTags,
+		parentCheck = IsBetaEnabled,
 		getValue = function()
 			return GetFriendTagSetting("enabled", true) == true
 		end,
@@ -3372,15 +3926,16 @@ end
 local function RegisterSocialPages()
 	RegisterPage({ id = "social.who", category = "social", title = T("SETTINGS_CENTER_PAGE_SOCIAL_WHO", "Who"), iconKey = "bfl-social-who", order = 100 })
 	AddGroup("social.who", "who", T("SETTINGS_TAB_WHO", "Who"), 100)
-	AddToggle("social.who", { key = "whoShowClassIcons", group = "who", label = T("SETTINGS_WHO_SHOW_CLASS_ICONS", "Show Class Icons"), default = true, order = 100, after = RefreshFriends })
-	AddToggle("social.who", { key = "whoClassColorNames", group = "who", label = T("SETTINGS_WHO_CLASS_COLOR_NAMES", "Color Names by Class"), default = true, order = 110, after = RefreshFriends })
-	AddToggle("social.who", { key = "whoLevelColors", group = "who", label = T("SETTINGS_WHO_LEVEL_COLORS", "Color Levels"), default = true, order = 120, after = RefreshFriends })
-	AddToggle("social.who", { key = "whoZebraStripes", group = "who", label = T("SETTINGS_WHO_ZEBRA_STRIPES", "Alternating Rows"), default = true, order = 130, after = RefreshFriends })
-	AddDropdown("social.who", { key = "whoDoubleClickAction", group = "who", label = T("SETTINGS_WHO_DOUBLE_CLICK_ACTION", "Double-Click Action"), list = { whisper = WHISPER or "Whisper", invite = INVITE or "Invite", inspect = INSPECT or "Inspect" }, orderList = { "whisper", "invite", "inspect" }, default = "whisper", order = 140 })
+	AddToggle("social.who", { key = "whoShowClassIcons", group = "who", label = T("SETTINGS_WHO_SHOW_CLASS_ICONS", "Show Class Icons"), default = true, order = 100, after = RefreshWho })
+	AddToggle("social.who", { key = "whoClassColorNames", group = "who", label = T("SETTINGS_WHO_CLASS_COLOR_NAMES", "Color Names by Class"), default = true, order = 110, after = RefreshWho })
+	AddToggle("social.who", { key = "whoLevelColors", group = "who", label = T("SETTINGS_WHO_LEVEL_COLORS", "Color Levels"), default = true, order = 120, after = RefreshWho })
+	AddToggle("social.who", { key = "whoZebraStripes", group = "who", label = T("SETTINGS_WHO_ZEBRA_STRIPES", "Alternating Rows"), default = true, order = 130, after = RefreshWho, refreshOnChange = true })
+	AddSlider("social.who", { key = "whoZebraStripeStrength", group = "who", label = T("SETTINGS_WHO_ZEBRA_STRIPE_STRENGTH", "Alternating Row Strength"), min = 0, max = 1, step = 0.01, default = 0.3, formatter = PercentFormatter, order = 140, parentCheck = function() return GetDB("whoZebraStripes", true) == true end, after = RefreshWho })
+	AddDropdown("social.who", { key = "whoDoubleClickAction", group = "who", label = T("SETTINGS_WHO_DOUBLE_CLICK_ACTION", "Double-Click Action"), list = { whisper = WHISPER or "Whisper", invite = INVITE or "Invite" }, orderList = { "whisper", "invite" }, default = "whisper", order = 150, getValue = function() return GetDB("whoDoubleClickAction", "whisper") == "invite" and "invite" or "whisper" end })
 
 	RegisterPage({ id = "social.raid", category = "social", title = T("SETTINGS_CENTER_PAGE_SOCIAL_RAID", "Raid"), iconKey = "bfl-social-raid", mainToggleID = "enableReadyCheckButton", order = 110 })
 	AddGroup("social.raid", "raid", T("SETTINGS_RAID_SHORTCUTS_TITLE", "Raid Shortcuts"), 100)
-	AddToggle("social.raid", { key = "enableReadyCheckButton", group = "raid", label = T("SETTINGS_RAID_ENABLE_READY_CHECK_BUTTON", "Enable Ready Check Button"), desc = T("SETTINGS_RAID_ENABLE_READY_CHECK_BUTTON_DESC", "Show a compact ready check button next to Raid Info in the Raid tab."), default = false, order = 100, after = RefreshFriends })
+	AddToggle("social.raid", { key = "enableReadyCheckButton", group = "raid", label = T("SETTINGS_RAID_ENABLE_READY_CHECK_BUTTON", "Enable Ready Check Button"), desc = T("SETTINGS_RAID_ENABLE_READY_CHECK_BUTTON_DESC", "Show a compact ready check button next to Raid Info in the Raid tab."), default = false, order = 100, after = function() if BetterRaidFrame_UpdateControlPanelButtons then BetterRaidFrame_UpdateControlPanelButtons() end; local RaidFrame = BFL:GetModule("RaidFrame"); if RaidFrame and RaidFrame.UpdateControlPanelLayout then RaidFrame:UpdateControlPanelLayout() end end })
 	AddToggle("social.raid", { key = "raidShortcutEnabled_mainTank", group = "raid", label = T("SETTINGS_RAID_ACTION_MAIN_TANK", "Set Main Tank"), default = true, order = 110 })
 	AddToggle("social.raid", { key = "raidShortcutEnabled_mainAssist", group = "raid", label = T("SETTINGS_RAID_ACTION_MAIN_ASSIST", "Set Main Assist"), default = true, order = 120 })
 	AddToggle("social.raid", { key = "raidShortcutEnabled_lead", group = "raid", label = T("SETTINGS_RAID_ACTION_RAID_LEAD", "Set Raid Leader"), default = true, order = 130 })
@@ -3466,10 +4021,10 @@ local function RegisterBrokerPages()
 	RegisterPage({ id = "broker.friends", category = "broker", title = T("SETTINGS_CENTER_PAGE_BROKER_FRIENDS", "Friends Broker"), iconKey = "bfl-broker-friends", mainToggleID = "brokerEnabled", order = 100 })
 	AddGroup("broker.friends", "integration", T("BROKER_SETTINGS_HEADER_INTEGRATION", "Data Broker Integration"), 100)
 	AddToggle("broker.friends", { key = "brokerEnabled", group = "integration", label = T("BROKER_SETTINGS_ENABLE", "Enable Data Broker"), desc = T("BROKER_SETTINGS_ENABLE_TOOLTIP", "Enable/Disable Data Broker integration."), default = false, order = 100, requiresReload = true, reloadReason = T("SETTINGS_CENTER_RELOAD_REQUIRED", "This change requires a UI reload.\n\nReload now?"), refreshOnChange = true })
-	AddToggle("broker.friends", { key = "brokerShowIcon", group = "integration", label = T("BROKER_SETTINGS_SHOW_ICON", "Show Icon"), default = true, order = 110, parentCheck = function() return GetDB("brokerEnabled", false) end, after = RefreshBrokerTooltips })
-	AddToggle("broker.friends", { key = "brokerShowLabel", group = "integration", label = T("BROKER_SETTINGS_SHOW_LABEL", "Show Label"), default = true, order = 120, parentCheck = function() return GetDB("brokerEnabled", false) end, after = RefreshBrokerTooltips })
-	AddToggle("broker.friends", { key = "brokerShowTotal", group = "integration", label = T("BROKER_SETTINGS_SHOW_TOTAL", "Show Total Count"), default = true, order = 130, parentCheck = function() return GetDB("brokerEnabled", false) end, after = RefreshBrokerTooltips })
-	AddToggle("broker.friends", { key = "brokerShowGroups", group = "integration", label = T("BROKER_SETTINGS_SHOW_GROUPS", "Split WoW and BNet Friend Counts"), default = false, order = 140, parentCheck = function() return GetDB("brokerEnabled", false) end, after = RefreshBrokerTooltips })
+	AddToggle("broker.friends", { key = "brokerShowIcon", group = "integration", label = T("BROKER_SETTINGS_SHOW_ICON", "Show Icon"), default = true, order = 110, parentCheck = function() return GetDB("brokerEnabled", false) end, after = RefreshBrokerDisplays })
+	AddToggle("broker.friends", { key = "brokerShowLabel", group = "integration", label = T("BROKER_SETTINGS_SHOW_LABEL", "Show Label"), default = true, order = 120, parentCheck = function() return GetDB("brokerEnabled", false) end, after = RefreshBrokerDisplays })
+	AddToggle("broker.friends", { key = "brokerShowTotal", group = "integration", label = T("BROKER_SETTINGS_SHOW_TOTAL", "Show Total Count"), default = true, order = 130, parentCheck = function() return GetDB("brokerEnabled", false) end, after = RefreshBrokerDisplays })
+	AddToggle("broker.friends", { key = "brokerShowGroups", group = "integration", label = T("BROKER_SETTINGS_SHOW_GROUPS", "Split WoW and BNet Friend Counts"), default = false, order = 140, parentCheck = function() return GetDB("brokerEnabled", false) end, after = RefreshBrokerDisplays })
 	AddToggle("broker.friends", { key = "brokerShowWoWIcon", group = "integration", label = T("BROKER_SETTINGS_SHOW_WOW_ICON", "Show WoW Icon"), default = true, order = 145, parentCheck = function() return GetDB("brokerEnabled", false) and GetDB("brokerShowGroups", false) end, after = RefreshBrokerDisplays })
 	AddToggle("broker.friends", { key = "brokerShowBNetIcon", group = "integration", label = T("BROKER_SETTINGS_SHOW_BNET_ICON", "Show Battle.net Icon"), default = true, order = 146, parentCheck = function() return GetDB("brokerEnabled", false) and GetDB("brokerShowGroups", false) end, after = RefreshBrokerDisplays })
 	AddDropdown("broker.friends", { key = "brokerTooltipMode", group = "integration", label = T("BROKER_SETTINGS_TOOLTIP_MODE", "Tooltip Mode"), list = { basic = T("BROKER_TOOLTIP_BASIC", "Basic"), advanced = T("BROKER_TOOLTIP_ADVANCED", "Advanced") }, orderList = { "basic", "advanced" }, default = "advanced", order = 150, parentCheck = function() return GetDB("brokerEnabled", false) end, after = RefreshBrokerTooltips })
@@ -3501,12 +4056,11 @@ local function RegisterBrokerPages()
 	RegisterPage({ id = "broker.guild", category = "broker", title = T("SETTINGS_CENTER_PAGE_BROKER_GUILD", "Guild Broker"), iconKey = "bfl-broker-guild", mainToggleID = "guildBrokerEnabled", order = 110 })
 	AddGroup("broker.guild", "guildBroker", T("GUILD_BROKER_SETTINGS_HEADER", "Guild Plugin"), 100)
 	AddToggle("broker.guild", { key = "guildBrokerEnabled", group = "guildBroker", label = T("GUILD_BROKER_SETTINGS_ENABLE", "Enable Guild Broker"), desc = T("GUILD_BROKER_SETTINGS_ENABLE_DESC", "Show guild member data in your Data Broker display addon."), default = false, order = 100, requiresReload = true, reloadReason = T("SETTINGS_CENTER_RELOAD_REQUIRED", "This change requires a UI reload.\n\nReload now?"), refreshOnChange = true })
-	AddToggle("broker.guild", { key = "guildBrokerShowIcon", group = "guildBroker", label = T("GUILD_BROKER_SETTINGS_SHOW_ICON", "Show Icon"), default = true, order = 110, parentCheck = function() return GetDB("guildBrokerEnabled", false) end, after = RefreshBrokerTooltips })
-	AddToggle("broker.guild", { key = "guildBrokerShowLabel", group = "guildBroker", label = T("GUILD_BROKER_SETTINGS_SHOW_LABEL", "Show Label"), default = true, order = 120, parentCheck = function() return GetDB("guildBrokerEnabled", false) end, after = RefreshBrokerTooltips })
-	AddToggle("broker.guild", { key = "guildBrokerShowTotal", group = "guildBroker", label = T("GUILD_BROKER_SETTINGS_SHOW_TOTAL", "Show Total Count"), default = true, order = 130, parentCheck = function() return GetDB("guildBrokerEnabled", false) end, after = RefreshBrokerTooltips })
-	AddToggle("broker.guild", { key = "guildBrokerShowApplicants", group = "guildBroker", label = T("GUILD_BROKER_SETTINGS_SHOW_APPLICANTS", "Show Applicant Count"), default = true, order = 140, parentCheck = function() return GetDB("guildBrokerEnabled", false) end, after = RefreshBrokerTooltips })
+	AddToggle("broker.guild", { key = "guildBrokerShowIcon", group = "guildBroker", label = T("GUILD_BROKER_SETTINGS_SHOW_ICON", "Show Icon"), default = true, order = 110, parentCheck = function() return GetDB("guildBrokerEnabled", false) end, after = RefreshBrokerDisplays })
+	AddToggle("broker.guild", { key = "guildBrokerShowLabel", group = "guildBroker", label = T("GUILD_BROKER_SETTINGS_SHOW_LABEL", "Show Label"), default = true, order = 120, parentCheck = function() return GetDB("guildBrokerEnabled", false) end, after = RefreshBrokerDisplays })
+	AddToggle("broker.guild", { key = "guildBrokerShowTotal", group = "guildBroker", label = T("GUILD_BROKER_SETTINGS_SHOW_TOTAL", "Show Total Count"), default = true, order = 130, parentCheck = function() return GetDB("guildBrokerEnabled", false) end, after = RefreshBrokerDisplays })
+	AddToggle("broker.guild", { key = "guildBrokerShowApplicants", group = "guildBroker", label = T("GUILD_BROKER_SETTINGS_SHOW_APPLICANTS", "Show Applicant Count"), default = true, order = 140, parentCheck = function() return GetDB("guildBrokerEnabled", false) end, after = RefreshBrokerDisplays })
 	AddToggle("broker.guild", { key = "guildBrokerShowHints", group = "guildBroker", label = T("GUILD_BROKER_SETTINGS_SHOW_HINTS", "Show Hints"), default = true, order = 145, parentCheck = function() return GetDB("guildBrokerEnabled", false) end, after = RefreshBrokerDisplays })
-	AddDropdown("broker.guild", { key = "guildBrokerTooltipMode", group = "guildBroker", label = T("GUILD_BROKER_SETTINGS_TOOLTIP_MODE", "Tooltip Mode"), list = { basic = T("BROKER_TOOLTIP_BASIC", "Basic"), advanced = T("BROKER_TOOLTIP_ADVANCED", "Advanced") }, orderList = { "basic", "advanced" }, default = "advanced", order = 150, parentCheck = function() return GetDB("guildBrokerEnabled", false) end, after = RefreshBrokerDisplays })
 	AddDropdown("broker.guild", { key = "guildBrokerClickAction", group = "guildBroker", label = T("GUILD_BROKER_SETTINGS_CLICK_ACTION", "Left Click Action"), list = { guild_tab = T("GUILD_BROKER_ACTION_GUILD_FRAME", "Open Guild Tab"), settings = T("GUILD_BROKER_ACTION_SETTINGS", "Open Settings") }, orderList = { "guild_tab", "settings" }, default = "guild_tab", order = 160, parentCheck = function() return GetDB("guildBrokerEnabled", false) end })
 	AddDropdown("broker.guild", { key = "guildBrokerGroupMode", group = "guildBroker", label = T("GUILD_BROKER_SETTINGS_GROUP_MODE", "Group Mode"), list = { none = NONE or "None", by_rank = RANK or "Rank", by_class = CLASS or "Class" }, orderList = { "none", "by_rank", "by_class" }, default = "none", order = 170, parentCheck = function() return GetDB("guildBrokerEnabled", false) end, after = RefreshBrokerTooltips })
 	AddDropdown("broker.guild", { key = "guildBrokerFilter", group = "guildBroker", label = T("GUILD_BROKER_SETTINGS_FILTER", "Default Filter"), list = { all = ALL or "All", online = FRIENDS_LIST_ONLINE or "Online" }, orderList = { "online", "all" }, default = "online", order = 180, parentCheck = function() return GetDB("guildBrokerEnabled", false) end, after = RefreshBrokerTooltips })
@@ -3901,6 +4455,10 @@ function SettingsDesigner:Show(pageID, focusControlID)
 		return nil
 	end
 	local frame = ConfigUI:Open(registeredApp, pageID, focusControlID)
+	local FriendsUI = BFL:GetModule("FriendsUI")
+	if frame and FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() and FriendsUI.AnchorAuxiliaryWindow then
+		FriendsUI:AnchorAuxiliaryWindow(frame, 0)
+	end
 	self:ApplySkin("open")
 	return frame
 end

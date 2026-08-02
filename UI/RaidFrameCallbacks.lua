@@ -274,6 +274,7 @@ function BetterRaidFrame_Update()
 	local isPreviewRaid = RaidFrame.mockEnabled and RaidFrame.raidMembers and #RaidFrame.raidMembers > 0
 	local showRaidRoster = isRealRaid or isPreviewRaid
 	local controlPanel = frame.ControlPanel
+	local modernRaidLayout = BFL.FriendsUI and BFL.FriendsUI:IsModernActive()
 
 	-- Show/hide UI elements based on group type (Raid vs Party)
 	if controlPanel then
@@ -284,6 +285,9 @@ function BetterRaidFrame_Update()
 		if controlPanel.EveryoneAssistLabel then
 			controlPanel.EveryoneAssistLabel:Show()
 		end
+		if controlPanel.EveryoneAssistIcon then
+			controlPanel.EveryoneAssistIcon:SetShown(modernRaidLayout)
+		end
 		if controlPanel.MemberCount then
 			controlPanel.MemberCount:Show()
 		end
@@ -292,6 +296,11 @@ function BetterRaidFrame_Update()
 		end
 		if controlPanel.RoleSummary then
 			controlPanel.RoleSummary:Show()
+		end
+		for _, roleFrame in ipairs({ controlPanel.TankFrame, controlPanel.HealerFrame, controlPanel.DamagerFrame }) do
+			if roleFrame then
+				roleFrame:Hide()
+			end
 		end
 		-- Raid Info Button always visible
 	end
@@ -353,7 +362,12 @@ function BetterRaidFrame_UpdateControlPanelButtons()
 		end
 	end
 	if controlPanel.EveryoneAssistLabel then
-		if canAssist then
+		local modernRaidLayout = BFL.FriendsUI and BFL.FriendsUI:IsModernActive()
+		if modernRaidLayout and GameFontNormalMed1 then
+			controlPanel.EveryoneAssistLabel:SetFontObject(GameFontNormalMed1)
+			local color = canAssist and NORMAL_FONT_COLOR or GRAY_FONT_COLOR
+			controlPanel.EveryoneAssistLabel:SetTextColor(color:GetRGB())
+		elseif canAssist then
 			controlPanel.EveryoneAssistLabel:SetFontObject("BetterFriendlistFontNormal")
 		else
 			controlPanel.EveryoneAssistLabel:SetFontObject("BetterFriendlistFontDisable")
@@ -591,10 +605,16 @@ local function ApplyDockedRaidInfoFrameLayering()
 	RaidInfoFrame:Raise()
 end
 
+local function GetNumSavedRaidLockouts()
+	local instances = GetNumSavedInstances and GetNumSavedInstances() or 0
+	local worldBosses = GetNumSavedWorldBosses and GetNumSavedWorldBosses() or 0
+	return instances + worldBosses
+end
+
 -- Raid Info Button
 function BetterRaidFrame_RaidInfoButton_OnClick(self)
 	-- Get number of saved instances to check if we have any
-	local numSaved = GetNumSavedInstances()
+	local numSaved = GetNumSavedRaidLockouts()
 
 	if numSaved == 0 then
 		-- No saved instances, show message
@@ -679,7 +699,7 @@ function BetterRaidFrame_UpdateRaidInfoButton()
 	end
 
 	-- Check for saved instances
-	local numSaved = GetNumSavedInstances()
+	local numSaved = GetNumSavedRaidLockouts()
 
 	if numSaved > 0 then
 		button:Enable()
@@ -729,11 +749,6 @@ function BetterRaidMemberButton_OnEnter(self)
 	end
 	if self.pendingName or IsPendingRaidRosterName(self.name) then
 		ClearRaidMemberGameTooltip(self)
-		return
-	end
-
-	local RaidFrame = GetRaidFrame()
-	if RaidFrame and RaidFrame.ShowSecureProxyForButton and RaidFrame:ShowSecureProxyForButton(self) then
 		return
 	end
 

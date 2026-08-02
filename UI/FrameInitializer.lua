@@ -11,6 +11,8 @@ local L = BFL.L -- Localization shortcut (Use Proxy Table for Fallbacks)
 local UI_CONSTANTS = {
 	-- Dropdown
 	DROPDOWN_WIDTH = 51,
+	STATUS_DROPDOWN_WIDTH = 54,
+	STATUS_ICON_SIZE = 19,
 
 	-- Tooltip positioning
 	TOOLTIP_OFFSET_X = 36,
@@ -67,6 +69,11 @@ BFL.UI.CONSTANTS = UI_CONSTANTS
 local IsModernDropdown = BFL.IsModernDropdown
 local APPEAR_OFFLINE_TEXTURE = FRIENDS_TEXTURE_OFFLINE or "Interface\\FriendsFrame\\StatusIcon-Offline"
 
+local function UsesModernFriendsUI()
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	return FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() or false
+end
+
 -- Module registration
 local FrameInitializer = {
 	name = "FrameInitializer",
@@ -104,10 +111,30 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 		bnStatus = FRIENDS_TEXTURE_ONLINE
 	end
 
+	local function GetStatusAtlas(status)
+		if status == FRIENDS_TEXTURE_ONLINE then
+			return "friends-status-online"
+		elseif status == FRIENDS_TEXTURE_AFK then
+			return "friends-status-away"
+		elseif status == FRIENDS_TEXTURE_DND then
+			return "friends-status-busy"
+		end
+		return "friends-status-offline"
+	end
+	local function FormatStatusLabel(status, label)
+		if IsModernDropdown(dropdown) and UsesModernFriendsUI() and BFL.GetAtlasMarkup then
+			local size = UI_CONSTANTS.STATUS_ICON_SIZE
+			local markup = BFL.GetAtlasMarkup(GetStatusAtlas(status), size, size)
+			if markup and markup ~= "" then
+				return string.format("%s %s", markup, label)
+			end
+		end
+		return string.format("|T%s.tga:14:14:0:0|t %s", status, label)
+	end
 	local optionLabels = {
-		string.format("|T%s.tga:14:14:0:0|t %s", FRIENDS_TEXTURE_ONLINE, FRIENDS_LIST_AVAILABLE),
-		string.format("|T%s.tga:14:14:0:0|t %s", FRIENDS_TEXTURE_AFK, FRIENDS_LIST_AWAY),
-		string.format("|T%s.tga:14:14:0:0|t %s", FRIENDS_TEXTURE_DND, FRIENDS_LIST_BUSY),
+		FormatStatusLabel(FRIENDS_TEXTURE_ONLINE, FRIENDS_LIST_AVAILABLE),
+		FormatStatusLabel(FRIENDS_TEXTURE_AFK, FRIENDS_LIST_AWAY),
+		FormatStatusLabel(FRIENDS_TEXTURE_DND, FRIENDS_LIST_BUSY),
 	}
 	local optionValues = {
 		FRIENDS_TEXTURE_ONLINE,
@@ -117,8 +144,7 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 	if BFL.CanSetAppearOffline and BFL.CanSetAppearOffline() then
 		table.insert(
 			optionLabels,
-			string.format(
-				"|T%s.tga:14:14:0:0|t %s",
+			FormatStatusLabel(
 				APPEAR_OFFLINE_TEXTURE,
 				L.STATUS_APPEAR_OFFLINE or SOCIAL_UI_PRESENCE_TYPE_LABEL_APPEAR_OFFLINE or "Appear Offline"
 			)
@@ -138,8 +164,15 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 		return FRIENDS_LIST_AVAILABLE
 	end
 	local function GetStatusSelectionText(status)
-		if IsModernDropdown(dropdown) then
-			return string.format("|T%s.tga:16:16:0:0|t", status or FRIENDS_TEXTURE_ONLINE)
+		if IsModernDropdown(dropdown) and UsesModernFriendsUI() then
+			local iconSize = UI_CONSTANTS.STATUS_ICON_SIZE
+			if BFL.GetAtlasMarkup then
+				local markup = BFL.GetAtlasMarkup(GetStatusAtlas(status or FRIENDS_TEXTURE_ONLINE), iconSize, iconSize)
+				if markup and markup ~= "" then
+					return markup
+				end
+			end
+			return string.format("|T%s.tga:%d:%d:0:0|t", status or FRIENDS_TEXTURE_ONLINE, iconSize, iconSize)
 		end
 		return string.format("|T%s.tga:14:14:-2:-2|t", status or FRIENDS_TEXTURE_ONLINE)
 	end
@@ -230,7 +263,7 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 	end
 
 	-- Modern dropdown path.
-	dropdown:SetWidth(UI_CONSTANTS.DROPDOWN_WIDTH)
+	dropdown:SetWidth(UsesModernFriendsUI() and UI_CONSTANTS.STATUS_DROPDOWN_WIDTH or UI_CONSTANTS.DROPDOWN_WIDTH)
 	BFL.InitializeDropdown(dropdown, {
 		labels = optionLabels,
 		values = optionValues,

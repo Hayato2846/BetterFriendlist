@@ -76,6 +76,7 @@ Modules\IconSelector.lua
 Modules\Changelog.lua
 Modules\HelpFrame.lua
 Modules\FrameSettings.lua
+Modules\FriendsUI.lua [AllowLoadGameType mainline]
 Modules\Groups.lua
 Modules\RecentlyAdded.lua
 Modules\FriendsList.lua
@@ -134,6 +135,7 @@ UI\QuickJoinCallbacks.lua [AllowLoadGameType mainline]
 # Legacy
 BetterFriendlist.lua
 BetterFriendlist.xml [AllowLoadGameType mainline]
+BetterFriendlist_Modern.xml [AllowLoadGameType mainline]
 BetterFriendlist_Classic.xml [AllowLoadGameType vanilla, tbc, wrath, cata, mists]
 BetterFriendlist_InviteTemplates.xml
 BetterFriendlist_Tooltip.lua

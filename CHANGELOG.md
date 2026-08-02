@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+
+### Added
+- **Retail 12.1 Friendlist UI** - Added a new Retail interface based on Blizzard's 12.1 SocialUI, including vertical section tabs, modern friend cards and group headers, a Battle.net bar, compact search/filter/sort controls, and a dedicated Friend Requests view.
+- **Interface Style Setting** - Retail can switch between Modern and Legacy without reloading. Modern is the Retail default when Blizzard's SocialUI is enabled; Classic and unsupported Retail states continue to use Legacy.
+- **Friend Tab Settings** - Modern Retail users can reorder every side tab, hide individual tabs, and optionally show Friend Requests or Quick Join only while they contain entries. Hidden tabs are removed from the layout without leaving gaps.
+
+### Improved
+- **Social Entry Points** - Retail SocialUI toggles and tab-opening calls now route to matching BetterFriendlist sections, while the menu option for Blizzard's friendlist opens Blizzard's original SocialUI.
+- **Retail 12.1 Contact Views** - Friends, Recent Allies, Friend Requests, Quick Join, Guild, and Who now use section-specific Modern search, filter, divider, list, and action-bar layouts. Recent Allies supports Blizzard's new status and interest filters with an older-client fallback.
+- **Retail 12.1 Social Actions** - Recent Allies can send WoW title-friend invitations, and Quick Join toasts now select and scroll to the matching BetterFriendlist group.
+- **Retail 12.1 Parity** - Quick Join uses the new queue icon, shared action layout, text-scale-aware row extents, and Blizzard's friends-restriction state. Quick Join and Friend Requests badges match Blizzard's geometry, Raid recognizes world-boss lockouts, additional roster events, and the new raid-disable game rule, RAF supports Blizzard's dynamically created SocialView while retaining locked trial rewards, and the status dropdown keeps Blizzard's native template height.
+- **Modern Raid Layout** - Raid now combines Blizzard's 12.1 group-card chrome with BFL's compact role summary, a native top-edge layout that keeps the warm SocialUI fade without BFL's extra divider, native-size group labels, aligned compact footer buttons, expanded group space, transparent member rows, class-colored preview rows, and Blizzard's new raid-assignment atlases with hover tooltips.
+- **Consistent Section Layout** - All scrollable Modern sections use the same 18-pixel viewport reserve and final 7-pixel scrollbar gap, placing every visible scrollbar two pixels left of the previous visual adjustment without changing row width; Quick Join and Friend Requests also share one full-height scrollbar rail.
+- **Modern Directory Views** - Guild and Who use the same search-field chrome as Friends. Who also uses Modern action buttons and table headers, a full-height scrollbar, and a centered full-width Search Builder with aligned search fields and localized placeholders.
+- **Modern Friend Requests** - Friend Requests now match Blizzard's received-request header, Title/BattleTag/Real ID card surfaces, tertiary accept/decline actions, and full-size privacy warning.
+- **Modern Social Detail Views** - Recent Allies places native-size pin and pending-request indicators inline with character data, Friend Requests uses Blizzard's scaled accept and decline-dropdown contract with centered actions, and Recruit a Friend now matches the 12.1 SocialView header, action buttons, 70-pixel cards, activity-chest spacing, and rewards overview.
+- **Modern Window Spacing** - Streamer Mode occupies the Battle.net bar's right action edge, Raid Help sits beside Assist All, and Help, Settings, and Ignore windows clear the Modern side-tab rail.
+- **Theme Compatibility** - Blizzard, Dark, Custom, and ElvUI themes share the new geometry while preserving their own colors and skin behavior.
+- **Friend Tag Chips** - Friend-row tags now use true circular capsule ends without MaskTextures and no longer intercept mouse input or show separate tag tooltips.
+- **Adaptive Friend Rows** - Friend cards now stack their visible name, info, multi-account, and tag lines from a three-pixel top inset and calculate their height from the content that is actually shown. Long names wrap across as many lines as needed, including names without spaces, instead of being truncated. Rows grow beyond the old fixed Modern sizes and retired height cap when configured fonts or extra lines need more room.
+- **WHO Rows** - Alternating row backgrounds now have an adjustable strength control in both settings interfaces.
+- **Settings Preview** - Changes from both settings interfaces now refresh every active Preview surface immediately. The fixtures cover mobile-only and multi-game friends, max-level rows, nicknames, dynamic groups, Contact Memory, Guild nicknames, and Broker columns without writing preview data to SavedVariables.
+
+### Fixed
+- **Recent Allies Invite Button** - The Modern invite action now resets the legacy TravelPass texture crop before applying Blizzard's square SocialCard atlases, preventing the button background from rendering as narrow vertical strips while preserving the original Legacy artwork.
+- **Preview Mode** - `/bfl preview` again toggles the complete Retail 12.1 fixture, including Recent Allies and a fully local Recruit a Friend roster that remains available when RAF is disabled on the account or PTR. Its full boot is distributed safely across frames without debug chat spam, then commits the complete mock friend model after all gated fixture work, preventing client stalls and empty custom groups. Preview friends expose deterministic game-specific icons and WoW status, consume current name/info, faction, favorite, font, and layout settings instead of stale cached values, and keep multi-account details above rather than underneath tag chips. Friend Requests cover Title/BattleTag/Real ID and reproduce Blizzard's pending-request counter and tab glow outside the selected Requests view; Quick Join reproduces its counter without an artificial tab glow. RAF exposes Blizzard's complete rewards window through a seven-step local reward track while keeping claim and recruitment services disabled. Raid rows use their class backgrounds, and selected mock friends are released when switching or disabling preview profiles.
+- **Preview Who Isolation** - Preview Mode no longer creates, stores, refreshes, or advertises mock Who results; the Who directory remains entirely on Blizzard's live search data.
+- **Modern Group Headers** - Retail 12.1 group headers now use static, bounded name/count regions. Labels in other writing systems use Blizzard's preinitialized multilingual system font instead of resolving BFL's runtime-created FontFamily during ScrollBox setup; ASCII and extended Latin labels retain all configurable BFL font settings. Preview diagnostics can compare ASCII, extended Latin, and multilingual regression sets.
+- **Raid Member Interaction** - Hovering raid members on Retail 12.1 no longer attempts to anchor a protected proxy to an insecure member slot. Right-click menus continue to use the member button's secure action path.
+- **Drag and Hover Handling** - Reordering groups, filters, sorters, and broker columns no longer calls the removed global mouse-over helper. Friend-group drops and themed hover states use the cross-flavor Region API as well.
+- **Modern Frame Chrome** - The content background and lower divider now remain inside the resizable frame border, and friend-row tags sit two pixels lower.
+- **Friends Frame** - The title now uses the correct centered bounds when Simple Mode hides the portrait, and legacy filter/sort dropdowns stay hidden while the Modern UI is active.
+- **Theme Settings** - Theme sliders no longer reskin the full interface for every drag increment, and resetting a theme updates the visible controls immediately.
+- **Frame Scale** - Changing the scale in Settings Center now applies it immediately.
+- **Friend Tags** - Tags and chips can now be enabled independently from Private Notes.
+- **Group Order** - Arrow color controls are hidden when collapse arrows are disabled.
+- **Tooltips** - BetterFriendlist friend tooltips now use `TOOLTIP` strata with a deliberate frame-level lead, keeping them above Modern cards, tabs, and other SocialUI child frames.
+- **WHO Double-Click** - WHO actions now expose only the supported Whisper and Invite options; stale unsupported Inspect selections fall back safely to Whisper.
+
+---
+
 ## [2.7.0]        - 2026-07-29
 
 ### Fixed
@@ -124,32 +166,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Battle.net Favorites** - World of Warcraft currently reports no Battle.net Favorites for some accounts even when Favorites are set in the Battle.net Desktop App. This Blizzard API issue has been reported; BetterFriendlist cannot restore Favorite data while the client APIs return none.
 
 ---
-
-## [2.6.1]        - 2026-05-31
-
-### Added
-- **Guild Tab Beta** - Added a default-off Retail-only beta Guild tab with BetterFriendlist-owned roster search, online/offline filtering, sorting, guild counts, member details, notes, class and status indicators, and safe member actions where permissions and Blizzard APIs allow them. Enable Beta Features under Settings > Advanced > Beta Features, then turn on the Guild roster tab under Settings > Guild. Classic support for this beta feature will follow in a later version.
-- **External AddOn Menu Bridge Beta** - Added a default-off beta bridge and official companion AddOn for showing compatible AddOn actions in supported BetterFriendlist context menus. Enable it under Settings > Advanced > Beta Features.
-- **Theme Customization** - Added Retail-only beta theme customization with a Custom theme based on Dark, expanded Dark and Custom settings for colors, opacity, hover and selection states, borders, scrollbars, icons, and BFL Avatar visibility. Enable Beta Features under Settings > Advanced > Beta Features, then configure themes under Settings > Theme. Classic support for these beta theme features will follow in a later version.
-- **Raid Tab** - Added an optional compact Ready Check button next to Raid Info. Enable it under Settings > Raid.
-
-### Improved
-- **Guild Broker Tooltips** - Added a subtle separator between Friends Broker groups and Guild Broker rank groups.
-
-### Changed
-- **Client Compatibility** - Prepared friend invites and raid controls for upcoming Retail client changes while preserving current Retail and Classic support.
-- **Raid Tools** - Improved handling for temporarily uncached raid roster names.
-- **Font Rendering** - Made custom font handling more defensive on newer clients.
-
-### Fixed
-- **Friend Menus** - Restored Blizzard's invite versus request-to-join labels and actions for Battle.net friends.
-- **Recruit A Friend** - Shortened the search placeholder and kept it on one line in the header search field.
-- **Tabs** - Fixed truncated top and bottom tab labels showing duplicate hover tooltips.
-
-### Performance
-- **Top Tabs** - Reduced hitches when switching between Friends, Recent Allies, Recruit A Friend, and Guild tabs.
-- **Guild Roster** - Reduced memory churn when reopening or switching to the Guild roster tab.
-- **Quick Join** - Reduced repeated row-height work while showing available groups.
 
 ---
 

@@ -558,6 +558,20 @@ local function RestorePortraitArtwork(engine, frame)
 	if not frame then
 		return
 	end
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	local modern = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
+	if modern then
+		local avatarAlpha = GetAvatarAlpha(1)
+		SetObjectShown(engine, frame, frame.PortraitIcon, false)
+		SetObjectShown(engine, frame, frame.PortraitMask, false)
+		SetObjectShown(engine, frame, frame.PortraitButton, false)
+		local modernPortrait = FriendsUI.root and FriendsUI.root.PortraitOverlay
+		if modernPortrait then
+			modernPortrait:SetAlpha(avatarAlpha)
+			SetObjectShown(engine, modernPortrait, modernPortrait, avatarAlpha > 0)
+		end
+		return
+	end
 
 	local portraitButton = frame.PortraitButton
 	local avatarAlpha = GetAvatarAlpha(1)
@@ -1689,6 +1703,9 @@ function DarkTheme:SkinWhoFrame(engine)
 	local WhoFrame = BFL:GetModule("WhoFrame")
 	if WhoFrame then
 		local builderContainer = WhoFrame.builderDockedContainer or WhoFrame.builderContainer or _G.BetterFriendlistSearchBuilderFrame
+		local modernBuilderEmbedded = WhoFrame.IsModernSearchBuilderEmbedded
+			and WhoFrame:IsModernSearchBuilderEmbedded()
+			or false
 		local builderSkinKey = tostring(WhoFrame.builderToggle)
 			.. ":"
 			.. tostring(WhoFrame.builderDockBtn)
@@ -1700,6 +1717,8 @@ function DarkTheme:SkinWhoFrame(engine)
 			.. tostring(builderContainer)
 			.. ":"
 			.. tostring(WhoFrame.builderCloseBtn)
+			.. ":"
+			.. tostring(modernBuilderEmbedded)
 			.. ":"
 			.. tostring(_G.BetterFriendlistSearchBuilderFrame)
 		if who.BFL_DarkWhoBuilderSkinKey ~= builderSkinKey then
@@ -1713,7 +1732,9 @@ function DarkTheme:SkinWhoFrame(engine)
 				engine:RestoreFrame(WhoFrame.builderDockBtn)
 			end
 			if WhoFrame.builderFlyout then
-				if WhoFrame.builderDocked then
+				if modernBuilderEmbedded then
+					engine:RestoreFrame(WhoFrame.builderFlyout)
+				elseif WhoFrame.builderDocked then
 					HideFrameChrome(engine, WhoFrame.builderFlyout)
 				else
 					engine:SkinFrame(WhoFrame.builderFlyout, "popup", { stripTextures = true, textureAlpha = 0 })
@@ -1722,6 +1743,9 @@ function DarkTheme:SkinWhoFrame(engine)
 				if WhoFrame.builderCloseBtn then
 					WhoFrame.builderCloseBtn.BFL_DarkNoButtonChrome = nil
 					engine:SkinCloseButton(WhoFrame.builderCloseBtn)
+				end
+				if modernBuilderEmbedded and WhoFrame.ApplyModernSearchBuilderStyle then
+					WhoFrame:ApplyModernSearchBuilderStyle()
 				end
 			end
 
@@ -1761,6 +1785,7 @@ function DarkTheme:SkinRaidFrame(engine)
 	end
 
 	local control = raid.ControlPanel
+	local modernRaidLayout = BFL.FriendsUI and BFL.FriendsUI:IsModernActive()
 	local staticSkinKey = BuildSkinKey(
 		raid,
 		control,
@@ -1770,7 +1795,8 @@ function DarkTheme:SkinRaidFrame(engine)
 		raid.GroupsInset,
 		raid.ConvertToRaidButton,
 		raid.RaidToolsButton,
-		control and control.CombatIcon
+		control and control.CombatIcon,
+		modernRaidLayout
 	)
 	if raid.BFL_DarkRaidSkinKey == staticSkinKey then
 		for _, button in ipairs({
@@ -1796,14 +1822,22 @@ function DarkTheme:SkinRaidFrame(engine)
 		texture = control and control.ReadyCheckButton and control.ReadyCheckButton.Icon,
 		size = 14,
 	})
-	SkinField(engine, raid, "GroupsInset", "inset")
+	if modernRaidLayout then
+		HideFieldChrome(engine, raid, "GroupsInset")
+	else
+		SkinField(engine, raid, "GroupsInset", "inset")
+	end
 	SkinButtonField(engine, raid, "ConvertToRaidButton")
 	SkinButtonField(engine, raid, "RaidToolsButton")
 	SkinButtonField(engine, raid.ControlPanel, "CombatIcon")
 	engine:SkinTree(raid, 5)
 	HideFrameChrome(engine, raid)
 	HideFieldChrome(engine, raid, "ControlPanel")
-	SkinField(engine, raid, "GroupsInset", "inset")
+	if modernRaidLayout then
+		HideFieldChrome(engine, raid, "GroupsInset")
+	else
+		SkinField(engine, raid, "GroupsInset", "inset")
+	end
 	SkinRaidAssistCheckButtonField(engine, raid.ControlPanel, "EveryoneAssistCheckbox")
 	RestoreClassicRaidRoleIcons(engine, raid)
 end
@@ -2311,7 +2345,6 @@ function DarkTheme:InstallHooks()
 
 	for _, methodName in ipairs({
 		"UpdateMemberButton",
-		"UpdateMemberButtonVisuals",
 		"UpdateMemberButtons",
 		"UpdateRoleSummary",
 	}) do
@@ -2419,6 +2452,7 @@ function DarkTheme:InstallHooks()
 	for _, methodName in ipairs({
 		"RefreshThemeTab",
 		"RefreshGeneralTab",
+		"RefreshFriendTabsTab",
 		"RefreshFontsTab",
 		"RefreshGroupsTab",
 		"RefreshAdvancedTab",

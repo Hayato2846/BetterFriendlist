@@ -9,8 +9,30 @@ local MAX_HEIGHT = 1200
 local MIN_SCALE = 0.5
 local MAX_SCALE = 2.0
 
--- Layout key for storage (removing complexity of multiple layouts)
-local LAYOUT_KEY = "Default"
+local LEGACY_LAYOUT_KEY = "Default"
+local MODERN_LAYOUT_KEY = "RetailModern"
+
+function FrameSettings:GetLayoutKey()
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.GetLayoutKey then
+		return FriendsUI:GetLayoutKey()
+	end
+	return LEGACY_LAYOUT_KEY
+end
+
+function FrameSettings:GetDefaultSize(layoutKey)
+	if layoutKey == MODERN_LAYOUT_KEY then
+		return 410, 675
+	end
+	return self.db.defaultFrameWidth or 415, self.db.defaultFrameHeight or 570
+end
+
+function FrameSettings:EnsureLayout(layoutKey)
+	if not self.db.mainFrameSize[layoutKey] then
+		local width, height = self:GetDefaultSize(layoutKey)
+		self.db.mainFrameSize[layoutKey] = { width = width, height = height }
+	end
+end
 
 function FrameSettings:Initialize()
 	self.db = BetterFriendlistDB
@@ -29,12 +51,10 @@ function FrameSettings:Initialize()
 		self.db.lockWindow = false
 	end
 
-	-- Ensure "Default" entries exist
-	if not self.db.mainFrameSize[LAYOUT_KEY] then
-		self.db.mainFrameSize[LAYOUT_KEY] = {
-			width = self.db.defaultFrameWidth or 415,
-			height = self.db.defaultFrameHeight or 570,
-		}
+	-- Keep Legacy and Retail Modern geometry independent.
+	self:EnsureLayout(LEGACY_LAYOUT_KEY)
+	if BFL.IsRetail then
+		self:EnsureLayout(MODERN_LAYOUT_KEY)
 	end
 
 	-- Hook MainFrame movement to save position
@@ -138,7 +158,9 @@ function FrameSettings:ApplySize(bgWidth, bgHeight)
 		return
 	end
 
-	local currentSize = self.db.mainFrameSize[LAYOUT_KEY]
+	local layoutKey = self:GetLayoutKey()
+	self:EnsureLayout(layoutKey)
+	local currentSize = self.db.mainFrameSize[layoutKey]
 	local width = bgWidth or currentSize.width
 	local height = bgHeight or currentSize.height
 
@@ -186,7 +208,7 @@ function FrameSettings:ApplyPosition()
 		return
 	end
 
-	local pos = self.db.mainFramePosition[LAYOUT_KEY]
+	local pos = self.db.mainFramePosition[self:GetLayoutKey()]
 	if pos and pos.point then
 		frame:ClearAllPoints()
 		-- Safety check for bad coordinates
@@ -212,7 +234,7 @@ function FrameSettings:SavePosition()
 	local point, _, relativePoint, x, y = frame:GetPoint()
 
 	if point then
-		self.db.mainFramePosition[LAYOUT_KEY] = {
+		self.db.mainFramePosition[self:GetLayoutKey()] = {
 			point = point,
 			relativePoint = relativePoint,
 			x = x,
@@ -225,13 +247,12 @@ end
 function FrameSettings:ResetDefaults()
 	-- Reset to defaults defined in Database.lua indirectly
 	self.db.windowScale = 1.0
-	self.db.mainFrameSize[LAYOUT_KEY] = {
-		width = 415,
-		height = 570,
-	}
+	local layoutKey = self:GetLayoutKey()
+	local width, height = self:GetDefaultSize(layoutKey)
+	self.db.mainFrameSize[layoutKey] = { width = width, height = height }
 
 	-- Reset position to center
-	self.db.mainFramePosition[LAYOUT_KEY] = {
+	self.db.mainFramePosition[layoutKey] = {
 		point = "CENTER",
 		relativePoint = "CENTER",
 		x = 0,

@@ -105,7 +105,7 @@ local defaults = {
 	showMobileAsAFK = false, -- Show mobile friends with AFK status icon (default: OFF)
 	treatMobileAsOffline = false, -- Treat mobile friends as offline (display in Offline group) (default: OFF)
 	nameDisplayFormat = "%name%", -- LEGACY: Migrated to nameFormatPreset/nameFormatCustom
-	nameFormatPreset = "default", -- Preset: "default", "battletag", "nickname", "name_nickname", "name_note", "name_battletag", "custom"
+	nameFormatPreset = "default", -- Preset: "default", "battletag", "battletag_only", "nickname", "character", "name_only", "custom"
 	nameFormatCustom = "%name%", -- Custom format string (used when nameFormatPreset == "custom")
 	infoFormatPreset = "default", -- Preset: "default", "zone", "level", "class_zone", "level_class_zone", "game", "disabled", "custom"
 	infoFormatCustom = "%level%, %zone%", -- Custom info format string (used when infoFormatPreset == "custom")
@@ -114,7 +114,7 @@ local defaults = {
 	windowScale = 1.0, -- Window scale factor: 0.5 = 50%, 1.0 = 100%, 2.0 = 200% (default: 100%)
 	hideMaxLevel = false, -- Hide level display for max level characters (default: OFF)
 	colorLevelByDifficulty = true, -- Color level text by difficulty (grey/green/yellow/orange/red) (default: ON)
-	showNoteIcon = false, -- Show a note icon if the friend has a note (default: OFF)
+	showNoteIcon = false, -- Deprecated compatibility value; no note icon is rendered
 	accordionGroups = false, -- Only allow one group to be open at a time (default: OFF)
 	showFavoritesGroup = true, -- Show the Favorites group (default: ON)
 	enableFavoriteIcon = true, -- Show the Favorite icon on the friend button (default: ON)
@@ -190,6 +190,10 @@ local defaults = {
 	enableGlobalSyncDeletion = false, -- Enable deletion of friends during sync (default: OFF)
 
 	-- Main Frame Edit Mode (Phase EditMode)
+	friendsFrameStyle = BFL.IsRetail and "modern" or "legacy", -- Requested UI style; capability fallback never overwrites this value
+	modernFriendTabOrder = {}, -- Modern SocialUI side-tab order; missing IDs are appended in their default order
+	modernFriendTabVisibility = {}, -- Per-tab visibility; missing IDs remain visible
+	modernFriendTabPopulatedOnly = { quick_join = false, friend_requests = false }, -- Optional empty-state hiding for count-driven tabs
 	mainFrameSize = {}, -- {[layoutName] = {width, height}} - Main frame size per layout
 	mainFramePosition = {}, -- {[layoutName] = {point, x, y}} - Main frame position per layout
 	settingsCenterWindow = { width = 1080, height = 700, locked = false, density = "compact" }, -- LibSettingsDesigner window state
@@ -205,6 +209,9 @@ local defaults = {
 	brokerShowLabel = true, -- Show label text (default: ON)
 	brokerShowTotal = true, -- Show total count (default: ON)
 	brokerShowGroups = false, -- Split counts by WoW/BNet (default: OFF, shows combined)
+	brokerShowWoWIcon = true, -- Show the WoW count icon when counts are split (default: ON)
+	brokerShowBNetIcon = true, -- Show the Battle.net count icon when counts are split (default: ON)
+	brokerShowClassIcons = false, -- Show class icons in the broker tooltip (default: OFF)
 	brokerTooltipMode = "advanced", -- Tooltip detail level: "basic" or "advanced" (default: advanced)
 	brokerClickAction = "toggle", -- Left click action: "toggle", "friends", "settings" (default: toggle)
 	brokerShowHints = true, -- Show hint text in LDB tooltip footer (default: ON)
@@ -226,7 +233,7 @@ local defaults = {
 	guildBrokerShowIcon = true, -- Show guild icon on display addons (default: ON)
 	guildBrokerShowLabel = true, -- Show label text (default: ON)
 	guildBrokerShowTotal = true, -- Show total member count (default: ON)
-	guildBrokerTooltipMode = "advanced", -- Tooltip detail level: "basic" or "advanced" (default: advanced)
+	guildBrokerTooltipMode = "advanced", -- Deprecated compatibility value; Guild Broker uses its single supported tooltip layout
 	guildBrokerClickAction = "guild_tab", -- Left click action: "guild_tab", "settings" (default: guild_tab)
 	guildBrokerShowHints = true, -- Show hint text in tooltip footer (default: ON)
 	guildBrokerShowApplicants = true, -- Show pending Guild Finder applicant count when available
@@ -287,9 +294,10 @@ local defaults = {
 	whoShowClassIcons = true, -- Show class icon in WHO result rows (default: ON)
 	whoLevelColors = true, -- Color level text by difficulty (default: ON)
 	whoZebraStripes = true, -- Alternating row backgrounds in WHO (default: ON)
+	whoZebraStripeStrength = 0.3, -- Opacity for alternating WHO row backgrounds
 	whoSearchHistoryEnabled = true, -- Enable WHO search history (default: ON)
 	whoSearchHistoryMax = 8, -- Maximum search history entries (default: 8)
-	whoDoubleClickAction = "whisper", -- Double-click action: whisper, invite, inspect (default: whisper)
+	whoDoubleClickAction = "whisper", -- Double-click action: whisper or invite (default: whisper)
 	whoSearchHistory = {}, -- Stored search history entries
 	whoSearchBuilderDocked = false, -- Search Builder docked mode (default: OFF, flyout overlay)
 
@@ -914,6 +922,14 @@ function DB:Set(key, value)
 			NoteSync:OnGroupOrderChanged()
 		end
 	end
+
+	-- Keep every active Preview surface in sync with Settings Center and legacy
+	-- controls. PreviewMode coalesces a whole change burst into one bounded
+	-- refresh, so sliders and color pickers cannot create refresh storms.
+	local PreviewMode = BFL and BFL:GetModule("PreviewMode")
+	if PreviewMode and PreviewMode.OnSettingChanged then
+		PreviewMode:OnSettingChanged(key)
+	end
 end
 
 function DB:GetLastInvitedAccount(friendUID)
@@ -1154,6 +1170,13 @@ function DB:GetNickname(friendUID)
 	if not friendUID then
 		return nil
 	end
+	local PreviewMode = BFL and BFL:GetModule("PreviewMode")
+	if PreviewMode and PreviewMode.GetMockFriendNickname then
+		local previewNickname = PreviewMode:GetMockFriendNickname(friendUID)
+		if previewNickname then
+			return previewNickname
+		end
+	end
 
 	local libKey = self:GetLibKey(friendUID)
 
@@ -1224,6 +1247,13 @@ end
 function DB:GetGuildNickname(fullName)
 	if not fullName then
 		return nil
+	end
+	local PreviewMode = BFL and BFL:GetModule("PreviewMode")
+	if PreviewMode and PreviewMode.GetMockGuildNickname then
+		local previewNickname = PreviewMode:GetMockGuildNickname(fullName)
+		if previewNickname then
+			return previewNickname
+		end
 	end
 
 	-- 1. Try CustomNames Lib first

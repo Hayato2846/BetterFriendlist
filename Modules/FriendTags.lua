@@ -630,6 +630,10 @@ local function RefreshSurfaces(refreshCallback, options)
 	else
 		ClearRuntimeCaches()
 	end
+	local PreviewMode = BFL:GetModule("PreviewMode")
+	if PreviewMode and PreviewMode.OnSettingChanged then
+		PreviewMode:OnSettingChanged("friendTags")
+	end
 	if type(refreshCallback) == "function" then
 		refreshCallback()
 	elseif BFL.ScheduleFriendsListRefresh then
@@ -1204,10 +1208,7 @@ function FriendTags:IsEnabled()
 		cache.isEnabled = false
 		return false
 	end
-	local ContactMemory = BFL:GetModule("ContactMemory")
-	if not (ContactMemory and ContactMemory.GetEnabledSetting and ContactMemory:GetEnabledSetting() ~= true) then
-		enabled = self:GetSetting("enabled", true) ~= false
-	end
+	enabled = self:GetSetting("enabled", true) ~= false
 	cache.isEnabled = enabled
 	return enabled
 end

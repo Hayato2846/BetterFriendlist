@@ -7,23 +7,16 @@ local TagChips = BFL:RegisterModule("TagChips", {})
 
 local CHIP_HEIGHT = 14
 local CHIP_GAP = 4
+local ROW_GAP = 2
 local CHIP_MAX_WIDTH = 88
 local OVERFLOW_WIDTH = 30
 local MAX_RENDERED_CHIPS = 4
+local CHIP_BORDER_INSET = 1
 local EMPTY_TABLE = {}
 local OVERFLOW_PROFILE = { color = { r = 0.45, g = 0.45, b = 0.45, a = 1 }, textColor = { r = 1, g = 1, b = 1, a = 1 } }
-local BACKDROP = {
-	bgFile = "Interface\\Buttons\\WHITE8X8",
-	edgeFile = "Interface\\Buttons\\WHITE8X8",
-	edgeSize = 1,
-}
 
 local function GetFriendTags()
 	return BFL:GetModule("FriendTags")
-end
-
-local function GetBackdropTemplate()
-	return BackdropTemplateMixin and "BackdropTemplate" or nil
 end
 
 local function CopyColor(color, fallback)
@@ -32,6 +25,39 @@ local function CopyColor(color, fallback)
 		return 1, 1, 1, 1
 	end
 	return tonumber(color.r) or 1, tonumber(color.g) or 1, tonumber(color.b) or 1, color.a == nil and 1 or (tonumber(color.a) or 1)
+end
+
+local function CreatePillLayer(chip, layer, inset)
+	local pill = {}
+	-- Use the neutral portrait alpha circle directly. The previous RaidBlips
+	-- atlas contains artwork around the circle and produced jagged pill seams.
+	local diameter = CHIP_HEIGHT - (inset * 2)
+	local radius = diameter / 2
+
+	pill.left = chip:CreateTexture(nil, layer)
+	pill.left:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask")
+	pill.left:SetSize(diameter, diameter)
+	pill.left:SetPoint("LEFT", chip, "LEFT", inset, 0)
+
+	pill.right = chip:CreateTexture(nil, layer)
+	pill.right:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask")
+	pill.right:SetSize(diameter, diameter)
+	pill.right:SetPoint("RIGHT", chip, "RIGHT", -inset, 0)
+
+	pill.middle = chip:CreateTexture(nil, layer)
+	pill.middle:SetPoint("TOPLEFT", chip, "TOPLEFT", inset + radius, -inset)
+	pill.middle:SetPoint("BOTTOMRIGHT", chip, "BOTTOMRIGHT", -(inset + radius), inset)
+	pill.middle:SetColorTexture(1, 1, 1, 1)
+	return pill
+end
+
+local function SetPillColor(pill, r, g, b, a)
+	if not pill then
+		return
+	end
+	pill.left:SetVertexColor(r, g, b, a)
+	pill.right:SetVertexColor(r, g, b, a)
+	pill.middle:SetColorTexture(r, g, b, a)
 end
 
 local function ApplyFont(fontString)
@@ -48,16 +74,6 @@ local function ApplyFont(fontString)
 	end
 	fontString:SetWordWrap(false)
 	fontString:SetJustifyH("LEFT")
-end
-
-local function GetSourceText(source)
-	local L = BFL and BFL.L
-	if source == "blizzard" then
-		return (L and L.FRIEND_TAGS_SOURCE_BLIZZARD) or "Blizzard"
-	elseif source == "custom" then
-		return (L and L.FRIEND_TAGS_SOURCE_CUSTOM) or "Custom"
-	end
-	return source or ""
 end
 
 local function HideRow(row)
@@ -227,39 +243,8 @@ local function CanRenderRow(friend, friendsList, FriendTags)
 	return compactMode ~= "hidden"
 end
 
-local function Chip_OnEnter(self)
-	local tooltip = _G.BFL_Tooltip or _G.GameTooltip
-	if not tooltip then
-		return
-	end
-	tooltip:SetOwner(self, "ANCHOR_RIGHT")
-	local L = BFL and BFL.L
-	tooltip:SetText((L and L.FRIEND_TAGS_TOOLTIP_TITLE) or "Friend Tags", 1, 1, 1)
-	if type(self.overflowTags) == "table" then
-		for _, overflowTag in ipairs(self.overflowTags) do
-			tooltip:AddLine((overflowTag.name or overflowTag.id or "") .. " - " .. GetSourceText(overflowTag.source), 0.50, 0.78, 1.00, true)
-		end
-	elseif type(self.tagData) == "table" then
-		tooltip:AddLine(self.tagData.name or self.tagData.id or "", 0.50, 0.78, 1.00, true)
-		tooltip:AddLine(GetSourceText(self.tagData.source), 0.75, 0.75, 0.75, true)
-	end
-	tooltip:Show()
-end
-
-local function Chip_OnLeave()
-	local tooltip = _G.BFL_Tooltip or _G.GameTooltip
-	if tooltip then
-		tooltip:Hide()
-	end
-end
-
 local function ApplyIcon(texture, profile)
 	return BFL.ApplyIconProfile and BFL.ApplyIconProfile(texture, profile) or false
-end
-
-local function SetChipTooltip(chip, tag, overflowTags)
-	chip.tagData = tag
-	chip.overflowTags = overflowTags
 end
 
 function TagChips:EnsureRow(button)
@@ -272,15 +257,16 @@ function TagChips:EnsureRow(button)
 
 	local row = CreateFrame("Frame", nil, button)
 	row:SetHeight(CHIP_HEIGHT)
+	row:EnableMouse(false)
 	row:Hide()
 	row.chips = {}
 
 	for index = 1, MAX_RENDERED_CHIPS do
-		local chip = CreateFrame("Frame", nil, row, GetBackdropTemplate())
+		local chip = CreateFrame("Frame", nil, row)
 		chip:SetHeight(CHIP_HEIGHT)
-		if chip.SetBackdrop then
-			chip:SetBackdrop(BACKDROP)
-		end
+		chip:EnableMouse(false)
+		chip.pillBorder = CreatePillLayer(chip, "BACKGROUND", 0)
+		chip.pillBackground = CreatePillLayer(chip, "BORDER", CHIP_BORDER_INSET)
 		chip:Hide()
 
 		chip.icon = chip:CreateTexture(nil, "ARTWORK")
@@ -291,8 +277,6 @@ function TagChips:EnsureRow(button)
 		ApplyFont(chip.label)
 		chip.label:SetPoint("LEFT", chip.icon, "RIGHT", 3, 0)
 		chip.label:SetPoint("RIGHT", chip, "RIGHT", -5, 0)
-		chip:SetScript("OnEnter", Chip_OnEnter)
-		chip:SetScript("OnLeave", Chip_OnLeave)
 
 		row.chips[index] = chip
 	end
@@ -327,7 +311,6 @@ function TagChips:GetRowData(friend, friendsList)
 		end
 	end
 
-	local settingsCache = friendsList and friendsList.settingsCache
 	data = ResetRowData(data, friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag)
 	if useFriendCache then
 		friend._bflTagChipsRowData = data
@@ -383,7 +366,7 @@ function TagChips:GetRowData(friend, friendsList)
 	end
 
 	data.canRender = true
-	data.height = CHIP_HEIGHT + (settingsCache.compactMode and 2 or 4)
+	data.height = CHIP_HEIGHT + ROW_GAP
 	data.compactMode = compactMode
 	data.iconOnly = iconOnly
 	data.maxChips = maxChips
@@ -395,8 +378,26 @@ function TagChips:GetRowExtraHeight(friend, friendsList)
 	return self:GetRowData(friend, friendsList).height
 end
 
+function TagChips:GetRowAnchor(button)
+	if not button then
+		return nil
+	end
+	local multiAccountRow = button.multiAccountRow
+	if
+		multiAccountRow
+		and multiAccountRow.IsShown
+		and multiAccountRow:IsShown()
+	then
+		return multiAccountRow
+	end
+	local info = button.Info
+	if info and (not info.IsShown or info:IsShown()) then
+		return info
+	end
+	return button.Name or button
+end
+
 function TagChips:UpdateRowChips(button, friend, friendsList, rowData)
-	local row = self:EnsureRow(button)
 	if rowData then
 		local FriendTags = GetFriendTags()
 		local friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag =
@@ -406,8 +407,12 @@ function TagChips:UpdateRowChips(button, friend, friendsList, rowData)
 		end
 	end
 	rowData = rowData or self:GetRowData(friend, friendsList)
-	if not row or not rowData.canRender then
-		HideRow(row)
+	if not rowData.canRender then
+		HideRow(button and button.friendTagRow)
+		return false
+	end
+	local row = self:EnsureRow(button)
+	if not row then
 		return false
 	end
 
@@ -417,12 +422,14 @@ function TagChips:UpdateRowChips(button, friend, friendsList, rowData)
 	local renderCount = visibleCount + (overflow > 0 and 1 or 0)
 
 	row:ClearAllPoints()
-	local anchor = button.Info or button.Name or button
-	row:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -1)
+	-- Multi-account details are a real third text line. Anchor chips below it
+	-- instead of stacking both surfaces below Info.
+	local anchor = self:GetRowAnchor(button)
+	row:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -ROW_GAP)
 	row:SetPoint("RIGHT", button, "RIGHT", -80, 0)
 	row:SetHeight(CHIP_HEIGHT)
 
-	local availableWidth = math.max(36, (button:GetWidth() or 0) - 44 - 84)
+	local availableWidth = math.max(36, (button:GetWidth() or 0) - (button.textLeftInset or 44) - 84)
 	local cursorX = 0
 
 	for index = 1, MAX_RENDERED_CHIPS do
@@ -432,14 +439,9 @@ function TagChips:UpdateRowChips(button, friend, friendsList, rowData)
 			local tag = entry and entry.tag
 			local labelText
 			local profile
-			local overflowTags
 			if index > visibleCount then
 				labelText = string.format("+%d", overflow)
 				profile = OVERFLOW_PROFILE
-				overflowTags = {}
-				for hiddenIndex = visibleCount + 1, #renderableTags do
-					overflowTags[#overflowTags + 1] = renderableTags[hiddenIndex].tag
-				end
 			else
 				labelText = entry.labelText or ""
 				profile = entry.profile or tag and tag.chipProfile or {}
@@ -447,12 +449,8 @@ function TagChips:UpdateRowChips(button, friend, friendsList, rowData)
 
 			local r, g, b, a = CopyColor(profile.color, { r = 0.50, g = 0.78, b = 1.00, a = 1 })
 			local tr, tg, tb, ta = CopyColor(profile.textColor, { r = 1, g = 1, b = 1, a = 1 })
-			if chip.SetBackdropColor then
-				chip:SetBackdropColor(r * 0.16, g * 0.16, b * 0.16, math.min(0.88, a))
-			end
-			if chip.SetBackdropBorderColor then
-				chip:SetBackdropBorderColor(r, g, b, 0.78)
-			end
+			SetPillColor(chip.pillBorder, r, g, b, 0.95)
+			SetPillColor(chip.pillBackground, r, g, b, math.min(0.34, a))
 			chip.label:SetTextColor(tr, tg, tb, ta)
 			chip.label:SetText(labelText)
 
@@ -480,7 +478,6 @@ function TagChips:UpdateRowChips(button, friend, friendsList, rowData)
 			else
 				desiredWidth = math.min(CHIP_MAX_WIDTH, math.max(26, labelWidth + (hasIcon and 24 or 14)))
 			end
-			SetChipTooltip(chip, tag, overflowTags)
 			if cursorX + desiredWidth > availableWidth and index > 1 then
 				chip:Hide()
 			else

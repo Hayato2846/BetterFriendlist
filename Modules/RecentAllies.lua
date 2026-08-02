@@ -7,6 +7,152 @@ local ADDON_NAME, BFL = ...
 -- Register Module
 local RecentAllies = BFL:RegisterModule("RecentAllies", {})
 
+local function IsModernSocialUIActive()
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	return FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() or false
+end
+
+local function SetLegacyPartyButtonTextures(partyButton)
+	local textureFile = "Interface\\FriendsFrame\\TravelPass-Invite"
+	local textures = {
+		{ partyButton:GetNormalTexture(), 0.01562500, 0.39062500, 0.27343750, 0.52343750 },
+		{ partyButton:GetPushedTexture(), 0.42187500, 0.79687500, 0.27343750, 0.52343750 },
+		{ partyButton:GetDisabledTexture(), 0.01562500, 0.39062500, 0.00781250, 0.25781250 },
+		{ partyButton:GetHighlightTexture(), 0.42187500, 0.79687500, 0.00781250, 0.25781250 },
+	}
+	for _, textureInfo in ipairs(textures) do
+		local texture = textureInfo[1]
+		if texture then
+			texture:SetTexture(textureFile)
+			texture:SetTexCoord(textureInfo[2], textureInfo[3], textureInfo[4], textureInfo[5])
+		end
+	end
+end
+
+local function SetModernPartyButtonAtlas(texture, atlas)
+	if not texture then
+		return
+	end
+
+	-- The shared entry template starts with cropped TravelPass texture coordinates.
+	-- Reset them while applying the SocialCard atlas or only a thin atlas slice is shown.
+	if texture.SetAtlas then
+		local applied = pcall(texture.SetAtlas, texture, atlas, false, nil, true)
+		if applied then
+			return
+		end
+	end
+
+	BFL.SetTextureOrAtlas(texture, atlas)
+end
+
+function RecentAllies:ApplyEntryLayout(button, stateData)
+	local modern = IsModernSocialUIActive()
+	local stateContainer = button.StateIconContainer
+	local pinDisplay = stateContainer.PinDisplay
+	local requestDisplay = stateContainer.FriendRequestPendingDisplay
+	local characterData = button.CharacterData
+	local classText = characterData.Class
+	local mostRecentInteraction = characterData.MostRecentInteraction
+	local partyButton = button.PartyButton
+
+	if not modern then
+		button.bflModernRecentAllyLayout = nil
+		stateContainer:Show()
+		stateContainer:ClearAllPoints()
+		stateContainer:SetSize(32, 20)
+		stateContainer:SetPoint("TOPRIGHT", button, "TOPRIGHT", -24, 0)
+		requestDisplay:ClearAllPoints()
+		requestDisplay:SetSize(13, 13)
+		requestDisplay:SetPoint("LEFT")
+		requestDisplay.Icon:ClearAllPoints()
+		requestDisplay.Icon:SetAllPoints()
+		pinDisplay:ClearAllPoints()
+		pinDisplay:SetSize(15, 15)
+		pinDisplay:SetPoint("RIGHT")
+		characterData:ClearAllPoints()
+		characterData:SetPoint("TOPLEFT", button.OnlineStatusIcon, "TOPRIGHT", 2, -2)
+		characterData:SetPoint("RIGHT", stateContainer, "LEFT", -2, 0)
+		classText:ClearAllPoints()
+		classText:SetPoint("LEFT", characterData.LevelDivider, "RIGHT", 3, -1)
+		classText:SetPoint("RIGHT")
+		mostRecentInteraction:ClearAllPoints()
+		mostRecentInteraction:SetPoint("TOPLEFT", characterData.Name, "BOTTOMLEFT", 0, -1)
+		mostRecentInteraction:SetPoint("TOPRIGHT", classText, "BOTTOMRIGHT", 0, -1)
+		partyButton:SetSize(24, 32)
+		partyButton:ClearAllPoints()
+		partyButton:SetPoint("RIGHT")
+		if partyButton.ActionIcon then
+			partyButton.ActionIcon:Hide()
+		end
+		SetLegacyPartyButtonTextures(partyButton)
+		return
+	end
+
+	button.bflModernRecentAllyLayout = true
+	local pinShown = stateData.pinExpirationDate ~= nil
+	local requestShown = stateData.friendRequestSentThisSession or stateData.hasFriendRequestPending or false
+	local stateWidth = (pinShown and 18 or 0) + (requestShown and 18 or 0)
+	if pinShown and requestShown then
+		stateWidth = stateWidth + 3
+	end
+
+	pinDisplay:ClearAllPoints()
+	pinDisplay:SetSize(18, 18)
+	pinDisplay:SetPoint("LEFT")
+	requestDisplay:ClearAllPoints()
+	requestDisplay:SetSize(18, 18)
+	if pinShown then
+		requestDisplay:SetPoint("LEFT", pinDisplay, "RIGHT", 3, 0)
+	else
+		requestDisplay:SetPoint("LEFT", stateContainer, "LEFT", 0, 0)
+	end
+	requestDisplay.Icon:ClearAllPoints()
+	requestDisplay.Icon:SetPoint("TOPLEFT", 1, -1)
+	requestDisplay.Icon:SetPoint("BOTTOMRIGHT", -1, 1)
+
+	characterData:ClearAllPoints()
+	characterData:SetPoint("TOPLEFT", button.OnlineStatusIcon, "TOPRIGHT", 2, -2)
+	characterData:SetPoint("RIGHT", partyButton, "LEFT", -5, 0)
+
+	local nameWidth = characterData.Name:GetWidth() or 0
+	local levelWidth = characterData.Level:GetWidth() or 0
+	local usedBeforeClass = nameWidth + levelWidth + 29
+	local availableClassWidth = math.max(
+		1,
+		(characterData:GetWidth() or 0) - usedBeforeClass - stateWidth - (stateWidth > 0 and 2 or 0)
+	)
+	classText:ClearAllPoints()
+	classText:SetPoint("LEFT", characterData.LevelDivider, "RIGHT", 3, -1)
+	classText:SetWidth(math.min(classText:GetUnboundedStringWidth(), availableClassWidth))
+
+	stateContainer:ClearAllPoints()
+	stateContainer:SetSize(stateWidth, 18)
+	stateContainer:SetPoint("LEFT", classText, "RIGHT", stateWidth > 0 and 2 or 0, 0)
+	stateContainer:SetShown(stateWidth > 0)
+
+	mostRecentInteraction:ClearAllPoints()
+	mostRecentInteraction:SetPoint("TOPLEFT", characterData.Name, "BOTTOMLEFT", 0, -1)
+	mostRecentInteraction:SetPoint("RIGHT", characterData, "RIGHT")
+
+	partyButton:SetSize(34, 34)
+	partyButton:ClearAllPoints()
+	partyButton:SetPoint("RIGHT", button, "RIGHT", -4, 0)
+	SetModernPartyButtonAtlas(partyButton:GetNormalTexture(), "common-button-tertiary-square-normal")
+	SetModernPartyButtonAtlas(partyButton:GetPushedTexture(), "common-button-tertiary-square-pressed")
+	SetModernPartyButtonAtlas(partyButton:GetDisabledTexture(), "common-button-tertiary-square-normal")
+	SetModernPartyButtonAtlas(partyButton:GetHighlightTexture(), "common-button-tertiary-square-normal")
+	if not partyButton.ActionIcon then
+		partyButton.ActionIcon = partyButton:CreateTexture(nil, "OVERLAY")
+		partyButton.ActionIcon:SetPoint("CENTER")
+	end
+	local partyAtlas = stateData.isOnline
+		and "friends-icon-friendsAvailable"
+		or "friends-icon-friendsAvailable-dis"
+	BFL.SetTextureOrAtlas(partyButton.ActionIcon, partyAtlas, nil, true)
+	partyButton.ActionIcon:Show()
+end
+
 -- ========================================
 -- Module Dependencies
 -- ========================================
@@ -24,6 +170,40 @@ local RecentAlliesListEvents = {
 
 -- Current search text for filtering
 RecentAllies.searchText = ""
+RecentAllies.selectedFilters = {}
+
+local STATUS_FILTER_OPTIONS = {
+	{ id = "online", field = "isOnline", global = "SOCIAL_UI_PRESENCE_TYPE_LABEL_ONLINE", fallback = "FILTER_ONLINE" },
+	{ id = "away", field = "isAFK", global = "SOCIAL_UI_PRESENCE_TYPE_LABEL_AWAY", fallback = "STATUS_AWAY" },
+	{ id = "busy", field = "isDND", global = "SOCIAL_UI_PRESENCE_TYPE_LABEL_BUSY", fallback = "STATUS_BUSY" },
+	{ id = "offline", field = "isOffline", global = "SOCIAL_UI_PRESENCE_TYPE_LABEL_OFFLINE", fallback = "FILTER_OFFLINE" },
+}
+
+local INTEREST_FILTER_OPTIONS = {
+	{ id = "professions", enum = "Professions", global = "SOCIAL_UI_BATTLE_NET_FRIEND_TAG_LABEL_PROFESSIONS", fallback = "FRIEND_TAGS_BLIZZARD_PROFESSIONS" },
+	{ id = "pvp", enum = "PvP", global = "SOCIAL_UI_BATTLE_NET_FRIEND_TAG_LABEL_PVP", fallback = "FRIEND_TAGS_BLIZZARD_PVP" },
+	{ id = "raiding", enum = "Raiding", global = "SOCIAL_UI_BATTLE_NET_FRIEND_TAG_LABEL_RAIDING", fallback = "FRIEND_TAGS_BLIZZARD_RAIDING" },
+	{ id = "dungeons", enum = "Dungeons", global = "SOCIAL_UI_BATTLE_NET_FRIEND_TAG_LABEL_DUNGEONS", fallback = "FRIEND_TAGS_BLIZZARD_DUNGEONS" },
+	{ id = "delves", enum = "Delves", global = "SOCIAL_UI_BATTLE_NET_FRIEND_TAG_LABEL_DELVE", fallback = "FRIEND_TAGS_BLIZZARD_DELVES" },
+	{ id = "questing", enum = "Questing", global = "SOCIAL_UI_BATTLE_NET_FRIEND_TAG_LABEL_QUESTING", fallback = "FRIEND_TAGS_BLIZZARD_QUESTING" },
+	-- Build 68675's generated enum has only six values. Keep this dynamic so a
+	-- later PTR can expose RolePlaying without making the current menu error.
+	{ id = "roleplaying", enum = "RolePlaying", global = "SOCIAL_UI_BATTLE_NET_FRIEND_TAG_LABEL_ROLEPLAYING", fallback = "FRIEND_TAGS_BLIZZARD_ROLEPLAYING" },
+}
+
+local function GetFilterOptionLabel(option)
+	local legacyLabels = {
+		online = FRIENDS_LIST_ONLINE,
+		offline = FRIENDS_LIST_OFFLINE,
+		away = CHAT_FLAG_AFK,
+		busy = CHAT_FLAG_DND,
+	}
+	return _G[option.global] or BFL.L[option.fallback] or legacyLabels[option.id] or option.id
+end
+
+local function CanUseNativeRecentAlliesSearch()
+	return BFL.IsRetail and C_RecentAllies and type(C_RecentAllies.SearchRecentAllies) == "function"
+end
 
 -- ========================================
 -- Public API
@@ -107,6 +287,8 @@ function RecentAllies:OnShow(frame)
 	end
 
 	FrameUtil.RegisterFrameForEvents(frame, RecentAlliesListEvents)
+	-- TryRequestRecentAlliesData is restricted to Blizzard UI. The client fills
+	-- the cache and RECENT_ALLIES_CACHE_UPDATE drives our refresh when it is ready.
 
 	-- Show spinner initially, will hide when data is ready
 	self:SetLoadingSpinnerShown(frame, true)
@@ -131,6 +313,21 @@ end
 
 -- Refresh the list (RecentAlliesListMixin:Refresh)
 function RecentAllies:Refresh(frame, retainScrollPosition)
+	local PreviewMode = BFL:GetModule("PreviewMode")
+	local previewActive = PreviewMode
+		and PreviewMode.IsComponentEnabled
+		and PreviewMode:IsComponentEnabled("recent_allies")
+		and PreviewMode.mockData
+		and type(PreviewMode.mockData.recentAllies) == "table"
+	if previewActive then
+		self:SetLoadingSpinnerShown(frame, false)
+		if frame.UnavailableText then
+			frame.UnavailableText:Hide()
+		end
+		frame.ScrollBox:SetDataProvider(self:BuildDataProvider(), retainScrollPosition)
+		return
+	end
+
 	-- Check if the Recent Allies system is enabled at all
 	if not BFL.HasRecentAllies or not C_RecentAllies or not C_RecentAllies.IsSystemEnabled() then
 		self:SetLoadingSpinnerShown(frame, false)
@@ -163,16 +360,187 @@ function RecentAllies:Refresh(frame, retainScrollPosition)
 end
 
 -- Build data provider (RecentAlliesListMixin:BuildRecentAlliesDataProvider)
+function RecentAllies:HasActiveFilters()
+	for _, selected in pairs(self.selectedFilters) do
+		if selected then
+			return true
+		end
+	end
+	return false
+end
+
+function RecentAllies:GetFilterCount()
+	local count = 0
+	for _, selected in pairs(self.selectedFilters) do
+		if selected then
+			count = count + 1
+		end
+	end
+	return count
+end
+
+function RecentAllies:GetFilterDropdownText()
+	local count = self:GetFilterCount()
+	local label = FILTER or "Filter"
+	return count > 0 and string.format("%s (%d)", label, count) or label
+end
+
+function RecentAllies:GetAvailableInterestOptions()
+	local available = {}
+	local recentTags = Enum and Enum.RecentAlliesFriendTag
+	if not (CanUseNativeRecentAlliesSearch() and recentTags) then
+		return available
+	end
+	for _, option in ipairs(INTEREST_FILTER_OPTIONS) do
+		if recentTags[option.enum] ~= nil then
+			available[#available + 1] = option
+		end
+	end
+	return available
+end
+
+function RecentAllies:SetFilterEnabled(filterID, enabled)
+	self.selectedFilters[filterID] = enabled == true or nil
+	if self.filterDropdown then
+		BFL.RefreshDropdown(self.filterDropdown, self:GetFilterDropdownText())
+	end
+	local frame = BetterFriendsFrame and BetterFriendsFrame.RecentAlliesFrame
+	if frame and frame:IsShown() then
+		self:Refresh(frame, ScrollBoxConstants.DiscardScrollPosition)
+	end
+end
+
+function RecentAllies:PopulateFilterMenu(rootDescription)
+	rootDescription:SetTag("MENU_BFL_RECENT_ALLIES_FILTER")
+	local statusTitle = rootDescription:CreateTitle(STATUS or FRIENDS_LIST_AVAILABLE or "Status")
+	if statusTitle and statusTitle.AddInitializer and SocialUIUtil and SocialUIUtil.InitializeUserScaledDropdownTitle then
+		statusTitle:AddInitializer(SocialUIUtil.InitializeUserScaledDropdownTitle)
+	end
+	for _, option in ipairs(STATUS_FILTER_OPTIONS) do
+		local filterID = option.id
+		local checkbox = rootDescription:CreateCheckbox(GetFilterOptionLabel(option), function()
+			return self.selectedFilters[filterID] == true
+		end, function()
+			self:SetFilterEnabled(filterID, self.selectedFilters[filterID] ~= true)
+		end)
+		if checkbox and checkbox.SetCloseOnClick then
+			checkbox:SetCloseOnClick(false)
+		end
+	end
+
+	local interests = self:GetAvailableInterestOptions()
+	if #interests > 0 then
+		rootDescription:CreateDivider()
+		local interestTitle = rootDescription:CreateTitle(BFL.L.FRIEND_TAGS_INTERESTS_SECTION or "Interests")
+		if interestTitle and interestTitle.AddInitializer and SocialUIUtil and SocialUIUtil.InitializeUserScaledDropdownTitle then
+			interestTitle:AddInitializer(SocialUIUtil.InitializeUserScaledDropdownTitle)
+		end
+		for _, option in ipairs(interests) do
+			local filterID = option.id
+			local checkbox = rootDescription:CreateCheckbox(GetFilterOptionLabel(option), function()
+				return self.selectedFilters[filterID] == true
+			end, function()
+				self:SetFilterEnabled(filterID, self.selectedFilters[filterID] ~= true)
+			end)
+			if checkbox and checkbox.SetCloseOnClick then
+				checkbox:SetCloseOnClick(false)
+			end
+		end
+	end
+end
+
+function RecentAllies:InitializeFilterDropdown(dropdown)
+	if not (dropdown and dropdown.SetupMenu) then
+		return false
+	end
+	self.filterDropdown = dropdown
+	dropdown:SetupMenu(function(_, rootDescription)
+		self:PopulateFilterMenu(rootDescription)
+	end)
+	if dropdown.SetDefaultText then
+		dropdown:SetDefaultText(self:GetFilterDropdownText())
+	end
+	if dropdown.SetSelectionText then
+		dropdown:SetSelectionText(function()
+			return self:GetFilterDropdownText()
+		end)
+	end
+	return true
+end
+
+function RecentAllies:BuildSearchInfo()
+	local searchInfo = {
+		searchText = self.searchText or "",
+		isOnline = false,
+		isAFK = false,
+		isDND = false,
+		isOffline = false,
+		interests = {},
+	}
+	for _, option in ipairs(STATUS_FILTER_OPTIONS) do
+		if self.selectedFilters[option.id] then
+			searchInfo[option.field] = true
+		end
+	end
+	local recentTags = Enum and Enum.RecentAlliesFriendTag
+	if recentTags then
+		for _, option in ipairs(INTEREST_FILTER_OPTIONS) do
+			local enumValue = recentTags[option.enum]
+			if enumValue ~= nil and self.selectedFilters[option.id] then
+				searchInfo.interests[#searchInfo.interests + 1] = enumValue
+			end
+		end
+	end
+	return searchInfo
+end
+
+function RecentAllies:MatchesStatusFilters(ally)
+	local hasStatusFilter = false
+	local stateData = ally and ally.stateData or {}
+	for _, option in ipairs(STATUS_FILTER_OPTIONS) do
+		if self.selectedFilters[option.id] then
+			hasStatusFilter = true
+			local matches = option.field == "isOffline" and not stateData.isOnline or stateData[option.field] == true
+			if matches then
+				return true
+			end
+		end
+	end
+	return not hasStatusFilter
+end
+
+function RecentAllies:GetFilteredRecentAllies()
+	local PreviewMode = BFL:GetModule("PreviewMode")
+	if PreviewMode
+		and PreviewMode.IsComponentEnabled
+		and PreviewMode:IsComponentEnabled("recent_allies")
+		and PreviewMode.mockData
+		and type(PreviewMode.mockData.recentAllies) == "table"
+	then
+		return PreviewMode.mockData.recentAllies, false
+	end
+
+	if CanUseNativeRecentAlliesSearch() and (self:HasActiveFilters() or self.searchText ~= "") then
+		local ok, result = pcall(C_RecentAllies.SearchRecentAllies, self:BuildSearchInfo())
+		if ok and type(result) == "table" then
+			return result, true
+		end
+	end
+	return C_RecentAllies.GetRecentAllies(), false
+end
+
 function RecentAllies:BuildDataProvider()
 	-- Get recent allies (presorted by pin state, online status, most recent interaction, alphabetically)
-	local recentAllies = C_RecentAllies.GetRecentAllies()
+	local recentAllies, usedNativeSearch = self:GetFilteredRecentAllies()
 
-	-- Apply search filter if active
-	if self.searchText and self.searchText ~= "" then
+	-- Older clients retain BFL's accent-insensitive local fallback. Native 12.1
+	-- search is authoritative for interests, which are absent from RecentAllyData.
+	if not usedNativeSearch and (self.searchText ~= "" or self:HasActiveFilters()) then
 		local searchNormalized = BFL:StripAccents(self.searchText)
 		local filtered = {}
 		for _, ally in ipairs(recentAllies) do
-			if self:MatchesSearch(ally, searchNormalized) then
+			local matchesText = self.searchText == "" or self:MatchesSearch(ally, searchNormalized)
+			if matchesText and self:MatchesStatusFilters(ally) then
 				filtered[#filtered + 1] = ally
 			end
 		end
@@ -327,12 +695,22 @@ function RecentAllies:InitializeEntry(button, elementData)
 		-- Check if pin is nearing expiration
 		local remainingDays = (stateData.pinExpirationDate - GetServerTime()) / SECONDS_PER_DAY
 		local isNearingExpiration = remainingDays <= 7
-		local atlas = isNearingExpiration and "friendslist-recentallies-pin" or "friendslist-recentallies-pin-yellow"
-		BFL.SetTextureOrAtlas(button.StateIconContainer.PinDisplay.Icon, atlas, nil, true)
+		local atlas
+		if IsModernSocialUIActive() then
+			atlas = stateData.isOnline
+				and (isNearingExpiration and "friendslist-recentallies-pin" or "friends-icon-pinned")
+				or "friends-icon-pinned-dis"
+		else
+			atlas = isNearingExpiration
+				and "friendslist-recentallies-pin"
+				or "friendslist-recentallies-pin-yellow"
+		end
+		BFL.SetTextureOrAtlas(button.StateIconContainer.PinDisplay.Icon, atlas)
 	end
 
 	-- Field renamed in 12.0.5: hasFriendRequestPending -> friendRequestSentThisSession
 	button.StateIconContainer.FriendRequestPendingDisplay:SetShown(stateData.friendRequestSentThisSession or stateData.hasFriendRequestPending or false)
+	self:ApplyEntryLayout(button, stateData)
 
 	-- Enable/disable party button based on online status
 	button.PartyButton:SetEnabled(stateData.isOnline)

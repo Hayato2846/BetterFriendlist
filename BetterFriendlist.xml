@@ -1085,8 +1085,7 @@
 					</Anchors>
 				</Texture>
 				<!-- Main Tank Icon (left of rank icon) -->
-				<Texture parentKey="MainTankIcon" hidden="true"
-					file="Interface\GroupFrame\UI-Group-MainTankIcon">
+				<Texture parentKey="MainTankIcon" hidden="true">
 					<Size x="12" y="12" />
 					<Anchors>
 						<Anchor point="RIGHT" relativeKey="$parent.RankIcon" relativePoint="LEFT"
@@ -1095,8 +1094,7 @@
 				</Texture>
 				<!-- Main Assist Icon (left of rank icon, same position as MainTank - only one
 				shows) -->
-				<Texture parentKey="MainAssistIcon" hidden="true"
-					file="Interface\GroupFrame\UI-Group-MainAssistIcon">
+				<Texture parentKey="MainAssistIcon" hidden="true">
 					<Size x="12" y="12" />
 					<Anchors>
 						<Anchor point="RIGHT" relativeKey="$parent.RankIcon" relativePoint="LEFT"
@@ -1237,12 +1235,33 @@
 		</HighlightTexture>
 	</Button>
 
+	<!-- Retail 12.1 Social Raid role count: count followed by the 24 px role icon. -->
+	<Frame name="BFLModernRaidRoleCountTemplate" virtual="true">
+		<Size x="48" y="24" />
+		<Layers>
+			<Layer level="ARTWORK">
+				<FontString parentKey="Count" inherits="GameFontHighlight" text="0">
+					<Size y="24" />
+					<Anchors>
+						<Anchor point="LEFT" />
+					</Anchors>
+				</FontString>
+				<Texture parentKey="Icon">
+					<Size x="24" y="24" />
+					<Anchors>
+						<Anchor point="LEFT" relativeKey="$parent.Count" relativePoint="RIGHT" x="4" />
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+	</Frame>
+
 	<!-- Raid Group Template -->
 	<Frame name="BetterRaidGroupTemplate" virtual="true">
 		<Size x="180" y="115" />
 		<Layers>
 			<Layer level="BACKGROUND">
-				<Texture setAllPoints="true">
+				<Texture parentKey="Background" setAllPoints="true">
 					<Color r="0" g="0" b="0" a="0" />
 				</Texture>
 			</Layer>
@@ -2328,7 +2347,7 @@
 						</Scripts>
 					</Button>
 					<!-- Bottom Buttons -->
-					<Button parentKey="WhoButton" inherits="UIPanelButtonTemplate" text="REFRESH">
+					<Button parentKey="WhoButton" inherits="SharedButtonTemplate" text="REFRESH">
 						<NormalFont style="BetterFriendlistFontNormal" />
 						<HighlightFont style="BetterFriendlistFontHighlight" />
 						<DisabledFont style="BetterFriendlistFontDisable" />
@@ -2351,7 +2370,7 @@
 							</OnClick>
 						</Scripts>
 					</Button>
-					<Button parentKey="AddFriendButton" inherits="UIPanelButtonTemplate"
+					<Button parentKey="AddFriendButton" inherits="SharedButtonTemplate"
 						text="ADD_FRIEND">
 						<NormalFont style="BetterFriendlistFontNormal" />
 						<HighlightFont style="BetterFriendlistFontHighlight" />
@@ -2369,7 +2388,7 @@
 							</OnClick>
 						</Scripts>
 					</Button>
-					<Button parentKey="GroupInviteButton" inherits="UIPanelButtonTemplate"
+					<Button parentKey="GroupInviteButton" inherits="SharedButtonTemplate"
 						text="GROUP_INVITE">
 						<NormalFont style="BetterFriendlistFontNormal" />
 						<HighlightFont style="BetterFriendlistFontHighlight" />
@@ -2874,12 +2893,9 @@
 						</Anchors>
 						<Frames>
 							<!-- Raid Info Button (top right) -->
-							<Button parentKey="RaidInfoButton" inherits="UIPanelButtonTemplate"
-								text="Raid Info">
-								<NormalFont style="BetterFriendlistFontNormal" />
-								<HighlightFont style="BetterFriendlistFontHighlight" />
-								<DisabledFont style="BetterFriendlistFontDisable" />
-								<Size x="90" y="22" />
+							<Button parentKey="RaidInfoButton" inherits="SharedButtonTemplate"
+								text="RAID_INFO">
+								<Size x="100" y="32" />
 								<Anchors>
 									<Anchor point="TOPRIGHT" x="0" y="-15" />
 								</Anchors>
@@ -2947,6 +2963,13 @@
 						</Frames>
 						<Layers>
 							<Layer level="OVERLAY">
+								<Texture parentKey="EveryoneAssistIcon" hidden="true">
+									<Anchors>
+										<Anchor point="LEFT"
+											relativeKey="$parent.EveryoneAssistCheckbox"
+											relativePoint="RIGHT" x="2" />
+									</Anchors>
+								</Texture>
 								<!-- Member Count Display - Right next to Role Summary -->
 								<FontString parentKey="MemberCount"
 									inherits="BetterFriendlistFontHighlight" justifyH="LEFT">
@@ -2974,6 +2997,12 @@
 										relativePoint="LEFT" x="-85" y="0" />
 								</Anchors>
 							</Frame>
+							<Frame parentKey="TankFrame" inherits="BFLModernRaidRoleCountTemplate"
+								hidden="true" />
+							<Frame parentKey="HealerFrame" inherits="BFLModernRaidRoleCountTemplate"
+								hidden="true" />
+							<Frame parentKey="DamagerFrame" inherits="BFLModernRaidRoleCountTemplate"
+								hidden="true" />
 							<!-- Combat Icon - Shows between MemberCount and RaidInfo button during
 							combat -->
 							<Button parentKey="CombatIcon" hidden="true">
@@ -3088,12 +3117,9 @@
 					</Frame>
 
 					<!-- Convert Group/Raid Button -->
-					<Button parentKey="ConvertToRaidButton" inherits="UIPanelButtonTemplate"
+					<Button parentKey="ConvertToRaidButton" inherits="SharedButtonTemplate"
 						text="CONVERT_TO_RAID">
-						<NormalFont style="BetterFriendlistFontNormal" />
-						<HighlightFont style="BetterFriendlistFontHighlight" />
-						<DisabledFont style="BetterFriendlistFontDisable" />
-						<Size x="150" y="21" />
+						<Size x="150" y="24" />
 						<Anchors>
 							<Anchor point="BOTTOMRIGHT" relativeKey="$parent" x="-2" y="-1" />
 						</Anchors>
@@ -3118,11 +3144,8 @@
 					</Button>
 
 					<!-- Raid Tools Button (bottom left, mirrors ConvertToRaidButton) -->
-					<Button parentKey="RaidToolsButton" inherits="UIPanelButtonTemplate" text="Tools">
-						<NormalFont style="BetterFriendlistFontNormal" />
-						<HighlightFont style="BetterFriendlistFontHighlight" />
-						<DisabledFont style="BetterFriendlistFontDisable" />
-						<Size x="150" y="21" />
+					<Button parentKey="RaidToolsButton" inherits="SharedButtonTemplate" text="Tools">
+						<Size x="100" y="24" />
 						<Anchors>
 							<Anchor point="TOPLEFT" relativeKey="$parent.GroupsInset" relativePoint="BOTTOMLEFT" x="-2" y="-1" />
 						</Anchors>

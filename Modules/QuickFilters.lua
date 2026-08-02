@@ -63,6 +63,18 @@ local function ResolveFilter(mode)
 	return mode or "all"
 end
 
+local function UsesModernFriendsFilterLabel()
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	return FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() or false
+end
+
+local function GetFriendsFilterSelectionText(mode, icon, size)
+	if UsesModernFriendsFilterLabel() then
+		return string.format("%s (%s)", FILTER or "Filter", FormatIcon(icon, math.max(10, (size or 16) - 1)))
+	end
+	return FormatIcon(icon, size)
+end
+
 function QuickFilters:Initialize()
 	local Registry = GetRegistry()
 	if Registry and Registry.NormalizeCurrentSelections then
@@ -144,16 +156,16 @@ function QuickFilters:InitDropdown(dropdown)
 		end
 	end
 
-	dropdown:SetWidth(51)
+	dropdown:SetWidth(UsesModernFriendsFilterLabel() and 92 or 51)
 	BFL.InitializeDropdown(dropdown, {
 		getSelectionText = function(mode)
 			local GuildFrame = GetActiveGuildFrame()
 			if GuildFrame and GuildFrame.GetHeaderFilterIcon then
-				return FormatIcon(GuildFrame:GetHeaderFilterIcon(), 16)
+				return GetFriendsFilterSelectionText(mode, GuildFrame:GetHeaderFilterIcon(), 16)
 			end
 			local Registry = GetRegistry()
 			local icon = Registry and Registry:GetQuickFilterIcon(mode) or self:GetIcon(mode)
-			return FormatIcon(icon, 16)
+			return GetFriendsFilterSelectionText(mode, icon, 16)
 		end,
 		populateRootDescription = function(rootDescription)
 			local GuildFrame = GetActiveGuildFrame()
@@ -170,7 +182,7 @@ function QuickFilters:InitDropdown(dropdown)
 		end,
 	}, IsSelected, SetSelected)
 
-	dropdown:SetScript("OnEnter", function()
+	local function OnEnter()
 		local GuildFrame = GetActiveGuildFrame()
 		if GuildFrame and GuildFrame.GetHeaderFilterText then
 			BFL_Tooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
@@ -183,8 +195,14 @@ function QuickFilters:InitDropdown(dropdown)
 		BFL_Tooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
 		BFL_Tooltip:SetText(string.format(L.TOOLTIP_QUICK_FILTER or "Quick Filter: %s", filterText))
 		BFL_Tooltip:Show()
-	end)
-	dropdown:SetScript("OnLeave", BFL_Tooltip_Hide)
+	end
+	if dropdown.HookScript then
+		dropdown:HookScript("OnEnter", OnEnter)
+		dropdown:HookScript("OnLeave", BFL_Tooltip_Hide)
+	else
+		dropdown:SetScript("OnEnter", OnEnter)
+		dropdown:SetScript("OnLeave", BFL_Tooltip_Hide)
+	end
 end
 
 function QuickFilters:SetFilter(mode)
@@ -247,6 +265,11 @@ function QuickFilters:GetIcons()
 end
 
 function QuickFilters:RefreshDropdown(dropdown)
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() then
+		local modernDropdown = FriendsUI.root and FriendsUI.root.FilterBar and FriendsUI.root.FilterBar.FilterDropdown
+		dropdown = modernDropdown or dropdown
+	end
 	if not dropdown then
 		return
 	end
@@ -254,7 +277,8 @@ function QuickFilters:RefreshDropdown(dropdown)
 	local GuildFrame = GetActiveGuildFrame()
 	if GuildFrame and GuildFrame.GetHeaderFilterIcon then
 		local modernDropdown = IsModernDropdown(dropdown)
-		local text = FormatIcon(GuildFrame:GetHeaderFilterIcon(), modernDropdown and 16 or 14)
+		local size = modernDropdown and 16 or 14
+		local text = GetFriendsFilterSelectionText(nil, GuildFrame:GetHeaderFilterIcon(), size)
 		BFL.SetDropdownText(dropdown, text)
 		return
 	end
@@ -263,7 +287,7 @@ function QuickFilters:RefreshDropdown(dropdown)
 	local icon = self:GetIcon(currentFilter)
 	local modernDropdown = IsModernDropdown(dropdown)
 	local size = modernDropdown and 16 or 14
-	local text = FormatIcon(icon, size)
+	local text = GetFriendsFilterSelectionText(currentFilter, icon, size)
 
 	BFL.SetDropdownText(dropdown, text)
 end

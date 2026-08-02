@@ -38,7 +38,17 @@ end
 -- ========================================
 
 function RecentlyAdded:IsFriendRecentlyAdded(friendUID)
-	if not friendUID or not BetterFriendlistDB then
+	if not friendUID then
+		return false
+	end
+	local PreviewMode = BFL:GetModule("PreviewMode")
+	if PreviewMode and PreviewMode.GetMockRecentlyAddedTimestamp then
+		local timestamp = PreviewMode:GetMockRecentlyAddedTimestamp(friendUID)
+		if timestamp then
+			return (time() - timestamp) < self:GetDurationSeconds()
+		end
+	end
+	if not BetterFriendlistDB then
 		return false
 	end
 	local timestamps = BetterFriendlistDB.recentlyAddedTimestamps
@@ -54,6 +64,18 @@ end
 
 function RecentlyAdded:GetAllRecentFriendUIDs()
 	local result = {}
+	local PreviewMode = BFL:GetModule("PreviewMode")
+	if PreviewMode and PreviewMode.GetMockRecentlyAddedUIDs then
+		local previewUIDs = PreviewMode:GetMockRecentlyAddedUIDs()
+		if previewUIDs then
+			for _, friendUID in ipairs(previewUIDs) do
+				if self:IsFriendRecentlyAdded(friendUID) then
+					result[#result + 1] = friendUID
+				end
+			end
+			return result
+		end
+	end
 	if not BetterFriendlistDB then
 		return result
 	end

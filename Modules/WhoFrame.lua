@@ -91,7 +91,15 @@ local WHO_HEADER_OVERLAP = -1
 local WHO_CLASSIC_DROPDOWN_X_OFFSET = -12
 local WHO_CLASSIC_DROPDOWN_VISUAL_WIDTH = 76
 local WHO_CLASSIC_ELVUI_DROPDOWN_VISUAL_WIDTH = 106
-local WHO_SCROLLBAR_RESERVE = 24
+local WHO_SCROLLBAR_RESERVE = 18
+
+local function GetWhoResultCounts()
+	return C_FriendList.GetNumWhoResults()
+end
+
+local function GetWhoResult(index)
+	return C_FriendList.GetWhoInfo(index)
+end
 
 -- Class icon texture coordinates (from WoW global CLASS_ICON_TCOORDS)
 local CLASS_ICON_TEXTURE = "Interface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES"
@@ -99,6 +107,23 @@ local CLASS_ICON_TEXTURE = "Interface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREAT
 -- Zebra stripe colors
 local ZEBRA_EVEN_COLOR = { r = 0.1, g = 0.1, b = 0.1, a = 0.3 }
 local ZEBRA_ODD_COLOR = { r = 0, g = 0, b = 0, a = 0 }
+
+local function ApplyZebraStripe(button, dataIndex, enabled, strength)
+	if not button or not button.background then
+		return
+	end
+	if enabled and dataIndex % 2 == 0 then
+		strength = math.max(0, math.min(1, tonumber(strength) or ZEBRA_EVEN_COLOR.a))
+		button.background:SetColorTexture(
+			ZEBRA_EVEN_COLOR.r,
+			ZEBRA_EVEN_COLOR.g,
+			ZEBRA_EVEN_COLOR.b,
+			strength
+		)
+	else
+		button.background:SetColorTexture(ZEBRA_ODD_COLOR.r, ZEBRA_ODD_COLOR.g, ZEBRA_ODD_COLOR.b, ZEBRA_ODD_COLOR.a)
+	end
+end
 
 -- WHO sort values
 local whoSortValue = 1 -- 1=Zone, 2=Guild, 3=Race
@@ -183,12 +208,211 @@ function WhoFrame:Initialize()
 	-- Restore docked state from DB (must be here, not in CreateSearchBuilder,
 	-- because SavedVariables are not yet available during XML OnLoad)
 	local DB = BFL:GetModule("DB")
-	if DB and self.builderFlyout then
+	if DB and self.builderFlyout and not self:IsModernSearchBuilderEmbedded() then
 		local isDocked = DB:Get("whoSearchBuilderDocked", false)
 		if isDocked then
 			self:SetBuilderDocked(true)
 		end
 	end
+end
+
+function WhoFrame:IsModernSearchBuilderEmbedded()
+	local FriendsUI = BFL:GetModule("FriendsUI")
+	return FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() or false
+end
+
+local function EnsureModernBuilderLine(frame, key, point)
+	if frame[key] then
+		return frame[key]
+	end
+	local line = frame:CreateTexture(nil, "BORDER", nil, 2)
+	line:SetColorTexture(0.34, 0.28, 0.22, 1)
+	if point == "TOP" or point == "BOTTOM" then
+		line:SetHeight(1)
+		line:SetPoint(point .. "LEFT", frame, point .. "LEFT")
+		line:SetPoint(point .. "RIGHT", frame, point .. "RIGHT")
+	else
+		line:SetWidth(1)
+		line:SetPoint("TOP" .. point, frame, "TOP" .. point)
+		line:SetPoint("BOTTOM" .. point, frame, "BOTTOM" .. point)
+	end
+	frame[key] = line
+	return line
+end
+
+function WhoFrame:ApplyModernSearchBuilderStyle()
+	if not self:IsModernSearchBuilderEmbedded() then
+		return false
+	end
+	local flyout = self.builderFlyout
+	if not flyout then
+		return false
+	end
+
+	flyout.BFL_ModernEmbedded = true
+	if flyout.SetBackdrop then
+		flyout:SetBackdrop(nil)
+	end
+	if flyout.BFL_DarkBackdrop then
+		flyout.BFL_DarkBackdrop:Hide()
+	end
+	if not flyout.BFL_ModernBackground then
+		local background = flyout:CreateTexture(nil, "BACKGROUND", nil, -2)
+		background:SetAllPoints()
+		background:SetColorTexture(0.025, 0.022, 0.020, 0.97)
+		flyout.BFL_ModernBackground = background
+
+		local header = flyout:CreateTexture(nil, "BACKGROUND", nil, -1)
+		header:SetPoint("TOPLEFT", flyout, "TOPLEFT", 1, -1)
+		header:SetPoint("TOPRIGHT", flyout, "TOPRIGHT", -1, -1)
+		header:SetHeight(24)
+		header:SetColorTexture(0.15, 0.12, 0.095, 1)
+		flyout.BFL_ModernHeader = header
+	end
+	flyout.BFL_ModernBackground:Show()
+	flyout.BFL_ModernHeader:Show()
+	-- This is embedded content, not another popup window. A single lower
+	-- divider separates it from the result list without boxing it twice.
+	EnsureModernBuilderLine(flyout, "BFL_ModernTopLine", "TOP"):Hide()
+	EnsureModernBuilderLine(flyout, "BFL_ModernBottomLine", "BOTTOM"):Show()
+	EnsureModernBuilderLine(flyout, "BFL_ModernLeftLine", "LEFT"):Hide()
+	EnsureModernBuilderLine(flyout, "BFL_ModernRightLine", "RIGHT"):Hide()
+
+	if self.builderTitle then
+		self.builderTitle:ClearAllPoints()
+		self.builderTitle:SetPoint("TOPLEFT", flyout, "TOPLEFT", 10, -5)
+		self.builderTitle:SetFontObject(_G.UserScaledFontSystem15Shadow or _G.GameFontNormal)
+		self.builderTitle:Show()
+	end
+	if self.builderCloseBtn then
+		self.builderCloseBtn:ClearAllPoints()
+		self.builderCloseBtn:SetPoint("TOPRIGHT", flyout, "TOPRIGHT", -2, -2)
+		self.builderCloseBtn:SetSize(22, 22)
+		self.builderCloseBtn:Show()
+	end
+
+	local builder = self.builder
+	if builder then
+		local padding = 12
+		local labelWidth = 62
+		local fieldGap = 7
+		local fieldLeft = padding + labelWidth + fieldGap
+		local dropdownFieldLeft = fieldLeft - 8
+
+		for _, row in ipairs(builder.fieldRows or {}) do
+			if row.label then
+				row.label:ClearAllPoints()
+				row.label:SetPoint("TOPLEFT", flyout, "TOPLEFT", padding, row.y)
+				row.label:SetWidth(labelWidth)
+			end
+			if row.input then
+				row.input:ClearAllPoints()
+				row.input:SetPoint("TOPLEFT", flyout, "TOPLEFT", fieldLeft, row.y + 4)
+				row.input:SetPoint("TOPRIGHT", flyout, "TOPRIGHT", -padding, row.y + 4)
+				row.input:SetHeight(24)
+			end
+		end
+		for _, input in ipairs({
+			builder.nameInput,
+			builder.guildInput,
+			builder.zoneInput,
+			builder.levelMin,
+			builder.levelMax,
+		}) do
+			if input then
+				input:SetFontObject(_G.UserScaledFontBody or _G.GameFontHighlight)
+			end
+		end
+		for _, dropdown in ipairs(builder.dropdowns or {}) do
+			if dropdown.BFL_ModernBuilderLabel then
+				dropdown.BFL_ModernBuilderLabel:ClearAllPoints()
+				dropdown.BFL_ModernBuilderLabel:SetPoint(
+					"TOPLEFT",
+					flyout,
+					"TOPLEFT",
+					padding,
+					dropdown.BFL_ModernBuilderY
+				)
+				dropdown.BFL_ModernBuilderLabel:SetWidth(labelWidth)
+			end
+			dropdown:ClearAllPoints()
+			dropdown:SetPoint(
+				"TOPLEFT",
+				flyout,
+				"TOPLEFT",
+				dropdownFieldLeft,
+				dropdown.BFL_ModernBuilderY + 3
+			)
+			dropdown:SetPoint(
+				"TOPRIGHT",
+				flyout,
+				"TOPRIGHT",
+				-padding,
+				dropdown.BFL_ModernBuilderY + 3
+			)
+			dropdown:SetHeight(26)
+		end
+		if builder.levelLabel and builder.levelMin and builder.levelMax then
+			builder.levelLabel:ClearAllPoints()
+			builder.levelLabel:SetPoint("TOPLEFT", flyout, "TOPLEFT", padding, builder.levelRowY)
+			builder.levelLabel:SetWidth(labelWidth)
+			builder.levelMin:ClearAllPoints()
+			builder.levelMin:SetPoint("TOPLEFT", flyout, "TOPLEFT", fieldLeft, builder.levelRowY + 4)
+			builder.levelMin:SetSize(58, 24)
+			builder.levelMax:ClearAllPoints()
+			builder.levelMax:SetPoint("LEFT", builder.levelMin, "RIGHT", 46, 0)
+			builder.levelMax:SetSize(58, 24)
+			if builder.levelToLabel then
+				builder.levelToLabel:ClearAllPoints()
+				builder.levelToLabel:SetPoint("LEFT", builder.levelMin, "RIGHT", 0, 0)
+				builder.levelToLabel:SetPoint("RIGHT", builder.levelMax, "LEFT", 0, 0)
+			end
+		end
+		if builder.searchBtn then
+			builder.searchBtn:SetSize(90, 28)
+			builder.searchBtn:ClearAllPoints()
+			builder.searchBtn:SetPoint("BOTTOMRIGHT", flyout, "BOTTOM", -4, 7)
+		end
+		if builder.resetBtn then
+			builder.resetBtn:SetSize(90, 28)
+			builder.resetBtn:ClearAllPoints()
+			builder.resetBtn:SetPoint("BOTTOMLEFT", flyout, "BOTTOM", 4, 7)
+		end
+	end
+	return true
+end
+
+function WhoFrame:ApplyModernSearchBuilderLayout()
+	if not self:IsModernSearchBuilderEmbedded() then
+		return false
+	end
+	local flyout = self.builderFlyout
+	local whoFrame = self.builderWhoFrame
+	if not (flyout and whoFrame) then
+		return false
+	end
+
+	if self.builderDocked then
+		self:SetBuilderDocked(false)
+	end
+	self.builderDocked = false
+	if self.builderDockedContainer then
+		self.builderDockedContainer:Hide()
+	end
+	if self.builderDockBtn then
+		self.builderDockBtn:Hide()
+	end
+
+	flyout:SetParent(whoFrame)
+	flyout:ClearAllPoints()
+	flyout:SetPoint("TOPLEFT", whoFrame.ListInset or whoFrame, "TOPLEFT", 4, -2)
+	flyout:SetPoint("TOPRIGHT", whoFrame.ListInset or whoFrame, "TOPRIGHT", -4, -2)
+	flyout:SetHeight(242)
+	flyout:SetFrameStrata(whoFrame:GetFrameStrata())
+	flyout:SetFrameLevel(whoFrame:GetFrameLevel() + 3)
+	self:ApplyModernSearchBuilderStyle()
+	whoFrame.BFL_ModernBuilderHeight = flyout:IsShown() and 246 or 0
+	return true
 end
 
 -- Get a WHO setting from the database with fallback
@@ -339,7 +563,12 @@ function WhoFrame:UpdateResponsiveLayout()
 	-- Restored centering logic to fix "too far right" issue in Retail
 	-- CRITICAL: Do NOT apply this to Classic, as it breaks the XML anchor chain
 	-- In Classic, buttons are right-aligned and anchored to each other
-	if not BFL.IsClassic then
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	local modernDirectory = BFL.IsRetail
+		and FriendsUI
+		and FriendsUI.IsModernActive
+		and FriendsUI:IsModernActive()
+	if not BFL.IsClassic and not modernDirectory then
 		local buttonsTotalWidth = 327 -- 85 (Refresh) + 1 + 120 (Add) + 1 + 120 (Invite) = 327
 		local buttonsStartX = math.floor((frameWidth - buttonsTotalWidth) / 2)
 
@@ -761,6 +990,7 @@ function WhoFrame:InitButton(button, elementData)
 	local classColorNames = self:GetSetting("whoClassColorNames", true)
 	local levelColors = self:GetSetting("whoLevelColors", true)
 	local zebraStripes = self:GetSetting("whoZebraStripes", true)
+	local zebraStripeStrength = self:GetSetting("whoZebraStripeStrength", ZEBRA_EVEN_COLOR.a)
 
 	-- PERFORMANCE: Cache class color lookup
 	local classTextColor = info.filename and RAID_CLASS_COLORS[info.filename] or HIGHLIGHT_FONT_COLOR
@@ -778,25 +1008,7 @@ function WhoFrame:InitButton(button, elementData)
 	end
 
 	-- Zebra stripe background
-	if button.background and zebraStripes then
-		if dataIndex % 2 == 0 then
-			button.background:SetColorTexture(
-				ZEBRA_EVEN_COLOR.r,
-				ZEBRA_EVEN_COLOR.g,
-				ZEBRA_EVEN_COLOR.b,
-				ZEBRA_EVEN_COLOR.a
-			)
-		else
-			button.background:SetColorTexture(
-				ZEBRA_ODD_COLOR.r,
-				ZEBRA_ODD_COLOR.g,
-				ZEBRA_ODD_COLOR.b,
-				ZEBRA_ODD_COLOR.a
-			)
-		end
-	elseif button.background then
-		button.background:SetColorTexture(0, 0, 0, 0)
-	end
+	ApplyZebraStripe(button, dataIndex, zebraStripes, zebraStripeStrength)
 
 	-- Selection highlight (create once per button)
 	if not button.selectionHighlight then
@@ -1182,7 +1394,7 @@ function WhoFrame:Update(forceRebuild)
 		return
 	end
 
-	local numWhos, totalCount = C_FriendList.GetNumWhoResults()
+	local numWhos, totalCount = GetWhoResultCounts()
 
 	-- Update totals text with improved format
 	local L = BFL.L
@@ -1216,7 +1428,7 @@ function WhoFrame:Update(forceRebuild)
 	if isClassicMode then
 		self.classicWhoDataList = {}
 		for i = 1, numWhos do
-			local info = C_FriendList.GetWhoInfo(i)
+			local info = GetWhoResult(i)
 			if info then
 				if info.fullName then
 					info.fullName = info.fullName:gsub("%-$", "")
@@ -1252,7 +1464,7 @@ function WhoFrame:Update(forceRebuild)
 	whoDataProvider:Flush()
 
 	for i = 1, numWhos do
-		local info = C_FriendList.GetWhoInfo(i)
+		local info = GetWhoResult(i)
 		if info then
 			if info.fullName then
 				info.fullName = info.fullName:gsub("%-$", "")
@@ -1335,7 +1547,7 @@ function WhoFrame:SortByColumn(sortType, preserveDirection)
 	end
 
 	-- Client-side sort: Get all WHO data and sort it locally
-	local numWhos = C_FriendList.GetNumWhoResults()
+	local numWhos = GetWhoResultCounts()
 	if numWhos == 0 then
 		return
 	end
@@ -1343,7 +1555,7 @@ function WhoFrame:SortByColumn(sortType, preserveDirection)
 	-- Collect all WHO data
 	local whoData = {}
 	for i = 1, numWhos do
-		local info = C_FriendList.GetWhoInfo(i)
+		local info = GetWhoResult(i)
 		if info then
 			table.insert(whoData, { index = i, info = info })
 		end
@@ -1487,7 +1699,7 @@ function WhoFrame:OnButtonClick(button, mouseButton)
 
 		-- Fallback for legacy/error cases: Fetch by index
 		if not info and button.index then
-			info = C_FriendList.GetWhoInfo(button.index)
+			info = GetWhoResult(button.index)
 			-- Must manually sanitize if fetching fresh
 			if info then
 				if info.fullName then
@@ -1841,28 +2053,10 @@ function _G.BetterWhoListButton_OnLeave(self)
 	-- Restore zebra stripe
 	if self.background and self.elementData then
 		local WhoFrameModule = BFL:GetModule("WhoFrame")
-		local zebraStripes = WhoFrameModule:GetSetting("whoZebraStripes", true)
+		local zebraStripes = WhoFrameModule and WhoFrameModule:GetSetting("whoZebraStripes", true)
+		local zebraStripeStrength = WhoFrameModule and WhoFrameModule:GetSetting("whoZebraStripeStrength", ZEBRA_EVEN_COLOR.a)
 		local dataIndex = self.elementData.dataIndex or self.elementData.index or 1
-
-		if zebraStripes then
-			if dataIndex % 2 == 0 then
-				self.background:SetColorTexture(
-					ZEBRA_EVEN_COLOR.r,
-					ZEBRA_EVEN_COLOR.g,
-					ZEBRA_EVEN_COLOR.b,
-					ZEBRA_EVEN_COLOR.a
-				)
-			else
-				self.background:SetColorTexture(
-					ZEBRA_ODD_COLOR.r,
-					ZEBRA_ODD_COLOR.g,
-					ZEBRA_ODD_COLOR.b,
-					ZEBRA_ODD_COLOR.a
-				)
-			end
-		else
-			self.background:SetColorTexture(0, 0, 0, 0)
-		end
+		ApplyZebraStripe(self, dataIndex, zebraStripes, zebraStripeStrength)
 	end
 end
 
@@ -1887,6 +2081,8 @@ function _G.BetterWhoListButton_OnDoubleClick(self, mouseButton)
 	if action == "invite" then
 		BFL.InviteUnit(name)
 	else
+		-- WHO results provide names and GUIDs, but no inspectable unit token. Keep
+		-- legacy/invalid action values on the safe, supported Whisper path.
 		BFL:SecureSendTell(name)
 	end
 end
@@ -2891,6 +3087,8 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	local fieldGap = 6
 	local dropdownHeight = 20
 	local builderDropdowns = {}
+	self.builder.dropdowns = builderDropdowns
+	self.builder.fieldRows = {}
 
 	local function GetBuilderFieldWidth()
 		local parentWidth = flyout.GetWidth and flyout:GetWidth() or 0
@@ -2902,6 +3100,30 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 
 	local function SetBuilderDropdownWidth(dropdown)
 		if not dropdown then
+			return
+		end
+
+		if self:IsModernSearchBuilderEmbedded() and dropdown.BFL_ModernBuilderY then
+			local modernPadding = 12
+			-- SearchBoxTemplate has an 8 px visual left inset around its outer
+			-- frame. Match that visible edge so the native dropdown chrome and
+			-- the search fields form one clean column.
+			local modernFieldLeft = modernPadding + 62 + 7 - 8
+			dropdown:ClearAllPoints()
+			dropdown:SetPoint(
+				"TOPLEFT",
+				flyout,
+				"TOPLEFT",
+				modernFieldLeft,
+				dropdown.BFL_ModernBuilderY + 3
+			)
+			dropdown:SetPoint(
+				"TOPRIGHT",
+				flyout,
+				"TOPRIGHT",
+				-modernPadding,
+				dropdown.BFL_ModernBuilderY + 3
+			)
 			return
 		end
 
@@ -2936,7 +3158,7 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	flyout:HookScript("OnSizeChanged", RefreshBuilderDropdowns)
 
 	-- Helper: Create a labeled row with an EditBox
-	local function CreateInputRow(parent, labelText, yPos)
+	local function CreateInputRow(parent, labelText, placeholderText, yPos)
 		local label = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 		ApplyDefaultSlugToFontString(label)
 		label:SetPoint("TOPLEFT", parent, "TOPLEFT", padding, yPos)
@@ -2944,14 +3166,21 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 		label:SetJustifyH("LEFT")
 		label:SetText(labelText)
 
-		local input = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
+		local inputTemplate = BFL.IsRetail and "SearchBoxTemplate" or "InputBoxTemplate"
+		local input = CreateFrame("EditBox", nil, parent, inputTemplate)
 		input:SetPoint("LEFT", label, "RIGHT", fieldGap, 0)
 		input:SetPoint("RIGHT", parent, "RIGHT", -padding, 0)
 		input:SetHeight(20)
 		input:SetAutoFocus(false)
 		input:SetFontObject("GameFontHighlight")
 		ApplyDefaultSlugToFontString(input)
-		input:SetScript("OnTextChanged", function()
+		if input.Instructions then
+			input.Instructions:SetText(placeholderText)
+			input.Instructions:SetFontObject("BetterFriendlistFontDisableSmall")
+			input.Instructions:SetJustifyH("LEFT")
+			input.Instructions:SetMaxLines(1)
+		end
+		input:HookScript("OnTextChanged", function()
 			WhoFrame:UpdateBuilderPreview()
 		end)
 		input:SetScript("OnEnterPressed", function(self)
@@ -2965,20 +3194,40 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 			end
 		end)
 		-- Tab navigation handled by WoW default EditBox behavior
+		self.builder.fieldRows[#self.builder.fieldRows + 1] = {
+			label = label,
+			input = input,
+			y = yPos,
+		}
 		return input
 	end
 
 	-- Row 1: Name (max 12 chars = WoW character name limit)
-	self.builder.nameInput = CreateInputRow(flyout, (L.WHO_BUILDER_NAME or "Name") .. ":", yOffset)
+	self.builder.nameInput = CreateInputRow(
+		flyout,
+		(L.WHO_BUILDER_NAME or "Name") .. ":",
+		L.WHO_BUILDER_NAME_PLACEHOLDER or "Search for character name",
+		yOffset
+	)
 	self.builder.nameInput:SetMaxLetters(12)
 	yOffset = yOffset - rowHeight
 
 	-- Row 2: Guild
-	self.builder.guildInput = CreateInputRow(flyout, (L.WHO_BUILDER_GUILD or "Guild") .. ":", yOffset)
+	self.builder.guildInput = CreateInputRow(
+		flyout,
+		(L.WHO_BUILDER_GUILD or "Guild") .. ":",
+		L.WHO_BUILDER_GUILD_PLACEHOLDER or "Search for guild name",
+		yOffset
+	)
 	yOffset = yOffset - rowHeight
 
 	-- Row 3: Zone
-	self.builder.zoneInput = CreateInputRow(flyout, (L.WHO_BUILDER_ZONE or "Zone") .. ":", yOffset)
+	self.builder.zoneInput = CreateInputRow(
+		flyout,
+		(L.WHO_BUILDER_ZONE or "Zone") .. ":",
+		L.WHO_BUILDER_ZONE_PLACEHOLDER or "Search for zone",
+		yOffset
+	)
 	yOffset = yOffset - rowHeight
 
 	-- Row 4: Class dropdown
@@ -3001,6 +3250,8 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 		classDropdown:SetPoint("LEFT", classLabel, "RIGHT", -14, -2)
 	end
 	RegisterBuilderDropdown(classDropdown)
+	classDropdown.BFL_ModernBuilderLabel = classLabel
+	classDropdown.BFL_ModernBuilderY = yOffset
 	self.builder.classDropdown = classDropdown
 
 	-- Forward declaration (RebuildRaceDropdown is defined after RebuildClassDropdown)
@@ -3066,6 +3317,8 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 		raceDropdown:SetPoint("LEFT", raceLabel, "RIGHT", -14, -2)
 	end
 	RegisterBuilderDropdown(raceDropdown)
+	raceDropdown.BFL_ModernBuilderLabel = raceLabel
+	raceDropdown.BFL_ModernBuilderY = yOffset
 	self.builder.raceDropdown = raceDropdown
 
 	-- Function to build/rebuild race dropdown with optional class filter
@@ -3228,6 +3481,9 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 		end
 	end)
 	self.builder.levelMax = levelMax
+	self.builder.levelLabel = levelLabel
+	self.builder.levelToLabel = toLabel
+	self.builder.levelRowY = yOffset
 	yOffset = yOffset - rowHeight
 
 	-- Separator line
@@ -3239,7 +3495,7 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	yOffset = yOffset - 6
 
 	-- Buttons row (anchored flush to bottom)
-	local searchBtn = CreateFrame("Button", nil, flyout, "UIPanelButtonTemplate")
+	local searchBtn = CreateFrame("Button", nil, flyout, BFL.IsRetail and "SharedButtonTemplate" or "UIPanelButtonTemplate")
 	searchBtn:SetSize(80, 22)
 	searchBtn:SetPoint("BOTTOMRIGHT", flyout, "BOTTOM", -2, 6)
 	searchBtn:SetText(L.WHO_BUILDER_SEARCH or "Search")
@@ -3252,7 +3508,7 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	end)
 	self.builder.searchBtn = searchBtn
 
-	local resetBtn = CreateFrame("Button", nil, flyout, "UIPanelButtonTemplate")
+	local resetBtn = CreateFrame("Button", nil, flyout, BFL.IsRetail and "SharedButtonTemplate" or "UIPanelButtonTemplate")
 	resetBtn:SetSize(80, 22)
 	resetBtn:SetPoint("BOTTOMLEFT", flyout, "BOTTOM", 2, 6)
 	resetBtn:SetText(L.WHO_BUILDER_RESET or "Reset")
@@ -3263,6 +3519,7 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	resetBtn:SetScript("OnClick", function()
 		WhoFrame:ResetBuilder()
 	end)
+	self.builder.resetBtn = resetBtn
 
 	-- Preview row (between separator and buttons, using TOPLEFT for proper multi-line alignment)
 	local previewLabel = flyout:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -3393,6 +3650,9 @@ function WhoFrame:SetBuilderDocked(docked)
 	local whoFrame = self.builderWhoFrame
 	if not flyout or not whoFrame then
 		return
+	end
+	if docked and self:IsModernSearchBuilderEmbedded() then
+		docked = false
 	end
 
 	local DB = BFL:GetModule("DB")
@@ -3554,6 +3814,13 @@ function WhoFrame:ToggleSearchBuilder(show)
 			if self.builder.levelMax then
 				self.builder.levelMax:ClearFocus()
 			end
+		end
+	end
+	if self:ApplyModernSearchBuilderLayout() then
+		local FriendsUI = BFL:GetModule("FriendsUI")
+		if FriendsUI and FriendsUI.ApplyModernDirectoryGeometry then
+			FriendsUI:ApplyModernDirectoryGeometry("who")
+			FriendsUI:ApplyModernScrollBarGeometry()
 		end
 	end
 end

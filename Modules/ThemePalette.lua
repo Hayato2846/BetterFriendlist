@@ -549,6 +549,19 @@ function ThemePalette:ApplyAvatarVisibility(frame)
 
 	local alpha = self:GetAvatarAlpha(1, "blizzard")
 	local showAvatar = not IsSimpleModeEnabled() and alpha > 0
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	local modern = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
+	if modern then
+		SetObjectShown(frame.PortraitIcon, false)
+		SetObjectShown(frame.PortraitMask, false)
+		SetObjectShown(frame.PortraitButton, false)
+		local modernPortrait = FriendsUI.root and FriendsUI.root.PortraitOverlay
+		if modernPortrait then
+			modernPortrait:SetAlpha(alpha)
+			SetObjectShown(modernPortrait, alpha > 0)
+		end
+		return
+	end
 
 	for _, object in ipairs({
 		frame.PortraitIcon,

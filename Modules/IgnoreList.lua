@@ -31,6 +31,10 @@ function IgnoreList:OnLoad(frame)
 	-- Set up frame visuals matching Blizzard's InitializeFrameVisuals
 	ButtonFrameTemplate_HidePortrait(frame)
 	frame:SetTitle(IGNORE_LIST)
+	local FriendsUI = BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.AnchorAuxiliaryWindow then
+		FriendsUI:AnchorAuxiliaryWindow(frame, 0)
+	end
 
 	if frame.TopTileStreaks then
 		frame.TopTileStreaks:Hide()
@@ -437,6 +441,10 @@ function IgnoreList:Toggle()
 		return
 	end
 
+	local FriendsUI = BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.AnchorAuxiliaryWindow then
+		FriendsUI:AnchorAuxiliaryWindow(frame.IgnoreListWindow, 0)
+	end
 	frame.IgnoreListWindow:SetShown(not frame.IgnoreListWindow:IsShown())
 	PlaySound(SOUNDKIT.IG_CHAT_EMOTE_BUTTON)
 end

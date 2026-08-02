@@ -80,6 +80,14 @@ local function SafeCall(fn, ...)
 	return pcall(fn, ...)
 end
 
+local function IsGuildPreviewActive()
+	local PreviewMode = BFL:GetModule("PreviewMode")
+	return PreviewMode
+		and PreviewMode.IsComponentEnabled
+		and PreviewMode:IsComponentEnabled("guild")
+		or false
+end
+
 local function IsSecretValue(value)
 	return value ~= nil and BFL.HasSecretValues and BFL.IsSecret and BFL:IsSecret(value)
 end
@@ -425,6 +433,20 @@ function GuildActions:CanEditMOTD()
 end
 
 function GuildActions:GetMemberCapabilities(member)
+	if member and member._isMock then
+		return {
+			whisper = false,
+			inviteParty = false,
+			who = false,
+			nickname = false,
+			copyName = true,
+			promote = false,
+			demote = false,
+			remove = false,
+			setLeader = false,
+		}
+	end
+
 	local hasName = IsUsableString(self:GetFullName(member))
 	local online = member and member.online == true
 	return {
@@ -441,6 +463,15 @@ function GuildActions:GetMemberCapabilities(member)
 end
 
 function GuildActions:GetGuildCapabilities()
+	if IsGuildPreviewActive() then
+		return {
+			invite = false,
+			editMOTD = false,
+			leave = false,
+			disband = false,
+		}
+	end
+
 	local isLeader = IsGuildLeader and IsGuildLeader() == true
 	local inGuild = true
 	if IsInGuild then

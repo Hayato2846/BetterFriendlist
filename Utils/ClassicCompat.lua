@@ -1281,7 +1281,10 @@ local ATLAS_FALLBACKS = {
 	["NewCharacter-Alliance"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\star",
 	["CharacterCreate-NewLabel"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\star",
 	["socialqueuing-icon-eye"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\eye",
+	["friends-icon-eye"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\eye",
 	["socialqueuing-icon-group"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\users",
+	["friends-icon-addFriend"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\user-plus",
+	["friends-icon-addFriend-logo-battleNet"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\star",
 
 	-- Clock icon
 	["icon-clock"] = "Interface\\Icons\\INV_Misc_PocketWatch_01",
@@ -1295,6 +1298,12 @@ local ATLAS_FALLBACKS = {
 	["RecruitAFriend_RecruitedFriends_ActiveChest"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\gift",
 	["RecruitAFriend_RecruitedFriends_OpenChest"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\package",
 	["RecruitAFriend_RecruitedFriends_ClaimedChest"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\check-circle",
+	["friends-RAF-chest-locked"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\lock",
+	["friends-RAF-chest-claimed-hover"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\check-circle",
+	["friends-RAF-chest-default-hover"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\gift",
+	["friends-raf-chest-default"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\gift",
+	["friends-raf-chest-ready"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\package",
+	["friends-RAF-chest-claimed"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\check-circle",
 }
 
 local ATLAS_AVAILABILITY = {}
@@ -1936,6 +1945,21 @@ function Compat.AreTitleFriendsEnabled()
 	return false
 end
 
+-- Send a title-friend invite on Retail 12.1+, falling back to the legacy
+-- character-friend system on older Retail and every Classic flavor.
+-- This wrapper must only be called from a hardware-event path because the
+-- title-friend API is restricted and only accepts untainted arguments.
+function Compat.SendTitleFriendInviteByName(name)
+	if not name or (BFL.IsSecret and BFL:IsSecret(name)) then
+		return false
+	end
+	if Compat.AreTitleFriendsEnabled() and C_BattleNet and C_BattleNet.SendTitleFriendInviteByName then
+		local ok = pcall(C_BattleNet.SendTitleFriendInviteByName, name)
+		return ok == true
+	end
+	return Compat.AddFriend(name)
+end
+
 function Compat.AreTitleFriendCustomNamesEnabled()
 	if C_BattleNet and C_BattleNet.AreTitleFriendCustomNamesEnabled then
 		local ok, enabled = pcall(C_BattleNet.AreTitleFriendCustomNamesEnabled)
@@ -2555,6 +2579,7 @@ BFL.IsBattleNetFriendsListEnabled = Compat.IsBattleNetFriendsListEnabled
 BFL.AreBattleNetFriendTagsEnabled = Compat.AreBattleNetFriendTagsEnabled
 BFL.GetBNetFriendInviteInfo = Compat.GetBNetFriendInviteInfo
 BFL.AreTitleFriendsEnabled = Compat.AreTitleFriendsEnabled
+BFL.SendTitleFriendInviteByName = Compat.SendTitleFriendInviteByName
 BFL.AreTitleFriendCustomNamesEnabled = Compat.AreTitleFriendCustomNamesEnabled
 BFL.IsTitleFriend = Compat.IsTitleFriend
 BFL.GetCustomTitleFriendName = Compat.GetCustomTitleFriendName

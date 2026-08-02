@@ -236,13 +236,20 @@ function ThemeManager:ApplyCurrentTheme(reason)
 	end
 
 	local ElvUISkin = BFL:GetModule("ElvUISkin")
+	local friendsUITheme = theme
 	if ElvUISkin then
 		local useElvUISkin = (ElvUISkin.IsSkinEnabled and ElvUISkin:IsSkinEnabled()) or theme == "elvui"
 		if useElvUISkin and ElvUISkin.RegisterSkin then
+			friendsUITheme = "elvui"
 			ElvUISkin:RegisterSkin()
 		elseif ElvUISkin.HideClassicMainFrameShell then
 			ElvUISkin:HideClassicMainFrameShell()
 		end
+	end
+
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.ApplyTheme then
+		FriendsUI:ApplyTheme(friendsUITheme)
 	end
 
 	return true

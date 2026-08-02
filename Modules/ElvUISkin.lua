@@ -579,6 +579,8 @@ function ElvUISkin:SkinFrames(E, S)
 
 	-- BFL:DebugPrint("ElvUISkin: SkinFrames started")
 	local frame = _G.BetterFriendsFrame
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	local isModernFriendsUI = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
 	self:SkinClassicMainFrameShell(E, S, frame)
 	-- Skin Main Frame
 	-- BFL:DebugPrint("ElvUISkin: Skinning Main Frame")
@@ -684,6 +686,7 @@ function ElvUISkin:SkinFrames(E, S)
 		end
 	end
 	self:HideClassicPortraitArtifacts(frame, shouldSkinPortrait and portraitButton or nil, true)
+	if not isModernFriendsUI then
 	-- Skin Tabs (Top)
 	BFL:DebugPrint("ElvUISkin: Skinning Top Tabs")
 	for i = 1, 4 do
@@ -758,6 +761,7 @@ function ElvUISkin:SkinFrames(E, S)
 				CenterBFLTabText(tab)
 			end
 		end
+	end
 	end
 
 	-- Skin Insets
@@ -940,6 +944,26 @@ function ElvUISkin:SkinFrames(E, S)
 	if frame.RecruitmentButton then
 		S:HandleButton(frame.RecruitmentButton)
 	end
+	if isModernFriendsUI and FriendsUI.root then
+		local modernRoot = FriendsUI.root
+		if modernRoot.BottomActionBar and modernRoot.BottomActionBar.AddFriendButton then
+			S:HandleButton(modernRoot.BottomActionBar.AddFriendButton)
+		end
+		if modernRoot.FilterBar and modernRoot.FilterBar.SortButton then
+			S:HandleButton(modernRoot.FilterBar.SortButton)
+		end
+		if modernRoot.FilterBar and modernRoot.FilterBar.FilterDropdown and S.HandleDropDownBox then
+			S:HandleDropDownBox(modernRoot.FilterBar.FilterDropdown, 92)
+			modernRoot.FilterBar.FilterDropdown:SetSize(92, 30)
+		end
+		if modernRoot.FilterBar and modernRoot.FilterBar.RecentFilterDropdown and S.HandleDropDownBox then
+			S:HandleDropDownBox(modernRoot.FilterBar.RecentFilterDropdown, 92)
+			modernRoot.FilterBar.RecentFilterDropdown:SetSize(92, 30)
+		end
+		if modernRoot.BattleNetBar and modernRoot.BattleNetBar.MenuButton then
+			S:HandleButton(modernRoot.BattleNetBar.MenuButton)
+		end
+	end
 
 	-- Skin HelpButton
 	if frame.HelpButton then
@@ -952,7 +976,7 @@ function ElvUISkin:SkinFrames(E, S)
 
 	-- Point 2: MenuButton & SettingsButton
 	if frame.FriendsTabHeader and frame.FriendsTabHeader.BattlenetFrame then
-		if frame.FriendsTabHeader.BattlenetFrame.ContactsMenuButton then
+		if not isModernFriendsUI and frame.FriendsTabHeader.BattlenetFrame.ContactsMenuButton then
 			pcall(S.HandleButton, S, frame.FriendsTabHeader.BattlenetFrame.ContactsMenuButton)
 		end
 		if frame.FriendsTabHeader.BattlenetFrame.SettingsButton then
@@ -1155,12 +1179,14 @@ function ElvUISkin:SkinFrames(E, S)
 				-- Reposition: 1px gap left of BattlenetFrame
 				dropdown:ClearAllPoints()
 				dropdown:SetPoint("RIGHT", frame.FriendsTabHeader.BattlenetFrame, "LEFT", -1, 0)
+			elseif isModernFriendsUI then
+				SkinAndSizeDropdown(frame.FriendsTabHeader.StatusDropdown, 54, 30)
 			else
 				SkinAndSizeDropdown(frame.FriendsTabHeader.StatusDropdown, 70, 22)
 			end
 		end
 
-		if frame.FriendsTabHeader.QuickFilterDropdown then
+		if frame.FriendsTabHeader.QuickFilterDropdown and not isModernFriendsUI then
 			if BFL.IsClassic then
 				-- Classic: Re-anchor with clearer spacing to avoid visual clipping with sort dropdowns.
 				local dropdown = frame.FriendsTabHeader.QuickFilterDropdown
@@ -1177,8 +1203,7 @@ function ElvUISkin:SkinFrames(E, S)
 					dropdown:SetPoint("TOPLEFT", frame.FriendsTabHeader.SearchBox, "TOPLEFT", isModernDropdown and 0 or -16, 32)
 				end
 			else
-				-- Retail: Use smaller width (50) to fit in one row
-				SkinAndSizeDropdown(frame.FriendsTabHeader.QuickFilterDropdown, 50, 30)
+				SkinAndSizeDropdown(frame.FriendsTabHeader.QuickFilterDropdown, isModernFriendsUI and 105 or 50, 30)
 			end
 		end
 
@@ -1332,7 +1357,10 @@ function ElvUISkin:SkinFrames(E, S)
 		-- Fix: Use GroupsInset instead of ListInset
 		if frame.RaidFrame.GroupsInset then
 			frame.RaidFrame.GroupsInset:StripTextures()
-			frame.RaidFrame.GroupsInset:CreateBackdrop("Transparent")
+			local modernRaidLayout = BFL.FriendsUI and BFL.FriendsUI:IsModernActive()
+			if not modernRaidLayout then
+				frame.RaidFrame.GroupsInset:CreateBackdrop("Transparent")
+			end
 		elseif frame.RaidFrame.ListInset then
 			-- Fallback if ListInset exists
 			frame.RaidFrame.ListInset:StripTextures()
@@ -1476,6 +1504,11 @@ function ElvUISkin:SkinFrames(E, S)
 	if FontFix then
 		BFL:DebugPrint("ElvUISkin: Re-applying FontFix")
 		FontFix:ApplyFixedFonts()
+	end
+	if isModernFriendsUI and FriendsUI.ApplyTheme then
+		-- ElvUI applies asynchronously as well as through ThemeManager. Reassert
+		-- the Modern geometry after either pass without touching Legacy tabs.
+		FriendsUI:ApplyTheme("elvui")
 	end
 
 	BFL:DebugPrint("ElvUI Skin applied to BetterFriendlist")
@@ -1830,6 +1863,14 @@ function ElvUISkin:SkinSettings(E, S)
 			local content = frame.ContentScrollFrame.Content
 			if content and content.GeneralTab then
 				SkinEditBoxesInTab(content.GeneralTab)
+			end
+		end)
+		hooksecurefunc(Settings, "RefreshFriendTabsTab", function()
+			for _, row in ipairs(Settings.friendTabSettingRows or {}) do
+				if row.Visibility and not row.Visibility.BFL_ElvSkinned then
+					S:HandleCheckBox(row.Visibility)
+					row.Visibility.BFL_ElvSkinned = true
+				end
 			end
 		end)
 		hooksecurefunc(Settings, "EnsureFilterSortEditorPanel", SkinFilterSortEditor)

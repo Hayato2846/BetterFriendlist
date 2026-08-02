@@ -1155,16 +1155,20 @@ function BFL:InstallFriendsFrameRedirects()
 			_G.HideBetterFriendsFrame()
 		end
 
-		if BFL.OriginalFriendsFrameUIPanelSettings and UIPanelWindows then
-			UIPanelWindows["FriendsFrame"] = BFL.OriginalFriendsFrameUIPanelSettings
-		end
-
-		if BFL.OriginalOpenFriendsFrame then
-			BFL.OriginalOpenFriendsFrame(1)
-		elseif BFL.OriginalToggleFriendsFrame then
-			BFL.OriginalToggleFriendsFrame(1)
-		elseif FriendsFrame then
-			FriendsFrame:Show()
+		local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+		if FriendsUI and FriendsUI.IsSocialUIEnabled and FriendsUI:IsSocialUIEnabled() then
+			FriendsUI:OpenBlizzardSocialUI()
+		else
+			if BFL.OriginalFriendsFrameUIPanelSettings and UIPanelWindows then
+				UIPanelWindows["FriendsFrame"] = BFL.OriginalFriendsFrameUIPanelSettings
+			end
+			if BFL.OriginalOpenFriendsFrame then
+				BFL.OriginalOpenFriendsFrame(1)
+			elseif BFL.OriginalToggleFriendsFrame then
+				BFL.OriginalToggleFriendsFrame(1)
+			elseif FriendsFrame then
+				FriendsFrame:Show()
+			end
 		end
 
 		C_Timer.After(0.1, function()
@@ -1210,7 +1214,9 @@ function BFL:UpdatePortraitVisibility(reason)
 		return
 	end
 
-	local simpleMode = DB:Get("simpleMode", false)
+	local FriendsUI = self.FriendsUI or self:GetModule("FriendsUI")
+	local modern = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
+	local simpleMode = not modern and DB:Get("simpleMode", false)
 	local shouldShow = not simpleMode
 	local shouldShowPortrait = shouldShow
 	local isClassicElvUISkinActive = CoreIsClassicElvUISkinActive()
@@ -1234,16 +1240,16 @@ function BFL:UpdatePortraitVisibility(reason)
 			frame.PortraitContainer:SetShown(shouldShowPortrait)
 		end
 		if frame.portrait then
-			frame.portrait:SetShown(shouldShowPortrait)
+			frame.portrait:SetShown(shouldShowPortrait and not modern)
 		end
 		if frame.PortraitButton then
 			frame.PortraitButton:SetShown(shouldShowPortrait)
 		end
 		if frame.PortraitIcon then
-			frame.PortraitIcon:SetShown(shouldShowPortrait)
+			frame.PortraitIcon:SetShown(shouldShowPortrait and not modern)
 		end
 		if frame.PortraitMask then
-			frame.PortraitMask:SetShown(shouldShowPortrait)
+			frame.PortraitMask:SetShown(shouldShowPortrait and not modern)
 		end
 		if frame.SetPortraitShown then
 			frame:SetPortraitShown(shouldShowPortrait)
@@ -1253,7 +1259,27 @@ function BFL:UpdatePortraitVisibility(reason)
 		local globalPortraitName = frame:GetName() .. "Portrait"
 		local globalPortrait = _G[globalPortraitName]
 		if globalPortrait then
-			globalPortrait:SetShown(shouldShowPortrait)
+			globalPortrait:SetShown(shouldShowPortrait and not modern)
+		end
+		if modern then
+			-- Modern keeps its portrait in the Modern root so the Battle.net bar
+			-- cannot cover the lower half of the parent-layer texture.
+			if frame.portrait then
+				frame.portrait:Hide()
+			end
+			if globalPortrait then
+				globalPortrait:Hide()
+			end
+			if frame.PortraitIcon then
+				frame.PortraitIcon:Hide()
+			end
+			if frame.PortraitMask then
+				frame.PortraitMask:Hide()
+			end
+			local modernPortrait = FriendsUI and FriendsUI.root and FriendsUI.root.PortraitOverlay
+			if modernPortrait then
+				modernPortrait:Show()
+			end
 		end
 
 		local classicButtonFrameLayoutApplied = false
@@ -3226,4 +3252,8 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		print("")
 		print(BFL.L.CORE_HELP_LINK)
 	end
+end
+
+function BFL:IsRegionMouseOver(region)
+	return region ~= nil and type(region.IsMouseOver) == "function" and region:IsMouseOver() or false
 end

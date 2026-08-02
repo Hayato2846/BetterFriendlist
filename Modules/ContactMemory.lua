@@ -108,6 +108,10 @@ local function NotifySettingsChanged(refreshCallback)
 		if FriendsList and FriendsList.InvalidateSettingsCache then
 			FriendsList:InvalidateSettingsCache()
 		end
+		local PreviewMode = BFL.GetModule and BFL:GetModule("PreviewMode")
+		if PreviewMode and PreviewMode.OnSettingChanged then
+			PreviewMode:OnSettingChanged("contactMemory")
+		end
 	end
 	RefreshSurfaces(refreshCallback)
 end
@@ -535,8 +539,18 @@ function ContactMemory:ResolveContactKeyFromIgnore(squelchType, index)
 end
 
 function ContactMemory:GetContact(contactKey, create)
+	if type(contactKey) ~= "string" or contactKey == "" then
+		return nil
+	end
+	local PreviewMode = BFL:GetModule("PreviewMode")
+	if PreviewMode and PreviewMode.GetMockContact then
+		local mockContact, handled = PreviewMode:GetMockContact(contactKey)
+		if handled then
+			return mockContact
+		end
+	end
 	local db = self:NormalizeDB()
-	if not db or type(contactKey) ~= "string" or contactKey == "" then
+	if not db then
 		return nil
 	end
 

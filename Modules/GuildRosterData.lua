@@ -47,7 +47,24 @@ local function GetCacheTime()
 	return time and time() or 0
 end
 
+function GuildRosterData:GetPreviewData()
+	local PreviewMode = BFL:GetModule("PreviewMode")
+	if not (
+		PreviewMode
+		and PreviewMode.IsComponentEnabled
+		and PreviewMode:IsComponentEnabled("guild")
+		and PreviewMode.mockData
+		and type(PreviewMode.mockData.guildRosterMembers) == "table"
+	) then
+		return nil
+	end
+	return PreviewMode.mockData
+end
+
 function GuildRosterData:HasBaseRosterAPI()
+	if self:GetPreviewData() then
+		return true
+	end
 	return IsInGuild ~= nil
 		and GetNumGuildMembers ~= nil
 		and BFL.GetGuildRosterInfo ~= nil
@@ -55,6 +72,9 @@ function GuildRosterData:HasBaseRosterAPI()
 end
 
 function GuildRosterData:IsInGuild()
+	if self:GetPreviewData() then
+		return true
+	end
 	if not IsInGuild then
 		return false
 	end
@@ -63,12 +83,31 @@ function GuildRosterData:IsInGuild()
 end
 
 function GuildRosterData:GetGuildName()
+	local previewData = self:GetPreviewData()
+	if previewData then
+		return previewData.guildRosterName or ""
+	end
 	if not GetGuildInfo then
 		return ""
 	end
 	local ok, guildName = pcall(GetGuildInfo, "player")
 	if ok then
 		return SafeText(guildName, "")
+	end
+	return ""
+end
+
+function GuildRosterData:GetGuildMOTD()
+	local previewData = self:GetPreviewData()
+	if previewData then
+		return previewData.guildRosterMOTD or ""
+	end
+	if not BFL.GetGuildMOTD then
+		return ""
+	end
+	local ok, motd = pcall(BFL.GetGuildMOTD)
+	if ok then
+		return SafeText(motd, "")
 	end
 	return ""
 end
@@ -82,6 +121,17 @@ function GuildRosterData:CanViewOfficerNote()
 end
 
 function GuildRosterData:GetCounts()
+	local previewData = self:GetPreviewData()
+	if previewData then
+		local members = previewData.guildRosterMembers
+		local online = 0
+		for _, member in ipairs(members) do
+			if member.online then
+				online = online + 1
+			end
+		end
+		return online, #members
+	end
 	if not self:HasBaseRosterAPI() or not self:IsInGuild() then
 		return 0, 0
 	end
@@ -94,17 +144,43 @@ function GuildRosterData:GetCounts()
 	return SafeNumber(online, 0), SafeNumber(total, 0)
 end
 
+function GuildRosterData:InvalidateCache()
+	self.rosterSnapshotCache = nil
+end
+
 function GuildRosterData:RequestRosterUpdate()
+	if self:GetPreviewData() then
+		self:InvalidateCache()
+		return true
+	end
 	if not self:HasBaseRosterAPI() then
 		return false
 	end
-	self.rosterSnapshotCache = nil
+	self:InvalidateCache()
 	local ok = pcall(BFL.GuildRoster)
 	return ok == true
 end
 
 function GuildRosterData:CollectRoster(options)
 	options = options or {}
+
+	local previewData = self:GetPreviewData()
+	if previewData then
+		local members = previewData.guildRosterMembers
+		local online, total = self:GetCounts()
+		local maxRows = SafeNumber(options.maxRows, total)
+		if maxRows <= 0 or maxRows > total then
+			maxRows = total
+		end
+		if maxRows == total then
+			return members, { online = online, total = total }
+		end
+		local limited = {}
+		for index = 1, maxRows do
+			limited[index] = members[index]
+		end
+		return limited, { online = online, total = total }
+	end
 
 	if not self:HasBaseRosterAPI() or not self:IsInGuild() then
 		return {}, { online = 0, total = 0 }

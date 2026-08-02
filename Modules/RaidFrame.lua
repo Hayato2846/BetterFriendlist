@@ -42,6 +42,15 @@ end
 
 local RAID_MEMBERS_TO_DISPLAY = 40 -- Maximum raid size
 local RAID_MEMBER_HEIGHT = 20 -- Height of each member button
+local MODERN_RAID_GROUP_HEADER_HEIGHT = 20
+
+local function ApplyModernRaidGroupTitleFont(fontString)
+	if not fontString or not GameFontHighlight then
+		return
+	end
+
+	fontString:SetFontObject(GameFontHighlight)
+end
 
 -- Sort modes
 local SORT_MODE_GROUP = 1 -- By group then name
@@ -127,6 +136,26 @@ local function SetRoleCountIcon(texture, role)
 	end
 end
 
+local function IsModernRaidLayout()
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	return BFL.IsRetail and FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
+end
+
+local function SetModernRoleCountDisplay(controlPanel, tanks, healers, damagers)
+	if not controlPanel then
+		return
+	end
+	if controlPanel.TankFrame and controlPanel.TankFrame.Count then
+		controlPanel.TankFrame.Count:SetText(tanks or 0)
+	end
+	if controlPanel.HealerFrame and controlPanel.HealerFrame.Count then
+		controlPanel.HealerFrame.Count:SetText(healers or 0)
+	end
+	if controlPanel.DamagerFrame and controlPanel.DamagerFrame.Count then
+		controlPanel.DamagerFrame.Count:SetText(damagers or 0)
+	end
+end
+
 local function SetRoleCountDisplay(roleCount, tanks, healers, damagers)
 	if not roleCount then
 		return
@@ -178,6 +207,165 @@ local function SetRoleIconTexture(texture, role)
 	end
 end
 
+local RAID_ASSIGNMENT_ICON_DATA = {
+	leader = {
+		atlas = "friends-icon-raidLead",
+		fallback = "Interface\\GroupFrame\\UI-Group-LeaderIcon",
+		tooltip = function()
+			return RAID_LEADER
+		end,
+	},
+	assistant = {
+		atlas = "friends-icon-raidAssist",
+		fallback = "Interface\\GroupFrame\\UI-Group-AssistantIcon",
+		tooltip = function()
+			return RAID_ASSISTANT
+		end,
+	},
+	mainTank = {
+		atlas = "RaidFrame-Icon-MainTank",
+		fallback = "Interface\\GroupFrame\\UI-Group-MainTankIcon",
+		tooltip = function()
+			return MAIN_TANK
+		end,
+	},
+	mainAssist = {
+		atlas = "RaidFrame-Icon-MainAssist",
+		fallback = "Interface\\GroupFrame\\UI-Group-MainAssistIcon",
+		tooltip = function()
+			return MAIN_ASSIST
+		end,
+	},
+}
+
+local function SetRaidAssignmentTexture(texture, iconData)
+	if not (texture and iconData) then
+		return
+	end
+	if BFL.IsRetail and texture.SetAtlas then
+		local ok = pcall(texture.SetAtlas, texture, iconData.atlas, false)
+		if ok then
+			return
+		end
+	end
+	texture:SetTexture(iconData.fallback)
+end
+
+local function PositionRaidAssignmentTooltipHitboxes(button)
+	if not button then
+		return
+	end
+	local roleWidth = button.RoleIcon and button.RoleIcon:GetWidth() or 16
+	local rankWidth = button.RankIcon and button.RankIcon:GetWidth() or 16
+	local rankHeight = button.RankIcon and button.RankIcon:GetHeight() or 16
+	local mainTankWidth = button.MainTankIcon and button.MainTankIcon:GetWidth() or 12
+	local mainTankHeight = button.MainTankIcon and button.MainTankIcon:GetHeight() or 12
+	local mainAssistWidth = button.MainAssistIcon and button.MainAssistIcon:GetWidth() or 12
+	local mainAssistHeight = button.MainAssistIcon and button.MainAssistIcon:GetHeight() or 12
+	local rankRightOffset = -(2 + roleWidth + 5)
+	local assignmentRightOffset = rankRightOffset - rankWidth - 2
+
+	if button._bflRankTooltip then
+		button._bflRankTooltip:ClearAllPoints()
+		button._bflRankTooltip:SetSize(rankWidth, rankHeight)
+		button._bflRankTooltip:SetPoint("RIGHT", button, "RIGHT", rankRightOffset, 1)
+	end
+	if button._bflMainTankTooltip then
+		button._bflMainTankTooltip:ClearAllPoints()
+		button._bflMainTankTooltip:SetSize(mainTankWidth, mainTankHeight)
+		button._bflMainTankTooltip:SetPoint("RIGHT", button, "RIGHT", assignmentRightOffset, 0)
+	end
+	if button._bflMainAssistTooltip then
+		button._bflMainAssistTooltip:ClearAllPoints()
+		button._bflMainAssistTooltip:SetSize(mainAssistWidth, mainAssistHeight)
+		button._bflMainAssistTooltip:SetPoint("RIGHT", button, "RIGHT", assignmentRightOffset, 0)
+	end
+end
+
+local function EnsureRaidAssignmentTooltip(button, texture, storageKey)
+	if not (button and texture) then
+		return nil
+	end
+	local hitBox = button[storageKey]
+	if hitBox then
+		return hitBox
+	end
+	hitBox = CreateFrame("Frame", nil, button)
+	hitBox:EnableMouse(true)
+	hitBox:SetFrameLevel(button:GetFrameLevel() + 3)
+	hitBox:SetScript("OnEnter", function(frame)
+		if not frame.tooltipText then
+			return
+		end
+		GameTooltip:SetOwner(frame, "ANCHOR_RIGHT")
+		GameTooltip_AddNormalLine(GameTooltip, frame.tooltipText)
+		GameTooltip:Show()
+	end)
+	hitBox:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+	hitBox:Hide()
+	button[storageKey] = hitBox
+	PositionRaidAssignmentTooltipHitboxes(button)
+	return hitBox
+end
+
+local function UpdateRaidAssignmentIcons(button, rank, raidRole, everyoneIsAssistant)
+	if not button then
+		return
+	end
+	local rankData
+	if rank == 2 then
+		rankData = RAID_ASSIGNMENT_ICON_DATA.leader
+	elseif rank == 1 or (everyoneIsAssistant and rank ~= 2) then
+		rankData = RAID_ASSIGNMENT_ICON_DATA.assistant
+	end
+	if button.RankIcon then
+		if rankData then
+			SetRaidAssignmentTexture(button.RankIcon, rankData)
+			button.RankIcon:Show()
+		else
+			button.RankIcon:Hide()
+		end
+	end
+
+	local mainTankData = raidRole == "MAINTANK" and RAID_ASSIGNMENT_ICON_DATA.mainTank or nil
+	if button.MainTankIcon then
+		if mainTankData then
+			SetRaidAssignmentTexture(button.MainTankIcon, mainTankData)
+			button.MainTankIcon:Show()
+		else
+			button.MainTankIcon:Hide()
+		end
+	end
+
+	local mainAssistData = raidRole == "MAINASSIST" and RAID_ASSIGNMENT_ICON_DATA.mainAssist or nil
+	if button.MainAssistIcon then
+		if mainAssistData then
+			SetRaidAssignmentTexture(button.MainAssistIcon, mainAssistData)
+			button.MainAssistIcon:Show()
+		else
+			button.MainAssistIcon:Hide()
+		end
+	end
+
+	local rankTooltip = EnsureRaidAssignmentTooltip(button, button.RankIcon, "_bflRankTooltip")
+	local tankTooltip = EnsureRaidAssignmentTooltip(button, button.MainTankIcon, "_bflMainTankTooltip")
+	local assistTooltip = EnsureRaidAssignmentTooltip(button, button.MainAssistIcon, "_bflMainAssistTooltip")
+	PositionRaidAssignmentTooltipHitboxes(button)
+	for _, entry in ipairs({
+		{ rankTooltip, rankData },
+		{ tankTooltip, mainTankData },
+		{ assistTooltip, mainAssistData },
+	}) do
+		local hitBox, iconData = entry[1], entry[2]
+		if hitBox then
+			hitBox.tooltipText = iconData and iconData.tooltip() or nil
+			hitBox:SetShown(iconData ~= nil)
+		end
+	end
+end
+
 -- ========================================
 -- RESPONSIVE LAYOUT (PHASE 4)
 -- ========================================
@@ -204,11 +392,20 @@ function RaidFrame:UpdateGroupLayout()
 
 	local insetWidth = inset:GetWidth()
 	local insetHeight = inset:GetHeight()
+	local modernLayout = IsModernRaidLayout()
+	local containerWidth = groupsContainer:GetWidth()
+	local containerHeight = groupsContainer:GetHeight()
+	local layoutWidth = modernLayout and containerWidth > 0 and containerWidth or insetWidth
+	local layoutHeight = modernLayout and containerHeight > 0 and containerHeight or insetHeight
 
-	-- PERFY OPTIMIZATION: Skip recalculation if inset dimensions haven't changed
-	local roundedWidth = math.floor(insetWidth + 0.5)
-	local roundedHeight = math.floor(insetHeight + 0.5)
-	if self._lastLayoutWidth == roundedWidth and self._lastLayoutHeight == roundedHeight then
+	-- PERFY OPTIMIZATION: Modern geometry is driven by the inner container,
+	-- whose padding may change independently from the outer inset.
+	local roundedWidth = math.floor(layoutWidth + 0.5)
+	local roundedHeight = math.floor(layoutHeight + 0.5)
+	if self._lastLayoutWidth == roundedWidth
+		and self._lastLayoutHeight == roundedHeight
+		and self._lastLayoutModern == modernLayout
+	then
 		-- Dimensions unchanged: skip grid recalculation but still refresh member buttons
 		-- (roster data may have changed even if frame size didn't)
 		self:UpdateAllMemberButtons()
@@ -216,13 +413,14 @@ function RaidFrame:UpdateGroupLayout()
 	end
 	self._lastLayoutWidth = roundedWidth
 	self._lastLayoutHeight = roundedHeight
+	self._lastLayoutModern = modernLayout
 
 	-- GroupsContainer padding (from XML)
-	local containerPaddingX = 20 -- 10px left + 10px right
-	local containerPaddingY = 4 -- 2px top + 2px bottom
+	local containerPaddingX = modernLayout and 18 or 20
+	local containerPaddingY = modernLayout and 14 or 4
 
-	local availableWidth = insetWidth - containerPaddingX
-	local availableHeight = insetHeight - containerPaddingY
+	local availableWidth = modernLayout and containerWidth > 0 and containerWidth or (insetWidth - containerPaddingX)
+	local availableHeight = modernLayout and containerHeight > 0 and containerHeight or (insetHeight - containerPaddingY)
 
 	-- BFL:DebugPrint("|cff00ff00=== RaidFrame Layout Debug ===|r")
 	-- BFL:DebugPrint(string.format("Frame size: %.1f x %.1f", frame:GetWidth(), frame:GetHeight()))
@@ -230,11 +428,12 @@ function RaidFrame:UpdateGroupLayout()
 	-- BFL:DebugPrint(string.format("Available space: %.1f x %.1f", availableWidth, availableHeight))
 
 	-- Group spacing and structure (from XML)
-	local groupGapX = 4 -- Horizontal gap between groups (reduced from 10 for better space usage)
-	local groupGapY = -5 -- Vertical gap between groups (reduced from 6 for tighter layout)
-	local groupHeaderHeight = 20 -- GroupTitle + padding (from XML: y="-7" to y="-20")
+	local groupGapX = modernLayout and 5 or 4
+	local groupGapY = modernLayout and 6 or -5
+	local groupHeaderHeight = modernLayout and MODERN_RAID_GROUP_HEADER_HEIGHT or 20
 	local buttonHeight = 20 -- Each member button (from XML)
-	local buttonGap = 2 -- Gap between buttons (from XML)
+	local buttonGap = modernLayout and 1 or 2
+	local groupBottomPadding = modernLayout and 4 or 0
 	local numButtons = 5 -- 5 slots per group
 
 	-- DYNAMIC GRID CALCULATION: Find optimal columns/rows for 8 groups
@@ -249,7 +448,9 @@ function RaidFrame:UpdateGroupLayout()
 
 	-- Try ONLY valid grid configurations that use all 8 groups
 	-- Valid layouts: 1×8, 2×4, 4×2, 8×1
-	local validLayouts = {
+	local validLayouts = modernLayout and {
+		{ cols = 2, rows = 4 },
+	} or {
 		{ cols = 1, rows = 8 },
 		{ cols = 2, rows = 4 },
 		{ cols = 4, rows = 2 },
@@ -325,7 +526,7 @@ function RaidFrame:UpdateGroupLayout()
 	-- 		bestCols, bestRows, bestGroupWidth, bestGroupHeight, bestArea))
 
 	-- Calculate proportional button dimensions
-	local newButtonHeight = (bestGroupHeight - groupHeaderHeight - (numButtons - 1) * buttonGap) / numButtons
+	local newButtonHeight = (bestGroupHeight - groupHeaderHeight - groupBottomPadding - (numButtons - 1) * buttonGap) / numButtons
 	local newButtonGap = buttonGap
 
 	-- BFL:DebugPrint(string.format("Button dimensions: %.1fpx height, %.1fpx gap", newButtonHeight, newButtonGap))
@@ -338,6 +539,16 @@ function RaidFrame:UpdateGroupLayout()
 		if group then
 			group:ClearAllPoints()
 			group:SetScale(1.0) -- No scaling!
+			if group.Background then
+				if modernLayout then
+					BFL.SetTextureOrAtlas(group.Background, "friends-card-raidBG")
+					group.Background:SetVertexColor(1, 1, 1, 1)
+					group.Background:Show()
+				else
+					group.Background:SetTexture(nil)
+					group.Background:SetColorTexture(0, 0, 0, 0)
+				end
+			end
 
 			-- Calculate column and row (0-indexed)
 			local col = (i - 1) % bestCols
@@ -352,8 +563,19 @@ function RaidFrame:UpdateGroupLayout()
 			-- Resize GroupTitle (stays at top)
 			if group.GroupTitle then
 				group.GroupTitle:ClearAllPoints()
-				group.GroupTitle:SetPoint("TOP", group, "TOP", 0, -7)
-				group.GroupTitle:SetWidth(bestGroupWidth)
+				if modernLayout then
+					group.GroupTitle:SetPoint("TOPLEFT", group, "TOPLEFT", 6, -4)
+					group.GroupTitle:SetWidth(bestGroupWidth - 12)
+					group.GroupTitle:SetJustifyH("LEFT")
+					ApplyModernRaidGroupTitleFont(group.GroupTitle)
+				else
+					group.GroupTitle:SetPoint("TOP", group, "TOP", 0, -7)
+					group.GroupTitle:SetWidth(bestGroupWidth)
+					group.GroupTitle:SetJustifyH("CENTER")
+					if BetterFriendlistFontNormalSmall then
+						group.GroupTitle:SetFontObject(BetterFriendlistFontNormalSmall)
+					end
+				end
 			end
 
 			-- Resize and reposition all 5 member button slots
@@ -361,7 +583,7 @@ function RaidFrame:UpdateGroupLayout()
 				local slot = group["Slot" .. slotNum]
 				if slot then
 					slot:ClearAllPoints()
-					slot:SetSize(bestGroupWidth, newButtonHeight)
+					slot:SetSize(bestGroupWidth - (modernLayout and 8 or 0), newButtonHeight)
 
 					-- Position: first slot below header, others stacked with gaps
 					if slotNum == 1 then
@@ -376,12 +598,16 @@ function RaidFrame:UpdateGroupLayout()
 						slot.Background:ClearAllPoints()
 						slot.Background:SetPoint("TOPLEFT", slot, "TOPLEFT", -3, 0)
 						slot.Background:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", 3, 0)
+						slot.Background:SetShown(not modernLayout)
 					end
 
 					if slot.ClassColorTint then
 						slot.ClassColorTint:ClearAllPoints()
 						slot.ClassColorTint:SetPoint("TOPLEFT", slot, "TOPLEFT", 1, -1)
 						slot.ClassColorTint:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", -1, 1)
+						slot.ClassColorTint:SetShown(
+							not modernLayout or (slot.memberData and slot.memberData._isMock == true)
+						)
 					end
 
 					if slot.CombatOverlay then
@@ -401,6 +627,7 @@ function RaidFrame:UpdateGroupLayout()
 					if slot.RoleIcon then
 						slot.RoleIcon:SetSize(iconSize, iconSize)
 					end
+					PositionRaidAssignmentTooltipHitboxes(slot)
 				end
 			end
 
@@ -429,6 +656,13 @@ function RaidFrame:UpdateControlPanelLayout()
 	local controlPanel = raidFrame.ControlPanel
 	if not controlPanel then
 		-- BFL:DebugPrint("|cffff0000[ControlPanel] ControlPanel not found|r")
+		return
+	end
+	if IsModernRaidLayout() then
+		local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+		if FriendsUI and FriendsUI.ApplyModernRaidGeometry then
+			FriendsUI:ApplyModernRaidGeometry()
+		end
 		return
 	end
 
@@ -587,9 +821,9 @@ end
 -- ========================================
 -- SECURE ATTRIBUTES SYSTEM
 -- ========================================
--- Retail SecretValues builds need the right-click UnitPopup to come from a small
--- UIParent proxy instead of the visual BFL raid button. The visual button keeps
--- left-click, drag, and non-menu fallback behavior.
+-- Attributes stay on the visual InsecureActionButtonTemplate buttons. That
+-- template performs secure actions outside combat without protecting the parent
+-- BFL frame or requiring a protected hover proxy to anchor to an insecure slot.
 
 local RAID_SHORTCUT_MODIFIERS = {
 	["SHIFT"] = "shift-",
@@ -656,82 +890,6 @@ local function ApplyRaidShortcutAttributes(button, shortcuts)
 	end
 end
 
-function RaidFrame:CreateSecureProxy()
-	if self.SecureProxy then
-		return
-	end
-
-	local proxy = CreateFrame("Button", "BFL_RaidFrame_SecureProxy", UIParent, "SecureActionButtonTemplate")
-
-	proxy:SetFrameStrata("DIALOG")
-	proxy:SetFrameLevel(9999)
-	proxy:SetAttribute("useOnKeyDown", false)
-	proxy:Hide()
-
-	local highlight = proxy:CreateTexture(nil, "HIGHLIGHT")
-	highlight:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
-	highlight:SetBlendMode("ADD")
-	highlight:SetAllPoints(proxy)
-	proxy:SetHighlightTexture(highlight)
-
-	proxy:RegisterForClicks("AnyUp")
-	if proxy.SetPassThroughButtons then
-		proxy:SetPassThroughButtons("LeftButton", "Button3", "Button4", "Button5")
-	end
-
-	proxy:SetScript("OnEnter", function(self)
-		local visualButton = self.visualButton
-		if visualButton then
-			self.unit = visualButton.unit
-			self.name = visualButton.name
-			self.id = tonumber(string.match(self.unit or "", "raid(%d+)"))
-			self.groupIndex = visualButton.groupIndex
-			self.slotIndex = visualButton.slotIndex
-			if visualButton.Highlight then
-				visualButton.Highlight:Show()
-			end
-		end
-
-		if self.unit then
-			pcall(UnitFrame_UpdateTooltip, self)
-		end
-	end)
-
-	proxy:SetScript("OnLeave", function(self)
-		local visualButton = self.visualButton
-		if visualButton and visualButton.Highlight then
-			visualButton.Highlight:Hide()
-		end
-		if GameTooltip and GameTooltip:GetOwner() == self then
-			GameTooltip:Hide()
-		end
-		self:Hide()
-		self:ClearAllPoints()
-		self.visualButton = nil
-		self.unit = nil
-		self.groupIndex = nil
-		self.slotIndex = nil
-	end)
-
-	proxy:RegisterEvent("PLAYER_REGEN_DISABLED")
-	proxy:SetScript("OnEvent", function(self, event)
-		if event == "PLAYER_REGEN_DISABLED" then
-			self:Hide()
-			self:ClearAllPoints()
-			self.visualButton = nil
-		end
-	end)
-
-	proxy:SetScript("PostClick", function(self, button)
-		local visualButton = self.visualButton
-		if visualButton and BetterRaidMemberButton_PostClick then
-			BetterRaidMemberButton_PostClick(visualButton, button)
-		end
-	end)
-
-	self.SecureProxy = proxy
-end
-
 --- Apply configured shortcuts directly to a raid member button
 -- ONLY MainTank/MainAssist via Secure Attributes (native types exist)
 -- Promote/Lead handled via OnClick callbacks (no native secure types)
@@ -740,6 +898,14 @@ function RaidFrame:UpdateSecureAttributesForButton(button)
 		return
 	end
 	if InCombatLockdown() then
+		return
+	end
+
+	-- ClearMockData() removes any prior live attributes before a preview preset
+	-- is installed. Do not touch the secure attribute system again while
+	-- painting synthetic rows; even nil writes are queued for next-frame secure
+	-- processing on Retail 12.1.
+	if button.memberData and button.memberData._isMock then
 		return
 	end
 
@@ -761,53 +927,12 @@ function RaidFrame:UpdateSecureAttributesForButton(button)
 	button:SetAttribute("*type1", nil)
 	button:SetAttribute("type1", nil)
 
-	-- SecretValues builds route the unmodified right-click menu through the
-	-- UIParent proxy. Pre-secret clients keep the direct UnitPopup fallback.
-	button:SetAttribute("type2", BFL.HasSecretValues and nil or "togglemenu")
+	-- Keep the unmodified right-click on the visual InsecureActionButtonTemplate.
+	-- PostClick must not reopen this menu from addon Lua on SecretValues builds.
+	button:SetAttribute("type2", "togglemenu")
 
 	-- Apply ONLY MainTank/MainAssist shortcuts (have native secure types)
 	ApplyRaidShortcutAttributes(button, shortcuts)
-end
-
-function RaidFrame:ShowSecureProxyForButton(button)
-	if not BFL.HasSecretValues then
-		return false
-	end
-	if InCombatLockdown() then
-		return false
-	end
-	if not button or not button.unit or button.pendingName or IsPendingRaidRosterName(button.name) then
-		return false
-	end
-	if not UnitExists(button.unit) then
-		return false
-	end
-
-	self:CreateSecureProxy()
-	local proxy = self.SecureProxy
-	if not proxy then
-		return false
-	end
-
-	ClearRaidButtonAttributes(proxy)
-	proxy.visualButton = button
-	proxy.unit = button.unit
-	proxy.name = button.name
-	proxy.groupIndex = button.groupIndex
-	proxy.slotIndex = button.slotIndex
-
-	proxy:SetAttribute("unit", button.unit)
-	proxy:SetAttribute("*type1", nil)
-	proxy:SetAttribute("type1", nil)
-	proxy:SetAttribute("type2", "togglemenu")
-
-	local DB = BFL and BFL:GetModule("DB")
-	ApplyRaidShortcutAttributes(proxy, DB and DB:Get("raidShortcuts") or {})
-
-	proxy:ClearAllPoints()
-	proxy:SetAllPoints(button)
-	proxy:Show()
-	return true
 end
 
 --- Handle Promote/Lead shortcuts via direct function calls
@@ -1162,8 +1287,18 @@ function RaidFrame:RegisterEvents()
 
 	-- Role assignment events
 	BFL:RegisterEventCallback("PLAYER_ROLES_ASSIGNED", function(...)
-		RaidFrame:UpdateRoleSummary()
+		RaidFrame:OnRaidRosterUpdate(...)
 	end, 50)
+
+	-- Retail 12.1's extracted Blizzard_RaidFrame refreshes the complete roster
+	-- for leadership/LFG restrictions and per-unit connection or level changes.
+	-- These events also exist on supported Classic clients, so the shared
+	-- coalesced refresh remains capability-safe without flavor branching.
+	for _, event in ipairs({ "PARTY_LEADER_CHANGED", "PARTY_LFG_RESTRICTED", "UNIT_CONNECTION", "UNIT_LEVEL" }) do
+		BFL:RegisterEventCallback(event, function(...)
+			RaidFrame:OnRaidRosterUpdate(...)
+		end, 50)
+	end
 
 	-- Instance info events
 	BFL:RegisterEventCallback("UPDATE_INSTANCE_INFO", function(...)
@@ -1366,28 +1501,23 @@ function RaidFrame:CacheFontSettings()
 	}
 end
 
---- Update all member buttons in the UI
-function RaidFrame:UpdateAllMemberButtons()
+function RaidFrame:PrepareMemberButtonUpdate()
 	local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
 	if not frame then
-		return
+		return false
 	end
 
-	-- Update font cache before processing buttons
 	self:CacheFontSettings()
-
-	-- Cache everyone-is-assistant flag for this update cycle
-	-- GetRaidRosterInfo returns rank=0 for regular members even when everyone-is-assistant is active,
-	-- so we need the global flag to properly show assistant icons for all non-leaders.
-	self.everyoneIsAssistant = IsEveryoneAssistant()
+	-- Preview data is not a real roster and must not consult the native raid
+	-- assignment state while its synthetic rows are being built.
+	self.everyoneIsAssistant = self.mockEnabled and false or IsEveryoneAssistant()
 
 	-- GroupsContainer is inside GroupsInset
 	local groupsContainer = frame.GroupsInset and frame.GroupsInset.GroupsContainer
 	if not groupsContainer then
-		return
+		return false
 	end
 
-	-- Organize members by subgroup
 	if not self._membersByGroup then
 		self._membersByGroup = {}
 		for i = 1, 8 do
@@ -1410,34 +1540,58 @@ function RaidFrame:UpdateAllMemberButtons()
 			table.insert(membersByGroup[subgroup], member)
 		end
 	end
+	return true
+end
 
-	-- Update each group's buttons
-	for groupIndex = 1, 8 do
-		-- Update group title
-		local groupFrame = groupsContainer["Group" .. groupIndex]
-		if groupFrame and groupFrame.GroupTitle then
-			groupFrame.GroupTitle:SetText(string.format(L.RAID_GROUP_NAME, groupIndex))
-		end
-
-		-- Update each slot in the group using self.memberButtons[]
-		local members = membersByGroup[groupIndex]
-		local hasGroupMembers = #members > 0
-
-		-- Always show group frame (User Request: Fix visibility)
-		if groupFrame then
-			groupFrame:Show()
-		end
-
-		if self.memberButtons[groupIndex] then
-			for slotIndex = 1, 5 do
-				local button = self.memberButtons[groupIndex][slotIndex]
-				if button then
-					local memberData = members[slotIndex]
-					self:UpdateMemberButton(button, memberData)
-				end
-			end
-		end
+function RaidFrame:PrepareMemberButtonGroup(groupIndex)
+	local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
+	local groupsContainer = frame and frame.GroupsInset and frame.GroupsInset.GroupsContainer
+	local members = self._membersByGroup and self._membersByGroup[groupIndex]
+	if not groupsContainer or not members then
+		return false
 	end
+
+	local groupFrame = groupsContainer["Group" .. groupIndex]
+	if groupFrame and groupFrame.GroupTitle then
+		groupFrame.GroupTitle:SetText(string.format(L.RAID_GROUP_NAME, groupIndex))
+	end
+	if groupFrame then
+		groupFrame:Show()
+	end
+	return true
+end
+
+function RaidFrame:UpdateMemberButtonSlot(groupIndex, slotIndex)
+	local members = self._membersByGroup and self._membersByGroup[groupIndex]
+	local button = self.memberButtons
+		and self.memberButtons[groupIndex]
+		and self.memberButtons[groupIndex][slotIndex]
+	if not members or not button then
+		return false
+	end
+	self:UpdateMemberButton(button, members[slotIndex])
+	return true
+end
+
+function RaidFrame:UpdateMemberButtonGroup(groupIndex)
+	if not self:PrepareMemberButtonGroup(groupIndex) then
+		return false
+	end
+	for slotIndex = 1, 5 do
+		self:UpdateMemberButtonSlot(groupIndex, slotIndex)
+	end
+	return true
+end
+
+--- Update all member buttons in the UI
+function RaidFrame:UpdateAllMemberButtons()
+	if not self:PrepareMemberButtonUpdate() then
+		return
+	end
+	for groupIndex = 1, 8 do
+		self:UpdateMemberButtonGroup(groupIndex)
+	end
+	self:UpdateCombatOverlay()
 end
 
 --- Initialize member buttons in all 8 groups
@@ -1475,6 +1629,9 @@ function RaidFrame:InitializeMemberButtons()
 					button.groupIndex = groupIndex
 					button.slotIndex = slotIndex
 					self.memberButtons[groupIndex][slotIndex] = button
+					EnsureRaidAssignmentTooltip(button, button.RankIcon, "_bflRankTooltip")
+					EnsureRaidAssignmentTooltip(button, button.MainTankIcon, "_bflMainTankTooltip")
+					EnsureRaidAssignmentTooltip(button, button.MainAssistIcon, "_bflMainAssistTooltip")
 
 					-- Note: Secure Proxy Link is handled by BetterRaidMemberButton_OnEnter in RaidFrameCallbacks.lua
 					-- We don't need to hook it here anymore.
@@ -1486,195 +1643,7 @@ end
 
 --- Update all member buttons based on current raid roster
 function RaidFrame:UpdateMemberButtons()
-	if not self.memberButtons or not self.raidMembers then
-		return
-	end
-
-	-- Ensure fonts are cached
-	self:CacheFontSettings()
-
-	-- Cache everyone-is-assistant flag for this update cycle
-	self.everyoneIsAssistant = IsEveryoneAssistant()
-
-	-- First, hide all buttons and clear secure attributes
-	local canSetAttributes = not InCombatLockdown()
-	for groupIndex = 1, 8 do
-		if self.memberButtons[groupIndex] then
-			for slotIndex = 1, 5 do
-				local button = self.memberButtons[groupIndex][slotIndex]
-				if button then
-					button:Hide()
-					button.memberData = nil
-					-- Fix #53: Clear secure attributes to prevent stale unit references
-					if canSetAttributes then
-						button:SetAttribute("unit", nil)
-						button:SetAttribute("type2", nil)
-					end
-				end
-			end
-		end
-	end
-
-	-- Now assign members to buttons based on their subgroup
-	for _, member in ipairs(self.raidMembers) do
-		local groupIndex = member.subgroup or 1
-		if groupIndex >= 1 and groupIndex <= 8 and self.memberButtons[groupIndex] then
-			-- Find first empty slot in this group
-			for slotIndex = 1, 5 do
-				local button = self.memberButtons[groupIndex][slotIndex]
-				if button and not button.memberData then
-					-- Assign member to this button
-					button.memberData = member
-					button:Show()
-
-					-- Update button visuals
-					self:UpdateMemberButtonVisuals(button, member)
-					break
-				end
-			end
-		end
-	end
-
-	-- Update combat overlay state
-	self:UpdateCombatOverlay()
-end
-
---- Update visual appearance of a member button
-function RaidFrame:UpdateMemberButtonVisuals(button, member)
-	if not button or not member then
-		return
-	end
-
-	-- Set secure unit attribute for targeting (must be set before combat)
-	if not InCombatLockdown() and member.unit then
-		button:SetAttribute("unit", member.unit)
-	end
-
-	-- Update class icon
-	if button.ClassIcon then
-		if member.classFileName then
-			button.ClassIcon:SetTexture("Interface\\WorldStateFrame\\Icons-Classes")
-			local coords = CLASS_ICON_TCOORDS[member.classFileName]
-			if coords then
-				button.ClassIcon:SetTexCoord(coords[1], coords[2], coords[3], coords[4])
-				button.ClassIcon:Show()
-			else
-				button.ClassIcon:Hide()
-			end
-		else
-			button.ClassIcon:Hide()
-		end
-	end
-
-	-- Store data in button for callbacks
-	button.unit = member.unit
-	button.name = member.name
-	button.raidSlot = member.index
-	button.pendingName = member.pendingName
-
-	-- Update level
-	if button.Level then
-		if member.level and member.level > 0 then
-			button.Level:SetText(member.level)
-			button.Level:Show()
-		else
-			button.Level:Hide()
-		end
-	end
-
-	-- Update name with class color
-	if button.Name then
-		button.Name:SetText(member.name or "")
-
-		-- Apply cached raid font with FontFamily fallback for non-roman alphabets
-		if self.fontCache and self.fontCache.name then
-			local fc = self.fontCache.name
-			if BFL.FontManager and BFL.FontManager.ApplyFont then
-				BFL.FontManager:ApplyFont(button.Name, fc.path, fc.size, fc.outline, fc.shadow)
-			else
-				SafeSetFont(button.Name, fc.path, fc.size, fc.outline)
-				if fc.shadow then
-					button.Name:SetShadowOffset(1, -1)
-				else
-					button.Name:SetShadowOffset(0, 0)
-				end
-			end
-		end
-
-		-- Apply class color
-		local classColor = RAID_CLASS_COLORS[member.classFileName]
-		if member.online then
-			if member.isDead then
-				-- Dead: Red
-				button.Name:SetTextColor(1.0, 0, 0)
-			elseif classColor then
-				-- Alive & Online: Class color
-				button.Name:SetTextColor(classColor.r, classColor.g, classColor.b)
-			else
-				-- Fallback: White
-				button.Name:SetTextColor(1.0, 1.0, 1.0)
-			end
-		else
-			-- Offline: Gray
-			button.Name:SetTextColor(0.5, 0.5, 0.5)
-		end
-	end
-
-	-- Update rank icon (Leader/Assistant)
-	if button.RankIcon then
-		if member.rank == 2 then
-			-- Leader
-			button.RankIcon:SetTexture("Interface\\GroupFrame\\UI-Group-LeaderIcon")
-			button.RankIcon:Show()
-		elseif member.rank == 1 or (self.everyoneIsAssistant and member.rank ~= 2) then
-			-- Assistant (individually promoted OR everyone-is-assistant flag active)
-			button.RankIcon:SetTexture("Interface\\GroupFrame\\UI-Group-AssistantIcon")
-			button.RankIcon:Show()
-		else
-			button.RankIcon:Hide()
-		end
-	end
-
-	-- Update role icon (Tank/Healer/DPS)
-	if button.RoleIcon then
-		if member.combatRole == "TANK" or member.combatRole == "HEALER" or member.combatRole == "DAMAGER" then
-			SetRoleIconTexture(button.RoleIcon, member.combatRole)
-			button.RoleIcon:Show()
-		else
-			button.RoleIcon:Hide()
-		end
-	end
-
-	-- Update Main Tank / Main Assist icons (raid role assignment)
-	if button.MainTankIcon then
-		if member.role == "MAINTANK" then
-			button.MainTankIcon:Show()
-		else
-			button.MainTankIcon:Hide()
-		end
-	end
-
-	if button.MainAssistIcon then
-		if member.role == "MAINASSIST" then
-			button.MainAssistIcon:Show()
-		else
-			button.MainAssistIcon:Hide()
-		end
-	end
-
-	-- Update ready check icon (will be updated by events)
-	if button.ReadyCheckIcon then
-		button.ReadyCheckIcon:Hide() -- Hidden by default
-	end
-
-	-- Update background alpha based on online status
-	if button.Background then
-		if member.online then
-			button.Background:SetAlpha(0.5)
-		else
-			button.Background:SetAlpha(0.3)
-		end
-	end
+	return self:UpdateAllMemberButtons()
 end
 
 --- Update Member Count display
@@ -1713,13 +1682,14 @@ function RaidFrame:UpdateControlPanel()
 
 	-- BFL:DebugPrint("[BFL] UpdateControlPanel called")
 
-	-- Set Assist All label if not already set
+	-- Modern mirrors Blizzard's separate assist icon + short label. Legacy keeps
+	-- the established inline icon text.
 	if frame.ControlPanel.EveryoneAssistLabel then
-		local currentText = frame.ControlPanel.EveryoneAssistLabel:GetText()
-		if not currentText or currentText == "" then
+		if IsModernRaidLayout() then
+			frame.ControlPanel.EveryoneAssistLabel:SetText(ALL_ASSIST_LABEL_SHORT or L.ALL or "All")
+		else
 			local ASSIST_ICON = "|TInterface\\GroupFrame\\UI-Group-AssistantIcon:14:14|t"
 			frame.ControlPanel.EveryoneAssistLabel:SetText(L.ALL .. " " .. ASSIST_ICON)
-			-- BFL:DebugPrint("[BFL] Assist All label set: All " .. ASSIST_ICON)
 		end
 	end
 
@@ -1782,6 +1752,7 @@ function RaidFrame:UpdateRoleSummary()
 	end
 
 	SetRoleCountDisplay(frame.ControlPanel.RoleSummary, tanks, healers, dps)
+	SetModernRoleCountDisplay(frame.ControlPanel, tanks, healers, dps)
 
 	-- Trigger layout update to recalculate centering with new string width
 	self:UpdateControlPanelLayout()
@@ -1811,7 +1782,7 @@ function RaidFrame:UpdateMemberButton(button, memberData)
 		-- Fix #53: Clear secure attributes to prevent interaction with Blizzard raid frame
 		-- Stale "unit" attributes on empty buttons cause the game's secure action system
 		-- to route actions through these buttons, interfering with Blizzard's raid frame
-		if not InCombatLockdown() then
+		if not self.mockEnabled and not InCombatLockdown() then
 			button:SetAttribute("unit", nil)
 			button:SetAttribute("type2", nil)
 		end
@@ -1844,7 +1815,9 @@ function RaidFrame:UpdateMemberButton(button, memberData)
 		end
 		if button.ClassColorTint then
 			button.ClassColorTint:SetColorTexture(0.1, 0.1, 0.1, 0.5)
+			button.ClassColorTint:SetShown(false)
 		end
+		UpdateRaidAssignmentIcons(button, nil, nil, false)
 
 		-- Show "Empty" text
 		if button.EmptyText then
@@ -1974,22 +1947,11 @@ function RaidFrame:UpdateMemberButton(button, memberData)
 		else
 			button.ClassColorTint:SetColorTexture(0.1, 0.1, 0.1, 0.5)
 		end
+		button.ClassColorTint:SetShown(not IsModernRaidLayout() or memberData._isMock == true)
 	end
 
-	-- Update Rank Icon (Leader/Assistant)
-	-- Also check everyone-is-assistant flag (GetRaidRosterInfo returns rank=0 even when flag is active)
 	local isEveryoneAssist = self.everyoneIsAssistant
-	if memberData.rank == 2 then
-		-- Leader
-		button.RankIcon:SetTexture("Interface\\GroupFrame\\UI-Group-LeaderIcon")
-		button.RankIcon:Show()
-	elseif memberData.rank == 1 or (isEveryoneAssist and memberData.rank ~= 2) then
-		-- Assistant (individually promoted OR everyone-is-assistant flag active)
-		button.RankIcon:SetTexture("Interface\\GroupFrame\\UI-Group-AssistantIcon")
-		button.RankIcon:Show()
-	else
-		button.RankIcon:Hide()
-	end
+	UpdateRaidAssignmentIcons(button, memberData.rank, memberData.role, isEveryoneAssist)
 
 	-- Update Role Icon (Tank/Healer/DPS)
 	-- FIX: Always fetch fresh from API if unit available, but keep stored roles for mock preview data
@@ -2009,23 +1971,6 @@ function RaidFrame:UpdateMemberButton(button, memberData)
 		button.RoleIcon:Show()
 	else
 		button.RoleIcon:Hide()
-	end
-
-	-- Update Main Tank / Main Assist Icons (raid role assignment)
-	if button.MainTankIcon then
-		if memberData.role == "MAINTANK" then
-			button.MainTankIcon:Show()
-		else
-			button.MainTankIcon:Hide()
-		end
-	end
-
-	if button.MainAssistIcon then
-		if memberData.role == "MAINASSIST" then
-			button.MainAssistIcon:Show()
-		else
-			button.MainAssistIcon:Hide()
-		end
 	end
 
 	-- Update Ready Check Icon (if active)
@@ -2351,6 +2296,22 @@ function RaidFrame:UpdateSavedInstances()
 				maxPlayers = maxPlayers,
 				numEncounters = numEncounters,
 				encounterProgress = encounterProgress,
+			})
+		end
+	end
+
+	local numWorldBosses = GetNumSavedWorldBosses and GetNumSavedWorldBosses() or 0
+	for i = 1, numWorldBosses do
+		local name, worldBossID, reset = GetSavedWorldBossInfo(i)
+		if name then
+			table.insert(self.savedInstances, {
+				index = i,
+				name = name,
+				id = worldBossID,
+				reset = reset,
+				locked = true,
+				isRaid = true,
+				isWorldBoss = true,
 			})
 		end
 	end
@@ -2910,14 +2871,19 @@ end
 --[[
 	Create standard 25-player raid (Heroic/Normal)
 ]]
-function RaidFrame:CreateMockPreset_Standard()
+function RaidFrame:CreateMockPreset_Standard(options)
+	options = options or {}
 	self:ClearMockData()
 	self.mockEnabled = true
 
 	self.raidMembers = GenerateRaidComposition(25)
 
-	self:ApplyMockData()
-	self:StartMockDynamicUpdates()
+	if not options.deferApply then
+		self:ApplyMockData()
+	end
+	if not options.deferDynamicUpdates then
+		self:StartMockDynamicUpdates()
+	end
 
 	BFL:DebugPrint("BFL RaidFrame: " .. BFL.L.RAID_MOCK_CREATED_25)
 	BFL:DebugPrint("  Tanks: 2, Healers: 5, DPS: 18")
@@ -3000,35 +2966,53 @@ end
 --[[
 	Apply mock data to the UI
 ]]
-function RaidFrame:ApplyMockData()
-	-- Build display list
-	self:BuildDisplayList()
-	self:UpdateMemberButtons()
+local MOCK_DATA_APPLY_PHASES = {
+	"build_display",
+	"member_buttons",
+	"visibility",
+	"control_panel",
+	"button_visuals",
+	"layout",
+}
 
-	-- Force UI to show mock raid (bypass IsInRaid() checks)
+function RaidFrame:GetMockDataApplyPhases()
+	return MOCK_DATA_APPLY_PHASES
+end
+
+function RaidFrame:ApplyMockDataPhase(phase)
+	if phase == "build_display" then
+		self:BuildDisplayList()
+		return
+	elseif phase == "member_buttons" then
+		self:UpdateAllMemberButtons()
+		return
+	end
+
 	local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
 	if not frame then
 		return
 	end
 
-	-- Hide "Not in Raid" text
-	if frame.NotInRaid then
-		frame.NotInRaid:Hide()
+	if phase == "visibility" then
+		if frame.NotInRaid then
+			frame.NotInRaid:Hide()
+		end
+		if frame.GroupsInset and frame.GroupsInset.GroupsContainer then
+			frame.GroupsInset.GroupsContainer:Show()
+		end
+	elseif phase == "control_panel" then
+		self:UpdateMockControlPanel()
+	elseif phase == "button_visuals" then
+		self:FixMockButtonVisuals()
+	elseif phase == "layout" then
+		self:UpdateGroupLayout()
 	end
+end
 
-	-- Show groups container
-	if frame.GroupsInset and frame.GroupsInset.GroupsContainer then
-		frame.GroupsInset.GroupsContainer:Show()
+function RaidFrame:ApplyMockData()
+	for _, phase in ipairs(MOCK_DATA_APPLY_PHASES) do
+		self:ApplyMockDataPhase(phase)
 	end
-
-	-- Update control panel
-	self:UpdateMockControlPanel()
-
-	-- Fix all button visuals
-	self:FixMockButtonVisuals()
-
-	-- Apply responsive layout
-	self:UpdateGroupLayout()
 end
 
 --[[
@@ -3048,8 +3032,12 @@ function RaidFrame:UpdateMockControlPanel()
 	end
 	if controlPanel.EveryoneAssistLabel then
 		controlPanel.EveryoneAssistLabel:Show()
-		local ASSIST_ICON = "|TInterface\\GroupFrame\\UI-Group-AssistantIcon:14:14|t"
-		controlPanel.EveryoneAssistLabel:SetText("All " .. ASSIST_ICON)
+		if IsModernRaidLayout() then
+			controlPanel.EveryoneAssistLabel:SetText(ALL_ASSIST_LABEL_SHORT or ALL or "All")
+		else
+			local ASSIST_ICON = "|TInterface\\GroupFrame\\UI-Group-AssistantIcon:14:14|t"
+			controlPanel.EveryoneAssistLabel:SetText("All " .. ASSIST_ICON)
+		end
 	end
 
 	-- Update member count
@@ -3075,6 +3063,7 @@ function RaidFrame:UpdateMockControlPanel()
 		end
 
 		SetRoleCountDisplay(controlPanel.RoleSummary, tanks, healers, dps)
+		SetModernRoleCountDisplay(controlPanel, tanks, healers, dps)
 	end
 
 	-- Trigger layout update
@@ -3436,6 +3425,7 @@ function RaidFrame:ClearMockData()
 						button.name = nil
 						button.raidSlot = nil
 						button.pendingName = nil
+						self:UpdateSecureAttributesForButton(button)
 					end
 				end
 			end

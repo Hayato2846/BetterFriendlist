@@ -198,7 +198,25 @@ function SkinEngine:RefreshThemeColors()
 end
 
 local function IsForbidden(frame)
-	return frame and frame.IsForbidden and frame:IsForbidden()
+	if not frame then
+		return false
+	end
+
+	-- 12.1 can constrain an object for the current execution context without
+	-- making the older IsForbidden() check sufficient. Test contextual access
+	-- first and treat an API failure as inaccessible.
+	if type(frame.CanBeAccessedInContext) == "function" then
+		local ok, canAccess = pcall(frame.CanBeAccessedInContext, frame)
+		if not ok or not canAccess then
+			return true
+		end
+	end
+
+	if type(frame.IsForbidden) == "function" then
+		local ok, forbidden = pcall(frame.IsForbidden, frame)
+		return not ok or forbidden == true
+	end
+	return false
 end
 
 local function GetObjectType(frame)
@@ -1547,12 +1565,12 @@ function SkinEngine:InstallButtonHooks(button)
 	button:HookScript("OnMouseUp", function(self)
 		if SkinEngine:IsActive() then
 			if self.BFL_DarkBorderlessIconButton then
-				local isMouseOver = MouseIsOver and MouseIsOver(self)
+				local isMouseOver = BFL:IsRegionMouseOver(self)
 				SkinEngine:ApplyButtonState(self, isMouseOver and "hover" or nil)
 			elseif self.BFL_DarkTabButton then
 				SkinEngine:RefreshRelatedTabs(self)
 			else
-				local isMouseOver = MouseIsOver and MouseIsOver(self)
+				local isMouseOver = BFL:IsRegionMouseOver(self)
 				SkinEngine:ApplyButtonState(self, isMouseOver and "hover" or nil)
 			end
 		end
@@ -1592,7 +1610,7 @@ function SkinEngine:InstallIconButtonHooks(button)
 	end)
 	button:HookScript("OnMouseUp", function(self)
 		if SkinEngine:IsActive() and self.BFL_DarkBorderlessIconButton then
-			local isMouseOver = MouseIsOver and MouseIsOver(self)
+			local isMouseOver = BFL:IsRegionMouseOver(self)
 			SkinEngine:ApplyButtonState(self, isMouseOver and "hover" or nil)
 		end
 	end)
@@ -2477,7 +2495,7 @@ function SkinEngine:GetDropdownMenu(dropdown)
 			SkinEngine:RenderCustomDropdown(self.ownerDropdown)
 		end)
 		menu:SetScript("OnLeave", function(self)
-			if MouseIsOver and (MouseIsOver(self) or MouseIsOver(self.ownerDropdown)) then
+			if BFL:IsRegionMouseOver(self) or BFL:IsRegionMouseOver(self.ownerDropdown) then
 				return
 			end
 			self:Hide()
@@ -2863,7 +2881,7 @@ function SkinEngine:InstallScrollThumbHooks(scrollBar, thumb)
 		target:HookScript("OnMouseUp", function(_, buttonName)
 			if buttonName == "LeftButton" then
 				owner.BFL_DarkScrollThumbDragging = nil
-				owner.BFL_DarkScrollThumbOver = MouseIsOver and MouseIsOver(target)
+				owner.BFL_DarkScrollThumbOver = BFL:IsRegionMouseOver(target)
 				refresh(owner.BFL_DarkScrollThumbOver and "hover" or nil)
 			end
 		end)
@@ -2890,7 +2908,7 @@ function SkinEngine:InstallScrollThumbHooks(scrollBar, thumb)
 		owner:HookScript("OnMouseUp", function(self, buttonName)
 			if buttonName == "LeftButton" then
 				self.BFL_DarkScrollThumbDragging = nil
-				self.BFL_DarkScrollThumbOver = MouseIsOver and MouseIsOver(self)
+				self.BFL_DarkScrollThumbOver = BFL:IsRegionMouseOver(self)
 				refresh(self.BFL_DarkScrollThumbOver and "hover" or nil)
 			end
 		end)
@@ -3248,8 +3266,8 @@ function SkinEngine:SkinRow(row)
 			backdrop:SetFrameLevel(row:GetFrameLevel() or 1)
 		end
 		self:InstallRowHooks(row)
-		if row.BFL_DarkRowOver == nil and MouseIsOver then
-			row.BFL_DarkRowOver = MouseIsOver(row) or nil
+		if row.BFL_DarkRowOver == nil then
+			row.BFL_DarkRowOver = BFL:IsRegionMouseOver(row) or nil
 		end
 	end
 	if row.background and row.BFL_DarkRowBackground ~= row.background then
@@ -3390,7 +3408,7 @@ function SkinEngine:InstallRowHooks(row)
 	row:HookScript("OnMouseUp", function(self, buttonName)
 		if SkinEngine:IsActive() and buttonName == "LeftButton" then
 			self.BFL_DarkRowMouseDown = nil
-			local isOver = self.BFL_DarkRowOver or (MouseIsOver and MouseIsOver(self))
+			local isOver = self.BFL_DarkRowOver or BFL:IsRegionMouseOver(self)
 			SkinEngine:ApplyRowState(self, isOver and "hover" or nil)
 		end
 	end)

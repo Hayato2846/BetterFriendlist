@@ -341,6 +341,7 @@ local GAME_PRIORITY = {
 	S1 = 2,
 	D3 = 3,
 	D4 = 3,
+	ANBS = 3,
 	OSI = 4,
 	Pro = 5,
 	Hero = 6,

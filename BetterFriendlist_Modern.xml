@@ -1,0 +1,405 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<!-- Retail 12.1 visual layer. Runtime capability checks live in Modules/FriendsUI.lua. -->
+	<Button name="BFLModernSideTabTemplate" inherits="LargeSideTabButtonTemplate" virtual="true">
+		<Layers>
+				<Layer level="ARTWORK">
+				<FontString parentKey="Count" inherits="GameFontHighlightSmall" justifyH="CENTER" justifyV="MIDDLE">
+					<Size x="32" y="18" />
+					<Anchors>
+						<Anchor point="BOTTOM" x="-2" y="6" />
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+	</Button>
+
+	<Button name="BFLModernFriendCardTemplate" virtual="true" registerForClicks="LeftButtonUp, RightButtonUp">
+		<Size x="366" y="70" />
+		<Layers>
+			<Layer level="BACKGROUND" textureSubLevel="-8">
+				<Texture parentKey="FactionTint" setAllPoints="true" alphaMode="BLEND" hidden="true">
+					<Color r="1" g="1" b="1" a="1" />
+				</Texture>
+				<!--
+					Faction color forms the opaque card base. The native card
+					surface is composited above it, while text remains on ARTWORK.
+				-->
+				<MaskTexture parentKey="FactionTintMask" atlas="friends-card-default" setAllPoints="true">
+					<MaskedTextures>
+						<MaskedTexture childKey="FactionTint" />
+					</MaskedTextures>
+				</MaskTexture>
+			</Layer>
+			<Layer level="BACKGROUND" textureSubLevel="-7">
+				<Texture parentKey="CardBackground" atlas="friends-card-default" setAllPoints="true" />
+			</Layer>
+			<!-- Runtime keeps this legacy compatibility region transparent. -->
+			<Layer level="BORDER" textureSubLevel="-8">
+				<Texture parentKey="background" setAllPoints="true">
+					<Color r="0" g="0" b="0" a="0" />
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture parentKey="status" file="Interface\FriendsFrame\StatusIcon-Online">
+					<Size x="19" y="19" />
+					<Anchors>
+						<Anchor point="LEFT" x="10" />
+					</Anchors>
+				</Texture>
+				<FontString parentKey="Name" inherits="BetterFriendlistFriendsFontNormal" justifyH="LEFT" maxLines="0" wordwrap="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="38" y="-11" />
+					</Anchors>
+				</FontString>
+				<FontString parentKey="Info" inherits="BetterFriendlistFriendsFontSmall" justifyH="LEFT" maxLines="1" wordwrap="false">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeKey="$parent.Name" relativePoint="BOTTOMLEFT" y="-4" />
+					</Anchors>
+					<Color color="FRIENDS_GRAY_COLOR" />
+				</FontString>
+				<Texture parentKey="gameIcon">
+					<Size x="28" y="28" />
+					<Anchors>
+						<Anchor point="RIGHT" x="-44" />
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Button parentKey="travelPassButton" hidden="true" motionScriptsWhileDisabled="true">
+				<Size x="34" y="34" />
+				<Anchors>
+					<Anchor point="RIGHT" x="-4" />
+				</Anchors>
+				<Layers>
+					<Layer level="OVERLAY">
+						<Texture parentKey="ActionIcon" atlas="friends-icon-friendsAvailable-dis" useAtlasSize="true">
+							<Anchors><Anchor point="CENTER" /></Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+				<NormalTexture parentKey="NormalTexture" atlas="common-button-tertiary-square-normal" />
+				<PushedTexture parentKey="PushedTexture" atlas="common-button-tertiary-square-pressed" />
+				<DisabledTexture parentKey="DisabledTexture" atlas="common-button-tertiary-square-normal" />
+				<HighlightTexture parentKey="HighlightTexture" atlas="common-button-tertiary-square-normal" alphaMode="ADD" />
+				<Scripts>
+					<OnClick>BetterFriendsList_TravelPassButton_OnClick(self);</OnClick>
+					<OnEnter>BetterFriendsList_TravelPassButton_OnEnter(self);</OnEnter>
+					<OnLeave>BFL_Tooltip:Hide();</OnLeave>
+				</Scripts>
+			</Button>
+		</Frames>
+		<HighlightTexture parentKey="highlight" atlas="friends-card-selected" alphaMode="ADD" />
+		<Scripts>
+			<OnClick>BetterFriendsList_Button_OnClick(self, button);</OnClick>
+			<OnDoubleClick>BetterFriendsList_Button_OnDoubleClick(self, button);</OnDoubleClick>
+			<OnEnter>BetterFriendsList_Button_OnEnter(self);</OnEnter>
+			<OnLeave>BetterFriendsList_Button_OnLeave(self);</OnLeave>
+		</Scripts>
+	</Button>
+
+	<!--
+		Keep the Modern group header visually aligned with Blizzard while BFL's
+		separately colored name/count layout remains independent of stateful
+		ButtonText font and anchor changes.
+	-->
+	<Button name="BFLModernGroupHeaderTemplate" virtual="true" enableMouse="true">
+		<Size x="366" y="24" />
+		<Layers>
+			<Layer level="ARTWORK">
+				<FontString parentKey="HeaderText" inherits="BetterFriendlistFontNormalLeft" justifyH="LEFT" justifyV="MIDDLE" maxLines="1" wordwrap="false">
+					<Anchors>
+						<Anchor point="LEFT" x="8" y="1" />
+					</Anchors>
+				</FontString>
+				<FontString parentKey="CountText" inherits="BetterFriendlistFontNormalLeft" justifyH="LEFT" justifyV="MIDDLE" maxLines="1" wordwrap="false">
+					<Anchors>
+						<Anchor point="LEFT" relativeKey="$parent.HeaderText" relativePoint="RIGHT" x="4" />
+					</Anchors>
+				</FontString>
+				<Texture parentKey="RightArrow" atlas="friendslist-categorybutton-arrow-right" useAtlasSize="true" hidden="true">
+					<Anchors><Anchor point="LEFT" x="8" /></Anchors>
+				</Texture>
+				<Texture parentKey="DownArrow" atlas="friendslist-categorybutton-arrow-down" useAtlasSize="true" hidden="true">
+					<Anchors><Anchor point="LEFT" x="6" y="-2" /></Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Button parentKey="CollapseButton" inherits="CollapseButtonTemplate">
+				<Anchors>
+					<Anchor point="RIGHT" x="-6" />
+				</Anchors>
+			</Button>
+		</Frames>
+		<NormalTexture atlas="common-button-list-collapseExpand" />
+		<HighlightTexture atlas="common-button-list-collapseExpand" alphaMode="ADD" alpha="0.4" />
+	</Button>
+
+	<Button name="BFLModernFriendRequestCardTemplate" virtual="true" registerForClicks="LeftButtonUp, RightButtonUp">
+		<Size x="366" y="70" />
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Background" atlas="friends-card-battleNet" setAllPoints="true" />
+			</Layer>
+			<Layer level="ARTWORK">
+				<FontString parentKey="RequestTimestamp" inherits="UserScaledFontBody" justifyH="LEFT" justifyV="MIDDLE" maxLines="1" wordwrap="false">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="10" y="-11" />
+						<Anchor point="RIGHT" x="-145" />
+					</Anchors>
+				</FontString>
+				<FontString parentKey="Name" inherits="UserScaledFontHeader" justifyH="LEFT" justifyV="MIDDLE" maxLines="1" wordwrap="false">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeKey="$parent.RequestTimestamp" relativePoint="BOTTOMLEFT" y="-4" />
+						<Anchor point="RIGHT" x="-145" />
+					</Anchors>
+				</FontString>
+				<FontString parentKey="FriendType" inherits="UserScaledFontBody" justifyH="LEFT" justifyV="MIDDLE" maxLines="1" wordwrap="false">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeKey="$parent.Name" relativePoint="BOTTOMLEFT" y="-4" />
+						<Anchor point="RIGHT" x="-145" />
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Button parentKey="AcceptButton" inherits="UserScaledFrameTemplate">
+				<Size x="90" y="34" />
+				<KeyValues>
+					<KeyValue key="baseWidth" value="90" type="number" />
+					<KeyValue key="baseHeight" value="34" type="number" />
+					<KeyValue key="maxWidth" value="110" type="number" />
+					<KeyValue key="useScaleWeight" value="true" type="boolean" />
+					<KeyValue key="useScaleWeightForHeight" value="true" type="boolean" />
+					<KeyValue key="scaleWeight" value="0.6" type="number" />
+				</KeyValues>
+				<Anchors><Anchor point="RIGHT" x="-32" y="-11" /></Anchors>
+				<ButtonText parentKey="Text" inherits="UserScaledFontGameHighlight" justifyH="CENTER" justifyV="MIDDLE" maxLines="1" wordwrap="false">
+					<Anchors><Anchor point="LEFT" x="8" /><Anchor point="RIGHT" x="-8" /></Anchors>
+				</ButtonText>
+				<NormalTexture parentKey="NormalTexture" atlas="common-button-tertiary-normal" />
+				<PushedTexture parentKey="PushedTexture" atlas="common-button-tertiary-pressed" />
+				<HighlightTexture parentKey="HighlightTexture" atlas="common-button-tertiary-normal" alphaMode="ADD" alpha="0.6" />
+			</Button>
+			<DropdownButton parentKey="DeclineButton" inherits="UserScaledFrameTemplate">
+				<Size x="23" y="23" />
+				<KeyValues>
+					<KeyValue key="baseWidth" value="23" type="number" />
+					<KeyValue key="baseHeight" value="23" type="number" />
+					<KeyValue key="useScaleWeight" value="true" type="boolean" />
+					<KeyValue key="useScaleWeightForHeight" value="true" type="boolean" />
+					<KeyValue key="scaleWeight" value="0.6" type="number" />
+				</KeyValues>
+				<Anchors><Anchor point="LEFT" relativeKey="$parent.AcceptButton" relativePoint="RIGHT" x="5" y="0" /></Anchors>
+				<NormalTexture atlas="auctionhouse-ui-filter-redx" setAllPoints="true" />
+				<HighlightTexture atlas="auctionhouse-ui-filter-redx" setAllPoints="true" alphaMode="ADD" alpha="0.4" />
+			</DropdownButton>
+		</Frames>
+		<HighlightTexture atlas="friends-card-selected" alphaMode="ADD" />
+	</Button>
+
+	<Button name="BFLModernFriendRequestHeaderTemplate" virtual="true" enableMouse="false">
+		<Size x="366" y="24" />
+		<Layers>
+			<Layer level="ARTWORK">
+				<FontString parentKey="ButtonText" inherits="UserScaledFontSystem15Shadow" justifyH="LEFT" justifyV="MIDDLE" maxLines="1" wordwrap="false">
+					<Anchors><Anchor point="LEFT" x="8" y="1" /><Anchor point="RIGHT" x="-8" y="1" /></Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<NormalTexture atlas="common-button-list-collapseExpand" />
+	</Button>
+
+	<Frame name="BFLModernFriendRequestSpacerTemplate" virtual="true">
+		<Size y="2" />
+	</Frame>
+
+	<Frame name="BFLModernFriendsRootTemplate" virtual="true">
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="ContentBackground" file="Interface\Buttons\WHITE8X8">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="4" y="-98" />
+						<Anchor point="BOTTOMRIGHT" x="-4" y="4" />
+					</Anchors>
+					<Color r="0" g="0" b="0" a="0.72" />
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture parentKey="TopFade" atlas="friends-frame-toptexbg" useAtlasSize="true">
+					<Anchors><Anchor point="TOP" y="-94" /></Anchors>
+				</Texture>
+				<Texture parentKey="BottomFade" atlas="friends-frame-bottomtexbg" useAtlasSize="true">
+					<Anchors><Anchor point="BOTTOM" /></Anchors>
+				</Texture>
+				<Texture parentKey="TopDivider" atlas="perks-divider-short" texelSnappingBias="0.0" snapToPixelGrid="false">
+					<Size x="400" y="3" />
+				</Texture>
+					<Texture parentKey="BottomDivider" atlas="perks-divider-short" texelSnappingBias="0.0" snapToPixelGrid="false">
+						<Size x="400" y="3" />
+					</Texture>
+					<FontString parentKey="FriendsDisabledText" inherits="UserScaledFontBody" hidden="true" justifyH="CENTER" justifyV="MIDDLE" wordwrap="true">
+						<Anchors>
+							<Anchor point="TOPLEFT" x="24" y="-120" />
+							<Anchor point="BOTTOMRIGHT" x="-24" y="60" />
+						</Anchors>
+					</FontString>
+					<MaskTexture parentKey="FadeMask" file="Interface\Buttons\WHITE8X8" hWrapMode="CLAMPTOBLACKADDITIVE" vWrapMode="CLAMPTOBLACKADDITIVE">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="4" y="-98" />
+						<Anchor point="BOTTOMRIGHT" x="-4" y="4" />
+					</Anchors>
+					<MaskedTextures>
+						<MaskedTexture childKey="TopFade" />
+						<MaskedTexture childKey="BottomFade" />
+					</MaskedTextures>
+				</MaskTexture>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Frame parentKey="PortraitOverlay" enableMouse="false">
+				<Size x="60" y="60" />
+				<Anchors><Anchor point="TOPLEFT" x="-5" y="7" /></Anchors>
+				<Layers>
+					<Layer level="ARTWORK">
+						<Texture parentKey="Icon" file="Interface\AddOns\BetterFriendlist\Textures\PortraitIcon">
+							<Size x="60" y="60" />
+							<Anchors><Anchor point="CENTER" /></Anchors>
+							<TexCoords left="0.08" right="0.92" top="0.08" bottom="0.92" />
+						</Texture>
+						<MaskTexture parentKey="Mask" file="Interface\CharacterFrame\TempPortraitAlphaMask" hWrapMode="CLAMPTOBLACKADDITIVE" vWrapMode="CLAMPTOBLACKADDITIVE">
+							<Size x="60" y="60" />
+							<Anchors><Anchor point="CENTER" /></Anchors>
+							<MaskedTextures><MaskedTexture childKey="Icon" /></MaskedTextures>
+						</MaskTexture>
+					</Layer>
+				</Layers>
+			</Frame>
+
+			<Frame parentKey="BattleNetBar">
+				<Size y="50" />
+				<Anchors>
+					<Anchor point="TOPLEFT" x="-1" y="-48" />
+					<Anchor point="TOPRIGHT" x="1" y="-48" />
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<Texture parentKey="Background" atlas="friends-frame-infobg" setAllPoints="true" />
+					</Layer>
+				</Layers>
+				<Frames>
+					<DropdownButton parentKey="MenuButton">
+						<Size x="34" y="34" />
+						<Anchors><Anchor point="RIGHT" x="-8" y="4" /></Anchors>
+						<Layers>
+							<Layer level="OVERLAY">
+								<Texture parentKey="Icon" atlas="friends-icon-menu" useAtlasSize="true">
+									<Anchors><Anchor point="CENTER" /></Anchors>
+								</Texture>
+							</Layer>
+						</Layers>
+						<NormalTexture parentKey="NormalTexture" atlas="common-button-tertiary-square-normal" />
+						<PushedTexture parentKey="PushedTexture" atlas="common-button-tertiary-square-pressed" />
+						<HighlightTexture parentKey="HighlightTexture" atlas="common-button-tertiary-square-normal" alphaMode="ADD" />
+					</DropdownButton>
+					<Button parentKey="CopyBattleTagButton">
+						<Size x="13" y="13" />
+						<Layers>
+							<Layer level="ARTWORK" textureSubLevel="1">
+								<Texture parentKey="Icon" atlas="friends-icon-battlenet-copy" useAtlasSize="true">
+									<Anchors><Anchor point="CENTER" /></Anchors>
+								</Texture>
+							</Layer>
+						</Layers>
+						<HighlightTexture parentKey="HighlightTexture" atlas="friends-icon-battlenet-copy" alphaMode="ADD" alpha="0.5" />
+					</Button>
+				</Frames>
+			</Frame>
+
+			<Frame parentKey="FilterBar">
+				<Size y="50" />
+				<Anchors>
+					<Anchor point="TOPLEFT" x="4" y="-98" />
+					<Anchor point="TOPRIGHT" x="-4" y="-98" />
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND"><Texture parentKey="Background" file="Interface\Buttons\WHITE8X8" setAllPoints="true" hidden="true"><Color r="0.04" g="0.04" b="0.04" a="0" /></Texture></Layer>
+				</Layers>
+				<Frames>
+					<DropdownButton parentKey="SortButton" inherits="WowStyle1FilterDropdownTemplate">
+						<Size x="92" y="29" />
+						<Anchors><Anchor point="RIGHT" x="-7" /></Anchors>
+						<KeyValues>
+							<KeyValue key="resizeToText" value="false" type="boolean" />
+							<KeyValue key="text" value="SORT_BY" type="global" />
+						</KeyValues>
+					</DropdownButton>
+					<DropdownButton parentKey="FilterDropdown" inherits="WowStyle1FilterDropdownTemplate">
+						<Size x="92" y="29" />
+						<KeyValues>
+							<KeyValue key="resizeToText" value="false" type="boolean" />
+							<KeyValue key="text" value="FILTER" type="global" />
+						</KeyValues>
+					</DropdownButton>
+					<DropdownButton parentKey="RecentFilterDropdown" inherits="WowStyle1FilterDropdownTemplate" hidden="true">
+						<Size x="92" y="29" />
+						<KeyValues>
+							<KeyValue key="resizeToText" value="false" type="boolean" />
+							<KeyValue key="text" value="FILTER" type="global" />
+						</KeyValues>
+					</DropdownButton>
+				</Frames>
+			</Frame>
+
+			<Frame parentKey="BottomActionBar">
+				<Size y="60" />
+				<Anchors><Anchor point="BOTTOMLEFT" x="4" /><Anchor point="BOTTOMRIGHT" x="-4" /></Anchors>
+				<Frames>
+					<Button parentKey="AddFriendButton" inherits="SharedButtonTemplate">
+						<Size x="160" y="30" />
+						<Anchors><Anchor point="BOTTOM" y="12" /></Anchors>
+					</Button>
+				</Frames>
+			</Frame>
+
+			<Frame parentKey="RequestsFrame" hidden="true">
+				<Anchors><Anchor point="TOPLEFT" x="8" y="-104" /><Anchor point="BOTTOMRIGHT" x="-8" y="42" /></Anchors>
+				<Frames>
+					<Frame parentKey="RealIDWarning" hidden="true" frameStrata="DIALOG" enableMouse="true">
+						<Anchors><Anchor point="TOPLEFT" /><Anchor point="BOTTOMRIGHT" /></Anchors>
+						<Layers>
+							<Layer level="BACKGROUND"><Texture parentKey="Background" file="Interface\Buttons\WHITE8X8" setAllPoints="true"><Color color="BLACK_FONT_COLOR" a="0.85" /></Texture></Layer>
+							<Layer level="ARTWORK">
+								<Texture parentKey="PlayerIcon" atlas="friends-icon-addFriend" useAtlasSize="true"><Anchors><Anchor point="TOP" y="-67" /></Anchors></Texture>
+								<Texture parentKey="BattleNetIcon" atlas="friends-icon-addFriend-logo-battleNet" useAtlasSize="true"><Anchors><Anchor point="BOTTOMLEFT" relativeKey="$parent.PlayerIcon" relativePoint="BOTTOM" y="10" /></Anchors></Texture>
+								<FontString parentKey="Text" inherits="UserScaledFontGameHighlight" justifyH="CENTER" justifyV="MIDDLE" wordwrap="true">
+									<Anchors>
+										<Anchor point="TOP" relativeKey="$parent.PlayerIcon" relativePoint="BOTTOM" y="-27" />
+										<Anchor point="LEFT" x="30" />
+										<Anchor point="RIGHT" x="-30" />
+										<Anchor point="BOTTOM" relativeKey="$parent.ContinueButton" relativePoint="TOP" y="20" />
+									</Anchors>
+									<Color color="HIGHLIGHT_FONT_COLOR" />
+								</FontString>
+							</Layer>
+						</Layers>
+						<Frames>
+							<Button parentKey="ContinueButton" inherits="SharedButtonTemplate">
+								<Size x="100" y="30" />
+								<Anchors><Anchor point="TOP" relativePoint="BOTTOM" y="95" /></Anchors>
+							</Button>
+						</Frames>
+					</Frame>
+					<Frame parentKey="ScrollBox" inherits="WowScrollBoxList">
+						<Anchors><Anchor point="TOPLEFT" /><Anchor point="BOTTOMRIGHT" x="-18" /></Anchors>
+					</Frame>
+					<EventFrame parentKey="ScrollBar" inherits="MinimalScrollBar">
+						<Anchors><Anchor point="TOPLEFT" relativeKey="$parent.ScrollBox" relativePoint="TOPRIGHT" x="4" /><Anchor point="BOTTOMLEFT" relativeKey="$parent.ScrollBox" relativePoint="BOTTOMRIGHT" x="4" /></Anchors>
+					</EventFrame>
+				</Frames>
+				<Layers><Layer level="ARTWORK"><FontString parentKey="EmptyLabel" inherits="BetterFriendlistFontLarge" justifyH="CENTER" wordwrap="true" hidden="true"><Anchors><Anchor point="CENTER" /><Anchor point="LEFT" x="30" /><Anchor point="RIGHT" x="-30" /></Anchors><Color color="FRIENDS_GRAY_COLOR" /></FontString></Layer></Layers>
+			</Frame>
+		</Frames>
+	</Frame>
+</Ui>

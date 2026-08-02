@@ -108,6 +108,14 @@ function StreamerMode:UpdateAdjacentButtonAnchors()
 	if not BetterFriendsFrame then
 		return
 	end
+	local FriendsUI = BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() then
+		-- Modern places Streamer Mode at the right edge of the Battle.net bar
+		-- and Raid Help in the raid control row. FriendsUI owns both anchors.
+		FriendsUI:LayoutBattleTagActions()
+		FriendsUI:ApplyModernRaidGeometry()
+		return
+	end
 
 	local helpButton = BetterFriendsFrame.HelpButton
 	if helpButton then
@@ -127,6 +135,11 @@ function StreamerMode:UpdateAdjacentButtonAnchors()
 				helpButton:SetPoint("TOPRIGHT", self.toggleButton, "TOPLEFT", 0, 0)
 			end
 		end
+	end
+
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() and FriendsUI.LayoutBattleTagActions then
+		FriendsUI:LayoutBattleTagActions()
 	end
 end
 
