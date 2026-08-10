@@ -5205,6 +5205,7 @@ local function RegisterBuiltInTests()
 
 			local calls = {
 				buttons = {},
+				checkboxes = {},
 				dropdowns = {},
 				editBoxes = {},
 				tabs = {},
@@ -5218,6 +5219,11 @@ local function RegisterBuiltInTests()
 					end
 				end,
 				StateButtonLabel = function() end,
+				Checkbox = function(checkbox)
+					if checkbox then
+						calls.checkboxes[checkbox] = true
+					end
+				end,
 				Dropdown = function(dropdown)
 					if dropdown then
 						calls.dropdowns[dropdown] = true
@@ -5302,6 +5308,25 @@ local function RegisterBuiltInTests()
 				end
 
 				skin:SkinLegacyChrome(frame)
+				local checkedTexture = MakeTexture()
+				local checkbox = MakeButton()
+				function checkbox:GetCheckedTexture()
+					return checkedTexture
+				end
+				function checkbox:GetDisabledCheckedTexture()
+					return nil
+				end
+				skin:SkinCheckbox(checkbox)
+				V:Assert(calls.checkboxes[checkbox] == true, "Legacy checkbox should use the EUI facade")
+				V:Assert(checkedTexture.desaturated == true, "Legacy checkbox should discard its native checkmark hue")
+				V:AssertEqual(checkedTexture.vertexColor[1], 0.12, "Legacy checkbox should use pure EUI accent red")
+				V:AssertEqual(checkedTexture.vertexColor[2], 0.73, "Legacy checkbox should use pure EUI accent green")
+				V:AssertEqual(checkedTexture.vertexColor[3], 0.54, "Legacy checkbox should use pure EUI accent blue")
+				checkedTexture:SetDesaturated(false)
+				checkedTexture:SetVertexColor(0, 1, 0, 1)
+				checkbox.hooks.OnShow[1]()
+				V:Assert(checkedTexture.desaturated == true, "Legacy checkbox refresh should neutralize native color again")
+				V:AssertEqual(checkedTexture.vertexColor[2], 0.73, "Legacy checkbox refresh should restore EUI accent")
 				for _, editBox in ipairs({
 					header.SearchBox,
 					frame.GuildFrame.SearchBox,
@@ -5370,12 +5395,12 @@ local function RegisterBuiltInTests()
 					"Interface\\AddOns\\BetterFriendlist\\Textures\\PortraitIcon",
 					"Legacy EUI logo should reuse the BFL portrait artwork"
 				)
-				V:AssertEqual(portrait.width, 42, "Legacy EUI logo should use the compact EUI header size")
+				V:AssertEqual(portrait.width, 34, "Legacy EUI logo should leave space above the search row")
 				V:Assert(portrait.shown == true, "Legacy EUI logo should be visible")
-				V:AssertEqual(frame.PortraitButton.point[1], "TOPLEFT", "Legacy EUI logo button should use the Modern anchor")
+				V:AssertEqual(frame.PortraitButton.point[1], "TOPLEFT", "Legacy EUI logo button should use the header anchor")
 				V:AssertEqual(frame.PortraitButton.point[2], frame, "Legacy EUI logo button should anchor to the main frame")
-				V:AssertEqual(frame.PortraitButton.point[4], 6, "Legacy EUI logo should match the Modern horizontal offset")
-				V:AssertEqual(frame.PortraitButton.point[5], -25, "Legacy EUI logo should match the Modern vertical offset")
+				V:AssertEqual(frame.PortraitButton.point[4], 15, "Legacy EUI logo should align with the search field")
+				V:AssertEqual(frame.PortraitButton.point[5], -21, "Legacy EUI logo should meet the top header edge")
 
 				local invite = {
 					AcceptButton = MakeButton(),

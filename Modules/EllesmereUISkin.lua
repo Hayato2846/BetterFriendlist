@@ -14,6 +14,26 @@ local BFL_PORTRAIT_TEXTURE = "Interface\\AddOns\\BetterFriendlist\\Textures\\Por
 local EUI_PORTRAIT_OFFSET_X = 6
 local EUI_PORTRAIT_OFFSET_Y = -25
 local EUI_PORTRAIT_SIZE = 42
+local EUI_LEGACY_PORTRAIT_OFFSET_X = 15
+local EUI_LEGACY_PORTRAIT_OFFSET_Y = -21
+local EUI_LEGACY_PORTRAIT_SIZE = 34
+local LEGACY_SETTINGS_REFRESH_METHODS = {
+	"RefreshThemeTab",
+	"RefreshFriendTabsTab",
+	"RefreshGeneralTab",
+	"RefreshContactMemoryTab",
+	"RefreshFriendTagsTab",
+	"RefreshGuildTab",
+	"RefreshFontsTab",
+	"RefreshGroupsTab",
+	"RefreshAdvancedTab",
+	"RefreshFilterSortTab",
+	"RefreshBrokerTab",
+	"RefreshGlobalSyncTab",
+	"RefreshStreamerTab",
+	"RefreshRaidTab",
+	"RefreshWhoTab",
+}
 
 local function SafeCall(api, method, ...)
 	local callback = api and api[method]
@@ -21,6 +41,47 @@ local function SafeCall(api, method, ...)
 		return false
 	end
 	return pcall(callback, ...)
+end
+
+local function RefreshCheckboxAccent(api, checkbox)
+	if not checkbox then
+		return
+	end
+	local r, g, b = 0.047, 0.824, 0.616
+	if api and type(api.GetAccentColor) == "function" then
+		local ok, accentR, accentG, accentB = pcall(api.GetAccentColor)
+		if ok and tonumber(accentR) and tonumber(accentG) and tonumber(accentB) then
+			r, g, b = accentR, accentG, accentB
+		end
+	end
+	for _, texture in ipairs({
+		checkbox.GetCheckedTexture and checkbox:GetCheckedTexture(),
+		checkbox.GetDisabledCheckedTexture and checkbox:GetDisabledCheckedTexture(),
+	}) do
+		if texture.SetDesaturated then
+			texture:SetDesaturated(true)
+		end
+		if texture.SetVertexColor then
+			texture:SetVertexColor(r, g, b, 1)
+		end
+	end
+end
+
+local function SkinCheckbox(api, checkbox)
+	if not checkbox then
+		return
+	end
+	SafeCall(api, "Checkbox", checkbox)
+	RefreshCheckboxAccent(api, checkbox)
+	if not checkbox.BFL_EllesmereAccentCheckHooks and checkbox.HookScript then
+		checkbox.BFL_EllesmereAccentCheckHooks = true
+		local function RefreshAccent()
+			RefreshCheckboxAccent(api, checkbox)
+		end
+		for _, event in ipairs({ "OnShow", "OnClick", "OnEnter", "OnLeave", "OnEnable", "OnDisable" }) do
+			checkbox:HookScript(event, RefreshAccent)
+		end
+	end
 end
 
 local function IsForbidden(frame)
@@ -102,7 +163,7 @@ local function SkinWidget(api, frame)
 	if objectType == "EditBox" then
 		SafeCall(api, "EditBox", frame)
 	elseif objectType == "CheckButton" then
-		SafeCall(api, "Checkbox", frame)
+		SkinCheckbox(api, frame)
 	elseif objectType == "StatusBar" then
 		SafeCall(api, "ApplyBarFill", frame)
 	elseif LooksLikeDropdown(frame, name) then
@@ -347,6 +408,13 @@ function EllesmereUISkin:ApplyAccentIcon(icon)
 	end
 end
 
+function EllesmereUISkin:SkinCheckbox(checkbox)
+	if not self:IsSkinEnabled() or not checkbox then
+		return
+	end
+	SkinCheckbox(self.facade, checkbox)
+end
+
 function EllesmereUISkin:SkinIconButton(button)
 	if not self:IsSkinEnabled() or not button then
 		return
@@ -401,10 +469,10 @@ function EllesmereUISkin:SkinLegacyPortrait(frame)
 		"TOPLEFT",
 		frame,
 		"TOPLEFT",
-		EUI_PORTRAIT_OFFSET_X,
-		EUI_PORTRAIT_OFFSET_Y
+		EUI_LEGACY_PORTRAIT_OFFSET_X,
+		EUI_LEGACY_PORTRAIT_OFFSET_Y
 	)
-	portraitButton:SetSize(EUI_PORTRAIT_SIZE, EUI_PORTRAIT_SIZE)
+	portraitButton:SetSize(EUI_LEGACY_PORTRAIT_SIZE, EUI_LEGACY_PORTRAIT_SIZE)
 	local icon = portraitButton.BFL_EllesmerePortraitIcon
 	if not icon then
 		-- EUI's Shell primitive intentionally fades direct textures on the main
@@ -417,7 +485,7 @@ function EllesmereUISkin:SkinLegacyPortrait(frame)
 	end
 	icon:ClearAllPoints()
 	icon:SetPoint("TOPLEFT", portraitButton, "TOPLEFT", 0, 0)
-	icon:SetSize(EUI_PORTRAIT_SIZE, EUI_PORTRAIT_SIZE)
+	icon:SetSize(EUI_LEGACY_PORTRAIT_SIZE, EUI_LEGACY_PORTRAIT_SIZE)
 	if icon.SetDesaturated then
 		icon:SetDesaturated(false)
 	end
@@ -781,6 +849,19 @@ function EllesmereUISkin:InstallHooks()
 	HookObject(BFL:GetModule("RaidTools"), "RaidTools", "CreateFrame")
 	HookObject(BFL:GetModule("WhoFrame"), "WhoFrame", "CreateSearchBuilder")
 	HookObject(BFL:GetModule("WhoFrame"), "WhoFrame", "ToggleSearchBuilder")
+	local Settings = BFL:GetModule("Settings")
+	if Settings then
+		for _, methodName in ipairs(LEGACY_SETTINGS_REFRESH_METHODS) do
+			if type(Settings[methodName]) == "function" then
+				hooksecurefunc(Settings, methodName, function()
+					-- Legacy settings pages destroy/recreate their controls on every
+					-- refresh. Skin the completed page synchronously so native green
+					-- checkmarks or dropdown chrome never become the final state.
+					self:SkinLegacySettings()
+				end)
+			end
+		end
+	end
 	if type(BFL.ApplyTabVisualState) == "function" then
 		hooksecurefunc(BFL, "ApplyTabVisualState", function(_, tab)
 			-- BFL reapplies font objects and colors after PanelTemplates changes
