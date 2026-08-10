@@ -326,6 +326,8 @@ function EllesmereUISkin:SkinModernChrome(frame, FriendsUI)
 	local api = self.facade
 	local root = FriendsUI.root
 	local header = frame.FriendsTabHeader
+	local guild = frame.GuildFrame
+	local who = frame.WhoFrame
 	if not root then
 		return
 	end
@@ -335,6 +337,10 @@ function EllesmereUISkin:SkinModernChrome(frame, FriendsUI)
 	SafeCall(api, "Dropdown", root.FilterBar and root.FilterBar.FilterDropdown)
 	SafeCall(api, "Dropdown", root.FilterBar and root.FilterBar.RecentFilterDropdown)
 	SafeCall(api, "Dropdown", root.FilterBar and root.FilterBar.SortButton)
+	SafeCall(api, "EditBox", guild and guild.SearchBox)
+	SafeCall(api, "Dropdown", guild and guild.FilterDropdown)
+	SafeCall(api, "Dropdown", guild and guild.SortDropdown)
+	SafeCall(api, "Dropdown", who and who.ColumnDropdown)
 	SafeCall(api, "Button", root.BattleNetBar and root.BattleNetBar.MenuButton, { "Icon" })
 	self:SkinFooterActionButton(root.BottomActionBar and root.BottomActionBar.AddFriendButton)
 
@@ -344,7 +350,6 @@ function EllesmereUISkin:SkinModernChrome(frame, FriendsUI)
 	local raf = frame.RecruitAFriendFrame
 	local raid = frame.RaidFrame
 	local raidControl = raid and raid.ControlPanel
-	local who = frame.WhoFrame
 	self:SkinActionButton(frame.RecruitmentButton)
 	self:SkinActionButton(raf and raf.RewardClaiming and raf.RewardClaiming.ClaimOrViewRewardButton)
 	self:SkinActionButton(raidControl and raidControl.RaidInfoButton)
