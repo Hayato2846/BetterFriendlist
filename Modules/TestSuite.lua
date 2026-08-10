@@ -5102,6 +5102,10 @@ local function RegisterBuiltInTests()
 				for _, key in ipairs({ "background", "surface", "inset", "control", "border", "accent", "text" }) do
 					V:Assert(type(palette[key]) == "table" and #palette[key] == 4, "EUI palette resolves " .. key)
 				end
+				V:Assert(palette.externalShell == true, "EUI palette should preserve the public EUI shell")
+				V:Assert(palette.externalControls == true, "EUI palette should delegate controls to the public EUI API")
+				V:Assert(palette.friendsStyle == true, "EUI palette should request EUIFriends-style Modern surfaces")
+				V:Assert(palette.background[4] < 0.5, "BFL content wash should not cover the EUI shell")
 			end)
 			skin.facade = originalFacade
 			skin.facadeActivated = originalFacadeActivated

@@ -513,7 +513,7 @@ local function ApplyModernControlTheme(control, palette, themed)
 	if not control then
 		return
 	end
-	if themed then
+	if themed and not palette.externalControls then
 		local SkinEngine = BFL:GetModule("SkinEngine")
 		if SkinEngine and SkinEngine.StyleBackdrop then
 			SkinEngine:StyleBackdrop(control, palette.control, palette.border)
@@ -4189,7 +4189,7 @@ function FriendsUI:ApplyTheme(theme)
 	local modernActive = self:IsModernActive()
 	local battleNetDisplay = header and header.BattlenetFrame
 	local SkinEngine = BFL:GetModule("SkinEngine")
-	if modernActive and themed and SkinEngine and SkinEngine.StyleBackdrop and frame then
+	if modernActive and themed and not palette.externalShell and SkinEngine and SkinEngine.StyleBackdrop and frame then
 		SkinEngine:StyleBackdrop(frame, palette.background, palette.border)
 	end
 
@@ -4234,10 +4234,10 @@ function FriendsUI:ApplyTheme(theme)
 	if modernActive then
 		ApplyModernOwnedSurface(self.root.BattleNetBar, palette.surface, false)
 		SafeShow(self.root.BattleNetBar.BFL_DarkBackdrop, false)
-		ApplyModernOwnedSurface(battleNetDisplay, palette.control, themed)
+		ApplyModernOwnedSurface(battleNetDisplay, palette.control, themed and not palette.externalControls)
 		ApplyModernControlTheme(header and header.StatusDropdown, palette, themed)
 		ApplyModernControlTheme(header and header.SearchBox, palette, themed)
-		if themed and SkinEngine and SkinEngine.StyleBackdrop then
+		if themed and not palette.externalControls and SkinEngine and SkinEngine.StyleBackdrop then
 			SkinEngine:StyleBackdrop(battleNetDisplay, palette.control, palette.border)
 		end
 	end
@@ -4257,7 +4257,12 @@ function FriendsUI:ApplyTheme(theme)
 		if not streamerActive then
 			self:RefreshBattleTag()
 		end
-		ApplyThemedFontColor(battleNetDisplay, battleNetDisplay and battleNetDisplay.Tag, MODERN_WHITE, themed)
+		ApplyThemedFontColor(
+			battleNetDisplay,
+			battleNetDisplay and battleNetDisplay.Tag,
+			palette.battleTagText or MODERN_WHITE,
+			themed
+		)
 		ApplyThemedFontColor(
 			battleNetDisplay,
 			battleNetDisplay and battleNetDisplay.UnavailableLabel,
@@ -4439,6 +4444,12 @@ function FriendsUI:StyleFriendCard(button)
 	end
 	-- FriendsList owns row height and the top-down text stack. Modern styling
 	-- must not replace that calculated extent with the old 70/46px presets.
+	if palette.friendsStyle then
+		local EllesmereUISkin = BFL:GetModule("EllesmereUISkin")
+		if EllesmereUISkin and EllesmereUISkin.SkinModernFriendCard then
+			EllesmereUISkin:SkinModernFriendCard(button)
+		end
+	end
 end
 
 function FriendsUI:StyleQuickJoinCard(button)
@@ -4569,6 +4580,12 @@ function FriendsUI:StyleGroupHeader(button)
 	end
 	if button.ThemeTint then
 		button.ThemeTint:Hide()
+	end
+	if palette.friendsStyle then
+		local EllesmereUISkin = BFL:GetModule("EllesmereUISkin")
+		if EllesmereUISkin and EllesmereUISkin.SkinModernGroupHeader then
+			EllesmereUISkin:SkinModernGroupHeader(button)
+		end
 	end
 end
 
