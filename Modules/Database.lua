@@ -53,7 +53,7 @@ local defaults = {
 	preferredGameAccounts = {}, -- {friendUID: gameAccountID} - user-selected preferred game account per friend
 	-- Visual Settings
 	compactMode = false, -- Use compact button layout
-	theme = "blizzard", -- UI theme: "blizzard", "dark", "custom", "elvui"
+	theme = "blizzard", -- UI theme: "blizzard", "dark", "custom", "elvui", "ellesmereui"
 	darkThemeSettings = ThemePalette and ThemePalette:GetDefaultDarkSettings() or {},
 	customThemeSettings = ThemePalette and ThemePalette:GetDefaultCustomSettings() or {},
 	customTheme = {},
@@ -226,6 +226,7 @@ local defaults = {
 		dark = {},
 		custom = {},
 		elvui = {},
+		ellesmereui = {},
 	}, -- Per-theme broker tooltip background overrides; nil values inherit theme defaults
 	brokerShowColStatus = false, -- Column: Status icon (default: OFF)
 	brokerGroupHeaderAlign = "LEFT", -- Friends Broker group header alignment: LEFT/CENTER/RIGHT
@@ -355,6 +356,7 @@ local VALID_THEMES = {
 	dark = true,
 	custom = true,
 	elvui = true,
+	ellesmereui = true,
 }
 
 local THEME_SETTINGS_INDEPENDENT_DEFAULTS_VERSION = 1
@@ -436,7 +438,11 @@ function DB:NormalizeThemeSetting()
 	-- Per-theme palette data is normalized separately below.
 	if BetterFriendlistDB.theme == "elvui" then
 		BetterFriendlistDB.enableElvUISkin = true
-	elseif BetterFriendlistDB.theme == "dark" or BetterFriendlistDB.theme == "custom" then
+	elseif
+		BetterFriendlistDB.theme == "dark"
+		or BetterFriendlistDB.theme == "custom"
+		or BetterFriendlistDB.theme == "ellesmereui"
+	then
 		BetterFriendlistDB.enableElvUISkin = false
 	elseif BetterFriendlistDB.enableElvUISkin == nil then
 		BetterFriendlistDB.enableElvUISkin = false
@@ -466,13 +472,19 @@ function DB:NormalizeThemeSettings()
 	if type(BetterFriendlistDB.brokerTooltipThemeSettings) ~= "table" then
 		BetterFriendlistDB.brokerTooltipThemeSettings = self:InternalDeepCopy(defaults.brokerTooltipThemeSettings)
 	else
-		for _, theme in ipairs({ "blizzard", "dark", "custom", "elvui" }) do
+		for _, theme in ipairs({ "blizzard", "dark", "custom", "elvui", "ellesmereui" }) do
 			if type(BetterFriendlistDB.brokerTooltipThemeSettings[theme]) ~= "table" then
 				BetterFriendlistDB.brokerTooltipThemeSettings[theme] = {}
 			end
 		end
 		for theme in pairs(BetterFriendlistDB.brokerTooltipThemeSettings) do
-			if theme ~= "blizzard" and theme ~= "dark" and theme ~= "custom" and theme ~= "elvui" then
+			if
+				theme ~= "blizzard"
+				and theme ~= "dark"
+				and theme ~= "custom"
+				and theme ~= "elvui"
+				and theme ~= "ellesmereui"
+			then
 				BetterFriendlistDB.brokerTooltipThemeSettings[theme] = nil
 			end
 		end

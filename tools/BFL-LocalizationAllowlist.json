@@ -9,6 +9,12 @@
     },
     {
       "locale": "*",
+      "key": "SETTINGS_THEME_ELLESMEREUI",
+      "checks": ["source-identical", "english-language"],
+      "reason": "EllesmereUI is a product name."
+    },
+    {
+      "locale": "*",
       "key": "MENU_BETTERFRIENDLIST_TITLE",
       "checks": ["source-identical", "english-language"],
       "reason": "BetterFriendList is the addon name used by this legacy menu title."

@@ -443,12 +443,19 @@ function BFL:GetThemeAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
 		end
 	end
 
+	if self.IsThemeActive and self:IsThemeActive("ellesmereui") then
+		local EllesmereUISkin = self.GetModule and self:GetModule("EllesmereUISkin")
+		if EllesmereUISkin and EllesmereUISkin.GetAccentColor then
+			return EllesmereUISkin:GetAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
+		end
+	end
+
 	return fallbackR, fallbackG, fallbackB, fallbackA
 end
 
 function BFL:GetThemeAccentHex(fallbackHex)
 	local theme = self.GetEffectiveTheme and self:GetEffectiveTheme() or "blizzard"
-	if theme == "dark" or theme == "custom" then
+	if theme == "dark" or theme == "custom" or theme == "ellesmereui" then
 		local r, g, b = self:GetThemeAccentColor()
 		return string.format("%02x%02x%02x", ColorComponentToHex(r), ColorComponentToHex(g), ColorComponentToHex(b))
 	end

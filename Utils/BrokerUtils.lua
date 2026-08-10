@@ -199,6 +199,7 @@ local BROKER_TOOLTIP_THEME_KEYS = {
 	dark = true,
 	custom = true,
 	elvui = true,
+	ellesmereui = true,
 }
 
 local function Clamp(value, minValue, maxValue)
@@ -467,6 +468,14 @@ function BU.GetBrokerTooltipFallbackBackground(theme, tt)
 		return GetSkinEnginePopupColor(theme) or CopyColor(DEFAULT_BROKER_TOOLTIP_BACKGROUND)
 	end
 
+	if theme == "ellesmereui" then
+		local EllesmereUISkin = BFL and BFL.GetModule and BFL:GetModule("EllesmereUISkin")
+		if EllesmereUISkin and EllesmereUISkin.GetPanelColor then
+			local r, g, b, a = EllesmereUISkin:GetPanelColor()
+			return NormalizeColor({ r = r, g = g, b = b, a = a }, DEFAULT_BROKER_TOOLTIP_BACKGROUND)
+		end
+	end
+
 	current = CaptureTooltipBackground(GameTooltip)
 	if current then
 		return current
@@ -715,6 +724,15 @@ end
 function BU.ApplyElvUISkin(tt)
 	if not tt then return end
 
+	if BFL and BFL.IsThemeActive and BFL:IsThemeActive("ellesmereui") then
+		local EllesmereUISkin = BFL:GetModule("EllesmereUISkin")
+		if EllesmereUISkin and EllesmereUISkin.SkinTooltip then
+			EllesmereUISkin:SkinTooltip(tt)
+		end
+		BU.ApplyBrokerTooltipThemeBackground(tt)
+		return
+	end
+
 	if BFL and BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme() then
 		local Engine = BFL:GetModule("SkinEngine")
 		if Engine then
@@ -744,6 +762,9 @@ end
 --- Remove ElvUI skin from a LibQTip tooltip (restore default appearance)
 function BU.RemoveElvUISkin(tt)
 	if not tt then return end
+	if BFL and BFL.IsThemeActive and BFL:IsThemeActive("ellesmereui") and tt.bflEllesmereUISkinned then
+		return
+	end
 
 	BU.RestoreBrokerTooltipBackground(tt)
 

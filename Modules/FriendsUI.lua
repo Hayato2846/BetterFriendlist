@@ -653,6 +653,28 @@ function FriendsUI:GetModernThemeColors(theme)
 	if theme == "elvui" then
 		return MODERN_ELVUI_THEME_COLORS, false
 	end
+	if theme == "ellesmereui" then
+		local EllesmereUISkin = BFL:GetModule("EllesmereUISkin")
+		local colorVersion = EllesmereUISkin
+			and EllesmereUISkin.GetPaletteVersion
+			and EllesmereUISkin:GetPaletteVersion()
+			or 0
+		if
+			self.modernThemeColors
+			and self.modernThemeColorsTheme == theme
+			and self.modernThemeColorsVersion == colorVersion
+		then
+			return self.modernThemeColors, true
+		end
+		local colors = EllesmereUISkin and EllesmereUISkin.GetPalette and EllesmereUISkin:GetPalette()
+		if type(colors) ~= "table" then
+			return MODERN_BLIZZARD_THEME_COLORS, false
+		end
+		self.modernThemeColors = colors
+		self.modernThemeColorsTheme = theme
+		self.modernThemeColorsVersion = colorVersion
+		return colors, true
+	end
 	if theme ~= "dark" and theme ~= "custom" then
 		return MODERN_BLIZZARD_THEME_COLORS, false
 	end
@@ -3254,7 +3276,7 @@ function FriendsUI:ApplyModernPortrait()
 	end
 	local db = GetDB()
 	local simpleMode = db and db.simpleMode == true
-	local themed = BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme()
+	local themed = BFL.UsesFlatTheme and BFL:UsesFlatTheme()
 	frame._bflModernPortraitChromeShown = not simpleMode
 	-- PortraitFrame can restore its native portrait and corner artwork whenever
 	-- the panel is shown. Reapply this state on every Modern layout pass rather
@@ -3365,7 +3387,7 @@ function FriendsUI:ApplyModernContentLayout(sectionID, skipNavigationRefresh)
 			bnetFrame:SetPoint("LEFT", self.root.BattleNetBar, "LEFT", 65, 4)
 			bnetFrame:SetPoint("RIGHT", self.root.BattleNetBar.MenuButton, "LEFT", -7, 4)
 			bnetFrame:Show()
-			SafeShow(bnetFrame.Background, not (BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme()))
+			SafeShow(bnetFrame.Background, not (BFL.UsesFlatTheme and BFL:UsesFlatTheme()))
 			SafeShow(bnetFrame.ContactsMenuButton, false)
 			SafeShow(self.root.BattleNetBar.MenuButton, true)
 			SafeShow(bnetFrame.SettingsButton, false)
@@ -3532,7 +3554,7 @@ function FriendsUI:ApplyModernLayout()
 			bnetFrame:SetPoint("LEFT", root.BattleNetBar, "LEFT", 65, 4)
 			bnetFrame:SetPoint("RIGHT", root.BattleNetBar.MenuButton, "LEFT", -7, 4)
 			bnetFrame:Show()
-			SafeShow(bnetFrame.Background, not (BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme()))
+			SafeShow(bnetFrame.Background, not (BFL.UsesFlatTheme and BFL:UsesFlatTheme()))
 			SafeShow(bnetFrame.ContactsMenuButton, false)
 			SafeShow(root.BattleNetBar.MenuButton, true)
 			SafeShow(bnetFrame.SettingsButton, false)
@@ -4648,12 +4670,12 @@ function FriendsUI:RegisterTests()
 		end,
 		action = function(V)
 			self:ApplyTheme(BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() or "blizzard")
-			local flatTheme = BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme()
+			local flatTheme = BFL.UsesFlatTheme and BFL:UsesFlatTheme()
 			V:Assert(self.root.ContentInsetTint ~= nil, "Modern theme owns a dedicated inset surface")
 			V:AssertEqual(
 				self.root.ContentInsetTint:IsShown(),
 				flatTheme == true,
-				"Modern inset tint is shown only for Dark and Custom"
+				"Modern inset tint is shown for flat themes"
 			)
 		end,
 	})
@@ -5245,10 +5267,10 @@ function FriendsUI:RegisterTests()
 				end
 				db.simpleMode = false
 				self:ApplyModernPortrait()
-				if BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme() then
+				if BFL.UsesFlatTheme and BFL:UsesFlatTheme() then
 					local point, relativeTo, relativePoint, x, y = self.root.PortraitOverlay:GetPoint(1)
-					V:AssertEqual(self.root.PortraitOverlay:GetWidth(), MODERN_THEMED_PORTRAIT_SIZE, "Modern Dark portrait uses the compact square width")
-					V:AssertEqual(self.root.PortraitOverlay:GetHeight(), MODERN_THEMED_PORTRAIT_SIZE, "Modern Dark portrait uses the compact square height")
+					V:AssertEqual(self.root.PortraitOverlay:GetWidth(), MODERN_THEMED_PORTRAIT_SIZE, "Modern flat-theme portrait uses the compact square width")
+					V:AssertEqual(self.root.PortraitOverlay:GetHeight(), MODERN_THEMED_PORTRAIT_SIZE, "Modern flat-theme portrait uses the compact square height")
 					V:Assert(
 						point == "TOPLEFT"
 							and relativeTo == frame
@@ -5256,7 +5278,7 @@ function FriendsUI:RegisterTests()
 							and x == MODERN_THEMED_PORTRAIT_OFFSET_X
 							and y == MODERN_THEMED_PORTRAIT_OFFSET_Y
 							and not self.root.PortraitOverlay.Mask:IsShown(),
-						"Modern Dark portrait is square and contained by the main frame"
+						"Modern flat-theme portrait is square and contained by the main frame"
 					)
 				end
 			end)

@@ -9,6 +9,7 @@ local VALID_THEMES = {
 	dark = true,
 	custom = true,
 	elvui = true,
+	ellesmereui = true,
 }
 
 BFL.THEMES = {
@@ -16,6 +17,7 @@ BFL.THEMES = {
 	DARK = "dark",
 	CUSTOM = "custom",
 	ELVUI = "elvui",
+	ELLESMEREUI = "ellesmereui",
 }
 
 local function NormalizeTheme(theme)
@@ -35,6 +37,10 @@ end
 
 local function IsElvUIAvailable()
 	return BFL.IsElvUIAvailable and BFL:IsElvUIAvailable()
+end
+
+local function IsEllesmereUIAvailable()
+	return BFL.IsEllesmereUIAvailable and BFL:IsEllesmereUIAvailable()
 end
 
 local function ShouldShowLegacyElvUISkinSetting()
@@ -104,6 +110,9 @@ function BFL:GetEffectiveTheme()
 	if theme == "elvui" and not IsElvUIAvailable() then
 		return "blizzard"
 	end
+	if theme == "ellesmereui" and not IsEllesmereUIAvailable() then
+		return "blizzard"
+	end
 	return theme
 end
 
@@ -120,9 +129,17 @@ function BFL:IsElvUISkinActive()
 	return self:IsThemeActive("elvui") or IsLegacyElvUISkinEnabled()
 end
 
+function BFL:IsEllesmereUISkinActive()
+	local EllesmereUISkin = self.GetModule and self:GetModule("EllesmereUISkin")
+	return EllesmereUISkin
+		and EllesmereUISkin.IsSkinEnabled
+		and EllesmereUISkin:IsSkinEnabled() == true
+		or false
+end
+
 function BFL:UsesFlatTheme()
 	local theme = self:GetEffectiveTheme()
-	return theme == "dark" or theme == "custom"
+	return theme == "dark" or theme == "custom" or theme == "ellesmereui"
 end
 
 function BFL:UsesDarkSkinTheme()
@@ -257,6 +274,10 @@ function ThemeManager:ApplyCurrentTheme(reason)
 	if FriendsUI and FriendsUI.ApplyTheme then
 		FriendsUI:ApplyTheme(friendsUITheme)
 	end
+	local EllesmereUISkin = BFL:GetModule("EllesmereUISkin")
+	if theme == "ellesmereui" and EllesmereUISkin and EllesmereUISkin.Apply then
+		EllesmereUISkin:Apply(reason or "theme-manager")
+	end
 	self:SkinVisibleStaticPopups()
 	if theme == "blizzard" then
 		-- DarkTheme restores registered controls before module-specific theme and
@@ -280,10 +301,11 @@ end
 
 function ThemeManager:ShowReloadDialog()
 	local L = BFL.L or _G.BFL_L
-	StaticPopupDialogs["BFL_ELVUI_RELOAD"] = {
-		text = (L and L.DIALOG_ELVUI_RELOAD_TEXT) or "Changing ElvUI Skin settings requires a UI Reload.\nReload now?",
-		button1 = (L and L.DIALOG_ELVUI_RELOAD_BTN1) or "Yes",
-		button2 = (L and L.DIALOG_ELVUI_RELOAD_BTN2) or "No",
+	StaticPopupDialogs["BFL_EXTERNAL_THEME_RELOAD"] = {
+		text = (L and L.SETTINGS_CENTER_RELOAD_REQUIRED)
+			or "This change requires a UI reload.\n\nReload now?",
+		button1 = (L and L.DIALOG_UI_PANEL_RELOAD_BTN1) or "Reload",
+		button2 = (L and L.DIALOG_UI_PANEL_RELOAD_BTN2) or "Cancel",
 		OnAccept = function()
 			ReloadUI()
 		end,
@@ -291,7 +313,7 @@ function ThemeManager:ShowReloadDialog()
 		whileDead = true,
 		hideOnEscape = true,
 	}
-	StaticPopup_Show("BFL_ELVUI_RELOAD")
+	StaticPopup_Show("BFL_EXTERNAL_THEME_RELOAD")
 end
 
 local function IsBetterFriendlistPopup(which)
