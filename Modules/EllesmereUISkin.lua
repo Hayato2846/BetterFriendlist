@@ -61,12 +61,6 @@ local function LooksLikeDropdown(frame, name)
 		or (frame and frame.Button and (frame.Text or frame.SelectionText or frame.Arrow))
 end
 
-local function LooksLikeScrollBar(frame, name)
-	name = name or GetName(frame)
-	return name:find("ScrollBar", 1, true) ~= nil
-		or (frame and (frame.ThumbTexture or frame.ScrollUpButton or frame.ScrollDownButton))
-end
-
 local function LooksLikeTab(frame, name)
 	name = name or GetName(frame)
 	return name:find("BetterFriendsFrameTab", 1, true) ~= nil
@@ -86,9 +80,7 @@ local function SkinWidget(api, frame)
 
 	local objectType = GetObjectType(frame)
 	local name = GetName(frame)
-	if LooksLikeScrollBar(frame, name) then
-		SafeCall(api, "ScrollBar", frame)
-	elseif objectType == "EditBox" then
+	if objectType == "EditBox" then
 		SafeCall(api, "EditBox", frame)
 	elseif objectType == "CheckButton" then
 		SafeCall(api, "Checkbox", frame)
@@ -223,7 +215,7 @@ function EllesmereUISkin:GetPalette()
 		preserveNativeInviteButtons = true,
 		transparentBattleNetBar = true,
 		portraitOffsetX = 8,
-		portraitOffsetY = -30,
+		portraitOffsetY = -23,
 		portraitSize = 42,
 		customTabInactiveMultiplier = 0.68,
 		panel = panel,
@@ -360,8 +352,6 @@ function EllesmereUISkin:SkinModernChrome(frame, FriendsUI)
 	self:SkinActionButton(who and who.WhoButton)
 	self:SkinActionButton(who and who.AddFriendButton)
 	self:SkinActionButton(who and who.GroupInviteButton)
-	SafeCall(api, "ScrollBar", frame.MinimalScrollBar)
-	SafeCall(api, "ScrollBar", root.RequestsFrame and root.RequestsFrame.ScrollBar)
 end
 
 function EllesmereUISkin:SkinSettingsCenter(frame)
