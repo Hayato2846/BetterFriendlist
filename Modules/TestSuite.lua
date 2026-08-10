@@ -5206,6 +5206,7 @@ local function RegisterBuiltInTests()
 			local calls = {
 				buttons = {},
 				dropdowns = {},
+				editBoxes = {},
 				tabs = {},
 				scrollbar = false,
 			}
@@ -5222,6 +5223,11 @@ local function RegisterBuiltInTests()
 						calls.dropdowns[dropdown] = true
 					end
 				end,
+				EditBox = function(editBox)
+					if editBox then
+						calls.editBoxes[editBox] = true
+					end
+				end,
 				Tab = function(tab)
 					if tab then
 						calls.tabs[tab] = true
@@ -5236,6 +5242,7 @@ local function RegisterBuiltInTests()
 			}
 
 			local header = {
+				SearchBox = MakeButton(),
 				StatusDropdown = MakeButton(),
 				QuickFilterDropdown = MakeButton(),
 				PrimarySortDropdown = MakeButton(),
@@ -5246,6 +5253,7 @@ local function RegisterBuiltInTests()
 				},
 			}
 			local who = {
+				EditBox = MakeButton(),
 				ColumnDropdown = MakeButton(),
 				WhoButton = MakeButton(),
 				AddFriendButton = MakeButton(),
@@ -5270,6 +5278,7 @@ local function RegisterBuiltInTests()
 					},
 				},
 				GuildFrame = {
+					SearchBox = MakeButton(),
 					ActionsButton = MakeButton(),
 				},
 				WhoFrame = who,
@@ -5293,6 +5302,13 @@ local function RegisterBuiltInTests()
 				end
 
 				skin:SkinLegacyChrome(frame)
+				for _, editBox in ipairs({
+					header.SearchBox,
+					frame.GuildFrame.SearchBox,
+					who.EditBox,
+				}) do
+					V:Assert(calls.editBoxes[editBox] == true, "Every tab search field should use the EUI facade")
+				end
 				for _, dropdown in ipairs({
 					header.StatusDropdown,
 					header.QuickFilterDropdown,

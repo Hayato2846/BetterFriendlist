@@ -468,6 +468,18 @@ function EllesmereUISkin:SkinRequestedActionControls(frame)
 	self:SkinActionButton(who and who.GroupInviteButton)
 end
 
+function EllesmereUISkin:SkinTabSearchFields(frame)
+	if not self:IsSkinEnabled() or not frame then
+		return
+	end
+	local header = frame.FriendsTabHeader
+	local guild = frame.GuildFrame
+	local who = frame.WhoFrame
+	SafeCall(self.facade, "EditBox", header and header.SearchBox)
+	SafeCall(self.facade, "EditBox", guild and guild.SearchBox)
+	SafeCall(self.facade, "EditBox", who and who.EditBox)
+end
+
 function EllesmereUISkin:SkinLegacyChrome(frame)
 	if not self:IsSkinEnabled() or not frame or self:IsModernInterfaceActive() then
 		return
@@ -480,6 +492,7 @@ function EllesmereUISkin:SkinLegacyChrome(frame)
 
 	-- Legacy controls are deliberately allowlisted. List rows, group headers,
 	-- scrollbars, and the native tab backgrounds are not traversed generically.
+	self:SkinTabSearchFields(frame)
 	SafeCall(api, "Dropdown", header and header.StatusDropdown)
 	SafeCall(api, "Dropdown", header and header.QuickFilterDropdown)
 	SafeCall(api, "Dropdown", header and header.PrimarySortDropdown)
@@ -515,15 +528,13 @@ function EllesmereUISkin:SkinModernChrome(frame, FriendsUI)
 		return
 	end
 
+	self:SkinTabSearchFields(frame)
 	SafeCall(api, "Dropdown", header and header.StatusDropdown)
-	SafeCall(api, "EditBox", header and header.SearchBox)
 	SafeCall(api, "Dropdown", root.FilterBar and root.FilterBar.FilterDropdown)
 	SafeCall(api, "Dropdown", root.FilterBar and root.FilterBar.RecentFilterDropdown)
 	SafeCall(api, "Dropdown", root.FilterBar and root.FilterBar.SortButton)
-	SafeCall(api, "EditBox", guild and guild.SearchBox)
 	SafeCall(api, "Dropdown", guild and guild.FilterDropdown)
 	SafeCall(api, "Dropdown", guild and guild.SortDropdown)
-	SafeCall(api, "EditBox", who and who.EditBox)
 	SafeCall(api, "Dropdown", who and who.ColumnDropdown)
 	SafeCall(api, "Button", root.BattleNetBar and root.BattleNetBar.MenuButton, { "Icon" })
 	self:SkinFooterActionButton(root.BottomActionBar and root.BottomActionBar.AddFriendButton)
