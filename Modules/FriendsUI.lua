@@ -4293,6 +4293,14 @@ function FriendsUI:ApplyTheme(theme)
 		self:ApplyModernPortrait()
 		self:ApplyModernContentLayout(self.selectedSection or "friends", true)
 	end
+	if modernActive and self.currentTheme == "elvui" then
+		-- ThemeManager applies BFL's geometry after ElvUI's addon callback. Let
+		-- ElvUI own the final visual pass without recursively re-running themes.
+		local ElvUISkin = BFL:GetModule("ElvUISkin")
+		if ElvUISkin and ElvUISkin.RefreshModernSkin then
+			ElvUISkin:RefreshModernSkin()
+		end
+	end
 end
 
 function FriendsUI:StyleFriendCard(button)
