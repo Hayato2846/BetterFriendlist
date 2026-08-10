@@ -223,7 +223,7 @@ function EllesmereUISkin:GetPalette()
 		preserveNativeInviteButtons = true,
 		transparentBattleNetBar = true,
 		portraitOffsetX = 8,
-		portraitOffsetY = -31,
+		portraitOffsetY = -30,
 		portraitSize = 42,
 		customTabInactiveMultiplier = 0.68,
 		panel = panel,
@@ -340,6 +340,7 @@ function EllesmereUISkin:SkinModernChrome(frame, FriendsUI)
 	SafeCall(api, "EditBox", guild and guild.SearchBox)
 	SafeCall(api, "Dropdown", guild and guild.FilterDropdown)
 	SafeCall(api, "Dropdown", guild and guild.SortDropdown)
+	SafeCall(api, "EditBox", who and who.EditBox)
 	SafeCall(api, "Dropdown", who and who.ColumnDropdown)
 	SafeCall(api, "Button", root.BattleNetBar and root.BattleNetBar.MenuButton, { "Icon" })
 	self:SkinFooterActionButton(root.BottomActionBar and root.BottomActionBar.AddFriendButton)
