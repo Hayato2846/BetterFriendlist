@@ -45,7 +45,7 @@ BFL:RegisterLocale("frFR", function()
 	L.FRIEND_TAGS_SETTINGS_TOOLTIPS_DESC = "Inclut les étiquettes d’amis dans les sections Notes et étiquettes."
 	L.FRIEND_TAGS_SETTINGS_MAX_TOOLTIP_CHIPS = "Nombre maximal d’étiquettes dans les infobulles"
 	L.FRIEND_TAGS_SETTINGS_MAX_TOOLTIP_CHIPS_DESC = "Limite le nombre d’étiquettes dans les infobulles Notes et étiquettes."
-	L.FRIEND_TAGS_SETTINGS_SEARCH = "Recherche et confidentialité"
+	L.FRIEND_TAGS_SETTINGS_SEARCH = "Recherche et menus"
 	L.FRIEND_TAGS_SETTINGS_SEARCH_BLIZZARD = "Rechercher les étiquettes Blizzard"
 	L.FRIEND_TAGS_SETTINGS_SEARCH_BLIZZARD_DESC = "Permet à la recherche d’amis de trouver les étiquettes compatibles avec Blizzard."
 	L.FRIEND_TAGS_SETTINGS_SEARCH_CUSTOM = "Rechercher les étiquettes personnalisées"

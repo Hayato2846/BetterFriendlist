@@ -2903,14 +2903,23 @@ function FriendsList:WhisperFriend(friend)
 		local accountID = friend.bnetIDAccount or friend.bnetAccountID
 		local accountName = friend.accountName
 		local battleTag = friend.battleTag
+		local accountInfo
 
 		if accountID and C_BattleNet and C_BattleNet.GetAccountInfoByID then
-			local accountInfo = C_BattleNet.GetAccountInfoByID(accountID)
+			accountInfo = C_BattleNet.GetAccountInfoByID(accountID)
 			if accountInfo then
 				accountID = accountInfo.bnetAccountID or accountID
 				accountName = accountInfo.accountName or accountName
 				battleTag = accountInfo.battleTag or battleTag
 			end
+		end
+
+		local isOffline = friend.connected == false
+		if accountInfo and accountInfo.gameAccountInfo and accountInfo.gameAccountInfo.isOnline ~= nil then
+			isOffline = accountInfo.gameAccountInfo.isOnline == false
+		end
+		if BFL.IsOfflineTitleFriend and BFL.IsOfflineTitleFriend(accountInfo or friend, isOffline) then
+			return false
 		end
 
 		local tellName = nil
@@ -5524,6 +5533,11 @@ function FriendsList:PassesFilters(friend) -- Search text filter
 		if not found then
 			return false
 		end
+	end
+
+	local QuickFilters = BFL:GetModule("QuickFilters")
+	if QuickFilters and QuickFilters.PassesTagFilters and not QuickFilters:PassesTagFilters(friend) then
+		return false
 	end
 
 	local filterMode = self.filterMode or "all"

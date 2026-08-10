@@ -205,6 +205,12 @@ function ThemeManager:ApplyCurrentTheme(reason)
 	if theme == "blizzard" and BFL.RefreshMainTabVisualState then
 		BFL:RefreshMainTabVisualState()
 	end
+	if theme == "blizzard" then
+		local Settings = BFL:GetModule("Settings")
+		if Settings and Settings.RefreshCategoryVisualState then
+			Settings:RefreshCategoryVisualState()
+		end
+	end
 
 	if BFL.ForceRefreshFriendsList then
 		BFL:ForceRefreshFriendsList()
@@ -250,6 +256,16 @@ function ThemeManager:ApplyCurrentTheme(reason)
 	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
 	if FriendsUI and FriendsUI.ApplyTheme then
 		FriendsUI:ApplyTheme(friendsUITheme)
+	end
+	self:SkinVisibleStaticPopups()
+	if theme == "blizzard" then
+		-- DarkTheme restores registered controls before module-specific theme and
+		-- layout refreshes run. Finalize native button atlases afterwards so no
+		-- later owner/state update can leave a partial ThreeSlice or stale font.
+		local SkinEngine = BFL:GetModule("SkinEngine")
+		if SkinEngine and SkinEngine.FinalizeNativeButtonRestore then
+			SkinEngine:FinalizeNativeButtonRestore()
+		end
 	end
 
 	return true
@@ -320,6 +336,64 @@ local function SkinStaticPopupButtons(engine, popup)
 	end
 end
 
+local function GetStaticPopupEditBox(popup)
+	if not popup then
+		return nil
+	end
+	if popup.GetEditBox then
+		local ok, editBox = pcall(popup.GetEditBox, popup)
+		if ok and editBox then
+			return editBox
+		end
+	end
+	return popup.EditBox or popup.editBox
+end
+
+local function SkinStaticPopupFrame(engine, popup)
+	engine:SkinFrame(popup, "popup", { stripTextures = true, textureAlpha = 0 })
+	-- StaticPopup slots are reused, and GameDialogMixin can restore the native
+	-- BG atlases while preparing a new dialog. Reassert the single themed popup
+	-- surface every time so its alpha is exactly the configured popupOpacity.
+	engine:DampenRegions(popup, 0)
+	engine:DampenKnownArtwork(popup, 0)
+	engine:DampenNineSlice(popup, 0)
+	if popup.BG then
+		engine:DampenFrameTextures(popup.BG, 0, 2)
+	end
+	if popup.AlertIcon then
+		engine:SetTextureAlpha(popup, popup.AlertIcon, 0)
+	end
+
+	engine:SkinTree(popup, 4)
+	local editBox = GetStaticPopupEditBox(popup)
+	if editBox and (not editBox.IsShown or editBox:IsShown()) then
+		engine:SkinEditBox(editBox)
+	end
+	SkinStaticPopupButtons(engine, popup)
+
+	local colors = engine.colors
+	if colors then
+		engine:StyleBackdrop(popup, colors.popup, colors.border)
+	end
+end
+
+function ThemeManager:SkinVisibleStaticPopups()
+	if not (BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme()) then
+		return
+	end
+	local Engine = BFL:GetModule("SkinEngine")
+	if not Engine or not Engine.IsActive or not Engine:IsActive() then
+		return
+	end
+
+	for i = 1, STATICPOPUP_NUMDIALOGS or 4 do
+		local popup = _G["StaticPopup" .. i]
+		if popup and popup:IsShown() and IsBetterFriendlistPopup(popup.which) then
+			SkinStaticPopupFrame(Engine, popup)
+		end
+	end
+end
+
 function ThemeManager:SkinStaticPopup(which)
 	if not IsBetterFriendlistPopup(which) or not (BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme()) then
 		return
@@ -333,13 +407,7 @@ function ThemeManager:SkinStaticPopup(which)
 	for i = 1, STATICPOPUP_NUMDIALOGS or 4 do
 		local popup = _G["StaticPopup" .. i]
 		if popup and popup:IsShown() and popup.which == which then
-			Engine:SkinFrame(popup, "popup", { stripTextures = true, textureAlpha = 0 })
-			Engine:DampenNineSlice(popup, 0)
-			if popup.AlertIcon then
-				Engine:SetTextureAlpha(popup, popup.AlertIcon, 0)
-			end
-			Engine:SkinTree(popup, 4)
-			SkinStaticPopupButtons(Engine, popup)
+			SkinStaticPopupFrame(Engine, popup)
 		end
 	end
 end

@@ -335,9 +335,25 @@ end
 
 local function CollectMacroIcons()
 	local icons = {}
+	local seen = {}
 	local function Add(icon)
-		if icon then
-			table.insert(icons, icon)
+		local key = icon ~= nil and (type(icon) .. ":" .. tostring(icon)) or nil
+		if key and not seen[key] then
+			seen[key] = true
+			icons[#icons + 1] = icon
+		end
+	end
+	local function CollectFrom(functionRef)
+		if type(functionRef) ~= "function" then
+			return
+		end
+		local target = {}
+		local ok, result = pcall(functionRef, target)
+		if ok then
+			result = type(result) == "table" and result or target
+			for _, icon in ipairs(result) do
+				Add(icon)
+			end
 		end
 	end
 
@@ -350,22 +366,10 @@ local function CollectMacroIcons()
 		end
 	end
 
-	if #icons == 0 and GetMacroIcons then
-		local ok, result = pcall(GetMacroIcons)
-		if ok and type(result) == "table" then
-			for _, icon in ipairs(result) do
-				Add(icon)
-			end
-		else
-			local target = {}
-			ok = pcall(GetMacroIcons, target)
-			if ok then
-				for _, icon in ipairs(target) do
-					Add(icon)
-				end
-			end
-		end
-	end
+	CollectFrom(GetLooseMacroIcons)
+	CollectFrom(GetLooseMacroItemIcons)
+	CollectFrom(GetMacroIcons)
+	CollectFrom(GetMacroItemIcons)
 
 	if #icons == 0 then
 		icons = {
@@ -397,6 +401,53 @@ local function GetIconName(icon)
 	return name:match("([^\\]+)$") or name
 end
 
+local function CreateModernButton(parent, text, width)
+	local template = not BFL.IsClassic and "SharedButtonTemplate" or "UIPanelButtonTemplate"
+	local ok, button = pcall(CreateFrame, "Button", nil, parent, template)
+	if not ok or not button then
+		button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+	end
+	button:SetText(text or "")
+	local fontString = button.GetFontString and button:GetFontString()
+	local textWidth = fontString and fontString:GetStringWidth() or 0
+	button:SetSize(math.max(width or 80, math.ceil(textWidth + 30)), 24)
+	return button
+end
+
+local function NormalizeIconItem(icon, source)
+	if type(icon) == "table" then
+		local value = icon.iconValue or icon.texture or icon.icon or icon.atlas
+		local profile = icon
+		if source == "blizzard" then
+			profile = {}
+			for key, profileValue in pairs(icon) do
+				profile[key] = profileValue
+			end
+			profile.iconZoom = true
+		end
+		return {
+			value = value,
+			label = icon.label or icon.id or GetIconName(value),
+			profile = profile,
+		}
+	end
+	local profile
+	if source == "blizzard" then
+		profile = {
+			iconType = "texture",
+			iconValue = icon,
+			icon = icon,
+			texture = icon,
+			iconZoom = true,
+		}
+	end
+	return {
+		value = icon,
+		label = GetIconName(icon),
+		profile = profile,
+	}
+end
+
 function IconSelector:Initialize()
 	self.blizzardIcons = nil
 end
@@ -417,10 +468,13 @@ function IconSelector:CreateFrame()
 		return self.frame
 	end
 
-	local frame = CreateFrame("Frame", "BetterFriendlistIconSelectorFrame", UIParent, "BasicFrameTemplateWithInset")
-	frame:SetSize(430, 450)
-	frame:SetFrameStrata("DIALOG")
+	local template = not BFL.IsClassic and "ButtonFrameTemplate" or "BasicFrameTemplateWithInset"
+	local frame = CreateFrame("Frame", "BetterFriendlistIconSelectorFrame", UIParent, template)
+	frame:SetSize(560, 500)
+	frame:SetFrameStrata("FULLSCREEN_DIALOG")
+	frame:SetToplevel(true)
 	frame:SetPoint("CENTER")
+	frame:SetClampedToScreen(true)
 	frame:Hide()
 	frame:SetMovable(true)
 	frame:EnableMouse(true)
@@ -428,37 +482,69 @@ function IconSelector:CreateFrame()
 	frame:SetScript("OnDragStart", frame.StartMoving)
 	frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
 
-	frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-	frame.title:SetPoint("TOP", 0, -8)
+	if not BFL.IsClassic then
+		if ButtonFrameTemplate_HidePortrait then
+			ButtonFrameTemplate_HidePortrait(frame)
+		end
+		if ButtonFrameTemplate_HideAttic then
+			ButtonFrameTemplate_HideAttic(frame)
+		end
+		if frame.Inset then
+			frame.Inset:Hide()
+		end
+	end
+	frame.title = frame.TitleContainer and frame.TitleContainer.TitleText or frame.TitleText
+	if not frame.title then
+		frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+		frame.title:SetPoint("TOP", 0, -8)
+	end
 	frame.title:SetText(GetText("ICON_SELECTOR_TITLE", "Select Icon"))
 
-	frame.search = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
-	frame.search:SetSize(180, 20)
-	frame.search:SetPoint("TOPLEFT", 22, -35)
+	frame.inner = CreateFrame("Frame", nil, frame, "BackdropTemplate")
+	frame.inner:SetPoint("TOPLEFT", frame, "TOPLEFT", 14, -30)
+	frame.inner:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -14, 10)
+	frame.inner:SetBackdrop({
+		bgFile = "Interface\\Buttons\\WHITE8X8",
+		edgeFile = "Interface\\Buttons\\WHITE8X8",
+		edgeSize = 1,
+	})
+	frame.inner:SetBackdropColor(0.025, 0.025, 0.032, 0.92)
+	frame.inner:SetBackdropBorderColor(0.30, 0.30, 0.34, 0.75)
+
+	frame.search = CreateFrame("EditBox", nil, frame.inner, "InputBoxTemplate")
+	frame.search:SetSize(300, 22)
+	frame.search:SetPoint("TOPLEFT", frame.inner, "TOPLEFT", 14, -14)
 	frame.search:SetAutoFocus(false)
 	frame.search:SetText("")
+	frame.searchHint = frame.inner:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontDisableSmall")
+	frame.searchHint:SetPoint("LEFT", frame.search, "LEFT", 8, 0)
+	frame.searchHint:SetText(SEARCH or "Search")
 
-	frame.bflButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-	frame.bflButton:SetSize(82, 22)
-	frame.bflButton:SetPoint("LEFT", frame.search, "RIGHT", 12, 0)
+	frame.tagButton = CreateModernButton(frame.inner, GetText("FRIEND_TAGS_MENU_TITLE", "Friend Tags"), 108)
+	frame.tagButton:SetPoint("TOPLEFT", frame.inner, "TOPLEFT", 14, -48)
+
+	frame.bflButton = CreateModernButton(frame.inner, "BFL", 62)
+	frame.bflButton:SetPoint("LEFT", frame.tagButton, "RIGHT", 6, 0)
 	frame.bflButton:SetText("BFL")
 
-	frame.blizzardButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-	frame.blizzardButton:SetSize(100, 22)
+	frame.blizzardButton = CreateModernButton(frame.inner, GetText("ICON_SELECTOR_BLIZZARD", "Blizzard"), 96)
 	frame.blizzardButton:SetPoint("LEFT", frame.bflButton, "RIGHT", 6, 0)
-	frame.blizzardButton:SetText(GetText("ICON_SELECTOR_BLIZZARD", "Blizzard"))
 
-	frame.scroll = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
-	frame.scroll:SetPoint("TOPLEFT", 20, -66)
-	frame.scroll:SetPoint("BOTTOMRIGHT", -30, 42)
+	frame.count = frame.inner:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontDisableSmall")
+	frame.count:SetPoint("TOPRIGHT", frame.inner, "TOPRIGHT", -16, -16)
+	frame.count:SetHeight(18)
+	frame.count:SetJustifyH("RIGHT")
+	frame.count:SetJustifyV("MIDDLE")
+
+	frame.scroll = CreateFrame("ScrollFrame", nil, frame.inner, "UIPanelScrollFrameTemplate")
+	frame.scroll:SetPoint("TOPLEFT", frame.inner, "TOPLEFT", 14, -82)
+	frame.scroll:SetPoint("BOTTOMRIGHT", frame.inner, "BOTTOMRIGHT", -30, 48)
 	frame.content = CreateFrame("Frame", nil, frame.scroll)
-	frame.content:SetSize(360, 330)
+	frame.content:SetSize(472, 350)
 	frame.scroll:SetScrollChild(frame.content)
 
-	frame.close = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-	frame.close:SetSize(90, 22)
-	frame.close:SetPoint("BOTTOMRIGHT", -18, 13)
-	frame.close:SetText(GetText("BUTTON_CANCEL", "Cancel"))
+	frame.close = CreateModernButton(frame.inner, CLOSE or GetText("BUTTON_CANCEL", "Close"), 90)
+	frame.close:SetPoint("BOTTOMRIGHT", frame.inner, "BOTTOMRIGHT", -14, 12)
 	frame.close:SetScript("OnClick", function()
 		frame:Hide()
 	end)
@@ -466,6 +552,10 @@ function IconSelector:CreateFrame()
 	frame.buttons = {}
 	frame.activeSource = "bfl"
 
+	frame.tagButton:SetScript("OnClick", function()
+		frame.activeSource = "tags"
+		IconSelector:RefreshFrame()
+	end)
 	frame.bflButton:SetScript("OnClick", function()
 		frame.activeSource = "bfl"
 		IconSelector:RefreshFrame()
@@ -475,8 +565,24 @@ function IconSelector:CreateFrame()
 		IconSelector:RefreshFrame()
 	end)
 	frame.search:SetScript("OnTextChanged", function()
+		frame.searchHint:SetShown((frame.search:GetText() or "") == "" and not frame.search:HasFocus())
 		IconSelector:RefreshFrame()
 	end)
+	frame.search:SetScript("OnEditFocusGained", function()
+		frame.searchHint:Hide()
+	end)
+	frame.search:SetScript("OnEditFocusLost", function()
+		frame.searchHint:SetShown((frame.search:GetText() or "") == "")
+	end)
+	frame.search:SetScript("OnEscapePressed", function()
+		frame.search:ClearFocus()
+		frame:Hide()
+	end)
+	if frame.CloseButton then
+		frame.CloseButton:SetScript("OnClick", function()
+			frame:Hide()
+		end)
+	end
 
 	self.frame = frame
 	return frame
@@ -489,11 +595,36 @@ function IconSelector:AcquireButton(index)
 		return button
 	end
 
-	button = CreateFrame("Button", nil, frame.content)
-	button:SetSize(30, 30)
+	button = CreateFrame("Button", nil, frame.content, "BackdropTemplate")
+	button:SetSize(42, 42)
+	button:SetBackdrop({
+		bgFile = "Interface\\Buttons\\WHITE8X8",
+		edgeFile = "Interface\\Buttons\\WHITE8X8",
+		edgeSize = 1,
+	})
 	button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
 	button.icon = button:CreateTexture(nil, "ARTWORK")
-	button.icon:SetAllPoints()
+	button.icon:SetPoint("TOPLEFT", 4, -4)
+	button.icon:SetPoint("BOTTOMRIGHT", -4, 4)
+	button:SetScript("OnClick", function(self)
+		if frame.callback and self.iconItem then
+			frame.callback(self.iconItem.value, self.iconItem.profile)
+		end
+		frame:Hide()
+	end)
+	button:SetScript("OnEnter", function(self)
+		if GameTooltip and self.iconItem then
+			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+			GameTooltip:SetText(self.iconItem.label or tostring(self.iconItem.value), 1, 1, 1)
+			GameTooltip:AddLine(tostring(self.iconItem.value or ""), 0.65, 0.65, 0.65)
+			GameTooltip:Show()
+		end
+	end)
+	button:SetScript("OnLeave", function()
+		if GameTooltip then
+			GameTooltip:Hide()
+		end
+	end)
 	frame.buttons[index] = button
 	return button
 end
@@ -504,17 +635,25 @@ function IconSelector:RefreshFrame()
 		return
 	end
 
-	local icons = frame.activeSource == "blizzard" and self:GetBlizzardIcons() or self:GetBFLIcons()
+	local icons
+	if frame.activeSource == "tags" then
+		icons = frame.extraIcons or {}
+	elseif frame.activeSource == "blizzard" then
+		icons = self:GetBlizzardIcons()
+	else
+		icons = self:GetBFLIcons()
+	end
 	local search = (frame.search:GetText() or ""):lower()
-	local columns = 10
-	local size = 30
-	local gap = 6
+	local columns = 9
+	local size = 42
+	local gap = 7
 	local visibleIndex = 0
-	local maxIcons = 800
+	local maxIcons = 900
 
 	for _, icon in ipairs(icons) do
-		local name = GetIconName(icon):lower()
-		if search == "" or name:find(search, 1, true) then
+		local item = NormalizeIconItem(icon, frame.activeSource)
+		local searchText = ((item.label or "") .. " " .. tostring(item.value or "")):lower()
+		if item.value and (search == "" or searchText:find(search, 1, true)) then
 			visibleIndex = visibleIndex + 1
 			if visibleIndex > maxIcons then
 				break
@@ -524,15 +663,18 @@ function IconSelector:RefreshFrame()
 			local row = math.floor((visibleIndex - 1) / columns)
 			button:ClearAllPoints()
 			button:SetPoint("TOPLEFT", frame.content, "TOPLEFT", column * (size + gap), -row * (size + gap))
-			button.icon:SetTexture(icon)
-			button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-			button.iconRef = icon
-			button:SetScript("OnClick", function(self)
-				if frame.callback then
-					frame.callback(self.iconRef)
-				end
-				frame:Hide()
-			end)
+			button.iconItem = item
+			button.icon:SetTexture(nil)
+			button.icon:SetTexCoord(0, 1, 0, 1)
+			local applied = item.profile and BFL.ApplyIconProfile and BFL.ApplyIconProfile(button.icon, item.profile)
+			if not applied then
+				button.icon:SetTexture(item.value)
+				button.icon:Show()
+			end
+			button.icon:SetTexCoord(frame.activeSource == "blizzard" and 0.08 or 0, frame.activeSource == "blizzard" and 0.92 or 1, frame.activeSource == "blizzard" and 0.08 or 0, frame.activeSource == "blizzard" and 0.92 or 1)
+			local selected = tostring(frame.initialIcon or "") == tostring(item.value or "")
+			button:SetBackdropColor(selected and 0.20 or 0.035, selected and 0.15 or 0.035, selected and 0.05 or 0.045, selected and 0.95 or 0.78)
+			button:SetBackdropBorderColor(selected and 1.00 or 0.22, selected and 0.76 or 0.22, selected and 0.18 or 0.26, selected and 1 or 0.72)
 			button:Show()
 		end
 	end
@@ -542,7 +684,10 @@ function IconSelector:RefreshFrame()
 	end
 
 	local rows = math.ceil(math.max(visibleIndex, 1) / columns)
-	frame.content:SetHeight(math.max(330, rows * (size + gap)))
+	frame.content:SetHeight(math.max(350, rows * (size + gap)))
+	frame.count:SetText(tostring(visibleIndex))
+	frame.tagButton:SetShown(type(frame.extraIcons) == "table" and #frame.extraIcons > 0)
+	frame.tagButton:SetEnabled(frame.activeSource ~= "tags")
 	frame.bflButton:SetEnabled(frame.activeSource ~= "bfl")
 	frame.blizzardButton:SetEnabled(frame.activeSource ~= "blizzard")
 end
@@ -550,17 +695,31 @@ end
 function IconSelector:Show(owner, initialIcon, callback, options)
 	local frame = self:CreateFrame()
 	frame.callback = callback
-	frame.activeSource = (options and options.source) or "bfl"
+	frame.extraIcons = options and options.extraIcons or nil
+	frame.initialIcon = initialIcon
+	frame.activeSource = (options and options.source) or (frame.extraIcons and "tags" or "bfl")
+	if frame.activeSource == "tags" and not frame.extraIcons then
+		frame.activeSource = "bfl"
+	end
 	frame.search:SetText("")
-	frame.title:SetText(GetText("ICON_SELECTOR_TITLE", "Select Icon") .. " " .. FormatIcon(initialIcon, 18))
+	frame.title:SetText(GetText("ICON_SELECTOR_TITLE", "Select Icon"))
+	local anchorFrame = options and options.anchorFrame or nil
+	frame:SetParent(anchorFrame or UIParent)
+	frame:SetFrameStrata("FULLSCREEN_DIALOG")
+	if anchorFrame and anchorFrame.GetFrameLevel then
+		frame:SetFrameLevel((anchorFrame:GetFrameLevel() or 0) + 20)
+	end
 	frame:ClearAllPoints()
-	if owner and owner.GetCenter then
+	if anchorFrame then
+		frame:SetPoint("CENTER", anchorFrame, "CENTER", 0, 0)
+	elseif owner and owner.GetCenter then
 		frame:SetPoint("CENTER", owner, "CENTER")
 	else
-		frame:SetPoint("CENTER")
+		frame:SetPoint("CENTER", UIParent, "CENTER")
 	end
 	self:RefreshFrame()
 	frame:Show()
+	frame:Raise()
 end
 
 function IconSelector:FormatIcon(iconRef, size)

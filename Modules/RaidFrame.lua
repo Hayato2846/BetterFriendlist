@@ -141,10 +141,21 @@ local function IsModernRaidLayout()
 	return BFL.IsRetail and FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
 end
 
-local function SetModernRoleCountDisplay(controlPanel, tanks, healers, damagers)
+local function FormatRoleCount(value, minimumDigits)
+	value = tonumber(value) or 0
+	if minimumDigits and minimumDigits > 1 then
+		return string.format("%0" .. minimumDigits .. "d", value)
+	end
+	return value
+end
+
+local function SetModernRoleCountDisplay(controlPanel, tanks, healers, damagers, minimumDigits)
 	if not controlPanel then
 		return
 	end
+	tanks = FormatRoleCount(tanks, minimumDigits)
+	healers = FormatRoleCount(healers, minimumDigits)
+	damagers = FormatRoleCount(damagers, minimumDigits)
 	if controlPanel.TankFrame and controlPanel.TankFrame.Count then
 		controlPanel.TankFrame.Count:SetText(tanks or 0)
 	end
@@ -156,10 +167,13 @@ local function SetModernRoleCountDisplay(controlPanel, tanks, healers, damagers)
 	end
 end
 
-local function SetRoleCountDisplay(roleCount, tanks, healers, damagers)
+local function SetRoleCountDisplay(roleCount, tanks, healers, damagers, minimumDigits)
 	if not roleCount then
 		return
 	end
+	tanks = FormatRoleCount(tanks, minimumDigits)
+	healers = FormatRoleCount(healers, minimumDigits)
+	damagers = FormatRoleCount(damagers, minimumDigits)
 
 	SetRoleCountIcon(roleCount.TankIcon, "TANK")
 	SetRoleCountIcon(roleCount.HealerIcon, "HEALER")
@@ -177,7 +191,7 @@ local function SetRoleCountDisplay(roleCount, tanks, healers, damagers)
 		local tankIcon = GetRoleIconString("TANK", iconSize)
 		local healIcon = GetRoleIconString("HEALER", iconSize)
 		local dpsIcon = GetRoleIconString("DAMAGER", iconSize)
-		roleCount:SetText(string.format("%s %d  %s %d  %s %d", tankIcon, tanks or 0, healIcon, healers or 0, dpsIcon, damagers or 0))
+		roleCount:SetText(string.format("%s %s  %s %s  %s %s", tankIcon, tanks, healIcon, healers, dpsIcon, damagers))
 	end
 end
 
@@ -242,11 +256,9 @@ local function SetRaidAssignmentTexture(texture, iconData)
 	if not (texture and iconData) then
 		return
 	end
-	if BFL.IsRetail and texture.SetAtlas then
-		local ok = pcall(texture.SetAtlas, texture, iconData.atlas, false)
-		if ok then
-			return
-		end
+	if IsModernRaidLayout() and BFL.SetTextureOrAtlas then
+		BFL.SetTextureOrAtlas(texture, iconData.atlas, iconData.fallback, false)
+		return
 	end
 	texture:SetTexture(iconData.fallback)
 end
@@ -678,7 +690,8 @@ function RaidFrame:UpdateControlPanelLayout()
 	local checkboxStartX = 35 -- Avatar clearance
 	local checkboxLabelGap = 2 -- Gap between checkbox and label
 	local buttonRightPadding = 3 -- Padding from right edge
-	local centerElementGap = 5 -- Gap between RoleSummary and MemberCount (reduced from 8)
+	local centerElementGap = 5 -- Gap between RoleSummary and MemberCount
+	local memberCountLeftShift = BFL.IsRetail and 8 or 0
 	local utilityButtonGap = 5
 	local utilitySlotWidth = 22
 
@@ -691,7 +704,7 @@ function RaidFrame:UpdateControlPanelLayout()
 	local labelTextWidth = controlPanel.EveryoneAssistLabel and controlPanel.EveryoneAssistLabel:GetStringWidth() or 100
 
 	-- Reduce button width if needed
-	local optimizedButtonWidth = 75 -- Reduced from 90
+	local optimizedButtonWidth = 75
 	local hasUtilitySlot = (controlPanel.ReadyCheckButton and controlPanel.ReadyCheckButton:IsShown())
 		or (controlPanel.CombatIcon and controlPanel.CombatIcon:IsShown())
 	local rightReservedWidth = optimizedButtonWidth
@@ -715,7 +728,7 @@ function RaidFrame:UpdateControlPanelLayout()
 	local availableCenter = rightSectionStart - leftSectionEnd
 
 	-- Auto-hide Assist Label if space is too tight (Classic fix)
-	if availableCenter < centerSectionWidth and controlPanel.EveryoneAssistLabel then
+	if not BFL.IsRetail and availableCenter < centerSectionWidth and controlPanel.EveryoneAssistLabel then
 		controlPanel.EveryoneAssistLabel:Hide()
 		leftSectionEnd = checkboxStartX + checkboxWidth + checkboxLabelGap -- Recalculate boundary
 		availableCenter = rightSectionStart - leftSectionEnd
@@ -779,10 +792,10 @@ function RaidFrame:UpdateControlPanelLayout()
 		--     actualWidth or -1, buttonRightPadding, actualX or -1))
 	end
 
-	local utilityCenterOffset = -(utilityButtonGap + (utilitySlotWidth / 2))
 	if controlPanel.ReadyCheckButton then
 		controlPanel.ReadyCheckButton:ClearAllPoints()
-		controlPanel.ReadyCheckButton:SetPoint("CENTER", controlPanel.RaidInfoButton, "LEFT", utilityCenterOffset, 0)
+		controlPanel.ReadyCheckButton:SetSize(utilitySlotWidth, utilitySlotWidth)
+		controlPanel.ReadyCheckButton:SetPoint("RIGHT", controlPanel.RaidInfoButton, "LEFT", -utilityButtonGap, 0)
 	end
 
 	-- Reposition RoleSummary (centered in available space)
@@ -798,7 +811,13 @@ function RaidFrame:UpdateControlPanelLayout()
 	-- Reposition MemberCount (right of RoleSummary with reduced gap)
 	if controlPanel.MemberCount then
 		controlPanel.MemberCount:ClearAllPoints()
-		controlPanel.MemberCount:SetPoint("LEFT", controlPanel.RoleSummary, "RIGHT", centerElementGap, 0)
+		controlPanel.MemberCount:SetPoint(
+			"LEFT",
+			controlPanel.RoleSummary,
+			"RIGHT",
+			centerElementGap - memberCountLeftShift,
+			0
+		)
 		controlPanel.MemberCount:SetJustifyH("LEFT")
 
 		local actualX = controlPanel.MemberCount:GetLeft()
@@ -811,6 +830,7 @@ function RaidFrame:UpdateControlPanelLayout()
 	-- Reposition CombatIcon (if visible, between counts and button)
 	if controlPanel.CombatIcon then
 		controlPanel.CombatIcon:ClearAllPoints()
+		local utilityCenterOffset = -(utilityButtonGap + (utilitySlotWidth / 2))
 		controlPanel.CombatIcon:SetPoint("CENTER", controlPanel.RaidInfoButton, "LEFT", utilityCenterOffset, -1)
 		-- BFL:DebugPrint(string.format("  CombatIcon: Anchored to shared utility slot"))
 	end
@@ -1661,9 +1681,11 @@ function RaidFrame:UpdateMemberCount()
 		numMembers = GetNumSubgroupMembers() + 1 -- +1 for player
 	end
 
-	-- Add friend icon before the count (same icon as in Quick Filters "All Friends")
+	-- Modern intentionally renders a compact text-only count. Keep Legacy's
+	-- established inline texture unchanged.
 	local FRIEND_ICON = "|TInterface\\FriendsFrame\\UI-Toast-FriendOnlineIcon:16:16|t"
-	local textToSet = FRIEND_ICON .. " " .. numMembers .. "/40"
+	local modernLayout = IsModernRaidLayout()
+	local textToSet = modernLayout and (numMembers .. "/40") or (FRIEND_ICON .. " " .. numMembers .. "/40")
 	-- BFL:DebugPrint("[BFL] UpdateMemberCount: Setting text to '" .. textToSet .. "' (numMembers=" .. numMembers .. ")")
 	frame.ControlPanel.MemberCount:SetText(textToSet)
 	local actualText = frame.ControlPanel.MemberCount:GetText()
@@ -3044,7 +3066,10 @@ function RaidFrame:UpdateMockControlPanel()
 	if controlPanel.MemberCount then
 		controlPanel.MemberCount:Show()
 		local FRIEND_ICON = "|TInterface\\FriendsFrame\\UI-Toast-FriendOnlineIcon:16:16|t"
-		controlPanel.MemberCount:SetText(FRIEND_ICON .. " " .. #self.raidMembers .. "/40")
+		local modernLayout = IsModernRaidLayout()
+		controlPanel.MemberCount:SetText(
+			modernLayout and (#self.raidMembers .. "/40") or (FRIEND_ICON .. " " .. #self.raidMembers .. "/40")
+		)
 	end
 
 	-- Update role summary
@@ -3062,8 +3087,14 @@ function RaidFrame:UpdateMockControlPanel()
 			end
 		end
 
-		SetRoleCountDisplay(controlPanel.RoleSummary, tanks, healers, dps)
-		SetModernRoleCountDisplay(controlPanel, tanks, healers, dps)
+		local minimumDigits
+		local PreviewMode = BFL:GetModule("PreviewMode")
+		if PreviewMode and PreviewMode.IsComponentEnabled and PreviewMode:IsComponentEnabled("raid") then
+			minimumDigits = 2
+		end
+
+		SetRoleCountDisplay(controlPanel.RoleSummary, tanks, healers, dps, minimumDigits)
+		SetModernRoleCountDisplay(controlPanel, tanks, healers, dps, minimumDigits)
 	end
 
 	-- Trigger layout update

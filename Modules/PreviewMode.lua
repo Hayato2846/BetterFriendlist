@@ -829,6 +829,13 @@ PreviewMode.mockData = {
 -- Mock BattleTag for privacy in screenshots
 PreviewMode.MOCK_BATTLETAG = "YourName#1234"
 
+function PreviewMode:GetPreviewBattleTag()
+	if self:IsComponentEnabled("battletag") then
+		return self.MOCK_BATTLETAG
+	end
+	return nil
+end
+
 function PreviewMode:GetMockFriendNickname(friendUID)
 	if
 		not (self:IsComponentEnabled("friends") or self:IsComponentEnabled("broker"))
@@ -931,6 +938,10 @@ function PreviewMode:ApplyMockBattleTag()
 
 	-- Apply mock BattleTag
 	bnetFrame.Tag:SetText(mockTag)
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() and FriendsUI.RefreshBattleTag then
+		FriendsUI:RefreshBattleTag()
+	end
 
 	-- Hook the FrameInitializer to prevent it from overwriting our mock tag
 	local FrameInitializer = BFL:GetModule("FrameInitializer")
@@ -1002,6 +1013,11 @@ function PreviewMode:RestoreBattleTag()
 			end
 			bnetFrame.Tag:SetText(battleTag)
 		end
+	end
+
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() and FriendsUI.RefreshBattleTag then
+		FriendsUI:RefreshBattleTag()
 	end
 end
 

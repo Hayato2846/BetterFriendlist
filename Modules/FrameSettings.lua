@@ -32,6 +32,22 @@ function FrameSettings:EnsureLayout(layoutKey)
 		local width, height = self:GetDefaultSize(layoutKey)
 		self.db.mainFrameSize[layoutKey] = { width = width, height = height }
 	end
+
+	-- WoW can report scaled frame dimensions with small floating-point tails
+	-- (for example 549.99987792969). Legacy size controls have always operated
+	-- on whole pixels, so normalize only the Legacy bucket when it is read.
+	-- Retail Modern keeps its independent geometry completely untouched.
+	if layoutKey == LEGACY_LAYOUT_KEY then
+		local size = self.db.mainFrameSize[layoutKey]
+		if type(size) == "table" then
+			if type(size.width) == "number" then
+				size.width = math.floor(size.width + 0.5)
+			end
+			if type(size.height) == "number" then
+				size.height = math.floor(size.height + 0.5)
+			end
+		end
+	end
 end
 
 function FrameSettings:Initialize()
@@ -163,13 +179,18 @@ function FrameSettings:ApplySize(bgWidth, bgHeight)
 	local currentSize = self.db.mainFrameSize[layoutKey]
 	local width = bgWidth or currentSize.width
 	local height = bgHeight or currentSize.height
+	if layoutKey == LEGACY_LAYOUT_KEY then
+		width = math.floor(width + 0.5)
+		height = math.floor(height + 0.5)
+	end
 
 	-- Clamp values
 	width = math.max(MIN_WIDTH, math.min(MAX_WIDTH, width))
 	height = math.max(MIN_HEIGHT, math.min(MAX_HEIGHT, height))
 
-	-- Save if explicitly changed (bgWidth/Height passed)
-	if bgWidth or bgHeight then
+	-- Persist normalized Legacy dimensions as well as explicit setting changes.
+	-- This removes stale fractional values from SavedVariables permanently.
+	if bgWidth or bgHeight or layoutKey == LEGACY_LAYOUT_KEY then
 		currentSize.width = width
 		currentSize.height = height
 	end

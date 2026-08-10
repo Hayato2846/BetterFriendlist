@@ -54,6 +54,11 @@ local function RefreshQuickJoinAvailability()
 	return BFL.HasQuickJoin
 end
 
+local function IsModernSocialUIActive()
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	return FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() or false
+end
+
 BFL.HasQuickJoin = RefreshQuickJoinAvailability()
 
 -- Constants
@@ -679,6 +684,10 @@ end
 
 local function CalculateQuickJoinEntryHeight(memberCount, queueCount)
 	local numLines = math.max(memberCount, math.min(queueCount, MAX_NUM_DISPLAYED_QUEUES))
+	if not IsModernSocialUIActive() then
+		local legacyLineHeight = 12 + QUICK_JOIN_ENTRY_NAME_SEPARATION
+		return 13 + legacyLineHeight * numLines
+	end
 	local textHeight = numLines * GetScaledQuickJoinValue(QUICK_JOIN_ENTRY_DEFAULT_LINE_HEIGHT)
 		+ math.max(numLines - 1, 0) * QUICK_JOIN_ENTRY_NAME_SEPARATION
 	return textHeight + GetScaledQuickJoinValue(QUICK_JOIN_ENTRY_VERTICAL_PADDING) * 2
@@ -857,10 +866,11 @@ function QuickJoinEntry:ApplyToFrame(frame)
 	local members = EnsureQuickJoinFontArray(frame, "Members", "MemberName")
 	local queues = EnsureQuickJoinFontArray(frame, "Queues", "QueueName")
 	local canJoin = self:CanJoin()
+	local modern = IsModernSocialUIActive()
 	local verticalPadding = GetScaledQuickJoinValue(QUICK_JOIN_ENTRY_VERTICAL_PADDING)
 	if frame.MemberName then
 		frame.MemberName:ClearAllPoints()
-		frame.MemberName:SetPoint("TOPLEFT", frame, "TOPLEFT", 3, -verticalPadding)
+		frame.MemberName:SetPoint("TOPLEFT", frame, "TOPLEFT", 3, modern and -verticalPadding or -8)
 	end
 
 	for i = 1, #self.displayedMembers do
@@ -869,9 +879,14 @@ function QuickJoinEntry:ApplyToFrame(frame)
 		local nameObj = members[i]
 		if not nameObj then
 			nameObj = frame:CreateFontString(nil, "ARTWORK", "BetterQuickJoinButtonMemberTemplate")
-			nameObj:SetPoint("TOPLEFT", members[i - 1], "BOTTOMLEFT", 0, -QUICK_JOIN_ENTRY_NAME_SEPARATION)
-			nameObj:SetPoint("TOPRIGHT", members[i - 1], "BOTTOMRIGHT", 0, -QUICK_JOIN_ENTRY_NAME_SEPARATION)
 			members[i] = nameObj
+		end
+		if i > 1 then
+			nameObj:ClearAllPoints()
+			nameObj:SetPoint("TOPLEFT", members[i - 1], "BOTTOMLEFT", 0, -QUICK_JOIN_ENTRY_NAME_SEPARATION)
+			if modern then
+				nameObj:SetPoint("TOPRIGHT", members[i - 1], "BOTTOMRIGHT", 0, -QUICK_JOIN_ENTRY_NAME_SEPARATION)
+			end
 		end
 
 		local displayName = name or member.name or playerLink or ""
@@ -902,20 +917,28 @@ function QuickJoinEntry:ApplyToFrame(frame)
 	local queueData = firstQueue and firstQueue.queueData
 	local useGroupIcon = queueData and queueData.queueType == "lfglist"
 	if frame.Icon then
-		local atlas = useGroupIcon and "socialqueuing-icon-group" or "friends-icon-eye"
+		local atlas = useGroupIcon and "socialqueuing-icon-group"
+			or (modern and "friends-icon-eye" or "socialqueuing-icon-eye")
 		BFL.SetTextureOrAtlas(frame.Icon, atlas)
-		frame.Icon:SetSize(
-			GetScaledQuickJoinValue(20),
-			GetScaledQuickJoinValue(useGroupIcon and 18 or 20)
-		)
+		if modern then
+			frame.Icon:SetSize(
+				GetScaledQuickJoinValue(20),
+				GetScaledQuickJoinValue(useGroupIcon and 18 or 20)
+			)
+		elseif frame.MemberName then
+			frame.Icon:SetHeight(math.max(17, frame.MemberName:GetHeight()))
+			frame.Icon:SetWidth(math.max(16, frame.Icon:GetHeight() * 0.95))
+		end
 		frame.Icon:SetDesaturation(canJoin and 0 or 1)
 		frame.Icon:SetAlpha(canJoin and 0.9 or 0.3)
 	end
 
 	if frame.QueueName and frame.MemberName and frame.Icon then
 		frame.QueueName:ClearAllPoints()
-		frame.QueueName:SetPoint("TOPLEFT", frame.MemberName, "TOPRIGHT", frame.Icon:GetWidth() + 6, 0)
-		frame.QueueName:SetPoint("RIGHT", frame, "RIGHT", -7, 0)
+		frame.QueueName:SetPoint("TOPLEFT", frame.MemberName, "TOPRIGHT", frame.Icon:GetWidth() + (modern and 6 or 4), 0)
+		if modern then
+			frame.QueueName:SetPoint("RIGHT", frame, "RIGHT", -7, 0)
+		end
 	end
 
 	for i = 1, #self.displayedQueues do
@@ -923,9 +946,14 @@ function QuickJoinEntry:ApplyToFrame(frame)
 		local queueObj = queues[i]
 		if not queueObj then
 			queueObj = frame:CreateFontString(nil, "ARTWORK", "BetterQuickJoinButtonQueueTemplate")
-			queueObj:SetPoint("TOPLEFT", queues[i - 1], "BOTTOMLEFT", 0, -QUICK_JOIN_ENTRY_NAME_SEPARATION)
-			queueObj:SetPoint("TOPRIGHT", queues[i - 1], "BOTTOMRIGHT", 0, -QUICK_JOIN_ENTRY_NAME_SEPARATION)
 			queues[i] = queueObj
+		end
+		if i > 1 then
+			queueObj:ClearAllPoints()
+			queueObj:SetPoint("TOPLEFT", queues[i - 1], "BOTTOMLEFT", 0, -QUICK_JOIN_ENTRY_NAME_SEPARATION)
+			if modern then
+				queueObj:SetPoint("TOPRIGHT", queues[i - 1], "BOTTOMRIGHT", 0, -QUICK_JOIN_ENTRY_NAME_SEPARATION)
+			end
 		end
 
 		if i == MAX_NUM_DISPLAYED_QUEUES and i ~= #self.displayedQueues then
@@ -1626,6 +1654,24 @@ function QuickJoin:UpdateRetailScrollBoxWidth()
 	end
 end
 
+function QuickJoin:ApplyFriendsUIStyle()
+	local modern = IsModernSocialUIActive()
+	if self.retailScrollBoxView then
+		if modern then
+			self.retailScrollBoxView:SetPadding(10, 10, 6, 6, 3)
+		else
+			self.retailScrollBoxView:SetPadding(5, 5, 5, 5, 2)
+		end
+	end
+	for _, entry in ipairs(self.entriesCache or {}) do
+		entry.cachedHeight = nil
+	end
+	self:UpdateRetailScrollBoxWidth()
+	if self.retailScrollBox and self.retailScrollBox.FullUpdate then
+		pcall(self.retailScrollBox.FullUpdate, self.retailScrollBox, ScrollBoxConstants and ScrollBoxConstants.UpdateImmediately)
+	end
+end
+
 function QuickJoin:InitializeRetailScrollBox(frame)
 	if not BFL.HasModernScrollBox then
 		return false
@@ -1659,12 +1705,17 @@ function QuickJoin:InitializeRetailScrollBox(frame)
 		self:OnScrollBoxInitialize(button, elementData)
 	end)
 	view:SetElementExtentCalculator(function()
-		-- BFL's modern card is a fixed three-line presentation rather than
-		-- Blizzard's member/queue columns, but its extent still has to follow the
-		-- 12.1 user text scale so rows cannot overlap.
-		return GetScaledQuickJoinValue(QUICK_JOIN_CARD_BASE_HEIGHT)
+		-- Modern follows the 12.1 text scale. Legacy deliberately retains the
+		-- fixed 65 px card contract from v2.7.0.
+		return IsModernSocialUIActive()
+			and GetScaledQuickJoinValue(QUICK_JOIN_CARD_BASE_HEIGHT)
+			or QUICK_JOIN_CARD_BASE_HEIGHT
 	end)
-	view:SetPadding(10, 10, 6, 6, 3)
+	if IsModernSocialUIActive() then
+		view:SetPadding(10, 10, 6, 6, 3)
+	else
+		view:SetPadding(5, 5, 5, 5, 2)
+	end
 
 	if not BFL.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view) then
 		return false
@@ -2075,6 +2126,10 @@ function QuickJoin:OnScrollBoxInitialize(button, elementData)
 		else
 			button.Selected:Hide()
 		end
+	end
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.StyleQuickJoinCard then
+		FriendsUI:StyleQuickJoinCard(button)
 	end
 
 	-- 9. Tooltip

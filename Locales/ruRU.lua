@@ -245,7 +245,7 @@ BFL:RegisterLocale("ruRU", function()
 	L.FRIEND_TAGS_SETTINGS_TOOLTIPS_DESC = "Добавляет метки друзей в разделы подсказки «Заметки и метки»."
 	L.FRIEND_TAGS_SETTINGS_MAX_TOOLTIP_CHIPS = "Максимум меток в подсказке"
 	L.FRIEND_TAGS_SETTINGS_MAX_TOOLTIP_CHIPS_DESC = "Ограничивает число меток в подсказках «Заметки и метки»."
-	L.FRIEND_TAGS_SETTINGS_SEARCH = "Поиск и конфиденциальность"
+	L.FRIEND_TAGS_SETTINGS_SEARCH = "Поиск и меню"
 	L.FRIEND_TAGS_SETTINGS_SEARCH_BLIZZARD = "Искать метки Blizzard"
 	L.FRIEND_TAGS_SETTINGS_SEARCH_BLIZZARD_DESC = "Учитывает совместимые с Blizzard метки при поиске по списку друзей."
 	L.FRIEND_TAGS_SETTINGS_SEARCH_CUSTOM = "Искать пользовательские метки"

@@ -645,6 +645,28 @@ function Settings:HideLegacyWindow()
 	end
 end
 
+-- Keep an already-open settings window adjacent to the active Friends UI.
+-- Opening the window establishes the same anchor, but a live Legacy/Modern
+-- style switch changes the required side-tab clearance without reopening it.
+function Settings:RefreshVisibleWindowAnchor()
+	local FriendsUI = BFL:GetModule("FriendsUI")
+	if not (FriendsUI and FriendsUI.AnchorAuxiliaryWindow) then
+		return
+	end
+
+	if settingsFrame and settingsFrame:IsShown() then
+		FriendsUI:AnchorAuxiliaryWindow(settingsFrame, 0)
+	end
+
+	local Designer = BFL:GetModule("SettingsDesigner")
+	if Designer and Designer.IsShown and Designer.GetFrame and Designer:IsShown() then
+		local frame = Designer:GetFrame()
+		if frame then
+			FriendsUI:AnchorAuxiliaryWindow(frame, 0)
+		end
+	end
+end
+
 function Settings:OnSettingsCenterBetaChanged(checked)
 	local DB = GetDB()
 	if not DB then
@@ -805,7 +827,7 @@ local TAB_DEFINITIONS = {
 		id = 13,
 		name = L.SETTINGS_TAB_FRIEND_TAGS or "Friend Tags",
 		icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\tag.blp",
-		beta = true,
+		beta = false,
 	},
 	{
 		id = 12,
@@ -848,6 +870,46 @@ local function GetAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
 		return BFL:GetThemeAccentColor(fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1)
 	end
 	return fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1
+end
+
+local FAVORITE_ICON_TEXTURE = "Interface\\AddOns\\BetterFriendlist\\Icons\\star"
+
+local function GetFavoriteIconMarkup(style, size)
+	size = tonumber(size) or 17
+	local themed = BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme()
+	if not themed then
+		if style == "blizzard" and BFL.GetAtlasOrTextureMarkup then
+			return BFL.GetAtlasOrTextureMarkup("friendslist-favorite", FAVORITE_ICON_TEXTURE, size, size)
+		end
+		return string.format("|T%s:%d:%d|t", FAVORITE_ICON_TEXTURE, size, size)
+	end
+
+	local r, g, b = GetAccentColor(1, 0.82, 0)
+	local function ToMarkupByte(value)
+		return math.floor(math.max(0, math.min(1, tonumber(value) or 1)) * 255 + 0.5)
+	end
+	r, g, b = ToMarkupByte(r), ToMarkupByte(g), ToMarkupByte(b)
+	if
+		style == "blizzard"
+		and BFL.HasAtlas
+		and BFL.HasAtlas("friendslist-favorite")
+		and BFL.GetAtlasMarkup
+	then
+		-- Atlas markup accepts RGB bytes after its offsets. Supplying them replaces
+		-- the atlas' native gold with the active Dark/Custom accent.
+		return BFL.GetAtlasMarkup("friendslist-favorite", size, size, 0, 0, r, g, b)
+	end
+	-- The bundled star is 32x32. Full texture bounds are required before the RGB
+	-- byte fields can be supplied in inline texture markup.
+	return string.format(
+		"|T%s:%d:%d:0:0:32:32:0:32:0:32:%d:%d:%d|t",
+		FAVORITE_ICON_TEXTURE,
+		size,
+		size,
+		r,
+		g,
+		b
+	)
 end
 
 local function IsTabAvailableForClient(tabDef)
@@ -1046,6 +1108,58 @@ function Settings:Hide()
 	end
 end
 
+function Settings:RefreshCategoryVisualState()
+	for _, button in pairs(categoryButtons) do
+		-- Determine if beta category for color restoration
+		local isBeta = false
+		for _, def in ipairs(TAB_DEFINITIONS) do
+			if def.id == button.id and def.beta then
+				isBeta = true
+				break
+			end
+		end
+
+		if button.id == currentTab then
+			-- SELECTED STATE
+			if button.selectedTex then
+				button.selectedTex:Show()
+			end
+			button.text:SetTextColor(1, 1, 1) -- White Text
+			if button.icon then
+				local themed = BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme()
+				if button.icon.SetDesaturated then
+					button.icon:SetDesaturated(themed == true)
+				end
+				if themed then
+					button.icon:SetVertexColor(GetAccentColor(1, 0.82, 0))
+				else
+					button.icon:SetVertexColor(1, 1, 1)
+				end
+			end
+		else
+			-- UNSELECTED STATE
+			if button.selectedTex then
+				button.selectedTex:Hide()
+			end
+
+			local r, g, b
+			if isBeta then
+				r, g, b = 1, 0.53, 0 -- Beta Orange
+			else
+				r, g, b = GetAccentColor(1, 0.82, 0) -- Normal Gold
+			end
+
+			button.text:SetTextColor(r, g, b)
+			if button.icon then
+				if button.icon.SetDesaturated then
+					button.icon:SetDesaturated(BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme())
+				end
+				button.icon:SetVertexColor(r, g, b)
+			end
+		end
+	end
+end
+
 -- Select a settings category
 function Settings:SelectCategory(categoryID)
 	if not settingsFrame then
@@ -1062,45 +1176,7 @@ function Settings:SelectCategory(categoryID)
 		self:HideFilterSortEditorPanel()
 	end
 
-	-- Update Button Selection States
-	for _, button in pairs(categoryButtons) do
-		-- Determine if beta category for color restoration
-		local isBeta = false
-		for _, def in ipairs(TAB_DEFINITIONS) do
-			if def.id == button.id and def.beta then
-				isBeta = true
-				break
-			end
-		end
-
-		if button.id == categoryID then
-			-- SELECTED STATE
-			if button.selectedTex then
-				button.selectedTex:Show()
-			end
-			button.text:SetTextColor(1, 1, 1) -- White Text
-			if button.icon then
-				button.icon:SetVertexColor(1, 1, 1)
-			end -- White Icon
-		else
-			-- UNSELECTED STATE
-			if button.selectedTex then
-				button.selectedTex:Hide()
-			end
-
-			local r, g, b
-			if isBeta then
-				r, g, b = 1, 0.53, 0 -- Beta Orange
-			else
-				r, g, b = GetAccentColor(1, 0.82, 0) -- Normal Gold
-			end
-
-			button.text:SetTextColor(r, g, b)
-			if button.icon then
-				button.icon:SetVertexColor(r, g, b)
-			end
-		end
-	end
+	self:RefreshCategoryVisualState()
 
 	local content = settingsFrame.ContentScrollFrame.Content
 	if content then
@@ -3343,8 +3419,14 @@ function Settings:RefreshGuildTabVisibility()
 		GuildFrame:OnGuildTabSettingChanged()
 	end
 	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
-	if FriendsUI and FriendsUI.RefreshNavigation then
-		FriendsUI:RefreshNavigation()
+	if FriendsUI then
+		if FriendsUI.IsModernActive and FriendsUI:IsModernActive() then
+			if FriendsUI.RefreshNavigation then
+				FriendsUI:RefreshNavigation()
+			end
+		elseif FriendsUI.RestoreLegacyTabs then
+			FriendsUI:RestoreLegacyTabs(false)
+		end
 	end
 end
 
@@ -4460,14 +4542,11 @@ function Settings:RefreshGeneralTab()
 	-- Row 7: Favorite Icon + Favorite Icon Dropdown (conditional)
 	local favoriteIconEnabled = DB:Get("enableFavoriteIcon", true)
 	local hasBlizzardFavoriteIcon = BFL.HasAtlas and BFL.HasAtlas("friendslist-favorite")
-	local blizzardIconTag = BFL.GetAtlasOrTextureMarkup
-		and BFL.GetAtlasOrTextureMarkup("friendslist-favorite", "Interface\\AddOns\\BetterFriendlist\\Icons\\star", 20, 20)
-		or "|TInterface\\AddOns\\BetterFriendlist\\Icons\\star:20:20|t"
+	local blizzardIconTag = GetFavoriteIconMarkup("blizzard", 20)
 
 	local favoriteEntries = {
 		labels = {
-			"|TInterface\\AddOns\\BetterFriendlist\\Icons\\star:17:17|t "
-				.. (L.SETTINGS_FAVORITE_ICON_OPTION_BFL or "BFL Icon"),
+			GetFavoriteIconMarkup("bfl", 17) .. " " .. (L.SETTINGS_FAVORITE_ICON_OPTION_BFL or "BFL Icon"),
 			blizzardIconTag .. " " .. (L.SETTINGS_FAVORITE_ICON_OPTION_BLIZZARD or "Blizzard Icon"),
 		},
 		values = { "bfl", "blizzard" },
@@ -4740,10 +4819,8 @@ function Settings:RefreshGeneralTab()
 	})
 	table.insert(allFrames, behaviorRow1)
 
-	-- In Modern, Simple Mode only controls the portrait. Legacy retains its
-	-- established compact frame behavior and optional search control.
-	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
-	local modernActive = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
+	-- Modern owns a fixed compact Contacts layout. Legacy retains its broader
+	-- compact frame behavior and optional search control.
 	local behaviorRow2 = Components:CreateDoubleCheckbox(tab, {
 		label = L.SETTINGS_USE_UI_PANEL_SYSTEM or "Use UI Panel System",
 		initialValue = DB:Get("useUIPanelSystem", false),
@@ -4766,7 +4843,7 @@ function Settings:RefreshGeneralTab()
 	})
 	table.insert(allFrames, behaviorRow2)
 
-	if not modernActive and DB:Get("simpleMode", false) then
+	if DB:Get("simpleMode", false) then
 		table.insert(allFrames, Components:CreateCheckbox(tab, {
 			label = L.SETTINGS_SIMPLE_MODE_SHOW_SEARCH or "Show Search in Simple Mode",
 			initialValue = DB:Get("simpleModeShowSearch", true),
@@ -5085,92 +5162,6 @@ local function OpenLegacyFriendTagEditor(tagId)
 	return false
 end
 
-local function CreateLegacyFriendTagRow(parent, FriendTags, tag, refreshCallback)
-	local row = CreateFrame("Frame", nil, parent, "BackdropTemplate")
-	row:SetHeight(36)
-	row:SetPoint("LEFT", UI.SPACING_MEDIUM, 0)
-	row:SetPoint("RIGHT", -UI.SPACING_MEDIUM, 0)
-	row:SetBackdrop({
-		bgFile = "Interface\\Buttons\\WHITE8X8",
-		edgeFile = "Interface\\Buttons\\WHITE8X8",
-		edgeSize = 1,
-	})
-	row:SetBackdropColor(0.05, 0.05, 0.06, 0.45)
-	row:SetBackdropBorderColor(0.24, 0.24, 0.28, 0.55)
-
-	local profile = FriendTags and FriendTags:GetChipProfile(tag)
-	local icon = row:CreateTexture(nil, "ARTWORK")
-	icon:SetSize(18, 18)
-	icon:SetPoint("LEFT", row, "LEFT", 8, 0)
-	if profile and profile.icon then
-		icon:SetTexture(profile.icon)
-	else
-		icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\tag")
-	end
-
-	local name = row:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
-	name:SetPoint("LEFT", icon, "RIGHT", 8, 0)
-	name:SetPoint("RIGHT", row, "RIGHT", tag.source == "custom" and -210 or -142, 0)
-	name:SetJustifyH("LEFT")
-	name:SetWordWrap(false)
-	local label = FriendTags and FriendTags.GetChipLabel and FriendTags:GetChipLabel(tag) or nil
-	if label and label ~= "" and label ~= tag.name then
-		name:SetText((tag.name or tag.id) .. "  |cffaaaaaa(" .. label .. ")|r")
-	else
-		name:SetText(tag.name or tag.id)
-	end
-
-	local source = row:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlightSmall")
-	source:SetPoint("LEFT", name, "RIGHT", 6, 0)
-	source:SetWidth(66)
-	source:SetJustifyH("LEFT")
-	if tag.source == "custom" then
-		source:SetText(L.FRIEND_TAGS_SOURCE_CUSTOM or "Custom")
-		source:SetTextColor(0.64, 0.86, 0.56, 1)
-	else
-		source:SetText(L.FRIEND_TAGS_SOURCE_BLIZZARD or "Blizzard")
-		source:SetTextColor(0.50, 0.78, 1.00, 1)
-	end
-
-	local function CreateRowButton(text, width, rightOffset, onClick)
-		local button = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-		button:SetSize(width or 58, 22)
-		button:SetPoint("RIGHT", row, "RIGHT", rightOffset, 0)
-		button:SetText(text)
-		button:SetScript("OnClick", onClick)
-		return button
-	end
-
-	if tag.source == "custom" then
-		CreateRowButton(L.FRIEND_TAGS_EDITOR_DELETE or DELETE or "Delete", 58, -8, function()
-			if StaticPopup_Show and StaticPopupDialogs and StaticPopupDialogs["BFL_FRIEND_TAG_EDITOR_DELETE_CUSTOM"] then
-				StaticPopup_Show("BFL_FRIEND_TAG_EDITOR_DELETE_CUSTOM", tag.name or tag.id, nil, { tagId = tag.id })
-			elseif FriendTags and FriendTags.DeleteCustomTag then
-				FriendTags:DeleteCustomTag(tag.id, refreshCallback)
-			end
-		end)
-		CreateRowButton(L.FRIEND_TAGS_EDITOR_RESET or RESET or "Reset", 58, -70, function()
-			if FriendTags and FriendTags.ResetChipProfile then
-				FriendTags:ResetChipProfile(tag.id, refreshCallback)
-			end
-		end)
-		CreateRowButton(L.FRIEND_TAGS_EDITOR_EDIT or EDIT or "Edit", 58, -132, function()
-			OpenLegacyFriendTagEditor(tag.id)
-		end)
-	else
-		CreateRowButton(L.FRIEND_TAGS_EDITOR_RESET or RESET or "Reset", 58, -8, function()
-			if FriendTags and FriendTags.ResetChipProfile then
-				FriendTags:ResetChipProfile(tag.id, refreshCallback)
-			end
-		end)
-		CreateRowButton(L.FRIEND_TAGS_EDITOR_EDIT or EDIT or "Edit", 58, -70, function()
-			OpenLegacyFriendTagEditor(tag.id)
-		end)
-	end
-
-	return row
-end
-
 function Settings:RefreshContactMemoryTab()
 	if not settingsFrame or not Components then
 		return
@@ -5366,6 +5357,11 @@ function Settings:RefreshFriendTagsTab()
 		tooltipDesc = L.FRIEND_TAGS_ENABLE_DESC or "Adds Blizzard-compatible and custom tags for friends.",
 	})
 	table.insert(allFrames, enableTags)
+	local editorButton = Components:CreateButton(tab, L.FRIEND_TAGS_EDITOR_OPEN or "Open Tag Editor", function()
+		OpenLegacyFriendTagEditor()
+	end, L.FRIEND_TAGS_EDITOR_DESC or "Customize labels, icons, colors, visibility, and custom tags.")
+	editorButton:SetWidth(260)
+	table.insert(allFrames, editorButton)
 
 	table.insert(allFrames, Components:CreateSpacer(tab))
 	table.insert(allFrames, Components:CreateHeader(tab, L.FRIEND_TAGS_SETTINGS_VISIBILITY or "Visibility"))
@@ -5433,7 +5429,7 @@ function Settings:RefreshFriendTagsTab()
 	end
 	table.insert(allFrames, compactDropdown)
 
-	table.insert(allFrames, Components:CreateSlider(tab, L.FRIEND_TAGS_MAX_ROW_CHIPS or "Max Row Chips", 1, 8,
+	table.insert(allFrames, Components:CreateSlider(tab, L.FRIEND_TAGS_MAX_ROW_CHIPS or "Max Row Chips", 1, 9,
 		FriendTags:GetSetting("maxRowChips", 3), function(value)
 			return tostring(math.floor((tonumber(value) or 0) + 0.5))
 		end, function(value)
@@ -5448,26 +5444,7 @@ function Settings:RefreshFriendTagsTab()
 		end))
 
 	table.insert(allFrames, Components:CreateSpacer(tab))
-	table.insert(allFrames, Components:CreateHeader(tab, L.FRIEND_TAGS_SETTINGS_GROUPS or "Dynamic Tag Groups"))
-	table.insert(allFrames, Components:CreateDoubleCheckbox(tab, {
-		label = L.FRIEND_TAGS_SETTINGS_DYNAMIC_GROUPS or "Show Dynamic Tag Groups",
-		initialValue = FriendTags:GetSetting("enableDynamicTagGroups", false) == true,
-		callback = function(val)
-			FriendTags:SetSetting("enableDynamicTagGroups", val == true, RefreshFriendTagsSettings)
-		end,
-		tooltipTitle = L.FRIEND_TAGS_SETTINGS_DYNAMIC_GROUPS or "Show Dynamic Tag Groups",
-		tooltipDesc = L.FRIEND_TAGS_SETTINGS_DYNAMIC_GROUPS_DESC
-			or "Add virtual groups for assigned tags without writing those groups to Blizzard notes.",
-	}, {
-		label = L.FRIEND_TAGS_SHOW_MENU_COUNTS or "Show Menu Counts",
-		initialValue = FriendTags:GetSetting("showMenuTagCounts", true) ~= false,
-		callback = function(val)
-			FriendTags:SetSetting("showMenuTagCounts", val == true, RefreshFriendTagsSettings)
-		end,
-		tooltipTitle = L.FRIEND_TAGS_SHOW_MENU_COUNTS or "Show Menu Counts",
-		tooltipDesc = L.FRIEND_TAGS_SHOW_MENU_COUNTS_DESC or "Show assigned tag counts in supported context menus.",
-	}))
-
+	table.insert(allFrames, Components:CreateHeader(tab, L.FRIEND_TAGS_SETTINGS_SEARCH or "Search & Menus"))
 	table.insert(allFrames, Components:CreateDoubleCheckbox(tab, {
 		label = L.FRIEND_TAGS_SEARCH_BLIZZARD or "Search Blizzard Tags",
 		initialValue = FriendTags:GetSetting("includeBlizzardTagsInSearch", true) ~= false,
@@ -5486,42 +5463,60 @@ function Settings:RefreshFriendTagsTab()
 		tooltipDesc = L.FRIEND_TAGS_SEARCH_CUSTOM_DESC or "Include custom tags in friend search.",
 	}))
 
-	table.insert(allFrames, Components:CreateSpacer(tab))
-	table.insert(allFrames, Components:CreateHeader(tab, L.FRIEND_TAGS_SETTINGS_EDITOR or "Tag Editor"))
-	table.insert(
-		allFrames,
-		Components:CreateButton(tab, L.FRIEND_TAGS_EDITOR_OPEN or "Open Tag Editor", function()
-			OpenLegacyFriendTagEditor()
-		end, L.FRIEND_TAGS_EDITOR_DESC or "Customize labels, icons, colors, visibility, and custom tags.")
-	)
+	table.insert(allFrames, Components:CreateCheckbox(tab, {
+		label = L.FRIEND_TAGS_SHOW_MENU_COUNTS or "Show Menu Counts",
+		initialValue = FriendTags:GetSetting("showMenuTagCounts", true) ~= false,
+		callback = function(val)
+			FriendTags:SetSetting("showMenuTagCounts", val == true, RefreshFriendTagsSettings)
+		end,
+		tooltipTitle = L.FRIEND_TAGS_SHOW_MENU_COUNTS or "Show Menu Counts",
+		tooltipDesc = L.FRIEND_TAGS_SHOW_MENU_COUNTS_DESC or "Show assigned tag counts in supported context menus.",
+	}))
 
-	if FriendTags:IsBlizzardTagAPIAvailable() then
-		local count = FriendTags:GetLocalBlizzardTagAssignmentCount()
+	table.insert(allFrames, Components:CreateSpacer(tab))
+	table.insert(allFrames, Components:CreateHeader(tab, L.FRIEND_TAGS_SETTINGS_GROUPS or "Dynamic Tag Groups"))
+	table.insert(allFrames, Components:CreateCheckbox(tab, {
+		label = L.FRIEND_TAGS_SETTINGS_DYNAMIC_GROUPS or "Show Dynamic Tag Groups",
+		initialValue = FriendTags:GetSetting("enableDynamicTagGroups", false) == true,
+		callback = function(val)
+			FriendTags:SetSetting("enableDynamicTagGroups", val == true, RefreshFriendTagsSettings)
+		end,
+		tooltipTitle = L.FRIEND_TAGS_SETTINGS_DYNAMIC_GROUPS or "Show Dynamic Tag Groups",
+		tooltipDesc = L.FRIEND_TAGS_SETTINGS_DYNAMIC_GROUPS_DESC
+			or "Add virtual groups for assigned tags without writing those groups to Blizzard notes.",
+	}))
+
+	local pendingAssignments = FriendTags:GetLocalBlizzardTagAssignmentCount()
+	if FriendTags:AreBlizzardTagsEnabled() and pendingAssignments > 0 then
+		table.insert(allFrames, Components:CreateSpacer(tab))
+		table.insert(
+			allFrames,
+			Components:CreateHeader(
+				tab,
+				string.format("%s (%d)", L.FRIEND_TAGS_SYNC_LOCAL_TITLE or "Sync Local Blizzard-compatible Tags", pendingAssignments)
+			)
+		)
+		table.insert(
+			allFrames,
+			Components:CreateLabel(
+				tab,
+				L.FRIEND_TAGS_SYNC_LOCAL_DESC
+					or "Moves locally stored Blizzard-compatible tag selections to Blizzard's native 12.1 tag storage.",
+				true,
+				{ r = 0.75, g = 0.75, b = 0.75, a = 1 }
+			)
+		)
 		local handoffButton = Components:CreateButton(
 			tab,
-			string.format("%s (%d)", L.FRIEND_TAGS_SYNC_LOCAL_BUTTON or "Sync Local Blizzard Tags", count or 0),
+			L.FRIEND_TAGS_SYNC_LOCAL_BUTTON or "Sync Known Friends",
 			function()
 				FriendTags:HandoffKnownLocalBlizzardTags(RefreshFriendTagsSettings)
 			end,
 			L.FRIEND_TAGS_SYNC_LOCAL_DESC
 				or "Moves locally stored Blizzard-compatible tag selections to Blizzard's native 12.1 tag storage."
 		)
-		if count <= 0 or not FriendTags:AreBlizzardTagsEnabled() then
-			handoffButton:Disable()
-		end
+		handoffButton:SetWidth(260)
 		table.insert(allFrames, handoffButton)
-	end
-
-	table.insert(allFrames, Components:CreateSpacer(tab))
-	table.insert(allFrames, Components:CreateHeader(tab, L.FRIEND_TAGS_SETTINGS_TAG_LIST or "Tags"))
-
-	local definitions = FriendTags:GetAllTagDefinitions()
-	if #definitions == 0 then
-		table.insert(allFrames, Components:CreateLabel(tab, L.FRIEND_TAGS_SETTINGS_TAG_LIST_EMPTY or "No tags available.", true))
-	else
-		for _, tag in ipairs(definitions) do
-			table.insert(allFrames, CreateLegacyFriendTagRow(tab, FriendTags, tag, RefreshFriendTagsSettings))
-		end
 	end
 
 	Components:AnchorChain(allFrames, -5)

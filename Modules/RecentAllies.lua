@@ -48,6 +48,8 @@ end
 
 function RecentAllies:ApplyEntryLayout(button, stateData)
 	local modern = IsModernSocialUIActive()
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	local _, themed = FriendsUI and FriendsUI.GetModernThemeColors and FriendsUI:GetModernThemeColors()
 	local stateContainer = button.StateIconContainer
 	local pinDisplay = stateContainer.PinDisplay
 	local requestDisplay = stateContainer.FriendRequestPendingDisplay
@@ -55,6 +57,7 @@ function RecentAllies:ApplyEntryLayout(button, stateData)
 	local classText = characterData.Class
 	local mostRecentInteraction = characterData.MostRecentInteraction
 	local partyButton = button.PartyButton
+	partyButton.BFL_DarkForceFlatButton = modern and themed and true or nil
 
 	if not modern then
 		button.bflModernRecentAllyLayout = nil

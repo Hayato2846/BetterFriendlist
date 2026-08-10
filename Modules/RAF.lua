@@ -137,9 +137,25 @@ local function CallBlizzardMethod(owner, method, ...)
 end
 
 local function GetNativeRecruitAFriendFrame()
-	-- Retail 12.1 creates the RAF SocialView dynamically below SocialUIFrame.
-	-- Keep the old global as a fallback for older Retail clients.
-	return (SocialUIFrame and SocialUIFrame.RecruitAFriendFrame) or RecruitAFriendFrame
+	-- Retail 12.1 can keep both RAF views alive. Match Blizzard's active-frame
+	-- selection instead of assuming that the presence of SocialUIFrame wins.
+	local socialFrame = SocialUIFrame and SocialUIFrame.RecruitAFriendFrame
+	if socialFrame then
+		if C_SocialUI and C_SocialUI.IsSystemEnabled then
+			local ok, enabled = pcall(CallBlizzardFunction, C_SocialUI.IsSystemEnabled)
+			if ok and enabled == true then
+				return socialFrame
+			end
+		else
+			-- Older Retail builds expose only one effective RAF frame.
+			return socialFrame
+		end
+	end
+	return RecruitAFriendFrame
+end
+
+function RAF:GetNativeRecruitAFriendFrame()
+	return GetNativeRecruitAFriendFrame()
 end
 
 local function LoadBlizzardRecruitAFriend()
@@ -208,6 +224,8 @@ local nativeRewardsState = {
 	selectedRAFVersion = nil,
 	previewProxy = nil,
 	originalGetRecruitAFriendFrame = nil,
+	fullRefreshHookInstalled = false,
+	hideHookInstalled = false,
 }
 local nativeRewardTabHooks = setmetatable({}, { __mode = "k" })
 local SelectNativeRewardVersion
@@ -233,6 +251,44 @@ end
 
 local function IsNativeLegacyRewardVersion(rafInfo, rafVersion)
 	return rafVersion ~= GetNativeLatestRewardVersion(rafInfo)
+end
+
+local function EnforcePreviewRewardsSafety(rewardsFrame, rafInfo)
+	if not (rewardsFrame and rafInfo and rafInfo._isMock) then
+		return false
+	end
+	local claimButton = rewardsFrame.ClaimLegacyRewardsButton
+	if claimButton then
+		if claimButton.SetAutoClaimRewardsEnabled then
+			CallBlizzardMethod(claimButton, claimButton.SetAutoClaimRewardsEnabled, false)
+		end
+		if claimButton.SetEnabled then
+			claimButton:SetEnabled(false)
+		end
+		if claimButton.Hide then
+			claimButton:Hide()
+		end
+	end
+	return true
+end
+
+function RAF:EnforcePreviewRewardsSafety(rewardsFrame, rafInfo)
+	return EnforcePreviewRewardsSafety(rewardsFrame, rafInfo)
+end
+
+local function CanUseNativeRewardsFullRefresh(rewardsFrame, rafInfo)
+	if not (rewardsFrame and rewardsFrame.FullRefresh) then
+		return false
+	end
+	if rafInfo and rafInfo._isMock then
+		return nativeRewardsState.previewProxy ~= nil
+	end
+	local nativeFrame = GetNativeRecruitAFriendFrame()
+	if not (nativeFrame and nativeFrame.GetSelectedRAFVersionInfo) then
+		return false
+	end
+	local ok, selectedInfo = pcall(CallBlizzardMethod, nativeFrame, nativeFrame.GetSelectedRAFVersionInfo)
+	return ok and selectedInfo ~= nil
 end
 
 local function RefreshNativeRewardTabs()
@@ -345,11 +401,20 @@ local function RefreshNativeRewardsFrame()
 		CloseSideDressUpFrame(rewardsFrame)
 	end
 
-	UpdateNativeRewardsBackground(rewardsFrame, selectedRAFVersion)
-
 	if rewardsFrame.SetUpTabs then
 		CallBlizzardMethod(rewardsFrame, rewardsFrame.SetUpTabs, rafInfo)
 	end
+	if CanUseNativeRewardsFullRefresh(rewardsFrame, rafInfo) then
+		local ok = pcall(CallBlizzardMethod, rewardsFrame, rewardsFrame.FullRefresh)
+		if ok then
+			EnforcePreviewRewardsSafety(rewardsFrame, rafInfo)
+			return true
+		end
+	end
+
+	-- Older clients and hidden native frames without a selected version retain
+	-- the pre-12.1 manual renderer as a compatibility fallback.
+	UpdateNativeRewardsBackground(rewardsFrame, selectedRAFVersion)
 
 	if rewardsFrame.Description then
 		local description = IsNativeLegacyRewardVersion(rafInfo, selectedRAFVersion)
@@ -364,8 +429,7 @@ local function RefreshNativeRewardsFrame()
 	UpdateNativeRewardsList(rewardsFrame, selectedVersionInfo.rewards)
 
 	if rafInfo._isMock and rewardsFrame.ClaimLegacyRewardsButton then
-		rewardsFrame.ClaimLegacyRewardsButton:Hide()
-		rewardsFrame.ClaimLegacyRewardsButton:SetEnabled(false)
+		EnforcePreviewRewardsSafety(rewardsFrame, rafInfo)
 	elseif rewardsFrame.ClaimLegacyRewardsButton and rewardsFrame.ClaimLegacyRewardsButton.Update then
 		CallBlizzardMethod(
 			rewardsFrame.ClaimLegacyRewardsButton,
@@ -424,7 +488,14 @@ local function HookNativeRewardTabs()
 		if not nativeRewardTabHooks[rewardTab] then
 			rewardTab:HookScript("OnClick", function(tab)
 				if RecruitAFriendRewardsFrame and RecruitAFriendRewardsFrame:IsShown() and IsBetterFriendlistRewardsContext() then
-					SelectNativeRewardVersion(tab.rafVersion)
+					local nativeRefreshOwnsSelection = RecruitAFriendRewardsFrame.FullRefresh
+						and RecruitAFriendRewardsFrame.RefreshTabs
+						and not (nativeRewardsState.rafInfo and nativeRewardsState.rafInfo._isMock)
+					if nativeRefreshOwnsSelection then
+						nativeRewardsState.selectedRAFVersion = tab.rafVersion
+					else
+						SelectNativeRewardVersion(tab.rafVersion)
+					end
 				end
 			end)
 			nativeRewardTabHooks[rewardTab] = true
@@ -442,6 +513,37 @@ local function RestoreNativeRewardsFrameOwner()
 	nativeRewardsState.previewProxy = nil
 end
 
+local function IsPreviewRewardsOwner(rewardsFrame)
+	local proxy = nativeRewardsState.previewProxy
+	if not (proxy and rewardsFrame and rewardsFrame.GetRecruitAFriendFrame) then
+		return false
+	end
+	local ok, owner = pcall(CallBlizzardMethod, rewardsFrame, rewardsFrame.GetRecruitAFriendFrame)
+	return ok and owner == proxy
+end
+
+local function InstallNativeRewardsLifecycleHooks(rewardsFrame)
+	if not rewardsFrame then
+		return
+	end
+	if not nativeRewardsState.fullRefreshHookInstalled and hooksecurefunc and rewardsFrame.FullRefresh then
+		local ok = pcall(hooksecurefunc, rewardsFrame, "FullRefresh", function()
+			if IsPreviewRewardsOwner(rewardsFrame) then
+				EnforcePreviewRewardsSafety(rewardsFrame, nativeRewardsState.rafInfo)
+			end
+		end)
+		nativeRewardsState.fullRefreshHookInstalled = ok == true
+	end
+	if not nativeRewardsState.hideHookInstalled and rewardsFrame.HookScript then
+		rewardsFrame:HookScript("OnHide", function()
+			if IsPreviewRewardsOwner(rewardsFrame) then
+				RestoreNativeRewardsFrameOwner()
+			end
+		end)
+		nativeRewardsState.hideHookInstalled = true
+	end
+end
+
 local function PrepareRewardsFrameForInfo(rafInfo, resetToLatest, preview)
 	if not LoadBlizzardRecruitAFriend() or not RecruitAFriendRewardsFrame then
 		return false
@@ -455,6 +557,7 @@ local function PrepareRewardsFrameForInfo(rafInfo, resetToLatest, preview)
 	if not nativeRewardsState.originalGetRecruitAFriendFrame then
 		nativeRewardsState.originalGetRecruitAFriendFrame = rewardsFrame.GetRecruitAFriendFrame
 	end
+	InstallNativeRewardsLifecycleHooks(rewardsFrame)
 
 	if preview then
 		local proxy = nativeRewardsState.previewProxy or {}
@@ -467,6 +570,9 @@ local function PrepareRewardsFrameForInfo(rafInfo, resetToLatest, preview)
 		end
 		function proxy:GetSelectedRAFVersionInfo()
 			return GetNativeRewardVersionInfo(nativeRewardsState.rafInfo, nativeRewardsState.selectedRAFVersion)
+		end
+		function proxy:GetRAFVersionInfo(rafVersion)
+			return GetNativeRewardVersionInfo(nativeRewardsState.rafInfo, rafVersion)
 		end
 		function proxy:GetRAFInfo()
 			return nativeRewardsState.rafInfo
@@ -886,6 +992,14 @@ function RAF:EnablePreview(frame)
 		tab:Show()
 	end
 	self:OnLoad(frame)
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if FriendsUI then
+		if FriendsUI.IsModernActive and FriendsUI:IsModernActive() then
+			FriendsUI:RefreshNavigation()
+		elseif FriendsUI.RestoreLegacyTabs then
+			FriendsUI:RestoreLegacyTabs(false)
+		end
+	end
 	return frame.previewRAF == true
 end
 
@@ -928,13 +1042,21 @@ function RAF:DisablePreview(frame)
 		frame.rafRecruitingEnabled = false
 		frame:Hide()
 	end
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if FriendsUI then
+		if FriendsUI.IsModernActive and FriendsUI:IsModernActive() then
+			FriendsUI:RefreshNavigation()
+		elseif FriendsUI.RestoreLegacyTabs then
+			FriendsUI:RestoreLegacyTabs(false)
+		end
+	end
 end
 
 --------------------------------------------------------------------------
 -- RAF Frame Initialization and Event Handling
 --------------------------------------------------------------------------
 
-local function EnsureModernActionButton(owner, key, parent, width, onClick, template)
+local function EnsureModernActionButton(owner, key, parent, width, onClick, template, maxWidth)
 	local legacyKey = "bflLegacy" .. key
 	local modernKey = "bflModern" .. key
 	if not owner[legacyKey] then
@@ -954,9 +1076,20 @@ local function EnsureModernActionButton(owner, key, parent, width, onClick, temp
 			return owner[key]
 		end
 		modernButton = created
-		modernButton:SetSize(width, 30)
 		modernButton:SetScript("OnClick", onClick)
 		owner[modernKey] = modernButton
+	end
+
+	-- SocialUIActionButtonTemplate is only the 70 px base template. Blizzard's
+	-- actual Social UI action button overrides these values in XML before its
+	-- UserScaledButtonFitToTextMixin registers with TextSizeManager. BFL creates
+	-- the proxy dynamically, so SetText() otherwise recalculates it back to the
+	-- 70 px base after our SetSize(), collapsing the disabled three-slice art.
+	modernButton.baseWidth = width
+	modernButton.maxWidth = maxWidth or modernButton.maxWidth
+	modernButton:SetSize(width, 30)
+	if modernButton.UpdateWidth then
+		modernButton:UpdateWidth()
 	end
 
 	local previous = owner[key]
@@ -994,7 +1127,10 @@ function RAF:ApplyFrameStyle(frame)
 		return
 	end
 
-	local mainFrame = frame:GetParent()
+	-- RecruitAFriendFrame is temporarily reparented under the Modern content
+	-- hierarchy. Its action button, however, always belongs to the actual BFL
+	-- window; using GetParent() here leaked the Modern replacement into Legacy.
+	local mainFrame = BetterFriendsFrame or frame:GetParent()
 	if not IsModernSocialUIActive() then
 		local claimButton = RestoreLegacyActionButton(rewardPanel, "ClaimOrViewRewardButton")
 		local recruitmentButton = mainFrame and RestoreLegacyActionButton(mainFrame, "RecruitmentButton")
@@ -1049,6 +1185,7 @@ function RAF:ApplyFrameStyle(frame)
 			rewardPanel.NextRewardInfoButton:Show()
 		end
 		if claimButton then
+			claimButton:SetScale(1)
 			claimButton:ClearAllPoints()
 			claimButton:SetPoint("BOTTOM", rewardPanel, "BOTTOM", 7, 10)
 			claimButton:SetSize(155, 21)
@@ -1127,7 +1264,8 @@ function RAF:ApplyFrameStyle(frame)
 		function(button)
 			RAF:ClaimOrViewRewardButton_OnClick(button)
 		end,
-		"SocialUIActionButtonTemplate, RAFClaimRewardButtonSocialViewBaseTemplate"
+		"SocialUIActionButtonTemplate, RAFClaimRewardButtonSocialViewBaseTemplate",
+		230
 	)
 	if claimButton then
 		claimButton:SetScale(0.9)
@@ -1143,7 +1281,9 @@ function RAF:ApplyFrameStyle(frame)
 			160,
 			function(button)
 				RAF:RecruitmentButton_OnClick(button)
-			end
+			end,
+			nil,
+			400
 		)
 		if recruitmentButton then
 			recruitmentButton:SetText(RAF_RECRUITMENT)

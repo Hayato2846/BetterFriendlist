@@ -397,8 +397,13 @@ function BetterRaidFrame_UpdateControlPanelButtons()
 		end
 
 		if controlPanel.ReadyCheckButton.Icon then
-			controlPanel.ReadyCheckButton.Icon:SetDesaturated(not canReadyCheck)
-			controlPanel.ReadyCheckButton.Icon:SetAlpha(canReadyCheck and 1.0 or 0.45)
+			local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+			if FriendsUI and FriendsUI.RefreshModernReadyCheckIconColor and FriendsUI:IsModernActive() then
+				FriendsUI:RefreshModernReadyCheckIconColor(controlPanel.ReadyCheckButton)
+			else
+				controlPanel.ReadyCheckButton.Icon:SetDesaturated(not canReadyCheck)
+				controlPanel.ReadyCheckButton.Icon:SetAlpha(canReadyCheck and 1.0 or 0.45)
+			end
 		end
 	end
 

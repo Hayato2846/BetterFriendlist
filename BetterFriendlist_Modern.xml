@@ -2,7 +2,12 @@
 	<!-- Retail 12.1 visual layer. Runtime capability checks live in Modules/FriendsUI.lua. -->
 	<Button name="BFLModernSideTabTemplate" inherits="LargeSideTabButtonTemplate" virtual="true">
 		<Layers>
-				<Layer level="ARTWORK">
+			<Layer level="BACKGROUND" textureSubLevel="7">
+				<Texture parentKey="ThemeGlow" setAllPoints="true" hidden="true" alphaMode="ADD">
+					<Color r="1" g="0.82" b="0" a="0" />
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
 				<FontString parentKey="Count" inherits="GameFontHighlightSmall" justifyH="CENTER" justifyV="MIDDLE">
 					<Size x="32" y="18" />
 					<Anchors>
@@ -11,6 +16,12 @@
 				</FontString>
 			</Layer>
 		</Layers>
+		<Animations>
+			<AnimationGroup parentKey="ThemeGlowAnimation" looping="REPEAT" setToFinalAlpha="true">
+				<Alpha childKey="ThemeGlow" duration="0.9" order="1" fromAlpha="0.04" toAlpha="0.28" />
+				<Alpha childKey="ThemeGlow" duration="0.9" order="2" fromAlpha="0.28" toAlpha="0.04" />
+			</AnimationGroup>
+		</Animations>
 	</Button>
 
 	<Button name="BFLModernFriendCardTemplate" virtual="true" registerForClicks="LeftButtonUp, RightButtonUp">
@@ -32,6 +43,16 @@
 			</Layer>
 			<Layer level="BACKGROUND" textureSubLevel="-7">
 				<Texture parentKey="CardBackground" atlas="friends-card-default" setAllPoints="true" />
+			</Layer>
+			<Layer level="BACKGROUND" textureSubLevel="-6">
+				<Texture parentKey="ThemeTint" setAllPoints="true" hidden="true" alphaMode="BLEND">
+					<Color r="1" g="1" b="1" a="0" />
+				</Texture>
+				<MaskTexture parentKey="ThemeTintMask" atlas="friends-card-default" setAllPoints="true">
+					<MaskedTextures>
+						<MaskedTexture childKey="ThemeTint" />
+					</MaskedTextures>
+				</MaskTexture>
 			</Layer>
 			<!-- Runtime keeps this legacy compatibility region transparent. -->
 			<Layer level="BORDER" textureSubLevel="-8">
@@ -141,6 +162,14 @@
 		<Layers>
 			<Layer level="BACKGROUND">
 				<Texture parentKey="Background" atlas="friends-card-battleNet" setAllPoints="true" />
+				<Texture parentKey="ThemeTint" setAllPoints="true" hidden="true" alphaMode="BLEND">
+					<Color r="1" g="1" b="1" a="0" />
+				</Texture>
+				<MaskTexture parentKey="ThemeTintMask" atlas="friends-card-battleNet" setAllPoints="true">
+					<MaskedTextures>
+						<MaskedTexture childKey="ThemeTint" />
+					</MaskedTextures>
+				</MaskTexture>
 			</Layer>
 			<Layer level="ARTWORK">
 				<FontString parentKey="RequestTimestamp" inherits="UserScaledFontBody" justifyH="LEFT" justifyV="MIDDLE" maxLines="1" wordwrap="false">

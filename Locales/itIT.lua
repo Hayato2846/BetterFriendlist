@@ -45,7 +45,7 @@ BFL:RegisterLocale("itIT", function()
 	L.FRIEND_TAGS_SETTINGS_TOOLTIPS_DESC = "Include le etichette degli amici nelle sezioni Note ed etichette."
 	L.FRIEND_TAGS_SETTINGS_MAX_TOOLTIP_CHIPS = "Numero massimo di etichette nei riquadri"
 	L.FRIEND_TAGS_SETTINGS_MAX_TOOLTIP_CHIPS_DESC = "Limita quante etichette vengono elencate nei riquadri Note ed etichette."
-	L.FRIEND_TAGS_SETTINGS_SEARCH = "Ricerca e privacy"
+	L.FRIEND_TAGS_SETTINGS_SEARCH = "Ricerca e menu"
 	L.FRIEND_TAGS_SETTINGS_SEARCH_BLIZZARD = "Cerca etichette Blizzard"
 	L.FRIEND_TAGS_SETTINGS_SEARCH_BLIZZARD_DESC = "Consente alla ricerca amici di trovare le etichette compatibili con Blizzard."
 	L.FRIEND_TAGS_SETTINGS_SEARCH_CUSTOM = "Cerca etichette personalizzate"

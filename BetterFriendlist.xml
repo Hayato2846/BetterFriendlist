@@ -1744,8 +1744,8 @@
 						inherits="PanelTopTabButtonTemplate" text="CONTACTS_RECENT_ALLIES_TAB_NAME"
 						id="2">
 						<Anchors>
-							<Anchor point="LEFT" relativeTo="BetterFriendsFrameTab1"
-								relativePoint="RIGHT" x="-16" y="0" />
+							<Anchor point="TOPLEFT" relativeTo="BetterFriendsFrameTab1"
+								relativePoint="TOPRIGHT" x="3" y="0" />
 						</Anchors>
 						<Scripts>
 							<OnClick>
@@ -1757,8 +1757,8 @@
 					<Button name="BetterFriendsFrameTab3" parentKey="Tab3"
 						inherits="PanelTopTabButtonTemplate" text="RECRUIT_A_FRIEND" id="3">
 						<Anchors>
-							<Anchor point="LEFT" relativeTo="BetterFriendsFrameTab2"
-								relativePoint="RIGHT" x="-16" y="0" />
+							<Anchor point="TOPLEFT" relativeTo="BetterFriendsFrameTab2"
+								relativePoint="TOPRIGHT" x="3" y="0" />
 						</Anchors>
 						<Scripts>
 							<OnClick>
@@ -1770,8 +1770,8 @@
 					<Button name="BetterFriendsFrameTab4" parentKey="Tab4"
 						inherits="PanelTopTabButtonTemplate" text="GUILD" id="4" hidden="true">
 						<Anchors>
-							<Anchor point="LEFT" relativeTo="BetterFriendsFrameTab3"
-								relativePoint="RIGHT" x="-16" y="0" />
+							<Anchor point="TOPLEFT" relativeTo="BetterFriendsFrameTab3"
+								relativePoint="TOPRIGHT" x="3" y="0" />
 						</Anchors>
 						<Scripts>
 							<OnClick>
@@ -2152,9 +2152,9 @@
 						</KeyValues>
 						<Size y="20" />
 						<Anchors>
-							<Anchor point="BOTTOMLEFT" relativeKey="$parent.ListInset" x="35" y="40" />
+							<Anchor point="BOTTOMLEFT" relativeKey="$parent.ListInset" x="35" y="15" />
 							<Anchor point="BOTTOMRIGHT" relativeKey="$parent.ListInset" x="-20"
-								y="40" />
+								y="15" />
 						</Anchors>
 						<Layers>
 							<Layer level="BACKGROUND">
@@ -2347,7 +2347,7 @@
 						</Scripts>
 					</Button>
 					<!-- Bottom Buttons -->
-					<Button parentKey="WhoButton" inherits="SharedButtonTemplate" text="REFRESH">
+					<Button parentKey="WhoButton" inherits="UIPanelButtonTemplate" text="REFRESH">
 						<NormalFont style="BetterFriendlistFontNormal" />
 						<HighlightFont style="BetterFriendlistFontHighlight" />
 						<DisabledFont style="BetterFriendlistFontDisable" />
@@ -2370,7 +2370,7 @@
 							</OnClick>
 						</Scripts>
 					</Button>
-					<Button parentKey="AddFriendButton" inherits="SharedButtonTemplate"
+					<Button parentKey="AddFriendButton" inherits="UIPanelButtonTemplate"
 						text="ADD_FRIEND">
 						<NormalFont style="BetterFriendlistFontNormal" />
 						<HighlightFont style="BetterFriendlistFontHighlight" />
@@ -2388,7 +2388,7 @@
 							</OnClick>
 						</Scripts>
 					</Button>
-					<Button parentKey="GroupInviteButton" inherits="SharedButtonTemplate"
+					<Button parentKey="GroupInviteButton" inherits="UIPanelButtonTemplate"
 						text="GROUP_INVITE">
 						<NormalFont style="BetterFriendlistFontNormal" />
 						<HighlightFont style="BetterFriendlistFontHighlight" />
@@ -2893,9 +2893,12 @@
 						</Anchors>
 						<Frames>
 							<!-- Raid Info Button (top right) -->
-							<Button parentKey="RaidInfoButton" inherits="SharedButtonTemplate"
+							<Button parentKey="RaidInfoButton" inherits="UIPanelButtonTemplate"
 								text="RAID_INFO">
-								<Size x="100" y="32" />
+								<NormalFont style="BetterFriendlistFontNormal" />
+								<HighlightFont style="BetterFriendlistFontHighlight" />
+								<DisabledFont style="BetterFriendlistFontDisable" />
+								<Size x="90" y="22" />
 								<Anchors>
 									<Anchor point="TOPRIGHT" x="0" y="-15" />
 								</Anchors>
@@ -3117,9 +3120,12 @@
 					</Frame>
 
 					<!-- Convert Group/Raid Button -->
-					<Button parentKey="ConvertToRaidButton" inherits="SharedButtonTemplate"
+					<Button parentKey="ConvertToRaidButton" inherits="UIPanelButtonTemplate"
 						text="CONVERT_TO_RAID">
-						<Size x="150" y="24" />
+						<NormalFont style="BetterFriendlistFontNormal" />
+						<HighlightFont style="BetterFriendlistFontHighlight" />
+						<DisabledFont style="BetterFriendlistFontDisable" />
+						<Size x="150" y="21" />
 						<Anchors>
 							<Anchor point="BOTTOMRIGHT" relativeKey="$parent" x="-2" y="-1" />
 						</Anchors>
@@ -3144,8 +3150,11 @@
 					</Button>
 
 					<!-- Raid Tools Button (bottom left, mirrors ConvertToRaidButton) -->
-					<Button parentKey="RaidToolsButton" inherits="SharedButtonTemplate" text="Tools">
-						<Size x="100" y="24" />
+					<Button parentKey="RaidToolsButton" inherits="UIPanelButtonTemplate" text="Tools">
+						<NormalFont style="BetterFriendlistFontNormal" />
+						<HighlightFont style="BetterFriendlistFontHighlight" />
+						<DisabledFont style="BetterFriendlistFontDisable" />
+						<Size x="150" y="21" />
 						<Anchors>
 							<Anchor point="TOPLEFT" relativeKey="$parent.GroupsInset" relativePoint="BOTTOMLEFT" x="-2" y="-1" />
 						</Anchors>

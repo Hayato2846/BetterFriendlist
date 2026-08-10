@@ -5,13 +5,11 @@ local ADDON_NAME, BFL = ...
 local FriendTagEditor = BFL:RegisterModule("FriendTagEditor", {})
 
 local FRAME_NAME = "BetterFriendlistFriendTagEditorFrame"
-local ROW_HEIGHT = 30
-local SECTION_HEIGHT = 18
-local LEFT_WIDTH = 232
-local EDITOR_WIDTH = 760
-local EDITOR_HEIGHT = 512
-
-local dropdownCounter = 0
+local ROW_HEIGHT = 42
+local ROW_GAP = 4
+local LEFT_WIDTH = 230
+local EDITOR_WIDTH = 800
+local EDITOR_HEIGHT = 550
 
 local function L(key, fallback)
 	local locale = BFL and BFL.L
@@ -20,6 +18,10 @@ end
 
 local function GetFriendTags()
 	return BFL and BFL:GetModule("FriendTags")
+end
+
+local function GetTagChips()
+	return BFL and BFL:GetModule("TagChips")
 end
 
 local function CopyColor(color, fallback)
@@ -38,6 +40,10 @@ end
 local function ClearChildren(frame)
 	if not frame then
 		return
+	end
+	local regions = { frame:GetRegions() }
+	for _, region in ipairs(regions) do
+		region:Hide()
 	end
 	local children = { frame:GetChildren() }
 	for _, child in ipairs(children) do
@@ -62,7 +68,7 @@ end
 
 local function SetEditBoxText(editBox, text)
 	if editBox and editBox.SetText then
-		editBox:SetText(text or "")
+		editBox:SetText(text == nil and "" or tostring(text))
 	end
 end
 
@@ -71,9 +77,15 @@ local function CreateFont(parent, template)
 end
 
 local function CreateSmallButton(parent, text, width, onClick)
-	local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-	button:SetSize(width or 110, 24)
+	local template = not BFL.IsClassic and "SharedButtonTemplate" or "UIPanelButtonTemplate"
+	local ok, button = pcall(CreateFrame, "Button", nil, parent, template)
+	if not ok or not button then
+		button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+	end
 	button:SetText(text or "")
+	local fontString = button.GetFontString and button:GetFontString()
+	local textWidth = fontString and fontString:GetStringWidth() or 0
+	button:SetSize(math.max(width or 110, math.ceil(textWidth + 30)), 26)
 	button:SetScript("OnClick", function(self)
 		if onClick then
 			onClick(self)
@@ -139,6 +151,19 @@ local function CopyTexCoord(texCoord)
 	}
 end
 
+local function NormalizeIconZoom(value)
+	if value == true then
+		return true
+	elseif value == nil or value == false then
+		return false
+	end
+	local zoom = tonumber(value)
+	if not zoom or zoom <= 0 then
+		return false
+	end
+	return math.max(0, math.min(0.45, zoom))
+end
+
 local function CopyIconProfile(source)
 	source = type(source) == "table" and source or {}
 	local iconType = source.iconType
@@ -168,6 +193,7 @@ local function CopyIconProfile(source)
 		fallbackAtlas = source.fallbackAtlas,
 		texture = texture,
 		texCoord = CopyTexCoord(source.texCoord),
+		iconZoom = NormalizeIconZoom(source.iconZoom),
 	}
 end
 
@@ -254,10 +280,13 @@ function FriendTagEditor:EnsureFrame()
 		return self.frame
 	end
 
-	local frame = CreateFrame("Frame", FRAME_NAME, UIParent, "ButtonFrameTemplate")
+	local template = not BFL.IsClassic and "ButtonFrameTemplate" or "BasicFrameTemplateWithInset"
+	local frame = CreateFrame("Frame", FRAME_NAME, UIParent, template)
 	frame:SetSize(EDITOR_WIDTH, EDITOR_HEIGHT)
 	frame:SetPoint("CENTER")
 	frame:SetFrameStrata("DIALOG")
+	frame:SetToplevel(true)
+	frame:SetClampedToScreen(true)
 	frame:SetMovable(true)
 	frame:EnableMouse(true)
 	frame:RegisterForDrag("LeftButton")
@@ -265,13 +294,27 @@ function FriendTagEditor:EnsureFrame()
 	frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
 	frame:Hide()
 
-	if frame.TitleText then
-		frame.TitleText:SetText(L("FRIEND_TAGS_EDITOR_TITLE", "Friend Tags & Chips"))
+	if not BFL.IsClassic then
+		if ButtonFrameTemplate_HidePortrait then
+			ButtonFrameTemplate_HidePortrait(frame)
+		end
+		if ButtonFrameTemplate_HideAttic then
+			ButtonFrameTemplate_HideAttic(frame)
+		end
+		if frame.Inset then
+			frame.Inset:Hide()
+		end
 	end
+	frame.title = frame.TitleContainer and frame.TitleContainer.TitleText or frame.TitleText
+	if not frame.title then
+		frame.title = frame:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
+		frame.title:SetPoint("TOP", frame, "TOP", 0, -8)
+	end
+	frame.title:SetText(L("FRIEND_TAGS_EDITOR_TITLE", "Friend Tags & Chips"))
 
 	frame.leftPane = CreateFrame("Frame", nil, frame, "BackdropTemplate")
-	frame.leftPane:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, -58)
-	frame.leftPane:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 18, 44)
+	frame.leftPane:SetPoint("TOPLEFT", frame, "TOPLEFT", 14, -30)
+	frame.leftPane:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 14, 10)
 	frame.leftPane:SetWidth(LEFT_WIDTH)
 	frame.leftPane:SetBackdrop({
 		bgFile = "Interface\\Buttons\\WHITE8X8",
@@ -283,7 +326,7 @@ function FriendTagEditor:EnsureFrame()
 
 	frame.rightPane = CreateFrame("Frame", nil, frame, "BackdropTemplate")
 	frame.rightPane:SetPoint("TOPLEFT", frame.leftPane, "TOPRIGHT", 12, 0)
-	frame.rightPane:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -18, 44)
+	frame.rightPane:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -14, 10)
 	frame.rightPane:SetBackdrop({
 		bgFile = "Interface\\Buttons\\WHITE8X8",
 		edgeFile = "Interface\\Buttons\\WHITE8X8",
@@ -293,21 +336,36 @@ function FriendTagEditor:EnsureFrame()
 	frame.rightPane:SetBackdropBorderColor(0.36, 0.36, 0.40, 0.35)
 
 	frame.listScroll = CreateFrame("ScrollFrame", nil, frame.leftPane, "UIPanelScrollFrameTemplate")
-	frame.listScroll:SetPoint("TOPLEFT", frame.leftPane, "TOPLEFT", 4, -10)
-	frame.listScroll:SetPoint("BOTTOMRIGHT", frame.leftPane, "BOTTOMRIGHT", -26, 42)
+	frame.listScroll:SetPoint("TOPLEFT", frame.leftPane, "TOPLEFT", 6, -8)
+	frame.listScroll:SetPoint("BOTTOMRIGHT", frame.leftPane, "BOTTOMRIGHT", -26, 54)
 	frame.listContent = CreateFrame("Frame", nil, frame.listScroll)
-	frame.listContent:SetSize(LEFT_WIDTH - 34, 1)
+	frame.listContent:SetSize(LEFT_WIDTH - 38, 1)
 	frame.listScroll:SetScrollChild(frame.listContent)
 
 	frame.editorContent = CreateFrame("Frame", nil, frame.rightPane)
 	frame.editorContent:SetPoint("TOPLEFT", frame.rightPane, "TOPLEFT", 14, -14)
 	frame.editorContent:SetPoint("BOTTOMRIGHT", frame.rightPane, "BOTTOMRIGHT", -14, 14)
 
-	local createButton = CreateSmallButton(frame.leftPane, L("FRIEND_TAGS_CREATE_CUSTOM", "Create Custom Tag"), LEFT_WIDTH - 38, function()
+	local createButton = CreateSmallButton(frame.leftPane, L("FRIEND_TAGS_CREATE_CUSTOM", "Create Custom Tag"), LEFT_WIDTH - 20, function()
 		StaticPopup_Show("BFL_FRIEND_TAG_EDITOR_CREATE_CUSTOM")
 	end)
-	createButton:SetPoint("BOTTOMLEFT", frame.leftPane, "BOTTOMLEFT", 8, 10)
+	createButton:SetPoint("BOTTOM", frame.leftPane, "BOTTOM", 0, 12)
 	frame.createButton = createButton
+
+	frame.dragMarker = frame.leftPane:CreateTexture(nil, "OVERLAY")
+	frame.dragMarker:SetColorTexture(1, 0.76, 0.18, 1)
+	frame.dragMarker:SetHeight(2)
+	frame.dragMarker:Hide()
+
+	if frame.CloseButton then
+		frame.CloseButton:SetScript("OnClick", function()
+			self:FlushAutoSave()
+			frame:Hide()
+		end)
+	end
+	frame:SetScript("OnHide", function()
+		self:FlushAutoSave()
+	end)
 
 	self.frame = frame
 	return frame
@@ -320,6 +378,13 @@ end
 
 function FriendTagEditor:Show(tagId)
 	local frame = self:EnsureFrame()
+	local FriendsUI = BFL:GetModule("FriendsUI")
+	if _G.BetterFriendsFrame and _G.BetterFriendsFrame:IsShown() and FriendsUI and FriendsUI.AnchorAuxiliaryWindow then
+		FriendsUI:AnchorAuxiliaryWindow(frame, 0)
+	else
+		frame:ClearAllPoints()
+		frame:SetPoint("CENTER")
+	end
 	self.selectedTagId = tagId or self.selectedTagId
 	if not self.selectedTagId then
 		local definitions = self:GetDefinitions()
@@ -327,6 +392,7 @@ function FriendTagEditor:Show(tagId)
 	end
 	self:Refresh()
 	frame:Show()
+	frame:Raise()
 end
 
 function FriendTagEditor:Refresh()
@@ -340,44 +406,17 @@ function FriendTagEditor:RefreshList()
 	ClearChildren(frame.listContent)
 
 	local definitions = self:GetDefinitions()
-	local sections = {
-		{ source = "blizzard", title = L("FRIEND_TAGS_BLIZZARD_SECTION", "Blizzard Tags"), definitions = {} },
-		{ source = "custom", title = L("FRIEND_TAGS_CUSTOM_SECTION", "Custom Tags"), definitions = {} },
-	}
-	for _, def in ipairs(definitions) do
-		if def.source == "custom" then
-			sections[2].definitions[#sections[2].definitions + 1] = def
-		else
-			sections[1].definitions[#sections[1].definitions + 1] = def
-		end
-	end
-
-	local y = 0
 	local FriendTags = GetFriendTags()
+	frame.tagRows = {}
 
-	local function AddSectionTitle(title)
-		local header = CreateFont(frame.listContent, "BetterFriendlistFontDisableSmall")
-		header:SetPoint("TOPLEFT", frame.listContent, "TOPLEFT", 6, y - 2)
-		header:SetPoint("RIGHT", frame.listContent, "RIGHT", -4, 0)
-		header:SetJustifyH("LEFT")
-		header:SetText(title or "")
-		y = y - SECTION_HEIGHT
-	end
-
-	local function AddEmptyText(text)
-		local empty = CreateFont(frame.listContent, "BetterFriendlistFontDisableSmall")
-		empty:SetPoint("TOPLEFT", frame.listContent, "TOPLEFT", 8, y - 2)
-		empty:SetPoint("RIGHT", frame.listContent, "RIGHT", -8, 0)
-		empty:SetJustifyH("LEFT")
-		empty:SetText(text or "")
-		y = y - (ROW_HEIGHT - 4)
-	end
-
-	local function AddRow(def)
+	for index, def in ipairs(definitions) do
 		local row = CreateFrame("Button", nil, frame.listContent, "BackdropTemplate")
-		row:SetPoint("TOPLEFT", frame.listContent, "TOPLEFT", 0, y)
+		row:SetPoint("TOPLEFT", frame.listContent, "TOPLEFT", 0, -((index - 1) * (ROW_HEIGHT + ROW_GAP)))
 		row:SetPoint("RIGHT", frame.listContent, "RIGHT", -2, 0)
 		row:SetHeight(ROW_HEIGHT)
+		row:RegisterForDrag("LeftButton")
+		row.tagId = def.id
+		row.orderIndex = index
 		row:SetBackdrop({
 			bgFile = "Interface\\Buttons\\WHITE8X8",
 			edgeFile = "Interface\\Buttons\\WHITE8X8",
@@ -386,44 +425,157 @@ function FriendTagEditor:RefreshList()
 		local selected = self.selectedTagId == def.id
 		row:SetBackdropColor(selected and 0.15 or 0.05, selected and 0.13 or 0.05, selected and 0.09 or 0.06, selected and 0.86 or 0.42)
 		row:SetBackdropBorderColor(selected and 0.95 or 0.22, selected and 0.72 or 0.22, selected and 0.30 or 0.24, selected and 0.82 or 0.48)
+		row:SetHighlightTexture("Interface\\Buttons\\WHITE8X8")
+		local highlight = row:GetHighlightTexture()
+		if highlight then
+			highlight:SetVertexColor(1, 0.76, 0.18, 0.08)
+		end
+
+		local dragHandle = row:CreateTexture(nil, "ARTWORK")
+		dragHandle:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\move")
+		dragHandle:SetSize(13, 13)
+		dragHandle:SetPoint("LEFT", row, "LEFT", 5, 0)
+		dragHandle:SetVertexColor(0.55, 0.55, 0.58, 0.9)
 
 		local profile = FriendTags and FriendTags:GetChipProfile(def)
 		local icon = row:CreateTexture(nil, "ARTWORK")
-		icon:SetSize(16, 16)
-		icon:SetPoint("LEFT", row, "LEFT", 7, 0)
+		icon:SetSize(18, 18)
+		icon:SetPoint("LEFT", row, "LEFT", 23, 0)
 		if not ApplyIcon(icon, profile) then
 			icon:Hide()
 		end
 
-		local text = CreateFont(row, "BetterFriendlistFontHighlightSmall")
-		text:SetPoint("LEFT", icon, "RIGHT", 6, 0)
-		text:SetPoint("RIGHT", row, "RIGHT", -8, 0)
-		text:SetJustifyH("LEFT")
-		text:SetText(def.name or def.id)
+		local name = CreateFont(row, "BetterFriendlistFontHighlightSmall")
+		name:SetPoint("LEFT", icon, "RIGHT", 6, 7)
+		name:SetPoint("RIGHT", row, "RIGHT", -6, 7)
+		name:SetHeight(15)
+		name:SetJustifyH("LEFT")
+		name:SetJustifyV("MIDDLE")
+		name:SetText(def.name or def.id)
+
+		local source = CreateFont(row, "BetterFriendlistFontDisableSmall")
+		source:SetPoint("LEFT", icon, "RIGHT", 6, -9)
+		source:SetPoint("RIGHT", row, "RIGHT", -6, -9)
+		source:SetHeight(13)
+		source:SetJustifyH("LEFT")
+		source:SetJustifyV("MIDDLE")
+		source:SetText(def.source == "custom" and L("FRIEND_TAGS_SOURCE_CUSTOM", "Custom") or L("FRIEND_TAGS_SOURCE_BLIZZARD", "Blizzard"))
 
 		row:SetScript("OnClick", function()
+			self:FlushAutoSave()
 			self.selectedTagId = def.id
 			self:Refresh()
 		end)
-
-		y = y - (ROW_HEIGHT + 4)
+		row:SetScript("OnDragStart", function()
+			self:BeginTagDrag(row)
+		end)
+		row:SetScript("OnDragStop", function()
+			self:EndTagDrag(row)
+		end)
+		frame.tagRows[index] = row
 	end
 
-	for _, section in ipairs(sections) do
-		if #section.definitions > 0 or section.source == "custom" then
-			AddSectionTitle(section.title)
-			if #section.definitions == 0 then
-				AddEmptyText(L("FRIEND_TAGS_NO_CUSTOM_TAGS", "No custom tags yet"))
-			else
-				for _, def in ipairs(section.definitions) do
-					AddRow(def)
-				end
-			end
-			y = y - 4
+	if #definitions == 0 then
+		local empty = CreateFont(frame.listContent, "BetterFriendlistFontDisableSmall")
+		empty:SetPoint("TOPLEFT", frame.listContent, "TOPLEFT", 8, -8)
+		empty:SetText(L("FRIEND_TAGS_NO_CUSTOM_TAGS", "No custom tags yet"))
+	end
+
+	frame.listContent:SetHeight(math.max(1, (#definitions * (ROW_HEIGHT + ROW_GAP)) - ROW_GAP))
+end
+
+function FriendTagEditor:BeginTagDrag(row)
+	local frame = self:EnsureFrame()
+	if not (row and row.orderIndex and frame.tagRows) then
+		return
+	end
+	self:FlushAutoSave()
+	self.dragState = { fromIndex = row.orderIndex, targetIndex = row.orderIndex, row = row }
+	row:SetAlpha(0.42)
+	frame:SetScript("OnUpdate", function()
+		self:UpdateTagDrag()
+	end)
+	self:UpdateTagDrag()
+end
+
+function FriendTagEditor:UpdateTagDrag()
+	local frame = self.frame
+	local drag = self.dragState
+	if not (frame and drag and frame.tagRows and #frame.tagRows > 0) then
+		return
+	end
+	local _, cursorY = GetCursorPosition()
+	cursorY = cursorY / UIParent:GetEffectiveScale()
+	local targetIndex = #frame.tagRows + 1
+	for index, row in ipairs(frame.tagRows) do
+		local top, bottom = row:GetTop(), row:GetBottom()
+		if top and bottom and cursorY >= ((top + bottom) / 2) then
+			targetIndex = index
+			break
 		end
 	end
+	drag.targetIndex = targetIndex
+	frame.dragMarker:ClearAllPoints()
+	local target = frame.tagRows[targetIndex]
+	if target then
+		frame.dragMarker:SetPoint("TOPLEFT", target, "TOPLEFT", 0, 2)
+		frame.dragMarker:SetPoint("TOPRIGHT", target, "TOPRIGHT", 0, 2)
+	else
+		local lastRow = frame.tagRows[#frame.tagRows]
+		frame.dragMarker:SetPoint("BOTTOMLEFT", lastRow, "BOTTOMLEFT", 0, -2)
+		frame.dragMarker:SetPoint("BOTTOMRIGHT", lastRow, "BOTTOMRIGHT", 0, -2)
+	end
+	frame.dragMarker:Show()
+end
 
-	frame.listContent:SetHeight(math.max(1, math.abs(y) + 4))
+function FriendTagEditor:EndTagDrag(row)
+	local frame = self.frame
+	local drag = self.dragState
+	if frame then
+		frame:SetScript("OnUpdate", nil)
+		frame.dragMarker:Hide()
+	end
+	if row then
+		row:SetAlpha(1)
+	end
+	self.dragState = nil
+	if not drag then
+		return
+	end
+
+	local definitions = {}
+	for index, def in ipairs(self:GetDefinitions()) do
+		definitions[index] = def
+	end
+	local moved = table.remove(definitions, drag.fromIndex)
+	if not moved then
+		return
+	end
+	local insertIndex = drag.targetIndex
+	if insertIndex > drag.fromIndex then
+		insertIndex = insertIndex - 1
+	end
+	insertIndex = math.max(1, math.min(insertIndex, #definitions + 1))
+	if insertIndex == drag.fromIndex then
+		return
+	end
+	table.insert(definitions, insertIndex, moved)
+	local tagIds = {}
+	for _, def in ipairs(definitions) do
+		tagIds[#tagIds + 1] = def.id
+	end
+	local FriendTags = GetFriendTags()
+	if FriendTags and FriendTags.SetTagOrder then
+		FriendTags:SetTagOrder(tagIds, function()
+			if C_Timer and C_Timer.After then
+				C_Timer.After(0, function()
+					self:Refresh()
+				end)
+			else
+				self:Refresh()
+			end
+		end)
+	end
 end
 
 function FriendTagEditor:LoadState(def)
@@ -450,6 +602,8 @@ function FriendTagEditor:LoadState(def)
 	local iconOptionID = selectedIcon and selectedIcon.id or "tag"
 	if not iconValue or iconValue == "" or profile.iconType == "none" then
 		iconMode = "none"
+	elseif not selectedIcon and NormalizeIconZoom(profile.iconZoom) ~= false then
+		iconMode = "selected"
 	elseif not selectedIcon then
 		iconMode = "custom"
 	end
@@ -469,7 +623,9 @@ function FriendTagEditor:LoadState(def)
 		fallbackAtlas = profile.fallbackAtlas,
 		texture = profile.texture,
 		texCoord = CopyTexCoord(profile.texCoord),
+		iconZoom = NormalizeIconZoom(profile.iconZoom),
 		color = CopyColor(profile.color),
+		textColor = CopyColor(profile.textColor, { r = 1, g = 1, b = 1, a = 1 }),
 		visible = profile.visible ~= false,
 		rowVisible = profile.rowVisible ~= false,
 		tooltipVisible = profile.tooltipVisible ~= false,
@@ -485,8 +641,11 @@ end
 
 function FriendTagEditor:RefreshEditor()
 	local frame = self:EnsureFrame()
-	local content = frame.editorContent
-	ClearChildren(content)
+	local editorHost = frame.editorContent
+	ClearChildren(editorHost)
+	local content = CreateFrame("Frame", nil, editorHost)
+	content:SetAllPoints(editorHost)
+	self.dynamicEditorContent = content
 
 	local def = self:GetSelectedDefinition()
 	if not def then
@@ -507,54 +666,73 @@ function FriendTagEditor:RefreshEditor()
 	local source = CreateFont(content, "BetterFriendlistFontDisableSmall")
 	source:SetPoint("TOPRIGHT", content, "TOPRIGHT", 0, y - 2)
 	source:SetText(def.source == "blizzard" and L("FRIEND_TAGS_SOURCE_BLIZZARD", "Blizzard") or L("FRIEND_TAGS_SOURCE_CUSTOM", "Custom"))
-	y = y - 34
+	y = y - 28
 
 	self:CreatePreview(content, y)
-	y = y - 54
+	y = y - 52
 
 	if def.source == "custom" then
-		self.nameInput = self:CreateLabeledInput(content, L("FRIEND_TAGS_EDITOR_NAME", "Tag Name"), state.name, y, 220, 32)
-		y = y - 34
+		self.nameInput = self:CreateLabeledInput(content, L("FRIEND_TAGS_EDITOR_NAME", "Tag Name"), state.name, y, 280, 32)
+		self.nameInput:SetScript("OnTextChanged", function()
+			state.name = GetEditBoxText(self.nameInput)
+			self:RefreshPreview()
+		end)
+		self.nameInput:SetScript("OnEnterPressed", function(editBox)
+			editBox:ClearFocus()
+			self:FlushAutoSave()
+		end)
+		self.nameInput:SetScript("OnEditFocusLost", function()
+			self:FlushAutoSave()
+		end)
+		y = y - 36
 	end
 
-	self.labelInput = self:CreateLabeledInput(content, L("FRIEND_TAGS_EDITOR_LABEL", "Chip Label"), state.labelValue, y, 220, 32)
+	self.labelInput = self:CreateLabeledInput(content, L("FRIEND_TAGS_EDITOR_LABEL", "Chip Label"), state.labelValue, y, 168, 32)
 	self.labelInput:SetScript("OnTextChanged", function()
+		if self.suppressEditorChanges then
+			return
+		end
 		state.labelValue = GetEditBoxText(self.labelInput)
 		if state.labelMode ~= "icon_only" then
 			state.labelMode = state.labelValue == "" and "default" or "custom"
 		end
 		self:RefreshPreview()
+		self:QueueAutoSave()
 	end)
 
-	local defaultButton = CreateSmallButton(content, L("FRIEND_TAGS_EDITOR_LABEL_DEFAULT", "Default"), 78, function()
+	local defaultButton = CreateSmallButton(content, L("FRIEND_TAGS_EDITOR_LABEL_DEFAULT", "Default"), 100, function()
 		state.labelMode = "default"
-		state.labelValue = def.name or ""
+		state.labelValue = state.name ~= "" and state.name or def.name or ""
+		self.suppressEditorChanges = true
 		SetEditBoxText(self.labelInput, state.labelValue)
+		self.suppressEditorChanges = false
 		self:RefreshPreview()
+		self:CommitState()
 	end)
-	defaultButton:SetPoint("TOPLEFT", content, "TOPLEFT", 284, y + 2)
+	defaultButton:SetPoint("TOPLEFT", content, "TOPLEFT", 294, y)
 
-	local iconOnlyButton = CreateSmallButton(content, L("FRIEND_TAGS_EDITOR_LABEL_ICON_ONLY", "Icon Only"), 92, function()
+	local iconOnlyButton = CreateSmallButton(content, L("FRIEND_TAGS_EDITOR_LABEL_ICON_ONLY", "Icon Only"), 82, function()
 		state.labelMode = "icon_only"
 		state.labelValue = ""
+		self.suppressEditorChanges = true
 		SetEditBoxText(self.labelInput, "")
+		self.suppressEditorChanges = false
 		self:RefreshPreview()
+		self:CommitState()
 	end)
 	iconOnlyButton:SetPoint("LEFT", defaultButton, "RIGHT", 8, 0)
 	y = y - 38
 
-	self:CreateIconControls(content, y)
+	y = y - self:CreateIconControls(content, y)
+
+	self:CreateColorControl(content, y, "color", L("FRIEND_TAGS_EDITOR_COLOR", "Chip Color"), "colorButton")
 	y = y - 38
 
-	self:CreateColorControl(content, y)
-	y = y - 42
+	self:CreateColorControl(content, y, "textColor", L("SETTINGS_FONT_COLOR", "Font Color"), "textColorButton")
+	y = y - 38
 
 	self:CreateVisibilityControls(content, y)
-	y = y - 94
-
-	self.orderInput = self:CreateLabeledInput(content, L("FRIEND_TAGS_EDITOR_ORDER", "Order"), tostring(state.order), y, 80, 6)
-	self.orderInput:SetNumeric(true)
-	y = y - 40
+	y = y - 66
 
 	self:CreateActionButtons(content)
 end
@@ -562,18 +740,24 @@ end
 function FriendTagEditor:CreatePreview(parent, y)
 	local preview = CreateFrame("Frame", nil, parent, "BackdropTemplate")
 	preview:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y)
-	preview:SetSize(242, 32)
+	preview:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, y)
+	preview:SetHeight(40)
 	preview:SetBackdrop({
 		bgFile = "Interface\\Buttons\\WHITE8X8",
 		edgeFile = "Interface\\Buttons\\WHITE8X8",
 		edgeSize = 1,
 	})
-	preview.icon = preview:CreateTexture(nil, "ARTWORK")
-	preview.icon:SetSize(14, 14)
-	preview.icon:SetPoint("LEFT", preview, "LEFT", 8, 0)
-	preview.label = CreateFont(preview, "BetterFriendlistFontHighlightSmall")
-	preview.label:SetPoint("LEFT", preview.icon, "RIGHT", 4, 0)
-	preview.label:SetPoint("RIGHT", preview, "RIGHT", -8, 0)
+	preview:SetBackdropColor(0.015, 0.015, 0.018, 0.76)
+	preview:SetBackdropBorderColor(0.28, 0.28, 0.31, 0.62)
+	local TagChips = GetTagChips()
+	preview.chip = TagChips and TagChips.CreateStandaloneChip and TagChips:CreateStandaloneChip(preview)
+	if preview.chip then
+		preview.chip:SetPoint("LEFT", preview, "LEFT", 12, 0)
+	end
+	preview.empty = CreateFont(preview, "BetterFriendlistFontDisableSmall")
+	preview.empty:SetPoint("LEFT", preview, "LEFT", 12, 0)
+	preview.empty:SetText(L("FRIEND_TAGS_EDITOR_PREVIEW_HIDDEN", "Preview hidden"))
+	preview.empty:Hide()
 	self.preview = preview
 	self:RefreshPreview()
 end
@@ -586,7 +770,7 @@ function FriendTagEditor:GetPreviewLabel()
 	elseif state.labelMode == "custom" then
 		return state.labelValue or ""
 	end
-	return def and def.name or ""
+	return (state.name and state.name ~= "" and state.name) or (def and def.name) or ""
 end
 
 function FriendTagEditor:GetPreviewIconProfile()
@@ -615,39 +799,47 @@ function FriendTagEditor:GetPreviewIcon()
 	return icon and (icon.iconValue or icon.texture or icon.icon) or nil
 end
 
+function FriendTagEditor:GetPreviewChipProfile()
+	local state = self.editState or {}
+	local profile = self:GetPreviewIconProfile() or { iconType = "none" }
+	profile.color = CopyColor(state.color)
+	profile.textColor = CopyColor(state.textColor, { r = 1, g = 1, b = 1, a = 1 })
+	return profile
+end
+
 function FriendTagEditor:RefreshPreview()
 	local preview = self.preview
 	local state = self.editState
 	if not (preview and state) then
 		return
 	end
-	local color = CopyColor(state.color)
-	preview:SetBackdropColor(color.r * 0.16, color.g * 0.16, color.b * 0.16, 0.88)
-	preview:SetBackdropBorderColor(color.r, color.g, color.b, 0.78)
-
-	local icon = self:GetPreviewIconProfile()
-	local hasIcon = icon and ApplyIcon(preview.icon, icon) or false
-	if not hasIcon then
-		preview.icon:Hide()
-	end
-
 	local label = self:GetPreviewLabel()
-	if label == "" and not hasIcon then
-		label = L("FRIEND_TAGS_EDITOR_PREVIEW_HIDDEN", "Hidden until an icon or label is set")
+	local profile = self:GetPreviewChipProfile()
+	local iconValue = profile.iconValue or profile.icon or profile.texture or profile.atlas
+	local hasIcon = profile.iconType ~= "none" and iconValue ~= nil and iconValue ~= ""
+	local shownInFriendList = state.visible ~= false and state.rowVisible ~= false
+	local TagChips = GetTagChips()
+	if shownInFriendList and preview.chip and TagChips and TagChips.UpdateStandaloneChip and (label ~= "" or hasIcon) then
+		TagChips:UpdateStandaloneChip(preview.chip, profile, label, 180)
+		preview.chip:SetAlpha(1)
+		preview.empty:Hide()
+	else
+		if preview.chip then
+			preview.chip:Hide()
+		end
+		preview.empty:Show()
 	end
-	preview.label:SetText(label)
-	preview.label:SetTextColor(1, 1, 1, 1)
 end
 
 function FriendTagEditor:CreateLabeledInput(parent, label, value, y, width, maxLetters)
 	local text = CreateFont(parent, "BetterFriendlistFontHighlightSmall")
 	text:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y - 4)
-	text:SetWidth(118)
+	text:SetWidth(108)
 	text:SetJustifyH("LEFT")
 	text:SetText(label)
 
 	local editBox = CreateInput(parent, width, maxLetters)
-	editBox:SetPoint("TOPLEFT", parent, "TOPLEFT", 128, y)
+	editBox:SetPoint("TOPLEFT", parent, "TOPLEFT", 118, y)
 	SetEditBoxText(editBox, value)
 	return editBox
 end
@@ -659,185 +851,204 @@ function FriendTagEditor:CreateIconControls(parent, y)
 
 	local label = CreateFont(parent, "BetterFriendlistFontHighlightSmall")
 	label:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y - 4)
-	label:SetWidth(118)
+	label:SetWidth(108)
+	label:SetJustifyH("LEFT")
 	label:SetText(L("FRIEND_TAGS_EDITOR_ICON", "Chip Icon"))
 
-	dropdownCounter = dropdownCounter + 1
-	local dropdownName = "BFLFriendTagIconDropdown" .. tostring(dropdownCounter)
-	local dropdown = BFL.CreateDropdown and BFL.CreateDropdown(parent, dropdownName, 150, true)
-	if not dropdown then
-		return
-	end
-	dropdown:SetPoint("TOPLEFT", parent, "TOPLEFT", 120, y + 2)
-	local isLegacyDropdown = not (BFL.IsModernDropdown and BFL.IsModernDropdown(dropdown))
-	if isLegacyDropdown then
-		BFL.SetDropdownWidth(dropdown, 150)
-		BFL.JustifyDropdownText(dropdown, "LEFT")
-	end
-	self.iconDropdown = dropdown
-
-	local function SetDropdownDisplayText(text)
-		BFL.SetDropdownText(dropdown, text or "")
+	local function GetCurrentReference()
+		local profile = self:GetPreviewIconProfile()
+		return profile and (profile.iconValue or profile.texture or profile.icon or profile.atlas) or nil
 	end
 
-	local function SetDropdownText()
-		if state.iconMode == "none" then
-			SetDropdownDisplayText(NONE or "None")
-		elseif state.iconMode == "custom" then
-			SetDropdownDisplayText(L("FRIEND_TAGS_EDITOR_ICON_CUSTOM", "Custom Path"))
-		else
-			for _, option in ipairs(options) do
-				if option.id == state.iconOptionID then
-					SetDropdownDisplayText(option.label)
-					return
-				end
-			end
-			SetDropdownDisplayText(L("FRIEND_TAGS_ICON_TAG", "Tag"))
+	local previewHolder = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+	previewHolder:SetPoint("TOPLEFT", parent, "TOPLEFT", 118, y)
+	previewHolder:SetSize(26, 26)
+	previewHolder:SetBackdrop({
+		bgFile = "Interface\\Buttons\\WHITE8X8",
+		edgeFile = "Interface\\Buttons\\WHITE8X8",
+		edgeSize = 1,
+	})
+	previewHolder:SetBackdropColor(0.02, 0.02, 0.025, 0.82)
+	previewHolder:SetBackdropBorderColor(0.28, 0.28, 0.31, 0.72)
+	local TagChips = GetTagChips()
+	previewHolder.chip = TagChips and TagChips.CreateStandaloneChip and TagChips:CreateStandaloneChip(previewHolder)
+	if previewHolder.chip then
+		previewHolder.chip:SetPoint("CENTER", previewHolder, "CENTER", 0, 0)
+	end
+	self.iconButtonPreview = previewHolder
+
+	local selectButton = CreateSmallButton(parent, L("ICON_SELECTOR_TITLE", "Select Icon"), 130, function(button)
+		if not BFL.ShowIconSelector then
+			return
 		end
-	end
-
-	local function UpdateCustomInput()
-		if self.iconInput then
-			self.iconInput:SetShown(state.iconMode == "custom")
-		end
-	end
-
-	local function ApplyOption(option)
-		local icon = CopyIconProfile(option)
-		state.iconMode = "option"
-		state.iconOptionID = option.id
-		state.iconType = icon.iconType
-		state.iconValue = icon.iconValue
-		state.icon = icon.icon
-		state.atlas = icon.atlas
-		state.fallbackAtlas = icon.fallbackAtlas
-		state.texture = icon.texture
-		state.texCoord = CopyTexCoord(icon.texCoord)
-		SetEditBoxText(self.iconInput, icon.texture or icon.icon or icon.iconValue or "")
-	end
-
-	local optionLabels = { NONE or "None" }
-	local optionValues = { "none" }
-	for _, option in ipairs(options) do
-		optionLabels[#optionLabels + 1] = option.label
-		optionValues[#optionValues + 1] = option.id
-	end
-	optionLabels[#optionLabels + 1] = L("FRIEND_TAGS_EDITOR_ICON_CUSTOM", "Custom Path")
-	optionValues[#optionValues + 1] = "custom"
-
-	local function GetOptionByID(optionID)
-		for _, option in ipairs(options) do
-			if option.id == optionID then
-				return option
-			end
-		end
-		return nil
-	end
-
-	local function IsSelected(value)
-		if value == "none" then
-			return state.iconMode == "none"
-		elseif value == "custom" then
-			return state.iconMode == "custom"
-		end
-		return state.iconMode == "option" and state.iconOptionID == value
-	end
-
-	local function SelectIconOption(value)
-		if value == "none" then
-			state.iconMode = "none"
-			state.iconType = "none"
-			state.iconValue = ""
-			state.icon = nil
-			state.atlas = nil
-			state.fallbackAtlas = nil
-			state.texture = nil
-			state.texCoord = nil
-		elseif value == "custom" then
-			state.iconMode = "custom"
-			state.iconType = "texture"
-			state.iconValue = GetEditBoxText(self.iconInput)
-			state.icon = state.iconValue
-			state.atlas = nil
-			state.fallbackAtlas = nil
-			state.texture = state.iconValue
-			state.texCoord = nil
-		else
-			local option = GetOptionByID(value)
-			if option then
-				ApplyOption(option)
-			end
-		end
-
-		SetDropdownText()
-		UpdateCustomInput()
-		self:RefreshPreview()
-	end
-
-	BFL.InitializeDropdown(dropdown, {
-		labels = optionLabels,
-		values = optionValues,
-		getSelectionText = function(value)
-			if value == "none" then
-				return NONE or "None"
-			elseif value == "custom" then
-				return L("FRIEND_TAGS_EDITOR_ICON_CUSTOM", "Custom Path")
-			end
-			local option = GetOptionByID(value)
-			return option and option.label or L("FRIEND_TAGS_ICON_TAG", "Tag")
-		end,
-	}, IsSelected, SelectIconOption)
-	SetDropdownText()
-
-	self.iconInput = CreateInput(parent, 148, 180)
-	self.iconInput:SetPoint("TOPLEFT", parent, "TOPLEFT", 306, y)
-	SetEditBoxText(self.iconInput, state.texture or state.icon or state.iconValue)
-	self.iconInput:SetScript("OnTextChanged", function()
-		if state.iconMode == "custom" then
-			state.iconValue = GetEditBoxText(self.iconInput)
-			state.icon = state.iconValue
-			state.texture = state.iconValue
+		BFL.ShowIconSelector(button, GetCurrentReference(), function(iconRef, iconProfile)
+			local profile = CopyIconProfile(iconProfile or {
+				iconType = "texture",
+				iconValue = iconRef,
+				icon = iconRef,
+				texture = iconRef,
+			})
+			state.iconMode = "selected"
+			state.iconOptionID = iconProfile and iconProfile.id or nil
+			state.iconType = profile.iconType or "texture"
+			state.iconValue = profile.iconValue or iconRef
+			state.icon = profile.icon or iconRef
+			state.atlas = profile.atlas
+			state.fallbackAtlas = profile.fallbackAtlas
+			state.texture = profile.texture or (profile.iconType ~= "atlas" and iconRef or nil)
+			state.texCoord = CopyTexCoord(profile.texCoord)
+			state.iconZoom = NormalizeIconZoom(profile.iconZoom)
+			self.suppressEditorChanges = true
+			SetEditBoxText(self.iconInput, state.texture or state.icon or state.iconValue or "")
+			self.suppressEditorChanges = false
+			self:UpdateIconControls()
 			self:RefreshPreview()
-		end
+			self:CommitState()
+		end, {
+			source = "tags",
+			extraIcons = options,
+			anchorFrame = self.frame,
+		})
 	end)
-	UpdateCustomInput()
+	selectButton:SetPoint("LEFT", previewHolder, "RIGHT", 8, 0)
+	self.iconSelectButton = selectButton
+
+	local noneButton = CreateSmallButton(parent, NONE or "None", 68, function()
+		state.iconMode = "none"
+		state.iconType = "none"
+		state.iconValue = false
+		state.icon = false
+		state.atlas = nil
+		state.fallbackAtlas = nil
+		state.texture = nil
+		state.texCoord = nil
+		state.iconZoom = false
+		self:UpdateIconControls()
+		self:RefreshPreview()
+		self:CommitState()
+	end)
+	noneButton:SetPoint("LEFT", selectButton, "RIGHT", 8, 0)
+
+	local customButton = CreateSmallButton(parent, L("FRIEND_TAGS_EDITOR_ICON_CUSTOM", "Custom Path"), 122, function()
+		state.iconMode = "custom"
+		state.iconType = "texture"
+		state.iconValue = GetEditBoxText(self.iconInput)
+		state.icon = state.iconValue
+		state.texture = state.iconValue
+		state.atlas = nil
+		state.fallbackAtlas = nil
+		state.texCoord = nil
+		state.iconZoom = false
+		self:UpdateIconControls()
+		self:RefreshPreview()
+		self:CommitState()
+	end)
+	customButton:SetPoint("LEFT", noneButton, "RIGHT", 8, 0)
+
+	self.iconInput = CreateInput(parent, 380, 180)
+	self.iconInput:SetPoint("TOPLEFT", parent, "TOPLEFT", 118, y - 34)
+	SetEditBoxText(self.iconInput, state.texture or state.icon or state.iconValue or "")
+	self.iconInput:SetScript("OnTextChanged", function()
+		if self.suppressEditorChanges or state.iconMode ~= "custom" then
+			return
+		end
+		state.iconValue = GetEditBoxText(self.iconInput)
+		state.icon = state.iconValue
+		state.texture = state.iconValue
+		self:UpdateIconControls()
+		self:RefreshPreview()
+		self:QueueAutoSave()
+	end)
+	self.iconInput:SetScript("OnEnterPressed", function(editBox)
+		editBox:ClearFocus()
+		self:FlushAutoSave()
+	end)
+
+	self.iconNoneButton = noneButton
+	self.iconCustomButton = customButton
+	self:UpdateIconControls()
+	return 66
 end
 
-function FriendTagEditor:CreateColorControl(parent, y)
+function FriendTagEditor:UpdateIconControls()
+	local state = self.editState or {}
+	if self.iconSelectButton then
+		self.iconSelectButton:SetText(L("ICON_SELECTOR_TITLE", "Select Icon"))
+	end
+	if self.iconButtonPreview then
+		local profile = self:GetPreviewChipProfile()
+		local iconValue = profile.iconValue or profile.icon or profile.texture or profile.atlas
+		local TagChips = GetTagChips()
+		if self.iconButtonPreview.chip and TagChips and TagChips.UpdateStandaloneChip and profile.iconType ~= "none" and iconValue and iconValue ~= "" then
+			TagChips:UpdateStandaloneChip(self.iconButtonPreview.chip, profile, "", 22)
+		else
+			if self.iconButtonPreview.chip then
+				self.iconButtonPreview.chip:Hide()
+			end
+		end
+	end
+	if self.iconInput then
+		self.iconInput:SetShown(state.iconMode == "custom")
+	end
+	if self.iconNoneButton then
+		if state.iconMode == "none" then
+			self.iconNoneButton:LockHighlight()
+		else
+			self.iconNoneButton:UnlockHighlight()
+		end
+	end
+	if self.iconCustomButton then
+		if state.iconMode == "custom" then
+			self.iconCustomButton:LockHighlight()
+		else
+			self.iconCustomButton:UnlockHighlight()
+		end
+	end
+end
+
+function FriendTagEditor:CreateColorControl(parent, y, stateKey, labelText, buttonField)
 	local state = self.editState
+	stateKey = stateKey or "color"
+	labelText = labelText or L("FRIEND_TAGS_EDITOR_COLOR", "Chip Color")
+	buttonField = buttonField or "colorButton"
+	local fallback = stateKey == "textColor" and { r = 1, g = 1, b = 1, a = 1 } or nil
 	local label = CreateFont(parent, "BetterFriendlistFontHighlightSmall")
 	label:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y - 4)
-	label:SetWidth(118)
-	label:SetText(L("FRIEND_TAGS_EDITOR_COLOR", "Chip Color"))
+	label:SetWidth(108)
+	label:SetText(labelText)
 
 	local button = CreateFrame("Button", nil, parent, "BackdropTemplate")
-	button:SetPoint("TOPLEFT", parent, "TOPLEFT", 128, y)
+	button:SetPoint("TOPLEFT", parent, "TOPLEFT", 118, y)
 	button:SetSize(28, 24)
 	button:SetBackdrop({
 		bgFile = "Interface\\Buttons\\WHITE8X8",
 		edgeFile = "Interface\\Buttons\\WHITE8X8",
 		edgeSize = 1,
 	})
-	self.colorButton = button
+	self[buttonField] = button
 
 	local function UpdateSwatch()
-		local color = CopyColor(state.color)
+		local color = CopyColor(state[stateKey], fallback)
 		button:SetBackdropColor(color.r, color.g, color.b, color.a or 1)
 		button:SetBackdropBorderColor(0, 0, 0, 1)
 	end
 	UpdateSwatch()
 
 	button:SetScript("OnClick", function()
-		local color = CopyColor(state.color)
+		local color = CopyColor(state[stateKey], fallback)
 		if BFL.ShowColorPicker then
 			BFL.ShowColorPicker(color.r, color.g, color.b, color.a or 1, function(r, g, b, a)
-				state.color = { r = r, g = g, b = b, a = a or 1 }
+				state[stateKey] = { r = r, g = g, b = b, a = a or 1 }
 				UpdateSwatch()
+				self:UpdateIconControls()
 				self:RefreshPreview()
+				self:QueueAutoSave()
 			end, function(r, g, b, a)
-				state.color = { r = r, g = g, b = b, a = a or 1 }
+				state[stateKey] = { r = r, g = g, b = b, a = a or 1 }
 				UpdateSwatch()
+				self:UpdateIconControls()
 				self:RefreshPreview()
+				self:CommitState()
 			end)
 		end
 	end)
@@ -845,6 +1056,10 @@ end
 
 function FriendTagEditor:CreateVisibilityControls(parent, y)
 	local state = self.editState
+	local sectionLabel = CreateFont(parent, "BetterFriendlistFontHighlightSmall")
+	sectionLabel:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y - 4)
+	sectionLabel:SetWidth(108)
+	sectionLabel:SetText(L("FRIEND_TAGS_EDITOR_VISIBLE", "Visible"))
 	local labels = {
 		{ key = "visible", text = L("FRIEND_TAGS_EDITOR_VISIBLE", "Visible") },
 		{ key = "rowVisible", text = L("FRIEND_TAGS_EDITOR_ROW_VISIBLE", "Friend Rows") },
@@ -853,30 +1068,30 @@ function FriendTagEditor:CreateVisibilityControls(parent, y)
 	}
 	for index, entry in ipairs(labels) do
 		local holder = CreateFrame("Frame", nil, parent)
-		holder:SetPoint("TOPLEFT", parent, "TOPLEFT", index <= 2 and 0 or 230, y - (((index - 1) % 2) * 30))
-		holder:SetSize(220, 26)
+		local column = (index - 1) % 2
+		local row = math.floor((index - 1) / 2)
+		holder:SetPoint("TOPLEFT", parent, "TOPLEFT", 118 + (column * 190), y - (row * 30))
+		holder:SetSize(180, 26)
 		local check = CreateCheckbox(holder, entry.text, state[entry.key], function(checked)
 			state[entry.key] = checked
+			self:RefreshPreview()
+			self:CommitState()
 		end)
 		check:SetPoint("LEFT", holder, "LEFT", 0, 0)
 	end
 end
 
 function FriendTagEditor:CreateActionButtons(parent)
-	local save = CreateSmallButton(parent, SAVE or "Save", 90, function()
-		self:Save()
-	end)
-	save:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -190, 0)
-
-	local reset = CreateSmallButton(parent, RESET or "Reset", 90, function()
+	local reset = CreateSmallButton(parent, RESET or "Reset", 96, function()
 		self:Reset()
 	end)
-	reset:SetPoint("LEFT", save, "RIGHT", 8, 0)
 
 	local close = CreateSmallButton(parent, CLOSE or "Close", 90, function()
+		self:FlushAutoSave()
 		self.frame:Hide()
 	end)
-	close:SetPoint("LEFT", reset, "RIGHT", 8, 0)
+	close:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
+	reset:SetPoint("RIGHT", close, "LEFT", -8, 0)
 
 	local def = self:GetSelectedDefinition()
 	if def and def.source == "custom" then
@@ -887,18 +1102,45 @@ function FriendTagEditor:CreateActionButtons(parent)
 	end
 end
 
-function FriendTagEditor:Save()
+function FriendTagEditor:QueueAutoSave()
+	self.autoSaveGeneration = (self.autoSaveGeneration or 0) + 1
+	local generation = self.autoSaveGeneration
+	self.autoSavePending = true
+	if C_Timer and C_Timer.After then
+		C_Timer.After(0.25, function()
+			if self.autoSavePending and self.autoSaveGeneration == generation then
+				self:CommitState()
+			end
+		end)
+	else
+		self:CommitState()
+	end
+end
+
+function FriendTagEditor:FlushAutoSave()
+	if self.editState then
+		self:CommitState()
+	end
+end
+
+function FriendTagEditor:CommitState()
 	local FriendTags = GetFriendTags()
 	local def = self:GetSelectedDefinition()
 	local state = self.editState
-	if not (FriendTags and def and state) then
-		return
+	if not (FriendTags and def and state) or state.tagId ~= def.id then
+		return false
 	end
+	self.autoSaveGeneration = (self.autoSaveGeneration or 0) + 1
+	self.autoSavePending = false
 
+	local renamed = false
 	if def.source == "custom" and self.nameInput then
 		local name = GetEditBoxText(self.nameInput)
 		if name ~= "" and name ~= def.name then
-			FriendTags:RenameCustomTag(def.id, name)
+			renamed = FriendTags:RenameCustomTag(def.id, name) == true
+			if renamed then
+				state.name = name
+			end
 		end
 	end
 
@@ -909,10 +1151,10 @@ function FriendTagEditor:Save()
 	elseif state.labelMode == "icon_only" then
 		chipLabel = ""
 	else
-		chipLabel = GetEditBoxText(self.labelInput)
+		chipLabel = state.labelValue or ""
 	end
 
-	local iconType, iconValue, icon, atlas, fallbackAtlas, texture, texCoord
+	local iconType, iconValue, icon, atlas, fallbackAtlas, texture, texCoord, iconZoom
 	if state.iconMode == "none" then
 		iconType = "none"
 		iconValue = false
@@ -921,11 +1163,13 @@ function FriendTagEditor:Save()
 		fallbackAtlas = false
 		texture = false
 		texCoord = false
+		iconZoom = false
 	elseif state.iconMode == "custom" then
 		iconType = "texture"
-		iconValue = GetEditBoxText(self.iconInput)
+		iconValue = state.iconValue or (self.iconInput and GetEditBoxText(self.iconInput)) or ""
 		icon = iconValue
 		texture = iconValue
+		iconZoom = false
 	else
 		local iconProfile = self:GetPreviewIconProfile() or {}
 		iconType = iconProfile.iconType or "texture"
@@ -935,6 +1179,7 @@ function FriendTagEditor:Save()
 		fallbackAtlas = iconProfile.fallbackAtlas
 		texture = iconProfile.texture
 		texCoord = iconProfile.texCoord
+		iconZoom = NormalizeIconZoom(iconProfile.iconZoom)
 	end
 
 	FriendTags:SetChipProfile(def.id, {
@@ -947,16 +1192,20 @@ function FriendTagEditor:Save()
 		fallbackAtlas = fallbackAtlas,
 		texture = texture,
 		texCoord = texCoord,
+		iconZoom = iconZoom,
 		color = state.color,
+		textColor = state.textColor,
 		visible = state.visible,
 		rowVisible = state.rowVisible,
 		tooltipVisible = state.tooltipVisible,
 		brokerVisible = state.brokerVisible,
-		order = tonumber(GetEditBoxText(self.orderInput)) or state.order,
-	}, function()
-		self:Refresh()
-	end)
-	self:Refresh()
+		order = state.order,
+	})
+	return true
+end
+
+function FriendTagEditor:Save()
+	return self:FlushAutoSave()
 end
 
 function FriendTagEditor:Reset()
@@ -966,7 +1215,6 @@ function FriendTagEditor:Reset()
 		FriendTags:ResetChipProfile(def.id, function()
 			self:Refresh()
 		end)
-		self:Refresh()
 	end
 end
 

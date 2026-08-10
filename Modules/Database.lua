@@ -127,6 +127,7 @@ local defaults = {
 	secondarySort = "name", -- Secondary sort method: none, name, level, zone (default: name)
 	-- Filter Settings
 	quickFilter = "all", -- Quick filter mode: all, online, offline, wowonline, wow, bnet, hideafk, retail, ingame (default: all)
+	quickFilterTags = {}, -- Selected Friend Tag facets: { [tagId] = true }
 	customQuickFilters = {}, -- User-created QuickFilter definitions (account-wide)
 	quickFilterVisibility = {}, -- {filterId: boolean}; nil means visible
 	quickFilterOrder = {}, -- Ordered list of built-in and custom QuickFilter IDs

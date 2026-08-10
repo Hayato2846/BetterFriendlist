@@ -1980,6 +1980,29 @@ end
 function Registry:FormatIcon(iconRef, size)
 	size = size or 16
 	iconRef = NormalizeIconRef(iconRef) or BFL_ICON_PREFIX .. "filter-all"
+	if type(iconRef) == "string"
+		and iconRef:find(BFL_ICON_PREFIX, 1, true) == 1
+		and BFL.UsesDarkSkinTheme
+		and BFL:UsesDarkSkinTheme()
+		and BFL.GetThemeAccentColor then
+		local r, g, b = BFL:GetThemeAccentColor(1, 0.82, 0, 1)
+		local function ToColorByte(value)
+			value = math.max(0, math.min(1, tonumber(value) or 1))
+			return math.floor((value * 255) + 0.5)
+		end
+		-- Texture markup accepts RGB tint bytes after its file/crop fields. BFL's
+		-- monochrome menu assets are 32x32; Blizzard and user icons retain their
+		-- original colors.
+		return string.format(
+			"|T%s:%d:%d:0:0:32:32:0:32:0:32:%d:%d:%d|t",
+			tostring(iconRef),
+			size,
+			size,
+			ToColorByte(r),
+			ToColorByte(g),
+			ToColorByte(b)
+		)
+	end
 	return string.format("|T%s:%d:%d:0:0|t", tostring(iconRef), size, size)
 end
 

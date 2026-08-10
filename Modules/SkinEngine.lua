@@ -85,6 +85,17 @@ local function CopyColorTable(source)
 	return result
 end
 
+local function CopyBackdropInfo(source)
+	if type(source) ~= "table" then
+		return source
+	end
+	local result = {}
+	for key, value in pairs(source) do
+		result[key] = type(value) == "table" and CopyBackdropInfo(value) or value
+	end
+	return result
+end
+
 local COLORS = CopyColorTable(DEFAULT_COLORS)
 
 local ICONS = {
@@ -145,6 +156,7 @@ local DECOR_KEYS = {
 
 local BUTTON_TEXTURE_KEYS = {
 	"Left",
+	"Center",
 	"Middle",
 	"Right",
 	"LeftDisabled",
@@ -258,6 +270,9 @@ end
 
 local function IsTravelPassButton(button)
 	if not button or not IsObjectType(button, "Button") then
+		return false
+	end
+	if button.BFL_DarkForceFlatButton then
 		return false
 	end
 
@@ -405,6 +420,55 @@ local function IsControlEnabled(frame)
 	end
 
 	return true
+end
+
+local function RefreshNativeButtonVisualState(button)
+	if not button or not IsObjectType(button, "Button") then
+		return
+	end
+
+	-- Stateful Blizzard buttons can change enabled state while their native
+	-- artwork is hidden by the dark skin. Rebuild the atlas and FontObject from
+	-- the state that is current now instead of retaining the originally captured
+	-- text color after the Blizzard theme has been restored.
+	if button.UpdateButton and button.Left and button.Center and button.Right then
+		pcall(button.UpdateButton, button)
+		-- ThreeSliceButtonMixin rebuilds the atlases and geometry, but it does
+		-- not restore region alpha. Dark/Custom deliberately hides these three
+		-- regions, so normalize them explicitly after the reversible state has
+		-- been applied or a disabled RAF action can retain only partial chrome.
+		for _, slice in ipairs({ button.Left, button.Center, button.Right }) do
+			if slice.SetAlpha then
+				slice:SetAlpha(1)
+			end
+			if slice.SetDesaturated then
+				slice:SetDesaturated(false)
+			end
+			if slice.SetVertexColor then
+				slice:SetVertexColor(1, 1, 1, 1)
+			end
+			if slice.SetBlendMode then
+				slice:SetBlendMode("BLEND")
+			end
+		end
+	end
+
+	local fontString = button.GetFontString and button:GetFontString()
+	if not (fontString and fontString.SetFontObject) then
+		return
+	end
+
+	local fontObject
+	if not IsControlEnabled(button) then
+		fontObject = button.GetDisabledFontObject and button:GetDisabledFontObject()
+	elseif BFL:IsRegionMouseOver(button) then
+		fontObject = button.GetHighlightFontObject and button:GetHighlightFontObject()
+	else
+		fontObject = button.GetNormalFontObject and button:GetNormalFontObject()
+	end
+	if fontObject then
+		fontString:SetFontObject(fontObject)
+	end
 end
 
 local function GetCachedTextureRegions(frame)
@@ -652,6 +716,7 @@ function SkinEngine:GetState(frame)
 	if not state then
 		state = {
 			textureAlpha = {},
+			textureDesaturated = {},
 			textureVertexColors = {},
 			textureBlendModes = {},
 			fontColors = {},
@@ -665,6 +730,7 @@ function SkinEngine:GetState(frame)
 		frame.BFL_DarkSkin = state
 	else
 		state.textureAlpha = state.textureAlpha or {}
+		state.textureDesaturated = state.textureDesaturated or {}
 		state.textureVertexColors = state.textureVertexColors or {}
 		state.textureBlendModes = state.textureBlendModes or {}
 		state.fontColors = state.fontColors or {}
@@ -785,6 +851,17 @@ function SkinEngine:SetTextureAlpha(frame, texture, alpha)
 	end
 	self:RememberTextureAlpha(frame, texture)
 	texture:SetAlpha(alpha)
+end
+
+function SkinEngine:SetTextureDesaturated(frame, texture, desaturated)
+	if not texture or not texture.SetDesaturated then
+		return
+	end
+	local state = self:GetState(frame)
+	if state and state.textureDesaturated[texture] == nil then
+		state.textureDesaturated[texture] = texture.IsDesaturated and texture:IsDesaturated() == true or false
+	end
+	texture:SetDesaturated(desaturated == true)
 end
 
 function SkinEngine:RememberTextureVertexColor(frame, texture)
@@ -1164,6 +1241,37 @@ function SkinEngine:CreateBackdrop(frame, variant, insets)
 	return backdrop
 end
 
+function SkinEngine:ClearNativeBackdrop(frame)
+	if
+		not self:IsActive()
+		or not frame
+		or IsForbidden(frame)
+		or not frame.GetBackdrop
+		or not frame.SetBackdrop
+	then
+		return
+	end
+
+	local state = self:GetState(frame)
+	if not state.nativeBackdrop then
+		local backdropInfo = frame:GetBackdrop()
+		if not backdropInfo then
+			return
+		end
+		state.nativeBackdrop = {
+			info = CopyBackdropInfo(backdropInfo),
+		}
+		if frame.GetBackdropColor then
+			state.nativeBackdrop.backgroundColor = { frame:GetBackdropColor() }
+		end
+		if frame.GetBackdropBorderColor then
+			state.nativeBackdrop.borderColor = { frame:GetBackdropBorderColor() }
+		end
+	end
+
+	frame:SetBackdrop(nil)
+end
+
 function SkinEngine:DampenRegions(frame, alpha)
 	if not frame or IsForbidden(frame) or not frame.GetRegions then
 		return
@@ -1492,7 +1600,8 @@ function SkinEngine:ApplyButtonState(button, interactionState)
 		border = COLORS.controlBorderDisabled
 	elseif button.BFL_DarkTabButton then
 		if interactionState == "down" then
-			bg = COLORS.controlDown
+			bg = button.BFL_DarkPreserveTabBackgroundOnPress and (selectedTab and COLORS.tabHover or COLORS.tab)
+				or COLORS.controlDown
 			border = COLORS.accent
 		elseif interactionState == "hover" then
 			bg = COLORS.tabHover
@@ -1978,6 +2087,9 @@ function SkinEngine:IsTabSelected(tab)
 	if not tab then
 		return false
 	end
+	if tab.BFL_DarkManagedSelection ~= nil then
+		return tab.BFL_DarkManagedSelection == true
+	end
 
 	local owner = tab.GetParent and tab:GetParent()
 	if LowerName(tab):find("bottomtab") then
@@ -2394,6 +2506,10 @@ function SkinEngine:SkinEditBox(editBox)
 	end
 
 	self:CreateBackdrop(editBox, "editbox", ZERO_INSETS)
+	-- Retail StaticPopup edit boxes inherit TooltipBackdropTemplate directly on
+	-- the EditBox frame. Clear that native backdrop while themed so it cannot
+	-- stack with the SkinEngine surface; RestoreFrame puts it back for Blizzard.
+	self:ClearNativeBackdrop(editBox)
 	self:DampenNamedTextures(editBox, 0, {
 		"Left",
 		"Middle",
@@ -2412,6 +2528,8 @@ function SkinEngine:SkinEditBox(editBox)
 		"MiddleBorder",
 		"Backdrop",
 	})
+	self:DampenNineSlice(editBox, 0)
+	self:DampenKnownArtwork(editBox, 0)
 
 	self:SetFontColor(editBox, editBox, 0.92, 0.92, 0.92, 1)
 
@@ -3236,6 +3354,38 @@ local function RefreshRowTravelPassButton(engine, row, button, buttonKey, shownK
 
 	local shown = IsShownForRowRefresh(button)
 	local enabled = IsControlEnabled(button)
+	if button.BFL_DarkForceFlatButton then
+		button.BFL_DarkTravelPassButton = nil
+		button.BFL_DarkTravelPassSkinned = nil
+		local iconSize = 24
+		if button.ActionIcon and button.ActionIcon.GetWidth then
+			local width = button.ActionIcon:GetWidth()
+			if width and width > 0 then
+				iconSize = width
+			end
+		end
+		if button.ActionIcon then
+			engine:SetTextureDesaturated(button, button.ActionIcon, true)
+		end
+		engine:SkinIconButton(button, nil, {
+			texture = button.ActionIcon,
+			size = iconSize,
+			insets = ZERO_INSETS,
+			color = engine.colors and engine.colors.accent and {
+				engine.colors.accent[1],
+				engine.colors.accent[2],
+				engine.colors.accent[3],
+				1,
+			},
+		})
+		if button.BFL_DarkHoverIcon then
+			engine:SetTextureDesaturated(button, button.BFL_DarkHoverIcon, true)
+		end
+		row[buttonKey] = button
+		row[shownKey] = shown
+		row[enabledKey] = enabled
+		return
+	end
 	if not button.BFL_DarkTravelPassSkinned then
 		engine:SkinTravelPassButton(button)
 	elseif
@@ -3560,6 +3710,7 @@ function SkinEngine:RestoreFrame(frame)
 		return
 	end
 	state.textureAlpha = state.textureAlpha or {}
+	state.textureDesaturated = state.textureDesaturated or {}
 	state.textureVertexColors = state.textureVertexColors or {}
 	state.textureBlendModes = state.textureBlendModes or {}
 	state.fontColors = state.fontColors or {}
@@ -3590,6 +3741,19 @@ function SkinEngine:RestoreFrame(frame)
 
 	if frame.BFL_DarkBackdrop then
 		frame.BFL_DarkBackdrop:Hide()
+	end
+
+	if state.nativeBackdrop and frame.SetBackdrop then
+		frame:SetBackdrop(state.nativeBackdrop.info)
+		local backgroundColor = state.nativeBackdrop.backgroundColor
+		if backgroundColor and frame.SetBackdropColor then
+			frame:SetBackdropColor(unpack(backgroundColor))
+		end
+		local borderColor = state.nativeBackdrop.borderColor
+		if borderColor and frame.SetBackdropBorderColor then
+			frame:SetBackdropBorderColor(unpack(borderColor))
+		end
+		state.nativeBackdrop = nil
 	end
 
 	if state.points and frame.ClearAllPoints and frame.SetPoint then
@@ -3663,6 +3827,13 @@ function SkinEngine:RestoreFrame(frame)
 	end
 	wipe(state.textureAlpha)
 
+	for texture, desaturated in pairs(state.textureDesaturated) do
+		if texture and texture.SetDesaturated then
+			texture:SetDesaturated(desaturated == true)
+		end
+	end
+	wipe(state.textureDesaturated)
+
 	for texture, color in pairs(state.textureVertexColors) do
 		if texture and texture.SetVertexColor then
 			texture:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
@@ -3710,6 +3881,7 @@ function SkinEngine:RestoreFrame(frame)
 		end
 	end
 	wipe(state.fontJustify)
+	RefreshNativeButtonVisualState(frame)
 
 	if frame.bflDarkSkinned ~= nil then
 		frame.bflDarkSkinned = nil
@@ -3744,6 +3916,7 @@ function SkinEngine:RestoreFrame(frame)
 	frame.BFL_DarkButtonTexturesAlpha = nil
 	frame.BFL_DarkButtonTextureObjects = nil
 	frame.BFL_DarkButtonTextureObjectsName = nil
+	frame.BFL_DarkPreserveTabBackgroundOnPress = nil
 	frame.BFL_DarkBorderlessIconButton = nil
 	frame.BFL_DarkIconButtonSkinned = nil
 	frame.BFL_DarkIconButtonTextureAlpha = nil
@@ -3793,10 +3966,32 @@ function SkinEngine:RestoreFrame(frame)
 end
 
 function SkinEngine:RestoreAll()
+	local restoredButtons = {}
 	for frame, _ in pairs(self.registry) do
 		self:RestoreFrame(frame)
+		if IsObjectType(frame, "Button") then
+			restoredButtons[#restoredButtons + 1] = frame
+		end
 	end
 	wipe(self.registry)
+
+	-- A texture can be captured by both its button and a recursively skinned
+	-- owner. Registry iteration order is undefined, so the per-frame refresh can
+	-- be overwritten later in the same restore. Finish with buttons only after
+	-- every owner has returned its state, then retain the list for ThemeManager's
+	-- post-layout Blizzard finalization.
+	for _, button in ipairs(restoredButtons) do
+		RefreshNativeButtonVisualState(button)
+	end
+	self.pendingNativeButtonRestore = #restoredButtons > 0 and restoredButtons or nil
+end
+
+function SkinEngine:FinalizeNativeButtonRestore()
+	local restoredButtons = self.pendingNativeButtonRestore
+	self.pendingNativeButtonRestore = nil
+	for _, button in ipairs(restoredButtons or {}) do
+		RefreshNativeButtonVisualState(button)
+	end
 end
 
 return SkinEngine

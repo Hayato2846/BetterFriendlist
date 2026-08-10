@@ -132,7 +132,7 @@ BFL:RegisterLocale("koKR", function()
 	L.FRIEND_TAGS_SETTINGS_TOOLTIPS_DESC = "메모 및 태그 툴팁 영역에 친구 태그를 포함합니다."
 	L.FRIEND_TAGS_SETTINGS_MAX_TOOLTIP_CHIPS = "툴팁 태그 최대 개수"
 	L.FRIEND_TAGS_SETTINGS_MAX_TOOLTIP_CHIPS_DESC = "메모 및 태그 툴팁에 나열할 태그 수를 제한합니다."
-	L.FRIEND_TAGS_SETTINGS_SEARCH = "검색 및 개인정보"
+	L.FRIEND_TAGS_SETTINGS_SEARCH = "검색 및 메뉴"
 	L.FRIEND_TAGS_SETTINGS_SEARCH_BLIZZARD = "블리자드 태그 검색"
 	L.FRIEND_TAGS_SETTINGS_SEARCH_BLIZZARD_DESC = "친구 목록 검색에 블리자드 호환 태그를 포함합니다."
 	L.FRIEND_TAGS_SETTINGS_SEARCH_CUSTOM = "사용자 태그 검색"

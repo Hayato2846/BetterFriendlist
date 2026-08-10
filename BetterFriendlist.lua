@@ -637,7 +637,8 @@ function BFL:ApplyTabFonts()
 		selectedTabId,
 		selectedOffset,
 		unselectedOffset,
-		fixedHeight
+		fixedHeight,
+		fillTrailingSpace
 	)
 		-- Collect all tabs
 		local tabList = {}
@@ -882,7 +883,7 @@ function BFL:ApplyTabFonts()
 			if right and left then
 				local rightEdge = right - left
 				local slack = maxRightEdge - rightEdge
-				if slack > 0 then
+				if fillTrailingSpace ~= false and slack > 0 then
 					local targetInfo = nil
 					for i = #tabList, 1, -1 do
 						local info = tabList[i]
@@ -1054,6 +1055,12 @@ function BFL:ApplyTabFonts()
 	local topBaseOffset = shouldCenterTopTabs and 0 or -5
 	local topSelectedOffset = shouldCenterTopTabs and 0 or -5
 	local topUnselectedOffset = shouldCenterTopTabs and 0 or -8
+	local fillTopTrailingSpace = not (
+		BFL.IsRetail
+		and BFL.FriendsUI
+		and BFL.FriendsUI.IsModernActive
+		and not BFL.FriendsUI:IsModernActive()
+	)
 	ProcessTabGroup(
 		topTabs,
 		20,
@@ -1068,7 +1075,8 @@ function BFL:ApplyTabFonts()
 		selectedTopTabId,
 		topSelectedOffset,
 		topUnselectedOffset,
-		32
+		32,
+		fillTopTrailingSpace
 	)
 
 	-- Reposition first top tab to align with Inset
@@ -2393,6 +2401,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				if not contextData then
 					return
 				end
+				if BFL.IsOfflineTitleFriend and BFL.IsOfflineTitleFriend(contextData, contextData.isOffline) then
+					return
+				end
 
 				pcall(function()
 					for _, elementDescription in rootDescription:EnumerateElementDescriptions() do
@@ -2875,7 +2886,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 				local FriendTags = BFL:GetModule("FriendTags")
 				local tagFriendData
-				if FriendTags and FriendTags.IsEnabled and FriendTags:IsEnabled() then
+				if isOwnMenu and FriendTags then
 					if not friendData and bnetIDAccount and FriendsList and FriendsList.friendsList then
 						for _, f in ipairs(FriendsList.friendsList) do
 							if f.type == "bnet" and f.bnetAccountID == bnetIDAccount then
@@ -2899,7 +2910,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end
 
 				local ContactMemory = BFL:GetModule("ContactMemory")
-				if ContactMemory and ContactMemory.IsEnabled and ContactMemory:IsEnabled() then
+				if isOwnMenu and ContactMemory and ContactMemory.IsEnabled and ContactMemory:IsEnabled() then
 					local contactKey = friendData and ContactMemory:ResolveContactKeyFromFriend(friendData)
 						or ContactMemory:ResolveContactKeyFromContext(contextData)
 						or ContactMemory:ResolveContactKeyFromFriend(friendUID)
@@ -2912,11 +2923,20 @@ frame:SetScript("OnEvent", function(self, event, ...)
 						})
 						ContactMemory:PopulateMenu(rootDescription, contactKey, menuDisplayName or contextName or battleTag, function()
 							BFL:ForceRefreshFriendsList()
-						end, {
-							friendData = tagFriendData,
-							friendUID = friendUID,
-						})
+						end)
 					end
+				end
+
+				if isOwnMenu and FriendTags and tagFriendData then
+					FriendTags:PopulateMenu(
+						rootDescription,
+						tagFriendData,
+						friendUID,
+						menuDisplayName or contextName or battleTag,
+						function()
+							BFL:ForceRefreshFriendsList()
+						end
+					)
 				end
 
 				-- Keep richer game-account controls on BFL-owned menus only. Native Blizzard
@@ -3098,6 +3118,16 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 				-- Check if already a friend (by GUID if available)
 				if contextData.guid and BFL.IsWoWFriend(contextData.guid) then
+					return
+				end
+
+				local PreviewMode = BFL:GetModule("PreviewMode")
+				if
+					PreviewMode
+					and PreviewMode.IsComponentEnabled
+					and PreviewMode:IsComponentEnabled("recent_allies")
+				then
+					-- Preview data is synthetic and must never expose a live invite action.
 					return
 				end
 
@@ -3843,6 +3873,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					or menuType == "BN_FRIEND_OFFLINE"
 					or menuType == "FRIEND"
 					or menuType == "FRIEND_OFFLINE"
+				local isOfflineTitleFriend = isBNet
+					and BFL.IsOfflineTitleFriend
+					and BFL.IsOfflineTitleFriend(contextData, isOffline)
 				local menuTypeWrapper = contextData.bflWhoPlayerMenu and "WHO" or nil
 
 				createContextMenu(owner, function(ownerRegion, rootDescription)
@@ -3869,7 +3902,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 					BFL_AddRafSummonButton(rootDescription, contextData, isBNet, isOffline)
 
-					if (not isOffline) or isBNet then
+					if ((not isOffline) or isBNet) and not isOfflineTitleFriend then
 						rootDescription:CreateButton(WHISPER or "Whisper", function()
 							if isBNet then
 								BFL:SecureSendBNetTell(contextData.name, contextData.bnetIDAccount)
@@ -5242,7 +5275,8 @@ function BetterFriendsList_Button_OnClick(button, mouseButton)
 					nil, -- communityEpoch
 					nil, -- communityPosition
 					accountInfo.battleTag,
-					resolvedIndex
+					resolvedIndex,
+					accountInfo.friendLevel
 				)
 			end
 		else
@@ -5344,7 +5378,8 @@ function BetterFriendsList_ShowBNDropdown(
 	communityEpoch,
 	communityPosition,
 	battleTag,
-	index
+	index,
+	friendLevel
 ) -- Ensure friendsList is a number (index) if possible
 	local actualIndex = index
 	if not actualIndex and type(showMenuFlag) == "number" then
@@ -5365,6 +5400,8 @@ function BetterFriendsList_ShowBNDropdown(
 			chatFrame = chatFrame,
 			bnetIDAccount = bnetIDAccount,
 			battleTag = battleTag,
+			friendLevel = friendLevel,
+			isOffline = connected == false,
 			uid = (battleTag and battleTag ~= "") and ("bnet_" .. battleTag) or ("bnet_" .. tostring(bnetIDAccount)), -- For Nickname (consistent with FriendsList UID)
 			index = actualIndex, -- Required for some addons
 			friendsIndex = actualIndex, -- Alternative name
@@ -5425,9 +5462,10 @@ function BetterFriendsFrame_ShowContactsMenu(button)
 		local simpleMode = DB and DB:Get("simpleMode", false) or false
 		local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
 		local modern = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
-		if simpleMode and not modern then
-			-- Search Toggle
-			local searchToggle = rootDescription:CreateCheckbox(L.MENU_SHOW_SEARCH or "Show Search", function()
+		if simpleMode then
+			-- Both layouts expose the same option. Modern renders it as a single
+			-- full-width search row while filter/sort actions remain in this menu.
+			rootDescription:CreateCheckbox(L.MENU_SHOW_SEARCH or "Show Search", function()
 				return DB and DB:Get("simpleModeShowSearch", true)
 			end, function()
 				if DB then
@@ -5462,7 +5500,7 @@ function BetterFriendsFrame_ShowContactsMenu(button)
 
 		-- Changelog option (Simple Mode OR Classic+ElvUI)
 		local DB = GetDB()
-		local simpleMode = not modern and DB and DB:Get("simpleMode", false) or false
+		local simpleMode = DB and DB:Get("simpleMode", false) or false
 		local isElvUIActive = BFL.IsClassic
 			and _G.ElvUI
 			and BFL.IsElvUISkinActive

@@ -198,6 +198,9 @@ end
 
 local function FormatIcon(icon, size)
 	size = size or 16
+	if BFL.FormatIcon then
+		return BFL.FormatIcon(icon or ICON_ROOT .. "guild.blp", size)
+	end
 	return string.format("|T%s:%d:%d:0:0|t", icon or ICON_ROOT .. "guild.blp", size, size)
 end
 

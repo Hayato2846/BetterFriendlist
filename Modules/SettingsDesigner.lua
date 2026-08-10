@@ -2560,49 +2560,20 @@ local function OpenFriendTagEditor(tagId)
 	end
 end
 
-local function BuildFriendTagEntries()
-	local FriendTags = GetFriendTagsModule()
-	local entries = {}
-	if not (FriendTags and FriendTags.GetAllTagDefinitions) then
-		return entries
-	end
-	for _, def in ipairs(FriendTags:GetAllTagDefinitions()) do
-		local profile = FriendTags:GetChipProfile(def)
-		entries[#entries + 1] = {
-			id = def.id,
-			key = def.id,
-			label = (def.name or def.id)
-				.. "  "
-				.. (def.source == "blizzard" and T("FRIEND_TAGS_SOURCE_BLIZZARD", "Blizzard") or T("FRIEND_TAGS_SOURCE_CUSTOM", "Custom")),
-			icon = profile and profile.icon or def.icon or "Interface\\AddOns\\BetterFriendlist\\Icons\\tag",
-			source = def.source,
-			visible = profile and profile.visible ~= false,
-		}
-	end
-	return entries
-end
-
-local function MoveFriendTagEntry(fromIndex, toIndex)
-	local FriendTags = GetFriendTagsModule()
-	if not (FriendTags and FriendTags.SetChipProfile) then
-		return
-	end
-	local entries = BuildFriendTagEntries()
-	if fromIndex < 1 or fromIndex > #entries or toIndex < 1 or toIndex > #entries then
-		return
-	end
-	local moved = table.remove(entries, fromIndex)
-	table.insert(entries, toIndex, moved)
-	for index, entry in ipairs(entries) do
-		FriendTags:SetChipProfile(entry.id, { order = index * 10 }, RefreshFriends)
-	end
-end
-
 local function SyncKnownBlizzardTags()
 	local FriendTags = GetFriendTagsModule()
 	if FriendTags and FriendTags.HandoffKnownLocalBlizzardTags then
 		FriendTags:HandoffKnownLocalBlizzardTags(RefreshFriends)
 	end
+end
+
+local function HasPendingLocalBlizzardTags()
+	local FriendTags = GetFriendTagsModule()
+	return FriendTags
+		and FriendTags.AreBlizzardTagsEnabled
+		and FriendTags:AreBlizzardTagsEnabled()
+		and FriendTags.GetLocalBlizzardTagAssignmentCount
+		and FriendTags:GetLocalBlizzardTagAssignmentCount() > 0
 end
 
 local function SetSettingsCenterBetaEnabled(value)
@@ -3460,7 +3431,7 @@ local function RegisterFriendsPages()
 	AddToggle("friends.behavior", { key = "accordionGroups", group = "list", label = T("SETTINGS_ACCORDION_GROUPS", "Accordion Groups"), desc = T("SETTINGS_ACCORDION_GROUPS_DESC", "Only one group can be expanded at a time."), default = false, order = 100, method = "OnAccordionGroupsChanged" })
 	AddToggle("friends.behavior", { key = "compactMode", group = "list", label = T("SETTINGS_COMPACT_MODE", "Compact Mode"), desc = T("SETTINGS_COMPACT_MODE_DESC", "Use compact friend row spacing."), default = false, order = 110, method = "OnCompactModeChanged" })
 	AddToggle("friends.behavior", { key = "simpleMode", group = "list", label = T("SETTINGS_SIMPLE_MODE", "Simple Mode"), desc = T("SETTINGS_SIMPLE_MODE_DESC", "Use a simplified Friends frame layout."), default = false, order = 120, method = "OnSimpleModeChanged", refreshOnChange = true })
-	AddToggle("friends.behavior", { key = "simpleModeShowSearch", group = "list", label = T("SETTINGS_SIMPLE_MODE_SHOW_SEARCH", "Show Search in Simple Mode"), desc = T("SETTINGS_SIMPLE_MODE_SHOW_SEARCH_DESC", "Keep the search field visible while Simple Mode is enabled."), default = true, order = 130, parentCheck = function() return GetDB("simpleMode", false) end, visibleWhen = function() local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI"); return not (BFL.IsRetail and FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()) end, after = RefreshFriends })
+	AddToggle("friends.behavior", { key = "simpleModeShowSearch", group = "list", label = T("SETTINGS_SIMPLE_MODE_SHOW_SEARCH", "Show Search in Simple Mode"), desc = T("SETTINGS_SIMPLE_MODE_SHOW_SEARCH_DESC", "Keep the search field visible while Simple Mode is enabled."), default = true, order = 130, parentCheck = function() return GetDB("simpleMode", false) end, after = RefreshFriends })
 	AddToggle("friends.behavior", { key = "useUIPanelSystem", group = "list", label = T("SETTINGS_USE_UI_PANEL_SYSTEM", "Respect UI Hierarchy"), desc = T("SETTINGS_USE_UI_PANEL_SYSTEM_DESC", "Use Blizzard panel behavior for the BetterFriendlist frame."), default = false, order = 140, method = "OnUseUIPanelSystemChanged" })
 	AddGroup("friends.behavior", "clicks", T("SETTINGS_CENTER_GROUP_CLICKS", "Click Actions"), 200)
 	AddToggle("friends.behavior", { key = "friendListClickWhisperEnabled", group = "clicks", label = T("SETTINGS_FRIEND_CLICK_WHISPER", "Click to Whisper"), desc = T("SETTINGS_FRIEND_CLICK_WHISPER_DESC", "Allow friend row clicks to start whispers."), default = false, order = 200, method = "OnFriendListClickWhisperEnabledChanged", refreshOnChange = true })
@@ -3556,7 +3527,6 @@ local function RegisterFriendTagsControls()
 		iconKey = "bfl-groups-order",
 		mainToggleID = "friendTags.enabled",
 		order = 135,
-		visibleWhen = IsBetaEnabled,
 		newTagID = "friend-tags",
 	})
 
@@ -3568,7 +3538,6 @@ local function RegisterFriendTagsControls()
 		desc = T("FRIEND_TAGS_SETTINGS_ENABLE_DESC", "Adds Blizzard-compatible and custom tags for friends."),
 		default = true,
 		order = 100,
-		parentCheck = IsBetaEnabled,
 		getValue = function()
 			return GetFriendTagSetting("enabled", true) == true
 		end,
@@ -3599,7 +3568,7 @@ local function RegisterFriendTagsControls()
 		label = T("FRIEND_TAGS_SETTINGS_MAX_ROW_CHIPS", "Maximum Row Chips"),
 		desc = T("FRIEND_TAGS_SETTINGS_MAX_ROW_CHIPS_DESC", "Limits how many tags are shown in each friend row before using a +count chip."),
 		min = 1,
-		max = 4,
+		max = 9,
 		step = 1,
 		default = 3,
 		integer = true,
@@ -3668,7 +3637,38 @@ local function RegisterFriendTagsControls()
 		end,
 	})
 
-	AddGroup("groups.friendtags", "search", T("FRIEND_TAGS_SETTINGS_SEARCH", "Search & Privacy"), 200)
+	AddToggle("groups.friendtags", {
+		id = "friendTags.showTagsInStreamerMode",
+		group = "general",
+		label = T("FRIEND_TAGS_SETTINGS_STREAMER", "Show in Streamer Mode"),
+		desc = T("FRIEND_TAGS_SETTINGS_STREAMER_DESC", "Keep friend tags visible while Streamer Mode is active."),
+		default = false,
+		order = 150,
+		parentCheck = IsFriendTagsEnabled,
+		getValue = function()
+			return GetFriendTagSetting("showTagsInStreamerMode", false) == true
+		end,
+		setValue = function(value)
+			SetFriendTagSetting("showTagsInStreamerMode", value == true)
+		end,
+	})
+	AddToggle("groups.friendtags", {
+		id = "friendTags.showBrokerChips",
+		group = "general",
+		label = T("FRIEND_TAGS_SETTINGS_BROKER", "Show in Broker Tooltips"),
+		desc = T("FRIEND_TAGS_SETTINGS_BROKER_DESC", "Allow broker integrations to include friend tags where supported."),
+		default = true,
+		order = 160,
+		parentCheck = IsFriendTagsEnabled,
+		getValue = function()
+			return GetFriendTagSetting("showBrokerChips", true) == true
+		end,
+		setValue = function(value)
+			SetFriendTagSetting("showBrokerChips", value == true)
+		end,
+	})
+
+	AddGroup("groups.friendtags", "search", T("FRIEND_TAGS_SETTINGS_SEARCH", "Search & Menus"), 200)
 	AddToggle("groups.friendtags", {
 		id = "friendTags.includeBlizzardTagsInSearch",
 		group = "search",
@@ -3700,33 +3700,18 @@ local function RegisterFriendTagsControls()
 		end,
 	})
 	AddToggle("groups.friendtags", {
-		id = "friendTags.showTagsInStreamerMode",
+		id = "friendTags.showMenuTagCounts",
 		group = "search",
-		label = T("FRIEND_TAGS_SETTINGS_STREAMER", "Show in Streamer Mode"),
-		desc = T("FRIEND_TAGS_SETTINGS_STREAMER_DESC", "Keep friend tags visible while Streamer Mode is active."),
-		default = false,
+		label = T("FRIEND_TAGS_SHOW_MENU_COUNTS", "Show Menu Counts"),
+		desc = T("FRIEND_TAGS_SHOW_MENU_COUNTS_DESC", "Show assigned tag counts in supported context menus."),
+		default = true,
 		order = 220,
 		parentCheck = IsFriendTagsEnabled,
 		getValue = function()
-			return GetFriendTagSetting("showTagsInStreamerMode", false) == true
+			return GetFriendTagSetting("showMenuTagCounts", true) == true
 		end,
 		setValue = function(value)
-			SetFriendTagSetting("showTagsInStreamerMode", value == true)
-		end,
-	})
-	AddToggle("groups.friendtags", {
-		id = "friendTags.showBrokerChips",
-		group = "search",
-		label = T("FRIEND_TAGS_SETTINGS_BROKER", "Show in Broker Tooltips"),
-		desc = T("FRIEND_TAGS_SETTINGS_BROKER_DESC", "Allow broker integrations to include friend tags where supported."),
-		default = true,
-		order = 230,
-		parentCheck = IsFriendTagsEnabled,
-		getValue = function()
-			return GetFriendTagSetting("showBrokerChips", true) == true
-		end,
-		setValue = function(value)
-			SetFriendTagSetting("showBrokerChips", value == true)
+			SetFriendTagSetting("showMenuTagCounts", value == true)
 		end,
 	})
 
@@ -3768,66 +3753,8 @@ local function RegisterFriendTagsControls()
 		desc = T("FRIEND_TAGS_SYNC_LOCAL_DESC", "Transfers locally stored 12.0.7 Blizzard-compatible tags for currently known Battle.net friends to Blizzard when the 12.1 API is available."),
 		buttonText = T("FRIEND_TAGS_SYNC_LOCAL_BUTTON", "Sync Known Friends"),
 		order = 410,
-		parentCheck = function()
-			local FriendTags = GetFriendTagsModule()
-			return IsFriendTagsEnabled() and FriendTags and FriendTags.AreBlizzardTagsEnabled and FriendTags:AreBlizzardTagsEnabled()
-		end,
+		visibleWhen = HasPendingLocalBlizzardTags,
 		onClick = SyncKnownBlizzardTags,
-	})
-	AddReorderList("groups.friendtags", {
-		id = "friendTags.tagList",
-		group = "editor",
-		label = T("FRIEND_TAGS_SETTINGS_TAG_LIST", "Tags"),
-		desc = T("FRIEND_TAGS_SETTINGS_TAG_LIST_DESC", "Change tag order, visibility, and open the full chip editor."),
-		order = 430,
-		getEntries = BuildFriendTagEntries,
-		moveEntry = MoveFriendTagEntry,
-		emptyText = T("FRIEND_TAGS_SETTINGS_TAG_LIST_EMPTY", "No tags available."),
-		entryToggle = {
-			getValue = function(tagId)
-				local FriendTags = GetFriendTagsModule()
-				local profile = FriendTags and FriendTags:GetChipProfile(tagId)
-				return profile and profile.visible ~= false
-			end,
-			setValue = function(tagId, _, value)
-				local FriendTags = GetFriendTagsModule()
-				if FriendTags then
-					FriendTags:SetChipProfile(tagId, { visible = value == true }, RefreshFriends)
-				end
-			end,
-		},
-		rowActions = {
-			{
-				id = "edit",
-				label = T("FRIEND_TAGS_EDITOR_EDIT", "Edit"),
-				onClick = function(tagId)
-					OpenFriendTagEditor(tagId)
-				end,
-			},
-			{
-				id = "reset",
-				label = T("FRIEND_TAGS_EDITOR_RESET", "Reset"),
-				onClick = function(tagId)
-					local FriendTags = GetFriendTagsModule()
-					if FriendTags then
-						FriendTags:ResetChipProfile(tagId, RefreshFriends)
-					end
-				end,
-			},
-			{
-				id = "delete",
-				label = T("FRIEND_TAGS_EDITOR_DELETE", "Delete"),
-				visibleWhen = function(entry)
-					return entry and entry.source == "custom"
-				end,
-				onClick = function(tagId)
-					local FriendTags = GetFriendTagsModule()
-					if FriendTags then
-						FriendTags:DeleteCustomTag(tagId, RefreshFriends)
-					end
-				end,
-			},
-		},
 	})
 end
 
@@ -4638,6 +4565,34 @@ function SettingsDesigner:ApplySkin(reason)
 
 	local currentTheme = BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() or GetDB("theme", "blizzard")
 	if currentTheme == "blizzard" then
+		local state = frame._LibSettingsDesignerState
+		if state and state.RefreshSidebarSelection then
+			state:RefreshSidebarSelection()
+		end
+
+		-- The library's public Open path owns the complete frame-theme refresh.
+		-- Defer it out of the theme control callback so the current page can be
+		-- rebuilt safely without mutating the control that is still dispatching.
+		if frame:IsShown() and ConfigUI and ConfigUI.Open and not self.blizzardSkinRefreshPending then
+			local target = state and state.view == "page" and state.selectedPageID
+				or state and state.view == "dashboard" and "dashboard"
+				or nil
+			self.blizzardSkinRefreshPending = true
+			local function refreshBlizzardFrame()
+				self.blizzardSkinRefreshPending = nil
+				local activeFrame = self:GetFrame()
+				local activeTheme = BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() or GetDB("theme", "blizzard")
+				if activeTheme == "blizzard" and activeFrame and activeFrame:IsShown() then
+					ConfigUI:Open(app or APP_ID, target)
+					self:ScheduleIconPolish()
+				end
+			end
+			if C_Timer and C_Timer.After then
+				C_Timer.After(0, refreshBlizzardFrame)
+			else
+				refreshBlizzardFrame()
+			end
+		end
 		return
 	end
 

@@ -8,10 +8,13 @@ local TagChips = BFL:RegisterModule("TagChips", {})
 local CHIP_HEIGHT = 14
 local CHIP_GAP = 4
 local ROW_GAP = 2
-local CHIP_MAX_WIDTH = 88
+local STANDALONE_CHIP_MAX_WIDTH = 180
 local OVERFLOW_WIDTH = 30
-local MAX_RENDERED_CHIPS = 4
+local MAX_ROW_CHIPS = 9
+local CHIPS_PER_LINE = 3
+local MAX_RENDERED_CHIPS = MAX_ROW_CHIPS + 1
 local CHIP_BORDER_INSET = 1
+local BLIZZARD_PICKER_ICON_ZOOM = 0.16
 local EMPTY_TABLE = {}
 local OVERFLOW_PROFILE = { color = { r = 0.45, g = 0.45, b = 0.45, a = 1 }, textColor = { r = 1, g = 1, b = 1, a = 1 } }
 
@@ -60,6 +63,19 @@ local function SetPillColor(pill, r, g, b, a)
 	pill.middle:SetColorTexture(r, g, b, a)
 end
 
+local function SetPillShown(pill, shown)
+	if not pill then
+		return
+	end
+	for _, region in pairs(pill) do
+		if shown then
+			region:Show()
+		else
+			region:Hide()
+		end
+	end
+end
+
 local function ApplyFont(fontString)
 	if not fontString then
 		return
@@ -74,6 +90,47 @@ local function ApplyFont(fontString)
 	end
 	fontString:SetWordWrap(false)
 	fontString:SetJustifyH("LEFT")
+end
+
+local measureLabel
+local measuredLabelWidths = {}
+local measuredLabelVersion
+
+local function MeasureLabelWidth(labelText)
+	labelText = tostring(labelText or "")
+	local version = BFL.SettingsVersion or 0
+	if measuredLabelVersion ~= version then
+		measuredLabelWidths = {}
+		measuredLabelVersion = version
+	end
+	if measuredLabelWidths[labelText] then
+		return measuredLabelWidths[labelText]
+	end
+	if not measureLabel then
+		measureLabel = UIParent:CreateFontString(nil, "ARTWORK")
+		ApplyFont(measureLabel)
+	end
+	measureLabel:SetText(labelText)
+	local width = measureLabel:GetStringWidth() or 0
+	measuredLabelWidths[labelText] = width
+	return width
+end
+
+local function GetDesiredChipWidth(labelText, hasIcon, overflow)
+	if overflow then
+		return OVERFLOW_WIDTH
+	elseif labelText == "" and hasIcon then
+		return CHIP_HEIGHT
+	end
+	return math.max(26, MeasureLabelWidth(labelText) + (hasIcon and 24 or 14))
+end
+
+local function GetAvailableRowWidth(friendsList)
+	local buttonWidth = friendsList and friendsList.GetButtonWidth and friendsList:GetButtonWidth() or 300
+	local FriendsUI = BFL:GetModule("FriendsUI")
+	local modern = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
+	local textLeftInset = modern and 38 or 44
+	return math.max(36, math.floor(buttonWidth - textLeftInset - 84))
 end
 
 local function HideRow(row)
@@ -101,6 +158,7 @@ local function GetRowCacheVersions(friend, friendsList, FriendTags)
 	local settingsVersion = BFL.SettingsVersion or 0
 	local compactModeFlag = settingsCache and settingsCache.compactMode and 1 or 0
 	local infoDisabledFlag = settingsCache and settingsCache.infoDisabled and 1 or 0
+	local availableWidth = GetAvailableRowWidth(friendsList)
 
 	if type(friend) == "table" then
 		if
@@ -110,13 +168,15 @@ local function GetRowCacheVersions(friend, friendsList, FriendTags)
 			and friend._bflTagChipsVersionSettingsVersion == settingsVersion
 			and friend._bflTagChipsVersionCompactMode == compactModeFlag
 			and friend._bflTagChipsVersionInfoDisabled == infoDisabledFlag
+			and friend._bflTagChipsVersionAvailableWidth == availableWidth
 		then
 			return friendsVersion,
 				tagsDefinitionVersion,
 				friend._bflTagChipsVersionTagsAssignmentVersion or 0,
 				settingsVersion,
 				compactModeFlag,
-				infoDisabledFlag
+				infoDisabledFlag,
+				availableWidth
 		end
 	end
 
@@ -131,6 +191,7 @@ local function GetRowCacheVersions(friend, friendsList, FriendTags)
 		friend._bflTagChipsVersionSettingsVersion = settingsVersion
 		friend._bflTagChipsVersionCompactMode = compactModeFlag
 		friend._bflTagChipsVersionInfoDisabled = infoDisabledFlag
+		friend._bflTagChipsVersionAvailableWidth = availableWidth
 	end
 
 	return friendsVersion,
@@ -138,10 +199,11 @@ local function GetRowCacheVersions(friend, friendsList, FriendTags)
 		tagsAssignmentVersion,
 		settingsVersion,
 		compactModeFlag,
-		infoDisabledFlag
+		infoDisabledFlag,
+		availableWidth
 end
 
-local function RowDataMatches(data, friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactMode, infoDisabled)
+local function RowDataMatches(data, friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactMode, infoDisabled, availableWidth)
 	return data
 		and data.cacheFriendsVersion == friendsVersion
 		and data.cacheTagsDefinitionVersion == tagsDefinitionVersion
@@ -149,9 +211,10 @@ local function RowDataMatches(data, friendsVersion, tagsDefinitionVersion, tagsA
 		and data.cacheSettingsVersion == settingsVersion
 		and data.cacheCompactMode == compactMode
 		and data.cacheInfoDisabled == infoDisabled
+		and data.availableWidth == availableWidth
 end
 
-local function CreateRowData(friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactMode, infoDisabled)
+local function CreateRowData(friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactMode, infoDisabled, availableWidth)
 	return {
 		cacheFriendsVersion = friendsVersion,
 		cacheTagsDefinitionVersion = tagsDefinitionVersion,
@@ -159,11 +222,13 @@ local function CreateRowData(friendsVersion, tagsDefinitionVersion, tagsAssignme
 		cacheSettingsVersion = settingsVersion,
 		cacheCompactMode = compactMode,
 		cacheInfoDisabled = infoDisabled,
+		availableWidth = availableWidth,
 		canRender = false,
 		height = 0,
 		compactMode = nil,
 		iconOnly = false,
 		maxChips = 0,
+		lineCount = 0,
 		renderableTags = EMPTY_TABLE,
 	}
 end
@@ -190,8 +255,8 @@ local function ReleaseRenderableTags(data)
 	end
 end
 
-local function ResetRowData(data, friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactMode, infoDisabled)
-	data = data or CreateRowData(friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactMode, infoDisabled)
+local function ResetRowData(data, friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactMode, infoDisabled, availableWidth)
+	data = data or CreateRowData(friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactMode, infoDisabled, availableWidth)
 	ReleaseRenderableTags(data)
 	data.cacheFriendsVersion = friendsVersion
 	data.cacheTagsDefinitionVersion = tagsDefinitionVersion
@@ -199,11 +264,13 @@ local function ResetRowData(data, friendsVersion, tagsDefinitionVersion, tagsAss
 	data.cacheSettingsVersion = settingsVersion
 	data.cacheCompactMode = compactMode
 	data.cacheInfoDisabled = infoDisabled
+	data.availableWidth = availableWidth
 	data.canRender = false
 	data.height = 0
 	data.compactMode = nil
 	data.iconOnly = false
 	data.maxChips = 0
+	data.lineCount = 0
 	data.renderableTags = EMPTY_TABLE
 	return data
 end
@@ -243,8 +310,142 @@ local function CanRenderRow(friend, friendsList, FriendTags)
 	return compactMode ~= "hidden"
 end
 
+local function GetIconZoom(profile)
+	if type(profile) ~= "table" or profile.iconZoom == nil or profile.iconZoom == false then
+		return nil
+	end
+	if profile.iconZoom == true then
+		return BLIZZARD_PICKER_ICON_ZOOM
+	end
+	local zoom = tonumber(profile.iconZoom)
+	return zoom and math.max(0, math.min(0.45, zoom)) or nil
+end
+
+local function ApplyZoomedTexCoord(texture, texCoord, zoom)
+	local left = type(texCoord) == "table" and (tonumber(texCoord[1]) or 0) or 0
+	local right = type(texCoord) == "table" and (tonumber(texCoord[2]) or 1) or 1
+	local top = type(texCoord) == "table" and (tonumber(texCoord[3]) or 0) or 0
+	local bottom = type(texCoord) == "table" and (tonumber(texCoord[4]) or 1) or 1
+	zoom = tonumber(zoom) or BLIZZARD_PICKER_ICON_ZOOM
+	local width = right - left
+	local height = bottom - top
+	texture:SetTexCoord(left + (width * zoom), right - (width * zoom), top + (height * zoom), bottom - (height * zoom))
+end
+
+local function ApplyZoomedAtlas(texture, profile, zoom)
+	if not (texture and type(profile) == "table" and profile.iconType == "atlas" and BFL.GetAtlasInfo) then
+		return false
+	end
+	local atlasNames = { profile.iconValue or false, profile.atlas or false, profile.fallbackAtlas or false }
+	local seen = {}
+	for _, atlasName in ipairs(atlasNames) do
+		if type(atlasName) == "string" and atlasName ~= "" and not seen[atlasName] then
+			seen[atlasName] = true
+			local info = BFL.GetAtlasInfo(atlasName)
+			local textureFile = info and (info.file or info.filename)
+			if textureFile then
+				texture:SetTexture(textureFile)
+				ApplyZoomedTexCoord(texture, {
+					info.leftTexCoord,
+					info.rightTexCoord,
+					info.topTexCoord,
+					info.bottomTexCoord,
+				}, zoom)
+				texture:Show()
+				return true
+			end
+		end
+	end
+	return false
+end
+
 local function ApplyIcon(texture, profile)
-	return BFL.ApplyIconProfile and BFL.ApplyIconProfile(texture, profile) or false
+	if not (texture and type(profile) == "table") then
+		return false
+	end
+	local iconZoom = GetIconZoom(profile)
+	-- Zoom is opt-in profile metadata: picker Blizzard icons use the shared
+	-- default, while selected map-legend defaults can provide an exact crop.
+	if iconZoom and ApplyZoomedAtlas(texture, profile, iconZoom) then
+		return true
+	end
+	local applied = BFL.ApplyIconProfile and BFL.ApplyIconProfile(texture, profile) or false
+	if applied and iconZoom and profile.iconType ~= "atlas" then
+		ApplyZoomedTexCoord(texture, profile.texCoord, iconZoom)
+	end
+	return applied
+end
+
+local function CreateChip(parent)
+	local chip = CreateFrame("Frame", nil, parent)
+	chip:SetHeight(CHIP_HEIGHT)
+	chip:EnableMouse(false)
+	chip.pillBorder = CreatePillLayer(chip, "BACKGROUND", 0)
+	chip.pillBackground = CreatePillLayer(chip, "BORDER", CHIP_BORDER_INSET)
+
+	chip.icon = chip:CreateTexture(nil, "ARTWORK")
+	chip.icon:SetSize(11, 11)
+	chip.icon:SetPoint("LEFT", chip, "LEFT", 4, 0)
+
+	chip.label = chip:CreateFontString(nil, "OVERLAY")
+	ApplyFont(chip.label)
+	chip.label:SetPoint("LEFT", chip.icon, "RIGHT", 3, 0)
+	chip.label:SetPoint("RIGHT", chip, "RIGHT", -5, 0)
+	chip:Hide()
+	return chip
+end
+
+local function UpdateChipVisual(chip, profile, labelText, options)
+	if not chip then
+		return 0, false
+	end
+	profile = type(profile) == "table" and profile or {}
+	options = options or {}
+	labelText = tostring(labelText or "")
+
+	local r, g, b, a = CopyColor(profile.color, { r = 0.50, g = 0.78, b = 1.00, a = 1 })
+	local tr, tg, tb, ta = CopyColor(profile.textColor, { r = 1, g = 1, b = 1, a = 1 })
+	SetPillColor(chip.pillBorder, 0, 0, 0, 1)
+	-- The fill remains opaque enough to preserve the configured color while the
+	-- one-pixel inset reveals the black outline underneath it.
+	SetPillColor(chip.pillBackground, r, g, b, math.min(0.94, a))
+	chip.label:SetTextColor(tr, tg, tb, ta)
+	chip.label:SetText(labelText)
+
+	local hasIcon = options.allowIcon ~= false and (profile.iconValue or profile.icon or profile.texture or profile.atlas)
+	if hasIcon then
+		hasIcon = ApplyIcon(chip.icon, profile)
+	end
+	local bareIcon = labelText == "" and hasIcon == true and options.overflow ~= true
+	chip.bareIcon = bareIcon
+	SetPillShown(chip.pillBorder, not bareIcon)
+	SetPillShown(chip.pillBackground, not bareIcon)
+	chip.label:SetShown(not bareIcon)
+	chip.icon:ClearAllPoints()
+	chip.label:ClearAllPoints()
+	if bareIcon then
+		chip.icon:SetSize(CHIP_HEIGHT, CHIP_HEIGHT)
+		chip.icon:SetPoint("CENTER", chip, "CENTER", 0, 0)
+	elseif hasIcon then
+		chip.icon:SetSize(11, 11)
+		chip.icon:SetPoint("LEFT", chip, "LEFT", 4, 0)
+		chip.label:SetPoint("LEFT", chip.icon, "RIGHT", 3, 0)
+		chip.label:SetPoint("RIGHT", chip, "RIGHT", -5, 0)
+	else
+		chip.icon:Hide()
+		chip.icon:SetSize(11, 11)
+		chip.icon:SetPoint("LEFT", chip, "LEFT", 4, 0)
+		chip.label:SetPoint("LEFT", chip, "LEFT", 6, 0)
+		chip.label:SetPoint("RIGHT", chip, "RIGHT", -6, 0)
+	end
+
+	local desiredWidth = GetDesiredChipWidth(labelText, hasIcon == true, options.overflow == true)
+	if options.maxWidth then
+		desiredWidth = math.min(desiredWidth, options.maxWidth)
+	end
+	chip:SetWidth(desiredWidth)
+	chip:Show()
+	return desiredWidth, hasIcon == true
 end
 
 function TagChips:EnsureRow(button)
@@ -262,23 +463,7 @@ function TagChips:EnsureRow(button)
 	row.chips = {}
 
 	for index = 1, MAX_RENDERED_CHIPS do
-		local chip = CreateFrame("Frame", nil, row)
-		chip:SetHeight(CHIP_HEIGHT)
-		chip:EnableMouse(false)
-		chip.pillBorder = CreatePillLayer(chip, "BACKGROUND", 0)
-		chip.pillBackground = CreatePillLayer(chip, "BORDER", CHIP_BORDER_INSET)
-		chip:Hide()
-
-		chip.icon = chip:CreateTexture(nil, "ARTWORK")
-		chip.icon:SetSize(10, 10)
-		chip.icon:SetPoint("LEFT", chip, "LEFT", 4, 0)
-
-		chip.label = chip:CreateFontString(nil, "OVERLAY")
-		ApplyFont(chip.label)
-		chip.label:SetPoint("LEFT", chip.icon, "RIGHT", 3, 0)
-		chip.label:SetPoint("RIGHT", chip, "RIGHT", -5, 0)
-
-		row.chips[index] = chip
+		row.chips[index] = CreateChip(row)
 	end
 
 	button.friendTagRow = row
@@ -287,14 +472,14 @@ end
 
 function TagChips:GetRowData(friend, friendsList)
 	local FriendTags = GetFriendTags()
-	local friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag =
+	local friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag, availableWidth =
 		GetRowCacheVersions(friend, friendsList, FriendTags)
 	local data
 	local useFriendCache = type(friend) == "table"
 
 	if useFriendCache then
 		data = friend._bflTagChipsRowData
-		if RowDataMatches(data, friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag) then
+		if RowDataMatches(data, friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag, availableWidth) then
 			return data
 		end
 	else
@@ -306,12 +491,12 @@ function TagChips:GetRowData(friend, friendsList)
 			cacheKey = tostring(cacheKey or "")
 		end
 		data = self.scalarRowCache[cacheKey]
-		if RowDataMatches(data, friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag) then
+		if RowDataMatches(data, friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag, availableWidth) then
 			return data
 		end
 	end
 
-	data = ResetRowData(data, friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag)
+	data = ResetRowData(data, friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag, availableWidth)
 	if useFriendCache then
 		friend._bflTagChipsRowData = data
 	else
@@ -333,8 +518,8 @@ function TagChips:GetRowData(friend, friendsList)
 
 	local compactMode = GetCompactRowMode(friendsList, FriendTags)
 	local iconOnly = compactMode == "icon_only"
-	local maxChips = iconOnly and 2 or (tonumber(FriendTags:GetSetting("maxRowChips", 3)) or 3)
-	maxChips = math.max(1, math.min(maxChips, MAX_RENDERED_CHIPS - 1))
+	local maxChips = tonumber(FriendTags:GetSetting("maxRowChips", 3)) or 3
+	maxChips = math.max(1, math.min(maxChips, MAX_ROW_CHIPS))
 
 	local renderableTags = data.renderableTags
 	if renderableTags == EMPTY_TABLE then
@@ -366,7 +551,28 @@ function TagChips:GetRowData(friend, friendsList)
 	end
 
 	data.canRender = true
-	data.height = CHIP_HEIGHT + ROW_GAP
+	local visibleCount = math.min(#renderableTags, maxChips)
+	local renderCount = visibleCount + (#renderableTags > visibleCount and 1 or 0)
+	local cursorX = 0
+	local chipsOnLine = 0
+	local lineCount = 1
+	for index = 1, renderCount do
+		local overflow = index > visibleCount
+		local entry = renderableTags[index]
+		local profile = not overflow and entry and entry.profile or nil
+		local labelText = overflow and string.format("+%d", #renderableTags - visibleCount) or (entry and entry.labelText or "")
+		local hasIcon = not overflow and profile and (profile.iconValue or profile.icon or profile.texture or profile.atlas) ~= nil
+		local desiredWidth = math.min(GetDesiredChipWidth(labelText, hasIcon == true, overflow), availableWidth)
+		if chipsOnLine >= CHIPS_PER_LINE or (chipsOnLine > 0 and cursorX + desiredWidth > availableWidth) then
+			lineCount = lineCount + 1
+			cursorX = 0
+			chipsOnLine = 0
+		end
+		cursorX = cursorX + desiredWidth + CHIP_GAP
+		chipsOnLine = chipsOnLine + 1
+	end
+	data.lineCount = lineCount
+	data.height = (data.lineCount * CHIP_HEIGHT) + (data.lineCount * ROW_GAP)
 	data.compactMode = compactMode
 	data.iconOnly = iconOnly
 	data.maxChips = maxChips
@@ -400,9 +606,9 @@ end
 function TagChips:UpdateRowChips(button, friend, friendsList, rowData)
 	if rowData then
 		local FriendTags = GetFriendTags()
-		local friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag =
+		local friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag, availableWidth =
 			GetRowCacheVersions(friend, friendsList, FriendTags)
-		if not RowDataMatches(rowData, friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag) then
+		if not RowDataMatches(rowData, friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag, availableWidth) then
 			rowData = nil
 		end
 	end
@@ -427,10 +633,12 @@ function TagChips:UpdateRowChips(button, friend, friendsList, rowData)
 	local anchor = self:GetRowAnchor(button)
 	row:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -ROW_GAP)
 	row:SetPoint("RIGHT", button, "RIGHT", -80, 0)
-	row:SetHeight(CHIP_HEIGHT)
+	row:SetHeight(rowData.height - ROW_GAP)
 
-	local availableWidth = math.max(36, (button:GetWidth() or 0) - (button.textLeftInset or 44) - 84)
+	local availableWidth = rowData.availableWidth or GetAvailableRowWidth(friendsList)
 	local cursorX = 0
+	local lineIndex = 0
+	local chipsOnLine = 0
 
 	for index = 1, MAX_RENDERED_CHIPS do
 		local chip = row.chips[index]
@@ -447,46 +655,20 @@ function TagChips:UpdateRowChips(button, friend, friendsList, rowData)
 				profile = entry.profile or tag and tag.chipProfile or {}
 			end
 
-			local r, g, b, a = CopyColor(profile.color, { r = 0.50, g = 0.78, b = 1.00, a = 1 })
-			local tr, tg, tb, ta = CopyColor(profile.textColor, { r = 1, g = 1, b = 1, a = 1 })
-			SetPillColor(chip.pillBorder, r, g, b, 0.95)
-			SetPillColor(chip.pillBackground, r, g, b, math.min(0.34, a))
-			chip.label:SetTextColor(tr, tg, tb, ta)
-			chip.label:SetText(labelText)
-
-			local hasIcon = (profile.iconValue or profile.icon) and index <= visibleCount
-			if hasIcon then
-				hasIcon = ApplyIcon(chip.icon, profile)
+			local desiredWidth = UpdateChipVisual(chip, profile, labelText, {
+				allowIcon = index <= visibleCount,
+				overflow = index > visibleCount,
+				maxWidth = availableWidth,
+			})
+			if chipsOnLine >= CHIPS_PER_LINE or (chipsOnLine > 0 and cursorX + desiredWidth > availableWidth) then
+				lineIndex = lineIndex + 1
+				cursorX = 0
+				chipsOnLine = 0
 			end
-			if hasIcon then
-				chip.label:ClearAllPoints()
-				chip.label:SetPoint("LEFT", chip.icon, "RIGHT", 3, 0)
-				chip.label:SetPoint("RIGHT", chip, "RIGHT", -5, 0)
-			else
-				chip.icon:Hide()
-				chip.label:ClearAllPoints()
-				chip.label:SetPoint("LEFT", chip, "LEFT", 6, 0)
-				chip.label:SetPoint("RIGHT", chip, "RIGHT", -6, 0)
-			end
-
-			local labelWidth = chip.label:GetStringWidth() or 0
-			local desiredWidth
-			if index > visibleCount then
-				desiredWidth = OVERFLOW_WIDTH
-			elseif labelText == "" and hasIcon then
-				desiredWidth = 22
-			else
-				desiredWidth = math.min(CHIP_MAX_WIDTH, math.max(26, labelWidth + (hasIcon and 24 or 14)))
-			end
-			if cursorX + desiredWidth > availableWidth and index > 1 then
-				chip:Hide()
-			else
-				chip:ClearAllPoints()
-				chip:SetPoint("LEFT", row, "LEFT", cursorX, 0)
-				chip:SetWidth(desiredWidth)
-				chip:Show()
-				cursorX = cursorX + desiredWidth + CHIP_GAP
-			end
+			chip:ClearAllPoints()
+			chip:SetPoint("TOPLEFT", row, "TOPLEFT", cursorX, -(lineIndex * (CHIP_HEIGHT + ROW_GAP)))
+			cursorX = cursorX + desiredWidth + CHIP_GAP
+			chipsOnLine = chipsOnLine + 1
 		else
 			chip:Hide()
 		end
@@ -494,6 +676,17 @@ function TagChips:UpdateRowChips(button, friend, friendsList, rowData)
 
 	row:Show()
 	return true
+end
+
+function TagChips:CreateStandaloneChip(parent)
+	return parent and CreateChip(parent) or nil
+end
+
+function TagChips:UpdateStandaloneChip(chip, profile, labelText, maxWidth)
+	return UpdateChipVisual(chip, profile, labelText, {
+		allowIcon = true,
+		maxWidth = maxWidth or STANDALONE_CHIP_MAX_WIDTH,
+	})
 end
 
 return TagChips

@@ -80,6 +80,61 @@ local FrameInitializer = {
 	initialized = false,
 }
 
+local function GetHeaderDropdownTextRegion(dropdown)
+	if not dropdown then
+		return nil
+	end
+	local text = dropdown.Text or dropdown.TextRegion or dropdown.SelectionText
+	if text then
+		return text
+	end
+	local dropdownName = dropdown.GetName and dropdown:GetName()
+	return dropdownName and _G[dropdownName .. "Text"] or nil
+end
+
+function FrameInitializer:AlignHeaderDropdownSelection(dropdown)
+	local text = GetHeaderDropdownTextRegion(dropdown)
+	if not text then
+		return false
+	end
+
+	text:ClearAllPoints()
+	if IsModernDropdown(dropdown) then
+		-- WowStyle1DropdownTemplate anchors its text to TOP with a fixed offset.
+		-- These compact icon-only controls need a centered region instead.
+		text:SetPoint("LEFT", dropdown, "LEFT", 4, 0)
+		text:SetPoint("RIGHT", dropdown, "RIGHT", -20, 0)
+	else
+		-- UIDropDownMenuTemplate normally places selected text two pixels above
+		-- center. Keep Blizzard's horizontal center within the middle artwork,
+		-- but remove that vertical offset for the compact BFL header controls.
+		local dropdownName = dropdown.GetName and dropdown:GetName()
+		local middle = dropdown.Middle or (dropdownName and _G[dropdownName .. "Middle"])
+		text:SetPoint("CENTER", middle or dropdown, "CENTER", middle and -5 or -10, 0)
+	end
+	text:SetJustifyH("CENTER")
+	if text.SetJustifyV then
+		text:SetJustifyV("MIDDLE")
+	end
+	if text.SetWordWrap then
+		text:SetWordWrap(false)
+	end
+	return true
+end
+
+function FrameInitializer:AlignLegacyHeaderDropdownSelection(dropdown)
+	if UsesModernFriendsUI() then
+		return false
+	end
+	return self:AlignHeaderDropdownSelection(dropdown)
+end
+
+function FrameInitializer:AlignStatusDropdownSelection(dropdown)
+	-- Status remains visible in both BFL styles, so it uses the same centered
+	-- compact-selection contract in Modern and Legacy.
+	return self:AlignHeaderDropdownSelection(dropdown)
+end
+
 -- Current sort mode tracking (for Sort Dropdown)
 local currentSortMode = "status"
 
@@ -174,7 +229,7 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 			end
 			return string.format("|T%s.tga:%d:%d:0:0|t", status or FRIENDS_TEXTURE_ONLINE, iconSize, iconSize)
 		end
-		return string.format("|T%s.tga:14:14:-2:-2|t", status or FRIENDS_TEXTURE_ONLINE)
+		return string.format("|T%s.tga:14:14:0:0|t", status or FRIENDS_TEXTURE_ONLINE)
 	end
 	local function IsSelected(status)
 		return bnStatus == status
@@ -211,8 +266,10 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 			if dropdown.GenerateMenu then
 				dropdown:GenerateMenu()
 			end
+			self:AlignStatusDropdownSelection(dropdown)
 		else
 			BFL.SetDropdownText(dropdown, GetStatusSelectionText(bnStatus))
+			self:AlignLegacyHeaderDropdownSelection(dropdown)
 		end
 	end
 	dropdown.BFLRefreshStatus = RefreshStatus
@@ -229,6 +286,7 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 
 		-- Set initial selected text with smaller icon and left offset
 		BFL.SetDropdownText(dropdown, GetStatusSelectionText(bnStatus))
+		self:AlignLegacyHeaderDropdownSelection(dropdown)
 
 		-- Restore text on show (Fix for "..." when switching tabs)
 		-- We use C_Timer.After to ensure this runs AFTER any default layout logic that might clear our text
@@ -275,6 +333,7 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 	if dropdown.GenerateMenu then
 		dropdown:GenerateMenu()
 	end
+	self:AlignStatusDropdownSelection(dropdown)
 
 	-- Set up tooltip
 	dropdown:SetScript("OnEnter", function()
@@ -327,7 +386,8 @@ local SORT_NAMES = {
 local function FormatIconText(iconData, text)
 	-- Check if it's a texture path (starts with "Interface")
 	if type(iconData) == "number" or (type(iconData) == "string" and iconData:match("^Interface")) then
-		return string.format("\124T%s:16:16:0:0\124t %s", iconData, text)
+		local markup = BFL.FormatIcon and BFL.FormatIcon(iconData, 16) or string.format("\124T%s:16:16:0:0\124t", iconData)
+		return markup .. " " .. text
 	else
 		-- Font Awesome icon - use directly with color
 		return string.format("|cFF00CCFF%s|r %s", iconData, text)
@@ -337,7 +397,7 @@ end
 -- Helper: Format icon only for dropdown button
 local function FormatIconOnly(iconData)
 	if type(iconData) == "number" or (type(iconData) == "string" and iconData:match("^Interface")) then
-		return string.format("\124T%s:16:16:0:0\124t", iconData)
+		return BFL.FormatIcon and BFL.FormatIcon(iconData, 16) or string.format("\124T%s:16:16:0:0\124t", iconData)
 	else
 		-- Font Awesome icon
 		return string.format("|cFF00CCFF%s|r", iconData)
@@ -397,7 +457,7 @@ function FrameInitializer:InitializeSortDropdown(frame)
 	local optionValues = { "status", "name", "level", "zone" }
 	local function GetSortSelectionText(sortMode)
 		local icon = SORT_ICONS[sortMode] or SORT_ICONS.status
-		return string.format("|T%s:14:14:-2:-2|t", icon)
+		return BFL.FormatIcon and BFL.FormatIcon(icon, 14) or string.format("|T%s:14:14:0:0|t", icon)
 	end
 	local function IsSelected(sortMode)
 		return currentSortMode == sortMode
@@ -427,7 +487,11 @@ function FrameInitializer:InitializeSortDropdown(frame)
 
 		-- Set initial selected text
 		local currentIcon = SORT_ICONS[currentSortMode] or SORT_ICONS.status
-		BFL.SetDropdownText(dropdown, string.format("|T%s:14:14:-2:-2|t", currentIcon))
+		BFL.SetDropdownText(
+			dropdown,
+			BFL.FormatIcon and BFL.FormatIcon(currentIcon, 14) or string.format("|T%s:14:14:0:0|t", currentIcon)
+		)
+		self:AlignLegacyHeaderDropdownSelection(dropdown)
 
 		-- Setup tooltip for Classic
 		-- Hook button as it consumes mouse events
@@ -468,6 +532,7 @@ function FrameInitializer:InitializeSortDropdown(frame)
 	if dropdown.GenerateMenu then
 		dropdown:GenerateMenu()
 	end
+	self:AlignLegacyHeaderDropdownSelection(dropdown)
 
 	-- Set up tooltip
 	dropdown:SetScript("OnEnter", function()
@@ -507,7 +572,8 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 			BFL.SetDropdownWidth(primaryDropdown, 70)
 		end
 		local function GetIconText(sortMode)
-			return string.format("|T%s:14:14:-2:-2|t", GetSorterIcon(sortMode))
+			return BFL.FormatIcon and BFL.FormatIcon(GetSorterIcon(sortMode), 14)
+				or string.format("|T%s:14:14:-2:-2|t", GetSorterIcon(sortMode))
 		end
 
 		local function GetSortDB()
@@ -519,11 +585,13 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 			local labels = {}
 			local values = {}
 			if includeNone then
-				table.insert(labels, string.format("|T%s:14:14:0:0|t %s", SORT_ICONS.none, L.SORT_NONE))
+				table.insert(labels, GetIconText("none") .. " " .. L.SORT_NONE)
 				table.insert(values, "none")
 			end
 			for _, sorter in ipairs(GetVisibleSorters()) do
-				table.insert(labels, string.format("|T%s:14:14:0:0|t %s", sorter.icon, sorter.name))
+				local icon = BFL.FormatIcon and BFL.FormatIcon(sorter.icon, 14)
+					or string.format("|T%s:14:14:0:0|t", sorter.icon)
+				table.insert(labels, icon .. " " .. sorter.name)
 				table.insert(values, sorter.id)
 			end
 			return {
@@ -573,6 +641,8 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 			currentSecondary = "none"
 		end
 		BFL.SetDropdownText(secondaryDropdown, GetIconText(currentSecondary))
+		self:AlignLegacyHeaderDropdownSelection(primaryDropdown)
+		self:AlignLegacyHeaderDropdownSelection(secondaryDropdown)
 
 		-- Setup tooltips for Classic
 		-- Hook buttons as they consume mouse events
@@ -694,6 +764,7 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 	if primaryDropdown.GenerateMenu then
 		primaryDropdown:GenerateMenu()
 	end
+	self:AlignLegacyHeaderDropdownSelection(primaryDropdown)
 
 	primaryDropdown:SetScript("OnEnter", function()
 		local GuildFrame = GetActiveGuildFrame()
@@ -746,6 +817,7 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 	if secondaryDropdown.GenerateMenu then
 		secondaryDropdown:GenerateMenu()
 	end
+	self:AlignLegacyHeaderDropdownSelection(secondaryDropdown)
 
 	secondaryDropdown:SetScript("OnEnter", function()
 		local sortName = GetSorterName(FriendsList.secondarySort)
@@ -785,13 +857,16 @@ function FrameInitializer:InitializeTabs(frame)
 		PanelTemplates_SetNumTabs(frame.FriendsTabHeader, 1)
 		PanelTemplates_SetTab(frame.FriendsTabHeader, 1)
 	else
-		-- Retail: Set up the tabs on the FriendsTabHeader
-		-- Base tabs: Friends, Recent Allies, RAF. Guild tab (Tab4) added conditionally.
-		local enableGuildTab = BFL.IsGuildTabEnabled and BFL:IsGuildTabEnabled()
-		local numTopTabs = enableGuildTab and 4 or 3
-		PanelTemplates_SetNumTabs(frame.FriendsTabHeader, numTopTabs)
-		PanelTemplates_SetTab(frame.FriendsTabHeader, 1)
-		PanelTemplates_UpdateTabs(frame.FriendsTabHeader)
+		local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+		if FriendsUI and FriendsUI.RestoreLegacyTabs and not FriendsUI:IsModernActive() then
+			FriendsUI:RestoreLegacyTabs(true)
+		else
+			-- Modern owns its side tabs, but the underlying Legacy registry still
+			-- needs a valid selection for section routing during initialization.
+			PanelTemplates_SetNumTabs(frame.FriendsTabHeader, 4)
+			PanelTemplates_SetTab(frame.FriendsTabHeader, 1)
+			PanelTemplates_UpdateTabs(frame.FriendsTabHeader)
+		end
 	end
 end
 

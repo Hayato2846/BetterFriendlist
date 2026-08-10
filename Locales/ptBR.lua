@@ -124,7 +124,7 @@ BFL:RegisterLocale("ptBR", function()
 	L.FRIEND_TAGS_SETTINGS_TOOLTIPS_DESC = "Inclui as etiquetas dos amigos nas seções Notas e etiquetas."
 	L.FRIEND_TAGS_SETTINGS_MAX_TOOLTIP_CHIPS = "Máximo de etiquetas nas dicas"
 	L.FRIEND_TAGS_SETTINGS_MAX_TOOLTIP_CHIPS_DESC = "Limita quantas etiquetas aparecem nas dicas de Notas e etiquetas."
-	L.FRIEND_TAGS_SETTINGS_SEARCH = "Busca e privacidade"
+	L.FRIEND_TAGS_SETTINGS_SEARCH = "Busca e menus"
 	L.FRIEND_TAGS_SETTINGS_SEARCH_BLIZZARD = "Buscar etiquetas da Blizzard"
 	L.FRIEND_TAGS_SETTINGS_SEARCH_BLIZZARD_DESC = "Permite que a busca de amigos encontre etiquetas compatíveis com a Blizzard."
 	L.FRIEND_TAGS_SETTINGS_SEARCH_CUSTOM = "Buscar etiquetas personalizadas"

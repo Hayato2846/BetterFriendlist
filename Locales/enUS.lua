@@ -48,7 +48,7 @@ local function LoadEnUS()
 	L.FRIEND_TAGS_SETTINGS_TOOLTIPS_DESC = "Include friend tags in Notes & Tags tooltip sections."
 	L.FRIEND_TAGS_SETTINGS_MAX_TOOLTIP_CHIPS = "Maximum Tooltip Tags"
 	L.FRIEND_TAGS_SETTINGS_MAX_TOOLTIP_CHIPS_DESC = "Limits how many tags are listed in Notes & Tags tooltips."
-	L.FRIEND_TAGS_SETTINGS_SEARCH = "Search & Privacy"
+	L.FRIEND_TAGS_SETTINGS_SEARCH = "Search & Menus"
 	L.FRIEND_TAGS_SETTINGS_SEARCH_BLIZZARD = "Search Blizzard Tags"
 	L.FRIEND_TAGS_SETTINGS_SEARCH_BLIZZARD_DESC = "Let friend list search match Blizzard-compatible tags."
 	L.FRIEND_TAGS_SETTINGS_SEARCH_CUSTOM = "Search Custom Tags"

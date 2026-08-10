@@ -45,7 +45,7 @@ BFL:RegisterLocale("deDE", function()
 	L.FRIEND_TAGS_SETTINGS_TOOLTIPS_DESC = "Zeigt Freund-Tags in Notizen-&-Tags-Tooltip-Abschnitten."
 	L.FRIEND_TAGS_SETTINGS_MAX_TOOLTIP_CHIPS = "Maximale Tooltip-Tags"
 	L.FRIEND_TAGS_SETTINGS_MAX_TOOLTIP_CHIPS_DESC = "Begrenzt, wie viele Tags in Notizen-&-Tags-Tooltips gelistet werden."
-	L.FRIEND_TAGS_SETTINGS_SEARCH = "Suche & Datenschutz"
+	L.FRIEND_TAGS_SETTINGS_SEARCH = "Suche & Menues"
 	L.FRIEND_TAGS_SETTINGS_SEARCH_BLIZZARD = "Blizzard-Tags durchsuchen"
 	L.FRIEND_TAGS_SETTINGS_SEARCH_BLIZZARD_DESC = "Laesst die Freundeslisten-Suche Blizzard-kompatible Tags finden."
 	L.FRIEND_TAGS_SETTINGS_SEARCH_CUSTOM = "Eigene Tags durchsuchen"
