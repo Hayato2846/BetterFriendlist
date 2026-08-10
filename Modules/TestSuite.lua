@@ -5109,8 +5109,8 @@ local function RegisterBuiltInTests()
 				V:Assert(palette.preserveNativeGroupHeaders == true, "EUI palette should preserve Blizzard group headers")
 				V:Assert(palette.preserveNativeInviteButtons == true, "EUI palette should preserve Blizzard invite buttons")
 				V:Assert(palette.transparentBattleNetBar == true, "EUI palette should keep the Battle.net bar transparent")
-				V:AssertEqual(palette.portraitOffsetX, 8, "EUI portrait should keep the compact left inset")
-				V:AssertEqual(palette.portraitOffsetY, -24, "EUI portrait artwork should fill the Battle.net header strip")
+				V:AssertEqual(palette.portraitOffsetX, 6, "EUI portrait should keep the refined left inset")
+				V:AssertEqual(palette.portraitOffsetY, -25, "EUI portrait artwork should fill the Battle.net header strip")
 				V:AssertEqual(palette.portraitSize, 42, "EUI portrait should keep the compact themed size")
 				V:AssertEqual(palette.customTabInactiveMultiplier, 0.68, "EUI custom tabs should match inactive Blizzard luminance")
 				V:Assert(palette.background[4] < 0.5, "BFL content wash should not cover the EUI shell")
@@ -5156,6 +5156,9 @@ local function RegisterBuiltInTests()
 				function texture:SetPoint(...)
 					self.point = { ... }
 				end
+				function texture:ClearAllPoints()
+					self.point = nil
+				end
 				function texture:SetShown(shown)
 					self.shown = shown == true
 				end
@@ -5186,6 +5189,16 @@ local function RegisterBuiltInTests()
 					local texture = MakeTexture()
 					self.createdTexture = texture
 					return texture
+				end
+				function button:ClearAllPoints()
+					self.point = nil
+				end
+				function button:SetPoint(...)
+					self.point = { ... }
+				end
+				function button:SetSize(width, height)
+					self.width = width
+					self.height = height
 				end
 				return button
 			end
@@ -5343,6 +5356,10 @@ local function RegisterBuiltInTests()
 				)
 				V:AssertEqual(portrait.width, 42, "Legacy EUI logo should use the compact EUI header size")
 				V:Assert(portrait.shown == true, "Legacy EUI logo should be visible")
+				V:AssertEqual(frame.PortraitButton.point[1], "TOPLEFT", "Legacy EUI logo button should use the Modern anchor")
+				V:AssertEqual(frame.PortraitButton.point[2], frame, "Legacy EUI logo button should anchor to the main frame")
+				V:AssertEqual(frame.PortraitButton.point[4], 6, "Legacy EUI logo should match the Modern horizontal offset")
+				V:AssertEqual(frame.PortraitButton.point[5], -25, "Legacy EUI logo should match the Modern vertical offset")
 
 				local invite = {
 					AcceptButton = MakeButton(),

@@ -11,6 +11,9 @@ local EUI_FRIENDS_ROW = { 0, 0, 0, 0.10 }
 local EUI_FRIENDS_HOVER = { 1, 1, 1, 0.035 }
 local EUI_BATTLENET_TEXT = { 0.26, 0.68, 0.94, 1 }
 local BFL_PORTRAIT_TEXTURE = "Interface\\AddOns\\BetterFriendlist\\Textures\\PortraitIcon"
+local EUI_PORTRAIT_OFFSET_X = 6
+local EUI_PORTRAIT_OFFSET_Y = -25
+local EUI_PORTRAIT_SIZE = 42
 
 local function SafeCall(api, method, ...)
 	local callback = api and api[method]
@@ -230,9 +233,9 @@ function EllesmereUISkin:GetPalette()
 		preserveNativeGroupHeaders = true,
 		preserveNativeInviteButtons = true,
 		transparentBattleNetBar = true,
-		portraitOffsetX = 8,
-		portraitOffsetY = -24,
-		portraitSize = 42,
+		portraitOffsetX = EUI_PORTRAIT_OFFSET_X,
+		portraitOffsetY = EUI_PORTRAIT_OFFSET_Y,
+		portraitSize = EUI_PORTRAIT_SIZE,
 		customTabInactiveMultiplier = 0.68,
 		panel = panel,
 		panelSoft = Color(0, 0, 0, 0.12),
@@ -393,6 +396,15 @@ function EllesmereUISkin:SkinLegacyPortrait(frame)
 	if not self:IsSkinEnabled() or not portraitButton or not portraitButton.CreateTexture then
 		return
 	end
+	portraitButton:ClearAllPoints()
+	portraitButton:SetPoint(
+		"TOPLEFT",
+		frame,
+		"TOPLEFT",
+		EUI_PORTRAIT_OFFSET_X,
+		EUI_PORTRAIT_OFFSET_Y
+	)
+	portraitButton:SetSize(EUI_PORTRAIT_SIZE, EUI_PORTRAIT_SIZE)
 	local icon = portraitButton.BFL_EllesmerePortraitIcon
 	if not icon then
 		-- EUI's Shell primitive intentionally fades direct textures on the main
@@ -402,9 +414,10 @@ function EllesmereUISkin:SkinLegacyPortrait(frame)
 		portraitButton.BFL_EllesmerePortraitIcon = icon
 		icon:SetTexture(BFL_PORTRAIT_TEXTURE)
 		icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-		icon:SetSize(42, 42)
-		icon:SetPoint("CENTER", portraitButton, "CENTER", 0, 0)
 	end
+	icon:ClearAllPoints()
+	icon:SetPoint("TOPLEFT", portraitButton, "TOPLEFT", 0, 0)
+	icon:SetSize(EUI_PORTRAIT_SIZE, EUI_PORTRAIT_SIZE)
 	if icon.SetDesaturated then
 		icon:SetDesaturated(false)
 	end
