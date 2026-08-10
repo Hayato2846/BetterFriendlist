@@ -1562,8 +1562,9 @@ function FriendsUI:LayoutNavigationTabs(sectionIDs, themed)
 		return
 	end
 	if themed == nil then
-		local _
-		_, themed = self:GetModernThemeColors()
+		local palette
+		palette, themed = self:GetModernThemeColors()
+		themed = themed and not palette.preserveNativeSideTabs
 	end
 	local orderedSections = sectionIDs
 	if not orderedSections then
@@ -1644,7 +1645,7 @@ function FriendsUI:RefreshNavigation()
 		end
 	end
 	local palette, themed = self:GetModernThemeColors()
-	self:LayoutNavigationTabs(availableSections, themed)
+	self:LayoutNavigationTabs(availableSections, themed and not palette.preserveNativeSideTabs)
 	if
 		self:IsModernActive()
 		and self.selectedSection
@@ -1703,7 +1704,7 @@ function FriendsUI:StartRequestGlow()
 	end
 	tab.BFL_RequestGlowActive = true
 	local palette, themed = self:GetModernThemeColors()
-	if themed and tab.ThemeGlowAnimation then
+	if themed and not palette.preserveNativeSideTabs and tab.ThemeGlowAnimation then
 		SetModernSideTabGlowTheme(tab, palette, true)
 	elseif tab.SetTabGlowAnimationPlaying then
 		tab:SetTabGlowAnimationPlaying(true)
@@ -4216,6 +4217,7 @@ function FriendsUI:ApplyTheme(theme)
 	end
 	if battleNetDisplay and battleNetDisplay.Background then
 		ApplyModernAtlasColor(battleNetDisplay.Background, palette.control, modernActive and themed)
+		SafeShow(battleNetDisplay.Background, not (modernActive and themed and palette.transparentBattleNetBar))
 	end
 	if themed then
 		ApplySolidTextureColor(self.root.TopFade, palette.surface)
@@ -4305,16 +4307,17 @@ function FriendsUI:ApplyTheme(theme)
 	ApplyThemedFontColor(self.root, self.root.FriendsDisabledText, palette.disabledText, themed)
 	ApplyThemedFontColor(self.root.RequestsFrame, self.root.RequestsFrame and self.root.RequestsFrame.EmptyLabel, palette.disabledText, themed)
 	ApplyThemedFontColor(warning, warning and warning.Text, palette.text, themed)
+	local skinSideTabs = themed and not palette.preserveNativeSideTabs
 	for _, definition in ipairs(SECTION_DEFINITIONS) do
 		local tab = definition.tab
 		if tab then
 			local selected = self.selectedSection == definition.id
-			ApplyModernSideTabTheme(tab, palette, themed, selected)
+			ApplyModernSideTabTheme(tab, skinSideTabs and palette or MODERN_BLIZZARD_THEME_COLORS, skinSideTabs, selected)
 			ApplySectionIcon(tab.Icon or tab.icon, definition, selected)
-			ApplyThemedFontColor(tab, tab.Count, palette.accent, themed)
+			ApplyThemedFontColor(tab, tab.Count, palette.accent, skinSideTabs)
 		end
 	end
-	self:LayoutNavigationTabs(nil, themed)
+	self:LayoutNavigationTabs(nil, skinSideTabs)
 	self:RefreshModernThemeRows()
 	if self:IsModernActive() and BetterFriendsFrame then
 		self:ApplyModernPortrait()
@@ -4392,7 +4395,8 @@ function FriendsUI:StyleFriendCard(button)
 	end
 	local actionButton = button.travelPassButton
 	if actionButton then
-		actionButton.BFL_DarkForceFlatButton = themed and true or nil
+		local skinInviteButton = themed and not palette.preserveNativeInviteButtons
+		actionButton.BFL_DarkForceFlatButton = skinInviteButton and true or nil
 		actionButton.friendData = friend
 		actionButton.friendIndex = friend and friend.index or nil
 		actionButton:SetSize(34, 34)
@@ -4402,15 +4406,15 @@ function FriendsUI:StyleFriendCard(button)
 		ApplyAtlasTexture(actionButton.PushedTexture, "common-button-tertiary-square-pressed")
 		ApplyAtlasTexture(actionButton.DisabledTexture, "common-button-tertiary-square-normal")
 		ApplyAtlasTexture(actionButton.HighlightTexture, "common-button-tertiary-square-normal")
-		SetTextureDesaturated(actionButton.NormalTexture, themed)
-		SetTextureDesaturated(actionButton.PushedTexture, themed)
-		SetTextureDesaturated(actionButton.DisabledTexture, themed)
-		SetTextureDesaturated(actionButton.HighlightTexture, themed)
-		local controlTint = themed and GetAtlasTint(palette.control) or MODERN_BLIZZARD_THEME_COLORS.control
+		SetTextureDesaturated(actionButton.NormalTexture, skinInviteButton)
+		SetTextureDesaturated(actionButton.PushedTexture, skinInviteButton)
+		SetTextureDesaturated(actionButton.DisabledTexture, skinInviteButton)
+		SetTextureDesaturated(actionButton.HighlightTexture, skinInviteButton)
+		local controlTint = skinInviteButton and GetAtlasTint(palette.control) or MODERN_BLIZZARD_THEME_COLORS.control
 		ApplyTextureColor(actionButton.NormalTexture, controlTint)
-		ApplyTextureColor(actionButton.PushedTexture, themed and GetAtlasTint(palette.selected) or controlTint)
+		ApplyTextureColor(actionButton.PushedTexture, skinInviteButton and GetAtlasTint(palette.selected) or controlTint)
 		ApplyTextureColor(actionButton.DisabledTexture, controlTint)
-		ApplyTextureColor(actionButton.HighlightTexture, themed and palette.hover or MODERN_BLIZZARD_THEME_COLORS.control)
+		ApplyTextureColor(actionButton.HighlightTexture, skinInviteButton and palette.hover or MODERN_BLIZZARD_THEME_COLORS.control)
 
 		local isInGroup = false
 		local playerGUID = friend and (friend.guid or (friend.gameAccountInfo and friend.gameAccountInfo.playerGuid))
@@ -4429,10 +4433,11 @@ function FriendsUI:StyleFriendCard(button)
 				atlas = atlas .. "-dis"
 			end
 			ApplyAtlasTexture(actionButton.ActionIcon, atlas)
-			SetTextureDesaturated(actionButton.ActionIcon, themed)
+			SetTextureDesaturated(actionButton.ActionIcon, skinInviteButton)
 			ApplyTextureColor(
 				actionButton.ActionIcon,
-				themed and (enabled and OpaqueThemeColor(palette.accent) or palette.disabledText) or MODERN_BLIZZARD_THEME_COLORS.control
+				skinInviteButton and (enabled and OpaqueThemeColor(palette.accent) or palette.disabledText)
+					or MODERN_BLIZZARD_THEME_COLORS.control
 			)
 		end
 		actionButton:Show()
@@ -4444,7 +4449,7 @@ function FriendsUI:StyleFriendCard(button)
 	end
 	-- FriendsList owns row height and the top-down text stack. Modern styling
 	-- must not replace that calculated extent with the old 70/46px presets.
-	if palette.friendsStyle then
+	if palette.skinFriendCardSurface then
 		local EllesmereUISkin = BFL:GetModule("EllesmereUISkin")
 		if EllesmereUISkin and EllesmereUISkin.SkinModernFriendCard then
 			EllesmereUISkin:SkinModernFriendCard(button)
@@ -4541,6 +4546,7 @@ function FriendsUI:StyleGroupHeader(button)
 	end
 	button:SetHeight(24)
 	local palette, themed = self:GetModernThemeColors()
+	local skinGroupHeader = themed and not palette.preserveNativeGroupHeaders
 	local collapsed = button.elementData and button.elementData.collapsed == true
 	SafeShow(button.RightArrow, false)
 	SafeShow(button.DownArrow, false)
@@ -4559,10 +4565,10 @@ function FriendsUI:StyleGroupHeader(button)
 	-- Preserve Blizzard's complete collapse/expand atlas, but multiply it into
 	-- the restrained dark tone used before the flat replacement. Dark/Custom
 	-- suppresses only the gold click highlight; the normal texture stays visible.
-	local nativeTone = themed and GetAtlasTint(palette.surface) or MODERN_BLIZZARD_THEME_COLORS.control
+	local nativeTone = skinGroupHeader and GetAtlasTint(palette.surface) or MODERN_BLIZZARD_THEME_COLORS.control
 	local normal = button:GetNormalTexture()
 	if normal then
-		normal:SetDesaturated(themed)
+		normal:SetDesaturated(skinGroupHeader)
 		ApplyTextureColor(normal, nativeTone)
 		normal:SetAlpha(1)
 	end
@@ -4570,22 +4576,16 @@ function FriendsUI:StyleGroupHeader(button)
 	if highlight then
 		highlight:SetDesaturated(false)
 		highlight:SetVertexColor(1, 1, 1, 1)
-		highlight:SetAlpha(themed and 0 or 0.4)
+		highlight:SetAlpha(skinGroupHeader and 0 or 0.4)
 	end
 	local pushed = button:GetPushedTexture()
 	if pushed then
-		pushed:SetDesaturated(themed)
+		pushed:SetDesaturated(skinGroupHeader)
 		ApplyTextureColor(pushed, nativeTone)
 		pushed:SetAlpha(1)
 	end
 	if button.ThemeTint then
 		button.ThemeTint:Hide()
-	end
-	if palette.friendsStyle then
-		local EllesmereUISkin = BFL:GetModule("EllesmereUISkin")
-		if EllesmereUISkin and EllesmereUISkin.SkinModernGroupHeader then
-			EllesmereUISkin:SkinModernGroupHeader(button)
-		end
 	end
 end
 

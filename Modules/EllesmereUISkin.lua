@@ -9,8 +9,6 @@ local SKIN_REGISTRATION_NAME = "BetterFriendlist"
 local EUI_FRIENDS_BACKGROUND = { 0.03, 0.045, 0.05, 1 }
 local EUI_FRIENDS_ROW = { 0, 0, 0, 0.10 }
 local EUI_FRIENDS_HOVER = { 1, 1, 1, 0.035 }
-local EUI_FRIENDS_HEADER_TEXT = { 0.72, 0.72, 0.72, 1 }
-local EUI_FRIENDS_HEADER_COUNT = { 0.58, 0.58, 0.58, 1 }
 local EUI_BATTLENET_TEXT = { 0.26, 0.68, 0.94, 1 }
 
 local function SafeCall(api, method, ...)
@@ -219,7 +217,11 @@ function EllesmereUISkin:GetPalette()
 		battleTagText = EUI_BATTLENET_TEXT,
 		externalShell = true,
 		externalControls = true,
-		friendsStyle = true,
+		skinFriendCardSurface = true,
+		preserveNativeSideTabs = true,
+		preserveNativeGroupHeaders = true,
+		preserveNativeInviteButtons = true,
+		transparentBattleNetBar = true,
 		panel = panel,
 		panelSoft = Color(0, 0, 0, 0.12),
 		controlHover = Color(1, 1, 1, 0.05),
@@ -237,14 +239,10 @@ function EllesmereUISkin:SkinModernFriendCard(button)
 	if not self:IsSkinEnabled() or not button then
 		return
 	end
-	local api = self.facade
-	SafeCall(api, "Font", button.Name or button.name)
-	SafeCall(api, "Font", button.Info or button.info)
-	SafeCall(api, "Font", button.Status or button.statusText)
 
 	-- EUIFriends uses a restrained 10% black tile rather than Blizzard's
-	-- sculpted friends-card atlas. Preserve BFL's faction mask and row geometry,
-	-- but exchange only the visible surface and hover treatment.
+	-- sculpted friends-card atlas. Exchange only the visible surface and hover
+	-- treatment; BFL continues to own row geometry, fonts, and action buttons.
 	if button.CardBackground then
 		button.CardBackground:SetAlpha(0)
 	end
@@ -262,62 +260,53 @@ function EllesmereUISkin:SkinModernFriendCard(button)
 		highlight:SetVertexColor(1, 1, 1, 1)
 		highlight:SetAlpha(1)
 	end
-	if button.travelPassButton then
-		SafeCall(api, "Button", button.travelPassButton, { "ActionIcon" })
-	end
 end
 
-function EllesmereUISkin:SkinModernGroupHeader(button)
-	if not self:IsSkinEnabled() or not button then
+local function HideNativeButtonChrome(button)
+	if not button then
 		return
 	end
-	local api = self.facade
-	SafeCall(api, "Panel", button, { inset = true })
-	for _, texture in ipairs({
-		button.GetNormalTexture and button:GetNormalTexture(),
-		button.GetPushedTexture and button:GetPushedTexture(),
-		button.GetHighlightTexture and button:GetHighlightTexture(),
-	}) do
-		if texture then
+	for _, getter in ipairs({ "GetNormalTexture", "GetPushedTexture", "GetDisabledTexture", "GetHighlightTexture" }) do
+		local callback = button[getter]
+		local texture = callback and callback(button)
+		if texture and texture.SetAlpha then
 			texture:SetAlpha(0)
 		end
 	end
-	SafeCall(api, "Font", button.HeaderText, unpack(EUI_FRIENDS_HEADER_TEXT))
-	SafeCall(api, "Font", button.CountText, unpack(EUI_FRIENDS_HEADER_COUNT))
-
-	local collapseButton = button.CollapseButton
-	local accentR, accentG, accentB = self:GetAccentColor()
-	for _, texture in ipairs({
-		collapseButton and collapseButton.GetNormalTexture and collapseButton:GetNormalTexture(),
-		collapseButton and collapseButton.GetPushedTexture and collapseButton:GetPushedTexture(),
+	-- Retail's SharedButtonTemplate calls its middle slice "Center" while the
+	-- public EUI primitive also supports the older "Middle" name. Suppress both
+	-- on every state transition so Blizzard cannot repaint red atlas slices over
+	-- the EUI button after the facade's idempotent first pass.
+	for _, key in ipairs({
+		"Left",
+		"Middle",
+		"Center",
+		"Right",
+		"LeftSeparator",
+		"RightSeparator",
+		"NormalTexture",
+		"PushedTexture",
+		"DisabledTexture",
+		"HighlightTexture",
 	}) do
-		if texture then
-			texture:SetDesaturated(true)
-			texture:SetVertexColor(accentR, accentG, accentB, 0.85)
+		local texture = button[key]
+		if texture and texture.SetAlpha then
+			texture:SetAlpha(0)
 		end
 	end
 end
 
-function EllesmereUISkin:SkinModernSideTabs(FriendsUI)
-	if not self:IsSkinEnabled() or not FriendsUI or not FriendsUI.GetSectionDefinitions then
+function EllesmereUISkin:SkinFooterActionButton(button)
+	if not self:IsSkinEnabled() or not button then
 		return
 	end
-	local api = self.facade
-	local accentR, accentG, accentB = self:GetAccentColor()
-	for _, definition in ipairs(FriendsUI:GetSectionDefinitions() or {}) do
-		local tab = definition.tab
-		if tab then
-			SafeCall(api, "Button", tab, { "Icon", "Count", "ThemeGlow" })
-			SafeCall(api, "Font", tab.Count, accentR, accentG, accentB)
-			if not tab.BFL_EllesmereSelectedBar then
-				local selectedBar = tab:CreateTexture(nil, "OVERLAY", nil, 7)
-				selectedBar:SetPoint("TOPLEFT", tab, "TOPLEFT", 1, -3)
-				selectedBar:SetPoint("BOTTOMLEFT", tab, "BOTTOMLEFT", 1, 3)
-				selectedBar:SetWidth(2)
-				tab.BFL_EllesmereSelectedBar = selectedBar
-			end
-			tab.BFL_EllesmereSelectedBar:SetColorTexture(accentR, accentG, accentB, 0.9)
-			tab.BFL_EllesmereSelectedBar:SetShown(FriendsUI.selectedSection == definition.id)
+	SafeCall(self.facade, "Button", button)
+	SafeCall(self.facade, "StateButtonLabel", button)
+	HideNativeButtonChrome(button)
+	if not button.BFL_EllesmereChromeHooks then
+		button.BFL_EllesmereChromeHooks = true
+		for _, event in ipairs({ "OnShow", "OnEnter", "OnLeave", "OnMouseDown", "OnMouseUp", "OnEnable", "OnDisable" }) do
+			button:HookScript(event, HideNativeButtonChrome)
 		end
 	end
 end
@@ -333,37 +322,15 @@ function EllesmereUISkin:SkinModernChrome(frame, FriendsUI)
 		return
 	end
 
-	local title = frame.TitleContainer and frame.TitleContainer.TitleText or frame.TitleText
-	SafeCall(api, "Font", title, 1, 1, 1)
 	SafeCall(api, "Dropdown", header and header.StatusDropdown)
 	SafeCall(api, "EditBox", header and header.SearchBox)
 	SafeCall(api, "Dropdown", root.FilterBar and root.FilterBar.FilterDropdown)
 	SafeCall(api, "Dropdown", root.FilterBar and root.FilterBar.RecentFilterDropdown)
 	SafeCall(api, "Dropdown", root.FilterBar and root.FilterBar.SortButton)
 	SafeCall(api, "Button", root.BattleNetBar and root.BattleNetBar.MenuButton, { "Icon" })
-	SafeCall(api, "Button", root.BottomActionBar and root.BottomActionBar.AddFriendButton)
-	SafeCall(api, "Font", root.BottomActionBar and root.BottomActionBar.AddFriendButton
-		and root.BottomActionBar.AddFriendButton:GetFontString())
-	SafeCall(api, "StateButtonLabel", root.BottomActionBar and root.BottomActionBar.AddFriendButton)
-
-	local battleNetDisplay = header and header.BattlenetFrame
-	SafeCall(api, "Panel", battleNetDisplay, { inset = true })
-	SafeCall(api, "Font", battleNetDisplay and battleNetDisplay.Tag, unpack(EUI_BATTLENET_TEXT))
-	SafeCall(api, "Font", battleNetDisplay and battleNetDisplay.UnavailableLabel, 0.5, 0.5, 0.5)
+	self:SkinFooterActionButton(root.BottomActionBar and root.BottomActionBar.AddFriendButton)
 	SafeCall(api, "ScrollBar", frame.MinimalScrollBar)
 	SafeCall(api, "ScrollBar", root.RequestsFrame and root.RequestsFrame.ScrollBar)
-
-	for _, control in ipairs({
-		header and header.SearchBox,
-		root.FilterBar and root.FilterBar.FilterDropdown,
-		root.FilterBar and root.FilterBar.RecentFilterDropdown,
-		root.FilterBar and root.FilterBar.SortButton,
-	}) do
-		if control and control.SetHeight then
-			control:SetHeight(30)
-		end
-	end
-	self:SkinModernSideTabs(FriendsUI)
 end
 
 function EllesmereUISkin:SkinSettingsCenter(frame)
@@ -379,7 +346,6 @@ function EllesmereUISkin:SkinSettingsCenter(frame)
 	SafeCall(api, "Button", frame.ResetButton)
 	SafeCall(api, "Button", frame.LockButton)
 	SafeCall(api, "Button", frame.DensityButton)
-	SkinWidgetTree(api, frame, 3)
 end
 
 function EllesmereUISkin:SkinTooltip(tooltip)
@@ -449,26 +415,15 @@ function EllesmereUISkin:SkinMainFrame()
 		return
 	end
 	local api = self.facade
-	SafeCall(api, "Shell", frame, { bottomBar = 80 })
+	SafeCall(api, "Shell", frame, { bottomBar = 80, noBorder = true })
 	SafeCall(api, "Inset", frame.Inset)
 	SafeCall(api, "CloseButton", frame.CloseButton)
-	SafeCall(api, "Button", frame.PortraitButton, { "Icon" })
-	if frame.PortraitButton and frame.PortraitButton.Icon then
-		SafeCall(api, "SquareIcon", frame.PortraitButton.Icon, frame.PortraitButton)
-	end
 	for index = 1, 4 do
 		SafeCall(api, "Tab", _G["BetterFriendsFrameTab" .. index])
 		SafeCall(api, "Tab", _G["BetterFriendsFrameBottomTab" .. index])
 	end
 
-	local root = BFL.FriendsUI or BFL:GetModule("FriendsUI")
-	local FriendsUI = root
-	root = FriendsUI and FriendsUI.root
-	if root then
-		SafeCall(api, "Panel", root.BattleNetBar, { noBorder = true, noBg = true })
-		SafeCall(api, "Panel", root.FilterBar, { noBorder = true, noBg = true })
-		SafeCall(api, "Panel", root.BottomActionBar, { noBorder = true, noBg = true })
-	end
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
 
 	local who = frame.WhoFrame
 	local guild = frame.GuildFrame
@@ -479,9 +434,6 @@ function EllesmereUISkin:SkinMainFrame()
 	SafeCall(api, "Inset", raid and raid.GroupsInset)
 	SafeCall(api, "Inset", quickJoin and quickJoin.ContentInset)
 	self:SkinModernChrome(frame, FriendsUI)
-	-- Explicit Modern controls must claim their EUI primitive before the
-	-- generic tree sees them as plain buttons (notably the Sort menu).
-	SkinWidgetTree(api, frame, 8)
 end
 
 function EllesmereUISkin:Apply(reason)

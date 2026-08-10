@@ -5104,7 +5104,11 @@ local function RegisterBuiltInTests()
 				end
 				V:Assert(palette.externalShell == true, "EUI palette should preserve the public EUI shell")
 				V:Assert(palette.externalControls == true, "EUI palette should delegate controls to the public EUI API")
-				V:Assert(palette.friendsStyle == true, "EUI palette should request EUIFriends-style Modern surfaces")
+				V:Assert(palette.skinFriendCardSurface == true, "EUI palette should request EUIFriends-style friend-card surfaces")
+				V:Assert(palette.preserveNativeSideTabs == true, "EUI palette should preserve Blizzard side-tab chrome")
+				V:Assert(palette.preserveNativeGroupHeaders == true, "EUI palette should preserve Blizzard group headers")
+				V:Assert(palette.preserveNativeInviteButtons == true, "EUI palette should preserve Blizzard invite buttons")
+				V:Assert(palette.transparentBattleNetBar == true, "EUI palette should keep the Battle.net bar transparent")
 				V:Assert(palette.background[4] < 0.5, "BFL content wash should not cover the EUI shell")
 			end)
 			skin.facade = originalFacade
@@ -9083,7 +9087,7 @@ local function RegisterBuiltInTests()
 	})
 
 	TS:RegisterTest("filter", "Registry_BFLMenuIcons_UseThemeAccent", {
-		description = "BFL-owned menu textures use the active Dark/Custom accent without tinting Blizzard assets",
+		description = "BFL-owned menu textures use the active Dark/Custom or EllesmereUI accent without tinting Blizzard assets",
 		action = function(V)
 			local Registry = BFL:GetModule("FilterSortRegistry")
 			if not Registry then
@@ -9092,30 +9096,50 @@ local function RegisterBuiltInTests()
 			end
 
 			local oldUsesDarkSkinTheme = BFL.UsesDarkSkinTheme
+			local oldIsEllesmereUISkinActive = BFL.IsEllesmereUISkinActive
 			local oldGetThemeAccentColor = BFL.GetThemeAccentColor
-			local bflMarkup, blizzardMarkup
+			local darkMarkup, ellesmereMarkup, blizzardMarkup
 			local ok, err = pcall(function()
 				BFL.UsesDarkSkinTheme = function()
 					return true
 				end
+				BFL.IsEllesmereUISkinActive = function()
+					return false
+				end
 				BFL.GetThemeAccentColor = function()
 					return 1, 0, 0, 1
 				end
-				bflMarkup = Registry:FormatIcon("Interface\\AddOns\\BetterFriendlist\\Icons\\filter", 16)
+				darkMarkup = Registry:FormatIcon("Interface\\AddOns\\BetterFriendlist\\Icons\\filter", 16)
+
+				BFL.UsesDarkSkinTheme = function()
+					return false
+				end
+				BFL.IsEllesmereUISkinActive = function()
+					return true
+				end
+				BFL.GetThemeAccentColor = function()
+					return 0, 1, 0, 1
+				end
+				ellesmereMarkup = Registry:FormatIcon("Interface\\AddOns\\BetterFriendlist\\Icons\\filter", 16)
 				blizzardMarkup = Registry:FormatIcon("Interface\\Icons\\INV_Misc_Note_01", 16)
 			end)
 			BFL.UsesDarkSkinTheme = oldUsesDarkSkinTheme
+			BFL.IsEllesmereUISkinActive = oldIsEllesmereUISkinActive
 			BFL.GetThemeAccentColor = oldGetThemeAccentColor
 			if not ok then
 				error(err, 0)
 			end
 
 			V:Assert(
-				bflMarkup:find(":255:0:0|t", 1, true) ~= nil,
-				"BFL menu texture markup should contain the active accent tint"
+				darkMarkup:find(":255:0:0|t", 1, true) ~= nil,
+				"BFL menu texture markup should contain the active Dark/Custom accent tint"
 			)
 			V:Assert(
-				blizzardMarkup:find(":255:0:0|t", 1, true) == nil,
+				ellesmereMarkup:find(":0:255:0|t", 1, true) ~= nil,
+				"BFL menu texture markup should contain the active EllesmereUI accent tint"
+			)
+			V:Assert(
+				blizzardMarkup:find(":0:255:0|t", 1, true) == nil,
 				"Blizzard menu textures should retain their native color"
 			)
 		end,

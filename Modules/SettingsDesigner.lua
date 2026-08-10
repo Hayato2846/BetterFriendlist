@@ -4536,6 +4536,15 @@ local function PolishIconTexture(texture)
 	if texture.SetSnapToPixelGrid then
 		pcall(texture.SetSnapToPixelGrid, texture, false)
 	end
+	if BFL.IsEllesmereUISkinActive and BFL:IsEllesmereUISkinActive() and BFL.GetThemeAccentColor then
+		local r, g, b = BFL:GetThemeAccentColor(1, 0.82, 0, 1)
+		if texture.SetDesaturated then
+			texture:SetDesaturated(true)
+		end
+		if texture.SetVertexColor then
+			texture:SetVertexColor(r, g, b, 1)
+		end
+	end
 end
 
 local function PolishSettingsIcons(frame, visited)

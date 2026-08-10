@@ -1980,10 +1980,11 @@ end
 function Registry:FormatIcon(iconRef, size)
 	size = size or 16
 	iconRef = NormalizeIconRef(iconRef) or BFL_ICON_PREFIX .. "filter-all"
+	local usesThemeAccent = (BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme())
+		or (BFL.IsEllesmereUISkinActive and BFL:IsEllesmereUISkinActive())
 	if type(iconRef) == "string"
 		and iconRef:find(BFL_ICON_PREFIX, 1, true) == 1
-		and BFL.UsesDarkSkinTheme
-		and BFL:UsesDarkSkinTheme()
+		and usesThemeAccent
 		and BFL.GetThemeAccentColor then
 		local r, g, b = BFL:GetThemeAccentColor(1, 0.82, 0, 1)
 		local function ToColorByte(value)
