@@ -361,6 +361,13 @@ function EllesmereUISkin:SkinIconButton(button)
 	end
 end
 
+function EllesmereUISkin:RefreshLegacyTabLabel(tab)
+	if not self:IsSkinEnabled() or self:IsModernInterfaceActive() then
+		return
+	end
+	HideNativeTabLabel(tab)
+end
+
 function EllesmereUISkin:SkinLegacyTab(tab)
 	if not self:IsSkinEnabled() or not tab then
 		return
@@ -369,11 +376,14 @@ function EllesmereUISkin:SkinLegacyTab(tab)
 	-- EUI creates its own label. BFL's font refresh can recolor the original
 	-- Blizzard label afterwards, so keep that source label transparent instead
 	-- of relying on the color chosen during the first skin pass.
-	HideNativeTabLabel(tab)
+	self:RefreshLegacyTabLabel(tab)
 	if not tab.BFL_EllesmereNativeLabelHooks and tab.HookScript then
 		tab.BFL_EllesmereNativeLabelHooks = true
-		for _, event in ipairs({ "OnShow", "OnEnable", "OnDisable" }) do
-			tab:HookScript(event, HideNativeTabLabel)
+		local function RefreshTabLabel()
+			self:RefreshLegacyTabLabel(tab)
+		end
+		for _, event in ipairs({ "OnShow", "OnEnable", "OnDisable", "OnClick" }) do
+			tab:HookScript(event, RefreshTabLabel)
 		end
 	end
 end
@@ -747,6 +757,14 @@ function EllesmereUISkin:InstallHooks()
 	HookObject(BFL:GetModule("RaidTools"), "RaidTools", "CreateFrame")
 	HookObject(BFL:GetModule("WhoFrame"), "WhoFrame", "CreateSearchBuilder")
 	HookObject(BFL:GetModule("WhoFrame"), "WhoFrame", "ToggleSearchBuilder")
+	if type(BFL.ApplyTabVisualState) == "function" then
+		hooksecurefunc(BFL, "ApplyTabVisualState", function(_, tab)
+			-- BFL reapplies font objects and colors after PanelTemplates changes
+			-- selection. Run after that final refresh so the original Blizzard
+			-- label cannot reappear beside EUI's replacement label.
+			self:RefreshLegacyTabLabel(tab)
+		end)
+	end
 
 	local FriendsList = BFL:GetModule("FriendsList")
 	if FriendsList and type(FriendsList.UpdateInviteButton) == "function" then

@@ -5326,6 +5326,12 @@ local function RegisterBuiltInTests()
 				tab.Text:SetAlpha(1)
 				tab.hooks.OnShow[1](tab)
 				V:AssertEqual(tab.Text.alpha, 0, "Legacy tab show should suppress duplicate native text again")
+				tab.Text:SetAlpha(1)
+				skin:RefreshLegacyTabLabel(tab)
+				V:AssertEqual(tab.Text.alpha, 0, "Legacy tab visual refresh should suppress duplicate native text again")
+				tab.Text:SetAlpha(1)
+				tab.hooks.OnClick[1](tab)
+				V:AssertEqual(tab.Text.alpha, 0, "Legacy tab click should suppress duplicate native text again")
 
 				skin:SkinLegacyPortrait(frame)
 				local portrait = frame.PortraitButton.BFL_EllesmerePortraitIcon
