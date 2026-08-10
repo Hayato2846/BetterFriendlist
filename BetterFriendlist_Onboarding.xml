@@ -1,0 +1,73 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<Frame name="BFLAppearanceOnboardingFrame" parent="UIParent" hidden="true" enableMouse="true" toplevel="true" frameStrata="DIALOG" clampedToScreen="true" inherits="BackdropTemplate">
+		<Size x="520" y="610" />
+		<KeyValues>
+			<KeyValue key="backdropInfo" value="BACKDROP_DIALOG_32_32" type="global" />
+		</KeyValues>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="AccentBar" file="Interface\Buttons\WHITE8X8">
+					<Size x="4" />
+					<Anchors>
+						<Anchor point="TOPLEFT" x="12" y="-16" />
+						<Anchor point="BOTTOMLEFT" x="12" y="16" />
+					</Anchors>
+					<Color r="1" g="0.82" b="0" a="1" />
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture parentKey="Icon" file="Interface\AddOns\BetterFriendlist\Textures\PortraitIcon.blp">
+					<Size x="42" y="42" />
+					<Anchors><Anchor point="TOPLEFT" x="31" y="-25" /></Anchors>
+				</Texture>
+				<FontString parentKey="Title" inherits="GameFontNormalLarge" justifyH="LEFT" justifyV="MIDDLE" maxLines="1" wordwrap="false">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="86" y="-25" />
+						<Anchor point="TOPRIGHT" x="-54" y="-25" />
+					</Anchors>
+				</FontString>
+				<FontString parentKey="StepText" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="MIDDLE" maxLines="1" wordwrap="false">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeKey="$parent.Title" relativePoint="BOTTOMLEFT" y="-4" />
+						<Anchor point="TOPRIGHT" relativeKey="$parent.Title" relativePoint="BOTTOMRIGHT" y="-4" />
+					</Anchors>
+				</FontString>
+				<FontString parentKey="Subtitle" inherits="GameFontHighlight" justifyH="LEFT" justifyV="TOP" maxLines="3" wordwrap="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="31" y="-86" />
+						<Anchor point="TOPRIGHT" x="-31" y="-86" />
+					</Anchors>
+				</FontString>
+				<Texture parentKey="HeaderDivider" file="Interface\Buttons\WHITE8X8">
+					<Size y="1" />
+					<Anchors>
+						<Anchor point="TOPLEFT" x="31" y="-142" />
+						<Anchor point="TOPRIGHT" x="-31" y="-142" />
+					</Anchors>
+					<Color r="1" g="0.82" b="0" a="0.35" />
+				</Texture>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Button parentKey="CloseButton" inherits="UIPanelCloseButton">
+				<Anchors><Anchor point="TOPRIGHT" x="-8" y="-8" /></Anchors>
+			</Button>
+			<Frame parentKey="Content">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="31" y="-158" />
+					<Anchor point="BOTTOMRIGHT" x="-31" y="72" />
+				</Anchors>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnLoad>
+				local module = BFL and BFL:GetModule("AppearanceOnboarding");
+				if module and module.OnFrameLoad then module:OnFrameLoad(self); end
+			</OnLoad>
+			<OnHide>
+				local module = BFL and BFL:GetModule("AppearanceOnboarding");
+				if module and module.OnFrameHide then module:OnFrameHide(self); end
+			</OnHide>
+		</Scripts>
+	</Frame>
+</Ui>
