@@ -872,16 +872,26 @@ local function GetAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
 	return fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1
 end
 
+local function UsesThemeIconAccent()
+	return (BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme())
+		or (BFL.IsEllesmereUISkinActive and BFL:IsEllesmereUISkinActive())
+end
+
 local FAVORITE_ICON_TEXTURE = "Interface\\AddOns\\BetterFriendlist\\Icons\\star"
 
 local function GetFavoriteIconMarkup(style, size)
 	size = tonumber(size) or 17
-	local themed = BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme()
+	local themed = UsesThemeIconAccent()
 	if not themed then
 		if style == "blizzard" and BFL.GetAtlasOrTextureMarkup then
 			return BFL.GetAtlasOrTextureMarkup("friendslist-favorite", FAVORITE_ICON_TEXTURE, size, size)
 		end
 		return string.format("|T%s:%d:%d|t", FAVORITE_ICON_TEXTURE, size, size)
+	end
+	if style ~= "blizzard" and BFL.FormatIcon then
+		-- The EUI-aware formatter swaps BFL's baked-gold star for a neutral mask
+		-- before tinting, keeping the result at the exact theme accent.
+		return BFL.FormatIcon(FAVORITE_ICON_TEXTURE, size)
 	end
 
 	local r, g, b = GetAccentColor(1, 0.82, 0)
@@ -1054,6 +1064,9 @@ function Settings:RefreshCategories()
 
 		if catDef.icon then
 			button.icon:SetTexture(catDef.icon)
+			if button.icon.SetDesaturated then
+				button.icon:SetDesaturated(UsesThemeIconAccent())
+			end
 			button.icon:SetVertexColor(r, g, b) -- Match text color exactly
 			button.icon:Show()
 		else
@@ -1126,7 +1139,7 @@ function Settings:RefreshCategoryVisualState()
 			end
 			button.text:SetTextColor(1, 1, 1) -- White Text
 			if button.icon then
-				local themed = BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme()
+				local themed = UsesThemeIconAccent()
 				if button.icon.SetDesaturated then
 					button.icon:SetDesaturated(themed == true)
 				end
@@ -1152,7 +1165,7 @@ function Settings:RefreshCategoryVisualState()
 			button.text:SetTextColor(r, g, b)
 			if button.icon then
 				if button.icon.SetDesaturated then
-					button.icon:SetDesaturated(BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme())
+					button.icon:SetDesaturated(UsesThemeIconAccent())
 				end
 				button.icon:SetVertexColor(r, g, b)
 			end

@@ -5109,6 +5109,10 @@ local function RegisterBuiltInTests()
 				V:Assert(palette.preserveNativeGroupHeaders == true, "EUI palette should preserve Blizzard group headers")
 				V:Assert(palette.preserveNativeInviteButtons == true, "EUI palette should preserve Blizzard invite buttons")
 				V:Assert(palette.transparentBattleNetBar == true, "EUI palette should keep the Battle.net bar transparent")
+				V:AssertEqual(palette.portraitOffsetX, 8, "EUI portrait should keep the compact left inset")
+				V:AssertEqual(palette.portraitOffsetY, -31, "EUI portrait should sit inside the Battle.net header strip")
+				V:AssertEqual(palette.portraitSize, 42, "EUI portrait should keep the compact themed size")
+				V:AssertEqual(palette.customTabInactiveMultiplier, 0.68, "EUI custom tabs should match inactive Blizzard luminance")
 				V:Assert(palette.background[4] < 0.5, "BFL content wash should not cover the EUI shell")
 			end)
 			skin.facade = originalFacade
@@ -9135,8 +9139,16 @@ local function RegisterBuiltInTests()
 				"BFL menu texture markup should contain the active Dark/Custom accent tint"
 			)
 			V:Assert(
+				darkMarkup:find("Textures\\ThemeIcons\\filter.tga", 1, true) ~= nil,
+				"Dark/Custom menu texture markup should use the neutral BFL icon mask"
+			)
+			V:Assert(
 				ellesmereMarkup:find(":0:255:0|t", 1, true) ~= nil,
 				"BFL menu texture markup should contain the active EllesmereUI accent tint"
+			)
+			V:Assert(
+				ellesmereMarkup:find("Textures\\ThemeIcons\\filter.tga", 1, true) ~= nil,
+				"EllesmereUI menu texture markup should use the neutral BFL icon mask"
 			)
 			V:Assert(
 				blizzardMarkup:find(":0:255:0|t", 1, true) == nil,

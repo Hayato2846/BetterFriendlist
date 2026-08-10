@@ -807,13 +807,15 @@ local function ApplySectionIcon(texture, definition, selected)
 		texture:SetTexture(definition.customTexture)
 		texture:SetSize(32, 32)
 		texture:SetTexCoord(0, 1, 0, 1)
-		-- Keep the artwork's native luminance. Its source palette is already gold;
-		-- the calibrated tint below removes blue and corrects green to Blizzard's
-		-- effective 1:0.82:0 hue without darkening the icon into brown.
+		-- Custom tabs use one source texture for both states while Blizzard tabs
+		-- have separate active/inactive atlases. Recreate that luminance step after
+		-- desaturation so EUI's accent remains pure instead of mixing with the
+		-- source artwork's baked gold.
 		texture:SetDesaturated(themed)
 		local color = themed and palette.accent
 			or (selected and CUSTOM_TAB_ICON_ACTIVE_COLOR or CUSTOM_TAB_ICON_INACTIVE_COLOR)
-		texture:SetVertexColor(color[1], color[2], color[3], 1)
+		local multiplier = themed and not selected and (tonumber(palette.customTabInactiveMultiplier) or 1) or 1
+		texture:SetVertexColor(color[1] * multiplier, color[2] * multiplier, color[3] * multiplier, 1)
 		return
 	end
 	ApplyAtlasTexture(texture, selected and definition.activeAtlas or definition.inactiveAtlas, definition.fallback)
@@ -3277,7 +3279,7 @@ function FriendsUI:ApplyModernPortrait()
 	end
 	local db = GetDB()
 	local simpleMode = db and db.simpleMode == true
-	local themed = BFL.UsesFlatTheme and BFL:UsesFlatTheme()
+	local palette, themed = self:GetModernThemeColors()
 	frame._bflModernPortraitChromeShown = not simpleMode
 	-- PortraitFrame can restore its native portrait and corner artwork whenever
 	-- the panel is shown. Reapply this state on every Modern layout pass rather
@@ -3320,18 +3322,23 @@ function FriendsUI:ApplyModernPortrait()
 	if portrait then
 		portrait:ClearAllPoints()
 		if themed then
-			-- Dark/Custom follows the established flat-theme portrait contract:
-			-- a compact square fully inside the main frame's upper-left corner.
+			-- Flat themes use the established compact square; EUI supplies a lower
+			-- offset so the BFL mark sits inside its Battle.net header strip.
+			local portraitOffsetX = tonumber(palette and palette.portraitOffsetX)
+				or MODERN_THEMED_PORTRAIT_OFFSET_X
+			local portraitOffsetY = tonumber(palette and palette.portraitOffsetY)
+				or MODERN_THEMED_PORTRAIT_OFFSET_Y
+			local portraitSize = tonumber(palette and palette.portraitSize) or MODERN_THEMED_PORTRAIT_SIZE
 			portrait:SetPoint(
 				"TOPLEFT",
 				frame,
 				"TOPLEFT",
-				MODERN_THEMED_PORTRAIT_OFFSET_X,
-				MODERN_THEMED_PORTRAIT_OFFSET_Y
+				portraitOffsetX,
+				portraitOffsetY
 			)
-			portrait:SetSize(MODERN_THEMED_PORTRAIT_SIZE, MODERN_THEMED_PORTRAIT_SIZE)
+			portrait:SetSize(portraitSize, portraitSize)
 			if portrait.Icon then
-				portrait.Icon:SetSize(MODERN_THEMED_PORTRAIT_SIZE, MODERN_THEMED_PORTRAIT_SIZE)
+				portrait.Icon:SetSize(portraitSize, portraitSize)
 				if portrait.Mask and portrait.Icon.RemoveMaskTexture and not portrait.BFL_ModernSquarePortrait then
 					portrait.Icon:RemoveMaskTexture(portrait.Mask)
 				end

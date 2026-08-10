@@ -222,6 +222,10 @@ function EllesmereUISkin:GetPalette()
 		preserveNativeGroupHeaders = true,
 		preserveNativeInviteButtons = true,
 		transparentBattleNetBar = true,
+		portraitOffsetX = 8,
+		portraitOffsetY = -31,
+		portraitSize = 42,
+		customTabInactiveMultiplier = 0.68,
 		panel = panel,
 		panelSoft = Color(0, 0, 0, 0.12),
 		controlHover = Color(1, 1, 1, 0.05),
@@ -296,11 +300,11 @@ local function HideNativeButtonChrome(button)
 	end
 end
 
-function EllesmereUISkin:SkinFooterActionButton(button)
+function EllesmereUISkin:SkinActionButton(button, keepKeys)
 	if not self:IsSkinEnabled() or not button then
 		return
 	end
-	SafeCall(self.facade, "Button", button)
+	SafeCall(self.facade, "Button", button, keepKeys)
 	SafeCall(self.facade, "StateButtonLabel", button)
 	HideNativeButtonChrome(button)
 	if not button.BFL_EllesmereChromeHooks then
@@ -309,6 +313,10 @@ function EllesmereUISkin:SkinFooterActionButton(button)
 			button:HookScript(event, HideNativeButtonChrome)
 		end
 	end
+end
+
+function EllesmereUISkin:SkinFooterActionButton(button)
+	self:SkinActionButton(button)
 end
 
 function EllesmereUISkin:SkinModernChrome(frame, FriendsUI)
@@ -329,6 +337,23 @@ function EllesmereUISkin:SkinModernChrome(frame, FriendsUI)
 	SafeCall(api, "Dropdown", root.FilterBar and root.FilterBar.SortButton)
 	SafeCall(api, "Button", root.BattleNetBar and root.BattleNetBar.MenuButton, { "Icon" })
 	self:SkinFooterActionButton(root.BottomActionBar and root.BottomActionBar.AddFriendButton)
+
+	-- Keep the EUI pass intentionally allowlisted. These are the visible RAF,
+	-- Raid, and Who action controls requested by the integration; row hit targets,
+	-- group headers, invite buttons, and side-tab backgrounds remain native.
+	local raf = frame.RecruitAFriendFrame
+	local raid = frame.RaidFrame
+	local raidControl = raid and raid.ControlPanel
+	local who = frame.WhoFrame
+	self:SkinActionButton(frame.RecruitmentButton)
+	self:SkinActionButton(raf and raf.RewardClaiming and raf.RewardClaiming.ClaimOrViewRewardButton)
+	self:SkinActionButton(raidControl and raidControl.RaidInfoButton)
+	self:SkinActionButton(raidControl and raidControl.ReadyCheckButton, { "Icon" })
+	self:SkinActionButton(raid and raid.RaidToolsButton)
+	self:SkinActionButton(raid and raid.ConvertToRaidButton)
+	self:SkinActionButton(who and who.WhoButton)
+	self:SkinActionButton(who and who.AddFriendButton)
+	self:SkinActionButton(who and who.GroupInviteButton)
 	SafeCall(api, "ScrollBar", frame.MinimalScrollBar)
 	SafeCall(api, "ScrollBar", root.RequestsFrame and root.RequestsFrame.ScrollBar)
 end
