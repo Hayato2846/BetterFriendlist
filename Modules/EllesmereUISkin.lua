@@ -215,7 +215,7 @@ function EllesmereUISkin:GetPalette()
 		preserveNativeInviteButtons = true,
 		transparentBattleNetBar = true,
 		portraitOffsetX = 8,
-		portraitOffsetY = -23,
+		portraitOffsetY = -24,
 		portraitSize = 42,
 		customTabInactiveMultiplier = 0.68,
 		panel = panel,
