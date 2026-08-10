@@ -5124,6 +5124,250 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
+	TS:RegisterTest("data", "EllesmereUISkin_LegacyControlAllowlist", {
+		description = "EUI Legacy skinning should cover requested controls without traversing scrollbars or Modern invites",
+		action = function(V)
+			local skin = BFL:GetModule("EllesmereUISkin")
+			V:AssertNotNil(skin, "EllesmereUISkin module should be loaded")
+
+			local function MakeTexture()
+				local texture = {
+					shown = false,
+				}
+				function texture:SetAlpha(alpha)
+					self.alpha = alpha
+				end
+				function texture:SetDesaturated(desaturated)
+					self.desaturated = desaturated == true
+				end
+				function texture:SetVertexColor(r, g, b, a)
+					self.vertexColor = { r, g, b, a }
+				end
+				function texture:SetTexture(path)
+					self.texture = path
+				end
+				function texture:SetTexCoord(...)
+					self.texCoord = { ... }
+				end
+				function texture:SetSize(width, height)
+					self.width = width
+					self.height = height
+				end
+				function texture:SetPoint(...)
+					self.point = { ... }
+				end
+				function texture:SetShown(shown)
+					self.shown = shown == true
+				end
+				function texture:Show()
+					self.shown = true
+				end
+				function texture:Hide()
+					self.shown = false
+				end
+				return texture
+			end
+
+			local function MakeButton(withIcon)
+				local button = {
+					hooks = {},
+				}
+				if withIcon then
+					button.Icon = MakeTexture()
+				end
+				function button:HookScript(event, callback)
+					self.hooks[event] = self.hooks[event] or {}
+					self.hooks[event][#self.hooks[event] + 1] = callback
+				end
+				function button:GetFontString()
+					return self.Text
+				end
+				function button:CreateTexture()
+					local texture = MakeTexture()
+					self.createdTexture = texture
+					return texture
+				end
+				return button
+			end
+
+			local calls = {
+				buttons = {},
+				dropdowns = {},
+				tabs = {},
+				scrollbar = false,
+			}
+			local facade = {
+				apiVersion = 1,
+				Button = function(button)
+					if button then
+						calls.buttons[button] = true
+					end
+				end,
+				StateButtonLabel = function() end,
+				Dropdown = function(dropdown)
+					if dropdown then
+						calls.dropdowns[dropdown] = true
+					end
+				end,
+				Tab = function(tab)
+					if tab then
+						calls.tabs[tab] = true
+					end
+				end,
+				ScrollBar = function()
+					calls.scrollbar = true
+				end,
+				GetAccentColor = function()
+					return 0.12, 0.73, 0.54
+				end,
+			}
+
+			local header = {
+				StatusDropdown = MakeButton(),
+				QuickFilterDropdown = MakeButton(),
+				PrimarySortDropdown = MakeButton(),
+				SecondarySortDropdown = MakeButton(),
+				BattlenetFrame = {
+					ContactsMenuButton = MakeButton(true),
+					SettingsButton = MakeButton(true),
+				},
+			}
+			local who = {
+				ColumnDropdown = MakeButton(),
+				WhoButton = MakeButton(),
+				AddFriendButton = MakeButton(),
+				GroupInviteButton = MakeButton(),
+			}
+			local raid = {
+				ControlPanel = {
+					RaidInfoButton = MakeButton(),
+					ReadyCheckButton = MakeButton(true),
+				},
+				RaidToolsButton = MakeButton(),
+				ConvertToRaidButton = MakeButton(),
+			}
+			local frame = {
+				FriendsTabHeader = header,
+				AddFriendButton = MakeButton(),
+				SendMessageButton = MakeButton(),
+				RecruitmentButton = MakeButton(),
+				RecruitAFriendFrame = {
+					RewardClaiming = {
+						ClaimOrViewRewardButton = MakeButton(),
+					},
+				},
+				GuildFrame = {
+					ActionsButton = MakeButton(),
+				},
+				WhoFrame = who,
+				RaidFrame = raid,
+				PortraitButton = MakeButton(),
+				ScrollBar = MakeButton(),
+			}
+
+			local originalFacade = skin.facade
+			local originalFacadeActivated = skin.facadeActivated
+			local originalIsSkinEnabled = skin.IsSkinEnabled
+			local originalIsModernInterfaceActive = skin.IsModernInterfaceActive
+			local ok, err = pcall(function()
+				skin.facade = facade
+				skin.facadeActivated = true
+				skin.IsSkinEnabled = function()
+					return true
+				end
+				skin.IsModernInterfaceActive = function()
+					return false
+				end
+
+				skin:SkinLegacyChrome(frame)
+				for _, dropdown in ipairs({
+					header.StatusDropdown,
+					header.QuickFilterDropdown,
+					header.PrimarySortDropdown,
+					header.SecondarySortDropdown,
+					who.ColumnDropdown,
+				}) do
+					V:Assert(calls.dropdowns[dropdown] == true, "Requested Legacy dropdown should use the EUI facade")
+				end
+				for _, button in ipairs({
+					header.BattlenetFrame.ContactsMenuButton,
+					header.BattlenetFrame.SettingsButton,
+					frame.AddFriendButton,
+					frame.SendMessageButton,
+					frame.RecruitmentButton,
+					frame.RecruitAFriendFrame.RewardClaiming.ClaimOrViewRewardButton,
+					frame.GuildFrame.ActionsButton,
+					who.WhoButton,
+					who.AddFriendButton,
+					who.GroupInviteButton,
+					raid.ControlPanel.RaidInfoButton,
+					raid.ControlPanel.ReadyCheckButton,
+					raid.RaidToolsButton,
+					raid.ConvertToRaidButton,
+				}) do
+					V:Assert(calls.buttons[button] == true, "Requested Legacy action should use the EUI facade")
+				end
+				V:Assert(calls.scrollbar == false, "Legacy EUI allowlist must not skin scrollbars")
+
+				local menuIcon = header.BattlenetFrame.ContactsMenuButton.Icon
+				V:Assert(menuIcon.desaturated == true, "Legacy menu icon should discard its source hue")
+				V:AssertEqual(menuIcon.vertexColor[1], 0.12, "Legacy menu icon should use pure EUI accent red")
+				V:AssertEqual(menuIcon.vertexColor[2], 0.73, "Legacy menu icon should use pure EUI accent green")
+				V:AssertEqual(menuIcon.vertexColor[3], 0.54, "Legacy menu icon should use pure EUI accent blue")
+				menuIcon:SetVertexColor(1, 0, 0, 1)
+				header.BattlenetFrame.ContactsMenuButton.hooks.OnEnter[2]()
+				V:AssertEqual(menuIcon.vertexColor[2], 0.73, "Legacy menu hover should restore the pure EUI accent")
+
+				local tab = MakeButton()
+				tab.Text = MakeTexture()
+				skin:SkinLegacyTab(tab)
+				V:Assert(calls.tabs[tab] == true, "Legacy tab should use the EUI facade")
+				V:AssertEqual(tab.Text.alpha, 0, "Original Legacy tab label should stay hidden behind EUI's label")
+				tab.Text:SetAlpha(1)
+				tab.hooks.OnShow[1](tab)
+				V:AssertEqual(tab.Text.alpha, 0, "Legacy tab show should suppress duplicate native text again")
+
+				skin:SkinLegacyPortrait(frame)
+				local portrait = frame.PortraitButton.BFL_EllesmerePortraitIcon
+				V:AssertNotNil(portrait, "Legacy EUI should create a logo below the shell's direct-texture strip")
+				V:AssertEqual(
+					portrait.texture,
+					"Interface\\AddOns\\BetterFriendlist\\Textures\\PortraitIcon",
+					"Legacy EUI logo should reuse the BFL portrait artwork"
+				)
+				V:AssertEqual(portrait.width, 42, "Legacy EUI logo should use the compact EUI header size")
+				V:Assert(portrait.shown == true, "Legacy EUI logo should be visible")
+
+				local invite = {
+					AcceptButton = MakeButton(),
+					DeclineButton = MakeButton(),
+				}
+				skin:SkinLegacyInviteButtons(invite)
+				V:Assert(calls.buttons[invite.AcceptButton] == true, "Legacy Accept should use the EUI facade")
+				V:Assert(calls.buttons[invite.DeclineButton] == true, "Legacy Decline should use the EUI facade")
+
+				local modernInvite = {
+					AcceptButton = MakeButton(),
+					DeclineButton = MakeButton(),
+				}
+				skin.IsModernInterfaceActive = function()
+					return true
+				end
+				skin:SkinLegacyInviteButtons(modernInvite)
+				V:Assert(calls.buttons[modernInvite.AcceptButton] ~= true, "Modern Accept should remain native")
+				V:Assert(calls.buttons[modernInvite.DeclineButton] ~= true, "Modern Decline should remain native")
+			end)
+
+			skin.facade = originalFacade
+			skin.facadeActivated = originalFacadeActivated
+			skin.IsSkinEnabled = originalIsSkinEnabled
+			skin.IsModernInterfaceActive = originalIsModernInterfaceActive
+			if not ok then
+				error(err, 2)
+			end
+		end,
+	})
+
 	TS:RegisterTest("data", "Theme_BetaDisabledKeepsStandardThemes", {
 		description = "Disabled Beta Features should not disable standard themes",
 		action = function(V)

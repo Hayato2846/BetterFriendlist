@@ -10,6 +10,7 @@ local EUI_FRIENDS_BACKGROUND = { 0.03, 0.045, 0.05, 1 }
 local EUI_FRIENDS_ROW = { 0, 0, 0, 0.10 }
 local EUI_FRIENDS_HOVER = { 1, 1, 1, 0.035 }
 local EUI_BATTLENET_TEXT = { 0.26, 0.68, 0.94, 1 }
+local BFL_PORTRAIT_TEXTURE = "Interface\\AddOns\\BetterFriendlist\\Textures\\PortraitIcon"
 
 local function SafeCall(api, method, ...)
 	local callback = api and api[method]
@@ -49,6 +50,21 @@ local function HasFontString(button)
 	end
 	local ok, fontString = pcall(button.GetFontString, button)
 	return ok and fontString ~= nil
+end
+
+local function GetFontString(button)
+	if not button or not button.GetFontString then
+		return nil
+	end
+	local ok, fontString = pcall(button.GetFontString, button)
+	return ok and fontString or nil
+end
+
+local function HideNativeTabLabel(tab)
+	local label = tab and (tab.Text or GetFontString(tab))
+	if label and label.SetAlpha then
+		label:SetAlpha(0)
+	end
 end
 
 local function LooksLikeDropdown(frame, name)
@@ -307,8 +323,160 @@ function EllesmereUISkin:SkinActionButton(button, keepKeys)
 	end
 end
 
+function EllesmereUISkin:IsModernInterfaceActive()
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	return FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() == true or false
+end
+
+function EllesmereUISkin:ApplyAccentIcon(icon)
+	if not icon then
+		return
+	end
+	local r, g, b = self:GetAccentColor()
+	if icon.SetDesaturated then
+		icon:SetDesaturated(true)
+	end
+	if icon.SetVertexColor then
+		icon:SetVertexColor(r, g, b, 1)
+	end
+	if icon.SetAlpha then
+		icon:SetAlpha(1)
+	end
+end
+
+function EllesmereUISkin:SkinIconButton(button)
+	if not self:IsSkinEnabled() or not button then
+		return
+	end
+	self:SkinActionButton(button, { "Icon" })
+	self:ApplyAccentIcon(button.Icon)
+	if not button.BFL_EllesmereAccentIconHooks and button.HookScript then
+		button.BFL_EllesmereAccentIconHooks = true
+		local function RefreshAccentIcon()
+			self:ApplyAccentIcon(button.Icon)
+		end
+		for _, event in ipairs({ "OnShow", "OnEnter", "OnLeave", "OnMouseDown", "OnMouseUp", "OnEnable", "OnDisable" }) do
+			button:HookScript(event, RefreshAccentIcon)
+		end
+	end
+end
+
+function EllesmereUISkin:SkinLegacyTab(tab)
+	if not self:IsSkinEnabled() or not tab then
+		return
+	end
+	SafeCall(self.facade, "Tab", tab)
+	-- EUI creates its own label. BFL's font refresh can recolor the original
+	-- Blizzard label afterwards, so keep that source label transparent instead
+	-- of relying on the color chosen during the first skin pass.
+	HideNativeTabLabel(tab)
+	if not tab.BFL_EllesmereNativeLabelHooks and tab.HookScript then
+		tab.BFL_EllesmereNativeLabelHooks = true
+		for _, event in ipairs({ "OnShow", "OnEnable", "OnDisable" }) do
+			tab:HookScript(event, HideNativeTabLabel)
+		end
+	end
+end
+
+function EllesmereUISkin:SkinLegacyPortrait(frame)
+	local portraitButton = frame and frame.PortraitButton
+	if not self:IsSkinEnabled() or not portraitButton or not portraitButton.CreateTexture then
+		return
+	end
+	local icon = portraitButton.BFL_EllesmerePortraitIcon
+	if not icon then
+		-- EUI's Shell primitive intentionally fades direct textures on the main
+		-- frame. Parent the themed copy to the portrait button so subsequent EUI
+		-- shell refreshes cannot make the Legacy BFL logo disappear again.
+		icon = portraitButton:CreateTexture(nil, "OVERLAY", nil, 7)
+		portraitButton.BFL_EllesmerePortraitIcon = icon
+		icon:SetTexture(BFL_PORTRAIT_TEXTURE)
+		icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		icon:SetSize(42, 42)
+		icon:SetPoint("CENTER", portraitButton, "CENTER", 0, 0)
+	end
+	if icon.SetDesaturated then
+		icon:SetDesaturated(false)
+	end
+	if icon.SetVertexColor then
+		icon:SetVertexColor(1, 1, 1, 1)
+	end
+	if icon.SetAlpha then
+		icon:SetAlpha(1)
+	end
+	if icon.Show then
+		icon:Show()
+	end
+end
+
+function EllesmereUISkin:SetLegacyPortraitShown(frame, shown)
+	local portraitButton = frame and frame.PortraitButton
+	local icon = portraitButton and portraitButton.BFL_EllesmerePortraitIcon
+	if icon and icon.SetShown then
+		icon:SetShown(shown == true)
+	elseif icon and shown and icon.Show then
+		icon:Show()
+	elseif icon and icon.Hide then
+		icon:Hide()
+	end
+end
+
 function EllesmereUISkin:SkinFooterActionButton(button)
 	self:SkinActionButton(button)
+end
+
+function EllesmereUISkin:SkinRequestedActionControls(frame)
+	if not self:IsSkinEnabled() or not frame then
+		return
+	end
+	local raf = frame.RecruitAFriendFrame
+	local raid = frame.RaidFrame
+	local raidControl = raid and raid.ControlPanel
+	local who = frame.WhoFrame
+
+	self:SkinActionButton(frame.RecruitmentButton)
+	self:SkinActionButton(raf and raf.RewardClaiming and raf.RewardClaiming.ClaimOrViewRewardButton)
+	self:SkinActionButton(raidControl and raidControl.RaidInfoButton)
+	self:SkinIconButton(raidControl and raidControl.ReadyCheckButton)
+	self:SkinActionButton(raid and raid.RaidToolsButton)
+	self:SkinActionButton(raid and raid.ConvertToRaidButton)
+	self:SkinActionButton(who and who.WhoButton)
+	self:SkinActionButton(who and who.AddFriendButton)
+	self:SkinActionButton(who and who.GroupInviteButton)
+end
+
+function EllesmereUISkin:SkinLegacyChrome(frame)
+	if not self:IsSkinEnabled() or not frame or self:IsModernInterfaceActive() then
+		return
+	end
+	local api = self.facade
+	local header = frame.FriendsTabHeader
+	local battleNet = header and header.BattlenetFrame
+	local guild = frame.GuildFrame
+	local who = frame.WhoFrame
+
+	-- Legacy controls are deliberately allowlisted. List rows, group headers,
+	-- scrollbars, and the native tab backgrounds are not traversed generically.
+	SafeCall(api, "Dropdown", header and header.StatusDropdown)
+	SafeCall(api, "Dropdown", header and header.QuickFilterDropdown)
+	SafeCall(api, "Dropdown", header and header.PrimarySortDropdown)
+	SafeCall(api, "Dropdown", header and header.SecondarySortDropdown)
+	self:SkinIconButton(battleNet and battleNet.ContactsMenuButton)
+	self:SkinIconButton(battleNet and battleNet.SettingsButton)
+
+	self:SkinActionButton(frame.AddFriendButton)
+	self:SkinActionButton(frame.SendMessageButton)
+	self:SkinActionButton(guild and guild.ActionsButton)
+	SafeCall(api, "Dropdown", who and who.ColumnDropdown)
+	self:SkinRequestedActionControls(frame)
+end
+
+function EllesmereUISkin:SkinLegacyInviteButtons(button)
+	if not self:IsSkinEnabled() or self:IsModernInterfaceActive() or not button then
+		return
+	end
+	self:SkinActionButton(button.AcceptButton)
+	self:SkinActionButton(button.DeclineButton)
 end
 
 function EllesmereUISkin:SkinModernChrome(frame, FriendsUI)
@@ -337,21 +505,9 @@ function EllesmereUISkin:SkinModernChrome(frame, FriendsUI)
 	SafeCall(api, "Button", root.BattleNetBar and root.BattleNetBar.MenuButton, { "Icon" })
 	self:SkinFooterActionButton(root.BottomActionBar and root.BottomActionBar.AddFriendButton)
 
-	-- Keep the EUI pass intentionally allowlisted. These are the visible RAF,
-	-- Raid, and Who action controls requested by the integration; row hit targets,
-	-- group headers, invite buttons, and side-tab backgrounds remain native.
-	local raf = frame.RecruitAFriendFrame
-	local raid = frame.RaidFrame
-	local raidControl = raid and raid.ControlPanel
-	self:SkinActionButton(frame.RecruitmentButton)
-	self:SkinActionButton(raf and raf.RewardClaiming and raf.RewardClaiming.ClaimOrViewRewardButton)
-	self:SkinActionButton(raidControl and raidControl.RaidInfoButton)
-	self:SkinActionButton(raidControl and raidControl.ReadyCheckButton, { "Icon" })
-	self:SkinActionButton(raid and raid.RaidToolsButton)
-	self:SkinActionButton(raid and raid.ConvertToRaidButton)
-	self:SkinActionButton(who and who.WhoButton)
-	self:SkinActionButton(who and who.AddFriendButton)
-	self:SkinActionButton(who and who.GroupInviteButton)
+	-- Keep the EUI pass intentionally allowlisted. Row hit targets, group
+	-- headers, invite buttons, and side-tab backgrounds remain native in Modern.
+	self:SkinRequestedActionControls(frame)
 end
 
 function EllesmereUISkin:SkinSettingsCenter(frame)
@@ -439,12 +595,18 @@ function EllesmereUISkin:SkinMainFrame()
 	SafeCall(api, "Shell", frame, { bottomBar = 80, noBorder = true })
 	SafeCall(api, "Inset", frame.Inset)
 	SafeCall(api, "CloseButton", frame.CloseButton)
-	for index = 1, 4 do
-		SafeCall(api, "Tab", _G["BetterFriendsFrameTab" .. index])
-		SafeCall(api, "Tab", _G["BetterFriendsFrameBottomTab" .. index])
-	end
 
 	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	local modern = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() == true
+	if modern then
+		self:SetLegacyPortraitShown(frame, false)
+	else
+		self:SkinLegacyPortrait(frame)
+		for index = 1, 4 do
+			self:SkinLegacyTab(_G["BetterFriendsFrameTab" .. index])
+			self:SkinLegacyTab(_G["BetterFriendsFrameBottomTab" .. index])
+		end
+	end
 
 	local who = frame.WhoFrame
 	local guild = frame.GuildFrame
@@ -454,7 +616,11 @@ function EllesmereUISkin:SkinMainFrame()
 	SafeCall(api, "Inset", guild and guild.ListInset)
 	SafeCall(api, "Inset", raid and raid.GroupsInset)
 	SafeCall(api, "Inset", quickJoin and quickJoin.ContentInset)
-	self:SkinModernChrome(frame, FriendsUI)
+	if modern then
+		self:SkinModernChrome(frame, FriendsUI)
+	else
+		self:SkinLegacyChrome(frame)
+	end
 end
 
 function EllesmereUISkin:Apply(reason)
@@ -581,6 +747,13 @@ function EllesmereUISkin:InstallHooks()
 	HookObject(BFL:GetModule("RaidTools"), "RaidTools", "CreateFrame")
 	HookObject(BFL:GetModule("WhoFrame"), "WhoFrame", "CreateSearchBuilder")
 	HookObject(BFL:GetModule("WhoFrame"), "WhoFrame", "ToggleSearchBuilder")
+
+	local FriendsList = BFL:GetModule("FriendsList")
+	if FriendsList and type(FriendsList.UpdateInviteButton) == "function" then
+		hooksecurefunc(FriendsList, "UpdateInviteButton", function(_, button)
+			self:SkinLegacyInviteButtons(button)
+		end)
+	end
 
 	if _G.BetterFriendsFrame and _G.BetterFriendsFrame.HookScript then
 		_G.BetterFriendsFrame:HookScript("OnShow", function()
