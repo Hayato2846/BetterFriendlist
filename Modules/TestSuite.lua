@@ -4966,6 +4966,7 @@ local function RegisterBuiltInTests()
 			V:AssertNotNil(BFL.IsThemeActive, "BFL:IsThemeActive should exist")
 			V:AssertNotNil(BFL.UsesFlatTheme, "BFL:UsesFlatTheme should exist")
 			V:AssertNotNil(BFL.UsesDarkSkinTheme, "BFL:UsesDarkSkinTheme should exist")
+			V:AssertNotNil(BFL.IsEllesmereUISkinActive, "BFL:IsEllesmereUISkinActive should exist")
 			V:AssertNotNil(BFL.AreThemeFeaturesEnabled, "BFL:AreThemeFeaturesEnabled should exist")
 			V:AssertNotNil(BFL.ShouldUseLegacyElvUISkinSetting, "BFL:ShouldUseLegacyElvUISkinSetting should exist")
 			V:AssertNotNil(BFL.ShouldShowLegacyElvUISkinSetting, "BFL:ShouldShowLegacyElvUISkinSetting should exist")
@@ -4998,6 +4999,26 @@ local function RegisterBuiltInTests()
 				error(err, 2)
 			end
 
+			local originalIsEllesmereUIAvailable = BFL.IsEllesmereUIAvailable
+			BFL.IsEllesmereUIAvailable = function()
+				return true
+			end
+			local euiOK, euiError = pcall(function()
+				WithTemporaryDatabase({
+					theme = "ellesmereui",
+				}, function(tempDB)
+					V:AssertEqual(tempDB.theme, "ellesmereui", "EllesmereUI should remain a valid stored theme")
+					V:AssertEqual(BFL:GetEffectiveTheme(), "ellesmereui", "EllesmereUI should become effective when available")
+					V:Assert(BFL:IsThemeActive("ellesmereui"), "EllesmereUI theme should be active")
+					V:Assert(BFL:UsesFlatTheme(), "EllesmereUI should use flat-theme layout rules")
+					V:Assert(not BFL:UsesDarkSkinTheme(), "EllesmereUI should not activate the BFL skin engine")
+				end)
+			end)
+			BFL.IsEllesmereUIAvailable = originalIsEllesmereUIAvailable
+			if not euiOK then
+				error(euiError, 2)
+			end
+
 			WithTemporaryDatabase({
 				theme = "blizzard",
 			}, function()
@@ -5022,6 +5043,72 @@ local function RegisterBuiltInTests()
 				V:AssertEqual(BFL:GetEffectiveTheme(), "blizzard", "ElvUI theme should fall back to Blizzard")
 				V:Assert(not BFL:IsThemeActive("elvui"), "ElvUI theme should not be active without ElvUI")
 			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "Theme_EllesmereUIFallbackWithoutSkinAPI", {
+		description = "Stored EllesmereUI theme should fall back to Blizzard until the EUI skin facade is active",
+		action = function(V)
+			local originalIsEllesmereUIAvailable = BFL.IsEllesmereUIAvailable
+			BFL.IsEllesmereUIAvailable = function()
+				return false
+			end
+
+			local ok, err = pcall(function()
+				WithTemporaryDatabase({
+					theme = "ellesmereui",
+				}, function(tempDB)
+					V:AssertEqual(tempDB.theme, "ellesmereui", "Unavailable EllesmereUI preference should remain stored")
+					V:AssertEqual(BFL:GetEffectiveTheme(), "blizzard", "Unavailable EllesmereUI should fall back to Blizzard")
+					V:Assert(not BFL:IsThemeActive("ellesmereui"), "EllesmereUI should be inactive without its skin facade")
+				end)
+			end)
+
+			BFL.IsEllesmereUIAvailable = originalIsEllesmereUIAvailable
+			if not ok then
+				error(err, 2)
+			end
+		end,
+	})
+
+	TS:RegisterTest("data", "EllesmereUISkin_FacadeLifetimeAndPalette", {
+		description = "Dispatched EUI facade should remain active until reload and expose Modern palette tokens",
+		action = function(V)
+			local skin = BFL:GetModule("EllesmereUISkin")
+			V:AssertNotNil(skin, "EllesmereUISkin module should be loaded")
+			local originalFacade = skin.facade
+			local originalFacadeActivated = skin.facadeActivated
+			local originalPaletteVersion = skin.paletteVersion
+			local ok, err = pcall(function()
+				skin.facade = {
+					apiVersion = 1,
+					IsEnabled = function()
+						return false
+					end,
+					GetAccentColor = function()
+						return 0.1, 0.7, 0.5
+					end,
+					GetPanelColor = function()
+						return 0.04, 0.05, 0.06, 0.94
+					end,
+				}
+				skin.facadeActivated = true
+				V:Assert(skin:IsAvailable(), "A dispatched EUI facade should remain available until reload")
+				local accentR, accentG, accentB = skin:GetAccentColor()
+				V:AssertEqual(accentR, 0.1, "EUI accent red should come from the public facade")
+				V:AssertEqual(accentG, 0.7, "EUI accent green should come from the public facade")
+				V:AssertEqual(accentB, 0.5, "EUI accent blue should come from the public facade")
+				local palette = skin:GetPalette()
+				for _, key in ipairs({ "background", "surface", "inset", "control", "border", "accent", "text" }) do
+					V:Assert(type(palette[key]) == "table" and #palette[key] == 4, "EUI palette resolves " .. key)
+				end
+			end)
+			skin.facade = originalFacade
+			skin.facadeActivated = originalFacadeActivated
+			skin.paletteVersion = originalPaletteVersion
+			if not ok then
+				error(err, 2)
+			end
 		end,
 	})
 
@@ -5217,6 +5304,7 @@ local function RegisterBuiltInTests()
 				local settings = tempDB.brokerTooltipThemeSettings
 				V:AssertType(settings.blizzard, "table", "Blizzard broker tooltip settings should exist")
 				V:AssertType(settings.elvui, "table", "ElvUI broker tooltip settings should exist")
+				V:AssertType(settings.ellesmereui, "table", "EllesmereUI broker tooltip settings should exist")
 				V:AssertNil(settings.unknown, "Unknown broker tooltip themes should be discarded")
 				V:AssertEqual(settings.dark.backgroundColor.r, 0, "Broker tooltip red should be clamped")
 				V:AssertEqual(settings.dark.backgroundColor.b, 1, "Broker tooltip blue should be clamped")
