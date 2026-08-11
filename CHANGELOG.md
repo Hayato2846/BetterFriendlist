@@ -10,11 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [DRAFT]
 
 ### Added
+- **EllesmereUI Theme** - Added conditional EllesmereUI styling for Retail Legacy and Modern interface styles through EUI's public skinning API, including live accent and appearance updates when EllesmereUI skinning is enabled.
 - **Retail 12.1 Friendlist UI** - Added a new Retail interface based on Blizzard's 12.1 SocialUI, including vertical section tabs, modern friend cards and group headers, a Battle.net bar, compact search/filter/sort controls, and a dedicated Friend Requests view.
 - **Interface Style Setting** - Retail can switch between Modern and Legacy without reloading. Modern is the Retail default when Blizzard's SocialUI is enabled; Classic and unsupported Retail states continue to use Legacy.
 - **Friend Tab Settings** - Modern Retail users can reorder every side tab, hide individual tabs, and optionally show Friend Requests or Quick Join only while they contain entries. Hidden tabs are removed from the layout without leaving gaps.
 
 ### Improved
+- **EllesmereUI Visual Parity** - The friendlist now uses EUI's translucent shell, pure accent-colored BFL icons, matched custom side-tab states, aligned header branding, EUI-styled Guild and Who search/dropdown controls, and matching RAF, Raid, Who, and footer actions, while preserving Blizzard's side-tab chrome, group headers, invite buttons, font geometry, and transparent Battle.net bar.
 - **Social Entry Points** - Retail SocialUI toggles and tab-opening calls now route to matching BetterFriendlist sections, while the menu option for Blizzard's friendlist opens Blizzard's original SocialUI.
 - **Retail 12.1 Contact Views** - Friends, Recent Allies, Friend Requests, Quick Join, Guild, and Who now use section-specific Modern search, filter, divider, list, and action-bar layouts. Recent Allies supports Blizzard's new status and interest filters with an older-client fallback.
 - **Retail 12.1 Social Actions** - Recent Allies sends WoW title-friend invitations through Blizzard's confirmation dialog, offline WoW-only Title friends no longer expose an unreachable Whisper action, and Quick Join toasts select and scroll to the matching BetterFriendlist group.

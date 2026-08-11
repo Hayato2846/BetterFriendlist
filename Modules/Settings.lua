@@ -872,16 +872,26 @@ local function GetAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
 	return fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1
 end
 
+local function UsesThemeIconAccent()
+	return (BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme())
+		or (BFL.IsEllesmereUISkinActive and BFL:IsEllesmereUISkinActive())
+end
+
 local FAVORITE_ICON_TEXTURE = "Interface\\AddOns\\BetterFriendlist\\Icons\\star"
 
 local function GetFavoriteIconMarkup(style, size)
 	size = tonumber(size) or 17
-	local themed = BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme()
+	local themed = UsesThemeIconAccent()
 	if not themed then
 		if style == "blizzard" and BFL.GetAtlasOrTextureMarkup then
 			return BFL.GetAtlasOrTextureMarkup("friendslist-favorite", FAVORITE_ICON_TEXTURE, size, size)
 		end
 		return string.format("|T%s:%d:%d|t", FAVORITE_ICON_TEXTURE, size, size)
+	end
+	if style ~= "blizzard" and BFL.FormatIcon then
+		-- The EUI-aware formatter swaps BFL's baked-gold star for a neutral mask
+		-- before tinting, keeping the result at the exact theme accent.
+		return BFL.FormatIcon(FAVORITE_ICON_TEXTURE, size)
 	end
 
 	local r, g, b = GetAccentColor(1, 0.82, 0)
@@ -1054,6 +1064,9 @@ function Settings:RefreshCategories()
 
 		if catDef.icon then
 			button.icon:SetTexture(catDef.icon)
+			if button.icon.SetDesaturated then
+				button.icon:SetDesaturated(UsesThemeIconAccent())
+			end
 			button.icon:SetVertexColor(r, g, b) -- Match text color exactly
 			button.icon:Show()
 		else
@@ -1126,7 +1139,7 @@ function Settings:RefreshCategoryVisualState()
 			end
 			button.text:SetTextColor(1, 1, 1) -- White Text
 			if button.icon then
-				local themed = BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme()
+				local themed = UsesThemeIconAccent()
 				if button.icon.SetDesaturated then
 					button.icon:SetDesaturated(themed == true)
 				end
@@ -1152,7 +1165,7 @@ function Settings:RefreshCategoryVisualState()
 			button.text:SetTextColor(r, g, b)
 			if button.icon then
 				if button.icon.SetDesaturated then
-					button.icon:SetDesaturated(BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme())
+					button.icon:SetDesaturated(UsesThemeIconAccent())
 				end
 				button.icon:SetVertexColor(r, g, b)
 			end
@@ -3559,6 +3572,10 @@ local function IsDarkSkinThemeValue(theme)
 	return theme == "dark" or theme == "custom"
 end
 
+local function IsExternalSkinThemeValue(theme)
+	return theme == "elvui" or theme == "ellesmereui"
+end
+
 local function ApplyThemeSettingsChanged(reason)
 	local ThemeManager = BFL:GetModule("ThemeManager")
 	if ThemeManager and ThemeManager.ApplyCurrentTheme then
@@ -3577,13 +3594,25 @@ function Settings:OnThemeChanged(theme)
 		return
 	end
 
-	if theme ~= "blizzard" and theme ~= "dark" and theme ~= "custom" and theme ~= "elvui" then
+	if
+		theme ~= "blizzard"
+		and theme ~= "dark"
+		and theme ~= "custom"
+		and theme ~= "elvui"
+		and theme ~= "ellesmereui"
+	then
 		theme = "blizzard"
 	end
 	-- Dark and Custom are standard theme values.
 	-- They remain selectable even when Beta Features are disabled.
 	-- Only unavailable addon-backed themes fall back to Blizzard.
 	if theme == "elvui" and (not BFL.IsElvUIAvailable or not BFL:IsElvUIAvailable()) then
+		theme = "blizzard"
+	end
+	if
+		theme == "ellesmereui"
+		and (not BFL.IsEllesmereUIAvailable or not BFL:IsEllesmereUIAvailable())
+	then
 		theme = "blizzard"
 	end
 
@@ -3593,12 +3622,12 @@ function Settings:OnThemeChanged(theme)
 	DB:Set("enableElvUISkin", theme == "elvui")
 
 	local ThemeManager = BFL:GetModule("ThemeManager")
-	local touchesElvUI = oldEffectiveTheme == "elvui" or theme == "elvui"
-	if touchesElvUI then
+	local touchesExternalSkin = IsExternalSkinThemeValue(oldEffectiveTheme) or IsExternalSkinThemeValue(theme)
+	if touchesExternalSkin then
 		if IsDarkSkinThemeValue(oldEffectiveTheme) then
 			local DarkTheme = BFL:GetModule("DarkTheme")
 			if DarkTheme and DarkTheme.Remove then
-				DarkTheme:Remove("settings-elvui")
+				DarkTheme:Remove("settings-external-theme")
 			end
 		end
 		if ThemeManager and ThemeManager.ShowReloadDialog then
@@ -3676,6 +3705,10 @@ function Settings:RefreshThemeTab()
 		table.insert(labels, L.SETTINGS_THEME_ELVUI or "ElvUI")
 		table.insert(values, "elvui")
 	end
+	if BFL.IsEllesmereUIAvailable and BFL:IsEllesmereUIAvailable() then
+		table.insert(labels, L.SETTINGS_THEME_ELLESMEREUI or "EllesmereUI")
+		table.insert(values, "ellesmereui")
+	end
 
 	local themeDropdown = Components:CreateDropdown(
 		tab,
@@ -3694,7 +3727,7 @@ function Settings:RefreshThemeTab()
 	themeDropdown:SetTooltip(
 		L.SETTINGS_THEME_DROPDOWN or "Theme",
 		L.SETTINGS_THEME_DROPDOWN_DESC
-			or "Choose the visual style for BetterFriendlist. ElvUI requires a UI reload."
+			or "Choose the visual style for BetterFriendlist. ElvUI and EllesmereUI require a UI reload."
 	)
 	table.insert(allFrames, themeDropdown)
 

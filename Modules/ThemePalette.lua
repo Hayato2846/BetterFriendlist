@@ -52,6 +52,7 @@ local BROKER_TOOLTIP_THEME_ORDER = {
 	"dark",
 	"custom",
 	"elvui",
+	"ellesmereui",
 }
 
 local BROKER_TOOLTIP_THEME_KEYS = {
@@ -59,6 +60,7 @@ local BROKER_TOOLTIP_THEME_KEYS = {
 	dark = true,
 	custom = true,
 	elvui = true,
+	ellesmereui = true,
 }
 
 local CUSTOM_COLOR_KEYS = {

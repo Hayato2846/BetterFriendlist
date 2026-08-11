@@ -226,12 +226,18 @@ local function SetModernBFLIconColor(icon, fallbackR, fallbackG, fallbackB, fall
 	if not icon then
 		return
 	end
-	if
-		WhoFrame.IsModernSearchBuilderEmbedded
+	local usesThemeAccent = WhoFrame.IsModernSearchBuilderEmbedded
 		and WhoFrame:IsModernSearchBuilderEmbedded()
-		and BFL.UsesDarkSkinTheme
-		and BFL:UsesDarkSkinTheme()
-	then
+		and (
+			(BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme())
+			or (BFL.IsEllesmereUISkinActive and BFL:IsEllesmereUISkinActive())
+		)
+	if icon.SetDesaturated then
+		-- BFL's builder icons have a baked gold source color. Desaturate before
+		-- tinting so Dark/Custom and EUI receive the exact accent on every state.
+		icon:SetDesaturated(usesThemeAccent == true)
+	end
+	if usesThemeAccent then
 		icon:SetVertexColor(GetAccentColor(1, 0.82, 0, 1))
 	else
 		icon:SetVertexColor(fallbackR or 1, fallbackG or 1, fallbackB or 1, fallbackA or 1)
@@ -4152,7 +4158,7 @@ function WhoFrame:ToggleSearchBuilder(show)
 			self.builderDockedContainer:Show()
 		end
 		self.builderFlyout:Show()
-		self.builderToggle.icon:SetVertexColor(GetAccentColor(1, 0.82, 0, 1))
+		SetModernBFLIconColor(self.builderToggle.icon, 1, 1, 1, 1)
 		self:UpdateBuilderPreview()
 	else
 		self.builderFlyout:Hide()
@@ -4192,7 +4198,7 @@ end
 function WhoFrame:RefreshAccentColors()
 	if self.builderToggle and self.builderToggle.icon then
 		if self.builderFlyout and self.builderFlyout:IsShown() then
-			self.builderToggle.icon:SetVertexColor(GetAccentColor(1, 0.82, 0, 1))
+			SetModernBFLIconColor(self.builderToggle.icon, 1, 1, 1, 1)
 		else
 			SetModernBFLIconColor(self.builderToggle.icon, 0.7, 0.7, 0.7, 1)
 		end

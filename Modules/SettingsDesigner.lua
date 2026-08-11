@@ -825,6 +825,10 @@ local function GetThemeOptions()
 		options.elvui = T("SETTINGS_THEME_ELVUI", "ElvUI")
 		order[#order + 1] = "elvui"
 	end
+	if BFL.IsEllesmereUIAvailable and BFL:IsEllesmereUIAvailable() then
+		options.ellesmereui = T("SETTINGS_THEME_ELLESMEREUI", "EllesmereUI")
+		order[#order + 1] = "ellesmereui"
+	end
 	return options, order
 end
 
@@ -1080,6 +1084,33 @@ local function GetElvUISettingsCenterColors()
 	})
 end
 
+local function GetEllesmereUISettingsCenterColors()
+	local EllesmereUISkin = BFL:GetModule("EllesmereUISkin")
+	local colors = EllesmereUISkin and EllesmereUISkin.GetPalette and EllesmereUISkin:GetPalette()
+	if type(colors) ~= "table" then
+		return GetBlizzardSettingsCenterColors()
+	end
+
+	return BuildSettingsCenterColorMap({
+		accent = colors.accent,
+		panel = colors.panel or colors.background,
+		surface = colors.panelSoft or colors.surface,
+		inset = colors.inset,
+		control = colors.control,
+		controlHover = colors.controlHover or colors.hover,
+		rowHover = colors.rowHover or colors.hover,
+		selected = colors.rowDown or colors.selected,
+		border = colors.border,
+		borderSoft = colors.borderSoft,
+		borderMuted = colors.borderMuted,
+		borderHover = colors.borderHover or colors.accent,
+		controlBorder = colors.controlBorder,
+		divider = colors.divider,
+		text = colors.text,
+		disabledText = colors.disabledText,
+	})
+end
+
 local function GetBFLThemeSettingsCenterColors()
 	local SkinEngine = BFL:GetModule("SkinEngine")
 	if SkinEngine and SkinEngine.RefreshThemeColors then
@@ -1115,7 +1146,9 @@ end
 local function GetSettingsCenterThemeColors()
 	local currentTheme = BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() or GetDB("theme", "blizzard")
 	local elvUIAvailable = BFL.IsElvUIAvailable and BFL:IsElvUIAvailable()
-	if elvUIAvailable and (currentTheme == "elvui" or GetDB("enableElvUISkin", false) == true) then
+	if currentTheme == "ellesmereui" and BFL.IsEllesmereUIAvailable and BFL:IsEllesmereUIAvailable() then
+		return GetEllesmereUISettingsCenterColors()
+	elseif elvUIAvailable and (currentTheme == "elvui" or GetDB("enableElvUISkin", false) == true) then
 		return GetElvUISettingsCenterColors()
 	elseif currentTheme == "dark" or currentTheme == "custom" then
 		return GetBFLThemeSettingsCenterColors()
@@ -4503,6 +4536,15 @@ local function PolishIconTexture(texture)
 	if texture.SetSnapToPixelGrid then
 		pcall(texture.SetSnapToPixelGrid, texture, false)
 	end
+	if BFL.IsEllesmereUISkinActive and BFL:IsEllesmereUISkinActive() and BFL.GetThemeAccentColor then
+		local r, g, b = BFL:GetThemeAccentColor(1, 0.82, 0, 1)
+		if texture.SetDesaturated then
+			texture:SetDesaturated(true)
+		end
+		if texture.SetVertexColor then
+			texture:SetVertexColor(r, g, b, 1)
+		end
+	end
 end
 
 local function PolishSettingsIcons(frame, visited)
@@ -4564,6 +4606,13 @@ function SettingsDesigner:ApplySkin(reason)
 	self:ScheduleIconPolish()
 
 	local currentTheme = BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() or GetDB("theme", "blizzard")
+	if currentTheme == "ellesmereui" then
+		local EllesmereUISkin = BFL:GetModule("EllesmereUISkin")
+		if EllesmereUISkin and EllesmereUISkin.SkinSettingsCenter then
+			EllesmereUISkin:SkinSettingsCenter(frame)
+		end
+		return
+	end
 	if currentTheme == "blizzard" then
 		local state = frame._LibSettingsDesignerState
 		if state and state.RefreshSidebarSelection then
@@ -4626,6 +4675,19 @@ function SettingsDesigner:ApplySkin(reason)
 		SetBackdrop(frame.ContentShell, { 0.030, 0.029, 0.026, 0.94 }, { 0.45, 0.36, 0.18, 0.50 })
 	end
 	SkinText(frame, { r = 0.92, g = 0.88, b = 0.78, a = 1 })
+end
+
+function SettingsDesigner:RefreshThemeAvailability()
+	local frame = self:GetFrame()
+	if not (frame and frame.IsShown and frame:IsShown() and ConfigUI and ConfigUI.Open) then
+		return
+	end
+	local state = frame._LibSettingsDesignerState
+	local target = state and state.view == "page" and state.selectedPageID
+		or state and state.view == "dashboard" and "dashboard"
+		or nil
+	ConfigUI:Open(app or APP_ID, target)
+	self:ScheduleIconPolish()
 end
 
 function SettingsDesigner:ApplyElvUISkin(E, S)

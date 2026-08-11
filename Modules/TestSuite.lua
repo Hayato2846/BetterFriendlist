@@ -4966,6 +4966,7 @@ local function RegisterBuiltInTests()
 			V:AssertNotNil(BFL.IsThemeActive, "BFL:IsThemeActive should exist")
 			V:AssertNotNil(BFL.UsesFlatTheme, "BFL:UsesFlatTheme should exist")
 			V:AssertNotNil(BFL.UsesDarkSkinTheme, "BFL:UsesDarkSkinTheme should exist")
+			V:AssertNotNil(BFL.IsEllesmereUISkinActive, "BFL:IsEllesmereUISkinActive should exist")
 			V:AssertNotNil(BFL.AreThemeFeaturesEnabled, "BFL:AreThemeFeaturesEnabled should exist")
 			V:AssertNotNil(BFL.ShouldUseLegacyElvUISkinSetting, "BFL:ShouldUseLegacyElvUISkinSetting should exist")
 			V:AssertNotNil(BFL.ShouldShowLegacyElvUISkinSetting, "BFL:ShouldShowLegacyElvUISkinSetting should exist")
@@ -4998,6 +4999,26 @@ local function RegisterBuiltInTests()
 				error(err, 2)
 			end
 
+			local originalIsEllesmereUIAvailable = BFL.IsEllesmereUIAvailable
+			BFL.IsEllesmereUIAvailable = function()
+				return true
+			end
+			local euiOK, euiError = pcall(function()
+				WithTemporaryDatabase({
+					theme = "ellesmereui",
+				}, function(tempDB)
+					V:AssertEqual(tempDB.theme, "ellesmereui", "EllesmereUI should remain a valid stored theme")
+					V:AssertEqual(BFL:GetEffectiveTheme(), "ellesmereui", "EllesmereUI should become effective when available")
+					V:Assert(BFL:IsThemeActive("ellesmereui"), "EllesmereUI theme should be active")
+					V:Assert(BFL:UsesFlatTheme(), "EllesmereUI should use flat-theme layout rules")
+					V:Assert(not BFL:UsesDarkSkinTheme(), "EllesmereUI should not activate the BFL skin engine")
+				end)
+			end)
+			BFL.IsEllesmereUIAvailable = originalIsEllesmereUIAvailable
+			if not euiOK then
+				error(euiError, 2)
+			end
+
 			WithTemporaryDatabase({
 				theme = "blizzard",
 			}, function()
@@ -5022,6 +5043,392 @@ local function RegisterBuiltInTests()
 				V:AssertEqual(BFL:GetEffectiveTheme(), "blizzard", "ElvUI theme should fall back to Blizzard")
 				V:Assert(not BFL:IsThemeActive("elvui"), "ElvUI theme should not be active without ElvUI")
 			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "Theme_EllesmereUIFallbackWithoutSkinAPI", {
+		description = "Stored EllesmereUI theme should fall back to Blizzard until the EUI skin facade is active",
+		action = function(V)
+			local originalIsEllesmereUIAvailable = BFL.IsEllesmereUIAvailable
+			BFL.IsEllesmereUIAvailable = function()
+				return false
+			end
+
+			local ok, err = pcall(function()
+				WithTemporaryDatabase({
+					theme = "ellesmereui",
+				}, function(tempDB)
+					V:AssertEqual(tempDB.theme, "ellesmereui", "Unavailable EllesmereUI preference should remain stored")
+					V:AssertEqual(BFL:GetEffectiveTheme(), "blizzard", "Unavailable EllesmereUI should fall back to Blizzard")
+					V:Assert(not BFL:IsThemeActive("ellesmereui"), "EllesmereUI should be inactive without its skin facade")
+				end)
+			end)
+
+			BFL.IsEllesmereUIAvailable = originalIsEllesmereUIAvailable
+			if not ok then
+				error(err, 2)
+			end
+		end,
+	})
+
+	TS:RegisterTest("data", "EllesmereUISkin_FacadeLifetimeAndPalette", {
+		description = "Dispatched EUI facade should remain active until reload and expose Modern palette tokens",
+		action = function(V)
+			local skin = BFL:GetModule("EllesmereUISkin")
+			V:AssertNotNil(skin, "EllesmereUISkin module should be loaded")
+			local originalFacade = skin.facade
+			local originalFacadeActivated = skin.facadeActivated
+			local originalPaletteVersion = skin.paletteVersion
+			local ok, err = pcall(function()
+				skin.facade = {
+					apiVersion = 1,
+					IsEnabled = function()
+						return false
+					end,
+					GetAccentColor = function()
+						return 0.1, 0.7, 0.5
+					end,
+					GetPanelColor = function()
+						return 0.04, 0.05, 0.06, 0.94
+					end,
+				}
+				skin.facadeActivated = true
+				V:Assert(skin:IsAvailable(), "A dispatched EUI facade should remain available until reload")
+				local accentR, accentG, accentB = skin:GetAccentColor()
+				V:AssertEqual(accentR, 0.1, "EUI accent red should come from the public facade")
+				V:AssertEqual(accentG, 0.7, "EUI accent green should come from the public facade")
+				V:AssertEqual(accentB, 0.5, "EUI accent blue should come from the public facade")
+				local palette = skin:GetPalette()
+				for _, key in ipairs({ "background", "surface", "inset", "control", "border", "accent", "text" }) do
+					V:Assert(type(palette[key]) == "table" and #palette[key] == 4, "EUI palette resolves " .. key)
+				end
+				V:Assert(palette.externalShell == true, "EUI palette should preserve the public EUI shell")
+				V:Assert(palette.externalControls == true, "EUI palette should delegate controls to the public EUI API")
+				V:Assert(palette.skinFriendCardSurface == true, "EUI palette should request EUIFriends-style friend-card surfaces")
+				V:Assert(palette.preserveNativeSideTabs == true, "EUI palette should preserve Blizzard side-tab chrome")
+				V:Assert(palette.preserveNativeGroupHeaders == true, "EUI palette should preserve Blizzard group headers")
+				V:Assert(palette.preserveNativeInviteButtons == true, "EUI palette should preserve Blizzard invite buttons")
+				V:Assert(palette.transparentBattleNetBar == true, "EUI palette should keep the Battle.net bar transparent")
+				V:AssertEqual(palette.portraitOffsetX, 6, "EUI portrait should keep the refined left inset")
+				V:AssertEqual(palette.portraitOffsetY, -25, "EUI portrait artwork should fill the Battle.net header strip")
+				V:AssertEqual(palette.portraitSize, 42, "EUI portrait should keep the compact themed size")
+				V:AssertEqual(palette.customTabInactiveMultiplier, 0.68, "EUI custom tabs should match inactive Blizzard luminance")
+				V:Assert(palette.background[4] < 0.5, "BFL content wash should not cover the EUI shell")
+			end)
+			skin.facade = originalFacade
+			skin.facadeActivated = originalFacadeActivated
+			skin.paletteVersion = originalPaletteVersion
+			if not ok then
+				error(err, 2)
+			end
+		end,
+	})
+
+	TS:RegisterTest("data", "EllesmereUISkin_LegacyControlAllowlist", {
+		description = "EUI Legacy skinning should cover requested controls without traversing scrollbars or Modern invites",
+		action = function(V)
+			local skin = BFL:GetModule("EllesmereUISkin")
+			V:AssertNotNil(skin, "EllesmereUISkin module should be loaded")
+
+			local function MakeTexture()
+				local texture = {
+					shown = false,
+				}
+				function texture:SetAlpha(alpha)
+					self.alpha = alpha
+				end
+				function texture:SetDesaturated(desaturated)
+					self.desaturated = desaturated == true
+				end
+				function texture:SetVertexColor(r, g, b, a)
+					self.vertexColor = { r, g, b, a }
+				end
+				function texture:SetTexture(path)
+					self.texture = path
+				end
+				function texture:SetTexCoord(...)
+					self.texCoord = { ... }
+				end
+				function texture:SetSize(width, height)
+					self.width = width
+					self.height = height
+				end
+				function texture:SetPoint(...)
+					self.point = { ... }
+				end
+				function texture:ClearAllPoints()
+					self.point = nil
+				end
+				function texture:SetShown(shown)
+					self.shown = shown == true
+				end
+				function texture:Show()
+					self.shown = true
+				end
+				function texture:Hide()
+					self.shown = false
+				end
+				return texture
+			end
+
+			local function MakeButton(withIcon)
+				local button = {
+					hooks = {},
+				}
+				if withIcon then
+					button.Icon = MakeTexture()
+				end
+				function button:HookScript(event, callback)
+					self.hooks[event] = self.hooks[event] or {}
+					self.hooks[event][#self.hooks[event] + 1] = callback
+				end
+				function button:GetFontString()
+					return self.Text
+				end
+				function button:CreateTexture()
+					local texture = MakeTexture()
+					self.createdTexture = texture
+					return texture
+				end
+				function button:ClearAllPoints()
+					self.point = nil
+				end
+				function button:SetPoint(...)
+					self.point = { ... }
+				end
+				function button:SetSize(width, height)
+					self.width = width
+					self.height = height
+				end
+				return button
+			end
+
+			local calls = {
+				buttons = {},
+				checkboxes = {},
+				dropdowns = {},
+				editBoxes = {},
+				tabs = {},
+				scrollbar = false,
+			}
+			local facade = {
+				apiVersion = 1,
+				Button = function(button)
+					if button then
+						calls.buttons[button] = true
+					end
+				end,
+				StateButtonLabel = function() end,
+				Checkbox = function(checkbox)
+					if checkbox then
+						calls.checkboxes[checkbox] = true
+					end
+				end,
+				Dropdown = function(dropdown)
+					if dropdown then
+						calls.dropdowns[dropdown] = true
+					end
+				end,
+				EditBox = function(editBox)
+					if editBox then
+						calls.editBoxes[editBox] = true
+					end
+				end,
+				Tab = function(tab)
+					if tab then
+						calls.tabs[tab] = true
+					end
+				end,
+				ScrollBar = function()
+					calls.scrollbar = true
+				end,
+				GetAccentColor = function()
+					return 0.12, 0.73, 0.54
+				end,
+			}
+
+			local header = {
+				SearchBox = MakeButton(),
+				StatusDropdown = MakeButton(),
+				QuickFilterDropdown = MakeButton(),
+				PrimarySortDropdown = MakeButton(),
+				SecondarySortDropdown = MakeButton(),
+				BattlenetFrame = {
+					ContactsMenuButton = MakeButton(true),
+					SettingsButton = MakeButton(true),
+				},
+			}
+			local who = {
+				EditBox = MakeButton(),
+				ColumnDropdown = MakeButton(),
+				WhoButton = MakeButton(),
+				AddFriendButton = MakeButton(),
+				GroupInviteButton = MakeButton(),
+			}
+			local raid = {
+				ControlPanel = {
+					RaidInfoButton = MakeButton(),
+					ReadyCheckButton = MakeButton(true),
+				},
+				RaidToolsButton = MakeButton(),
+				ConvertToRaidButton = MakeButton(),
+			}
+			local frame = {
+				FriendsTabHeader = header,
+				AddFriendButton = MakeButton(),
+				SendMessageButton = MakeButton(),
+				RecruitmentButton = MakeButton(),
+				RecruitAFriendFrame = {
+					RewardClaiming = {
+						ClaimOrViewRewardButton = MakeButton(),
+					},
+				},
+				GuildFrame = {
+					SearchBox = MakeButton(),
+					ActionsButton = MakeButton(),
+				},
+				WhoFrame = who,
+				RaidFrame = raid,
+				PortraitButton = MakeButton(),
+				ScrollBar = MakeButton(),
+			}
+
+			local originalFacade = skin.facade
+			local originalFacadeActivated = skin.facadeActivated
+			local originalIsSkinEnabled = skin.IsSkinEnabled
+			local originalIsModernInterfaceActive = skin.IsModernInterfaceActive
+			local ok, err = pcall(function()
+				skin.facade = facade
+				skin.facadeActivated = true
+				skin.IsSkinEnabled = function()
+					return true
+				end
+				skin.IsModernInterfaceActive = function()
+					return false
+				end
+
+				skin:SkinLegacyChrome(frame)
+				local checkedTexture = MakeTexture()
+				local checkbox = MakeButton()
+				function checkbox:GetCheckedTexture()
+					return checkedTexture
+				end
+				function checkbox:GetDisabledCheckedTexture()
+					return nil
+				end
+				skin:SkinCheckbox(checkbox)
+				V:Assert(calls.checkboxes[checkbox] == true, "Legacy checkbox should use the EUI facade")
+				V:Assert(checkedTexture.desaturated == true, "Legacy checkbox should discard its native checkmark hue")
+				V:AssertEqual(checkedTexture.vertexColor[1], 0.12, "Legacy checkbox should use pure EUI accent red")
+				V:AssertEqual(checkedTexture.vertexColor[2], 0.73, "Legacy checkbox should use pure EUI accent green")
+				V:AssertEqual(checkedTexture.vertexColor[3], 0.54, "Legacy checkbox should use pure EUI accent blue")
+				checkedTexture:SetDesaturated(false)
+				checkedTexture:SetVertexColor(0, 1, 0, 1)
+				checkbox.hooks.OnShow[1]()
+				V:Assert(checkedTexture.desaturated == true, "Legacy checkbox refresh should neutralize native color again")
+				V:AssertEqual(checkedTexture.vertexColor[2], 0.73, "Legacy checkbox refresh should restore EUI accent")
+				for _, editBox in ipairs({
+					header.SearchBox,
+					frame.GuildFrame.SearchBox,
+					who.EditBox,
+				}) do
+					V:Assert(calls.editBoxes[editBox] == true, "Every tab search field should use the EUI facade")
+				end
+				for _, dropdown in ipairs({
+					header.StatusDropdown,
+					header.QuickFilterDropdown,
+					header.PrimarySortDropdown,
+					header.SecondarySortDropdown,
+					who.ColumnDropdown,
+				}) do
+					V:Assert(calls.dropdowns[dropdown] == true, "Requested Legacy dropdown should use the EUI facade")
+				end
+				for _, button in ipairs({
+					header.BattlenetFrame.ContactsMenuButton,
+					header.BattlenetFrame.SettingsButton,
+					frame.AddFriendButton,
+					frame.SendMessageButton,
+					frame.RecruitmentButton,
+					frame.RecruitAFriendFrame.RewardClaiming.ClaimOrViewRewardButton,
+					frame.GuildFrame.ActionsButton,
+					who.WhoButton,
+					who.AddFriendButton,
+					who.GroupInviteButton,
+					raid.ControlPanel.RaidInfoButton,
+					raid.ControlPanel.ReadyCheckButton,
+					raid.RaidToolsButton,
+					raid.ConvertToRaidButton,
+				}) do
+					V:Assert(calls.buttons[button] == true, "Requested Legacy action should use the EUI facade")
+				end
+				V:Assert(calls.scrollbar == false, "Legacy EUI allowlist must not skin scrollbars")
+
+				local menuIcon = header.BattlenetFrame.ContactsMenuButton.Icon
+				V:Assert(menuIcon.desaturated == true, "Legacy menu icon should discard its source hue")
+				V:AssertEqual(menuIcon.vertexColor[1], 0.12, "Legacy menu icon should use pure EUI accent red")
+				V:AssertEqual(menuIcon.vertexColor[2], 0.73, "Legacy menu icon should use pure EUI accent green")
+				V:AssertEqual(menuIcon.vertexColor[3], 0.54, "Legacy menu icon should use pure EUI accent blue")
+				menuIcon:SetVertexColor(1, 0, 0, 1)
+				header.BattlenetFrame.ContactsMenuButton.hooks.OnEnter[2]()
+				V:AssertEqual(menuIcon.vertexColor[2], 0.73, "Legacy menu hover should restore the pure EUI accent")
+
+				local tab = MakeButton()
+				tab.Text = MakeTexture()
+				skin:SkinLegacyTab(tab)
+				V:Assert(calls.tabs[tab] == true, "Legacy tab should use the EUI facade")
+				V:AssertEqual(tab.Text.alpha, 0, "Original Legacy tab label should stay hidden behind EUI's label")
+				tab.Text:SetAlpha(1)
+				tab.hooks.OnShow[1](tab)
+				V:AssertEqual(tab.Text.alpha, 0, "Legacy tab show should suppress duplicate native text again")
+				tab.Text:SetAlpha(1)
+				skin:RefreshLegacyTabLabel(tab)
+				V:AssertEqual(tab.Text.alpha, 0, "Legacy tab visual refresh should suppress duplicate native text again")
+				tab.Text:SetAlpha(1)
+				tab.hooks.OnClick[1](tab)
+				V:AssertEqual(tab.Text.alpha, 0, "Legacy tab click should suppress duplicate native text again")
+
+				skin:SkinLegacyPortrait(frame)
+				local portrait = frame.PortraitButton.BFL_EllesmerePortraitIcon
+				V:AssertNotNil(portrait, "Legacy EUI should create a logo below the shell's direct-texture strip")
+				V:AssertEqual(
+					portrait.texture,
+					"Interface\\AddOns\\BetterFriendlist\\Textures\\PortraitIcon",
+					"Legacy EUI logo should reuse the BFL portrait artwork"
+				)
+				V:AssertEqual(portrait.width, 34, "Legacy EUI logo should leave space above the search row")
+				V:Assert(portrait.shown == true, "Legacy EUI logo should be visible")
+				V:AssertEqual(frame.PortraitButton.point[1], "TOPLEFT", "Legacy EUI logo button should use the header anchor")
+				V:AssertEqual(frame.PortraitButton.point[2], frame, "Legacy EUI logo button should anchor to the main frame")
+				V:AssertEqual(frame.PortraitButton.point[4], 15, "Legacy EUI logo should align with the search field")
+				V:AssertEqual(frame.PortraitButton.point[5], -21, "Legacy EUI logo should meet the top header edge")
+
+				local invite = {
+					AcceptButton = MakeButton(),
+					DeclineButton = MakeButton(),
+				}
+				skin:SkinLegacyInviteButtons(invite)
+				V:Assert(calls.buttons[invite.AcceptButton] == true, "Legacy Accept should use the EUI facade")
+				V:Assert(calls.buttons[invite.DeclineButton] == true, "Legacy Decline should use the EUI facade")
+
+				local modernInvite = {
+					AcceptButton = MakeButton(),
+					DeclineButton = MakeButton(),
+				}
+				skin.IsModernInterfaceActive = function()
+					return true
+				end
+				skin:SkinLegacyInviteButtons(modernInvite)
+				V:Assert(calls.buttons[modernInvite.AcceptButton] ~= true, "Modern Accept should remain native")
+				V:Assert(calls.buttons[modernInvite.DeclineButton] ~= true, "Modern Decline should remain native")
+			end)
+
+			skin.facade = originalFacade
+			skin.facadeActivated = originalFacadeActivated
+			skin.IsSkinEnabled = originalIsSkinEnabled
+			skin.IsModernInterfaceActive = originalIsModernInterfaceActive
+			if not ok then
+				error(err, 2)
+			end
 		end,
 	})
 
@@ -5217,6 +5624,7 @@ local function RegisterBuiltInTests()
 				local settings = tempDB.brokerTooltipThemeSettings
 				V:AssertType(settings.blizzard, "table", "Blizzard broker tooltip settings should exist")
 				V:AssertType(settings.elvui, "table", "ElvUI broker tooltip settings should exist")
+				V:AssertType(settings.ellesmereui, "table", "EllesmereUI broker tooltip settings should exist")
 				V:AssertNil(settings.unknown, "Unknown broker tooltip themes should be discarded")
 				V:AssertEqual(settings.dark.backgroundColor.r, 0, "Broker tooltip red should be clamped")
 				V:AssertEqual(settings.dark.backgroundColor.b, 1, "Broker tooltip blue should be clamped")
@@ -8991,7 +9399,7 @@ local function RegisterBuiltInTests()
 	})
 
 	TS:RegisterTest("filter", "Registry_BFLMenuIcons_UseThemeAccent", {
-		description = "BFL-owned menu textures use the active Dark/Custom accent without tinting Blizzard assets",
+		description = "BFL-owned menu textures use the active Dark/Custom or EllesmereUI accent without tinting Blizzard assets",
 		action = function(V)
 			local Registry = BFL:GetModule("FilterSortRegistry")
 			if not Registry then
@@ -9000,30 +9408,58 @@ local function RegisterBuiltInTests()
 			end
 
 			local oldUsesDarkSkinTheme = BFL.UsesDarkSkinTheme
+			local oldIsEllesmereUISkinActive = BFL.IsEllesmereUISkinActive
 			local oldGetThemeAccentColor = BFL.GetThemeAccentColor
-			local bflMarkup, blizzardMarkup
+			local darkMarkup, ellesmereMarkup, blizzardMarkup
 			local ok, err = pcall(function()
 				BFL.UsesDarkSkinTheme = function()
 					return true
 				end
+				BFL.IsEllesmereUISkinActive = function()
+					return false
+				end
 				BFL.GetThemeAccentColor = function()
 					return 1, 0, 0, 1
 				end
-				bflMarkup = Registry:FormatIcon("Interface\\AddOns\\BetterFriendlist\\Icons\\filter", 16)
+				darkMarkup = Registry:FormatIcon("Interface\\AddOns\\BetterFriendlist\\Icons\\filter", 16)
+
+				BFL.UsesDarkSkinTheme = function()
+					return false
+				end
+				BFL.IsEllesmereUISkinActive = function()
+					return true
+				end
+				BFL.GetThemeAccentColor = function()
+					return 0, 1, 0, 1
+				end
+				ellesmereMarkup = Registry:FormatIcon("Interface\\AddOns\\BetterFriendlist\\Icons\\filter", 16)
 				blizzardMarkup = Registry:FormatIcon("Interface\\Icons\\INV_Misc_Note_01", 16)
 			end)
 			BFL.UsesDarkSkinTheme = oldUsesDarkSkinTheme
+			BFL.IsEllesmereUISkinActive = oldIsEllesmereUISkinActive
 			BFL.GetThemeAccentColor = oldGetThemeAccentColor
 			if not ok then
 				error(err, 0)
 			end
 
 			V:Assert(
-				bflMarkup:find(":255:0:0|t", 1, true) ~= nil,
-				"BFL menu texture markup should contain the active accent tint"
+				darkMarkup:find(":255:0:0|t", 1, true) ~= nil,
+				"BFL menu texture markup should contain the active Dark/Custom accent tint"
 			)
 			V:Assert(
-				blizzardMarkup:find(":255:0:0|t", 1, true) == nil,
+				darkMarkup:find("Textures\\ThemeIcons\\filter.tga", 1, true) ~= nil,
+				"Dark/Custom menu texture markup should use the neutral BFL icon mask"
+			)
+			V:Assert(
+				ellesmereMarkup:find(":0:255:0|t", 1, true) ~= nil,
+				"BFL menu texture markup should contain the active EllesmereUI accent tint"
+			)
+			V:Assert(
+				ellesmereMarkup:find("Textures\\ThemeIcons\\filter.tga", 1, true) ~= nil,
+				"EllesmereUI menu texture markup should use the neutral BFL icon mask"
+			)
+			V:Assert(
+				blizzardMarkup:find(":0:255:0|t", 1, true) == nil,
 				"Blizzard menu textures should retain their native color"
 			)
 		end,
