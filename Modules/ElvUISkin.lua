@@ -13,7 +13,7 @@ local ELVUI_CLASSIC_STATUS_DROPDOWN_WIDTH = 57
 local ELVUI_CLASSIC_MAIN_DROPDOWN_TEXT_Y_OFFSET = 0
 local ELVUI_CLASSIC_WHO_COLUMN_DROPDOWN_Y_OFFSET = 2
 
-local IsModernDropdown = BFL.IsModernDropdown
+local IsModernDropdown, CallElvUIHandler = BFL.IsModernDropdown
 local classicDropdownSelectedValueFixes = setmetatable({}, { __mode = "k" })
 local classicDropdownTextHookInstalled = false
 
@@ -435,7 +435,7 @@ end
 
 function ElvUISkin:Initialize()
 	-- Check if ElvUI is loaded immediately
-	if BFL.IsElvUIAvailable and BFL:IsElvUIAvailable() then
+	self:RegisterTests(); if BFL.IsElvUIAvailable and BFL:IsElvUIAvailable() then
 		self:RegisterSkin()
 	else
 		-- Wait for ElvUI to load (in case BFL loads first)
@@ -503,7 +503,7 @@ function ElvUISkin:RegisterSkin()
 			RealS[k] = v
 		end,
 	})
-
+	self.ElvUIEngine, self.ElvUISkins, self.ElvUISkinProxy = E, RealS, S
 	-- Register callback once; ThemeManager may re-apply after theme changes.
 	-- The callback itself still covers ElvUI's normal addon skin pass.
 	if S.AddCallbackForAddon and not self.ElvUICallbackRegistered then
@@ -519,15 +519,15 @@ function ElvUISkin:RegisterSkin()
 	end
 
 	-- Force run if ElvUI is already initialized (Classic fix)
-	if E.initialized then
-		-- BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Direct call triggered (E.initialized=true)")
+	if self:IsEngineInitialized(E, RealS) then
+		-- BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Direct call triggered (ElvUI initialized)")
 		xpcall(function()
 			self:SkinFrames(E, S)
 		end, function(err)
 			-- BFL:DebugPrint("|cffff0000BetterFriendlist ElvUI Skin Error:|r " .. tostring(err))
 		end)
 	else
-		-- BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Direct call skipped (E.initialized=false)")
+		-- BFL:DebugPrint("|cff00ffffBFL ElvUI:|r Direct call skipped (ElvUI not initialized)")
 	end
 
 	return true
@@ -543,7 +543,6 @@ function ElvUISkin:SkinFrames(E, S)
 	if not _G.BetterFriendsFrame then
 		return
 	end
-
 	-- Ensure Tab Text is centered (Hook for updates)
 	if not self.TabHookInstalled then
 		-- On 12.0.0+ (HasSecretValues), global PanelTemplates hooks taint the
@@ -576,11 +575,12 @@ function ElvUISkin:SkinFrames(E, S)
 
 		self.TabHookInstalled = true
 	end
-
 	-- BFL:DebugPrint("ElvUISkin: SkinFrames started")
 	local frame = _G.BetterFriendsFrame
 	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
 	local isModernFriendsUI = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
+	if not isModernFriendsUI then
+	self.lastAppliedStyle = "legacy"
 	self:SkinClassicMainFrameShell(E, S, frame)
 	-- Skin Main Frame
 	-- BFL:DebugPrint("ElvUISkin: Skinning Main Frame")
@@ -1072,32 +1072,32 @@ function ElvUISkin:SkinFrames(E, S)
 			if bnet.Tag then
 				bnet.Tag:SetParent(bnet.backdrop)
 			end
-
 			-- Set initial border color to default (not blue)
 			if E.media and E.media.bordercolor then
 				bnet.backdrop:SetBackdropBorderColor(unpack(E.media.bordercolor))
 			end
 
-			-- Add Hover Effect (like ElvUI)
+			-- Add Hover Effect without replacing BFL's own Battle.net scripts.
 			bnet:EnableMouse(true)
-			bnet:SetScript("OnEnter", function(self)
-				if self.backdrop then
-					local c = _G.FRIENDS_BNET_NAME_COLOR
-					if c then
-						self.backdrop:SetBackdropBorderColor(c.r, c.g, c.b)
+			if bnet.HookScript and not bnet.BFL_ElvUIHoverHooked then
+				bnet:HookScript("OnEnter", function(self)
+					if self.backdrop then
+						local c = _G.FRIENDS_BNET_NAME_COLOR
+						if c then
+							self.backdrop:SetBackdropBorderColor(c.r, c.g, c.b)
+						end
 					end
-				end
-			end)
-
-			bnet:SetScript("OnLeave", function(self)
-				if self.backdrop then
-					local c = E.media.bordercolor
-					if c then
-						self.backdrop:SetBackdropBorderColor(unpack(c))
+				end)
+				bnet:HookScript("OnLeave", function(self)
+					if self.backdrop then
+						local c = E.media.bordercolor
+						if c then
+							self.backdrop:SetBackdropBorderColor(unpack(c))
+						end
 					end
-				end
-			end)
-
+				end)
+				bnet.BFL_ElvUIHoverHooked = true
+			end
 			if bnet.BroadcastFrame then
 				bnet.BroadcastFrame:StripTextures()
 				bnet.BroadcastFrame:CreateBackdrop("Transparent")
@@ -1366,16 +1366,13 @@ function ElvUISkin:SkinFrames(E, S)
 			frame.RaidFrame.ListInset:StripTextures()
 			frame.RaidFrame.ListInset:CreateBackdrop("Transparent")
 		end
-
 		if frame.RaidFrame.ConvertToRaidButton then
 			S:HandleButton(frame.RaidFrame.ConvertToRaidButton)
 		end
-
 		-- Point 8: Raid Info Button
 		if frame.RaidFrame.ControlPanel and frame.RaidFrame.ControlPanel.RaidInfoButton then
 			S:HandleButton(frame.RaidFrame.ControlPanel.RaidInfoButton)
 		end
-
 		if frame.RaidFrame.ControlPanel and frame.RaidFrame.ControlPanel.ReadyCheckButton then
 			S:HandleButton(frame.RaidFrame.ControlPanel.ReadyCheckButton)
 		end
@@ -1390,7 +1387,10 @@ function ElvUISkin:SkinFrames(E, S)
 			S:HandleButton(frame.RaidFrame.RaidToolsButton)
 		end
 	end
-
+	else
+		self:HideClassicMainFrameShell()
+		self:SkinModernFrames(E, S, frame, FriendsUI)
+	end
 	-- Hook Friends List (ScrollBox Items)
 	BFL:DebugPrint("ElvUISkin: Hooking FriendsList")
 	self:HookFriendsList(E, S)
@@ -1505,10 +1505,10 @@ function ElvUISkin:SkinFrames(E, S)
 		BFL:DebugPrint("ElvUISkin: Re-applying FontFix")
 		FontFix:ApplyFixedFonts()
 	end
-	if isModernFriendsUI and FriendsUI.ApplyTheme then
-		-- ElvUI applies asynchronously as well as through ThemeManager. Reassert
-		-- the Modern geometry after either pass without touching Legacy tabs.
-		FriendsUI:ApplyTheme("elvui")
+	if isModernFriendsUI then
+		-- FriendsUI's theme pass calls RefreshModernSkin after restoring geometry.
+		-- Do not call ApplyTheme here: that would recurse into this skin pipeline.
+		-- The dedicated Modern branch above has already completed this pass.
 	end
 
 	BFL:DebugPrint("ElvUI Skin applied to BetterFriendlist")
@@ -1519,31 +1519,32 @@ function ElvUISkin:HookFriendsList(E, S)
 	if not FriendsList then
 		return
 	end
-
 	-- Explicitly skin Classic ScrollBar if it exists now (Backup for initialization order)
 	if BFL.IsClassic then
 		local classicSB = _G["BetterFriendsClassicScrollFrameScrollBar"]
-		if classicSB and not classicSB.isSkinned then
+		if classicSB and not classicSB.BFL_ElvUILegacyScrollSkinned then
 			SkinScrollBar(S, classicSB)
-			classicSB.isSkinned = true
+			classicSB.BFL_ElvUILegacyScrollSkinned = true
 		end
 	end
-
 	if self.FriendsListHooksInstalled then return end; self.FriendsListHooksInstalled = true
-	hooksecurefunc(FriendsList, "UpdateGroupHeaderButton", function(_, button, elementData)
-		if not button.isSkinned then
-			S:HandleButton(button)
+	hooksecurefunc(FriendsList, "UpdateGroupHeaderButton", function(_, button)
+		if self:IsSkinEnabled() and self:IsModernFriendsUIActive() then
+			self:SkinModernScrollableHeader(S, button)
+		elseif not button.BFL_ElvUILegacyHeaderSkinned then
+			CallElvUIHandler(S, "HandleButton", button)
 			-- Strip the custom background texture if it exists
 			if button.BG then
 				button.BG:SetTexture(nil)
 			end
-			button.isSkinned = true
+			button.BFL_ElvUILegacyHeaderSkinned = true
 		end
 	end)
-
 	-- Hook Friend Button
-	hooksecurefunc(FriendsList, "UpdateFriendButton", function(_, button, elementData)
-		if not button.isSkinned then
+	hooksecurefunc(FriendsList, "UpdateFriendButton", function(_, button)
+		if self:IsSkinEnabled() and self:IsModernFriendsUIActive() then
+			self:SkinModernSocialCard(S, button)
+		elseif not button.BFL_ElvUILegacyFriendSkinned then
 			-- Don't full skin friend buttons as they are list items
 			-- BFL: Travelpass button should NOT be skinned (User request)
 			-- But we can skin the travel pass button in Retail only (not in Classic)
@@ -1556,38 +1557,38 @@ function ElvUISkin:HookFriendsList(E, S)
 			-- 		button.travelPassButton.NormalTexture:SetPoint("CENTER")
 			-- 	end
 			-- end
-			button.isSkinned = true
+			button.BFL_ElvUILegacyFriendSkinned = true
 		end
 	end)
-
 	-- Hook Invite Header
-	hooksecurefunc(FriendsList, "UpdateInviteHeaderButton", function(_, button, elementData)
-		if not button.isSkinned then
-			S:HandleButton(button)
-			button.isSkinned = true
+	hooksecurefunc(FriendsList, "UpdateInviteHeaderButton", function(_, button)
+		if self:IsSkinEnabled() and self:IsModernFriendsUIActive() then
+			self:SkinModernScrollableHeader(S, button)
+		elseif not button.BFL_ElvUILegacyInviteHeaderSkinned then
+			CallElvUIHandler(S, "HandleButton", button)
+			button.BFL_ElvUILegacyInviteHeaderSkinned = true
 		end
 	end)
-
 	-- Hook Invite Button
-	hooksecurefunc(FriendsList, "UpdateInviteButton", function(_, button, elementData)
-		if not button.isSkinned then
+	hooksecurefunc(FriendsList, "UpdateInviteButton", function(_, button)
+		if self:IsSkinEnabled() and self:IsModernFriendsUIActive() then
+			self:SkinModernSocialCard(S, button)
+		elseif not button.BFL_ElvUILegacyInviteSkinned then
 			if button.AcceptButton then
-				S:HandleButton(button.AcceptButton)
+				CallElvUIHandler(S, "HandleButton", button.AcceptButton)
 			end
 			if button.DeclineButton then
-				S:HandleButton(button.DeclineButton)
+				CallElvUIHandler(S, "HandleButton", button.DeclineButton)
 			end
-			button.isSkinned = true
+			button.BFL_ElvUILegacyInviteSkinned = true
 		end
 	end)
-
 	-- Hook UpdateSearchBoxState to enforce ElvUI positioning in Classic Normal Mode
 	if FriendsList.UpdateSearchBoxState then
 		hooksecurefunc(FriendsList, "UpdateSearchBoxState", function()
 			if BFL.IsClassic then
 				local DB = BFL:GetModule("DB")
 				local simpleMode = DB and DB:Get("simpleMode", false)
-
 				if not simpleMode then
 					local frame = _G.BetterFriendsFrame
 					if
@@ -1607,13 +1608,11 @@ function ElvUISkin:HookFriendsList(E, S)
 		end)
 	end
 end
-
 function ElvUISkin:SkinRecruitAFriend(E, S, frame)
 	local raf = frame.RecruitAFriendFrame
 	if not raf then
 		return
 	end
-
 	-- Skin Main Elements
 	if raf.Border then
 		raf.Border:StripTextures()
@@ -1777,7 +1776,8 @@ function ElvUISkin:SkinSettings(E, S)
 
 	-- Hook Refresh functions to skin EditBoxes (Point 3)
 	local Settings = BFL:GetModule("Settings")
-	if Settings then
+	if Settings and not self.SettingsHooksInstalled then
+		self.SettingsHooksInstalled = true
 		local function SkinEditBoxesInTab(tab)
 			if not tab or not tab.components then
 				return
@@ -2972,4 +2972,548 @@ function ElvUISkin:HideClassicMainFrameShell()
 	if shell then
 		shell:Hide()
 	end
+end
+
+CallElvUIHandler = function(S, handlerName, object, ...)
+	if not (S and object) then
+		return false
+	end
+
+	local handler = S[handlerName]
+	if type(handler) ~= "function" then
+		return false
+	end
+
+	return pcall(handler, S, object, ...)
+end
+
+local function SetTextureAlpha(texture, alpha)
+	if texture and texture.SetAlpha then
+		texture:SetAlpha(alpha)
+	end
+end
+
+local function SetTextureColor(texture, r, g, b, a)
+	if texture and texture.SetColorTexture then
+		texture:SetColorTexture(r, g, b, a)
+	elseif texture and texture.SetVertexColor then
+		texture:SetVertexColor(r, g, b, a)
+	end
+end
+
+local function EnsureTransparentBackdrop(frame, inset)
+	if not (frame and frame.CreateBackdrop) then
+		return nil
+	end
+
+	if not frame.backdrop then
+		frame:CreateBackdrop("Transparent")
+	end
+	if frame.backdrop and inset and frame.backdrop.SetInside then
+		frame.backdrop:SetInside(frame, inset, inset)
+	end
+	return frame.backdrop
+end
+
+local function HideButtonStateTextures(button)
+	if not button then
+		return
+	end
+	for _, texture in pairs({
+		button.NormalTexture,
+		button.PushedTexture,
+		button.DisabledTexture,
+		button.HighlightTexture,
+		button.Left,
+		button.Middle,
+		button.Center,
+		button.Right,
+		button.GetNormalTexture and button:GetNormalTexture(),
+		button.GetPushedTexture and button:GetPushedTexture(),
+		button.GetDisabledTexture and button:GetDisabledTexture(),
+		button.GetHighlightTexture and button:GetHighlightTexture(),
+	}) do
+		SetTextureAlpha(texture, 0)
+	end
+end
+
+local function SkinModernScrollBar(S, scrollBar)
+	if not scrollBar then
+		return
+	end
+	if not scrollBar.BFL_ElvUIModernScrollSkinned then
+		SkinScrollBar(S, scrollBar)
+		scrollBar.BFL_ElvUIModernScrollSkinned = true
+	end
+end
+
+function ElvUISkin:IsModernFriendsUIActive()
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	return FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() == true
+end
+
+function ElvUISkin:IsEngineInitialized(E, S)
+	return (E and (E.Initialized == true or E.initialized == true)) or (S and S.Initialized == true) or false
+end
+
+function ElvUISkin:SkinModernActionButton(S, button)
+	if not button then
+		return
+	end
+
+	if S and S.SocialUI_HandleActionButton then
+		CallElvUIHandler(S, "SocialUI_HandleActionButton", button)
+	else
+		EnsureTransparentBackdrop(button)
+	end
+
+	SetTextureAlpha(button.NormalTexture or (button.GetNormalTexture and button:GetNormalTexture()), 0)
+	SetTextureAlpha(button.PushedTexture or (button.GetPushedTexture and button:GetPushedTexture()), 0)
+	local highlight = button.HighlightTexture or (button.GetHighlightTexture and button:GetHighlightTexture())
+	if highlight then
+		SetTextureColor(highlight, 1, 1, 1, 0.25)
+		if highlight.SetAllPoints then
+			highlight:SetAllPoints(button.backdrop or button)
+		end
+	end
+	button.BFL_ElvUIModernActionSkinned = true
+end
+
+function ElvUISkin:SkinModernButton(S, button)
+	if not button then
+		return
+	end
+	CallElvUIHandler(S, "HandleButton", button)
+	HideButtonStateTextures(button)
+	button.BFL_ElvUIModernButtonSkinned = true
+end
+
+function ElvUISkin:SkinModernSideTab(tab)
+	if not tab then
+		return
+	end
+
+	local backdrop = EnsureTransparentBackdrop(tab)
+	if backdrop then
+		-- Keep BFL's complete 40px hit target and tab-rail geometry. ElvUI's
+		-- native SocialUI skin uses a 30px visual tab surface, inset two pixels
+		-- from the frame edge; reproduce that surface without shrinking clicks.
+		backdrop:ClearAllPoints()
+		backdrop:SetPoint("TOPLEFT", tab, "TOPLEFT", 2, 0)
+		backdrop:SetPoint("BOTTOMRIGHT", tab, "TOPLEFT", 32, -40)
+	end
+
+	SetTextureAlpha(tab.Background, 0)
+	if tab.SelectedTexture then
+		SetTextureColor(tab.SelectedTexture, 1, 0.82, 0, 0.3)
+		tab.SelectedTexture:ClearAllPoints()
+		tab.SelectedTexture:SetAllPoints(backdrop or tab)
+	end
+	if tab.HighlightTexture then
+		SetTextureColor(tab.HighlightTexture, 1, 1, 1, 0.3)
+		tab.HighlightTexture:ClearAllPoints()
+		tab.HighlightTexture:SetAllPoints(backdrop or tab)
+	end
+	SetTextureAlpha(tab.TabGlow, 0)
+	if tab.Icon then
+		tab.Icon:ClearAllPoints()
+		tab.Icon:SetPoint("CENTER", backdrop or tab, "CENTER")
+	end
+	tab.BFL_ElvUIModernTabSkinned = true
+end
+
+function ElvUISkin:SkinModernSocialCard(S, button)
+	if not button then
+		return
+	end
+
+	local backdrop = EnsureTransparentBackdrop(button, 2)
+	SetTextureAlpha(button.CardBackground or button.Background, 0)
+	SetTextureAlpha(button.ThemeTint, 0)
+
+	local highlight = button.highlight or button.Highlight or (button.GetHighlightTexture and button:GetHighlightTexture())
+	if highlight then
+		SetTextureColor(highlight, 0.24, 0.56, 1, 0.2)
+		if highlight.SetInside then
+			highlight:SetInside(backdrop or button)
+		elseif highlight.SetAllPoints then
+			highlight:SetAllPoints(backdrop or button)
+		end
+	end
+
+	local selected = button.Selected or button.selected
+	if selected then
+		SetTextureColor(selected, 1, 0.82, 0, 0.2)
+		if selected.SetAllPoints then
+			selected:SetAllPoints(backdrop or button)
+		end
+	end
+
+	for _, actionButton in pairs({
+		button.travelPassButton,
+		button.PartyButton,
+		button.RAFSummonButton,
+	}) do
+		self:SkinModernActionButton(S, actionButton)
+	end
+	if button.AcceptButton then
+		self:SkinModernButton(S, button.AcceptButton)
+	end
+	if button.DeclineButton then
+		self:SkinModernButton(S, button.DeclineButton)
+	end
+	button.BFL_ElvUIModernCardSkinned = true
+end
+
+function ElvUISkin:SkinModernScrollableHeader(S, button)
+	if not button then
+		return
+	end
+
+	if not button.BFL_ElvUIModernHeaderSkinned then
+		if button.StripTextures then
+			button:StripTextures()
+		end
+		CallElvUIHandler(S, "HandleButton", button)
+		button.BFL_ElvUIModernHeaderSkinned = true
+	end
+	SetTextureAlpha(button.GetNormalTexture and button:GetNormalTexture(), 0)
+	SetTextureAlpha(button.GetPushedTexture and button:GetPushedTexture(), 0)
+end
+
+function ElvUISkin:SkinModernDynamicRow(S, button)
+	if not button then
+		return
+	end
+
+	if button.HeaderText or button.ButtonText then
+		self:SkinModernScrollableHeader(S, button)
+	elseif button.CardBackground or button.Background or button.PartyButton or button.AcceptButton then
+		self:SkinModernSocialCard(S, button)
+	end
+end
+
+function ElvUISkin:SkinModernScrollBoxRows(S, scrollBox)
+	if not (scrollBox and scrollBox.ForEachFrame) then
+		return
+	end
+
+	scrollBox:ForEachFrame(function(button)
+		self:SkinModernDynamicRow(S, button)
+	end)
+end
+
+function ElvUISkin:SkinModernTabs(FriendsUI)
+	for _, tab in ipairs((FriendsUI and FriendsUI.sideTabs) or {}) do
+		self:SkinModernSideTab(tab)
+	end
+end
+
+function ElvUISkin:InstallModernDynamicHooks(E, S, FriendsUI)
+	if self.ModernDynamicHooksInstalled then
+		return
+	end
+	self.ModernDynamicHooksInstalled = true
+
+	local function SkinRow(button)
+		if self:IsSkinEnabled() and self:IsModernFriendsUIActive() then
+			self:SkinModernDynamicRow(S, button)
+		end
+	end
+
+	if FriendsUI then
+		if FriendsUI.InitializeRequestHeader then
+			hooksecurefunc(FriendsUI, "InitializeRequestHeader", function(_, button)
+				SkinRow(button)
+			end)
+		end
+		if FriendsUI.InitializeRequestCard then
+			hooksecurefunc(FriendsUI, "InitializeRequestCard", function(_, button)
+				SkinRow(button)
+			end)
+		end
+		if FriendsUI.RefreshNavigation then
+			hooksecurefunc(FriendsUI, "RefreshNavigation", function()
+				if self:IsSkinEnabled() and self:IsModernFriendsUIActive() then
+					self:SkinModernTabs(FriendsUI)
+				end
+			end)
+		end
+	end
+
+	for _, hookInfo in ipairs({
+		{ "RecentAllies", "InitializeEntry" },
+		{ "QuickJoin", "OnScrollBoxInitialize" },
+		{ "RAF", "RecruitListButton_Init" },
+		{ "GuildFrame", "UpdateMemberButton" },
+		{ "WhoFrame", "InitButton" },
+		{ "RaidFrame", "UpdateMemberButton" },
+	}) do
+		local module = BFL:GetModule(hookInfo[1])
+		local methodName = hookInfo[2]
+		if module and type(module[methodName]) == "function" then
+			hooksecurefunc(module, methodName, function(_, button)
+				SkinRow(button)
+			end)
+		end
+	end
+end
+
+function ElvUISkin:SkinModernFrames(E, S, frame, FriendsUI)
+	if not (frame and FriendsUI and FriendsUI.root and FriendsUI:IsModernActive()) then
+		return false
+	end
+
+	self.lastAppliedStyle = "modern"
+	if FriendsUI.ApplyModernContentLayout then
+		FriendsUI:ApplyModernContentLayout(FriendsUI:GetSelectedSection() or "friends", true)
+	end
+
+	if not frame.BFL_ElvUIModernFrameSkinned then
+		CallElvUIHandler(S, "HandlePortraitFrame", frame)
+		frame.BFL_ElvUIModernFrameSkinned = true
+	end
+
+	local root = FriendsUI.root
+	SetTextureAlpha(root.ContentBackground, 0)
+	SetTextureAlpha(root.ContentInsetTint, 0)
+	SetTextureAlpha(root.TopFade, 0)
+	SetTextureAlpha(root.BottomFade, 0)
+	SetTextureAlpha(root.TopDivider, 0)
+	SetTextureAlpha(root.BottomDivider, 0)
+	if root.FilterBar then
+		SetTextureAlpha(root.FilterBar.Background, 0)
+	end
+	if root.BattleNetBar then
+		SetTextureAlpha(root.BattleNetBar.Background, 0)
+	end
+
+	local header = frame.FriendsTabHeader
+	local battleNetDisplay = header and header.BattlenetFrame
+	if battleNetDisplay then
+		if not battleNetDisplay.BFL_ElvUIModernDisplaySkinned then
+			battleNetDisplay:StripTextures()
+			EnsureTransparentBackdrop(battleNetDisplay)
+			battleNetDisplay.BFL_ElvUIModernDisplaySkinned = true
+		end
+		SetTextureAlpha(battleNetDisplay.Background, 0)
+		if battleNetDisplay.Tag and battleNetDisplay.Tag.SetTextColor then
+			battleNetDisplay.Tag:SetTextColor(1, 1, 1)
+		end
+	end
+
+	local statusDropdown = header and header.StatusDropdown
+	if statusDropdown then
+		if not statusDropdown.BFL_ElvUIModernDropdownSkinned then
+			CallElvUIHandler(S, "HandleDropDownBox", statusDropdown, 54)
+			statusDropdown.BFL_ElvUIModernDropdownSkinned = true
+		end
+		statusDropdown:SetSize(54, 30)
+	end
+	if header and header.SearchBox then
+		CallElvUIHandler(S, "HandleEditBox", header.SearchBox)
+	end
+
+	local filterBar = root.FilterBar
+	for _, dropdown in pairs({
+		filterBar and filterBar.FilterDropdown,
+		filterBar and filterBar.RecentFilterDropdown,
+		filterBar and filterBar.SortButton,
+	}) do
+		if dropdown then
+			CallElvUIHandler(
+				S,
+				"HandleButton",
+				dropdown,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				true,
+				"right"
+			)
+			HideButtonStateTextures(dropdown)
+			dropdown:SetSize(92, 29)
+		end
+	end
+
+	self:SkinModernButton(S, root.BottomActionBar and root.BottomActionBar.AddFriendButton)
+	self:SkinModernButton(
+		S,
+		root.RequestsFrame and root.RequestsFrame.RealIDWarning and root.RequestsFrame.RealIDWarning.ContinueButton
+	)
+	self:SkinModernActionButton(S, root.BattleNetBar and root.BattleNetBar.MenuButton)
+	self:SkinModernActionButton(S, root.BattleNetBar and root.BattleNetBar.CopyBattleTagButton)
+	self:SkinModernActionButton(S, frame.StreamerModeButton)
+	self:SkinModernTabs(FriendsUI)
+
+	local who = frame.WhoFrame
+	if who then
+		CallElvUIHandler(S, "HandleEditBox", who.EditBox)
+		if who.ColumnDropdown and not who.ColumnDropdown.BFL_ElvUIModernDropdownSkinned then
+			CallElvUIHandler(S, "HandleDropDownBox", who.ColumnDropdown, 90)
+			who.ColumnDropdown.BFL_ElvUIModernDropdownSkinned = true
+		end
+		for _, control in pairs({ who.NameHeader, who.LevelHeader, who.ClassHeader, who.WhoButton, who.AddFriendButton, who.GroupInviteButton }) do
+			self:SkinModernButton(S, control)
+		end
+		for _, headerButton in pairs({ who.NameHeader, who.LevelHeader, who.ClassHeader }) do
+			if headerButton then
+				headerButton:SetHeight(28)
+			end
+		end
+	end
+
+	local guild = frame.GuildFrame
+	if guild then
+		CallElvUIHandler(S, "HandleEditBox", guild.SearchBox)
+		for _, control in pairs({
+			guild.FilterDropdown,
+			guild.SortDropdown,
+			guild.NameHeader,
+			guild.RankHeader,
+			guild.LevelHeader,
+			guild.ZoneHeader,
+			guild.ILvlHeader,
+			guild.FilterAll,
+			guild.FilterOnline,
+			guild.FilterOffline,
+			guild.ActionsButton,
+			guild.InvitePlayerButton,
+		}) do
+			self:SkinModernButton(S, control)
+		end
+	end
+
+	local quickJoin = frame.QuickJoinFrame
+	local quickJoinInset = quickJoin and quickJoin.ContentInset
+	self:SkinModernButton(S, quickJoinInset and quickJoinInset.JoinQueueButton)
+	if quickJoinInset then
+		SetTextureAlpha(quickJoinInset.Bg, 0)
+		SetTextureAlpha(quickJoinInset.NineSlice, 0)
+	end
+
+	local raf = frame.RecruitAFriendFrame
+	if raf then
+		self:SkinModernButton(S, frame.RecruitmentButton)
+		self:SkinModernButton(S, raf.RewardClaiming and raf.RewardClaiming.ClaimOrViewRewardButton)
+		self:SkinModernButton(S, raf.SplashFrame and raf.SplashFrame.OKButton)
+	end
+
+	local raid = frame.RaidFrame
+	if raid then
+		self:SkinModernButton(S, raid.ConvertToRaidButton)
+		self:SkinModernButton(S, raid.RaidToolsButton)
+		self:SkinModernButton(S, raid.ControlPanel and raid.ControlPanel.RaidInfoButton)
+		self:SkinModernButton(S, raid.ControlPanel and raid.ControlPanel.ReadyCheckButton)
+		CallElvUIHandler(S, "HandleCheckBox", raid.ControlPanel and raid.ControlPanel.EveryoneAssistCheckbox)
+	end
+
+	local ignoreWindow = frame.IgnoreListWindow
+	if ignoreWindow then
+		CallElvUIHandler(S, "HandlePortraitFrame", ignoreWindow)
+		self:SkinModernButton(S, ignoreWindow.UnignorePlayerButton)
+		self:SkinModernButton(S, ignoreWindow.GlobalIgnoreListButton)
+		self:SkinModernButton(S, ignoreWindow.EnhanceQoLIgnoreButton)
+	end
+
+	local FriendsList = BFL:GetModule("FriendsList")
+	for _, scrollBar in pairs({
+		frame.MinimalScrollBar,
+		frame.RecentAlliesFrame and frame.RecentAlliesFrame.ScrollBar,
+		root.RequestsFrame and root.RequestsFrame.ScrollBar,
+		quickJoinInset and quickJoinInset.ScrollBar,
+		raf and raf.RecruitList and raf.RecruitList.ScrollBar,
+		who and who.ScrollBar,
+		guild and guild.ScrollBar,
+		raid and raid.ScrollBar,
+	}) do
+		SkinModernScrollBar(S, scrollBar)
+	end
+
+	for _, scrollBox in pairs({
+		FriendsList and FriendsList.scrollBox,
+		frame.RecentAlliesFrame and frame.RecentAlliesFrame.ScrollBox,
+		root.RequestsFrame and root.RequestsFrame.ScrollBox,
+		quickJoinInset and (quickJoinInset.ScrollBox or quickJoinInset.ScrollBoxContainer),
+		raf and raf.RecruitList and raf.RecruitList.ScrollBox,
+		who and who.ScrollBox,
+		guild and guild.ScrollBox,
+	}) do
+		self:SkinModernScrollBoxRows(S, scrollBox)
+	end
+
+	self:InstallModernDynamicHooks(E, S, FriendsUI)
+	return true
+end
+
+function ElvUISkin:RefreshModernSkin()
+	if self.applyingModernSkin or not self:IsSkinEnabled() or not self:IsModernFriendsUIActive() then
+		return false
+	end
+
+	local E = self.ElvUIEngine or (BFL.GetElvUIEngine and BFL:GetElvUIEngine(false))
+	local S = self.ElvUISkinProxy or (E and E.GetModule and E:GetModule("Skins"))
+	local frame = _G.BetterFriendsFrame
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if not (E and S and frame and FriendsUI) then
+		return false
+	end
+
+	self.applyingModernSkin = true
+	local ok, result = xpcall(function()
+		return self:SkinModernFrames(E, S, frame, FriendsUI)
+	end, function(err)
+		return err
+	end)
+	self.applyingModernSkin = nil
+	if not ok then
+		return false
+	end
+	return result
+end
+
+function ElvUISkin:RegisterTests()
+	if self.testsRegistered then
+		return
+	end
+	local TestSuite = BFL:GetModule("TestSuite")
+	if not (TestSuite and TestSuite.RegisterTest) then
+		return
+	end
+	self.testsRegistered = true
+
+	TestSuite:RegisterTest("ui", "ElvUISkin_InitializationContract", {
+		action = function(V)
+			V:Assert(self:IsEngineInitialized({ Initialized = true }, nil), "Current ElvUI initialization flag is supported")
+			V:Assert(self:IsEngineInitialized({ initialized = true }, nil), "Legacy ElvUI initialization flag remains supported")
+			V:Assert(self:IsEngineInitialized({}, { Initialized = true }), "Initialized Skins module is supported")
+			V:Assert(not self:IsEngineInitialized({}, {}), "Uninitialized ElvUI is not treated as ready")
+		end,
+	})
+
+	TestSuite:RegisterTest("ui", "ElvUISkin_ModernGeometryContract", {
+		condition = function()
+			return self:IsSkinEnabled() and self:IsModernFriendsUIActive() and BFL.FriendsUI and BFL.FriendsUI.root
+		end,
+		action = function(V)
+			self:RefreshModernSkin()
+			local FriendsUI = BFL.FriendsUI
+			local root = FriendsUI.root
+			local header = BetterFriendsFrame and BetterFriendsFrame.FriendsTabHeader
+			V:AssertEqual(root.FilterBar.FilterDropdown:GetWidth(), 92, "Modern ElvUI filter keeps BFL width")
+			V:AssertEqual(root.FilterBar.FilterDropdown:GetHeight(), 29, "Modern ElvUI filter keeps BFL height")
+			V:AssertEqual(root.FilterBar.SortButton:GetWidth(), 92, "Modern ElvUI sort keeps BFL width")
+			V:AssertEqual(root.FilterBar.SortButton:GetHeight(), 29, "Modern ElvUI sort keeps BFL height")
+			V:AssertEqual(header.StatusDropdown:GetWidth(), 54, "Modern ElvUI status keeps the manifest width")
+			V:AssertEqual(header.StatusDropdown:GetHeight(), 30, "Modern ElvUI status keeps the manifest height")
+			V:AssertEqual(self.lastAppliedStyle, "modern", "Modern ElvUI uses the dedicated skin pipeline")
+		end,
+	})
 end
