@@ -4,13 +4,8 @@
 local ADDON_NAME, BFL = ...
 local ThemeManager = BFL:RegisterModule("ThemeManager", {})
 
-local VALID_THEMES = {
-	blizzard = true,
-	dark = true,
-	custom = true,
-	elvui = true,
-	ellesmereui = true,
-}
+local VALID_THEMES = {}
+local THEME_DEFINITIONS = {}
 
 BFL.THEMES = {
 	BLIZZARD = "blizzard",
@@ -19,6 +14,65 @@ BFL.THEMES = {
 	ELVUI = "elvui",
 	ELLESMEREUI = "ellesmereui",
 }
+
+local function IsElvUIAvailable()
+	return BFL.IsElvUIAvailable and BFL:IsElvUIAvailable()
+end
+
+local function IsEllesmereUIAvailable()
+	return BFL.IsEllesmereUIAvailable and BFL:IsEllesmereUIAvailable()
+end
+
+local function RegisterThemeDefinition(theme, options)
+	if type(theme) ~= "string" or theme == "" then
+		return false
+	end
+
+	options = type(options) == "table" and options or {}
+	VALID_THEMES[theme] = true
+	THEME_DEFINITIONS[theme] = {
+		id = theme,
+		order = tonumber(options.order) or 1000,
+		labelKey = options.labelKey,
+		label = options.label,
+		onboardingDescriptionKey = options.onboardingDescriptionKey,
+		isAvailable = options.isAvailable,
+		requiresReload = options.requiresReload == true,
+		previewable = options.previewable ~= false,
+	}
+	return true
+end
+
+RegisterThemeDefinition("blizzard", {
+	order = 100,
+	labelKey = "SETTINGS_THEME_BLIZZARD",
+	onboardingDescriptionKey = "ONBOARDING_THEME_BLIZZARD_DESC",
+})
+RegisterThemeDefinition("dark", {
+	order = 200,
+	labelKey = "SETTINGS_THEME_DARK",
+	onboardingDescriptionKey = "ONBOARDING_THEME_DARK_DESC",
+})
+RegisterThemeDefinition("custom", {
+	order = 300,
+	labelKey = "SETTINGS_THEME_CUSTOM",
+	onboardingDescriptionKey = "ONBOARDING_THEME_CUSTOM_DESC",
+})
+RegisterThemeDefinition("elvui", {
+	order = 900,
+	labelKey = "SETTINGS_THEME_ELVUI",
+	onboardingDescriptionKey = "ONBOARDING_THEME_ELVUI_DESC",
+	isAvailable = IsElvUIAvailable,
+	requiresReload = true,
+	previewable = false,
+})
+RegisterThemeDefinition("ellesmereui", {
+	order = 910,
+	labelKey = "SETTINGS_THEME_ELLESMEREUI",
+	isAvailable = IsEllesmereUIAvailable,
+	requiresReload = true,
+	previewable = false,
+})
 
 local function NormalizeTheme(theme)
 	if VALID_THEMES[theme] then
@@ -33,14 +87,6 @@ end
 
 local function ShouldUseLegacyElvUISkinSetting()
 	return not AreThemeFeaturesEnabled()
-end
-
-local function IsElvUIAvailable()
-	return BFL.IsElvUIAvailable and BFL:IsElvUIAvailable()
-end
-
-local function IsEllesmereUIAvailable()
-	return BFL.IsEllesmereUIAvailable and BFL:IsEllesmereUIAvailable()
 end
 
 local function ShouldShowLegacyElvUISkinSetting()
@@ -167,6 +213,95 @@ function ThemeManager:IsValidTheme(theme)
 	return VALID_THEMES[theme] == true
 end
 
+function ThemeManager:RegisterTheme(theme, options)
+	-- Theme modules register at file load so database normalization, Settings,
+	-- and the one-time appearance onboarding all consume the same catalog.
+	return RegisterThemeDefinition(theme, options)
+end
+
+function ThemeManager:GetThemeDefinition(theme)
+	return THEME_DEFINITIONS[theme]
+end
+
+function ThemeManager:IsThemeAvailable(theme)
+	local definition = THEME_DEFINITIONS[theme]
+	if not definition or not VALID_THEMES[theme] then
+		return false
+	end
+	if type(definition.isAvailable) ~= "function" then
+		return true
+	end
+	local ok, available = pcall(definition.isAvailable)
+	return ok and available == true
+end
+
+function ThemeManager:GetAvailableThemeIDs()
+	local themes = {}
+	for theme in pairs(THEME_DEFINITIONS) do
+		if self:IsThemeAvailable(theme) then
+			themes[#themes + 1] = theme
+		end
+	end
+	table.sort(themes, function(left, right)
+		local leftDefinition = THEME_DEFINITIONS[left] or {}
+		local rightDefinition = THEME_DEFINITIONS[right] or {}
+		local leftOrder = tonumber(leftDefinition.order) or 1000
+		local rightOrder = tonumber(rightDefinition.order) or 1000
+		if leftOrder ~= rightOrder then
+			return leftOrder < rightOrder
+		end
+		return left < right
+	end)
+	return themes
+end
+
+local function GetThemeLocalizationToken(theme)
+	return tostring(theme or ""):gsub("[^%w]", "_"):upper()
+end
+
+function ThemeManager:GetThemeLabel(theme)
+	local definition = THEME_DEFINITIONS[theme] or {}
+	local locale = BFL.L or _G.BFL_L or {}
+	local labelKey = definition.labelKey or ("SETTINGS_THEME_" .. GetThemeLocalizationToken(theme))
+	return locale[labelKey] or definition.label or tostring(theme or "")
+end
+
+function ThemeManager:GetThemeOnboardingDescription(theme)
+	local definition = THEME_DEFINITIONS[theme] or {}
+	local locale = BFL.L or _G.BFL_L or {}
+	local descriptionKey = definition.onboardingDescriptionKey
+		or ("ONBOARDING_THEME_" .. GetThemeLocalizationToken(theme) .. "_DESC")
+	if locale[descriptionKey] then
+		return locale[descriptionKey]
+	end
+	local fallback = locale.ONBOARDING_THEME_GENERIC_DESC or "Preview the %s theme on your BetterFriendlist."
+	local ok, text = pcall(string.format, fallback, self:GetThemeLabel(theme))
+	return ok and text or fallback
+end
+
+function ThemeManager:GetThemeOptions()
+	local options = {}
+	local order = self:GetAvailableThemeIDs()
+	for _, theme in ipairs(order) do
+		options[theme] = self:GetThemeLabel(theme)
+	end
+	return options, order
+end
+
+function ThemeManager:ThemeSelectionRequiresReload(previousTheme, nextTheme)
+	local previous = THEME_DEFINITIONS[previousTheme]
+	local nextDefinition = THEME_DEFINITIONS[nextTheme]
+	return (previous and previous.requiresReload == true)
+		or (nextDefinition and nextDefinition.requiresReload == true)
+end
+
+function ThemeManager:CanPreviewTheme(theme, previousTheme)
+	local definition = THEME_DEFINITIONS[theme]
+	return definition ~= nil
+		and definition.previewable ~= false
+		and not self:ThemeSelectionRequiresReload(previousTheme, theme)
+end
+
 function ThemeManager:GetStoredTheme()
 	return GetStoredTheme()
 end
@@ -277,6 +412,10 @@ function ThemeManager:ApplyCurrentTheme(reason)
 	local EllesmereUISkin = BFL:GetModule("EllesmereUISkin")
 	if theme == "ellesmereui" and EllesmereUISkin and EllesmereUISkin.Apply then
 		EllesmereUISkin:Apply(reason or "theme-manager")
+	end
+	local AppearanceOnboarding = BFL:GetModule("AppearanceOnboarding")
+	if AppearanceOnboarding and AppearanceOnboarding.ApplySkin then
+		AppearanceOnboarding:ApplySkin(reason or "theme-manager")
 	end
 	self:SkinVisibleStaticPopups()
 	if theme == "blizzard" then

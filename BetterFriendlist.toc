@@ -122,6 +122,7 @@ Modules\SkinEngine.lua
 Modules\DarkTheme.lua
 Modules\ElvUISkin.lua
 Modules\EllesmereUISkin.lua
+Modules\AppearanceOnboarding.lua [AllowLoadGameType mainline]
 Modules\AddOnSkins.lua [AllowLoadGameType mainline]
 Modules\Compat_NorthernSkyRaidTools.lua [AllowLoadGameType mainline]
 Modules\Compat_GlobalIgnoreList.lua
@@ -137,6 +138,7 @@ UI\QuickJoinCallbacks.lua [AllowLoadGameType mainline]
 BetterFriendlist.lua
 BetterFriendlist.xml [AllowLoadGameType mainline]
 BetterFriendlist_Modern.xml [AllowLoadGameType mainline]
+BetterFriendlist_Onboarding.xml [AllowLoadGameType mainline]
 BetterFriendlist_Classic.xml [AllowLoadGameType vanilla, tbc, wrath, cata, mists]
 BetterFriendlist_InviteTemplates.xml
 BetterFriendlist_Tooltip.lua

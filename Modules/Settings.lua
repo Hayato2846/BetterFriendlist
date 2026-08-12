@@ -2456,6 +2456,9 @@ function Settings:ExportSettings()
 	-- This fulfills the requirement to export future settings automatically
 	local DB = GetDB()
 	local exportData = DB:InternalDeepCopy(BetterFriendlistDB)
+	-- The one-time onboarding acknowledgement belongs to this installation and
+	-- must not suppress (or re-open) onboarding on another imported profile.
+	exportData.appearanceOnboardingVersion = nil
 
 	-- Tag with export version 3 (Base64 + Full DB)
 	exportData.exportVersion = 3
@@ -2503,6 +2506,7 @@ function Settings:ImportSettings(importString)
 	-- Handle V3 (Everything)
 	if importData.exportVersion and importData.exportVersion >= 3 then
 		BFL:DebugPrint("|cff00ff00BetterFriendlist:|r Importing V3 (Full) backup...")
+		local appearanceOnboardingVersion = BetterFriendlistDB.appearanceOnboardingVersion
 
 		-- Wipe the entire DB first, then apply import data.
 		-- This ensures keys that existed in the live DB but NOT in the export
@@ -2512,10 +2516,11 @@ function Settings:ImportSettings(importString)
 		-- Import ALL keys from the export
 		for key, value in pairs(importData) do
 			-- Skip metadata
-			if key ~= "exportVersion" and key ~= "version" then
+			if key ~= "exportVersion" and key ~= "version" and key ~= "appearanceOnboardingVersion" then
 				BetterFriendlistDB[key] = value
 			end
 		end
+		BetterFriendlistDB.appearanceOnboardingVersion = appearanceOnboardingVersion
 
 		-- Explicitly handle version to prevent mismatches
 		-- We keep the current addon version in DB, not the one from export,
@@ -3572,10 +3577,6 @@ local function IsDarkSkinThemeValue(theme)
 	return theme == "dark" or theme == "custom"
 end
 
-local function IsExternalSkinThemeValue(theme)
-	return theme == "elvui" or theme == "ellesmereui"
-end
-
 local function ApplyThemeSettingsChanged(reason)
 	local ThemeManager = BFL:GetModule("ThemeManager")
 	if ThemeManager and ThemeManager.ApplyCurrentTheme then
@@ -3594,19 +3595,15 @@ function Settings:OnThemeChanged(theme)
 		return
 	end
 
-	if
-		theme ~= "blizzard"
-		and theme ~= "dark"
-		and theme ~= "custom"
-		and theme ~= "elvui"
-		and theme ~= "ellesmereui"
-	then
+	local ThemeManager = BFL:GetModule("ThemeManager")
+	local validTheme = ThemeManager and ThemeManager.IsValidTheme and ThemeManager:IsValidTheme(theme)
+	if not validTheme then
 		theme = "blizzard"
 	end
 	-- Dark and Custom are standard theme values.
 	-- They remain selectable even when Beta Features are disabled.
 	-- Only unavailable addon-backed themes fall back to Blizzard.
-	if theme == "elvui" and (not BFL.IsElvUIAvailable or not BFL:IsElvUIAvailable()) then
+	if ThemeManager and ThemeManager.IsThemeAvailable and not ThemeManager:IsThemeAvailable(theme) then
 		theme = "blizzard"
 	end
 	if
@@ -3621,9 +3618,10 @@ function Settings:OnThemeChanged(theme)
 	DB:Set("theme", theme)
 	DB:Set("enableElvUISkin", theme == "elvui")
 
-	local ThemeManager = BFL:GetModule("ThemeManager")
-	local touchesExternalSkin = IsExternalSkinThemeValue(oldEffectiveTheme) or IsExternalSkinThemeValue(theme)
-	if touchesExternalSkin then
+	local requiresReload = ThemeManager
+		and ThemeManager.ThemeSelectionRequiresReload
+		and ThemeManager:ThemeSelectionRequiresReload(oldEffectiveTheme, theme)
+	if requiresReload then
 		if IsDarkSkinThemeValue(oldEffectiveTheme) then
 			local DarkTheme = BFL:GetModule("DarkTheme")
 			if DarkTheme and DarkTheme.Remove then
@@ -3695,21 +3693,23 @@ function Settings:RefreshThemeTab()
 	local allFrames = {}
 	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_THEME_HEADER or "Theme"))
 
-	local labels = {
-		L.SETTINGS_THEME_BLIZZARD or "Blizzard",
-		L.SETTINGS_THEME_DARK or "Dark",
-		L.SETTINGS_THEME_CUSTOM or "Custom",
-	}
-	local values = { "blizzard", "dark", "custom" }
-	if BFL.IsElvUIAvailable and BFL:IsElvUIAvailable() then
-		table.insert(labels, L.SETTINGS_THEME_ELVUI or "ElvUI")
-		table.insert(values, "elvui")
+	local labels = {}
+	local values = {}
+	local ThemeManager = BFL:GetModule("ThemeManager")
+	if ThemeManager and ThemeManager.GetThemeOptions then
+		local options, order = ThemeManager:GetThemeOptions()
+		for _, theme in ipairs(order or {}) do
+			labels[#labels + 1] = options[theme]
+			values[#values + 1] = theme
+		end
+	else
+		labels = {
+			L.SETTINGS_THEME_BLIZZARD or "Blizzard",
+			L.SETTINGS_THEME_DARK or "Dark",
+			L.SETTINGS_THEME_CUSTOM or "Custom",
+		}
+		values = { "blizzard", "dark", "custom" }
 	end
-	if BFL.IsEllesmereUIAvailable and BFL:IsEllesmereUIAvailable() then
-		table.insert(labels, L.SETTINGS_THEME_ELLESMEREUI or "EllesmereUI")
-		table.insert(values, "ellesmereui")
-	end
-
 	local themeDropdown = Components:CreateDropdown(
 		tab,
 		L.SETTINGS_THEME_DROPDOWN or "Theme",

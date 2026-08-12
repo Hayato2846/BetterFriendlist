@@ -53,7 +53,7 @@ local defaults = {
 	preferredGameAccounts = {}, -- {friendUID: gameAccountID} - user-selected preferred game account per friend
 	-- Visual Settings
 	compactMode = false, -- Use compact button layout
-	theme = "blizzard", -- UI theme: "blizzard", "dark", "custom", "elvui", "ellesmereui"
+	theme = "blizzard", -- Registered UI theme ID; built-ins and addon-backed themes are declared by ThemeManager
 	darkThemeSettings = ThemePalette and ThemePalette:GetDefaultDarkSettings() or {},
 	customThemeSettings = ThemePalette and ThemePalette:GetDefaultCustomSettings() or {},
 	customTheme = {},
@@ -193,6 +193,7 @@ local defaults = {
 	-- Main Frame Edit Mode (Phase EditMode)
 	friendsFrameStyle = BFL.IsRetail and "modern" or "legacy", -- Requested UI style; capability fallback never overwrites this value
 	forceModernFriendsUI = false, -- Developer override for testing Modern while Blizzard disables C_SocialUI
+	appearanceOnboardingVersion = 0, -- One-time Retail style/theme onboarding schema; installation-local and not imported
 	modernFriendTabOrder = {}, -- Modern SocialUI side-tab order; missing IDs are appended in their default order
 	modernFriendTabVisibility = {}, -- Per-tab visibility; missing IDs remain visible
 	modernFriendTabPopulatedOnly = { quick_join = false, friend_requests = false }, -- Optional empty-state hiding for count-driven tabs
@@ -427,7 +428,11 @@ function DB:NormalizeThemeSetting()
 		BetterFriendlistDB.theme = BetterFriendlistDB.enableElvUISkin == true and "elvui" or "blizzard"
 	end
 
-	if not VALID_THEMES[BetterFriendlistDB.theme] then
+	local ThemeManager = BFL:GetModule("ThemeManager")
+	local validTheme = ThemeManager and ThemeManager.IsValidTheme
+		and ThemeManager:IsValidTheme(BetterFriendlistDB.theme)
+		or VALID_THEMES[BetterFriendlistDB.theme] == true
+	if not validTheme then
 		BetterFriendlistDB.theme = "blizzard"
 	end
 

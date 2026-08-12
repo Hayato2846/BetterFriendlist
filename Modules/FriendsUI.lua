@@ -887,6 +887,16 @@ function FriendsUI:GetDefaultRequestedStyle(isRetail)
 	return isRetail and STYLE_MODERN or STYLE_LEGACY
 end
 
+function FriendsUI:ResolveRequestedStyle(storedStyle, isRetail, onboardingVersion, requiredOnboardingVersion)
+	if storedStyle == STYLE_MODERN or storedStyle == STYLE_LEGACY then
+		return storedStyle
+	end
+	if isRetail == true and (tonumber(onboardingVersion) or 0) < (tonumber(requiredOnboardingVersion) or 1) then
+		return STYLE_LEGACY
+	end
+	return self:GetDefaultRequestedStyle(isRetail)
+end
+
 function FriendsUI:ComputeEffectiveStyle(requestedStyle, isRetail, socialUIEnabled, forceModern)
 	if requestedStyle ~= STYLE_MODERN then
 		return STYLE_LEGACY
@@ -930,10 +940,13 @@ end
 function FriendsUI:GetRequestedStyle()
 	local db = GetDB()
 	local style = db and db.friendsFrameStyle
-	if style ~= STYLE_MODERN and style ~= STYLE_LEGACY then
-		return self:GetDefaultRequestedStyle()
-	end
-	return style
+	local onboardingVersion = db and db.appearanceOnboardingVersion or 0
+	return self:ResolveRequestedStyle(
+		style,
+		BFL.IsRetail == true,
+		onboardingVersion,
+		BFL.APPEARANCE_ONBOARDING_VERSION or 1
+	)
 end
 
 function FriendsUI:GetEffectiveStyle()
@@ -4731,6 +4744,26 @@ function FriendsUI:RegisterTests()
 		action = function(V)
 			V:AssertEqual(self:GetDefaultRequestedStyle(true), STYLE_MODERN, "Retail defaults to Modern")
 			V:AssertEqual(self:GetDefaultRequestedStyle(false), STYLE_LEGACY, "Classic defaults to Legacy")
+			V:AssertEqual(
+				self:ResolveRequestedStyle(nil, true, 0, 1),
+				STYLE_LEGACY,
+				"Retail stays on Legacy until the interface onboarding is confirmed"
+			)
+			V:AssertEqual(
+				self:ResolveRequestedStyle(nil, true, 1, 1),
+				STYLE_MODERN,
+				"Completed Retail profiles retain the platform default fallback"
+			)
+			V:AssertEqual(
+				self:ResolveRequestedStyle(STYLE_MODERN, true, 0, 1),
+				STYLE_MODERN,
+				"A stored Modern preference is preserved while onboarding is pending"
+			)
+			V:AssertEqual(
+				self:ResolveRequestedStyle(STYLE_LEGACY, true, 1, 1),
+				STYLE_LEGACY,
+				"A stored Legacy preference is preserved after onboarding"
+			)
 		end,
 	})
 	TestSuite:RegisterTest("ui", "FriendsUI_ModernThemePalette", {

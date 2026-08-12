@@ -811,6 +811,10 @@ local function MarkPageNewTagsSeen(page, pageApp)
 end
 
 local function GetThemeOptions()
+	local ThemeManager = BFL:GetModule("ThemeManager")
+	if ThemeManager and ThemeManager.GetThemeOptions then
+		return ThemeManager:GetThemeOptions()
+	end
 	local options = {
 		blizzard = T("SETTINGS_THEME_BLIZZARD", "Blizzard"),
 		dark = T("SETTINGS_THEME_DARK", "Dark"),
