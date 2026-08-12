@@ -2309,6 +2309,14 @@ function FriendsUI:PerformContactAction()
 	end
 end
 
+function FriendsUI:ShouldReserveModernActionFooter(sectionID, chrome)
+	chrome = chrome or self:GetContactChrome(sectionID)
+	-- RAF keeps Blizzard's dedicated Recruitment button instead of using the
+	-- shared BottomActionBar button. Its list still needs the same 60 px footer
+	-- reservation or the final recruit card is laid out behind that button.
+	return chrome.action ~= nil or sectionID == "recruit_a_friend"
+end
+
 function FriendsUI:ApplyContactChrome(sectionID, header)
 	if not self.root then
 		return self:GetContactChrome(sectionID)
@@ -3506,7 +3514,7 @@ function FriendsUI:ApplyModernContentLayout(sectionID, skipNavigationRefresh)
 		end
 	end
 	local chrome, showFilter = self:ApplyContactChrome(sectionID, header)
-	local showAction = chrome.action ~= nil
+	local reserveActionFooter = self:ShouldReserveModernActionFooter(sectionID, chrome)
 	local raidLayout = sectionID == "raid"
 	self:ApplyModernSectionTopChrome(sectionID)
 	SafeShow(frame.AddFriendButton, false)
@@ -3522,7 +3530,7 @@ function FriendsUI:ApplyModernContentLayout(sectionID, skipNavigationRefresh)
 			frame.Inset:SetPoint("BOTTOMRIGHT", frame.Bg or frame, "BOTTOMRIGHT", 0, 0)
 		elseif showFilter then
 			frame.Inset:SetPoint("TOPLEFT", self.root.FilterBar, "BOTTOMLEFT", 8, -10)
-			if showAction then
+			if reserveActionFooter then
 				frame.Inset:SetPoint("BOTTOMRIGHT", self.root.BottomActionBar, "TOPRIGHT", -8, 1)
 			else
 				frame.Inset:SetPoint("BOTTOMRIGHT", frame.Bg or frame, "BOTTOMRIGHT", -8, 8)
@@ -3530,7 +3538,7 @@ function FriendsUI:ApplyModernContentLayout(sectionID, skipNavigationRefresh)
 		else
 			local background = frame.Bg or frame
 			frame.Inset:SetPoint("TOPLEFT", self.root.TopDivider, "BOTTOMLEFT", 3, -7)
-			if showAction then
+			if reserveActionFooter then
 				frame.Inset:SetPoint("BOTTOMRIGHT", self.root.BottomActionBar, "TOPRIGHT", -8, 1)
 			else
 				frame.Inset:SetPoint("BOTTOMRIGHT", background, "BOTTOMRIGHT", -8, 8)
@@ -5455,6 +5463,18 @@ function FriendsUI:RegisterTests()
 					self:ApplyModernQuickJoinGeometry(self.selectedSection)
 				end
 			end
+		end,
+	})
+	TestSuite:RegisterTest("ui", "FriendsUI_ModernRAFFooterReservation", {
+		action = function(V)
+			V:Assert(
+				self:ShouldReserveModernActionFooter("recruit_a_friend"),
+				"Modern Recruit A Friend reserves the action footer for its Recruitment button"
+			)
+			V:Assert(
+				not self:ShouldReserveModernActionFooter("raid"),
+				"Modern sections without bottom actions keep the full content height"
+			)
 		end,
 	})
 	TestSuite:RegisterTest("ui", "FriendsUI_ModernRequestLevels", {

@@ -35,6 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Modern UI Availability** - Retail now uses BetterFriendlist's Modern UI whenever the client provides the 12.1 SocialUI API, even while Blizzard temporarily disables its own new Friendlist frame. Native Blizzard SocialUI routing still follows Blizzard's runtime switch.
 - **Recent Allies Availability** - BetterFriendlist now reacts immediately to `RECENT_ALLIES_SYSTEM_STATUS_UPDATED`, refreshing Modern navigation, Legacy tabs, and visible Recent Allies content when Blizzard changes the feature state.
 
+### Fixed
+- **Recruit a Friend Layout** - Long recruit lists now stop above the Modern Recruitment button instead of covering the footer action.
+
 ## [2.8.0]        - 2026-08-12
 
 BetterFriendlist 2.8.0 is one of the biggest updates the addon has received so far. With a change this broad, a few rough edges or bugs may still show up. We will keep polishing and adjusting the new experience over the next few days. Feedback on GitHub or CurseForge is always welcome.
