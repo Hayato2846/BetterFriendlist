@@ -913,6 +913,37 @@ function AppearanceOnboarding:StoreThemeSelection(theme)
 	end
 end
 
+function AppearanceOnboarding:CheckpointReloadTheme(theme)
+	if not self.snapshot or type(theme) ~= "string" or theme == "" then
+		return false
+	end
+	-- A reload is a hard session boundary. Once the player accepts it, that
+	-- loaded theme becomes the rollback baseline; Decide Later must not undo it
+	-- and immediately request the inverse reload.
+	self.snapshot.theme = theme
+	self.snapshot.enableElvUISkin = theme == "elvui"
+	return true
+end
+
+function AppearanceOnboarding:PreserveLoadedThemeForDefer()
+	local loadedTheme = self.sessionLoadedTheme
+	local restoreTheme = self.snapshot and self.snapshot.theme
+	if not loadedTheme or not restoreTheme or loadedTheme == restoreTheme then
+		return false
+	end
+	local ThemeManager = BFL:GetModule("ThemeManager")
+	if
+		not (
+			ThemeManager
+			and ThemeManager.ThemeSelectionRequiresReload
+			and ThemeManager:ThemeSelectionRequiresReload(loadedTheme, restoreTheme)
+		)
+	then
+		return false
+	end
+	return self:CheckpointReloadTheme(loadedTheme)
+end
+
 function AppearanceOnboarding:ShowImmediateThemeReloadDialog(theme, previousTheme)
 	local ThemeManager = BFL:GetModule("ThemeManager")
 	if not (ThemeManager and ThemeManager.ShowReloadDialog) then
@@ -921,6 +952,7 @@ function AppearanceOnboarding:ShowImmediateThemeReloadDialog(theme, previousThem
 	local popup = ThemeManager:ShowReloadDialog({
 		onReloadAccepted = function()
 			self:StoreThemeSelection(theme)
+			self:CheckpointReloadTheme(theme)
 			self:SaveResumeState(true)
 		end,
 		onReloadCancelled = function()
@@ -1258,6 +1290,12 @@ function AppearanceOnboarding:Begin()
 		self.selectedCompactMode = resumeState.selectedCompactMode == true
 		self.currentStep = math.max(1, math.min(TOTAL_STEPS, tonumber(resumeState.currentStep) or 1))
 		self.resumePending = true
+		-- Also repairs resume data written before accepted reload themes became
+		-- explicit checkpoints. Equality proves that the requested theme is the
+		-- one which actually initialized this addon session.
+		if self.selectedTheme == self.sessionLoadedTheme then
+			self:CheckpointReloadTheme(self.sessionLoadedTheme)
+		end
 	else
 		self.snapshot = {
 			style = BetterFriendlistDB.friendsFrameStyle,
@@ -1323,8 +1361,8 @@ function AppearanceOnboarding:SelectTheme(theme)
 	self.selectedTheme = theme
 	if self:NeedsReload() then
 		-- External skin modules are loaded during addon startup. Persist the choice
-		-- only once the player accepts the reload, then resume this exact step with
-		-- the original rollback snapshot intact in the next session.
+		-- only once the player accepts the reload, checkpoint it, then resume this
+		-- exact step in the next session.
 		self:RefreshStep()
 		self:ShowImmediateThemeReloadDialog(theme, previousTheme)
 		return true
@@ -1444,23 +1482,16 @@ function AppearanceOnboarding:Defer()
 		return
 	end
 	self:HideImmediateThemeReloadDialog()
-	local restoreTheme = self.snapshot and self.snapshot.theme
-	local ThemeManager = BFL:GetModule("ThemeManager")
-	local needsRestoreReload = restoreTheme
-		and restoreTheme ~= self.sessionLoadedTheme
-		and ThemeManager
-		and ThemeManager.ThemeSelectionRequiresReload
-		and ThemeManager:ThemeSelectionRequiresReload(self.sessionLoadedTheme, restoreTheme)
-		or false
+	-- Esc/Decide Later rolls back preview-safe choices only. A theme which
+	-- already initialized this session is retained instead of triggering a
+	-- second (inverse) reload prompt.
+	self:PreserveLoadedThemeForDefer()
 	self.sessionDeferred = true
 	self.active = false
 	self:RestoreSnapshot(false)
 	self.snapshot = nil
 	self:ClearResumeState()
 	self:HideFrame()
-	if needsRestoreReload and ThemeManager and ThemeManager.ShowReloadDialog then
-		ThemeManager:ShowReloadDialog()
-	end
 end
 
 function AppearanceOnboarding:Commit()
@@ -1661,6 +1692,8 @@ function AppearanceOnboarding:RegisterTests()
 	TestSuite:RegisterTest("settings", "AppearanceOnboarding_ReloadResume", {
 		action = function(V)
 			local previousState = BetterFriendlistDB.appearanceOnboardingResume
+			local previousSnapshot = self.snapshot
+			local previousLoadedTheme = self.sessionLoadedTheme
 			local state = {
 				version = ONBOARDING_VERSION,
 				currentStep = 2,
@@ -1679,8 +1712,22 @@ function AppearanceOnboarding:RegisterTests()
 			}
 			BetterFriendlistDB.appearanceOnboardingResume = state
 			V:Assert(self:GetResumeState() == state, "A matching reload state resumes the selected onboarding step")
+			self.snapshot = CopySnapshot(state.snapshot)
+			V:Assert(self:CheckpointReloadTheme("elvui"), "An accepted reload theme creates a rollback checkpoint")
+			V:Assert(
+				self.snapshot.theme == "elvui" and self.snapshot.enableElvUISkin == true,
+				"The reload checkpoint preserves the loaded external theme when onboarding is deferred"
+			)
+			self.snapshot = CopySnapshot(state.snapshot)
+			self.sessionLoadedTheme = "elvui"
+			V:Assert(
+				self:PreserveLoadedThemeForDefer() and self.snapshot.theme == "elvui",
+				"Decide Later retains an already loaded reload theme instead of requesting its rollback"
+			)
 			state.version = ONBOARDING_VERSION - 1
 			V:Assert(self:GetResumeState() == nil, "Stale onboarding reload state is ignored")
+			self.snapshot = previousSnapshot
+			self.sessionLoadedTheme = previousLoadedTheme
 			BetterFriendlistDB.appearanceOnboardingResume = previousState
 		end,
 	})
